@@ -18,7 +18,7 @@
 * This function is the entry point of refinement
 **************************************************************************/
 void RefineVolKWay(CtrlType *ctrl, GraphType *orggraph, GraphType *graph, int nparts, 
-                   float *tpwgts, float ubfactor)
+                   floattype *tpwgts, floattype ubfactor)
 {
   int i, nlevels;
   GraphType *ptr;

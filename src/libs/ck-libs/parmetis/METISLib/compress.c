@@ -157,7 +157,7 @@ void CompressGraph(CtrlType *ctrl, GraphType *graph, int nvtxs, idxtype *xadj, i
 * This function prunes all the vertices in a graph with degree greater 
 * than factor*average
 **************************************************************************/
-void PruneGraph(CtrlType *ctrl, GraphType *graph, int nvtxs, idxtype *xadj, idxtype *adjncy, idxtype *iperm, float factor)
+void PruneGraph(CtrlType *ctrl, GraphType *graph, int nvtxs, idxtype *xadj, idxtype *adjncy, idxtype *iperm, floattype factor)
 {
   int i, j, k, l, nlarge, pnvtxs, pnedges;
   idxtype *pxadj, *padjncy, *padjwgt, *pvwgt;

@@ -23,6 +23,9 @@ typedef short idxtype;
 #endif
 #endif
 
+/* define floattype to double for maximum fp precision */
+typedef double  floattype;
+
 #define MAXIDX	(1<<8*sizeof(idxtype)-2)
 /* This is the type passed as the size argument to malloc().
   It can be helpful to have this be longer than "int"
@@ -199,8 +202,8 @@ struct graphdef {
 
   /* Additional info needed by the MOC routines */
   int ncon;			/* The # of constrains */ 
-  float *nvwgt;			/* Normalized vertex weights */
-  float *npwgts;		/* The normalized partition weights */
+  floattype *nvwgt;			/* Normalized vertex weights */
+  floattype *npwgts;		/* The normalized partition weights */
 
   struct graphdef *coarser, *finer;
 };
@@ -225,7 +228,7 @@ struct controldef {
   int IType;			/* The type of initial partitioning */
   int RType;			/* The type of refinement */
   int maxvwgt;			/* The maximum allowed weight for a vertex */
-  float nmaxvwgt;		/* The maximum allowed weight for a vertex for each constrain */
+  floattype nmaxvwgt;		/* The maximum allowed weight for a vertex for each constrain */
   int optype;			/* Type of operation */
   int pfactor;			/* .1*prunning factor */
   int nseps;			/* The number of separators to be found during multiple bisections */
@@ -247,7 +250,7 @@ typedef struct controldef CtrlType;
 * Vertical MOC k-way refinement
 **************************************************************************/
 struct vpwgtdef {
-  float max[2][MAXNCON];
+  floattype max[2][MAXNCON];
   int imax[2][MAXNCON];
 };
 

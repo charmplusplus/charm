@@ -17,7 +17,7 @@
 /*************************************************************************
 * This function is the entry point of refinement
 **************************************************************************/
-void Refine2Way(CtrlType *ctrl, GraphType *orggraph, GraphType *graph, int *tpwgts, float ubfactor)
+void Refine2Way(CtrlType *ctrl, GraphType *orggraph, GraphType *graph, int *tpwgts, floattype ubfactor)
 {
 
   IFSET(ctrl->dbglvl, DBG_TIME, starttimer(ctrl->UncoarsenTmr));

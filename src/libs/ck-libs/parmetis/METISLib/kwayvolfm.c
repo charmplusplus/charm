@@ -16,8 +16,8 @@
 /*************************************************************************
 * This function performs k-way refinement
 **************************************************************************/
-void Random_KWayVolRefine(CtrlType *ctrl, GraphType *graph, int nparts, float *tpwgts, 
-                          float ubfactor, int npasses, int ffactor)
+void Random_KWayVolRefine(CtrlType *ctrl, GraphType *graph, int nparts, floattype *tpwgts, 
+                          floattype ubfactor, int npasses, int ffactor)
 {
   int i, ii, iii, j, jj, k, kk, l, u, pass, nvtxs, nmoves, tvwgt, myndegrees, xgain; 
   int from, me, to, oldcut, oldvol, vwgt;
@@ -160,8 +160,8 @@ void Random_KWayVolRefine(CtrlType *ctrl, GraphType *graph, int nparts, float *t
 /*************************************************************************
 * This function performs k-way refinement
 **************************************************************************/
-void Random_KWayVolRefineMConn(CtrlType *ctrl, GraphType *graph, int nparts, float *tpwgts, 
-            float ubfactor, int npasses, int ffactor)
+void Random_KWayVolRefineMConn(CtrlType *ctrl, GraphType *graph, int nparts, floattype *tpwgts, 
+            floattype ubfactor, int npasses, int ffactor)
 {
   int i, ii, iii, j, jj, k, kk, l, u, pass, nvtxs, nmoves, tvwgt, myndegrees, xgain; 
   int from, me, to, oldcut, oldvol, vwgt, nadd, maxndoms;
@@ -399,8 +399,8 @@ void Random_KWayVolRefineMConn(CtrlType *ctrl, GraphType *graph, int nparts, flo
 /*************************************************************************
 * This function performs k-way refinement
 **************************************************************************/
-void Greedy_KWayVolBalance(CtrlType *ctrl, GraphType *graph, int nparts, float *tpwgts, 
-                           float ubfactor, int npasses)
+void Greedy_KWayVolBalance(CtrlType *ctrl, GraphType *graph, int nparts, floattype *tpwgts, 
+                           floattype ubfactor, int npasses)
 {
   int i, ii, iii, j, jj, k, kk, l, u, pass, nvtxs, nmoves, tvwgt, myndegrees, xgain; 
   int from, me, to, vwgt, gain;
@@ -553,8 +553,8 @@ void Greedy_KWayVolBalance(CtrlType *ctrl, GraphType *graph, int nparts, float *
 /*************************************************************************
 * This function performs k-way refinement
 **************************************************************************/
-void Greedy_KWayVolBalanceMConn(CtrlType *ctrl, GraphType *graph, int nparts, float *tpwgts, 
-                                float ubfactor, int npasses)
+void Greedy_KWayVolBalanceMConn(CtrlType *ctrl, GraphType *graph, int nparts, floattype *tpwgts, 
+                                floattype ubfactor, int npasses)
 {
   int i, ii, iii, j, jj, k, kk, l, u, pass, nvtxs, nmoves, tvwgt, myndegrees, xgain; 
   int from, me, to, vwgt, gain, maxndoms, nadd;
@@ -1384,7 +1384,7 @@ void ComputeVolSubDomainGraph(GraphType *graph, int nparts, idxtype *pmat, idxty
 /*************************************************************************
 * This function computes the subdomain graph
 **************************************************************************/
-void EliminateVolSubDomainEdges(CtrlType *ctrl, GraphType *graph, int nparts, float *tpwgts)
+void EliminateVolSubDomainEdges(CtrlType *ctrl, GraphType *graph, int nparts, floattype *tpwgts)
 {
   int i, ii, j, k, me, other, nvtxs, total, max, avg, totalout, nind, ncand, ncand2, target, target2, nadd;
   int min, move, cpwgt, tvwgt;
@@ -1611,7 +1611,7 @@ void EliminateVolSubDomainEdges(CtrlType *ctrl, GraphType *graph, int nparts, fl
 * partitioning vector in wgraph->where and tries to push them around to 
 * remove some of them
 **************************************************************************/
-void EliminateVolComponents(CtrlType *ctrl, GraphType *graph, int nparts, float *tpwgts, float ubfactor)
+void EliminateVolComponents(CtrlType *ctrl, GraphType *graph, int nparts, floattype *tpwgts, floattype ubfactor)
 {
   int i, ii, j, jj, k, me, nvtxs, tvwgt, first, last, nleft, ncmps, cwgt, ncand, other, target, deltawgt;
   idxtype *xadj, *adjncy, *vwgt, *adjwgt, *where, *pwgts, *maxpwgt;

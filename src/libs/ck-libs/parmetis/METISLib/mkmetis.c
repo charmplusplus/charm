@@ -22,7 +22,7 @@
 **************************************************************************/
 void METIS_mCPartGraphKway(int *nvtxs, int *ncon, idxtype *xadj, idxtype *adjncy, 
                           idxtype *vwgt, idxtype *adjwgt, int *wgtflag, int *numflag, 
-                          int *nparts, float *rubvec, int *options, int *edgecut, 
+                          int *nparts, floattype *rubvec, int *options, int *edgecut, 
                           idxtype *part)
 {
   int i, j;
@@ -75,7 +75,7 @@ void METIS_mCPartGraphKway(int *nvtxs, int *ncon, idxtype *xadj, idxtype *adjncy
 * This function takes a graph and produces a bisection of it
 **************************************************************************/
 int MCMlevelKWayPartitioning(CtrlType *ctrl, GraphType *graph, int nparts, idxtype *part, 
-      float *rubvec)
+      floattype *rubvec)
 {
   int i, j, nvtxs;
   GraphType *cgraph;

@@ -22,7 +22,7 @@
 void METIS_EstimateMemory(int *nvtxs, idxtype *xadj, idxtype *adjncy, int *numflag, int *optype, int *nbytes)
 {
   int i, j, k, nedges, nlevels;
-  float vfraction, efraction, vmult, emult;
+  floattype vfraction, efraction, vmult, emult;
   int coresize, gdata, rdata;
 
   if (*numflag == 1)
@@ -63,7 +63,7 @@ void METIS_EstimateMemory(int *nvtxs, idxtype *xadj, idxtype *adjncy, int *numfl
 /*************************************************************************
 * This function finds a matching using the HEM heuristic
 **************************************************************************/
-void EstimateCFraction(int nvtxs, idxtype *xadj, idxtype *adjncy, float *vfraction, float *efraction)
+void EstimateCFraction(int nvtxs, idxtype *xadj, idxtype *adjncy, floattype *vfraction, floattype *efraction)
 {
   int i, ii, j, cnvtxs, cnedges, maxidx;
   idxtype *match, *cmap, *perm;

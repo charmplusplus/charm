@@ -17,7 +17,7 @@
 /*************************************************************************
 * This function is the entry point of refinement
 **************************************************************************/
-void RefineKWay(CtrlType *ctrl, GraphType *orggraph, GraphType *graph, int nparts, float *tpwgts, float ubfactor)
+void RefineKWay(CtrlType *ctrl, GraphType *orggraph, GraphType *graph, int nparts, floattype *tpwgts, floattype ubfactor)
 {
   int i, nlevels, mustfree=0;
   GraphType *ptr;
@@ -326,7 +326,7 @@ void ProjectKWayPartition(CtrlType *ctrl, GraphType *graph, int nparts)
 * This function checks if the partition weights are within the balance
 * contraints
 **************************************************************************/
-int IsBalanced(idxtype *pwgts, int nparts, float *tpwgts, float ubfactor)
+int IsBalanced(idxtype *pwgts, int nparts, floattype *tpwgts, floattype ubfactor)
 {
   int i, j, tvwgt;
 

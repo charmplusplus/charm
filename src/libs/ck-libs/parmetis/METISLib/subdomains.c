@@ -19,7 +19,7 @@
 /*************************************************************************
 * This function performs k-way refinement
 **************************************************************************/
-void Random_KWayEdgeRefineMConn(CtrlType *ctrl, GraphType *graph, int nparts, float *tpwgts, float ubfactor, int npasses, int ffactor)
+void Random_KWayEdgeRefineMConn(CtrlType *ctrl, GraphType *graph, int nparts, floattype *tpwgts, floattype ubfactor, int npasses, int ffactor)
 {
   int i, ii, iii, j, jj, k, l, pass, nvtxs, nmoves, nbnd, tvwgt, myndegrees; 
   int from, me, to, oldcut, vwgt, gain;
@@ -309,7 +309,7 @@ void Random_KWayEdgeRefineMConn(CtrlType *ctrl, GraphType *graph, int nparts, fl
 /*************************************************************************
 * This function performs k-way refinement
 **************************************************************************/
-void Greedy_KWayEdgeBalanceMConn(CtrlType *ctrl, GraphType *graph, int nparts, float *tpwgts, float ubfactor, int npasses)
+void Greedy_KWayEdgeBalanceMConn(CtrlType *ctrl, GraphType *graph, int nparts, floattype *tpwgts, floattype ubfactor, int npasses)
 {
   int i, ii, iii, j, jj, k, l, pass, nvtxs, nbnd, tvwgt, myndegrees, oldgain, gain, nmoves; 
   int from, me, to, oldcut, vwgt, maxndoms, nadd;
@@ -718,7 +718,7 @@ void ComputeSubDomainGraph(GraphType *graph, int nparts, idxtype *pmat, idxtype 
 /*************************************************************************
 * This function computes the subdomain graph
 **************************************************************************/
-void EliminateSubDomainEdges(CtrlType *ctrl, GraphType *graph, int nparts, float *tpwgts)
+void EliminateSubDomainEdges(CtrlType *ctrl, GraphType *graph, int nparts, floattype *tpwgts)
 {
   int i, ii, j, k, me, other, nvtxs, total, max, avg, totalout, nind, ncand, ncand2, target, target2, nadd;
   int min, move, cpwgt, tvwgt;
@@ -1045,7 +1045,7 @@ void MoveGroupMConn(CtrlType *ctrl, GraphType *graph, idxtype *ndoms, idxtype *p
 * partitioning vector in wgraph->where and tries to push them around to 
 * remove some of them
 **************************************************************************/
-void EliminateComponents(CtrlType *ctrl, GraphType *graph, int nparts, float *tpwgts, float ubfactor)
+void EliminateComponents(CtrlType *ctrl, GraphType *graph, int nparts, floattype *tpwgts, floattype ubfactor)
 {
   int i, ii, j, jj, k, me, nvtxs, tvwgt, first, last, nleft, ncmps, cwgt, other, target, deltawgt;
   idxtype *xadj, *adjncy, *vwgt, *adjwgt, *where, *pwgts, *maxpwgt;

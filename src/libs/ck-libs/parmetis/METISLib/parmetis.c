@@ -24,7 +24,7 @@ void METIS_PartGraphKway2(int *nvtxs, idxtype *xadj, idxtype *adjncy, idxtype *v
                          int *options, int *edgecut, idxtype *part)
 {
   int i;
-  float *tpwgts;
+  floattype *tpwgts;
 
   tpwgts = fmalloc(*nparts, "KMETIS: tpwgts");
   for (i=0; i<*nparts; i++) 
@@ -43,7 +43,7 @@ void METIS_PartGraphKway2(int *nvtxs, idxtype *xadj, idxtype *adjncy, idxtype *v
 **************************************************************************/
 void METIS_WPartGraphKway2(int *nvtxs, idxtype *xadj, idxtype *adjncy, idxtype *vwgt, 
                           idxtype *adjwgt, int *wgtflag, int *numflag, int *nparts, 
-                          float *tpwgts, int *options, int *edgecut, idxtype *part)
+                          floattype *tpwgts, int *options, int *edgecut, idxtype *part)
 {
   int i, j;
   GraphType graph;
@@ -196,7 +196,7 @@ void MlevelNestedDissectionP(CtrlType *ctrl, GraphType *graph, idxtype *order, i
   int i, j, nvtxs, nbnd, tvwgt, tpwgts2[2];
   idxtype *label, *bndind;
   GraphType lgraph, rgraph;
-  float ubfactor;
+  floattype ubfactor;
 
   nvtxs = graph->nvtxs;
 
@@ -377,13 +377,13 @@ void METIS_EdgeComputeSeparator(int *nvtxs, idxtype *xadj, idxtype *adjncy, idxt
 **************************************************************************/
 void METIS_mCPartGraphRecursive2(int *nvtxs, int *ncon, idxtype *xadj, idxtype *adjncy, 
        idxtype *vwgt, idxtype *adjwgt, int *wgtflag, int *numflag, int *nparts, 
-       float *tpwgts, int *options, int *edgecut, idxtype *part)
+       floattype *tpwgts, int *options, int *edgecut, idxtype *part)
 {
   int i, j;
   GraphType graph;
   CtrlType ctrl;
-  float *mytpwgts;
-  float avgwgt;
+  floattype *mytpwgts;
+  floattype avgwgt;
 
   if (*numflag == 1)
     Change2CNumbering(*nvtxs, xadj, adjncy);
@@ -438,8 +438,8 @@ for (j=0; j<*ncon; j++) {
    maxwgt = (wgt[i*(*ncon)+j] > wgt[maxwgt*(*ncon)+j]) ? i : maxwgt;
    sumwgt += wgt[i*(*ncon)+j];
  }
- avgwgt = (float)sumwgt / (float)*nparts;
- printf("min: %5d, max: %5d, avg: %5.2f, balance: %6.3f\n", wgt[minwgt*(*ncon)+j], wgt[maxwgt*(*ncon)+j], avgwgt, (float)wgt[maxwgt*(*ncon)+j] / avgwgt);
+ avgwgt = (floattype)sumwgt / (floattype)*nparts;
+ printf("min: %5d, max: %5d, avg: %5.2f, balance: %6.3f\n", wgt[minwgt*(*ncon)+j], wgt[maxwgt*(*ncon)+j], avgwgt, (floattype)wgt[maxwgt*(*ncon)+j] / avgwgt);
 }
 printf("\n");
 }
@@ -461,10 +461,10 @@ printf("\n");
 * This function takes a graph and produces a bisection of it
 **************************************************************************/
 int MCMlevelRecursiveBisection2(CtrlType *ctrl, GraphType *graph, int nparts,
-    float *tpwgts, idxtype *part, float ubfactor, int fpart)
+    floattype *tpwgts, idxtype *part, floattype ubfactor, int fpart)
 {
   int i, nvtxs, cut;
-  float wsum, tpwgts2[2];
+  floattype wsum, tpwgts2[2];
   idxtype *label, *where;
   GraphType lgraph, rgraph;
 

@@ -24,7 +24,7 @@ void METIS_PartGraphVKway(int *nvtxs, idxtype *xadj, idxtype *adjncy, idxtype *v
                          int *options, int *volume, idxtype *part)
 {
   int i;
-  float *tpwgts;
+  floattype *tpwgts;
 
   tpwgts = fmalloc(*nparts, "KMETIS: tpwgts");
   for (i=0; i<*nparts; i++) 
@@ -42,7 +42,7 @@ void METIS_PartGraphVKway(int *nvtxs, idxtype *xadj, idxtype *adjncy, idxtype *v
 **************************************************************************/
 void METIS_WPartGraphVKway(int *nvtxs, idxtype *xadj, idxtype *adjncy, idxtype *vwgt, 
                           idxtype *vsize, int *wgtflag, int *numflag, int *nparts, 
-                          float *tpwgts, int *options, int *volume, idxtype *part)
+                          floattype *tpwgts, int *options, int *volume, idxtype *part)
 {
   int i, j;
   GraphType graph;
@@ -92,7 +92,7 @@ void METIS_WPartGraphVKway(int *nvtxs, idxtype *xadj, idxtype *adjncy, idxtype *
 * This function takes a graph and produces a bisection of it
 **************************************************************************/
 int MlevelVolKWayPartitioning(CtrlType *ctrl, GraphType *graph, int nparts, idxtype *part, 
-                              float *tpwgts, float ubfactor)
+                              floattype *tpwgts, floattype ubfactor)
 {
   int i, j, nvtxs, tvwgt, tpwgts2[2];
   GraphType *cgraph;

@@ -17,15 +17,15 @@
 /*************************************************************************
 * This function performs an edge-based FM refinement
 **************************************************************************/
-void MocFM_2WayEdgeRefine(CtrlType *ctrl, GraphType *graph, float *tpwgts, int npasses)
+void MocFM_2WayEdgeRefine(CtrlType *ctrl, GraphType *graph, floattype *tpwgts, int npasses)
 {
   int i, ii, j, k, l, kwgt, nvtxs, ncon, nbnd, nswaps, from, to, pass, me, limit, tmp, cnum;
   idxtype *xadj, *adjncy, *adjwgt, *where, *id, *ed, *bndptr, *bndind;
   idxtype *moved, *swaps, *perm, *qnum;
-  float *nvwgt, *npwgts, mindiff[MAXNCON], origbal, minbal, newbal;
+  floattype *nvwgt, *npwgts, mindiff[MAXNCON], origbal, minbal, newbal;
   PQueueType parts[MAXNCON][2];
   int higain, oldgain, mincut, initcut, newcut, mincutorder;
-  float rtpwgts[2];
+  floattype rtpwgts[2];
 
   nvtxs = graph->nvtxs;
   ncon = graph->ncon;
@@ -234,10 +234,10 @@ void MocFM_2WayEdgeRefine(CtrlType *ctrl, GraphType *graph, float *tpwgts, int n
 * This function selects the partition number and the queue from which
 * we will move vertices out
 **************************************************************************/ 
-void SelectQueue(int ncon, float *npwgts, float *tpwgts, int *from, int *cnum, PQueueType queues[MAXNCON][2])
+void SelectQueue(int ncon, floattype *npwgts, floattype *tpwgts, int *from, int *cnum, PQueueType queues[MAXNCON][2])
 {
   int i, part, maxgain=0;
-  float max, maxdiff=0.0;
+  floattype max, maxdiff=0.0;
 
   *from = -1;
   *cnum = -1;
@@ -297,10 +297,10 @@ void SelectQueue(int ncon, float *npwgts, float *tpwgts, int *from, int *cnum, P
 * This function checks if the balance achieved is better than the diff 
 * For now, it uses a 2-norm measure
 **************************************************************************/ 
-int BetterBalance(int ncon, float *npwgts, float *tpwgts, float *diff)
+int BetterBalance(int ncon, floattype *npwgts, floattype *tpwgts, floattype *diff)
 {
   int i;
-  float ndiff[MAXNCON];
+  floattype ndiff[MAXNCON];
 
   for (i=0; i<ncon; i++)
     ndiff[i] = fabs(tpwgts[0]-npwgts[i]);
@@ -313,10 +313,10 @@ int BetterBalance(int ncon, float *npwgts, float *tpwgts, float *diff)
 /*************************************************************************
 * This function computes the load imbalance over all the constrains
 **************************************************************************/ 
-float Compute2WayHLoadImbalance(int ncon, float *npwgts, float *tpwgts)
+floattype Compute2WayHLoadImbalance(int ncon, floattype *npwgts, floattype *tpwgts)
 {
   int i;
-  float max=0.0, temp;
+  floattype max=0.0, temp;
 
   for (i=0; i<ncon; i++) {
     /* temp = amax(npwgts[i]/tpwgts[0], npwgts[ncon+i]/tpwgts[1]); */
@@ -331,7 +331,7 @@ float Compute2WayHLoadImbalance(int ncon, float *npwgts, float *tpwgts)
 * This function computes the load imbalance over all the constrains
 * For now assume that we just want balanced partitionings
 **************************************************************************/ 
-void Compute2WayHLoadImbalanceVec(int ncon, float *npwgts, float *tpwgts, float *lbvec)
+void Compute2WayHLoadImbalanceVec(int ncon, floattype *npwgts, floattype *tpwgts, floattype *lbvec)
 {
   int i;
 

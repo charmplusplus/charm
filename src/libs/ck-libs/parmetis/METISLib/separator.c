@@ -18,7 +18,7 @@
 * This function takes a bisection and constructs a minimum weight vertex 
 * separator out of it. It uses the node-based separator refinement for it.
 **************************************************************************/
-void ConstructSeparator(CtrlType *ctrl, GraphType *graph, float ubfactor)
+void ConstructSeparator(CtrlType *ctrl, GraphType *graph, floattype ubfactor)
 {
   int i, j, k, nvtxs, nbnd;
   idxtype *xadj, *where, *bndind;
@@ -60,7 +60,7 @@ void ConstructSeparator(CtrlType *ctrl, GraphType *graph, float ubfactor)
 * separator out of it. It uses an unweighted minimum-cover algorithm
 * followed by node-based separator refinement.
 **************************************************************************/
-void ConstructMinCoverSeparator0(CtrlType *ctrl, GraphType *graph, float ubfactor)
+void ConstructMinCoverSeparator0(CtrlType *ctrl, GraphType *graph, floattype ubfactor)
 {
   int i, ii, j, jj, k, l, nvtxs, nbnd, bnvtxs[3], bnedges[2], csize;
   idxtype *xadj, *adjncy, *bxadj, *badjncy;
@@ -175,7 +175,7 @@ void ConstructMinCoverSeparator0(CtrlType *ctrl, GraphType *graph, float ubfacto
 * separator out of it. It uses an unweighted minimum-cover algorithm
 * followed by node-based separator refinement.
 **************************************************************************/
-void ConstructMinCoverSeparator(CtrlType *ctrl, GraphType *graph, float ubfactor)
+void ConstructMinCoverSeparator(CtrlType *ctrl, GraphType *graph, floattype ubfactor)
 {
   int i, ii, j, jj, k, l, nvtxs, nbnd, bnvtxs[3], bnedges[2], csize;
   idxtype *xadj, *adjncy, *bxadj, *badjncy;

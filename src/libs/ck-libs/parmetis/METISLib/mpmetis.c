@@ -77,12 +77,12 @@ void METIS_mCPartGraphRecursive(int *nvtxs, int *ncon, idxtype *xadj, idxtype *a
 **************************************************************************/
 void METIS_mCHPartGraphRecursive(int *nvtxs, int *ncon, idxtype *xadj, idxtype *adjncy, 
        idxtype *vwgt, idxtype *adjwgt, int *wgtflag, int *numflag, int *nparts, 
-       float *ubvec, int *options, int *edgecut, idxtype *part)
+       floattype *ubvec, int *options, int *edgecut, idxtype *part)
 {
   int i, j;
   GraphType graph;
   CtrlType ctrl;
-  float *myubvec;
+  floattype *myubvec;
 
   if (*numflag == 1)
     Change2CNumbering(*nvtxs, xadj, adjncy);
@@ -135,7 +135,7 @@ void METIS_mCHPartGraphRecursive(int *nvtxs, int *ncon, idxtype *xadj, idxtype *
 * for the target partitions
 **************************************************************************/
 void METIS_mCPartGraphRecursiveInternal(int *nvtxs, int *ncon, idxtype *xadj, idxtype *adjncy, 
-       float *nvwgt, idxtype *adjwgt, int *nparts, int *options, int *edgecut, idxtype *part)
+       floattype *nvwgt, idxtype *adjwgt, int *nparts, int *options, int *edgecut, idxtype *part)
 {
   int i, j;
   GraphType graph;
@@ -182,13 +182,13 @@ void METIS_mCPartGraphRecursiveInternal(int *nvtxs, int *ncon, idxtype *xadj, id
 * for the target partitions
 **************************************************************************/
 void METIS_mCHPartGraphRecursiveInternal(int *nvtxs, int *ncon, idxtype *xadj, idxtype *adjncy, 
-       float *nvwgt, idxtype *adjwgt, int *nparts, float *ubvec, int *options, int *edgecut, 
+       floattype *nvwgt, idxtype *adjwgt, int *nparts, floattype *ubvec, int *options, int *edgecut, 
        idxtype *part)
 {
   int i, j;
   GraphType graph;
   CtrlType ctrl;
-  float *myubvec;
+  floattype *myubvec;
 
   SetUpGraph2(&graph, *nvtxs, *ncon, xadj, adjncy, nvwgt, adjwgt);
 
@@ -236,12 +236,12 @@ void METIS_mCHPartGraphRecursiveInternal(int *nvtxs, int *ncon, idxtype *xadj, i
 * This function takes a graph and produces a bisection of it
 **************************************************************************/
 int MCMlevelRecursiveBisection(CtrlType *ctrl, GraphType *graph, int nparts, idxtype *part, 
-       float ubfactor, int fpart)
+       floattype ubfactor, int fpart)
 {
   int i, j, nvtxs, ncon, cut;
   idxtype *label, *where;
   GraphType lgraph, rgraph;
-  float tpwgts[2];
+  floattype tpwgts[2];
 
   nvtxs = graph->nvtxs;
   if (nvtxs == 0) {
@@ -288,12 +288,12 @@ int MCMlevelRecursiveBisection(CtrlType *ctrl, GraphType *graph, int nparts, idx
 * This function takes a graph and produces a bisection of it
 **************************************************************************/
 int MCHMlevelRecursiveBisection(CtrlType *ctrl, GraphType *graph, int nparts, idxtype *part, 
-      float *ubvec, int fpart)
+      floattype *ubvec, int fpart)
 {
   int i, j, nvtxs, ncon, cut;
   idxtype *label, *where;
   GraphType lgraph, rgraph;
-  float tpwgts[2], *npwgts, *lubvec, *rubvec;
+  floattype tpwgts[2], *npwgts, *lubvec, *rubvec;
 
   lubvec = rubvec = NULL;
 
@@ -363,7 +363,7 @@ int MCHMlevelRecursiveBisection(CtrlType *ctrl, GraphType *graph, int nparts, id
 /*************************************************************************
 * This function performs multilevel bisection
 **************************************************************************/
-void MCMlevelEdgeBisection(CtrlType *ctrl, GraphType *graph, float *tpwgts, float ubfactor)
+void MCMlevelEdgeBisection(CtrlType *ctrl, GraphType *graph, floattype *tpwgts, floattype ubfactor)
 {
   GraphType *cgraph;
 
@@ -380,7 +380,7 @@ void MCMlevelEdgeBisection(CtrlType *ctrl, GraphType *graph, float *tpwgts, floa
 /*************************************************************************
 * This function performs multilevel bisection
 **************************************************************************/
-void MCHMlevelEdgeBisection(CtrlType *ctrl, GraphType *graph, float *tpwgts, float *ubvec)
+void MCHMlevelEdgeBisection(CtrlType *ctrl, GraphType *graph, floattype *tpwgts, floattype *ubvec)
 {
   int i;
   GraphType *cgraph;

@@ -36,7 +36,7 @@
                  do {(a) += (val); (b) -= (val);} while(0)
 
 
-#define scopy(n, a, b) (float *)memcpy((void *)(b), (void *)(a), sizeof(float)*(n))
+#define scopy(n, a, b) (floattype *)memcpy((void *)(b), (void *)(a), sizeof(floattype)*(n))
 #define idxcopy(n, a, b) (idxtype *)memcpy((void *)(b), (void *)(a), sizeof(idxtype)*(n)) 
 
 #define HASHFCT(key, size) ((key)%(size))
@@ -61,7 +61,7 @@
 **************************************************************************/
 #ifdef DMALLOC
 #define imalloc(n, msg) (malloc(sizeof(int)*(n)))
-#define fmalloc(n, msg) (malloc(sizeof(float)*(n)))
+#define fmalloc(n, msg) (malloc(sizeof(floattype)*(n)))
 #define idxmalloc(n, msg) (malloc(sizeof(idxtype)*(n)))
 #define ismalloc(n, val, msg) (iset((n), (val), malloc(sizeof(int)*(n))))
 #define idxsmalloc(n, val, msg) (idxset((n), (val), malloc(sizeof(idxtype)*(n))))

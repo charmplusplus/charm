@@ -17,16 +17,16 @@
 /*************************************************************************
 * This function performs an edge-based FM refinement
 **************************************************************************/
-void MocFM_2WayEdgeRefine2(CtrlType *ctrl, GraphType *graph, float *tpwgts, float *orgubvec, 
+void MocFM_2WayEdgeRefine2(CtrlType *ctrl, GraphType *graph, floattype *tpwgts, floattype *orgubvec, 
        int npasses)
 {
   int i, ii, j, k, l, kwgt, nvtxs, ncon, nbnd, nswaps, from, to, pass, me, limit, tmp, cnum;
   idxtype *xadj, *adjncy, *adjwgt, *where, *id, *ed, *bndptr, *bndind;
   idxtype *moved, *swaps, *perm, *qnum;
-  float *nvwgt, *npwgts, origdiff[MAXNCON], origbal[MAXNCON], minbal[MAXNCON];
+  floattype *nvwgt, *npwgts, origdiff[MAXNCON], origbal[MAXNCON], minbal[MAXNCON];
   PQueueType parts[MAXNCON][2];
   int higain, oldgain, mincut, initcut, newcut, mincutorder;
-  float *maxwgt, *minwgt, ubvec[MAXNCON], tvec[MAXNCON];
+  floattype *maxwgt, *minwgt, ubvec[MAXNCON], tvec[MAXNCON];
 
   nvtxs = graph->nvtxs;
   ncon = graph->ncon;
@@ -260,11 +260,11 @@ void MocFM_2WayEdgeRefine2(CtrlType *ctrl, GraphType *graph, float *tpwgts, floa
 * This function selects the partition number and the queue from which
 * we will move vertices out
 **************************************************************************/ 
-void SelectQueue2(int ncon, float *npwgts, float *tpwgts, int *from, int *cnum, 
-       PQueueType queues[MAXNCON][2], float *maxwgt)
+void SelectQueue2(int ncon, floattype *npwgts, floattype *tpwgts, int *from, int *cnum, 
+       PQueueType queues[MAXNCON][2], floattype *maxwgt)
 {
   int i, j, maxgain=0;
-  float diff, max, maxdiff=0.0;
+  floattype diff, max, maxdiff=0.0;
 
   *from = -1;
   *cnum = -1;
@@ -323,10 +323,10 @@ void SelectQueue2(int ncon, float *npwgts, float *tpwgts, int *from, int *cnum,
 * This function checks if the newbal is better than oldbal given the
 * ubvector ubvec
 **************************************************************************/
-int IsBetter2wayBalance(int ncon, float *newbal, float *oldbal, float *ubvec)
+int IsBetter2wayBalance(int ncon, floattype *newbal, floattype *oldbal, floattype *ubvec)
 {
   int i, j;
-  float max1=0.0, max2=0.0, sum1=0.0, sum2=0.0, tmp;
+  floattype max1=0.0, max2=0.0, sum1=0.0, sum2=0.0, tmp;
 
   for (i=0; i<ncon; i++) {
     tmp = (newbal[i]-1)/(ubvec[i]-1);

@@ -122,7 +122,7 @@ void METIS_NodeND(int *nvtxs, idxtype *xadj, idxtype *adjncy, int *numflag, int 
     ==============================================================*/
     piperm = idxmalloc(*nvtxs, "ONMETIS: piperm");
 
-    PruneGraph(&ctrl, &graph, *nvtxs, xadj, adjncy, piperm, (float)(0.1*ctrl.pfactor));
+    PruneGraph(&ctrl, &graph, *nvtxs, xadj, adjncy, piperm, (floattype)(0.1*ctrl.pfactor));
   }
   else if (ctrl.oflags&OFLAG_COMPRESS) {
     /*============================================================
@@ -260,7 +260,7 @@ void METIS_NodeWND(int *nvtxs, idxtype *xadj, idxtype *adjncy, idxtype *vwgt, in
 /*************************************************************************
 * This function takes a graph and produces a bisection of it
 **************************************************************************/
-void MlevelNestedDissection(CtrlType *ctrl, GraphType *graph, idxtype *order, float ubfactor, int lastvtx)
+void MlevelNestedDissection(CtrlType *ctrl, GraphType *graph, idxtype *order, floattype ubfactor, int lastvtx)
 {
   int i, j, nvtxs, nbnd, tvwgt, tpwgts2[2];
   idxtype *label, *bndind;
@@ -320,7 +320,7 @@ void MlevelNestedDissection(CtrlType *ctrl, GraphType *graph, idxtype *order, fl
 /*************************************************************************
 * This function takes a graph and produces a bisection of it
 **************************************************************************/
-void MlevelNestedDissectionCC(CtrlType *ctrl, GraphType *graph, idxtype *order, float ubfactor, int lastvtx)
+void MlevelNestedDissectionCC(CtrlType *ctrl, GraphType *graph, idxtype *order, floattype ubfactor, int lastvtx)
 {
   int i, j, nvtxs, nbnd, tvwgt, tpwgts2[2], nsgraphs, ncmps, rnvtxs;
   idxtype *label, *bndind;
@@ -383,7 +383,7 @@ void MlevelNestedDissectionCC(CtrlType *ctrl, GraphType *graph, idxtype *order, 
 * This function performs multilevel bisection. It performs multiple 
 * bisections and selects the best.
 **************************************************************************/
-void MlevelNodeBisectionMultiple(CtrlType *ctrl, GraphType *graph, int *tpwgts, float ubfactor)
+void MlevelNodeBisectionMultiple(CtrlType *ctrl, GraphType *graph, int *tpwgts, floattype ubfactor)
 {
   int i, nvtxs, cnvtxs, mincut, tmp;
   GraphType *cgraph; 
@@ -465,7 +465,7 @@ void MlevelNodeBisectionMultiple(CtrlType *ctrl, GraphType *graph, int *tpwgts, 
 /*************************************************************************
 * This function performs multilevel bisection
 **************************************************************************/
-void MlevelNodeBisection(CtrlType *ctrl, GraphType *graph, int *tpwgts, float ubfactor)
+void MlevelNodeBisection(CtrlType *ctrl, GraphType *graph, int *tpwgts, floattype ubfactor)
 {
   GraphType *cgraph;
 

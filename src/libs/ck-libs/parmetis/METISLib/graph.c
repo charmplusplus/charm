@@ -22,7 +22,7 @@ void SetUpGraph(GraphType *graph, int OpType, int nvtxs, int ncon,
        idxtype *xadj, idxtype *adjncy, idxtype *vwgt, idxtype *adjwgt, int wgtflag)
 {
   int i, j, k, sum, gsize;
-  float *nvwgt;
+  floattype *nvwgt;
   idxtype tvwgt[MAXNCON];
 
   if (OpType == OP_KMETIS && ncon == 1 && (wgtflag&2) == 0 && (wgtflag&1) == 0) {
@@ -169,7 +169,7 @@ void SetUpGraphKway(GraphType *graph, int nvtxs, idxtype *xadj, idxtype *adjncy)
 * This function sets up the graph from the user input
 **************************************************************************/
 void SetUpGraph2(GraphType *graph, int nvtxs, int ncon, idxtype *xadj, 
-       idxtype *adjncy, float *nvwgt, idxtype *adjwgt)
+       idxtype *adjncy, floattype *nvwgt, idxtype *adjwgt)
 {
   int i, j, sum;
 
@@ -213,7 +213,7 @@ void VolSetUpGraph(GraphType *graph, int OpType, int nvtxs, int ncon, idxtype *x
 {
   int i, j, k, sum, gsize;
   idxtype *adjwgt;
-  float *nvwgt;
+  floattype *nvwgt;
   idxtype tvwgt[MAXNCON];
 
   InitGraph(graph);

@@ -18,7 +18,7 @@
 /*************************************************************************
 * This function performs a node-based FM refinement 
 **************************************************************************/
-void FM_2WayNodeRefine(CtrlType *ctrl, GraphType *graph, float ubfactor, int npasses)
+void FM_2WayNodeRefine(CtrlType *ctrl, GraphType *graph, floattype ubfactor, int npasses)
 {
   int i, ii, j, k, jj, kk, nvtxs, nbnd, nswaps, nmind;
   idxtype *xadj, *vwgt, *adjncy, *where, *pwgts, *edegrees, *bndind, *bndptr;
@@ -253,7 +253,7 @@ void FM_2WayNodeRefine(CtrlType *ctrl, GraphType *graph, float ubfactor, int npa
 /*************************************************************************
 * This function performs a node-based FM refinement 
 **************************************************************************/
-void FM_2WayNodeRefine2(CtrlType *ctrl, GraphType *graph, float ubfactor, int npasses)
+void FM_2WayNodeRefine2(CtrlType *ctrl, GraphType *graph, floattype ubfactor, int npasses)
 {
   int i, ii, j, k, jj, kk, nvtxs, nbnd, nswaps, nmind;
   idxtype *xadj, *vwgt, *adjncy, *where, *pwgts, *edegrees, *bndind, *bndptr;
@@ -714,7 +714,7 @@ void FM_2WayNodeRefineEqWgt(CtrlType *ctrl, GraphType *graph, int npasses)
 * This function performs a node-based FM refinement. This is the 
 * one-way version 
 **************************************************************************/
-void FM_2WayNodeRefine_OneSided(CtrlType *ctrl, GraphType *graph, float ubfactor, int npasses)
+void FM_2WayNodeRefine_OneSided(CtrlType *ctrl, GraphType *graph, floattype ubfactor, int npasses)
 {
   int i, ii, j, k, jj, kk, nvtxs, nbnd, nswaps, nmind;
   idxtype *xadj, *vwgt, *adjncy, *where, *pwgts, *edegrees, *bndind, *bndptr;
@@ -915,7 +915,7 @@ void FM_2WayNodeRefine_OneSided(CtrlType *ctrl, GraphType *graph, float ubfactor
 /*************************************************************************
 * This function performs a node-based FM refinement 
 **************************************************************************/
-void FM_2WayNodeBalance(CtrlType *ctrl, GraphType *graph, float ubfactor)
+void FM_2WayNodeBalance(CtrlType *ctrl, GraphType *graph, floattype ubfactor)
 {
   int i, ii, j, k, jj, kk, nvtxs, nbnd, nswaps;
   idxtype *xadj, *vwgt, *adjncy, *where, *pwgts, *edegrees, *bndind, *bndptr;

@@ -19,7 +19,7 @@
 /*************************************************************************
 * This function is the entry point of the bisection balancing algorithms.
 **************************************************************************/
-void MocBalance2Way(CtrlType *ctrl, GraphType *graph, float *tpwgts, float lbfactor)
+void MocBalance2Way(CtrlType *ctrl, GraphType *graph, floattype *tpwgts, floattype lbfactor)
 {
 
   if (Compute2WayHLoadImbalance(graph->ncon, graph->npwgts, tpwgts) < lbfactor)
@@ -33,12 +33,12 @@ void MocBalance2Way(CtrlType *ctrl, GraphType *graph, float *tpwgts, float lbfac
 /*************************************************************************
 * This function performs an edge-based FM refinement
 **************************************************************************/
-void MocGeneral2WayBalance(CtrlType *ctrl, GraphType *graph, float *tpwgts, float lbfactor)
+void MocGeneral2WayBalance(CtrlType *ctrl, GraphType *graph, floattype *tpwgts, floattype lbfactor)
 {
   int i, ii, j, k, l, kwgt, nvtxs, ncon, nbnd, nswaps, from, to, pass, me, limit, tmp, cnum;
   idxtype *xadj, *adjncy, *adjwgt, *where, *id, *ed, *bndptr, *bndind;
   idxtype *moved, *swaps, *perm, *qnum;
-  float *nvwgt, *npwgts, mindiff[MAXNCON], origbal, minbal, newbal;
+  floattype *nvwgt, *npwgts, mindiff[MAXNCON], origbal, minbal, newbal;
   PQueueType parts[MAXNCON][2];
   int higain, oldgain, mincut, newcut, mincutorder;
   int qsizes[MAXNCON][2];

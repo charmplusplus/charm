@@ -19,10 +19,10 @@
 /*************************************************************************
 * This function is the entry point of the bisection balancing algorithms.
 **************************************************************************/
-void MocBalance2Way2(CtrlType *ctrl, GraphType *graph, float *tpwgts, float *ubvec)
+void MocBalance2Way2(CtrlType *ctrl, GraphType *graph, floattype *tpwgts, floattype *ubvec)
 {
   int i;
-  float tvec[MAXNCON];
+  floattype tvec[MAXNCON];
 
   Compute2WayHLoadImbalanceVec(graph->ncon, graph->npwgts, tpwgts, tvec);
   if (!AreAllBelow(graph->ncon, tvec, ubvec))
@@ -34,15 +34,15 @@ void MocBalance2Way2(CtrlType *ctrl, GraphType *graph, float *tpwgts, float *ubv
 /*************************************************************************
 * This function performs an edge-based FM refinement
 **************************************************************************/
-void MocGeneral2WayBalance2(CtrlType *ctrl, GraphType *graph, float *tpwgts, float *ubvec)
+void MocGeneral2WayBalance2(CtrlType *ctrl, GraphType *graph, floattype *tpwgts, floattype *ubvec)
 {
   int i, ii, j, k, l, kwgt, nvtxs, ncon, nbnd, nswaps, from, to, pass, me, limit, tmp, cnum;
   idxtype *xadj, *adjncy, *adjwgt, *where, *id, *ed, *bndptr, *bndind;
   idxtype *moved, *swaps, *perm, *qnum;
-  float *nvwgt, *npwgts, origbal[MAXNCON], minbal[MAXNCON], newbal[MAXNCON];
+  floattype *nvwgt, *npwgts, origbal[MAXNCON], minbal[MAXNCON], newbal[MAXNCON];
   PQueueType parts[MAXNCON][2];
   int higain, oldgain, mincut, newcut, mincutorder;
-  float *maxwgt, *minwgt, tvec[MAXNCON];
+  floattype *maxwgt, *minwgt, tvec[MAXNCON];
 
 
   nvtxs = graph->nvtxs;
@@ -263,11 +263,11 @@ void MocGeneral2WayBalance2(CtrlType *ctrl, GraphType *graph, float *tpwgts, flo
 * This function selects the partition number and the queue from which
 * we will move vertices out
 **************************************************************************/ 
-void SelectQueue3(int ncon, float *npwgts, float *tpwgts, int *from, int *cnum, 
-       PQueueType queues[MAXNCON][2], float *maxwgt)
+void SelectQueue3(int ncon, floattype *npwgts, floattype *tpwgts, int *from, int *cnum, 
+       PQueueType queues[MAXNCON][2], floattype *maxwgt)
 {
   int i, j, maxgain=0;
-  float maxdiff=0.0, diff;
+  floattype maxdiff=0.0, diff;
 
   *from = -1;
   *cnum = -1;

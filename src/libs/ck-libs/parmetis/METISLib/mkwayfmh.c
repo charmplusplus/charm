@@ -18,7 +18,7 @@
 * This function performs k-way refinement
 **************************************************************************/
 void MCRandom_KWayEdgeRefineHorizontal(CtrlType *ctrl, GraphType *graph, int nparts, 
-       float *orgubvec, int npasses)
+       floattype *orgubvec, int npasses)
 {
   int i, ii, iii, j, jj, k, l, pass, nvtxs, ncon, nmoves, nbnd, myndegrees, same; 
   int from, me, to, oldcut, gain;
@@ -26,7 +26,7 @@ void MCRandom_KWayEdgeRefineHorizontal(CtrlType *ctrl, GraphType *graph, int npa
   idxtype *where, *perm, *bndptr, *bndind;
   EDegreeType *myedegrees;
   RInfoType *myrinfo;
-  float *npwgts, *nvwgt, *minwgt, *maxwgt, maxlb, minlb, ubvec[MAXNCON], tvec[MAXNCON];
+  floattype *npwgts, *nvwgt, *minwgt, *maxwgt, maxlb, minlb, ubvec[MAXNCON], tvec[MAXNCON];
 
   nvtxs = graph->nvtxs;
   ncon = graph->ncon;
@@ -255,7 +255,7 @@ void MCRandom_KWayEdgeRefineHorizontal(CtrlType *ctrl, GraphType *graph, int npa
 * This function performs k-way refinement
 **************************************************************************/
 void MCGreedy_KWayEdgeBalanceHorizontal(CtrlType *ctrl, GraphType *graph, int nparts, 
-       float *ubvec, int npasses)
+       floattype *ubvec, int npasses)
 {
   int i, ii, iii, j, jj, k, l, pass, nvtxs, ncon, nbnd, myndegrees, oldgain, gain, nmoves; 
   int from, me, to, oldcut;
@@ -264,7 +264,7 @@ void MCGreedy_KWayEdgeBalanceHorizontal(CtrlType *ctrl, GraphType *graph, int np
   EDegreeType *myedegrees;
   RInfoType *myrinfo;
   PQueueType queue;
-  float *npwgts, *nvwgt, *minwgt, *maxwgt, tvec[MAXNCON];
+  floattype *npwgts, *nvwgt, *minwgt, *maxwgt, tvec[MAXNCON];
 
   nvtxs = graph->nvtxs;
   ncon = graph->ncon;
@@ -509,7 +509,7 @@ void MCGreedy_KWayEdgeBalanceHorizontal(CtrlType *ctrl, GraphType *graph, int np
 * This function checks if the vertex weights of two vertices are below 
 * a given set of values
 **************************************************************************/
-int AreAllHVwgtsBelow(int ncon, float alpha, float *vwgt1, float beta, float *vwgt2, float *limit)
+int AreAllHVwgtsBelow(int ncon, floattype alpha, floattype *vwgt1, floattype beta, floattype *vwgt2, floattype *limit)
 {
   int i;
 
@@ -526,7 +526,7 @@ int AreAllHVwgtsBelow(int ncon, float alpha, float *vwgt1, float beta, float *vw
 * This function checks if the vertex weights of two vertices are above 
 * a given set of values
 **************************************************************************/
-int AreAllHVwgtsAbove(int ncon, float alpha, float *vwgt1, float beta, float *vwgt2, float *limit)
+int AreAllHVwgtsAbove(int ncon, floattype alpha, floattype *vwgt1, floattype beta, floattype *vwgt2, floattype *limit)
 {
   int i;
 
@@ -542,10 +542,10 @@ int AreAllHVwgtsAbove(int ncon, float alpha, float *vwgt1, float beta, float *vw
 * This function computes the load imbalance over all the constrains
 * For now assume that we just want balanced partitionings
 **************************************************************************/ 
-void ComputeHKWayLoadImbalance(int ncon, int nparts, float *npwgts, float *lbvec)
+void ComputeHKWayLoadImbalance(int ncon, int nparts, floattype *npwgts, floattype *lbvec)
 {
   int i, j;
-  float max;
+  floattype max;
 
   for (i=0; i<ncon; i++) {
     max = 0.0;
@@ -562,10 +562,10 @@ void ComputeHKWayLoadImbalance(int ncon, int nparts, float *npwgts, float *lbvec
 /*************************************************************************
 * This function determines if a partitioning is horizontally balanced
 **************************************************************************/
-int MocIsHBalanced(int ncon, int nparts, float *npwgts, float *ubvec)
+int MocIsHBalanced(int ncon, int nparts, floattype *npwgts, floattype *ubvec)
 {
   int i, j;
-  float max;
+  floattype max;
 
   for (i=0; i<ncon; i++) {
     max = 0.0;
@@ -590,12 +590,12 @@ int MocIsHBalanced(int ncon, int nparts, float *npwgts, float *ubvec)
 * partitions will improve by moving the vertex v from pfrom to pto,
 * subject to the target partition weights of tfrom, and tto respectively
 **************************************************************************/
-int IsHBalanceBetterFT(int ncon, int nparts, float *pfrom, float *pto, float *vwgt, float *ubvec)
+int IsHBalanceBetterFT(int ncon, int nparts, floattype *pfrom, floattype *pto, floattype *vwgt, floattype *ubvec)
 {
   int i, j, k;
-  float blb1=0.0, alb1=0.0, sblb=0.0, salb=0.0;
-  float blb2=0.0, alb2=0.0;
-  float temp;
+  floattype blb1=0.0, alb1=0.0, sblb=0.0, salb=0.0;
+  floattype blb2=0.0, alb2=0.0;
+  floattype temp;
 
   for (i=0; i<ncon; i++) {
     temp = amax(pfrom[i], pto[i])*nparts/ubvec[i];
@@ -638,10 +638,10 @@ int IsHBalanceBetterFT(int ncon, int nparts, float *pfrom, float *pto, float *vw
 * to pt1 subject to their target weights of tt1 and tt2, respectively
 * This routine takes into account the weight of the vertex in question
 **************************************************************************/
-int IsHBalanceBetterTT(int ncon, int nparts, float *pt1, float *pt2, float *vwgt, float *ubvec)
+int IsHBalanceBetterTT(int ncon, int nparts, floattype *pt1, floattype *pt2, floattype *vwgt, floattype *ubvec)
 {
   int i;
-  float m11=0.0, m12=0.0, m21=0.0, m22=0.0, sm1=0.0, sm2=0.0, temp;
+  floattype m11=0.0, m12=0.0, m21=0.0, m22=0.0, sm1=0.0, sm2=0.0, temp;
 
   for (i=0; i<ncon; i++) {
     temp = (pt1[i]+vwgt[i])*nparts/ubvec[i];

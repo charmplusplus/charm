@@ -25,7 +25,7 @@ void CreateCoarseGraph(CtrlType *ctrl, GraphType *graph, int cnvtxs, idxtype *ma
   idxtype *xadj, *vwgt, *vsize, *adjncy, *adjwgt, *adjwgtsum, *auxadj;
   idxtype *cmap, *htable;
   idxtype *cxadj, *cvwgt, *cvsize, *cadjncy, *cadjwgt, *cadjwgtsum;
-  float *nvwgt, *cnvwgt;
+  floattype *nvwgt, *cnvwgt;
   GraphType *cgraph;
 
   dovsize = (ctrl->optype == OP_KVMETIS ? 1 : 0);
@@ -198,7 +198,7 @@ void CreateCoarseGraphNoMask(CtrlType *ctrl, GraphType *graph, int cnvtxs, idxty
   idxtype *xadj, *vwgt, *vsize, *adjncy, *adjwgt, *adjwgtsum, *auxadj;
   idxtype *cmap, *htable;
   idxtype *cxadj, *cvwgt, *cvsize, *cadjncy, *cadjwgt, *cadjwgtsum;
-  float *nvwgt, *cnvwgt;
+  floattype *nvwgt, *cnvwgt;
   GraphType *cgraph;
 
   dovsize = (ctrl->optype == OP_KVMETIS ? 1 : 0);
@@ -333,7 +333,7 @@ void CreateCoarseGraph_NVW(CtrlType *ctrl, GraphType *graph, int cnvtxs, idxtype
   idxtype *xadj, *adjncy, *adjwgtsum, *auxadj;
   idxtype *cmap, *htable;
   idxtype *cxadj, *cvwgt, *cadjncy, *cadjwgt, *cadjwgtsum;
-  float *nvwgt, *cnvwgt;
+  floattype *nvwgt, *cnvwgt;
   GraphType *cgraph;
 
 

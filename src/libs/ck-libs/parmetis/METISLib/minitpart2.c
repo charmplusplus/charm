@@ -18,7 +18,7 @@
 /*************************************************************************
 * This function computes the initial bisection of the coarsest graph
 **************************************************************************/
-void MocInit2WayPartition2(CtrlType *ctrl, GraphType *graph, float *tpwgts, float *ubvec) 
+void MocInit2WayPartition2(CtrlType *ctrl, GraphType *graph, floattype *tpwgts, floattype *ubvec) 
 {
   int dbglvl;
 
@@ -54,7 +54,7 @@ void MocInit2WayPartition2(CtrlType *ctrl, GraphType *graph, float *tpwgts, floa
 * growing algorithm. The resulting partition is returned in
 * graph->where
 **************************************************************************/
-void MocGrowBisection2(CtrlType *ctrl, GraphType *graph, float *tpwgts, float *ubvec)
+void MocGrowBisection2(CtrlType *ctrl, GraphType *graph, floattype *tpwgts, floattype *ubvec)
 {
   int i, j, k, nvtxs, ncon, from, bestcut, mincut, nbfs;
   idxtype *bestwhere, *where;
@@ -105,7 +105,7 @@ void MocGrowBisection2(CtrlType *ctrl, GraphType *graph, float *tpwgts, float *u
 * growing algorithm. The resulting partition is returned in
 * graph->where
 **************************************************************************/
-void MocGrowBisectionNew2(CtrlType *ctrl, GraphType *graph, float *tpwgts, float *ubvec)
+void MocGrowBisectionNew2(CtrlType *ctrl, GraphType *graph, floattype *tpwgts, floattype *ubvec)
 {
   int i, j, k, nvtxs, ncon, from, bestcut, mincut, nbfs;
   idxtype *bestwhere, *where;
@@ -153,12 +153,12 @@ void MocGrowBisectionNew2(CtrlType *ctrl, GraphType *graph, float *tpwgts, float
 * It moves vertices from the domain that is overweight to the one that 
 * is underweight.
 **************************************************************************/
-void MocInit2WayBalance2(CtrlType *ctrl, GraphType *graph, float *tpwgts, float *ubvec)
+void MocInit2WayBalance2(CtrlType *ctrl, GraphType *graph, floattype *tpwgts, floattype *ubvec)
 {
   int i, ii, j, k, l, kwgt, nvtxs, nbnd, ncon, nswaps, from, to, pass, me, cnum, tmp, imin;
   idxtype *xadj, *adjncy, *adjwgt, *where, *id, *ed, *bndptr, *bndind;
   idxtype *moved, *perm, *qnum;
-  float *nvwgt, *npwgts, minwgt;
+  floattype *nvwgt, *npwgts, minwgt;
   PQueueType parts[MAXNCON][2];
   int higain, oldgain, mincut;
 
@@ -327,11 +327,11 @@ void MocInit2WayBalance2(CtrlType *ctrl, GraphType *graph, float *tpwgts, float 
 * This function selects the partition number and the queue from which
 * we will move vertices out
 **************************************************************************/ 
-int SelectQueueOneWay2(int ncon, float *pto, PQueueType queues[MAXNCON][2], float *ubvec)
+int SelectQueueOneWay2(int ncon, floattype *pto, PQueueType queues[MAXNCON][2], floattype *ubvec)
 {
   int i, cnum=-1, imax, maxgain;
-  float max=0.0;
-  float twgt[MAXNCON];
+  floattype max=0.0;
+  floattype twgt[MAXNCON];
 
   for (i=0; i<ncon; i++) {
     if (max < pto[i]) {

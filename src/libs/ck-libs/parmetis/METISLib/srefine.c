@@ -18,7 +18,7 @@
 /*************************************************************************
 * This function is the entry point of the separator refinement
 **************************************************************************/
-void Refine2WayNode(CtrlType *ctrl, GraphType *orggraph, GraphType *graph, float ubfactor)
+void Refine2WayNode(CtrlType *ctrl, GraphType *orggraph, GraphType *graph, floattype ubfactor)
 {
 
   IFSET(ctrl->dbglvl, DBG_TIME, starttimer(ctrl->UncoarsenTmr));

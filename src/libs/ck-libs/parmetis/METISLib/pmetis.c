@@ -24,7 +24,7 @@ void METIS_PartGraphRecursive(int *nvtxs, idxtype *xadj, idxtype *adjncy, idxtyp
                               int *options, int *edgecut, idxtype *part)
 {
   int i;
-  float *tpwgts;
+  floattype *tpwgts;
 
   tpwgts = fmalloc(*nparts, "KMETIS: tpwgts");
   for (i=0; i<*nparts; i++) 
@@ -44,12 +44,12 @@ void METIS_PartGraphRecursive(int *nvtxs, idxtype *xadj, idxtype *adjncy, idxtyp
 **************************************************************************/
 void METIS_WPartGraphRecursive(int *nvtxs, idxtype *xadj, idxtype *adjncy, idxtype *vwgt, 
                                idxtype *adjwgt, int *wgtflag, int *numflag, int *nparts, 
-                               float *tpwgts, int *options, int *edgecut, idxtype *part)
+                               floattype *tpwgts, int *options, int *edgecut, idxtype *part)
 {
   int i, j;
   GraphType graph;
   CtrlType ctrl;
-  float *mytpwgts;
+  floattype *mytpwgts;
 
   if (*numflag == 1)
     Change2CNumbering(*nvtxs, xadj, adjncy);
@@ -100,12 +100,12 @@ void METIS_WPartGraphRecursive(int *nvtxs, idxtype *xadj, idxtype *adjncy, idxty
 /*************************************************************************
 * This function takes a graph and produces a bisection of it
 **************************************************************************/
-int MlevelRecursiveBisection(CtrlType *ctrl, GraphType *graph, int nparts, idxtype *part, float *tpwgts, float ubfactor, int fpart)
+int MlevelRecursiveBisection(CtrlType *ctrl, GraphType *graph, int nparts, idxtype *part, floattype *tpwgts, floattype ubfactor, int fpart)
 {
   int i, j, nvtxs, cut, tvwgt, tpwgts2[2];
   idxtype *label, *where;
   GraphType lgraph, rgraph;
-  float wsum;
+  floattype wsum;
 
   nvtxs = graph->nvtxs;
   if (nvtxs == 0) {
@@ -165,7 +165,7 @@ int MlevelRecursiveBisection(CtrlType *ctrl, GraphType *graph, int nparts, idxty
 /*************************************************************************
 * This function performs multilevel bisection
 **************************************************************************/
-void MlevelEdgeBisection(CtrlType *ctrl, GraphType *graph, int *tpwgts, float ubfactor)
+void MlevelEdgeBisection(CtrlType *ctrl, GraphType *graph, int *tpwgts, floattype ubfactor)
 {
   GraphType *cgraph;
 
@@ -194,7 +194,7 @@ void SplitGraphPart(CtrlType *ctrl, GraphType *graph, GraphType *lgraph, GraphTy
   idxtype *sxadj[2], *svwgt[2], *sadjncy[2], *sadjwgt[2], *sadjwgtsum[2], *slabel[2];
   idxtype *rename;
   idxtype *auxadjncy, *auxadjwgt;
-  float *nvwgt, *snvwgt[2], *npwgts;
+  floattype *nvwgt, *snvwgt[2], *npwgts;
 
 
   IFSET(ctrl->dbglvl, DBG_TIME, starttimer(ctrl->SplitTmr));

@@ -62,14 +62,14 @@ idxtype *idxmalloc(size_t n, char *msg)
 
 
 /*************************************************************************
-* The following function allocates an array of float 
+* The following function allocates an array of floattype 
 **************************************************************************/
-float *fmalloc(size_t n, char *msg)
+floattype *fmalloc(size_t n, char *msg)
 {
   if (n == 0)
     return NULL;
 
-  return (float *)GKmalloc(sizeof(float)*n, msg);
+  return (floattype *)GKmalloc(sizeof(floattype)*n, msg);
 }
 
 
@@ -172,7 +172,7 @@ idxtype *idxset(int n, idxtype val, idxtype *x)
 /*************************************************************************
 * These functions set the values of a vector
 **************************************************************************/
-float *sset(int n, float val, float *x)
+floattype *sset(int n, floattype val, floattype *x)
 {
   int i;
 
@@ -230,7 +230,7 @@ int idxamax_strd(int n, idxtype *x, int incx)
 /*************************************************************************
 * These functions return the index of the maximum element in a vector
 **************************************************************************/
-int samax(int n, float *x)
+int samax(int n, floattype *x)
 {
   int i, max=0;
 
@@ -243,7 +243,7 @@ int samax(int n, float *x)
 /*************************************************************************
 * These functions return the index of the almost maximum element in a vector
 **************************************************************************/
-int samax2(int n, float *x)
+int samax2(int n, floattype *x)
 {
   int i, max1, max2;
 
@@ -286,7 +286,7 @@ int idxamin(int n, idxtype *x)
 /*************************************************************************
 * These functions return the index of the minimum element in a vector
 **************************************************************************/
-int samin(int n, float *x)
+int samin(int n, floattype *x)
 {
   int i, min=0;
 
@@ -365,10 +365,10 @@ int isum(int n, int *x)
 /*************************************************************************
 * This function sums the entries in an array
 **************************************************************************/
-float ssum(int n, float *x)
+floattype ssum(int n, floattype *x)
 {
   int i;
-  float sum = 0.0;
+  floattype sum = 0.0;
 
   for (i=0; i<n; i++)
     sum += x[i];
@@ -379,10 +379,10 @@ float ssum(int n, float *x)
 /*************************************************************************
 * This function sums the entries in an array
 **************************************************************************/
-float ssum_strd(int n, float *x, int incx)
+floattype ssum_strd(int n, floattype *x, int incx)
 {
   int i;
-  float sum = 0.0;
+  floattype sum = 0.0;
 
   for (i=0; i<n; i++, x+=incx)
     sum += *x;
@@ -393,7 +393,7 @@ float ssum_strd(int n, float *x, int incx)
 /*************************************************************************
 * This function sums the entries in an array
 **************************************************************************/
-void sscale(int n, float alpha, float *x)
+void sscale(int n, floattype alpha, floattype *x)
 {
   int i;
 
@@ -405,10 +405,10 @@ void sscale(int n, float alpha, float *x)
 /*************************************************************************
 * This function computes a 2-norm
 **************************************************************************/
-float snorm2(int n, float *v)
+floattype snorm2(int n, floattype *v)
 {
   int i;
-  float partial = 0;
+  floattype partial = 0;
  
   for (i = 0; i<n; i++)
     partial += v[i] * v[i];
@@ -421,10 +421,10 @@ float snorm2(int n, float *v)
 /*************************************************************************
 * This function computes a 2-norm
 **************************************************************************/
-float sdot(int n, float *x, float *y)
+floattype sdot(int n, floattype *x, floattype *y)
 {
   int i;
-  float partial = 0;
+  floattype partial = 0;
  
   for (i = 0; i<n; i++)
     partial += x[i] * y[i];
@@ -436,7 +436,7 @@ float sdot(int n, float *x, float *y)
 /*************************************************************************
 * This function computes a 2-norm
 **************************************************************************/
-void saxpy(int n, float alpha, float *x, int incx, float *y, int incy)
+void saxpy(int n, floattype alpha, floattype *x, int incx, floattype *y, int incy)
 {
   int i;
  

@@ -24,7 +24,7 @@ void METIS_PartGraphKway(int *nvtxs, idxtype *xadj, idxtype *adjncy, idxtype *vw
                          int *options, int *edgecut, idxtype *part)
 {
   int i;
-  float *tpwgts;
+  floattype *tpwgts;
 
   tpwgts = fmalloc(*nparts, "KMETIS: tpwgts");
   for (i=0; i<*nparts; i++) 
@@ -42,7 +42,7 @@ void METIS_PartGraphKway(int *nvtxs, idxtype *xadj, idxtype *adjncy, idxtype *vw
 **************************************************************************/
 void METIS_WPartGraphKway(int *nvtxs, idxtype *xadj, idxtype *adjncy, idxtype *vwgt, 
                           idxtype *adjwgt, int *wgtflag, int *numflag, int *nparts, 
-                          float *tpwgts, int *options, int *edgecut, idxtype *part)
+                          floattype *tpwgts, int *options, int *edgecut, idxtype *part)
 {
   int i, j;
   GraphType graph;
@@ -91,7 +91,7 @@ void METIS_WPartGraphKway(int *nvtxs, idxtype *xadj, idxtype *adjncy, idxtype *v
 /*************************************************************************
 * This function takes a graph and produces a bisection of it
 **************************************************************************/
-int MlevelKWayPartitioning(CtrlType *ctrl, GraphType *graph, int nparts, idxtype *part, float *tpwgts, float ubfactor)
+int MlevelKWayPartitioning(CtrlType *ctrl, GraphType *graph, int nparts, idxtype *part, floattype *tpwgts, floattype ubfactor)
 {
   int i, j, nvtxs, tvwgt, tpwgts2[2];
   GraphType *cgraph;

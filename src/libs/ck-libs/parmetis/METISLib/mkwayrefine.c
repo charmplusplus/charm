@@ -18,7 +18,7 @@
 * This function is the entry point of refinement
 **************************************************************************/
 void MocRefineKWayHorizontal(CtrlType *ctrl, GraphType *orggraph, GraphType *graph, int nparts, 
-       float *ubvec)
+       floattype *ubvec)
 {
 
   IFSET(ctrl->dbglvl, DBG_TIME, starttimer(ctrl->UncoarsenTmr));
@@ -74,7 +74,7 @@ void MocAllocateKWayPartitionMemory(CtrlType *ctrl, GraphType *graph, int nparts
   pad64 = (3*nvtxs+nparts)%2;
 
   graph->rdata = idxmalloc(3*nvtxs+ncon*nparts+(sizeof(RInfoType)/sizeof(idxtype))*nvtxs+pad64, "AllocateKWayPartitionMemory: rdata");
-  graph->npwgts         = (float *)graph->rdata;
+  graph->npwgts         = (floattype *)graph->rdata;
   graph->where          = graph->rdata + ncon*nparts;
   graph->bndptr         = graph->rdata + nvtxs + ncon*nparts;
   graph->bndind         = graph->rdata + 2*nvtxs + ncon*nparts;
@@ -91,7 +91,7 @@ void MocComputeKWayPartitionParams(CtrlType *ctrl, GraphType *graph, int nparts)
   idxtype *xadj, *adjncy, *adjwgt, *where, *bndind, *bndptr;
   RInfoType *rinfo, *myrinfo;
   EDegreeType *myedegrees;
-  float *nvwgt, *npwgts;
+  floattype *nvwgt, *npwgts;
 
   nvtxs = graph->nvtxs;
   ncon = graph->ncon;

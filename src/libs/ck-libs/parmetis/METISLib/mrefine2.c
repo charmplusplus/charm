@@ -17,8 +17,8 @@
 /*************************************************************************
 * This function is the entry point of refinement
 **************************************************************************/
-void MocRefine2Way2(CtrlType *ctrl, GraphType *orggraph, GraphType *graph, float *tpwgts, 
-       float *ubvec)
+void MocRefine2Way2(CtrlType *ctrl, GraphType *orggraph, GraphType *graph, floattype *tpwgts, 
+       floattype *ubvec)
 {
 
   IFSET(ctrl->dbglvl, DBG_TIME, starttimer(ctrl->UncoarsenTmr));

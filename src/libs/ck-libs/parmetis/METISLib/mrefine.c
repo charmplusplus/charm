@@ -17,10 +17,10 @@
 /*************************************************************************
 * This function is the entry point of refinement
 **************************************************************************/
-void MocRefine2Way(CtrlType *ctrl, GraphType *orggraph, GraphType *graph, float *tpwgts, float ubfactor)
+void MocRefine2Way(CtrlType *ctrl, GraphType *orggraph, GraphType *graph, floattype *tpwgts, floattype ubfactor)
 {
   int i;
-  float tubvec[MAXNCON];
+  floattype tubvec[MAXNCON];
 
   for (i=0; i<graph->ncon; i++)
     tubvec[i] = 1.0;
@@ -92,7 +92,7 @@ void MocCompute2WayPartitionParams(CtrlType *ctrl, GraphType *graph)
 {
   int i, j, k, l, nvtxs, ncon, nbnd, mincut;
   idxtype *xadj, *adjncy, *adjwgt;
-  float *nvwgt, *npwgts;
+  floattype *nvwgt, *npwgts;
   idxtype *id, *ed, *where;
   idxtype *bndptr, *bndind;
   int me, other;

@@ -18,7 +18,7 @@
 /*************************************************************************
 * This function computes the initial bisection of the coarsest graph
 **************************************************************************/
-void Init2WayPartition(CtrlType *ctrl, GraphType *graph, int *tpwgts, float ubfactor) 
+void Init2WayPartition(CtrlType *ctrl, GraphType *graph, int *tpwgts, floattype ubfactor) 
 {
   int dbglvl;
 
@@ -55,7 +55,7 @@ void Init2WayPartition(CtrlType *ctrl, GraphType *graph, int *tpwgts, float ubfa
 /*************************************************************************
 * This function computes the initial bisection of the coarsest graph
 **************************************************************************/
-void InitSeparator(CtrlType *ctrl, GraphType *graph, float ubfactor) 
+void InitSeparator(CtrlType *ctrl, GraphType *graph, floattype ubfactor) 
 {
   int dbglvl;
 
@@ -82,7 +82,7 @@ void InitSeparator(CtrlType *ctrl, GraphType *graph, float ubfactor)
 * growing algorithm. The resulting partition is returned in
 * graph->where
 **************************************************************************/
-void GrowBisection(CtrlType *ctrl, GraphType *graph, int *tpwgts, float ubfactor)
+void GrowBisection(CtrlType *ctrl, GraphType *graph, int *tpwgts, floattype ubfactor)
 {
   int i, j, k, nvtxs, drain, nleft, first, last, pwgts[2], minpwgt[2], maxpwgt[2], from, bestcut, icut, mincut, me, pass, nbfs;
   idxtype *xadj, *vwgt, *adjncy, *adjwgt, *where;
@@ -210,7 +210,7 @@ void GrowBisection(CtrlType *ctrl, GraphType *graph, int *tpwgts, float ubfactor
 * growing algorithm. The resulting partition is returned in
 * graph->where
 **************************************************************************/
-void GrowBisectionNode(CtrlType *ctrl, GraphType *graph, float ubfactor)
+void GrowBisectionNode(CtrlType *ctrl, GraphType *graph, floattype ubfactor)
 {
   int i, j, k, nvtxs, drain, nleft, first, last, pwgts[2], tpwgts[2], minpwgt[2], maxpwgt[2], from, bestcut, icut, mincut, me, pass, nbfs;
   idxtype *xadj, *vwgt, *adjncy, *adjwgt, *where, *bndind;
@@ -346,7 +346,7 @@ void GrowBisectionNode(CtrlType *ctrl, GraphType *graph, float ubfactor)
 * growing algorithm. The resulting partition is returned in
 * graph->where
 **************************************************************************/
-void RandomBisection(CtrlType *ctrl, GraphType *graph, int *tpwgts, float ubfactor)
+void RandomBisection(CtrlType *ctrl, GraphType *graph, int *tpwgts, floattype ubfactor)
 {
   int i, ii, j, k, nvtxs, pwgts[2], minpwgt[2], maxpwgt[2], from, bestcut, icut, mincut, me, pass, nbfs;
   idxtype *xadj, *vwgt, *adjncy, *adjwgt, *where;

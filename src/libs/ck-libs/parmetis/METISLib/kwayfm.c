@@ -16,7 +16,7 @@
 /*************************************************************************
 * This function performs k-way refinement
 **************************************************************************/
-void Random_KWayEdgeRefine(CtrlType *ctrl, GraphType *graph, int nparts, float *tpwgts, float ubfactor, int npasses, int ffactor)
+void Random_KWayEdgeRefine(CtrlType *ctrl, GraphType *graph, int nparts, floattype *tpwgts, floattype ubfactor, int npasses, int ffactor)
 {
   int i, ii, iii, j, jj, k, l, pass, nvtxs, nmoves, nbnd, tvwgt, myndegrees; 
   int from, me, to, oldcut, vwgt, gain;
@@ -219,7 +219,7 @@ void Random_KWayEdgeRefine(CtrlType *ctrl, GraphType *graph, int nparts, float *
 /*************************************************************************
 * This function performs k-way refinement
 **************************************************************************/
-void Greedy_KWayEdgeRefine(CtrlType *ctrl, GraphType *graph, int nparts, float *tpwgts, float ubfactor, int npasses)
+void Greedy_KWayEdgeRefine(CtrlType *ctrl, GraphType *graph, int nparts, floattype *tpwgts, floattype ubfactor, int npasses)
 {
   int i, ii, iii, j, jj, k, l, pass, nvtxs, nbnd, tvwgt, myndegrees, oldgain, gain; 
   int from, me, to, oldcut, vwgt;
@@ -449,7 +449,7 @@ void Greedy_KWayEdgeRefine(CtrlType *ctrl, GraphType *graph, int nparts, float *
 /*************************************************************************
 * This function performs k-way refinement
 **************************************************************************/
-void Greedy_KWayEdgeBalance(CtrlType *ctrl, GraphType *graph, int nparts, float *tpwgts, float ubfactor, int npasses)
+void Greedy_KWayEdgeBalance(CtrlType *ctrl, GraphType *graph, int nparts, floattype *tpwgts, floattype ubfactor, int npasses)
 {
   int i, ii, iii, j, jj, k, l, pass, nvtxs, nbnd, tvwgt, myndegrees, oldgain, gain, nmoves; 
   int from, me, to, oldcut, vwgt;

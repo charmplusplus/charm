@@ -24,9 +24,9 @@ int CheckGraph(GraphType *graph)
   int i, j, k, l;
   int nvtxs, ncon, err=0;
   int minedge, maxedge, minewgt, maxewgt;
-  float minvwgt[MAXNCON], maxvwgt[MAXNCON];
+  floattype minvwgt[MAXNCON], maxvwgt[MAXNCON];
   idxtype *xadj, *adjncy, *adjwgt, *htable;
-  float *nvwgt, ntvwgts[MAXNCON];
+  floattype *nvwgt, ntvwgts[MAXNCON];
 
   nvtxs = graph->nvtxs;
   ncon = graph->ncon;

@@ -24,7 +24,7 @@ void MCMatch_RM(CtrlType *ctrl, GraphType *graph)
   int i, ii, j, k, nvtxs, ncon, cnvtxs, maxidx;
   idxtype *xadj, *adjncy, *adjwgt;
   idxtype *match, *cmap, *perm;
-  float *nvwgt;
+  floattype *nvwgt;
 
   IFSET(ctrl->dbglvl, DBG_TIME, starttimer(ctrl->MatchTmr));
 
@@ -81,7 +81,7 @@ void MCMatch_HEM(CtrlType *ctrl, GraphType *graph)
   int i, ii, j, k, l, nvtxs, cnvtxs, ncon, maxidx, maxwgt;
   idxtype *xadj, *adjncy, *adjwgt;
   idxtype *match, *cmap, *perm;
-  float *nvwgt;
+  floattype *nvwgt;
 
   IFSET(ctrl->dbglvl, DBG_TIME, starttimer(ctrl->MatchTmr));
 
@@ -140,7 +140,7 @@ void MCMatch_SHEM(CtrlType *ctrl, GraphType *graph)
   int i, ii, j, k, nvtxs, cnvtxs, ncon, maxidx, maxwgt, avgdegree;
   idxtype *xadj, *adjncy, *adjwgt;
   idxtype *match, *cmap, *degrees, *perm, *tperm;
-  float *nvwgt;
+  floattype *nvwgt;
 
   IFSET(ctrl->dbglvl, DBG_TIME, starttimer(ctrl->MatchTmr));
 
@@ -234,7 +234,7 @@ void MCMatch_SHEBM(CtrlType *ctrl, GraphType *graph, int norm)
   int i, ii, j, k, nvtxs, cnvtxs, ncon, maxidx, maxwgt, avgdegree;
   idxtype *xadj, *adjncy, *adjwgt;
   idxtype *match, *cmap, *degrees, *perm, *tperm;
-  float *nvwgt;
+  floattype *nvwgt;
 
   IFSET(ctrl->dbglvl, DBG_TIME, starttimer(ctrl->MatchTmr));
 
@@ -335,7 +335,7 @@ void MCMatch_SBHEM(CtrlType *ctrl, GraphType *graph, int norm)
   int i, ii, j, k, nvtxs, cnvtxs, ncon, maxidx, maxwgt, avgdegree;
   idxtype *xadj, *adjncy, *adjwgt;
   idxtype *match, *cmap, *degrees, *perm, *tperm;
-  float *nvwgt, vbal;
+  floattype *nvwgt, vbal;
 
   IFSET(ctrl->dbglvl, DBG_TIME, starttimer(ctrl->MatchTmr));
 
@@ -432,10 +432,10 @@ void MCMatch_SBHEM(CtrlType *ctrl, GraphType *graph, int norm)
 * This function checks if v+u2 provides a better balance in the weight 
 * vector that v+u1
 **************************************************************************/
-float BetterVBalance(int ncon, int norm, float *vwgt, float *u1wgt, float *u2wgt)
+floattype BetterVBalance(int ncon, int norm, floattype *vwgt, floattype *u1wgt, floattype *u2wgt)
 {
   int i;
-  float sum1, sum2, max1, max2, min1, min2, diff1, diff2;
+  floattype sum1, sum2, max1, max2, min1, min2, diff1, diff2;
 
   if (norm == -1) {
     max1 = min1 = vwgt[0]+u1wgt[0];
@@ -488,7 +488,7 @@ float BetterVBalance(int ncon, int norm, float *vwgt, float *u1wgt, float *u2wgt
 * This function checks if the vertex weights of two vertices are below 
 * a given set of values
 **************************************************************************/
-int AreAllVwgtsBelowFast(int ncon, float *vwgt1, float *vwgt2, float limit)
+int AreAllVwgtsBelowFast(int ncon, floattype *vwgt1, floattype *vwgt2, floattype limit)
 {
   int i;
 

@@ -127,13 +127,13 @@ void idxwspacefree(CtrlType *ctrl, int n)
 /*************************************************************************
 * This function allocate space from the core 
 **************************************************************************/
-float *fwspacemalloc(CtrlType *ctrl, memsize_t n)
+floattype *fwspacemalloc(CtrlType *ctrl, memsize_t n)
 {
   n += n%2; /* This is a fix for 64 bit machines that require 8-byte pointer allignment */
 
   ctrl->wspace.ccore += n;
   ASSERT(ctrl->wspace.ccore <= ctrl->wspace.maxcore);
-  return (float *) (ctrl->wspace.core + ctrl->wspace.ccore - n);
+  return (floattype *) (ctrl->wspace.core + ctrl->wspace.ccore - n);
 }
 
 /*************************************************************************

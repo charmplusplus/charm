@@ -18,7 +18,7 @@
 /*************************************************************************
 * This function is the entry point of the bisection balancing algorithms.
 **************************************************************************/
-void Balance2Way(CtrlType *ctrl, GraphType *graph, int *tpwgts, float ubfactor)
+void Balance2Way(CtrlType *ctrl, GraphType *graph, int *tpwgts, floattype ubfactor)
 {
   int i, j, nvtxs, from, imax, gain, mindiff;
   idxtype *id, *ed;
