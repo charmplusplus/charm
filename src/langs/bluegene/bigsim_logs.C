@@ -5,6 +5,7 @@
 
 int genTimeLog = 0;			// was 1 for guna 's seq correction
 int correctTimeLog = 0;
+int bgverbose = 0;
 int bgcorroff = 0;
 
 extern BgTimeLineRec* currTline;
@@ -45,6 +46,50 @@ void bgMsgEntry::send() {
   sendMsg = NULL;
 }
 #endif
+
+void bgEvents::print()
+{
+  switch (eType) {
+  case BG_EVENT_PROJ:
+	CmiPrintf("EVT: Projection %d\n", index);  break;
+  case BG_EVENT_PRINT: {
+	CmiPrintf("EVT: %s\n", data);
+	break;
+       }
+  default: CmiAbort("bgEvents::pup(): unknown BG event type!");
+  }
+}
+
+void bgEvents::write(FILE *fp)
+{
+  switch (eType) {
+  case BG_EVENT_PROJ:
+	fprintf(fp, "EVT: Projection %d\n", index);  break;
+  case BG_EVENT_PRINT: {
+	fprintf(fp, "EVT: %s\n", data);
+	break;
+       }
+  default: CmiAbort("bgEvents::pup(): unknown BG event type!");
+  }
+}
+
+void bgEvents::pup(PUP::er &p) 
+{
+  p|eType; p|rTime;
+  switch (eType) {
+  case BG_EVENT_PROJ:
+	   p|index;  break;
+  case BG_EVENT_PRINT: {
+	     int slen = 0;
+	     if (p.isPacking()) slen = strlen((char *)data)+1;
+	     p|slen;
+	     if (p.isUnpacking()) data=malloc(sizeof(char)*slen);
+	     p((char *)data,slen); 
+	     break;
+	   }
+  default: CmiAbort("bgEvents::pup(): unknown BG event type!");
+  }
+}
 
 bgTimeLog::bgTimeLog(bgTimeLog *log)
 {
@@ -149,9 +194,12 @@ void bgTimeLog::closeLog()
 
 void bgTimeLog::print(int node, int th)
 {
+  int i;
   CmiPrintf("<<== [%d th:%d] ep:%d name:%s startTime:%f endTime:%f srcnode:%d msgID:%d\n", node, th, ep, name,startTime, endTime, srcnode, msgID);
-  for (int i=0; i<msgs.length(); i++)
+  for (i=0; i<msgs.length(); i++)
     msgs[i]->print();
+  for (i=0; i<evts.length(); i++)
+    evts[i]->print();
   CmiPrintf("==>>\n");
 }
 
@@ -159,9 +207,11 @@ void bgTimeLog::print(int node, int th)
 void bgTimeLog::write(FILE *fp)
 { 
   int i;
-  fprintf(fp,"<<==  %p ep:%d name:%s startTime:%f endTime:%f recvime:%f effRecvTime:%e srcnode:%d msgID:%d seqno:%d\n", this, ep, name,startTime, endTime, recvTime, effRecvTime, srcnode, msgID, seqno);
+  fprintf(fp,"<<==  %p ep:%d name:%s (srcnode:%d msgID:%d) startTime:%f endTime:%f recvime:%f effRecvTime:%e seqno:%d\n", this, ep, name, srcnode, msgID, startTime, endTime, recvTime, effRecvTime, seqno);
   for (i=0; i<msgs.length(); i++)
-   msgs[i]->write(fp);
+    msgs[i]->write(fp);
+  for (i=0; i<evts.length(); i++)
+    evts[i]->write(fp);
   // fprintf(fp,"\nbackwardDeps [%d]:\n",backwardDeps.length());
   fprintf(fp, "backward: ");
   for (i=0; i<backwardDeps.length(); i++)
@@ -183,16 +233,16 @@ void bgTimeLog::addMsgBackwardDep(BgTimeLineRec &tlinerec, void* msg){
   addBackwardDep(msglog);
 }
 
-void bgTimeLog::addBackwardDep(bgTimeLog* log){
-  
-  CmiAssert(recvTime < 0.);
-  if(log != NULL){
-    for (int i=0; i<backwardDeps.length(); i++)
-      if (backwardDeps[i] == log) return;	// already exist
-    backwardDeps.insertAtEnd(log);
-    log->forwardDeps.insertAtEnd(this);
-    effRecvTime = MAX(effRecvTime, log->effRecvTime);
-  }
+// log  => this
+void bgTimeLog::addBackwardDep(bgTimeLog* log)
+{
+  //CmiAssert(recvTime < 0.);
+  if(log == NULL) return;
+  for (int i=0; i<backwardDeps.length(); i++)
+    if (backwardDeps[i] == log) return;	// already exist
+  backwardDeps.insertAtEnd(log);
+  log->forwardDeps.insertAtEnd(this);
+  effRecvTime = MAX(effRecvTime, log->effRecvTime);
 }
 
 void bgTimeLog::addBackwardDeps(CkVec<bgTimeLog*> logs){
@@ -296,6 +346,10 @@ void BgTimeLineRec::logEntryInsert(bgTimeLog* log)
   if(timeline[timeline.length()-1]->endTime == 0.0)
     CmiPrintf("\nERROR tried to insert %s after %s\n",log->name,timeline[timeline.length()-1]->name);
   enq(log, 1);
+  if (bgPrevLog) {
+    log->addBackwardDep(bgPrevLog);
+    bgPrevLog = NULL;
+  }
 }
 
 void BgTimeLineRec::logEntryStart(bgTimeLog* log)
@@ -323,7 +377,7 @@ void BgTimeLineRec::logEntrySplit()
   logEntryClose();
 
   // make up a new bglog to start, setting up dependencies.
-  bgTimeLog *newLog = new bgTimeLog(-1, "broadcast", timerFunc());
+  bgTimeLog *newLog = new bgTimeLog(-1, "split-broadcast", timerFunc());
   newLog->addBackwardDep(rootLog);
   logEntryInsert(newLog);
   bgCurLog = newLog;
@@ -368,6 +422,29 @@ void BgTimeLineRec::pup(PUP::er &p)
           timeline[i]->pup(p);
         }
     }
+}
+
+// BigSim log API
+
+int BgIsInALog(BgTimeLineRec &tlinerec)
+{
+  if (tlinerec.bgCurLog) return 1;
+  else return 0;
+}
+
+bgTimeLog *BgCurrentLog(BgTimeLineRec &tlinerec)
+{
+  return tlinerec[tlinerec.length()-1];
+}
+
+bgTimeLog *BgStartLogByName(BgTimeLineRec &tlinerec, int ep, char *name, double starttime, bgTimeLog *prevLog)
+{
+  bgTimeLog* newLog = new bgTimeLog(ep, name, starttime);
+  if (prevLog) {
+    newLog->addBackwardDep(prevLog);
+  }
+  tlinerec.logEntryStart(newLog);
+  return newLog;
 }
 
 void BgWriteThreadTimeLine(char *pgm, int x, int y, int z, int th, BgTimeLine &tline)

@@ -61,22 +61,9 @@ public:
   inline void update(double startT, double recvT, int e) {
 	if (eType==e) callbackFn(data, startT+rTime, recvT, usrPtr);
   }
-  void pup(PUP::er &p) { 
-	p|eType; p|rTime;
-	switch (eType) {
-	case BG_EVENT_PROJ:
-	   p|index;  break;
-	case BG_EVENT_PRINT: {
-	     int slen = 0;
-	     if (p.isPacking()) slen = strlen((char *)data)+1;
-	     p|slen;
-	     if (p.isUnpacking()) data=malloc(sizeof(char)*slen);
-	     p((char *)data,slen); 
-	     break;
-	   }
-	default: CmiAbort("bgEvents::pup(): unknown BG event type!");
-   	}
-  }
+  void print();
+  void write(FILE *fp);
+  void pup(PUP::er &p);
 };
 
 #define BG_STARTSIM     0x1
@@ -198,13 +185,14 @@ public:
   int         correctSendIdx;
   int 	      counter;
   double      minCorrection;
-  bgTimeLog  *bgCurLog;
+  bgTimeLog  *bgCurLog;		/* current unfinished log */
+  bgTimeLog  *bgPrevLog;	/* previous log that should make dependency */
 #if DELAY_SEND
   CkQ<bgTimeLog *>   sendingLogs;	// send buffered
 #endif
 public:
   BgTimeLineRec(): timeline(1024), commit(0), counter(1), correctSendIdx(0), 
-		   startIdx(0), bgCurLog(NULL) {
+		   startIdx(0), bgCurLog(NULL), bgPrevLog(NULL) {
       if (bgcorroff) startCorrFlag=0; else startCorrFlag=1;
       minCorrection = INVALIDTIME;
     }
@@ -256,6 +244,11 @@ public:
 
   void pup(PUP::er &p);
 };
+
+// BigSim log function API
+int BgIsInALog(BgTimeLineRec &tlinerec);
+bgTimeLog *BgCurrentLog(BgTimeLineRec &tlinerec);
+bgTimeLog *BgStartLogByName(BgTimeLineRec &tlinerec, int ep, char *name, double starttime, bgTimeLog *prevLog);
 
 int BgLoadTraceSummary(char *fname, int &totalProcs, int &numX, int &numY, int &numZ, int &numCth, int &numWth, int &numPes);
 void BgReadProc(int procNum, int numWth ,int numPes, int totalProcs, int* allNodeOffsets, BgTimeLineRec& tlinerec);
