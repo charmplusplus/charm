@@ -112,13 +112,15 @@ void
 ampi::send(int t1, int t2, void* buf, int count, int type,  int idx, int comm)
 {
   CkArrayID aid = thisArrayID;
+  int mycomm = AMPI_COMM_WORLD;
   if(comm != AMPI_COMM_WORLD)
   {
-    aid = ampimain::ampi_comms[comm].aid;
+    mycomm = AMPI_COMM_UNIVERSE[commidx];
+    aid = ampimain::ampi_comms[comm-1].aid;
   }
   DDT_DataType *ddt = myDDT->getType(type);
   int len = ddt->getSize(count);
-  AmpiMsg *msg = new (&len, 0) AmpiMsg(t1, t2, len, comm);
+  AmpiMsg *msg = new (&len, 0) AmpiMsg(t1, t2, len, mycomm);
   ddt->serialize((char*)buf, (char*)msg->data, count, 1);
   CProxy_ampi pa(aid);
   pa[idx].generic(msg);
@@ -127,7 +129,7 @@ ampi::send(int t1, int t2, void* buf, int count, int type,  int idx, int comm)
 void 
 ampi::sendraw(int t1, int t2, void* buf, int len, CkArrayID aid, int idx)
 {
-  AmpiMsg *msg = new (&len, 0) AmpiMsg(t1, t2, len, -1);
+  AmpiMsg *msg = new (&len, 0) AmpiMsg(t1, t2, len, 0);
   memcpy(msg->data, buf, len);
   CProxy_ampi pa(aid);
   pa[idx].generic(msg);
@@ -186,7 +188,7 @@ ampi::bcast(int root, void* buf, int count, int type)
 void
 ampi::bcastraw(void* buf, int len, CkArrayID aid)
 {
-  AmpiMsg *msg = new (&len, 0) AmpiMsg(0, AMPI_BCAST_TAG, len, -1);
+  AmpiMsg *msg = new (&len, 0) AmpiMsg(0, AMPI_BCAST_TAG, len, 0);
   memcpy(msg->data, buf, len);
   CProxy_ampi pa(aid);
   pa.generic(msg);
