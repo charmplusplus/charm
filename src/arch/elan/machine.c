@@ -260,6 +260,8 @@ static struct CmiStateStruct Cmi_state;
 int _Cmi_mype;
 int _Cmi_myrank;
 
+#include "immediate.c"
+
 void CmiMemLock(void) {}
 void CmiMemUnlock(void) {}
 
@@ -279,10 +281,11 @@ static void CmiPushPE(int pe,void *msg)
   CmiState cs=CmiGetStateN(pe);
   MACHSTATE1(2,"Pushing message into %d's queue",pe);
 #if CMK_IMMEDIATE_MSG
-  if (CmiGetHandler(msg) == CpvAccessOther(CmiImmediateMsgHandlerIdx,0)) {
-      //CmiPrintf("[node %d] Immediate Message %d %d {{. \n", CmiMyNode(), CmiGetHandler(msg), _ImmediateMsgHandlerIdx);
-      CmiHandleMessage(msg);
-      //CmiPrintf("[node %d] Immediate Message done.}} \n", CmiMyNode());
+  if (CmiIsImmediate(msg)) {
+      /*CmiPrintf("[node %d] Immediate Message %d %d {{. \n", CmiMyNode(), CmiGetHandler(msg), _ImmediateMsgHandlerIdx);*/
+      /*CmiHandleMessage(msg);*/
+      CmiPushImmediateMsg(msg);
+      /*CmiPrintf("[node %d] Immediate Message done.}} \n", CmiMyNode());*/
       return;
   }
 #endif
@@ -693,6 +696,9 @@ int PumpMsgs(int retflag)
                 traceUserBracketEvent(10, pmp_start_time, pmp_end_time);
 #endif
 #endif
+#if CMK_IMMEDIATE_MSG && !CMK_SMP
+            CmiHandleImmediate();
+#endif
             return recd;    
         }
         
@@ -704,12 +710,18 @@ int PumpMsgs(int retflag)
                 traceUserBracketEvent(10, pmp_start_time, pmp_end_time);
 #endif
 #endif
+#if CMK_IMMEDIATE_MSG && !CMK_SMP
+            CmiHandleImmediate();
+#endif
             return flg;
         }
         
         recd = 1;
         flg = 0;
     }
+#if CMK_IMMEDIATE_MSG && !CMK_SMP
+    CmiHandleImmediate();
+#endif
     return recd;
 }
 
@@ -798,6 +810,19 @@ void CmiProbeImmediateMsg()
 #endif
 /********************* MESSAGE SEND FUNCTIONS ******************/
 
+static void CmiSendSelf(char *msg)
+{
+#if CMK_IMMEDIATE_MSG
+    if (CmiIsImmediate(msg)) {
+      /* CmiBecomeNonImmediate(msg); */
+      CmiHandleImmediateMessage(msg);
+      return;
+    }
+#endif
+    CQdCreate(CpvAccess(cQdState), 1);
+    CdsFifo_Enqueue(CpvAccess(CmiLocalQueue),msg);
+}
+
 void CmiSyncSendFn(int destPE, int size, char *msg)
 {
     CmiState cs = CmiGetState();
@@ -809,10 +834,8 @@ void CmiSyncSendFn(int destPE, int size, char *msg)
     //  CmiPrintf("Setting root to %d\n", 0);
     CMI_SET_BROADCAST_ROOT(dupmsg, 0);
     
-    if (cs->pe==destPE) {
-        CQdCreate(CpvAccess(cQdState), 1);
-        CdsFifo_Enqueue(CpvAccess(CmiLocalQueue),dupmsg);
-    }
+    if (cs->pe==destPE)
+        CmiSendSelf(dupmsg);
     else
         CmiAsyncSendFn(destPE, size, dupmsg);
 }
@@ -864,14 +887,14 @@ CmiCommHandle ElanSendFn(int destPE, int size, char *msg, int flag)
     SMSG_LIST *msg_tmp;
     CmiUInt2  rank, node;
     
-    CQdCreate(CpvAccess(cQdState), 1);
     if(destPE == cs->pe) {
         char *dupmsg = (char *) CmiAlloc(size);
         memcpy(dupmsg, msg, size);
-        CdsFifo_Enqueue(CpvAccess(CmiLocalQueue),dupmsg);
+        CmiSendSelf(dupmsg);
         return 0;
     }
     
+    CQdCreate(CpvAccess(cQdState), 1);
 #if CMK_PERSISTENT_COMM
     if (phs) {
         CmiAssert(phsSize == 1);
@@ -1061,8 +1084,7 @@ void CmiFreeSendFn(int destPE, int size, char *msg)
     CMI_SET_BROADCAST_ROOT(msg, 0);
     
     if (cs->pe==destPE) {
-        CQdCreate(CpvAccess(cQdState), 1);
-        CdsFifo_Enqueue(CpvAccess(CmiLocalQueue),msg);
+        CmiSendSelf(msg);
     } 
     else { 
         if(size <= NON_BLOCKING_MSG) {
@@ -1105,8 +1127,7 @@ void CmiSyncSendFn1(int destPE, int size, char *msg)
     char *dupmsg = (char *) CmiAlloc(size);
     memcpy(dupmsg, msg, size);
     if (cs->pe==destPE) {
-        CQdCreate(CpvAccess(cQdState), 1);
-        CdsFifo_Enqueue(CpvAccess(CmiLocalQueue),dupmsg);
+        CmiSendSelf(dupmsg);
     }
     else
         ElanSendFn(destPE, size, dupmsg, 1);
@@ -1279,6 +1300,10 @@ static void ConverseRunPE(int everReturn)
   
   PumpMsgs(0);
   elan_gsync(elan_base->allGroup);
+
+  /* Converse initialization finishes, immediate messages can be processed.
+     node barrier previously should take care of the node synchronization */
+  _immediateReady = 1;
 
   if (!everReturn) {
     Cmi_startfn(CmiGetArgc(CmiMyArgv), CmiMyArgv);
@@ -1676,4 +1701,3 @@ void CmiFreeListSendFn(int npes, int *pes, int len, char *msg)
 #include "persistent.c"
 #endif
 
-#include "immediate.c"
