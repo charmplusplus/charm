@@ -390,8 +390,8 @@ virtual             {CPP_KEYWORD_RETURN(VIRTUAL);}
 "->*"                {NAMEDOP_RETURN(ARROWstar);}
 "++"                 {NAMEDOP_RETURN(ICR);}
 "--"                 {NAMEDOP_RETURN(DECR);}
-"<<"                 {NAMEDOP_RETURN(LS);}
-">>"                 {NAMEDOP_RETURN(RS);}
+"<<"                 {NAMEDOP_RETURN(LSHIFT);}
+">>"                 {NAMEDOP_RETURN(RSHIFT);}
 "<="                 {NAMEDOP_RETURN(LE);}
 ">="                 {NAMEDOP_RETURN(GE);}
 "=="                 {NAMEDOP_RETURN(EQ);}

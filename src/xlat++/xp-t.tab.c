@@ -1,5 +1,5 @@
 
-/*  A Bison parser, made from xp-t.y
+/*  A Bison parser, made from xp-t.bison
  by  GNU Bison version 1.25
   */
 
@@ -79,8 +79,8 @@
 #define	ARROW	329
 #define	ICR	330
 #define	DECR	331
-#define	LS	332
-#define	RS	333
+#define	LSHIFT	332
+#define	RSHIFT	333
 #define	LE	334
 #define	GE	335
 #define	EQ	336
@@ -102,7 +102,7 @@
 #define	ERassign	352
 #define	ORassign	353
 
-#line 1 "xp-t.y"
+#line 1 "xp-t.bison"
 
 
 /*  Copyright (C) 1989-1991 James A. Roskind, All rights reserved. 
@@ -174,7 +174,7 @@ distinguishing expressions.
 
 */
 
-#line 151 "xp-t.y"
+#line 151 "xp-t.bison"
 
 /*************** Includes and Defines *****************************/
 #define YYDEBUG_LEXER_TEXT (yylval) /* our lexer loads this up each time.
@@ -775,7 +775,7 @@ static const char * const yytname[] = {   "$","error","$undefined.","CHARE",
 "THIS","OPERATOR","CLASS","PUBLIC","PROTECTED","PRIVATE","VIRTUAL","FRIEND",
 "INLINE","UNDERSCORE_INLINE","OVERLOAD","IDENTIFIER","STRINGliteral","FLOATINGconstant",
 "INTEGERconstant","CHARACTERconstant","OCTALconstant","HEXconstant","TYPEDEFname",
-"ARROW","ICR","DECR","LS","RS","LE","GE","EQ","NE","ANDAND","OROR","ELLIPSIS",
+"ARROW","ICR","DECR","LSHIFT","RSHIFT","LE","GE","EQ","NE","ANDAND","OROR","ELLIPSIS",
 "CLCL","DOTstar","ARROWstar","MULTassign","DIVassign","MODassign","PLUSassign",
 "MINUSassign","LSassign","RSassign","ANDassign","ERassign","ORassign","'('",
 "')'","'+'","'-'","'*'","'/'","'%'","'^'","'&'","'|'","'~'","'!'","'<'","'>'",
@@ -5333,63 +5333,63 @@ yyreduce:
   switch (yyn) {
 
 case 1:
-#line 356 "xp-t.y"
+#line 356 "xp-t.bison"
 { yyval = yyvsp[0] ; ;
     break;}
 case 2:
-#line 357 "xp-t.y"
+#line 357 "xp-t.bison"
 { yyval = yyvsp[0] ; ;
     break;}
 case 3:
-#line 361 "xp-t.y"
+#line 361 "xp-t.bison"
 { yyval = yyvsp[0] ; ;
     break;}
 case 4:
-#line 362 "xp-t.y"
+#line 362 "xp-t.bison"
 { yyval = yyvsp[0] ; ;
     break;}
 case 5:
-#line 363 "xp-t.y"
+#line 363 "xp-t.bison"
 { yyval = yyvsp[0] ; ;
     break;}
 case 8:
-#line 408 "xp-t.y"
+#line 408 "xp-t.bison"
 {  yyval = yyvsp[0] ; ;
     break;}
 case 9:
-#line 409 "xp-t.y"
+#line 409 "xp-t.bison"
 { yyval = yyvsp[0] ; ;
     break;}
 case 11:
-#line 437 "xp-t.y"
+#line 437 "xp-t.bison"
 { yyval = yyvsp[0] ; ;
     break;}
 case 13:
-#line 439 "xp-t.y"
+#line 439 "xp-t.bison"
 { yyval = (char *)malloc(sizeof(char)*5);
 					  strcpy(yyval,"this") ;
 					;
     break;}
 case 14:
-#line 442 "xp-t.y"
+#line 442 "xp-t.bison"
 { yyval = yyvsp[0] ; ;
     break;}
 case 16:
-#line 444 "xp-t.y"
+#line 444 "xp-t.bison"
 { yyval = Concat3("(",yyvsp[-1],")") ; ;
     break;}
 case 23:
-#line 492 "xp-t.y"
+#line 492 "xp-t.bison"
 { 	yyval = (char *)malloc(sizeof(char)*(9+strlen(yyvsp[0]))) ;
 		sprintf(yyval,"operator %s",yyvsp[0]) ;	
 	;
     break;}
 case 63:
-#line 585 "xp-t.y"
+#line 585 "xp-t.bison"
 { yyval = yyvsp[0] ; ;
     break;}
 case 64:
-#line 587 "xp-t.y"
+#line 587 "xp-t.bison"
 {	char *temp ;	
 		strcpy(SendPe,yyvsp[-1]);
 		strcpy(SendChare,yyvsp[-3]) ;
@@ -5399,7 +5399,7 @@ case 64:
 	  ;
     break;}
 case 65:
-#line 595 "xp-t.y"
+#line 595 "xp-t.bison"
 { yyval = Concat3(yyvsp[-2],"(",")") ; 
 	    if ( MakeGraph && ( InsideChareCode || CurrentAggType==CHARE 
 				|| CurrentAggType==BRANCHED) )
@@ -5407,7 +5407,7 @@ case 65:
 	  ;
     break;}
 case 66:
-#line 601 "xp-t.y"
+#line 601 "xp-t.bison"
 { char *charename, *scopestr, *temp ; 
 
 	    /***
@@ -5440,19 +5440,19 @@ case 66:
 	  ;
     break;}
 case 67:
-#line 632 "xp-t.y"
+#line 632 "xp-t.bison"
 {StructScope=1;;
     break;}
 case 68:
-#line 633 "xp-t.y"
+#line 633 "xp-t.bison"
 { yyval = Concat3(yyvsp[-3],".",yyvsp[0]) ;StructScope=0; ;
     break;}
 case 69:
-#line 634 "xp-t.y"
+#line 634 "xp-t.bison"
 {StructScope=1;;
     break;}
 case 70:
-#line 635 "xp-t.y"
+#line 635 "xp-t.bison"
 { if ( strcmp(CurrentSharedHandle,"_CK_NOTACCHANDLE") != 0 ) {
 	        int handleindex ;
 	        char *sptr = Mystrstr(OutBuf,CurrentSharedHandle) ;
@@ -5486,7 +5486,7 @@ case 70:
 	  ;
     break;}
 case 71:
-#line 667 "xp-t.y"
+#line 667 "xp-t.bison"
 {	char *wovid ;
 		StructScope = 0 ;
 	        if ( SearchHandleTable(WrOnHandleTable,
@@ -5507,15 +5507,15 @@ case 71:
 	  ;
     break;}
 case 72:
-#line 686 "xp-t.y"
+#line 686 "xp-t.bison"
 { yyval = Concat2(yyvsp[-1],"++") ; ;
     break;}
 case 73:
-#line 688 "xp-t.y"
+#line 688 "xp-t.bison"
 { yyval = Concat2(yyvsp[-1],"--") ; ;
     break;}
 case 74:
-#line 693 "xp-t.y"
+#line 693 "xp-t.bison"
 {	char *sptr ; int i ; char str[64] ;
 		sptr = Mystrstr(OutBuf,yyvsp[-3]) ;
 		if ( sptr != NULL ) 
@@ -5538,14 +5538,14 @@ case 74:
 	  ;
     break;}
 case 75:
-#line 714 "xp-t.y"
+#line 714 "xp-t.bison"
 {
 		if ( MakeGraph ) 
 			fprintf(graphfile," %s\n",yyvsp[0]) ;
 	  ;
     break;}
 case 76:
-#line 719 "xp-t.y"
+#line 719 "xp-t.bison"
 {	if ( !SendMsgBranchPoss ) {
 			SendType = SIMPLE ;
 			strcpy(SendChare,yyvsp[-1]) ;
@@ -5557,7 +5557,7 @@ case 76:
 	  ;
     break;}
 case 77:
-#line 729 "xp-t.y"
+#line 729 "xp-t.bison"
 { 	char *sptr ;	
 		strcpy(SendEP,yyvsp[0]) ; 
 	    	/* discard all the CHARM++ `=>' stuff */
@@ -5574,13 +5574,13 @@ case 77:
 	  ;
     break;}
 case 78:
-#line 745 "xp-t.y"
+#line 745 "xp-t.bison"
 {	strcpy(SendChare,yyvsp[-4]) ;
 		SendType = BROADCAST ;
 	  ;
     break;}
 case 79:
-#line 749 "xp-t.y"
+#line 749 "xp-t.bison"
 { 	char *sptr ;
 		strcpy(SendEP,yyvsp[0]) ; 
 	    	/* discard all the CHARM++ `=>' stuff */
@@ -5597,36 +5597,36 @@ case 79:
 	  ;
     break;}
 case 80:
-#line 772 "xp-t.y"
+#line 772 "xp-t.bison"
 { yyval = Concat3(yyvsp[-2],"(",")") ; ;
     break;}
 case 81:
-#line 774 "xp-t.y"
+#line 774 "xp-t.bison"
 { yyval = Concat3(yyvsp[-2],"(",")") ; ;
     break;}
 case 82:
-#line 776 "xp-t.y"
+#line 776 "xp-t.bison"
 { char *temp ;
 	    temp = Concat3(yyvsp[-3],"(",yyvsp[-1]) ;
 	    yyval = Concat2(temp,")") ;
 	  ;
     break;}
 case 83:
-#line 781 "xp-t.y"
+#line 781 "xp-t.bison"
 { char *temp ;
 	    temp = Concat3(yyvsp[-3],"(",yyvsp[-1]) ;
 	    yyval = Concat2(temp,")") ;
 	  ;
     break;}
 case 84:
-#line 786 "xp-t.y"
+#line 786 "xp-t.bison"
 { char *temp ;
 	    temp = Concat3(yyvsp[-3],"(",yyvsp[-1]) ;
 	    yyval = Concat2(temp,")") ;
 	  ;
     break;}
 case 85:
-#line 809 "xp-t.y"
+#line 809 "xp-t.bison"
 {	char *str ;	
 		if ( IsMonoCall && strcmp(yyvsp[0],"Update")==0 ) {
 		        str=Mystrstr(OutBuf,"Update") ;
@@ -5640,32 +5640,32 @@ case 85:
 	;
     break;}
 case 90:
-#line 828 "xp-t.y"
+#line 828 "xp-t.bison"
 { yyval = yyvsp[0] ; /* FLUSHBUF() ;*/ ;
     break;}
 case 91:
-#line 830 "xp-t.y"
+#line 830 "xp-t.bison"
 { yyval = Concat3(yyvsp[-2],",",yyvsp[0]) ; 
 	    strcpy(LastArg,yyvsp[0]) ;
 	  ;
     break;}
 case 92:
-#line 837 "xp-t.y"
+#line 837 "xp-t.bison"
 { 	yyval = yyvsp[0] ; 
 		strcpy(CurrentSharedHandle,"_CK_NOTACCHANDLE") ; 
 		SendMsgBranchPoss = FALSE ;
 	;
     break;}
 case 93:
-#line 841 "xp-t.y"
+#line 841 "xp-t.bison"
 { yyval = Concat2("++",yyvsp[0]) ; ;
     break;}
 case 94:
-#line 842 "xp-t.y"
+#line 842 "xp-t.bison"
 { yyval = Concat2("--",yyvsp[0]) ; ;
     break;}
 case 95:
-#line 844 "xp-t.y"
+#line 844 "xp-t.bison"
 {  if ( ! FoundChareEPPair ) 
 		yyval = Concat2(CurrentAsterisk,yyvsp[0]) ; 
              else
@@ -5674,347 +5674,347 @@ case 95:
 	  ;
     break;}
 case 96:
-#line 850 "xp-t.y"
+#line 850 "xp-t.bison"
 { yyval = Concat2("-",yyvsp[0]) ; ;
     break;}
 case 97:
-#line 851 "xp-t.y"
+#line 851 "xp-t.bison"
 { yyval = Concat2("+",yyvsp[0]) ; ;
     break;}
 case 98:
-#line 852 "xp-t.y"
+#line 852 "xp-t.bison"
 { yyval = Concat2("~",yyvsp[0]) ; ;
     break;}
 case 99:
-#line 853 "xp-t.y"
+#line 853 "xp-t.bison"
 { yyval = Concat2("!",yyvsp[0]) ; ;
     break;}
 case 100:
-#line 854 "xp-t.y"
+#line 854 "xp-t.bison"
 { yyval = Concat2("sizeof",yyvsp[0]) ; ;
     break;}
 case 101:
-#line 855 "xp-t.y"
+#line 855 "xp-t.bison"
 { char *temp = Concat3("sizeof","(",yyvsp[-1]) ;
 					  yyval = Concat2(temp,")") ;
 					;
     break;}
 case 102:
-#line 858 "xp-t.y"
+#line 858 "xp-t.bison"
 { yyval = yyvsp[0] ; ;
     break;}
 case 103:
-#line 882 "xp-t.y"
+#line 882 "xp-t.bison"
 { 	OutputNewChareMsg(yyvsp[-2], yyvsp[0], NULL) ; ;
     break;}
 case 104:
-#line 885 "xp-t.y"
+#line 885 "xp-t.bison"
 { 	OutputNewChareMsg(yyvsp[-2], yyvsp[0], yyvsp[-5]) ; ;
     break;}
 case 105:
-#line 889 "xp-t.y"
+#line 889 "xp-t.bison"
 { 	OutputNewChareMsg(NewType, yyvsp[0], NULL) ;;
     break;}
 case 106:
-#line 892 "xp-t.y"
+#line 892 "xp-t.bison"
 { 	OutputNewChareMsg(NewType, yyvsp[0], yyvsp[-2]) ; ;
     break;}
 case 107:
-#line 898 "xp-t.y"
+#line 898 "xp-t.bison"
 { NewOpType = NEW ; ;
     break;}
 case 108:
-#line 899 "xp-t.y"
+#line 899 "xp-t.bison"
 { NewOpType = NEWCHARE ; ;
     break;}
 case 109:
-#line 900 "xp-t.y"
+#line 900 "xp-t.bison"
 { NewOpType = NEWGROUP ; ;
     break;}
 case 110:
-#line 901 "xp-t.y"
+#line 901 "xp-t.bison"
 { NewOpType = NEW ; ;
     break;}
 case 112:
-#line 910 "xp-t.y"
+#line 910 "xp-t.bison"
 { 	NewType = (char *)malloc(strlen(yyvsp[-2])+1) ;
 		strcpy(NewType, yyvsp[-2]) ;
 		yyval = yyvsp[0] ;
 	  ;
     break;}
 case 113:
-#line 922 "xp-t.y"
+#line 922 "xp-t.bison"
 { FoundDeclarator = FALSE; ;
     break;}
 case 114:
-#line 924 "xp-t.y"
+#line 924 "xp-t.bison"
 { FoundDeclarator = TRUE; ;
     break;}
 case 115:
-#line 926 "xp-t.y"
+#line 926 "xp-t.bison"
 { FoundDeclarator = TRUE; ;
     break;}
 case 116:
-#line 928 "xp-t.y"
+#line 928 "xp-t.bison"
 { FoundDeclarator = TRUE; ;
     break;}
 case 120:
-#line 938 "xp-t.y"
+#line 938 "xp-t.bison"
 { yyval = NULL ; ;
     break;}
 case 121:
-#line 939 "xp-t.y"
+#line 939 "xp-t.bison"
 { yyval = NULL ; ;
     break;}
 case 122:
-#line 940 "xp-t.y"
+#line 940 "xp-t.bison"
 { yyval = yyvsp[-1] ; ;
     break;}
 case 123:
-#line 944 "xp-t.y"
+#line 944 "xp-t.bison"
 { yyval=yyvsp[0] ; ;
     break;}
 case 124:
-#line 946 "xp-t.y"
+#line 946 "xp-t.bison"
 { char *temp = Concat3("(",yyvsp[-2],")") ; 
 	    yyval = Concat2(temp,yyvsp[0]) ;
 	  ;
     break;}
 case 125:
-#line 954 "xp-t.y"
+#line 954 "xp-t.bison"
 { yyval=yyvsp[0] ; ;
     break;}
 case 131:
-#line 970 "xp-t.y"
+#line 970 "xp-t.bison"
 { yyval=yyvsp[0] ; ;
     break;}
 case 132:
-#line 972 "xp-t.y"
+#line 972 "xp-t.bison"
 { yyval = Concat3(yyvsp[-2],".*",yyvsp[0]) ; ;
     break;}
 case 133:
-#line 974 "xp-t.y"
+#line 974 "xp-t.bison"
 { yyval = Concat3(yyvsp[-2],"->*",yyvsp[0]) ; ;
     break;}
 case 134:
-#line 978 "xp-t.y"
+#line 978 "xp-t.bison"
 { yyval=yyvsp[0] ; ;
     break;}
 case 135:
-#line 980 "xp-t.y"
+#line 980 "xp-t.bison"
 { yyval = Concat3(yyvsp[-2],"*",yyvsp[0]) ; ;
     break;}
 case 136:
-#line 982 "xp-t.y"
+#line 982 "xp-t.bison"
 { yyval = Concat3(yyvsp[-2],"/",yyvsp[0]) ; ;
     break;}
 case 137:
-#line 984 "xp-t.y"
+#line 984 "xp-t.bison"
 { yyval = Concat3(yyvsp[-2],"%",yyvsp[0]) ; ;
     break;}
 case 138:
-#line 988 "xp-t.y"
+#line 988 "xp-t.bison"
 { yyval=yyvsp[0] ; ;
     break;}
 case 139:
-#line 990 "xp-t.y"
+#line 990 "xp-t.bison"
 { yyval = Concat3(yyvsp[-2],"+",yyvsp[0]) ; ;
     break;}
 case 140:
-#line 992 "xp-t.y"
+#line 992 "xp-t.bison"
 { yyval = Concat3(yyvsp[-2],"-",yyvsp[0]) ; ;
     break;}
 case 141:
-#line 996 "xp-t.y"
+#line 996 "xp-t.bison"
 { yyval=yyvsp[0] ; ;
     break;}
 case 142:
-#line 998 "xp-t.y"
+#line 998 "xp-t.bison"
 { yyval = Concat3(yyvsp[-2],"<<",yyvsp[0]) ; ;
     break;}
 case 143:
-#line 1000 "xp-t.y"
+#line 1000 "xp-t.bison"
 { yyval = Concat3(yyvsp[-2],">>",yyvsp[0]) ; ;
     break;}
 case 144:
-#line 1004 "xp-t.y"
+#line 1004 "xp-t.bison"
 { yyval=yyvsp[0] ; ;
     break;}
 case 145:
-#line 1006 "xp-t.y"
+#line 1006 "xp-t.bison"
 { yyval = Concat3(yyvsp[-2],"<",yyvsp[0]) ; ;
     break;}
 case 146:
-#line 1008 "xp-t.y"
+#line 1008 "xp-t.bison"
 { yyval = Concat3(yyvsp[-2],">",yyvsp[0]) ; ;
     break;}
 case 147:
-#line 1010 "xp-t.y"
+#line 1010 "xp-t.bison"
 { yyval = Concat3(yyvsp[-2],"<=",yyvsp[0]) ; ;
     break;}
 case 148:
-#line 1012 "xp-t.y"
+#line 1012 "xp-t.bison"
 { yyval = Concat3(yyvsp[-2],">=",yyvsp[0]) ; ;
     break;}
 case 149:
-#line 1016 "xp-t.y"
+#line 1016 "xp-t.bison"
 { yyval=yyvsp[0] ; ;
     break;}
 case 150:
-#line 1018 "xp-t.y"
+#line 1018 "xp-t.bison"
 { yyval = Concat3(yyvsp[-2],"==",yyvsp[0]) ; ;
     break;}
 case 151:
-#line 1020 "xp-t.y"
+#line 1020 "xp-t.bison"
 { yyval = Concat3(yyvsp[-2],"!=",yyvsp[0]) ; ;
     break;}
 case 152:
-#line 1024 "xp-t.y"
+#line 1024 "xp-t.bison"
 { yyval=yyvsp[0] ; ;
     break;}
 case 153:
-#line 1026 "xp-t.y"
+#line 1026 "xp-t.bison"
 { yyval = Concat3(yyvsp[-2],"&",yyvsp[0]) ; ;
     break;}
 case 154:
-#line 1030 "xp-t.y"
+#line 1030 "xp-t.bison"
 { yyval=yyvsp[0] ; ;
     break;}
 case 155:
-#line 1032 "xp-t.y"
+#line 1032 "xp-t.bison"
 { yyval = Concat3(yyvsp[-2],"^",yyvsp[0]) ; ;
     break;}
 case 156:
-#line 1036 "xp-t.y"
+#line 1036 "xp-t.bison"
 { yyval=yyvsp[0] ; ;
     break;}
 case 157:
-#line 1038 "xp-t.y"
+#line 1038 "xp-t.bison"
 { yyval = Concat3(yyvsp[-2],"|",yyvsp[0]) ; ;
     break;}
 case 158:
-#line 1042 "xp-t.y"
+#line 1042 "xp-t.bison"
 { yyval=yyvsp[0] ; ;
     break;}
 case 159:
-#line 1044 "xp-t.y"
+#line 1044 "xp-t.bison"
 { yyval = Concat3(yyvsp[-2],"&&",yyvsp[0]) ; ;
     break;}
 case 160:
-#line 1048 "xp-t.y"
+#line 1048 "xp-t.bison"
 { yyval=yyvsp[0] ; ;
     break;}
 case 161:
-#line 1050 "xp-t.y"
+#line 1050 "xp-t.bison"
 { yyval = Concat3(yyvsp[-2],"||",yyvsp[0]) ; ;
     break;}
 case 162:
-#line 1054 "xp-t.y"
+#line 1054 "xp-t.bison"
 { yyval=yyvsp[0] ; ;
     break;}
 case 163:
-#line 1058 "xp-t.y"
+#line 1058 "xp-t.bison"
 { char *temp = Concat3(yyvsp[-4],"?",yyvsp[-2]) ;
 	    yyval = Concat3(temp,":",yyvsp[0]) ;
 	  ;
     break;}
 case 164:
-#line 1064 "xp-t.y"
+#line 1064 "xp-t.bison"
 { yyval=yyvsp[0] ; ;
     break;}
 case 165:
-#line 1066 "xp-t.y"
+#line 1066 "xp-t.bison"
 { yyval = Concat3(yyvsp[-2],CurrentAssOp,yyvsp[0]) ; ;
     break;}
 case 166:
-#line 1070 "xp-t.y"
+#line 1070 "xp-t.bison"
 { yyval = yyvsp[0] ; strcpy(CurrentAssOp,"=") ;;
     break;}
 case 167:
-#line 1071 "xp-t.y"
+#line 1071 "xp-t.bison"
 { yyval = yyvsp[0] ; strcpy(CurrentAssOp,"*=") ;;
     break;}
 case 168:
-#line 1072 "xp-t.y"
+#line 1072 "xp-t.bison"
 { yyval = yyvsp[0] ; strcpy(CurrentAssOp,"/=") ;;
     break;}
 case 169:
-#line 1073 "xp-t.y"
+#line 1073 "xp-t.bison"
 { yyval = yyvsp[0] ; strcpy(CurrentAssOp,"%=") ;;
     break;}
 case 170:
-#line 1074 "xp-t.y"
+#line 1074 "xp-t.bison"
 { yyval = yyvsp[0] ; strcpy(CurrentAssOp,"+=") ;;
     break;}
 case 171:
-#line 1075 "xp-t.y"
+#line 1075 "xp-t.bison"
 { yyval = yyvsp[0] ; strcpy(CurrentAssOp,"-=") ;;
     break;}
 case 172:
-#line 1076 "xp-t.y"
+#line 1076 "xp-t.bison"
 { yyval = yyvsp[0] ; strcpy(CurrentAssOp,"<<=") ;;
     break;}
 case 173:
-#line 1077 "xp-t.y"
+#line 1077 "xp-t.bison"
 { yyval = yyvsp[0] ; strcpy(CurrentAssOp,">>=") ;;
     break;}
 case 174:
-#line 1078 "xp-t.y"
+#line 1078 "xp-t.bison"
 { yyval = yyvsp[0] ; strcpy(CurrentAssOp,"&=") ;;
     break;}
 case 175:
-#line 1079 "xp-t.y"
+#line 1079 "xp-t.bison"
 { yyval = yyvsp[0] ; strcpy(CurrentAssOp,"^=") ;;
     break;}
 case 176:
-#line 1080 "xp-t.y"
+#line 1080 "xp-t.bison"
 { yyval = yyvsp[0] ; strcpy(CurrentAssOp,"|=") ;;
     break;}
 case 177:
-#line 1084 "xp-t.y"
+#line 1084 "xp-t.bison"
 { yyval=yyvsp[0] ; ;
     break;}
 case 178:
-#line 1086 "xp-t.y"
+#line 1086 "xp-t.bison"
 { yyval = Concat3(yyvsp[-2],",",yyvsp[0]) ; ;
     break;}
 case 182:
-#line 1116 "xp-t.y"
+#line 1116 "xp-t.bison"
 { 	
 		strcpy(CurrentDeclType,"") ;
 		FoundReadOnly = FALSE ;
 	  ;
     break;}
 case 183:
-#line 1122 "xp-t.y"
+#line 1122 "xp-t.bison"
 { 	
 		strcpy(CurrentDeclType,"") ;
 		FoundReadOnly = FALSE ;
 	  ;
     break;}
 case 184:
-#line 1126 "xp-t.y"
+#line 1126 "xp-t.bison"
 { /* this is constraint error, as it
                                         includes a storage class!?!*/ ;
     break;}
 case 187:
-#line 1130 "xp-t.y"
+#line 1130 "xp-t.bison"
 { FLUSHBUF() ; ;
     break;}
 case 188:
-#line 1154 "xp-t.y"
+#line 1154 "xp-t.bison"
 {;
     break;}
 case 190:
-#line 1155 "xp-t.y"
+#line 1155 "xp-t.bison"
 {;
     break;}
 case 192:
-#line 1156 "xp-t.y"
+#line 1156 "xp-t.bison"
 {;
     break;}
 case 197:
-#line 1170 "xp-t.y"
+#line 1170 "xp-t.bison"
 {	strcpy(CurrentDeclType,yyvsp[-1]) ;
 		if ( CurrentStorage == TYPEDEF ) {
 			InsertSymTable(yyvsp[0]) ;
@@ -6033,7 +6033,7 @@ case 197:
 	;
     break;}
 case 199:
-#line 1188 "xp-t.y"
+#line 1188 "xp-t.bison"
 {	strcpy(CurrentDeclType,yyvsp[-1]) ; 
 		if ( FoundReadOnly && CurrentStorage != EXTERN ) {
 			if ( FoundInMsgTable(yyvsp[-1]) != -1 )
@@ -6046,11 +6046,11 @@ case 199:
 	  ;
     break;}
 case 201:
-#line 1199 "xp-t.y"
+#line 1199 "xp-t.bison"
 {strcpy(CurrentDeclType,yyvsp[-1]) ;;
     break;}
 case 203:
-#line 1201 "xp-t.y"
+#line 1201 "xp-t.bison"
 {	strcpy(CurrentDeclType,yyvsp[-1]) ;
 	  	if ( strcmp(yyvsp[-1],"table")==0 ) {
 			CurrentAggType = DTABLE ;
@@ -6059,11 +6059,11 @@ case 203:
 	  ;
     break;}
 case 205:
-#line 1209 "xp-t.y"
+#line 1209 "xp-t.bison"
 {strcpy(CurrentDeclType,yyvsp[-1]) ;;
     break;}
 case 207:
-#line 1211 "xp-t.y"
+#line 1211 "xp-t.bison"
 {	if ( FoundReadOnly && CurrentStorage != EXTERN ) {
 			if ( FoundInMsgTable(CurrentDeclType) != -1 )
                         	CurrentAggType = READMSG ;
@@ -6079,29 +6079,29 @@ case 207:
 	  ;
     break;}
 case 237:
-#line 1325 "xp-t.y"
+#line 1325 "xp-t.bison"
 {yyval=yyvsp[0];;
     break;}
 case 238:
-#line 1327 "xp-t.y"
+#line 1327 "xp-t.bison"
 { yyval = (char *)malloc(sizeof(char)*2) ;
 	    strcpy(yyval,"") ; 
           ;
     break;}
 case 239:
-#line 1330 "xp-t.y"
+#line 1330 "xp-t.bison"
 {yyval=yyvsp[0];;
     break;}
 case 240:
-#line 1334 "xp-t.y"
+#line 1334 "xp-t.bison"
 {yyval = yyvsp[0];;
     break;}
 case 243:
-#line 1337 "xp-t.y"
+#line 1337 "xp-t.bison"
 {yyval = yyvsp[0];;
     break;}
 case 253:
-#line 1360 "xp-t.y"
+#line 1360 "xp-t.bison"
 { if ( CurrentScope > 0 ) 
 		CharmError("readonly variables allowed only at file scope") ;
 	  else 
@@ -6109,193 +6109,193 @@ case 253:
 	;
     break;}
 case 254:
-#line 1368 "xp-t.y"
+#line 1368 "xp-t.bison"
 { yyval = yyvsp[0] ; ;
     break;}
 case 255:
-#line 1369 "xp-t.y"
+#line 1369 "xp-t.bison"
 { yyval = yyvsp[-1] ; ;
     break;}
 case 256:
-#line 1370 "xp-t.y"
+#line 1370 "xp-t.bison"
 { yyval = yyvsp[-1] ; ;
     break;}
 case 257:
-#line 1371 "xp-t.y"
+#line 1371 "xp-t.bison"
 { yyval = yyvsp[-1] ; ;
     break;}
 case 258:
-#line 1372 "xp-t.y"
+#line 1372 "xp-t.bison"
 { yyval = yyvsp[-1] ; ;
     break;}
 case 259:
-#line 1377 "xp-t.y"
+#line 1377 "xp-t.bison"
 { yyval = yyvsp[-1] ; ;
     break;}
 case 260:
-#line 1378 "xp-t.y"
+#line 1378 "xp-t.bison"
 { yyval = yyvsp[-1] ; ;
     break;}
 case 261:
-#line 1379 "xp-t.y"
+#line 1379 "xp-t.bison"
 { yyval = yyvsp[-1] ; ;
     break;}
 case 262:
-#line 1380 "xp-t.y"
+#line 1380 "xp-t.bison"
 { yyval = yyvsp[-1] ; ;
     break;}
 case 263:
-#line 1381 "xp-t.y"
+#line 1381 "xp-t.bison"
 { yyval = yyvsp[-1] ; ;
     break;}
 case 275:
-#line 1405 "xp-t.y"
+#line 1405 "xp-t.bison"
 { yyval = yyvsp[0]; ;
     break;}
 case 276:
-#line 1406 "xp-t.y"
+#line 1406 "xp-t.bison"
 { yyval = yyvsp[0]; ;
     break;}
 case 277:
-#line 1407 "xp-t.y"
+#line 1407 "xp-t.bison"
 { yyval = yyvsp[-1]; ;
     break;}
 case 278:
-#line 1408 "xp-t.y"
+#line 1408 "xp-t.bison"
 { yyval = yyvsp[-1]; ;
     break;}
 case 279:
-#line 1409 "xp-t.y"
+#line 1409 "xp-t.bison"
 { yyval = yyvsp[-1]; ;
     break;}
 case 280:
-#line 1410 "xp-t.y"
+#line 1410 "xp-t.bison"
 { yyval = yyvsp[-1]; ;
     break;}
 case 281:
-#line 1414 "xp-t.y"
+#line 1414 "xp-t.bison"
 { yyval = yyvsp[0] ; ;
     break;}
 case 282:
-#line 1415 "xp-t.y"
+#line 1415 "xp-t.bison"
 { yyval = yyvsp[0] ; ;
     break;}
 case 283:
-#line 1417 "xp-t.y"
+#line 1417 "xp-t.bison"
 { yyval = yyvsp[-1] ; ;
     break;}
 case 284:
-#line 1418 "xp-t.y"
+#line 1418 "xp-t.bison"
 { yyval = yyvsp[-1] ; ;
     break;}
 case 285:
-#line 1420 "xp-t.y"
+#line 1420 "xp-t.bison"
 { yyval = yyvsp[-1] ; ;
     break;}
 case 286:
-#line 1449 "xp-t.y"
+#line 1449 "xp-t.bison"
 { CurrentStorage = EXTERN ; ;
     break;}
 case 287:
-#line 1450 "xp-t.y"
+#line 1450 "xp-t.bison"
 { CurrentStorage = TYPEDEF ; ;
     break;}
 case 288:
-#line 1451 "xp-t.y"
+#line 1451 "xp-t.bison"
 { CurrentStorage = STATIC ; ;
     break;}
 case 289:
-#line 1452 "xp-t.y"
+#line 1452 "xp-t.bison"
 { CurrentStorage = AUTO ; ;
     break;}
 case 290:
-#line 1453 "xp-t.y"
+#line 1453 "xp-t.bison"
 { CurrentStorage = REGISTER ; ;
     break;}
 case 291:
-#line 1454 "xp-t.y"
+#line 1454 "xp-t.bison"
 { CurrentStorage = FRIEND ; ;
     break;}
 case 292:
-#line 1455 "xp-t.y"
+#line 1455 "xp-t.bison"
 { CurrentStorage = OVERLOAD ; ;
     break;}
 case 293:
-#line 1456 "xp-t.y"
+#line 1456 "xp-t.bison"
 { CurrentStorage = INLINE ; 
 						  CurrentFnIsInline = TRUE ;
 						;
     break;}
 case 294:
-#line 1459 "xp-t.y"
+#line 1459 "xp-t.bison"
 { CurrentStorage = INLINE ; ;
     break;}
 case 295:
-#line 1460 "xp-t.y"
+#line 1460 "xp-t.bison"
 { CurrentStorage = VIRTUAL ; ;
     break;}
 case 296:
-#line 1464 "xp-t.y"
+#line 1464 "xp-t.bison"
 { yyval = (char *)malloc(4) ; 
 			  strcpy(yyval,"int") ;	   ;
     break;}
 case 297:
-#line 1466 "xp-t.y"
+#line 1466 "xp-t.bison"
 { yyval = (char *)malloc(5) ; 
 			  strcpy(yyval,"char") ;	   ;
     break;}
 case 298:
-#line 1468 "xp-t.y"
+#line 1468 "xp-t.bison"
 { yyval = (char *)malloc(6) ; 
 			  strcpy(yyval,"short") ;	   ;
     break;}
 case 299:
-#line 1470 "xp-t.y"
+#line 1470 "xp-t.bison"
 { yyval = (char *)malloc(5) ; 
 			  strcpy(yyval,"long") ;	   ;
     break;}
 case 300:
-#line 1472 "xp-t.y"
+#line 1472 "xp-t.bison"
 { yyval = (char *)malloc(6) ; 
 			  strcpy(yyval,"float") ;	   ;
     break;}
 case 301:
-#line 1474 "xp-t.y"
+#line 1474 "xp-t.bison"
 { yyval = (char *)malloc(10) ; 
 			  strcpy(yyval,"ptrdiff_t") ; ;
     break;}
 case 302:
-#line 1476 "xp-t.y"
+#line 1476 "xp-t.bison"
 { yyval = (char *)malloc(10) ; 
 			  strcpy(yyval,"wchar_t") ; ;
     break;}
 case 303:
-#line 1478 "xp-t.y"
+#line 1478 "xp-t.bison"
 { yyval = (char *)malloc(10) ; 
 			  strcpy(yyval,"__wchar_t") ; ;
     break;}
 case 304:
-#line 1480 "xp-t.y"
+#line 1480 "xp-t.bison"
 { yyval = (char *)malloc(7) ; 
 			  strcpy(yyval,"double") ;	   ;
     break;}
 case 305:
-#line 1482 "xp-t.y"
+#line 1482 "xp-t.bison"
 { yyval = (char *)malloc(7) ; 
 			  strcpy(yyval,"signed") ;	   ;
     break;}
 case 306:
-#line 1484 "xp-t.y"
+#line 1484 "xp-t.bison"
 { yyval = (char *)malloc(9) ; 
 			  strcpy(yyval,"unsigned") ;  ;
     break;}
 case 307:
-#line 1486 "xp-t.y"
+#line 1486 "xp-t.bison"
 { yyval = (char *)malloc(5) ; 
 			  strcpy(yyval,"void") ;	   ;
     break;}
 case 312:
-#line 1515 "xp-t.y"
+#line 1515 "xp-t.bison"
 {  	if ( CurrentAggType == CHARE ) {
 			FLUSHBUF() ;	
 			if ( numparents == 0  )
@@ -6326,7 +6326,7 @@ case 312:
 	;
     break;}
 case 313:
-#line 1544 "xp-t.y"
+#line 1544 "xp-t.bison"
 {	int num, i ;	
 		ChareInfo *chare ;
 		char *mymsg ;
@@ -6398,11 +6398,11 @@ case 313:
 	;
     break;}
 case 314:
-#line 1613 "xp-t.y"
+#line 1613 "xp-t.bison"
 { FillPermanentAggTable(yyvsp[-5]) ; ;
     break;}
 case 315:
-#line 1615 "xp-t.y"
+#line 1615 "xp-t.bison"
 {   FLUSHBUF() ;	
 	    if ( CurrentAggType == ACCUMULATOR || CurrentAggType == MONOTONIC )
 	    {   if ( !FilledAccMsg ) 
@@ -6484,14 +6484,14 @@ case 315:
 	;
     break;}
 case 317:
-#line 1713 "xp-t.y"
+#line 1713 "xp-t.bison"
 {	strcpy(CurrentAggName,yyvsp[0]);
 	   	InsertSymTable(yyvsp[0]) ;
 	   	yyval = yyvsp[0] ;
 	  ;
     break;}
 case 318:
-#line 1718 "xp-t.y"
+#line 1718 "xp-t.bison"
 {	if ( AddedScope > 0 ) {
 			PopStack() ;	
 			AddedScope = 0 ;
@@ -6502,14 +6502,14 @@ case 318:
 	  ;
     break;}
 case 319:
-#line 1727 "xp-t.y"
+#line 1727 "xp-t.bison"
 {	strcpy(CurrentAggName,yyvsp[0]);
 	    	InsertSymTable(yyvsp[0]) ;
 	     	yyval = yyvsp[0] ;
 	  ;
     break;}
 case 320:
-#line 1732 "xp-t.y"
+#line 1732 "xp-t.bison"
 {	if ( AddedScope > 0 ) {
 			PopStack() ;	
 			AddedScope = 0 ;
@@ -6520,95 +6520,95 @@ case 320:
 	  ;
     break;}
 case 323:
-#line 1745 "xp-t.y"
+#line 1745 "xp-t.bison"
 {FLUSHBUF(); SyntaxError("class defn header");;
     break;}
 case 324:
-#line 1750 "xp-t.y"
+#line 1750 "xp-t.bison"
 {	ParentArray[numparents] = (char *)malloc(strlen(yyvsp[0])+1) ;
 		strcpy(ParentArray[numparents],yyvsp[0]) ;
 		numparents++ ;
 	;
     break;}
 case 325:
-#line 1755 "xp-t.y"
+#line 1755 "xp-t.bison"
 {	ParentArray[numparents] = (char *)malloc(strlen(yyvsp[0])+1) ;
 		strcpy(ParentArray[numparents],yyvsp[0]) ;
 		numparents++ ;
 	;
     break;}
 case 326:
-#line 1762 "xp-t.y"
+#line 1762 "xp-t.bison"
 {yyval=yyvsp[0];;
     break;}
 case 327:
-#line 1763 "xp-t.y"
+#line 1763 "xp-t.bison"
 {yyval=yyvsp[0];;
     break;}
 case 328:
-#line 1764 "xp-t.y"
+#line 1764 "xp-t.bison"
 {yyval=yyvsp[0];;
     break;}
 case 333:
-#line 1778 "xp-t.y"
+#line 1778 "xp-t.bison"
 { CurrentAccess = PUBLIC ; ;
     break;}
 case 334:
-#line 1779 "xp-t.y"
+#line 1779 "xp-t.bison"
 { CurrentAccess = PRIVATE ; ;
     break;}
 case 335:
-#line 1780 "xp-t.y"
+#line 1780 "xp-t.bison"
 { CurrentAccess = PROTECTED ; ;
     break;}
 case 336:
-#line 1781 "xp-t.y"
+#line 1781 "xp-t.bison"
 { CurrentAccess = ENTRY ; ;
     break;}
 case 337:
-#line 1785 "xp-t.y"
+#line 1785 "xp-t.bison"
 { CurrentAggType = STRUCT ; ;
     break;}
 case 338:
-#line 1786 "xp-t.y"
+#line 1786 "xp-t.bison"
 { CurrentAggType = UNION ; ;
     break;}
 case 339:
-#line 1787 "xp-t.y"
+#line 1787 "xp-t.bison"
 { CurrentAggType = CLASS ; ;
     break;}
 case 340:
-#line 1788 "xp-t.y"
+#line 1788 "xp-t.bison"
 { CurrentAggType = CHARE ; ;
     break;}
 case 341:
-#line 1790 "xp-t.y"
+#line 1790 "xp-t.bison"
 { CurrentAggType = MESSAGE ; ;
     break;}
 case 342:
-#line 1791 "xp-t.y"
+#line 1791 "xp-t.bison"
 { CurrentAggType = ACCUMULATOR ; 
 				  FilledAccMsg=FALSE; ;
     break;}
 case 343:
-#line 1793 "xp-t.y"
+#line 1793 "xp-t.bison"
 { CurrentAggType = MONOTONIC ; 
 				  FilledAccMsg=FALSE; ;
     break;}
 case 345:
-#line 1806 "xp-t.y"
+#line 1806 "xp-t.bison"
 { FLUSHBUF() ;;
     break;}
 case 346:
-#line 1810 "xp-t.y"
+#line 1810 "xp-t.bison"
 { strcpy(CurrentDeclType,"") ;;
     break;}
 case 347:
-#line 1811 "xp-t.y"
+#line 1811 "xp-t.bison"
 { strcpy(CurrentDeclType,"") ;;
     break;}
 case 362:
-#line 1854 "xp-t.y"
+#line 1854 "xp-t.bison"
 {strcpy(CurrentDeclType,yyvsp[-2]) ;	
 	   if (FoundParms&&(CurrentAggType==CHARE||CurrentAggType==BRANCHED)) {
 		if ( CurrentAccess == PRIVATE || CurrentAccess == PUBLIC )
@@ -6617,7 +6617,7 @@ case 362:
 	  ;
     break;}
 case 363:
-#line 1861 "xp-t.y"
+#line 1861 "xp-t.bison"
 {int ind ;
 	   if ( FoundParms ) {
 	     if (CurrentAggType==CHARE || CurrentAggType==BRANCHED) {
@@ -6650,7 +6650,7 @@ case 363:
 	  ;
     break;}
 case 365:
-#line 1894 "xp-t.y"
+#line 1894 "xp-t.bison"
 {strcpy(CurrentDeclType,yyvsp[-2]) ;	
 	   if (FoundParms&&(CurrentAggType==CHARE||CurrentAggType==BRANCHED)) {
 		if ( CurrentAccess == PRIVATE || CurrentAccess == PUBLIC )
@@ -6659,7 +6659,7 @@ case 365:
 	  ;
     break;}
 case 374:
-#line 1921 "xp-t.y"
+#line 1921 "xp-t.bison"
 { if ( (CurrentAggType==ACCUMULATOR || CurrentAggType==MONOTONIC) 
 		&& !FilledAccMsg ) 
 	  {	CurrentAcc->msgtype = (char *)malloc((strlen(yyvsp[-2])+1)*sizeof(char));
@@ -6685,15 +6685,15 @@ case 374:
 	;
     break;}
 case 375:
-#line 1946 "xp-t.y"
+#line 1946 "xp-t.bison"
 {	strcpy(CurrentDeclType,yyvsp[-2]) ;  	;
     break;}
 case 376:
-#line 1948 "xp-t.y"
+#line 1948 "xp-t.bison"
 {     strcpy(CurrentDeclType,yyvsp[-2]) ;    ;
     break;}
 case 377:
-#line 1951 "xp-t.y"
+#line 1951 "xp-t.bison"
 {     strcpy(CurrentDeclType,yyvsp[-2]) ;    
 		if ( CurrentStorage == TYPEDEF ) {
 			InsertSymTable(yyvsp[-1]) ;
@@ -6713,48 +6713,48 @@ case 377:
 	  ;
     break;}
 case 378:
-#line 1969 "xp-t.y"
+#line 1969 "xp-t.bison"
 {     strcpy(CurrentDeclType,yyvsp[-2]) ;    ;
     break;}
 case 379:
-#line 1971 "xp-t.y"
+#line 1971 "xp-t.bison"
 {     strcpy(CurrentDeclType,yyvsp[-2]) ;    ;
     break;}
 case 405:
-#line 2063 "xp-t.y"
+#line 2063 "xp-t.bison"
 {;
     break;}
 case 408:
-#line 2076 "xp-t.y"
+#line 2076 "xp-t.bison"
 {;
     break;}
 case 412:
-#line 2096 "xp-t.y"
+#line 2096 "xp-t.bison"
 { InsertSymTable(yyvsp[0]) ; ;
     break;}
 case 424:
-#line 2142 "xp-t.y"
+#line 2142 "xp-t.bison"
 { 	EpMsg=yyvsp[-2]; 
 	  ;
     break;}
 case 458:
-#line 2278 "xp-t.y"
+#line 2278 "xp-t.bison"
 { 	EpMsg=yyvsp[-1]; 
 		strcpy(CurrentMsgParm,yyvsp[-1]) ;
 	  ;
     break;}
 case 459:
-#line 2282 "xp-t.y"
+#line 2282 "xp-t.bison"
 { 	EpMsg=yyvsp[-1]; 
 		strcpy(CurrentMsgParm,yyvsp[-1]) ;
 	  ;
     break;}
 case 465:
-#line 2295 "xp-t.y"
+#line 2295 "xp-t.bison"
 { yyval = yyvsp[0] ; ;
     break;}
 case 491:
-#line 2352 "xp-t.y"
+#line 2352 "xp-t.bison"
 {	if ( FoundAccFnDef ) {
 			strcat(OutBuf,prevtoken) ;
 			strcpy(prevtoken,"") ;
@@ -6769,7 +6769,7 @@ case 491:
 	;
     break;}
 case 492:
-#line 2365 "xp-t.y"
+#line 2365 "xp-t.bison"
 { 	if ( AccFnScope == CurrentScope+1 ) {
 		/* +1 because the '}' has already been lexed at this point */
 			FLUSHBUF() ;
@@ -6782,75 +6782,75 @@ case 492:
 	;
     break;}
 case 493:
-#line 2375 "xp-t.y"
+#line 2375 "xp-t.bison"
 { FLUSHBUF() ; ;
     break;}
 case 494:
-#line 2384 "xp-t.y"
+#line 2384 "xp-t.bison"
 { FLUSHBUF() ; ;
     break;}
 case 495:
-#line 2385 "xp-t.y"
+#line 2385 "xp-t.bison"
 { FLUSHBUF() ; ;
     break;}
 case 497:
-#line 2390 "xp-t.y"
+#line 2390 "xp-t.bison"
 { FLUSHBUF() ; ;
     break;}
 case 502:
-#line 2404 "xp-t.y"
+#line 2404 "xp-t.bison"
 { FLUSHBUF(); ;
     break;}
 case 503:
-#line 2405 "xp-t.y"
+#line 2405 "xp-t.bison"
 { FLUSHBUF(); 
 			  SyntaxError("if/switch condition") ;;
     break;}
 case 504:
-#line 2410 "xp-t.y"
+#line 2410 "xp-t.bison"
 {FLUSHBUF();;
     break;}
 case 506:
-#line 2411 "xp-t.y"
+#line 2411 "xp-t.bison"
 { FLUSHBUF() ; 
 				  SyntaxError("while loop condition");;
     break;}
 case 509:
-#line 2416 "xp-t.y"
+#line 2416 "xp-t.bison"
 { FLUSHBUF() ; 
 				    SyntaxError("do loop condition"); ;
     break;}
 case 511:
-#line 2421 "xp-t.y"
+#line 2421 "xp-t.bison"
 {FLUSHBUF();;
     break;}
 case 514:
-#line 2425 "xp-t.y"
+#line 2425 "xp-t.bison"
 { FLUSHBUF() ; 
 				  SyntaxError("for loop header") ; ;
     break;}
 case 523:
-#line 2451 "xp-t.y"
+#line 2451 "xp-t.bison"
 { FLUSHBUF() ; 
 						  strcpy(CurrentAggName,"") ;
 						;
     break;}
 case 530:
-#line 2463 "xp-t.y"
+#line 2463 "xp-t.bison"
 {	
 	    	if ( FoundLBrace ) 
 			FoundLBrace = 0 ;
 	  ;
     break;}
 case 531:
-#line 2468 "xp-t.y"
+#line 2468 "xp-t.bison"
 {
 	    	if ( FoundRBrace ) 
 			FoundRBrace = 0 ;
 	  ;
     break;}
 case 536:
-#line 2498 "xp-t.y"
+#line 2498 "xp-t.bison"
 { 	
 		if ( !CurrentFnIsInline )
 			InsertFunctionTable(yyvsp[0],TRUE) ; 
@@ -6859,11 +6859,11 @@ case 536:
  	;
     break;}
 case 539:
-#line 2528 "xp-t.y"
+#line 2528 "xp-t.bison"
 {	AddScope(yyvsp[0]) ;	;
     break;}
 case 540:
-#line 2530 "xp-t.y"
+#line 2530 "xp-t.bison"
 { RemoveScope(yyvsp[-2]) ; yyval = yyvsp[-2] ;
 	    if (CurrentAggType==CHARE || CurrentAggType==BRANCHED) {
 		if ( CurrentAccess == PRIVATE || CurrentAccess == PUBLIC )
@@ -6872,7 +6872,7 @@ case 540:
 	  ;
     break;}
 case 541:
-#line 2537 "xp-t.y"
+#line 2537 "xp-t.bison"
 {if ( CurrentAggType==CHARE || CurrentAggType==BRANCHED ) {
                 if ( CurrentAccess == ENTRY )
                         ProcessEP(yyvsp[0],TRUE);
@@ -6886,29 +6886,29 @@ case 541:
 	  ;
     break;}
 case 542:
-#line 2549 "xp-t.y"
+#line 2549 "xp-t.bison"
 { RemoveScope(yyvsp[-2]) ; 
 	    yyval = yyvsp[-2] ;
 	    InsideChareCode = 0 ;
 	  ;
     break;}
 case 543:
-#line 2553 "xp-t.y"
+#line 2553 "xp-t.bison"
 { FLUSHBUF() ; 
 			  	  	  SyntaxError("function header") ; ;
     break;}
 case 545:
-#line 2558 "xp-t.y"
+#line 2558 "xp-t.bison"
 {       AddScope(yyvsp[0]) ;  ;
     break;}
 case 546:
-#line 2560 "xp-t.y"
+#line 2560 "xp-t.bison"
 { RemoveScope(yyvsp[-2]) ; 
 	    yyval = yyvsp[-2] ;
 	  ;
     break;}
 case 547:
-#line 2565 "xp-t.y"
+#line 2565 "xp-t.bison"
 {int ind ;
 	   if ( CurrentAggType==CHARE || CurrentAggType==BRANCHED ) {
 		if ( CurrentAccess == ENTRY )
@@ -6938,91 +6938,91 @@ case 547:
 	  ;
     break;}
 case 548:
-#line 2593 "xp-t.y"
+#line 2593 "xp-t.bison"
 { RemoveScope(yyvsp[-2]) ; 
 	    yyval = yyvsp[-2] ;
 	    InsideChareCode = 0 ;
 	  ;
     break;}
 case 549:
-#line 2598 "xp-t.y"
+#line 2598 "xp-t.bison"
 { FLUSHBUF() ; 
 			  	  SyntaxError("function header") ; ;
     break;}
 case 551:
-#line 2603 "xp-t.y"
+#line 2603 "xp-t.bison"
 {AddScope(yyvsp[0]) ;;
     break;}
 case 552:
-#line 2604 "xp-t.y"
+#line 2604 "xp-t.bison"
 { RemoveScope(yyvsp[-2]) ; 
 	    yyval = yyvsp[-2] ;
 	  ;
     break;}
 case 553:
-#line 2608 "xp-t.y"
+#line 2608 "xp-t.bison"
 {AddScope(yyvsp[0]) ;;
     break;}
 case 554:
-#line 2609 "xp-t.y"
+#line 2609 "xp-t.bison"
 { RemoveScope(yyvsp[-2]) ; 
 	    yyval = yyvsp[-2] ;
 	  ;
     break;}
 case 555:
-#line 2613 "xp-t.y"
+#line 2613 "xp-t.bison"
 {AddScope(yyvsp[0]) ;;
     break;}
 case 556:
-#line 2614 "xp-t.y"
+#line 2614 "xp-t.bison"
 { RemoveScope(yyvsp[-2]) ; 
 	    yyval = yyvsp[-2] ;
 	  ;
     break;}
 case 557:
-#line 2618 "xp-t.y"
+#line 2618 "xp-t.bison"
 {AddScope(yyvsp[0]) ;;
     break;}
 case 558:
-#line 2619 "xp-t.y"
+#line 2619 "xp-t.bison"
 { RemoveScope(yyvsp[-2]) ; 
 	    yyval = yyvsp[-2] ;
 	  ;
     break;}
 case 559:
-#line 2632 "xp-t.y"
+#line 2632 "xp-t.bison"
 {;
     break;}
 case 561:
-#line 2633 "xp-t.y"
+#line 2633 "xp-t.bison"
 {;
     break;}
 case 563:
-#line 2634 "xp-t.y"
+#line 2634 "xp-t.bison"
 {;
     break;}
 case 565:
-#line 2635 "xp-t.y"
+#line 2635 "xp-t.bison"
 {;
     break;}
 case 567:
-#line 2636 "xp-t.y"
+#line 2636 "xp-t.bison"
 {;
     break;}
 case 569:
-#line 2637 "xp-t.y"
+#line 2637 "xp-t.bison"
 {;
     break;}
 case 571:
-#line 2638 "xp-t.y"
+#line 2638 "xp-t.bison"
 {;
     break;}
 case 573:
-#line 2639 "xp-t.y"
+#line 2639 "xp-t.bison"
 {;
     break;}
 case 577:
-#line 2670 "xp-t.y"
+#line 2670 "xp-t.bison"
 {	int ind ;	
 
 		SetDefinedIfEp(yyvsp[-2]) ;
@@ -7045,17 +7045,17 @@ case 577:
 	;
     break;}
 case 578:
-#line 2691 "xp-t.y"
+#line 2691 "xp-t.bison"
 {	RemoveScope(yyvsp[-4]) ;
 		InsideChareCode = 0 ;
 	;
     break;}
 case 582:
-#line 2731 "xp-t.y"
+#line 2731 "xp-t.bison"
 { 	foundargs = FALSE ; ;
     break;}
 case 583:
-#line 2733 "xp-t.y"
+#line 2733 "xp-t.bison"
 {	int ind ;	
 
 		if ( (ind=FoundInAccTable(AccTable,TotalAccs,yyvsp[-1])) != -1 ) {
@@ -7075,90 +7075,90 @@ case 583:
 	  ;
     break;}
 case 584:
-#line 2763 "xp-t.y"
+#line 2763 "xp-t.bison"
 { CheckConstructorEP(yyvsp[-4],FALSE) ; 
 	     FoundConstructorBody = FALSE ; ;
     break;}
 case 585:
-#line 2766 "xp-t.y"
+#line 2766 "xp-t.bison"
 { CheckConstructorEP(yyvsp[-6],FALSE) ; 
 	     FoundConstructorBody = FALSE ; ;
     break;}
 case 586:
-#line 2769 "xp-t.y"
+#line 2769 "xp-t.bison"
 { foundargs = TRUE ; 
 	     CheckConstructorEP(yyvsp[-5],FALSE) ; 
 	     FoundConstructorBody = FALSE ; ;
     break;}
 case 587:
-#line 2775 "xp-t.y"
+#line 2775 "xp-t.bison"
 {    CheckConstructorEP(yyvsp[-4],TRUE) ; 
 	   ;
     break;}
 case 588:
-#line 2778 "xp-t.y"
+#line 2778 "xp-t.bison"
 { 	FoundConstructorBody = TRUE ; 
 	   ;
     break;}
 case 589:
-#line 2782 "xp-t.y"
+#line 2782 "xp-t.bison"
 {    CheckConstructorEP(yyvsp[-6],TRUE) ; 
 	   ;
     break;}
 case 590:
-#line 2785 "xp-t.y"
+#line 2785 "xp-t.bison"
 { 	FoundConstructorBody = TRUE ; 
 	   ;
     break;}
 case 591:
-#line 2789 "xp-t.y"
+#line 2789 "xp-t.bison"
 {    foundargs = TRUE ; CheckConstructorEP(yyvsp[-5],TRUE) ; 
 	   ;
     break;}
 case 592:
-#line 2792 "xp-t.y"
+#line 2792 "xp-t.bison"
 { 	FoundConstructorBody = TRUE ; 
 	   ;
     break;}
 case 593:
-#line 2796 "xp-t.y"
+#line 2796 "xp-t.bison"
 {   	EpMsg = CurrentTypedef ; 
 		CheckConstructorEP(yyvsp[-1],FALSE) ; 	;
     break;}
 case 631:
-#line 2935 "xp-t.y"
+#line 2935 "xp-t.bison"
 { yyval = yyvsp[0]; ;
     break;}
 case 632:
-#line 2936 "xp-t.y"
+#line 2936 "xp-t.bison"
 { yyval = yyvsp[0]; ;
     break;}
 case 635:
-#line 2942 "xp-t.y"
+#line 2942 "xp-t.bison"
 {yyval=yyvsp[0];;
     break;}
 case 636:
-#line 2946 "xp-t.y"
+#line 2946 "xp-t.bison"
 { yyval = yyvsp[0]; ;
     break;}
 case 637:
-#line 2947 "xp-t.y"
+#line 2947 "xp-t.bison"
 { yyval = yyvsp[-1]; ;
     break;}
 case 657:
-#line 3004 "xp-t.y"
+#line 3004 "xp-t.bison"
 { yyval = yyvsp[0]; ;
     break;}
 case 658:
-#line 3005 "xp-t.y"
+#line 3005 "xp-t.bison"
 { yyval = yyvsp[0]; FoundParms = FALSE ;;
     break;}
 case 659:
-#line 3016 "xp-t.y"
+#line 3016 "xp-t.bison"
 { yyval = yyvsp[0]; ;
     break;}
 case 660:
-#line 3018 "xp-t.y"
+#line 3018 "xp-t.bison"
 { if ( FoundHandle > 0 ) {
 		if ( CurrentCharmType == ACCUMULATOR )
 			InsertHandleTable(AccHandleTable,&AccHandleTableSize,yyvsp[0]) ;
@@ -7179,41 +7179,41 @@ case 660:
 	  ;
     break;}
 case 662:
-#line 3042 "xp-t.y"
+#line 3042 "xp-t.bison"
 { yyval = yyvsp[-1]; ;
     break;}
 case 664:
-#line 3045 "xp-t.y"
+#line 3045 "xp-t.bison"
 { yyval = yyvsp[-2] ; ;
     break;}
 case 677:
-#line 3093 "xp-t.y"
+#line 3093 "xp-t.bison"
 { FoundParms = TRUE ; ;
     break;}
 case 689:
-#line 3117 "xp-t.y"
+#line 3117 "xp-t.bison"
 { strcpy(CurrentAsterisk,"*") ; ;
     break;}
 case 690:
-#line 3118 "xp-t.y"
+#line 3118 "xp-t.bison"
 { strcpy(CurrentAsterisk,"&") ; ;
     break;}
 case 691:
-#line 3119 "xp-t.y"
+#line 3119 "xp-t.bison"
 {	/* CheckCharmName() ;	Done in t.l now */
 			FoundHandle = HANDLE ;
 			strcpy(CurrentAsterisk, CurrentTypedef) ;
 		   ;
     break;}
 case 692:
-#line 3123 "xp-t.y"
+#line 3123 "xp-t.bison"
 {	/* CheckCharmName() ;	Done in t.l now */
 			FoundHandle = GROUP ;
 			strcpy(CurrentAsterisk, CurrentTypedef) ;
 		   ;
     break;}
 case 693:
-#line 3130 "xp-t.y"
+#line 3130 "xp-t.bison"
 { if ( AddedScope > 0 ) {
 							AddedScope = 0 ;
 							PopStack() ;
@@ -7221,26 +7221,26 @@ case 693:
 						;
     break;}
 case 695:
-#line 3162 "xp-t.y"
+#line 3162 "xp-t.bison"
 { 	yyval = yyvsp[0] ; 
 		AddOneScope(yyvsp[0]) ;
 	  ;
     break;}
 case 696:
-#line 3166 "xp-t.y"
+#line 3166 "xp-t.bison"
 { 	yyval = yyvsp[0] ; 
 		AddOneScope(yyvsp[0]) ;
 	  ;
     break;}
 case 697:
-#line 3174 "xp-t.y"
+#line 3174 "xp-t.bison"
 { 	yyval = (char *)malloc(sizeof(char)*(strlen(yyvsp[-1])+3)) ;
 		strcpy(yyval,yyvsp[-1]) ;
 		strcat(yyval,yyvsp[0]) ; 
 	  ;
     break;}
 case 698:
-#line 3179 "xp-t.y"
+#line 3179 "xp-t.bison"
 { 	yyval = (char *)malloc(sizeof(char)*(strlen(yyvsp[-2])+strlen(yyvsp[-1])+3)) ;
 		strcpy(yyval,yyvsp[-2]) ;
 		strcat(yyval,yyvsp[-1]) ; 
@@ -7248,19 +7248,19 @@ case 698:
 	  ;
     break;}
 case 699:
-#line 3197 "xp-t.y"
+#line 3197 "xp-t.bison"
 { yyval = yyvsp[0] ; ;
     break;}
 case 700:
-#line 3198 "xp-t.y"
+#line 3198 "xp-t.bison"
 { yyval = yyvsp[0] ; ;
     break;}
 case 701:
-#line 3202 "xp-t.y"
+#line 3202 "xp-t.bison"
 { /*scan for upcoming name in file scope */ FoundGlobalScope=1 ; ;
     break;}
 case 704:
-#line 3207 "xp-t.y"
+#line 3207 "xp-t.bison"
 { if ( AddedScope > 0 ) { 
 				PopStack() ;		
 				AddedScope = 0 ;
@@ -7268,7 +7268,7 @@ case 704:
 			;
     break;}
 case 705:
-#line 3212 "xp-t.y"
+#line 3212 "xp-t.bison"
 { if ( AddedScope > 0 ) { 
 					PopStack() ;		
 					AddedScope = 0 ;
@@ -7276,13 +7276,13 @@ case 705:
 				;
     break;}
 case 706:
-#line 3228 "xp-t.y"
+#line 3228 "xp-t.bison"
 { 	yyval = yyvsp[0] ; 
 		CheckSharedHandle(yyvsp[0]);
 	  ;
     break;}
 case 707:
-#line 3232 "xp-t.y"
+#line 3232 "xp-t.bison"
 { 	char *sptr, *sptr2, *lastcoln ;
 		int ch, bo ;	
 		EP *ep ;
@@ -7343,11 +7343,11 @@ case 707:
 	  ;
     break;}
 case 708:
-#line 3293 "xp-t.y"
+#line 3293 "xp-t.bison"
 { 	yyval = yyvsp[0] ; ;
     break;}
 case 709:
-#line 3294 "xp-t.y"
+#line 3294 "xp-t.bison"
 { 	if ( AddedScope > 0 ) { 
 						PopStack() ;		
 						AddedScope = 0 ;
@@ -7355,19 +7355,19 @@ case 709:
 				;
     break;}
 case 711:
-#line 3303 "xp-t.y"
+#line 3303 "xp-t.bison"
 { yyval = yyvsp[0] ; ;
     break;}
 case 712:
-#line 3320 "xp-t.y"
+#line 3320 "xp-t.bison"
 { yyval = yyvsp[0] ; ;
     break;}
 case 713:
-#line 3321 "xp-t.y"
+#line 3321 "xp-t.bison"
 { yyval = yyvsp[0] ; ;
     break;}
 case 716:
-#line 3338 "xp-t.y"
+#line 3338 "xp-t.bison"
 { yyval = (char *)malloc(sizeof(char)*(strlen(yyvsp[-1])+strlen(yyvsp[0])+1)) ;
 	  strcpy(yyval,yyvsp[-1]) ;
 	  strcat(yyval,yyvsp[0]) ; 
@@ -7379,29 +7379,29 @@ case 716:
 	;
     break;}
 case 717:
-#line 3350 "xp-t.y"
+#line 3350 "xp-t.bison"
 { yyval = yyvsp[0] ; ;
     break;}
 case 718:
-#line 3352 "xp-t.y"
+#line 3352 "xp-t.bison"
 { 	yyval = yyvsp[0] ; 
 		strcpy(CurrentTypedef,yyvsp[-1]) ;
 		strcat(CurrentTypedef,yyvsp[0]) ;
 	  ;
     break;}
 case 719:
-#line 3357 "xp-t.y"
+#line 3357 "xp-t.bison"
 { 	yyval = yyvsp[0] ; 
 		strcpy(CurrentTypedef,yyvsp[-1]) ;
 		strcat(CurrentTypedef,yyvsp[0]) ;
 	  ;
     break;}
 case 720:
-#line 3364 "xp-t.y"
+#line 3364 "xp-t.bison"
 { yyval = yyvsp[0] ; ;
     break;}
 case 721:
-#line 3365 "xp-t.y"
+#line 3365 "xp-t.bison"
 { yyval = yyvsp[0] ; ;
     break;}
 }
@@ -7602,7 +7602,7 @@ yyerrhandle:
   yystate = yyn;
   goto yynewstate;
 }
-#line 3368 "xp-t.y"
+#line 3368 "xp-t.bison"
 
 yyerror(string)
 char*string;

@@ -773,9 +773,9 @@ static char *yy_last_accepting_cpos;
 #define YY_MORE_ADJ 0
 #define YY_RESTORE_YY_MORE_OFFSET
 char *yytext;
-#line 1 "xp-lexer.l"
+#line 1 "xp-lexer.flex"
 #define INITIAL 0
-#line 2 "xp-lexer.l"
+#line 2 "xp-lexer.flex"
 
 /*  Copyright (C) 1989-1991 James A. Roskind, All rights reserved.
     This lexer description was written by James A.  Roskind.  Copying
@@ -1083,7 +1083,7 @@ YY_DECL
 	register char *yy_cp, *yy_bp;
 	register int yy_act;
 
-#line 197 "xp-lexer.l"
+#line 197 "xp-lexer.flex"
 
 
 
@@ -1170,63 +1170,63 @@ do_action:	/* This label is used only to access EOF actions. */
 
 case 1:
 YY_RULE_SETUP
-#line 199 "xp-lexer.l"
+#line 199 "xp-lexer.flex"
 { }
 	YY_BREAK
 case 2:
 YY_RULE_SETUP
-#line 201 "xp-lexer.l"
+#line 201 "xp-lexer.flex"
 {
 			WHITE_RETURN(" ");
 			}
 	YY_BREAK
 case 3:
 YY_RULE_SETUP
-#line 205 "xp-lexer.l"
+#line 205 "xp-lexer.flex"
 {
 			WHITE_RETURN(" ");
 			}
 	YY_BREAK
 case 4:
 YY_RULE_SETUP
-#line 210 "xp-lexer.l"
+#line 210 "xp-lexer.flex"
 {
 			NEW_LINE_RETURN();
 			}
 	YY_BREAK
 case 5:
 YY_RULE_SETUP
-#line 214 "xp-lexer.l"
+#line 214 "xp-lexer.flex"
 {CHARM_KEYWORD_RETURN(CHARE);}
 	YY_BREAK
 case 6:
 YY_RULE_SETUP
-#line 215 "xp-lexer.l"
+#line 215 "xp-lexer.flex"
 {CHARM_KEYWORD_RETURN(ACCUMULATOR);}
 	YY_BREAK
 case 7:
 YY_RULE_SETUP
-#line 216 "xp-lexer.l"
+#line 216 "xp-lexer.flex"
 {CHARM_KEYWORD_RETURN(MONOTONIC);}
 	YY_BREAK
 case 8:
 YY_RULE_SETUP
-#line 217 "xp-lexer.l"
+#line 217 "xp-lexer.flex"
 {CHARM_KEYWORD_RETURN(READONLY);}
 	YY_BREAK
 case 9:
 YY_RULE_SETUP
-#line 218 "xp-lexer.l"
+#line 218 "xp-lexer.flex"
 {CHARM_KEYWORD_RETURN(WRITEONCE);}
 	YY_BREAK
 case 10:
 YY_RULE_SETUP
-#line 220 "xp-lexer.l"
+#line 220 "xp-lexer.flex"
 {CHARM_KEYWORD_RETURN(MESSAGE);}
 	YY_BREAK
 case 11:
 YY_RULE_SETUP
-#line 221 "xp-lexer.l"
+#line 221 "xp-lexer.flex"
 {	if ( CheckCharmName() ) {
 				CHARM_KEYWORD_RETURN(HANDLE);
 			}
@@ -1237,7 +1237,7 @@ YY_RULE_SETUP
 	YY_BREAK
 case 12:
 YY_RULE_SETUP
-#line 228 "xp-lexer.l"
+#line 228 "xp-lexer.flex"
 {	if ( CheckCharmName() ) {
 				CHARM_KEYWORD_RETURN(GROUP);
 				/* handle and group are processed same way */
@@ -1249,281 +1249,281 @@ YY_RULE_SETUP
 	YY_BREAK
 case 13:
 YY_RULE_SETUP
-#line 236 "xp-lexer.l"
+#line 236 "xp-lexer.flex"
 {if ( shouldprint ) strcat(OutBuf,prevtoken); 
 		     strcpy(prevtoken,"public") ;	
 		     CHARM_KEYWORD_RETURN(ENTRY);}
 	YY_BREAK
 case 14:
 YY_RULE_SETUP
-#line 239 "xp-lexer.l"
+#line 239 "xp-lexer.flex"
 {CHARM_KEYWORD_RETURN(DOUBLEARROW);}
 	YY_BREAK
 case 15:
 YY_RULE_SETUP
-#line 240 "xp-lexer.l"
+#line 240 "xp-lexer.flex"
 {CHARM_KEYWORD_RETURN(DOUBLEARROW);}
 	YY_BREAK
 case 16:
 YY_RULE_SETUP
-#line 241 "xp-lexer.l"
+#line 241 "xp-lexer.flex"
 {CHARM_KEYWORD_RETURN(ALL_NODES);}
 	YY_BREAK
 case 17:
 YY_RULE_SETUP
-#line 242 "xp-lexer.l"
+#line 242 "xp-lexer.flex"
 {CHARM_KEYWORD_RETURN(LOCAL);}
 	YY_BREAK
 case 18:
 YY_RULE_SETUP
-#line 243 "xp-lexer.l"
+#line 243 "xp-lexer.flex"
 { FoundVarSize = TRUE ; }
 	YY_BREAK
 case 19:
 YY_RULE_SETUP
-#line 244 "xp-lexer.l"
+#line 244 "xp-lexer.flex"
 {CPP_KEYWORD_RETURN(NEWCHARE);}
 	YY_BREAK
 case 20:
 YY_RULE_SETUP
-#line 245 "xp-lexer.l"
+#line 245 "xp-lexer.flex"
 {CPP_KEYWORD_RETURN(NEWGROUP);}
 	YY_BREAK
 case 21:
 YY_RULE_SETUP
-#line 246 "xp-lexer.l"
+#line 246 "xp-lexer.flex"
 {CPP_KEYWORD_RETURN(NEW);}
 	YY_BREAK
 case 22:
 YY_RULE_SETUP
-#line 247 "xp-lexer.l"
+#line 247 "xp-lexer.flex"
 {CPP_KEYWORD_RETURN(NEW);}
 	YY_BREAK
 case 23:
 YY_RULE_SETUP
-#line 250 "xp-lexer.l"
+#line 250 "xp-lexer.flex"
 {PA_KEYWORD_RETURN(AUTO);}
 	YY_BREAK
 case 24:
 YY_RULE_SETUP
-#line 251 "xp-lexer.l"
+#line 251 "xp-lexer.flex"
 {PA_KEYWORD_RETURN(BREAK);}
 	YY_BREAK
 case 25:
 YY_RULE_SETUP
-#line 252 "xp-lexer.l"
+#line 252 "xp-lexer.flex"
 {PA_KEYWORD_RETURN(CASE);}
 	YY_BREAK
 case 26:
 YY_RULE_SETUP
-#line 253 "xp-lexer.l"
+#line 253 "xp-lexer.flex"
 {PA_KEYWORD_RETURN(CHAR);}
 	YY_BREAK
 case 27:
 YY_RULE_SETUP
-#line 254 "xp-lexer.l"
+#line 254 "xp-lexer.flex"
 {PA_KEYWORD_RETURN(CONST);}
 	YY_BREAK
 case 28:
 YY_RULE_SETUP
-#line 255 "xp-lexer.l"
+#line 255 "xp-lexer.flex"
 {PA_KEYWORD_RETURN(CONTINUE);}
 	YY_BREAK
 case 29:
 YY_RULE_SETUP
-#line 256 "xp-lexer.l"
+#line 256 "xp-lexer.flex"
 {PA_KEYWORD_RETURN(DEFAULT);}
 	YY_BREAK
 case 30:
 YY_RULE_SETUP
-#line 257 "xp-lexer.l"
+#line 257 "xp-lexer.flex"
 {PP_KEYWORD_RETURN(DEFINE);}
 	YY_BREAK
 case 31:
 YY_RULE_SETUP
-#line 258 "xp-lexer.l"
+#line 258 "xp-lexer.flex"
 {PP_KEYWORD_RETURN(OPDEFINED);}
 	YY_BREAK
 case 32:
 YY_RULE_SETUP
-#line 259 "xp-lexer.l"
+#line 259 "xp-lexer.flex"
 {PA_KEYWORD_RETURN(DO);}
 	YY_BREAK
 case 33:
 YY_RULE_SETUP
-#line 260 "xp-lexer.l"
+#line 260 "xp-lexer.flex"
 {PA_KEYWORD_RETURN(DOUBLE);}
 	YY_BREAK
 case 34:
 YY_RULE_SETUP
-#line 261 "xp-lexer.l"
+#line 261 "xp-lexer.flex"
 {PP_KEYWORD_RETURN(ELIF);}
 	YY_BREAK
 case 35:
 YY_RULE_SETUP
-#line 262 "xp-lexer.l"
+#line 262 "xp-lexer.flex"
 {PPPA_KEYWORD_RETURN(ELSE);}
 	YY_BREAK
 case 36:
 YY_RULE_SETUP
-#line 263 "xp-lexer.l"
+#line 263 "xp-lexer.flex"
 {PP_KEYWORD_RETURN(ENDIF);}
 	YY_BREAK
 case 37:
 YY_RULE_SETUP
-#line 264 "xp-lexer.l"
+#line 264 "xp-lexer.flex"
 {PA_KEYWORD_RETURN(ENUM);}
 	YY_BREAK
 case 38:
 YY_RULE_SETUP
-#line 265 "xp-lexer.l"
+#line 265 "xp-lexer.flex"
 {PP_KEYWORD_RETURN(ERROR);}
 	YY_BREAK
 case 39:
 YY_RULE_SETUP
-#line 266 "xp-lexer.l"
+#line 266 "xp-lexer.flex"
 {PA_KEYWORD_RETURN(EXTERN);}
 	YY_BREAK
 case 40:
 YY_RULE_SETUP
-#line 267 "xp-lexer.l"
+#line 267 "xp-lexer.flex"
 {PA_KEYWORD_RETURN(FLOAT);}
 	YY_BREAK
 case 41:
 YY_RULE_SETUP
-#line 268 "xp-lexer.l"
+#line 268 "xp-lexer.flex"
 {PA_KEYWORD_RETURN(FOR);}
 	YY_BREAK
 case 42:
 YY_RULE_SETUP
-#line 269 "xp-lexer.l"
+#line 269 "xp-lexer.flex"
 {PA_KEYWORD_RETURN(GOTO);}
 	YY_BREAK
 case 43:
 YY_RULE_SETUP
-#line 270 "xp-lexer.l"
+#line 270 "xp-lexer.flex"
 {PPPA_KEYWORD_RETURN(IF);}
 	YY_BREAK
 case 44:
 YY_RULE_SETUP
-#line 271 "xp-lexer.l"
+#line 271 "xp-lexer.flex"
 {PP_KEYWORD_RETURN(IFDEF);}
 	YY_BREAK
 case 45:
 YY_RULE_SETUP
-#line 272 "xp-lexer.l"
+#line 272 "xp-lexer.flex"
 {PP_KEYWORD_RETURN(IFNDEF);}
 	YY_BREAK
 case 46:
 YY_RULE_SETUP
-#line 273 "xp-lexer.l"
+#line 273 "xp-lexer.flex"
 {PP_KEYWORD_RETURN(INCLUDE); }
 	YY_BREAK
 case 47:
 YY_RULE_SETUP
-#line 274 "xp-lexer.l"
+#line 274 "xp-lexer.flex"
 {PA_KEYWORD_RETURN(INT);}
 	YY_BREAK
 case 48:
 YY_RULE_SETUP
-#line 275 "xp-lexer.l"
+#line 275 "xp-lexer.flex"
 {PP_KEYWORD_RETURN(LINE);}
 	YY_BREAK
 case 49:
 YY_RULE_SETUP
-#line 276 "xp-lexer.l"
+#line 276 "xp-lexer.flex"
 {PA_KEYWORD_RETURN(LONG);}
 	YY_BREAK
 case 50:
 YY_RULE_SETUP
-#line 277 "xp-lexer.l"
+#line 277 "xp-lexer.flex"
 {PP_KEYWORD_RETURN(PRAGMA);}
 	YY_BREAK
 case 51:
 YY_RULE_SETUP
-#line 278 "xp-lexer.l"
+#line 278 "xp-lexer.flex"
 {if (ptrdiff_is_predefined)
                        { PA_KEYWORD_RETURN(PTRDIFF_TOKEN); }
                      else { IDENTIFIER_RETURN(); } }
 	YY_BREAK
 case 52:
 YY_RULE_SETUP
-#line 281 "xp-lexer.l"
+#line 281 "xp-lexer.flex"
 {PA_KEYWORD_RETURN(REGISTER);}
 	YY_BREAK
 case 53:
 YY_RULE_SETUP
-#line 282 "xp-lexer.l"
+#line 282 "xp-lexer.flex"
 {PA_KEYWORD_RETURN(RETURN);}
 	YY_BREAK
 case 54:
 YY_RULE_SETUP
-#line 283 "xp-lexer.l"
+#line 283 "xp-lexer.flex"
 {PA_KEYWORD_RETURN(SHORT);}
 	YY_BREAK
 case 55:
 YY_RULE_SETUP
-#line 284 "xp-lexer.l"
+#line 284 "xp-lexer.flex"
 {PA_KEYWORD_RETURN(SIGNED);}
 	YY_BREAK
 case 56:
 YY_RULE_SETUP
-#line 285 "xp-lexer.l"
+#line 285 "xp-lexer.flex"
 {PA_KEYWORD_RETURN(SIZEOF);}
 	YY_BREAK
 case 57:
 YY_RULE_SETUP
-#line 286 "xp-lexer.l"
+#line 286 "xp-lexer.flex"
 {PA_KEYWORD_RETURN(STATIC);}
 	YY_BREAK
 case 58:
 YY_RULE_SETUP
-#line 287 "xp-lexer.l"
+#line 287 "xp-lexer.flex"
 {PA_KEYWORD_RETURN(STRUCT);}
 	YY_BREAK
 case 59:
 YY_RULE_SETUP
-#line 288 "xp-lexer.l"
+#line 288 "xp-lexer.flex"
 {PA_KEYWORD_RETURN(SWITCH);}
 	YY_BREAK
 case 60:
 YY_RULE_SETUP
-#line 289 "xp-lexer.l"
+#line 289 "xp-lexer.flex"
 {PA_KEYWORD_RETURN(TYPEDEF);}
 	YY_BREAK
 case 61:
 YY_RULE_SETUP
-#line 290 "xp-lexer.l"
+#line 290 "xp-lexer.flex"
 {PP_KEYWORD_RETURN(UNDEF);}
 	YY_BREAK
 case 62:
 YY_RULE_SETUP
-#line 291 "xp-lexer.l"
+#line 291 "xp-lexer.flex"
 {PA_KEYWORD_RETURN(UNION);}
 	YY_BREAK
 case 63:
 YY_RULE_SETUP
-#line 292 "xp-lexer.l"
+#line 292 "xp-lexer.flex"
 {PA_KEYWORD_RETURN(UNSIGNED);}
 	YY_BREAK
 case 64:
 YY_RULE_SETUP
-#line 293 "xp-lexer.l"
+#line 293 "xp-lexer.flex"
 {PA_KEYWORD_RETURN(VOID);}
 	YY_BREAK
 case 65:
 YY_RULE_SETUP
-#line 294 "xp-lexer.l"
+#line 294 "xp-lexer.flex"
 {PA_KEYWORD_RETURN(VOLATILE);}
 	YY_BREAK
 case 66:
 YY_RULE_SETUP
-#line 295 "xp-lexer.l"
+#line 295 "xp-lexer.flex"
 {PA_KEYWORD_RETURN(WHILE);}
 	YY_BREAK
 case 67:
 YY_RULE_SETUP
-#line 296 "xp-lexer.l"
+#line 296 "xp-lexer.flex"
 { if (wchar_is_predefined) {
                          PA_KEYWORD_RETURN(WCHAR_TOKEN);
                       } else {
@@ -1532,77 +1532,77 @@ YY_RULE_SETUP
 	YY_BREAK
 case 68:
 YY_RULE_SETUP
-#line 301 "xp-lexer.l"
+#line 301 "xp-lexer.flex"
 { PA_KEYWORD_RETURN(__WCHAR_TOKEN); }
 	YY_BREAK
 case 69:
 YY_RULE_SETUP
-#line 303 "xp-lexer.l"
+#line 303 "xp-lexer.flex"
 {CPP_KEYWORD_RETURN(CLASS);}
 	YY_BREAK
 case 70:
 YY_RULE_SETUP
-#line 304 "xp-lexer.l"
+#line 304 "xp-lexer.flex"
 {CPP_KEYWORD_RETURN(DELETE);}
 	YY_BREAK
 case 71:
 YY_RULE_SETUP
-#line 305 "xp-lexer.l"
+#line 305 "xp-lexer.flex"
 {CPP_KEYWORD_RETURN(FRIEND);}
 	YY_BREAK
 case 72:
 YY_RULE_SETUP
-#line 306 "xp-lexer.l"
+#line 306 "xp-lexer.flex"
 {CPP_KEYWORD_RETURN(INLINE);}
 	YY_BREAK
 case 73:
 YY_RULE_SETUP
-#line 307 "xp-lexer.l"
+#line 307 "xp-lexer.flex"
 {CPP_KEYWORD_RETURN(UNDERSCORE_INLINE);}
 	YY_BREAK
 case 74:
 YY_RULE_SETUP
-#line 308 "xp-lexer.l"
+#line 308 "xp-lexer.flex"
 {CPP_KEYWORD_RETURN(NEW);}
 	YY_BREAK
 case 75:
 YY_RULE_SETUP
-#line 309 "xp-lexer.l"
+#line 309 "xp-lexer.flex"
 {CPP_KEYWORD_RETURN(OPERATOR);}
 	YY_BREAK
 case 76:
 YY_RULE_SETUP
-#line 310 "xp-lexer.l"
+#line 310 "xp-lexer.flex"
 {CPP_KEYWORD_RETURN(OVERLOAD);}
 	YY_BREAK
 case 77:
 YY_RULE_SETUP
-#line 311 "xp-lexer.l"
+#line 311 "xp-lexer.flex"
 {CPP_KEYWORD_RETURN(PROTECTED);}
 	YY_BREAK
 case 78:
 YY_RULE_SETUP
-#line 312 "xp-lexer.l"
+#line 312 "xp-lexer.flex"
 {CPP_KEYWORD_RETURN(PRIVATE);}
 	YY_BREAK
 case 79:
 YY_RULE_SETUP
-#line 313 "xp-lexer.l"
+#line 313 "xp-lexer.flex"
 {CPP_KEYWORD_RETURN(PUBLIC);}
 	YY_BREAK
 case 80:
 YY_RULE_SETUP
-#line 314 "xp-lexer.l"
+#line 314 "xp-lexer.flex"
 {CPP_KEYWORD_RETURN(THIS);}
 	YY_BREAK
 case 81:
 YY_RULE_SETUP
-#line 315 "xp-lexer.l"
+#line 315 "xp-lexer.flex"
 {CPP_KEYWORD_RETURN(VIRTUAL);}
 	YY_BREAK
 case 82:
 YY_RULE_SETUP
-#line 319 "xp-lexer.l"
+#line 319 "xp-lexer.flex"
 {
 			/* Find the identifier */
 			char str[128] ;
@@ -1623,300 +1623,300 @@ YY_RULE_SETUP
 	YY_BREAK
 case 83:
 YY_RULE_SETUP
-#line 339 "xp-lexer.l"
+#line 339 "xp-lexer.flex"
 { IDENTIFIER_RETURN(); }
 	YY_BREAK
 case 84:
 YY_RULE_SETUP
-#line 341 "xp-lexer.l"
+#line 341 "xp-lexer.flex"
 {NUMERICAL_RETURN(INTEGERconstant);}
 	YY_BREAK
 case 85:
 YY_RULE_SETUP
-#line 342 "xp-lexer.l"
+#line 342 "xp-lexer.flex"
 {NUMERICAL_RETURN(OCTALconstant);}
 	YY_BREAK
 case 86:
 YY_RULE_SETUP
-#line 343 "xp-lexer.l"
+#line 343 "xp-lexer.flex"
 {NUMERICAL_RETURN(HEXconstant);}
 	YY_BREAK
 case 87:
 YY_RULE_SETUP
-#line 344 "xp-lexer.l"
+#line 344 "xp-lexer.flex"
 {NUMERICAL_RETURN(FLOATINGconstant);}
 	YY_BREAK
 case 88:
 YY_RULE_SETUP
-#line 347 "xp-lexer.l"
+#line 347 "xp-lexer.flex"
 {
 			NUMERICAL_RETURN(CHARACTERconstant);
 			}
 	YY_BREAK
 case 89:
 YY_RULE_SETUP
-#line 352 "xp-lexer.l"
+#line 352 "xp-lexer.flex"
 {
 			LITERAL_RETURN(STRINGliteral);}
 	YY_BREAK
 case 90:
 YY_RULE_SETUP
-#line 358 "xp-lexer.l"
+#line 358 "xp-lexer.flex"
 {PPOP_RETURN(LP);}
 	YY_BREAK
 case 91:
 YY_RULE_SETUP
-#line 359 "xp-lexer.l"
+#line 359 "xp-lexer.flex"
 {PPOP_RETURN(RP);}
 	YY_BREAK
 case 92:
 YY_RULE_SETUP
-#line 360 "xp-lexer.l"
+#line 360 "xp-lexer.flex"
 {PPOP_RETURN(COMMA);}
 	YY_BREAK
 case 93:
 YY_RULE_SETUP
-#line 361 "xp-lexer.l"
+#line 361 "xp-lexer.flex"
 {NAMED_PPOP_RETURN('#') ;}
 	YY_BREAK
 case 94:
 YY_RULE_SETUP
-#line 362 "xp-lexer.l"
+#line 362 "xp-lexer.flex"
 {NAMED_PPOP_RETURN(POUNDPOUND);}
 	YY_BREAK
 case 95:
 YY_RULE_SETUP
-#line 364 "xp-lexer.l"
+#line 364 "xp-lexer.flex"
 { LBRACE_RETURN(LC); }
 	YY_BREAK
 case 96:
 YY_RULE_SETUP
-#line 365 "xp-lexer.l"
+#line 365 "xp-lexer.flex"
 { RBRACE_RETURN(RC); }
 	YY_BREAK
 case 97:
 YY_RULE_SETUP
-#line 367 "xp-lexer.l"
+#line 367 "xp-lexer.flex"
 {ASCIIOP_RETURN(LB);}
 	YY_BREAK
 case 98:
 YY_RULE_SETUP
-#line 368 "xp-lexer.l"
+#line 368 "xp-lexer.flex"
 {ASCIIOP_RETURN(RB);}
 	YY_BREAK
 case 99:
 YY_RULE_SETUP
-#line 369 "xp-lexer.l"
+#line 369 "xp-lexer.flex"
 {ASCIIOP_RETURN(DOT);}
 	YY_BREAK
 case 100:
 YY_RULE_SETUP
-#line 370 "xp-lexer.l"
+#line 370 "xp-lexer.flex"
 {ASCIIOP_RETURN(AND);}
 	YY_BREAK
 case 101:
 YY_RULE_SETUP
-#line 371 "xp-lexer.l"
+#line 371 "xp-lexer.flex"
 {ASCIIOP_RETURN(STAR);}
 	YY_BREAK
 case 102:
 YY_RULE_SETUP
-#line 372 "xp-lexer.l"
+#line 372 "xp-lexer.flex"
 {ASCIIOP_RETURN(PLUS);}
 	YY_BREAK
 case 103:
 YY_RULE_SETUP
-#line 373 "xp-lexer.l"
+#line 373 "xp-lexer.flex"
 {ASCIIOP_RETURN(MINUS);}
 	YY_BREAK
 case 104:
 YY_RULE_SETUP
-#line 374 "xp-lexer.l"
+#line 374 "xp-lexer.flex"
 {ASCIIOP_RETURN(NEGATE);}
 	YY_BREAK
 case 105:
 YY_RULE_SETUP
-#line 375 "xp-lexer.l"
+#line 375 "xp-lexer.flex"
 {ASCIIOP_RETURN(NOT);}
 	YY_BREAK
 case 106:
 YY_RULE_SETUP
-#line 376 "xp-lexer.l"
+#line 376 "xp-lexer.flex"
 {ASCIIOP_RETURN(DIV);}
 	YY_BREAK
 case 107:
 YY_RULE_SETUP
-#line 377 "xp-lexer.l"
+#line 377 "xp-lexer.flex"
 {ASCIIOP_RETURN(MOD);}
 	YY_BREAK
 case 108:
 YY_RULE_SETUP
-#line 378 "xp-lexer.l"
+#line 378 "xp-lexer.flex"
 {ASCIIOP_RETURN(LT);}
 	YY_BREAK
 case 109:
 YY_RULE_SETUP
-#line 379 "xp-lexer.l"
+#line 379 "xp-lexer.flex"
 {ASCIIOP_RETURN(GT);}
 	YY_BREAK
 case 110:
 YY_RULE_SETUP
-#line 380 "xp-lexer.l"
+#line 380 "xp-lexer.flex"
 {ASCIIOP_RETURN(XOR);}
 	YY_BREAK
 case 111:
 YY_RULE_SETUP
-#line 381 "xp-lexer.l"
+#line 381 "xp-lexer.flex"
 {ASCIIOP_RETURN(PIPE);}
 	YY_BREAK
 case 112:
 YY_RULE_SETUP
-#line 382 "xp-lexer.l"
+#line 382 "xp-lexer.flex"
 {ASCIIOP_RETURN(QUESTION);}
 	YY_BREAK
 case 113:
 YY_RULE_SETUP
-#line 383 "xp-lexer.l"
+#line 383 "xp-lexer.flex"
 {ASCIIOP_RETURN(COLON);}
 	YY_BREAK
 case 114:
 YY_RULE_SETUP
-#line 384 "xp-lexer.l"
+#line 384 "xp-lexer.flex"
 {ASCIIOP_RETURN(SEMICOLON);}
 	YY_BREAK
 case 115:
 YY_RULE_SETUP
-#line 385 "xp-lexer.l"
+#line 385 "xp-lexer.flex"
 {ASCIIOP_RETURN(ASSIGN);}
 	YY_BREAK
 case 116:
 YY_RULE_SETUP
-#line 387 "xp-lexer.l"
+#line 387 "xp-lexer.flex"
 {NAMEDOP_RETURN(DOTstar);}
 	YY_BREAK
 case 117:
 YY_RULE_SETUP
-#line 388 "xp-lexer.l"
+#line 388 "xp-lexer.flex"
 {NAMEDOP_RETURN(CLCL);}
 	YY_BREAK
 case 118:
 YY_RULE_SETUP
-#line 389 "xp-lexer.l"
+#line 389 "xp-lexer.flex"
 {NAMEDOP_RETURN(ARROW);}
 	YY_BREAK
 case 119:
 YY_RULE_SETUP
-#line 390 "xp-lexer.l"
+#line 390 "xp-lexer.flex"
 {NAMEDOP_RETURN(ARROWstar);}
 	YY_BREAK
 case 120:
 YY_RULE_SETUP
-#line 391 "xp-lexer.l"
+#line 391 "xp-lexer.flex"
 {NAMEDOP_RETURN(ICR);}
 	YY_BREAK
 case 121:
 YY_RULE_SETUP
-#line 392 "xp-lexer.l"
+#line 392 "xp-lexer.flex"
 {NAMEDOP_RETURN(DECR);}
 	YY_BREAK
 case 122:
 YY_RULE_SETUP
-#line 393 "xp-lexer.l"
-{NAMEDOP_RETURN(LS);}
+#line 393 "xp-lexer.flex"
+{NAMEDOP_RETURN(LSHIFT);}
 	YY_BREAK
 case 123:
 YY_RULE_SETUP
-#line 394 "xp-lexer.l"
-{NAMEDOP_RETURN(RS);}
+#line 394 "xp-lexer.flex"
+{NAMEDOP_RETURN(RSHIFT);}
 	YY_BREAK
 case 124:
 YY_RULE_SETUP
-#line 395 "xp-lexer.l"
+#line 395 "xp-lexer.flex"
 {NAMEDOP_RETURN(LE);}
 	YY_BREAK
 case 125:
 YY_RULE_SETUP
-#line 396 "xp-lexer.l"
+#line 396 "xp-lexer.flex"
 {NAMEDOP_RETURN(GE);}
 	YY_BREAK
 case 126:
 YY_RULE_SETUP
-#line 397 "xp-lexer.l"
+#line 397 "xp-lexer.flex"
 {NAMEDOP_RETURN(EQ);}
 	YY_BREAK
 case 127:
 YY_RULE_SETUP
-#line 398 "xp-lexer.l"
+#line 398 "xp-lexer.flex"
 {NAMEDOP_RETURN(NE);}
 	YY_BREAK
 case 128:
 YY_RULE_SETUP
-#line 399 "xp-lexer.l"
+#line 399 "xp-lexer.flex"
 {NAMEDOP_RETURN(ANDAND);}
 	YY_BREAK
 case 129:
 YY_RULE_SETUP
-#line 400 "xp-lexer.l"
+#line 400 "xp-lexer.flex"
 {NAMEDOP_RETURN(OROR);}
 	YY_BREAK
 case 130:
 YY_RULE_SETUP
-#line 401 "xp-lexer.l"
+#line 401 "xp-lexer.flex"
 {NAMEDOP_RETURN(MULTassign);}
 	YY_BREAK
 case 131:
 YY_RULE_SETUP
-#line 402 "xp-lexer.l"
+#line 402 "xp-lexer.flex"
 {NAMEDOP_RETURN(DIVassign);}
 	YY_BREAK
 case 132:
 YY_RULE_SETUP
-#line 403 "xp-lexer.l"
+#line 403 "xp-lexer.flex"
 {NAMEDOP_RETURN(MODassign);}
 	YY_BREAK
 case 133:
 YY_RULE_SETUP
-#line 404 "xp-lexer.l"
+#line 404 "xp-lexer.flex"
 {NAMEDOP_RETURN(PLUSassign);}
 	YY_BREAK
 case 134:
 YY_RULE_SETUP
-#line 405 "xp-lexer.l"
+#line 405 "xp-lexer.flex"
 {NAMEDOP_RETURN(MINUSassign);}
 	YY_BREAK
 case 135:
 YY_RULE_SETUP
-#line 406 "xp-lexer.l"
+#line 406 "xp-lexer.flex"
 {NAMEDOP_RETURN(LSassign);}
 	YY_BREAK
 case 136:
 YY_RULE_SETUP
-#line 407 "xp-lexer.l"
+#line 407 "xp-lexer.flex"
 {NAMEDOP_RETURN(RSassign);}
 	YY_BREAK
 case 137:
 YY_RULE_SETUP
-#line 408 "xp-lexer.l"
+#line 408 "xp-lexer.flex"
 {NAMEDOP_RETURN(ANDassign);}
 	YY_BREAK
 case 138:
 YY_RULE_SETUP
-#line 409 "xp-lexer.l"
+#line 409 "xp-lexer.flex"
 {NAMEDOP_RETURN(ERassign);}
 	YY_BREAK
 case 139:
 YY_RULE_SETUP
-#line 410 "xp-lexer.l"
+#line 410 "xp-lexer.flex"
 {NAMEDOP_RETURN(ORassign);}
 	YY_BREAK
 case 140:
 YY_RULE_SETUP
-#line 411 "xp-lexer.l"
+#line 411 "xp-lexer.flex"
 {NAMEDOP_RETURN(ELLIPSIS);}
 	YY_BREAK
 case 141:
 YY_RULE_SETUP
-#line 413 "xp-lexer.l"
+#line 413 "xp-lexer.flex"
 { int i=0,j=0;
                                                   char temp[MAX_NAME_LENGTH];
 
@@ -1947,7 +1947,7 @@ YY_RULE_SETUP
 	YY_BREAK
 case 142:
 YY_RULE_SETUP
-#line 441 "xp-lexer.l"
+#line 441 "xp-lexer.flex"
 { /* #line used by SP */
 						
 						int i=0,j=0;     
@@ -1976,7 +1976,7 @@ YY_RULE_SETUP
 	YY_BREAK
 case 143:
 YY_RULE_SETUP
-#line 468 "xp-lexer.l"
+#line 468 "xp-lexer.flex"
 { /* #pragma when ... */
 
 		/* This pragma is used to specify dependences between EPs */
@@ -1991,7 +1991,7 @@ YY_RULE_SETUP
 	YY_BREAK
 case 144:
 YY_RULE_SETUP
-#line 481 "xp-lexer.l"
+#line 481 "xp-lexer.flex"
 { /* #pragma used by G++: copy to output */
 					strcat(OutBuf,prevtoken) ;
 					strcpy(prevtoken,"") ;
@@ -2001,7 +2001,7 @@ YY_RULE_SETUP
 	YY_BREAK
 case 145:
 YY_RULE_SETUP
-#line 488 "xp-lexer.l"
+#line 488 "xp-lexer.flex"
 { /* #file stuff used in nCUBE CC */
 					strcat(OutBuf,prevtoken) ;
 					strcpy(prevtoken,"") ;
@@ -2011,7 +2011,7 @@ YY_RULE_SETUP
 	YY_BREAK
 case 146:
 YY_RULE_SETUP
-#line 495 "xp-lexer.l"
+#line 495 "xp-lexer.flex"
 ECHO;
 	YY_BREAK
 case YY_STATE_EOF(INITIAL):
@@ -2889,7 +2889,7 @@ int main()
 	return 0;
 	}
 #endif
-#line 495 "xp-lexer.l"
+#line 495 "xp-lexer.flex"
 
 
 yywrap() { return(1); }

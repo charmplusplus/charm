@@ -329,7 +329,7 @@ extern char *Concat3() ;
 /* Multi-Character operators */
 %token  ARROW            /*    ->                              */
 %token  ICR DECR         /*    ++      --                      */
-%token  LS RS            /*    <<      >>                      */
+%token  LSHIFT RSHIFT    /*    <<      >>                      */
 %token  LE GE EQ NE      /*    <=      >=      ==      !=      */
 %token  ANDAND OROR      /*    &&      ||                      */
 %token  ELLIPSIS         /*    ...                             */
@@ -528,8 +528,8 @@ any_operator:
         | '!'
         | '<'
         | '>'
-        | LS
-        | RS
+        | LSHIFT
+        | RSHIFT
         | ANDAND
         | OROR
         | ARROW
@@ -994,9 +994,9 @@ additive_expression:
 
 shift_expression:
         additive_expression	{ $$=$1 ; }
-        | shift_expression LS additive_expression
+        | shift_expression LSHIFT additive_expression
 	  { $$ = Concat3($1,"<<",$3) ; }
-        | shift_expression RS additive_expression
+        | shift_expression RSHIFT additive_expression
 	  { $$ = Concat3($1,">>",$3) ; }
         ;
 
