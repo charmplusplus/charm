@@ -66,18 +66,24 @@ init(void)
   for (int sparseNo=0;sparseNo<2;sparseNo++) {
     int nSparse=dim;
     int *nodes=new int[2*nSparse];
+    int *elems=new int[2*nSparse];
     double *data=new double[3*nSparse];
     sparseSum[sparseNo]=0.0;
     for (int y=0;y<nSparse;y++) {
-      nodes[2*y+0]=(y  )*(dim+1)+(y  )*sparseNo;
-      nodes[2*y+1]=(y+1)*(dim+1)+(y+1)*sparseNo;
+      int x=y*sparseNo;
+      nodes[2*y+0]=(y  )*(dim+1)+(x  );
+      nodes[2*y+1]=(y+1)*(dim+1)+(x+1);
+      elems[2*y+0]=0; //Always element type 0
+      elems[2*y+1]=y*dim+x;
       double val=1.0+y*0.2+23.0*sparseNo;
       sparseSum[sparseNo]+=val;
       data[3*y+0]=data[3*y+1]=val;
       data[3*y+2]=10.0;
     }
     FEM_Set_Sparse(sparseNo,nSparse, nodes,2, data,3,FEM_DOUBLE);
+    FEM_Set_Sparse_Elem(sparseNo,elems);
     delete[] nodes;
+    delete[] elems;
     delete[] data;
   }
   
@@ -251,8 +257,7 @@ driver(void)
     }
     double globalSum=0.0;
     FEM_Reduce(doubleField,&sum,&globalSum,FEM_SUM);
-    if (globalSum<sparseSum[sparseNo]) //GlobalSum might be bigger because of duplicates
-    	CkAbort("Sparse data global sum indicates some missing sparse records!");
+    testEqual(globalSum,sparseSum[sparseNo],"sparse data global sum");
     delete[] nodes;
     delete[] data;
   }
