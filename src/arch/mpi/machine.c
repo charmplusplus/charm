@@ -820,6 +820,7 @@ void ConverseExit(void)
 }
 
 static char     **Cmi_argv;
+static char     **Cmi_argvcopy;
 static CmiStartFn Cmi_startfn;   /* The start function */
 static int        Cmi_usrsched;  /* Continue after start function finishes? */
 
@@ -878,7 +879,12 @@ static void ConverseRunPE(int everReturn)
   cs = CmiGetState();
   CpvInitialize(void *,CmiLocalQueue);
   CpvAccess(CmiLocalQueue) = cs->localqueue;
-  CmiMyArgv=CmiCopyArgs(Cmi_argv);
+
+  if (CmiMyRank())
+    CmiMyArgv=CmiCopyArgs(Cmi_argvcopy);
+  else   
+    CmiMyArgv=Cmi_argv;
+    
   CthInit(CmiMyArgv);
 #if MACHINE_DEBUG_LOG
   {
@@ -925,6 +931,7 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
 #endif
   Cmi_numpes = Cmi_numnodes * Cmi_mynodesize;
   Cmi_nodestart = Cmi_mynode * Cmi_mynodesize;
+  Cmi_argvcopy = CmiCopyArgs(argv);
   Cmi_argv = argv; Cmi_startfn = fn; Cmi_usrsched = usched;
   /* find dim = log2(numpes), to pretend we are a hypercube */
   for ( Cmi_dim=0,n=Cmi_numpes; n>1; n/=2 )
