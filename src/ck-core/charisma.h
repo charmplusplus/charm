@@ -203,6 +203,7 @@ class CharismaGraph
     }
     void Partition(void)
     {
+      int i;
       int n = 0; // number of objects
       CkHashtableIterator *ht = comps.iterator();
       CkHashtableIterator *pt = ports.iterator();
@@ -228,9 +229,9 @@ class CharismaGraph
       int *adjncy = new int[tadj];
       // construct the adjcency in CSR format as required by Metis
       xadj[0] = 0;
-      for(int i=1;i<n;i++)
+      for(i=1;i<n;i++)
         xadj[i] = xadj[i-1] + nconnect[i-1];
-      for(int i=0;i<tadj;i++)
+      for(i=0;i<tadj;i++)
         adjncy[i] = (-1); // set to something invalid
       pt->seekStart();
       while(pt->hasNext()) {
@@ -248,7 +249,6 @@ class CharismaGraph
       }
       int *vwgt = new int[n];
       int *adjwgt = new int[tadj];
-      int i;
       // currently all vertices are assumed to be of same wgt
       // this will change after embellishing the connection code
       for(i=0;i<n; i++)
