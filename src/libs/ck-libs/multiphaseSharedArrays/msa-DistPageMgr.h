@@ -652,14 +652,14 @@ protected:
     {
         if (pageTable[page] == 0) {
             pageFault(page, access);
-	}
+        }
 #ifndef CMK_OPTIMIZE
         if (stateN(page)->state!=access)
             CkAbort("MSA Runtime error: Attempting to access a page that is still in another mode.");
 #endif
         replacementPolicy->pageAccessed(page);
     }
-    
+
     // begin, end are indexes
     //
     // MSA_CacheGroup::
@@ -819,7 +819,8 @@ public:
         // is going to write to this location. In reality, two locations on the *same*
         // page can be written by two different threads, in which case we will need
         // to keep track of which parts of the page have been written, hence:
-	stateN(page)->write(offset);
+        stateN(page)->write(offset);
+//     ckout << "write:" << page*ENTRIES_PER_PAGE+offset << endl;
 	
         return pageTable[page];
     }
@@ -890,6 +891,7 @@ public:
         for(unsigned int i = 0; i < nPages; i++)
         {
             if(shouldWriteback(i)) {
+                //ckout << "p" << CkMyPe() << "FlushCache: sending page " << i << endl;
                 sendChangesToPageArray(i, 1);
             }
         }
@@ -987,7 +989,14 @@ public:
         // modified by another thread.
         EmptyCache();
 
-	getListener()->suspend();
+        // Now, we suspend too (if we had at least one dirty page).
+        // We will be awoken when all our dirty pages have been
+        // written and acknowledged.
+        getListener()->suspend();
+
+    // So far, the sync has been asynchronous, i.e. PE0 might be ahead
+    // of PE1.  Next we basically do a barrier to ensure that all PE's
+    // are synchronized.
 
         // at this point, the sync's across the group should
         // synchronize among themselves by each one sending
@@ -1141,11 +1150,12 @@ public:
     }
 
     /// Debugging routine
-    inline void emitBufferValue(unsigned int pageNum, unsigned int offset)
+    inline void emitBufferValue(int ID, unsigned int pageNum, unsigned int offset)
     {
         CkAssert( pageNum < nPages );
         CkAssert( offset < ENTRIES_PER_PAGE );
 
+        ckout << "p" << CkMyPe() << "ID" << ID;
         if (pageTable[pageNum] == 0)
             ckout << "emitBufferValue: page " << pageNum << " not available in local cache." << endl;
         else
@@ -1182,8 +1192,10 @@ protected:
     // begin and end are indexes into the page.
     inline void set(const ENTRY_TYPE* buffer, unsigned int begin, unsigned int end)
     {
+        //ckout << "set: " << begin << "," << end << endl;
         for(unsigned int i = 0; i < (end - begin); i++) {
             epage[begin + i] = buffer[i]; // @@@, calls assignment operator
+            //ckout << "set val[" << begin+i << "]=" << buffer[i] << endl;
         }
     }
 
@@ -1263,15 +1275,16 @@ public:
     {
         allocatePage(pageState);
 	
+        //ckout << "p" << CkMyPe() << "ReceiveRLEPage nSpans=" << nSpans << " nEntries=" << nEntries << endl;
         int e=0; /* consumed entries */
         for (int s=0;s<nSpans;s++) {
             if(pageState == Write_Fault)
                 set(&entries[e], spans[s].start,spans[s].end);
-	    else /* Accumulate_Fault */
+            else /* Accumulate_Fault */
                 combine(&entries[e], spans[s].start,spans[s].end);
-	    e+=spans[s].end-spans[s].start;
-	} 
-	
+            e+=spans[s].end-spans[s].start;
+        } 
+
         // send the acknowledgement to the sender that we received the page
         //ckout << "Sending AckRLE to PE " << pe << endl;
         cache[pe].AckPage(thisIndex);
@@ -1283,9 +1296,13 @@ public:
         contribute(0, NULL, CkReduction::concat);
     }
 
-    inline void emit(int index)
+    inline void emit(int ID, int index)
     {
-        ckout << "emit: " << epage[index] << endl;
+        ckout << "p" << CkMyPe() << "ID" << ID;
+        if(epage == NULL)
+            ckout << "emit: epage is NULL" << endl;
+        else
+            ckout << "emit: " << epage[index] << endl;
     }
 };
 
