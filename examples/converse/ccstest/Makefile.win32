@@ -1,0 +1,39 @@
+CHARMBIN=..\..\..\bin
+CPP = cl.exe
+
+INC = /I"..\..\..\include"
+
+CPP_PROJ=/nologo /MT /w /Gm /GX /ZI /Od $(INC)\
+ /D "WIN32" /D "_DEBUG" /D "_WINDOWS" /YX\
+ /Fo /FD /c /GZ
+
+LINK=link.exe
+LINK_FLAGS = /nologo /LIBPATH:"..\..\..\lib" /nodefaultlib:"libc"
+LINK_OTHER = libldb-rand.obj libck.lib libconv-core.lib libtrace-none.lib libconv-cplus-y.lib ws2_32.lib kernel32.lib 
+
+LINK_COTHER= /nologo ws2_32.lib
+
+SOBJS = server.obj
+COBJS = client.obj ccs.obj
+
+.SILENT:
+
+all: server client
+
+server: $(SOBJS)
+	$(LINK) $(LINK_FLAGS) $(LINK_OTHER) /out:"server.exe" $(SOBJS)
+	copy $(CHARMBIN)\conv-host.exe .
+
+client: $(COBJS)
+	$(LINK) $(LINK_COTHER) /out:"client.exe" $(COBJS)
+
+.c.obj: 
+	$(CPP) $(CPP_PROJ) $<
+
+clean:
+	del *.decl.h
+	del *.def.h
+	del conv-host.exe
+	del *.obj
+	del pgm.exe
+	del vc60.*
