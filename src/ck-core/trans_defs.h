@@ -12,7 +12,11 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.1  1995-06-08 17:07:12  gursoy
+ * Revision 2.2  1995-06-29 21:47:29  narain
+ * Changed members in MSG_STRUCT to packfn and unpackfn, and
+ * member in PSEUDO_STRUCT to tbl
+ *
+ * Revision 2.1  1995/06/08  17:07:12  gursoy
  * Cpv macro changes done
  *
  * Revision 1.5  1995/04/13  21:26:44  milind
@@ -80,8 +84,8 @@
 
 typedef struct msg_struct {
 	int size;
-	FUNCTION_PTR pack;
-	FUNCTION_PTR unpack;
+	FUNCTION_PTR packfn;
+	FUNCTION_PTR unpackfn;
 	FUNCTION_PTR alloc;
 } MSG_STRUCT;
 
@@ -106,7 +110,7 @@ typedef struct pseudo_struct {
 	union {
 		MONO_STRUCT mono;
 		ACC_STRUCT acc;
-		TABLE_STRUCT table;
+		TABLE_STRUCT tbl;
 	} pseudo_type;
 } PSEUDO_STRUCT;
 
