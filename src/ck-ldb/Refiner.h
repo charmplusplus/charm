@@ -32,7 +32,7 @@ public:
   static void FreeProcs(int* bufs);
   void Refine(int count, CentralLB::LDStats* stats, int* cur_p, int* new_p);
 
-private:
+protected:
   void create(int count, CentralLB::LDStats* stats, int* cur_p);
   int refine();
   void assign(computeInfo *c, int p);

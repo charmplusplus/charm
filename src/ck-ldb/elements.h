@@ -23,6 +23,8 @@
 #include "lbdb.h"
 
 #include "Set.h"
+#include "cklists.h"
+
 class minHeap;
 class maxHeap;
 
@@ -47,6 +49,7 @@ public:
    int originalPE;  // These two are used by refiner, but ignored by RefineLB
    int originalIdx;
    int migratable;
+   CkVec<int>  messages;
 };
 
 class processorInfo: public InfoRecord
