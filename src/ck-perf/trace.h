@@ -30,9 +30,11 @@ class Trace {
     virtual void traceBegin() {}
     virtual void traceEnd() {}
     // registers user event trace module returns int identifier 
-    virtual int traceRegisterUserEvent(const char* eventName) { return 0; }
+    virtual int traceRegisterUserEvent(const char* eventName, int e) { return 0; }
     // a user event has just occured
     virtual void userEvent(int eventID) {}
+    // a pair of begin/end user event has just occured
+    virtual void userBracketEvent(int eventID, double bt) {}
     // creation of message(s)
     virtual void creation(envelope *, int num=1) {}
     // ???
@@ -87,6 +89,7 @@ public:
     inline int length() const { return n; }
 
     inline void userEvent(int e) { ALLDO(userEvent(e));}
+    inline void userBracketEvent(int e,double t) {ALLDO(userBracketEvent(e,t));}
     inline void creation(envelope *env, int num=1) { ALLDO(creation(env, num));}
     inline void beginExecute(envelope *env) {ALLDO(beginExecute(env));}
     inline void beginExecute(int event,int msgType,int ep,int srcPe, int mlen) {ALLDO(beginExecute(event, msgType, ep, srcPe, mlen));}
@@ -102,10 +105,10 @@ public:
     inline void dequeue(envelope *e) {ALLDO(dequeue(e));}
     inline void beginComputation(void) {ALLDO(beginComputation());}
     inline void endComputation(void) {ALLDO(endComputation());}
-    inline int traceRegisterUserEvent(const char*x) {
+    inline int traceRegisterUserEvent(const char*x, int evt) {
 	  int eno = 0;
 	  for (int i=0; i<traces.length(); i++) {
-	    int e = traces[i]->traceRegisterUserEvent(x);
+	    int e = traces[i]->traceRegisterUserEvent(x, evt);
 	    if (e) eno = e;
           }
 	  return eno;

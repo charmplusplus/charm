@@ -73,10 +73,6 @@ static void traceCommonInit(char **argv)
   }
 }
 
-extern "C" int traceIsOn(void) {
-  return CpvAccess(traceOn);
-}
-
 /*Install the beginIdle/endIdle condition handlers.*/
 extern "C" void traceBegin(void) {
   OPTIMIZE_WARNING
@@ -178,10 +174,19 @@ void traceUserEvent(int e)
 }
 
 extern "C"
-int traceRegisterUserEvent(const char*x)
+void traceUserBracketEvent(int e, double beginT)
 {
 #ifndef CMK_OPTIMIZE
-  return CkpvAccess(_traces)->traceRegisterUserEvent(x);
+  if (CpvAccess(traceOn))
+    CkpvAccess(_traces)->userBracketEvent(e, beginT);
+#endif
+}
+
+extern "C"
+int traceRegisterUserEvent(const char*x, int e=-1)
+{
+#ifndef CMK_OPTIMIZE
+  return CkpvAccess(_traces)->traceRegisterUserEvent(x, e);
 #else
   return 0;
 #endif

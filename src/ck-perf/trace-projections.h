@@ -102,6 +102,7 @@ class TraceProjections : public Trace {
   public:
     TraceProjections(char **argv);
     void userEvent(int e);
+    void userBracketEvent(int e, double t);
     void creation(envelope *e, int num=1);
     void beginExecute(envelope *e);
     void beginExecute(int event,int msgType,int ep,int srcPe,int ml);
@@ -118,7 +119,7 @@ class TraceProjections : public Trace {
     void beginComputation(void);
     void endComputation(void);
 
-    int traceRegisterUserEvent(const char*);
+    int traceRegisterUserEvent(const char*, int);
     void traceClearEps();
     void traceWriteSts();
     void traceClose();

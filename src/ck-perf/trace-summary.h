@@ -181,29 +181,19 @@ class TraceSummary : public Trace {
     int msgNum;
   public:
     TraceSummary(char **argv);
-    void userEvent(int e) {}
-    void creation(envelope *e, int num=1) {}
     void beginExecute(envelope *e);
     void beginExecute(int event,int msgType,int ep,int srcPe, int mlen=0);
     void endExecute(void);
-    void messageRecv(char *env, int pe) {}
-    void beginIdle(void) {}
-    void endIdle(void)   {}
     void beginPack(void);
     void endPack(void);
     void beginUnpack(void);
     void endUnpack(void);
-    void enqueue(envelope *e) {}
-    void dequeue(envelope *e) {}
     void beginComputation(void);
     void endComputation(void);
 
-    int traceRegisterUserEvent(const char*);
     void traceClearEps();
     void traceWriteSts();
     void traceClose();
-    void traceBegin() {}
-    void traceEnd()   {}
 
     /**
        for trace summary event mark

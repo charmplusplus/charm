@@ -283,11 +283,6 @@ TraceSummary::TraceSummary(char **argv):curevent(0),msgNum(0),binStart(0.0),bin(
   execEp=INVALIDEP;
 }
 
-int TraceSummary::traceRegisterUserEvent(const char*)
-{
-  return 0;
-}
-
 void TraceSummary::traceClearEps(void)
 {
   _logPool->clearEps();

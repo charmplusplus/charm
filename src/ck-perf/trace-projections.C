@@ -22,7 +22,14 @@ static int _numEvents = 0;
 static int warned = 0;
 static int _threadMsg, _threadChare, _threadEP;
 
-CkpvStaticDeclare(CkVec<char *>, usrEvents);
+CkpvStaticDeclare(CkVec<char *>, usrEventlist);
+class UsrEvent {
+public:
+  int e;
+  char *str;
+  UsrEvent(int _e, char* _s): e(_e),str(_s) {}
+};
+CkpvStaticDeclare(CkVec<UsrEvent *>, usrEvents);
 
 #ifdef CMK_OPTIMIZE
 #define OPTIMIZED_VERSION 	\
@@ -203,7 +210,7 @@ void LogPool::writeSts(void)
   fprintf(stsfp, "TOTAL_EPS %d\n", _numEntries);
   fprintf(stsfp, "TOTAL_MSGS %d\n", _numMsgs);
   fprintf(stsfp, "TOTAL_PSEUDOS %d\n", 0);
-  fprintf(stsfp, "TOTAL_EVENTS %d\n", _numEvents);
+  fprintf(stsfp, "TOTAL_EVENTS %d\n", CkpvAccess(usrEvents).length());
   int i;
   for(i=0;i<_numChares;i++)
     fprintf(stsfp, "CHARE %d %s\n", i, _chareTable[i]->name);
@@ -212,8 +219,8 @@ void LogPool::writeSts(void)
                  _entryTable[i]->chareIdx, _entryTable[i]->msgIdx);
   for(i=0;i<_numMsgs;i++)
     fprintf(stsfp, "MESSAGE %d %d\n", i, _msgTable[i]->size);
-  for(i=0;i<_numEvents;i++)
-    fprintf(stsfp, "EVENT %d %s\n", i, CkpvAccess(usrEvents)[i]);
+  for(i=0;i<CkpvAccess(usrEvents).length();i++)
+    fprintf(stsfp, "EVENT %d %s\n", CkpvAccess(usrEvents)[i]->e, CkpvAccess(usrEvents)[i]->str);
   fprintf(stsfp, "END\n");
   fclose(stsfp);
 }
@@ -237,6 +244,7 @@ void LogEntry::write(FILE* fp)
 
   switch (type) {
     case USER_EVENT:
+    case USER_EVENT_PAIR:
       fprintf(fp, "%d %u %d %d\n", mIdx, (UInt) (time*1.0e6), event, pe);
       break;
 
@@ -284,6 +292,7 @@ void LogEntry::writeCompressed(gzFile zfp)
 
   switch (type) {
     case USER_EVENT:
+    case USER_EVENT_PAIR:
       gzprintf(zfp, "%d %u %d %d\n", mIdx, (UInt) (time*1.0e6), event, pe);
       break;
 
@@ -333,6 +342,7 @@ void LogEntry::writeBinary(FILE* fp)
 
   switch (type) {
     case USER_EVENT:
+    case USER_EVENT_PAIR:
       fwrite(&mIdx,sizeof(UShort),1,fp);
       fwrite(&ttime,sizeof(UInt),1,fp);
       fwrite(&event,sizeof(int),1,fp);
@@ -410,18 +420,41 @@ TraceProjections::TraceProjections(char **argv): curevent(0), isIdle(0)
   _logPool->init();
 }
 
-
-int TraceProjections::traceRegisterUserEvent(const char* evt)
+/*
+old version
+int TraceProjections::traceRegisterUserEvent(const char* evt, int e=-1)
 {
   OPTIMIZED_VERSION
   if(CkMyPe()==0) {
     CkAssert(evt != NULL);
-    CkAssert(CkpvAccess(usrEvents).length() ==  _numEvents);
-    CkpvAccess(usrEvents).push_back((char *)evt);
+    CkAssert(CkpvAccess(usrEventlist).length() ==  _numEvents);
+    CkpvAccess(usrEventlist).push_back((char *)evt);
     return _numEvents++;
   }
   else
     return 0;
+}
+*/
+
+int TraceProjections::traceRegisterUserEvent(const char* evt, int e)
+{
+  OPTIMIZED_VERSION
+  CkAssert(e==-1 || e>=0);
+  CkAssert(evt != NULL);
+  int event;
+  int biggest = 0;
+  for (int i=0; i<CkpvAccess(usrEvents).length(); i++) {
+    int cur = CkpvAccess(usrEvents)[i]->e;
+    if (cur == e) 
+      CmiAbort("UserEvent double registered!");
+    if (cur > biggest) biggest = cur;
+  }
+  if (e==-1) event = biggest;
+  else event = e;
+  if(CkMyPe()==0) {
+    CkpvAccess(usrEvents).push_back(new UsrEvent(event,(char *)evt));
+  }
+  return event;
 }
 
 void TraceProjections::traceClearEps(void)
@@ -468,6 +501,13 @@ void TraceProjections::traceEnd(void)
 void TraceProjections::userEvent(int e)
 {
   _logPool->add(USER_EVENT, e, 0, TraceTimer(),curevent++,CkMyPe());
+}
+
+void TraceProjections::userBracketEvent(int e, double bt)
+{
+  // two events record Begin/End of event e.
+  _logPool->add(USER_EVENT_PAIR, e, 0, TraceTimer(bt), curevent, CkMyPe());
+  _logPool->add(USER_EVENT_PAIR, e, 0, TraceTimer(), curevent++, CkMyPe());
 }
 
 void TraceProjections::creation(envelope *e, int num)
