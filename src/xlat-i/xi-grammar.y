@@ -1,3 +1,4 @@
+%expect 2
 %{
 #include <iostream.h>
 #include "xi-symbol.h"
@@ -259,8 +260,10 @@ Type		: SimpleType
 		{ $$ = $1; }
 		| Type '&'
 		{ $$ = $1; }
+		| CONST Type 
+		{ $$ = $2; }
 		;
-		
+
 ArrayDim	: NUMBER
 		{ $$ = new Value($1); }
 		| QualName
