@@ -14,10 +14,14 @@ eventID.o: eventID.C eventID.h ../../../../include/charm++.h \
   ../../../../include/init.h ../../../../include/ckhashtable.h \
   ../../../../include/debug-charm.h ../../../../include/CkMarshall.decl.h \
   ../../../../include/cksection.h ../../../../include/ckcallback.h \
+  ../../../../include/conv-ccs.h ../../../../include/sockRoutines.h \
+  ../../../../include/ccs-server.h ../../../../include/ckobjQ.h \
   ../../../../include/ckreduction.h \
   ../../../../include/CkReduction.decl.h \
   ../../../../include/cknodegroupreduction.h \
   ../../../../include/CkArrayReductionMgr.decl.h \
+  ../../../../include/ckmemcheckpoint.h \
+  ../../../../include/CkMemCheckpoint.decl.h \
   ../../../../include/readonly.h ../../../../include/ckarray.h \
   ../../../../include/cklocation.h ../../../../include/LBDatabase.h \
   ../../../../include/lbdb.h ../../../../include/LBDatabase.decl.h \
@@ -26,6 +30,7 @@ eventID.o: eventID.C eventID.h ../../../../include/charm++.h \
   ../../../../include/CkArray.decl.h \
   ../../../../include/ComlibArrayListener.h \
   ../../../../include/ComlibStrategy.h \
+  ../../../../include/convcomlibstrategy.h \
   ../../../../include/CkFutures.decl.h ../../../../include/charisma.h \
   ../../../../include/charisma.decl.h ../../../../include/tempo.h \
   ../../../../include/tempo.decl.h ../../../../include/waitqd.h \
@@ -50,10 +55,14 @@ stats.o: stats.C ../../../../include/charm++.h \
   ../../../../include/init.h ../../../../include/ckhashtable.h \
   ../../../../include/debug-charm.h ../../../../include/CkMarshall.decl.h \
   ../../../../include/cksection.h ../../../../include/ckcallback.h \
+  ../../../../include/conv-ccs.h ../../../../include/sockRoutines.h \
+  ../../../../include/ccs-server.h ../../../../include/ckobjQ.h \
   ../../../../include/ckreduction.h \
   ../../../../include/CkReduction.decl.h \
   ../../../../include/cknodegroupreduction.h \
   ../../../../include/CkArrayReductionMgr.decl.h \
+  ../../../../include/ckmemcheckpoint.h \
+  ../../../../include/CkMemCheckpoint.decl.h \
   ../../../../include/readonly.h ../../../../include/ckarray.h \
   ../../../../include/cklocation.h ../../../../include/LBDatabase.h \
   ../../../../include/lbdb.h ../../../../include/LBDatabase.decl.h \
@@ -62,6 +71,7 @@ stats.o: stats.C ../../../../include/charm++.h \
   ../../../../include/CkArray.decl.h \
   ../../../../include/ComlibArrayListener.h \
   ../../../../include/ComlibStrategy.h \
+  ../../../../include/convcomlibstrategy.h \
   ../../../../include/CkFutures.decl.h ../../../../include/charisma.h \
   ../../../../include/charisma.decl.h ../../../../include/tempo.h \
   ../../../../include/tempo.decl.h ../../../../include/waitqd.h \
@@ -69,13 +79,14 @@ stats.o: stats.C ../../../../include/charm++.h \
   ../../../../include/ckcheckpoint.h \
   ../../../../include/CkCheckpoint.decl.h \
   ../../../../include/ckarrayreductionmgr.h ../../../../include/trace.h \
-  ../../../../include/trace-bluegene.h stats.h stats.decl.h stats.def.h
+  ../../../../include/trace-bluegene.h stats.h stats.decl.h pose_config.h \
+  stats.def.h
 	$(CHARMC) -o stats.o stats.C
-pose.o: pose.C pose.h ../../../../include/StreamingStrategy.h \
-  ../../../../include/ComlibManager.h ../../../../include/charm++.h \
-  ../../../../include/charm.h ../../../../include/converse.h \
-  ../../../../include/conv-config.h ../../../../include/conv-common.h \
-  ../../../../include/conv-mach.h ../../../../include/conv-autoconfig.h \
+pose.o: pose.C pose.h pose_config.h pose.decl.h \
+  ../../../../include/charm++.h ../../../../include/charm.h \
+  ../../../../include/converse.h ../../../../include/conv-config.h \
+  ../../../../include/conv-common.h ../../../../include/conv-mach.h \
+  ../../../../include/conv-autoconfig.h \
   ../../../../include/conv-mach-opt.h ../../../../include/pup_c.h \
   ../../../../include/conv-cpm.h ../../../../include/conv-cpath.h \
   ../../../../include/conv-qd.h ../../../../include/conv-random.h \
@@ -87,10 +98,14 @@ pose.o: pose.C pose.h ../../../../include/StreamingStrategy.h \
   ../../../../include/init.h ../../../../include/ckhashtable.h \
   ../../../../include/debug-charm.h ../../../../include/CkMarshall.decl.h \
   ../../../../include/cksection.h ../../../../include/ckcallback.h \
+  ../../../../include/conv-ccs.h ../../../../include/sockRoutines.h \
+  ../../../../include/ccs-server.h ../../../../include/ckobjQ.h \
   ../../../../include/ckreduction.h \
   ../../../../include/CkReduction.decl.h \
   ../../../../include/cknodegroupreduction.h \
   ../../../../include/CkArrayReductionMgr.decl.h \
+  ../../../../include/ckmemcheckpoint.h \
+  ../../../../include/CkMemCheckpoint.decl.h \
   ../../../../include/readonly.h ../../../../include/ckarray.h \
   ../../../../include/cklocation.h ../../../../include/LBDatabase.h \
   ../../../../include/lbdb.h ../../../../include/LBDatabase.decl.h \
@@ -99,6 +114,7 @@ pose.o: pose.C pose.h ../../../../include/StreamingStrategy.h \
   ../../../../include/CkArray.decl.h \
   ../../../../include/ComlibArrayListener.h \
   ../../../../include/ComlibStrategy.h \
+  ../../../../include/convcomlibstrategy.h \
   ../../../../include/CkFutures.decl.h ../../../../include/charisma.h \
   ../../../../include/charisma.decl.h ../../../../include/tempo.h \
   ../../../../include/tempo.decl.h ../../../../include/waitqd.h \
@@ -106,12 +122,11 @@ pose.o: pose.C pose.h ../../../../include/StreamingStrategy.h \
   ../../../../include/ckcheckpoint.h \
   ../../../../include/CkCheckpoint.decl.h \
   ../../../../include/ckarrayreductionmgr.h ../../../../include/trace.h \
-  ../../../../include/trace-bluegene.h ../../../../include/envelope.h \
-  ../../../../include/commlib.h ../../../../include/commlib.decl.h \
-  pose.decl.h eventID.h evmpool.h evmpool.decl.h srtable.h stats.h \
-  stats.decl.h cancel.h event.h eqheap.h pvtobj.h lbObject.h ldbal.h \
+  ../../../../include/trace-bluegene.h eventID.h evmpool.h evmpool.decl.h \
+  srtable.h stats.h stats.decl.h cancel.h event.h \
+  ../../../../include/envelope.h eqheap.h pvtobj.h lbObject.h ldbal.h \
   ldbal.decl.h gvt.h gvt.decl.h evq.h rep.h strat.h sim.h sim.decl.h \
-  opt.h opt2.h opt3.h spec.h adapt.h cons.h chpt.h pose.def.h
+  opt.h opt2.h opt3.h spec.h adapt.h adapt2.h cons.h chpt.h pose.def.h
 	$(CHARMC) -o pose.o pose.C
 srtable.o: srtable.C ../../../../include/charm++.h \
   ../../../../include/charm.h ../../../../include/converse.h \
@@ -128,10 +143,14 @@ srtable.o: srtable.C ../../../../include/charm++.h \
   ../../../../include/init.h ../../../../include/ckhashtable.h \
   ../../../../include/debug-charm.h ../../../../include/CkMarshall.decl.h \
   ../../../../include/cksection.h ../../../../include/ckcallback.h \
+  ../../../../include/conv-ccs.h ../../../../include/sockRoutines.h \
+  ../../../../include/ccs-server.h ../../../../include/ckobjQ.h \
   ../../../../include/ckreduction.h \
   ../../../../include/CkReduction.decl.h \
   ../../../../include/cknodegroupreduction.h \
   ../../../../include/CkArrayReductionMgr.decl.h \
+  ../../../../include/ckmemcheckpoint.h \
+  ../../../../include/CkMemCheckpoint.decl.h \
   ../../../../include/readonly.h ../../../../include/ckarray.h \
   ../../../../include/cklocation.h ../../../../include/LBDatabase.h \
   ../../../../include/lbdb.h ../../../../include/LBDatabase.decl.h \
@@ -140,6 +159,7 @@ srtable.o: srtable.C ../../../../include/charm++.h \
   ../../../../include/CkArray.decl.h \
   ../../../../include/ComlibArrayListener.h \
   ../../../../include/ComlibStrategy.h \
+  ../../../../include/convcomlibstrategy.h \
   ../../../../include/CkFutures.decl.h ../../../../include/charisma.h \
   ../../../../include/charisma.decl.h ../../../../include/tempo.h \
   ../../../../include/tempo.decl.h ../../../../include/waitqd.h \
@@ -147,14 +167,12 @@ srtable.o: srtable.C ../../../../include/charm++.h \
   ../../../../include/ckcheckpoint.h \
   ../../../../include/CkCheckpoint.decl.h \
   ../../../../include/ckarrayreductionmgr.h ../../../../include/trace.h \
-  ../../../../include/trace-bluegene.h srtable.h pose.h \
-  ../../../../include/StreamingStrategy.h \
-  ../../../../include/ComlibManager.h ../../../../include/envelope.h \
-  ../../../../include/commlib.h ../../../../include/commlib.decl.h \
+  ../../../../include/trace-bluegene.h srtable.h pose.h pose_config.h \
   pose.decl.h eventID.h evmpool.h evmpool.decl.h stats.h stats.decl.h \
-  cancel.h event.h eqheap.h pvtobj.h lbObject.h ldbal.h ldbal.decl.h \
-  gvt.h gvt.decl.h evq.h rep.h strat.h sim.h sim.decl.h opt.h opt2.h \
-  opt3.h spec.h adapt.h cons.h chpt.h
+  cancel.h event.h ../../../../include/envelope.h eqheap.h pvtobj.h \
+  lbObject.h ldbal.h ldbal.decl.h gvt.h gvt.decl.h evq.h rep.h strat.h \
+  sim.h sim.decl.h opt.h opt2.h opt3.h spec.h adapt.h adapt2.h cons.h \
+  chpt.h
 	$(CHARMC) -o srtable.o srtable.C
 cancel.o: cancel.C eventID.h ../../../../include/charm++.h \
   ../../../../include/charm.h ../../../../include/converse.h \
@@ -171,10 +189,14 @@ cancel.o: cancel.C eventID.h ../../../../include/charm++.h \
   ../../../../include/init.h ../../../../include/ckhashtable.h \
   ../../../../include/debug-charm.h ../../../../include/CkMarshall.decl.h \
   ../../../../include/cksection.h ../../../../include/ckcallback.h \
+  ../../../../include/conv-ccs.h ../../../../include/sockRoutines.h \
+  ../../../../include/ccs-server.h ../../../../include/ckobjQ.h \
   ../../../../include/ckreduction.h \
   ../../../../include/CkReduction.decl.h \
   ../../../../include/cknodegroupreduction.h \
   ../../../../include/CkArrayReductionMgr.decl.h \
+  ../../../../include/ckmemcheckpoint.h \
+  ../../../../include/CkMemCheckpoint.decl.h \
   ../../../../include/readonly.h ../../../../include/ckarray.h \
   ../../../../include/cklocation.h ../../../../include/LBDatabase.h \
   ../../../../include/lbdb.h ../../../../include/LBDatabase.decl.h \
@@ -183,6 +205,7 @@ cancel.o: cancel.C eventID.h ../../../../include/charm++.h \
   ../../../../include/CkArray.decl.h \
   ../../../../include/ComlibArrayListener.h \
   ../../../../include/ComlibStrategy.h \
+  ../../../../include/convcomlibstrategy.h \
   ../../../../include/CkFutures.decl.h ../../../../include/charisma.h \
   ../../../../include/charisma.decl.h ../../../../include/tempo.h \
   ../../../../include/tempo.decl.h ../../../../include/waitqd.h \
@@ -190,14 +213,11 @@ cancel.o: cancel.C eventID.h ../../../../include/charm++.h \
   ../../../../include/ckcheckpoint.h \
   ../../../../include/CkCheckpoint.decl.h \
   ../../../../include/ckarrayreductionmgr.h ../../../../include/trace.h \
-  ../../../../include/trace-bluegene.h pose.h \
-  ../../../../include/StreamingStrategy.h \
-  ../../../../include/ComlibManager.h ../../../../include/envelope.h \
-  ../../../../include/commlib.h ../../../../include/commlib.decl.h \
-  pose.decl.h evmpool.h evmpool.decl.h srtable.h stats.h stats.decl.h \
-  cancel.h event.h eqheap.h pvtobj.h lbObject.h ldbal.h ldbal.decl.h \
-  gvt.h gvt.decl.h evq.h rep.h strat.h sim.h sim.decl.h opt.h opt2.h \
-  opt3.h spec.h adapt.h cons.h chpt.h
+  ../../../../include/trace-bluegene.h pose.h pose_config.h pose.decl.h \
+  evmpool.h evmpool.decl.h srtable.h stats.h stats.decl.h cancel.h \
+  event.h ../../../../include/envelope.h eqheap.h pvtobj.h lbObject.h \
+  ldbal.h ldbal.decl.h gvt.h gvt.decl.h evq.h rep.h strat.h sim.h \
+  sim.decl.h opt.h opt2.h opt3.h spec.h adapt.h adapt2.h cons.h chpt.h
 	$(CHARMC) -o cancel.o cancel.C
 evmpool.o: evmpool.C ../../../../include/charm++.h \
   ../../../../include/charm.h ../../../../include/converse.h \
@@ -214,10 +234,14 @@ evmpool.o: evmpool.C ../../../../include/charm++.h \
   ../../../../include/init.h ../../../../include/ckhashtable.h \
   ../../../../include/debug-charm.h ../../../../include/CkMarshall.decl.h \
   ../../../../include/cksection.h ../../../../include/ckcallback.h \
+  ../../../../include/conv-ccs.h ../../../../include/sockRoutines.h \
+  ../../../../include/ccs-server.h ../../../../include/ckobjQ.h \
   ../../../../include/ckreduction.h \
   ../../../../include/CkReduction.decl.h \
   ../../../../include/cknodegroupreduction.h \
   ../../../../include/CkArrayReductionMgr.decl.h \
+  ../../../../include/ckmemcheckpoint.h \
+  ../../../../include/CkMemCheckpoint.decl.h \
   ../../../../include/readonly.h ../../../../include/ckarray.h \
   ../../../../include/cklocation.h ../../../../include/LBDatabase.h \
   ../../../../include/lbdb.h ../../../../include/LBDatabase.decl.h \
@@ -226,6 +250,7 @@ evmpool.o: evmpool.C ../../../../include/charm++.h \
   ../../../../include/CkArray.decl.h \
   ../../../../include/ComlibArrayListener.h \
   ../../../../include/ComlibStrategy.h \
+  ../../../../include/convcomlibstrategy.h \
   ../../../../include/CkFutures.decl.h ../../../../include/charisma.h \
   ../../../../include/charisma.decl.h ../../../../include/tempo.h \
   ../../../../include/tempo.decl.h ../../../../include/waitqd.h \
@@ -233,20 +258,18 @@ evmpool.o: evmpool.C ../../../../include/charm++.h \
   ../../../../include/ckcheckpoint.h \
   ../../../../include/CkCheckpoint.decl.h \
   ../../../../include/ckarrayreductionmgr.h ../../../../include/trace.h \
-  ../../../../include/trace-bluegene.h pose.h \
-  ../../../../include/StreamingStrategy.h \
-  ../../../../include/ComlibManager.h ../../../../include/envelope.h \
-  ../../../../include/commlib.h ../../../../include/commlib.decl.h \
-  pose.decl.h eventID.h evmpool.h evmpool.decl.h srtable.h stats.h \
-  stats.decl.h cancel.h event.h eqheap.h pvtobj.h lbObject.h ldbal.h \
-  ldbal.decl.h gvt.h gvt.decl.h evq.h rep.h strat.h sim.h sim.decl.h \
-  opt.h opt2.h opt3.h spec.h adapt.h cons.h chpt.h evmpool.def.h
+  ../../../../include/trace-bluegene.h pose.h pose_config.h pose.decl.h \
+  eventID.h evmpool.h evmpool.decl.h srtable.h stats.h stats.decl.h \
+  cancel.h event.h ../../../../include/envelope.h eqheap.h pvtobj.h \
+  lbObject.h ldbal.h ldbal.decl.h gvt.h gvt.decl.h evq.h rep.h strat.h \
+  sim.h sim.decl.h opt.h opt2.h opt3.h spec.h adapt.h adapt2.h cons.h \
+  chpt.h evmpool.def.h
 	$(CHARMC) -o evmpool.o evmpool.C
-pvtobj.o: pvtobj.C pose.h ../../../../include/StreamingStrategy.h \
-  ../../../../include/ComlibManager.h ../../../../include/charm++.h \
-  ../../../../include/charm.h ../../../../include/converse.h \
-  ../../../../include/conv-config.h ../../../../include/conv-common.h \
-  ../../../../include/conv-mach.h ../../../../include/conv-autoconfig.h \
+pvtobj.o: pvtobj.C pose.h pose_config.h pose.decl.h \
+  ../../../../include/charm++.h ../../../../include/charm.h \
+  ../../../../include/converse.h ../../../../include/conv-config.h \
+  ../../../../include/conv-common.h ../../../../include/conv-mach.h \
+  ../../../../include/conv-autoconfig.h \
   ../../../../include/conv-mach-opt.h ../../../../include/pup_c.h \
   ../../../../include/conv-cpm.h ../../../../include/conv-cpath.h \
   ../../../../include/conv-qd.h ../../../../include/conv-random.h \
@@ -258,10 +281,14 @@ pvtobj.o: pvtobj.C pose.h ../../../../include/StreamingStrategy.h \
   ../../../../include/init.h ../../../../include/ckhashtable.h \
   ../../../../include/debug-charm.h ../../../../include/CkMarshall.decl.h \
   ../../../../include/cksection.h ../../../../include/ckcallback.h \
+  ../../../../include/conv-ccs.h ../../../../include/sockRoutines.h \
+  ../../../../include/ccs-server.h ../../../../include/ckobjQ.h \
   ../../../../include/ckreduction.h \
   ../../../../include/CkReduction.decl.h \
   ../../../../include/cknodegroupreduction.h \
   ../../../../include/CkArrayReductionMgr.decl.h \
+  ../../../../include/ckmemcheckpoint.h \
+  ../../../../include/CkMemCheckpoint.decl.h \
   ../../../../include/readonly.h ../../../../include/ckarray.h \
   ../../../../include/cklocation.h ../../../../include/LBDatabase.h \
   ../../../../include/lbdb.h ../../../../include/LBDatabase.decl.h \
@@ -270,6 +297,7 @@ pvtobj.o: pvtobj.C pose.h ../../../../include/StreamingStrategy.h \
   ../../../../include/CkArray.decl.h \
   ../../../../include/ComlibArrayListener.h \
   ../../../../include/ComlibStrategy.h \
+  ../../../../include/convcomlibstrategy.h \
   ../../../../include/CkFutures.decl.h ../../../../include/charisma.h \
   ../../../../include/charisma.decl.h ../../../../include/tempo.h \
   ../../../../include/tempo.decl.h ../../../../include/waitqd.h \
@@ -277,18 +305,17 @@ pvtobj.o: pvtobj.C pose.h ../../../../include/StreamingStrategy.h \
   ../../../../include/ckcheckpoint.h \
   ../../../../include/CkCheckpoint.decl.h \
   ../../../../include/ckarrayreductionmgr.h ../../../../include/trace.h \
-  ../../../../include/trace-bluegene.h ../../../../include/envelope.h \
-  ../../../../include/commlib.h ../../../../include/commlib.decl.h \
-  pose.decl.h eventID.h evmpool.h evmpool.decl.h srtable.h stats.h \
-  stats.decl.h cancel.h event.h eqheap.h pvtobj.h lbObject.h ldbal.h \
+  ../../../../include/trace-bluegene.h eventID.h evmpool.h evmpool.decl.h \
+  srtable.h stats.h stats.decl.h cancel.h event.h \
+  ../../../../include/envelope.h eqheap.h pvtobj.h lbObject.h ldbal.h \
   ldbal.decl.h gvt.h gvt.decl.h evq.h rep.h strat.h sim.h sim.decl.h \
-  opt.h opt2.h opt3.h spec.h adapt.h cons.h chpt.h
+  opt.h opt2.h opt3.h spec.h adapt.h adapt2.h cons.h chpt.h
 	$(CHARMC) -o pvtobj.o pvtobj.C
-lbObject.o: lbObject.C pose.h ../../../../include/StreamingStrategy.h \
-  ../../../../include/ComlibManager.h ../../../../include/charm++.h \
-  ../../../../include/charm.h ../../../../include/converse.h \
-  ../../../../include/conv-config.h ../../../../include/conv-common.h \
-  ../../../../include/conv-mach.h ../../../../include/conv-autoconfig.h \
+lbObject.o: lbObject.C pose.h pose_config.h pose.decl.h \
+  ../../../../include/charm++.h ../../../../include/charm.h \
+  ../../../../include/converse.h ../../../../include/conv-config.h \
+  ../../../../include/conv-common.h ../../../../include/conv-mach.h \
+  ../../../../include/conv-autoconfig.h \
   ../../../../include/conv-mach-opt.h ../../../../include/pup_c.h \
   ../../../../include/conv-cpm.h ../../../../include/conv-cpath.h \
   ../../../../include/conv-qd.h ../../../../include/conv-random.h \
@@ -300,10 +327,14 @@ lbObject.o: lbObject.C pose.h ../../../../include/StreamingStrategy.h \
   ../../../../include/init.h ../../../../include/ckhashtable.h \
   ../../../../include/debug-charm.h ../../../../include/CkMarshall.decl.h \
   ../../../../include/cksection.h ../../../../include/ckcallback.h \
+  ../../../../include/conv-ccs.h ../../../../include/sockRoutines.h \
+  ../../../../include/ccs-server.h ../../../../include/ckobjQ.h \
   ../../../../include/ckreduction.h \
   ../../../../include/CkReduction.decl.h \
   ../../../../include/cknodegroupreduction.h \
   ../../../../include/CkArrayReductionMgr.decl.h \
+  ../../../../include/ckmemcheckpoint.h \
+  ../../../../include/CkMemCheckpoint.decl.h \
   ../../../../include/readonly.h ../../../../include/ckarray.h \
   ../../../../include/cklocation.h ../../../../include/LBDatabase.h \
   ../../../../include/lbdb.h ../../../../include/LBDatabase.decl.h \
@@ -312,6 +343,7 @@ lbObject.o: lbObject.C pose.h ../../../../include/StreamingStrategy.h \
   ../../../../include/CkArray.decl.h \
   ../../../../include/ComlibArrayListener.h \
   ../../../../include/ComlibStrategy.h \
+  ../../../../include/convcomlibstrategy.h \
   ../../../../include/CkFutures.decl.h ../../../../include/charisma.h \
   ../../../../include/charisma.decl.h ../../../../include/tempo.h \
   ../../../../include/tempo.decl.h ../../../../include/waitqd.h \
@@ -319,18 +351,17 @@ lbObject.o: lbObject.C pose.h ../../../../include/StreamingStrategy.h \
   ../../../../include/ckcheckpoint.h \
   ../../../../include/CkCheckpoint.decl.h \
   ../../../../include/ckarrayreductionmgr.h ../../../../include/trace.h \
-  ../../../../include/trace-bluegene.h ../../../../include/envelope.h \
-  ../../../../include/commlib.h ../../../../include/commlib.decl.h \
-  pose.decl.h eventID.h evmpool.h evmpool.decl.h srtable.h stats.h \
-  stats.decl.h cancel.h event.h eqheap.h pvtobj.h lbObject.h ldbal.h \
+  ../../../../include/trace-bluegene.h eventID.h evmpool.h evmpool.decl.h \
+  srtable.h stats.h stats.decl.h cancel.h event.h \
+  ../../../../include/envelope.h eqheap.h pvtobj.h lbObject.h ldbal.h \
   ldbal.decl.h gvt.h gvt.decl.h evq.h rep.h strat.h sim.h sim.decl.h \
-  opt.h opt2.h opt3.h spec.h adapt.h cons.h chpt.h
+  opt.h opt2.h opt3.h spec.h adapt.h adapt2.h cons.h chpt.h
 	$(CHARMC) -o lbObject.o lbObject.C
-ldbal.o: ldbal.C pose.h ../../../../include/StreamingStrategy.h \
-  ../../../../include/ComlibManager.h ../../../../include/charm++.h \
-  ../../../../include/charm.h ../../../../include/converse.h \
-  ../../../../include/conv-config.h ../../../../include/conv-common.h \
-  ../../../../include/conv-mach.h ../../../../include/conv-autoconfig.h \
+ldbal.o: ldbal.C pose.h pose_config.h pose.decl.h \
+  ../../../../include/charm++.h ../../../../include/charm.h \
+  ../../../../include/converse.h ../../../../include/conv-config.h \
+  ../../../../include/conv-common.h ../../../../include/conv-mach.h \
+  ../../../../include/conv-autoconfig.h \
   ../../../../include/conv-mach-opt.h ../../../../include/pup_c.h \
   ../../../../include/conv-cpm.h ../../../../include/conv-cpath.h \
   ../../../../include/conv-qd.h ../../../../include/conv-random.h \
@@ -342,10 +373,14 @@ ldbal.o: ldbal.C pose.h ../../../../include/StreamingStrategy.h \
   ../../../../include/init.h ../../../../include/ckhashtable.h \
   ../../../../include/debug-charm.h ../../../../include/CkMarshall.decl.h \
   ../../../../include/cksection.h ../../../../include/ckcallback.h \
+  ../../../../include/conv-ccs.h ../../../../include/sockRoutines.h \
+  ../../../../include/ccs-server.h ../../../../include/ckobjQ.h \
   ../../../../include/ckreduction.h \
   ../../../../include/CkReduction.decl.h \
   ../../../../include/cknodegroupreduction.h \
   ../../../../include/CkArrayReductionMgr.decl.h \
+  ../../../../include/ckmemcheckpoint.h \
+  ../../../../include/CkMemCheckpoint.decl.h \
   ../../../../include/readonly.h ../../../../include/ckarray.h \
   ../../../../include/cklocation.h ../../../../include/LBDatabase.h \
   ../../../../include/lbdb.h ../../../../include/LBDatabase.decl.h \
@@ -354,6 +389,7 @@ ldbal.o: ldbal.C pose.h ../../../../include/StreamingStrategy.h \
   ../../../../include/CkArray.decl.h \
   ../../../../include/ComlibArrayListener.h \
   ../../../../include/ComlibStrategy.h \
+  ../../../../include/convcomlibstrategy.h \
   ../../../../include/CkFutures.decl.h ../../../../include/charisma.h \
   ../../../../include/charisma.decl.h ../../../../include/tempo.h \
   ../../../../include/tempo.decl.h ../../../../include/waitqd.h \
@@ -361,18 +397,17 @@ ldbal.o: ldbal.C pose.h ../../../../include/StreamingStrategy.h \
   ../../../../include/ckcheckpoint.h \
   ../../../../include/CkCheckpoint.decl.h \
   ../../../../include/ckarrayreductionmgr.h ../../../../include/trace.h \
-  ../../../../include/trace-bluegene.h ../../../../include/envelope.h \
-  ../../../../include/commlib.h ../../../../include/commlib.decl.h \
-  pose.decl.h eventID.h evmpool.h evmpool.decl.h srtable.h stats.h \
-  stats.decl.h cancel.h event.h eqheap.h pvtobj.h lbObject.h ldbal.h \
+  ../../../../include/trace-bluegene.h eventID.h evmpool.h evmpool.decl.h \
+  srtable.h stats.h stats.decl.h cancel.h event.h \
+  ../../../../include/envelope.h eqheap.h pvtobj.h lbObject.h ldbal.h \
   ldbal.decl.h gvt.h gvt.decl.h evq.h rep.h strat.h sim.h sim.decl.h \
-  opt.h opt2.h opt3.h spec.h adapt.h cons.h chpt.h ldbal.def.h
+  opt.h opt2.h opt3.h spec.h adapt.h adapt2.h cons.h chpt.h ldbal.def.h
 	$(CHARMC) -o ldbal.o ldbal.C
-gvt.o: gvt.C pose.h ../../../../include/StreamingStrategy.h \
-  ../../../../include/ComlibManager.h ../../../../include/charm++.h \
-  ../../../../include/charm.h ../../../../include/converse.h \
-  ../../../../include/conv-config.h ../../../../include/conv-common.h \
-  ../../../../include/conv-mach.h ../../../../include/conv-autoconfig.h \
+gvt.o: gvt.C pose.h pose_config.h pose.decl.h \
+  ../../../../include/charm++.h ../../../../include/charm.h \
+  ../../../../include/converse.h ../../../../include/conv-config.h \
+  ../../../../include/conv-common.h ../../../../include/conv-mach.h \
+  ../../../../include/conv-autoconfig.h \
   ../../../../include/conv-mach-opt.h ../../../../include/pup_c.h \
   ../../../../include/conv-cpm.h ../../../../include/conv-cpath.h \
   ../../../../include/conv-qd.h ../../../../include/conv-random.h \
@@ -384,10 +419,14 @@ gvt.o: gvt.C pose.h ../../../../include/StreamingStrategy.h \
   ../../../../include/init.h ../../../../include/ckhashtable.h \
   ../../../../include/debug-charm.h ../../../../include/CkMarshall.decl.h \
   ../../../../include/cksection.h ../../../../include/ckcallback.h \
+  ../../../../include/conv-ccs.h ../../../../include/sockRoutines.h \
+  ../../../../include/ccs-server.h ../../../../include/ckobjQ.h \
   ../../../../include/ckreduction.h \
   ../../../../include/CkReduction.decl.h \
   ../../../../include/cknodegroupreduction.h \
   ../../../../include/CkArrayReductionMgr.decl.h \
+  ../../../../include/ckmemcheckpoint.h \
+  ../../../../include/CkMemCheckpoint.decl.h \
   ../../../../include/readonly.h ../../../../include/ckarray.h \
   ../../../../include/cklocation.h ../../../../include/LBDatabase.h \
   ../../../../include/lbdb.h ../../../../include/LBDatabase.decl.h \
@@ -396,6 +435,7 @@ gvt.o: gvt.C pose.h ../../../../include/StreamingStrategy.h \
   ../../../../include/CkArray.decl.h \
   ../../../../include/ComlibArrayListener.h \
   ../../../../include/ComlibStrategy.h \
+  ../../../../include/convcomlibstrategy.h \
   ../../../../include/CkFutures.decl.h ../../../../include/charisma.h \
   ../../../../include/charisma.decl.h ../../../../include/tempo.h \
   ../../../../include/tempo.decl.h ../../../../include/waitqd.h \
@@ -403,19 +443,18 @@ gvt.o: gvt.C pose.h ../../../../include/StreamingStrategy.h \
   ../../../../include/ckcheckpoint.h \
   ../../../../include/CkCheckpoint.decl.h \
   ../../../../include/ckarrayreductionmgr.h ../../../../include/trace.h \
-  ../../../../include/trace-bluegene.h ../../../../include/envelope.h \
-  ../../../../include/commlib.h ../../../../include/commlib.decl.h \
-  pose.decl.h eventID.h evmpool.h evmpool.decl.h srtable.h stats.h \
-  stats.decl.h cancel.h event.h eqheap.h pvtobj.h lbObject.h ldbal.h \
+  ../../../../include/trace-bluegene.h eventID.h evmpool.h evmpool.decl.h \
+  srtable.h stats.h stats.decl.h cancel.h event.h \
+  ../../../../include/envelope.h eqheap.h pvtobj.h lbObject.h ldbal.h \
   ldbal.decl.h gvt.h gvt.decl.h evq.h rep.h strat.h sim.h sim.decl.h \
-  opt.h opt2.h opt3.h spec.h adapt.h cons.h chpt.h gvt.def.h \
+  opt.h opt2.h opt3.h spec.h adapt.h adapt2.h cons.h chpt.h gvt.def.h \
   ../../../../include/qd.h
 	$(CHARMC) -o gvt.o gvt.C
-event.o: event.C pose.h ../../../../include/StreamingStrategy.h \
-  ../../../../include/ComlibManager.h ../../../../include/charm++.h \
-  ../../../../include/charm.h ../../../../include/converse.h \
-  ../../../../include/conv-config.h ../../../../include/conv-common.h \
-  ../../../../include/conv-mach.h ../../../../include/conv-autoconfig.h \
+event.o: event.C pose.h pose_config.h pose.decl.h \
+  ../../../../include/charm++.h ../../../../include/charm.h \
+  ../../../../include/converse.h ../../../../include/conv-config.h \
+  ../../../../include/conv-common.h ../../../../include/conv-mach.h \
+  ../../../../include/conv-autoconfig.h \
   ../../../../include/conv-mach-opt.h ../../../../include/pup_c.h \
   ../../../../include/conv-cpm.h ../../../../include/conv-cpath.h \
   ../../../../include/conv-qd.h ../../../../include/conv-random.h \
@@ -427,10 +466,14 @@ event.o: event.C pose.h ../../../../include/StreamingStrategy.h \
   ../../../../include/init.h ../../../../include/ckhashtable.h \
   ../../../../include/debug-charm.h ../../../../include/CkMarshall.decl.h \
   ../../../../include/cksection.h ../../../../include/ckcallback.h \
+  ../../../../include/conv-ccs.h ../../../../include/sockRoutines.h \
+  ../../../../include/ccs-server.h ../../../../include/ckobjQ.h \
   ../../../../include/ckreduction.h \
   ../../../../include/CkReduction.decl.h \
   ../../../../include/cknodegroupreduction.h \
   ../../../../include/CkArrayReductionMgr.decl.h \
+  ../../../../include/ckmemcheckpoint.h \
+  ../../../../include/CkMemCheckpoint.decl.h \
   ../../../../include/readonly.h ../../../../include/ckarray.h \
   ../../../../include/cklocation.h ../../../../include/LBDatabase.h \
   ../../../../include/lbdb.h ../../../../include/LBDatabase.decl.h \
@@ -439,6 +482,7 @@ event.o: event.C pose.h ../../../../include/StreamingStrategy.h \
   ../../../../include/CkArray.decl.h \
   ../../../../include/ComlibArrayListener.h \
   ../../../../include/ComlibStrategy.h \
+  ../../../../include/convcomlibstrategy.h \
   ../../../../include/CkFutures.decl.h ../../../../include/charisma.h \
   ../../../../include/charisma.decl.h ../../../../include/tempo.h \
   ../../../../include/tempo.decl.h ../../../../include/waitqd.h \
@@ -446,18 +490,17 @@ event.o: event.C pose.h ../../../../include/StreamingStrategy.h \
   ../../../../include/ckcheckpoint.h \
   ../../../../include/CkCheckpoint.decl.h \
   ../../../../include/ckarrayreductionmgr.h ../../../../include/trace.h \
-  ../../../../include/trace-bluegene.h ../../../../include/envelope.h \
-  ../../../../include/commlib.h ../../../../include/commlib.decl.h \
-  pose.decl.h eventID.h evmpool.h evmpool.decl.h srtable.h stats.h \
-  stats.decl.h cancel.h event.h eqheap.h pvtobj.h lbObject.h ldbal.h \
+  ../../../../include/trace-bluegene.h eventID.h evmpool.h evmpool.decl.h \
+  srtable.h stats.h stats.decl.h cancel.h event.h \
+  ../../../../include/envelope.h eqheap.h pvtobj.h lbObject.h ldbal.h \
   ldbal.decl.h gvt.h gvt.decl.h evq.h rep.h strat.h sim.h sim.decl.h \
-  opt.h opt2.h opt3.h spec.h adapt.h cons.h chpt.h
+  opt.h opt2.h opt3.h spec.h adapt.h adapt2.h cons.h chpt.h
 	$(CHARMC) -o event.o event.C
-eqheap.o: eqheap.C pose.h ../../../../include/StreamingStrategy.h \
-  ../../../../include/ComlibManager.h ../../../../include/charm++.h \
-  ../../../../include/charm.h ../../../../include/converse.h \
-  ../../../../include/conv-config.h ../../../../include/conv-common.h \
-  ../../../../include/conv-mach.h ../../../../include/conv-autoconfig.h \
+eqheap.o: eqheap.C pose.h pose_config.h pose.decl.h \
+  ../../../../include/charm++.h ../../../../include/charm.h \
+  ../../../../include/converse.h ../../../../include/conv-config.h \
+  ../../../../include/conv-common.h ../../../../include/conv-mach.h \
+  ../../../../include/conv-autoconfig.h \
   ../../../../include/conv-mach-opt.h ../../../../include/pup_c.h \
   ../../../../include/conv-cpm.h ../../../../include/conv-cpath.h \
   ../../../../include/conv-qd.h ../../../../include/conv-random.h \
@@ -469,10 +512,14 @@ eqheap.o: eqheap.C pose.h ../../../../include/StreamingStrategy.h \
   ../../../../include/init.h ../../../../include/ckhashtable.h \
   ../../../../include/debug-charm.h ../../../../include/CkMarshall.decl.h \
   ../../../../include/cksection.h ../../../../include/ckcallback.h \
+  ../../../../include/conv-ccs.h ../../../../include/sockRoutines.h \
+  ../../../../include/ccs-server.h ../../../../include/ckobjQ.h \
   ../../../../include/ckreduction.h \
   ../../../../include/CkReduction.decl.h \
   ../../../../include/cknodegroupreduction.h \
   ../../../../include/CkArrayReductionMgr.decl.h \
+  ../../../../include/ckmemcheckpoint.h \
+  ../../../../include/CkMemCheckpoint.decl.h \
   ../../../../include/readonly.h ../../../../include/ckarray.h \
   ../../../../include/cklocation.h ../../../../include/LBDatabase.h \
   ../../../../include/lbdb.h ../../../../include/LBDatabase.decl.h \
@@ -481,6 +528,7 @@ eqheap.o: eqheap.C pose.h ../../../../include/StreamingStrategy.h \
   ../../../../include/CkArray.decl.h \
   ../../../../include/ComlibArrayListener.h \
   ../../../../include/ComlibStrategy.h \
+  ../../../../include/convcomlibstrategy.h \
   ../../../../include/CkFutures.decl.h ../../../../include/charisma.h \
   ../../../../include/charisma.decl.h ../../../../include/tempo.h \
   ../../../../include/tempo.decl.h ../../../../include/waitqd.h \
@@ -488,18 +536,17 @@ eqheap.o: eqheap.C pose.h ../../../../include/StreamingStrategy.h \
   ../../../../include/ckcheckpoint.h \
   ../../../../include/CkCheckpoint.decl.h \
   ../../../../include/ckarrayreductionmgr.h ../../../../include/trace.h \
-  ../../../../include/trace-bluegene.h ../../../../include/envelope.h \
-  ../../../../include/commlib.h ../../../../include/commlib.decl.h \
-  pose.decl.h eventID.h evmpool.h evmpool.decl.h srtable.h stats.h \
-  stats.decl.h cancel.h event.h eqheap.h pvtobj.h lbObject.h ldbal.h \
+  ../../../../include/trace-bluegene.h eventID.h evmpool.h evmpool.decl.h \
+  srtable.h stats.h stats.decl.h cancel.h event.h \
+  ../../../../include/envelope.h eqheap.h pvtobj.h lbObject.h ldbal.h \
   ldbal.decl.h gvt.h gvt.decl.h evq.h rep.h strat.h sim.h sim.decl.h \
-  opt.h opt2.h opt3.h spec.h adapt.h cons.h chpt.h
+  opt.h opt2.h opt3.h spec.h adapt.h adapt2.h cons.h chpt.h
 	$(CHARMC) -o eqheap.o eqheap.C
-evq.o: evq.C pose.h ../../../../include/StreamingStrategy.h \
-  ../../../../include/ComlibManager.h ../../../../include/charm++.h \
-  ../../../../include/charm.h ../../../../include/converse.h \
-  ../../../../include/conv-config.h ../../../../include/conv-common.h \
-  ../../../../include/conv-mach.h ../../../../include/conv-autoconfig.h \
+evq.o: evq.C pose.h pose_config.h pose.decl.h \
+  ../../../../include/charm++.h ../../../../include/charm.h \
+  ../../../../include/converse.h ../../../../include/conv-config.h \
+  ../../../../include/conv-common.h ../../../../include/conv-mach.h \
+  ../../../../include/conv-autoconfig.h \
   ../../../../include/conv-mach-opt.h ../../../../include/pup_c.h \
   ../../../../include/conv-cpm.h ../../../../include/conv-cpath.h \
   ../../../../include/conv-qd.h ../../../../include/conv-random.h \
@@ -511,10 +558,14 @@ evq.o: evq.C pose.h ../../../../include/StreamingStrategy.h \
   ../../../../include/init.h ../../../../include/ckhashtable.h \
   ../../../../include/debug-charm.h ../../../../include/CkMarshall.decl.h \
   ../../../../include/cksection.h ../../../../include/ckcallback.h \
+  ../../../../include/conv-ccs.h ../../../../include/sockRoutines.h \
+  ../../../../include/ccs-server.h ../../../../include/ckobjQ.h \
   ../../../../include/ckreduction.h \
   ../../../../include/CkReduction.decl.h \
   ../../../../include/cknodegroupreduction.h \
   ../../../../include/CkArrayReductionMgr.decl.h \
+  ../../../../include/ckmemcheckpoint.h \
+  ../../../../include/CkMemCheckpoint.decl.h \
   ../../../../include/readonly.h ../../../../include/ckarray.h \
   ../../../../include/cklocation.h ../../../../include/LBDatabase.h \
   ../../../../include/lbdb.h ../../../../include/LBDatabase.decl.h \
@@ -523,6 +574,7 @@ evq.o: evq.C pose.h ../../../../include/StreamingStrategy.h \
   ../../../../include/CkArray.decl.h \
   ../../../../include/ComlibArrayListener.h \
   ../../../../include/ComlibStrategy.h \
+  ../../../../include/convcomlibstrategy.h \
   ../../../../include/CkFutures.decl.h ../../../../include/charisma.h \
   ../../../../include/charisma.decl.h ../../../../include/tempo.h \
   ../../../../include/tempo.decl.h ../../../../include/waitqd.h \
@@ -530,18 +582,17 @@ evq.o: evq.C pose.h ../../../../include/StreamingStrategy.h \
   ../../../../include/ckcheckpoint.h \
   ../../../../include/CkCheckpoint.decl.h \
   ../../../../include/ckarrayreductionmgr.h ../../../../include/trace.h \
-  ../../../../include/trace-bluegene.h ../../../../include/envelope.h \
-  ../../../../include/commlib.h ../../../../include/commlib.decl.h \
-  pose.decl.h eventID.h evmpool.h evmpool.decl.h srtable.h stats.h \
-  stats.decl.h cancel.h event.h eqheap.h pvtobj.h lbObject.h ldbal.h \
+  ../../../../include/trace-bluegene.h eventID.h evmpool.h evmpool.decl.h \
+  srtable.h stats.h stats.decl.h cancel.h event.h \
+  ../../../../include/envelope.h eqheap.h pvtobj.h lbObject.h ldbal.h \
   ldbal.decl.h gvt.h gvt.decl.h evq.h rep.h strat.h sim.h sim.decl.h \
-  opt.h opt2.h opt3.h spec.h adapt.h cons.h chpt.h
+  opt.h opt2.h opt3.h spec.h adapt.h adapt2.h cons.h chpt.h
 	$(CHARMC) -o evq.o evq.C
-sim.o: sim.C pose.h ../../../../include/StreamingStrategy.h \
-  ../../../../include/ComlibManager.h ../../../../include/charm++.h \
-  ../../../../include/charm.h ../../../../include/converse.h \
-  ../../../../include/conv-config.h ../../../../include/conv-common.h \
-  ../../../../include/conv-mach.h ../../../../include/conv-autoconfig.h \
+sim.o: sim.C pose.h pose_config.h pose.decl.h \
+  ../../../../include/charm++.h ../../../../include/charm.h \
+  ../../../../include/converse.h ../../../../include/conv-config.h \
+  ../../../../include/conv-common.h ../../../../include/conv-mach.h \
+  ../../../../include/conv-autoconfig.h \
   ../../../../include/conv-mach-opt.h ../../../../include/pup_c.h \
   ../../../../include/conv-cpm.h ../../../../include/conv-cpath.h \
   ../../../../include/conv-qd.h ../../../../include/conv-random.h \
@@ -553,10 +604,14 @@ sim.o: sim.C pose.h ../../../../include/StreamingStrategy.h \
   ../../../../include/init.h ../../../../include/ckhashtable.h \
   ../../../../include/debug-charm.h ../../../../include/CkMarshall.decl.h \
   ../../../../include/cksection.h ../../../../include/ckcallback.h \
+  ../../../../include/conv-ccs.h ../../../../include/sockRoutines.h \
+  ../../../../include/ccs-server.h ../../../../include/ckobjQ.h \
   ../../../../include/ckreduction.h \
   ../../../../include/CkReduction.decl.h \
   ../../../../include/cknodegroupreduction.h \
   ../../../../include/CkArrayReductionMgr.decl.h \
+  ../../../../include/ckmemcheckpoint.h \
+  ../../../../include/CkMemCheckpoint.decl.h \
   ../../../../include/readonly.h ../../../../include/ckarray.h \
   ../../../../include/cklocation.h ../../../../include/LBDatabase.h \
   ../../../../include/lbdb.h ../../../../include/LBDatabase.decl.h \
@@ -565,6 +620,7 @@ sim.o: sim.C pose.h ../../../../include/StreamingStrategy.h \
   ../../../../include/CkArray.decl.h \
   ../../../../include/ComlibArrayListener.h \
   ../../../../include/ComlibStrategy.h \
+  ../../../../include/convcomlibstrategy.h \
   ../../../../include/CkFutures.decl.h ../../../../include/charisma.h \
   ../../../../include/charisma.decl.h ../../../../include/tempo.h \
   ../../../../include/tempo.decl.h ../../../../include/waitqd.h \
@@ -572,18 +628,17 @@ sim.o: sim.C pose.h ../../../../include/StreamingStrategy.h \
   ../../../../include/ckcheckpoint.h \
   ../../../../include/CkCheckpoint.decl.h \
   ../../../../include/ckarrayreductionmgr.h ../../../../include/trace.h \
-  ../../../../include/trace-bluegene.h ../../../../include/envelope.h \
-  ../../../../include/commlib.h ../../../../include/commlib.decl.h \
-  pose.decl.h eventID.h evmpool.h evmpool.decl.h srtable.h stats.h \
-  stats.decl.h cancel.h event.h eqheap.h pvtobj.h lbObject.h ldbal.h \
+  ../../../../include/trace-bluegene.h eventID.h evmpool.h evmpool.decl.h \
+  srtable.h stats.h stats.decl.h cancel.h event.h \
+  ../../../../include/envelope.h eqheap.h pvtobj.h lbObject.h ldbal.h \
   ldbal.decl.h gvt.h gvt.decl.h evq.h rep.h strat.h sim.h sim.decl.h \
-  opt.h opt2.h opt3.h spec.h adapt.h cons.h chpt.h sim.def.h
+  opt.h opt2.h opt3.h spec.h adapt.h adapt2.h cons.h chpt.h sim.def.h
 	$(CHARMC) -o sim.o sim.C
-rep.o: rep.C pose.h ../../../../include/StreamingStrategy.h \
-  ../../../../include/ComlibManager.h ../../../../include/charm++.h \
-  ../../../../include/charm.h ../../../../include/converse.h \
-  ../../../../include/conv-config.h ../../../../include/conv-common.h \
-  ../../../../include/conv-mach.h ../../../../include/conv-autoconfig.h \
+rep.o: rep.C pose.h pose_config.h pose.decl.h \
+  ../../../../include/charm++.h ../../../../include/charm.h \
+  ../../../../include/converse.h ../../../../include/conv-config.h \
+  ../../../../include/conv-common.h ../../../../include/conv-mach.h \
+  ../../../../include/conv-autoconfig.h \
   ../../../../include/conv-mach-opt.h ../../../../include/pup_c.h \
   ../../../../include/conv-cpm.h ../../../../include/conv-cpath.h \
   ../../../../include/conv-qd.h ../../../../include/conv-random.h \
@@ -595,10 +650,14 @@ rep.o: rep.C pose.h ../../../../include/StreamingStrategy.h \
   ../../../../include/init.h ../../../../include/ckhashtable.h \
   ../../../../include/debug-charm.h ../../../../include/CkMarshall.decl.h \
   ../../../../include/cksection.h ../../../../include/ckcallback.h \
+  ../../../../include/conv-ccs.h ../../../../include/sockRoutines.h \
+  ../../../../include/ccs-server.h ../../../../include/ckobjQ.h \
   ../../../../include/ckreduction.h \
   ../../../../include/CkReduction.decl.h \
   ../../../../include/cknodegroupreduction.h \
   ../../../../include/CkArrayReductionMgr.decl.h \
+  ../../../../include/ckmemcheckpoint.h \
+  ../../../../include/CkMemCheckpoint.decl.h \
   ../../../../include/readonly.h ../../../../include/ckarray.h \
   ../../../../include/cklocation.h ../../../../include/LBDatabase.h \
   ../../../../include/lbdb.h ../../../../include/LBDatabase.decl.h \
@@ -607,6 +666,7 @@ rep.o: rep.C pose.h ../../../../include/StreamingStrategy.h \
   ../../../../include/CkArray.decl.h \
   ../../../../include/ComlibArrayListener.h \
   ../../../../include/ComlibStrategy.h \
+  ../../../../include/convcomlibstrategy.h \
   ../../../../include/CkFutures.decl.h ../../../../include/charisma.h \
   ../../../../include/charisma.decl.h ../../../../include/tempo.h \
   ../../../../include/tempo.decl.h ../../../../include/waitqd.h \
@@ -614,18 +674,17 @@ rep.o: rep.C pose.h ../../../../include/StreamingStrategy.h \
   ../../../../include/ckcheckpoint.h \
   ../../../../include/CkCheckpoint.decl.h \
   ../../../../include/ckarrayreductionmgr.h ../../../../include/trace.h \
-  ../../../../include/trace-bluegene.h ../../../../include/envelope.h \
-  ../../../../include/commlib.h ../../../../include/commlib.decl.h \
-  pose.decl.h eventID.h evmpool.h evmpool.decl.h srtable.h stats.h \
-  stats.decl.h cancel.h event.h eqheap.h pvtobj.h lbObject.h ldbal.h \
+  ../../../../include/trace-bluegene.h eventID.h evmpool.h evmpool.decl.h \
+  srtable.h stats.h stats.decl.h cancel.h event.h \
+  ../../../../include/envelope.h eqheap.h pvtobj.h lbObject.h ldbal.h \
   ldbal.decl.h gvt.h gvt.decl.h evq.h rep.h strat.h sim.h sim.decl.h \
-  opt.h opt2.h opt3.h spec.h adapt.h cons.h chpt.h
+  opt.h opt2.h opt3.h spec.h adapt.h adapt2.h cons.h chpt.h
 	$(CHARMC) -o rep.o rep.C
-strat.o: strat.C pose.h ../../../../include/StreamingStrategy.h \
-  ../../../../include/ComlibManager.h ../../../../include/charm++.h \
-  ../../../../include/charm.h ../../../../include/converse.h \
-  ../../../../include/conv-config.h ../../../../include/conv-common.h \
-  ../../../../include/conv-mach.h ../../../../include/conv-autoconfig.h \
+strat.o: strat.C pose.h pose_config.h pose.decl.h \
+  ../../../../include/charm++.h ../../../../include/charm.h \
+  ../../../../include/converse.h ../../../../include/conv-config.h \
+  ../../../../include/conv-common.h ../../../../include/conv-mach.h \
+  ../../../../include/conv-autoconfig.h \
   ../../../../include/conv-mach-opt.h ../../../../include/pup_c.h \
   ../../../../include/conv-cpm.h ../../../../include/conv-cpath.h \
   ../../../../include/conv-qd.h ../../../../include/conv-random.h \
@@ -637,10 +696,14 @@ strat.o: strat.C pose.h ../../../../include/StreamingStrategy.h \
   ../../../../include/init.h ../../../../include/ckhashtable.h \
   ../../../../include/debug-charm.h ../../../../include/CkMarshall.decl.h \
   ../../../../include/cksection.h ../../../../include/ckcallback.h \
+  ../../../../include/conv-ccs.h ../../../../include/sockRoutines.h \
+  ../../../../include/ccs-server.h ../../../../include/ckobjQ.h \
   ../../../../include/ckreduction.h \
   ../../../../include/CkReduction.decl.h \
   ../../../../include/cknodegroupreduction.h \
   ../../../../include/CkArrayReductionMgr.decl.h \
+  ../../../../include/ckmemcheckpoint.h \
+  ../../../../include/CkMemCheckpoint.decl.h \
   ../../../../include/readonly.h ../../../../include/ckarray.h \
   ../../../../include/cklocation.h ../../../../include/LBDatabase.h \
   ../../../../include/lbdb.h ../../../../include/LBDatabase.decl.h \
@@ -649,6 +712,7 @@ strat.o: strat.C pose.h ../../../../include/StreamingStrategy.h \
   ../../../../include/CkArray.decl.h \
   ../../../../include/ComlibArrayListener.h \
   ../../../../include/ComlibStrategy.h \
+  ../../../../include/convcomlibstrategy.h \
   ../../../../include/CkFutures.decl.h ../../../../include/charisma.h \
   ../../../../include/charisma.decl.h ../../../../include/tempo.h \
   ../../../../include/tempo.decl.h ../../../../include/waitqd.h \
@@ -656,18 +720,17 @@ strat.o: strat.C pose.h ../../../../include/StreamingStrategy.h \
   ../../../../include/ckcheckpoint.h \
   ../../../../include/CkCheckpoint.decl.h \
   ../../../../include/ckarrayreductionmgr.h ../../../../include/trace.h \
-  ../../../../include/trace-bluegene.h ../../../../include/envelope.h \
-  ../../../../include/commlib.h ../../../../include/commlib.decl.h \
-  pose.decl.h eventID.h evmpool.h evmpool.decl.h srtable.h stats.h \
-  stats.decl.h cancel.h event.h eqheap.h pvtobj.h lbObject.h ldbal.h \
+  ../../../../include/trace-bluegene.h eventID.h evmpool.h evmpool.decl.h \
+  srtable.h stats.h stats.decl.h cancel.h event.h \
+  ../../../../include/envelope.h eqheap.h pvtobj.h lbObject.h ldbal.h \
   ldbal.decl.h gvt.h gvt.decl.h evq.h rep.h strat.h sim.h sim.decl.h \
-  opt.h opt2.h opt3.h spec.h adapt.h cons.h chpt.h
+  opt.h opt2.h opt3.h spec.h adapt.h adapt2.h cons.h chpt.h
 	$(CHARMC) -o strat.o strat.C
-cons.o: cons.C pose.h ../../../../include/StreamingStrategy.h \
-  ../../../../include/ComlibManager.h ../../../../include/charm++.h \
-  ../../../../include/charm.h ../../../../include/converse.h \
-  ../../../../include/conv-config.h ../../../../include/conv-common.h \
-  ../../../../include/conv-mach.h ../../../../include/conv-autoconfig.h \
+cons.o: cons.C pose.h pose_config.h pose.decl.h \
+  ../../../../include/charm++.h ../../../../include/charm.h \
+  ../../../../include/converse.h ../../../../include/conv-config.h \
+  ../../../../include/conv-common.h ../../../../include/conv-mach.h \
+  ../../../../include/conv-autoconfig.h \
   ../../../../include/conv-mach-opt.h ../../../../include/pup_c.h \
   ../../../../include/conv-cpm.h ../../../../include/conv-cpath.h \
   ../../../../include/conv-qd.h ../../../../include/conv-random.h \
@@ -679,10 +742,14 @@ cons.o: cons.C pose.h ../../../../include/StreamingStrategy.h \
   ../../../../include/init.h ../../../../include/ckhashtable.h \
   ../../../../include/debug-charm.h ../../../../include/CkMarshall.decl.h \
   ../../../../include/cksection.h ../../../../include/ckcallback.h \
+  ../../../../include/conv-ccs.h ../../../../include/sockRoutines.h \
+  ../../../../include/ccs-server.h ../../../../include/ckobjQ.h \
   ../../../../include/ckreduction.h \
   ../../../../include/CkReduction.decl.h \
   ../../../../include/cknodegroupreduction.h \
   ../../../../include/CkArrayReductionMgr.decl.h \
+  ../../../../include/ckmemcheckpoint.h \
+  ../../../../include/CkMemCheckpoint.decl.h \
   ../../../../include/readonly.h ../../../../include/ckarray.h \
   ../../../../include/cklocation.h ../../../../include/LBDatabase.h \
   ../../../../include/lbdb.h ../../../../include/LBDatabase.decl.h \
@@ -691,6 +758,7 @@ cons.o: cons.C pose.h ../../../../include/StreamingStrategy.h \
   ../../../../include/CkArray.decl.h \
   ../../../../include/ComlibArrayListener.h \
   ../../../../include/ComlibStrategy.h \
+  ../../../../include/convcomlibstrategy.h \
   ../../../../include/CkFutures.decl.h ../../../../include/charisma.h \
   ../../../../include/charisma.decl.h ../../../../include/tempo.h \
   ../../../../include/tempo.decl.h ../../../../include/waitqd.h \
@@ -698,18 +766,17 @@ cons.o: cons.C pose.h ../../../../include/StreamingStrategy.h \
   ../../../../include/ckcheckpoint.h \
   ../../../../include/CkCheckpoint.decl.h \
   ../../../../include/ckarrayreductionmgr.h ../../../../include/trace.h \
-  ../../../../include/trace-bluegene.h ../../../../include/envelope.h \
-  ../../../../include/commlib.h ../../../../include/commlib.decl.h \
-  pose.decl.h eventID.h evmpool.h evmpool.decl.h srtable.h stats.h \
-  stats.decl.h cancel.h event.h eqheap.h pvtobj.h lbObject.h ldbal.h \
+  ../../../../include/trace-bluegene.h eventID.h evmpool.h evmpool.decl.h \
+  srtable.h stats.h stats.decl.h cancel.h event.h \
+  ../../../../include/envelope.h eqheap.h pvtobj.h lbObject.h ldbal.h \
   ldbal.decl.h gvt.h gvt.decl.h evq.h rep.h strat.h sim.h sim.decl.h \
-  opt.h opt2.h opt3.h spec.h adapt.h cons.h chpt.h
+  opt.h opt2.h opt3.h spec.h adapt.h adapt2.h cons.h chpt.h
 	$(CHARMC) -o cons.o cons.C
-opt.o: opt.C pose.h ../../../../include/StreamingStrategy.h \
-  ../../../../include/ComlibManager.h ../../../../include/charm++.h \
-  ../../../../include/charm.h ../../../../include/converse.h \
-  ../../../../include/conv-config.h ../../../../include/conv-common.h \
-  ../../../../include/conv-mach.h ../../../../include/conv-autoconfig.h \
+opt.o: opt.C pose.h pose_config.h pose.decl.h \
+  ../../../../include/charm++.h ../../../../include/charm.h \
+  ../../../../include/converse.h ../../../../include/conv-config.h \
+  ../../../../include/conv-common.h ../../../../include/conv-mach.h \
+  ../../../../include/conv-autoconfig.h \
   ../../../../include/conv-mach-opt.h ../../../../include/pup_c.h \
   ../../../../include/conv-cpm.h ../../../../include/conv-cpath.h \
   ../../../../include/conv-qd.h ../../../../include/conv-random.h \
@@ -721,10 +788,14 @@ opt.o: opt.C pose.h ../../../../include/StreamingStrategy.h \
   ../../../../include/init.h ../../../../include/ckhashtable.h \
   ../../../../include/debug-charm.h ../../../../include/CkMarshall.decl.h \
   ../../../../include/cksection.h ../../../../include/ckcallback.h \
+  ../../../../include/conv-ccs.h ../../../../include/sockRoutines.h \
+  ../../../../include/ccs-server.h ../../../../include/ckobjQ.h \
   ../../../../include/ckreduction.h \
   ../../../../include/CkReduction.decl.h \
   ../../../../include/cknodegroupreduction.h \
   ../../../../include/CkArrayReductionMgr.decl.h \
+  ../../../../include/ckmemcheckpoint.h \
+  ../../../../include/CkMemCheckpoint.decl.h \
   ../../../../include/readonly.h ../../../../include/ckarray.h \
   ../../../../include/cklocation.h ../../../../include/LBDatabase.h \
   ../../../../include/lbdb.h ../../../../include/LBDatabase.decl.h \
@@ -733,6 +804,7 @@ opt.o: opt.C pose.h ../../../../include/StreamingStrategy.h \
   ../../../../include/CkArray.decl.h \
   ../../../../include/ComlibArrayListener.h \
   ../../../../include/ComlibStrategy.h \
+  ../../../../include/convcomlibstrategy.h \
   ../../../../include/CkFutures.decl.h ../../../../include/charisma.h \
   ../../../../include/charisma.decl.h ../../../../include/tempo.h \
   ../../../../include/tempo.decl.h ../../../../include/waitqd.h \
@@ -740,18 +812,17 @@ opt.o: opt.C pose.h ../../../../include/StreamingStrategy.h \
   ../../../../include/ckcheckpoint.h \
   ../../../../include/CkCheckpoint.decl.h \
   ../../../../include/ckarrayreductionmgr.h ../../../../include/trace.h \
-  ../../../../include/trace-bluegene.h ../../../../include/envelope.h \
-  ../../../../include/commlib.h ../../../../include/commlib.decl.h \
-  pose.decl.h eventID.h evmpool.h evmpool.decl.h srtable.h stats.h \
-  stats.decl.h cancel.h event.h eqheap.h pvtobj.h lbObject.h ldbal.h \
+  ../../../../include/trace-bluegene.h eventID.h evmpool.h evmpool.decl.h \
+  srtable.h stats.h stats.decl.h cancel.h event.h \
+  ../../../../include/envelope.h eqheap.h pvtobj.h lbObject.h ldbal.h \
   ldbal.decl.h gvt.h gvt.decl.h evq.h rep.h strat.h sim.h sim.decl.h \
-  opt.h opt2.h opt3.h spec.h adapt.h cons.h chpt.h
+  opt.h opt2.h opt3.h spec.h adapt.h adapt2.h cons.h chpt.h
 	$(CHARMC) -o opt.o opt.C
-opt2.o: opt2.C pose.h ../../../../include/StreamingStrategy.h \
-  ../../../../include/ComlibManager.h ../../../../include/charm++.h \
-  ../../../../include/charm.h ../../../../include/converse.h \
-  ../../../../include/conv-config.h ../../../../include/conv-common.h \
-  ../../../../include/conv-mach.h ../../../../include/conv-autoconfig.h \
+opt2.o: opt2.C pose.h pose_config.h pose.decl.h \
+  ../../../../include/charm++.h ../../../../include/charm.h \
+  ../../../../include/converse.h ../../../../include/conv-config.h \
+  ../../../../include/conv-common.h ../../../../include/conv-mach.h \
+  ../../../../include/conv-autoconfig.h \
   ../../../../include/conv-mach-opt.h ../../../../include/pup_c.h \
   ../../../../include/conv-cpm.h ../../../../include/conv-cpath.h \
   ../../../../include/conv-qd.h ../../../../include/conv-random.h \
@@ -763,10 +834,14 @@ opt2.o: opt2.C pose.h ../../../../include/StreamingStrategy.h \
   ../../../../include/init.h ../../../../include/ckhashtable.h \
   ../../../../include/debug-charm.h ../../../../include/CkMarshall.decl.h \
   ../../../../include/cksection.h ../../../../include/ckcallback.h \
+  ../../../../include/conv-ccs.h ../../../../include/sockRoutines.h \
+  ../../../../include/ccs-server.h ../../../../include/ckobjQ.h \
   ../../../../include/ckreduction.h \
   ../../../../include/CkReduction.decl.h \
   ../../../../include/cknodegroupreduction.h \
   ../../../../include/CkArrayReductionMgr.decl.h \
+  ../../../../include/ckmemcheckpoint.h \
+  ../../../../include/CkMemCheckpoint.decl.h \
   ../../../../include/readonly.h ../../../../include/ckarray.h \
   ../../../../include/cklocation.h ../../../../include/LBDatabase.h \
   ../../../../include/lbdb.h ../../../../include/LBDatabase.decl.h \
@@ -775,6 +850,7 @@ opt2.o: opt2.C pose.h ../../../../include/StreamingStrategy.h \
   ../../../../include/CkArray.decl.h \
   ../../../../include/ComlibArrayListener.h \
   ../../../../include/ComlibStrategy.h \
+  ../../../../include/convcomlibstrategy.h \
   ../../../../include/CkFutures.decl.h ../../../../include/charisma.h \
   ../../../../include/charisma.decl.h ../../../../include/tempo.h \
   ../../../../include/tempo.decl.h ../../../../include/waitqd.h \
@@ -782,18 +858,17 @@ opt2.o: opt2.C pose.h ../../../../include/StreamingStrategy.h \
   ../../../../include/ckcheckpoint.h \
   ../../../../include/CkCheckpoint.decl.h \
   ../../../../include/ckarrayreductionmgr.h ../../../../include/trace.h \
-  ../../../../include/trace-bluegene.h ../../../../include/envelope.h \
-  ../../../../include/commlib.h ../../../../include/commlib.decl.h \
-  pose.decl.h eventID.h evmpool.h evmpool.decl.h srtable.h stats.h \
-  stats.decl.h cancel.h event.h eqheap.h pvtobj.h lbObject.h ldbal.h \
+  ../../../../include/trace-bluegene.h eventID.h evmpool.h evmpool.decl.h \
+  srtable.h stats.h stats.decl.h cancel.h event.h \
+  ../../../../include/envelope.h eqheap.h pvtobj.h lbObject.h ldbal.h \
   ldbal.decl.h gvt.h gvt.decl.h evq.h rep.h strat.h sim.h sim.decl.h \
-  opt.h opt2.h opt3.h spec.h adapt.h cons.h chpt.h
+  opt.h opt2.h opt3.h spec.h adapt.h adapt2.h cons.h chpt.h
 	$(CHARMC) -o opt2.o opt2.C
-opt3.o: opt3.C pose.h ../../../../include/StreamingStrategy.h \
-  ../../../../include/ComlibManager.h ../../../../include/charm++.h \
-  ../../../../include/charm.h ../../../../include/converse.h \
-  ../../../../include/conv-config.h ../../../../include/conv-common.h \
-  ../../../../include/conv-mach.h ../../../../include/conv-autoconfig.h \
+opt3.o: opt3.C pose.h pose_config.h pose.decl.h \
+  ../../../../include/charm++.h ../../../../include/charm.h \
+  ../../../../include/converse.h ../../../../include/conv-config.h \
+  ../../../../include/conv-common.h ../../../../include/conv-mach.h \
+  ../../../../include/conv-autoconfig.h \
   ../../../../include/conv-mach-opt.h ../../../../include/pup_c.h \
   ../../../../include/conv-cpm.h ../../../../include/conv-cpath.h \
   ../../../../include/conv-qd.h ../../../../include/conv-random.h \
@@ -805,10 +880,14 @@ opt3.o: opt3.C pose.h ../../../../include/StreamingStrategy.h \
   ../../../../include/init.h ../../../../include/ckhashtable.h \
   ../../../../include/debug-charm.h ../../../../include/CkMarshall.decl.h \
   ../../../../include/cksection.h ../../../../include/ckcallback.h \
+  ../../../../include/conv-ccs.h ../../../../include/sockRoutines.h \
+  ../../../../include/ccs-server.h ../../../../include/ckobjQ.h \
   ../../../../include/ckreduction.h \
   ../../../../include/CkReduction.decl.h \
   ../../../../include/cknodegroupreduction.h \
   ../../../../include/CkArrayReductionMgr.decl.h \
+  ../../../../include/ckmemcheckpoint.h \
+  ../../../../include/CkMemCheckpoint.decl.h \
   ../../../../include/readonly.h ../../../../include/ckarray.h \
   ../../../../include/cklocation.h ../../../../include/LBDatabase.h \
   ../../../../include/lbdb.h ../../../../include/LBDatabase.decl.h \
@@ -817,6 +896,7 @@ opt3.o: opt3.C pose.h ../../../../include/StreamingStrategy.h \
   ../../../../include/CkArray.decl.h \
   ../../../../include/ComlibArrayListener.h \
   ../../../../include/ComlibStrategy.h \
+  ../../../../include/convcomlibstrategy.h \
   ../../../../include/CkFutures.decl.h ../../../../include/charisma.h \
   ../../../../include/charisma.decl.h ../../../../include/tempo.h \
   ../../../../include/tempo.decl.h ../../../../include/waitqd.h \
@@ -824,18 +904,17 @@ opt3.o: opt3.C pose.h ../../../../include/StreamingStrategy.h \
   ../../../../include/ckcheckpoint.h \
   ../../../../include/CkCheckpoint.decl.h \
   ../../../../include/ckarrayreductionmgr.h ../../../../include/trace.h \
-  ../../../../include/trace-bluegene.h ../../../../include/envelope.h \
-  ../../../../include/commlib.h ../../../../include/commlib.decl.h \
-  pose.decl.h eventID.h evmpool.h evmpool.decl.h srtable.h stats.h \
-  stats.decl.h cancel.h event.h eqheap.h pvtobj.h lbObject.h ldbal.h \
+  ../../../../include/trace-bluegene.h eventID.h evmpool.h evmpool.decl.h \
+  srtable.h stats.h stats.decl.h cancel.h event.h \
+  ../../../../include/envelope.h eqheap.h pvtobj.h lbObject.h ldbal.h \
   ldbal.decl.h gvt.h gvt.decl.h evq.h rep.h strat.h sim.h sim.decl.h \
-  opt.h opt2.h opt3.h spec.h adapt.h cons.h chpt.h
+  opt.h opt2.h opt3.h spec.h adapt.h adapt2.h cons.h chpt.h
 	$(CHARMC) -o opt3.o opt3.C
-spec.o: spec.C pose.h ../../../../include/StreamingStrategy.h \
-  ../../../../include/ComlibManager.h ../../../../include/charm++.h \
-  ../../../../include/charm.h ../../../../include/converse.h \
-  ../../../../include/conv-config.h ../../../../include/conv-common.h \
-  ../../../../include/conv-mach.h ../../../../include/conv-autoconfig.h \
+spec.o: spec.C pose.h pose_config.h pose.decl.h \
+  ../../../../include/charm++.h ../../../../include/charm.h \
+  ../../../../include/converse.h ../../../../include/conv-config.h \
+  ../../../../include/conv-common.h ../../../../include/conv-mach.h \
+  ../../../../include/conv-autoconfig.h \
   ../../../../include/conv-mach-opt.h ../../../../include/pup_c.h \
   ../../../../include/conv-cpm.h ../../../../include/conv-cpath.h \
   ../../../../include/conv-qd.h ../../../../include/conv-random.h \
@@ -847,10 +926,14 @@ spec.o: spec.C pose.h ../../../../include/StreamingStrategy.h \
   ../../../../include/init.h ../../../../include/ckhashtable.h \
   ../../../../include/debug-charm.h ../../../../include/CkMarshall.decl.h \
   ../../../../include/cksection.h ../../../../include/ckcallback.h \
+  ../../../../include/conv-ccs.h ../../../../include/sockRoutines.h \
+  ../../../../include/ccs-server.h ../../../../include/ckobjQ.h \
   ../../../../include/ckreduction.h \
   ../../../../include/CkReduction.decl.h \
   ../../../../include/cknodegroupreduction.h \
   ../../../../include/CkArrayReductionMgr.decl.h \
+  ../../../../include/ckmemcheckpoint.h \
+  ../../../../include/CkMemCheckpoint.decl.h \
   ../../../../include/readonly.h ../../../../include/ckarray.h \
   ../../../../include/cklocation.h ../../../../include/LBDatabase.h \
   ../../../../include/lbdb.h ../../../../include/LBDatabase.decl.h \
@@ -859,6 +942,7 @@ spec.o: spec.C pose.h ../../../../include/StreamingStrategy.h \
   ../../../../include/CkArray.decl.h \
   ../../../../include/ComlibArrayListener.h \
   ../../../../include/ComlibStrategy.h \
+  ../../../../include/convcomlibstrategy.h \
   ../../../../include/CkFutures.decl.h ../../../../include/charisma.h \
   ../../../../include/charisma.decl.h ../../../../include/tempo.h \
   ../../../../include/tempo.decl.h ../../../../include/waitqd.h \
@@ -866,18 +950,17 @@ spec.o: spec.C pose.h ../../../../include/StreamingStrategy.h \
   ../../../../include/ckcheckpoint.h \
   ../../../../include/CkCheckpoint.decl.h \
   ../../../../include/ckarrayreductionmgr.h ../../../../include/trace.h \
-  ../../../../include/trace-bluegene.h ../../../../include/envelope.h \
-  ../../../../include/commlib.h ../../../../include/commlib.decl.h \
-  pose.decl.h eventID.h evmpool.h evmpool.decl.h srtable.h stats.h \
-  stats.decl.h cancel.h event.h eqheap.h pvtobj.h lbObject.h ldbal.h \
+  ../../../../include/trace-bluegene.h eventID.h evmpool.h evmpool.decl.h \
+  srtable.h stats.h stats.decl.h cancel.h event.h \
+  ../../../../include/envelope.h eqheap.h pvtobj.h lbObject.h ldbal.h \
   ldbal.decl.h gvt.h gvt.decl.h evq.h rep.h strat.h sim.h sim.decl.h \
-  opt.h opt2.h opt3.h spec.h adapt.h cons.h chpt.h
+  opt.h opt2.h opt3.h spec.h adapt.h adapt2.h cons.h chpt.h
 	$(CHARMC) -o spec.o spec.C
-adapt.o: adapt.C pose.h ../../../../include/StreamingStrategy.h \
-  ../../../../include/ComlibManager.h ../../../../include/charm++.h \
-  ../../../../include/charm.h ../../../../include/converse.h \
-  ../../../../include/conv-config.h ../../../../include/conv-common.h \
-  ../../../../include/conv-mach.h ../../../../include/conv-autoconfig.h \
+adapt.o: adapt.C pose.h pose_config.h pose.decl.h \
+  ../../../../include/charm++.h ../../../../include/charm.h \
+  ../../../../include/converse.h ../../../../include/conv-config.h \
+  ../../../../include/conv-common.h ../../../../include/conv-mach.h \
+  ../../../../include/conv-autoconfig.h \
   ../../../../include/conv-mach-opt.h ../../../../include/pup_c.h \
   ../../../../include/conv-cpm.h ../../../../include/conv-cpath.h \
   ../../../../include/conv-qd.h ../../../../include/conv-random.h \
@@ -889,10 +972,14 @@ adapt.o: adapt.C pose.h ../../../../include/StreamingStrategy.h \
   ../../../../include/init.h ../../../../include/ckhashtable.h \
   ../../../../include/debug-charm.h ../../../../include/CkMarshall.decl.h \
   ../../../../include/cksection.h ../../../../include/ckcallback.h \
+  ../../../../include/conv-ccs.h ../../../../include/sockRoutines.h \
+  ../../../../include/ccs-server.h ../../../../include/ckobjQ.h \
   ../../../../include/ckreduction.h \
   ../../../../include/CkReduction.decl.h \
   ../../../../include/cknodegroupreduction.h \
   ../../../../include/CkArrayReductionMgr.decl.h \
+  ../../../../include/ckmemcheckpoint.h \
+  ../../../../include/CkMemCheckpoint.decl.h \
   ../../../../include/readonly.h ../../../../include/ckarray.h \
   ../../../../include/cklocation.h ../../../../include/LBDatabase.h \
   ../../../../include/lbdb.h ../../../../include/LBDatabase.decl.h \
@@ -901,6 +988,7 @@ adapt.o: adapt.C pose.h ../../../../include/StreamingStrategy.h \
   ../../../../include/CkArray.decl.h \
   ../../../../include/ComlibArrayListener.h \
   ../../../../include/ComlibStrategy.h \
+  ../../../../include/convcomlibstrategy.h \
   ../../../../include/CkFutures.decl.h ../../../../include/charisma.h \
   ../../../../include/charisma.decl.h ../../../../include/tempo.h \
   ../../../../include/tempo.decl.h ../../../../include/waitqd.h \
@@ -908,18 +996,17 @@ adapt.o: adapt.C pose.h ../../../../include/StreamingStrategy.h \
   ../../../../include/ckcheckpoint.h \
   ../../../../include/CkCheckpoint.decl.h \
   ../../../../include/ckarrayreductionmgr.h ../../../../include/trace.h \
-  ../../../../include/trace-bluegene.h ../../../../include/envelope.h \
-  ../../../../include/commlib.h ../../../../include/commlib.decl.h \
-  pose.decl.h eventID.h evmpool.h evmpool.decl.h srtable.h stats.h \
-  stats.decl.h cancel.h event.h eqheap.h pvtobj.h lbObject.h ldbal.h \
+  ../../../../include/trace-bluegene.h eventID.h evmpool.h evmpool.decl.h \
+  srtable.h stats.h stats.decl.h cancel.h event.h \
+  ../../../../include/envelope.h eqheap.h pvtobj.h lbObject.h ldbal.h \
   ldbal.decl.h gvt.h gvt.decl.h evq.h rep.h strat.h sim.h sim.decl.h \
-  opt.h opt2.h opt3.h spec.h adapt.h cons.h chpt.h
+  opt.h opt2.h opt3.h spec.h adapt.h adapt2.h cons.h chpt.h
 	$(CHARMC) -o adapt.o adapt.C
-adapt2.o: adapt2.C pose.h ../../../../include/StreamingStrategy.h \
-  ../../../../include/ComlibManager.h ../../../../include/charm++.h \
-  ../../../../include/charm.h ../../../../include/converse.h \
-  ../../../../include/conv-config.h ../../../../include/conv-common.h \
-  ../../../../include/conv-mach.h ../../../../include/conv-autoconfig.h \
+adapt2.o: adapt2.C pose.h pose_config.h pose.decl.h \
+  ../../../../include/charm++.h ../../../../include/charm.h \
+  ../../../../include/converse.h ../../../../include/conv-config.h \
+  ../../../../include/conv-common.h ../../../../include/conv-mach.h \
+  ../../../../include/conv-autoconfig.h \
   ../../../../include/conv-mach-opt.h ../../../../include/pup_c.h \
   ../../../../include/conv-cpm.h ../../../../include/conv-cpath.h \
   ../../../../include/conv-qd.h ../../../../include/conv-random.h \
@@ -931,10 +1018,14 @@ adapt2.o: adapt2.C pose.h ../../../../include/StreamingStrategy.h \
   ../../../../include/init.h ../../../../include/ckhashtable.h \
   ../../../../include/debug-charm.h ../../../../include/CkMarshall.decl.h \
   ../../../../include/cksection.h ../../../../include/ckcallback.h \
+  ../../../../include/conv-ccs.h ../../../../include/sockRoutines.h \
+  ../../../../include/ccs-server.h ../../../../include/ckobjQ.h \
   ../../../../include/ckreduction.h \
   ../../../../include/CkReduction.decl.h \
   ../../../../include/cknodegroupreduction.h \
   ../../../../include/CkArrayReductionMgr.decl.h \
+  ../../../../include/ckmemcheckpoint.h \
+  ../../../../include/CkMemCheckpoint.decl.h \
   ../../../../include/readonly.h ../../../../include/ckarray.h \
   ../../../../include/cklocation.h ../../../../include/LBDatabase.h \
   ../../../../include/lbdb.h ../../../../include/LBDatabase.decl.h \
@@ -943,6 +1034,7 @@ adapt2.o: adapt2.C pose.h ../../../../include/StreamingStrategy.h \
   ../../../../include/CkArray.decl.h \
   ../../../../include/ComlibArrayListener.h \
   ../../../../include/ComlibStrategy.h \
+  ../../../../include/convcomlibstrategy.h \
   ../../../../include/CkFutures.decl.h ../../../../include/charisma.h \
   ../../../../include/charisma.decl.h ../../../../include/tempo.h \
   ../../../../include/tempo.decl.h ../../../../include/waitqd.h \
@@ -950,10 +1042,9 @@ adapt2.o: adapt2.C pose.h ../../../../include/StreamingStrategy.h \
   ../../../../include/ckcheckpoint.h \
   ../../../../include/CkCheckpoint.decl.h \
   ../../../../include/ckarrayreductionmgr.h ../../../../include/trace.h \
-  ../../../../include/trace-bluegene.h ../../../../include/envelope.h \
-  ../../../../include/commlib.h ../../../../include/commlib.decl.h \
-  pose.decl.h eventID.h evmpool.h evmpool.decl.h srtable.h stats.h \
-  stats.decl.h cancel.h event.h eqheap.h pvtobj.h lbObject.h ldbal.h \
+  ../../../../include/trace-bluegene.h eventID.h evmpool.h evmpool.decl.h \
+  srtable.h stats.h stats.decl.h cancel.h event.h \
+  ../../../../include/envelope.h eqheap.h pvtobj.h lbObject.h ldbal.h \
   ldbal.decl.h gvt.h gvt.decl.h evq.h rep.h strat.h sim.h sim.decl.h \
-  opt.h opt2.h opt3.h spec.h adapt.h cons.h chpt.h
+  opt.h opt2.h opt3.h spec.h adapt.h adapt2.h cons.h chpt.h
 	$(CHARMC) -o adapt2.o adapt2.C
