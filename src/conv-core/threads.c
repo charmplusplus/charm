@@ -760,9 +760,6 @@ CthThread CthUnpackThread(void *buffer)
 #include <sys/stat.h>
 #include <fcntl.h>
 
-#define STACKSIZE (32768)
-CpvStaticDeclare(int, _stksize);
-
 typedef struct _slotset
 {
   int maxbuf;
@@ -855,10 +852,30 @@ delete_slotset(slotset* ss)
   free(ss);
 }
 
+/*
+ * this message is used both as a request and a reply message.
+ * request:
+ *   pe is the processor requesting a slot.
+ *   t is the thread for which this slot is requested.
+ * reply:
+ *   pe is the processor that responds
+ *   slot is the slot that it sends
+ *   t is the thread for which this slot is used.
+ */
+typedef struct _slotmsg
+{
+  char cmicore[CmiMsgHeaderSizeBytes];
+  int pe;
+  int slot;
+  CthThread t;
+  CthVoidFn fn;
+  void *arg;
+} slotmsg;
+
 struct CthThreadStruct
 {
   char cmicore[CmiMsgHeaderSizeBytes];
-  CthAwkFn  awakenfn;
+  CthAwkFn   awakenfn;
   CthThFn    choosefn;
   int        autoyield_enable;
   int        autoyield_blocks;
@@ -868,9 +885,67 @@ struct CthThreadStruct
   int        Event;
   CthThread  qnext;
   int        slotnum;
+  int        awakened;
   qt_t      *stack;
   qt_t      *stackp;
 };
+
+#define STACKSIZE (32768)
+CpvStaticDeclare(int, _stksize);
+
+CpvStaticDeclare(int, reqHdlr);
+CpvStaticDeclare(int, respHdlr);
+CpvStaticDeclare(slotset *, myss);
+CpvStaticDeclare(void *, heapbdry);
+CpvStaticDeclare(int, zerofd);
+
+
+/*
+ * this handler is invoked by a request for slot.
+ */
+static void 
+reqslot(slotmsg *msg)
+{
+  int slot, pe;
+  CmiGrabBuffer((void**)&msg);
+  if(msg->pe == CmiMyPe())
+    CmiAbort("All stack slots have been exhausted!\n");
+  slot = get_slot(CpvAccess(myss));
+  if(slot==(-1))
+  {
+    CmiSyncSendAndFree((CmiMyPe()+1)%CmiNumPes(), sizeof(slotmsg), msg);
+  }
+  else
+  {
+    pe = msg->pe;
+    msg->pe = CmiMyPe();
+    msg->slot = slot;
+    CmiSetHandler(msg,CpvAccess(respHdlr));
+    CmiSyncSendAndFree(pe, sizeof(slotmsg), msg);
+  }
+}
+
+static void CthStackCreate(CthThread t, CthVoidFn fn, void *arg, int slotnum);
+
+/*
+ * this handler is invoked by a response for slot.
+ * it sets the slot number for the thread, and actually awakens it
+ * if it was awakened with CthAwaken already.
+ */
+static void 
+respslot(slotmsg *msg)
+{
+  CthThread t = msg->t;
+  if(t->slotnum != (-2))
+  {
+    CmiError("[%d] requested a slot for a live thread? aborting.\n",CmiMyPe());
+    CmiAbort("");
+  }
+  CthStackCreate(t, msg->fn, msg->arg, msg->slot);
+  if(t->awakened)
+    CthAwaken(t);
+  /* msg will be automatically freed by the scheduler */
+}
 
 CthCpvDeclare(char *,    CthData);
 CthCpvStatic(CthThread,  CthCurrent);
@@ -889,6 +964,7 @@ CthThread t;
   t->autoyield_blocks = 0;
   t->suspendable = 1;
   t->slotnum = (-1);
+  t->awakened = 0;
 }
 
 void CthFixData(t)
@@ -908,10 +984,6 @@ CthThread t;
     return;
   }
 }
-
-CpvStaticDeclare(slotset *, myss);
-CpvStaticDeclare(void *, heapbdry);
-CpvStaticDeclare(int, zerofd);
 
 /*
  * maps the virtual memory associated with slot using mmap
@@ -1004,6 +1076,12 @@ void CthInit(char **argv)
   CpvInitialize(slotset *, myss);
   CpvAccess(myss) = new_slotset(CmiMyPe()*numslots, numslots);
 
+  CpvInitialize(int, reqHdlr);
+  CpvInitialize(int, respHdlr);
+
+  CpvAccess(reqHdlr) = CmiRegisterHandler((CmiHandler)reqslot);
+  CpvAccess(respHdlr) = CmiRegisterHandler((CmiHandler)respslot);
+
   CpvInitialize(int, _numSwitches);
   CpvAccess(_numSwitches) = 0;
 
@@ -1042,7 +1120,7 @@ static void *
 CthAbortHelp(qt_t *sp, CthThread old, void *null)
 {
   if (old->data) free(old->data);
-  if(old->slotnum != (-1))
+  if(old->slotnum >= 0)
   {
     free_slot(CpvAccess(myss), old->slotnum);
     unmap_slot(old->slotnum);
@@ -1083,30 +1161,51 @@ static void CthOnly(void *arg, void *vt, qt_userf_t fn)
   CthSuspend();
 }
 
+static void
+CthStackCreate(CthThread t, CthVoidFn fn, void *arg, int slotnum)
+{
+  qt_t *stack, *stackbase, *stackp;
+  int size = CpvAccess(_stksize);
+  t->slotnum = slotnum;
+  stack = (qt_t*) map_slot(slotnum);
+  _MEMCHECK(stack);
+  stackbase = QT_SP(stack, size);
+  stackp = QT_ARGS(stackbase, arg, t, (qt_userf_t *)fn, CthOnly);
+  t->stack = stack;
+  t->stackp = stackp;
+}
+
 CthThread CthCreate(fn, arg, size)
 CthVoidFn fn; void *arg; int size;
 {
-  CthThread result; qt_t *stack, *stackbase, *stackp;
-  /* FIXME: not checking for return value of (-1) as yet. */
-  int slotnum = get_slot(CpvAccess(myss));
-  /* FIXME: warn size!=0 */
+  CthThread result; 
+  int slotnum;
   if(size!=0 && size>CpvAccess(_stksize))
   {
     CmiPrintf("[%d] Nonzero stacksize %d bytes specified. Using %d bytes.\n",
       CmiMyPe(), size, CpvAccess(_stksize));
   }
-  size = CpvAccess(_stksize);
-  stack = (qt_t*) map_slot(slotnum);
-  _MEMCHECK(stack);
   result = (CthThread)malloc(sizeof(struct CthThreadStruct));
   _MEMCHECK(result);
   CthThreadInit(result);
-  result->slotnum = slotnum;
-  stackbase = QT_SP(stack, size);
-  stackp = QT_ARGS(stackbase, arg, result, (qt_userf_t *)fn, CthOnly);
-  result->stack = stack;
-  result->stackp = stackp;
   CthSetStrategyDefault(result);
+  slotnum = get_slot(CpvAccess(myss));
+  if(slotnum == (-1)) /* mype does not have any free slots left */
+  {
+    slotmsg msg;
+    result->slotnum = (-2);
+    msg.pe = CmiMyPe();
+    msg.slot = (-1); /* just to be safe */
+    msg.t = result;
+    msg.fn = fn;
+    msg.arg = arg;
+    CmiSetHandler((void*)&msg, CpvAccess(reqHdlr));
+    CmiSyncSend((CmiMyPe()+1)%CmiNumPes(), sizeof(msg), (void*)&msg);
+  }
+  else
+  {
+    CthStackCreate(result, fn, arg, slotnum);
+  }
   return result;
 }
 
@@ -1134,6 +1233,12 @@ void CthAwaken(th)
 CthThread th;
 {
   if (th->awakenfn == 0) CthNoStrategy();
+  /* thread stack is not yet allocated. */
+  if (th->slotnum == (-2))
+  {
+    th->awakened = 1;
+    return;
+  }
   CpvAccess(curThread) = th;
 #ifndef CMK_OPTIMIZE
   if(CpvAccess(traceOn))
@@ -1151,6 +1256,11 @@ void CthYield()
 void CthAwakenPrio(CthThread th, int s, int pb, int *prio)
 {
   if (th->awakenfn == 0) CthNoStrategy();
+  if (th->slotnum == (-2))
+  {
+    th->awakened = 1;
+    return;
+  }
   CpvAccess(curThread) = th;
 #ifndef CMK_OPTIMIZE
   if(CpvAccess(traceOn))
