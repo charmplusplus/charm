@@ -15,6 +15,9 @@
 static char ident[] = "@(#)$Header$";
 
 #include <stdio.h>
+#ifdef CMK_USLEEP_WHEN_PROCESSOR_IDLE
+#include <sys/time.h>
+#endif
 #include "converse.h"
 
 #define MAX_HANDLERS 512
@@ -373,7 +376,9 @@ int maxmsgs;
       maxmsgs--; if (maxmsgs==0) return maxmsgs;
     } else { /* Processor is idle */
 #ifdef CMK_USLEEP_WHEN_PROCESSOR_IDLE
-      usleep(10000);
+      struct timeval tv;
+      tv.tv_usec=10000; tv.tv_sec=0;
+      select(0,0,0,0,&tv);
 #endif
       CcdRaiseCondition(CcdPROCESSORIDLE) ;
       if (CpvAccess(CsdStopFlag)) return maxmsgs;
