@@ -2,6 +2,7 @@
 
 CkChareID _mainhandle;
 CkArrayID _femaid;
+int _migHandle;
 unsigned int _nchunks;
 
 CtvStaticDeclare(chunk*, _femptr);
@@ -110,6 +111,7 @@ main::main(CkArgMsg *am)
       break;
     }
   }
+  _migHandle = CProxy_migrator::ckNew();
   _femaid = CProxy_chunk::ckNew(_nchunks);
   CProxy_chunk farray(_femaid);
   farray.setReductionClient(_allReduceHandler, 0);
@@ -788,7 +790,7 @@ chunk::pup(PUP::er &p)
     tid = CthUnpackThread(p.getBuf());
     p.advance(tsize);
     CthAwaken(tid);
-    // FIXME: we have to somehow set the _femptr Ctv variable of tid to this.
+    CtvAccessOther(tid,_femptr) = this;
   }
   p(seqnum);
   p(nRecd);
@@ -906,6 +908,20 @@ FEM_Get_Userdata(void)
 extern "C" void
 FEM_Migrate(void)
 {
+  chunk *cptr = CtvAccess(_femptr);
+  cptr->tid = CthSelf();
+  int idx = cptr->thisIndex;
+  int mype = CkMyPe();
+  int npes = CkNumPes();
+  int tope = (mype+1)%npes;
+  CProxy_migrator pmg(_migHandle);
+  pmg.migrateElement(new MigrateInfo((ArrayElement*)cptr,(mype+1)%npes));
+  CthSuspend();
+  if(CkMyPe()!=tope)
+  {
+    CkError("[%d] wanted to go to %d but went to %d!\n",idx,tope,CkMyPe());
+    CkAbort("");
+  }
 }
 
 extern "C" void 

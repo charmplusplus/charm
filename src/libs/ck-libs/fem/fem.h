@@ -103,6 +103,28 @@ class ChunkMsg : public CMessage_ChunkMsg {
   static ChunkMsg *unpack(void *);
 };
 
+class MigrateInfo :public CMessage_MigrateInfo
+{
+ public:
+  ArrayElement *elem;
+  int where;
+  MigrateInfo(ArrayElement *e, int w) : elem(e), where(w) {}
+};
+
+extern int _migHandle;
+
+class migrator : public Group
+{
+ public:
+  migrator(void) {}
+  void migrateElement(MigrateInfo *msg)
+  {
+    // CkPrintf("migrator: tid is %p\n", CthSelf());
+    msg->elem->migrateMe(msg->where);
+    delete msg;
+  }
+};
+
 #define MAXDT 20
 
 class chunk : public ArrayElement1D
@@ -125,7 +147,6 @@ class chunk : public ArrayElement1D
 
   CmmTable messages; // messages to be processed
   int wait_for; // which tag is tid waiting for ? 0 if not waiting
-  CthThread tid; // waiting thread, 0 if no one is waiting
   int tsize; // cached packbuf size for thread
 
   int seqnum; // sequence number for update operation
@@ -140,6 +161,7 @@ class chunk : public ArrayElement1D
   int usize; // cached size of user's data structure
  public:
 
+  CthThread tid; // waiting thread, 0 if no one is waiting
   int doneCalled;
 
   chunk(void);
