@@ -496,6 +496,9 @@ void CthSuspend(void)
 {
   CthThread next;
   CthThreadBase *cur=B(CthCpvAccess(CthCurrent));
+
+  if (cur->suspendable == 0)
+    CmiAbort("Fatal Error> trying to suspend a non-suspendable thread!\n");
   
   if (cur->choosefn == 0) CthNoStrategy();
   next = cur->choosefn();
