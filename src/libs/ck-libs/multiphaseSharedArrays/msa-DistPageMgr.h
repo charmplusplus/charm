@@ -8,8 +8,6 @@
 #include <list>
 #include <stack>
 template<class T> class DefaultEntry;  // needed in msa-DistPageMgr.ci, i.e. in msa.decl.h
-typedef DefaultEntry<int> DefaultEntryInt_;
-typedef DefaultEntry<double> DefaultEntryDbl_;
 #include "msa-common.h"
 #include "msa.decl.h"
 

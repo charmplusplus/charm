@@ -29,6 +29,6 @@ module msa
         entry void emit(int offset);
     };
 
-    group CacheGroup<double, DefaultEntryDbl_ >;
-    array [1D] PageArray<double, DefaultEntryDbl_ >;
+    group CacheGroup<double, DefaultEntry<double> >;
+    array [1D] PageArray<double, DefaultEntry<double> >;
 };
