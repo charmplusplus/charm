@@ -1,18 +1,25 @@
 /*
   Myrinet API GM implementation of Converse NET version
   contains only GM API specific code for:
+  * CmiMachineInit()
   * CmiNotifyIdle()
   * DeliverViaNetwork()
   * CommunicationServer()
 
   written by 
   Gengbin Zheng, gzheng@uiuc.edu  4/22/2001
+
+  TODO:
+  1. DMAable buffer reuse;
+  2. packetizing;
 */
 
 
 /* default as in busywaiting mode */
+#undef CMK_DISABLE_SIGNAL
 #undef CMK_WHEN_PROCESSOR_IDLE_BUSYWAIT
 #undef CMK_WHEN_PROCESSOR_IDLE_USLEEP
+#define CMK_DISABLE_SIGNAL 		1
 #define CMK_WHEN_PROCESSOR_IDLE_BUSYWAIT 1
 #define CMK_WHEN_PROCESSOR_IDLE_USLEEP 0
 
@@ -27,7 +34,7 @@ static gm_alarm_t gmalarm;
 
 
 /* max length of pending messages */
-#define MAXPENDINGSEND  100
+#define MAXPENDINGSEND  200
 
 typedef struct PendingMsgStruct
 {
@@ -75,6 +82,31 @@ static void send_progress();
 
 /******************************************************************************
  *
+ * DMA message pool
+ *
+ *****************************************************************************/
+
+#define CMK_MSGPOOL  0
+
+#define MAXMSGLEN  20
+
+static char* msgpool[MAXMSGLEN];
+static int msgNums = 0;
+
+static int maxMsgSize = 0;
+
+#define putPool(msg) 	{	\
+  if (msgNums == MAXMSGLEN) gm_dma_free(gmport, msg);	\
+  else msgpool[msgNums++] = msg; }	
+
+#define getPool(msg, len)	{	\
+  if (msgNums == 0) msg  = gm_dma_malloc(gmport, maxMsgSize);	\
+  else msg = msgpool[--msgNums];	\
+}
+
+
+/******************************************************************************
+ *
  * CmiNotifyIdle()-- wait until a packet comes in
  *
  *****************************************************************************/
@@ -97,6 +129,11 @@ void CmiNotifyIdle(void)
   gm_recv_event_t *e;
   int pollMs = 5;
 
+  if (Cmi_idlepoll) {
+    if (Cmi_netpoll) CommunicationServer(0);
+    return;
+  }
+
   gm_set_alarm (gmport, &gmalarm, (gm_u64_t) pollMs*1000, alarmcallback,
                     (void *)NULL );
   e = gm_blocking_receive_no_spin(gmport);
@@ -107,6 +144,9 @@ void CmiNotifyIdle(void)
   if (nreadable) {
     return;
   }
+  if (Cmi_netpoll) CommunicationServer(5);
+  return;
+
   pollMs = 0;
   if (Cmi_charmrun_fd!=-1) {
     fds[n].fd = Cmi_charmrun_fd;
@@ -231,7 +271,11 @@ void send_callback(struct gm_port *p, void *msg, gm_status_t status)
     CmiAbort("");
   }
 
+#if !CMK_MSGPOOL
   gm_dma_free(gmport, msg);
+#else
+  putPool(msg);
+#endif
   gm_free_send_token (gmport, GM_LOW_PRIORITY);
 
   /* since we have one free send token, start next send */
@@ -273,13 +317,18 @@ void DeliverViaNetwork(OutgoingMsg ogm, OtherNode node, int rank)
   char *buf;
   int size = gm_min_size_for_length(ogm->size);
   int len = ogm->size;
+  int alloclen, allocSize;
 
 //CmiPrintf("DeliverViaNetwork: size:%d\n", size);
 
   DgramHeaderMake(ogm->data, rank, ogm->src, Cmi_charmrun_pid, node->send_next);
 
   /* allocate DMAable memory to prepare sending */
+#if !CMK_MSGPOOL
   buf = (char *)gm_dma_malloc(gmport, len);
+#else
+  getPool(buf, len);
+#endif
   _MEMCHECK(buf);
   memcpy(buf, ogm->data, len);
 
@@ -305,12 +354,13 @@ void DeliverViaNetwork(OutgoingMsg ogm, OtherNode node, int rank)
 }
 
 
-void initialize_gm()
+void CmiMachineInit()
 {
   gm_status_t status;
   int device, i, j, maxsize;
   char portname[200];
   char *buf;
+  int mlen;
 
   gmport = NULL;
   if (dataport == -1) return;
@@ -328,6 +378,9 @@ void initialize_gm()
   for (i=1; i<maxsize; i++) {
     int len = gm_max_length_for_size(i);
     int num = 2;
+
+    maxMsgSize = len;
+
     if (i<5) num = 0;
     else if (i<11 && i>6)  num = 20;
     else if (i>22) num = 1;
@@ -344,5 +397,9 @@ void initialize_gm()
                        gm_num_send_tokens (gmport));
 
   gm_initialize_alarm(&gmalarm);
+
+#if CMK_MSGPOOL
+  msgpool[msgNums++]  = gm_dma_malloc(gmport, maxMsgSize);
+#endif
 }
 

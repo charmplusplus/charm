@@ -1,6 +1,7 @@
 /*
   UDP implementation of Converse NET version
   contains only UDP specific code for:
+  * CmiMachineInit()
   * CmiNotifyIdle()
   * DeliverViaNetwork()
   * CommunicationServer()
@@ -609,5 +610,10 @@ static void CommunicationServer(int withDelayMs)
 #if CMK_SHARED_VARS_UNAVAILABLE
   terrupt--;
 #endif
+}
+
+
+void CmiMachineInit()
+{
 }
 

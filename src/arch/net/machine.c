@@ -797,6 +797,7 @@ static double Cmi_ack_delay;
 static int    Cmi_dgram_max_data;
 static int    Cmi_tickspeed;
 static int    Cmi_netpoll;
+static int    Cmi_idlepoll;;
 static int    Cmi_syncprint;
 static int writeableAcks,writeableDgrams;/*Write-queue counts (to know when to sleep)*/
 
@@ -2221,7 +2222,7 @@ CmiCommHandle CmiGeneralSend(int pe, int size, int freemode, char *data)
 
   if (freemode == 'S') {
     char *copy = (char *)CmiAlloc(size);
-  if (!copy)
+    if (!copy)
       fprintf(stderr, "%d: Out of mem\n", Cmi_mynode);
     memcpy(copy, data, size);
     data = copy; freemode = 'F';
@@ -2487,10 +2488,20 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usc, int everReturn)
 #endif
 #endif
   Cmi_argv = argv; Cmi_startfn = fn; Cmi_usrsched = usc;
-#if CMK_WHEN_PROCESSOR_IDLE_BUSYWAIT
+#if CMK_DISABLE_SIGNAL
   Cmi_netpoll = 1;      /* set as default, but still allow change next */
 #endif
-  Cmi_netpoll ^= CmiGetArgFlag(argv,"+netpoll");
+#if CMK_WHEN_PROCESSOR_IDLE_USLEEP
+  Cmi_idlepoll = 0;
+#else
+  Cmi_idlepoll = 1;
+#endif
+    /* netpoll disable signal */
+  if (CmiGetArgFlag(argv,"+netpoll")) Cmi_netpoll = 1;
+    /* idlepoll use poll instead if sleep when idle */
+  if (CmiGetArgFlag(argv,"+idlepoll")) Cmi_idlepoll = 1;
+    /* idlesleep use sleep instead if busywait when idle */
+  if (CmiGetArgFlag(argv,"+idlesleep")) Cmi_idlepoll = 0;
   Cmi_syncprint = CmiGetArgFlag(argv,"+syncprint");
   skt_init();
   atexit(exitDelay);
@@ -2513,9 +2524,9 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usc, int everReturn)
   	dataskt=-1;
   	Cmi_charmrun_fd=-1;
   }
-#if CMK_USE_GM
-  initialize_gm();
-#endif
+
+  CmiMachineInit();
+
   node_addresses_obtain(argv);
   skt_set_idle(CmiYield);
   Cmi_check_delay = 2.0+0.5*Cmi_numnodes;
