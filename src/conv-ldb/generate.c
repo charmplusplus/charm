@@ -8,6 +8,7 @@ Output form: directory graphN/ containing files graph0 ... graphN-1
 Modified from the original: changed output format, and converted main to a parametered function
 */
 
+#include "stdio.h"
 #include "typedefs.h"
 
 #define VMAX 2050
