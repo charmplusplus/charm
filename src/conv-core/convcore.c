@@ -850,9 +850,7 @@ void (*handler)();
 void CsdBeginIdle(void)
 {
   CcdCallBacks();
-#ifndef CMK_OPTIMIZE
   _LOG_E_PROC_IDLE(); 	/* projector */
-#endif
   CcdRaiseCondition(CcdPROCESSOR_BEGIN_IDLE) ;
 }
 
@@ -863,9 +861,7 @@ void CsdStillIdle(void)
 
 void CsdEndIdle(void)
 {
-#ifndef CMK_OPTIMIZE	
   _LOG_E_PROC_BUSY(); 	/* projector */
-#endif
   CcdRaiseCondition(CcdPROCESSOR_BEGIN_BUSY) ;
 }
 
@@ -1017,6 +1013,7 @@ int handler;
  
   side = 0;
   while (1) {
+    CsdPeriodic();
     side ^= 1;
     if (side) msg = CmiGetNonLocal();
     else      msg = CdsFifo_Dequeue(localqueue);
@@ -1029,7 +1026,6 @@ int handler;
 	CdsFifo_Enqueue(localqueue, msg);
       }
     }
-    CsdPeriodic();
   }
 }
  
