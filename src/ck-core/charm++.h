@@ -357,18 +357,22 @@ class IrrGroup : public Chare {
     static int isIrreducible(){ return 1;}
 };
 
+#define CBASE_PROXY_MEMBERS(CProxy_Derived) \
+	typedef typename CProxy_Derived::local_t local_t; \
+	typedef typename CProxy_Derived::index_t index_t; \
+	typedef typename CProxy_Derived::proxy_t proxy_t; \
+	typedef typename CProxy_Derived::element_t element_t; \
+	CProxy_Derived thisProxy; 
 
-/*Macro implmentation of CBase_* */
-#define CBase_ProxyDecls(Derived) CProxy_##Derived thisProxy;
-#define CBase_ProxyInits(this) thisProxy(this)
 
 /*Templated implementation of CBase_* classes.*/
 template <class Parent,class CProxy_Derived>
 class CBaseT : public Parent {
 public:
-	CProxy_Derived thisProxy;
-	CBaseT(void) :Parent(), CBase_ProxyInits(this) {}
-	CBaseT(CkMigrateMessage *m) :Parent(m), CBase_ProxyInits(this) {}
+	CBASE_PROXY_MEMBERS(CProxy_Derived)
+
+	CBaseT(void) :Parent(), thisProxy(this) {}
+	CBaseT(CkMigrateMessage *m) :Parent(m), thisProxy(this) {}
 	void pup(PUP::er &p) {
 		Parent::pup(p);
 		p|thisProxy;
@@ -379,14 +383,16 @@ public:
 template <class Parent1,class Parent2,class CProxy_Derived>
 class CBaseT2 : public Parent1, public Parent2 {
 public:
-	CProxy_Derived thisProxy;
+	CBASE_PROXY_MEMBERS(CProxy_Derived)
+
 	CBaseT2(void) :Parent1(), Parent2(),
-		CBase_ProxyInits((Parent1 *)this) {}
+		thisProxy((Parent1 *)this) {}
 	CBaseT2(CkMigrateMessage *m) :Parent1(m), Parent2(m),
-		CBase_ProxyInits((Parent1 *)this) {} 
+		thisProxy((Parent1 *)this) {} 
 	void pup(PUP::er &p) {
 		Parent1::pup(p);
 		Parent2::pup(p);
+		p|thisProxy;
 	}
 
 //These overloads are needed to prevent ambiguity for multiple inheritance:
