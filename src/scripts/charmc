@@ -637,6 +637,9 @@ Copymod() {
 		if [ "a$COPY" != "a$OBJECT" ] 
 		then
 			[ -d $COPY ] && COPY="$COPY/"
+			if [ -n "$CMK_MOD_NAME_ALLCAPS" ] ; then
+			  OBJECT=`echo $OBJECT | tr "a-z" "A-Z"`
+			fi
 			if [ -r "$OBJECT.$CMK_MOD_EXT" ] ; then
 			  echo "Appending .$CMK_MOD_EXT to object file name"
 			  OBJECT="$OBJECT.$CMK_MOD_EXT"
