@@ -110,12 +110,10 @@ void CentralLB::AtSync()
 {
   DEBUGF(("[%d] CentralLB At Sync step %d!!!!\n",CkMyPe(),mystep));
 
-  startFlag = 0;
   if (!QueryBalanceNow(step())) {
-    MigrationDone();
+    MigrationDone(0);
     return;
   }
-  startFlag = 1;
   thisProxy [CkMyPe()].ProcessAtSync();
 }
 
@@ -172,7 +170,7 @@ void CentralLB::Migrated(LDObjHandle h)
   //  CkPrintf("[%d] An object migrated! %d %d\n",
   //  	   CkMyPe(),migrates_completed,migrates_expected);
   if (migrates_completed == migrates_expected) {
-    MigrationDone();
+    MigrationDone(1);
   }
 }
 
@@ -352,6 +350,11 @@ void CentralLB::ReceiveMigration(LBMigrateMsg *m)
       migrates_expected++;
     }
   }
+#if 0
+  if (m->n_moves ==0) {
+    theLbdb->SetLBPeriod(theLbdb->GetLBPeriod()*2);
+  }
+#endif
   
   cur_ld_balancer = m->next_lb;
   if((CkMyPe() == cur_ld_balancer) && (cur_ld_balancer != 0)){
@@ -361,14 +364,14 @@ void CentralLB::ReceiveMigration(LBMigrateMsg *m)
   }
 
   if (migrates_expected == 0 || migrates_completed == migrates_expected)
-    MigrationDone();
+    MigrationDone(1);
   delete m;
 }
 
 
-void CentralLB::MigrationDone()
+void CentralLB::MigrationDone(int balancing)
 {
-  if (startFlag && CkMyPe() == cur_ld_balancer) {
+  if (balancing && CkMyPe() == cur_ld_balancer) {
     double end_lb_time = CmiWallTimer();
     CkPrintf("Load balancing step %d finished at %f duration %f\n",
 	     step(),end_lb_time,end_lb_time - start_lb_time);

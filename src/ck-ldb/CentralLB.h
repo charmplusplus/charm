@@ -50,7 +50,7 @@ public:
   static void staticMigrated(void* me, LDObjHandle h);
   void Migrated(LDObjHandle h);
 
-  void MigrationDone(void);  // Call when migration is complete
+  void MigrationDone(int balancing);  // Call when migration is complete
   int step() { return mystep; };
 
   void set_avail_vector(char *new_vector);
@@ -99,7 +99,6 @@ private:
   LDStats* statsDataList;
   int migrates_completed;
   int migrates_expected;
-  int startFlag;
   double start_lb_time;
 };
 
