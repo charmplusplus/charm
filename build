@@ -27,7 +27,7 @@ syntax() {
   echo ''
   echo '<options>: compiler and platform specific options'
   echo 'cc cc64 cxx kcc pgcc acc icc ecc gcc3 mpcc'
-  echo 'help smp gm tcp vmi scyld clustermatic opteron bluegene'
+  echo 'help smp gm tcp vmi scyld clustermatic opteron bluegene ooc syncft'
   echo '--incdir --libdir --basedir --build-shared --no-shared -j'
   if test $more = 1
   then
@@ -58,6 +58,7 @@ syntax() {
   echo 'Advanced options:'
   echo '  bluegene	  compile for BigSim (Blue Gene) simulator'
   echo '  ooc		  compile with out of core support'
+  echo '  syncft	  compile with Charm++ fault tolerance support'
   echo ''
   echo "Charm++ dynamic libraries:"
   echo "  --build-shared  build Charm++ dynamic libraries (.so), this is on by default"
@@ -67,7 +68,7 @@ syntax() {
   echo '  --incdir=DIR	  specify additional include path for compiler'
   echo '  --libdir=DIR	  specify additional lib path for compiler'
   echo '  --basedir=DIR	  shortcut for the above two - DIR/include and DIR/lib'
-  echo '  -jNUM           parallel make, NUM is the number of paralle make jobs'
+  echo '  -j[N]           parallel make, N is the number of paralle make jobs'
   fi
   echo ''
   echo '<charmc-options>: normal compiler options e.g. -g -O -save -verbose'
