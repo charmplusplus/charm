@@ -328,6 +328,7 @@ void CkMemCheckPT::resetLB(int diepe)
 // called on all processors
 void CkMemCheckPT::restart(int diePe)
 {
+#if CMK_MEM_CHECKPOINT
   failed(diePe);	// add into the list of failed pes
   thisFailedPe = diePe;
 
@@ -344,6 +345,7 @@ void CkMemCheckPT::restart(int diePe)
 
   thisProxy[0].quiescence(CkCallback(CkIndex_CkMemCheckPT::removeArrayElements(), thisProxy));
   // afterwards, the QD detection should work again
+#endif
 }
 
 void CkMemCheckPT::removeArrayElements()
