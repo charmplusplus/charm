@@ -11,6 +11,7 @@ liveVizConfig lv_config;
 CProxy_liveVizGroup lvG;
 CkReduction::reducerType imageCombineReducer;
 CkCallback clientGetImageCallback;
+double requestTime, depositTime;
 
 //Called by clients to start liveViz.
 void liveVizInit(const liveVizConfig &cfg, CkArrayID a, CkCallback c)
@@ -36,6 +37,7 @@ void liveVizInitComplete(void *rednMessage) {
 //  Just forwards request on to user.
 void liveViz0Get(const liveVizRequest3d &req)
 {
+  requestTime = CkWallTimer();
   clientGetImageCallback.send(new liveVizRequestMsg(req));
 }
 
@@ -196,7 +198,8 @@ void vizReductionHandler(void *r_msg)
       imageData[i] = 0;
     liveViz0Deposit(*req, imageData);
   }
-
+  depositTime = CkWallTimer();
+  CkPrintf("depositTime - requestTime = %lf", depositTime - requestTime);
   delete req;
   delete msg;
 }
@@ -326,6 +329,8 @@ void vizReductionHandler(void *r_msg)
     dest.put(hdr->r.l,hdr->r.t,src);
     liveViz0Deposit(hdr->req,dest.getData());
   }
+  depositTime = CkWallTimer();
+  CkPrintf("depositTime - requestTime = %lf", depositTime - requestTime);
   delete msg;
 }
 #endif
