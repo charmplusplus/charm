@@ -21,17 +21,19 @@ L2H=latex2html -white -antialias -local_icons \
 	-address '<p align="right">'"`/bin/date +"%B %d, %Y"`"'<br> \
             '$(PROJECT_LINK)'<a href="http://charm.cs.uiuc.edu/">Charm Homepage</a>'
 
+DEPTEX=$(TEX) $(FILE).aux index.tex
+
 # Default target: build postscript, pdf, and html:
 
 all: ps pdf html
 
-$(FILE).aux: $(TEX)
+$(FILE).aux: $(TEX) index.tex
 	latex $(FILE).tex
 
 
 ps: $(FILE).ps
 
-$(FILE).dvi: $(TEX) $(FILE).aux
+$(FILE).dvi: $(TEX) $(FILE).aux 
 	latex $(FILE).tex
 
 $(FILE).ps: $(FILE).dvi
@@ -51,11 +53,17 @@ $(FILE): $(TEX) $(FILE).aux
 	-@rm -fr $(FILE)/*.html $(FILE)/*.aux
 	$(LATEX2HTML) $(FILE).tex
 
+$(FILE).idx:
+	touch index.tex
+
+index.tex: manual.idx
+	makeindex -o index.tex $(FILE).idx
 
 # Clean out all TeX droppings:
 clean:
 	-rm -fr *.aux *.log *.dvi *.ps *.pdf $(FILE)
-	-rm -fr *.log *.bbl *.blg *.toc *~ fig/*.bak
+	-rm -fr *.idx *.log *.bbl *.blg *.toc *~ fig/*.bak
+	-rm -fr index.tex
 
 # Build local copy of documentation:
 doc: all
