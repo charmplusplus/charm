@@ -26,6 +26,8 @@
 
 #undef CMK_MULTIPLE_DELETE
 
+#undef CMK_SIGSAFE_SYSTEM
+
 #undef CMK_USE_POLL
 
 #undef CMK_DLL_USE_DLOPEN

@@ -277,6 +277,13 @@ EOT
 test_cxx "whether the poll() syscall exists" "yes" "no" ""
 AC_DEFINE_UNQUOTED(CMK_USE_POLL, $pass)
 
+#### test for system ###
+cat > $t <<EOT
+#include "ckdll_system.C"
+EOT
+test_cxx "whether to use signal-safe system() " "yes" "no" ""
+AC_DEFINE_UNQUOTED(CMK_SIGSAFE_SYSTEM, $pass)
+
 #### check if dlopen works ####
 cat > $t <<EOT
 #include "ckdll_dlopen.C"
