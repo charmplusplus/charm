@@ -388,7 +388,7 @@ then
 	echo "-------------------------------------------------"
 	echo "$PROGRAM built successfully."
 	echo "Next, try out a sample program like" \
-	     "pgms/charm++/simplearrayhello"
+	     "tests/charm++/simplearrayhello"
 else
 	echo "-------------------------------------------------"
 	echo "Charm++ NOT BUILT. Either cd into $VERSION/tmp and try"
