@@ -49,7 +49,7 @@ class LogEntry {
     void *operator new(size_t s) {void*ret=malloc(s);_MEMCHECK(ret);return ret;}
     void *operator new(size_t, void *ptr) { return ptr; }
     void operator delete(void *ptr) { free(ptr); }
-#ifdef WIN32
+#if defined(WIN32) || CMK_MULTIPLE_DELETE
     void operator delete(void *, void *) { }
 #endif
     // **CW** For backward compatibility, the previous signature is provided.

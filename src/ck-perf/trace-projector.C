@@ -148,7 +148,7 @@ void TraceProjector::beginExecute(CmiObjId  *tid)
 }
 
 
-void TraceProjector::beginExecute(int event,int msgType,int ep,int srcPe, int mlen)
+void TraceProjector::beginExecute(int event,int msgType,int ep,int srcPe,int mlen,CmiObjId *idx)
 {
 	//CmiPrintf("TraceProjector:iData in beginExecuteDetailed %d %d \n",event,srcPe);
 	_LOG_E_BEGIN_EXECUTE_DETAILED(event, msgType, ep, srcPe, mlen);
