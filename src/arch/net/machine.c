@@ -1156,7 +1156,12 @@ static void CommunicationInterrupt(int ignored)
 {
   if (memflag) return;
   MACHSTATE(2,"--BEGIN SIGIO--")
-  CommunicationServer(0);
+  {
+    /*Make sure any malloc's we do in here are NOT migratable:*/
+    CmiIsomallocBlockList *oldList=CmiIsomallocBlockListActivate(NULL);
+    CommunicationServer(0);
+    CmiIsomallocBlockListActivate(oldList);
+  }
   MACHSTATE(2,"--END SIGIO--")
 }
 

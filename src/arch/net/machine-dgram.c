@@ -387,7 +387,7 @@ static ImplicitDgram Cmi_freelist_implicit;
 
 #define MallocImplicitDgram(dg) {\
   ImplicitDgram d = Cmi_freelist_implicit;\
-  if (d==0) {d = ((ImplicitDgram)malloc_nomigrate(sizeof(struct ImplicitDgramStruct)));\
+  if (d==0) {d = ((ImplicitDgram)malloc(sizeof(struct ImplicitDgramStruct)));\
              _MEMCHECK(d);\
   } else Cmi_freelist_implicit = d->next;\
   dg = d;\
@@ -401,7 +401,7 @@ static ImplicitDgram Cmi_freelist_implicit;
 
 #define MallocExplicitDgram(dg) {\
   ExplicitDgram d = Cmi_freelist_explicit;\
-  if (d==0) { d = ((ExplicitDgram)malloc_nomigrate \
+  if (d==0) { d = ((ExplicitDgram)malloc \
 		   (sizeof(struct ExplicitDgramStruct) + Cmi_max_dgram_size));\
               _MEMCHECK(d);\
   } else Cmi_freelist_explicit = d->next;\
@@ -412,7 +412,7 @@ static ImplicitDgram Cmi_freelist_implicit;
 
 #define FreeOutgoingMsg(m) (free(m))
 #define MallocOutgoingMsg(m)\
-    {(m=(OutgoingMsg)malloc_nomigrate(sizeof(struct OutgoingMsgStruct))); _MEMCHECK(m);}
+    {(m=(OutgoingMsg)malloc(sizeof(struct OutgoingMsgStruct))); _MEMCHECK(m);}
 
 /****************************************************************************
  *                                                                          
