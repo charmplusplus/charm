@@ -79,26 +79,24 @@ void CommLB::add_graph(int x, int y, int data, int nmsg){
     graph * ptr, *temp;
     
     ptr = &(object_graph[x]);  
-    for(;ptr->next != NULL; ptr = ptr->next);
     
     temp = new graph;
     
     temp->id = y;
     temp->data = data;
     temp->nmsg = nmsg;
-    temp->next = NULL;
+    temp->next = ptr->next;
     
     ptr->next = temp;
     
     ptr = &(object_graph[y]);  
-    for(;ptr->next != NULL; ptr = ptr->next);
-    
+
     temp = new graph;
     
     temp->id = x;
     temp->data = data;
     temp->nmsg = nmsg;
-    temp->next = NULL;
+    temp->next = ptr->next;
     
     ptr->next = temp;
 }
@@ -287,6 +285,18 @@ CLBMigrateMsg* CommLB::Strategy(CentralLB::LDStats* stats, int count)
     delete alloc_array;
     delete htable;
     delete translate;   
+
+    for(int oindex= 0; oindex < nobj; oindex++){
+      graph * ptr = &object_graph[oindex];
+      ptr = ptr->next;
+      
+      while(ptr != NULL){
+	graph *cur = ptr;
+	ptr = ptr->next;
+	delete cur;
+      }
+    }
+
     delete object_graph;
 
     return msg;
