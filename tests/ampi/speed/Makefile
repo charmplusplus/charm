@@ -1,0 +1,26 @@
+CHARMC=../../../../bin/charmc $(OPTS)
+
+OBJS = hello.o msgspeed.o test_mpi.o
+
+all: hello
+
+hello: $(OBJS)
+	$(CHARMC) -language charm++ -module ampi -o hello $(OBJS)
+
+hello.decl.h: hello.ci
+	$(CHARMC)  hello.ci
+
+clean:
+	rm -f *.decl.h *.def.h conv-host *.o hello charmrun *.log *.sum *.sts
+
+hello.o: hello.C hello.decl.h
+	$(CHARMC) -c hello.C
+
+test_mpi.o: test_mpi.c
+	$(CHARMC) -c $<
+
+msgspeed.o: msgspeed.c
+	$(CHARMC) -c $<
+
+test: all
+	./charmrun hello +p2
