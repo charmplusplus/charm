@@ -60,6 +60,7 @@ extern int AMPI_COMM_UNIVERSE[AMPI_MAX_COMM];
 
 void ampi_init_universe(int *unicomm)
 {
+  AMPIAPI("ampi_init_universe");
   for(int i=0;i<ampi_ncomms; i++)
   {
     unicomm[i] = AMPI_COMM_UNIVERSE[i];
@@ -336,12 +337,14 @@ void ampi_alltoall(void *sendbuf, int *sendcount, int *sendtype,
 
 void ampi_comm_dup(int *comm, int *newcomm, int *ierr)
 {
+  AMPIAPI("ampi_com_dup");
   *newcomm = *comm;
   *ierr = 0;
 }
 
 void ampi_comm_free(int *comm, int *ierr)
 {
+  AMPIAPI("ampi_comm_free");
   *ierr = 0;
 }
 
@@ -375,3 +378,4 @@ int ampi_register(void *d, AMPI_PupFn f)
 }
 
 } // extern "C"
+

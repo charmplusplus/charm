@@ -58,7 +58,7 @@ static ampi_comm_structs ampi_comms;
 int ampi_ncomms;
 int AMPI_COMM_UNIVERSE[AMPI_MAX_COMM];
 
-extern "C" void AMPI_Setup_Switch(void);
+CDECL void AMPI_Setup_Switch(void);
 
 CtvDeclare(ampi*, ampiPtr);
 static void ampiNodeInit(void)
@@ -349,7 +349,7 @@ void ampi::checkpoint(DirMsg *msg)
   CProxy_ampimain pm(ampimain::handle); 
   pm.checkpoint(); 
 }
-extern "C" void
+CDECL void
 AMPI_Checkpoint(char *dirname)
 {
   mkdir(dirname, 0777);
@@ -403,93 +403,105 @@ static ampi *getAmpiInstance(void) {
   return ret;
 }
 
-extern "C" void
+CDECL void
 AMPI_Migrate(void)
 {
+  AMPIAPI("AMPI_Migrate");
   TCharmMigrate();
 }
 
-extern "C" 
+CDECL
 int AMPI_Init(int *argc, char*** argv)
 {
+  AMPIAPI("AMPI_Init");
   return 0;
 }
 
-extern "C" 
+CDECL
 int AMPI_Comm_rank(AMPI_Comm comm, int *rank)
 {
+  AMPIAPI("AMPI_Comm_rank");
   *rank = TCharmElement();
   return 0;
 }
 
-extern "C" 
+CDECL
 int AMPI_Comm_size(AMPI_Comm comm, int *size)
 {
+  AMPIAPI("AMPI_Comm_size");
   *size = TCharmNumElements();
   return 0;
 }
 
-extern "C" 
+CDECL
 int AMPI_Finalize(void)
 {
+  AMPIAPI("AMPI_Finalize");
   return 0;
 }
 
-extern "C" 
+CDECL
 int AMPI_Send(void *msg, int count, AMPI_Datatype type, int dest, 
                         int tag, AMPI_Comm comm)
 {
+  AMPIAPI("AMPI_Send");
   ampi *ptr = CtvAccess(ampiPtr);
   ptr->send(tag, ptr->getIndex(), msg, count, type, dest, comm);
   return 0;
 }
 
-extern "C" 
+CDECL
 int AMPI_Ssend(void *msg, int count, AMPI_Datatype type, int dest, 
                         int tag, AMPI_Comm comm)
 {
+  AMPIAPI("AMPI_Ssend");
   ampi *ptr = CtvAccess(ampiPtr);
   ptr->send(tag, ptr->getIndex(), msg, count, type, dest, comm);
   return 0;
 }
 
-extern "C" 
+CDECL
 int AMPI_Recv(void *msg, int count, AMPI_Datatype type, int src, int tag, 
               AMPI_Comm comm, AMPI_Status *status)
 {
+  AMPIAPI("AMPI_Recv");
   ampi *ptr = CtvAccess(ampiPtr);
   ptr->recv(tag,src,msg,count,type, comm, (int*) status);
   return 0;
 }
 
-extern "C" 
+CDECL
 int AMPI_Probe(int src, int tag, AMPI_Comm comm, AMPI_Status *status)
 {
+  AMPIAPI("AMPI_Probe");
   ampi *ptr = CtvAccess(ampiPtr);
   ptr->probe(tag,src, comm, (int*) status);
   return 0;
 }
 
-extern "C" 
+CDECL
 int AMPI_Iprobe(int src,int tag,AMPI_Comm comm,int *flag,AMPI_Status *status)
 {
+  AMPIAPI("AMPI_Iprobe");
   ampi *ptr = CtvAccess(ampiPtr);
   *flag = ptr->iprobe(tag,src,comm,(int*) status);
   return 0;
 }
 
-extern "C" 
+CDECL
 int AMPI_Sendrecv(void *sbuf, int scount, int stype, int dest, 
                   int stag, void *rbuf, int rcount, int rtype,
                   int src, int rtag, AMPI_Comm comm, AMPI_Status *sts)
 {
+  AMPIAPI("AMPI_Sendrecv");
   return (AMPI_Send(sbuf,scount,stype,dest,stag,comm) ||
           AMPI_Recv(rbuf,rcount,rtype,src,rtag,comm,sts));
 }
 
-extern "C" 
+CDECL
 int AMPI_Barrier(AMPI_Comm comm)
 {
+  AMPIAPI("AMPI_Barrier");
   if(comm != AMPI_COMM_WORLD)
   {
     CkAbort("AMPI> Cannot have global operations across communicators.\n");
@@ -499,10 +511,11 @@ int AMPI_Barrier(AMPI_Comm comm)
   return 0;
 }
 
-extern "C" 
+CDECL
 int AMPI_Bcast(void *buf, int count, AMPI_Datatype type, int root, 
                          AMPI_Comm comm)
 {
+  AMPIAPI("AMPI_Bcast");
   if(comm != AMPI_COMM_WORLD)
   {
     CkAbort("AMPI> Cannot have global operations across communicators.\n");
@@ -564,10 +577,11 @@ getReductionType(int type, int op)
   return mytype;
 }
 
-extern "C" 
+CDECL
 int AMPI_Reduce(void *inbuf, void *outbuf, int count, int type, AMPI_Op op, 
                 int root, AMPI_Comm comm)
 {
+  AMPIAPI("AMPI_Reduce");
   if(comm != AMPI_COMM_WORLD)
   {
     CkAbort("AMPI> Cannot have global operations across communicators.\n");
@@ -586,10 +600,11 @@ int AMPI_Reduce(void *inbuf, void *outbuf, int count, int type, AMPI_Op op,
   return 0;
 }
 
-extern "C" 
+CDECL
 int AMPI_Allreduce(void *inbuf, void *outbuf, int count, int type,
                    AMPI_Op op, AMPI_Comm comm)
 {
+  AMPIAPI("AMPI_Allreduce");
   if(comm != AMPI_COMM_WORLD)
   {
     CkAbort("AMPI> Cannot have global operations across communicators.\n");
@@ -606,15 +621,17 @@ int AMPI_Allreduce(void *inbuf, void *outbuf, int count, int type,
   return 0;
 }
 
-extern "C" 
+CDECL
 double AMPI_Wtime(void)
 {
+  AMPIAPI("AMPI_Wtime");
   return CmiWallTimer();
 }
 
-extern "C" 
+CDECL
 int AMPI_Start(AMPI_Request *reqnum)
 {
+  AMPIAPI("AMPI_Start");
   ampi *ptr = CtvAccess(ampiPtr);
   if(*reqnum >= ptr->nrequests) {
     CkAbort("Invalid persistent Request..\n");
@@ -627,9 +644,10 @@ int AMPI_Start(AMPI_Request *reqnum)
   return 0;
 }
 
-extern "C" 
+CDECL
 int AMPI_Waitall(int count, AMPI_Request *request, AMPI_Status *sts)
 {
+  AMPIAPI("AMPI_Waitall");
   ampi *ptr = CtvAccess(ampiPtr);
   int i;
   for(i=0;i<count;i++) {
@@ -659,9 +677,10 @@ int AMPI_Waitall(int count, AMPI_Request *request, AMPI_Status *sts)
   return 0;
 }
 
-extern "C" 
+CDECL
 int AMPI_Waitany(int count, AMPI_Request *request, int *idx, AMPI_Status *sts)
 {
+  AMPIAPI("AMPI_Waitany");
   ampi *ptr = CtvAccess(ampiPtr);
   while(1) {
     for(*idx=0;(*idx)<count;(*idx)++) {
@@ -699,9 +718,10 @@ int AMPI_Waitany(int count, AMPI_Request *request, int *idx, AMPI_Status *sts)
   return 0;
 }
 
-extern "C" 
+CDECL
 int AMPI_Wait(AMPI_Request *request, AMPI_Status *sts)
 {
+  AMPIAPI("AMPI_Wait");
   ampi *ptr = CtvAccess(ampiPtr);
   if(*request == (-1))
       return 0;
@@ -728,9 +748,10 @@ int AMPI_Wait(AMPI_Request *request, AMPI_Status *sts)
   return 0;
 }
 
-extern "C" 
+CDECL
 int AMPI_Test(AMPI_Request *request, int *flag, AMPI_Status *sts)
 {
+  AMPIAPI("AMPI_Test");
   ampi *ptr = CtvAccess(ampiPtr);
   if(*request==(-1)) {
     *flag = 1;
@@ -750,9 +771,10 @@ int AMPI_Test(AMPI_Request *request, int *flag, AMPI_Status *sts)
   return 0;
 }
 
-extern "C" 
+CDECL
 int AMPI_Testall(int count, AMPI_Request *request, int *flag, AMPI_Status *sts)
 {
+  AMPIAPI("AMPI_Testall");
   int i;
   int tmpflag;
   *flag = 1;
@@ -764,10 +786,11 @@ int AMPI_Testall(int count, AMPI_Request *request, int *flag, AMPI_Status *sts)
   return 0;
 }
 
-extern "C" 
+CDECL
 int AMPI_Recv_init(void *buf, int count, int type, int src, int tag,
                    AMPI_Comm comm, AMPI_Request *req)
 {
+  AMPIAPI("AMPI_Recv_init");
 
   ampi *ptr = CtvAccess(ampiPtr);
 
@@ -786,10 +809,11 @@ int AMPI_Recv_init(void *buf, int count, int type, int src, int tag,
   return 0;
 }
 
-extern "C" 
+CDECL
 int AMPI_Send_init(void *buf, int count, int type, int dest, int tag,
                    AMPI_Comm comm, AMPI_Request *req)
 {
+  AMPIAPI("AMPI_Send_init");
   ampi *ptr = CtvAccess(ampiPtr);
   if(ptr->nrequests == 100) {
     CmiAbort("Too many persistent commrequests.\n");
@@ -806,10 +830,11 @@ int AMPI_Send_init(void *buf, int count, int type, int dest, int tag,
   return 0;
 }
 
-extern "C" 
+CDECL
 int AMPI_Type_contiguous(int count, AMPI_Datatype oldtype, 
                          AMPI_Datatype *newtype)
 {
+  AMPIAPI("AMPI_Type_contiguous");
   ampi *ptr = CtvAccess(ampiPtr);
   ptr->myDDT->newContiguous(count, oldtype, newtype); 
   return 0;
@@ -819,6 +844,7 @@ extern  "C"
 int AMPI_Type_vector(int count, int blocklength, int stride, 
                      AMPI_Datatype oldtype, AMPI_Datatype*  newtype)
 {
+  AMPIAPI("AMPI_Type_vector");
   ampi  *ptr = CtvAccess(ampiPtr);
   ptr->myDDT->newVector(count, blocklength, stride, oldtype, newtype);
   return 0 ;
@@ -828,6 +854,7 @@ extern  "C"
 int AMPI_Type_hvector(int count, int blocklength, int stride, 
                       AMPI_Datatype oldtype, AMPI_Datatype*  newtype)
 {
+  AMPIAPI("AMPI_Type_hvector");
   ampi  *ptr = CtvAccess(ampiPtr);
   ptr->myDDT->newHVector(count, blocklength, stride, oldtype, newtype);
   return 0 ;
@@ -837,6 +864,7 @@ extern  "C"
 int AMPI_Type_indexed(int count, int* arrBlength, int* arrDisp, 
                       AMPI_Datatype oldtype, AMPI_Datatype*  newtype)
 {
+  AMPIAPI("AMPI_Type_indexed");
   ampi  *ptr = CtvAccess(ampiPtr);
   ptr->myDDT->newIndexed(count, arrBlength, arrDisp, oldtype, newtype);
   return 0 ;
@@ -846,6 +874,7 @@ extern  "C"
 int AMPI_Type_hindexed(int count, int* arrBlength, int* arrDisp, 
                        AMPI_Datatype oldtype, AMPI_Datatype*  newtype)
 {
+  AMPIAPI("AMPI_Type_hindexed");
   ampi  *ptr = CtvAccess(ampiPtr);
   ptr->myDDT->newHIndexed(count, arrBlength, arrDisp, oldtype, newtype);
   return 0 ;
@@ -855,46 +884,52 @@ extern  "C"
 int AMPI_Type_struct(int count, int* arrBlength, int* arrDisp, 
                      AMPI_Datatype* oldtype, AMPI_Datatype*  newtype)
 {
+  AMPIAPI("AMPI_Type_struct");
   ampi  *ptr = CtvAccess(ampiPtr);
   ptr->myDDT->newStruct(count, arrBlength, arrDisp, oldtype, newtype);
   return 0 ;
 }
 
-extern "C" 
+CDECL
 int AMPI_Type_commit(AMPI_Datatype *datatype)
 {
+  AMPIAPI("AMPI_Type_commit");
   return 0;
 }
 
-extern "C" 
+CDECL
 int AMPI_Type_free(AMPI_Datatype *datatype)
 {
+  AMPIAPI("AMPI_Type_free");
   ampi  *ptr = CtvAccess(ampiPtr);
   ptr->myDDT->freeType(datatype);
   return 0;
 }
 
 
-extern "C" 
+CDECL
 int AMPI_Type_extent(AMPI_Datatype datatype, AMPI_Aint extent)
 {
+  AMPIAPI("AMPI_Type_extent");
   ampi *ptr = CtvAccess(ampiPtr) ;
   *extent = ptr->myDDT->getExtent(datatype);
   return 0;
 }
 
-extern "C" 
+CDECL
 int AMPI_Type_size(AMPI_Datatype datatype, AMPI_Aint size)
 {
+  AMPIAPI("AMPI_Type_size");
   ampi *ptr = CtvAccess(ampiPtr) ;
   *size = ptr->myDDT->getSize(datatype);
   return 0;
 }
 
-extern "C" 
+CDECL
 int AMPI_Isend(void *buf, int count, AMPI_Datatype type, int dest, 
               int tag, AMPI_Comm comm, AMPI_Request *request)
 {
+  AMPIAPI("AMPI_Isend");
   ampi *ptr = CtvAccess(ampiPtr);
   
   ptr->send(tag, ptr->getIndex(), buf, count, type, dest, comm);
@@ -902,10 +937,11 @@ int AMPI_Isend(void *buf, int count, AMPI_Datatype type, int dest,
   return 0;
 }
 
-extern "C" 
+CDECL
 int AMPI_Issend(void *buf, int count, AMPI_Datatype type, int dest, 
               int tag, AMPI_Comm comm, AMPI_Request *request)
 {
+  AMPIAPI("AMPI_Issend");
   ampi *ptr = CtvAccess(ampiPtr);
   
   ptr->send(tag, ptr->getIndex(), buf, count, type, dest, comm);
@@ -913,10 +949,11 @@ int AMPI_Issend(void *buf, int count, AMPI_Datatype type, int dest,
   return 0;
 }
 
-extern "C" 
+CDECL
 int AMPI_Irecv(void *buf, int count, AMPI_Datatype type, int src, 
               int tag, AMPI_Comm comm, AMPI_Request *request)
 {
+  AMPIAPI("AMPI_Irecv");
   ampi *ptr = CtvAccess(ampiPtr);
   if(ptr->nirequests == 100) {
     CmiAbort("Too many Irecv requests.\n");
@@ -940,11 +977,12 @@ int AMPI_Irecv(void *buf, int count, AMPI_Datatype type, int src,
   return 0;
 }
 
-extern "C" 
+CDECL
 int AMPI_Allgatherv(void *sendbuf, int sendcount, AMPI_Datatype sendtype, 
                    void *recvbuf, int *recvcounts, int *displs, 
                    AMPI_Datatype recvtype, AMPI_Comm comm) 
 {
+  AMPIAPI("AMPI_Allgatherv");
   if(comm != AMPI_COMM_WORLD)
   {
     CkAbort("AMPI> Cannot have global operations across communicators.\n");
@@ -967,11 +1005,12 @@ int AMPI_Allgatherv(void *sendbuf, int sendcount, AMPI_Datatype sendtype,
   return 0;
 }
 
-extern "C"
+CDECL
 int AMPI_Allgather(void *sendbuf, int sendcount, AMPI_Datatype sendtype,
                   void *recvbuf, int recvcount, AMPI_Datatype recvtype,
                   AMPI_Comm comm)
 {
+  AMPIAPI("AMPI_Allgather");
   if(comm != AMPI_COMM_WORLD)
   {
     CkAbort("AMPI> Cannot have global operations across communicators.\n");
@@ -994,11 +1033,12 @@ int AMPI_Allgather(void *sendbuf, int sendcount, AMPI_Datatype sendtype,
   return 0;
 }
 
-extern "C"
+CDECL
 int AMPI_Gatherv(void *sendbuf, int sendcount, AMPI_Datatype sendtype,
                 void *recvbuf, int *recvcounts, int *displs,
                 AMPI_Datatype recvtype, int root, AMPI_Comm comm)
 {
+  AMPIAPI("AMPI_Gatherv");
   if(comm != AMPI_COMM_WORLD)
   {
     CkAbort("AMPI> Cannot have global operations across communicators.\n");
@@ -1022,11 +1062,12 @@ int AMPI_Gatherv(void *sendbuf, int sendcount, AMPI_Datatype sendtype,
   return 0;
 }
 
-extern "C"
+CDECL
 int AMPI_Gather(void *sendbuf, int sendcount, AMPI_Datatype sendtype,
                void *recvbuf, int recvcount, AMPI_Datatype recvtype, 
                int root, AMPI_Comm comm)
 {
+  AMPIAPI("AMPI_Gather");
   if(comm != AMPI_COMM_WORLD)
   {
     CkAbort("AMPI> Cannot have global operations across communicators.\n");
@@ -1049,11 +1090,12 @@ int AMPI_Gather(void *sendbuf, int sendcount, AMPI_Datatype sendtype,
   return 0;
 }
 
-extern "C" 
+CDECL
 int AMPI_Alltoallv(void *sendbuf, int *sendcounts, int *sdispls,
                   AMPI_Datatype sendtype, void *recvbuf, int *recvcounts,
                   int *rdispls, AMPI_Datatype recvtype, AMPI_Comm comm)
 {
+  AMPIAPI("AMPI_Alltoallv");
   if(comm != AMPI_COMM_WORLD)
   {
     CkAbort("AMPI> Cannot have global operations across communicators.\n");
@@ -1079,11 +1121,12 @@ int AMPI_Alltoallv(void *sendbuf, int *sendcounts, int *sdispls,
   return 0;
 }
 
-extern "C" 
+CDECL
 int AMPI_Alltoall(void *sendbuf, int sendcount, AMPI_Datatype sendtype, 
                  void *recvbuf, int recvcount, AMPI_Datatype recvtype, 
                  AMPI_Comm comm)
 {
+  AMPIAPI("AMPI_Alltoall");
   if(comm != AMPI_COMM_WORLD)
   {
     CkAbort("AMPI> Cannot have global operations across communicators.\n");
@@ -1109,29 +1152,33 @@ int AMPI_Alltoall(void *sendbuf, int sendcount, AMPI_Datatype sendtype,
   return 0;
 }
 
-extern "C"
+CDECL
 int AMPI_Comm_dup(int comm, int *newcomm)
 {
+  AMPIAPI("AMPI_Comm_dup");
   *newcomm = comm;
   return 0;
 }
 
-extern "C"
+CDECL
 int AMPI_Comm_free(int *comm)
 {
+  AMPIAPI("AMPI_Comm_free");
   return 0;
 }
 
-extern "C"
+CDECL
 int AMPI_Abort(int comm, int errorcode)
 {
+  AMPIAPI("AMPI_Abort");
   CkAbort("AMPI: User called MPI_Abort!\n");
   return errorcode;
 }
 
-extern "C"
+CDECL
 int AMPI_Get_count(AMPI_Status *sts, AMPI_Datatype dtype, int *count)
 {
+  AMPIAPI("AMPI_Get_count");
   ampi *ptr = CtvAccess(ampiPtr);
   DDT_DataType* dttype = ptr->myDDT->getType(dtype) ;
   int itemsize = dttype->getSize() ;
@@ -1139,10 +1186,11 @@ int AMPI_Get_count(AMPI_Status *sts, AMPI_Datatype dtype, int *count)
   return 0;
 }
 
-extern "C"
+CDECL
 int AMPI_Pack(void *inbuf, int incount, AMPI_Datatype dtype, void *outbuf,
               int outsize, int *position, AMPI_Comm comm)
 {
+  AMPIAPI("AMPI_Pack");
   ampi *ptr = CtvAccess(ampiPtr);
   DDT_DataType* dttype = ptr->myDDT->getType(dtype) ;
   int itemsize = dttype->getSize();
@@ -1151,10 +1199,11 @@ int AMPI_Pack(void *inbuf, int incount, AMPI_Datatype dtype, void *outbuf,
   return 0;
 }
 
-extern "C"
+CDECL
 int AMPI_Unpack(void *inbuf, int insize, int *position, void *outbuf,
               int outcount, AMPI_Datatype dtype, AMPI_Comm comm)
 {
+  AMPIAPI("AMPI_Unpack");
   ampi *ptr = CtvAccess(ampiPtr);
   DDT_DataType* dttype = ptr->myDDT->getType(dtype) ;
   int itemsize = dttype->getSize();
@@ -1163,51 +1212,59 @@ int AMPI_Unpack(void *inbuf, int insize, int *position, void *outbuf,
   return 0;
 }
 
-extern "C"
+CDECL
 int AMPI_Pack_size(int incount,AMPI_Datatype datatype,AMPI_Comm comm,int *sz)
 {
+  AMPIAPI("AMPI_Pack_size");
   ampi *ptr = CtvAccess(ampiPtr);
   DDT_DataType* dttype = ptr->myDDT->getType(datatype) ;
   return incount*dttype->getSize() ;
 }
 
-extern "C"
+CDECL
 void AMPI_Print(char *str)
 {
+  AMPIAPI("AMPI_Print");
   ampi *ptr = CtvAccess(ampiPtr);
   CkPrintf("[%d] %s\n", ptr->thisIndex, str);
 }
 
-extern "C"
+CDECL
 int AMPI_Register(void *d, AMPI_PupFn f)
 {
+	AMPIAPI("AMPI_Register");
 	return TCharmRegister(d,f);
 }
 
-extern "C"
+CDECL
 void *AMPI_Get_userdata(int idx)
 {
+	AMPIAPI("AMPI_Get_userdata");
 	return TCharmGetUserdata(idx);
 }
 
 CDECL void AMPI_Register_main(AMPI_MainFn mainFn,const char *name)
 {
+	AMPIAPI("AMPI_Register_main");
 	ampiCreateMain(mainFn);
 	ampiAttach(name,strlen(name));
 }
 FDECL void FTN_NAME(AMPI_REGISTER_MAIN,ampi_register_main)
 	(AMPI_MainFn mainFn,const char *name,int nameLen)
 {
+	AMPIAPI("AMPI_register_main");
 	ampiCreateMain(mainFn);	
 	ampiAttach(name,nameLen);
 }
 
 CDECL void AMPI_Attach(const char *name)
 {
+	AMPIAPI("AMPI_Attach");
 	ampiAttach(name,strlen(name));	
 }
 FDECL void FTN_NAME(AMPI_ATTACH,ampi_attach)(const char *name,int nameLen)
 {
+	AMPIAPI("AMPI_attach");
 	ampiAttach(name,nameLen);
 }
 

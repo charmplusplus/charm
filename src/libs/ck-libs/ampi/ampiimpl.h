@@ -213,4 +213,7 @@ class ampi : public ArrayElement1D {
     DDT *myDDT ;
 };
 
+//Use this to mark the start of AMPI interface routines:
+#define AMPIAPI(routineName) TCHARM_API_TRACE(routineName,"ampi")
+
 #endif
