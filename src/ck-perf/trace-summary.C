@@ -575,7 +575,10 @@ void TraceSummaryBOC::write(void)
 extern "C" void CombineSummary()
 {
 CmiPrintf("[%d] CombineSummary called!\n", CkMyPe());
-  if (sumonly) CProxy_TraceSummaryBOC(traceSummaryGID).askSummary();
+  if (sumonly) {
+CmiPrintf("[%d] Sum Only start!\n", CkMyPe());
+    CProxy_TraceSummaryBOC(traceSummaryGID).askSummary();
+  }
   else CkExit();
 }
 
