@@ -57,7 +57,8 @@ int CommLB::search(LDObjid oid, LDOMid mid){
     
     for(id=0;id<nobj;id++){
 	int index = (id+hash)%nobj;
-	if((translate[htable[index]].oid.id[0] == oid.id[0])&&(translate[htable[index]].oid.id[1] == oid.id[1])&&(translate[htable[index]].oid.id[2] == oid.id[2])&&(translate[htable[index]].oid.id[3] == oid.id[3])&&(translate[htable[index]].mid.id == mid.id))
+        if (LDObjIDEqual(translate[htable[index]].oid, oid) &&
+	    LDOMidEqual(translate[htable[index]].mid, mid))
 	    return htable[index];
     }
     //  CkPrintf("not found \n");
@@ -215,7 +216,7 @@ LBMigrateMsg* CommLB::Strategy(CentralLB::LDStats* stats, int count)
 		xcoord = search(stats[pe].commData[com].sender,stats[pe].commData[com].senderOM); 
 		ycoord = search(stats[pe].commData[com].receiver,stats[pe].commData[com].receiverOM);
 		if((xcoord == -1)||(ycoord == -1))
-		    CkPrintf("Error in search\n");
+		    CkAbort("Error in search\n");
 		add_graph(xcoord,ycoord,stats[pe].commData[com].bytes, stats[pe].commData[com].messages);	
 	    }
     

@@ -43,7 +43,10 @@ public:
 
   LBCommData(const LBCommData& d) {
     src_proc = d.src_proc;
-    if (!from_proc()) srcObj = d.srcObj;
+    if (!from_proc()) {
+      srcObj = d.srcObj;
+      srcOM = d.srcOM;
+    }
     destOM = d.destOM;
     destObj = d.destObj;
     n_messages = d.n_messages;
@@ -55,7 +58,10 @@ public:
 
   LBCommData& operator=(const LBCommData& d) {
     src_proc = d.src_proc;
-    if (!from_proc()) srcObj = d.srcObj;
+    if (!from_proc()) { 
+      srcObj = d.srcObj;
+      srcOM = d.srcOM;
+    }
     destOM = d.destOM;
     destObj = d.destObj;
     n_messages = d.n_messages;

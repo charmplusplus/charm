@@ -60,14 +60,12 @@ typedef int LDOMIndex;
 
 typedef struct {
   LDOMHandle omhandle;
-//  void *user_ptr;
   LDObjid id;
   LDObjIndex  handle;
 } LDObjHandle;
 
 typedef struct {
   LDObjHandle handle;
-//  LDOMHandle omHandle;
   double cpuTime;
   double wallTime;
   CmiBool migratable;
