@@ -293,7 +293,7 @@ public:
 	}
 };
 
-typedef CkHashtableT<PUP::able::PUP_ID,PUP_regEntry> PUP_registry;
+typedef CkHashtableTslow<PUP::able::PUP_ID,PUP_regEntry> PUP_registry;
 
 static PUP_registry *PUP_getRegistry(void) {
 	static PUP_registry *reg=NULL;
