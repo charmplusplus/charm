@@ -33,7 +33,7 @@ extern "C" void CmiError(const char *fmt, ...) {
 extern "C" void *CmiTmpAlloc(int size) {return malloc(size);}
 extern "C" void CmiTmpFree(void *p) {free(p);}
 
-/* Bizarre stuff for Cpv support: thankfully not needed.
+/* Bizarre stuff for Cpv support: thankfully not needed by FEM.
 #ifndef CmiMyPe
 int CmiMyPe(void) {return 0;}
 #endif
@@ -47,6 +47,11 @@ int _Cmi_myrank=0;
 int _Cmi_mynodesize=1;
 int _Cmi_mynode=0;
 int _Cmi_numnodes=1;
+
+/* CmiWallTimer support */
+double _cpu_speed_factor=0.0;
+CDECL double CmiTimer(void) {return 0.0;}
+CDECL double CmiWallTimer(void) {return 0.0;}
 
 /* Mini-micro TCHARM */
 #include "tcharmc.h"
