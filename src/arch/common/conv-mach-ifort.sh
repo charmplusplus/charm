@@ -3,6 +3,7 @@ CMK_CF77='ifort -auto '
 CMK_CF90='ifort -auto '
 CMK_CF90_FIXED="$CMK_CF90 -132 -FI "
 CMK_F90LIBS="-L/opt/intel_fc_80/lib/ -lifcore -lifport "
+CMK_F77LIBS=$CMK_F90LIBS
 CMK_MOD_NAME_ALLCAPS=
 CMK_MOD_EXT="mod"
 CMK_F90_USE_MODDIR=""
