@@ -48,8 +48,6 @@ then
         output="$indir/charmrun_script.$$.stdout"
         result="$indir/charmrun_script.$$.result"
 	rm -f $result
-        echo "Submitting batch job for> mpirun -np $pes $args"
-        echo " using the command> qsub $script"
 # Some machine specific 
 	USE_LSF=0
 	queue_stat=qstat
@@ -113,6 +111,7 @@ echo \$status > $result
 EOF
 	else
 #  use LSF
+	  mpirun=cmpirun
           cat > $script << EOF
 #!/bin/sh
 # This is a charmrun-generated PBS batch job script.
@@ -126,12 +125,14 @@ EOF
 
 cd $indir
 echo \$LSB_MCPU_HOSTS
-cmpirun -lsf -poll -no_smp $args
+$mpirun -lsf -poll -no_smp $args
 # Save mpirun exit status
 status=\$?
 echo \$status > $result
 EOF
 	fi
+        echo "Submitting batch job for> $mpirun -np $pes $args"
+        echo " using the command> $queue_qsub $script"
         chmod 755 $script
 	while [ -z "$jobid" ]
 	do
@@ -139,12 +140,13 @@ EOF
 	  [ $USE_LSF = 1 ] && jobid=`$queue_qsub < $script|tail -1|sed -e 's/[^0-9]*//g'`
 	done
 	echo "Job enqueued under job ID $jobid"
+	retry=0
 # Wait for the job to complete, by checking its status
         while [ true ]
         do
                 $queue_stat $jobid > tmp.$$
-# Job ID does not exist now
-                if test $? -ne 0 -o -f $output
+		exitstatus=$?
+                if test -f $output
                 then
 # The job is done-- print its output
                         rm tmp.$$
@@ -159,7 +161,23 @@ EOF
 # The job is still queued or running-- print status and wait
                 tail -1 tmp.$$
                 rm tmp.$$
-                sleep 20
+# Job ID may not exist now
+		if test $exitstatus -ne 0
+		then
+# retry a few times when error occurs
+			retry=`expr $retry + 1`
+			if test $retry -gt 6
+			then
+				echo "Charmrun> abort!"
+				exit 1
+			else
+				sleep 10
+			fi
+		else
+# job still in queue
+			retry=0
+                	sleep 20
+		fi
         done
 else
   mpirun -np $pes $args
