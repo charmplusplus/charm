@@ -349,18 +349,15 @@ Chare::genGroupDecls(XStr& str)
     str << "    void ckSetGroupId(int _gid) { _ck_gid = _gid; }\n";
   } else {
     str << "(int _gid) { _ck_ngid = _gid; }\n";
-    str << "    int ckGetNodeGroupId(void) { return _ck_ngid; }\n";
-    str << "    void ckSetNodeGroupId(int _gid) { _ck_ngid = _gid; }\n";
+    str << "    int ckGetGroupId(void) { return _ck_ngid; }\n";
+    str << "    void ckSetGroupId(int _gid) { _ck_ngid = _gid; }\n";
   }
   str << "    ";
   type->print(str);
   if(templat) {
     templat->genVars(str);
   }
-  if(chareType==SGROUP)
-    str << "* ckLocalBranch(void) {\n";
-  else
-    str << "* ckLocalNodeBranch(void) {\n";
+  str << "* ckLocalBranch(void) {\n";
   str << "      return (";
   type->print(str);
   if(templat) {
@@ -376,10 +373,7 @@ Chare::genGroupDecls(XStr& str)
   if(templat) {
     templat->genVars(str);
   }
-  if(chareType==SGROUP)
-    str << "* ckLocalBranch(int gID) {\n";
-  else
-    str << "* ckLocalNodeBranch(int gID) {\n";
+  str << "* ckLocalBranch(int gID) {\n";
   str << "      return (";
   type->print(str);
   if(templat) {

@@ -138,6 +138,18 @@ void *CkRemoteBranchCall(int ep, void *m, int group, int PE)
 }
 
 extern "C" 
+void *CkRemoteNodeBranchCall(int ep, void *m, int group, int node)
+{ 
+  void * result;
+  envelope *env = UsrToEnv(m);
+  int i = createFuture();
+  env->setRef(i);
+  CkSendMsgNodeBranch(ep, m, node, group);
+  result = waitFuture(i, 1);
+  return (result);
+}
+
+extern "C" 
 void *CkRemoteCall(int ep, void *m, CkChareID *ID)
 { 
   void * result;
