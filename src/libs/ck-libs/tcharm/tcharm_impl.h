@@ -131,8 +131,6 @@ class TCharm: public ArrayElement1D
 	~TCharm();
 
 	void clear();
-	void ckCheckpoint(char* fname);
-	void ckRestart(char* fname);
 
 	//Pup routine packs the user data and migrates the thread
 	virtual void pup(PUP::er &p);

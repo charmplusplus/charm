@@ -225,32 +225,6 @@ void TCharm::clear()
   delete initMsg;
 }
 
-// checkpoint and restart for TCharm
-// difference is set pup'er to userlevel
-void TCharm::ckCheckpoint(char* fname)
-{
-  FILE *chkptfile=fopen(fname,"wb");
-  if(chkptfile == NULL){
-    CkAbort("TCharm::ckCheckpoint open file failed!");
-  }
-  PUP::toDisk p(chkptfile);
-  p.becomeUserlevel();
-  this->pup(p);
-  fclose(chkptfile);
-}
-
-void TCharm::ckRestart(char* fname)
-{
-  FILE *chkptfile=fopen(fname,"rb");
-  if(chkptfile == NULL){
-    CkAbort("TCharm::ckRestart open file failed!");
-  }
-  PUP::fromDisk p(chkptfile);
-  p.becomeUserlevel();
-  this->pup(p);
-  fclose(chkptfile);
-}
-
 //Register user data to be packed with the thread
 int TCharm::add(const TCharm::UserData &d)
 {
