@@ -266,7 +266,7 @@ ampi::recv(int t1, int t2, void* buf, int count, int type, int comm, int *sts)
             type, count, len, msg->length);
     CkAbort("Exiting.\n");
   }
-  ddt->serialize((char*)buf, (char*)msg->data, len/(ddt->getSize(1)), (-1));
+  ddt->serialize((char*)buf, (char*)msg->data, msg->length/(ddt->getSize(1)), (-1));
   delete msg;
 }
 
