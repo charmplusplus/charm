@@ -504,6 +504,8 @@ void LogEntry::pup(PUP::er &p)
       // visualization.
     case BEGIN_COMPUTATION:
     case END_COMPUTATION:
+    case BEGIN_TRACE:
+    case END_TRACE:
       p|itime;
       break;
 
@@ -597,9 +599,15 @@ void TraceProjections::traceClose(void)
 //  free(CkpvAccess(traceRoot));
 }
 
-void TraceProjections::traceBegin(void) { }
+void TraceProjections::traceBegin(void)
+{
+  _logPool->add(BEGIN_TRACE, 0, 0, TraceTimer(), curevent++, CkMyPe());
+}
 
-void TraceProjections::traceEnd(void) { }
+void TraceProjections::traceEnd(void)
+{
+  _logPool->add(END_TRACE, 0, 0, TraceTimer(), curevent++, CkMyPe());
+}
 
 void TraceProjections::userEvent(int e)
 {

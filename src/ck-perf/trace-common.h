@@ -23,6 +23,8 @@
 #define  BEGIN_INTERRUPT    8
 #define  END_INTERRUPT      9
 #define  MESSAGE_RECV       10
+#define  BEGIN_TRACE        11
+#define  END_TRACE          12
 #define  USER_EVENT         13
 #define  BEGIN_IDLE         14
 #define  END_IDLE           15
