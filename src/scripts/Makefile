@@ -123,9 +123,9 @@ dirs+sources:
 ###############################################################################
 
 CVHEADERS=converse.h conv-mach.h conv-mach.csh \
-          ../include/CkFutures.decl.h ../include/CkFutures.def.h \
-          ../include/CkArray.decl.h ../include/CkArray.def.h \
-          ../include/tempo.decl.h ../include/tempo.def.h
+          ../include/CkFutures.decl.h CkFutures.def.h \
+          ../include/CkArray.decl.h CkArray.def.h \
+          ../include/tempo.decl.h tempo.def.h
 
 TRACELIBS=libtrace-none.a libtrace-projections.a
 
@@ -245,23 +245,14 @@ libtrace-projections.a: $(LIBTRACE_PROJ)
 ../include/CkArray.decl.h : CkArray.decl.h
 	/bin/cp CkArray.decl.h ../include
 
-../include/CkArray.def.h : CkArray.def.h
-	/bin/cp CkArray.def.h ../include
-
 ../include/CkFutures.decl.h : CkFutures.decl.h
 	/bin/cp CkFutures.decl.h ../include
-
-../include/CkFutures.def.h : CkFutures.def.h
-	/bin/cp CkFutures.def.h ../include
 
 CkFutures.decl.h CkFutures.def.h : ckfutures.ci charmxi
 	$(CHARMC) ckfutures.ci
 
 ../include/tempo.decl.h : tempo.decl.h
 	/bin/cp tempo.decl.h ../include
-
-../include/tempo.def.h : tempo.def.h
-	/bin/cp tempo.def.h ../include
 
 tempo.decl.h tempo.def.h : tempo.ci charmxi
 	$(CHARMC) tempo.ci
@@ -695,14 +686,14 @@ charmidl: libdrv.a libbe.a libfe.a libast.a libutil.a libnarrow.a
 
 libidl.a: idl.o
 	$(CHARMC) -cp ../lib/ -o libidl.a idl.o
-	/bin/cp idl.decl.h idl.def.h ../include/
+	/bin/cp idl.decl.h ../include/
 
 idl.o: basics idl.C idl.h idl.decl.h idl.def.h
 	$(CHARMC) -c idl.C
 
 idl.decl.h idl.def.h: charmxi idl.ci
 	$(CHARMC) idl.ci
-	/bin/cp idl.decl.h idl.def.h ../include/
+	/bin/cp idl.decl.h ../include/
 
 ###############################################################################
 #
