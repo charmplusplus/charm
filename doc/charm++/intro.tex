@@ -1,0 +1,165 @@
+\section{Introduction}
+
+%update as you wish
+
+This manual describes \charmpp, an object oriented portable parallel
+programming language based on C++. Its program structure, execution
+model, interface language constructs and runtime system calls are
+described here\footnote{For a description of the underlying design
+philosophy please refer to the following papers :\\
+    L. V. Kale and Sanjeev Krishnan,
+    {\em ``CHARM++ : Parallel Programming with Message-Driven Objects''},
+    in ``Parallel Programming Using C++'',
+    MIT Press, 1995. \\
+    L. V. Kale and Sanjeev Krishnan,
+    {\em ``CHARM++ : A Portable Concurrent Object Oriented System
+    Based On C++''},
+    Proceedings of the Conference on Object Oriented Programming,
+    Systems, Languages and Applications (OOPSLA), September 1993.
+}.
+% Change to citations in appendices. 
+
+\charmpp\ has continuously evolved since the OOPSLA 1993 paper.
+The current version does not augment the C++ syntax, and does not
+use a \charmpp\ translator as in previous versions. Instead, efforts
+are made to convert most of the older constructs to calls into the
+runtime library, with minimal language constructs used to describe
+the interfaces.
+
+\charmpp\ is an explicitly parallel language based on C++ with a
+runtime library for supporting parallel computation. 
+It provides a clear separation between sequential
+and parallel objects.  The execution model of \charmpp\ is message
+driven, thus helping one write programs that are latency-tolerant.
+\charmpp\ supports dynamic load balancing while creating new work as well
+as periodically, based on object migration. 
+Several dynamic load balancing strategies are
+provided.  \charmpp\ supports both irregular as well as regular,
+data-parallel applications.
+It is based on the {\sc Converse} interoperable runtime system for
+parallel programming.
+
+Currently the parallel platforms supported by \charmpp\ are the 
+IBM SP, SGI Origin2000, Cray T3E, Intel Paragon,
+a single workstation or a network of workstations
+from Sun Microsystems (Solaris), IBM RS-6000 (AIX)
+SGI (IRIX 5.3 or 6.4), HP (HP-UX), and Intel x86 (Linux, Windows NT).
+\charmpp\ programs can run without changing the source on all these platforms.
+Please see the {\sl Charm++/Converse Installation and Usage Manual}
+for details about installing, compiling and running \charmpp\
+programs.
+
+For a description of the C-based {\sc Charm} parallel programming system,
+please refer to the {\sl Charm Programming Language Manual} and the
+{\sl Tutorial Introduction to Charm}\footnote{{\sc Charm} is no longer
+actively supported and maintained, and these manuals are kept only for
+offering the historical perspectives.}.
+
+\subsection{Overview}
+
+%update as you wish
+
+\charmpp\ is an object oriented parallel language. What sets \charmpp\
+apart from traditional programming models such as message passing
+and shared variable programming is that the execution model of
+\charmpp\ is message-driven. Therefore, computations in \charmpp\
+are triggered based on arrival of associated messages. These
+computations in turn can fire off more messages to other (possibly remote)
+processors that trigger more computations on those processors.
+
+At the heart of any \charmpp\ program is a scheduler that
+repetitively chooses a message from the available pool of messages,
+and executes the computations associated with that message.
+
+The programmer-visible entities in a \charmpp\ program are:
+
+\begin{itemize}
+\item Concurrent Objects : called {\em chares}\footnote{
+      Chare (pronounced {\bf ch\"ar}, \"a as in c{\bf a}rt) is Old 
+      English for chore.
+      }
+\item Communication Objects : messages
+\end{itemize}
+
+\charmpp\ starts a program by creating a single \index{chare} chare of
+type {\tt main} on processor 0, and envokes the constructor method 
+({\tt main}) of this chare. Typically, this chare 
+then creates a number of other \index{chare} chares, possibly on 
+other processors, which can simultaniously work to 
+solve the problem at hand.
+
+Each \index{chare}chare contains a number of 
+\index{entry method}{\em entry methods}, which 
+are methods that can be invoked from remote processors. The \charmpp\ runtime 
+system needs to be explicitly told about these methods, via 
+an {\em interface} in a separate file.
+The syntax of this interface specification file is described in the later
+sections.
+
+\charmpp\ provides system calls to asynchronously create remote \index{chare}
+chares and to asynchronously invoke entry methods on remote chares by
+sending \index{message} messages to those chares. This asynchronous 
+\index{message}message passing is the 
+basic interprocess communication mechanism in \charmpp. However, \charmpp\ 
+also permits wide variations on this mechanism to make it easy for the 
+programmer to write programs that adapt to the dynamic runtime environment. 
+These possible variations include prioritization (associating priorities with 
+method invocations), conditional \index{message packing}message packing and 
+unpacking (for reducing
+messaging overhead), \index{quiescence}quiescence detection 
+(for detecting completion of
+some phase of the program), and dynamic load balancing (during remote object
+creation). In addition, several libraries are built on top of \charmpp\
+that can simplify otherwise arduous parallel programming tasks.
+
+The following sections provide detailed information about various features
+of \charmpp\ programming system.
+
+\subsection{History}
+
+%update with history up to 5.0 version
+
+The {\sc Charm} software was developed as a group effort of the Parallel
+Programming Laboratory at the University of Illinois at Urbana-Champaign.
+The earliest prototype, Chare Kernel(1.0), was developed by Wennie Shu
+and Kevin Nomura working with Laxmikant Kale.  The second prototype,
+Chare Kernel(2.0), a complete re-write with major design changes, was
+developed by a team consisting of Wayne Fenton, Balkrishna Ramkumar,
+Vikram Saletore, Amitabh B. Sinha and Laxmikant Kale. The translator
+for Chare Kernel(2.0) was written by Manish Gupta.  {\sc Charm}(3.0), with
+significant design changes, was developed by a team consisting of
+Attila Gursoy, Balkrishna Ramkumar, Amitabh B.  Sinha and Laxmikant
+Kale, with a new translator written by Nimish Shah.  The \charmpp\
+implementation was done by Sanjeev Krishnan.  {\sc Charm}(4.0) included
+\charmpp\ and was released in fall 1993.  The translator-based version
+of the {\sc Charm} software (4.5), has been developed by Attila Gursoy,
+Sanjeev Krishnan, Milind Bhandarkar, Joshua Yelon, Narain Jagathesan
+and Laxmikant Kale.  The runtime system of {\sc Charm}(4.5) was completely
+rewritten on top of the {\sc Converse} portable parallel runtime system
+\cite{ConverseRTSPP98}, \cite{InterOpIPPS96}.  We no
+longer support the translator-based version of \charmpp. Instead, in
+its current form, \charmpp is built as a library on top of the Converse
+runtime system, with a tiny interface translator. This version of
+\charmpp, which, in earlier releases was known as {\em Interface
+Translator \charmpp}, is the default version of \charmpp\ now, and
+hence referred simply as {\bf \charmpp}.
+
+\subsection{Notation Used}
+
+Small code samples used to illustrate syntax specifications throughout
+this document will use the following typeface conventions:
+
+\begin{itemize}
+\item Language keywords appear as boldface words: \keyword{chare}.
+\item User-defined types and function names appear in a sans serif font:
+\userword{chareName}. 
+\item User-defined variables appear italicized: {\it myChare}.
+\item All other code appears in the same font as the regular text of
+this document.
+\end{itemize}
+
+Longer code samples of actual code will appear in the standard
+typewriter font. 
+
+
+

@@ -1,0 +1,64 @@
+\subsection{Other Calls}
+
+\label{other Charm++ calls}
+
+The following calls provide information about the machines upon which the
+parallel program is executing.  Processing Element refers to a single CPU.
+Node refers to a single machine-- a set of processing elements which share
+memory (i.e. an address space).  Processing Elements and Nodes are numbered,
+starting from zero.
+
+Thus if a parallel program is executing on one 4-processor workstation and one
+2-processor workstation, there would be 6 processing elements (0, 1 ,2, 3, 4,
+and 5) but only 2 nodes (0 and 1).  A given node's processing elements are
+numbered sequentially.
+
+{\bf int CkNumPes()} \index{CkNumPes} \\
+returns the total number of processors, across all nodes.
+
+{\bf int CkMyPe()} \index{CkMyPe} \\
+returns the processor number on which the call was made.
+
+{\bf int CkMyRank()} \index{CkMyRank} \\
+returns the rank number of the processor on which the call was made.
+Processing elements within a node are ranked starting from zero.
+
+{\bf int CkMyNode()} \index{CkMyNode} \\
+returns the address space number (node number) on which the call was made.
+
+{\bf int CkNumNodes()} \index{CkMyNodes} \\
+returns the total number of address spaces.
+
+{\bf int CkNodeFirst(int node)} \index{CkNodeFirst} \\
+returns the processor number of the first processor in this address space.
+
+{\bf int CkNodeSize(int node)} \index{CkNodeSize} \\
+returns the number of processors in the address space on which the call was made.
+
+{\bf int CkNodeOf(int pe)} \index{CkNodeOf} \\
+returns the node number on which the call was made.
+
+{\bf int CkRankOf(int pe)} \index{CkRankOf} \\
+returns the rank of the given processor within its node.
+
+The following calls provide commonly needed functions.
+
+{\bf void CkAbort(const char *message)} \index{CkAbort} \\
+Cause the program to abort, printing the given error message.
+
+{\bf void CkExit()} \index{CkExit} \\
+This call informs the Charm kernel that computation on all processors should 
+terminate.  After the currently executing entry method completes, no more 
+messages or entry methods will be called.  \keyword{CkExit()} should be the 
+last statement of the entry method from which it was called. 
+
+{\bf int CkTimer()} \index{CkTimer} \index{timers} \\
+returns the current value of the system timer in milliseconds. The system
+timer is started when \\
+the program begins execution. This timer measures
+process time (user and system).
+
+{\bf double CkWallTimer()} \index{CkWallTimer} \index{timers} \\
+returns the elapsed time since the program has started from the wall clock 
+timer.
+

@@ -1,0 +1,66 @@
+\subsection{Nodegroup Objects}
+
+{\it Node groups} \index{node groups} \index{nodegroup} are very
+similar to the group objects already discussed in that node groups are
+collections of chares as well.  Node groups, however, have one chare
+per node rather than one chare per processor.
+So, each node contains a branch of the node group, each containing one
+set of data members.  When an entry method of a node group is
+executed, it runs on only one processor within each
+node.
+
+Node groups have a definition syntax that is very similar to groups.  Rather
+than inheriting from the system defined class, \kw{Group}, node groups 
+inherit from \kw{Nodegroup}.  For example, in the interface file, we declare:
+
+\begin{tabbing}
+~~~~ \=~~~~ \=~~~~ \=~~~~ \=~~~~ \=~~~~ \=~~~~ \=~~~~ \=~~~~ \=~~~~ \kill
+\> \kw{nodegroup} \uw{NodegroupType} \{ \\
+\> \> // Interface specifications as for normal chares \\
+\> \};
+\end{tabbing}
+
+In the {\tt .h} file, we define \uw{NodeGroupType} as follows:
+
+\begin{tabbing}
+~~~~ \=~~~~ \=~~~~ \=~~~~ \=~~~~ \=~~~~ \=~~~~ \=~~~~ \=~~~~ \=~~~~ \kill
+\> \kw{class} \uw{NodeGroupType} : \kw{public Nodegroup} [,other
+superclasses ] \{ \\
+\> \> // Data and member functions as in C++ \\
+\> \> // Entry functions as for normal chares \\
+\> \};
+\end{tabbing}
+
+Like groups, nodegroups are identified by a globally unique identifier
+of type \index{CkGroupID}\kw{CkGroupID}.  Just like with groups, this 
+identifier is
+common to all branches of the nodegroup and can be obtained from the
+variable \index{thisgroup}\kw{thisgroup}, and once again, \index{thishandle}
+\kw{thishandle} is the handle of the particular branch in which the function 
+is executing.
+
+Node groups may possess \index{exclusive}\keyword{exclusive} entry methods.  
+These are entry methods that will not run while other other exclusive entry 
+methods of that node group are running on the same node.  For instructions 
+for making an entry method exclusive, refer to section \ref{attributes}.
+
+For certain applications, node groups can be used in the place of
+regular groups to cut down on messaging overhead when shared memory
+access is possible.  For example, consider a parallel program that
+does one calculation that can be decomposed into several mutually
+exclusive subcalculations.  The program distributes the work amongst
+all of the processors, the subresults are all stored in the local
+branch of a group, and when the local branch has recieved all of its
+results, it relays everything to one particular processor where the
+subresults are put together into the final result.  When normal groups
+are used, the number of messages sent is $O$(\# of processors).
+However, if node groups are used, a number of message sends will be
+replaced by local memory accesses if there is more than
+one processor per node.  Instead, the number of messages sent is
+$O$(\# of nodes).
+
+Just like groups, there can be many instances corresponding to a single node
+group type, and each instance has a different group handle, and its own set of
+branches.
+
+

@@ -1,0 +1,184 @@
+\section{Charm++ Overview}
+
+\subsection{\charmpp\ Execution Model}
+
+A \charmpp\ program consists of a number of \charmpp\ objects distributed across
+the available number of processors. Thus,
+the basic unit of parallel computation in \charmpp\ programs is the
+{\em chare}\index{chare}, a \charmpp\ object that can be
+created on any available processor and can be accessed from remote processors.
+A \index{chare}chare is similar to a
+process, an actor, an ADA task, etc.  \index{chare}Chares 
+are created dynamically, and many chares
+may be active.  Chares send \index{message}{\em messages} to one another 
+to invoke methods asynchronously.  Conceptually, the system maintains a
+``work-pool'' consisting of seeds for new \index{chare}chares, and 
+\index{message}messages for
+existing chares. The runtime system (called {\em Charm Kernel}) may pick 
+multiple items,
+non-deterministically, from this pool and execute them.  It will not
+process two messages for the same \index{chare}chare concurrently, but 
+otherwise it is free to schedule them in any way.
+
+Methods of a \index{chare}chare that can be remotely invoked are called 
+\index{entry method}{\em entry} methods.
+Entry methods may take a pointer to a message object, or no parameters.
+Since \index{chare}chares can be created on remote processors, obviously 
+some constructor of a chare needs to be an entry method.
+
+\charmpp\ provides dynamic seed-based load balancing. Thus location 
+(processor number)
+need not be specified while creating a remote \index{chare}chare. The Charm Kernel
+will then place
+the remote chare on a least loaded processor. Thus one can imagine chare 
+creation as
+generating only a seed for the new chare, which may {\em take root} on the most
+{\em fertile} processor. Charm Kernel identifies a \index{chare}chare by a 
+{\em ChareID}.
+Since user code does not need to name a chares' processor, chares 
+can potentially migrate from one processor to another.
+(This behaviour is used by the dynamic load-balancing framework for 
+chare containers, such as arrays.)
+
+Other \charmpp\ objects are collections of chares. They are:
+\index{group}{\em chare-groups}, \index{nodegroup}{\em chare-nodegroups}, and
+\index{array}{\em chare-arrays}, referred to as {\em groups}, 
+{\em nodegroups}, and
+{\em arrays} throughout this manual. A group (nodegroup) is a collection of 
+chares, one per processor (SMP node),
+that is addressed using a unique system-wide name. An array is a collection 
+of arbitrary
+number of migratable chares, mapped to processors according to a user-defined 
+map group.
+
+Every \charmpp\ program must have at least one \kw{mainchare}.
+There can be only one instance of this \index{chare}, which is created on 
+processor 0 when the \charmpp\ program starts up.
+Execution of a \charmpp\ program begins with Charm Kernel constructing all the
+designated \kw{mainchare}s.  Typically, the \kw{mainchare} constructor
+starts the computation by creating other chares and chare \index{group}
+groups.  It can also be used to initialize shared \kw{readonly} objects.
+
+The only method of communication between processors in \charmpp\ is 
+asynchronous \index{entry method}
+entry method invocation on remote chares. For this purpose, Charm Kernel needs
+to know about the types of \index{chare}chares in the user program, the 
+methods that can
+be invoked on these chares from remote processors, the arguments these methods
+take as input etc. Therefore, when the program starts up, these user-defined
+entities need to be registered with Charm Kernel, which assigns a unique
+identifier to each of them. While invoking a method on a remote object, these 
+identifiers need to be specified to Charm Kernel. Registration of user-defind 
+entities, and maintaining these identifiers can be cumbersome. Fortunately, 
+it can be done
+by the \charmpp\ interface translator. The \charmpp\ interface translator 
+generates
+definitions for {\em proxy} objects. A proxy object acts as a {\em handle} to 
+a remote
+chare. One invokes methods on a proxy object, which in turn carries out remote
+method invocation on the chare.
+
+In addition, the \charmpp\ interface translator provides ways to enhance the basic
+functionality of Charm Kernel using user-level threads and futures. These allow
+entry methods to be executed in separate user-level threads. 
+These \index{threaded}
+{\em threaded} entry methods may block waiting for data by making 
+{\em synchronous} 
+calls to remote object methods that return results in messages.
+
+\charmpp\ program execution is terminated by the \index{CkExit}
+\keyword{CkExit()} call. This call is not the same as \keyword{exit()} in Unix:
+it merely informs the Charm Kernel that all computations on all
+processors must be terminated, and then returns to the user program:
+the programmer should make sure that no work is done by the method after
+\keyword{CkExit()} is called. Charm Kernel ensures that no
+messages are processed and no entry methods are called after the
+currently executing entry method completes. \keyword{CkExit()} need
+not be called on all processors; it is enough to call it from just one
+processor at the end of the computation.
+
+%The user can specify an entry method (using the \keyword{CkStartQD()}
+%\index{CkStartQD} call), to be invoked on a chare when the computation
+%has become quiescent (i.e., when no processor is executing an entry
+%method and all messages that have been sent have also been
+%consumed). This function is useful in computations where the user
+%cannot forsee when the program is going to become quiescent. It is
+%also useful for computations which proceed in phases --- the
+%quiescence entry method can be used to start new phases of
+%computation.
+
+
+\subsection{Entities in \charmpp\ programs}
+
+This section describes various entities in a typical \charmpp\ program.
+
+\subsubsection{Sequential Objects}
+
+A \charmpp\ program typically contains a number of sequential objects. These
+objects are similar to the objects in C++, except that they {\em should 
+not have any static data members}\footnote{
+  This restriction makes \charmpp\ programs portable across distributed
+  and shared memory architectures, as well as clusters of shared memory
+  multiprocessors. If one feels that these restrictions are too severe,
+  one is encouraged to look at the portability macros of Converse, that
+  make it possible to write portable programs in presence of global or
+  static variables.
+}. These objects are created synchronously
+on the local processor (using a {\tt new} operator in C++), and their
+method could be synchronously invoked only from the local processor.
+These objects are not known to the \charmpp\ runtime system, and
+thus they need not be mentioned in the module interface files.
+
+\subsubsection{Communication Objects}
+
+Communication objects (messages) supply data arguments to the
+asynchronous remote method invocation. Messages are instances of C++ classes
+that are subclassed from a special class called {\tt comm\_object}.
+These objects are treated differently from other objects in \charmpp\
+by the runtime system, and therefore they should be specified in the
+interface file of the module. They also have to be created differently
+than normal C++ objects. Another variation of communication objects
+is conditionally packed and unpacked. This variation should be used when
+one wants to send messages that contain pointers to the data rather than
+the actual data to other processors. This type of communication objects
+contains two methods: {\tt pack}, and {\tt unpack}. 
+These messages are specified differently in the interface file for the module.
+The third variation of communication objects is called {\em varsize} messages. 
+Varsize messages is an effective optimization on conditionally packed messages,
+and have to be made known to the \charmpp\ runtime using a special keyword in
+the interface file.
+
+\subsubsection{Chares}
+
+Chares are the most important entities in a \charmpp\ program. These 
+concurrent objects are different from sequential C++ objects in many
+ways. Syntactically, Chares are instances of C++ classes that are derived
+from a system-provided class called {\tt chare\_object}. Also, in addition
+to the usual C++ private and public data and method members, they contain
+some public methods called {\em entry methods}. These entry methods do not
+return anything (they are {\tt void} methods), and take exactly one argument,
+which is a pointer to a communication object. Chares are {\em accessed} using
+a handle (a structure defined in \charmpp), rather than a pointer as in C++.
+Semantically, they are different
+from C++ objects because they can be created asynchronously from remote
+processors, and their entry methods also could be invoked asynchronously
+from the remote processors. Since the constructor method is invoked
+from remote processor (while creating a chare), every chare should have
+its constuctors as entry methods (with one communication object pointer
+parameter). These chares and their entry methods have to be specified
+in the interface file.
+
+\subsubsection{Branched Chares}
+
+Branched chares\footnote{
+  These were called Branch Office Chares (BOC) in earlier version of Charm.
+} (or charegroups) are a special type of concurrent objects.
+Each branched chare is a collection of chares, with one representative on
+each processor. All the branches of a branched chare share a globally
+unique name (handle). An entire branched chare could be addressed using
+this global handle, and an individual branch of a branched chare can be
+addressed using the global handle, and a processor number. Branched chares
+are instances of C++ classes subclasses from a system-provided class called
+{\tt groupmember}. The runtime system has to be notified that these
+chares are semantically different, and therefore branched chares have 
+a different declaration in the interface specification file.

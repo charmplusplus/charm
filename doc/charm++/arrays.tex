@@ -1,0 +1,99 @@
+\subsection{Chare Arrays}
+
+Chare arrays \index{arrays} are arbitrarily-sized collections of chares,
+referenced by a globally unique array identifier of type \keyword{CkArrayID}
+\index{CkArrayID} and an index. 
+
+\uw{ArrayType} is specified in the interface file as:
+
+\begin{tabbing}
+~~~~ \=~~~~ \=~~~~ \=~~~~ \=~~~~ \=~~~~ \=~~~~ \=~~~~ \=~~~~ \=~~~~ \kill
+\> \kw{array} \uw{ArrayType} \{ \\
+\> \> \kw{entry} \uw{ArrayType}(\uw{MessageType1} *); \\
+\> \> \kw{entry void} \uw{EntryPointName2}(\uw{MessageType2} *); \\
+\> \};
+\end{tabbing}
+
+The definition has the form:
+
+\begin{tabbing}
+~~~~ \=~~~~ \=~~~~ \=~~~~ \=~~~~ \=~~~~ \=~~~~ \=~~~~ \=~~~~ \=~~~~ \kill
+\> \kw{class} \uw{ArrayType} : \kw{public ArrayElement} [: superclass
+names] \{ \\
+\> \> // Data and member functions as in C++ \\
+\> \> // One or more {\it entry method} \index{entry method}
+definitions of the form \\
+\> \kw{public}: \\
+\> \> \uw{ArrayType}(\uw{MessageType1} *{\it MsgPointer}) \\
+\> \> \> \{ // C++ code block  \} \\
+\> \> \kw{void} \uw{EntryPointName2}(\uw{MessageType2} *{\it MsgPointer}) \\
+\> \> \> \{ // C++ code block  \} \\
+\> \};
+\end{tabbing}
+
+In most respects, array elements are identical to chares.  Differences
+include variations in the creation and remote invocation syntax, to
+include the array size and array index.  Also, the messages handled by
+array elements must be subclasses of the \keyword{ArrayMessage}
+\index{ArrayMessage} type.
+
+
+\subsubsection{Chare Array Creation}
+
+Given the following code for a \index{array}\index{chare array}chare array declaration:
+In the ``.ci'' file:
+
+\begin{verbatim}
+array G {
+  entry G(M1 *);
+  entry void someEntry(M2 *);
+};
+\end{verbatim}
+
+and in the ``.h'' file:
+
+\begin{verbatim}
+class G : public ArrayElement {
+  public:
+    G(M1 *);
+    void someEntry(M2 *);
+
+    // Optional, for migratable elements
+    G(ArrayElementMigrateMsg *);
+    void packsize();
+    void pack();
+};
+\end{verbatim}
+
+An \index{array}array can be created as follows:
+
+\begin{verbatim}
+CProxy_A *pA = new CProxy_A(num_elements);
+   // or
+CkArrayID aid = CProxy_G::ckNew(num_elements);
+CProxy_G g(aid);
+\end{verbatim}
+
+
+\subsubsection{Method Invocation on Chare Arrays}
+
+To invoke an entry method f on a chare array, you need to have a proxy
+for it.  If you have a global array id (of type CkArrayID) for the
+array, you can construct the proxy as follows:
+
+\begin{verbatim}
+CkArrayID aid = CProxy_G::ckNew(num_elements);
+// aid may be passed in messages to other objects
+CProxy_G g(aid);
+
+// Chare array message invocation
+g[i].f(msg);
+
+// Chare array broadcast
+g.f(msg);
+\end{verbatim}
+
+
+
+
+

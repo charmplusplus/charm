@@ -1,0 +1,44 @@
+\subsection{Terminal I/O}
+
+\index{input/output}
+Charm++ provides both C and C++ style methods of doing terminal I/O.  
+
+In the place of C-style printf and scanf, charm++ provides
+\index{CkPrintf}CkPrintf and \index{CkScanf}CkScanf.  These functions have
+interfaces that are identical to their C counterparts, but there are some
+differences in their behavior that should be mentioned.
+
+{\bf int CkPrintf(format [, arg]*)} \index{CkPrintf} \index{input/output} \\
+This call is used for atomic terminal output. Its usage is similar to {\sf
+printf} in C.  However, CkPrintf has some special properties that make it more
+suited for parallel programming on networks of workstations.  CkPrintf routes
+all terminal output to the processor 0, which is the one running the host
+program.  So, if a \index{chare}chare on processor 3 makes a call to CkPrintf,
+that call puts the output in a \index{message}message and sends it to processor
+0 where it will be displayed.  This message passing is an asynchronous send,
+meaning that the call to CkPrintf returns immediately after the message has
+been sent, and most likely before the message has actually been received,
+processed, and displayed. \footnote{Because of communication latencies, the
+following scenario is actually possible: Chare 1 does a Ckprintf from processor
+1, then creates chare 2 on processor 2.  After chare 2's creation, it calls
+CkPrintf, and the message from chare 2 is displayed before the one from chare
+1.}   
+
+{\bf void CkError(format [, arg]*))} \index{CkError} \index{input/output} \\
+Like CkPrintf, but used to print error messages.
+
+{\bf int CkScanf(format [, arg]*)} \index{CkScanf} \index{input/output} \\
+This call is used for atomic terminal input. Its usage is similar to
+{\sf scanf} in C.  A call to CkScanf, unlike CkPrintf, blocks all execution on
+the processor it is called from, and returns only after all input has been
+retrieved.
+
+For C++ style stream-based I/O, Charm++ offers \index{ckin}\keyword{ckin},
+\index{ckout}\keyword{ckout}, and \index{ckerr}\keyword{ckerr} in the place of
+cin, cout, and cerr.  The C++ streams and their Charm++ equivalents are related
+in the same manner as printf and scanf are to CkPrintf and CkScanf.  The
+Charm++ streams are all used through the same interface as the C++ streams, and
+all behave in a slightly different way, just like C-style I/O.  \keyword{ckout}
+and \keyword{ckerr} both have the same idiosyncratic behavior as CkPrintf, and
+\keyword{ckin} behaves in the same way as CkScanf.
+

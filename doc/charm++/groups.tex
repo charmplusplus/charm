@@ -1,0 +1,186 @@
+\subsection{Group Objects}
+
+A {\sl group\footnote{Originally called {\em Branch Office Chare} or 
+{\em Branched Chare}}} \index{group}is a collection of chares where 
+there exists \index{chare}one chare (or {\sl branch}) on each
+processor.   Each branch has its own data members.  Groups have
+a definition syntax similar to normal chares, except that they must
+inherit from the system defined class \keyword{Group}, rather than
+\keyword{Chare}.
+
+In the interface file, we declare
+
+\begin{tabbing}
+~~~~ \=~~~~ \=~~~~ \=~~~~ \=~~~~ \=~~~~ \=~~~~ \=~~~~ \=~~~~ \=~~~~ \kill
+\> \kw{group} \uw{GroupType} \{ \\
+\> \>  // Interface specifications as for normal chares \\
+\> \};
+\end{tabbing}
+
+In the {\tt .h} file, we define \uw{GroupType} as follows:
+
+\begin{tabbing}
+~~~~ \=~~~~ \=~~~~ \=~~~~ \=~~~~ \=~~~~ \=~~~~ \=~~~~ \=~~~~ \=~~~~ \kill
+\> \kw{class} \uw{GroupType} : \kw{public Group} [,other superclasses
+] \{ \\
+\> \> // Data and member functions as in C++ \\
+\> \> // Entry functions as for normal chares \\
+\> \};
+\end{tabbing}
+
+A group is identified by a globally unique group identifier, whose type is
+\kw{CkGroupID}. \index{CkGroupID}This identifier is common to all of the 
+group's branches and can be obtained from the variable \keyword{thisgroup},
+\index{thisgroup}which is a public local variable of the \keyword{Group} 
+superclass.  For groups, \kw{thishandle} \index{thishandle} is the handle of 
+the particular branch in which the function is executing: it is 
+a normal chare handle.
+
+Groups can be used to implement data-parallel operations easily.
+In addition to sending messages to a particular branch of a group, one can 
+broadcast messages to all branches of a group.
+See Section~\ref{sending messages}.
+
+There can be many instances corresponding to a group type.  Each
+instance has a different group handle, and its own set of branches.
+
+\subsubsection{Group Creation}
+
+\noindent {\bf Chare Group Declaration}:
+
+\noindent Given a {\tt .ci} file as follows:
+
+\begin{verbatim}
+group G {
+  entry G(M1 *);
+  entry void someEntry(M2 *);
+};
+\end{verbatim}
+
+\noindent and the following {\tt .h} file:
+
+\begin{verbatim}
+class G : public Group {
+  public:
+    G(M1 *);
+    void someEntry(M2 *);
+};
+\end{verbatim}
+
+we can create a \index{group}group in a manner similar to a regular \index{chare}chare.  Note
+the difference in how the \index{virtual handle}virtual handle is created.
+
+\begin{verbatim}
+M1 *m1 = new M1;
+CProxy_G *pG = new CProxy_G(m1);
+  // or
+CkGroupID gid = CProxy_G::ckNew(m1);
+CProxy_G g(gid);
+\end{verbatim}
+
+\subsubsection{Method Invocation on Groups}
+
+Similarly, before sending a message to a \index{group}group via an entry
+method, we need to get a proxy of that group using the group identifier (a
+\index{CkGroupID}\kw{CkGroupID}). The syntax for obtaining the proxy or a proxy
+pointer is:
+
+\begin{tabbing} ~~~~ \=~~~~ \=~~~~ \=~~~~ \=~~~~ \=~~~~ \=~~~~ \=~~~~ \=~~~~
+\=~~~~ \kill \> \kw{CProxy}\_\uw{groupType} {\it groupProxy}({\it groupID}); \\
+\> \> or, \\ \> \kw{CProxy}\_\uw{groupType} *{\it groupProxyPointer} = \kw{new
+CProxy}\_\kw{groupType}({\it groupID}); \end{tabbing}
+
+The first approach creates a proxy to the group represented by {\it groupID}
+while the second creates a pointer named {\it groupProxyPointer} to a proxy to
+the group represented by {\it groupID}. 
+
+A message may be sent to a particular \index{branch}branch of group using the
+notation:
+
+\begin{tabbing} ~~~~ \=~~~~ \=~~~~ \=~~~~ \=~~~~ \=~~~~ \=~~~~ \=~~~~ \=~~~~
+\=~~~~ \kill \> {\it groupProxy}$.$\uw{EntryMethod}({\it MessagePointer}, {\it
+Processor}) \\ \> \> or, \\ \> {\it groupProxyPointer}$->$\uw{EntryMethod}({\it
+MessagePointer}, {\it Processor}) \end{tabbing}
+
+This sends the message in {\it MessagePointer} to the \index{branch}branch of
+the group represented by {\it groupID} which is on processor number {\it
+Processor} at the entry method \uw{EntryMethod}, which must be a valid entry
+method of that group type. This call is asynchronous and non-blocking; it
+returns immediately after sending the message.
+
+A message may be broadcast \index{broadcast} to all branches of a branched
+chare (i.e., to all processors) using the notation :
+
+\begin{tabbing} ~~~~ \=~~~~ \=~~~~ \=~~~~ \=~~~~ \=~~~~ \=~~~~ \=~~~~ \=~~~~
+\=~~~~ \kill \> {\it groupProxy}$.$\uw{EntryMethod}({\it MessagePointer}) \\ \>
+{\it groupProxyPointer}$->$\uw{EntryMethod}({\it MessagePointer}) \end{tabbing}
+
+This sends the message in {\it MessagePointer} to all branches of the group at
+the entry method {\sf EntryMethod}, which must be a valid entry method of that
+group type. This call is asynchronous and non-blocking; it returns immediately
+after sending the message.
+
+Note that the programmer relinquishes control of a message after sending it.
+Further access to the message field can cause runtime errors.
+
+Similarly, methods could be invoked either on a particular \index{branch}branch
+of a \index{nodegroup}nodegroup by specifying a {\em node number} as a method
+parameter. In the absence of such a parameter, the call is treated as broadcast
+on a \index{nodegroup}nodegroup, i.e. executed by all nodes. When a method is
+invoked on a particular \index{branch}branch of a \index{nodegroup}nodegroup,
+it may be executed by {\em ANY} processor in that node. Thus two invocations of
+a specific method on a particular \index{branch}branch of a
+\index{nodegroup}nodegroup may be carried out {\em simultaneously} by two
+different processors of the node. If that method contains code that
+should be executed by only one processor at a time, the method should
+be flagged
+\index{exclusive}\kw{exclusive} in the interface file. If a method \uw{M} of a
+nodegroup \uw{NG} is marked exclusive, it means that while that method is being
+executed by any processor within a node, no other processor within the same
+node may execute any other {\em exclusive} method of that
+\index{nodegroup}nodegroup \index{branch}branch.  Other processors are free to
+execute other {\em non-exclusive} methods of that nodegroup
+\index{branch}branch, however.
+
+Sequential objects, chares and other groups can access public members of the
+\index{branch}branch of a group \index{group} {\it on their processor} using
+the following notation:
+
+((\uw{GroupType}*)\kw{CkLocalBranch}(\kw{CkGroupID} {\it groupID}))-$>${\it
+DataMember}, and \\ ((\uw{GroupType}*)\kw{CkLocalBranch}(\kw{CkGroupID} {\it
+groupID}))-$>$\uw{method}().  \index{CkLocalBranch}
+
+Thus a dynamically created \index{chare}chare can call a public method of a
+group without needing to know which processor it actually resides: the method
+executes in the local \index{branch}branch of the group. 
+
+Similarly, the local \index{branch}branch of a \index{nodegroup}\kw{nodegroup}
+can be accessed using \index{CkLocalNodeBranch}\kw{CkLocalNodeBranch()}
+function. Thus data members could be accessed/modified or methods could be
+invoked on a \index{branch}branch of a \kw{nodegroup} using this function. Note
+that such accesses are {\em not} thread-safe by default. Concurrent invocation
+of a method on a \index{nodegroup}nodegroup by different processors within a
+node may result in unpredictable runtime behavior.  One way to avoid this is to
+use node-level locks (described in Converse manual.)
+
+Both \index{CkLocalBranch}\kw{CkLocalBranch} and \index{CkLocalNodeBranch}
+\kw{CkLocalNodeBranch} return generic ({\tt void *}) pointers. They need to be
+cast to pointers of appropriate classes before invoking methods or accesing
+data members. \charmpp\ provides another way to do this using the generated
+\index{proxy}{\em proxy} classes. One may call the static method
+\kw{ckLocalBranch} or \kw{ckLocalNodeBranch} of the proxy class of appropriate
+group or \index{nodegroup}nodegroup to get the correct type of pointer.  For
+example, method \uw{foo} can to be invoked on the local \index{branch}branch of
+a group \uw{G} with \uw{gid} as CkGroupID as:
+
+(\kw{CProxy}\_\uw{G}::\kw{ckLocalBranch}({\it gid}))-$>$\uw{foo}(...);\\
+\index{ckLocalBranch}
+
+
+
+
+
+
+
+
+

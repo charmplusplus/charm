@@ -1,0 +1,67 @@
+\subsection{Quiescence Detection}
+
+In \charmpp, \index{quiescence}quiescence is defined as the state in which no
+processor is executing an entry point, and no messages are awaiting processing.
+
+\charmpp\ provides two facilities for detecting quiescence: \kw{CkStartQd} and
+\kw{CkWaitQd}. \index{CkStartQd} \index{CkWaitQd}
+
+\kw{CkStartQd} registers with the system a callback that should be made the
+next time \index{quiescence}quiescence is detected.  \kw{CkStartQd} takes two
+parameters: an index corresponding to the entry function that is to be called,
+and a handle to the chare on which that entry function should be called.  The
+syntax of this call looks like this:
+
+\begin{tabbing}
+~~~~ \=~~~~ \=~~~~ \=~~~~ \=~~~~ \=~~~~ \=~~~~ \=~~~~ \=~~~~ \=~~~~ \kill
+\> \kw{CkStartQd}(\kw{int} {\it Index}, \kw{CkChareID} {\it chareID});
+\end{tabbing}
+
+To retrieve the corresponding index of a particular \index{entry method}entry
+method, you must use a static method contained within the
+\index{CProxy}\kw{CProxy} object corresponding to the \index{chare}chare
+containing that entry method.  The syntax of this call is as follows:
+
+\begin{tabbing}
+~~~~ \=~~~~ \=~~~~ \=~~~~ \=~~~~ \=~~~~ \=~~~~ \=~~~~ \=~~~~ \=~~~~ \kill
+\kw{CProxy}\_\uw{ChareName}::\kw{ckIdx}\_\uw{EntryMethod}(\uw{Msg}
+*{\it Message});
+\end{tabbing}
+
+where {\it chareID} is the name of the chare identifier of the chare containing
+the desired entry method, \uw{EntryMethod} is the name of that entry method,
+and {\it Message} is a pointer to the kind of message that the desired entry
+method takes as a parameter. To make this look a little cleaner, we have
+provided a simple macro called \kw{EntryIndex}, which can be used in the place
+of this convoluted looking static method call.
+\kw{EntryIndex}\index{EntryIndex} takes as parameters the type of chare in
+which the entry method is located, the name of the entry method itself, and the
+type of message that the entry method takes as a parameter. For example:
+
+\begin{tabbing}
+~~~~ \=~~~~ \=~~~~ \=~~~~ \=~~~~ \=~~~~ \=~~~~ \=~~~~ \=~~~~ \=~~~~ \kill
+\> \kw{EntryIndex}(\uw{ChareName}, \uw{EntryName}, \uw{MsgName});
+\end{tabbing}
+
+Note that ChareName, EntryName, and MsgName are {\bf NOT} variables or
+constants. This is text that the preprocessor uses to fill in portions of the
+previously mentioned static method call.  Additionally, this macro method will
+not work with templated chares (refer to Section ~\ref{inheritance and
+templates} for details on templated chares).
+
+\index{CkWaitQd}\kw{CkWaitQd}, however, does not register a callback.  Rather,
+\kw{CkWaitQd} blocks and does not return until \index{quiescence}quiescence is
+detected.  It takes no parameters and returns no value.  A call to
+\kw{CkWaitQd} simply looks like this: 
+
+\begin{tabbing}
+~~~~ \=~~~~ \=~~~~ \=~~~~ \=~~~~ \=~~~~ \=~~~~ \=~~~~ \=~~~~ \=~~~~ \kill
+\> \kw{CkWaitQd}();
+\end{tabbing}
+
+Keep in mind that \kw{CkWaitQd} should only be called from threaded
+\index{entry method}entry methods because a call to \kw{CkWaitQd} suspends the
+current thread of execution, and if it were called outside of a threaded entry
+method it would suspend the main thread of execution of the processor from
+which \kw{CkWaitQd} was called and the entire program would come to a grinding
+halt on that processor.

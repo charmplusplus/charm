@@ -1,0 +1,69 @@
+\subsection{Read-only Variables, Messages and Arrays}
+
+Since \charmpp\ does not allow global variables, it provides a special
+mechanism for sharing data amongst all objects. {\it Read-only}
+variables, messages and arrays are used to share information that 
+is obtained only after the program begins execution and does not
+change after they are initialized in the {\tt main::main()} function. They
+can be accessed from any \index{chare}chare on any processor as ``global''
+variables. Large data structures containing pointers can be made
+available as read-only variables using read-only messages or
+read-only arrays. Read-only variables, messages and arrays can
+be used just like local variables for each processor, but the user has
+to allocate space for read-only messages using \kw{new} to create
+the message in the {\tt main} function of the \kw{mainchare}. 
+
+Read-only variables, messages, and arrays are declared by using the type
+modifier \index{readonly}\kw{readonly}, which is similar to \kw{const} in
+\CC. Read-only data is specified in the {\tt .ci} file (the interface
+file) as: 
+
+\begin{tabbing}
+~~~~ \=~~~~ \=~~~~ \=~~~~ \=~~~~ \=~~~~ \=~~~~ \=~~~~ \=~~~~ \=~~~~ \kill
+\> \kw{readonly} \uw{Type} {\it ReadonlyVarName};
+\end{tabbing}
+
+The variable {\it ReadonlyVarName} is declared to be a read-only
+variable of type \uw{Type}. \uw{Type} must be a single token and not a
+type expression.
+
+\begin{tabbing}
+~~~~ \=~~~~ \=~~~~ \=~~~~ \=~~~~ \=~~~~ \=~~~~ \=~~~~ \=~~~~ \=~~~~ \kill
+\> \kw{readonly} \uw{MessageType} *{\it ReadonlyMsgName};
+\end{tabbing}
+
+The variable {\it ReadonlyMsgName} is declared to be a read-only
+message of type \uw{MessageType}. Pointers are not allowed to be
+readonly variables unless they are pointers to message types. In this
+case, the message will be initialized on every processor.
+
+\begin{tabbing}
+~~~~ \=~~~~ \=~~~~ \=~~~~ \=~~~~ \=~~~~ \=~~~~ \=~~~~ \=~~~~ \=~~~~ \kill
+\> \kw{readonly} \uw{Type} {\it ReadonlyArrayName} [{\it arraysize}];
+\end{tabbing}
+
+The variable {\it ReadonlyArrayName} is declared to be a read-only
+array of type \uw{Type}. \uw{Type} must be a single token and not a
+type expression.
+
+Read-only variables, messages and arrays must be declared either as
+global or as public class static data, and these declarations have the
+usual form:
+
+\begin{tabbing}
+~~~~ \=~~~~ \=~~~~ \=~~~~ \=~~~~ \=~~~~ \=~~~~ \=~~~~ \=~~~~ \=~~~~ \kill
+\> \uw{Type} {\it ReadonlyVarName}; \\
+\> \uw{MessageType} *{\it ReadonlyMsgName}; \\
+\> \uw{Type} {\it ReadonlyArrayName} [{\it arraysize}];
+\end{tabbing}
+
+Similar declarations preceded by \kw{extern} would appear in the {\tt
+.h} file. 
+
+{\it Note:}  The current \charmpp\ compiler cannot prevent
+assignments to read-only variables.  The user must make sure that no
+assignments occur in the program.
+
+
+
+
