@@ -18,7 +18,7 @@
 
 #define CMK_CCS_AVAILABLE                                  1
 #define CMK_WEB_MODE                                       1
-#define CMK_DEBUG_MODE                                     1
+#define CMK_DEBUG_MODE                                     0
 
 #define CMK_CMIDELIVERS_USE_COMMON_CODE                    1
 #define CMK_CMIDELIVERS_USE_SPECIAL_CODE                   0
