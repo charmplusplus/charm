@@ -211,7 +211,7 @@ void RecBisectBfLB::partitionInTwo(Graph *g, int nodes[], int numNodes,
   *pp1 = p1;
   *pp2 = p2;
   destroySet(s1);
-  destroySet(s1);
+  destroySet(s2);
   fifoInt_destroy(q1);
   fifoInt_destroy(q2);
 }

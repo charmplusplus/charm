@@ -7,7 +7,7 @@ IntQueue * fifoInt_create(int size) {
 
   q->max = size;
   q->size = 0;
-  q->vector = (int *) malloc(sizeof(int)* (size + 1)*2);
+  q->vector = (int *) malloc(sizeof(int)* (size + 1));
   q->head = 0;
   q->tail = -1;
   return q;
