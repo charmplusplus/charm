@@ -10,10 +10,6 @@ schedulers.
 
 \section{Basic Thread Calls}
 
-In this section, we refer to the ``scheduler queue''.  By this, we mean
-the priority queue described in section \ref{schedqueue}.
-
-
 \function{typedef struct CthThreadStruct *CthThread;}
 \index{CthThread}
 \desc{This is an opaque type defined in {\tt converse.h}.  It represents
@@ -22,12 +18,12 @@ contents of a CthThreadStruct.}
 
 \function{typedef void (CthVoidFn)();}
 \index{CthVoidFn}
-\desc{This is a type defined in {\tt threads.h}.  It represents
+\desc{This is a type defined in {\tt converse.h}.  It represents
 a function that returns nothing.}
 
 \function{typedef CthThread (CthThFn)();}
 \index{CthThFn}
-\desc{This is a type defined in {\tt threads.h}.  It represents
+\desc{This is a type defined in {\tt converse.h}.  It represents
 a function that returns a CthThread.}
 
 \function{CthThread CthSelf()}
@@ -65,9 +61,7 @@ thread suspends.  To terminate itself, a thread calls
 \desc{Causes the current thread to stop executing.
 The suspended thread will not start executing again until somebody
 pushes it into the scheduler queue again, using CthAwaken below.  Control
-transfers to the thread running CsdScheduler.  This has the effect of
-polling for messages, and possibly transferring control to a
-thread in the scheduler queue.}
+transfers to the next task in the scheduler queue.}
 
 \function{void CthAwaken(CthThread t)}
 \index{CthAwaken}
@@ -97,6 +91,39 @@ functions listed here pay no attention to the contents of this field).
 This field is typically used by the implementors of mutexes, condition
 variables, and other synchronization abstractions to link threads
 together into queues.  This function sets the contents of the next field.}
+
+\section{Thread Scheduling and Blocking Restrictions}
+
+Converse threads use a scheduler queue, like any other threads
+package.  We chose to use the same queue as the one used for Converse
+messages (see section \ref{schedqueue}).  Because of this, thread
+context-switching will not work unless there is a thread polling for
+messages.  A rule of thumb, with Converse, it is best to have a thread
+polling for messages at all times.  In Converse's normal mode (see
+section \ref{initial}), this happens automatically.  However, in
+user-calls-scheduler mode, you must be aware of it.
+
+There is a second caution associated with this design.  There is a
+thread polling for messages (even in normal mode, it's just hidden in
+normal mode).  The continuation of your computation depends on that
+thread --- you must not block it.  In particular, you must not call
+blocking operations in these places:
+
+\begin{itemize}
+
+\item{In the code of a Converse handler (see sections \ref{handler1}
+and \ref{handler2}).}
+
+\item{In the code of the Converse start-function (see section
+\ref{initial}).}
+
+\end{itemize}
+
+These restrictions are usually easy to avoid.  For example, if you
+wanted to use a blocking operation inside a Converse handler, you
+would restructure the code so that the handler just creates a new
+thread and returns.  The newly-created thread would then do the work
+that the handler originally did.
 
 \section{Thread Scheduling Hooks}
 

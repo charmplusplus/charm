@@ -5,6 +5,7 @@ CSD.  Together, they serve to transmit messages and schedule the
 delivery of messages.
 
 \section{Defining Handler Numbers}
+\label{handler1}
 
 When a message arrives at a processor, it triggers the execution of a
 {\em handler function}, not unlike a UNIX signal handler.  The handler
@@ -77,6 +78,7 @@ in a program.  The system guarantees that no numbering conflicts will
 occur as a result of this combination.
 
 \section{Writing Handler Functions}
+\label{handler2}
 
 A message handler function is just a C function that accepts a void
 pointer (to a message buffer) as an argument, and returns nothing.  The
@@ -412,6 +414,7 @@ provided here for backward compatibility.}
 is empty, zero otherwise.}
 
 \section{Polling for Messages}
+\label{polling}
 
 As we stated earlier, Converse messages trigger handler functions when
 they arrive.  In fact, for this to work, the processor must
@@ -590,11 +593,11 @@ array should at least be of size \param{CmiNumChildren()}.}
 
 \section{Spanning Tree Calls}
 
-Converse defines a spanning tree organization of the processor procNums along
-with routines for accessing elements of that tree.  The spanning tree
-routines come in handy when writing programs with collective communication
-because message communication patterns can be made to proceed along the
-spanning tree arcs to avoid bottlenecks at a single procNum.
+Sometimes, it is convenient to view the nodes of the machine as a
+tree.  For this purpose, Converse defines a tree over the nodes.  We
+provide functions to obtain the parent and children of each node.  On
+those machines where the communication topology is relevant, we
+arrange the tree to optimize communication performance.
 
 \function{int CmiSpanTreeRoot()}
 \index{CmiSpanTreeRoot}
