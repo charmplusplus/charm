@@ -36,12 +36,17 @@ charm++: charm charmxlat++ charm++libs
 
 ALLHEADERS=acc.h c++interface.h chare.h ckdefs.h common.h communication.h condsend.h const.h core_macros.h dagger.h dtable.h env_macros.h globals.h mono.h msg_macros.h prio_macros.h quies.h stat.h sys_macros.h table.h tbl.h trans_decls.h trans_defs.h trans_externs.h user_macros.h vid.h wrtone.h converse.h internal.h quies.cplus.h performance.h dag.h generic_redn.h pglib.h
 
-basics: $(ALLHEADERS) charmc conv-mach.csh
+ALLINTERFACES=GENERIC-ACC.int GENERIC-HIST.int GENERIC-REDN.int barrier_redn.int cache.int dacc_count.int dacc_hist.int dcountredn.int dmaxredn.int dminredn.int dprodredn.int dsumredn.int facc_count.int facc_hist.int fcountredn.int fmaxredn.int fminredn.int fprodredn.int fsumredn.int iacc_count.int iacc_hist.int icountredn.int imaxredn.int iminredn.int iprodredn.int isumredn.int pg.int
+
+basics: $(ALLHEADERS) $(ALLINTERFACES) charmc conv-mach.csh
 	if [ ! -d ../bin ] ; then mkdir ../bin ; fi
 	if [ ! -d ../lib ] ; then mkdir ../lib ; fi
+	chmod 755 ../bin/*
+	chmod 644 ../lib/*
 	rm -rf ../include
 	mkdir ../include
 	cp $(ALLHEADERS) ../include/
+	cp $(ALLINTERFACES) ../include/
 	cp charmc ../bin/
 	cp conv-mach.csh ../include/
 	touch basics
@@ -369,9 +374,9 @@ LIBCHARM=pglib.o cache.o dag.o barrier_redn.o \
 	 fminredn.o fmaxredn.o fsumredn.o fprodredn.o \
 	 dminredn.o dmaxredn.o dsumredn.o dprodredn.o
 
-libcharm: basics ../lib/libcharm.a
+libcharm: basics charmxlat ../lib/libcharm.a
 
-../lib/libcharm.a: charmxlat $(LIBCHARM)
+../lib/libcharm.a: $(LIBCHARM)
 	../bin/charmc -o $@ $(LIBCHARM)
 
 pglib.o: pglib.p pglib.h pg.int $(CKHEADERS)
