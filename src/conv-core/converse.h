@@ -47,6 +47,13 @@ extern "C" {
  *
  *****************************************************************************/
 
+#ifdef __cplusplus
+/* In C++, use new so t's constructor gets called */
+# define CpvInit_Alloc(t,n) new t[n]
+#else
+# define CpvInit_Alloc(t,n) (t *)calloc(n,sizeof(t))
+#endif
+
 #if CMK_SHARED_VARS_UNAVAILABLE /* Non-SMP version of shared vars. */
 
 extern int Cmi_mype;
@@ -185,7 +192,7 @@ extern int Cmi_numpes;
 #define CpvStaticDeclare(t,v) static t* CMK_CONCAT(Cpv_Var_,v)
 #define CpvInitialize(t,v)\
   do  { if (CMK_CONCAT(Cpv_Var_,v)==0)\
-        { CMK_CONCAT(Cpv_Var_,v) = (t *)CmiAlloc(CmiNumPes()*sizeof(t)); }}\
+        { CMK_CONCAT(Cpv_Var_,v) = CpvInit_Alloc(t,CmiNumPes()); }}\
   while(0)
 #define CpvInitialized(v) (0!=CMK_CONCAT(Cpv_Var_,v))
 #define CpvAccess(v) CMK_CONCAT(Cpv_Var_,v)[CmiMyPe()]
@@ -291,7 +298,7 @@ for each processor in the node.
        if (CmiMyRank()) { \
 		while (!CpvInitialized(v)) CMK_CPV_IS_SMP \
        } else { \
-	       CMK_CONCAT(Cpv_Var_,v)=(t*)calloc((1+CmiMyNodeSize()),sizeof(t));\
+	       CMK_CONCAT(Cpv_Var_,v)=CpvInit_Alloc(t,1+CmiMyNodeSize());\
        } \
     } while(0)
 #define CpvInitialized(v) (0!=CMK_CONCAT(Cpv_Var_,v))
