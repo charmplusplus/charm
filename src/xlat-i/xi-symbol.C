@@ -2773,6 +2773,27 @@ void PUPableClass::genReg(XStr& str)
 	if (next) next->genReg(str);
 }
 
+/***************** normal extern C Class support **************/
+IncludeFile::IncludeFile(int l, const char *n,IncludeFile *next_)
+	    : name(n), next(next_)
+{ 
+	line=l; setChare(0); 
+}
+void IncludeFile::print(XStr& str)
+{
+	str<<"  include "<<name<<";\n";
+	if (next) next->print(str);
+}
+void IncludeFile::genPub(XStr& declstr, XStr& defstr, XStr& defconstr, int& connectPresent) {}
+void IncludeFile::genDecls(XStr& str) {
+	str<<"#include "<<name<<"\n";
+	if (next) next->genDecls(str);
+}
+void IncludeFile::genIndexDecls(XStr& str) {}
+void IncludeFile::genDefs(XStr& str) {}
+void IncludeFile::genReg(XStr& str) {}
+
+
 
 
 /****************** Registration *****************/

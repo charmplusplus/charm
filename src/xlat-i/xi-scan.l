@@ -97,6 +97,7 @@ struct rwtable rwtable[] = {
   "nokeep",	NOKEEP,
   "template",	TEMPLATE,
   "class",	CLASS,
+  "include",	INCLUDE,
   "sync",	SYNC,
   "exclusive",	EXCLUSIVE,
   "immediate",  IMMEDIATE,

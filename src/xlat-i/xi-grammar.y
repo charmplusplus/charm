@@ -41,6 +41,7 @@ ModuleList *modlist;
   MsgVar *mv;
   MsgVarList *mvlist;
   PUPableClass *pupable;
+  IncludeFile *includeFile;
   char *strval;
   int intval;
   Chare::attrib_t cattr;
@@ -58,6 +59,7 @@ ModuleList *modlist;
 %token <intval> CHARE MAINCHARE GROUP NODEGROUP ARRAY
 %token MESSAGE
 %token CLASS
+%token INCLUDE
 %token STACKSIZE
 %token THREADED
 %token TEMPLATE
@@ -109,6 +111,7 @@ ModuleList *modlist;
 %type <mbrlist>		MemberEList MemberList
 %type <member>		Member NonEntryMember InitNode InitProc
 %type <pupable>		PUPableClass
+%type <includeFile>	IncludeFile
 %type <tvar>		TVar
 %type <tvarlist>	TVarList TemplateSpec
 %type <val>		ArrayDim Dim DefaultParameter
@@ -526,6 +529,8 @@ NonEntryMember  : Readonly ';'
 		{ $$ = $1; }
 		| PUPABLE PUPableClass ';'
 		{ $$ = $2; }
+		| INCLUDE IncludeFile ';'
+		{ $$ = $2; }
 		;
 
 InitNode	: INITNODE OptVoid QualName
@@ -550,6 +555,10 @@ PUPableClass    : QualName
 		{ $$ = new PUPableClass(lineno,$1,0); } 
 		| QualName ',' PUPableClass
 		{ $$ = new PUPableClass(lineno,$1,$3); }
+		;
+
+IncludeFile    : LITERAL
+		{ $$ = new IncludeFile(lineno,$1,0); } 
 		;
 
 Member		: Entry ';'

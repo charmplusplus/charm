@@ -834,6 +834,19 @@ public:
     void genReg(XStr& str);
 };
 
+class IncludeFile : public Member {
+    const char *name; //Name of class that is PUP::able
+    IncludeFile *next; //Linked-list of PUPable classes
+public:
+    IncludeFile(int l, const char *name_, IncludeFile *next_);
+    void print(XStr& str);
+    void genPub(XStr& declstr, XStr& defstr, XStr& defconstr, int& connectPresent);
+    void genDecls(XStr& str);
+    void genIndexDecls(XStr& str);
+    void genDefs(XStr& str);
+    void genReg(XStr& str);
+};
+
 
 /******************* Structured Dagger Constructs ***************/
 class SdagConstruct { 
