@@ -479,6 +479,7 @@ static void CmiIdleLock_checkMessage(CmiIdleLock *l) {
 
 void CmiStateInit(int pe, int rank, CmiState state)
 {
+  MACHSTATE(4,"StateInit")
   state->pe = pe;
   state->rank = rank;
   if (rank==Cmi_mynodesize) return; /* Communications thread */
@@ -490,8 +491,11 @@ void CmiStateInit(int pe, int rank, CmiState state)
 void CmiNodeStateInit(CmiNodeState *nodeState)
 {
 #if CMK_IMMEDIATE_MSG
-  nodeState->imm = PCQueueCreate();
-  nodeState->CmiImmLock = CmiCreateLock();
+  MACHSTATE(4,"NodeStateInit")
+  nodeState->immSendLock = CmiCreateLock();
+  nodeState->immRecvLock = CmiCreateLock();
+  nodeState->immQ = PCQueueCreate();
+  nodeState->delayedImmQ = PCQueueCreate();
 #endif
 #if CMK_NODE_QUEUE_AVAILABLE
   nodeState->CmiNodeRecvLock = CmiCreateLock();
