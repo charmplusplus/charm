@@ -8,7 +8,8 @@
 
 #include "qt.h"
 #include <setjmp.h>
-#ifdef ALLOCA_H
+/*#ifdef ALLOCA_H*/
+#if CMK_HAS_ALLOCA
 #include <alloca.h>
 #endif
 

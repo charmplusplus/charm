@@ -8,7 +8,7 @@ qt: md/setjmp_d.h qt.c md/setjmp.c
 	../system_ln md/setjmp_d.h qtmd.h
 	$(CHARMC) -pedantic -c -o qt.o qt.c
 	$(CHARMC) -c -o qtmds.o md/setjmp.c
-	$(CHARMC) -cp ../ -o libqt.a qt.o qtmds.o 
+	$(CHARMC) -o libqt.a qt.o qtmds.o 
 
 stp:
 	$(CHARMC) -c stp.c
