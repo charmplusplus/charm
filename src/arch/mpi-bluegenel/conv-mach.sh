@@ -1,6 +1,8 @@
+BL_INSTALL=/bgl/BlueLight/floor/
+
 [ -z "$BL_INSTALL" ] && echo "ERROR: BL_INSTALL not defined!" && exit 1
 
-BGL_BASE=/BlueLight/floor
+BGL_BASE=$BL_INSTALL
 BGL_BIN=$BGL_BASE/blrts-gnu/bin
 BGL_INC=$BL_INSTALL/bglsys/include
 BGL_LIB=$BL_INSTALL/bglsys/lib
