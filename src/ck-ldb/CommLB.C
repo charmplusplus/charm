@@ -13,19 +13,18 @@
 
 void CreateCommLB()
 {
-  CkPrintf("[%d] creating CommLB %d\n",CkMyPe(),loadbalancer);
   loadbalancer = CProxy_CommLB::ckNew();
-  CkPrintf("[%d] created CommLB %d\n",CkMyPe(),loadbalancer);
 }
 
 CommLB::CommLB()
 {
-  CkPrintf("[%d] CommLB created\n",CkMyPe());
+  if (CkMyPe() == 0)
+    CkPrintf("[%d] CommLB created\n",CkMyPe());
 }
 
 CmiBool CommLB::QueryBalanceNow(int _step)
 {
-  CkPrintf("[%d] Balancing on step %d\n",CkMyPe(),_step);
+  //  CkPrintf("[%d] Balancing on step %d\n",CkMyPe(),_step);
   return CmiTrue;
 }
 
@@ -136,7 +135,7 @@ CLBMigrateMsg* CommLB::Strategy(CentralLB::LDStats* stats, int count)
   double load_pe=0.0;
   ObjectRecord *x;
 
-  CkPrintf("[%d] CommLB strategy\n",CkMyPe());
+  //  CkPrintf("[%d] CommLB strategy\n",CkMyPe());
 
   CkVector migrateInfo;
 
@@ -146,17 +145,17 @@ CLBMigrateMsg* CommLB::Strategy(CentralLB::LDStats* stats, int count)
   for(pe=0; pe < count; pe++) 
     for(obj=0; obj < stats[pe].n_objs; obj++) 
       nobj++;
-  CkPrintf("OBJ: Before \n");
+  //  CkPrintf("OBJ: Before \n");
 
   ObjectHeap maxh(nobj+1);
   nobj =0;
   for(pe=0; pe < count; pe++) {
-    CkPrintf("[%d] PE %d : %d Objects : %d Communication\n",
-	     CkMyPe(),pe,stats[pe].n_objs,stats[pe].n_comm);
+    //    CkPrintf("[%d] PE %d : %d Objects : %d Communication\n",
+    //	     CkMyPe(),pe,stats[pe].n_objs,stats[pe].n_comm);
     load_pe = 0.0;
     for(obj=0; obj < stats[pe].n_objs; obj++) {
       load_pe += stats[pe].objData[obj].wallTime;
-      CkPrintf("OBJ: %d , %d , %5.3lf\n",pe,stats[pe].objData[obj].id.id[0],stats[pe].objData[obj].wallTime);
+      //      CkPrintf("OBJ: %d , %d , %5.3lf\n",pe,stats[pe].objData[obj].id.id[0],stats[pe].objData[obj].wallTime);
       nobj++;
       x = new ObjectRecord;
       x->id = nobj -1;
@@ -165,7 +164,7 @@ CLBMigrateMsg* CommLB::Strategy(CentralLB::LDStats* stats, int count)
       x->pe = pe;
       maxh.insert(x);
     }
-    CkPrintf("OBJ: %d = %5.3lf\n",pe,load_pe);
+    //    CkPrintf("OBJ: %d = %5.3lf\n",pe,load_pe);
   }
 
   npe = count;
@@ -250,12 +249,12 @@ CLBMigrateMsg* CommLB::Strategy(CentralLB::LDStats* stats, int count)
       migrateInfo.push_back((void *)migrateMe);
     }
   }
-  CkPrintf("OBJ: After\n"); 
+  //  CkPrintf("OBJ: After\n"); 
 
   for(pe=0;pe<count;pe++)
     for(obj=0;obj<nobj;obj++)
-      if(alloc_array[pe][obj] > 0)
-	CkPrintf("OBJ: %d , %d , %5.3lf\n",pe,translate[obj].oid.id[0],alloc_array[pe][obj]);
+      //      if(alloc_array[pe][obj] > 0)
+	//	CkPrintf("OBJ: %d , %d , %5.3lf\n",pe,translate[obj].oid.id[0],alloc_array[pe][obj]);
  
   int migrate_count = migrateInfo.size();
   CLBMigrateMsg* msg = new(&migrate_count,1) CLBMigrateMsg;
