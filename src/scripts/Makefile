@@ -872,7 +872,7 @@ pvmc_groups.o: pvmc_groups.c pvmc.h pvm3.h
 pvmc_main.o: pvmc_main.c pvmc.h pvm3.h
 	$(CHARMC) -o $@ pvmc_main.c
 
-$(L)/libf90charm.a: f90main.ci f90main.h f90main.C charmf.h charmf.C futil.f90
+$(L)/libf90charm.a: charmxi f90main.ci f90main.h f90main.C charmf.h charmf.C futil.f90
 	$(CHARMC) f90main.ci
 	$(CHARMC) -c -DAMPI_FORTRAN=1 f90main.C
 	$(CHARMC) -c -DAMPI_FORTRAN=1 charmf.C
