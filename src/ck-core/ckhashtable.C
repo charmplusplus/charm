@@ -87,6 +87,7 @@ protected:
 public:
 	hashKeyHeap(int NnBytes,const void *Ndata) {
 		nBytes=NnBytes;
+		data=new unsigned char[nBytes];
 		memcpy(data,Ndata,nBytes);
 	}
 	~hashKeyHeap() {delete data;}
