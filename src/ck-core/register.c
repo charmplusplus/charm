@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.7  1995-10-11 17:52:51  sanjeev
+ * Revision 2.8  1996-03-28 14:45:11  kale
+ * added registration of threaded  entry points.
+ *
+ * Revision 2.7  1995/10/11 17:52:51  sanjeev
  * fixed Charm++ chare creation
  *
  * Revision 2.6  1995/09/07  21:21:38  jyelon
@@ -104,6 +107,9 @@ int size ;
 	return(CpvAccess(msgCount)-1) ;
 }
 
+setThreadedEp( int entry) {
+(CsvAccess(EpInfoTable)+ entry)->threaded = 1;
+}
 
 void SetEp(ep,name,function,language,messageindex,chareindex,chare_or_boc)
 char *name;
@@ -120,6 +126,7 @@ int ep, language, messageindex, chareindex, chare_or_boc;
   epinfo->messageindex= messageindex;
   epinfo->chareindex  = chareindex;
   epinfo->chare_or_boc= chare_or_boc;
+  epinfo->threaded = 0; 
 }
 
 int registerEp(name,function,language,messageindex,chareindex)
