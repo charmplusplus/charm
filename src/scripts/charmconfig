@@ -89,10 +89,11 @@ public:
 	template<func_t f> //Templated member function
 	void memb(void) {f();}
 };
+inline void fn(void) {}
 void myfunc(void)
 {
   foo x;
-  x.template memb<myfunc>();
+  x.template memb<fn>();
 }
 EOT
 test_cxx "Testing whether templated member functions work" "ok" "no"
