@@ -152,7 +152,10 @@ class CkSparseContiguousReducer
   void contribute(ArrayElement *elem, CkReduction::reducerType type, const
 		  CkCallback &cb){
     int size = r.getNumElements()*sizeof(T) + sizeof(int) + sizeof(CkDataSegHeader);
-    unsigned char *ptr = new unsigned char[size];
+    CkReductionMsg* msg = CkReductionMsg::buildNew (size, NULL, type);
+    msg->setCallback(cb);
+
+    unsigned char *ptr = (unsigned char*)(msg->getData());
     int count = 1;
     /* pack data */
     memcpy(ptr, &count, sizeof(int));
@@ -160,9 +163,7 @@ class CkSparseContiguousReducer
     memcpy(ptr + sizeof(int) + sizeof(CkDataSegHeader), data,
 	   r.getNumElements()*sizeof(T));
     /* contribute on behalf of chare calling this function */
-    elem->contribute(size, ptr, type, cb);
-    
-    delete [] ptr;
+    elem->contribute(msg);
   }
 
   /* 
@@ -170,18 +171,22 @@ class CkSparseContiguousReducer
      it contributes data "added" to this object
   */
   void contribute(ArrayElement *elem, CkReduction::reducerType type){
-    int size = r.getNumElements()*sizeof(T) + sizeof(int) + sizeof(CkDataSegHeader);
-    unsigned char *ptr = new unsigned char[size];
-    int count = 1;
-    /* pack data */
-    memcpy(ptr, &count, sizeof(int));
-    memcpy(ptr + sizeof(int), &r, sizeof(CkDataSegHeader));
-    memcpy(ptr + sizeof(int) + sizeof(CkDataSegHeader), data,
-    r.getNumElements()*sizeof(T));
-    /* contribute on behalf of chare calling this function */
-    elem->contribute(size, ptr, type);
+    CkCallback cb;
+    contribute (elem, type, cb);
+
+//    int size = r.getNumElements()*sizeof(T) + sizeof(int) + sizeof(CkDataSegHeader);
+//    unsigned char *ptr = new unsigned char[size];
+//    int count = 1;
+         // pack data 
+//    memcpy(ptr, &count, sizeof(int));
+//    memcpy(ptr + sizeof(int), &r, sizeof(CkDataSegHeader));
+//    memcpy(ptr + sizeof(int) + sizeof(CkDataSegHeader), data,
+//    r.getNumElements()*sizeof(T));
+        // contribute on behalf of chare calling this function 
+//    elem->contribute(size, ptr, type);
     
-    delete [] ptr;
+//    delete [] ptr;
+
   }
 };
 
