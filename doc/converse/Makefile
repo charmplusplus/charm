@@ -12,7 +12,12 @@
 # REVISION HISTORY:
 #
 # $Log$
-# Revision 1.8  1996-06-14 21:38:25  jyelon
+# Revision 1.9  1996-11-18 16:55:50  milind
+# Made changes to the scheduler section to reflect the semantics of
+# CsdScheduler(0). Also, changed the Makefile to have targets ps, html,
+# install and all.
+#
+# Revision 1.8  1996/06/14 21:38:25  jyelon
 # This thing doesn't work at all.  Restructured.
 #
 # Revision 1.7  1995/11/15 18:01:22  brunner
@@ -46,20 +51,26 @@ TEXFILES=cmi.tex cpm.tex cpvmacros.tex index.tex ldb.tex manual.tex\
 msgmgr.tex queue.tex scheduler.tex simulator.tex threads.tex\
 thsync.tex
 
-all:
-	rm -f index.tex
-	echo > index.tex
+ps:
 	latex manual.tex
-	#texindex manual
-	#mv manual.ind index.tex
+	latex manual.tex
+	latex manual.tex
 	dvips -o manual.ps manual.dvi
-	cp manual.ps /charm/manuals-comp/converse.manual/
 
-pre: all
-	ghostview manual.ps
-
-html: all
+html:
+	latex manual.tex
 	latex2html manual.tex
+
+install:
+	rm -f /expand1/groupMosaic/distrib/converse.manual.ps.gz
+	cp manual.ps /expand1/groupMosaic/distrib/converse.manual.ps
+	gzip /expand1/groupMosaic/distrib/converse.manual.ps
+	chmod 664 /expand1/groupMosaic/distrib/converse.manual.ps.gz
+	rm -f /expand1/groupMosaic/html-manuals/converse.manual/*
+	cp manual/* /expand1/groupMosaic/html-manuals/converse.manual/
+	chmod 664 /expand1/groupMosaic/html-manuals/converse.manual/*
+
+all: ps html install
 
 co:
 	co Makefile $(TEXFILES)

@@ -44,10 +44,10 @@ messages (see below), and delivers it.
 The {\tt NumberOfMessages}
 parameter specifies how many messages should be processed (i.e. delivered
 to their handlers). If set to -1, the scheduler continues delivering
-messages until CsdExitScheduler() is called from a message handler.}
-% a function or option (-2?)  Is needed to specify that the scheduler
-% continue delivering messages until it exhausts its supply of
-% messages (i.e. becomes idle)
+messages until CsdExitScheduler() is called from a message handler.
+if {\tt NumberOfMessages} is 0, the scheduler continues delivering messages
+until it exhausts its supply of messages (i.e. becomes idle) or some 
+handler calls CsdExitScheduler().}
 
 \function {void CsdExitScheduler(void)}
 \index{CsdExitScheduler}
