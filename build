@@ -10,7 +10,7 @@ syntax() {
   echo '<targets>: converse, charm++ libs AMPI IDL tsm sm pvm sdag bluegene'
   echo '<targets>: doc ps-doc pdf-doc html-doc'
   echo '<versions>: ' 
-  ( cd $src ; ls -1 | egrep -v '(^CVS)|(^shmem$)|(^mpi$)|(^sim$)|(^net$)|(^elan$)|(^util$)|(^common$)|(^uth$)|(^conv-mach-fix.sh$)|(^win32$)' | pr -3 -t )
+  ( cd $src ; ls -1 | egrep -v '(^CVS)|(^shmem$)|(^mpi$)|(^sim$)|(^net$)|(^elan$)|(^util$)|(^common$)|(^uth$)|(^conv-mach-fix.sh$)|(^win32$)|(^paragon$)' | pr -3 -t )
   echo ''
   echo '<options>: help cc cc64 cxx kcc pgcc acc icc ecc gcc3 mpcc smp gm tcp vmi scyld bluegene'
   echo ''
