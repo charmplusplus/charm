@@ -691,12 +691,41 @@ SIMPLE_REDUCTION(logical_or,int,"%d",
   ret[i]=!!ret[i];//Make sure ret[i] is 0 or 1
 )
 
-
-/////////////// non-simple reductions: set ////////////////
+/////////////// concat ////////////////
 /*
-This reducer simply appends the data it recieves from each element
-(along with some housekeeping data indicating the source element and data size).
-The message data is then a list of reduction_set_element structures
+This reducer simply appends the data it recieves from each element,
+without any housekeeping data to separate them.
+*/
+static CkReductionMsg *concat(int nMsg,CkReductionMsg **msg)
+{
+  RED_DEB(("/ PE_%d: reduction_concat invoked on %d messages\n",CkMyPe(),nMsg));
+  //Figure out how big a message we'll need
+  int i,retSize=0;
+  for (i=0;i<nMsg;i++)
+      retSize+=msg[i]->dataSize;
+
+  RED_DEB(("|- concat'd reduction message will be %d bytes\n",retSize));
+  
+  //Allocate a new message
+  CkReductionMsg *ret=CkReductionMsg::buildNew(retSize,NULL);
+  
+  //Copy the source message data into the return message
+  char *cur=(char *)(ret->data);
+  for (i=0;i<nMsg;i++) {
+    int messageBytes=msg[i]->dataSize;
+    memcpy((void *)cur,(void *)msg[i]->data,messageBytes);
+    cur+=messageBytes;
+  }
+  RED_DEB(("\\ PE_%d: reduction_concat finished-- %d messages combined\n",CkMyPe(),nMsg));
+  return ret;
+}
+
+/////////////// set ////////////////
+/*
+This reducer appends the data it recieves from each element
+along with some housekeeping data indicating the source element 
+and data size.
+The message data is thus a list of reduction_set_element structures
 terminated by a dummy reduction_set_element with a sourceElement of -1.
 */
 
@@ -774,7 +803,7 @@ CkReduction::setElement *CkReduction::setElement::next(void)
 CkReduction::CkReduction() {} //Dummy private constructor
 
 //Add the given reducer to the list.  Returns the new reducer's
-// reducerType.  Must be called in the same order on all PE's.
+// reducerType.  Must be called in the same order on every node.
 CkReduction::reducerType CkReduction::addReducer(reducerFn fn)
 {
   reducerTable[nReducers]=fn;
@@ -786,7 +815,7 @@ It's indexed by reducerType, so the order in this table
 must *exactly* match the reducerType enum declaration.
 The names don't have to match, but it helps.
 */
-int CkReduction::nReducers=15;//Number of reducers currently in table below
+int CkReduction::nReducers=16;//Number of reducers currently in table below
 
 CkReduction::reducerFn CkReduction::reducerTable[CkReduction::MAXREDUCERS]={
     ::invalid_reducer,
@@ -809,6 +838,9 @@ CkReduction::reducerFn CkReduction::reducerTable[CkReduction::MAXREDUCERS]={
   //Compute the logical OR of the integers passed by each element.
   // The resulting integer will be 1 if any source integer is nonzero.
     ::logical_or,
+
+  //Concatenate the (arbitrary) data passed by each element
+    ::concat,
 
   //Combine the data passed by each element into an list of setElements.
   // Each element may contribute arbitrary data (with arbitrary length).

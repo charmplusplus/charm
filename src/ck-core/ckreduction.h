@@ -47,7 +47,10 @@ public:
 	//Compute the logical OR of the integers passed by each element.
 	// The resulting integer will be 1 if any source integer is nonzero.
 		logical_or,
-
+		
+	//Concatenate the (arbitrary) data passed by each element
+		concat,
+		
 	//Combine the data passed by each element into an list of setElements.
 	// Each element may contribute arbitrary data (with arbitrary length).
 		set,
@@ -76,13 +79,14 @@ public:
 	typedef CkReductionMsg *(*reducerFn)(int nMsg,CkReductionMsg **msgs);
 	
 	//Add the given reducer to the list.  Returns the new reducer's
-	// reducerType.  Must be called in the same order on all PE's.
+	// reducerType.  Must be called in the same order on every node.
 	static reducerType addReducer(reducerFn fn);
 
 private:
 	friend class CkReductionMgr;
 //System-level interface
-	//This is the maximum number of possible reducers, including builtins
+	//This is the maximum number of possible reducers, 
+	// including both builtin and user-defined types
 	enum {MAXREDUCERS=256};
 	
 	//Reducer table: maps reducerTypes to reducerFns.
