@@ -65,7 +65,7 @@ void gengraph(int pV, int pC, int pseed, int *pes, int *npe, int tofile)
   seed = pseed;
   
   if (CmiMyPe() == 0)
-  CmiPrintf("for %d PEs, connectivity %d... ", V, C);
+  CmiPrintf("for %d PEs, connectivity %d... \n", V, C);
 
   /* make a directory */
   if (tofile && CmiMyPe() == 0) {
@@ -130,11 +130,14 @@ static void AddEdges(EdgeListType *EdgeList, int V, int n)
 	/* Add more edges to make up a total of E edges */
   {	int i,j,w,x,y,k;
 	int c1,max,maxi;
-	int varr[V][2];
+	int **varr;
 	int varrlen,count=0;
 	int flag=0;
 
 	/* first add edges for a C-way spanning tree.*/
+        varr=(int **)calloc(V, sizeof(int*));
+        for (i=0;i<V;i++)
+            varr[i]=calloc(2, sizeof(int));
 	
 	if (C>1) c1 = C-1;
 
@@ -148,10 +151,6 @@ static void AddEdges(EdgeListType *EdgeList, int V, int n)
 	     	  }
 	
 	/*varr is array of vertices and free connection for each vertex*/
-	
-	for(i=0;i<V;i++)
-		for (j=0;j<2;j++)
-			varr[i][j]=0;	
 	j=0;
 	for (i=0;i<V;i++)
 		if(connections(i)<C)
@@ -273,6 +272,8 @@ static void AddEdges(EdgeListType *EdgeList, int V, int n)
 						 varrlen--;
 					}
 			}	      
+        for (i=0;i<V;i++) free(varr[i]);
+        free(varr);
 }
 
 
@@ -518,6 +519,7 @@ static Q * makeQueue()
   Q *q = (Q *) malloc(sizeof(Q));
   _MEMCHECK(q);
   q->size = VMAX;
+  q->numElements = 0;
   q->head = 1;
   q->tail = 0;
   q->buf = (int *) malloc(VMAX*sizeof(int));
