@@ -1,0 +1,15 @@
+#!/bin/sh -x
+
+CC="cc -D__AXP__ -I."
+
+ln -s md/t3e.h qtmd.h
+$CC -c -o qt.o qt.c
+cam -o qtmds.o md/t3e.s
+ar q libqt.a qt.o qtmds.o
+
+$CC -c stp.c
+ar q libstp.a stp.o
+
+#$CC -c meas.c
+#cam -o qtmdb.o md/t3e_b.s
+#$CC -o run meas.o qtmdb.o libstp.a libqt.a
