@@ -1808,6 +1808,8 @@ then
 fi
 
 #### test the version number of bproc ####
+if test -n "$CMK_BPROC"
+then
 cat > $t <<EOT
 #include <stdio.h>
 #include <sys/bproc.h>
@@ -1816,10 +1818,9 @@ int main()
   struct bproc_version_t vers;
   bproc_version(&vers);
   printf("%s\n", vers.version_string);
-  return 0;
 }
 EOT
-test_link "whether it is bproc" "yes" "no" "-lbproc"
+test_link "whether bproc compiles" "yes" "no" "-lbproc"
 if test $pass -eq 1
 then
 echo "$as_me:$LINENO: checking \"bproc version\"" >&5
@@ -1832,6 +1833,7 @@ cat >>confdefs.h <<_ACEOF
 #define CMK_BPROC_VERSION $bproc_ver
 _ACEOF
 
+fi
 fi
 
 ################## Fortran #########################
