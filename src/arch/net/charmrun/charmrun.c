@@ -1779,9 +1779,14 @@ void start_nodes_local(char ** env)
 
 #elif CMK_SCYLD
 
+/**
+  ++ppn now is supported in both SMP and non SMP version
+  in SMP, ++ppn specifies number of threads on each node;
+  in non-SMP, ++ppn specifies number of processes on each node.
+*/
 void nodetab_init_for_scyld()
 {
-  int maxNodes, i, node, npes;
+  int maxNodes, i, node, npes, rank;
   nodetab_host group;
   int tablesize;
 
@@ -1796,13 +1801,16 @@ void nodetab_init_for_scyld()
   nodetab_reset(&group);
 
   if (arg_ppn==0) arg_ppn=1;
+/*
 #if CMK_SHARED_VARS_UNAVAILABLE
   if (arg_ppn > 1) {
     fprintf(stderr,"Warning> Invalid ppn %d in nodelist ignored.\n", arg_ppn);
     arg_ppn=1;
   }
 #endif
-  group.cpus = arg_ppn;
+*/
+  group.cpus = 1;
+  group.rank = 0;
 
   /* check which slave node is available from frompe to endpe */
   npes = 0;
@@ -1810,11 +1818,16 @@ void nodetab_init_for_scyld()
     char hostname[256];
     if (bproc_nodestatus(i) != bproc_node_up) continue;
     if (i!= -1 && i<arg_startpe) continue;
-    if (i==-1 && arg_skipmaster) continue;
+    if (i==-1 && arg_skipmaster) continue;    /* skip master node -1 */
     sprintf(hostname, "%d", i);
+#if ! CMK_SHARED_VARS_UNAVAILABLE
     if (npes + arg_ppn > arg_requested_pes) group.cpus = arg_requested_pes-npes;
     else group.cpus = arg_ppn;
-    for (group.rank = 0; group.rank<arg_ppn; group.rank++) {
+#endif
+    for (rank = 0; rank<arg_ppn; rank++) {
+#if ! CMK_SHARED_VARS_UNAVAILABLE
+      group.rank = rank;
+#endif
       nodetab_makehost(hostname, &group);
       if (++npes == arg_requested_pes) break;
     }   
@@ -1831,12 +1844,17 @@ void nodetab_init_for_scyld()
     int orig_size = npes;
     int startnode = 0;
     if (arg_singlemaster && nodetab_rank0_size > 1 && !arg_skipmaster) 
-    	startnode = arg_ppn;      /* skip -1 if we can */
+    	startnode = arg_ppn;      /* skip -1 */
     int node = startnode; 
     while (npes < arg_requested_pes) {
+#if ! CMK_SHARED_VARS_UNAVAILABLE
       if (npes+arg_ppn > arg_requested_pes) group.cpus = arg_requested_pes-npes;
       else group.cpus = arg_ppn;
-      for (group.rank = 0; group.rank<arg_ppn; group.rank++) {
+#endif
+      for (rank = 0; rank<arg_ppn; rank++) {
+#if ! CMK_SHARED_VARS_UNAVAILABLE
+        group.rank = rank;
+#endif
         nodetab_makehost(nodetab_name(node), &group);
         if (++node == orig_size) node = startnode;
         if (++npes == arg_requested_pes) break;
