@@ -78,13 +78,17 @@ translators: charmxi conv-cpm
 pose:  charm++
 	cd libs/ck-libs/pose && $(MAKE)
 
-jade:
+msa:
+	cd libs/ck-libs/multiphaseSharedArrays && $(MAKE)
+
+jade: charm++ msa
 #	make the lib, include
 	cd langs/jade && $(MAKE)
 
 # This should be done offline, since the user does not need to compile
 # parser files, etc.  All they need is the libjade + include files,
-# antlr.jar, jade.jar, and a few scripts.
+# antlr.jar, jade.jar, and a few scripts which the jade target takes
+# care of.
 jadeall: jade
 #	make parser.g -> .java files
 	cd langs/jade && $(MAKE) p
