@@ -1,5 +1,9 @@
 #in vmi, no mpicc, so switch to gcc if no overriding.
-if test "$CMK_CC" = 'mpicc '
+override=0
+case "$CMK_CC" in
+mpicc*) override=1 ;;
+esac
+if test $override = 1
 then
 test -z "$CMK_INCDIR" && CMK_INCDIR='-I /usr/local/vmi/mpich/include'
 test -z "$CMK_LIBDIR" && CMK_LIBDIR='-L /usr/local/vmi/mpich/lib/gcc'
