@@ -452,9 +452,11 @@ int CheckSocketsReady(int withDelayMs)
   }
   nreadable = poll(fds, n, withDelayMs);
 #endif
+  ctrlskt_ready_read = 0;
+  dataskt_ready_read = 0;
+  dataskt_ready_write = 0;
+
   if (nreadable == 0) {
-    ctrlskt_ready_read = 0;
-    dataskt_ready_read = 0;
     MACHSTATE(1,"} CheckSocketsReady (nothing readable)")
     return nreadable;
   }

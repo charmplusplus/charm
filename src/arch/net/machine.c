@@ -189,20 +189,20 @@ extremely verbose, 2 shows most procedure entrance/exits,
 3 shows most communication, and 5 only shows rare or unexpected items.
 Displaying lower priority messages doesn't stop higher priority ones.
 */
-#define MACHINE_DEBUG_PRIO 4
+#define MACHINE_DEBUG_PRIO 2
 #define MACHINE_DEBUG_LOG 0 /*Controls whether output goes to log file*/
 
 FILE *debugLog;
 # define MACHSTATE_I(prio,args) if ((prio)>=MACHINE_DEBUG_PRIO) {\
 	fprintf args ; fflush(debugLog); }
 # define MACHSTATE(prio,str) \
-	MACHSTATE_I(prio,(debugLog,"[%d %.3f]> "str"\n",CmiMyPe(),CmiWallTimer()))
+	MACHSTATE_I(prio,(debugLog,"[%.3f]> "str"\n",CmiWallTimer()))
 # define MACHSTATE1(prio,str,a) \
-	MACHSTATE_I(prio,(debugLog,"[%d %.3f]> "str"\n",CmiMyPe(),CmiWallTimer(),a))
+	MACHSTATE_I(prio,(debugLog,"[%.3f]> "str"\n",CmiWallTimer(),a))
 # define MACHSTATE2(prio,str,a,b) \
-	MACHSTATE_I(prio,(debugLog,"[%d %.3f]> "str"\n",CmiMyPe(),CmiWallTimer(),a,b))
+	MACHSTATE_I(prio,(debugLog,"[%.3f]> "str"\n",CmiWallTimer(),a,b))
 # define MACHSTATE3(prio,str,a,b,c) \
-	MACHSTATE_I(prio,(debugLog,"[%d %.3f]> "str"\n",CmiMyPe(),CmiWallTimer(),a,b,c))
+	MACHSTATE_I(prio,(debugLog,"[%.3f]> "str"\n",CmiWallTimer(),a,b,c))
 #else
 # define MACHINE_DEBUG_LOG 0
 # define MACHSTATE(n,x) /*empty*/
@@ -574,13 +574,16 @@ static void CmiIdleLock_init(CmiIdleLock *l) {
 static void CmiIdleLock_sleep(CmiIdleLock *l,int msTimeout) {
   if (l->hasMessages) return;
   l->isSleeping=1;
+  MACHSTATE(4,"Processor going to sleep {")
   WaitForSingleObject(l->sem,msTimeout);
+  MACHSTATE(4,"} Processor awake again")
   l->isSleeping=0;
 }
 
 static void CmiIdleLock_addMessage(CmiIdleLock *l) {
   l->hasMessages=1;
-  if (l->isSleeping) { /*The PE is sleeping on this lock-- wake him*/
+  if (l->isSleeping) { /*The PE is sleeping on this lock-- wake him*/  
+    MACHSTATE(4,"Waking sleeping processor")
     ReleaseSemaphore(l->sem,1,NULL);
   }
 }
@@ -627,16 +630,19 @@ static void CmiIdleLock_sleep(CmiIdleLock *l,int msTimeout) {
 
   if (l->hasMessages) return;
   l->isSleeping=1;
+  MACHSTATE(4,"Processor going to sleep {")
   pthread_mutex_lock(&l->mutex);
   getTimespec(msTimeout,&wakeup);
   while (!l->hasMessages)
     if (ETIMEDOUT==pthread_cond_timedwait(&l->cond,&l->mutex,&wakeup))
       break;
   pthread_mutex_unlock(&l->mutex);
+  MACHSTATE(4,"} Processor awake again")
   l->isSleeping=0;
 }
 static void CmiIdleLock_wakeup(CmiIdleLock *l) {
   l->hasMessages=1;
+  MACHSTATE(4,"Waking sleeping processor")
   /*The PE is sleeping on this condition variable-- wake him*/
   pthread_mutex_lock(&l->mutex);
   pthread_cond_signal(&l->cond);
@@ -1342,6 +1348,7 @@ static void charmrun_abort(const char *s)
 static void CmiPushPE(int pe,void *msg)
 {
   CmiState cs=CmiGetStateN(pe);
+  MACHSTATE1(2,"Pushing message into %d's queue",pe);
   CmiIdleLock_addMessage(&cs->idle);
   PCQueuePush(cs->recv,msg);
 }
@@ -1792,7 +1799,8 @@ CmiCommHandle CmiGeneralNodeSend(int pe, int size, int freemode, char *data)
   CmiCommLock();
   DeliverOutgoingNodeMessage(ogm);
   CmiCommUnlock();
-#if CMK_SHARED_VARS_UNAVAILABLE
+#if 1
+/*CMK_SHARED_VARS_UNAVAILABLE*/
   CommunicationServer(0);
 #endif
   return (CmiCommHandle)ogm;
@@ -1843,7 +1851,8 @@ CmiCommHandle CmiGeneralSend(int pe, int size, int freemode, char *data)
   CmiCommLock();
   DeliverOutgoingMessage(ogm);
   CmiCommUnlock();
-#if CMK_SHARED_VARS_UNAVAILABLE
+#if 1
+/*CMK_SHARED_VARS_UNAVAILABLE*/
   CommunicationServer(0);
 #endif
   return (CmiCommHandle)ogm;
