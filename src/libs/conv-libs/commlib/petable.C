@@ -276,14 +276,16 @@ char * PeTable ::ExtractAndPack(comID id, int ufield, int npe, int *pelist, int 
   *length += msg_offset;
   char *p;
 
+#if 0
   if(combcount == 128)
     combcount = 0;
   if ((*length) < MAXBUFSIZE) {
     p=CombBuffer[combcount];
     combcount ++;
   }
-  else 
-    p=(char *)CmiAlloc(*length);
+  else
+#endif 
+  p=(char *)CmiAlloc(*length);
 
   int l1 = *length;
   

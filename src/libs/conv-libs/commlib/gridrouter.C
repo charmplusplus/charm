@@ -223,8 +223,5 @@ void GridRouter::SetID(comID id)
 void GridRouter :: SetMap(int *pes)
 {
   gpes=pes;
-
-  //  ComlibPrintf("%d:GPES[1] = %d\n", CmiMyPe(), gpes[1]);
-  gpes[1] = 4;
 }
 
