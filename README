@@ -45,8 +45,8 @@ build <target> <version> [options ...] [--basedir=dir] [--libdir=dir] [--incdir=
 REQUIRED:
 ---------
 <target> specifies the parts of Charm++ to compile.  The most often used 
-  <target> is charm++, which will compile the key Charm++ executables and 
-  runtime libraries.
+  <target> is "charm++", which will compile the key Charm++ executables and 
+  runtime libraries.  Other common targets are "AMPI" and "FEM".
 <versions> defines the CPU, OS and Communication layer of the machines.  See 
   "How to choose a <version>" below for details.
 
@@ -63,21 +63,28 @@ OPTIONAL:
 
 
 Running build script, a directory of the name of combination of version and 
-options like "<version>-<option1>-<option2>-..." will be created and build 
-script will compiler Charm++ under this directory.
-For example:
+options like "<version>-<option1>-<option2>-..." will be created and 
+the build script will compile Charm++ under this directory.
 
-./build charm++ net-linux scyld icc tcp
+For example, on an ordinary Linux PC:
 
-will build charm++ in a directory: net-linux-scyld-tcp-icc/.
-for Linux version on Scyld using TCP for communication, compiled with 
-Intel C++ compiler.
+   ./build charm++ net-linux
 
-You can specify multiple options, however you should only give one compiler 
+will build charm++ in the directory: net-linux/.  The communication
+defaults to UDP packets and the compiler to gcc.
+
+For a more complex example, on a Scyld workstation with the Intel C++ 
+compiler, where you want the communication to happen over TCP sockets:
+
+   ./build charm++ net-linux scyld icc tcp
+
+will build charm++ in the directory: net-linux-scyld-tcp-icc/.
+
+You can specify multiple options, however you can use at most one compiler 
 option. The sequence of the options are not important given in build script, 
 only one directory name will be generated, following the rules:
 1. compiler option will be at the end;
-2. other options are shorted alphabetically.
+2. other options are sorted alphabetically.
 
 **** How to choose a <version> ****
 
@@ -86,24 +93,25 @@ in Charm version is gcc/g++. However, one can use <options> to specify other
 compilers. See the detailed explanation of the <options> below.
 (Note: this isn't a complete list.  Run ./build for a complete listing)
 
-Charm version          OS        Communication     Compiler  
+Charm version          OS        Communication    Default Compiler  
 -------------       ---------    --------------   --------------------
 net-linux            PC Linux       UDP/Myrinet   GNU compiler
-net-linux-ia64       IA64 Linux     UDP/Myrinet   GNU compiler
-net-axp              Alpha          UDP           GNU compiler
-net-cygwin           Win32/cygwin   UDP           GNU compiler
-net-win32            Win32          UDP           MS Visual C++
 net-sol              Solaris        UDP           GNU compiler
-net-irix             IRIX	    UDP           GNU compiler
-net-hp               HP-UX          UDP           GNU compiler
+net-win32            Win32          UDP           MS Visual C++
+net-cygwin           Win32/cygwin   UDP           GNU compiler
+mpi-sp               IBM A/IX       MPI           A/IX xlC Compiler 
+mpi-origin           Origin2000     MPI           SGI C++ compiler
+
 net-ppc-darwin       MacOS X        UDP           GNU C++ compiler
+net-linux-ia64       IA64 Linux     UDP/Myrinet   GNU compiler
+net-irix             IRIX	    UDP           GNU compiler
+net-axp              Alpha          UDP           GNU compiler
+net-hp               HP-UX          UDP           GNU compiler
 mpi-linux            PC Linux       MPI           GNU compiler
 mpi-linux-ia64       IA64 Linux     MPI           GNU compiler
 mpi-axp              Alpha          MPI           GNU compiler
 mpi-linux-axp        Alpha Linux    MPI           GNU compiler
-mpi-origin           Origin2000     MPI           C++ compiler
-mpi-sp               AIX            MPI           AIX xlC Compiler 
-origin2000           Origin2000  shared-mem       SGI C++ compiler     
+origin2000           Origin2000  shared-mem       SGI C++ compiler
 t3e                  Cray T3E    shared-mem       Cray C++ compiler
 
 
@@ -145,6 +153,7 @@ threads; "sim-" switches between processors and counts communications.
 3.)  Some operating systems have other options, such as:
 	"-x86"     For Solaris, use PC hardware (instead of Sun).
 	"-axp"     For Linux, use Alpha hardware (instead of PC).
+        "-ia64"    Use Itanium(tm) instructions (instead of x86)
 
 Your Charm++ version is made by concatenating the options, e.g.:
 
