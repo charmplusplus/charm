@@ -285,6 +285,7 @@ void _loadbalancerInit()
 }
 
 int LBDatabase::manualOn = 0;
+char *LBDatabase::avail_vector = NULL;
 
 void LBDatabase::init(void) 
 {
@@ -294,9 +295,11 @@ void LBDatabase::init(void)
   nloadbalancers = 0;
 
   int num_proc = CkNumPes();
-  avail_vector = new char[num_proc];
-  for(int proc = 0; proc < num_proc; proc++)
-      avail_vector[proc] = 1;
+  if (!avail_vector) {
+    avail_vector = new char[num_proc];
+    for(int proc = 0; proc < num_proc; proc++)
+        avail_vector[proc] = 1;
+  }
   new_ld_balancer = 0;
 
   CkpvAccess(lbdatabaseInited) = 1;
@@ -306,6 +309,7 @@ void LBDatabase::init(void)
 }
 
 void LBDatabase::get_avail_vector(char * bitmap) {
+    CmiAssert(bitmap && avail_vector);
     const int num_proc = CkNumPes();
     for(int proc = 0; proc < num_proc; proc++){
       bitmap[proc] = avail_vector[proc];
@@ -324,6 +328,7 @@ void LBDatabase::set_avail_vector(char * bitmap, int new_ld){
       new_ld_balancer = new_ld;
       assigned = 1;
     }
+    CmiAssert(bitmap && avail_vector);
     for(int count = 0; count < num_proc; count++){
         avail_vector[count] = bitmap[count];
         if((bitmap[count] == 1) && !assigned){

@@ -145,7 +145,7 @@ class LBDatabase : public IrrGroup {
 public:
   LBDatabase(void)  { init(); }
   LBDatabase(CkMigrateMessage *m)  { init(); }
-  ~LBDatabase()  { delete [] avail_vector; }
+  ~LBDatabase()  { if (avail_vector) delete [] avail_vector; }
   
 private:
   void init();
@@ -288,7 +288,7 @@ public:
 private:
   int mystep;
   LDHandle myLDHandle;
-  char *avail_vector;			// processor bit vector
+  static char *avail_vector;	// processor bit vector
   int new_ld_balancer;		// for Node 0
   CkVec<BaseLB *>   loadbalancers;
   int nloadbalancers;
