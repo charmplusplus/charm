@@ -68,7 +68,7 @@ void CldHandler(char *msg)
 {
   int len, queueing, priobits; CldField ldbfield;
   unsigned int *prioptr; CldInfoFn ifn;
-  CmiGrabBuffer(&msg);
+  CmiGrabBuffer((void **)&msg);
   CldRestoreHandler(msg, &ldbfield);
   ifn = (CldInfoFn)CmiHandlerToFunction(ldbfield->infofn);
   ifn(msg, &len, &ldbfield, &queueing, &priobits, &prioptr);

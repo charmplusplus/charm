@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.29  1998-02-27 11:52:06  jyelon
+ * Revision 2.30  1998-05-07 21:20:14  rbrunner
+ * Added correct prototypes for CmiGrabBuffer, to match changes in converse.h
+ *
+ * Revision 2.29  1998/02/27 11:52:06  jyelon
  * Cleaned up header files, replaced load-balancer.
  *
  * Revision 2.28  1998/01/28 17:52:49  milind
@@ -333,7 +336,7 @@ void BUFFER_INCOMING_MSG(env)
 ENVELOPE *env;
 {
   if (CpvAccess(CkInitPhase)) {
-    CmiGrabBuffer(&env);
+    CmiGrabBuffer((void **)&env);
     FIFO_EnQueue(CpvAccess(CkBuffQueue),(void *)env);
   } else {
     HANDLE_INCOMING_MSG(env);
@@ -347,7 +350,7 @@ ENVELOPE *env;
 void HANDLE_INCOMING_MSG(env)
 ENVELOPE *env;
 {
-  CmiGrabBuffer(&env);
+  CmiGrabBuffer((void **)&env);
   UNPACK(env);
   if(CpvAccess(traceOn))
     trace_enqueue(env);

@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.52  1998-02-27 11:52:04  jyelon
+ * Revision 2.53  1998-05-07 21:20:13  rbrunner
+ * Added correct prototypes for CmiGrabBuffer, to match changes in converse.h
+ *
+ * Revision 2.52  1998/02/27 11:52:04  jyelon
  * Cleaned up header files, replaced load-balancer.
  *
  * Revision 2.51  1998/01/28 17:52:48  milind
@@ -560,7 +563,7 @@ ENVELOPE *env;
   int          type;
   void         *usrMsg;
   
-  CmiGrabBuffer(&env);
+  CmiGrabBuffer((void **)&env);
   if ((GetEnv_msgType(env) == BocInitMsg) ||
       (GetEnv_msgType(env) == ReadMsgMsg))
     UNPACK(env);
