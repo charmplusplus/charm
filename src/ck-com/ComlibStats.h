@@ -32,7 +32,7 @@ class ComlibComRec {
     }
 
     ComlibComRec(int _npes) {
-        npes = npes;
+        npes = _npes;
         procMap = 0;
         totalbytes_sent = 0;
         totalbytes_received = 0;
@@ -179,14 +179,12 @@ class ComlibLocalStats {
     CkVec<ComlibComRec> cdata;
     int nstrats;
 
-    ComlibLocalStats(int _strats) {
-        nstrats = _strats;
-        cdata.resize(nstrats);
+    ComlibLocalStats(int _strats) : cdata(_strats) {
+      nstrats = _strats;
     }
     
-    ComlibLocalStats() {
-        nstrats = MAX_NUM_STRATS;
-        cdata.resize(nstrats);
+    ComlibLocalStats() : cdata(1) {
+      nstrats = 1;
     }
 
     void setNstrats(int nst) {
@@ -194,65 +192,86 @@ class ComlibLocalStats {
     }
 
     inline void recordSend(int sid, int size, int dest) {
-        cdata[sid].recordSend(size, dest);
+      if(sid >= nstrats) {
+	nstrats = sid + 1;
+	cdata.resize(nstrats);
+      }
+
+      cdata[sid].recordSend(size, dest);
+
     }
 
     inline void recordRecv(int sid, int size, int src) {
-        cdata[sid].recordRecv(size, src);
+      if(sid >= nstrats) {
+	nstrats = sid + 1;
+	cdata.resize(nstrats);
+      }
+
+      cdata[sid].recordRecv(size, src);
     }
 
     inline void recordSendM(int sid, int size, int *dest_m, int ndest) {
-        cdata[sid].recordSendM(size, dest_m, ndest);
+      if(sid >= nstrats) {
+	nstrats = sid + 1;
+	cdata.resize(nstrats);
+      }
+
+      cdata[sid].recordSendM(size, dest_m, ndest);
     }
 
     inline void recordRecvM(int sid, int size, int *src_m, int nsrc) {
-        cdata[sid].recordRecvM(size, src_m, nsrc);
-    }
+      if(sid >= nstrats) {
+	nstrats = sid + 1;
+	cdata.resize(nstrats);
+      }
 
+      cdata[sid].recordRecvM(size, src_m, nsrc);
+    }
+    
     inline void reset() {
-        for(int count = 0; count < nstrats; count++)
-            cdata[count].reset();
+      for(int count = 0; count < nstrats; count++)
+	cdata[count].reset();
     }
 
     void pup(PUP::er &p) {
-        p | nstrats;
-        p | cdata;
+      p | nstrats;
+      p | cdata;
     }
 
     ComlibLocalStats & operator=(ComlibLocalStats &in) {
-        nstrats = in.nstrats;
+      nstrats = in.nstrats;
 
-        cdata.resize(in.cdata.size());
-        for(int count = 0; count < in.nstrats; count++) {
-            if(in.cdata[count].isRecorded()) {
-                memcpy(&cdata[count],&in.cdata[count], sizeof(ComlibComRec));
-                
-                int npes = in.cdata[count].npes;
-                int mapsize = (npes / (sizeof(char)*8) + 1) * sizeof(char); 
-                cdata[count].procMap = (unsigned char*) CmiAlloc(mapsize);
-                memcpy(cdata[count].procMap, in.cdata[count].procMap, mapsize);
-            }
-            else
-                cdata[count].reset();
-        }
-
-        return *this;
+      cdata.resize(in.cdata.size());
+      for(int count = 0; count < in.nstrats; count++) {
+	if(in.cdata[count].isRecorded()) {
+	  memcpy(&cdata[count],&in.cdata[count], sizeof(ComlibComRec));
+	  
+	  int npes = in.cdata[count].npes;
+	  int mapsize = (npes / (sizeof(char)*8) + 1) * sizeof(char); 
+	  cdata[count].procMap = (unsigned char*) CmiAlloc(mapsize);
+	  memcpy(cdata[count].procMap, in.cdata[count].procMap, mapsize);
+	}
+	else
+	  cdata[count].reset();
+      }
+      
+      return *this;
     }
 };
 
 class ComlibGlobalStats {
  
-    ComlibLocalStats *statsArr;
-
+  ComlibLocalStats *statsArr;
+  
  public:
-
-    ComlibGlobalStats();
-    ~ComlibGlobalStats() {}
-
-    void updateStats(ComlibLocalStats &stats, int pe); 
-    
-    //The average amount of data communicated
-    void getAverageStats(int sid, double &, double &, double &, double &);
+  
+  ComlibGlobalStats();
+  ~ComlibGlobalStats() {}
+  
+  void updateStats(ComlibLocalStats &stats, int pe); 
+  
+  //The average amount of data communicated
+  void getAverageStats(int sid, double &, double &, double &, double &);
 };
 
 #endif
