@@ -1004,7 +1004,7 @@ void setBreakPoints(char *);
 char *getBreakPoints();
 
 char* getObjectList();
-char* getObjectContents();
+char* getObjectContents(int);
 
 void msgListCache();
 void msgListCleanup();
@@ -1042,6 +1042,7 @@ int CcsEnabled(void);
 int CcsIsRemoteRequest(void);
 void CcsCallerId(unsigned int *pip, unsigned int *pport);
 void CcsSendReply(unsigned int ip, unsigned int port, int size, void *reply);
+void CcsSendReplyFd(unsigned int ip, unsigned int port, int size, void *reply);
 #else
 #define CcsInit()
 #define CcsUseHandler(x,y)

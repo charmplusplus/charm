@@ -1142,8 +1142,10 @@ int readUntilString(int fd, char *buffer, char *match){
   char *str;
   int junk;
   
+  /*
   printf("Inside readUntilString()\n");
   fflush(stdout);
+  */
   
   while(!found){
     readBytes = read(fd, buffer + totalReadBytes, MAXREADBYTES);
@@ -1155,8 +1157,10 @@ int readUntilString(int fd, char *buffer, char *match){
       found = 1;
     }
     
+    /*
     printf("string read = %s: %d : %d\n", buffer, strlen(buffer), totalReadBytes);
     fflush(stdout);
+    */
   }
   
   return(totalReadBytes);
@@ -1200,8 +1204,11 @@ void checkForGDBActivity(){
     for(i = 0; i < numGDBs; i++){
       if(FD_ISSET((rsh_prog_gdb[i].p)->ofd, &rfds)){
 	rsh_prog_gdb[i].open = 1;
+
+	/*
 	printf("activity seen on : %d\n", i);
 	fflush(stdout);
+	*/
 
 	/* Debugging */
 	/* nread = read((rsh_prog_gdb[i].p)->ofd, buffer, 1000);
@@ -1245,8 +1252,10 @@ void processOnOpen(void)
         printf("Error reading gdb pipe %d", i);
         exit(1);
       }
+      /*
       printf("Sending CCS Reply for node %d:buffer contents:%s\n", i, buffer);
       fflush(stdout);
+      */
       sendCCSReply(clientIP, clientKillPort, i, strlen(buffer) + 1, buffer);
       openStatus[i] = 1;
     }
@@ -1265,13 +1274,15 @@ void processOnOpen(void)
       writeall(fd, "unfreeze", strlen("unfreeze") + 1);
       close(fd);
 
+      /*
       printf("1.sent unfreeze (to Debugger Client)...%s %d\n", command, writeBytes);
+      */
 
       if(strncmp(command, "c", 1) == 0){
         int nread;
 
         /* Debugging */
-        printf("CHECK : 'continue' pressed\n");
+        /* printf("CHECK : 'continue' pressed\n"); */
 
         nread = read((rsh_prog_gdb[destProcessor].p)->ofd, buffer, 1000);
         if(nread < 0){
@@ -2057,9 +2068,10 @@ int req_handle_gdb_command(char *line)
   }
 
   /**** Debugging *****/
-  printf("GDB command from client for proc %d = %s, %d\n", destProcessor, 
-                    command, strlen(command));
+  /*printf("GDB command from client for proc %d = %s, %d\n", destProcessor, 
+    command, strlen(command));
   fflush(stdout);
+  */
   /** ***/
 
   return REQ_OK;
@@ -2215,16 +2227,20 @@ void req_serve_client(int workerno)
     nread = xstr_read(buffer, CcsClientFd);
 
     /*** debugging ***/
+    /*
     printf("Read the first part : %s, %d\n", xstr_lptr(buffer), nread);
     fflush(stdout);
+    */
 
     /* if necessary, read the rest */
     while(nread != 0){
       nread = xstr_read(buffer, CcsClientFd);
       
       /*** debugging ***/
+      /*
       printf("Read the second part: %s\n", xstr_lptr(buffer));
       fflush(stdout);
+      */
     }
   }
   else{
@@ -2266,12 +2282,6 @@ void req_serve_client(int workerno)
     
     if(CcsActiveFlag == 1) break;
   }
-
-  /**** Debugging ****/
-  if(CcsActiveFlag == 1){
-    printf("req_handle_client over for CCS..\n");
-    fflush(stdout);
-  }
 }
 
 
@@ -2305,9 +2315,9 @@ void req_poll()
 #if CMK_CCS_AVAILABLE
   if (arg_server ==1) {
     if(FD_ISSET(myFd, &rfds)){
-      printf("Activity detected on client socket\n");
+      /* printf("Activity detected on client socket\n"); */
       skt_accept(myFd, &clientIP, &clientPortNo, &CcsClientFd);
-      printf("Accept over\n");
+      /* printf("Accept over\n"); */
       fflush(stdout);
       req_serve_client(-1);
     }
@@ -2320,7 +2330,7 @@ void req_poll()
       fflush(stdout);
       checkForGDBActivity();
       if (openProcessingNeeded == 1){
-        printf("activity detected on the gdb pipes\n");
+        /* printf("activity detected on the gdb pipes\n"); */
         fflush(stdout);
         processOnOpen();
       }
@@ -2335,7 +2345,7 @@ void req_poll()
             char line[1024];
 
             commandSent = 1;
-            printf("Sending request to processor %d\n", destProcessor);
+            /* printf("Sending request to processor %d\n", destProcessor); */
             fd = skt_connect(nodetab_ip(destProcessor), serverCCSPorts[destProcessor]);
             sprintf(line, "req %d %d %d %d %s\n", destProcessor, size, junkIP, junkPort, "DebugHandler");
             write(fd, line, strlen(line));
@@ -2357,13 +2367,15 @@ void req_poll()
             writeall(fd, "unfreeze", strlen("unfreeze") + 1);
             close(fd);
 
-            printf("2.sent unfreeze (to Debugger Client)...%s %d %d\n", command,writeBytes, destProcessor);
+	    /*
+	      printf("2.sent unfreeze (to Debugger Client)...%s %d %d\n", command,writeBytes, destProcessor);
+	    */
 
             if(strncmp(command, "c", 1) == 0){
               int nread;
 
               /* Debugging */
-              printf("CHECK2 : 'continue' pressed\n");
+              /* printf("CHECK2 : 'continue' pressed\n"); */
 
               nread = read((rsh_prog_gdb[destProcessor].p)->ofd, buffer, 1000);
               if(nread < 0){
@@ -2436,6 +2448,11 @@ void req_worker(int workerno)
     }
     for(i=0; i<numclients; i++) {
       if (FD_ISSET(client[i], &rfds)) {
+	
+	/**** Debugging ***/
+	/* printf("Activity on %d\n", i);*/
+
+
 	buffer = clientbuf[i];
 	nread = xstr_read(buffer, client[i]);
 	if (nread<=0) exit(1);
@@ -2497,7 +2514,7 @@ prog rsh_start(nodeno)
   rshargv[4]="exec /bin/csh -f";
   rshargv[5]=0;
 
-  rsh = prog_start(nodetab_shell(nodeno), rshargv, 0);
+  rsh = prog_start(nodetab_shell(nodeno), rshargv, 1);
   if ((rsh==0)&&(errno!=EMFILE)) { perror("ERROR> starting rsh"); exit(1); }
   if (rsh==0)
     {

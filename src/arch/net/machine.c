@@ -1605,7 +1605,7 @@ void CmiYield() { jsleep(0,100); }
 int interruptFlag;
 
 static unsigned int terrupt;
-static void CommunicationInterrupt()
+static void CommunicationInterrupt(int arg)
 {
   nodes[CmiMyNode()].stat_total_intr++;
   if (comm_flag) return;
@@ -1699,10 +1699,19 @@ typedef struct CcsRequestNode {
 } *CcsRequest;
 #endif
 
+#if CMK_WEB_MODE
+extern int appletFd;
+#endif
+
 static void ctrl_getone()
 {
   char line[10000];
   int ok, ip, port, fd;  FILE *f;
+#if CMK_WEB_MODE
+  char hndlrId[100];
+  int dont_close = 0;
+  int svrip, svrport;
+#endif
 
   skt_accept(ctrlskt, &ip, &port, &fd);
   f = fdopen(fd,"r");
@@ -1716,7 +1725,15 @@ static void ctrl_getone()
     } else if (strncmp(line, "req ", 4)==0) {
       char cmd[5], *msg;
       int pe, size, len;
+#if CMK_WEB_MODE   
+      sscanf(line, "%s%d%d%d%d%s", cmd, &pe, &size, &svrip, &svrport, hndlrId);
+      if(strcmp(hndlrId, "MonitorHandler") == 0) {
+	appletFd = fd;
+	dont_close = 1;
+      }
+#else
       sscanf(line, "%s%d%d", cmd, &pe, &size);
+#endif
       len = strlen(line);
       msg = (char *) CmiAlloc(len+size+CmiMsgHeaderSizeBytes+1);
       if (!msg)
@@ -1743,8 +1760,14 @@ static void ctrl_getone()
     }
     else KillEveryoneCode(2932);
   }
-  fclose(f);
-  close(fd);
+#if CMK_WEB_MODE
+  if(dont_close==0) {
+#endif
+    fclose(f);
+    close(fd);
+#if CMK_WEB_MODE
+  }
+#endif
 }
 
 /*****************************************************************************
@@ -2814,6 +2837,7 @@ void ConverseExit()
     log_done();
     ConverseCommonExit();
   }
+
   ctrl_sendone(120,"ending"); /* this causes host to go away */
   Cmi_check_delay = 2.0;
   while (1) CmiYield(); /* loop until host disappearance causes exit */

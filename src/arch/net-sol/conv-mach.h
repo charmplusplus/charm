@@ -110,6 +110,7 @@
 
 #define CMK_DEBUG_MODE					   1 
 #define CMK_WEB_MODE                                       1
+#define CMK_USE_PERSISTENT_CCS                             0
 
 #define CPP_LOCATION "/usr/ccs/lib/cpp"
 

@@ -1015,7 +1015,7 @@ void CpdUnFreeze(void)
 typedef int (*CWebFunction)();
 unsigned int appletIP;
 unsigned int appletPort;
-
+int appletFd = -1;
 int countMsgs;
 char **valueArray;
 CWebFunction CWebPerformanceFunctionArray[MAXFNS];
@@ -1023,13 +1023,14 @@ int CWebNoOfFns;
 CpvDeclare(int, CWebPerformanceDataCollectionHandlerIndex);
 CpvDeclare(int, CWebHandlerIndex);
 
-void sendDataFunction(void)
+static void sendDataFunction(void)
 {
   char *reply;
   int len = 0, i;
 
   for(i=0; i<CmiNumPes(); i++){
-    len += (strlen((char*)(valueArray[i]+CmiMsgHeaderSizeBytes+sizeof(int)))+1);
+    len += (strlen((char*)(valueArray[i]+
+			   CmiMsgHeaderSizeBytes+sizeof(int)))+1);
     /* for the spaces in between */
   }
   len+=6; /* for 'perf ' and the \0 at the end */
@@ -1043,8 +1044,12 @@ void sendDataFunction(void)
   }
 
   /* Do the CcsSendReply */
+#if CMK_USE_PERSISTENT_CCS
+  CcsSendReplyFd(appletIP, appletPort, strlen(reply) + 1, reply);
+#else
   CcsSendReply(appletIP, appletPort, strlen(reply) + 1, reply);
-  CmiPrintf("Reply = %s\n", reply);
+#endif
+  /* CmiPrintf("Reply = %s\n", reply); */
   free(reply);
 
   /* Free valueArray contents */
@@ -1075,6 +1080,7 @@ void CWebPerformanceDataCollectionHandler(char *msg){
     sendDataFunction();
   }
 }
+
 void CWebPerformanceGetData(void *dummy)
 {
   char *msg, data[100];
@@ -1121,6 +1127,7 @@ static void CWebHandler(char *msg){
     if(strcmp(name, "getStuff") == 0){
       appletIP = ip;
       appletPort = port;
+
       valueArray = (char **)malloc(sizeof(char *) * CmiNumPes());
       for(i = 0; i < CmiNumPes(); i++)
         valueArray[i] = 0;
@@ -2407,7 +2414,7 @@ void CcsSendReply(unsigned int ip, unsigned int port, int size, void *msg)
       CmiPrintf("client Exited\n");
       return; /* maybe the requester exited */
   }
-  sprintf(cmd, "reply %d\n", size);
+  sprintf(cmd, "reply %10d\n", size);
   writeall(fd, cmd, strlen(cmd));
   writeall(fd, msg, size);
 
@@ -2418,6 +2425,27 @@ void CcsSendReply(unsigned int ip, unsigned int port, int size, void *msg)
 #else
   close(fd);
 #endif
+}
+
+void CcsSendReplyFd(unsigned int ip, unsigned int port, int size, void *msg)
+{
+  char cmd[100], c;
+  int fd;
+
+  fd = appletFd;
+  if (fd<0) {
+    CmiPrintf("client Exited\n");
+    return; /* maybe the requester exited */
+  }
+  sprintf(cmd, "reply %10d\n", size);
+  writeall(fd, cmd, strlen(cmd));
+  writeall(fd, msg, size);
+#if CMK_SYNCHRONIZE_ON_TCP_CLOSE
+  shutdown(fd, 1);
+  while (read(fd, &c, 1)==EINTR);
+#endif
+
+  usleep(1);
 }
 
 #endif
