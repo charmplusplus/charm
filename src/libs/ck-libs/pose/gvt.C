@@ -203,6 +203,8 @@ void GVT::runGVT(UpdateMsg *m)
   lastNextEarliest = m->nextTS;
   lastNextSends = m->nextSends;
   lastNextRecvs = m->nextRecvs;
+  inactive = m->inactive;
+  inactiveTime = m->inactiveTime;
   //nextLBstart = m->nextLB;
   CkFreeMsg(m);
   CProxy_PVT p(ThePVT);
@@ -414,6 +416,8 @@ void GVT::computeGVT(UpdateMsg *m)
       umsg->nextTS = nextEarliest;
       umsg->nextSends = nextSends;
       umsg->nextRecvs = nextRecvs;
+      umsg->inactive = inactive;
+      umsg->inactiveTime = inactiveTime;
       g[(CkMyPe()+1) % CkNumPes()].runGVT(umsg);
     }
     optGVT = conGVT = -1;

@@ -27,6 +27,7 @@ public:
   int optPVT, conPVT;         // pvts of local optimistic/conservative objects
   int earlyTS, earlySends, earlyRecvs;
   int nextTS, nextSends, nextRecvs;
+  int inactive, inactiveTime;
   int nextLB;                 // iterations of GVT since last LB
 };
 

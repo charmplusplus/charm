@@ -55,7 +55,9 @@ void sim::Step()
   switch (myStrat->STRAT_T) {
   case CONS_T:
   case OPT_T:
-  case OPT2_T:
+  case OPT2_T: // do it now!
+    myStrat->Step();
+    break;
   case OPT3_T: // prioritized step
     if (eq->currentPtr->timestamp >= 0) {
       pm->setPriority(eq->currentPtr->timestamp-INT_MAX);

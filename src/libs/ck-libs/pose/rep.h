@@ -16,7 +16,7 @@ class rep
   int ovt;                 // the object's virtual time
   int myHandle;            // the objects unique handle
   int copy;                // flag to signify if this is a checkpoint copy
-  rep() { ovt = 0; copy = 0; }
+  rep() { ovt = 0; copy = 0; parent = NULL; myStrat = NULL; }
   rep(int init_ovt) { ovt = init_ovt; copy = 0; }
   virtual ~rep() { }
   void init(eventMsg *m);  // call at start of constructor
