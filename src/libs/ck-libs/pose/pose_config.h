@@ -6,7 +6,7 @@
 /// Uncomment to gather and print POSE statistics set
 //#define POSE_STATS_ON 1
 //#define POSE_DOP_ON 1
-//#define PRIO_MSGS 1
+#define PRIO_MSGS 1 // timestep type must be int
 //#define MSG_RECYCLING 1
 /// Uncomment to make use of the Streaming Communication Library optimizations
 //#define POSE_COMM_ON 1
@@ -24,7 +24,7 @@
 #define STORE_RATE 10       // default checkpoint rate: 1 for every n events
 #define SPEC_WINDOW 10      // speculative event window size
 #define MIN_LEASH 10        // min speculative window for adaptive strategy
-#define MAX_LEASH 40        // max  "     "     "     "        "     "
+#define MAX_LEASH 20        // max  "     "     "     "        "     "
 #define LEASH_FLEX 1        // leash increment
 
 /// Load balancer constants

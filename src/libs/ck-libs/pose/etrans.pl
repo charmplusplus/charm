@@ -519,6 +519,7 @@ while (@line=split(' ',($thisline=getcodeline($inChandle)))) {
       $outChandle->print("        || (eq->currentPtr == eq->backPtr)) {\n");
       $outChandle->print("      myStrat->ResetRBevent(e);\n");
       $outChandle->print("    }\n");
+#      $outChandle->print("    Step();\n");
       $outChandle->print("    if (!rb) Step();\n");
       $outChandle->print("    else if (active == 0) { active = 1; POSE_Objects[thisIndex].Step(); }\n");
       $outChandle->print("  }\n");
