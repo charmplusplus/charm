@@ -18,9 +18,9 @@
 // Flags not yet correct
 //#define _PAIRCALC_SECONDPHASE_LOADBAL_
 
-#define _FUNDER_
+//#define FORTRANUNDERSCORE
 
-#ifdef _FUNDER_
+#ifdef FORTRANUNDERSCORE
 #define ZGEMM zgemm_ 
 #define DCOPY dcopy_
 #define ZTODO ztodo_

@@ -1,12 +1,9 @@
-FFTW_HOME=/expand8/home/yanshi/fftw
+FFTW_HOME=$(HOME)/fftw
 CHARMC=$(CDIR)/bin/charmc $(OPTS) $(FLAGS)
 
 CDIR=../../../..
 LIBDIR=$(CDIR)/lib
 FFTW_LIBDIR=$(FFTW_HOME)/lib
-
-OPTS=-g
-FLAGS=-Wno-deprecated
 
 INCLUDE=-I$(FFTW_HOME)/include
 COMPILER=$(CHARMC) $(INCLUDE)
