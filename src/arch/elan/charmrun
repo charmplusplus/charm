@@ -82,10 +82,9 @@ EOF
 		qstat $jobid > tmp.$$
 		if [ ! $? -eq 0 ]
 		then
-# The job is done-- print its output
-			cat $output
+# The job is done-- print its output			
 			rm tmp.$$
-			exit 1
+			exec cat $output
 		fi
 # The job is still queued or running-- print status and wait
 		tail -1 tmp.$$
@@ -93,4 +92,3 @@ EOF
 		sleep 5
 	done
 fi
-
