@@ -3,9 +3,7 @@
 
 #define CMK_CMIPRINTF_IS_A_BUILTIN                         0
 
-#define CMK_HANDLE_SIGUSR                                  1
-
-#define CMK_MSG_HEADER_FIELDS CmiUInt2 rank,root,hdl,xhdl,info,stratid,pad1,pad2;
+#define CMK_MSG_HEADER_FIELDS CmiUInt2 rank,root,hdl,xhdl,info,stratid,size,pad2;
 #define CMK_MSG_HEADER_BASIC  CMK_MSG_HEADER_EXT
 #define CMK_MSG_HEADER_EXT    { CMK_MSG_HEADER_FIELDS }
 #define CMK_MSG_HEADER_BLUEGENE    { CMK_MSG_HEADER_FIELDS CMK_BLUEGENE_FIELDS }
@@ -15,12 +13,14 @@
 #define CMK_MULTICAST_LIST_USE_COMMON_CODE                 1
 #define CMK_MULTICAST_GROUP_USE_COMMON_CODE                1
 
-#define CMK_RSH_IS_A_COMMAND                               0
-#define CMK_RSH_NOT_NEEDED                                 1
-#define CMK_RSH_USE_REMSH                                  0
-
 #define CMK_SPANTREE_MAXSPAN                               4
 #define CMK_SPANTREE_USE_COMMON_CODE                       1
+
+/* definitions specific of lapi */
+/* CmiReference seems not to work at all, the other broadcast have not been fully checked */
+#define CMK_BROADCAST_SPANNING_TREE                        0
+#define CMK_BROADCAST_HYPERCUBE                            0
+#define CMK_BROADCAST_USE_CMIREFERENCE                     0
 
 #define CMK_VECTOR_SEND_USES_COMMON_CODE                   1
 
@@ -28,4 +28,4 @@
 
 #define NODE_0_IS_CONVHOST                                 1
 
-#define CMK_IMMEDIATE_MSG				   0
+#define CMK_IMMEDIATE_MSG				   1

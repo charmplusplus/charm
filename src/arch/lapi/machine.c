@@ -1,35 +1,32 @@
 /*****************************************************************************
 LAPI version of machine layer
-Based on the MPI and Elan versions of the machine layer
-
-Also based on Orion's LAPI test program.
+Based on the template machine layer
 
 Developed by 
-Sameer Kumar    12/05/03
+Filippo Gioachin   03/23/05
 ************************************************************************/
 
-#include <stdio.h>
-#include <errno.h>
-#include <stdlib.h>
-#include <string.h>
 #include <lapi.h>
-#include <sys/time.h>
-#include <assert.h>
 
 #include "converse.h"
+
+/*
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sys/time.h>
+*/
+#include <assert.h>
+#include <errno.h>
 
 /*Support for ++debug: */
 #include <unistd.h> /*For getpid()*/
 #include <stdlib.h> /*For sleep()*/
 
-#if defined(CMK_SHARED_VARS_POSIX_THREADS_SMP)
-#define CMK_SMP 1
-#endif
-
 #include "machine.h"
 #include "pcqueue.h"
 
-#define MAX_QLEN 200
+/* #define MAX_QLEN 200 */
 
 /*
     To reduce the buffer used in broadcast and distribute the load from 
@@ -38,50 +35,70 @@ Sameer Kumar    12/05/03
     This will use the fourth short in message as an indicator of spanning tree
   root.
 */
-#if CMK_SMP
-#define CMK_BROADCAST_SPANNING_TREE    1
-#else
-#define CMK_BROADCAST_SPANNING_TREE    1
-#define CMK_BROADCAST_HYPERCUBE        0
-#endif
 
-#define BROADCAST_SPANNING_FACTOR      4
+#define BROADCAST_SPANNING_FACTOR        CMK_SPANTREE_MAXSPAN
 
 #define CMI_BROADCAST_ROOT(msg)          ((CmiMsgHeaderBasic *)msg)->root
-#define CMI_GET_CYCLE(msg)               ((CmiMsgHeaderBasic *)msg)->root
-
 #define CMI_DEST_RANK(msg)               ((CmiMsgHeaderBasic *)msg)->rank
 
-#if CMK_BROADCAST_SPANNING_TREE
-#  define CMI_SET_BROADCAST_ROOT(msg, root)  CMI_BROADCAST_ROOT(msg) = (root);
-#else
-#  define CMI_SET_BROADCAST_ROOT(msg, root)
-#endif
-
-#if CMK_BROADCAST_HYPERCUBE
-#  define CMI_SET_CYCLE(msg, cycle)  CMI_GET_CYCLE(msg) = (cycle);
-#else
-#  define CMI_SET_CYCLE(msg, cycle)
-#endif
 
 static int lapiDebugMode=0;
-static int lapiInterruptMode=0;
+/* static int lapiInterruptMode=0; */
 
-static int SHORT_MESSAGE_SIZE=512;
+CsvDeclare(int, lapiInterruptMode);
 
-int               _Cmi_numpes;
-int               _Cmi_mynode;    /* Which address space am I */
-int               _Cmi_mynodesize;/* Number of processors in my address space */
-int               _Cmi_numnodes;  /* Total number of address spaces */
-int               _Cmi_numpes;    /* Total number of processors */
-static int        Cmi_nodestart; /* First processor in this address space */ 
+/* static int SHORT_MESSAGE_SIZE=512; */
+
+static void ConverseRunPE(int everReturn);
+static void PerrorExit(const char *msg);
+static int Cmi_nodestart;   /* First processor in this node - stupid need due to
+			       machine-smp.h that uses it!!  */
+
+#include "machine-smp.c"
+
+
+/* Variables describing the processor ID */
+
+#if CMK_SHARED_VARS_UNAVAILABLE
+
+int _Cmi_mype;
+int _Cmi_numpes;
+int _Cmi_myrank;
+
+void CmiMemLock() {}
+void CmiMemUnlock() {}
+
+static struct CmiStateStruct Cmi_state;
+
+#define CmiGetState() (&Cmi_state)
+#define CmiGetStateN(n) (&Cmi_state)
+
+void CmiYield() { sleep(0); }
+
+#elif CMK_SHARED_VARS_POSIX_THREADS_SMP
+
+int _Cmi_numpes;
+int _Cmi_mynodesize;
+int _Cmi_mynode;
+int _Cmi_numnodes;
+
+int CmiMyPe(void) { return CmiGetState()->pe; }
+
+int CmiMyRank(void) { return CmiGetState()->rank; }
+
+int CmiNodeFirst(int node) { return node*_Cmi_mynodesize; }
+int CmiNodeSize(int node)  { return _Cmi_mynodesize; }
+
+int CmiNodeOf(int pe)      { return (pe/_Cmi_mynodesize); }
+int CmiRankOf(int pe)      { return pe-(CmiNodeOf(pe)*_Cmi_mynodesize); }
+
+#endif
+
 CpvDeclare(void*, CmiLocalQueue);
 
-int 		  idleblock = 0;
-
-#if CMK_NODE_QUEUE_AVAILABLE
 #define DGRAM_NODEMESSAGE   (0xFB)
 
+#if CMK_NODE_QUEUE_AVAILABLE
 #define NODE_BROADCAST_OTHERS (-1)
 #define NODE_BROADCAST_ALL    (-2)
 #endif
@@ -99,7 +116,7 @@ static void check_lapi_err(int returnCode,const char *routine,int line) {
         }
 }
 
-static void ConverseRunPE(int everReturn);
+/*
 static void CommunicationServer(int sleepTime);
 static void CommunicationServerThread(int sleepTime);
 
@@ -108,7 +125,7 @@ typedef struct msg_list {
   struct msg_list *next;
   int size, destpe;
   
-  /* LAPI Stuff Here */
+  // LAPI Stuff Here 
   lapi_cntr_t lapiSendCounter;
   
 } SMSG_LIST;
@@ -118,35 +135,22 @@ static int request_max;
 
 static SMSG_LIST *sent_msgs=0;
 static SMSG_LIST *end_sent=0;
+*/
 
-static int Cmi_dim;
-
-static int no_outstanding_sends=0; 
+/* static int no_outstanding_sends=0; */
 /*FLAG: consume outstanding Isends in scheduler loop*/
 
 static lapi_handle_t lapiContext;
+static lapi_long_t lapiHeaderHandler = 1;
 
-#if NODE_0_IS_CONVHOST
-int inside_comm = 0;
-#endif
+/* double starttimer; */
 
-double starttimer;
+/* void CmiAbort(const char *message); */
 
-void CmiAbort(const char *message);
-static void PerrorExit(const char *msg);
+void SendSpanningChildren(int size, char *msg);
+void SendHypercube(int size, char *msg);
 
-void SendSpanningChildren(lapi_handle_t *context, int size, char *msg);
-void SendHypercube(lapi_handle_t *context, int size, char *msg);
-
-static void PerrorExit(const char *msg)
-{
-  perror(msg);
-  exit(1);
-}
-
-
-char *CopyMsg(char *msg, int len)
-{
+char *CopyMsg(char *msg, int len) {
   char *copy = (char *)CmiAlloc(len);
   if (!copy)
       fprintf(stderr, "Out of memory\n");
@@ -154,111 +158,50 @@ char *CopyMsg(char *msg, int len)
   return copy;
 }
 
-/**************************  TIMER FUNCTIONS **************************/
-
-#if CMK_TIMER_USE_SPECIAL
-
-/* timer calls may not be threadsafe, CHECK **********/
-static CmiNodeLock  timerLock = NULL;
-
-void CmiTimerInit(void)
-{
-  struct timestruc_t val;
-  gettimer(TIMEOFDAY, &val);
-  starttimer = val.tv_sec +  val.tv_nsec * 1e-9; 
-}
-
-double CmiTimer(void)
-{
-  struct timestruc_t val;
-  double t;
-#if CMK_SMP  
-  if (timerLock) CmiLock(timerLock);
-#endif  
-
-  gettimer(TIMEOFDAY, &val);  
-  t =   val.tv_sec +  val.tv_nsec * 1e-9 - starttimer;
-
-#if CMK_SMP
-  if (timerLock) CmiUnlock(timerLock);
-#endif
-
-  return t;
-}
-
-double CmiWallTimer(void)
-{
-  return CmiTimer();
-}
-
-double CmiCpuTimer(void)
-{
-  return CmiTimer();
-}
-
-#endif
-
-
 typedef struct ProcState {
-/* PCQueue      sendMsgBuf; */      /* per processor message sending queue */
-CmiNodeLock  recvLock;		    /* for cs->recv */
+  CmiNodeLock  recvLock;		    /* for cs->recv */
 } ProcState;
 
 static ProcState  *procState;
 
+/*
 #if CMK_SMP
 
 static PCQueue sendMsgBuf;
-static CmiNodeLock  sendMsgBufLock = NULL;        /* for sendMsgBuf */
+static CmiNodeLock  sendMsgBufLock = NULL;        // for sendMsgBuf 
 
 #endif
+*/
 
-/************************************************************
- * 
- * Processor state structure
- *
- ************************************************************/
-
-/* fake Cmi_charmrun_fd */
-static int Cmi_charmrun_fd = 0;
-#include "machine-smp.c"
-
+#if CMK_NODE_QUEUE_AVAILABLE
 CsvDeclare(CmiNodeState, NodeState);
+#endif
 
+#if CMK_IMMEDIATE_MSG
 #include "immediate.c"
+#endif
 
-#if ! CMK_SMP
-/************ non SMP **************/
-static struct CmiStateStruct Cmi_state;
-int _Cmi_mype;
-int _Cmi_myrank;
+#if CMK_SHARED_VARS_UNAVAILABLE
 
-void CmiMemLock(void) {}
-void CmiMemUnlock(void) {}
-
-#define CmiGetState() (&Cmi_state)
-#define CmiGetStateN(n) (&Cmi_state)
-
-void CmiYield(void) { sleep(0); }
-
-static void CmiStartThreads(char **argv)
-{
+/* To conform with the call made in SMP mode */
+static void CmiStartThreads(char **argv) {
   CmiStateInit(Cmi_nodestart, 0, &Cmi_state);
-  _Cmi_mype = Cmi_nodestart;
+  /* _Cmi_mype = Cmi_nodestart; // already set! */
   _Cmi_myrank = 0;
-}      
-#endif	/* non smp */
+}
+#endif
 
-/*Add a message to this processor's receive queue, pe is a rank */
-static void CmiPushPE(int pe,void *msg)
-{
+/* Add a message to this processor's receive queue, pe is a rank */
+static void CmiPushPE(int pe,void *msg) {
   CmiState cs = CmiGetStateN(pe);
-  MACHSTATE2(3,"Pushing message into rank %d's queue %p{",pe, cs->recv);
+  MACHSTATE3(3,"[%p] Pushing message into rank %d's queue %p {",CmiGetState(),pe, cs->recv);
 
 #if CMK_IMMEDIATE_MSG
   if (CmiIsImmediate(msg)) {
-    *(CmiUInt2 *)msg = pe;
+    MACHSTATE1(3, "[%p] Handling Immediate Message",CmiGetState());
+    CMI_DEST_RANK(msg) = pe;
     CmiPushImmediateMsg(msg);
+    CmiHandleImmediate();
     return;
   }
 #endif
@@ -278,14 +221,15 @@ static void CmiPushPE(int pe,void *msg)
 
 #if CMK_NODE_QUEUE_AVAILABLE
 /*Add a message to this processor's receive queue */
-static void CmiPushNode(void *msg)
-{
-  MACHSTATE(3,"Pushing message into NodeRecv queue");
+static void CmiPushNode(void *msg) {
+  MACHSTATE1(3,"[%p] Pushing message into NodeRecv queue",CmiGetState());
 
 #if CMK_IMMEDIATE_MSG
   if (CmiIsImmediate(msg)) {
+    MACHSTATE1(3, "[%p] Handling Immediate Message",CmiGetState());
     CMI_DEST_RANK(msg) = 0;
     CmiPushImmediateMsg(msg);
+    CmiHandleImmediate();
     return;
   }
 #endif
@@ -302,32 +246,11 @@ static void CmiPushNode(void *msg)
 }
 #endif
 
-#ifndef CmiMyPe
-int CmiMyPe(void)
-{
-  return CmiGetState()->pe;
-}
-#endif
+/*
+Functions to release the space used by sent messages. This is handled by the
+sender completion handler.
 
-#ifndef CmiMyRank
-int CmiMyRank(void)
-{
-  return CmiGetState()->rank;
-}
-#endif
-
-#ifndef CmiNodeFirst
-int CmiNodeFirst(int node) { return node*_Cmi_mynodesize; }
-int CmiNodeSize(int node)  { return _Cmi_mynodesize; }
-#endif
-
-#ifndef CmiNodeOf
-int CmiNodeOf(int pe)      { return (pe/_Cmi_mynodesize); }
-int CmiRankOf(int pe)      { return pe%_Cmi_mynodesize; }
-#endif
-
-static int CmiAllAsyncMsgsSent(void)
-{
+static int CmiAllAsyncMsgsSent(void) {
    SMSG_LIST *msg_tmp = sent_msgs;
    
    int done;
@@ -363,13 +286,7 @@ int CmiAsyncMsgSent(CmiCommHandle c) {
   }
 }
 
-void CmiReleaseCommHandle(CmiCommHandle c)
-{
-  return;
-}
-
-static void CmiReleaseSentMessages(void)
-{
+static void CmiReleaseSentMessages(void) {
   SMSG_LIST *msg_tmp=sent_msgs;
   SMSG_LIST *prev=0;
   SMSG_LIST *temp;
@@ -386,9 +303,9 @@ static void CmiReleaseSentMessages(void)
       MACHSTATE2(3,"CmiReleaseSentMessages release one %d to %d", CmiMyPe(), msg_tmp->destpe);
       MsgQueueLen--;
       
-      /* Release the message */
+      // Release the message
       temp = msg_tmp->next;
-      if(prev==0)  /* first message */
+      if(prev==0)  // first message
         sent_msgs = temp;
       else
         prev->next = temp;
@@ -403,42 +320,16 @@ static void CmiReleaseSentMessages(void)
   end_sent = prev;
   MACHSTATE(2,"} CmiReleaseSentMessages end");
 }
+*/
 
-static void PumpMsgsComplete(lapi_handle_t *myLapiContext, void *am_info);
-
-static void* PumpMsgsBegin(lapi_handle_t *myLapiContext,
-			   void *hdr, uint *uhdr_len,  uint *msg_len,
-			   compl_hndlr_t **comp_h, void **comp_am_info)
-{
-  void *msg_buf;
-  if(*msg_len == 0) {
-    msg_buf = CopyMsg(hdr, *uhdr_len);
-    PumpMsgsComplete(NULL, msg_buf);
-
-    /* *comp_h = NULL; */
-    *comp_am_info = NULL;
-  }
-  else {
-    msg_buf = (void *)malloc(*msg_len);
-    
-    *comp_h = PumpMsgsComplete;
-    *comp_am_info = msg_buf;
-  }
-
-  return msg_buf;  
-}
-
-
-static void  PumpMsgsComplete(lapi_handle_t *myLapiContext,
-			    void *am_info)
-{
-  int nbytes, flg, res;
+/* lapi completion handler */
+static void PumpMsgsComplete(lapi_handle_t *myLapiContext, void *am_info) {
+  int i;
   char *msg = am_info;
   
-  nbytes = ((CmiMsgHeaderBasic *)msg)->size;
+  int nbytes = ((CmiMsgHeaderBasic *)msg)->size;
   
-  MACHSTATE(2,"PumpMsgsComplete begin {");
-  flg = 0;
+  MACHSTATE1(2,"[%p] PumpMsgsComplete begin {",CmiGetState());
   
 #if CMK_NODE_QUEUE_AVAILABLE
   if (CMI_DEST_RANK(msg)==DGRAM_NODEMESSAGE)
@@ -447,32 +338,87 @@ static void  PumpMsgsComplete(lapi_handle_t *myLapiContext,
 #endif
     CmiPushPE(CMI_DEST_RANK(msg), msg);
 
-#if CMK_IMMEDIATE_MSG && !CMK_SMP
-  CmiHandleImmediate();
-#endif
-
+  /*
   if(!myLapiContext)
     return;
+  */
 
 #if CMK_BROADCAST_SPANNING_TREE
-  if (CMI_BROADCAST_ROOT(msg)) 
-    SendSpanningChildren(myLapiContext, nbytes, msg);
+  if (CMI_BROADCAST_ROOT(msg)) {
+    SendSpanningChildren(nbytes, msg);
+  }
   
 #elif CMK_BROADCAST_HYPERCUBE
-  if (CMI_GET_CYCLE(msg))
-    SendHypercube(myLapiContext, nbytes, msg);
+  if (CMI_BROADCAST_ROOT(msg)) {
+    SendHypercube(nbytes, msg);
+  }
+#endif
+
+#if CMK_SMP
+  if (CMI_BROADCAST_ROOT(msg) && CMI_DEST_RANK(msg)!=DGRAM_NODEMESSAGE) {
+    assert(CMI_DEST_RANK(msg)==0);
+    for (i=1; i<CmiMyNodeSize(); ++i) {
+      CmiPushPE(i, msg);
+    }
+  }
 #endif
 
   MACHSTATE(2,"} PumpMsgsComplete end ");
   return;
 }
 
+/* lapi header handler */
+static void* PumpMsgsBegin(lapi_handle_t *myLapiContext,
+			   void *hdr, uint *uhdr_len,
+			   lapi_return_info_t *msg_info,
+			   compl_hndlr_t **comp_h, void **comp_am_info) {
+  void *msg_buf;
+  MACHSTATE1(2,"[%p] PumpMsgsBegin begin {",CmiGetState());
+  /*
+  if(msg_info->udata_one_pkt_ptr != NULL) {
+    // it means that all the data has already arrived
+    msg_buf = CopyMsg(msg_info->udata_one_pkt_ptr, msg_info->msg_len);
+    PumpMsgsComplete(myLapiContext, msg_buf);
+
+    *comp_h = NULL;
+    *comp_am_info = NULL;
+    MACHSTATE(2,"} PumpMsgsBegin end single message");
+    return NULL;
+  } else {
+  */
+    /* prepare the space for receiving the data, set the completion handler to
+       be executed inline */
+    msg_buf = (void *)CmiAlloc(msg_info->msg_len);
+    
+    msg_info->ret_flags = LAPI_SEND_REPLY;
+    *comp_h = PumpMsgsComplete;
+    *comp_am_info = msg_buf;
+    MACHSTATE(2,"} PumpMsgsBegin end");
+    return msg_buf;
+    /*}*/
+}
+
+/* lapi sender handlers*/
+static void ReleaseMsg(lapi_handle_t *myLapiContext, void *msg, lapi_sh_info_t *info) {
+  MACHSTATE2(2,"[%p] ReleaseMsg begin %p {",CmiGetState(),msg);
+  check_lapi_err(info->reason, "ReleaseMsg", __LINE__);
+  CmiFree(msg);
+  MACHSTATE(2,"} ReleaseMsg end");
+}
+
+static void DeliveredMsg(lapi_handle_t *myLapiContext, void *msg, lapi_sh_info_t *info) {
+  MACHSTATE1(2,"[%p] DeliveredMsg begin {",CmiGetState());
+  check_lapi_err(info->reason, "DeliveredMsg", __LINE__);
+  *((int *)msg) = *((int *)msg) - 1;
+  MACHSTATE(2,"} DeliveredMsg end");
+}
+
+/*
 #if CMK_SMP
 
 static int inexit = 0;
 
-static int MsgQueueEmpty()
-{
+static int MsgQueueEmpty() {
   int i;
 #if 0
   for (i=0; i<_Cmi_mynodesize; i++)
@@ -485,9 +431,8 @@ static int MsgQueueEmpty()
 
 static int SendMsgBuf();
 
-/* test if all processors recv queues are empty */
-static int RecvQueueEmpty()
-{
+// test if all processors recv queues are empty
+static int RecvQueueEmpty() {
   int i;
   for (i=0; i<_Cmi_mynodesize; i++) {
     CmiState cs=CmiGetStateN(i);
@@ -495,23 +440,17 @@ static int RecvQueueEmpty()
   }
   return 1;
 }
+*/
 
 /**
 CommunicationServer calls MPI to send messages in the queues and probe message from network.
 */
-static void CommunicationServer(int sleepTime)
-{
-  int static count=0;
 /*
-  count ++;
-  if (count % 10000000==0) MACHSTATE(3, "Entering CommunicationServer {");
-*/
-  /* PumpMsgs(); */
+static void CommunicationServer(int sleepTime) {
+  // PumpMsgs();
   CmiReleaseSentMessages();
   SendMsgBuf(); 
-/*
-  if (count % 10000000==0) MACHSTATE(3, "} Exiting CommunicationServer.");
-*/
+
   if (inexit == CmiMyNodeSize()) {
     MACHSTATE(2, "CommunicationServer exiting {");
 #if 0
@@ -520,7 +459,7 @@ static void CommunicationServer(int sleepTime)
     while(!MsgQueueEmpty() || !CmiAllAsyncMsgsSent()) {
       CmiReleaseSentMessages();
       SendMsgBuf(); 
-      /* PumpMsgs(); */
+      // PumpMsgs();
     }
 
     MACHSTATE(2, "CommunicationServer barrier begin {");
@@ -538,11 +477,11 @@ static void CommunicationServer(int sleepTime)
     exit(0);   
   }
 }
-
 #endif
+*/
 
-static void CommunicationServerThread(int sleepTime)
-{
+/*
+static void CommunicationServerThread(int sleepTime) {
 #if CMK_SMP
   CommunicationServer(sleepTime);
 #endif
@@ -550,15 +489,15 @@ static void CommunicationServerThread(int sleepTime)
   CmiHandleImmediate();
 #endif
 }
+*/
 
 #if CMK_NODE_QUEUE_AVAILABLE
-char *CmiGetNonLocalNodeQ(void)
-{
+char *CmiGetNonLocalNodeQ(void) {
   CmiState cs = CmiGetState();
   char *result = 0;
   CmiIdleLock_checkMessage(&cs->idle);
   if(!PCQueueEmpty(CsvAccess(NodeState).NodeRecv)) {
-    MACHSTATE1(3,"CmiGetNonLocalNodeQ begin %d {", CmiMyPe());
+    MACHSTATE2(3,"[%p] CmiGetNonLocalNodeQ begin %d {",CmiGetState(),CmiMyPe());
     CmiLock(CsvAccess(NodeState).CmiNodeRecvLock);
     result = (char *) PCQueuePop(CsvAccess(NodeState).NodeRecv);
     CmiUnlock(CsvAccess(NodeState).CmiNodeRecvLock);
@@ -568,88 +507,206 @@ char *CmiGetNonLocalNodeQ(void)
 }
 #endif
 
-void *CmiGetNonLocal(void)
-{
+void *CmiGetNonLocal(void) {
+  CmiState cs = CmiGetState();
+  CmiIdleLock_checkMessage(&cs->idle);
+  MACHSTATE2(3,"[%p] CmiGetNonLocal %d",CmiGetState(),CmiMyPe());
+  return PCQueuePop(cs->recv);
+  /*
   static int count=0;
   CmiState cs = CmiGetState();
   void *msg;
   CmiIdleLock_checkMessage(&cs->idle);
 
-  /* POSSIBLY UNNECESSARY LOCKING *******************/
+  // un-necessary locking since only one processor pulls the queue, and the queue is lock safe
 
-  CmiLock(procState[cs->rank].recvLock);
+  //CmiLock(procState[cs->rank].recvLock);
   msg =  PCQueuePop(cs->recv); 
-  CmiUnlock(procState[cs->rank].recvLock);
+  //CmiUnlock(procState[cs->rank].recvLock);
 
 #if ! CMK_SMP
   if (no_outstanding_sends) {
     while (MsgQueueLen>0) {
       CmiReleaseSentMessages();
-      /* PumpMsgs() ??*/
+      // PumpMsgs() ??
     }
   }
 
   if(!msg) {
     CmiReleaseSentMessages();
-    /* Potentially put a flag here!! */
+    // Potentially put a flag here!!
     return  PCQueuePop(cs->recv);
   }
 #endif
   return msg;
+*/
 }
 
-void CmiNotifyIdle(void)
-{
-  CmiReleaseSentMessages();
+void CmiNotifyIdle(void) {
+  /* CmiReleaseSentMessages(); */
+  LAPI_Probe(lapiContext);
+  CmiYield();
 }
  
-/* user call to handle immediate message, only useful in non SMP version
-   using polling method to schedule message.
+/* user call to handle immediate message, since there is no ServerThread polling
+   messages (lapi does all the polling) every thread is authorized to process
+   immediate messages. If we are not in lapiInterruptMode check for progress.
 */
 #if CMK_IMMEDIATE_MSG
-void CmiProbeImmediateMsg()
-{
-#if !CMK_SMP
+void CmiProbeImmediateMsg() {
+  MACHSTATE1(2,"[%p] Probing Immediate Messages",CmiGetState());
+  if (!CsvAccess(lapiInterruptMode)) LAPI_Probe(lapiContext);
+  MACHSTATE1(3, "[%p] Handling Immediate Message",CmiGetState());
   CmiHandleImmediate();
-#endif
 }
 #endif
+
+/* These two barriers are only needed by CmiTimerInit to synchronize all the
+   threads. They do not need to provide a general barrier. */
+void CmiBarrier() {}
+void CmiBarrierZero() {}
 
 /********************* MESSAGE SEND FUNCTIONS ******************/
 
-static void CmiSendSelf(char *msg)
-{
+static void CmiSendSelf(char *msg) {
+  MACHSTATE1(3,"[%p] Sending itself a message {",CmiGetState());
+
 #if CMK_IMMEDIATE_MSG
-    if (CmiIsImmediate(msg)) {
-      /* CmiBecomeNonImmediate(msg); */
-      CmiHandleImmediateMessage(msg);
-      return;
-    }
+  if (CmiIsImmediate(msg)) {
+    MACHSTATE1(3, "[%p] Handling Immediate Message",CmiGetState());
+    /* CmiBecomeNonImmediate(msg); */
+    CmiPushImmediateMsg(msg);
+    CmiHandleImmediate();
+    return;
+  }
 #endif
-    CQdCreate(CpvAccess(cQdState), 1);
-    CdsFifo_Enqueue(CpvAccess(CmiLocalQueue),msg);
+  CQdCreate(CpvAccess(cQdState), 1);
+  CdsFifo_Enqueue(CmiGetState()->localqueue,msg);
+
+  MACHSTATE(3,"} Sending itself a message");
 }
 
-void CmiSyncSendFn(int destPE, int size, char *msg)
-{
-  CmiState cs = CmiGetState();
-  char *dupmsg = (char *) CmiAlloc(size);
-  memcpy(dupmsg, msg, size);
+/* the field deliverable is used to know if the message can be encoded into the
+   destPE queue without duplication (for usage of SMP). If it has already been
+   duplicated (and therefore is deliverable), we do not want to copy it again,
+   while if it has not been copied we must do it before enqueuing it. */
+void lapiSendFn(int destPE, int size, char *msg, scompl_hndlr_t *shdlr, void *sinfo, int deliverable) {
+  /* CmiState cs = CmiGetState(); */
+  CmiUInt2  rank, node;
+  lapi_xfer_t xfer_cmd;
+     
+  MACHSTATE1(2,"[%p] lapiSendFn begin {",CmiGetState());
+  CQdCreate(CpvAccess(cQdState), 1);
+  node = CmiNodeOf(destPE);
+#if CMK_SMP
+  rank = CmiRankOf(destPE);
+  
+  if (node == CmiMyNode())  {
+    if (deliverable) {
+      CmiPushPE(rank, msg);
+      /* the acknowledge of delivery must not be called */
+    } else {
+      CmiPushPE(rank, CopyMsg(msg, size));
+      /* acknowledge that the message has been delivered */
+      lapi_sh_info_t lapiInfo;
+      lapiInfo.src = node;
+      lapiInfo.reason = LAPI_SUCCESS;
+      (*shdlr)(&lapiContext, sinfo, &lapiInfo);
+    }
+    return;
+  }
+  /*
+  CMI_DEST_RANK(msg) = rank;
+#else
+  // non smp
+  CMI_DEST_RANK(msg) = 0;	// rank is always 0
+  */
+#endif
+  /* The rank is now set by the caller function! */
 
-  CMI_SET_BROADCAST_ROOT(dupmsg, 0);
+  /* send the message out of the processor */
+
+  /*
+  msg_tmp = (SMSG_LIST *) CmiAlloc(sizeof(SMSG_LIST));
+  msg_tmp->msg = msg;
+  msg_tmp->next = 0;
+  while (MsgQueueLen > request_max) {
+    //printf("Waiting for %d messages to be sent\n", MsgQueueLen);
+    CmiReleaseSentMessages();
+  }
+
+  check_lapi(LAPI_Setcntr, (*my_context, &msg_tmp->lapiSendCounter, 0));
+  */
+  if (CMI_DEST_RANK(msg) > 10) MACHSTATE2(5, "Error!! in lapiSendFn! destPe=%d, destRank=%d",destPE,CMI_DEST_RANK(msg));
+
+  xfer_cmd.Am.Xfer_type = LAPI_AM_XFER;
+  xfer_cmd.Am.flags     = 0;
+  xfer_cmd.Am.tgt       = node;
+  xfer_cmd.Am.hdr_hdl   = lapiHeaderHandler;
+  xfer_cmd.Am.uhdr_len  = 0;
+  xfer_cmd.Am.uhdr      = NULL;
+  xfer_cmd.Am.udata     = msg;
+  xfer_cmd.Am.udata_len = size;
+  xfer_cmd.Am.shdlr     = shdlr;
+  xfer_cmd.Am.sinfo     = sinfo;
+  xfer_cmd.Am.tgt_cntr  = NULL;
+  xfer_cmd.Am.org_cntr  = NULL;
+  xfer_cmd.Am.cmpl_cntr = NULL;
+
+  check_lapi(LAPI_Xfer,(lapiContext, &xfer_cmd));
+
+  MACHSTATE(2,"} lapiSendFn end");
+  /*
+  if(size < SHORT_MESSAGE_SIZE && my_context != NULL) {
+    check_lapi(LAPI_Amsend,(*my_context, node, (void *)PumpMsgsBegin, 
+			    msg, size, 0, 0, NULL, NULL,
+			    &msg_tmp->lapiSendCounter));      
+  }
+  else {
+
+    if(my_context == NULL)
+      my_context = &lapiContext;
+    
+    check_lapi(LAPI_Amsend,(*my_context, destPE,
+			    (void *)PumpMsgsBegin, 0, 0, msg, size,
+			    NULL, NULL, &msg_tmp->lapiSendCounter));
+  }
+  */
+  /*
+  MsgQueueLen++;
+  if(sent_msgs==0)
+    sent_msgs = msg_tmp;
+  else
+    end_sent->next = msg_tmp;
+  end_sent = msg_tmp;
+  return (CmiCommHandle) msg_tmp;
+  */
+}
+
+void CmiSyncSendFn(int destPE, int size, char *msg) {
+  CmiState cs = CmiGetState();
+  /*char *dupmsg = (char *) CmiAlloc(size);
+    memcpy(dupmsg, msg, size); */
+  char *dupmsg = CopyMsg(msg, size);
+
+  MACHSTATE1(3,"[%p] Sending sync message begin {",CmiGetState());
+  CMI_BROADCAST_ROOT(dupmsg) = 0;
+  CMI_DEST_RANK(dupmsg) = CmiRankOf(destPE);
 
   if (cs->pe==destPE) {
     CmiSendSelf(dupmsg);
+  } else {
+    lapiSendFn(destPE, size, dupmsg, ReleaseMsg, dupmsg, 1);
+    /*CmiAsyncSendFn(destPE, size, dupmsg); */
   }
-  else
-    CmiAsyncSendFn(destPE, size, dupmsg);
+  MACHSTATE(3,"} Sending sync message end");
 }
 
+/*
 #if CMK_SMP
 
-/* called by communication thread in SMP */
-static int SendMsgBuf()
-{
+// called by communication thread in SMP
+static int SendMsgBuf() {
   SMSG_LIST *msg_tmp;
   char *msg;
   int node, rank, size;
@@ -658,7 +715,7 @@ static int SendMsgBuf()
 
   MACHSTATE(2,"SendMsgBuf begin {");
 
-  /* single message sending queue */
+  // single message sending queue
   CmiLock(sendMsgBufLock);
   msg_tmp = (SMSG_LIST *)PCQueuePop(sendMsgBuf);
   CmiUnlock(sendMsgBufLock);
@@ -671,7 +728,7 @@ static int SendMsgBuf()
       msg_tmp->next = 0;
       while (MsgQueueLen > request_max) {
 	CmiReleaseSentMessages();
-	/* PumpMsgs(); */
+	// PumpMsgs();
       }
       
       MACHSTATE2(3,"LAPI_Amsend to node %d rank: %d{", node,CMI_DEST_RANK(msg));
@@ -703,8 +760,7 @@ static int SendMsgBuf()
   return sent;
 }
 
-  void EnqueueMsg(void *m, int size, int node)    
-{
+void EnqueueMsg(void *m, int size, int node) {
   SMSG_LIST *msg_tmp = (SMSG_LIST *) CmiAlloc(sizeof(SMSG_LIST));
   MACHSTATE1(3,"EnqueueMsg to node %d {{ ", node);
   msg_tmp->msg = m;
@@ -717,11 +773,11 @@ static int SendMsgBuf()
 }
 
 #endif
+*/
 
-
+/*
 CmiCommHandle lapiSendFn(lapi_handle_t *my_context, int destPE, 
-			     int size, char *msg)
-{
+			     int size, char *msg) {
   CmiState cs = CmiGetState();
   SMSG_LIST *msg_tmp;
   CmiUInt2  rank, node;
@@ -747,13 +803,13 @@ CmiCommHandle lapiSendFn(lapi_handle_t *my_context, int destPE,
 
 #else
   
-  /* non smp */
-  CMI_DEST_RANK(msg) = 0;	/* rank is always 0 */
+  // non smp
+  CMI_DEST_RANK(msg) = 0;	// rank is always 0
   msg_tmp = (SMSG_LIST *) CmiAlloc(sizeof(SMSG_LIST));
   msg_tmp->msg = msg;
   msg_tmp->next = 0;
   while (MsgQueueLen > request_max) {
-    /*printf("Waiting for %d messages to be sent\n", MsgQueueLen);*/
+    //printf("Waiting for %d messages to be sent\n", MsgQueueLen);
     CmiReleaseSentMessages();
   }
 
@@ -783,214 +839,125 @@ CmiCommHandle lapiSendFn(lapi_handle_t *my_context, int destPE,
   return (CmiCommHandle) msg_tmp;
 #endif
 }
+*/
 
-CmiCommHandle CmiAsyncSendFn(int destPE, int size, char *msg) {
-  return lapiSendFn(&lapiContext, destPE, size, msg);
+int CmiAsyncMsgSent(CmiCommHandle handle) {
+  return (*((int *)handle) == 0)?1:0;
 }
 
+void CmiReleaseCommHandle(CmiCommHandle handle) {
+#ifndef CMK_OPTIMIZE
+  if (*((int *)handle) != 0) CmiAbort("Released a CmiCommHandle not free!");
+#endif
+  free(handle);
+}
 
-void CmiFreeSendFn(int destPE, int size, char *msg)
-{
+/* the CmiCommHandle returned is a pointer to the location of an int. When it is
+   set to 1 the message is available. */
+CmiCommHandle CmiAsyncSendFn(int destPE, int size, char *msg) {
+  MACHSTATE1(3,"[%p] Sending async message begin {",CmiGetState());
+  void *handle;
   CmiState cs = CmiGetState();
-  CMI_SET_BROADCAST_ROOT(msg, 0);
+  CMI_BROADCAST_ROOT(msg) = 0;
+  CMI_DEST_RANK(msg) = CmiRankOf(destPE);
+
+  /* if we are the destination, send ourself a copy of the message */
+  if (cs->pe==destPE) {
+    CmiSendSelf(CopyMsg(msg, size));
+    MACHSTATE(3,"} Sending async message end");
+    return 0;
+  }
+
+  handle = malloc(sizeof(int));
+  *((int *)handle) = 1;
+  lapiSendFn(destPE, size, msg, DeliveredMsg, handle, 0);
+  /* the message may have been duplicated and already delivered if we are in SMP
+     mode and the destination is on the same node, but there is no optimized
+     check for that. */
+  MACHSTATE(3,"} Sending async message end");
+  return handle;
+}
+
+void CmiFreeSendFn(int destPE, int size, char *msg) {
+  MACHSTATE1(3,"[%p] Sending sync free message begin {",CmiGetState());
+  CmiState cs = CmiGetState();
+  CMI_BROADCAST_ROOT(msg) = 0;
+  CMI_DEST_RANK(msg) = CmiRankOf(destPE);
 
   if (cs->pe==destPE) {
     CmiSendSelf(msg);
   } else {
-    CmiAsyncSendFn(destPE, size, msg);
+    lapiSendFn(destPE, size, msg, ReleaseMsg, msg, 1);
+    /*CmiAsyncSendFn(destPE, size, msg);*/
   }
-}
-
-/*********************** BROADCAST FUNCTIONS **********************/
-
-/* same as CmiSyncSendFn, but don't set broadcast root in msg header */
-void CmiSyncSendFn1(lapi_handle_t *context, int destPE, int size, char *msg)
-{
-  CmiState cs = CmiGetState();
-  char *dupmsg = (char *) CmiAlloc(size);
-  memcpy(dupmsg, msg, size);
-  if (cs->pe==destPE)
-    CmiSendSelf(dupmsg);
-  else
-    lapiSendFn(context, destPE, size, dupmsg);
-}
-
-/* send msg to its spanning children in broadcast. G. Zheng */
-void SendSpanningChildren(lapi_handle_t *context, int size, char *msg)
-{
-  CmiState cs = CmiGetState();
-  int startpe = CMI_BROADCAST_ROOT(msg)-1;
-  int i;
-
-  assert(startpe>=0 && startpe<_Cmi_numpes);
-
-  for (i=1; i<=BROADCAST_SPANNING_FACTOR; i++) {
-    int p = cs->pe - startpe;
-    if (p<0) p+=_Cmi_numpes;
-    p = BROADCAST_SPANNING_FACTOR*p + i;
-    if (p > _Cmi_numpes - 1) break;
-    p += startpe;
-    p = p%_Cmi_numpes;
-    assert(p>=0 && p<_Cmi_numpes && p!=cs->pe);
-    CmiSyncSendFn1(context, p, size, msg);
-  }
-}
-
-#include <math.h>
-
-/* send msg along the hypercube in broadcast. (Sameer) */
-void SendHypercube(lapi_handle_t *context, int size, char *msg)
-{
-  CmiState cs = CmiGetState();
-  int curcycle = CMI_GET_CYCLE(msg);
-  int i;
-
-  double logp = CmiNumPes();
-  logp = log(logp)/log(2.0);
-  logp = ceil(logp);
-  
-  /*  CmiPrintf("In hypercube\n"); */
-
-  /* assert(startpe>=0 && startpe<_Cmi_numpes); */
-
-  for (i = curcycle; i < logp; i++) {
-    int p = cs->pe ^ (1 << i);
-    
-    /*   CmiPrintf("p = %d, logp = %5.1f\n", p, logp);*/
-
-    if(p < CmiNumPes()) {
-      CMI_SET_CYCLE(msg, i + 1);
-      CmiSyncSendFn1(context, p, size, msg);
-    }
-  }
-}
-
-void CmiSyncBroadcastFn(int size, char *msg)     /* ALL_EXCEPT_ME  */
-{
-#if CMK_BROADCAST_SPANNING_TREE
-  CMI_SET_BROADCAST_ROOT(msg, _Cmi_mype+1);
-  SendSpanningChildren(NULL, size, msg);
-  
-#elif CMK_BROADCAST_HYPERCUBE
-  CMI_SET_CYCLE(msg, 0);
-  SendHypercube(NULL, size, msg);
-    
-#else
-  CmiState cs = CmiGetState();
-  int i;
-
-  for ( i=cs->pe+1; i<_Cmi_numpes; i++ ) 
-    CmiSyncSendFn(i, size,msg) ;
-  for ( i=0; i<cs->pe; i++ ) 
-    CmiSyncSendFn(i, size,msg) ;
-#endif
-
-  /*CmiPrintf("In  SyncBroadcast broadcast\n");*/
-}
-
-
-/*  FIXME: luckily async is never used  G. Zheng */
-CmiCommHandle CmiAsyncBroadcastFn(int size, char *msg)  
-{
-  CmiState cs = CmiGetState();
-  int i ;
-
-  for ( i=cs->pe+1; i<_Cmi_numpes; i++ ) 
-    CmiAsyncSendFn(i,size,msg) ;
-  for ( i=0; i<cs->pe; i++ ) 
-    CmiAsyncSendFn(i,size,msg) ;
-
-  /*CmiPrintf("In  AsyncBroadcast broadcast\n");*/
-CmiAbort("CmiAsyncBroadcastFn should never be called");
-  return (CmiCommHandle) (CmiAllAsyncMsgsSent());
-}
-
-void CmiFreeBroadcastFn(int size, char *msg)
-{
-   CmiSyncBroadcastFn(size,msg);
-   CmiFree(msg);
-}
- 
-void CmiSyncBroadcastAllFn(int size, char *msg)        /* All including me */
-{
- 
-#if CMK_BROADCAST_SPANNING_TREE
-  CmiState cs = CmiGetState();
-  CmiSyncSendFn(cs->pe, size,msg) ;
-  CMI_SET_BROADCAST_ROOT(msg, cs->pe+1);
-  SendSpanningChildren(NULL, size, msg);
-
-#elif CMK_BROADCAST_HYPERCUBE
-  CmiState cs = CmiGetState();
-  CmiSyncSendFn(cs->pe, size,msg) ;
-  CMI_SET_CYCLE(msg, 0);
-  SendHypercube(NULL, size, msg);
-
-#else
-    int i ;
-     
-  for ( i=0; i<_Cmi_numpes; i++ ) 
-    CmiSyncSendFn(i,size,msg) ;
-#endif
-
-  /*CmiPrintf("In  SyncBroadcastAll broadcast\n");*/
-}
-
-CmiCommHandle CmiAsyncBroadcastAllFn(int size, char *msg)  
-{
-  int i ;
-
-  for ( i=1; i<_Cmi_numpes; i++ ) 
-    CmiAsyncSendFn(i,size,msg) ;
-
-  CmiAbort("In  AsyncBroadcastAll broadcast\n");
-    
-  return (CmiCommHandle) (CmiAllAsyncMsgsSent());
-}
-
-void CmiFreeBroadcastAllFn(int size, char *msg)  /* All including me */
-{
-
-#if CMK_BROADCAST_SPANNING_TREE
-  CmiState cs = CmiGetState();
-  CmiSyncSendFn(cs->pe, size,msg) ;
-  CMI_SET_BROADCAST_ROOT(msg, cs->pe+1);
-  SendSpanningChildren(NULL, size, msg);
-
-#elif CMK_BROADCAST_HYPERCUBE
-  CmiState cs = CmiGetState();
-  CmiSyncSendFn(cs->pe, size,msg) ;
-  CMI_SET_CYCLE(msg, 0);
-  SendHypercube(NULL, size, msg);
-
-#else
-  int i ;
-     
-  for ( i=0; i<_Cmi_numpes; i++ ) 
-    CmiSyncSendFn(i,size,msg) ;
-#endif
-  CmiFree(msg) ;
-  /*CmiPrintf("In FreeBroadcastAll broadcast\n");*/
+  MACHSTATE(3,"} Sending sync free message end");
 }
 
 #if CMK_NODE_QUEUE_AVAILABLE
 
-static void CmiSendNodeSelf(char *msg)
-{
+static void CmiSendNodeSelf(char *msg) {
+  CmiState cs;
+  MACHSTATE1(3,"[%p] Sending itself a node message {",CmiGetState());
+
 #if CMK_IMMEDIATE_MSG
-    if (CmiIsImmediate(msg)) {
-      CmiHandleImmediateMessage(msg);
-      return;
-    }
+  if (CmiIsImmediate(msg)) {
+    MACHSTATE1(3, "[%p] Handling Immediate Message {",CmiGetState());
+    CMI_DEST_RANK(msg) = 0;
+    CmiPushImmediateMsg(msg);
+    CmiHandleImmediate();
+    MACHSTATE(3, "} Handling Immediate Message end");
+    return;
+  }
 #endif
-    CQdCreate(CpvAccess(cQdState), 1);
-    CmiLock(CsvAccess(NodeState).CmiNodeRecvLock);
-    PCQueuePush(CsvAccess(NodeState).NodeRecv, msg);
-    CmiUnlock(CsvAccess(NodeState).CmiNodeRecvLock);
+  CQdCreate(CpvAccess(cQdState), 1);
+  CmiLock(CsvAccess(NodeState).CmiNodeRecvLock);
+  PCQueuePush(CsvAccess(NodeState).NodeRecv, msg);
+  CmiUnlock(CsvAccess(NodeState).CmiNodeRecvLock);
+
+  cs=CmiGetStateN(0);
+  CmiIdleLock_addMessage(&cs->idle);
+
+  MACHSTATE(3,"} Sending itself a node message");
 }
 
-CmiCommHandle CmiAsyncNodeSendFn(int dstNode, int size, char *msg)
-{
+void CmiSyncNodeSendFn(int destNode, int size, char *msg) {
+  char *dupmsg = CopyMsg(msg, size);
+
+  MACHSTATE1(3,"[%p] Sending sync node message begin {",CmiGetState());
+  CMI_BROADCAST_ROOT(dupmsg) = 0;
+  CMI_DEST_RANK(dupmsg) = DGRAM_NODEMESSAGE;
+
+  if (CmiMyNode()==destNode) {
+    CmiSendNodeSelf(dupmsg);
+  } else {
+    lapiSendFn(CmiNodeFirst(destNode), size, dupmsg, ReleaseMsg, dupmsg, 1);
+  }
+  MACHSTATE(3,"} Sending sync node message end");
+}
+
+CmiCommHandle CmiAsyncNodeSendFn(int destNode, int size, char *msg) {
+  void *handle;
+  CMI_BROADCAST_ROOT(msg) = 0;
+  CMI_DEST_RANK(msg) = DGRAM_NODEMESSAGE;
+
+  MACHSTATE1(3,"[%p] Sending async node message begin {",CmiGetState());
+  /* if we are the destination, send ourself a copy of the message */
+  if (CmiMyNode()==destNode) {
+    CmiSendNodeSelf(CopyMsg(msg, size));
+    MACHSTATE(3,"} Sending async node message end");
+    return 0;
+  }
+
+  handle = malloc(sizeof(int));
+  *((int *)handle) = 1;
+  lapiSendFn(CmiNodeFirst(destNode), size, msg, DeliveredMsg, handle, 0);
+  /* the message may have been duplicated and already delivered if we are in SMP
+     mode and the destination is on the same node, but there is no optimized
+     check for that. */
+  MACHSTATE(3,"} Sending async node message end");
+  return handle;
+
+  /*
   int i;
   SMSG_LIST *msg_tmp;
   char *dupmsg;
@@ -1017,91 +984,306 @@ CmiCommHandle CmiAsyncNodeSendFn(int dstNode, int size, char *msg)
     }
   }
   return 0;
+  */
 }
 
-void CmiSyncNodeSendFn(int p, int s, char *m)
-{
-  CmiAsyncNodeSendFn(p, s, m);
+void CmiFreeNodeSendFn(int destNode, int size, char *msg) {
+  CMI_BROADCAST_ROOT(msg) = 0;
+  CMI_DEST_RANK(msg) = DGRAM_NODEMESSAGE;
+
+  MACHSTATE1(3,"[%p] Sending sync free node message begin {",CmiGetState());
+  if (CmiMyNode()==destNode) {
+    CmiSendNodeSelf(msg);
+  } else {
+    lapiSendFn(CmiNodeFirst(destNode), size, msg, ReleaseMsg, msg, 1);
+  }
+  MACHSTATE(3,"} Sending sync free node message end");
 }
 
-/* need */
-void CmiFreeNodeSendFn(int p, int s, char *m)
-{
-  CmiAsyncNodeSendFn(p, s, m);
-  CmiFree(m);
-}
-
-/* need */
-void CmiSyncNodeBroadcastFn(int s, char *m)
-{
-  CmiAsyncNodeSendFn(NODE_BROADCAST_OTHERS, s, m);
-}
-
-CmiCommHandle CmiAsyncNodeBroadcastFn(int s, char *m)
-{
-}
-
-/* need */
-void CmiFreeNodeBroadcastFn(int s, char *m)
-{
-  CmiAsyncNodeSendFn(NODE_BROADCAST_OTHERS, s, m);
-  CmiFree(m);
-}
-
-void CmiSyncNodeBroadcastAllFn(int s, char *m)
-{
-  CmiAsyncNodeSendFn(NODE_BROADCAST_ALL, s, m);
-}
-
-CmiCommHandle CmiAsyncNodeBroadcastAllFn(int s, char *m)
-{
-  CmiAsyncNodeSendFn(NODE_BROADCAST_ALL, s, m);
-}
-
-/* need */
-void CmiFreeNodeBroadcastAllFn(int s, char *m)
-{
-  CmiAsyncNodeSendFn(NODE_BROADCAST_ALL, s, m);
-  CmiFree(m);
-}
 #endif
+
+/*********************** BROADCAST FUNCTIONS **********************/
+
+/* send msg to its spanning children in broadcast. G. Zheng */
+void SendSpanningChildren(int size, char *msg) {
+  int startnode = CMI_BROADCAST_ROOT(msg)-1;
+  int i;
+  char *dupmsg;
+
+  assert(startnode>=0 && startnode<CmiNumNodes());
+
+  for (i=1; i<=BROADCAST_SPANNING_FACTOR; i++) {
+    int p = CmiMyNode() - startnode;
+    if (p<0) p+=CmiNumNodes();
+    p = BROADCAST_SPANNING_FACTOR*p + i;
+    if (p > CmiNumNodes() - 1) break;
+    p += startnode;
+    p = p%CmiNumNodes();
+    assert(p>=0 && p<CmiNumNodes() && p!=CmiMyNode());
+#if CMK_BROADCAST_USE_CMIREFERENCE
+    CmiReference(msg);
+    lapiSendFn(CmiNodeFirst(p), size, msg, ReleaseMsg, msg, 0);
+#else
+    dupmsg = CopyMsg(msg, size);
+    lapiSendFn(CmiNodeFirst(p), size, dupmsg, ReleaseMsg, dupmsg, 1);
+#endif
+    /*CmiSyncSendFn1(p, size, msg); */
+  }
+}
+
+int Cmi_log_of_2 (int i) {
+  int m;
+  for (m=0; i>(1<<m); ++m);
+  return m;
+}
+
+/* send msg along the hypercube in broadcast. (Filippo Gioachin) */
+void SendHypercube(int size, char *msg) {
+  int srcPeNumber, tmp, k, num_pes, *dest_pes;
+
+  srcPeNumber = CMI_BROADCAST_ROOT(msg);
+  tmp = srcPeNumber ^ CmiMyPe();
+  k = Cmi_log_of_2(CmiNumPes()) + 2;
+  if (tmp) {
+    do {--k;} while (!(tmp>>k));
+  }
+
+  /* now 'k' is the last dimension in the hypercube used for exchange */
+  CMI_BROADCAST_ROOT(msg) = CmiMyPe();  /* where the message is coming from */
+  dest_pes = (int *)malloc(k*sizeof(int));
+  --k;  /* next dimension in the cube to be used */
+  num_pes = HypercubeGetBcastDestinations(CmiMyPe(), CmiNumPes(), k, dest_pes);
+  for (k=0; k<num_pes; ++k) {
+#if CMI_BROADCAST_USE_CMIREFERENCE
+    CmiReference(msg);
+    CmiSyncSendAndFree(dest_pes[k], size, msg);
+#else
+    CmiSyncSend(dest_pes[k], size, msg);
+#endif
+  }
+  free(dest_pes);
+}
+
+void CmiSyncBroadcastGeneralFn(int size, char *msg) {    /* ALL_EXCEPT_ME  */
+  int i, rank;
+  MACHSTATE1(3,"[%p] Sending sync broadcast message begin {",CmiGetState());
+#if CMK_BROADCAST_SPANNING_TREE
+  CMI_BROADCAST_ROOT(msg) = CmiMyPe()+1;
+  SendSpanningChildren(size, msg);
+  
+#elif CMK_BROADCAST_HYPERCUBE
+  CMI_BROADCAST_ROOT(msg) = CmiMyPe()+1;
+  SendHypercube(size, msg);
+    
+#else
+  CmiState cs = CmiGetState();
+  char *dupmsg;
+
+  CMI_BROADCAST_ROOT(msg) = 0;
+#if CMK_BROADCAST_USE_CMIREFERENCE
+  for (i=cs->pe+1; i<CmiNumPes(); i++) {
+    CmiReference(msg);
+    lapiSendFn(i, size, msg, ReleaseMsg, msg, 0);
+    /*CmiSyncSendFn(i, size, msg) ;*/
+  }
+  for (i=0; i<cs->pe; i++) {
+    CmiReference(msg);
+    lapiSendFn(i, size, msg, ReleaseMsg, msg, 0);
+    /*CmiSyncSendFn(i, size,msg) ;*/
+  }
+#else
+  for (i=cs->pe+1; i<CmiNumPes(); i++) {
+    dupmsg = CopyMsg(msg, size);
+    lapiSendFn(i, size, dupmsg, ReleaseMsg, dupmsg, 1);
+    /*CmiSyncSendFn(i, size, msg) ;*/
+  }
+  for (i=0; i<cs->pe; i++) {
+    dupmsg = CopyMsg(msg, size);
+    lapiSendFn(i, size, dupmsg, ReleaseMsg, dupmsg, 1);
+    /*CmiSyncSendFn(i, size,msg) ;*/
+  }
+#endif
+#endif
+
+#if CMK_SMP
+  /* deliver local node messages */
+  if (CMI_DEST_RANK(msg)!=DGRAM_NODEMESSAGE) {
+    rank = CmiMyRank();
+    for (i=0; i<CmiMyNodeSize(); ++i) {
+      if (i != rank) CmiPushPE(i, CopyMsg(msg, size));
+    }
+  }
+#endif
+  MACHSTATE(3,"} Sending sync broadcast message end");
+}
+
+CmiCommHandle CmiAsyncBroadcastGeneralFn(int size, char *msg) {
+  CmiState cs = CmiGetState();
+  int i, rank;
+
+  MACHSTATE1(3,"[%p] Sending async broadcast message from {",CmiGetState());
+  CMI_BROADCAST_ROOT(msg) = 0;
+  void *handle = malloc(sizeof(int));
+  *((int *)handle) = CmiNumPes()-1;
+  for (i=cs->pe+1; i<CmiNumPes(); i++) {
+    lapiSendFn(i, size, msg, DeliveredMsg, handle, 0);
+  }
+  for (i=0; i<cs->pe; i++) {
+    lapiSendFn(i, size, msg, DeliveredMsg, handle, 0);
+  }
+#if CMK_SMP
+  /* deliver local node messages */
+  if (CMI_DEST_RANK(msg)!=DGRAM_NODEMESSAGE) {
+    rank = CmiMyRank();
+    for (i=0; i<CmiMyNodeSize(); ++i) {
+      if (i != rank) CmiPushPE(i, CopyMsg(msg, size));
+    }
+  }
+#endif
+  MACHSTATE(3,"} Sending async broadcast message end");
+  return handle;
+}
+
+void CmiSyncBroadcastFn(int size, char *msg) {
+  CMI_DEST_RANK(msg) = 0;
+  CmiSyncBroadcastGeneralFn(size, msg);
+}
+
+CmiCommHandle CmiAsyncBroadcastFn(int size, char *msg) {
+  CMI_DEST_RANK(msg) = 0;
+  return CmiAsyncBroadcastGeneralFn(size, msg);
+}
+
+void CmiFreeBroadcastFn(int size, char *msg) {
+   CmiSyncBroadcastFn(size,msg);
+   CmiFree(msg);
+}
+
+void CmiSyncBroadcastAllFn(int size, char *msg) {       /* All including me */
+  CmiSendSelf(CopyMsg(msg, size));
+  CmiSyncBroadcastFn(size, msg);
+}
+
+CmiCommHandle CmiAsyncBroadcastAllFn(int size, char *msg) {
+  CmiSendSelf(CopyMsg(msg, size));
+  return CmiAsyncBroadcastFn(size, msg);
+}
+
+void CmiFreeBroadcastAllFn(int size, char *msg) {       /* All including me */
+  CmiSendSelf(CopyMsg(msg, size));
+  CmiSyncBroadcastFn(size, msg);
+  CmiFree(msg);
+}
+
+#if CMK_NODE_QUEUE_AVAILABLE
+
+void CmiSyncNodeBroadcastFn(int size, char *msg) {
+  CMI_DEST_RANK(msg) = DGRAM_NODEMESSAGE;
+  CmiSyncBroadcastGeneralFn(size, msg);
+}
+
+CmiCommHandle CmiAsyncNodeBroadcastFn(int size, char *msg) {
+   CMI_DEST_RANK(msg) = DGRAM_NODEMESSAGE;
+   CmiAsyncBroadcastGeneralFn(size, msg);
+}
+
+void CmiFreeNodeBroadcastFn(int size, char *msg) {
+  CmiSyncNodeBroadcastFn(size, msg);
+  CmiFree(msg);
+}
+
+void CmiSyncNodeBroadcastAllFn(int size, char *msg) {
+  CmiSendNodeSelf(msg);
+  CmiSyncNodeBroadcastFn(size, msg);
+}
+
+CmiCommHandle CmiAsyncNodeBroadcastAllFn(int size, char *msg) {
+  CmiSendNodeSelf(msg);
+  return CmiAsyncNodeBroadcastFn(size, msg);
+}
+
+void CmiFreeNodeBroadcastAllFn(int size, char *msg) {
+  CmiSendNodeSelf(CopyMsg(msg, size));
+  CmiSyncNodeBroadcastFn(size, msg);
+  CmiFree(msg);
+}
+
+#endif
+
+#if ! CMK_MULTICAST_LIST_USE_COMMON_CODE
+
+void CmiSyncListSendFn(int, int *, int, char*) {
+
+}
+
+CmiCommHandle CmiAsyncListSendFn(int, int *, int, char*) {
+
+}
+
+void CmiFreeListSendFn(int, int *, int, char*) {
+
+}
+
+#endif
+
+#if ! CMK_VECTOR_SEND_USES_COMMON_CODE
+
+void CmiSyncVectorSend(int, int, int *, char **) {
+
+}
+
+CmiCommHandle CmiAsyncVectorSend(int, int, int *, char **) {
+
+}
+
+void CmiSyncVectorSendAndFree(int, int, int *, char **) {
+
+}
+
+#endif
+
 
 /************************** MAIN ***********************************/
 
-void ConverseExit(void)
-{
-#if ! CMK_SMP
-  while(!CmiAllAsyncMsgsSent()) {
-    /* PumpMsgs(); */
-    CmiReleaseSentMessages();
-  }
-  
-  check_lapi(LAPI_Gfence,(lapiContext));
+static volatile int inexit = 0;
 
-  ConverseCommonExit();
-  check_lapi(LAPI_Term,(lapiContext));
+void ConverseExit(void) {
+  MACHSTATE2(2, "[%d-%p] entering ConverseExit",CmiMyPe(),CmiGetState());
+#if CMK_SMP
+  if (CmiMyRank() != 0) {
+    CmiCommLock();
+    inexit++;
+    CmiCommUnlock();
+
+    /* By leaving this function to return, the caller function (ConverseRunPE)
+       will also terminate and return. Since that functions was called by the
+       thread constructor (call_startfn of machine-smp.c), the thread will be
+       terminated. */
+  } else {
+    /* processor 0 */
+    CmiState cs = CmiGetState();
+    MACHSTATE2(2, "waiting for inexit (%d) to be %d",inexit,CmiMyNodeSize()-1);
+    while (inexit != CmiMyNodeSize()-1) {
+      CmiIdleLock_sleep(&cs->idle,10);
+    }
+    /* ok, all threads synchronized! */
+#endif
+    check_lapi(LAPI_Gfence, (lapiContext));
+
+    ConverseCommonExit();
+    check_lapi(LAPI_Term, (lapiContext));
 
 #if (CMK_DEBUG_MODE || CMK_WEB_MODE || NODE_0_IS_CONVHOST)
-  if (CmiMyPe() == 0){
-    CmiPrintf("End of program\n");
-  }
+    if (CmiMyPe() == 0) CmiPrintf("End of program\n");
 #endif
 
-  exit(0);
-
-#else
-  /* SMP version, communication thread will exit */
-  ConverseCommonExit();
-  /* atomic increment */
-  CmiCommLock();
-  inexit++;
-  CmiCommUnlock();
-  while (1) CmiYield();
+    exit(0);
+#if CMK_SMP
+  }
 #endif
 }
 
 static char     **Cmi_argv;
-static char     **Cmi_argvcopy;
 static CmiStartFn Cmi_startfn;   /* The start function */
 static int        Cmi_usrsched;  /* Continue after start function finishes? */
 
@@ -1111,8 +1293,7 @@ typedef struct {
   CmiState cs; /*Machine state*/
 } CmiIdleState;
 
-static CmiIdleState *CmiNotifyGetState(void)
-{
+static CmiIdleState *CmiNotifyGetState(void) {
   CmiIdleState *s=(CmiIdleState *)malloc(sizeof(CmiIdleState));
   s->sleepMs=0;
   s->nIdles=0;
@@ -1120,55 +1301,44 @@ static CmiIdleState *CmiNotifyGetState(void)
   return s;
 }
 
-static void CmiNotifyBeginIdle(CmiIdleState *s)
-{
+static void CmiNotifyBeginIdle(CmiIdleState *s) {
   s->sleepMs=0;
   s->nIdles=0;
 }
-    
-static void CmiNotifyStillIdle(CmiIdleState *s)
-{ 
-#if ! CMK_SMP
-  CmiReleaseSentMessages();
-  /* PumpMsgs(); */
-#else
-/*  CmiYield();  */
-#endif
 
-#if 1
-  {
-  int nSpins=20; /*Number of times to spin before sleeping*/
-  MACHSTATE1(2,"still idle (%d) begin {",CmiMyPe())
+#define SPINS_BEFORE_SLEEP     20
+    
+static void CmiNotifyStillIdle(CmiIdleState *s) {
+  MACHSTATE2(2,"[%p] still idle (%d) begin {",CmiGetState(),CmiMyPe());
   s->nIdles++;
-  if (s->nIdles>nSpins) { /*Start giving some time back to the OS*/
+  if (s->nIdles>SPINS_BEFORE_SLEEP) { /*Start giving some time back to the OS*/
     s->sleepMs+=2;
     if (s->sleepMs>10) s->sleepMs=10;
   }
-  /*Comm. thread will listen on sockets-- just sleep*/
   if (s->sleepMs>0) {
-    MACHSTATE1(2,"idle lock(%d) {",CmiMyPe())
+    MACHSTATE1(2,"idle sleep (%d) {",CmiMyPe());
     CmiIdleLock_sleep(&s->cs->idle,s->sleepMs);
-    MACHSTATE1(2,"} idle lock(%d)",CmiMyPe())
+    MACHSTATE1(2,"} idle sleep (%d)",CmiMyPe());
   }       
-  MACHSTATE1(2,"still idle (%d) end {",CmiMyPe())
-  }
-#endif
+  LAPI_Probe(lapiContext);
+  MACHSTATE1(2,"still idle (%d) end {",CmiMyPe());
 }
 
-static void ConverseRunPE(int everReturn)
-{
-  CmiIdleState *s=CmiNotifyGetState();
-  CmiState cs;
+static void ConverseRunPE(int everReturn) {
+  CmiIdleState *s;
   char** CmiMyArgv;
-  CmiNodeAllBarrier();
-  cs = CmiGetState();
   CpvInitialize(void *,CmiLocalQueue);
-  CpvAccess(CmiLocalQueue) = cs->localqueue;
 
-  if (CmiMyRank())
-    CmiMyArgv=CmiCopyArgs(Cmi_argvcopy);
-  else   
-    CmiMyArgv=Cmi_argv;
+  MACHSTATE2(2, "[%d] ConverseRunPE (thread %p)",CmiMyRank(),CmiGetState());
+  /* No communication thread */
+  s=CmiNotifyGetState();
+  /*CmiState cs;*/
+  CmiNodeBarrier();
+  /*cs = CmiGetState();*/
+
+  CpvAccess(CmiLocalQueue) = CmiGetState()->localqueue;
+
+  CmiMyArgv=CmiCopyArgs(Cmi_argv);
     
   CthInit(CmiMyArgv);
 
@@ -1181,24 +1351,17 @@ static void ConverseRunPE(int everReturn)
   CcdCallOnConditionKeep(CcdPROCESSOR_STILL_IDLE,(CcdVoidFn)CmiNotifyIdle,NULL);
 #endif
 
-#if MACHINE_DEBUG_LOG
-  if (CmiMyRank() == 0) {
-    char ln[200];
-    sprintf(ln,"debugLog.%d",CmiMyNode());
-    debugLog=fopen(ln,"w");
-  }
-#endif
-
 #if CMK_IMMEDIATE_MSG
   /* Converse initialization finishes, immediate messages can be processed.
      node barrier previously should take care of the node synchronization */
   _immediateReady = 1;
 #endif
 
+  /*if (CmiMyRank() == CmiMyNodeSize()) return;*/
   /* communication thread */
   if (CmiMyRank() == CmiMyNodeSize()) {
     Cmi_startfn(CmiGetArgc(CmiMyArgv), CmiMyArgv);
-    while (1) CommunicationServerThread(5);
+    while (1) sleep(1); /*CommunicationServerThread(5);*/
   }
   else {  /* worker thread */
   if (!everReturn) {
@@ -1215,15 +1378,12 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
 #if MACHINE_DEBUG
   debugLog=NULL;
 #endif
-#if CMK_USE_HP_MAIN_FIX
-#if FOR_CPLUS
-  _main(argc,argv);
-#endif
-#endif
 
   lapi_info_t info;
-  int LAPI_Init_rc;
+  /*int LAPI_Init_rc;*/
   memset(&info,0,sizeof(info));
+  check_lapi(LAPI_Init,(&lapiContext, &info));
+  /*
   info.err_hndlr=NULL;
   LAPI_Init_rc = LAPI_Init(&lapiContext, &info);
   if (LAPI_Init_rc == LAPI_ERR_BAD_PARAMETER) {
@@ -1235,31 +1395,35 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
 	   getenv("MP_EULIB"));
   }
   check_lapi(LAPI_Init_rc,);
-  
-  /**
-     Apparently it's a good idea to start with a fence,
-     because packets recv'd before a LAPI_Init are just dropped.
   */
+  
+  /* It's a good idea to start with a fence,
+     because packets recv'd before a LAPI_Init are just dropped. */
   check_lapi(LAPI_Gfence,(lapiContext));
   
+  CsvAccess(lapiInterruptMode) = 0;
+  CsvAccess(lapiInterruptMode) = CmiGetArgFlag(argv,"+poll")?0:1;
+  CsvAccess(lapiInterruptMode) = CmiGetArgFlag(argv,"+nopoll")?1:0;
+
   check_lapi(LAPI_Senv,(lapiContext, ERROR_CHK, lapiDebugMode));
-  check_lapi(LAPI_Senv,(lapiContext, INTERRUPT_SET, lapiInterruptMode));
+  check_lapi(LAPI_Senv,(lapiContext, INTERRUPT_SET, CsvAccess(lapiInterruptMode)));
   
-  check_lapi(LAPI_Qenv,(lapiContext, TASK_ID, &_Cmi_mynode));
-  check_lapi(LAPI_Qenv,(lapiContext, NUM_TASKS, & _Cmi_numnodes));
+  check_lapi(LAPI_Qenv,(lapiContext, TASK_ID, &CmiMyNode()));
+  check_lapi(LAPI_Qenv,(lapiContext, NUM_TASKS, &CmiNumNodes()));
+
+  check_lapi(LAPI_Addr_set,(lapiContext,(void *)PumpMsgsBegin,lapiHeaderHandler));
 
   /* processor per node */
-  _Cmi_mynodesize = 1;
-  CmiGetArgInt(argv,"+ppn", &_Cmi_mynodesize);
-#if ! CMK_SMP
-  if (_Cmi_mynodesize > 1 && _Cmi_mynode == 0) 
+#if CMK_SMP
+  CmiMyNodeSize() = 1;
+  CmiGetArgInt(argv,"+ppn", &CmiMyNodeSize());
+#else
+  if (CmiGetArgFlag(argv,"+ppn")) {
     CmiAbort("+ppn cannot be used in non SMP version!\n");
-#endif
-  idleblock = CmiGetArgFlag(argv, "+idleblocking");
-  if (idleblock && _Cmi_mynode == 0) {
-    CmiPrintf("Charm++: Running in idle blocking mode.\n");
   }
+#endif
 
+  /*
 #if CMK_NO_OUTSTANDING_SENDS
   no_outstanding_sends=1;
 #endif
@@ -1267,39 +1431,55 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
      CmiPrintf("Charm++: Will%s consume outstanding sends in scheduler loop\n",
      	no_outstanding_sends?"":" not");
   }
-  _Cmi_numpes = _Cmi_numnodes * _Cmi_mynodesize;
-  Cmi_nodestart = _Cmi_mynode * _Cmi_mynodesize;
-  Cmi_argvcopy = CmiCopyArgs(argv);
-  Cmi_argv = argv; Cmi_startfn = fn; Cmi_usrsched = usched;
-  /* find dim = log2(numpes), to pretend we are a hypercube */
-  for ( Cmi_dim=0,n=_Cmi_numpes; n>1; n/=2 )
-    Cmi_dim++ ;
+  */
+  CmiNumPes() = CmiNumNodes() * CmiMyNodeSize();
+  Cmi_nodestart = CmiMyNode() * CmiMyNodeSize();
+  /*Cmi_argvcopy = CmiCopyArgs(argv);*/
+  Cmi_argv = argv;
+  Cmi_startfn = fn;
+  Cmi_usrsched = usched;
  /* CmiSpanTreeInit();*/
+  /*
   request_max=MAX_QLEN;
   CmiGetArgInt(argv,"+requestmax",&request_max);
+  */
   /*printf("request max=%d\n", request_max);*/
   if (CmiGetArgFlag(argv,"++debug"))
   {   /*Pause so user has a chance to start and attach debugger*/
-    printf("CHARMDEBUG> Processor %d has PID %d\n",_Cmi_mynode,getpid());
+    printf("CHARMDEBUG> Processor %d has PID %d\n",CmiMyNode(),getpid());
     if (!CmiGetArgFlag(argv,"++debug-no-pause"))
       sleep(10);
   }
 
-  CmiTimerInit();
+  /*CmiTimerInit();*/
 
+#if CMK_NODE_QUEUE_AVAILABLE
   CsvInitialize(CmiNodeState, NodeState);
   CmiNodeStateInit(&CsvAccess(NodeState));
+#endif
 
-  procState = (ProcState *)malloc((_Cmi_mynodesize+1) * sizeof(ProcState));
-  for (i=0; i<_Cmi_mynodesize+1; i++) {
+  procState = (ProcState *)malloc((CmiMyNodeSize()) * sizeof(ProcState));
+  for (i=0; i<CmiMyNodeSize(); i++) {
 /*    procState[i].sendMsgBuf = PCQueueCreate();   */
     procState[i].recvLock = CmiCreateLock();
   }
+  /*
 #if CMK_SMP
   sendMsgBuf = PCQueueCreate();
   sendMsgBufLock = CmiCreateLock();
 #endif
+  */
 
+#if MACHINE_DEBUG_LOG
+  {
+    char ln[200];
+    sprintf(ln,"debugLog.%d",CmiMyNode());
+    debugLog=fopen(ln,"w");
+  }
+#endif
+  for (i=0; i<10; ++i) MACHSTATE2(2, "Rankof(%d) = %d",i,CmiRankOf(i));
+
+  MACHSTATE(2, "Starting threads");
   CmiStartThreads(argv);
   ConverseRunPE(initret);
 }
@@ -1310,10 +1490,15 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
  *
  ************************************************************************/
 
-void CmiAbort(const char *message)
-{
+void CmiAbort(const char *message) {
   CmiError(message);
   check_lapi(LAPI_Term,(lapiContext));
+  exit(1);
 }
 
+static void PerrorExit(const char *msg) {
+  perror(msg);
+  check_lapi(LAPI_Term,(lapiContext));
+  exit(1);
+}
 
