@@ -117,7 +117,7 @@ void startPairCalcRight(PairCalcID* pcid, int n, complex* ptr, int myS, int myZ)
     }
 }
 
-void finishPairCalc(PairCalcID* pcid, int n, complex*ptr, CkCallback cb) {
+void finishPairCalc(PairCalcID* pcid, int n, double *ptr, CkCallback cb) {
 #ifdef _DEBUG_
   CkPrintf("     Calc Finish\n");
 #endif

@@ -45,7 +45,7 @@ void startPairCalcLeft(PairCalcID* aid, int n, complex* ptr, int myS, int myZ);
 
 void startPairCalcRight(PairCalcID* aid, int n, complex* ptr, int myS, int myZ);
 
-extern "C" void finishPairCalc(PairCalcID* aid, int n, complex*ptr, const CkCallback cb);
+extern "C" void finishPairCalc(PairCalcID* aid, int n, double *ptr, const CkCallback cb);
 
 void startPairCalcLeftAndFinish(PairCalcID* pcid, int n, complex* ptr, int myS, int myZ);
 

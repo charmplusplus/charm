@@ -28,7 +28,7 @@ PairCalculator::PairCalculator(bool sym, int grainSize, int s, int blkSize,  int
     for (int i = 0; i < numExpected; i++)
       inDataRight[i] = NULL;
   }
-  outData = new complex[grainSize * grainSize];
+  outData = new double[grainSize * grainSize];
   newData = NULL;
   sumPartialCount = 0;
   setMigratable(false);
@@ -53,7 +53,7 @@ PairCalculator::pup(PUP::er &p)
   p|op1;
   p|op2;
   if (p.isUnpacking()) {
-    outData = new complex[grainSize * grainSize];
+    outData = new double[grainSize * grainSize];
     inDataLeft = new complex*[numExpected];
     for (int i = 0; i < numExpected; i++)
       inDataLeft[i] = new complex[N];
@@ -161,19 +161,19 @@ PairCalculator::calculatePairs(int size, complex *points, int sender, bool fromR
     // FIXME: should do 'op2' here!!!
 
    r.add((int)thisIndex.y, (int)thisIndex.x, (int)(thisIndex.y+grainSize-1), (int)(thisIndex.x+grainSize-1), (CkTwoDoubles*)outData);
-    r.contribute(this, sparse_sum_TwoDoubles);
+    r.contribute(this, sparse_sum_double);
 
-    memset(outData, 0, sizeof(complex) * grainSize * grainSize);
+    memset(outData, 0, sizeof(double) * grainSize * grainSize);
   }
 }
 
 void
-PairCalculator::acceptEntireResult(int size, complex *matrix){
+PairCalculator::acceptEntireResult(int size, double *matrix){
   acceptEntireResult(size, matrix, cb);
 }
 
 void
-PairCalculator::acceptEntireResult(int size, complex *matrix, CkCallback cb)
+PairCalculator::acceptEntireResult(int size, double *matrix, CkCallback cb)
 {
 #ifdef _DEBUG_
   CkPrintf("[%d %d %d %d]: Accept EntireResult with size %d\n", thisIndex.w, thisIndex.x, thisIndex.y, thisIndex.z, size);
@@ -186,7 +186,7 @@ PairCalculator::acceptEntireResult(int size, complex *matrix, CkCallback cb)
 
 
 void
-PairCalculator::acceptResult(int size, complex *matrix, int rowNum, CkCallback cb)
+PairCalculator::acceptResult(int size, double *matrix, int rowNum, CkCallback cb)
 {
 #ifdef _DEBUG_
   CkPrintf("[%d %d %d %d]: Accept Result with size %d\n", thisIndex.w, thisIndex.x, thisIndex.y, thisIndex.z, size);
@@ -195,7 +195,9 @@ PairCalculator::acceptResult(int size, complex *matrix, int rowNum, CkCallback c
   memset(mynewData, 0, sizeof(complex)*N*grainSize);
 
   int offset = 0, index = thisIndex.y*S + thisIndex.x;
-  complex m=complex(0,0);  
+
+  //ASSUMING TMATRIX IS REAL (LOSS OF GENERALITY)
+  register double m=0;  
   //  complex zero=complex(0,0);  
 
   for (int i = 0; i < grainSize; i++) {
@@ -273,7 +275,7 @@ PairCalcReducer::acceptPartialResult(int size, complex* matrix, int fromRow, int
 }
 
 void
-PairCalcReducer::broadcastEntireResult(int size, complex* matrix, bool symmtype, CkCallback cb){
+PairCalcReducer::broadcastEntireResult(int size, double* matrix, bool symmtype, CkCallback cb){
   for (int i = 0; i < localElements[symmtype].length(); i++)
     (localElements[symmtype])[i]->acceptEntireResult(size, matrix, cb); 
 }

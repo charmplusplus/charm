@@ -27,12 +27,12 @@ class PairCalculator: public CBase_PairCalculator {
   PairCalculator(CkMigrateMessage *);
   ~PairCalculator();
   void calculatePairs(int, complex *, int, bool); 
-  void acceptEntireResult(int size, complex *matrix);
-  void acceptEntireResult(int size, complex *matrix, CkCallback cb);
-  void acceptResult(int size, complex *matrix, int rowNum, CkCallback cb);
+  void acceptEntireResult(int size, double *matrix);
+  void acceptEntireResult(int size, double *matrix, CkCallback cb);
+  void acceptResult(int size, double *matrix, int rowNum, CkCallback cb);
   void sumPartialResult(int size, complex *result, int offset, CkCallback cb);
   void pup(PUP::er &);
-  inline complex compute_entry(int n, complex *psi1, complex *psi2, int op) 
+  inline double compute_entry(int n, complex *psi1, complex *psi2, int op) 
     {
         /*
           double re=0, im = 0;
@@ -46,9 +46,9 @@ class PairCalculator: public CBase_PairCalculator {
         */
         
         int i;
-        complex sum(0,0);
+        register double sum = 0;
         for (i = 0; i < n; i++) {
-            sum += psi1[i] * psi2[i].conj();
+            sum += psi1[i].re * psi2[i].re +  psi1[i].im * psi2[i].im;
         }
         
         return sum;
@@ -58,7 +58,8 @@ class PairCalculator: public CBase_PairCalculator {
   int op1, op2;
   FuncType fn1, fn2;
   complex **inDataLeft, **inDataRight;
-  complex *outData, *newData;
+  double *outData;
+  complex *newData;
   int sumPartialCount;
   bool symmetric;
   CkCallback cb;
@@ -71,7 +72,7 @@ class PairCalcReducer : public Group {
   PairCalcReducer(){ acceptCount = 0; numRegistered[0] = 0; numRegistered[1] = 0;}
   ~PairCalcReducer() {}
   void acceptPartialResult(int size, complex* matrix, int fromRow, int fromCol, CkCallback cb);
-  void broadcastEntireResult(int size, complex* matrix, bool symmtype, CkCallback cb);
+  void broadcastEntireResult(int size, double* matrix, bool symmtype, CkCallback cb);
   void doRegister(PairCalculator *, bool);
 
  private:

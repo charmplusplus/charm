@@ -6,14 +6,14 @@ module ckPairCalculator {
 	array [Index4D] PairCalculator {
 		entry PairCalculator(bool sym, int grainSize, int s, int blkSize, int op1, FuncType fn1, int op2, FuncType fn2, CkCallback cb, CkGroupID gid);
    		entry void calculatePairs(int size, complex points[size], int, bool);
-		entry void acceptEntireResult(int size, complex matrix[size]);
-		entry void acceptEntireResult(int size, complex matrix[size], CkCallback cb);
+		entry void acceptEntireResult(int size, double matrix[size]);
+		entry void acceptEntireResult(int size, double matrix[size], CkCallback cb);
 	  	entry void sumPartialResult(int size, complex result[size], int offset, CkCallback cb);
 	};
 
 	group PairCalcReducer {
 		entry PairCalcReducer();
 		entry void acceptPartialResult(int size, complex matrix[size], int fromRow, int fromCol, CkCallback cb);
-		entry void broadcastEntireResult(int size, complex matrix[size], bool symmtype, CkCallback cb);			
+		entry void broadcastEntireResult(int size, double matrix[size], bool symmtype, CkCallback cb);			
 	}
 }
