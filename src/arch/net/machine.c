@@ -1216,6 +1216,7 @@ static void CmiPushPE(int pe,void *msg)
   CmiIdleLock_addMessage(&cs->idle);
 }
 
+#if CMK_NODE_QUEUE_AVAILABLE
 /*Add a message to the node queue.  
   Must be called while holding comm. lock
 */
@@ -1228,7 +1229,7 @@ static void CmiPushNode(void *msg)
     will be awake to handle the message*/
   CmiIdleLock_addMessage(&cs->idle);
 }
-
+#endif
 
 /***************************************************************
  Communication with charmrun:
