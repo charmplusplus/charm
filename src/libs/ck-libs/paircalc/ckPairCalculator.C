@@ -170,6 +170,21 @@ PairCalculator::acceptResult(int size, complex *matrix, int rowNum, CkCallback c
 
   int offset = 0, index = thisIndex.y*S + thisIndex.x;
   complex m=complex(0,0);  
+  complex zero=complex(0,0);  
+
+  for (int i = 0; i < grainSize; i++) {
+    int iSindex=i*S+index;
+    int iN=i*N;
+    complex *newiNdata=&mynewData[iN];
+    for (int j = 0; j < grainSize; j++){ 
+      m = matrix[iSindex + j];
+      if(!(m==zero))
+	for (int p = 0; p < N; p++)
+	  if(!(inDataLeft[j][p]==zero))
+	    newiNdata[p] += inDataLeft[j][p] * m;
+    }
+  }
+  /*
   for (int i = 0; i < grainSize; i++) {
     for (int j = 0; j < grainSize; j++){ 
       m = matrix[index + j + i*S];
@@ -177,7 +192,7 @@ PairCalculator::acceptResult(int size, complex *matrix, int rowNum, CkCallback c
 	mynewData[p + i*N] += inDataLeft[j][p] * m;
     }
   }
-
+  */
   if(!symmetric){
     CkArrayIndexIndex4D idx(thisIndex.w, 0, thisIndex.y, thisIndex.z);
     thisProxy(idx).sumPartialResult(N*grainSize, mynewData, thisIndex.z, cb);
