@@ -12,6 +12,7 @@ class PtrQ {
       block = new void*[blklen=BLKSZ];
     }
     ~PtrQ() { delete[] block; }
+    int length(void) { return len; }
     void *deq(void) {
       void *ret=0;
       if(len>0) {

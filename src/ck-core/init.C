@@ -188,6 +188,11 @@ static inline void _processBufferedMsgs(void)
   }
 }
 
+static int _charmLoadEstimator(void)
+{
+  return CpvAccess(_buffQ)->length();
+}
+
 static inline void _initDone(void)
 {
   CmiNumberHandler(_exitHandlerIdx, (CmiHandler)_exitHandler);
@@ -370,6 +375,7 @@ void _initCharm(int argc, char **argv)
   _bocHandlerIdx = CmiRegisterHandler((CmiHandler)_initHandler);
   _qdHandlerIdx = CmiRegisterHandler((CmiHandler)_qdHandler);
   _infoIdx = CldRegisterInfoFn(_infoFn);
+  CldRegisterEstimator(_charmLoadEstimator);
 
 #if CMK_DEBUG_MODE
   handlerArrayRegister(_charmHandlerIdx, fHeader, fContent);
