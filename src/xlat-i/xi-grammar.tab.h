@@ -13,6 +13,7 @@ typedef union {
   Message *message;
   Chare *chare;
   Entry *entry;
+  EntryList *entrylist;
   Parameter *pname;
   ParamList *plist;
   Template *templat;
@@ -29,6 +30,7 @@ typedef union {
   char *strval;
   int intval;
   Chare::attrib_t cattr;
+  SdagConstruct *sc;
 } YYSTYPE;
 #define	MODULE	257
 #define	MAINMODULE	258
@@ -59,17 +61,28 @@ typedef union {
 #define	PACKED	283
 #define	VARSIZE	284
 #define	ENTRY	285
-#define	IDENT	286
-#define	NUMBER	287
-#define	LITERAL	288
-#define	CPROGRAM	289
-#define	INT	290
-#define	LONG	291
-#define	SHORT	292
-#define	CHAR	293
-#define	FLOAT	294
-#define	DOUBLE	295
-#define	UNSIGNED	296
+#define	FOR	286
+#define	FORALL	287
+#define	WHILE	288
+#define	WHEN	289
+#define	OVERLAP	290
+#define	ATOMIC	291
+#define	FORWARD	292
+#define	IF	293
+#define	ELSE	294
+#define	CONNECT	295
+#define	PUBLISHES	296
+#define	IDENT	297
+#define	NUMBER	298
+#define	LITERAL	299
+#define	CPROGRAM	300
+#define	INT	301
+#define	LONG	302
+#define	SHORT	303
+#define	CHAR	304
+#define	FLOAT	305
+#define	DOUBLE	306
+#define	UNSIGNED	307
 
 
 extern YYSTYPE yylval;
