@@ -20,6 +20,9 @@ void rep::init(eventMsg *m) {
   myHandle = m->parent->thisIndex;
   anti_methods = 0;
   prand_seed = myHandle;
+  prand48_seed[0] = (unsigned short int)myHandle;
+  prand48_seed[1] = (unsigned short int)myHandle;
+  prand48_seed[2] = (unsigned short int)myHandle;
 }
 
 /// Timestamps event message, sets priority, and records in spawned list
