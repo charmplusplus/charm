@@ -103,4 +103,5 @@ class CkQdMsg {
 #include "CkFutures.decl.h"
 #include "CkArray.decl.h"
 #include "ckarray.h"
+#include "tempo.h"
 #endif

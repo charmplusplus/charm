@@ -66,4 +66,5 @@ class TempoArray : public ArrayElement, public Tempo
     void ckTempoSendElem(int tag, void *buffer, int buflen, int idx);
 };
 
+extern void _registertempo(void);
 #endif

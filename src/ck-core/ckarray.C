@@ -1,4 +1,4 @@
-#include "ckarray.h"
+#include "charm++.h"
 #include "register.h"
 #include "CkArray.def.h"
 
