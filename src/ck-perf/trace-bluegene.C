@@ -180,9 +180,10 @@ void TraceBluegene::userBracketEvent(char* name, double bt, double et, void** pa
 
 
 void TraceBluegene::bgPrint(char* str){
-  if (!genTimeLog) return;
-  bgAddProjEvent(strdup(str), -1, BgGetTime(), writeData, this, BG_EVENT_PRINT);
-  CmiPrintf(str, BgGetTime());
+  double curT = BgGetTime();
+  if (genTimeLog)
+    bgAddProjEvent(strdup(str), -1, curT, writeData, this, BG_EVENT_PRINT);
+  CmiPrintf(str, curT);
 }
 
 extern "C" void BgPrintf(char *str)
