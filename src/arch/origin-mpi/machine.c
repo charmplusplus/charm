@@ -408,7 +408,9 @@ void recdQueueInit(void)
 
 void recdQueueAddToBack(void *element)
 {
+#if NODE_0_IS_CONVHOST
   inside_comm = 1;
+#endif
   if(recdQueue_len==recdQueue_blk_len) {
     void **blk;
     recdQueue_blk_len *= 3;
@@ -419,7 +421,9 @@ void recdQueueAddToBack(void *element)
     recdQueue_first = 0;
   }
   recdQueue_blk[(recdQueue_first+recdQueue_len++)%recdQueue_blk_len] = element;
+#if NODE_0_IS_CONVHOST
   inside_comm = 0;
+#endif
 }
 
 

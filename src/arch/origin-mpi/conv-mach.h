@@ -7,7 +7,7 @@
 #define CMK_ASYNC_USE_FIOSSAIOSTAT_AND_FIOSSAIOOWN         0
 #define CMK_ASYNC_USE_F_SETFL_AND_F_SETOWN                 1
 
-#define CMK_CCS_AVAILABLE                                  1
+#define CMK_CCS_AVAILABLE                                  0
 
 #define CMK_CMIDELIVERS_USE_COMMON_CODE                    1
 #define CMK_CMIDELIVERS_USE_SPECIAL_CODE                   0
@@ -123,9 +123,9 @@
 
 #define CPP_LOCATION "/usr/lib/cpp"
 
-#define NODE_0_IS_CONVHOST                                 1
-#define CMK_DEBUG_MODE                                     1
-#define CMK_WEB_MODE                                       1
-#define CMK_USE_PERSISTENT_CCS                             1
+#define NODE_0_IS_CONVHOST                                 0
+#define CMK_DEBUG_MODE                                     0
+#define CMK_WEB_MODE                                       0
+#define CMK_USE_PERSISTENT_CCS                             0
 #endif
 

@@ -131,17 +131,21 @@ typedef struct CthThreadStruct
 
 int CthPackBufSize(CthThread t)
 {
+#ifndef CMK_OPTIMIZE
   if (t->savedsize == 0)
     CmiAbort("Trying to pack a running thread!!\n");
+#endif
   return sizeof(CthThreadStruct) + t->datasize + t->savedsize;
 }
 
 void CthPackThread(CthThread t, void *buffer)
 {
+#ifndef CMK_OPTIMIZE
   if (t->savedsize == 0)
     CmiAbort("Trying to pack a running thread!!\n");
   if (t->insched)
     CmiAbort("Trying to pack a thread in scheduler queue!!\n");
+#endif
   memcpy(buffer, (void *)t, sizeof(CthThreadStruct));
   memcpy(((char*)buffer)+sizeof(CthThreadStruct), 
          (void *)t->data, t->datasize);
