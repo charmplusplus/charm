@@ -79,6 +79,10 @@ typedef CkHashtableT<ClibGlobalArrayIndex,int> ClibLocationTableType;
 //CkNumPes so 0 would mean processor -CkNumPes which is invalid.
 CkpvExtern(ClibLocationTableType *, locationTable);
 
+CkpvExtern(CkArrayIndexMax, cache_index);
+CkpvExtern(int, cache_pe);
+CkpvExtern(CkArrayID, cache_aid);
+
 //Info classes that help bracketed streategies manage objects
 //Each info class points to a list of source (or destination) objects
 //ArrayInfo also access the array listener interface
@@ -246,7 +250,7 @@ class CharmStrategy : public Strategy {
 };
 
 //API calls which will be valid when communication library is not linked
-int ComlibGetLastKnown(CkArrayID a, CkArrayIndexMax idx);
 void ComlibNotifyMigrationDone();
+int ComlibGetLastKnown(CkArrayID aid, CkArrayIndexMax idx);
 
 #endif

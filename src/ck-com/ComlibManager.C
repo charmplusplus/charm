@@ -81,6 +81,13 @@ void ComlibManager::init(){
     CkpvInitialize(ClibLocationTableType*, locationTable);
     CkpvAccess(locationTable) = new CkHashtableT <ClibGlobalArrayIndex, int>;
 
+    CkpvInitialize(CkArrayIndexMax, cache_index);
+    CkpvInitialize(int, cache_pe);
+    CkpvInitialize(CkArrayID, cache_aid);
+
+    CkpvAccess(cache_index).nInts = -1;
+    CkpvAccess(cache_aid).setZero();
+
     CkpvInitialize(int, RecvmsgHandle);
     CkpvAccess(RecvmsgHandle) =CkRegisterHandler((CmiHandler)recv_array_msg);
 

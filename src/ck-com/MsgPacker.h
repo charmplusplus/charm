@@ -94,24 +94,35 @@ inline void MsgPacker::deliver(CombinedMessage *cmb_msg){
     ComlibPrintf("In MsgPacker::deliver\n");
     CkArrayID aid = cmb_hdr.aid;
     int src_pe = cmb_hdr.srcPE;
+    CkArray *a=(CkArray *)_localBranch(aid);
+
+    ArrayElement *a_elem=NULL, *prev_elem=NULL;
+    CkArrayIndexMax prev_idx;
+    prev_idx.nInts = -1;
 
     for(int count = 0; count < nmsgs; count ++){
         short_envelope senv;
         fp | senv;
         
         int ep = senv.epIdx;
-        CkArrayIndexMax idx = senv.idx;
         int size = senv.size;
 
-        CProxyElement_ArrayBase ap(aid, idx);
-        ArrayElement *a_elem = ap.ckLocal();
-        CkArray *a=(CkArray *)_localBranch(aid);
+        if(senv.idx == prev_idx) {
+            a_elem = prev_elem;
+        }
+        else {
+            CProxyElement_ArrayBase ap(aid, senv.idx);
+            a_elem = ap.ckLocal();
+        }
 
         int msgIdx = _entryTable[ep]->msgIdx;
         if(_entryTable[ep]->noKeep && a_elem != NULL) {
             //Unpack the message
             senv.data = (char *)_msgTable[msgIdx]->unpack(senv.data); 
             CkDeliverMessageReadonly(ep, senv.data, a_elem);            
+
+            prev_elem = a_elem;
+            prev_idx = senv.idx;
             CmiFree(senv.data);
         }
         else {
@@ -126,7 +137,7 @@ inline void MsgPacker::deliver(CombinedMessage *cmb_msg){
             data = (char *)_msgTable[msgIdx]->unpack(data); 
             
             env->getsetArrayMgr() = aid;
-            env->getsetArrayIndex() = idx;
+            env->getsetArrayIndex() = senv.idx;
             env->getsetArrayEp() = ep;
             env->setPacked(0); 
             env->getsetArraySrcPe()=src_pe;  
@@ -144,8 +155,10 @@ inline void MsgPacker::deliver(CombinedMessage *cmb_msg){
             
             a->deliver((CkArrayMessage *)data, CkDeliver_queue);
 
+            prev_elem = a_elem;
+            prev_idx = senv.idx;
             CmiFree(senv.data);
-        }        
+        }   
     }      
         
     CmiFree(cmb_msg);

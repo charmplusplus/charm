@@ -510,6 +510,10 @@ void ComlibNotifyMigrationDone() {
 //CkNumPes so 0 would mean processor -CkNumPes which is invalid.
 CkpvDeclare(ClibLocationTableType *, locationTable);
 
+CkpvDeclare(CkArrayIndexMax, cache_index);
+CkpvDeclare(int, cache_pe);
+CkpvDeclare(CkArrayID, cache_aid);
+
 int ComlibGetLastKnown(CkArrayID aid, CkArrayIndexMax idx) {
     //CProxy_ComlibManager cgproxy(CkpvAccess(cmgrID));
     //return (cgproxy.ckLocalBranch())->getLastKnown(aid, idx);
@@ -517,10 +521,11 @@ int ComlibGetLastKnown(CkArrayID aid, CkArrayIndexMax idx) {
     if(!CpvInitialized(locationTable)) {
         CkAbort("Uninitialized table\n");
     }
-
-    if(CkpvAccess(locationTable) == NULL)
-        CkAbort("comlib location table is NULL\n");
-
+    CkAssert(CkpvAccess(locationTable) != NULL);
+    
+    if(CkpvAccess(cache_index) == idx && CkpvAccess(cache_aid) == aid)
+        return CkpvAccess(cache_pe);
+    
     ClibGlobalArrayIndex cidx;
     cidx.aid = aid;
     cidx.idx = idx;
@@ -535,5 +540,9 @@ int ComlibGetLastKnown(CkArrayID aid, CkArrayIndexMax idx) {
     }
     //CkPrintf("last pe = %d \n", pe - CkNumPes());
     
+    CkpvAccess(cache_index) = idx;
+    CkpvAccess(cache_aid) = aid;
+    CkpvAccess(cache_pe) = pe - CkNumPes();
+
     return pe - CkNumPes();
 }
