@@ -14,7 +14,6 @@
        external TCHARM_Yield
        external TCHARM_Done
 
-       external TCHARM_Readonly_globals
        external TCHARM_Init
 
        integer, external :: TCHARM_Iargc
