@@ -468,6 +468,7 @@ public:
 	// These accessors might be used by the templated code.
  	inline ENTRY &operator[](int i) {return data[i];}
  	inline const ENTRY &operator[](int i) const {return data[i];}
+    inline ENTRY *getData() { return data; }
 };
 
 //=============================== Cache Manager =================================
@@ -744,7 +745,7 @@ protected:
         if (nSpans==1) 
         { /* common case: can make very fast */
             int nEntries=writeSpans[0].end-writeSpans[0].start;
-            pageArray[page].ReceiveRLEPage(writeSpans,nSpans,
+            pageArray[page].PAReceiveRLEPageWithPup(writeSpans,nSpans,
                 page_t(&writePage[writeSpans[0].start],nEntries),nEntries,
                 CkMyPe(),stateN(page)->state);
         } 
@@ -755,7 +756,7 @@ protected:
                 for (int i=writeSpans[s].start;i<writeSpans[s].end;i++)
                     writeEntries[nEntries++]=writePage[i]; // calls assign
             }
-            pageArray[page].ReceiveRLEPage(writeSpans,nSpans,
+            pageArray[page].PAReceiveRLEPageWithPup(writeSpans,nSpans,
                                            page_t(writeEntries,nEntries),nEntries,
                                            CkMyPe(),stateN(page)->state);
         }
@@ -859,7 +860,12 @@ public:
 
     /// A requested page has arrived from the network.
     ///  nEntriesInPage_ = num entries being sent (0 for empty page, num entries otherwise)
-    inline void ReceivePage(unsigned int page, page_t &pageData, int size)
+    inline void ReceivePageWithPUP(unsigned int page, page_t &pageData, int size)
+    {
+        ReceivePage(page, pageData.getData(), size);
+    }
+
+    inline void ReceivePage(unsigned int page, ENTRY_TYPE* pageData, int size)
     {
         CkAssert(0==size || ENTRIES_PER_PAGE == size);
         // the page we requested has been received
@@ -1273,9 +1279,9 @@ public:
     inline void GetPage(int pe)
     {
         if(epage == NULL)
-            cache[pe].ReceivePage(pageNo(), page_t((ENTRY_TYPE*)NULL), 0); // send empty page
+            cache[pe].ReceivePageWithPUP(pageNo(), page_t((ENTRY_TYPE*)NULL), 0); // send empty page
         else
-            cache[pe].ReceivePage(pageNo(), page_t(epage), ENTRIES_PER_PAGE);  // send page with data
+            cache[pe].ReceivePageWithPUP(pageNo(), page_t(epage), ENTRIES_PER_PAGE);  // send page with data
     }
 
     /// Receive a non-runlength encoded page from the network:
@@ -1296,9 +1302,18 @@ public:
     }
 
     /// Receive a runlength encoded page from the network:
-    inline void ReceiveRLEPage(
+    inline void PAReceiveRLEPageWithPup(
     	const MSA_WriteSpan_t *spans, unsigned int nSpans, 
-        const MSA_PageT<ENTRY_TYPE, ENTRY_OPS_CLASS, ENTRIES_PER_PAGE> &entries, unsigned int nEntries, 
+        MSA_PageT<ENTRY_TYPE, ENTRY_OPS_CLASS, ENTRIES_PER_PAGE> &entries, unsigned int nEntries, 
+        int pe, MSA_Page_Fault_t pageState)
+    {
+        PAReceiveRLEPage(spans, nSpans, entries.getData(), nEntries, pe, pageState);
+    }
+
+
+    inline void PAReceiveRLEPage(
+    	const MSA_WriteSpan_t *spans, unsigned int nSpans, 
+        const ENTRY_TYPE *entries, unsigned int nEntries, 
         int pe, MSA_Page_Fault_t pageState)
     {
         allocatePage(pageState);

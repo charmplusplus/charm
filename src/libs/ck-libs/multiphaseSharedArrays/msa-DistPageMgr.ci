@@ -9,7 +9,8 @@ module msa
         entry MSA_CacheGroup(unsigned int nPages, CkArrayID pageArrayID,
                          unsigned int max_bytes, unsigned int nEntries, unsigned int numberOfWorkerThreads);
         entry void AckPage(unsigned int page);
-        entry void ReceivePage(unsigned int page, MSA_PageT<ENTRY_TYPE, ENTRY_OPS_CLASS, ENTRIES_PER_PAGE> pageData, int size);
+        entry void ReceivePage(unsigned int page, ENTRY_TYPE pageData[size], int size);
+        entry void ReceivePageWithPUP(unsigned int page, MSA_PageT<ENTRY_TYPE, ENTRY_OPS_CLASS, ENTRIES_PER_PAGE> pageData, int size);
         entry void enroll(unsigned int numberOfWorkerThreads);
         entry void enrollAck();  // internal method
         entry void enrollDone();  // internal mathod
@@ -29,7 +30,8 @@ module msa
 	
         entry void GetPage(int pe);
         entry void PAReceivePage(ENTRY_TYPE page[ENTRIES_PER_PAGE], int pe, MSA_Page_Fault_t pageState);
-        entry void ReceiveRLEPage(MSA_WriteSpan_t spans[nSpans], unsigned int nSpans, MSA_PageT<ENTRY_TYPE, ENTRY_OPS_CLASS, ENTRIES_PER_PAGE> entries, unsigned int nEntries, int pe, MSA_Page_Fault_t pageState);
+        entry void PAReceiveRLEPage(MSA_WriteSpan_t spans[nSpans], unsigned int nSpans, ENTRY_TYPE entries[nEntries], unsigned int nEntries, int pe, MSA_Page_Fault_t pageState);
+        entry void PAReceiveRLEPageWithPup(MSA_WriteSpan_t spans[nSpans], unsigned int nSpans, MSA_PageT<ENTRY_TYPE, ENTRY_OPS_CLASS, ENTRIES_PER_PAGE> entries, unsigned int nEntries, int pe, MSA_Page_Fault_t pageState);
         entry void Sync();
 	
         // for debugging purposes only
