@@ -1472,7 +1472,7 @@ int MPI_Wait(MPI_Request *request, MPI_Status *sts)
   } else {  // alltoall request
     int i;
     int index = *request - 200;
-    ATAReqs *req = &(ptr->atarequests[index]);
+    ATAReqs *req = ptr->atarequests[index];
     for(i=0;i<req->count;i++){
       getAmpiInstance(req->reqs[i].comm)->recv(req->reqs[i].tag, req->reqs[i].proc, req->reqs[i].buf,
                       req->reqs[i].count, req->reqs[i].type, req->reqs[i].comm, (int*)sts);
@@ -1503,7 +1503,7 @@ int MPI_Test(MPI_Request *request, int *flag, MPI_Status *sts)
   } else {  // alltoall request
     int i;
     int index = *request - 200;
-    ATAReqs *req = &(ptr->atarequests[index]);
+    ATAReqs *req = ptr->atarequests[index];
     *flag = getAmpiInstance(req->reqs[0].comm)->iprobe(req->reqs[0].tag, req->reqs[0].proc, req->reqs[0].comm, (int*) sts);
     for(i=1;i<req->count;i++){
       *flag *= getAmpiInstance(req->reqs[i].comm)->iprobe(req->reqs[i].tag, req->reqs[i].proc, req->reqs[i].comm, (int*) sts);
@@ -2028,8 +2028,8 @@ int MPI_Ialltoall(void *sendbuf, int sendcount, MPI_Datatype sendtype,
   if(reqptr->natarequests >= 10) {
     CmiAbort("Too many Alltoall requests.\n");
   }
-  ATAReqs *req = &(reqptr->atarequests[0]);
-  req->init(size);
+  ATAReqs *req = new ATAReqs(size);
+  reqptr->atarequests[0] = req;
   for(i=0;i<size;i++){
     req->reqs[i].sndrcv = 2;
     req->reqs[i].buf = ((char*)recvbuf)+(itemsize*i);

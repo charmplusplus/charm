@@ -267,12 +267,8 @@ class ATAReqs {
 public:
   int count;
   PersReq* reqs;
-  ATAReqs(void):count(0),reqs(NULL) { }
+  ATAReqs(int c_):count(c_) { reqs = new PersReq [c_]; }
   ~ATAReqs(void) { if(reqs) delete [] reqs; }
-  void init(int c_) {
-    count = c_;
-    reqs = new PersReq [c_];
-  }
 };
 
 //A simple destructive-copy memory buffer
@@ -415,7 +411,7 @@ public:
     PersReq irequests[100];
     int nirequests;
     int firstfree;
-    ATAReqs atarequests[10];
+    ATAReqs *atarequests[10];
     int natarequests;
 };
 PUPmarshall(ampiPersRequests);
