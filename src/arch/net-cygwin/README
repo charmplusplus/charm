@@ -1,18 +1,28 @@
-These directory contains the configurations for charm on cygwin.
+This directory contains the configurations for compiling charm on cygwin.
+Note This version of cygwin is still under testing.
 
 To compile charm on cygwin:
 1. install cygwin from: http://sourceware.cygnus.com/cygwin
-   with inetutils and w32api packages.
-   setup /etc/inetd.conf and /etc/services to use rshd, 
-   Here is an example of inetd.conf:
+   with inetutils and w32api packages. TCSH need to be installed separately
+   in order to run charm programs.  (tcsh doesn't come with the cygwin package,
+   but can be found on the same web site) 
+
+2. compile charm++:    ./SUPER_INSTALL charm++ net-cygwin
+
+3. setting up running environment:
+   setup /etc/inetd.conf and /etc/services to start rshd, 
+   Here is an example of /etc/inetd.conf:
+
 ###
 shell stream tcp nowait.1000  root /usr/sbin/in.rshd  in.rshd
 ###
+
    and an example of /etc/services:
+
 ###   
 shell     514/tcp    cmd
 ###
 
-2. compile charm++:    ./SUPER_INSTALL charm++ net-cygwin
+3. before running charm program, start 'inetd' first to get rshd running.
 
-3. before running charm program, start 'inetd' first.
+
