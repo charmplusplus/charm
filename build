@@ -2,14 +2,15 @@
 
 syntax() {
   echo ''
-  echo 'Usage: build <target> <version> [charmc-options ...]'
+  echo 'Usage: build <target> <version> <options> [charmc-options ...]'
 #  echo ''
   echo '<targets>: converse, charm++ libs AMPI IDL tsm sm pvm sdag bluegene'
   echo '<targets>: doc ps-doc pdf-doc html-doc'
   echo '<versions>: ' 
   ( cd src ; ls -1 | egrep -v '(^Common)|(^CVS)|(^QuickThreads)|(^ccs-client)' | pr -3 -t )
 #  echo ''
-  echo 'example <charmc-options>: -g -save -verbose'
+  echo '<options>:  gm'
+  echo '<charmc-options>: e.g. -g -save -verbose'
   echo 'Note: This script is trivial.  It'
   echo ' 1. Creates directories <version> and <version>/tmp';
 #  echo ' 2. Copies src/Common/scripts/Makefile into <version>/tmp';
@@ -22,6 +23,7 @@ syntax() {
 
 MAKEOPTS=""
 OPTS=""
+MORE=""
 
 while [ ! $# -eq 0 ]
 do
@@ -34,7 +36,18 @@ do
           VERSION=$1 ; shift
           while [ ! $# -eq 0 ]
           do
-            OPTS="$OPTS $1"; shift
+            if test "$1" = "gm"
+            then
+              if [ ! -f src/$VERSION/conv-mach-$1.h ]
+              then
+                echo; 
+                echo "Error> option: $1 is not supported! in this version"; echo
+                exit 1
+              fi
+              MORE="$MORE $1"; shift;
+            else
+              OPTS="$OPTS $1"; shift;
+            fi
 	  done
 	  ;;
   esac
@@ -69,6 +82,21 @@ fi
 
 chmod +x $VERSION/tmp/system_ln
 ln -s "../../src/Common/scripts/Makefile" $VERSION/tmp/Makefile
+
+#special options
+echo "Generating $VERSION/tmp/conv-mach-opt.h"
+/bin/rm -f $VERSION/tmp/conv-mach-opt.h
+/bin/rm -f $VERSION/tmp/conv-mach-opt.sh
+touch $VERSION/tmp/conv-mach-opt.h
+touch $VERSION/tmp/conv-mach-opt.sh
+if test -n "$MORE"
+then
+  for i in $MORE
+  do
+    cat src/$VERSION/conv-mach-$i.h >> $VERSION/tmp/conv-mach-opt.h
+    cat src/$VERSION/conv-mach-$i.sh >> $VERSION/tmp/conv-mach-opt.sh
+  done
+fi
 
 echo "Performing 'make $MAKEOPTS $PROGRAM OPTS="$OPTS"' in $VERSION/tmp"
 cd $VERSION/tmp ; make $MAKEOPTS $PROGRAM OPTS="$OPTS"
