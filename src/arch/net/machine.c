@@ -1042,6 +1042,10 @@ static void send_ack(packet,penum)
      int penum;
 {
   NumSends++;
+  packet->seq_num = htonl(packet->seq_num);
+  packet->PeNum = htonl(packet->PeNum);
+  packet->pktidx = htonl(packet->pktidx);
+  packet->rem_size = htonl(packet->rem_size);
   my_sendto(data_skt, (char *)packet, sizeof(DATA_HDR), 0, 
     (struct sockaddr *)&addr_table[penum],
     sizeof(struct sockaddr_in));
@@ -1186,10 +1190,14 @@ int destpe;
     TRACE(CmiPrintf("Node %d: sending packet seq_num=%d, rem_size=%d\n",
            CpvAccess(Cmi_mype),
            packet->seq_num, 
-           packet->rem_size));
+           ntohl(packet->rem_size)));
 
     NumSends++ ;
     act_size=(packet->rem_size<MAXDSIZE)?packet->rem_size:MAXDSIZE;
+    packet->seq_num = htonl(packet->seq_num);
+    packet->PeNum = htonl(packet->PeNum);
+    packet->pktidx = htonl(packet->pktidx);
+    packet->rem_size = htonl(packet->rem_size);
     bytes_sent = my_sendto(data_skt, (char *)packet,
           act_size + sizeof(DATA_HDR),
           0, (struct sockaddr *)&addr_table[destpe],
@@ -1263,6 +1271,10 @@ static int RetransmitPackets()
         NumRetransmits++ ;
         NumSends++;
         act_size=(packet->rem_size<MAXDSIZE)?packet->rem_size:MAXDSIZE;
+        packet->seq_num = htonl(packet->seq_num);
+        packet->PeNum = htonl(packet->PeNum);
+        packet->pktidx = htonl(packet->pktidx);
+        packet->rem_size = htonl(packet->rem_size);
         my_sendto(data_skt, (char *)packet,
             act_size + sizeof(DATA_HDR), 0, (struct sockaddr *)&addr_table[i],
             sizeof(struct sockaddr_in)); 
@@ -1471,6 +1483,7 @@ static void AckReceivedMsgs()
         TRACE(CmiPrintf("Node %d: acking seq_num %d on window %d\n",
             CpvAccess(Cmi_mype), ack.seq_num, i)); 
       NumAcksSent++ ;
+      ack.seq_num = ack.seq_num;
       send_ack(&ack,i);
     }
   }
@@ -1512,6 +1525,10 @@ static int data_getone()
   do n=recvfrom(data_skt,(char *)recv_buf,CMK_DGRAM_MAX_SIZE,0,(struct sockaddr *)&src,&srclen);
   while ((n<0)&&(errno==EINTR));
   if (n<0) { KillEveryone(strerror(errno)); }
+  recv_buf->hd.seq_num = ntohl(recv_buf->hd.seq_num);
+  recv_buf->hd.PeNum = ntohl(recv_buf->hd.PeNum);
+  recv_buf->hd.pktidx = ntohl(recv_buf->hd.pktidx);
+  recv_buf->hd.rem_size = ntohl(recv_buf->hd.rem_size);
   kind = (recv_buf->hd.rem_size)?SEND:ACK;
   if (kind == ACK) {
     UpdateSendWindow(recv_buf, (int) recv_buf->hd.PeNum);
@@ -1526,17 +1543,21 @@ static int data_getone()
 		srcnode = (recv_buf->hd.PeNum ^ (root<<16)) & (~(1<<31));
 		my_children(root, &d1, &d2);
 		if(d1!=(-1)){
+		  int tmp = recv_buf->hd.PeNum;
 		  m1 = (msgspace *)CmiAlloc(CMK_DGRAM_MAX_SIZE);
 		  memcpy(m1, recv_buf, CMK_DGRAM_MAX_SIZE);
-		  m1->hd.PeNum = ((m1->hd.PeNum >> 16) << 16) | CpvAccess(Cmi_mype);
-        InsertInTransmitQueue(m1, d1);
+		  tmp = ((tmp >> 16) << 16) | CpvAccess(Cmi_mype);
+		  m1->hd.PeNum = tmp;
+                  InsertInTransmitQueue(m1, d1);
 		  SendPackets(d1);
 		}
 		if(d2!=(-1)){
+		  int tmp = recv_buf->hd.PeNum;
 		  m2 = (msgspace *)CmiAlloc(CMK_DGRAM_MAX_SIZE);
 		  memcpy(m2, recv_buf, CMK_DGRAM_MAX_SIZE);
-		  m2->hd.PeNum = ((m1->hd.PeNum >> 16) << 16) | CpvAccess(Cmi_mype);
-        InsertInTransmitQueue(m2, d2);
+		  tmp = ((tmp >> 16) << 16) | CpvAccess(Cmi_mype);
+		  m2->hd.PeNum = tmp;
+                  InsertInTransmitQueue(m2, d2);
 		  SendPackets(d2);
 		}
 		recv_buf->hd.PeNum = srcnode;
