@@ -13,7 +13,7 @@ module CkMemCheckpoint {
   message CkArrayCheckPTReqMessage;
 
   group [migratable] CkMemCheckPT {
-        entry CkMemCheckPT(void);
+        entry CkMemCheckPT(int w);
 	entry void createEntry(CkArrayID, CkGroupID, CkArrayIndexMax, int);
  	// checkpointing
         entry void doItNow(int spe, CkCallback &);  //checkpointing

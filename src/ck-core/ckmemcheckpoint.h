@@ -50,10 +50,14 @@ public:
    virtual int getSize() = 0;
 };
 
+/// memory or disk checkpointing
+#define CkCheckPoint_inMEM   1
+#define CkCheckPoint_inDISK  2
+
 class CkMemCheckPT: public CBase_CkMemCheckPT {
 public:
-  CkMemCheckPT();
-  CkMemCheckPT(CkMigrateMessage *m):CBase_CkMemCheckPT(m) { }
+  CkMemCheckPT(int w);
+  CkMemCheckPT(CkMigrateMessage *m):CBase_CkMemCheckPT(m) {}
   virtual ~CkMemCheckPT();
   void pup(PUP::er& p);
   void doItNow(int sp, CkCallback &);
@@ -82,15 +86,19 @@ private:
   CkVec<CkCheckPTInfo *> ckTable;
 
   int recvCount, peCount;
+    /// the processor who initiate the checkpointing
   int cpStarter;
   CkVec<int> failedPes;
   int thisFailedPe;
+
+    /// to use memory or disk checkpointing
+  int    where;
 private:
-  inline int iFailed() { return isFailed(CkMyPe()); }
-  int isFailed(int pe);
-  int totalFailed();
-  void failed(int pe);
   inline int isMaster(int pe);
+
+  int  isFailed(int pe);
+  void failed(int pe);
+  int  totalFailed();
 
   void sendProcData();
 };
