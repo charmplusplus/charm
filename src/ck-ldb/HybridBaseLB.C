@@ -59,6 +59,8 @@ HybridBaseLB::HybridBaseLB(const CkLBOptions &opt): BaseLB(opt)
   foundNeighbors = 0;
   future_migrates_expected = -1;
 
+  maxLoad = 0.0;
+
   if (_lb_args.statsOn()) theLbdb->CollectStatsOn();
 #endif
 }
@@ -328,6 +330,9 @@ CLBStatsMsg * HybridBaseLB::buildCombinedLBStatsMessage(int atlevel)
         cmsg->pe_speed += procStat.pe_speed;		// important
         cmsg->total_walltime += procStat.total_walltime;
         cmsg->total_cputime += procStat.total_cputime;
+        cmsg->idletime += procStat.idletime;
+        cmsg->bg_walltime += procStat.bg_walltime;
+        cmsg->bg_cputime += procStat.bg_cputime;
   }
   cmsg->idletime = 0.0;
   cmsg->bg_walltime = 0.0;
@@ -744,17 +749,24 @@ void HybridBaseLB::MigrationDone(int balancing)
 
   DEBUGF(("[%d] calling ResumeClients.\n", CkMyPe()));
   if (balancing && _lb_args.syncResume()) {
+    // max load of all
     CkCallback cb(CkIndex_HybridBaseLB::ResumeClients((CkReductionMsg*)NULL),
                   thisProxy);
-    contribute(0, NULL, CkReduction::sum_int, cb);
+    contribute(sizeof(double), &maxLoad, CkReduction::max_double, cb);
   }
   else
     thisProxy[CkMyPe()].ResumeClients(balancing);
+
+  maxLoad = 0.0;
 #endif
 }
 
 void HybridBaseLB::ResumeClients(CkReductionMsg *msg)
 {
+  if (CkMyPe() == 0 && _lb_args.printSummary()) {
+    double mload = *(double *)msg->getData();
+    CkPrintf("[%d] MAX Load: %f at step %d.\n", CkMyPe(), mload, step()-1);
+  }
   ResumeClients(1);
   delete msg;
 }
@@ -856,9 +868,9 @@ LBMigrateMsg * HybridBaseLB::createMigrateMsg(LDStats* stats,int count)
   if (_lb_args.printSummary() && currentLevel == 1) {
       LBInfo info(msg->expectedLoad, count);
       info.getInfo(stats, count, 0);	// no comm cost
-      double maxLoad, totalLoad;
+      double totalLoad;
       info.getSummary(maxLoad, totalLoad);
-      CkPrintf("[%d] Load Summary: max: %f total: %f on %d processors.\n", CkMyPe(), maxLoad, totalLoad, count);
+      CkPrintf("[%d] Load Summary: max: %f total: %f on %d processors at step %d.\n", CkMyPe(), maxLoad, totalLoad, count, step());
   }
 
   // translate relative pe number to its real number

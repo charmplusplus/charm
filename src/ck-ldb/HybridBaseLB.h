@@ -65,6 +65,8 @@ public:
     if (level == 0) return mype/span[0]*span[0];
     if (level == 1) return toproot;
     if (level == 2) return -1;
+    CmiAssert(0);
+    return -1;
   }
   virtual int isroot(int mype, int level) {
     if (level == 0) return 0;
@@ -220,6 +222,8 @@ private:
   int mig_msgs_received;
   int cur_ld_balancer;
   double start_lb_time;
+
+  double maxLoad;
 };
 
 /*
