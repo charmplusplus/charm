@@ -12,6 +12,7 @@ double sim_timer;
 int POSE_inactDetect;
 POSE_TimeType POSE_endtime;
 POSE_TimeType POSE_GlobalClock;
+ComlibInstanceHandle POSE_commlib_insthndl;
 
 // Main initialization for all of POSE
 void POSE_init() // use inactivity detection by default
@@ -40,13 +41,12 @@ void POSE_init(int IDflag, int ET) // can specify both
 #ifndef SEQUENTIAL_POSE
 #ifdef POSE_COMM_ON
   // Create the communication library for POSE
-  ComlibInstanceHandle cinst = CkGetComlibInstance();
+  POSE_commlib_insthndl = CkGetComlibInstance();
   // Create the communication strategy for POSE
   //DummyStrategy *strategy = new DummyStrategy();
-  StreamingStrategy *strategy =new StreamingStrategy(COMM_TIMEOUT,COMM_MAXMSG);
-  //strategy->enableShortArrayMessagePacking();
+  PrioStreaming *strategy =new PrioStreaming(COMM_TIMEOUT,COMM_MAXMSG);
   //Register the strategy
-  cinst.setStrategy(strategy);
+  POSE_commlib_insthndl.setStrategy(strategy);
   //comm_debug=1;
   CkPrintf("Simulation run with StreamingStrategy(%d,%d) for communication optimization...\n", COMM_TIMEOUT, COMM_MAXMSG);
 #endif

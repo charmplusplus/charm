@@ -84,6 +84,9 @@ extern int POSE_inactDetect;
 /// Global clock (for sequential simulation)
 extern POSE_TimeType POSE_GlobalClock;
 
+/// For getting access to the commlib strategy
+extern ComlibInstanceHandle POSE_commlib_insthndl;
+
 /// Set busy wait time
 void POSE_set_busy_wait(double n);
 /// Busy wait for busyWait
