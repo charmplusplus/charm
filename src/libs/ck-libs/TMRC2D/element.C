@@ -192,6 +192,7 @@ void element::collapse(int shortEdge)
   int opnode, delNode, keepNode, delEdge, keepEdge, result;
   elemRef keepNbr, delNbr, nbr;
   int local, first, flag, kBound, dBound, kCorner, dCorner, collapseFlag=-1;
+  int orig_keep, orig_del;
 
   if (edges[shortEdge].isPending(myRef)) {
   }
@@ -215,6 +216,8 @@ void element::collapse(int shortEdge)
   dBound = C->theNodes[nodes[delNode]].boundary;
   kCorner = C->theNodes[nodes[keepNode]].corner;
   dCorner = C->theNodes[nodes[delNode]].corner;
+  orig_keep = nodes[keepNode];
+  orig_del = nodes[delNode];
 
   // check boundary conditions
   if ((kBound == 0) && (dBound == 0)) { // both interior nodes
@@ -308,10 +311,10 @@ void element::collapse(int shortEdge)
     if (local && !first) flag = LOCAL_SECOND;
     if (!local && first) flag = BOUND_FIRST;
     if (!local && !first) flag = BOUND_SECOND;
-    C->theClient->collapse(myRef.idx, nodes[keepNode], nodes[delNode], 
+    C->theClient->collapse(myRef.idx, orig_keep, orig_del, 
 			   newNode.X(), newNode.Y(), flag);
     CkPrintf("TMRC2D: [%d] theClient->collapse(%d, %d, %d, %2.10f, %2.10f\n", 
-	     myRef.cid, myRef.idx, nodes[keepNode], nodes[delNode], 
+	     myRef.cid, myRef.idx, orig_keep, orig_del,
 	     newNode.X(), newNode.Y());
     // remove self
     C->removeElement(myRef.idx);
@@ -330,6 +333,9 @@ void element::collapse(int shortEdge)
     // tell delNbr to replace delEdge with keepEdge
     keepNbr = edges[keepEdge].getNbr(myRef);
     delNbr = edges[delEdge].getNbr(myRef);
+    int mytmp = orig_del;
+    orig_del = orig_keep;    
+    orig_keep = mytmp;
     CkPrintf("In collapse[%d](b) shortEdge=%d delEdge=%d keepEdge=%d opnode=%d delNode=%d keepNode=%d delNbr=%d keepNbr=%d\n", myRef.idx, edges[shortEdge].idx, edges[delEdge].idx, edges[keepEdge].idx, nodes[opnode], nodes[delNode], nodes[keepNode], delNbr.idx, keepNbr.idx);
     if (delNbr.cid != -1)
       mesh[delNbr.cid].updateElementEdge(delNbr.idx, edges[delEdge], 
@@ -345,9 +351,9 @@ void element::collapse(int shortEdge)
     if (!local && first) flag = BOUND_FIRST;
     if (!local && !first) flag = BOUND_SECOND;
     CkPrintf("TMRC2D: [%d] theClient->collapse(%d, %d, %d, %2.10f, %2.10f\n", 
-	     myRef.cid, myRef.idx, nodes[keepNode], nodes[delNode], 
+	     myRef.cid, myRef.idx, orig_keep, orig_del,
 	     newNode.X(), newNode.Y());
-    C->theClient->collapse(myRef.idx, nodes[keepNode], nodes[delNode],
+    C->theClient->collapse(myRef.idx, orig_keep, orig_del,
 			   newNode.X(), newNode.Y(), flag);
     // remove self
     C->removeElement(myRef.idx);
