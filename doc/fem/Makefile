@@ -1,49 +1,61 @@
+# Makefile for LaTeX PPL manual
+FILE=manual
+TEX=$(FILE).tex
+DEST=fem
+
 DOCDIR=..
 WEBDIR=/expand8/www/ppl_manuals
+WEBARGS=-split 4
+LATEX2HTML=latex2html $(WEBARGS) -show_section_numbers \
+	-white -antialias -local_icons 
+
 
 all: ps pdf html
 
-ps:
-	touch index.tex
-	latex manual.tex
-	latex manual.tex
-	if [ -f manual.idx ] ; then makeindex -o index.tex manual.idx ; fi
-	latex manual.tex
-	dvips -o manual.ps manual.dvi
+$(FILE).aux: $(TEX)
+	latex $(FILE).tex
 
-html:
-	touch index.tex
+
+ps: $(FILE).ps
+
+$(FILE).dvi: $(TEX) $(FILE).aux
+	latex $(FILE).tex
+
+$(FILE).ps: $(FILE).dvi
+	dvips -t letter -f $(FILE).dvi > $(FILE).ps
+
+
+pdf: $(FILE).pdf
+
+$(FILE).pdf: $(TEX) $(FILE).aux
+	pdflatex $(FILE).tex
+
+
+html: $(FILE)
+
+$(FILE): $(TEX) $(FILE).aux
 	-@ln -s ../pplmanual.* .
-	latex manual.tex
-	latex2html -local_icons manual.tex
+	-@rm -fr $(FILE)/*.html $(FILE)/*.aux
+	$(LATEX2HTML) $(FILE).tex
 
-pdf:
-	touch index.tex
-	pdflatex manual.tex
-	if [ -f manual.idx ] ; then makeindex -o index.tex manual.idx ; fi
-	pdflatex manual.tex
+clean:
+	-rm -fr *.aux *.log *.dvi *.ps *.pdf $(FILE)
+	-rm -fr *.log *.bbl *.blg *.toc *~ fig/*.bak
 
-doc:
-	make all
+doc: all
 	if [ ! -d $(DOCDIR) ] ; then mkdir $(DOCDIR) ; fi
 	if [ ! -d $(DOCDIR)/ps ] ; then mkdir $(DOCDIR)/ps ; fi
 	if [ ! -d $(DOCDIR)/pdf ] ; then mkdir $(DOCDIR)/pdf ; fi
 	if [ ! -d $(DOCDIR)/html ] ; then mkdir $(DOCDIR)/html ; fi
-	/bin/cp manual.ps $(DOCDIR)/ps/fem.ps
-	/bin/cp manual.pdf $(DOCDIR)/pdf/fem.pdf
-	/bin/rm -rf $(DOCDIR)/html/fem
-	/bin/cp -R manual $(DOCDIR)/html/fem
+	/bin/cp $(FILE).ps $(DOCDIR)/ps/$(DEST).ps
+	/bin/cp $(FILE).pdf $(DOCDIR)/pdf/$(DEST).pdf
+	/bin/rm -rf $(DOCDIR)/html/$(DEST)
+	/bin/cp -R $(FILE) $(DOCDIR)/html/$(DEST)
 
-web:
-	make all
-	/bin/cp manual.ps $(WEBDIR)/ps/fem.ps
-	/bin/cp manual.pdf $(WEBDIR)/pdf/fem.pdf
-	/bin/rm -rf $(WEBDIR)/html/fem
-	/bin/cp -R manual $(WEBDIR)/html/fem
-	find $(WEBDIR) -type f -exec chmod 664 {} \;
-	find $(WEBDIR) -type d -exec chmod 775 {} \;
-
-clean:
-	/bin/rm -f *.ps *.pdf *.ilg *.aux *.log *.dvi *.idx *.toc 
-	/bin/rm -f index.tex *.blg *.bbl
-	/bin/rm -rf manual
+web: all
+	/bin/cp $(FILE).ps $(WEBDIR)/ps/$(DEST).ps
+	/bin/cp $(FILE).pdf $(WEBDIR)/pdf/$(DEST).pdf
+	/bin/rm -rf $(WEBDIR)/html/$(DEST)
+	/bin/cp -R $(FILE) $(WEBDIR)/html/$(DEST)
+	find $(WEBDIR)/html/$(DEST) $(WEBDIR)/p*/$(DEST).p* -type f -exec chmod 664 {} \;
+	find $(WEBDIR)/html/$(DEST) -type d -exec chmod 775 {} \;
