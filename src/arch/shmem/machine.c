@@ -557,7 +557,7 @@ static void McInitList(void)
     bcast_lock[i] = 0;
   }
   my_lock = &(head_lock[Cmi_mype]);
-  barrier();
+  shmem_barrier_all();
   clear_lock(my_lock, Cmi_mype);
   clear_lock(&bcast_lock[Cmi_mype], Cmi_mype);
 }
@@ -576,7 +576,6 @@ static void McEnqueueRemote(void *msg, int msg_sz, int dst_pe)
 
   McDistList tmp_link;
   McDistList *msg_link;
-  long long tmp;
 
   /*  CmiPrintf("PE %d outgoing msg = %d msg_type = %d size = %d dst_pe=%d\n",
 	    Cmi_mype,msg,((McMsgHdr *)msg)->msg_type,msg_sz, dst_pe); */
@@ -645,7 +644,6 @@ static void McRetrieveRemote(void)
   int received_f;
   enum boolean bcast_msg;
   McMsgHdr *bcast_ptr;
-  long long tmp;
 
   /* Get the head of the list */
 
@@ -933,6 +931,48 @@ double CmiTimer()
   return (clocktick * (now - inittime_wallclock));
 }
 
+#elif CMK_TIMER_USE_CLOCK_GETTIME
+
+CpvStaticDeclare(double,inittime_wallclock);
+CpvStaticDeclare(double,inittime_virtual);
+
+void CmiTimerInit(void)
+{
+  struct timespec temp;
+  CpvInitialize(double, inittime_wallclock);
+  CpvInitialize(double, inittime_virtual);
+  clock_gettime(CLOCK_SGI_CYCLE, &temp);
+  CpvAccess(inittime_wallclock) = (double) temp.tv_sec +
+                                  1e-9 * temp.tv_nsec;
+  CpvAccess(inittime_virtual) = CpvAccess(inittime_wallclock);
+}
+
+double CmiWallTimer(void)
+{
+  struct timespec temp;
+  double currenttime;
+
+  clock_gettime(CLOCK_SGI_CYCLE, &temp); 
+  currenttime = (double) temp.tv_sec +
+                1e-9 * temp.tv_nsec;
+  return (currenttime - CpvAccess(inittime_wallclock));
+}
+
+double CmiCpuTimer(void)
+{
+  struct timespec temp;
+  double currenttime;
+
+  clock_gettime(CLOCK_SGI_CYCLE, &temp);
+  currenttime = (double) temp.tv_sec +
+                1e-9 * temp.tv_nsec;
+  return (currenttime - CpvAccess(inittime_virtual));
+}
+
+double CmiTimer(void)
+{
+  return CmiCpuTimer();
+}              
 #endif
 
 /*   Memory lock and unlock functions */
