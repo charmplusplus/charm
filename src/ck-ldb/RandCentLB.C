@@ -49,7 +49,7 @@ CLBMigrateMsg* RandCentLB::Strategy(CentralLB::LDStats* stats, int count)
     //	     CkMyPe(),pe,stats[pe].n_objs,stats[pe].n_comm);
     for(int obj=0; obj < stats[pe].n_objs; obj++) {
       if (stats[pe].objData[obj].migratable) {
-	const int dest = (int)(CrnDrand()*(CmiNumPes()-1) + 0.5);
+	const int dest = (int)(CrnDrand()*(CkNumPes()-1) + 0.5);
 	if (dest != pe) {
 	  //	CkPrintf("[%d] Obj %d migrating from %d to %d\n",
 	  //		 CkMyPe(),obj,pe,dest);
