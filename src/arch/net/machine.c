@@ -2015,7 +2015,7 @@ static void ConverseRunPE(int everReturn)
 
   if (CmiMyRank()==0 && Cmi_charmrun_fd!=-1) {
 #if CMK_SHARED_VARS_UNAVAILABLE
-    //Occasionally ping charmrun, to test if it's dead
+    /*Occasionally ping charmrun, to test if it's dead*/
     struct itimerval i;
     CmiSignal(SIGALRM, 0, 0, pingCharmrun);
     i.it_interval.tv_sec = 1;
@@ -2025,7 +2025,7 @@ static void ConverseRunPE(int everReturn)
     setitimer(ITIMER_REAL, &i, NULL);
 #endif
     
-    //Occasionally check for retransmissions, outgoing acks, etc.
+    /*Occasionally check for retransmissions, outgoing acks, etc.*/
     CcdCallFnAfter(CommunicationsClock,NULL,100);
   }
 
