@@ -8,13 +8,13 @@ void CreateHeapCentLB();
 
 class HeapCentLB : public CentralLB {
 
-struct HeapData {
-	double load;
-	int    pe;
-	int    id;
-};
-
 public:
+  struct HeapData {
+    double load;
+    int    pe;
+    int    id;
+  };
+
   HeapCentLB();
 private:
   void           Heapify(HeapData *, int, int);
