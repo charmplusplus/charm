@@ -75,6 +75,7 @@ NborBaseLB::NborBaseLB(const CkLBOptions &opt): BaseLB(opt)
   myStats.objData = NULL;
   myStats.n_comm = 0;
   myStats.commData = NULL;
+
   receive_stats_ready = 0;
 
   if (_lb_args.statsOn()) theLbdb->CollectStatsOn();
@@ -152,7 +153,7 @@ void NborBaseLB::AtSync()
 NLBStatsMsg* NborBaseLB::AssembleStats()
 {
 #if CMK_LBDB_ON
-  // Get stats
+  // Get my own stats, this is used in NeighborLB for example
   theLbdb->TotalTime(&myStats.total_walltime,&myStats.total_cputime);
   theLbdb->IdleTime(&myStats.idletime);
   theLbdb->BackgroundLoad(&myStats.bg_walltime,&myStats.bg_cputime);
@@ -260,6 +261,9 @@ void NborBaseLB::ReceiveStats(CkMarshalledNLBStatsMessage &data)
       statsDataList[peslot].objData = m->objData;
       statsDataList[peslot].n_comm = m->n_comm;
       statsDataList[peslot].commData = m->commData;
+
+      if (_lb_args.ignoreBgLoad()) statsDataList[peslot].clearBgLoad();
+
       stats_msg_count++;
     }
   }

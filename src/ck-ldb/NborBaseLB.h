@@ -66,6 +66,10 @@ public:
     LDObjData* objData;
     int n_comm;
     LDCommData* commData;
+
+    inline void clearBgLoad() {
+      bg_walltime = bg_cputime = idletime = 0.0;
+    }
   };
 
 protected:
