@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.26  1995-09-29 09:51:12  jyelon
+ * Revision 2.27  1995-09-30 14:49:36  jyelon
+ * fixed bug: only PE's of rank 0 were registering their handlers.
+ *
+ * Revision 2.26  1995/09/29  09:51:12  jyelon
  * Many small corrections.
  *
  * Revision 2.25  1995/09/26  22:36:55  jyelon
@@ -340,6 +343,7 @@ FUNCTION_PTR donehandler;
         InitializeBocDataTable();
         InitializeBocIDMessageCountTable();
         
+        CharmRegisterHandlers();
         if (CmiMyRank() == 0) InitializeEPTables();
         CmiNodeBarrier();          
   
@@ -636,6 +640,25 @@ char          **argv;
 
 #define TABLE_SIZE 256
 
+CharmRegisterHandlers()
+{
+  /* Register the Charm handlers with Converse */
+  CsvAccess(BUFFER_INCOMING_MSG_Index)
+    = CmiRegisterHandler(BUFFER_INCOMING_MSG) ;
+  CsvAccess(MAIN_HANDLE_INCOMING_MSG_Index)
+    = CmiRegisterHandler(HANDLE_INCOMING_MSG) ;
+  CsvAccess(HANDLE_INIT_MSG_Index)
+    = CmiRegisterHandler(HANDLE_INIT_MSG);
+  CsvAccess(CkProcIdx_ForChareMsg)
+    = CmiRegisterHandler(CkProcess_ForChareMsg);
+  CsvAccess(CkProcIdx_DynamicBocInitMsg)
+    = CmiRegisterHandler(CkProcess_DynamicBocInitMsg);
+  CsvAccess(CkProcIdx_NewChareMsg)
+    = CmiRegisterHandler(CkProcess_NewChareMsg);
+  CsvAccess(CkProcIdx_VidSendOverMsg)
+    = CmiRegisterHandler(CkProcess_VidSendOverMsg);
+}
+
 InitializeEPTables()
 {
   int             i;
@@ -754,22 +777,6 @@ InitializeEPTables()
     CmiPrintf("[%d] ERROR: registerMainChare() not called : uninitialized module exists\n",CmiMyPe()) ;
   }
   
-  /* Register the Charm handlers with Converse */
-  CsvAccess(BUFFER_INCOMING_MSG_Index)
-    = CmiRegisterHandler(BUFFER_INCOMING_MSG) ;
-  CsvAccess(MAIN_HANDLE_INCOMING_MSG_Index)
-    = CmiRegisterHandler(HANDLE_INCOMING_MSG) ;
-  CsvAccess(HANDLE_INIT_MSG_Index)
-    = CmiRegisterHandler(HANDLE_INIT_MSG);
-  CsvAccess(CkProcIdx_ForChareMsg)
-    = CmiRegisterHandler(CkProcess_ForChareMsg);
-  CsvAccess(CkProcIdx_DynamicBocInitMsg)
-    = CmiRegisterHandler(CkProcess_DynamicBocInitMsg);
-  CsvAccess(CkProcIdx_NewChareMsg)
-    = CmiRegisterHandler(CkProcess_NewChareMsg);
-  CsvAccess(CkProcIdx_VidSendOverMsg)
-    = CmiRegisterHandler(CkProcess_VidSendOverMsg);
-
   /* set the main message handler to buffering handler */
   /* after initialization phase, it will be assigned to regular handler */
   CsvAccess(HANDLE_INCOMING_MSG_Index)
