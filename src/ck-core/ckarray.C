@@ -82,11 +82,11 @@ public:
   bool fromMigration;
 };
 
-CpvStaticDeclare(ArrayElement_initInfo,initInfo);
+CkpvStaticDeclare(ArrayElement_initInfo,initInfo);
 
 void ArrayElement::initBasics(void)
 {
-  ArrayElement_initInfo &info=CpvAccess(initInfo);
+  ArrayElement_initInfo &info=CkpvAccess(initInfo);
   thisArray=info.thisArray;
   thisArrayID=info.thisArrayID;
   numElements=info.numInitial;
@@ -270,7 +270,7 @@ void CProxySection_ArrayBase::pup(PUP::er &p)
 /*********************** CkArray Creation *************************/
 void _ckArrayInit(void)
 {
-  CpvInitialize(ArrayElement_initInfo,initInfo);
+  CkpvInitialize(ArrayElement_initInfo,initInfo);
 }
 
 CkArray::CkArray(const CkArrayOptions &c,CkMarshalledMessage &initMsg)
@@ -281,7 +281,7 @@ CkArray::CkArray(const CkArrayOptions &c,CkMarshalledMessage &initMsg)
   //Registration
   elements=(ArrayElementList *)locMgr->addManager(thisgroup,this);
 //  moved to _ckArrayInit()
-//  CpvInitialize(ArrayElement_initInfo,initInfo);
+//  CkpvInitialize(ArrayElement_initInfo,initInfo);
   CcdCallOnConditionKeep(CcdPERIODIC_1minute,staticSpringCleaning,(void *)this);
 
   //Set class variables
@@ -304,7 +304,7 @@ CkMigratable *CkArray::allocateMigrated(int elChareType,const CkArrayIndex &idx)
 ArrayElement *CkArray::allocate(int elChareType,const CkArrayIndex &idx,int bcast,bool fromMigration) 
 {
 	//Stash the element's initialization information in the global "initInfo"
-	ArrayElement_initInfo &init=CpvAccess(initInfo);
+	ArrayElement_initInfo &init=CkpvAccess(initInfo);
 	init.numInitial=numInitial;
 	init.thisArray=this;
 	init.thisArrayID=thisgroup;

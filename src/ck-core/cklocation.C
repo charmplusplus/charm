@@ -214,7 +214,7 @@ public:
   }
 };
 
-CpvStaticDeclare(double*, rem);
+CkpvStaticDeclare(double*, rem);
 
 class arrInfo {
  private:
@@ -236,9 +236,9 @@ static int cmp(const void *first, const void *second)
 {
   int fi = *((const int *)first);
   int si = *((const int *)second);
-  return ((CpvAccess(rem)[fi]==CpvAccess(rem)[si]) ? 
+  return ((CkpvAccess(rem)[fi]==CkpvAccess(rem)[si]) ? 
           0 : 
-          ((CpvAccess(rem)[fi]<CpvAccess(rem)[si]) ? 
+          ((CkpvAccess(rem)[fi]<CkpvAccess(rem)[si]) ? 
           1 : (-1)));
 }
 
@@ -262,16 +262,16 @@ arrInfo::distrib(int *speeds)
   nr = _nelems - nr;
   if(nr != 0)
   {
-    CpvAccess(rem) = new double[npes];
+    CkpvAccess(rem) = new double[npes];
     for(i=0;i<npes;i++)
-      CpvAccess(rem)[i] = (double)_nelems*nspeeds[i] - cp[i];
+      CkpvAccess(rem)[i] = (double)_nelems*nspeeds[i] - cp[i];
     int *pes = new int[npes];
     for(i=0;i<npes;i++)
       pes[i] = i;
     qsort(pes, npes, sizeof(int), cmp);
     for(i=0;i<nr;i++)
       cp[pes[i]]++;
-    delete[] CpvAccess(rem);
+    delete[] CkpvAccess(rem);
     delete[] pes;
   }
   k = 0;
@@ -293,7 +293,7 @@ arrInfo::getMap(const CkArrayIndex &i)
     return _map[((i.hash()+739)%1280107)%_nelems];
 }
 
-CpvStaticDeclare(int*, speeds);
+CkpvStaticDeclare(int*, speeds);
 
 #if CMK_USE_PROP_MAP
 typedef struct _speedmsg
@@ -306,15 +306,15 @@ typedef struct _speedmsg
 static void _speedHdlr(void *m)
 {
   speedMsg *msg = (speedMsg *) m;
-  CpvAccess(speeds)[msg->pe] = msg->speed;
+  CkpvAccess(speeds)[msg->pe] = msg->speed;
   CmiFree(m);
 }
 
 void _propMapInit(void)
 {
-  CpvInitialize(int*, speeds);
-  CpvAccess(speeds) = new int[CkNumPes()];
-  int hdlr = CmiRegisterHandler((CmiHandler)_speedHdlr);
+  CkpvInitialize(int*, speeds);
+  CkpvAccess(speeds) = new int[CkNumPes()];
+  int hdlr = CkRegisterHandler((CmiHandler)_speedHdlr);
   CmiPrintf("[%d]Measuring processor speed for prop. mapping...\n", CkMyPe());
   int s = LDProcessorSpeed();
   speedMsg msg;
@@ -322,7 +322,7 @@ void _propMapInit(void)
   msg.pe = CkMyPe();
   msg.speed = s;
   CmiSyncBroadcast(sizeof(msg), &msg);
-  CpvAccess(speeds)[CkMyPe()] = s;
+  CkpvAccess(speeds)[CkMyPe()] = s;
   int i;
   for(i=1;i<CkNumPes();i++)
     CmiDeliverSpecificMsg(hdlr);
@@ -330,11 +330,11 @@ void _propMapInit(void)
 #else
 void _propMapInit(void)
 {
-  CpvInitialize(int*, speeds);
-  CpvAccess(speeds) = new int[CkNumPes()];
+  CkpvInitialize(int*, speeds);
+  CkpvAccess(speeds) = new int[CkNumPes()];
   int i;
   for(i=0;i<CkNumPes();i++)
-    CpvAccess(speeds)[i] = 1;
+    CkpvAccess(speeds)[i] = 1;
 }
 #endif
 
@@ -345,14 +345,14 @@ private:
 public:
   PropMap(void)
   {
-    CpvInitialize(double*, rem);
+    CkpvInitialize(double*, rem);
     DEBC((AA"Creating PropMap\n"AB));
   }
   PropMap(CkMigrateMessage *m) {}
   int registerArray(int numElements,CkArrayID aid)
   {
     int idx = arrs.length();
-    arrs.insertAtEnd(new arrInfo(numElements, CpvAccess(speeds)));
+    arrs.insertAtEnd(new arrInfo(numElements, CkpvAccess(speeds)));
     return idx;
   }
   int procNum(int arrayHdl, const CkArrayIndex &i)
@@ -379,14 +379,14 @@ public:
 	int chareType;
 };
 
-CpvStaticDeclare(CkMigratable_initInfo,mig_initInfo);
+CkpvStaticDeclare(CkMigratable_initInfo,mig_initInfo);
 
 void _CkMigratable_initInfoInit(void) {
-  CpvInitialize(CkMigratable_initInfo,mig_initInfo);
+  CkpvInitialize(CkMigratable_initInfo,mig_initInfo);
 }
 
 void CkMigratable::commonInit(void) {
-	CkMigratable_initInfo &i=CpvAccess(mig_initInfo);
+	CkMigratable_initInfo &i=CkpvAccess(mig_initInfo);
 	myRec=i.locRec;
 	thisIndexMax=myRec->getIndex();
 	thisChareType=i.chareType;
@@ -595,8 +595,8 @@ bool CkLocRec_local::invokeEntry(CkMigratable *obj,void *msg,int epIdx) {
 	bool isDeleted=false; //Enables us to detect deletion during processing
 	deletedMarker=&isDeleted;
 	//The currentChare globals are used by CkGetChareID()
-	CpvAccess(_currentChare) = (void*) obj;
-	CpvAccess(_currentChareType) = _entryTable[epIdx]->chareIdx;
+	CkpvAccess(_currentChare) = (void*) obj;
+	CkpvAccess(_currentChareType) = _entryTable[epIdx]->chareIdx;
 	startTiming();
 	if (msg) {
 		envelope *env=UsrToEnv(msg);
@@ -844,7 +844,7 @@ CkLocMgr::CkLocMgr(CkGroupID mapID_,CkGroupID lbdbID_,int numInitial)
 {
 	DEBC((AA"Creating new location manager %d\n"AB,thisgroup));
 // moved to _CkMigratable_initInfoInit()
-//	CpvInitialize(CkMigratable_initInfo,mig_initInfo);
+//	CkpvInitialize(CkMigratable_initInfo,mig_initInfo);
 	
 	ckEnableTracing=CmiFalse; //Prevent us from being recorded
 	managers.init();
@@ -967,7 +967,7 @@ bool CkLocMgr::addElementToRec(CkLocRec_local *rec,ManagerRec *m,
 	
 //Call the element's constructor
 	DEBC((AA"Constructing element %s of array\n"AB,idx2str(idx)));
-	CkMigratable_initInfo &i=CpvAccess(mig_initInfo);
+	CkMigratable_initInfo &i=CkpvAccess(mig_initInfo);
 	i.locRec=rec;
 	i.chareType=_entryTable[ctorIdx]->chareIdx;
 	if (!rec->invokeEntry(elt,ctorMsg,ctorIdx)) return false;
