@@ -8,17 +8,23 @@ class PairCalcID {
   CkGroupID Gid;
   int GrainSize;
   int BlkSize;
-  int S;
+  int S; 
   bool Symmetric;
+  int instid;
+  CkGroupID dmid;
+  bool useComlib;
   PairCalcID() {}
   ~PairCalcID() {}
-  void Init(CkArrayID aid,CkArrayID gid, int grain, int blk, int s, bool sym) {
+  void Init(CkArrayID aid, CkGroupID gid, int grain, int blk, int s, bool sym, bool _useComlib, int _instid, CkGroupID _dmid) {
     Aid = aid;
     Gid = gid;
     GrainSize = grain;
     BlkSize = blk;
     S = s;
     Symmetric = sym;
+    useComlib = _useComlib;
+    instid = _instid; 
+    dmid = _dmid; 
   }
   void pup(PUP::er &p) {
     p|Aid;
@@ -27,10 +33,13 @@ class PairCalcID {
     p|BlkSize;
     p|S;
     p|Symmetric;
+    p|instid;
+    p|dmid;
+    p|useComlib;
   }
 };
 
-extern "C" void createPairCalculator(bool sym, int w, int numZ, int* z, int op1, FuncType f1, int op2, FuncType f2, const CkCallback cb, PairCalcID* aid);
+extern "C" void createPairCalculator(bool sym, int w, int numZ, int* z, int op1, FuncType f1, int op2, FuncType f2, const CkCallback cb, PairCalcID* aid, int flag=0);
 
 void startPairCalcLeft(PairCalcID* aid, int n, complex* ptr, int myS, int myZ);
 

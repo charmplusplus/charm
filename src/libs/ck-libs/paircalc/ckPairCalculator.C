@@ -110,34 +110,8 @@ PairCalculator::calculatePairs(int size, complex *points, int sender, bool fromR
     inData[offset] = new complex[size];
   memcpy(inData[offset], points, size * sizeof(complex));
 
-
-#if 0
-    CkPrintf("--------Partial Deposit----------\n");
-    for (int i = 0; i < size; i++){
-      CkPrintf(" {%.2f %.2f}", points[i].re, points[i].im);    
-    }
-    CkPrintf("\n");
-#endif
-  
   numRecd++; 
   if (numRecd == numExpected * 2 || (symmetric && thisIndex.x==thisIndex.y && numRecd==numExpected)) {
-#if 0
-    CkPrintf("--------All Deposit----------\n");
-    for (int j = 0; j < numExpected; j++)
-    for (int i = 0; i < size; i++){
-      CkPrintf(" {%.2f %.2f}", inDataLeft[j][i].re, inDataLeft[j][i].im);    
-    }
-
-    CkPrintf("\n");
-    if(!symmetric) {
-    for (int j = 0; j < numExpected; j++)
-    for (int i = 0; i < size; i++){
-      CkPrintf(" {%.2f %.2f}", inDataRight[j][i].re, inDataRight[j][i].im);    
-    }
-
-    CkPrintf("\n");
-    }
-#endif
   
 #ifdef _DEBUG_
     CkPrintf("     pairCalc[%d %d %d %d] got expected %d\n", thisIndex.w, thisIndex.x, thisIndex.y, thisIndex.z,  numExpected);
@@ -160,35 +134,6 @@ PairCalculator::calculatePairs(int size, complex *points, int sender, bool fromR
     }
 
     // FIXME: should do 'op2' here!!!
-/*    
-    double *ptr = new double[S*S*2];
-    memset((void*)ptr, 0, sizeof(double)*S*S*2);
-
-    //    for(int i=0; i<grainSize; i++)
-    //      memcpy(ptr+(thisIndex.y+thisIndex.x*S+i*S)*2, outData+i*grainSize, grainSize*sizeof(complex));
-    for(int i=0; i<grainSize; i++) {
-      for(int j=0; j<grainSize; j++){
-	ptr[(i*S+j+thisIndex.y+thisIndex.x*S)*2] = outData[i*grainSize+j].re;
-	ptr[(i*S+j+thisIndex.y+thisIndex.x*S)*2+1] = outData[i*grainSize+j].im;
-      }
-    }
-#if 0
-    CkPrintf("--------Partial Result----------\n");
-    for (int i = 0; i < grainSize; i++){
-      for (int j = 0; j < grainSize; j++)
-	CkPrintf(" {%.2f %.2f}", outData[i * grainSize + j].re, outData[i * grainSize + j].im);    
-      CkPrintf("\n");
-    }
-    for (int i = 0; i < S; i++){
-      for (int j = 0; j < S; j++)
-	CkPrintf(" [%.2f %.2f]", ptr[(i * S + j)*2], ptr[(i * S + j)*2+1]);    
-      CkPrintf("\n");
-    }
-#endif
-    
-    contribute(S*S*sizeof(double) * 2, ptr, CkReduction::sum_double);
-    delete [] ptr;
-*/
 
    r.add((int)thisIndex.y, (int)thisIndex.x, (int)(thisIndex.y+grainSize-1), (int)(thisIndex.x+grainSize-1), (CkTwoDoubles*)outData);
     r.contribute(this, sparse_sum_TwoDoubles);
@@ -208,27 +153,9 @@ PairCalculator::acceptEntireResult(int size, complex *matrix, CkCallback cb)
   CkPrintf("[%d %d %d %d]: Accept EntireResult with size %d\n", thisIndex.w, thisIndex.x, thisIndex.y, thisIndex.z, size);
 #endif
   CkArrayIndexIndex4D myidx(thisIndex.w, thisIndex.x, thisIndex.y, thisIndex.z);
-  
-#if 0
-  complex *myportion = new complex[grainSize * grainSize];	
-  for (int i = 0; i < grainSize; i++)
-    memcpy(myportion + i*grainSize,
-	   matrix + thisIndex.y + (thisIndex.x+i)*S,
-	   sizeof(complex)*grainSize);
-  acceptResult(grainSize*grainSize, myportion, thisIndex.x, cb);
-  if (symmetric && thisIndex.x != thisIndex.y) {
-    for(int i = 0; i < grainSize; i++)
-      memcpy(myportion + i*grainSize,
-	     matrix + thisIndex.x + (thisIndex.y+1)*grainSize,
-	     sizeof(complex)*grainSize);
-    acceptResult(grainSize*grainSize, myportion, thisIndex.y, cb);
-  }
-  delete [] myportion;
-#else
   acceptResult(size, matrix, thisIndex.x, cb);
   if(symmetric && thisIndex.x != thisIndex.y)
     acceptResult(size, matrix, thisIndex.y, cb);
-#endif
 }
 
 
@@ -253,12 +180,10 @@ PairCalculator::acceptResult(int size, complex *matrix, int rowNum, CkCallback c
 
   if(!symmetric){
     CkArrayIndexIndex4D idx(thisIndex.w, 0, thisIndex.y, thisIndex.z);
-    //CkArrayIndexIndex4D idx(thisIndex.w, thisIndex.x, 0, thisIndex.z);
     thisProxy(idx).sumPartialResult(N*grainSize, mynewData, thisIndex.z, cb);
   }
   else {
     CkArrayIndexIndex4D idx(thisIndex.w, 0, thisIndex.y, thisIndex.z);
-    //CkArrayIndexIndex4D idx(thisIndex.w, thisIndex.x, 0, thisIndex.z);
     thisProxy(idx).sumPartialResult(N*grainSize, mynewData, thisIndex.z, cb);  
     if (rowNum != thisIndex.x){
       CkArrayIndexIndex4D idx(thisIndex.w, 0, thisIndex.x, thisIndex.z);
@@ -274,17 +199,6 @@ PairCalculator::sumPartialResult(int size, complex *result, int offset, CkCallba
 {
 #ifdef _DEBUG_
   CkPrintf("[%d %d %d %d]: sum result from %d\n", thisIndex.w, thisIndex.x, thisIndex.y, thisIndex.z, offset);
-
-#if 0  
-  if(thisIndex.x==0 && thisIndex.y==0 && thisIndex.w==0){
-    CkPrintf("partial sum (N=%d): \n", N);
-    for(int i=0; i<N*grainSize; i++){
-      if(i%N == 0)
-	CkPrintf("[%d]:{%2.5f %2.5f}\n", i, result[i].re, result[i].im);
-    }
-    CkPrintf("\n");
-  }
-#endif
 #endif
 
   sumPartialCount++;
@@ -298,7 +212,6 @@ PairCalculator::sumPartialResult(int size, complex *result, int offset, CkCallba
   if (sumPartialCount == (S/grainSize)*blkSize) {
     for(int j=0; j<grainSize; j++){
       CkCallback mycb(cb.d.array.ep, CkArrayIndex2D(thisIndex.y+j, thisIndex.w), cb.d.array.id);
-      //CkCallback mycb(cb.d.array.ep, CkArrayIndex2D(thisIndex.x+j, thisIndex.w), cb.d.array.id);
       mySendMsg *msg = new (N, 0)mySendMsg(N, newData+j*N); // msg with newData (size N)
       mycb.send(msg);
     }

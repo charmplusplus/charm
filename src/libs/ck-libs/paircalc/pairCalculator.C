@@ -1,7 +1,11 @@
 #include "ckPairCalculator.h"
 #include "pairCalculator.h"
 
-void createPairCalculator(bool sym, int s, int numZ, int* z, int op1, FuncType f1, int op2, FuncType f2, CkCallback cb,  PairCalcID* pcid) {
+void createPairCalculator(bool sym, int s, int numZ, int* z, int op1, FuncType f1, int op2, FuncType f2, CkCallback cb, PairCalcID* pcid, int comlib_flag) {
+
+  Strategy * pstrat = new PipeBroadcastStrategy();
+  ComlibInstanceHandle bcastInstance = CkGetComlibInstance();
+  bcastInstance.setStrategy(pstrat);
 
   CProxy_PairCalcReducer pairCalcReducerProxy = CProxy_PairCalcReducer::ckNew();
   pairCalcReducerProxy.ckSetReductionClient(&cb); 
@@ -14,7 +18,7 @@ void createPairCalculator(bool sym, int s, int numZ, int* z, int op1, FuncType f
   int blkSize = 1;
 
   int proc = 0, n_paircalc = 0;
-  pcid->Init(pairCalculatorProxy.ckGetArrayID(), pairCalcReducerProxy.ckGetGroupID(), grainSize, blkSize, s, sym);
+  pcid->Init(pairCalculatorProxy.ckGetArrayID(), pairCalcReducerProxy.ckGetGroupID(), grainSize, blkSize, s, sym, comlib_flag, bcastInstance._instid, bcastInstance._dmid);
 
   if(sym){
     for(int numX = 0; numX < numZ; numX += blkSize){
@@ -58,7 +62,7 @@ void createPairCalculator(bool sym, int s, int numZ, int* z, int op1, FuncType f
 // Deposit data and start calculation
 void startPairCalcLeft(PairCalcID* pcid, int n, complex* ptr, int myS, int myZ){
 #ifdef _DEBUG_
-  CkPrintf("     Calc Left \n");
+  CkPrintf("     Calc Left ptr %d\n", ptr);
 #endif
   CkArrayID pairCalculatorID = (CkArrayID)pcid->Aid; 
   CProxy_PairCalculator pairCalculatorProxy(pairCalculatorID);
@@ -90,7 +94,7 @@ void startPairCalcLeft(PairCalcID* pcid, int n, complex* ptr, int myS, int myZ){
 
 void startPairCalcRight(PairCalcID* pcid, int n, complex* ptr, int myS, int myZ){
 #ifdef _DEBUG_
-  CkPrintf("     Calc Right\n");
+  CkPrintf("     Calc Right symm=%d\n", pcid->Symmetric);
 #endif
   CkArrayID pairCalculatorID = (CkArrayID)pcid->Aid; 
   CProxy_PairCalculator pairCalculatorProxy(pairCalculatorID);
@@ -99,7 +103,7 @@ void startPairCalcRight(PairCalcID* pcid, int n, complex* ptr, int myS, int myZ)
   int grainSize = pcid->GrainSize;
   int blkSize =  pcid->BlkSize;
   int S = pcid->S;
-  int symmetric = pcid->Symmetric;
+  bool symmetric = pcid->Symmetric;
 
   CkAssert(symmetric == false);
   
@@ -118,7 +122,18 @@ void finishPairCalc(PairCalcID* pcid, int n, complex*ptr, CkCallback cb) {
 
   CkArrayID pairCalcReducerID = (CkArrayID)pcid->Gid; 
   CProxy_PairCalcReducer pairCalcReducerProxy(pairCalcReducerID);
+  ComlibInstanceHandle bcastInstance = ComlibInstanceHandle(pcid->instid, pcid->dmid);
+
+  if(pcid->useComlib) {
+      ComlibDelegateProxy(&pairCalcReducerProxy);
+      bcastInstance.beginIteration();
+  }
+
   pairCalcReducerProxy.broadcastEntireResult(n, ptr, pcid->Symmetric, cb);
+
+  if(pcid->useComlib) {
+      bcastInstance.endIteration();
+  }
 }
 
 void startPairCalcLeftAndFinish(PairCalcID* pcid, int n, complex* ptr, int myS, int myZ){

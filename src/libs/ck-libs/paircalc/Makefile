@@ -30,7 +30,7 @@ $(HEADERS): pairCalculator.h ckPairCalculator.h ckPairCalculator.decl.h
 	/bin/cp ckPairCalculator.def.h $(CDIR)/include
 
 $(LIB): pairCalculator.o ckPairCalculator.o 
-	$(COMPILER) -o $(LIB) $(LIBOBJ) -module CkSparseContiguousReducer
+	$(COMPILER) -o $(LIB) $(LIBOBJ) -module commlib -module CkSparseContiguousReducer 
 	/bin/cp $(LIB) $(CDIR)/lib/
 
 ckPairCalculator.o: ckPairCalculator.C ckPairCalculator.h ckPairCalculator.decl.h 
