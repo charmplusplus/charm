@@ -40,7 +40,8 @@ public:
     inline MSA1D(){}
     virtual void pup(PUP::er &p){ ckout << "PUP of MSA1D not implemented yet."; CkExit(); };
 
-    inline MSA1D(unsigned int nEntries_, unsigned int num_wrkrs, unsigned int maxBytes=MSA_DEFAULT_MAX_BYTES) : nEntries(nEntries_)
+    inline MSA1D(unsigned int nEntries_, unsigned int num_wrkrs, unsigned int maxBytes=MSA_DEFAULT_MAX_BYTES)
+        : nEntries(nEntries_)
     {
         // first create an array and the cache for the pages
         unsigned int nPages = (nEntries + ENTRIES_PER_PAGE - 1)/ENTRIES_PER_PAGE;
@@ -51,19 +52,11 @@ public:
         cache = cg.ckLocalBranch();
     }
 
-    // We need to know the total number of workers across all
-    // processors, and we also calculate the number of worker threads
-    // running on this processor.
-    //
-    // blocking method, basically does a barrier until all workers
-    // enroll.
-    inline void enroll(int num_workers)
+    inline MSA1D(CProxy_CacheGroup<ENTRY, ENTRY_OPS_CLASS> cg_)
+        : cg(cg_)
     {
-        // @@ This is a hack to identify the number of MSA1D
-        // threads on this processor.  This number is needed for sync.
-        //
-        // @@ What if a MSA1D thread migrates?
-        cache->enroll(num_workers);
+        cache = cg.ckLocalBranch();
+        nEntries = cache->getNumEntries();
     }
 
     inline ~MSA1D()
@@ -73,12 +66,6 @@ public:
         //cg.destroy();
         // TODO: calling FreeMem does not seem to work. Need to debug it.
         //cache->FreeMem();
-    }
-
-    inline MSA1D(CProxy_CacheGroup<ENTRY, ENTRY_OPS_CLASS> cg_) : cg(cg_)
-    {
-        cache = cg.ckLocalBranch();
-        nEntries = cache->getNumEntries();
     }
 
     /**
@@ -92,7 +79,41 @@ public:
         /* don't need to update the number of entries, as that does not change */
     }
 
+    // ================ Accessor/Utility functions ================
     inline unsigned int length() const { return nEntries; }
+
+    inline CProxy_CacheGroup<ENTRY, ENTRY_OPS_CLASS> getCacheGroup() { return cg; }
+
+    // Avoid using the term "page size" because it is confusing: does
+    // it mean in bytes or number of entries?
+    inline unsigned int getNumEntriesPerPage() const { return ENTRIES_PER_PAGE; }
+
+    inline unsigned int getPageIndex(unsigned int idx)
+    {
+        return idx / ENTRIES_PER_PAGE;
+    }
+
+    inline unsigned int getOffsetWithinPage(unsigned int idx)
+    {
+        return idx % ENTRIES_PER_PAGE;
+    }
+
+    // ================ MSA API ================
+
+    // We need to know the total number of workers across all
+    // processors, and we also calculate the number of worker threads
+    // running on this processor.
+    //
+    // Blocking method, basically does a barrier until all workers
+    // enroll.
+    inline void enroll(int num_workers)
+    {
+        // @@ This is a hack to identify the number of MSA1D
+        // threads on this processor.  This number is needed for sync.
+        //
+        // @@ What if a MSA1D thread migrates?
+        cache->enroll(num_workers);
+    }
 
     inline const ENTRY& get(unsigned int idx)
     {
@@ -101,6 +122,7 @@ public:
         return readablePage(page)[offset];
     }
 
+    // known local page
     inline const ENTRY& get2(unsigned int idx)
     {
         unsigned int page = idx / ENTRIES_PER_PAGE;
@@ -117,8 +139,6 @@ public:
     }
 
     inline void sync(int single=0) { cache->SyncReq(single); }
-
-    inline CProxy_CacheGroup<ENTRY, ENTRY_OPS_CLASS> getCacheGroup() { return cg; }
 
     inline void accumulate(unsigned int idx, const ENTRY& ent)
     {
@@ -150,8 +170,16 @@ public:
 
     inline int WaitAll()    { return cache->WaitAll(); }
 
+    // unlocks all locked pages
     inline void Unlock()    { return cache->UnlockPages(); }
 
+    // start and end are element indexes.
+    // Unlocks completely spanned pages given a range of elements
+    // index'd from "start" to "end".  If start/end does not span a
+    // page completely, i.e. start/end is in the middle of a page,
+    // that page is not unlocked.
+    //
+    // If start > end, flips them.
     inline void Unlock(unsigned int start, unsigned int end)
     {
         if(start > end)
@@ -198,18 +226,33 @@ public:
     inline MSA2D() : MSA1D<ENTRY, ENTRY_OPS_CLASS, ENTRIES_PER_PAGE>() {}
     virtual void pup(PUP::er &p){ ckout << "PUP of MSA2D not implemented yet."; CkExit(); };
 
-    inline MSA2D(unsigned int rows_, unsigned int cols_, unsigned int numwrkrs, unsigned int maxBytes=MSA_DEFAULT_MAX_BYTES) : MSA1D<ENTRY, ENTRY_OPS_CLASS, ENTRIES_PER_PAGE>(rows_*cols_, numwrkrs, maxBytes)
+    inline MSA2D(unsigned int rows_, unsigned int cols_, unsigned int numwrkrs,
+                 unsigned int maxBytes=MSA_DEFAULT_MAX_BYTES)
+        : MSA1D<ENTRY, ENTRY_OPS_CLASS, ENTRIES_PER_PAGE>(rows_*cols_, numwrkrs, maxBytes)
     {
         rows = rows_; cols = cols_;
     }
 
-    inline MSA2D(unsigned int rows_, unsigned int cols_, CProxy_CacheGroup<ENTRY, ENTRY_OPS_CLASS> cg_) : rows(rows_), cols(cols_), MSA1D<ENTRY, ENTRY_OPS_CLASS, ENTRIES_PER_PAGE>(cg_) {}
+    inline MSA2D(unsigned int rows_, unsigned int cols_, CProxy_CacheGroup<ENTRY, ENTRY_OPS_CLASS> cg_)
+        : rows(rows_), cols(cols_), MSA1D<ENTRY, ENTRY_OPS_CLASS, ENTRIES_PER_PAGE>(cg_)
+    {}
+
+    inline unsigned int getPageIndex(unsigned int row, unsigned int col)
+    {
+        return getIndex(row, col)/ENTRIES_PER_PAGE;
+    }
+
+    inline unsigned int getOffsetWithinPage(unsigned int row, unsigned int col)
+    {
+        return getIndex(row, col)%ENTRIES_PER_PAGE;
+    }
 
     inline const ENTRY& get(unsigned int row, unsigned int col)
     {
         return MSA1D<ENTRY, ENTRY_OPS_CLASS, ENTRIES_PER_PAGE>::get(getIndex(row, col));
     }
 
+    // known local
     inline const ENTRY& get2(unsigned int row, unsigned int col)
     {
         return MSA1D<ENTRY, ENTRY_OPS_CLASS, ENTRIES_PER_PAGE>::get2(getIndex(row, col));
@@ -237,6 +280,7 @@ public:
         MSA1D<ENTRY, ENTRY_OPS_CLASS, ENTRIES_PER_PAGE>::Prefetch(index1, index2);
     }
 
+    // Unlocks pages starting from row "start" through row "end", inclusive
     inline void UnlockPages(unsigned int start, unsigned int end)
     {
         if(start > end)
