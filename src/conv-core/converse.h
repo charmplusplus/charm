@@ -336,8 +336,10 @@ for each processor in the node.
 
 #if CMK_USE_GM
 extern void CmiBarrier(void);
+extern void CmiBarrierZero(void);
 #else
 #define CmiBarrier()
+#define CmiBarrierZero()
 #endif
 
 /******** CMI: TYPE DEFINITIONS ********/
