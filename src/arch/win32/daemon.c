@@ -50,7 +50,7 @@ void main()
 	WORD wVersionRequested = MAKEWORD(2,0);
 	WSADATA wsaData;
 
-	int myPortNumber = DAEMON_IP_PORT;
+	unsigned short  myPortNumber = DAEMON_IP_PORT;
 	int myIP;
 	int myfd;
 

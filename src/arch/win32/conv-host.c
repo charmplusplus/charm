@@ -276,7 +276,7 @@ unsigned int skt_ip()
 
 
 
-void skt_server(unsigned int *pip, unsigned int *ppo, SOCKET *pfd)
+void skt_server(unsigned int *pip, unsigned short *ppo, SOCKET *pfd)
 {  
   SOCKET             fd = INVALID_SOCKET;
   int                ok, len;
@@ -1067,8 +1067,8 @@ char *arg_myhome;
 char *arg_shell;
 
 #if CMK_CCS_AVAILABLE
-int   arg_server;
-int   arg_server_port;
+unsigned int   arg_server;
+unsigned short arg_server_port;
 #endif
 
 #if CMK_DEBUG_MODE
@@ -2233,7 +2233,8 @@ void req_poll()
 int req_worker(int workerno)
 {  
   int            numclients;
-  unsigned int   master_ip, master_port; 
+  unsigned int   master_ip;
+  unsigned short master_port; 
   SOCKET         master_fd, client_fd;
   unsigned int   client_ip, client_port;
   int            i, status, nread, len, timeout;
@@ -2457,7 +2458,8 @@ void start_nodes()
 int main(int argc, char **argv)
 {  
 #if CMK_CCS_AVAILABLE
-  unsigned int myIP, myPortNo;
+  unsigned int   myIP;
+  unsigned short myPortNo;
 #endif
   WSADATA  WSAData;
 

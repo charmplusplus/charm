@@ -84,7 +84,7 @@ unsigned int skt_ip()
 
 void skt_server(pip,ppo,pfd)
     unsigned int *pip;
-    unsigned int *ppo;
+    unsigned short *ppo;
     unsigned int *pfd;
 {
   int fd= -1;
@@ -112,10 +112,10 @@ void skt_server(pip,ppo,pfd)
 void skt_accept(src,pip,ppo,pfd)
     int src;
     unsigned int *pip;
-    unsigned int *ppo;
+    unsigned short *ppo;
     unsigned int *pfd;
 {
-  int i, fd, ok;
+  int i, fd;
   struct sockaddr_in remote;
   i = sizeof(remote);
  acc:
@@ -134,7 +134,7 @@ int skt_connect(ip, port)
     unsigned int ip; int port;
 {
   struct sockaddr_in remote; short sport=port;
-  int fd, ok, len;
+  int fd, ok;
     
   /* create an address structure for the server */ 
   memset(&remote, 0, sizeof(remote));
@@ -147,7 +147,6 @@ int skt_connect(ip, port)
   if ((fd<0)&&(errno=EMFILE)) goto sock;
   if (fd < 0) return -1;
   
- conn:
   ok = connect(fd, (struct sockaddr *)&(remote), sizeof(remote));
   if (ok<0) {
     switch (errno) {
@@ -157,3 +156,4 @@ int skt_connect(ip, port)
   }
   return fd;
 }
+
