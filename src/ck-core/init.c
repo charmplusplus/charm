@@ -12,7 +12,11 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.23  1995-09-20 16:36:26  jyelon
+ * Revision 2.24  1995-09-26 22:23:17  sanjeev
+ * fixed bug because CkBuffQueue was created too late : moved it up
+ * in StartCharm
+ *
+ * Revision 2.23  1995/09/20  16:36:26  jyelon
  * *** empty log message ***
  *
  * Revision 2.22  1995/09/20  15:41:56  gursoy
@@ -338,6 +342,10 @@ FUNCTION_PTR donehandler;
         SysBocInit();
         CpvAccess(msgs_created) = CpvAccess(msgs_processed) = 0;
 
+       /* create the queue for non-init messages arrived
+          during initialization */
+        CpvAccess(CkBuffQueue) = (void *) FIFO_Create();
+
 
 	if (CmiMyPe() == 0)
 	{
@@ -419,10 +427,6 @@ FUNCTION_PTR donehandler;
                 /* create the boc init message queue */
                 CpvAccess(BocInitQueueHead) = (BOCINIT_QUEUE *) BocInitQueueCreate();
 	}
-
-       /* create the queue for non-init messages arrived
-          during initialization */
-        CpvAccess(CkBuffQueue) = (void *) FIFO_Create();
 
 	SysPeriodicCheckInit();
 }
