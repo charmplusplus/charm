@@ -139,7 +139,7 @@ void TransmitAckDatagram(OtherNode node)
   
   seqno = node->recv_next;
   MACHSTATE2(2,"  TransmitAckDgram [seq %d to 'pe' %d]",seqno,node->nodestart)
-  DgramHeaderMake(&ack, DGRAM_ACKNOWLEDGE, Cmi_nodestart, Cmi_charmrun_pid, seqno);
+  DgramHeaderMake(&ack, DGRAM_ACKNOWLEDGE, Cmi_nodestart, Cmi_charmrun_pid, seqno, 0);
   LOG(Cmi_clock, Cmi_nodestart, 'A', node->nodestart, seqno);
   for (i=0; i<Cmi_window_size; i++) {
     slot = seqno % Cmi_window_size;
@@ -183,7 +183,7 @@ void TransmitImplicitDgram(ImplicitDgram dg)
   head = (DgramHeader *)(data - DGRAM_HEADER_SIZE);
   temp = *head;
   dest = dg->dest;
-  DgramHeaderMake(head, dg->rank, dg->srcpe, Cmi_charmrun_pid, dg->seqno);
+  DgramHeaderMake(head, dg->rank, dg->srcpe, Cmi_charmrun_pid, dg->seqno, dg->broot);
 #ifdef CMK_USE_CHECKSUM
   head->magic ^= computeCheckSum((unsigned char*)head, len + DGRAM_HEADER_SIZE);
 #endif
@@ -209,7 +209,7 @@ void TransmitImplicitDgram1(ImplicitDgram dg)
   head = (DgramHeader *)(data - DGRAM_HEADER_SIZE);
   temp = *head;
   dest = dg->dest;
-  DgramHeaderMake(head, dg->rank, dg->srcpe, Cmi_charmrun_pid, dg->seqno);
+  DgramHeaderMake(head, dg->rank, dg->srcpe, Cmi_charmrun_pid, dg->seqno, dg->broot);
 #ifdef CMK_USE_CHECKSUM
   head->magic ^= computeCheckSum((unsigned char *)head, len + DGRAM_HEADER_SIZE);
 #endif
@@ -311,7 +311,7 @@ int TransmitDatagram()
  * datagrams. 
  ***********************************************************************/
 void EnqueueOutgoingDgram
-        (OutgoingMsg ogm, char *ptr, int len, OtherNode node, int rank)
+        (OutgoingMsg ogm, char *ptr, int len, OtherNode node, int rank, int broot)
 {
   int seqno, dst, src; ImplicitDgram dg;
   src = ogm->src;
@@ -323,6 +323,7 @@ void EnqueueOutgoingDgram
   dg->srcpe = src;
   dg->rank = rank;
   dg->seqno = seqno;
+  dg->broot = broot;
   dg->dataptr = ptr;
   dg->datalen = len;
   dg->ogm = ogm;
@@ -345,7 +346,7 @@ void EnqueueOutgoingDgram
  * function takes the outgoing messages, splits it into datagrams and
  * enqueues them into the Send Queue.
  ***********************************************************************/
-void DeliverViaNetwork(OutgoingMsg ogm, OtherNode node, int rank)
+void DeliverViaNetwork(OutgoingMsg ogm, OtherNode node, int rank, unsigned int broot)
 {
   int size; char *data;
   OtherNode myNode = nodes+CmiMyNode();
@@ -356,11 +357,11 @@ void DeliverViaNetwork(OutgoingMsg ogm, OtherNode node, int rank)
   data = ogm->data + DGRAM_HEADER_SIZE;
   writeableDgrams++;
   while (size > Cmi_dgram_max_data) {
-    EnqueueOutgoingDgram(ogm, data, Cmi_dgram_max_data, node, rank);
+    EnqueueOutgoingDgram(ogm, data, Cmi_dgram_max_data, node, rank, broot);
     data += Cmi_dgram_max_data;
     size -= Cmi_dgram_max_data;
   }
-  EnqueueOutgoingDgram(ogm, data, size, node, rank);
+  EnqueueOutgoingDgram(ogm, data, size, node, rank, broot);
 
   myNode->sent_msgs++;
   myNode->sent_bytes += ogm->size;
@@ -422,7 +423,9 @@ void AssembleDatagram(OtherNode node, ExplicitDgram dg)
       CmiPushPE(0, msg);
     } else {
 #if CMK_NODE_QUEUE_AVAILABLE
-         if (node->asm_rank==DGRAM_NODEMESSAGE) {
+         if (node->asm_rank==DGRAM_NODEMESSAGE ||
+	     node->asm_rank==DGRAM_NODEBROADCAST) 
+	 {
 	   CmiPushNode(msg);
          }
 	 else
@@ -475,7 +478,6 @@ void AssembleReceivedDatagrams(OtherNode node)
  * assembled. 
  ************************************************************************/
 
-
 void IntegrateMessageDatagram(ExplicitDgram dg)
 {
   int seqno;
@@ -502,7 +504,22 @@ void IntegrateMessageDatagram(ExplicitDgram dg)
 	node->recv_ack_time = 0.0;
       if (seqno >= node->recv_expect)
 	node->recv_expect = ((seqno+1)&DGRAM_SEQNO_MASK);
-  LOG(Cmi_clock, Cmi_nodestart, 'Y', node->recv_next, dg->seqno);
+      LOG(Cmi_clock, Cmi_nodestart, 'Y', node->recv_next, dg->seqno);
+#if CMK_BROADCAST_SPANNING_TREE
+      if (dg->rank == DGRAM_BROADCAST
+#if CMK_NODE_QUEUE_AVAILABLE 
+          || dg->rank == DGRAM_NODEBROADCAST
+#endif
+      )
+        SendSpanningChildren(NULL, 0, dg->len, (char*)dg->data, dg->broot, dg->rank);
+#elif CMK_BROADCAST_HYPERCUBE
+      if (dg->rank == DGRAM_BROADCAST
+#if CMK_NODE_QUEUE_AVAILABLE
+          || dg->rank == DGRAM_NODEBROADCAST
+#endif
+      )
+        SendHypercube(NULL, 0, dg->len, (char*)dg->data, dg->broot, dg->rank);
+#endif
       return;
     }
   }
@@ -668,7 +685,7 @@ void ReceiveDatagram()
 #endif
 
   if (ok >= DGRAM_HEADER_SIZE) {
-    DgramHeaderBreak(dg->data, dg->rank, dg->srcpe, magic, dg->seqno);
+    DgramHeaderBreak(dg->data, dg->rank, dg->srcpe, magic, dg->seqno, dg->broot);
     MACHSTATE3(2,"  recv dgram [seq %d, for rank %d, from pe %d]",
 	       dg->seqno,dg->rank,dg->srcpe)
 #ifdef CMK_USE_CHECKSUM

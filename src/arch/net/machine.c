@@ -1472,16 +1472,22 @@ void DeliverOutgoingNodeMessage(OutgoingMsg ogm)
     CmiPushNode(CopyMsg(ogm->data,ogm->size));
     /*case-fallthrough (no break)-- deliver to all other processors*/
   case NODE_BROADCAST_OTHERS:
+#if CMK_BROADCAST_SPANNING_TREE
+    SendSpanningChildren(ogm, 1, 0, NULL, 0, DGRAM_NODEBROADCAST);
+#elif CMK_BROADCAST_HYPERCUBE
+    SendHypercube(ogm, 1, 0, NULL, 0, DGRAM_NODEBROADCAST);
+#else
     for (i=0; i<_Cmi_numnodes; i++)
       if (i!=_Cmi_mynode)
-	DeliverViaNetwork(ogm, nodes + i, DGRAM_NODEMESSAGE);
+	DeliverViaNetwork(ogm, nodes + i, DGRAM_NODEMESSAGE, DGRAM_ROOTPE_MASK);
+#endif
     GarbageCollectMsg(ogm);
     break;
   default:
     node = nodes+dst;
     rank=DGRAM_NODEMESSAGE;
     if (dst != _Cmi_mynode) {
-      DeliverViaNetwork(ogm, node, rank);
+      DeliverViaNetwork(ogm, node, rank, DGRAM_ROOTPE_MASK);
       GarbageCollectMsg(ogm);
     } else {
       if (ogm->freemode == 'A') {
@@ -1521,9 +1527,15 @@ void DeliverOutgoingMessage(OutgoingMsg ogm)
     for (rank = 0; rank<_Cmi_mynodesize; rank++) {
       CmiPushPE(rank,CopyMsg(ogm->data,ogm->size));
     }
+#if CMK_BROADCAST_SPANNING_TREE
+    SendSpanningChildren(ogm, 1, 0, NULL, 0, DGRAM_BROADCAST);
+#elif CMK_BROADCAST_HYPERCUBE
+    SendHypercube(ogm, 1, 0, NULL, 0, DGRAM_BROADCAST);
+#else
     for (i=0; i<_Cmi_numnodes; i++)
       if (i!=_Cmi_mynode)
-	DeliverViaNetwork(ogm, nodes + i, DGRAM_BROADCAST);
+	DeliverViaNetwork(ogm, nodes + i, DGRAM_BROADCAST, DGRAM_ROOTPE_MASK);
+#endif
     GarbageCollectMsg(ogm);
     break;
   case PE_BROADCAST_OTHERS:
@@ -1531,9 +1543,15 @@ void DeliverOutgoingMessage(OutgoingMsg ogm)
       if (rank + Cmi_nodestart != ogm->src) {
 	CmiPushPE(rank,CopyMsg(ogm->data,ogm->size));
       }
+#if CMK_BROADCAST_SPANNING_TREE
+    SendSpanningChildren(ogm, 1, 0, NULL, 0, DGRAM_BROADCAST);
+#elif CMK_BROADCAST_HYPERCUBE
+    SendHypercube(ogm, 1, 0, NULL, 0, DGRAM_BROADCAST);
+#else
     for (i = 0; i<_Cmi_numnodes; i++)
       if (i!=_Cmi_mynode)
-	DeliverViaNetwork(ogm, nodes + i, DGRAM_BROADCAST);
+	DeliverViaNetwork(ogm, nodes + i, DGRAM_BROADCAST, DGRAM_ROOTPE_MASK);
+#endif
     GarbageCollectMsg(ogm);
     break;
   default:
@@ -1544,7 +1562,7 @@ void DeliverOutgoingMessage(OutgoingMsg ogm)
     node = nodes_by_pe[dst];
     rank = dst - node->nodestart;
     if (node->nodestart != Cmi_nodestart) {
-      DeliverViaNetwork(ogm, node, rank);
+      DeliverViaNetwork(ogm, node, rank, DGRAM_ROOTPE_MASK);
       GarbageCollectMsg(ogm);
     } else {
       if (ogm->freemode == 'A') {
@@ -1594,12 +1612,11 @@ void *CmiGetNonLocal(void)
 
 
 /**
- * Set up and OutgoingMsg structure for this message.
+ * Set up an OutgoingMsg structure for this message.
  */
 static OutgoingMsg PrepareOutgoing(CmiState cs,int pe,int size,int freemode,char *data) {
   OutgoingMsg ogm;
   MallocOutgoingMsg(ogm);
-  CmiMsgHeaderSetLength(data, size);
   MACHSTATE2(2,"Preparing outgoing message for pe %d, size %d",pe,size);
   ogm->size = size;
   ogm->data = data;
@@ -1645,6 +1662,8 @@ CmiCommHandle CmiGeneralNodeSend(int node, int size, int freemode, char *data)
     return;
   }
 #endif
+
+  CmiMsgHeaderSetLength(data, size);
   ogm=PrepareOutgoing(cs,node,size,freemode,data);
   CmiCommLock();
   DeliverOutgoingNodeMessage(ogm);
@@ -1713,6 +1732,7 @@ CmiCommHandle CmiGeneralSend(int pe, int size, int freemode, char *data)
   }
 #endif
 
+  CmiMsgHeaderSetLength(data, size);
   ogm=PrepareOutgoing(cs,pe,size,freemode,data);
   CmiCommLock();
   DeliverOutgoingMessage(ogm);
@@ -1884,6 +1904,79 @@ void CmiFreeListSendFn(int npes, int *pes, int len, char *msg)
   CmiFree(msg);
 }
 
+#endif
+
+#if CMK_BROADCAST_SPANNING_TREE
+/*
+  if root is 1, it is called from the broadcast root, only ogm is needed;
+  if root is 0, it is called in the tree, ogm must be NULL and msg, size and startpe are needed
+*/
+void SendSpanningChildren(OutgoingMsg ogm, int root, int size, char *msg, unsigned int startpe, int noderank)
+{
+  CmiState cs = CmiGetState();
+  int i;
+
+  if (root) startpe = _Cmi_mynode;
+  else ogm = NULL;
+
+  CmiAssert(startpe>=0 && startpe<_Cmi_numnodes);
+
+  for (i=1; i<=BROADCAST_SPANNING_FACTOR; i++) {
+    int p = _Cmi_mynode-startpe;
+    if (p<0) p+=_Cmi_numnodes;
+    p = BROADCAST_SPANNING_FACTOR*p + i;
+    if (p > _Cmi_numnodes - 1) break;
+    p += startpe;
+    p = p%_Cmi_numnodes;
+    CmiAssert(p!=_Cmi_mynode);
+    /* CmiPrintf("SendSpanningChildren: %d => %d\n", _Cmi_mynode, p); */
+    if (!root && !ogm) ogm=PrepareOutgoing(cs, PE_BROADCAST_OTHERS, size,'F',CopyMsg(msg, size));
+    DeliverViaNetwork(ogm, nodes + p, noderank, startpe);
+  }
+  if (!root && ogm) GarbageCollectMsg(ogm);
+}
+#endif
+
+#if CMK_BROADCAST_HYPERCUBE
+int log_of_2 (int i) {
+  int m;
+  for (m=0; i>(1<<m); ++m);
+  return m;
+}
+
+/* called from root - send msg along the hypercube in broadcast. */
+void SendHypercube(OutgoingMsg ogm, int root, int size, char *msg, unsigned int srcpe, int noderank)
+{
+  CmiState cs = CmiGetState();
+  int i, k, npes, tmp;
+  int *dest_pes;
+
+  if (root) {
+    msg = ogm->data;
+    srcpe = CmiMyPe();
+  }
+  else ogm = NULL;
+
+  tmp = srcpe ^ CmiMyPe();
+  k = log_of_2(CmiNumPes()) + 2;
+  if (tmp) {
+     do {--k;} while (!(tmp>>k));
+  }
+
+  dest_pes = CmiTmpAlloc(sizeof(int)*(k+1));
+  k--;
+  npes = HypercubeGetBcastDestinations(CmiMyPe(), CmiNumPes(), k, dest_pes);
+  
+  for (i = 0; i < npes; i++) {
+    int p = dest_pes[i];
+    /* CmiPrintf("SendHypercube: %d => %d (%d)\n", cs->pe, p, i); */
+    if (!root && !ogm) 
+      ogm=PrepareOutgoing(cs ,PE_BROADCAST_OTHERS, size,'F',CopyMsg(msg, size));
+    DeliverViaNetwork(ogm, nodes + p, noderank, CmiMyPe());
+  }
+  if (!root && ogm) GarbageCollectMsg(ogm);
+  CmiTmpFree(dest_pes);
+}
 #endif
 
 /*

@@ -342,11 +342,11 @@ static void freeMaxBuf(char *buf) {
 static void IntegrateMessageDatagram(char **msg, int len)
 {
   char *newmsg;
-  int rank, srcpe, seqno, magic, i;
+  int rank, srcpe, seqno, magic, broot, i;
   int size;
   
   if (len >= DGRAM_HEADER_SIZE) {
-    DgramHeaderBreak(*msg, rank, srcpe, magic, seqno);
+    DgramHeaderBreak(*msg, rank, srcpe, magic, seqno, broot);
     if (magic == (Cmi_charmrun_pid&DGRAM_MAGIC_MASK)) {
       OtherNode node = nodes_by_pe[srcpe];
       newmsg = node->asm_msg;
@@ -388,7 +388,7 @@ static void IntegrateMessageDatagram(char **msg, int len)
           CmiPushPE(0, newmsg);
         } else {
 #if CMK_NODE_QUEUE_AVAILABLE
-           if (rank==DGRAM_NODEMESSAGE) {
+           if (rank==DGRAM_NODEMESSAGE || rank==DGRAM_NODEBROADCAST) {
              CmiPushNode(newmsg);
            }
            else
@@ -397,6 +397,21 @@ static void IntegrateMessageDatagram(char **msg, int len)
         }
         node->asm_msg = 0;
       }
+#if CMK_BROADCAST_SPANNING_TREE
+      if (rank == DGRAM_BROADCAST
+#if CMK_NODE_QUEUE_AVAILABLE
+          || rank == DGRAM_NODEBROADCAST
+#endif
+         )
+        SendSpanningChildren(NULL, 0, len, newmsg+node->asm_fill-len, broot, rank);
+#elif CMK_BROADCAST_HYPERCUBE
+      if (rank == DGRAM_BROADCAST
+#if CMK_NODE_QUEUE_AVAILABLE
+          || rank == DGRAM_NODEBROADCAST
+         )
+#endif
+        SendHypercube(NULL, 0, len, newmsg+node->asm_fill-len, broot, rank);
+#endif
     } 
     else {
       CmiPrintf("message ignored1: magic not agree:%d != %d!\n", magic, Cmi_charmrun_pid&DGRAM_MAGIC_MASK);
@@ -475,7 +490,7 @@ int TransmitImplicitDgram(ImplicitDgram dg)
   temp = *head;
   dest = dg->dest;
   /* first int is len of the packet */
-  DgramHeaderMake(head, dg->rank, dg->srcpe, Cmi_charmrun_pid, len);
+  DgramHeaderMake(head, dg->rank, dg->srcpe, Cmi_charmrun_pid, len, dg->broot);
   LOG(Cmi_clock, Cmi_nodestart, 'T', dest->nodestart, dg->seqno);
   /*
   ChMessageHeader_new("data", len, &msg);
@@ -513,7 +528,7 @@ int TransmitDatagram(int pe)
 }
 
 void EnqueueOutgoingDgram
-        (OutgoingMsg ogm, char *ptr, int len, OtherNode node, int rank)
+        (OutgoingMsg ogm, char *ptr, int len, OtherNode node, int rank, int broot)
 {
   int seqno, dst, src; ImplicitDgram dg;
   src = ogm->src;
@@ -525,6 +540,7 @@ void EnqueueOutgoingDgram
   dg->srcpe = src;
   dg->rank = rank;
   dg->seqno = seqno;
+  dg->broot = broot;
   dg->dataptr = ptr;
   dg->datalen = len;
   dg->ogm = ogm;
@@ -539,7 +555,7 @@ void EnqueueOutgoingDgram
   }
 }
 
-void DeliverViaNetwork(OutgoingMsg ogm, OtherNode node, int rank)
+void DeliverViaNetwork(OutgoingMsg ogm, OtherNode node, int rank, unsigned int broot)
 {
   int size; char *data;
 
@@ -549,11 +565,11 @@ void DeliverViaNetwork(OutgoingMsg ogm, OtherNode node, int rank)
   size = ogm->size - DGRAM_HEADER_SIZE;
   data = ogm->data + DGRAM_HEADER_SIZE;
   while (size > Cmi_dgram_max_data) {
-    EnqueueOutgoingDgram(ogm, data, Cmi_dgram_max_data, node, rank);
+    EnqueueOutgoingDgram(ogm, data, Cmi_dgram_max_data, node, rank, broot);
     data += Cmi_dgram_max_data;
     size -= Cmi_dgram_max_data;
   }
-  EnqueueOutgoingDgram(ogm, data, size, node, rank);
+  EnqueueOutgoingDgram(ogm, data, size, node, rank, broot);
 }
 
 /***********************************************************************

@@ -16,11 +16,10 @@
 #define CMK_MULTICAST_LIST_USE_COMMON_CODE                 1
 #define CMK_MULTICAST_GROUP_USE_COMMON_CODE                1
 
-/* the first 5 fields of the header are defined in machine-dgram.c
+/* the first 4 fields of the header are defined in machine-dgram.c
    and are used for the udp retransmission protocol implementation.
    Parameters stratid and root are for the communication library.
    Stratid is the stratgy id and root is used in the broadcast.
-   - Sameer 10/06/04 
 */
 #define CMK_MSG_HEADER_BASIC  {CmiUInt2 d0,d1,d2,d3,d4,d5,hdl,stratid,root,pad9;}
 #define CMK_MSG_HEADER_EXT_    CmiUInt2 d0,d1,d2,d3,d4,d5,hdl,stratid,root,xhdl,info,pad11;
@@ -44,4 +43,8 @@
 #define CMK_OBJECT_QUEUE_AVAILABLE		   	   0
 #define CMK_USE_SPECIAL_MESSAGE_QUEUE_CHECK                1
 
+#define CMK_BROADCAST_SPANNING_TREE    			   0
+#define CMK_BROADCAST_HYPERCUBE        			   1
+
 #define CMK_MACHINE_PROGRESS_DEFINED                       1
+

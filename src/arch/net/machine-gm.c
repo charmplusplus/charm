@@ -40,6 +40,7 @@
 #define CMK_WHEN_PROCESSOR_IDLE_BUSYWAIT 1
 #define CMK_WHEN_PROCESSOR_IDLE_USLEEP 0
 
+
 static gm_alarm_t gmalarm;
 
 /*#define CMK_USE_CHECKSUM*/
@@ -347,11 +348,12 @@ static void processMessage(char *msg, int len)
 {
   char *newmsg;
   int rank, srcpe, seqno, magic, i;
+  unsigned int broot;
   int size;
   unsigned char checksum;
   
   if (len >= DGRAM_HEADER_SIZE) {
-    DgramHeaderBreak(msg, rank, srcpe, magic, seqno);
+    DgramHeaderBreak(msg, rank, srcpe, magic, seqno, broot);
 #ifdef CMK_USE_CHECKSUM
     checksum = computeCheckSum(msg, len);
     if (checksum == 0)
@@ -396,28 +398,50 @@ static void processMessage(char *msg, int len)
         memcpy(newmsg + node->asm_fill, msg+DGRAM_HEADER_SIZE, size);
         node->asm_fill += size;
       }
+      /* get a full packet */
       if (node->asm_fill == node->asm_total) {
-        if (rank == DGRAM_BROADCAST) {
+        switch (rank) {
+        case DGRAM_BROADCAST: {
           for (i=1; i<_Cmi_mynodesize; i++)
-            CmiPushPE(i, CopyMsg(newmsg, len));
+            CmiPushPE(i, CopyMsg(newmsg, node->asm_total));
           CmiPushPE(0, newmsg);
-        } else {
+          break;
+        }
 #if CMK_NODE_QUEUE_AVAILABLE
-           if (rank==DGRAM_NODEMESSAGE) {
-             CmiPushNode(newmsg);
-           }
-           else
+        case DGRAM_NODEBROADCAST: 
+        case DGRAM_NODEMESSAGE: {
+          CmiPushNode(newmsg);
+          break;
+        }
 #endif
-             CmiPushPE(rank, newmsg);
+        default:
+          CmiPushPE(rank, newmsg);
         }
         node->asm_msg = 0;
       }
+      /* do it after integration - the following function may re-entrant */
+#if CMK_BROADCAST_SPANNING_TREE
+      if (rank == DGRAM_BROADCAST
+#if CMK_NODE_QUEUE_AVAILABLE
+          || rank == DGRAM_NODEBROADCAST
+#endif
+         )
+        SendSpanningChildren(NULL, 0, len, msg, broot, rank);
+#elif CMK_BROADCAST_HYPERCUBE
+      if (rank == DGRAM_BROADCAST
+#if CMK_NODE_QUEUE_AVAILABLE
+          || rank == DGRAM_NODEBROADCAST
+#endif
+         )
+        SendHypercube(NULL, 0, len, msg, broot, rank);
+#endif
     } 
     else {
 #ifdef CMK_USE_CHECKSUM
       CmiPrintf("[%d] message ignored: checksum (%d) not 0!\n", CmiMyPe(), checksum);
 #else
-      CmiPrintf("[%d] message ignored: magic not agree:%d != %d!\n", CmiMyPe(), magic, Cmi_charmrun_pid&DGRAM_MAGIC_MASK);
+      CmiPrintf("[%d] message ignored: magic not agree:%d != %d!\n", 
+                 CmiMyPe(), magic, Cmi_charmrun_pid&DGRAM_MAGIC_MASK);
 #endif
       CmiPrintf("recved: rank:%d src:%d mag:%d seqno:%d len:%d\n", rank, srcpe, magic, seqno, len);
     }
@@ -436,6 +460,18 @@ static int processEvent(gm_recv_event_t *e)
   int status = 1;
   switch (gm_ntohc(e->recv.type))
   {
+      /* avoid copy from message to buffer */
+    case GM_FAST_PEER_RECV_EVENT:
+    case GM_FAST_RECV_EVENT:
+      MACHSTATE(4,"Incoming message")
+      msg = gm_ntohp(e->recv.message);
+      len = gm_ntohl(e->recv.length);
+      processMessage(msg, len);
+      break;
+/*
+    case GM_FAST_HIGH_PEER_RECV_EVENT:
+    case GM_FAST_HIGH_RECV_EVENT:
+*/
     case GM_HIGH_RECV_EVENT:
     case GM_RECV_EVENT:
       MACHSTATE(4,"Incoming message")
@@ -443,7 +479,7 @@ static int processEvent(gm_recv_event_t *e)
       msg = gm_ntohp(e->recv.buffer);
       len = gm_ntohl(e->recv.length);
       processMessage(msg, len);
-      gm_provide_receive_buffer(gmport, msg, size, GM_LOW_PRIORITY);
+      gm_provide_receive_buffer(gmport, msg, size, GM_HIGH_PRIORITY);
       break;
     case GM_NO_RECV_EVENT:
       return 0;
@@ -457,6 +493,7 @@ static int processEvent(gm_recv_event_t *e)
 }
 
 
+#ifdef __FAULT__ 
 void drop_send_callback(struct gm_port *p, void *context, gm_status_t status)
 {
   PendingMsg out = (PendingMsg)context;
@@ -471,6 +508,17 @@ void drop_send_callback(struct gm_port *p, void *context, gm_status_t status)
 
   FreePendingMsg(out);
 }
+#else
+void send_callback(struct gm_port *p, void *context, gm_status_t status);
+void drop_send_callback(struct gm_port *p, void *context, gm_status_t status)
+{
+  PendingMsg out = (PendingMsg)context;
+  void *msg = out->msg;
+  gm_send_with_callback(gmport, msg, out->size, out->length,
+                        GM_HIGH_PRIORITY, out->mach_id, out->dataport, 
+                        send_callback, out);
+}
+#endif
 
 void send_callback(struct gm_port *p, void *context, gm_status_t status)
 {
@@ -479,10 +527,10 @@ void send_callback(struct gm_port *p, void *context, gm_status_t status)
   unsigned char cksum;
 
   if (status != GM_SUCCESS) { 
-    int srcpe, seqno, magic;
+    int srcpe, seqno, magic, broot;
     char rank;
     char *errmsg;
-    DgramHeaderBreak(msg, rank, srcpe, magic, seqno);
+    DgramHeaderBreak(msg, rank, srcpe, magic, seqno, broot);
     errmsg = getErrorMsg(status);
     CmiPrintf("GM Error> PE:%d send to msg %p node %d rank %d mach_id %d port %d len %d size %d failed to complete (error %d): %s\n", srcpe, msg, out->node_idx, rank, out->mach_id, out->dataport, out->length, out->size, status, errmsg); 
     switch (status) {
@@ -492,32 +540,39 @@ void send_callback(struct gm_port *p, void *context, gm_status_t status)
         if (out->mach_id == node->mach_id && out->dataport == node->dataport) {
           /* it not crashed, resent */
           gm_send_with_callback(gmport, msg, out->size, out->length, 
-                            GM_LOW_PRIORITY, out->mach_id, out->dataport, 
+                            GM_HIGH_PRIORITY, out->mach_id, out->dataport, 
                             send_callback, out);
           return;
         }
       }
       default: {
-        gm_drop_sends (gmport, GM_LOW_PRIORITY, out->mach_id, out->dataport,
+        gm_drop_sends (gmport, GM_HIGH_PRIORITY, out->mach_id, out->dataport,
 		                             drop_send_callback, out);
         return;
       }
 #else
       case GM_SEND_TIMED_OUT: {
-        OtherNode node = nodes + out->node_idx;
 	out->retry_count ++;
 	if (out->retry_count > 4) CmiAbort("gm send_callback failed with too many timeouts");
- 	CmiPrintf("gm send_callback timeout, send again (%d)\n", out->retry_count ++);
-  	gm_free_send_token (gmport, GM_LOW_PRIORITY);
-	if (gm_alloc_send_token(gmport, GM_LOW_PRIORITY)) {
-        	gm_send_with_callback(gmport, msg, out->size, out->length, 
-                            GM_LOW_PRIORITY, out->mach_id, out->dataport, 
+ 	CmiPrintf("gm send_callback timeout, drop sends and re-enable send (#%d)\n", out->retry_count ++);
+        /* resent this one and drop sends */
+        if (gm_alloc_send_token(gmport, GM_LOW_PRIORITY)) {
+                gm_send_with_callback(gmport, msg, out->size, out->length,
+                            GM_LOW_PRIORITY, out->mach_id, out->dataport,
                             send_callback, out);
-	}
-	else
-		CmiAbort("Fatal error during resend!\n");
+        }
+        else
+                CmiAbort("Fatal error during resend!\n");
+        gm_drop_sends (gmport, GM_HIGH_PRIORITY, out->mach_id, out->dataport,
+                         drop_send_callback, out);
         return;
       }
+      case GM_SEND_DROPPED:
+        CmiPrintf("Got DROPPED_SEND notification, resend\n");
+        gm_send_with_callback(gmport, msg, out->size, out->length,
+                            GM_HIGH_PRIORITY, out->mach_id, out->dataport, 
+                            send_callback, out);
+        break;
       default:
         CmiAbort("gm send_callback failed");
 #endif
@@ -542,7 +597,7 @@ void send_callback(struct gm_port *p, void *context, gm_status_t status)
   putPool(msg);
 #endif
 
-  gm_free_send_token (gmport, GM_LOW_PRIORITY);
+  gm_free_send_token (gmport, GM_HIGH_PRIORITY);
   FreePendingMsg(out);
 
   /* since we have one free send token, start next send */
@@ -569,11 +624,18 @@ static void send_progress()
   while (1)
   {
     out = peek_sending();
-    if (out && gm_alloc_send_token(gmport, GM_LOW_PRIORITY)) {
-      gm_send_with_callback(gmport, out->msg, out->size, out->length, 
-                            GM_LOW_PRIORITY, out->mach_id, out->dataport, 
+    if (out && gm_alloc_send_token(gmport, GM_HIGH_PRIORITY)) {
+      if (dataport == out->dataport) {
+        gm_send_to_peer_with_callback(gmport, out->msg, out->size, out->length, 
+                            GM_HIGH_PRIORITY, out->mach_id,
                             send_callback, out);
-       /* dequeue out, but not free it, used at callback */
+      }
+      else {
+        gm_send_with_callback(gmport, out->msg, out->size, out->length, 
+                            GM_HIGH_PRIORITY, out->mach_id, out->dataport, 
+                            send_callback, out);
+      }
+      /* dequeue out, but not free it, used at callback */
       dequeue_sending();
 #if GM_STATS
       gm_stats[out->size] ++;
@@ -593,13 +655,17 @@ static void send_progress()
  ***********************************************************************/
 
 void EnqueueOutgoingDgram
-        (OutgoingMsg ogm, char *ptr, int dlen, OtherNode node, int rank)
+     (OutgoingMsg ogm, char *ptr, int dlen, OtherNode node, int rank, int broot)
 {
   char *buf;
   int size, len, seqno;
   int alloclen, allocSize;
 
 /* CmiPrintf("DeliverViaNetwork: size:%d\n", size); */
+
+  /* don't have to worry about ref count because we do copy, and
+     ogm can be free'ed right away */
+  /* ogm->refcount++; */
 
   len = dlen + DGRAM_HEADER_SIZE;
 
@@ -614,7 +680,7 @@ void EnqueueOutgoingDgram
   _MEMCHECK(buf);
 
   seqno = node->send_next;
-  DgramHeaderMake(buf, rank, ogm->src, Cmi_charmrun_pid, seqno);
+  DgramHeaderMake(buf, rank, ogm->src, Cmi_charmrun_pid, seqno, broot);
   node->send_next = ((seqno+1)&DGRAM_SEQNO_MASK);
   memcpy(buf+DGRAM_HEADER_SIZE, ptr, dlen);
 #ifdef CMK_USE_CHECKSUM
@@ -627,20 +693,24 @@ void EnqueueOutgoingDgram
 
   /* if queue is not empty, enqueue msg. this is to guarantee the order */
   if (pendinglen != 0) {
-    while (pendinglen == MAXPENDINGSEND) {
+    /* this potential screw up broadcast, because bcast packets can not be
+       interrupted by other sends in CommunicationServer_nolock */
+    enqueue_sending(buf, len, node, size);
+#if 0
+    while (pendinglen >= MAXPENDINGSEND && broot == DGRAM_ROOTPE_MASK) {
       /* pending max len exceeded, busy wait until get a token 
          Doing this surprisingly improve the performance by 2s for 200MB msg */
       MACHSTATE(4,"Polling until token available")
       CommunicationServer_nolock(0);
     }
-    enqueue_sending(buf, len, node, size);
+#endif
     return;
   }
   enqueue_sending(buf, len, node, size);
   send_progress();
 }
 
-void DeliverViaNetwork(OutgoingMsg ogm, OtherNode node, int rank)
+void DeliverViaNetwork(OutgoingMsg ogm, OtherNode node, int rank, unsigned int broot)
 {
   int size; char *data;
  
@@ -650,11 +720,19 @@ void DeliverViaNetwork(OutgoingMsg ogm, OtherNode node, int rank)
   if (size > Cmi_dgram_max_data) defrag ++;
 #endif
   while (size > Cmi_dgram_max_data) {
-    EnqueueOutgoingDgram(ogm, data, Cmi_dgram_max_data, node, rank);
+    EnqueueOutgoingDgram(ogm, data, Cmi_dgram_max_data, node, rank, broot);
     data += Cmi_dgram_max_data;
     size -= Cmi_dgram_max_data;
   }
-  if (size) EnqueueOutgoingDgram(ogm, data, size, node, rank);
+  if (size>0) EnqueueOutgoingDgram(ogm, data, size, node, rank, broot);
+
+  /* a simple flow control */
+  while (pendinglen >= MAXPENDINGSEND) {
+      /* pending max len exceeded, busy wait until get a token 
+         Doing this surprisingly improve the performance by 2s for 200MB msg */
+      MACHSTATE(4,"Polling until token available")
+      CommunicationServer_nolock(0);
+  }
 }
 
 /* simple barrier at machine layer */
@@ -672,7 +750,7 @@ static void sendBarrierMessage(int pe)
   OtherNode  node = nodes + pe;
   CmiAssert(buf);
   gm_send_with_callback(gmport, buf, size, len,
-              GM_LOW_PRIORITY, node->mach_id, node->dataport,
+              GM_HIGH_PRIORITY, node->mach_id, node->dataport,
               send_callback_nothing, buf);
 }
 
@@ -691,7 +769,7 @@ static void recvBarrierMessage()
         size = gm_ntohc(e->recv.size);
         msg = gm_ntohp(e->recv.buffer);
         len = gm_ntohl(e->recv.length);
-        gm_provide_receive_buffer(gmport, msg, size, GM_LOW_PRIORITY);
+        gm_provide_receive_buffer(gmport, msg, size, GM_HIGH_PRIORITY);
         return;
       case GM_NO_RECV_EVENT:
         continue ;
@@ -857,14 +935,14 @@ void CmiMachineInit(char **argv)
     for (j=0; j<num; j++) {
       buf = gm_dma_malloc(gmport, len);
       _MEMCHECK(buf);
-      gm_provide_receive_buffer(gmport, buf, i, GM_LOW_PRIORITY);
+      gm_provide_receive_buffer(gmport, buf, i, GM_HIGH_PRIORITY);
     }
   }
   Cmi_dgram_max_data = maxMsgSize - DGRAM_HEADER_SIZE;
 
-  status = gm_set_acceptable_sizes (gmport, GM_LOW_PRIORITY, (1<<(maxsize+1))-1);
+  status = gm_set_acceptable_sizes (gmport, GM_HIGH_PRIORITY, (1<<(maxsize+1))-1);
 
-  gm_free_send_tokens (gmport, GM_LOW_PRIORITY,
+  gm_free_send_tokens (gmport, GM_HIGH_PRIORITY,
                        gm_num_send_tokens (gmport));
 
 #if CMK_MSGPOOL
@@ -886,7 +964,7 @@ void CmiMachineExit()
   sprintf(fname, "gm-stats.%d", CmiMyPe());
   gmf = fopen(fname, "w");
   mype = CmiMyPe();
-  for (i=5; i<maxsize; i++)  {
+  for (i=5; i<=maxsize; i++)  {
     fprintf(gmf, "[%d] size:%d count:%d\n", mype, i, gm_stats[i]);
   }
   fprintf(gmf, "[%d] max quelen: %d possible streaming: %d  defrag: %d \n", mype, maxQueueLength, possible_streamed, defrag);

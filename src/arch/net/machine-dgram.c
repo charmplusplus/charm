@@ -22,11 +22,13 @@
 #define CmiMsgHeaderGetLength(msg)      (((int*)(msg))[2])
 #define CmiMsgNext(msg) (*((void**)(msg)))
 
+#define DGRAM_ROOTPE_MASK   (0xFFFFu)
 #define DGRAM_SRCPE_MASK    (0xFFFF)
 #define DGRAM_MAGIC_MASK    (0xFF)
-#define DGRAM_SEQNO_MASK    (0xFFFFFFFFu)
+#define DGRAM_SEQNO_MASK    (0xFFFFu)
 
 #if CMK_NODE_QUEUE_AVAILABLE
+#define DGRAM_NODEBROADCAST (0xFA)
 #define DGRAM_NODEMESSAGE   (0xFB)
 #endif
 #define DGRAM_DSTRANK_MAX   (0xFC)
@@ -37,10 +39,11 @@
 /* DgramHeader overlays the first 4 fields of the converse CMK_MSG_HEADER_BASIC,
    defined in conv-common.h.  As such, its size and alignment are critical. */
 typedef struct {
-        unsigned int seqno:32;  /* seq number in send window */
+        unsigned int seqno:16;  /* seq number in send window */
         unsigned int srcpe:16;  /* CmiMyPe of the sender */
         unsigned int dstrank:8; /* rank of destination processor */
         unsigned int magic:8;   /* Low 8 bits of charmrun PID */
+        unsigned int rootpe:16; /* broadcast root processor */
 } DgramHeader;
 
 
@@ -49,20 +52,22 @@ typedef struct { DgramHeader head; char window[1024]; } DgramAck;
 
 extern unsigned char computeCheckSum(unsigned char *data, int len);
 
-#define DgramHeaderMake(ptr, dstrank_, srcpe_, magic_, seqno_) { \
+#define DgramHeaderMake(ptr, dstrank_, srcpe_, magic_, seqno_, root_) { \
    DgramHeader *header = (DgramHeader *)(ptr);	\
    header->seqno = seqno_; \
    header->srcpe = srcpe_; \
    header->dstrank = dstrank_; \
    header->magic = magic_ & DGRAM_MAGIC_MASK; \
+   header->rootpe = root_; \
 }
 
-#define DgramHeaderBreak(ptr, dstrank_, srcpe_, magic_, seqno_) { \
+#define DgramHeaderBreak(ptr, dstrank_, srcpe_, magic_, seqno_, root_) { \
    DgramHeader *header = (DgramHeader *)(ptr);	\
    seqno_ = header->seqno; \
    srcpe_ = header->srcpe; \
    dstrank_ = header->dstrank; \
    magic_ = header->magic; \
+   root_ = header->rootpe; \
 }
 
 #ifdef CMK_RANDOMLY_CORRUPT_MESSAGES
@@ -193,7 +198,7 @@ typedef struct OutgoingMsgStruct
 typedef struct ExplicitDgramStruct
 {
   struct ExplicitDgramStruct *next;
-  int  srcpe, rank, seqno;
+  int  srcpe, rank, seqno, broot;
   unsigned int len, dummy; /* dummy to fix bug in rs6k alignment */
   double data[1];
 }
@@ -203,7 +208,7 @@ typedef struct ImplicitDgramStruct
 {
   struct ImplicitDgramStruct *next;
   struct OtherNodeStruct *dest;
-  int srcpe, rank, seqno;
+  int srcpe, rank, seqno, broot;
   char  *dataptr;
   int    datalen;
   OutgoingMsg ogm;
@@ -581,6 +586,13 @@ static void CommunicationPeriodicCaller(void *ignored)
   CcdCallFnAfter((CcdVoidFn)CommunicationPeriodicCaller,NULL,Cmi_comm_periodic_delay);
 }
 #endif
+
+/* common hardware dependent API */
+void EnqueueOutgoingDgram(OutgoingMsg ogm, char *ptr, int dlen, OtherNode node, int rank, int broot);
+void DeliverViaNetwork(OutgoingMsg ogm, OtherNode node, int rank, unsigned int broot);
+
+void SendSpanningChildren(OutgoingMsg ogm, int root, int size, char *msg, unsigned int startpe, int nodesend);
+void SendHypercube(OutgoingMsg ogm, int root, int size, char *msg, unsigned int curcycle, int nodesend);
 
 #if CMK_USE_GM
 
