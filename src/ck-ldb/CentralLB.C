@@ -470,7 +470,7 @@ void CentralLB::simulation() {
 
     // now we have the simulation data, so print it and exit
     CmiPrintf("LBSim: Simulation of one load balancing step done.\n");
-		simResults.PrintSimulationResults();
+    simResults.PrintSimulationResults();
 
     delete migrateMsg;
     CkExit();
@@ -532,6 +532,9 @@ void CentralLB::writeStatsMsgs(const char* filename) {
   for (i = 0; i < stats_msg_count; i++) {
     CkPupMessage(p, (void **)&statsMsgsList[i], 1);
   }
+
+  fclose(f);
+
   CmiPrintf("writeStatsMsgs to %s\n", filename);
   CmiPrintf("LBDump: Dumped the load balancing data.\n");
 }
@@ -549,16 +552,16 @@ static void getPredictedLoad(CentralLB::LDStats* stats, int count, LBMigrateMsg*
 
 	for(pe = 0; pe < count; pe++)
   	{
-    	peLoads[pe] = stats[pe].bg_walltime;
+    	  peLoads[pe] = stats[pe].bg_walltime;
 
-    	for(int obj = 0; obj < stats[pe].n_objs; obj++)
-    	{
-			peLoads[pe] += stats[pe].objData[obj].wallTime;
-    	}
+    	  for(int obj = 0; obj < stats[pe].n_objs; obj++)
+    	  {
+		peLoads[pe] += stats[pe].objData[obj].wallTime;
+    	  }
 	}
 
-	// now for each migration, substract the load of the migrating object from the source pe
-	// and add it to the destination pe
+	// now for each migration, substract the load of the migrating 
+        // object from the source pe and add it to the destination pe
 	for(int mig = 0; mig < msg->n_moves; mig++)
 	{
 		int from = msg->moves[mig].from_pe;
@@ -634,9 +637,9 @@ static void getPredictedLoad(CentralLB::LDStats* stats, int count, LBMigrateMsg*
 
 void CentralLB::FindSimResults(LDStats* stats, int count, LBMigrateMsg* msg, CLBSimResults* simResults)
 {
-	CkAssert(simResults != NULL && count == simResults->numPes);
-	// estimate the new loads of the processors. As a first approximation, this is the
-	// sum of the cpu times of the objects on that processor
+    CkAssert(simResults != NULL && count == simResults->numPes);
+    // estimate the new loads of the processors. As a first approximation, this is the
+    // sum of the cpu times of the objects on that processor
     getPredictedLoad(stats, count, msg, simResults->peLoads);
 }
 
@@ -667,7 +670,7 @@ static int FindPEAfterMigration(LDObjid& id, CentralLB::LDStats* stats, int coun
 }
 
 int CentralLB::useMem() { 
-  return CkNumPes() * (sizeof(CentralLB::LDStats)+sizeof(CLBStatsMsg)) +
+  return CkNumPes() * (sizeof(CentralLB::LDStats *)+sizeof(CLBStatsMsg *)) +
                         sizeof(CentralLB);
 }
 
