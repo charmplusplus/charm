@@ -507,13 +507,21 @@ extern "C" int ck_fem_map_compare_int(const void *a, const void *b)
 
 //Maps node tuples to element lists
 class tupleTable : public CkHashtable {
-	int tupleLen; //Nodes in a tuple
-	CkHashtableIterator *it;
+  int tupleLen; //Nodes in a tuple
+  CkHashtableIterator *it;
+  static int roundUp(int val,int to) {
+    return ((val+to-1)/to)*to;
+  }
+  static CkHashtableLayout makeLayout(int tupleLen) {
+    int ks=tupleLen*sizeof(int);
+    int oo=roundUp(ks+sizeof(char),sizeof(void *));
+    int os=sizeof(elemList);
+    return CkHashtableLayout(ks,ks,oo,os,oo+os);
+  }
 public:
 	enum {MAX_TUPLE=8};
 	tupleTable(int tupleLen_)
-		:CkHashtable(tupleLen_*sizeof(int),
-			     sizeof(elemList),
+		:CkHashtable(makeLayout(tupleLen_),
 			     137,0.75,
 			     CkHashFunction_ints,
 			     CkHashCompare_ints)
