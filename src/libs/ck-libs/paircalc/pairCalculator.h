@@ -5,14 +5,16 @@
 class PairCalcID {
  public:
   CkArrayID Aid;
+  CkGroupID Gid;
   int GrainSize;
   int BlkSize;
   int S;
   bool Symmetric;
   PairCalcID() {}
   ~PairCalcID() {}
-  void Init(CkArrayID aid, int grain, int blk, int s, bool sym) {
+  void Init(CkArrayID aid,CkArrayID gid, int grain, int blk, int s, bool sym) {
     Aid = aid;
+    Gid = gid;
     GrainSize = grain;
     BlkSize = blk;
     S = s;
@@ -20,6 +22,7 @@ class PairCalcID {
   }
   void pup(PUP::er &p) {
     p|Aid;
+    p|Gid;
     p|GrainSize;
     p|BlkSize;
     p|S;
@@ -33,6 +36,10 @@ void startPairCalcLeft(PairCalcID* aid, int n, complex* ptr, int myS, int myZ);
 
 void startPairCalcRight(PairCalcID* aid, int n, complex* ptr, int myS, int myZ);
 
-extern "C" void finishPairCalc(PairCalcID* aid, int n, complex*ptr, int myS, int myZ, const CkCallback cb);
+extern "C" void finishPairCalc(PairCalcID* aid, int n, complex*ptr, const CkCallback cb);
+
+void startPairCalcLeftAndFinish(PairCalcID* pcid, int n, complex* ptr, int myS, int myZ);
+
+void startPairCalcRightAndFinish(PairCalcID* pcid, int n, complex* ptr, int myS, int myZ);
 
 #endif

@@ -24,7 +24,7 @@ class mySendMsg : public CMessage_mySendMsg {
 
 class PairCalculator: public CBase_PairCalculator {
  public:
-  PairCalculator(bool, int, int, int, int op1, FuncType fn1, int op2, FuncType fn2, CkCallback cb);
+  PairCalculator(bool, int, int, int, int op1, FuncType fn1, int op2, FuncType fn2, CkCallback cb, CkGroupID gid);
   PairCalculator(CkMigrateMessage *);
   ~PairCalculator();
   void calculatePairs(int, complex *, int, bool); 
@@ -45,6 +45,21 @@ class PairCalculator: public CBase_PairCalculator {
   CkCallback cb;
   CkSparseContiguousReducer<CkTwoDoubles> r;
 };
+
+class PairCalcReducer : public Group {
+ public:
+  PairCalcReducer(CkMigrateMessage *m) { }
+  PairCalcReducer(){ acceptCount = 0; numRegistered[0] = 0; numRegistered[1] = 0;}
+  ~PairCalcReducer() {}
+  void acceptPartialResult(int size, complex* matrix, int fromRow, int fromCol, CkCallback cb);
+  void broadcastEntireResult(int size, complex* matrix, bool symmtype, CkCallback cb);
+  void doRegister(PairCalculator *, bool);
+
+ private:
+  CkVec<PairCalculator *> localElements[2];
+  int numRegistered[2];
+  int acceptCount;
+}; 
 
 //#define  _DEBUG_
 

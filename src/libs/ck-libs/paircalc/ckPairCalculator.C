@@ -2,7 +2,7 @@
 
 PairCalculator::PairCalculator(CkMigrateMessage *m) { }
 	
-PairCalculator::PairCalculator(bool sym, int grainSize, int s, int blkSize,  int op1,  FuncType fn1, int op2,  FuncType fn2, CkCallback cb) 
+PairCalculator::PairCalculator(bool sym, int grainSize, int s, int blkSize,  int op1,  FuncType fn1, int op2,  FuncType fn2, CkCallback cb, CkGroupID gid) 
 {
   this->symmetric = sym;
   this->grainSize = grainSize;
@@ -30,6 +30,10 @@ PairCalculator::PairCalculator(bool sym, int grainSize, int s, int blkSize,  int
   newData = NULL;
   sumPartialCount = 0;
   setMigratable(false);
+
+  CProxy_PairCalcReducer pairCalcReducerProxy(gid); 
+  pairCalcReducerProxy.ckLocalBranch()->doRegister(this, symmetric);
+
 #ifdef _DEBUG_
   CkPrintf("     pairCalc [%d %d %d %d] inited\n", thisIndex.w, thisIndex.x, thisIndex.y, thisIndex.z);
 #endif
@@ -251,6 +255,25 @@ PairCalculator::compute_entry(int n, complex *psi1, complex *psi2, int op)
   for (i = 0; i < n; i++)
     sum += psi1[i] * psi2[i].conj();
   return sum;
+}
+
+
+void
+PairCalcReducer::acceptPartialResult(int size, complex* matrix, int fromRow, int fromCol, CkCallback cb){
+  
+
+}
+
+void
+PairCalcReducer::broadcastEntireResult(int size, complex* matrix, bool symmtype, CkCallback cb){
+  for (int i = 0; i < localElements[symmtype].length(); i++)
+    (localElements[symmtype])[i]->acceptEntireResult(size, matrix, cb); 
+}
+
+void
+PairCalcReducer:: doRegister(PairCalculator *elem, bool symmtype){
+    localElements[symmtype].push_back(elem);
+    numRegistered[symmtype]++;
 }
 
 #include "ckPairCalculator.def.h"
