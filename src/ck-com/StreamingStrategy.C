@@ -4,7 +4,7 @@
 void StreamingHandlerFn(void *msg) {
     CombinedMessage hdr;
     
-    CkPrintf("In streaming handler fn\n");
+    ComlibPrintf("In streaming handler fn\n");
 
     PUP_fromCmiAllocMem fp(msg);
     fp | hdr;
@@ -12,7 +12,7 @@ void StreamingHandlerFn(void *msg) {
     for(int count = 0; count < hdr.nmsgs; count ++) {
         char *msg;
         fp.pupCmiAllocBuf((void **)&msg);
-        int size = SIZEFIELD(msg);
+        int size = ((envelope *)msg)->getTotalsize(); //SIZEFIELD(msg);
         CmiSyncSendAndFree(CkMyPe(), size, msg);
     }
     CmiFree(msg);
@@ -79,6 +79,7 @@ void StreamingStrategy::flushPE(int pe) {
       streamingMsgCount[pe] = 0;
   }
   else {
+      
     // Build a CmiMultipleSend list of messages to be sent off:
     int msg_count=streamingMsgCount[pe], msg_pe=0;
     if(msg_count == 1) {
@@ -93,7 +94,7 @@ void StreamingStrategy::flushPE(int pe) {
         streamingMsgCount[pe] = 0;
         return;
     }
-    
+    /*
     char **msgComps = new char*[msg_count];
     int *sizes = new int[msg_count];
     ComlibPrintf("[%d] StreamingStrategy::flushPE: %d messages to %d\n", 
@@ -129,8 +130,8 @@ void StreamingStrategy::flushPE(int pe) {
         delete cmsg;
         cmsg = toBeDeleted;            
     }     
+    */
     
-    /*
     PUP_cmiAllocSizer sp;
     CombinedMessage hdr;
     
@@ -164,14 +165,14 @@ void StreamingStrategy::flushPE(int pe) {
     }
 
     for(int count = 0; count < nmsgs; count++) {
-        cmsg = streamingMsgBuf[pe][count];
+        cmsg = streamingMsgBuf[pe].deq();
+        CkFreeMsg(cmsg->getCharmMessage());
         delete cmsg;
     }    
     
     streamingMsgCount[pe] = 0;
     CmiSetHandler(newmsg, streaming_handler_id);
     CmiSyncSendAndFree(pe, sp.size(), newmsg); 
-    */
   }
 }
 
