@@ -2008,11 +2008,12 @@ void rsh_pump_sh(p, nodeno, rank0no, argv)
           xstr_printf(ibuf,"for dir in `echo $PATH | sed -e 's/:/ /g'`; do\n");
           xstr_printf(ibuf,"  test -f $dir/%s && F_DBG=$dir/%s && export F_DBG\n",dbg,dbg);
           xstr_printf(ibuf,"done\n");
-          xstr_printf(ibuf,"if -z \"$F_DBG\"; then\n");
+          xstr_printf(ibuf,"if test -z \"$F_DBG\"; then\n");
           xstr_printf(ibuf,"   echo '%s not in path - set your path in your cshrc.'\n",dbg);
           xstr_printf(ibuf,"   test -f /bin/sync && /bin/sync\n");
           xstr_printf(ibuf,"   exit 1\n");
           xstr_printf(ibuf,"fi\n");
+          if(arg_verbose) xstr_printf(ibuf,"echo 'using debugger' $F_DBG\n");
           prog_flush(p);
        }
 
@@ -2191,6 +2192,7 @@ void rsh_pump_csh(p, nodeno, rank0no, argv)
           xstr_printf(ibuf,"   echo '%s not in path - set your path in your cshrc.'\n",dbg);
           xstr_printf(ibuf,"   exit 1\n");
           xstr_printf(ibuf,"endif\n");
+          if(arg_verbose) xstr_printf(ibuf,"echo 'using debugger' $F_DBG\n");
           prog_flush(p);
        }
 
