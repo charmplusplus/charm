@@ -1638,6 +1638,7 @@ void nodetab_init_for_scyld(void);
 void start_nodes_scyld(void);
 #endif
 void start_nodes_local(char **envp);
+void kill_nodes(void);
 
 static void fast_idleFn(void) {sleep(0);}
 void finish_nodes(void);
