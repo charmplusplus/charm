@@ -393,17 +393,16 @@ double CmiTimer()
 
 #if CMK_TIMER_USE_GETRUSAGE
 
-CpvStaticDeclare(double, inittime_wallclock);
+static double inittime_wallclock;
 CpvStaticDeclare(double, inittime_virtual);
 
 void CmiTimerInit()
 {
   struct timeval tv;
   struct rusage ru;
-  CpvInitialize(double, inittime_wallclock);
   CpvInitialize(double, inittime_virtual);
   gettimeofday(&tv,0);
-  CpvAccess(inittime_wallclock) = (tv.tv_sec * 1.0) + (tv.tv_usec*0.000001);
+  inittime_wallclock = (tv.tv_sec * 1.0) + (tv.tv_usec*0.000001);
   getrusage(0, &ru); 
   CpvAccess(inittime_virtual) =
     (ru.ru_utime.tv_sec * 1.0)+(ru.ru_utime.tv_usec * 0.000001) +
@@ -429,7 +428,7 @@ double CmiWallTimer()
 
   gettimeofday(&tv,0);
   currenttime = (tv.tv_sec * 1.0) + (tv.tv_usec * 0.000001);
-  return currenttime - CpvAccess(inittime_wallclock);
+  return currenttime - inittime_wallclock;
 }
 
 double CmiTimer()
