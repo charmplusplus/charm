@@ -8,7 +8,10 @@
  ***************************************************************************
  *
  * $Log$
- * Revision 2.33  1997-02-13 09:31:58  jyelon
+ * Revision 2.34  1997-03-19 04:58:19  jyelon
+ * Removed the CMK_DEFAULT_MAIN_USES_SIMULATOR_CODE flag.
+ *
+ * Revision 2.33  1997/02/13 09:31:58  jyelon
  * Updated for new main/ConverseInit structure.
  *
  * Revision 2.32  1997/02/08 14:10:29  jyelon
@@ -72,9 +75,6 @@
 
 #define CMK_CSDEXITSCHEDULER_IS_A_FUNCTION                 0
 #define CMK_CSDEXITSCHEDULER_SET_CSDSTOPFLAG               1
-
-#define CMK_DEFAULT_MAIN_USES_COMMON_CODE                  1
-#define CMK_DEFAULT_MAIN_USES_SIMULATOR_CODE               0
 
 #define CMK_FIX_HP_CONNECT_BUG                             1
 
