@@ -901,7 +901,7 @@ void nodetab_init()
 			group=global;
 			nodetab_args(b3,&group);
 			rightgroup = subeqs(b2,e2,arg_nodegroup);
-		} else {
+		} else if (b1!=b3) {
 			fprintf(stderr,"ERROR> unrecognized command in nodesfile:\n");
 			fprintf(stderr,"ERROR> %s\n", input_line);
 			exit(1);
@@ -1435,6 +1435,7 @@ void start_nodes_scyld(void);
 void start_nodes_local(char **envp);
 
 static void fast_idleFn(void) {sleep(0);}
+void finish_nodes(void);
 
 int main(int argc, char **argv, char **envp)
 {
@@ -1479,6 +1480,7 @@ int main(int argc, char **argv, char **envp)
   /* Wait for all clients to connect */
   req_client_connect();
   if(arg_verbose) fprintf(stderr, "Charmrun> node programs all connected\n");
+  finish_nodes();
 
   /* enter request-service mode */
   while (1) req_poll();
@@ -1561,6 +1563,7 @@ void start_nodes_daemon(void)
   different, so we can't use Rsh on win32 yet.  
   Fall back to the daemon.*/
 void start_nodes_rsh() {start_nodes_daemon();}
+void finish_nodes(void) {}
 
 void envCat(char *dest,LPTSTR oldEnv)
 {
@@ -1733,6 +1736,7 @@ void start_nodes_scyld(void)
   }
   free(envp[0]);
 }
+void finish_nodes(void) {}
 
 #else
 /*Unix systems can use Rsh normally*/
@@ -1745,7 +1749,20 @@ void start_nodes_scyld(void)
 /****************************************************************************/
 #include <sys/wait.h>
 
-int rsh_start(int nodeno,const char *startScript)
+extern char **environ;
+void removeEnv(const char *doomedEnv)
+{ /*Remove a value from the environment list*/
+      char **oe, **ie;
+      oe=ie=environ;
+      while (*ie != NULL) {
+        if (0!=strncmp(*ie,doomedEnv,strlen(doomedEnv)))
+          *oe++ = *ie;
+        ie++;
+      }
+      *oe=NULL;/*NULL-terminate list*/
+}
+
+int rsh_fork(int nodeno,const char *startScript)
 {
   char *rshargv[6];
   int pid;
@@ -1767,9 +1784,10 @@ int rsh_start(int nodeno,const char *startScript)
       int fdScript=open(startScript,O_RDONLY);
   /**/  unlink(startScript); /**/
       dup2(fdScript,0);/*Open script as standard input*/
-      putenv("DISPLAY="); /*Disables ssh X forwarding, which hangs ssh*/
+      removeEnv("DISPLAY="); /*No DISPLAY disables ssh's slow X11 forwarding*/
       for(i=3; i<1024; i++) close(i);
       execvp(rshargv[0], rshargv);
+      fprintf(stderr,"Charmrun> Couldn't find rsh program '%s'!\n",rshargv[0]);
       exit(1);
   }
   if (arg_verbose)
@@ -1801,9 +1819,21 @@ void rsh_script(FILE *f, int nodeno, int rank0no, char **argv)
 
   fprintf(f, /*Echo: prints out status message*/
   	"Echo() {\n"
-  	"  echo 'Charmrun (%s.%d)>' $*\n"
+  	"  echo 'Charmrun rsh(%s.%d)>' $*\n"
   	"}\n",host,nodeno);
-  
+  fprintf(f, /*Exit: exits with return code*/
+	"Exit() {\n"
+	"  if [ $1 -ne 0 ]\n"
+	"  then\n"
+	"    Echo Exiting with error code $1\n"
+	"  fi\n"
+#if CMK_RSH_KILL /*End by killing ourselves*/
+	"  sleep 5\n" /*Delay until any error messages are flushed*/
+	"  kill -9 $$\n"
+#else /*Exit normally*/
+	"  exit $1\n"
+#endif
+	"}\n");
   fprintf(f, /*Find: locates a binary program in PATH, sets loc*/
   	"Find() {\n"
   	"  loc=''\n"
@@ -1815,7 +1845,7 @@ void rsh_script(FILE *f, int nodeno, int rank0no, char **argv)
   	"  then\n"
   	"    Echo $1 not found in your PATH \"($PATH)\"--\n"
   	"    Echo set your path in your ~/.charmrunrc\n"
-  	"    exit 1\n"
+  	"    Exit 1\n"
   	"  fi\n"
   	"}\n",host,nodeno);
   
@@ -1857,21 +1887,21 @@ void rsh_script(FILE *f, int nodeno, int rank0no, char **argv)
     fprintf(f,"  Echo 'Cannot contact X Server '$DISPLAY'.  You probably'\n");
     fprintf(f,"  Echo 'need to run xhost to authorize connections.'\n");
     fprintf(f,"  Echo '(See manual for xhost for security issues)'\n");
-    fprintf(f,"  exit 1\n");
+    fprintf(f,"  Exit 1\n");
     fprintf(f,"fi\n");
   }
   
   fprintf(f,"if test ! -x %s\nthen\n",arg_nodeprog_r);
   fprintf(f,"  Echo 'Cannot locate this node-program:'\n");
   fprintf(f,"  Echo '%s'\n",arg_nodeprog_r);
-  fprintf(f,"  exit 1\n");
+  fprintf(f,"  Exit 1\n");
   fprintf(f,"fi\n");
   
   fprintf(f,"cd %s\n",arg_currdir_r);
   fprintf(f,"if test $? = 1\nthen\n");
   fprintf(f,"  Echo 'Cannot propagate this current directory:'\n"); 
   fprintf(f,"  Echo '%s'\n",arg_currdir_r);
-  fprintf(f,"  exit 1\n");
+  fprintf(f,"  Exit 1\n");
   fprintf(f,"fi\n");
   
   if (strcmp(nodetab_setup(nodeno),"*")) {
@@ -1880,7 +1910,7 @@ void rsh_script(FILE *f, int nodeno, int rank0no, char **argv)
     fprintf(f,"  Echo 'this initialization command failed:'\n");
     fprintf(f,"  Echo '\"%s\"'\n",nodetab_setup(nodeno));
     fprintf(f,"  Echo 'edit your nodes file to fix it.'\n");
-    fprintf(f,"  exit 1\n");
+    fprintf(f,"  Exit 1\n");
     fprintf(f,"fi\n");
   }
 
@@ -1950,13 +1980,14 @@ void rsh_script(FILE *f, int nodeno, int rank0no, char **argv)
     fprintf(f,CLOSE_ALL "\n");
   }
   if (arg_verbose) fprintf(f,"Echo 'rsh phase successful.'\n");
-  fprintf(f,"exit 0\n");
+  fprintf(f,"Exit 0\n");
 }
 
+int *rsh_pids=NULL;
 void start_nodes_rsh()
 {
   int rank0no;
-  int *pids=(int *)malloc(sizeof(int)*nodetab_rank0_size);
+  rsh_pids=(int *)malloc(sizeof(int)*nodetab_rank0_size);
   /*Start up the user program, by sending a message
   to PE 0 on each node.*/
   for (rank0no=0;rank0no<nodetab_rank0_size;rank0no++)
@@ -1968,27 +1999,38 @@ void start_nodes_rsh()
      f=fopen(startScript,"w");
      rsh_script(f,pe,rank0no,arg_argv);
      fclose(f);
-     pids[rank0no]=rsh_start(pe,startScript);
+     rsh_pids[rank0no]=rsh_fork(pe,startScript);
   }
+}
+
+void finish_nodes()
+{
+  int rank0no;
+  if (!rsh_pids) return; /*nothing to do*/
   /*Now wait for all the rsh'es to finish*/
   for (rank0no=0;rank0no<nodetab_rank0_size;rank0no++)
   {
      const char *host=nodetab_name(nodetab_rank0_table[rank0no]);
      int status=0;
-     if (arg_verbose) printf("Charmrun> waiting for rsh (%s:%d)\n",host,rank0no);
+     if (arg_verbose) printf("Charmrun> waiting for rsh (%s:%d), pid %d\n",
+		host,rank0no,rsh_pids[rank0no]);
+#if CMK_RSH_KILL /*Just blow the rsh away*/
+     kill(rsh_pids[rank0no],9);
+     waitpid(rsh_pids[rank0no],&status,0); /*<- no zombies*/
+#else /*Wait for the rsh to finish properly*/
      do {
-     	waitpid(pids[rank0no],&status,0);
+     	waitpid(rsh_pids[rank0no],&status,0);
      } while (!WIFEXITED(status));
      if (WEXITSTATUS(status)!=0)
      {
      	fprintf(stderr,"Charmrun> Error %d returned from rsh (%s:%d)\n",
      		WEXITSTATUS(status),host,rank0no);
      	exit(1);
-     }
+     }     
+#endif
   }
-  free(pids);
+  free(rsh_pids);
 }
-
 
 /* simple version of charmrun that avoids the rshd or charmd,   */
 /* it spawn the node program just on local machine using exec. */
