@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.4  1995-09-01 02:13:17  jyelon
+ * Revision 2.5  1995-09-05 22:02:43  sanjeev
+ * added chareptr to CHARE_BLOCK
+ *
+ * Revision 2.4  1995/09/01  02:13:17  jyelon
  * VID_BLOCK, CHARE_BLOCK, BOC_BLOCK consolidated.
  *
  * Revision 2.3  1995/07/22  23:44:13  jyelon
@@ -71,6 +74,7 @@ typedef struct chare_block {
      ChareIDType  realID;          /* if a Filled-VID */
      struct fifo_queue *vid_queue; /* if an Unfilled-VID */
  } x;
+ void *chareptr ;		   /* Pointer to the data area of the chare */
  double dummy;                     /* Pad it to 8 bytes */
 } CHARE_BLOCK ;  
 
