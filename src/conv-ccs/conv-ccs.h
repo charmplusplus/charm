@@ -55,6 +55,8 @@ void CcsCallerId(skt_ip_t *pip, unsigned int *pport);
 void CcsSendReply(int replyLen, const void *replyData);
 CcsDelayedReply CcsDelayReply(void);
 void CcsSendDelayedReply(CcsDelayedReply d,int replyLen, const void *replyData);
+void CcsNoReply();
+void CcsNoDelayedReply(CcsDelayedReply d);
 
 #else
 typedef void *CcsDelayedReply;
@@ -67,6 +69,8 @@ typedef void *CcsDelayedReply;
 #define CcsDelayReply() 0
 #define CcsSendReply(s,r) /*empty*/
 #define CcsSendDelayedReply(d,s,r); 
+#define CcsNoReply() /*empty*/
+#define CcsNoDelayedReply(d) /*empty*/
 #endif
 
 #ifdef __cplusplus

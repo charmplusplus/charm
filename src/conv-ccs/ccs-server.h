@@ -86,12 +86,18 @@ Closes the socket afterwards.
 */
 void CcsServer_sendReply(CcsImplHeader *hdr,int repBytes,const void *repData);
 
+/*No request will be sent through this socket.
+Closes it.
+*/
+void CcsServer_noReply(CcsImplHeader *hdr);
+
 #else /*CCS not available*/
 
 #define CcsServer_new(i,p) /*empty*/
 #define CcsServer_fd() SOCKET_ERROR
 #define CcsServer_recvReq(h,b) 0
 #define CcsServer_sendReply(f,l,d) /*empty*/
+#define CcsServer_noReply(f) /*empty*/
 #define CcsImpl_kill() /*empty*/
 #endif /*CCS available*/
 

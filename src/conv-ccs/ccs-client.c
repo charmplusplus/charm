@@ -283,6 +283,14 @@ int CcsImpl_recvReplyAuth(CcsServer *svr)
   return 0;
 }
 
+/*Close the socket to the server. A reply is not expected
+ */
+int CcsNoResponse(CcsServer *svr)
+{
+  skt_close(svr->replyFd);
+  svr->replyFd=-1;
+  return 0;
+}
 
 /*Receive data back from the server. (Arbitrary length response)
 */

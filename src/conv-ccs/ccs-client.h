@@ -55,6 +55,7 @@ int CcsSendRequest(CcsServer *svr, const char *hdlrID, int pe,
 int CcsSendRequestWithTimeout(CcsServer *svr, const char *hdlrID, int pe, 
 		    int size, const void *msg, int timeout);
 
+int CcsNoResponse(CcsServer *svr);
 int CcsRecvResponse(CcsServer *svr, 
 		    int maxsize, void *recvBuffer, int timeout);
 int CcsRecvResponseMsg(CcsServer *svr, 

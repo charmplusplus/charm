@@ -112,6 +112,7 @@ void CcsSendReply(int replyLen, const void *replyData)
 {
   if (CpvAccess(ccsReq)==NULL)
     CmiAbort("CcsSendReply: reply already sent!\n");
+  CpvAccess(ccsReq)->len = ChMessageInt_new(1);
   CcsImpl_reply(CpvAccess(ccsReq),replyLen,replyData);
   CpvAccess(ccsReq) = NULL;
 }
@@ -121,12 +122,30 @@ void CcsSendDelayedReply(CcsDelayedReply d,int replyLen, const void *replyData)
   CcsImplHeader h;
   h.attr=d.attr;
   h.replyFd=d.replyFd;
+  h.len=ChMessageInt_new(1);
   CcsImpl_reply(&h,replyLen,replyData);
+}
+
+void CcsNoReply()
+{
+  if (CpvAccess(ccsReq)==NULL) return;
+  CpvAccess(ccsReq)->len = ChMessageInt_new(0);
+  CcsImpl_reply(CpvAccess(ccsReq),0,NULL);
+  CpvAccess(ccsReq) = NULL;
+}
+
+void CcsNoDelayedReply(CcsDelayedReply d)
+{
+  CcsImplHeader h;
+  h.attr=d.attr;
+  h.replyFd=d.replyFd;
+  h.len = ChMessageInt_new(0);
+  CcsImpl_reply(&h,0,NULL);
 }
 
 
 /**********************************
-CCS Implementation Routines:
+_CCS Implementation Routines:
   These do the request forwarding and
 delivery.
 ***********************************/
@@ -269,6 +288,15 @@ static void rep_fw_handler(char *msg)
   len=ChMessageInt(hdr->len);
   CcsImpl_reply(hdr,len,r);
   CmiFree(msg);
+}
+
+/*No request will be sent through this socket.
+Closes it.
+*/
+void CcsImpl_noReply(CcsImplHeader *hdr)
+{
+  int fd=ChMessageInt(hdr->replyFd);
+  skt_close(fd);
 }
 
 /*
