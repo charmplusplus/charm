@@ -194,6 +194,10 @@ to mark the chunk to which a ghost node or element belongs datatype=FEM_INDEX*/
   IDXL_t FEM_Comm_shared(int fem_mesh,int entity);
   IDXL_t FEM_Comm_ghost(int fem_mesh,int entity);
 
+  void FEM_Get_roccom_pconn_size(int fem_mesh,int *total_len,int *ghost_len);
+  void FEM_Get_roccom_pconn(int fem_mesh,int *pconn);
+
+
   /*Migration */
   int FEM_Register(void *userData,FEM_PupFn _pup_ud);
   void FEM_Migrate(void);

@@ -275,6 +275,11 @@
          integer, intent(in) :: partnerNo
          integer :: FEM_Get_comm_count
        end function
+
+       subroutine FEM_Get_roccom_pconn_size(mesh,total_len,ghost_len)
+         integer, intent(in) :: mesh
+         integer, intent(out) :: total_len,ghost_len
+       end subroutine
        
        end interface
 

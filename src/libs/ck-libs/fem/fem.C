@@ -1154,6 +1154,61 @@ FDECL void FTN_NAME(FEM_GET_GHOST_LIST,fem_get_ghost_list)
 }
 
 
+/********* Roccom utility interface *******/
+
+/** Extract an IDXL_Side_t into Roccom format. */
+static void getRoccomPconn(IDXL_Side_t is,int bias,CkVec<int> &pconn)
+{
+	int p,np=IDXL_Get_partners(is);
+	for (p=0;p<np;p++) {
+		pconn.push_back(IDXL_Get_partner(is,p)+1); /* paneID's are 1-based */
+		int n,nn=IDXL_Get_count(is,p);
+		pconn.push_back(nn); /* number of shared nodes */
+		for (n=0;n<nn;n++)
+			pconn.push_back(IDXL_Get_index(is,p,n)+1+bias); /* nodes are 1-based */
+	}
+}
+
+/** Extract all FEM communication information into Roccom format. */
+static CkVec<int> getRoccomPconn(int fem_mesh,int *ghost_len)
+{
+	CkVec<int> pconn;
+	// Shared nodes come first:
+	getRoccomPconn(IDXL_Get_send(FEM_Comm_shared(fem_mesh,FEM_NODE)),0,pconn);
+	int realLen=pconn.size();
+	
+	// Next come sent ghost nodes:
+	getRoccomPconn(IDXL_Get_send(FEM_Comm_ghost(fem_mesh,FEM_NODE)),0,pconn);
+	// Separator distinguishes ghost send from recv:
+	pconn.push_back(0); pconn.push_back(0);
+	// Now received ghost nodes (use bias to switch to Roccom ghost node numbering)
+	getRoccomPconn(IDXL_Get_recv(FEM_Comm_ghost(fem_mesh,FEM_NODE)),
+		FEM_Mesh_get_length(fem_mesh,FEM_NODE),pconn);
+	
+	if (ghost_len) *ghost_len=pconn.size()-realLen;
+	return pconn;
+}
+
+CDECL void FEM_Get_roccom_pconn_size(int fem_mesh,int *total_len,int *ghost_len)
+{
+	CkVec<int> pconn=getRoccomPconn(fem_mesh,ghost_len);
+	*total_len=pconn.size();
+}
+FORTRAN_AS_C(FEM_GET_ROCCOM_PCONN_SIZE,FEM_Get_roccom_pconn_size,fem_get_roccom_pconn_size,
+        (int *mesh,int *tl,int *gl), (*mesh,tl,gl)
+)
+
+CDECL void FEM_Get_roccom_pconn(int fem_mesh,int *dest)
+{
+	CkVec<int> pconn=getRoccomPconn(fem_mesh,NULL);
+	for (unsigned int i=0;i<pconn.size();i++)
+		dest[i]=pconn[i];
+}
+FORTRAN_AS_C(FEM_GET_ROCCOM_PCONN,FEM_Get_roccom_pconn,fem_get_roccom_pconn,
+        (int *mesh,int *dest), (*mesh,dest)
+)
+
+
 /********* Debugging mesh printouts *******/
 
 class localToGlobal : public IDXL_Print_Map {
