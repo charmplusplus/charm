@@ -180,11 +180,11 @@ void LogPool::creatFiles(char *fix)
 #if CMK_PROJECTIONS_USE_ZLIB
   int len;
   if(compressed)
-    len = strlen(pgmname)+strlen(fix)+strlen(".logd")+strlen(pestr)+strlen(".gz")+3;
+    len = strlen(pgmname)+strlen(fix)+strlen(".logold")+strlen(pestr)+strlen(".gz")+3;
   else
-    len = strlen(pgmname)+strlen(fix)+strlen(".logd")+strlen(pestr)+3;
+    len = strlen(pgmname)+strlen(fix)+strlen(".logold")+strlen(pestr)+3;
 #else
-  int len = strlen(pgmname)+strlen(fix)+strlen(".logd")+strlen(pestr)+3;
+  int len = strlen(pgmname)+strlen(fix)+strlen(".logold")+strlen(pestr)+3;
 #endif
   if (nonDeltaLog) {
     fname = new char[len];
@@ -194,26 +194,38 @@ void LogPool::creatFiles(char *fix)
   }
 #if CMK_PROJECTIONS_USE_ZLIB
   if(compressed) {
-    if (nonDeltaLog) {
-      sprintf(fname, "%s%s.%s.log.gz", pgmname, fix, pestr);
-    }
-    if (deltaLog) {
-      sprintf(dfname, "%s%s.%s.logd.gz", pgmname, fix, pestr);
+    if (deltaLog && nonDeltaLog) {
+      sprintf(fname, "%s%s.%s.logold.gz", pgmname, fix, pestr);
+      sprintf(dfname, "%s%s.%s.log.gz", pgmname, fix, pestr);
+    } else {
+      if (nonDeltaLog) {
+	sprintf(fname, "%s%s.%s.log.gz", pgmname, fix, pestr);
+      } else {
+	sprintf(dfname, "%s%s.%s.log.gz", pgmname, fix, pestr);
+      }
     }
   } else {
-    if (nonDeltaLog) {
-      sprintf(fname, "%s%s.%s.log", pgmname, fix, pestr);
-    }
-    if (deltaLog) {
-      sprintf(dfname, "%s%s.%s.logd", pgmname, fix, pestr);
+    if (deltaLog && nonDeltaLog) {
+      sprintf(fname, "%s%s.%s.logold", pgmname, fix, pestr);
+      sprintf(dfname, "%s%s.%s.log", pgmname, fix, pestr);
+    } else {
+      if (nonDeltaLog) {
+	sprintf(fname, "%s%s.%s.log", pgmname, fix, pestr);
+      } else {
+	sprintf(dfname, "%s%s.%s.log", pgmname, fix, pestr);
+      }
     }
   }
 #else
-  if (nonDeltaLog) {
-    sprintf(fname, "%s%s.%s.log", pgmname, fix, pestr);
-  }
-  if (deltaLog) {
-    sprintf(dfname, "%s%s.%s.logd", pgmname, fix, pestr);
+  if (deltaLog && nonDeltaLog) {
+    sprintf(fname, "%s%s.%s.logold", pgmname, fix, pestr);
+    sprintf(dfname, "%s%s.%s.log", pgmname, fix, pestr);
+  } else {
+    if (nonDeltaLog) {
+      sprintf(fname, "%s%s.%s.log", pgmname, fix, pestr);
+    } else {
+      sprintf(dfname, "%s%s.%s.log", pgmname, fix, pestr);
+    }
   }
 #endif
   openLog("w+");
