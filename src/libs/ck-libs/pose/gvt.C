@@ -117,7 +117,7 @@ void PVT::setGVT(GVTMsg *m)
   objs.Commit();
   p[CkMyPe()].startPhase();
 #ifdef POSE_STATS_ON
-  if (m->estGVT > nextQuanta) {
+  if (estGVT > nextQuanta) {
     nextQuanta += DOP_QUANTA;
     DOPcalc();
   }
