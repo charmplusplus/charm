@@ -905,15 +905,12 @@ typedef struct CmiStateStruct
 {
   int pe, rank;
   PCQueue recv;
-#if CMK_NODE_QUEUE_AVAILABLE
-  PCQueue noderecv;
-#endif
   void *localqueue;
 }
 *CmiState;
 
 #if CMK_NODE_QUEUE_AVAILABLE
-CsvDeclare(PCQueue, NodeRecv);
+CsvStaticDeclare(PCQueue, NodeRecv);
 #endif
 
 void CmiStateInit(int pe, int rank, CmiState state)
@@ -925,11 +922,7 @@ void CmiStateInit(int pe, int rank, CmiState state)
 #if CMK_NODE_QUEUE_AVAILABLE
   if (rank==0) {
     CsvInitialize(PCQueue, NodeRecv);
-    state->noderecv=PCQueueCreate();
-    CsvAccess(NodeRecv)=state->noderecv;
-  } else {
-    CsvInitialize(PCQueue, NodeRecv);
-    state->noderecv=CsvAccess(NodeRecv);
+    CsvAccess(NodeRecv) = PCQueueCreate();
   }
 #endif
 }
@@ -2208,7 +2201,7 @@ void DeliverOutgoingNodeMessage(OutgoingMsg ogm)
     GarbageCollectMsg(ogm);
     break;
   case NODE_BROADCAST_ALL:
-    PCQueuePush(CmiGetStateN(0)->noderecv,CopyMsg(ogm->data,ogm->size));
+    PCQueuePush(CsvAccess(NodeRecv),CopyMsg(ogm->data,ogm->size));
     for (i=0; i<Cmi_numnodes; i++)
       if (i!=Cmi_mynode)
 	DeliverViaNetwork(ogm, nodes + i, DGRAM_NODEMESSAGE);
@@ -2222,10 +2215,10 @@ void DeliverOutgoingNodeMessage(OutgoingMsg ogm)
       GarbageCollectMsg(ogm);
     } else {
       if (ogm->freemode == 'A') {
-	PCQueuePush(CmiGetStateN(0)->noderecv,CopyMsg(ogm->data,ogm->size));
+	PCQueuePush(CsvAccess(NodeRecv),CopyMsg(ogm->data,ogm->size));
 	ogm->freemode = 'X';
       } else {
-	PCQueuePush(CmiGetStateN(0)->noderecv, ogm->data);
+	PCQueuePush(CsvAccess(NodeRecv), ogm->data);
 	FreeOutgoingMsg(ogm);
       }
     }
@@ -2336,7 +2329,7 @@ void AssembleDatagram(OtherNode node, ExplicitDgram dg)
     } else {
 #if CMK_NODE_QUEUE_AVAILABLE
          if (node->asm_rank==DGRAM_NODEMESSAGE) {
-	   PCQueuePush(CmiGetStateN(0)->noderecv, msg);
+	   PCQueuePush(CsvAccess(NodeRecv), msg);
          }
 	 else
 #endif
@@ -2625,7 +2618,7 @@ static void CommunicationServer()
 char *CmiGetNonLocalNodeQ()
 {
   CmiState cs = CmiGetState();
-  void *result = PCQueuePop(cs->noderecv);
+  void *result = PCQueuePop(CsvAccess(NodeRecv));
   return (char *) result;
 }
 #endif
