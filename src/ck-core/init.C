@@ -16,6 +16,7 @@ UInt  _printCS = 0;
 UInt  _printSS = 0;
 
 UInt  _numInitMsgs = 0;
+UInt  _numExpectInitMsgs = 0;
 UInt  _numInitNodeMsgs = 0;
 int   _infoIdx;
 int   _charmHandlerIdx;
@@ -304,7 +305,7 @@ static inline void _initDone(void)
 
 static void _triggerHandler(envelope *env)
 {
-  if (_numInitMsgs && CkpvAccess(_numInitsRecd) + _numInitNodeMsgs == _numInitMsgs)
+  if (_numExpectInitMsgs && CkpvAccess(_numInitsRecd) + _numInitNodeMsgs == _numExpectInitMsgs)
   {
     DEBUGF(("Calling Init Done from _triggerHandler\n"));
     _initDone();
@@ -354,13 +355,13 @@ static void _initHandler(void *msg)
     case RODataMsg:
       CkpvAccess(_numInitsRecd)+=2;  /*++;*/
       CpvAccess(_qd)->process();
-      _numInitMsgs = env->getCount();
+      _numExpectInitMsgs = env->getCount();
       _processRODataMsg(env);
       break;
     default:
       CmiAbort("Internal Error: Unknown-msg-type. Contact Developers.\n");
   }
-  if(_numInitMsgs&&(CkpvAccess(_numInitsRecd)+_numInitNodeMsgs==_numInitMsgs)) {
+  if(_numExpectInitMsgs&&(CkpvAccess(_numInitsRecd)+_numInitNodeMsgs==_numExpectInitMsgs)) {
     _initDone();
   }
 }
