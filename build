@@ -84,7 +84,7 @@ do
           while [ ! $# -eq 0 ]
           do
             case "$1" in
-	    "pgcc"|"ecc"|"icc"|"cxx"|"kcc"|"cc"|"cc64"|"acc"|"gcc3"|"mpcc")
+	    "pgcc"|"ecc"|"icc"|"cxx"|"kcc"|"cc"|"cc64"|"acc"|"gcc3"|"mpcc"|"lcs")
                 TestIfSupported $1
                 COMPILER=$1; shift
 	        ;;
