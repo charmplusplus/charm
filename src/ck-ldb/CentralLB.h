@@ -64,6 +64,8 @@ public:
 	return Strategy(stats,count);
    };
 
+   void dumpLDStats(LDStats* statsList, char *file);
+   LDStats* loadLDStats(char *file, int pe);
 protected:
   virtual CmiBool QueryBalanceNow(int) { return CmiTrue; };  
   virtual CLBMigrateMsg* Strategy(LDStats* stats,int count);

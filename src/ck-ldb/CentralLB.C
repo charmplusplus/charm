@@ -5,6 +5,9 @@
  * $Revision$
  *****************************************************************************/
 
+#include <unistd.h>
+#include <fcntl.h>
+
 #include <charm++.h>
 #include <LBDatabase.h>
 #include "CentralLB.h"
@@ -142,7 +145,6 @@ void CentralLB::ReceiveStats(CLBStatsMsg *m)
   if (stats_msg_count == clients) {
     double strat_start_time = CmiWallTimer();
     
-
     CLBMigrateMsg* migrateMsg = Strategy(statsDataList,clients);
     CProxy_CentralLB(thisgroup).ReceiveMigration(migrateMsg);
 
@@ -251,6 +253,42 @@ CLBMigrateMsg* CentralLB::Strategy(LDStats* stats,int count)
   msg->n_moves = 0;
 
   return msg;
+}
+
+void CentralLB::dumpLDStats(LDStats* statsList, char *file)
+{
+  int fd = open(file, O_WRONLY|O_CREAT|O_TRUNC, 0644);
+  if (fd == -1){
+     perror("dumpLDStats");
+     return;
+  }
+  for (int i=0; i<CkNumPes(); i++) 
+  {
+     write(fd, &statsList[i], sizeof(LDStats));
+     write(fd, statsList[i].objData, sizeof(LDObjData)*statsList[i].n_objs);
+     write(fd, statsList[i].commData, sizeof(LDCommData)*statsList[i].n_comm);
+  }
+  close(fd);
+}
+
+CentralLB::LDStats* CentralLB::loadLDStats(char *file, int pe)
+{
+  int fd = open(file, O_RDONLY);
+  if (fd == -1){
+     perror("loadLDStats");
+     return NULL;
+  }
+  LDStats* statsList = new LDStats[pe];
+  for (int i=0; i<pe; i++) 
+  {
+     if (read(fd, &statsList[i], sizeof(LDStats)) <= 0) { perror("loadLDStats"); return NULL; }
+     statsList[i].objData = new LDObjData[statsList[i].n_objs];
+     if (statsList[i].n_objs && read(fd, statsList[i].objData, sizeof(LDObjData)*statsList[i].n_objs) <= 0) { perror("loadLDStats"); return NULL; }
+     statsList[i].commData = new LDCommData[statsList[i].n_comm];
+     if (statsList[i].n_comm && read(fd, statsList[i].commData, sizeof(LDCommData)*statsList[i].n_comm) <= 0) { perror("loadLDStats"); return NULL; }
+  }
+  close(fd);
+  return statsList;
 }
 
 void* CLBStatsMsg::alloc(int msgnum, size_t size, int* array, int priobits)
