@@ -281,9 +281,11 @@ extern "C" void defaultBgHandler(char *null)
 int BgRegisterHandler(BgHandler h)
 {
   /* leave 0 as blank, so it can report error luckily */
-  int cur = cva(handlerTableCount)++;
+  int cur;
 
-  ASSERT(cva(inEmulatorInit));
+  for (cur=1; cur<cva(handlerTableCount); cur++)
+    if (cva(handlerTable)[cur] == h) return cur;
+  cva(handlerTableCount)++;
   if (cur >= MAX_HANDLERS)
     CmiAbort("BG> HandlerID exceed the maximum.\n");
   cva(handlerTable)[cur] = h;
