@@ -282,6 +282,7 @@ void StatTable::write(FILE* fp)
 {
   DEBUGF(("%d/%d DEBUG: Writing StatTable\n", CmiMyPe(), CmiNumPes()));
   int i, j;
+  int _numEntries=_entryTable.size();
   for (i=0; i<numStats_; i++) {
     // FAKE OUT AND WRITE AN OVERVIEW AS LAST ENTRY
     // write description of the entry
@@ -467,6 +468,7 @@ void CountLogPool::write(int phase)
   if (phase >= 0) { lastPhase_ = phase; }
   if (phase < 0 && lastPhase_ >= 0) { lastPhase_++;  phase = lastPhase_; }
 
+  int _numEntries=_entryTable.size();
   FILE* fp = (phase==-1) ? openFile() : openFile(phase); 
   fprintf(fp, "ver:%3.1f %d/%d ep:%d counters:%d\n", 
 	  CpvAccess(version), CmiMyPe(), CmiNumPes(), _numEntries+1, 
@@ -485,6 +487,7 @@ void CountLogPool::writeSts(int phase)
 
   const static int strSize = 10;
   char phasestr[strSize+1];
+  int _numEntries=_entryTable.size();
   // add strSize for phase number
   char *fname = 
     new char[strlen(CpvAccess(_logName))+strlen(".count.sts")+strSize];
@@ -504,20 +507,20 @@ void CountLogPool::writeSts(int phase)
   delete[] fname;
   fprintf(sts, "MACHINE %s\n",CMK_MACHINE_NAME);
   fprintf(sts, "PROCESSORS %d\n", CmiNumPes());
-  fprintf(sts, "TOTAL_CHARES %d\n", _numChares);
+  fprintf(sts, "TOTAL_CHARES %d\n", _chareTable.size());
   fprintf(sts, "TOTAL_EPS %d\n", _numEntries+1);  // make extra overview
-  fprintf(sts, "TOTAL_MSGS %d\n", _numMsgs);
+  fprintf(sts, "TOTAL_MSGS %d\n", _msgTable.size());
   fprintf(sts, "TOTAL_PSEUDOS %d\n", 0);
   fprintf(sts, "TOTAL_EVENTS %d\n", _numEvents);
   int i;
-  for(i=0;i<_numChares;i++)
+  for(i=0;i<_chareTable.size();i++)
     fprintf(sts, "CHARE %d %s\n", i, _chareTable[i]->name);
   for(i=0;i<_numEntries;i++)
     fprintf(sts, "ENTRY CHARE %d %s %d %d\n", i, _entryTable[i]->name,
                  _entryTable[i]->chareIdx, _entryTable[i]->msgIdx);
   // fake out, make OVERVIEW
   fprintf(sts, "ENTRY CHARE %d OVERVIEW -1 -1\n", _numEntries);
-  for(i=0;i<_numMsgs;i++)
+  for(i=0;i<_msgTable.size();i++)
     fprintf(sts, "MESSAGE %d %ld\n", i, _msgTable[i]->size);
   for(i=0;i<_numEvents;i++)
     fprintf(sts, "EVENT %d Event%d\n", i, i);
@@ -1064,6 +1067,7 @@ void TraceCounter::endOverview()
   DEBUGF(("%d/%d DEBUG:   endOverview\n", CmiMyPe(), CmiNumPes()));
  
   double t = TraceTimer();
+  int _numEntries=_entryTable.size();
 
   long long value1 = 0, value2 = 0;
   int genRead;
