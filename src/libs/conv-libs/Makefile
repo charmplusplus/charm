@@ -1,11 +1,11 @@
 CHARMC=../../../bin/charmc $(OPTS)
 
 all:
-	cd master-slave; make all OPTS='$(OPTS)'
-	cd commlib; make all OPTS='$(OPTS)'
-	cd packlib; make all OPTS='$(OPTS)'
-	cd metis; make all OPTS='$(OPTS)'
-	cd ddt; make all OPTS='$(OPTS)'
+	cd master-slave; $(MAKE) all OPTS='$(OPTS)'
+	cd commlib; $(MAKE) all OPTS='$(OPTS)'
+	cd packlib; $(MAKE) all OPTS='$(OPTS)'
+	cd metis; $(MAKE) all OPTS='$(OPTS)'
+	cd ddt; $(MAKE) all OPTS='$(OPTS)'
 
 clean:
 	cd master-slave; make clean
