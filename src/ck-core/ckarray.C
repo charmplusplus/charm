@@ -427,6 +427,8 @@ void _ckArrayInit(void)
   CkpvInitialize(ArrayElement_initInfo,initInfo);
   CkDisableTracing(CkIndex_CkArray::insertElement(0));
   CkDisableTracing(CkIndex_CkArray::recvBroadcast(0));
+    // disable because broadcast listener may deliver broadcast message
+  CkDisableTracing(CkIndex_CkLocMgr::immigrate(0));
 }
 
 CkArray::CkArray(CkArrayOptions &c,CkMarshalledMessage &initMsg,CkNodeGroupID nodereductionID)
