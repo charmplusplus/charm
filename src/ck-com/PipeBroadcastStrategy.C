@@ -7,7 +7,7 @@ void propagate_handler(void *message) {
   myStrategy->propagate((char*)message, false, env->getSrcPe(), env->getTotalsize(), envelope::setSrcPe);
 }
 
-void PipeBroadcastStrategy::deliverer(char *msg) {
+void PipeBroadcastStrategy::deliverer(char *msg, int dim) {
   envelope *env = (envelope*)msg;
   ComlibPrintf("isArray = %d\n", (getType() == ARRAY_STRATEGY));
 
