@@ -20,6 +20,24 @@
 #define AMPI_DEBUG /* empty */
 #endif
 
+#define AMPI_COUNTER 0
+#if AMPI_COUNTER
+class AmpiCounters{
+public:
+	int send,recv,isend,irecv,barrier,bcast,gather,scatter,allgather,alltoall,reduce,allreduce,scan;
+	AmpiCounters(){
+		send=0;recv=0;isend=0;irecv=0;barrier=0;bcast=0;gather=0;scatter=0;allgather=0;alltoall=0;reduce=0;allreduce=0;scan=0;
+	}
+	void output(int idx){
+		FILE* f = fopen("ampi.counters","a+");
+		fprintf(f,"[%d]send=%d;recv=%d;isend=%d;irecv=%d;barrier=%d;bcast=%d;gather=%d;scatter=%d;allgather=%d;alltoall=%d;reduce=%d;allreduce=%d;scan=%d\n",send,recv,isend,irecv,barrier,bcast,gather,scatter,allgather,alltoall,reduce,allreduce,scan,idx);
+		fclose(f);
+	}
+};
+#endif
+
+
+
 void applyOp(MPI_Datatype datatype, MPI_Op op, int count, void* invec, void* inoutvec);
 PUPfunctionpointer(MPI_Op);
 class AmpiOpHeader {
@@ -955,7 +973,7 @@ class ampiParent : public CBase_ampiParent {
     CkPupPtrVec<groupStruct> groups; // "Wild" groups that don't have a communicator
     CkPupPtrVec<WinStruct> winStructList;   //List of windows for one-sided communication
     CkPupPtrVec<InfoStruct> infos; // list of all MPI_Infos
-    
+
     inline int isSplit(MPI_Comm comm) const {
       return (comm>=MPI_COMM_FIRST_SPLIT && comm<MPI_COMM_FIRST_GROUP);
     }
@@ -1186,6 +1204,11 @@ public:
     WinStruct getWinStruct(MPI_Win win);
     void removeWinStruct(WinStruct win);
 
+#if AMPI_COUNTER
+public:
+    AmpiCounters counters;
+#endif    
+    
 public:
     MPI_Info createInfo(void);
     MPI_Info dupInfo(MPI_Info info);

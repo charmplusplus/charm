@@ -1648,7 +1648,6 @@ CDECL void AMPI_Setmigratable(MPI_Comm comm, int mig){
 #endif
 }
 
-
 CDECL int AMPI_Init(int *p_argc, char*** p_argv)
 {
   if (nodeinit_has_been_called) {
@@ -1682,6 +1681,9 @@ CDECL int AMPI_Finalized(int *isFinalized)
 {
     AMPIAPI("AMPI_Initialized");     /* in case charm init not called */
     *isFinalized=CtvAccess(ampiFinalized);
+#if AMPI_COUNTER
+    getAmpiParent()->counters.output(getAmpiInstance(MPI_COMM_WORLD)->getRank(MPI_COMM_WORLD));
+#endif
     return 0;
 }
 
@@ -1749,6 +1751,9 @@ int AMPI_Send(void *msg, int count, MPI_Datatype type, int dest,
   AMPIAPI("AMPI_Send");
   ampi *ptr = getAmpiInstance(comm);
   ptr->send(tag, ptr->getRank(comm), msg, count, type, dest, comm);
+#if AMPI_COUNTER
+  getAmpiParent()->counters.send++;
+#endif
   return 0;
 }
 
@@ -1762,6 +1767,9 @@ int AMPI_Recv(void *msg, int count, MPI_Datatype type, int src, int tag,
 //CkPrintf("dedede%d[[",CpvAccess(_traceCoreOn));if(CpvAccess(_traceCoreOn) !=0) ampi_endProcessing(ptr->thisIndex); else CkPrintf("]]]] %ddededededededede\n",CpvAccess(_traceCoreOn));
 	if(-1==ptr->recv(tag,src,msg,count,type, comm, (int*) status)) CkAbort("AMPI> Error in MPI_Recv");
 
+#if AMPI_COUNTER
+  getAmpiParent()->counters.recv++;
+#endif
 	return 0;
 }
 
@@ -1820,6 +1828,9 @@ int AMPI_Barrier(MPI_Comm comm)
 #if CMK_BLUEGENE_CHARM
   TRACE_BG_AMPI_BARRIER_END(barrierLog);
 #endif
+#if AMPI_COUNTER
+  getAmpiParent()->counters.barrier++;
+#endif
   return 0;
 }
 
@@ -1832,6 +1843,9 @@ int AMPI_Bcast(void *buf, int count, MPI_Datatype type, int root,
   if(comm==MPI_COMM_SELF) return 0;
   ampi *ptr = getAmpiInstance(comm);
   ptr->bcast(root, buf, count, type,comm);
+#if AMPI_COUNTER
+  getAmpiParent()->counters.bcast++;
+#endif
   return 0;
 }
 
@@ -1891,6 +1905,9 @@ int AMPI_Reduce(void *inbuf, void *outbuf, int count, int type, MPI_Op op,
     if(-1==ptr->recv(MPI_REDUCE_TAG, MPI_REDUCE_SOURCE, outbuf, count, type, MPI_REDUCE_COMM))
       CkAbort("AMPI>MPI_Reduce called with different values on different processors!");
   }
+#if AMPI_COUNTER
+  getAmpiParent()->counters.reduce++;
+#endif
   return 0;
 }
 
@@ -1911,6 +1928,9 @@ int AMPI_Allreduce(void *inbuf, void *outbuf, int count, int type,
   /*HACK: Use recv() to block until the reduction data comes back*/
   if(-1==ptr->recv(MPI_REDUCE_TAG, MPI_REDUCE_SOURCE, outbuf, count, type, MPI_REDUCE_COMM))
     CkAbort("AMPI> MPI_Allreduce called with different values on different processors!");
+#if AMPI_COUNTER
+  getAmpiParent()->counters.allreduce++;
+#endif
   return 0;
 }
 
@@ -2031,6 +2051,9 @@ int AMPI_Scan(void* sendbuf, void* recvbuf, int count, MPI_Datatype datatype, MP
 
   free(tmp_buf);
   free(partial_scan);
+#if AMPI_COUNTER
+  getAmpiParent()->counters.scan++;
+#endif
   return 0;
 }
 
@@ -2592,6 +2615,9 @@ int AMPI_Isend(void *buf, int count, MPI_Datatype type, int dest,
   ampi *ptr = getAmpiInstance(comm);
   ptr->send(tag, ptr->getRank(comm), buf, count, type, dest, comm);
   *request = MPI_REQUEST_NULL;
+#if AMPI_COUNTER
+  getAmpiParent()->counters.isend++;
+#endif
   return 0;
 }
 
@@ -2605,6 +2631,9 @@ int AMPI_Irecv(void *buf, int count, MPI_Datatype type, int src,
   AmpiRequestList* reqs = getReqs();
   IReq *newreq = new IReq(buf,count,type,src,tag,comm);
   *request = reqs->insert(newreq);
+#if AMPI_COUNTER
+  getAmpiParent()->counters.irecv++;
+#endif
   return 0;
 }
 
@@ -2666,6 +2695,9 @@ int AMPI_Allgather(void *sendbuf, int sendcount, MPI_Datatype sendtype,
     AMPI_Recv(((char*)recvbuf)+(itemsize*i), recvcount, recvtype,
              i, MPI_GATHER_TAG, comm, &status);
   }
+#if AMPI_COUNTER
+  getAmpiParent()->counters.allgather++;
+#endif
   return 0;
 }
 
@@ -2747,6 +2779,9 @@ int AMPI_Allgatherv(void *sendbuf, int sendcount, MPI_Datatype sendtype,
     AMPI_Recv(((char*)recvbuf)+(itemsize*displs[i]), recvcounts[i], recvtype,
              i, MPI_GATHER_TAG, comm, &status);
   }
+#if AMPI_COUNTER
+  getAmpiParent()->counters.allgather++;
+#endif
   return 0;
 }
 
@@ -2773,6 +2808,9 @@ int AMPI_Gather(void *sendbuf, int sendcount, MPI_Datatype sendtype,
                i, MPI_GATHER_TAG, comm, &status);
     }
   }
+#if AMPI_COUNTER
+  getAmpiParent()->counters.gather++;
+#endif
   return 0;
 }
 
@@ -2800,6 +2838,9 @@ int AMPI_Gatherv(void *sendbuf, int sendcount, MPI_Datatype sendtype,
                i, MPI_GATHER_TAG, comm, &status);
     }
   }
+#if AMPI_COUNTER
+  getAmpiParent()->counters.gather++;
+#endif
   return 0;
 }
 
@@ -2829,6 +2870,9 @@ int AMPI_Scatter(void *sendbuf, int sendcount, MPI_Datatype sendtype,
   MPI_Status status;
   AMPI_Recv(recvbuf, recvcount, recvtype, root, MPI_SCATTER_TAG, comm, &status);
 
+#if AMPI_COUNTER
+  getAmpiParent()->counters.scatter++;
+#endif
   return 0;
 }
 
@@ -2858,6 +2902,9 @@ int AMPI_Scatterv(void *sendbuf, int *sendcounts, int *displs, MPI_Datatype send
   MPI_Status status;
   AMPI_Recv(recvbuf, recvcount, recvtype, root, MPI_SCATTER_TAG, comm, &status);
   
+#if AMPI_COUNTER
+  getAmpiParent()->counters.scatter++;
+#endif
   return 0;
 }
 
@@ -2898,6 +2945,9 @@ int AMPI_Alltoall(void *sendbuf, int sendcount, MPI_Datatype sendtype,
     AMPI_Recv(((char*)recvbuf)+(itemsize*i), recvcount, recvtype,
               i, MPI_ATA_TAG, comm, &status);
   }
+#if AMPI_COUNTER
+  getAmpiParent()->counters.alltoall++;
+#endif
   return 0;
 }
 
@@ -2979,6 +3029,9 @@ int AMPI_Alltoallv(void *sendbuf, int *sendcounts, int *sdispls,
     AMPI_Recv(((char*)recvbuf)+(itemsize*rdispls[i]), recvcounts[i], recvtype,
              i, MPI_GATHER_TAG, comm, &status);
   }
+#if AMPI_COUNTER
+  getAmpiParent()->counters.alltoall++;
+#endif
   return 0;
 }
 
