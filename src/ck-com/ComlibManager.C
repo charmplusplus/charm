@@ -40,7 +40,7 @@ void recv_array_msg(void *msg){
     */
     
     CkArray *a=(CkArray *)_localBranch(env->getsetArrayMgr());
-    a->deliver((CkArrayMessage *)EnvToUsr(env), CkDeliver_queue, CmiTrue);    
+    a->deliver((CkArrayMessage *)EnvToUsr(env), CkDeliver_queue);
 
     ComlibPrintf("%d:Out of recv_msg\n", CkMyPe());
     return;

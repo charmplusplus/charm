@@ -163,7 +163,7 @@ void MsgPacker::deliver(CombinedMessage *cmb_msg){
             //else
             //ap.ckSend((CkArrayMessage *)data, ep);
             
-            a->deliver((CkArrayMessage *)data, CkDeliver_queue, CmiTrue);
+            a->deliver((CkArrayMessage *)data, CkDeliver_queue);
 
             CmiFree(senv.data);
         }        
