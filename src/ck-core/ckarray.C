@@ -1,12 +1,12 @@
 /* Generalized Chare Arrays
 
-An Array is a collection of array elements (Chares) which 
-can be indexed by an arbitary run of bytes (a CkArrayIndex).  
+An Array is a collection of array elements (Chares) which
+can be indexed by an arbitary run of bytes (a CkArrayIndex).
 Elements can be inserted or removed from the array,
 or migrated between processors.  Arrays are integrated with
 the run-time load balancer.
 
-Elements can also receive broadcasts and participate in 
+Elements can also receive broadcasts and participate in
 reductions.
 
 Converted from 1-D arrays 2/27/2000 by
@@ -215,10 +215,33 @@ void ArrayElement::CkAbort(const char *str) const
 	CkError("Array element at index %s aborting:\n",
 		idx2str(thisIndexMax));
 	CkMigratable::CkAbort(str);
-} 
+}
+
+//// Checkpoint: pup to disk file
+void ArrayElement::ckCheckpoint(char* fname)
+{
+  FILE *chkptfile=fopen(fname,"wb");
+  if(chkptfile == NULL){
+    CkAbort("ArrayElement::ckCheckpoint open file failed!");
+  }
+  PUP::toDisk p(chkptfile);
+  this->pup(p);
+  fclose(chkptfile);
+}
+
+void ArrayElement::ckRestart(char* fname)
+{
+  FILE *chkptfile=fopen(fname,"rb");
+  if(chkptfile == NULL){
+    CkAbort("ArrayElement::ckRestart open file failed!");
+  }
+  PUP::fromDisk p(chkptfile);
+  this->pup(p);
+  fclose(chkptfile);
+}
 
 /*********************** Spring Cleaning *****************
-Periodically (every minute or so) remove expired broadcasts 
+Periodically (every minute or so) remove expired broadcasts
 from the queue.
 */
 
