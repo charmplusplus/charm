@@ -50,6 +50,15 @@ public:
 	}
 	/// Shorthand for add function.
 	inline void operator+=(real r) { add(r); }
+
+	/** Add all these samples to this set */
+	inline void add(const CkSampleT<real,ret> &errs) {
+		if (errs.lo<lo) lo=errs.lo;
+		if (errs.hi>hi) hi=errs.hi;
+		sum+=errs.sum;
+		sq+=errs.sq;
+		n+=errs.n;
+	}
 	
 	/**
 	 * Return the mean value of this sample--the "average" value, in (value) units.
@@ -85,6 +94,9 @@ public:
 	 * Return the number of values in this sample.
 	 */
 	int getCount(void) const {return n;}
+
+	/// Return the RMS value of this variable (square root of sum of squares over number)
+	ret getRMS(void) const {return sqrt(sq/n);}
 	
 	/**
 	 * Print a textual description of this sample to this FILE.
