@@ -211,10 +211,11 @@ inline groupStruct rangeExclOp(int n, int ranges[][3], groupStruct vec){
 
 extern int mpi_nworlds;
 
-#define MPI_BCAST_TAG  MPI_TAG_UB+10
-#define MPI_BARR_TAG   MPI_TAG_UB+11
-#define MPI_REDUCE_TAG MPI_TAG_UB+12
-#define MPI_GATHER_TAG MPI_TAG_UB+13
+#define MPI_BCAST_TAG   MPI_TAG_UB+10
+#define MPI_BARR_TAG    MPI_TAG_UB+11
+#define MPI_REDUCE_TAG  MPI_TAG_UB+12
+#define MPI_GATHER_TAG  MPI_TAG_UB+13
+#define MPI_SCATTER_TAG MPI_TAG_UB+14
 
 #if 0
 // This is currently not used.

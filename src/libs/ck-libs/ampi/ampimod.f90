@@ -36,6 +36,8 @@ module MPIINCL
    external MPI_Allgather
    external MPI_Gatherv
    external MPI_Gather
+   external MPI_Scatterv
+   external MPI_Scatter
    external MPI_Alltoallv
    external MPI_Alltoall
    external MPI_Comm_dup

@@ -46,6 +46,8 @@ FDECL {
 #define mpi_allgather FTN_NAME( MPI_ALLGATHER , mpi_allgather )
 #define mpi_gatherv FTN_NAME( MPI_GATHERV , mpi_gatherv )
 #define mpi_gather FTN_NAME( MPI_GATHER , mpi_gather )
+#define mpi_scatterv FTN_NAME( MPI_SCATTERV , mpi_scatterv )
+#define mpi_scatter FTN_NAME( MPI_SCATTER , mpi_scatter )
 #define mpi_alltoallv FTN_NAME( MPI_ALLTOALLV , mpi_alltoallv )
 #define mpi_alltoall FTN_NAME( MPI_ALLTOALL , mpi_alltoall )
 #define mpi_comm_dup FTN_NAME( MPI_COMM_DUP , mpi_comm_dup )
@@ -328,6 +330,21 @@ void mpi_gather(void *sendbuf, int *sendcount, int *sendtype,
    int *root, int *comm, int *ierr)
 {
   *ierr = MPI_Gather(sendbuf, *sendcount, *sendtype, recvbuf, *recvcount,
+                      *recvtype, *root, *comm);
+}
+
+void mpi_scatterv(void *sendbuf, int *sendcounts, int *displs, int *sendtype,
+   void *recvbuf, int *recvcount, int *recvtype, int *root, int *comm, int *ierr)
+{
+  *ierr = MPI_Scatterv(sendbuf, sendcounts, displs, *sendtype, recvbuf, *recvcount,
+                       *recvtype, *root, *comm);
+}
+
+void mpi_scatter(void *sendbuf, int *sendcount, int *sendtype,
+   void *recvbuf, int *recvcount, int *recvtype,
+   int *root, int *comm, int *ierr)
+{
+  *ierr = MPI_Scatter(sendbuf, *sendcount, *sendtype, recvbuf, *recvcount,
                       *recvtype, *root, *comm);
 }
 

@@ -1564,7 +1564,7 @@ int MPI_Gatherv(void *sendbuf, int sendcount, MPI_Datatype sendtype,
     MPI_Status status;
     CkDDT_DataType* dttype = ptr->getDDT()->getType(recvtype) ;
     int itemsize = dttype->getSize() ;
-  
+
     for(i=0;i<size;i++) {
       MPI_Recv(((char*)recvbuf)+(itemsize*displs[i]), recvcounts[i], recvtype,
                i, MPI_GATHER_TAG, comm, &status);
@@ -1575,7 +1575,7 @@ int MPI_Gatherv(void *sendbuf, int sendcount, MPI_Datatype sendtype,
 
 CDECL
 int MPI_Gather(void *sendbuf, int sendcount, MPI_Datatype sendtype,
-               void *recvbuf, int recvcount, MPI_Datatype recvtype, 
+               void *recvbuf, int recvcount, MPI_Datatype recvtype,
                int root, MPI_Comm comm)
 {
   AMPIAPI("MPI_Gather");
@@ -1588,12 +1588,60 @@ int MPI_Gather(void *sendbuf, int sendcount, MPI_Datatype sendtype,
     MPI_Status status;
     CkDDT_DataType* dttype = ptr->getDDT()->getType(recvtype) ;
     int itemsize = dttype->getSize(recvcount) ;
-  
+
     for(i=0;i<size;i++) {
       MPI_Recv(((char*)recvbuf)+(itemsize*i), recvcount, recvtype,
                i, MPI_GATHER_TAG, comm, &status);
     }
   }
+  return 0;
+}
+
+CDECL
+int MPI_Scatterv(void *sendbuf, int *sendcounts, int *displs, MPI_Datatype sendtype,
+                 void *recvbuf, int recvcount, MPI_Datatype recvtype,
+                 int root, MPI_Comm comm)
+{
+  AMPIAPI("MPI_Scatterv");
+  ampi *ptr = getAmpiInstance(comm);
+  int size = ptr->getSize();
+  int i;
+
+  if(ptr->getRank() == root) {
+    CkDDT_DataType* dttype = ptr->getDDT()->getType(sendtype) ;
+    int itemsize = dttype->getSize() ;
+    for(i=0;i<size;i++) {
+      MPI_Send(((char*)sendbuf)+(itemsize*displs[i]), sendcounts[i], sendtype,
+               i, MPI_SCATTER_TAG, comm);
+    }
+  }
+  MPI_Status status;
+  MPI_Recv(recvbuf, recvcount, recvtype, root, MPI_SCATTER_TAG, comm, &status);
+
+  return 0;
+}
+
+CDECL
+int MPI_Scatter(void *sendbuf, int sendcount, MPI_Datatype sendtype,
+                void *recvbuf, int recvcount, MPI_Datatype recvtype,
+                int root, MPI_Comm comm)
+{
+  AMPIAPI("MPI_Scatter");
+  ampi *ptr = getAmpiInstance(comm);
+  int size = ptr->getSize();
+  int i;
+
+  if(ptr->getRank()==root) {
+    CkDDT_DataType* dttype = ptr->getDDT()->getType(sendtype) ;
+    int itemsize = dttype->getSize(sendcount) ;
+    for(i=0;i<size;i++) {
+      MPI_Send(((char*)sendbuf)+(itemsize*i), sendcount, sendtype,
+               i, MPI_SCATTER_TAG, comm);
+    }
+  }
+  MPI_Status status;
+  MPI_Recv(recvbuf, recvcount, recvtype, root, MPI_SCATTER_TAG, comm, &status);
+
   return 0;
 }
 
