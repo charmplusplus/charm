@@ -23,15 +23,33 @@ class MessageHolder : public PUP::able {
     int npes;
     int *pelist;
     
-    MessageHolder() : PUP::able() 
+    MessageHolder() 
         {dest_proc = size = isDummy = 0; data = NULL;}    
 
-    MessageHolder(CkMigrateMessage *m) : PUP::able(m) {}
+    MessageHolder(CkMigrateMessage *m) {}
 
-    MessageHolder(char * msg, int dest_proc, int size);
-    ~MessageHolder();
+    inline MessageHolder(char * msg, int proc, int sz) {
+        data = msg;
+        dest_proc = proc;
+        size = sz;
+        
+        isDummy = 0;
+        
+        npes = 0;
+        pelist = 0;
 
-    char * getMessage();
+    }
+
+    inline ~MessageHolder() {
+        /*
+          if(pelist != NULL && npes > 0)
+          delete[] pelist;
+        */
+    }
+
+    inline char * getMessage() {
+        return data;
+    }
 
     virtual void pup(PUP::er &p);
     PUPable_decl(MessageHolder);

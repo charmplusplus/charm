@@ -30,31 +30,6 @@ struct AllToAllHdr{
     int nmsgs;
 };
 
-#define ALIGN8(x)       (int)((~7)&((x)+7))
-
-/* Reduce the no. of mallocs by allocating from
- * a free list */
-#define PTALLOC(ktmp) {\
-  if (PTFreeList) {\
-  	ktmp=PTFreeList;\
-	PTFreeList=ktmp->next;\
-  }\
-  else {\
-  	ktmp=(PTinfo *)CmiAlloc(sizeof(PTinfo));\
-	}\
-}
-
-#define PTFREE(ktmp) {\
-  ktmp->next=PTFreeList;\
-  PTFreeList=ktmp;\
-}
-
-#define REALLOC(ktmp, ksize) {\
-   PTinfo **junkptr=(PTinfo **)CmiAlloc(2*ksize*sizeof(void *));\
-   for (int ki=0; ki<ksize;ki++) junkptr[ki]=ktmp[ki];\
-   CmiFree(ktmp);\
-   ktmp=junkptr;\
-}
 
 /**************************************************************
  * Preallocated memory=P*MSGQLEN ptr + 2P ints + 1000 ptrs
@@ -113,39 +88,6 @@ void PeTable:: Purge()
   //combcount = 0;
 }
 
-void PeTable :: InsertMsgs(int npe, int *pelist, int size, void *msg)
-{
-  PTinfo *tmp;
-  PTALLOC(tmp);
-  tmp->refCount=0;
-  tmp->magic=0;
-  tmp->offset=0;
-  tmp->freelistindex=-1;
-  tmp->msgsize=size;
-  tmp->msg=msg;
-
-  for (int j=0;j<npe;j++) {
-    tmp->refCount++;
-    int index=pelist[j];
-    
-    ComlibPrintf("[%d] Inserting %d %d %d\n", CkMyPe(), msgnum[index], index, size);
-    
-    if (msgnum[index] >= MaxSize[index]) {
-        REALLOC(PeList[index], MaxSize[index]);
-        MaxSize[index] *= 2;
-    }
-    PeList[index][msgnum[index]]=tmp;
-    msgnum[index]++;
-  }
-}
-
-void PeTable :: InsertMsgs(int npe, int *pelist, int nmsgs, void **msglist)
-{
-  msgstruct **m=(msgstruct **)msglist;
-  for (int i=0;i<nmsgs;i++)
-      InsertMsgs(npe, pelist, m[i]->msgsize, m[i]->msg);
-}
-
 void PeTable :: ExtractAndDeliverLocalMsgs(int index)
 {
   int j;
@@ -169,40 +111,6 @@ void PeTable :: ExtractAndDeliverLocalMsgs(int index)
   msgnum[index]=j+1;
 
   return;
-}
-
-int PeTable :: TotalMsgSize(int npe, int *pelist, int *nm, int *nd)
-{
-    register int totsize=0;
-    magic++;
-    *nm=0;
-    *nd=0;        
-
-    for (int i=0;i<npe;i++) {
-        
-        int index = pelist[i];
-        
-        *nm += msgnum[index];
-
-        ComlibPrintf("%d: NUM MSGS %d, %d\n", CmiMyPe(), index, 
-                     msgnum[index]);
-
-        for (int j=0;j<msgnum[index];j++) {
-            if (PeList[index][j]->magic != magic) {
-
-                int tmp_size = PeList[index][j]->msgsize;
-                if(tmp_size % 8 != 0)
-                    tmp_size += 8 - tmp_size % 8;
-                
-                totsize += tmp_size;                
-                totsize += sizeof(int)+sizeof(int);
-                
-                PeList[index][j]->magic=magic;
-                (*nd)++;
-            }
-        }
-    }
-    return(totsize);
 }
 
 
@@ -297,8 +205,8 @@ char * PeTable ::ExtractAndPackAll(comID id, int ufield, int *length)
                 PACKMSG(&ref, sizeof(int));
                 PeList[index][j]->magic=magic;
                 PACKMSG(PeList[index][j]->msg, size);
-                if(msg_offset % 8 != 0)
-                    msg_offset += 8 - msg_offset%8;
+
+                msg_offset = ALIGN8(msg_offset);
             }
 
             //Free it when all the processors have gotten rid of it
@@ -343,8 +251,7 @@ char * PeTable ::ExtractAndPack(comID id, int ufield, int npe,
     int msg_offset = CmiReservedHeaderSize + sizeof(comID) 
         + (npe + 4 + nummsgs) * sizeof(int);  
 
-    if(msg_offset % 8 != 0)
-        msg_offset += 8 - msg_offset % 8;
+    msg_offset = ALIGN8(msg_offset);
     
     int headersize=msg_offset;
     
@@ -371,6 +278,7 @@ char * PeTable ::ExtractAndPack(comID id, int ufield, int npe,
     int npacked = 0;
     for (i=0;i<npe;i++) {
         int index=pelist[i];
+
         if (msgnum[index]<=0) {
             lesspe++;
             continue;
@@ -411,12 +319,9 @@ char * PeTable ::ExtractAndPack(comID id, int ufield, int npe,
  		PACKMSG(&nullptr, sizeof(int));
 
      		PACKMSG(tempmsg->msg, tempmsg->msgsize);
-                if(msg_offset % 8 != 0)
-                    msg_offset += 8 - msg_offset%8;
 
-                if(actual_msgsize % 8 != 0)                    
-                    actual_msgsize += 8 - actual_msgsize % 8;
-                
+                msg_offset = ALIGN8(msg_offset);
+                actual_msgsize = ALIGN8(actual_msgsize);                
 		actual_msgsize += 2*sizeof(int);
             }
             else {

@@ -25,32 +25,9 @@ void Strategy::pup(PUP::er &p){
     p | type;
 }
 
-
 //Message holder functions. Message holder is a wrapper around a
 //message. Has other useful data like destination processor list for a
 //multicast etc.
-
-MessageHolder::MessageHolder(char * msg, int proc, int sz) : PUP::able() {
-    data = msg;
-    dest_proc = proc;
-    size = sz;
-    
-    isDummy = 0;
-
-    npes = 0;
-    pelist = 0;
-}
-
-MessageHolder::~MessageHolder() {
-    /*
-      if(pelist != NULL && npes > 0)
-      delete[] pelist;
-    */
-}
-
-char * MessageHolder::getMessage(){
-    return data;
-}
 
 void MessageHolder::pup(PUP::er &p) {
     //PUP::able::pup(p);
