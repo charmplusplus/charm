@@ -63,7 +63,7 @@ inline int ClibGlobalArrayIndex::compare(const ClibGlobalArrayIndex &k2) const
 inline int ClibGlobalArrayIndex::staticCompare(const void *k1, const void *k2, 
                                                 size_t ){
     return ((const ClibGlobalArrayIndex *)k1)->
-                compare(*(const ClibGlobalArrayIndex *)k2);
+        compare(*(const ClibGlobalArrayIndex *)k2);
 }
 
 inline CkHashCode ClibGlobalArrayIndex::staticHash(const void *v,size_t){
@@ -190,6 +190,7 @@ class CharmStrategy : public Strategy {
  protected:
     int forwardOnMigration;
     ComlibLearner *learner;
+    CmiBool mflag;    //Does this strategy handle point-to-point or 
 
  public:
     ComlibGroupInfo ginfo;
@@ -203,26 +204,33 @@ class CharmStrategy : public Strategy {
         setType(GROUP_STRATEGY); 
         forwardOnMigration = 0;
         learner = NULL;
+        mflag = CmiFalse;
     }
 
     CharmStrategy(CkMigrateMessage *m) : Strategy(m){
         learner = NULL;
     }
 
+    //Set flag to optimize strategy for 
+    inline void setMulticast(){
+        mflag = CmiTrue;
+    }
+
+    //get the multicast flag
+    CmiBool getMulticast () {
+        return mflag;
+    }
+
     //Called for each message
     //Function inserts a Charm++ message
     virtual void insertMessage(CharmMessageHolder *msg) {
-      CkAbort("Bummer Should Not come here:CharmStrategy is abstract\n");
+        CkAbort("Bummer Should Not come here:CharmStrategy is abstract\n");
     }
 
     //Removed the virtual!
     //Charm strategies should not use Message Holder
     void insertMessage(MessageHolder *msg);
     
-    //Called after all chares and groups have finished depositing their 
-    //messages on that processor.
-    // DUPLICATED virtual void doneInserting() {}
-
     //Added a new call that is called after the strategy had be
     //created on every processor.
     //DOES NOT exist in Converse Strategies

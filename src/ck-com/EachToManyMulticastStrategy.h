@@ -2,7 +2,6 @@
 #define EACH_TO_MANY_MULTICAST_STRATEGY
 
 #include "ComlibManager.h"
-#include "ComlibSectionInfo.h"
 #include "routerstrategy.h"
 
 class EachToManyMulticastStrategy: public CharmStrategy {
@@ -11,20 +10,13 @@ class EachToManyMulticastStrategy: public CharmStrategy {
     int npes, *pelist; //Domain of the topology
     int MyPe;          //My id in that domain
 
-    CmiBool mflag;
-
     int ndestpes, *destpelist; //Destination processors
     int handlerId;
     
-    //Dynamically set by the application
-    CkHashtableT<ComlibSectionHashKey, void *> sec_ht;
-
     //Executes common code just after array and group constructors
     virtual void commonInit();
-    virtual void initSectionID(CkSectionID *sid);
 
     RouterStrategy *rstrat;
-    ComlibSectionInfo sinfo;
 
  public:
     //Group constructor

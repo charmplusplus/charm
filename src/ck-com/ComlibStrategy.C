@@ -23,6 +23,7 @@ void CharmStrategy::pup(PUP::er &p) {
     p | ginfo;
     p | ainfo;
     p | forwardOnMigration;
+    p | mflag;
 }
 
 CharmMessageHolder::CharmMessageHolder(char * msg, int proc) 
@@ -457,9 +458,10 @@ void ComlibArrayInfo::localMulticast(CkVec<CkArrayIndexMax>*vec,
     env->getsetArrayHops()=1;
     env->setUsed(0);
 
-    for(int count = 0; count < nelements; count ++){
-        CkArrayIndexMax idx = (*vec)[count];
-        
+    CkArrayIndexMax idx;
+    
+    for(int count = 0; count < nelements-1; count ++){
+        idx = (*vec)[count];
         //if(comm_debug) idx.print();
 
         env->getsetArrayIndex() = idx;
@@ -474,7 +476,17 @@ void ComlibArrayInfo::localMulticast(CkVec<CkArrayIndexMax>*vec,
 
     }
 
-    CmiFree(env);
+    idx = (*vec)[nelements-1];
+    //if(comm_debug) idx.print();
+    env->getsetArrayIndex() = idx;
+    
+    CkArray *a=(CkArray *)_localBranch(dest_aid);
+    if(_entryTable[ep]->noKeep) {
+        a->deliver((CkArrayMessage *)msg, CkDeliver_inline, CK_MSG_KEEP);
+        CmiFree(env);
+    }
+    else
+        a->deliver((CkArrayMessage *)msg, CkDeliver_queue);
 }
 
 /* Delivers a message to an array element, making sure that

@@ -71,6 +71,27 @@ inline CkHashCode ComlibSectionHashKey::staticHash(const void *v,size_t){
 /*************** End CkHashtable Functions *****************/
 
 
+
+class ComlibSectionHashObject {
+ public:
+    //My local indices
+    CkVec<CkArrayIndexMax> indices;
+    
+    //Other processors to send this message to
+    int npes;
+    int *pelist;
+    
+    ComlibSectionHashObject(): indices(0) {
+        npes = 0;
+        pelist = NULL;
+    }
+
+    ~ComlibSectionHashObject() {
+        delete pelist;
+    }
+};
+
+
 /*** Class that helps a communication library strategy manage array
      sections
 ***************/
@@ -101,23 +122,38 @@ class ComlibSectionInfo {
         MaxSectionID = 1;
     }
     
-    void initSectionID(CkSectionID *sid);
+    inline void initSectionID(CkSectionID *sid) {
+        sid->_cookie.sInfo.cInfo.id = MaxSectionID ++;            
+    }
     
     void processOldSectionMessage(CharmMessageHolder *cmsg);
 
     ComlibMulticastMsg *getNewMulticastMessage(CharmMessageHolder *cmsg);
 
-    void unpack(envelope *cb_env, CkVec<CkArrayIndexMax> *&destIndices, 
+    void unpack(envelope *cb_env, CkVec<CkArrayIndexMax> &destIndices, 
                 envelope *&env);
 
     void localMulticast(envelope *env);
 
+    void getRemotePelist(int nindices, CkArrayIndexMax *idxlist, 
+                         int &npes, int *&pelist);
+
+    void getPeList(int nindices, CkArrayIndexMax *idxlist, 
+                   int &npes, int *&pelist);
+
+    void getLocalIndices(int nindices, CkArrayIndexMax *idxlist, 
+                         CkVec<CkArrayIndexMax> &idx_vec);   
+        
     static inline int getSectionID(CkSectionID id) {
         return id._cookie.sInfo.cInfo.id;
     }
-    
-};
 
-PUPbytes(ComlibSectionInfo);
+    void pup(PUP::er &p) {
+        p | destArrayID;
+        p | MaxSectionID;
+        p | instanceID;
+        p | localDestIndexVec;
+    }
+};
 
 #endif

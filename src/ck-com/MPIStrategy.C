@@ -89,6 +89,8 @@ void MPIStrategy::doneInserting(){
 }
 
 void MPIStrategy::pup(PUP::er &p) {
+    CharmStrategy::pup(p);
+
     p | messageCount;
     p | npes; 
        

@@ -700,7 +700,7 @@ void MeshStreamingStrategy::pup (PUP::er &p)
   ComlibPrintf ("[%d] MeshStreamingStrategy::pup() invoked.\n", CkMyPe());
 
   // Call the superclass method -- easy.
-  Strategy::pup (p);
+  CharmStrategy::pup (p);
 
   // Pup the instance variables -- easy.
   p | num_pe;

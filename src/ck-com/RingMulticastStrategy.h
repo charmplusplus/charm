@@ -3,61 +3,34 @@
 
 #include "DirectMulticastStrategy.h"
 
-class RingMulticastHashObject{
- public:
-    CkVec<CkArrayIndexMax> indices;
-    int nextPE;
-};
-
 
 class RingMulticastStrategy: public DirectMulticastStrategy {
     
-    int nextPE;
+ protected:
     
-    void commonRingInit();
     int isEndOfRing(int next_pe, int src_pe);
-    RingMulticastHashObject *getHashObject(int pe, int id);
-    RingMulticastHashObject *createHashObject(int nelements, 
-                                              CkArrayIndexMax *elements);
-    void initSectionID(CkSectionID *sid);
-
- public:
     
-    //Group constructor
-    RingMulticastStrategy(int ndestpes, int *destpelist);
+    //Defining the two entries of the section multicast interface
+    virtual ComlibSectionHashObject *createObjectOnSrcPe(int nelements, 
+                                                         CkArrayIndexMax *elements);
+
+    virtual ComlibSectionHashObject *createObjectOnIntermediatePe
+        (int nelements, CkArrayIndexMax *elements, int src_pe);
+    
+ public:
     
     //Array constructor
     RingMulticastStrategy(CkArrayID dest_id);    
-    RingMulticastStrategy(CkArrayID src, CkArrayID dest);    
-    RingMulticastStrategy(CkMigrateMessage *m) {}
+    RingMulticastStrategy(CkMigrateMessage *m) : DirectMulticastStrategy(m){}
 
     //Destructor
-    ~RingMulticastStrategy() { 
-        
-        CkHashtableIterator *ht_iterator = sec_ht.iterator();
-        ht_iterator->seekStart();
-        while(ht_iterator->hasNext()){
-            void **data;
-            data = (void **)ht_iterator->next();        
-            RingMulticastHashObject *robj = 
-                (RingMulticastHashObject*)(* data);
-
-            *data = NULL;
-            if(robj)
-                delete robj;
-        }
-
-        sec_ht.empty();
-    }
-    
-    void insertMessage(CharmMessageHolder *msg);
-    void doneInserting();
-    void handleMulticastMessage(void *msg);
+    ~RingMulticastStrategy() {}
     
     void pup(PUP::er &p);    
     void beginProcessing(int nelements);
     
     PUPable_decl(RingMulticastStrategy);
 };
+
 #endif
 

@@ -1,5 +1,21 @@
+
+/********************************************************
+        Section multicast strategy suite. DirectMulticast and its
+        derivatives, multicast messages to a section of array elements
+        created on the fly. The section is invoked by calling a
+        section proxy. These strategies can also multicast to a subset
+        of processors for groups.
+
+        These strategies are non-bracketed. When the first request is
+        made a route is dynamically built on the section. The route
+        information is stored in
+
+ - Sameer Kumar
+
+**********************************************/
+
+
 #include "DirectMulticastStrategy.h"
-#include "AAMLearner.h"
 
 CkpvExtern(CkGroupID, cmgrID);
 
@@ -13,60 +29,24 @@ void *DMHandler(void *msg){
     nm_mgr = (DirectMulticastStrategy *) 
         CProxy_ComlibManager(CkpvAccess(cmgrID)).
         ckLocalBranch()->getStrategy(instid);
-
+    
     envelope *env = (envelope *) msg;
     RECORD_RECV_STATS(instid, env->getTotalsize(), env->getSrcPe());
     nm_mgr->handleMulticastMessage(msg);
     return NULL;
 }
 
-//Group Constructor
-DirectMulticastStrategy::DirectMulticastStrategy(int ndest, int *pelist)
-    : CharmStrategy() {
- 
-    setType(GROUP_STRATEGY);
-    
-    ndestpes = ndest;
-    destpelist = pelist;
-
-    commonInit();
-}
-
 DirectMulticastStrategy::DirectMulticastStrategy(CkArrayID aid)
     :  CharmStrategy() {
 
-    //ainfo.setSourceArray(aid);
     ainfo.setDestinationArray(aid);
     setType(ARRAY_STRATEGY);
-    ndestpes = 0;
-    destpelist = 0;
-    commonInit();
 }
 
-DirectMulticastStrategy::DirectMulticastStrategy(CkArrayID said, CkArrayID daid)
-    :  CharmStrategy() {
-
-    ainfo.setSourceArray(said);
-    ainfo.setDestinationArray(daid);
-    setType(ARRAY_STRATEGY);
-    ndestpes = 0;
-    destpelist = 0;
-    commonInit();
-}
-
-void DirectMulticastStrategy::commonInit(){
-
-    if(ndestpes == 0) {
-        ndestpes = CkNumPes();
-        destpelist = new int[CkNumPes()];
-        for(int count = 0; count < CkNumPes(); count ++)
-            destpelist[count] = count;        
-    }
-}
-
+//Destroy all old built routes
 DirectMulticastStrategy::~DirectMulticastStrategy() {
-    if(ndestpes > 0)
-        delete [] destpelist;
+    
+    ComlibPrintf("Calling Distructor\n");
 
     if(getLearner() != NULL)
         delete getLearner();
@@ -76,140 +56,154 @@ DirectMulticastStrategy::~DirectMulticastStrategy() {
     while(ht_iterator->hasNext()){
         void **data;
         data = (void **)ht_iterator->next();        
-        CkVec<CkArrayIndexMax> *a_vec = (CkVec<CkArrayIndexMax> *) (* data);
-        if(a_vec != NULL)
-            delete a_vec;
+        ComlibSectionHashObject *obj = (ComlibSectionHashObject *) (* data);
+        if(obj != NULL)
+            delete obj;
     }
 }
 
 void DirectMulticastStrategy::insertMessage(CharmMessageHolder *cmsg){
-    if(messageBuf == NULL) {
-	CkPrintf("ERROR MESSAGE BUF IS NULL\n");
-	return;
-    }
-
-    ComlibPrintf("[%d] Comlib Direct Multicast: insertMessage \n", 
+    
+    ComlibPrintf("[%d] Comlib Direct Section Multicast: insertMessage \n", 
                  CkMyPe());   
-   
-    if(cmsg->dest_proc == IS_BROADCAST) {
-        void *m = cmsg->getCharmMessage();
-        CkSectionInfo minfo;
-        minfo.type = COMLIB_MULTICAST_MESSAGE;
-        minfo.sInfo.cInfo.instId = getInstance();
-        minfo.sInfo.cInfo.status = COMLIB_MULTICAST_ALL;  
-        minfo.sInfo.cInfo.id = 0; 
-        minfo.pe = CkMyPe();
-        ((CkMcastBaseMsg *)m)->_cookie = minfo;       
-    }
 
     if(cmsg->dest_proc == IS_SECTION_MULTICAST && cmsg->sec_id != NULL) { 
-        int cur_sec_id = ComlibSectionInfo::getSectionID(*cmsg->sec_id);
-
+        CkSectionID *sid = cmsg->sec_id;
+        int cur_sec_id = ComlibSectionInfo::getSectionID(*sid);
+        
         if(cur_sec_id > 0) {        
-            sinfo.processOldSectionMessage(cmsg);
-        }
-        else {
-            CkSectionID *sid = cmsg->sec_id;
+            sinfo.processOldSectionMessage(cmsg);            
+            
+            ComlibSectionHashKey 
+                key(CkMyPe(), sid->_cookie.sInfo.cInfo.id);        
+            ComlibSectionHashObject *obj = sec_ht.get(key);
 
+            if(obj == NULL)
+                CkAbort("Cannot Find Section\n");
+
+            envelope *env = UsrToEnv(cmsg->getCharmMessage());
+            localMulticast(env, obj);
+            remoteMulticast(env, obj);
+        }
+        else {            
             //New sec id, so send it along with the message
             void *newmsg = sinfo.getNewMulticastMessage(cmsg);
-            CkFreeMsg(cmsg->getCharmMessage());
-            delete cmsg;
-            
-            sinfo.initSectionID(sid);
+            insertSectionID(sid);
 
-            cmsg = new CharmMessageHolder((char *)newmsg, 
-                                          IS_SECTION_MULTICAST); 
-            cmsg->sec_id = sid;
+            ComlibSectionHashKey 
+                key(CkMyPe(), sid->_cookie.sInfo.cInfo.id);        
+            
+            ComlibSectionHashObject *obj = sec_ht.get(key);
+
+            if(obj == NULL)
+                CkAbort("Cannot Find Section\n");
+            
+            char *msg = cmsg->getCharmMessage();
+            localMulticast(UsrToEnv(msg), obj);
+            CkFreeMsg(msg);
+            
+            remoteMulticast(UsrToEnv(newmsg), obj);
         }        
     }
-   
-    messageBuf->enq(cmsg);
-    if(!isBracketed())
-        doneInserting();
+    else 
+        CkAbort("Section multicast cannot be used without a section proxy");
+
+    delete cmsg;       
 }
 
-void DirectMulticastStrategy::doneInserting(){
-    ComlibPrintf("%d: DoneInserting \n", CkMyPe());
+void DirectMulticastStrategy::insertSectionID(CkSectionID *sid) {
     
-    if(messageBuf->length() == 0) {
-        return;
-    }
+    ComlibSectionHashKey 
+        key(CkMyPe(), sid->_cookie.sInfo.cInfo.id);
 
-    while(!messageBuf->isEmpty()) {
-	CharmMessageHolder *cmsg = messageBuf->deq();
-        char *msg = cmsg->getCharmMessage();
-        	
-        if(cmsg->dest_proc == IS_SECTION_MULTICAST || 
-           cmsg->dest_proc == IS_BROADCAST) {      
-
-            if(getType() == ARRAY_STRATEGY)
-                CmiSetHandler(UsrToEnv(msg), handlerId);
-            
-            int *cur_map = destpelist;
-            int cur_npes = ndestpes;
-            if(cmsg->sec_id != NULL && cmsg->sec_id->pelist != NULL) {
-                cur_map = cmsg->sec_id->pelist;
-                cur_npes = cmsg->sec_id->npes;
-            }
-            
-            //Collect Multicast Statistics
-            RECORD_SENDM_STATS(getInstance(), 
-                               ((envelope *)cmsg->getMessage())->getTotalsize(), 
-                               cur_map, cur_npes);
+    ComlibSectionHashObject *obj = NULL;    
+    obj = sec_ht.get(key);
+    
+    if(obj != NULL)
+        delete obj;
+    
+    obj = createObjectOnSrcPe(sid->_nElems, sid->_elems);
+    sec_ht.put(key) = obj;
+}
 
 
-            ComlibPrintf("[%d] Calling Direct Multicast %d %d %d\n", CkMyPe(),
-                         UsrToEnv(msg)->getTotalsize(), cur_npes, 
-                         cmsg->dest_proc);
+ComlibSectionHashObject *DirectMulticastStrategy::createObjectOnSrcPe
+(int nindices, CkArrayIndexMax *idxlist) {
 
-            /*
-              for(int i=0; i < cur_npes; i++)
-              CkPrintf("[%d] Sending to %d %d\n", CkMyPe(), 
-              cur_map[i], cur_npes);
-            */
+    ComlibSectionHashObject *obj = new ComlibSectionHashObject();
+    
+    sinfo.getRemotePelist(nindices, idxlist, obj->npes, obj->pelist);
+    sinfo.getLocalIndices(nindices, idxlist, obj->indices);
+    
+    return obj;
+}
 
-            CmiSyncListSendAndFree(cur_npes, cur_map, 
-                                   UsrToEnv(msg)->getTotalsize(), 
-                                   (char*)(UsrToEnv(msg)));            
-        }
-        else {
-            //CkPrintf("SHOULD NOT BE HERE\n");
-            CmiSyncSendAndFree(cmsg->dest_proc, 
-                               UsrToEnv(msg)->getTotalsize(), 
-                               (char *)UsrToEnv(msg));
-        }        
+
+ComlibSectionHashObject *DirectMulticastStrategy::
+createObjectOnIntermediatePe(int nindices, CkArrayIndexMax *idxlist, 
+                             int srcpe){
+
+    ComlibSectionHashObject *obj = new ComlibSectionHashObject();
         
-	delete cmsg; 
+    obj->pelist = 0;
+    obj->npes = 0;
+    
+    sinfo.getLocalIndices(nindices, idxlist, obj->indices);
+
+    return obj;
+}
+
+
+void DirectMulticastStrategy::doneInserting(){
+    //Do nothing! Its a bracketed strategy
+}
+
+//Send the multicast message the local array elements. The message is 
+//copied and sent if elements exist. 
+void DirectMulticastStrategy::localMulticast(envelope *env, 
+                                             ComlibSectionHashObject *obj) {
+    int nIndices = obj->indices.size();
+    
+    if(nIndices > 0) {
+        void *msg = EnvToUsr(env);
+        void *msg1 = msg;
+        
+        msg1 = CkCopyMsg(&msg);
+        ComlibArrayInfo::localMulticast(&(obj->indices), UsrToEnv(msg1));
+    }    
+}
+
+
+//Calls default multicast scheme to send the messages. It could 
+//also call a converse lower level strategy to do the muiticast.
+//For example pipelined multicast
+void DirectMulticastStrategy::remoteMulticast(envelope *env, 
+                                              ComlibSectionHashObject *obj) {
+    
+    int npes = obj->npes;
+    int *pelist = obj->pelist;
+    
+    if(npes == 0) {
+        CmiFree(env);
+        return;    
     }
+    
+    CmiSetHandler(env, handlerId);
+
+    //Collect Multicast Statistics
+    RECORD_SENDM_STATS(getInstance(), env->getTotalsize(), pelist, npes);
+    
+    //Sending a remote multicast
+    CmiSyncListSendAndFree(npes, pelist, env->getTotalsize(), (char*)env);
 }
 
 void DirectMulticastStrategy::pup(PUP::er &p){
 
     CharmStrategy::pup(p);
-
-    p | ndestpes;
-    if(p.isUnpacking() && ndestpes > 0)
-        destpelist = new int[ndestpes];
-    
-    p(destpelist, ndestpes);        
-    
-    if(p.isUnpacking()) {
-        CkArrayID src;
-        int nidx;
-        CkArrayIndexMax *idx_list;     
-        ainfo.getSourceArray(src, idx_list, nidx);
-        
-        if(!src.isZero()) {
-            AAMLearner *l = new AAMLearner();
-            setLearner(l);
-        }
-    }
 }
 
 void DirectMulticastStrategy::beginProcessing(int numElements){
     
-    messageBuf = new CkQ<CharmMessageHolder *>;    
     handlerId = CkRegisterHandler((CmiHandler)DMHandler);    
     
     CkArrayID dest;
@@ -218,46 +212,82 @@ void DirectMulticastStrategy::beginProcessing(int numElements){
 
     ainfo.getDestinationArray(dest, idx_list, nidx);
     sinfo = ComlibSectionInfo(dest, myInstanceID);
+
+    ComlibLearner *learner = new ComlibLearner();
+    setLearner(learner);
 }
 
 void DirectMulticastStrategy::handleMulticastMessage(void *msg){
     register envelope *env = (envelope *)msg;
-    
+
+    //Section multicast base message
     CkMcastBaseMsg *cbmsg = (CkMcastBaseMsg *)EnvToUsr(env);
-
-    int status = cbmsg->_cookie.sInfo.cInfo.status;
-    ComlibPrintf("[%d] In local multicast %d\n", CkMyPe(), status);
     
-    CkVec<CkArrayIndexMax> *dest_indices; 
-    if(status == COMLIB_MULTICAST_ALL) {        
-        ainfo.localBroadcast(env);
-    }   
-    else if(status == COMLIB_MULTICAST_NEW_SECTION){        
-        CkUnpackMessage(&env);
-        envelope *newenv;
-        sinfo.unpack(env, dest_indices, newenv);
-        ComlibArrayInfo::localMulticast(dest_indices, newenv);
-
-        CkVec<CkArrayIndexMax> *old_dest_indices;
-        ComlibSectionHashKey key(cbmsg->_cookie.pe, 
-                                 cbmsg->_cookie.sInfo.cInfo.id);
-
-        old_dest_indices = (CkVec<CkArrayIndexMax> *)sec_ht.get(key);
-        if(old_dest_indices != NULL)
-            delete old_dest_indices;
-        
-        sec_ht.put(key) = dest_indices;
-        CmiFree(env);                
-    }
+    int status = cbmsg->_cookie.sInfo.cInfo.status;
+    ComlibPrintf("[%d] In handleMulticastMessage %d\n", CkMyPe(), status);
+    
+    if(status == COMLIB_MULTICAST_NEW_SECTION)
+        handleNewMulticastMessage(env);
     else {
         //status == COMLIB_MULTICAST_OLD_SECTION, use the cached section id
         ComlibSectionHashKey key(cbmsg->_cookie.pe, 
                                  cbmsg->_cookie.sInfo.cInfo.id);    
-        dest_indices = (CkVec<CkArrayIndexMax> *)sec_ht.get(key);
         
-        if(dest_indices == NULL)
+        ComlibSectionHashObject *obj;
+        obj = sec_ht.get(key);
+        
+        if(obj == NULL)
             CkAbort("Destination indices is NULL\n");
         
-        ComlibArrayInfo::localMulticast(dest_indices, env);
+        localMulticast(env, obj);
+        remoteMulticast(env, obj);
     }
+}
+
+
+void DirectMulticastStrategy::handleNewMulticastMessage(envelope *env) {
+
+    ComlibPrintf("%d : In handleNewMulticastMessage\n", CkMyPe());
+
+    CkUnpackMessage(&env);    
+    
+    envelope *newenv;
+    CkVec<CkArrayIndexMax> idx_list;    
+    
+    sinfo.unpack(env, idx_list, newenv);
+
+    ComlibMulticastMsg *cbmsg = (ComlibMulticastMsg *)EnvToUsr(env);
+    ComlibSectionHashKey key(cbmsg->_cookie.pe, 
+                             cbmsg->_cookie.sInfo.cInfo.id);
+    
+    ComlibSectionHashObject *old_obj = NULL;
+    
+    old_obj = sec_ht.get(key);
+    if(old_obj != NULL)
+        delete old_obj;
+
+    
+    CkArrayIndexMax *idx_list_array = new CkArrayIndexMax[idx_list.size()];
+    for(int count = 0; count < idx_list.size(); count++)
+        idx_list_array[count] = idx_list[count];
+
+    ComlibSectionHashObject *new_obj = createObjectOnIntermediatePe
+        (idx_list.size(), idx_list_array, cbmsg->_cookie.pe);
+
+    delete idx_list_array;
+    
+    sec_ht.put(key) = new_obj;
+
+    if(new_obj->npes > 0) {
+        CkPackMessage(&env);
+        CmiSyncListSendAndFree(new_obj->npes, new_obj->pelist, 
+                               env->getTotalsize(), (char*)env);  
+    }
+    else        
+        CmiFree(env);                
+    
+    if(new_obj->indices.size() > 0)
+        ComlibArrayInfo::localMulticast(&(new_obj->indices), newenv);    
+    else        
+        CmiFree(newenv);                
 }

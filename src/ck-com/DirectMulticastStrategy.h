@@ -8,31 +8,43 @@ void *DMHandler(void *msg);
 
 class DirectMulticastStrategy: public CharmStrategy {
  protected:
-    CkQ <CharmMessageHolder*> *messageBuf;
-    
-    int ndestpes, *destpelist; //Destination processors
-    int handlerId;
-    
+    int handlerId;    
     ComlibSectionInfo sinfo;
     
     //Array section support
-    CkHashtableT<ComlibSectionHashKey, void *> sec_ht; 
+    CkHashtableT<ComlibSectionHashKey, ComlibSectionHashObject *> sec_ht; 
     
-    //Common Initializer for group and array constructors
-    //Every substrategy should implement its own
-    void commonInit();
+    //Add this section to the hash table locally
+    void insertSectionID(CkSectionID *sid);
+
+    //Called when a new section multicast is called by the user locally.
+    //The strategy should then create a topology for it and 
+    //return a hash object to store that topology
+    virtual ComlibSectionHashObject *createObjectOnSrcPe
+        (int nindices, CkArrayIndexMax *idx_list);
+   
+    //Similar to createHashObjectOnSrcPe, but that this call 
+    //is made on the destination or intermediate processor
+    virtual ComlibSectionHashObject *createObjectOnIntermediatePe
+        (int nindices, CkArrayIndexMax *idx_list, int srcpe);
+        
+    //Called to multicast the message to local array elements
+    void localMulticast(envelope *env, ComlibSectionHashObject *obj);
     
+    //Called to send to message out to the remote destinations
+    //This method can be overridden to call converse level strategies 
+    virtual void remoteMulticast(envelope *env, ComlibSectionHashObject *obj);
+
+    //Process a new message by extracting the array elements 
+    //from it and creating a new hash object by calling createObjectOnIntermediatePe();
+    void handleNewMulticastMessage(envelope *env);
+
  public:
-    
-    //Group constructor
-    DirectMulticastStrategy(int ndestpes = 0, int *destpelist = 0);    
+
     DirectMulticastStrategy(CkMigrateMessage *m): CharmStrategy(m){}
                 
     //Array constructor
     DirectMulticastStrategy(CkArrayID aid);
-
-    //Array constructor
-    DirectMulticastStrategy(CkArrayID said, CkArrayID dest);
         
     //Destuctor
     ~DirectMulticastStrategy();
@@ -41,8 +53,8 @@ class DirectMulticastStrategy: public CharmStrategy {
     virtual void doneInserting();
 
     //Called by the converse handler function
-    virtual void handleMulticastMessage(void *msg);
-    
+    void handleMulticastMessage(void *msg);    
+
     virtual void pup(PUP::er &p);    
     virtual void beginProcessing(int nelements);
     

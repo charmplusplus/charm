@@ -2,7 +2,7 @@
 #include "ComlibManager.h"
 
 #include "EachToManyMulticastStrategy.h"
-#include "RingMulticastStrategy.h"
+//#include "RingMulticastStrategy.h"
 
 AAMLearner::AAMLearner() {
    init();
@@ -21,7 +21,8 @@ Strategy *AAMLearner::optimizePattern(Strategy *strat,
     CharmStrategy *ostrat = NULL;
 
     double degree = 0, msgsize = 0, nmsgs = 0;
-    stats.getAverageStats(strat->getInstance(), msgsize, nmsgs, degree, npes);
+    stats.getAverageStats(strat->getInstance(), msgsize, nmsgs, 
+                          degree, npes);
 
     double dcost = computeDirect(npes, msgsize, degree);
     double mcost = computeMesh(npes, msgsize, degree);
@@ -51,15 +52,21 @@ Strategy *AAMLearner::optimizePattern(Strategy *strat,
         CkPrintf("Choosing router %d, %g, %g, %g\n", minstrat, 
                  mcost, hcost, dcost);
         
-        if(minstrat != USE_DIRECT) {
-            ostrat = new EachToManyMulticastStrategy
-                (minstrat, said, daid,
-                 nsrc, sidxlist, ndest,
-                 didxlist);
-        }
-        else {
-            ostrat = new RingMulticastStrategy(said, daid);
-        }
+        //if(minstrat != USE_DIRECT) {
+        ostrat = new EachToManyMulticastStrategy
+            (minstrat, said, daid,
+             nsrc, sidxlist, ndest,
+             didxlist);
+        
+        ostrat->setMulticast();
+
+        /*
+          }        
+          else {
+          ostrat = new RingMulticastStrategy(said, daid);
+          
+          }
+        */
         
         ostrat->setInstance(in_strat->getInstance());
     }
@@ -107,6 +114,7 @@ double AAMLearner::computeHypercube(double P, double m, double d) {
 
 //P = number of processors, m = msgsize, d = degree
 double AAMLearner::computeGrid(double P, double m, double d) {
+
     double cost = 0.0;
     cost = 3 * cubeRoot((double) P) * alpha;
     cost += d * m * (beta + gamma);

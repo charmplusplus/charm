@@ -19,12 +19,17 @@ class ComlibLearner {
     virtual void init() {}
     
     //Optimizes a specific strategy. Returns a new optimized strategy
-    virtual Strategy* optimizePattern(Strategy *strat,ComlibGlobalStats &sdata){return NULL;}
+    virtual Strategy* optimizePattern(Strategy *strat, 
+                                      ComlibGlobalStats &sdata){
+        return NULL;
+    }
     
     //Optimizes the communication pattern of a group of strategies
     //together
     virtual Strategy** optimizePattern(Strategy **strat, 
-                                           ComlibGlobalStats &sdata){return NULL;}
+                                       ComlibGlobalStats &sdata){
+        return NULL;
+    }
 };
 
 #endif
