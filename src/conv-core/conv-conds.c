@@ -177,7 +177,7 @@ typedef struct {
 CpvStaticDeclare(ccd_periodic_callbacks, pcb);
 CpvDeclare(int, _ccd_numchecks);
 
-#define MAXTIMERHEAPENTRIES       512
+#define MAXTIMERHEAPENTRIES       256
 
 typedef struct {
     double time;
@@ -258,10 +258,19 @@ static void ccd_heap_remove(void)
 static void ccd_heap_update(double ctime)
 {
   ccd_heap_elem *h = CpvAccess(ccd_heap);
-  while ((CpvAccess(ccd_heaplen) > 0) && (h[1].time < ctime)) {
-      (*(h[1].cb.fn))(h[1].cb.arg);
-      ccd_heap_remove();
+  ccd_heap_elem *e = h+MAXTIMERHEAPENTRIES;
+  int i,ne=0;
+  /* Pull out all expired heap entries */
+  while ((CpvAccess(ccd_heaplen)>0) && (h[1].time<ctime)) {
+    e[ne++]=h[1];
+    ccd_heap_remove();
   }
+  /* Now execute those heap entries.  This must be
+     separated from the removal phase because executing
+     an entry may change the heap. 
+  */
+  for (i=0;i<ne;i++)
+      (*(e[i].cb.fn))(e[i].cb.arg);
 }
 
 void CcdModuleInit(void)
@@ -275,7 +284,7 @@ void CcdModuleInit(void)
    CpvInitialize(int, _ccd_numchecks);
 
    CpvAccess(ccd_heap) = 
-     (ccd_heap_elem*) malloc(sizeof(ccd_heap_elem)*(MAXTIMERHEAPENTRIES + 1));
+     (ccd_heap_elem*) malloc(sizeof(ccd_heap_elem)*2*(MAXTIMERHEAPENTRIES + 1));
    _MEMCHECK(CpvAccess(ccd_heap));
    CpvAccess(ccd_heaplen) = 0;
    for(i=0;i<MAXNUMCONDS;i++) {
