@@ -710,39 +710,12 @@ Paragon (ASCI Red) is in progress.
 
 \section{Installing AMPI}
 
-\ampi{} is included in the source distribution of \charmpp{}. \charmpp{} is
-publicly distributed from the website \verb+http://charm.cs.uiuc.edu/+.  As of
-today, the stable binary distribution of \charmpp{} available from the above
-website is version 5.0. \ampi{} is a recent addition to \charmpp{}, and is NOT
-included in the binary version. Even the new release of \charmpp{} in the near
-future (version 5.4) is not expected to contain \ampi{} in its binary
-distribution. There are several reasons for this. The most important being that
-the threads implementation required for executing migratable threaded programs
-(such as \ampi{} programs) is not the default threads implementation in
-\charmpp{} (the default is non-migratable threads that are very lightweight.)
-In order to install and use \ampi{}, one thus needs to download the publicly
-available source code of \charmpp{} and install it oneself. The source
-distributed in the \verb+src.tar.gz+ file on the download site will suffice.
-However, since \ampi{} is under active development, and bug fixes,
-optimizations and feature additions are being done frequently, it is your best
-bet to use the source control system (CVS\footnote{See
-\texttt{http://www.cvshome.org/} for more information on CVS.}) used by the
-Parallel Programming Laboratory (PPL) to download the latest copy of \charmpp{}
-source code.
+\ampi{} is included in the source distribution of \charmpp{}. 
+To get the latest sources from PPL, visit:
+	http://charm.cs.uiuc.edu/
 
-To get the latest sources from PPL, issue the following commands from the shell
-prompt (assuming C shell or tcsh):
-
-\begin{alltt}
-> setenv CVSROOT :pserver:checkout@thrift.cs.uiuc.edu:/expand6/cvsroot
-> cvs login
-(press ENTER when prompted for password)
-> cvs co -P charm
-\end{alltt}
-
-This will connect to the source control server \verb+thrift.cs.uiuc.edu+ and
-will download the latest version of \charmpp{} and \ampi{} into a directory
-called \texttt{charm}. Now one has to build \charmpp{} and \ampi{} from source.
+and follow the download link.
+Now one has to build \charmpp{} and \ampi{} from source.
 
 The build script for \charmpp{} is called \texttt{build}. The syntax for this
 script is:
@@ -755,97 +728,22 @@ For building \ampi{} (which also includes building \charmpp{} and other
 libraries needed by \ampi{}), specify \verb+<target>+ to be \verb+AMPI+. And
 \verb+<opts>+ are command line options passed to the \verb+charmc+ compile
 script.  Common compile time options such as \texttt{-g, -O, -Ipath, -Lpath,
--llib} are accepted. In order to build \ampi{}, one needs to specify the
-following options:
+-llib} are accepted. 
 
+To build a debugging version of \ampi{}, use the option:
 \begin{alltt}
--O -DCMK_OPTIMIZE=1 -DCMK_THREADS_USE_ISOMALLOC=1
+-g
+\end{alltt}
+
+To build a production version of \ampi{}, use the options:
+\begin{alltt}
+-O -DCMK_OPTIMIZE=1
 \end{alltt}
 
 \verb+<version>+ depends on the machine, operating system, and the underlying
-communication library one wants to use for running \ampi{} programs. Your
-choice is determined by the following options.
+communication library one wants to use for running \ampi{} programs.
+See the charm/README file for details on picking the proper version.
 
-\begin{enumerate}
-
-\item The way a parallel program written in \ampi{} will communicate:
-
-\begin{itemize}
-
-\item ``net-'' \ampi{} communicates using the regular TCP/IP stack
-(UDP packets), which works everywhere but is fairly slow.  Use this
-option for networks of workstations, clusters, or single-machine 
-development and testing.
-
-\item ``mpi-'' Charm++ communicates using MPI calls.  Use this for
-machines with a good MPI implementation (such as the Origin 2000).
-
-\item ``exemplar'', ``ncube-2'', ``paragon-red'', ``sp3'', and ``t3e'' \ampi{} 
-communicates using direct calls to the machine's communication primitives.
-
-\item ``sim-'' and ``uth-'' are not actively maintained.  These are
-single-processor versions: ``uth-'' simulates processors as user-level
-threads; ``sim-'' switches between processors and counts communications.
-
-\end{itemize}
-
-\item  Your operating system and platform:
-
-\begin{itemize}
-\item ``linux''   Linux 
-\item ``win32''   MS Windows NT/98/2k (and MS Visual C++ compiler)
-\item ``cygwin''  MS Windows with Cygnus' Cygwin Unix layer
-\item ``irix''    SGI IRIX
-\item ``origin''  SGI Origin 2000 IRIX
-\item ``sol''     Solaris
-\item ``sun''     SunOS
-\item ``rs6k''    IBM R/S 6000 A/IX 
-\item ``sp''      IBM SP A/IX
-\item ``hp''      Hewlett-Packard HP-UX
-\item ``axp''     DEC Alpha DECUNIX
-\end{itemize}
-
-\item Your compiler and other options.  \ampi{} normally picks an
-appropriate compiler for the system, but you may select another
-compiler:
-
-\begin{itemize}
-\item ``-cc''      The OEM C/C++ compiler.  When given, this
-will override the choice of the GNU C/C++ compiler.
-\item ``-kcc''     Kuck \& Associates C++ compiler.
-\item ``-acc''     Uses HP's aCC instead of CC.
-\end{itemize}
-
-Some operating systems have other options, such as:
-
-\begin{itemize}
-\item ``-x86''     For Solaris, use PC hardware (instead of Sun).
-\item ``-axp''     For Linux, use Alpha hardware (instead of PC).
-\item ``-64''      For IRIX, use -64 instead of -32. 
-\end{itemize}
-
-You may also choose to enable direct SMP support with a ``-smp''
-version, which may result in more efficient communication in
-a cluster-of-SMPs.  A ``-smp'' version will communicate using
-shared memory within a machine; but message passing across machines.
-``-smp'' is currently only available with ``net-'' versions.
-Because of locking, ``-smp'' may slightly impact non-SMP performance.
-
-\end{enumerate}
-
-Your \ampi{} \verb+<version>+ is made by concatenating all three options, e.g.:
-
-\begin{itemize}
-\item ``net-linux''     \ampi{} for a network of Linux workstations, compiled
-using g++.
-\item ``net-linux-kcc'' \ampi{} for a network of Linux workstations, compiled
-using Kuck \& Associates C++ compiler.
-\item ``net-linux-smp'' \ampi{} for a network of Linux SMP workstations,
-compiled using g++.
-\item ``net-sol-cc''    \ampi{} for a network of Sun workstations, 
-compiled using Sun CC.
-\item ``mpi-origin''    \ampi{} for SGI Origin 2000, compiled using SGI CC.
-\end{itemize}
 
 \section{Running AMPI Programs}
 
@@ -859,104 +757,11 @@ every chunk) and the program arguments. A typical invocation of \ampi{} program
 \texttt{pgm} with \texttt{charmrun} is:
 
 \begin{alltt}
-> charmrun +p 16 pgm +vp 32 +stacksize 3276800
+> charmrun pgm +p16 +vp32 +stacksize 3276800
 \end{alltt}
 
 Here, the \ampi{} program \texttt{pgm} is run on 16 physical processors with
 32 chunks (which will be mapped 2 per processor initially), where each
-user-level thread associated with a chunk has the stack size of 3276800 bytes.
-
-Running \ampi{} program over a network of workstations requires an additional
-file that specifies the configuration of the network (such as which machines
-are on the network, which shell to use for executing jobs etc.) The
-\texttt{charmrun} command-line remains the same.  \texttt{charmrun} looks for
-thhis file with name \texttt{nodelist} in the directory from where the job is
-run. If it is not found in the current directory, then it tries to look for the
-file with name \texttt{.nodelist} in user's home directory. The format of this
-file allows you to define groups of machines, giving each group a name.  Each
-line of the nodes file is a command.  The most important command is:
-
-\begin{alltt}
-host <hostname> <qualifiers>
-\end{alltt}
-
-which specifies a host.  The other commands are qualifiers: they modify
-the properties of all hosts that follow them.  The qualifiers are:
-
-
-\begin{tabbing}
-{\tt group <groupname>}~~~\= - subsequent hosts are members of specified group\\
-{\tt login <login>  }     \> - subsequent hosts use the specified login\\
-{\tt shell <shell>  }     \> - subsequent hosts use the specified remote 
-shell\\
-{\tt setup <cmd>  }       \> - subsequent hosts should execute cmd\\
-{\tt home <dir> }         \> - subsequent hosts should find programs under dir\\
-{\tt cpus <n>}            \> - subsequent hosts should use N light-weight processes\\
-{\tt speed <s>}           \> - subsequent hosts have relative speed rating\\
-{\tt ext <extn>}          \> - subsequent hosts should append extn to the pgm name\\
-\end{tabbing}
-
-{\bf Note:}
-By default, charmrun uses a remote shell ``rsh'' to spawn node processes
-on the remote hosts. The {\tt shell} qualifier can be used to override
-it with say, ``ssh''. One can set the {\tt CONV\_RSH} environment variable
-or use charmrun option {\tt ++remote-shell} to override the default remote 
-shell for all hosts with unspecified {\tt shell} qualifier.
-
-All qualifiers accept ``*'' as an argument, this resets the modifier to
-its default value.  Note that currently, the passwd, cpus, and speed
-factors are ignored.  Inline qualifiers are also allowed:
-
-\begin{alltt}
-host copernicus.cse.uiuc.edu ++cpus 4 ++shell ssh
-\end{alltt}
-
-Except for ``group'', every other qualifier can be inlined, with the
-restriction that if the ``setup'' qualifier is inlined, it should be
-the last qualifier on the ``host'' or ``group'' statement line.
-
-Here is a simple nodes file:
-
-\begin{alltt}
-        group kale-sun ++cpus 1
-          host charm.cs.uiuc.edu ++shell ssh
-          host dp.cs.uiuc.edu
-          host grace.cs.uiuc.edu
-          host dagger.cs.uiuc.edu
-        group kale-sol
-          host beauty.cs.uiuc.edu ++cpus 2
-        group main
-          host localhost
-\end{alltt}
-
-This defines three groups of machines: group kale-sun, group kale-sol,
-and group main.  The ++nodegroup option is used to specify which group
-of machines to use.  Note that there is wraparound: if you specify
-more nodes than there are hosts in the group, it will reuse
-hosts. Thus,
-
-\begin{alltt}
-        charmrun pgm ++nodegroup kale-sun +p6
-\end{alltt}
-
-uses hosts (charm, dp, grace, dagger, charm, dp) respectively as
-nodes (0, 1, 2, 3, 4, 5).
-
-If you don't specify a ++nodegroup, the default is ++nodegroup main.
-Thus, if one specifies
-
-\begin{alltt}
-        charmrun pgm +p4
-\end{alltt}
-
-it will use ``localhost'' four times.  ``localhost'' is a Unix
-trick; it always find a name for whatever machine you're on.
-
-The user is required to set up remote login permissions on all nodes using the
-``.rhosts'' file in the home directory if ``rsh'' is used for remote login into
-the hosts. If ``ssh'' is used, the user will have to setup password-less login
-to remote hosts either using ``.shosts'' file, or using RSA authentication
-based on a key-pair and adding public keys to ``.ssh/authorized\_keys'' file.
-See ``ssh'' documentation for more information.
+user-level thread associated with a chunk has the stack size of 3,276,800 bytes.
 
 \end{document}
