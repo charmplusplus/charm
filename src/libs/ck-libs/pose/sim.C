@@ -23,7 +23,7 @@ sim::sim()
 #ifdef POSE_STATS_ON
   localStats = (localStat *)CkLocalBranch(theLocalStats);
 #endif
-  active = DOs = UNDOs = 0;
+  lastGVT = active = DOs = UNDOs = 0;
   srVector = (int *)malloc(CkNumPes() * sizeof(int));
   for (int i=0; i<CkNumPes(); i++) srVector[i] = 0;
   eq = new eventQueue();
@@ -99,7 +99,6 @@ void sim::Step(prioMsg *m)
 /// Commit events based on new GVT estimate
 void sim::Commit()
 {
-  static int lastGVT = 0;
   if (active < 0)  return; // object is migrating
 #ifdef POSE_STATS_ON
     int tstat = localStats->TimerRunning();
@@ -110,13 +109,16 @@ void sim::Commit()
 #ifdef POSE_STATS_ON
   localStats->SwitchTimer(MISC_TIMER);
 #endif
-  if (localPVT->done() && (POSE_endtime == -1)) { // simulation inactive
-    eq->CommitEvents(this, -1); // commit all events in queue
-    objID->terminus(); // call terminus on all posers
-  }
-  else { 
-    eq->CommitEvents(this, localPVT->getGVT()); // commit events up to GVT
-    if (localPVT->done()) objID->terminus(); // if sim done, term posers
+  if (localPVT->getGVT() > lastGVT) {
+    lastGVT = localPVT->getGVT();
+    if (localPVT->done() && (POSE_endtime == -1)) { // simulation inactive
+      eq->CommitEvents(this, -1); // commit all events in queue
+      objID->terminus(); // call terminus on all posers
+    }
+    else { 
+      eq->CommitEvents(this, lastGVT); // commit events up to GVT
+      if (localPVT->done()) objID->terminus(); // if sim done, term posers
+    }
   }
 #ifdef POSE_STATS_ON
   localStats->SwitchTimer(SIM_TIMER);

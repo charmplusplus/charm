@@ -169,6 +169,8 @@ class sim : public ArrayElement1D {
   int sync;
   /// Number of sends/recvs per PE
   int *srVector;    
+  /// Most recent GVT estimate
+  int lastGVT;
 #ifdef POSE_STATS_ON
   /// The local statistics collector
   localStat *localStats; 

@@ -57,8 +57,8 @@ void PVT::startPhase()
       }
       if ((optPVT < estGVT) && (optPVT != -1) && (estGVT != -1))
 	CkPrintf("optPVT=%d estGVT=%d\n", optPVT, estGVT);
-      CmiAssert((optPVT >= estGVT) || (optPVT == -1) || (estGVT == -1));
-      CmiAssert((conPVT >= estGVT) || (conPVT == -1) || (estGVT == -1));
+      CmiAssert(simdone || (optPVT >= estGVT) || (optPVT == -1) || (estGVT == -1));
+      CmiAssert(simdone || (conPVT >= estGVT) || (conPVT == -1) || (estGVT == -1));
     }
 
   // pack PVT data
@@ -142,7 +142,7 @@ void PVT::objRemove(int pvtIdx)
 /// Update send/recv table at timestamp
 void PVT::objUpdate(int timestamp, int sr)
 {
-  CmiAssert((timestamp >= estGVT) || (estGVT == -1));
+  CmiAssert(simdone || (timestamp >= estGVT) || (estGVT == -1));
   CmiAssert((sr == SEND) || (sr == RECV));
   SendsAndRecvs->Insert(timestamp, sr);
 }
@@ -152,7 +152,7 @@ void PVT::objUpdate(int pvtIdx, int safeTime, int timestamp, int sr)
 {
   int index = (pvtIdx-CkMyPe())/1000;
   //CmiAssert((timestamp >= estGVT) || (timestamp == -1) || (estGVT == -1));
-  CmiAssert((safeTime >= estGVT) || (safeTime == -1));
+  CmiAssert(simdone || (safeTime >= estGVT) || (safeTime == -1));
   // minimize the non-idle OVT
   if ((safeTime > -1) && 
       ((objs.objs[index].getOVT() > safeTime) || 
@@ -182,6 +182,7 @@ void PVT::DOPcalc()
   avg = sum/(double)qcount;
   CkPrintf("[%d] @ quanta %d worked %fs... AVG=%f\n", CkMyPe(), 
 	   estGVT, totalDoP, avg);
+  // localStats->SendStats();
 }
 
 /// Basic Constructor
@@ -302,7 +303,7 @@ void GVT::computeGVT(UpdateMsg *m)
     //optGVT, conGVT, lastGVT, earliestMsg, lastSR, POSE_endtime);
     CmiAssert(estGVT >= lastGVT); 
     //if (estGVT % 100 == 0)
-    CkPrintf("[%d] New GVT = %d\n", CkMyPe(), estGVT);
+    //CkPrintf("[%d] New GVT = %d\n", CkMyPe(), estGVT);
 
     // check for termination conditions
     int term = 0;

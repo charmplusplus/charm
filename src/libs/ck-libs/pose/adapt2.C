@@ -21,7 +21,7 @@ void adapt2::Step()
 #ifdef POSE_STATS_ON
     localStats->SwitchTimer(RB_TIMER);      
 #endif
-    timeLeash -= LEASH_FLEX;
+    timeLeash = RBevent->timestamp - lastGVT;
     if (timeLeash < MIN_LEASH) timeLeash = MIN_LEASH;
     Rollback(); 
 #ifdef POSE_STATS_ON
@@ -52,7 +52,10 @@ void adapt2::Step()
 #endif
   }
 #ifdef POSE_STATS_ON
-  if (iter > 0) localStats->Loop();
+  if (iter > 0) { 
+    localStats->Loop();
+    if (iter == MAX_ITERATIONS) CkPrintf("Touched MAX_ITERATIONS!\n");
+  }
 #endif  
   if (timeLeash < MAX_LEASH) timeLeash += LEASH_FLEX;
 }
