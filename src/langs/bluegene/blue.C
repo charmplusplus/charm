@@ -357,7 +357,7 @@ void addBgThreadMessage(char *msgPtr, int threadID)
   ckMsgQueue &que = tMYNODE->affinityQ[threadID];
   que.enq(msgPtr);
 #if SCHEDULE_WORK
-  /* don't awake, put into a priority queue sorted by recv time */
+  /* don't awake directly, put into a priority queue sorted by recv time */
 //  double nextT = CmiBgMsgRecvTime(que[0]);
   double nextT = CmiBgMsgRecvTime(msgPtr);
   CthThread tid = tTHREADTABLE[threadID];
@@ -374,10 +374,11 @@ void addBgThreadMessage(char *msgPtr, int threadID)
 /* add a message to a node's non-affinity queue */
 void addBgNodeMessage(char *msgPtr)
 {
+  int i;
   /* find a idle worker thread */
   /* FIXME:  flat search is bad if there is many work threads */
   int wID = tMYNODE->lastW;
-  for (int i=0; i<cva(numWth); i++) 
+  for (i=0; i<cva(numWth); i++) 
   {
     wID ++;
     if (wID == cva(numWth)) wID = 0;
@@ -401,6 +402,16 @@ void addBgNodeMessage(char *msgPtr)
   /* all worker threads are busy */   
   DEBUGF(("all work threads are busy.\n"));
   tNODEQ.enq(msgPtr);
+#if SCHEDULE_WORK
+  DEBUGF(("[N%d] activate all work threads on N%d.\n", tMYNODEID));
+  for (i=0; i<cva(numWth); i++) 
+  {
+      double nextT = CmiBgMsgRecvTime(msgPtr);
+      CthThread tid = tTHREADTABLE[i];
+      unsigned int prio = (unsigned int)(nextT*PRIO_FACTOR)+1;
+      CthAwakenPrio(tid, CQS_QUEUEING_IFIFO, sizeof(int), &prio);
+  }
+#endif
 }
 
 int checkReady()
@@ -453,7 +464,7 @@ void nodeBCastMsgHandlerFunc(char *msg)
       dupmsg = (char *)CmiAlloc(len);
       memcpy(dupmsg, msg, len);
     }
-    DEBUGF(("[%d] addBgNodeInbuffer to %d\n", BgMyNode(), i));
+    DEBUGF(("addBgNodeInbuffer to %d\n", i));
     addBgNodeInbuffer(dupmsg, i);
     count ++;
   }
@@ -1016,8 +1027,8 @@ void comm_thread(threadInfo *tinfo)
         addBgNodeMessage(msg);			/* non-affinity message */
       }
       else {
-        DEBUGF(("affinity msg, call addBgThreadMessage to %d\n", 
-			CmiBgMsgThreadID(msg)));
+        DEBUGF(("[N%d] affinity msg, call addBgThreadMessage to tID:%d\n", 
+			BgMyNode(), CmiBgMsgThreadID(msg)));
         addBgThreadMessage(msg, CmiBgMsgThreadID(msg));
       }
     }
@@ -1054,7 +1065,7 @@ void work_thread(threadInfo *tinfo)
 
 //  InitHandlerTable();
   if (workStartFunc) {
-    DEBUGF(("[%d] work thread %d start.\n", BgMyNode(), tMYID));
+    DEBUGF(("[N%d] work thread %d start.\n", BgMyNode(), tMYID));
     char **Cmi_argvcopy = CmiCopyArgs(arg_argv);
     // timing
     startVTimer();
@@ -1087,7 +1098,7 @@ void work_thread(threadInfo *tinfo)
     if ( msg == NULL ) {
 //      tCURRTIME += (CmiWallTimer()-tSTARTTIME);
       CthSuspend();
-      DEBUGF(("[%d] work thread %d awakened.\n", BgMyNode(), tMYID));
+      DEBUGF(("[N%d] work thread T%d awakened.\n", BgMyNode(), tMYID));
       continue;
     }
 #if BLUEGENE_TIMING
@@ -1103,7 +1114,7 @@ void work_thread(threadInfo *tinfo)
     }
 #endif
 #endif   /* TIMING */
-    DEBUGF(("[%d] work thread %d has a msg.\n", BgMyNode(), tMYID));
+    DEBUGF(("[N%d] work thread T%d has a msg.\n", BgMyNode(), tMYID));
 
 //if (tMYNODEID==0)
 //CmiPrintf("[%d] recvT: %e\n", tMYNODEID, CmiBgMsgRecvTime(msg));
@@ -1122,13 +1133,13 @@ void work_thread(threadInfo *tinfo)
 
     if (fromQ2 == 1) q2.deq();
 
-    DEBUGF(("[%d] work thread %d finish a msg.\n", BgMyNode(), tMYID));
+    DEBUGF(("[N%d] work thread T%d finish a msg.\n", BgMyNode(), tMYID));
 
     /* let other work thread do their jobs */
 #if SCHEDULE_WORK
-    DEBUGF(("[%d] work thread %d suspend when done.\n", BgMyNode(), tMYID));
+    DEBUGF(("[N%d] work thread T%d suspend when done - %d to go.\n", BgMyNode(), tMYID, q2.length()));
     CthSuspend();
-    DEBUGF(("[%d] work thread %d awakened here.\n", BgMyNode(), tMYID));
+    DEBUGF(("[N%d] work thread T%d awakened here.\n", BgMyNode(), tMYID));
 #else
     CthYield();
 #endif
