@@ -175,6 +175,12 @@ class LogPool {
       epTime[epidx] += time;
       epCount[epidx] ++;
     }
+    void clearEps() {
+      for(int i=0; i < epSize; i++) {
+	epTime[i]  = 0.;
+	epCount[i] = 0;
+      }
+    }
     void shrink(void) ;
     void addEventType(int eventType, double time);
 };

@@ -142,6 +142,12 @@ void traceClose(void)
   delete CpvAccess(_logPool);
 }
 
+extern "C"
+void traceClearEps(void)
+{
+  CpvAccess(_logPool)->clearEps();
+}
+
 extern "C" void Ck_Summary_MarkEvent(int eventType)
 {
    CpvAccess(_logPool)->addEventType(eventType, CmiTimer());

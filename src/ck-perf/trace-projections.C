@@ -109,6 +109,11 @@ int traceRegisterUserEvent(const char*)
 }
 
 extern "C"
+void traceClearEps(void)
+{
+}
+
+extern "C"
 void traceClose(void)
 {
   CpvAccess(_trace)->endComputation();

@@ -26,4 +26,5 @@ extern "C" void traceSuspend(void) {}
 extern "C" void traceAwaken(void) {}
 extern "C" void traceUserEvent(int) {}
 extern "C" int  traceRegisterUserEvent(const char*) {return 0;}
+extern "C" void traceClearEps(void) {}
 extern "C" void traceClose(void) {}
