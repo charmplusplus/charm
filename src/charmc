@@ -470,8 +470,8 @@ switch ($OBJECT)
             if ($status) goto failure
         endif
     else
-        if ( $?VERBOSE ) echo $CMK_LDRO $OBJECT $OBJECTFILES
-        $CMK_LDRO $OBJECT $OBJECTFILES
+        if ( $?VERBOSE ) echo $CMK_LDRO $OBJECT $OPTS_LDRO $OBJECTFILES
+        $CMK_LDRO $OBJECT $OPTS_LDRO $OBJECTFILES
         if ($status) goto failure
     endif
     goto copyobj
@@ -579,8 +579,8 @@ endif
 echo "linking $OBJECT with -language $LANGUAGE"
 
 set DELETE=(CHARMC-USR.TMP.o CHARMC-USR.TMP.nm $DELETE)
-if ($?VERBOSE) echo "$CMK_LDRO CHARMC-USR.TMP.o $OBJECTFILES -L$CHARMLIB $LIBRARIES"
-$CMK_LDRO CHARMC-USR.TMP.o $OBJECTFILES -L$CHARMLIB $LIBRARIES
+if ($?VERBOSE) echo $CMK_LDRO CHARMC-USR.TMP.o $OPTS_LDRO -L$CHARMLIB $OBJECTFILES $LIBRARIES
+$CMK_LDRO CHARMC-USR.TMP.o $OPTS_LDRO -L$CHARMLIB $OBJECTFILES $LIBRARIES
 if ($status) goto failure
 nm CHARMC-USR.TMP.o | csh -fc "$CMK_NM_FILTER" > CHARMC-USR.TMP.nm
 if ($status) goto failure
