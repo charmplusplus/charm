@@ -566,7 +566,7 @@ case "$LANGUAGE" in
 "c"|"C"|"c++"|"C++")
 	[ -z "$SEQUENTIAL" ] && Abort "Language $LANGUAGE is for sequential programs"
 	;;
-"charm"|"charm++"|"converse"|"converse++")
+"charm"|"charm++"|"converse"|"converse++"|"sdag")
 	[ -z "$SEQUENTIAL" ] || Abort "Language $LANGUAGE is for parallel programs"
 	;;
 "fem"|"femf"|"ampi"|"ampif"|"f90charm"|"bluegene"|"ckbluegene")
@@ -891,21 +891,16 @@ case "$LANGUAGE" in
 "ckbluegene")
         POST_LIBRARIES="$POST_LIBRARIES -lbluegene"
 	;;
+"sdag")
+        POST_LIBRARIES="$POST_LIBRARIES -lsdag"
+	;;
 esac
 
 LANG_LIBS="-L$CHARMLIB -I$CHARMINC $BAL_OBJ $OBJECTFILES $PRE_LIBRARIES"
 CORE_LIBS="-lconv-core -lconv-util -ltrace-$TRACEMODE"
 
 case "$LANGUAGE" in
-"charm"|"charm++")
-	Do $CMK_LDXX $OPTSL $OPTS_LDXX -o $OBJECT \
-		$LANG_LIBS -lck -lconv-cplus-y $CORE_LIBS -lm $CMK_LIBS $POST_LIBRARIES
-	;;
-"f90charm")
-	Do $CMK_LDXX $OPTSL $OPTS_LDXX -o $OBJECT \
-		$LANG_LIBS -lck -lconv-cplus-y $CORE_LIBS -lm $CMK_LIBS $POST_LIBRARIES
-	;;
-"ampi"|"ampif"|"fem"|"femf"|"ckbluegene")
+"charm"|"charm++"|"sdag"|"f90charm"|"ampi"|"ampif"|"fem"|"femf"|"ckbluegene")
 	Do $CMK_LDXX $OPTSL $OPTS_LDXX -o $OBJECT \
 		$LANG_LIBS -lck -lconv-cplus-y $CORE_LIBS -lm $CMK_LIBS $POST_LIBRARIES
 	;;
