@@ -867,6 +867,9 @@ int CmiIsomallocInRange(void *addr)
 
 void CmiIsomallocInit(char **argv)
 {
+#if CMK_NO_ISO_MALLOC
+  disable_isomalloc("isomalloc disabled by conv-mach");
+#else
   init_comm(argv);
   if (!init_map(argv)) {
     disable_isomalloc("mmap() does not work");
@@ -874,6 +877,7 @@ void CmiIsomallocInit(char **argv)
   else {
     init_ranges(argv);
   }
+#endif
 }
 
 /***************** BlockList interface *********
