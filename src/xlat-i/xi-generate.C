@@ -28,6 +28,12 @@ void Generate(char *interfacefile)
 
   ofstream top(topname), bot(botname) ;
 
+  if (top == 0 || bot == 0) {
+    cerr << "Cannot open " << topname 
+         << " or " << botname << " for writing !!" << endl;
+    exit(1);
+  }
+
   sprintf(definename, "CI_%s_TOP_H", thismodule->name);
   top << "#ifndef " << definename << "\n#define " << definename << endl;
   sprintf(definename, "CI_%s_BOT_H", thismodule->name);
