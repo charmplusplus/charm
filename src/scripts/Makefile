@@ -85,16 +85,16 @@ test-fem: FEM
 	cd ../pgms ; make test-fem  OPTS='$(OPTS)'
 
 ps-doc: basics
-	cd doc ; make ps
+	cd ../doc ; make ps
 
 pdf-doc: basics
-	cd doc ; make pdf
+	cd ../doc ; make pdf
 
 html-doc: basics
-	cd doc ; make html
+	cd ../doc ; make html
 
 doc: basics
-	cd doc ; make doc
+	cd ../doc ; make doc
 
 CHARMC=../bin/charmc $(CHARMOPTS) $(OPTS)
 
