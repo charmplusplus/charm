@@ -32,7 +32,9 @@ static int slotsize;
 /*Total number of slots per processor*/
 static int numslots=0;
 
-/*Start and end of isomalloc-managed addresses*/
+/*Start and end of isomalloc-managed addresses.
+If isomallocStart==NULL, isomalloc is disabled.
+*/
 static char *isomallocStart=NULL;
 static char *isomallocEnd=NULL;
 
@@ -226,35 +228,57 @@ print_slots(slotset *ss)
           ss->buf[i].nslots);
   }
 }
+#else
+#  define print_slots(ss) /*empty*/
 #endif
 
-#if ! CMK_HAS_MMAP
-/****************** Manipulate memory map (Win32 non-version) *****************/
-static int map_warned=0;
-
-static void *
-map_slots(int slot, int nslots)
-{
-	if (!map_warned) {
-		map_warned=1;
+/*This version of the allocate/deallocate calls are used if the 
+real mmap versions are disabled.*/
+static int disabled_map_warned=0;
+static void *disabled_map(CmiIsomallocBlock *bk,int nBytes) {
+	void *ret;
+	if (!disabled_map_warned) {
+		disabled_map_warned=1;
 		if (CmiMyPe()==0)
 			CmiError("isomalloc.c> Warning: since mmap() doesn't work,"
 			" you won't be able to migrate threads\n");
 	}
+	ret=malloc(nBytes);
+	*(void **)bk=ret; /*HACK: Stash the malloc'd pointer in the "block" object*/
+	return ret;
+}
+static void *disabled_unmap(CmiIsomallocBlock *bk) {
+	free(*(void **)bk);
+	*(void **)bk=NULL;
+}
 
-	return malloc(slotsize*nslots);
+/*Turn off isomalloc memory, for the given reason*/
+static void disable_isomalloc(const char *why)
+{
+    isomallocStart=NULL;
+#if CMK_THREADS_DEBUG
+    CmiPrintf("[%d] isomalloc.c> Disabling isomalloc because %s\n",CmiMyPe(),why);
+#endif
+}
+
+#if ! CMK_HAS_MMAP
+/****************** Manipulate memory map (Win32 non-version) *****************/
+static void *
+map_slots(int slot, int nslots)
+{
+	CmiAbort("isomalloc.c: map_slots should never be called here.");
 }
 
 static void
 unmap_slots(int slot, int nslots)
 {
-	/*emtpy-- there's no way to recover the actual address we 
-	  were allocated at.*/
+	CmiAbort("isomalloc.c: unmap_slots should never be called here.");	
 }
 
-static void 
+static int 
 init_map(char **argv)
 {
+  return 0; /*Isomalloc never works without mmap*/
 }
 #else /* CMK_HAS_MMAP */
 /****************** Manipulate memory map (UNIX version) *****************/
@@ -320,7 +344,7 @@ unmap_slots(int slot, int nslots)
 #endif
 }
 
-static void 
+static int 
 init_map(char **argv)
 {
 #if CMK_HAS_MMAP_ANON
@@ -329,14 +353,15 @@ init_map(char **argv)
   CpvInitialize(int, zerofd);  
   CpvAccess(zerofd) = open("/dev/zero", O_RDWR);
   if(CpvAccess(zerofd)<0)
-    CmiAbort("Cannot open /dev/zero. Aborting.\n");	
+    return 0; /* Cannot open /dev/zero or use MMAP_ANON, so can't mmap memory */
 #endif
+  return 1;
 }
 
 #endif /* UNIX memory map */
 
 
-static void map_bad(int s,int n)
+static void map_failed(int s,int n)
 {
   void *addr=slot2addr(s);
   CmiError("map failed to allocate %d bytes at %p.\n", slotsize*n, addr);
@@ -346,6 +371,7 @@ static void map_bad(int s,int n)
 
 
 /************ Address space voodoo: find free address range **********/
+
 CpvStaticDeclare(slotset *, myss); /*My managed slots*/
 
 /*This struct describes a range of virtual addresses*/
@@ -473,8 +499,6 @@ static memRegion_t find_free_region(memRegion_t *used,int nUsed,int atLeast)
     check_range(holeStart,holeEnd,&max);
   }
 
-  if (max.len==0)
-    CmiAbort("ISOMALLOC cannot locate any free virtual address space!");
   return max; 
 }
 
@@ -536,46 +560,55 @@ static void init_ranges(char **argv)
       p&=~(regions[i].len-1); /*Round down to a len-boundary (mask off low bits)*/
       regions[i].start=(char *)p;
 #if CMK_THREADS_DEBUG
-    CmiPrintf("[%d] Memory map: %p - %p  %s\n",CmiMyPe(),
+      CmiPrintf("[%d] Memory map: %p - %p  %s\n",CmiMyPe(),
 	      regions[i].start,regions[i].start+regions[i].len,regions[i].type);
 #endif
     }
     
     /*Find a large, unused region*/
     freeRegion=find_free_region(regions,nRegions,(512u)*meg);
-
-    /*If the unused region is very large, pad it on both ends for safety*/
-    if (freeRegion.len/gig>64u) {
-      freeRegion.start+=16u*gig;
-      freeRegion.len-=20u*gig;
+    
+    if (freeRegion.len==0) 
+    { /*No free address space-- disable isomalloc:*/
+      disable_isomalloc("no free virtual address space");
     }
+    else 
+    {
+      /*If the unused region is very large, pad it on both ends for safety*/
+      if (freeRegion.len/gig>64u) {
+        freeRegion.start+=16u*gig;
+        freeRegion.len-=20u*gig;
+      }
 
 #if CMK_THREADS_DEBUG
-    CmiPrintf("[%d] Largest unused region: %p - %p (%d megs)\n",CmiMyPe(),
+      CmiPrintf("[%d] Largest unused region: %p - %p (%d megs)\n",CmiMyPe(),
 	      freeRegion.start,freeRegion.start+freeRegion.len,
 	      freeRegion.len/meg);
 #endif
 
-    /*Allocate stacks in unused region*/
-    isomallocStart=freeRegion.start;
-    isomallocEnd=freeRegion.start+freeRegion.len;
+      /*Allocate stacks in unused region*/
+      isomallocStart=freeRegion.start;
+      isomallocEnd=freeRegion.start+freeRegion.len;
 
-    /*Make sure our largest slot number doesn't overflow an int:*/
-    if (freeRegion.len/slotsize>intMax)
-      freeRegion.len=intMax*slotsize;
+      /*Make sure our largest slot number doesn't overflow an int:*/
+      if (freeRegion.len/slotsize>intMax)
+        freeRegion.len=intMax*slotsize;
     
-    numslots=(freeRegion.len/slotsize)/CmiNumPes();
+      numslots=(freeRegion.len/slotsize)/CmiNumPes();
     
 #if CMK_THREADS_DEBUG
-    CmiPrintf("[%d] Can isomalloc up to %lu megs per pe\n",CmiMyPe(),
+      CmiPrintf("[%d] Can isomalloc up to %lu megs per pe\n",CmiMyPe(),
 	      ((memRange_t)numslots)*slotsize/meg);
 #endif
+    }
   }
   /*SMP Mode: wait here for rank 0 to initialize numslots so we can set up myss*/
   CmiNodeBarrier(); 
   
-  CpvInitialize(slotset *, myss);
-  CpvAccess(myss) = new_slotset(pe2slot(CmiMyPe()), numslots);
+  if (isomallocStart!=NULL) {
+    CpvInitialize(slotset *, myss);
+    CpvAccess(myss) = new_slotset(pe2slot(CmiMyPe()), numslots);
+  }
 }
 
 
@@ -668,6 +701,7 @@ void *CmiIsomalloc(int size,CmiIsomallocBlock *b)
 {
 	int s,n;
 	void *ret;
+	if (isomallocStart==NULL) return disabled_map(b,size);
 	n=length2slots(size);
 	/*Always satisfy mallocs with local slots:*/
 	s=get_slots(CpvAccess(myss),n);
@@ -680,13 +714,14 @@ void *CmiIsomalloc(int size,CmiIsomallocBlock *b)
 	b->slot=s;
 	b->nslots=n;
 	ret=map_slots(s,n);
-	if (!ret) map_bad(s,n);
+	if (!ret) map_failed(s,n);
 	return ret;
 }
 
 void *CmiIsomallocPup(pup_er p,CmiIsomallocBlock *b)
 {
 	int s,n;
+	if (isomallocStart==NULL) CmiAbort("isomalloc is disabled-- cannot use IsomallocPup");
 	pup_int(p,&b->slot);
 	pup_int(p,&b->nslots);
 	s=b->slot, n=b->nslots;
@@ -695,7 +730,7 @@ void *CmiIsomallocPup(pup_er p,CmiIsomallocBlock *b)
 		if (pup_isUserlevel(p))
 			/*Checkpoint: must grab old slots (even remote!)*/
 			all_slotOP(&grabOP,s,n);
-		if (!map_slots(s,n)) map_bad(s,n);
+		if (!map_slots(s,n)) map_failed(s,n);
 	}
 	
 	/*Pup the allocated data*/
@@ -711,16 +746,23 @@ void *CmiIsomallocPup(pup_er p,CmiIsomallocBlock *b)
 
 void CmiIsomallocFree(CmiIsomallocBlock *b)
 {
-	int s=b->slot, n=b->nslots;
-	if (n==0) return;
-	unmap_slots(s,n);
-	/*Mark used slots as free*/
-	all_slotOP(&freeOP,s,n);
+	if (isomallocStart==NULL) {
+		disabled_unmap(b);
+	}
+	else
+	{
+		int s=b->slot, n=b->nslots;
+		if (n==0) return;
+		unmap_slots(s,n);
+		/*Mark used slots as free*/
+		all_slotOP(&freeOP,s,n);
+	}
 }
 
 /*Return true if this address is in the region managed by isomalloc*/
 int CmiIsomallocInRange(void *addr)
 {
+	if (isomallocStart==NULL) return 1;
 	return pointer_ge((char *)addr,isomallocStart) && 
 	       pointer_lt((char*)addr,isomallocEnd);
 }
@@ -728,7 +770,11 @@ int CmiIsomallocInRange(void *addr)
 void CmiIsomallocInit(char **argv)
 {
   init_comm(argv);
-  init_map(argv);
-  init_ranges(argv);
+  if (!init_map(argv)) {
+    disable_isomalloc("mmap() does not work");
+  }
+  else {
+    init_ranges(argv);
+  }
 }
 
