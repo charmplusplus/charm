@@ -20,9 +20,7 @@ Orion Sky Lawlor, olawlor@acm.org, 1/3/2003
 #include "idxlc.h" /* C interface */
 #include "idxl_comm.h" /* basic comm. data structures */
 #include "idxl_layout.h" /* user-data description */
-
-class CProxy_IDXL_Chunk;
-class IDXL_DataMsg;
+#include "tcharmc.h" /* for TCHARM_Get/Set_global */
 
 void IDXL_Abort(const char *callingRoutine,const char *msg,int m0=0,int m1=0,int m2=0);
 
@@ -55,11 +53,12 @@ public: //<- Sun CC demands these types be public for use from an inner class
 		char *buf; /* Send/receive buffer */
 		int bufLen; /* bytes in send/receive buffer */
 		void allocate(int len) {
+			if (len==bufLen) return; /* right length already */
 			if (buf) {delete[] buf;buf=NULL;}
 			buf=new char[len];
 			bufLen=len;
 		}
-		msg_t() :buf(NULL) {}
+		msg_t() :buf(NULL),bufLen(0) {}
 		~msg_t() {if (buf) {delete[] buf;}}
 	};
 
@@ -75,8 +74,10 @@ private:
 	
 	int tag; MPI_Comm comm;
 	bool isPost; //If true, no more adds are allowed
+	bool isDone; //If true, ready to reset
 public:
 	IDXL_Comm(int tag,int context);
+	void reset(int tag,int context);
 	
 	// prepare to write this field to the message:
 	void send(const IDXL_Side *idx,const IDXL_Layout *dtype,const void *src);
@@ -93,9 +94,11 @@ public:
 	
 	/// Return true if we've sent off our messages
 	bool isPosted(void) { return isPost; }
+	bool isComplete(void) {return isDone;}
 };
 
-
+// This is our TCharm global ID:
+enum {IDXL_globalID=32};
 
 /**
  * IDXL_Chunk exists for just two reasons: 
@@ -124,6 +127,9 @@ public:
 	void pup(PUP::er &p);
 	~IDXL_Chunk();
 	
+  static IDXL_Chunk *getNULL(void) {
+  	return (IDXL_Chunk *)TCHARM_Get_global(IDXL_globalID);
+  }
   static IDXL_Chunk *get(const char *callingRoutine);
 	
 // Manipulate index lists (IDXL's):
@@ -131,9 +137,14 @@ public:
   IDXL_t addDynamic(void);
   /// Register this statically-allocated IDXL, possibly at this index
   IDXL_t addStatic(IDXL *idx,IDXL_t at=-1);
+  
+  /// Check this IDXL for validity
+  void check(IDXL_t u,const char *callingRoutine="") const;
+  
   /// Find this previously allocated IDXL:
   IDXL &lookup(IDXL_t u,const char *callingRoutine="");
   const IDXL &lookup(IDXL_t u,const char *callingRoutine="") const;
+  
   /// Done with this IDXL.  Deallocates if a dynamic IDXL.
   void destroy(IDXL_t t,const char *callingRoutine="");
   

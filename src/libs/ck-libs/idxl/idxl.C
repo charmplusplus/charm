@@ -11,7 +11,6 @@ CFD computation, etc.
 Orion Sky Lawlor, olawlor@acm.org, 1/7/2003
 */
 #include "idxl.h"
-#include "tcharmc.h" /* for TCHARM_Get/Set_global */
 #include "charm-api.h"
 
 void IDXL_Abort(const char *callingRoutine,const char *msg,int m0,int m1,int m2)
@@ -22,9 +21,6 @@ void IDXL_Abort(const char *callingRoutine,const char *msg,int m0,int m1,int m2)
 	CkAbort(msg2);
 }
 
-// This is our TCharm global ID:
-enum {IDXL_globalID=32};
-
 CDECL void pupIDXL_Chunk(pup_er cp) {
 	PUP::er &p=*(PUP::er *)cp;
 	IDXL_Chunk *c=(IDXL_Chunk *)TCHARM_Get_global(IDXL_globalID);
@@ -33,11 +29,15 @@ CDECL void pupIDXL_Chunk(pup_er cp) {
 		TCHARM_Set_global(IDXL_globalID,c,pupIDXL_Chunk);
 	}
 	c->pup(p);
-	if (p.isDeleting())
+	if (p.isDeleting()) {
 		delete c;
+		/// Zero out our global entry now that we're gone--
+		///   this prevents use-after-delete bugs from creeping in.
+		TCHARM_Set_global(IDXL_globalID,0,pupIDXL_Chunk);
+	}
 }
 IDXL_Chunk *IDXL_Chunk::get(const char *callingRoutine) {
-	IDXL_Chunk *c=(IDXL_Chunk *)TCHARM_Get_global(IDXL_globalID);
+	IDXL_Chunk *c=getNULL();
 	if(!c) IDXL_Abort(callingRoutine,"IDXL is not initialized");
 	return c;
 }
@@ -68,7 +68,7 @@ void IDXL_Chunk::pup(PUP::er &p) {
 	p|mpi_comm;
 
 	p|layouts;
-	if (currentComm) CkAbort("Cannot migrate with ongoing IDXL communication");
+	if (currentComm && !currentComm->isComplete()) CkAbort("Cannot migrate with ongoing IDXL communication");
 	
 	//Pack the dynamic IDXLs (static IDXLs must re-add themselves)
 	int lat, nDynamic=0;
@@ -112,6 +112,19 @@ IDXL_t IDXL_Chunk::addDynamic(void)
 }
 /// Register this statically-allocated IDXL at this existing index
 IDXL_t IDXL_Chunk::addStatic(IDXL *idx,IDXL_t at) {
+	if (at!=-1) 
+	{ //User provided a (previously returned) index-- try that first
+		if (at<FIRST_IDXL || at>=FIRST_IDXL+STATIC_IDXL)
+			CkAbort("Provided bad fixed address to IDXL_Chunk::add!");
+		int lat=at-FIRST_IDXL;
+		if (idxls[lat]==NULL)
+		{ /* that slot is free-- re-use the fixed address */
+			idxls[lat]=idx;
+			return at;
+		}
+		else /* idxls[lat]!=NULL, somebody's already there-- fall through */
+			at=-1;
+	}
 	if (at==-1) { //Pick the next free static index
 		for (int ret=0;ret<STATIC_IDXL;ret++)
 			if (idxls[ret]==NULL) {
@@ -120,31 +133,26 @@ IDXL_t IDXL_Chunk::addStatic(IDXL *idx,IDXL_t at) {
 			}
 		CkAbort("Ran out of room in (silly fixed-size static) IDXL table");
 	}
-	else /* at!=-1 */ { //User provided a (previously returned) index 
-		if (at<FIRST_IDXL || at>=FIRST_IDXL+STATIC_IDXL)
-			CkAbort("Provided bad fixed address to IDXL_Chunk::add!");
-		int lat=at-FIRST_IDXL;
-		if (idxls[lat]!=NULL)
-			CkAbort("Cannot re-use a fixed IDXL address!");
-		idxls[lat]=idx;
-		return at;
-	}
 	return -1; //<- for whining compilers
 }
-IDXL &IDXL_Chunk::lookup(IDXL_t at,const char *callingRoutine) {
+
+/// Check this IDXL for validity
+void IDXL_Chunk::check(IDXL_t at,const char *callingRoutine) const {
 	if (at<FIRST_IDXL || at>=FIRST_IDXL+LAST_IDXL)
 			IDXL_Abort(callingRoutine,"Invalid IDXL_t %d",at);
+}
+IDXL &IDXL_Chunk::lookup(IDXL_t at,const char *callingRoutine) {
+	check(at,callingRoutine);
 	int lat=at-FIRST_IDXL;
 	return *idxls[lat];
 }
 const IDXL &IDXL_Chunk::lookup(IDXL_t at,const char *callingRoutine) const {
-	if (at<FIRST_IDXL || at>=FIRST_IDXL+LAST_IDXL)
-			IDXL_Abort(callingRoutine,"Invalid IDXL_t %d",at);
+	check(at,callingRoutine);
 	int lat=at-FIRST_IDXL;
 	return *idxls[lat];
 }
 void IDXL_Chunk::destroy(IDXL_t at,const char *callingRoutine) {
-	lookup(at, callingRoutine); //For side-effect of checking t's validity
+	check(at,callingRoutine);
 	int lat=at-FIRST_IDXL;
 	if (lat>=STATIC_IDXL) /*dynamically allocated: destroy */
 		delete idxls[lat]; 
@@ -163,9 +171,12 @@ IDXL_Layout_List &IDXL_Layout_List::get(void)
 
 IDXL_Comm_t IDXL_Chunk::addComm(int tag,int context)
 {
-	if (currentComm) CkAbort("Cannot start two IDXL_Comms at once");
+	if (currentComm && !currentComm->isComplete()) CkAbort("Cannot start two IDXL_Comms at once");
 	if (context==0) context=mpi_comm;
-	currentComm=new IDXL_Comm(tag,context);
+	if (currentComm==0) 
+		currentComm=new IDXL_Comm(tag,context);
+	else 
+		currentComm->reset(tag,context);
 	return 27; //FIXME: there's only one outstanding comm!
 }
 IDXL_Comm *IDXL_Chunk::lookupComm(IDXL_Comm_t uc,const char *callingRoutine)
@@ -175,12 +186,17 @@ IDXL_Comm *IDXL_Chunk::lookupComm(IDXL_Comm_t uc,const char *callingRoutine)
 }
 
 IDXL_Comm::IDXL_Comm(int tag_,int context) {
+	reset(tag_,context);
+}
+void IDXL_Comm::reset(int tag_,int context) {
 	tag=tag_;
 	if (context==0) comm=MPI_COMM_WORLD;
 	else comm=(MPI_Comm)context; /* silly: not all MPI's use "int" for MPI_Comm */
 	nSto=nMsg=0;
 	isPost=false;
+	isDone=false;
 }
+
 
 // prepare to write this field to the message:
 void IDXL_Comm::send(const IDXL_Side *idx,const IDXL_Layout *dtype,const void *src)
@@ -249,13 +265,11 @@ void IDXL_Comm::wait(void) {
 			break;
 		};
 	}
+	isDone=true;
 }
 
 void IDXL_Chunk::waitComm(IDXL_Comm *comm)
 {
 	comm->wait();
-	
-	delete comm;
-	currentComm=NULL;
 }
 
