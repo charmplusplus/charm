@@ -92,5 +92,6 @@ class CkVec {
       block[pos] = elt;
     }
     void insertAtEnd(const T &elt) {insert(length(),elt);}
+    void push_back(const T &elt) {insert(length(),elt);}
 };
 #endif
