@@ -28,13 +28,14 @@ Orion Sky Lawlor, olawlor@acm.org, 7/22/2002
 
 /*************** Simple classes ***************/
 
-template <class A,class B> void operator|(PUP::er &p,std::pair<A,B> &v)
+template <class A,class B> 
+inline void operator|(PUP::er &p,std::pair<A,B> &v)
 {
   p|v.first;
   p|v.second;
 }
 template <class charType> 
-void operator|(PUP::er &p,std::basic_string<charType> &v)
+inline void operator|(PUP::er &p,std::basic_string<charType> &v)
 {
   int nChar=v.length();
   p|nChar;
@@ -54,7 +55,7 @@ void operator|(PUP::er &p,std::basic_string<charType> &v)
 
 //Impl. util: pup the length of a container
 template <class container>
-int PUP_stl_container_size(PUP::er &p,container &c) {
+inline int PUP_stl_container_size(PUP::er &p,container &c) {
   int nElem=c.size();
   p|nElem;
   return nElem; 
@@ -62,7 +63,7 @@ int PUP_stl_container_size(PUP::er &p,container &c) {
 
 //Impl. util: pup each current item of a container (no allocation)
 template <class container>
-void PUP_stl_container_items(PUP::er &p,container &c) {
+inline void PUP_stl_container_items(PUP::er &p,container &c) {
   for (typename container::iterator it=c.begin();
        it!=c.end();
        ++it)
@@ -70,7 +71,7 @@ void PUP_stl_container_items(PUP::er &p,container &c) {
 }
 
 template <class container,class dtype>
-void PUP_stl_container(PUP::er &p,container &c) {
+inline void PUP_stl_container(PUP::er &p,container &c) {
   int nElem=PUP_stl_container_size(p,c);
   if (p.isUnpacking()) 
   { //Unpacking: Extract each element and push_back:
@@ -85,7 +86,7 @@ void PUP_stl_container(PUP::er &p,container &c) {
 //Map objects don't have a "push_back", while vector and list
 //  don't have an "insert", so PUP_stl_map isn't PUP_stl_container
 template <class container,class dtype>
-void PUP_stl_map(PUP::er &p,container &c) {
+inline void PUP_stl_map(PUP::er &p,container &c) {
   int nElem=PUP_stl_container_size(p,c);
   if (p.isUnpacking()) 
   { //Unpacking: Extract each element and insert:
@@ -98,16 +99,18 @@ void PUP_stl_map(PUP::er &p,container &c) {
   else PUP_stl_container_items(p,c);
 }
 
-template <class T> void operator|(PUP::er &p,std::vector<T> &v)
+template <class T> 
+inline void operator|(PUP::er &p,std::vector<T> &v)
   { PUP_stl_container<std::vector<T>,T>(p,v); }
-template <class T> void operator|(PUP::er &p,std::list<T> &v)
+template <class T> 
+inline void operator|(PUP::er &p,std::list<T> &v)
   { PUP_stl_container<std::list<T>,T>(p,v); }
 
 template <class V,class T,class Cmp> 
-void operator|(PUP::er &p,std::map<V,T,Cmp> &m)
+inline void operator|(PUP::er &p,std::map<V,T,Cmp> &m)
   { PUP_stl_map<std::map<V,T,Cmp>,std::pair<const V,T> >(p,m); }
 template <class V,class T,class Cmp> 
-void operator|(PUP::er &p,std::multimap<V,T,Cmp> &m)
+inline void operator|(PUP::er &p,std::multimap<V,T,Cmp> &m)
   { PUP_stl_map<std::multimap<V,T,Cmp>,std::pair<const V,T> >(p,m); }
 
 
