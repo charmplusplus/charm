@@ -580,6 +580,9 @@ static void open_tcp_sockets()
     ok = skt_recvN(skt, &pe, sizeof(int));
     if (ok<0) KillEveryoneCode(98246556);
     nodes[pe].sock = skt;
+#if FRAGMENTATION
+    skt_setSockBuf(skt, PACKET_MAX);
+#endif
 #if 0
 #if !defined(_WIN32) || defined(__CYGWIN__)
     if ((val = fcntl(skt, F_GETFL, 0)) < 0) KillEveryoneCode(98246557);
@@ -597,6 +600,9 @@ static void open_tcp_sockets()
     ok = skt_sendN(skt, &mype, sizeof(int));
     if (ok<0) KillEveryoneCode(98246556);
     nodes[pe].sock = skt;
+#if FRAGMENTATION
+    skt_setSockBuf(skt, PACKET_MAX);
+#endif
 #if 0
 #if !defined(_WIN32) || defined(__CYGWIN__)
     if ((val = fcntl(skt, F_GETFL, 0)) < 0) KillEveryoneCode(98246557);
