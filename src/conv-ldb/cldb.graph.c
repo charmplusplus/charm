@@ -85,7 +85,7 @@ void CldBalance()
 
   int len, queueing, priobits, totalUnderAvg=0, numUnderAvg=0;
   unsigned int *prioptr;
-  CldInfoFn ifn;
+  CldInfoFn ifn; CldPackFn pfn;
 
   avgload = CldAvgNeighborLoad();
   overload = CldCountTokens() - avgload;
@@ -118,7 +118,7 @@ void CldBalance()
                 {
                   numSent++;
                   ifn = (CldInfoFn)CmiHandlerToFunction(CmiGetInfo(msgs[j]));
-                  ifn(msgs[j], &len, &queueing, &priobits, &prioptr);
+                  ifn(msgs[j], &pfn, &len, &queueing, &priobits, &prioptr);
                   msgSizes[j] = len;
                   CldSwitchHandler(msgs[j], CpvAccess(CldBalanceHandlerIndex));
                 }
@@ -153,7 +153,7 @@ void CldBalance()
 	    {
 	      CldGetToken(&msgs[j]);
 	      ifn = (CldInfoFn)CmiHandlerToFunction(CmiGetInfo(msgs[j]));
-	      ifn(msgs[j], &len, &queueing, &priobits, &prioptr);
+	      ifn(msgs[j], &pfn, &len, &queueing, &priobits, &prioptr);
 	      msgSizes[j] = len;
 	      CldSwitchHandler(msgs[j], CpvAccess(CldBalanceHandlerIndex));
 	    }
@@ -214,40 +214,41 @@ void CldGraphModuleInit()
 
 void CldHandler(void *msg)
 {
-  CldInfoFn ifn;
+  CldInfoFn ifn; CldPackFn pfn;
   int len, queueing, priobits; unsigned int *prioptr;
   
   CmiGrabBuffer((void **)&msg);
   CldRestoreHandler(msg);
   ifn = (CldInfoFn)CmiHandlerToFunction(CmiGetInfo(msg));
-  ifn(msg, &len, &queueing, &priobits, &prioptr);
+  ifn(msg, &pfn, &len, &queueing, &priobits, &prioptr);
   CsdEnqueueGeneral(msg, queueing, priobits, prioptr);
 }
 
-void CldEnqueue(int pe, void *msg, int infofn, int packfn)
+void CldEnqueue(int pe, void *msg, int infofn)
 {
   int len, queueing, priobits; unsigned int *prioptr;
   CldInfoFn ifn = (CldInfoFn)CmiHandlerToFunction(infofn);
-  CldPackFn pfn = (CldPackFn)CmiHandlerToFunction(packfn);
+  CldPackFn pfn;
 
   if (CmiGetHandler(msg) >= CpvAccess(CmiHandlerMax)) *((int*)0)=0;
 
   if (pe == CLD_ANYWHERE)
     {
-      ifn(msg, &len, &queueing, &priobits, &prioptr);
+      ifn(msg, &pfn, &len, &queueing, &priobits, &prioptr);
       CmiSetInfo(msg,infofn);
       CldPutToken(msg); 
     } 
   else if (pe == CmiMyPe())
     {
-      ifn(msg, &len, &queueing, &priobits, &prioptr);
+      ifn(msg, &pfn, &len, &queueing, &priobits, &prioptr);
       CmiSetInfo(msg,infofn);
       CsdEnqueueGeneral(msg, queueing, priobits, prioptr);
     }
   else
     {
+      ifn(msg, &pfn, &len, &queueing, &priobits, &prioptr);
       pfn(&msg);
-      ifn(msg, &len, &queueing, &priobits, &prioptr);
+      ifn(msg, &pfn, &len, &queueing, &priobits, &prioptr);
       CldSwitchHandler(msg, CpvAccess(CldHandlerIndex));
       CmiSetInfo(msg,infofn);
       if (pe==CLD_BROADCAST) 
