@@ -33,13 +33,21 @@ OVERRIDE_CXX=""
 OVERRIDE_F90=""
 OVERRIDE_LD=""
 OVERRIDE_LDXX=""
+#Generic options, passed to everything
+OPTS=""
+#Compiler-only options
+OPTSC=""
+#Linker-only options
+OPTSL=""
+#Specific options
 OPTS_CPP=""
 OPTS_LDRO="" 
 OPTS_CC=""
 OPTS_CXX="" 
 OPTS_F90=""
 OPTS_LD=""  
-OPTS_LDXX=""  
+OPTS_LDXX=""
+
 OBJECT=""
 POST_LANGUAGE=""
 POST_LIBRARIES=""    
@@ -50,8 +58,7 @@ FILES=""
 OBJECTFILES=""  
 DELETE=""    
 MAINOBJ=""   
-GENCPM=""     
-DEBUG_MODE=""
+GENCPM=""
 OPTIMIZE_MODE=""
 USE_RELIABLE_CC=""
 USE_FASTEST_CC=""
@@ -335,57 +342,32 @@ do
 		shift
 		;;
 
-	-D*)
-		OPTS_CPP="$OPTS_CPP $arg"
-		OPTS_CC="$OPTS_CC  $arg"
-		OPTS_CXX="$OPTS_CXX $arg"
-		OPTS_F90="$OPTS_F90 $arg"
-		;;
-
-	-I*)
-		OPTS_CPP="$OPTS_CPP $arg"
-		OPTS_CC="$OPTS_CC  $arg"
-		OPTS_CXX="$OPTS_CXX $arg"
-		OPTS_F90="$OPTS_F90 $arg"
+	-D*|-I*)
+		OPTSC="$OPTSC $arg"
 		;;
 
 	-LANG*)
 		echo "passing unrecognized option $arg to all compilers and linkers"
-		OPTS_CPP="$OPTS_CPP  $arg"
-		OPTS_CC="$OPTS_CC   $arg"
-		OPTS_CXX="$OPTS_CXX  $arg"
-		OPTS_F90="$OPTS_F90  $arg"
+		OPTSC="$OPTSC  $arg"
 		;;
 	-L*)
-		OPTS_LDRO="$OPTS_LDRO $arg"
-		OPTS_LD="$OPTS_LD   $arg"
-		OPTS_LDXX="$OPTS_LDXX $arg"
+		OPTSL="$OPTSL $arg"
 		;;
 
-	"-g")
-		DEBUG_MODE=true
+	"-pg"|"-g")
+		OPTS="$OPTS $arg"
 		;;
 
 	"-O")
 		OPTIMIZE_MODE=true
 		;;
 
+	-O*)
+		OPTS="$OPTS $arg"
+		;;
+
 	"-NO")
 		OPTIMIZE_MODE=false
-		;;
-
-	"-pg")
-		OPTS_CC="$OPTS_CC $arg"
-		OPTS_CXX="$OPTS_CXX $arg"
-		OPTS_F90="$OPTS_F90 $arg"
-		OPTS_LD="$OPTS_LD $arg"
-		OPTS_LDXX="$OPTS_LDXX $arg"
-		;;
-
-	-O*)
-		OPTS_CC="$OPTS_CC $arg"
-		OPTS_CXX="$OPTS_CXX $arg"
-		OPTS_F90="$OPTS_F90 $arg"
 		;;
 
 	-l*)
@@ -398,8 +380,7 @@ do
 		;;
 
 	-s)
-		OPTS_LD="$OPTS_LD   $arg"
-		OPTS_LDXX="$OPTS_LDXX $arg"
+		OPTSL="$OPTSL   $arg"
 		;;
 
         -h|--help)
@@ -407,13 +388,7 @@ do
 		;;
 	-*|+*)
 		echo "passing unrecognized option $arg to all compilers and linkers"
-		OPTS_CPP="$OPTS_CPP  $arg"
-		OPTS_CC="$OPTS_CC   $arg"
-		OPTS_CXX="$OPTS_CXX  $arg"
-		OPTS_F90="$OPTS_F90  $arg"
-		OPTS_LD="$OPTS_LD   $arg"
-		OPTS_LDXX="$OPTS_LDXX $arg"
-		OPTS_LDRO="$OPTS_LDRO $arg"
+		OPTS="$OPTS  $arg"
 		;;
 	*.*)
 		[ -n "$VERBOSE" ] && echo "Adding file $arg..."
@@ -576,15 +551,7 @@ if [ -n "$OVERRIDE_LDXX" ]
 then
     CMK_LDXX="$OVERRIDE_LDXX $CMK_LDXX"
 fi
-Debug "set 3"
-if [ -n "$DEBUG_MODE" ]
-then
-    OPTS_CC="$CMK_C_DEBUG $OPTS_CC"
-    OPTS_CXX="$CMK_CXX_DEBUG $OPTS_CXX"
-    OPTS_F90="$CMK_F90_DEBUG $OPTS_F90"
-    OPTS_LD="$CMK_C_DEBUG $OPTS_LD"
-    OPTS_LDXX="$CMK_CXX_DEBUG $OPTS_LDXX"
-fi
+
 Debug "set 4"
 if [ -n "$OPTIMIZE_MODE" ]
 then
@@ -595,6 +562,9 @@ then
     OPTS_LDXX="$CMK_CXX_OPTIMIZE $OPTS_LDXX"
 fi
 
+#Add generic options to the compiler- and linker-options
+OPTSC="$OPTS $OPTSC"
+OPTSL="$OPTS $OPTSL"
 
 # There's really no analog for this in the Bourne shell: 
 #  -------- C Shell ------> onintr failure
@@ -699,7 +669,7 @@ do
 	DoNoErrCheck $RM $BASE.cpm.h $TMP.c
 	Do touch $BASE.cpm.h
 	Do $LN -s $FILE $TMP.c
-	Do $CMK_CPP_C $OPTS_CPP -I$CHARMINC $TMP.c > $TMP.i
+	Do $CMK_CPP_C $OPTSC $OPTS_CPP -I$CHARMINC $TMP.c > $TMP.i
 	Do $CHARMBIN/conv-cpm $TMP.i $BASE.cpm.h
 done
 
@@ -740,19 +710,19 @@ do
 		Do $CHARMBIN/sdagx $BASE.sdag
 		;;
 	*.c|*.s)
-		Do $CMK_CC $OPTS_CC -I$CHARMINC -c $FILE -o $BASE.o
+		Do $CMK_CC $OPTSC $OPTS_CC -I$CHARMINC -c $FILE -o $BASE.o
 		NU_OBJ=$BASE.o
 		;;
 	*.C|*.cc|*.cxx|*.cpp|*.c++)
-		Do $CMK_CXX $OPTS_CXX -I$CHARMINC -c $FILE -o $BASE.o
+		Do $CMK_CXX $OPTSC $OPTS_CXX -I$CHARMINC -c $FILE -o $BASE.o
 		NU_OBJ=$BASE.o
 		;;
 	*.f|*.F)
-		Do $CMK_CF90 $OPTS_F90 -freeform -I$CHARMINC -c $FILE -o $BASE.o
+		Do $CMK_CF90 $OPTSC $OPTS_F90 -freeform -I$CHARMINC -c $FILE -o $BASE.o
 		NU_OBJ=$BASE.o
 		;;
 	*.f90|*.F90)
-		Do $CMK_CF90 $OPTS_F90 -I$CHARMINC -c $FILE -o $BASE.o
+		Do $CMK_CF90 $OPTSC $OPTS_F90 -I$CHARMINC -c $FILE -o $BASE.o
 		;;
 	*.fc|*.FC)
 		Abort "I'm not yet smart enough to compile $FILE"
@@ -813,7 +783,7 @@ case "$OBJECT" in
 		fi
 	else
 		DoNoErrCheck $RM $OBJECT
-		Do $CMK_LDRO $OBJECT $OPTS_LDRO $OBJECTFILES
+		Do $CMK_LDRO $OBJECT $OPTSL $OPTS_LDRO $OBJECTFILES
 	fi
 	Copyobj
 	;;
@@ -829,11 +799,11 @@ esac
 
 case "$LANGUAGE" in
 "c"|"C"|"f90"|"f77")
-	Do $CMK_SEQ_LD $OPTS_LD -o $OBJECT $OBJECTFILES -L$CHARMLIB $PRE_LIBRARIES $CMK_SEQ_LIBS $POST_LIBRARIES
+	Do $CMK_SEQ_LD $OPTSL $OPTS_LD -o $OBJECT $OBJECTFILES -L$CHARMLIB $PRE_LIBRARIES $CMK_SEQ_LIBS $POST_LIBRARIES
 	Copyobj
 	;;
 "c++"|"C++")
-	Do $CMK_SEQ_LDXX $OPTS_LD -o $OBJECT $OBJECTFILES -L$CHARMLIB $PRE_LIBRARIES $CMK_SEQ_LIBS $POST_LIBRARIES
+	Do $CMK_SEQ_LDXX $OPTSL $OPTS_LD -o $OBJECT $OBJECTFILES -L$CHARMLIB $PRE_LIBRARIES $CMK_SEQ_LIBS $POST_LIBRARIES
 	Copyobj
 	;;
 esac
@@ -949,27 +919,27 @@ CORE_LIBS="-lconv-core -lconv-util -ltrace-$TRACEMODE"
 
 case "$LANGUAGE" in
 "charm"|"charm++")
-	Do $CMK_LDXX $OPTS_LDXX -o $OBJECT \
+	Do $CMK_LDXX $OPTSL $OPTS_LDXX -o $OBJECT \
 		$LANG_LIBS -lconv-cplus-y $CORE_LIBS -lm $CMK_LIBS
 	;;
 "f90charm")
-	Do $CMK_LDXX $OPTS_LDXX -o $OBJECT \
+	Do $CMK_LDXX $OPTSL $OPTS_LDXX -o $OBJECT \
 		$LANG_LIBS -lconv-cplus-y $CORE_LIBS -lm $CMK_LIBS
 	;;
 "idl")
-	Do $CMK_LDXX $OPTS_LDXX -o $OBJECT \
+	Do $CMK_LDXX $OPTSL $OPTS_LDXX -o $OBJECT \
 		$LANG_LIBS -lconv-cplus-y $CORE_LIBS -lidl -lm $CMK_LIBS
 	;;
 "ampi"|"ampif"|"fem"|"femf")
-	Do $CMK_LDXX $OPTS_LDXX -o $OBJECT \
+	Do $CMK_LDXX $OPTSL $OPTS_LDXX -o $OBJECT \
 		$LANG_LIBS -lconv-cplus-y $CORE_LIBS -lm $CMK_LIBS
 	;;
 "converse")
-	Do $CMK_LD $OPTS_LD -o $OBJECT \
+	Do $CMK_LD $OPTSL $OPTS_LD -o $OBJECT \
 		$LANG_LIBS -lconv-cplus-n $CORE_LIBS -lm $CMK_LIBS
 	;;
 "converse++")
-	Do $CMK_LDXX $OPTS_LDXX -o $OBJECT \
+	Do $CMK_LDXX $OPTSL $OPTS_LDXX -o $OBJECT \
 		$LANG_LIBS -lconv-cplus-y $CORE_LIBS -lm $CMK_LIBS
 	;;
 esac
