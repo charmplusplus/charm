@@ -58,6 +58,11 @@ class VidBlock {
       }
       delete msgQ; msgQ=0;
     }
+    void *getLocalChare(void) {
+      if (state==FILLED && actualID.onPE==CkMyPe()) 
+          return actualID.objPtr;
+      return NULL;
+    }
 };
 
 extern void _processHandler(void *);
