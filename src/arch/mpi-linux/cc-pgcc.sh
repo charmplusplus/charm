@@ -1,5 +1,5 @@
-test -z "$CMK_INCDIR" && CMK_INCDIR='-I /usr/local/vmi/mpich/include'
-test -z "$CMK_LIBDIR" && CMK_LIBDIR='-L /usr/local/vmi/mpich/lib/pgi'
+#test -z "$CMK_INCDIR" && CMK_INCDIR='-I /usr/local/vmi/mpich/include'
+#test -z "$CMK_LIBDIR" && CMK_LIBDIR='-L /usr/local/vmi/mpich/lib/pgi'
 CMK_CPP_C="pgcc -E $CMK_INCDIR "
 CMK_CC="pgcc $CMK_INCDIR "
 CMK_CC_RELIABLE="gcc $CMK_INCDIR "
