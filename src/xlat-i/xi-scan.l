@@ -80,6 +80,7 @@ struct rwtable rwtable[] = {
   "class",	CLASS,
   "sync",	SYNC,
   "exclusive",	EXCLUSIVE,
+  "virtual",    VIRTUAL,
   "void",	VOID,
   "mainchare",	MAINCHARE,
   "packed",     PACKED,

@@ -1105,6 +1105,8 @@ void Entry::genChareDecl(XStr& str)
   } else {
     // entry method declaration
     str << "    ";
+    if(isVirtual())
+      str << "virtual ";
     if(retType==0) {
       cerr << "Entry methods must specify a return type: ";
       cerr << "use void if necessary\n";
@@ -1137,6 +1139,8 @@ void Entry::genGroupDecl(XStr& str)
     // entry method broadcast declaration
     if(!isSync()) {
       str << "    ";
+      if(isVirtual())
+        str << "virtual ";
       if(retType==0) {
         cerr << "Entry methods must specify a return type: ";
         cerr << "use void if necessary\n";
@@ -1169,6 +1173,8 @@ void Entry::genGroupDecl(XStr& str)
     }
     // entry method onPE declaration
     str << "    ";
+    if(isVirtual())
+      str << "virtual ";
     retType->print(str);
     str << " " << name;
     str << "(";
@@ -1233,6 +1239,8 @@ void Entry::genArrayDecl(XStr& str)
   } else {
     // entry method broadcast declaration
     str << "    ";
+    if(isVirtual())
+      str << "virtual ";
     if(retType==0) {
       cerr << "Entry methods must specify a return type: ";
       cerr << "use void if necessary\n";
@@ -1266,6 +1274,8 @@ void Entry::genArrayDecl(XStr& str)
     str << "    }\n";
     // entry method onPE declaration
     str << "    ";
+    if(isVirtual())
+      str << "virtual ";
     retType->print(str);
     str << " " << name;
     str << "(";

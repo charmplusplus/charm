@@ -381,6 +381,7 @@ class TVarList : public Printable {
 #define STHREADED 0x01
 #define SSYNC     0x02
 #define SLOCKED   0x04
+#define SVIRTUAL  0x08
 
 class Entry : public Member {
   private:
@@ -420,6 +421,7 @@ class Entry : public Member {
     int isSync(void) { return (attribs & SSYNC); }
     int isConstructor(void) { return !strcmp(name, container->getBaseName());}
     int isExclusive(void) { return (attribs & SLOCKED); }
+    int isVirtual(void) { return (attribs & SVIRTUAL); }
     void print(XStr& str);
     void genDecls(XStr& str);
     void genDefs(XStr& str);

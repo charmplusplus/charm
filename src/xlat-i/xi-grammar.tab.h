@@ -40,21 +40,22 @@ typedef union {
 #define	TEMPLATE	269
 #define	SYNC	270
 #define	EXCLUSIVE	271
-#define	VOID	272
-#define	PACKED	273
-#define	VARSIZE	274
-#define	ENTRY	275
-#define	MAINCHARE	276
-#define	IDENT	277
-#define	NUMBER	278
-#define	LITERAL	279
-#define	INT	280
-#define	LONG	281
-#define	SHORT	282
-#define	CHAR	283
-#define	FLOAT	284
-#define	DOUBLE	285
-#define	UNSIGNED	286
+#define	VIRTUAL	272
+#define	VOID	273
+#define	PACKED	274
+#define	VARSIZE	275
+#define	ENTRY	276
+#define	MAINCHARE	277
+#define	IDENT	278
+#define	NUMBER	279
+#define	LITERAL	280
+#define	INT	281
+#define	LONG	282
+#define	SHORT	283
+#define	CHAR	284
+#define	FLOAT	285
+#define	DOUBLE	286
+#define	UNSIGNED	287
 
 
 extern YYSTYPE yylval;
