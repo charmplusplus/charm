@@ -662,24 +662,24 @@ void element::splitNeighborsLocal(int longEdge, int opnode, int othernode,
   elemRef newNbrRef;
   if (nbrOpnode == 0) {
     if (nbrOthernode == 1)
-      newElemRef = C->addElement(C->theElements[nbr.idx].nodes[0], 
+      newNbrRef = C->addElement(C->theElements[nbr.idx].nodes[0], 
 				 C->theElements[nbr.idx].nodes[1], mIdx, 
 				 C->theElements[nbr.idx].edges[nbrModEdge], 
 				 newLongRef, newNbrEdgeRef);
     else // nbrOthernode == 2
-      newElemRef = C->addElement(C->theElements[nbr.idx].nodes[0], mIdx, 
+      newNbrRef = C->addElement(C->theElements[nbr.idx].nodes[0], mIdx, 
 				 C->theElements[nbr.idx].nodes[2], 
 				 newNbrEdgeRef, newLongRef, 
 				 C->theElements[nbr.idx].edges[nbrModEdge]);
   }
   else if (nbrOpnode == 1) {
     if (nbrOthernode == 0)
-      newElemRef = C->addElement(C->theElements[nbr.idx].nodes[0], 
+      newNbrRef = C->addElement(C->theElements[nbr.idx].nodes[0], 
 				 C->theElements[nbr.idx].nodes[1], mIdx, 
 				 C->theElements[nbr.idx].edges[nbrModEdge], 
 				 newNbrEdgeRef, newLongRef);
     else // nbrOthernode == 2
-      newElemRef = C->addElement(mIdx, C->theElements[nbr.idx].nodes[1], 
+      newNbrRef = C->addElement(mIdx, C->theElements[nbr.idx].nodes[1], 
 				 C->theElements[nbr.idx].nodes[2], 
 				 newNbrEdgeRef, 
 				 C->theElements[nbr.idx].edges[nbrModEdge], 
@@ -687,12 +687,12 @@ void element::splitNeighborsLocal(int longEdge, int opnode, int othernode,
   }
   else { // nbrOpnode is 2
     if (nbrOthernode == 0)
-      newElemRef = C->addElement(C->theElements[nbr.idx].nodes[0], mIdx, 
+      newNbrRef = C->addElement(C->theElements[nbr.idx].nodes[0], mIdx, 
 				 C->theElements[nbr.idx].nodes[2], newLongRef, 
 				 newNbrEdgeRef, 
 				 C->theElements[nbr.idx].edges[nbrModEdge]);
     else // nbrOthernode == 1
-      newElemRef = C->addElement(mIdx, C->theElements[nbr.idx].nodes[1], 
+      newNbrRef = C->addElement(mIdx, C->theElements[nbr.idx].nodes[1], 
 				 C->theElements[nbr.idx].nodes[2], newLongRef, 
 				 C->theElements[nbr.idx].edges[nbrModEdge], 
 				 newNbrEdgeRef);
