@@ -250,7 +250,7 @@ void CmiSyncBroadcastFn(int size, char *msg)
   for(i=0; i<Cmi_numpes; i++)
     if (i != Cmi_mype)
     {
-      dup_tok = (McMsgHdr *)CmiAlloc(hdr_size);
+      dup_tok = (McMsgHdr *)CmiAlloc(ALIGN8(hdr_size));
       memcpy(dup_tok,&bcast_msg_tok,hdr_size);
       McEnqueueRemote(dup_tok,hdr_size,i); 
     }
@@ -293,10 +293,6 @@ void CmiFreeBroadcastAllFn(int size, char *msg)
   CmiFree(msg);
 }
 
-void CmiMulticastInit(void)
-{
-  // Nothing to do.
-}
 
 void CmiSyncListSendFn(int npes, int *pes, int size, char *msg)
 {
@@ -310,6 +306,11 @@ void CmiSyncListSendFn(int npes, int *pes, int size, char *msg)
   /*
    * Count how many remote PEs, and send to the local PE if it is in the list
    */
+  /*
+  CmiPrintf("CmiSyncListSendFn: size %d handler %d\n",
+	    size,((McMsgHdr *)msg)->handler);
+  CmiPrintf("CmiSyncListSendFn: size %d npes %d\n",size,npes);
+  */
   n_remote_pes = 0;
   for (i=0; i < npes; i++)
   {
@@ -328,9 +329,6 @@ void CmiSyncListSendFn(int npes, int *pes, int size, char *msg)
   memcpy(dup_msg,msg,size);
   dup_msg->bcast.count = n_remote_pes;
   /*
-  CmiPrintf("PE %d broadcast handler=%d\n",Cmi_mype,dup_msg->handler);
-  */
-  /*
    * Make the broadcast token point to the copied message
    */
   bcast_msg_tok.msg_type = BcastMessage;
@@ -343,10 +341,10 @@ void CmiSyncListSendFn(int npes, int *pes, int size, char *msg)
    * Enqueue copies of the token message on other nodes.  This code should
    * be similar to CmiSyncSend
    */
-  for(i=0; i<n_remote_pes; i++)
+  for(i=0; i<npes; i++)
     if (pes[i] != Cmi_mype)
     {
-      dup_tok = (McMsgHdr *)CmiAlloc(hdr_size);
+      dup_tok = (McMsgHdr *)CmiAlloc(ALIGN8(hdr_size));
       memcpy(dup_tok,&bcast_msg_tok,hdr_size);
       McEnqueueRemote(dup_tok,hdr_size,pes[i]); 
     }
@@ -370,21 +368,52 @@ void CmiFreeListSendFn(int npes, int *pes, int size, char *msg)
   CmiFree(msg);
 }
 
+typedef struct {
+  char header[CmiMsgHeaderSizeBytes];
+  CmiGroup grp;
+  int size;
+  char *user_msg;
+} McMultiMsg;
+
+CpvDeclare(int,McMulticastWaitHandler);
+
 void CmiSyncMulticastFn(CmiGroup grp, int size, char *msg)
 {
   int npes;
   int *pes;
+  McMultiMsg multi_msg;
   
+  /*
+  CmiPrintf("CmiSyncMulticastFn: size %d handler %d\n",
+	    size,((McMsgHdr *)msg)->handler);
+   */
   /*
    *  Check for group, and busy-wait, if necessary, for group info
    */
   CmiLookupGroup(grp, &npes, &pes);
-  while (pes == 0)
+  if (pes != 0)
+    CmiSyncListSendFn( npes, pes, size, msg);
+  else
   {
-    McRetrieveRemote();
-    CmiLookupGroup(grp, &npes, &pes);
+    multi_msg.grp = grp;
+    multi_msg.size = size;
+    multi_msg.user_msg = (char *) CmiAlloc(ALIGN8(size));
+    memcpy(multi_msg.user_msg,msg,size);
+
+    CmiSetHandler(&multi_msg,CpvAccess(McMulticastWaitHandler));
+    CmiSyncSendFn(CmiMyPe(),sizeof(McMultiMsg),(char *)&multi_msg);
   }
-  CmiSyncListSendFn( npes, pes, size, msg);
+}
+
+void McMulticastWaitFn(McMultiMsg *msg)
+{
+  CmiFreeMulticastFn(msg->grp,msg->size,msg->user_msg);
+}
+
+void CmiMulticastInit(void)
+{
+  CpvInitialize(int,McMulticastWaitHandler);
+  CpvAccess(McMulticastWaitHandler) = CmiRegisterHandler(McMulticastWaitFn);
 }
 
 CmiCommHandle CmiAsyncMulticastFn(CmiGroup grp, int size, char *msg)
@@ -626,8 +655,6 @@ static void McRetrieveRemote(void)
     /* If it is a broadcast message, retrieve the actual message */
     if (cur_msg->msg_type == BcastMessage)
     {
-      /*      CmiPrintf("PE %d receiving broadcast message from %d\n",
-		Cmi_mype,cur_node->nxt_node);*/
 
       bcast_msg = true;
       bcast_ptr = (McMsgHdr *)CmiAlloc(ALIGN8(cur_msg->bcast_msg_size));
@@ -644,12 +671,14 @@ static void McRetrieveRemote(void)
       shmem_get(bcast_ptr,cur_msg->bcast.ptr,
 		ALIGN8(cur_msg->bcast_msg_size)/8,cur_node->nxt_node);
       /* Decrement the count, and write it back to the original node. */
-      /*      CmiPrintf(
+      /*
+      CmiPrintf(
       "PE %d received broadcast message count=%d size=%d handler=%d\n",
-		Cmi_mype,bcast_ptr->bcast.count,
-		cur_msg->bcast_msg_size,bcast_ptr->handler
+      Cmi_mype,bcast_ptr->bcast.count,
+      cur_msg->bcast_msg_size,bcast_ptr->handler
       );
       */
+
       bcast_ptr->bcast.count--;
 
       shmem_put(&(cur_msg->bcast.ptr->bcast.count),
