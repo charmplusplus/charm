@@ -12,7 +12,12 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.40  1997-03-14 20:23:50  milind
+ * Revision 2.41  1997-03-24 23:14:03  milind
+ * Made Charm-runtime 64-bit safe by removing conversions of pointers to
+ * integers. Also, removed charm runtime's dependence of unused argv[]
+ * elements being 0. Also, added sim-irix-64 version. It works.
+ *
+ * Revision 2.40  1997/03/14 20:23:50  milind
  * Made MAXLOGBUFSIZE in projections a commandline parameter.
  * One can now specify it as "+logsize 10000" on the program
  * command line.
@@ -270,16 +275,8 @@ void _CkNullFunc()
 
 
 
-static int CountArgs(argv)
-char **argv;
-{
-    int argc=0;
-    while (*argv) { argc++; argv++; }
-    return argc;
-}
-
-
-InitializeCharm(argv)
+InitializeCharm(argc, argv)
+int argc;
 char **argv;
 {
 /* these lines were in user_main */
@@ -367,7 +364,8 @@ static void PropagateInitBarrier()
 }
 
 
-StartCharm(argv, donehandler)
+StartCharm(argc, argv, donehandler)
+int argc;
 char **argv;
 FUNCTION_PTR donehandler;
 {
@@ -375,7 +373,7 @@ FUNCTION_PTR donehandler;
 	char           *ReadBufMsg;
 
         CpvAccess(UserStartCharmDoneHandler) = donehandler;
-        CpvAccess(userArgc) = ParseCommandOptions(CountArgs(argv), argv);
+        CpvAccess(userArgc) = ParseCommandOptions(argc, argv);
         CpvAccess(userArgv) = argv;
 
 	InitializeMessageMacros();

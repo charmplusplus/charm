@@ -12,7 +12,12 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.19  1995-11-13 04:04:33  gursoy
+ * Revision 2.20  1997-03-24 23:14:01  milind
+ * Made Charm-runtime 64-bit safe by removing conversions of pointers to
+ * integers. Also, removed charm runtime's dependence of unused argv[]
+ * elements being 0. Also, added sim-irix-64 version. It works.
+ *
+ * Revision 2.19  1995/11/13 04:04:33  gursoy
  * made changes related to initial msg synchronization
  *
  * Revision 2.18  1995/11/07  17:53:45  sanjeev
@@ -416,7 +421,7 @@ ChareIDType * pChareID;
   env = ENVELOPE_UPTR(Msg);
   SetEnv_msgType(env, ForChareMsg);
   SetEnv_EP(env, Entry);
-  SetEnv_chareBlockPtr(env, (int)GetID_chareBlockPtr((*pChareID)));
+  SetEnv_chareBlockPtr(env, GetID_chareBlockPtr((*pChareID)));
   SetEnv_chare_magic_number(env, GetID_chare_magic_number((*pChareID)));
   QDCountThisCreation(Entry, USERcat, ForChareMsg, 1);
   trace_creation(GetEnv_msgType(env), Entry, env);

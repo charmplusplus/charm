@@ -12,7 +12,12 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.17  1997-03-19 04:32:53  jyelon
+ * Revision 2.18  1997-03-24 23:14:02  milind
+ * Made Charm-runtime 64-bit safe by removing conversions of pointers to
+ * integers. Also, removed charm runtime's dependence of unused argv[]
+ * elements being 0. Also, added sim-irix-64 version. It works.
+ *
+ * Revision 2.17  1997/03/19 04:32:53  jyelon
  * Fixed new ConverseInit
  *
  * Revision 2.16  1997/03/19 04:30:50  jyelon
@@ -85,8 +90,8 @@ void charm_init(argc, argv)
 int argc;
 char **argv;
 {
-  InitializeCharm(argv);
-  StartCharm(argv, (void *)0);
+  InitializeCharm(argc, argv);
+  StartCharm(argc, argv, (void *)0);
 }
 
 main(argc, argv)

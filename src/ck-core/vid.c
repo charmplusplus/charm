@@ -12,7 +12,12 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.8  1995-10-13 18:15:53  jyelon
+ * Revision 2.9  1997-03-24 23:14:05  milind
+ * Made Charm-runtime 64-bit safe by removing conversions of pointers to
+ * integers. Also, removed charm runtime's dependence of unused argv[]
+ * elements being 0. Also, added sim-irix-64 version. It works.
+ *
+ * Revision 2.8  1995/10/13 18:15:53  jyelon
  * K&R changes.
  *
  * Revision 2.7  1995/09/01  02:13:17  jyelon
@@ -152,7 +157,7 @@ CHARE_BLOCK *vidBlockPtr;
     msg->ID = CpvAccess(currentChareBlock)->selfID;
     env = ENVELOPE_UPTR(msg);
     SetEnv_msgType(env, VidSendOverMsg);
-    SetEnv_vidBlockPtr(env, (int)vidBlockPtr);
+    SetEnv_vidBlockPtr(env, vidBlockPtr);
     SetEnv_EP(env, 0);
 
     QDCountThisCreation(0, IMMEDIATEcat, VidSendOverMsg, 1);

@@ -12,7 +12,12 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.6  1995-09-07 21:21:38  jyelon
+ * Revision 2.7  1997-03-24 23:14:04  milind
+ * Made Charm-runtime 64-bit safe by removing conversions of pointers to
+ * integers. Also, removed charm runtime's dependence of unused argv[]
+ * elements being 0. Also, added sim-irix-64 version. It works.
+ *
+ * Revision 2.6  1995/09/07 21:21:38  jyelon
  * Added prefixes to Cpv and Csv macros, fixed bugs thereby revealed.
  *
  * Revision 2.5  1995/09/07  05:26:49  gursoy
@@ -86,7 +91,7 @@ struct chare_block * mainChareBlock;
 	
 	/* this is where we add the information for the main chare
 	block */
-	SetEnv_chareBlockPtr(env, (int) mainChareBlock);
+	SetEnv_chareBlockPtr(env, mainChareBlock);
 	SetEnv_chare_magic_number(env, 
 			GetID_chare_magic_number(mainChareBlock->selfID));
 
