@@ -1,0 +1,88 @@
+The Finite Element Method is a commonly used modeling and analysis tool for
+predicting behavior of real-world objects with respect to mechanical stresses,
+vibrations, heat conduction etc. It works by modeling a structure with a
+complex geometry into a number of small ``elements'' connected at ``nodes''.
+This process is called ``meshing''. Meshes can be structured or unstructured.
+Structured meshes have equal connectivity for each node, while unstructured
+meshes have different connectivity.  Unstructured meshes are more commonly used
+for FEM.
+
+The FEM solver solves a set of matrix equations that approximate the physical
+phenomena under study. For example, in stress analysis, the system of equations
+is:
+
+$$
+F = k x
+$$
+
+where F is the stress, k is the stiffness matrix, and x is the displacement.
+The stiffness matrix is formed by superposing such equations for all the
+elements. When using FEM for dynamic analysis, these equations are solved in
+every iteration, advancing time by a small ``timestep''. In explicit FEM,
+forces on elements are calculated from displacements of nodes (strain) in the
+previous iteration, and they in turn cause displacements of nodes in the next
+iteration.
+
+In order to reduce errors of these approximations, the element size is very
+small, resulting in a large number of elements (typically hundreds of
+thousands). The sheer amount of computations lends this problem to parallel
+computing. Also, since connectivity of elements is small, this results in good
+computation to communication ratios. However, the arbitrary connectivity of
+unstructured meshes, alongwith dynamic physical phenomena introduce
+irregularity and dynamic behavior, which are difficult to handle using
+traditional parallel computing methods.
+
+The FEM Framework presented in this section is an attempt to provide the right
+infrastructure for programming parallel FEM applications. It is built on top of
+\charmpp.
+
+\subsection{Design Priciples}
+
+The basic philosophy of the FEM framework is to hide most details of
+parallelization from the FEM application developer. Thus, the FEM application
+developer writes sequential code for performing computations over a partition
+of the mesh. Partitioning, communication, and synchronization are performed by
+the framework.
+
+Computational structure of most FEM codes resembles the following pseudocode:
+
+\begin{alltt}
+  read connectivity information from a grid file
+  read initial values for nodes
+  read boundary conditions
+  repeat until termination criterion is satisfied
+    for all elements e, do
+      for each node n connected to element e, do
+        contribute to n some value based solely on e.
+      end for
+    end for
+    for all nodes n, do
+      update node values
+    end for
+  end repeat
+  write final values for nodes
+\end{alltt}
+
+A node may have different instances of values that are contributed from an
+element, such as forces, temperatures, pressures etc. Also, the element and
+node loops may be repeated more than once in the program operating on different
+value. The termination criterion may be error based, which requires a reduction
+across all elements, or all nodes; or it may be based on a fixed number of such
+iterations.
+
+FEM framework is developed in \charmpp\ in order to facilitate dynamic
+applications, where the runtime, or computational load of each partition may
+vary at runtime. When load imbalance occurs, \charmpp\ moves these partitions
+automatically in order to rebalance the load.
+
+Most of the existing FEM codes are written using fortran77 or fortran90.  We
+provide interefaces for these languages. This avoids having to write the entire
+application in a different languages, and makes conversion from exisiting
+programs easier.
+
+
+\subsection{Writing an FEM Application}
+
+\subsection{Compiling and Running}
+
+\subsection{Support for Dynamic Applications}

@@ -58,6 +58,8 @@
 
 \makeindex
 
+\usepackage{alltt}
+
 \begin{document}
 
 \begin{titlepage}
@@ -78,10 +80,16 @@ Version 1.0\\
 \tableofcontents
 
 \newpage
-
+\section{Introduction}
 \input{intro}
 
+\newpage
+\section{iRecv Library}
 \input{irecv}
+
+\newpage
+\section{FEM Framework}
+\input{fem}
 
 \nocite{InterOpIPPS96}  % Just put a citation in here, so the makefile 
                         % doesn't complain
