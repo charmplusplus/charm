@@ -13,7 +13,7 @@ module tcharm {
   };
   
   readonly CProxy_TCharmReadonlyGroup tcharm_readonlygroup;
-  group TCharmReadonlyGroup {
+  group [migratable] TCharmReadonlyGroup {
     entry TCharmReadonlyGroup(TCharmReadonlys r,int len,char data[len]);
     entry void add(TCharmReadonlys r,int len,char data[len]);
   };

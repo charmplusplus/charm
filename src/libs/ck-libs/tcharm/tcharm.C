@@ -376,6 +376,7 @@ class TCharmReadonlyGroup : public CBase_TCharmReadonlyGroup {
 public:
 	TCharmReadonlys all;
 	
+	TCharmReadonlyGroup(CkMigrateMessage* m){ /* empty */ }
 	TCharmReadonlyGroup(TCharmReadonlys &r,int len,const char *data)
 	{
 		add(r,len,data);
