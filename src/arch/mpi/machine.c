@@ -100,9 +100,7 @@ static void *recdQueueRemoveFromFront(void);
 
 static void ConverseRunPE(int everReturn);
 static void CommunicationServer(int sleepTime);
-#if CMK_SMP
 static void CommunicationServerThread(int sleepTime);
-#endif
 
 typedef struct msg_list {
      char *msg;
@@ -558,6 +556,7 @@ static void CommunicationServer(int sleepTime)
   }
 }
 
+#endif
 
 static void CommunicationServerThread(int sleepTime)
 {
@@ -568,9 +567,6 @@ static void CommunicationServerThread(int sleepTime)
   CmiHandleImmediate();
 #endif
 }
-
-#endif
-
 
 #if CMK_NODE_QUEUE_AVAILABLE
 char *CmiGetNonLocalNodeQ(void)
