@@ -130,6 +130,7 @@ class TCharm: public CBase_TCharm
 	CthThread tid; //Our migratable thread
 	friend class TCharmAPIRoutine; //So he can get to heapBlocks:
 	CmiIsomallocBlockList *heapBlocks; //Migratable heap data
+	CtgGlobals threadGlobals; //Global data
 
 	bool isStopped, resumeAfterMigration, exitWhenDone;
 	ThreadInfo threadInfo;
@@ -206,13 +207,18 @@ class TCharm: public CBase_TCharm
 	//Go to sync, block, possibly migrate, and then resume
 	void migrate(void);
 
-	//Make subsequent malloc's go into our list:
-	inline void activateHeap(void) {
-		CmiIsomallocBlockListActivate(heapBlocks);
+	//Entering thread context: turn stuff on
+	static void activateThread(void) {
+		TCharm *tc=CtvAccess(_curTCharm);
+		if (tc!=NULL) {
+			CmiIsomallocBlockListActivate(tc->heapBlocks);
+			CtgInstall(tc->threadGlobals);
+		}
 	}
-	//Disable migratable memory
-	inline void deactivateHeap(void) {
+	//Leaving this thread's context: turn stuff back off
+	static void deactivateThread(void) {
 		CmiIsomallocBlockListActivate(NULL);
+		CtgInstall(NULL);		
 	}
 };
 
@@ -222,12 +228,11 @@ class TCharmAPIRoutine {
  public:
 	TCharmAPIRoutine() { //Entering Charm++ from user code
 		//Disable migratable memory allocation while in Charm++:
-		CmiIsomallocBlockListActivate(NULL);
+		TCharm::deactivateThread();
 	}
 	~TCharmAPIRoutine() { //Returning to user code from Charm++:
 		//Reenable migratable memory allocation
-		TCharm *tc=CtvAccess(_curTCharm);
-		if (tc!=NULL) tc->activateHeap();
+		TCharm::activateThread();
 	}
 };
 

@@ -65,6 +65,7 @@ void TCharm::procInit(void)
   CtvInitialize(TCharm *,_curTCharm);
   CtvAccess(_curTCharm)=NULL;
   tcharm_initted=1;
+  CtgInit();
 
   // called on every pe to eat these arguments
   char **argv=CkGetArgv();
@@ -101,10 +102,10 @@ void TCHARM_Api_trace(const char *routineName,const char *libraryName)
 static void startTCharmThread(TCharmInitMsg *msg)
 {
 	DBGX("thread started");
-	CtvAccess(_curTCharm)->activateHeap();
+	TCharm::activateThread();
 	typedef void (*threadFn_t)(void *);
 	((threadFn_t)msg->threadFn)(msg->data);
-	CmiIsomallocBlockListActivate(NULL); //Turn off migratable memory
+	TCharm::deactivateThread();
 	CtvAccess(_curTCharm)->done();
 }
 
@@ -113,6 +114,7 @@ TCharm::TCharm(TCharmInitMsg *initMsg_)
   initMsg=initMsg_;
   initMsg->opts.sanityCheck();
   timeOffset=0.0;
+  threadGlobals=CtgCreate();
   if (tcharm_nothreads)
   { //Don't even make a new thread-- just use main thread
     tid=CthSelf();
@@ -146,6 +148,7 @@ TCharm::TCharm(CkMigrateMessage *msg)
 {
   initMsg=NULL;
   tid=NULL;
+  threadGlobals=NULL;
   threadInfo.tProxy=CProxy_TCharm(thisArrayID);
 }
 
@@ -178,6 +181,7 @@ void TCharm::pup(PUP::er &p) {
     tid = CthPup((pup_er) &p, tid);
     CtvAccessOther(tid,_curTCharm)=this;
     CmiIsomallocBlockListPup((pup_er) &p,&heapBlocks);
+    threadGlobals=CtgPup((pup_er) &p,threadGlobals);
     //Restart our clock: set it up so packTime==CkWallTimer+timeOffset
     double packTime;
     p(packTime);
@@ -187,15 +191,18 @@ void TCharm::pup(PUP::er &p) {
   //Pack all user data
   s.seek(0);
   p(nUd);
-  for(int i=0;i<nUd;i++)
-    ud[i].pup(p);
+  
+  activateThread();
+  for(int i=0;i<nUd;i++) ud[i].pup(p);
   p|sud;
-
+  deactivateThread();
+  
   if (!p.isUnpacking())
   {//In this case, pack the thread & heap after the user data
     s.seek(1);
     tid = CthPup((pup_er) &p, tid);
     CmiIsomallocBlockListPup((pup_er) &p,&heapBlocks);
+    threadGlobals=CtgPup((pup_er) &p,threadGlobals);
     //Stop our clock:
     double packTime=CkWallTimer()+timeOffset;
     p(packTime);
