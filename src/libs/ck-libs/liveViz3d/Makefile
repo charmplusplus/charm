@@ -1,11 +1,11 @@
 CDIR=../../../..
 CHARMC=$(CDIR)/bin/charmc $(OPTS)
 
-HEADERS=liveViz3d.h liveViz3d.decl.h liveViz3d_impl.h viewable.h viewpoint.h
+HEADERS=liveViz3d.h liveViz3d.decl.h ckviewable.h ckviewpoint.h
 HEADDEP=$(HEADERS) 
-OBJS=liveViz3d.o viewable.o
+OBJS=ckviewpoint.o liveViz3d.o ckviewable.o
 DEST=$(CDIR)/lib/libmoduleliveViz3d.a
-OBJS2=viewable.o
+OBJS2=ckviewpoint.o ckviewable.o
 DEST2=$(CDIR)/lib/libliveViz3d-client.a
 
 all: $(DEST) $(DEST2)
@@ -23,8 +23,11 @@ headers: $(HEADERS)
 liveViz3d.o: liveViz3d.C $(HEADDEP)
 	$(CHARMC) -c liveViz3d.C
 
-viewable.o: viewable.C $(HEADDEP)
-	$(CHARMC) -c viewable.C
+ckviewable.o: ckviewable.C $(HEADDEP)
+	$(CHARMC) -c ckviewable.C
+
+ckviewpoint.o: ckviewpoint.C $(HEADDEP)
+	$(CHARMC) -c ckviewpoint.C
 
 liveViz3d.decl.h liveViz3d.def.h: liveViz3d.ci
 	$(CHARMC) liveViz3d.ci

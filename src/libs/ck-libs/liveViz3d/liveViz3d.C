@@ -1,17 +1,22 @@
 /*
-  Interface to server portion of the sixty library.
+  Interface to server portion of the liveViz3d library.
 */
 #include "pup.h"
-#include "viewpoint.h"
+#include "ckviewpoint.h"
 #include "ckvector3d.h"
 #include "conv-ccs.h"
-#include "liveViz3d_impl.h"
 #include "liveViz3d.h"
 #include "pup_toNetwork4.h"
 #include <vector>
 
-static CProxy_liveViz3dManager mgrProxy;
 
+static /* readonly */ CProxy_liveViz3dManager mgrProxy;
+#define masterProcessor 0
+
+/** 
+ * The liveViz3dManager group stores up outgoing views before
+ * they're sent off to clients.
+ */ 
 class liveViz3dManager : public CBase_liveViz3dManager {
 //FIXME: support multiple clients here
 	//These are all the views that have not yet been sent off to the client
@@ -20,19 +25,20 @@ class liveViz3dManager : public CBase_liveViz3dManager {
 	bool hasDelayed;
 	CcsDelayedReply delayedReply;
 	
+	/// Pack up and send off all our stored views:
 	void sendReply(CcsDelayedReply repl) {
 		int i,n=views.size();
 		CmiPrintf("Sending off %d new views\n",n);
 		PUP_toNetwork4_sizer ps;
 		ps|n;
-		for (i=0;i<n;i++) ps|*views[i];
+		for (i=0;i<n;i++) pup_pack(ps,*views[i]);
 		int len=ps.size();
 		char *retMsg=new char[len];
 		PUP_toNetwork4_pack pp(retMsg);
 		pp|n;
 		for (i=0;i<n;i++) {
-			pp|*views[i];
-			delete views[i];
+			pup_pack(pp,*views[i]);
+			views[i]->unref();
 		}
 		views.clear();//erase(views.begin(),views.end());
 		CcsSendDelayedReply(repl,len,retMsg);
@@ -40,22 +46,26 @@ class liveViz3dManager : public CBase_liveViz3dManager {
 		CmiPrintf("Done sending off %d views\n",n);
 	}
 	
+	// FIXME: should have a vector of consumers, for each client
+	CkViewConsumer *cons;
 public:
-	liveViz3dManager(void) {
-		mgrProxy=thisgroup;
-		hasDelayed=false;
-	}
+	liveViz3dManager(void);
 	
-	//This object has created a new view for client ID:
-	void addView(pupPtrHolder<CkView> &view,int clientID) {
-		views.push_back(view.release());
+	/// This remote object has created a new view:
+	void addView(CkViewHolder &view) {
+		addView(view.release());
+	}
+	/// This local object has a new view:
+	void addView(CkView *view) {
+		view->ref();
+		views.push_back(view);
 		if (hasDelayed) { //There's already somebody waiting
 			hasDelayed=false;
 			sendReply(delayedReply);
 		}
 	}
 	
-	//This client is requesting the latest views:
+	/// This client is requesting the latest views:
 	void getViews(int clientID) {
 	#if 1
 		if (views.size()==0) { //Nothing to send yet-- wait for it
@@ -69,23 +79,93 @@ public:
 		}	
 	}
 	
+	/// Viewable needs a place to put its views:
+	inline CkViewConsumer &getConsumer(const liveViz3dRequestMsg *m) {
+		return *cons;
+	}
 };
 
+
+/// Used to send views off to the master processor
+class RemoteManagerConsumer : public CkViewConsumer {
+	// Prevent uploading duplicate views:
+	CkHashtableT<CkViewableID,CkView *> views;
+public:
+	virtual void add(CkView *view);
+};
+void RemoteManagerConsumer::add(CkView *view) {
+	CkView *oldView=views.get(view->id);
+	if (oldView!=view) 
+	{ // The view has changed: add it to our hashtable and pass it on
+		views.put(view->id)=view;
+		mgrProxy[masterProcessor].addView(view);
+	}
+}
+
+/// Used to hand views off to the local group
+class LocalManagerConsumer : public CkViewConsumer {
+	// Prevent uploading duplicate views:
+	CkHashtableT<CkViewableID,CkView *> views;
+	liveViz3dManager *mgr;
+public:
+	LocalManagerConsumer(liveViz3dManager *mgr_) 
+		:mgr(mgr_) {}
+	
+	virtual void add(CkView *view);
+};
+void LocalManagerConsumer::add(CkView *view) {
+	CkView *oldView=views.get(view->id);
+	if (oldView!=view) 
+	{ // The view has changed: add it to our hashtable and pass it on
+		views.put(view->id)=view;
+		mgr->addView(view);
+	}
+}
+
+liveViz3dManager::liveViz3dManager(void)
+{
+	mgrProxy=thisgroup;
+	hasDelayed=false;
+	
+	if (CkMyPe()==masterProcessor)
+		cons=new LocalManagerConsumer(this);
+	else
+		cons=new RemoteManagerConsumer();
+}
 
 /* CCS Interface */
 //These are only set on processor 0:
 static CkBbox3d pe0_box;
 static CkCallback pe0_request; 
 
+/*
+"lv3d_newViewpoint" handler:
+	Sent by the client when his viewpoint changes,
+to request updated views of the objects.
+
+Outgoing request is a CkViewpoint.
+There is no response.
+*/
 extern "C" void lv3d_newViewpoint(char *msg) {
 	liveViz3dRequestMsg *rm=new liveViz3dRequestMsg;
 	PUP_toNetwork4_unpack p(&msg[CmiMsgHeaderSizeBytes]);
-	rm->nv.pup(p);
+	rm->clientID=0; //FIXME
+	rm->vp.pup(p);
 	pe0_request.send(rm);
 	CmiFree(msg);
-		CmiPrintf("New user viewpoint\n");
+	CmiPrintf("New user viewpoint\n");
 }
 
+/*
+"lv3d_getViews" handler:
+	Sent by the client to request the actual images
+of any updated object views.
+
+Outgoing request is a single integer, the client ID
+Incoming response is a set of updated CkViews:
+    int n; p|n;
+    for (int i=0;i<n;i++) p|view[i];
+*/
 extern "C" void lv3d_getViews(char *msg) {
 	int clientID;
 	PUP_toNetwork4_unpack p(&msg[CmiMsgHeaderSizeBytes]);
@@ -109,65 +189,15 @@ void liveViz3dInit(const CkBbox3d &box,CkCallback incomingRequest)
 	CProxy_liveViz3dManager::ckNew();
 }
 
-/******************* liveViz3dViewable ***********************
-This object should live on every viewable: its 
-"handleRequest" method should be called every time
-the user changes their viewpoint.  You must implement
-a subclass of this class that implements the "view" 
-method to draw yourself.
-*/
-class liveViz3dViewableImpl {
-	CkView *lastView; //Last rendered viewpoint
-public:	
-	liveViz3dViewableImpl() {
-		lastView=NULL;
-	}
-	~liveViz3dViewableImpl() {
-		delete lastView;
-	}
-	void pup(PUP::er &p) {
-		/*empty-- view cache is flushed on migration*/
-	}
-	
-	
-	//Return true if we're out of date under this view:
-	bool outOfDate(const CkViewpoint &vp) {
-		if (lastView==NULL) return true; 
-		double viewTol=2.0; //Accept up to this many pixels of error:
-		if (lastView->rmsError(vp)>viewTol) return true;
-		return false;
-	}
-	
-	//Get the best view for this (out of date) viewpoint:
-	CkView *getView(const CkViewpoint &vp,CkViewable *obj) {
-		if (lastView) delete lastView;
-		lastView=new CkView(vp,obj);
-		return lastView;
-	}
-};
-
-
-liveViz3dViewable::liveViz3dViewable(void) {
-	impl=new liveViz3dViewableImpl;
-}
-liveViz3dViewable::~liveViz3dViewable() {
-	delete impl;
-}
-
-void liveViz3dViewable::handleRequest(liveViz3dRequestMsg *m)
+/**
+ * Call this routine with each viewable each time the
+ * incomingRequest callback is executed.  
+ * Can be called on any processor.
+ * Be sure to delete the message after all the calls.
+ */
+void liveViz3dHandleRequest(const liveViz3dRequestMsg *m,CkViewable &v) 
 {
-	const CkViewpoint &vp=m->nv.vp;
-	if (!impl->outOfDate(vp)) {delete m; return;}
-	//Make a new view and send it off to processor 0:
-	CkView *v=impl->getView(vp,this);
-	mgrProxy[0].addView(v,m->nv.clientID);
-}
-
-void liveViz3dViewable::pup(PUP::er &p)
-{
-	p|id;
-	p|univPoints;
-	impl->pup(p);
+	v.view(m->vp,mgrProxy.ckLocalBranch()->getConsumer(m));
 }
 
 #include "liveViz3d.def.h" //For liveViz3dRequestMsg
