@@ -761,7 +761,7 @@ typedef struct ExplicitDgramStruct
 {
   struct ExplicitDgramStruct *next;
   int  srcpe, rank, seqno;
-  unsigned int  len;
+  unsigned int len, dummy; /* dummy to fix bug in rs6k alignment */
   double data[1];
 }
 *ExplicitDgram;

@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 1.12  1997-03-24 16:21:54  milind
+ * Revision 1.13  1997-08-04 09:50:40  jyelon
+ * *** empty log message ***
+ *
+ * Revision 1.12  1997/03/24 16:21:54  milind
  * removed an alignment bug caused by mycpy. Replaced mycpy with memcpy.
  *
  * Revision 1.11  1997/03/19 04:31:30  jyelon
@@ -117,6 +120,14 @@ int i;
      Cmi_mype = i; 
 }
 
+void CmiNotifyIdle()
+{
+#if CMK_WHEN_PROCESSOR_IDLE_USLEEP
+  struct timeval tv;
+  tv.tv_sec=0; tv.tv_usec=5000;
+  select(0,0,0,0,&tv);
+#endif
+}
 
 void *CmiAlloc(size)
 int size;

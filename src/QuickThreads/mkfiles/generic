@@ -6,7 +6,7 @@ all: qt stp testpgm
 qt:
 	ln -s md/setjmp_d.h qtmd.h
 	$(CC) -pedantic -Wall -c -o qt.o qt.c
-	$(CC) -DQT_GROW_DOWN -c -o qtmds.o md/setjmp.c
+	$(CC) -c -o qtmds.o md/setjmp.c
 	ar q libqt.a qt.o qtmds.o
 
 stp:

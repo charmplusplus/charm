@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 1.27  1997-07-30 19:58:09  jyelon
+ * Revision 1.28  1997-08-04 09:50:42  jyelon
+ * *** empty log message ***
+ *
+ * Revision 1.27  1997/07/30 19:58:09  jyelon
  * *** empty log message ***
  *
  * Revision 1.26  1997/07/30 17:31:13  jyelon
@@ -451,6 +454,7 @@ int handler;
 void CmiNotifyIdle()
 {
 #if CMK_WHEN_PROCESSOR_IDLE_USLEEP
+  struct timeval tv;
   tv.tv_sec=0; tv.tv_usec=5000;
   select(0,0,0,0,&tv);
 #endif

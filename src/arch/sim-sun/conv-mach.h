@@ -8,7 +8,10 @@
  ***************************************************************************
  *
  * $Log$
- * Revision 1.23  1997-07-28 19:01:21  jyelon
+ * Revision 1.24  1997-08-04 09:50:46  jyelon
+ * *** empty log message ***
+ *
+ * Revision 1.23  1997/07/28 19:01:21  jyelon
  * *** empty log message ***
  *
  * Revision 1.22  1997/07/26 16:42:15  jyelon
@@ -127,7 +130,7 @@
 #define CMK_SIGNAL_USE_SIGACTION                           1
 #define CMK_SIGNAL_USE_SIGACTION_WITH_RESTART              0
 
-#define CMK_SIZE_T                                         long
+#define CMK_SIZE_T                                         long unsigned int
 
 #define CMK_STATIC_PROTO_FAILS                             0
 #define CMK_STATIC_PROTO_WORKS                             1
