@@ -1,0 +1,19 @@
+module HybridLB {
+
+extern module LBDatabase;
+extern module BaseLB;
+
+include "NeighborLBMsg.h";
+include "CentralLBMsg.h";
+
+group [migratable] HybridLB: BaseLB {
+  entry void HybridLB(const CkLBOptions &);  
+  entry void ReceiveStats(CkMarshalledCLBStatsMessage data);
+  entry void ResumeClients(CkReductionMsg *msg);
+  entry void ResumeClients(void);
+  entry void ReceiveMigration(LBMigrateMsg*);	
+  entry void Loadbalancing();	
+  entry void NotifyMigrationDone();	
+};
+
+};
