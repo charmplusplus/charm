@@ -27,6 +27,7 @@ class StatTable {
   public:
     StatTable();
     ~StatTable();
+    void init(char** name, char** desc, int argc);
     //! one entry is called for 'time' seconds, value is counter reading 
     void setEp(int epidx, int stat, long long value, double time);
     //! write three lines for each stat:
@@ -36,7 +37,6 @@ class StatTable {
     void write(FILE* fp);
     void clear();
     int numStats() { return numStats_; }
-    void init(char** name, char** desc, int argc);
 
   private:
     //! struct to maintain statistics
@@ -52,10 +52,10 @@ class StatTable {
 
     Statistics* stats_;             // track stats for each entry point
     int         numStats_;          // size of statistics being tracked
-    // bool        error_;             // will be set to true if error writing info
 };
 
-// counter log pool
+//! counter log pool this implements functions for TraceCounter but
+//! that needed to be performed on a node-level
 class CountLogPool {
   public:
     CountLogPool();
@@ -64,18 +64,14 @@ class CountLogPool {
     void writeSts(int phase=-1);
     FILE* openFile(int phase=-1);
     void setEp(int epidx, long long count1, long long count2, double time);
-    void clearEps() { dirty_ = false; stats_.clear(); }
-    void setTrace(bool on) { traceOn_ = on; }
-    void setDirty(bool d) { dirty_ = d; }
+    void clearEps() { stats_.clear(); }
     void init(char** name, char** desc, int argc) { 
       stats_.init(name, desc, argc);
     }
 
   private:
-    StatTable stats_;
-    bool      traceOn_;
-    int       lastPhase_;
-    bool      dirty_;
+    StatTable stats_;       // store stats per counter
+    int       lastPhase_;   // keep track of last phase for closing behavior
 };
 
 //! For each processor, TraceCounter calculates mean, stdev, etc of 
@@ -84,35 +80,61 @@ class TraceCounter : public Trace {
   public:
     TraceCounter();
     ~TraceCounter();
+    //! process command line arguments!
+    void traceInit(char **argv);
+    //! turn trace on/off, note that charm will automatically call traceBegin()
+    //! at the beginning of every run unless the command line option "+traceoff"
+    //! is specified
     void traceBegin();
     void traceEnd();
+    //! registers user event trace module returns int identifier 
     int traceRegisterUserEvent(const char* userEvent) { 
       // CmiPrintf("%d/%d traceRegisterUserEvent(%s)\n", 
       // CkMyPe(), CkNumPes(), userEvent);
       return 0;
     }
+    //! a user event has just occured
     void userEvent(int e) { 
       // CmiPrintf("%d/%d userEvent %d\n", CkMyPe(), CkNumPes(), e); 
     }
+    //! creation of message(s)
     void creation(envelope *e, int num=1) { }
+    //! ???
     void messageRecv(char *env, int pe) { }
+    //! begin/end execution of a Charm++ entry point
+    //! NOTE: begin/endPack and begin/endUnpack can be called in between
+    //!       a beginExecute and its corresponding endExecute.
     void beginExecute(envelope *e);
-    void beginExecute(int event, int msgType, int ep, int srcPe, int mlen=0);
+    void beginExecute(
+      int event,   //! event type defined in trace-common.h
+      int msgType, //! message type
+      int ep,      //! Charm++ entry point (will correspond to sts file) 
+      int srcPe,   //! Which PE originated the call
+      int ml=0);   //! message size
     void endExecute(void);
-    void beginIdle(void) { }
-    void endIdle(void) { }
+    //! begin/end idle time for this pe
+    void beginIdle(void) { if (traceOn_) { startIdle_ = TraceTimer(); } }
+    void endIdle(void) { 
+      if (traceOn_) { idleTime_ += TraceTimer()-startIdle_; }
+    }
+    //! begin/end the process of packing a message (to send)
     void beginPack(void);
     void endPack(void);
+    //! begin/end the process of unpacking a message (can occur before calling
+    //! a entry point or during an entry point when 
     void beginUnpack(void);
     void endUnpack(void);
+    //! ???
     void enqueue(envelope *e) { }
     void dequeue(envelope *e) { }
+    //! begin/end of execution
     void beginComputation(void);
     void endComputation(void) { }
-
-    void traceInit(char **argv);
+    //! clear all data collected for entry points
     void traceClearEps();
+    //! write the summary sts file for this trace
     void traceWriteSts();
+    //! do any clean-up necessary for tracing
     void traceClose();
 
     //! CounterArg is a linked list of strings that allows
@@ -132,32 +154,51 @@ class TraceCounter : public Trace {
     };
 
   private:
-    int         execEP_;        // id currently executing entry point
-    double      startEP_;       // start time of currently executing ep
-    double      startPack_;     // start time of pack operation
-    double      startUnpack_;   // start time of unpack operation
+    enum TC_Status { IDLE, WORKING };
+    
+    // command line processing
     CounterArg* firstArg_;      // pointer to start of linked list of args
     CounterArg* lastArg_;       // pointer to end of linked list of args
-    int         argStrSize_;    // size of maximum arg string (formatted output)
-    int         phase_;         // current phase
-    bool        traceOn_;       // true if trace is turned on
-
+    int         argStrSize_;    // size of max arg string (formatted output)
     CounterArg* commandLine_;   // list of command line args
     int         commandLineSz_; // size of commande line args array
-    CounterArg* counter1_;      // point to current counter
-    CounterArg* counter2_;      // point to current counter
+    CounterArg* counter1_;      // point to current counter, circle linked list
+    CounterArg* counter2_;      // point to current counter, circle linked list
+    int         counter1Sz_;    // size of cycle
+    int         counter2Sz_;    // size of cycle
+    
+    // result of different command line opts
+    bool        overview_;      // if true, just measure between phases
+    bool        switchRandom_;  // if true, switch counters randomly
+    bool        switchByPhase_; // if true, switch counters only at phases
 
-    enum Status { IDLE, WORKING };
-    Status      status_;        // to prevent errors
+    // store between start/stop of counter read
+    int         execEP_;        // id currently executing entry point
+    double      startEP_;       // start time of currently executing ep
+    double      startIdle_;     // start time of currently executing idle
     int         genStart_;      // track value of start_counters
+
+    // store state
+    double      idleTime_;      // total idle time
+    int         phase_;         // current phase
+    bool        traceOn_;       // true if trace is turned on
+    TC_Status   status_;        // to prevent errors
     bool        dirty_;         // true if endExecute called 
 
+    //! start/stop the overall counting ov eps (don't write to logCount, 
+    //! just print to screen
+    void beginOverview();
+    void endOverview();
+    //! switch counters by whatever switching strategy 
+    void switchCounters();
     //! add the argument parameters to the linked list of args choices
     void registerArg(CounterArg* arg);
     //! see if the arg (str or code) matches any in the linked list of choices
     //! and sets arg->code to the SGI code
     //! return true if arg matches, false otherwise
     bool matchArg(CounterArg* arg);
+    //! print out usage argument
+    void usage();
     //! print out all arguments in the linked-list of choices
     void printHelp();
 };
