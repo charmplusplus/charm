@@ -1,0 +1,171 @@
+/***************************************************************************
+ * RCS INFORMATION:
+ *
+ *	$RCSfile$
+ *	$Author$	$Locker$		$State$
+ *	$Revision$	$Date$
+ *
+ ***************************************************************************
+ * DESCRIPTION:
+ *
+ ***************************************************************************
+ * REVISION HISTORY:
+ *
+ * $Log$
+ * Revision 2.0  1995-06-29 21:19:36  narain
+ * *** empty log message ***
+ *
+ ***************************************************************************/
+/* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
+/* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
+/* * * * * * * * The RAND Load Balancing Strategy* * * * * * * * */
+/* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
+/* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
+
+#define LDB_ELEMENT void
+
+module ldb {
+#include "ldb.h"
+
+message {
+    int dummy;
+} DUMMYMSG;
+
+export_to_C setLdbSize()
+{
+       CpvAccess(LDB_ELEM_SIZE) = 0;
+}
+
+export_to_C LdbCreateBoc()
+{
+  DUMMYMSG *msg;
+  msg = (DUMMYMSG *)CkAllocMsg(DUMMYMSG);	
+  CreateBoc(LDB, LDB@BranchInit, msg);
+}
+
+export_to_C LdbFillLDB(ldb)
+  LDB_ELEMENT *ldb;
+{
+  BranchCall(CpvAccess(LdbBocNum), LDB@FillLDB(ldb));
+}
+
+export_to_C LdbStripLDB(ldb)
+     LDB_ELEMENT *ldb;
+{
+  BranchCall(CpvAccess(LdbBocNum), LDB@StripLDB(ldb));
+}
+
+
+export_to_C Ldb_NewMsg_FromNet(msg) 
+     void *msg;
+{
+  BranchCall(CpvAccess(LdbBocNum), LDB@NewMsg_FromNet(msg) );
+}
+
+export_to_C Ldb_NewMsg_FromLocal(msg)
+     void *msg;
+{
+  BranchCall(CpvAccess(LdbBocNum), LDB@NewMsg_FromLocal(msg) );
+}
+
+export_to_C LdbProcessMsg(msgPtr, localdataPtr)
+void *msgPtr, *localdataPtr;
+{
+	BranchCall(CpvAccess(LdbBocNum), LDB@ProcessMsg(msgPtr, localdataPtr));
+}
+
+export_to_C LdbProcessorIdle()
+{
+	BranchCall(CpvAccess(LdbBocNum), LDB@ProcessorIdle());
+}
+
+
+export_to_C LdbPeriodicCheckInit()
+{
+	BranchCall(CpvAccess(LdbBocNum) , LDB@PeriodicCheckInit());
+}
+
+
+BranchOffice LDB {
+
+int   NeedLdbStripMsg;
+int	numNeighbours;
+int	NumPE;
+int 	myPE;
+int *neighboursList;
+int LdbBoc;
+
+private Strategy(msg)
+void *msg;
+{
+    int pe = rand() % CmiNumPe();
+    if (pe == myPE)
+      {
+         CmiSetMsgHndlr(msg, CsvAccess(CallProcessMsg_Index));
+         EnqUsrMsg(msg);
+      }
+    else
+      SEND_TO(msg, pe);	
+}
+
+
+entry BranchInit : (message DUMMYMSG * dmsg)
+{
+	int i;
+	
+	TRACE(CkPrintf("Enter Node LdbInit()\n"));
+	LdbBoc = MyBocNum();
+	CpvAccess(LdbBocNum) = LdbBoc;
+	NumPE = CmiNumPe();
+	myPE = CmiMyPe();
+	numNeighbours = CmiNumNeighbours(myPE);
+	TRACE(CkPrintf("Node LdbInit() Done: NumPE %d, numNeighbours %d\n",
+		NumPE, numNeighbours));
+}
+
+
+public FillLDB(ldb)
+LDB_ELEMENT *ldb;
+{
+}
+
+public StripLDB(ldb)
+LDB_ELEMENT *ldb;
+{
+}
+
+
+public NewMsg_FromNet(msg) 
+void *msg;
+{
+    CmiSetMsgHndlr(msg, CsvAccess(CallProcessMsg_Index));
+    EnqUsrMsg(msg);
+}
+
+public NewMsg_FromLocal( msg)
+void *msg;
+{
+    PrivateCall(Strategy(msg));
+}
+
+public ProcessMsg(msgPtr, localdataPtr)
+void *msgPtr, *localdataPtr;
+{
+  CkFreeMsg(msgPtr);		/* After processing the message, free it.*/
+}
+
+public ProcessorIdle()
+{
+}
+
+
+public PeriodicCheckInit()
+{
+}
+
+
+}
+
+}
+
+

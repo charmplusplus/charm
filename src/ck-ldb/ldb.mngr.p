@@ -1,0 +1,676 @@
+/***************************************************************************
+ * RCS INFORMATION:
+ *
+ *	$RCSfile$
+ *	$Author$	$Locker$		$State$
+ *	$Revision$	$Date$
+ *
+ ***************************************************************************
+ * DESCRIPTION:
+ *
+ ***************************************************************************
+ * REVISION HISTORY:
+ *
+ * $Log$
+ * Revision 2.0  1995-06-29 21:19:36  narain
+ * *** empty log message ***
+ *
+ ***************************************************************************/
+/* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
+/* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
+/* * * * * * * * The MNGR Load Balancing Strategy* * * * * * * * */
+/* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
+/* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
+
+#define MAXINT  0xffff
+#define HUGE_INT 9999999
+
+#define MAX_BOSSES 32
+#define CLUSTER_SIZE 16
+
+#define  CONTROLLER(pe)  (((pe + 1)%CLUSTER_SIZE == 0) || ((pe + 1 ) == numPe))
+
+#define  MAX_STEP  5
+#define  MAX_EXCHANGES  6
+
+#define KID_SATURATION			3
+#define MINIMUM_KID_LOAD 		2
+#define KID_STATUS_UPDATE_INTERVAL  	50
+
+#define BOSS_SATURATION			3
+#define MINIMUM_BOSS_LOAD 		1
+#define BOSS_STATUS_UPDATE_INTERVAL  	25
+#define BOSS_REDIST_UPDATE_INTERVAL	100
+
+
+
+module ldb {
+#include "ldb.h"
+
+typedef struct ldb_element {
+  unsigned int srcPE;
+  int piggybackLoad;
+} LDB_ELEMENT;
+
+message {
+    int dummy;
+} DUMMYMSG;
+
+message {
+    int dummy;
+} DUMMY_MSG;
+
+typedef struct ldb_status {
+  int	peLoad;
+  int	myLoadSent;
+  int timeLoadSent;
+  int statusMsgID;
+} LDB_STATUS;
+
+
+export_to_C setLdbSize()
+{
+       CpvAccess(LDB_ELEM_SIZE) = sizeof(LDB_ELEMENT);
+}
+
+
+export_to_C LdbCreateBoc()
+{
+  DUMMYMSG *msg;
+  msg = (DUMMYMSG *)CkAllocMsg(DUMMYMSG);	
+  CreateBoc(LDB, LDB@BranchInit, msg);
+}
+
+
+export_to_C LdbFillLDB(ldb)
+  LDB_ELEMENT *ldb;
+{
+  BranchCall(CpvAccess(LdbBocNum), LDB@FillLDB(ldb));
+}
+
+export_to_C LdbStripLDB(ldb)
+     LDB_ELEMENT *ldb;
+{
+  BranchCall(CpvAccess(LdbBocNum), LDB@StripLDB(ldb));
+}
+
+
+
+export_to_C Ldb_NewMsg_FromNet(msg) 
+     void *msg;
+{
+  BranchCall(CpvAccess(LdbBocNum), LDB@NewMsg_FromNet(msg) );
+}
+
+export_to_C Ldb_NewMsg_FromLocal( msg)
+     void *msg;
+{
+  BranchCall(CpvAccess(LdbBocNum), LDB@NewMsg_FromLocal(msg) );
+}
+
+export_to_C LdbProcessMsg(msgPtr, localdataPtr)
+     void *msgPtr, *localdataPtr;
+{
+  BranchCall(CpvAccess(LdbBocNum), LDB@ProcessMsg(msgPtr, localdataPtr));
+}
+
+export_to_C LdbProcessorIdle()
+{
+  BranchCall(CpvAccess(LdbBocNum), LDB@ProcessorIdle());
+}
+
+
+export_to_C LdbPeriodicCheckInit()
+{
+  BranchCall(CpvAccess(LdbBocNum), LDB@PeriodicCheckInit());
+}
+
+export_to_C void LdbPeriodicBossesRedist()
+{
+  BranchCall(CpvAccess(LdbBocNum), LDB@PeriodicBossesRedist());
+}
+
+export_to_C void LdbPeriodicStatus()
+{
+}
+export_to_C void LdbPeriodicKidStatus()
+{
+}
+
+export_to_C void LdbPeriodicBossStatus()
+{
+  BranchCall(CpvAccess(LdbBocNum), LDB@PeriodicBossStatus());
+}
+
+export_to_C void LdbPeriodicRedist()
+{
+  /*
+    LdbPeriodicBossesRedist(bocNum);
+    */
+  BranchCall(CpvAccess(LdbBocNum), LDB@PeriodicKidsRedist());
+  CallBocAfter(LdbPeriodicRedist, CpvAccess(LdbBocNum), 
+	       BOSS_REDIST_UPDATE_INTERVAL);
+}
+
+BranchOffice LDB {
+  
+  
+  int exchanges;
+  BOOLEAN controller;
+  int mycontroller;
+  DUMMYMSG *statusMsg;
+  int load_cluster[CLUSTER_SIZE];
+  
+  int numBoss;
+  int nbr_boss[MAX_BOSSES];
+  int  load_boss[MAX_BOSSES];
+  DUMMYMSG *boss_statusMsg;
+  int myPE;
+  int LdbBoc;
+  
+  void *LdbFreeChareQueue;
+  
+  
+  private unsigned int flipi(n, i)
+    unsigned int n, i;
+  {
+    n /= CLUSTER_SIZE;
+    return( ((n & (1<<i)) ^ (1<<i)) | (n & ~(1<<i)));
+  }
+  
+  private unsigned int get_index(m)
+    unsigned int m;
+  {
+    unsigned int i, n, result;
+    
+    if (CONTROLLER(m))
+      {
+	n = myPE;
+	
+	for (i=0; i<exchanges; i++)
+	  {
+	    result = PrivateCall(flipi(n, i));
+	    if (m/CLUSTER_SIZE == result)
+	      return i;
+	  }
+      }
+    else
+      return (m % CLUSTER_SIZE);
+    return -1;
+  }
+  
+  private increment_load(least_loaded_pe)
+    int least_loaded_pe;
+  {
+    int index;
+    
+    index = PrivateCall(get_index(least_loaded_pe));
+    if (CONTROLLER(least_loaded_pe))
+      load_boss[index] ++;
+    else
+      load_cluster[index] += 1;
+  }
+  
+  private LeastLoadKids(load)
+    int *load;
+  {
+    int pe;
+    int index;
+    int min_pe = 0;
+    int min = HUGE_INT;
+    int start_pe, end_pe;
+    
+    end_pe = myPE;
+    start_pe = (end_pe/CLUSTER_SIZE)*CLUSTER_SIZE;
+    for (pe=start_pe; pe<end_pe; pe++)
+      {
+	index = PrivateCall(get_index(pe));
+	if (load_cluster[index] < min)
+	  {
+	    min = load_cluster[index];
+	    min_pe = pe;
+	  }
+      }
+    *load = min;
+    if (min < KID_SATURATION)
+      return(min_pe);
+    return -1;
+  }
+  
+
+  private LeastLoadBosses()
+    {
+      int i, j;
+      int min_pe;
+      int min = HUGE_INT;
+      static int start_pe = 0;
+      
+      if (numBoss <= 1) return -1;
+      for (j=0; j<exchanges; j++)
+	{
+	  i = (start_pe + j) % exchanges;
+	  if (load_boss[i] < min)
+	    {
+	      min = load_boss[i];
+	      min_pe = nbr_boss[i];
+	    }
+	}
+      if (min < BOSS_SATURATION)
+	{
+	  start_pe = min_pe; 
+	  return min_pe;
+	}
+      else
+	start_pe = 0;
+      return -1;
+    }
+  
+  
+  private int MyLoad()
+    {
+      return Qs_Length(LdbFreeChareQueue);
+    }
+
+  private PickFreeChareMsg(msgPtr)
+    void ** msgPtr;
+  {
+    if ( !Qs_Empty(LdbFreeChareQueue))
+      {
+	Qs_DeQMsg(LdbFreeChareQueue,msgPtr);
+      }   /* Funny define  */
+    else 
+      *msgPtr = (void *) NULL;
+  }
+
+  private SendFreeChare(pe, fixed)
+    int pe;
+  BOOLEAN fixed;
+  {	
+    void *msg; 
+    
+    PrivateCall(PickFreeChareMsg(&msg));
+    if (msg)
+      {
+	SEND_FIXED_TO(msg, fixed, pe);
+	return 1;
+      }	
+    return 0;
+  }
+  
+  private do_redistribution(other, other_load)
+    int other, other_load;
+  {
+    int i;
+    int number;
+    int SKIP = 1;
+    int index = 0;
+    int my_load = PrivateCall(MyLoad());
+    
+    number = 0;
+    if (my_load > other_load)
+      number = (my_load - other_load)/2;
+#ifdef PRIORITY
+    number = MAX_EXCHANGES/2;
+#endif
+    
+    TRACE(CkPrintf("[%d] do_redist: my_load=%d, other_load=%d, number = %d\n",
+		   myPE, my_load, other_load, number));	
+    
+    if (number > MAX_EXCHANGES)
+      number = MAX_EXCHANGES;
+    for (i=0; i<number; i++)
+      PrivateCall(SendFreeChare(other, FALSE));
+    TRACE(CkPrintf("[%d] do_redist: Finish\n", myPE));	
+  }
+  
+  private MyController(x)
+    int x;
+  {
+    x = x / CLUSTER_SIZE;
+    x = (x+1)*CLUSTER_SIZE;
+    if (x>numPe-1)
+      return numPe-1;
+    return x-1;
+  }
+  
+  
+  private SentUpdateStatus(pe)
+    int pe;
+  {
+  }
+  
+  private RecvUpdateStatus(ldb)
+    LDB_ELEMENT * ldb;
+  {
+    int index;
+    
+    index = PrivateCall(get_index(ldb->srcPE));
+    if (CONTROLLER(ldb->srcPE))
+      load_boss[index] = ldb->piggybackLoad;
+    else
+      load_cluster[index] = ldb->piggybackLoad;
+  }
+  
+  
+  private PrintNodeNeighbours()
+    {
+    }
+  
+  public ProcessorIdle()
+    {
+    }
+  
+  
+  private LeastLoadPe()
+    {
+      int pe;
+      int boss;
+      int kid_load;
+      int kid = PrivateCall(LeastLoadKids(&kid_load));
+      
+      if (kid==-1)
+	pe = PrivateCall(LeastLoadBosses());
+      else
+	if (kid_load < MINIMUM_KID_LOAD)
+	  pe = kid;
+	else
+	  {
+	    pe = PrivateCall(LeastLoadBosses());
+	    /*
+	      if (pe == -1)
+	      pe = kid;
+	      */
+	  }
+      
+      return pe;
+    }
+  
+  
+  
+  private EmptyQueue()
+    {
+      if (Qs_Empty(LdbFreeChareQueue))
+	return TRUE;
+      return FALSE;
+    }
+
+  
+  
+  
+  private EnqMsg(msg)
+    void *msg;
+  {
+    Qs_EnQMsg(LdbFreeChareQueue, msg);
+  }
+  
+  public PeriodicCheckInit()
+    {
+      if (numPe > 1)
+	{
+	  if (CONTROLLER(myPE))
+	    {
+	      if (numPe > CLUSTER_SIZE)
+		CallBocAfter(LdbPeriodicBossStatus, LdbBoc, 
+			     BOSS_STATUS_UPDATE_INTERVAL);
+	      CallBocAfter(LdbPeriodicRedist, LdbBoc,
+			   BOSS_REDIST_UPDATE_INTERVAL);
+	    }
+	  else
+	    CallBocAfter(LdbPeriodicKidStatus, LdbBoc, 
+			 KID_STATUS_UPDATE_INTERVAL);
+	}
+    }
+  
+  
+  public ProcessMsg(msgPtr, localdataPtr)
+    void *msgPtr, *localdataPtr;
+  {
+  }
+  
+  
+  /* LDB Branch Office Chare Functions */
+  
+  entry RecvStatus : (message DUMMYMSG *dmsg)
+    {
+      LDB_ELEMENT *ldb;
+      int index;
+      ldb = LDB_UPTR(dmsg);
+      
+      if (CONTROLLER(ldb->srcPE))
+	{
+	  index = PrivateCall(get_index(ldb->srcPE));
+	  PrivateCall(do_redistribution(ldb->srcPE, load_boss[index]));
+	}
+      CkFreeMsg(dmsg);
+    }
+  
+  entry BranchInit : (message DUMMYMSG * dmsg)
+    {
+      int i;
+      void *Qs_Create();
+      LDB_ELEMENT *ldb;
+  
+      TRACE(CkPrintf("Enter Node LdbInit()\n"));
+      
+      CpvAccess(LDB_ELEM_SIZE) = sizeof(LDB_ELEMENT);
+      LdbBoc = MyBocNum();
+      CpvAccess(LdbBocNum) = LdbBoc;
+      
+      numPe = CmiNumPe();
+      myPE = CmiMyPe();
+      controller = CONTROLLER(myPE);
+      mycontroller = PrivateCall(MyController(myPE));
+      exchanges = numBoss = 0;
+      if (controller)
+	{
+	  LdbFreeChareQueue = Qs_Create();
+	  for (i=0; i<CLUSTER_SIZE; i++)
+	    load_cluster[i] = 0;
+	  if (numPe%CLUSTER_SIZE == 0)
+	    numBoss = numPe/CLUSTER_SIZE;
+	  else
+	    numBoss = numPe/CLUSTER_SIZE + 1;
+	  if (numBoss > 1)
+	    {
+	      exchanges = (int) (log((double) numBoss) /
+				 log((double) 2.0));
+	      
+	      TRACE(CkPrintf("[%d] Ldbinit: log(numBoss)=%f, log(2.0)=%f, exchanged=%f\n",
+			     myPE, log((double) numBoss), log((double) 2.0),
+			     log((double) numBoss)/log((double) 2.0)));
+	      
+	      TRACE(CkPrintf("[%d] LdbInit: exchanges=%d, numBoss=%d\n",
+			     myPE, exchanges, numBoss));
+	      
+	      for (i=0; i<exchanges; i++)
+		{
+		  int boss_index;
+		  
+		  boss_index = PrivateCall(flipi(myPE, i));
+		  load_boss[i] = 0;
+		  if((nbr_boss[i] = (CLUSTER_SIZE-1) + boss_index*CLUSTER_SIZE)
+		     >= numPe)
+		    nbr_boss[i] = numPe - 1;
+		}
+	    }
+	}
+    }
+  
+  
+  /* Load Balance messages received at the Node from the Network */
+  public StripLDB(ldb)
+    LDB_ELEMENT *ldb;
+  {
+    /*possible Neighbour update status from piggyback info from Node only*/
+    if ((numPe > 1) && (ldb->srcPE != myPE) 
+	&&  (ldb->srcPE != McHostPeNum()) && controller)
+      PrivateCall(RecvUpdateStatus(ldb));
+  }
+  
+  private Strategy(msg)
+    void *msg;
+  {
+    int load;
+    LDB_ELEMENT *ldb;
+    int least_loaded_pe, fixed;
+    
+    ldb = LDB_UPTR(msg);
+    if (CONTROLLER(ldb->srcPE))
+      least_loaded_pe = PrivateCall(LeastLoadKids(&load));
+    else
+      least_loaded_pe = PrivateCall(LeastLoadPe());
+    
+    TRACE(CkPrintf("[%d] LdbStrategy: srcPE=%d, destPE=%d\n",
+		   myPE, ldb->srcPE, least_loaded_pe));
+    
+    if (least_loaded_pe >= 0)
+      {
+#ifdef PRIORITY
+	if (PrivateCall(EmptyQueue())) 
+	  {
+	    fixed = (!CONTROLLER(least_loaded_pe))?  TRUE: FALSE;
+	    
+	    TRACE(CkPrintf("[%d] LdbStrategy: x = 0x%x, size = %d,dest = %d\n",
+			   myPE, x, CmiSize(x), x->destPE));
+	    SEND_FIXED_TO(msg, fixed, least_loaded_pe);
+	    PrivateCall(increment_load(least_loaded_pe));
+	  }
+	else
+#endif
+	  {
+	    PrivateCall(EnqMsg(msg));
+	    if (PrivateCall(SendFreeChare(least_loaded_pe, 
+					  !CONTROLLER(least_loaded_pe))))
+	      PrivateCall(increment_load(least_loaded_pe));
+	  }
+      }
+    else
+      PrivateCall(EnqMsg(msg));
+  }
+
+  public NewMsg_FromNet(x)
+    void *x;
+  {
+    if (controller)
+      PrivateCall(Strategy(x));
+    else
+      { 
+	TRACE(CkPrintf("[%d] Ldb_NewChare_Net:: Message from outside. \n",
+		       myPE));
+	QsEnqUsrMsg(x);
+      }
+  }
+  
+
+  public NewMsg_FromLocal(x)
+    void *x;
+  {
+    if (controller)
+      {
+	TRACE(CkPrintf("[%d] Ldb_NewChare_Local:: Queuing up.\n",
+		       myPE));
+      PrivateCall(EnqMsg(x));
+      }
+    else
+      {
+	TRACE(CkPrintf("[%d] Ldb_NewChare_Local:: Send to control.\n",
+		       myPE));
+	SEND_TO(x, mycontroller);
+      }
+  }
+
+  
+  
+  public FillLDB(ldb)
+    LDB_ELEMENT *ldb;
+  {
+    ldb->srcPE = myPE;
+    if (CONTROLLER(ldb->srcPE))
+      ldb->piggybackLoad = PrivateCall(MyLoad());
+    else	
+      ldb->piggybackLoad = QsMyLoad();
+  }
+  
+  
+  
+  public void PeriodicKidStatus()
+    {
+      statusMsg = (DUMMYMSG *) CkAllocMsg(DUMMYMSG);
+      CkMemError(statusMsg);
+      ImmSendMsgBranch(RecvStatus, statusMsg, mycontroller);
+      CallBocAfter(LdbPeriodicKidStatus, LdbBoc,
+		   KID_STATUS_UPDATE_INTERVAL);
+    }
+
+  
+  
+  public void PeriodicBossStatus()
+    {
+      static int index = 0;
+
+      boss_statusMsg = (DUMMYMSG *) CkAllocMsg(DUMMYMSG);
+      CkMemError(boss_statusMsg);
+      ImmSendMsgBranch(RecvStatus, boss_statusMsg, nbr_boss[index]);
+      index = (index+1) % exchanges;
+      CallBocAfter(LdbPeriodicBossStatus, LdbBoc, 
+		   BOSS_STATUS_UPDATE_INTERVAL);
+    }
+
+  
+  
+  
+  public void PeriodicKidsRedist()
+    {
+      int i, j;
+      int picked, index;
+      BOOLEAN done;
+      int start_pe, end_pe;
+      
+      end_pe = myPE;
+      start_pe = (end_pe/CLUSTER_SIZE) * CLUSTER_SIZE;
+      done = FALSE;
+      
+      while (!done)
+	{
+	  picked=0;
+	  for (i=start_pe; i<end_pe; i++)
+	    {	
+	      index = PrivateCall(get_index(i));
+	      if (load_cluster[index] < KID_SATURATION)
+		{
+		  if (PrivateCall(SendFreeChare(i, TRUE)))
+		    {
+		      picked++;
+		      load_cluster[index]++;
+		    }
+		  else
+		    {
+		      done = TRUE;
+		      break;
+		    }
+		}
+	    }
+	  if (!picked)
+	    done = TRUE;
+	}
+    }
+  
+  public void PeriodicBossesRedist()
+    {
+      int i;
+      
+      for (i=0; i<exchanges; i++)
+	if (load_boss[i] < BOSS_SATURATION)
+	  if (PrivateCall(SendFreeChare(nbr_boss[i], FALSE)))
+	    load_boss[i]++;
+	  else
+	    break;
+    }
+
+  
+}
+  
+  
+}
+
+
