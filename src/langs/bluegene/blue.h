@@ -50,6 +50,7 @@ void BgSetNodeData(char *data);
 	/* register user defined function and get a handler, 
 	   should only be called in BgGlobalInit() */
 int  BgRegisterHandler(BgHandler h);
+void BgNumberHandler(int, BgHandler h);
 
 double BgGetTime();
 

@@ -292,6 +292,11 @@ int BgRegisterHandler(BgHandler h)
   return cur;
 }
 
+void BgNumberHandler(int idx, BgHandler h)
+{
+  cva(handlerTable)[idx] = h;
+}
+
 /* communication thread call getFullBuffer to test if there is data ready 
    in INBUFFER for its own queue */
 bgMsg * getFullBuffer()
