@@ -28,14 +28,18 @@ class CkVector3dT {
 public:
 	real x,y,z;
 	CkVector3dT(void) {}//Default consructor
+
 	//Simple 1-value constructors
 	explicit CkVector3dT(int init) {x=y=z=(real)init;}
 	explicit CkVector3dT(float init) {x=y=z=(real)init;}
 	explicit CkVector3dT(double init) {x=y=z=(real)init;}
+	//Array constructors:
+	explicit CkVector3dT(const int *i) {x=(real)i[0];y=(real)i[1];z=(real)i[2];}
+	explicit CkVector3dT(const float *i) {x=(real)i[0];y=(real)i[1];z=(real)i[2];}
+	explicit CkVector3dT(const double *i) {x=(real)i[0];y=(real)i[1];z=(real)i[2];}
+
 	//3-value constructor
 	CkVector3dT(const real Nx,const real Ny,const real Nz) {x=Nx;y=Ny;z=Nz;}
-	//real array constructor
-	CkVector3dT(const real *arr) {x=arr[0];y=arr[1];z=arr[2];}
 
 #if 0
 	//Constructors from other types of CkVector:
