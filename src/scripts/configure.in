@@ -213,7 +213,7 @@ then
     if test $finish = 0 && test -n "$TELNET" && test -n "$UUDECODE"
     then
       printf "(telnet) ..."
-      ( cat > get_libpthread <<EOT
+      cat > get_libpthread <<EOT
 #! /bin/sh
 echo "GET /distrib/libpthread.uu 1.0"
 echo
@@ -224,7 +224,7 @@ while : ; do
  sleep 1
 done
 EOT
-      /bin/sh ./get_libpthread | $TELNET charm.cs.uiuc.edu 80 > .uulib 2>/dev/null) && $UUDECODE .uulib && rm -f .uulib && mv libpthread.a ../lib && finish=1
+      /bin/sh ./get_libpthread | ($TELNET $CHARMIP 80 > .uulib 2>/dev/null); $UUDECODE .uulib 2>/dev/null && rm -f .uulib && mv libpthread.a ../lib && finish=1
     fi
     if test $finish = 0 || test ! -f ../lib/libpthread.a
     then
