@@ -46,7 +46,7 @@ MACHINE = BlueGene
 all:
 	@echo
 	for i in $(SUBDIRS) ; do \
-	( cd $$i ; make $(MACHINE) MACHINE="../$(MACHINE)" ) || exit 1; \
+	( cd $$i ; $(MAKE) $(MACHINE) MACHINE="../$(MACHINE)" ) || exit 1; \
 	done
 
 	$(CHARMC) -o InitNetwork.o -seq InitNetwork.C -I../Main -I./
@@ -58,7 +58,7 @@ all:
 clean:
 	@echo
 	for i in $(SUBDIRS) ; do \
-	( cd $$i ; make clean ) ; \
+	( cd $$i ; $(MAKE) clean ) ; \
 	done
 	cd ../tmp; rm -f *.o; rm -f charmrun; rm -f module*; rm -f $(PGM)
 	rm -f *.o
