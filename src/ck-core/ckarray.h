@@ -104,7 +104,7 @@ public:
 class CkArrayMessage {
 public:
   //These routines are implementation utilities
-  CkArrayIndexMax &array_index(void);
+  inline CkArrayIndexMax &array_index(void);
   unsigned short &array_ep(void);
   unsigned char &array_hops(void);
   unsigned int array_getSrcPe(void);
@@ -329,11 +329,11 @@ public:
   // After send, the array owns msg.
   void Send(CkArrayMessage *msg);
   //Called by send to deliver message to an element.
-  void RecvForElement(CkArrayMessage *msg);
+  inline void RecvForElement(CkArrayMessage *msg);
   //Called by CkArrayRec for a local message
   void deliverLocal(CkArrayMessage *msg,ArrayElement *el);
    //Called by CkArrayRec for a remote message
-  void deliverRemote(CkArrayMessage *msg,int onPE);
+  inline void deliverRemote(CkArrayMessage *msg,int onPE);
    //Called by CkArrayRec for a remote message
   void deliverUnknown(CkArrayMessage *msg);
 

@@ -978,7 +978,7 @@ void CkArray::migrateMe(ArrayElement *el, int where)
   
   //Switch this element's CkArrayRec to remote--
   insertRec(new CkArrayRec_remote(this,where),idx);
-  curElementIsDead=true;
+  curElementIsDead=CmiTrue;
 }
 
 void CkArray::RecvMigratedElement(CkArrayElementMigrateMessage *msg)
