@@ -67,14 +67,14 @@ static void setPad(char *pad) {
 }
 
 /*The given area is uninitialized-- fill it as such. */
-int memory_fill=-1;
+int memory_fill=-1; /*-1 (alternate), 0 (zeros), or 1 (DE)*/
+int memory_fillphase=0;
 static void fill_uninit(char *loc,int len)
 {
-	static int fillCount=0;
 	int fill=memory_fill;
 	char fillChar;
 	if (fill==-1) /*Alternate zero and DE fill*/
-		fill=(fillCount++)%2;
+		fill=(memory_fillphase++)%2;
 	if (fill!=0) fillChar=0xDE;
 	else fillChar=0;
 	memset(loc,fillChar,len);
@@ -226,9 +226,31 @@ static int meta_getpagesize(void)
 	return cache;
 }
 
+/*Only display startup status messages from processor 0*/
+static void status(char *msg) {
+  if (CmiMyPe()==0) {
+    CmiPrintf("%s",msg);
+  }
+}
 static void meta_init(char **argv)
 {
-  CmiPrintf("[%d] Converse -memory mode: paranoid\n",CmiMyPe());
+  status("Converse -memory mode: paranoid");
+  /*Parse uninitialized-memory-fill options:*/
+  if (CmiGetArgInt(argv,"+memory_fill",&memory_fill)) { 
+    status(" fill");
+  }
+  if (CmiGetArgFlag(argv,"+memory_fillphase")) { 
+    status(" phaseflip");
+    memory_fillphase=1;
+  }
+  if (CmiGetArgInt(argv,"+memory_fillphase",&memory_fillphase)) { 
+    status(" phaseflip");
+  }  
+  /*Parse heap-check options*/
+  if (CmiGetArgInt(argv,"+memory_checkfreq",&memory_checkfreq)) {
+    status(" checkfreq");
+  }
+  status("\n");
 }
 
 static void *meta_malloc(size_t size)
