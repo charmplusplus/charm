@@ -7,6 +7,23 @@ init(void)
 {
 }
 
+static int
+mypksz(GlobalData *gd)
+{
+  return 0;
+}
+
+static void
+mypk(GlobalData *gd, void *buffer)
+{
+}
+
+static GlobalData *
+myupk(void *buffer)
+{
+  return 0;
+}
+
 static void
 initNodes(GlobalData *gd)
 {
@@ -59,6 +76,8 @@ extern "C" void
 driver(int nn, int *nnums, int ne, int *enums, int npere, int *conn)
 {
   GlobalData *gd = new GlobalData;
+  FEM_Register((void*)gd, (FEM_Packsize_Fn)mypksz, (FEM_Pack_Fn)mypk,
+               (FEM_Unpack_Fn)myupk);
   Node *nodes = new Node[nn];
   Element *elements = new Element[ne];
   gd->myid = FEM_My_Partition();
@@ -100,6 +119,12 @@ driver(int nn, int *nnums, int ne, int *enums, int npere, int *conn)
     lst_coh2(gd);
     updateNodes(gd, prop, slope);
     FEM_Update_Field(rfield, gd->nodes);
+    // FIXME: Place holder for now.
+    FEM_Migrate();
+    gd = (GlobalData*) FEM_Get_Userdata();
+    gd->nnums = FEM_Get_Node_Nums();
+    gd->enums = FEM_Get_Elem_Nums();
+    gd->conn = FEM_Get_Conn();
   }
   etime = CkTimer();
   if(gd->myid == 0)
