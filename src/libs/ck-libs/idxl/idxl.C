@@ -13,6 +13,26 @@ Orion Sky Lawlor, olawlor@acm.org, 1/7/2003
 #include "idxl.h"
 #include "idxl.decl.h"
 
+class IDXL_DataMsg : public CMessage_IDXL_DataMsg
+{
+ public:
+  int seqnum, tag; //Sequence number and user tag
+  int from; //Source's chunk number
+  int length; //Length in bytes of below array
+  int nSto; //Number of separate send/recv entries in message
+  void *data; // User data
+  double alignPad; //Makes sure this structure is double-aligned
+  
+  IDXL_DataMsg(int s,int t, int f,int l, int sto) 
+    :seqnum(s), tag(t), from(f), length(l), nSto(sto) 
+  	{ data = (void*) (this+1); }
+  IDXL_DataMsg(void) { data = (void*) (this+1); }
+  static void *pack(IDXL_DataMsg *);
+  static IDXL_DataMsg *unpack(void *);
+  static void *alloc(int, size_t, int*, int);
+};
+
+
 //_idxlptr gives the current chunk
 CtvStaticDeclare(IDXL_Chunk*, _idxlptr);
 void IDXLnodeInit(void) {
@@ -150,26 +170,6 @@ IDXL_Layout_List &getLayouts(void) {
 }
 
 /**** Data Message ****/
-class IDXL_DataMsg : public CMessage_IDXL_DataMsg
-{
- public:
-  int seqnum, tag; //Sequence number and user tag
-  int from; //Source's chunk number
-  int length; //Length in bytes of below array
-  int nSto; //Number of separate send/recv entries in message
-  void *data; // User data
-  double alignPad; //Makes sure this structure is double-aligned
-  
-  IDXL_DataMsg(int s,int t, int f,int l, int sto) 
-    :seqnum(s), tag(t), from(f), length(l), nSto(sto) 
-  	{ data = (void*) (this+1); }
-  IDXL_DataMsg(void) { data = (void*) (this+1); }
-  static void *pack(IDXL_DataMsg *);
-  static IDXL_DataMsg *unpack(void *);
-  static void *alloc(int, size_t, int*, int);
-};
-
-
 void *
 IDXL_DataMsg::pack(IDXL_DataMsg *in)
 {
