@@ -1,0 +1,37 @@
+This application forms a little stiffness matrix from a 
+2D grid of springs.  The finite element formulation is
+undoubtably horribly wrong, but this should be enough to
+demonstrate how to solve matrix-based problems with real
+boundary conditions using the FEM framework.
+
+-------- Scaling Test on Cool -------
+A 100x100 grid (10K elements, 30K DOF) can be solved 
+serially in about 500 iterations, which takes some 15s.
+This tiny problem doesn't scale up very well--4.7 seconds on
+4 processors.  This is probably because the mesh setup
+overwhelms the actual calculation.
+
+A 200x200 grid (40K elements, 120K DOF) takes 1000 iterations
+and hence 34 seconds (about 8x longer) on 4 processors.
+The scaling is a bit better:
+  +p4, +n4: 34s
+  +p8, +n8: 18s
+  +p8, +n8, +vp16: 18s 
+  +p8, +n8, +vp32: 19s
+  +p8, +n8, +vp64: 21s
+  +p8, +n2: 47s (implies memory bandwidth is an issue)
+  +p8, +n2, +vp16: 42s 
+  +p8, +n2, +vp32: 42s
+  +p16, +n8: 15s (counting bandwidth limit, this is OK)
+  +p24, +n8: 14s
+A single timestep is in the dozen-millisecond range, so on
+this timeshared system we can't hope for much.
+
+A 400x400 grid (160K elements, 0.5M DOF) takes 2000 iterations
+and hence 143 seconds, which is right in line.
+  +p2, +n2: 526s
+  +p4, +n4: 296s
+  +p8, +n8: 143s (perfect!)
+  +p16, +n8: 110s
+
+
