@@ -1,1 +1,1 @@
--module tcharm -lmetis -lddt 
+-module tcharm -lmetis -lddt -lcomm
