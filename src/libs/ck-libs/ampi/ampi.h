@@ -8,9 +8,6 @@
 #ifndef _MPI_H
 #define _MPI_H
 
-#ifdef __cplusplus
-extern "C" {
-#endif
 
 /*NON-standard define: this lets people #ifdef on
 AMPI, e.g. for our bizarre MPI_Main.
@@ -18,14 +15,21 @@ AMPI, e.g. for our bizarre MPI_Main.
 #define AMPI
 
 /*
-Silently rename the user's main routine to "MPI_Main" or "MPI_Main_cpp".
-This is needed so we can call the routine as a new thread.
+Silently rename the user's main routine.
+This is needed so we can call the routine as a new thread,
+instead of as an actual "main".
 */
-#ifdef __cplusplus
+#ifdef __cplusplus /* C++ version-- rename "main" as "MPI_Main_cpp" */
 #  define main MPI_Main_cpp
-#else
+int MPI_Main_cpp(int argc,char **argv); /* prototype for C++ main routine */
+
+extern "C" {
+#else /* C version-- rename "main" as "MPI_Main" */
 #  define main MPI_Main
 #endif
+
+int MPI_Main(int argc,char **argv); /* prototype for C main routine */
+
 
 /********************** MPI-1.1 prototypes and defines ***************************/
 /* MPI-1 Errors */

@@ -280,8 +280,6 @@ int _ampi_fallback_setup_count;
 CDECL void MPI_Setup(void);
 FDECL void FTN_NAME(MPI_SETUP,mpi_setup)(void);
 
-int MPI_Main_cpp(int argc,char **argv);
-CDECL int MPI_Main(int argc,char **argv);
 FDECL void FTN_NAME(MPI_MAIN,mpi_main)(void);
 
 /*Main routine used when missing MPI_Setup routine*/
