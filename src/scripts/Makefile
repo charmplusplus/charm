@@ -23,15 +23,15 @@
 
 SHELL=/bin/sh
 
-all: charm++ IDL smsg pvm sdag
+all: charm++ IDL tsm sm pvm sdag
 
-charm: converse charmlibs
-
-charm++: charm charmxi libck-cplus-y.a libck-defmain-cpp.a
+charm++: converse charmxi charmlibs
 
 IDL: charm++ charmidl libidl.a
 
-smsg: converse libsimplemsg.a
+tsm: converse libtsm.a
+
+sm: converse libsm.a
 
 pvm: converse libpvmc.a
 
@@ -56,7 +56,7 @@ SEQCHARMC=../bin/charmc -seq $(CHARMOPTS)
 #
 ###############################################################################
 
-ALLHEADERS=charm++.h charm.h charm++-inc.h charm-inc.h cpthreads.h converse.h conv-mach.h simplemsg.h trace.h pvmc.h pvm3.h sdag.h CDep.h CCounter.h CMsgBuffer.h CWhenTrigger.h TList.h idl.h objectData.h fifo.h queueing.h
+ALLHEADERS=charm++.h ckstream.h charm.h cpthreads.h converse.h conv-trace.h conv-mach.h simplemsg.h sm.h trace.h pvmc.h pvm3.h sdag.h CDep.h CCounter.h CMsgBuffer.h CWhenTrigger.h TList.h idl.h
 
 ALLINTERFACES=idl.ci
 
@@ -118,11 +118,11 @@ dirs+sources:
 
 CVHEADERS=converse.h conv-mach.h conv-mach.csh
 
-TRACELIBS=libtrace-none.a libtrace-summary.a libtrace-projections.a
+TRACELIBS=libtrace-none.a libtrace-projections.a
 
 CVLIBS=libconv-core.a libconv-cplus-n.a libconv-cplus-y.a libldb-rand.o libldb-spray.o libldb-graph.o libldb-test.o $(TRACELIBS)
 
-LIBCONV_CORE=threads.o convcore.o conv-conds.o spantree.o queueing.o fifo.o msgmgr.o memory.o cpm.o cpthreads.o futures.o cldb.o random.o messageData.o objectData.o info.o globals.o
+LIBCONV_CORE=threads.o convcore.o conv-conds.o spantree.o queueing.o fifo.o msgmgr.o memory.o cpm.o cpthreads.o futures.o cldb.o random.o debug-message.o debug-object.o info.o
 
 converse: basics QuickThreads/libqt.a $(CVLIBS) conv-host-if-needed conv-cpm
 
@@ -195,7 +195,6 @@ libldb-rand.o: cldb.rand.c $(CVHEADERS)
 
 libldb-graph.o: cldb.graph.c ../../src/Common/conv-ldb/cldb.graph.h $(CVHEADERS)
 	$(CHARMC) -I../../src/Common/conv-ldb/ -cp ../lib/ -o $@ cldb.graph.c 
-#	$(CHARMC) -cp cldb.graph.c ../lib/ -o $@ cldb.graph.o cldb.graph.h
 
 libldb-spray.o: cldb.spray.c $(CVHEADERS)
 	$(CHARMC) -cp ../lib/ -o $@ cldb.spray.c
@@ -209,143 +208,68 @@ libldb-test.o: cldb.test.c $(CVHEADERS)
 #
 ###############################################################################
 
-CKHEADERS=charm.h trace.h $(CVHEADERS)
+CKHEADERS=ck.h ckstream.h envelope.h init.h qd.h charm.h charm++.h trace.h \
+          CkFutures.decl.h CkFutures.def.h ckfutures.h $(CVHEADERS)
 
-CK_LIBS_CORE=libck-core.a
+CK_LIBS_CORE=libck.a
 
-CK_LIBS_LDB=
+CK_LIBS=$(CK_LIBS_CORE)
 
-CK_LIBS_CPLUS=libck-cplus-n.a libck-defmain-std.a
-
-CK_LIBS=$(CK_LIBS_CORE) $(CK_LIBS_LDB) $(CK_LIBS_CPLUS)
-
-LIBCK_CORE=common.o globals.o init.o register.o boc.o condsend.o qd.o vid.o rdonly.o stat.o wrtone.o acc.o mono.o tbl.o memstuff.o ck.o main.o
+LIBCK_CORE=init.o register.o qd.o ck.o main.o msgalloc.o ckfutures.o
 
 charmlibs: converse $(CK_LIBS)
 
-libck-core.a: $(LIBCK_CORE)
+libck.a: $(LIBCK_CORE)
 	$(CHARMC) -cp ../lib/ -o $@ $(LIBCK_CORE)
 
 LIBTRACE_NONE=trace-none.o
 libtrace-none.a: $(LIBTRACE_NONE)
 	$(CHARMC) -cp ../lib/ -o $@ $(LIBTRACE_NONE)
 
-LIBTRACE_SUMMARY=trace-summary.o traceio.o
-libtrace-summary.a: $(LIBTRACE_SUMMARY)
-	$(CHARMC) -cp ../lib/ -o $@ $(LIBTRACE_SUMMARY)
-
-LIBTRACE_PROJ=trace-projections.o traceio.o
+LIBTRACE_PROJ=trace-projections.o
 libtrace-projections.a: $(LIBTRACE_PROJ)
 	$(CHARMC) -cp ../lib/ -o $@ $(LIBTRACE_PROJ)
 
-libldb-acwn.o: ldb.acwn.p ldb.h $(CKHEADERS)
-	$(CHARMC) -cp ../lib/ -o $@ ldb.acwn.p
-
-libldb-mngr.o: ldb.mngr.p ldb.h $(CKHEADERS)
-	$(CHARMC) -cp ../lib/ -o $@ ldb.mngr.p
-
-libck-cplus-n.a: dummy.cplus.c $(CKHEADERS)
-	$(CHARMC) -cp ../lib/ -o $@ dummy.cplus.c
-
-libck-defmain-std.a: defmain-std.c $(CKHEADERS)
-	$(CHARMC) -cp ../lib/ -o $@ defmain-std.c
-
-common.o: common.c $(CKHEADERS)
-	$(CHARMC) -o common.o common.c
-
-globals.o: globals.c $(CKHEADERS)
-	$(CHARMC) -o globals.o globals.c
-
-register.o: register.c $(CKHEADERS)
-	$(CHARMC) -o register.o register.c
-
-init.o: init.c $(CKHEADERS)
-	$(CHARMC) -o init.o init.c
-
-boc.o: boc.c $(CKHEADERS)
-	$(CHARMC) -o boc.o boc.c
-
-condsend.o: condsend.c $(CKHEADERS)
-	$(CHARMC) -o condsend.o condsend.c
-
-qd.o: qd.c $(CKHEADERS)
-	$(CHARMC) -o qd.o qd.c
-
-vid.o: vid.c $(CKHEADERS)
-	$(CHARMC) -o vid.o vid.c
-
-stat.o: stat.c $(CKHEADERS)
-	$(CHARMC) -o stat.o stat.c
-
-rdonly.o: rdonly.c $(CKHEADERS)
-	$(CHARMC) -o rdonly.o rdonly.c
-
-acc.o: acc.c $(CKHEADERS)
-	$(CHARMC) -o acc.o acc.c
-
-mono.o: mono.c $(CKHEADERS)
-	$(CHARMC) -o mono.o mono.c
-
-tbl.o: tbl.c $(CKHEADERS)
-	$(CHARMC) -o tbl.o tbl.c
-
-wrtone.o: wrtone.c $(CKHEADERS)
-	$(CHARMC) -o wrtone.o wrtone.c
-
-memstuff.o: memstuff.c $(CKHEADERS)
-	$(CHARMC) -o memstuff.o memstuff.c
-
-main.o: main.c $(CKHEADERS)
-	$(CHARMC) -o main.o main.c
-
-objectData.o: objectData.h objectData.C $(CKHEADERS)
-	$(CHARMC) -o objectData.o objectData.C
-
-messageData.o: messageData.C $(CKHEADERS)
-	$(CHARMC) -o messageData.o messageData.C
-
-info.o:	info.c $(CKHEADERS)
-	$(CHARMC) -o info.o info.c
-
-ck.o: ck.c $(CKHEADERS)
-	$(CHARMC) -o ck.o ck.c
-
-traceio.o : traceio.c trace.h $(CKHEADERS)
-	$(CHARMC) -o traceio.o traceio.c
-
-trace-none.o : trace-none.c trace.h $(CKHEADERS)
-	$(CHARMC) -o trace-none.o trace-none.c
-
-trace-summary.o : trace-summary.c trace.h $(CKHEADERS)
-	$(CHARMC) -o trace-summary.o trace-summary.c
-
-trace-record.o : trace-record.c trace.h $(CKHEADERS)
-	$(CHARMC) -o trace-record.o trace-record.c
-
-trace-replay.o : trace-replay.c trace.h $(CKHEADERS)
-	$(CHARMC) -o trace-replay.o trace-replay.c
-
-trace-projections.o : trace-projections.c trace.h $(CKHEADERS)
-	$(CHARMC) -o trace-projections.o trace-projections.c
-
-###############################################################################
-#
-# C++ code for the charm++ runtime library.
-#
-###############################################################################
-
-ckfutures.o: ckfutures.C ckfutures.ci charm++.h $(CKHEADERS)
+CkFutures.decl.h CkFutures.def.h : ckfutures.ci charmxi
 	$(CHARMC) ckfutures.ci
-	$(CHARMC) -c ckfutures.C
+	/bin/cp CkFutures.decl.h CkFutures.def.h ../include
 
-cplus.o: cplus.C charm++.h $(CKHEADERS)
-	$(CHARMC) -o cplus.o cplus.C
+init.o: init.C $(CKHEADERS)
+	$(CHARMC) -o init.o init.C
 
-libck-cplus-y.a: cplus.o ckfutures.o 
-	$(CHARMC) -cp ../lib/ -o $@ cplus.o ckfutures.o
+msgalloc.o: msgalloc.C $(CKHEADERS)
+	$(CHARMC) -o msgalloc.o msgalloc.C
 
-libck-defmain-cpp.a: defmain-cpp.C $(CKHEADERS)
-	$(CHARMC) -cp ../lib/ -o $@ defmain-cpp.C
+register.o: register.C $(CKHEADERS)
+	$(CHARMC) -o register.o register.C
+
+ckfutures.o: ckfutures.C $(CKHEADERS)
+	$(CHARMC) -o ckfutures.o ckfutures.C
+
+qd.o: qd.C $(CKHEADERS)
+	$(CHARMC) -o qd.o qd.C
+
+main.o: main.C $(CKHEADERS)
+	$(CHARMC) -o main.o main.C
+
+debug-object.o: debug-object.h debug-object.C $(CKHEADERS)
+	$(CHARMC) -o debug-object.o debug-object.C
+
+debug-message.o: debug-message.C $(CKHEADERS)
+	$(CHARMC) -o debug-message.o debug-message.C
+
+info.o:	info.C $(CKHEADERS)
+	$(CHARMC) -o info.o info.C
+
+ck.o: ck.C $(CKHEADERS)
+	$(CHARMC) -o ck.o ck.C
+
+trace-none.o : trace-none.C trace.h $(CKHEADERS)
+	$(CHARMC) -o trace-none.o trace-none.C
+
+trace-projections.o:trace-projections.C trace-projections.h trace.h $(CKHEADERS)
+	$(CHARMC) -o trace-projections.o trace-projections.C
+
 
 ###############################################################################
 #
@@ -365,8 +289,8 @@ conv-cpm.o: conv-cpm.c
 #
 ###############################################################################
 
-XIHEADERS=xi-symbol.h xi-parse.tab.C
-CHARMXI=xi-main.o xi-symbol.o xi-generate.o xi-parse.tab.o xi-scan.o
+XIHEADERS=xi-symbol.h xi-util.h xi-grammar.tab.h
+CHARMXI=xi-main.o xi-symbol.o xi-grammar.tab.o xi-scan.o xi-util.o
 
 charmxi: $(CHARMXI)
 	$(SEQCHARMC) -language c++ -cp ../bin/ -o charmxi $(CHARMXI)
@@ -377,11 +301,11 @@ xi-main.o: xi-main.C $(XIHEADERS)
 xi-symbol.o: xi-symbol.C $(XIHEADERS)
 	$(SEQCHARMC) xi-symbol.C
 
-xi-generate.o: xi-generate.C $(XIHEADERS)
-	$(SEQCHARMC) xi-generate.C
+xi-util.o: xi-util.C $(XIHEADERS)
+	$(SEQCHARMC) xi-util.C
 
-xi-parse.tab.o: xi-parse.tab.C $(XIHEADERS)
-	$(SEQCHARMC) xi-parse.tab.C
+xi-grammar.tab.o: xi-grammar.tab.C $(XIHEADERS)
+	$(SEQCHARMC) xi-grammar.tab.C
 
 xi-scan.o: xi-scan.C $(XIHEADERS)
 	$(SEQCHARMC) xi-scan.C
@@ -392,8 +316,11 @@ xi-scan.o: xi-scan.C $(XIHEADERS)
 #
 ###############################################################################
 
-libsimplemsg.a: converse simplemsg.c simplemsg.h
+libtsm.a: converse simplemsg.c simplemsg.h
 	$(CHARMC) -cp ../lib/ -o $@ simplemsg.c
+
+libsm.a: converse sm.c sm.h
+	$(CHARMC) -cp ../lib/ -o $@ sm.c
 
 ###############################################################################
 #

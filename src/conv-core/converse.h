@@ -1052,6 +1052,8 @@ int CrnInt(CrnStream *);
 double CrnDouble(CrnStream *);
 float CrnFloat(CrnStream *);
 
+#include "conv-trace.h"
+
 /**** DEAL WITH DIFFERENCES: KERNIGHAN-RITCHIE-C, ANSI-C, AND C++ ****/
 
 #if defined(__cplusplus)

@@ -1,8 +1,16 @@
-readonly int futureBocNum;
-message FutureInitMsg;
+module CkFutures {
+  // temporarily All system messages are here
+  message CkQdMsg;
+  message FutureInitMsg;
 
-group FutureBOC {
-  entry FutureBOC(FutureInitMsg *);
-  entry SetFuture(FutureInitMsg *);
+  group FutureBOC {
+    entry FutureBOC(FutureInitMsg *);
+    entry void SetFuture(FutureInitMsg *);
+  };
+
+  mainchare FutureMain {
+    entry FutureMain();
+  };
+
+  readonly CProxy_FutureBOC fBOC;
 };
-

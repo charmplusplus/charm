@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <string.h>
 #include "converse.h"
-#include "trace.h"
+#include "conv-trace.h"
 #include <errno.h>
 
 #if CMK_WHEN_PROCESSOR_IDLE_USLEEP
@@ -85,14 +85,6 @@ static char *DeleteArg(argv)
 }
 
 
-/**
- * Global variable for Trace in converse (moved from charm)
- */
-
-CpvDeclare(int, CtrRecdTraceMsg);
-CpvDeclare(int, traceOn);
-CpvDeclare(int, CtrLogBufSize);
-
 /*****************************************************************************
  *
  * Statistics: currently, the following statistics are not updated by converse.
@@ -110,7 +102,6 @@ char **argv;
 {
   int argc;
   char **origArgv = argv;
-  int trace = 1;
 
 #ifdef MEMMONITOR
   CpvInitialize(mmulong,MemoryUsage);
@@ -125,15 +116,12 @@ char **argv;
   CpvAccess(BlocksAllocated) = 0;
 #endif
 
-  CpvInitialize(int, CtrRecdTraceMsg);
-  CpvInitialize(int, CtrLogBufSize);
   CpvInitialize(int, CstatsMaxChareQueueLength);
   CpvInitialize(int, CstatsMaxForChareQueueLength);
   CpvInitialize(int, CstatsMaxFixedChareQueueLength);
   CpvInitialize(int, CstatPrintQueueStatsFlag);
   CpvInitialize(int, CstatPrintMemStatsFlag);
 
-  CpvAccess(CtrLogBufSize) = 100000;
   CpvAccess(CstatsMaxChareQueueLength) = 0;
   CpvAccess(CstatsMaxForChareQueueLength) = 0;
   CpvAccess(CstatsMaxFixedChareQueueLength) = 0;
@@ -148,24 +136,13 @@ char **argv;
     if (strcmp(*argv, "+qs") == 0) {
       CpvAccess(CstatPrintQueueStatsFlag)=1;
       DeleteArg(argv);
-    } else if (strcmp(*argv, "+logsize") == 0) {
-      int logsize;
-      DeleteArg(argv);
-      sscanf(*argv, "%d", &logsize);
-      CpvAccess(CtrLogBufSize) = logsize;
-      DeleteArg(argv);
-    } else if (strcmp(*argv, "+traceoff") == 0) {
-      trace = 0;
-      DeleteArg(argv);
     } else
     argv++;
   }
 
   argc = 0; argv=origArgv;
   for(argc=0;argv[argc];argc++);
-  traceModuleInit(&argc, argv);
-  CpvAccess(traceOn) = (CpvAccess(traceOn) && trace);
-  log_init();
+  traceInit(&argc, argv);
 }
 
 int CstatMemory(i)
@@ -943,7 +920,7 @@ void CsdEndIdle()
     if(!CpvAccess(CsdStopNotifyFlag)) {
       (CpvAccess(CsdNotifyBusy))();
       if(CpvAccess(traceOn))
-        trace_end_idle();
+        traceEndIdle();
     }
   }
 }
@@ -955,7 +932,7 @@ void CsdBeginIdle()
     if(!CpvAccess(CsdStopNotifyFlag)) {
       (CpvAccess(CsdNotifyIdle))();
       if(CpvAccess(traceOn))
-        trace_begin_idle();
+        traceBeginIdle();
     }
   }
 
@@ -1237,7 +1214,7 @@ CpvStaticDeclare(int      , CthResumeNormalThreadIdx);
 CpvStaticDeclare(int      , CthResumeSchedulingThreadIdx);
 
 /** addition for tracing */
-CpvExtern(CthThread, cThread);
+CpvDeclare(CthThread, curThread);
 /* end addition */
 
 static void CthStandinCode()
@@ -1275,9 +1252,9 @@ static void CthResumeNormalThread(CthThread t)
 {
   CmiGrabBuffer((void**)&t);
   /** addition for tracing */
-  CpvAccess(cThread) = t;
+  CpvAccess(curThread) = t;
   if(CpvAccess(traceOn))
-    trace_begin_execute(0);
+    traceResume();
   /* end addition */
   CthResume(t);
 }
@@ -2064,7 +2041,7 @@ void ConverseCommonInit(char **argv)
 
 void ConverseCommonExit(void)
 {
-  close_log();
+  traceClose();
 }
 
 

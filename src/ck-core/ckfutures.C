@@ -1,6 +1,6 @@
-
 #include "charm++.h"
-#include "ckfutures.top.h"
+#include "ck.h"
+#include "ckfutures.h"
 #include <stdlib.h>
 
 /******************************************************************************
@@ -9,16 +9,14 @@
  *
  *****************************************************************************/
 
-typedef struct Future_s
-{
+typedef struct Future_s {
   int ready;
   void *value;
   CthThread waiters;
   int next; 
 } Future;
 
-typedef struct
-{
+typedef struct {
   Future *array;
   int max;
   int freelist;
@@ -97,7 +95,7 @@ static void setFuture(int handle, void *pointer)
   fut->waiters = 0;
 }
 
-extern "C" void futuresModuleInit()
+void _futuresModuleInit(void)
 {
   int i; Future *array;
   CpvInitialize(FutureState, futurestate);
@@ -113,63 +111,59 @@ extern "C" void futuresModuleInit()
  *
  *****************************************************************************/
 
-int futureBocNum;
+CProxy_FutureBOC fBOC(0);
 
-class FutureInitMsg : public comm_object
-{
+class FutureInitMsg : public CMessage_FutureInitMsg {
   public: int x ;
 };
 
-extern "C" void *CRemoteCallBranchFn( int ep, void *m, int group, int processor)
+class  FutureMain : public Chare {
+  public:
+    FutureMain(CkArgMsg *m) {
+      fBOC.ckSetGroupId(CProxy_FutureBOC::ckNew(new FutureInitMsg));
+      CkFreeMsg(m);
+    }
+};
+
+extern "C" 
+void *CkRemoteCallBranch(int ep, void *m, int group, int PE)
 { 
   void * result;
-  ENVELOPE *env = ENVELOPE_UPTR(m);
+  envelope *env = UsrToEnv(m);
   int i = createFuture();
-  SetRefNumber(m,i);
-  SetEnv_pe(env, CmiMyPe());
-  GeneralSendMsgBranch(ep, m, processor, -1, group);
+  env->setRef(i);
+  CkSendMsgBranch(ep, m, PE, group);
   result = waitFuture(i, 1);
   return (result);
 }
 
-extern "C" void *CRemoteCallFn(int ep, void *m, ChareIDType *ID)
+extern "C" 
+void *CkRemoteCall(int ep, void *m, CkChareID *ID)
 { 
   void * result;
-  ENVELOPE *env = ENVELOPE_UPTR(m);
+  envelope *env = UsrToEnv(m);
   int i = createFuture();
-  SetRefNumber(m,i);
-  SetEnv_pe(env, CmiMyPe());
-  SendMsg(ep, m, ID);
+  env->setRef(i);
+  CkSendMsg(ep, m, ID);
   result = waitFuture(i, 1);
   return (result);
 }
 
-class FutureBOC: public groupmember
-{
+class FutureBOC: public Group {
 public:
-
-  FutureBOC(FutureInitMsg *m) 
-  {
-    delete m;
-  }
-  void SetFuture(FutureInitMsg * m)
-  {
+  FutureBOC(FutureInitMsg *m) { delete m; }
+  void SetFuture(FutureInitMsg * m) { 
     int key;
-    key = GetRefNumber(m);
+    key = UsrToEnv((void *)m)->getRef();
     setFuture( key, m);
   }
 };
 
-extern "C" void futuresCreateBOC()
+extern "C" 
+void CkSendToFuture(int futNum, void *m, int PE)
 {
-  FutureInitMsg *message2 = new (MsgIndex(FutureInitMsg)) FutureInitMsg ;
-  futureBocNum = new_group (FutureBOC, FutureInitMsg, message2);
+  UsrToEnv(m)->setRef(futNum);
+  fBOC.SetFuture((FutureInitMsg *)m,PE);
 }
 
-extern "C" void CSendToFuture(void *m, int processor)
-{
-  CSendMsgBranch(FutureBOC, SetFuture, FutureInitMsg, m, futureBocNum, processor);
-}
-
-
-#include "ckfutures.bot.h"
+#include "CkFutures.def.h"

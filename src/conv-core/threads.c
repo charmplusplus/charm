@@ -97,7 +97,7 @@
  
 #include "converse.h"
 #include "qt.h"
-#include "trace.h"
+#include "conv-trace.h"
 
 #define STACKSIZE (32768)
 
@@ -154,10 +154,6 @@ CthCpvStatic(int,        CthExiting);
 CthCpvStatic(int,        CthDatasize);
 CpvStaticDeclare(CthThread, CthSchedThreadVar);
 CpvStaticDeclare(int, CthSchedResumeIndex);
-
-/** addition for tracing */
-CpvDeclare(CthThread, cThread);
-/** End Addition */
 
 int CthImplemented()
 { return 1; }
@@ -306,7 +302,7 @@ void CthSuspend()
   next = CthCpvAccess(CthCurrent)->choosefn();
   /** addition for tracing */
   if(CpvAccess(traceOn))
-    trace_end_execute(0, -1, 0);
+    traceSuspend();
   /* end addition */
   CthResume(next);
 }
@@ -316,9 +312,9 @@ CthThread th;
 {
   if (th->awakenfn == 0) CthNoStrategy();
   /** addition for tracing */
-  CpvAccess(cThread) = th;
+  CpvAccess(curThread) = th;
   if(CpvAccess(traceOn))
-    trace_creation(0,0,0);
+    traceAwaken();
   /* end addition */
   th->awakenfn(th);
 }

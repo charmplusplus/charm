@@ -652,60 +652,6 @@ if (! -e $BAL_OBJ) then
 endif
 
 ###############################################################################
-# 
-# Make sure all temp-files created during linkage get deleted.
-#
-###############################################################################
-
-set DELETE=(CHARMC-PRE.TMP.xxx CHARMC-PRE.TMP.nm $DELETE)
-set DELETE=(CHARMC-MOD.TMP.dat CHARMC-MOD.TMP.c CHARMC-MOD.TMP.o $DELETE)
-rm -f CHARMC-PRE.TMP.xxx CHARMC-PRE.TMP.nm
-rm -f CHARMC-MOD.TMP.dat CHARMC-MOD.TMP.c CHARMC-MOD.TMP.o
-
-###############################################################################
-#
-# 			Create CHARMC-MOD.TMP.c
-#
-# This file contains the function _CK_module_init_fn, which
-# initializes each charm or charm++ module in turn.   Its creation
-# is highly system-dependent, which is why I have all these
-# nested if-statements here.
-#
-###############################################################################
-
-if (($LANGUAGE == charm++) || ($LANGUAGE == idl)) then
-    if ($LANGUAGE == charm++) then
-	echo 'void _CK_module_init_fn() {}' > CHARMC-MOD.TMP.c
-	($ECHOCMD ; $CMK_CC $OPTS_CC -c -o CHARMC-MOD.TMP.o CHARMC-MOD.TMP.c)
-        ($ECHOCMD ; $CMK_LDXX $OPTS_LDXX -o CHARMC-PRE.TMP.xxx -L$CHARMLIB \
-		      $BAL_OBJ $OBJECTFILES $LIBRARIES \
-		      CHARMC-MOD.TMP.o -lck-core -ltrace-$TRACEMODE \
-                      -lck-cplus-y -lconv-cplus-y -lconv-core \
-		      -lck-defmain-cpp -lm $CMK_LIBS)
-    else if ($LANGUAGE == idl) then
-	echo 'void _CK_module_init_fn() {}' > CHARMC-MOD.TMP.c
-	($ECHOCMD ; $CMK_CC $OPTS_CC -c -o CHARMC-MOD.TMP.o CHARMC-MOD.TMP.c)
-        ($ECHOCMD ; $CMK_LDXX $OPTS_LDXX -o CHARMC-PRE.TMP.xxx -L$CHARMLIB \
-		      $BAL_OBJ $OBJECTFILES $LIBRARIES \
-		      CHARMC-MOD.TMP.o -lck-core -ltrace-$TRACEMODE \
-                      -lck-cplus-y -lconv-cplus-y -lconv-core \
-		      -lck-defmain-cpp -lidl -lm $CMK_LIBS)
-    endif
-    rm -f CHARMC-PRE.TMP.nm
-    strings -a CHARMC-PRE.TMP.xxx | awk '/^charmc autoinit / { print $3; }' > CHARMC-PRE.TMP.nm
-    sort < CHARMC-PRE.TMP.nm | uniq > CHARMC-MOD.TMP.dat
-    echo 'Charm Modules: '`cat CHARMC-MOD.TMP.dat`
-    rm -f CHARMC-MOD.TMP.c
-    awk '{print "extern void _CK_"$1"_init();";}' < CHARMC-MOD.TMP.dat >> CHARMC-MOD.TMP.c
-    echo 'void _CK_module_init_fn()' >> CHARMC-MOD.TMP.c
-    echo '{' >> CHARMC-MOD.TMP.c
-    awk '{print "_CK_"$1"_init();";}' < CHARMC-MOD.TMP.dat >> CHARMC-MOD.TMP.c
-    echo '}' >> CHARMC-MOD.TMP.c
-    ($ECHOCMD ; $CMK_CC $OPTS_CC -c CHARMC-MOD.TMP.c)
-    if ($status) goto failure
-endif
-
-###############################################################################
 #
 #                               Finally, LINK
 #
@@ -714,17 +660,17 @@ endif
 switch ($LANGUAGE)
     case "charm++"
         ($ECHOCMD ; $CMK_LDXX $OPTS_LDXX -o $OBJECT -L$CHARMLIB \
-		      CHARMC-MOD.TMP.o $BAL_OBJ $OBJECTFILES \
-                      $LIBRARIES -lck-core -ltrace-$TRACEMODE \
-                      -lck-cplus-y -lconv-cplus-y -lconv-core \
-		      -lck-defmain-cpp -lm $CMK_LIBS)
+		      $BAL_OBJ $OBJECTFILES \
+                      $LIBRARIES -lck \
+                      -lconv-cplus-y -lconv-core  -ltrace-$TRACEMODE \
+		      -lm $CMK_LIBS)
         breaksw
     case "idl"
         ($ECHOCMD ; $CMK_LDXX $OPTS_LDXX -o $OBJECT -L$CHARMLIB \
-		      CHARMC-MOD.TMP.o $BAL_OBJ $OBJECTFILES \
-                      $LIBRARIES -lck-core -ltrace-$TRACEMODE \
-                      -lck-cplus-y -lconv-cplus-y -lconv-core \
-		      -lck-defmain-cpp -lidl -lm $CMK_LIBS)
+		      $BAL_OBJ $OBJECTFILES \
+                      $LIBRARIES -lck \
+                      -lconv-cplus-y -lconv-core -ltrace-$TRACEMODE \
+		      -lidl -lm $CMK_LIBS)
         breaksw
     case "converse"
         ($ECHOCMD ; $CMK_LD $OPTS_LD -o $OBJECT -L$CHARMLIB $BAL_OBJ \
