@@ -151,9 +151,10 @@ CpvStaticDeclare(int  , CmiHandlerMax);
 void CmiNumberHandler(n, h)
 int n; CmiHandler h;
 {
-  CmiHandler *tab = CpvAccess(CmiHandlerTable);
+  CmiHandler *tab;
   int         max = CpvAccess(CmiHandlerMax);
 
+  tab = CpvAccess(CmiHandlerTable);
   if (n >= max) {
     int newmax = ((n<<1)+10);
     int bytes = max*sizeof(CmiHandler);
@@ -522,11 +523,13 @@ void CmiGrabBuffer()
 int CmiDeliverMsgs(maxmsgs)
 int maxmsgs;
 {
-  int *buffergrabbed = &CpvAccess(CmiBufferGrabbed);
-  void *localqueue = CpvAccess(CmiLocalQueue);
+  int *buffergrabbed;
+  void *localqueue;
   void *msg1, *msg2;
   int counter;
   
+  buffergrabbed = &CpvAccess(CmiBufferGrabbed);
+  localqueue = CpvAccess(CmiLocalQueue);
   while (1) {
     msg1 = CmiGetNonLocal();
     if (msg1) {

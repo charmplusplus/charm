@@ -1,12 +1,13 @@
 
-CC=/usr/convex/bin/cc -I. -O
+CC=/bin/cc -I. -O
 
 all: qt stp testpgm
 
 qt:
+	rm -f qtmd.h
 	ln -s md/hppa.h qtmd.h
 	$(CC) -pedantic -Wall -c -o qt.o qt.c
-	as -o qtmds.o md/hppa.s
+	cc -c -o qtmds.o md/hppa.s
 	ar q libqt.a qt.o qtmds.o
 
 stp:
@@ -15,5 +16,5 @@ stp:
 
 testpgm:
 	$(CC) -c meas.c
-	as -o qtmdb.o md/hppa_b.s
+	cc -c -o qtmdb.o md/hppa_b.s
 	$(CC) -o run meas.o qtmdb.o libstp.a libqt.a

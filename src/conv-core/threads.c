@@ -217,7 +217,8 @@ static void *CthBlockHelp(qt_t *sp, CthThread old, void *null)
 void CthResume(t)
 CthThread t;
 {
-  CthThread tc = CthCpvAccess(CthCurrent);
+  CthThread tc;
+  tc = CthCpvAccess(CthCurrent);
   if (t == tc) return;
   CthFixData(t);
   CthCpvAccess(CthCurrent) = t;

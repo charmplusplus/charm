@@ -115,7 +115,8 @@ int Cpthread_key_create(Cpthread_key_t *keyp, void (*destructo)(void *))
 
 int Cpthread_key_delete(Cpthread_key_t key)
 {
-  Cpthread_key_t active = CpvAccess(keys_active);
+  Cpthread_key_t active;
+  active = CpvAccess(keys_active);
   if (key->magic != KEY_MAGIC) errcode(EINVAL);
   if (active==key) {
     CpvAccess(keys_active) = key->next;
@@ -137,7 +138,8 @@ deleted:
 
 int Cpthread_setspecific(Cpthread_key_t key, void *val)
 {
-  char *data = CthCpvAccess(CthData);
+  char *data;
+  data = CthCpvAccess(CthData);
   if (key->magic != KEY_MAGIC) errcode(EINVAL);
   *((void **)(data+(key->offset))) = val;
   return 0;
@@ -145,7 +147,8 @@ int Cpthread_setspecific(Cpthread_key_t key, void *val)
 
 void *Cpthread_getspecific(Cpthread_key_t key)
 {
-  char *data = CthCpvAccess(CthData);
+  char *data;
+  data = CthCpvAccess(CthData);
   if (key->magic != KEY_MAGIC) errcode(EINVAL);
   return *((void **)(data+(key->offset)));
 }

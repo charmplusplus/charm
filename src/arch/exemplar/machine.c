@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.21  1996-11-23 02:25:36  milind
+ * Revision 2.22  1997-07-22 18:16:05  milind
+ * fixed some exemplar-related bugs.
+ *
+ * Revision 2.21  1996/11/23 02:25:36  milind
  * Fixed several subtle bugs in the converse runtime for convex
  * exemplar.
  *
@@ -111,6 +114,7 @@ static McQueue **MsgQueue;
 CpvDeclare(void*, CmiLocalQueue);
 CpvDeclare(int, Cmi_mype);
 CpvDeclare(int, Cmi_numpes);
+CpvDeclare(int, Cmi_myrank);
 
 static node_private barrier_t barrier;
 static node_private barrier_t *barr;
@@ -164,6 +168,9 @@ char *blk;
 
 
 
+CmiNotifyIdle()
+{
+}
 
 
 int CmiAsyncMsgSent(msgid)
@@ -177,13 +184,12 @@ typedef struct {
    int argc;
    void *argv;
    int  npe;
+   CmiStartFn fn;
 } USER_PARAMETERS;
 
 
 
-main(argc,argv)
-int argc;
-char *argv[];
+void ConverseInit(int argc, char** argv, CmiStartFn fn, int usched, int initret)
 {
     int i;
     USER_PARAMETERS usrparam;
@@ -217,6 +223,7 @@ char *argv[];
     usrparam.argc = argc;
     usrparam.argv = (void *) argv;
     usrparam.npe  = requested_npe;
+    usrparam.fn = fn;
     request.node = CPS_ANY_NODE;
     request.min  = requested_npe;
     request.max  = requested_npe;
@@ -256,7 +263,7 @@ void *arg;
     CpvAccess(Cmi_mype)  = my_thread();
     CpvAccess(Cmi_numpes) =  usrparam->npe;
 
-    user_main(usrparam->argc,usrparam->argv);
+    usrparam->fn(usrparam->argc,usrparam->argv);
 }
 
 
@@ -381,13 +388,6 @@ char *msg;
     for(i=0; i<CmiNumPes(); i++)
        if (CmiMyPe() != i) CmiSyncSendFn(i,size,msg);
     FIFO_EnQueue(CpvAccess(CmiLocalQueue),msg);
-}
-
-
-CmiMyRank()
-{
-   /* to be implemented */
-   return CmiMyPe();
 }
 
 
@@ -558,6 +558,7 @@ unsigned int first, len;
 	memcpy(&destblk[len-first],srcblk,first*sizeof(void *));
 }
 
+static
 McQueue *
 McQueueCreate()
 {
@@ -579,6 +580,7 @@ McQueueCreate()
 	return queue;
 }
 
+static 
 void
 McQueueAddToBack(queue, element)
 McQueue *queue;
@@ -603,6 +605,7 @@ void  *element;
 }
 
 
+static
 void *
 McQueueRemoveFromFront(queue)
 McQueue *queue;

@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.63  1997-07-21 21:00:05  jyelon
+ * Revision 2.64  1997-07-22 18:15:59  milind
+ * fixed some exemplar-related bugs.
+ *
+ * Revision 2.63  1997/07/21 21:00:05  jyelon
  * added cpthreads.
  *
  * Revision 2.62  1997/07/07 23:03:38  rbrunner
@@ -304,16 +307,6 @@ typedef int CmiMutex;
 #include <spp_prog_model.h>
 #include <memory.h>
 
-extern thread_private int Cmi_mype;
-extern thread_private int Cmi_myrank;
-extern thread_private int Cmi_numpes;
-extern thread_private int Cmi_nodesize;
-
-#define CmiMyPe() Cmi_mype
-#define CmiMyRank() Cmi_myrank
-#define CmiNumPes() Cmi_numpes
-#define CmiNodeSize() Cmi_nodesize
-
 #define SHARED_DECL node_private
 #define CpvDeclare(t,v) thread_private t CMK_CONCAT(Cpv_Var_,v)
 #define CpvExtern(t,v)  extern thread_private t CMK_CONCAT(Cpv_Var_,v)
@@ -326,6 +319,16 @@ extern thread_private int Cmi_nodesize;
 #define CsvExtern(t,v) extern node_private t CMK_CONCAT(Csv_Var_,v)
 #define CsvInitialize(t,v)
 #define CsvAccess(v) CMK_CONCAT(Csv_Var_,v)
+
+#define CmiMyPe() CpvAccess(Cmi_mype)
+#define CmiMyRank() CpvAccess(Cmi_myrank)
+#define CmiNumPes() CpvAccess(Cmi_numpes)
+#define CmiNodeSize() CpvAccess(Cmi_nodesize)
+
+CpvExtern(int, Cmi_mype);
+CpvExtern(int, Cmi_numpes);
+CpvExtern(int, Cmi_myrank);
+CpvExtern(int, Cmi_nodesize);
 
 extern void CmiMemLock();
 extern void CmiMemUnlock();
