@@ -373,13 +373,16 @@ void SumLogPool::updateSummaryDetail(int epIdx, double startTime, double endTime
         }
 
         double binSz = CkpvAccess(binSize);
-        int startingBinIdx = (int)(startTime/binSz);
-        int endingBinIdx = (int)(endTime/binSz);
-        // Ensure that shrink() has been called.
-        if (startingBinIdx >= poolSize)
-            CmiAbort("Internal Error: startingBinIdx\n");
-        if (endingBinIdx >= poolSize)
-            CmiAbort("Internal Error: endingBinIdx\n");
+        int startingBinIdx, endingBinIdx;
+        endingBinIdx = (int)(endTime/binSz);
+        if (endingBinIdx >= poolSize) {
+	  shrink();
+          binSz = CkpvAccess(binSize);
+	}
+	startingBinIdx = (int)(startTime/binSz);
+        endingBinIdx = (int)(endTime/binSz);
+        CmiAssert(startingBinIdx < poolSize);
+        CmiAssert(endingBinIdx < poolSize);
 
         if (startingBinIdx == endingBinIdx) {
             addToCPUtime(startingBinIdx, epIdx, endTime - startTime);
