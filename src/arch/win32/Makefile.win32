@@ -107,7 +107,7 @@ TRACELIBS=libtrace-none.lib libtrace-projections.lib libtrace-summary.lib
 
 CVLIBS=libconv-core.lib libconv-cplus-n.lib libconv-cplus-y.lib libldb-rand.obj libldb-spray.obj libldb-graph.obj libldb-test.obj $(TRACELIBS)
 	
-LIBCONV_CORE=threads.obj convcore.obj conv-conds.obj spantree.obj queueing.obj fifo.obj msgmgr.obj memory.obj cpm.obj cpthreads.obj futures.obj cldb.obj random.obj debug-message.obj debug-object.obj info.obj generate.obj edgelist.obj conv-ccs.obj winrand48.obj quiescence.obj
+LIBCONV_CORE=threads.obj convcore.obj conv-conds.obj spantree.obj queueing.obj fifo.obj msgmgr.obj memory.obj cpm.obj cpthreads.obj futures.obj cldb.obj random.obj debug-message.obj debug-object.obj info.obj generate.obj edgelist.obj conv-ccs.obj quiescence.obj
 
 CONVERSE : BASICS $(CVLIBS) CONV-HOST CONVLIBS DAEMON CONVCPM
 
@@ -418,9 +418,6 @@ tempo.obj: tempo.C $(CKHEADERS)
 
 waitqd.obj: waitqd.C $(CKHEADERS)
 	$(CPP) $(CPP_PROJ) /TP waitqd.C
-
-winrand48.obj : winrand48.c
-	$(CPP) $(CPP_PROJ) /TP winrand48.c
 
 ckarray.obj: ckarray.C $(CKHEADERS)
 	$(CPP) $(CPP_PROJ) /TP ckarray.C
