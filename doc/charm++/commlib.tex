@@ -2,18 +2,16 @@
 
 The communications framework in Charm++/converse is aimed at
 optimizing certain communication patterns. Currently the programmer
-has to specify the communication pattern. 
-
-The communications library uses the delegation framework. This is done
-to make access to the communication library transparent to the
-programmer. 
+has to specify the communication pattern. The communications library
+uses the delegation framework. This is done to make access to the
+communication library transparent to the programmer.
 
 To access the communication framework you first need to create an
 instance of the Communication Framework which will work with your
 messages and optimize that pattern. Each communication framework
-instance needs to know how to manage the messages. Hence there is a
-Strategy which needs to be initialized and passed to the instance of
-the Communication Library framework. 
+instance needs to know how to manage the messages. Hence a Strategy
+needs to be initialized and passed to the instance of the
+Communication Library framework.
 
 Each strategy inherits from the class {\em Strategy} and implements
 its entry methods.  Each strategy has its own set of options passed to
@@ -24,7 +22,7 @@ its constructor. There are two types of strategies in our framework.
 \item Bracketed Strategies. In bracketed strategies each source Chare
 (which could be an array element or a group) deposits its entries and
 then the strategy performs the communication optimization. For example
-the EachToMany Strategy is a bracketed strategy. For bracketed
+the EachToManyMulticastStrategy is a bracketed strategy. For bracketed
 strategies a beginIteration and an endIteration must be called before
 and after making the deposits respectively. 
 
@@ -32,7 +30,7 @@ and after making the deposits respectively.
 optimizations in the background and do not need beginIteration and
 endIteration to start processing. They usually combine and process
 the messages after every few ms (a parameter to the strategy) or after
-a certain amount of data has been deposited.
+certain number of messages have been deposited.
 
 \end{itemize}
 
@@ -47,8 +45,8 @@ combination of both. In collective personalized communication
 operation each array element sends a distinct message to many other
 array elements. The sending and receiving elements need not belong to
 the same array.  Collective multicast is a special case of collective
-personalized communication where the array element sends the same
-message to destination array elements.
+personalized communication where each array element sends the same
+message to the destination array elements.
 
 Strategy * strategy = new EachToManyMulticastStrategy(topology,
 src\_array, dest\_array);
@@ -57,8 +55,9 @@ if the entire arrays are participating in the strategies. If only
 sections of the source and destination arrays are participating in the
 collective operation the following constructor could also be used.
 
-EachToManyMulticastStrategy(int topology, CkArrayID srcarray, int nsrc, 
-CkArrayIndexMax *indices, CkArrayID destarray, int ndest, 
+EachToManyMulticastStrategy(int topology, CkArrayID srcarray, CkArrayID destarray,
+int nsrc, 
+CkArrayIndexMax *indices, int ndest, 
 CkArrayIndexMax  *destelements);
 
 Setting nsrc to 0 or ndest to 0 would make the strategy use the entire
@@ -102,7 +101,10 @@ The header file is StreamingStrategy.h.
 
 \end{itemize}
 
-\subsubsection{Initialization}
+The following are the steps to use the communication library 
+in a user program.
+
+\subsubsection{Compiling the library}
 
 To use the communications library it needs to be compiled first.
 
@@ -111,12 +113,17 @@ cd charm/tmp/libs/ck-libs/commlib;
 make;
 \end{verbatim}
 
-Calls to the communications library have to be made at two places in
+\subsubsection{Compiling User Code}
+All user programs that use the communcation library should use the
+linker option -module commlib.For Example \\ 
+charmc -o pgm pgm.o -module commlib
+
+\subsubsection {Calling the Library from User Code}
+Calls to the communication library have to be made at two places in
 the user program. They are :
 
 \begin{enumerate}
-
-\item main.C \\
+\item main.C 
 \begin{verbatim}
 //Include the appropriate header file
 #include <EachToManyMulticastStrategy.h>
@@ -137,7 +144,7 @@ cinst.setStrategy(strategy);
 
 \end{verbatim}
 
-\item In the array element \\
+\item In the array element 
 \begin{verbatim}
 
 //Before calling an entry method whose message should go thorough the
