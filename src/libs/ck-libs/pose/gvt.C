@@ -70,15 +70,11 @@ void PVT::startPhase()
     }
 
   // Step 3: pack up PVT data to send to GVT
-  umsg = new UpdateMsg;
+  umsg = SendsAndRecvs->packTable();
   umsg->optPVT = optPVT;
   umsg->conPVT = conPVT;
-  for (i=0; i<GVT_WINDOW; i++) {
-    umsg->sends[i] = SendsAndRecvs->sends[i];
-    umsg->recvs[i] = SendsAndRecvs->recvs[i];
-  }
-  umsg->offset = SendsAndRecvs->offset;
-
+  umsg->gvtW = SendsAndRecvs->gvtWindow;
+  umsg->numB = SendsAndRecvs->numBuckets;
   if (simdone) {
     g[0].computeGVT(umsg);              // transmit final info to GVT
   }
@@ -100,8 +96,12 @@ void PVT::setGVT(GVTMsg *m)
 #endif
   simdone = m->done;
   estGVT = m->estGVT;
-  CkFreeMsg(m);
+  if (m->resize < 0)
+    SendsAndRecvs->shrink();
+  else if (m->resize > 0)
+    SendsAndRecvs->expand();
   SendsAndRecvs->PurgeBelow(estGVT);
+  CkFreeMsg(m);
   if (!simdone)  SendsAndRecvs->FileResiduals();
   objs.Commit();
   waitingForGVT = 0;
@@ -127,6 +127,7 @@ void PVT::objRemove(int pvtIdx)
 // Update sends/recvs arrays and residual bin with new message info
 void PVT::objUpdate(int timestamp, int sr)
 {
+  CmiAssert(timestamp >= estGVT);
   if ((sr == SEND) || (sr == RECV))
     SendsAndRecvs->Insert(timestamp, sr);
   else 
@@ -140,6 +141,7 @@ void PVT::objUpdate(int pvtIdx, int safeTime, int timestamp, int sr)
 {
   int index = (pvtIdx-CkMyPe())/1000;
 
+  CmiAssert((timestamp >= estGVT) || (timestamp == -1));
   // minimize the non-idle OVT
   if ((safeTime >= 0) && 
       ((objs.objs[index].ovt > safeTime) || (objs.objs[index].ovt < 0)))
@@ -189,16 +191,14 @@ void GVT::runGVT(UpdateMsg *m)
   estGVT = m->optPVT;
   nextLBstart = m->nextLB;
   LastSR->FreeTable();
-  for (int i=0; i<GVT_WINDOW; i++) {
-    LastSR->sends[i] = m->sends[i];
-    LastSR->recvs[i] = m->recvs[i];
-  }
-  LastSR->offset = m->offset;
-  CkFreeMsg(m);
+  LastSR->SetOffset(m->conPVT);
+  LastSR->addEntries(m);
   SendsAndRecvs->FreeTable();
-  SendsAndRecvs->SetOffset(estGVT);
+  SendsAndRecvs->SetOffset(m->conPVT);
+  CkFreeMsg(m);
   CProxy_PVT p(ThePVT);
-  //CkPrintf("GVT on [%d] issuing startPhase...\n", CkMyPe());
+  //CkPrintf("GVT on [%d] issuing startPhase; table offset=%d...\n", CkMyPe(),
+  //estGVT);
   p.startPhase();  // start the PVT phase of the GVT algorithm
 #ifdef POSE_STATS_ON
   localStats->TimerStop();
@@ -222,11 +222,7 @@ void GVT::computeGVT(UpdateMsg *m)
     optGVT = m->optPVT;
   if ((conGVT < 0) || ((m->conPVT >= 0) && (m->conPVT < conGVT)))
     conGVT = m->conPVT;
-  if (SendsAndRecvs->offset != m->offset) CkPrintf("ERROR: offset mismatch\n");
-  for (int i=0; i<GVT_WINDOW; i++) {
-    SendsAndRecvs->sends[i] += m->sends[i];
-    SendsAndRecvs->recvs[i] += m->recvs[i];
-  }
+  SendsAndRecvs->addEntries(m);
   CkFreeMsg(m);
   done++;
 
@@ -251,6 +247,7 @@ void GVT::computeGVT(UpdateMsg *m)
     else inactive = 0;
 
     // STEP 2: Check if send/recv activity provides lower possible estimate
+    int testResult = SendsAndRecvs->TestThreshold();
     int unmatchedMsg = SendsAndRecvs->FindDifferenceTimestamp(LastSR);
     if ((unmatchedMsg < estGVT) || (estGVT < 0))
       estGVT = unmatchedMsg;
@@ -285,6 +282,7 @@ void GVT::computeGVT(UpdateMsg *m)
     // STEP 6: Report the new GVT estimate to all PVT branches
     gmsg->estGVT = estGVT;
     gmsg->done = term;
+    gmsg->resize = testResult;
     if (term) {
       if (POSE_endtime >= 0) gmsg->estGVT = POSE_endtime + 1;
       else gmsg->estGVT++;
@@ -311,14 +309,11 @@ void GVT::computeGVT(UpdateMsg *m)
 #endif
 #endif
       SendsAndRecvs->PurgeBelow(estGVT);
-      UpdateMsg *umsg = new (8*sizeof(int)) UpdateMsg;
+      UpdateMsg *umsg = SendsAndRecvs->packTable();
       umsg->optPVT = estGVT;
-      umsg->nextLB = nextLBstart;
-      umsg->offset = SendsAndRecvs->offset;
-      for(int j=0; j<GVT_WINDOW; j++) {
-	umsg->sends[j] = SendsAndRecvs->sends[j];
-	umsg->recvs[j] = SendsAndRecvs->recvs[j];
-      }
+      umsg->conPVT = SendsAndRecvs->offset;
+      umsg->gvtW = SendsAndRecvs->gvtWindow;
+      umsg->numB = SendsAndRecvs->numBuckets;
       int prio = 0; //estGVT - INT_MAX + 2*SPEC_WINDOW;
       *((int*)CkPriorityPtr(umsg)) = prio;
       CkSetQueueing(umsg, CK_QUEUEING_IFIFO);

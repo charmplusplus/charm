@@ -5,7 +5,9 @@
 module gvt {
   readonly CkGroupID ThePVT;
   readonly CkGroupID TheGVT;
-  message UpdateMsg;
+  message UpdateMsg {
+    SRentry msgs[];
+  };
   message GVTMsg;
 
   group PVT {

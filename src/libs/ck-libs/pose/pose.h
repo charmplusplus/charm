@@ -6,7 +6,7 @@
 #define POSE_H
 
 // Primary versions
-//#define POSE_STATS_ON 1
+#define POSE_STATS_ON 1
 //#define POSE_COMM_ON 1
 //#define LB_ON 1
 
@@ -21,15 +21,17 @@
 #define LB_DIFF 10000        // min diff between min and max load PEs
 
 // Strategy variables
-#define MAX_FUTURE_OFFSET 1000000 // CancelList GetItem gets cancels w/ts < gvt+this
+#define MAX_FUTURE_OFFSET 10000 // CancelList GetItem gets cancels w/ts < gvt+this
 #define STORE_RATE 1         // default store rate: 1 for every n events
-#define SPEC_WINDOW 50       // speculative event window
-#define GVT_WINDOW 50        // GVT improvement limit; sets s/r table size
+#define SPEC_WINDOW 30     // speculative event window
+#define GVT_WINDOW 200      // GVT improvement limit; sets s/r table size
                              // GVT window should not be more than leash so
                              // upper bound is SPEC_WINDOW or MIN_LEASH 
                              // depending on synch strategy in use
-#define MIN_LEASH 5
-#define MAX_LEASH 50
+#define GVT_bucket 25       // number of buckets to sort sends/recvs into
+#define TBL_THRESHOLD 2000
+#define MIN_LEASH 100
+#define MAX_LEASH 20000
 
 // MISC
 #define MAX_POOL_SIZE 20     // maximum size of an eventMsg pool
