@@ -20,7 +20,7 @@ class ParamList;
 class CEntry{
   public:
     XStr *entry;
-    Entry *decl_entry;
+    Entry *decl_entry;			// point to the real Entry of the Chare
     //CParseNode *paramlist;
     ParamList *paramlist;
     int entryNum;

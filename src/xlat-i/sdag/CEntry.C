@@ -7,6 +7,7 @@
 
 #include "CEntry.h"
 #include "xi-symbol.h"
+
 void CEntry::generateDeps(XStr& op)
 {
   SdagConstruct *cn;
@@ -54,15 +55,20 @@ void CEntry::generateCode(XStr& op)
   }
   op <<  ") {\n";
   op << "    CWhenTrigger *tr;\n";
+  op<<  "    void* _bgParentLog = NULL;\n";
+  op<<  "    BgElapse(0.01e-6);\n";
+  cn->generateTlineEndCall(op);
+
+  op << "    CMsgBuffer* cmsgbuf;\n";
+
   int hasArrays = 0;
   int paramMarshalling = 0;
   int count = 0;
   sv = (CStateVar *)myParameters->begin();
   i = 0;
   if (isVoid == 1) {
-     op << "    __cDep->bufferMessage("<<entryNum<<", (void *) CkAllocSysMsg(), 0);\n";
+     op << "   __cDep->bufferMessage("<<entryNum<<", (void *) CkAllocSysMsg(), 0);\n";
      op << "    tr = __cDep->getTrigger("<<entryNum<<", 0);\n";
-
   }
   else {
      for(; i<(myParameters->length());i++, sv=(CStateVar *)myParameters->next()) {
@@ -81,10 +87,10 @@ void CEntry::generateCode(XStr& op)
         if (paramMarshalling ==0) {
            if(refNumNeeded) {
               op << "    int refnum = CkGetRefNum(" <<sv->name->charstar() <<"_msg);\n";
-              op << "    __cDep->bufferMessage("<<entryNum<<",(void *) "<<sv->name->charstar() <<"_msg ,refnum);\n";
+              op << "    cmsgbuf = __cDep->bufferMessage("<<entryNum<<",(void *) "<<sv->name->charstar() <<"_msg , (void *) _bgParentLog, refnum);\n";
               op << "    tr = __cDep->getTrigger("<<entryNum<<", refnum);\n";
            } else {
-              op << "    __cDep->bufferMessage("<<entryNum<<", (void *) "<<sv->name->charstar() <<"_msg, 0);\n";
+              op << "    cmsgbuf = __cDep->bufferMessage("<<entryNum<<", (void *) "<<sv->name->charstar() <<"_msg,  (void *) _bgParentLog, 0);\n";
               op << "    tr = __cDep->getTrigger("<<entryNum<<", 0);\n";
            } 
         }
@@ -144,23 +150,27 @@ void CEntry::generateCode(XStr& op)
 	 }
        }
      }
+     
      if(refNumNeeded) {
      // When a reference number is needed and there are parameters that need marshalling 
      // (in other words the parameters of the entry method are not messages) 
      // then the first parameter of the entry method is an integer that specifies the 
      // reference number
           sv = (CStateVar *)myParameters->begin();
-          op << "    __cDep->bufferMessage("<<entryNum<<",(void *) impl_msg1,"<<sv->name->charstar()<<");\n";
+          op << "   cmsgbuf = __cDep->bufferMessage("<<entryNum<<",(void *) impl_msg1, (void*) _bgParentLog,"<<sv->name->charstar()<<");\n";
           op << "    tr = __cDep->getTrigger("<<entryNum<<","<<sv->name->charstar()<<");\n"; 
      } else {
-       op << "    __cDep->bufferMessage("<<entryNum<<", (void *) impl_msg1, 0);\n";
+       op << "    cmsgbuf = __cDep->bufferMessage("<<entryNum<<", (void *) impl_msg1, (void*) _bgParentLog, 0);\n";
        op << "    tr = __cDep->getTrigger("<<entryNum<<", 0);\n";
      }
-     
    }
 
   op << "    if (tr == 0)\n";
   op << "      return;\n"; 
+
+  cn->generateTraceEndCall(op);
+  cn->generateEndExec(op);
+
   XStr *whenParams; 
   int iArgs = 0;
   if(whenList.length() == 1) {
@@ -173,18 +183,31 @@ void CEntry::generateCode(XStr& op)
     i = 0;
     paramMarshalling = 0;
     lastWasVoid = 0;
-    for(; i<(cn->stateVars->length());i++, sv=(CStateVar *)cn->stateVars->next()) {
-       if ((sv->isMsg == 0) && (paramMarshalling == 0) && (sv->isVoid ==0)){
+
+    //Guna begin
+   
+    op <<"    cmsgbuf->bgLog2 = (void*)tr->args[1];\n";
+    //op << "    " << cn->label->charstar() << "(";    
+    //Guna end
+
+    for( i=0; i<(cn->stateVars->length());i++, sv=(CStateVar *)cn->stateVars->next()) {
+      if ((sv->isMsg == 0) && (paramMarshalling == 0) && (sv->isVoid ==0)){
           paramMarshalling =1;
           op << "    CkMarshallMsg *impl_msg = (CkMarshallMsg *) tr->args[" <<iArgs <<"];\n"; 
           op << "    char *impl_buf=((CkMarshallMsg *)impl_msg)->msgBuf;\n";
           op << "    PUP::fromMem implP(impl_buf);\n";
           iArgs++;
-       }
-       if (sv->isMsg == 1) {
-          if((i!=0) && (lastWasVoid == 0))
+      }
+      if (sv->isMsg == 1) {
+	  if((i!=0) && (lastWasVoid == 0))
 	     whenParams->append(", ");
-          whenParams->append("(");
+	  if(i==1){   
+	   whenParams->append("NULL");
+	   lastWasVoid=0;
+	   iArgs++;
+	   continue;
+	  }
+	  whenParams->append("(");
 	  whenParams->append(sv->type->charstar());
 	  whenParams->append(" *) tr->args[");
 	  *whenParams<<iArgs;
@@ -213,26 +236,32 @@ void CEntry::generateCode(XStr& op)
        if (sv->arrayLength != 0) 
           op<<"    "<<sv->type->charstar()<<" *"<<sv->name->charstar()<<"=("<<sv->type->charstar()<<" *)(impl_buf+impl_off_"<<sv->name->charstar()<<");\n";
     }
+
     if (paramMarshalling == 1) 
        op << "    delete (CkMarshallMsg *)impl_msg;\n";
     op << "    " << cn->label->charstar() << "(" << whenParams->charstar();
     op << ");\n";
   
     op << "    delete tr;\n";
+    cn->generateBeginExec(op, "dummy");
+    cn->generateDummyBeginExecute(op);
     op << "    return;\n";
-  } 
-  else {  
+  }
+  else {   
     op << "    switch(tr->whenID) {\n";
     for(cn=whenList.begin(); !whenList.end(); cn=whenList.next()) {
       whenParams = new XStr("");
       i = 0; iArgs = 0;
       op << "      case " << cn->nodeNum << ":\n";
       op << "      {\n";
-      lastWasVoid = 0;
+      
+      // bgLog2 stores the parent dependence of when, e.g. for, olist
+      op <<"  cmsgbuf->bgLog2 = (void*)tr->args[1];\n";	 
       sv = (CStateVar *)cn->stateVars->begin();
       i = 0;
       paramMarshalling = 0;
       lastWasVoid = 0;
+
       for(; i<(cn->stateVars->length());i++, sv=(CStateVar *)cn->stateVars->next()) {
          if ((sv->isMsg == 0) && (paramMarshalling == 0) && (sv->isVoid ==0)){
             paramMarshalling =1;
@@ -241,9 +270,14 @@ void CEntry::generateCode(XStr& op)
             op << "        PUP::fromMem implP" <<cn->nodeNum <<"(impl_buf" <<cn->nodeNum <<");\n";
          }
          if (sv->isMsg == 1) {
-            if((i!=0) && (lastWasVoid == 0))
-	       whenParams->append(", ");
-            whenParams->append("(");
+	    if((i!=0) && (lastWasVoid == 0))
+	      whenParams->append(", ");
+	    if(i==1){
+	       whenParams->append(" NULL ");
+	       lastWasVoid=0;
+	       continue;
+	    }
+	    whenParams->append("(");
 	    whenParams->append(sv->type->charstar());
 	    whenParams->append(" *) tr->args[");
 	    *whenParams<<iArgs;
@@ -279,6 +313,10 @@ void CEntry::generateCode(XStr& op)
       op << "        " << cn->label->charstar() << "(" << whenParams->charstar();
       op << ");\n";
       op << "        delete tr;\n";
+
+      cn->generateBeginExec(op, "dummy");
+      cn->generateDummyBeginExecute(op);
+
       op << "        return;\n";
       op << "      }\n";
     }

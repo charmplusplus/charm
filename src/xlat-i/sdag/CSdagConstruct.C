@@ -118,7 +118,6 @@ void SdagConstruct::labelNodes(void)
 
 void EntryList::generateEntryList(TList<CEntry*>& CEntrylist, SdagConstruct *thisWhen)
 {
-   Entry *e;
    EntryList *el;
    el = this;
    while (el != NULL)
@@ -298,7 +297,16 @@ void SdagConstruct::propagateState(int uniqueVarNum)
       stateVars->append(sv);
     }
   }
-  stateVarsChildren = stateVars; 
+
+  // adding _bgParentLog as the last extra parameter for tracing
+  //stateVarsChildren = stateVars; 
+  stateVarsChildren = new TList<CStateVar*>();
+
+  for(sv=stateVars->begin();!stateVars->end();sv=stateVars->next())
+    stateVarsChildren->append(sv);
+  sv = new CStateVar(0, "void *", 0,"_bgParentLog", 0, NULL, 1);  
+  stateVarsChildren->append(sv);
+
   SdagConstruct *cn;
   TList<CStateVar*> *whensEntryMethodStateVars; 
   whensEntryMethodStateVars = new TList<CStateVar*>();
@@ -346,7 +354,7 @@ void SdagConstruct::propagateState(TList<CStateVar*>& list, TList<CStateVar*>& w
       stateVarsChildrenHasVoid = 0;
       for(sv = stateVars->begin(); ((!stateVars->end()) && (stateVarsHasVoid != 1)); sv=stateVars->next()) {
          if (sv->isVoid == 1)
-	     stateVarsHasVoid == 1;
+	     stateVarsHasVoid == 1;	// what this means??? gengbin
       }
       for(sv=list.begin(); !list.end(); sv=list.next()) {
          if ((sv->isVoid == 1) && (stateVarsHasVoid != 1)) {
@@ -596,9 +604,11 @@ void SdagConstruct::generateForward(XStr& op) {
 
 void SdagConstruct::generateWhen(XStr& op)
 {
+  sprintf(nameStr,"%s%s", CParsedFile::className->charstar(),label->charstar());
   op << "  int " << label->charstar() << "(";
   generatePrototype(op, *stateVars);
   op << ") {\n";
+  generateBeginTime(op);
 
   CStateVar *sv;
 
@@ -672,6 +682,32 @@ void SdagConstruct::generateWhen(XStr& op)
         op << "&&";
   }
   op << ") {\n";
+
+  // for tracing
+  //TODO: instead of this, add a length field to EntryList
+  int elen=0;
+  for(el=elist; el!=NULL; el=elist->next) elen++;
+ 
+  op << "         void * logs1["<< elen << "]; \n";
+  op << "         void * logs2["<< elen + 1<< "]; \n";
+  int localnum = 0;
+  for(el=elist; el!=NULL; el=elist->next) {
+    e = el->entry;
+       if ((e->paramIsMarshalled() == 1) || (e->param->isVoid() ==1)) {
+	op << "       logs1[" << localnum << "] = " << /*el->con4->text->charstar() sv->type->charstar()*/e->getEntryName() << "_buf->bgLog1; \n";
+	op << "       logs2[" << localnum << "] = " << /*el->con4->text->charstar() sv->type->charstar()*/e->getEntryName() << "_buf->bgLog2; \n";
+	localnum++;
+      }
+      else{
+	op << "       logs1[" << localnum << "] = " << /*el->con4->text->charstar()*/ sv->name->charstar()<< "_buf->bgLog1; \n";
+	op << "       logs2[" << localnum << "] = " << /*el->con4->text->charstar()*/ sv->name->charstar() << "_buf->bgLog2; \n";
+	localnum++;
+      }
+  }
+      
+  op << "       logs2[" << localnum << "] = " << "_bgParentLog; \n";
+  generateEventBracket(op,SWHEN);
+  op << "       _TRACE_BG_FORWARD_DEPS(logs1,logs2,"<< localnum << ",_bgParentLog);\n";
 
   el = elist;
   while (el != NULL) {
@@ -880,11 +916,18 @@ void SdagConstruct::generateWhen(XStr& op)
 
   // end actual code
   op << "  }\n\n";
+
+  // trace
+  sprintf(nameStr,"%s%s", CParsedFile::className->charstar(),label->charstar());
+  strcat(nameStr,"_end");
+
   // end function
   op << "  void " << label->charstar() << "_end(";
   generatePrototype(op, *stateVarsChildren);
   op << ") {\n";
   // actual code here 
+  generateBeginTime(op);
+  generateEventBracket(op,SWHEN_END);
   if(nextBeginOrEnd == 1)
    op << "    " << next->label->charstar() << "(";
   else 
@@ -944,11 +987,15 @@ void SdagConstruct::generateWhile(XStr& op)
 void SdagConstruct::generateFor(XStr& op)
 {
   // inlined start function
+  sprintf(nameStr,"%s%s", CParsedFile::className->charstar(),label->charstar());
   op << "  void " << label->charstar() << "(";
   generatePrototype(op, *stateVars);
   op << ") {\n";
   // actual code here 
+  generateBeginTime(op);
   op << "    " << con1->text->charstar() << ";\n";
+  //Record only the beginning for FOR
+  generateEventBracket(op,SFOR);
   op << "    if (" << con2->text->charstar() << ") {\n";
   op << "      " << constructs->front()->label->charstar() <<
         "(";
@@ -965,9 +1012,13 @@ void SdagConstruct::generateFor(XStr& op)
   // end actual code
   op << "  }\n";
   // inlined end function
+  // trace
+  sprintf(nameStr,"%s%s", CParsedFile::className->charstar(),label->charstar());
+  strcat(nameStr,"_end");
   op << "  void " << label->charstar() << "_end(";
   generatePrototype(op, *stateVarsChildren);
   op << ") {\n";
+  generateBeginTime(op);		// trace
   // actual code here 
   op << con3->text->charstar() << ";\n";
   op << "    if (" << con2->text->charstar() << ") {\n";
@@ -976,6 +1027,7 @@ void SdagConstruct::generateFor(XStr& op)
   generateCall(op, *stateVarsChildren);
   op << ");\n";
   op << "    } else {\n";
+  generateEventBracket(op,SFOR_END);   // trace
   if(nextBeginOrEnd == 1)
    op << "      " << next->label->charstar() << "(";
   else
@@ -990,9 +1042,12 @@ void SdagConstruct::generateFor(XStr& op)
 void SdagConstruct::generateIf(XStr& op)
 {
   // inlined start function
+  strcpy(nameStr,label->charstar());
   op << "  void " << label->charstar() << "(";
   generatePrototype(op, *stateVars);
   op << ") {\n";
+  generateBeginTime(op);
+  generateEventBracket(op,SIF);
   // actual code here 
   op << "    if (" << con1->text->charstar() << ") {\n";
   op << "      " << constructs->front()->label->charstar() <<
@@ -1013,9 +1068,14 @@ void SdagConstruct::generateIf(XStr& op)
   // end actual code
   op << "  }\n\n";
   // inlined end function
+  strcpy(nameStr,label->charstar());
+  strcat(nameStr,"_end");
   op << "  void " << label->charstar() << "_end(";
   generatePrototype(op, *stateVarsChildren);
   op << ") {\n";
+  // trace
+  generateBeginTime(op);
+  generateEventBracket(op,SIF_END);
   // actual code here 
   if(nextBeginOrEnd == 1)
    op << "      " << next->label->charstar() << "(";
@@ -1030,9 +1090,13 @@ void SdagConstruct::generateIf(XStr& op)
 void SdagConstruct::generateElse(XStr& op)
 {
   // inlined start function
+  strcpy(nameStr,label->charstar());
   op << "  void " << label->charstar() << "(";
   generatePrototype(op, *stateVars);
   op << ") {\n";
+  // trace
+  generateBeginTime(op);
+  generateEventBracket(op,SELSE);
   // actual code here 
   op << "    " << constructs->front()->label->charstar() << 
         "(";
@@ -1041,9 +1105,15 @@ void SdagConstruct::generateElse(XStr& op)
   // end actual code
   op << "  }\n\n";
   // inlined end function
+  // trace
+  sprintf(nameStr,"%s%s", CParsedFile::className->charstar(),label->charstar());
+  strcat(nameStr,"_end");
   op << "  void " << label->charstar() << "_end(";
   generatePrototype(op, *stateVarsChildren);
   op << ") {\n";
+  // trace
+  generateBeginTime(op);
+  generateEventBracket(op,SELSE_END);
   // actual code here 
   if(nextBeginOrEnd == 1)
    op << "      " << next->label->charstar() << "(";
@@ -1117,14 +1187,27 @@ void SdagConstruct::generateOlist(XStr& op)
   }
   // end actual code
   op << "  }\n";
+
+  // trace
+  sprintf(nameStr,"%s%s", CParsedFile::className->charstar(),label->charstar());
+  strcat(nameStr,"_end");
+  op << "  CkVec<void*> " <<label->charstar() << "_bgLogList;\n";     // trace
+
   // inlined end function
   op << "  void " << label->charstar() << "_end(";
   generatePrototype(op, *stateVarsChildren);
   op << ") {\n";
+  generateBeginTime(op);
   // actual code here 
+  //Accumulate all the bgParent pointers that the calling when_end functions give
+  op << "    " <<label->charstar() << "_bgLogList.insertAtEnd(_bgParentLog);\n";                                                                                
   op << "    " << counter->charstar() << "->decrement();\n";
   op << "    if (" << counter->charstar() << "->isDone()) {\n";
   op << "      delete " << counter->charstar() << ";\n";
+
+  // trace
+  generateListEventBracket(op,SOLIST_END);
+  op << "       "<< label->charstar() <<"_bgLogList.length()=0;\n";
 
   if(nextBeginOrEnd == 1)
    op << "      " << next->label->charstar() << "(";
@@ -1140,9 +1223,12 @@ void SdagConstruct::generateOlist(XStr& op)
 void SdagConstruct::generateOverlap(XStr& op)
 {
   // inlined start function
+  sprintf(nameStr,"%s%s", CParsedFile::className->charstar(),label->charstar());
   op << "  void " << label->charstar() << "(";
   generatePrototype(op, *stateVars);
   op << ") {\n";
+  generateBeginTime(op);
+  generateEventBracket(op,SOVERLAP);
   // actual code here 
   op << "    " << constructs->front()->label->charstar() <<
         "(";
@@ -1150,10 +1236,15 @@ void SdagConstruct::generateOverlap(XStr& op)
   op << ");\n";
   // end actual code
   op << "  }\n";
+  // trace
+  sprintf(nameStr,"%s%s", CParsedFile::className->charstar(),label->charstar());
+  strcat(nameStr,"_end");
   // inlined end function
   op << "  void " << label->charstar() << "_end(";
   generatePrototype(op, *stateVarsChildren);
   op << ") {\n";
+  generateBeginTime(op);
+  generateEventBracket(op,SOVERLAP_END);
   // actual code here 
   if(nextBeginOrEnd == 1)
    op << "    " << next->label->charstar() << "(";
@@ -1187,7 +1278,6 @@ void SdagConstruct::generateSlist(XStr& op)
    op << "    " << next->label->charstar() << "(";
   else
    op << "    " << next->label->charstar() << "_end(";
-  //generateCall(op, *stateVars);
   generateCall(op, *stateVars);
   op << ");\n";
   // end actual code
@@ -1207,26 +1297,40 @@ void SdagConstruct::generateSdagEntry(XStr& op)
      for(sc1=sc->constructs->begin(); !sc->constructs->end(); sc1 = sc->constructs->next())
         op << "    _connect_" << sc1->text->charstar() <<"();\n";
      }
+  // trace
+  generateEndSeq(op);
   // actual code here 
   op << "    " << constructs->front()->label->charstar() <<
         "(";
   generateCall(op, *stateVarsChildren);
   op << ");\n";
+  // trace
+  generateBeginExec(op, "dummy");
+  generateDummyBeginExecute(op);
   // end actual code
   op << "  }\n\n";
   op << "private:\n";
   op << "  void " << con1->text->charstar() << "_end(";
-  generatePrototype(op, *stateVars);
+  // guna
+  //generatePrototype(op, *stateVars);
+  generatePrototype(op, *stateVarsChildren);
   op << ") {\n";
   op << "  }\n\n";
 }
 
 void SdagConstruct::generateAtomic(XStr& op)
 { 
+  sprintf(nameStr,"%s%s", CParsedFile::className->charstar(),label->charstar());
   op << "  void " << label->charstar() << "(";
   generatePrototype(op, *stateVars);
   op << ") {\n";
+  // trace
+  generateBeginExec(op, nameStr);
+  generateTraceBeginCall(op);
   op << "    " << text->charstar() << "\n";
+  // trace
+  generateTraceEndCall(op);
+  generateEndExec(op);
   SdagConstruct *cn;
   if(nextBeginOrEnd == 1)
     op << "    " << next->label->charstar() << "(";
@@ -1384,6 +1488,121 @@ void SdagConstruct::setNext(SdagConstruct *n, int boe)
     for(cn=constructs->begin(); !constructs->end(); cn=constructs->next()) {
       cn->setNext(n, boe);
     }
+  }
+}
+
+
+// for trace
+
+void SdagConstruct::generateTrace()
+{
+  char text[1024];
+  switch(type) {
+  case SATOMIC:
+    sprintf(text, "%s%s", CParsedFile::className->charstar(), label->charstar());
+    traceName = new XStr(text);
+    break;
+  default:
+    break;
+  }
+  SdagConstruct *cn;
+  for(cn=constructs->begin(); !constructs->end(); cn=constructs->next()) {
+    cn->generateTrace();
+  }
+}
+
+void SdagConstruct::generateTraceBeginCall(XStr& op)          // for trace
+{
+  if(traceName)
+    op << "    " << "_TRACE_BEGIN_EXECUTE_DETAILED(-1, -1, " << "__idx_" << traceName->charstar() << ", CkMyPe(), 0, NULL); \n";
+}
+
+void SdagConstruct::generateDummyBeginExecute(XStr& op)
+{
+    op << "    " << "_TRACE_BEGIN_EXECUTE_DETAILED(-1, -1, _dummyEP, CkMyPe(), 0, NULL); \n";
+}
+
+void SdagConstruct::generateTraceEndCall(XStr& op)          // for trace
+{
+  op << "    " << "_TRACE_END_EXECUTE(); \n";
+}
+
+void SdagConstruct::generateBeginExec(XStr& op, char *name){
+  op << "     " << "_TRACE_BG_BEGIN_EXECUTE(\""<<name<<"\",&_bgParentLog);\n"; 
+}
+
+void SdagConstruct::generateEndExec(XStr& op){
+  op << "     " << "_TRACE_BG_END_EXECUTE();\n";
+}
+
+void SdagConstruct::generateBeginTime(XStr& op)
+{
+  //Record begin time for tracing
+  op<< "    double __begintime = BgGetTime(); \n";
+}
+
+void SdagConstruct::generateTlineEndCall(XStr& op)
+{
+  //Trace this event
+  op<<"    _TRACE_BG_TLINE_END(&_bgParentLog);\n";
+}
+
+void SdagConstruct::generateEndSeq(XStr& op)
+{
+  op<<  "    void* _bgParentLog = NULL;\n";
+  op<<  "    BgElapse(0.01e-6);\n";
+  //op<<  "    BgElapse(1e-6);\n";
+  generateTlineEndCall(op);
+  generateTraceEndCall(op);
+  generateEndExec(op);
+}
+
+void SdagConstruct::generateEventBracket(XStr& op, int eventType)
+{
+  //Trace this event
+  op<<"     _TRACE_BG_USER_EVENT_BRACKET(\""<<nameStr<<"\", __begintime, BgGetTime(),&_bgParentLog); \n"; 
+}
+
+void SdagConstruct::generateListEventBracket(XStr& op, int eventType){
+
+  op<<"    _TRACE_BGLIST_USER_EVENT_BRACKET(\""<<nameStr<<"\",__begintime,BgGetTime(),&_bgParentLog, "<<label->charstar()<<"_bgLogList);\n";
+}
+
+void SdagConstruct::generateRegisterEp(XStr& op)          // for trace
+{
+  if (traceName) {
+    //   op << "    __idx_" << traceName->charstar() << 
+    //     " = CkRegisterEp(\"" << traceName->charstar() << "(void)\", NULL, 0, 0);\n";
+    op << "    __idx_" << traceName->charstar() <<
+      " = CkRegisterEp(\"" << traceName->charstar() << "(void)\", NULL, 0, CkIndex_" << CParsedFile::className->charstar() << "::__idx, 0);\n";
+
+  }
+  SdagConstruct *cn;
+  for(cn=constructs->begin(); !constructs->end(); cn=constructs->next()) {
+    cn->generateRegisterEp(op);
+  }
+}
+
+void SdagConstruct::generateTraceEpDecl(XStr& op)          // for trace
+{
+  if (traceName) {
+    op << "  static int __idx_" << traceName->charstar() << ";\n"; 
+  }
+  SdagConstruct *cn;
+  for(cn=constructs->begin(); !constructs->end(); cn=constructs->next()) {
+    cn->generateTraceEpDecl(op);
+  }
+}
+
+
+void SdagConstruct::generateTraceEpDef(XStr& op)          // for trace
+{
+  if (traceName) {
+    op << "  int " << CParsedFile::className->charstar() << "::__idx_" << traceName->charstar() << "=0;\\\n"; 
+  }
+  SdagConstruct *cn;
+  for(cn=constructs->begin(); !constructs->end(); cn=constructs->next()) {
+    cn->generateTraceEpDef(op);
   }
 }
 

@@ -21,8 +21,13 @@ class CParsedFile {
     void generateConnectEntries(XStr& output);
     void generateInitFunction(XStr& output);
     void generatePupFunction(XStr& output);
+    void generateRegisterEp(XStr& output);
+    void generateTraceEpDecl(XStr& output);
+    void generateTraceEpDef(XStr& output);
+    void generateTrace();
   public:
     Chare *container;
+    static XStr *className;
     TList<CEntry*> entryList;
     TList<SdagConstruct *> connectEntryList;
     TList<Entry*> nodeList;
@@ -30,18 +35,25 @@ class CParsedFile {
     ~CParsedFile(void){}
     void print(int indent);
     void doProcess(XStr& classname, XStr& output) {
+      className = &classname;
       output << "#define " << classname << "_SDAG_CODE \n";
       numberNodes();
       labelNodes();
       propagateState();
       generateConnectEntryList();
+      generateTrace();				// for tracing Gengbin
       generateEntryList();
       mapCEntry();
       generateCode(output);
       generateEntries(output);
       generateInitFunction(output);
       generatePupFunction(output);
+      generateRegisterEp(output);		// for tracing Gengbin
+      generateTraceEpDecl(output);		// for tracing Gengbin
       output.line_append('\\');
+      output << "\n";
+      output << "#define " << classname << "_SDAG_CODE_DEF \\\n";
+      generateTraceEpDef(output);
       output << "\n";
     }
 
