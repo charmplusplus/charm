@@ -1751,6 +1751,11 @@ static void ctrl_getone()
       else{
 	PCQueuePush(CmiGetStateN(pe)->recv, msg);
       }
+
+#if CMK_USE_PERSISTENT_CCS
+      if(dont_close == 1) break;
+#endif
+
 #endif
     } else if (strncmp(line,"die ",4)==0) {
       fprintf(stderr,"aborting: %s\n",line+4);
