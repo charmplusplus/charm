@@ -95,6 +95,7 @@ class ampi : public ArrayElement1D {
     void recv(int t1, int t2, void* buf, int count, int type);
     void barrier(void);
     void bcast(int root, void* buf, int count, int type);
+    static void bcastraw(void* buf, int len, CkArrayID aid);
     void reduce(int root, int op, void* inb, void *outb, int count, int type);
   public:
     int csize, isize, rsize, fsize;

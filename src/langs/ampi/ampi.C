@@ -171,6 +171,15 @@ ampi::bcast(int root, void* buf, int count, int type)
   nbcasts++;
 }
 
+void
+ampi::bcastraw(void* buf, int len, CkArrayID aid)
+{
+  AmpiMsg *msg = new (&len, 0) AmpiMsg(0, AMPI_BCAST_TAG, len);
+  memcpy(msg->data, buf, len);
+  CProxy_ampi pa(aid);
+  pa.generic(msg);
+}
+
 void 
 ampi::reduce(int root, int op, void* inb, void *outb, int count, int type)
 {

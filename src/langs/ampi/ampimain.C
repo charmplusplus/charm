@@ -20,7 +20,7 @@ CkArrayID _ampiAid;
 
 static void allReduceHandler(void *,int dataSize,void *data)
 {
-  TempoArray::ckTempoBcast(0, data, dataSize, _ampiAid);
+  ampi::bcastraw(data, dataSize, _ampiAid);
 }
 
 ampimain::ampimain(CkArgMsg *m)
