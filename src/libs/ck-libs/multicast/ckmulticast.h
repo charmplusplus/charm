@@ -6,7 +6,7 @@ class mCastEntry;
 class multicastSetupMsg;
 class multicastGrpMsg;
 class cookieMsg;
-class ReductionMsg;
+class CkSectionReductionMsg;
 class CkMcastBaseMsg;
 
 typedef mCastEntry * mCastEntryPtr;
@@ -30,6 +30,27 @@ public:
   inline int &gpe(void) { return _cookie.pe; }
   inline int &redno(void) { return _cookie.redNo; }
   inline void *&cookie(void) { return _cookie.val; }
+};
+
+class CkSectionReductionMsg: public CMessage_CkSectionReductionMsg {
+friend class CkMulticastMgr;
+public:
+  int dataSize;
+  char *data;
+  CkSectionCookie sid;
+private:
+  CkReduction::reducerType reducer;
+  char flag;  // 1: come from array elem 2: come from BOC
+  int redNo;
+  int gcounter;
+  char rebuilt;
+  CkCallback callback;   /**< user callback */
+public:
+  static CkSectionReductionMsg* buildNew(int NdataSize,void *srcData,
+		  CkReduction::reducerType reducer=CkReduction::invalid);
+  void setCallback(CkCallback &cb) { callback = cb; }
+  inline int getSize(void) const {return dataSize;}
+  inline void *getData(void) {return data;}
 };
 
 typedef void (*redClientFn)(CkSectionCookie sid, void *param,int dataSize,void *data);
@@ -69,13 +90,15 @@ class CkMulticastMgr: public CkDelegateMgr {
     void recvMsg(multicastGrpMsg *m);
     // for reduction
     void setReductionClient(CProxySection_ArrayElement &, redClientFn fn,void *param=NULL);
+    void setReductionClient(CProxySection_ArrayElement &, CkCallback *cb);
     void contribute(int dataSize,void *data,CkReduction::reducerType type, CkSectionCookie &sid);
+    void contribute(int dataSize,void *data,CkReduction::reducerType type, CkSectionCookie &sid, CkCallback &cb);
     void rebuild(CkSectionCookie &);
     // entry
-    void recvRedMsg(ReductionMsg *msg);
+    void recvRedMsg(CkSectionReductionMsg *msg);
     void updateRedNo(mCastEntryPtr, int red);
   public:
-    typedef ReductionMsg *(*reducerFn)(int nMsg,ReductionMsg **msgs);
+    typedef CkSectionReductionMsg *(*reducerFn)(int nMsg,CkSectionReductionMsg **msgs);
   private:
     void initCookie(CkSectionCookie sid);
     void resetCookie(CkSectionCookie sid);
@@ -83,6 +106,7 @@ class CkMulticastMgr: public CkDelegateMgr {
     static reducerFn reducerTable[MAXREDUCERS];
     void releaseFutureReduceMsgs(mCastEntryPtr entry);
     void releaseBufferedReduceMsgs(mCastEntryPtr entry);
+    inline CkSectionReductionMsg *buildContributeMsg(int dataSize,void *data,CkReduction::reducerType type, CkSectionCookie &id, CkCallback &cb);
 };
 
 
