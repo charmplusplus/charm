@@ -273,7 +273,7 @@ void FEMcoordinator::updateMesh(marshallMeshChunk &chk)
       if (doWhat==1) { /*repartition the mesh*/
 	MeshChunkOutputUpdate u(femChunks);
 	mesh_split(_nchunks,&u);
-      } else if (doWhat=2) { /*just broadcast meshUpdatedComplete*/
+      } else if (doWhat==2) { /*just broadcast meshUpdatedComplete*/
         femChunks.meshUpdatedComplete();
       }
 
