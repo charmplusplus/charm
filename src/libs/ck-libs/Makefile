@@ -1,7 +1,7 @@
 CHARMC=../../bin/charmc $(OPTS)
-DIRS=sparseContiguousReducer tcharm ampi idxl fem ifem \
-        armci collide mblock barrier multiphaseSharedArrays \
-	multicast irecv netfem liveViz taskGraph search datatransfer
+DIRS=sparseContiguousReducer tcharm ampi idxl parmetis multiphaseSharedArrays fem ifem \
+        armci collide mblock barrier \
+	multicast irecv netfem liveViz liveViz3d taskGraph search datatransfer
 
 all:  
 	for d in $(DIRS); do (cd $$d && $(MAKE) all OPTS='$(OPTS)' || exit 1) || exit 1; done
@@ -15,7 +15,10 @@ tcharm:
 ampi:  tcharm
 	(cd ampi; $(MAKE) all OPTS='$(OPTS)')
 
-fem:  idxl ampi
+parmetis: ampi
+	(cd parmetis; $(MAKE) all OPTS='$(OPTS)')
+
+fem:  idxl ampi parmetis
 	(cd fem; $(MAKE) all OPTS='$(OPTS)')
 
 clean:
