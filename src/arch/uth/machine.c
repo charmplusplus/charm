@@ -164,6 +164,7 @@ char * msg;
   char *buf = (char *)CmiAlloc(size);
   memcpy(buf,msg,size);
   FIFO_EnQueue(CmiQueues[destPE],buf);
+  CQdCreate(CpvAccess(cQdState), 1);
 }
 
 CmiCommHandle CmiAsyncSendFn(destPE, size, msg) 
@@ -174,6 +175,7 @@ char * msg;
   char *buf = (char *)CmiAlloc(size);
   memcpy(buf,msg,size);
   FIFO_EnQueue(CmiQueues[destPE],buf);
+  CQdCreate(CpvAccess(cQdState), 1);
   return 0;
 }
 
@@ -183,6 +185,7 @@ int size;
 char * msg;
 {
   FIFO_EnQueue(CmiQueues[destPE], msg);
+  CQdCreate(CpvAccess(cQdState), 1);
 }
 
 void CmiSyncBroadcastFn(size, msg)
@@ -235,6 +238,7 @@ char * msg;
   for(i=0; i<CmiNumPes(); i++)
     if (i!=CmiMyPe()) CmiSyncSendFn(i,size,msg);
   FIFO_EnQueue(CpvAccess(CmiLocalQueue),msg);
+  CQdCreate(CpvAccess(cQdState), 1);
 }
 
 

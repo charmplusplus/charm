@@ -269,6 +269,7 @@ void CmiSyncSendFn(int destPE, int size, char *msg)
 #endif
   memcpy(buf,msg,size);
   McQueueAddToBack(MsgQueue[destPE],buf); 
+  CQdCreate(CpvAccess(cQdState), 1);
 }
 
 
@@ -282,6 +283,7 @@ CmiCommHandle CmiAsyncSendFn(int destPE, int size, char *msg)
 void CmiFreeSendFn(int destPE, int size, char *msg)
 {
   if (Cmi_mype==destPE) {
+    CQdCreate(CpvAccess(cQdState), 1);
     FIFO_EnQueue(CpvAccess(CmiLocalQueue),msg);
   } else {
     CmiSyncSendFn(destPE, size, msg);
@@ -332,6 +334,7 @@ void CmiFreeBroadcastAllFn(int size, char *msg)
     }
   }
   FIFO_EnQueue(CpvAccess(CmiLocalQueue),msg);
+  CQdCreate(CpvAccess(cQdState), 1);
 }
 
 /* ****************************************************************** */

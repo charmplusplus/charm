@@ -167,8 +167,10 @@ void CmiSyncSendFn(int destPE, int size, char *msg)
 {
   char *dupmsg = (char *) CmiAlloc(size);
   memcpy(dupmsg, msg, size);
-  if (Cmi_mype==destPE)
+  if (Cmi_mype==destPE) {
     FIFO_EnQueue(CpvAccess(CmiLocalQueue),dupmsg);
+    CQdCreate(CpvAccess(cQdState), 1);
+  }
   else
     CmiAsyncSendFn(destPE, size, dupmsg);
 }
@@ -189,12 +191,14 @@ CmiCommHandle CmiAsyncSendFn(int destPE, int size, char *msg)
   else
     end_sent->next = msg_tmp;
   end_sent = msg_tmp;
+  CQdCreate(CpvAccess(cQdState), 1);
   return (CmiCommHandle) msgid;
 }
 
 void CmiFreeSendFn(int destPE, int size, char *msg)
 {
   if (Cmi_mype==destPE) {
+    CQdCreate(CpvAccess(cQdState), 1);
     FIFO_EnQueue(CpvAccess(CmiLocalQueue),msg);
   } else {
     CmiAsyncSendFn(destPE, size, msg);

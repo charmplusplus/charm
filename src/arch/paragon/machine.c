@@ -150,6 +150,7 @@ char * msg;
        }
     else
           csend(MSG_TYPE, msg, size, destPE, PROCESS_PID);
+    CQdCreate(CpvAccess(cQdState), 1);
 }
 
 
@@ -160,6 +161,7 @@ char * msg;
 {
     long msgid;
     msgid = isend(MSG_TYPE, msg, size, destPE, PROCESS_PID);
+    CQdCreate(CpvAccess(cQdState), 1);
     return msgid;
 }
 
@@ -180,6 +182,7 @@ void CmiFreeSendFn(destPE, size, msg)
           csend(MSG_TYPE, msg, size, destPE, PROCESS_PID);
           CmiFree(msg);
        }
+    CQdCreate(CpvAccess(cQdState), 1);
 }
 
 
@@ -190,6 +193,7 @@ char * msg;
 {
     if (Cmi_numpes > 1) 
        csend(MSG_TYPE, msg, size, ALL_NODES,PROCESS_PID);
+    CQdCreate(CpvAccess(cQdState), Cmi_numpes-1);
 }
 
 
@@ -199,6 +203,7 @@ char * msg;
 {
         long msgid;
         msgid = isend(MSG_TYPE, msg, size, ALL_NODES, PROCESS_PID);
+        CQdCreate(CpvAccess(cQdState), Cmi_numpes-1);
         return msgid;
 }
 
@@ -220,6 +225,7 @@ char * msg;
     temp = (char *)CmiAlloc(size) ;
     memcpy(temp, msg, size) ;
     FIFO_EnQueue(CpvAccess(CmiLocalQueue), temp); 
+    CQdCreate(CpvAccess(cQdState), Cmi_numpes);
 }
 
 
@@ -233,6 +239,7 @@ char * msg;
         temp = (char *)CmiAlloc(size) ;
         memcpy(temp, msg, size) ;
         FIFO_EnQueue(CpvAccess(CmiLocalQueue), temp);
+        CQdCreate(CpvAccess(cQdState), Cmi_numpes);
         return msgid;
 }
 
@@ -245,6 +252,7 @@ char * msg;
     if (Cmi_numpes > 1)
        csend(MSG_TYPE, msg, size, ALL_NODES,PROCESS_PID);
     FIFO_EnQueue(CpvAccess(CmiLocalQueue), msg);
+    CQdCreate(CpvAccess(cQdState), Cmi_numpes);
 }
 
 

@@ -178,6 +178,7 @@ void CmiSyncSendFn(int dest_pe, int size, char *msg)
   {
     McEnqueueRemote(dup_msg,ALIGN8(size),dest_pe); 
   }
+  CQdCreate(CpvAccess(cQdState), 1);
 }
 
 CmiCommHandle CmiAsyncSendFn(int dest_pe, int size, char *msg)
@@ -198,6 +199,7 @@ void CmiFreeSendFn(int dest_pe, int size, char *msg)
   {
     McEnqueueRemote(msg,size,dest_pe); 
   }
+  CQdCreate(CpvAccess(cQdState), 1);
 }
 
 void CmiSyncBroadcastFn(int size, char *msg)
@@ -243,6 +245,7 @@ void CmiSyncBroadcastFn(int size, char *msg)
    * garbage collection.
    */
   McQueueAddToBack(broadcast_queue,dup_msg);
+  CQdCreate(CpvAccess(cQdState), Cmi_numpes-1);
 }
 
 CmiCommHandle CmiAsyncBroadcastFn(int size, char *msg)
@@ -330,6 +333,7 @@ void CmiSyncListSendFn(int npes, int *pes, int size, char *msg)
       dup_tok = (McMsgHdr *)CmiAlloc(ALIGN8(hdr_size));
       memcpy(dup_tok,&bcast_msg_tok,hdr_size);
       McEnqueueRemote(dup_tok,hdr_size,pes[i]); 
+      CQdCreate(CpvAccess(cQdState), 1);
     }
   /*
    * The token message will be deleted as a normal message,

@@ -120,6 +120,7 @@ char * msg;
        }
     else
           nwrite(msg, size, destPE, MSG_TYPE, &cflag);
+    CQdCreate(CpvAccess(cQdState), 1);
 }
 
 
@@ -129,6 +130,7 @@ int size;
 char * msg;
 {
     nwrite(msg, size, destPE, MSG_TYPE, &cflag);
+    CQdCreate(CpvAccess(cQdState), 1);
     return 0 ;
 }
 
@@ -144,6 +146,7 @@ void CmiFreeSendFn(destPE, size, msg)
         nwrite(msg, size, destPE, MSG_TYPE, &cflag);
         CmiFree(msg);
       }
+    CQdCreate(CpvAccess(cQdState), 1);
 }
 
 /*********************** BROADCAST FUNCTIONS **********************/
@@ -158,6 +161,7 @@ char * msg;
 	for (i=0; i<CpvAccess(Cmi_numpes); i++)
 		if (i != CpvAccess(Cmi_mype))
 			nwrite(msg, size, i, MSG_TYPE, &cflag);
+        CQdCreate(CpvAccess(cQdState), CpvAccess(Cmi_numpes)-1);
 }
 
 
@@ -171,6 +175,7 @@ char * msg;
 	for (i=0; i<CpvAccess(Cmi_numpes); i++)
 		if (i != CpvAccess(Cmi_mype))
 			nwrite(msg, size, i, MSG_TYPE, &cflag);
+        CQdCreate(CpvAccess(cQdState), CpvAccess(Cmi_numpes)-1);
 	return 0 ;
 }
 
@@ -188,6 +193,7 @@ char * msg;
 {
     	int dest = 0xffff;
 	nwrite(msg, size, dest, MSG_TYPE, &cflag); 
+        CQdCreate(CpvAccess(cQdState), CpvAccess(Cmi_numpes));
 }
 
 
@@ -197,6 +203,7 @@ char * msg;
 {
     	int dest = 0xffff;
 	nwrite(msg, size, dest, MSG_TYPE, &cflag); 
+        CQdCreate(CpvAccess(cQdState), CpvAccess(Cmi_numpes));
 	return 0 ;
 }
 
@@ -206,6 +213,7 @@ char * msg;
 {
 	int dest = 0xffff;
 	nwrite(msg, size, dest, MSG_TYPE, &cflag); 
+        CQdCreate(CpvAccess(cQdState), CpvAccess(Cmi_numpes));
 	CmiFree(msg) ; 
 }
 
