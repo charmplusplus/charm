@@ -30,7 +30,7 @@ public:
   double doTime, rbTime, gvtTime, simTime, cpTime, canTime, lbTime, miscTime, 
     maxDo, minDo;
   long cpBytes;
-  int pe, dos, undos, gvts, maxChkPts;
+  int pe, dos, undos, loops, gvts, maxChkPts;
 };
 
 /// Group to gather stats on a each PE separately
@@ -39,7 +39,7 @@ private:
   /// Current active timer
   short int whichStat;
   /// Counters for various occurrences
-  int rollbacks, dos, undos, gvts, chkPts, maxChkPts;  
+  int rollbacks, dos, undos, loops, gvts, chkPts, maxChkPts;  
   /// Count of bytes checkpointed
   long cpBytes;
   /// Timer start values
@@ -50,7 +50,7 @@ private:
 public:
   /// Basic Constructor
   localStat(void) {
-    whichStat=rollbacks=dos=undos=gvts=cpBytes=chkPts=maxChkPts = 0;
+    whichStat=rollbacks=dos=undos=loops=gvts=cpBytes=chkPts=maxChkPts = 0;
     rollbackTime=totalTime=gvtTime=simTime=cpTime=canTime=lbTime=miscTime= 0.0;
     maxDo = minDo = -1.0;
   }
@@ -65,6 +65,8 @@ public:
   void Do() { dos++; }         
   /// Increment event rollback count
   void Undo() { undos++; }    
+  /// Increment event loop count
+  void Loop() { loops++; }    
   /// Increment GVT estimation count     
   void GvtInc() { gvts++; }   
   /// Increment rollback count
@@ -88,7 +90,7 @@ private:
     cpAvg, cpMax, canAvg, canMax, lbAvg, lbMax, miscAvg, miscMax, maxTime;
   double minDo, maxDo, avgDo, GvtTime;
   long cpBytes;
-  int reporting, totalDos, totalUndos, totalGvts, maxChkPts;
+  int reporting, totalDos, totalUndos, totalLoops, totalGvts, maxChkPts;
 public:
   /// Basic Constructor
   globalStat(void);

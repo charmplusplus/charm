@@ -55,6 +55,10 @@ void chpt<StateType>::checkpoint(StateType *data)
     myStrat->currentEvent->cpData->copy = 1;
     *((StateType *)myStrat->currentEvent->cpData) = *data;
     sinceLast = 0;
+#ifdef POSE_STATS_ON
+    localStats->Checkpoint();
+    localStats->CPbytes(sizeof(StateType));
+#endif
   }
   else sinceLast++;
 #ifdef POSE_STATS_ON

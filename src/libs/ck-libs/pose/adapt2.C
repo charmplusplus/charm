@@ -47,6 +47,9 @@ void adapt2::Step()
     eq->ShiftEvent(); // shift to next event
     ev = eq->currentPtr;
   }
+#ifdef POSE_STATS_ON
+  if (iter > 0) localStats->Loop();
+#endif  
   if (timeLeash < MAX_LEASH) timeLeash += LEASH_FLEX;
 }
 
