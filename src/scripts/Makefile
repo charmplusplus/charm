@@ -267,7 +267,7 @@ conv-ccs.o: conv-ccs.c $(CVHEADERS)
 	$(CHARMC) conv-ccs.c
 
 ccs-builtins.o: ccs-builtins.C $(CVHEADERS)
-	$(CHARMC) $<
+	$(CHARMC) ccs-builtins.C
 
 sockRoutines.o: sockRoutines.c $(CVHEADERS) $(UTILHEADERS)
 	$(CHARMC) sockRoutines.c
@@ -466,7 +466,7 @@ main.o: main.C $(CKHEADERS)
 	$(CHARMC) -o main.o main.C
 
 debug-message.o: debug-message.C $(CKHEADERS)
-	$(CHARMC) -I. $<
+	$(CHARMC) -I. debug-message.C
 
 ck.o: ck.C $(CKHEADERS)
 	$(CHARMC) -o ck.o ck.C
