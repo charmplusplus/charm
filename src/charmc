@@ -663,7 +663,7 @@ if ($status) goto failure
 
 # Scan user-object for user_main, if none, set MAINOBJ
 
-if (!{ (egrep '^user_main$' < CHARMC-USR.TMP.nm >& /dev/null) }) then
+if (! { (egrep '^user_main$' < CHARMC-USR.TMP.nm >& /dev/null) }) then
     set LOADER=($LOADER $CHARMLIB/lib${LIBCLASS}-defmain.o)
 endif
 
