@@ -1,0 +1,10 @@
+#!/bin/sh
+#
+# Tiny wrapper around charmc for the "-np" MPI-style argument.
+
+# delete our "-np" argument
+shift
+nPE=$1
+shift
+charmrun +p$nPE "$@"
+
