@@ -87,8 +87,8 @@ SEQCHARMC=../bin/charmc -seq $(CHARMOPTS)
 #
 ###############################################################################
 
-CVHEADERS=cpthreads.h converse.h conv-mach.h conv-mach.sh \
-      conv-trace.h trace.h conv-ccs.h \
+CVHEADERS=cpthreads.h converse.h conv-trace.h trace.h conv-ccs.h \
+      conv-autoconfig.h conv-mach.h conv-mach.sh \
       CkFutures.decl.h CkArray.decl.h CkReduction.decl.h \
       LBDatabase.decl.h CentralLB.decl.h \
       RandCentLB.decl.h RecBisectBfLB.decl.h \
@@ -132,6 +132,8 @@ headerlinks: dirs+sources Makefile
 	rm -f ../bin/charmc ; cp charmc ../bin/
 	chmod +x ../bin/charmc
 	rm -rf ../include ; mkdir ../include
+	./charmconfig
+	-echo "Soft-linking headers..."
 	-for hdr in $(ALLHEADERS) ; do test ! -f "../include/$$hdr" && ln -f -s "../tmp/$$hdr" ../include ; done
 	touch headerlinks	
 
