@@ -157,6 +157,11 @@ public:
         return readablePage(page)[offset];
     }
 
+    inline const ENTRY& operator[](unsigned int idx)
+    {
+        return get(idx);
+    }
+
     // idx is the element to be read/written
     //
     // This function returns a reference to the first element on the
