@@ -192,7 +192,7 @@
 #include "ccs-server.h"
 #include "sockRoutines.h"
 
-#ifdef _WIN32
+#if defined(_WIN32) && ! defined(__CYGWIN__)
 /*For windows systems:*/
 #  include <windows.h>
 #  include <wincon.h>
@@ -279,7 +279,7 @@ static void KillOnAllSigs(int sigNo)
   exit(1);
 }
 
-#ifndef _WIN32
+#if !defined(_WIN32) || defined(__CYGWIN__)
 static void HandleUserSignals(int signum)
 {
   int condnum = ((signum==SIGUSR1) ? CcdSIGUSR1 : CcdSIGUSR2);
@@ -308,7 +308,7 @@ static void KillOnSIGPIPE(int dummy)
 
 double GetClock()
 {
-#ifdef _WIN32
+#if defined(_WIN32) && !defined(__CYGWIN__)
   struct _timeb tv; 
   _ftime(&tv);
   return (tv.time * 1.0 + tv.millitm * 1.0E-3);
@@ -818,7 +818,7 @@ static void parse_netstart()
   if (ns==0) goto abort;
   nread = sscanf(ns, "%d%d%d%d",
 		 &Cmi_mynode,&Cmi_host_IP, &Cmi_host_port, &Cmi_host_pid);
-  
+
   if (nread!=4) goto abort;
   return;
  abort:
@@ -2801,7 +2801,7 @@ static void machine_init(void)
   signal(SIGINT, KillOnAllSigs);
   signal(SIGTERM, KillOnAllSigs);
   signal(SIGABRT, KillOnAllSigs);
-#  ifndef _WIN32 /*UNIX-only signals*/
+#  if !defined(_WIN32) || defined(__CYGWIN__) /*UNIX-only signals*/
   signal(SIGQUIT, KillOnAllSigs);
   signal(SIGBUS, KillOnAllSigs);
   signal(SIGPIPE, KillOnSIGPIPE);
