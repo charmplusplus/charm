@@ -115,9 +115,11 @@ class CkQ : private CkSTLHelper<T>, private CkNoncopyable {
 /// Default pup routine for CkQ: pup each of the elements
 template <class T>
 inline void operator|(PUP::er &p,CkQ<T> &q) {
+    p.syncComment(PUP::sync_begin_array);
     int l=q.length();
     p|l;
     for (int i=0;i<l;i++) {
+    	p.syncComment(PUP::sync_item);
     	if (p.isUnpacking()) {
 		T t;
 		p|t;
@@ -126,6 +128,7 @@ inline void operator|(PUP::er &p,CkQ<T> &q) {
 		p|q[i];
 	}
     }
+    p.syncComment(PUP::sync_end_array);
 }
 
 /// "Flag" class: do not initialize this object.
@@ -133,6 +136,9 @@ inline void operator|(PUP::er &p,CkQ<T> &q) {
 ///  when the default zero-initialization is enough.
 class CkSkipInitialization {};
 
+// Forward declarations:
+template <class T> class CkVec;
+template <class T> void pupCkVec(PUP::er &p,CkVec<T> &vec);
 
 /// A typesafe, automatically growing array.
 /// Classes used must have a default constructor and working copy constructor.
@@ -147,7 +153,8 @@ class CkVec : private CkSTLHelper<T> {
     int blklen; //Allocated size of block (STL capacity) 
     int len; //Number of used elements in block (STL size; <= capacity)
     void makeBlock(int blklen_,int len_) {
-       block=new T[blklen_];
+       if (blklen_==0) block=0; //< saves 1-byte allocations
+       else block=new T[blklen_];
        blklen=blklen_; len=len_;
     }
     void freeBlock(void) {
@@ -229,8 +236,7 @@ class CkVec : private CkSTLHelper<T> {
 /* Visual C++ 6.0's operator overloading is buggy,
    so use default operator|, which calls this pup routine. */
      void pup(PUP::er &p) {
-        int l=pupbase(p);
-        for (int i=0;i<l;i++) p|operator[](i);
+        pupCkVec(p,*this);
      }
 #endif
 };
@@ -238,8 +244,13 @@ class CkVec : private CkSTLHelper<T> {
 /// Default pup routine for CkVec: pup each of the elements
 template <class T>
 inline void pupCkVec(PUP::er &p,CkVec<T> &vec) {
+    p.syncComment(PUP::sync_begin_array);
     int l=vec.pupbase(p);
-    for (int i=0;i<l;i++) p|vec[i];
+    for (int i=0;i<l;i++) {
+    	p.syncComment(PUP::sync_item);
+    	p|vec[i];
+    }
+    p.syncComment(PUP::sync_end_array);
 }
 
 #ifndef _MSC_VER
@@ -356,10 +367,7 @@ class CkPupPtrVec : public CkVec< CkZeroPtr<T, PUP_PTR> > {
 		for (int i=0;i<length();i++)
 			operator[] (i).destroy();
 	}
-	void pup(PUP::er &p) {
-		int l=pupbase(p);
-		for (int i=0;i<l;i++) p|operator[] (i);
-	}
+	void pup(PUP::er &p) { pupCkVec(p,*this); }
 	friend void operator|(PUP::er &p,this_type &v) {v.pup(p);}
 };
 
@@ -391,10 +399,7 @@ class CkPupAblePtrVec : public CkVec< CkZeroPtr<T, CkPupAblePtr<T> > > {
 	~CkPupAblePtrVec() {
 		destroy();
 	}
-	void pup(PUP::er &p) {
-		int l=pupbase(p);
-		for (int i=0;i<l;i++) p|operator[] (i);
-	}
+	void pup(PUP::er &p) { pupCkVec(p,*this); }
 	friend void operator|(PUP::er &p,this_type &v) {v.pup(p);}
 };
 

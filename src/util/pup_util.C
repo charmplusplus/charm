@@ -318,15 +318,15 @@ int PUP::disk::impl_tell(seekBlock &s) /*Give the current offset*/
 void PUP::disk::impl_seek(seekBlock &s,int off) /*Seek to the given offset*/
   {fseek(F,s.data.loff+off,0);}
 
-/*PUP::xlater just forwards seek calls to its unpacker.*/
-void PUP::xlater::impl_startSeek(seekBlock &s) /*Begin a seeking block*/
-  {myUnpacker.impl_startSeek(s);}
-int PUP::xlater::impl_tell(seekBlock &s) /*Give the current offset*/
-  {return myUnpacker.impl_tell(s);}
-void PUP::xlater::impl_seek(seekBlock &s,int off) /*Seek to the given offset*/
-  {myUnpacker.impl_seek(s,off);}
-void PUP::xlater::impl_endSeek(seekBlock &s) /*Finish a seeking block*/
-  {myUnpacker.impl_endSeek(s);}
+/*PUP::wrap_er just forwards seek calls to its wrapped PUP::er.*/
+void PUP::wrap_er::impl_startSeek(seekBlock &s) /*Begin a seeking block*/
+  {p.impl_startSeek(s);}
+int PUP::wrap_er::impl_tell(seekBlock &s) /*Give the current offset*/
+  {return p.impl_tell(s);}
+void PUP::wrap_er::impl_seek(seekBlock &s,int off) /*Seek to the given offset*/
+  {p.impl_seek(s,off);}
+void PUP::wrap_er::impl_endSeek(seekBlock &s) /*Finish a seeking block*/
+  {p.impl_endSeek(s);}
   
 
 /**************** PUP::able support **********************
@@ -345,26 +345,6 @@ from the ID.
  */
 
 static PUP::able::PUP_ID null_PUP_ID(0); /*ID of null object*/
-
-//For allocatable objects: new/delete object and call pup routine
-void PUP::er::object(able** a)
-{
-	if (isUnpacking()) 
-	{ //Find the object type & create the object
-		PUP::able::PUP_ID id;//The object's id
-		id.pup(*this);
-		if (id==null_PUP_ID) {*a=NULL; return;}
-		//Find the object's constructor and invoke it (calls new)
-		*a=PUP::able::get_constructor(id) ();
-	} else {//Just write out the object type
-		if (*a==NULL) {
-			null_PUP_ID.pup(*this);
-			return;
-		} else
-			(*a)->get_PUP_ID().pup(*this);
-	}
-	(*a)->pup(*this);
-}
 
 PUP::able *PUP::able::clone(void) const {
 	// Make a new object to fill out
@@ -428,6 +408,14 @@ static PUP_registry *PUP_getRegistry(void) {
 	return reg;
 }
 
+const PUP_regEntry *PUP_getRegEntry(const PUP::able::PUP_ID &id)
+{
+	const PUP_regEntry &cur=PUP_getRegistry()->get(id);
+	if (cur.name==NULL)
+		CmiAbort("Unrecognized PUP::able::PUP_ID. is there an unregistered module?");
+	return &cur;
+}
+
 PUP::able::PUP_ID PUP::able::register_constructor
 	(const char *className,constructor_function fn)
 {
@@ -435,15 +423,39 @@ PUP::able::PUP_ID PUP::able::register_constructor
 	PUP_getRegistry()->put(id)=PUP_regEntry(className,id,fn);
 	return id;
 }
+
 PUP::able::constructor_function PUP::able::get_constructor
 	(const PUP::able::PUP_ID &id)
 {
-	const PUP_regEntry &cur=PUP_getRegistry()->get(id);
-	if (cur.name!=NULL)
-		return cur.ctor; 
-	//Error! ID not in list-- unknown class
-	CmiAbort("Unrecognzied PUP::able::PUP_ID passed to get_constructor!");
-	return NULL;
+	return PUP_getRegEntry(id)->ctor;
+}
+
+
+//For allocatable objects: new/delete object and call pup routine
+void PUP::er::object(able** a)
+{
+	const PUP_regEntry *r=NULL;
+	if (isUnpacking()) 
+	{ //Find the object type & create the object
+		PUP::able::PUP_ID id;//The object's id
+		id.pup(*this);
+		if (id==null_PUP_ID) {*a=NULL; return;}
+		r=PUP_getRegEntry(id);
+		//Invoke constructor (calls new)
+		*a=(r->ctor)();
+	} else {//Just write out the object type
+		if (*a==NULL) {
+			null_PUP_ID.pup(*this);
+			return;
+		} else {
+			const PUP::able::PUP_ID &id=(*a)->get_PUP_ID();
+			id.pup(*this);
+			r=PUP_getRegEntry(id);
+		}
+	}
+	syncComment(PUP::sync_begin_object,r->name);
+	(*a)->pup(*this);
+	syncComment(PUP::sync_end_object);
 }
 
 /****************** Text Pup ******************/
@@ -486,6 +498,8 @@ void PUP::toTextUtil::comment(const char *message)
 
 void PUP::toTextUtil::synchronize(unsigned int m)
 {
+  sprintf(beginLine(),"sync=0x%08x\n",m); endLine();
+#if 0 /* text people don't care this much about synchronization */
   char *o=beginLine();
   sprintf(o,"sync=");o+=strlen(o);
   const char *consonants="bcdfgjklmprstvxz";
@@ -497,7 +511,7 @@ void PUP::toTextUtil::synchronize(unsigned int m)
 	o+=strlen(o);
   }
   sprintf(o,"\n"); endLine();
-  
+#endif
 }
 
 void PUP::toTextUtil::bytes(void *p,int n,size_t itemSize,dataType t) {
@@ -581,7 +595,7 @@ char *PUP::sizerText::advance(char *cur) {
 }
 
 PUP::sizerText::sizerText(void)
-  :toTextUtil(IS_SIZING,line),charCount(0) { }
+  :toTextUtil(IS_SIZING+IS_COMMENTS,line),charCount(0) { }
 
 //Text packer
 char *PUP::toText::advance(char *cur) {
@@ -590,7 +604,7 @@ char *PUP::toText::advance(char *cur) {
 }
 
 PUP::toText::toText(char *outBuf)
-  :toTextUtil(IS_PACKING,outBuf),buf(outBuf),charCount(0) { }
+  :toTextUtil(IS_PACKING+IS_COMMENTS,outBuf),buf(outBuf),charCount(0) { }
 
 /************** To/from text FILE ****************/
 void PUP::toTextFile::bytes(void *p,int n,size_t itemSize,dataType t)

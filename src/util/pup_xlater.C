@@ -237,7 +237,7 @@ static dataConverterFn converterFloat(
 
 /*Constructor (builds conversionFn table)*/
 PUP::xlater::xlater(const PUP::machineInfo &src,PUP::er &fromData)
-	:er(fromData.PUP_er_state),myUnpacker(fromData)
+	:wrap_er(fromData)
 {
 	const machineInfo &cur=PUP::machineInfo::current();
 	if (src.intFormat>1) abort();//Unknown integer format
@@ -284,18 +284,18 @@ PUP::xlater::xlater(const PUP::machineInfo &src,PUP::er &fromData)
 }
 
 //Generic bottleneck: unpack n items of size itemSize from p.
-void PUP::xlater::bytes(void *p,int n,size_t itemSize,dataType t)
+void PUP::xlater::bytes(void *ptr,int n,size_t itemSize,dataType t)
 {
 	if (convertSize[t]==itemSize)
 	{//Do conversion in-place
-		myUnpacker.bytes(p,n,itemSize,t);
-		convertFn[t](itemSize,(const myByte *)p,(myByte *)p,n);//Convert in-place
+		p.bytes(ptr,n,itemSize,t);
+		convertFn[t](itemSize,(const myByte *)ptr,(myByte *)ptr,n);//Convert in-place
 	}
 	else 
 	{//Read into temporary buffer, unpack, and then convert
 		void *buf=(void *)malloc(convertSize[t]*n);
-		myUnpacker.bytes(buf,n,convertSize[t],t);
-		convertFn[t](convertSize[t],(const myByte *)buf,(myByte *)p,n);
+		p.bytes(buf,n,convertSize[t],t);
+		convertFn[t](convertSize[t],(const myByte *)buf,(myByte *)ptr,n);
 		free(buf);
 	}
 }

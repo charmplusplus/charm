@@ -31,7 +31,9 @@ Orion Sky Lawlor, olawlor@acm.org, 7/22/2002
 template <class A,class B> 
 inline void operator|(PUP::er &p,typename std::pair<A,B> &v)
 {
+  p.syncComment(PUP::sync_index);
   p|v.first;
+  p.syncComment(PUP::sync_item);
   p|v.second;
 }
 template <class charType> 
@@ -52,6 +54,7 @@ inline void operator|(PUP::er &p,typename std::basic_string<charType> &v)
 }
 inline void operator|(PUP::er &p,std::string &v)
 {
+  p.syncComment(PUP::sync_begin_object,"std::string");
   int nChar=v.length();
   p|nChar;
   if (p.isUnpacking()) { //Unpack to temporary buffer
@@ -64,6 +67,7 @@ inline void operator|(PUP::er &p,std::string &v)
     //Have to cast away constness here
     p((char *)v.data(),nChar);
   }
+  p.syncComment(PUP::sync_end_object);
 }
 
 /**************** Containers *****************/
@@ -81,27 +85,33 @@ template <class container>
 inline void PUP_stl_container_items(PUP::er &p,container &c) {
   for (typename container::iterator it=c.begin();
        it!=c.end();
-       ++it)
+       ++it) {
+    p.syncComment(PUP::sync_item);
     p|*it;  
+  }
 }
 
 template <class container,class dtype>
 inline void PUP_stl_container(PUP::er &p,container &c) {
+  p.syncComment(PUP::sync_begin_array);
   int nElem=PUP_stl_container_size(p,c);
   if (p.isUnpacking()) 
   { //Unpacking: Extract each element and push_back:
     for (int i=0;i<nElem;i++) {
+      p.syncComment(PUP::sync_item);
       dtype n;
       p|n;
       c.push_back(n);
     } 
   }
   else PUP_stl_container_items(p,c);
+  p.syncComment(PUP::sync_end_array);
 }
 //Map objects don't have a "push_back", while vector and list
 //  don't have an "insert", so PUP_stl_map isn't PUP_stl_container
 template <class container,class dtype>
 inline void PUP_stl_map(PUP::er &p,container &c) {
+  p.syncComment(PUP::sync_begin_list);
   int nElem=PUP_stl_container_size(p,c);
   if (p.isUnpacking()) 
   { //Unpacking: Extract each element and insert:
@@ -112,6 +122,7 @@ inline void PUP_stl_map(PUP::er &p,container &c) {
     } 
   }
   else PUP_stl_container_items(p,c);
+  p.syncComment(PUP::sync_end_list);
 }
 
 template <class T> 

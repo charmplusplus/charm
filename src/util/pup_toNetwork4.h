@@ -23,12 +23,7 @@ class PUP_toNetwork4_pack : public PUP::er {
 		//Write floating-point number to stream.
 		// Assumes "int4" and "float" type have the
 		// same size and endianness (true on every current machine).
-		union {
-			float f;
-			CMK_TYPEDEF_INT4 i;
-		} mixer;
-		mixer.f=f; //Put in as float
-		w(mixer.i); //Take out as integer and write out
+		w(*(CMK_TYPEDEF_INT4 *)&f); //Take out as integer and write out
 	}
 	inline void w(int i) {
 		//Write big-endian integer to output stream
@@ -52,12 +47,8 @@ class PUP_toNetwork4_unpack : public PUP::er {
 		//Read floating-point number from stream.
 		// Assumes "int4" and "float" type have the
 		// same size and endianness (true on every current machine).
-		union {
-			float f;
-			CMK_TYPEDEF_INT4 i;
-		} mixer;
-		mixer.i=read_int();
-		return mixer.f;
+		CMK_TYPEDEF_INT4 i=read_int();
+		return *(float *)&i;
 	}
 	inline int read_int(void) {
 		//Read big-endian integer to output stream

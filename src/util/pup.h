@@ -22,13 +22,13 @@ class foo {
   int x;
   char y;
   unsigned long z;
-  float q[3];
+  CkVec<double> q;
  public:
   ...
   void pup(PUP::er &p) {
-    p(isBar);
-    p(x);p(y);p(z);
-    p(q,3);
+    PUPn(isBar);
+    PUPn(x);PUPn(y);PUPn(z);
+    PUPn(q);
   }
 };
 
@@ -42,11 +42,11 @@ class bar {
   ...
   
   void pup(PUP::er &p) {
-    f.pup(p);
-    p(nArr);
-    if (p.isUnpacking())
+    PUPn(f); // <- automatically calls foo::pup
+    PUPn(nArr);
+    if (p.isUnpacking()) // <- must allocate array on other side.
       arr=new double[nArr];
-    p(arr,nArr);
+    PUPv(arr,nArr); // <- special syntax for arrays of simple types
   }
 };
 */
@@ -133,11 +133,17 @@ class er {
  private:
   er(const er &p);//You don't want to copy PUP::er's.
  protected:
-  enum {IS_DELETING =0x0008, IS_USERLEVEL =0x0004};
+  /// These state bits describe various user-settable properties.
+  enum {IS_USERLEVEL=0x0004, // If set, this is *not* a migration pup-- it's something else.
+	IS_DELETING =0x0008, // If set, C & f90 objects should delete themselves after pup
+	IS_COMMENTS =0x0010  // If set, this PUP::er wants comments and sync codes.
+  };
+  /// These state bits describe the PUP::er's direction.
   enum {IS_SIZING   =0x0100,
   	IS_PACKING  =0x0200,
         IS_UNPACKING=0x0400,
-        TYPE_MASK   =0xFF00};
+        TYPE_MASK   =0xFF00
+  };
   unsigned int PUP_er_state;
 #if CMK_EXPLICIT
   explicit /* Makes constructor below behave better */
@@ -152,6 +158,7 @@ class er {
   CmiBool isPacking(void) const {return (PUP_er_state&IS_PACKING)!=0?CmiTrue:CmiFalse;}
   CmiBool isUnpacking(void) const {return (PUP_er_state&IS_UNPACKING)!=0?CmiTrue:CmiFalse;}
   char *  typeString() const;
+  unsigned int getStateFlags(void) const {return PUP_er_state;}
 
   //This indicates that the pup routine should free memory during packing.
   void becomeDeleting(void) {PUP_er_state|=IS_DELETING;}
@@ -160,6 +167,8 @@ class er {
   //This indicates that the pup routine should not call system objects' pups.
   void becomeUserlevel(void) {PUP_er_state|=IS_USERLEVEL;}
   CmiBool isUserlevel(void) const {return (PUP_er_state&IS_USERLEVEL)!=0?CmiTrue:CmiFalse;}
+  
+  CmiBool hasComments(void) const {return (PUP_er_state&IS_COMMENTS)!=0?CmiTrue:CmiFalse;}
 
 //For single elements, pretend it's an array containing one element
   void operator()(signed char &v)     {(*this)(&v,1);}
@@ -241,25 +250,65 @@ class er {
   //For pre- or stack-allocated PUP::able objects-- just call object's pup
   void operator()(able& a);
 
-  //A descriptive (but entirely optional) human-readable comment field
+  /// A descriptive (but entirely optional) human-readable comment field
   virtual void comment(const char *message);
 
-  //A 32-bit synchronization marker (not human readable)
-  virtual void synchronize(unsigned int m);
+  /// A 32-bit "synchronization marker" (not human readable).
+  ///  Some standard codes are listed under PUP::sync_....
+  virtual void synchronize(unsigned int sync);
+  
+  /// Insert a synchronization marker and comment into the stream.
+  ///  Only applies if this PUP::er wants comments.
+  inline void syncComment(unsigned int sync,const char *message=0) {
+  	if (hasComments()) {
+		synchronize(sync);
+		if (message) comment(message);
+	}
+  }
 
- protected:
   //Generic bottleneck: pack/unpack n items of size itemSize
   // and data type t from p.  Desc describes the data item
-  friend class xlater;
   virtual void bytes(void *p,int n,size_t itemSize,dataType t) =0;
   virtual void object(able** a);
 
   //For seeking (pack/unpack in different orders)
-  friend class seekBlock;
   virtual void impl_startSeek(seekBlock &s); /*Begin a seeking block*/
   virtual int impl_tell(seekBlock &s); /*Give the current offset*/
   virtual void impl_seek(seekBlock &s,int off); /*Seek to the given offset*/
   virtual void impl_endSeek(seekBlock &s);/*End a seeking block*/
+};
+
+/**
+ "Sync" codes are an extra channel to encode data in a pup stream, 
+ to indicate higher-order structures in the pup'd objects.
+ Sync codes must follow this grammar:
+   <obj> -> <obj> <obj> | <array> | <list>
+   <obj> -> begin (<obj> system) <obj> end
+   <array> -> begin <obj> (item <obj>)* end
+   <list> -> begin <obj> (index <obj> item <obj>)* end
+ This hack is used, e.g., by the debugger.
+*/
+enum {
+  sync_builtin=0x70000000, // Built-in, standard sync codes begin here
+  sync_begin=sync_builtin+0x01000000, // Sync code at start of collection
+  sync_end=sync_builtin+0x02000000, // Sync code at end of collection
+  sync_last_system=sync_builtin+0x09000000, // Sync code at end of "system" portion of object
+  sync_array_m=0x00100000, // Linear-indexed (0..n) array-- use item to separate
+  sync_list_m=0x00200000, // Some other collection-- use index and item
+  sync_object_m=0x00300000, // Sync mask for general object
+  
+  sync_begin_array=sync_begin+sync_array_m,
+  sync_begin_list=sync_begin+sync_list_m, 
+  sync_begin_object=sync_begin+sync_object_m, 
+  
+  sync_end_array=sync_end+sync_array_m, 
+  sync_end_list=sync_end+sync_list_m, 
+  sync_end_object=sync_end+sync_object_m, 
+  
+  sync_item=sync_builtin+0x00110000, // Sync code for a list or array item
+  sync_index=sync_builtin+0x00120000, // Sync code for index of item in a list
+  
+  sync_last
 };
 
 /************** PUP::er -- Sizer ******************/
@@ -466,10 +515,23 @@ class machineInfo {
   static const machineInfo &current(void);
 };
 
+/// "Wrapped" PUP::er: forwards requests to another PUP::er.
+class wrap_er : public er {
+protected:
+	er &p;
+public:
+	wrap_er(er &p_,unsigned int newFlags=0) :er(p_.getStateFlags()|newFlags), p(p_) {}
+	
+	virtual void impl_startSeek(seekBlock &s); /*Begin a seeking block*/
+	virtual int impl_tell(seekBlock &s); /*Give the current offset*/
+	virtual void impl_seek(seekBlock &s,int off); /*Seek to the given offset*/
+	virtual void impl_endSeek(seekBlock &s);/*End a seeking block*/
+};
+
 //For translating some odd disk/memory representation into the 
 // current machine representation.  (We really only need to
 // translate during unpack-- "reader makes right".)
-class xlater : public er {
+class xlater : public wrap_er {
  protected:
   typedef void (*dataConverterFn)(int N,const myByte *in,myByte *out,int nElem);
   
@@ -482,18 +544,10 @@ class xlater : public er {
   void setConverterInt(const machineInfo &m,const machineInfo &cur,
     int isUnsigned,int intType,dataType dest);
   
-  er &myUnpacker;//Raw data unpacker
   //Generic bottleneck: unpack n items of size itemSize from p.
   virtual void bytes(void *p,int n,size_t itemSize,dataType t);
  public:
   xlater(const machineInfo &fromMachine, er &fromData);
- protected:
-  //For seeking (pack/unpack in different orders)
-  friend class seekBlock;
-  virtual void impl_startSeek(seekBlock &s); /*Begin a seeking block*/
-  virtual int impl_tell(seekBlock &s); /*Give the current offset*/
-  virtual void impl_seek(seekBlock &s,int off); /*Seek to the given offset*/
-  virtual void impl_endSeek(seekBlock &s);/*End a seeking block*/
 };
 
 /*************** PUP::able support ***************/
@@ -721,7 +775,11 @@ inline void operator|(PUP::er &p,T &t)
 /// This defines "p|t" to call t's pup routine, if no
 ///  existing operator| is found.
 template <class T>
-inline void operator|(PUP::er &p,T &t) {t.pup(p);}
+inline void operator|(PUP::er &p,T &t) {
+	p.syncComment(PUP::sync_begin_object);
+	t.pup(p);
+	p.syncComment(PUP::sync_end_object);
+}
 
 #define PUPmarshall(type) /* empty, for backward compatability */
 
@@ -735,6 +793,17 @@ inline void operator|(PUP::er &p,T &t) {t.pup(p);}
   inline void operator|(PUP::er &p,type &t) { p((void *)&t,sizeof(type)); }
 
 #define PUPmarshallBytes(type) PUPbytes(type)
+
+
+//This macro is useful in simple pup routines:
+//  It's just p|x, but it also documents the *name* of the variable.
+// You must have a PUP::er named p.
+#define PUPn(field) \
+  do{  if (p.hasComments()) p.comment(#field); p|field; } while(0)
+
+//Like PUPn(x), above, but for arrays of built-in types.
+#define PUPv(field,len) \
+  do{  if (p.hasComments()) p.comment(#field); p(field,len); } while(0)
 
 
 #endif //def __CK_PUP_H
