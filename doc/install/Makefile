@@ -1,34 +1,44 @@
-PSDIR=../../../doc/ps
-PDFDIR=../../../doc/pdf
-HDIR=../../../doc/html
+DOCDIR=../../../doc
+WEBDIR=/expand6/groupMosaic/pplmantest
 
 all: ps pdf html
 
 ps:
-	make clean
 	touch index.tex
 	latex manual.tex
 	latex manual.tex
 	if [ -f manual.idx ] ; then makeindex -o index.tex manual.idx ; fi
 	latex manual.tex
 	dvips -o manual.ps manual.dvi
-	/bin/cp manual.ps $(PSDIR)/install.ps
 
 html:
-	make clean
 	touch index.tex
 	latex manual.tex
 	latex2html -local_icons manual.tex
-	/bin/rm -rf $(HDIR)/install
-	/bin/cp -R manual $(HDIR)/install
 
 pdf:
-	make clean
 	touch index.tex
 	pdflatex manual.tex
 	if [ -f manual.idx ] ; then makeindex -o index.tex manual.idx ; fi
 	pdflatex manual.tex
-	/bin/cp manual.pdf $(PDFDIR)/install.pdf
+
+doc:
+	make all
+	if [ ! -d $(DOCDIR) ] ; then mkdir $(DOCDIR) ; fi
+	if [ ! -d $(DOCDIR)/ps ] ; then mkdir $(DOCDIR)/ps ; fi
+	if [ ! -d $(DOCDIR)/pdf ] ; then mkdir $(DOCDIR)/pdf ; fi
+	if [ ! -d $(DOCDIR)/html ] ; then mkdir $(DOCDIR)/html ; fi
+	/bin/cp manual.ps $(DOCDIR)/ps/install.ps
+	/bin/cp manual.pdf $(DOCDIR)/pdf/install.pdf
+	/bin/rm -rf $(DOCDIR)/html/install
+	/bin/cp -R manual $(DOCDIR)/html/install
+
+web:
+	make all
+	/bin/cp manual.ps $(WEBDIR)/ps/install.ps
+	/bin/cp manual.pdf $(WEBDIR)/pdf/install.pdf
+	/bin/rm -rf $(WEBDIR)/html/install
+	/bin/cp -R manual $(WEBDIR)/html/install
 
 clean:
 	/bin/rm -f *.ps *.pdf *.ilg *.aux *.log *.dvi *.idx *.toc 
