@@ -35,11 +35,18 @@ typedef LBMigrateMsg  CLBMigrateMsg;
 class LBInfo
 {
 public:
-  double *peLoads; 
-  double *bgLoads; 
+  double *peLoads; 	// total load: object + background
+  double *objLoads; 	// total obj load
+  double *comLoads; 	// total comm load
+  double *bgLoads; 	// background load
+  int    numPes;
   double minObjLoad, maxObjLoad;
-  LBInfo(): peLoads(NULL), bgLoads(NULL), minObjLoad(0.0), maxObjLoad(0.0) {}
-  LBInfo(double *p, double *bg): peLoads(p), bgLoads(bg), minObjLoad(0.0), maxObjLoad(0.0) {}
+  LBInfo(): peLoads(NULL), objLoads(NULL), comLoads(NULL), bgLoads(NULL), numPes(0), minObjLoad(0.0), maxObjLoad(0.0) {}
+  LBInfo(double *pl, int count): peLoads(pl), objLoads(NULL), comLoads(NULL), bgLoads(NULL), numPes(count), minObjLoad(0.0), maxObjLoad(0.0) {}
+  LBInfo(int count);
+  ~LBInfo();
+  void clear();
+  void print();
 };
 
 class CentralLB : public BaseLB
@@ -296,6 +303,7 @@ public:
   ~CLBStatsMsg();
   void pup(PUP::er &p);
 }; 
+
 
 // compute load distribution info
 void getLoadInfo(CentralLB::LDStats* stats, int count, LBInfo &info, int considerComm);

@@ -19,24 +19,78 @@ int LBSimulation::simStepSize = 1;           /// number of steps to simulate
 int LBSimulation::simProcs = 0; 	     /// simulation target procs
 int LBSimulation::procsChanged = 0;          /// flag if the number of procs has been changed
 
-LBSimulation::LBSimulation(int numPes_) : numPes(numPes_)
+/*****************************************************************************
+		LBInfo: evaluation information for LBStats  
+*****************************************************************************/
+
+LBInfo::LBInfo(int count): minObjLoad(0.0), maxObjLoad(0.0), numPes(count)
 {
-	lbinfo.peLoads = new double [numPes];
-	lbinfo.bgLoads = new double [numPes];
-	for(int i = 0; i < numPes; i++)
-		lbinfo.peLoads[i] = lbinfo.bgLoads[i] = 0.0;
+  peLoads = new double[numPes]; 
+  objLoads = new double[numPes]; 
+  comLoads = new double[numPes]; 
+  bgLoads = new double[numPes]; 
+  clear();
+}
+
+LBInfo::~LBInfo()
+{
+  // only free when it is allocated in the constructor
+  if (peLoads && bgLoads) {
+    delete [] bgLoads;
+    delete [] comLoads;
+    delete [] objLoads;
+    delete [] peLoads;
+  }
+}
+
+void LBInfo::clear()
+{
+  for (int i=0; i<numPes; i++) {
+    peLoads[i] = 0.0;
+    if (objLoads) objLoads[i] = 0.0;
+    if (comLoads) comLoads[i] = 0.0;
+    if (bgLoads)  bgLoads[i] = 0.0;
+  }
+  minObjLoad = 0.0;
+  maxObjLoad = 0.0;
+}
+
+void LBInfo::print()
+{
+  int i;
+  double minLoad, maxLoad, sum, average;
+  sum = .0;
+  sum = minLoad = maxLoad = objLoads[0]+comLoads[0];
+  for (i = 1; i < numPes; i++) {
+    double load = peLoads[i];
+    if (load>maxLoad) maxLoad=load;
+    else if (peLoads[i]<minLoad) minLoad=load;
+    sum += load;
+  }
+  average = sum/numPes;
+  CmiPrintf("The processor loads are: \n");
+  CmiPrintf("PE   (Total Load) (Obj Load) (Comm Load) (BG Load)\n");
+  for(i = 0; i < numPes; i++) {
+    CmiPrintf("%-4d %10f %10f %10f %10f", i, peLoads[i], objLoads[i], comLoads[i], bgLoads[i]);
+    CmiPrintf("\n");
+  }
+  CmiPrintf("Min : %f	Max : %f	Average: %f\n", minLoad, maxLoad, average);
+  CmiPrintf("MinObj : %f	MaxObj : %f\n", minObjLoad, maxObjLoad, average);
+}
+
+////////////////////////////////////////////////////////////////////////////
+
+LBSimulation::LBSimulation(int numPes_) : numPes(numPes_), lbinfo(numPes_)
+{
 }
 
 LBSimulation::~LBSimulation()
 {
- 	delete [] lbinfo.peLoads;
- 	delete [] lbinfo.bgLoads;
 }
 
 void LBSimulation::reset()
 {
-  for(int i = 0; i < numPes; i++)
-    lbinfo.peLoads[i] = lbinfo.bgLoads[i] = 0.0;
+  lbinfo.clear();
 }
 
 void LBSimulation::SetProcessorLoad(int pe, double load, double bgload)
@@ -48,26 +102,7 @@ void LBSimulation::SetProcessorLoad(int pe, double load, double bgload)
 
 void LBSimulation::PrintSimulationResults()
 {
-  int i;
-  double minLoad, maxLoad, sum, average;
-  double *peLoads = lbinfo.peLoads;
-  double *bgLoads = lbinfo.bgLoads;
-  sum = .0;
-  sum = minLoad = maxLoad = peLoads[0];
-  for (i = 1; i < numPes; i++) {
-    if (peLoads[i]>maxLoad) maxLoad=peLoads[i];
-    else if (peLoads[i]<minLoad) minLoad=peLoads[i];
-    sum += peLoads[i];
-  }
-  average = sum/numPes;
-  CmiPrintf("The processor loads are: \n");
-  CmiPrintf("PE   (Total Load) (BG Load)\n");
-  for(i = 0; i < numPes; i++) {
-    CmiPrintf("%-4d %10f %10f", i, peLoads[i], bgLoads[i]);
-    CmiPrintf("\n");
-  }
-  CmiPrintf("Min : %f	Max : %f	Average: %f\n", minLoad, maxLoad, average);
-  CmiPrintf("MinObj : %f	MaxObj : %f\n", lbinfo.minObjLoad, lbinfo.maxObjLoad, average);
+  lbinfo.print();
 }
 
 void LBSimulation::PrintDifferences(LBSimulation *realSim, CentralLB::LDStats *stats)

@@ -351,7 +351,7 @@ void CentralLB::LoadBalance()
 //  calculate predicted load
 //  very time consuming though, so only happen when debugging is on
   if (_lb_args.debug()) {
-      LBInfo info(migrateMsg->expectedLoad, NULL);
+      LBInfo info(migrateMsg->expectedLoad, clients);
       getPredictedLoadWithMsg(statsData, clients, migrateMsg, info, 1);
   }
 
@@ -870,11 +870,21 @@ void getLoadInfo(CentralLB::LDStats* stats, int count,
 {
 	int i, pe;
 	double *peLoads = info.peLoads;
+	double *objLoads = info.objLoads;
+	double *comLoads = info.comLoads;
+	double *bgLoads = info.bgLoads;
         double minObjLoad = 1.0e20;  // I suppose no object load is beyond this
 	double maxObjLoad = 0.0;
 
 	CmiAssert(peLoads);
 	stats->makeCommHash();
+
+	info.clear();
+
+        // get background load
+	if (bgLoads)
+    	  for(pe = 0; pe < count; pe++)
+    	   bgLoads[pe] = stats->procs[pe].bg_walltime;
 
 	for(pe = 0; pe < count; pe++)
     	  peLoads[pe] = stats->procs[pe].bg_walltime;
@@ -886,6 +896,7 @@ void getLoadInfo(CentralLB::LDStats* stats, int count,
 		if (oload < minObjLoad) minObjLoad = oload;
 		if (oload > maxObjLoad) maxObjLoad = oload;
 		peLoads[pe] += oload;
+		if (objLoads) objLoads[pe] += oload;
 	}
 
 	// handling of the communication overheads. 
@@ -931,21 +942,18 @@ void getLoadInfo(CentralLB::LDStats* stats, int count,
 	  // now for each processor, add to its load the send and receive overheads
 	  for(i = 0; i < count; i++)
 	  {
-		peLoads[i] += msgRecvCount[i]  * PER_MESSAGE_RECV_OVERHEAD +
+		double comload = msgRecvCount[i]  * PER_MESSAGE_RECV_OVERHEAD +
 			      msgSentCount[i]  * PER_MESSAGE_SEND_OVERHEAD +
 			      byteRecvCount[i] * PER_BYTE_RECV_OVERHEAD +
 			      byteSentCount[i] * PER_BYTE_SEND_OVERHEAD;
+		peLoads[i] += comload;
+		if (comLoads) comLoads[i] += comload;
 	  }
 	  delete [] msgRecvCount;
 	  delete [] msgSentCount;
 	  delete [] byteRecvCount;
 	  delete [] byteSentCount;
 	}
-
-        // get background load
-	if (info.bgLoads)
-    	  for(pe = 0; pe < count; pe++)
-    	   info.bgLoads[pe] = stats->procs[pe].bg_walltime;
 
  	info.minObjLoad = minObjLoad;
  	info.maxObjLoad = maxObjLoad;
