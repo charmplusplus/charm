@@ -420,11 +420,13 @@ void GVT::computeGVT(UpdateMsg *m)
     // check for inactivity
     if ((optGVT == POSE_UnsetTS) && (earliestMsg == POSE_UnsetTS)) {
       inactive++;
+      /*
       if (inactive == 1) {
 	CkPrintf("[%d] Inactive... calling CkWaitQD...\n", CkMyPe());
 	CkWaitQD();
 	CkPrintf("[%d] Back from CkWaitQD...\n", CkMyPe());
       }
+      */
       estGVT = lastGVT;
       if (inactive == 1) inactiveTime = lastGVT;
     }
