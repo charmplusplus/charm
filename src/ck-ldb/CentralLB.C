@@ -11,6 +11,7 @@
 /*@{*/
 
 #include <charm++.h>
+#include "envelope.h"
 #include "CentralLB.h"
 #include "CentralLB.def.h"
 
@@ -481,10 +482,13 @@ void CentralLB::simulation() {
   }
 }
 
+#define OLD_FORMAT_COMPATIBLE  0
+
 void CentralLB::readStatsMsgs(const char* filename) {
 
   int i;
   FILE *f = fopen(filename, "r");
+  if (f==NULL) CmiAbort("LB Dump file not exist!\n");
 
   // at this stage, we need to rebuild the statsMsgList and
   // statsDataList structures. For that first deallocate the
@@ -501,10 +505,15 @@ void CentralLB::readStatsMsgs(const char* filename) {
   statsDataList = new LDStats[stats_msg_count];
 
   for (i = 0; i < stats_msg_count; i++) {
-    statsMsgsList[i] = new CLBStatsMsg;
-    CkPupMessage(p, (void **)&statsMsgsList[i], 1);
+    CLBStatsMsg* m = new CLBStatsMsg;
+    CkPupMessage(p, (void **)&m, 1);
+#if ! OLD_FORMAT_COMPATIBLE
+    envelope *env=UsrToEnv(m);
+    CkUnpackMessage(&env); //UnPack it
+    m = (CLBStatsMsg *)EnvToUsr(env);
+#endif
 
-    CLBStatsMsg* m = statsMsgsList[i];
+    statsMsgsList[i] = m;
     statsDataList[i].total_walltime = m->total_walltime;
     statsDataList[i].total_cputime = m->total_cputime;
     statsDataList[i].idletime = m->idletime;
@@ -518,7 +527,11 @@ void CentralLB::readStatsMsgs(const char* filename) {
     statsDataList[i].objData = m->objData;
     statsDataList[i].n_comm = m->n_comm;
     statsDataList[i].commData = m->commData;
-//CmiPrintf("i:%d bg_walltime: %f total_walltime: %f\n", i, m->bg_walltime, m->total_walltime);
+#if OLD_FORMAT_COMPATIBLE
+    statsDataList[i].objData = (LDObjData*)((char*)m+(size_t)m->objData);
+    statsDataList[i].commData = (LDCommData*)((char *)m+(size_t)m->commData);
+#endif
+//CmiPrintf("i:%d bg_walltime: %f total_walltime: %f objData: %p comm: %p\n", i, m->bg_walltime, m->total_walltime, m->objData, m->commData);
   }
 
   // file f is closed in the destructor of PUP::fromDisk
@@ -534,6 +547,8 @@ void CentralLB::writeStatsMsgs(const char* filename) {
   p|stats_msg_count;
 
   for (i = 0; i < stats_msg_count; i++) {
+    envelope *env=UsrToEnv(statsMsgsList[i]);
+    CkPackMessage(&env); //Pack it
     CkPupMessage(p, (void **)&statsMsgsList[i], 1);
   }
 

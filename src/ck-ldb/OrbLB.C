@@ -29,7 +29,7 @@ void CreateOrbLB()
 }
 
 static void lbinit(void) {
-  LBRegisterBalancer("ORbLB", CreateOrbLB, "partition objects based on coordinates");
+  LBRegisterBalancer("OrbLB", CreateOrbLB, "partition objects based on coordinates");
 }
 
 #include "OrbLB.def.h"
