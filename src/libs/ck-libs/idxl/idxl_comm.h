@@ -97,6 +97,7 @@ public:
 		return ret;
 	}
 	void pup(PUP::er &p);
+	void sort2d(double *coord);
 };
 PUPmarshall(IDXL_List)
 
@@ -189,6 +190,8 @@ public:
 		 int hisChunk,int hisLocalNo,IDXL_Side &hisList);
 	
 	void print(const IDXL_Print_Map *idxmap=NULL) const;
+
+	void sort2d(double *coord);
 };
 
 /**
@@ -251,6 +254,8 @@ public:
 	const IDXL_Side &getSend(void) const {return *send;}
 	IDXL_Side &getRecv(void) {return *recv;}
 	const IDXL_Side &getRecv(void) const {return *recv;}
+
+	void sort2d(double *coord);
 };
 
 #endif

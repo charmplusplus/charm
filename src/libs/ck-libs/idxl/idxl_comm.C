@@ -76,6 +76,28 @@ void IDXL_List::pup(PUP::er &p)
 	shared.pup(p);
 }
 
+void IDXL_List::sort2d(double *coord){
+	double *dist = new double[shared.size()];
+	for(int i=0;i<shared.size();i++){
+		int idx = shared[i];
+		dist[i] = coord[2*idx]*coord[2*idx]+coord[2*idx+1]*coord[2*idx+1];
+	}
+	for(int i=0;i<shared.size();i++){
+		for(int j=i;j<shared.size();j++){
+			if(dist[i] > dist[j]){
+				int k = shared[j];
+				double temp = dist[j];
+				shared[j] = shared[i];
+				dist[j] = dist[i];
+				shared[i] = k;
+				dist[i] = temp;
+			}
+		}
+	}
+	delete [] dist;
+}
+
+
 /* IDXL_Side Itself: list the IDXL_Lists for all chunks
 */
 IDXL_Side::IDXL_Side(void) :cached_map(NULL) 
@@ -159,5 +181,25 @@ void IDXL_Side::print(const IDXL_Print_Map *idxmap) const
   }
 }
 
+void IDXL_Side::sort2d(double *coord){
+	for(int i=0;i<comm.size();i++){
+		IDXL_List *l = comm[i];
+		l->sort2d(coord);
+	}
+	flushMap();
+}
 
 
+/*
+	IDXL functions
+*/
+
+void IDXL::sort2d(double *coord){
+	IDXL_Side &side = getSend();
+	side.sort2d(coord);
+	
+	if(!isSingle()){
+		IDXL_Side &recvSide = getRecv();
+		recvSide.sort2d(coord);
+	}
+}

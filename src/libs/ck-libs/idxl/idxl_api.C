@@ -125,6 +125,14 @@ FORTRAN_AS_C(IDXL_COMBINE,IDXL_Combine,idxl_combine,
 
 /** Sort the indices in this list by these 2D coordinates */
 // FIXME: void IDXL_Sort_2d(IDXL_t l,double *coord2d);
+CDECL void IDXL_Sort_2d(IDXL_t l_t,double *coord2d){
+	const char *caller = "IDXL_Sort_2d";
+	IDXLAPI(caller); IDXL_Chunk *c=IDXL_Chunk::get(caller);
+	IDXL &l=c->lookup(l_t,caller);
+	l.sort2d(coord2d);
+};
+
+
 /** Sort the indices in this list by these 3D coordinates */
 // FIXME: void IDXL_Sort_3d(IDXL_t l,double *coord3d);
 
@@ -178,7 +186,6 @@ FDECL void FTN_NAME(IDXL_ADD_ENTITY,idxl_add_entity)
 	IDXL &l=c->lookup(*l_t,caller);
 	splitEntity(l,*localIdx-1,*nBetween,between,1);	
 }
-
 
 
 /** Throw away this index list */
