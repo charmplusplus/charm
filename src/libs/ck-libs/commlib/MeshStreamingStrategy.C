@@ -37,11 +37,6 @@
 ** provide documentation within this code to describe what is going on.
 */
 
-
-// TODO:
-//    * allow for the strategy to receive a list of processes
-
-
 #include "MeshStreamingStrategy.h"
 
 // These macros are taken directly from convcore.c.
@@ -97,12 +92,12 @@ void periodic_flush_handler (void *ptr)
 **
 ** The layout of the message received is shown in the diagram below.
 **
-**                /
+**             \  /
 ** +------------||---------------------------------------------------+
 ** |Conv| I | # || dest || size | ref || Converse | Charm++  || user | ...
 ** |hdr | D |   ||  PE  ||      | cnt ||  header  | envelope || data | ...
 ** +------------||---------------------------------------------------+
-**                \
+**             /  \
 **
 ** The function first retrieves the strategy ID and the number of messages
 ** in the packed message and then uses the strategy ID to obtain a pointer
@@ -138,7 +133,7 @@ void *column_handler (char *msg)
 
   ComlibPrintf ("[%d] column_handler() invoked.\n", CkMyPe());
 
-  my_pe = CkMyPe();
+  my_pe = CkMyPe ();
 
   strategy_id = ((int *) (msg + CmiMsgHeaderSizeBytes))[0];
   num_msgs = ((int *) (msg + CmiMsgHeaderSizeBytes))[1];
@@ -174,31 +169,22 @@ void *column_handler (char *msg)
 
 
 /**************************************************************************
+** This is the MeshStreamingStrategy constructor.
 **
-*/
-MeshStreamingStrategy::MeshStreamingStrategy ()
-{
-  ComlibPrintf ("[%d] MeshStreamingStrategy::MeshStreamingStrategy() invoked.\n", CkMyPe());
-
-  num_pe = CkNumPes ();
-
-  num_columns = (int) (ceil (sqrt ((double) num_pe)));
-  num_rows = num_columns;
-  row_length = num_columns;
-
-  max_bucket_size = DEFAULT_MAX_BUCKET_SIZE;
-  flush_period = DEFAULT_FLUSH_PERIOD;
-
-  column_bucket = new CkQ<char *>[num_columns];
-  column_bytes = new int[num_columns];
-  row_bucket = new CkQ<char *>[num_rows];
-}
-
-
-
-
-/**************************************************************************
+** The period and bucket_size have default values specified in the .h file.
 **
+** The constructor is invoked when the client code instantiates this
+** strategy.  The constructor executes on a SINGLE PROCESS in the
+** computation, so it cannot do things like determine an individual
+** process's position within the mesh.
+**
+** After the constructor is invoked, the communications library creates
+** instances that get pup'ed and shipped to each processor in the
+** computation.  To that end, the process that instantiates this strategy
+** (most likely PE 0) will then use pup to pack copies of the strategy
+** and then ship them off to other processes.  They will be un-pup'ed
+** there.  Finally, beginProcessing() will be called on EACH instance on
+** its target processor.
 */
 MeshStreamingStrategy::MeshStreamingStrategy (int period, int bucket_size)
 {
@@ -210,44 +196,13 @@ MeshStreamingStrategy::MeshStreamingStrategy (int period, int bucket_size)
   num_rows = num_columns;
   row_length = num_columns;
 
-  max_bucket_size = bucket_size;
   flush_period = period;
+  max_bucket_size = bucket_size;
 
   column_bucket = new CkQ<char *>[num_columns];
   column_bytes = new int[num_columns];
   row_bucket = new CkQ<char *>[num_rows];
 }
-
-
-
-
-
-#if 0
-/**************************************************************************
-**
-*/
-MeshStreamingStrategy::MeshStreamingStrategy (int numpe, int pelist[])
-{
-  ComlibPrintf ("[%d] MeshStreamingStrategy::MeshStreamingStrategy() invoked.\n", CkMyPe());
-
-  // Empty.
-}
-
-
-
-
-/**************************************************************************
-**
-*/
-MeshStreamingStrategy::MeshStreamingStrategy (int period, int something,
-					      int numpe, int pelist[])
-{
-  ComlibPrintf ("[%d] MeshStreamingStrategy::MeshStreamingStrategy() invoked.\n", CkMyPe());
-
-  // Empty.
-}
-#endif
-
 
 
 
@@ -356,7 +311,6 @@ void MeshStreamingStrategy::insertMessage (CharmMessageHolder *cmsg)
 
 
 
-
 /**************************************************************************
 ** This method is not used for streaming strategies.
 */
@@ -372,8 +326,10 @@ void MeshStreamingStrategy::doneInserting ()
 /**************************************************************************
 ** This method is invoked prior to any processing taking place in the
 ** class.  Various initializations take place here that cannot take place
-** in the class constructor due to the CommLib itself not being totally
-** initialized.
+** in the class constructor due to the communications library itself not
+** being totally initialized.
+**
+** See MeshStreamingStrategy::MeshStreamingStrategy() for more details.
 */
 void MeshStreamingStrategy::beginProcessing (int ignored)
 {
@@ -429,12 +385,12 @@ void MeshStreamingStrategy::RegisterPeriodicFlush (void)
 ** to hold the new message which will pack all of the messages in the
 ** column bucket together.  The layout of this message is shown below:
 **
-**                /
+**             \  /
 ** +------------||---------------------------------------------------+
 ** |Conv| I | # || dest || size | ref || Converse | Charm++  || user | ...
 ** |hdr | D |   ||  PE  ||      | cnt ||  header  | envelope || data | ...
 ** +------------||---------------------------------------------------+
-**                \
+**             /  \
 **
 ** Since the buffer represents a Converse message, it must begin with a
 ** Converse header.  After the header is an int representing the Commlib
@@ -471,6 +427,7 @@ void MeshStreamingStrategy::FlushColumn (int column)
 
   dest_pe = column + (my_row * row_length);
   if (dest_pe >= num_pe) {
+    // This means that there is a hole in the mesh.
     dest_pe = column + ((my_row % (num_rows - 1) - 1) * row_length);
   }
 
@@ -627,14 +584,21 @@ int MeshStreamingStrategy::GetRowLength (void)
 
 
 /**************************************************************************
-** A very complicated pack/unpack method.
+** This is a very complicated pack/unpack method.
+**
+** This method must handle the column_bucket[] and row_bucket[] data
+** structures.  These are arrays of queues of (char *).  To pack these,
+** we must iterate through the data structures and pack the sizes of
+** each message (char *) pointed to by each queue entry.
 */
 void MeshStreamingStrategy::pup (PUP::er &p)
 {
   ComlibPrintf ("[%d] MeshStreamingStrategy::pup() invoked.\n", CkMyPe());
 
+  // Call the superclass method -- easy.
   Strategy::pup (p);
 
+  // Pup the instance variables -- easy.
   p | num_pe;
   p | num_columns;
   p | num_rows;
@@ -649,6 +613,11 @@ void MeshStreamingStrategy::pup (PUP::er &p)
   p | strategy_id;
   p | column_handler_id;
 
+  // Handle the column_bucket[] data structure.
+  // For each element in column_bucket[], pup the length of the queue
+  // at that element followed by the contents of that queue.  For each
+  // queue, pup the size of the message pointed to by the (char *)
+  // entry, followed by the memory for the (char *) entry.
   if (p.isUnpacking ()) {
     column_bucket = new CkQ<char *>[num_columns];
   }
@@ -666,16 +635,16 @@ void MeshStreamingStrategy::pup (PUP::er &p)
     }
   }
 
-
-
+  // Handle the column_bytes[] data structure.
+  // This is a straightforward packing of an int array.
   if (p.isUnpacking ()) {
     column_bytes = new int[num_columns];
   }
 
   p(column_bytes, num_columns);
 
-
-
+  // Handle the row_bucket[] data structure.
+  // This works exactly like the column_bucket[] above.
   if (p.isUnpacking ()) {
     row_bucket = new CkQ<char *>[num_rows];
   }

@@ -12,15 +12,15 @@
 #include <math.h>
 
 #include "ComlibManager.h"
-//#include "commlib.h"
 
-#define DEFAULT_MAX_BUCKET_SIZE 1000
-#define DEFAULT_FLUSH_PERIOD 10
+#define DEFAULT_FLUSH_PERIOD 10        // milliseconds
+#define DEFAULT_MAX_BUCKET_SIZE 1000   // number of messages
 
-class MeshStreamingStrategy : public Strategy {
+class MeshStreamingStrategy : public Strategy
+{
   public:
-    MeshStreamingStrategy ();
-    MeshStreamingStrategy (int period, int bucket_size);
+    MeshStreamingStrategy (int period=DEFAULT_FLUSH_PERIOD,
+			   int bucket_size=DEFAULT_MAX_BUCKET_SIZE);
     MeshStreamingStrategy (CkMigrateMessage *) { }
     void insertMessage (CharmMessageHolder *msg);
     void doneInserting ();
@@ -44,8 +44,8 @@ class MeshStreamingStrategy : public Strategy {
     int my_column;
     int my_row;
 
-    int max_bucket_size;
     int flush_period;
+    int max_bucket_size;
 
     int strategy_id;
 
