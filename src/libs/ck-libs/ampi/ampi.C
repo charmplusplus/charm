@@ -829,6 +829,7 @@ void ampi::pup(PUP::er &p)
 
 ampi::~ampi()
 {
+/*
   int tags[3], sts[3];
   tags[0] = tags[1] = tags[2] = CmmWildCard;
   AmpiMsg *msg = (AmpiMsg *) CmmGet(msgs, 3, tags, sts);
@@ -836,6 +837,7 @@ ampi::~ampi()
     delete msg;
     msg = (AmpiMsg *) CmmGet(msgs, 3, tags, sts);
   }
+*/
   CmmFree(msgs);
 }
 
