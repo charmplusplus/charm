@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.4  1995-06-13 17:00:16  jyelon
+ * Revision 2.5  1995-06-18 21:55:06  sanjeev
+ * removed loop from charm_main, put in CsdScheduler()
+ *
+ * Revision 2.4  1995/06/13  17:00:16  jyelon
  * *** empty log message ***
  *
  * Revision 2.3  1995/06/13  14:33:55  gursoy
@@ -38,7 +41,6 @@ static char ident[] = "@(#)$Header$";
 
 #include "converse.h"
 
-CpvDeclare(int, disable_sys_msgs);
 
 CpvExtern(int, numHeapEntries);
 CpvExtern(int, numCondChkArryElts);
@@ -47,8 +49,6 @@ CpvExtern(int, CsdStopFlag);
 
 void defaultmainModuleInit()
 {
-   CpvInitialize(int, disable_sys_msgs);
-   CpvAccess(disable_sys_msgs) = 0; 
 }
 
 charm_main(argc, argv)
@@ -75,6 +75,10 @@ char *argv[];
   ConverseInit(argv);
   StartCharm(argv);
   CpvAccess(CsdStopFlag)=0;
+
+  CsdScheduler(-1) ;
+
+/**** Josh's old code
   while (1) {
     void *msg;
     msg = CsdGetMsg();
@@ -84,6 +88,8 @@ char *argv[];
         { if (CpvAccess(numHeapEntries) > 0) TimerChecks();
           if (CpvAccess(numCondChkArryElts) > 0) PeriodicChecks(); }
   }
+****/
+
   EndCharm();
   ConverseExit() ;
 }
