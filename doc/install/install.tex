@@ -12,8 +12,212 @@
 % REVISION HISTORY:
 %
 % $Log$
-% Revision 1.1  1995-10-31 22:27:53  milind
+% Revision 1.2  1995-11-01 19:53:54  jyelon
+% *** empty log message ***
+%
+% Revision 1.1  1995/10/31  22:27:53  milind
 % Initial revision
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\section{Installing Converse, Charm, and Charm++}
+
+The three programming systems are distributed as a single package ---
+one always installs all three.  They will all be installed in a single
+directory which, for lack of a better term, we will call the "charm"
+directory.  It would be typical to choose {\tt /usr/local/charm} as
+the location for the charm directory, although any location will do.
+Our explanation of the installation process will assume that {\tt
+/usr/local/charm} is to be the location of the charm directory,
+if not, you must mentally translate.
+
+Download the tar-file file appropriate to your machine.  For example,
+if you are installing the version of charm for networks of solaris
+machines, download {\tt net-sun.tar.Z}:
+
+\begin{verbatim}
+
+    % ftp a.cs.uiuc.edu
+    Connected to a.cs.uiuc.edu.
+    220 a.cs.uiuc.edu FTP server ready.
+    Name: anonymous
+    331 Guest login ok, send your complete e-mail address as password.
+    Password: jyelon@cs.uiuc.edu
+    230-
+    230-    Welcome to the University of Illinois at Urbana-Champaign,
+    230-                 Dept. of Computer Science FTP server.
+    230-
+    230 Guest login ok, access restrictions apply.
+    ftp> cd pub/CHARM/CHARM.4.5
+    250 CWD command successful.
+    ftp> binary
+    200 Type set to I.
+    ftp> get net-sun.tar.Z
+    200 PORT command successful.
+    150 Opening BINARY mode data connection for net-sun.tar.Z (648211 bytes).
+    226 Transfer complete.
+    local: net-sun.tar.Z remote: net-sun.tar.Z
+    648211 bytes received in 38 seconds (17 Kbytes/s)
+    ftp> quit
+
+\end{verbatim}
+
+Now that you have downloaded it, you are ready to install it: uncompress it,
+untar it, and move the directory thereby created to {\tt /usr/local/charm}:
+
+\begin{verbatim}
+
+    % uncompress net-sun.tar.Z
+    % tar xf net-sun.tar
+    % mv net-sun /usr/local/charm
+
+\end{verbatim}
+
+You are almost ready to go.  The last thing you need to do is put the
+charm binaries in your path.  There are two acceptable ways to do
+this.  The first is to simply reset your path:
+
+\begin{verbatim}
+
+    % setenv PATH /usr/local/charm/bin:$PATH
+
+\end{verbatim}
+
+The second is to install the charm binaries in a common directory available
+to all users of your machine, such as {\tt /usr/local/bin}.  {\em DO NOT}
+move the charm binaries from their original location.  If you do, charm will
+cease to function correctly.  Do not copy them either.  The only reliable
+way to put the charm binaries in a common directory is to symbolically link
+them:
+
+\begin{verbatim}
+
+    % ln -s /usr/local/charm/bin/*   /usr/local/bin
+
+\end{verbatim}
+
+The three programming systems, converse, charm, and charm++, are
+probably ready to go.  However, there is one possible situation that
+they may not be.  If your parallel machine has a separate ``host''
+computer on which you do compilation, and if your ``host'' computer is
+of a type different from the one we anticipated, then some of the
+binaries may be compiled for the wrong kind of CPU.  To correct this
+situation, you may need to rebuild the charm and charm++ compilers:
+
+\begin{verbatim}
+
+    % cd /usr/local/charm/src
+    % make all
+
+\end{verbatim}
+
+There are a few things to attend to before you start using them on a
+regular basis.  These are security issues and disk space consumption.
+
+\subsection{Security Issues}
+
+On most computers, charm programs are simple binaries, and they pose
+no more security issues than any other program would.  The exceptions
+to this rule are the network versions {\tt net-sun}, {\tt net-sol},
+{\tt net-hp}, and {\tt net-rs6k}.  This section only applies to users
+of the networked versions, all other users may skip it.
+
+The network versions utilize many unix processes communicating with
+each other via UDP.  No explicit attempt is currently being made to
+filter out unauthorized packets.  Therefore, networked charm programs
+pose a minor security vulnerability: they can be attacked by sending
+UDP packets to the charm program's sockets.
+
+The second security issue associated with networked charm programs is
+associated with the fact that we, the charm developers, need evidence
+that our tools are being used.  (Such evidence is useful in convincing
+funding agencies to continue to support our work.)  To this end, we
+have inserted code in the network {\tt conv-host} program (described
+later) to notify us that our software is being used.
+Implementationally speaking, the {\tt conv-host} program sends a
+single {\tt UDP} packet to {\tt charm.cs.uiuc.edu}.  The packet
+contains no information other than the name of the machine on which it
+is being used, and a 16-bit user number to help us tell if more than
+one user is using it.  We simply gather this information into tables
+recording the number of different institutions and individuals using
+our software, and the frequency with which it is used.
+
+Please note that this notification code {\tt only} exists within the
+network version.  It does {\em not} exist within any other version.
+
+We recognize that some users will object to our gathering statistics.
+Therefore, we have provided a second copy of the {\tt conv-host}
+program with the notification code removed.  If you look within the
+charm {\tt bin} directory, you will find these programs:
+
+\begin{verbatim}
+
+    % cd /usr/local/charm/bin
+    % ls conv-host*
+    conv-host
+    conv-host.notify
+    conv-host.silent
+
+\end{verbatim}
+
+The program {\conv-host.silent} has the notification code removed.  To
+permanently deactivate notification, you may delete the version containing
+the notification code:
+
+\begin{verbatim}
+
+    % cd /usr/local/charm/bin
+    % cp conv-host.silent conv-host
+    % rm conv-host.notify
+
+\end{verbatim}
+
+\subsection{Reducing disk usage}
+
+This section describes how you may delete parts of the distribution
+to save disk space.
+
+The charm directory contains a collection of example-programs and
+test-programs.  These may be deleted with no other effects.
+
+\subsection{Using more than one version of Charm on the same Machine}
+
+It is common to wish to install more than one version of charm on the
+same machine.  For example, we often use the {\tt uth-sol} version for
+debugging our programs (it supports {\tt gdb} in a simple way), and
+then we switch to the {\tt net-sol} version to run our programs in
+parallel.
+
+To do this, you will need more than one charm directory.  For example,
+we use {\tt /usr/local/charm-uth-sol} and {\tt
+/usr/local/charm-net-sol}.  Simply install the two versions
+independently, one at a time.
+
+Now that both are installed, you must explicitly use one or the other
+to compile your programs.  This is done by explicitly specifying which
+{\tt charmc} to use.  For example, to compile a program with the {\tt uth-sol}
+version of charm, we do this:
+
+\begin{verbatim}
+
+    % /usr/local/charm-uth-sol/bin/charmc -c myprog.p
+    % /usr/local/charm-uth-sol/bin/charmc -o myprog myprog.o
+
+\end{verbatim}
+
+When we are then ready to run it in parallel using the {\tt net-sol}
+version, we recompile it:
+
+\begin{verbatim}
+
+    % /usr/local/charm-net-sol/bin/charmc -c myprog.p
+    % /usr/local/charm-net-sol/bin/charmc -o myprog myprog.o
+
+\end{verbatim}
+
+It is common to automate this process with simple scripts.  Since sites
+are all unique, such scripts cannot be easily distributed, but they are
+easy to write.
+
+
 
