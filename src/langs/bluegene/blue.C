@@ -834,15 +834,23 @@ static inline void ProcessMessage(char *msg)
 
   CmiSetHandler(msg, CmiBgMsgHandle(msg));
 
-  // don't count thread overhead and timinmg overhead
+  // don't count thread overhead and timing overhead
   if (timingMethod == BG_WALLTIME)
     tSTARTTIME = CmiWallTimer();
+  else if (timingMethod == BG_ELAPSE)
+    tSTARTTIME = tCURRTIME;
 
   entryFunc(msg);
 
   if (timingMethod == BG_WALLTIME) {
     tCURRTIME += (CmiWallTimer()-tSTARTTIME);
     tSTARTTIME = CmiWallTimer();
+  }
+  else if (timingMethod == BG_ELAPSE) {
+    // if no bgelapse called, assume it takes 1us
+    if (tCURRTIME-tSTARTTIME < 1E-9) {
+//      tCURRTIME += 1e-6;
+    }
   }
 }
 
@@ -875,7 +883,7 @@ void comm_thread(threadInfo *tinfo)
     /* schedule a worker thread, if small work do it itself */
     if (CmiBgMsgType(msg) == SMALL_WORK) {
       if (CmiBgMsgRecvTime(msg) > tCURRTIME)  tCURRTIME = CmiBgMsgRecvTime(msg);
-      tSTARTTIME = CmiWallTimer();
+//      tSTARTTIME = CmiWallTimer();
       /* call user registered handler function */
       ProcessMessage(msg);
     }
@@ -951,7 +959,9 @@ void work_thread(threadInfo *tinfo)
     }
     DEBUGF(("[%d] work thread %d has a msg.\n", BgMyNode(), tMYID));
 
-    if (CmiBgMsgRecvTime(msg) > tCURRTIME) tCURRTIME = CmiBgMsgRecvTime(msg);
+    if (CmiBgMsgRecvTime(msg) > tCURRTIME) {
+      tCURRTIME = CmiBgMsgRecvTime(msg);
+    }
 
     BG_ENTRYSTART(CmiBgMsgHandle(msg), msg);
     // ProcessMessage may trap into scheduler
