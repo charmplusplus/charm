@@ -228,6 +228,10 @@ class NodeGroup : public CkNodeReductionMgr {
     virtual int isNodeGroup() { return 1; }
 
     virtual void pup(PUP::er &p);
+    virtual void flushStates() {
+    	CkNodeReductionMgr::flushStates();
+        reductionInfo.redNo = 0;
+    }
 
     CK_REDUCTION_CONTRIBUTE_METHODS_DECL
     void contributeWithCounter(CkReductionMsg *msg,int count);

@@ -310,6 +310,10 @@ class Group : public CkReductionMgr
 	Group(CkMigrateMessage *msg):CkReductionMgr(msg) {}
 	virtual int isNodeGroup() { return 0; }
 	virtual void pup(PUP::er &p);
+	virtual void flushStates() {
+		CkReductionMgr::flushStates();
+		reductionInfo.redNo = 0;
+ 	}
 
 	CK_REDUCTION_CONTRIBUTE_METHODS_DECL
 };
