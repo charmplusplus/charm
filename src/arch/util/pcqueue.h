@@ -29,6 +29,7 @@ typedef struct PCQueueStruct
 {
   CircQueue head;
   CircQueue tail;
+  int  len;
 }
 *PCQueue;
 
@@ -73,14 +74,23 @@ PCQueue PCQueueCreate(void)
   _MEMCHECK(Q);
   Q->head = circ;
   Q->tail = circ;
+  Q->len = 0;
   return Q;
 }
 
 int PCQueueEmpty(PCQueue Q)
 {
+/*
   CircQueue circ = Q->head;
   char *data = circ->data[circ->pull];
   return (data == 0);
+*/
+  return (Q->len == 0);
+}
+
+int PCQueueLength(PCQueue Q)
+{
+  return Q->len;
 }
 
 char *PCQueuePop(PCQueue Q)
@@ -103,6 +113,7 @@ char *PCQueuePop(PCQueue Q)
 	/* links in the next buffer *before* filling */
                                /* in the last slot. See below. */
       }
+      Q->len --;
       return data;
     }
     else { /* queue seems to be empty. The producer may be adding something
@@ -129,8 +140,8 @@ void PCQueuePush(PCQueue Q, char *data)
   }
   circ1->data[push] = data;
   circ1->push = (push + 1);
+  Q->len ++;
 }
-
 
 
 #endif
