@@ -39,6 +39,8 @@ void BaseLB::unregister() {
 
 #else
 BaseLB::BaseLB(const CkLBOptions &) {}
+BaseLB::~BaseLB() {} 
+
 void BaseLB::unregister() {}
 #endif
 
