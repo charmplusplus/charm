@@ -38,7 +38,7 @@
 CpvExtern(int, _traceCoreOn);   /* projector */
 extern void CcdModuleInit(char **);
 extern void CmiMemoryInit(char **);
-extern void CldModuleInit(void);
+extern void CldModuleInit(char **);
 
 #if CMK_WHEN_PROCESSOR_IDLE_USLEEP
 #include <sys/types.h>
@@ -2010,7 +2010,7 @@ void ConverseCommonInit(char **argv)
   CQdInit();
 
   CrnInit();
-  CldModuleInit();
+  CldModuleInit(argv);
 
   CmiInitImmediateMsg();
 }
