@@ -331,7 +331,6 @@ char **CmiInitPE()
   int argc; char **argv;
   argv = CopyArgvec(CmiArgv);
   CpvAccess(CmiLocalQueue) = CmiQueues[CmiMyPe()];
-  CmiSpanTreeInit();
   CmiTimerInit();
   ConverseCommonInit(argv);
   return argv;

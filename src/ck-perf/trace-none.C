@@ -8,6 +8,7 @@ void traceInit(int*, char**)
 {
   CpvInitialize(Trace*, _trace);
   CpvAccess(_trace) = 0;
+  CpvInitialize(int,traceOn);
   CpvAccess(traceOn) = 0;
 }
 
