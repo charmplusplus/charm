@@ -3,10 +3,10 @@
 
 typedef struct fifo_queue {
         void **block;
-        short block_len;
-        short first;
-        short avail;
-        short length;
+        int block_len;
+        int first;
+        int avail;
+        int length;
 } FIFO_QUEUE;
 
 
