@@ -11,6 +11,10 @@
 #include "converse.h"
 #include <mpi.h>
 
+/*Support for ++debug: */
+#include <unistd.h> /*For getpid()*/
+#include <stdlib.h> /*For sleep()*/
+
 #define FLIPBIT(node,bitnumber) (node ^ (1 << bitnumber))
 #define MAX_QLEN 200
 
@@ -428,6 +432,13 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
   request_max=MAX_QLEN;
   CmiGetArgInt(argv,"+requestmax",&request_max);
   /*printf("request max=%d\n", request_max);*/
+  if (CmiGetArgFlag(argv,"++debug"))
+  {   /*Pause so user has a chance to start and attach debugger*/
+    printf("CHARMDEBUG> Processor %d has PID %d\n",Cmi_mype,getpid());
+    if (!CmiGetArgFlag(argv,"++debug-no-pause"))
+      sleep(10);
+  }
+
   CmiTimerInit();
   CpvInitialize(void *, CmiLocalQueue);
   CpvAccess(CmiLocalQueue) = CdsFifo_Create();
