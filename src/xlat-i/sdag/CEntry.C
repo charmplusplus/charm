@@ -237,7 +237,17 @@ void CEntry::generateCode(XStr& op)
       op << "      case " << cn->nodeNum << ":\n";
       op << "      {\n";
       lastWasVoid = 0;
-      for(sv = (CStateVar *)cn->stateVars->begin(); i<(cn->stateVars->length());i++, sv=(CStateVar *)cn->stateVars->next()) {
+      sv = (CStateVar *)cn->stateVars->begin();
+      i = 0;
+      paramMarshalling = 0;
+      lastWasVoid = 0;
+      for(; i<(cn->stateVars->length());i++, sv=(CStateVar *)cn->stateVars->next()) {
+         if ((sv->isMsg == 0) && (paramMarshalling == 0) && (sv->isVoid ==0)){
+            paramMarshalling =1;
+            op << "        CkMarshallMsg *impl_msg" <<cn->nodeNum <<" = (CkMarshallMsg *) tr->args["<<iArgs++<<"];\n"; 
+            op << "        char *impl_buf" <<cn->nodeNum <<"=((CkMarshallMsg *)impl_msg" <<cn->nodeNum <<")->msgBuf;\n";
+            op << "        PUP::fromMem implP" <<cn->nodeNum <<"(impl_buf" <<cn->nodeNum <<");\n";
+         }
          if (sv->isMsg == 1) {
             if((i!=0) && (lastWasVoid == 0))
 	       whenParams->append(", ");
@@ -247,24 +257,10 @@ void CEntry::generateCode(XStr& op)
 	    *whenParams<<iArgs;
 	    whenParams->append("]");
 	    iArgs++;
-         } 
-	 if (sv->isVoid == 1) {
-            op <<"        CkFreeSysMsg((void *)tr->args[" <<iArgs++ <<"]);\n";
-	 }
-         lastWasVoid = sv->isVoid;
-      }
-      sv = (CStateVar *)cn->stateVars->begin();
-      i = 0;
-      paramMarshalling = 0;
-      lastWasVoid = 0;
-      for(; i<(cn->stateVars->length());i++, sv=(CStateVar *)cn->stateVars->next()) {
-         if ((sv->isMsg == 0) && (paramMarshalling == 0) && (sv->isVoid ==0)){
-            paramMarshalling =1;
-            op << "        CkMarshallMsg *impl_msg" <<cn->nodeNum <<" = (CkMarshallMsg *) tr->args[0];\n"; 
-            op << "        char *impl_buf" <<cn->nodeNum <<"=((CkMarshallMsg *)impl_msg" <<cn->nodeNum <<")->msgBuf;\n";
-            op << "        PUP::fromMem implP" <<cn->nodeNum <<"(impl_buf" <<cn->nodeNum <<");\n";
          }
-         if ((sv->isMsg == 0)&&(sv->isVoid == 0)) {
+         else if (sv->isVoid == 1) 
+            op <<"    CkFreeSysMsg((void  *)tr->args[" <<iArgs++ <<"]);\n";
+         else if ((sv->isMsg == 0) && (sv->isVoid == 0)) {
             if((i > 0) && (lastWasVoid == 0))
 	       whenParams->append(", ");
             whenParams->append(*(sv->name));

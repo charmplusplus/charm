@@ -269,16 +269,25 @@ void CParseNode::propagateState(int uniqueVarNum)
            }
 	   else 
              vType2 = 0;
+	   XStr *name;
            if ((parameter1->con2 == 0) && (parameter1->con3 == 0)) {  // Type
-	       XStr *name = new XStr("noname_"); *name<<uniqueVarNum;
+	       name = new XStr("noname_"); *name<<uniqueVarNum;
 	       uniqueVarNum++;
                sv = new CStateVar(constStr, 0, vType1, vType2, 0, 0, name, byRef, 0, isMsg);
 	   }
-	   else if ((parameter1->con2 != 0) && (parameter1->con3 == 0))   // Type Name
+	   else if ((parameter1->con2 != 0) && (parameter1->con3 == 0)) {   // Type Name
+	       //name = new XStr(parameter1->con2->text->charstar()); name->append("_"); *name<<uniqueVarNum;
+	       //uniqueVarNum++;
+               //sv = new CStateVar(constStr, 0,vType1, vType2, 0, 0, name ,byRef,0, isMsg);
                sv = new CStateVar(constStr, 0,vType1, vType2, 0, 0, new XStr(*(parameter1->con2->text)),byRef,0, isMsg);
-	   else if ((parameter1->con2 != 0) && (parameter1->con3 != 0))   // Type Name [ArrayLength]
+	   }
+	   else if ((parameter1->con2 != 0) && (parameter1->con3 != 0)) {  // Type Name [ArrayLength]
+	       //name = new XStr(parameter1->con2->text->charstar()); name->append("_"); *name<<uniqueVarNum;
+	       //uniqueVarNum++;
+	       //sv = new CStateVar(constStr, 0,vType1, vType2, 0, 0, name, byRef,new XStr(*(parameter1->con3->text)), isMsg);
 	       sv = new CStateVar(constStr, 0,vType1, vType2, 0, 0, new XStr(*(parameter1->con2->text)), byRef,new XStr(*(parameter1->con3->text)), isMsg);
-           stateVars->append(sv);
+           }
+	   stateVars->append(sv);
         }
         else if (vartype1->con3->type == PTRTYPE) {
            isMsg = 0;
@@ -299,15 +308,24 @@ void CParseNode::propagateState(int uniqueVarNum)
 	   if ((numParameters == 1) && (vartype1->con3->numPtrs == 1))
 	      isMsg = 1;
 	       
+	      XStr *name;
 	   if ((parameter1->con2 == 0) && (parameter1->con3 == 0)) {
-	      XStr *name = new XStr("noname_"); *name<<uniqueVarNum;
+	      name = new XStr("noname_"); *name<<uniqueVarNum;
 	      uniqueVarNum++;
               sv = new CStateVar(constStr, 0, vType1, vType2, pt, vartype1->con3->numPtrs, name,byRef, 0, isMsg);
 	   }
-	   else if ((parameter1->con2 != 0) && (parameter1->con3 == 0)) 
+	   else if ((parameter1->con2 != 0) && (parameter1->con3 == 0)) {
+	      //name = new XStr(parameter1->con2->text->charstar()); name->append("_"); *name<<uniqueVarNum;
+	      //uniqueVarNum++;
+              //sv = new CStateVar(constStr,0, vType1, vType2, pt, vartype1->con3->numPtrs, name, byRef, 0, isMsg);
               sv = new CStateVar(constStr,0, vType1, vType2, pt, vartype1->con3->numPtrs, new XStr(*(parameter1->con2->text)), byRef, 0, isMsg);
-	   else if ((parameter1->con2 != 0) && (parameter1->con3 != 0))
+	   }
+	   else if ((parameter1->con2 != 0) && (parameter1->con3 != 0)) {
+	      //name = new XStr(parameter1->con2->text->charstar()); name->append("_"); *name<<uniqueVarNum;
+	      //uniqueVarNum++;
+              //sv = new CStateVar(constStr, 0, vType1, vType2, pt, vartype1->con3->numPtrs, name, byRef, new XStr(*(parameter1->con3->text)), isMsg);
               sv = new CStateVar(constStr, 0, vType1, vType2, pt, vartype1->con3->numPtrs, new XStr(*(parameter1->con2->text)), byRef, new XStr(*(parameter1->con3->text)), isMsg);
+	   }
            stateVars->append(sv);
         }
         if (byRef != 0) {
@@ -478,15 +496,24 @@ TList<CStateVar*> CParseNode::propagateState(TList<CStateVar*>& list, TList<CSta
 		     }	
 		     else 
 		        vType2 = 0;
+	             XStr *name;
 	             if ((parameter1->con2 == 0) && (parameter1->con3 == 0)) {
-	                XStr *name = new XStr("noname_"); *name<<uniqueVarNum;
+	                name = new XStr("noname_"); *name<<uniqueVarNum;
 	                uniqueVarNum++;
                         sv = new CStateVar(constStr, 0, vType1, vType2, 0, 0, name, byRef, 0, isMsg);
 		     }
-	             else if ((parameter1->con2 != 0) && (parameter1->con3 == 0)) 
+	             else if ((parameter1->con2 != 0) && (parameter1->con3 == 0)) {
+	                //name = new XStr(parameter1->con2->text->charstar()); name->append("_"); *name<<uniqueVarNum;
+	                //uniqueVarNum++;
+                        //sv = new CStateVar(constStr, 0, vType1, vType2, 0, 0, name ,byRef,0, isMsg);
                         sv = new CStateVar(constStr, 0, vType1, vType2, 0, 0, new XStr(*(parameter1->con2->text)),byRef,0, isMsg);
-		     else if ((parameter1->con2 != 0) && (parameter1->con3 != 0))
+		     }
+		     else if ((parameter1->con2 != 0) && (parameter1->con3 != 0)) {
+	                //name = new XStr(parameter1->con2->text->charstar()); name->append("_"); *name<<uniqueVarNum;
+	                //uniqueVarNum++;
+                        //sv = new CStateVar(constStr, 0, vType1, vType2, 0,0 , name, byRef,new XStr(*(parameter1->con3->text)), isMsg);
                         sv = new CStateVar(constStr, 0, vType1, vType2, 0,0 , new XStr(*(parameter1->con2->text)), byRef,new XStr(*(parameter1->con3->text)), isMsg);
+		     }
                      allstateVars->append(sv);
                      stateVarsChildren->append(sv);
                      whensEntryMethodStateVars->append(sv); 
@@ -511,15 +538,24 @@ TList<CStateVar*> CParseNode::propagateState(TList<CStateVar*>& list, TList<CSta
                      vartype->append(*(pt));
 	             if ((numParameters == 1) && (type1->con3->numPtrs == 1))
 	                isMsg = 1;
+	                XStr *name;
 	             if ((parameter1->con2 == 0) && (parameter1->con3 == 0)) {
-	                XStr *name = new XStr("noname_"); *name<<uniqueVarNum;
+	                name = new XStr("noname_"); *name<<uniqueVarNum;
 	                uniqueVarNum++;
                         sv = new CStateVar(constStr, 0,  vType1, vType2, pt, type1->con3->numPtrs, name,byRef, 0, isMsg);
 		     }
-	             else if ((parameter1->con2 != 0) && (parameter1->con3 == 0)) 
+	             else if ((parameter1->con2 != 0) && (parameter1->con3 == 0)) {
+	                //name = new XStr(parameter1->con2->text->charstar()); name->append("_"); *name<<uniqueVarNum;
+	                //uniqueVarNum++;
+                        //sv = new CStateVar(constStr, 0, vType1, vType2, pt, type1->con3->numPtrs, name ,byRef,0, isMsg);
                         sv = new CStateVar(constStr, 0, vType1, vType2, pt, type1->con3->numPtrs, new XStr(*(parameter1->con2->text)),byRef,0, isMsg);
-		     else if ((parameter1->con2 != 0) && (parameter1->con3 != 0))
+		     }
+		     else if ((parameter1->con2 != 0) && (parameter1->con3 != 0)) { 
+	               // name = new XStr(parameter1->con2->text->charstar()); name->append("_"); *name<<uniqueVarNum;
+	               // uniqueVarNum++;
+                        //sv = new CStateVar(constStr, 0, vType1, vType2, pt, type1->con3->numPtrs, name , byRef, new XStr(*(parameter1->con3->text)), isMsg);
                         sv = new CStateVar(constStr, 0, vType1, vType2, pt, type1->con3->numPtrs, new XStr(*(parameter1->con2->text)), byRef, new XStr(*(parameter1->con3->text)), isMsg);
+		     }
                      stateVarsChildren->append(sv);
                      allstateVars->append(sv);
  	             entry1->stateVars->append(sv);
