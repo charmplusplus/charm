@@ -29,6 +29,8 @@
 int MAX_STREAMS = (146138719);
 */
 
+extern unsigned int prime_list[];
+
 unsigned int PARAMLIST[3][2] = {{0x87b0b0fdU, 0x27bb2ee6U}, 
 				      {0xe78b6955U,0x2c6fe96eU},
 				      {0x31a53f85U,0x369dea0fU}};
@@ -51,7 +53,7 @@ unsigned int PARAMLIST[3][2] = {{0x87b0b0fdU, 0x27bb2ee6U},
 
 CpvStaticDeclare(int, nstreams);
 
-static void CrnInit(void)
+void CrnInit(void)
 {
   CpvInitialize(int, nstreams);
   CpvAccess(nstreams) = 0;
@@ -61,7 +63,6 @@ static void CrnInit(void)
 
 void CrnInitState(CrnState *genptr, int seed, int type)
 {
-  CrnState *genptr;
   int gennum = CmiMyPe()+CpvAccess(nstreams)*CmiNumPes();
   int i;
   double tempdbl;
