@@ -599,7 +599,7 @@ Array::genSubDecls(XStr& str)
 	"            CkArrayMessage *msg)\n"
 	"    {\n"
 	"        CkGroupID id=buildArrayGroup(mapID,numInitial);\n"
-	"        CProxy_CkArrayBase(id).base_insert1D(ctorIndex,__idx,numInitial,msg);\n"
+	"        CProxy_CkArrayBase(id).base_insert1D(ctorIndex,numInitial,msg);\n"
 	"        return id;\n"
 	"    }\n";
   }
@@ -1431,7 +1431,7 @@ void Entry::genArrayStaticConstructorDefs(XStr& str)
        "{ return CkArrayID(buildArrayGroup("<<epIdx()<<",numElements,mapID,"<<callMsg<<"));}\n";
     str<<
     makeDecl("void")<<"::insert("<<paramComma()<<"int onPE)\n"
-    "{ base_insert("<<epIdx()<<",__idx,onPE,"<<callMsg<<");}\n";
+    "{ base_insert("<<epIdx()<<",onPE,"<<callMsg<<");}\n";
 }
 
 
