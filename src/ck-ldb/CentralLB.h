@@ -225,6 +225,7 @@ public:
   void readStatsMsgs(const char* filename);
   void writeStatsMsgs(const char* filename);
 
+  void preprocess(LDStats* stats,int count);
   virtual LBMigrateMsg* Strategy(LDStats* stats,int count);
   virtual void work(LDStats* stats,int count);
   virtual LBMigrateMsg * createMigrateMsg(LDStats* stats,int count);
