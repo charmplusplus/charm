@@ -7,7 +7,7 @@
 #include "string.h"
 
 extern "C" EToken yylex();
-extern "C" char yytext[];
+extern char *myyytext;
 extern "C" void Unput(char);
 
 class CLexer {

@@ -32,7 +32,7 @@ CToken *CLexer::lookAhead(void)
       delete cToken;
       continue;
     } else {
-      char *yycopy = strdup(yytext);
+      char *yycopy = strdup(myyytext);
       for(int i=strlen(yycopy)-1; i>=0; i-- ) {
         charNum--;
         Unput(yycopy[i]) ;
@@ -53,17 +53,17 @@ CToken *CLexer::getNextToken(void)
     type = yylex();
     if ((int)type == 0)
       return (CToken *) 0;
-    charNum += strlen(yytext);
+    charNum += strlen(myyytext);
     if(type == NEW_LINE) {
       lineNum++;
       charNum = 1;
       if (wsSignificant)
-        return new CToken(type, yytext);
+        return new CToken(type, myyytext);
       else
         continue;
     }
     if((type != WSPACE) || wsSignificant) {
-      cToken = new CToken(type, yytext);
+      cToken = new CToken(type, myyytext);
       // cToken->print(0);
       return cToken;
     }
@@ -149,9 +149,9 @@ CToken *CLexer::getIntExpr(EToken term)
         break;
     }
     if(cToken->type == term && !numBraces && !numParens && !numBrackets) {
-      for(int i=strlen(yytext)-1; i>=0; i-- ) {
+      for(int i=strlen(myyytext)-1; i>=0; i-- ) {
         charNum--;
-        Unput(yytext[i]) ;
+        Unput(myyytext[i]) ;
       }
       endExpr = 1;
     } else {

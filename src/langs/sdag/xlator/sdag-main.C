@@ -19,7 +19,7 @@ int main(int argc, char *argv[])
   }
   for(int i=1; i<argc; i++) {
     resetNumbers();
-    printf("%s:\n", argv[i]);
+    // printf("%s:\n", argv[i]);
     CParser *cParser = new CParser(argv[i]);
     CParsedFile *parsedFile = cParser->doParse();
     parsedFile->doProcess();

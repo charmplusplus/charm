@@ -2,6 +2,10 @@
 #include "EToken.h"
 
 /* Assume that the C-style comments are not present in the source */
+char *myyytext;
+
+#define Return(x) { myyytext = (char *) malloc(strlen(yytext)+1); \
+                    strcpy(myyytext, yytext); return (x); }
 
 %}
 
@@ -30,60 +34,60 @@ octal_constant "0"[0-7]*{integer_suffix_opt}
 hex_constant "0"[xX][0-9a-fA-F]+{integer_suffix_opt}
 %%
 
-{comment}		{return WSPACE;}
+{comment}		{Return(WSPACE);}
 
-{hwhite}+		{return WSPACE;}
-({vt}|{cret}|{ff})+	{return WSPACE;}
-({hwhite}|{vt}|{cret}|{ff})*"\n"	{return(NEW_LINE);}
+{hwhite}+		{Return(WSPACE);}
+({vt}|{cret}|{ff})+	{Return(WSPACE);}
+({hwhite}|{vt}|{cret}|{ff})*"\n"	{Return(NEW_LINE);}
 
 
-class			{return(CLASS);}
-sdagentry		{return(SDAGENTRY);}
-overlap			{return(OVERLAP);}
-when			{return(WHEN);}
-if			{return(IF);}
-else			{return(ELSE);}
-while			{return(WHILE);}
-forall			{return(FORALL);}
-for			{return(FOR);}
-atomic			{return(ATOMIC);}
+class			{Return(CLASS);}
+sdagentry		{Return(SDAGENTRY);}
+overlap			{Return(OVERLAP);}
+when			{Return(WHEN);}
+if			{Return(IF);}
+else			{Return(ELSE);}
+while			{Return(WHILE);}
+forall			{Return(FORALL);}
+for			{Return(FOR);}
+atomic			{Return(ATOMIC);}
 
-{identifier}		{return(IDENT);}
+{identifier}		{Return(IDENT);}
 
-"L"?[']{c_char}+[']	{return(CHAR);}
-"L"?["]{s_char}*["]	{return(STRING);}
+"L"?[']{c_char}+[']	{Return(CHAR);}
+"L"?["]{s_char}*["]	{Return(STRING);}
 
-"("			{return(LP);}
-")"			{return(RP);}
-"["			{return(LB);}
-"]"			{return(RB);}
-"{"			{return(LBRACE);}
-"}"			{return(RBRACE);}
-"*"			{return(STAR);}
-":"			{return(COLON);}
-","			{return(COMMA);}
-";"			{return(SEMICOLON);}
+"("			{Return(LP);}
+")"			{Return(RP);}
+"["			{Return(LB);}
+"]"			{Return(RB);}
+"{"			{Return(LBRACE);}
+"}"			{Return(RBRACE);}
+"*"			{Return(STAR);}
+":"			{Return(COLON);}
+","			{Return(COMMA);}
+";"			{Return(SEMICOLON);}
 
-"#"			{return(DEFAULT);}
-"."			{return(DEFAULT);}
-"&"			{return(DEFAULT);}
-"+"			{return(DEFAULT);}
-"-"			{return(DEFAULT);}
-"~"			{return(DEFAULT);}
-"!"			{return(DEFAULT);}
-"/"			{return(DEFAULT);}
-"%"			{return(DEFAULT);}
-"<"			{return(DEFAULT);}
-">"			{return(DEFAULT);}
-"^"			{return(DEFAULT);}
-"|"			{return(DEFAULT);}
-"?"			{return(DEFAULT);}
-"="			{return(DEFAULT);}
+"#"			{Return(DEFAULT);}
+"."			{Return(DEFAULT);}
+"&"			{Return(DEFAULT);}
+"+"			{Return(DEFAULT);}
+"-"			{Return(DEFAULT);}
+"~"			{Return(DEFAULT);}
+"!"			{Return(DEFAULT);}
+"/"			{Return(DEFAULT);}
+"%"			{Return(DEFAULT);}
+"<"			{Return(DEFAULT);}
+">"			{Return(DEFAULT);}
+"^"			{Return(DEFAULT);}
+"|"			{Return(DEFAULT);}
+"?"			{Return(DEFAULT);}
+"="			{Return(DEFAULT);}
 
-{decimal_constant}  	{return(DEFAULT);}
-{octal_constant}    	{return(DEFAULT);}
-{hex_constant}      	{return(DEFAULT);}
-{floating_constant} 	{return(DEFAULT);}
+{decimal_constant}  	{Return(DEFAULT);}
+{octal_constant}    	{Return(DEFAULT);}
+{hex_constant}      	{Return(DEFAULT);}
+{floating_constant} 	{Return(DEFAULT);}
 
 %%
 
