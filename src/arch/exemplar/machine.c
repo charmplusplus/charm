@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.7  1995-07-05 23:15:29  gursoy
+ * Revision 2.8  1995-09-07 22:40:22  gursoy
+ * Cmi_mype, Cmi_numpe and CmiLocalQueuea are accessed thru macros now
+ *
+ * Revision 2.7  1995/07/05  23:15:29  gursoy
  * minor change in +p code
  *
  * Revision 2.6  1995/07/05  23:07:28  gursoy
@@ -40,7 +43,8 @@
 static char ident[] = "@(#)$Header$";
 
 #include "machine.h"
-#include "chare.h"
+#include "converse.h"
+#include "conv-conds.h"
 
 
 #define FreeFn		free
@@ -62,10 +66,9 @@ static McQueue **MsgQueue;
 #define g_malloc(s)  memory_class_malloc(s,NEAR_SHARED_MEM)
 
 
-
-thread_private void *CmiLocalQueue;
-thread_private int Cmi_mype; 
-thread_private int Cmi_numpe;
+CpvDeclare(void*, CmiLocalQueue);
+CpvDeclare(int, Cmi_mype);
+CpvDeclare(int, Cmi_numpe);
 
 static barrier_t barrier;
 static barrier_t *barr;
@@ -213,8 +216,12 @@ void *arg;
     USER_PARAMETERS *usrparam;
     usrparam = (USER_PARAMETERS *) arg;
 
-    Cmi_mype  = my_thread();
-    Cmi_numpe =  usrparam->npe;
+    CpvInitialize(int, Cmi_mype);
+    CpvInitialize(int, Cmi_numpe);
+    CpvInitialize(void*, CmiLocalQueue);
+
+    CpvAccess(Cmi_mype)  = my_thread();
+    CpvAccess(Cmi_numpe) =  usrparam->npe;
 
     user_main(usrparam->argc,usrparam->argv);
 }
@@ -225,8 +232,8 @@ char *argv[];
 {
     program_name(argv[0],"Convex/Exemplar");
 
-    neighbour_init(Cmi_mype);
-    CmiLocalQueue = (void *) FIFO_Create();
+    neighbour_init(CpvAccess(Cmi_mype));
+    CpvAccess(CmiLocalQueue) = (void *) FIFO_Create();
     CmiSpanTreeInit();
     CmiTimerInit();
 }
@@ -268,7 +275,7 @@ void         *msg;
     int i;
     for(i=0; i<CmiNumPe(); i++)
        if (CmiMyPe() != i) CmiSyncSend(i,size,msg);
-    FIFO_EnQueue(CmiLocalQueue,msg);
+    FIFO_EnQueue(CpvAccess(CmiLocalQueue),msg);
 }
 
 void CmiSyncBroadcastAll(size, msg)
@@ -291,7 +298,7 @@ void         *msg;
         }
 
     mycpy((unsigned long long *)buf,(unsigned long long *)msg,size);
-    FIFO_EnQueue(CmiLocalQueue,buf);
+    FIFO_EnQueue(CpvAccess(CmiLocalQueue),buf);
 }
 
 
