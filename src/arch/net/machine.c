@@ -265,7 +265,7 @@ static unsigned int dataport=0;
 static int Cmi_mach_id=0; /* Machine-specific identifier (GM-only) */
 static SOCKET       dataskt;
 
-#define CMK_BROADCAST_SPANNING_TREE		4
+#define BROADCAST_SPANNING_FACTOR		4
 
 /****************************************************************************
  *
