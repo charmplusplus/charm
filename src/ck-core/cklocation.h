@@ -408,7 +408,7 @@ public:
 
 enum CkElementCreation_t {
   CkElementCreation_migrate=2, // Create object for normal migration arrival
-  CkElementCreation_resume=3, // Create object after checkpoint
+  CkElementCreation_resume=3 // Create object after checkpoint
 };
 /// Abstract superclass of all array manager objects 
 class CkArrMgr {
