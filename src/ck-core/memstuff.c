@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.2  1995-06-14 19:38:29  gursoy
+ * Revision 2.3  1995-06-29 21:49:07  narain
+ * Changed member of MSG_STRUCT to packfn
+ *
+ * Revision 2.2  1995/06/14  19:38:29  gursoy
  * CmiAllocPackBuffer -> CkAllocPackBuffer
  *
  * Revision 2.1  1995/06/08  17:07:12  gursoy
@@ -186,7 +189,7 @@ int prio_size;
     SetEnv_isPACKED(env, NO_PACK);
     SetEnv_packid(env, 0);
 
-    if (CsvAccess(MsgToStructTable)[msgno].pack != NULL)
+    if (CsvAccess(MsgToStructTable)[msgno].packfn != NULL)
 #ifdef SHARED
 	{	
 	   env->needsPack = UNPACKED;
