@@ -765,7 +765,7 @@ double CmiCpuTimer()
 
 #include <rts.h>
 
-/*
+#if 0
 #define SPRN_TBRL 0x10C  // Time Base Read Lower Register (user & sup R/O)
 #define SPRN_TBRU 0x10D  // Time Base Read Upper Register (user & sup R/O)
 #define SPRN_PIR  0x11E  // CPU id
@@ -789,15 +789,15 @@ static inline unsigned long long BGLTimebase(void)
   result.w.hi = u2;
   return result.d;
 }
-*/
+#endif
 
-static long inittime_wallclock;
+static unsigned long long inittime_wallclock;
 CpvStaticDeclare(double, clocktick);
 
 void CmiTimerInit()
 {
-  CpvInitialize(double, clocktick);
   BGLPersonality dst;
+  CpvInitialize(double, clocktick);
   int size = sizeof(BGLPersonality);
   rts_get_personality(&dst, size);
   CpvAccess(clocktick) = 1.0 / dst.clockHz;
@@ -806,9 +806,9 @@ void CmiTimerInit()
 
 double CmiWallTimer()
 {
-  long currenttime;
+  unsigned long long currenttime;
   currenttime = rts_get_timebase();
-  return (currenttime-inittime_wallclock)*CpvAccess(clocktick);
+  return CpvAccess(clocktick)*(currenttime-inittime_wallclock);
 }
 
 double CmiCpuTimer()
@@ -818,7 +818,7 @@ double CmiCpuTimer()
 
 double CmiTimer()
 {
-	return CmiCpuTimer();
+  return CmiWallTimer();
 }
 
 #endif
