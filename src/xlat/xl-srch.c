@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.1  1995-06-15 20:57:00  jyelon
+ * Revision 2.2  1995-09-07 21:22:53  jyelon
+ * Added prefixes to Cpv and Csv macros, fixed bugs thereby revealed.
+ *
+ * Revision 2.1  1995/06/15  20:57:00  jyelon
  * *** empty log message ***
  *
  * Revision 2.0  1995/06/05  18:52:05  brunner
@@ -28,7 +31,7 @@ static char ident[] = "@(#)$Header$";
 
 extern int InPass1;
 extern int IMPORTFLAG,ImportLevel;
-char *CkGlobalFunctionTable="_CK_9_GlobalFunctionTable[";
+char *CkGlobalFunctionTable="CsvAccess(_CK_9_GlobalFunctionTable)[";
 extern char *Map();
 extern char *REFSUFFIX;
 extern int FNNAMETOREFFLAG;

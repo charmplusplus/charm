@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.5  1995-09-06 21:48:50  jyelon
+ * Revision 2.6  1995-09-07 21:21:38  jyelon
+ * Added prefixes to Cpv and Csv macros, fixed bugs thereby revealed.
+ *
+ * Revision 2.5  1995/09/06  21:48:50  jyelon
  * Eliminated 'CkProcess_BocMsg', using 'CkProcess_ForChareMsg' instead.
  *
  * Revision 2.4  1995/09/01  02:13:17  jyelon
@@ -265,7 +268,7 @@ ChareIDType    cid;
 	if (CmiMyPe() == 0)
 		HostAddWriteOnceVar(newWov,GetBocDataPtr(WOVBocNum));
 	else
-		GeneralSendMsgBranch(CkEp_WOV_HostAddWOV, newWov,
+		GeneralSendMsgBranch(CsvAccess(CkEp_WOV_HostAddWOV), newWov,
 		    0, ImmBocMsg, WOVBocNum);
 }
 

@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.16  1995-09-07 05:24:27  gursoy
+ * Revision 2.17  1995-09-07 21:21:38  jyelon
+ * Added prefixes to Cpv and Csv macros, fixed bugs thereby revealed.
+ *
+ * Revision 2.16  1995/09/07  05:24:27  gursoy
  * converted CharmInitLoop to a handler function
  *
  * Revision 2.15  1995/09/06  21:48:50  jyelon
@@ -118,7 +121,7 @@ CsvDeclare(int, _CK_MainChareIndex);
 CsvDeclare(int, _CK_MainEpIndex);
 
 CsvDeclare(int, ReadBuffSize); /* this is set in registerReadOnly() */
-CsvStaticDeclare(void, **_CK_9_ReadMsgTable);	/* was previously global */
+CsvStaticDeclare(void **, _CK_9_ReadMsgTable);	/* was previously global */
 
 CpvDeclare(char*, ReadBufIndex);
 CpvDeclare(char*, ReadFromBuffer);
@@ -246,14 +249,12 @@ char **argv;
 		 
 		CpvAccess(MainDataSize) = CsvAccess(ChareSizesTable)
 					      [CsvAccess(_CK_MainChareIndex)];
-		CpvAccess(mainChareBlock) = CpvAccess(currentChareBlock) = 
-					(CHARE_BLOCK *)CreateChareBlock(
-						CpvAccess(MainDataSize),
+		CpvAccess(mainChareBlock) =
+                    CpvAccess(currentChareBlock) = 
+			CreateChareBlock(CpvAccess(MainDataSize),
 						CHAREKIND_CHARE, rand());
 
-		if (CsvAccess(MainChareLanguage) != CHARMPLUSPLUS) 
-			CpvAccess(mainChareBlock)->chareptr = mainChareBlock + 1 ;
-		else {
+		if (CsvAccess(MainChareLanguage) == CHARMPLUSPLUS) {
 			CpvAccess(mainChareBlock)->chareptr = (void *)
 						((CsvAccess(ChareFnTable)
 					      [CsvAccess(_CK_MainChareIndex)])
@@ -553,7 +554,7 @@ InitializeEPTables()
    * TotalChares 	=  _CK_5mainChareCount(); TotalBocEps 	=
    * NumSysBocEps + _CK_5mainBranchEPCount();
    */
-  TotalEps = TABLE_SIZE;
+  CsvAccess(TotalEps) = TABLE_SIZE;
   TotalFns = TABLE_SIZE;
   TotalMsgs = TABLE_SIZE;
   TotalChares = TABLE_SIZE;
@@ -584,20 +585,20 @@ InitializeEPTables()
       CkMemError(CsvAccess(ROCopyToBufferTable));
     }
   
-  epinfo=(EP_STRUCT*)CmiSvAlloc((TotalEps+1)*sizeof(EP_STRUCT));
+  epinfo=(EP_STRUCT*)CmiSvAlloc((CsvAccess(TotalEps)+1)*sizeof(EP_STRUCT));
   CsvAccess(EpInfoTable)=epinfo;
-  if (TotalEps > 0) {
+  if (CsvAccess(TotalEps) > 0) {
     CkMemError(epinfo);
-    memset((char *)epinfo, 0, (TotalEps+1)*sizeof(EP_STRUCT));
+    memset((char *)epinfo, 0, (CsvAccess(TotalEps)+1)*sizeof(EP_STRUCT));
     for (i = 0; i < CpvAccess(chareEpsCount); i++)
       epinfo[i].language = -1;
   }
   
-  _CK_9_GlobalFunctionTable = (FUNCTION_PTR *) 
+  CsvAccess(_CK_9_GlobalFunctionTable) = (FUNCTION_PTR *) 
     CmiSvAlloc((TotalFns + 1) * sizeof(FUNCTION_PTR));
   
   if (TotalFns > 0)
-    CkMemError(_CK_9_GlobalFunctionTable);
+    CkMemError(CsvAccess(_CK_9_GlobalFunctionTable));
   
   
   CsvAccess(MsgToStructTable) = (MSG_STRUCT *) 
@@ -642,7 +643,7 @@ InitializeEPTables()
   
   /* Register all the built-in BOC's */
   AddSysBocEps();
-  NumSysBocEps = CpvAccess(chareEpsCount);
+  CsvAccess(NumSysBocEps) = CpvAccess(chareEpsCount);
 
   /*
    * This is the top level call to all modules for initialization. It
@@ -669,7 +670,7 @@ InitializeEPTables()
     = CmiRegisterHandler(CkProcess_VidSendOverMsg);
   
   /* set all the "Total" variables so that the rest of the modules work */
-  TotalEps = CpvAccess(chareEpsCount);
+  CsvAccess(TotalEps) = CpvAccess(chareEpsCount);
   TotalFns = CpvAccess(fnCount);
   TotalMsgs = CpvAccess(msgCount);
   TotalChares = CpvAccess(chareCount);

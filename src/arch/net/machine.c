@@ -538,8 +538,8 @@ static int    Cmi_enableinterrupts;
 static char   Topology;
 static char  *outputfile;
 
-int    Cmi_mype;
-int    Cmi_numpe;
+CpvDeclare(int, Cmi_mype);
+CpvDeclare(int, Cmi_numpe);
 
 static int    host_IP;
 static char   host_IP_str[16];
@@ -569,7 +569,7 @@ static void ParseNetstart()
   ns = getenv("NETSTART");
   if (ns==0) goto abort;
   nread = sscanf(ns, "%d%d%d%d%d",
-		 &Cmi_mype,&Cmi_numpe,&self_IP,&host_IP,&host_port);
+		 &CpvAccess(Cmi_mype),&CpvAccess(Cmi_numpe),&self_IP,&host_IP,&host_port);
   if (nread!=5) goto abort;
   return;
  abort:
@@ -651,7 +651,7 @@ char *msg;
   char buffer[1024]; int i;
   sprintf(buffer,"die %s",msg);
   KillIndividual(buffer, host_IP, host_port, 30);
-  for (i=0; i<Cmi_numpe; i++)
+  for (i=0; i<CpvAccess(Cmi_numpe); i++)
     KillIndividual(buffer, node_table[i].IP, node_table[i].ctrlport, 3);
   exit(1);
 }
@@ -660,21 +660,21 @@ static void KillEveryoneCode(n)
 int n;
 {
   char buffer[1024];
-  sprintf(buffer,"Internal error #%d (node %d)\n(Contact CHARM developers)\n", n,Cmi_mype);
+  sprintf(buffer,"Internal error #%d (node %d)\n(Contact CHARM developers)\n", n,CpvAccess(Cmi_mype));
   KillEveryone(buffer);
 }
 
 static void KillOnSegv()
 {
   char buffer[1024];
-  sprintf(buffer, "Node %d: Segmentation fault.\n",Cmi_mype);
+  sprintf(buffer, "Node %d: Segmentation fault.\n",CpvAccess(Cmi_mype));
   KillEveryone(buffer);
 }
 
 static void KillOnIntr()
 {
   char buffer[1000];
-  sprintf(buffer, "Node %d: Interrupted.\n",Cmi_mype);
+  sprintf(buffer, "Node %d: Interrupted.\n",CpvAccess(Cmi_mype));
   KillEveryone(buffer);
 }
 
@@ -774,10 +774,10 @@ static void ctrl_getone()
 static void node_addresses_receive()
 {
   ctrl_sendone(120, "aset addr %d %s.%d.%d\n",
-	       Cmi_mype, self_IP_str, ctrl_port, data_port);
+	       CpvAccess(Cmi_mype), self_IP_str, ctrl_port, data_port);
   ctrl_sendone(120, "aget %s %d addr 0 %d\n",
-    self_IP_str,ctrl_port,Cmi_numpe-1);
-  while (node_table_fill != Cmi_numpe) {
+    self_IP_str,ctrl_port,CpvAccess(Cmi_numpe)-1);
+  while (node_table_fill != CpvAccess(Cmi_numpe)) {
     if (wait_readable(ctrl_skt, 300)<0)
       { perror("waiting for data"); KillEveryoneCode(21323); }
     ctrl_getone();
@@ -791,8 +791,8 @@ static void node_addresses_store(addrs) char *addrs;
   p = skipblanks(addrs+10);
   p = readint(p,&lo);
   p = readint(p,&hi);
-  if ((lo!=0)||(hi!=Cmi_numpe-1)) KillEveryoneCode(824793);
-  for (i=0; i<Cmi_numpe; i++) {
+  if ((lo!=0)||(hi!=CpvAccess(Cmi_numpe)-1)) KillEveryoneCode(824793);
+  for (i=0; i<CpvAccess(Cmi_numpe); i++) {
     unsigned int ip0,ip1,ip2,ip3,cport,dport;
     p = readint(p,&ip0);
     p = readint(p,&ip1);
@@ -806,7 +806,7 @@ static void node_addresses_store(addrs) char *addrs;
   }
   p = skipblanks(p);
   if (*p!=0) KillEveryoneCode(82283);
-  node_table_fill = Cmi_numpe;
+  node_table_fill = CpvAccess(Cmi_numpe);
 }
 
 /*****************************************************************************
@@ -926,7 +926,7 @@ int CmiNumNeighbours(node)
 {
   switch (Topology) {
   case 'F': case 'f':		/* Full interconnectivity */
-    return Cmi_numpe-1;
+    return CpvAccess(Cmi_numpe)-1;
   default: KillEveryoneCode(233);
   }
 }
@@ -938,7 +938,7 @@ void CmiGetNodeNeighbours(node, nghbrs)
   switch (Topology) {
   case 'F': case 'f':		/* Full interconnectivity */
     for (i=0; i<node; i++) *nghbrs++ = i;
-    for (i=node+1; i<Cmi_numpe; i++) *nghbrs++ = i;
+    for (i=node+1; i<CpvAccess(Cmi_numpe); i++) *nghbrs++ = i;
     break;
   default: KillEveryoneCode(234);
   }
@@ -1149,8 +1149,8 @@ msg_tuple(PeNum,msgid,ack_or_send) int PeNum,msgid,ack_or_send; {
 static void SendWindowInit()
 {
     int i,j;
-    int numpe = Cmi_numpe;
-    int mype = Cmi_mype;
+    int numpe = CpvAccess(Cmi_numpe);
+    int mype = CpvAccess(Cmi_mype);
 
     send_window = (WindowElement **) CmiAlloc(numpe * sizeof(WindowElement *));
     transmit_head = (PacketQueueElem **) CmiAlloc(numpe * sizeof(PacketQueueElem *));
@@ -1261,7 +1261,7 @@ int destpe;
     {
 	AddToSendWindow(packet, destpe);
 	TRACE(CmiPrintf("Node %d: sending packet seq_num=%d, num_frags=%d fullsize=%d\n",
-		       Cmi_mype,
+		       CpvAccess(Cmi_mype),
 		       packet->seq_num, packet->numfrags, 
 		       packet->full_size));
 
@@ -1303,7 +1303,7 @@ int sourcepe;
     if (found)
     {
 	TRACE(CmiPrintf("Node %d: received ack with seq_num %d\n",
-		       Cmi_mype, ack->seq_num)); 
+		       CpvAccess(Cmi_mype), ack->seq_num)); 
 	index = first_window_index[sourcepe];
 	for (i = 0; i < count; i++)
 	{
@@ -1329,7 +1329,7 @@ static int RetransmitPackets()
   struct sockaddr_in addr;
   int sending=0;
 
-  for (i = 0; i < Cmi_numpe; i++) {
+  for (i = 0; i < CpvAccess(Cmi_numpe); i++) {
     index = first_window_index[i];
     if (cur_window_size[i] > 0) {
       sending = 1;
@@ -1373,7 +1373,7 @@ static void fragment_send(destPE,size,msg,full_size,msg_type, numfrags)
     KillEveryoneCode(5);
   
   TRACE(CmiPrintf("Node %d: sending fragment. fragsize=%d msgsize=%d\n", 
- 		  Cmi_mype, size, full_size));
+ 		  CpvAccess(Cmi_mype), size, full_size));
   
   
   /* Initialize the data header part of the send space. */
@@ -1388,7 +1388,7 @@ static void fragment_send(destPE,size,msg,full_size,msg_type, numfrags)
   hd->full_size = full_size;
   hd->msg_type = msg_type;
   hd->send_or_ack = SEND;
-  hd->SourcePeNum = Cmi_mype;
+  hd->SourcePeNum = CpvAccess(Cmi_mype);
   hd->numfrags = numfrags;
   
   /* Transfer the data to the data part of the send space. */
@@ -1420,8 +1420,8 @@ static void fragment_send(destPE,size,msg,full_size,msg_type, numfrags)
 static RecvWindowInit()
 {
     int i,j;
-    int numpe = Cmi_numpe;
-    int mype = Cmi_mype;
+    int numpe = CpvAccess(Cmi_numpe);
+    int mype = CpvAccess(Cmi_mype);
 
     recv_window = (WindowElement **) CmiAlloc(numpe * sizeof(WindowElement *));
     next_window_index = (int *) CmiAlloc(numpe * sizeof(int));
@@ -1451,7 +1451,7 @@ static RecvWindowInit()
     recd_msg_head = NULL;
     recd_msg_tail = NULL;
 
-    ack.DestPeNum = Cmi_mype;
+    ack.DestPeNum = CpvAccess(Cmi_mype);
     ack.send_or_ack = ACK;
 }
 
@@ -1499,7 +1499,7 @@ static int AddToReceiveWindow(packet, sourcepe)
 	    recv_window[sourcepe][index].packet = packet;
 	    recv_window[sourcepe][index].seq_num = seq_num;
 	    TRACE(CmiPrintf("Node %d: Inserting packet %d at index %d in recv window\n",
-			   Cmi_mype,
+			   CpvAccess(Cmi_mype),
 			   seq_num, index)); 
 	  }
 	}
@@ -1547,7 +1547,7 @@ static InsertInMessageQueue(packetlist)
   else recd_msg_tail->nextptr = newelem;
   recd_msg_tail = newelem;
   TRACE(CmiPrintf("Node %d: inserted seqnum=%d fullsize=%d in message queue\n", 
-		 Cmi_mype,
+		 CpvAccess(Cmi_mype),
 		 recd_msg_head->packetlist->packet->seq_num,
 		 recd_msg_head->packetlist->packet->full_size));
 }
@@ -1560,9 +1560,9 @@ static void ConstructMessages()
   DATA_HDR *ExtractNextPacket();
   PacketQueueElem *packetelem;
 
-  TRACE(CmiPrintf("Node %d: in ConstructMessages().\n",Cmi_mype));
-  for (i = 0; i < Cmi_numpe; i++)
-    if (i != Cmi_mype) {
+  TRACE(CmiPrintf("Node %d: in ConstructMessages().\n",CpvAccess(Cmi_mype)));
+  for (i = 0; i < CpvAccess(Cmi_numpe); i++)
+    if (i != CpvAccess(Cmi_mype)) {
       packet = ExtractNextPacket(i);
       while (packet != NULL) {
 	packetelem = (PacketQueueElem *) CmiAlloc(sizeof(PacketQueueElem));
@@ -1575,7 +1575,7 @@ static void ConstructMessages()
 	  /* msg complete */
 	  if (packet->msg_type == 1) {
 	    TRACE(CmiPrintf("Node %d: CK packet complete seqnum=%d numfrags=%d\n",
-			   Cmi_mype,
+			   CpvAccess(Cmi_mype),
 			   packet->seq_num, packet->numfrags));
 	    InsertInMessageQueue(recd_messages[i].packetlist);
 	  }
@@ -1592,14 +1592,14 @@ static void ConstructMessages()
 static void AckReceivedMsgs()
 {
   int i;
-  for (i = 0; i < Cmi_numpe; i++)
+  for (i = 0; i < CpvAccess(Cmi_numpe); i++)
     if (needack[i])	{
       needack[i] = FALSE;
       ack.SourcePeNum = i;
       ack.seq_num = expected_seq_num[i] - 1;
-      if (Cmi_mype < Cmi_numpe)
+      if (CpvAccess(Cmi_mype) < CpvAccess(Cmi_numpe))
 	TRACE(CmiPrintf("Node %d: acking seq_num %d on window %d\n",
-		       Cmi_mype, ack.seq_num, i)); 
+		       CpvAccess(Cmi_mype), ack.seq_num, i)); 
       NumAcksSent++ ;
       send_ack(&ack);
     }
@@ -1623,7 +1623,7 @@ static int data_getone()
   if (kind == ACK)
     {
       /* remove it from the socket */
-      if (recv_buf->hd.SourcePeNum != Cmi_mype) 
+      if (recv_buf->hd.SourcePeNum != CpvAccess(Cmi_mype)) 
 	KillEveryoneCode(7);
       UpdateSendWindow(recv_buf, (int) recv_buf->hd.DestPeNum);
       CmiFree(recv_buf);
@@ -1718,7 +1718,7 @@ static int netSend(destPE, size, msg, msg_type)
 
     if (!Communication_init) return -1;
 
-    if (destPE==Cmi_mype) 
+    if (destPE==CpvAccess(Cmi_mype)) 
         {
 	CmiError("illegal send to myself\n");
 	return -1;
@@ -1751,7 +1751,7 @@ static int netSend(destPE, size, msg, msg_type)
     Cmi_insidemachine = saveflag ;
     }
 
-void *CmiLocalQueue;
+CpvDeclare(void *,CmiLocalQueue);
 
 static int CmiProbe() 
 {
@@ -1828,9 +1828,9 @@ void CmiBroadcast(size,msg)
      int size; char *msg;
 {
   int i;
-  for (i=0;i<Cmi_numpe;i++)
+  for (i=0;i<CpvAccess(Cmi_numpe);i++)
     {
-      if (i != Cmi_mype) netSend(i,size,msg,1);
+      if (i != CpvAccess(Cmi_mype)) netSend(i,size,msg,1);
     }
   CmiFree(msg) ;
 }
@@ -1839,9 +1839,9 @@ void CmiSyncBroadcast(size,msg)
      int size; char *msg;
 {
   int i;
-  for (i=0;i<Cmi_numpe;i++)
+  for (i=0;i<CpvAccess(Cmi_numpe);i++)
     {
-      if (i != Cmi_mype) netSend(i,size,msg,1);
+      if (i != CpvAccess(Cmi_mype)) netSend(i,size,msg,1);
     }
 }
 
@@ -1849,9 +1849,9 @@ void CmiSyncBroadcastAllAndFree(size,msg)
      int size; char *msg;
 {
   int i;
-  for (i=0;i<Cmi_numpe;i++)
-    if (i != Cmi_mype) netSend(i,size,msg,1);
-  FIFO_EnQueue(CmiLocalQueue,msg);
+  for (i=0;i<CpvAccess(Cmi_numpe);i++)
+    if (i != CpvAccess(Cmi_mype)) netSend(i,size,msg,1);
+  FIFO_EnQueue(CpvAccess(CmiLocalQueue),msg);
 }
 
 void CmiSyncBroadcastAll(size,msg)
@@ -1859,11 +1859,11 @@ void CmiSyncBroadcastAll(size,msg)
 {
   int i;
   char *msg1;
-  for (i=0;i<Cmi_numpe;i++)
-    if (i != Cmi_mype) netSend(i,size,msg,1);
+  for (i=0;i<CpvAccess(Cmi_numpe);i++)
+    if (i != CpvAccess(Cmi_mype)) netSend(i,size,msg,1);
   msg1 = (char *)CmiAlloc(size);
   memcpy(msg1,msg,size);
-  FIFO_EnQueue(CmiLocalQueue,msg1);
+  FIFO_EnQueue(CpvAccess(CmiLocalQueue),msg1);
 }
 
 CmiCommHandle *CmiAsyncBroadcast(size, msg)
@@ -1930,10 +1930,10 @@ char **argv;
   ExtractArgs(argv);
   ParseNetstart();
   InitializePorts();
-  CmiLocalQueue = FIFO_Create();
+  CpvAccess(CmiLocalQueue) = FIFO_Create();
   KillInit();
   ctrl_sendone(120,"notify-die %s %d\n",self_IP_str,ctrl_port);
-  outlog_init(outputfile, Cmi_mype);
+  outlog_init(outputfile, CpvAccess(Cmi_mype));
   node_addresses_receive();
   CmiTimerInit();
   SendWindowInit();
@@ -1956,8 +1956,8 @@ CmiExit()
   Cmi_insidemachine = TRUE;
 
   ctrl_sendone(120,"aget %s %d done 0 %d\n",
-	       self_IP_str,ctrl_port,Cmi_numpe-1);
-  ctrl_sendone(120,"aset done %d TRUE\n",Cmi_mype);
+	       self_IP_str,ctrl_port,CpvAccess(Cmi_numpe)-1);
+  ctrl_sendone(120,"aset done %d TRUE\n",CpvAccess(Cmi_mype));
   ctrl_sendone(120,"ending\n");
   begin = time(0);
   while(!all_done && (time(0)<begin+120))

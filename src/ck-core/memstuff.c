@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.9  1995-09-01 02:13:17  jyelon
+ * Revision 2.10  1995-09-07 21:21:38  jyelon
+ * Added prefixes to Cpv and Csv macros, fixed bugs thereby revealed.
+ *
+ * Revision 2.9  1995/09/01  02:13:17  jyelon
  * VID_BLOCK, CHARE_BLOCK, BOC_BLOCK consolidated.
  *
  * Revision 2.8  1995/07/27  20:29:34  jyelon
@@ -178,9 +181,9 @@ CkAllocPrioMsg(Type,prio) -->  GenericCkAlloc(TypeId, sizeof(Type), prio) ;
 
 For varsize msgs :
 CkAllocMsg(Type,sizearray) -->  
-	(MsgToStructTable[TypeId].allocfn)(TypeId,sizeof(Type),sizearray,0) ;
+	(CsvAccess(MsgToStructTable)[TypeId].allocfn)(TypeId,sizeof(Type),sizearray,0) ;
 CkAllocPrioMsg(Type,prio,sizearray) -->  
-	(MsgToStructTable[TypeId].allocfn)(TypeId,sizeof(Type),sizearray,prio);
+	(CsvAccess(MsgToStructTable)[TypeId].allocfn)(TypeId,sizeof(Type),sizearray,prio);
 where the translator-generated allocfn template is :
 allocfn(id, msgsize, sizearray, prio)
 {

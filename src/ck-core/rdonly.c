@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.5  1995-09-07 05:26:49  gursoy
+ * Revision 2.6  1995-09-07 21:21:38  jyelon
+ * Added prefixes to Cpv and Csv macros, fixed bugs thereby revealed.
+ *
+ * Revision 2.5  1995/09/07  05:26:49  gursoy
  * made the necessary changes related to CharmInitLoop--> handler fuction
  *
  * Revision 2.4  1995/09/05  22:03:34  sanjeev
@@ -43,8 +46,8 @@ static char ident[] = "@(#)$Header$";
 #include "performance.h"
 
 
-CpvExtern(char, *ReadBufIndex);
-CpvExtern(char, *ReadFromBuffer);
+CpvExtern(char *, ReadBufIndex);
+CpvExtern(char *, ReadFromBuffer);
 
 /************************************************************************/
 /* The following functions are used to copy the read-buffer out of and 	*/

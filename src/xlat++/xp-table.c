@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.2  1995-09-07 17:04:33  sanjeev
+ * Revision 2.3  1995-09-07 21:24:33  jyelon
+ * Added prefixes to Cpv and Csv macros, fixed bugs thereby revealed.
+ *
+ * Revision 2.2  1995/09/07  17:04:33  sanjeev
  * changed NULL_PE to CK_PE_ANY
  *
  * Revision 2.1  1995/09/06  04:20:54  sanjeev
@@ -1325,7 +1328,7 @@ OutputNewChareMsg(char *name, char *arg, char *placement)
 			fprintf(outfile,"(%s *)GenericCkAlloc(_CK_%s._CK_msg_%s,sizeof(%s),0)", name, CoreName, name, name) ;
 		}
 		else { /* handle placement = "sizes, prio" */
-			fprintf(outfile,"(%s *)((ALLOCFNPTR)(MsgToStructTable[_CK_%s._CK_msg_%s].alloc))(_CK_%s._CK_msg_%s,sizeof(%s),", name, CoreName, name, CoreName, name, name) ;
+			fprintf(outfile,"(%s *)((ALLOCFNPTR)(CsvAccess(MsgToStructTable)[_CK_%s._CK_msg_%s].alloc))(_CK_%s._CK_msg_%s,sizeof(%s),", name, CoreName, name, CoreName, name, name) ;
 
 			if ( strchr(placement,',') != NULL ) /* sizes, prio */
 				fprintf(outfile,"%s)",placement) ;

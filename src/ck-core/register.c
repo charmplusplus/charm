@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.5  1995-07-27 20:29:34  jyelon
+ * Revision 2.6  1995-09-07 21:21:38  jyelon
+ * Added prefixes to Cpv and Csv macros, fixed bugs thereby revealed.
+ *
+ * Revision 2.5  1995/07/27  20:29:34  jyelon
  * Improvements to runtime system, general cleanup.
  *
  * Revision 2.4  1995/07/22  23:45:15  jyelon
@@ -159,7 +162,7 @@ int registerFunction(fn)
 FUNCTION_PTR fn ;
 {
 /* fills in _CK_9_GlobalFunctionTable */
-	_CK_9_GlobalFunctionTable[CpvAccess(fnCount)] = fn ;
+	CsvAccess(_CK_9_GlobalFunctionTable)[CpvAccess(fnCount)] = fn ;
 	CpvAccess(fnCount)++;	
 	return(CpvAccess(fnCount)-1) ;
 }

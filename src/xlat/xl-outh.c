@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.1  1995-06-15 20:57:00  jyelon
+ * Revision 2.2  1995-09-07 21:22:53  jyelon
+ * Added prefixes to Cpv and Csv macros, fixed bugs thereby revealed.
+ *
+ * Revision 2.1  1995/06/15  20:57:00  jyelon
  * *** empty log message ***
  *
  * Revision 2.0  1995/06/05  18:52:05  brunner
@@ -76,17 +79,17 @@ extern char    *Map();
 void            GenerateStruct();
 void            InitializeStruct();
 
-char           *CEPVAR = "_CK_13ChareEPCount";
-char           *TOTMSG = "_CK_13TotalMsgCount";
-char           *PACKMSG = "_CK_13PackMsgCount";
-char           *PACKOFFSET = "_CK_13PackOffset";
+char           *CEPVAR = "CpvAccess(_CK_13ChareEPCount)";
+char           *TOTMSG = "CpvAccess(_CK_13TotalMsgCount)";
+char           *PACKMSG = "CpvAccess(_CK_13PackMsgCount)";
+char           *PACKOFFSET = "CpvAccess(_CK_13PackOffset)";
 char           *CkGenericAlloc = "GenericCkAlloc";
-char           *CkVarSizeAlloc = "MsgToStructTable";
+char           *CkVarSizeAlloc = "CsvAccess(MsgToStructTable)";
 char           *REFSUFFIX = "_ref";
-char           *CkReadMsgTable = "_CK_ReadMsgTable";
+char           *CkReadMsgTable = "_CK_ReadMsgTable"; /* ??? */
 
-char           *CkSizeArray = "_CK_13SizeArray";
-char           *CkSizeArrayIndex = "_CK_13SizeArrayIndex";
+char           *CkSizeArray = "_CK_13SizeArray"; /* ??? */
+char           *CkSizeArrayIndex = "_CK_13SizeArrayIndex"; /* ??? */
 char           *CkCopyFromBuffer = "_CK_13CopyFromBuffer";
 char           *CkCopyToBuffer = "_CK_13CopyToBuffer";
 

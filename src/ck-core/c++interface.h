@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.8  1995-09-06 21:48:50  jyelon
+ * Revision 2.9  1995-09-07 21:21:38  jyelon
+ * Added prefixes to Cpv and Csv macros, fixed bugs thereby revealed.
+ *
+ * Revision 2.8  1995/09/06  21:48:50  jyelon
  * Eliminated 'CkProcess_BocMsg', using 'CkProcess_ForChareMsg' instead.
  *
  * Revision 2.7  1995/09/05  22:35:32  sanjeev
@@ -148,9 +151,8 @@ struct argc_argv {
 
 
 /* this is the handle of the main chare, used in place of MainChareID */
-extern ChareIDType mainhandle ;
-extern ChareIDType NULL_HANDLE ;
-
+extern ChareIDType mainhandle;
+extern ChareIDType NULL_HANDLE;
 
 /* These are the external definitions for all Charm calls */
 

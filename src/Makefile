@@ -27,9 +27,9 @@ all:
 	@echo '  make charm'
 	@echo '  make charm++'
 
-charm: converse charmxlat charmlibs libcharm
+charm: converse charmlibs libcharm charmxlat
 
-charm++: charm charmxlat++ charm++libs
+charm++: converse charmlibs libcharm charmxlat libck-cplus-y.o charmxlat++
 
 CHARMC=../bin/charmc $(OPTS)
 
@@ -96,7 +96,7 @@ machine.o: machine.c $(CVHEADERS)
 convcore.o: convcore.c $(CVHEADERS)
 	$(CHARMC) convcore.c
 
-queueing.o: queueing.c
+queueing.o: queueing.c $(CVHEADERS)
 	$(CHARMC) queueing.c
 
 conv-conds.o: conv-conds.c $(CVHEADERS)
@@ -153,37 +153,37 @@ LIBCK_CORE_PROJ=$(LIBCK_CORE) perf-proj.o perfio.o
 libck-core-proj.o: $(LIBCK_CORE_PROJ)
 	$(CHARMC) -cp ../lib/ -o $@ $(LIBCK_CORE_PROJ)
 
-libck-ldb-acwn.o: ldb.acwn.p ldb.h
+libck-ldb-acwn.o: ldb.acwn.p ldb.h $(CKHEADERS)
 	$(CHARMC) -cp ../lib/ -o $@ ldb.acwn.p
 
-libck-ldb-rand.o: ldb.rand.p ldb.h
+libck-ldb-rand.o: ldb.rand.p ldb.h $(CKHEADERS)
 	$(CHARMC) -cp ../lib/ -o $@ ldb.rand.p
 
-libck-ldb-mngr.o: ldb.mngr.p ldb.h
+libck-ldb-mngr.o: ldb.mngr.p ldb.h $(CKHEADERS)
 	$(CHARMC) -cp ../lib/ -o $@ ldb.mngr.p
 
-libck-ldb-priomngr.o: ldb.priomngr.p ldb.h
+libck-ldb-priomngr.o: ldb.priomngr.p ldb.h $(CKHEADERS)
 	$(CHARMC) -cp ../lib/ -o $@ ldb.priomngr.p
 
-libck-ldb-tok.o: ldb.tok.p ldb.h
+libck-ldb-tok.o: ldb.tok.p ldb.h $(CKHEADERS)
 	$(CHARMC) -cp ../lib/ -o $@ ldb.tok.p
 
-libck-ldb-btok.o: ldb.btok.p ldb.h
+libck-ldb-btok.o: ldb.btok.p ldb.h $(CKHEADERS)
 	$(CHARMC) -cp ../lib/ -o $@ ldb.tok.p -DBITVECTOR
 
-libck-ldb-repl.o: ldb.repl.p ldb.h
+libck-ldb-repl.o: ldb.repl.p ldb.h $(CKHEADERS)
 	$(CHARMC) -cp ../lib/ -o $@ ldb.repl.p
 
-libck-ldb-recv.o: ldb.recv.p ldb.h
+libck-ldb-recv.o: ldb.recv.p ldb.h $(CKHEADERS)
 	$(CHARMC) -cp ../lib/ -o $@ ldb.recv.p
 
-libck-cplus-n.o: dummy.cplus.c
+libck-cplus-n.o: dummy.cplus.c $(CKHEADERS)
 	$(CHARMC) -cp ../lib/ -o $@ dummy.cplus.c
 
-libck-defmain.o: default-main.c
+libck-defmain.o: default-main.c $(CKHEADERS)
 	$(CHARMC) -cp ../lib/ -o $@ default-main.c
 
-libck-unimain.o: uni_user_main.c
+libck-unimain.o: uni_user_main.c $(CKHEADERS)
 	$(CHARMC) -cp ../lib/ -o $@ uni_user_main.c
 
 ldbcfns.o: ldbcfns.c $(CKHEADERS)
@@ -260,19 +260,12 @@ perf-proj.o : perf-proj.c performance.h $(CKHEADERS)
 
 ###############################################################################
 #
-# Charm++ Libraries
+# The new, lightweight C++ stub library.
 #
 ###############################################################################
 
-
-charm++libs: charmlibs libck-cplus-y.o libck-cplus-y.o 
-
-LIBCK_CPLUS_Y=cplus.o 
-libck-cplus-y.o: $(LIBCK_CPLUS_Y)
-	$(CHARMC) -cp ../lib/ -o $@ $(LIBCK_CPLUS_Y)
-
-cplus.o: cplus.C $(CKHEADERS) c++interface.h
-	$(CHARMC) -o cplus.o cplus.C
+libck-cplus-y.o: cplus.C c++interface.h $(CKHEADERS)
+	$(CHARMC) -cp ../lib/ -o $@ cplus.C
 
 ###############################################################################
 #

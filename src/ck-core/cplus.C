@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.0  1995-09-06 17:41:24  sanjeev
+ * Revision 2.1  1995-09-07 21:26:02  jyelon
+ * Added prefixes to Cpv and Csv macros, fixed bugs thereby revealed.
+ *
+ * Revision 2.0  1995/09/06  17:41:24  sanjeev
  * *** empty log message ***
  *
  ***************************************************************************/
@@ -28,11 +31,11 @@ static char ident[] = "@(#)$Header$";
 
 #include "c++interface.h"
 
-
-CpvDeclare(ChareIDType, NULL_HANDLE) ;
-/* this is the value used in Insert, etc when no handle is specified */
-CpvDeclare(ChareIDType, mainhandle) ;
 /* this is the handle of the main chare, used in place of MainChareID */
+/* If you make these Cpv or Csv, you have to change the charm++ xlator too */
+ChareIDType mainhandle;
+ChareIDType NULL_HANDLE;
+
 int _CK_NumTables = 0 ;
 /* distributed table ssv ids are assigned at run time with _CK_NumTables */
 
@@ -60,7 +63,7 @@ void CPlus_ChareExit()
 	_CK_Object *temp = (_CK_Object *)CpvAccess(currentChareBlock->chareptr) ;
 	delete temp ;
 
-        SetID_chare_magic_number(CpvAccess(currentChareBlock)->selfID,-1) ;
+        SetID_chare_magic_number(CpvAccess(currentChareBlock)->selfID,0) ;
 	CmiFree(CpvAccess(currentChareBlock));
 }
 
@@ -73,18 +76,18 @@ void CPlus_SetMainChareID()
 {
   /* sets mainhandle, NULL_HANDLE etc */
 
-  SetID_onPE(CpvAccess(mainhandle), 0);
+  SetID_onPE(mainhandle, 0);
   if (CmiMyPe() == 0) 
-    SetID_chare_magic_number(CpvAccess(mainhandle), 
+    SetID_chare_magic_number(mainhandle, 
 		GetID_chare_magic_number(CpvAccess(mainChareBlock)->selfID)) ;
   else
-    SetID_chare_magic_number(CpvAccess(mainhandle), 
+    SetID_chare_magic_number(mainhandle, 
 				CpvAccess(mainChare_magic_number));
   
-  SetID_chareBlockPtr(CpvAccess(mainhandle), CpvAccess(mainChareBlock));
+  SetID_chareBlockPtr(mainhandle, CpvAccess(mainChareBlock));
 
   /* set the NULL_HANDLE field */
-  SetID_onPE(CpvAccess(NULL_HANDLE), CK_PE_INVALID);
+  SetID_onPE(NULL_HANDLE, CK_PE_INVALID);
 }
 
 
