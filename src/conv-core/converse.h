@@ -1063,28 +1063,7 @@ char **CmiCopyArgs(char **argv);
 CpvExtern(void*, CmiLocalQueue);
 #endif
 
-/*****************************************************************************
- *
- *    Converse Quiescence Detection
- *
- *****************************************************************************/
-
-struct ConvQdMsg;
-struct ConvQdState;
-typedef struct ConvQdMsg    *CQdMsg;
-typedef struct ConvQdState  *CQdState;
-typedef CcdVoidFn CQdVoidFn; 
-
-CpvExtern(CQdState, cQdState);
-
-void CQdInit(void);
-void CQdCreate(CQdState, int);
-void CQdProcess(CQdState, int);
-int  CQdGetCreated(CQdState);
-int  CQdGetProcessed(CQdState);
-void CQdRegisterCallback(CQdVoidFn, void *);
-void CmiStartQD(CQdVoidFn, void *);
-
+#include "conv-qd.h"
 #include "conv-random.h"
 #include "conv-lists.h"
 #include "conv-trace.h"

@@ -107,8 +107,9 @@ SEQCHARMC=../bin/charmc -seq $(CHARMOPTS)
 #
 ###############################################################################
 
-CVHEADERS=cpthreads.h converse.h conv-trace.h conv-random.h trace.h charm-api.h\
-      conv-ccs.h ccs-client.c ccs-client.h ccs-auth.c ccs-auth.h CcsServer.java \
+CVHEADERS=cpthreads.h converse.h conv-trace.h conv-random.h conv-qd.h \
+      trace.h charm-api.h conv-ccs.h ccs-client.c ccs-client.h ccs-auth.c \
+      ccs-auth.h CcsServer.java \
       memory-isomalloc.h debug-conv.h debug-charm.h conv-autoconfig.h \
       conv-common.h conv-mach.h conv-mach-opt.h conv-mach.sh conv-mach-opt.sh \
       CkMarshall.decl.h CkArray.decl.h CkLocation.decl.h CkReduction.decl.h \
@@ -118,8 +119,8 @@ CVHEADERS=cpthreads.h converse.h conv-trace.h conv-random.h trace.h charm-api.h\
       HeapCentLB.decl.h NborBaseLB.decl.h NeighborLB.decl.h \
       WSLB.decl.h GreedyRefLB.decl.h RandRefLB.decl.h \
       tempo.decl.h waitqd.decl.h \
-	  CommLB.decl.h Comm1LB.decl.h  \
-	  BlueGene.decl.h blue.h
+      CommLB.decl.h Comm1LB.decl.h  \
+      BlueGene.decl.h blue.h
 
 # The .c files are there to be #included by clients whole
 # This is a bit unusual, but makes client linking simpler.
