@@ -361,6 +361,14 @@ static char *parseint(char *p, int *value)
   return p;
 }
 
+char *getenv_rsh()
+{
+  char *e;
+
+  e = getenv("CONV_RSH");
+  return e ? e : RSH_CMD;
+}
+
 char *getenv_display()
 {
   static char result[100];
@@ -1077,6 +1085,7 @@ char *arg_currdir_r;
 char *arg_mylogin;
 char *arg_myhome;
 int   arg_server;
+char *arg_shell;
 
 void arg_init(int argc, char **argv)
 {
@@ -1091,6 +1100,7 @@ void arg_init(int argc, char **argv)
   pparam_defint ("maxrsh"        ,  16);
   pparam_defstr ("nodelist"      ,  0);
   pparam_defstr ("nodegroup"     ,  "main");
+  pparam_defstr ("remote-shell"  ,  0);
   
   pparam_doc("p",             "number of processes to create");
   pparam_doc("in-xterm",      "Run each node in an xterm window");
@@ -1101,6 +1111,7 @@ void arg_init(int argc, char **argv)
   pparam_doc("maxrsh",        "Maximum number of rsh's to run at a time");
   pparam_doc("nodelist",      "file containing list of nodes");
   pparam_doc("nodegroup",     "which group of nodes to use");
+  pparam_doc("remote-shell",  "which remote shell to use");
 
   if (pparam_parsecmd('+', argv) < 0) {
     fprintf(stderr,"ERROR> syntax: %s\n",pparam_error);
@@ -1119,9 +1130,14 @@ void arg_init(int argc, char **argv)
   arg_maxrsh         = pparam_getint("maxrsh");
   arg_nodelist       = pparam_getstr("nodelist");
   arg_nodegroup      = pparam_getstr("nodegroup");
+  arg_shell          = pparam_getstr("remote-shell");
 
   arg_verbose = arg_verbose || arg_debug || arg_debug_no_pause;
   
+  /* Find the current value of the CONV_RSH variable */
+  if(!arg_shell)
+    arg_shell = getenv_rsh();
+
   /* Find the current value of the DISPLAY variable */
   arg_display = getenv_display();
   if ((arg_debug || arg_debug_no_pause || arg_in_xterm) && (arg_display==0)) {
@@ -1194,6 +1210,7 @@ typedef struct nodetab_host {
   int      rank;
   double   speed;
   unsigned int ip;
+  char    *shell;
 } *nodetab_host;
 
 nodetab_host *nodetab_table;
@@ -1212,6 +1229,7 @@ char        *default_setup;
 double       default_speed;
 int          default_cpus;
 int          default_rank;
+char        *default_shell;
 
 void nodetab_reset()
 {
@@ -1224,6 +1242,7 @@ void nodetab_reset()
   default_speed = 1.0;
   default_cpus = 1;
   default_rank = 0;
+  default_shell = arg_shell;
 }
 
 void nodetab_add(nodetab_host res)
@@ -1254,6 +1273,7 @@ void nodetab_makehost(char *host)
   res->rank = default_rank;
   res->cpus = default_cpus;
   res->ip = ip;
+  res->shell = default_shell;
   nodetab_add(res);
 }
 
@@ -1295,6 +1315,7 @@ void nodetab_init()
     if (strcmp(default_ext, "*")==0) default_ext = "";
     if      (subeqs(b1,e1,"login")&&(*b3==0))    default_login = substr(b2,e2);
     else if (subeqs(b1,e1,"passwd")&&(*b3==0))   default_passwd = substr(b2,e2);
+    else if (subeqs(b1,e1,"shell")&&(*b3==0))   default_shell = substr(b2,e2);
     else if (subeqs(b1,e1,"speed")&&(*b3==0))    default_speed = atof(b2);
     else if (subeqs(b1,e1,"cpus")&&(*b3==0))     default_cpus = atol(b2);
     else if (subeqs(b1,e1,"pathfix")) 
@@ -1352,6 +1373,7 @@ char        *nodetab_passwd(i) int i;   { return nodetab_getinfo(i)->passwd; }
 char        *nodetab_setup(i) int i;    { return nodetab_getinfo(i)->setup; }
 pathfixlist  nodetab_pathfixes(i) int i;{ return nodetab_getinfo(i)->pathfixes; }
 char        *nodetab_ext(i) int i;      { return nodetab_getinfo(i)->ext; }
+char        *nodetab_shell(i) int i;      { return nodetab_getinfo(i)->shell; }
 unsigned int nodetab_ip(i) int i;       { return nodetab_getinfo(i)->ip; }
 unsigned int nodetab_cpus(i) int i;     { return nodetab_getinfo(i)->cpus; }
 unsigned int nodetab_rank(i) int i;     { return nodetab_getinfo(i)->rank; }
@@ -1974,13 +1996,13 @@ prog rsh_start(nodeno)
   char *rshargv[6];
   prog rsh;
   
-  rshargv[0]=RSH_CMD;
+  rshargv[0]=nodetab_shell(nodeno);
   rshargv[1]=nodetab_name(nodeno);
   rshargv[2]="-l";
   rshargv[3]=nodetab_login(nodeno);
   rshargv[4]="exec /bin/csh -f";
   rshargv[5]=0;
-  rsh = prog_start(RSH_CMD, rshargv, 0);
+  rsh = prog_start(nodetab_shell(nodeno), rshargv, 0);
   if ((rsh==0)&&(errno!=EMFILE)) { perror("ERROR> starting rsh"); exit(1); }
   if (rsh==0)
     {

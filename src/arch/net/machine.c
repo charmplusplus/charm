@@ -227,13 +227,6 @@ int  CmiScanf();
 char *strchr(), *strrchr(), *strdup();
 #endif
 
-#if CMK_RSH_IS_A_COMMAND
-#define RSH_CMD "rsh"
-#endif
-#if CMK_RSH_USE_REMSH
-#define RSH_CMD "remsh"
-#endif
-
 static void CommunicationServer();
 extern int CmemInsideMem();
 extern void CmemCallWhenMemAvail();
@@ -1386,10 +1379,7 @@ static void comm_thread(void)
 {
   struct timeval tmo; fd_set rfds;
   while (1) {
-    CmiCommLock();
-    CmiPrintf("Thread calling server\n");
     CommunicationServer();
-    CmiCommUnlock();
     tmo.tv_sec = 0;
     tmo.tv_usec = Cmi_tickspeed;
     FD_ZERO(&rfds);
@@ -1511,9 +1501,7 @@ static void comm_thread(void)
 {
   struct timeval tmo; fd_set rfds;
   while (1) {
-    CmiCommLock();
     CommunicationServer();
-    CmiCommUnlock();
     tmo.tv_sec = 0;
     tmo.tv_usec = Cmi_tickspeed;
     FD_ZERO(&rfds);
@@ -2429,11 +2417,13 @@ void ReceiveDatagram()
 static void CommunicationServer()
 {
   LOG(GetClock(), Cmi_nodestart, 'I', 0, 0);
+#if CMK_SHARED_VARS_UNAVAILABLE
   if (terrupt)
   {
       return;
   }
   terrupt++;
+#endif
   while (1) {
     Cmi_clock = GetClock();
     if (Cmi_clock > Cmi_check_last + Cmi_check_delay) {
@@ -2447,7 +2437,9 @@ static void CommunicationServer()
     if (dataskt_ready_write) { if (TransmitDatagram()) continue; }
     break;
   }
+#if CMK_SHARED_VARS_UNAVAILABLE
   terrupt--;
+#endif
 }
 
 /******************************************************************************
@@ -2487,6 +2479,7 @@ void CmiNotifyIdle()
   CommunicationServer();
   CmiCommUnlock();
 #endif
+  CmiYield();
 }
 
 /******************************************************************************
