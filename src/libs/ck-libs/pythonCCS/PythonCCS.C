@@ -2,7 +2,6 @@
 
 CsvDeclare(CmiNodeLock, pyLock);
 CsvDeclare(PythonTable *, pyWorkers);
-CsvDeclare(PythonThread *, pyThread);
 CsvDeclare(int, pyNumber);
 CtvDeclare(PyObject *, pythonReturnValue);
 
@@ -44,7 +43,7 @@ static PyObject *CkPy_read(PyObject *self, PyObject *args) {
   if (!PyArg_ParseTuple(args, "O:read")) return NULL;
   int pyNumber = PyInt_AsLong(PyDict_GetItemString(PyModule_GetDict(PyImport_AddModule("__main__")),"charmNumber"));
   CmiLock(CsvAccess(pyLock));
-  PythonObject *pyWorker = (*CsvAccess(pyWorkers))[pyNumber];
+  PythonObject *pyWorker = ((*CsvAccess(pyWorkers))[pyNumber]).object;
   CmiUnlock(CsvAccess(pyLock));
   return pyWorker->read(args);
 }
@@ -55,7 +54,7 @@ static PyObject *CkPy_write(PyObject *self, PyObject *args) {
   if (!PyArg_ParseTuple(args, "OO:write",&where,&what)) return NULL;
   int pyNumber = PyInt_AsLong(PyDict_GetItemString(PyModule_GetDict(PyImport_AddModule("__main__")),"charmNumber"));
   CmiLock(CsvAccess(pyLock));
-  PythonObject *pyWorker = (*CsvAccess(pyWorkers))[pyNumber];
+  PythonObject *pyWorker = ((*CsvAccess(pyWorkers))[pyNumber]).object;
   CmiUnlock(CsvAccess(pyLock));
   pyWorker->write(where, what);
   Py_INCREF(Py_None);return Py_None;
@@ -80,8 +79,11 @@ void PythonObject::execute (CkCcsRequestMsg *msg) {
   CmiLock(CsvAccess(pyLock));
   int pyReference = CsvAccess(pyNumber)++;
   CsvAccess(pyNumber) &= ~(1<<31);
-  (*CsvAccess(pyWorkers))[pyReference] = this;
+  ((*CsvAccess(pyWorkers))[pyReference]).object = this;
   CmiUnlock(CsvAccess(pyLock));
+
+  // send back this number to the client
+  CcsSendDelayedReply(msg->reply, 1, (void *)&pyReference);
 
   // create the new interpreter
   PyEval_AcquireLock();
@@ -101,6 +103,7 @@ void PythonObject::execute (CkCcsRequestMsg *msg) {
   // run the program
   //PythonArray1D *pyArray = dynamic_cast<PythonArray1D*>(this);
   CthResume(CthCreate((CthVoidFn)_callthr_executeThread, new CkThrCallArg(msg,this), 0));
+  //executeThread(msg);
   //CkIndex_PythonArray1D::_call_executeThread_CkCcsRequestMsg(msg,pyArray);
   //getMyHandle()[pyArray->thisIndex].executeThread(msg);
   //getMyHandle().executeThread(msg);
@@ -113,7 +116,6 @@ void PythonObject::execute (CkCcsRequestMsg *msg) {
 
   CmiLock(CsvAccess(pyLock));
   CsvAccess(pyWorkers)->erase(pyReference);
-  CsvAccess(pyThread)->erase(pyReference);
   CmiUnlock(CsvAccess(pyLock));
   delete msg;
   */
@@ -133,7 +135,7 @@ void PythonObject::executeThread(CkCcsRequestMsg *msg) {
 
   // store the self thread for future suspention
   CmiLock(CsvAccess(pyLock));
-  ((*CsvAccess(pyThread))[pyReference]).thread=CthSelf();
+  ((*CsvAccess(pyWorkers))[pyReference]).thread=CthSelf();
   CmiUnlock(CsvAccess(pyLock));
 
   PyRun_SimpleString((char *)msg->data);
@@ -143,7 +145,6 @@ void PythonObject::executeThread(CkCcsRequestMsg *msg) {
 
   CmiLock(CsvAccess(pyLock));
   CsvAccess(pyWorkers)->erase(pyReference);
-  CsvAccess(pyThread)->erase(pyReference);
   CmiUnlock(CsvAccess(pyLock));
   delete msg;
   // since this function should always be executed in a different thread,
@@ -157,8 +158,11 @@ void PythonObject::iterate (CkCcsRequestMsg *msg) {
   CmiLock(CsvAccess(pyLock));
   int pyReference = CsvAccess(pyNumber)++;
   CsvAccess(pyNumber) &= ~(1<<31);
-  (*CsvAccess(pyWorkers))[pyReference] = this;
+  ((*CsvAccess(pyWorkers))[pyReference]).object = this;
   CmiUnlock(CsvAccess(pyLock));
+
+  // send back this number to the client
+  CcsSendDelayedReply(msg->reply, 1, (void *)&pyReference);
 
   // create the new interpreter
   PyEval_AcquireLock();
@@ -273,8 +277,6 @@ static void initializePythonDefault(void) {
   CsvAccess(pyNumber) = 0;
   CsvInitialize(PythonTable *,pyWorkers);
   CsvAccess(pyWorkers) = new PythonTable();
-  CsvInitialize(PythonThread *,pyThread);
-  CsvAccess(pyThread) = new PythonThread();
   CsvInitialize(CmiNodeLock, pyLock);
   CsvAccess(pyLock) = CmiCreateLock();
   CtvInitialize(PyObject *,pythonReturnValue);
@@ -379,7 +381,7 @@ void PythonObject::pythonGetComplex(PyObject *arg, char *descr, double *real, do
 
 PyObject *PythonObject::pythonGetArg(int handle) {
   CmiLock(CsvAccess(pyLock));
-  PyObject *result = ((*CsvAccess(pyThread))[handle]).arg;
+  PyObject *result = ((*CsvAccess(pyWorkers))[handle]).arg;
   CmiUnlock(CsvAccess(pyLock));
   return result;
 }
@@ -390,22 +392,22 @@ void PythonObject::pythonPrepareReturn(int handle) {
 
 void PythonObject::pythonReturn(int handle) {
   CmiLock(CsvAccess(pyLock));
-  CthThread handleThread = ((*CsvAccess(pyThread))[handle]).thread;
+  CthThread handleThread = ((*CsvAccess(pyWorkers))[handle]).thread;
   CmiUnlock(CsvAccess(pyLock));
   CthAwaken(handleThread);
 }
 
 void PythonObject::pythonReturn(int handle, PyObject* data) {
   CmiLock(CsvAccess(pyLock));
-  CthThread handleThread = ((*CsvAccess(pyThread))[handle]).thread;
-  *((*CsvAccess(pyThread))[handle]).result = data;
+  CthThread handleThread = ((*CsvAccess(pyWorkers))[handle]).thread;
+  *((*CsvAccess(pyWorkers))[handle]).result = data;
   CmiUnlock(CsvAccess(pyLock));
   CthAwaken(handleThread);
 }
 
 void PythonObject::pythonAwake(int handle) {
   CmiLock(CsvAccess(pyLock));
-  PyThreadState *handleThread = ((*CsvAccess(pyThread))[handle]).pythread;
+  PyThreadState *handleThread = ((*CsvAccess(pyWorkers))[handle]).pythread;
   CmiUnlock(CsvAccess(pyLock));
   PyEval_AcquireLock();
   PyThreadState_Swap(handleThread);

@@ -18,14 +18,6 @@
  public: \
   PyMethodDef *getMethods() {return CkPy_MethodsCustom;}
 
-typedef struct {
-  PyObject *arg;
-  PyObject **result;
-  CthThread thread;
-  PyThreadState *pythread;
-} PythonHigh;
-typedef std::map<int,PythonHigh> PythonThread;
-
 extern PyMethodDef CkPy_MethodsDefault[];
 
 class PythonObject {
@@ -33,6 +25,7 @@ class PythonObject {
  public:
   void execute(CkCcsRequestMsg *msg);
   void iterate(CkCcsRequestMsg *msg);
+  void getPrint(CkCcsRequestMsg *msg);
   static void _callthr_executeThread(CkThrCallArg *impl_arg);
   void executeThread(CkCcsRequestMsg *msg);
   virtual PyMethodDef *getMethods() {return CkPy_MethodsCustom;}
@@ -81,11 +74,19 @@ class PythonObject {
 
 };
 
-typedef std::map<int,PythonObject*>  PythonTable;
+typedef struct {
+  PythonObject *object; /* The c++ object running the job */
+  PyObject *arg;
+  PyObject **result;
+  CthThread thread;       /* The charm thread running the python code */
+  PyThreadState *pythread; /* The python interpreter interpreting the code */
+  CcsDelayedReply client; /* Where to send the printed data */
+  std::string printed; /* Union of all printed string and not shipped to the client */
+} PythonStruct;
+typedef std::map<int,PythonStruct> PythonTable;
 
 CsvExtern(CmiNodeLock, pyLock);
 CsvExtern(PythonTable *, pyWorkers);
-CsvExtern(PythonThread *, pyThread);
 CsvExtern(int, pyNumber);
 CtvExtern(PyObject *, pythonReturnValue);
 
