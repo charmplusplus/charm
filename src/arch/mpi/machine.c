@@ -256,7 +256,7 @@ static void CmiPushPE(int pe,void *msg)
 #if CMK_IMMEDIATE_MSG
   if (CmiGetHandler(msg) == CpvAccessOther(CmiImmediateMsgHandlerIdx,pe)) {
 /*
-CmiPrintf("[node %d] Immediate Message {{. \n", CmiMyNode());
+CmiPrintf("[node %d] Immediate Message hdl: %d rank: %d {{. \n", CmiMyNode(), CmiGetHandler(msg), pe);
     CmiHandleMessage(msg);
 CmiPrintf("[node %d] Immediate Message done.}} \n", CmiMyNode());
 */
@@ -755,6 +755,7 @@ CmiCommHandle CmiAsyncSendFn(int destPE, int size, char *msg)
   return 0;
 #else
   /* non smp */
+  CMI_DEST_RANK(msg) = 0;	/* rank is always 0 */
   msg_tmp = (SMSG_LIST *) CmiAlloc(sizeof(SMSG_LIST));
   msg_tmp->msg = msg;
   msg_tmp->next = 0;
