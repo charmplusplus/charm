@@ -234,4 +234,18 @@ charm/java/bin/                        & \texttt{jade.jar} file \\
 \hline
 \end{tabular}
 
+\subsection{Java packages}
+
+The way packages work in Java is as follows: There is a ROOT directory. Within
+the ROOT, a subdirectory is used which also gives the package name.  Beneath
+the package directory all the \texttt{.class} files are stored.  The ROOT
+directory should be placed in the java CLASSPATH.
+
+For \jade, the ROOT is charm/java/charm/.
+
+The \jade package name is \texttt{jade}, and is in charm/java/charm/jade.
+Within here, all the jade Java files are placed, they are compiled to
+\texttt{.class} files, and then jar'd up into the \texttt{jade.jar} file, which
+is placed in charm/java/bin for convenience.
+
 \end{document}
