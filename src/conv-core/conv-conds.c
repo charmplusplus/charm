@@ -200,6 +200,7 @@ typedef struct {
 
 CpvStaticDeclare(ccd_heap_elem*, ccd_heap); 
 CpvStaticDeclare(int, ccd_heaplen);
+CpvStaticDeclare(int, ccd_heapmaxlen);
 
 static void ccd_heap_swap(int index1, int index2)
 {
@@ -211,14 +212,44 @@ static void ccd_heap_swap(int index1, int index2)
   h[index2] = temp;
 }
 
+/*
+ expand the ccd_heap, double the size
+ 256 is reasonably big, so expanding won't happen often
+*/
+static void expand_ccd_heap()
+{
+  int i;
+  int oldlen = CpvAccess(ccd_heapmaxlen);
+  int newlen = oldlen*2;
+  ccd_heap_elem *newheap;
+
+CmiPrintf("[%d] ccd_heap expand from %d to %d\n", CmiMyPe(),oldlen, newlen);
+
+  newheap = (ccd_heap_elem*) malloc(sizeof(ccd_heap_elem)*2*(newlen+1));
+  _MEMCHECK(newheap);
+  /* need to copy the second half part ??? */
+  for (i=0; i<=oldlen; i++) {
+    newheap[i] = CpvAccess(ccd_heap)[i];
+    newheap[i+newlen] = CpvAccess(ccd_heap)[i+oldlen];
+  }
+  free(CpvAccess(ccd_heap));
+  CpvAccess(ccd_heap) = newheap;
+  CpvAccess(ccd_heapmaxlen) = newlen;
+}
+
 static void ccd_heap_insert(double t, CcdVoidFn fnp, void *arg, int pe)
 {
   int child, parent;
-  ccd_heap_elem *h = CpvAccess(ccd_heap);
+  ccd_heap_elem *h;
   
-  if(CpvAccess(ccd_heaplen) > MAXTIMERHEAPENTRIES) {
-    CmiAbort("Heap overflow (InsertInHeap), exiting...\n");
-  } else {
+  if(CpvAccess(ccd_heaplen) > CpvAccess(ccd_heapmaxlen)) {
+/* CmiAbort("Heap overflow (InsertInHeap), exiting...\n"); */
+    expand_ccd_heap();
+  } 
+
+  h = CpvAccess(ccd_heap);
+
+  {
     ccd_heap_elem *e = &(h[++CpvAccess(ccd_heaplen)]);
     e->time = t;
     e->cb.fn = fnp;
@@ -268,7 +299,7 @@ static void ccd_heap_remove(void)
 static void ccd_heap_update(double ctime)
 {
   ccd_heap_elem *h = CpvAccess(ccd_heap);
-  ccd_heap_elem *e = h+MAXTIMERHEAPENTRIES;
+  ccd_heap_elem *e = h+CpvAccess(ccd_heapmaxlen);
   int i,ne=0;
   /* Pull out all expired heap entries */
   while ((CpvAccess(ccd_heaplen)>0) && (h[1].time<ctime)) {
@@ -280,6 +311,10 @@ static void ccd_heap_update(double ctime)
      an entry may change the heap. 
   */
   for (i=0;i<ne;i++) {
+/*
+      ccd_heap_elem *h = CpvAccess(ccd_heap);
+      ccd_heap_elem *e = h+CpvAccess(ccd_heapmaxlen);
+*/
       int old = CmiSwitchToPE(e[i].cb.pe);
       (*(e[i].cb.fn))(e[i].cb.arg);
       CmiSwitchToPE(old);
@@ -296,12 +331,14 @@ void CcdModuleInit(void)
    CpvInitialize(ccd_cond_callbacks, conds);
    CpvInitialize(ccd_periodic_callbacks, pcb);
    CpvInitialize(int, ccd_heaplen);
+   CpvInitialize(int, ccd_heapmaxlen);
    CpvInitialize(int, _ccd_numchecks);
 
+   CpvAccess(ccd_heaplen) = 0;
+   CpvAccess(ccd_heapmaxlen) = MAXTIMERHEAPENTRIES;
    CpvAccess(ccd_heap) = 
      (ccd_heap_elem*) malloc(sizeof(ccd_heap_elem)*2*(MAXTIMERHEAPENTRIES + 1));
    _MEMCHECK(CpvAccess(ccd_heap));
-   CpvAccess(ccd_heaplen) = 0;
    for(i=0;i<MAXNUMCONDS;i++) {
      init_cblist(&(CpvAccess(conds).condcb[i]), CBLIST_INIT_LEN);
      init_cblist(&(CpvAccess(conds).condcb_keep[i]), CBLIST_INIT_LEN);
