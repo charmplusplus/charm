@@ -85,6 +85,13 @@ int traceRegisterUserEvent(const char*)
 }
 
 extern "C"
+void traceWriteSts(void)
+{
+  if(CmiMyPe()==0)
+      CpvAccess(_logPool)->writeSts();
+}
+
+extern "C"
 void traceClose(void)
 {
   CpvAccess(_trace)->endComputation();

@@ -23,6 +23,20 @@ static int _threadMsg, _threadChare, _threadEP;
 	if (!warned) { warned=1; 	\
 	CmiPrintf("\n\n!!!! Warning: traceUserEvent not availbale in optimized version!!!!\n\n\n"); }
 
+/*
+On T3E, we need to have file number control by open/close files only when needed.
+*/
+#if CMI_FILE_NUM_CONTROL
+#define OPEN_LOG  \
+  do  {  \
+    fp = fopen(fname, "a");   \
+  } while (!fp && (errno == EINTR || errno == EMFILE)); 	\
+  if(!fp) CmiAbort("Cannot open Projections Trace File for writing...\n");
+#define CLOSE_LOG  fclose(fp);
+#else
+#define OPEN_LOG
+#define CLOSE_LOG
+#endif
 
 extern "C" 
 void traceInit(char **argv)
@@ -120,11 +134,20 @@ void traceClearEps(void)
 }
 
 extern "C"
+void traceWriteSts(void)
+{
+  if(CmiMyPe()==0)
+    CpvAccess(_logPool)->writeSts();
+}
+
+extern "C"
 void traceClose(void)
 {
   CpvAccess(_trace)->endComputation();
+/*
   if(CmiMyPe()==0)
     CpvAccess(_logPool)->writeSts();
+*/
   delete CpvAccess(_logPool);
   delete CpvAccess(_trace);
   free(CpvAccess(traceRoot));
@@ -138,26 +161,53 @@ LogPool::LogPool(char *pgm, int b) {
   char pestr[10];
   sprintf(pestr, "%d", CkMyPe());
   int len = strlen(pgm) + strlen(".log.") + strlen(pestr) + 1;
-  char *fname = new char[len];
+  fname = new char[len];
   sprintf(fname, "%s.%s.log", pgm, pestr);
   do
   {
     fp = fopen(fname, "w+");
-  } while (!fp && errno == EINTR);
-  delete[] fname;
+  } while (!fp && (errno == EINTR || errno == EMFILE));
   if(!fp) {
     CmiAbort("Cannot open Projections Trace File for writing...\n");
   }
+#if CMI_FILE_NUM_CONTROL
+  CLOSE_LOG 
+#endif
   if(!binary) {
+    OPEN_LOG
     fprintf(fp, "PROJECTIONS-RECORD\n");
+    CLOSE_LOG 
   }
+}
+
+LogPool::~LogPool() 
+{
+  if(binary) writeBinary();
+  else write();
+#if !CMI_FILE_NUM_CONTROL
+  fclose(fp);
+#endif
+  delete[] pool;
+  delete [] fname;
+}
+
+void LogPool::write(void) 
+{
+  OPEN_LOG
+  for(UInt i=0; i<numEntries; i++)
+    pool[i].write(fp);
+  CLOSE_LOG
 }
 
 void LogPool::writeSts(void)
 {
   char *fname = new char[strlen(CpvAccess(traceRoot))+strlen(".sts")+1];
   sprintf(fname, "%s.sts", CpvAccess(traceRoot));
-  FILE *sts = fopen(fname, "w");
+  FILE *sts;
+  do
+  {
+    sts = fopen(fname, "w");
+  } while (!fp && (errno == EINTR || errno == EMFILE));
   if(sts==0)
     CmiAbort("Cannot open projections sts file for writing.\n");
   delete[] fname;
@@ -180,6 +230,19 @@ void LogPool::writeSts(void)
     fprintf(sts, "EVENT %d Event%d\n", i, i);
   fprintf(sts, "END\n");
   fclose(sts);
+}
+
+void LogPool::add(UChar type,UShort mIdx,UShort eIdx,double time,int event,int pe) 
+{
+  new (&pool[numEntries++])
+    LogEntry(time, type, mIdx, eIdx, event, pe);
+  if(poolSize==numEntries) {
+    double writeTime = CkTimer();
+    if(binary) writeBinary(); else write();
+    numEntries = 0;
+    new (&pool[numEntries++]) LogEntry(writeTime, BEGIN_INTERRUPT);
+    new (&pool[numEntries++]) LogEntry(CkTimer(), END_INTERRUPT);
+  }
 }
 
 void LogEntry::write(FILE* fp)
@@ -341,12 +404,18 @@ void TraceProjections::endExecute(void)
 
 void TraceProjections::beginIdle(void)
 {
-  CpvAccess(_logPool)->add(BEGIN_IDLE, 0, 0, CmiWallTimer(), 0, CmiMyPe());
+  if (isIdle == 0) {
+    CpvAccess(_logPool)->add(BEGIN_IDLE, 0, 0, CmiWallTimer(), 0, CmiMyPe());
+    isIdle = 1;
+  }
 }
 
 void TraceProjections::endIdle(void)
 {
-  CpvAccess(_logPool)->add(END_IDLE, 0, 0, CmiWallTimer(), 0, CmiMyPe());
+  if (isIdle) {
+    CpvAccess(_logPool)->add(END_IDLE, 0, 0, CmiWallTimer(), 0, CmiMyPe());
+    isIdle = 0;
+  }
 }
 
 void TraceProjections::beginPack(void)

@@ -60,35 +60,18 @@ class LogPool {
     UInt numEntries;
     LogEntry *pool;
     FILE *fp;
+    char *fname;
     int binary;
   public:
-    LogPool(char *pgm, int b); 
-    ~LogPool() {
-      if(binary) writeBinary();
-      else write();
-      fclose(fp);
-      delete[] pool;
-    }
-    void write(void) {
-      for(UInt i=0; i<numEntries; i++)
-        pool[i].write(fp);
-    }
+    LogPool(char *pgm, int b);
+    ~LogPool();
+    void write(void);
     void writeBinary(void) {
       for(UInt i=0; i<numEntries; i++)
         pool[i].writeBinary(fp);
     }
     void writeSts(void);
-    void add(UChar type,UShort mIdx,UShort eIdx,double time,int event,int pe) {
-      new (&pool[numEntries++])
-        LogEntry(time, type, mIdx, eIdx, event, pe);
-      if(poolSize==numEntries) {
-        double writeTime = CkTimer();
-        if(binary) writeBinary(); else write();
-        numEntries = 0;
-        new (&pool[numEntries++]) LogEntry(writeTime, BEGIN_INTERRUPT);
-        new (&pool[numEntries++]) LogEntry(CkTimer(), END_INTERRUPT);
-      }
-    }
+    void add(UChar type,UShort mIdx,UShort eIdx,double time,int event,int pe);
 };
 
 class TraceProjections : public Trace {
@@ -96,8 +79,9 @@ class TraceProjections : public Trace {
     int execEvent;
     int execEp;
     int execPe;
+    int isIdle;
   public:
-    TraceProjections() { curevent=0; }
+    TraceProjections() { curevent=0; isIdle=0; }
     void userEvent(int e);
     void creation(envelope *e, int num=1);
     void beginExecute(envelope *e);
