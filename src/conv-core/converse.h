@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.61  1997-05-05 13:47:12  jyelon
+ * Revision 2.62  1997-07-07 23:03:38  rbrunner
+ * Added stdio.h to CMI_PRINTF_IS_BUILTIN block
+ *
+ * Revision 2.61  1997/05/05 13:47:12  jyelon
  * Revamped threads package using quickthreads.
  *
  * Revision 2.60  1997/04/03 20:32:11  milind
@@ -523,6 +526,8 @@ int   CmiScanf  CMK_PROTO((char *, ...));
 #endif
 
 #if CMK_CMIPRINTF_IS_JUST_PRINTF
+#include <stdio.h>
+
 #define CmiPrintf printf
 #define CmiError  printf
 #define CmiScanf  scanf
