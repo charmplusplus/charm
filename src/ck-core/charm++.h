@@ -357,16 +357,44 @@ PUPmarshall(CProxy_Chare)
     	   {return super::ckGetChareID();} \
         operator const CkChareID &(void) const {return ckGetChareID();}
 
-//Silly: need the type of a reduction client here.
-//  This declaration should go away once we have "CkContinuation".
-        //A clientFn is called on PE 0 when all contributions
-        // have been received and reduced.
-        //  param can be ignored, or used to pass any client-specific data you $
-        //  dataSize gives the size (in bytes) of the data array
-        //  data gives the reduced contributions--
-        //       it will be disposed of after this procedure returns.
-        typedef void (*CkReductionClientFn)(void *param,int dataSize,void *data);
+/******************* Reduction Declarations ****************/
+//Silly: need the type of a reduction client here so it can be used by proxies.
+//A clientFn is called on PE 0 when all contributions
+// have been received and reduced.
+//  param can be ignored, or used to pass any client-specific data you $
+//  dataSize gives the size (in bytes) of the data array
+//  data gives the reduced contributions--
+//       it will be disposed of after this procedure returns.
+typedef void (*CkReductionClientFn)(void *param,int dataSize,void *data);
 
+/// Tiny utility class used by CkReductionClientAdaptor--
+/// lets us keep backward compatability with the old C-style interface.
+class CkReductionClientBundle : public CkCallback {
+	CkReductionClientFn fn;
+	void *param;
+	static void callbackCfn(void *thisPtr,void *reductionMsg);
+ public:
+	CkReductionClientBundle(CkReductionClientFn fn_,void *param_);
+};
+
+#define CK_REDUCTION_CLIENT_DECL \
+	void setReductionClient(CkReductionClientFn fn,void *param=NULL) const\
+		{ ckSetReductionClient(fn,param); } \
+	void ckSetReductionClient(CkReductionClientFn fn,void *param=NULL) const \
+		{ ckSetReductionClient(new CkReductionClientBundle(fn,param)); } \
+	void ckSetReductionClient(CkCallback *cb) const;\
+
+#define CK_REDUCTION_CLIENT_DEF(className,mgr) \
+ 	void className::ckSetReductionClient(CkCallback *cb) const \
+		{ (mgr)->ckSetReductionClient(cb); }\
+
+#define CK_REDUCTION_CLIENT_DISAMBIG(super) \
+	inline void setReductionClient(CkReductionClientFn fn,void *param=NULL) const \
+		{ super::setReductionClient(fn,param); } \
+	inline void ckSetReductionClient(CkReductionClientFn fn,void *param=NULL) const \
+		{ super::ckSetReductionClient(fn,param); } \
+	inline void ckSetReductionClient(CkCallback *cb) const \
+		{ super::ckSetReductionClient(cb); }\
 
 class CProxy_Group : public CProxy {
   private:
@@ -409,7 +437,7 @@ class CProxy_Group : public CProxy {
     	CProxy::pup(p);
 	p | _ck_gid;
     }
-    void setReductionClient(CkReductionClientFn client,void *param=NULL);
+    CK_REDUCTION_CLIENT_DECL
 };
 PUPmarshall(CProxy_Group)
 #define CK_DISAMBIG_GROUP(super) \
@@ -420,8 +448,7 @@ PUPmarshall(CProxy_Group)
 	CkGroupID ckGetGroupID(void) const \
 	   {return super::ckGetGroupID();} \
 	operator CkGroupID () const { return ckGetGroupID(); } \
-	void setReductionClient(CkReductionClientFn client,void *param=NULL) \
-	   {super::setReductionClient(client,param);}
+	CK_REDUCTION_CLIENT_DISAMBIG(super)\
 
 
 class CProxyElement_Group : public CProxy_Group {

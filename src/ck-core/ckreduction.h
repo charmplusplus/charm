@@ -132,24 +132,30 @@ protected:
 	void setNotReady(void) {_isReady = 0; }
 };
 
+class CkReductionMsg;
+
 
 class CkReductionNumberMsg;
 
-/*One CkReductionMgr runs a non-overlapping set of reductions.
-It collects messages from all local contributors, then sends
-the reduced message up the reduction tree to node zero, where
-they're passed to the user's client function.
-*/
+/**
+ * One CkReductionMgr runs a non-overlapping set of reductions.
+ * It collects messages from all local contributors, then sends
+ * the reduced message up the reduction tree to node zero, where
+ * they're passed to the user's client function.
+ */
 class CkReductionMgr : public CkGroupInitCallback {
         CProxy_CkReductionMgr thisProxy;
 public:
 	CkReductionMgr(void);
-	CkReductionMgr(CkMigrateMessage *m):thisProxy(this) {}
+	CkReductionMgr(CkMigrateMessage *m) :CkGroupInitCallback(m) {}
 	
 	typedef CkReductionClientFn clientFn;
 
-	//Add the given client function.  Overwrites any previous client.
-	void setClient(clientFn client,void *param=NULL);
+	/**
+	 * Add the given client function.  Overwrites any previous client.
+	 * This manager will dispose of the callback when replaced or done.
+	 */
+	void ckSetReductionClient(CkCallback *cb);
 
 //Contributors keep a copy of this structure:
 	class contributorInfo {
@@ -191,10 +197,9 @@ public:
 
 private:
 //Data members
-	//Stored client function
-	clientFn storedClient;
-	void *storedClientParam;
-
+	//Stored callback function (may be NULL if none has been set)
+	CkCallback *storedCallback;
+	
 	int redNo;//Number of current reduction (incremented at end)
 	CmiBool inProgress;//Is a reduction started, but not complete?
 	CmiBool creating;//Are elements still being created?
@@ -266,25 +271,45 @@ class CkReductionMsg : public CMessage_CkReductionMsg
 	friend class CkReduction;
 	friend class CkReductionMgr;
 public:
-//External fields
+
+//Publically-accessible fields:	
+	//"Constructor"-- builds and returns a new CkReductionMsg.
+	//  the "srcData" array you specify will be copied into this object (unless NULL).
+	static CkReductionMsg *buildNew(int NdataSize,const void *srcData,
+		CkReduction::reducerType reducer=CkReduction::invalid);
+	
+	inline int getLength(void) const {return dataSize;}
+	inline int getSize(void) const {return dataSize;}
+	inline void *getData(void) {return data;}
+	
+	inline int getUserFlag(void) const {return userFlag;}
+	inline void setUserFlag(int f) { userFlag=f;}
+	
+	inline void setCallback(const CkCallback &cb) { callback=cb; }
+
+	//Return true if this message came straight from a contribute call--
+	// if it didn't come from a previous reduction function.
+	inline int isFromUser(void) const {return sourceFlag==-1;}
+
+//Implementation-only fields (don't access these directly!)
+	//Msg runtime support
+	static void *alloc(int msgnum, size_t size, int *reqSize, int priobits);
+	static void *pack(CkReductionMsg *);
+	static CkReductionMsg *unpack(void *in);
+	
+private:
 	int dataSize;//Length of array below, in bytes
 	void *data;//Reduction data
+	int userFlag; //Some sort of identifying flag, for client use
+	CkCallback callback; //What to do when done
+	
 	int sourceFlag;/*Flag:
 		0 indicates this is a placeholder message (meaning: nothing to report)
 		-1 indicates this is a single (non-reduced) contribution.
   		>0 indicates this is a reduced contribution.
   	*/
   	int nSources(void) {return abs(sourceFlag);}
-	//"Constructor"-- builds and returns a new CkReductionMsg.
-	//  the "srcData" array you specify will be copied into this object (unless NULL).
-	static CkReductionMsg *buildNew(int NdataSize,const void *srcData,
-		CkReduction::reducerType reducer=CkReduction::invalid);
 
-	//Msg runtime support
-	static void *alloc(int msgnum, size_t size, int *reqSize, int priobits);
-	static void *pack(CkReductionMsg *);
-	static CkReductionMsg *unpack(void *in);
-	
 private:
 	CkReduction::reducerType reducer;
 	CkReductionMgr::contributorInfo *ci;//Source contributor, or NULL if none
@@ -300,14 +325,29 @@ private:
 //Define methods used to contribute to the given reduction type.
 //  Data is copied, not deleted.
 #define CK_REDUCTION_CONTRIBUTE_METHODS_DECL \
-  void contribute(int dataSize,const void *data,CkReduction::reducerType type);
+  void contribute(int dataSize,const void *data,CkReduction::reducerType type, \
+	int userFlag=-1); \
+  void contribute(int dataSize,const void *data,CkReduction::reducerType type, \
+	const CkCallback &cb,int userFlag=-1); \
+  
 
 #define CK_REDUCTION_CONTRIBUTE_METHODS_DEF(me,myRednMgr,myRednInfo) \
-void me::contribute(int dataSize,const void *data,CkReduction::reducerType type)\
+void me::contribute(int dataSize,const void *data,CkReduction::reducerType type,\
+	int userFlag)\
 {\
-	myRednMgr->contribute(&myRednInfo,\
-		CkReductionMsg::buildNew(dataSize,data,type));\
-}
+	CkReductionMsg *msg=CkReductionMsg::buildNew(dataSize,data,type);\
+	msg->setUserFlag(userFlag);\
+	myRednMgr->contribute(&myRednInfo,msg);\
+}\
+void me::contribute(int dataSize,const void *data,CkReduction::reducerType type,\
+	const CkCallback &cb,int userFlag)\
+{\
+	CkReductionMsg *msg=CkReductionMsg::buildNew(dataSize,data,type);\
+	msg->setUserFlag(userFlag);\
+	msg->setCallback(cb);\
+	myRednMgr->contribute(&myRednInfo,msg);\
+}\
+
 
 //A group that can contribute to reductions
 class Group : public CkReductionMgr

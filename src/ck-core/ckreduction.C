@@ -72,13 +72,7 @@ Group::Group()
 CK_REDUCTION_CONTRIBUTE_METHODS_DEF(Group,
 				    ((CkReductionMgr *)this),
 				    reductionInfo);
-
-void CProxy_Group::setReductionClient(CkReductionClientFn client,void 
-*param)
-{
-	Group *g=(Group *)CkLocalBranch(_ck_gid);
-	g->setClient(client,param);
-}
+CK_REDUCTION_CLIENT_DEF(CProxy_Group,(CkReductionMgr *)CkLocalBranch(_ck_gid));
 
 
 CkGroupInitCallback::CkGroupInitCallback(void) {}
@@ -122,6 +116,15 @@ CkGroupReadyCallback::callMeBack(CkGroupCallbackMsg *msg)
   }
 }
 
+CkReductionClientBundle::CkReductionClientBundle(CkReductionClientFn fn_,void *param_)
+	:CkCallback(callbackCfn,(void *)this),fn(fn_),param(param_) {}
+void CkReductionClientBundle::callbackCfn(void *thisPtr,void *reductionMsg)
+{
+	CkReductionClientBundle *b=(CkReductionClientBundle *)thisPtr;
+	CkReductionMsg *m=(CkReductionMsg *)reductionMsg;
+	b->fn(b->param,m->getSize(),m->getData());
+	delete m;
+}
 
 ///////////////// Reduction Manager //////////////////
 class CkReductionNumberMsg:public CMessage_CkReductionNumberMsg {
@@ -140,8 +143,7 @@ they're passed to the user's client function.
 CkReductionMgr::CkReductionMgr()//Constructor
   : thisProxy(thisgroup)
 {
-  storedClient=NULL;
-  storedClientParam=NULL;
+  storedCallback=NULL;
   redNo=0;
   inProgress=CmiFalse;
   creating=CmiFalse;
@@ -154,10 +156,12 @@ CkReductionMgr::CkReductionMgr()//Constructor
 //////////// Reduction Manager Client API /////////////
 
 //Add the given client function.  Overwrites any previous client.
-void CkReductionMgr::setClient(clientFn client,void *param)
+void CkReductionMgr::ckSetReductionClient(CkCallback *cb)
 {
-  storedClient=client;
-  storedClientParam=param;
+  if (CkMyPe()!=0)
+	  CkError("WARNING: ckSetReductionClient should only be called from processor zero!\n");
+  delete storedCallback;
+  storedCallback=cb;
 }
 
 ///////////////////////////// Contributor ////////////////////////
@@ -393,10 +397,13 @@ void CkReductionMgr::finishReduction(void)
       CkAbort("ERROR! Too many contributions at root!\n");
     }
     DEBR((AA"Passing result to client function\n"AB));
-    if (storedClient==NULL) 
-      CkAbort("No reduction client function installed!\n");
-    (*storedClient)(storedClientParam,result->dataSize,result->data);
-    delete result;
+    if (!result->callback.isInvalid())
+	    result->callback.send(result);
+    else if (storedCallback!=NULL)
+	    storedCallback->send(result);
+    else
+	    CkAbort("No reduction client!\n"
+		    "You must register a client with either SetReductionClient or during contribute.\n");
   }
   
   DEBR((AA"Reduction %d finished!\n"AB,redNo));
@@ -469,20 +476,29 @@ CkReductionMsg *CkReductionMgr::reduceMessages(void)
 {
   CkReductionMsg *ret=NULL;
   int nMsgs=msgs.length();
+
   //Look through the vector for a valid reducer, swapping out placeholder messages
   CkReduction::reducerType r=CkReduction::invalid;
   int msgs_gcount=0;//Reduced gcount
   int msgs_nSources=0;//Reduced nSources
+  int msgs_userFlag=-1;
+  CkCallback msgs_callback;
   int i;
   for (i=0;i<nMsgs;i++)
   {
     CkReductionMsg *m=msgs[i];
     msgs_gcount+=m->gcount;
-    msgs_nSources+=m->nSources();
-    if (m->reducer!=CkReduction::invalid)
+    if (m->sourceFlag!=0) 
+    { //This is a real message from an element, not just a placeholder
+      msgs_nSources+=m->nSources();
       r=m->reducer;
-    if (m->sourceFlag==0)
-    {//Replace this placeholder message
+      if (!m->callback.isInvalid())
+        msgs_callback=m->callback;
+      if (m->userFlag!=-1)
+        msgs_userFlag=m->userFlag;
+    }
+    else 
+    { //This is just a placeholder message-- replace it
       msgs[i--]=msgs[--nMsgs];
       delete m;
     }
@@ -505,6 +521,8 @@ CkReductionMsg *CkReductionMgr::reduceMessages(void)
   //Set the message counts
   ret->redNo=redNo;
   ret->gcount=msgs_gcount;
+  ret->userFlag=msgs_userFlag;
+  ret->callback=msgs_callback;
   ret->sourceFlag=msgs_nSources;
   DEBR((AA"Reduced gcount=%d; sourceFlag=%d\n"AB,ret->gcount,ret->sourceFlag));
 
@@ -621,6 +639,7 @@ CkReductionMsg *CkReductionMsg::
   ret->dataSize=NdataSize;
   if (srcData!=NULL)
     memcpy(ret->data,srcData,NdataSize);
+  ret->userFlag=-1;
   ret->reducer=reducer;
   ret->ci=NULL;
   ret->sourceFlag=-1000;
@@ -665,7 +684,7 @@ CkReductionMsg *sum_int(int nMsg,CkReductionMessage **msg)
 {
   int i,ret=0;
   for (i=0;i<nMsg;i++)
-    ret+=*(int *)(msg[i]->data);
+    ret+=*(int *)(msg[i]->getData());
   return CkReductionMsg::buildNew(sizeof(int),(void *)&ret);
 }
 
@@ -691,11 +710,11 @@ static CkReductionMsg *name(int nMsg,CkReductionMsg **msg)\
 {\
   RED_DEB(("/ PE_%d: " #name " invoked on %d messages\n",CkMyPe(),nMsg));\
   int m,i;\
-  int nElem=msg[0]->dataSize/sizeof(dataType);\
-  dataType *ret=(dataType *)(msg[0]->data);\
+  int nElem=msg[0]->getLength()/sizeof(dataType);\
+  dataType *ret=(dataType *)(msg[0]->getData());\
   for (m=1;m<nMsg;m++)\
   {\
-    dataType *value=(dataType *)(msg[m]->data);\
+    dataType *value=(dataType *)(msg[m]->getData());\
     for (i=0;i<nElem;i++)\
     {\
       RED_DEB(("|\tmsg%d (from %d) [%d]="typeStr"\n",m,msg[m]->sourceFlag,i,value[i]));\
@@ -753,7 +772,7 @@ static CkReductionMsg *concat(int nMsg,CkReductionMsg **msg)
   //Figure out how big a message we'll need
   int i,retSize=0;
   for (i=0;i<nMsg;i++)
-      retSize+=msg[i]->dataSize;
+      retSize+=msg[i]->getSize();
 
   RED_DEB(("|- concat'd reduction message will be %d bytes\n",retSize));
   
@@ -761,10 +780,10 @@ static CkReductionMsg *concat(int nMsg,CkReductionMsg **msg)
   CkReductionMsg *ret=CkReductionMsg::buildNew(retSize,NULL);
   
   //Copy the source message data into the return message
-  char *cur=(char *)(ret->data);
+  char *cur=(char *)(ret->getData());
   for (i=0;i<nMsg;i++) {
-    int messageBytes=msg[i]->dataSize;
-    memcpy((void *)cur,(void *)msg[i]->data,messageBytes);
+    int messageBytes=msg[i]->getSize();
+    memcpy((void *)cur,(void *)msg[i]->getData(),messageBytes);
     cur+=messageBytes;
   }
   RED_DEB(("\\ PE_%d: reduction_concat finished-- %d messages combined\n",CkMyPe(),nMsg));
@@ -774,8 +793,7 @@ static CkReductionMsg *concat(int nMsg,CkReductionMsg **msg)
 /////////////// set ////////////////
 /*
 This reducer appends the data it recieves from each element
-along with some housekeeping data indicating the source element 
-and data size.
+along with some housekeeping data indicating contribution boundaries.
 The message data is thus a list of reduction_set_element structures
 terminated by a dummy reduction_set_element with a sourceElement of -1.
 */
@@ -802,12 +820,13 @@ static CkReductionMsg *set(int nMsg,CkReductionMsg **msg)
   RED_DEB(("/ PE_%d: reduction_set invoked on %d messages\n",CkMyPe(),nMsg));
   //Figure out how big a message we'll need
   int i,retSize=0;
-  for (i=0;i<nMsg;i++)
-    if (msg[i]->sourceFlag>0)
+  for (i=0;i<nMsg;i++) {
+    if (!msg[i]->isFromUser())
     //This message is composite-- it will just be copied over (less terminating -1)
-      retSize+=(msg[i]->dataSize-sizeof(int));
+      retSize+=(msg[i]->getSize()-sizeof(int));
     else //This is a message from an element-- it will be wrapped in a reduction_set_element
-      retSize+=SET_SIZE(msg[i]->dataSize);
+      retSize+=SET_SIZE(msg[i]->getSize());
+  }
   retSize+=sizeof(int);//Leave room for terminating -1.
 
   RED_DEB(("|- composite set reduction message will be %d bytes\n",retSize));
@@ -816,20 +835,20 @@ static CkReductionMsg *set(int nMsg,CkReductionMsg **msg)
   CkReductionMsg *ret=CkReductionMsg::buildNew(retSize,NULL);
   
   //Copy the source message data into the return message
-  CkReduction::setElement *cur=(CkReduction::setElement *)(ret->data);
+  CkReduction::setElement *cur=(CkReduction::setElement *)(ret->getData());
   for (i=0;i<nMsg;i++)
-    if (msg[i]->sourceFlag>0)
+    if (!msg[i]->isFromUser())
     {//This message is composite-- just copy it over (less terminating -1)
-                        int messageBytes=msg[i]->dataSize-sizeof(int);
-                        RED_DEB(("|\tmsg[%d] is %d bytes from %d sources\n",i,msg[i]->dataSize,msg[i]->nSources()));
-                        memcpy((void *)cur,(void *)msg[i]->data,messageBytes);
+                        int messageBytes=msg[i]->getSize()-sizeof(int);
+                        RED_DEB(("|\tmsg[%d] is %d bytes\n",i,msg[i]->getSize()));
+                        memcpy((void *)cur,(void *)msg[i]->getData(),messageBytes);
                         cur=(CkReduction::setElement *)(((char *)cur)+messageBytes);
     }
     else //This is a message from an element-- wrap it in a reduction_set_element
     {
-      RED_DEB(("|\tmsg[%d] is %d bytes\n",i,msg[i]->dataSize));
-      cur->dataSize=msg[i]->dataSize;
-      memcpy((void *)cur->data,(void *)msg[i]->data,msg[i]->dataSize);
+      RED_DEB(("|\tmsg[%d] is %d bytes\n",i,msg[i]->getSize()));
+      cur->dataSize=msg[i]->getSize();
+      memcpy((void *)cur->data,(void *)msg[i]->getData(),msg[i]->getSize());
       cur=SET_NEXT(cur);
     }
   cur->dataSize=-1;//Add a terminating -1.

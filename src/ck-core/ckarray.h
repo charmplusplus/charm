@@ -151,7 +151,8 @@ public:
 	inline operator CkArrayID () const {return ckGetArrayID();}
 
 	void doneInserting(void);
-	void setReductionClient(CkReductionMgr::clientFn fn,void *param=NULL);
+
+	CK_REDUCTION_CLIENT_DECL
 
 	void pup(PUP::er &p);
 };
@@ -173,8 +174,7 @@ PUPmarshall(CProxy_ArrayBase);
 	inline CkArray *ckLocalBranch(void) const \
 	  { return super::ckLocalBranch(); } \
 	inline void doneInserting(void) { super::doneInserting(); }\
-	inline void setReductionClient(CkReductionMgr::clientFn fn,void *param=NULL)\
-	  { super::setReductionClient(fn,param); }\
+	CK_REDUCTION_CLIENT_DISAMBIG(super) \
 
 
 class CProxyElement_ArrayBase:public CProxy_ArrayBase {

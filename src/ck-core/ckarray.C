@@ -176,8 +176,7 @@ CProxyElement_ArrayBase::CProxyElement_ArrayBase(const ArrayElement *e)
 	:CProxy_ArrayBase(e), _idx(e->ckGetArrayIndex())
 	{}
 
-void CProxy_ArrayBase::setReductionClient(CkReductionMgr::clientFn fn,void *param)
-{ ckLocalBranch()->setClient(fn,param); }
+CK_REDUCTION_CLIENT_DEF(CProxy_ArrayBase,ckLocalBranch());
 
 CkArrayOptions::CkArrayOptions(void) //Default: empty array
 	:numInitial(0),map(_RRMapID)
