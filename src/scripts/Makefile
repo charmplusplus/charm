@@ -24,11 +24,11 @@
 
 SHELL=/bin/sh
 
-all: charm++ libs ampi IDL tsm sm pvm sdag doc
+all: charm++ LIBS ampi IDL tsm sm pvm sdag doc
 
 charm++: converse libck.a charmxi
 
-for-namd: charm++ pvm ampic
+for-namd: charm++ pvm AMPIC
 
 IDL: charm++ charmidl libidl.a
 
@@ -40,21 +40,21 @@ pvm: converse libpvmc.a
 
 sdag: charm++ sdagx libsdag.a
 
-fem: femc femf
+FEM: FEMC FEMF
 
-femc: charm++ libs
+FEMC: charm++ LIBS
 
-femf: femc libconv-utilf.a
+FEMF: FEMC libconv-utilf.a
 
-ampi: ampic ampif
+AMPI: AMPIC AMPIF
 
-ampic: charm++ libs libampi.a
+AMPIC: charm++ LIBS libampi.a
 
-ampif: charm++ libconv-utilf.a libs libampif.a
+AMPIF: charm++ libconv-utilf.a LIBS libampif.a
 
 translators: sdagx charmxi conv-cpm charmidl
 
-libs: convlibs charmlibs
+LIBS: CONVLIBS CHARMLIBS
 	cd libs; make otherlibs OPTS='$(OPTS)'
 
 test-all: all
@@ -198,7 +198,7 @@ QuickThreads/libckqt.a:
 	cd QuickThreads ; make qt  OPTS='$(OPTS)'
 	cp QuickThreads/libqt.a ../lib/libckqt.a
 
-convlibs: converse
+CONVLIBS: converse
 	cd libs; make convlibs OPTS='$(OPTS)'
 
 libconv-core.a: $(LIBCONV_CORE)
@@ -314,7 +314,7 @@ LIBCK_CORE=init.o register.o qd.o ck.o main.o msgalloc.o ckfutures.o \
            HeapCentLB.o heap.o NborBaseLB.o NeighborLB.o WSLB.o \
 	   GreedyRefLB.o RandRefLB.o CommLBHeap.o
 
-charmlibs: charm++
+CHARMLIBS: charm++
 	cd libs; make charmlibs OPTS='$(OPTS)'
 
 libck.a: $(LIBCK_CORE)
