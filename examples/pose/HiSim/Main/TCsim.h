@@ -300,10 +300,10 @@ class BGnode {
     return *this; }
   // Event methods
   void recvOutgoingMsg(TaskMsg *rm);
-  inline void recvOutgoingMsg_anti(TaskMsg *m)  {}
+  inline void recvOutgoingMsg_anti(TaskMsg *m)  {restore(this);}
   inline void recvOutgoingMsg_commit(TaskMsg *m)  {}
   void recvIncomingMsg(TaskMsg *rm);
-  inline void recvIncomingMsg_anti(TaskMsg *rm) {}
+  inline void recvIncomingMsg_anti(TaskMsg *rm) {restore(this);}
   inline void recvIncomingMsg_commit(TaskMsg *rm)  {}
 };
 

@@ -675,6 +675,7 @@ int BGproc::getReceiveTime(TaskID taskID)
 
 BGnode::BGnode(BGnodeMsg *m)
 {
+  useAntimethods();
   procsPerNode = m->procsPerNode;
   switchPID = m->switchID;
   nodePID = parent->thisIndex;		// pose index
