@@ -1,30 +1,3 @@
-/***************************************************************************
- * RCS INFORMATION:
- *
- *	$RCSfile$
- *	$Author$	$Locker$		$State$
- *	$Revision$	$Date$
- *
- ***************************************************************************
- * DESCRIPTION:
- *
- ***************************************************************************
- * REVISION HISTORY:
- *
- * $Log$
- * Revision 2.1  1995-09-22 20:44:24  sanjeev
- * bug fixes for working with new runtime
- *
- * Revision 2.0  1995/06/02  17:40:29  brunner
- * Reorganized directory structure
- *
- * Revision 1.2  1994/11/11  05:31:17  brunner
- * Removed ident added by accident with RCS header
- *
- * Revision 1.1  1994/11/07  15:39:40  brunner
- * Initial revision
- *
- ***************************************************************************/
 #define  CREATION           1
 #define  BEGIN_PROCESSING   2
 #define  END_PROCESSING     3
@@ -68,15 +41,6 @@ typedef struct logstr {         /* structure of the log entry 		*/
 	int pe; 		/* message event processor number	*/
     unsigned int time1;     /* time in microseconds of event        */
 } LOGSTR;
-
-/*
-typedef struct logstr {         * structure of the log entry           *
-    int type;             * creation/processing                  *
-    int msg_type;         * type of message                      *
-    int entry;              * entry point message was sent         *
-    unsigned int time1;     * time in microseconds of event        *
-} LOGSTR;
-*/
 
 
 #ifdef MAIN_PERF

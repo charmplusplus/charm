@@ -1,31 +1,3 @@
-/***************************************************************************
- * RCS INFORMATION:
- *
- *	$RCSfile$
- *	$Author$	$Locker$		$State$
- *	$Revision$	$Date$
- *
- ***************************************************************************
- * DESCRIPTION:
- *
- ***************************************************************************
- * REVISION HISTORY:
- *
- * $Log$
- * Revision 2.1  1995-10-27 21:37:45  jyelon
- * changed NumPe --> NumPes
- *
- * Revision 2.0  1995/06/02  17:40:29  brunner
- * Reorganized directory structure
- *
- * Revision 1.2  1995/04/13  20:55:09  sanjeev
- * Changed Mc to Cmi
- *
- * Revision 1.1  1994/11/03  17:40:06  brunner
- * Initial revision
- *
- ***************************************************************************/
-static char ident[] = "@(#)$Header$";
 /* program to log the trace information */
 
 #include <stdio.h>
@@ -33,11 +5,11 @@ static char ident[] = "@(#)$Header$";
 #include "chare.h"
 #include "globals.h"
 #define MAIN_PERF
-#include "performance.h"
+#include "trace.h"
 #undef MAIN_PERF
 
 char *pgm, *machine;
-int RecdPerfMsg = 1;
+int RecdTraceMsg = 1;
 char *log_file_name;		/* log file name      	*/
 LOGSTR logbuf[MAXLOGBUFSIZE];
 
@@ -288,7 +260,7 @@ int count;
 
 send_log() {}
 
-CollectPerfFromNodes(msg, data)
+CollectTraceFromNodes(msg, data)
 char  msg, data;
 {}
 

@@ -1,76 +1,3 @@
-/***************************************************************************
- * RCS INFORMATION:
- *
- *	$RCSfile$
- *	$Author$	$Locker$		$State$
- *	$Revision$	$Date$
- *
- ***************************************************************************
- * DESCRIPTION:
- *
- ***************************************************************************
- * REVISION HISTORY:
- *
- * $Log$
- * Revision 2.12  1997-07-18 19:14:56  milind
- * Fixed the perfModuleInit call to pass command-line params.
- * Also added trace_enqueue call to Charm message handler.
- *
- * Revision 2.11  1997/03/14 20:23:52  milind
- * Made MAXLOGBUFSIZE in projections a commandline parameter.
- * One can now specify it as "+logsize 10000" on the program
- * command line.
- *
- * Revision 2.10  1995/11/05 17:54:33  sanjeev
- * current_event should be initialized to 0, not 1
- *
- * Revision 2.9  1995/11/03  04:34:38  sanjeev
- * for END_PROCESSING, put overload the msg_type field with chare-magic
- *
- * Revision 2.8  1995/10/27  21:37:45  jyelon
- * changed NumPe --> NumPes
- *
- * Revision 2.7  1995/09/26  19:47:51  sanjeev
- * *** empty log message ***
- *
- * Revision 2.6  1995/09/22  20:44:02  sanjeev
- * bug fixes for working with new runtime
- *
- * Revision 2.5  1995/07/27  20:48:27  jyelon
- * *** empty log message ***
- *
- * Revision 2.4  1995/07/12  21:36:20  brunner
- * Added prog_name to perfModuleInit(), so argv[0] can be used
- * to generate a unique tace file name.
- *
- * Revision 2.3  1995/07/11  20:34:38  knauff
- * Changed 'uint' to 'un_int' to avoid crashes with gcc v 2.5.8
- * (on the SP, at least)
- *
- * Revision 2.2  1995/07/10  22:29:40  brunner
- * Created perfModuleInit() to handle CPV macros
- *
- * Revision 2.1  1995/06/19  16:47:38  brunner
- * Added Cpv macros and modified to use chareCount instead of TotalChares,
- * pseudoCount instead of TotalPseudos, etc.
- * Doesn't work yet, but I need to get a new copy of the files, so I'm
- * checking it in.
- *
- * Revision 2.0  1995/06/02  17:40:29  brunner
- * Reorganized directory structure
- *
- * Revision 1.3  1995/04/13  20:55:09  sanjeev
- * Changed Mc to Cmi
- *
- * Revision 1.2  1994/12/02  00:02:37  sanjeev
- * interop stuff
- *
- * Revision 1.1  1994/11/03  17:40:02  brunner
-
- * Initial revision
- *
- ***************************************************************************/
-static char ident[] = "@(#)$Header$";
 /* program to log the trace information */
 
 #include <stdio.h>
@@ -78,12 +5,12 @@ static char ident[] = "@(#)$Header$";
 #include "chare.h"
 #include "globals.h"
 #define MAIN_PERF
-#include "performance.h"
+#include "trace.h"
 #undef MAIN_PERF
 
 CpvDeclare(char*,pgm);
 
-CpvExtern(int,RecdPerfMsg);
+CpvExtern(int,RecdTraceMsg);
 
 CpvDeclare(char*,log_file_name);		/* log file name      	*/
 CpvDeclare(int,current_event);
@@ -113,7 +40,7 @@ CpvExtern(int, chareEpsCount);
 
 
 
-perfModuleInit(pargc, argv)
+traceModuleInit(pargc, argv)
 int *pargc;
 char **argv;
 {
@@ -317,7 +244,7 @@ log_init()
 	FILE *log_file_desc;
 
 
-	CpvAccess(RecdPerfMsg)=1;
+	CpvAccess(RecdTraceMsg)=1;
 	CpvAccess(current_event)=0;
 	CpvAccess(begin_pe)=-1;
 	CpvAccess(begin_event)=-1;
@@ -469,7 +396,7 @@ int count;
 
 send_log() {}
 
-CollectPerfFromNodes(msg, data)
+CollectTraceFromNodes(msg, data)
 char  msg, data;
 {}
 

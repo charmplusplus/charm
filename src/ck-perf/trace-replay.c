@@ -1,38 +1,10 @@
-/***************************************************************************
- * RCS INFORMATION:
- *
- *	$RCSfile$
- *	$Author$	$Locker$		$State$
- *	$Revision$	$Date$
- *
- ***************************************************************************
- * DESCRIPTION:
- *
- ***************************************************************************
- * REVISION HISTORY:
- *
- * $Log$
- * Revision 2.1  1995-10-27 21:37:45  jyelon
- * changed NumPe --> NumPes
- *
- * Revision 2.0  1995/06/02  17:40:29  brunner
- * Reorganized directory structure
- *
- * Revision 1.2  1995/04/13  20:55:09  sanjeev
- * Changed Mc to Cmi
- *
- * Revision 1.1  1994/11/03  17:40:04  brunner
- * Initial revision
- *
- ***************************************************************************/
-static char ident[] = "@(#)$Header$";
 #include <stdio.h>
 #include <string.h>
 #include <sys/param.h>
 #include "chare.h"
 #include "globals.h"
 #define MAIN_PERF
-#include "performance.h"
+#include "trace.h"
 #undef MAIN_PERF
 
 #define MAXTRANSSIZE 50000
@@ -56,7 +28,7 @@ int type, msg_type, entry, event, dest, pe;
 int read_in_debug_line(), read_in_projections_data(); 
 
 char *pgm;
-int RecdPerfMsg = 1;
+int RecdTraceMsg = 1;
 char *event_file_name;			/* log file name      	*/
 int debug_replay, projections_replay;
 
@@ -219,7 +191,7 @@ char *s, *m;
 
 send_log() {}
 
-CollectPerfFromNodes(msg, data)
+CollectTraceFromNodes(msg, data)
 char  msg, data;
 {}
 

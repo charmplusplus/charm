@@ -12,7 +12,23 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.12  1995-11-07 17:53:45  sanjeev
+ * Revision 2.13  1997-07-18 21:21:02  milind
+ * all files of the form perf-*.c have been changed to trace-*.c, with
+ * name expansions. For example, perf-proj.c has been changed to
+ * trace-projections.c.
+ * performance.h has been renamed as trace.h, and perfio.c has been
+ * renamed as traceio.c.
+ * Corresponding changes have been made in the Makefile too.
+ * Earlier, there used to be three libck-core-*.a where * was projections,
+ * summary or none. Now, there will be a single libck-core.a and
+ * three libck-trace-*.a where *=projections, summary and none.
+ * The execmode parameter to charmc script has been renamed as
+ * tracemode.
+ * Also, the perfModuleInit function has been renamed as traceModuleInit,
+ * RecdPerfMsg => RecdTraceMsg
+ * CollectPerfFromNodes => CollectTraceFromNodes
+ *
+ * Revision 2.12  1995/11/07 17:53:45  sanjeev
  * fixed bugs in statistics collection
  *
  * Revision 2.11  1995/11/02  20:10:44  sanjeev
@@ -76,7 +92,7 @@
 static char ident[] = "@(#)$Header$";
 #include "chare.h"
 #include "globals.h"
-#include "performance.h"
+#include "trace.h"
 
 #define MAXBOC 15
 

@@ -1,56 +1,3 @@
-/***************************************************************************
- * RCS INFORMATION:
- *
- *	$RCSfile$
- *	$Author$	$Locker$		$State$
- *	$Revision$	$Date$
- *
- ***************************************************************************
- * DESCRIPTION:
- *
- ***************************************************************************
- * REVISION HISTORY:
- *      $Log$
- *      Revision 2.12  1997-07-18 19:14:58  milind
- *      Fixed the perfModuleInit call to pass command-line params.
- *      Also added trace_enqueue call to Charm message handler.
- *
- *      Revision 2.11  1997/03/19 23:17:38  milind
- *      Got net-irix to work. Had to modify jsleep to deal with restaring
- *      system calls on interrupts.
- *
- *      Revision 2.10  1995/10/30 22:29:57  sanjeev
- *      converted static variable in CollectPerfFromNodes to Cpv
- *
- * Revision 2.9  1995/10/30  14:31:12  jyelon
- * Fixed an obvious bug, but there's probably still more.
- *
- * Revision 2.8  1995/10/27  21:37:45  jyelon
- * changed NumPe --> NumPes
- *
- * Revision 2.7  1995/07/27  20:48:27  jyelon
- * *** empty log message ***
- *
- * Revision 2.6  1995/07/22  23:44:01  jyelon
- * *** empty log message ***
- *
- * Revision 2.5  1995/07/12  21:36:20  brunner
- * Added prog_name to perfModuleInit(), so argv[0] can be used
- * to generate a unique tace file name.
- *
- * Revision 2.4  1995/07/12  20:23:47  brunner
- * Changed global variable time to now, to avoid conflict with
- * system function time.
- *
- * Revision 2.3  1995/07/10  22:29:40  brunner
- * Created perfModuleInit() to handle CPV macros
- *
- * Revision 2.2  1995/07/06  22:42:54  narain
- * Corrected usage of LdbBocNum to StatisticBocNum
- *
- *
- ***************************************************************************/
-static char ident[] = "@(#)$Header$";
 /* program to log the trace information */
 
 #include <stdio.h>
@@ -58,12 +5,12 @@ static char ident[] = "@(#)$Header$";
 #include "chare.h"
 #include "globals.h"
 #define MAIN_PERF
-#include "performance.h"
+#include "trace.h"
 #undef MAIN_PERF
 #include "stat.h"
 
 CpvDeclare(char*,pgm);
-CpvExtern(int,RecdPerfMsg); 
+CpvExtern(int,RecdTraceMsg); 
 
 CpvDeclare(int,display_index);
 CpvDeclare(int,last_time_interval);
@@ -80,7 +27,7 @@ CpvDeclare(int,num_childmsgs);
 
 CpvExtern(int,RecdStatMsg);
 
-perfModuleInit(pargc, argv)
+traceModuleInit(pargc, argv)
 int *pargc;
 char **argv;
 {
@@ -204,7 +151,7 @@ log_init()
 	int i, j;
 	CpvAccess(timestep) = INITIAL_TIMESTEP;
 
-	CpvAccess(RecdPerfMsg) = 0;
+	CpvAccess(RecdTraceMsg) = 0;
 	CpvAccess(init_time) = CkTimer();
 	CpvAccess(start_processing_time) = -1;
         for (i=0; i<NUMBER_DISPLAYS; i++)
@@ -325,7 +272,7 @@ PERF_MSG *msg;
 /*************************************************************************/ 
 /** Send out performance message.					**/
 /*************************************************************************/ 
-SendOutPerfMsg(mype)
+SendOutTraceMsg(mype)
 int mype;
 {
 	int i, j;
@@ -345,7 +292,7 @@ int mype;
 TRACE(CmiPrintf("[%d] Send out perf message to %d\n", 
 		mype, CmiSpanTreeParent(mype)));
 
-	GeneralSendMsgBranch(CsvAccess(CkEp_Stat_PerfCollectNodes), msg,
+	GeneralSendMsgBranch(CsvAccess(CkEp_Stat_TraceCollectNodes), msg,
 		CmiSpanTreeParent(mype), BocMsg, StatisticBocNum);
 }
 
@@ -358,16 +305,16 @@ send_log()
 	int mype = CmiMyPe();
 	if (CmiNumSpanTreeChildren(mype) == 0)
 	{
-		CpvAccess(RecdPerfMsg) = 1;
+		CpvAccess(RecdTraceMsg) = 1;
 		if (mype != 0)
-			SendOutPerfMsg(mype);
+			SendOutTraceMsg(mype);
 	}
 }
 
 /************************************************************************/ 
 /** Collect performance messages sent from children here.		**/
 /************************************************************************/ 
-CollectPerfFromNodes(msg, localdataptr)
+CollectTraceFromNodes(msg, localdataptr)
 PERF_MSG *msg;
 void  *localdataptr;
 {
@@ -377,13 +324,13 @@ void  *localdataptr;
 	add_log(msg);
 	mype = CmiMyPe();
 
-TRACE(CmiPrintf("[%d] CollectPerf..: num_childmsgs=%d,  span=%d\n",
+TRACE(CmiPrintf("[%d] CollectTrace..: num_childmsgs=%d,  span=%d\n",
 		mype, CpvAccess(num_childmsgs), CmiNumSpanTreeChildren(mype)));
 	if (CpvAccess(num_childmsgs) == CmiNumSpanTreeChildren(mype))
 	{
-		CpvAccess(RecdPerfMsg) = 1;
+		CpvAccess(RecdTraceMsg) = 1;
 		if (mype != 0)
-			SendOutPerfMsg(mype);
+			SendOutTraceMsg(mype);
 TRACE(CmiPrintf("[%d] RecdStatMsg=%d\n", CmiMyPe(), CpvAccess(RecdStatMsg)));
 		if (CpvAccess(RecdStatMsg)) ExitNode(); 	
 	}  

@@ -12,7 +12,23 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.16  1997-03-14 20:23:49  milind
+ * Revision 2.17  1997-07-18 21:21:06  milind
+ * all files of the form perf-*.c have been changed to trace-*.c, with
+ * name expansions. For example, perf-proj.c has been changed to
+ * trace-projections.c.
+ * performance.h has been renamed as trace.h, and perfio.c has been
+ * renamed as traceio.c.
+ * Corresponding changes have been made in the Makefile too.
+ * Earlier, there used to be three libck-core-*.a where * was projections,
+ * summary or none. Now, there will be a single libck-core.a and
+ * three libck-trace-*.a where *=projections, summary and none.
+ * The execmode parameter to charmc script has been renamed as
+ * tracemode.
+ * Also, the perfModuleInit function has been renamed as traceModuleInit,
+ * RecdPerfMsg => RecdTraceMsg
+ * CollectPerfFromNodes => CollectTraceFromNodes
+ *
+ * Revision 2.16  1997/03/14 20:23:49  milind
  * Made MAXLOGBUFSIZE in projections a commandline parameter.
  * One can now specify it as "+logsize 10000" on the program
  * command line.
@@ -134,7 +150,7 @@ CpvExtern(int, QueueingDefault);
 CpvExtern(int, LogBufSize);
 
 CpvExtern(int, RecdStatMsg);
-CpvExtern(int, RecdPerfMsg);
+CpvExtern(int, RecdTraceMsg);
 
 CpvExtern(int, numHeapEntries);
 CpvExtern(int, numCondChkArryElts);
@@ -194,7 +210,7 @@ CsvExtern(int, CkEp_DBOC_InitiateDynamicBocBroadcast);
 /* These are the entry points for the statistics BOC */
 CsvExtern(int, CkEp_Stat_CollectNodes);
 CsvExtern(int, CkEp_Stat_Data);
-CsvExtern(int, CkEp_Stat_PerfCollectNodes);
+CsvExtern(int, CkEp_Stat_TraceCollectNodes);
 CsvExtern(int, CkEp_Stat_BroadcastExitMessage);
 CsvExtern(int, CkEp_Stat_ExitMessage);
 

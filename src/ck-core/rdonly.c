@@ -12,7 +12,23 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.7  1997-03-24 23:14:04  milind
+ * Revision 2.8  1997-07-18 21:21:10  milind
+ * all files of the form perf-*.c have been changed to trace-*.c, with
+ * name expansions. For example, perf-proj.c has been changed to
+ * trace-projections.c.
+ * performance.h has been renamed as trace.h, and perfio.c has been
+ * renamed as traceio.c.
+ * Corresponding changes have been made in the Makefile too.
+ * Earlier, there used to be three libck-core-*.a where * was projections,
+ * summary or none. Now, there will be a single libck-core.a and
+ * three libck-trace-*.a where *=projections, summary and none.
+ * The execmode parameter to charmc script has been renamed as
+ * tracemode.
+ * Also, the perfModuleInit function has been renamed as traceModuleInit,
+ * RecdPerfMsg => RecdTraceMsg
+ * CollectPerfFromNodes => CollectTraceFromNodes
+ *
+ * Revision 2.7  1997/03/24 23:14:04  milind
  * Made Charm-runtime 64-bit safe by removing conversions of pointers to
  * integers. Also, removed charm runtime's dependence of unused argv[]
  * elements being 0. Also, added sim-irix-64 version. It works.
@@ -48,7 +64,7 @@
 static char ident[] = "@(#)$Header$";
 #include "chare.h"
 #include "globals.h"
-#include "performance.h"
+#include "trace.h"
 
 
 CpvExtern(char *, ReadBufIndex);

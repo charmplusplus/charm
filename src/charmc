@@ -29,7 +29,7 @@ unsetenv SEQUENTIAL
 unsetenv LANGUAGE
 unsetenv BALANCE
 unsetenv MEMORY
-unsetenv EXECMODE
+unsetenv TRACEMODE
 unsetenv VERBOSE
 unsetenv SAVE
 unsetenv PURIFY
@@ -101,8 +101,8 @@ while ($argindex <= $#argv)
             @ argindex = $argindex + 1
             breaksw
 
-	case "-execmode"
-            set EXECMODE=$argv[$argindex]
+	case "-tracemode"
+            set TRACEMODE=$argv[$argindex]
             @ argindex = $argindex + 1
             breaksw
 
@@ -624,26 +624,26 @@ endsw
 #
 # Some quick consistency checks prior to full link-step
 #
-# Check for valid choice of EXECMODE
+# Check for valid choice of TRACEMODE
 # Check for valid choice of BALANCE
-# Check for compatibility among BALANCE and EXECMODE
+# Check for compatibility among BALANCE and TRACEMODE
 #
 ##############################################################################
 
-# Check for valid choice of EXECMODE
+# Check for valid choice of TRACEMODE
 
 if (($LANGUAGE == charm) || ($LANGUAGE == charm++)) then
 
-    if (! -e $CHARMLIB/libck-core-notrace.a) then
+    if (! -e $CHARMLIB/libck-trace-none.a) then
         echo "charmc: charm libraries not installed."
         goto failure
     endif
     
-    if ($?EXECMODE == 0) set EXECMODE=notrace
+    if ($?TRACEMODE == 0) set TRACEMODE=none
 
-    if (! -e $CHARMLIB/libck-core-$EXECMODE.a) then
-       echo "charmc : No such execmode $EXECMODE"
-       (cd $CHARMLIB ; ls -al libck-core-*)
+    if (! -e $CHARMLIB/libck-trace-$TRACEMODE.a) then
+       echo "charmc : No such tracemode $TRACEMODE"
+       (cd $CHARMLIB ; ls -al libck-trace-*)
        goto failure
     endif
 
@@ -655,12 +655,12 @@ if (($LANGUAGE == charm) || ($LANGUAGE == charm++)) then
 
     if ($?BALANCE == 0) set BALANCE=rand
 
-    # Check that EXECMODE is compatible with BALANCE
+    # Check that TRACEMODE is compatible with BALANCE
 
-    if ($EXECMODE == replay) then
+    if ($TRACEMODE == replay) then
         if ($?BALANCE == 0) set BALANCE=replay
         if ($BALANCE != replay) then
-            echo "Ignoring -balance $BALANCE, incompatible with -execmode replay"
+            echo "Ignoring -balance $BALANCE, incompatible with -tracemode replay"
         endif
         set BALANCE=replay
     endif
@@ -717,7 +717,7 @@ if (($LANGUAGE == charm) || ($LANGUAGE == charm++)) then
 	($ECHOCMD ; $CMK_CC $OPTS_CC -c -o CHARMC-MOD.TMP.o CHARMC-MOD.TMP.c)
         ($ECHOCMD ; $CMK_LD $OPTS_LD -o CHARMC-PRE.TMP.xxx -L$CHARMLIB \
                       $BAL_OBJ $OBJECTFILES $LIBRARIES \
-		      CHARMC-MOD.TMP.o -lck-core-$EXECMODE \
+		      CHARMC-MOD.TMP.o -lck-core -lck-trace-$TRACEMODE \
                       -lck-cplus-n -lconv-cplus-n -lconv-core -lck-defmain-std\
 		      $CMK_LIBS -lm)
     else if ($LANGUAGE == charm++) then
@@ -725,7 +725,7 @@ if (($LANGUAGE == charm) || ($LANGUAGE == charm++)) then
 	($ECHOCMD ; $CMK_CC $OPTS_CC -c -o CHARMC-MOD.TMP.o CHARMC-MOD.TMP.c)
         ($ECHOCMD ; $CMK_LDXX $OPTS_LDXX -o CHARMC-PRE.TMP.xxx -L$CHARMLIB \
 		      $BAL_OBJ $OBJECTFILES $LIBRARIES \
-		      CHARMC-MOD.TMP.o -lck-core-$EXECMODE \
+		      CHARMC-MOD.TMP.o -lck-core -lck-trace-$TRACEMODE \
                       -lck-cplus-y -lconv-cplus-y -lconv-core -lck-defmain-cpp\
 		      $CMK_LIBS -lm)
     endif
@@ -753,14 +753,14 @@ switch ($LANGUAGE)
     case "charm"
         ($ECHOCMD ; $CMK_LD $OPTS_LD -o $OBJECT -L$CHARMLIB \
                       CHARMC-MOD.TMP.o $BAL_OBJ $OBJECTFILES \
-                      $LIBRARIES -lck-core-$EXECMODE \
+                      $LIBRARIES -lck-core -lck-trace-$TRACEMODE \
                       -lck-cplus-n -lconv-cplus-n -lconv-core -lck-defmain-std\
 		      $CMK_LIBS -lm)
         breaksw
     case "charm++"
         ($ECHOCMD ; $CMK_LDXX $OPTS_LDXX -o $OBJECT -L$CHARMLIB \
 		      CHARMC-MOD.TMP.o $BAL_OBJ $OBJECTFILES \
-                      $LIBRARIES -lck-core-$EXECMODE \
+                      $LIBRARIES -lck-core -lck-trace-$TRACEMODE \
                       -lck-cplus-y -lconv-cplus-y -lconv-core -lck-defmain-cpp\
 		      $CMK_LIBS -lm)
         breaksw

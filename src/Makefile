@@ -56,7 +56,7 @@ CHARMC=../bin/charmc $(CHARMOPTS) $(OPTS)
 #
 ###############################################################################
 
-ALLHEADERS=acc.h c++interface.h chare.h ckdefs.h common.h communication.h condsend.h const.h dagger.h dtable.h env_macros.h globals.h mono.h msg_macros.h prio_macros.h qd.h stat.h sys_macros.h table.h tbl.h trans_decls.h trans_defs.h trans_externs.h user_macros.h vid.h wrtone.h converse.h conv-mach.h internal.h quiescence.h performance.h dag.h generic_redn.h charmFuturesInclude.h # pglib.h
+ALLHEADERS=acc.h c++interface.h chare.h ckdefs.h common.h communication.h condsend.h const.h dagger.h dtable.h env_macros.h globals.h mono.h msg_macros.h prio_macros.h qd.h stat.h sys_macros.h table.h tbl.h trans_decls.h trans_defs.h trans_externs.h user_macros.h vid.h wrtone.h converse.h conv-mach.h internal.h quiescence.h trace.h dag.h generic_redn.h charmFuturesInclude.h # pglib.h
 
 ALLINTERFACES=GENERIC-ACC.int GENERIC-HIST.int GENERIC-REDN.int barrier_redn.int cache.int dacc_count.int dacc_hist.int dcountredn.int dmaxredn.int dminredn.int dprodredn.int dsumredn.int facc_count.int facc_hist.int fcountredn.int fmaxredn.int fminredn.int fprodredn.int fsumredn.int iacc_count.int iacc_hist.int icountredn.int imaxredn.int iminredn.int iprodredn.int isumredn.int pg.int
 
@@ -184,31 +184,36 @@ memory.o: memory.c $(CVHEADERS)
 ###############################################################################
 
 CKHEADERS=chare.h const.h msg_macros.h prio_macros.h env_macros.h globals.h\
-	  sys_macros.h communication.h performance.h $(CVHEADERS)
+	  sys_macros.h communication.h trace.h $(CVHEADERS)
 
-CK_LIBS_CORE=libck-core-notrace.a libck-core-summary.a libck-core-projections.a
+CK_LIBS_CORE=libck-core.a
+
+CK_LIBS_TRACE=libck-trace-none.a libck-trace-summary.a libck-trace-projections.a
 
 CK_LIBS_LDB=libck-ldb-rand.o libck-ldb-acwn.o libck-ldb-mngr.o # libck-ldb-priomngr.o libck-ldb-recv.o libck-ldb-tok.o libck-ldb-btok.o
 
 CK_LIBS_CPLUS=libck-cplus-n.a libck-defmain-std.a
 
-CK_LIBS=$(CK_LIBS_CORE) $(CK_LIBS_LDB) $(CK_LIBS_CPLUS)
+CK_LIBS=$(CK_LIBS_CORE) $(CK_LIBS_TRACE) $(CK_LIBS_LDB) $(CK_LIBS_CPLUS)
 
 LIBCK_CORE=common.o globals.o init.o register.o boc.o condsend.o qd.o vid.o rdonly.o stat.o wrtone.o acc.o mono.o tbl.o memstuff.o ldbcfns.o ck.o main.o
 
 charmlibs: converse $(CK_LIBS)
 
-LIBCK_CORE_NOTRACE=$(LIBCK_CORE) perf-none.o
-libck-core-notrace.a: $(LIBCK_CORE_NOTRACE)
-	$(CHARMC) -cp ../lib/ -o $@ $(LIBCK_CORE_NOTRACE)
+libck-core.a: $(LIBCK_CORE)
+	$(CHARMC) -cp ../lib/ -o $@ $(LIBCK_CORE)
 
-LIBCK_CORE_SUMMARY=$(LIBCK_CORE) perf-sum.o perfio.o
-libck-core-summary.a: $(LIBCK_CORE_SUMMARY)
-	$(CHARMC) -cp ../lib/ -o $@ $(LIBCK_CORE_SUMMARY)
+LIBCK_TRACE_NONE=trace-none.o
+libck-trace-none.a: $(LIBCK_TRACE_NONE)
+	$(CHARMC) -cp ../lib/ -o $@ $(LIBCK_TRACE_NONE)
 
-LIBCK_CORE_PROJ=$(LIBCK_CORE) perf-proj.o perfio.o
-libck-core-projections.a: $(LIBCK_CORE_PROJ)
-	$(CHARMC) -cp ../lib/ -o $@ $(LIBCK_CORE_PROJ)
+LIBCK_TRACE_SUMMARY=trace-summary.o traceio.o
+libck-trace-summary.a: $(LIBCK_TRACE_SUMMARY)
+	$(CHARMC) -cp ../lib/ -o $@ $(LIBCK_TRACE_SUMMARY)
+
+LIBCK_TRACE_PROJ=trace-projections.o traceio.o
+libck-trace-projections.a: $(LIBCK_TRACE_PROJ)
+	$(CHARMC) -cp ../lib/ -o $@ $(LIBCK_TRACE_PROJ)
 
 libck-ldb-acwn.o: ldb.acwn.p ldb.h $(CKHEADERS)
 	$(CHARMC) -cp ../lib/ -o $@ ldb.acwn.p
@@ -294,23 +299,23 @@ main.o: main.c $(CKHEADERS)
 ck.o: ck.c $(CKHEADERS)
 	$(CHARMC) -o ck.o ck.c
 
-perfio.o : perfio.c performance.h $(CKHEADERS)
-	$(CHARMC) -o perfio.o perfio.c
+traceio.o : traceio.c trace.h $(CKHEADERS)
+	$(CHARMC) -o traceio.o traceio.c
 
-perf-none.o : perf-none.c performance.h $(CKHEADERS)
-	$(CHARMC) -o perf-none.o perf-none.c
+trace-none.o : trace-none.c trace.h $(CKHEADERS)
+	$(CHARMC) -o trace-none.o trace-none.c
 
-perf-sum.o : perf-sum.c performance.h $(CKHEADERS)
-	$(CHARMC) -o perf-sum.o perf-sum.c
+trace-summary.o : trace-summary.c trace.h $(CKHEADERS)
+	$(CHARMC) -o trace-summary.o trace-summary.c
 
-perf-recd.o : perf-recd.c performance.h $(CKHEADERS)
-	$(CHARMC) -o perf-recd.o perf-recd.c
+trace-record.o : trace-record.c trace.h $(CKHEADERS)
+	$(CHARMC) -o trace-record.o trace-record.c
 
-perf-repl.o : perf-repl.c performance.h $(CKHEADERS)
-	$(CHARMC) -o perf-repl.o perf-repl.c
+trace-replay.o : trace-replay.c trace.h $(CKHEADERS)
+	$(CHARMC) -o trace-replay.o trace-replay.c
 
-perf-proj.o : perf-proj.c performance.h $(CKHEADERS)
-	$(CHARMC) -o perf-proj.o perf-proj.c
+trace-projections.o : trace-projections.c trace.h $(CKHEADERS)
+	$(CHARMC) -o trace-projections.o trace-projections.c
 
 ###############################################################################
 #

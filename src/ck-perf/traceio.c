@@ -1,34 +1,7 @@
-/***************************************************************************
- * RCS INFORMATION:
- *
- *	$RCSfile$
- *	$Author$	$Locker$		$State$
- *	$Revision$	$Date$
- *
- ***************************************************************************
- * DESCRIPTION:
- *
- ***************************************************************************
- * REVISION HISTORY:
- *
- * $Log$
- * Revision 2.1  1997-03-14 21:41:11  milind
- * Fixed projections output bugs..
- *
- * Revision 2.0  1995/06/02 17:40:29  brunner
- * Reorganized directory structure
- *
- * Revision 1.2  1994/11/16  20:06:25  sanjeev
- * removed char *ident.....
- *
- * Revision 1.1  1994/11/03  17:40:12  brunner
- * Initial revision
- *
- ***************************************************************************/
 #include <stdio.h>
 #include "chare.h"
 #include "globals.h"
-#include "performance.h"
+#include "trace.h"
 
 read_in_debug_line(fp, replay, type, mtype, entry, time, event, dest, pe)
 FILE *fp;

@@ -12,7 +12,23 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.13  1997-07-08 15:28:40  milind
+ * Revision 2.14  1997-07-18 21:21:11  milind
+ * all files of the form perf-*.c have been changed to trace-*.c, with
+ * name expansions. For example, perf-proj.c has been changed to
+ * trace-projections.c.
+ * performance.h has been renamed as trace.h, and perfio.c has been
+ * renamed as traceio.c.
+ * Corresponding changes have been made in the Makefile too.
+ * Earlier, there used to be three libck-core-*.a where * was projections,
+ * summary or none. Now, there will be a single libck-core.a and
+ * three libck-trace-*.a where *=projections, summary and none.
+ * The execmode parameter to charmc script has been renamed as
+ * tracemode.
+ * Also, the perfModuleInit function has been renamed as traceModuleInit,
+ * RecdPerfMsg => RecdTraceMsg
+ * CollectPerfFromNodes => CollectTraceFromNodes
+ *
+ * Revision 2.13  1997/07/08 15:28:40  milind
  * fixed an old bug that had been reintroduced in statistics collection
  * module.
  *
@@ -74,7 +90,7 @@ static char ident[] = "@(#)$Header$";
 
 #include "chare.h"
 #include "globals.h"
-#include "performance.h"
+#include "trace.h"
 #include "stat.h"
 
 typedef int **ARRAY_;
@@ -82,7 +98,7 @@ CpvStaticDeclare(ARRAY_, HostStat);
 CpvStaticDeclare(ARRAY_, HostMemStatistics);
 CpvStaticDeclare(int, NumPes);
 
-extern CollectPerfFromNodes();
+extern CollectTraceFromNodes();
 extern CHARE_BLOCK *CreateChareBlock();
 
 
@@ -228,7 +244,7 @@ TRACE(CmiPrintf("Host %d: Enter CollectFromNodes(): NumPes %d\n",
 	if (CpvAccess(NumPes) == 0)
 	{
 		CpvAccess(RecdStatMsg) = 1;
-		if (CpvAccess(RecdPerfMsg)) ExitNode();
+		if (CpvAccess(RecdTraceMsg)) ExitNode();
 	}
 }
 
@@ -344,9 +360,9 @@ StatAddSysBocEps()
     registerBocEp("CkEp_Stat_Data",
 		  NodeCollectStatistics,
 		  CHARM, 0, 0);
-  CsvAccess(CkEp_Stat_PerfCollectNodes)=
-    registerBocEp("CkEp_Stat_PerfCollectNodes",
-		  CollectPerfFromNodes,
+  CsvAccess(CkEp_Stat_TraceCollectNodes)=
+    registerBocEp("CkEp_Stat_TraceCollectNodes",
+		  CollectTraceFromNodes,
 		  CHARM, 0, 0);
   CsvAccess(CkEp_Stat_BroadcastExitMessage)=
     registerBocEp("CkEp_Stat_BroadcastExitMessage",

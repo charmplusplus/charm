@@ -12,7 +12,23 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.13  1997-03-14 20:23:48  milind
+ * Revision 2.14  1997-07-18 21:21:05  milind
+ * all files of the form perf-*.c have been changed to trace-*.c, with
+ * name expansions. For example, perf-proj.c has been changed to
+ * trace-projections.c.
+ * performance.h has been renamed as trace.h, and perfio.c has been
+ * renamed as traceio.c.
+ * Corresponding changes have been made in the Makefile too.
+ * Earlier, there used to be three libck-core-*.a where * was projections,
+ * summary or none. Now, there will be a single libck-core.a and
+ * three libck-trace-*.a where *=projections, summary and none.
+ * The execmode parameter to charmc script has been renamed as
+ * tracemode.
+ * Also, the perfModuleInit function has been renamed as traceModuleInit,
+ * RecdPerfMsg => RecdTraceMsg
+ * CollectPerfFromNodes => CollectTraceFromNodes
+ *
+ * Revision 2.13  1997/03/14 20:23:48  milind
  * Made MAXLOGBUFSIZE in projections a commandline parameter.
  * One can now specify it as "+logsize 10000" on the program
  * command line.
@@ -135,7 +151,7 @@ CpvDeclare(int, QueueingDefault);
 CpvDeclare(int, LogBufSize);
 
 CpvDeclare(int, RecdStatMsg);
-CpvDeclare(int, RecdPerfMsg);
+CpvDeclare(int, RecdTraceMsg);
 
 CpvDeclare(int, numHeapEntries);      /* heap of tme-dep calls   */
 CpvDeclare(int, numCondChkArryElts);  /* arry hldng conditon check info */
@@ -200,7 +216,7 @@ CsvDeclare(int, CkEp_DBOC_InitiateDynamicBocBroadcast);
 /* These are the entry points for the statistics BOC */
 CsvDeclare(int, CkEp_Stat_CollectNodes);
 CsvDeclare(int, CkEp_Stat_Data);
-CsvDeclare(int, CkEp_Stat_PerfCollectNodes);
+CsvDeclare(int, CkEp_Stat_TraceCollectNodes);
 CsvDeclare(int, CkEp_Stat_BroadcastExitMessage);
 CsvDeclare(int, CkEp_Stat_ExitMessage);
 
@@ -261,7 +277,7 @@ void globalsModuleInit()
    CpvInitialize(int, PrintSummaryStat);
    CpvInitialize(int, QueueingDefault);
    CpvInitialize(int, RecdStatMsg);
-   CpvInitialize(int, RecdPerfMsg);
+   CpvInitialize(int, RecdTraceMsg);
    CpvInitialize(int, numHeapEntries);      
    CpvInitialize(int, numCondChkArryElts); 
    CpvInitialize(int, _CK_13PackOffset);

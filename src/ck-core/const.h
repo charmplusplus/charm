@@ -12,7 +12,23 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.12  1996-08-01 21:10:13  jyelon
+ * Revision 2.13  1997-07-18 21:21:04  milind
+ * all files of the form perf-*.c have been changed to trace-*.c, with
+ * name expansions. For example, perf-proj.c has been changed to
+ * trace-projections.c.
+ * performance.h has been renamed as trace.h, and perfio.c has been
+ * renamed as traceio.c.
+ * Corresponding changes have been made in the Makefile too.
+ * Earlier, there used to be three libck-core-*.a where * was projections,
+ * summary or none. Now, there will be a single libck-core.a and
+ * three libck-trace-*.a where *=projections, summary and none.
+ * The execmode parameter to charmc script has been renamed as
+ * tracemode.
+ * Also, the perfModuleInit function has been renamed as traceModuleInit,
+ * RecdPerfMsg => RecdTraceMsg
+ * CollectPerfFromNodes => CollectTraceFromNodes
+ *
+ * Revision 2.12  1996/08/01 21:10:13  jyelon
  * *** empty log message ***
  *
  * Revision 2.11  1995/09/20 14:24:27  jyelon
@@ -121,7 +137,7 @@
 #define CHAREKIND_FVID     3   /* Filled-VID */
 
 /* MsgTypes */
-/* The performance tools use these also. */
+/* The trace tools use these also. */
 /**********		USERcat			*******/
 #define NewChareMsg  		0
 #define NewChareNoBalanceMsg    1
