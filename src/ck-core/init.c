@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.38  1996-04-07 19:16:52  jyelon
+ * Revision 2.39  1996-04-24 22:53:27  jyelon
+ * *** empty log message ***
+ *
+ * Revision 2.38  1996/04/07 19:16:52  jyelon
  * Was calling StartCharm-callback too soon, moved it later.
  *
  * Revision 2.37  1996/03/05 16:09:56  sanjeev
@@ -632,6 +635,7 @@ char          **argv;
   if (CmiMyPe() == 0)
     mainflag = 1;
   
+  CpvAccess(QueueingDefault) = CK_QUEUEING_FIFO;
   for (i = 1; i < end; i++) {
     foundSysOpt = 0;
     if (strcmp(argv[i], "+cs") == 0) {
