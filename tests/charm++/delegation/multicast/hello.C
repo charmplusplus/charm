@@ -10,6 +10,7 @@ CkGroupID mCastGrpId;
 CProxySection_Hello *mcast;
 
 #define SECTIONSIZE  5
+#define REDUCE_TIME  30
 
 class HiMsg : public CkMcastBaseMsg, public CMessage_HiMsg
 {
@@ -60,7 +61,23 @@ public:
 void client(CkSectionID sid, void *param, int dataSize, void *data)
 {
   myReductionCounter *c=(myReductionCounter *)param;
-  CmiPrintf("RESULT: %d %d\n", *(int *)data, c->reductionNo); 
+  CmiPrintf("RESULT [%d]: %d\n", c->reductionNo, *(int *)data); 
+  // check correctness
+  int result;
+  if (c->reductionNo%3 == 0) {
+    result = 0;
+    for (int i=0; i<SECTIONSIZE; i++) result+=i;
+  }
+  else if (c->reductionNo%3 == 2) {
+    result = 1;
+    for (int i=1; i<SECTIONSIZE+1; i++) result*=i;
+  }
+  else {
+    result = SECTIONSIZE+1;
+  }
+  if (*(int *)data != result) {
+    CmiAbort("wrong!");
+  }
 
   c->reductionsRemaining--;
   if (c->reductionsRemaining<=0) {
@@ -69,6 +86,7 @@ void client(CkSectionID sid, void *param, int dataSize, void *data)
   }
   else {
     CkMulticastMgr *mg = CProxy_CkMulticastMgr(mCastGrpId).ckLocalBranch();
+//    if (c->reductionNo % 4 == 0)
     mg->rebuild(mcast->ckGetSectionID());
 
     c->reductionNo++;
@@ -113,7 +131,7 @@ public:
 #endif
 
     myReductionCounter *c=new myReductionCounter;
-    c->reductionsRemaining=18;
+    c->reductionsRemaining=REDUCE_TIME;
     c->reductionNo=0;
     mg->setReductionClient(mcast, client, c);
 
@@ -124,18 +142,19 @@ public:
   
   void SayHi(HiMsg *m)
   {
-    CkPrintf("[%d] Hi[%d] from element %d\n",CmiMyPe(), m->data[0],thisIndex);
+//    CkPrintf("[%d] Hi[%d] from element %d\n",CmiMyPe(), m->data[0],thisIndex);
 
     CkGetSectionID(sid, m);
+CmiPrintf("[%d] SayHi: sid on %d %p\n", CmiMyPe(), sid.pe, sid.val);
 
     CkMulticastMgr *mg = CProxy_CkMulticastMgr(mCastGrpId).ckLocalBranch();
 
     int data = thisIndex;
     mg->contribute(sizeof(int), &data,CkReduction::sum_int, sid);
-    data = thisIndex+1;
-    mg->contribute(sizeof(int), &data,CkReduction::product_int, sid);
     data = thisIndex+2;
     mg->contribute(sizeof(int), &data,CkReduction::max_int, sid);
+    data = thisIndex+1;
+    mg->contribute(sizeof(int), &data,CkReduction::product_int, sid);
     delete m;
   }
 };
