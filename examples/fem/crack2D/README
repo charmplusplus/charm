@@ -1,0 +1,42 @@
+This is a 2D crack propagation application built on top of the
+FEM framework. Note that one needs to use migratable threads of
+converse in order to compile and run this application.
+
+So, make sure that you invoke super_install as
+
+SUPER_INSTALL ampi {net-sol-cc|mpi-origin} -O -DCMK_THREADS_USE_ISOMALLOC=1
+
+In order to compile the crack2d program, you need to just type "make"
+in this directory. This wll make two programs: pgm and getmesh
+
+getmesh is needed to prepare inputs for the program. Where as pgm is the
+crack2d application.
+
+After compilation, run:
+
+# this will extract the mesh description from the input file crck_bar.inp
+# and will put it in crck_bar.mesh
+
+./getmesh
+
+# this will convert the mesh in crck_bar.mesh to a graph in crck_bar.graph
+# needed to do partitioning with metis
+
+../../../../bin/mesh2graph crck_bar.mesh crck_bar.graph
+
+# this will partition the graph in crck_bar.graph into 4 partitions
+# and will create individual files meshdata.Pe* for each partition.
+
+../../../../bin/gmap crck_bar.graph 4
+
+# this will run the program pgm on 2 processors, by mapping 4 partitions
+# onto these two processors. This program runs for 2000 iterations, and
+# prints the time taken for each iteration at the end. Migration is
+# performed after every 25 iterations. Note that the number of iterations can
+# be changed in the cohesive.inp file.
+
+./conv-host +p2 pgm +vp4
+
+I have bigger data files available for this program. SO, if you are interested
+in using those, you should contact me. (They are so big, I dont want to
+check them in this directory.
