@@ -3,7 +3,7 @@ message SmallWorkMsg;
 message MediumWorkMsg;
 message LargeWorkMsg;
 
-poser worker : sim spec chpt {
+poser worker : sim adapt2 chpt {
   entry worker(WorkerData *);
   // Event methods
   entry [event] void workSmall(SmallWorkMsg *);

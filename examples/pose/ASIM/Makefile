@@ -9,7 +9,7 @@
 #
 # ***********************************************************************
 
-OPTS=-g -O#-DCMK_OPTIMIZE=1 -DCMK_MEMCHECKS_OFF=1
+OPTS=-O#-DCMK_OPTIMIZE=1 -DCMK_MEMCHECKS_OFF=1
 
 CHARMBASE=../../../
 CHARMBIN=$(CHARMBASE)/bin
@@ -50,7 +50,7 @@ summary:    $(PGM).summary
 
 $(PGM):	$(SIM_OBJECTS) 
 	$(CHARMC) $(SIM_OBJECTS) $(OTHER) $(LIBS) -o $(PGM) \
-	-lpose -language charm++
+	-lpose -language charm++ -memory gnuold
 
 $(PGM).comm:	$(SIM_OBJECTS) 
 	$(CHARMC) $(SIM_OBJECTS) $(OTHER) $(LIBS) -o $(PGM).comm \
