@@ -25,7 +25,7 @@
 #include "trace-common.h"
 #include "trace-projector.h"
 
-#define PROJECTION_VERSION  "4.0"
+#define PROJECTION_VERSION  "5.0"
 
 /// a log entry in trace projection
 class LogEntry {
