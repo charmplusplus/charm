@@ -261,13 +261,8 @@ class CkVec : private CkSTLHelper<T> {
 /// Default pup routine for CkVec: pup each of the elements
 template <class T>
 inline void pupCkVec(PUP::er &p,CkVec<T> &vec) {
-    p.syncComment(PUP::sync_begin_array);
-    int l=vec.pupbase(p);
-    for (int i=0;i<l;i++) {
-    	p.syncComment(PUP::sync_item);
-    	p|vec[i];
-    }
-    p.syncComment(PUP::sync_end_array);
+    int len=vec.pupbase(p);
+    PUParray(p,&vec[0],len);
 }
 
 #ifndef _MSC_VER
@@ -276,23 +271,8 @@ template <class T>
 inline void operator|(PUP::er &p,CkVec<T> &vec) {pupCkVec(p,vec);}
 #endif
 
-
-///A vector of basic types, which can be pupped as an array
-/// (more restricted, but more efficient version of CkVec)
-template <class T>
-class CkPupBasicVec : public CkVec<T> {
-public:
-	CkPupBasicVec() {}
-	CkPupBasicVec(int size) :CkVec<T>(size) {}
-	
-        void pup(PUP::er &p) {   
-                int l=pupbase(p);
-                p(getVec(),l);
-        }
-        friend void operator|(PUP::er &p,CkPupBasicVec<T> &v) {v.pup(p);}
-};
-
-
+/* OLD: Deprecated name for vector of basic types. */
+#define CkPupBasicVec CkVec
 
 /// Helper for smart pointer classes: allocate a new copy when pup'd.
 ///  Assumes pointer is non-null
