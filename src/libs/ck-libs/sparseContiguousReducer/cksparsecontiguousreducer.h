@@ -147,9 +147,10 @@ class CkSparseContiguousReducer
 int numDataSegs(const unsigned char *data);
 
 /* 
-   returns an instance of CkDataSegHeader having indices for index(th) data segment 
+   returns an instance of CkDataSegHeader having indices for index(th) data 
+   segment 
 */
-CkDataSegHeader getDataSegHeader(int index, unsigned char *data);
+CkDataSegHeader getDataSegHeader(int index, const unsigned char *data);
 
 /* 
    returns pointer to data portion in the message. All the data segments are 
@@ -157,5 +158,20 @@ CkDataSegHeader getDataSegHeader(int index, unsigned char *data);
    the returned pointer
 */
 unsigned char * getDataPtr(const unsigned char *ptr);
+
+/*
+   expands the message returned by reduction, into a 2D array returned as a 1D
+   array in row major order. It returns the size of array implicitly in 
+   'CkDataSegHeader' input to the function.
+
+   NOTE: while passing the 'nullValue' to this function, ensure to type cast it
+   to pass proper data type as these are overloaded functions and output will
+   be defined based to on the function which is called.
+*/
+int *decompressMsg(CkReductionMsg *m, CkDataSegHeader &h, int nullVal);
+
+float *decompressMsg(CkReductionMsg *m, CkDataSegHeader &h, float nullVal);
+
+double *decompressMsg(CkReductionMsg *m, CkDataSegHeader &h, double nullVal);
 
 #endif

@@ -31,7 +31,7 @@ CkReduction::reducerType sparse_min_double;
   This function returns the index of jth data segment header in the 
   array of headers pointed to by 'ptr'.
 */
-int getIndex(CkDataSegHeader *r, unsigned char *ptr, int j);
+int getIndex(CkDataSegHeader *r, const unsigned char *ptr, int j);
 
 /*
   macro defining various reducer functions
@@ -200,20 +200,17 @@ int numDataSegs(const unsigned char *data){
   return size;
 }
 
-CkDataSegHeader getDataSegHeader(int index, unsigned char *data){
+CkDataSegHeader getDataSegHeader(int index, const unsigned char *data){
   int size=numDataSegs(data);
   CkDataSegHeader r;
   if(index >= size)
     CkAbort("Error!!!\n");
 
-  unsigned char *ptr = data;
-  ptr += sizeof(int);
-  ptr += sizeof(CkDataSegHeader)*index;
-  memcpy(&r, ptr, sizeof(CkDataSegHeader));
+  memcpy(&r, data+sizeof(int)+sizeof(CkDataSegHeader)*index, sizeof(CkDataSegHeader));
   return r;
 }
 
-int getIndex(CkDataSegHeader *r, unsigned char *ptr, int j){
+int getIndex(CkDataSegHeader *r, const unsigned char *ptr, int j){
   int i=0;
   CkDataSegHeader header = getDataSegHeader(j, ptr);
   while(!(header == r[i]))
@@ -226,5 +223,58 @@ unsigned char * getDataPtr(const unsigned char *ptr){
   size = numDataSegs(ptr);
   return (unsigned char*)(ptr + sizeof(int) + size*sizeof(CkDataSegHeader));
 }
+
+CkDataSegHeader getDecompressedDataHdr(const unsigned char *msg){
+  CkDataSegHeader retHead(0, 0, 0, 0);
+  CkDataSegHeader h;
+  int numSegs = numDataSegs(msg);
+
+  for(int i=0; i<numSegs; i++){
+    h = getDataSegHeader(i, msg);
+    if(retHead.sx > h.sx)
+      retHead.sx = h.sx;
+    if(retHead.sy > h.sy)
+      retHead.sy = h.sy;
+    if(retHead.ex < h.ex)
+      retHead.ex = h.ex;
+    if(retHead.ey < h.ey)
+      retHead.ey = h.ey;
+  }
+  return retHead;
+}
+
+#define SIMPLE_DECOMPRESSOR(dataType)\
+dataType *decompressMsg(CkReductionMsg *m, CkDataSegHeader &h, dataType nullVal){\
+  unsigned char *msg = (unsigned char*)m->getData();\
+  h = getDecompressedDataHdr(msg);\
+  CkDataSegHeader head;\
+  dataType *data;\
+  int sizeX = h.ex - h.sx + 1;\
+  int sizeY = h.ey - h.sy + 1;\
+  int numSegs = numDataSegs(msg);\
+\
+  data = new (dataType)[sizeX*sizeY];\
+\
+  for(int i=0; i<sizeX*sizeY; i++)\
+      data[i] = nullVal;\
+\
+  dataType *msgDataptr = (dataType *)getDataPtr(msg);\
+  for(int i=0; i<numSegs; i++){\
+    head = getDataSegHeader(i, msg);\
+    for(int y=(head.sy - h.sy); y<=(head.ey-h.sy); y++)\
+      for(int x=(head.sx - h.sx); x<=(head.ex-h.sx); x++)\
+        data[x+y*sizeX] = *msgDataptr++;\
+  }\
+  return data;\
+}
+
+// define decompressor for 'int' data 
+SIMPLE_DECOMPRESSOR(int);
+
+// define decompressor for 'float' data
+SIMPLE_DECOMPRESSOR(float);
+
+// define decompressor for 'double' data
+SIMPLE_DECOMPRESSOR(double);
 
 #include "CkSparseContiguousReducer.def.h"
