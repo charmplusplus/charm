@@ -12,7 +12,14 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.55  1997-02-13 09:31:02  jyelon
+ * Revision 2.56  1997-03-17 23:40:23  milind
+ * Added Idle Notification Functionality:
+ * The new Macros in converse.h for this are:
+ * CsdSetNotifyIdle(fn1, fn2)
+ * CsdStartNotifyIdle()
+ * CsdStopNotifyIdle()
+ *
+ * Revision 2.55  1997/02/13 09:31:02  jyelon
  * Modified everything for new main/ConverseInit structure
  *
  * Revision 2.54  1997/02/07 02:15:37  jyelon
@@ -413,6 +420,9 @@ typedef struct { char c[16]; }  CFloat16;
 CpvExtern(CmiHandler*, CmiHandlerTable);
 CpvExtern(void*,       CsdSchedQueue);
 CpvExtern(int,         CsdStopFlag);
+CpvExtern(CmiHandler, CsdNotifyIdle);
+CpvExtern(CmiHandler, CsdNotifyBusy);
+CpvExtern(int,        CsdStopNotifyFlag);
 
 extern int CmiRegisterHandler CMK_PROTO((CmiHandler));
 extern int CmiRegisterHandlerLocal CMK_PROTO((CmiHandler));
@@ -503,6 +513,10 @@ int   CmiScanf  CMK_PROTO((char *, ...));
 /********* CSD - THE SCHEDULER ********/
 
 extern  int CsdScheduler CMK_PROTO((int));
+#define CsdSetNotifyIdle(f1,f2) {CpvAccess(CsdNotifyIdle)=(f1);\
+                                 CpvAccess(CsdNotifyBusy)=(f2);}
+#define CsdStartNotifyIdle() (CpvAccess(CsdStopNotifyFlag)=0)
+#define CsdStopNotifyIdle() (CpvAccess(CsdStopNotifyFlag)=1)
 
 #if CMK_CSDEXITSCHEDULER_IS_A_FUNCTION
 extern void CsdExitScheduler CMK_PROTO((void));

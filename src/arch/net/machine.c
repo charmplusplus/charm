@@ -1704,7 +1704,7 @@ void MoveDatagramsIntoSendWindow(OtherNode node)
     if (node->send_window[slot]) break;
     FIFO_Pop(node->send_queue);
     node->send_window[slot] = dg;
-    dg->nextxmit = 0;
+    dg->nextxmit = 0.0;
     FIFO_EnQueue(transmit_queue, (void *)dg);
   }
 }

@@ -496,6 +496,12 @@ void (*handler)();
  *
  *****************************************************************************/
 
+CpvDeclare(int, CsdStopNotifyFlag);
+CpvStaticDeclare(int, CsdIdleDetectedFlag);
+CpvDeclare(CmiHandler, CsdNotifyIdle);
+CpvDeclare(CmiHandler, CsdNotifyBusy);
+
+
 #if CMK_CMIDELIVERS_USE_COMMON_CODE
 
 CpvStaticDeclare(int, CmiBufferGrabbed);
@@ -523,6 +529,10 @@ int maxmsgs;
   while (1) {
     msg1 = CmiGetNonLocal();
     if (msg1) {
+      if(CpvAccess(CsdIdleDetectedFlag)) {
+         CpvAccess(CsdIdleDetectedFlag) = 0;
+         if(!CpvAccess(CsdStopNotifyFlag)) (CpvAccess(CsdNotifyBusy))();
+      }
       *buffergrabbed = 0;
       (CmiGetHandlerFunction(msg1))(msg1);
       if (!*buffergrabbed) CmiFree(msg1);
@@ -530,6 +540,10 @@ int maxmsgs;
     }
     FIFO_DeQueue(localqueue, &msg2);
     if (msg2) {
+      if(CpvAccess(CsdIdleDetectedFlag)) {
+         CpvAccess(CsdIdleDetectedFlag) = 0;
+         if(!CpvAccess(CsdStopNotifyFlag)) (CpvAccess(CsdNotifyBusy))();
+      }
       *buffergrabbed = 0;
       (CmiGetHandlerFunction(msg2))(msg2);
       if (!*buffergrabbed) CmiFree(msg2);
@@ -650,7 +664,6 @@ CthThread t;
  * 
  ***************************************************************************/
 
-
 CsdInit(argv)
   char **argv;
 {
@@ -659,10 +672,16 @@ CsdInit(argv)
   CpvInitialize(int,   disable_sys_msgs);
   CpvInitialize(void*, CsdSchedQueue);
   CpvInitialize(int,   CsdStopFlag);
+  CpvInitialize(int,   CsdStopNotifyFlag);
+  CpvInitialize(int,   CsdIdleDetectedFlag);
+  CpvInitialize(CmiHandler,   CsdNotifyIdle);
+  CpvInitialize(CmiHandler,   CsdNotifyBusy);
   
   CpvAccess(disable_sys_msgs) = 0;
   CpvAccess(CsdSchedQueue) = CqsCreate();
   CpvAccess(CsdStopFlag)  = 0;
+  CpvAccess(CsdStopNotifyFlag) = 1;
+  CpvAccess(CsdIdleDetectedFlag) = 0;
 }
 
 
@@ -685,23 +704,41 @@ int maxmsgs;
     return maxmsgs;
   }
   while (1) {
-    maxmsgs = CmiDeliverMsgs(maxmsgs);
+    int oldmaxmsgs, ndelivered;
+
+    oldmaxmsgs = maxmsgs;
+    maxmsgs = CmiDeliverMsgs(oldmaxmsgs);
+    ndelivered = oldmaxmsgs - maxmsgs;
     if (maxmsgs == 0) return maxmsgs;
     
     /* Check Scheduler queue */
     if ( !CqsEmpty(CpvAccess(CsdSchedQueue)) ) {
+      if(CpvAccess(CsdIdleDetectedFlag)) {
+        CpvAccess(CsdIdleDetectedFlag) = 0;
+        if(!CpvAccess(CsdStopNotifyFlag)) (CpvAccess(CsdNotifyBusy))();
+      }
       CqsDequeue(CpvAccess(CsdSchedQueue),&msg);
       (CmiGetHandlerFunction(msg))(msg);
       if (CpvAccess(CsdStopFlag)) return maxmsgs;
       maxmsgs--; if (maxmsgs==0) return maxmsgs;
     } else { /* Processor is idle */
+      if (ndelivered == 0 && !CpvAccess(CsdIdleDetectedFlag)) {
+        CpvAccess(CsdIdleDetectedFlag) = 1;
+        if(!CpvAccess(CsdStopNotifyFlag)) (CpvAccess(CsdNotifyIdle))();
+      }
 #if CMK_WHEN_PROCESSOR_IDLE_USLEEP
       struct timeval tv;
       tv.tv_usec=10000; tv.tv_sec=0;
       select(0,0,0,0,&tv);
 #endif
       CcdRaiseCondition(CcdPROCESSORIDLE) ;
-      if (CpvAccess(CsdStopFlag)) return maxmsgs;
+      if (CpvAccess(CsdStopFlag)) { 
+        if(CpvAccess(CsdIdleDetectedFlag)) {
+          CpvAccess(CsdIdleDetectedFlag) = 0;
+          if(!CpvAccess(CsdStopNotifyFlag)) (CpvAccess(CsdNotifyBusy))();
+        }
+        return maxmsgs;
+      }
     }
     
     if (!CpvAccess(disable_sys_msgs)) {
