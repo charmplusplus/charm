@@ -210,11 +210,11 @@ CLBMigrateMsg* Comm1LB::Strategy(CentralLB::LDStats* stats, int count)
 
   for(pe=0; pe < count; pe++) 
     for(obj=0; obj < stats[pe].n_objs; obj++){ 
-      translate[objno].mid.id = stats[pe].objData[obj].omID.id;
-      translate[objno].oid.id[0] = stats[pe].objData[obj].id.id[0];
-      translate[objno].oid.id[1] = stats[pe].objData[obj].id.id[1];
-      translate[objno].oid.id[2] = stats[pe].objData[obj].id.id[2];
-      translate[objno].oid.id[3] = stats[pe].objData[obj].id.id[3];
+      translate[objno].mid.id = stats[pe].objData[obj].omID().id;
+      translate[objno].oid.id[0] = stats[pe].objData[obj].id().id[0];
+      translate[objno].oid.id[1] = stats[pe].objData[obj].id().id[1];
+      translate[objno].oid.id[2] = stats[pe].objData[obj].id().id[2];
+      translate[objno].oid.id[3] = stats[pe].objData[obj].id().id[3];
       objno++;
     }
 

@@ -17,7 +17,6 @@ friend class LBCommTable;
 
 public:
   LBCommData(int _src_proc, LDOMid _destOM, LDObjid _destObj) {
-    from_proc = CmiTrue;
     src_proc = _src_proc;
     destOM = _destOM;
     destObj = _destObj;
@@ -27,7 +26,7 @@ public:
   };
 
   LBCommData(LDObjHandle _srcObj, LDOMid _destOM, LDObjid _destObj) {
-    from_proc = CmiFalse;
+    src_proc = -1;
     srcObj = _srcObj;
     destOM = _destOM;
     destObj = _destObj;
@@ -37,9 +36,8 @@ public:
   };
 
   LBCommData(const LBCommData& d) {
-    if (from_proc = d.from_proc)
-      src_proc = d.src_proc;
-    else srcObj = d.srcObj;
+    src_proc = d.src_proc;
+    if (!from_proc()) srcObj = d.srcObj;
     destOM = d.destOM;
     destObj = d.destObj;
     n_messages = d.n_messages;
@@ -50,9 +48,8 @@ public:
   ~LBCommData() { };
 
   LBCommData& operator=(const LBCommData& d) {
-    if (from_proc = d.from_proc)
-      src_proc = d.src_proc;
-    else srcObj = d.srcObj;
+    src_proc = d.src_proc;
+    if (!from_proc()) srcObj = d.srcObj;
     destOM = d.destOM;
     destObj = d.destObj;
     n_messages = d.n_messages;
@@ -66,9 +63,10 @@ public:
     n_bytes += bytes;
   };
 
-  int key() const { return mykey; };
+  inline int key() const { return mykey; };
   CmiBool equal(const LBCommData _d2) const;
 
+  inline CmiBool from_proc() const { return src_proc != -1; }
 private:
   LBCommData() {};
   
@@ -76,7 +74,6 @@ private:
   int hash(const int i, const int m) const;
 
   int mykey;
-  CmiBool from_proc;
   int src_proc;
   LDObjHandle srcObj;
   LDOMid destOM;

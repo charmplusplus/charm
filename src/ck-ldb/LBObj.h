@@ -32,9 +32,8 @@ public:
   void DepositHandle(LDObjHandle _h) {
     myhandle = _h;
     data.handle = myhandle;
-    data.id = myid;
+    CkAssert(myid == myhandle.id);
     data.omHandle = _h.omhandle;
-    data.omID = _h.omhandle.id;
     data.migratable = migratable;
     data.cpuTime = 0.;
     data.wallTime = 0.;

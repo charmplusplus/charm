@@ -88,7 +88,7 @@ void LBCommTable::Resize()
 
 CmiBool LBCommData::equal(const LBCommData d2) const
 {
-  if (from_proc) {
+  if (from_proc()) {
     if (src_proc != d2.src_proc)
       return CmiFalse;
   } else {
@@ -108,7 +108,7 @@ int LBCommData::compute_key()
   char* kptr = (char*)((void*)(&(kstring[0])));
   int pcount;
 
-  if (from_proc) {
+  if (from_proc()) {
     pcount = sprintf(kptr,"%d",src_proc);
     kptr += pcount;
   } else {
@@ -155,7 +155,7 @@ void LBCommTable::GetCommData(LDCommData* data)
   for(i=0; i < cur_sz; i++, curtable++, curstate++) {
     if (*curstate == InUse) {
       out->to_proc = CmiFalse;
-      if (curtable->from_proc) {
+      if (curtable->from_proc()) {
 	out->from_proc = CmiTrue;
 	out->src_proc = curtable->src_proc;
       } else {

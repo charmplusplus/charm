@@ -290,8 +290,8 @@ CLBMigrateMsg* CentralLB::Strategy(LDStats* stats,int count)
 	     j,osz);
     for(i=0; i < osz; i++) {
       CkPrintf("Object %d\n",i);
-      CkPrintf("     id = %d\n",odata[i].id.id[0]);
-      CkPrintf("  OM id = %d\n",odata[i].omID.id);
+      CkPrintf("     id = %d\n",odata[i].id().id[0]);
+      CkPrintf("  OM id = %d\n",odata[i].omID().id);
       CkPrintf("   Mig. = %d\n",odata[i].migratable);
       CkPrintf("    CPU = %f\n",odata[i].cpuTime);
       CkPrintf("   Wall = %f\n",odata[i].wallTime);

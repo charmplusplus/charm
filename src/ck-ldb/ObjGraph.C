@@ -60,8 +60,8 @@ ObjGraph::ObjGraph(int count, CentralLB::LDStats* _stats)
       thisnode->n_in = 0;
       thisnode->inEdge = 0;
       cur_node++;
-      const int hashval = calc_hashval(stats[pe].objData[index].omID,
-				       stats[pe].objData[index].id);
+      const int hashval = calc_hashval(stats[pe].objData[index].omID(),
+				       stats[pe].objData[index].id());
       thisnode->nxt_hash = node_table[hashval];
       node_table[hashval] = thisnode;
     }
@@ -149,9 +149,9 @@ ObjGraph::Node* ObjGraph::find_node(LDOMid edge_omid, LDObjid edge_id)
 
   while (from_node != 0) {
     const LDOMid omid =
-      stats[from_node->proc].objData[from_node->index].omID;
+      stats[from_node->proc].objData[from_node->index].omID();
     const LDObjid objid =
-      stats[from_node->proc].objData[from_node->index].id;
+      stats[from_node->proc].objData[from_node->index].id();
     //    CkPrintf("Comparing %d to %d\n",objid.id[0],edge_id.id[0]);
     if (LDOMidEqual(omid,edge_omid) && LDObjIDEqual(objid,edge_id) )
       break;

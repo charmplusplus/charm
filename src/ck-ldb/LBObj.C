@@ -21,9 +21,9 @@
 void LBObj::Clear(void)
 {
   data.handle = myhandle;
-  data.id = myid;
+//  data.id = myid;
   data.omHandle = parentOM;
-  data.omID = parentDB->LbOM(parentOM)->id();
+//  data.omID = parentDB->LbOM(parentOM)->id();
   data.cpuTime = 0.;
   data.wallTime = 0.;
 }

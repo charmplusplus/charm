@@ -40,8 +40,14 @@ typedef struct {
   int handle;
 } LDOMHandle;
 
-typedef struct {
+typedef struct _LDObjid {
   int id[OBJ_ID_SZ];
+#ifdef __cplusplus
+  CmiBool operator==(const struct _LDObjid& objid) const {
+    for (int i=0; i<OBJ_ID_SZ; i++) if (id[i] != objid.id[i]) return CmiFalse;
+    return CmiTrue;
+  }
+#endif
 } LDObjid;
 
 typedef struct {
@@ -53,12 +59,14 @@ typedef struct {
 
 typedef struct {
   LDObjHandle handle;
-  LDObjid id;
   LDOMHandle omHandle;
-  LDOMid omID;
   double cpuTime;
   double wallTime;
   CmiBool migratable;
+#ifdef __cplusplus
+  inline const LDOMid &omID() { return omHandle.id; }
+  inline const LDObjid &id() { return handle.id; }
+#endif
 } LDObjData;
 
 typedef struct {

@@ -67,7 +67,7 @@ void Refiner::create(int count, CentralLB::LDStats* stats, int** procs)
     for(i=0; i < osz; i++) {
       if (odata[i].migratable == CmiTrue)
       {
-        computes[index].id = odata[i].id;
+        computes[index].id = odata[i].id();
         computes[index].handle = odata[i].handle;
         computes[index].load = odata[i].cpuTime;
         computes[index].originalPE = j;
