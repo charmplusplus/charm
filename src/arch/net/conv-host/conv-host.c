@@ -447,7 +447,7 @@ int pparam_countargs(argv)
 
 int pparam_parseopt()
 {
-  int ok; ppdef def;
+  int ok; ppdef def=NULL;
   char *opt = pparam_argv[pparam_pos];
   /* handle ++ by skipping to end */
   if ((opt[1]=='+')&&(opt[2]==0))
@@ -471,11 +471,18 @@ int pparam_parseopt()
       name[1]=0;
       def = pparam_find(name);
     }
-  if (opt[1]=='+' && def==0)
+  if (def==NULL)
+  {
+    if (opt[1]=='+')
     {
        sprintf(pparam_error,"Option %s not recognized.",opt);
        return -1;
-    }
+    } else {
+	   /*Unrecognized + option-- skip it.*/
+	   pparam_pos++;
+	   return 0;
+	}
+  }
   /* handle flag-options */
   if ((def->type=='f')&&(opt[1]!='+')&&(opt[2]))
     {
