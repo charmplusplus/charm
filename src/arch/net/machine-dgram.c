@@ -461,8 +461,16 @@ int CheckSocketsReady(int withDelayMs)
     return nreadable;
   }
   if (nreadable==-1) {
-    if (errno && errno!=EINTR)
-      KillEveryone("Socket error in CheckSocketsReady!\n");
+#if defined(_WIN32) && !defined(__CYGWIN__)
+/* Win32 socket seems to randomly return inexplicable errors
+here-- WSAEINVAL, WSAENOTSOCK-- yet everything is actually OK. 
+	int err=WSAGetLastError();
+	CmiPrintf("(%d)Select returns -1; errno=%d, WSAerr=%d\n",withDelayMs,errno,err);
+*/
+#else
+	if (errno!=EINTR)
+		KillEveryone("Socket error in CheckSocketsReady!\n");
+#endif
     MACHSTATE(2,"} CheckSocketsReady (INTERRUPTED!)")
     return CheckSocketsReady(0);
   }
