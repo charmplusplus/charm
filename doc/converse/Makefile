@@ -12,7 +12,10 @@
 # REVISION HISTORY:
 #
 # $Log$
-# Revision 1.12  2000-06-22 14:31:02  milind
+# Revision 1.13  2000-06-22 15:59:44  milind
+# Removed libtemplate, as it has been overtaken by libraries manual.
+#
+# Revision 1.12  2000/06/22 14:31:02  milind
 # Made compatible with pdflatex as well.
 #
 # Revision 1.11  1999/07/27 21:04:39  jmwrght1
@@ -73,7 +76,7 @@ ps:
 
 html:
 	latex manual.tex
-	latex2html manual.tex
+	latex2html -local_icons manual.tex
 
 pdf:
 	latex manual.tex

@@ -4,7 +4,7 @@ ps:
 
 html:
 	latex HowToLB.tex
-	latex2html HowToLB.tex
+	latex2html -local_icons HowToLB.tex
 
 pdf:
 	pdflatex HowToLB.tex
