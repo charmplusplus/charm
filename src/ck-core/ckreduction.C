@@ -182,7 +182,8 @@ void CkReductionMgr::flushStates()
   creating=CmiFalse;
   gcount=lcount=0;
   startRequested=CmiFalse;
-//  nContrib=nRemote=0;
+  nContrib=nRemote=0;
+  maxStartRequest=0;
 
   while (!msgs.isEmpty()) { delete msgs.deq(); }
   while (!futureMsgs.isEmpty()) delete futureMsgs.deq();

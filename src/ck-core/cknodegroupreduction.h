@@ -147,7 +147,7 @@ public:
 	void RecvMsg(CkReductionMsg *m);
 	void doRecvMsg(CkReductionMsg *m);
 
-        void flushStates();	// flush state varaibles
+        virtual void flushStates();	// flush state varaibles
 
 private:
 //Data members

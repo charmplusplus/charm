@@ -131,7 +131,7 @@ public:
 	void endArrayReduction();
 
 	virtual CmiBool isReductionMgr(void){ return CmiTrue; }
-	void flushStates();
+	virtual void flushStates();
 private:
 
 
