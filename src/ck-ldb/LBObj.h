@@ -34,7 +34,7 @@ public:
 
   ~LBObj() { };
 
-  void DepositHandle(LDObjHandle _h) {
+  void DepositHandle(const LDObjHandle &_h) {
     myhandle = _h;
     data.handle = myhandle;
     CkAssert(myid == myhandle.id);
@@ -46,6 +46,7 @@ public:
   };
 
   void Clear(void);
+
   void IncrementTime(double walltime, double cputime);
   void StartTimer(void);
   void StopTimer(double* walltime, double* cputime);
