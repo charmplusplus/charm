@@ -70,6 +70,7 @@ WSLB::WSLB()
   receive_stats_ready = 0;
 
   vacate = CmiFalse;
+  usage = 1.0;
 
   theLbdb->CollectStatsOn();
 }
@@ -151,6 +152,28 @@ WSLBStatsMsg* WSLB::AssembleStats()
 
   WSLBStatsMsg* msg = new WSLBStatsMsg;
 
+  // Calculate usage percentage
+  double myload = myStats.total_walltime - myStats.idletime;
+  double myusage;
+//   for(i=0; i < myStats.obj_data_sz; i++) {
+//     myobjcpu += myStats.objData[i].cpuTime;
+//     myobjwall += myStats.objData[i].wallTime;
+//   }
+//   if (myobjwall > 0)
+//     myusage = myobjcpu / myobjwall;
+//   else
+
+ if (myload > 0)
+    myusage = myStats.total_cputime / myload;
+  else myusage = 1.0;
+ 
+  if (myusage > usage)
+    usage += (myusage-usage) * 0.1;
+  else usage = myusage;
+
+  CkPrintf("PE %d myload = %f myusage = %f usage = %f\n",
+	   CkMyPe(),myload,myusage,usage);
+
   msg->from_pe = CkMyPe();
   msg->serial = rand();
   msg->proc_speed = myStats.proc_speed;
@@ -162,6 +185,7 @@ WSLBStatsMsg* WSLB::AssembleStats()
   msg->obj_walltime = myStats.obj_walltime;
   msg->obj_cputime = myStats.obj_cputime;
   msg->vacate_me = vacate;
+  msg->usage = usage;
 
   //  CkPrintf(
   //    "Proc %d speed=%d Total(wall,cpu)=%f %f Idle=%f Bg=%f %f Obj=%f %f\n",
@@ -216,6 +240,7 @@ void WSLB::ReceiveStats(WSLBStatsMsg *m)
       statsDataList[peslot].obj_walltime = m->obj_walltime;
       statsDataList[peslot].obj_cputime = m->obj_cputime;
       statsDataList[peslot].vacate_me = m->vacate_me;
+      statsDataList[peslot].usage = m->usage;
       stats_msg_count++;
     }
   }
@@ -351,29 +376,16 @@ WSLBMigrateMsg* WSLB::Strategy(WSLB::LDStats* stats, int count)
   //  CkPrintf("[%d] Strategy starting\n",CkMyPe());
   // Compute the average load to see if we are overloaded relative
   // to our neighbors
-  double myload = myStats.total_walltime - myStats.idletime;
   const double load_factor = 1.05;
   double objload;
 
   double myobjcpu=0;
   double myobjwall=0;
 
-  double myusage;
-  int i;
-  for(i=0; i < myStats.obj_data_sz; i++) {
-    myobjcpu += myStats.objData[i].cpuTime;
-    myobjwall += myStats.objData[i].wallTime;
-  }
-  if (myobjwall > 0)
-    myusage = myobjcpu / myobjwall;
-  else if (myload > 0)
-    myusage = myStats.total_cputime / myload;
-  else myusage = 1.0;
-
-  CkPrintf("PE %d myload = %f myusage = %f\n",CkMyPe(),myload,myusage);
-
+  double myload = myStats.total_walltime - myStats.idletime;
   double avgload = myload;
   int unvacated_neighbors = 0;
+  int i;
   for(i=0; i < count; i++) {
     // If the neighbor is vacating, skip him
     if (stats[i].vacate_me)
@@ -381,12 +393,9 @@ WSLBMigrateMsg* WSLB::Strategy(WSLB::LDStats* stats, int count)
 
     // Scale times we need appropriately for relative proc speeds
     double hisload = stats[i].total_walltime - stats[i].idletime;
-    double hisusage;
-    if (hisload > 0)
-      hisusage = stats[i].total_cputime / hisload;
-    else hisusage = 1.0;
+    const double hisusage = stats[i].usage;
 
-    const double scale =  (myStats.proc_speed * myusage) 
+    const double scale =  (myStats.proc_speed * usage) 
       / (stats[i].proc_speed * hisusage);
 
     hisload *= scale;

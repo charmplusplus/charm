@@ -43,6 +43,7 @@ public:
     double bg_cputime;
     double obj_walltime;
     double obj_cputime;
+    double usage;
     int proc_speed;
     CmiBool vacate_me;
   };
@@ -103,6 +104,7 @@ private:
   int receive_stats_ready;
   double start_lb_time;
   double first_step_time;
+  double usage;
   CmiBool vacate;
 };
 
@@ -118,6 +120,7 @@ public:
   double bg_cputime;
   double obj_walltime;
   double obj_cputime;
+  double usage;
   CmiBool vacate_me;
 }; 
 
