@@ -45,4 +45,4 @@ set CMK_NM='nm'
 set CMK_NM_FILTER="grep '|extern|' | sed -e 's@ *|.*@@'"
 set CMK_CPP_SUFFIX="ii"
 set CMK_XLATPP='charmxlat++ -w'
-set CMK_QT='hpux-cc'
+set CMK_QT='hpux-gcc'

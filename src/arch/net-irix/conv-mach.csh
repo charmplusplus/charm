@@ -45,4 +45,4 @@ set CMK_NM='nm'
 set CMK_NM_FILTER="grep '|Proc    |' | sed -e 's/.*| //'"
 set CMK_CPP_SUFFIX="i"
 set CMK_XLATPP='charmxlat++  '
-set CMK_QT='irix5-gcc'
+set CMK_QT='irix5-cc'

@@ -12,7 +12,10 @@
 # REVISION HISTORY:
 #
 # $Log$
-# Revision 2.19  1997-05-05 13:56:32  jyelon
+# Revision 2.20  1997-05-05 14:25:32  jyelon
+# More quickthreads related changes.
+#
+# Revision 2.19  1997/05/05 13:56:32  jyelon
 # Updated for quickthreads
 #
 # Revision 2.18  1996/08/05 15:28:49  jyelon
@@ -96,4 +99,4 @@ set CMK_NM='nm'
 set CMK_NM_FILTER="grep '|extern|' | sed -e 's@ *|.*@@'"
 set CMK_CPP_SUFFIX="ii"
 set CMK_XLATPP='charmxlat++ -w'
-set CMK_QT='hpux-cc'
+set CMK_QT='hpux-gcc'

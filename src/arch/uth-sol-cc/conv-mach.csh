@@ -45,4 +45,4 @@ set CMK_NM='nm'
 set CMK_NM_FILTER='grep "|GLOB" | sed -e "s@.*|@@"'
 set CMK_CPP_SUFFIX="cc"
 set CMK_XLATPP='charmxlat++ -w '
-set CMK_QT='setjmp-gcc-d'
+set CMK_QT='solaris-cc'

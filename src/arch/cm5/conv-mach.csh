@@ -46,4 +46,4 @@ set CMK_NM='nm'
 set CMK_NM_FILTER='grep "T _" | sed -e "s/.*T _//"'
 set CMK_CPP_SUFFIX="ii"
 set CMK_XLATPP='charmxlat++ '
-set CMK_QT='setjmp-gcc-d'
+set CMK_QT='cm5'

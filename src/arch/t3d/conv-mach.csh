@@ -45,4 +45,4 @@ set CMK_NM='/mpp/bin/nm'
 set CMK_NM_FILTER="grep ' B ' | awk '{print "'$'"3;}'"
 set CMK_CPP_SUFFIX="i"
 set CMK_XLATPP='charmxlat++ '
-set CMK_QT='setjmp-gcc-d'
+set CMK_QT='cray-t3d'
