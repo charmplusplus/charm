@@ -1,5 +1,5 @@
-#ifndef _RANDCENTLB_H_
-#define _RANDCENTLB_H_
+#ifndef _METISLB_H_
+#define _METISLB_H_
 
 #include "CentralLB.h"
 #include "MetisLB.decl.h"
@@ -14,4 +14,4 @@ private:
   CLBMigrateMsg* Strategy(CentralLB::LDStats* stats, int count);
 };
 
-#endif /* _RANDCENTLB_H_ */
+#endif /* _METISLB_H_ */

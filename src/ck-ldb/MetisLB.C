@@ -189,7 +189,7 @@ CLBMigrateMsg* MetisLB::Strategy(CentralLB::LDStats* stats, int count)
     xadj[i+1] = count4all;
   }
 
-  CkPrintf("Pre-LDB Statistics step %d\n", step);
+  CkPrintf("Pre-LDB Statistics step %d\n", step());
   printStats(count, numobjs, cputime, comm, origmap);
 
   int wgtflag = 3; // Weights both on vertices and edges
@@ -201,7 +201,7 @@ CLBMigrateMsg* MetisLB::Strategy(CentralLB::LDStats* stats, int count)
 
   if(count > 1) {
     newmap = new int[numobjs];
-    if(step >= 0) {
+    if(step() >= 0) {
       for(i=0;i<(numobjs+1);i++)
         xadj[i] = 0;
       delete[] edgewt;
@@ -219,7 +219,7 @@ CLBMigrateMsg* MetisLB::Strategy(CentralLB::LDStats* stats, int count)
   } else {
     newmap = origmap;
   }
-  CkPrintf("Post-LDB Statistics step %d\n", step);
+  CkPrintf("Post-LDB Statistics step %d\n", step());
   printStats(count, numobjs, cputime, comm, newmap);
 
   for(i=0;i<numobjs;i++)
