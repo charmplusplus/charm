@@ -404,8 +404,8 @@ void CkMulticastMgr::recvMsg(multicastGrpMsg *msg)
   }
 
   // send to local
-//CmiPrintf("send to local %d\n", msgSize);
   int nLocal = entry->localElem.length();
+//CmiPrintf("send to local %d\n", nLocal);
   for (i=0; i<nLocal-1; i++) {
     CProxyElement_ArrayBase ap(msg->aid, entry->localElem[i]);
     multicastGrpMsg *newm = (multicastGrpMsg *)CkCopyMsg((void **)&msg);
@@ -416,7 +416,7 @@ void CkMulticastMgr::recvMsg(multicastGrpMsg *msg)
     ap.ckSend((CkArrayMessage *)msg, msg->ep);
   }
   else {
-    CmiPrintf("no local elemented on %d\n", CmiMyPe());
+    CkAssert (entry->rootSid.pe == CmiMyPe());
     delete msg;
   }
 
