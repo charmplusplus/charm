@@ -630,30 +630,49 @@ Deallocation is done in the element destructor as usual.
 on array elements.  The idea is to run programs more efficiently
 by migrating array elements away from overloaded processors.
 To use the load balancer, you must make your elements migratable
-(see migration section above) and chose a load balancing 
+(see migration section above) and choose a load balancing 
 ``strategy'' (see the load balancing section for a description
 of load balancing strategy routines).
 
-There are two ways to use the load balancer-- the AtSync
-method, for elements that only want to be migrated at certain
-times; and the Anytime method, for elements that can migrate
-at any time.
+There are three ways to use the load balancer-- 
+\begin{itemize}
 
-The Anytime method is the default.  Your elements may be
-asked to migrate any time they are not currently executing
-an entry method.
+\item Method 1: By default, the array elements may be asked to migrate any time
+provided they are not in the middle of executing an entry method. 
+The array element's variable \kw{usesAtSync} being false attributes
+to this default behaviour. 
 
-For the AtSync method, set \kw{usesAtSync} to true in your 
+\item Method 2: Using the AtSync method, elements can be migrated at certain
+times.  For the AtSync method, set \kw{usesAtSync} to true in your 
 array element constructor.  When an element is ready to migrate,
-call \kw{ArrayElement::AtSync}.  Once all elements have reached \kw{AtSync}, 
-and after the first DoneInserting call,
-the load balancer runs and may migrate elements.  Once
-all migrations are complete, the load balancer calls 
-\kw{ArrayElement::ResumeFromSync}.  You must ensure no messages are
+call \kw{ArrayElement::AtSync}.  
+After the first \kw{doneInserting} call (which starts the load balancer)
+and once all elements have reached \kw{AtSync},
+the load balancer runs and migrates elements.  Once
+all migrations are complete, the load balancer calls the 
+virtual function \kw{ArrayElement::ResumeFromSync} for each of the
+array element.  One must ensure that no messages are
 sent to an array element between its calls to \kw{AtSync} and
 \kw{ResumeFromSync}. \kw{AtSync}/\kw{ResumeFromSync} is currently
-a implemented as a global barrier.
+implemented as a global barrier.
+Note: Setting usesAtSync to true makes it mandatory for the array
+element to call \kw{AtSync} and implement the \kw{ResumeFromSync}
+ function.
 
+\item Method 3: The load balancer can be programmed to be started
+manually. 
+ To use this feature, the LBDatabase object
+can be got explicitly by making the call \kw{LBDatabase::Object()}
+For example, LBDatabase * myLbdb = LBDatabase::Object().
+\kw{myLbdb->TurnManualLBOn()} will enable the manual switching on of
+the Load Balancer, so that no Load Balancer will be started automatically.
+\kw{TurnManualLBOn()} should be called as early as possible in the
+program. It must be ideally called in the constructor of a static array and
+definitely before the doneInserting call for a dynamic array.  This call has to be made on all processors. It can be called multiple times on one pe, but the last one takes effect.   
+The function call \kw{myLbdb->StartLB()} will start the load balancer. This call can be made on only one pe as the start message is broadcast to all processors. The load balancing happens in the background and won't stop the chares from functioning. 
+\kw{myLbdb->TurnManualLBOff()} turns off manual load balancing and switches back to the automatic Load balancing mode (using or not using AtSync). 
+
+\end{itemize}
 
 \subsubsection{Local Access}
 \experimental{}
