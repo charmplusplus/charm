@@ -15,6 +15,8 @@
 
 /* change this define to "x" to trace all send/recv's */
 #define MSG_ORDER_DEBUG(x) /* empty */
+/* change this define to "x" to trace user calls */
+#define USER_CALL_DEBUG(x) /* ckout<<"vp "<<TCHARM_Element()<<": "<<x<<endl; */
 #define STARTUP_DEBUG(x)  /* ckout<<"ampi[pe "<<CkMyPe()<<"] "<< x <<endl; */
 
 #ifndef AMPI_COMLIB
@@ -36,7 +38,25 @@ int MPI_COMM_UNIVERSE[MPI_MAX_COMM_WORLDS]; /*Accessed by user code*/
    the final reduction message will see additional
    sizeof(AmpiOpHeader) bytes in the buffer before
    any user data.                             */
-typedef struct { double re, im; } AmpiComplex;
+class AmpiComplex { 
+public: 
+	double re, im; 
+	void operator+=(const AmpiComplex &a) {
+		re+=a.re;
+		im+=a.im;
+	}
+	void operator*=(const AmpiComplex &a) {
+		double nu_re=re*a.re-im*a.im;
+		im=re*a.im+im*a.re;
+		re=nu_re;
+	}
+	int operator>(const AmpiComplex &a) {
+		CkAbort("Cannot compare complex numbers with MPI_MAX");
+	}
+	int operator<(const AmpiComplex &a) {
+		CkAbort("Cannot compare complex numbers with MPI_MIN");
+	}
+};
 typedef struct { float val; int idx; } FloatInt;
 typedef struct { double val; int idx; } DoubleInt;
 typedef struct { long val; int idx; } LongInt;
@@ -46,120 +66,55 @@ typedef struct { long double val; int idx; } LongdoubleInt;
 typedef struct { float val; float idx; } FloatFloat;
 typedef struct { double val; double idx; } DoubleDouble;
 
+
+#define MPI_OP_SWITCH(OPNAME) \
+  int i; \
+  switch (*datatype) { \
+  case MPI_CHAR: for(i=0;i<(*len);i++) { MPI_OP_IMPL(char); } break; \
+  case MPI_SHORT: for(i=0;i<(*len);i++) { MPI_OP_IMPL(short); } break; \
+  case MPI_INT: for(i=0;i<(*len);i++) { MPI_OP_IMPL(int); } break; \
+  case MPI_LONG: for(i=0;i<(*len);i++) { MPI_OP_IMPL(long); } break; \
+  case MPI_UNSIGNED_CHAR: for(i=0;i<(*len);i++) { MPI_OP_IMPL(unsigned char); } break; \
+  case MPI_UNSIGNED_SHORT: for(i=0;i<(*len);i++) { MPI_OP_IMPL(unsigned short); } break; \
+  case MPI_UNSIGNED: for(i=0;i<(*len);i++) { MPI_OP_IMPL(unsigned int); } break; \
+  case MPI_UNSIGNED_LONG: for(i=0;i<(*len);i++) { MPI_OP_IMPL(unsigned long); } break; \
+  case MPI_FLOAT: for(i=0;i<(*len);i++) { MPI_OP_IMPL(float); } break; \
+  case MPI_DOUBLE: for(i=0;i<(*len);i++) { MPI_OP_IMPL(double); } break; \
+  case MPI_COMPLEX: for(i=0;i<(*len);i++) { MPI_OP_IMPL(AmpiComplex); } break; \
+  case MPI_LONG_LONG_INT: for(i=0;i<(*len);i++) { MPI_OP_IMPL(CMK_TYPEDEF_INT8); } break; \
+  default: \
+    ckerr << "Type " << *datatype << " with Op "#OPNAME" not supported." << endl; \
+    CmiAbort("Unsupported MPI datatype for MPI Op"); \
+  };\
+
 void MPI_MAX( void *invec, void *inoutvec, int *len, MPI_Datatype *datatype){
-  int i;
-  switch (*datatype) {
-  case MPI_INT:
-    for(i=0;i<(*len);i++)
-      if(((int *)invec)[i] > ((int *)inoutvec)[i]) ((int *)inoutvec)[i] = ((int *)invec)[i];
-    break;
-  case MPI_LONG:
-    for(i=0;i<(*len);i++)
-      if(((long *)invec)[i] > ((long *)inoutvec)[i]) ((long *)inoutvec)[i] = ((long *)invec)[i];
-    break;
-  case MPI_FLOAT:
-    for(i=0;i<(*len);i++)
-      if(((float *)invec)[i] > ((float *)inoutvec)[i]) ((float *)inoutvec)[i] = ((float *)invec)[i];
-    break;
-  case MPI_DOUBLE:
-    for(i=0;i<(*len);i++)
-      if(((double *)invec)[i] > ((double *)inoutvec)[i]) ((double *)inoutvec)[i] = ((double *)invec)[i];
-    break;
-  case MPI_LONG_LONG_INT:
-    for(i=0;i<(*len);i++)
-      if(((CMK_TYPEDEF_INT8 *)invec)[i] > ((CMK_TYPEDEF_INT8 *)inoutvec)[i]) ((CMK_TYPEDEF_INT8 *)inoutvec)[i] = ((CMK_TYPEDEF_INT8 *)invec)[i];
-    break;
-  default:
-    ckerr << "Type " << *datatype << " with Op MPI_MAX not supported." << endl;
-    CmiAbort("exiting");
-  }
+#define MPI_OP_IMPL(type) \
+	if(((type *)invec)[i] > ((type *)inoutvec)[i]) ((type *)inoutvec)[i] = ((type *)invec)[i];
+  MPI_OP_SWITCH(MPI_MAX)
+#undef MPI_OP_IMPL
 }
+
 void MPI_MIN( void *invec, void *inoutvec, int *len, MPI_Datatype *datatype){
-  int i;
-  switch (*datatype) {
-  case MPI_INT:
-    for(i=0;i<(*len);i++)
-      if(((int *)invec)[i] < ((int *)inoutvec)[i]) ((int *)inoutvec)[i] = ((int *)invec)[i];
-    break;
-  case MPI_LONG:
-    for(i=0;i<(*len);i++)
-      if(((long *)invec)[i] < ((long *)inoutvec)[i]) ((long *)inoutvec)[i] = ((long *)invec)[i];
-    break;
-  case MPI_FLOAT:
-    for(i=0;i<(*len);i++)
-      if(((float *)invec)[i] < ((float *)inoutvec)[i]) ((float *)inoutvec)[i] = ((float *)invec)[i];
-    break;
-  case MPI_DOUBLE:
-    for(i=0;i<(*len);i++)
-      if(((double *)invec)[i] < ((double *)inoutvec)[i]) ((double *)inoutvec)[i] = ((double *)invec)[i];
-    break;
-  case MPI_LONG_LONG_INT:
-    for(i=0;i<(*len);i++)
-      if(((CMK_TYPEDEF_INT8 *)invec)[i] < ((CMK_TYPEDEF_INT8 *)inoutvec)[i]) ((CMK_TYPEDEF_INT8 *)inoutvec)[i] = ((CMK_TYPEDEF_INT8 *)invec)[i];
-    break;
-  default:
-    ckerr << "Type " << *datatype << " with Op MPI_MIN not supported." << endl;
-    CmiAbort("exiting");
-  }
+#define MPI_OP_IMPL(type) \
+	if(((type *)invec)[i] < ((type *)inoutvec)[i]) ((type *)inoutvec)[i] = ((type *)invec)[i];
+  MPI_OP_SWITCH(MPI_MIN)
+#undef MPI_OP_IMPL
 }
+
 void MPI_SUM( void *invec, void *inoutvec, int *len, MPI_Datatype *datatype){
-  int i;
-  switch (*datatype) {
-  case MPI_INT:
-    for(i=0;i<(*len);i++)
-      ((int *)inoutvec)[i] += ((int *)invec)[i];
-    break;
-  case MPI_LONG:
-    for(i=0;i<(*len);i++)
-      ((long *)inoutvec)[i] += ((long *)invec)[i];
-    break;
-  case MPI_FLOAT:
-    for(i=0;i<(*len);i++)
-      ((float *)inoutvec)[i] += ((float *)invec)[i];
-    break;
-  case MPI_DOUBLE:
-    for(i=0;i<(*len);i++)
-      ((double *)inoutvec)[i] += ((double *)invec)[i];
-    break;
-  case MPI_COMPLEX:
-    for(i=0;i<(*len);i++){
-      ((AmpiComplex *)inoutvec)[i].re += ((AmpiComplex *)invec)[i].re;
-      ((AmpiComplex *)inoutvec)[i].im += ((AmpiComplex *)invec)[i].im;
-    }
-    break;
-  case MPI_LONG_LONG_INT:
-    for(i=0;i<(*len);i++)
-      ((CMK_TYPEDEF_INT8 *)inoutvec)[i] += ((CMK_TYPEDEF_INT8 *)invec)[i];
-    break;
-  default:
-    ckerr << "Type " << *datatype << " with Op MPI_SUM not supported." << endl;
-    CmiAbort("exiting");
-  }
+#define MPI_OP_IMPL(type) \
+	((type *)inoutvec)[i] += ((type *)invec)[i];
+  MPI_OP_SWITCH(MPI_SUM)
+#undef MPI_OP_IMPL
 }
+
 void MPI_PROD( void *invec, void *inoutvec, int *len, MPI_Datatype *datatype){
-  int i;
-  switch (*datatype) {
-  case MPI_INT:
-    for(i=0;i<(*len);i++)
-      ((int *)inoutvec)[i] *= ((int *)invec)[i];
-    break;
-  case MPI_LONG:
-    for(i=0;i<(*len);i++)
-      ((long *)inoutvec)[i] *= ((long *)invec)[i];
-    break;
-  case MPI_FLOAT:
-    for(i=0;i<(*len);i++)
-      ((float *)inoutvec)[i] *= ((float *)invec)[i];
-    break;
-  case MPI_DOUBLE:
-    for(i=0;i<(*len);i++)
-      ((double *)inoutvec)[i] *= ((double *)invec)[i];
-    break;
-  default:
-    ckerr << "Type " << *datatype << " with Op MPI_PROD not supported." << endl;
-    CmiAbort("exiting");
-  }
+#define MPI_OP_IMPL(type) \
+	((type *)inoutvec)[i] *= ((type *)invec)[i];
+  MPI_OP_SWITCH(MPI_PROD)
+#undef MPI_OP_IMPL
 }
+
 void MPI_LAND( void *invec, void *inoutvec, int *len, MPI_Datatype *datatype){
   int i;  
   switch (*datatype) {
@@ -211,7 +166,7 @@ void MPI_BOR( void *invec, void *inoutvec, int *len, MPI_Datatype *datatype){
     break;
   case MPI_BYTE:
     for(i=0;i<(*len);i++)
-      ((char *)inoutvec)[i] = ((char *)inoutvec)[i] & ((char *)invec)[i];
+      ((char *)inoutvec)[i] = ((char *)inoutvec)[i] | ((char *)invec)[i];
     break;
   default:
     ckerr << "Type " << *datatype << " with Op MPI_BOR not supported." << endl;
@@ -890,7 +845,7 @@ public:
 void ampi::split(int color,int key,MPI_Comm *dest, int type)
 {
   if (type == CART_TOPOL) {
-	ampiSplitKey splitKey(parent->getNextCart(),color,key,getRank());
+	ampiSplitKey splitKey(parent->getNextCart(),color,key,myRank);
 	int rootIdx=myComm.getIndexForRank(0);
 	CkCallback cb(CkIndex_ampi::splitPhase1(0),CkArrayIndex1D(rootIdx),myComm.getProxy());
 	contribute(sizeof(splitKey),&splitKey,CkReduction::concat,cb);
@@ -899,7 +854,7 @@ void ampi::split(int color,int key,MPI_Comm *dest, int type)
 	MPI_Comm newComm=parent->getNextCart()-1;
 	*dest=newComm;
   } else {
-	ampiSplitKey splitKey(parent->getNextSplit(),color,key,getRank());
+	ampiSplitKey splitKey(parent->getNextSplit(),color,key,myRank);
 	int rootIdx=myComm.getIndexForRank(0);
 	CkCallback cb(CkIndex_ampi::splitPhase1(0),CkArrayIndex1D(rootIdx),myComm.getProxy());
 	contribute(sizeof(splitKey),&splitKey,CkReduction::concat,cb);
@@ -923,7 +878,7 @@ void ampi::splitPhase1(CkReductionMsg *msg)
 	//Order the keys, which orders the ranks properly:
 	int nKeys=msg->getSize()/sizeof(ampiSplitKey);
 	ampiSplitKey *keys=(ampiSplitKey *)msg->getData();
-	if (nKeys!=getSize()) CkAbort("ampi::splitReduce expected a split contribution from every rank!");
+	if (nKeys!=myComm.getSize()) CkAbort("ampi::splitReduce expected a split contribution from every rank!");
 	qsort(keys,nKeys,sizeof(ampiSplitKey),compareAmpiSplitKey);
 
 	MPI_Comm newComm = -1;
@@ -1173,7 +1128,7 @@ void ampiParent::interChildRegister(const ampiCommStruct &s) {
 }
 
 void ampi::intercommMerge(int first, MPI_Comm *ncomm){ // first valid only at local root
-  if(getRank() == 0 && first == 1){ // first (lower) group creates the intracommunicator for the higher group
+  if(myRank == 0 && first == 1){ // first (lower) group creates the intracommunicator for the higher group
     groupStruct lvec = myComm.getIndices();
     groupStruct rvec = myComm.getRemoteIndices();
     int rsize = rvec.size();
@@ -1250,8 +1205,8 @@ void
 ampi::generic(AmpiMsg* msg)
 {
 MSG_ORDER_DEBUG(
-  CkPrintf("AMPI Rank %d arrival: tag=%d, src=%d, comm=%d  (from %d, seq %d)\n",
-  	getRank(),msg->tag,msg->srcRank,msg->comm, msg->srcIdx, msg->seq);
+  CkPrintf("AMPI vp %d arrival: tag=%d, src=%d, comm=%d  (from %d, seq %d)\n",
+  	thisIndex,msg->tag,msg->srcRank,msg->comm, msg->srcIdx, msg->seq);
 )
 //	AmpiMsg *msgcopy = msg;
   if(msg->seq != -1) {
@@ -1277,8 +1232,8 @@ void
 ampi::inorder(AmpiMsg* msg)
 {
 MSG_ORDER_DEBUG(
-  CkPrintf("AMPI Rank %d inorder: tag=%d, src=%d, comm=%d  (from %d, seq %d)\n",
-  	getRank(),msg->tag,msg->srcRank,msg->comm, msg->srcIdx, msg->seq);
+  CkPrintf("AMPI vp %d inorder: tag=%d, src=%d, comm=%d  (from %d, seq %d)\n",
+  	thisIndex,msg->tag,msg->srcRank,msg->comm, msg->srcIdx, msg->seq);
 )
   int tags[3];
   tags[0] = msg->tag; tags[1] = msg->srcRank; tags[2] = msg->comm;
@@ -1292,7 +1247,7 @@ AmpiMsg *ampi::makeAmpiMsg(int destIdx,
   int len = ddt->getSize(count);
   int sIdx=thisIndex;
   int seq = -1;
-  if (destIdx>=0 && destcomm<=MPI_COMM_WORLD && t<=MPI_TAG_UB)
+  if (destIdx>=0 && destcomm<=MPI_COMM_WORLD && t<=MPI_TAG_UB_VALUE)
   { //Not cross-module: set seqno
      seq = oorder.nextOutgoing(destIdx);
   }
@@ -1329,7 +1284,7 @@ ampi::delesend(int t, int sRank, const void* buf, int count, int type,  int rank
     arrproxy = remoteProxy;
   }
  MSG_ORDER_DEBUG(
-  CkPrintf("AMPI Rank %d send: tag=%d, src=%d, comm=%d (to %d)\n",getRank(),t,sRank,destcomm,destIdx);
+  CkPrintf("AMPI vp %d send: tag=%d, src=%d, comm=%d (to %d)\n",thisIndex,t,sRank,destcomm,destIdx);
  )
 
   arrproxy[destIdx].generic(makeAmpiMsg(destIdx,t,sRank,buf,count,type,destcomm));
@@ -1361,7 +1316,7 @@ ampi::recv(int t, int s, void* buf, int count, int type, int comm, int *sts)
   CkDDT_DataType *ddt = getDDT()->getType(type);
   int len = ddt->getSize(count);
  MSG_ORDER_DEBUG(
-  CkPrintf("AMPI Rank %d blocking recv: tag=%d, src=%d, comm=%d\n",getRank(),t,s,comm);
+  CkPrintf("AMPI vp %d blocking recv: tag=%d, src=%d, comm=%d\n",thisIndex,t,s,comm);
  )
 
   resumeOnRecv=true;
@@ -1649,7 +1604,7 @@ CDECL int AMPI_Initialized(int *isInit)
 CDECL int AMPI_Comm_rank(MPI_Comm comm, int *rank)
 {
   AMPIAPI("AMPI_Comm_rank");
-  *rank = (comm==MPI_COMM_SELF)?0:getAmpiInstance(comm)->getRank();
+  *rank = getAmpiInstance(comm)->getRank(comm);
   return 0;
 }
 
@@ -1657,7 +1612,7 @@ CDECL
 int AMPI_Comm_size(MPI_Comm comm, int *size)
 {
   AMPIAPI("AMPI_Comm_size");
-  *size = (comm==MPI_COMM_SELF)?1:getAmpiInstance(comm)->getSize();
+  *size = getAmpiInstance(comm)->getSize(comm);
   return 0;
 }
 
@@ -1708,9 +1663,7 @@ int AMPI_Send(void *msg, int count, MPI_Datatype type, int dest,
 {
   AMPIAPI("AMPI_Send");
   ampi *ptr = getAmpiInstance(comm);
-  int srcRank=ptr->getRank();
-  if(comm==MPI_COMM_SELF) { srcRank=0; }
-  ptr->send(tag, srcRank, msg, count, type, dest, comm);
+  ptr->send(tag, ptr->getRank(comm), msg, count, type, dest, comm);
   return 0;
 }
 
@@ -1909,7 +1862,7 @@ int AMPI_Reduce_scatter(void* sendbuf, void* recvbuf, int *recvcounts,
   if(getAmpiParent()->isInter(comm)) CkAbort("MPI_Reduce_scatter not allowed for Inter-communicator!");
   if(comm==MPI_COMM_SELF) return copyDatatype(comm,datatype,recvcounts[0],sendbuf,recvbuf);
   ampi *ptr = getAmpiInstance(comm);
-  int size = ptr->getSize();
+  int size = ptr->getSize(comm);
   int count=0;
   int *displs = new int [size];
   int len;
@@ -1924,7 +1877,7 @@ int AMPI_Reduce_scatter(void* sendbuf, void* recvbuf, int *recvcounts,
   tmpbuf = malloc(len);
   AMPI_Reduce(sendbuf, tmpbuf, count, datatype, op, 0, comm);
   AMPI_Scatterv(tmpbuf, recvcounts, displs, datatype,
-               recvbuf, recvcounts[ptr->getRank()], datatype, 0, comm);
+               recvbuf, recvcounts[ptr->getRank(comm)], datatype, 0, comm);
   free(tmpbuf);
   delete [] displs;	// < memory leak ! // gzheng
   return 0;
@@ -1965,9 +1918,9 @@ int AMPI_Scan(void* sendbuf, void* recvbuf, int count, MPI_Datatype datatype, MP
   if(getAmpiParent()->isInter(comm)) CkAbort("MPI_Scan not allowed for Inter-communicator!");
   MPI_Status sts;
   ampi *ptr = getAmpiInstance(comm);
-  int size = ptr->getSize();
+  int size = ptr->getSize(comm);
   int blklen = ptr->getDDT()->getType(datatype)->getSize(count);
-  int rank = ptr->getRank();
+  int rank = ptr->getRank(comm);
   int mask = 0x1;
   int dst;
   void* tmp_buf = malloc(blklen);
@@ -2031,7 +1984,7 @@ double AMPI_Wtick(void){
 int PersReq::start(){
   if(sndrcv == 1) { // send request
     ampi *aptr=getAmpiInstance(comm);
-    aptr->send(tag, aptr->getRank(), buf, count, type, src, comm);
+    aptr->send(tag, aptr->getRank(comm), buf, count, type, src, comm);
   }
   return 0;
 }
@@ -2230,6 +2183,8 @@ CDECL
 int AMPI_Waitany(int count, MPI_Request *request, int *idx, MPI_Status *sts)
 {
   AMPIAPI("AMPI_Waitany");
+  
+  USER_CALL_DEBUG("AMPI_Waitany("<<count<<")");
   checkRequests(count,request);
   if(areInactiveReqs(count,request)){
     *idx=MPI_UNDEFINED;
@@ -2238,16 +2193,20 @@ int AMPI_Waitany(int count, MPI_Request *request, int *idx, MPI_Status *sts)
   }
   int flag=0;
   CkVec<CkVec<int> > reqvec = vecIndex(count,request);
-  while(count>0){
+  while(count>0){ /* keep looping until some request finishes: */
     for(int i=0;i<reqvec.size();i++){
       AMPI_Test(&request[(reqvec[i])[0]], &flag, sts);
       if(flag == 1 && sts->MPI_COMM != 0){ // to skip MPI_REQUEST_NULL
         *idx = (reqvec[i])[0];
+  	USER_CALL_DEBUG("AMPI_Waitany returning "<<*idx);
         return 0;
       }
     }
+    /* no requests have finished yet-- schedule and try again */
+    AMPI_Yield(MPI_COMM_WORLD);
   }
   *idx = MPI_UNDEFINED;
+  USER_CALL_DEBUG("AMPI_Waitany returning UNDEFINED");
   return 0;
 }
 
@@ -2544,8 +2503,9 @@ int AMPI_Isend(void *buf, int count, MPI_Datatype type, int dest,
               int tag, MPI_Comm comm, MPI_Request *request)
 {
   AMPIAPI("AMPI_Isend");
+  USER_CALL_DEBUG("AMPI_Isend("<<type<<","<<dest<<","<<tag<<","<<comm<<")");
   ampi *ptr = getAmpiInstance(comm);
-  ptr->send(tag, ptr->getRank(), buf, count, type, dest, comm);
+  ptr->send(tag, ptr->getRank(comm), buf, count, type, dest, comm);
   *request = MPI_REQUEST_NULL;
   return 0;
 }
@@ -2555,6 +2515,7 @@ int AMPI_Irecv(void *buf, int count, MPI_Datatype type, int src,
               int tag, MPI_Comm comm, MPI_Request *request)
 {
   AMPIAPI("AMPI_Irecv");
+  USER_CALL_DEBUG("AMPI_Irecv("<<type<<","<<src<<","<<tag<<","<<comm<<")");
   AmpiRequestList* reqs = getReqs();
   IReq *newreq = new IReq(buf,count,type,src,tag,comm);
   *request = reqs->insert(newreq);
@@ -2593,13 +2554,13 @@ int AMPI_Allgather(void *sendbuf, int sendcount, MPI_Datatype sendtype,
   if(getAmpiParent()->isInter(comm)) CkAbort("MPI_Allgather not allowed for Inter-communicator!");
   if(comm==MPI_COMM_SELF) return copyDatatype(comm,sendtype,sendcount,sendbuf,recvbuf);
   ampi *ptr = getAmpiInstance(comm);
-  int size = ptr->getSize();
+  int size = ptr->getSize(comm);
   int i;
 
   // commlib support
   CProxy_ampi arrproxy = ptr->comlibBegin();
   for(i=0;i<size;i++) {
-    ptr->delesend(MPI_GATHER_TAG, ptr->getRank(), sendbuf, sendcount,
+    ptr->delesend(MPI_GATHER_TAG, ptr->getRank(comm), sendbuf, sendcount,
                   sendtype, i, comm, arrproxy);
   }
   ptr->comlibEnd();
@@ -2624,13 +2585,13 @@ int AMPI_Iallgather(void *sendbuf, int sendcount, MPI_Datatype sendtype,
   if(getAmpiParent()->isInter(comm)) CkAbort("MPI_Iallgather not allowed for Inter-communicator!");
   if(comm==MPI_COMM_SELF) return copyDatatype(comm,sendtype,sendcount,sendbuf,recvbuf);
   ampi *ptr = getAmpiInstance(comm);
-  int size = ptr->getSize();
+  int size = ptr->getSize(comm);
   int i;
 
   // commlib support
   CProxy_ampi arrproxy = ptr->comlibBegin();
   for(i=0;i<size;i++) {
-    ptr->delesend(MPI_GATHER_TAG, ptr->getRank(), sendbuf, sendcount,
+    ptr->delesend(MPI_GATHER_TAG, ptr->getRank(comm), sendbuf, sendcount,
                   sendtype, i, comm, arrproxy);
   }
   ptr->comlibEnd();
@@ -2660,13 +2621,13 @@ int AMPI_Allgatherv(void *sendbuf, int sendcount, MPI_Datatype sendtype,
   if(getAmpiParent()->isInter(comm)) CkAbort("MPI_Allgatherv not allowed for Inter-communicator!");
   if(comm==MPI_COMM_SELF) return copyDatatype(comm,sendtype,sendcount,sendbuf,recvbuf);
   ampi *ptr = getAmpiInstance(comm);
-  int size = ptr->getSize();
+  int size = ptr->getSize(comm);
   int i;
 
   // commlib support
   CProxy_ampi arrproxy = ptr->comlibBegin();
   for(i=0;i<size;i++) {
-    ptr->delesend(MPI_GATHER_TAG, ptr->getRank(), sendbuf, sendcount,
+    ptr->delesend(MPI_GATHER_TAG, ptr->getRank(comm), sendbuf, sendcount,
                   sendtype, i, comm, arrproxy);
   }
   ptr->comlibEnd();
@@ -2691,11 +2652,11 @@ int AMPI_Gather(void *sendbuf, int sendcount, MPI_Datatype sendtype,
   if(getAmpiParent()->isInter(comm)) CkAbort("MPI_Gather not allowed for Inter-communicator!");
   if(comm==MPI_COMM_SELF) return copyDatatype(comm,sendtype,sendcount,sendbuf,recvbuf);
   ampi *ptr = getAmpiInstance(comm);
-  int size = ptr->getSize();
+  int size = ptr->getSize(comm);
   int i;
   AMPI_Send(sendbuf, sendcount, sendtype, root, MPI_GATHER_TAG, comm);
 
-  if(ptr->getRank()==root) {
+  if(ptr->getRank(comm)==root) {
     MPI_Status status;
     CkDDT_DataType* dttype = ptr->getDDT()->getType(recvtype) ;
     int itemsize = dttype->getSize(recvcount) ;
@@ -2717,15 +2678,15 @@ int AMPI_Gatherv(void *sendbuf, int sendcount, MPI_Datatype sendtype,
   if(getAmpiParent()->isInter(comm)) CkAbort("MPI_Gatherv not allowed for Inter-communicator!");
   if(comm==MPI_COMM_SELF) return copyDatatype(comm,sendtype,sendcount,sendbuf,recvbuf);
   ampi *ptr = getAmpiInstance(comm);
-  int size = ptr->getSize();
+  int size = ptr->getSize(comm);
   int i;
 
   AMPI_Send(sendbuf, sendcount, sendtype, root, MPI_GATHER_TAG, comm);
 
-  if(ptr->getRank() == root) {
+  if(ptr->getRank(comm) == root) {
     MPI_Status status;
     CkDDT_DataType* dttype = ptr->getDDT()->getType(recvtype) ;
-    int itemsize = dttype->getSize() ;
+    int itemsize = dttype->getSize();
 
     for(i=0;i<size;i++) {
       AMPI_Recv(((char*)recvbuf)+(itemsize*displs[i]), recvcounts[i], recvtype,
@@ -2744,15 +2705,15 @@ int AMPI_Scatter(void *sendbuf, int sendcount, MPI_Datatype sendtype,
   if(getAmpiParent()->isInter(comm)) CkAbort("MPI_Scatter not allowed for Inter-communicator!");
   if(comm==MPI_COMM_SELF) return copyDatatype(comm,sendtype,sendcount,sendbuf,recvbuf);
   ampi *ptr = getAmpiInstance(comm);
-  int size = ptr->getSize();
+  int size = ptr->getSize(comm);
   int i;
 
-  if(ptr->getRank()==root) {
+  if(ptr->getRank(comm)==root) {
     CProxy_ampi arrproxy = ptr->comlibBegin();
     CkDDT_DataType* dttype = ptr->getDDT()->getType(sendtype) ;
     int itemsize = dttype->getSize(sendcount) ;
     for(i=0;i<size;i++) {
-      ptr->delesend(MPI_SCATTER_TAG, ptr->getRank(), ((char*)sendbuf)+(itemsize*i),
+      ptr->delesend(MPI_SCATTER_TAG, ptr->getRank(comm), ((char*)sendbuf)+(itemsize*i),
                     sendcount, sendtype, i, comm, arrproxy);
     }
     ptr->comlibEnd();
@@ -2773,15 +2734,15 @@ int AMPI_Scatterv(void *sendbuf, int *sendcounts, int *displs, MPI_Datatype send
   if(getAmpiParent()->isInter(comm)) CkAbort("MPI_Scatterv not allowed for Inter-communicator!");
   if(comm==MPI_COMM_SELF) return copyDatatype(comm,sendtype,sendcounts[0],sendbuf,recvbuf);
   ampi *ptr = getAmpiInstance(comm);
-  int size = ptr->getSize();
+  int size = ptr->getSize(comm);
   int i;
 
-  if(ptr->getRank() == root) {
+  if(ptr->getRank(comm) == root) {
     CProxy_ampi arrproxy = ptr->comlibBegin();
     CkDDT_DataType* dttype = ptr->getDDT()->getType(sendtype) ;
     int itemsize = dttype->getSize() ;
     for(i=0;i<size;i++) {
-      ptr->delesend(MPI_SCATTER_TAG, ptr->getRank(), ((char*)sendbuf)+(itemsize*displs[i]),
+      ptr->delesend(MPI_SCATTER_TAG, ptr->getRank(comm), ((char*)sendbuf)+(itemsize*displs[i]),
                     sendcounts[i], sendtype, i, comm, arrproxy);
     }
     ptr->comlibEnd();
@@ -2802,7 +2763,7 @@ int AMPI_Alltoall(void *sendbuf, int sendcount, MPI_Datatype sendtype,
   if(getAmpiParent()->isInter(comm)) CkAbort("MPI_Alltoall not allowed for Inter-communicator!");
   if(comm==MPI_COMM_SELF) return copyDatatype(comm,sendtype,sendcount,sendbuf,recvbuf);
   ampi *ptr = getAmpiInstance(comm);
-  int size = ptr->getSize();
+  int size = ptr->getSize(comm);
   CkDDT_DataType* dttype = ptr->getDDT()->getType(sendtype) ;
   int itemsize = dttype->getSize(sendcount) ;
   int i;
@@ -2810,7 +2771,7 @@ int AMPI_Alltoall(void *sendbuf, int sendcount, MPI_Datatype sendtype,
   // commlib support
   CProxy_ampi arrproxy = ptr->comlibBegin();
   for(i=0;i<size;i++) {
-    ptr->delesend(MPI_ATA_TAG, ptr->getRank(), ((char*)sendbuf)+(itemsize*i), sendcount,
+    ptr->delesend(MPI_ATA_TAG, ptr->getRank(comm), ((char*)sendbuf)+(itemsize*i), sendcount,
                   sendtype, i, comm, arrproxy);
   }
   ptr->comlibEnd();
@@ -2836,7 +2797,7 @@ int AMPI_Ialltoall(void *sendbuf, int sendcount, MPI_Datatype sendtype,
   if(comm==MPI_COMM_SELF) return copyDatatype(comm,sendtype,sendcount,sendbuf,recvbuf);
   ampi *ptr = getAmpiInstance(comm);
   AmpiRequestList* reqs = getReqs();
-  int size = ptr->getSize();
+  int size = ptr->getSize(comm);
   int reqsSize = reqs->size();
   CkDDT_DataType* dttype = ptr->getDDT()->getType(sendtype) ;
   int itemsize = dttype->getSize(sendcount) ;
@@ -2845,7 +2806,7 @@ int AMPI_Ialltoall(void *sendbuf, int sendcount, MPI_Datatype sendtype,
   // commlib support
   CProxy_ampi arrproxy = ptr->comlibBegin();
   for(i=0;i<size;i++) {
-    ptr->delesend(MPI_ATA_TAG+reqsSize, ptr->getRank(), ((char*)sendbuf)+(itemsize*i), sendcount,
+    ptr->delesend(MPI_ATA_TAG+reqsSize, ptr->getRank(comm), ((char*)sendbuf)+(itemsize*i), sendcount,
                   sendtype, i, comm, arrproxy);
   }
   ptr->comlibEnd();
@@ -2870,7 +2831,7 @@ int AMPI_Alltoallv(void *sendbuf, int *sendcounts, int *sdispls,
   if(getAmpiParent()->isInter(comm)) CkAbort("MPI_Alltoallv not allowed for Inter-communicator!");
   if(comm==MPI_COMM_SELF) return 0;
   ampi *ptr = getAmpiInstance(comm);
-  int size = ptr->getSize();
+  int size = ptr->getSize(comm);
   CkDDT_DataType* dttype = ptr->getDDT()->getType(sendtype) ;
   int itemsize = dttype->getSize() ;
   int i;
@@ -2878,7 +2839,7 @@ int AMPI_Alltoallv(void *sendbuf, int *sendcounts, int *sdispls,
   // commlib support
   CProxy_ampi arrproxy = ptr->comlibBegin();
   for(i=0;i<size;i++) {
-    ptr->delesend(MPI_GATHER_TAG,ptr->getRank(),((char*)sendbuf)+(itemsize*sdispls[i]),sendcounts[i],
+    ptr->delesend(MPI_GATHER_TAG,ptr->getRank(comm),((char*)sendbuf)+(itemsize*sdispls[i]),sendcounts[i],
                   sendtype, i, comm, arrproxy);
   }
   ptr->comlibEnd();
@@ -2949,7 +2910,7 @@ int AMPI_Intercomm_create(MPI_Comm lcomm, int lleader, MPI_Comm pcomm, int rlead
 
   if(lrank==lleader){
     int lsize, rsize;
-    lsize = ptr->getSize();
+    lsize = ptr->getSize(lcomm);
     int *larr = new int [lsize];
     int *rarr;
     CkVec<int> lvec = ptr->getIndices();
@@ -2988,7 +2949,7 @@ int AMPI_Intercomm_merge(MPI_Comm intercomm, int high, MPI_Comm *newintracomm){
   lroot = ptr->getIndexForRank(0);
   rroot = ptr->getIndexForRemoteRank(0);
   lhigh = high;
-  lrank = ptr->getRank();
+  lrank = ptr->getRank(intercomm);
 
   if(lrank==0){
     MPI_Status sts;

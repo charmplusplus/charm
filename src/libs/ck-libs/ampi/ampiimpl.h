@@ -1233,8 +1233,15 @@ class ampi : public CBase_ampi {
     void intercommMerge(int first, MPI_Comm *ncomm);
 
     inline int getWorldRank(void) const {return parent->thisIndex;}
-    inline int getRank(void) const {return myRank;}
-    inline int getSize(void) const {return myComm.getSize();}
+    /// Return our rank in this communicator
+    inline int getRank(MPI_Comm comm) const {
+    	if (comm==MPI_COMM_SELF) return 0;
+	else return myRank;
+    }
+    inline int getSize(MPI_Comm comm) const {
+    	if (comm==MPI_COMM_SELF) return 1;
+        else return myComm.getSize();
+    }
     inline MPI_Comm getComm(void) const {return myComm.getComm();}
     inline CkVec<int> getIndices(void) const { return myComm.getindices(); }
     inline const CProxy_ampi &getProxy(void) const {return thisProxy;}
