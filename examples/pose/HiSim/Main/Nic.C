@@ -124,8 +124,8 @@ void NetInterface::recvPacket(Packet *p) {
         curInterval = ovt/config.collection_interval;
         if((curInterval > prevIntervalStart) && (numRecvd)) {
         prevIntervalStart = curInterval;
-        parent->CommitPrintf("%d*%d %d %lld %.2f\n",nicConsts->id-config.nicStart,numRecvd,
-        hops,prevIntervalStart,(float)counter/numRecvd);counter=0; numRecvd = 0;
+        parent->CommitPrintf("%d*%d %d %lld %.2f\n",nicConsts->id-config.nicStart,numRecvd, hops,(POSE_TimeType)prevIntervalStart,(float)counter/numRecvd);
+	counter=0; numRecvd = 0;
         }
         }
         counter += ((POSE_TimeType)(100.0 * extra/(ovt-ms.origovt))) * (p->hdr.totalLen); 

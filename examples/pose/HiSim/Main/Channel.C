@@ -26,7 +26,7 @@ void Channel::recvPacket(Packet *copyP) {
         curInterval = ovt/config.collection_interval;
         if(curInterval > prevIntervalStart) {
         prevIntervalStart = curInterval;
-        parent->CommitPrintf("%d->%d %ld %f\n",nodeid,portid,prevIntervalStart,(float)counter/config.collection_interval);
+        parent->CommitPrintf("%d->%d %lld %f\n",nodeid,portid,(CmiInt8)prevIntervalStart,(float)counter/config.collection_interval);
         counter=0;
         }
         }
