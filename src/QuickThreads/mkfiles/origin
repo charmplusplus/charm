@@ -1,21 +1,21 @@
 #!/bin/sh -x
 
-CC="cc -64 -I. -O"
+CC=cc -64 -I. -O
 
 all: qt stp testpgm
 
 qt:
 	ln -s md/mipspro.h qtmd.h
-	$CC -c -o qt.o qt.c
+	$(CC) -c -o qt.o qt.c
 	cc -c -O -64 -o qtmds.o md/mipspro.s
 	ar q libqt.a qt.o qtmds.o
 
 stp:
-	$CC -c stp.c
+	$(CC) -c stp.c
 	ar q libstp.a stp.o
 
 testpgm:
-	$CC -c meas.c
+	$(CC) -c meas.c
 	cc -c -64 -O -o qtmdb.o md/mipspro_b.s
-	$CC -O -o run meas.o qtmdb.o libstp.a libqt.a
+	$(CC) -O -o run meas.o qtmdb.o libstp.a libqt.a
 
