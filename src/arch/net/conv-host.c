@@ -1263,6 +1263,7 @@ char *arg_rshprog;
 char *arg_currdir_a;
 char *arg_currdir_r;
 char *arg_mylogin;
+char *arg_myexec_home;
 
 arg_init(argc, argv)
     int argc; char **argv;
@@ -1315,14 +1316,6 @@ arg_init(argc, argv)
   if (buf[0]==0)
     { fprintf(stderr,"No such program %s\n",argv[1]); exit(1); }
   arg_nodeprog_a = strdup(buf);
-  
-  /* find the node-program, relative version */
-  sprintf(buf,"%s",getenv("HOME"));
-  if ((len=path_isprefix(buf,arg_nodeprog_a))!=0) {
-    sprintf(buf,"$HOME/%s",arg_nodeprog_a+len);
-    arg_nodeprog_r = strdup(buf);
-  }
-  else arg_nodeprog_r = arg_nodeprog_a;
 
   strcpy(buf, RSH_CMD);
   path_search(buf, getenv("PATH"));
@@ -1333,16 +1326,10 @@ arg_init(argc, argv)
   /* find the current directory, absolute version */
   getcwd(buf, 1023);
   arg_currdir_a = strdup(buf);
-  
-  /* find the current directory, relative version */
-  sprintf(buf,"%s",getenv("HOME"));
-  if ((len=path_isprefix(buf, arg_currdir_a))!=0) {
-    sprintf(buf,"$HOME/%s",arg_currdir_a+len);
-    arg_currdir_r = strdup(buf);
-  }
-  else arg_currdir_r = arg_currdir_a;
 
   arg_mylogin = mylogin();
+  arg_myexec_home = (char *) malloc(MAXPATHLEN);
+  strcpy(arg_myexec_home, getenv("HOME"));
 }
 
 /****************************************************************************
@@ -1393,6 +1380,8 @@ typedef struct nodetab_info {
    char *name;
    char *login;
    char *passwd;
+   char *exec_home;
+   char *ext;
    char *setup;
    unsigned int ip;
 } *nodetab_info;
@@ -1467,6 +1456,8 @@ void nodetab_init()
     /* put default information */
     node->login="*";
     node->passwd="*";
+    node->exec_home = "*";
+    node->ext="*";
     node->setup="";
     b=skipblanks(e);
     if (*b==0) goto endnode;
@@ -1478,11 +1469,23 @@ void nodetab_init()
     node->passwd=substr(b,e);
     b=skipblanks(e);
     if (*b==0) goto endnode;
+    e=skipstuff(b);
+    node->exec_home=substr(b,e);
+    b=skipblanks(e);
+    if (*b==0) goto endnode;
+    e=skipstuff(b);
+    node->ext=substr(b,e);
+    b=skipblanks(e);
+    if (*b==0) goto endnode;
     e=b+strlen(b);
     node->setup=substr(b,e);
   endnode:;
     if (strcmp(node->login,"*")==0)
       node->login = arg_mylogin;
+    if (strcmp(node->exec_home,"*")==0)
+      node->exec_home = arg_myexec_home;
+    if (strcmp(node->ext,"*")==0)
+      node->ext = "";
     node->ip = lookup_ip(node->name);
     if (node->ip==0) {
       fprintf(stderr,"cannot get IP of %s\n",node->name);
@@ -1517,6 +1520,8 @@ char        *nodetab_name(i) int i;    { return nodetab_getinfo(i)->name; }
 char        *nodetab_login(i) int i;   { return nodetab_getinfo(i)->login; }
 char        *nodetab_passwd(i) int i;  { return nodetab_getinfo(i)->passwd; }
 char        *nodetab_setup(i) int i;   { return nodetab_getinfo(i)->setup; }
+char        *nodetab_exec_home(i) int i; { return nodetab_getinfo(i)->exec_home; }
+char        *nodetab_ext(i) int i; { return nodetab_getinfo(i)->ext; }
 unsigned int nodetab_ip(i) int i;      { return nodetab_getinfo(i)->ip; }
  
 /****************************************************************************
@@ -1970,6 +1975,8 @@ prog rsh_start(nodeno)
 int rsh_pump(p, nodeno, argv)
     prog p; int nodeno; char **argv;
 {
+  static char buf[1024];
+  int len;
   xstr ibuf = p->ibuf;
   int randno = rand();
   
@@ -1980,6 +1987,26 @@ int rsh_pump(p, nodeno, argv)
   xstr_printf(ibuf,"setenv NETSTART '%d %d %d %d %d'\n",
     nodeno, nodetab_size, nodetab_ip(nodeno), req_ip, req_port);
   prog_flush(p);
+
+  /* find the node-program, relative version */
+  sprintf(buf,"%s",getenv("HOME"));
+  if ((len=path_isprefix(buf,arg_nodeprog_a))!=0) {
+    sprintf(buf,"%s/%s%s",nodetab_exec_home(nodeno),
+			  arg_nodeprog_a+len,nodetab_ext(nodeno));
+    arg_nodeprog_r = strdup(buf);
+  }
+  else {
+    sprintf(buf,"%s%s",arg_nodeprog_a,nodetab_ext(nodeno));
+    arg_nodeprog_r = strdup(buf);
+  }
+
+  /* find the current directory, relative version */
+  sprintf(buf,"%s",getenv("HOME"));
+  if ((len=path_isprefix(buf, arg_currdir_a))!=0) {
+    sprintf(buf,"%s/%s",nodetab_exec_home(nodeno),arg_currdir_a+len);
+    arg_currdir_r = strdup(buf);
+  }
+  else arg_currdir_r = arg_currdir_a;
 
   if (arg_debug || arg_debug_no_pause || arg_in_xterm) {
     xstr_printf(ibuf,"foreach dir ($path)\n");
