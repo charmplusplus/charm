@@ -557,6 +557,8 @@ int   arg_debug_no_pause;
 
 int   arg_local;	/* start node programs directly by exec on localhost */
 
+int   arg_help;		/* print help message */
+
 #if CMK_USE_RSH
 int   arg_maxrsh;
 char *arg_shell;
@@ -600,12 +602,19 @@ void arg_init(int argc, char **argv)
   pparam_flag(&arg_in_xterm,      0, "in-xterm",      "Run each node in an xterm window");
   pparam_str(&arg_xterm,          0, "xterm",         "which xterm to use");
 #endif
+  pparam_flag(&arg_help,	0, "help", "print help messages");
 
   if (pparam_parsecmd('+', argv) < 0) {
     fprintf(stderr,"ERROR> syntax: %s\n",pparam_error);
     pparam_printdocs();
     exit(1);
   }
+
+  if (arg_help) {
+    pparam_printdocs();
+    exit(0);
+  }
+
   arg_argv = argv+1; /*Skip over charmrun (0) here and program name (1) later*/
   arg_argc = pparam_countargs(arg_argv);
   if (arg_argc<1) {
@@ -753,11 +762,28 @@ void nodetab_reset(nodetab_host *h)
 #endif
 }
 
+void showIP(unsigned int nip, char *str)
+{
+  unsigned int ip = ntohl(nip);
+  int a1 = ip >> 24;
+  int a2 = (ip & 0xFF0000) >> 16;
+  int a3 = (ip & 0xFF00) >> 8;
+  int a4 = (ip & 0x00FF) ;
+  sprintf(str, "%d.%d.%d.%d", a1,a2,a3,a4);
+}
+
 void nodetab_add(nodetab_host *h)
 {
   if (h->rank == 0)
     nodetab_rank0_table[nodetab_rank0_size++] = nodetab_size;
   nodetab_table[nodetab_size] = (nodetab_host *) malloc(sizeof(nodetab_host));
+
+  if (arg_verbose) {
+    char ips[100];
+    showIP(h->ip, ips);
+    printf("Charmrun> adding client %d:\"%s\", IP:%s\n", nodetab_size, h->name, ips);
+  }
+
   *nodetab_table[nodetab_size++] = *h;
 }
 
@@ -969,6 +995,11 @@ void nodeinfo_add(const ChMessageInt_t *nodeInfo,SOCKET ctrlfd)
 	    nodetab_table[nt+pe]->dataport=ChMessageInt(i.dataport);
 	    nodetab_table[nt+pe]->ctrlfd=ctrlfd;
 	  }
+        if (arg_verbose) {
+	  char ips[100];
+	  showIP(nodetab_ip(nt), ips);
+	  printf("Charmrun> client %d connected: IP:%s port:%d\n", nt, ips, ChMessageInt(nodeInfo[1]));
+	}
 }
 
 /****************************************************************************
@@ -1348,7 +1379,7 @@ void req_client_connect(void)
 	for (client=0;client<req_nClients;client++)
 	{/*Wait for the next client to connect to our server port.*/
 		unsigned int clientIP,clientPort;/*These are actually ignored*/
-		if (arg_verbose) printf("Charmrun> Waiting for client %d to connect.\n",client);
+		if (arg_verbose) printf("Charmrun> Waiting %d-th client to connect.\n",client);
 		if (0==skt_select1(server_fd,arg_timeout*1000))
 			client_connect_problem(client,"Timeout waiting for node-program to connect");
 		req_clients[client]=skt_accept(server_fd,&clientIP,&clientPort);
@@ -1376,7 +1407,12 @@ void req_start_server(void)
   server_port = 0;
   server_ip=skt_my_ip();
   server_fd=skt_server(&server_port);
-  DEBUGF(("Charmrun control IP = %d, port = %d\n", server_ip, server_port));
+
+  if (arg_verbose) {
+    char ips[100];
+    showIP(server_ip, ips);
+    printf("Charmrun> Charmrun node IP = %s, port = %d\n", ips, server_port);
+  }
   
 #if CMK_CCS_AVAILABLE
   if(arg_server == 1) CcsServer_new(NULL,&arg_server_port);
@@ -1451,7 +1487,7 @@ environment variable entry for the given node #.
 It uses the idiotic "return reference to static buffer"
 string return idiom.
 */
-const char *create_netstart(int node)
+char *create_netstart(int node)
 {
   static char dest[80];
   sprintf(dest,"%d %d %d %d",node,server_ip,server_port,getpid()&0x7FFF);
@@ -2088,6 +2124,7 @@ prog rsh_start(nodeno)
 void rsh_pump_sh(p, nodeno, rank0no, argv)
     prog p; int nodeno, rank0no; char **argv;
 {
+  char *netstart;
   char *arg_nodeprog_r,*arg_currdir_r;
   char *dbg=nodetab_debugger(nodeno);
   xstr ibuf = p->ibuf;
@@ -2099,8 +2136,13 @@ void rsh_pump_sh(p, nodeno, rank0no, argv)
   xstr_printf(ibuf,"test -f $HOME/.charmrunrc && . $HOME/.charmrunrc\n");
   if (arg_display)
     xstr_printf(ibuf,"DISPLAY=%s;export DISPLAY\n",arg_display);
-  xstr_printf(ibuf,"NETSTART='%s';export NETSTART\n",create_netstart(rank0no));
+  netstart = create_netstart(rank0no);
+  xstr_printf(ibuf,"NETSTART='%s';export NETSTART\n",netstart);
   prog_flush(p);
+
+  if (arg_verbose) {
+    printf("Charmrun> Sending \"%s\" to client %d.\n", netstart, rank0no);
+  }
 
   /* find the node-program */
   arg_nodeprog_r = pathfix(arg_nodeprog_a, nodetab_pathfixes(nodeno));
@@ -2270,6 +2312,7 @@ void rsh_pump_sh(p, nodeno, rank0no, argv)
 void rsh_pump_csh(p, nodeno, rank0no, argv)
     prog p; int nodeno, rank0no; char **argv;
 {
+  char *netstart;
   char *arg_nodeprog_r,*arg_currdir_r;
   char *dbg=nodetab_debugger(nodeno);
   xstr ibuf = p->ibuf;
@@ -2281,8 +2324,13 @@ void rsh_pump_csh(p, nodeno, rank0no, argv)
   xstr_printf(ibuf,"if ( -x ~/.charmrunrc )   source ~/.charmrunrc\n");
   if (arg_display)
     xstr_printf(ibuf,"setenv DISPLAY %s\n",arg_display);
-  xstr_printf(ibuf,"setenv NETSTART '%s'\n",create_netstart(rank0no));
+  netstart = create_netstart(rank0no);
+  xstr_printf(ibuf,"setenv NETSTART '%s'\n",netstart);
   prog_flush(p);
+
+  if (arg_verbose) {
+    printf("Charmrun> Sending \"%s\" to client %d.\n", netstart, rank0no);
+  }
 
   /* find the node-program */
   arg_nodeprog_r = pathfix(arg_nodeprog_a, nodetab_pathfixes(nodeno));
