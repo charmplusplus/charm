@@ -159,6 +159,8 @@ public:
   inline void TotalTime(double* walltime, double* cputime) 
        { machineUtil.TotalTime(walltime,cputime); };
   void BackgroundLoad(double* walltime, double* cputime);
+  void GetTime(double *total_walltime,double *total_cputime,
+                   double *idletime, double *bg_walltime, double *bg_cputime);
   void ClearLoads(void);
 
   /**

@@ -343,6 +343,19 @@ void LBDB::BackgroundLoad(double* walltime, double* cputime)
   
   *walltime = totalwall - idle - obj_walltime;
   *cputime = totalcpu - obj_cputime;
+  if (*walltime < 0) *walltime = 0.;
+}
+
+void LBDB::GetTime(double *total_walltime,double *total_cputime,
+                   double *idletime, double *bg_walltime, double *bg_cputime)
+{
+  TotalTime(total_walltime,total_cputime);
+
+  IdleTime(idletime);
+  
+  *bg_walltime = *total_walltime - *idletime - obj_walltime;
+  *bg_cputime = *total_cputime - obj_cputime;
+  if (*bg_walltime < 0) *bg_walltime = 0.;
 }
 
 void LBDB::DumpDatabase()
