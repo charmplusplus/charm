@@ -9,7 +9,7 @@ Orion Sky Lawlor, olawlor@acm.org, 11/2/2001
 #include "ccs-client.h"
 #include "pup.h"
 #include "pup_toNetwork4.h"
-#include "conv-mach.h"
+#include "conv-config.h"
 #include "netfem_data.h"
 
 //Print statistics by running down the rows of this data
