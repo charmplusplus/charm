@@ -89,7 +89,6 @@ class PythonExecute : private PythonAbstract {
      bit 2: keepPrint
      bit 3: isHighLevel
      bit 4: isIterate
-     bit 5: print request
   */
   static const char FLAG_PERSISTENT = 0x80;
   static const char FLAG_KEEPPRINT = 0x40;
