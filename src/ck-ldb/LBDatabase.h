@@ -13,7 +13,6 @@ class LBDatabase : public Group {
 public:
   LBDatabase(void) {
     myLDHandle = LDCreate();  
-    CkPrintf("Hi from LBDatabase1D[%d] %d\n",CkMyPe(),thisgroup);
   };
 
   /*

@@ -62,7 +62,6 @@ CkGroupID Array1D::CreateArray(int numElements,
   msg->elementConstType = elementConstructor;
   msg->elementMigrateType = elementMigrator;
 #if CMK_LBDB_ON
-  CmiPrintf("Creating array %d\n",lbdb);
   msg->loadbalancer = lbdb;
 #endif
   group = CProxy_Array1D::ckNew(msg);
@@ -95,8 +94,6 @@ Array1D::Array1D(ArrayCreateMessage *msg)
   myCallbacks.queryEstLoad = staticQueryLoad;
   
   myHandle = the_lbdb->RegisterOM(myId,this,myCallbacks);
-  CkPrintf("[%d] Created myHandle %d\n",CkMyPe(),myHandle.handle);
-
 #endif
 
   ArrayMapRegisterMessage *mapMsg = new ArrayMapRegisterMessage;
@@ -134,7 +131,6 @@ void Array1D::RecvMapID(ArrayMap *mPtr, int mHandle)
 #if CMK_LBDB_ON
   // Tell the lbdb that I'm registering objects, until I'm done
   // registering them.
-  CkPrintf("[%d] using myHandle %d\n",CkMyPe(),myHandle.handle);
   the_lbdb->RegisteringObjects(myHandle);
 #endif
 
@@ -196,7 +192,6 @@ void Array1D::RecvElementID(int index, ArrayElement *elem,
   elemID.id[0] = index;
   elemID.id[1] = elemID.id[2] = elemID.id[3] = 0;
 
-  //  CkPrintf("Registering object\n");
   elementIDs[index].ldHandle = the_lbdb->RegisterObj(myHandle,elemID,0,1);
 
   if (use_local_barrier)
@@ -276,11 +271,13 @@ void Array1D::RecvForElement(ArrayMessage *msg)
     register int epIdx = msg->entryIndex;
     CkChareID handle = elementIDs[msg->destIndex].elementHandle;
     register void *obj = handle.objPtr;
+    const int index = msg->destIndex;
 
 #if CMK_LBDB_ON
-    the_lbdb->ObjectStart(elementIDs[msg->destIndex].ldHandle);
+    the_lbdb->ObjectStart(elementIDs[index].ldHandle);
+    // Can't use msg after call(): The user may delete it!
     _entryTable[epIdx]->call(msg, obj);
-    the_lbdb->ObjectStop(elementIDs[msg->destIndex].ldHandle);
+    the_lbdb->ObjectStop(elementIDs[index].ldHandle);
 #else
     _entryTable[epIdx]->call(msg, obj);
 #endif
@@ -321,8 +318,6 @@ void Array1D::migrateMe(int index, int where)
   if (elementIDs[index].uses_barrier)
     the_lbdb->RemoveLocalBarrierClient(elementIDs[index].barrierHandle);
 #endif
-  CkPrintf("[%d] Element %d migrating away\n",CkMyPe(),index);
-
   numLocalElements--;
   elementIDsReported--;
 
@@ -404,7 +399,6 @@ void Array1D::RecvMigratedElementID(int index, ArrayElement *elem,
   elemID.id[0] = index;
   elemID.id[1] = elemID.id[2] = elemID.id[3] = 0;
 
-  CkPrintf("[%d] Registering Migrated object index %d\n",CkMyPe(),index);
   elementIDs[index].ldHandle = the_lbdb->RegisterObj(myHandle,elemID,0,1);
 
   if (elementIDs[index].uses_barrier)
