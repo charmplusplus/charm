@@ -1,0 +1,95 @@
+[jyothi@honesty synth_benchmark]$ rm *.log; ./charmrun +p4 hello 100 +record
+Running Hello on 4 processors for 100 elements
+Hi from element 0
+Hi from element 4
+Hi from element 8
+Hi from element 12
+Hi from element 16
+Hi from element 20
+Hi from element 24
+Hi from element 28
+Hi from element 32
+Hi from element 36
+Hi from element 40
+Hi from element 44
+Hi from element 48
+Hi from element 52
+Hi from element 56
+Hi from element 60
+Hi from element 64
+Hi from element 68
+Hi from element 72
+Hi from element 76
+Hi from element 80
+Hi from element 84
+Hi from element 88
+Hi from element 92
+Hi from element 96
+------------- Processor 0 Exiting: Caught Signal ------------
+Signal: floating point exception
+Suggestion: Check for integer or floating-point division by zero.
+Stack Traceback:
+  [0] /lib/tls/libc.so.6 [0x420276f8]
+  [1] _ZN12CkIndex_Main20_call_done_marshall2EPvP4Main+0x5e  [0x8080280]
+  [2] CkDeliverMessageFree+0x24  [0x808f0c2]
+  [3] /expand8/home/jyothi/cpd/synth_benchmark/hello [0x809174e]
+  [4] /expand8/home/jyothi/cpd/synth_benchmark/hello [0x80917af]
+  [5] /expand8/home/jyothi/cpd/synth_benchmark/hello [0x8091885]
+  [6] _Z15_processHandlerPvP11CkCoreState+0x2d2  [0x809038c]
+  [7] CmiHandleMessage+0x5a  [0x80c5ec6]
+  [8] CsdScheduleForever+0x60  [0x80c603f]
+  [9] CsdScheduler+0x11  [0x80c5fb1]
+  [10] /expand8/home/jyothi/cpd/synth_benchmark/hello [0x80c49a3]
+  [11] ConverseInit+0x27d  [0x80c4db1]
+  [12] main+0x27  [0x80937a3]
+  [13] __libc_start_main+0xe4  [0x420156a4]
+  [14] _Znwj+0x51  [0x807f949]
+Fatal error on PE 0> floating point exception
+[jyothi@honesty synth_benchmark]$ ./charmrun +p4 hello 100 +replay
+Running Hello on 4 processors for 100 elements
+Hi from element 0
+Hi from element 4
+Hi from element 8
+Hi from element 12
+Hi from element 16
+Hi from element 20
+Hi from element 24
+Hi from element 28
+Hi from element 32
+Hi from element 36
+Hi from element 40
+Hi from element 44
+Hi from element 48
+Hi from element 52
+Hi from element 56
+Hi from element 60
+Hi from element 64
+Hi from element 68
+Hi from element 72
+Hi from element 76
+Hi from element 80
+Hi from element 84
+Hi from element 88
+Hi from element 92
+Hi from element 96
+------------- Processor 0 Exiting: Caught Signal ------------
+Signal: floating point exception
+Suggestion: Check for integer or floating-point division by zero.
+Stack Traceback:
+  [0] /lib/tls/libc.so.6 [0x420276f8]
+  [1] _ZN12CkIndex_Main20_call_done_marshall2EPvP4Main+0x5e  [0x8080280]
+  [2] CkDeliverMessageFree+0x24  [0x808f0c2]
+  [3] /expand8/home/jyothi/cpd/synth_benchmark/hello [0x809174e]
+  [4] /expand8/home/jyothi/cpd/synth_benchmark/hello [0x80917af]
+  [5] /expand8/home/jyothi/cpd/synth_benchmark/hello [0x8091885]
+  [6] _Z15_processHandlerPvP11CkCoreState+0x2d2  [0x809038c]
+  [7] CmiHandleMessage+0x5a  [0x80c5ec6]
+  [8] CsdScheduleForever+0x60  [0x80c603f]
+  [9] CsdScheduler+0x11  [0x80c5fb1]
+  [10] /expand8/home/jyothi/cpd/synth_benchmark/hello [0x80c49a3]
+  [11] ConverseInit+0x27d  [0x80c4db1]
+  [12] main+0x27  [0x80937a3]
+  [13] __libc_start_main+0xe4  [0x420156a4]
+  [14] _Znwj+0x51  [0x807f949]
+Fatal error on PE 0> floating point exception
+
