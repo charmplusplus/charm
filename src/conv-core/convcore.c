@@ -362,7 +362,7 @@ int appletFd = -1;
 #endif
 
 #if NODE_0_IS_CONVHOST
-
+int serverFlag = 0;
 extern int inside_comm;
 CpvExtern(int, strHandlerID);
 
@@ -697,7 +697,8 @@ void CHostHandler(char *msg)
   numRegistered++;
  
   if(numRegistered == CmiNumPes()){
-    CmiPrintf("Server IP = %u, Server port = %u $\n",(CmiInt4) nodeIPs[0], nodePorts[0]);
+    if (serverFlag == 1) 
+      CmiPrintf("Server IP = %u, Server port = %u $\n",(CmiInt4) nodeIPs[0], nodePorts[0]);
   }
 }
 
@@ -2540,6 +2541,9 @@ extern void CrnInit(void);
 
 void ConverseCommonInit(char **argv)
 {
+#if NODE_0_IS_CONVHOST
+  int i;
+#endif
   CrnInit();
   CmiTimerInit();
   CstatsInit(argv);
@@ -2565,7 +2569,14 @@ void ConverseCommonInit(char **argv)
   CmiSignal(SIGALRM, SIGIO, 0, CommunicationServer);
   CmiEnableAsyncIO(hostskt);
   CHostRegister();
-  CmiPrintf("%d]Host Port = %u\n", CmiMyPe(), hostport);
+  
+  if(CmiMyPe() == 0){
+    for(i = 1; i < argc; i++)
+      if(strcmp(argv[i], "++server") == 0) {
+	serverFlag = 1;
+	break;
+      }
+  }
 #endif
   CldModuleInit();
 }
