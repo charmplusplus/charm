@@ -24,7 +24,7 @@ static void initNullLB(void) {
 void NullLB::init(void)
 {
   // if (CkMyPe() == 0) CkPrintf("[%d] NullLB created\n",CkMyPe());
-  hasNullLB = 1;
+  CkpvAccess(hasNullLB) = 1;
   theLbdb=CProxy_LBDatabase(lbdb).ckLocalBranch();
   receiver = theLbdb->
     AddLocalBarrierReceiver((LDBarrierFn)(staticAtSync),
@@ -40,8 +40,8 @@ NullLB::~NullLB()
 void NullLB::staticAtSync(void* data)
 {
   // if there is other LBs, just return
-  // CmiPrintf("numLoadBalancers = %d\n", numLoadBalancers);
-  if (numLoadBalancers > 1) return;
+  // CmiPrintf("numLoadBalancers = %d\n", CkpvAccess(numLoadBalancers));
+  if (CkpvAccess(numLoadBalancers) > 1) return;
 
   NullLB *me = (NullLB*)(data);
   me->AtSync();

@@ -13,6 +13,9 @@
 
 extern CkGroupID lbdb;
 
+CkpvExtern(int, numLoadBalancers);
+CkpvExtern(int, hasNullLB);
+
 typedef void (*LBDefaultCreateFn)(void);
 void LBSetDefaultCreate(LBDefaultCreateFn f);
 

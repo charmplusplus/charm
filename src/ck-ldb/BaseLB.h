@@ -3,9 +3,6 @@
 
 #include "LBDatabase.h"
 
-extern int numLoadBalancers;
-extern int hasNullLB;
-
 class BaseLB: public Group
 {
 protected:
