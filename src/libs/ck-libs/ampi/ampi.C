@@ -425,7 +425,7 @@ static ampi *ampiInit(char **argv)
 	CkArrayID threads;
         opts=TCHARM_Attach_start(&threads,&_nchunks);
 	parent=CProxy_ampiParent::ckNew(new_world,threads,cinst, opts);
-
+	STARTUP_DEBUG("ampiInit> array size "<<_nchunks);
 #if AMPI_COMLIB
         //CProxy_ComlibManager comlib = CProxy_ComlibManager::ckNew(strat, 1);
 	//comlib.ckLocalBranch()->createId();
