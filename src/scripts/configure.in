@@ -15,7 +15,8 @@ fi
 
 test -r ./conv-mach-opt.sh && . ./conv-mach-opt.sh
 
-VERSION=050608
+#turn out to be in octal number, don't use digit >= 8
+VERSION=050610
 AC_DEFINE_UNQUOTED(CHARM_VERSION, $VERSION)
 
 AC_MSG_CHECKING(machine name)
