@@ -14,7 +14,7 @@
        function REFINE2D_Get_Split_Length()
           integer  :: REFINE2D_Get_Split_Length
        end function REFINE2D_Get_Split_Length
-       subroutine REFINE2D_Get_Split(splitNo,conn,tri,edge,movingNode,frac)
+       subroutine REFINE2D_Get_Split(splitNo,conn,tri,A,B,C,frac)
           integer, intent(in) :: splitNo
           integer, intent(in) :: conn(:,:)
           integer, intent(out) :: tri
