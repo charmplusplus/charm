@@ -22,7 +22,7 @@ CMK_CF90_FIXED="cmpif90c -ifc "
 CMK_F90LIBS="-lifcore $F90MAIN "
 # for_main.o is important for main() in f90 code
 F90DIR=`which ifort 2> /dev/null`
-test -n "$F90DIR" && F90MAIN="`dirname $F90DIR`/../lib/for_main.o"
+test -x "$F90DIR" && F90MAIN="`dirname $F90DIR`/../lib/for_main.o"
 CMK_F90MAINLIBS="$F90MAIN "
 CMK_F77LIBS=$CMK_F90LIBS
 CMK_MOD_NAME_ALLCAPS=
