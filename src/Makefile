@@ -54,7 +54,7 @@ basics: dirs+sources $(ALLHEADERS) $(ALLINTERFACES) charmc conv-mach.csh
 	rm -f ../bin/charmc ; cp charmc ../bin/
 	cp conv-mach.csh ../include/
 	touch basics
-	
+
 dirs+sources:
 	@rm -f .vdir .gdir
 	@(cd .. ; basename `pwd` > tmp/.vdir)
@@ -347,25 +347,25 @@ LIBCKD_CPLUS_Y=init.cplus.d.o main.cplus.d.o ck.cplus.d.o acc.cplus.d.o mono.cpl
 libckd-cplus-y.o: $(LIBCKD_CPLUS_Y)
 	$(CHARMC) -cp ../lib/ -o $@ $(LIBCKD_CPLUS_Y)
 
-init.cplus.n.o init.cplus.d.o : init.cplus.cxx $(CKHEADERS) c++interface.h
-	$(CHARMC) -o init.cplus.n.o init.cplus.cxx
-	$(CHARMC) -o init.cplus.d.o init.cplus.cxx -DDEBUGGING_MODE
+init.cplus.n.o init.cplus.d.o : init.cplus.C $(CKHEADERS) c++interface.h
+	$(CHARMC) -o init.cplus.n.o init.cplus.C
+	$(CHARMC) -o init.cplus.d.o init.cplus.C -DDEBUGGING_MODE
 
-main.cplus.n.o main.cplus.d.o : main.cplus.cxx $(CKHEADERS) c++interface.h
-	$(CHARMC) -o main.cplus.n.o main.cplus.cxx
-	$(CHARMC) -o main.cplus.d.o main.cplus.cxx -DDEBUGGING_MODE
+main.cplus.n.o main.cplus.d.o : main.cplus.C $(CKHEADERS) c++interface.h
+	$(CHARMC) -o main.cplus.n.o main.cplus.C
+	$(CHARMC) -o main.cplus.d.o main.cplus.C -DDEBUGGING_MODE
 
-ck.cplus.n.o ck.cplus.d.o : ck.cplus.cxx $(CKHEADERS) c++interface.h
-	$(CHARMC) -o ck.cplus.n.o ck.cplus.cxx
-	$(CHARMC) -o ck.cplus.d.o ck.cplus.cxx -DDEBUGGING_MODE
+ck.cplus.n.o ck.cplus.d.o : ck.cplus.C $(CKHEADERS) c++interface.h
+	$(CHARMC) -o ck.cplus.n.o ck.cplus.C
+	$(CHARMC) -o ck.cplus.d.o ck.cplus.C -DDEBUGGING_MODE
 
-acc.cplus.n.o acc.cplus.d.o : acc.cplus.cxx $(CKHEADERS) c++interface.h acc.h
-	$(CHARMC) -o acc.cplus.n.o acc.cplus.cxx
-	$(CHARMC) -o acc.cplus.d.o acc.cplus.cxx -DDEBUGGING_MODE
+acc.cplus.n.o acc.cplus.d.o : acc.cplus.C $(CKHEADERS) c++interface.h acc.h
+	$(CHARMC) -o acc.cplus.n.o acc.cplus.C
+	$(CHARMC) -o acc.cplus.d.o acc.cplus.C -DDEBUGGING_MODE
 
-mono.cplus.n.o mono.cplus.d.o : mono.cplus.cxx $(CKHEADERS) c++interface.h mono.h
-	$(CHARMC) -o mono.cplus.n.o mono.cplus.cxx
-	$(CHARMC) -o mono.cplus.d.o mono.cplus.cxx -DDEBUGGING_MODE
+mono.cplus.n.o mono.cplus.d.o : mono.cplus.C $(CKHEADERS) c++interface.h mono.h
+	$(CHARMC) -o mono.cplus.n.o mono.cplus.C
+	$(CHARMC) -o mono.cplus.d.o mono.cplus.C -DDEBUGGING_MODE
 
 ###############################################################################
 #
