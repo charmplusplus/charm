@@ -1157,6 +1157,17 @@ void CkMessageWatcherInit(char **argv,CkCoreState *ck) {
 
 
 
+int CkMessageToEpIdx(void *msg) {
+        envelope *env=UsrToEnv(msg);
+        int ep=env->getEpIdx();
+        if (ep==CkIndex_CkLocMgr::deliverInline(0)
+         || ep==CkIndex_CkArray::recvBroadcast(0))
+        { // It's actually an array message:
+                ep=env->array_ep();
+        }
+        return ep;
+}
+
 
 
 
