@@ -151,6 +151,8 @@ static void PerrorExit(const char *msg)
 
 /**************************  TIMER FUNCTIONS **************************/
 
+#if CMK_TIMER_USE_SPECIAL
+
 #include <sys/timers.h>
 void CmiTimerInit(void)
 {
@@ -199,6 +201,8 @@ double CmiCpuTimer(void)
 
     //return (elan_clock(elan_base->state) - starttimer)/1e9;
 }
+
+#endif
 
 static PCQueue   msgBuf;
 
