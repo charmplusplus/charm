@@ -1521,7 +1521,7 @@ void CmiInitImmediateMsg(void)
 }
 
 #if !CMK_IMMEDIATE_MSG
-void CmiPollImmediateMsg()
+void CmiProbeImmediateMsg()
 {
 }
 #endif 

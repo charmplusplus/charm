@@ -933,7 +933,7 @@ CpvExtern(void*, CmiLocalQueue);
 
 CpvExtern(int, CmiImmediateMsgHandlerIdx);
 
-void CmiPollImmediateMsg();
+void CmiProbeImmediateMsg();
 
 /******** Object ID ********/
 
