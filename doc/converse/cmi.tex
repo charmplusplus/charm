@@ -24,7 +24,7 @@ process. A separate call to \param{exit()} is needed after
 \section{Message Handler Calls}
 
 
-\function {CmiMsgHeaderSizeBytes}
+\function {\#define CmiMsgHeaderSizeBytes}
 \desc{This constant, defined in {\tt converse.h}, denotes
 the size of the message header in bytes.}
  
@@ -235,6 +235,27 @@ parallel program is being run.}
 \desc{ Returns the logical processor identifier of processor on which the 
 caller resides. A processor Id is between \param{0} and \param{CmiNumPe()-1}.}
 
+\section{Memory Management}
+
+\function{void *CmiAlloc(int size)}
+\desc{Allocates memory of size \param{size} in heap and returns pointer to 
+the usable space. All the converse entities (e.g. messages) should be 
+allocated with \param{CmiAlloc} and not with standard C library 
+functions such as \param{malloc} because converse uses \param{CmiFree} to free 
+these entities internally. \note{Currently this function is a simple wrapper
+around \param{malloc}. However, in future, sophisticated memory allocation
+strategies will be incorporated into converse.}}
+
+\function{int CmiSize(void *ptr)}
+\desc{This function returns the allocated size of memory pointed to by 
+\param{ptr}. \param{ptr} should be returned by an earlier call to 
+\param{CmiAlloc}.}
+
+\function{void CmiFree(void *ptr)}
+\desc{This function frees the memory pointed to by \param{ptr}. \param{ptr}
+should be returned by an earlier callto \param{CmiAlloc}.}
+
+
 \section{Input/Output}
 
 \function{void CmiPrintf(char *format, arg1, arg2, ...)}
@@ -242,7 +263,7 @@ caller resides. A processor Id is between \param{0} and \param{CmiNumPe()-1}.}
 On machine with host, this is implemented on top of the messaging 
 layer using asynchronous sends.}
 
-\function{void CmiScanf(char *format, void *arg1, void *arg2, ...)}
+\function{int CmiScanf(char *format, void *arg1, void *arg2, ...)}
 \desc{This function performs an atomic \param{scanf} from \param{stdin}.
 The processor, on which the caller resides, blocks for input. On machines with
 host, this is implemented on top of the messaging layer using asynchronous
@@ -292,3 +313,26 @@ in the processor-group \param{group}.}
 children processor \param{node} in processor-group \param{group}. This
 array should atleast be of size \param{CmiNumChildren()}.}
 }
+
+\section{Spanning Tree Calls}
+
+Converse defines a spanning tree organization of the processor nodes along
+with routines for accessing elements of that tree.  The spanning tree
+routines come in handy when writing programs with collective communication
+because message communication patterns can be made to proceed along the
+spanning tree arcs to avoid bottlenecks at a single node.
+
+\function{int CmiSpanTreeRoot()}
+\desc{Returns the processor number of the root of the spanning tree.}
+
+\function{int CmiSpanTreeParent(int node)}
+\desc{This function returns the processor number of the parent of
+\param{node} in the spanning tree.}
+
+\function{int CmiNumSpanTreeChildren(int node)}
+\desc{Returns the number of children of \param{node} in the spanning tree.}
+
+\function{void CmiSpanTreeChildren(int node, int *children)}
+\desc{This function fills the array \param{children} with processor
+numbers of children of \param{node} in the spanning tree.}
+
