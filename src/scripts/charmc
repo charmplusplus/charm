@@ -876,13 +876,31 @@ do
 	BASE=`stripExtention \`basename $FILE\``
 	TMP=`basename $FILE`".TMP"
 	FILE_EXT=`getExtention $FILE`
+	BASEO="$BASE.o"
+	DESTO="-o $BASEO"
+
+	# in case of: charmc -o object.o -c foo.c,
+	# avoid foo.c => remove foo.o => foo.o => object.o,
+	# instead generate object.o directly.
+ 	# remove and generate foo.o may be dangerous in parallel make 
+	# for example in the case of compiling several objs from one 
+	# same c file such as memory.c.
+	numFiles=`echo $FILES | wc -w`
+	if [ $numFiles = 1 -a -n "$OBJECT" ]
+	then
+		OBJ_EXT=`getExtention $OBJECT`
+		if [ "$OBJ_EXT" = '.o' ]
+          	then
+        	    BASEO=$OBJECT
+		    DESTO="-o $OBJECT"
+	  	fi
+        fi
+
 	if [ "$FILE_EXT" != ".o" -a "$FILE_EXT" != ".M" -a "$FILE_EXT" != ".ci" ]
 	then
 		[ $VERBOSE ] && echo "Compiling $FILE"
-		DoNoErrCheck $RM $BASE.o $BASE.f.o
+		DoNoErrCheck $RM $BASEO $BASE.f.o
 	fi
-	BASEO="$BASE.o"
-	DESTO="-o $BASEO"
 	if [ ! -z "$SKIPLINK" ] 
 	then
 		DESTO=""
@@ -930,7 +948,7 @@ do
 # Handle new object files
 	if [ -n "$NU_OBJ" -a -n "$OBJECT" ] 
 	then
-		if [ "$OBJECT" != "$BASE.o" ]
+		if [ "$OBJECT" != "$BASEO" ]
 		then
 			DELETE="$DELETE $NU_OBJ"
 		fi
