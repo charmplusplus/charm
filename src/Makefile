@@ -77,7 +77,7 @@ CVHEADERS=converse.h conv-conds.h conv-mach.h
 
 CVLIBS=libconv-core.o $(CVLIBS_QS)
 
-LIBCONV_CORE=convcore.o conv-conds.o machine.o spantree.o queueing.o fifo.o threads.o
+LIBCONV_CORE=convcore.o conv-conds.o machine.o spantree.o queueing.o fifo.o threads.o msgmgr.o
 
 converse: basics $(CVLIBS) cmk_extras
 
@@ -104,6 +104,9 @@ conv-conds.o: conv-conds.c $(CVHEADERS)
 
 threads.o: threads.c $(CVHEADERS)
 	$(CHARMC) threads.c
+
+msgmgr.o: msgmgr.c $(CVHEADERS)
+	$(CHARMC) msgmgr.c
 
 cmk_extras:
 	csh -fc 'source conv-mach.csh ; set echo ; $$CMK_EXTRAS'
@@ -420,7 +423,7 @@ xl-dag.o: xl-dag.c
 
 XPHEADERS=xp-extn.h xp-t.h xp-ytab.h
 
-CHARMXLATXX=xp-lexyy.o xp-process.o xp-table.o xp-ytab.o
+CHARMXLATXX=xp-lexyy.o xp-process.o xp-table.o xp-ytab.o xp-ycode.o
 
 charmxlat++: basics $(CHARMXLATXX) xp-space.o
 	$(CHARMC) -seq -o charmxlat++   -cp ../bin/ $(CHARMXLATXX)
@@ -435,12 +438,36 @@ xp-process.o: xp-process.c $(XPHEADERS)
 xp-table.o: xp-table.c $(XPHEADERS)
 	$(CHARMC) -seq xp-table.c
 
+xp-ycode.o: xp-ycode.c $(XPHEADERS)
+	$(CHARMC) -seq xp-ycode.c
+
 xp-ytab.o: xp-ytab.c $(XPHEADERS)
-	$(CHARMC) -seq xp-ytab.c
+	$(CHARMC) -seq -DYYDEBUG xp-ytab.c
 
 xp-space.o: xp-space.c $(XPHEADERS)
 	$(CHARMC) -seq xp-space.c
 
+
+###############################################################################
+#
+# make yacc++
+#
+###############################################################################
+
+yacc++:
+	byacc -d -r xp-t.y
+	cat y.tab.h > xp-ytab.h
+	rm -f y.tab.h
+	sed -e 's/, */,/g' -e 's/^ *//' < y.tab.c > xp-ytab.c
+	rm -f y.tab.c
+	cat y.code.c > xp-ycode.c
+	rm -f y.code.c
+	flex xp-sfilter
+	cat lex.yy.c > xp-space.c
+	rm -f lex.yy.c
+	flex xp-t.l
+	cat lex.yy.c > xp-lexyy.c
+	rm -f lex.yy.c
 
 ###############################################################################
 #
