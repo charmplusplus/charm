@@ -83,7 +83,7 @@ typedef union
 #ifdef __cplusplus
 
 #ifndef yyerror
-	void yyerror(const char *);
+	int yyerror(char *);
 #endif
 
 #ifndef yylex
