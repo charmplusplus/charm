@@ -1136,6 +1136,18 @@ CCS Interface:
 sockets.
 ***************************************************************************/
 
+#include <sys/time.h>
+
+double WallTimer(void)
+{
+  struct timeval tv;
+  double currenttime;
+
+  gettimeofday(&tv,0);
+  currenttime = (tv.tv_sec * 1.0) + (tv.tv_usec * 0.000001);
+  return currenttime;
+}
+
 #if CMK_CCS_AVAILABLE
 
 /*The Ccs Server socket became active-- 
@@ -1144,6 +1156,7 @@ by forwarding the request to the appropriate node.
  */
 void req_ccs_connect(void)
 {
+  const void *bufs[3]; int lens[3];
   struct {
    ChMessageHeader ch;/*Make a charmrun header*/
    CcsImplHeader hdr;/*Ccs internal header*/
@@ -1160,11 +1173,18 @@ void req_ccs_connect(void)
 	h.hdr.pe=ChMessageInt_new(pe);
   }
 
+#define LOOPBACK 0
+#if LOOPBACK /*Immediately reply "there's nothing!" (for performance testing)*/
+  CcsServer_sendReply(&h.hdr,0,0);
+#else
   /*Fill out the charmrun header & forward the CCS request*/
   ChMessageHeader_new("req_fw",sizeof(h.hdr)+reqBytes,&h.ch);  
+  
+  bufs[0]=&h; lens[0]=sizeof(h);
+  bufs[1]=reqData; lens[1]=reqBytes;
+  skt_sendV(nodetab_ctrlfd(pe),2,bufs,lens);
 
-  skt_sendN(nodetab_ctrlfd(pe),&h,sizeof(h));
-  skt_sendN(nodetab_ctrlfd(pe),reqData,reqBytes);
+#endif
   free(reqData);
 }
 
