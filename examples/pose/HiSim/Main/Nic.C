@@ -80,7 +80,8 @@ void NetInterface::storeMsgInAdvance(NicMsg *m) {
 // Receive packet by packet and finally send message to node
 
 void NetInterface::recvPacket(Packet *p) {
-        POSE_TimeType tmp,expected,extra,hops,remlen; TaskMsg *tm; TransMsg *tr;Position src; MsgStore ms;
+        POSE_TimeType tmp,expected,extra,remlen; TaskMsg *tm; TransMsg *tr;Position src; MsgStore ms;
+	int hops;
         remoteMsgId rmid(p->hdr.msgId,p->hdr.src);
         map<remoteMsgId,int>::iterator it2 = pktMap.find(rmid);
 
