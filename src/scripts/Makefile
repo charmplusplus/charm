@@ -208,10 +208,10 @@ charmrun-target: daemon-target
 	if [ -f charmrun ] ; then ( cp charmrun ../bin ) ; fi
 
 daemon-target: sockRoutines.o
-	[ -f daemon.c ] && $(CHARMC) -seq daemon.c \
-		sockRoutines.o -o ../bin/daemon 
-	[ -f daemon.c ] && $(CHARMC) -DFACELESS -seq daemon.c \
-		sockRoutines.o -o ../bin/daemon_faceless 
+	if test -f daemon.c ; then $(CHARMC) -seq daemon.c \
+		sockRoutines.o -o ../bin/daemon; fi 
+	if test -f daemon.c ; then $(CHARMC) -DFACELESS -seq daemon.c \
+		sockRoutines.o -o ../bin/daemon_faceless; fi 
 	touch daemon-target
 
 QuickThreads/libckqt.a:
