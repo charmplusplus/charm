@@ -816,6 +816,13 @@ static void CmiPushNode(void *msg)
 {
   CmiState cs=CmiGetStateN(0);
   MACHSTATE1(2,"Pushing message into node queue",pe);
+#if CMK_IMMEDIATE_MSG
+  if ((CmiGetHandler(msg) == CpvAccessOther(CmiImmediateMsgHandlerIdx,0))) {
+    *(int *)msg = 0;         /* store the rank in msg header, pretend 0 */
+    PCQueuePush(CsvAccess(NodeState).imm, (char *)msg);
+    return;
+  }
+#endif
   PCQueuePush(CsvAccess(NodeState).NodeRecv,msg);
   /*Silly: always try to wake up processor 0, so at least *somebody*
     will be awake to handle the message*/
