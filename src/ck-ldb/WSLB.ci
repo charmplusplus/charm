@@ -5,6 +5,8 @@ extern module BaseLB;
 
 message WSLBStatsMsg;
 
+initnode void lbinit();
+
 group [migratable] WSLB: BaseLB {
   entry void WSLB(const CkLBOptions&);  
   entry void ReceiveStats(WSLBStatsMsg*);

@@ -29,6 +29,13 @@
 
 CreateLBFunc_Def(WSLB);
 
+static void lbinit(void) {
+  LBRegisterBalancer("WSLB", 
+                     CreateWSLB, 
+		     AllocateWSLB, 
+                     "Workstation load balancer");
+}
+
 
 void WSLB::staticMigrated(void* data, LDObjHandle h)
 {
@@ -203,11 +210,13 @@ WSLBStatsMsg* WSLB::AssembleStats()
   msg->vacate_me = vacate;
   msg->usage = usage;
 
-  //  CkPrintf(
-  //    "Proc %d speed=%d Total(wall,cpu)=%f %f Idle=%f Bg=%f %f Obj=%f %f\n",
-  //    CkMyPe(),msg->proc_speed,msg->total_walltime,msg->total_cputime,
-  //    msg->idletime,msg->bg_walltime,msg->bg_cputime,
-  //    msg->obj_walltime,msg->obj_cputime);
+  if (_lb_debug) {
+    CkPrintf(
+      "Proc %d speed=%d Total(wall,cpu)=%f %f Idle=%f Bg=%f %f Obj=%f %f\n",
+      CkMyPe(),msg->proc_speed,msg->total_walltime,msg->total_cputime,
+      msg->idletime,msg->bg_walltime,msg->bg_cputime,
+      msg->obj_walltime,msg->obj_cputime);
+  }
 
   //  CkPrintf("PE %d sending %d to ReceiveStats %d objs, %d comm\n",
   //	   CkMyPe(),msg->serial,msg->n_objs,msg->n_comm);
