@@ -581,7 +581,8 @@ fi
 
 CHARMLIB="$CHARMBIN/../lib"
 CHARMINC="$CHARMBIN/../include"
-CHARMLIBSO=`cd "$CHARMBIN/../lib_so"; pwd`
+CHARMLIBSO=
+[ -d "$CHARMBIN/../lib_so" ] && CHARMLIBSO=`cd "$CHARMBIN/../lib_so"; pwd`
 
 
 ##############################################################################
@@ -668,6 +669,7 @@ fi
 
 if [ "$BUILD_SHARE" = "1" ]
 then
+ 	[ -z "$CHARMLIBSO" ] &&  Abort "Charm++ lib_so not found!"
 	# ignore BUILD_SHARE if the target is not .a or .so
 	case "$OBJECT" in
 	*.a|*.so|*.sl)
@@ -1231,6 +1233,7 @@ fi
 
 if [ "$CHARM_SHARED" = "1" ]
 then
+  [ -z "$CHARMLIBSO" ] &&  Abort "Charm++ lib_so directory not found!"
   # build user executable/shared lib linking with charm .so
   OPTS_LD="$OPTS_LD $CMK_LD_LIBRARY_PATH"
   if [ "$BUILD_SHARE" = "1" ]
