@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.10  1995-09-19 17:56:25  sanjeev
+ * Revision 2.11  1995-09-19 23:10:24  jyelon
+ * added function pointer to 'StartCharm' arglist.
+ *
+ * Revision 2.10  1995/09/19  17:56:25  sanjeev
  * moved Charm's module inits from user_main to InitializeCharm
  *
  * Revision 2.9  1995/07/19  22:15:24  jyelon
@@ -71,7 +74,7 @@ char *argv[];
   ConverseInit(argv);
 
   InitializeCharm(argv) ;
-  StartCharm(argv);
+  StartCharm(argv, (void *)0);
 
   CpvAccess(CsdStopFlag)=0;
 
