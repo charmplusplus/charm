@@ -38,9 +38,7 @@ are included in a \charmpp\ program.
 
 The \charmpp\ interface file as the suffix ``.ci''. 
 The \charmpp\ interface translator parses this file and produces two files 
-(with suffixes ``.decl.h'' and ``.def.h'') that contain declarations 
-(interface) and definitions (implementation)
-of various translator-generated entities. If the name of a
+(with suffixes ``.decl.h'' and ``.def.h'', {\em for each modules declared in the ``.ci'' file}), that contain declarations (interface) and definitions (implementation)of various translator-generated entities. If the name of a
 module is \uw{MOD}, then the files produced by the \charmpp\ interface translator 
 are named \uw{MOD.decl.h} and \uw{MOD.def.h}\footnote{Note that the interface 
 file for module \uw{MOD} need not be named \uw{MOD.ci}. Indeed one ``.ci'' 
@@ -59,9 +57,10 @@ A simple \charmpp\ program is given below:
 // File: pgm.ci
 
 module Hello {
+  readonly mid;
   mainchare HelloMain {
     entry HelloMain(); // implicit CkArgMsg * as argument
-    entry [threaded] void Wait(void);
+    entry void Wait(void);
   };
   group HelloGroup {
     entry HelloGroup(void);
@@ -73,6 +72,7 @@ module Hello {
 #include "Hello.decl.h" // Note: not pgm.decl.h
 
 class HelloMain: public Chare {
+  int count;
   HelloMain(CkArgMsg *);
   void Wait(void);
 };
@@ -87,18 +87,21 @@ class HelloGroup: public Group {
 
 HelloMain::HelloMain(CkArgMsg *msg) {
   delete msg;
+  count = 0;
   CProxy_HelloGroup::ckNew(); //Create a new ``HelloGroup''
-  CProxy_HelloMain pself(thishandle);
-  pself.Wait();
+  mid = thishandle;
 }
 
 void HelloMain::Wait(void) {
-  CkWaitQD(); //Waits for ``quiescence''
-  CkExit();
+  count ++;
+  if(count == CkNumPes())  // Wait for all group members to finish the printf.
+      CkExit();	
 }
 
 HelloGroup::HelloGroup(void) {
   ckout << "Hello World from processor " << CkMyPe() << endl;
+  CProxy_HelloMain pself(mid);
+  pself.wait();
 }
 
 #include "Hello.def.h" //Include the Charm++ object implementations
@@ -115,16 +118,29 @@ pgm: pgm.ci pgm.h pgm.C
 
 \uw{HelloMain} is designated a \kw{mainchare}. Thus the Charm Kernel starts 
 execution of this program by creating an instance of \uw{HelloMain} on 
-processor 0. The HelloMain constructor creates a chare group \uw{HelloGroup}, and 
-calls \uw{Wait} on itself asynchronously.  Both these calls return immediately
-after directing Charm Kernel to perform the actual creation and invocation. 
+processor 0. The HelloMain constructor creates a chare group \uw{HelloGroup},
+ and and and stores a handle to itself and returns. The call to create the 
+group returns immediately after directing Charm Kernel to perform 
+the actual creation and invocation. 
 Shortly after, the Charm Kernel will create an object of type
-\uw{HelloGroup} on each processor, which will print out 
-``Hello World...''.  The \uw{Wait} method 
-of \uw{HelloMain} may simultainously be invoked, which  
-will wait for quiescence (no activity in 
-the program) and then it will exit the program.
+\uw{HelloGroup} on each processor, and call its constructor. The constructor 
+will then print 
+``Hello World...'' and then call the \uw{Wait} method 
+of \uw{HelloMain}. The wait method calls CkExit() after all group members have called it (\em{ie} they have finished printing ``Hello World...''), and the \charmpp program exits.
 
+\subsubsection{Functions of the ``decl.h'' and ``def.h'' files}
+
+	The {\em decl.h} file provides decelerations for the proxy classes, of the concurrent objects declared in the ``.ci'' file. So the \uw{Hello.decl.h} file will have the deceleration of the class CProxy_HelloMain. Similarly it will also have the deceleration for the HelloGroup class. 
+
+	This class will have functions to create new instances of the chares and groups, like the function ckNew. For HelloGroup this function creates an instance of the class HelloGroup on all the processors. 
+
+	The proxy class also has functions corresponding to the entry methods defined in the ``.ci'' file. In the above program the method wait is declared in CProxy_HelloMain (proxy class for HelloMain).
+
+	The proxy class also provides a static register functions for all readonly variables and entry methods. These entities need to be registered so that, objects can send messages to remote objects.
+
+	The ``def.h'' file also has a register function {__registerHello in the above program} which calls all the resgiter functions, corresponding to the {\em readonly variables} and {\em entry methods} declared in the module. The charm runtime calls this register function to register all readonly variables and entry methods.
+
+	
 
 
 
