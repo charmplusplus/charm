@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 1.10  1996-07-02 21:22:24  jyelon
+ * Revision 1.11  1996-07-12 18:37:46  jyelon
+ * Updated CMK_ASYNC and CMK_SIGNAL stuff.
+ *
+ * Revision 1.10  1996/07/02 21:22:24  jyelon
  * Many small changes.
  *
  * Revision 1.9  1996/06/28 21:27:11  jyelon
@@ -130,12 +133,9 @@
 #define CMK_TIMER_USE_GETRUSAGE
 /* #define CMK_TIMER_USE_TIMES */
 
-#define CMK_ASYNC_USE_SETOWN_AND_SETFL
-/* #define CMK_ASYNC_USE_SIOCGPGRP_AND_FIOASYNC */
-
 #define CMK_SIGNAL_IS_A_BUILTIN
 /* #define CMK_SIGNAL_USE_SIGACTION */
-/* #define CMK_SIGNAL_USE_SIGACTION_AND_SIGEMPTYSET */
+/* #define CMK_SIGNAL_USE_SIGACTION_WITH_RESTART */
 
 #define CMK_MAX_DGRAM_SIZE 4096
 
