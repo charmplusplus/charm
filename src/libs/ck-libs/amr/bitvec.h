@@ -1,6 +1,6 @@
 #define MAXDIMENSION 3
 #if CK_ARRAYINDEX_MAXLEN < MAXDIMENSION+1
-#  error "You need to set CK_ARRAYINDEX_MAXLEN to at least 4"
+#  warning "You need to set CK_ARRAYINDEX_MAXLEN to at least 4"
 #endif
 
 class bitvec
