@@ -1,7 +1,7 @@
 \subsection{Chare Arrays}
 
 Chare arrays \index{arrays} are arbitrarily-sized collections of chares.  The
-entire array is has a globally unique identifier of type \kw{CkArrayID}, and
+entire array has a globally unique identifier of type \kw{CkArrayID}, and
 each element has a unique index of type \kw{CkArrayIndex}.  A \kw{CkArrayIndex}
 can be a single integer (i.e. 1D array), several integers (i.e. a
 multidimentional array), or an arbitrary string of bytes (e.g. a binary tree
@@ -21,13 +21,8 @@ as:
 \begin{alltt}
 //In the .ci file:
 array [1D] A \{
-  entry A();
-  entry void someEntry(M1 *);
-\};
-
-//In the .h file:
-class M1:public CMessage_M1 \{
-//...message fields...
+  entry A(\uw{parameters1});
+  entry void someEntry(\uw{parameters2});
 \};
 \end{alltt}
 
@@ -41,10 +36,10 @@ and ``thisIndex'', the element's array index.
 \begin{alltt}
 class A : public ArrayElement1D \{
   public:
-    A(void);
+    A(\uw{parameters1});
     A(CkMigrateMessage *);
 
-    void someEntry(M1 *);
+    void someEntry(\uw{parameters2});
 \};
 \end{alltt}
 
@@ -71,10 +66,10 @@ index arrays.  These arrays can be declared as:
 \begin{alltt}
 //In the .ci file:
 message MyMsg;
-array [1D] A1 \{ entry A1(); entry void e(MyMsg *m);\}
-array [2D] A2 \{ entry A2(); entry void e(MyMsg *m);\}
-array [3D] A3 \{ entry A3(); entry void e(MyMsg *m);\}
-array [Foo] AF \{ entry AF(); entry void e(MyMsg *m);\}
+array [1D] A1 \{ entry A1(); entry void e(\uw{parameters});\}
+array [2D] A2 \{ entry A2(); entry void e(\uw{parameters});\}
+array [3D] A3 \{ entry A3(); entry void e(\uw{parameters});\}
+array [Foo] AF \{ entry AF(); entry void e(\uw{parameters});\}
 \end{alltt}
 
 The last declaration expects an array index of type \kw{CkArrayIndex}\uw{Foo},
@@ -83,11 +78,6 @@ which must be defined before including the \texttt{.decl.h} file
 
 \begin{alltt}
 //In the .h file:
-class MyMsg: public CMessage_MyMsg \{
-public: 
-  int val;
-  MyMsg(int i) \{val=i;\}
-\}
 class A1:public ArrayElement1D \{ public: A1()\{\} ...\};
 class A2:public ArrayElement2D \{ public: A2()\{\} ...\};
 class A3:public ArrayElement3D \{ public: A3()\{\} ...\};
@@ -112,7 +102,7 @@ use (x,y,z); and for user-defined types use [f] or (f).
 
 You insert elements into the array by indexing the proxy
 and calling insert.  The insert call optionally takes 
-a message, which is passed to the constructor, or a
+parameters, which are passed to the constructor; and a
 processor number, where the element will be created.
 Array elements can be inserted in any order from 
 any processor at any time.  Array elements need not 
@@ -126,25 +116,25 @@ After creating elements, start using the array with
 int x,y,z;
 CProxy_A1 a1=CProxy_A1::ckNew();  //Creates new 1D array
 for (x=...) \{
-   a1[x  ].insert();  //Bracket syntax
-   a1(x+1).insert();  // or equivalent parenthesis syntax
+   a1[x  ].insert(\uw{parameters});  //Bracket syntax
+   a1(x+1).insert(\uw{parameters});  // or equivalent parenthesis syntax
 \}
 a1.doneInserting();
 
 CProxy_A2 a2=CProxy_A2::ckNew();   //Creates new 2D array
 for (x=...) for (y=...)
-   a2(x,y).insert();  //Can't use brackets!
+   a2(x,y).insert(\uw{parameters});  //Can't use brackets!
 a2.doneInserting();
 
 CProxy_A3 a3=CProxy_A3::ckNew();   //Creates new 3D array
 for (x=...) for (y=...) for (z=...)
-   a3(x,y,z).insert();
+   a3(x,y,z).insert(\uw{parameters});
 a3.doneInserting();
 
 CProxy_AF aF=CProxy_AF::ckNew();   //Creates new user-defined index array
 for (...) \{
-   aF[CkArrayIndexFoo(...)].insert(); //Use brackets...
-   aF(CkArrayIndexFoo(...)).insert(); //  ...or parenthesis
+   aF[CkArrayIndexFoo(...)].insert(\uw{parameters}); //Use brackets...
+   aF(CkArrayIndexFoo(...)).insert(\uw{parameters}); //  ...or parenthesis
 \}
 aF.doneInserting();
 
@@ -161,7 +151,7 @@ This is exactly equivalent to the loop:
 \begin{alltt}
 CProxy_A1 a = CProxy_A1::ckNew();
 for (i=0;i<num_elements;i++)
-	a1[i].insert();
+	a1[i].insert(\uw{parameters});
 a1.doneInserting();
 \end{alltt}
 
@@ -192,15 +182,16 @@ You must ensure that no messages are sent to a deleted element.
 After destroying an element, you may insert a new element at
 its index.
 
-\subsubsection{Messages and Broadcasts}
+
+\subsubsection{Messages}
 
 To send a \index{Array message} message to an array element, index the proxy 
-and call the method name, possibly passing a message:
+and call the method name:
 
 \begin{alltt}
-a1[i].doSomething(new MyMsg(7));
-a3(x,y,z).doAnother(new MyMsg(23));
-aF[CkArrayIndexFoo(...)].doAgain();
+a1[i].doSomething(\uw{parameters});
+a3(x,y,z).doAnother(\uw{parameters});
+aF[CkArrayIndexFoo(...)].doAgain(\uw{parameters});
 \end{alltt}
 
 You may invoke methods on array elements that have not yet
@@ -224,16 +215,38 @@ Messages sent to migrating elements will be delivered after
 the migrating element arrives.  It is an error to send 
 a message to a deleted array element.
 
+
+\subsubsection{Broadcasts}
 To \index{Array broadcast} broadcast a message to all the current elements of an array, 
 simply omit the index, as:
 
 \begin{alltt}
-a3.doIt(new MyMsg(7)); //<- invokes doIt(7) on each array element
+a3.doIt(\uw{parameters}); //<- invokes doIt on each array element
 \end{alltt}
 
 The broadcast message will be delivered to every existing array 
 element exactly once.  Broadcasts work properly even with ongoing
 migrations, insertions, and deletions.
+
+
+\subsubsection{Local Access}
+\experimental{}
+You can get direct access to a local array element using the
+proxy's \kw{ckLocal} method, which returns an ordinary \CC\ pointer
+to the element if it exists on the local processor; and NULL if
+the element does not exist or is on another processor.
+
+\begin{alltt}
+A1 *a=a1[i].ckLocal();
+if (a==NULL) //...is remote-- send message
+else //...is local-- directly use members and methods of a
+\end{alltt}
+
+Note that if the element migrates or is deleted, any pointers 
+obtained with \kw{ckLocal} are no longer valid.  It is best,
+then, to call \kw{ckLocal} anew each time the element may have
+migrated; e.g., at the start of each entry method.
+
 
 
 \subsubsection{Reductions on Chare Arrays}
@@ -407,8 +420,8 @@ public:
         nInts=sizeof(f)/sizeof(int);
     \}
     //Not required, but convenient: cast-to-foo operators
-    operator foo &() {return f;}
-    operator const foo &() const {return f;}
+    operator foo &() \{return f;\}
+    operator const foo &() const \{return f;\}
 \};
 \end{alltt}
 
@@ -416,13 +429,13 @@ Note that \uw{foo}'s size must be an integral number of integers--
 you must pad it with zero bytes if this is not the case.
 Also, \uw{foo} must be a simple class-- it cannot contain 
 pointers, have virtual functions, or require a destructor.
-Finally, there is a \charmpp configuration-time option called
+Finally, there is a \charmpp\ configuration-time option called
 CK\_ARRAYINDEX\_MAXLEN \index{CK\_ARRAYINDEX\_MAXLEN} 
 which is the largest allowable number of 
 integers in an array index.  The default is 3; but you may 
 override this to any value by passing ``-DCK\_ARRAYINDEX\_MAXLEN=n'' 
-to the \charmpp build script. Larger values will increase the
-size of each message.
+to the \charmpp\ build script as well as all user code. Larger 
+values will increase the size of each message.
 
 You can then declare an array indexed by \uw{foo} objects with
 

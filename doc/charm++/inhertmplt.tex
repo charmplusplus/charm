@@ -18,13 +18,13 @@ declared in the \charmpp\ interface file to be explicitly derived from
 
 \begin{alltt}
   chare BaseChare \{
-    BaseChare(someMessage *);
-    baseMethod(void);
+    entry BaseChare(someMessage *);
+    entry void baseMethod(void);
     ...
   \}
   chare DerivedChare : BaseChare \{
-    DerivedChare(otherMessage *);
-    derivedMethod(void);
+    entry DerivedChare(otherMessage *);
+    entry void derivedMethod(void);
     ...
   \}
 \end{alltt}
@@ -43,13 +43,13 @@ The class definitions of both these chares should look like:
     // private or protected data
     public:
       BaseChare(someMessage *);
-      baseMethod(void);
+      void baseMethod(void);
   \};
   class DerivedChare : public BaseChare \{
     // private or protected data
     public:
       DerivedChare(otherMessage *);
-      derivedMethod(void);
+      void derivedMethod(void);
   \};
 \end{alltt}
 
@@ -66,40 +66,64 @@ as shown below:
   ...
   Cproxy_BaseChare *pb = pd;
   pb->baseMethod();    // OK
-  pb->derivedMethod(); // ERROR
+  pb->derivedMethod(); // COMPILE ERROR
 \end{alltt}
 
 Note that \CC\ calls the default constructor \index{default constructor} of the
 base class from any constructor for the derived class where base class
 constructor is not called explicitly. Therefore, one should always provide a
-default constructor for the base class to avoid explicitly calling another base
+default constructor for the base class, or explicitly call another base
 class constructor.
 
 Multiple inheritance \index{multiple inheritance} is also allowed for Chares
-and Groups. However, one should make sure that each of the base classes inherit
+and Groups. Often, one should make each of the base classes inherit
 ``virtually'' from \kw{Chare} or \kw{Group}, so that a single copy of
 \kw{Chare} or \kw{Group} exists for each multiply derived class.
 
-One may have {\em virtual} entry methods \index{virtual} in base chare classes.
-They are specified by the entry attribute \kw{virtual} in the interface file.
-Also, such a method could be pure virtual \index{pure virtual} (where
-implementation of this method is not given.) It is noted with the usual \CC\
-syntax of ``{\tt =0}'' even in the interface file. Base classes with pure
-virtual methods are called {\em abstract} base classes \index{abstract base
-class} in OO-lingo. Note that, though instances of abstract base chares cannot
-be created, a proxy objects of such a type can be created by constructing it
-with the chareID of the concrete derived chare. Invoking methods on this proxy
-object would invoke those methods remotely on the concrete derived class
-instance.
+Entry methods are inherited in the
+same manner as methods of sequential \CC{} objects.  
+To make an entry method virtual, just add the keyword \kw{virtual}
+to the corresponding chare method-- no change is needed in the interface file.
+Pure virtual entry methods also require no special description
+in the interface file.
+
 
 \subsection{Inheritance for Messages}
 \index{message inheritance}
 
-Similar to Chares, messages can also be derived from base messages. One needs
-to specify this in the \charmpp\ interface file similar to the Chare
-inheritance specification (that is, without the \kw{public} access specifier.)
-Message inheritance makes it possible to send a message of derived type to the
-method expecting a base class message.
+Messages cannot inherit from other messages.  A message can, however,
+inherit from a regular \CC\ class.  For example:
+
+\begin{alltt}
+//In the .ci file:
+  message BaseMessage1;
+  message BaseMessage2;
+
+//In the .h file:
+  class Base \{
+    // ...
+  \};
+  class BaseMessage1 : public Base, public CMessage_BaseMessage1 \{
+    // ...
+  \};
+  class BaseMessage2 : public Base, public CMessage_BaseMessage2 \{
+    // ...
+  \};
+\end{alltt}
+
+Messages cannot contain virtual methods
+or virtual base classes unless you use a packed message.
+Parameter marshalling has complete support for inheritance, virtual
+methods, and virtual base classes via the PUP::able framework.
+
+
+% ( I think the following is now a lie  OSL 7/5/2001 )  
+%Similar to Chares, messages can also be derived from base messages. One needs
+%to specify this in the \charmpp\ interface file similar to the Chare
+%inheritance specification (that is, without the \kw{public} access specifier.)
+%Message inheritance makes it possible to send a message of derived type to the
+%method expecting a base class message.
+
 
 \subsection{Generic Programming Using Templates}
 \index{templates}

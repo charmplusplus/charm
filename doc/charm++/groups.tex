@@ -44,8 +44,8 @@ Given a \texttt{.ci} file as follows:
 
 \begin{alltt}
 group G \{
-  entry G(M1 *);
-  entry void someEntry(M2 *);
+  entry G(\uw{parameters1});
+  entry void someEntry(\uw{parameters2});
 \};
 \end{alltt}
 
@@ -54,101 +54,65 @@ and the following \texttt{.h} file:
 \begin{alltt}
 class G : public Group \{
   public:
-    G(M1 *);
-    void someEntry(M2 *);
+    G(\uw{parameters1});
+    void someEntry(\uw{parameters2});
 \};
 \end{alltt}
 
 we can create a \index{group}group in a manner similar to a regular
-\index{chare}chare.  Note the difference in how the \index{virtual
-handle}virtual handle is created.
+\index{chare}chare. 
 
 \begin{alltt}
-M1 *m1 = new M1;
-CProxy_G *pG = new CProxy_G(m1);
-  // or
-CkGroupID gid = CProxy_G::ckNew(m1);
-CProxy_G g(gid);
+CProxy_G groupProxy = CProxy_G::ckNew(\uw{parameters1});
 \end{alltt}
 
 \subsubsection{Method Invocation on Groups}
 
 Before sending a message to a \index{group}group via an entry
-method, we need to get a proxy of that group using the group identifier (a
-\kw{CkGroupID}). The syntax for obtaining the proxy or a proxy
-pointer is:
-
-\begin{alltt}
- CProxy_groupType groupProxy(groupID);
-  or,
- CProxy_groupType *groupProxyPointer = new CProxy_groupType(groupID);
-\end{alltt}
-
-The first approach creates a proxy to the group represented by \uw{groupID}
-while the second creates a pointer named \uw{groupProxyPointer} to a proxy to
-the group represented by \uw{groupID}. 
+method, we need to get a proxy of that group.
 
 A message may be sent to a particular \index{branch}branch of group using the
 notation:
 
 \begin{alltt}
- groupProxy.EntryMethod(MessagePointer, Processor)
-  or,
- groupProxyPointer->EntryMethod(MessagePointer, Processor)
+ groupProxy[Processor].EntryMethod(\uw{parameters});
 \end{alltt}
 
-This sends the message in \uw{MessagePointer} to the \index{branch}branch of
-the group represented by \uw{groupID} which is on processor number
+This sends the given parameters to the \index{branch}branch of
+the group referred to by \uw{groupProxy} which is on processor number
 \uw{Processor} at the entry method \uw{EntryMethod}, which must be a valid
 entry method of that group type. This call is asynchronous and non-blocking; it
 returns immediately after sending the message.
 
-A message may be broadcast \index{broadcast} to all branches of a branched
-chare (i.e., to all processors) using the notation :
+A message may be broadcast \index{broadcast} to all branches of a group
+(i.e., to all processors) using the notation :
 
 \begin{alltt}
- groupProxy.EntryMethod(MessagePointer)
- groupProxyPointer->EntryMethod(MessagePointer)
+ groupProxy.EntryMethod(\uw{parameters});
 \end{alltt}
 
-This sends the message in \uw{MessagePointer} to all branches of the group at
+This sends the given parameters to all branches of the group at
 the entry method \uw{EntryMethod}, which must be a valid entry method of that
 group type. This call is asynchronous and non-blocking; it returns immediately
 after sending the message.
 
-Note that the programmer relinquishes control of a message after sending it.
-Further access to the message field can cause runtime errors.
 
-
-Sequential objects, chares and other groups can access public members of the
-\index{branch}branch of a group \index{group} {\it on their processor} using
-the following notation:
+Sequential objects, chares and other groups can gain access to the local
+(i.e., on their processor) group object using:
 
 \begin{alltt}
-((GroupType*)CkLocalBranch(CkGroupID groupID))->DataMember
-{\em and} 
-(GroupType*)CkLocalBranch(CkGroupID groupID))->method() 
+GroupType *g=groupProxy.ckLocalBranch();
 \end{alltt}
+
+This call returns a regular \CC\ pointer to the actual object (not a proxy)
+referred to by the proxy \uw{groupProxy}.  Once a proxy to the
+local branch of a group is obtained, that branch can be accessed as a regular
+\CC\ object.  Its public methods can return values, and its public data is 
+readily accessible.
 
 Thus a dynamically created \index{chare}chare can call a public method of a
 group without needing to know which processor it actually resides: the method
-executes in the local \index{branch}branch of the group.  Once a proxy to the
-local branch of a group is obtained, that branch can be thought of as a regular
-object.  Its public methods can return values, and its public data is readily
-accessible.   
-
-\kw{CkLocalBranch} returns a generic (\texttt{void *}) pointer.  It needs to be
-cast to a pointer of appropriate classe before invoking methods or accessing
-data members. \charmpp\ provides another way to do this using the generated
-\index{proxy}{\em proxy} classes. One may call the static method
-\kw{ckLocalBranch} of the proxy class of appropriate group to get the correct
-type of pointer.  For example, method \uw{foo} can to be invoked on the local
-\index{branch}branch of a group \uw{G} with \uw{gid} as CkGroupID as:
-
-\begin{alltt}
-(CProxy_G::ckLocalBranch(gid))->foo(...);
-\end{alltt}
-\index{ckLocalBranch}
+executes in the local \index{branch}branch of the group.
 
 One very nice use of Groups is to reduce the number of messages sent between
 processors by collecting the data from all the chares on a single processor
@@ -157,5 +121,11 @@ break up the work of a problem.  Also, create a group.  When a particular chare
 finishes its work, it reports its findings to the local branch of the group.
 When all the chares on one processor are complete, the local branch of the
 group can then report to the main chare.  This reduces the number of messages
-sent to main from the number of chares created to the number of processors.     
+sent to main from the number of chares created to the number of processors. 
+
+
+
+
+
+
 

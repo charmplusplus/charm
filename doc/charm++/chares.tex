@@ -7,8 +7,8 @@ must be specified in the interface (\texttt{.ci}) file:
 \begin{alltt}
 chare ChareType
 \{
-    entry   ChareType             (MessageType1 *);
-    entry   void EntryMethodName2 (MessageType2 *);
+    entry   ChareType             (\uw{parameters1});
+    entry   void EntryMethodName2 (\uw{parameters2});
 \};
 \end{alltt}
 
@@ -20,9 +20,9 @@ have the form:
         // Data and member functions as in C++ 
         // One or more entry methods definitions of the form: 
    public: 
-      ChareType(MessageType1 *MsgPointer) 
+      ChareType(\uw{parameters2}) 
          \{ // C++ code block  \} 
-      void EntryMethodName2(MessageType2 *MsgPointer) 
+      void EntryMethodName2(\uw{parameters2}) 
          \{ // C++ code block  \} 
    \};
 \end{alltt}
@@ -74,8 +74,8 @@ In the \texttt{mod.ci} file we have:
 \begin{alltt}
 module mod \{
   chare C \{
-    entry C(M1 *);
-    entry void someEntry(M2 *);
+    entry C(\uw{parameters});
+    entry void someEntry(\uw{parameters});
   \};
 \}
 \end{alltt}
@@ -86,8 +86,8 @@ and in the \texttt{mod.h} file:
 #include "mod.decl.h"
 class C : public Chare \{
   public:
-    C(M1 *);
-    void someEntry(M2 *);
+    C(\uw{parameters});
+    void someEntry(\uw{parameters});
 \};
 \end{alltt}
 
@@ -98,21 +98,18 @@ type \kw{CProxy}\_\uw{C}. A number of \index{chare}chare creation calls exist
 as static or instance methods of class \kw{CProxy}\_\uw{chareType}:
 
 \begin{alltt}
-   CProxy_chareType::ckNew(MessageType *msgPtr, CkChareID *vHdl, int destPE);
+   CProxy_chareType::ckNew(\uw{parameters}, CkChareID *vHdl, int destPE);
 \end{alltt}
 
-where each parameter above is optional and where
+Each item above is optional, and:
 
 \begin{itemize}
 
 \item \uw{chareType} is the name of the type of \index{chare}chare to be
 created.
 
-\item \uw{msgPtr} is a pointer to a \index{message}message whose type must
-correspond to the parameter for the \index{constructor}constructor entry method
-\uw{chareType}(\uw{MessageType}*) in \index{chare}chare \uw{chareType}.  This
-parameter may be omitted if the \index{constructor}constructor takes a void
-parameter.
+\item \uw{parameters} must correspond to the parameters for the \index{constructor}constructor entry method.  If the constructor takes void, 
+pass nothing here.
 
 \item \uw{vHdl} is a pointer to a \index{chare}chare handle of type
 \kw{CkChareID}, which is filled by the \kw{ckNew} method. This optional
@@ -156,67 +153,63 @@ method to create chares.
 processor:}
 
 \begin{alltt}
-   MessageType *MsgPtr = new MessageType;
-   CProxy_C *pC = new CProxy_C(MsgPtr);
-      // or
-   MessageType *MsgPtr = new MessageType;
-   CProxy_C::ckNew(MsgPtr);
+   CProxy_C chareProxy = CProxy_C::ckNew(\uw{parameters});
 \end{alltt} 
 
 \item{This will create a new \index{chare}chare of type \uw{C} on processor
 \kw{destPE}:}
 
 \begin{alltt}
-   MessageType *MsgPtr = new MessageType;
-   CProxy_C::ckNew(MsgPtr, destPE);
+   CProxy_C chareProxy = CProxy_C::ckNew(\uw{parameters}, destPE);
 \end{alltt}
 
 \item{The following first creates a \kw{CkChareID} \uw{cid},
 then creates a new \index{chare}chare of type \uw{C} on processor \uw{destPE}:}
 
 \begin{alltt}
-   MessageType *MsgPtr = new MessageType;
    CkChareID cid;
-   CProxy_C::ckNew(MsgPtr, \&cid, destPE);
-   CProxy_C c(cid);
+   CProxy_C::ckNew(\uw{parameters}, \&cid, destPE);
+   CProxy_C chareProxy(cid);
 \end{alltt}
 
 \end{enumerate}
 
 \subsubsection{Method Invocation on Chares}
 
-Before sending a \index{message}message to a \index{chare}chare via an
-\index{entry method}entry method, we need to get a \index{proxy}{\it proxy} of
-that \index{chare}chare using either the chare identifier, or by creating the
-proxy directly from the \index{chare}chare creation (see Section~\ref{chare
-creation}. The following code creates a proxy from a \kw{CkChareID}.
-
-\begin{alltt}
-   CProxy_chareType chareProxy(chareID);
-\end{alltt}
-
-This declares a proxy named \uw{chareProxy} of \uw{chareType} 
-using \uw{chareID}.  Alternatively, we can create a proxy pointer:
-
-\begin{alltt}
-CProxy_chareType *chareProxyPointer = new CProxy_chareType(chareID);
-\end{alltt}
-
-This creates a pointer named \uw{chareProxyPointer} which points to the proxy. 
-
 A message \index{message} may be sent to a \index{chare}chare using the
 notation:
 
 \begin{tabbing}
-chareProxy.EntryMethod(MessagePointer)
-or,
-chareProxyPointer->EntryMethod(MessagePointer)
+chareProxy.EntryMethod(\uw{parameters})
 \end{tabbing}
 
-This sends the message pointed to by \uw{MessagePointer} to the
-\index{chare}chare whose proxy/proxy pointer is 
-\uw{chareProxy}/\uw{chareProxyPointer} at the \index{entry method}entry method 
-\uw{EntryMethod},
-which must be a valid entry method of that \index{chare}chare type. This call
+This invokes the entry method \uw{EntryMethod} on the chare referred
+to by the proxy \uw{chareProxy}. This call
 is asynchronous and non-blocking; it returns immediately after sending the
 message. 
+
+
+\subsubsection{Local Access}
+\experimental{}
+You can get direct access to a local chare using the
+proxy's \kw{ckLocal} method, which returns an ordinary \CC\ pointer
+to the chare if it exists on the local processor; and NULL if
+the chare does not exist or is on another processor.
+
+\begin{alltt}
+C *c=chareProxy.ckLocal();
+if (c==NULL) //...is remote-- send message
+else //...is local-- directly use members and methods of c
+\end{alltt}
+
+
+
+
+
+
+
+
+
+
+
+

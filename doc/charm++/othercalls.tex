@@ -1,19 +1,20 @@
 \subsection{\kw{initcall} routines}
+\experimental{}
 Some registration routines need be executed exactly once
 on every processor before the computation begins.
-By declaring a regular \CC subroutine \index{initcall}
+By declaring a regular \CC\ subroutine \index{initcall}
 \kw{initcall} in the .ci file, you ask \charmpp to execute 
-the routine exactly once on every processor before the
+the routine exactly once on every node before the
 computation begins.
 
 \begin{alltt}
-module foo {
+module foo \{
     initcall void fooGlobalInit(void);
-    chare bar {
+    chare bar \{
         ...
         initcall void barInit(void);
-    };
-};
+    \};
+\};
 \end{alltt}
 
 This code will execute the routines \uw{fooGlobalInit} and

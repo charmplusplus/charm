@@ -56,10 +56,10 @@ A simple \charmpp\ program is given below:
 // File: pgm.ci
 
 mainmodule Hello \{
-  readonly CkChareID mid;
+  readonly CProxy_HelloMain mainProxy;
   mainchare HelloMain \{
     entry HelloMain(); // implicit CkArgMsg * as argument
-    entry void Wait(void);
+    entry void PrintDone(void);
   \};
   group HelloGroup \{
     entry HelloGroup(void);
@@ -73,7 +73,7 @@ mainmodule Hello \{
 class HelloMain: public Chare \{
   public:
     HelloMain(CkArgMsg *);
-    void Wait(void);
+    void PrintDone(void);
   private:
     int count;
 \};
@@ -87,16 +87,16 @@ class HelloGroup: public Group \{
 // File: pgm.C
 #include "pgm.h"
 
-CkChareID mid;
+CProxy_HelloMain mainProxy;
 
 HelloMain::HelloMain(CkArgMsg *msg) \{
   delete msg;
   count = 0;
-  mid = thishandle;
+  mainProxy=thishandle;
   CProxy_HelloGroup::ckNew(); // Create a new "HelloGroup"
 \}
 
-void HelloMain::Wait(void) \{
+void HelloMain::PrintDone(void) \{
   count++;
   if (count == CkNumPes()) \{ // Wait for all group members to finish the printf
     CkExit();
@@ -105,8 +105,7 @@ void HelloMain::Wait(void) \{
 
 HelloGroup::HelloGroup(void) \{
   ckout << "Hello World from processor " << CkMyPe() << endl;
-  CProxy_HelloMain pself(mid);
-  pself.Wait();
+  mainProxy.PrintDone();
 \}
 
 #include "Hello.def.h" // Include the Charm++ object implementations
@@ -123,15 +122,15 @@ pgm: pgm.ci pgm.h pgm.C
 
 \uw{HelloMain} is designated a \kw{mainchare}. Thus the Charm Kernel starts
 execution of this program by creating an instance of \uw{HelloMain} on
-processor 0. The HelloMain constructor creates a chare group \uw{HelloGroup},
-and stores a handle to itself and returns. The call to create the group returns
-immediately after directing Charm Kernel to perform the actual creation and
-invocation.  Shortly after, the Charm Kernel will create an object of type
-\uw{HelloGroup} on each processor, and call its constructor. The constructor
-will then print ``Hello World...'' and then call the \uw{Wait} method of
-\uw{HelloMain}. The Wait method calls CkExit() after all group members have
-called it (i.e., they have finished printing ``Hello World...''), and the
-\charmpp program exits.
+processor 0. The HelloMain constructor creates a chare group
+\uw{HelloGroup}, and stores a handle to itself and returns. The call to
+create the group returns immediately after directing Charm Kernel to perform
+the actual creation and invocation.  Shortly after, the Charm Kernel will
+create an object of type \uw{HelloGroup} on each processor, and call its
+constructor. The constructor will then print ``Hello World...'' and then
+call the \uw{PrintDone} method of \uw{HelloMain}. The \uw{PrintDone} method
+calls \kw{CkExit} after all group members have called it (i.e., they have
+finished printing ``Hello World...''), and the \charmpp program exits.
 
 \subsubsection{Functions in the ``decl.h'' and ``def.h'' files}
 

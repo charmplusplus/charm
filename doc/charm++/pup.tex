@@ -10,7 +10,7 @@ Like many \CC\ concepts, the PUP framework is easier to use than
 describe: 
 
 \begin{alltt}
-class foo {
+class foo \{
  private:
     double a;
     int x;
@@ -21,12 +21,12 @@ class foo {
     ...other methods...
 
     //pack/unpack routine: describe my fields to charm++
-    void pup(PUP::er &p) {
+    void pup(PUP::er &p) \{
       p(a);
       p(x);p(y);p(z);
       p(q,3);
-    }
-};
+    \}
+\};
 PUPmarshall(foo); //<- for passing foo's as marshalled parameters
 \end{alltt}
 
@@ -101,7 +101,7 @@ these need to be allocated (in the usual way) before you pup them.
 Deallocation should be left to the class destructor as usual.
 
 \begin{alltt}
-class bar {
+class bar \{
 private:
     foo *f; /*Heap-allocated foo object*/
     int n;
@@ -109,10 +109,10 @@ private:
 public:
     ...other methods...
     //Destructor is the usual
-    ~bar() {free(arr);delete f;}
+    ~bar() \{free(arr);delete f;\}
     
     //pack/unpack: describe my fields to Charm++
-    void pup(PUP::er &p) {
+    void pup(PUP::er &p) \{
       if (p.isUnpacking()) 
          f=new foo;
       f->pup(p);//pup f's fields
@@ -121,8 +121,8 @@ public:
       if (p.isUnpacking()) 
          arr=(double *)malloc(sizeof(double)*n);
       p(arr,n);//pup array data
-    }
-};
+    \}
+\};
 PUPmarshall(bar); //<- for passing foo's as marshalled parameters
 \end{alltt}
 
@@ -150,38 +150,39 @@ For example,
    initcall void parentChildInit(void);
 
 //In the .h file:
-class parent : public PUP::able {
+class parent : public PUP::able \{
     ... data members ...
 public:
     ... other methods ...
-    parent() {...}
-    parent(CkMigrateMessage *m) : PUP::able(m) {}
-    virtual void pup(PUP::er &p) {
+    parent() \{...\}
+    parent(CkMigrateMessage *m) : PUP::able(m) \{\}
+    virtual void pup(PUP::er &p) \{
         PUP::able::pup(p);//Call base class
         ... pup data members as usual ...
-    }
+    \}
     PUPable\_decl(parent);    
-};
-class child : public parent {
+\};
+class child : public parent \{
     ... more data members ...
 public:    ... more methods, possibly virtual ...
-    child() {...}
-    child(CkMigrateMessage *m) : parent(m) {}
-    virtual void pup(PUP::er &p) {
+    child() \{...\}
+    child(CkMigrateMessage *m) : parent(m) \{\}
+    virtual void pup(PUP::er &p) \{
         parent::pup(p);//Call base class
         ... pup child's data members as usual ...
-    }
+    \}
     PUPable\_decl(child);    
-};
+\};
 
 //Somewhere in a .C file:
 PUPable\_def(parent);
 PUPable\_def(child);
+
 void parentChildInit(void)
-{//Called once on each processor
+\{//Called once on each processor
     PUPable\_reg(parent);
     PUPable\_reg(child);
-}
+\}
 \end{alltt}
 
 These declarations supercede the \kw{PUPmarshall} declaration 
@@ -192,18 +193,18 @@ allocate and pup a pointer to a parent or child
 using the vertical bar \kw{PUP::er} syntax:
 
 \begin{alltt}
-class keepsParent {
-    parent *obj; //May actually point to a child class
+class keepsParent \{
+    parent *obj; //May actually point to a child class (or be NULL)
 public:
     ...
-    ~keepsParent() {
+    ~keepsParent() \{
         delete obj;
-    }
+    \}
     void pup(PUP::er &p) 
-    {
+    \{
         p|obj;
-    }
-};
+    \}
+\};
 \end{alltt}
 
 This will properly pack, allocate, and unpack obj whether
@@ -216,22 +217,22 @@ For example, if the nodes of a binary tree are \kw{PUP::able},
 one may write the tree's pup routine easily:
 
 \begin{alltt}
-class treeNode : public PUP::able {
+class treeNode : public PUP::able \{
     treeNode *left;//Left subtree
     treeNode *right;//Right subtree
     ... other fields ...
 public:
     ... usual PUP::able support: ...
-    treeNode(CkMigrateMessage *m) : PUP::able(m) {}
-    ~treeNode() {delete left; delete right;}
-    void pup(PUP::er &p) {
+    treeNode(CkMigrateMessage *m) : PUP::able(m) \{\}
+    ~treeNode() \{delete left; delete right;\}
+    void pup(PUP::er &p) \{
         PUP::able::pup(p);//Call base class
         p|left;
         p|right;
         ... pup other fields as usual ...
-    }
+    \}
     PUPable\_decl(treeNode);
-};
+\};
 \end{alltt}
 
 This same implementation will work properly if the tree's
@@ -276,25 +277,25 @@ depends on and affects some object B, we can pup the two with:
 
 \begin{alltt}
 void pupAB(PUP::er &p)
-{
+\{
   ... other fields ...
   PUP::seekBlock s(p,2); //2 seek sections
   if (p.isUnpacking()) 
-  {//In this case, pup B first
+  \{//In this case, pup B first
     s.seek(1);
     B.pup(p);
-  }
+  \}
   s.seek(0);
   A.pup(p,B);
   
   if (!p.isUnpacking()) 
-  {//In this case, pup B last
+  \{//In this case, pup B last
     s.seek(1);
     B.pup(p);
-  }
+  \}
   s.endBlock(); //End of seeking block
   ... other fields ...
-};
+\};
 \end{alltt}
 
 Note that without the seek block, A's fields would be unpacked

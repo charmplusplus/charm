@@ -13,39 +13,25 @@ and a handle to the chare on which that entry function should be called.  The
 syntax of this call looks like this:
 
 \begin{alltt}
- CkStartQD(int Index, CkChareID* chareID);
+ CkStartQD(int Index,const CkChareID* chareID);
 \end{alltt}
 
 To retrieve the corresponding index of a particular \index{entry method}entry
-method, you must use a static method contained within the \uw{CProxy} object
+method, you must use a static method contained within the \uw{CkIndex} object
 corresponding to the \index{chare}chare containing that entry method.  The
 syntax of this call is as follows:
 
 \begin{alltt}
-CProxy_ChareName::ckIdx_EntryMethod(Msg *Message);
+\kw{myIdx}=CkIndex_\uw{ChareName}::\uw{EntryMethod}(\uw{parameters});
 \end{alltt}
 
-where \uw{chareID} is the name of the chare identifier of the chare containing
+where \uw{ChareName} is the name of the chare containing
 the desired entry method, \uw{EntryMethod} is the name of that entry method,
-and \uw{Message} is a pointer to the kind of message that the desired entry
-method takes as a parameter. To make this look a little cleaner, we have
-provided a simple macro called \kw{EntryIndex}, which can be used in the place
-of this convoluted looking static method call.  \kw{EntryIndex} takes as
-parameters the type of chare in which the entry method is located, the name of
-the entry method itself, and the type of message that the entry method takes as
-a parameter. For example:
+and \uw{parameters} are the parameters taken by the method.
+These parameters are only used to resolve the proper \uw{EntryMethod};
+they are otherwise ignored.
 
-\begin{alltt}
- EntryIndex(ChareName, EntryName, MsgName);
-\end{alltt}
-
-Note that \uw{ChareName}, \uw{EntryName}, and \uw{MsgName} are {\bf NOT}
-variables or constants. This is text that the preprocessor uses to fill in
-portions of the previously mentioned static method call.  Additionally, this
-macro method will not work with templated chares (refer to Section
-~\ref{inheritance and templates} for details on templated chares).
-
-\kw{CkWaitQD}, however, does not register a callback.  Rather,
+\kw{CkWaitQD}, by contrast, does not register a callback.  Rather,
 \kw{CkWaitQD} blocks and does not return until \index{quiescence}quiescence is
 detected.  It takes no parameters and returns no value.  A call to
 \kw{CkWaitQD} simply looks like this: 

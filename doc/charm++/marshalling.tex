@@ -1,5 +1,7 @@
 \subsection{Parameter Marshalling}
-	
+\label{marshalling}
+
+\experimental{}	
 In \charmpp, \index{chare}chares, \index{group}groups and \index{nodegroup}
 nodegroups communicate by invoking each others methods. 
 The methods may either take several parameters, described here; 
@@ -24,8 +26,8 @@ we must specify the length of the array in the interface file, as:
   entry void bar(int n,double arr[n]);
 \end{alltt}
 Since \CC\ does not recognize this syntax, the array data
-should be passed to the chare proxy as a simple pointer.
-The array data will be copied sent to the
+must be passed to the chare proxy as a simple pointer.
+The array data will be copied and sent to the
 destination processor, where the chare will receive the copy
 via a simple pointer again.  The remote copy of the data
 will be kept until the remote method returns, when
@@ -37,8 +39,8 @@ uses call-by-value, even for arrays and structures.
 
 This also means the data must be copied on the sending 
 side, and to be kept must be copied again 
-at the receive side-- for a more efficient approach,
-use the message objects described in the next section.
+at the receive side.  Especially for large arrays, this 
+is less efficient than messages, as described in the next section.
 
 Array parameters and other parameters can be combined in arbitrary ways, as:
 \begin{alltt}
@@ -51,6 +53,9 @@ The array length expression between the square brackets can be
 any valid C++ expression, and may depend in any way on any of the passed
 parameters, global variables, or global data.  The array length expression
 is evaluated exactly once per invocation, on the sending side only.
+Thus executing the \kw{doGeneral} method above will invoke the 
+(user-defined) \kw{product} function exactly once on the sending
+processor.
 
 \subsubsection{Marshalling User-Defined Structures and Classes}
 
@@ -62,22 +67,22 @@ with no further effort:
 
 \begin{alltt}
 //Declarations:
-class point3d {
+class point3d \{
 public:
     double x,y,z;    
-};
+\};
 
-typedef struct {
+typedef struct \{
     int refCount;
     char data[17];
-} refChars;
+\} refChars;
 
-class date {
+class date \{
 public:
     char month,day;
     int year;
     //...non-virtual manipulation routines...
-};
+\};
 
 //In the .ci file:
     entry void pointRefOnDate(point3d &p,refChars r[d.year],date &d);
@@ -93,9 +98,9 @@ allocated data or virtual methods can only be passed as
 parameters, but never in arrays.  They also must include a pup
 routine and \CC\ operator| (see the PUP chapter for details).
 \kw{PUP::able} structures may be passed via a pointer,
-but will be dynamically allocated on the receive side
-but, for historical reasons, cannot appear alone in the
-parameter list (or else they are confused with messages).
+but will be copied and then dynamically allocated on the receive side.
+For historical reasons, pointer-accessible structures cannot appear 
+alone in the parameter list (because they are confused with messages).
 
-Complicated structures are usually most efficiently passed 
+Large, complicated structures are most efficiently passed 
 via messages; not marshalling.
