@@ -436,6 +436,7 @@ REL_TIME delay;
     SIM_TIME arrival_time;
     time_assign(&arrival_time,&gclock);
     time_add(&arrival_time,delay);
+    time_add(&arrival_time,msg->arrival_time);
     time_assign(&msg->arrival_time,&arrival_time); 
     insert(ADDR_Q_MSG_FRONT(d),ge,msg);
     
@@ -586,6 +587,7 @@ int         broadcast; /* TRUE if broadcast */
 int         destPE;
 {
     int scp;
+    REL_TIME elapsed_time;
     MSG *msg;
 
     scp = CPU_TO_SCP(pno+1); 
@@ -596,7 +598,11 @@ int         destPE;
 	msg->dest      = destPE+1;
 	msg->envelope  = env;
 	msg->next      = NULL;
-
+        /* message must be sended after elapsed_time + gclock */
+        /* save elpased time in the message, actual send will add */
+        /* gclock and latency                                     */
+        elapsed_time = (REL_TIME) (CsiTimer() - Csi_start_time);
+        msg->arrival_time = elapsed_time;
 	fifo_enqueue(ADDR_Q_MSG(scp),msg);
 	if ( !IS_WAITING_ON_COND(scp) && IS_IDLE(scp) ){
 	    make_active(scp);
