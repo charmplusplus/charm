@@ -104,6 +104,7 @@ void NetFEM_item::pup(PUP::er &p) {
 }
 
 void NetFEM_elems::localCopy(void) {
+  CkPrintf("localCopy: nodesPer=%d, items=%d, bytesPer=%d\n",nodesPer,getItems(),bytesPer);
 	if (isHeapAllocated) return;
 	const int *src=conn;
 	//Make a canonical heap copy of this data
