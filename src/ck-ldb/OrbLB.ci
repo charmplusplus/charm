@@ -2,7 +2,7 @@ module OrbLB {
 
 extern module CentralLB;
 initcall void lbinit(void);
-group OrbLB : CentralLB {
+group [migratable] OrbLB : CentralLB {
   entry void OrbLB(void);  
 };
 
