@@ -836,7 +836,7 @@ Array::genSubDecls(XStr& str)
     str<< //Build a simple, empty array
     "    static CkArrayID ckNew(void) {return ckCreateEmptyArray();}\n";
     
-    XStr etype; etype<<Prefix::ProxyElement<<type;
+    XStr etype; etype<<Prefix::ProxyElement<<type<<tvars();
     if (indexSuffix!=(const char*)"none")
     {
       str <<
@@ -873,7 +873,7 @@ Array::genSubDecls(XStr& str)
   { /* for Section, indexible version*/    
     str << "    CK_DISAMBIG_ARRAY_SECTION("<<super<<")\n";
 
-    XStr etype; etype<<Prefix::ProxyElement<<type;
+    XStr etype; etype<<Prefix::ProxyElement<<type<<tvars();
     if (indexSuffix!=(const char*)"none")
     {
       str <<
