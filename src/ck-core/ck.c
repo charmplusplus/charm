@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.13  1995-10-11 17:54:40  sanjeev
+ * Revision 2.14  1995-10-27 09:09:31  jyelon
+ * *** empty log message ***
+ *
+ * Revision 2.13  1995/10/11  17:54:40  sanjeev
  * fixed Charm++ chare creation
  *
  * Revision 2.12  1995/09/06  21:48:50  jyelon
@@ -436,18 +439,6 @@ int kind;
   SetEnv_queueing(ENVELOPE_UPTR(usrptr), kind);
 }
 
-void *CkPriorityPtr(usrptr)
-void *usrptr;
-{
-  return PRIORITY_UPTR(usrptr);
-}
-
-int   CkPriorityBits(usrptr)
-void *usrptr;
-{
-  return GetEnv_priosize(ENVELOPE_UPTR(usrptr));
-}
-
 /*****************************************************************************
  * CkLdbSend is a function that is passed to the Ldb strategy to send out a
  * message to another processor
@@ -471,3 +462,82 @@ void *env;
     GetEnv_priobgn(env));
 }
 
+/************************************************************************
+ *
+ * CkPrioConcat
+ *
+ * Copies all the priority bits from the bitvector in 'srcmsg' onto
+ * the bitvector in 'dstmsg', then, if there is any space left in the
+ * bitvector of 'dstmsg', that space is filled by bits taken from the
+ * lsb of 'delta'.
+ *
+ * The code works as follows:
+ *
+ * step 1: Copy old bitvector onto new. Always copies a multiple of
+ * 32 bits, therefore, may copy some "padding" bits.  The number of
+ * padding bits copied can be found in 'padbits'.
+ *
+ * step 2: move bits in delta to msb-end.
+ *
+ * step 3: if any padding-bits were copied, overwrite them with a
+ * piece of delta.
+ *
+ * step 4: if padding-bits were insufficient to hold all of delta,
+ * store remainder of delta in next word.
+ *
+ ************************************************************************/
+
+#define INTBITS (sizeof(int)*8)
+
+void CkPrioConcatFn(srcmsg, dstmsg, delta)
+void *srcmsg;
+void *dstmsg;
+unsigned int delta;
+{
+  int padbits, deltabits;
+  ENVELOPE *srcenv = ENVELOPE_UPTR(srcmsg);
+  ENVELOPE *dstenv = ENVELOPE_UPTR(dstmsg);
+  int srcbits = GetEnv_priosize(srcenv);
+  int dstbits = GetEnv_priosize(dstenv);
+  int srcwords = (srcbits+INTBITS-1)/INTBITS;
+  int dstwords = (dstbits+INTBITS-1)/INTBITS;
+  unsigned int *srcptr = GetEnv_prioend(srcenv) - srcwords;
+  unsigned int *dstptr = GetEnv_prioend(dstenv) - dstwords;
+  deltabits = dstbits - srcbits;
+  if (deltabits < 0) {
+    CmiPrintf("CkPrioConcat: prio-bits from source message don't fit in destination message.\n");
+    exit(1);
+  }
+  if (deltabits > INTBITS) {
+    CmiPrintf("CkPrioConcat: prio-bits from source message plus bits of delta don't fill destination-message.\n");
+    exit(1);
+  }
+  while (srcbits>0) { *dstptr++ = *srcptr++; srcbits -= INTBITS; }
+  padbits = -srcbits;
+  delta <<= (INTBITS-deltabits);
+  if (padbits) {
+    dstptr[-1] &= (((unsigned int)(-1))<<padbits);
+    dstptr[-1] |= (delta>>(INTBITS-padbits));
+  }
+  if (deltabits>padbits) dstptr[0] = (delta<<padbits);
+}
+
+int CkPrioSizeBitsFn(void *msg)
+{
+    return GetEnv_priosize(ENVELOPE_UPTR(msg));
+}
+
+int CkPrioSizeBytesFn(void *msg)
+{
+    return GetEnv_priobytes(ENVELOPE_UPTR(msg));
+}
+
+int CkPrioSizeWordsFn(void *msg)
+{
+    return GetEnv_priowords(ENVELOPE_UPTR(msg));
+}
+
+unsigned int *CkPrioPtrFn(void *msg)
+{
+    return GetEnv_priobgn(ENVELOPE_UPTR(msg));
+}

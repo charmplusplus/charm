@@ -34,6 +34,8 @@ charm: converse charmxlat charmlibs libcharm
 
 charm++: converse charmxlat charmlibs charmxlat++ libcharm libck-cplus-y.a
 
+translators: charmxlat charmfilter charmxlat++ charmfilter++
+
 test-converse: converse
 	(cd ../pgms ; make test-converse)
 
@@ -87,9 +89,16 @@ dirs+sources:
 	rm -rf ../pgms
 	(cd ../.. ; find pgms -type d -print) | sed -e 's@^@mkdir ../@' | sh
 	rt=`(cd ../.. ; pwd)` ; (cd ../.. ; find pgms -type f -print) | awk '{ print "ln -s '$$rt'/"$$1" ../"$$1; }' | sh
+	@echo
+	@echo 'Gathering source-code in '`cat .vdir`'/src'
+	@echo
+	rm -rf ../src ; mkdir ../src
+	cp xl-* ../src
+	cp xp-* ../src
+	cp Maketrans ../src/Makefile
+	@echo
 	@rm -f .vdir .gdir
 	touch dirs+sources
-
 
 
 ###############################################################################
@@ -310,7 +319,7 @@ LIBCHARM=cache.o dag.o barrier_redn.o pglib.o \
 	 fminredn.o fmaxredn.o fsumredn.o fprodredn.o \
 	 dminredn.o dmaxredn.o dsumredn.o dprodredn.o
 
-libcharm: basics charmxlat libcharm.a
+libcharm: charmxlat libcharm.a
 
 libcharm.a: $(LIBCHARM)
 	$(CHARMC) -cp ../lib/ -o $@ $(LIBCHARM)
@@ -392,110 +401,45 @@ dcountredn.o: dcountredn.int $(GENERIC_REDN_H)
 
 ###############################################################################
 #
-# charmxlat and charmfilter
+# charmxlat, charmfilter, charmxlat++, charmfilter++, yacc, yacc++
 #
 ###############################################################################
 
-CHARMXLAT=xl-main.o xl-ytab.o xl-sym.o xl-str.o xl-lex.o xl-lexyy.o xl-rdtok.o xl-parse.o xl-outh.o xl-srch.o xl-dag.o
+charmxlat:
+	make -f Maketrans charmxlat OPTS='$(OPTS)'
 
-charmxlat charmfilter: basics $(CHARMXLAT)
-	$(CHARMC) -seq -o charmxlat   -cp ../bin/ $(CHARMXLAT)
-	$(CHARMC) -seq -o charmfilter -cp ../bin/ xl-space.c
+charmfilter:
+	make -f Maketrans charmfilter OPTS='$(OPTS)'
 
-xl-main.o: xl-main.c
-	$(CHARMC) -seq xl-main.c
+charmxlat++:
+	make -f Maketrans charmxlat++ OPTS='$(OPTS)'
 
-xl-ytab.o: xl-ytab.c xl-lex.h xl-sym.h
-	$(CHARMC) -seq xl-ytab.c
+charmfilter++:
+	make -f Maketrans charmfilter++ OPTS='$(OPTS)'
 
-xl-sym.o: xl-sym.c xl-sym.h
-	$(CHARMC) -seq xl-sym.c
+yacc:
+	make -f Maketrans yacc OPTS='($OPTS)'
 
-xl-str.o: xl-str.c
-	$(CHARMC) -seq xl-str.c
+xlatyacc:
+	make -f Maketrans xlatyacc OPTS='$(OPTS)'
 
-xl-lex.o: xl-lex.c xl-lex.h xl-sym.h
-	$(CHARMC) -seq xl-lex.c
+xlatlex:
+	make -f Maketrans xlatlex OPTS='$(OPTS)'
 
-xl-lexyy.o: xl-lexyy.c	
-	$(CHARMC) -seq xl-lexyy.c
+sfilterlex:
+	make -f Maketrans sfilterlex OPTS='$(OPTS)'
 
-xl-rdtok.o: xl-rdtok.c xl-lex.h xl-sym.h
-	$(CHARMC) -seq xl-rdtok.c
+yacc++:
+	make -f Maketrans yacc++ OPTS='($OPTS)'
 
-xl-parse.o: xl-parse.c xl-lex.h xl-sym.h
-	$(CHARMC) -seq xl-parse.c
+xlat++yacc:
+	make -f Maketrans xlat++yacc OPTS='$(OPTS)'
 
-xl-outh.o: xl-outh.c xl-lex.h xl-sym.h
-	$(CHARMC) -seq xl-outh.c
+xlat++lex:
+	make -f Maketrans xlat++lex OPTS='$(OPTS)'
 
-xl-srch.o: xl-srch.c xl-lex.h xl-sym.h
-	$(CHARMC) -seq xl-srch.c
-
-xl-dag.o: xl-dag.c
-	$(CHARMC) -seq xl-dag.c
-
-###############################################################################
-#
-# charmxlat++ and charmfilter++
-#
-###############################################################################
-
-XPHEADERS=xp-extn.h xp-t.h xp-ytab.h
-
-CHARMXLATXX=xp-lexyy.o xp-process.o xp-table.o xp-ytab.o xp-ycode.o
-
-charmxlat++: basics $(CHARMXLATXX) xp-space.o
-	$(CHARMC) -seq -o charmxlat++   -cp ../bin/ $(CHARMXLATXX)
-	$(CHARMC) -seq -o charmfilter++ -cp ../bin/ xp-space.o
-
-xp-lexyy.o: xp-lexyy.c $(XPHEADERS)
-	$(CHARMC) -seq xp-lexyy.c
-
-xp-process.o: xp-process.c $(XPHEADERS)
-	$(CHARMC) -seq xp-process.c
-
-xp-table.o: xp-table.c $(XPHEADERS)
-	$(CHARMC) -seq xp-table.c
-
-xp-ycode.o: xp-ycode.c $(XPHEADERS)
-	$(CHARMC) -seq xp-ycode.c
-
-xp-ytab.o: xp-ytab.c $(XPHEADERS)
-	$(CHARMC) -seq -DYYDEBUG xp-ytab.c
-
-xp-space.o: xp-space.c $(XPHEADERS)
-	$(CHARMC) -seq xp-space.c
-
-
-###############################################################################
-#
-# Rules for Charm++ translator and spacefilter
-#
-###############################################################################
-
-yacc++: xlat++yacc xlat++lex sfilter++lex
-	touch xlat++yacc xlat++lex sfilter++lex
-
-xlat++yacc: xp-t.y
-	byacc -d -r xp-t.y
-	cat y.tab.h > xp-ytab.h
-	rm -f y.tab.h
-	sed -e 's/, */,/g' -e 's/^ *//' < y.tab.c > xp-ytab.c
-	rm -f y.tab.c
-	cat y.code.c > xp-ycode.c
-	rm -f y.code.c
-
-xlat++lex: xp-t.l
-	flex xp-t.l
-	cat lex.yy.c > xp-lexyy.c
-	rm -f lex.yy.c
-
-sfilter++lex: xp-sfilter
-	flex xp-sfilter
-	cat lex.yy.c > xp-space.c
-	rm -f lex.yy.c
-
+sfilter++lex:
+	make -f Maketrans sfilter++lex OPTS='$(OPTS)'
 
 ###############################################################################
 #

@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.13  1995-09-29 09:51:12  jyelon
+ * Revision 2.14  1995-10-27 09:09:31  jyelon
+ * *** empty log message ***
+ *
+ * Revision 2.13  1995/09/29  09:51:12  jyelon
  * Many small corrections.
  *
  * Revision 2.12  1995/09/14  21:23:52  jyelon
@@ -85,15 +88,13 @@ unsigned int bytespacked;
 {
   int i;
   unsigned int priowords;
-  unsigned int priobytes;
   unsigned int headersize;
   unsigned int totalsize;
-  char *ptr1, *ptr2; int size1, size2, size;
+  unsigned int *ptr1, *ptr2;
   ENVELOPE *envelope, *pack_envelope;
   
   bytespacked = align(bytespacked);
-  priowords = MSG_PRIOSIZE_WORDS(msg);
-  priobytes = priowords * sizeof(int);
+  priowords = GetEnv_priowords(ENVELOPE_UPTR(msg));
   totalsize = TOTAL_MSG_SIZE(bytespacked, priowords);
   pack_envelope = (ENVELOPE *)CmiAlloc(totalsize);
   
@@ -107,7 +108,7 @@ unsigned int bytespacked;
   /*** Now we copy the priority field ***/
   ptr1 = GetEnv_prioend(envelope);
   ptr2 = GetEnv_prioend(pack_envelope);
-  memcpy(ptr2-priobytes, ptr1-priobytes, priobytes);
+  while (priowords) { *(--ptr2) = *(--ptr1); priowords--; }
   return((void *)USER_MSG_PTR(pack_envelope));
 }
 

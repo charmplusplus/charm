@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.20  1995-10-20 17:25:42  sanjeev
+ * Revision 2.21  1995-10-27 09:09:31  jyelon
+ * *** empty log message ***
+ *
+ * Revision 2.20  1995/10/20  17:25:42  sanjeev
  * added typedef CMK_SIZE_T size_t ;
  *
  * Revision 2.19  1995/10/18  22:19:54  jyelon
@@ -188,7 +191,14 @@ extern "C" void _CK_BroadcastMono(void *, int) ;
 extern "C" void CollectValue(int, int, ChareIDType *) ;
 extern "C" void * MonoValue(int) ;
 
-extern "C" void * CkPriorityPtr(void *) ;
+extern "C" unsigned int *CkPrioPtrFn(void *);
+extern "C" int           CkPrioSizeBitsFn(void *);          
+extern "C" int           CkPrioSizeBytesFn(void *);          
+extern "C" int           CkPrioSizeWordsFn(void *);
+extern "C" void          CkPrioConcatFn(void *, void *, unsigned int);
+
+extern "C" void          CkSetQueueing(void *, int);
+
 extern "C" ENVELOPE *CkCopyEnv(ENVELOPE *) ;
 
 

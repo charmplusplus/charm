@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.10  1995-10-13 18:15:53  jyelon
+ * Revision 2.11  1995-10-27 09:09:31  jyelon
+ * *** empty log message ***
+ *
+ * Revision 2.10  1995/10/13  18:15:53  jyelon
  * K&R changes.
  *
  * Revision 2.9  1995/09/29  09:51:12  jyelon
@@ -197,8 +200,8 @@ typedef struct envelope {
 
 #define GetEnv_priowords(e) ((GetEnv_priosize(e)+INTBITS-1)/INTBITS)
 #define GetEnv_priobytes(e) (GetEnv_priowords(e)*sizeof(int))
-#define GetEnv_prioend(e) (((char *)(e))+GetEnv_TotalSize(e))
-#define GetEnv_priobgn(e) (GetEnv_prioend(e)-GetEnv_priobytes(e))
+#define GetEnv_prioend(e) ((unsigned int *)(((char *)(e))+GetEnv_TotalSize(e)))
+#define GetEnv_priobgn(e) ((unsigned int *)(((char *)(e))+GetEnv_TotalSize(e)-GetEnv_priobytes(e)))
 
 #endif
 

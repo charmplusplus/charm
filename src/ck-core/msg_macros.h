@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.3  1995-07-12 16:28:45  jyelon
+ * Revision 2.4  1995-10-27 09:09:31  jyelon
+ * *** empty log message ***
+ *
+ * Revision 2.3  1995/07/12  16:28:45  jyelon
  * *** empty log message ***
  *
  * Revision 2.2  1995/06/29  22:35:57  narain
@@ -41,9 +44,9 @@
  This file provides access macros for extracting the different
  sections of a message. The organisation of a message is as follows 
 
-           -------------------------------------
-           | env | ldb | pad | user | priority |
-           -------------------------------------
+           -------------------------------
+           | env | ldb | user | priority |
+           -------------------------------
  
    The sizes of the fields are as follows:
  
@@ -54,13 +57,12 @@
        ldb           : LDB_ELEM_SIZE is a global variable defined by the
                         load balancing module
  
-       pad           : padding to ensure that the message header ends at a
-                       double word boundary.
- 
        user          : the user message data.
  
        priority      : bit-vector (variable size)
 
+   all fields are padded to 8-byte boundaries except the priority,
+   which is padded to an int-sized boundary.
 
 ************************************************************************
  The following variables reflect the message format above. If any
@@ -89,8 +91,9 @@ CpvExtern(int, _CK_Usr_To_Ldb);
 
 
 
+#define TOTAL_MSG_SIZE(usrsize, priowords)\
+    (CpvAccess(HEADER_SIZE)+((priowords)*sizeof(int))+(usrsize))
 
-#define TOTAL_MSG_SIZE(usrsize, priosize) (CpvAccess(HEADER_SIZE) + (priosize*sizeof(int)) + usrsize)
 #define CHARRED(x) ((char *) (x))
 
 
@@ -98,6 +101,7 @@ CpvExtern(int, _CK_Usr_To_Ldb);
 /**********************************************************************/
 /* The following macros assume that -env- is an ENVELOPE pointer */
 /**********************************************************************/
+
 #define LDB_ELEMENT_PTR(env)  \
     (void *) (CHARRED(env) + _CK_Env_To_Ldb)
 
@@ -118,22 +122,11 @@ CpvExtern(int, _CK_Usr_To_Ldb);
 /* the following macros assume that "usrptr" is a pointer to a user defined 
    message */
 /**********************************************************************/
+
 #define ENVELOPE_UPTR(usrptr)\
 	(ENVELOPE *) (CHARRED(usrptr) + CpvAccess(_CK_Usr_To_Env))
 
 #define LDB_UPTR(usrptr)\
         (LDB_ELEMENT *) (CHARRED(usrptr) + CpvAccess(_CK_Usr_To_Ldb))
-
-#define PRIORITY_UPTR(usrptr) \
-        (GetEnv_priobgn(CHARRED(usrptr) + CpvAccess(_CK_Usr_To_Env)))
-
-#define MSG_PRIOSIZE_BITS(usrptr) \
-        GetEnv_priosize(CHARRED(usrptr) + CpvAccess(_CK_Usr_To_Env))
-
-#define MSG_PRIOSIZE_WORDS(usrptr) \
-        ((MSG_PRIOSIZE_BITS(usrptr)+(sizeof(int)*8)-1)/(sizeof(int)*8))
-
-#define MSG_PRIOSIZE_BYTES(usrptr) \
-        (MSG_PRIOSIZE_WORDS(usrptr)*sizeof(int))
 
 #endif

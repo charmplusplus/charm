@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.8  1995-10-24 19:48:42  brunner
+ * Revision 2.9  1995-10-27 09:09:31  jyelon
+ * *** empty log message ***
+ *
+ * Revision 2.8  1995/10/24  19:48:42  brunner
  * Added Ck* defines for all Mc functions.  For example, McTotalNumPe() ->
  * CkNumPe().
  *
@@ -73,6 +76,10 @@
 #define BranchCall(x)		x
 #define PrivateCall(x)		x
 
+#ifndef NULL
+#define NULL 0
+#endif
+
 #ifdef CMK_COMPILER_LIKES_STATIC_PROTO
 #define PROTO_PUB_PRIV static
 #endif
@@ -94,7 +101,79 @@
 #define _CK_MyBranchID		MyBranchID
 #define _CK_MonoValue		MonoValue
 
-/* The rest are for use by programs that use the old names */ 
+/* charm and charm++ names for converse functions */
+
+#define CK_INT_BITS             (sizeof(int)*8)
+#define  C_INT_BITS             (sizeof(int)*8)
+
+#define CkMyPe                  CmiMyPe
+#define  CMyPe                  CmiMyPe
+
+#define CkNumPe                 CmiNumPe
+#define  CNumPe                 CmiNumPe
+
+#define CkPrintf                CmiPrintf
+#define  CPrintf                CmiPrintf
+
+#define CkScanf                 CmiScanf
+#define  CScanf                 CmiScanf
+
+#define CkAlloc                 CmiAlloc
+#define  CAlloc                 CmiAlloc
+
+#define CkFree                  CmiFree
+#define  CFree                  CmiFree
+
+#define CkSpanTreeParent        CmiSpanTreeParent
+#define  CSpanTreeParent        CmiSpanTreeParent
+
+#define CkSpanTreeRoot          CmiSpanTreeRoot
+#define  CSpanTreeRoot          CmiSpanTreeRoot
+
+#define CkSpanTreeChildren      CmiSpanTreeChildren
+#define  CSpanTreeChildren      CmiSpanTreeChildren
+
+#define CkSendToSpanTreeLeaves  CmiSendToSpanTreeLeaves
+#define  CSendToSpanTreeLeaves  CmiSendToSpanTreeLeaves
+
+#define CkNumSpanTreeChildren   CmiNumSpanTreeChildren
+#define  CNumSpanTreeChildren   CmiNumSpanTreeChildren
+
+#define CK_QUEUEING_FIFO  CQS_QUEUEING_FIFO
+#define  C_QUEUEING_FIFO  CQS_QUEUEING_FIFO
+
+#define CK_QUEUEING_LIFO  CQS_QUEUEING_LIFO
+#define  C_QUEUEING_LIFO  CQS_QUEUEING_LIFO
+
+#define CK_QUEUEING_IFIFO CQS_QUEUEING_IFIFO
+#define  C_QUEUEING_IFIFO CQS_QUEUEING_IFIFO
+
+#define CK_QUEUEING_ILIFO CQS_QUEUEING_ILIFO
+#define  C_QUEUEING_ILIFO CQS_QUEUEING_ILIFO
+
+#define CK_QUEUEING_BFIFO CQS_QUEUEING_BFIFO
+#define  C_QUEUEING_BLIFO CQS_QUEUEING_BLIFO
+
+
+/* Charm++ names for charm functions */
+
+#define CPrioPtr                CkPrioPtr
+#define CPrioSizeBits           CkPrioSizeBits
+#define CPrioSizeBytes          CkPrioSizeBytes
+#define CPrioSizeWords          CkPrioSizeWords
+#define CPrioConcat             CkPrioConcat
+
+#define CFunctionNameToRef	FunctionNameToRef
+#define CFunctionRefToName	FunctionRefToName
+#define CStartQuiescence	CPlus_StartQuiescence
+#define CharmExit               CkExit
+#define CSetQueueing            CkSetQueueing
+
+/* obsolete names */
+
+#define CMyPeNum                CmiMyPe
+#define CMaxPeNum               CmiNumPe
+
 #define McMyPeNum() CmiMyPe()
 #define McMaxPeNum() CmiNumPe()
 #define McTotalNumPe() CmiNumPe()   
@@ -104,44 +183,6 @@
 #define McSpanTreeChild(node, children) CmiSpanTreeChildren(node, children)
 #define McNumSpanTreeChildren(node) CmiNumSpanTreeChildren(node)
 #define McSendToSpanTreeLeaves(size, msg) CmiSendToSpanTreeLeaves(size, msg)
-
-/* We are going to only use Ck prefixes in Charm programs */
-#define CkMyPe() CmiMyPe()
-#define CkNumPe() CmiNumPe()
-#define CkSpanTreeInit() CmiSpanTreeInit()
-#define CkSpanTreeParent(node) CmiSpanTreeParent(node)
-#define CkSpanTreeRoot() CmiSpanTreeRoot()
-#define CkSpanTreeChild(node, children) CmiSpanTreeChildren(node, children)
-#define CkNumSpanTreeChildren(node) CmiNumSpanTreeChildren(node)
-#define CkSendToSpanTreeLeaves(size, msg) CmiSendToSpanTreeLeaves(size, msg)
-
-#define CkPrintf                CmiPrintf
-#define CPrintf                 CmiPrintf
-#define CkScanf                 CmiScanf
-#define CScanf                  CmiScanf
-#define CMyPeNum                CmiMyPe
-#define CharmExit               CkExit
-#define CkAlloc                 CmiAlloc
-#define CkFree                  CmiFree
-
-#define CMaxPeNum               CmiNumPe
-#define CNumSpanTreeChildren    CmiNumSpanTreeChildren
-#define CSpanTreeChild     	CmiSpanTreeChild
-#define CSpanTreeParent         CmiSpanTreeParent
-#define CSpanTreeRoot           CmiSpanTreeRoot
-
-#define CStartQuiescence	CPlus_StartQuiescence
-
-#define CFunctionNameToRef	FunctionNameToRef
-#define CFunctionRefToName	FunctionRefToName
-
-#define CPriorityPtr		PRIORITY_UPTR
-#define CPrioritySize		CkPrioritySize
-
-#ifndef NULL
-#define NULL 0
-#endif
-
 
 
 #endif
