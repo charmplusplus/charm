@@ -8,6 +8,7 @@ CkChareID mid;
 CProxy_Hello arr;
 CkGroupID mCastGrpId;
 CProxySection_Hello *mcast;
+int nElements;			// readonly
 
 #define SECTIONSIZE  5
 #define REDUCE_TIME  1000
@@ -40,7 +41,7 @@ public:
     if(m->argc < 2) {
       CkAbort("Usage: hello <nElements>\n");
     }
-    int nElements = atoi(m->argv[1]);
+    nElements = atoi(m->argv[1]);
     delete m;
     CkPrintf("Running Hello on %d processors for %d elements\n",
 	     CkNumPes(),nElements);
@@ -72,6 +73,7 @@ private:
   int init;
   myReductionCounter cnt;
   CProxySection_Hello mcp;
+  int sectionSize;
 
 public:
   Hello()
@@ -84,18 +86,21 @@ public:
 
   void start()
   {
-CmiPrintf("start\n");
+CmiPrintf("start %d elements\n", nElements);
     CkMulticastMgr *mg = CProxy_CkMulticastMgr(mCastGrpId).ckLocalBranch();
 
-    CkArrayIndexMax al[SECTIONSIZE];
-    for (int i=0; i<SECTIONSIZE; i++) {
+    sectionSize = SECTIONSIZE;
+    if (sectionSize > nElements) sectionSize = nElements;
+    CkArrayIndexMax *al = new CkArrayIndexMax[sectionSize];
+    for (int i=0; i<sectionSize; i++) {
       al[i] = CkArrayIndex1D(i);
     }
 #if 0
     mcast = new CProxySection_Hello(thisArrayID, al, SECTIONSIZE, mCastGrpId);
 #endif
-    mcp = CProxySection_Hello::ckNew(thisArrayID, al, SECTIONSIZE);
+    mcp = CProxySection_Hello::ckNew(thisArrayID, al, sectionSize);
     mcp.ckSectionDelegate(mg);
+    delete [] al;
 /*
     mcp.ckDelegate(mg);
     mg->setSection(mcp);
@@ -115,8 +120,9 @@ CmiPrintf("start\n");
     CkCallback *cb = new CkCallback(CkIndex_Hello::cb_client(NULL), CkArrayIndex1D(0), thisProxy);
     mg->setReductionClient(mcp, cb);
 
-    HiMsg *hiMsg = new (1, 0) HiMsg;
-    hiMsg->data[0] = 17;
+    HiMsg *hiMsg = new (2, 0) HiMsg;
+    hiMsg->data[0] = 22;
+    hiMsg->data[1] = 28;
     mcp.SayHi(hiMsg);
   }
   
@@ -132,14 +138,14 @@ CmiPrintf("start\n");
     int redno = msg->getRedNo();
     if (redno%3 == 0) {
       result = 0;
-      for (int i=0; i<SECTIONSIZE; i++) result+=i;
+      for (int i=0; i<sectionSize; i++) result+=i;
     }
     else if (redno%3 == 2) {
       result = 1;
-      for (int i=1; i<SECTIONSIZE+1; i++) result*=i;
+      for (int i=1; i<sectionSize+1; i++) result*=i;
     }
     else {
-      result = SECTIONSIZE+1;
+      result = sectionSize+1;
     }
     if (*(int *)data != result) {
       CmiPrintf("Expected: %d acual:%d\n", result, *(int *)data);
@@ -160,8 +166,10 @@ CmiPrintf("start\n");
 #endif
   
       if (cnt.reductionNo%3 == 0) {
-        HiMsg *hiMsg = new (1, 0) HiMsg;
-        hiMsg->data[0] = 18+cnt.reductionNo;
+        HiMsg *hiMsg = new (2, 0) HiMsg;
+        //hiMsg->data[0] = 18+cnt.reductionNo;
+        hiMsg->data[0] = 22;
+        hiMsg->data[1] = 28;
         mcp.SayHi(hiMsg);
       }
       cnt.reductionNo++;
@@ -171,7 +179,8 @@ CmiPrintf("start\n");
 
   void SayHi(HiMsg *m)
   {
-//    CkPrintf("[%d] Hi[%d] from element %d\n",CmiMyPe(), m->data[0],thisIndex);
+    //CkPrintf("[%d] Hi[%d] from element %d\n",CmiMyPe(), m->data[0],thisIndex);
+    CmiAssert(m->data[0] == 22 && m->data[1] == 28);
 
     CkGetSectionInfo(sid, m);
 //CmiPrintf("[%d] SayHi: sid on %d %p\n", CmiMyPe(), sid.pe, sid.val);

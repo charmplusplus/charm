@@ -3,6 +3,7 @@ mainmodule hello {
   readonly CkChareID mid;
   readonly CProxy_Hello arr;
   readonly CkGroupID mCastGrpId;
+  readonly int nElements;
 
   message HiMsg {
     int data[];
