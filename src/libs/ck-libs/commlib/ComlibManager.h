@@ -7,7 +7,7 @@
 #include "commlib.h"
 #include <math.h>
 
-#define USE_DIRECT 0          //A dummy strategy that directly forwards 
+#define USE_DIRECT 4          //A dummy strategy that directly forwards 
                               //messages without any processing.
 #define USE_TREE 1            //Organizes the all to all as a tree
 #define USE_MESH 2            //Virtual topology is a mesh here
