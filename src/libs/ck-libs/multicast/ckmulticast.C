@@ -419,7 +419,7 @@ void CkMulticastMgr::recvMsg(multicastGrpMsg *msg)
 
 }
 
-void CkGetSectionCookie(CkSectionInfo &id, void *msg)
+void CkGetSectionInfo(CkSectionInfo &id, void *msg)
 {
   CkMcastBaseMsg *m = (CkMcastBaseMsg *)msg;
   if (CkMcastBaseMsg::checkMagic(m) == 0) 

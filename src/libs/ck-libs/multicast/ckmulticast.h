@@ -94,6 +94,6 @@ class CkMulticastMgr: public CkDelegateMgr {
 };
 
 
-extern void CkGetSectionCookie(CkSectionInfo &id, void *msg);
+extern void CkGetSectionInfo(CkSectionInfo &id, void *msg);
 
 #endif
