@@ -213,6 +213,7 @@ CkDataMsg *CkDataMsg::buildNew(int length,const void *data)
 	msg->length=length;
 	memcpy(msg->data,data,length);
 	msg->checkTag=dataMsgTag;
+	return msg;
 }
 
 void CkDataMsg::check(void)
