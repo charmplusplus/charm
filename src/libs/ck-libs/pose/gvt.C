@@ -62,8 +62,8 @@ void PVT::startPhase()
 			     (objs.objs[i].getOVT() >= 0)))
 	  conPVT = objs.objs[i].getOVT();
       }
-      CmiAssert((optPVT >= estGVT) || (optPVT == -1));
-      CmiAssert((conPVT >= estGVT) || (conPVT == -1));
+      CmiAssert((optPVT >= estGVT) || (optPVT == -1) || (estGVT == -1));
+      CmiAssert((conPVT >= estGVT) || (conPVT == -1) || (estGVT == -1));
     }
 
   // pack PVT data
@@ -127,7 +127,7 @@ void PVT::objRemove(int pvtIdx)
 /// Update send/recv table at timestamp
 void PVT::objUpdate(int timestamp, int sr)
 {
-  CmiAssert(timestamp >= estGVT);
+  CmiAssert((timestamp >= estGVT) || (estGVT == -1));
   CmiAssert((sr == SEND) || (sr == RECV));
   SendsAndRecvs->Insert(timestamp, sr);
 }
@@ -136,8 +136,8 @@ void PVT::objUpdate(int timestamp, int sr)
 void PVT::objUpdate(int pvtIdx, int safeTime, int timestamp, int sr)
 {
   int index = (pvtIdx-CkMyPe())/1000;
-  CmiAssert((timestamp >= estGVT) || (timestamp == -1));
-  CmiAssert((safeTime >= estGVT) || (safeTime == -1));
+  CmiAssert((timestamp >= estGVT) || (timestamp == -1) || (estGVT == -1));
+  CmiAssert((safeTime >= estGVT) || (safeTime == -1) || (estGVT == -1));
   // minimize the non-idle OVT
   if ((safeTime >= 0) && 
       ((objs.objs[index].getOVT() > safeTime) || 
@@ -240,8 +240,6 @@ void GVT::computeGVT(UpdateMsg *m)
     lastGVT = estGVT; // store previous estimate
     estGVT = -1;
     
-    //CkPrintf("PRE: opt=%d con=%d lastGVT=%d early=%d #S=%d #R=%d last=%d #S=%d #R=%d et=%d\n", optGVT, conGVT, lastGVT, earliestMsg, earlySends, earlyRecvs, lastEarliest, lastSends, lastRecvs, POSE_endtime);
-
     // derive GVT estimate from min optimistic & conservative GVTs
     estGVT = optGVT;
     if ((conGVT >= 0) && (estGVT >= 0) && (conGVT < estGVT))  estGVT = conGVT;
@@ -271,8 +269,6 @@ void GVT::computeGVT(UpdateMsg *m)
     if ((earliestMsg >= 0) && ((earliestMsg < estGVT) || (estGVT < 0)))
       estGVT = earliestMsg;
 
-    //CkPrintf("POST: opt=%d con=%d lastGVT=%d early=%d #S=%d #R=%d last=%d #S=%d #R=%d et=%d\n", optGVT, conGVT, lastGVT, earliestMsg, earlySends, earlyRecvs, lastEarliest, lastSends, lastRecvs, POSE_endtime);
-
     // check for inactivity
     if (((estGVT == lastGVT) || (estGVT < 0)) && (earliestMsg == -1)) {
       inactive++; 
@@ -287,7 +283,8 @@ void GVT::computeGVT(UpdateMsg *m)
 
     // check the estimate
     CmiAssert(estGVT >= lastGVT); 
-    
+    //CkPrintf("opt=%d con=%d lastGVT=%d early=%d et=%d\n", optGVT, conGVT, 
+    //	     lastGVT, earliestMsg, POSE_endtime);
     //CkPrintf("[%d] New GVT = %d\n", CkMyPe(), estGVT);
 
     // check for termination conditions
