@@ -96,7 +96,7 @@ class PairCalculator: public CBase_PairCalculator {
 #ifdef USE_BLAS
       int incx=1;
       int incy=1;
-      complex output=zdotu_(&n, psi1, &incx,  psi2, &incy);
+      complex output=zdotu_(&n, &(psi1[0]), &incx,  &(psi2[0]), &incy);
       return(output.re);
 #else
         

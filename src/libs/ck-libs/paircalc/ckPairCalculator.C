@@ -428,7 +428,7 @@ PairCalculator::acceptResult(int size, double *matrix, int rowNum)
     memcpy(one+j*N,inDataLeft[j],N*sizeof(complex));
   zgemm_(&transform, &transform, &n_in, &m_in, &k_in, &alpha, one, &n_in, amatrix, &k_in, &beta, mynewData, &n_in);
   */
-  zgemm_(&transform, &transform, &n_in, &m_in, &k_in, &alpha, inDataLeft[0], &n_in, amatrix, &k_in, &beta, mynewData, &n_in);
+  zgemm_(&transform, &transform, &n_in, &m_in, &k_in, &alpha, &(inDataLeft[0][0]), &n_in, &(amatrix[0]), &k_in, &beta, &(mynewData[0]), &n_in);
   /*
   complex *tdata=new complex[N*grainSize];
   memset(tdata, 0, sizeof(complex)*N*grainSize);
@@ -454,7 +454,7 @@ PairCalculator::acceptResult(int size, double *matrix, int rowNum)
       memcpy(one+j*N,inDataRight[j],N*sizeof(complex));
     zgemm_(&transform, &transform, &n_in, &m_in, &k_in, &alpha, one, &n_in, amatrix, &k_in, &beta, othernewData, &n_in);
     */
-    zgemm_(&transform, &transform, &n_in, &m_in, &k_in, &alpha, inDataRight[0], &n_in, amatrix, &k_in, &beta, othernewData, &n_in);
+    zgemm_(&transform, &transform, &n_in, &m_in, &k_in, &alpha, &(inDataRight[0][0]), &n_in, &(amatrix[0]), &k_in, &beta, &(othernewData[0]), &n_in);
   }
   //  delete [] one;
   delete [] amatrix;
