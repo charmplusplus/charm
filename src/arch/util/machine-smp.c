@@ -128,7 +128,7 @@ void CmiYield(void)
 static DWORD WINAPI comm_thread(LPVOID dummy)
 {  
   if (Cmi_charmrun_fd!=-1)
-    while (1) CommunicationServer(5);
+    while (1) CommunicationServerThread(5);
   return 0;
 }
 
@@ -157,7 +157,7 @@ static DWORD WINAPI call_startfn(LPVOID vindex)
   else { /*Communication thread*/
 	  CommunicationServerInit();
 	  if (Cmi_charmrun_fd!=-1)
-		  while (1) CommunicationServer(5);
+		  while (1) CommunicationServerThread(5);
   } 
   return 0;
 }
@@ -332,7 +332,7 @@ static void *call_startfn(void *vindex)
   { /*Communication thread*/
 	  CommunicationServerInit();
 	  if (Cmi_charmrun_fd!=-1)
-		  while (1) CommunicationServer(5);
+		  while (1) CommunicationServerThread(5);
   }
   
   return 0;
