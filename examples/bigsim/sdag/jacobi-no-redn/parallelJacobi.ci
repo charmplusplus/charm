@@ -26,19 +26,19 @@ mainmodule parallelJacobi {
 	entry void startWork();
 	
 	entry void singleStep(VoidMsg* msg){
-		atomic{	 		
+		atomic "startwork" {	 		
 			/*delete msg;*/ 
 			startWork();
 		}
 		overlap{
 			when getStripfromleft(Msg *aMessage){
-				atomic {processStripfromleft(aMessage);}
+				atomic "fromLeft" {processStripfromleft(aMessage);}
 			}
 			when getStripfromright(Msg *aMessage){
-				atomic{processStripfromright(aMessage);}
+				atomic "fromRight" {processStripfromright(aMessage);}
 			}
 		}
-		atomic{
+		atomic "doWork" {
 			doWork();
 			if(iterations == 3)
 				{ /*BgPrint0("Real Iter: %e\n"); */}
