@@ -538,14 +538,14 @@ SUBROUTINE chunkpup(p, c)
 end subroutine
 
 //C Example
-void chunkpup(PUP::er& p, struct chunk c)\{
-  p|c.t;
-  p|c.xidx;
-  p|c.yidx;
-  p|c.bxm;
-  p|c.bxp;
-  p|c.bym;
-  p|c.byp;
+void chunkpup(pup_er p, struct chunk c)\{
+  pup_double(p,c.t);
+  pup_int(p,c.xidx);
+  pup_int(p,c.yidx);
+  pup_double(p,c.bxm);
+  pup_double(p,c.bxp);
+  pup_double(p,c.bym);
+  pup_double(p,c.byp);
 \}
 \end{alltt}
 
@@ -619,15 +619,15 @@ SUBROUTINE dchunkpup(p, c)
 END SUBROUTINE
 
 //C Example
-void dchunkpup(PUP::er& p, struct dchunk c)\{
-  p|c.asize;
-  if(p.isUnpacking())\{
-    c.xarr = (double *)malloc(sizeof(double)*asize);
-    c.yarr = (double *)malloc(sizeof(double)*asize);
+void dchunkpup(pup_er p, struct dchunk c)\{
+  pup_int(p,c.asize);
+  if(pup_isUnpacking(p))\{
+    c.xarr = (double *)malloc(sizeof(double)*c.asize);
+    c.yarr = (double *)malloc(sizeof(double)*c.asize);
   \}
-  p(asize,xarr);
-  p(asize,yarr);
-  if(p.isPacking())\{
+  pup_doubles(p,c.xarr,c.asize);
+  pup_doubles(p,c.yarr,c.asize);
+  if(pup_isPacking(p))\{
     free(c.xarr);
     free(c.yarr);
   \}
