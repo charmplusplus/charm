@@ -53,8 +53,10 @@ class LogEntry {
     CmiObjId   id;
     int numpes;
     int *pes;
-#if CMK_HAS_COUNTER_PAPI
+    // this is taken out so as to provide a placeholder value for non-PAPI
+    // versions (whose value is *always* zero).
     int numPapiEvents;
+#if CMK_HAS_COUNTER_PAPI
     int *papiIDs;
     LONG_LONG_PAPI *papiValues;
 #endif
@@ -67,8 +69,9 @@ class LogEntry {
       type = t; mIdx = m; eIdx = e; event = ev; pe = p; time = tm; msglen = ml;
       if (d) id = *d; else {id.id[0]=id.id[1]=id.id[2]=0; };
       recvTime = rt; cputime = cputm;
-#if CMK_HAS_COUNTER_PAPI
+      // initialize for papi as well as non papi versions.
       numPapiEvents = 0;
+#if CMK_HAS_COUNTER_PAPI
       papiIDs = NULL;
       papiValues = NULL;
 #endif

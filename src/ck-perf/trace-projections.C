@@ -542,6 +542,8 @@ void LogEntry::pup(PUP::er &p)
 	//	p|papiIDs[i]; 
 	p|papiValues[i];
       }
+#else
+      p|numPapiEvents;     // non papi version has value 0
 #endif
       if (p.isUnpacking()) {
 	recvTime = irecvtime/1.0e6;
@@ -558,6 +560,8 @@ void LogEntry::pup(PUP::er &p)
 	//	p|papiIDs[i];
 	p|papiValues[i];
       }
+#else
+      p|numPapiEvents;  // non papi version has value 0
 #endif
       if (p.isUnpacking()) cputime = icputime/1.0e6;
       break;
