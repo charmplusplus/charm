@@ -533,6 +533,18 @@ Chare::genArrayDecls(XStr& str)
   str << "    ";
   str<<array_prefix();
   type->print(str);
+  str << "(const ";
+  str << array_prefix();
+  type->print(str);
+  str << " &_arr) ";
+  if(bases !=0) {
+    str << ":";
+    bases->genProxyNames2(str, "", "((const ", " &)_arr)", ", ");
+  }
+  str << "{ *this = _arr;}\n";
+  str << "    ";
+  str<<array_prefix();
+  type->print(str);
   str << "(CkChareID __cid) ";
   if(bases !=0) {
     str << ":";
@@ -981,6 +993,23 @@ void TypeList::genProxyNames(XStr& str, const char *prefix,
   if(next) {
     str << sep;
     next->genProxyNames(str, prefix, suffix, sep);
+  }
+}
+
+void TypeList::genProxyNames2(XStr& str, const char *prefix, 
+                             const char *middle, const char *suffix, 
+                             const char *sep)
+{
+  if(type) {
+    str << prefix;
+    type->genProxyName(str);
+    str << middle;
+    type->genProxyName(str);
+    str << suffix;
+  }
+  if(next) {
+    str << sep;
+    next->genProxyNames2(str, prefix, middle, suffix, sep);
   }
 }
 

@@ -91,6 +91,8 @@ class TypeList : public Printable {
     TypeList(Type *t, TypeList *n=0) : type(t), next(n) {}
     void print(XStr& str);
     void genProxyNames(XStr& str, const char*, const char*, const char*);
+    void genProxyNames2(XStr& str, const char*, const char*, 
+                        const char*, const char*);
 };
 
 /* EnType is the type of an entry method parameter, 
