@@ -301,6 +301,7 @@ public:
   void setMigratable(int migratable);
 #else
   void AtSync(int waitForMigration=1) { ResumeFromSync();}
+  void setMigratable(int migratable)  { }
 public:
   void ckFinishConstruction(void) { }
 #endif
