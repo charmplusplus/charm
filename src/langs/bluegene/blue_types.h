@@ -103,21 +103,18 @@ public:
   }
   char * operator[](size_t n)
   {
-//CmiPrintf("[] %d\n", n);
     return h[n];
   }
   int least(int a, int b, int c){
-    int small;
+    int smaller;
 
-    //if(h[a]->key() < h[b]->key())
-      if(CmiBgMsgRecvTime(h[a])<CmiBgMsgRecvTime(h[b]))
-      small=a;
+    if(CmiBgMsgRecvTime(h[a])<CmiBgMsgRecvTime(h[b]))
+      smaller=a;
     else
-      small=b;
+      smaller=b;
     
-      //if(h[small]->key()<h[c]->key())
-      if(CmiBgMsgRecvTime(h[small])<CmiBgMsgRecvTime(h[c]))
-      return small;
+    if(CmiBgMsgRecvTime(h[smaller])<CmiBgMsgRecvTime(h[c]))
+      return smaller;
     else
       return c;
   }
@@ -137,10 +134,10 @@ public:
     int c2 = 2*index+2;
 
     if(c2<length()){
-      int small = least(index,c1,c2);
-      if(small != index){
-   	swap(small,index);
-	update(small);
+      int smaller = least(index,c1,c2);
+      if(smaller != index){
+   	swap(smaller,index);
+	update(smaller);
 	return;
       }
     }
@@ -194,17 +191,15 @@ public:
   }
 
   int least(int a, int b, int c){
-    int small;
+    int smaller;
 
-    //if(h[a]->key() < h[b]->key())
-      if(h[a]->compareKey(h[b])==-1)
-      small=a;
+    if(h[a]->compareKey(h[b])==-1)
+      smaller=a;
     else
-      small=b;
+      smaller=b;
     
-      //if(h[small]->key()<h[c]->key())
-      if(h[small]->compareKey(h[c])==-1)
-      return small;
+    if(h[smaller]->compareKey(h[c])==-1)
+      return smaller;
     else
       return c;
   }
@@ -231,10 +226,10 @@ public:
     int c2 = 2*index+2;
 
     if(c2<length()){
-      int small = least(index,c1,c2);
-      if(small != index){
-   	swap(small,index);
-	update(small);
+      int smaller = least(index,c1,c2);
+      if(smaller != index){
+   	swap(smaller,index);
+	update(smaller);
 	return;
       }
     }

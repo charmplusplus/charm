@@ -659,7 +659,7 @@ static void getPredictedLoad(CentralLB::LDStats* stats, int count,
 
 	stats->makeCommHash();
  	// update to_proc according to migration msgs
-	for(int i = 0; i < msg->n_moves; i++) {
+	for(i = 0; i < msg->n_moves; i++) {
 	  MigrateInfo &mInfo = msg->moves[i];
 	  int idx = stats->getHash(mInfo.obj.objID(), mInfo.obj.omID());
 	  CmiAssert(idx != -1);

@@ -33,7 +33,7 @@ ObjGraph::ObjGraph(int count, CentralLB::LDStats* _stats)
   n_edges = 0;
     // initialize node array
   int index;
-  for(int index = 0; index < stats->n_comm; index++) {
+  for(index = 0; index < stats->n_comm; index++) {
       const LDCommData newedgedata = stats->commData[index];
 
       // If this isn't an object-to-object message, ignore it
