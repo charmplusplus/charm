@@ -261,7 +261,7 @@ TEMP_BASE="/tmp/charmc_tmp.$$"
 findCharmBin() {
 if [ -z "$CHARMBIN" ]
 then
-	SCRIPT=$0
+	SCRIPT=$1
 	CHARMBIN=`dirname $SCRIPT`
 #	CHARMBIN=`cd $CHARMBIN; pwd`
 # NOTE: this script no longer tries to follow soft links
@@ -293,7 +293,7 @@ fi
 
 printVersion()
 {
-	findCharmBin
+	findCharmBin $0
 	version=`cat $CHARMBIN/../include/VERSION`
 	echo Charm++ Version $version
 }
@@ -620,7 +620,7 @@ ORIGDIR=`pwd`
 
 # Try to find CHARMBIN by looking in directory where charmc is
 
-findCharmBin
+findCharmBin $0
 
 FIRST_THREE=`uname -s | awk '{print substr($1,1,3)}' `
 if [ "$FIRST_THREE" = "CYG" ]
