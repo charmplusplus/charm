@@ -1063,7 +1063,7 @@ sub posefuncmap
 		if ($isconstructor) {
 		  $output=$preline."\n{\n";
 		  $output.="int _POSE_handle = ".$segments[3].";\n";
-		  $output.="int _POSE_timeOffset = ".$segments[4].";\n" if ($#segments>=4);
+		  $output.="unsigned int _POSE_timeOffset = ".$segments[4].";\n" if ($#segments>=4);
 		  $output.="PVT *pvt = (PVT *)CkLocalBranch(ThePVT);\n";
 		  $output.=$msg."->Timestamp(ovt+(_POSE_timeOffset));\n";
 		  $output.="pvt->objUpdate(ovt+(_POSE_timeOffset), SEND);\n";
@@ -1077,7 +1077,7 @@ sub posefuncmap
 		  $output=$preline."\n{\n";
 		  $output.="if (!CpvAccess(stateRecovery)) {\n";
 		  $output.="int _POSE_handle = ".$segments[3].";\n";
-		  $output.="int _POSE_timeOffset = ".$segments[4].";\n";
+		  $output.="unsigned int _POSE_timeOffset = ".$segments[4].";\n";
 		  $output.="registerTimestamp(_POSE_handle, ".$msg.",_POSE_timeOffset);\n";
 		  $output.="$msg->fromPE = CkMyPe();\n";
 		  $output.="if ((_POSE_handle<0) || (_POSE_handle>=INT_MAX)) CkAbort(\"ERROR: Sending to invalid array index!\\n\");\n";
@@ -1097,7 +1097,7 @@ sub posefuncmap
 		  $event=$1;
 		  $msg=$2;
 		  if (!$issim || ($issim && $isconstructor)) {
-		    print "warning: should use POSE_invoke instead of POSE_invoke_at in side sim object constructors\n" if ($issim && $isconstructor);
+		    print "warning: should use POSE_invoke instead of POSE_invoke_at inside sim object constructors\n" if ($issim && $isconstructor);
 		    $output=$preline."\n{\n";
 		    $output.="int _POSE_handle = ".$segments[3].";\n";
 		    $output.="int _POSE_atTime = ".$segments[4].";\n";
@@ -1138,7 +1138,7 @@ sub posefuncmap
 		    $msg=$2;
 		    if ($issim && $isconstructor) {
 		      $output=$preline."\n{\n";
-		      $output.="int _POSE_timeOffset = ".$segments[2].";\n";
+		      $output.="unsigned int _POSE_timeOffset = ".$segments[2].";\n";
 		      $output.="PVT *pvt = (PVT *)CkLocalBranch(ThePVT);\n";
 		      $output.=$msg."->Timestamp(ovt+(_POSE_timeOffset));\n";
 		      $output.="pvt->objUpdate(ovt+(_POSE_timeOffset), SEND);\n";
@@ -1149,7 +1149,7 @@ sub posefuncmap
 		      $output.="}\n";
 		    } elsif ($issim) {
 		      $output=$preline."\n{\n";
-		      $output.="int _POSE_timeOffset = ".$segments[2].";\n";
+		      $output.="unsigned int _POSE_timeOffset = ".$segments[2].";\n";
 		      $output.="if (!CpvAccess(stateRecovery)) {\n";
 		      $output.="registerTimestamp(parent->thisIndex, ".$msg.", _POSE_timeOffset);\n";
 		      $output.="$msg->fromPE = CkMyPe();\n";

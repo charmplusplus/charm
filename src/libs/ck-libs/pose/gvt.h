@@ -66,6 +66,7 @@ private:
   int estGVT;                        // GVT estimates
   int inactive, inactiveTime;        // #iterations since change in state
   int nextLBstart;                   // #iterations since last LB run
+  int lastEarliest, lastCount;
   SRtable *SendsAndRecvs, *LastSR;   // Send and Recv events
 #ifdef POSE_STATS_ON
   localStat *localStats;

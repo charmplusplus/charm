@@ -28,6 +28,7 @@ void opt2::Step()
     localStats->SwitchTimer(SIM_TIMER);      
 #endif
   }
+
   // Prepare to execute an event
   ev = eq->currentPtr;
   if (ev->timestamp >= 0) {

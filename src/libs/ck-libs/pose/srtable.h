@@ -38,6 +38,15 @@ class SRbucket { // A bucket for holding a range of SRentries
   int offset;       // the minimum timestamp to be stored in this bucket
   SRentry *bucket, *bucketTail;  // the entries in this bucket
   SRbucket() { bucket = NULL;  count = 0; bktSz = -1; offset = 0; }
+  void dump() {
+    CkPrintf("bkt: Count=%d bktSz=%d offset=%d\n", count, bktSz, offset);
+    SRentry *tmp = bucket;
+    while (tmp) {
+      CkPrintf("  %d", tmp->timestamp);
+      tmp = tmp->next;
+    }
+    if (bucket) CkPrintf("\n");
+  }
   ~SRbucket() {
     SRentry *next, *current=bucket;
     while (current) {
@@ -109,7 +118,7 @@ class SRbucket { // A bucket for holding a range of SRentries
     }
     return 0;
   }
-  void emptyOutBucket(SRentry *recyc, SRentry *recycTail, int *recycCount) {
+  void emptyOutBucket(SRentry *&recyc, SRentry *&recycTail, int *recycCount) {
     SRentry *tmp;
     if (bucket) {
       if (recycCount == NULL) { // actually moves bucket contents to residuals
@@ -141,7 +150,7 @@ class SRtable {
  private:
   SRentry *residuals, *residualsTail;  // all other send/recv events
   SRentry *recyc, *recycTail;          // SRentries that can be reused
-  int recycCount;
+  int recycCount, availableBuckets;
  public:
   SRbucket *sends, *recvs; // send/recv events occurring 
                                 // at timestamps between gvt and gvt+gvtWindow
@@ -176,14 +185,79 @@ class SRtable {
     return 0;
   }
   void Insert(int timestamp, int srSt); // insert s/r at timestamp
+  int FindEarliest(int *ec) {
+    //sanitize();
+    int early;
+    SRentry *tmp;
+    if (inBuckets == 0) return offset+gvtWindow;
+    for (int i=0; i<numBuckets; i++) {
+      if (sends[i].count > 0) {
+	early = sends[i].bucket->timestamp;
+	*ec = 1;
+	tmp = sends[i].bucket->next;
+	while (tmp && (tmp->timestamp == early)) {
+	  (*ec)++;
+	  tmp = tmp->next;
+	}
+	if ((recvs[i].count > 0) && (early > recvs[i].bucket->timestamp)) {
+	  early = recvs[i].bucket->timestamp;
+	  *ec = 1;
+	  tmp = recvs[i].bucket->next;
+	  while (tmp && (tmp->timestamp == early)) {
+	    (*ec)++;
+	    tmp = tmp->next;
+	  }
+	}
+	return early;
+      }
+      else if (recvs[i].count > 0) {
+	early = recvs[i].bucket->timestamp;
+	*ec = 1;
+	tmp = recvs[i].bucket->next;
+	while (tmp && (tmp->timestamp == early)) {
+	  (*ec)++;
+	  tmp = tmp->next;
+	}
+	return early;
+      }
+    }
+    return offset+gvtWindow;    
+  }
+  int FindNextEarliest(int em) {
+    int early = -1;
+    SRentry *tmp;
+    for (int i=(em-offset)/bktSz; i<numBuckets; i++) {
+      if (sends[i].count > 0) {
+	tmp = sends[i].bucket;
+	while (tmp && (tmp->timestamp == em))
+	  tmp = tmp->next;
+	if (tmp)  early = tmp->timestamp;
+	if (recvs[i].count > 0) {
+	  tmp = recvs[i].bucket;
+	  while (tmp && (tmp->timestamp == em))
+	    tmp = tmp->next;
+	  if (tmp && (tmp->timestamp < early))
+	    early = tmp->timestamp;
+	}
+      }
+      else if (recvs[i].count > 0) {
+	tmp = recvs[i].bucket;
+	while (tmp && (tmp->timestamp == em))
+	  tmp = tmp->next;
+	if (tmp)  early = tmp->timestamp;
+      }
+      if (early != -1) return early;
+    }
+    return offset+gvtWindow;
+  }
   int FindDiff() {
     //sanitize();
     int result;
+    if (inBuckets == 0) return -1;
     for (int i=0; i<numBuckets; i++)
       if ((result = sends[i].diffBucket(recvs[i])) != -1)
 	return result;
     return -1;
-    //sanitize();
   }
   void PurgeBelow(int ts);      // purge table below timestamp ts
   void FileResiduals();         // try to file each residual event in table
@@ -204,7 +278,6 @@ class SRtable {
     }
     residuals = residualsTail = NULL;
     offset = -1;
-    //sanitize();
   }
   UpdateMsg *packTable();
   void addEntries(UpdateMsg *um);

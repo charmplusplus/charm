@@ -29,7 +29,7 @@ class rep
   virtual Event *getCommitEvent(Event *e);  // get event to rollback to
 
   // timestamps event message, sets priority, and makes a record of the send
-  virtual void registerTimestamp(int idx, eventMsg *m, int offset);
+  virtual void registerTimestamp(int idx, eventMsg *m, unsigned int offset);
   virtual void CheckpointAll();        // set checkpoint rate to 1/1
   virtual void ResetCheckpointRate();  // reset checkpoint rate to default
 

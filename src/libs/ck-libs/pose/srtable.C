@@ -14,10 +14,11 @@
 SRtable::SRtable() 
 { 
   gvtWindow = 16;
-  numBuckets = 2;
+  availableBuckets = numBuckets = 2;
   residuals = residualsTail = recyc = recycTail = NULL;
   recycCount = 0;
-  inBuckets = offset = 0;
+  inBuckets = 0;
+  offset = 0;
   bktSz = gvtWindow / numBuckets;
   sends = (SRbucket *)malloc(numBuckets*sizeof(SRbucket));
   recvs = (SRbucket *)malloc(numBuckets*sizeof(SRbucket));
@@ -25,6 +26,7 @@ SRtable::SRtable()
     sends[i].initBucket(bktSz, offset+i*bktSz);
     recvs[i].initBucket(bktSz, offset+i*bktSz);
   }
+  offset = -1;
 }
 
 // Destructor: needed to free linked lists
@@ -48,13 +50,16 @@ SRtable::~SRtable()
 // Makes an SRentry out of parameters and sends to other Insert
 void SRtable::Insert(int timestamp, int srSt)
 {
-  //sanitize();
   SRentry *entry;
+  CmiAssert(timestamp >= offset);
+  if (offset == -1) offset = 0;
+  //sanitize();
   if (timestamp >= offset+gvtWindow) {
     if (recyc) {
       entry = recyc;
       recyc = recyc->next;
       if (!recyc) recycTail = NULL;
+      recycCount--;
       entry->Set(timestamp, srSt, residuals);
       if (residualsTail)
 	residuals = entry;
@@ -76,6 +81,7 @@ void SRtable::Insert(int timestamp, int srSt)
       entry = recyc;
       recyc = recyc->next;
       if (!recyc) recycTail = NULL;
+      recycCount--;
       entry->Set(timestamp, srSt, NULL);
     }
     else
@@ -173,13 +179,13 @@ void SRtable::FileResiduals()
     current = tmp;
     tmp = tmp->next;
     current->next = NULL;
-    if (current->timestamp >= offset+gvtWindow) {
+    if (current->timestamp >= offset+gvtWindow) { // entry not in window
+      // put back into residuals
       current->next = residuals;
       if (residuals) residuals = current;
       else residuals = residualsTail = current;
     }
-    else {
-      //CmiAssert(current->timestamp >= offset);
+    else { // entry in window; place it in a bucket
       bkt = (current->timestamp - offset)/bktSz;
       inBuckets++;
       if (current->sr == SEND)  sends[bkt].addToBucket(current);
@@ -190,16 +196,15 @@ void SRtable::FileResiduals()
 }
 
 UpdateMsg *SRtable::packTable()
-{ // packs only buckets; residuals left behind
-  //sanitize();
+{ // packs only entries with the two earliest timestamps available in buckets;
+  // packed into an UpdateMsg; residuals left behind
   UpdateMsg *um;
   int count=0, i;
   SRentry *j;
 
-  for (i=0; i<numBuckets; i++) 
-    count = count + sends[i].count + recvs[i].count;
-  um = new (count, 8*sizeof(int)) UpdateMsg;
-  um->msgCount = count;
+  //sanitize();
+  um = new (inBuckets, 8*sizeof(int)) UpdateMsg;
+  um->msgCount = inBuckets;
   um->gvtW = gvtWindow;
   um->numB = numBuckets;
   um->offset = offset;
@@ -220,28 +225,26 @@ UpdateMsg *SRtable::packTable()
       j = j->next;
     }
   }
-  //sanitize();
   return um;
 }
 
 void SRtable::addEntries(UpdateMsg *um)
-{
-  //  sanitize();
+{ // table we are adding to should be either empty, or of the right size
   int i, bkt;
   SRentry *entry;
 
   // first, resize if necessary
+  CmiAssert((offset == -1) || (offset == um->offset));
   if ((gvtWindow != um->gvtW) || (numBuckets != um->numB) || 
       (offset != um->offset)) {
     int oldNumBuckets = numBuckets;
     gvtWindow = um->gvtW;
     numBuckets = um->numB;
     offset = um->offset;
-    //CmiAssert(offset == um->offset);
-    // move all elements to residuals
+    CmiAssert(residuals == NULL);
     for (i=0; i<oldNumBuckets; i++) {
-      sends[i].emptyOutBucket(residuals, residualsTail, NULL);
-      recvs[i].emptyOutBucket(residuals, residualsTail, NULL);
+      CmiAssert(sends[i].count == 0);
+      CmiAssert(recvs[i].count == 0);
     }
     // free and realloc arrays
     free(sends);
@@ -253,14 +256,15 @@ void SRtable::addEntries(UpdateMsg *um)
     SetOffset(offset);
     FileResiduals();
   }
-  else if (offset != um->offset)  SetOffset(um->offset);
 
+  //sanitize();
   // now move the new stuff in
   for (i=0; i<um->msgCount; i++) {
     if (recyc) {
       entry = recyc;
       recyc = recyc->next;
       if (!recyc) recycTail = NULL;
+      recycCount--;
       entry->Set(um->msgs[i].timestamp, um->msgs[i].sr, NULL);
     }
     else
@@ -274,61 +278,61 @@ void SRtable::addEntries(UpdateMsg *um)
 }
 
 void SRtable::shrink()
-{ 
-  //sanitize();
-  // Minimum GVT Window is 8; minimum bucket size is 1
+{ // Assumes bucket size is 8; currently not flexible
+  // This code shrinks by a single bucket
   int oldNumBuckets = numBuckets, i;
   SRentry *tmp;
 
+  //sanitize();
   if (gvtWindow > 16) gvtWindow = gvtWindow-8;
   else return;
   numBuckets = gvtWindow/8;
-  // move all elements to residuals
-  for (i=0; i<oldNumBuckets; i++) {
-    sends[i].emptyOutBucket(residuals, residualsTail, NULL);
-    recvs[i].emptyOutBucket(residuals, residualsTail, NULL);
-  }
-  // free and re-malloc arrays
-  free(sends);
-  free(recvs);
-  inBuckets = 0;
-  bktSz = gvtWindow / numBuckets;
-  sends = (SRbucket *)malloc(numBuckets*sizeof(SRbucket));
-  recvs = (SRbucket *)malloc(numBuckets*sizeof(SRbucket));
-  SetOffset(offset);
-  FileResiduals();
+  // move elements from last bucket to residuals
+  inBuckets = inBuckets - sends[oldNumBuckets-1].count - recvs[oldNumBuckets-1].count;
+  sends[oldNumBuckets-1].emptyOutBucket(residuals, residualsTail, NULL);
+  recvs[oldNumBuckets-1].emptyOutBucket(residuals, residualsTail, NULL);
   //sanitize();
 }
 
 void SRtable::expand()
-{
-  //sanitize();
+{ // Assumes bucket size is 8; currently not flexible
+  // This code expands by a single bucket
   int oldNumBuckets = numBuckets, i;
   SRentry *tmp;
 
+  //sanitize();
   if (gvtWindow > MAX_GVT_WINDOW) return;
   gvtWindow = gvtWindow*2;
   numBuckets = gvtWindow/8;
-  // move all elements to residuals
-  for (i=0; i<oldNumBuckets; i++) {
-    sends[i].emptyOutBucket(residuals, residualsTail, NULL);
-    recvs[i].emptyOutBucket(residuals, residualsTail, NULL);
+  if (numBuckets > availableBuckets) { // need to actually expand table
+    // move all elements to residuals
+    for (i=0; i<oldNumBuckets; i++) {
+      sends[i].emptyOutBucket(residuals, residualsTail, NULL);
+      recvs[i].emptyOutBucket(residuals, residualsTail, NULL);
+    }
+    // free and re-malloc arrays (fastest for expand -- avoids copy)
+    free(sends);
+    free(recvs);
+    inBuckets = 0;
+    sends = (SRbucket *)malloc(numBuckets*sizeof(SRbucket));
+    recvs = (SRbucket *)malloc(numBuckets*sizeof(SRbucket));
+    SetOffset(offset);
   }
-  // free and re-malloc arrays (fastest for expand -- avoids unnecessary copy)
-  free(sends);
-  free(recvs);
-  inBuckets = 0;
-  bktSz = gvtWindow / numBuckets;
-  sends = (SRbucket *)malloc(numBuckets*sizeof(SRbucket));
-  recvs = (SRbucket *)malloc(numBuckets*sizeof(SRbucket));
-  SetOffset(offset);
   FileResiduals();
   //sanitize();
 }
 
 void SRtable::dump()
 {
-  CkPrintf("SRtable::dump: WRITE ME\n");
+  CkPrintf("SRtable::dump():\n");
+  CkPrintf("OFFSET=%d #inBuckets=%d gvtWindow=%d numBuckets=%d bktSz=%d\n",
+	   offset, inBuckets, gvtWindow, numBuckets, bktSz);
+  if (residuals) CkPrintf("Residuals is non-empty.  ");
+  else CkPrintf("Residuals is empty.  ");
+  if (recyc) CkPrintf("Recyc is non-empty (%d entries).\n", recycCount);
+  else CkPrintf("Recyc is empty.\n");
+  for (int i=0; i<numBuckets; i++) sends[i].dump();
+  for (int j=0; j<numBuckets; j++) recvs[j].dump();    
 }
 
 void SRtable::sanitize()

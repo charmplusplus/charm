@@ -28,6 +28,7 @@ void opt::Step()
     localStats->SwitchTimer(SIM_TIMER);      
 #endif
   }
+
   // Prepare to execute an event
   ev = eq->currentPtr;
 
@@ -226,34 +227,25 @@ void opt::CancelEvents()
 }
 
 int opt::SafeTime()
- {  // compute safe time for object
-    int ovt=userObj->OVT(), theTime=-1, ec=parent->cancels.earliest,
-      gvt=localPVT->getGVT(), worktime = eq->currentPtr->timestamp;
-    
-    if (!RBevent && (ec<0) && (worktime < 0) && (ovt <= gvt))  // idle object
-      return -1;
-    
-    if (worktime > theTime)                         // check queued events
-      theTime = worktime;
-    else if (theTime < 0) 
-      theTime = ovt;
-    if (RBevent && (RBevent->timestamp<theTime)) // rollbacks
-      theTime = RBevent->timestamp;
-    if ((ec >= 0) && (ec < theTime))     // check cancellations
-      theTime = ec;
-    if ((ovt < theTime) && (ovt > gvt))
-      theTime = ovt;
-    
-    //    if ((theTime < gvt) && (theTime >= 0)) {
-    //      CkPrintf("WARNING: opt::SafeTime: time calculated (%d) is less than GVT estimate (%d)\n ovt=%d ec=%d worktime=%d\n", theTime, gvt, ovt, ec, worktime);
-    //      theTime = gvt;
-    //    }
-    //CkPrintf("%d on PE %d: ovt=%d ec=%d worktime=%d\n", 
-    //parent->thisIndex, CkMyPe(), ovt, ec, worktime);
-    return theTime;
-  }
-
-
+{  // compute safe time for object
+  int ovt=userObj->OVT(), theTime=-1, ec=parent->cancels.earliest,
+    gvt=localPVT->getGVT(), worktime = eq->currentPtr->timestamp;
+  
+  if (!RBevent && (ec<0) && (worktime < 0) && (ovt <= gvt))  // idle object
+    return -1;
+  
+  if (worktime > theTime)                         // check queued events
+    theTime = worktime;
+  else if (theTime < 0) 
+    theTime = ovt;
+  if (RBevent && (RBevent->timestamp<theTime)) // rollbacks
+    theTime = RBevent->timestamp;
+  if ((ec >= 0) && (ec < theTime))     // check cancellations
+    theTime = ec;
+  if ((ovt < theTime) && (ovt > gvt))
+    theTime = ovt;
+  return theTime;
+}
 
 void opt::RecoverState(Event *recoveryPoint)
 {

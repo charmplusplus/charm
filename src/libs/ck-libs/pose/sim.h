@@ -117,8 +117,8 @@ public:
 class sim : public ArrayElement1D {
  protected:
   int active; // set if Step message queued; sync strategy
-  int myPVTidx,  myLBidx;  // unique global IDs for this object on PVT and LB
  public:
+  int myPVTidx,  myLBidx;  // unique global IDs for this object on PVT and LB
   int DOs, UNDOs;
   int sync;
   int *srVector;    // number of sends/recvs per PE

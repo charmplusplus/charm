@@ -42,6 +42,7 @@ void adapt2::Step()
     localStats->SwitchTimer(SIM_TIMER);      
 #endif
   }
+
   // Prepare to execute an event
   ev = eq->currentPtr;
   // Shorten the leash as we near POSE_endtime
