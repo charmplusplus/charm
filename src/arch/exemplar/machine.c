@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.23  1997-07-23 16:55:02  milind
+ * Revision 2.24  1997-07-23 18:40:24  milind
+ * Made charm++ to work on exemplar.
+ *
+ * Revision 2.23  1997/07/23 16:55:02  milind
  * Made Converse run on Exemplar.
  *
  * Revision 2.22  1997/07/22 18:16:05  milind
@@ -115,10 +118,8 @@ static McQueue **MsgQueue;
 
 
 CpvDeclare(void*, CmiLocalQueue);
-CpvDeclare(int, Cmi_mype);
-CpvDeclare(int, Cmi_numpes);
-CpvDeclare(int, Cmi_myrank);
-CpvDeclare(int, Cmi_nodesize);
+int Cmi_numpes;
+int Cmi_nodesize;
 
 static node_private barrier_t barrier;
 static node_private barrier_t *barr;
@@ -131,10 +132,7 @@ void *CmiAlloc(size)
 int size;
 {
   char *res;
-  res =(char *) memory_class_malloc(size+8,THREAD_PRIVATE_MEM);
-  if (res==(char *)0) { memory_class_malloc(size+8,NODE_PRIVATE_MEM); }
-  if (res==(char *)0) { memory_class_malloc(size+8,NEAR_SHARED_MEM); }
-  if (res==(char *)0) { memory_class_malloc(size+8,FAR_SHARED_MEM); }
+  res =(char *) malloc(size+8);
   if (res==(char *)0) { CmiError("%d:Memory allocation failed.",CmiMyPe()); exit(1); }
   ((int *)res)[0]=size;
   return (void *)(res+8);
@@ -269,16 +267,10 @@ void *arg;
     USER_PARAMETERS *usrparam;
     usrparam = (USER_PARAMETERS *) arg;
 
-    CpvInitialize(int, Cmi_mype);
-    CpvInitialize(int, Cmi_numpes);
-    CpvInitialize(int, Cmi_myrank);
-    CpvInitialize(int, Cmi_nodesize);
     CpvInitialize(void*, CmiLocalQueue);
 
-    CpvAccess(Cmi_mype)  = my_thread();
-    CpvAccess(Cmi_numpes) =  usrparam->npe;
-    CpvAccess(Cmi_myrank)  = CpvAccess(Cmi_mype);
-    CpvAccess(Cmi_nodesize)  = CpvAccess(Cmi_numpes);
+    Cmi_numpes =  usrparam->npe;
+    Cmi_nodesize  = Cmi_numpes;
 
     ConverseCommonInit(usrparam->argv);
     CthInit(usrparam->argv);
@@ -292,7 +284,7 @@ void *arg;
 void CmiInitMc(argv)
 char *argv[];
 {
-    neighbour_init(CpvAccess(Cmi_mype));
+    neighbour_init(CmiMyPe());
     CpvAccess(CmiLocalQueue) = (void *) FIFO_Create();
     CmiSpanTreeInit();
     CmiTimerInit();

@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.64  1997-07-22 18:15:59  milind
+ * Revision 2.65  1997-07-23 18:40:22  milind
+ * Made charm++ to work on exemplar.
+ *
+ * Revision 2.64  1997/07/22 18:15:59  milind
  * fixed some exemplar-related bugs.
  *
  * Revision 2.63  1997/07/21 21:00:05  jyelon
@@ -305,30 +308,30 @@ typedef int CmiMutex;
 #if CMK_SHARED_VARS_EXEMPLAR
 
 #include <spp_prog_model.h>
-#include <memory.h>
 
-#define SHARED_DECL node_private
-#define CpvDeclare(t,v) thread_private t CMK_CONCAT(Cpv_Var_,v)
-#define CpvExtern(t,v)  extern thread_private t CMK_CONCAT(Cpv_Var_,v)
-#define CpvStaticDeclare(t,v) static thread_private t CMK_CONCAT(Cpv_Var_,v)
-#define CpvInitialize(t,v)
-#define CpvAccess(v) CMK_CONCAT(Cpv_Var_,v)
+extern int Cmi_numpes;
+extern int Cmi_nodesize;
 
-#define CsvDeclare(t,v) node_private t CMK_CONCAT(Csv_Var_,v)
-#define CsvStaticDeclare(t,v) static node_private t CMK_CONCAT(Csv_Var_,v)
-#define CsvExtern(t,v) extern node_private t CMK_CONCAT(Csv_Var_,v)
+#define CmiMyPe() my_thread()
+#define CmiMyRank() my_thread()
+#define CmiNumPes() Cmi_numpes
+#define CmiNodeSize() Cmi_nodesize
+
+#define SHARED_DECL
+#define CpvDeclare(t,v) t* CMK_CONCAT(Cpv_Var_,v)
+#define CpvExtern(t,v)  extern t* CMK_CONCAT(Cpv_Var_,v)
+#define CpvStaticDeclare(t,v) static t* CMK_CONCAT(Cpv_Var_,v)
+#define CpvInitialize(t,v)\
+    { if (CmiMyRank()) while (CMK_CONCAT(Cpv_Var_,v)==0);\
+    else { CMK_CONCAT(Cpv_Var_,v)=(t*)malloc(sizeof(t)*CmiNodeSize()); }}
+#define CpvAccess(v) CMK_CONCAT(Cpv_Var_,v)[CmiMyRank()]
+
+#define CsvDeclare(t,v) t CMK_CONCAT(Csv_Var_,v)
+#define CsvStaticDeclare(t,v) static t CMK_CONCAT(Csv_Var_,v)
+#define CsvExtern(t,v) extern t CMK_CONCAT(Csv_Var_,v)
 #define CsvInitialize(t,v)
 #define CsvAccess(v) CMK_CONCAT(Csv_Var_,v)
 
-#define CmiMyPe() CpvAccess(Cmi_mype)
-#define CmiMyRank() CpvAccess(Cmi_myrank)
-#define CmiNumPes() CpvAccess(Cmi_numpes)
-#define CmiNodeSize() CpvAccess(Cmi_nodesize)
-
-CpvExtern(int, Cmi_mype);
-CpvExtern(int, Cmi_numpes);
-CpvExtern(int, Cmi_myrank);
-CpvExtern(int, Cmi_nodesize);
 
 extern void CmiMemLock();
 extern void CmiMemUnlock();
