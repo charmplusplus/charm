@@ -344,23 +344,12 @@ double GetClock()
   return (tv.tv_sec * 1.0 + tv.tv_usec * 1.0E-6);
 }
 
-void jmemcpy(char *dst, char *src, int len)
-{
-  char *sdend = (char *)(((CMK_SIZE_T)(src + len)) & ~(sizeof(double)-1));
-  while (src != sdend) {
-    *((double*)dst) = *((double*)src);
-    dst+=sizeof(double); src+=sizeof(double);
-  }
-  len &= (sizeof(double)-1);
-  while (len) { *dst++ = *src++; len--; }
-}
-
 char *CopyMsg(char *msg, int len)
 {
   char *copy = (char *)CmiAlloc(len);
   if (!copy)
       fprintf(stderr, "Out of memory\n");
-  jmemcpy(copy, msg, len);
+  memcpy(copy, msg, len);
   return copy;
 }
 
@@ -2279,14 +2268,14 @@ void AssembleDatagram(OtherNode node, ExplicitDgram dg)
   if (!msg)
       fprintf(stderr, "%d: Out of mem\n", Cmi_mynode);
     if (size < dg->len) KillEveryoneCode(4559312);
-    jmemcpy(msg, (char*)(dg->data), dg->len);
+    memcpy(msg, (char*)(dg->data), dg->len);
     node->asm_rank = dg->rank;
     node->asm_total = size;
     node->asm_fill = dg->len;
     node->asm_msg = msg;
   } else {
     size = dg->len - DGRAM_HEADER_SIZE;
-    jmemcpy(msg + node->asm_fill, ((char*)(dg->data))+DGRAM_HEADER_SIZE, size);
+    memcpy(msg + node->asm_fill, ((char*)(dg->data))+DGRAM_HEADER_SIZE, size);
     node->asm_fill += size;
   }
   if (node->asm_fill > node->asm_total)
