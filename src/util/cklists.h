@@ -94,6 +94,15 @@ class CkQ : private CkNoncopyable {
     }
 };
 
+/*
+This class is modelled after, but *not* identical to, the (still nonportable)
+std::vector.  In particular, this class really stupidly uses constructors
+and destructors (new and delete), but also uses memcpy() instead of an actual
+copy constructor.  This leads to horrific, impossible-to-track-down memory
+leaks and double-deletes.  The general rule is to *never* store a class that
+requires a copy constructor in a CkVec; you'll have to store pointers to that 
+class (see CkPupPtrVec).
+*/
 template <class T>
 class CkVec {
     T *block;
