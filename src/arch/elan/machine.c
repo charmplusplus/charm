@@ -46,6 +46,7 @@ Developed by Sameer Kumar
 
 #define CMI_BROADCAST_ROOT(msg)          ((CmiMsgHeaderBasic *)msg)->root
 #define CMI_DEST_RANK(msg)               ((CmiMsgHeaderBasic *)msg)->rank
+#define CMI_MESSAGE_SIZE(msg)            ((CmiMsgHeaderBasic *)msg)->size
 
 #if CMK_BROADCAST_SPANNING_TREE
 #  define CMI_SET_BROADCAST_ROOT(msg, root)  CMI_BROADCAST_ROOT(msg) = (root);
@@ -145,11 +146,6 @@ static SMSG_LIST *sent_msgs=0;
 static SMSG_LIST *end_sent=0;
 static SMSG_LIST *cur_unsent=0;
 
-void PumpPersistent();
-void CmiSendPersistentMsg(PersistentHandle h, int destPE, int size, void *m);
-void CmiSyncSendPersistent(int destPE, int size, char *msg, 
-                           PersistentHandle h);
-
 void ElanSendQueuedMessages();
 static int CmiReleaseSentMessages();
 
@@ -168,13 +164,13 @@ static void PerrorExit(const char *msg);
 
 void SendSpanningChildren(int size, char *msg);
 
-#define TYPE_FIELD(buf) ((int *)buf)[0]
-#define SIZE_FIELD(buf) ((int *)buf)[1]
-#define CONV_SIZE_FIELD(buf) ((int *)buf)[2]
+#define TYPE_FIELD(buf) ((int *)(buf))[0]
+#define SIZE_FIELD(buf) ((int *)(buf))[1]
+#define CONV_SIZE_FIELD(buf) ((int *)(buf))[2]
 #define REF_FIELD(buf)  ((int *)buf)[3]
 
-#define CONV_BUF_START(res) ((char *)res - 2*sizeof(int))
-#define USER_BUF_START(res) ((char *)res - 4*sizeof(int))
+#define CONV_BUF_START(res) ((char *)(res) - 2*sizeof(int))
+#define USER_BUF_START(res) ((char *)(res) - 4*sizeof(int))
 
 #define DYNAMIC_MESSAGE 0
 #define STATIC_MESSAGE 1
@@ -392,7 +388,11 @@ static int CmiReleaseSentMessages(void)
 #ifndef CMK_OPTIMIZE 
     double rel_start_time = CmiWallTimer();
 #endif
-     
+
+#if CMK_PERSISTENT_COMM
+  release_pmsg_list();
+#endif
+
   while(msg_tmp != NULL){
       if(msg_tmp->sent) {
           done =0;
@@ -530,6 +530,11 @@ int PumpMsgs(int retflag)
 #endif
 
     int ecount = 0, emcount = 0;
+
+#if CMK_PERSISTENT_COMM
+    if (PumpPersistent()) return 1;
+#endif
+        
     while(1) {
         msg = 0;
         
@@ -551,6 +556,7 @@ int PumpMsgs(int retflag)
         }
         post_idx = ecount + 1;
 
+#if 1
         emcount = 0;
         for(mcount = 0; mcount < MID_MSG_Q_SIZE; mcount ++){
             emcount = (mcount + post_m_idx) % MID_MSG_Q_SIZE;
@@ -637,6 +643,7 @@ int PumpMsgs(int retflag)
             }
         }
         event_m_idx = emcount + 1;
+#endif
         
         ecount = 0;
         for(rcount = 0; rcount < RECV_MSG_Q_SIZE; rcount ++){
@@ -682,7 +689,6 @@ int PumpMsgs(int retflag)
             }
         }
         event_idx = ecount + 1;
-        
         
 #if CMK_PERSISTENT_COMM
         PumpPersistent();
@@ -1327,6 +1333,9 @@ void *elan_CmiAlloc(int size){
     char *res = NULL;
     char *buf;
     
+#if CMK_PERSISTENT_COMM
+    size += sizeof(int)*2;
+#endif
     if(size <= SMALL_MESSAGE_SIZE + 2 * sizeof(int)) {
         size = SMALL_MESSAGE_SIZE + 4 * sizeof(int);
         if(!PCQueueEmpty(localSmallBufferQueue))
