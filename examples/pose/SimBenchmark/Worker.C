@@ -177,5 +177,7 @@ void worker::doWork()
   }
   int elapseCheck = sent * (1.0/localDensity);
   if (OVT() < elapseCheck) elapse(elapseCheck-OVT());
+  //  if (sent == numMsgs)
+  //    CkPrintf("%d sent %d & received %d messages!\n", myHandle, sent, received);
 }
 
