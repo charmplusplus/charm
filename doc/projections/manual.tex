@@ -163,7 +163,7 @@ relationship to other system events.
 Eg. {\tt traceUserEvent(10);}
 
 \item
-{\tt void userBracketEvent(int EventNum, double StartTime, double EndTime) }
+{\tt void traceUserBracketEvent(int EventNum, double StartTime, double EndTime) }
 
 This function brackets an event that lasts the period of time between
 {\tt StartTime} and {\tt EndTime}. Both times can be obtained from function call
@@ -175,7 +175,7 @@ Eg.
    double critStart;  // times of start
    critStart = TraceTimer();
    // do the critical code
-   userBracketEvent(20, critStart,CmiWallTimer());
+   traceUserBracketEvent(20, critStart,CmiWallTimer());
 \end{verbatim}
 
 \end{itemize}
