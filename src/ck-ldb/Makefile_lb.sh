@@ -34,7 +34,7 @@ $bal.decl.h: $bal.ci charmxi
 EOB
 done
 
-rm EveryLB.ci
+echo "" >  EveryLB.ci
 echo "module EveryLB {" >> EveryLB.ci
 for bal in $LOADBALANCERS
 do
