@@ -818,6 +818,16 @@ Message::genDefs(XStr& str)
   if(!templat) {
     if(!external) {
       str << "int "<<ptype<<"::__idx=0;\n";
+
+      // Define the Marshalling message for Fortran
+      if (fortranMode)
+      {
+        str << "class " << type 
+            << " : public CMessage_" << type << "\n";
+        str << "{\npublic:\n";
+        contents->genUnmarshalList2(str);
+        str << "};\n";
+      }
     }
   }
   str << "#endif\n";
@@ -1675,12 +1685,14 @@ void Entry::genDefs(XStr& str)
       msg_contents->genUnmarshalList0(str);
       str << ");\n";
 
+/*
       // Define the Marshalling message
       str << "class " << msg_name 
           << " : public CMessage_" << msg_name << "\n";
       str << "{\npublic:\n";
       msg_contents->genUnmarshalList2(str);
       str << "};\n";
+*/
 
       // Define the Fortran interface function
       // This is called from Fortran to send the message to a chare.
