@@ -428,7 +428,7 @@ void BinEntry::write(FILE* fp)
   writeU(fp, getU());
 }
 
-TraceSummary::TraceSummary(char **argv):curevent(1),binStart(0.0),bin(0.0),msgNum(0)
+TraceSummary::TraceSummary(char **argv):binStart(0.0),bin(0.0),msgNum(0)
 {
   char *tmpStr;
   CkpvInitialize(double, binSize);
@@ -492,7 +492,6 @@ void TraceSummary::beginExecute(envelope *e)
     beginExecute(-1,-1,_threadEP,-1);
   }
   else {
-    e->setEvent(curevent++);
     beginExecute(-1,-1,e->getEpIdx(),-1);
   }  
 }
@@ -615,14 +614,6 @@ void TraceSummary::startPhase(int phase)
 {
    _logPool->startPhase(phase);
 }
-
-
-void TraceSummary::creation(envelope *e, int ep, int num)
-{
-  if (e) e->setEvent(curevent++);
-}
-
-
 
 
 /// for TraceSummaryBOC

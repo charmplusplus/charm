@@ -232,7 +232,6 @@ class SumLogPool {
 */
 class TraceSummary : public Trace {
     SumLogPool*  _logPool;
-    int curevent;
     int execEvent;
     int execEp;
     int execPe;
@@ -243,7 +242,7 @@ class TraceSummary : public Trace {
     int msgNum;
   public:
     TraceSummary(char **argv);
-    void creation(envelope *e, int epIdx, int num=1);
+    void creation(envelope *e, int epIdx, int num=1) {}
 
     void beginExecute(envelope *e);
     void beginExecute(CmiObjId  *tid);
