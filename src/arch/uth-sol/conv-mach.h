@@ -8,7 +8,10 @@
  ***************************************************************************
  *
  * $Log$
- * Revision 1.19  1996-11-23 02:25:46  milind
+ * Revision 1.20  1997-01-17 15:50:43  jyelon
+ * Minor adjustments to deal with recent changes to Common code.
+ *
+ * Revision 1.19  1996/11/23 02:25:46  milind
  * Fixed several subtle bugs in the converse runtime for convex
  * exemplar.
  *
@@ -47,10 +50,6 @@
 #define CMK_CMIDELIVERS_USE_COMMON_CODE                    0
 #define CMK_CMIDELIVERS_USE_SPECIAL_CODE                   1
 
-#define CMK_CMIMYPE_IS_A_BUILTIN                           0
-#define CMK_CMIMYPE_IS_A_VARIABLE                          0
-#define CMK_CMIMYPE_UNIPROCESSOR                           1
-
 #define CMK_CMIPRINTF_IS_A_BUILTIN                         0
 #define CMK_CMIPRINTF_IS_JUST_PRINTF                       1
 
@@ -76,8 +75,7 @@
 
 #define CMK_MACHINE_NAME                                   "uth-sol"
 
-#define CMK_MALLOC_USE_GNU                                 0
-#define CMK_MALLOC_USE_GNU_WITH_INTERRUPT_SUPPORT          0
+#define CMK_MALLOC_USE_GNU_MALLOC                          0
 #define CMK_MALLOC_USE_OS_BUILTIN                          1
 
 #define CMK_MSG_HEADER_SIZE_BYTES                          4
@@ -94,6 +92,7 @@
 
 #define CMK_SHARED_VARS_EXEMPLAR                           0
 #define CMK_SHARED_VARS_UNAVAILABLE                        0
+#define CMK_SHARED_VARS_SUN_THREADS                        0
 #define CMK_SHARED_VARS_UNIPROCESSOR                       1
 
 #define CMK_SIGHOLD_IS_A_BUILTIN                           1
@@ -117,19 +116,21 @@
 #define CMK_STRINGS_USE_STRINGS_H                          0
 #define CMK_STRINGS_USE_STRING_H                           1
 
+#define CMK_THREADS_REQUIRE_ALLOCA_H                       1
+#define CMK_THREADS_REQUIRE_PRAGMA_ALLOCA                  0
+#define CMK_THREADS_REQUIRE_NO_CPV                         1
+
 #define CMK_THREADS_UNAVAILABLE                            0
-#define CMK_THREADS_USE_ALLOCA                             0
-#define CMK_THREADS_USE_ALLOCA_WITH_HEADER_FILE            0
-#define CMK_THREADS_USE_ALLOCA_WITH_PRAGMA                 0
-#define CMK_THREADS_USE_JB_TWEAKING                        1
+#define CMK_THREADS_USE_ALLOCA                             1
+#define CMK_THREADS_USE_JB_TWEAKING                        0
 #define CMK_THREADS_USE_JB_TWEAKING_EXEMPLAR               0
 
 #define CMK_TIMER_USE_GETRUSAGE                            0
 #define CMK_TIMER_USE_SPECIAL                              0
 #define CMK_TIMER_USE_TIMES                                1
 
-#define CMK_VECTOR_SEND_USES_COMMON_CODE                        1
-#define CMK_VECTOR_SEND_USES_SPECIAL_CODE                        0
+#define CMK_VECTOR_SEND_USES_COMMON_CODE                   1
+#define CMK_VECTOR_SEND_USES_SPECIAL_CODE                  0
 
 #define CMK_WAIT_NOT_NEEDED                                0
 #define CMK_WAIT_USES_SYS_WAIT_H                           1

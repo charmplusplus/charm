@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 1.18  1996-11-20 06:46:54  jyelon
+ * Revision 1.19  1997-01-17 15:49:57  jyelon
+ * Minor adjustments to deal with recent changes to Common code.
+ *
+ * Revision 1.18  1996/11/20 06:46:54  jyelon
  * Repaired rob's HP/C++ mods.
  *
  * Revision 1.17  1996/11/08 22:22:53  brunner
@@ -159,7 +162,9 @@ free( ((char *)blk)-8);
 typedef void *Fifo;
 
 int        Cmi_mype;
+int        Cmi_myrank;
 int        Cmi_numpes;
+int        Cmi_nodesize;
 int        Cmi_stacksize = 64000;
 char     **CmiArgv;
 CthThread *CmiThreads;
@@ -187,9 +192,9 @@ int node;
   bit = 1;
   while (1) {
     int neighbour = node ^ bit;
-    if (neighbour < Cmi_numpes) count++;
+    if (neighbour < CmiNumPes()) count++;
     bit = bit<<1; 
-    if (bit > Cmi_numpes) break;
+    if (bit > CmiNumPes()) break;
   }
   return count;
 }
@@ -201,9 +206,9 @@ int node, *neighbours;
   bit = 1;
   while (1) {
     int neighbour = node ^ bit;
-    if (neighbour < Cmi_numpes) neighbours[count++] = neighbour;
+    if (neighbour < CmiNumPes()) neighbours[count++] = neighbour;
     bit = bit<<1; 
-    if (bit > Cmi_numpes) break;
+    if (bit > CmiNumPes()) break;
   }
   return count;
 }
@@ -215,9 +220,9 @@ int node, nbr;
   bit = 1;
   while (1) {
     int neighbour = node ^ bit;
-    if (neighbour < Cmi_numpes) { if (nbr==neighbour) return count; count++; }
+    if (neighbour < CmiNumPes()) { if (nbr==neighbour) return count; count++; }
     bit = bit<<=1; 
-    if (bit > Cmi_numpes) break;
+    if (bit > CmiNumPes()) break;
   }
   return(-1);
 }
@@ -245,12 +250,12 @@ CmiCommHandle c ;
 static void CmiNext()
 {
   CthThread t; int index; int orig;
-  index = (Cmi_mype+1) % Cmi_numpes;
+  index = (CmiMyPe()+1) % CmiNumPes();
   orig = index;
   while (1) {
     t = CmiThreads[index];
     if ((t)&&(!CmiBarred[index])) break;
-    index = (index+1) % Cmi_numpes;
+    index = (index+1) % CmiNumPes();
     if (index == orig) exit(0);
   }
   Cmi_mype = index;
@@ -259,14 +264,14 @@ static void CmiNext()
 
 void CmiExit()
 {
-  CmiThreads[Cmi_mype] = 0;
+  CmiThreads[CmiMyPe()] = 0;
   CmiFree(CthSelf());
   CmiNext();
 }
 
 void CmiYield()
 {
-  CmiThreads[Cmi_mype] = CthSelf();
+  CmiThreads[CmiMyPe()] = CthSelf();
   CmiNext();
 }
 
@@ -274,9 +279,9 @@ void CmiNodeBarrier()
 {
   int i;
   CmiNumBarred++;
-  CmiBarred[Cmi_mype] = 1;
-  if (CmiNumBarred == Cmi_numpes) {
-    for (i=0; i<Cmi_numpes; i++) CmiBarred[i]=0;
+  CmiBarred[CmiMyPe()] = 1;
+  if (CmiNumBarred == CmiNumPes()) {
+    for (i=0; i<CmiNumPes(); i++) CmiBarred[i]=0;
     CmiNumBarred=0;
   }
   CmiYield();
@@ -438,8 +443,8 @@ int size;
 char * msg;
 {
   int i;
-  for(i=0; i<Cmi_numpes; i++)
-    if (i != Cmi_mype) CmiSyncSendFn(i,size,msg);
+  for(i=0; i<CmiNumPes(); i++)
+    if (i != CmiMyPe()) CmiSyncSendFn(i,size,msg);
 }
 
 CmiCommHandle CmiAsyncBroadcastFn(size, msg)
@@ -463,7 +468,7 @@ int size;
 char * msg;
 {
   int i;
-  for(i=0; i<Cmi_numpes; i++)
+  for(i=0; i<CmiNumPes(); i++)
     CmiSyncSendFn(i,size,msg);
 }
 
@@ -480,8 +485,8 @@ int size;
 char * msg;
 {
   int i;
-  for(i=0; i<Cmi_numpes; i++)
-    if (i!=Cmi_mype) CmiSyncSendFn(i,size,msg);
+  for(i=0; i<CmiNumPes(); i++)
+    if (i!=CmiMyPe()) CmiSyncSendFn(i,size,msg);
   FIFO_EnQueue(CpvAccess(CmiLocalQueue),msg);
 }
 
@@ -492,7 +497,7 @@ char * msg;
 void CmiInitMc(argv)
 char *argv[];
 {
-  CpvAccess(CmiLocalQueue) = CmiQueues[Cmi_mype];
+  CpvAccess(CmiLocalQueue) = CmiQueues[CmiMyPe()];
   CmiSpanTreeInit();
   CmiTimerInit();
 }
@@ -504,7 +509,7 @@ void CmiCallMain()
   argv = (char **)CmiAlloc((argc+1)*sizeof(char *));
   memcpy(argv, CmiArgv, (argc+1)*sizeof(char *));
   user_main(argc, argv);
-  CmiThreads[Cmi_mype] = 0;
+  CmiThreads[CmiMyPe()] = 0;
   CmiNext();
 }
 
@@ -521,13 +526,13 @@ char **argv;
     } else if ((strcmp(*argp,"+p")==0)&&(argp[1])) {
       Cmi_numpes = atoi(argp[1]);
       argp+=2;
-    } else if (sscanf(*argp, "+p%d", &Cmi_numpes) == 1) {
+    } else if (sscanf(*argp, "+p%d", &CmiNumPes()) == 1) {
       argp+=1;
     } else argp++;
   }
   
-  if (Cmi_numpes<1) {
-    printf("Error: must specify number of processors to simulate with +pXXX\n",Cmi_numpes);
+  if (CmiNumPes()<1) {
+    printf("Error: must specify number of processors to simulate with +pXXX\n",CmiNumPes());
     exit(1);
   }
 }
@@ -549,12 +554,12 @@ char *argv[];
   CthInit(argv);
   
   CpvInitialize(void*, CmiLocalQueue);
-  CmiThreads = (CthThread *)CmiAlloc(Cmi_numpes*sizeof(CthThread));
-  CmiBarred  = (int       *)CmiAlloc(Cmi_numpes*sizeof(int));
-  CmiQueues  = (Fifo      *)CmiAlloc(Cmi_numpes*sizeof(Fifo));
+  CmiThreads = (CthThread *)CmiAlloc(CmiNumPes()*sizeof(CthThread));
+  CmiBarred  = (int       *)CmiAlloc(CmiNumPes()*sizeof(int));
+  CmiQueues  = (Fifo      *)CmiAlloc(CmiNumPes()*sizeof(Fifo));
   
   /* Create threads for all PE except PE 0 */
-  for(i=0; i<Cmi_numpes; i++) {
+  for(i=0; i<CmiNumPes(); i++) {
     t = (i==0) ? CthSelf() : CthCreate(CmiCallMain, 0, Cmi_stacksize);
     CmiThreads[i] = t;
     CmiBarred[i] = 0;
