@@ -12,7 +12,11 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.8  1995-11-15 21:03:52  jyelon
+ * Revision 2.9  1996-03-28 13:50:45  kale
+ *  added threaded field to ep_struct.  In preparation for supporting threaded
+ * entry points.
+ *
+ * Revision 2.8  1995/11/15 21:03:52  jyelon
  * *** empty log message ***
  *
  * Revision 2.7  1995/11/02  21:17:21  sanjeev
@@ -112,6 +116,7 @@ typedef struct ep_struct {
     int messageindex;
     int chareindex;
     int chare_or_boc;
+    int threaded;
 } EP_STRUCT;
         
 typedef struct msg_struct {
