@@ -2873,7 +2873,8 @@ int AMPI_Pack_size(int incount,MPI_Datatype datatype,MPI_Comm comm,int *sz)
 {
   AMPIAPI("AMPI_Pack_size");
   CkDDT_DataType* dttype = getDDT()->getType(datatype) ;
-  return incount*dttype->getSize() ;
+  *sz = incount*dttype->getSize() ;
+  return 0;
 }
 
 CDECL
