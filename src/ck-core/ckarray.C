@@ -1014,7 +1014,7 @@ void CkArray::migrateMe(ArrayElement *el, int where)
   msg->type.create.fromPE=CkMyPe();
   msg->type.create.chareType=el->thisChareType;
   msg->type.create.ctorIndex=_chareTable[el->thisChareType]->getMigCtor();
-  { PUP::toMem p(msg->packData); el->pup(p);}
+  { PUP::toMem p(msg->packData); p.becomeDeleting(); el->pup(p);}
   msg =msg->insert(idx);
   DEBM((AA"Migrated index size %s\n"AB,idx2str(msg->index())));
   contributorLeaving(&el->reductionInfo);
