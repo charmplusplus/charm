@@ -3,7 +3,9 @@
 /* #include <sys/unistd.h>  (net-axp chokes on this, so if somebody needs */
 /*                             it, we need to use a typedef -RKB 8.24.99) */
 #include <errno.h>
+#ifndef  WIN32
 #include <sys/time.h>
+#endif
 #include <string.h>
 
 #include "conv-ccs.h"
