@@ -581,19 +581,19 @@ Chare::genDefs(XStr& str)
     // We have to generate the chare array itself
     str << "extern \"C\" " << fortranify(baseName()) << "_allocate_(char **, void *);\n";
     str << "\n";
-    str << "class " << baseName() << " : public ArrayElement\n";
+    str << "class " << baseName() << " : public ArrayElement1D\n";
     str << "{\n";
     str << "public:\n";
     str << "  char user_data[64];\n";
     str << "public:\n";
-    str << "  " << baseName() << "(ArrayElementCreateMessage *m) : ArrayElement(m)\n";
+    str << "  " << baseName() << "(ArrayElementCreateMessage *m) : ArrayElement1D(m)\n";
     str << "  {\n";
     str << "    CkPrintf(\"" << baseName() << " %d created\\n\",thisIndex);\n";
     str << "    CkArrayID *aid = &thisArrayID;\n";
     str << "    " << fortranify(baseName()) << "_allocate_((char **)&user_data, &aid);\n";
     str << "  }\n";
     str << "\n";
-    str << "  " << baseName() << "(ArrayElementMigrateMessage *m) : ArrayElement(m)\n";
+    str << "  " << baseName() << "(ArrayElementMigrateMessage *m) : ArrayElement1D(m)\n";
     str << "  {\n";
     str << "    CkPrintf(\"" << baseName() << " %d migrating\\n\",thisIndex);\n";
     str << "  }\n";
