@@ -2710,60 +2710,114 @@ CmiCommHandle CmiGeneralSend(int pe, int size, int freemode, char *data)
 }
 
 void CmiSyncSendFn(int p, int s, char *m)
-{ CmiGeneralSend(p,s,'S',m); }
+{ 
+  CQdCreate(CpvAccess(cQdState), 1);
+  CmiGeneralSend(p,s,'S',m); 
+}
 
 CmiCommHandle CmiAsyncSendFn(int p, int s, char *m)
-{ return CmiGeneralSend(p,s,'A',m); }
+{ 
+  CQdCreate(CpvAccess(cQdState), 1);
+  return CmiGeneralSend(p,s,'A',m); 
+}
 
 void CmiFreeSendFn(int p, int s, char *m)
-{ CmiGeneralSend(p,s,'F',m); }
+{ 
+  CQdCreate(CpvAccess(cQdState), 1);
+  CmiGeneralSend(p,s,'F',m); 
+}
 
 void CmiSyncBroadcastFn(int s, char *m)
-{ CmiGeneralSend(PE_BROADCAST_OTHERS,s,'S',m); }
+{ 
+  CQdCreate(CpvAccess(cQdState), CmiNumPes()-1); 
+  CmiGeneralSend(PE_BROADCAST_OTHERS,s,'S',m); 
+}
 
 CmiCommHandle CmiAsyncBroadcastFn(int s, char *m)
-{ return CmiGeneralSend(PE_BROADCAST_OTHERS,s,'A',m); }
+{ 
+  CQdCreate(CpvAccess(cQdState), CmiNumPes()-1); 
+  return CmiGeneralSend(PE_BROADCAST_OTHERS,s,'A',m); 
+}
 
 void CmiFreeBroadcastFn(int s, char *m)
-{ CmiGeneralSend(PE_BROADCAST_OTHERS,s,'F',m); }
+{ 
+  CQdCreate(CpvAccess(cQdState), CmiNumPes()-1);
+  CmiGeneralSend(PE_BROADCAST_OTHERS,s,'F',m); 
+}
 
 void CmiSyncBroadcastAllFn(int s, char *m)
-{ CmiGeneralSend(PE_BROADCAST_ALL,s,'S',m); }
+{ 
+  CQdCreate(CpvAccess(cQdState), CmiNumPes()); 
+  CmiGeneralSend(PE_BROADCAST_ALL,s,'S',m); 
+}
 
 CmiCommHandle CmiAsyncBroadcastAllFn(int s, char *m)
-{ return CmiGeneralSend(PE_BROADCAST_ALL,s,'A',m); }
+{ 
+  CQdCreate(CpvAccess(cQdState), CmiNumPes()); 
+  return CmiGeneralSend(PE_BROADCAST_ALL,s,'A',m); 
+}
 
 void CmiFreeBroadcastAllFn(int s, char *m)
-{ CmiGeneralSend(PE_BROADCAST_ALL,s,'F',m); }
+{ 
+  CQdCreate(CpvAccess(cQdState), CmiNumPes()); 
+  CmiGeneralSend(PE_BROADCAST_ALL,s,'F',m); 
+}
 
 #if CMK_NODE_QUEUE_AVAILABLE
 
 void CmiSyncNodeSendFn(int p, int s, char *m)
-{ CmiGeneralNodeSend(p,s,'S',m); }
+{ 
+  CQdCreate(CpvAccess(cQdState), 1);
+  CmiGeneralNodeSend(p,s,'S',m); 
+}
 
 CmiCommHandle CmiAsyncNodeSendFn(int p, int s, char *m)
-{ return CmiGeneralNodeSend(p,s,'A',m); }
+{ 
+  CQdCreate(CpvAccess(cQdState), 1);
+  return CmiGeneralNodeSend(p,s,'A',m); 
+}
 
 void CmiFreeNodeSendFn(int p, int s, char *m)
-{ CmiGeneralNodeSend(p,s,'F',m); }
+{ 
+  CQdCreate(CpvAccess(cQdState), 1);
+  CmiGeneralNodeSend(p,s,'F',m); 
+}
 
 void CmiSyncNodeBroadcastFn(int s, char *m)
-{ CmiGeneralNodeSend(NODE_BROADCAST_OTHERS,s,'S',m); }
+{ 
+  CQdCreate(CpvAccess(cQdState), CmiNumNodes()-1);
+  CmiGeneralNodeSend(NODE_BROADCAST_OTHERS,s,'S',m); 
+}
 
 CmiCommHandle CmiAsyncNodeBroadcastFn(int s, char *m)
-{ CmiGeneralNodeSend(NODE_BROADCAST_OTHERS,s,'A',m); }
+{ 
+  CQdCreate(CpvAccess(cQdState), CmiNumNodes()-1);
+  CmiGeneralNodeSend(NODE_BROADCAST_OTHERS,s,'A',m); 
+}
 
 void CmiFreeNodeBroadcastFn(int s, char *m)
-{ CmiGeneralNodeSend(NODE_BROADCAST_OTHERS,s,'F',m); }
+{ 
+  CQdCreate(CpvAccess(cQdState), CmiNumNodes()-1);
+  CmiGeneralNodeSend(NODE_BROADCAST_OTHERS,s,'F',m); 
+}
 
 void CmiSyncNodeBroadcastAllFn(int s, char *m)
-{ CmiGeneralNodeSend(NODE_BROADCAST_ALL,s,'S',m); }
+{ 
+  CQdCreate(CpvAccess(cQdState), CmiNumNodes());
+  CmiGeneralNodeSend(NODE_BROADCAST_ALL,s,'S',m); 
+}
 
 CmiCommHandle CmiAsyncNodeBroadcastAllFn(int s, char *m)
-{ CmiGeneralNodeSend(NODE_BROADCAST_ALL,s,'A',m); }
+{ 
+  CQdCreate(CpvAccess(cQdState), CmiNumNodes());
+  CmiGeneralNodeSend(NODE_BROADCAST_ALL,s,'A',m); 
+}
 
 void CmiFreeNodeBroadcastAllFn(int s, char *m)
-{ CmiGeneralNodeSend(NODE_BROADCAST_ALL,s,'F',m); }
+{ 
+  CQdCreate(CpvAccess(cQdState), CmiNumNodes());
+  CmiGeneralNodeSend(NODE_BROADCAST_ALL,s,'F',m); 
+}
 #endif
 
 /******************************************************************************
@@ -2795,6 +2849,12 @@ void ConverseInitPE()
   CpvAccess(internal_printf_buffer) = (char *) malloc(PRINTBUFSIZE);
   _MEMCHECK(CpvAccess(internal_printf_buffer));
   CthInit(Cmi_argv);
+#if CMK_CCS_AVAILABLE
+  CpvInitialize(void *, CcsRequestQueue);
+  CpvAccess(CcsRequestQueue) = FIFO_Create();
+  CpvInitialize(int, stateAvailable);
+  CpvAccess(stateAvailable) = 0;
+#endif
   ConverseCommonInit(Cmi_argv);
   CpvInitialize(void *,CmiLocalQueue);
   CpvAccess(CmiLocalQueue) = cs->localqueue;
@@ -2836,12 +2896,6 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usc, int ret)
   parse_netstart();
   extract_args(argv);
   log_init();
-#if CMK_CCS_AVAILABLE
-  CpvInitialize(void *, CcsRequestQueue);
-  CpvAccess(CcsRequestQueue) = FIFO_Create();
-  CpvInitialize(int, stateAvailable);
-  CpvAccess(stateAvailable) = 0;
-#endif
   signal(SIGPIPE, KillOnSIGPIPE);
   signal(SIGSEGV, KillOnAllSigs);
   signal(SIGBUS, KillOnAllSigs);
