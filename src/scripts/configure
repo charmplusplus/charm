@@ -1319,7 +1319,7 @@ echo $ECHO_N "checking \"$1\"... $ECHO_C" >&6
 test_linkso() {
         echo "$as_me:$LINENO: checking \"$1\"" >&5
 echo $ECHO_N "checking \"$1\"... $ECHO_C" >&6
-	$CMK_CXX -I../include -I. $CMK_LIBDIR $CMK_INCDIR $CMK_LD_SHARED $t -o testlink.$CMK_SHARED_SUF $4 > out 2>&1
+	$CMK_LD -I../include -I. $CMK_LIBDIR $CMK_INCDIR $CMK_LD_SHARED $t -o testlink.$CMK_SHARED_SUF $4 > out 2>&1
 	test_result $? "$1" "$2" "$3"
 	/bin/rm -f out testlink.$CMK_SHARED_SUF
 }
