@@ -1,34 +1,44 @@
-PSDIR=../../../doc/ps
-PDFDIR=../../../doc/pdf
-HDIR=../../../doc/html
+DOCDIR=../../../doc
+WEBDIR=/expand6/groupMosaic/pplmantest
 
 all: ps pdf html
 
 ps:
-	make clean
 	touch index.tex
 	latex manual.tex
 	latex manual.tex
 	if [ -f manual.idx ] ; then makeindex -o index.tex manual.idx ; fi
 	latex manual.tex
 	dvips -o manual.ps manual.dvi
-	/bin/cp manual.ps $(PSDIR)/ampi.ps
 
 html:
-	make clean
 	touch index.tex
 	latex manual.tex
 	latex2html -local_icons manual.tex
-	/bin/rm -rf $(HDIR)/ampi
-	/bin/cp -R manual $(HDIR)/ampi
 
 pdf:
-	make clean
 	touch index.tex
 	pdflatex manual.tex
 	if [ -f manual.idx ] ; then makeindex -o index.tex manual.idx ; fi
 	pdflatex manual.tex
-	/bin/cp manual.pdf $(PDFDIR)/ampi.pdf
+
+doc:
+	make all
+	if [ ! -d $(DOCDIR) ] ; then mkdir $(DOCDIR) ; fi
+	if [ ! -d $(DOCDIR)/ps ] ; then mkdir $(DOCDIR)/ps ; fi
+	if [ ! -d $(DOCDIR)/pdf ] ; then mkdir $(DOCDIR)/pdf ; fi
+	if [ ! -d $(DOCDIR)/html ] ; then mkdir $(DOCDIR)/html ; fi
+	/bin/cp manual.ps $(DOCDIR)/ps/ampi.ps
+	/bin/cp manual.pdf $(DOCDIR)/pdf/ampi.pdf
+	/bin/rm -rf $(DOCDIR)/html/ampi
+	/bin/cp -R manual $(DOCDIR)/html/ampi
+
+web:
+	make all
+	/bin/cp manual.ps $(WEBDIR)/ps/ampi.ps
+	/bin/cp manual.pdf $(WEBDIR)/pdf/ampi.pdf
+	/bin/rm -rf $(WEBDIR)/html/ampi
+	/bin/cp -R manual $(WEBDIR)/html/ampi
 
 clean:
 	/bin/rm -f *.ps *.pdf *.ilg *.aux *.log *.dvi *.idx *.toc 
