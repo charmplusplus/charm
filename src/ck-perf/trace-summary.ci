@@ -12,7 +12,7 @@ module TraceSummary {
   group TraceSummaryBOC {
     entry TraceSummaryBOC(void);
     entry void askSummary();
-    entry void sendSummaryBOC(int n, BinEntry s[n]);
+    entry void sendSummaryBOC(int traced, int n, BinEntry s[n]);
   };
 
 };

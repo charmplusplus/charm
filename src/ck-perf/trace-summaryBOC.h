@@ -16,11 +16,12 @@ private:
   int count;
   BinEntry *bins;
   int  nBins;
+  int nTracedPEs;
 public:
-  TraceSummaryBOC(void): count(0), bins(NULL), nBins(0) {};
+  TraceSummaryBOC(void): count(0), bins(NULL), nBins(0), nTracedPEs(0) {};
   TraceSummaryBOC(CkMigrateMessage *m) {};
   void askSummary();
-  void sendSummaryBOC(int n, BinEntry *b);
+  void sendSummaryBOC(int traced, int n, BinEntry *b);
 private:
   void write();
 };

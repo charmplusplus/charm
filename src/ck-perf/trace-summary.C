@@ -474,22 +474,29 @@ void TraceSummaryBOC::askSummary()
 #endif
 #endif
 
+  int n=0;
+  BinEntry *bins = NULL;
+  int traced = TRACE_CHARM_PE();
+  if (traced) {
   CkpvAccess(_trace)->endComputation();
-  int n = CkpvAccess(_trace)->pool()->getNumEntries();
-  BinEntry *bins = CkpvAccess(_trace)->pool()->bins();
+  n = CkpvAccess(_trace)->pool()->getNumEntries();
+  bins = CkpvAccess(_trace)->pool()->bins();
 #if 1
-CmiPrintf("askSummary on [%d] numEntried=%d\n", CkMyPe(), n);
-for (int i=0; i<n; i++) 
-  CmiPrintf("%4d", bins[i].getU());
-CmiPrintf("\n");
+  CmiPrintf("askSummary on [%d] numEntried=%d\n", CkMyPe(), n);
+#if 0
+  for (int i=0; i<n; i++) 
+    CmiPrintf("%4d", bins[i].getU());
+  CmiPrintf("\n");
 #endif
+#endif
+  }
   CProxy_TraceSummaryBOC p(traceSummaryGID);
-  p[0].sendSummaryBOC(n, bins);
+  p[0].sendSummaryBOC(traced, n, bins);
 }
 
 extern "C" void _CkExit();
 
-void TraceSummaryBOC::sendSummaryBOC(int n, BinEntry *b)
+void TraceSummaryBOC::sendSummaryBOC(int traced, int n, BinEntry *b)
 {
   int i;
   if (CkpvAccess(_trace) == NULL) return;
@@ -507,9 +514,12 @@ void TraceSummaryBOC::sendSummaryBOC(int n, BinEntry *b)
     nBins = CkpvAccess(_trace)->pool()->getNumEntries();
     bins = new BinEntry[nBins];
   }
-  if (n>nBins) n = nBins;
-  for (i=0; i<n; i++) {
-    bins[i].Time() += b[i].Time();
+  if (traced) {
+    nTracedPEs ++;
+    if (n>nBins) n = nBins;
+    for (i=0; i<n; i++) {
+      bins[i].Time() += b[i].Time();
+    }
   }
   if (count == CkNumPes()) {
     write();
@@ -530,7 +540,7 @@ void TraceSummaryBOC::write(void)
       CmiAbort("Cannot open summary sts file for writing.\n");
   delete[] fname;
 
-  fprintf(sumfp, "ver:%3.1f %d/%d count:%d ep:%d interval:%e", CkpvAccess(version), CkMyPe(), CkNumPes(), nBins, _numEntries, CkpvAccess(binSize));
+  fprintf(sumfp, "ver:%3.1f %d/%d count:%d ep:%d interval:%e numTracedPE:%d", CkpvAccess(version), CkMyPe(), CkNumPes(), nBins, _numEntries, CkpvAccess(binSize), nTracedPEs);
   fprintf(sumfp, "\n");
 
   // write bin time
@@ -553,7 +563,7 @@ void TraceSummaryBOC::write(void)
   if (count > 1) fprintf(fp, "+%d", count);
 #else
   for(j=0; j<nBins; j++) {
-    bins[j].Time() /= CkNumPes();
+    bins[j].Time() /= nTracedPEs;
     bins[j].write(sumfp);
   }
 #endif
