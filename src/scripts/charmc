@@ -936,9 +936,9 @@ done
 MakeSO() {
 	Debugf "Running ldro..."
 	DoNoErrCheck $RM $OBJECT
+	Warning "Warning: creating $OBJECT "
 	Do $CMK_LD -o $OBJECT $OPTS_LD $OPTS_LDRO $OBJECTFILES \
 		$PRE_LIBRARIES $POST_LIBRARIES
-	Warning "Warning: creating $OBJECT "
 	Copyobj
 }
 
