@@ -867,7 +867,7 @@ $(L)/libbluegene.a: BlueGene.C BlueGene.h BlueGene.decl.h BlueGene.def.h
 	$(CHARMC) -o $@ BlueGene.o
 
 # (Converse) Blue Gene emulator
-BLUE_HEADERS = blue_types.h blue_timing.h blue_defs.h blue_logs.h blue.h blue_impl.h
+BLUE_HEADERS = blue_types.h blue_timing.h blue_defs.h blue_logs.h blue.h blue_impl.h blue_network.h
 BLUE_OBJS = blue.o blue_node.o blue_proc.o blue_init.o blue_timing.o
 BLUE_IO_OBJS = blue_IO.o blue_logs.o
 
