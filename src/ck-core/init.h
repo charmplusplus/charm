@@ -139,6 +139,7 @@ CksvExtern(unsigned int, _numNodeGroups);
 CkpvExtern(int, _charmEpoch);
 
 CkpvExtern(CkGroupID,_currentGroup);
+CkpvExtern(void*,  _currentNodeGroupObj);
 CkpvExtern(CkGroupID, _currentGroupRednMgr);
 
 CkpvExtern(GroupTable*, _groupTable);

@@ -77,8 +77,8 @@ CkInStream  ckin;
 CkpvDeclare(void*,       _currentChare);
 CkpvDeclare(int,         _currentChareType);
 CkpvDeclare(CkGroupID,   _currentGroup);
-CkpvDeclare(CkGroupID, _currentGroupRednMgr);
-CkpvDeclare(CkGroupID,   _currentNodeGroup);
+CkpvDeclare(void*,       _currentNodeGroupObj);
+CkpvDeclare(CkGroupID,   _currentGroupRednMgr);
 CkpvDeclare(GroupTable*, _groupTable);
 CkpvDeclare(GroupIDTable*, _groupIDTable);
 CkpvDeclare(UInt, _numGroups);
@@ -551,8 +551,8 @@ void _initCharm(int unused_argc, char **argv)
 	CkpvInitialize(void*, _currentChare);
 	CkpvInitialize(int,   _currentChareType);
 	CkpvInitialize(CkGroupID, _currentGroup);
+	CkpvInitialize(void *, _currentNodeGroupObj);
 	CkpvInitialize(CkGroupID, _currentGroupRednMgr);
-	CkpvInitialize(CkGroupID, _currentNodeGroup);
 	CkpvInitialize(GroupTable*, _groupTable);
 	CkpvInitialize(GroupIDTable*, _groupIDTable);
 	CkpvInitialize(UInt, _numGroups);
@@ -581,6 +581,8 @@ void _initCharm(int unused_argc, char **argv)
 	CkpvAccess(_numGroups) = 1; // make 0 an invalid group number
 	CkpvAccess(_buffQ) = new PtrQ();
 	CkpvAccess(_bocInitVec) = new PtrVec();
+
+	CkpvAccess(_currentNodeGroupObj) = NULL;
 
 	if(CkMyRank()==0)
 	{
@@ -625,8 +627,6 @@ void _initCharm(int unused_argc, char **argv)
 	_infoIdx = CldRegisterInfoFn((CldInfoFn)_infoFn);
 	_triggerHandlerIdx = CkRegisterHandler((CmiHandler)_triggerHandler);
 	_ckModuleInit();
-
-	CthSetSuspendable(CthSelf(), 0);
 
 	CldRegisterEstimator((CldEstimator)_charmLoadEstimator);
 

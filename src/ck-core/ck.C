@@ -278,6 +278,9 @@ extern "C"
 void *CkLocalNodeBranch(CkGroupID groupID)
 {
   void *retval;
+  // we are called in a constructor
+  if (CkpvAccess(_currentNodeGroupObj) && CkpvAccess(_currentGroup) == groupID) 
+    return CkpvAccess(_currentNodeGroupObj);
   while (NULL== (retval=_ckLocalNodeBranch(groupID))) 
   { // Nodegroup hasn't finished being created yet-- schedule...
     CsdScheduler(0);
@@ -425,9 +428,13 @@ void CkCreateLocalNodeGroup(CkGroupID groupID, int epIdx, envelope *env)
 //  NodeGroups can be accessed by multiple processors, so 
 //  this is in the opposite order from groups - invoking the constructor
 //  before registering it.
+// User may call CkLocalNodeBranch() inside the nodegroup constructor
+//  store nodegroup into _currentNodeGroupObj
+  CkpvAccess(_currentNodeGroupObj) = obj;
   _invokeEntryNoTrace(epIdx,env,obj);
+  CkpvAccess(_currentNodeGroupObj) = NULL;
   _STATS_RECORD_PROCESS_NODE_GROUP_1();
-
+  
   CmiLock(CksvAccess(_nodeLock));
   CksvAccess(_nodeGroupTable)->find(groupID).setObj(obj);
   CksvAccess(_nodeGroupTable)->find(groupID).setcIdx(gIdx);
