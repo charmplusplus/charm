@@ -14,6 +14,11 @@
   1. DMAable buffer reuse;
 */
 
+#ifdef GM_API_VERSION_2_0
+#if GM_API_VERSION >= GM_API_VERSION_2_0
+#define CMK_USE_GM2    1
+#endif
+#endif
 
 /* default as in busywaiting mode */
 #undef CMK_WHEN_PROCESSOR_IDLE_BUSYWAIT
@@ -321,9 +326,8 @@ static int processEvent(gm_recv_event_t *e)
   int size, len;
   char *msg, *buf;
   int status = 1;
-  int evt=gm_ntohc(e->recv.type);
-    switch (evt)
-    {
+  switch (gm_ntohc(e->recv.type))
+  {
     case GM_HIGH_RECV_EVENT:
     case GM_RECV_EVENT:
       MACHSTATE(4,"Incoming message")
@@ -489,7 +493,11 @@ void CmiMachineInit()
   for (dataport=2;dataport<dataport_max;dataport++) {
     char portname[200];
     sprintf(portname, "converse_port%d_%d", Cmi_charmrun_pid, _Cmi_mynode);
+#if CMK_USE_GM2
+    status = gm_open(&gmport, device, dataport, portname, GM_API_VERSION_2_0);
+#else
     status = gm_open(&gmport, device, dataport, portname, GM_API_VERSION_1_1);
+#endif
     if (status == GM_SUCCESS) { break; }
   }
   if (dataport==dataport_max) 
@@ -501,6 +509,9 @@ void CmiMachineInit()
   /* get our node id */
   status = gm_get_node_id(gmport, (unsigned int *)&Cmi_mach_id);
   if (status != GM_SUCCESS) { gm_perror("gm_get_node_id", status); return; }
+#if CMK_USE_GM2
+  gm_node_id_to_global_id(gmport, Cmi_mach_id, &Cmi_mach_id);
+#endif
   
   /* default abort will take care of gm clean up */
   skt_set_abort(gmExit);
@@ -550,17 +561,22 @@ void CmiCheckGmStatus()
   int i;
   int doabort = 0;
   if (gmport == NULL) machine_exit(1);
+  /*CmiPrintf("[%d] Cmi_mach_id: %d\n", CmiMyPe(), Cmi_mach_id);*/
   for (i=0; i<_Cmi_numnodes; i++) {
     gm_status_t status;
     char uid[6], str[100];
     unsigned int mach_id=nodes[i].mach_id;
+#if CMK_USE_GM2 
+    gm_global_id_to_node_id(gmport, mach_id, &nodes[i].mach_id);
+#endif
+    mach_id=nodes[i].mach_id;
     status = gm_node_id_to_unique_id(gmport, mach_id, uid);
     if (status != GM_SUCCESS || ( uid[0]==0 && uid[1]== 0 
          && uid[2]==0 && uid[3]==0 && uid[4]==0 && uid[5]==0)) { 
       CmiPrintf("Error> gm node %d can't contact node %d. \n", CmiMyPe(), i);
       doabort = 1;
     }
-/*    CmiPrintf("%d: ip:%d %d %d %d\n", CmiMyPe(), nodes[i].IP,uid[0], uid[3], uid[5]); */
+    /*CmiPrintf("[%d]: %d mach:%d ip:%d %d %d %d\n", CmiMyPe(), i, mach_id, nodes[i].IP,uid[0], uid[3], uid[5]);*/
   }
   if (doabort) CmiAbort("");
 }
