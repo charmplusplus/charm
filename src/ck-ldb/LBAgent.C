@@ -9,7 +9,7 @@
 //#include "charm.h"
 
 //#include "topology.h"
-#include "Agent.h"
+#include "LBAgent.h"
 
 
 int topoAgent :: compare(const void *p,const void *q){
