@@ -90,6 +90,7 @@ void CldPropagateLoad(double load)
 void CldReduceHandler(struct loadmsg *msg)
 {
   CldPropagateLoad(msg->load_total);
+  CmiFree(msg);
 }
 
 void CldAverageHandler(struct loadmsg *msg)
@@ -104,6 +105,7 @@ void CldAverageHandler(struct loadmsg *msg)
     CmiPrintf("PE %d load=%6d average=%6d rebalance=%d\n", 
 	      CmiMyPe(), CldEstimate(), (int)average, rebalance);
   pinf->rebalance = rebalance;
+  CmiFree(msg);
   CcdCallFnAfter((CcdVoidFn)CldInitiateReduction, 0, CYCLE_MILLISECONDS);
 }
 

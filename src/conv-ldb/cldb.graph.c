@@ -108,6 +108,7 @@ void CldLoadResponseHandler(loadmsg *msg)
       CpvAccess(neighbors)[i].load = msg->load;
       break;
     }
+  CmiFree(msg);
 }
 
 void CldBalanceHandler(void *msg)
@@ -296,7 +297,7 @@ void CldGraphModuleInit()
   CpvAccess(CldBalanceHandlerIndex) = 
     CmiRegisterHandler(CldBalanceHandler);
   CpvAccess(CldLoadResponseHandlerIndex) = 
-    CmiRegisterHandler(CldLoadResponseHandler);
+    CmiRegisterHandler((CmiHandler)CldLoadResponseHandler);
 
   if (CmiNumPes() > 1) {
     sprintf(filename, "graph%d/graph%d", CmiNumPes(), CmiMyPe());
