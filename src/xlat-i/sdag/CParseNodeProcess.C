@@ -355,7 +355,7 @@ TList<CStateVar*> CParseNode::propagateState(TList<CStateVar*>& list, int unique
         stateVarsChildren->append(sv);
       }
       sv = new CStateVar(0,0, new XStr("int"), 0, 0, 0, new XStr(*(con1->text)), 0,0, 0);
-      allstateVars->append(sv);
+      //allstateVars->append(sv);
       stateVarsChildren->append(sv);
       {
         char txt[128];
@@ -575,7 +575,10 @@ TList<CStateVar*> CParseNode::propagateState(TList<CStateVar*>& list, int unique
   c1 = 0;
   c2 = 0;
   for(cn=constructs->begin(); !constructs->end(); cn=constructs->next()) {
-    returnStateVars = cn->propagateState(*allstateVars, uniqueVarNum);
+    if (type == FORALL)
+       returnStateVars = cn->propagateState(*stateVarsChildren, uniqueVarNum);
+    else
+       returnStateVars = cn->propagateState(*allstateVars, uniqueVarNum);
     c1=0; c2=0;
     for (sv=returnStateVars.begin(); !returnStateVars.end(); sv=returnStateVars.next()) {
        c2++;
@@ -880,10 +883,10 @@ void CParseNode::generateWhen(XStr& op)
         stateVars->length() << ", " << nRefs << ", " << nAny << ");\n";
   int iArgs=0;
  
-  //op << "       int impl_off=0;\n";
+//  op << "       int impl_off=0;\n";
   int hasArray = 0;
   int isVoid = 0;
-  int numParamsNeedingMarshalling =0;
+  int numParamsNeedingMarshalling = 0;
   int paramIndex =0;
   for(sv=stateVars->begin();!stateVars->end();sv=stateVars->next()) {
     if (sv->isVoid == 1) {
@@ -894,12 +897,13 @@ void CParseNode::generateWhen(XStr& op)
       if (sv->isMsg == 1) {
          op << "       tr->args["<<iArgs++ <<"] = (size_t) " <<sv->name->charstar()<<";\n";
       }
-      else 
+      else {
          numParamsNeedingMarshalling++;
-      if (numParamsNeedingMarshalling == 1) {
-         op << "       int impl_off=0;\n";
-         paramIndex = iArgs;
-         iArgs++;
+         if (numParamsNeedingMarshalling == 1) {
+           op << "       int impl_off=0;\n";
+           paramIndex = iArgs;
+           iArgs++;
+         }
       }
       if (sv->arrayLength !=0) {
          hasArray++;
