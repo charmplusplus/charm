@@ -18,9 +18,6 @@
 #define CMK_CMIPRINTF_IS_A_BUILTIN                         0
 #define CMK_CMIPRINTF_IS_JUST_PRINTF                       1
 
-#define CMK_CSDEXITSCHEDULER_IS_A_FUNCTION                 1
-#define CMK_CSDEXITSCHEDULER_SET_CSDSTOPFLAG               0
-
 
 #define CMK_GETPAGESIZE_AVAILABLE                          0
 

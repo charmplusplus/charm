@@ -579,13 +579,7 @@ extern  int CsdScheduler(int);
 #define CsdStartNotifyIdle() (CpvAccess(CsdStopNotifyFlag)=0)
 #define CsdStopNotifyIdle() (CpvAccess(CsdStopNotifyFlag)=1)
 
-#if CMK_CSDEXITSCHEDULER_IS_A_FUNCTION
-extern void CsdExitScheduler(void);
-#endif 
-
-#if CMK_CSDEXITSCHEDULER_SET_CSDSTOPFLAG
 #define CsdExitScheduler()  (CpvAccess(CsdStopFlag)++)
-#endif
 
 #if CMK_SPANTREE_USE_COMMON_CODE
 

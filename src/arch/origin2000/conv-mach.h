@@ -16,9 +16,6 @@
 #define CMK_CMIPRINTF_IS_A_BUILTIN                         0
 #define CMK_CMIPRINTF_IS_JUST_PRINTF                       1
 
-#define CMK_CSDEXITSCHEDULER_IS_A_FUNCTION                 0
-#define CMK_CSDEXITSCHEDULER_SET_CSDSTOPFLAG               1
-
 #define CMK_DEFAULT_MAIN_USES_COMMON_CODE                  1
 
 

@@ -284,14 +284,6 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usc, int initret)
   exit(0);
 }
 
-void CsdExitScheduler()
-{
-  CpvAccess(CsdStopFlag) = 1;
-  CsvAccess(CsdStopCount)--;
-}
-
-
-
 /* ********************************************************************* */
 /*                      SIMULATOR                                        */
 /* ********************************************************************* */

@@ -144,6 +144,8 @@ THRESHOLD  *threshold;
 
 /***********************************************************************/
 
+CsvExtern(int, CsdStopCount);
+
 static void simulate()
 {
     int pno;
@@ -157,8 +159,10 @@ static void simulate()
 	           cpu_event(pno);
                    return;
                }
-            else
+            else {
+	       CsvAccess(CsdStopCount)--;
                become_idle(pno);
+	    }
         }
         else if (IS_RCP(pno))
 	    switch ( EVENT_TYPE(pno) ) {
