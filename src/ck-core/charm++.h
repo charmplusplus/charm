@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.1  1998-03-02 14:58:02  jyelon
+ * Revision 2.2  1998-03-04 18:22:10  rbrunner
+ * size_t changed to CMK_SIZE_T
+ *
+ * Revision 2.1  1998/03/02 14:58:02  jyelon
  * Forgot to check these in last time.
  *
  * Revision 2.32  1997/07/30 17:30:56  jyelon
@@ -259,7 +262,7 @@ extern "C" void      CSendToFuture(void *m, int processor);
 class GroupIdMessage {	// sizeof(GroupIdMessage) MUST be 4
 public:	GroupIdType groupid ;
 
-	void *operator new(size_t size) {	// should never be called
+	void *operator new(CMK_SIZE_T size) {	// should never be called
 		size += 0 ;	// to prevent CC from generating "size unused"
 		return NULL ;
 	}
@@ -272,7 +275,7 @@ public:	GroupIdType groupid ;
 class QuiescenceMessage {// used in quiescence module
 public:	int emptyfield ;
 
-	void *operator new(size_t size) {	// should never be called
+	void *operator new(CMK_SIZE_T size) {	// should never be called
 		size += 0 ;	// to prevent CC from generating "size unused"
 		return NULL ;
 	}
@@ -288,7 +291,7 @@ class TableMessage {
 public: int key ;
         char *data ;
  
-	void *operator new(size_t size) {	// should never be called
+	void *operator new(CMK_SIZE_T size) {	// should never be called
 		size += 0 ;	// to prevent CC from generating "size unused"
 		return NULL ;
 	}
@@ -308,21 +311,21 @@ public:	void operator delete(void *msg) {
 		CkFreeMsg(msg) ;
 	}
 
-	void *operator new(size_t size) ;
+	void *operator new(CMK_SIZE_T size) ;
 
-	void *operator new(size_t size, int id) {
+	void *operator new(CMK_SIZE_T size, int id) {
 		return (void *)GenericCkAlloc(id, size, 0) ;
 	}
 
-	void *operator new(size_t size, int id, int prio) {
+	void *operator new(CMK_SIZE_T size, int id, int prio) {
 		return (void *)GenericCkAlloc(id, size, prio) ;
 	}
 
-	void *operator new(size_t size, int id, int* sizes) {
+	void *operator new(CMK_SIZE_T size, int id, int* sizes) {
 		return (void *)((ALLOCFNPTR)(CsvAccess(MsgToStructTable)[id].alloc))(id, size, sizes, 0) ;
 	}
 
-	void *operator new(size_t size, int id, int prio, int* sizes) {
+	void *operator new(CMK_SIZE_T size, int id, int prio, int* sizes) {
 		return (void *)((ALLOCFNPTR)(CsvAccess(MsgToStructTable)[id].alloc))(id, size, sizes, prio) ;
 	}
 } ;
@@ -340,9 +343,9 @@ public:
 
 	_CK_Object() ;
 
-        void * operator new(size_t size) ;
+        void * operator new(CMK_SIZE_T size) ;
  
-        void * operator new(size_t size, void *buf) ;
+        void * operator new(CMK_SIZE_T size, void *buf) ;
 
  	void operator delete(void *obj) {
 		obj = obj ;	// to prevent CC from generating "obj unused"
