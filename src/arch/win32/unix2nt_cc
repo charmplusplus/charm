@@ -25,7 +25,7 @@ VCC_DIR="C:/Program Files/Microsoft Visual Studio/Vc98"
 
 #CL command-line options for -O and -g mode
 CL_CMD="$VCC_DIR/BIN/CL.EXE"
-CL_COMMON=' /nologo /W3 /GB /GX /DWIN32 /D_WINDOWS /FD'
+CL_COMMON=' /nologo /W3 /GB /GX /DWIN32 /D_WINDOWS /FD /Zp4 '
 CL_O=$CL_COMMON" /DNDEBUG /MT /Ox"
 CL_DEF=$CL_COMMON" /MT"
 CL_G=$CL_COMMON" /Z7 /MTd /Od"
