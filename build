@@ -72,11 +72,11 @@ do
 		;;
     	    "--libdir")
           	shift 
-          	LIBDIR="$LIBDIR -L $1"; shift
+          	LIBDIR="$LIBDIR -L$1"; shift
  	  	;;
     	    "--incdir")
           	shift 
-          	INCDIR="$INCDIR -I $1"; shift
+          	INCDIR="$INCDIR -I$1"; shift
  	  	;;
             *)
                 OPTS="$OPTS $1"; shift
