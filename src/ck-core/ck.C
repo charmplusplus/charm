@@ -137,8 +137,8 @@ void _createGroupMember(CkGroupID groupID, int eIdx, void *msg)
   register int gIdx = _entryTable[eIdx]->chareIdx;
   register void *obj = malloc(_chareTable[gIdx]->size);
   _MEMCHECK(obj);
-  CpvAccess(_groupTable)->add(groupID, obj);
-  PtrQ *ptrq = CpvAccess(_groupTable)->getPending(groupID);
+  CpvAccess(_groupTable).add(groupID, obj);
+  PtrQ *ptrq = CpvAccess(_groupTable).getPending(groupID);
   if(ptrq) {
     void *pending;
     while((pending=ptrq->deq())!=0)
@@ -407,7 +407,7 @@ static inline void _processForBocMsg(envelope *env)
   register CkGroupID groupID = env->getGroupNum();
   register void *obj = _localBranch(groupID);
   if(!obj) { // groupmember not yet created
-    CpvAccess(_groupTable)->enqmsg(groupID, env);
+    CpvAccess(_groupTable).enqmsg(groupID, env);
     return;
   }
   CpvAccess(_qd)->process();

@@ -11,13 +11,15 @@ class GroupTable {
     public:
       void *obj;
       PtrQ *pending; //Buffers msgs recv'd before group is created
-      TableEntry() { 
-        obj=0; pending=0;
-      }
   };
   TableEntry tab[MAXBINS];
   public:
     GroupTable();
+    void init(void) {
+      for(int i=0;i<MAXBINS;i++) {
+        tab[i].obj = 0; tab[i].pending = 0; 
+      }
+    }
     void add(CkGroupID n, void *obj);
     void enqmsg(CkGroupID n, void *msg);
     PtrQ *getPending(CkGroupID n) {
@@ -47,11 +49,11 @@ CpvExtern(void*,       _currentChare);
 CpvExtern(int,       _currentChareType);
 CpvExtern(CkGroupID,         _currentGroup);
 CpvExtern(CkGroupID,         _currentNodeGroup);
-CpvExtern(GroupTable*, _groupTable);
+CpvExtern(GroupTable, _groupTable);
 
 static inline void *_localBranch(int gID)
 {
-  return CpvAccess(_groupTable)->find(gID);
+  return CpvAccess(_groupTable).find(gID);
 }
 
 extern GroupTable*    _nodeGroupTable;
