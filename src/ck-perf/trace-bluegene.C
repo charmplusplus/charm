@@ -46,32 +46,19 @@ void TraceBluegene::writePrint(char* str, double t){
   fprintf(pfp,str,t);
 }
 
-TraceBluegene::TraceBluegene(char** argv): stsfp(NULL), pfp(NULL)
+TraceBluegene::TraceBluegene(char** argv): pfp(NULL)
 {
-  if(CkMyPe() == 0){
-    stsfp = fopen("bgTraceFile", "w");
-    if(stsfp==0)
-      CmiAbort("Cannot open Bluegene sts file for writing.\n");
-  }
 }
 
 void TraceBluegene::traceClose() {
   DEBUGF(("%d TraceBluegene::traceClose\n", CkMyPe()));
   bgUpdateProj(2);
   if(pfp != 0)  fclose(pfp);
-  if((CkMyPe() == 0)&&(stsfp !=0)) fclose(stsfp);
-  pfp = stsfp = NULL;
+  pfp = NULL;
   CkpvAccess(_traces)->removeTrace(this);
 }
 
 TraceBluegene::~TraceBluegene(){
-/*
-  bgUpdateProj();
-  if(pfp != 0)
-    fclose(pfp);
-  if((CkMyPe() == 0)&&(stsfp !=0))
-    fclose(stsfp);
-*/
 }
 
 void TraceBluegene::creatFiles()
@@ -194,17 +181,9 @@ void TraceBluegene::userBracketEvent(char* name, double bt, double et, void** pa
 }
 
 
-void TraceBluegene::traceWriteSts(){
-  if (!genTimeLog) return;
-  //  CmiPrintf("\n\n\n[%d]In the traceWriteSts before printing logs\n\n\n\n",CkMyPe());
-  //if(CkMyPe() == 0)
-  // currLog->write(stsfp);
-  return;
-}
-
 void TraceBluegene::bgPrint(char* str){
   if (!genTimeLog) return;
-  bgAddProjEvent(strdup(str), -1, BgGetTime(), writeData, this, 2);
+  bgAddProjEvent(strdup(str), -1, BgGetTime(), writeData, this, BG_EVENT_PRINT);
 
 }
 

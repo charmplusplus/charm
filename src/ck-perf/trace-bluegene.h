@@ -20,7 +20,6 @@
 class TraceBluegene : public Trace {
 
  private:
-    FILE* stsfp;
     FILE* pfp;
  public:
     TraceBluegene(char** argv);
@@ -40,7 +39,6 @@ class TraceBluegene : public Trace {
     void userBracketEvent(char* name, double bt, double et, void** parentLogPtr);
     void userBracketEvent(char* name, double bt, double et, void** parentLogPtr, CkVec<void*> bgLogList);
     void bgPrint(char* str);
-    void traceWriteSts();
     void creatFiles();
     void writePrint(char *, double t);
     void traceClose();

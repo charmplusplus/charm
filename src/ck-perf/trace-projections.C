@@ -399,7 +399,7 @@ void LogPool::add(UChar type,UShort mIdx,UShort eIdx,double time,int event,int p
     case BEGIN_UNPACK:
     case END_UNPACK:
     case USER_EVENT_PAIR:
-      bgAddProjEvent(&pool[numEntries-1], numEntries-1, time, updateProjLog, &fp, 1);
+      bgAddProjEvent(&pool[numEntries-1], numEntries-1, time, updateProjLog, &fp, BG_EVENT_PROJ);
   }
 #endif
 }
