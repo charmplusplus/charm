@@ -60,39 +60,95 @@ class CDep {
    // register a trigger to be called with
    // with <nEntries> specified
    // in <entries> with corresponding <refnums>
-   void Register(CWhenTrigger *trigger);
+   void Register(CWhenTrigger *trigger)
+   {
+     whens[trigger->whenID]->append(trigger);
+   }
 
    // deregister trigger from all
    // the entries it is registered for
-   void deRegister(CWhenTrigger *trigger);
+   void deRegister(CWhenTrigger *trigger)
+   {
+     whens[trigger->whenID]->remove(trigger);
+   }
 
    // buffer a message for a specific entry point with a specified
    // reference number
-   void bufferMessage(int entry, void *msg, int refnum);
+   void bufferMessage(int entry, void *msg, int refnum)
+   {
+     CMsgBuffer *buf = new CMsgBuffer(entry, msg, refnum);
+     buffers[entry]->append(buf);
+   }
 
    // For a specified entry number and reference number,
    // get the registered trigger which satisfies dependency. 
    // If no trigger exists
    // for the given reference number, get the trigger registered for
    // ANY ref num. If that also doesnt exist, Return NULL
-   CWhenTrigger *getTrigger(int entry, int refnum);
+   CWhenTrigger *getTrigger(int entry, int refnum)
+   {
+     for(int i=0;i<numEntryDepends[entry];i++) {
+       TListCWhenTrigger *wlist = entryDepends[entry][i];
+       for(CWhenTrigger *elem=wlist->begin(); 
+           !wlist->end(); 
+           elem=wlist->next()) {
+         if(elem==0)
+           break;
+         if(depSatisfied(elem)){
+            deRegister(elem);
+            return elem;
+         }
+       }
+     }
+     return 0;
+   }
+
 
    // given the entry number and reference number,
    // get the buffered message, without removing it from
    // the list, NULL if no such message exists
-   CMsgBuffer *getMessage(int entry, int refnum);
+   CMsgBuffer *getMessage(int entry, int refnum)
+   {
+     TListCMsgBuffer *list = buffers[entry];
+     for(CMsgBuffer *elem=list->begin(); !list->end(); elem=list->next()) {
+       if(elem==0)
+         return 0;
+       if(elem->refnum == refnum)
+         return elem;
+     }
+     return 0;
+   }
 
    // given the entry number,
    // get the buffered message, without removing it from
    // the list, NULL if no such message exists
    // note that this is the ANY case
-   CMsgBuffer *getMessage(int entry);
+   CMsgBuffer *getMessage(int entry)
+   {
+     return buffers[entry]->front();
+   }
 
    // remove the given message from buffer
-   void removeMessage(CMsgBuffer *msg);
+   void removeMessage(CMsgBuffer *msg)
+   {
+     TListCMsgBuffer *list = buffers[msg->entry];
+     list->remove(msg);
+   }
 
    // return 1 if all the dependeces for trigger are satisfied
    // return 0 otherwise
-   int depSatisfied(CWhenTrigger *trigger);
+   int depSatisfied(CWhenTrigger *trigger)
+   {
+     int i;
+     for(i=0;i<trigger->nEntries;i++) {
+       if(!getMessage(trigger->entries[i], trigger->refnums[i]))
+         return 0;
+     }
+     for(i=0;i<trigger->nAnyEntries;i++) {
+       if(!getMessage(trigger->anyEntries[i]))
+         return 0;
+     }
+     return 1;
+   }
 };
 #endif

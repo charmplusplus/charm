@@ -28,18 +28,7 @@ int numWhiles=0;
 int numAtomics=0;
 int numForalls=0;
 
-FILE *fC, *fh;
-
-void pC(int indent, const char *format, ...)
-{
-  va_list args;
-
-  va_start(args, format);
-  for(int i=0;i<indent;i++)
-    fprintf(fC, "  ");
-  vfprintf(fC, format, args);
-  va_end(args);
-}
+FILE *fh;
 
 void pH(int indent, const char *format, ...)
 {

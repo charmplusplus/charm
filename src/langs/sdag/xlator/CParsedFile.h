@@ -41,16 +41,12 @@ class CParsedFile {
       labelNodes();
       propogateState();
       generateEntryList();
-      CString *fCname = new CString(sourceFile);
-      fCname->append(".C");
-      fC = fopen(fCname->charstar(), "w");
       CString *fhname = new CString(sourceFile);
       fhname->append(".h");
       fh = fopen(fhname->charstar(), "w");
       generateCode();
       generateEntries();
       generateInitFunction();
-      fclose(fC);
       fclose(fh);
     }
 };

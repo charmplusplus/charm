@@ -23,9 +23,9 @@
 
 SHELL=/bin/sh
 
-all: charm++ bluegene LIBS ampi f90charm tsm sm pvm sdag doc
+all: charm++ bluegene LIBS ampi f90charm tsm sm pvm doc
 
-charm++: converse libck.a charmxi
+charm++: converse libck.a charmxi sdagx
 
 bluegene: charm++ libconv-bluegene.a libbluegene.a
 
@@ -36,8 +36,6 @@ tsm: converse libtsm.a
 sm: converse libsm.a
 
 pvm: converse libpvmc.a
-
-sdag: charm++ sdagx libsdag.a
 
 FEM: FEMC FEMF
 
@@ -670,12 +668,6 @@ libf90charm.a: f90main.ci f90main.h f90main.C charmf.h charmf.C futil.f90
 	$(CHARMC) -c -DAMPI_FORTRAN=1 charmf.C
 	$(CHARMC) -c futil.f90
 	$(CHARMC) -cp ../lib -o libf90charm.a f90main.o charmf.o futil.o
-
-libsdag.a: CDep.o
-	$(CHARMC) -cp ../lib -o libsdag.a CDep.o
-
-CDep.o: CDep.C CDep.h CMsgBuffer.h CWhenTrigger.h
-	$(CHARMC) -c CDep.C
 
 SDAGOBJ=sdag-main.o trans.o CLexer.o CParser.o CParsedFile.o CParseNode.o \
 	sdag-globals.o CParseNodeProcess.o CEntry.o

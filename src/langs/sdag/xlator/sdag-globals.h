@@ -26,10 +26,8 @@ extern int numWhiles;
 extern int numAtomics;
 extern int numForalls;
 
-extern FILE *fC;
 extern FILE *fh;
 
-extern void pC(int, const char *, ...);
 extern void pH(int, const char *, ...);
 extern void resetNumbers(void);
 

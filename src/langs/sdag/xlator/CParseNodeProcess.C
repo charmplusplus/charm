@@ -292,60 +292,52 @@ void CParseNode::generateCode(void)
 
 void CParseNode::generateWhen(void)
 {
-  // header file
-  pH(1,"int %s(", label->charstar());
+  // header file: inlined start function
+  pH(1, "int %s(", label->charstar());
   generatePrototype(fh, stateVars);
-  pH(0,");\n");
-  pH(1,"void %s_end(", label->charstar());
-  generatePrototype(fh, stateVarsChildren);
-  pH(0,");\n");
-
-  // C++ file: start function
-  pC(0, "int %s::%s(", className->charstar(), label->charstar());
-  generatePrototype(fC, stateVars);
-  pC(0, ") {\n");
+  pH(1, ") {\n");
   // actual code here 
   TList *elist = con1->constructs;
   CParseNode *el;
   for(el=(CParseNode *)(elist->begin()); !elist->end(); el=(CParseNode *)(elist->next())) {
-    pC(1, "CMsgBuffer *%s_buf;\n", el->con4->text->charstar());
-    pC(1, "%s *%s;\n", el->con3->text->charstar(),
+    pH(2, "CMsgBuffer *%s_buf;\n", el->con4->text->charstar());
+    pH(2, "%s *%s;\n", el->con3->text->charstar(),
                 el->con4->text->charstar());
   }
-  pC(0, "\n");
+  pH(1, "\n");
   for(el=(CParseNode *)(elist->begin()); !elist->end(); el=(CParseNode *)(elist->next())) {
     if(el->con2 == 0)
-      pC(1, "%s_buf = __cDep->getMessage(%d);\n",
+      pH(2, "%s_buf = __cDep->getMessage(%d);\n",
                   el->con4->text->charstar(),
                   el->entryPtr->entryNum);
     else
-      pC(1, "%s_buf = __cDep->getMessage(%d, %s);\n",
+      pH(2, "%s_buf = __cDep->getMessage(%d, %s);\n",
                   el->con4->text->charstar(),
                   el->entryPtr->entryNum,
                   el->con2->text->charstar());
   }
-  pC(0, "\n");
-  pC(1, "if (");
+  pH(1, "\n");
+  pH(2, "if (");
   for(el=(CParseNode *)(elist->begin()); !elist->end();) {
-    pC(0, "(%s_buf != 0)", el->con4->text->charstar());
+    pH(1, "(%s_buf != 0)", el->con4->text->charstar());
     el = (CParseNode *)(elist->next());
     if(el != 0)
-      pC(0, "&&");
+      pH(1, "&&");
   }
-  pC(0, ") {\n");
+  pH(1, ") {\n");
   for(el=(CParseNode *)(elist->begin()); !elist->end(); el=(CParseNode *)(elist->next())) {
-    pC(2, "%s = (%s *) %s_buf->msg;\n",
+    pH(3, "%s = (%s *) %s_buf->msg;\n",
                   el->con4->text->charstar(),
                   el->con3->text->charstar(),
                   el->con4->text->charstar());
-    pC(2, "__cDep->removeMessage(%s_buf);\n",
+    pH(3, "__cDep->removeMessage(%s_buf);\n",
                 el->con4->text->charstar());
   }
-  pC(2, "%s(", ((CParseNode *)constructs->front())->label->charstar());
-  generateCall(fC, stateVarsChildren);
-  pC(0, ");\n");
-  pC(2, "return 1;\n");
-  pC(1, "} else {\n");
+  pH(3, "%s(", ((CParseNode *)constructs->front())->label->charstar());
+  generateCall(fh, stateVarsChildren);
+  pH(1, ");\n");
+  pH(3, "return 1;\n");
+  pH(2, "} else {\n");
 
   int nRefs=0, nAny=0;
   for(el=(CParseNode *)(elist->begin()); !elist->end(); el=(CParseNode *)(elist->next())) {
@@ -377,113 +369,95 @@ void CParseNode::generateWhen(void)
     exit(1);
   }
 
-  pC(2, "CWhenTrigger *tr;\n");
-  pC(2, "tr = new CWhenTrigger(%d, %d, %d, %d);\n",
+  pH(3, "CWhenTrigger *tr;\n");
+  pH(3, "tr = new CWhenTrigger(%d, %d, %d, %d);\n",
                    nodeNum, 
                    stateVars->length(), nRefs, nAny);
   CStateVar *sv;
   int iArgs=0;
   for(sv=(CStateVar *)(stateVars->begin());!stateVars->end();sv=(CStateVar *)(stateVars->next())) {
-    pC(2, "tr->args[%d] = (size_t) %s;\n", iArgs++,
+    pH(3, "tr->args[%d] = (size_t) %s;\n", iArgs++,
                 sv->name->charstar());
   }
   int iRef=0, iAny=0;
   for(el=(CParseNode *)(elist->begin()); !elist->end(); el=(CParseNode *)(elist->next())) {
     if(el->con2 == 0) {
-      pC(2, "tr->anyEntries[%d] = %d;\n", iAny++,
+      pH(3, "tr->anyEntries[%d] = %d;\n", iAny++,
                   el->entryPtr->entryNum);
     } else {
-      pC(2, "tr->entries[%d] = %d;\n", iRef,
+      pH(3, "tr->entries[%d] = %d;\n", iRef,
                   el->entryPtr->entryNum);
-      pC(2, "tr->refnums[%d] = %s;\n", iRef++,
+      pH(3, "tr->refnums[%d] = %s;\n", iRef++,
                   el->con2->text->charstar());
     }
   }
-  pC(2, "__cDep->Register(tr);\n");
-  pC(2, "return 0;\n");
-  pC(1, "}\n");
+  pH(3, "__cDep->Register(tr);\n");
+  pH(3, "return 0;\n");
+  pH(2, "}\n");
   // end actual code
-  pC(0, "}\n\n");
-  // C++ file: end function
-  pC(0, "void %s::%s_end(", className->charstar(), label->charstar());
-  generatePrototype(fC, stateVarsChildren);
-  pC(0, ") {\n");
+  pH(1, "}\n\n");
+  // header file: inlined end function
+  pH(1, "void %s_end(", label->charstar());
+  generatePrototype(fh, stateVarsChildren);
+  pH(1, ") {\n");
   // actual code here 
   for(el=(CParseNode *)(elist->begin()); !elist->end(); el=(CParseNode *)(elist->next())) {
-    // pC(1, "delete %s;\n", el->con4->text->charstar());
+    // pH(2, "delete %s;\n", el->con4->text->charstar());
   }
   if(nextBeginOrEnd == 1)
-   pC(1, "%s(", next->label->charstar());
+   pH(2, "%s(", next->label->charstar());
   else
-   pC(1, "%s_end(", next->label->charstar());
-  generateCall(fC, stateVars);
-  pC(0, ");\n");
+   pH(2, "%s_end(", next->label->charstar());
+  generateCall(fh, stateVars);
+  pH(1, ");\n");
   // end actual code
-  pC(0, "}\n\n");
+  pH(1, "}\n\n");
 }
 
 void CParseNode::generateWhile(void)
 {
-  // header file
-  pH(1,"void %s(", label->charstar());
+  // header file: inlined start function
+  pH(1, "void %s(", label->charstar());
   generatePrototype(fh, stateVars);
-  pH(0,");\n");
-  pH(1,"void %s_end(", label->charstar());
+  pH(1, ") {\n");
+  // actual code here 
+  pH(2, "if (%s) {\n", con1->text->charstar());
+  pH(3, "%s(", ((CParseNode *)constructs->front())->label->charstar());
+  generateCall(fh, stateVarsChildren);
+  pH(1, ");\n");
+  pH(2, "} else {\n");
+  if(nextBeginOrEnd == 1)
+   pH(3, "%s(", next->label->charstar());
+  else
+   pH(3, "%s_end(", next->label->charstar());
+  generateCall(fh, stateVars);
+  pH(1, ");\n");
+  pH(2, "}\n");
+  // end actual code
+  pH(1, "}\n\n");
+  // header file: inlined end function
+  pH(1, "void %s_end(", label->charstar());
   generatePrototype(fh, stateVarsChildren);
-  pH(0,");\n");
-
-  // C++ file: start function
-  pC(0, "void %s::%s(", className->charstar(), label->charstar());
-  generatePrototype(fC, stateVars);
-  pC(0, ") {\n");
+  pH(1, ") {\n");
   // actual code here 
-  pC(1, "if (%s) {\n", con1->text->charstar());
-  pC(2, "%s(", ((CParseNode *)constructs->front())->label->charstar());
-  generateCall(fC, stateVarsChildren);
-  pC(0, ");\n");
-  pC(1, "} else {\n");
+  pH(2, "if (%s) {\n", con1->text->charstar());
+  pH(3, "%s(", ((CParseNode *)constructs->front())->label->charstar());
+  generateCall(fh, stateVarsChildren);
+  pH(1, ");\n");
+  pH(2, "} else {\n");
   if(nextBeginOrEnd == 1)
-   pC(2, "%s(", next->label->charstar());
+   pH(3, "%s(", next->label->charstar());
   else
-   pC(2, "%s_end(", next->label->charstar());
-  generateCall(fC, stateVars);
-  pC(0, ");\n");
-  pC(1, "}\n");
+   pH(3, "%s_end(", next->label->charstar());
+  generateCall(fh, stateVars);
+  pH(1, ");\n");
+  pH(2, "}\n");
   // end actual code
-  pC(0, "}\n\n");
-  // C++ file: end function
-  pC(0, "void %s::%s_end(", className->charstar(), label->charstar());
-  generatePrototype(fC, stateVarsChildren);
-  pC(0, ") {\n");
-  // actual code here 
-  pC(1, "if (%s) {\n", con1->text->charstar());
-  pC(2, "%s(", ((CParseNode *)constructs->front())->label->charstar());
-  generateCall(fC, stateVarsChildren);
-  pC(0, ");\n");
-  pC(1, "} else {\n");
-  if(nextBeginOrEnd == 1)
-   pC(2, "%s(", next->label->charstar());
-  else
-   pC(2, "%s_end(", next->label->charstar());
-  generateCall(fC, stateVars);
-  pC(0, ");\n");
-  pC(1, "}\n");
-  // end actual code
-  pC(0, "}\n\n");
+  pH(1, "}\n\n");
 }
 
 void CParseNode::generateFor(void)
 {
-#if 0
-  // header file
-  pH(1,"void %s(", label->charstar());
-  generatePrototype(fh, stateVars);
-  pH(0,");\n");
-  pH(1,"void %s_end(", label->charstar());
-  generatePrototype(fh, stateVarsChildren);
-  pH(0,");\n");
-#endif
-
   // header file: inlined start function
   pH(1, "void %s(", label->charstar());
   generatePrototype(fh, stateVars);
@@ -528,149 +502,115 @@ void CParseNode::generateFor(void)
 
 void CParseNode::generateIf(void)
 {
-  // header file
-  pH(1,"void %s(", label->charstar());
+  // header file: inlined start function
+  pH(1, "void %s(", label->charstar());
   generatePrototype(fh, stateVars);
-  pH(0,");\n");
-  pH(1,"void %s_end(", label->charstar());
-  generatePrototype(fh, stateVarsChildren);
-  pH(0,");\n");
-
-  // C++ file: start function
-  pC(0, "void %s::%s(", className->charstar(), label->charstar());
-  generatePrototype(fC, stateVars);
-  pC(0, ") {\n");
+  pH(1, ") {\n");
   // actual code here 
-  pC(1, "if (%s) {\n", con1->text->charstar());
-  pC(2, "%s(", ((CParseNode *)constructs->front())->label->charstar());
-  generateCall(fC, stateVarsChildren);
-  pC(0, ");\n");
-  pC(1, "} else {\n");
+  pH(2, "if (%s) {\n", con1->text->charstar());
+  pH(3, "%s(", ((CParseNode *)constructs->front())->label->charstar());
+  generateCall(fh, stateVarsChildren);
+  pH(1, ");\n");
+  pH(2, "} else {\n");
   if (con2 != 0) {
-    pC(2, "%s(", con2->label->charstar());
-    generateCall(fC, stateVarsChildren);
-    pC(0, ");\n");
+    pH(3, "%s(", con2->label->charstar());
+    generateCall(fh, stateVarsChildren);
+    pH(1, ");\n");
   } else {
-    pC(2, "%s_end(", label->charstar());
-    generateCall(fC, stateVarsChildren);
-    pC(0, ");\n");
+    pH(3, "%s_end(", label->charstar());
+    generateCall(fh, stateVarsChildren);
+    pH(1, ");\n");
   }
-  pC(1, "}\n");
+  pH(2, "}\n");
   // end actual code
-  pC(0, "}\n\n");
-  // C++ file: end function
-  pC(0, "void %s::%s_end(", className->charstar(), label->charstar());
-  generatePrototype(fC, stateVarsChildren);
-  pC(0, ") {\n");
+  pH(1, "}\n\n");
+  // header file: inlined end function
+  pH(1, "void %s_end(", label->charstar());
+  generatePrototype(fh, stateVarsChildren);
+  pH(1, ") {\n");
   // actual code here 
   if(nextBeginOrEnd == 1)
-   pC(2, "%s(", next->label->charstar());
+   pH(3, "%s(", next->label->charstar());
   else
-   pC(2, "%s_end(", next->label->charstar());
-  generateCall(fC, stateVars);
-  pC(0, ");\n");
+   pH(3, "%s_end(", next->label->charstar());
+  generateCall(fh, stateVars);
+  pH(1, ");\n");
   // end actual code
-  pC(0, "}\n\n");
+  pH(1, "}\n\n");
 }
 
 void CParseNode::generateElse(void)
 {
-  // header file
-  pH(1,"void %s(", label->charstar());
+  // header file: inlined start function
+  pH(1, "void %s(", label->charstar());
   generatePrototype(fh, stateVars);
-  pH(0,");\n");
-  pH(1,"void %s_end(", label->charstar());
-  generatePrototype(fh, stateVarsChildren);
-  pH(0,");\n");
-
-  // C++ file: start function
-  pC(0, "void %s::%s(", className->charstar(), label->charstar());
-  generatePrototype(fC, stateVars);
-  pC(0, ") {\n");
+  pH(1, ") {\n");
   // actual code here 
-  pC(1, "%s(", ((CParseNode *)constructs->front())->label->charstar());
-  generateCall(fC, stateVarsChildren);
-  pC(0, ");\n");
+  pH(2, "%s(", ((CParseNode *)constructs->front())->label->charstar());
+  generateCall(fh, stateVarsChildren);
+  pH(1, ");\n");
   // end actual code
-  pC(0, "}\n\n");
-  // C++ file: end function
-  pC(0, "void %s::%s_end(", className->charstar(), label->charstar());
-  generatePrototype(fC, stateVarsChildren);
-  pC(0, ") {\n");
+  pH(1, "}\n\n");
+  // header file: inlined end function
+  pH(1, "void %s_end(", label->charstar());
+  generatePrototype(fh, stateVarsChildren);
+  pH(1, ") {\n");
   // actual code here 
   if(nextBeginOrEnd == 1)
-   pC(2, "%s(", next->label->charstar());
+   pH(3, "%s(", next->label->charstar());
   else
-   pC(2, "%s_end(", next->label->charstar());
-  generateCall(fC, stateVars);
-  pC(0, ");\n");
+   pH(3, "%s_end(", next->label->charstar());
+  generateCall(fh, stateVars);
+  pH(1, ");\n");
   // end actual code
-  pC(0, "}\n\n");
+  pH(1, "}\n\n");
 }
 
 void CParseNode::generateForall(void)
 {
-  // header file
-  pH(1,"void %s(", label->charstar());
+  // header file: inlined start function
+  pH(1, "void %s(", label->charstar());
   generatePrototype(fh, stateVars);
-  pH(0,");\n");
-  pH(1,"void %s_end(", label->charstar());
-  generatePrototype(fh, stateVarsChildren);
-  pH(0,");\n");
-
-  // C++ file: start function
-  pC(0, "void %s::%s(", className->charstar(), label->charstar());
-  generatePrototype(fC, stateVars);
-  pC(0, ") {\n");
+  pH(1, ") {\n");
   // actual code here 
-  pC(1, "int __first = (%s), __last = (%s), __stride = (%s);\n",
+  pH(2, "int __first = (%s), __last = (%s), __stride = (%s);\n",
               con2->text->charstar(), con3->text->charstar(),
               con4->text->charstar());
-  pC(1, "if (__first > __last) {\n");
-  pC(2, "__swap(&__first, &__last);\n");
-  pC(2, "__stride = -__stride;\n");
-  pC(1, "}\n");
-  pC(1, "CCounter *%s = new CCounter(__first,__last,__stride);\n", 
+  pH(2, "if (__first > __last) {\n");
+  pH(3, "__swap(&__first, &__last);\n");
+  pH(3, "__stride = -__stride;\n");
+  pH(2, "}\n");
+  pH(2, "CCounter *%s = new CCounter(__first,__last,__stride);\n", 
               counter->charstar());
-  pC(1, "for(int %s=__first;%s<=__last;%s+=__stride) {\n",
+  pH(2, "for(int %s=__first;%s<=__last;%s+=__stride) {\n",
               con1->text->charstar(), con1->text->charstar(),
               con1->text->charstar());
-  pC(2, "%s(", ((CParseNode *)constructs->front())->label->charstar());
-  generateCall(fC, stateVarsChildren);
-  pC(0, ");\n");
-  pC(1, "}\n");
+  pH(3, "%s(", ((CParseNode *)constructs->front())->label->charstar());
+  generateCall(fh, stateVarsChildren);
+  pH(1, ");\n");
+  pH(2, "}\n");
   // end actual code
-  pC(0, "}\n\n");
-  // C++ file: end function
-  pC(0, "void %s::%s_end(", className->charstar(), label->charstar());
-  generatePrototype(fC, stateVarsChildren);
-  pC(0, ") {\n");
+  pH(1, "}\n\n");
+  // header file: inlined end function
+  pH(1, "void %s_end(", label->charstar());
+  generatePrototype(fh, stateVarsChildren);
+  pH(1, ") {\n");
   // actual code here 
-  pC(1, "%s->decrement();\n", counter->charstar());
-  pC(1, "if (%s->isDone()) {\n", counter->charstar());
-  pC(2, "delete %s;\n", counter->charstar());
+  pH(2, "%s->decrement();\n", counter->charstar());
+  pH(2, "if (%s->isDone()) {\n", counter->charstar());
+  pH(3, "delete %s;\n", counter->charstar());
   if(nextBeginOrEnd == 1)
-   pC(2, "%s(", next->label->charstar());
+   pH(3, "%s(", next->label->charstar());
   else
-   pC(2, "%s_end(", next->label->charstar());
-  generateCall(fC, stateVars);
-  pC(0, ");\n");
+   pH(3, "%s_end(", next->label->charstar());
+  generateCall(fh, stateVars);
+  pH(1, ");\n");
   // end actual code
-  pC(1, "}\n}\n\n");
+  pH(2, "}\n}\n\n");
 }
 
 void CParseNode::generateOlist(void)
 {
-#if 0
-  // header file
-  pH(1,"void %s(", label->charstar());
-  generatePrototype(fh, stateVars);
-  pH(0,");\n");
-  pH(1,"void %s_end(", label->charstar());
-  generatePrototype(fh, stateVarsChildren);
-  pH(0,");\n");
-#endif
-
   // header file: inlined start function
   pH(1, "void %s(",  label->charstar());
   generatePrototype(fh, stateVars);
@@ -707,16 +647,6 @@ void CParseNode::generateOlist(void)
 
 void CParseNode::generateOverlap(void)
 {
-#if 0
-  // header file
-  pH(1,"void %s(", label->charstar());
-  generatePrototype(fh, stateVars);
-  pH(0,");\n");
-  pH(1,"void %s_end(", label->charstar());
-  generatePrototype(fh, stateVarsChildren);
-  pH(0,");\n");
-#endif
-
   // header file: inlined start function
   pH(1, "void %s(", label->charstar());
   generatePrototype(fh, stateVars);
@@ -744,16 +674,6 @@ void CParseNode::generateOverlap(void)
 
 void CParseNode::generateSlist(void)
 {
-#if 0
-  // header file
-  pH(1,"void %s(", label->charstar());
-  generatePrototype(fh, stateVars);
-  pH(0,");\n");
-  pH(1,"void %s_end(", label->charstar());
-  generatePrototype(fh, stateVarsChildren);
-  pH(0,");\n");
-#endif
-
   // header file: inlined start function
   pH(1, "void %s(", label->charstar());
   generatePrototype(fh, stateVars);
@@ -783,49 +703,38 @@ void CParseNode::generateSdagEntry(void)
 {
   // header file
   pH(0,"public:\n");
-  pH(1,"void %s(", con1->text->charstar());
+  pH(1, "void %s(", con1->text->charstar());
   generatePrototype(fh, stateVars);
-  pH(0,");\n");
+  pH(1, ") {\n");
+  // actual code here 
+  pH(2, "%s(", ((CParseNode *)constructs->front())->label->charstar());
+  generateCall(fh, stateVarsChildren);
+  pH(1, ");\n");
+  // end actual code
+  pH(1, "}\n\n");
   pH(0,"private:\n");
-  pH(1,"void %s_end(", con1->text->charstar());
-  generatePrototype(fh, stateVarsChildren);
-  pH(0,");\n");
-
-  // C++ file
-  pC(0, "void %s::%s(", className->charstar(), con1->text->charstar());
-  generatePrototype(fC, stateVars);
-  pC(0, ") {\n");
+  pH(1, "void %s_end(", con1->text->charstar());
+  generatePrototype(fh, stateVars);
+  pH(1, ") {\n");
   // actual code here 
-  pC(1, "%s(", ((CParseNode *)constructs->front())->label->charstar());
-  generateCall(fC, stateVarsChildren);
-  pC(0, ");\n");
+  // pH(2, "delete %s;\n", con3->text->charstar());
   // end actual code
-  pC(0, "}\n\n");
-  pC(0, "void %s::%s_end(", className->charstar(), con1->text->charstar());
-  generatePrototype(fC, stateVars);
-  pC(0, ") {\n");
-  // actual code here 
-  // pC(1, "delete %s;\n", con3->text->charstar());
-  // end actual code
-  pC(0, "}\n\n");
+  pH(1, "}\n\n");
 }
 
 void CParseNode::generateAtomic(void)
 {
-  pH(1,"void %s(", label->charstar());
+  pH(1, "void %s(", label->charstar());
   generatePrototype(fh, stateVars);
-  pH(0,");\n");
-  pC(0, "void %s::%s(", className->charstar(), label->charstar());
-  generatePrototype(fC, stateVars);
-  pC(0, ") {\n");
-  pC(0, "%s\n", text->charstar());
+  pH(1, ") {\n");
+  pH(1, "%s\n", text->charstar());
   if(nextBeginOrEnd == 1)
-    pC(1, "%s(", next->label->charstar());
+    pH(2, "%s(", next->label->charstar());
   else
-    pC(1, "%s_end(", next->label->charstar());
-  generateCall(fC, stateVars);
-  pC(0, ");\n");
-  pC(0, "}\n\n");
+    pH(2, "%s_end(", next->label->charstar());
+  generateCall(fh, stateVars);
+  pH(1, ");\n");
+  pH(1, "}\n\n");
 }
 
 void CParseNode::generatePrototype(FILE *f, TList *list)

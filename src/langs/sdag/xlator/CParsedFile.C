@@ -75,8 +75,6 @@ void CParsedFile::generateInitFunction(void)
 {
   pH(0,"private:\n");
   pH(1,"CDep *__cDep;\n");
-  // pH(1,"void __sdag_init(void);\n");
-
   pH(1,"void __sdag_init(void) {\n");
   pH(2,"__cDep = new CDep(%d, %d);\n", numEntries, numWhens);
   CEntry *en;

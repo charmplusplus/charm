@@ -1,8 +1,0 @@
-libsdag.a: CDep.o
-	ar r libsdag.a CDep.o
-
-CDep.o: CDep.C CDep.h CMsgBuffer.h CWhenTrigger.h
-	charmc -c -O CDep.C
-
-clean:
-	rm -rf ptrepository ii_files *.o *.a  *.ii
