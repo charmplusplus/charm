@@ -12,6 +12,9 @@
 #include <string.h>
 #include <signal.h>
 #include <time.h>
+#if CMK_SCYLD
+#include <sys/bproc.h>
+#endif
 
 #include "sockRoutines.h"
 #ifndef CMK_NO_SOCKETS /*<- for ASCI Red*/
@@ -131,17 +134,33 @@ unsigned long skt_my_ip(void)
   unsigned long self_ip=0x7F000001u;/*Host byte order 127.0.0.1*/
   char hostname[1000];
   
+#if CMK_SCYLD
+  /* on Scyld, the hostname is just the node number */
+  sprintf(hostname, "%d", bproc_currnode());
+  ip=skt_lookup_ip(hostname);
+#else
   if (ip==0) 
   {
     if (gethostname(hostname, 999)==0) 
 		ip=skt_lookup_ip(hostname);
   }
   if (ip==0) ip=self_ip;
+#endif
   return ip;
 }
 
 unsigned long skt_lookup_ip(const char *name)
 {
+#if CMK_SCYLD
+  struct sockaddr_in addr;
+  int len = sizeof(struct sockaddr_in);
+  if (-1 == bproc_nodeaddr(atoi(name), &addr, &len)) {
+    return 0;
+  }
+  else {
+    return ntohl(addr.sin_addr.s_addr);
+  }
+#else
   const unsigned int inval=0xffFFffFFu;
   unsigned long ret;
   ret=inet_addr(name);/*Try dotted decimal*/
@@ -154,7 +173,9 @@ unsigned long skt_lookup_ip(const char *name)
     ip=ntohl(*((unsigned int *)(h->h_addr_list[0])));
     return ip;
   }
+#endif
 }
+
 struct sockaddr_in skt_build_addr(unsigned int IP,unsigned int port)
 {
   struct sockaddr_in ret={0};
