@@ -58,7 +58,7 @@ done
 ( echo $BASEVERSION | egrep -s '^Common' ) && syntax
 [ -d src/$BASEVERSION ] || syntax
 
-if test -n $MORE
+if test -n "$MORE"
 then
   for i in $MORE
   do
