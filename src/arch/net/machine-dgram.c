@@ -217,6 +217,7 @@ static void OtherNode_init(OtherNode node)
     node->send_queue_h=node->send_queue_t=NULL;
     node->send_next=0;
     node->send_good=(unsigned int)(-1);
+    node->send_ack_seqno=0;
 
     node->asm_rank=0;
     node->asm_total=0;
@@ -225,6 +226,8 @@ static void OtherNode_init(OtherNode node)
     
     node->recv_ack_cnt=0;
     node->recv_ack_time=1.0e30;
+    node->recv_ack_seqno=0;
+    node->recv_expect=0;
     node->recv_window =
       (ExplicitDgram*)malloc(Cmi_window_size*sizeof(ExplicitDgram));
     for (i=0;i<Cmi_window_size;i++) node->recv_window[i]=NULL;    
