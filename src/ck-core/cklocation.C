@@ -159,7 +159,10 @@ int CkArrayMap::registerArray(int numElements,CkArrayID aid)
 
 void CkArrayMap::populateInitial(int arrayHdl,int numElements,void *ctorMsg,CkArrMgr *mgr)
 {
-	if (numElements==0) return;
+	if (numElements==0) {
+          CkFreeMsg(ctorMsg);
+          return;
+        }
 	int thisPe=CkMyPe();
 	for (int i=0;i<numElements;i++) {
 		//Make 1D indices
