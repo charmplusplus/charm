@@ -136,10 +136,10 @@ typedef struct
 #define CMI_VMI_BROADCAST_SPANNING_FACTOR 4
 #endif
 
-#define CMI_BROADCAST_ROOT(msg)   ((CmiMsgHeaderBasic *)msg)->root
-#define CMI_DEST_RANK(msg)        ((CmiMsgHeaderBasic *)msg)->rank
+#define CMI_BROADCAST_ROOT(msg)   ((CmiMsgHeaderBasic *)msg)->tree_root
+#define CMI_DEST_RANK(msg)        ((CmiMsgHeaderBasic *)msg)->tree_rank
 
-#define CMI_SET_BROADCAST_ROOT(msg,root)   CMI_BROADCAST_ROOT(msg) = (root);
+#define CMI_SET_BROADCAST_ROOT(msg,tree_root)   CMI_BROADCAST_ROOT(msg) = (tree_root);
 #endif
 
 
