@@ -378,6 +378,13 @@ including communication lists between chunks.
 void fem_split(const FEM_Mesh *mesh,int nchunks,int *elem2chunk,
 	       int nGhostLayers,const ghostLayer *g,MeshChunkOutput *out)
 {
+#ifndef CMK_OPTIMIZE
+	//Check the elem2chunk array for out-of-bounds values
+	for (int e=0;e<mesh->nElems();e++) {
+		if (elem2chunk[e]<0) CkAbort("Entry in elem2chunk is negative (did you do a bad FEM_Set_Partition?");
+		if (elem2chunk[e]>=nchunks) CkAbort("Entry in elem2chunk is too large (did you do a bad FEM_Set_Partition?");
+	}
+#endif
 	splitter s(mesh,elem2chunk,nchunks);
 
 	s.buildCommLists();
