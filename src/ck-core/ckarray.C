@@ -360,17 +360,6 @@ void ArrayElement::migrate(int where)
 */
 }
 
-int ArrayElement::packsize(void)
-{ 
-  // CkPrintf("ArrayElement::packsize not defined!\n");
-  return 0;
-}
-
-void ArrayElement::pack(void *pack)
-{ 
-  // CkPrintf("ArrayElement::pack not defined!\n");
-}
-
 void ArrayElement::exit(ArrayElementExitMessage *msg)
 {
   delete msg;

@@ -62,8 +62,8 @@ public:
   int getSize(void)  { return numElements; }
 
 protected:
-  virtual int packsize(void);
-  virtual void pack(void *pack);
+  virtual int packsize(void) { return 0; }
+  virtual void pack(void *) { return; }
 
   CkChareID arrayChareID;
   CkGroupID arrayGroupID;

@@ -1,5 +1,10 @@
-#include "charm++.h"
-#include "ck.h"
+#include <converse.h>
+#include <charm.h>
+#ifdef CMK_OPTIMIZE
+#define NDEBUG
+#endif
+#include <assert.h>
+#include "envelope.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

@@ -1,5 +1,7 @@
-#include "ck.h"
-#include "stdio.h"
+#include <converse.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 
 #if CMK_DEBUG_MODE
 
