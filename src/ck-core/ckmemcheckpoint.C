@@ -24,9 +24,12 @@ Restart phase contains two steps:
    states to be consistent.
 
 added 3/14/04:
-
 1. also support for double in-disk checkpoint/restart
    use macro CK_USE_MEM and CK_USE_DISK to switch.
+
+added 4/16/04:
+1. also support the case when there is a pool of extra processors.
+   set CK_NO_PROC_POOL to 0.
 
 TODO:
  checkpoint scheme can be reimplemented based on per processor scheme;
@@ -44,6 +47,10 @@ TODO:
 // choose to use in-memory or in-disk checkpointing
 #define CK_USE_MEM 				1
 #define CK_USE_DISK 			        0	
+
+// assume NO extra processors--1
+// assume extra processors--0
+#define CK_NO_PROC_POOL				1
 
 int CkMemCheckPT::inRestarting = 0;
 double CkMemCheckPT::startTime;
@@ -140,6 +147,7 @@ public:
     return (CkArrayCheckPTMessage *)CkCopyMsg((void **)&ckBuffer);
   }     
   inline void updateBuddy(int b1, int b2) {
+     CmiAssert(ckBuffer);
      ckBuffer->bud1 = b1; ckBuffer->bud2 = b2;
   }
   inline int getSize() { 
@@ -207,7 +215,11 @@ public:
 
 CkMemCheckPT::CkMemCheckPT()
 {
+#if CK_NO_PROC_POOL
   if (CkNumPes() <= 2) {
+#else
+  if (CkNumPes()  == 1) {
+#endif
     if (CkMyPe() == 0)  CkPrintf("Warning: CkMemCheckPT disabled!\n");
     _memChkptOn = 0;
   }
@@ -240,14 +252,15 @@ void CkMemCheckPT::pup(PUP::er& p)
 void CkMemCheckPT::inmem_restore(CkArrayCheckPTMessage *m) 
 {
 #if CMK_MEM_CHECKPOINT
-  //DEBUGF("[%d] inmem_restore restore", CmiMyPe());  m->index.print();
-//  CmiPrintf("[%d] inmem_restore restore: mgr: %d ", CmiMyPe(), m->locMgr);  m->index.print();
+  DEBUGF("[%d] inmem_restore restore: mgr: %d ", CmiMyPe(), m->locMgr);  m->index.print();
   PUP::fromMem p(m->packData);
   CkLocMgr *mgr = CProxy_CkLocMgr(m->locMgr).ckLocalBranch();
+  CmiAssert(mgr);
   mgr->resume(m->index, p);
 
   // find a list of array elements bound together
   ArrayElement *elt = (ArrayElement *)mgr->lookup(m->index, m->aid);
+  CmiAssert(elt);
   CkLocRec_local *rec = elt->myRec;
   CkVec<CkMigratable *> list;
   mgr->migratableList(rec, list);
@@ -266,7 +279,7 @@ void CkMemCheckPT::inmem_restore(CkArrayCheckPTMessage *m)
 #endif
 }
 
-// return 1 is pe was a crashed processor
+// return 1 if pe is a crashed processor
 int CkMemCheckPT::isFailed(int pe)
 {
   for (int i=0; i<failedPes.length(); i++)
@@ -399,12 +412,13 @@ void CkMemCheckPT::recvData(CkArrayCheckPTMessage *msg)
   CkAssert(idx < len);
   int isChkpting = msg->cp_flag;
   ckTable[idx]->updateBuffer(msg);
-    // all my array elements have returned their inmem data
-    // inform starter processor that I am done.
   if (isChkpting) {
+      // all my array elements have returned their inmem data
+      // inform starter processor that I am done.
     recvCount ++;
     if (recvCount == ckTable.length()) {
 #if CK_USE_MEM
+//CmiPrintf("[%d] CkMemCheckPT::recvData report to %d\n", CkMyPe(), cpStarter);
       thisProxy[cpStarter].cpFinish();
 #else
       // another barrier for finalize the writing using fsync
@@ -429,8 +443,7 @@ void CkMemCheckPT::cpFinish()
 {
   CmiAssert(CkMyPe() == cpStarter);
   peCount++;
-    // now all processors have finished, activate callback
-//CmiPrintf("peCount:%d\n",peCount);
+    // now that all processors have finished, activate callback
   if (peCount == 2*(CkNumPes())) {
     CmiPrintf("[%d] Checkpoint finished in %f seconds, sending callback ... \n", CkMyPe(), CmiWallTimer()-startTime);
     cpCallback.send();
@@ -439,6 +452,7 @@ void CkMemCheckPT::cpFinish()
   }
 }
 
+// for debugging, report checkpoint info
 void CkMemCheckPT::report()
 {
   int objsize = 0;
@@ -449,19 +463,23 @@ void CkMemCheckPT::report()
     objsize += entry->getSize();
   }
   CmiAssert(CpvAccess(procChkptBuf));
-  CkPrintf("[%d] Checkpointed Object size: %d Processor data: %d\n", CkMyPe(), objsize, CpvAccess(procChkptBuf)->len);
+  CkPrintf("[%d] Checkpointed Object size: %d len: %d Processor data: %d\n", CkMyPe(), objsize, len, CpvAccess(procChkptBuf)->len);
 }
 
 /*****************************************************************************
 			RESTART Procedure
 *****************************************************************************/
 
-inline int CkMemCheckPT::isMaster(int pe)
+// master processor of two buddies
+inline int CkMemCheckPT::isMaster(int buddype)
 {
-  int mype = CkMyPe(); 
+  int mype = CkMyPe();
 //CkPrintf("ismaster: %d %d\n", pe, mype);
+  if (CkNumPes() - totalFailed() == 2) {
+    return mype > buddype;
+  }
   for (int i=1; i<CkNumPes(); i++) {
-    int me = (pe+i)%CkNumPes();
+    int me = (buddype+i)%CkNumPes();
     if (isFailed(me)) continue;
     if (me == mype) return 1;
     else return 0;
@@ -508,7 +526,9 @@ void CkMemCheckPT::resetLB(int diepe)
   for (i=0; i<failedPes.length(); i++)
     bitmap[failedPes[i]] = 0; 
   bitmap[diepe] = 0;
+#if CK_NO_PROC_POOL
   set_avail_vector(bitmap);
+#endif
 
   // if I am the crashed pe, rebuild my failedPEs array
   if (CkMyPe() == diepe)
@@ -519,7 +539,7 @@ void CkMemCheckPT::resetLB(int diepe)
 #endif
 }
 
-// in case when failedPe dies, everybody go through its check point table:
+// in case when failedPe dies, everybody go through its checkpoint table:
 // destory all array elements
 // recover lost buddies
 // reconstruct all array elements from check point data
@@ -534,11 +554,12 @@ void CkMemCheckPT::restart(int diePe)
   startTime = curTime;
   CkPrintf("[%d] CkMemCheckPT ----- restart.\n",CkMyPe());
 
+#if CK_NO_PROC_POOL
   failed(diePe);	// add into the list of failed pes
+#endif
   thisFailedPe = diePe;
 
-  // clean array chkpt table
-  if (CkMyPe() == diePe) ckTable.length() = 0;
+  if (CkMyPe() == diePe) CmiAssert(ckTable.length() == 0);
 
   inRestarting = 1;
                                                                                 
@@ -567,6 +588,7 @@ void CkMemCheckPT::removeArrayElements()
   if (CkMyPe()==thisFailedPe) CmiAssert(len == 0);
 
   // get rid of all buffering and remote recs
+  // including destorying all array elements
   CKLOCMGR_LOOP(mgr->flushAllRecs(););
 
 //  CKLOCMGR_LOOP(ElementDestoryer chk(mgr); mgr->iterate(chk););
@@ -623,16 +645,19 @@ void CkMemCheckPT::recoverBuddies()
   stage = "recoverBuddies";
   startTime = curTime;
 
-  //if (iFailed()) return;   ??????
-
   // recover buddies
   for (idx=0; idx<len; idx++) {
     CkCheckPTInfo *entry = ckTable[idx];
     if (entry->pNo == thisFailedPe) {
+#if CK_NO_PROC_POOL
+      // find a new buddy
       int budPe = CkMyPe();
 //      while (budPe == CkMyPe() || isFailed(budPe)) budPe = CrnRand()%CkNumPes();
       while (budPe == CkMyPe() || isFailed(budPe)) budPe = (budPe+1)%CkNumPes();
       entry->pNo = budPe;
+#else
+      int budPe = thisFailedPe;
+#endif
       thisProxy[budPe].createEntry(entry->aid, entry->locMgr, entry->index, CkMyPe());
       CkArrayCheckPTMessage *msg = entry->getCopy();
       msg->cp_flag = 0;            // not checkpointing
@@ -644,25 +669,30 @@ void CkMemCheckPT::recoverBuddies()
     CkStartQD(CkCallback(CkIndex_CkMemCheckPT::recoverArrayElements(), thisProxy));
 }
 
-// restore 
+// restore array elements
 void CkMemCheckPT::recoverArrayElements()
 {
   double curTime = CmiWallTimer();
-  CkPrintf("[%d] CkMemCheckPT ----- %s in %f seconds\n",CkMyPe(), stage, curTime-startTime);
+  int len = ckTable.length();
+  CkPrintf("[%d] CkMemCheckPT ----- %s len: %d in %f seconds \n",CkMyPe(), stage, len, curTime-startTime);
   stage = "recoverArrayElements";
   startTime = curTime;
-  //if (iFailed()) return;
 
   // recover all array elements
   int count = 0;
-  int len = ckTable.length();
   for (int idx=0; idx<len; idx++)
   {
     CkCheckPTInfo *entry = ckTable[idx];
+#if CK_NO_PROC_POOL
     // the bigger one will do 
 //    if (CkMyPe() < entry->pNo) continue;
     if (!isMaster(entry->pNo)) continue;
-//CkPrintf("[%d] restore idx:%d aid:%d loc:%d ", CkMyPe(), idx, (CkGroupID)(entry->aid), entry->locMgr); entry->index.print();
+#else
+    // smaller one do it, which has the original object
+    if (CkMyPe() == entry->pNo+1 || 
+        CkMyPe()+CkNumPes() == entry->pNo+1) continue;
+#endif
+CkPrintf("[%d] restore idx:%d aid:%d loc:%d ", CkMyPe(), idx, (CkGroupID)(entry->aid), entry->locMgr); entry->index.print();
     entry->updateBuddy(CkMyPe(), entry->pNo);
     CkArrayCheckPTMessage *msg = entry->getCopy();
     // gzheng
@@ -670,7 +700,7 @@ void CkMemCheckPT::recoverArrayElements()
     inmem_restore(msg);
     count ++;
   }
-  //CkPrintf("[%d] recoverArrayElements restore %d objects\n", CkMyPe(), count);
+//CkPrintf("[%d] recoverArrayElements restore %d objects\n", CkMyPe(), count);
 
   if (CkMyPe() == 0)
     CkStartQD(CkCallback(CkIndex_CkMemCheckPT::finishUp(), thisProxy));
@@ -680,14 +710,7 @@ void CkMemCheckPT::recoverArrayElements()
 // turn load balancer back on
 void CkMemCheckPT::finishUp()
 {
-  int i;
-  int numGroups = CkpvAccess(_groupIDTable)->size();
-  for(i=0;i<numGroups;i++) {
-    CkGroupID gID = (*CkpvAccess(_groupIDTable))[i];
-    IrrGroup *obj = CkpvAccess(_groupTable)->find(gID).getObj();
-    if (obj->isLocMgr()) 
-      ((CkLocMgr *)obj)->doneInserting();
-  }
+  CKLOCMGR_LOOP(mgr->doneInserting(););
   
   inRestarting = 0;
 
@@ -695,11 +718,13 @@ void CkMemCheckPT::finishUp()
   {
        CkPrintf("[%d] CkMemCheckPT ----- %s in %f seconds\n",CkMyPe(), stage, CmiWallTimer()-startTime);
        CkStartQD(cpCallback);
-       if (CkNumPes()-totalFailed() <=2) {
-         if (CkMyPe()==0) CkPrintf("Warning: CkMemCheckPT disabled!\n");
-         _memChkptOn = 0;
-       }
   } 
+#if CK_NO_PROC_POOL
+  if (CkNumPes()-totalFailed() <=2) {
+    if (CkMyPe()==0) CkPrintf("Warning: CkMemCheckPT disabled!\n");
+    _memChkptOn = 0;
+  }
+#endif
 }
 
 // called only on 0
@@ -722,6 +747,11 @@ void CkStartMemCheckpoint(CkCallback &cb)
 #if CMK_MEM_CHECKPOINT
   if (_memChkptOn == 0) {
     CkPrintf("Warning: In-Memory checkpoint has been disabled! \n");
+    cb.send();
+    return;
+  }
+  if (CkInRestarting()) {
+      // trying to checkpointing during restart
     cb.send();
     return;
   }
