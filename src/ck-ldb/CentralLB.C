@@ -482,8 +482,6 @@ void CentralLB::simulation() {
   }
 }
 
-#define OLD_FORMAT_COMPATIBLE  0
-
 void CentralLB::readStatsMsgs(const char* filename) {
 
   int i;
@@ -506,12 +504,12 @@ void CentralLB::readStatsMsgs(const char* filename) {
 
   for (i = 0; i < stats_msg_count; i++) {
     CLBStatsMsg* m = new CLBStatsMsg;
-    CkPupMessage(p, (void **)&m, 1);
-#if ! OLD_FORMAT_COMPATIBLE
+    CLBStatsMsg *oldm = m;
+    envelope oldenv=*UsrToEnv(oldm);
+    CkPupMessage(p, (void **)&m, 2);
     envelope *env=UsrToEnv(m);
     CkUnpackMessage(&env); //UnPack it
     m = (CLBStatsMsg *)EnvToUsr(env);
-#endif
 
     statsMsgsList[i] = m;
     statsDataList[i].total_walltime = m->total_walltime;
@@ -531,30 +529,34 @@ void CentralLB::readStatsMsgs(const char* filename) {
     statsDataList[i].objData = (LDObjData*)((char*)m+(size_t)m->objData);
     statsDataList[i].commData = (LDCommData*)((char *)m+(size_t)m->commData);
 #endif
-//CmiPrintf("i:%d bg_walltime: %f total_walltime: %f objData: %p comm: %p\n", i, m->bg_walltime, m->total_walltime, m->objData, m->commData);
+//CmiPrintf("i:%d bg_walltime: %f total_walltime: %f objData: %d %p comm: %d %p\n", i, m->bg_walltime, m->total_walltime, m->n_objs, m->objData, m->n_comm, m->commData);
   }
 
   // file f is closed in the destructor of PUP::fromDisk
-  CmiPrintf("readStatsMsg from %s\n", filename);
+  CmiPrintf("ReadStatsMsg from %s completed\n", filename);
 }
 
 void CentralLB::writeStatsMsgs(const char* filename) {
 
   int i;
   FILE *f = fopen(filename, "w");
+  if (f == NULL) 
+    CmiAbort("writeStatsMsgs failed to open the output file!\n");
 
   PUP::toDisk p(f);
   p|stats_msg_count;
 
   for (i = 0; i < stats_msg_count; i++) {
-    envelope *env=UsrToEnv(statsMsgsList[i]);
+    CLBStatsMsg *m = statsMsgsList[i];
+    envelope *env=UsrToEnv(m);
     CkPackMessage(&env); //Pack it
-    CkPupMessage(p, (void **)&statsMsgsList[i], 1);
+    m = (CLBStatsMsg *)EnvToUsr(env);
+    CkPupMessage(p, (void **)&m, 2);
   }
 
   fclose(f);
 
-  CmiPrintf("writeStatsMsgs to %s\n", filename);
+  CmiPrintf("WriteStatsMsgs to %s succeed!\n", filename);
 }
 
 static void getPredictedLoad(CentralLB::LDStats* stats, int count, LBMigrateMsg* msg, double *peLoads)
