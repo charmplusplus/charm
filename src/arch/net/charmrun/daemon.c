@@ -27,7 +27,7 @@ typedef unsigned int BYTE;
 (daemon.log) and doesn't show a DOS window.
 Otherwise, the daemon logs things to its DOS window.
 */
-/*#define FACELESS  /*<- sent in from the makefile*/
+/*#define FACELESS*/  /*<- sent in from the makefile*/
 
 FILE *logfile;/*Status messages to standard output*/
 
