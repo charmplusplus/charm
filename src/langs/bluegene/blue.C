@@ -874,13 +874,11 @@ double BgGetTime()
 #endif
 }
 
-#if 0
 // moved to blue_logs.C
 double BgGetCurTime()
 {
   return tCURRTIME;
 }
-#endif
 
 extern "C" 
 void BgElapse(double t)
@@ -1017,7 +1015,7 @@ void threadInfo::run_work_thread()
     DEBUGF(("[N%d] work thread %d start.\n", BgMyNode(), id));
     // timing
     startVTimer();
-    BG_ENTRYSTART(-1, NULL);
+    BG_ENTRYSTART((char*)NULL);
     char **Cmi_argvcopy = CmiCopyArgs(arg_argv);
     workStartFunc(arg_argc, Cmi_argvcopy);
     BG_ENTRYEND();
@@ -1076,7 +1074,7 @@ void threadInfo::run_work_thread()
       tCURRTIME = CmiBgMsgRecvTime(msg);
     }
 
-    BG_ENTRYSTART(CmiBgMsgHandle(msg), msg);
+    BG_ENTRYSTART(msg);
     // ProcessMessage may trap into scheduler
     ProcessMessage(msg);
     BG_ENTRYEND();
@@ -1283,6 +1281,8 @@ CmiStartFn bgMain(int argc, char **argv)
 
   /* check if all bluegene node size and thread information are set */
   BGARGSCHECK;
+
+  timerFunc = BgGetCurTime;
 
   BgInitTiming();		// timing module
 

@@ -83,7 +83,7 @@ public:
 
   friend class BgTimeLineRec;
 private:
-  bgTimeLog(int epc, char *msg);
+  bgTimeLog(char *msg);
 public:
   bgTimeLog(bgTimeLog *);
   bgTimeLog(): ep(-1), recvTime(.0), startTime(.0), endTime(.0), msgID(-1), effRecvTime(INVALIDTIME), seqno(0), doCorrect(1) {strcpy(name,"dummyname");}
@@ -200,7 +200,7 @@ public:
     }
 #endif
   }
-  void logEntryStart(int handler, char *m);
+  void logEntryStart(char *m);
   void logEntryCommit();
   void logEntryInsert(bgTimeLog* log);
   void logEntryStart(bgTimeLog* log);

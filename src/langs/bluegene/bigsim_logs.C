@@ -9,10 +9,11 @@ int bgcorroff = 0;
 extern BgTimeLineRec* currTline;
 extern int currTlineIdx;
 
-double BgGetCurTime()
-{
-  return tCURRTIME;
-}
+// null timer for using blue_logs as a sequential library
+static double nullTimer() { return 0.; }
+
+// bluegene timer call
+double (*timerFunc) (void) = nullTimer;
 
 // dstNode is the dest bg node, can be -1
 bgMsgEntry::bgMsgEntry(char *msg, int dstNode, int tid, int local)
@@ -106,10 +107,10 @@ bgTimeLog::bgTimeLog(int epc, char* namestr, double sTime, double eTime)
   doCorrect = 1;
 }
 
-bgTimeLog::bgTimeLog(int epc, char *msg)
+bgTimeLog::bgTimeLog(char *msg)
 {
   strcpy(name,"msgep");
-  ep = epc;
+  ep = msg?CmiBgMsgHandle(msg):-1;
   startTime = BgGetCurTime();
   recvTime = msg?CmiBgMsgRecvTime(msg):0;//startTime;
   endTime = 0.0;
@@ -144,7 +145,7 @@ void bgTimeLog::setExecTime(){
 
 void bgTimeLog::closeLog() 
 { 
-    endTime = BgGetCurTime(); 
+    endTime = timerFunc();
     setExecTime();
     
 //    if (correctTimeLog) BgAdjustTimeLineInsert(tTIMELINEREC);
@@ -203,11 +204,11 @@ void bgTimeLog::addBackwardDeps(CkVec<void*> logs){
     addBackwardDep((bgTimeLog*)(logs[i]));
 }
 
-void BgTimeLineRec::logEntryStart(int handler, char *m) {
+void BgTimeLineRec::logEntryStart(char *m) {
   if (!genTimeLog) return;
   if (tTHREADTYPE == WORK_THREAD) {
       CmiAssert(bgCurLog == NULL);
-      bgCurLog = new bgTimeLog(handler, m);
+      bgCurLog = new bgTimeLog(m);
       enq(bgCurLog, 1);
   }
 }

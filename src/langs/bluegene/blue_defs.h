@@ -61,8 +61,8 @@ inline int isEqual(double v1, double v2){
 
 #if BLUEGENE_TIMING
 
-#define BG_ENTRYSTART(handler, m)  \
-	tTIMELINEREC.logEntryStart(handler, m);
+#define BG_ENTRYSTART(m)  \
+	tTIMELINEREC.logEntryStart(m);
 
 #define BG_ENTRYEND()  \
 	tTIMELINEREC.logEntryCommit();
@@ -95,7 +95,7 @@ inline int isEqual(double v1, double v2){
                 tSTARTTIME = tCURRTIME;	\
 	}
 #else
-#define BG_ENTRYSTART(handler, m)
+#define BG_ENTRYSTART(m)
 #define BG_ENTRYEND()
 #define BG_ADDMSG(m, node, tid)
 #endif

@@ -103,6 +103,7 @@ class threadInfo;
 CtvExtern(threadInfo *, threadinfo); 
 class nodeInfo;
 CpvExtern(nodeInfo *, nodeinfo); 
+extern double (*timerFunc) (void);
 
 #define tMYID		cta(threadinfo)->id
 #define tMYGLOBALID	cta(threadinfo)->globalId
