@@ -1302,15 +1302,16 @@ static void ctrl_sendone_locking(const char *type,
 
 static double Cmi_check_last;
 
-/* no lock charm ping */
+/* no lock charm ping, for gm */
 static void pingCharmrunNoLock(void *context)
 {
   double clock=GetClock();
   if (clock > Cmi_check_last + Cmi_check_delay) {
     MACHSTATE(1,"CommunicationsClock pinging charmrun");       
     Cmi_check_last = clock; 
-    if (Cmi_charmrun_fd_sendflag) return; /*Busy talking to charmrun*/
-    ctrl_sendone_nolock("ping",NULL,0,NULL,0); /*Charmrun may have died*/
+    if (!Cmi_charmrun_fd_sendflag)  /*Busy talking to charmrun*/
+      ctrl_sendone_nolock("ping",NULL,0,NULL,0); /*Charmrun may have died*/
+    CcdCallFnAfter(pingCharmrunNoLock,NULL,1000);
   }
 }
 
