@@ -31,7 +31,10 @@ void traceInit(int* argc, char **argv)
   CpvAccess(binSize) = BIN_SIZE;
   int i;
   for(i=1;i<*argc;i++) {
-    if(strcmp(argv[i], "+binsize")==0) {
+    if(strcmp(argv[i], "+logsize")==0) {
+      CpvAccess(CtrLogBufSize) = atoi(argv[i+1]);
+      break;
+    } else if(strcmp(argv[i], "+binsize")==0) {
       double d;
       sscanf(argv[i+1], "%le", &d);
       CpvAccess(binSize) = d;
@@ -133,6 +136,17 @@ void LogPool::writeSts(void)
   fclose(sts);
 }
 
+void LogPool::shrink(void)
+{
+  for (int i=0; i<numEntries; i++)
+  {
+     pool[i].setTime(pool[i*2].getTime() + pool[i*2+1].getTime());
+  }
+  numEntries /= 2;
+  CpvAccess(binSize) *= 2;
+CkPrintf("Shrinked binsize: %f !!!!\n", CpvAccess(binSize));
+}
+
 void LogEntry::write(FILE* fp)
 {
   int per = time * 100.0 / CpvAccess(binSize);
@@ -156,13 +170,24 @@ void TraceProjections::beginExecute(envelope *e)
   if (start == t) {
      return;
   }
+/*
+  int oldIdx = start / CpvAccess(binSize);
   start = t;
-  int oldIdx = index;
-  index = t / CpvAccess(binSize);
+  int index = t / CpvAccess(binSize);
   // fill gaps
   for (int i=oldIdx; i<index; i++) {
      CpvAccess(_logPool)->add(i, bin, CmiMyPe());
      bin=0.0;
+  }
+*/
+  start = t;
+  double ts = binStart;
+  // fill gaps
+  while ((ts = ts + CpvAccess(binSize)) < t)
+  {
+     CpvAccess(_logPool)->add(-1, bin, CmiMyPe());
+     bin=0.0;
+     binStart = ts;
   }
 //CmiPrintf("start: %f index: %d\n", start, index);
 }
@@ -175,15 +200,15 @@ void TraceProjections::endExecute(void)
   if (msgNum != 0) return;
   double t = CmiTimer();
   double ts = start;
-  double nts = index*CpvAccess(binSize);
+  double nts = binStart;
   while ((nts = nts + CpvAccess(binSize)) < t)
   {
      bin += nts-ts;
-     CpvAccess(_logPool)->add(index, bin, CmiMyPe());
-//CmiPrintf("add index: %d time: %f\n", index,bin);
+     binStart  = nts;
+     CpvAccess(_logPool)->add(-1, bin, CmiMyPe());
+//CmiPrintf("add time: %f\n", bin);
      bin = 0;
      ts = nts;
-     index++;
   }
 //  CpvAccess(_logPool)->add(index, t - ts, CmiMyPe());
   bin += t - ts;
@@ -227,14 +252,25 @@ void TraceProjections::beginComputation(void)
 
 void TraceProjections::endComputation(void)
 {
-  if (index!= -1 && msgNum==0) {
+  if (msgNum==0) {
 //CmiPrintf("Add at last: %d pe:%d time:%f msg:%d\n", index, CmiMyPe(), bin, msgNum);
-     CpvAccess(_logPool)->add(index, bin, CmiMyPe());
+     CpvAccess(_logPool)->add(-1, bin, CmiMyPe());
      msgNum ++;
+/*
      // fill gap till end of program
      int curIdx = CmiTimer() / CpvAccess(binSize);
      for (int i=index+1; i<=curIdx; i++) {
         CpvAccess(_logPool)->add(i, 0.0, CmiMyPe());
+     }
+*/
+     binStart  += CpvAccess(binSize);
+     double t = CmiTimer();
+     double ts = binStart;
+     while (ts < t)
+     {
+       CpvAccess(_logPool)->add(-1, bin, CmiMyPe());
+       bin=0.0;
+       ts += CpvAccess(binSize);
      }
   }
 }

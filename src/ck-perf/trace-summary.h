@@ -39,6 +39,9 @@ class LogEntry {
     LogEntry(int idx, double t=0.0, int p=0) { 
       index = idx; time = t; pe = p;
     }
+    double getTime() { return time; }
+    void setTime(double t) { time = t; }
+
     double time;
     int event;
     int pe;
@@ -105,10 +108,14 @@ class LogPool {
       new (&pool[numEntries++])
         LogEntry(index, time, pe);
       if(poolSize==numEntries) {
+/*
         write();
         numEntries = 0;
+*/
+        shrink();
       }
     }
+    void shrink(void) ;
 };
 
 class TraceProjections : public Trace {
@@ -117,12 +124,12 @@ class TraceProjections : public Trace {
     int execEp;
     int execPe;
 
-    int index;
+    double binStart;
     double start;
     double bin;
     int msgNum;
   public:
-    TraceProjections() { curevent=0; index=0; msgNum=0;}
+    TraceProjections() { curevent=0; msgNum=0; binStart=0.0;}
     void userEvent(int e);
     void creation(envelope *e, int num=1);
     void beginExecute(envelope *e);
