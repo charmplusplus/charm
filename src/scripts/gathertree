@@ -3,11 +3,19 @@
 SRC=`(cd $1 ; pwd)`
 DST=$2
 
+# remove all temporary files
 rm -f temp.d temp.f temp.m temp.l
+# find all directories including and below SRC
 (cd $SRC ; find . -name CVS -prune -o -type d -print )|sed -e s@.@@> temp.d
+# find all files below SRC
 (cd $SRC ; find . -name CVS -prune -o -type f -print )|sed -e s@.@@> temp.f
-awk '{print "mkdir '$DST'"$1;}' < temp.d > temp.m
-awk '{print "ln -s '$SRC'"$1" '$DST'"$1;}' < temp.f > temp.l
+# generate shell script to make directories if they do not exist
+awk '{print "if [ ! -d '$DST'"$1" ] ; then mkdir '$DST'"$1" ; fi";}' <temp.d >temp.m
+# generate shell script to symlink files
+awk '{print "ln -s '$SRC'"$1" '$DST'"$1;}' <temp.f >temp.l
+# execute shell script to create directories
 sh temp.m
+# execute shell script to link files 
 sh temp.l
+# remove temporary files
 rm -f temp.d temp.f temp.m temp.l
