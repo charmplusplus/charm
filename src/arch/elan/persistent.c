@@ -2,7 +2,6 @@
 #include "converse.h"
 
 typedef struct _PersistentSendsTable {
-  int used;
   int destPE;
   int sizeMax;
   PersistentHandle   destHandle;  
@@ -10,6 +9,7 @@ typedef struct _PersistentSendsTable {
   void *destSlotFlagAddress;
   void *messageBuf;
   int messageSize;
+  char used;
 } PersistentSendsTable;
 
 typedef struct _PersistentReceivesTable {
@@ -29,9 +29,9 @@ int persistentReceivesTableCount = 0;
 /* Converse message type */
 typedef struct _PersistentRequestMsg {
   char core[CmiMsgHeaderSizeBytes];
+  int requestorPE;
   int maxBytes;
   PersistentHandle sourceHandlerIndex;
-  int requestorPE;
 } PersistentRequestMsg;
 
 typedef struct _PersistentReqGrantedMsg {
@@ -159,10 +159,6 @@ PersistentHandle CmiCreatePersistent(int destPE, int maxBytes)
   slot->used = 1;
   slot->destPE = destPE;
   slot->sizeMax = maxBytes;
-  slot->destAddress = NULL;
-  slot->destSlotFlagAddress = NULL;
-  slot->destHandle = 0;
-  slot->messageBuf = NULL;
 
   PersistentRequestMsg *msg = (PersistentRequestMsg *)CmiAlloc(sizeof(PersistentRequestMsg));
   msg->maxBytes = maxBytes;
@@ -195,6 +191,8 @@ void persistentRequestHandler(void *env)
 
   CmiSetHandler(gmsg, persistentReqGrantedHandlerIdx);
   CmiSyncSendAndFree(msg->requestorPE,sizeof(PersistentReqGrantedMsg),gmsg);
+
+  CmiFree(msg);
 }
 
 void persistentReqGrantedHandler(void *env)
@@ -210,6 +208,7 @@ void persistentReqGrantedHandler(void *env)
     CmiSendPersistentMsg(h, slot->destPE, slot->messageSize, slot->messageBuf);
     slot->messageBuf = NULL;
   }
+  CmiFree(msg);
 }
 
 void CmiSendPersistentMsg(PersistentHandle h, int destPE, int size, void *m)
@@ -251,7 +250,11 @@ CmiPrintf("[%d] CmiSendPersistentMsg handle: %d\n", CmiMyPe(), h);
     slot->messageSize = size;
 #else
   /* normal send */
+  PersistentHandle  *phs_tmp = phs;
+  int phsSize_tmp = phsSize;
+  phs = NULL; phsSize = 0;
   CmiSyncSendAndFree(slot->destPE, size, m);
+  phs = phs_tmp; phsSize = phsSize_tmp;
 #endif
   }
 }
@@ -344,6 +347,7 @@ void persistentDestoryHandler(void *env)
   PersistentDestoryMsg *msg = (PersistentDestoryMsg *)env;
   PersistentHandle h = msg->destHandlerIndex;
   CmiAssert(h!=NULL);
+  CmiFree(msg);
   PersistentReceivesTable *slot = (PersistentReceivesTable *)h;
 
   persistentReceivesTableCount --;
@@ -426,6 +430,11 @@ void CmiPersistentInit()
 
 void CmiUsePersistentHandle(PersistentHandle *p, int n)
 {
+#ifndef CMK_OPTIMIZE
+  int i;
+  for (i=0; i<n; i++)
+    if (p[i] == NULL) CmiAbort("CmiUsePersistentHandle: invalid PersistentHandle.\n");
+#endif
   phs = p;
   phsSize = n;
 }
