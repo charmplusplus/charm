@@ -11,7 +11,7 @@ POSEINCDIR = $(CHARMINC)/pose
 #***********************************
 OBJECTS=	eventID.o stats.o pose.o srtable.o cancel.o evmpool.o \
 		pvtobj.o lbObject.o ldbal.o gvt.o event.o eqheap.o \
-		evq.o sim.o rep.o strat.o con.o opt.o adapt.o
+		evq.o sim.o rep.o strat.o cons.o opt.o adapt.o
 LIB = libpose.a
 LIBDEST =  $(CDIR)/lib/$(LIB)
 CIFILES = evmpool.def.h  gvt.def.h  ldbal.def.h  pose.def.h  sim.def.h  stats.def.h  

@@ -67,7 +67,7 @@ class strat; // defined later in strat.h
 #include "sim.h"
 #include "opt.h"
 #include "adapt.h"
-#include "con.h"
+#include "cons.h"
 #include "chpt.h"
 
 void POSE_init();  // Main initialization for all of POSE

@@ -2,8 +2,8 @@
 // Module for conservative simulation strategy class
 // Last Modified: 06.05.01 by Terry L. Wilmarth
 
-#ifndef CON_H
-#define CON_H
+#ifndef CONS_H
+#define CONS_H
 
 class con : public strat {
  protected:
