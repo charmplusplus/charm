@@ -63,6 +63,11 @@ void CentralLB::AtSync()
     return;
   }
 
+  if (CkMyPe() == 0) {
+    start_lb_time = CmiWallTimer();
+    CkPrintf("Load balancing step %d starting at %f\n",
+	     step(),start_lb_time);
+  }
   // Send stats
   int sizes[2];
   const int osz = sizes[0] = theLbdb->GetObjDataSz();
@@ -164,6 +169,11 @@ void CentralLB::ReceiveMigration(CLBMigrateMsg *m)
 
 void CentralLB::MigrationDone()
 {
+  if (CkMyPe() == 0) {
+    double end_lb_time = CmiWallTimer();
+    CkPrintf("Load balancing step %d finished at %f duration %f\n",
+	     step(),end_lb_time,end_lb_time - start_lb_time);
+  }
   migrates_completed = 0;
   migrates_expected = -1;
   // Increment to next step

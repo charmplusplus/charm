@@ -62,6 +62,7 @@ private:
   LDStats* statsDataList;
   int migrates_completed;
   int migrates_expected;
+  double start_lb_time;
 };
 
 class CLBStatsMsg : public CMessage_CLBStatsMsg {
