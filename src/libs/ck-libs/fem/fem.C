@@ -1,27 +1,5 @@
 #include "fem.h"
 
-extern void _initCharm(int argc, char **argv);
-
-// this is needed because on o2k, f90 programs have to have main in
-// fortran90.
-extern "C" void fmain_(int *argc,char _argv[][80],int length[])
-{
-  int i;
-  char **argv = new char*[*argc+2];
-
-  for(i=0;i <= *argc;i++) {
-    if (length[i] < 100) {
-      _argv[i][length[i]]='\0';
-      argv[i] = &(_argv[i][0]);
-    } else {
-      argv[i][0] = '\0';
-    }
-  }
-  argv[*argc+1]=0;
-
-  ConverseInit(*argc, argv, (CmiStartFn) _initCharm, 0, 0);
-}
-
 CkChareID _mainhandle;
 CkArrayID _femaid;
 unsigned int _nchunks;
