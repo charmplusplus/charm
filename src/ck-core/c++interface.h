@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.6  1995-09-05 22:02:09  sanjeev
+ * Revision 2.7  1995-09-05 22:35:32  sanjeev
+ * removed _CK_MyBocNum
+ *
+ * Revision 2.6  1995/09/05  22:02:09  sanjeev
  * modified _CK_Object, _CK_BOC for new ChareBlock format.
  *
  * Revision 2.5  1995/09/01  02:13:17  jyelon
@@ -76,7 +79,6 @@ public:
 
 class _CK_BOC {  /* top level BOC object */
 public:
-	int _CK_MyBocNum ;  /* BocNum of this instance of the BOC */
 	int thishandle ;  /* stores BocNum */
 	ChareIDType thisbranchhandle ;
 
@@ -86,7 +88,7 @@ public:
         	SetID_chare_magic_number(thisbranchhandle,GetID_chare_magic_number(bocblock->selfID)) ;
         	SetID_chareBlockPtr(thisbranchhandle, bocblock);
 
-		thishandle = _CK_MyBocNum = bocblock->x.boc_num ;
+		thishandle = bocblock->x.boc_num ;
 	}
 } ;
 
