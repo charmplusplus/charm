@@ -183,7 +183,7 @@ dirs+sources:
 	./gathertree ../../src/Common/libs libs
 	./gathertree ../../src/Common/langs langs
 	./gathertree ../../src/Common.`cat .gdir`      .
-	./gatherflat ../../src/`cat .vdir`
+	./gatherflat ../../src/`cat .vdir`             .
 	rm -f ../bin/charmc ; cp charmc ../bin/
 	chmod +x ../bin/charmc
 	rm -f .gdir
