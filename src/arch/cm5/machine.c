@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.4  1995-09-29 09:50:07  jyelon
+ * Revision 2.5  1995-10-09 19:25:55  sanjeev
+ * fixed bugs
+ *
+ * Revision 2.4  1995/09/29  09:50:07  jyelon
  * CmiGet-->CmiDeliver, added protos, etc.
  *
  * Revision 2.3  1995/09/20  16:00:46  gursoy
@@ -60,9 +63,9 @@ static void CmiSyncReceive() ;
 static int CmiArrivedMsgLength() ;
 static int CmiProbe() ;
 
-void *CmiLocalQueue ;
-int Cmi_mype ;
-int Cmi_numpe ;
+CpvDeclare(void *, CmiLocalQueue) ;
+CpvDeclare(int, Cmi_mype) ;
+CpvDeclare(int, Cmi_numpe) ;
 
 
 /**************************  TIMER FUNCTIONS **************************/
@@ -142,6 +145,10 @@ void *buffer ;
 }
 
 
+/********************* MESSAGE SEND FUNCTIONS ******************/
+ 
+/* McAsyncSendFree not used for now *
+
 static int CmiInsideMem = 1;
 
 * Next 3 fns are internal fns *
@@ -178,6 +185,35 @@ static release_messages()
 	SentMsgList = 0 ;
 }
 
+
+void McAsyncSendFree(destPE, size, msg)
+int destPE;
+int size;
+void * msg;
+{
+        CMMD_mcb mcb ;
+ 
+        if ( destPE == CmiMyPe() ) {
+                FIFO_EnQueue(CpvAccess(CmiLocalQueue), msg);
+                return ;
+        }
+ 
+trysend:
+        mcb = CMMD_send_async(destPE, CMMD_DEFAULT_TAG, msg, size,
+                                SendHandler, msg) ;
+* the last arg to CMMD_send_async is the value passed to SendHandler
+   as the 2nd arg, so the buffer "msg" gets freed after being sent *
+ 
+        if ( mcb == CMMD_ERRVAL ) {
+                RecvMsgs() ;    * try and receive msgs to unclog network *
+                goto trysend ;
+        }
+}
+
+***********************************************************************/
+
+
+
 static RecvMsgs()
 {
 /* Called to clear up network when CmiAsyncSend has run out of MCBs.
@@ -213,13 +249,13 @@ static RecvMsgs()
 void CmiSyncSendFn(destPE, size, msg)
 int destPE;
 int size;
-void * msg;
+char * msg;
 {
 	if ( destPE == CmiMyPe() ) {
 		/* Make copy locally */
 		char *m2 = (char *)CmiAlloc(size) ;
 		memcpy(m2, msg, size) ;
-		FIFO_EnQueue(CmiLocalQueue, m2);
+		FIFO_EnQueue(CpvAccess(CmiLocalQueue), m2);
 		
 		return ;
 	}
@@ -231,7 +267,7 @@ void * msg;
 CmiCommHandle CmiAsyncSendFn(destPE, size, msg)
 int destPE;
 int size;
-void * msg;
+char * msg;
 {
         CMMD_mcb mcb ;
 
@@ -239,7 +275,7 @@ void * msg;
 		/* Make copy locally */
 		char *m2 = (char *)CmiAlloc(size) ;
 		memcpy(m2, msg, size) ;
-		FIFO_EnQueue(CmiLocalQueue, m2);
+		FIFO_EnQueue(CpvAccess(CmiLocalQueue), m2);
 		
 		return ((CmiCommHandle)CMMD_ERRVAL) ;
 	}
@@ -259,7 +295,7 @@ trysend:
 void CmiFreeSendFn(destPE, size, msg)
 int destPE;
 int size;
-void * msg;
+char * msg;
 {
     CmiSyncSendFn(destPE, size, msg);
     CmiFree(msg);
@@ -270,7 +306,7 @@ void * msg;
 
 void CmiSyncBroadcastFn(size, msg)     /* ALL_EXCEPT_ME  */
 int size;
-void * msg;
+char * msg;
 {
 	int i ;
 
@@ -283,7 +319,7 @@ void * msg;
 
 CmiCommHandle CmiAsyncBroadcastFn(size, msg) /*same as SyncBroadcast for now*/
 int size;
-void * msg;
+char * msg;
 {
 	int i ;
 
@@ -296,7 +332,7 @@ void * msg;
 
 void CmiFreeBroadcastFn(size, msg)
 int size;
-void *msg;
+char *msg;
 {
     CmiSyncBroadcastFn(size, msg);
     CmiFree(msg);
@@ -304,7 +340,7 @@ void *msg;
 
 void CmiSyncBroadcastAllFn(size, msg)
 int size;
-void * msg;
+char * msg;
 {
 	int i ;
 
@@ -315,7 +351,7 @@ void * msg;
 
 CmiCommHandle CmiAsyncBroadcastAllFn(size, msg)
 int size;
-void * msg;
+char * msg;
 {
 	int i ;
 
@@ -327,7 +363,7 @@ void * msg;
 
 void CmiFreeBroadcastAllFn(size, msg)
 int size;
-void * msg;
+char * msg;
 {
 	int i ;
 
@@ -412,22 +448,22 @@ char **argv;
         fcntl(fileno(stdout), F_SETFL, O_APPEND) ;
         fcntl(fileno(stderr), F_SETFL, O_APPEND) ;
 
-	Cmi_mype = CMMD_self_address() ;
+	CpvAccess(Cmi_mype) = CMMD_self_address() ;
 
-	if ( argc < 2 ) 
-		Cmi_numpe = numpes = CMMD_partition_size() ;
-	else { /* Check if theres a +p #procs */
+        CpvAccess(Cmi_numpe) = numpes = CMMD_partition_size() ;
+
+	if ( argc >= 2 ) { /* Check if theres a +p #procs */
 		for ( i=1; i<argc; i++ ) {
 			if ( strncmp(argv[i], "+p", 2) != 0) 
 				continue ;
 			if ( strlen(argv[i]) > 2 ) {
-				Cmi_numpe = numpes = atoi(&(argv[i][2])) ;
+				CpvAccess(Cmi_numpe) = numpes = atoi(&(argv[i][2])) ;
 				for ( j=i; j<argc-1; j++ )
 					argv[j] = argv[j+1] ;
 				argc-- ;
 			}
 			else {
-				Cmi_numpe = numpes = atoi(argv[i+1]) ;
+				CpvAccess(Cmi_numpe) = numpes = atoi(argv[i+1]) ;
 				for ( j=i; j<argc-2; j++ )
 					argv[j] = argv[j+2] ;
 				argc -= 2 ;
@@ -436,7 +472,7 @@ char **argv;
 		}
 	}
 
-	if ( Cmi_mype >= Cmi_numpe )
+	if ( CpvAccess(Cmi_mype) >= CpvAccess(Cmi_numpe) )
 		exit(0) ;
 
 	/* find dim = log2(numpes), to pretend we are a hypercube */
@@ -447,7 +483,7 @@ char **argv;
 	CMMD_node_timer_clear(TIMER_ID) ;
 	CMMD_node_timer_start(TIMER_ID) ;
 
-	charm_main(argc, argv);
+	user_main(argc, argv);
 }
 
 
@@ -457,7 +493,7 @@ char *argv[];
 {
 	CmiSpanTreeInit(); 
  
-	CmiLocalQueue = FIFO_Create() ;
+	CpvAccess(CmiLocalQueue) = FIFO_Create() ;
 }
 
 
@@ -485,7 +521,7 @@ int size;
 int CmiSize(blk)
 void *blk;
 {
-	return ((int *)(  ((char*blk) - 8) )[0];
+	return ( ((int *)((char *)blk - 8))[0] );
 }
  
 void CmiFree(blk)
