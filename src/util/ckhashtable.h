@@ -21,6 +21,9 @@ extern "C" {
 #endif
 #ifndef __OSL_HASH_TABLE_C
 #define __OSL_HASH_TABLE_C
+
+#include <converse.h>
+
 /*C Version of Hashtable header file: */
 typedef void *CkHashtable_c;
 
