@@ -15,6 +15,7 @@ mypksz(GlobalData *gd)
   size += gd->numProp*sizeof(double); // double *proportion
   size += gd->numMatVol*sizeof(VolMaterial); // VolMaterial* volm
   size += gd->numMatCoh*sizeof(CohMaterial); // CohMaterial* cohm
+  size += gd->nTime*sizeof(double); // double *itimes
   size += gd->nn*sizeof(Node); // Node *nodes
   size += gd->ne*sizeof(Element); // Element *elements
   return size;
@@ -33,6 +34,8 @@ mypk(GlobalData *gd, void *buffer)
   buf += gd->numMatVol*sizeof(VolMaterial);
   memcpy((void*)buf, (void*) gd->cohm, gd->numMatCoh*sizeof(CohMaterial));
   buf += gd->numMatCoh*sizeof(CohMaterial);
+  memcpy((void*)buf, (void*) gd->itimes, gd->nTime*sizeof(double));
+  buf += gd->nTime*sizeof(double);
   memcpy((void*)buf, (void*) gd->nodes, gd->nn*sizeof(Node));
   buf += gd->nn*sizeof(Node);
   memcpy((void*)buf, (void*) gd->elements, gd->ne*sizeof(Element));
@@ -41,6 +44,7 @@ mypk(GlobalData *gd, void *buffer)
   delete[] gd->proportion;
   delete[] gd->volm;
   delete[] gd->cohm;
+  delete[] gd->itimes;
   delete[] gd->nodes;
   delete[] gd->elements;
 }
@@ -55,6 +59,7 @@ myupk(void *buffer)
   gd->proportion = new double[gd->numProp];
   gd->volm = new VolMaterial[gd->numMatVol];
   gd->cohm = new CohMaterial[gd->numMatCoh];
+  gd->itimes = new double[gd->nTime];
   gd->nodes = new Node[gd->nn];
   gd->elements = new Element[gd->ne];
   memcpy((void*) gd->ts_proportion, (void*)buf, gd->numProp*sizeof(int));
@@ -65,6 +70,8 @@ myupk(void *buffer)
   buf += gd->numMatVol*sizeof(VolMaterial);
   memcpy((void*) gd->cohm, (void*)buf, gd->numMatCoh*sizeof(CohMaterial));
   buf += gd->numMatCoh*sizeof(CohMaterial);
+  memcpy((void*) gd->itimes, (void*)buf, gd->nTime*sizeof(double));
+  buf += gd->nTime*sizeof(double);
   memcpy((void*) gd->nodes, (void*)buf, gd->nn*sizeof(Node));
   buf += gd->nn*sizeof(Node);
   memcpy((void*) gd->elements, (void*)buf, gd->ne*sizeof(Element));
@@ -133,6 +140,7 @@ extern "C" void
 driver(int nn, int *nnums, int ne, int *enums, int npere, int *conn)
 {
   int myid = FEM_My_Partition();
+  int numparts = FEM_Num_Partitions();
   // CkPrintf("[%d] starting driver\n", myid);
   GlobalData *gd = new GlobalData;
   FEM_Register((void*)gd, (FEM_Packsize_Fn)mypksz, (FEM_Pack_Fn)mypk,
@@ -149,19 +157,25 @@ driver(int nn, int *nnums, int ne, int *enums, int npere, int *conn)
   gd->nodes = nodes;
   gd->elements = elements;
   readFile(gd);
+  gd->itimes = new double[gd->nTime];
+  int i;
+  for(i=0;i<gd->nTime;i++)
+    gd->itimes[i] = 0.0;
+  // CkPrintf("[%d] read file\n", myid);
   int massfield = FEM_Create_Field(FEM_DOUBLE, 2, offsetof(Node, xM), 
                                    sizeof(Node));
   int rfield = FEM_Create_Field(FEM_DOUBLE, 4, offsetof(Node, Rin), 
                                 sizeof(Node));
+  int tfield = FEM_Create_Field(FEM_DOUBLE, 1, 0, 0);
   FEM_Update_Field(massfield, gd->nodes);
-  int i;
   int kk = -1;
   double prop, slope;
-  double stime, etime;
+  //double stime, etime;
   int phase = 0;
+  //stime = CkWallTimer();
   for(i=0;i<gd->nTime;i++)
   {
-    stime = CkWallTimer();
+    gd->itimes[i] = CkWallTimer();
     // CkPrintf("[%d] iteration %d at %lf secs\n", gd->myid, i, CkTimer());
     if (gd->ts_proportion[kk+1] == i)
     {
@@ -178,24 +192,37 @@ driver(int nn, int *nnums, int ne, int *enums, int npere, int *conn)
     initNodes(gd);
     lst_NL(gd);
     lst_coh2(gd);
-    if(myid==3 && i>20)
+    if(myid==79 && i>35)
     {
-      int biter = (i < 30 ) ? i : 30;
-      _DELAY_((biter-20)*5000);
+      int biter = (i < 40 ) ? i : 40;
+      _DELAY_((biter-35)*19000);
     }
     updateNodes(gd, prop, slope);
     FEM_Update_Field(rfield, gd->nodes);
-    if(i%20==19)
+    if(i%25==24)
     {
+      // if(gd->myid == 0)
+      // {
+        // etime = CkWallTimer();
+        // CkPrintf("Phase=%d\tTime=%lf seconds\n", i, (etime-stime));
+        phase++;
+      // }
       FEM_Migrate();
       gd = (GlobalData*) FEM_Get_Userdata();
       gd->nnums = FEM_Get_Node_Nums();
       gd->enums = FEM_Get_Elem_Nums();
       gd->conn = FEM_Get_Conn();
+      //stime = CkWallTimer();
     }
-    etime = CkWallTimer();
-    if(gd->myid == 0)
-      CkPrintf("Iter=%d\tTime=%lf seconds\n", i, (etime-stime));
+    gd->itimes[i] = CkWallTimer()-(gd->itimes[i]);
+    FEM_Reduce(tfield, &gd->itimes[i], &gd->itimes[i], FEM_SUM);
+  }
+  if(gd->myid==0)
+  {
+    for(i=0;i<gd->nTime;i++)
+    {
+      CkPrintf("Iter=%d\tTime=%lf seconds\n",i,gd->itimes[i]/numparts);
+    }
   }
   // CkPrintf("[%d] exiting driver\n", myid);
 }

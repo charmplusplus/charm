@@ -123,6 +123,8 @@ struct GlobalData {
   VolMaterial *volm;
   CohMaterial *cohm;
 
+  double *itimes;
+
   int nn, ne, npere;
   int *nnums, *enums, *conn;
   Node *nodes;
