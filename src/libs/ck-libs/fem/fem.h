@@ -122,6 +122,9 @@ extern "C" {
   	void *data, int firstItem, int length, int datatype,int width);
   void FEM_Mesh_data_layout(int fem_mesh,int entity,int attr,
   	void *data, int firstItem, int length, IDXL_Layout_t layout);
+  void FEM_Mesh_data_offset(int fem_mesh,int entity,int attr,
+  	void *data, int firstItem, int length, 
+	int type,int width, int offsetBytes,int distanceBytes,int skewBytes);
   
   void FEM_Mesh_set_length(int fem_mesh,int entity,int newLength);
   int FEM_Mesh_get_width(int fem_mesh,int entity,int attr);

@@ -52,6 +52,7 @@
        external FEM_Mesh_get_data
        external FEM_Mesh_data
        external FEM_Mesh_data_layout
+       external FEM_Mesh_data_offset
        
        external FEM_Set_Mesh
 

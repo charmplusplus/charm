@@ -141,6 +141,24 @@ FORTRAN_AS_C(FEM_MESH_DATA_LAYOUT,FEM_Mesh_data_layout,fem_mesh_data_layout,
 	(*fem_mesh,*entity,*attr,data,*firstItem-1,*length,*layout)
 )
 
+CDECL void
+FEM_Mesh_data_offset(int fem_mesh,int entity,int attr, 	
+  	void *data, int firstItem,int length,
+	int type,int width, int offsetBytes,int distanceBytes,int skewBytes)
+{
+	const char *callingRoutine="FEM_Mesh_data_offset";
+	FEM_Mesh_data_layout(fem_mesh,entity,attr,data,firstItem,length,
+		IDXL_Layout(type,width,offsetBytes,distanceBytes,skewBytes));
+}
+FORTRAN_AS_C(FEM_MESH_DATA_OFFSET,FEM_Mesh_data_offset,fem_mesh_data_offset,
+	(int *fem_mesh,int *entity,int *attr,
+	 void *data,int *firstItem,int *length,
+	 int *type,int *width,int *offset,int *distance,int *skew),
+	(*fem_mesh,*entity,*attr,
+	 data,*firstItem-1,*length,
+	 *type,*width,*offset,*distance,*skew)
+)
+
 // Accessor API:
 
 CDECL void 
@@ -382,12 +400,12 @@ void FEM_Attribute::set(const void *src, int firstItem,int length,
 	int width=layout.width;
 	if (getWidth()==-1) setWidth(width);
 	else if (width!=getWidth()) 
-		bad("width",true,getWidth(),width, callingRoutine);
+		bad("width",false,getWidth(),width, callingRoutine);
 	
 	int datatype=layout.type;
 	if (getDatatype()==-1) setDatatype(datatype);
 	else if (datatype!=getDatatype()) 
-		bad("datatype",true,getDatatype(),datatype, callingRoutine);
+		bad("datatype",false,getDatatype(),datatype, callingRoutine);
 	
 	/* Assert: our storage should be allocated now.
 	   Our subclass will actually copy user data */
