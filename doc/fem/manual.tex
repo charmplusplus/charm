@@ -1,18 +1,12 @@
 \documentclass[10pt]{article}
 \usepackage{../pplmanual}
 
-\newcommand{\function}[1]{{\noindent{\textsf{#1}}\\}}
-\newcommand{\args}[1]{\hspace*{2em}{\texttt{#1}}\\}
-\newcommand{\param}[1]{{\texttt{#1}}}
-\newcommand{\kw}[1]{{\textsf{#1}}}
-\newcommand{\uw}[1]{{\textsl{#1}}}
-
 \makeindex
 
-\title{Charm++\\ Finite Element Framework\\ Manual}
+\title{\charmpp\\ Finite Element Framework\\ Manual}
 \version{1.0}
 \credits{
-Initial version of Charm++ Finite Element Framework was developed
+Initial version of \charmpp{} Finite Element Framework was developed
 by Milind Bhandarkar with inputs from Timothy Hinrichs and Kathikeyan
 Mahesh. The current version is almost completely rewritten by
 Orion Lawlor.
@@ -26,13 +20,13 @@ Orion Lawlor.
 
 The Finite Element Method (FEM) approach is used in many engineering
 applications with irregular domains, from elastic deformation problems to
-crack propagation to fluid flow.  Charm++ is a free message-passing parallel
+crack propagation to fluid flow.  \charmpp{} is a free message-passing parallel
 runtime system for machines from clusters of workstations to tightly-coupled
-SMPs.  The Charm++ FEM framework allows you to write a parallel FEM program,
+SMPs.  The \charmpp{} FEM framework allows you to write a parallel FEM program,
 in C or Fortran 90, that closely resembles a serial version but includes
 a few framework calls.
 Using the FEM framework also allows you to take advantage of all the
-features of Charm++, including run-time load balancing,  performance
+features of \charmpp, including run-time load balancing,  performance
 monitoring and visualization, and checkpoint/restart, with no additional
 effort.
 
@@ -139,7 +133,7 @@ has the structure:
      end time loop
 \end{alltt}
 
-This is exactly the form of the time loop for a Charm++ FEM framework
+This is exactly the form of the time loop for a \charmpp{} FEM framework
 program.  The framework will accept a serial mesh, partition it, distribute
 the chunks to each processor, allow the user to run their time loop, and
 handle the node-updates.
@@ -177,8 +171,8 @@ processor, and does the main work of the program.
 
 \section{Compilation and Execution}
 
-A FEM framework program is a Charm++ program, so you must begin by
-downloading the latest source version of Charm++ from
+A FEM framework program is a \charmpp\ program, so you must begin by
+downloading the latest source version of \charmpp\ from
 {\tt http://charm.cs.uiuc.edu/}.  Build the source with 
 {\tt ./SUPER\_INSTALL FEM version} or {\tt cd} into the build directory, 
 {\tt version/tmp}, and type {\tt make FEM}.
@@ -592,7 +586,7 @@ identical values in \kw{outVal}.  Op has the same values and meaning as
 
 \subsection{Migration}
 
-The Charm++ runtime framework includes an automated, run-time load balancer,
+The \charmpp\ runtime framework includes an automated, run-time load balancer,
 which will automatically monitor the performance of your parallel program.
 If needed, the load balancer can ``migrate'' mesh chunks from heavily-loaded
 processors to more lightly-loaded processors, improving the load balance and
