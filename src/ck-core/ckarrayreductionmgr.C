@@ -11,12 +11,11 @@
 
 CkArrayReductionMgr::CkArrayReductionMgr(){
 	//ARPRINT("Array ReductionMgr Constructor called %d\n",thisgroup);
-	if(CkMyRank()== 0){
 	redNo=0;
 	size = CkMyNodeSize();
 	count = 0;
 	lockCount = CmiCreateLock();
-	}
+	ctorDoneFlag = 1;
 };
 
 void CkArrayReductionMgr::collectAllMessages(){

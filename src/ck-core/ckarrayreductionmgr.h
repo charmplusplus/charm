@@ -15,6 +15,7 @@ class CkArrayReductionMgr : public NodeGroup{
 		CmiNodeLock lockCount;
 		void collectAllMessages();
 	public:
+		volatile int ctorDoneFlag;
 		CkArrayReductionMgr();
 		CkArrayReductionMgr(CkMigrateMessage *m):NodeGroup(m) {}
 		void contributeArrayReduction(CkReductionMsg *m);
