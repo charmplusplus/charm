@@ -62,17 +62,18 @@ ELAN_TPORT    *elan_port;
 ELAN_QUEUE    *elan_q;
 
 int enableGetBasedSend = 1;
+int enableBufferPooling = 0;
 
-int SMALL_MESSAGE_SIZE=8192;  /* Smallest message size queue 
-                                       used for receiving short messages */
+int SMALL_MESSAGE_SIZE=4072;  /* Smallest message size queue 
+                                 used for receiving short messages */
                                      
 int MID_MESSAGE_SIZE=65536;     /* Queue for larger messages 
-                                          which need pre posted receives
-                                          Message sizes greater will be 
-                                          probe received adding 5us overhead*/
+                                   which need pre posted receives
+                                   Message sizes greater will be 
+                                   probe received adding 5us overhead*/
 #define SYNC_MESSAGE_SIZE MID_MESSAGE_SIZE * 10
-                             /* Message sizes greater will be 
-                                sent synchronously thus avoiding copying*/
+                               /* Message sizes greater will be 
+                                  sent synchronously thus avoiding copying*/
 
 #define NON_BLOCKING_MSG  16     /* Message sizes greater 
                                     than this will be sent asynchronously*/
@@ -170,10 +171,14 @@ void SendSpanningChildren(int size, char *msg);
 
 #define TYPE_FIELD(buf) ((int *)(buf))[0]
 #define SIZE_FIELD(buf) ((int *)(buf))[1]
+//Encoded in the chunk header
 #define CONV_SIZE_FIELD(buf) ((int *)(buf))[2]
 #define REF_FIELD(buf)  ((int *)buf)[3]
 
-#define CONV_BUF_START(res) ((char *)(res) - 2*sizeof(int))
+#define CONV_BUF_START(res) ((char *)(res) + 2*sizeof(int))
+//bufstart from converse buffer
+#define MACHINE_BUF_START(res) ((char *)(res) - 2*sizeof(int))
+//bufstart from user message
 #define USER_BUF_START(res) ((char *)(res) - 4*sizeof(int))
 
 #define DYNAMIC_MESSAGE 0
@@ -1389,52 +1394,90 @@ void *elan_CmiAlloc(int size){
     char *res = NULL;
     char *buf;
     
+    int alloc_size = size;
+    if(enableBufferPooling) {
+        if(size <= SMALL_MESSAGE_SIZE + 2 * sizeof(int)) {
+            alloc_size = SMALL_MESSAGE_SIZE + 4 * sizeof(int); //2 more ints for machine header
+            size = SMALL_MESSAGE_SIZE + 2 * sizeof(int); //size of converse/user space
+
 #if CMK_PERSISTENT_COMM
-    size += sizeof(int)*2;
+            //Put a footer at the end the message of it. This footer only will be sent with the pers. message
+            alloc_size += sizeof(int)*2;
 #endif
 
-    if(size <= SMALL_MESSAGE_SIZE + 2 * sizeof(int)) {
-        size = SMALL_MESSAGE_SIZE + 4 * sizeof(int);
-        if(!PCQueueEmpty(localSmallBufferQueue))
-            buf = PCQueuePop(localSmallBufferQueue);
-        else
-            buf = (char *)malloc_nomigrate(size);
-    }
-    else if(size < MID_MESSAGE_SIZE + 2 * sizeof(int)) {
-        size = MID_MESSAGE_SIZE + 4 * sizeof(int);
-        if(!PCQueueEmpty(localMidBufferQueue))
-            buf = PCQueuePop(localMidBufferQueue);
-        else
-            buf = (char *)malloc_nomigrate(size);
-    }
-    else
-        buf =(char *)malloc_nomigrate(size + 2 * sizeof(int));
+            if(!PCQueueEmpty(localSmallBufferQueue))
+                buf = PCQueuePop(localSmallBufferQueue);
+            else
+                buf = (char *)malloc_nomigrate(alloc_size);
+        }
+        /*
+        else if(size < MID_MESSAGE_SIZE + 2 * sizeof(int)) {
+            alloc_size = MID_MESSAGE_SIZE + 4 * sizeof(int); //2 more ints for machine header
+            size = MID_MESSAGE_SIZE + 2 * sizeof(int); //size of converse/user space
 
+#if CMK_PERSISTENT_COMM
+            //Put a footer at the end the message of it. This footer will only be sent with the pers. message
+            alloc_size += sizeof(int)*2;
+#endif
+            
+            if(!PCQueueEmpty(localMidBufferQueue))
+                buf = PCQueuePop(localMidBufferQueue);
+            else
+                buf = (char *)malloc_nomigrate(alloc_size);
+        }
+        */
+        else {
+            alloc_size = size + 2 * sizeof(int);  //2 more ints for machine header
+            
+#if CMK_PERSISTENT_COMM
+            //Put a footer at the end the message of it. This footer will be sent with the pers. message
+            alloc_size += sizeof(int)*2;
+#endif            
+            
+            buf =(char *)malloc_nomigrate(alloc_size);
+        }
+    }
+    else { 
+        alloc_size = size + 2 * sizeof(int);    //2 more ints for machine header
+#if CMK_PERSISTENT_COMM
+        //Put a footer at the end the message of it. This footer will be sent with the pers. message
+        alloc_size += sizeof(int)*2;
+#endif
+        buf =(char *)malloc_nomigrate(alloc_size);
+    }
+    
     TYPE_FIELD(buf) = DYNAMIC_MESSAGE;
-    SIZE_FIELD(buf) = size;
-    res = (char *)((char *)buf + 2 * sizeof(int));
+    SIZE_FIELD(buf) = size; //size of user part of the buffer, excludes machine header and persistent footer
+    res = CONV_BUF_START(buf);  //That is where the converse message starts
     return res;
 }
 
 void elan_CmiFree(void *res){
 
-    char *buf = CONV_BUF_START(res);
-    
+    char *buf = MACHINE_BUF_START(res);    
     int type = TYPE_FIELD(buf);
 
     if(type == STATIC_MESSAGE)
         return;
-
+    
     if(type == DYNAMIC_MESSAGE) {    
         
-        //Called from Cmifree so we know the size and 
-        //we dont hve to store it again
-        int size = SIZE_FIELD(buf);
-        if(size == SMALL_MESSAGE_SIZE + 4 * sizeof(int))
-            PCQueuePush(localSmallBufferQueue, buf);
-        else if (size == MID_MESSAGE_SIZE + 4 * sizeof(int))
-            PCQueuePush(localMidBufferQueue, buf);
-        else 
+        if(enableBufferPooling) {
+            //Called from Cmifree so we know the size and 
+            //we dont hve to store it again
+            int size = SIZE_FIELD(buf);
+            if(size == SMALL_MESSAGE_SIZE + 2 * sizeof(int))
+                //I knew I allocated the SMALL_MESSSAGE_SIZE of user data, 
+                //so I can put it back to the pool
+                PCQueuePush(localSmallBufferQueue, buf);
+            /*
+              else if (size == MID_MESSAGE_SIZE + 2 * sizeof(int))
+              PCQueuePush(localMidBufferQueue, buf);
+            */
+            else 
+                free_nomigrate(buf);
+        }
+        else
             free_nomigrate(buf);
         return;
     }
@@ -1599,6 +1642,10 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
       blockingReceiveFlag = 1;
   }
 
+  if (CmiGetArgFlag(argv,"+enableBufferPooling")) {
+      enableBufferPooling = 1;
+  }
+
   CmiGetArgInt(argv,"+smallMessageSize", &SMALL_MESSAGE_SIZE);
   CmiGetArgInt(argv,"+midMessageSize", &MID_MESSAGE_SIZE);
   enableGetBasedSend = CmiGetArgFlag(argv,"+enableGetBasedSend");
@@ -1645,7 +1692,8 @@ CmiCommHandle CmiAsyncListSendFn(int npes, int *pes, int len, char *msg)
 extern void CmiReference(void *blk);
 #if 1
 #define ELAN_BUF_SIZE MID_MESSAGE_SIZE
-#define USE_NIC_MULTICAST 1
+#define USE_NIC_MULTICAST 0
+
 void CmiFreeListSendFn(int npes, int *pes, int len, char *msg)
 {  
     static int ppn = 0;
