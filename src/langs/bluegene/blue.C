@@ -1,3 +1,11 @@
+/*****************************************************************************
+ * $Source$
+ * $Author$
+ * $Date$
+ * $Revision$
+ *****************************************************************************/
+
+
 /*
   File: Blue.C -- Converse BlueGene Emulator Code
   Emulator written by Gengbin Zheng, gzheng@uiuc.edu on 2/20/2001
@@ -78,8 +86,8 @@ CpvStaticDeclare(int, numCth);	/* number of threads */
 CpvStaticDeclare(int, numWth);
 CpvStaticDeclare(int, numNodes);	/* number of bg nodes on this PE */
 
-CpvStaticDeclare(int, inEmulatorInit);
-
+CpvDeclare(int, inEmulatorInit);
+CpvDeclare(int, cpvinited);
 
 #define tMYID		CtvAccess(threadinfo)->id
 #define tMYGLOBALID	CtvAccess(threadinfo)->globalId
@@ -482,6 +490,19 @@ void BgSetSize(int sx, int sy, int sz)
   CpvAccess(numX) = sx; CpvAccess(numY) = sy; CpvAccess(numZ) = sz;
 }
 
+int BgNumNodes()
+{
+  ASSERT(!CpvAccess(inEmulatorInit));
+  return CpvAccess(numNodes);
+}
+
+/* return the node ID */
+int BgMyRank()
+{
+//  ASSERT(!CpvAccess(inEmulatorInit));
+  return tMYNODEID;
+}
+
 int BgGetThreadID()
 {
   ASSERT(tTHREADTYPE == WORK_THREAD || tTHREADTYPE == COMM_THREAD);
@@ -549,12 +570,12 @@ void BgShutdown()
   
   /* broadcast to shutdown */
   CmiSyncBroadcastAllAndFree(msgSize, sendmsg);
-  //CmiAbort("\nBG> BlueGene simulator shutdown gracefully!\n");
-  // CmiPrintf("\nBG> BlueGene simulator shutdown gracefully!\n");
+  //CmiAbort("\nBG> BlueGene emulator shutdown gracefully!\n");
+  // CmiPrintf("\nBG> BlueGene emulator shutdown gracefully!\n");
   /* don't return */
   // ConverseExit();
   CmiDeliverMsgs(-1);
-  CmiPrintf("\nBG> BlueGene simulator shutdown gracefully!\n");
+  CmiPrintf("\nBG> BlueGene emulator shutdown gracefully!\n");
   ConverseExit();
   exit(0);
   
@@ -566,7 +587,7 @@ void BgShutdown()
   for (i=0; i<numNodes; i++) CmmFree(msgBuffer[i]);
   delete [] msgBuffer;
 
-  CmiAbort("\nBG> BlueGene simulator shutdown gracefully!\n");
+  CmiAbort("\nBG> BlueGene emulator shutdown gracefully!\n");
 */
 }
 
@@ -584,6 +605,8 @@ void comm_thread(threadInfo *tinfo)
   if (!tSTARTED) {
     tSTARTED = 1;
     BgNodeStart(arg_argc, arg_argv);
+    /* bnv should be initialized */
+    CpvAccess(cpvinited) = 1;
   }
 
   for (;;) {
@@ -678,7 +701,9 @@ void BgNodeInitialize(nodeInfo *ninfo)
   for (i=0; i< CpvAccess(numWth); i++)
   {
     threadInfo *tinfo = new threadInfo(i, WORK_THREAD, ninfo);
+    _MEMCHECK(tinfo);
     t = CthCreate((CthVoidFn)work_thread, tinfo, 0);
+    if (t == NULL) CmiAbort("BG> Failed to create worker thread. \n");
     tinfo->setThread(t);
     /* put to thread table */
     tTHREADTABLE[tinfo->id] = t;
@@ -689,7 +714,9 @@ void BgNodeInitialize(nodeInfo *ninfo)
   for (i=0; i< CpvAccess(numCth); i++)
   {
     threadInfo *tinfo = new threadInfo(i+CpvAccess(numWth), COMM_THREAD, ninfo);
+    _MEMCHECK(tinfo);
     t = CthCreate((CthVoidFn)comm_thread, tinfo, 0);
+    if (t == NULL) CmiAbort("BG> Failed to create communication thread. \n");
     tinfo->setThread(t);
     /* put to thread table */
     tTHREADTABLE[tinfo->id] = t;
@@ -754,6 +781,9 @@ CmiStartFn mymain(int argc, char **argv)
   CpvInitialize(int, inEmulatorInit);
   CpvAccess(inEmulatorInit) = 0;
 
+  CpvInitialize(int, cpvinited);
+  CpvAccess(cpvinited) = 0;
+
   CpvAccess(inEmulatorInit) = 1;
   /* call user defined BgEmulatorInit */
   BgEmulatorInit(arg_argc, arg_argv);
@@ -770,15 +800,19 @@ CmiStartFn mymain(int argc, char **argv)
 
   CpvInitialize(msgQueue *, inBuffer);
   CpvAccess(inBuffer) = new msgQueue[CpvAccess(numNodes)];
+  _MEMCHECK( CpvAccess(inBuffer));
   for (i=0; i<CpvAccess(numNodes); i++) CpvAccess(inBuffer)[i].initialize(INBUFFER_SIZE);
   CpvInitialize(CmmTable *, msgBuffer);
   CpvAccess(msgBuffer) = new CmmTable[CpvAccess(numNodes)];
+  _MEMCHECK(CpvAccess(msgBuffer));
   for (i=0; i<CpvAccess(numNodes); i++) CpvAccess(msgBuffer)[i] = CmmNew();
 
   /* create BG nodes */
   CpvInitialize(nodeInfo *, nodeinfo);
   CpvAccess(nodeinfo) = new nodeInfo[CpvAccess(numNodes)];
+  _MEMCHECK(CpvAccess(nodeinfo));
   CtvAccess(threadinfo) = new threadInfo(-1, UNKNOWN_THREAD, NULL);
+  _MEMCHECK(CtvAccess(threadinfo));
   for (i=0; i<CpvAccess(numNodes); i++)
   {
     nodeInfo *ninfo = CpvAccess(nodeinfo) + i;
