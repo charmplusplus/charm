@@ -16,6 +16,8 @@ ComlibInstanceHandle mss_inst;
 ComlibInstanceHandle samp_inst;
 ComlibInstanceHandle dummy_inst;
 
+int bucketSize = 400;
+
 /*mainchare*/
 class Main : public Chare
 {
@@ -38,8 +40,8 @@ public:
 	
 	CProxy_Hello arr = CProxy_Hello::ckNew(nElements);
 	
-	StreamingStrategy *strat=new StreamingStrategy(1,400);
-	MeshStreamingStrategy *mstrat=new MeshStreamingStrategy(1,400);
+	StreamingStrategy *strat=new StreamingStrategy(1,bucketSize);
+	MeshStreamingStrategy *mstrat=new MeshStreamingStrategy(1,bucketSize);
 	
 	//strat->enableShortArrayMessagePacking();
 	//strat->disableIdleFlush();

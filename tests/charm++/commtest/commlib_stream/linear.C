@@ -20,8 +20,8 @@ int NUM_MSGS;
 
 #define TEST_HI 4001
 #define MAX_COUNT 2000
-int STREAMING_BUCKET_SIZE=100;
-#define MAX_PER_ITR 2*STREAMING_BUCKET_SIZE
+int bucketSize = 100;
+#define MAX_PER_ITR 2*bucketSize 
 
 ComlibInstanceHandle ss_inst;  //basic streaming strategy
 ComlibInstanceHandle mss_inst;  //mesh streaming strategy
@@ -42,7 +42,7 @@ public:
         //Process command-line arguments
         nElements=5;
         if(m->argc >1 ) nElements=atoi(m->argv[1]);
-        if(m->argc > 2 ) STREAMING_BUCKET_SIZE= atoi(m->argv[2]);
+        if(m->argc > 2 ) bucketSize= atoi(m->argv[2]);
         delete m;
         
         recv_count = 0;
@@ -50,16 +50,16 @@ public:
         
         //Start the computation
         CkPrintf("Running Hello on %d processors for %d elements with bucket %d\n",
-                 CkNumPes(),nElements, STREAMING_BUCKET_SIZE);
+                 CkNumPes(),nElements, bucketSize);
         mainProxy = thishandle;
         
         arr = CProxy_Hello::ckNew(nElements);
         
-        StreamingStrategy *strat=new StreamingStrategy(1,STREAMING_BUCKET_SIZE);
-        StreamingStrategy *sstrat=new StreamingStrategy(1,STREAMING_BUCKET_SIZE);
+        StreamingStrategy *strat=new StreamingStrategy(1,bucketSize);
+        StreamingStrategy *sstrat=new StreamingStrategy(1,bucketSize);
 
         MeshStreamingStrategy *mstrat=new 
-	  MeshStreamingStrategy(1, STREAMING_BUCKET_SIZE);
+	  MeshStreamingStrategy(1, bucketSize);
         
         sstrat->enableShortArrayMessagePacking();
         
