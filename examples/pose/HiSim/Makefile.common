@@ -1,16 +1,18 @@
 
 CHARMBASE=../../../../
+#CHARMBASE=/expand8/home/gzheng/tmp/pose/charm/net-linux
 CHARMBIN=$(CHARMBASE)/bin
 CHARMINC=$(CHARMBASE)/include
+ETRANS=$(CHARMBIN)/etrans.pl
 
 OBJDIR=../tmp
 
 CHARMC=$(CHARMBIN)/charmc -I$(CHARMINC)/pose $(OPTS)
-ETRANS=$(CHARMBIN)/etrans.pl
 POSEMODULE=-module pose
 
 ifeq ($(SEQUENTIAL),1)
-OPTS += "-DSEQUENTIAL_POSE"
+OPTS += -DSEQUENTIAL_POSE=1
 ETRANS += "-s"
 POSEMODULE=-module seqpose
 endif
+
