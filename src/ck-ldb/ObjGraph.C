@@ -130,8 +130,14 @@ ObjGraph::Node* ObjGraph::find_node(LDOMid edge_omid, LDObjid edge_id)
     //    CkPrintf("Comparing %d to %d\n",objid.id[0],edge_id.id[0]);
     if (LDOMidEqual(omid,edge_omid) && LDObjIDEqual(objid,edge_id) )
       break;
+    from_node = from_node->nxt_hash;
   }
 
   return from_node;
 }
+
+
+
+
+
 
