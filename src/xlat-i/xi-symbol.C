@@ -844,6 +844,8 @@ Array::genSubDecls(XStr& str)
          "        :";genProxyNames(str, "",NULL, "(aid,elems,nElems,dTo)", ", ");str << " {}\n";
     str <<"    "<<ptype<<"(const CkArrayID &aid, CkArrayIndexMax *elems, int nElems) \n"
          "        :";genProxyNames(str, "",NULL, "(aid,elems,nElems)", ", ");str<<" {}\n";
+    str <<"    "<<ptype<<"(const CkSectionID &sid)"
+	  "       :";genProxyNames(str, "",NULL, "(sid)", ", ");str<< " {}\n";
   }
   
   if(list)
@@ -1625,6 +1627,11 @@ void Entry::genArrayStaticConstructorDecl(XStr& str)
   else if (container->getForWhom()==forAll)
       str<< //With options
       "    static CkArrayID ckNew("<<paramComma(1)<<"const CkArrayOptions &opts);\n";
+  else if (container->getForWhom()==forSection) 
+      str << 
+      "    static CkSectionID ckNew(const CkArrayID &aid, CkArrayIndexMax *elems, int nElems) {\n"
+      "      return CkSectionID(aid, elems, nElems);\n"
+      "    } \n";
 }
 
 void Entry::genArrayStaticConstructorDefs(XStr& str)
