@@ -223,7 +223,7 @@ void CmiTimerInit()
 {
   struct timeval tv;
   struct rusage ru;
-  gettimeofday(&tv);
+  gettimeofday(&tv,0);
   inittime_wallclock = (tv.tv_sec * 1.0) + (tv.tv_usec*0.000001);
   getrusage(0, &ru); 
   inittime_virtual =
@@ -248,7 +248,7 @@ double CmiWallTimer()
   struct timeval tv;
   double currenttime;
 
-  gettimeofday(&tv);
+  gettimeofday(&tv,0);
   currenttime = (tv.tv_sec * 1.0) + (tv.tv_usec * 0.000001);
   return currenttime - inittime_wallclock;
 }
