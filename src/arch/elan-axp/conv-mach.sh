@@ -3,6 +3,7 @@ CMK_CPP_C='gcc -E'
 CMK_CC='gcc -D_REENTRANT -I/usr/opt/rms/include '
 CMK_CXX='g++ -D_REENTRANT -I/usr/opt/rms/include '
 CMK_CXXPP="$CMK_CXX -x c++ -E  "
+CMK_LD="eval $CMK_CC -expect_unresolved '*' "
 CMK_CF77='f77 -automatic'
 CMK_CF90='f90 -automatic'
 CMK_RANLIB='ranlib'
