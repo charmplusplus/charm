@@ -93,7 +93,7 @@ jadeall: jade
 #	make parser.g -> .java files
 	cd langs/jade && $(MAKE) p
 #	make the jade.jar file
-	cd ../../java/charm/jade && $(MAKE)
+	cd ../java/charm/jade && $(MAKE)
 
 LIBS: CONVLIBS CHARMLIBS
 	cd libs; $(MAKE) otherlibs
