@@ -81,6 +81,10 @@ the message buffer.}
 \param{destPE}. Message buffer for \param{msg} could be reused after
 the call returns.}
 
+\function{void CmiSyncSendAndFree(unsigned int destPE, unsigned int size, void *msg)}
+\desc{ Sends \param{msg} of size \param{size} bytes to processor
+\param{destPE} and frees the message buffer for \param{msg}.}
+
 \function{CmiCommHandle CmiAsyncSend(unsigned int destPE, unsigned int size, void *msg)}
 \desc{ Initiates an asynchronous send of \param{msg} of length
 \param{size} bytes to processor \param{destPE} and returns a
@@ -180,18 +184,24 @@ which could be used to  enquire about the status of this operation.}
 \desc{Sends \param{msg} of length \param{size} bytes to all processors
 excluding the processor on which the caller resides. }
 
-\function{void CmiSyncBroadcastAllAndFree(unsigned int size, void *msg)}
+\function{void CmiSyncBroadcastAndFree(unsigned int size, void *msg)}
 \desc{Sends \param{msg} of length \param{size} bytes to all processors
-including the processor on which the caller resides. This function
-frees the message buffer for \param{msg} before returning, so
-\param{msg} must point to a dynamically allocated buffer.}
+excluding the processor on which the caller resides. Frees the message buffer
+for \param{msg} when the broadcast completes. Therefore \param{msg} must
+point to a dynamically allocated buffer.}
 
 \function{void CmiSyncBroadcastAll(unsigned int size, void *msg)}
 \desc{Sends \param{msg} of length \param{size} bytes to all processors
 including the processor on which the caller resides. This function
 does not free the message buffer for \param{msg}.}
 
-\function{CommHandle CmiAsyncBroadcast(unsigned int size, void *msg)}
+\function{void CmiSyncBroadcastAllAndFree(unsigned int size, void *msg)}
+\desc{Sends \param{msg} of length \param{size} bytes to all processors
+including the processor on which the caller resides. This function
+frees the message buffer for \param{msg} before returning, so
+\param{msg} must point to a dynamically allocated buffer.}
+
+\function{CmiCommHandle CmiAsyncBroadcast(unsigned int size, void *msg)}
 \desc{ Initiates asynchronous broadcast of message \param{msg} of
 length \param{size} bytes to all processors excluding the processor on
 which the caller resides. It returns a communication handle which
@@ -199,7 +209,7 @@ could be used to check the status of this send using
 \param{CmiAsyncMsgSent()}. \param{msg} should not be overwritten or
 freed before the communication is complete.}
 
-\function{CommHandle CmiAsyncBroadcastAll(unsigned int size, void *msg)}
+\function{CmiCommHandle CmiAsyncBroadcastAll(unsigned int size, void *msg)}
 \desc{ Initiates asynchronous broadcast of message \param{msg} of
 length \param{size} bytes to all processors including the processor on
 which the caller resides. It returns a communication handle which
@@ -240,7 +250,7 @@ send and blocking receive.}
 
 \function{void CmiError(char *format, arg1, arg2, ...)}
 \desc{This function does an atomic \param{printf()} on \param{stderr}. 
-On machine with host, this is implemented on top of the messaging 
+On machines with host, this is implemented on top of the messaging 
 layer using asynchronous sends.}
 
 \internal{
