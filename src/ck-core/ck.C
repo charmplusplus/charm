@@ -35,6 +35,25 @@ void IrrGroup::pup(PUP::er &p)
 	p|ckEnableTracing;
 } 
 
+CkComponent::~CkComponent() {}
+void CkComponent::pup(PUP::er &p) {}
+CkComponent *IrrGroup::ckLookupComponent(int userIndex)
+{
+	return NULL;
+}
+CkComponent *CkComponentID::ckLookup(void) const {
+	CkComponent *ret=_localBranch(gid)->ckLookupComponent(index);
+#ifndef CMK_OPTIMIZE
+	if (ret==NULL) CkAbort("Group returned a NULL component!\n");
+#endif
+	return ret;
+}
+void CkComponentID::pup(PUP::er &p)
+{
+	p|gid;
+	p|index;
+}
+
 CkDelegateMgr::~CkDelegateMgr() { }
 
 //Default delegator implementation: do not delegate-- send directly

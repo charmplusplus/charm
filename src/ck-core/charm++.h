@@ -36,6 +36,69 @@ public: static int __idx;
 #include "cklists.h"
 #include "init.h"
 #include "pup.h"
+
+//Implementation class (don't instantiate)
+template <class T>
+class implCkVecPup : public CkVec<T> {
+ protected:
+	int pupbase(PUP::er &p) {
+		int len=length();
+		p(len);
+		if (p.isUnpacking()) {
+			setSize(len);
+			length()=len;
+		}
+		return len;
+	}
+};
+
+///A vector of derived types, which must be pupped separately
+template <class T>
+class CkPupVec : public implCkVecPup<T> {
+ public:
+	void pup(PUP::er &p) {
+		int len=pupbase(p);
+		for (int i=0;i<len;i++)
+			p|(*this)[i];
+	}
+};
+template <class T>
+inline void operator|(PUP::er &p,CkPupVec<T> &v) {v.pup(p);}
+
+
+///A vector of basic types, which can be pupped as an array
+/// (more restricted, but more efficient version of above)
+template <class T>
+class CkPupBasicVec : public implCkVecPup<T> {
+ public:
+	void pup(PUP::er &p) {
+		int len=pupbase(p);
+		p(getVec(),len);
+	}
+};
+template <class T>
+inline void operator|(PUP::er &p,CkPupBasicVec<T> &v) {v.pup(p);}
+
+///A vector of heap-allocated objects of type T
+template <class T>
+class CkPupPtrVec : public implCkVecPup<T *> {
+ public:
+	~CkPupPtrVec() {
+		for (int i=0;i<size();i++)
+			delete (*this)[i];
+	}
+	void pup(PUP::er &p) {
+		int len=pupbase(p);
+		for (int i=0;i<len;i++) {
+			if (p.isUnpacking()) (*this)[i]=new T;
+			(*this)[i]->pup(p);
+		}
+	}
+};
+template <class T>
+inline void operator|(PUP::er &p,CkPupPtrVec<T> &v) {v.pup(p);}
+
+
 #include "debug-charm.h"
 
 class CkMessage { //Superclass of all Charm++ messages
@@ -216,6 +279,27 @@ class Chare {
     CHARM_INPLACE_NEW
 };
 
+///A small piece of a Chare; one that cannot communicate.
+class CkComponent {
+ public:
+	virtual ~CkComponent();
+	virtual void pup(PUP::er &p);
+};
+
+///A cross-processor handle for a CkComponent.
+//Components can currently only live inside groups:
+class CkComponentID {
+	CkGroupID gid;
+	int index; //Index to pass to group's ckLookupComponent method
+ public:
+	CkComponentID() {index=-1;}
+	CkComponentID(int ignored) {index=-1;} //<- stupid; but needed by CkVec
+	CkComponentID(const CkGroupID &gid_,int index_)
+		:gid(gid_), index(index_) {}
+	CkComponent *ckLookup(void) const;
+	void pup(PUP::er &p);
+};
+
 //Superclass of all Groups that cannot participate in reductions.
 //  Undocumented: should only be used inside Charm++.
 /*forward*/ class Group;
@@ -232,6 +316,9 @@ class IrrGroup : public Chare {
 
     virtual void pup(PUP::er &p);//<- pack/unpack routine
     inline const CkGroupID &ckGetGroupID(void) const {return thisgroup;}
+
+    ///Map an index (user-defined meaning) to a component:
+    virtual CkComponent *ckLookupComponent(int userIndex);
 };
 
 class NodeGroup : public IrrGroup { //Superclass of all NodeGroups
