@@ -2075,7 +2075,7 @@ int req_handle_ending(line)
 int req_handle_abort(line)
     char *line;
 {
-  fprintf(stderr, "%s\n", line+6);
+  fprintf(stderr, "%s", line+6);
   exit(1);
 }
 

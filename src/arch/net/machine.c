@@ -265,14 +265,17 @@ static void KillEveryoneCode(n)
 int n;
 {
   char _s[100];
-  sprintf(_s, "Fatal error #%d\n", n);
+  sprintf(_s, "[%d] Fatal error #%d\n", CmiMyPe(), n);
   host_abort(_s);
   exit(1);
 }
 
 static void KillOnAllSigs(int dummy)
 {
-  KillEveryone("Node program received signal\n");
+  char _s[100];
+  sprintf(_s, "[%d] Node program recived signal\n", CmiMyPe());
+  host_abort(_s);
+  exit(1);
 }
 
 static void KillOnSIGPIPE(int dummy)
