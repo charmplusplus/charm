@@ -194,6 +194,7 @@ int printf(const char *fmt, ...) {
 
 
 #include "converse.h"
+#include "memory-isomalloc.h"
 
 #include <stdio.h>
 #include <stdlib.h>
