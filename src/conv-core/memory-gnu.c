@@ -1281,7 +1281,7 @@ int      __posix_memalign(void **, size_t, size_t);
 #endif
 
 #ifndef DEFAULT_MXFAST
-#define DEFAULT_MXFAST     64
+#define DEFAULT_MXFAST     128
 #endif
 
 
@@ -2096,7 +2096,7 @@ typedef struct malloc_chunk* mfastbinptr;
 #define fastbin_index(sz)        ((((unsigned int)(sz)) >> 3) - 2)
 
 /* The maximum fastbin request size we support */
-#define MAX_FAST_SIZE     80
+#define MAX_FAST_SIZE     144
 
 #define NFASTBINS  (fastbin_index(request2size(MAX_FAST_SIZE))+1)
 
