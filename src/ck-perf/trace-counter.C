@@ -201,8 +201,9 @@ CountLogPool::~CountLogPool()
 
 void CountLogPool::write(void) 
 {
-  fprintf(fp_, "ver:%3.1f %d/%d ep:%d\n", 
-	  CpvAccess(version), CmiMyPe(), CmiNumPes(), _numEntries);
+  fprintf(fp_, "ver:%3.1f %d/%d ep:%d counters:%d\n", 
+	  CpvAccess(version), CmiMyPe(), CmiNumPes(), _numEntries, 
+	  stats_.numStats_);
   stats_.write(fp_);
 }
 
