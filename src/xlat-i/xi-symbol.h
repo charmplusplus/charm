@@ -40,8 +40,10 @@ class Message {
 public: char *name;
         int packable;   // 1 is this msg type has pack/unpack functions
         Message *next;
+	int isextern;
 
-	Message(char *n, int p);
+	Message(char *n, int p, int e);
+	int isExtern() { return isextern ; }
 } ;
 
 class Entry {
@@ -61,9 +63,11 @@ public: char *name;
         Entry *entries;
 	int chareboc ;
         Chare *next;
+	int isextern;
 
-	Chare(char *n, int cb) ;
+	Chare(char *n, int cb, int e) ;
 	void AddEntry(char *e, char *m, int t = FALSE, char *r = NULL) ;
+	int isExtern() { return isextern ; }
 } ;
 
 class Module {

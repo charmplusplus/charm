@@ -29,11 +29,12 @@ ReadOnly::ReadOnly(char *n, char *t, int i)
 	next = NULL ;
 }
 
-Message::Message(char *n, int p)
+Message::Message(char *n, int p, int e)
 {
 	name = new char [strlen(n)+1] ;
 	strcpy(name,n) ;
 	packable = p ;
+	isextern = e ;
 	next = NULL ;
 }
 
@@ -66,12 +67,13 @@ Entry::Entry(char *n, char *m, int t, char *r)
 }
 
 
-Chare::Chare(char *n, int cb)
+Chare::Chare(char *n, int cb, int e)
 {
 	name = new char [strlen(n)+1] ;
 	strcpy(name,n) ;
 	entries = NULL ;
 	chareboc = cb ;
+	isextern = e ;
 	next = NULL ;
 }
 void Chare::AddEntry(char *e, char *m, int t, char *r)

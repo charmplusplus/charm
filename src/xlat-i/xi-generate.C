@@ -78,11 +78,17 @@ void GenerateStructsFns(ofstream& top, ofstream& bot)
 
 	for (c=thismodule->chares; c!=NULL; c=c->next ) {
 
-		sprintf(str,"int _CK_chare_%s = 0 ;",c->name) ;
+		if (c->isExtern())
+			sprintf(str,"extern int _CK_chare_%s ;",c->name) ;
+		else
+			sprintf(str,"int _CK_chare_%s = 0 ;",c->name) ;
 		top << str << endl ;
 
 		for (e=c->entries; e!=NULL; e=e->next ) {
-			sprintf(str,"int _CK_ep_%s_%s = 0 ;",c->name,e->name) ;
+			if (c->isExtern())
+				sprintf(str,"extern int _CK_ep_%s_%s ;",c->name,e->name) ;
+			else
+				sprintf(str,"int _CK_ep_%s_%s = 0 ;",c->name,e->name) ;
 			top << str << endl ;
 		}
 	}
@@ -160,7 +166,10 @@ void GenerateStructsFns(ofstream& top, ofstream& bot)
 	Message *m;
 	/* Output ids for message types */
 	for ( m=thismodule->messages; m!=NULL; m=m->next ) 
-		top << "int _CK_msg_" << m->name << "=0;" << endl ;
+		if (m->isExtern())
+			top << "extern int _CK_msg_" << m->name << ";" << endl ;
+		else
+			top << "int _CK_msg_" << m->name << "=0;" << endl ;
 
 
 
