@@ -831,6 +831,16 @@ fi
 
 Debug "About to perform final link..."
 
+case "$LANGUAGE" in
+"ampi")
+        PRE_LIBRARIES="$PRE_LIBRARIES -lampi"
+	;;
+"f90charm")
+        PRE_LIBRARIES="$PRE_LIBRARIES lib/libmain.a"
+        POST_LIBRARIES="$POST_LIBRARIES -lfsu -lsunmath"
+	;;
+esac
+
 LANG_LIBS="-L$CHARMLIB -I$CHARMINC $BAL_OBJ $OBJECTFILES $PRE_LIBRARIES -lck $POST_LIBRARIES"
 CORE_LIBS="-lconv-core -ltrace-$TRACEMODE"
 
@@ -841,15 +851,17 @@ case "$LANGUAGE" in
 	;;
 "f90charm")
 	Do $CMK_LDXX $OPTS_LDXX -o $OBJECT \
-		lib/libmain.a -lfsu -lsunmath $LANG_LIBS -lconv-cplus-y $CORE_LIBS -lm $CMK_LIBS
+		$LANG_LIBS -lconv-cplus-y $CORE_LIBS -lm $CMK_LIBS
 	;;
 "idl")
 	Do $CMK_LDXX $OPTS_LDXX -o $OBJECT \
 		$LANG_LIBS -lconv-cplus-y $CORE_LIBS -lidl -lm $CMK_LIBS
 	;;
 "ampi")
+        echo language: $LANG_LIBS
+	echo objects: $OBJECT
 	Do $CMK_LDXX $OPTS_LDXX -o $OBJECT \
-		$LANG_LIBS -lconv-cplus-y $CORE_LIBS -lampi -lm $CMK_LIBS
+		$LANG_LIBS -lconv-cplus-y $CORE_LIBS -lm $CMK_LIBS
 	;;
 "ampif")
 	Do $CMK_LDXX $OPTS_LDXX -o $OBJECT \

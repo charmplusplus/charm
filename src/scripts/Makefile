@@ -42,7 +42,7 @@ ampi: charm++ libampi.a libampif.a
 translators: sdagx charmxi conv-cpm charmidl
 
 libs: convlibs charmlibs
-	cd libs; make otherlibs OPTS='$(OPTS)'
+	cd libs; make otherlibs irecvlibs OPTS='$(OPTS)'
 
 test-all: all
 	cd ../pgms ; make test-all  OPTS='$(OPTS)'
@@ -73,7 +73,7 @@ ALLHEADERS=charm++.h ckstream.h charm.h cpthreads.h converse.h \
 	HeapCentLB.h Set.h elements.h heap.h conv-ccs.h \
 	NborBaseLB.h NeighborLB.h \
 	WSLB.h CkLists.h GreedyRefLB.h RandRefLB.h CommLB.h CommLBHeap.h \
-	ampi.h ampif.h
+	ampi.h ampif.h ampiimpl.h
 
 ALLINTERFACES=idl.ci
 
@@ -158,7 +158,8 @@ CVHEADERS=converse.h conv-mach.h conv-mach.sh \
           ../include/waitqd.decl.h waitqd.def.h \
 	  ../include/CommLB.decl.h CommLB.def.h  \
 	  ../include/Comm1LB.decl.h Comm1LB.def.h  \
-	  ../include/ampi.decl.h ampi.def.h
+	  ../include/ampi.decl.h ampi.def.h	\
+	  ../include/ampimain.decl.h ampimain.def.h
 
 TRACELIBS=libtrace-none.a libtrace-projections.a libtrace-summary.a
 
@@ -355,6 +356,12 @@ libtrace-summary.a: $(LIBTRACE_SUMM)
 
 ampi.decl.h ampi.def.h : ampi.ci charmxi
 	$(CHARMC) ampi.ci
+
+../include/ampimain.decl.h : ampimain.decl.h
+	/bin/cp ampimain.decl.h ../include
+
+ampimain.decl.h ampimain.def.h : ampimain.ci charmxi
+	$(CHARMC) ampimain.ci
 
 CkFutures.decl.h CkFutures.def.h : ckfutures.ci charmxi
 	$(CHARMC) ckfutures.ci
@@ -651,11 +658,17 @@ pvmc_main.o: pvmc_main.c pvmc.h pvm3.h
 libampi.a: ampi.o
 	$(CHARMC) -cp ../lib -o libampi.a ampi.o
 
-libampif.a: ampi.o futil.o
-	$(CHARMC) -cp ../lib -o libampif.a ampi.o futil.o
+libampif.a: ampif.o ampimain.o futil.o
+	$(CHARMC) -cp ../lib -o libampif.a ampimain.o ampif.o futil.o
 
-ampi.o: ampi.C ampi.h ampiimpl.h ampi.decl.h ampi.def.h
+ampi.o: ampi.C ampi.h ampiimpl.h ampi.decl.h ampi.def.h ampimain.decl.h ampimain.def.h
 	$(CHARMC) -c ampi.C
+
+ampif.o: ampi.C ampi.h ampiimpl.h ampi.decl.h ampi.def.h
+	$(CHARMC) -DAMPI_FORTRAN -o ampif.o -c ampi.C
+
+ampimain.o: ampimain.C ampi.h ampiimpl.h ampi.decl.h ampi.def.h ampimain.decl.h ampimain.def.h
+	$(CHARMC) -c ampimain.C
 
 futil.o: futil.f90 ampif.h
 	$(CHARMC) -c futil.f90
