@@ -115,13 +115,13 @@ void sim::Commit()
 #ifdef POSE_STATS_ON
   localStats->SwitchTimer(MISC_TIMER);
 #endif
-  if (localPVT->getGVT() > lastGVT + 10) {
+  if (localPVT->done()) { // simulation inactive
+    eq->CommitEvents(this, -1); // commit all events in queue
+    objID->terminus(); // call terminus on all posers
+  }
+  else if (localPVT->getGVT() > lastGVT + 10) {
     lastGVT = localPVT->getGVT();
-    if (localPVT->done()) { // simulation inactive
-      eq->CommitEvents(this, -1); // commit all events in queue
-      objID->terminus(); // call terminus on all posers
-    }
-    else eq->CommitEvents(this, lastGVT); // commit events up to GVT
+    eq->CommitEvents(this, lastGVT); // commit events up to GVT
   }
 #ifdef TRACE_DETAIL
   traceUserBracketEvent(50, critStart, CmiWallTimer());
