@@ -84,6 +84,13 @@
  *     Retries if possible (e.g., if interrupted), but aborts 
  *     on serious errors.  Returns zero or an abort code.
  *
+ * int skt_sendV(SOCKET fd,int nBuffers,void **buffers,int *lengths)
+ *   - Blocking call to write from several buffers.  This is much more
+ *     performance-critical than read-from-several buffers, because 
+ *     individual sends go out as separate network packets, and include
+ *     a (35 ms!) timeout for subsequent short messages.  Don't use more
+ *     than 8 buffers.
+ * 
  * void skt_set_idle(idleFunc f)
  *   - Specify a routine to be called while waiting for the network.
  *     Replaces any previous routine.
@@ -174,6 +181,7 @@ int skt_select1(SOCKET fd,int msec);
 /*Blocking Send/Recv*/
 int skt_sendN(SOCKET hSocket,const void *pBuff,int nBytes);
 int skt_recvN(SOCKET hSocket,      void *pBuff,int nBytes);
+int skt_sendV(SOCKET fd,int nBuffers,const void **buffers,int *lengths);
 
 #ifdef __cplusplus
 };

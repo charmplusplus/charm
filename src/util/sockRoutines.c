@@ -91,6 +91,12 @@ void skt_close(SOCKET fd)
 }
 #endif
 
+#ifndef SKT_HAS_BUFFER_BEGIN
+void skt_buffer_begin(SOCKET sk) {}
+void skt_buffer_end(SOCKET sk) {}
+#endif
+
+
 /*Called when a socket or select routine returns
 an error-- determines how to respond.
 Return 1 if the last call was interrupted
@@ -432,6 +438,33 @@ int skt_sendN(SOCKET hSocket,const void *buff,int nBytes)
   return 0;
 }
 
+/*Cheezy vector send: 
+  really should use writev on machines where it's available. 
+*/
+int skt_sendV(SOCKET fd,int nBuffers,const void **bufs,int *lens)
+{
+	int b,len=0;
+	for (b=0;b<nBuffers;b++) len+=lens[b];
+#define skt_sendV_max (16*1024)
+	if (len<=skt_sendV_max) { /*Short message: Copy and do one big send*/
+		char buf[skt_sendV_max];
+		char *dest=buf;
+		for (b=0;b<nBuffers;b++) {
+			memcpy(dest,bufs[b],lens[b]);
+			dest+=lens[b];
+		}
+		return skt_sendN(fd,buf,len);
+	}
+	else { /*Big message: Just send one-by-one as usual*/
+		int ret;
+		for (b=0;b<nBuffers;b++) 
+			if (0!=(ret=skt_sendN(fd,bufs[b],lens[b])))
+				return ret;
+		return 0;
+	}
+}
+
+
 
 /***********************************************
   Routines for manipulating simple binary messages,
@@ -511,9 +544,10 @@ void ChMessage_new(const char *type,unsigned int len,
 }
 int ChMessage_send(SOCKET fd,const ChMessage *src)
 {
-  if (0!=skt_sendN(fd,&src->header,sizeof(src->header))) return -1;
-  if (0!=skt_sendN(fd,src->data,src->len)) return -1;
-  return 0;
+  const void *bufs[2]; int lens[2];
+  bufs[0]=&src->header; lens[0]=sizeof(src->header);
+  bufs[1]=src->data; lens[1]=src->len;
+  return skt_sendV(fd,2,bufs,lens);
 } /*You must free after send*/
 
 #endif /*!CMK_NO_SOCKETS*/
