@@ -12,7 +12,11 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.12  1995-11-07 17:56:51  sanjeev
+ * Revision 2.13  1997-07-08 15:28:40  milind
+ * fixed an old bug that had been reintroduced in statistics collection
+ * module.
+ *
+ * Revision 2.12  1995/11/07 17:56:51  sanjeev
  * fixed bugs in statistics collection
  *
  * Revision 2.11  1995/11/06  22:59:01  sanjeev
@@ -181,7 +185,7 @@ TRACE(CmiPrintf("Host %d: Enter CollectFromNodes(): NumPes %d\n",
 	if (CpvAccess(NumPes) == CmiNumPes())
 	{
 	       CpvAccess(HostMemStatistics)=
-                              (int **) CmiAlloc(sizeof(int)*CpvAccess(NumPes));
+                              (int **) CmiAlloc(sizeof(int *)*CpvAccess(NumPes));
 	       CkMemError(CpvAccess(HostMemStatistics));
 		for (i=0; i<CpvAccess(NumPes); i++)
 		{
@@ -190,7 +194,7 @@ TRACE(CmiPrintf("Host %d: Enter CollectFromNodes(): NumPes %d\n",
 			CkMemError(CpvAccess(HostMemStatistics)[i]);
 		}
 		CpvAccess(HostStat) = 
-                           (int **) CmiAlloc(sizeof(int)*CpvAccess(NumPes));
+                           (int **) CmiAlloc(sizeof(int *)*CpvAccess(NumPes));
 		CkMemError(CpvAccess(HostStat));
 		for (i=0; i<CpvAccess(NumPes); i++)
 		{
