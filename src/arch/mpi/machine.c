@@ -211,9 +211,9 @@ static void CmiPushPE(int pe,void *msg)
   MACHSTATE1(2,"Pushing message into %d's queue",pe);
 #if CMK_IMMEDIATE_MSG
   if (CmiGetHandler(msg) == CpvAccessOther(CmiImmediateMsgHandlerIdx,0)) {
-//CmiPrintf("[node %d] Immediate Message {{. \n", CmiMyNode());
+/*CmiPrintf("[node %d] Immediate Message {{. \n", CmiMyNode());*/
     CmiHandleMessage(msg);
-//CmiPrintf("[node %d] Immediate Message done.}} \n", CmiMyNode());
+/*CmiPrintf("[node %d] Immediate Message done.}} \n", CmiMyNode());*/
     return;
   }
 #endif
