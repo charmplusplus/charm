@@ -402,8 +402,7 @@ static ampi *ampiInit(char **argv)
 	int new_idx=mpi_nworlds;
 	MPI_Comm new_world=MPI_COMM_WORLD+1+new_idx;
 
-        ComlibInstanceHandle cinst; 
-        cinst.init();
+        ComlibInstanceHandle cinst = CkGetComlibInstance();
         
         //Create and attach the ampiParent array
 	CkArrayID threads; int _nchunks;
@@ -411,9 +410,9 @@ static ampi *ampiInit(char **argv)
 	CProxy_ampiParent parent;
 	parent=CProxy_ampiParent::ckNew(new_world,threads,cinst, opts);
 
-        //CProxy_ComlibManager comlib = CProxy_ComlibManager::ckNew(strat, 1);
-	//comlib.ckLocalBranch()->createId();
-	EachToManyMulticastStrategy *strategy = new EachToManyMulticastStrategy(strat, parent.ckGetArrayID());
+	EachToManyMulticastStrategy *strategy = new 
+            EachToManyMulticastStrategy(strat, parent.ckGetArrayID(),  
+                                        parent.ckGetArrayID());
         cinst.setStrategy(strategy);
         
         //strategy->setSourceArray(parent.ckGetArrayID());
