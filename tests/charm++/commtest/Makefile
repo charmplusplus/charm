@@ -1,15 +1,16 @@
-# for bigsim only
-DIRS=comlib commlib_stream
-# BROKEN: pipeBroadcast
+DIRS=comlib commlib_stream pipeBroadcast
 
 .PHONY: test $(DIRS)
 
-test: comlib commlib_stream
+test: comlib commlib_stream pipeBroadcast
 
 comlib: 
 	$(MAKE) -C $@ test OPTS='$(OPTS)'
 
 commlib_stream:
+	$(MAKE) -C $@ test OPTS='$(OPTS)'
+
+pipeBroadcast: 
 	$(MAKE) -C $@ test OPTS='$(OPTS)'
 
 bgtest:
