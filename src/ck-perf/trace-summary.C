@@ -376,9 +376,9 @@ void SumLogPool::updateSummaryDetail(int epIdx, double startTime, double endTime
         int startingBinIdx = (int)(startTime/binSz);
         int endingBinIdx = (int)(endTime/binSz);
         // Ensure that shrink() has been called.
-        if (startingBinIdx >= epInfoSize)
+        if (startingBinIdx >= poolSize)
             CmiAbort("Internal Error: startingBinIdx\n");
-        if (endingBinIdx >= epInfoSize)
+        if (endingBinIdx >= poolSize)
             CmiAbort("Internal Error: endingBinIdx\n");
 
         if (startingBinIdx == endingBinIdx) {
