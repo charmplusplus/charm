@@ -59,8 +59,9 @@ class DDT ;
   inrRefCount - increament the reference count.
   getRefCount - returns the RefCount
 
-  copyBuffer - This is the function which actually copies the contents from
-         old buffer to New Buffer according to the datatype.
+  serialize - This is the function which actually copies the contents from
+    user's space to buffer if dir=1 or reverse if dir=0 
+    according to the datatype.
 */
 
 class DDT_DataType {
@@ -90,7 +91,7 @@ class DDT_DataType {
     virtual int getRefCount() ;
     virtual void pup(PUP::er  &p) ;
 
-    virtual int copyBuffer(char* oldBuffer, char* NewBuffer);
+    virtual int serialize(char* userdata, char* buffer, int dir=1);
 };
 
 /*   
@@ -111,7 +112,7 @@ class DDT_Contiguous : public DDT_DataType {
   DDT_Contiguous(int count, DDT_DataType* oldType);
   DDT_Contiguous(const DDT_Contiguous& obj) ;
   DDT_Contiguous& operator=(const DDT_Contiguous& obj);
-  virtual int copyBuffer(char* oldBuffer, char* NewBuffer);
+  virtual int serialize(char* userdata, char* buffer, int dir=1);
   virtual  void pup(PUP::er  &p) ;
 };
 
@@ -140,7 +141,7 @@ class DDT_Vector : public DDT_DataType {
     DDT_Vector& operator=(const DDT_Vector& obj);
     DDT_Vector() { } ;
     ~DDT_Vector() { } ;
-    virtual int copyBuffer(char* oldBuffer, char* NewBuffer);
+    virtual int serialize(char* userdata, char* buffer, int dir=1);
     virtual  void pup(PUP::er  &p) ;
 };
 
@@ -166,7 +167,7 @@ class DDT_HVector : public DDT_Vector {
     ~DDT_HVector() { } ;
     DDT_HVector(const DDT_HVector& obj) ;
     DDT_HVector& operator=(const DDT_HVector& obj);
-    virtual int copyBuffer(char* oldBuffer, char* NewBuffer);
+    virtual int serialize(char* userdata, char* buffer, int dir=1);
     virtual void pup(PUP::er &p);
 };
 
@@ -197,7 +198,7 @@ class DDT_Indexed : public DDT_DataType {
     DDT_Indexed& operator=(const DDT_Indexed& obj) ;
     DDT_Indexed() { } ;
     ~DDT_Indexed() ;
-    virtual int copyBuffer(char* oldBuffer, char* newBuffer);
+    virtual int serialize(char* userdata, char* buffer, int dir=1);
     virtual  void pup(PUP::er  &p) ;
 };
 
@@ -221,7 +222,7 @@ class DDT_HIndexed : public DDT_Indexed {
     DDT_HIndexed(int count, int* arrBlock, int* arrDisp, DDT_DataType* type);
     DDT_HIndexed(const DDT_HIndexed& obj);
     DDT_HIndexed& operator=(const DDT_HIndexed& obj) ;
-    virtual int copyBuffer(char* oldBuffer, char* newBuffer);
+    virtual int serialize(char* userdata, char* buffer, int dir=1);
     virtual void pup(PUP::er &p);
 };
 
@@ -251,7 +252,7 @@ class DDT_Struct : public DDT_DataType {
     DDT_Struct(DDT* ddt,int count, int* arrBlock, int* arrDisp, DDT_Type* type);
     DDT_Struct(const DDT_Struct& obj);
     DDT_Struct& operator=(const DDT_Struct& obj) ;
-    virtual int copyBuffer(char* oldBuffer, char* newBuffer);
+    virtual int serialize(char* userdata, char* buffer, int dir=1);
     virtual  void pup(PUP::er  &p) ;
 };
 

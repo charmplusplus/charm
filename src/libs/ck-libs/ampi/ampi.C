@@ -349,7 +349,7 @@ extern "C" int AMPI_Send(void *msg, int count, AMPI_Datatype type, int dest,
 
 	for(int i = 0 ; i < count ; i++)
 	{
-		bytesCopied = dttype->copyBuffer(oldBuffer, newBuffer);
+		bytesCopied = dttype->serialize(oldBuffer, newBuffer);
 		oldBuffer = oldBuffer + extentType ;
 		newBuffer = newBuffer + bytesCopied ;
 	}

@@ -1,4 +1,4 @@
-CDIR=../../../../
+CDIR=../../../..
 CHARMC=$(CDIR)/bin/charmc $(OPTS)
 
 all:libddt.a $(CDIR)/include/ddt.h

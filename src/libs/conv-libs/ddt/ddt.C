@@ -1,30 +1,5 @@
 #include "ddt.h"
 
-int DDT_Send(DDT* ddt, void* msg, int count, DDT_Type type, void* recvMsg)
-{
-  int bytesCopied , extentType ;
-  char* oldBuffer = (char*) msg ;
-  char* newBuffer = (char*) recvMsg ;
-
-
-  char* tempOldBuffer = oldBuffer ;
-  char* tempNewBuffer = newBuffer ;
-  DDT_DataType* dttype = ddt->getType(type) ;
-  extentType = dttype->getExtent();
-
-  for(int i = 0 ; i < count ; i++)
-  {
-    bytesCopied = dttype->copyBuffer(oldBuffer, newBuffer);
-    oldBuffer = oldBuffer + extentType ;
-    newBuffer = newBuffer + bytesCopied ;
-  }
-
-  oldBuffer = tempOldBuffer ;
-  newBuffer = tempNewBuffer ;
-  if(1) printf("NumBytes Copied = %d\n", bytesCopied );
-  return 0 ;
-}
-
 DDT_DataType* 
 DDT::getType(int nIndex)
 {
@@ -290,12 +265,14 @@ DDT_DataType::operator=(const DDT_DataType& obj)
 }
 
 int 
-DDT_DataType::copyBuffer(char* oldBuffer, char* newBuffer)
+DDT_DataType::serialize(char* userdata, char* buffer, int dir)
 {
-  int bytesCopied = size ;
-  memcpy(newBuffer, oldBuffer, bytesCopied );
-
-  return bytesCopied ;
+  if(dir) {
+    memcpy(buffer, userdata, size );
+  } else {
+    memcpy(userdata, buffer, size );
+  }
+  return size ;
 }
 
 int
@@ -373,19 +350,14 @@ DDT_Contiguous::operator=(const DDT_Contiguous& obj)
 }
 
 int 
-DDT_Contiguous::copyBuffer(char* oldBuffer, char* newBuffer)
+DDT_Contiguous::serialize(char* userdata, char* buffer, int dir)
 {
   int bytesCopied  = 0  ;
-  char* tempOldBuffer = oldBuffer ;
-  char* tempNewBuffer = newBuffer ;
   for(int i = 0 ; i < count ; i ++) {
-    bytesCopied += baseType->copyBuffer(oldBuffer, newBuffer);
-    newBuffer += baseSize ;
-    oldBuffer += baseExtent ;
+    bytesCopied += baseType->serialize(userdata, buffer, dir);
+    buffer += baseSize ;
+    userdata += baseExtent ;
   }
-
-  oldBuffer = tempOldBuffer ;
-  newBuffer = tempNewBuffer ;
   return bytesCopied ;
 }
 
@@ -417,24 +389,20 @@ DDT_Vector::DDT_Vector(int nCount, int blength, int stride, DDT_DataType* type)
 }
 
 int 
-DDT_Vector::copyBuffer(char* oldBuffer, char* newBuffer)
+DDT_Vector::serialize(char* userdata, char* buffer, int dir)
 {
-  char* tempOldBuffer = oldBuffer ;
-  char* tempBuffer = oldBuffer ;
-  char* tempNewBuffer = newBuffer ;
+  char* tbuf = userdata ;
   int  bytesCopied = 0  ;
 
   for(int i = 0 ; i < count; i++) {
-    oldBuffer = tempBuffer ;
+    userdata = tbuf ;
     for(int j = 0; j < blockLength; j++) {
-      bytesCopied += baseType->copyBuffer(oldBuffer, newBuffer);
-      newBuffer += baseSize ;
+      bytesCopied += baseType->serialize(userdata, buffer, dir);
+      buffer += baseSize ;
+      userdata += baseExtent;
     }  
-    tempBuffer += strideLength * baseSize ;
+    tbuf += (strideLength * baseExtent) ;
   }
-  oldBuffer = tempOldBuffer ;
-  newBuffer = tempNewBuffer ; 
-
   return bytesCopied ;
 }
 
@@ -468,24 +436,20 @@ DDT_HVector::DDT_HVector(int nCount, int blength, int stride,
 }
 
 int 
-DDT_HVector::copyBuffer(char* oldBuffer, char* newBuffer)
+DDT_HVector::serialize(char* userdata, char* buffer, int dir)
 {
-  char* tempOldBuffer = oldBuffer ;
-  char* tempBuffer = oldBuffer ;
-  char* tempNewBuffer = newBuffer ;
+  char* tbuf = userdata ;
   int  bytesCopied = 0 ;
 
   for(int i = 0 ; i < count; i++) {
-    oldBuffer = tempBuffer ;
+    userdata = tbuf ;
     for(int j = 0; j < blockLength; j++) {
-      bytesCopied += baseType->copyBuffer(oldBuffer, newBuffer);
-      newBuffer += baseSize ;
+      bytesCopied += baseType->serialize(userdata, buffer, dir);
+      buffer += baseSize ;
+      userdata += baseExtent;
     }  
-    tempBuffer += strideLength ;
+    tbuf += strideLength ;
   }
-  oldBuffer = tempOldBuffer ;
-  newBuffer = tempNewBuffer ; 
-
   return bytesCopied ;
 }
 
@@ -517,24 +481,19 @@ DDT_Indexed::DDT_Indexed(int nCount, int* arrBlock, int* arrDisp,
 }
 
 int 
-DDT_Indexed::copyBuffer(char* oldBuffer, char* newBuffer)
+DDT_Indexed::serialize(char* userdata, char* buffer, int dir)
 {
-  char* tempOldBuffer = oldBuffer ;
-  char* tempNewBuffer = newBuffer ;
+  char* tbuf = userdata ;
   int bytesCopied = 0 ;
 
   for(int i = 0 ; i < count; i++) {
-    oldBuffer = tempOldBuffer + baseSize * arrayDisplacements[i] ;
+    userdata = tbuf + baseSize * arrayDisplacements[i] ;
     for(int j = 0; j < arrayBlockLength[i] ; j++) {
-      bytesCopied +=  baseType->copyBuffer(oldBuffer, newBuffer);
-      newBuffer += baseSize ;
-      oldBuffer += baseExtent ;
+      bytesCopied +=  baseType->serialize(userdata, buffer, dir);
+      buffer += baseSize ;
+      userdata += baseExtent ;
     }
   }
-
-  oldBuffer = tempOldBuffer ;
-  newBuffer = tempNewBuffer ;
-
   return bytesCopied ;
 }
 
@@ -584,24 +543,19 @@ DDT_HIndexed::DDT_HIndexed(int nCount, int* arrBlock, int* arrDisp,
 }
 
 int 
-DDT_HIndexed::copyBuffer(char* oldBuffer, char* newBuffer)
+DDT_HIndexed::serialize(char* userdata, char* buffer, int dir)
 {
-  char* tempOldBuffer = oldBuffer ;
-  char* tempNewBuffer = newBuffer ;
+  char* tbuf = userdata ;
   int bytesCopied = 0 ;
 
   for(int i = 0 ; i < count; i++) {
-    oldBuffer = tempOldBuffer + arrayDisplacements[i] ;
+    userdata = tbuf + arrayDisplacements[i] ;
     for(int j = 0; j < arrayBlockLength[i] ; j++) {
-      bytesCopied += baseType->copyBuffer(oldBuffer, newBuffer);
-      newBuffer += baseSize ;
-      oldBuffer += baseExtent ;
+      bytesCopied += baseType->serialize(userdata, buffer, dir);
+      buffer += baseSize ;
+      userdata += baseExtent ;
     }
   }
-
-  oldBuffer = tempOldBuffer ;
-  newBuffer = tempNewBuffer ;
-
   return bytesCopied ;
 }
 
@@ -637,23 +591,19 @@ DDT_Struct::DDT_Struct(DDT* ddt, int nCount, int* arrBlock,
 }
 
 int 
-DDT_Struct::copyBuffer(char* oldBuffer, char* newBuffer)
+DDT_Struct::serialize(char* userdata, char* buffer, int dir)
 {
-  char* tempOldBuffer = oldBuffer ;
-  char* tempNewBuffer = newBuffer ;
+  char* tbuf = userdata ;
   int bytesCopied = 0 ;
 
   for(int i = 0 ; i < count ; i++) {
-    oldBuffer = tempOldBuffer + arrayDisplacements[i] ;
+    userdata = tbuf + arrayDisplacements[i] ;
     for(int j = 0 ; j < arrayBlockLength[i] ; j++) {
-      bytesCopied += arrayDataType[i]->copyBuffer(oldBuffer, newBuffer);
-      newBuffer += arrayDataType[i]->getSize();
-      oldBuffer += arrayDataType[i]->getExtent();
+      bytesCopied += arrayDataType[i]->serialize(userdata, buffer, dir);
+      buffer += arrayDataType[i]->getSize();
+      userdata += arrayDataType[i]->getExtent();
     }
   }
-  oldBuffer = tempOldBuffer ;
-  newBuffer = tempNewBuffer ;
-
   return bytesCopied ;
 }
 
