@@ -423,11 +423,31 @@ static stats::op_t op_deposit_views=stats::count_op("deposit.views","CkView coun
 static stats::op_t op_deposit_bytes=stats::count_op("deposit.bytes","CkView sizes","bytes");
 static stats::op_t op_deposit_pixels=stats::count_op("deposit.pixels","CkView pixels","pixels");
 
-
+/***** Saving Views to File ********/
 /// Destination to write incoming views to, or 0 if none (the normal case).
 CkpvStaticDeclare(FILE *,LV3D_save_views);
 static double LV3D_save_viewStart=0; ///< Time at view start
+static char *LV3D_copy_view_src=0, *LV3D_copy_view_dest=0;
 static stats::op_t op_save=stats::time_op("save.time","Time spent saving views to disk");
+
+static void LV3D_save_init(void) {
+	if (CkpvAccess(LV3D_save_views)) return;
+	if (LV3D_copy_view_src==0) return;
+	
+	char fName[1024];
+	sprintf(fName,LV3D_copy_view_src,CkMyPe());
+	FILE *f=fopen(fName,"wb");
+	if (f==NULL) CmiAbort("Couldn't create save view file!\n");
+	CkpvAccess(LV3D_save_views)=f;
+	CkPrintf("Created views file %s\n",fName);
+}
+
+static void LV3D_save_start(void)
+{
+	LV3D_save_init();
+	LV3D_save_viewStart=CkWallTimer(); //< HACK!
+}
+
 static void LV3D_save_view(LV3D0_ViewMsg *v) {
 	stats::op_sentry stats_sentry(op_save);
 	double t=CkWallTimer()-LV3D_save_viewStart;
@@ -435,6 +455,22 @@ static void LV3D_save_view(LV3D0_ViewMsg *v) {
 	if (1!=fwrite(&t,sizeof(t),1,f)) CmiAbort("Can't write to saved view file!\n");
 	if (1!=fwrite(v->view,v->view_size,1,f)) CmiAbort("Can't write to saved view file!\n");
 	delete v;
+}
+
+static void LV3D_save_finish(void) {
+	if (!CkpvAccess(LV3D_save_views)) return;
+	fclose(CkpvAccess(LV3D_save_views));
+	CkpvAccess(LV3D_save_views)=0;
+	if (LV3D_copy_view_dest) { /* Copy view file to dest directory */
+		char fSrc[1024], fDest[1024];
+		sprintf(fSrc,LV3D_copy_view_src,CkMyPe());
+		sprintf(fDest,LV3D_copy_view_dest,CkMyPe());
+		CkPrintf("Copying views file from %s to %s\n",fSrc,fDest);
+		if (-1==rename(fSrc,fDest)) {
+			perror(fDest);
+			CmiAbort("Error copying server file");
+		}
+	}
 }
 
 
@@ -531,7 +567,7 @@ public:
 		s->add(1.0,op_pes);
 		startTime=stats::time();
 		stats::swap(op_unknown);
-		LV3D_save_viewStart=CkWallTimer(); //< HACK!
+		LV3D_save_start();
 	}
 	void collect(void) { /* contribute current stats to reduction */
 		stats::stats *s=stats::get();
@@ -541,10 +577,7 @@ public:
 		contribute(sizeof(double)*stats::op_len,&s->t[0],CkReduction::sum_double,
 			CkCallback(printStats));
 		zero();
-		if (CkpvAccess(LV3D_save_views)) {
-			fclose(CkpvAccess(LV3D_save_views));
-			CkpvAccess(LV3D_save_views)=0;
-		}
+		LV3D_save_finish();
 	}
 	void traceOn(void) {
 		traceBegin();
@@ -776,14 +809,8 @@ void LV3D0_Init(LV3D_Universe *clientUniverse,LV3D_ServerMgr *mgr)
 void LV3D0_ProcInit(void) {
 	CkpvInitialize(FILE *,LV3D_save_views);
 	CkpvAccess(LV3D_save_views)=0;
-	char *fNamePat=0;
-	if (CmiGetArgStringDesc(CkGetArgv(),"+LV3D_save_views",&fNamePat,"Save rendered views to a file with this pattern.  Use like '/tmp/foo.%d.peviews'")) {
-		char fName[1024];
-		sprintf(fName,fNamePat,CkMyPe());
-		FILE *f=fopen(fName,"wb");
-		if (f==NULL) CmiAbort("Couldn't create save view file!\n");
-		CkpvAccess(LV3D_save_views)=f;
-	}
+	CmiGetArgStringDesc(CkGetArgv(),"+LV3D_save_views",&LV3D_copy_view_src,"Save rendered views to a file with this pattern.  Use like '/tmp/views.%d.pe'");
+	CmiGetArgStringDesc(CkGetArgv(),"+LV3D_copy_views",&LV3D_copy_view_dest,"Copy view files to this pattern.  Use like 'views.%d.pe'");
 	LV3D0_toMaster_bytesPer=LV3D0_toMaster_bytesPer/CkNumPes();
 	LV3D0_toMaster_bytesMax=LV3D0_toMaster_bytesMax/CkNumPes();
 }
