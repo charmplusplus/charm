@@ -205,10 +205,10 @@ FEM_Set_Mesh(int nelem, int nnodes, int ctype, int *connmat)
   if(_mainptr == 0) {
     CkAbort("FEM_Set_Mesh can be called from within _init only.\n");
   }
+#if FEM_FORTRAN
   int esize = (ctype==FEM_TRIANGULAR) ? 3:
               (ctype==FEM_HEXAHEDRAL) ? 8:
 	      4;
-#if FEM_FORTRAN
   // make the connmat row major
   c2r(nelem, esize, connmat);
 #endif
