@@ -7,15 +7,13 @@ can be a single integer (i.e. 1D array), several integers (i.e. a
 multidimentional array), or an arbitrary string of bytes (e.g. a binary tree
 index).
 
-In most respects, array elements are identical to chares.  Differences
-include variations in the creation and remote invocation syntax, to
-include the array index.  
-
-Array elements can be migrated, allowing arrays to be efficiently
+Array elements can be dynamically created and destroyed on any processor,
+and messages for the elements will still arrive properly.
+Array elements can be migrated at any time, allowing arrays to be efficiently
 load balanced.  Array elements can also receive array broadcasts and
 contribute to array reductions.
 
-\subsection{Creating an Array}
+\subsection{Declaring a 1D Array}
 
 You can declare a one-dimentional \index{array}\index{chare array}chare array
 as:
@@ -31,7 +29,16 @@ array [1D] A \{
 class M1:public CMessage_M1 \{
 //...message fields...
 \};
+\end{alltt}
 
+Just as every Chare inherits from the system class \kw{Chare}, every 
+array element inherits from the system class \kw{ArrayElement} (or one
+of its subclasses, \kw{ArrayElement1D}, \kw{ArrayElement2D}, or 
+\kw{ArrayElement3D}). Just as a Chare inherits ``thisChare'', each
+array element inherits ``thisArrayID'', the \kw{CkArrayID} of its array,
+and ``thisIndex'', the element's array index.
+
+\begin{alltt}
 class A : public ArrayElement1D \{
   public:
     A(void);
@@ -55,89 +62,8 @@ A::A(CkMigrateMessage *m) \{ \}
 Read the section ``Migratable Array Elements'' for more
 information on the \kw{CkMigrateMessage} constructor. 
 
-\subsection{Inserting and Destroying Array Elements}
 
-You create an array using the \kw{CProxy\_Array::ckNew}
-routine.  You insert elements into the array with the
-\kw{CProxy\_Array::insert} call, and start using
-the array with \kw{CProxy\_Array::doneInserting}.
-
-To create a 1D \index{array}array containing elements indexed 
-(0, 1, ..., \uw{num\_elements}-1), you can use the shorter:
-
-\begin{alltt}
-CProxy_A a = CProxy_A::ckNew(num_elements);
-\end{alltt}
-
-If \uw{A} has a constructor that takes a message, you can use
-
-\begin{alltt}
-CProxy_A a = CProxy_A::ckNew(msg,num_elements);
-\end{alltt}
-
-If you don't have a 1D array or don't want a contiguous range
-of elements, you insert array elements dynamically using the 
-\kw{insert} and \kw{doneInserting} methods:
-
-\begin{alltt}
-CProxy_A a = CProxy_A::ckNew(); //<- note no arguments
-a[17].insert(); //<- could also pass a message to constructor
-a[43].insert(); //<- could use a different message or constructor here
-a.doneInserting(); //<- needed because we used insert.
-\end{alltt}
-
-Insertion allows you to create sparse or multidimentional arrays,
-send a different message to each element, and specify the PE to create 
-the element on.  
-
-The \kw{doneInserting} call starts the the reduction manager (see ``Array
-Reductions'') and load balancer (see ``Load Balancer'')-- since
-these objects need to know about all the array's elements, they
-must be started after the initial elements are inserted.
-However, if you forget to call \kw{doneInserting}, the reduction manager 
-and load balancer will never start!
-
-You may call \kw{doneInserting} multiple times, but only the first
-call actually does anything.  You may even \kw{insert} or \kw{destroy}
-elements after a call to \kw{doneInserting}, with different semantics-- 
-see the reduction manager and load balancer sections for details.
-
-To summarize, if your constructor takes no message, you can use \kw{ckNew} 
-and \kw{insert} as:
-
-\begin{alltt}
-With 1D elements: ckNew(numInitial); //<- doesn't need doneInserting
-No elements:      ckNew(); //<- will need doneInserting
-Default PE:       insert();
-Specific PE:      insert(onPE);
-\end{alltt}
-
-And if your constructor takes a message:
-
-\begin{alltt}
-With 1D elements: ckNew(msg, numInitial); //<- doesn't need doneInserting
-No elements:      ckNew(); //<- will need doneInserting
-Default PE:       insert(msg);
-Specific PE:      insert(msg,onPE);
-\end{alltt}
-
-The system chooses the default PE to create an array element on
-based on the element's index: 1D indices map to processors in
-a round-robin fashion; other indices map based on a hash function
-applied to the index.
-
-To destroy an array element-- detach it from the array
-call its destructor, and release its memory--invoke its \kw{destroy} 
-entry method, as:
-
-\begin{alltt}
-a3(x,y,z).destroy();
-\end{alltt}
-
-After destroying an element, you may insert a new element at
-its index.
-
-\subsection{Messages and Broadcasts}
+\subsection{Declaring 2D, 3D, or User-defined Index Arrays}
 
 \charmpp{} contains direct support for 1D, 2D, 3D, and user-defined
 index arrays.  These arrays can be declared as:
@@ -151,11 +77,9 @@ array [3D] A3 \{ entry A3(); entry void e(MyMsg *m);\}
 array [Foo] AF \{ entry AF(); entry void e(MyMsg *m);\}
 \end{alltt}
 
-The last declaration expects an array index of type \uw{CkArrayIndexFoo},
+The last declaration expects an array index of type \kw{CkArrayIndex}\uw{Foo},
 which must be defined before including the \texttt{.decl.h} file 
-(see ``Defining a new array index type'' below).  
-Also, \texttt{charm++.h} must be included before the definition of the 
-\uw{CkArrayIndexFoo} type. 
+(see ``User-defined array index type'' below).  
 
 \begin{alltt}
 //In the .h file:
@@ -167,13 +91,116 @@ public:
 class A1:public ArrayElement1D \{ public: A1()\{\} ...\};
 class A2:public ArrayElement2D \{ public: A2()\{\} ...\};
 class A3:public ArrayElement3D \{ public: A3()\{\} ...\};
-class AF:public ArrayElement \{ public: AF()\{\} ...\};
-//(the migration constructors have been omitted for clarity)
+class AF:public ArrayElementT<CkArrayIndexFoo> 
+  \{ public: AF()\{\} ...\};
 \end{alltt}
 
-You can insert elements or invoke methods on the elements of these
-arrays by specifying the array index in parentheses.  For 1D 
-arrays or user-defined arrays, you can also use brackets.
+A 1D array element can access its index via its inherited ``thisIndex''
+field; a 2D via ``thisIndex.x'' and ``thisIndex.y'', and a 3D via
+``thisIndex.x'', ``thisIndex.y'', and ``thisIndex.z''.  A user-defined
+index array can access its index as ``thisIndex''.
+
+
+\subsection{Creating an Array}
+
+You create an array using the \kw{CProxy\_Array::ckNew}
+routine.  This returns a proxy object, which can
+be kept, copied, or sent in messages.
+The array proxy responds to the appropriate index call--
+for 1D arrays, use [i] or (i); for 2D use (x,y); for 3D
+use (x,y,z); and for user-defined types use [f] or (f).
+
+You insert elements into the array by indexing the proxy
+and calling insert.  The insert call optionally takes 
+a message, which is passed to the constructor, or a
+processor number, where the element will be created.
+Array elements can be inserted in any order from 
+any processor at any time.  Array elements need not 
+be contiguous.
+
+After creating elements, start using the array with 
+\kw{CProxy\_Array::doneInserting}:
+
+\begin{alltt}
+//In the .C file:
+int x,y,z;
+CProxy_A1 a1=CProxy_A1::ckNew();  //Creates new 1D array
+for (x=...) \{
+   a1[x  ].insert();  //Bracket syntax
+   a1(x+1).insert();  // or equivalent parenthesis syntax
+\}
+a1.doneInserting();
+
+CProxy_A2 a2=CProxy_A2::ckNew();   //Creates new 2D array
+for (x=...) for (y=...)
+   a2(x,y).insert();  //Can't use brackets!
+a2.doneInserting();
+
+CProxy_A3 a3=CProxy_A3::ckNew();   //Creates new 3D array
+for (x=...) for (y=...) for (z=...)
+   a3(x,y,z).insert();
+a3.doneInserting();
+
+CProxy_AF aF=CProxy_AF::ckNew();   //Creates new user-defined index array
+for (...) \{
+   aF[CkArrayIndexFoo(...)].insert(); //Use brackets...
+   aF(CkArrayIndexFoo(...)).insert(); //  ...or parenthesis
+\}
+aF.doneInserting();
+
+\end{alltt}
+
+To create a 1D \index{array}array containing elements indexed 
+(0, 1, ..., \uw{num\_elements}-1), you can use the shorter:
+
+\begin{alltt}
+CProxy_A1 a1 = CProxy_A1::ckNew(num_elements);
+\end{alltt}
+
+This is exactly equivalent to the loop:
+\begin{alltt}
+CProxy_A1 a = CProxy_A1::ckNew();
+for (i=0;i<num_elements;i++)
+	a1[i].insert();
+a1.doneInserting();
+\end{alltt}
+
+
+The \kw{doneInserting} call starts the the reduction manager (see ``Array
+Reductions'') and load balancer (see ``Load Balancer'')-- since
+these objects need to know about all the array's elements, they
+must be started after the initial elements are inserted.
+You may call \kw{doneInserting} multiple times, but only the first
+call actually does anything.  You may even \kw{insert} or \kw{destroy}
+elements after a call to \kw{doneInserting}, with different semantics-- 
+see the reduction manager and load balancer sections for details.
+
+If you do not specify one, the system will chooses a procesor to 
+create an array element on based on the element's index: 1D indices 
+map to processors in a round-robin fashion; other indices are mapped 
+based on a hash function applied to the index.
+
+To destroy an array element-- detach it from the array,
+call its destructor, and release its memory--invoke its 
+\kw{Array destroy} method, as:
+
+\begin{alltt}
+a3(x,y,z).destroy();
+\end{alltt}
+
+After destroying an element, you may insert a new element at
+its index.
+
+\subsection{Messages and Broadcasts}
+
+To send a \index{Array message} message to an array element, index the proxy 
+and call the method name, possibly passing a message:
+
+\begin{alltt}
+a1[i].doSomething(new MyMsg(7));
+a3(x,y,z).doAnother(new MyMsg(23));
+aF[CkArrayIndexFoo(...)].doAgain();
+\end{alltt}
 
 You may invoke methods on array elements that have not yet
 been created-- the system will buffer the message until the
@@ -183,43 +210,235 @@ Messages sent to migrating elements will be delivered after
 the migrating element arrives.  It is an error to send 
 a message to a deleted array element.
 
-\begin{alltt}
-//In the .C file:
-int x,y,z;
-CProxy_A1 a1=CProxy_A1::ckNew();
-a1[x  ].insert(); 
-a1(x+1).insert();
-a1.doneInserting();
-a1[x].e(new MyMsg(7));
 
-CProxy_A2 a2=CProxy_A2::ckNew(); 
-a2(x,y).insert();
-a2.doneInserting();
-a2(x,y).e(new MyMsg(7));
-
-CProxy_A3 a3=CProxy_A3::ckNew();
-a3(x,y,z).insert();
-a3.doneInserting();
-a3(x,y,z).e(new MyMsg(7);
-
-CProxy_AF aF=CProxy_AF::ckNew();
-aF(new CkArrayIndexFoo(...)).insert();
-aF[new CkArrayIndexFoo(...)].insert();
-aF.doneInserting();
-aF[new CkArrayIndexFoo(...)].e(new MyMsg(7);
-
-\end{alltt}
-
-With user-defined index types, you must pass a fresh index 
-(allocated with new) to a [] or () call in order to create an element proxy.
-System will delete the index in the destructor for the element proxy.
-
-To broadcast a message to all the current elements of an array, 
+To \index{Array broadcast} broadcast a message to all the current elements of an array, 
 simply omit the index, as:
 
 \begin{alltt}
-a3.e(new MyMsg(7)); //<- invokes e(7) on each array element
+a3.doIt(new MyMsg(7)); //<- invokes doIt(7) on each array element
 \end{alltt}
+
+The broadcast message will be delivered to every existing array 
+element exactly once.  Broadcasts work properly even with ongoing
+migrations, insertions, and deletions.
+
+
+\subsection{Reductions on Chare Arrays}
+A \index{Array reduction}reduction applies a single operation (e.g. add,
+max, min, ...) to data items scattered across many processors and
+collects the result in one place.  \charmpp{} supports reductions on the
+elements of a Chare array.
+
+The data to be reduced comes from each array element, 
+which must call the \kw{contribute} method:
+
+\begin{alltt}
+ArrayElement::contribute(int nBytes,void *data,ReducerType type);
+\end{alltt}
+
+This call contributes \kw{nBytes} bytes starting at \kw{data} to the
+reduction \kw{type} (see reduction types, below).  Unlike sending a
+message, you may use \kw{data} after the call to \kw{contribute}.  All
+array elements must call \kw{contribute}, and all must use the same
+reduction type.  
+
+When you create a new array element, it is expected
+to contribute to the next reduction not already in progress.  The
+reduction will complete properly even if array elements are migrated
+or deleted. No reduction will complete until the first DoneInserting
+is broadcast-- this gives every initial element a chance to contribute.
+
+If we want to sum each array element's single integer myInt, we would use:
+
+\begin{alltt}
+    //Inside any array element method
+    int myInt=get_myInt();
+    contribute(sizeof(int),(void *)\&myInt,CkReduction::sum_int);
+\end{alltt}
+
+The built-in reduction types (see below) can also handle arrays of
+numbers.  For example, if each element of an array has a pair of
+doubles \uw{forces}[2] which need to be summed up (separately) across
+all array elements, from each array element call:
+
+\begin{alltt}
+    //Inside any array element method
+    double forces[2]=get_my_forces();
+    contribute(2*sizeof(double),(void *)forces,CkReduction::sum_double);
+\end{alltt}
+
+Note that since C++ arrays (like \uw{forces}[2]) are already pointers, we 
+don't use (void *)\&\uw{forces}.
+
+
+After the data is reduced, it is passed to a ``client'' function on
+node zero.  This is an ordinary C or C++ function that you pass to
+\kw{CProxy\_Array::setReductionClient}.  Reduction clients are
+typically registered from your main Chare's constructor, as in:
+
+\begin{alltt}
+//Outside any class definition:
+void myClient(void *param,int dataSize,void *data)
+\{
+  double *forceSum=(double *)data;
+  cout<<``First force sum is ``<<forceSum[0]<<endl;
+  cout<<``Second force sum is ``<<forceSum[1]<<endl;
+\}
+
+...
+    //Inside main::main
+    myArray.setReductionClient(myClient,(void *)NULL);
+\end{alltt}
+
+This simple client prints out the double values received, and does not
+use the \uw{param} value passed in (\kw{NULL}, in this case).  The
+handler can use \uw{param}, \uw{dataSize}, and the data in any
+fashion; but the data will be deleted after the handler returns.
+
+
+\subsection{Built-in Array Reduction Types}
+
+\charmpp{} includes several built-in reduction types, used to combine the
+contributions from different array elements.  Any of them may be passed as an
+\kw{ArrayReductionFn} type to \kw{ArrayElement::contribute}.
+
+The first four reductions (sum, product, max, and min) work on int,
+float, or double data as indicated by the suffix.  The logical
+reductions (and, or) only work on integer data.  All the built-in
+reductions work on single numbers (pass a pointer) or arrays-- just
+pass the correct number of bytes to
+\kw{ArrayElement}::\kw{contribute}.
+
+\begin{enumerate}
+
+\item \kw{CkReduction::sum\_int}, \kw{sum\_float}, \kw{sum\_double}-- the
+result will be the sum of the given numbers.
+
+\item \kw{CkReduction::product\_int}, \kw{product\_float},
+\kw{product\_double}-- the result will be the product of the given numbers.
+
+\item \kw{CkReduction::max\_int}, \kw{max\_float}, \kw{max\_double}-- the
+result will be the largest of the given numbers.
+
+\item \kw{CkReduction::min\_int}, \kw{min\_float}, \kw{min\_double}-- the
+result will be the smallest of the given numbers.
+
+\item \kw{CkReduction::and}-- the result will be the logical AND of the given
+integers.  0 is false, nonzero is true.
+
+\item \kw{CkReduction::or}-- the result will be the logical OR of the given
+integers.
+
+\item \kw{CkReduction::set}-- the result will be a verbatim concatenation of
+all the contributed data, separated into \kw{CkReduction::setElement} records.
+The data contributed can be of any length, and can vary across array elements
+or reductions.  To extract the data from each element, see the description
+below.
+
+\end{enumerate}
+
+
+\kw{CkReduction::set} returns a collection of \kw{CkReduction::setElement}
+objects, one per contribution.  This class has definition:
+
+\begin{alltt}
+class CkReduction::setElement 
+\{
+public:
+  int dataSize;//The length of the data array below
+  char data[];//The (dataSize-long) array of data
+  CkReduction::setElement *next(void);
+\};
+\end{alltt}
+
+To extract the contribution of each array element from a reduction set, use the
+\uw{next} routine repeatedly:
+
+\begin{alltt}
+  //Inside a reduction handler-- 
+  //  data is our reduced data from CkReduction_set
+  CkReduction::setElement *cur=(CkReduction::setElement *)data;
+  while (cur!=NULL)
+  \{
+    ... //Use cur->dataSize and cur->data
+    //Now advance to the next element's contribution
+    cur=cur->next();
+  \}
+\end{alltt}
+
+The reduction set order is undefined.  Add a source field to your contribution
+if you need to know which array element gave a particular contribution.
+
+
+
+\subsection{User-defined array index type}
+
+\index{Array index type, user-defined}
+\charmpp{} array indices are arbitrary collections of integers.
+To define a new array index, you create an ordinary C++ class 
+which inherits from \kw{CkArrayIndex} and sets the ``nInts'' member
+to the length, in integers, of the array index.
+
+For example, if you have a structure or class named ``foo'', you 
+can use a \uw{foo} object as an array index by defining the class:
+
+\begin{alltt}
+#include <charm++.h>
+class CkArrayIndexFoo:public CkArrayIndex \{
+public:
+    foo f;
+
+    CkArrayIndexFoo(const foo \&in) 
+	\{
+		f=in;
+		nInts=sizeof(f)/sizeof(int);
+	\}
+\};
+\end{alltt}
+
+Note that \uw{foo}'s size must be an integral number of integers--
+you must pad it with zero bytes if this is not the case.
+Also, \uw{foo} must be a simple class-- it cannot contain 
+pointers, have virtual functions, or require a destructor.
+Finally, there is a \charmpp configuration-time option called
+CK\_ARRAYINDEX\_MAXLEN \index{CK\_ARRAYINDEX\_MAXLEN} 
+which is the largest allowable number of 
+integers in an array index.  The default is 3; but you may 
+override this to any value by passing ``-DCK\_ARRAYINDEX\_MAXLEN=n'' 
+to the \charmpp build script. Larger values will increase the
+size of each message.
+
+You can then declare an array indexed by \uw{foo} objects with
+
+\begin{alltt}
+//in the .ci file:
+array [Foo] AF \{ entry AF(); ... \}
+
+//in the .h file:
+class AF:public ArrayElementT<CkArrayIndexFoo>
+\{ public: AF() \{\} ... \}
+
+//in the .C file:
+    foo f;
+    CProxy_AF a=CProxy_AF::ckNew();
+    a[new CkArrayIndexFoo(f)].insert();
+    ...
+\end{alltt}
+
+\kw{ArrayElementT} is a class templated by the index type \uw{foo}.
+The array index is then accessible as ``thisIndex'':
+For example:
+
+\begin{alltt}
+
+//in the .C file:
+AF::AF()
+\{
+    CkArrayIndexFoo myF=thisIndex;
+    functionTakingFoo(myF);
+\}
+\end{alltt}
+
 
 \subsection{Migratable Array Elements}
 Array objects can \index{migrate}migrate from one PE to another.
@@ -246,7 +465,7 @@ public:
 //In the .C file:
 void A2::pup(PUP::er \&p)
 \{
-    ArrayElement2D::pup(p); //<- call superclass's pup routine
+    ArrayElement2D::pup(p); //<- MUST call superclass's pup routine
     p(nt);
     p(chr);
     p(flt,7);
@@ -346,225 +565,23 @@ of load balancing strategy routines).
 
 There are two ways to use the load balancer-- the AtSync
 method, for elements that only want to be migrated at certain
-times; and the non-AtSync method, for elements that can migrate
-any time.
+times; and the Anytime method, for elements that can migrate
+at any time.
 
-The non-AtSync method is the default.  Your elements may be
+The Anytime method is the default.  Your elements may be
 asked to migrate any time they are not currently executing
 an entry method.
 
 For the AtSync method, set \kw{usesAtSync} to true in your 
 array element constructor.  When an element is ready to migrate,
 call \kw{ArrayElement::AtSync}.  Once all elements have reached \kw{AtSync}, 
+and after the first DoneInserting call,
 the load balancer runs and may migrate elements.  Once
 all migrations are complete, the load balancer calls 
 \kw{ArrayElement::ResumeFromSync}.  You must ensure no messages are
 sent to an array element between its calls to \kw{AtSync} and
 \kw{ResumeFromSync}. \kw{AtSync}/\kw{ResumeFromSync} is currently
 a implemented as a global barrier.
-
-\subsection{Reductions on Chare Arrays}
-A \index{reduction}reduction applies a single operation (e.g. add,
-max, min, ...) to data items scattered across many processors and
-collects the result in one place.  \charmpp{} supports reductions on the
-elements of a Chare array.
-
-The data to be reduced comes from each array element, 
-which must call the \kw{contribute} method:
-
-\begin{alltt}
-ArrayElement::contribute(int nBytes,void *data,ReducerType type);
-\end{alltt}
-
-This call contributes \kw{nBytes} bytes starting at \kw{data} to the
-reduction \kw{type} (see reduction types, below).  Unlike sending a
-message, you may use \kw{data} after the call to \kw{contribute}.  All
-array elements must call \kw{contribute}, and all must use the same
-reduction type.  When you create a new array element, it is expected
-to contribute to the next reduction not already in progress.  The
-reduction will complete properly even if array elements are migrated
-or deleted.
-
-If we want to sum each array element's single integer myInt, we would use:
-
-\begin{alltt}
-    //Inside any array element method
-    int myInt=get_myInt();
-    contribute(sizeof(int),(void *)\&myInt,CkReduction::sum_int);
-\end{alltt}
-
-The built-in reduction types (see below) can also handle arrays of
-numbers.  For example, if each element of an array has a pair of
-doubles \uw{forces}[2] which need to be summed up (separately) across
-all array elements, from each array element call:
-
-\begin{alltt}
-    //Inside any array element method
-    double forces[2]=get_my_forces();
-    contribute(2*sizeof(double),(void *)forces,CkReduction::sum_double);
-\end{alltt}
-
-Note that since C++ arrays (like \uw{forces}[2]) are already pointers, we 
-don't use (void *)\&\uw{forces}.
-
-
-After the data is reduced, it is passed to a ``client'' function on
-node zero.  This is an ordinary C or C++ function that you pass to
-\kw{CProxy\_Array::setReductionClient}.  Reduction clients are
-typically registered from your main Chare's constructor, as in:
-
-\begin{alltt}
-//Outside any class definition:
-void myClient(void *param,int dataSize,void *data)
-\{
-  double *forceSum=(double *)data;
-  cout<<``First force sum is ``<<forceSum[0]<<endl;
-  cout<<``Second force sum is ``<<forceSum[1]<<endl;
-\}
-
-...
-    //Inside main::main
-    CProxy_A a=CProxy_A::ckNew();
-    a.setReductionClient(myClient,(void *)NULL);
-\end{alltt}
-
-This simple client prints out the double values received, and does not
-use the \uw{param} value passed in (\kw{NULL}, in this case).  The
-handler can use \uw{param}, \uw{dataSize}, and the data in any
-fashion; but the data will be deleted after the handler returns.
-
-
-\subsection{Built-in Array Reduction Types}
-
-\charmpp{} includes several built-in reduction types, used to combine the
-contributions from different array elements.  Any of them may be passed as an
-\kw{ArrayReductionFn} type to \kw{ArrayElement::contribute}.
-
-The first four reductions (sum, product, max, and min) work on int,
-float, or double data as indicated by the suffix.  The logical
-reductions (and, or) only work on integer data.  All the built-in
-reductions work on single numbers (pass a pointer) or arrays-- just
-pass the correct number of bytes to
-\kw{ArrayElement}::\kw{contribute}.
-
-\begin{enumerate}
-
-\item \kw{CkReduction::sum\_int}, \kw{sum\_float}, \kw{sum\_double}-- the
-result will be the sum of the given numbers.
-
-\item \kw{CkReduction::product\_int}, \kw{product\_float},
-\kw{product\_double}-- the result will be the product of the given numbers.
-
-\item \kw{CkReduction::max\_int}, \kw{max\_float}, \kw{max\_double}-- the
-result will be the largest of the given numbers.
-
-\item \kw{CkReduction::min\_int}, \kw{min\_float}, \kw{min\_double}-- the
-result will be the smallest of the given numbers.
-
-\item \kw{CkReduction::and}-- the result will be the logical AND of the given
-integers.  0 is false, nonzero is true.
-
-\item \kw{CkReduction::or}-- the result will be the logical OR of the given
-integers.
-
-\item \kw{CkReduction::set}-- the result will be a verbatim concatenation of
-all the contributed data, separated into \kw{CkReduction::setElement} records.
-The data contributed can be of any length, and can vary across array elements
-or reductions.  To extract the data from each element, see the description
-below.
-
-\end{enumerate}
-
-
-\kw{CkReduction::set} returns a collection of \kw{CkReduction::setElement}
-objects, one per contribution.  This class has definition:
-
-\begin{alltt}
-class CkReduction::setElement 
-\{
-public:
-  int dataSize;//The length of the data array below
-  char data[];//The (dataSize-long) array of data
-  CkReduction::setElement *next(void);
-\};
-\end{alltt}
-
-To extract the contribution of each array element from a reduction set, use the
-\uw{next} routine repeatedly:
-
-\begin{alltt}
-  //Inside a reduction handler-- 
-  //  data is our reduced data from CkReduction_set
-  CkReduction::setElement *cur=(CkReduction::setElement *)data;
-  while (cur!=NULL)
-  \{
-    ... //Use cur->dataSize and cur->data
-    //Now advance to the next element's contribution
-    cur=cur->next();
-  \}
-\end{alltt}
-
-The reduction set order is undefined.  Add a source field to your contribution
-if you need to know which array element gave a particular contribution.
-
-\subsection{Defining a new array index type}
-
-\charmpp{} array indices are arbitrary collections of bytes.
-To define a new array index, you create an ordinary C++ class 
-which inherits from \kw{CkArrayIndex} and overrides the \kw{getKey} method.  
-For example, if you have a structure or class named ``foo'', you 
-can use a \uw{foo} object as an array index by defining the class:
-
-\begin{alltt}
-class CkArrayIndexFoo:public CkArrayIndex \{
-public:
-    foo f;
-
-    CkArrayIndexFoo(const foo \&in) \{f=in;\}
-
-    //This method returns the length of and a pointer to the index data.
-    //The returned pointer must be aligned to at least an integer boundary.
-    virtual const unsigned char *getKey(/*out*/ int \&nBytes) const \{
-      	nBytes=sizeof(foo);
-        return (const unsigned char *)\&f;
-    \}
-\};
-\end{alltt}
-
-You can then declare an array indexed by \uw{foo} objects with
-
-\begin{alltt}
-//in the .ci file:
-array [Foo] AF \{ entry AF(); ... \}
-
-//in the .h file:
-class AF:public ArrayElement \{ public: AF() \{\} ... \}
-
-//in the .C file:
-    foo f;
-    CProxy_AF a=CProxy_AF::ckNew();
-    a[new CkArrayIndexFoo(f)].insert();
-    ...
-\end{alltt}
-
-Inside an \kw{ArrayElement}, you can get the bytes of your index
-from the ``thisindex'' variable, which has type \kw{CkArrayIndexGeneric*}.  
-It may be more convenient, however, to inherit from \kw{ArrayElementT} a 
-class templated in the index type \uw{foo} (stored as ``thisIndex'').
-For example:
-
-\begin{alltt}
-//.ci file unchanged
-//in the .h file:
-class AF:public ArrayElementT<foo> \{public: AF() \{\} ... \}
-
-//in the .C file:
-AF::AF()
-\{
-    foo myF=thisIndex;
-    functionTakingFoo(myF);
-\}
-\end{alltt}
 
 
 \subsection{Array Syntax Changes}
