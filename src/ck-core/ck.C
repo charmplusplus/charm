@@ -654,11 +654,11 @@ static void _processArrayEltMsg(CkCoreState *ck,envelope *env) {
 void _processHandler(void *converseMsg,CkCoreState *ck)
 {
   register envelope *env = (envelope *) converseMsg;
-#if CMK_RECORD_REPLAY
+//#if CMK_RECORD_REPLAY
   if (ck->watcher!=NULL) {
     if (!ck->watcher->processMessage(env,ck)) return;
   }
-#endif
+//#endif
   switch(env->getMsgtype()) {
 // Group support
     case BocInitMsg :
@@ -1145,13 +1145,14 @@ public:
 	}
 	
 	virtual CmiBool processMessage(envelope *env,CkCoreState *ck) {
-		fprintf(f,"%d %d %d\n",env->getSrcPe(),env->getTotalsize(),env->getEvent());
+                if (env->getEvent())
+		     fprintf(f,"%d %d %d\n",env->getSrcPe(),env->getTotalsize(),env->getEvent());
 		return CmiTrue;
 	}
 };
 
-// #define REPLAYDEBUG(args) ckout<<"["<<CkMyPe()<<"] "<< args <<endl;
-#define REPLAYDEBUG(args) /* empty */
+#define REPLAYDEBUG(args) ckout<<"["<<CkMyPe()<<"] "<< args <<endl;
+//#define REPLAYDEBUG(args) /* empty */
 
 class CkMessageReplay : public CkMessageWatcher {
 	FILE *f;
@@ -1195,6 +1196,7 @@ public:
 	~CkMessageReplay() {fclose(f);}
 	
 	virtual CmiBool processMessage(envelope *env,CkCoreState *ck) {
+                if (env->getEvent() == 0) return CmiTrue;
 		if (isNext(env)) { /* This is the message we were expecting */
 			REPLAYDEBUG("Executing message: "<<env->getSrcPe()<<" "<<env->getTotalsize()<<" "<<env->getEvent())
 			getNext(); /* Advance over this message */
@@ -1225,6 +1227,8 @@ static FILE *openReplayFile(const char *permissions) {
 void CkMessageWatcherInit(char **argv,CkCoreState *ck) {
 	if (CmiGetArgFlagDesc(argv,"+record","Record message processing order"))
 		ck->watcher=new CkMessageRecorder(openReplayFile("w"));
+        else
+                CmiPrintf("Watcher is not used\n"); 
 	if (CmiGetArgFlagDesc(argv,"+replay","Re-play recorded message stream"))
 		ck->watcher=new CkMessageReplay(openReplayFile("r"));
 }
