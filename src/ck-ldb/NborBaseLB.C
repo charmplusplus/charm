@@ -13,6 +13,7 @@
 #include "charm++.h"
 #include "BaseLB.h"
 #include "NborBaseLB.h"
+#include "LBDBManager.h"
 #include "NborBaseLB.def.h"
 
 //CreateLBFunc_Def(NborBaseLB);
@@ -37,12 +38,11 @@ NborBaseLB::NborBaseLB(const CkLBOptions &opt): BaseLB(opt)
   lbname = (char *)"NborBaseLB";
   mystep = 0;
   thisProxy = CProxy_NborBaseLB(thisgroup);
-  theLbdb->
+  receiver = theLbdb->
     AddLocalBarrierReceiver((LDBarrierFn)(staticAtSync),
 			    (void*)(this));
-  theLbdb->
-    NotifyMigrated((LDMigratedFn)(staticMigrated),
-		   (void*)(this));
+  notifier = theLbdb->getLBDB()->
+    NotifyMigrated((LDMigratedFn)(staticMigrated), (void*)(this));
 
 
   // I had to move neighbor initialization outside the constructor
@@ -56,14 +56,14 @@ NborBaseLB::NborBaseLB(const CkLBOptions &opt): BaseLB(opt)
   topo = topofn();
 
   mig_msgs_expected = 0;
-  neighbor_pes = 0;
+  neighbor_pes = NULL;
   stats_msg_count = 0;
-  statsMsgsList = 0;
-  statsDataList = 0;
+  statsMsgsList = NULL;
+  statsDataList = NULL;
   migrates_completed = 0;
   migrates_expected = -1;
   mig_msgs_received = 0;
-  mig_msgs = 0;
+  mig_msgs = NULL;
 
   myStats.pe_speed = theLbdb->ProcessorSpeed();
 //  char hostname[80];
@@ -82,7 +82,19 @@ NborBaseLB::NborBaseLB(const CkLBOptions &opt): BaseLB(opt)
 
 NborBaseLB::~NborBaseLB()
 {
-  CkPrintf("Going away\n");
+#if CMK_LBDB_ON
+  theLbdb = CProxy_LBDatabase(_lbdb).ckLocalBranch();
+  if (theLbdb) {
+    theLbdb->getLBDB()->
+      RemoveNotifyMigrated(notifier);
+    //theLbdb->
+    //  RemoveStartLBFn((LDStartLBFn)(staticStartLB));
+  }
+  if (statsMsgsList) delete [] statsMsgsList;
+  if (statsDataList) delete [] statsDataList;
+  if (neighbor_pes)  delete [] neighbor_pes;
+  if (mig_msgs)      delete [] mig_msgs;
+#endif
 }
 
 void NborBaseLB::FindNeighbors()

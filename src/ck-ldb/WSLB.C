@@ -13,11 +13,12 @@
 #ifndef  WIN32
 #include <unistd.h>
 #endif
-#include <charm++.h>
+#include "charm++.h"
 #include <BaseLB.h>
 #include <cklists.h>
 #include "heap.h"
 #include "WSLB.h"
+#include "LBDBManager.h"
 
 // Temporary vacating flags
 // Set PROC to -1 to disable
@@ -62,7 +63,7 @@ WSLB::WSLB(const CkLBOptions &opt) : BaseLB(opt)
   mystep = 0;
   theLbdb->
     AddLocalBarrierReceiver((LDBarrierFn)(staticAtSync),(void*)(this));
-  theLbdb->
+  notifier = theLbdb->getLBDB()->
     NotifyMigrated((LDMigratedFn)(staticMigrated),(void*)(this));
 
 
@@ -76,14 +77,14 @@ WSLB::WSLB(const CkLBOptions &opt) : BaseLB(opt)
   // I had to move neighbor initialization outside the constructor
   // in order to get the virtual functions of any derived classes
   // so I'll just set them to illegal values here.
-  neighbor_pes = 0;
+  neighbor_pes = NULL;
   stats_msg_count = 0;
-  statsMsgsList = 0;
-  statsDataList = 0;
+  statsMsgsList = NULL;
+  statsDataList = NULL;
   migrates_completed = 0;
   migrates_expected = -1;
   mig_msgs_received = 0;
-  mig_msgs = 0;
+  mig_msgs = NULL;
 
   myStats.proc_speed = theLbdb->ProcessorSpeed();
 //  char hostname[80];
@@ -103,7 +104,19 @@ WSLB::WSLB(const CkLBOptions &opt) : BaseLB(opt)
 
 WSLB::~WSLB()
 {
-  CkPrintf("Going away\n");
+#if CMK_LBDB_ON
+  theLbdb = CProxy_LBDatabase(_lbdb).ckLocalBranch();
+  if (theLbdb) {
+    theLbdb->getLBDB()->
+      RemoveNotifyMigrated(notifier);
+    //theLbdb->
+    //  RemoveStartLBFn((LDStartLBFn)(staticStartLB));
+  }
+  if (statsMsgsList) delete [] statsMsgsList;
+  if (statsDataList) delete [] statsDataList;
+  if (neighbor_pes)  delete [] neighbor_pes;
+  if (mig_msgs)      delete [] mig_msgs;
+#endif
 }
 
 void WSLB::FindNeighbors()

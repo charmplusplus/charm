@@ -73,8 +73,12 @@ void NullLB::init()
 
 NullLB::~NullLB()
 {
-  theLbdb->RemoveLocalBarrierReceiver(receiver);
-  theLbdb->RemoveStartLBFn((LDStartLBFn)(staticStartLB));
+  // the LBDatabase object may have been deleted.
+  theLbdb = CProxy_LBDatabase(_lbdb).ckLocalBranch();
+  if (theLbdb) {
+    theLbdb->RemoveLocalBarrierReceiver(receiver);
+    theLbdb->RemoveStartLBFn((LDStartLBFn)(staticStartLB));
+  }
 }
 
 void NullLB::staticAtSync(void* data)
