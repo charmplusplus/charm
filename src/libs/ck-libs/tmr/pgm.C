@@ -161,7 +161,7 @@ init(void)
 		}
 		fclose(f);
 	}
-	
+	printf("Number of edges %d \n",nEdge);
 	FEM_Register_entity(FEM_Mesh_default_write(),FEM_SPARSE,NULL,nEdge,nEdge,resize_edges);
 	FEM_Register_array(FEM_Mesh_default_write(),FEM_SPARSE,FEM_CONN,edgeConn,FEM_INDEX_0,2);
 	FEM_Register_array(FEM_Mesh_default_write(),FEM_SPARSE,FEM_BOUNDARY,edgeBoundary,FEM_INT,1);
@@ -453,6 +453,7 @@ void resize_elems(void *data,int *len,int *max){
 };
 
 void resize_edges(void *data,int *len,int *max){
+	printf("[%d] resize edges called len %d max %d\n",FEM_My_partition(),*len,*max);
 	FEM_Register_entity(FEM_Mesh_default_read(),FEM_SPARSE,data,*len,*max,resize_edges);
 	myGlobals *g = (myGlobals *)data;
 	
@@ -603,7 +604,7 @@ CkPrintf("[%d] end init\n",myChunk);
       CkPrintf("[%d] Starting refinement step: %d nodes, %d elements to %.3g\n",
 	       myChunk,g.nnodes,g.nelems,curArea);
 			
-			FEM_REFINE2D_Split(FEM_Mesh_default_read(),FEM_NODE,(double *)loc,FEM_ELEM,areas);
+			FEM_REFINE2D_Split(FEM_Mesh_default_read(),FEM_NODE,(double *)loc,FEM_ELEM,areas,FEM_SPARSE);
 			repeat_after_split((void *)&g);
 
 			
