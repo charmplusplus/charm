@@ -12,8 +12,8 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.1  1995-09-06 04:21:31  sanjeev
- * new Charm++ syntax, CHARE_BLOCK changes
+ * Revision 2.2  1995-09-20 14:51:25  sanjeev
+ * *** empty log message ***
  *
  * Revision 2.0  1995/06/05  19:01:24  brunner
  * Reorganized directory structure
@@ -87,6 +87,7 @@ extern char CurrentSharedHandle[] ;
 extern AccStruct *CurrentAcc ;
 extern ChareInfo *CurrentCharePtr ;
 extern char *EpMsg;
+extern char CurrentAsterisk[] ;
 extern char SendEP[] ;
 extern char SendChare[] ;
 extern char SendPe[] ;

@@ -12,11 +12,8 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.5  1995-09-19 22:49:08  sanjeev
+ * Revision 2.6  1995-09-20 14:51:25  sanjeev
  * *** empty log message ***
- *
- * Revision 2.4  1995/09/19  22:41:19  sanjeev
- * fixed "handle" bug
  *
  * Revision 2.0  1995/06/05  19:01:24  brunner
  * Reorganized directory structure
@@ -341,8 +338,8 @@ char *id ;
 {
 	table[*size].name = (char *)malloc(sizeof(char)*strlen(id)) ;
 	strcpy(table[*size].name,id) ;
-	table[*size].typestr = (char *)malloc((strlen(CurrentTypedef)+1)*sizeof(char)) ;
-	strcpy(table[*size].typestr, CurrentTypedef) ;
+	table[*size].typestr = (char *)malloc((strlen(CurrentAsterisk)+1)*sizeof(char)) ;
+	strcpy(table[*size].typestr, CurrentAsterisk) ;
 	(*size)++ ;
 }
 
