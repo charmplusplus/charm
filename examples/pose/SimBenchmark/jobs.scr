@@ -1,0 +1,29 @@
+fsub pgm.seq 10000 10 1 RANDOM SPARSE 50 2000 -gf 334 +n1 +ppn1 -stdout seq.1.out
+
+fsub pgm.opt 10000 10 1 RANDOM SPARSE 50 2000 -gf 334 +n1 +ppn1 -stdout opt.1.out
+fsub pgm.opt 10000 10 1 RANDOM SPARSE 50 2000 -gf 334 +n1 +ppn2 -stdout opt.2.out
+fsub pgm.opt 10000 10 1 RANDOM SPARSE 50 2000 -gf 334 +n1 +ppn4 -stdout opt.4.out
+fsub pgm.opt 10000 10 1 RANDOM SPARSE 50 2000 -gf 334 +n2 +ppn4 -stdout opt.8.out
+fsub pgm.opt 10000 10 1 RANDOM SPARSE 50 2000 -gf 334 +n4 +ppn4 -stdout opt.16.out
+fsub pgm.opt 10000 10 1 RANDOM SPARSE 50 2000 -gf 334 +n8 +ppn4 -stdout opt.32.out
+
+fsub pgm.ad3 10000 10 1 RANDOM SPARSE 50 2000 -gf 334 +n1 +ppn1 -stdout ad3.1.out
+fsub pgm.ad3 10000 10 1 RANDOM SPARSE 50 2000 -gf 334 +n1 +ppn2 -stdout ad3.2.out
+fsub pgm.ad3 10000 10 1 RANDOM SPARSE 50 2000 -gf 334 +n1 +ppn4 -stdout ad3.4.out
+fsub pgm.ad3 10000 10 1 RANDOM SPARSE 50 2000 -gf 334 +n2 +ppn4 -stdout ad3.8.out
+fsub pgm.ad3 10000 10 1 RANDOM SPARSE 50 2000 -gf 334 +n4 +ppn4 -stdout ad3.16.out
+fsub pgm.ad3 10000 10 1 RANDOM SPARSE 50 2000 -gf 334 +n8 +ppn4 -stdout ad3.32.out
+
+fsub pgm.lb 10000 10 1 RANDOM SPARSE 50 2000 -gf 334 +n1 +ppn1 -stdout lb.1.out
+fsub pgm.lb 10000 10 1 RANDOM SPARSE 50 2000 -gf 334 +n1 +ppn2 -stdout lb.2.out
+fsub pgm.lb 10000 10 1 RANDOM SPARSE 50 2000 -gf 334 +n1 +ppn4 -stdout lb.4.out
+fsub pgm.lb 10000 10 1 RANDOM SPARSE 50 2000 -gf 334 +n2 +ppn4 -stdout lb.8.out
+fsub pgm.lb 10000 10 1 RANDOM SPARSE 50 2000 -gf 334 +n4 +ppn4 -stdout lb.16.out
+fsub pgm.lb 10000 10 1 RANDOM SPARSE 50 2000 -gf 334 +n8 +ppn4 -stdout lb.32.out
+
+fsub pgm.all 10000 10 1 RANDOM SPARSE 50 2000 -gf 334 +n1 +ppn1 -stdout all.1.out
+fsub pgm.all 10000 10 1 RANDOM SPARSE 50 2000 -gf 334 +n1 +ppn2 -stdout all.2.out
+fsub pgm.all 10000 10 1 RANDOM SPARSE 50 2000 -gf 334 +n1 +ppn4 -stdout all.4.out
+fsub pgm.all 10000 10 1 RANDOM SPARSE 50 2000 -gf 334 +n2 +ppn4 -stdout all.8.out
+fsub pgm.all 10000 10 1 RANDOM SPARSE 50 2000 -gf 334 +n4 +ppn4 -stdout all.16.out
+fsub pgm.all 10000 10 1 RANDOM SPARSE 50 2000 -gf 334 +n8 +ppn4 -stdout all.32.out
