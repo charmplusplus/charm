@@ -27,7 +27,6 @@
 
 #define CMI_BROADCAST_ROOT(msg)          ((CmiMsgHeaderBasic *)msg)->root
 #define CMI_DEST_RANK(msg)               ((CmiMsgHeaderBasic *)msg)->rank
-#define CMI_MSG_TYPE(msg)                ((CmiMsgHeaderBasic *)msg)->type
 
 #if CMK_BROADCAST_SPANNING_TREE
 #  define CMI_SET_BROADCAST_ROOT(msg, root)  CMI_BROADCAST_ROOT(msg) = (root);
@@ -38,16 +37,16 @@
 ELAN_BASE     *elan_base;
 ELAN_TPORT    *elan_port;
 ELAN_QUEUE    *elan_q;
-const int SMALL_MESSAGE_SIZE= 2048;     /* for comm bench */
+const int SMALL_MESSAGE_SIZE= 4096;    /* for comm bench */
                                      /* Message sizes greater will be 
 					  probe received adding 5us overhead*/
-#define SYNC_MESSAGE_SIZE 165000
+#define SYNC_MESSAGE_SIZE 32768
                                        /* Message sizes greater will be 
 				       sent synchronously thus avoiding copying*/
 
 #define NON_BLOCKING_MSG  256          /* Message sizes greater 
 					  than this will be sent asynchronously*/
-#define RECV_MSG_Q_SIZE 16
+#define RECV_MSG_Q_SIZE 8
 
 ELAN_EVENT *esmall[RECV_MSG_Q_SIZE], *elarge;
 #define TAG_SMALL 0x69
@@ -70,9 +69,11 @@ static int MsgQueueBytes=0;
 static int request_max;
 static int request_bytes;
 
-#include "queueing.h"
+//#include "queueing.h"
+//Queue localMsgBuf;
 
-Queue localMsgBuf;
+#include "pcqueue.h"
+PCQueue localBufferQueue;
 
 int outstandingMsgs[3000];
 int ppn_factor = 1;                    //The size affinity group for 
@@ -304,7 +305,8 @@ static void CmiReleaseSentMessages(void)
 	  sent_msgs = temp;
 	else
 	  prev->next = temp;
-	
+
+	/*
 	if(CMI_MSG_TYPE(msg_tmp->msg) != 2) {
 	  if(SIZEFIELD(msg_tmp->msg) == SMALL_MESSAGE_SIZE) {
 	    //	  CmiPrintf("ELAN Returning message to queue\n");
@@ -317,7 +319,8 @@ static void CmiReleaseSentMessages(void)
 	  // Dont do any thing the message has been statically allocated
 	}
 	else
-	  CmiFree(msg_tmp->msg);
+        */
+        CmiFree(msg_tmp->msg);
       
 	CmiFree(msg_tmp);
 	msg_tmp = temp;
@@ -387,12 +390,14 @@ int PumpMsgs(int retflag)
 	//if(CmiMyPe() == 0)
 	//	CmiPrintf("%d:Posting %d, %d\n", CmiMyPe(), ecount, post_idx);
 
+          /*
 	if(!CqsEmpty(localMsgBuf)) {
-	  //CmiPrintf("ELAN Getting message from queue\n");
-	  CqsDequeue(localMsgBuf, (void *)&sbuf[ecount]);
+            //CmiPrintf("ELAN Getting message from queue\n");
+            CqsDequeue(localMsgBuf, (void *)&sbuf[ecount]);
 	}
 	else
-	  sbuf[ecount] = (char *) CmiAlloc(SMALL_MESSAGE_SIZE);
+          */
+          sbuf[ecount] = (char *) CmiAlloc(SMALL_MESSAGE_SIZE);
 	
 	esmall[ecount] = elan_tportRxStart(elan_port, 0, 0, 0, -1, TAG_SMALL, sbuf[ecount], SMALL_MESSAGE_SIZE);
 	recv_small_done[ecount] = 1;
@@ -529,8 +534,13 @@ int remote_get_done(void *e){
 }
 
 void remote_get_wait_all(){
-  elan_getWaitAll(elan_base->state, ELAN_WAIT_EVENT);
+    elan_getWaitAll(elan_base->state, ELAN_WAIT_EVENT);
 }
+
+void remote_put_wait_all(){
+    elan_putWaitAll(elan_base->state, ELAN_WAIT_EVENT);
+}
+
 
 /********************* MESSAGE RECEIVE FUNCTIONS ******************/
 void *CmiGetNonLocal(void)
@@ -598,16 +608,19 @@ void CmiSyncSendFn(int destPE, int size, char *msg)
 {
   CmiState cs = CmiGetState();
   char *dupmsg;
+  /*
   if(size <= SMALL_MESSAGE_SIZE){
     if(!CqsEmpty(localMsgBuf)) 
       CqsDequeue(localMsgBuf, (void **)&dupmsg);
     else 
-      dupmsg = CmiAlloc(SMALL_MESSAGE_SIZE);
+  
+  dupmsg = CmiAlloc(SMALL_MESSAGE_SIZE);
     
-    CMI_MSG_TYPE(dupmsg) = 1;
+  CMI_MSG_TYPE(dupmsg) = 1;
   }
   else
-    dupmsg = (char *) CmiAlloc(size);
+  */
+  dupmsg = (char *) CmiAlloc(size);
   memcpy(dupmsg, msg, size);
   
   //  CmiPrintf("Setting root to %d\n", 0);
@@ -770,12 +783,14 @@ void CmiFreeSendFn(int destPE, int size, char *msg)
     if(size <= NON_BLOCKING_MSG) {
       (void)elan_tportTxWait(elan_tportTxStart(elan_port, 0, destPE, CmiMyPe(), TAG_SMALL, msg, size));
 
+      /*
       if(SIZEFIELD(msg) == SMALL_MESSAGE_SIZE) {
 	//	CmiPrintf("ELAN Returning message to queue\n");
 	CqsEnqueue(localMsgBuf, msg);
       }
       else
-	CmiFree(msg);
+      */
+      CmiFree(msg);
     }
     else
       CmiAsyncSendFn(destPE, size, msg);
@@ -981,6 +996,77 @@ static void ConverseRunPE(int everReturn)
   }
 }
 
+void elan_barrier(){
+  elan_gsync(elan_base->allGroup);
+}
+
+#define TYPE_FIELD(buf) ((int *)buf)[0]
+#define SIZE_FIELD(buf) ((int *)buf)[2]
+#define REF_FIELD(buf)  ((int *)buf)[3]
+
+#define CONV_BUF_START(res) ((char *)res - 2*sizeof(int))
+#define USER_BUF_START(res) ((char *)res - 4*sizeof(int))
+
+#define DYNAMIC_MESSAGE 0
+#define STATIC_MESSAGE 1
+
+void *elan_CmiAlloc(int size){
+    char *res = NULL;
+    char *buf;
+    
+    if(size <= SMALL_MESSAGE_SIZE + 2 * sizeof(int)) {
+        size = SMALL_MESSAGE_SIZE + 4 * sizeof(int);
+        if(!PCQueueEmpty(localBufferQueue))
+            buf = PCQueuePop(localBufferQueue);
+        else
+            buf = (char *)malloc_nomigrate(size);
+    }
+    else 
+        buf =(char *)malloc_nomigrate(size + 2 * sizeof(int));
+
+    TYPE_FIELD(buf) = DYNAMIC_MESSAGE;
+    res = (char *)((char *)buf + 2 * sizeof(int));
+    return res;
+}
+
+void elan_CmiFree(void *res){
+
+    char *buf = CONV_BUF_START(res);
+    
+    if(TYPE_FIELD(buf) != DYNAMIC_MESSAGE)
+        return;
+   
+    //Called from Cmifree so we know the size and 
+    //we dont hve to store it again
+    int size = SIZE_FIELD(buf);
+    if(size <= SMALL_MESSAGE_SIZE) 
+        PCQueuePush(localBufferQueue, buf);
+    else       
+        free_nomigrate(buf);
+}
+
+//Called from the application for static messages which 
+//should not be freed by the system.
+void *elan_CmiStaticAlloc(int size){
+    char *res = NULL;
+    char *buf =(char *)malloc_nomigrate(size + 3 *sizeof(int));
+
+    TYPE_FIELD(buf) = STATIC_MESSAGE;
+    SIZE_FIELD(buf) = size;
+    REF_FIELD(buf) = 0;
+
+    res = buf + 3 *sizeof(int);
+    return res;
+}
+
+void elan_CmiStaticFree(void *res){
+    char *buf = USER_BUF_START(res);
+    if(TYPE_FIELD(buf) != STATIC_MESSAGE)
+        return;
+
+    free_nomigrate(buf);
+}
+
 void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
 {
   int n,i ;
@@ -992,7 +1078,8 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
 
   putenv("LIBELAN_SHM_ENABLE=1");
 
-  localMsgBuf = CqsCreate();
+  localBufferQueue = PCQueueCreate();
+  //localMsgBuf = CqsCreate();
 
   if (!(elan_base = elan_baseInit())) {
     perror("Failed elan_baseInit()");
@@ -1009,16 +1096,16 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
   
   int nslots = elan_base->tport_nslots;
   
-  if(nslots < elan_base->state->nvp)
-  nslots = elan_base->state->nvp;
-  if(nslots > 256)
-  nslots = 256;
-
+  //if(nslots < elan_base->state->nvp)
+  //  nslots = elan_base->state->nvp;
+  //if(nslots > 256)
+  //  nslots = 256;
+  
   if (!(elan_port = elan_tportInit(elan_base->state,
 				   elan_q,
 				   nslots /*elan_base->tport_nslots*/, 
 				   elan_base->tport_smallmsg,
-				   100000, //elan_base->tport_bigmsg,
+				   elan_base->tport_bigmsg,
 				   elan_base->waitType, elan_base->retryCount,
 				   &(elan_base->shm_key),
 				   elan_base->shm_fifodepth, 

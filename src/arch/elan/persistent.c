@@ -196,6 +196,8 @@ void persistentRequestHandler(void *env)
 
 void persistentReqGrantedHandler(void *env)
 {
+
+  //CmiPrintf("Persistent handler granted\n");
   PersistentReqGrantedMsg *msg = (PersistentReqGrantedMsg *)env;
   PersistentHandle h = msg->sourceHandlerIndex;
   PersistentSendsTable *slot = (PersistentSendsTable *)h;
@@ -226,6 +228,7 @@ void CmiSendPersistentMsg(PersistentHandle h, int destPE, int size, void *m)
 
   if (slot->destAddress) {
     ELAN_EVENT *e1, *e2;
+    //CmiPrintf("[%d]Calling elan put\n", CmiMyPe());
     e1 = elan_put(elan_base->state, m, slot->destAddress, size, destPE);
 #if 1
     PMSG_LIST *msg_tmp;
@@ -235,7 +238,7 @@ void CmiSendPersistentMsg(PersistentHandle h, int destPE, int size, void *m)
     elan_wait(e1, ELAN_POLL_EVENT);
     e2 = elan_put(elan_base->state, &size, slot->destSizeAddress, sizeof(int), destPE);
     elan_wait(e2, ELAN_POLL_EVENT);
-//CmiPrintf("[%d] elan finished. \n", CmiMyPe());
+    //CmiPrintf("[%d] elan finished. \n", CmiMyPe());
     CmiFree(m);
 #endif
   }
@@ -248,12 +251,13 @@ void CmiSendPersistentMsg(PersistentHandle h, int destPE, int size, void *m)
     slot->messageBuf = m;
     slot->messageSize = size;
 #else
-  /* normal send */
-  PersistentHandle  *phs_tmp = phs;
-  int phsSize_tmp = phsSize;
-  phs = NULL; phsSize = 0;
-  CmiSyncSendAndFree(slot->destPE, size, m);
-  phs = phs_tmp; phsSize = phsSize_tmp;
+    /* normal send */
+    PersistentHandle  *phs_tmp = phs;
+    int phsSize_tmp = phsSize;
+    phs = NULL; phsSize = 0;
+    CmiPrintf("[%d]Slot sending message directly\n", CmiMyPe());
+    CmiSyncSendAndFree(slot->destPE, size, m);
+    phs = phs_tmp; phsSize = phsSize_tmp;
 #endif
   }
 }
@@ -282,14 +286,15 @@ static int remote_put_done(PMSG_LIST *smsg)
   int flag = elan_poll(smsg->e, ELAN_POLL_EVENT);
   if (flag) {
     if (smsg->sent == 1) {
-/*
-CmiPrintf("remote_put_done on %d\n", CmiMyPe());
-*/
-      return 2;
+        /*
+          CmiPrintf("remote_put_done on %d\n", CmiMyPe());
+        */
+        return 2;
     }
     else {
       smsg->sent = 1;
       CmiFree(smsg->msg);
+
       PersistentSendsTable *slot = (PersistentSendsTable *)(smsg->h);
       smsg->e = elan_put(elan_base->state, &smsg->size, slot->destSizeAddress, sizeof(int), smsg->destpe);
       return 1;
@@ -334,17 +339,19 @@ void PumpPersistent()
       void *msg = slot->messagePtr;
 
 #if 1
-      // return messagePtr directly and user MUST make sure not to delete it.
-      void *dupmsg = CmiAlloc(size);
+      // return messagePtr directly and user MUST make sure not to delete it.      
+      void *dupmsg;
+      dupmsg = CmiAlloc(size);
+      
       _MEMCHECK(dupmsg);
       memcpy(dupmsg, msg, size);
       msg = dupmsg;
 #endif
-//CmiPrintf("[%d] %p size:%d rank:%d root:%d\n", CmiMyPe(), msg, size, CMI_DEST_RANK(msg), CMI_BROADCAST_ROOT(msg));
+      //CmiPrintf("[%d] %p size:%d rank:%d root:%d\n", CmiMyPe(), msg, size, CMI_DEST_RANK(msg), CMI_BROADCAST_ROOT(msg));
 
       CmiPushPE(CMI_DEST_RANK(msg), msg);
 #if CMK_BROADCAST_SPANNING_TREE
-        if (CMI_BROADCAST_ROOT(msg))
+      if (CMI_BROADCAST_ROOT(msg))
           SendSpanningChildren(size, msg);
 #endif
       slot->recvSize = 0;
