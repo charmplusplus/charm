@@ -110,8 +110,6 @@ void ComlibManager::init(){
 
     cmgrID = thisgroup;
 
-    slist_top = NULL;
-    slist_end = NULL;
     curStratID = 0;
 
     //initialize the strategy table.
@@ -140,7 +138,6 @@ void ComlibManager::createId(){
 
 void ComlibManager::createId(int *pelist, int npes){
     
-    slist_top = slist_end = NULL;
     Strategy *strat;
     if(strategyID != USE_MPI) 
         strat = new EachToManyStrategy(strategyID, npes, pelist);
@@ -152,30 +149,19 @@ void ComlibManager::createId(int *pelist, int npes){
 }
 
 int ComlibManager::createInstance(Strategy *strat) {
-    StrategyList* tmpStrat = new StrategyList;
-    tmpStrat->strategy = strat;
-
-    tmpStrat->next = NULL;
-    if(slist_end)
-        slist_end->next = tmpStrat;
-    else       //First strategy
-        slist_top = tmpStrat;
-    slist_end = tmpStrat;
-
-    nstrats ++;
-    return nstrats - 1;
+  ListOfStrategies.enq(strat);
+  nstrats++;
+  return nstrats - 1;
 }
 
 void ComlibManager::doneCreating() {
     StrategyWrapper sw;
     sw.s_table = new Strategy* [nstrats];
-    StrategyList *sptr = slist_top;
+    Strategy *aStrategy = ListOfStrategies.deq();
     sw.nstrats = nstrats;
     
-    for (int count = 0; count < nstrats; count ++){
-        sw.s_table[count] = sptr->strategy;
-        sptr = sptr->next;
-    }
+    for (int count=0; count<nstrats; count++)
+        sw.s_table[count] = aStrategy;
 
     CProxy_ComlibManager cgproxy(cmgrID);
     cgproxy.receiveTable(sw);

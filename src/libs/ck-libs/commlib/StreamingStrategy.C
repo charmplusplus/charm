@@ -1,93 +1,75 @@
 #include "StreamingStrategy.h"
 
 void call_endIteration(void *arg){
-    //    CkPrintf("Calling Flush\n");
   ((StreamingStrategy *)arg)->periodicFlush();
   return;
 }
 
 StreamingStrategy::StreamingStrategy(int period){
-    /*
-      streamingMsgBuf = new CharmMessageHolder*[CkNumPes()];
-      streamingMsgCount = new int[CkNumPes()];
-      for(int count = 0; count < CkNumPes(); count ++){
-      streamingMsgBuf[count] = NULL;
-      streamingMsgCount[count] = 0;
-      }
-    */
-
-    PERIOD = period;
+  /*
+  streamingMsgBuf = new CkQ<CharmMessageHolder *>[CkNumPes()];
+  streamingMsgCount = new int[CkNumPes()];
+  for (int count=0; count<CkNumPes(); count++)
+    streamingMsgBuf[count] = NULL;
+  */
+  PERIOD = period;
 }
 
-void StreamingStrategy::insertMessage(CharmMessageHolder *cmsg){
-  cmsg->next = streamingMsgBuf[cmsg->dest_proc];
-  streamingMsgBuf[cmsg->dest_proc] = cmsg;
-  streamingMsgCount[cmsg->dest_proc] ++;
+void StreamingStrategy::insertMessage(CharmMessageHolder *cmsg) {
+  streamingMsgBuf[cmsg->dest_proc].enq(cmsg);
+  streamingMsgCount[cmsg->dest_proc]++;
 }
 
 void StreamingStrategy::doneInserting(){
-    ComlibPrintf("[%d] In Streaming strategy\n", CkMyPe());
-    //Do nothing
+  ComlibPrintf("[%d] In Streaming strategy\n", CkMyPe());
+  //Do nothing
 }
 
 void StreamingStrategy::periodicFlush(){
-    CharmMessageHolder *cmsg;
-        
-    int buf_size = 0, count = 0;
-    for(count = 0; count < CkNumPes(); count ++) {
-        //        CkPrintf("Streaming Strategy: Processing proc[%d], %d \n", 
-        //        count, streamingMsgCount[count]);
-        
-        if(streamingMsgCount[count] == 0)
-            continue;
-        
-        cmsg = streamingMsgBuf[count];
-        char ** msgComps = new char*[streamingMsgCount[count]];
-        int *sizes = new int[streamingMsgCount[count]];
-        
-        int msg_count = 0;
-        while (cmsg != NULL) {
-            char * msg = cmsg->getCharmMessage();
-            envelope * env = UsrToEnv(msg);
-            sizes[msg_count] = env->getTotalsize();
-            msgComps[msg_count] = (char *)env;
-            
-            cmsg = cmsg->next;
-            msg_count ++;
-        }
-        
-        CmiMultipleSend(count, streamingMsgCount[count], sizes, msgComps);
-        delete [] msgComps;
-        delete [] sizes;
-        
-        cmsg = streamingMsgBuf[count];
-        CharmMessageHolder *prev = NULL;
-        
-        while(cmsg != NULL){
-            prev = cmsg;
-            cmsg = cmsg->next;
-            delete prev;
-        }
-        
-        streamingMsgCount[count] = 0;        
-        streamingMsgBuf[count] = NULL;
+  CharmMessageHolder *cmsg, *toBeDeleted = NULL;
+  envelope *env;
+  char **msgComps, *msg;
+  int *sizes, msg_count;
+
+  for (int count=0; count<CkNumPes(); count++) {
+    if(streamingMsgCount[count] == 0)
+      continue;
+    msgComps = new char*[streamingMsgCount[count]];
+    sizes = new int[streamingMsgCount[count]];
+    msg_count = 0;
+    while (!streamingMsgBuf[count].isEmpty()) {
+      cmsg = streamingMsgBuf[count].deq();
+      msg = cmsg->getCharmMessage();
+      env = UsrToEnv(msg);
+      sizes[msg_count] = env->getTotalsize();
+      msgComps[msg_count] = (char *)env;
+      msg_count++;
+      cmsg->next = toBeDeleted;
+      toBeDeleted = cmsg;
     }
-    
-    CcdCallFnAfter(call_endIteration, (void *)this, PERIOD);
+    CmiMultipleSend(count, streamingMsgCount[count], sizes, msgComps);
+    delete [] msgComps;
+    delete [] sizes;
+    streamingMsgCount[count] = 0;        
+  }
+  cmsg = toBeDeleted;
+  while (toBeDeleted) {
+    toBeDeleted = toBeDeleted->next;
+    delete cmsg;
+    cmsg = toBeDeleted;
+  }
+  CcdCallFnAfter(call_endIteration, (void *)this, PERIOD);
 }
 
 void StreamingStrategy::pup(PUP::er &p){
-    p | PERIOD;
-    
-    if(p.isUnpacking()) {
-        streamingMsgBuf = new CharmMessageHolder*[CkNumPes()];
-        streamingMsgCount = new int[CkNumPes()];
-        for(int count = 0; count < CkNumPes(); count ++){
-            streamingMsgBuf[count] = NULL;
-            streamingMsgCount[count] = 0;
-        }
-        periodicFlush();
-    }
+  p | PERIOD;
+  if(p.isUnpacking()) {
+    streamingMsgBuf = new CkQ<CharmMessageHolder *>[CkNumPes()];
+    streamingMsgCount = new int[CkNumPes()];
+    for(int count = 0; count < CkNumPes(); count ++)
+      streamingMsgCount[count] = 0;
+    periodicFlush();
+  }
 }
 
 PUPable_def(StreamingStrategy);

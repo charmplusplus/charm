@@ -84,11 +84,6 @@ class DummyMsg: public CMessage_DummyMsg {
     int dummy;
 };
 
-struct StrategyList {
-    Strategy *strategy;
-    StrategyList *next;
-};
-
 struct StrategyTable {
     Strategy *strategy;
     CkQ<CharmMessageHolder*> tmplist;
@@ -121,8 +116,7 @@ class ComlibManager: public CkDelegateMgr{
     int strategyID; //Identifier of the strategy
 
     StrategyTable strategyTable[MAX_NSTRAT]; //A table of strategy pointers
-    StrategyList *slist_top;      //Tmp list of strategies
-    StrategyList *slist_end;
+    CkQ<Strategy *> ListOfStrategies;
     int nstrats, curStratID;      //Number of strategies created by the user.
 
     //flags
