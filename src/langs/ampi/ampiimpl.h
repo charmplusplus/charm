@@ -98,6 +98,8 @@ class AmpiMsg : public CMessage_AmpiMsg {
   static AmpiMsg *unpack(void *in) { return new (in) AmpiMsg; }
 };
 
+#define AMPI_MAXUDATA 20
+
 class ampi : public ArrayElement1D {
   public: // entry methods
     ampi(void);
@@ -126,9 +128,10 @@ class ampi : public ArrayElement1D {
     void barrier(void);
     void bcast(int root, void* buf, int count, int type);
     static void bcastraw(void* buf, int len, CkArrayID aid);
+    int register_userdata(void *, AMPI_PupFn);
+    void *get_userdata(int);
   public:
     CmmTable msgs;
-    int msize;
     CthThread thread_id;
     int tsize;
     int nbcasts;
@@ -138,6 +141,9 @@ class ampi : public ArrayElement1D {
     int nirequests;
     int firstfree;
     DDT *myDDT ;
+    int nudata;
+    void *userdata[AMPI_MAXUDATA];
+    AMPI_PupFn pup_ud[AMPI_MAXUDATA];
 
     virtual void pup(PUP::er &p);
     virtual void start(void); // should be overloaded in derived class

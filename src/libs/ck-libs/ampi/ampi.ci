@@ -1,4 +1,5 @@
 module ampi {
+  extern module MetisLB;
   message [packed] ArgsInfo;
   message [varsize] AmpiMsg;
   array[1D] ampi {

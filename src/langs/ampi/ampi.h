@@ -53,6 +53,14 @@ typedef struct {
 typedef int AMPI_Datatype;
 typedef int*  AMPI_Aint ;
 
+#include "pup_c.h"
+
+#if AMPI_FORTRAN
+typedef void (*AMPI_PupFn)(pup_er, void*);
+#else
+typedef void *(*AMPI_PupFn)(pup_er, void*);
+#endif
+
 int AMPI_Init(int *argc, char*** argv);
 int AMPI_Comm_rank(AMPI_Comm comm, int *rank);
 int AMPI_Comm_size(AMPI_Comm comm, int *size);
@@ -122,6 +130,9 @@ int AMPI_Comm_dup(AMPI_Comm comm, AMPI_Comm *newcomm);
 int AMPI_Comm_free(AMPI_Comm *comm);
 int AMPI_Abort(AMPI_Comm comm, int errorcode);
 void AMPI_Print(char *str);
+int AMPI_Register(void *, AMPI_PupFn);
+void AMPI_Migrate(void);
+void *AMPI_Get_userdata(int);
 #ifdef __cplusplus
 }
 #endif

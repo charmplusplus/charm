@@ -174,7 +174,30 @@ void ampi::pup(PUP::er &p)
 {
   ArrayElement1D::pup(p);//Pack superclass
   msgs = CmmPup((pup_er)&p, msgs);
-  thread_id = CthPup((pup_er) &p, thread_id);
+  p(tsize);
+  void *tbuf;
+  // thread needs to be packed later than user data, but needs to be unpacked
+  // earlier than the user data
+  if(p.isPacking())
+    tbuf = p.getBuf(tsize);
+  if(p.isUnpacking() || p.isSizing())
+    thread_id = CthPup((pup_er) &p, thread_id, &tsize);
+  p(nudata);
+  int i;
+  for(i=0;i<nudata;i++) {
+    p((void*)&(userdata[i]), sizeof(void*));
+    p((void*)&(pup_ud[i]), sizeof(AMPI_PupFn));
+#if AMPI_FORTRAN
+    pup_ud[i]((pup_er) &p, userdata[i]);
+#else
+    userdata[i] = pup_ud[i]((pup_er) &p, userdata[i]);
+#endif
+  }
+  if(p.isPacking())
+  {
+    PUP::toMem tm((PUP::myByte*)tbuf);
+    thread_id = CthPup((pup_er) &tm, thread_id, &tsize);
+  }
   p(nbcasts);
   // persistent comm requests will have to be re-registered after
   // migration anyway, so no need to pup them
@@ -195,6 +218,25 @@ void ampi::pup(PUP::er &p)
     }
   }
   myDDT->pup(p);
+  if(p.isPacking())
+    CthFree(thread_id);
+}
+
+int
+ampi::register_userdata(void *d, AMPI_PupFn f)
+{
+  if(nudata==AMPI_MAXUDATA)
+    CkAbort("AMPI> UserData registration limit exceeded.!\n");
+  userdata[nudata] = d;
+  pup_ud[nudata] = f;
+  nudata++;
+  return (nudata-1);
+}
+
+void *
+ampi::get_userdata(int idx)
+{
+  return userdata[idx];
 }
 
 // This is invoked in the Fortran (and C ?) version of AMPI
@@ -781,6 +823,20 @@ void AMPI_Print(char *str)
 {
   ampi *ptr = CtvAccess(ampiPtr);
   CkPrintf("[%d] %s\n", ptr->thisIndex, str);
+}
+
+extern "C"
+int AMPI_Register(void *d, AMPI_PupFn f)
+{
+  ampi *ptr = CtvAccess(ampiPtr);
+  return ptr->register_userdata(d, f);
+}
+
+extern "C"
+void *AMPI_Get_userdata(int idx)
+{
+  ampi *ptr = CtvAccess(ampiPtr);
+  return ptr->get_userdata(idx);
 }
 
 #include "ampi.def.h"

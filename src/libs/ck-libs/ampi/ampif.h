@@ -22,3 +22,6 @@
   integer, parameter :: AMPI_MIN=2
   integer, parameter :: AMPI_SUM=3
   integer, parameter :: AMPI_PROD=4
+
+  integer, external :: AMPI_Register
+  double precision, external :: AMPI_Wtime

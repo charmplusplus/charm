@@ -465,3 +465,25 @@ ampi_print_
   AMPI_Print(tmpstr);
   delete[] tmpstr;
 }
+
+extern "C" void
+#if CMK_FORTRAN_USES_ALLCAPS
+AMPI_MIGRATE
+#else
+ampi_migrate_
+#endif
+  (void)
+{
+  AMPI_Migrate();
+}
+
+extern "C" int
+#if CMK_FORTRAN_USES_ALLCAPS
+AMPI_REGISTER
+#else
+ampi_register_
+#endif
+  (void *d, AMPI_PupFn f)
+{
+  return AMPI_Register(d,f);
+}

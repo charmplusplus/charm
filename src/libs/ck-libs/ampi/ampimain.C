@@ -13,6 +13,7 @@ static void allReduceHandler(void *redtype,int dataSize,void *data)
   }
 }
 
+extern void CreateMetisLB(void);
 ampimain::ampimain(CkArgMsg *m)
 {
   int i;
@@ -29,6 +30,7 @@ ampimain::ampimain(CkArgMsg *m)
       break;
     }
   }
+  CreateMetisLB();
   numDone = 0;
   ampiAid = CProxy_ampi::ckNew(nblocks);
   CProxy_ampi jarray(ampiAid);
