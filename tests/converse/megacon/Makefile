@@ -85,3 +85,9 @@ clean:
 	rm -f TAGS *.o
 	rm -f pgm
 	rm -f conv-host charmrun
+
+test: pgm
+	./charmrun ./pgm +p1
+	./charmrun ./pgm +p2
+	./charmrun ./pgm +p3
+	./charmrun ./pgm +p4
