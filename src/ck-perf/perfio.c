@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.0  1995-06-02 17:40:29  brunner
+ * Revision 2.1  1997-03-14 21:41:11  milind
+ * Fixed projections output bugs..
+ *
+ * Revision 2.0  1995/06/02 17:40:29  brunner
  * Reorganized directory structure
  *
  * Revision 1.2  1994/11/16  20:06:25  sanjeev
@@ -171,7 +174,7 @@ int event, pe;
 
 	case BEGIN_INTERRUPT:
 	case END_INTERRUPT:
-		fprintf(fp, "%d %d", event, pe);
+		fprintf(fp, "%u %d %d", time, event, pe);
 		break;
 
 	case BEGIN_COMPUTATION:
