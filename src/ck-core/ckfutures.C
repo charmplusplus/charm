@@ -103,6 +103,12 @@ void *CkWaitFuture(CkFutureID handle)
   }
   fut = (fs->array)+handle;
   value = fut->value;
+#ifndef CMK_OPTIMIZE
+  if (value==NULL) 
+	CkAbort("ERROR! CkWaitFuture would have to return NULL!\n"
+	"This can happen when a thread that calls a sync method "
+	"gets a CthAwaken call *before* the sync method returns.");
+#endif
   return value;
 }
 
@@ -118,6 +124,9 @@ static void setFuture(CkFutureID handle, void *pointer)
   FutureState *fs = &(CpvAccess(futurestate));
   Future *fut = (fs->array)+handle;
   fut->ready = 1;
+#ifndef CMK_OPTIMIZE
+  if (pointer==NULL) CkAbort("setFuture called with NULL!");
+#endif
   fut->value = pointer;
   for (t=fut->waiters; t; t=CthGetNext(t))
     CthAwaken(t);
@@ -212,6 +221,9 @@ public:
   FutureBOC(FutureInitMsg *m) { delete m; }
   FutureBOC(CkMigrateMessage *m) {}
   void SetFuture(FutureInitMsg * m) { 
+#ifndef CMK_OPTIMIZE
+    if (m==NULL) CkAbort("FutureBOC::SetFuture called with NULL!");
+#endif
     int key;
     key = UsrToEnv((void *)m)->getRef();
     setFuture( key, m);
