@@ -30,15 +30,20 @@ class VidBlock {
     VidState state;
     PtrQ *msgQ;
     CkChareID actualID;
+    void msgDeliver(envelope *env) {
+        env->setSrcPe(CkMyPe());           
+        env->setMsgtype(ForChareMsg);
+        env->setObjPtr(actualID.objPtr);
+        CldEnqueue(actualID.onPE, env, _infoIdx);
+        CpvAccess(_qd)->create();      
+    }
   public:
     VidBlock() ;
     void send(envelope *env) {
       if(state==UNFILLED) {
         msgQ->enq((void *)env);
       } else {
-        env->setObjPtr(actualID.objPtr);
-        CldEnqueue(actualID.onPE, env, _infoIdx);
-        CpvAccess(_qd)->create();
+        msgDeliver(env);
       }
     }
     void fill(int onPE, void *oPtr, int magic) {
@@ -48,9 +53,7 @@ class VidBlock {
       actualID.magic = magic;
       envelope *env;
       while(NULL!=(env=(envelope*)msgQ->deq())) {
-        env->setObjPtr(actualID.objPtr);
-        CldEnqueue(actualID.onPE, env, _infoIdx);
-        CpvAccess(_qd)->create();
+        msgDeliver(env);
       }
       delete msgQ; msgQ=0;
     }
