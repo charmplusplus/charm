@@ -1,6 +1,6 @@
 #ifndef REF_H
 #define REF_H
-#include "charm++.h"
+#include <charm++.h>
 
 class objRef { // a reference to a piece of data that may be remotely located
  public:

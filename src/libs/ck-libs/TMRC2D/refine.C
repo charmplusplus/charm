@@ -164,6 +164,23 @@ public:
 		nResults++;
 		res.push_back(resRec(elementID,collapseEdge,nodeToKeep,nX,nY,flag));
 	};
+	int countResults(){return nResults;}
+	void extract(int i,int *conn,int *tri,int *nodeToThrow,int *nodeToKeep,double *nx,double *ny,int *flag,int idxbase){
+		int t;
+		t = res[i].elemID;
+		*tri = t +idxbase;
+		*nodeToKeep = res[i].nodeToKeep;
+		int n1 = res[i].collapseEdge;
+		int n2 = (res[i].collapseEdge)%3;
+		if(*nodeToKeep == n1){
+			*nodeToThrow = n2;
+		}else{
+			*nodeToThrow = n1;
+		}
+		*nx = res[i].nx;
+		*ny = res[i].ny;
+		*flag = res[i].flag;
+	}
 };
 
 
@@ -246,6 +263,25 @@ FDECL void FTN_NAME(REFINE2D_GET_SPLIT,refine2d_get_split)
   TCHARM_API_TRACE("REFINE2D_Get_Split", "refine");
   refineResults *r=getResults();
   r->extract(*splitNo-1,conn,triDest,A,B,C,fracDest,1,flags);
+}
+
+static coarsenResults *getCoarsenResults(void) {
+  chunk *C = CtvAccess(_refineChunk);
+  if (!C)
+    CkAbort("Did you forget to call REFINE2D_Init?");
+  coarsenResults *ret=C->coarsenResultsStorage;
+  if (ret==NULL)
+    CkAbort("Did you forget to call REFINE2D_Coarsen?");
+  return ret;
+}
+
+
+CDECL int REFINE2D_Get_Collapse_Length(){
+	return getCoarsenResults()->countResults();
+}
+
+CDECL void REFINE2D_Get_Collapse(int i,int *conn,int *tri,int *nodeToThrow,int *nodeToKeep,double *nx,double *ny,int *flag,int idxbase){
+	return getCoarsenResults()->extract(i,conn,tri,nodeToThrow,nodeToKeep,nx,ny,flag,idxbase);
 }
 
 /********************* Check *****************/
