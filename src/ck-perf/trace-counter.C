@@ -458,7 +458,7 @@ void CountLogPool::write(int phase)
 
   FILE* fp = (phase==-1) ? openFile() : openFile(phase); 
   fprintf(fp, "ver:%3.1f %d/%d ep:%d counters:%d\n", 
-	  CpvAccess(version), CmiMyPe(), CmiNumPes(), _numEntries, 
+	  CpvAccess(version), CmiMyPe(), CmiNumPes(), _numEntries+1, 
 	  stats_.numStats());
   stats_.write(fp);
   fclose(fp);
@@ -619,7 +619,7 @@ void TraceCounter::traceInit(char **argv)
   commandLineSz_ = numCounters;
 
   // check to see if args are valid, output if not
-  if (badArg || CmiGetArgFlag(argv, "+counterhelp")) {
+  if (badArg || CmiGetArgFlag(argv, "+count-help")) {
     if (CmiMyPe() == 0) { printHelp(); }
     ConverseExit();  return;
   }
@@ -811,6 +811,7 @@ void TraceCounter::traceEnd() {
     }
     reductionPhase_++;
     CpvAccess(_logPool)->doReduction(reductionPhase_, idleTime_); 
+    CmiPrintf("idleTime (us)=%f\n", idleTime_);
     if (writeByPhase_) {
       idleTime_ = 0.0;
       CpvAccess(_logPool)->clearEps(); 
@@ -1175,7 +1176,7 @@ void TraceCounter::usage() {
     "REQUIRED: +counters <counter>\n"
     "\n"
     "  +counters <counters>: Where <counters> is comma delimited list\n"
-    "                        of valid counters.  Type '+counterhelp' to\n"
+    "                        of valid counters.  Type '+count-help' to\n"
     "                        get a list of valid counters.\n"
     "\n"
     "OPTIONAL: [+count-overview] [+count-switchrandom] [+switchbyphase]\n"
