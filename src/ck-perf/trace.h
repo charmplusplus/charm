@@ -91,6 +91,8 @@ class Trace {
     virtual void traceWriteSts() {}
     // do any clean-up necessary for tracing
     virtual void traceClose() {}
+
+    virtual ~Trace() {} /* for whining compilers */
 };
 
 #define ALLDO(x) for (int i=0; i<length(); i++) if (traces[i]->traceOnPE()) traces[i]->x
