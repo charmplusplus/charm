@@ -687,17 +687,10 @@ class AmpiMsg : public CMessage_AmpiMsg {
   int length; //Number of bytes in message (for pup)
   void *data;
 
-  AmpiMsg(void) { data = (char *)this + sizeof(AmpiMsg); }
+  AmpiMsg(void) { data = NULL; }
   AmpiMsg(int _s, int t, int sIdx,int sRank, int l, int c) :
     seq(_s), tag(t),srcIdx(sIdx), srcRank(sRank), comm(c), length(l) {
-    data = (char *)this + sizeof(AmpiMsg);
   }
-  static void *alloc(int msgnum, size_t size, int *sizes, int pbits) {
-    if(sizes==NULL) return CkAllocMsg(msgnum, size, pbits);
-    else return CkAllocMsg(msgnum, size+sizes[0], pbits);
-  }
-  static void *pack(AmpiMsg *in) { return (void *) in; }
-  static AmpiMsg *unpack(void *in) { return new (in) AmpiMsg; }
   static AmpiMsg* pup(PUP::er &p, AmpiMsg *m)
   {
     int seq, length, tag, srcIdx, srcRank, comm;
@@ -711,7 +704,7 @@ class AmpiMsg : public CMessage_AmpiMsg {
     }
     p(seq); p(tag); p(srcIdx); p(srcRank); p(comm); p(length);
     if(p.isUnpacking()) {
-      m = new (&length, 0) AmpiMsg(seq, tag, srcIdx, srcRank, length, comm);
+      m = new (length, 0) AmpiMsg(seq, tag, srcIdx, srcRank, length, comm);
     }
     p(m->data, length);
     if(p.isDeleting()) {

@@ -1,5 +1,7 @@
 module ampi {
-  message AmpiMsg;
+  message AmpiMsg {
+    char data[];
+  };
 
   initnode void ampiNodeInit(void);
   initproc void ampiProcInit(void);

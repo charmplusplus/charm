@@ -1265,7 +1265,7 @@ AmpiMsg *ampi::makeAmpiMsg(int destIdx,
   { //Not cross-module: set seqno
      seq = oorder.nextOutgoing(destIdx);
   }
-  AmpiMsg *msg = new (&len, 0) AmpiMsg(seq, t, sIdx, sRank, len, destcomm);
+  AmpiMsg *msg = new (len, 0) AmpiMsg(seq, t, sIdx, sRank, len, destcomm);
   ddt->serialize((char*)buf, (char*)msg->data, count, 1);
   return msg;
 }
@@ -1280,7 +1280,7 @@ ampi::send(int t, int sRank, const void* buf, int count, int type,  int rank, MP
 void
 ampi::sendraw(int t, int sRank, void* buf, int len, CkArrayID aid, int idx)
 {
-  AmpiMsg *msg = new (&len, 0) AmpiMsg(-1, t, -1, sRank, len, MPI_COMM_WORLD);
+  AmpiMsg *msg = new (len, 0) AmpiMsg(-1, t, -1, sRank, len, MPI_COMM_WORLD);
   memcpy(msg->data, buf, len);
   CProxy_ampi pa(aid);
   pa[idx].generic(msg);
@@ -1439,7 +1439,7 @@ ampi::bcast(int root, void* buf, int count, int type,MPI_Comm destcomm)
 void
 ampi::bcastraw(void* buf, int len, CkArrayID aid)
 {
-  AmpiMsg *msg = new (&len, 0) AmpiMsg(-1, MPI_BCAST_TAG, -1, 0, len, 0);
+  AmpiMsg *msg = new (len, 0) AmpiMsg(-1, MPI_BCAST_TAG, -1, 0, len, 0);
   memcpy(msg->data, buf, len);
   CProxy_ampi pa(aid);
   pa.generic(msg);

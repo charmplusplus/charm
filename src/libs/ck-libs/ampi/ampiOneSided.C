@@ -144,7 +144,7 @@ int win_obj::lock(int requestRank, int pe_src, int ftHandle, int lock_type){
   owner = requestRank;
 
   int tmp = 0;
-  AmpiMsg *msg = new (&tmp, 0) AmpiMsg(-1, -1, -1, 0, 0, comm);
+  AmpiMsg *msg = new (tmp, 0) AmpiMsg(-1, -1, -1, 0, 0, comm);
   CkSendToFuture(ftHandle, (void *)msg, pe_src);
   
   return WIN_SUCCESS;
@@ -162,7 +162,7 @@ int win_obj::unlock(int requestRank, int pe_src, int ftHandle){
   dequeue();
  
   int tmp = 0;
-  AmpiMsg *msg = new (&tmp, 0) AmpiMsg(-1, -1, -1, 0, 0, comm);
+  AmpiMsg *msg = new (tmp, 0) AmpiMsg(-1, -1, -1, 0, 0, comm);
   CkSendToFuture(ftHandle, (void *)msg, pe_src); 
   
   return WIN_SUCCESS;
@@ -252,7 +252,7 @@ ampi::winRemotePut(int orgtotalsize, char* sorgaddr, int orgcnt, MPI_Datatype or
   ddt->serialize(targaddr, (char*)sorgaddr, targcnt, (-1));
 
   int tmp = 0;
-  AmpiMsg *msg = new (&tmp, 0) AmpiMsg(-1, -1, -1, thisIndex, 0,myComm.getComm());
+  AmpiMsg *msg = new (tmp, 0) AmpiMsg(-1, -1, -1, thisIndex, 0,myComm.getComm());
   AMPI_DEBUG("    Rank[%d] Send to Future [%d] \n", thisIndex, ftHandle);
   CkSendToFuture(ftHandle, (void *)msg, pe_src);
 }
@@ -303,7 +303,7 @@ ampi::winRemoteGet(int orgcnt, MPI_Datatype orgtype, MPI_Aint targdisp, int targ
 
   AMPI_DEBUG("    Rank[%d] get win  [%d] \n", thisIndex, *(int*)stargaddr);
   
-  AmpiMsg *msg = new (&stargtotalsize, 0) AmpiMsg(-1, -1, -1, thisIndex, stargtotalsize,myComm.getComm());
+  AmpiMsg *msg = new (stargtotalsize, 0) AmpiMsg(-1, -1, -1, thisIndex, stargtotalsize,myComm.getComm());
 
   char* targaddr = (char*)(winobj->baseAddr) + ddt->getSize(targdisp);
   ddt->serialize(targaddr, (char*)stargaddr, targcnt, 1);
@@ -357,7 +357,7 @@ ampi::winRemoteAccumulate(int orgtotalsize, char* sorgaddr, int orgcnt, MPI_Data
   winobj->accumulate(getdata, targcnt, targtype, targdisp, targcnt, targtype, op);  
     
   int tmp = 0;
-  AmpiMsg *msg = new (&tmp, 0) AmpiMsg(-1, -1, -1, thisIndex, 0,myComm.getComm());
+  AmpiMsg *msg = new (tmp, 0) AmpiMsg(-1, -1, -1, thisIndex, 0,myComm.getComm());
 
   AMPI_DEBUG("    Rank[%d] Send to Future [%d] \n", thisIndex, ftHandle);
   CkSendToFuture(ftHandle, (void *)msg, pe_src);
