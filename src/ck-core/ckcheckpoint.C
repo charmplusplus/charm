@@ -14,7 +14,7 @@ More documentation goes here...
 #include "ck.h"
 //#include "ckcheckpoint.h"
 
-#define DEBCHK CkPrintf
+#define DEBCHK //CkPrintf
 
 CkGroupID _sysChkptMgr;
 
