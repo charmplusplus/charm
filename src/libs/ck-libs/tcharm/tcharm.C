@@ -3,6 +3,7 @@ Threaded Charm++ "Framework Framework"
 
 Orion Sky Lawlor, olawlor@acm.org, 11/19/2001
  */
+#include "tcharm_impl.h"
 #include "tcharm.h"
 #include <ctype.h>
 
@@ -38,6 +39,13 @@ class TCharmTraceLibList {
 	//List of libraries we want to trace:
 	int curLibs;
 	char libNames[maxLibs][maxLibNameLen];
+	int checkIfTracing(const char *lib) const
+	{
+		for (int i=0;i<curLibs;i++) 
+			if (0==strcmp(lib,libNames[i]))
+				return 1;
+		return 0;
+	}
 public:
 	TCharmTraceLibList() {curLibs=0;}
 	void addTracing(const char *lib) 
@@ -49,11 +57,9 @@ public:
 		libNames[curLibs][i]=0;
 		curLibs++;
 	}
-	int isTracing(const char *lib) const {
-		for (int i=0;i<curLibs;i++) 
-			if (0==strcmp(lib,libNames[i]))
-				return 1;
-		return 0;
+	inline int isTracing(const char *lib) const {
+		if (curLibs==0) return 0; //Common case
+		else return checkIfTracing(lib);
 	}
 };
 TCharmTraceLibList tcharm_tracelibs;
@@ -522,6 +528,24 @@ TCharmSetupCookie::TCharmSetupCookie(char **argv_)
 	coord=NULL;
 	stackSize=1*1024*1024; /*Default stack size is 1MB*/
 	CmiGetArgInt(argv,"+tcharm_stacksize",&stackSize);
+}
+
+CkArrayOptions TCharmAttachStart(CkArrayID *retTCharmArray,int *retNumElts)
+{
+	TCharmSetupCookie *tc=TCharmSetupCookie::get();
+	if (!tc->hasThreads())
+		CkAbort("You must create a thread array with TCharmCreate before calling Attach!\n");
+	int nElts=tc->getNumElements();
+	if (retNumElts!=NULL) *retNumElts=nElts;
+	*retTCharmArray=tc->getThreads();
+	CkArrayOptions opts(nElts);
+	opts.bindTo(tc->getThreads());
+	return opts;
+}
+void TCharmAttachFinish(const CkArrayID &libraryArray)
+{
+	TCharmSetupCookie *tc=TCharmSetupCookie::get();
+	tc->addClient(libraryArray);
 }
 
 
