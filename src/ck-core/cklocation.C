@@ -562,6 +562,7 @@ void CkMigratable::commonInit(void) {
 	thisChareType=i.chareType;
 	usesAtSync=CmiFalse;
 	barrierRegistered=CmiFalse;
+	usesReadyMigrate=CmiFalse;
 }
 
 CkMigratable::CkMigratable(void) {
@@ -577,6 +578,7 @@ void CkMigratable::pup(PUP::er &p) {
 	Chare::pup(p);
 	p|thisIndexMax;
 	p(usesAtSync);
+	p(usesReadyMigrate);
 	if(p.isUnpacking()) barrierRegistered=CmiFalse;
 	ckFinishConstruction();
 }
@@ -633,6 +635,9 @@ void CkMigratable::ResumeFromSync(void)
 #if CMK_LBDB_ON  //For load balancing:
 void CkMigratable::ckFinishConstruction(void)
 {
+	if (usesReadyMigrate) {
+	  myRec->usesReadyMigrate();
+	}
 //	if ((!usesAtSync) || barrierRegistered) return;
 	if (barrierRegistered) return;
 	DEBL((AA"Registering barrier client for %s\n"AB,idx2str(thisIndexMax)));
@@ -651,6 +656,12 @@ void CkMigratable::AtSync(void)
 	ckFinishConstruction();
 	DEBL((AA"Element %s going to sync\n"AB,idx2str(thisIndexMax)));
 	myRec->getLBDB()->AtLocalBarrier(ldBarrierHandle);
+}
+void CkMigratable::ReadyMigrate(CmiBool ready)
+{
+	if (!usesReadyMigrate)
+		CkAbort("You must set usesReadyMigrate=CmiTrue in your array element constructor to use ReadyMigrate!\n");
+	myRec->ReadyMigrate(ready);
 }
 void CkMigratable::staticResumeFromSync(void* data)
 {
@@ -703,18 +714,27 @@ interfaces with the load balancer on behalf of the
 represented array elements.
 */
 CkLocRec_local::CkLocRec_local(CkLocMgr *mgr,CmiBool fromMigration,
-  const CkArrayIndex &idx_,int localIdx_)
+  CmiBool ignoreArrival, const CkArrayIndex &idx_,int localIdx_)
 	:CkLocRec(mgr),idx(idx_),localIdx(localIdx_),
 	 running(CmiFalse),deletedMarker(NULL)
 {
 #if CMK_LBDB_ON
 	DEBL((AA"Registering element %s with load balancer\n"AB,idx2str(idx)));
+	nextPe = -1;
+	usingReadyMove = CmiFalse;
+	readyMove = CmiTrue;
 	the_lbdb=mgr->getLBDB();
 	ldHandle=the_lbdb->RegisterObj(mgr->getOMHandle(),
 		idx2LDObjid(idx),(void *)this,1);
 	if (fromMigration) {
-		DEBL((AA"Element %s migrated in\n"AB,idx2str(idx)));
-		the_lbdb->Migrated(ldHandle);
+		if (!ignoreArrival) {
+		  DEBL((AA"Element %s migrated in\n"AB,idx2str(idx)));
+		  the_lbdb->Migrated(ldHandle);
+		}
+		else {
+		  // load balancer should ignore this objects movement
+		  usesReadyMigrate();
+		}
 	}
 #endif
 }
@@ -817,6 +837,7 @@ CmiBool CkLocRec_local::invokeEntry(CkMigratable *obj,void *msg,
 			_TRACE_END_EXECUTE();
 	}
 #endif
+        if (!isDeleted) checkBufferedMigration();   // check if should migrate
 	if (isDeleted) return CmiFalse;//We were deleted
 	deletedMarker=NULL;
 	stopTiming();
@@ -855,7 +876,36 @@ void CkLocRec_local::staticMigrate(LDObjHandle h, int dest)
 {
 	CkLocRec_local *el=(CkLocRec_local *)LDObjUserData(h);
 	DEBL((AA"Load balancer wants to migrate %s to %d\n"AB,idx2str(el->idx),dest));
-	el->migrateMe(dest);
+	el->recvMigrate(dest);
+}
+
+void CkLocRec_local::recvMigrate(int toPe)
+{
+	// we are in the mode of delaying actual migration
+ 	// till readyMigrate()
+	if (readyMove) { migrateMe(toPe); }
+	else nextPe = toPe;
+}
+
+void CkLocRec_local::usesReadyMigrate()  {
+        if (!usingReadyMove) {    // only allow it to change the flag once
+            usingReadyMove = CmiTrue; 
+	    readyMove=CmiFalse;
+  	    the_lbdb->UseReadyMigrate(ldHandle, CmiTrue);
+        }
+}
+
+CmiBool CkLocRec_local::checkBufferedMigration()
+{
+	// we don't migrate in user's code when calling ReadyMigrate(true)
+	// we postphone the action to here until we exit from the user code.
+	if (readyMove && nextPe != -1) {
+	    int toPe = nextPe;
+	    nextPe = -1;
+	    // don't migrate inside the object call
+	    migrateMe(toPe);
+	    // don't do anything
+	}
 }
 
 void CkLocRec_local::setMigratable(int migratable)
@@ -1221,12 +1271,13 @@ void CkLocMgr::informHome(const CkArrayIndex &idx,int nowOnPe)
 	}
 }
 
-CkLocRec_local *CkLocMgr::createLocal(const CkArrayIndex &idx, CmiBool forMigration,
+CkLocRec_local *CkLocMgr::createLocal(const CkArrayIndex &idx, 
+		CmiBool forMigration, CmiBool ignoreArrival,
 		CmiBool notifyHome)
 {
 	int localIdx=nextFree();
 	DEBC((AA"Adding new record for element %s at local index %d\n"AB,idx2str(idx),localIdx));
-	CkLocRec_local *rec=new CkLocRec_local(this,forMigration,idx,localIdx);
+	CkLocRec_local *rec=new CkLocRec_local(this,forMigration,ignoreArrival,idx,localIdx);
 	insertRec(rec,idx); //Add to global hashtable
 	if (notifyHome) informHome(idx,CkMyPe());
 	return rec;
@@ -1241,7 +1292,7 @@ CmiBool CkLocMgr::addElement(CkArrayID id,const CkArrayIndex &idx,
 	CkLocRec_local *rec;
 	if (oldRec==NULL||oldRec->type()!=CkLocRec::local) 
 	{ //This is the first we've heard of that element-- add new local record
-		rec=createLocal(idx,CmiFalse,CmiTrue);
+		rec=createLocal(idx,CmiFalse,CmiFalse,CmiTrue);
 	} else 
 	{ //rec is *already* local-- must not be the first insertion	
 		rec=((CkLocRec_local *)oldRec);
@@ -1542,6 +1593,7 @@ void CkLocMgr::migrate(CkLocRec_local *rec,int toPe)
 		new (doubleSize, 0) CkArrayElementMigrateMessage;
 	msg->idx=idx;
 	msg->length=bufSize;
+	msg->ignoreArrival = rec->isUsingReadyMigrate()?1:0;
 	{
 		PUP::toMem p(msg->packData); 
 		p.becomeDeleting(); 
@@ -1584,7 +1636,7 @@ void CkLocMgr::migrateIncoming(CkArrayElementMigrateMessage *msg)
 	}
 
 	//Create a record for this element
-	CkLocRec_local *rec=createLocal(idx,CmiTrue,CmiFalse /* home told on departure */ );
+	CkLocRec_local *rec=createLocal(idx,CmiTrue,msg->ignoreArrival,CmiFalse /* home told on departure */ );
 	
 	//Create the new elements as we unpack the message
 	pupElementsFor(p,rec,CkElementCreation_migrate);
@@ -1607,7 +1659,7 @@ void CkLocMgr::migrateIncoming(CkArrayElementMigrateMessage *msg)
 /// Insert and unpack this array element from this checkpoint (e.g., from CkLocation::pup)
 void CkLocMgr::resume(const CkArrayIndex &idx, PUP::er &p)
 {
-	CkLocRec_local *rec=createLocal(idx,CmiFalse,CmiTrue /* home doesn't know yet */ );
+	CkLocRec_local *rec=createLocal(idx,CmiFalse,CmiFalse,CmiTrue /* home doesn't know yet */ );
 
 	//Create the new elements as we unpack the message
 	pupElementsFor(p,rec,CkElementCreation_resume);

@@ -60,6 +60,7 @@ typedef enum {
 class CkArrayElementMigrateMessage : public CMessage_CkArrayElementMigrateMessage {
 public:
 	CkArrayIndexMax idx; // Array index that is migrating
+	int ignoreArrival;   // if to inform LB of arrival
 	int length;//Size in bytes of the packed data
 	double* packData;
 };
@@ -166,7 +167,7 @@ class CkLocRec_local : public CkLocRec {
   CkQ<CkArrayMessage *> halfCreated; /// Stores messages for nonexistent siblings of existing elements
 public:
   //Creation and Destruction:
-  CkLocRec_local(CkLocMgr *mgr,CmiBool fromMigration,
+  CkLocRec_local(CkLocMgr *mgr,CmiBool fromMigration,CmiBool ignoreArrival,
   	const CkArrayIndex &idx_,int localIdx_);
   void migrateMe(int toPe); //Leave this processor
   void destroy(void); //User called destructor
@@ -208,10 +209,18 @@ public:
 public:
   inline LBDatabase *getLBDB(void) const {return the_lbdb;}
   static void staticMigrate(LDObjHandle h, int dest);
+  void recvMigrate(int dest);
   void setMigratable(int migratable);
+  void usesReadyMigrate();
+  CmiBool isUsingReadyMigrate()   { return usingReadyMove; }
+  void ReadyMigrate(CmiBool ready)  { readyMove = ready; }   //called from user
+  CmiBool checkBufferedMigration();
 private:
   LBDatabase *the_lbdb;
   LDObjHandle ldHandle;
+  CmiBool  usingReadyMove;  /// if readyMove is inited
+  CmiBool  readyMove;	    /// status whether it is ready to migrate
+  int  nextPe;              /// next migration dest processor
 #endif
 };
 class CkLocRec_remote;
@@ -280,8 +289,10 @@ protected:
   virtual void ResumeFromSync(void);
   CmiBool barrierRegistered;//True iff barrier handle below is set
 
+  CmiBool usesReadyMigrate;
 #if CMK_LBDB_ON  //For load balancing:
   void AtSync(void);
+  void ReadyMigrate(CmiBool ready);
 private: //Load balancer state:
   LDBarrierClient ldBarrierHandle;//Transient (not migrated)  
   LDBarrierReceiver ldBarrierRecvHandle;//Transient (not migrated)  
@@ -583,7 +594,8 @@ private:
 	CmiBool deliverUnknown(CkArrayMessage *msg,CkDeliver_t type);
 
 	/// Create a new local record at this array index.
-	CkLocRec_local *createLocal(const CkArrayIndex &idx, CmiBool forMigration,
+	CkLocRec_local *createLocal(const CkArrayIndex &idx, 
+		CmiBool forMigration, CmiBool ignoreArrival,
 		CmiBool notifyHome);
 
 //Data Members:
