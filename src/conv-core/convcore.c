@@ -153,14 +153,19 @@ int n; CmiHandler h;
   CmiHandler *tab = CpvAccess(CmiHandlerTable);
   int         max = CpvAccess(CmiHandlerMax);
 
-  if (n == max) {
+  if (n > 100000) {
+    *((char *)0)=0;
+  }
+  if (n >= max) {
+    int newmax = ((n<<1)+10);
     int bytes = max*sizeof(CmiHandler);
-    CmiHandler *new = (CmiHandler*)CmiAlloc(bytes<<1);
+    int newbytes = newmax*sizeof(CmiHandler);
+    CmiHandler *new = (CmiHandler*)CmiAlloc(newbytes);
     memcpy(new, tab, bytes);
-    memset(new+max, 0, bytes);
+    memset(((char *)new)+bytes, 0, (newbytes-bytes));
     free(tab); tab=new;
     CpvAccess(CmiHandlerTable) = tab;
-    CpvAccess(CmiHandlerMax) = (max<<1);
+    CpvAccess(CmiHandlerMax) = newmax;
   }
   tab[n] = h;
 }
@@ -653,8 +658,7 @@ CsdInit(argv)
 {
   void *CqsCreate();
 
-  CpvInitialize(int, disable_sys_msgs);
-  CpvInitialize(int,   CmiHandlerCount);
+  CpvInitialize(int,   disable_sys_msgs);
   CpvInitialize(void*, CsdSchedQueue);
   CpvInitialize(int,   CsdStopFlag);
   
@@ -761,26 +765,6 @@ char **msgs;
 
 /*****************************************************************************
  *
- * Fast Interrupt Blocking Device
- *
- * This is totally portable.  Go figure.  (The rest of it is just macros,
- * see converse.h)
- *
- *****************************************************************************/
-
-CpvDeclare(int,       CmiInterruptsBlocked);
-CpvDeclare(CthVoidFn, CmiInterruptFuncSaved);
-
-CmiInterruptsInit()
-{
-  CpvInitialize(int, CmiInterruptsBlocked);
-  CpvInitialize(CthVoidFn, CmiInterruptFuncSaved);
-  CpvAccess(CmiInterruptsBlocked) = 0;
-  CpvAccess(CmiInterruptFuncSaved) = 0;
-}
-
-/*****************************************************************************
- *
  * ConverseInit and ConverseExit
  *
  *****************************************************************************/
@@ -794,7 +778,6 @@ char **argv;
   CmiMemoryInit(argv);
   CmiDeliversInit();
   /* CmiSpanTreeInit(argv); done in CmiInitMc()  -- Sanjeev 3/5/96 */
-  CmiInterruptsInit();
   CmiInitMc(argv);
   CsdInit(argv);
 #if CMK_CTHINIT_IS_IN_CONVERSEINIT

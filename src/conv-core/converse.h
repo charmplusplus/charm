@@ -12,7 +12,13 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.51  1996-11-23 02:25:33  milind
+ * Revision 2.52  1997-01-17 15:49:06  jyelon
+ * Made many changes for SMP version.  In particular, memory module now uses
+ * CmiMemLock and CmiMemUnlock instead of CmiInterruptsBlock, which no longer
+ * exists.  Threads package uses CthCpv to declare all its global vars.
+ * Much other restructuring.
+ *
+ * Revision 2.51  1996/11/23 02:25:33  milind
  * Fixed several subtle bugs in the converse runtime for convex
  * exemplar.
  *
@@ -208,9 +214,27 @@ extern "C" {
 #define CMK_STATIC_PROTO extern
 #endif
 
-/******** CPV, CSV: PRIVATE AND SHARED VARIABLES *******/
+/******************************************************************************
+ *
+ * Deal with Shared Memory
+ *
+ * Shared memory strongly affects how CPV, CSV, and CmiMyPe are defined,
+ * and how memory locking is performed. Therefore, we control all these
+ * functions with a single flag.
+ *
+ *****************************************************************************/
 
 #if CMK_SHARED_VARS_UNAVAILABLE
+
+extern int Cmi_mype;
+extern int Cmi_myrank;
+extern int Cmi_numpes;
+extern int Cmi_nodesize;
+
+#define CmiMyPe() Cmi_mype
+#define CmiMyRank() Cmi_myrank
+#define CmiNumPes() Cmi_numpes
+#define CmiNodeSize() Cmi_nodesize
 
 #define SHARED_DECL
 #define CpvDeclare(t,v) t CMK_CONCAT(Cpv_Var_,v)
@@ -225,16 +249,27 @@ extern "C" {
 #define CsvExtern(t,v) extern t CMK_CONCAT(Csv_Var_,v)
 #define CsvAccess(v) CMK_CONCAT(Csv_Var_,v)
 
-#define CmiMyRank() 0
-#define CmiNodeBarrier()
+extern void CmiMemLock();
+extern void CmiMemUnlock();
+#define CmiNodeBarrier() 0
 #define CmiSvAlloc CmiAlloc
 
 #endif
 
-
 #if CMK_SHARED_VARS_EXEMPLAR
+
 #include <spp_prog_model.h>
 #include <memory.h>
+
+extern thread_private int Cmi_mype;
+extern thread_private int Cmi_myrank;
+extern thread_private int Cmi_numpes;
+extern thread_private int Cmi_nodesize;
+
+#define CmiMyPe() Cmi_mype
+#define CmiMyRank() Cmi_myrank
+#define CmiNumPes() Cmi_numpes
+#define CmiNodeSize() Cmi_nodesize
 
 #define SHARED_DECL node_private
 #define CpvDeclare(t,v) thread_private t CMK_CONCAT(Cpv_Var_,v)
@@ -249,24 +284,34 @@ extern "C" {
 #define CsvInitialize(t,v)
 #define CsvAccess(v) CMK_CONCAT(Csv_Var_,v)
 
-extern int CmiMyRank CMK_PROTO((void));
+extern void CmiMemLock();
+extern void CmiMemUnlock();
 extern void CmiNodeBarrier CMK_PROTO((void));
 extern void *CmiSvAlloc CMK_PROTO((int));
 
 #endif
 
+#if CMK_SHARED_VARS_SUN_THREADS
 
+#include <thread.h>
 
-#if CMK_SHARED_VARS_UNIPROCESSOR
+extern int Cmi_numpes;
+extern int Cmi_nodesize;
+
+extern int CmiMyPe();
+extern int CmiMyRank();
+#define CmiNumPes() Cmi_numpes
+#define CmiNodeSize() Cmi_nodesize
 
 #define SHARED_DECL
+
 #define CpvDeclare(t,v) t* CMK_CONCAT(Cpv_Var_,v)
 #define CpvExtern(t,v)  extern t* CMK_CONCAT(Cpv_Var_,v)
 #define CpvStaticDeclare(t,v) static t* CMK_CONCAT(Cpv_Var_,v)
 #define CpvInitialize(t,v)\
-    { if (CMK_CONCAT(Cpv_Var_,v)==0)\
-        { CMK_CONCAT(Cpv_Var_,v) = (t *)CmiAlloc(Cmi_numpes*sizeof(t)); }}
-#define CpvAccess(v) CMK_CONCAT(Cpv_Var_,v)[Cmi_mype]
+  { if (CmiMyRank()) while (CMK_CONCAT(Cpv_Var_,v)==0);\
+    else { CMK_CONCAT(Cpv_Var_,v)=(t*)malloc(sizeof(t)*CmiNodeSize()); }}
+#define CpvAccess(v) CMK_CONCAT(Cpv_Var_,v)[CmiMyRank()]
 
 #define CsvDeclare(t,v) t CMK_CONCAT(Csv_Var_,v)
 #define CsvStaticDeclare(t,v) static t CMK_CONCAT(Csv_Var_,v)
@@ -274,7 +319,41 @@ extern void *CmiSvAlloc CMK_PROTO((int));
 #define CsvInitialize(t,v)
 #define CsvAccess(v) CMK_CONCAT(Csv_Var_,v)
 
+extern void CmiMemLock();
+extern void CmiMemUnlock();
+#define CmiNodeBarrier() 0
+#define CmiSvAlloc CmiAlloc
+
+#endif
+
+#if CMK_SHARED_VARS_UNIPROCESSOR
+
+extern int Cmi_mype;
+extern int Cmi_numpes;
+
+#define CmiMyPe() Cmi_mype
 #define CmiMyRank() Cmi_mype
+#define CmiNumPes() Cmi_numpes
+#define CmiNodeSize() Cmi_numpes
+
+#define SHARED_DECL
+
+#define CpvDeclare(t,v) t* CMK_CONCAT(Cpv_Var_,v)
+#define CpvExtern(t,v)  extern t* CMK_CONCAT(Cpv_Var_,v)
+#define CpvStaticDeclare(t,v) static t* CMK_CONCAT(Cpv_Var_,v)
+#define CpvInitialize(t,v)\
+    { if (CMK_CONCAT(Cpv_Var_,v)==0)\
+        { CMK_CONCAT(Cpv_Var_,v) = (t *)CmiAlloc(CmiNumPes()*sizeof(t)); }}
+#define CpvAccess(v) CMK_CONCAT(Cpv_Var_,v)[CmiMyPe()]
+
+#define CsvDeclare(t,v) t CMK_CONCAT(Csv_Var_,v)
+#define CsvStaticDeclare(t,v) static t CMK_CONCAT(Csv_Var_,v)
+#define CsvExtern(t,v) extern t CMK_CONCAT(Csv_Var_,v)
+#define CsvInitialize(t,v)
+#define CsvAccess(v) CMK_CONCAT(Csv_Var_,v)
+
+#define CmiMemLock() 0
+#define CmiMemUnlock() 0
 extern void CmiNodeBarrier();
 #define CmiSvAlloc CmiAlloc
 
@@ -336,25 +415,6 @@ double   CmiCpuTimer   CMK_PROTO(());
 #define CsdEnqueueLifo(x)     (CqsEnqueueLifo(CpvAccess(CsdSchedQueue),(x)))
 #define CsdEnqueue(x)         (CqsEnqueueFifo(CpvAccess(CsdSchedQueue),(x)))
 #define CsdEmpty()            (CqsEmpty(CpvAccess(CsdSchedQueue)))
-
-#if CMK_CMIMYPE_IS_A_BUILTIN
-int CmiMyPe CMK_PROTO((void));
-int CmiNumPes CMK_PROTO((void));
-#endif
-
-#if CMK_CMIMYPE_IS_A_VARIABLE
-CpvExtern(int, Cmi_mype);
-CpvExtern(int, Cmi_numpes);
-#define CmiMyPe() CpvAccess(Cmi_mype)
-#define CmiNumPes() CpvAccess(Cmi_numpes)
-#endif
-
-#if CMK_CMIMYPE_UNIPROCESSOR
-extern int Cmi_mype;
-extern int Cmi_numpes;
-#define CmiMyPe() Cmi_mype
-#define CmiNumPes() Cmi_numpes
-#endif
 
 #if CMK_CMIPRINTF_IS_A_BUILTIN
 void  CmiPrintf CMK_PROTO((char *, ...));
@@ -434,16 +494,6 @@ void   CmiDeliverSpecificMsg   CMK_PROTO((int handler));
 
 /****** CTH: THE THREADS PACKAGE ******/
 
-#if CMK_THREADS_USE_ALLOCA_WITH_HEADER_FILE
-#undef CMK_THREADS_USE_ALLOCA
-#define CMK_THREADS_USE_ALLOCA 1
-#endif
-
-#if CMK_THREADS_USE_ALLOCA_WITH_PRAGMA
-#undef CMK_THREADS_USE_ALLOCA
-#define CMK_THREADS_USE_ALLOCA 1
-#endif
-
 typedef struct CthThreadStruct *CthThread;
 
 typedef void        (*CthVoidFn)();
@@ -464,56 +514,63 @@ void       CthYield               CMK_PROTO((void));
 
 /****** CTH: THREAD-PRIVATE VARIABLES (Geez, I hate C) ******/
 
+#if CMK_THREADS_REQUIRE_NO_CPV
+
+#define CthCpvDeclare(t,v)    t v
+#define CthCpvExtern(t,v)     extern t v
+#define CthCpvStatic(t,v)     static t v
+#define CthCpvInitialize(t,v) 
+#define CthCpvAccess(x)       x
+
+#else
+
+#define CthCpvDeclare(t,v)    CpvDeclare(t,v)
+#define CthCpvExtern(t,v)     CpvExtern(t,v)
+#define CthCpvStatic(t,v)     CpvStaticDeclare(t,v)
+#define CthCpvInitialize(t,v) CpvInitialize(t,v)
+#define CthCpvAccess(x)       CpvAccess(x)
+
+#endif
 
 #if CMK_THREADS_UNAVAILABLE
+
 #define CtvDeclare(t,v)         CpvDeclare(t,v)
 #define CtvStaticDeclare(t,v)   CpvStaticDeclare(t,v)
 #define CtvExtern(t,v)          CpvExtern(t,v)
 #define CtvAccess(v)            CpvAccess(v)
 #define CtvInitialize(t,v)      CpvInitialize(t,v)
+
 #endif
 
-
-
 #if CMK_THREADS_USE_ALLOCA
-#if CMK_PREPROCESSOR_USES_ANSI_STANDARD_CONCATENATION
-extern char *CthData;
+CthCpvExtern(char *,CthData);
 extern int CthRegister CMK_PROTO((int));
 #define CtvDeclare(t,v)         typedef t CtvType##v; CsvDeclare(int,CtvOffs##v);
 #define CtvStaticDeclare(t,v)   typedef t CtvType##v; CsvDeclare(int,CtvOffs##v);
 #define CtvExtern(t,v)          typedef t CtvType##v; CsvDeclare(int,CtvOffs##v);
-#define CtvAccess(v)            (*((CtvType##v *)(CthData+CsvAccess(CtvOffs##v))))
+#define CtvAccess(v)            (*((CtvType##v *)(CthCpvAccess(CthData)+CsvAccess(CtvOffs##v))))
 #define CtvInitialize(t,v)      if (CmiMyRank()==0) (CsvAccess(CtvOffs##v)=CthRegister(sizeof(CtvType##v)));
-#endif /* CMK_PREPROCESSOR_USES_ANSI_STANDARD_CONCATENATION */
 #endif /* CMK_THREADS_USE_ALLOCA */
 
-
 #if CMK_THREADS_USE_JB_TWEAKING
-#if CMK_PREPROCESSOR_USES_ANSI_STANDARD_CONCATENATION
-extern char *CthData;
+CthCpvExtern(char *,CthData);
 extern int CthRegister CMK_PROTO((int));
 #define CtvDeclare(t,v)         typedef t CtvType##v; CsvDeclare(int,CtvOffs##v);
 #define CtvStaticDeclare(t,v)   typedef t CtvType##v; CsvDeclare(int,CtvOffs##v);
 #define CtvExtern(t,v)          typedef t CtvType##v; CsvDeclare(int,CtvOffs##v);
-#define CtvAccess(v)            (*((CtvType##v *)(CthData+CsvAccess(CtvOffs##v))))
+#define CtvAccess(v)            (*((CtvType##v *)(CthCpvAccess(CthData)+CsvAccess(CtvOffs##v))))
 #define CtvInitialize(t,v)      if (CmiMyRank()==0) (CsvAccess(CtvOffs##v)=CthRegister(sizeof(CtvType##v)));
-#endif /* CMK_PREPROCESSOR_USES_ANSI_STANDARD_CONCATENATION */
 #endif /* CMK_THREADS_USE_JB_TWEAKING */
-
 
 #if CMK_THREADS_USE_JB_TWEAKING_EXEMPLAR
-#if CMK_PREPROCESSOR_USES_ANSI_STANDARD_CONCATENATION
-CpvExtern(char*,CthData);
+CthCpvExtern(char*,CthData);
 extern int CthRegister CMK_PROTO((int));
 #define CtvDeclare(t,v)         typedef t CtvType##v; CsvDeclare(int,CtvOffs##v);
 #define CtvStaticDeclare(t,v)   typedef t CtvType##v; CsvDeclare(int,CtvOffs##v);
 #define CtvExtern(t,v)          typedef t CtvType##v; CsvDeclare(int,CtvOffs##v);
-#define CtvAccess(v)            (*((CtvType##v *)(CpvAccess(CthData)+CsvAccess(CtvOffs##v))))
+#define CtvAccess(v)            (*((CtvType##v *)(CthCpvAccess(CthData)+CsvAccess(CtvOffs##v))))
 #define CtvInitialize(t,v)      if (CmiMyRank()==0) (CsvAccess(CtvOffs##v)=CthRegister(sizeof(CtvType##v)));
-#endif /* CMK_PREPROCESSOR_USES_ANSI_STANDARD_CONCATENATION */
 #endif /* CMK_THREADS_USE_JB_TWEAKING */
-
-
 
 #ifndef CtvDeclare
 error Barf.
@@ -643,28 +700,6 @@ void       CmmPut CMK_PROTO((CmmTable t, int ntags, int *tags, void *msg));
 void      *CmmFind CMK_PROTO((CmmTable t, int ntags, int *tags, int *returntags, int del));
 #define    CmmGet(t,nt,tg,rt)   (CmmFind((t),(nt),(tg),(rt),1))
 #define    CmmProbe(t,nt,tg,rt) (CmmFind((t),(nt),(tg),(rt),0))
-
-
-/****** FAST INTERRUPT BLOCKING FACILITY (NOT FOR CONVERSE USER) ********/
-
-CpvExtern(int,       CmiInterruptsBlocked);
-CpvExtern(CthVoidFn, CmiInterruptFuncSaved);
-
-#define CmiInterruptHeader(fn) \
-    if (CpvAccess(CmiInterruptsBlocked)) \
-        { CpvAccess(CmiInterruptFuncSaved)=(CthVoidFn)(fn); return; }
-
-#define CmiInterruptsBlock()\
-    { CpvAccess(CmiInterruptsBlocked)++; }
-
-#define CmiInterruptsRelease() {\
-    int val = CpvAccess(CmiInterruptsBlocked)-1;\
-    if (val==0) {\
-      CthVoidFn f = CpvAccess(CmiInterruptFuncSaved);\
-      if (f) { CpvAccess(CmiInterruptFuncSaved)=0; (f)(); }\
-    }\
-    CpvAccess(CmiInterruptsBlocked) = val;\
-}
 
 /******** CONVCONDS ********/
 

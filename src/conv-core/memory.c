@@ -8,7 +8,7 @@
  *
  * CMK_MALLOC_USE_OS_BUILTIN
  * CMK_MALLOC_USE_GNU
- * CMK_MALLOC_USE_GNU_WITH_INTERRUPT_SUPPORT
+ * CMK_MALLOC_USE_GNU_WITH_CMIMEMLOCK
  *
  *****************************************************************************/
 
@@ -33,44 +33,15 @@ void CmiMemoryInit(argv)
 
 /*****************************************************************************
  *
- * CMK_MALLOC_USE_GNU
+ * CMK_MALLOC_USE_GNU_MALLOC
  *
  * The GNU memory allocator is a good all-round memory allocator for
- * distributed memory machines.  It has no support for shared memory.
+ * distributed memory machines.  It has the advantage that you can define
+ * CmiMemLock and CmiMemUnlock to provide locking around it's operations.
  *
  *****************************************************************************/
 
-#if CMK_MALLOC_USE_GNU
-
-void CmiMemoryInit(argv)
-  char **argv;
-{
-}
-
-#undef sun /* I don't care if it's a sun, dangit.  No special treatment. */
-#undef BSD /* I don't care if it's BSD.  Same thing. */
-#include "gnumalloc.c"
-#endif
-
-/*****************************************************************************
- *
- * CMK_MALLOC_USE_GNU_WITH_INTERRUPT_SUPPORT
- *
- * This setting uses the GNU memory allocator, however, it surrounds every
- * memory routines with CmiInterruptsBlock and CmiInterruptsRelease (to make
- * it possible to use the memory allocator in an interrupt handler).  For
- * this to work correctly, the interrupt handler must start like this:
- *
- * void InterruptHandlerName()
- * {
- *    CmiInterruptHeader(InterruptHandlerName);
- *    ... rest of handler can use malloc ...
- * }
- *
- * 
- *****************************************************************************/
-
-#if CMK_MALLOC_USE_GNU_WITH_INTERRUPT_SUPPORT
+#if CMK_MALLOC_USE_GNU_MALLOC
 
 #define malloc   CmiMemory_Gnu_malloc
 #define free     CmiMemory_Gnu_free
@@ -93,75 +64,75 @@ void CmiMemoryInit(argv)
 #undef valloc
 
 void CmiMemoryInit(argv)
-  char **argv;
+char **argv;
 {
 }
 
 char *malloc(size)
     unsigned size;
 {
-    char *result;
-    CmiInterruptsBlock();
-    result = CmiMemory_Gnu_malloc(size);
-    CmiInterruptsRelease();
-    return result;
+  char *result;
+  CmiMemLock();
+  result = CmiMemory_Gnu_malloc(size);
+  CmiMemUnlock();
+  return result;
 }
 
 void free(mem)
     char *mem;
 {
-    CmiInterruptsBlock();
-    CmiMemory_Gnu_free(mem);
-    CmiInterruptsRelease();
+  CmiMemLock();
+  CmiMemory_Gnu_free(mem);
+  CmiMemUnlock();
 }
 
 char *calloc(nelem, size)
     unsigned nelem, size;
 {
-    char *result;
-    CmiInterruptsBlock();
-    result = CmiMemory_Gnu_calloc(nelem, size);
-    CmiInterruptsRelease();
-    return result;
+  char *result;
+  CmiMemLock();
+  result = CmiMemory_Gnu_calloc(nelem, size);
+  CmiMemUnlock();
+  return result;
 }
 
 void cfree(mem)
     char *mem;
 {
-    CmiInterruptsBlock();
-    CmiMemory_Gnu_cfree(mem);
-    CmiInterruptsRelease();
+  CmiMemLock();
+  CmiMemory_Gnu_cfree(mem);
+  CmiMemUnlock();
 }
 
 char *realloc(mem, size)
     char *mem;
     int size;
 {
-    char *result;
-    CmiInterruptsBlock();
-    result = CmiMemory_Gnu_realloc(mem, size);
-    CmiInterruptsRelease();
-    return result;
+  char *result;
+  CmiMemLock();
+  result = CmiMemory_Gnu_realloc(mem, size);
+  CmiMemUnlock();
+  return result;
 }
 
 char *memalign(align, size)
     int align, size;
 {
-    char *result;
-    CmiInterruptsBlock();
-    result = CmiMemory_Gnu_memalign(align, size);
-    CmiInterruptsRelease();
-    return result;
+  char *result;
+  CmiMemLock();
+  result = CmiMemory_Gnu_memalign(align, size);
+  CmiMemUnlock();
+  return result;    
 }
 
 char *valloc(size)
     int size;
 {
-    char *result;
-    CmiInterruptsBlock();
-    result = CmiMemory_Gnu_valloc(size);
-    CmiInterruptsRelease();
-    return result;
+  char *result;
+  CmiMemLock();
+  result = CmiMemory_Gnu_valloc(size);
+  CmiMemUnlock();
+  return result;
 }
 
-#endif /* CMK_MALLOC_USE_GNU_WITH_INTERRUPT_SUPPORT */
+#endif /* CMK_MALLOC_USE_GNU_MALLOC */
