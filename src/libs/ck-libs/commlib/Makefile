@@ -1,8 +1,9 @@
-CDIR=../../../..
 CHARMC=$(CDIR)/bin/charmc $(OPTS)
 COMMLIBDIR=../../conv-libs/commlib
+CDIR=../../../..
+LIBDIR=$(CDIR)/lib
 
-LIB = libcomm.a
+LIB = $(LIBDIR)/libcomm.a
 
 STRATEGY_OBJS = EachToManyStrategy.o MPIStrategy.o StreamingStrategy.o \
 		DummyStrategy.o NodeMulticast.o EachToManyMulticastStrategy.o
@@ -33,14 +34,12 @@ all: cifiles conversecom $(LIB)
 	cp  ComlibModule.def.h $(CDIR)/include
 	rm -f $(CDIR)/tmp/ComlibManager.ci
 	cp  ComlibManager.ci $(CDIR)/tmp
-	rm -f $(CDIR)/lib/libcomm.a
-	cp libcomm.a $(CDIR)/lib/
 
 conversecom :
 	(cd ../../conv-libs/commlib; make)
 
-libcomm.a: $(OBJS) $(STRATEGY_OBJS) $(CONVERSE_COM_OBJS)
-	$(CHARMC) -cp ../../../../../lib -o libcomm.a $(OBJS)
+$(LIBDIR)/libcomm.a: $(OBJS) $(STRATEGY_OBJS) $(CONVERSE_COM_OBJS)
+	$(CHARMC) -o $@ $(OBJS)
 
 ComlibManager.o: ComlibManager.C ComlibManager.h
 	$(CHARMC) -c ComlibManager.C
