@@ -890,8 +890,14 @@ void nodetab_makehost(char *name,nodetab_host *h)
   h->name=strdup(name);
   h->ip = skt_innode_lookup_ip(name);
   if (skt_ip_match(h->ip,_skt_invalid_ip)) {
+#ifdef CMK_BPROC
+    /* only the master node is used */
+    if (!(1 == arg_requested_pes && atoi(name)==-1))
+#endif
+    {
     fprintf(stderr,"ERROR> Cannot obtain IP address of %s\n", name);
     exit(1);
+    }
   }
   if (nodetab_size == nodetab_max) return;
   nodetab_add(h);
