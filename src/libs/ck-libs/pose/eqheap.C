@@ -202,8 +202,9 @@ Event *EqHeap::GetAndRemoveTopEvent()
     CkPrintf("ERROR: EqHeap::GetAndRemoveTopEvent: corrupt top\n");
   top = top->left->conjoin(top->right);
   result = tmp->e;
+  tmp->e = NULL;
   tmp->left = tmp->right = NULL;
-  free(tmp); // do not delete tmp -- that will delete tmp->e as well!
+  delete(tmp);
   heapSize--;
   return result;
 }

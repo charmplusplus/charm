@@ -16,7 +16,7 @@ class HeapNode  // EqHeap contains nodes of this type
   HeapNode(Event *ev, int sz, HeapNode *l, HeapNode *r) { 
     subheapsize = sz; e = ev; left = l; right = r; 
   }
-  ~HeapNode() { if (left) delete left; if (right) delete right; delete e; }
+  ~HeapNode() { if (left) delete left; if (right) delete right; if (e) delete e; }
   void insert(Event *e);                    // insert event in heap
   HeapNode *conjoin(HeapNode *h);           // join this heap with h
   int remove(eventID evID, int timestamp);  // remove node matching evID
