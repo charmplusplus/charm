@@ -125,6 +125,9 @@ void traceClose(void)
   delete CpvAccess(_logPool);
 }
 
+extern "C" void traceBegin(void) {CpvAccess(traceOn) = 1;}
+extern "C" void traceEnd(void) {CpvAccess(traceOn) = 0;}
+
 void LogPool::writeSts(void)
 {
   char *fname = new char[strlen(CpvAccess(pgmName))+strlen(".sts")+1];
