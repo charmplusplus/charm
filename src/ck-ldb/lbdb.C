@@ -363,13 +363,14 @@ extern "C" int LDProcessorSpeed()
   static int result=0;  // I don't care what this is, its just for
 			// timing, so this is thread safe.
   int wps = 0;
-  // First, count how many iterations for 1 second.
+  const double elapse = 0.4;
+  // First, count how many iterations for .2 second.
   // Since we are doing lots of function calls, this will be rough
-  const double end_time = CmiCpuTimer()+1;
+  const double end_time = CmiCpuTimer()+elapse;
   wps = 0;
   while(CmiCpuTimer() < end_time) {
-    work(100,&result);
-    wps+=100;
+    work(1000,&result);
+    wps+=1000;
   }
 
   // Now we have a rough idea of how many iterations there are per
@@ -382,7 +383,7 @@ extern "C" int LDProcessorSpeed()
     const double start_time = CmiCpuTimer();
     work(wps,&result);
     const double end_time = CmiCpuTimer();
-    const double correction = 1. / (end_time-start_time);
+    const double correction = elapse / (end_time-start_time);
     wps = (int)((double)wps * correction + 0.5);
   }
   
