@@ -26,20 +26,11 @@ bgMsgEntry::bgMsgEntry(char *msg, int dstNode, int tid, int local)
   dstPe = dstNode;
   tID = tid;                   // CmiBgMsgThreadID(msg);
   msgsize = CmiBgMsgLength(msg);
+  CmiAssert(msgsize > 0);
 #if DELAY_SEND
   sendMsg = NULL;
   if (!local && correctTimeLog) sendMsg = msg;
 #endif
-}
-
-bgMsgEntry::bgMsgEntry(int dest,int mID,int msize, int tid,double rTime){
-
-  msgID = mID;
-  dstPe=dest;
-  tID=tid;
-  msgsize = msize;
-  recvTime = rTime;
-  sendMsg=NULL;
 }
 
 #if DELAY_SEND
@@ -282,6 +273,7 @@ int bgTimeLog::bDepExists(bgTimeLog* log){
 
 void bgTimeLog::pup(PUP::er &p){
     int l=0,idx;
+    int i;
     p|ep; 
     p|seqno; p|srcnode;p|msgID;
     p|recvTime; p|effRecvTime;p|startTime; p|execTime; p|endTime;p|index;p(name,20);
@@ -294,33 +286,23 @@ void bgTimeLog::pup(PUP::er &p){
       threadNum = currTlineIdx;
     }
 
-    int destNode;CmiUInt2 tID;
     if(!p.isUnpacking()){
       l=msgs.length();
     }
     p|l;
 
-    for(int i=0;i<l;i++){
-      double rTime;
-      int msgID, msgsize;
-      if(p.isUnpacking()){
-	p|destNode;p|msgID;p|msgsize;p|tID;p|rTime;
-	msgs.push_back(new bgMsgEntry(destNode,msgID,msgsize,tID,rTime));
+    for(i=0;i<l;i++){
+      if (p.isUnpacking()){
+         msgs.push_back(new bgMsgEntry);
       }
-      else{
-	p|msgs[i]->dstPe;
-	p|msgs[i]->msgID;
-	p|msgs[i]->msgsize;
-	p|msgs[i]->tID;
-	p|msgs[i]->recvTime;
-     }
+      msgs[i]->pup(p);
     }
 
     if(!p.isUnpacking())
       l = backwardDeps.length();
     p|l;    
 
-    for(int i=0;i<l;i++){
+    for(i=0;i<l;i++){
       if(p.isUnpacking()){
 	p|idx;
 	addBackwardDep(currTline->timeline[idx]);
@@ -335,7 +317,7 @@ void bgTimeLog::pup(PUP::er &p){
     }
     p|l;
 
-    for(int i=0;i<l;i++){ 
+    for(i=0;i<l;i++){ 
       if(p.isUnpacking())
 	p|idx;
       else

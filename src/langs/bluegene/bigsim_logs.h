@@ -11,6 +11,7 @@ extern int bgcorroff;
   a message sent event in timeline
 */
 class bgMsgEntry {
+  friend class bgTimeLog;
 public:
   int msgID;
   int dstPe;		// dest bg node in global sequence
@@ -22,7 +23,7 @@ public:
 //  double sendtime;
   int msgsize;		// message size
 private:
-  bgMsgEntry(int destNode,int msgID,int msize, int tID,double rTime);
+  bgMsgEntry() {}
 public:
   bgMsgEntry(char *msg, int node, int tid, int local);
   inline void print() {
@@ -34,7 +35,9 @@ public:
 #if DELAY_SEND
   void send();
 #endif
-  friend class bgTimeLog;
+  void pup(PUP::er &p) {
+    p|msgID; p|dstPe; p|recvTime; p|tID; p|msgsize;
+  }
 };
 
 

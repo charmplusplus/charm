@@ -1635,6 +1635,7 @@ static void writeToDisk()
   //Num of simulated procs on this real pe
   int numProcs = cva(numNodes)*cva(numWth);
 
+  // write summary file on PE0
   if(CmiMyPe()==0){
     
     FILE *f2 = fopen("bgTrace","w");
@@ -1650,12 +1651,12 @@ static void writeToDisk()
     p|cva(numCth);p|cva(numWth);
     p|numPes;
     
-    CmiPrintf("Number is %d %d %d %d %d %d %d\n",cva(numX),cva(numY),cva(numZ),cva(numCth),cva(numWth),numPes,totalProcs);
+    CmiPrintf("[0] Number is numX:%d numY:%d numZ:%d numCth:%d numWth:%d numPes:%d totalProcs:%d\n",cva(numX),cva(numY),cva(numZ),cva(numCth),cva(numWth),numPes,totalProcs);
     
     fclose(f2);
   }
   
-  CmiPrintf("seq correct called on %d",CmiMyPe());
+  CmiPrintf("seq correct called on %d \n",CmiMyPe());
   sprintf(d,"bgTrace%d",CmiMyPe());
   FILE *f = fopen(d,"w");
  
@@ -1667,7 +1668,7 @@ static void writeToDisk()
   
   p|numProcs;
 
-  CmiPrintf("Timelines are: \n");
+  // CmiPrintf("Timelines are: \n");
   fseek(f,headerSize,SEEK_CUR); 
 
   for (int j=0; j<cva(numNodes); j++){
@@ -1689,7 +1690,7 @@ static void writeToDisk()
   p(procOffsets,numProcs);
   fclose(f);
 
-  CmiPrintf("Wrote to disk %d %d \n", cva(numNodes),cva(numWth));
+  CmiPrintf("[%d] Wrote to disk for BG node:%d work:%d \n", CmiMyPe(), cva(numNodes),cva(numWth));
 }
 
 
