@@ -394,13 +394,15 @@ void CkMulticastMgr::recvMsg(multicastGrpMsg *msg)
   int nLocal = entry->localElem.length();
   DEBUGF(("send to local %d\n", nLocal));
   for (i=0; i<nLocal-1; i++) {
-    CProxyElement_ArrayBase ap(msg->aid, entry->localElem[i]);
     multicastGrpMsg *newm = (multicastGrpMsg *)CkCopyMsg((void **)&msg);
-    ap.ckSend((CkArrayMessage *)newm, msg->ep);
+//    CProxyElement_ArrayBase ap(msg->aid, entry->localElem[i]);
+//    ap.ckSend((CkArrayMessage *)newm, msg->ep);
+    CkSendMsgArrayInline(msg->ep, newm, msg->aid, entry->localElem[i]);
   }
   if (nLocal) {
-    CProxyElement_ArrayBase ap(msg->aid, entry->localElem[nLocal-1]);
-    ap.ckSend((CkArrayMessage *)msg, msg->ep);
+//    CProxyElement_ArrayBase ap(msg->aid, entry->localElem[nLocal-1]);
+//    ap.ckSend((CkArrayMessage *)msg, msg->ep);
+    CkSendMsgArrayInline(msg->ep, msg, msg->aid, entry->localElem[nLocal-1]);
   }
   else {
     CkAssert (entry->rootSid.pe == CkMyPe());
