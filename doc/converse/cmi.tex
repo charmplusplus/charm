@@ -205,6 +205,10 @@ this situation, you can't reuse the message buffer at all.  Of course,
 to use a function of this type, you must allocate the message buffer
 using {\tt CmiAlloc}.}
 
+\item{{\bf node}: a version that send a message to a node instead of a
+specific processor. This means that when the message is received, any ``free''
+processor within than node can handle it.}
+
 \end{itemize}
 
 \function{void CmiSyncSend(unsigned int destPE, unsigned int size, void *msg)}
@@ -212,11 +216,22 @@ using {\tt CmiAlloc}.}
 \desc{Sends \param{msg} of size \param{size} bytes to processor
 \param{destPE}.  When it returns, you may reuse the message buffer.}
 
+\function{void CmiSyncNodeSend(unsigned int destNode, unsigned int size, void *msg)}
+\index{CmiSyncNodeSend}
+\desc{Sends \param{msg} of size \param{size} bytes to node
+\param{destNode}.  When it returns, you may reuse the message buffer.}
+
 \function{void CmiSyncSendAndFree(unsigned int destPE, unsigned int size, void *msg)}
 \index{CmiSyncSendAndFree}
 \desc{Sends \param{msg} of size \param{size} bytes to processor
 \param{destPE}.  When it returns, the message buffer has been freed
-using {\tt CmiFree}}
+using {\tt CmiFree}.}
+
+\function{void CmiSyncNodeSendAndFree(unsigned int destNode, unsigned int size, void *msg)}
+\index{CmiSyncNodeSendAndFree}
+\desc{Sends \param{msg} of size \param{size} bytes to node
+\param{destNode}.  When it returns, the message buffer has been freed
+using {\tt CmiFree}.}
 
 \function{CmiCommHandle CmiAsyncSend(unsigned int destPE, unsigned int size, void *msg)}
 \index{CmiAsyncSend}
@@ -224,7 +239,15 @@ using {\tt CmiFree}}
 \param{destPE}.  It returns a communication handle which can be
 tested using CmiAsyncMsgSent: when this returns true, you may reuse
 the message buffer. If the returned communication handle is 0, message buffer
-can be reused immediately, thus saving a call to CmiAsyncMsgSent.}
+can be reused immediately, thus saving a call to {\tt CmiAsyncMsgSent}.}
+
+\function{CmiCommHandle CmiAsyncNodeSend(unsigned int destNode, unsigned int size, void *msg)}
+\index{CmiAsyncNodeSend}
+\desc{Sends \param{msg} of size \param{size} bytes to node
+\param{destNode}.  It returns a communication handle which can be
+tested using CmiAsyncMsgSent: when this returns true, you may reuse
+the message buffer. If the returned communication handle is 0, message buffer
+can be reused immediately, thus saving a call to {\tt CmiAsyncMsgSent}.}
 
 \function{void CmiSyncVectorSend(int destPE, int len, int sizes[], char *msgComps[])}
 \desc{Concatenates several pieces of data and sends them to processor
@@ -307,10 +330,23 @@ called, the system will not be able to provide the service to the user.
 \desc{Sends \param{msg} of length \param{size} bytes to all processors
 excluding the processor on which the caller resides. }
 
+\function{void CmiSyncNodeBroadcast(unsigned int size, void *msg)}
+\index{CmiSyncNodeBroadcast}
+\desc{Sends \param{msg} of length \param{size} bytes to all nodes
+excluding the node on which the caller resides. }
+
 \function{void CmiSyncBroadcastAndFree(unsigned int size, void *msg)}
 \index{CmiSyncBroadcastAndFree}
 \desc{Sends \param{msg} of length \param{size} bytes to all processors
 excluding the processor on which the caller resides.  Uses {\tt
+CmiFree} to deallocate the message buffer for \param{msg} when the
+broadcast completes. Therefore \param{msg} must point to a buffer
+allocated with {\tt CmiAlloc}.}
+
+\function{void CmiSyncNodeBroadcastAndFree(unsigned int size, void *msg)}
+\index{CmiSyncNodeBroadcastAndFree}
+\desc{Sends \param{msg} of length \param{size} bytes to all nodes
+excluding the node on which the caller resides.  Uses {\tt
 CmiFree} to deallocate the message buffer for \param{msg} when the
 broadcast completes. Therefore \param{msg} must point to a buffer
 allocated with {\tt CmiAlloc}.}
@@ -321,10 +357,23 @@ allocated with {\tt CmiAlloc}.}
 including the processor on which the caller resides. This function
 does not free the message buffer for \param{msg}.}
 
+\function{void CmiSyncNodeBroadcastAll(unsigned int size, void *msg)}
+\index{CmiSyncNodeBroadcastAll}
+\desc{Sends \param{msg} of length \param{size} bytes to all nodes
+including the node on which the caller resides. This function
+does not free the message buffer for \param{msg}.}
+
 \function{void CmiSyncBroadcastAllAndFree(unsigned int size, void *msg)}
 \index{CmiSyncBroadcastAllAndFree}
 \desc{Sends \param{msg} of length \param{size} bytes to all processors
 including the processor on which the caller resides. This function
+frees the message buffer for \param{msg} before returning, so
+\param{msg} must point to a dynamically allocated buffer.}
+
+\function{void CmiSyncNodeBroadcastAllAndFree(unsigned int size, void *msg)}
+\index{CmiSyncNodeBroadcastAllAndFree}
+\desc{Sends \param{msg} of length \param{size} bytes to all nodes
+including the node on which the caller resides. This function
 frees the message buffer for \param{msg} before returning, so
 \param{msg} must point to a dynamically allocated buffer.}
 
@@ -339,10 +388,32 @@ message buffer can be reused immediately, thus saving a call to
 CmiAsyncMsgSent. \param{msg} should not be overwritten or
 freed before the communication is complete.}
 
+\function{CmiCommHandle CmiAsyncNodeBroadcast(unsigned int size, void *msg)}
+\index{CmiAsyncNodeBroadcast}
+\desc{Initiates asynchronous broadcast of message \param{msg} of
+length \param{size} bytes to all nodes excluding the node on
+which the caller resides. It returns a communication handle which
+could be used to check the status of this send using
+\param{CmiAsyncMsgSent()}. If the returned communication handle is 0, 
+message buffer can be reused immediately, thus saving a call to 
+CmiAsyncMsgSent. \param{msg} should not be overwritten or
+freed before the communication is complete.}
+
 \function{CmiCommHandle CmiAsyncBroadcastAll(unsigned int size, void *msg)}
 \index{CmiAsyncBroadcastAll}
 \desc{Initiates asynchronous broadcast of message \param{msg} of
 length \param{size} bytes to all processors including the processor on
+which the caller resides. It returns a communication handle which
+could be used to check the status of this send using
+\param{CmiAsyncMsgSent()}. If the returned communication handle is 0, 
+message buffer can be reused immediately, thus saving a call to 
+CmiAsyncMsgSent. \param{msg} should not be overwritten or
+freed before the communication is complete.}
+
+\function{CmiCommHandle CmiAsyncNodeBroadcastAll(unsigned int size, void *msg)}
+\index{CmiAsyncNodeBroadcastAll}
+\desc{Initiates asynchronous broadcast of message \param{msg} of
+length \param{size} bytes to all nodes including the node on
 which the caller resides. It returns a communication handle which
 could be used to check the status of this send using
 \param{CmiAsyncMsgSent()}. If the returned communication handle is 0, 
@@ -466,9 +537,27 @@ priority.
 Messages sent using the CMI functions take precedence over everything
 in the scheduler queue, regardless of priority.
 
+A recent addition to Converse scheduling mechanisms is the introduction of
+node-level scheduling designed to support low-overhead programming for the
+SMP clusters. These functions have ``Node'' in their names. All processors
+within the node has access to the node-level scheduler's queue, and thus
+a message enqueued in a node-level queue may be handled by any processor within
+that node. When deciding about which message to process next, i.e. from
+processor's own queue or from the node-level queue, a quick priority check
+is performed internally, thus a processor views scheduler's queue as a single
+prioritized queue that includes messages directed at that processor and
+messages from the node-level queue sorted according to priorities.
+
 \function{void CsdEnqueueGeneral(void *Message, int strategy, int priobits, int *prioptr)}
 \index{CsdEnqueueGeneral}
-\desc{This call enqueues a message to the scheduler's queue, to
+\desc{This call enqueues a message to the processor's scheduler's queue, to
+be sorted according to its priority and the queueing \param{strategy}.
+The meaning of the \param{priobits} and \param{prioptr} fields depend
+on the value of \param{strategy}, which are explained below.}
+
+\function{void CsdNodeEnqueueGeneral(void *Message, int strategy, int priobits, int *prioptr)}
+\index{CsdNodeEnqueueGeneral}
+\desc{This call enqueues a message to the node-level scheduler's queue, to
 be sorted according to its priority and the queueing \param{strategy}.
 The meaning of the \param{priobits} and \param{prioptr} fields depend
 on the value of \param{strategy}, which can be any of the following:
@@ -523,10 +612,22 @@ to actually arrange storage for the priority.
 {\tt CsdEnqueueGeneral(Message, CQS\_QUEUEING\_FIFO,0, NULL)} 
 provided here for backward compatibility.}
 
+\function {void CsdNodeEnqueue(void *Message)}
+\index{CsdNodeEnqueue}
+\desc{This macro is a shorthand for 
+{\tt CsdNodeEnqueueGeneral(Message, CQS\_QUEUEING\_FIFO,0, NULL)} 
+provided here for backward compatibility.}
+
 \function{void CsdEnqueueFifo(void *Message)}
 \index{CsdEnqueueFifo}
 \desc{This macro is a shorthand for 
 {\tt CsdEnqueueGeneral(Message, CQS\_QUEUEING\_FIFO,0, NULL)} 
+provided here for backward compatibility.}
+
+\function{void CsdNodeEnqueueFifo(void *Message)}
+\index{CsdNodeEnqueueFifo}
+\desc{This macro is a shorthand for 
+{\tt CsdNodeEnqueueGeneral(Message, CQS\_QUEUEING\_FIFO,0, NULL)} 
 provided here for backward compatibility.}
 
 \function{void CsdEnqueueLifo(void *Message)}
@@ -535,10 +636,21 @@ provided here for backward compatibility.}
 {\tt CsdEnqueueGeneral(Message, CQS\_QUEUEING\_LIFO,0, NULL)} 
 provided here for backward compatibility.}
 
+\function{void CsdNodeEnqueueLifo(void *Message)}
+\index{CsdNodeEnqueueLifo}
+\desc{This macro is a shorthand for
+{\tt CsdNodeEnqueueGeneral(Message, CQS\_QUEUEING\_LIFO,0, NULL)} 
+provided here for backward compatibility.}
+
 \function{int CsdEmpty()}
 \index{CsdEmpty}
-\desc{This function returns non-zero integer when the scheduler's queue
-is empty, zero otherwise.}
+\desc{This function returns non-zero integer when the scheduler's 
+processor-level queue is empty, zero otherwise.}
+
+\function{int CsdNodeEmpty()}
+\index{CsdNodeEmpty}
+\desc{This function returns non-zero integer when the scheduler's 
+node-level queue is empty, zero otherwise.}
 
 \section{Polling for Messages}
 \label{polling}
@@ -753,15 +865,13 @@ array should at least be of size \param{CmiNumChildren()}.}
 
 \section{Spanning Tree Calls}
 
-Sometimes, it is convenient to view the nodes of the machine as a
-tree.  For this purpose, Converse defines a tree over the nodes.  We
-provide functions to obtain the parent and children of each node.  On
+Sometimes, it is convenient to view the processors/nodes of the machine as a
+tree.  For this purpose, Converse defines a tree over processors/nodes.  We
+provide functions to obtain the parent and children of each processor/node.  On
 those machines where the communication topology is relevant, we
-arrange the tree to optimize communication performance.
-
-\function{int CmiSpanTreeRoot()}
-\index{CmiSpanTreeRoot}
-\desc{Returns the processor number of the root of the spanning tree.}
+arrange the tree to optimize communication performance. The root of
+the spanning tree (processor based or node-based) is always 0, thus
+the {\tt CmiSpanTreeRoot} call has been eliminated.
 
 \function{int CmiSpanTreeParent(int procNum)}
 \index{CmiSpanTreeParent}
@@ -776,4 +886,18 @@ arrange the tree to optimize communication performance.
 \index{CmiSpanTreeChildren}
 \desc{This function fills the array \param{children} with processor
 numbers of children of \param{procNum} in the spanning tree.}
+
+\function{int CmiNodeSpanTreeParent(int nodeNum)}
+\index{CmiNodeSpanTreeParent}
+\desc{This function returns the node number of the parent of
+\param{nodeNum} in the spanning tree.}
+
+\function{int CmiNumNodeSpanTreeChildren(int nodeNum)}
+\index{CmiNumNodeSpanTreeChildren}
+\desc{Returns the number of children of \param{nodeNum} in the spanning tree.}
+
+\function{void CmiNodeSpanTreeChildren(int nodeNum, int *children)}
+\index{CmiNodeSpanTreeChildren}
+\desc{This function fills the array \param{children} with node
+numbers of children of \param{nodeNum} in the spanning tree.}
 

@@ -12,7 +12,10 @@
 % REVISION HISTORY:
 %
 % $Log$
-% Revision 1.9  1997-07-29 20:55:30  milind
+% Revision 1.10  1999-07-29 20:50:37  milind
+% Added node-level functions.
+%
+% Revision 1.9  1997/07/29 20:55:30  milind
 % Updated machine model chapter and merged it with Cmi chapter.
 %
 % Revision 1.8  1997/07/19 23:51:52  wilmarth
@@ -255,9 +258,11 @@ then compete for acquiring \param{lock}.}
 \desc{Frees any memory associated with \param{lock}. It is an error to
 perform any operations with \param{lock} after a call to this function.}
 
+\internal{
 \function{void *CmiSvAlloc(int size)}
 \index{CmiSvAlloc}
 \desc{Allocates a block of memory of \param{size} bytes from the heap in node's 
 local memory and returns pointer to the start of this block. \note{On 
 machines other than shared-memory machines, this is equivalent to 
 \param{CmiAlloc}.}}
+}
