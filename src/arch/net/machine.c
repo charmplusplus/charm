@@ -1346,7 +1346,7 @@ void CcsImpl_reply(CcsImplHeader *hdr,int repLen,const void *repData)
  * CmiPrintf, CmiError, CmiScanf
  *
  *****************************************************************************/
-
+static void InternalWriteToTerminal(int isStdErr,const char *str,int len);
 static void InternalPrintf(const char *f, va_list l)
 {
   ChMessage replymsg;
@@ -1362,6 +1362,7 @@ static void InternalPrintf(const char *f, va_list l)
   } else {
   	  ctrl_sendone_locking("print", buffer,strlen(buffer)+1,NULL,0);
   }
+  InternalWriteToTerminal(0,buffer,strlen(buffer));
 }
 
 static void InternalError(const char *f, va_list l)
@@ -1379,6 +1380,7 @@ static void InternalError(const char *f, va_list l)
   } else {
   	  ctrl_sendone_locking("printerr", buffer,strlen(buffer)+1,NULL,0);
   }
+  InternalWriteToTerminal(1,buffer,strlen(buffer));
 }
 
 static int InternalScanf(char *fmt, va_list l)
@@ -1457,7 +1459,8 @@ int CmiScanf(const char *fmt, ...)
 
 /*Can read from stdout or stderr using these fd's*/
 static int readStdout[2]; 
-static int serviceStdout[2]; /*Normally zero; one if service needed.*/
+static int writeStdout[2]; /*The original stdout/stderr sockets*/ 
+static int serviceStdout[2]; /*(bool) Normally zero; one if service needed.*/
 #define readStdoutBufLen 8192
 static char readStdoutBuf[readStdoutBufLen+1]; /*Protected by comm. lock*/
 static int servicingStdout;
@@ -1477,6 +1480,10 @@ static void CmiStdoutInit(void) {
 		int pair[2];
 		int srcFd=1+i; /* 1 is stdout; 2 is stderr */
 		
+		/*First, save a copy of the original stdout*/
+		writeStdout[i]=dup(srcFd);
+		
+		/*Now build a pipe to connect to stdout*/
 		if (-1==pipe(pair)) {perror("building redirection pipe"); exit(1);}
 		readStdout[i]=pair[0]; /*We get the read end of pipe*/
 		if (-1==dup2(pair[1],srcFd)) {perror("dup2 redirection pipe"); exit(1);}
@@ -1495,7 +1502,16 @@ static void CmiStdoutInit(void) {
 # ifndef read
 #  define read(x,y,z) 0
 # endif
+# ifndef write
+#  define write(x,y,z) 
+# endif
 #endif
+}
+
+/*Sends data to original stdout (e.g., for ++debug or ++in-xterm)*/
+static void InternalWriteToTerminal(int isStdErr,const char *str,int len)
+{
+	write(writeStdout[isStdErr],str,len);	
 }
 
 /*
@@ -1526,6 +1542,8 @@ static void CmiStdoutServiceOne(int i) {
 		}
 		ctrl_sendone_nolock(cmdName[i],readStdoutBuf,nBytes,
 				    tooMuchWarn,tooMuchLen);
+		
+		InternalWriteToTerminal(i,readStdoutBuf,nBytes);
 	}
 	servicingStdout=0;
 	serviceStdout[i]=0; /*This pipe is now serviced*/
