@@ -300,7 +300,9 @@ void LV3D0_Deposit(CkView *v,int clientID) {
 /*************** CCS Interface ***************/
 //This only ever gets set on processor 0 (FIXME: checkpointing)
 static LV3D_Universe *theUniverse=0;
-static CkCallback frameUpdate;
+static LV3D_ServerMgr *theMgr=0;
+
+LV3D_ServerMgr::~LV3D_ServerMgr() {}
 
 /**
 "lv3d_setup" CCS handler:
@@ -320,6 +322,7 @@ extern "C" void LV3D0_setup(char *msg) {
 	pp|clientID;
 	pp|theUniverse;
 	CcsSendReply(sp.size(),buf);
+	theMgr->newClient(clientID);
 	// CmiPrintf("Registered (client %d)\n",clientID);
 	delete[] buf;
 }
@@ -340,7 +343,7 @@ extern "C" void LV3D0_newViewpoint(char *msg) {
 	p|m->frameID;
 	m->viewpoint.pup(p);
 	// CmiPrintf("New user viewpoint (client %d, frame %d)\n",clientID,frameID);
-	frameUpdate.send(m);
+	theMgr->newViewpoint(m);
 }
 
 /**
@@ -402,12 +405,12 @@ static void emptyDoneFn(void *param,void *msg) /* stage 3 */
 Register for libsixty redraw requests.  This routine
 must be called exactly once on processor 0.
 */
-void LV3D0_Init(LV3D_Universe *clientUniverse,const CkCallback &frameUpdate_)
+void LV3D0_Init(LV3D_Universe *clientUniverse,LV3D_ServerMgr *mgr)
 {
 	if (clientUniverse==0)
 		clientUniverse=new LV3D_Universe();
 	theUniverse=clientUniverse;
-	frameUpdate=frameUpdate_;
+	theMgr=mgr;
 	CcsRegisterHandler("lv3d_setup",(CmiHandler)LV3D0_setup);
 	CcsRegisterHandler("lv3d_newViewpoint",(CmiHandler)LV3D0_newViewpoint);
 	CcsRegisterHandler("lv3d_getViews",(CmiHandler)LV3D0_getViews);

@@ -247,11 +247,22 @@ void LV3D_RenderMsg::delete_(LV3D_RenderMsg *m) {
 	delete m;
 }
 
+class LV3D1_ServerMgr : public LV3D_ServerMgr {
+	CProxy_LV3D_Array a;
+public:
+	
+	LV3D1_ServerMgr(const CProxy_LV3D_Array &a_) :a(a_) {}
+	virtual void newClient(int clientID) {
+		a.LV3D_NewClient(clientID);
+	}
+	virtual void newViewpoint(LV3D_ViewpointMsg *m) {
+		a.LV3D_Viewpoint(m);
+	}
+};
+
 void LV3D1_Init(CkArrayID aid,LV3D_Universe *theUniverse)
 {
-	// Broadcast to LV3D_Viewpoint when the viewpoint changes.
-	CkCallback frameUpdate(CkIndex_LV3D_Array::LV3D_Viewpoint(0),aid);
-	LV3D0_Init(theUniverse,frameUpdate);
+	LV3D0_Init(theUniverse,new LV3D1_ServerMgr(aid));
 #if LV3D_USE_FLAT
 	// Broadcast to LV3D_FlatRender for 2D views.
 	CkCallback flatUpdate(CkIndex_LV3D_Array::LV3D_FlatRender(0),aid);

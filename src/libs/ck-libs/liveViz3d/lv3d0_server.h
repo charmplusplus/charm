@@ -22,6 +22,16 @@ public:
 };
 
 /**
+  Represents a set of impostors available for updates.
+*/
+class LV3D_ServerMgr {
+public:
+	virtual ~LV3D_ServerMgr();
+	virtual void newClient(int clientID) =0;
+	virtual void newViewpoint(LV3D_ViewpointMsg *m) =0;
+};
+
+/**
   Set up to accept LiveViz3D requests.  
   This routine must be called exactly once from processor 0
   at startup.
@@ -29,7 +39,7 @@ public:
   \param frameUpdate Callback to call (with a LV3D_ViewpointMsg) when a
      client viewpoint changes.
  */
-void LV3D0_Init(LV3D_Universe *clientUniverse,const CkCallback &frameUpdate);
+void LV3D0_Init(LV3D_Universe *clientUniverse,LV3D_ServerMgr *mgr);
 
 /**
   Send this view from the server to this client.
