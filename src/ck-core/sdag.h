@@ -271,7 +271,7 @@ class CDep {
         allocating of CDep and call addDepends(), so we don't pup whenDepends
         and entryDepends here.
      */ 
-     int i, j;
+        int i; // , j;
 
      for (i=0; i<numWhens; i++)    whens[i]->pup(p);
      for (i=0; i<numEntries; i++)  buffers[i]->pup(p);
