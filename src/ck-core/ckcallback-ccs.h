@@ -22,6 +22,10 @@ public:
 	char *data; //Actual data sent along with request.
 };
 
+#ifdef CcsRegisterHandler /*pollution from C conv-ccs header*/
+# undef CcsRegisterHandler
+#endif
+
 /**
  * When a CCS request comes in from the network with this handlername,
  * call this callback with an appropriate CkCcsRequestMsg.
