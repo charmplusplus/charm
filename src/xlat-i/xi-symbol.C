@@ -13,7 +13,7 @@
 #  include <fstream.h>
 #else /* ISO C++ */
 #  include <fstream>
-   using std::ofstream;
+   using namespace std;
 #endif
 
 int fortranMode;

@@ -17,9 +17,7 @@
 #  include <iostream.h>
 #else /* ISO C++ */
 #  include <iostream>
-   using std::cout;
-   using std::cerr;
-   using std::endl;
+   using namespace std;
 #endif
 
 
