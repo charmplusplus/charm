@@ -27,68 +27,107 @@ CmiBool GreedyRefLB::QueryBalanceNow(int _step)
 
 void GreedyRefLB::Heapify(HeapData *heap, int node, int heapSize)
 {
-  int left = 2*node+1;
-  int right = 2*node+2;
-  int largest;
+	int left = 2*node+1;
+	int right = 2*node+2;
+	int smallest;
 
-  if (left <= heapSize && heap[left].cpuTime < heap[node].cpuTime)
-    largest = left;
-  else largest = node;
+	if (left <= heapSize && heap[left].load > heap[node].load)
+		smallest = left;
+	else smallest = node;
 	
-  if (right <= heapSize && heap[right].cpuTime < heap[largest].cpuTime) 
-    largest = right;
+	if (right <= heapSize && heap[right].load > heap[smallest].load) 
+		smallest = right;
 
-  if (largest != node) {
-    HeapData obj;
-    obj = heap[node];
-    heap[node] = heap[largest];
-    heap[largest] = obj;
-    Heapify(heap, largest, heapSize);
-  }
-		
+	if (smallest != node) {
+		HeapData obj;
+		obj = heap[node];
+		heap[node] = heap[smallest];
+		heap[smallest] = obj;
+		Heapify(heap, smallest, heapSize);
+	}		
 }
+
+
+//Inserts object into appropriate sorted position in the object array
+void GreedyRefLB::InsertObject(HeapData *data, int index)
+{
+	HeapData key = data[index];
+	
+	for(int i = index-1; i >= 0 && objData[i].load < key.load; i--)
+		objData[i+1] = objData[i];
+	objData[i+1] = key;
+}
+
+HeapData* GreedyRefLB::BuildObjectArray(CentralLB::LDStats* stats, 
+																			 int count, int *objCount)
+{
+	HeapData *objData;
+
+	*objCount = 0;
+	for (int pe = 0; pe < count; pe++)
+		for (int obj = 0; obj < stats[pe].n_objs; obj++)
+			if (stats[pe].objData[obj].migratable == CmiTrue) *objCount++; 
+
+	objData  = new HeapData[*objCount];
+	*objCount = 0; 
+	for(int pe=0; pe < count; pe++)
+		for(int obj=0; obj < stats[pe].n_objs; obj++)
+			if (stats[pe].objData[obj].migratable == CmiTrue) {
+				objData[*objCount].load = 
+					stats[pe].objData[obj].wallTime * stats[pe].pe_speed;
+				objData[*objCount].pe = pe;
+				objData[*objCount].id = obj;
+				InsertObject(objData, *objCount++);
+			}
+
+	return objData;
+}
+
+HeapData* GreedyRefLB::BuildCpuArray(CentralLB::LDStats* stats, 
+																		int count, int *peCount)
+{
+	HeapData           *data;
+	CentralLB::LDStats *peData;
+	
+	*peCount = 0;
+	for (int pe = 0; pe < count; pe++)
+		if (stats[pe].available == CmiTrue) *peCount++;
+
+	data = new HeapData[*peCount];
+	
+	*peCount = 0;
+	for (int pe=0; pe < count; pe++) {
+		data[*peCount].load = 0.0;
+		peData = &(stats[pe]);
+
+		for (int obj = 0; obj < peData->n_objs; obj++) 
+			if (peData->objData[obj].migratable == CmiFalse) 
+				data[*peCount].load -= 
+					peData->objData[obj].wallTime * peData->pe_speed;
+				
+ 		if (peData->available == CmiTrue) {
+			data[*peCount].load += 
+				(peData->total_walltime - peData->bg_walltime) * peData->pe_speed;
+			data[*peCount].pe = data[*peCount].id = pe;
+			InsertObject(data, *peCount);
+			*peCount++;
+		}
+	}
+	
+	return data;
+}
+
 
 
 CLBMigrateMsg* GreedyRefLB::Strategy(CentralLB::LDStats* stats, int count)
 {
-  int pe,obj;
-  //  CkPrintf("[%d] GreedyRefLB strategy\n",CkMyPe());
-
   CkVector migrateInfo;
+	int      obj, heapSize, objCount;
+  HeapData *cpuData = BuildCpuArray(stats, count, &heapSize);
+  HeapData *objData = BuildObjectArray(stats, count, &objCount);
 
-  int totalObjs = 0;
-  HeapData *cpuData = new HeapData[count];
-  HeapData *objData;
+	//  CkPrintf("[%d] GreedyRefLB strategy\n",CkMyPe());
 
-  for (pe=0; pe < count; pe++) {
-    totalObjs += stats[pe].n_objs;
-    cpuData[pe].cpuTime = 0.;
-    cpuData[pe].pe = cpuData[pe].id = pe;
-  }
-
-  objData = new HeapData[totalObjs];
-  int objCount = 0;
-  for(pe=0; pe < count; pe++) {
-    //    CkPrintf("[%d] PE %d : %d Objects : %d Communication\n",
-    //	     CkMyPe(),pe,stats[pe].n_objs,stats[pe].n_comm);
-
-    for(obj=0; obj < stats[pe].n_objs; obj++, objCount++) {
-      objData[objCount].cpuTime = stats[pe].objData[obj].cpuTime;
-      objData[objCount].pe = pe;
-      objData[objCount].id = obj;
-    }
-  }
-
-  for (obj=1; obj < totalObjs; obj++) {
-    HeapData key = objData[obj];
-    int i = obj-1;
-    while (i >=0 && objData[i].cpuTime < key.cpuTime) {
-      objData[i+1] = objData[i];
-      i--;
-    }
-    objData[i+1] = key;
-  }
-  
   // Build the refine data structure, and use it for storing the info
   // from the heap
   int** from_procs = Refiner::AllocProcs(count, stats);
@@ -96,22 +135,22 @@ CLBMigrateMsg* GreedyRefLB::Strategy(CentralLB::LDStats* stats, int count)
     for(obj=0;obj < stats[pe].n_objs; obj++)
       from_procs[pe][obj] = 0;
 
-  int heapSize = count-1;
-  HeapData minCpu;	
-  for (obj=0; obj < totalObjs; obj++) {
-    // Operation of extracting the minimum(the least loaded processor)
+  heapSize--;
+  HeapData maxCpu;	
+  for (obj=0; obj < objCount; obj++) {
+    // Operation of extracting the the least loaded processor
     // from the heap
-    minCpu = cpuData[0];
+    maxCpu = cpuData[0];
     cpuData[0] = cpuData[heapSize];
     heapSize--;
     Heapify(cpuData, 0, heapSize);		
 
     // Increment the time of the least loaded processor by the cpuTime of
     // the `heaviest' object
-    minCpu.cpuTime += objData[obj].cpuTime;
+    maxCpu.load -= objData[obj].load;
 
     //Insert object into migration queue if necessary
-    const int dest = minCpu.pe;
+    const int dest = maxCpu.pe;
     const int pe   = objData[obj].pe;
     const int id   = objData[obj].id;
     from_procs[pe][id] = dest;
@@ -119,11 +158,11 @@ CLBMigrateMsg* GreedyRefLB::Strategy(CentralLB::LDStats* stats, int count)
     //Insert the least loaded processor with load updated back into the heap
     heapSize++;
     int location = heapSize;
-    while (location>0 && cpuData[(location-1)/2].cpuTime > minCpu.cpuTime) {
+    while (location>0 && cpuData[(location-1)/2].load < maxCpu.load) {
       cpuData[location] = cpuData[(location-1)/2];
       location = (location-1)/2;
     }
-    cpuData[location] = minCpu;
+    cpuData[location] = maxCpu;
   }
 
   int initial_migrates=0;
