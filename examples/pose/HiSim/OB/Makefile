@@ -53,7 +53,7 @@ all:
 	$(CHARMC) -o util.o -seq util.C
 	cp *.o ../tmp
 
-	cd ../tmp;$(CHARMC) *.o $(OTHER) $(LIBS) -o $(PGM) -lpose -ltrace-projections -language charm++ -module commlib
+	cd ../tmp; rm -f module*; $(CHARMC) *.o $(OTHER) $(LIBS) -o $(PGM) -lpose -ltrace-projections -language charm++ -module commlib
 
 
 clean:

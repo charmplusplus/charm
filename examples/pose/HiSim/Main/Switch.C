@@ -53,7 +53,7 @@ void Switch::recvPacket(Packet *copyP) {
         CkAssert(inPort <= numP);
         p->hdr.portId = outPort;
 	if((outPort == numP) && (!config.inputBuffering)) {
-		// Direct ticket to node w/o buffering in case of output buffering
+		// Direct ticket to node w/o buffering in case of output buffering in direct nets
 		sendPacket(p,outPort*config.switchVc,outPort,outPort*config.switchVc);
 		return;
 	}
@@ -72,7 +72,7 @@ void Switch::recvPacket(Packet *copyP) {
 	// vc and so buffering is to be done only in case not enough downstream tokens
 	// if selectOutputVc returned NO_VC_AVAILABLE then outVcId is set to invalid.
 	// To prevent that, outVc is valid till outVcId is computed
-	if(availBufsize[outPort] < p->hdr.routeInfo.datalen)
+	if(availBufsize[outPort] < p->hdr.routeInfo.datalen) //uncomment
         	outVc = NO_VC_AVAILABLE; 
 	}
 
@@ -102,7 +102,6 @@ void Switch::sendPacket(Packet *p,const int & outVcId,const int & outPort,const 
         mapVc[outVcId] =  inVcId;
 	int setRequest = (config.inputBuffering)?(inVcId):(outPort);
 
-        requested[setRequest] = 1;
 
         CkAssert(outPort == p->hdr.portId); 
 
@@ -111,6 +110,8 @@ void Switch::sendPacket(Packet *p,const int & outVcId,const int & outPort,const 
         if((p->hdr.nextId >= config.nicStart) && (p->hdr.nextId < (config.nicStart+config.numNodes))) goingToNic = 1;
         if((p->hdr.prevId >= config.nicStart) && (p->hdr.prevId < (config.nicStart+config.numNodes))) fromNic = 1;
 
+	if(config.inputBuffering || !goingToNic)
+        requested[setRequest] = 1; // uncomment
 
 	// availbufsize for output buffering is a very inefficient scheme which 
 	// leads to lot of fragmentation. There is a variable for each port indicating

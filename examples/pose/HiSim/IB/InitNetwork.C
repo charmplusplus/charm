@@ -22,7 +22,7 @@ void InitNetwork(MachineParams *mp) {
 
 	CkPrintf("fanout %d numP %d \n",fanout,mp->config->numP);	
 
-	mp->config->inputBuffering = 1;
+	mp->config->inputBuffering = 1; mp->config->sourceRouting = 0;
 	mp->config->numNodes = numNodes = nnodes ;	
        	switchP = mp->config->numP;
 	numSwitches = (numNodes/fanout)*numLevels;

@@ -16,7 +16,8 @@ BlueGene: $(OBJDIR)/SLQ.o
 
 IB: $(OBJDIR)/SLQ_Switch.o
 
-OB: $(OBJDIR)/SLQ_Switch.o
+#OB: $(OBJDIR)/SLQ_Switch.o
+OB: $(OBJDIR)/outputBufferIn.o
 
 $(OBJDIR)/RoundRobin.o: RoundRobin.C RoundRobin.h
 	$(CHARMC) -o $@ -seq RoundRobin.C -I$(MACHINE)

@@ -21,8 +21,10 @@ void InitNetwork(MachineParams *mp) {
         ports = (unsigned int *)malloc(sizeof(int)*mp->BGnodes);
         portindex = (unsigned int *)malloc(sizeof(int)*mp->BGnodes);
 
+	config.inputBuffering = 1;
         diff = mp->BGnodes; counter = 0; nnodes = 1; portindex[0] = 0;
         while(diff = diff >> 1)  { counter ++; nnodes *= 2; }
+	config.numP = counter;	
 
 	// The code here is mostly for the future incomplete hypercube. 
 	// The implementation is based on the fact that an incomplete hypercube

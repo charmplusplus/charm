@@ -1,11 +1,11 @@
 #include "BgSim_sim.h"
 #include "TCsim_sim.h"
-#include "math.h"
+#include "math.h" 
 
-extern void initializeNetwork(Topology **,RoutingAlgorithm **,InputVcSelection **,OutputVcSelection **);
-extern void initializeNetwork(Topology **,RoutingAlgorithm **);
+extern void initializeNetwork(Topology **,RoutingAlgorithm **,InputVcSelection **,OutputVcSelection **); 
+extern void initializeNetwork(Topology **,RoutingAlgorithm **); 
 
-NetInterface::NetInterface(NetInterfaceMsg *niMsg) {
+NetInterface::NetInterface(NetInterfaceMsg *niMsg) { 
    nicConsts = new NicConsts;
    nicConsts->id = niMsg->id;  nicConsts->numP = niMsg->numP;
    nicConsts->startId = niMsg->startId;
@@ -36,7 +36,9 @@ void NetInterface::recvMsg(NicMsg *nic) {
                 p->hdr.prevId = nicConsts->id; p->hdr.hop = 0;
                 p->hdr.prev_vcid = -1; p->hdr.prev_src = p->hdr.src;
                 p->hdr.nextId = topology->getStartSwitch(nicConsts->id-config.nicStart);
+		if(config.sourceRouting) {
 		routingAlgorithm->populateRoutes(p,nicConsts->numP); // Should do it just once later per message
+		}
 
                 POSE_invoke(recvPacket(p),Switch,nicConsts->startId,delay);
                 delay += ((POSE_TimeType)(curlen/config.switchC_BW));  msgLenRest -= curlen; 
@@ -121,4 +123,3 @@ void NetInterface::recvPacket(Packet *p) {
 	}
         }
 }
-

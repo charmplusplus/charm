@@ -6,4 +6,4 @@ CHARMINC=$(CHARMBASE)/include
 OBJDIR=../tmp
 
 CHARMC=$(CHARMBIN)/charmc -I$(CHARMINC)/pose $(OPTS)
-ETRANS=$(CHARMBIN)/etrans.pl
+ETRANS=$(CHARMBIN)/etrans.pl -s

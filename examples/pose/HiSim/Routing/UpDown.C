@@ -1,6 +1,5 @@
 #include "UpDown.h"
 
-
 // Check if direction we need to go from up to down
 int isDirectionChanged(int & src,int & dst,int & nodeRangeStart,int & nodeRangeEnd)
 {
@@ -10,6 +9,23 @@ int isDirectionChanged(int & src,int & dst,int & nodeRangeStart,int & nodeRangeE
                 return 0;
 }
 
+void UpDown::populateRoutes(Packet *p,int numP) {
+	int fanout = numP/2,n,src,dst,i=0,pktid;
+	n = fanout; src = p->hdr.src; dst = p->hdr.routeInfo.dst; pktid = p->hdr.pktId;
+
+	while(n <= config.numNodes)  { // Has to be perfect fat tree
+		if((src/n) == (dst/n)) break;
+		p->hdr.nextPort[i++] = (src+pktid)%fanout+fanout;
+		n *= fanout;
+	}
+
+	while(n >= fanout) {
+		p->hdr.nextPort[i++] = ((dst%n) * fanout)/n;
+		dst = dst % (n/fanout);  
+		n /= fanout;
+	}
+}
+			
 // Select by adaptive ( based on load ) or static routing
 int UpDown::selectRoute(int c,int d,int numP,Topology *top,Packet *p,map<int,int> & Bufsize) {
 	int goDown,nextP=-1,dstOffset,fanout=(config.numP/2),portId;

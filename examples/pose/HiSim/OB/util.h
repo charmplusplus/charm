@@ -29,6 +29,8 @@ public:
    int use_transceiver;
    int inputBuffering;
    int adaptive_routing;
+   int sourceRouting;
+   int check_on;
 
   int NodeStart;
   int HCAStart;
