@@ -9,7 +9,7 @@
 #define _CParseNode_H_
 
 #include "EToken.h"
-#include "CString.h"
+#include "xi-util.h"
 #include "CLexer.h"
 #include "sdag-globals.h"
 #include "CList.h"
@@ -20,13 +20,13 @@ class CParser;
 
 class CParseNode {
   public:
-    CString *className;
+    XStr *className;
     void print(int indent);
     int nodeNum;
-    CString *label;
-    CString *counter;
+    XStr *label;
+    XStr *counter;
     EToken type;
-    CString *text;
+    XStr *text;
     CParseNode *con1, *con2, *con3, *con4;
     TList *constructs;
     TList *stateVars;
@@ -35,10 +35,10 @@ class CParseNode {
     int nextBeginOrEnd;
     CEntry *entryPtr;
     CParseNode(EToken t, CLexer *cLexer, CParser *cParser);
-    CParseNode(EToken t, CString *txt) : type(t), text(txt), con1(0), con2(0),
+    CParseNode(EToken t, XStr *txt) : type(t), text(txt), con1(0), con2(0),
                                          con3(0), con4(0), constructs(0) {}
     void numberNodes(void);
-    void labelNodes(CString *);
+    void labelNodes(XStr *);
     void generateEntryList(TList *, CParseNode *);
     void propogateState(TList *);
     void generateCode(void);

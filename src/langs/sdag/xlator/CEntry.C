@@ -16,7 +16,7 @@ void CEntry::generateDeps(void)
   }
 }
 
-void CEntry::generateCode(CString *className)
+void CEntry::generateCode(XStr *className)
 {
   CParseNode *cn;
   // C++ file

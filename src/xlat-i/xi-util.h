@@ -33,9 +33,20 @@ class XStr {
   private:
     char *s;
     unsigned int len, blklen;
+    void initTo(const char *_s);
+  public:
+    // MAB: following append methods were earlier private. However,
+    // in order to minimize changes to sdag translator, they have been made
+    // public. Once the sdag translator is fully embedded in charmxi,
+    // they will be made private again.
     void append(const char *_s);
     void append(char c);
-    void initTo(const char *_s);
+    // MAB: the print method is needed for debugging sdag translator.
+    // this too will go away later.
+    void print(int indent) { 
+      for (int i=0; i<indent; i++) cout << "  ";
+      cout << get_string();
+    }
   public:
     XStr();
     XStr(const char *_s);
@@ -43,9 +54,14 @@ class XStr {
     ~XStr() { delete[] s; }
     char *get_string(void) { return s; }
     const char *get_string_const(void) const { return s; }
+    // this is to allow XStr to be substituted for CString in
+    // structured dagger translator without a lot of changes
+    char *charstar(void) { return get_string(); }
     //This operator allows us to use XStr's interchangably with char *'s:
     operator char *() {return get_string();}
     //Comparison operators
+    int operator==(XStr &s2) {return 0==strcmp(s,s2.s);}
+    int operator!=(XStr &s2) {return 0!=strcmp(s,s2.s);}
     int operator==(const char *s2) {return 0==strcmp(s,s2);}
     int operator!=(const char *s2) {return 0!=strcmp(s,s2);}
     //Addition operator

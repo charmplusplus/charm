@@ -8,7 +8,7 @@
 #ifndef _CParsedFile_H_
 #define _CParsedFile_H_
 
-#include "CString.h"
+#include "xi-util.h"
 #include "CList.h"
 #include "CEntry.h"
 #include "CParseNode.h"
@@ -25,12 +25,12 @@ class CParsedFile {
     void generateEntries(void);
     void generateInitFunction(void);
   public:
-    CString *className;
-    CString *sourceFile;
+    XStr *className;
+    XStr *sourceFile;
     TList *entryList;
     TList *nodeList;
     CParsedFile(char *sFile): className(0) {
-      sourceFile = new CString(sFile);
+      sourceFile = new XStr(sFile);
       entryList = new TList();
       nodeList = new TList();
     }
@@ -41,7 +41,7 @@ class CParsedFile {
       labelNodes();
       propogateState();
       generateEntryList();
-      CString *fhname = new CString(sourceFile);
+      XStr *fhname = new XStr(sourceFile->charstar());
       fhname->append(".h");
       fh = fopen(fhname->charstar(), "w");
       generateCode();

@@ -8,7 +8,7 @@
 #ifndef _CEntry_H_
 #define _CEntry_H_
 
-#include "CString.h"
+#include "xi-util.h"
 #include "sdag-globals.h"
 #include "CList.h"
 
@@ -16,12 +16,12 @@ class CParseNode;
 
 class CEntry{
   public:
-    CString *entry;
-    CString *msgType;
+    XStr *entry;
+    XStr *msgType;
     int entryNum;
     int refNumNeeded;
     TList *whenList;
-    CEntry(CString *e, CString *m) : entry(e), msgType(m) {
+    CEntry(XStr *e, XStr *m) : entry(e), msgType(m) {
       entryNum = numEntries++;
       whenList = new TList();
       refNumNeeded=0;
@@ -30,7 +30,7 @@ class CEntry{
       Indent(indent);
       printf("entry %s (%s *)", entry->charstar(), msgType->charstar());
     }
-    void generateCode(CString *);
+    void generateCode(XStr *);
     void generateDeps(void);
     
 };

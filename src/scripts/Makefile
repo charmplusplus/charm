@@ -668,7 +668,7 @@ libf90charm.a: f90main.ci f90main.h f90main.C charmf.h charmf.C futil.f90
 	$(CHARMC) -cp ../lib -o libf90charm.a f90main.o charmf.o futil.o
 
 SDAGOBJ=sdag-main.o trans.o CLexer.o CParser.o CParsedFile.o CParseNode.o \
-	sdag-globals.o CParseNodeProcess.o CEntry.o
+	sdag-globals.o CParseNodeProcess.o CEntry.o xi-util.o
 
 sdagx: $(SDAGOBJ)
 	$(SEQCHARMC) -cp ../bin -o sdagx -language c++ $(SDAGOBJ)

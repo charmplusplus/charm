@@ -8,13 +8,13 @@
 #ifndef _CStateVar_H_
 #define _CStateVar_H_
 
-#include "CString.h"
+#include "xi-util.h"
 
 class CStateVar {
   public:
-    CString *type;
-    CString *name;
-    CStateVar(CString *t, CString *n) : type(t), name(n) {}
+    XStr *type;
+    XStr *name;
+    CStateVar(XStr *t, XStr *n) : type(t), name(n) {}
 };
 
 #endif

@@ -93,7 +93,7 @@ CToken *CLexer::getMatchedCode(const char *start_str, EToken stok, EToken etok)
     if(cToken->type == etok) {
       currentScope--;
     }
-    code->text->append(cToken->text);
+    code->text->append(cToken->text->charstar());
     delete cToken;
   }
   wsSignificant = 0;
@@ -139,7 +139,7 @@ CToken *CLexer::getIntExpr(EToken term)
       }
       endExpr = 1;
     } else {
-      expr->text->append(cToken->text);
+      expr->text->append(cToken->text->charstar());
     }
     delete cToken;
   }

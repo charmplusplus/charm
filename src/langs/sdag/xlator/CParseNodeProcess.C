@@ -36,7 +36,7 @@ void CParseNode::numberNodes(void)
   }
 }
 
-void CParseNode::labelNodes(CString *cname)
+void CParseNode::labelNodes(XStr *cname)
 {
   char text[128];
 
@@ -45,48 +45,48 @@ void CParseNode::labelNodes(CString *cname)
     case ENTRY:
     case SDAGENTRY:
       sprintf(text, "%s", con1->text->charstar());
-      label = new CString(text);
+      label = new XStr(text);
       break;
     case OVERLAP: 
       sprintf(text, "_overlap_%d", nodeNum); 
-      label = new CString(text);
+      label = new XStr(text);
       break;
     case WHEN: 
       sprintf(text, "_when_%d", nodeNum); 
-      label = new CString(text);
+      label = new XStr(text);
       break;
     case FOR: 
       sprintf(text, "_for_%d", nodeNum); 
-      label = new CString(text);
+      label = new XStr(text);
       break;
     case WHILE: 
       sprintf(text, "_while_%d", nodeNum); 
-      label = new CString(text);
+      label = new XStr(text);
       break;
     case IF: 
       sprintf(text, "_if_%d", nodeNum); 
-      label = new CString(text);
+      label = new XStr(text);
       if(con2!=0) con2->labelNodes(cname);
       break;
     case ELSE: 
       sprintf(text, "_else_%d", nodeNum); 
-      label = new CString(text);
+      label = new XStr(text);
       break;
     case FORALL: 
       sprintf(text, "_forall_%d", nodeNum); 
-      label = new CString(text);
+      label = new XStr(text);
       break;
     case SLIST: 
       sprintf(text, "_slist_%d", nodeNum); 
-      label = new CString(text);
+      label = new XStr(text);
       break;
     case OLIST: 
       sprintf(text, "_olist_%d", nodeNum); 
-      label = new CString(text);
+      label = new XStr(text);
       break;
     case ATOMIC: 
       sprintf(text, "_atomic_%d", nodeNum); 
-      label = new CString(text);
+      label = new XStr(text);
       break;
     case ELIST:
     case INT_EXPR:
@@ -114,8 +114,8 @@ void CParseNode::generateEntryList(TList *list, CParseNode *thisWhen)
       int found=0;
       for(entry=(CEntry *)(list->begin()); !list->end(); 
           entry=(CEntry *)(list->next())) {
-        if(entry->entry->equal(con1->text) &&
-           entry->msgType->equal(con3->text)) {
+        if(*(entry->entry) == *(con1->text) &&
+           *(entry->msgType) == *(con3->text)) {
            found = 1;
            // check to see if thisWhen is already in entry's whenList
            int whenFound = 0;
@@ -136,7 +136,7 @@ void CParseNode::generateEntryList(TList *list, CParseNode *thisWhen)
       }
       if(!found) {
         CEntry *newEntry;
-        newEntry = new CEntry(new CString(con1->text), new CString(con3->text));
+        newEntry = new CEntry(new XStr(*(con1->text)), new XStr(*(con3->text)));
         list->append(newEntry);
         entryPtr = newEntry;
         newEntry->whenList->append(thisWhen);
@@ -158,9 +158,9 @@ void CParseNode::propogateState(TList *list)
   switch(type) {
     case SDAGENTRY:
       {
-        CString *vType = new CString(con2->text);
+        XStr *vType = new XStr(*(con2->text));
         vType->append(" *");
-        sv = new CStateVar(vType, new CString(con3->text));
+        sv = new CStateVar(vType, new XStr(*(con3->text)));
       }
       stateVars->append(sv);
       stateVarsChildren = stateVars;
@@ -171,13 +171,13 @@ void CParseNode::propogateState(TList *list)
         stateVars->append(sv);
         stateVarsChildren->append(sv);
       }
-      sv = new CStateVar(new CString("int"), new CString(con1->text));
+      sv = new CStateVar(new XStr("int"), new XStr(*(con1->text)));
       stateVarsChildren->append(sv);
       {
         char txt[128];
         sprintf(txt, "_cf%d", nodeNum);
-        counter = new CString(txt);
-        sv = new CStateVar(new CString("CCounter *"), counter);
+        counter = new XStr(txt);
+        sv = new CStateVar(new XStr("CCounter *"), counter);
         stateVarsChildren->append(sv);
       }
       break;
@@ -191,9 +191,9 @@ void CParseNode::propogateState(TList *list)
         TList *elist = con1->constructs;
         CParseNode *en;
         for(en=(CParseNode *)(elist->begin()); !elist->end(); en=(CParseNode *)(elist->next())) {
-          CString *vType = new CString(en->con3->text);
+          XStr *vType = new XStr(*(en->con3->text));
           vType->append(" *");
-          sv = new CStateVar(vType, new CString(en->con4->text));
+          sv = new CStateVar(vType, new XStr(*(en->con4->text)));
           stateVarsChildren->append(sv);
         }
       }
@@ -214,8 +214,8 @@ void CParseNode::propogateState(TList *list)
       {
         char txt[128];
         sprintf(txt, "_co%d", nodeNum);
-        counter = new CString(txt);
-        sv = new CStateVar(new CString("CCounter *"), counter);
+        counter = new XStr(txt);
+        sv = new CStateVar(new XStr("CCounter *"), counter);
         stateVarsChildren->append(sv);
       }
       break;

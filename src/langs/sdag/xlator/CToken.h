@@ -10,17 +10,17 @@
 
 #include <stdio.h>
 #include "EToken.h"
-#include "CString.h"
+#include "xi-util.h"
 #include "sdag-globals.h"
 
 class CToken {
   public:
     EToken type;
-    CString *text;
+    XStr *text;
     CToken(EToken t, const char *txt)
     {
       type = t;
-      text = new CString(txt);
+      text = new XStr(txt);
     }
     ~CToken()
     {
