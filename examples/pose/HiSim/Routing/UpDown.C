@@ -1,4 +1,5 @@
 #include "UpDown.h"
+#include <math.h>
 
 // Check if direction we need to go from up to down
 int isDirectionChanged(int & src,int & dst,int & nodeRangeStart,int & nodeRangeEnd)
@@ -24,6 +25,60 @@ void UpDown::populateRoutes(Packet *p,int numP) {
 		dst = dst % (n/fanout);  
 		n /= fanout;
 	}
+}
+
+void UpDown::sourceToSwitchRoutes(Packet *p,int numP) {
+
+int src,dst,mask,i=0,port,fanout = config.numP/2,numNodes,dimsize,prevdimsize,level,otherdim=0,tmp,actualLevel,bits,l=0;
+int level1,level2;
+numNodes = config.numNodes; src = p->hdr.src; dst = p->hdr.routeInfo.dst;
+
+prevdimsize = 1; dimsize = fanout;
+
+actualLevel = dst / (numNodes/fanout);
+tmp = dst%(numNodes/fanout); bits = (int)(log(fanout)/log(2));
+level1 = level2 = 0;
+level1 = (dst/(numNodes/fanout)) ;
+if((dst != 0)) { level2++; }
+
+while(tmp = tmp >> bits) { level2 ++; }
+
+level = (level1 > level2)?level1:level2;
+
+while(l < level) {
+        p->hdr.nextPort[i++] = (dst%dimsize)/prevdimsize+fanout;
+        dimsize *= fanout; prevdimsize *= fanout; l++;
+}
+
+        dimsize /= fanout; prevdimsize /= fanout;
+
+while(level > actualLevel) {
+        p->hdr.nextPort[i++] = (dst%dimsize)/prevdimsize;
+        dimsize /= fanout; prevdimsize /= fanout; level --;
+}
+
+}
+
+int UpDown::loadTable(Packet *p,int numP) {
+	int dstSwitch = p->hdr.routeInfo.dst,fanout = config.numP/2,level,dimid,startNode,endNode,i=0;
+	
+	level = dstSwitch/(config.numNodes/fanout)+1;
+        dstSwitch = (dstSwitch%(config.numNodes/fanout)) / ((int)pow(fanout,level-1));
+        startNode = (dstSwitch)*((int)pow(fanout,level));
+        endNode = (dstSwitch+1)*((int)pow(fanout,level))-1; // inclusive of end node
+
+	for(int dst = 0;dst < config.numNodes;dst ++) {
+		if((dst >= startNode) && (dst <=endNode)) 
+			p->hdr.routeSwitchPort[i++] = ((dst-startNode)*fanout)/(endNode-startNode+1);
+		else 
+			p->hdr.routeSwitchPort[i++] = fanout + (dst % fanout);
+	}
+	if(p->hdr.routeInfo.dst == p->hdr.src) return -1; // remove
+	else return 1;
+}
+
+int UpDown::getNextSwitch(int id) {
+	return id;
 }
 			
 // Select by adaptive ( based on load ) or static routing

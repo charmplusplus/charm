@@ -24,11 +24,12 @@ void InitNetwork(MachineParams *mp) {
 	CkPrintf("fanout %d numP %d \n",fanout,mp->config->numP);	
 
 	mp->config->inputBuffering = 0; mp->config->switchVc = mp->config->numP;
-	mp->config->sourceRouting = 1;
+	mp->config->sourceRouting = 0;
+	mp->config->loadRoutingTable = 1;
 
 	mp->config->numNodes = numNodes = nnodes ;	
        	switchP = mp->config->numP;
-	numSwitches = (numNodes/fanout)*numLevels;
+	mp->config->numSwitches = numSwitches = (numNodes/fanout)*numLevels;
 	// Basically each switch except the toplevel have numP channels
 	numChans = switchP*numSwitches ;  
 	// Should actually subtract numNodes above, but then getNextChannel interface becomes complicated 

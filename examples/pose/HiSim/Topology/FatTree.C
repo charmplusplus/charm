@@ -83,6 +83,9 @@ void FatTree::getNeighbours(int switchId,int numP) {
 }
 
 int FatTree::getNext(int portid,int nodeid,int numP) {
+	if(next[portid] < 0) {
+		CkPrintf("nodeid %d portid %d \n",nodeid,portid);
+	}
         return(next[portid]);
 }
 

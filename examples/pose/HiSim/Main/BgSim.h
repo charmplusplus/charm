@@ -134,7 +134,8 @@ class NicMsg {
 	}
 };
 
-#define MAX_ROUTE_HEADER 128  // This variable sucks
+#define MAX_ROUTE_HEADER 256  // This variable sucks
+#define MAX_SOURCE_ROUTE_HEADER 16
 #define CONTROL_PACKET 0x01
 #define DATA_PACKET 0x02
 #define SUBNET_MANAGER 0
@@ -143,7 +144,8 @@ class NicMsg {
 class Header {
         public:
 	RoutingInformation routeInfo;  // routing informating
-	unsigned char nextPort[MAX_ROUTE_HEADER]; // next port to take 
+	unsigned char nextPort[MAX_SOURCE_ROUTE_HEADER]; // next port to take 
+	unsigned char routeSwitchPort[MAX_ROUTE_HEADER]; // next port to take 
 	unsigned char hop;
         int src,prev_src;              // original source and previous node id
         int pktId;		       // packet id , not used in inorder arrival
@@ -161,7 +163,8 @@ class Header {
                 portId = obj.portId; nextId = obj.nextId;
                 vcid = obj.vcid; prev_vcid = obj.prev_vcid;
 		prev_src = obj.prev_src; hop = obj.hop; controlInfo = obj.controlInfo;
-		memcpy(nextPort, obj.nextPort, MAX_ROUTE_HEADER * sizeof(char));
+		memcpy(nextPort, obj.nextPort, MAX_SOURCE_ROUTE_HEADER * sizeof(char));
+		memcpy(routeSwitchPort, obj.routeSwitchPort, MAX_ROUTE_HEADER * sizeof(char));
                 return *this;
         }
 

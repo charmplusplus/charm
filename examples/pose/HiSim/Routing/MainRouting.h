@@ -13,5 +13,6 @@ class RoutingAlgorithm {
 	virtual void populateRoutes(Packet *,int){}
 	virtual int loadTable(Packet *,int){}
 	virtual int getNextSwitch(int){}
+	virtual void sourceToSwitchRoutes(Packet *,int){}
 };
 #endif

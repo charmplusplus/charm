@@ -34,9 +34,10 @@ void Channel::recvPacket(Packet *copyP) {
 
         if((p->hdr.nextId >= config.nicStart)  && (p->hdr.nextId < (config.nicStart+config.numNodes)))
                 POSE_invoke(recvPacket(p),NetInterface,p->hdr.nextId,(POSE_TimeType)(p->hdr.routeInfo.datalen/config.switchC_BW));
-        else
+        else {
+		CkAssert(p->hdr.nextId >= config.switchStart);
                 POSE_invoke(recvPacket(p),Switch,p->hdr.nextId,config.switchC_Delay);
-
+	}
         counter+= ((POSE_TimeType)(config.switchC_Delay+copyP->hdr.routeInfo.datalen/config.switchC_BW));
         elapse((POSE_TimeType)(copyP->hdr.routeInfo.datalen/config.switchC_BW));  // Same buffer , we have already elapsed, so no need.
 }

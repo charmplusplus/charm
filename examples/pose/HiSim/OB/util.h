@@ -31,7 +31,7 @@ public:
    int adaptive_routing;
    int sourceRouting;
    int check_on;
-
+   int loadRoutingTable;
   int NodeStart;
   int HCAStart;
   int DMAchannelStart;

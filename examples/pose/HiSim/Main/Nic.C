@@ -27,6 +27,7 @@ NetInterface::NetInterface(NetInterfaceMsg *niMsg) {
         	p->hdr.prev_vcid = -1; p->hdr.src = p->hdr.prev_src = SUBNET_MANAGER;
         	p->hdr.nextId = topology->getStartSwitch(nicConsts->id-config.nicStart);
 
+		routingAlgorithm->sourceToSwitchRoutes(p,nicConsts->numP);
 		routingAlgorithm->loadTable(p,nicConsts->numP);
 		POSE_invoke(recvPacket(p),Switch,nicConsts->startId,delay);
 		elapse(sizeof(char)*config.numNodes);
@@ -42,7 +43,6 @@ void NetInterface::recvMsg(NicMsg *nic) {
         Packet *p;
         NicMsg *newNic = new NicMsg; *newNic = *nic;
 
-
         POSE_invoke(storeMsgInAdvance(newNic),NetInterface,nic->routeInfo.dst+config.nicStart,0);
 
 //	parent->CommitPrintf("-%d %d %d %d\n",nic->src,nic->msgId,nic->routeInfo.dst,nic->totalLen);
@@ -51,7 +51,6 @@ void NetInterface::recvMsg(NicMsg *nic) {
                 p->hdr = *nic;
                 curlen  = minP(config.maxpacksize,msgLenRest);
                 p->hdr.routeInfo.datalen = curlen;
-                CkAssert(delay >= 0);
 		p->hdr.pktId = packetnum ++;
                 p->hdr.portId = topology->getStartPort(nicConsts->id-config.nicStart,nicConsts->numP);
                 p->hdr.vcid = roundRobin; roundRobin = (roundRobin+1)%config.switchVc;

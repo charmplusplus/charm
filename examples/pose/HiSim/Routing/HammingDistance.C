@@ -32,7 +32,7 @@ int HammingDistance::loadTable(Packet *p,int numP) {
 	else
         while(!(xorResult & mask)) { mask *= 2; port ++; }
 
-	p->hdr.nextPort[dst] = port;
+	p->hdr.routeSwitchPort[dst] = port;
 	}
 	if(p->hdr.routeInfo.dst == p->hdr.src) return -1;
 	return 1;
