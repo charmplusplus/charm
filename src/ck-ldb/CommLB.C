@@ -38,6 +38,7 @@ static void lbinit(void) {
 
 CommLB::CommLB()
 {
+    lbname = "CommLB";
     if (CkMyPe() == 0)
 	CkPrintf("[%d] CommLB created\n",CkMyPe());
     manager_init();

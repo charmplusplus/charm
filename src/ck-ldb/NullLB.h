@@ -27,7 +27,7 @@ class NullLB : public CBase_NullLB
 {
   void init(void);
 public:
-  NullLB() {init();}
+  NullLB() {init(); lbname="NullLB";}
   NullLB(CkMigrateMessage *m) {init();}
   ~NullLB();
 

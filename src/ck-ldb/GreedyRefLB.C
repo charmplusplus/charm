@@ -33,6 +33,7 @@ static void lbinit(void) {
 
 GreedyRefLB::GreedyRefLB()
 {
+  lbname = "GreedyRefLB";
   if (CkMyPe()==0)
     CkPrintf("[%d] GreedyRefLB created\n",CkMyPe());
 }

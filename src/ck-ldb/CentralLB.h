@@ -90,6 +90,7 @@ protected:
   virtual CmiBool QueryDumpData() { return CmiFalse; };  
   virtual LBMigrateMsg* Strategy(LDStats* stats,int count);
 
+  void simulation();
   void FindSimResults(LDStats* stats, int count, LBMigrateMsg* msg, CLBSimResults* simResults);
   void RemoveNonMigratable(LDStats* statsDataList, int count);
 

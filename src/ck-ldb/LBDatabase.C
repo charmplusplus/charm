@@ -29,6 +29,7 @@ CkpvDeclare(int, lbdatabaseInited);  /**< true if lbdatabase is inited */
 CkpvDeclare(int, dumpStep);			 /**< the load balancing step at which to dump data */
 CkpvDeclare(char*, dumpFile);		 /**< the name of the file in which the data will be dumped */
 CkpvDeclare(int, doSimulation);		 /**< true if the program is running under "simulation" mode for load balancing */
+const char defaultDumpFileName[] = "lbdata.dat";   //default fname for dumping
 
 static LBDefaultCreateFn defaultCreate=NULL;
 void LBSetDefaultCreate(LBDefaultCreateFn f)
@@ -117,7 +118,7 @@ void _loadbalancerInit()
   CkpvInitialize(int, dumpStep);
   CkpvAccess(dumpStep) = -1;
   CkpvInitialize(char*, dumpFile);
-  CkpvAccess(dumpFile) = NULL;
+  CkpvAccess(dumpFile) = (char *)defaultDumpFileName;
   CkpvInitialize(int, doSimulation);
   CkpvAccess(doSimulation) = 0;
 

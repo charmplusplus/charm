@@ -42,6 +42,7 @@ Comm1LB::Comm1LB()
 {
   if (CkMyPe() == 0)
     CkPrintf("[%d] Comm1LB created\n",CkMyPe());
+  lbname = "Comm1LB";
 }
 
 CmiBool Comm1LB::QueryBalanceNow(int _step)

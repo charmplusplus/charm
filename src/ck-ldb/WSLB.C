@@ -52,6 +52,7 @@ void WSLB::staticAtSync(void* data)
 
 WSLB::WSLB()  
 {
+  lbname = "WSLB";
   if (CkMyPe() == 0)
     CkPrintf("[%d] WSLB created\n",CkMyPe());
 

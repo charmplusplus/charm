@@ -13,6 +13,11 @@ CLBSimResults::CLBSimResults(int numPes_) : numPes(numPes_)
 		peLoads[i] = 0.0;
 }
 
+CLBSimResults::~CLBSimResults()
+{
+ 	delete [] peLoads;
+}
+
 void CLBSimResults::SetProcessorLoad(int pe, double load)
 {
 	CkAssert(0 <= pe && pe < numPes);

@@ -54,6 +54,7 @@ static void lbinit(void) {
 
 RecBisectBfLB::RecBisectBfLB()
 {
+  lbname = "RecBisectBfLB";
   if (CkMyPe() == 0)
     CkPrintf("[%d] RecBisectBfLB created\n",CkMyPe());
 }

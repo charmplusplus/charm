@@ -28,7 +28,7 @@ typedef void* cvoid; /* To eliminate warnings, because a C void* is not
 
 #if CMK_LBDB_ON
 typedef struct {
-  void *handle;
+  void *handle;            // pointer to LBDB
 } LDHandle;
 #else
 typedef int LDHandle;
@@ -42,7 +42,7 @@ typedef struct {
   LDHandle ldb;
   void *user_ptr;
   LDOMid id;
-  int handle;
+  int handle;		// index to LBOM
 } LDOMHandle;
 
 typedef struct _LDObjid {
@@ -55,21 +55,24 @@ typedef struct _LDObjid {
 #endif
 } LDObjid;
 
+typedef int LDObjIndex;
+
 typedef struct {
   LDOMHandle omhandle;
   void *user_ptr;
   LDObjid id;
-  int handle;
+  LDObjIndex  handle;
 } LDObjHandle;
 
 typedef struct {
   LDObjHandle handle;
-  LDOMHandle omHandle;
+//  LDOMHandle omHandle;
   double cpuTime;
   double wallTime;
   CmiBool migratable;
 #ifdef __cplusplus
-  inline const LDOMid &omID() const { return omHandle.id; }
+  inline const LDOMHandle &omHandle() const { return handle.omhandle; }
+  inline const LDOMid &omID() const { return handle.omhandle.id; }
   inline const LDObjid &id() const { return handle.id; }
 #endif
 } LDObjData;

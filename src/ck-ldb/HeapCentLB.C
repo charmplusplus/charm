@@ -33,6 +33,7 @@ static void lbinit(void) {
 
 HeapCentLB::HeapCentLB()
 {
+  lbname = "HeapCentLB";
   if (CkMyPe()==0)
     CkPrintf("[%d] HeapCentLB created\n",CkMyPe());
 }

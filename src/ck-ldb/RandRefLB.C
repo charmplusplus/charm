@@ -35,6 +35,7 @@ static void lbinit(void) {
 
 RandRefLB::RandRefLB()
 {
+  lbname = "RandRefLB";
   if (CkMyPe() == 0)
     CkPrintf("[%d] RandRefLB created\n",CkMyPe());
 }

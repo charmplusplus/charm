@@ -20,6 +20,7 @@ BaseLB::BaseLB() {
 //CmiPrintf("[%d] BaseLB created!\n", CkMyPe());
   if (CkpvAccess(numLoadBalancers) - CkpvAccess(hasNullLB) > 1)
     CmiAbort("Error: try to create more than one load balancer strategies!");
+  lbname = "Unknown";
 }
 
 void BaseLB::unregister() {
@@ -36,14 +37,14 @@ void BaseLB::unregister() {}
 void* LBMigrateMsg::alloc(int msgnum, size_t size, int* array, int priobits)
 {
   int totalsize = size + array[0] * sizeof(MigrateInfo) 
-    + CkNumPes() * sizeof(char);
+    + CkNumPes() * (sizeof(char)+sizeof(double));
 
   LBMigrateMsg* ret =
     (LBMigrateMsg*)(CkAllocMsg(msgnum,totalsize,priobits));
 
   ret->moves = (MigrateInfo*) ((char*)(ret)+ size);
-
   ret->avail_vector = (char *)(ret->moves + array[0]);
+  ret->expectedLoad = (double *)(ret->avail_vector + CkNumPes()*sizeof(char));
   return (void*)(ret);
 }
 
@@ -54,6 +55,9 @@ void* LBMigrateMsg::pack(LBMigrateMsg* m)
 
   m->avail_vector =(char*)(m->avail_vector
       - (char*)(&m->avail_vector));
+
+  m->expectedLoad = (double*)((char *)m->expectedLoad
+      - (char*)(&m->expectedLoad));
 
   return (void*)(m);
 }
@@ -69,6 +73,10 @@ LBMigrateMsg* LBMigrateMsg::unpack(void *m)
   ret_val->avail_vector =
     (char*)((char*)(&ret_val->avail_vector)
 			    +(size_t)(ret_val->avail_vector));
+
+  ret_val->expectedLoad =
+    (double*)((char*)(&ret_val->expectedLoad)
+			    +(size_t)(ret_val->expectedLoad));
 
   return ret_val;
 }

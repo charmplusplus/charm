@@ -1,3 +1,10 @@
+/*****************************************************************************
+ * $Source$
+ * $Author$
+ * $Date$
+ * $Revision$
+ *****************************************************************************/
+
 /**
  \defgroup CkLdb  Charm++ Load Balancing Framework 
 */
@@ -17,11 +24,19 @@
 class BaseLB: public Group
 {
 protected:
+  char *lbname;
   LBDatabase *theLbdb;
   LDBarrierReceiver receiver;
+
+  struct LastLBInfo {
+    double expectedLoad;
+  };
+  LastLBInfo lastLBInfo;
 public:
   BaseLB() ;
   void unregister(); 
+  inline char *lbName() { return lbname; }
+  inline double expectedLoad() { return lastLBInfo.expectedLoad; }
 };
 
 /// migration decision for an obj.
@@ -42,12 +57,13 @@ public:
   char * avail_vector;
   int next_lb;
 
+  double * expectedLoad;
+
   // Other methods & data members
 
   static void* alloc(int msgnum, size_t size, int* array, int priobits);
   static void* pack(LBMigrateMsg* in);
   static LBMigrateMsg* unpack(void* in);
-  static void print(LBMigrateMsg* in);
 };
 
 #endif

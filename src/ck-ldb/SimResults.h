@@ -16,6 +16,7 @@ class CLBSimResults
 {
 public:
 	CLBSimResults(int numPes_);
+	~CLBSimResults();
 	void SetProcessorLoad(int pe, double load);
 	void PrintSimulationResults();
 private:

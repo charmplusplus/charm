@@ -34,6 +34,7 @@ static void lbinit(void) {
 
 MetisLB::MetisLB()
 {
+  lbname = "MetisLB";
   if (CkMyPe() == 0)
     CkPrintf("[%d] MetisLB created\n",CkMyPe());
 }

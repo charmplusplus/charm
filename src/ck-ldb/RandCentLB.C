@@ -33,6 +33,7 @@ static void lbinit(void) {
 
 RandCentLB::RandCentLB()
 {
+  lbname = "RandCentLB";
   if (CkMyPe() == 0)
     CkPrintf("[%d] RandCentLB created\n",CkMyPe());
 }

@@ -82,16 +82,21 @@ LDOMHandle LBDB::AddOM(LDOMid _userID, void* _userData,
   return newhandle;
 }
 
-LDObjHandle LBDB::AddObj(LDOMHandle _h, LDObjid _id,
+LDObjHandle LBDB::AddObj(LDOMHandle _omh, LDObjid _id,
 			 void *_userData, CmiBool _migratable)
 {
   LDObjHandle newhandle;
 
-  newhandle.omhandle = _h;
+  newhandle.omhandle = _omh;
   newhandle.user_ptr = _userData;
   newhandle.id = _id;
   
-  LBObj *obj = new LBObj(this,_h,_id,_userData,_migratable);
+#if 1
+  newhandle.handle = objs.length();
+  LBObj *obj = new LBObj(this, newhandle, _migratable);
+  objs.insertAtEnd(obj);
+#else
+  LBObj *obj = new LBObj(this,_omh,_id,_userData,_migratable);
   if (obj != NULL) {
     newhandle.handle = objs.length();
     objs.insertAtEnd(obj);
@@ -99,6 +104,7 @@ LDObjHandle LBDB::AddObj(LDOMHandle _h, LDObjid _id,
     newhandle.handle = -1;
   }
   obj->DepositHandle(newhandle);
+#endif
   objCount++;
   return newhandle;
 }
@@ -198,7 +204,7 @@ void LBDB::Migrate(LDObjHandle h, int dest)
 	    CkMyPe(),h.handle,objCount);
 
   if ((h.handle < objCount) && ((objs[h.handle])->registered)) {
-    LBOM *const om = oms[(objs[h.handle])->parentOM.handle];
+    LBOM *const om = oms[(objs[h.handle])->parentOM().handle];
     om->Migrate(h, dest);
   }
   return;

@@ -21,10 +21,10 @@ char ** avail_vector_address;
 int * lb_ptr;
 int load_balancer_created;
 
-// the default file in which the load balancing data will be dumped
-const char defaultDumpFileName[] = "lbdata.dat";
-
 #if CMK_LBDB_ON
+
+static void getPredictedLoad(CentralLB::LDStats* stats, int count, 
+                             LBMigrateMsg* msg, double *peLoads);
 
 void CreateCentralLB()
 {
@@ -121,8 +121,8 @@ void CentralLB::ProcessAtSync()
 {
   if (CkMyPe() == cur_ld_balancer) {
     start_lb_time = CmiWallTimer();
-    CmiPrintf("Load balancing step %d starting at %f in %d\n",
-    step(),start_lb_time, cur_ld_balancer);
+    CmiPrintf("[%s] Load balancing step %d starting at %f in PE%d\n",
+    lbName(), step(),start_lb_time, cur_ld_balancer);
   }
   // Send stats
   const int osz = theLbdb->GetObjDataSz();
@@ -218,39 +218,10 @@ void CentralLB::ReceiveStats(CLBStatsMsg *m)
     for(proc = 0; proc < clients; proc++)
       statsDataList[proc].available = (CmiBool)avail_vector[proc];
 
+    // if this is the step at which we need to dump the database
+    simulation();
+
 //    CkPrintf("Before Calling Strategy\n");
-
-	// if this is the step at which we need to dump the database
-	if(step() == CkpvAccess(dumpStep))
-	{
-		// here we are supposed to dump the database
-		writeStatsMsgs((CkpvAccess(dumpFile) != NULL) ? CkpvAccess(dumpFile) : defaultDumpFileName);
-		CmiPrintf("LBDump: Dumped the load balancing data.\n");
-		CkExit();
-		return;
-	}
-	else if(CkpvAccess(doSimulation))
-	{
-		// here we are supposed to read the data from the dump database
-		readStatsMsgs((CkpvAccess(dumpFile) != NULL) ? CkpvAccess(dumpFile) : defaultDumpFileName);
-
-  		CLBSimResults simResults(stats_msg_count);
-
-		// now pass it to the strategy routine
-		LBMigrateMsg* migrateMsg = Strategy(statsDataList, stats_msg_count);
-
-		// now calculate the results of the load balancing simulation
-		FindSimResults(statsDataList, stats_msg_count, migrateMsg, &simResults);
-
-		// now we have the simulation data, so print it and exit
-		CmiPrintf("LBSim: Simulation of one load balancing step done.\n");
-		simResults.PrintSimulationResults();
-
-		delete migrateMsg;
-
-		CkExit();
-		return;
-	}
 
     LBMigrateMsg* migrateMsg = Strategy(statsDataList,clients);
 
@@ -260,6 +231,8 @@ void CentralLB::ReceiveStats(CLBStatsMsg *m)
     for(proc = 0; proc < num_proc; proc++)
 	migrateMsg->avail_vector[proc] = avail_vector[proc];
     migrateMsg->next_lb = new_ld_balancer;
+
+    getPredictedLoad(statsDataList, clients, migrateMsg, migrateMsg->expectedLoad);
 
 //  CkPrintf("calling recv migration\n");
     thisProxy.ReceiveMigration(migrateMsg);
@@ -377,6 +350,8 @@ void CentralLB::ReceiveMigration(LBMigrateMsg *m)
     theLbdb->SetLBPeriod(theLbdb->GetLBPeriod()*2);
   }
 #endif
+
+  lastLBInfo.expectedLoad = m->expectedLoad[CkMyPe()];
   
   cur_ld_balancer = m->next_lb;
   if((CkMyPe() == cur_ld_balancer) && (cur_ld_balancer != 0)){
@@ -395,8 +370,8 @@ void CentralLB::MigrationDone(int balancing)
 {
   if (balancing && CkMyPe() == cur_ld_balancer) {
     double end_lb_time = CmiWallTimer();
-    CkPrintf("Load balancing step %d finished at %f duration %f\n",
-	     step(),end_lb_time,end_lb_time - start_lb_time);
+    CkPrintf("[%s] Load balancing step %d finished at %f duration %f\n",
+	     lbName(), step(),end_lb_time,end_lb_time - start_lb_time);
   }
   migrates_completed = 0;
   migrates_expected = -1;
@@ -465,6 +440,36 @@ LBMigrateMsg* CentralLB::Strategy(LDStats* stats,int count)
   return msg;
 }
 
+void CentralLB::simulation() {
+  if(step() == CkpvAccess(dumpStep))
+  {
+    // here we are supposed to dump the database
+    writeStatsMsgs(CkpvAccess(dumpFile));
+    CkExit();
+    return;
+  }
+  else if(CkpvAccess(doSimulation))
+  {
+    // here we are supposed to read the data from the dump database
+    readStatsMsgs(CkpvAccess(dumpFile));
+
+    CLBSimResults simResults(stats_msg_count);
+
+    // now pass it to the strategy routine
+    LBMigrateMsg* migrateMsg = Strategy(statsDataList, stats_msg_count);
+
+    // now calculate the results of the load balancing simulation
+    FindSimResults(statsDataList, stats_msg_count, migrateMsg, &simResults);
+
+    // now we have the simulation data, so print it and exit
+    CmiPrintf("LBSim: Simulation of one load balancing step done.\n");
+		simResults.PrintSimulationResults();
+
+    delete migrateMsg;
+    CkExit();
+  }
+}
+
 void CentralLB::readStatsMsgs(const char* filename) {
 
   int i;
@@ -480,7 +485,7 @@ void CentralLB::readStatsMsgs(const char* filename) {
   PUP::fromDisk p(f);
   p|stats_msg_count;
 
-  // now resbuild new structures
+  // now rebuild new structures
   statsMsgsList = new CLBStatsMsg*[stats_msg_count];
   statsDataList = new LDStats[stats_msg_count];
 
@@ -521,6 +526,40 @@ void CentralLB::writeStatsMsgs(const char* filename) {
     CkPupMessage(p, (void **)&statsMsgsList[i], 1);
   }
   CmiPrintf("writeStatsMsgs to %s\n", filename);
+  CmiPrintf("LBDump: Dumped the load balancing data.\n");
+}
+
+static void getPredictedLoad(CentralLB::LDStats* stats, int count, LBMigrateMsg* msg, double *peLoads)
+{
+  for(int pe = 0; pe < count; pe++)
+  {
+    peLoads[pe] = stats[pe].bg_walltime;
+    for(int obj = 0; obj < stats[pe].n_objs; obj++)
+    {
+	peLoads[pe] += stats[pe].objData[obj].wallTime;
+    }
+  }
+
+  // now for each migration, substract the load of the migrating object from the source pe
+  // and add it to the destination pe
+  for(int mig = 0; mig < msg->n_moves; mig++)
+  {
+	int from = msg->moves[mig].from_pe;
+	int to = msg->moves[mig].to_pe;
+	double wallTime;
+	int oidx;
+
+	// find the cpu time for the object that is migrating
+	for(oidx = 0; oidx < stats[from].n_objs; oidx++)
+	  if(stats[from].objData[oidx].handle.id == msg->moves[mig].obj.id)
+	  {
+		wallTime = stats[from].objData[oidx].wallTime;
+		break;
+	  }
+	CkAssert(oidx != stats[from].n_objs);
+	peLoads[from] -= wallTime;
+	peLoads[to] += wallTime;
+  }
 }
 
 void CentralLB::FindSimResults(LDStats* stats, int count, LBMigrateMsg* msg, CLBSimResults* simResults)
@@ -528,37 +567,8 @@ void CentralLB::FindSimResults(LDStats* stats, int count, LBMigrateMsg* msg, CLB
 	CkAssert(simResults != NULL && count == simResults->numPes);
 	// estimate the new loads of the processors. As a first approximation, this is the
 	// sum of the cpu times of the objects on that processor
+        getPredictedLoad(stats, count, msg, simResults->peLoads);
 
-	// first find the load before the migration
-	for(int pe = 0; pe < count; pe++)
-	{
-		simResults->peLoads[pe] = 0.0;
-		for(int obj = 0; obj < stats[pe].n_objs; obj++)
-		{
-			simResults->peLoads[pe] += stats[pe].objData[obj].cpuTime;
-		}
-	}
-
-	// now for each migration, substract the load of the migrating object from the source pe
-	// and add it to the destination pe
-	for(int mig = 0; mig < msg->n_moves; mig++)
-	{
-		int from = msg->moves[mig].from_pe;
-		int to = msg->moves[mig].to_pe;
-		double cpuTime;
-		int oidx;
-
-		// find the cpu time for the object that is migrating
-		for(oidx = 0; oidx < stats[from].n_objs; oidx++)
-			if(stats[from].objData[oidx].handle.id == msg->moves[mig].obj.id)
-			{
-				cpuTime = stats[from].objData[oidx].cpuTime;
-				break;
-			}
-		CkAssert(oidx != stats[from].n_objs);
-		simResults->peLoads[from] -= cpuTime;
-		simResults->peLoads[to] += cpuTime;
-	}
 }
 
 #endif

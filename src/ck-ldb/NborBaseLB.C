@@ -43,6 +43,7 @@ void NborBaseLB::staticAtSync(void* data)
 
 NborBaseLB::NborBaseLB()
 {
+  lbname = "NborBaseLB";
   mystep = 0;
   theLbdb = CProxy_LBDatabase(lbdb).ckLocalBranch();
   theLbdb->

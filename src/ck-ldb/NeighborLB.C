@@ -33,6 +33,7 @@ static void lbinit(void) {
 
 NeighborLB::NeighborLB()
 {
+  lbname = "NeighborLB";
   if (CkMyPe() == 0)
     CkPrintf("[%d] NeighborLB created\n",CkMyPe());
 }
