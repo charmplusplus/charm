@@ -503,7 +503,7 @@ PairCalculator::acceptResult(int size, double *matrix)
     for (int j = 0; j < grainSize; j++){ 
       m = matrix[index + j + i*S];
       if(m!=amatrix[i*grainSize+j].re){CkPrintf("Dcopy broken in back path: %2.5g != %2.5g \n",
-						m, amatrix[i*grainSize+j]);}
+      						m, amatrix[i*grainSize+j].re);}
     }
   }
 
