@@ -6,6 +6,8 @@ CpvDeclare(int, CldBalanceHandlerIndex);
 CpvDeclare(int, CldRelocatedMessages);
 CpvDeclare(int, CldLoadBalanceMessages);
 CpvDeclare(int, CldMessageChunks);
+CpvDeclare(int, CldLoadNotify);
+extern void LoadNotifyFn(int);
 
 /* Estimator stuff.  Of any use? */
 /*
@@ -96,6 +98,8 @@ static void CldTokenHandler(CldToken tok)
   }
   else 
     CpvAccess(CldLoadOffset)--;
+  if (CpvAccess(CldLoadNotify))
+    LoadNotifyFn(CpvAccess(CldProc)->load);
 }
 
 int CldCountTokens()
@@ -124,11 +128,9 @@ void CldPutToken(char *msg)
   tok->pred->succ = tok;
   tok->succ->pred = tok;
   proc->load ++;
-  
   /* add token to the scheduler */
   CmiSetHandler(tok, proc->tokenhandleridx);
   ifn(msg, &pfn, &len, &queueing, &priobits, &prioptr);
-
   queueing = CQS_QUEUEING_LIFO; 
   CsdEnqueueGeneral(tok, queueing, priobits, prioptr);
 }
