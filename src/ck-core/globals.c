@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.7  1995-09-14 20:47:38  jyelon
+ * Revision 2.8  1995-09-20 15:41:27  gursoy
+ * added new handler indexes
+ *
+ * Revision 2.7  1995/09/14  20:47:38  jyelon
  * Added +fifo +lifo +ififo +ilifo +bfifo +blifo command-line options.
  *
  * Revision 2.6  1995/09/07  05:26:38  gursoy
@@ -130,6 +133,8 @@ CsvDeclare(FUNCTION_PTR*,  _CK_9_GlobalFunctionTable);
 CsvDeclare(int, MainChareLanguage);
 
 /* Handlers for various message-types */
+CsvDeclare(int, BUFFER_INCOMING_MSG_Index);
+CsvDeclare(int, MAIN_HANDLE_INCOMING_MSG_Index);
 CsvDeclare(int, HANDLE_INCOMING_MSG_Index);
 CsvDeclare(int, HANDLE_INIT_MSG_Index);
 CsvDeclare(int, CkProcIdx_ForChareMsg);

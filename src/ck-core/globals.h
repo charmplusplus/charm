@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.9  1995-09-14 20:49:01  jyelon
+ * Revision 2.10  1995-09-20 15:40:58  gursoy
+ * added new handler indexes
+ *
+ * Revision 2.9  1995/09/14  20:49:01  jyelon
  * Added +fifo +lifo +ififo +ilifo +bfifo +blifo command-line options.
  *
  * Revision 2.8  1995/09/07  05:26:14  gursoy
@@ -120,7 +123,8 @@ CsvExtern(int, MainChareLanguage);
 CpvExtern(int, LDB_ELEM_SIZE);
 
 /* Handlers for various message-types */
-CsvExtern(int, HANDLE_INCOMING_MSG_Index);
+CsvExtern(int, BUFFER_INCOMING_MSG_Index);
+CsvExtern(int, MAIN_HANDLE_INCOMING_MSG_Index);
 CsvExtern(int, HANDLE_INIT_MSG_Index);
 CsvExtern(int, CkProcIdx_ForChareMsg);
 CsvExtern(int, CkProcIdx_DynamicBocInitMsg);
