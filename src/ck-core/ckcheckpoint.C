@@ -20,6 +20,34 @@ More documentation goes here...
 
 CkGroupID _sysChkptMgr;
 
+// helper class to pup all elements that belong to same ckLocMgr
+class ElementCounter : public CkLocIterator {
+private:
+	int count;
+public:
+        ElementCounter():count(0){};
+        void addLocation(CkLocation &loc)  { count++; }
+	int getCount() { return count; }
+};
+
+// helper class to pup all elements that belong to same ckLocMgr
+class ElementCheckpointer : public CkLocIterator {
+private:
+        CkLocMgr *locMgr;
+        PUP::er &p;
+public:
+        ElementCheckpointer(CkLocMgr* mgr_, PUP::er &p_):locMgr(mgr_),p(p_){};
+        void addLocation(CkLocation &loc) {
+                CkArrayIndexMax idx=loc.getIndex();
+		//CkPrintf("[%d] addLocation: ", CkMyPe()), idx.print();
+		CkGroupID gID = locMgr->ckGetGroupID();
+		p|gID;
+                p|idx;
+	        p|loc;
+        }
+};
+
+
 static void bdcastRO(void){
 	int i;
 	//Determine the size of the RODataMessage
@@ -47,51 +75,20 @@ void printIndex(const CkArrayIndex &idx,char *dest) {
 		dest+=strlen(dest);
 	}
 }
-ElementSaver::ElementSaver(const char *dirName_,const int locMgrIdx_) :dirName(dirName_),locMgrIdx(locMgrIdx_){
-	char fileName[1024];
-	sprintf(fileName,"%s/loc_%d_%d.idx",dirName,locMgrIdx,CkMyPe());
-	indexFile=fopen(fileName,"w");
-	if (indexFile==NULL) CkAbort("Could not create index file");
-	fprintf(indexFile,"CHARM++_Checkpoint_File 1.0 %d %d\n",CkMyPe(),CkNumPes());
 
-	sprintf(fileName,"%s/arr_%d_%d.dat",dirName,locMgrIdx,CkMyPe());
-	datFile=fopen(fileName,"wb");
-	if (indexFile==NULL) CkAbort("Could not create data file");
-}
-ElementSaver::~ElementSaver() {
-	fclose(datFile);
-	fclose(indexFile);
-}
-void ElementSaver::addLocation(CkLocation &loc) {
-	const CkArrayIndex &idx=loc.getIndex();
-	const int *idxData=idx.data();
-	char idxName[128]; printIndex(idx,idxName);
-	char fileName[1024]; sprintf(fileName,"arr_%d_%d.dat",locMgrIdx,CkMyPe());
-
-	//Write a file index entry
-	fprintf(indexFile,"%s %d ",fileName,idx.nInts);
-	for (int i=0;i<idx.nInts;i++) fprintf(indexFile,"%d ",idxData[i]);
-	fprintf(indexFile,"\n");
-
-	//Save the actual array element data to the file:
-	if (!datFile) CkAbort("Could not write checkpoint file");
-	PUP::toDisk p(datFile);
-	loc.pup(p);
-	//DEBCHK("Saved array index %s to datFile\n",idxName);
-}
-
-void CkCheckpointMgr::Checkpoint(const char *dirname,CkCallback& cb){
+void CkCheckpointMgr::Checkpoint(const char *dirname, CkCallback& cb){
 	//DEBCHK("[%d]CkCheckpointMgr::Checkpoint called dirname={%s}\n",CkMyPe(),dirname);
 	IrrGroup* obj;
 	int numGroups = CkpvAccess(_groupIDTable)->size();
-	for(int i=0;i<numGroups;i++) {
-		obj = CkpvAccess(_groupTable)->find((*CkpvAccess(_groupIDTable))[i]).getObj();
-		if(obj->isLocMgr()){
-			DEBCHK("\tThis is a location manager!\n");
-			ElementSaver saver(dirname,obj->ckGetGroupID().idx);
-			((CkLocMgr*)(obj))->iterate(saver);
-		}
-	}
+
+	char fileName[1024];
+	sprintf(fileName,"%s/arr_%d.dat",dirname, CkMyPe());
+	FILE *datFile=fopen(fileName,"wb");
+	if (datFile==NULL) CkAbort("Could not create data file");
+	PUP::toDisk  p(datFile);
+	CkPupArrayElementsData(p);
+	fclose(datFile);
+
 	restartCB = cb;
 	DEBCHK("[%d]restartCB installed\n",CkMyPe());
 	CkCallback localcb(CkIndex_CkCheckpointMgr::SendRestartCB(NULL),thisgroup);
@@ -150,9 +147,9 @@ void CkPupMainChareData(PUP::er &p)
 }
 
 // handle GroupTable and data
-GroupInfo *CkPupGroupData(PUP::er &p, int &numGroups)
+void CkPupGroupData(PUP::er &p)
 {
-	int i;
+	int numGroups, i;
 
 	if (!p.isUnpacking()) {
 	  numGroups = CkpvAccess(_groupIDTable)->size();
@@ -207,13 +204,13 @@ GroupInfo *CkPupGroupData(PUP::er &p, int &numGroups)
 				tmpInfo[i].name);
 		}
 	}
-	return tmpInfo;
+	delete [] tmpInfo;
 }
 
 // handle NodeGroupTable and data
-GroupInfo *CkPupNodeGroupData(PUP::er &p, int &numNodeGroups)
+void CkPupNodeGroupData(PUP::er &p)
 {
-	int i;
+	int numNodeGroups, i;
 	if (!p.isUnpacking()) {
 	  numNodeGroups = CksvAccess(_nodeGroupIDTable).size();
 	}
@@ -255,7 +252,55 @@ GroupInfo *CkPupNodeGroupData(PUP::er &p, int &numNodeGroups)
 			ent2.getObj()->ckGetGroupID().idx,
 			_chareTable[ent2.getcIdx()]->name);
 	}
-	return tmpInfo2;
+	delete [] tmpInfo2;
+}
+
+// handle chare array elements for this processor
+void CkPupArrayElementsData(PUP::er &p)
+{
+	// safe in both packing/unpakcing
+        int numGroups = CkpvAccess(_groupIDTable)->size();
+
+	int numElements;
+	if (!p.isUnpacking()) {
+	  ElementCounter  counter;
+          for(int i=0;i<numGroups;i++) {
+                IrrGroup *obj = CkpvAccess(_groupTable)->find((*CkpvAccess(_groupIDTable))[i]).getObj();
+                if(obj->isLocMgr())  ((CkLocMgr*)obj)->iterate(counter);
+          }
+          numElements = counter.getCount();
+	}
+	p|numElements;
+
+	DEBCHK("[%d] CkPupArrayElementsData %s numGroups:%d numElements:%d \n",CkMyPe(),p.typeString(), numGroups, numElements);
+
+	if (!p.isUnpacking())
+	{
+          for(int i=0;i<numGroups;i++) {
+                IrrGroup *obj = CkpvAccess(_groupTable)->find((*CkpvAccess(_groupIDTable))[i]).getObj();
+                if(obj->isLocMgr()){
+			CmiPrintf("Found a location manager\n");
+			CkLocMgr *mgr = (CkLocMgr*)obj;
+                        ElementCheckpointer chk(mgr, p);
+                        mgr->iterate(chk);
+                }
+	  }
+        }
+	else {
+	  for (int i=0; i<numElements; i++) {
+		CkGroupID gID;
+		CkArrayIndexMax idx;
+		p|gID;
+                p|idx;
+		CkLocMgr *mgr = (CkLocMgr*)CkpvAccess(_groupTable)->find(gID).getObj();
+		mgr->resume(idx,p);
+	  }
+	}
+	// finish up
+        for(int i=0;i<numGroups;i++) {
+                IrrGroup *obj = CkpvAccess(_groupTable)->find((*CkpvAccess(_groupIDTable))[i]).getObj();
+	  	obj->ckJustMigrated();
+	}
 }
 
 void CkStartCheckpoint(char* dirname,const CkCallback& cb){
@@ -291,9 +336,7 @@ void CkStartCheckpoint(char* dirname,const CkCallback& cb){
 	FILE* fGroups = fopen(filename,"wb");
 	if(!fGroups) CkAbort("Failed to create checkpoint file for group table!");
 	PUP::toDisk pGroups(fGroups);
-	int numGroups;
-	GroupInfo *tmpInfo = CkPupGroupData(pGroups, numGroups);
- 	delete [] tmpInfo;
+	CkPupGroupData(pGroups);
 	fclose(fGroups);
 
 	// save nodegroups into NodeGroups.dat
@@ -302,9 +345,7 @@ void CkStartCheckpoint(char* dirname,const CkCallback& cb){
 	FILE* fNodeGroups = fopen(filename,"wb");
 	if(!fNodeGroups) CkAbort("Failed to create checkpoint file for nodegroup table!");
 	PUP::toDisk pNodeGroups(fNodeGroups);
-	int numNodeGroups;
-	GroupInfo *tmpInfo2 = CkPupNodeGroupData(pNodeGroups, numNodeGroups);
-	delete [] tmpInfo2;
+	CkPupNodeGroupData(pNodeGroups);
 	fclose(fNodeGroups);
 
 	// hand over to checkpoint managers for per-processor checkpointing
@@ -317,49 +358,11 @@ void CkStartCheckpoint(char* dirname,const CkCallback& cb){
   *          The mechanism exists as converse code and get invoked by
   *          broadcast message.
   **/
-ElementRestorer::ElementRestorer(const char *dirName_,CkLocMgr *dest_,int destPe)
-	:dirName(dirName_), dest(dest_)
-{
-	char indexName[1024];
-	sprintf(indexName,"%s/loc_%d_%d.idx",dirName,dest->ckGetGroupID().idx,destPe);
-	indexFile=fopen(indexName,"r");
-	if (indexFile==NULL)  CkAbort("Could not read index file");
-	char ignored[128]; double version; int srcPE; int srcSize;
-	if (4!=fscanf(indexFile,"%s%lf%d%d",ignored,&version,&srcPE,&srcSize))
-		CkAbort("Checkpoint index file format error");
-	if (version>=2.0) CkAbort("Checkpoint index file format is too new");
-
-	sprintf(indexName,"%s/arr_%d_%d.dat",dirName,dest->ckGetGroupID().idx,destPe);
-	datFile=fopen(indexName,"rb");
-	if (datFile==NULL)  CkAbort("Could not read data file");
-}
-ElementRestorer::~ElementRestorer() {
-	fclose(datFile);
-	fclose(indexFile);
-}
-// Try to restore one array element.  If it worked, return true.
-bool ElementRestorer::restore(void) {
-	// Find the index and filename from the file index:
-	CkArrayIndexMax idx;
-	char fileName[1024];
-
-	if (fscanf(indexFile,"%s%d",fileName,&idx.nInts)!=2) return false;
-	int *idxData=1+((int *)&idx);
-	for (int i=0;i<idx.nInts;i++) fscanf(indexFile,"%d",&idxData[i]);
-
-	//Restore the actual array element data from the file:
-	if (!datFile) CkAbort("Could not read checkpoint file");
-	PUP::fromDisk p(datFile);
-	dest->resume(idx,p);
-	//DEBCHK("Restored an index from datFile\n");
-	return true;
-}
 
 void CkRestartMain(const char* dirname){
 	int i;
 	char filename[1024];
 	CkCallback cb;
-	int numGroups,numNodeGroups;
 	
 	// restore readonlys
 	sprintf(filename,"%s/RO.dat",dirname);
@@ -390,7 +393,7 @@ void CkRestartMain(const char* dirname){
 	FILE* fGroups = fopen(filename,"rb");
 	if(!fGroups) CkAbort("Failed to open checkpoint file for group table!");
 	PUP::fromDisk pGroups(fGroups);
-	GroupInfo *tmpInfo = CkPupGroupData(pGroups, numGroups);
+	CkPupGroupData(pGroups);
 	fclose(fGroups);
 
 	// restore nodegroups
@@ -400,38 +403,28 @@ void CkRestartMain(const char* dirname){
 		FILE* fNodeGroups = fopen(filename,"rb");
 		if(!fNodeGroups) CkAbort("Failed to open checkpoint file for nodegroup table!");
 		PUP::fromDisk pNodeGroups(fNodeGroups);
-		GroupInfo *tmpInfo2 = CkPupNodeGroupData(pNodeGroups, numNodeGroups);
-		delete [] tmpInfo2;
+		CkPupNodeGroupData(pNodeGroups);
 		fclose(fNodeGroups);
 	}
 
 	// for each location, restore arrays
 	//DEBCHK("[%d]Trying to find location manager\n",CkMyPe());
 	DEBCHK("[%d]Number of PE: %d -> %d\n",CkMyPe(),_numPes,CkNumPes());
-	IrrGroup* obj;
-	CkGroupID gID;
 	if(CkMyPe() < _numPes) 	// in normal range: restore, o/w, do nothing
-		for(i=0;i<numGroups;i++) {
-			gID = tmpInfo[i].gID;
-			obj = CkpvAccess(_groupTable)->find(gID).getObj();
-			if(obj->isLocMgr()){
-				CkLocMgr *mgr = (CkLocMgr *)obj;
-				for(int j=0;j<_numPes;j++)
-					if(j%CkNumPes()==CkMyPe()){
-						ElementRestorer restorer(dirname,mgr,j);
-						while (restorer.restore()) {}
-					}
-			}
-			obj->ckJustMigrated();
-		}
-	delete [] tmpInfo;
+          for (i=0; i<_numPes;i++) {
+            if (i%CkNumPes() == CkMyPe()) {
+	      sprintf(filename,"%s/arr_%d.dat",dirname, i);
+	      FILE *datFile=fopen(filename,"rb");
+	      if (datFile==NULL) CkAbort("Could not read data file");
+	      PUP::fromDisk  p(datFile);
+	      CkPupArrayElementsData(p);
+	      fclose(datFile);
+            }
+	  }
 
 	if(CkMyPe()==0) {
 		CmiPrintf("[%d]CkRestartMain done. sending out callback.\n",CkMyPe());
 		cb.send();
-	}
-	else {
-		DEBCHK("[%d]CkRestartMain done. \n",CkMyPe());
 	}
 }
 

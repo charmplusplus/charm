@@ -10,41 +10,28 @@ be provided to continue after the checkpoint is done.
 
 Checkpoint manager is a Group to aid the saving and
 restarting of Charm++ programs. ...
+
+--- Updated 12/14/2003 by Gengbin, gzheng@uiuc.edu
+    rewrote to allow code reuse with following 5 functions, 
+    these functions each handle both packing and unpacking of a system data:
+	void CkPupROData(PUP::er &p);
+	void CkPupMainChareData(PUP::er &p);
+	void CkPupGroupData(PUP::er &p);
+	void CkPupNodeGroupData(PUP::er &p);
+	void CkPupArrayElementsData(PUP::er &p);
+    Completely changed the data file format for array elements to become
+    one file for each processor. 
+    Two main checkpoint/restart subroutines are greatly simplified.
 */
 #ifndef _CKCHECKPOINT_H
 #define _CKCHECKPOINT_H
+
 #include "CkCheckpoint.decl.h"
 
 /***
   * Location iterator that save each location
  ***/
 void printIndex(const CkArrayIndex &idx,char *dest);
-class ElementSaver : public CkLocIterator {
-private:
-	FILE *indexFile; //Output list of array indices and data files
-	FILE *datFile; // data file containing all elements' data
-	const char *dirName; //Output directory
-	const int locMgrIdx;
-public:
-	ElementSaver(const char *dirName_,const int locMgrIdx_);
-	~ElementSaver();
-	void addLocation(CkLocation &loc);
-};
-
-/***
-  *  Restore each array location listed in the index file
- ***/
-class ElementRestorer {
-private:
-	FILE *indexFile; //Input list of array indices and data files
-	FILE *datFile; // data file containing all elements' data
-	const char *dirName; //Input directory
-	CkLocMgr *dest; //Place to put new array elements
-public:
-	ElementRestorer(const char *dirName_,CkLocMgr *dest_,int destPe_);
-	~ElementRestorer();
-	CmiBool restore(void);
-};
 
 /**
  * There is only one Checkpoint Manager in the whole system
@@ -72,8 +59,9 @@ PUPmarshall(GroupInfo)
 // utility functions to pup system global tables
 void CkPupROData(PUP::er &p);
 void CkPupMainChareData(PUP::er &p);
-GroupInfo * CkPupGroupData(PUP::er &p, int &numGroups);
-GroupInfo *CkPupNodeGroupData(PUP::er &p, int &numNodeGroups);
+void CkPupGroupData(PUP::er &p);
+void CkPupNodeGroupData(PUP::er &p);
+void CkPupArrayElementsData(PUP::er &p);
 
 void CkStartCheckpoint(char* dirname,const CkCallback& cb);
 void CkRestartMain(const char* dirname);
