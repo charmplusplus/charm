@@ -440,17 +440,14 @@ void TCharmReadonlys::pupData(PUP::er &p) {
 
 //Pups all readonly data registered so far.
 void TCharmReadonlys::pupAll(PUP::er &p) {
-	if (!tcharm_readonlygroup_created) {
-		int n=0;
-		p|n;
-	} else /* normal case, already initialized */ {
-		TCharmReadonlys &all=tcharm_readonlygroup.ckLocalBranch()->all;
-		int n=all.size();
-		p|n;
-		if (n!=all.size())
-			CkAbort("TCharmReadonly list length mismatch!\n");
-		all.pupData(p);
-	}
+	if (!tcharm_readonlygroup_created)
+		CkAbort("TCharmReadonlys::pupAll can only be called after the TCHARM main");
+	TCharmReadonlys &all=tcharm_readonlygroup.ckLocalBranch()->all;
+	int n=all.size();
+	p|n;
+	if (n!=all.size())
+		CkAbort("TCharmReadonly list length mismatch!\n");
+	all.pupData(p);
 }
 
 CDECL void TCHARM_Readonly_globals(TCpupReadonlyGlobal fn)
@@ -855,6 +852,7 @@ void TCharm::semaPut(int id,void *data) {
 	TCharmSemaphore *s=findSema(id);
 	if (s->data!=NULL) CkAbort("Duplicate calls to TCharm::semaPut!");
 	s->data=data;
+	DBG("semaPut "<<id);
 	if (s->thread!=NULL) {//Awaken the thread
 		s->thread=NULL;
 		resume();
@@ -867,6 +865,7 @@ void TCharm::semaPut(int id,void *data) {
 void *TCharm::semaGet(int id) {
 	TCharmSemaphore *s=getSema(id);
 	void *ret=s->data;
+	DBG("semaGet "<<id);
 	// Now remove the semaphore from the list:
 	freeSema(s);
 	return ret;
