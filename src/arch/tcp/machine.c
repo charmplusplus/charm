@@ -75,14 +75,15 @@ static void KillEveryoneCode();
 #define TRACE(p)
 #endif
 
+extern int CmemInsideMem();
+extern void CmemCallWhenMemAvail();
+
 
 /*****************************************************************************
  *
  * CmiAlloc, CmiSize, and CmiFree
  *
  *****************************************************************************/
-
-static int CmiInsideMem = 1;
 
 void *CmiAlloc(size)
 int size;
@@ -591,7 +592,7 @@ char **argv;
 {
   resend_wait = 10;
   resend_fail = 600000;
-  Cmi_enableinterrupts = 0;
+  Cmi_enableinterrupts = 1;
   Topology = 'F';
   outputfile = NULL;
 
@@ -1028,8 +1029,6 @@ NewMessage;
 #define WINDOW_SIZE 16             /* size of sliding window  */
 
 #define MAX_SEQ_NUM 0xFFFFFFFF     /* 2^32 - 1 */
-
-static int Cmi_insidemachine;
 
 static int free_ack=0;
 static int free_send=0;
@@ -1676,13 +1675,10 @@ static void InterruptHandler()
 {
   int prevmask ;
   void dgram_scan();
+  CmiInterruptHeader(InterruptHandler);
 
   NumIntrCalls++;
-  if ( Cmi_insidemachine)
-    return ;
   NumOutsideMc++;
-  if (CmiInsideMem)
-    return ;
   sighold(SIGIO) ;
 
   dgram_scan();
@@ -1712,7 +1708,7 @@ static int netSend(destPE, size, msg, msg_type)
      char * msg; 
      int msg_type;
 {
-  int saveflag ;
+  CmiInterruptsBlock();
   
   if (!Communication_init) return -1;
   
@@ -1720,9 +1716,6 @@ static int netSend(destPE, size, msg, msg_type)
     CmiPrintf("netSend to self illegal.\n");
     exit(1);
   } 
-  
-  saveflag = Cmi_insidemachine ;
-  Cmi_insidemachine = 1 ;
   
   if (size > MAX_FRAG_SIZE) {
     /* Break the message into pieces and send each piece; start numbering
@@ -1744,22 +1737,21 @@ static int netSend(destPE, size, msg, msg_type)
   
   SendPackets(destPE);
   
-  Cmi_insidemachine = saveflag ;
+  CmiInterruptsRelease();
 }
 
 static int CmiProbe() 
 {
-  int val, saveflag;
+  int val;
   void dgram_scan();
 
-  saveflag = Cmi_insidemachine ;
-  Cmi_insidemachine = 1 ;
+  CmiInterruptsBlock();
 
   dgram_scan();
   RetransmitPackets();
   val = (recd_msg_head != NULL);
 
-  Cmi_insidemachine = saveflag ;
+  CmiInterruptsRelease();
   return (val);
 }
 
@@ -1772,10 +1764,8 @@ void *CmiGetNonLocal()
   DATA_HDR *packet;
   void *newmsg;
   int msglength;
-  int saveflag;
 
-  saveflag = Cmi_insidemachine;
-  Cmi_insidemachine = 1;
+  CmiInterruptsBlock();
 
   dgram_scan();
   RetransmitPackets();
@@ -1805,7 +1795,7 @@ void *CmiGetNonLocal()
   }
 
  done:
-  Cmi_insidemachine = saveflag;
+  CmiInterruptsRelease();
   return newmsg;
 }
 
@@ -1922,9 +1912,9 @@ char **argv;
 {
   static int initmc=0;
   void *FIFO_Create();
-  Cmi_insidemachine = 1;
   Communication_init = 0;
   
+  CmiInterruptsBlock();
   if (initmc==1) KillEveryone("CmiInit called twice");
   initmc=1;
   
@@ -1941,20 +1931,18 @@ char **argv;
   RecvWindowInit();
   InterruptInit();
   Communication_init = 1;
-
-  Cmi_insidemachine = 0 ;
+  CmiInterruptsRelease();
 }
 
 CmiExit()
 {
   static int exited;
-  int begin, saveflag;
+  int begin;
   
   if (exited==1) KillEveryone("CmiExit called twice");
   exited=1;
   
-  saveflag = Cmi_insidemachine;
-  Cmi_insidemachine = 1;
+  CmiInterruptsBlock();
 
   ctrl_sendone(120,"aget %s %d done 0 %d\n",
 	       self_IP_str,ctrl_port,CpvAccess(Cmi_numpe)-1);
@@ -1965,7 +1953,7 @@ CmiExit()
     { RetransmitPackets(); dgram_scan(); sleep(1); }
   outlog_done();
 
-  Cmi_insidemachine = saveflag;
+  CmiInterruptsRelease();
 }
 
 main(argc, argv)
