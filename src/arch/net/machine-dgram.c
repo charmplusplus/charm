@@ -50,12 +50,12 @@ typedef struct { DgramHeader head; char window[1024]; } DgramAck;
    dstrank = (tmp&0xFF); magic = (tmp>>8); \
 }
 
-#define PE_BROADCAST_OTHERS (-1)
-#define PE_BROADCAST_ALL    (-2)
+#define PE_BROADCAST_OTHERS (-101)
+#define PE_BROADCAST_ALL    (-102)
 
 #if CMK_NODE_QUEUE_AVAILABLE
-#define NODE_BROADCAST_OTHERS (-1)
-#define NODE_BROADCAST_ALL    (-2)
+#define NODE_BROADCAST_OTHERS (-201)
+#define NODE_BROADCAST_ALL    (-202)
 #endif
 
 /********* Startup and Command-line args ********/
