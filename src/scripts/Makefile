@@ -162,7 +162,7 @@ TRACELIBS=libtrace-none.a libtrace-projections.a libtrace-summary.a
 
 CVLIBS=libconv-core.a libconv-cplus-n.a libconv-cplus-y.a libldb-rand.o libldb-spray.o libldb-graph.o libldb-test.o $(TRACELIBS)
 
-LIBCONV_CORE=threads.o convcore.o conv-conds.o spantree.o queueing.o fifo.o msgmgr.o memory.o cpm.o cpthreads.o futures.o cldb.o random.o debug-message.o debug-object.o info.o generate.o edgelist.o conv-ccs.o
+LIBCONV_CORE=threads.o convcore.o conv-conds.o spantree.o queueing.o fifo.o msgmgr.o memory.o cpm.o cpthreads.o futures.o cldb.o random.o debug-message.o debug-object.o info.o generate.o edgelist.o conv-ccs.o quiescence.o
 
 converse: basics QuickThreads/libckqt.a $(CVLIBS) conv-host-if-needed conv-cpm convlibs
 
@@ -241,6 +241,9 @@ generate.o : generate.c ../../src/Common/conv-ldb/typedefs.h $(CVHEADERS)
 
 cldb.o: cldb.c ../../src/Common/conv-ldb/cldb.h $(CVHEADERS)
 	$(CHARMC) -I../../src/Common/conv-ldb/ cldb.c
+
+quiescence.o: quiescence.h $(CVHEADERS)
+	$(CHARMC) quiescence.c
 
 libldb-rand.o: cldb.rand.c ../../src/Common/conv-ldb/cldb.h $(CVHEADERS)
 	$(CHARMC) -I../../src/Common/conv-ldb/ -cp ../lib/ -o $@ cldb.rand.c
