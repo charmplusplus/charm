@@ -383,8 +383,23 @@ nodes.  Sparse data records are normally used to describe mesh boundary conditio
 for node-associated boundary conditions, \kw{nodesPerRec} is 1; for triangle-associated
 boundary conditions, \kw{nodesPerRec} is 3.
 
+In general, \kw{nodePerRec} gives the number of nodes associated with each
+sparse data record, and \kw{nodes} gives the actual node numbers.
+\kw{dataPerRec} gives the number of data items associated with each sparse 
+data record, and \kw{dataType}, one of \kw{FEM\_BYTE}, \kw{FEM\_INT},
+\kw{FEM\_REAL}, or \kw{FEM\_DOUBLE}, gives the type of each data item.
 As usual, you may change or delete the \kw{nodes} and \kw{data} arrays after this
 call returns.
+
+For example, if the first set of sparse data is 17 sparse data records, each 
+containing 2 nodes stored in \kw{bNodes} and 3 integers stored in \kw{bDesc}, 
+we would make the call:
+\begin{alltt}
+/*C version*/
+  FEM_Set_Sparse(0,17, bNodes,2, bDesc,3,FEM_INT);
+! Fortran version
+  CALL FEM_Set_Sparse(1,17, bNodes,2, bDesc,3,FEM_INT);
+\end{alltt}
 
 
 \function{int  FEM\_Get\_Sparse\_Length(int sID);}
