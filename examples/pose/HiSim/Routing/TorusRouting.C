@@ -13,19 +13,29 @@ int TorusRouting::selectRoute(int c,int d,int numP,Topology *top,Packet *p,map<i
         xdiff = dst.x - pos.x; ydiff = dst.y - pos.y ; zdiff = dst.z - pos.z;   
 	xdiff2 = (netLength-(int)abs(xdiff)); ydiff2 = (netHeight-(int)abs(ydiff)); zdiff2 = (netWidth-(int)abs(zdiff));
 
+
 	if(config.adaptiveRouting) {
 		if(xdiff) {  
+			//  Given source and destination, which direction ( + or - ) should we chose ?
 			if(xdiff > 0) offset = (X_POS*config.switchVc); else offset = (X_NEG*config.switchVc);
+			// Since we are simulating  a torus, we can use wraparound if it's shorter
         		if(xdiff2 < (int)abs(xdiff)) { offset = (((offset/config.switchVc)+3)%6)*config.switchVc; }
+			// Among 3 of the  4 VC in the given direction, select max avail buffer.
 			for(int i=0;i<(config.switchVc-1);i++)  
 				if(longestSize < Bufsize[offset+i]) {
 					longestSize = Bufsize[offset+i];
 					nextPort = offset/config.switchVc;
 				}
+			// bubble should contain the vc number of BUBBLE_VC ( 4th vc) among
+			// the ports, so that it has max avail buffer among BUBBLE_VC
+			// bubble vc is used ONLY if the other 3 vc are full
+			// Also, even after using bubble vc, space for one full packet should
+			// be available. This is to avoid deadlock
 			bubble = (Bufsize[config.switchVc-1+offset] > longestSize)? (config.switchVc-1+offset):-1;	
-			rand[0] = offset/config.switchVc;
+			rand[0] = offset/config.switchVc;// To be used when any vc is unable to fulfill the request.
 		} else rand[0] = (ydiff)?ydiff:zdiff;
 
+	// Comments for y and z direction  are the same as x
 		// Advantage of duplicating code is that topology can lie between mesh and torus
 		if(ydiff) {  
 			if(ydiff > 0) offset = (Y_POS*config.switchVc); else offset = (Y_NEG*config.switchVc);
