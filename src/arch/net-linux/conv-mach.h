@@ -44,11 +44,8 @@
 #define CMK_THREADS_REQUIRE_NO_CPV                         0
 #define CMK_THREADS_COPY_STACK                             0
 
-#if CMK_TIMER_USE_RDTSC
+#define CMK_TIMER_USE_RDTSC                                1
 #define CMK_TIMER_USE_GETRUSAGE                            0
-#else
-#define CMK_TIMER_USE_GETRUSAGE                            1
-#endif
 #define CMK_TIMER_USE_SPECIAL                              0
 #define CMK_TIMER_USE_TIMES                                0
 

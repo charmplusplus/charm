@@ -400,9 +400,26 @@ void    *CmiAlloc(int size);
 int      CmiSize(void *);
 void     CmiFree(void *);
 
+double   CmiCpuTimer(void);
+
+#if CMK_TIMER_USE_RDTSC
+
+extern double cpu_speed_factor;
+
+static __inline__ unsigned long long int rdtsc(void)
+{
+        unsigned long long int x;
+        __asm__ volatile (".byte 0x0f, 0x31" : "=A" (x));
+        return x;
+}
+
+#define CmiWallTimer() ((double)rdtsc()*(cpu_speed_factor))
+#define CmiTimer CmiCpuTimer
+
+#else
 double   CmiTimer(void);
 double   CmiWallTimer(void);
-double   CmiCpuTimer(void);
+#endif
 
 #if CMK_NODE_QUEUE_AVAILABLE
 

@@ -449,13 +449,6 @@ double CmiTimer()
 
 #if CMK_TIMER_USE_RDTSC
 
-static __inline__ unsigned long long int rdtsc(void)
-{
-        unsigned long long int x;
-        __asm__ volatile (".byte 0x0f, 0x31" : "=A" (x));
-        return x;
-}
-
 static double readMHz(void)
 {
   double x;
@@ -475,13 +468,14 @@ static double readMHz(void)
   return 0.0;
 }
 
-static double cpu_speed;
+double cpu_speed_factor;
 CpvStaticDeclare(double, inittime_virtual);
 
 void CmiTimerInit()
 {
   struct rusage ru;
-  cpu_speed = readMHz(); rdtsc(); rdtsc(); rdtsc(); rdtsc(); rdtsc();
+  cpu_speed_factor = 1.0/(readMHz()*1.0e6); 
+  rdtsc(); rdtsc(); rdtsc(); rdtsc(); rdtsc();
   CpvInitialize(double, inittime_virtual);
   getrusage(0, &ru); 
   CpvAccess(inittime_virtual) =
@@ -499,16 +493,6 @@ double CmiCpuTimer()
     (ru.ru_utime.tv_sec * 1.0)+(ru.ru_utime.tv_usec * 0.000001) +
     (ru.ru_stime.tv_sec * 1.0)+(ru.ru_stime.tv_usec * 0.000001);
   return currenttime - CpvAccess(inittime_virtual);
-}
-
-double CmiWallTimer(void)
-{
-  return (double)rdtsc()/(cpu_speed*1.0e6);
-}
-
-double CmiTimer()
-{
-  return CmiCpuTimer();
 }
 
 #endif
