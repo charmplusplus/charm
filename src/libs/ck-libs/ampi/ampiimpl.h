@@ -13,13 +13,37 @@
 #include "ampimain.decl.h"
 #include "ddt.h"
 
+#define AMPI_MAX_COMM 8
+
+struct ampi_redn_spec
+{
+  int type;
+  int root;
+};
+
+struct ampi_comm_struct
+{
+  CkArrayID aid;
+  void (*mainfunc)(int, char **);
+  int nobj;
+  ampi_redn_spec rspec;
+};
+
+class AmpiStartMsg : public CMessage_AmpiStartMsg
+{
+  public:
+    int commidx;
+    AmpiStartMsg(int _idx) : commidx(_idx) {}
+};
+
 class ampimain : public Chare
 {
-  int nblocks;
+  int nobjs;
   int numDone;
   public:
     static CkChareID handle;
-    static CkArrayID ampiAid;
+    static ampi_comm_struct ampi_comms[AMPI_MAX_COMM];
+    static int ncomms;
     ampimain(CkArgMsg *);
     ampimain(CkMigrateMessage *m) {}
     void done(void);
@@ -36,9 +60,6 @@ itersDone(void)
 #define AMPI_BARR_TAG   1026
 #define AMPI_REDUCE_TAG 1027
 #define AMPI_GATHER_TAG 1028
-
-extern int _redntype;
-extern int _rednroot;
 
 #if 0
 // This is currently not used.
@@ -69,6 +90,7 @@ class PersReq {
     int type;
     int proc;
     int tag;
+    int comm;
     int nextfree, prevfree;
 };
 
@@ -85,11 +107,11 @@ class ArgsInfo : public CMessage_ArgsInfo {
 
 class AmpiMsg : public CMessage_AmpiMsg {
  public:
-  int tag1, tag2, length;
+  int tag1, tag2, comm, length;
   void *data;
 
   AmpiMsg(void) { data = (char *)this + sizeof(AmpiMsg); }
-  AmpiMsg(int t1, int t2, int l):tag1(t1),tag2(t2),length(l) {
+  AmpiMsg(int t1, int t2, int l, int c):tag1(t1),tag2(t2),length(l),comm(c) {
     data = (char *)this + sizeof(AmpiMsg);
   }
   static void *alloc(int msgnum, size_t size, int *sizes, int pbits) {
@@ -103,7 +125,7 @@ class AmpiMsg : public CMessage_AmpiMsg {
 
 class ampi : public ArrayElement1D {
   public: // entry methods
-    ampi(void);
+    ampi(AmpiStartMsg *);
     ampi(CkMigrateMessage *msg) {}
     ~ampi();
     void run(ArgsInfo *);
@@ -123,16 +145,17 @@ class ampi : public ArrayElement1D {
     }
 
   public: // to be used by AMPI_* functions
-    void send(int t1, int t2, void* buf, int count, int type, int idx);
+    void send(int t1, int t2, void* buf, int count, int type, int idx, int comm);
     static void sendraw(int t1, int t2, void* buf, int len, CkArrayID aid, 
                         int idx);
-    void recv(int t1, int t2, void* buf, int count, int type);
+    void recv(int t1, int t2, void* buf, int count, int type, int comm);
     void barrier(void);
     void bcast(int root, void* buf, int count, int type);
     static void bcastraw(void* buf, int len, CkArrayID aid);
     int register_userdata(void *, AMPI_PupFn);
     void *get_userdata(int);
   public:
+    int commidx;
     CmmTable msgs;
     CthThread thread_id;
     int nbcasts;

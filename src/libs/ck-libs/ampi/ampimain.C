@@ -1,43 +1,68 @@
 #include "ampiimpl.h"
 
 CkChareID ampimain::handle;
-CkArrayID ampimain::ampiAid;
+ampi_comm_struct ampimain::ampi_comms[AMPI_MAX_COMM];
+int ampimain::ncomms = 0;
 
-static void allReduceHandler(void *redtype,int dataSize,void *data)
+static void 
+allReduceHandler(void *arg, int dataSize, void *data)
 {
-  int type = *((int*)redtype);
-  if(type==0) { // allreduce
-    ampi::bcastraw(data, dataSize, ampimain::ampiAid);
-  } else { // reduce
-    ampi::sendraw(0, AMPI_REDUCE_TAG, data, dataSize, ampimain::ampiAid, _rednroot);
+  ampi_comm_struct *commspec = (ampi_comm_struct *) arg;
+  int type = commspec->rspec.type;
+  if(type==0) 
+  { // allreduce
+    ampi::bcastraw(data, dataSize, commspec->aid);
+  } else 
+  { // reduce
+    ampi::sendraw(0, AMPI_REDUCE_TAG, data, dataSize, commspec->aid, 
+                  commspec->rspec.root);
   }
 }
 
+#if AMPI_FORTRAN
+#if CMK_FORTRAN_USES_ALLCAPS
+  extern "C" void AMPI_SETUP(void);
+#else
+  extern "C" void ampi_setup_(void);
+#endif
+#else
+  extern "C" void AMPI_Setup(void);
+#endif
+
 extern void CreateMetisLB(void);
+
 ampimain::ampimain(CkArgMsg *m)
 {
   int i;
-  nblocks = CkNumPes();
-  for(i=1;i<m->argc;i++) {
-    if(strncmp(m->argv[i], "+vp", 3) == 0) {
-      if (strlen(m->argv[i]) > 3) {
-        sscanf(m->argv[i], "+vp%d", &nblocks);
-      } else {
-        if (m->argv[i+1]) {
-          sscanf(m->argv[i+1], "%d", &nblocks);
-        }
-      }
-      break;
-    }
-  }
+  for(i=0;i<AMPI_MAX_COMM;i++)
+    ampi_comms[i].nobj = CkNumPes();
+  i = 0;
+  while(i<AMPI_MAX_COMM && CmiGetArgInt(m->argv, "+vp", &ampi_comms[i].nobj))
+    i++;
   CreateMetisLB();
   numDone = 0;
-  ampiAid = CProxy_ampi::ckNew(nblocks);
-  CProxy_ampi jarray(ampiAid);
-  jarray.setReductionClient(allReduceHandler,(void*)&_redntype);
-  for(i=0; i<nblocks; i++) {
-    ArgsInfo *argsinfo = new ArgsInfo(m->argc, m->argv);
-    jarray[i].run(argsinfo);
+#if AMPI_FORTRAN
+#if CMK_FORTRAN_USES_ALLCAPS
+  AMPI_SETUP();
+#else
+  ampi_setup_();
+#endif
+#else
+  AMPI_Setup();
+#endif
+  nobjs = 0;
+  for(i=0;i<ncomms;i++)
+  {
+    nobjs += ampi_comms[i].nobj;
+    ampi_comms[i].aid = CProxy_ampi::ckNew(new AmpiStartMsg(i), 
+                                           ampi_comms[i].nobj);
+    CProxy_ampi jarray(ampi_comms[i].aid);
+    jarray.setReductionClient(allReduceHandler,(void*)&ampi_comms[i]);
+    int j;
+    for(j=0; j<ampi_comms[i].nobj; j++) {
+      ArgsInfo *argsinfo = new ArgsInfo(m->argc, m->argv);
+      jarray[j].run(argsinfo);
+    }
   }
   delete m;
   handle = thishandle;
@@ -47,10 +72,28 @@ void
 ampimain::done(void)
 {
   numDone++;
-  if(numDone==nblocks) {
+  if(numDone==nobjs) {
     CkExit();
   }
 }
 
+extern "C" void 
+#if AMPI_FORTRAN
+#if CMK_FORTRAN_USES_ALLCAPS
+  AMPI_REGISTER_MAIN
+#else
+  ampi_register_main_
+#endif
+#else
+  AMPI_Register_main
+#endif
+(void (*mainfunc)(int, char **))
+{
+  if(ampimain::ncomms == AMPI_MAX_COMM)
+  {
+    CkAbort("AMPI> Number of registered comm_worlds exceeded limit.\n");
+  }
+  ampimain::ampi_comms[ampimain::ncomms++].mainfunc = mainfunc;
+}
 
 #include "ampimain.def.h"

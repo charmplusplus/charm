@@ -31,7 +31,7 @@ extern "C" {
 #define AMPI_UNSIGNED_LONG  13
 #define AMPI_LONG_DOUBLE  14
 
-#define AMPI_COMM_WORLD 0
+#define AMPI_COMM_WORLD (-1)
 #define AMPI_ANY_SOURCE (-1)
 #define AMPI_ANY_TAG (-1)
 #define AMPI_REQUEST_NULL (-1)
@@ -133,6 +133,15 @@ void AMPI_Print(char *str);
 int AMPI_Register(void *, AMPI_PupFn);
 void AMPI_Migrate(void);
 void *AMPI_Get_userdata(int);
+#if AMPI_FORTRAN
+#if CMK_FORTRAN_USES_ALLCAPS
+void AMPI_REGISTER_MAIN(void (*mainfunc) (int,char**));
+#else
+void ampi_register_main_(void (*mainfunc) (int,char**));
+#endif
+#else
+void AMPI_Register_main(void (*mainfunc) (int,char**));
+#endif
 #ifdef __cplusplus
 }
 #endif

@@ -1,4 +1,4 @@
-  integer, parameter :: AMPI_COMM_WORLD=0
+  integer, parameter :: AMPI_COMM_WORLD=-1
   integer, parameter :: AMPI_STATUS_SIZE=3
 
   integer, parameter :: AMPI_DOUBLE_PRECISION=0

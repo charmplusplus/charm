@@ -16,10 +16,21 @@ extern "C" void AMPIMAIN(int, char **);
 #else
 extern "C" void ampimain_(int, char **);
 #endif // CMK_FORTRAN_USES_ALLCAPS
-#endif // AMPI_FORTRAN
+#else
+extern "C" void ampimain(int, char **);
+#endif
 
-int _redntype;
-int _rednroot;
+// Default ampi_setup
+extern "C" void
+#if AMPI_FORTRAN
+#if CMK_FORTRAN_USES_ALLCAPS
+AMPI_SETUP(void){AMPI_REGISTER_MAIN(AMPIMAIN);}
+#else
+ampi_setup_(void){ampi_register_main_(ampimain_);}
+#endif
+#else
+AMPI_Setup(void){AMPI_Register_main(ampimain);}
+#endif
 
 void*
 ArgsInfo::pack(ArgsInfo* msg)
@@ -60,9 +71,11 @@ ArgsInfo::unpack(void *in)
 CtvDeclare(ampi*, ampiPtr);
 
 
-ampi::ampi(void)
+ampi::ampi(AmpiStartMsg *msg)
 {
   usesAtSync = CmiTrue;
+  commidx = msg->commidx;
+  delete msg;
   msgs = CmmNew();
   thread_id = 0;
   nbcasts = 0;
@@ -87,9 +100,9 @@ ampi::~ampi()
 void
 ampi::generic(AmpiMsg* msg)
 {
-  int tags[2];
-  tags[0] = msg->tag1; tags[1] = msg->tag2;
-  CmmPut(msgs, 2, tags, msg);
+  int tags[3];
+  tags[0] = msg->tag1; tags[1] = msg->tag2; tags[2] = msg->comm;
+  CmmPut(msgs, 3, tags, msg);
   if(thread_id) {
     CthAwaken(thread_id);
     thread_id = 0;
@@ -97,35 +110,40 @@ ampi::generic(AmpiMsg* msg)
 }
 
 void 
-ampi::send(int t1, int t2, void* buf, int count, int type,  int idx)
+ampi::send(int t1, int t2, void* buf, int count, int type,  int idx, int comm)
 {
+  CkArrayID aid = thisArrayID;
+  if(comm != AMPI_COMM_WORLD)
+  {
+    aid = ampimain::ampi_comms[comm].aid;
+  }
   DDT_DataType *ddt = myDDT->getType(type);
   int len = ddt->getSize(count);
-  AmpiMsg *msg = new (&len, 0) AmpiMsg(t1, t2, len);
+  AmpiMsg *msg = new (&len, 0) AmpiMsg(t1, t2, len, comm);
   ddt->serialize((char*)buf, (char*)msg->data, count, 1);
-  CProxy_ampi pa(thisArrayID);
+  CProxy_ampi pa(aid);
   pa[idx].generic(msg);
 }
 
 void 
 ampi::sendraw(int t1, int t2, void* buf, int len, CkArrayID aid, int idx)
 {
-  AmpiMsg *msg = new (&len, 0) AmpiMsg(t1, t2, len);
+  AmpiMsg *msg = new (&len, 0) AmpiMsg(t1, t2, len, -1);
   memcpy(msg->data, buf, len);
   CProxy_ampi pa(aid);
   pa[idx].generic(msg);
 }
 
 void 
-ampi::recv(int t1, int t2, void* buf, int count, int type)
+ampi::recv(int t1, int t2, void* buf, int count, int type, int comm)
 {
-  int tags[2];
+  int tags[3];
   AmpiMsg *msg = 0;
   DDT_DataType *ddt = myDDT->getType(type);
   int len = ddt->getSize(count);
   while(1) {
-    tags[0] = t1; tags[1] = t2;
-    msg = (AmpiMsg *) CmmGet(msgs, 2, tags, 0);
+    tags[0] = t1; tags[1] = t2; tags[2] = comm;
+    msg = (AmpiMsg *) CmmGet(msgs, 3, tags, 0);
     if (msg) break;
     thread_id = CthSelf();
     stop_running();
@@ -133,7 +151,7 @@ ampi::recv(int t1, int t2, void* buf, int count, int type)
     start_running();
   }
   if (msg->length < len) {
-    CkError("AMPI: (type=%d, count=%d) Expecting message of length %d, received %d\n",
+    CkError("AMPI: (type=%d, count=%d) Expecting msg of len %d, received %d\n",
             type, count, len, msg->length);
     CkAbort("Exiting.\n");
   }
@@ -145,12 +163,12 @@ void
 ampi::barrier(void)
 {
   if(thisIndex) {
-    send(AMPI_BARR_TAG, 0, 0, 0, 0, 0);
-    recv(AMPI_BARR_TAG, 0, 0, 0, 0);
+    send(AMPI_BARR_TAG, 0, 0, 0, 0, 0, AMPI_COMM_WORLD);
+    recv(AMPI_BARR_TAG, 0, 0, 0, 0, AMPI_COMM_WORLD);
   } else {
     int i;
-    for(i=1;i<numElements;i++) recv(AMPI_BARR_TAG, 0, 0, 0, 0);
-    for(i=1;i<numElements;i++) send(AMPI_BARR_TAG, 0, 0, 0, 0, i);
+    for(i=1;i<numElements;i++) recv(AMPI_BARR_TAG, 0, 0, 0, 0, AMPI_COMM_WORLD);
+    for(i=1;i<numElements;i++) send(AMPI_BARR_TAG, 0, 0, 0, 0, i, AMPI_COMM_WORLD);
   }
 }
 
@@ -160,16 +178,16 @@ ampi::bcast(int root, void* buf, int count, int type)
   if(root==thisIndex) {
     int i;
     for(i=0;i<numElements;i++)
-      send(AMPI_BCAST_TAG, nbcasts, buf, count, type, i);
+      send(AMPI_BCAST_TAG, nbcasts, buf, count, type, i, AMPI_COMM_WORLD);
   }
-  recv(AMPI_BCAST_TAG, nbcasts, buf, count, type);
+  recv(AMPI_BCAST_TAG, nbcasts, buf, count, type, AMPI_COMM_WORLD);
   nbcasts++;
 }
 
 void
 ampi::bcastraw(void* buf, int len, CkArrayID aid)
 {
-  AmpiMsg *msg = new (&len, 0) AmpiMsg(0, AMPI_BCAST_TAG, len);
+  AmpiMsg *msg = new (&len, 0) AmpiMsg(0, AMPI_BCAST_TAG, len, -1);
   memcpy(msg->data, buf, len);
   CProxy_ampi pa(aid);
   pa.generic(msg);
@@ -178,14 +196,16 @@ ampi::bcastraw(void* buf, int len, CkArrayID aid)
 void ampi::pup(PUP::er &p)
 {
   ArrayElement1D::pup(p);//Pack superclass
+  p(commidx);
   if(p.isDeleting())
   {//Resend saved messages to myself
     AmpiMsg *msg;
-    int snum[2];
+    int snum[3];
     snum[0] = CmmWildCard;
     snum[1] = CmmWildCard;
+    snum[2] = CmmWildCard;
     CProxy_ampi ap(thisArrayID);
-    while(msg = (AmpiMsg*)CmmGet(msgs,2,snum,0))
+    while(msg = (AmpiMsg*)CmmGet(msgs,3,snum,0))
       ap[thisIndex].generic(msg);
   }
   //This seekBlock allows us to reorder the packing/unpacking--
@@ -265,18 +285,9 @@ ampi::run(ArgsInfo *msg)
   delete msg;
   CtvInitialize(ampi *, ampiPtr);
   CtvAccess(ampiPtr) = this;
-#if AMPI_FORTRAN
-#if CMK_FORTRAN_USES_ALLCAPS
-  AMPIMAIN(argc, argv);
-#else
-  ampimain_(argc, argv);
-#endif
-
+  ampimain::ampi_comms[commidx].mainfunc(argc, argv);
   CProxy_ampimain mp(ampimain::handle);
   mp.done();
-#else
-  CkPrintf("You should link ampi using -language ampif\n");
-#endif
 }
 
 // This is invoked in the C++ version of AMPI
@@ -300,7 +311,7 @@ AMPI_Migrate(void)
   ampi *ptr = CtvAccess(ampiPtr);
   ptr->thread_id = CthSelf();
   int idx = ptr->thisIndex;
-  CProxy_ampi aproxy(ampimain::ampiAid);
+  CProxy_ampi aproxy(ampimain::ampi_comms[ptr->commidx].aid);
   aproxy[idx].migrate();
   ptr->stop_running();
   CthSuspend();
@@ -339,7 +350,7 @@ int AMPI_Send(void *msg, int count, AMPI_Datatype type, int dest,
                         int tag, AMPI_Comm comm)
 {
   ampi *ptr = CtvAccess(ampiPtr);
-  ptr->send(tag, ptr->getIndex(), msg, count, type, dest);
+  ptr->send(tag, ptr->getIndex(), msg, count, type, dest, comm);
   return 0;
 }
 
@@ -348,7 +359,7 @@ int AMPI_Recv(void *msg, int count, AMPI_Datatype type, int src, int tag,
               AMPI_Comm comm, AMPI_Status *status)
 {
   ampi *ptr = CtvAccess(ampiPtr);
-  ptr->recv(tag,src,msg,count,type);
+  ptr->recv(tag,src,msg,count,type, comm);
   return 0;
 }
 
@@ -364,6 +375,10 @@ int AMPI_Sendrecv(void *sbuf, int scount, int stype, int dest,
 extern "C" 
 int AMPI_Barrier(AMPI_Comm comm)
 {
+  if(comm != AMPI_COMM_WORLD)
+  {
+    CkAbort("AMPI> Cannot have global operations across communicators.\n");
+  }
   ampi *ptr = CtvAccess(ampiPtr);
   ptr->barrier();
   return 0;
@@ -373,6 +388,10 @@ extern "C"
 int AMPI_Bcast(void *buf, int count, AMPI_Datatype type, int root, 
                          AMPI_Comm comm)
 {
+  if(comm != AMPI_COMM_WORLD)
+  {
+    CkAbort("AMPI> Cannot have global operations across communicators.\n");
+  }
   ampi *ptr = CtvAccess(ampiPtr);
   ptr->bcast(root, buf, count, type);
   return 0;
@@ -434,13 +453,21 @@ extern "C"
 int AMPI_Reduce(void *inbuf, void *outbuf, int count, int type, AMPI_Op op, 
                 int root, AMPI_Comm comm)
 {
-  if(CkMyPe()==0) { _redntype = 1; _rednroot = root;}
-  CkReduction::reducerType mytype = getReductionType(type,op);
+  if(comm != AMPI_COMM_WORLD)
+  {
+    CkAbort("AMPI> Cannot have global operations across communicators.\n");
+  }
   ampi *ptr = CtvAccess(ampiPtr);
+  if(CkMyPe()==0)
+  {
+    ampimain::ampi_comms[ptr->commidx].rspec.type = 1;
+    ampimain::ampi_comms[ptr->commidx].rspec.root = root;
+  }
+  CkReduction::reducerType mytype = getReductionType(type,op);
   int size = ptr->myDDT->getType(type)->getSize(count) ;
   ptr->contribute(size, inbuf, mytype);
   if (ptr->thisIndex == root)
-    ptr->recv(0, AMPI_REDUCE_TAG, outbuf, count, type);
+    ptr->recv(0, AMPI_REDUCE_TAG, outbuf, count, type, comm);
   return 0;
 }
 
@@ -448,12 +475,19 @@ extern "C"
 int AMPI_Allreduce(void *inbuf, void *outbuf, int count, int type,
                    AMPI_Op op, AMPI_Comm comm)
 {
-  if(CkMyPe()==0) { _redntype = 0; }
-  CkReduction::reducerType mytype = getReductionType(type,op);
+  if(comm != AMPI_COMM_WORLD)
+  {
+    CkAbort("AMPI> Cannot have global operations across communicators.\n");
+  }
   ampi *ptr = CtvAccess(ampiPtr);
+  if(CkMyPe()==0)
+  {
+    ampimain::ampi_comms[ptr->commidx].rspec.type = 0;
+  }
+  CkReduction::reducerType mytype = getReductionType(type,op);
   int size = ptr->myDDT->getType(type)->getSize(count) ;
   ptr->contribute(size, inbuf, mytype);
-  ptr->recv(0, AMPI_BCAST_TAG, outbuf, count, type);
+  ptr->recv(0, AMPI_BCAST_TAG, outbuf, count, type, comm);
   return 0;
 }
 
@@ -473,11 +507,10 @@ int AMPI_Start(AMPI_Request *reqnum)
   PersReq *req = &(ptr->requests[*reqnum]);
   if(req->sndrcv == 1) { // send request
     ptr->send(req->tag, ptr->getIndex(), req->buf, req->count, req->type, 
-              req->proc);
+              req->proc, req->comm);
   } else {
-    ptr->recv(req->tag, req->proc, req->buf, req->count, req->type);
+    ptr->recv(req->tag, req->proc, req->buf, req->count, req->type, req->comm);
   }
-  // NO: recv request is handled in waitall
   return 0;
 }
 
@@ -492,12 +525,14 @@ int AMPI_Waitall(int count, AMPI_Request *request, AMPI_Status *sts)
     if(request[i] < 100) { // persistent request
       // PersReq *req = &(ptr->requests[request[i]]);
       // if(req->sndrcv == 2) { // recv request
-        // ptr->recv(req->tag, req->proc, req->buf, req->count, req->type);
+        // ptr->recv(req->tag, req->proc, req->buf, req->count, 
+        //           req->type, req->comm);
       // }
     } else { // irecv request
       int index = request[i] - 100;
       PersReq *req = &(ptr->irequests[index]);
-      ptr->recv(req->tag, req->proc, req->buf, req->count, req->type);
+      ptr->recv(req->tag, req->proc, req->buf, req->count, 
+                req->type, req->comm);
       // now free the request
       ptr->nirequests--;
       PersReq *ireq = &(ptr->irequests[0]);
@@ -527,6 +562,7 @@ int AMPI_Recv_init(void *buf, int count, int type, int src, int tag,
   ptr->requests[ptr->nrequests].type = type;
   ptr->requests[ptr->nrequests].proc = src;
   ptr->requests[ptr->nrequests].tag = tag;
+  ptr->requests[ptr->nrequests].comm = comm;
   *req = ptr->nrequests;
   ptr->nrequests ++;
   return 0;
@@ -546,6 +582,7 @@ int AMPI_Send_init(void *buf, int count, int type, int dest, int tag,
   ptr->requests[ptr->nrequests].type = type;
   ptr->requests[ptr->nrequests].proc = dest;
   ptr->requests[ptr->nrequests].tag = tag;
+  ptr->requests[ptr->nrequests].comm = comm;
   *req = ptr->nrequests;
   ptr->nrequests ++;
   return 0;
@@ -642,7 +679,7 @@ int AMPI_Isend(void *buf, int count, AMPI_Datatype type, int dest,
 {
   ampi *ptr = CtvAccess(ampiPtr);
   
-  ptr->send(tag, ptr->getIndex(), buf, count, type, dest);
+  ptr->send(tag, ptr->getIndex(), buf, count, type, dest, comm);
   *request = (-1);
   return 0;
 }
@@ -663,6 +700,7 @@ int AMPI_Irecv(void *buf, int count, AMPI_Datatype type, int src,
   req->type = type;
   req->proc = src;
   req->tag = tag;
+  req->comm = comm;
   *request = ptr->firstfree + 100;
   ptr->nirequests ++;
   // remove this request from the free list
@@ -678,6 +716,10 @@ int AMPI_Allgatherv(void *sendbuf, int sendcount, AMPI_Datatype sendtype,
                    void *recvbuf, int *recvcounts, int *displs, 
                    AMPI_Datatype recvtype, AMPI_Comm comm) 
 {
+  if(comm != AMPI_COMM_WORLD)
+  {
+    CkAbort("AMPI> Cannot have global operations across communicators.\n");
+  }
   ampi *ptr = CtvAccess(ampiPtr);
   int size = ptr->getArraySize();
   int i;
@@ -701,6 +743,10 @@ int AMPI_Allgather(void *sendbuf, int sendcount, AMPI_Datatype sendtype,
                   void *recvbuf, int recvcount, AMPI_Datatype recvtype,
                   AMPI_Comm comm)
 {
+  if(comm != AMPI_COMM_WORLD)
+  {
+    CkAbort("AMPI> Cannot have global operations across communicators.\n");
+  }
   ampi *ptr = CtvAccess(ampiPtr);
   int size = ptr->getArraySize();
   int i;
@@ -724,6 +770,10 @@ int AMPI_Gatherv(void *sendbuf, int sendcount, AMPI_Datatype sendtype,
                 void *recvbuf, int *recvcounts, int *displs,
                 AMPI_Datatype recvtype, int root, AMPI_Comm comm)
 {
+  if(comm != AMPI_COMM_WORLD)
+  {
+    CkAbort("AMPI> Cannot have global operations across communicators.\n");
+  }
   ampi *ptr = CtvAccess(ampiPtr);
   int size = ptr->getArraySize();
   int i;
@@ -748,6 +798,10 @@ int AMPI_Gather(void *sendbuf, int sendcount, AMPI_Datatype sendtype,
                void *recvbuf, int recvcount, AMPI_Datatype recvtype, 
                int root, AMPI_Comm comm)
 {
+  if(comm != AMPI_COMM_WORLD)
+  {
+    CkAbort("AMPI> Cannot have global operations across communicators.\n");
+  }
   ampi *ptr = CtvAccess(ampiPtr);
   int size = ptr->getArraySize();
   int i;
@@ -771,6 +825,10 @@ int AMPI_Alltoallv(void *sendbuf, int *sendcounts, int *sdispls,
                   AMPI_Datatype sendtype, void *recvbuf, int *recvcounts,
                   int *rdispls, AMPI_Datatype recvtype, AMPI_Comm comm)
 {
+  if(comm != AMPI_COMM_WORLD)
+  {
+    CkAbort("AMPI> Cannot have global operations across communicators.\n");
+  }
   ampi *ptr = CtvAccess(ampiPtr);
   int size = ptr->getArraySize();
   DDT_DataType* dttype = ptr->myDDT->getType(sendtype) ;
@@ -797,6 +855,10 @@ int AMPI_Alltoall(void *sendbuf, int sendcount, AMPI_Datatype sendtype,
                  void *recvbuf, int recvcount, AMPI_Datatype recvtype, 
                  AMPI_Comm comm)
 {
+  if(comm != AMPI_COMM_WORLD)
+  {
+    CkAbort("AMPI> Cannot have global operations across communicators.\n");
+  }
   ampi *ptr = CtvAccess(ampiPtr);
   int size = ptr->getArraySize();
   DDT_DataType* dttype = ptr->myDDT->getType(sendtype) ;
