@@ -35,6 +35,10 @@ static double itime;
 static SMSG_LIST *sent_msgs=0;
 static SMSG_LIST *end_sent=0;
 
+#if NODE_0_IS_CONVHOST
+int inside_comm = 0;
+#endif
+
 double starttimer;
 
 void CmiAbort(char *message);
@@ -401,6 +405,7 @@ void recdQueueInit(void)
 
 void recdQueueAddToBack(void *element)
 {
+  inside_comm = 1;
   if(recdQueue_len==recdQueue_blk_len) {
     void **blk;
     recdQueue_blk_len *= 3;
@@ -411,6 +416,7 @@ void recdQueueAddToBack(void *element)
     recdQueue_first = 0;
   }
   recdQueue_blk[(recdQueue_first+recdQueue_len++)%recdQueue_blk_len] = element;
+  inside_comm = 0;
 }
 
 

@@ -1,13 +1,13 @@
 #ifndef _CONV_MACH_H
 #define _CONV_MACH_H
 
-#define CMK_ASYNC_NOT_NEEDED                               1
+#define CMK_ASYNC_NOT_NEEDED                               0
 #define CMK_ASYNC_USE_FIOASYNC_AND_FIOSETOWN               0
 #define CMK_ASYNC_USE_FIOASYNC_AND_SIOCSPGRP               0
 #define CMK_ASYNC_USE_FIOSSAIOSTAT_AND_FIOSSAIOOWN         0
-#define CMK_ASYNC_USE_F_SETFL_AND_F_SETOWN                 0
+#define CMK_ASYNC_USE_F_SETFL_AND_F_SETOWN                 1
 
-#define CMK_CCS_AVAILABLE                                  0
+#define CMK_CCS_AVAILABLE                                  1
 
 #define CMK_CMIDELIVERS_USE_COMMON_CODE                    1
 #define CMK_CMIDELIVERS_USE_SPECIAL_CODE                   0
@@ -63,9 +63,9 @@
 #define CMK_SIGHOLD_NOT_NEEDED                             1
 #define CMK_SIGHOLD_USE_SIGMASK                            0
 
-#define CMK_SIGNAL_NOT_NEEDED                              1
+#define CMK_SIGNAL_NOT_NEEDED                              0
 #define CMK_SIGNAL_USE_SIGACTION                           0
-#define CMK_SIGNAL_USE_SIGACTION_WITH_RESTART              0
+#define CMK_SIGNAL_USE_SIGACTION_WITH_RESTART              1
 
 #define CMK_SIZE_T                                         unsigned long
 
@@ -119,5 +119,6 @@
 
 #define CPP_LOCATION "/usr/lib/cpp"
 
+#define NODE_0_IS_CONVHOST                                 1
 #endif
 

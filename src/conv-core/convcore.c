@@ -3,6 +3,13 @@
 #include "converse.h"
 #include "conv-trace.h"
 #include <errno.h>
+#if NODE_0_IS_CONVHOST
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <netdb.h>
+#include <sys/time.h>
+#endif
 
 #if CMK_WHEN_PROCESSOR_IDLE_USLEEP
 #include <sys/types.h>
@@ -343,6 +350,293 @@ double CmiTimer()
 #endif
 
 
+#if NODE_0_IS_CONVHOST
+
+extern int inside_comm;
+CpvExtern(int, strHandlerID);
+
+static int hostport, hostskt;
+static int hostskt_ready_read;
+static int hostskt_ready_write;
+
+CpvStaticDeclare(int, CHostHandlerIndex);
+static unsigned int *nodeIPs;
+static unsigned int *nodePorts;
+static int numRegistered;
+
+static void KillEveryoneCode(int n)
+{
+  char str[128];
+  sprintf(str, "Fatal Error: code %d\n", n);
+  CmiAbort(str);
+}
+
+static void jsleep(int sec, int usec)
+{
+  int ntimes,i;
+  struct timeval tm;
+
+  ntimes = sec*200 + usec/5000;
+  for(i=0;i<ntimes;i++) {
+    tm.tv_sec = 0;
+    tm.tv_usec = 5000;
+    while(1) {
+      if (select(0,NULL,NULL,NULL,&tm)==0) break;
+      if ((errno!=EBADF)&&(errno!=EINTR)) return;
+    }
+  }
+}
+
+void writeall(int fd, char *buf, int size)
+{
+  int ok;
+  while (size) {
+    retry:
+    ok = write(fd, buf, size);
+    if ((ok<0)&&((errno==EBADF)||(errno==EINTR))) goto retry;
+    if (ok<=0) {
+      CmiAbort("Write failed ..\n");
+    }
+    size-=ok; buf+=ok;
+  }
+}
+
+static void skt_server(ppo, pfd)
+unsigned int *ppo;
+unsigned int *pfd;
+{
+  int fd= -1;
+  int ok, len;
+  struct sockaddr_in addr;
+
+retry:
+  fd = socket(PF_INET, SOCK_STREAM, 0);
+  if ((fd<0)&&((errno==EINTR)||(errno==EBADF))) goto retry;
+  if (fd < 0) { perror("socket 1"); KillEveryoneCode(93483); }
+  memset(&addr, 0, sizeof(addr));
+  addr.sin_family = AF_INET;
+  ok = bind(fd, (struct sockaddr *)&addr, sizeof(addr));
+  if (ok < 0) { perror("bind"); KillEveryoneCode(22933); }
+  ok = listen(fd,5);
+  if (ok < 0) { perror("listen"); KillEveryoneCode(3948); }
+  len = sizeof(addr);
+  ok = getsockname(fd, (struct sockaddr *)&addr, &len);
+  if (ok < 0) { perror("getsockname"); KillEveryoneCode(93583); }
+
+  *pfd = fd;
+  *ppo = ntohs(addr.sin_port);
+}
+
+int skt_connect(ip, port, seconds)
+unsigned int ip; int port; int seconds;
+{
+  struct sockaddr_in remote; short sport=port;
+  int fd, ok, len, retry, begin;
+
+  /* create an address structure for the server */
+  memset(&remote, 0, sizeof(remote));
+  remote.sin_family = AF_INET;
+  remote.sin_port = htons(sport);
+  remote.sin_addr.s_addr = htonl(ip);
+
+  begin = time(0); ok= -1;
+  while (time(0)-begin < seconds) {
+  sock:
+    fd = socket(AF_INET, SOCK_STREAM, 0);
+    if ((fd<0)&&((errno==EINTR)||(errno==EBADF))) goto sock;
+    if (fd < 0) KillEveryoneCode(234234);
+
+  conn:
+    ok = connect(fd, (struct sockaddr *)&(remote), sizeof(remote));
+    if (ok>=0) break;
+    close(fd);
+    switch (errno) {
+    case EINTR: case EBADF: case EALREADY: break;
+    case ECONNREFUSED: jsleep(1,0); break;
+    case EADDRINUSE: jsleep(1,0); break;
+    case EADDRNOTAVAIL: jsleep(1,0); break;
+    default: return -1;
+    }
+  }
+  if (ok<0) return -1;
+  return fd;
+}
+
+static void skt_accept(src, pip, ppo, pfd)
+int src;
+unsigned int *pip;
+unsigned int *ppo;
+unsigned int *pfd;
+{
+  int i, fd, ok;
+  struct sockaddr_in remote;
+  i = sizeof(remote);
+ acc:
+  fd = accept(src, (struct sockaddr *)&remote, &i);
+  if ((fd<0)&&((errno==EINTR)||(errno==EBADF)||(errno==EPROTO))) goto acc;
+  if (fd<0) { perror("accept"); KillEveryoneCode(39489); }
+  *pip=htonl(remote.sin_addr.s_addr);
+  *ppo=htons(remote.sin_port);
+  *pfd=fd;
+}
+
+static void CheckSocketsReady(void)
+{
+  static fd_set rfds;
+  static fd_set wfds;
+  struct timeval tmo;
+  int nreadable;
+
+  FD_ZERO(&rfds);
+  FD_ZERO(&wfds);
+  FD_SET(hostskt, &rfds);
+  FD_SET(hostskt, &wfds);
+  tmo.tv_sec = 0;
+  tmo.tv_usec = 0;
+  nreadable = select(FD_SETSIZE, &rfds, &wfds, NULL, &tmo);
+  if (nreadable <= 0) {
+    hostskt_ready_read = 0;
+    hostskt_ready_write = 0;
+    return;
+  }
+  hostskt_ready_read = (FD_ISSET(hostskt, &rfds));
+  hostskt_ready_write = (FD_ISSET(hostskt, &wfds));
+}
+
+void CHostRegister(void)
+{
+  struct hostent *hostent;
+  char hostname[100];
+  int ip;
+  char *msg;
+  int *ptr;
+  int msgSize = CmiMsgHeaderSizeBytes + 3 * sizeof(unsigned int);
+
+  if(gethostname(hostname, 99) < 0) {
+    hostent = gethostent();
+  }
+  else{
+    hostent = gethostbyname(hostname);
+  }
+  if (hostent == 0)
+    ip = 0x7f000001;
+  else
+    ip = htonl(*((int *)(hostent->h_addr_list[0])));
+
+  msg = (char *)CmiAlloc(msgSize * sizeof(char));
+  ptr = (int *)(msg + CmiMsgHeaderSizeBytes);
+  ptr[0] = CmiMyPe();
+  ptr[1] = ip;
+  ptr[2] = hostport;
+  CmiSetHandler(msg, CpvAccess(CHostHandlerIndex));
+  CmiSyncSendAndFree(0, msgSize, msg);
+}
+
+void CHostGetOne()
+{
+  char line[10000];
+  char rest[1000];
+  int ok, ip, port, fd;  FILE *f;
+
+  skt_accept(hostskt, &ip, &port, &fd);
+  f = fdopen(fd,"r");
+  while (fgets(line, 9999, f)) {
+    if (strncmp(line, "req ", 4)==0) {
+      char cmd[5], *msg;
+      int pe, size, len;
+
+      /* DEBUGGING */
+      CmiPrintf("Line = %s\n", line);
+
+      sscanf(line, "%s%d%d", cmd, &pe, &size);
+      len = strlen(line);
+      msg = (char *) CmiAlloc(len+size+CmiMsgHeaderSizeBytes+1);
+      if (!msg)
+        CmiPrintf("%d: Out of mem\n", CmiMyPe());
+      CmiSetHandler(msg, CpvAccess(strHandlerID));
+      strcpy(msg+CmiMsgHeaderSizeBytes, line);
+      fread(msg+CmiMsgHeaderSizeBytes+len, 1, size, f);
+      msg[CmiMsgHeaderSizeBytes+len+size] = '\0';
+      CmiSyncSendAndFree(CmiMyPe(), CmiMsgHeaderSizeBytes+len+size+1, msg);
+    }
+    else if (strncmp(line, "getinfo ", 8)==0) {
+      unsigned int clientIP, clientPort;
+      char pre[1024], reply[1024], ans[1024];
+      char cmd[20];
+      int fd;
+      int i;
+      int nscanfread;
+      int nodetab_rank0_size = CmiNumNodes();
+
+      /* DEBUGGING */
+      CmiPrintf("Line = %s\n", line);
+      nscanfread = sscanf(line, "%s%u%u", cmd, &clientIP, &clientPort);
+      if(nscanfread != 3){
+        fgets(rest, 999, f);
+        sscanf(rest, "%u%u", &clientIP, &clientPort);
+      }
+      strcpy(pre, "info");
+      reply[0] = 0;
+      sprintf(ans, "%d ", nodetab_rank0_size);
+      strcat(reply, ans);
+      for(i=0;i<nodetab_rank0_size;i++) {
+        strcat(reply, "1 ");
+      }
+      for(i=0;i<nodetab_rank0_size;i++) {
+        sprintf(ans, "%d ", nodeIPs[i]);
+        strcat(reply, ans);
+      }
+      for(i=0;i<nodetab_rank0_size;i++) {
+        sprintf(ans, "%d ", nodePorts[i]);
+        strcat(reply, ans);
+      }
+      fd = skt_connect(clientIP, clientPort, 60);
+      if (fd<=0) KillEveryoneCode(2932);
+      write(fd, pre, strlen(pre));
+      write(fd, " ", 1);
+      write(fd, reply, strlen(reply));
+      close(fd);
+    }
+    else KillEveryoneCode(2932);
+  }
+  fclose(f);
+  close(fd);
+}
+
+static void CommunicationServer()
+{
+  if(inside_comm)
+    return;
+  while (1) {
+    CheckSocketsReady();
+    if (hostskt_ready_read) { CHostGetOne(); continue; }
+    break;
+  }
+}
+
+void CHostHandler(char *msg)
+{
+  int pe;
+  int *ptr = (int *)(msg + CmiMsgHeaderSizeBytes);
+  pe = ptr[0];
+  nodeIPs[pe] = (unsigned int)(ptr[1]);
+  nodePorts[pe] = (unsigned int)(ptr[2]);
+  numRegistered++;
+ 
+  if(numRegistered == CmiNumPes()){
+    CmiPrintf("Server IP = %u, Server port = %u $\n",nodeIPs[0], nodePorts[0]);
+  }
+}
+
+void CHostInit()
+{
+  nodeIPs = (unsigned int *)malloc(CmiNumPes() * sizeof(unsigned int));
+  nodePorts = (unsigned int *)malloc(CmiNumPes() * sizeof(unsigned int));
+  CpvInitialize(int, CHostHandlerIndex);
+  CpvAccess(CHostHandlerIndex) = CmiRegisterHandler(CHostHandler);
+}
+
+#endif
 /******************************************************************************
  *
  * CmiEnableAsyncIO
@@ -955,7 +1249,7 @@ void CmiHandleMessage(void *msg)
   char *freezeReply;
   int fd;
 
-  extern int skt_connect(int, int, int);
+  extern int skt_connect(unsigned int, int, int);
   extern void writeall(int, char *, int);
 #endif
 
@@ -1981,7 +2275,7 @@ void CcsCallerId(unsigned int *pip, unsigned int *pport)
   *pport = CpvAccess(callerPort);
 }
 
-extern int skt_connect(int, int, int);
+extern int skt_connect(unsigned int, int, int);
 extern void writeall(int, char *, int);
 
 void CcsSendReply(unsigned int ip, unsigned int port, int size, void *msg)
@@ -2037,6 +2331,14 @@ void ConverseCommonInit(char **argv)
 #endif
 #if CMK_WEB_MODE
   CWebInit();
+#endif
+#if NODE_0_IS_CONVHOST
+  CHostInit();
+  skt_server(&hostport, &hostskt);
+  CmiSignal(SIGALRM, SIGIO, 0, CommunicationServer);
+  CmiEnableAsyncIO(hostskt);
+  CHostRegister();
+  CmiPrintf("%d]Host Port = %u\n", CmiMyPe(), hostport);
 #endif
   CldModuleInit();
 }
