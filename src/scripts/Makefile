@@ -53,8 +53,7 @@ MBLOCKC: charm++ LIBS
 
 MBLOCKF: MBLOCKC
 
-AMPI: 
-	$(MAKE) charm++ 
+AMPI:  charm++
 	$(MAKE) CONVLIBS 
 	$(MAKE) AMPIC AMPIF
 
@@ -767,7 +766,9 @@ loadbalancers: $(LOADBALANCERS) $(L)/libmoduleEveryLB.a
 ###############################################################################
 
 bluegene:  basics
-	$(MAKE) charm++ $(L)/libconv-bluegene.a $(L)/libconv-bluegene-logs.a METIS
+	$(MAKE) bluegene-target
+
+bluegene-target: charm++ $(L)/libconv-bluegene.a $(L)/libconv-bluegene-logs.a METIS
 
 # old (Charm++) Blue Gene emulator
 BlueGene.decl.h BlueGene.def.h : BlueGene.ci charmxi
