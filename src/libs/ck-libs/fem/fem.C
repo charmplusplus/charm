@@ -465,8 +465,7 @@ FEM_My_Partition(void)
 int
 FEM_Num_Partitions(void)
 {
-  chunk *cptr = CtvAccess(_femptr);
-  return cptr->total();
+  return _nchunks;
 }
 
 // Fortran Bindings
