@@ -141,8 +141,8 @@ public:
 
 //	ArrayElement *ckLocal(void) const;
 	CkSectionID &ckGetSectionID() {return _sid;}
-        CkArrayIndexMax *ckGetArrayElements() { return _elems; }
-	int ckGetNumElements() { return _nElems; }
+        inline CkArrayIndexMax *ckGetArrayElements() const { return _elems; }
+	inline const int ckGetNumElements() const { return _nElems; }
 	void pup(PUP::er &p);
 };
 PUPmarshall(CProxySection_ArrayBase);

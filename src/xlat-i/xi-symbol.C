@@ -824,18 +824,19 @@ Array::genSubDecls(XStr& str)
     {
     str << 
     "    "<<etype<<" operator [] (int idx) const \n"
-    "        {return "<<etype<<"(ckGetArrayID(), CkArrayIndex1D(idx), ckDelegatedIdx());}\n"
+    "        {return "<<etype<<"(ckGetArrayID(), *(CkArrayIndex1D*)&ckGetArrayElements()[idx], ckDelegatedIdx());}\n"
     "    "<<etype<<" operator () (int idx) const \n"
-    "        {return "<<etype<<"(ckGetArrayID(), CkArrayIndex1D(idx), ckDelegatedIdx());}\n";
+    "        {return "<<etype<<"(ckGetArrayID(), *(CkArrayIndex1D*)&ckGetArrayElements()[idx], ckDelegatedIdx());}\n";
     } else if (indexSuffix==(const char*)"2D") {
     str << 
-    "    "<<etype<<" operator () (int i0,int i1) const \n"
-    "        {return "<<etype<<"(ckGetArrayID(), CkArrayIndex2D(i0,i1), ckDelegatedIdx());}\n";
+    "    "<<etype<<" operator () (int idx) const \n"
+    "        {return "<<etype<<"(ckGetArrayID(), *(CkArrayIndex2D*)&ckGetArrayElements()[idx], ckDelegatedIdx());}\n";
     } else if (indexSuffix==(const char*)"3D") {
     str << 
-    "    "<<etype<<" operator () (int i0,int i1,int i2) const \n"
-    "        {return "<<etype<<"(ckGetArrayID(), CkArrayIndex3D(i0,i1,i2), ckDelegatedIdx());}\n";
+    "    "<<etype<<" operator () (int idx) const \n"
+    "        {return "<<etype<<"(ckGetArrayID(), *(CkArrayIndex3D*)&ckGetArrayElements()[idx], ckDelegatedIdx());}\n";
     }
+
     str <<"    "<<ptype<<"(const CkArrayID &aid, CkArrayIndexMax *elems, int nElems, CkGroupID dTo) \n"
          "        :";genProxyNames(str, "",NULL, "(aid,elems,nElems,dTo)", ", ");str << " {}\n";
     str <<"    "<<ptype<<"(const CkArrayID &aid, CkArrayIndexMax *elems, int nElems) \n"
