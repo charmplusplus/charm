@@ -7,7 +7,7 @@ all: libcomm.a
 	cp commlib.h ../../../../include
 
 libcomm.a: $(OBJS)
-	$(CHARMC) -cp ../../../../lib -o libcomm.a $(OBJS)
+	#$(CHARMC) -cp ../../../../lib -o libcomm.a $(OBJS)
 
 charm_bind.o: charm_bind.C commlib.h
 	$(CHARMC)  -c -I../../.. charm_bind.C
