@@ -1581,6 +1581,24 @@ static void CommunicationInterrupt(int arg)
   CommunicationServer(0);
 }
 
+/* this will ensure that node program make sure charmrun is still there */
+static void ctrl_sendone_nolock(const char *type,
+				const char *data1,int dataLen1,
+				const char *data2,int dataLen2);
+static void alarmInterrupt(int arg)
+{
+  if (comm_flag) return;
+  if (memflag) return;
+
+  CmiCommLock();
+  Cmi_clock = GetClock();
+  if (Cmi_clock > Cmi_check_last + Cmi_check_delay) {
+    ctrl_sendone_nolock("ping",NULL,0,NULL,0);
+    Cmi_check_last = Cmi_clock;
+  }
+  CmiCommUnlock();
+}
+
 extern void CmiSignal(int sig1, int sig2, int sig3, void (*handler)());
 
 static void CmiStartThreads()
@@ -1605,6 +1623,10 @@ static void CmiStartThreads()
     if (Cmi_charmrun_fd!=-1) CmiEnableAsyncIO(Cmi_charmrun_fd);
 #endif
   }
+  else {
+    /* even in netpoll mode, we still need to ping charmrun periodically */
+    CmiSignal(SIGALRM, 0, 0, alarmInterrupt);
+  }
   
   /* if running on only one node, the only thing an interrupt
   is used for is to check if charmrun has been killed. And this is
@@ -1613,16 +1635,13 @@ static void CmiStartThreads()
 
   if(Cmi_numnodes==1) Cmi_tickspeed = (int)(Cmi_check_delay*1000000.0);
 
-  if (!Cmi_netpoll) 
-  {
   /*This will send us a SIGALRM every Cmi_tickspeed microseconds,
     which will call the CommunicationInterrupt routine above.*/
-    i.it_interval.tv_sec = 0;
-    i.it_interval.tv_usec = Cmi_tickspeed;
-    i.it_value.tv_sec = 0;
-    i.it_value.tv_usec = Cmi_tickspeed;
-    setitimer(ITIMER_REAL, &i, NULL);
-  }
+  i.it_interval.tv_sec = 0;
+  i.it_interval.tv_usec = Cmi_tickspeed;
+  i.it_value.tv_sec = 0;
+  i.it_value.tv_usec = Cmi_tickspeed;
+  setitimer(ITIMER_REAL, &i, NULL);
 }
 
 #endif

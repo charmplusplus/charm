@@ -414,7 +414,7 @@ void CmiMachineInit()
   maxsize = gm_min_size_for_length(4096);
   Cmi_dgram_max_data = 4096 - DGRAM_HEADER_SIZE;
 */
-  maxsize = 22;
+  maxsize = 21;
 
   for (i=1; i<maxsize; i++) {
     int len = gm_max_length_for_size(i);
@@ -445,34 +445,8 @@ void CmiMachineInit()
   /* alarm will ping charmrun */
   gm_initialize_alarm(&gmalarm);
 
-  CmiSignal(SIGALRM, 0, 0, alarmInterrupt);
-
-  {
-  struct itimerval i;
-   /*This will send us a SIGALRM every Cmi_tickspeed microseconds,
-   which will call the alarmInterrupt routine above.*/
-   i.it_interval.tv_sec = 0;
-   i.it_interval.tv_usec = Cmi_tickspeed;
-   i.it_value.tv_sec = 0;
-   i.it_value.tv_usec = Cmi_tickspeed;
-   setitimer(ITIMER_REAL, &i, NULL);
-  }
 }
 
-/* this will ensure that node program make sure charmrun is still there */
-static void alarmInterrupt(int arg)
-{
-  if (comm_flag) return;
-  if (memflag) return;
-
-  CmiCommLock();
-  Cmi_clock = GetClock();
-  if (Cmi_clock > Cmi_check_last + Cmi_check_delay) {
-    ctrl_sendone_nolock("ping",NULL,0,NULL,0);
-    Cmi_check_last = Cmi_clock;
-  }
-  CmiCommUnlock();
-}
 
 /* make sure other gm nodes are accessible in routing table */
 void CmiCheckGmStatus()
