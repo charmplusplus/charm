@@ -355,6 +355,8 @@ void jmemcpy(char *dst, char *src, int len)
 char *CopyMsg(char *msg, int len)
 {
   char *copy = (char *)CmiAlloc(len);
+  if (!copy)
+      fprintf(stderr, "Out of memory\n");
   jmemcpy(copy, msg, len);
   return copy;
 }
@@ -616,10 +618,47 @@ typedef struct PCQueueStruct
 }
 *PCQueue;
 
+static CircQueue Cmi_freelist_circqueuestruct = 0;
+int freeCount = 0;
+
+#define FreeCircQueueStruct(dg) {\
+  CircQueue d;\
+  CmiMemLock();\
+  d=(dg);\
+  d->next = Cmi_freelist_circqueuestruct;\
+  Cmi_freelist_circqueuestruct = d;\
+  freeCount++;\
+  CmiPrintf("%d]count = %d\n", CmiMyPe(), freeCount);\
+  CmiMemUnlock();\
+}
+
+#define MallocCircQueueStruct(dg) {\
+  CircQueue d;\
+  CmiMemLock();\
+  d = Cmi_freelist_circqueuestruct;\
+  if (d==(CircQueue)0){\
+    d = ((CircQueue)calloc(1, sizeof(struct CircQueueStruct)));\
+    CmiPrintf("%d] Mallocing fresh\n", CmiMyPe());\
+  }\
+  else{\
+    freeCount--;\
+    CmiPrintf("%d] in malloc, count = %d\n", CmiMyPe(), freeCount);\
+    Cmi_freelist_circqueuestruct = d->next;\
+    }\
+  dg = d;\
+  CmiMemUnlock();\
+}
+
+
 PCQueue PCQueueCreate()
 {
-  CircQueue circ = (CircQueue)calloc(1, sizeof(struct CircQueueStruct));
-  PCQueue Q = (PCQueue)malloc(sizeof(struct PCQueueStruct));
+  CircQueue circ;
+  PCQueue Q;
+
+  /* MallocCircQueueStruct(circ); */
+  circ = (CircQueue)calloc(1, sizeof(struct CircQueueStruct));
+
+  Q = (PCQueue)malloc(sizeof(struct PCQueueStruct));
   Q->head = circ;
   Q->tail = circ;
   return Q;
@@ -629,38 +668,48 @@ char *PCQueuePop(PCQueue Q)
 {
   CircQueue circ; int pull; char *data;
 
-  while (1) {
     circ = Q->head;
     pull = circ->pull;
     data = circ->data[pull];
     if (data) {
-      circ->pull = (pull + 1) & (PCQueueSize-1);
+      circ->pull = (pull + 1);
       circ->data[pull] = 0;
+      if (pull == PCQueueSize - 1) { /* just pulled the data from the last slot
+                                     of this buffer */
+        Q->head = circ-> next; /* next buffer must exist, because "Push"  */
+	
+	/* FreeCircQueueStruct(circ); */
+        free(circ);
+	
+	/* links in the next buffer *before* filling */
+                               /* in the last slot. See below. */
+      }
       return data;
     }
-    if (Q->tail == circ)
+    else { /* queue seems to be empty. The producer may be adding something
+              to it, but its ok to report queue is empty. */
       return 0;
-    Q->head = circ->next;
-    free(circ);
-  }
+    }
 }
 
 void PCQueuePush(PCQueue Q, char *data)
 {
-  CircQueue circ; int push;
+  CircQueue circ, circ1; int push;
   
-  circ = Q->tail;
-  push = circ->push;
-  if (circ->data[push] == 0) {
-    circ->data[push] = data;
-    circ->push = (push + 1) & (PCQueueSize-1);
-    return;
+  circ1 = Q->tail;
+  push = circ1->push;
+  if (push == (PCQueueSize -1)) { /* last slot is about to be filled */
+    /* this way, the next buffer is linked in before data is filled in 
+       in the last slot of this buffer */
+
+    circ = (CircQueue)calloc(1, sizeof(struct CircQueueStruct));
+    /* MallocCircQueueStruct(circ); */
+
+    Q->tail->next = circ;
+    Q->tail = circ;
   }
-  circ = (CircQueue)calloc(1, sizeof(struct CircQueueStruct));
-  circ->push = 1;
-  circ->data[0] = data;
-  Q->tail->next = circ;
-  Q->tail = circ;
+  circ1->data[push] = data;
+  circ1->push = (push + 1);
 }
 
 /***********************************************************************
@@ -752,6 +801,7 @@ int node, nbr;
 
 typedef struct { char data[DGRAM_HEADER_SIZE]; } DgramHeader;
 
+/* the window size needs to be Cmi_window_size + sizeof(unsigned int) bytes) */
 typedef struct { DgramHeader head; char window[1024]; } DgramAck;
 
 #define DgramHeaderMake(ptr, dstrank, srcpe, magic, seqno) { \
@@ -815,7 +865,8 @@ typedef struct OtherNodeStruct
   ImplicitDgram            send_queue_h; /* head of send queue */
   ImplicitDgram            send_queue_t; /* tail of send queue */
   unsigned int             send_next;    /* next seqno to go into queue */
-  
+  unsigned int             send_ack_seqno; /* next ack seqno to send */
+
   int                      asm_rank;
   int                      asm_total;
   int                      asm_fill;
@@ -827,6 +878,7 @@ typedef struct OtherNodeStruct
   ExplicitDgram           *recv_window;  /* Packets received, not integrated */
   int                      recv_winsz;   /* Number of packets in recv window */
   unsigned int             recv_next;    /* Seqno of first missing packet */
+  unsigned int             recv_ack_seqno; /* last ack seqno received */
 
   unsigned int             stat_total_intr; /* Total Number of Interrupts */
   unsigned int             stat_proc_intr;  /* Processed Interrupts */
@@ -836,6 +888,9 @@ typedef struct OtherNodeStruct
   unsigned int             stat_recv_pkt;   /* number of packets received */
   unsigned int             stat_recv_ack;   /* number of acks received */
   unsigned int             stat_ack_pkts;   /* packets acked */
+ 
+  int sent_msgs;
+  int recd_msgs;
 }
 *OtherNode;
 
@@ -937,35 +992,8 @@ static int Cmi_print_stats = 0;
  */
 
 char statstr[10000];
-
-void printWindow(void)
-{
-  char tmpstr[1024];
-  OtherNode node;
-  int i, j;
-
-  sprintf(tmpstr, "***********************************\n");
-  strcpy(statstr, tmpstr);
-  sprintf(tmpstr, "Send Window For Node %u at time %lf\n", CmiMyNode(), GetClock());
-  strcat(statstr, tmpstr);
-  for(i=0;i<CmiNumNodes();i++) {
-    node = nodes+i;
-    sprintf(tmpstr, "[%d->%d] ", CmiMyNode(), i);
-    strcat(statstr, tmpstr);
-    for(j=0;j<Cmi_window_size;j++) {
-      if(node->send_window[j] == 0) {
-        sprintf(tmpstr, "     N ");
-      } else {
-        sprintf(tmpstr, "%6d ", node->send_window[j]->seqno);
-      }
-      strcat(statstr, tmpstr);
-    }
-    strcat(statstr, "\n");
-  }
-  sprintf(tmpstr, "***********************************\n");
-  strcat(statstr, tmpstr);
-  CmiPrintf(statstr);
-}
+static unsigned int last_sum = 0;
+void printLog(void);
 
 void printNetStatistics(void)
 {
@@ -1087,7 +1115,7 @@ char **argv;
  *
  *****************************************************************************/
 
-#define LOGGING 0
+#define LOGGING 1
 
 #if LOGGING
 
@@ -1126,10 +1154,41 @@ static void log_done()
   fclose(f);
 }
 
+void printLog(void)
+{
+  char logname[100]; FILE *f; int i, j, size;
+  static int logged = 0;
+  if (logged)
+      return;
+  logged = 1;
+  CmiPrintf("Logging: %d\n", Cmi_mynode);
+  sprintf(logname, "log.%d", Cmi_mynode);
+  f = fopen(logname, "w");
+  if (f==0) KillEveryone("fopen problem");
+  for (i = 5000; i; i--)
+  {
+  /*for (i=0; i<size; i++) */
+    j = log_pos - i;
+    if (j < 0)
+    {
+        if (log_wrap)
+	    j = 5000 + j;
+	else
+	    j = 0;
+    };
+    {
+    logent ent = log+j;
+    fprintf(f, "%1.4f %d %c %d %d\n",
+	    ent->time, ent->srcpe, ent->kind, ent->dstpe, ent->seqno);
+    }
+  }
+  fclose(f);
+  CmiPrintf("Done Logging: %d\n", Cmi_mynode);
+}
+
 #define LOG(t,s,k,d,q) { if (log_pos==50000) { log_pos=0; log_wrap=1;} { logent ent=log+log_pos; ent->time=t; ent->srcpe=s; ent->kind=k; ent->dstpe=d; ent->seqno=q; log_pos++; }}
 
 #endif
-
 
 #if !LOGGING
 
@@ -1289,6 +1348,7 @@ CmiNodeLock CmiCreateLock()
 {
   CmiNodeLock lk = (CmiNodeLock)malloc(sizeof(mutex_t));
   mutex_init(lk,0,0);
+  return lk;
 }
 
 void CmiDestroyLock(CmiNodeLock lk)
@@ -1299,35 +1359,22 @@ void CmiDestroyLock(CmiNodeLock lk)
 
 void CmiYield() { thr_yield(); }
 
-static mutex_t barrier_mutex;
-CpvDeclare(int, local_sense);
-static volatile int sense;
-static volatile int count;
+int barrier;
+cond_t barrier_cond;
+mutex_t barrier_mutex;
 
-void CmiNodeBarrierInit()
+void CmiNodeBarrier(void)
 {
-  count=CmiNodeSize(CmiNodeOf(CmiMyPe()));
-  sense=1;
-  CpvInitialize(int, local_sense);
-  CpvAccess(local_sense)=1;
-}
-
-void CmiNodeBarrier()
-{
-  CpvAccess(local_sense)= 1-CpvAccess(local_sense);
   mutex_lock(&barrier_mutex);
-  count--;
-  mutex_unlock(&barrier_mutex);
-  if (count ==0) {
-        count=CmiNodeSize(CmiNodeOf(CmiMyPe()));
-        sense=CpvAccess(local_sense);
+  barrier++;
+  if(barrier != CmiNumPes())
+    cond_wait(&barrier_cond, &barrier_mutex);
+  else{
+    barrier = 0;
+    cond_broadcast(&barrier_cond);
   }
-  else
-        while (sense != CpvAccess(local_sense)) {
-                thr_yield();
-        }
+  mutex_unlock(&barrier_mutex);
 }
-
 
 #define CmiGetStateN(n) (Cmi_state_vector+(n))
 
@@ -1340,6 +1387,7 @@ static void comm_thread(void)
   struct timeval tmo; fd_set rfds;
   while (1) {
     CmiCommLock();
+    CmiPrintf("Thread calling server\n");
     CommunicationServer();
     CmiCommUnlock();
     tmo.tv_sec = 0;
@@ -1385,6 +1433,130 @@ static void CmiStartThreads()
 
 #endif
 
+#if CMK_SHARED_VARS_POSIX_THREADS_SMP
+
+static pthread_mutex_t memmutex;
+void CmiMemLock() { pthread_mutex_lock(&memmutex); }
+void CmiMemUnlock() { pthread_mutex_unlock(&memmutex); }
+
+static pthread_thread_key_t Cmi_state_key;
+static CmiState     Cmi_state_vector;
+
+CmiState CmiGetState()
+{
+  CmiState result = 0;
+  result = pthread__getspecific(Cmi_state_key);
+  return result;
+}
+
+int CmiMyPe()
+{
+  CmiState result = 0;
+  result = pthread__getspecific(Cmi_state_key);
+  return result->pe;
+}
+
+int CmiMyRank()
+{
+  CmiState result = 0;
+  result = pthread__getspecific(Cmi_state_key);
+  return result->rank;
+}
+
+int CmiNodeFirst(int node) { return nodes[node].nodestart; }
+int CmiNodeSize(int node)  { return nodes[node].nodesize; }
+int CmiNodeOf(int pe)      { return (nodes_by_pe[pe] - nodes); }
+int CmiRankOf(int pe)      { return pe - (nodes_by_pe[pe]->nodestart); }
+
+CmiNodeLock CmiCreateLock()
+{
+  CmiNodeLock lk = (CmiNodeLock)malloc(sizeof(pthread_mutex_t));
+  pthread_mutex_init(lk,(pthread_mutexattr_t *)0);
+  return lk;
+}
+
+void CmiDestroyLock(CmiNodeLock lk)
+{
+  pthread_mutex_destroy(lk);
+  free(lk);
+}
+
+void CmiYield() { sched_yield(); }
+
+int barrier;
+pthread_cond_t barrier_cond;
+pthread_mutex_t barrier_mutex;
+
+void CmiNodeBarrier(void)
+{
+  pthread_mutex_lock(&barrier_mutex);
+  barrier++;
+  if(barrier != CmiNumPes())
+    pthread_cond_wait(&barrier_cond, &barrier_mutex);
+  else{
+    barrier = 0;
+    pthread_cond_broadcast(&barrier_cond);
+  }
+  pthread_mutex_unlock(&barrier_mutex);
+}
+
+
+#define CmiGetStateN(n) (Cmi_state_vector+(n))
+
+static pthread_mutex_t comm_mutex;
+#define CmiCommLock() (pthread_mutex_lock(&comm_mutex))
+#define CmiCommUnlock() (pthread_mutex_unlock(&comm_mutex))
+
+static void comm_thread(void)
+{
+  struct timeval tmo; fd_set rfds;
+  while (1) {
+    CmiCommLock();
+    CommunicationServer();
+    CmiCommUnlock();
+    tmo.tv_sec = 0;
+    tmo.tv_usec = Cmi_tickspeed;
+    FD_ZERO(&rfds);
+    FD_SET(dataskt, &rfds);
+    FD_SET(ctrlskt, &rfds);
+    select(FD_SETSIZE, &rfds, 0, 0, &tmo);
+  }
+  pthread_exit(0);
+}
+
+static void *call_startfn(void *vindex)
+{
+  int index = (int)vindex;
+  CmiState state = Cmi_state_vector + index;
+  pthread_setspecific(Cmi_state_key, state);
+  ConverseInitPE();
+  Cmi_startfn(CountArgs(Cmi_argv), Cmi_argv);
+  if (Cmi_usrsched == 0) CsdScheduler(-1);
+  ConverseExit();
+  pthread_exit(0);
+}
+
+static void CmiStartThreads()
+{
+  int i, pid, ok;
+  
+  //thr_setconcurrency(Cmi_mynodesize);
+  pthread_keycreate(&Cmi_state_key, 0);
+  Cmi_state_vector =
+    (CmiState)calloc(Cmi_mynodesize, sizeof(struct CmiStateStruct));
+  for (i=0; i<Cmi_mynodesize; i++)
+    CmiStateInit(i+Cmi_nodestart, i, CmiGetStateN(i));
+  for (i=1; i<Cmi_mynodesize; i++) {
+    ok = thr_create(&pid, NULL, call_startfn, (void *)i);
+    if (ok<0) { perror("pthread_create"); exit(1); }
+  }
+  pthread_setspecific(Cmi_state_key, Cmi_state_vector);
+  ok = thr_create(&pid, NULL, (void *(*)(void *))comm_thread, 0);
+  if (ok<0) { perror("pthread_create"); exit(1); }
+}
+
+#endif
+
 #if CMK_SHARED_VARS_UNAVAILABLE
 
 static int memflag;
@@ -1403,17 +1575,18 @@ static int comm_flag;
 
 void CmiYield() { jsleep(0,100); }
 
-void printWindow(void);
+int interruptFlag;
 
+static unsigned int terrupt;
 static void CommunicationInterrupt()
 {
   nodes[CmiMyNode()].stat_total_intr++;
-  if(!(nodes[CmiMyNode()].stat_total_intr%10000))
-    printWindow();
   if (comm_flag) return;
   if (memflag) return;
   nodes[CmiMyNode()].stat_proc_intr++;
+  interruptFlag = 109;
   CommunicationServer();
+  interruptFlag = 0;
 }
 
 static void CmiStartThreads()
@@ -1503,6 +1676,8 @@ static void ctrl_getone()
       sscanf(line, "%s%d%d", cmd, &pe, &size);
       len = strlen(line);
       msg = (char *) CmiAlloc(len+size+CmiMsgHeaderSizeBytes);
+  if (!msg)
+      CmiPrintf("%d: Out of mem\n", Cmi_mynode);
       CmiSetHandler(msg, CpvAccess(strHandlerID));
       strcpy(msg+CmiMsgHeaderSizeBytes, line);
       fread(msg+CmiMsgHeaderSizeBytes+len, 1, size, f);
@@ -1591,6 +1766,8 @@ static void node_addresses_store(addrs) char *addrs;
   bype = (OtherNode*)malloc(Cmi_numpes * sizeof(OtherNode));
   for (i=0; i<Cmi_numnodes; i++) {
     OtherNode node = ntab + i;
+    node->sent_msgs = 0;
+    node->recd_msgs = 0;
     node->send_window =
       (ImplicitDgram*)calloc(Cmi_window_size, sizeof(ImplicitDgram));
     node->recv_window =
@@ -1697,6 +1874,16 @@ void DiscardImplicitDgram(ImplicitDgram dg)
   FreeImplicitDgram(dg);
 }
 
+
+/***********************************************************************
+ * TransmitAckDatagram
+ *
+ * This function sends the ack datagram, after setting the window
+ * array to show which of the datagrams in the current window have been
+ * received. The sending side will then use this information to resend
+ * packets, mark packets as received, etc. This system also prevents
+ * multiple retransmissions/acks when acks are lost.
+ ***********************************************************************/
 int TransmitAckDatagram(OtherNode node)
 {
   DgramAck ack; unsigned int i, seqno, slot; ExplicitDgram dg;
@@ -1710,13 +1897,23 @@ int TransmitAckDatagram(OtherNode node)
     ack.window[i] = (dg && (dg->seqno == seqno));
     seqno = ((seqno+1) & DGRAM_SEQNO_MASK);
   }
+  memcpy(&ack.window[Cmi_window_size], &(node->send_ack_seqno), 
+          sizeof(unsigned int));
+  node->send_ack_seqno = ((node->send_ack_seqno + 1) & DGRAM_SEQNO_MASK);
   sendto(dataskt, (char *)&ack,
-	 DGRAM_HEADER_SIZE + Cmi_window_size, 0,
+	 DGRAM_HEADER_SIZE + Cmi_window_size + sizeof(unsigned int), 0,
 	 (struct sockaddr *)&(node->addr),
 	 sizeof(struct sockaddr_in));
   node->stat_send_ack++;
 }
 
+
+/***********************************************************************
+ * TransmitImplicitDgram
+ * TransmitImplicitDgram1
+ *
+ * These functions do the actual work of sending a UDP datagram.
+ ***********************************************************************/
 void TransmitImplicitDgram(ImplicitDgram dg)
 {
   char *data; DgramHeader *head; int len; DgramHeader temp;
@@ -1753,6 +1950,15 @@ void TransmitImplicitDgram1(ImplicitDgram dg)
   dest->stat_resend_pkt++;
 }
 
+
+/***********************************************************************
+ * TransmitAcknowledgement
+ *
+ * This function sends the ack datagrams, after checking to see if the 
+ * Recv Window is atleast half-full. After that, if the Recv window size 
+ * is 0, then the count of un-acked datagrams, and the time at which
+ * the ack should be sent is reset.
+ ***********************************************************************/
 int TransmitAcknowledgement()
 {
   int skip; static int nextnode=0; OtherNode node;
@@ -1778,6 +1984,14 @@ int TransmitAcknowledgement()
   return 0;
 }
 
+
+/***********************************************************************
+ * TransmitDatagram()
+ *
+ * This function fills up the Send Window with the contents of the
+ * Send Queue. It also sets the node->send_primer variable, which
+ * indicates when a retransmission will be attempted.
+ ***********************************************************************/
 int TransmitDatagram()
 {
   ImplicitDgram dg; OtherNode node;
@@ -1817,6 +2031,13 @@ int TransmitDatagram()
   return 0;
 }
 
+/***********************************************************************
+ * EnqueOutgoingDgram()
+ *
+ * This function enqueues the datagrams onto the Send queue of the
+ * sender, after setting appropriate data values into each of the
+ * datagrams. 
+ ***********************************************************************/
 void EnqueueOutgoingDgram
         (OutgoingMsg ogm, char *ptr, int len, OtherNode node, int rank)
 {
@@ -1844,10 +2065,18 @@ void EnqueueOutgoingDgram
   }
 }
 
+
+/***********************************************************************
+ * DeliverViaNetwork()
+ *
+ * This function is responsible for all non-local transmission. This
+ * function takes the outgoing messages, splits it into datagrams and
+ * enqueues them into the Send Queue.
+ ***********************************************************************/
 void DeliverViaNetwork(OutgoingMsg ogm, OtherNode node, int rank)
 {
   int size, seqno; char *data;
-  
+ 
   size = ogm->size - DGRAM_HEADER_SIZE;
   data = ogm->data + DGRAM_HEADER_SIZE;
   while (size > Cmi_dgram_max_data) {
@@ -1855,9 +2084,24 @@ void DeliverViaNetwork(OutgoingMsg ogm, OtherNode node, int rank)
     data += Cmi_dgram_max_data;
     size -= Cmi_dgram_max_data;
   }
+
+  node->sent_msgs++;
+
   EnqueueOutgoingDgram(ogm, data, size, node, rank);
 }
 
+
+
+/***********************************************************************
+ * DeliverOutgoingMessage()
+ *
+ * This function takes care of delivery of outgoing messages from the
+ * sender end. Broadcast messages are divided into sets of messages that 
+ * are bound to the local node, and to remote nodes. For local
+ * transmission, the messages are directly pushed into the recv
+ * queues. For non-local transmission, the function DeliverViaNetwork()
+ * is called
+ ***********************************************************************/
 void DeliverOutgoingMessage(OutgoingMsg ogm)
 {
   int i, rank, dst; OtherNode node;
@@ -1899,14 +2143,28 @@ void DeliverOutgoingMessage(OutgoingMsg ogm)
   }
 }
 
+
+/***********************************************************************
+ * AssembleDatagram()
+ *
+ * This function does the actual assembly of datagrams into a
+ * message. node->asm_msg holds the current message being
+ * assembled. Once the message assemble is complete (known by checking
+ * if the total number of datagrams is equal to the number of datagrams
+ * constituting the assembled message), the message is pushed into the
+ * Producer-Consumer queue
+ ***********************************************************************/
 void AssembleDatagram(OtherNode node, ExplicitDgram dg)
 {
   int i, size; char *msg;
   
+  LOG(Cmi_clock, Cmi_nodestart, 'X', dg->srcpe, dg->seqno);
   msg = node->asm_msg;
   if (msg == 0) {
     size = CmiMsgHeaderGetLength(dg->data);
     msg = (char *)CmiAlloc(size);
+  if (!msg)
+      fprintf(stderr, "%d: Out of mem\n", Cmi_mynode);
     if (size < dg->len) KillEveryoneCode(4559312);
     jmemcpy(msg, (char*)(dg->data), dg->len);
     node->asm_rank = dg->rank;
@@ -1918,18 +2176,32 @@ void AssembleDatagram(OtherNode node, ExplicitDgram dg)
     jmemcpy(msg + node->asm_fill, ((char*)(dg->data))+DGRAM_HEADER_SIZE, size);
     node->asm_fill += size;
   }
+  if (node->asm_fill > node->asm_total)
+      fprintf(stderr, "\n\n\t\tLength mismatch!!\n\n");
   if (node->asm_fill == node->asm_total) {
     if (node->asm_rank == DGRAM_BROADCAST) {
       int len = node->asm_total;
       for (i=1; i<Cmi_mynodesize; i++)
 	PCQueuePush(CmiGetStateN(i)->recv, CopyMsg(msg, len));
       PCQueuePush(CmiGetStateN(0)->recv, msg);
-    } else PCQueuePush(CmiGetStateN(node->asm_rank)->recv, msg);
+    } else 
+    {
+      PCQueuePush(CmiGetStateN(node->asm_rank)->recv, msg);
+    }
     node->asm_msg = 0;
+  node->recd_msgs++;
   }
   FreeExplicitDgram(dg);
 }
 
+
+/***********************************************************************
+ * AssembleReceivedDatagrams()
+ *
+ * This function assembles the datagrams received so far, into a
+ * single message. This also results in part of the Receive Window being 
+ * freed.
+ ***********************************************************************/
 void AssembleReceivedDatagrams(OtherNode node)
 {
   unsigned int next, slot; ExplicitDgram dg;
@@ -1945,6 +2217,22 @@ void AssembleReceivedDatagrams(OtherNode node)
   }
   node->recv_next = next;
 }
+
+
+
+
+/************************************************************************
+ * IntegrateMessageDatagram()
+ *
+ * This function integrates the received datagrams. It first
+ * increments the count of un-acked datagrams. (This is to aid the
+ * heuristic that an ack should be sent when the Receive window is half
+ * full). If the current datagram is the first missing packet, then this 
+ * means that the datagram that was missing in the incomplete sequence
+ * of datagrams so far, has arrived, and hence the datagrams can be
+ * assembled. 
+ ************************************************************************/
+
 
 void IntegrateMessageDatagram(ExplicitDgram dg)
 {
@@ -1968,25 +2256,95 @@ void IntegrateMessageDatagram(ExplicitDgram dg)
 	node->recv_ack_time = 0.0;
       if (seqno >= node->recv_expect)
 	node->recv_expect = ((seqno+1)&DGRAM_SEQNO_MASK);
+  LOG(Cmi_clock, Cmi_nodestart, 'Y', node->recv_next, dg->seqno);
       return;
     }
   }
+  LOG(Cmi_clock, Cmi_nodestart, 'y', node->recv_next, dg->seqno);
   FreeExplicitDgram(dg);
 }
+
+
+
+/***********************************************************************
+ * IntegrateAckDatagram()
+ * 
+ * This function is called on the message sending side, on receipt of
+ * an ack for a message that it sent. Since messages and acks could be 
+ * lost, our protocol works in such a way that acks for higher sequence
+ * numbered packets act as implict acks for lower sequence numbered
+ * packets, in case the acks for the lower sequence numbered packets
+ * were lost.
+
+ * Recall that the Send and Receive windows are circular queues, and the
+ * sequence numbers of the packets (datagrams) are monotically
+ * increasing. Hence it is important to know for which sequence number
+ * the ack is for, and to correspodinly relate that to tha actual packet 
+ * sitting in the Send window. Since every 20th packet occupies the same
+ * slot in the windows, a number of sanity checks are required for our
+ * protocol to work. 
+ * 1. If the ack number (first missing packet sequence number) is less
+ * than the last ack number received then this ack can be ignored. 
+
+ * 2. The last ack number received must be set to the current ack
+ * sequence number (This is done only if 1. is not true).
+
+ * 3. Now the whole Send window is examined, in a kind of reverse
+ * order. The check starts from a sequence number = 20 + the first
+ * missing packet's sequence number. For each of these sequence numbers, 
+ * the slot in the Send window is checked for existence of a datagram
+ * that should have been sent. If there is no datagram, then the search
+ * advances. If there is a datagram, then the sequence number of that is 
+ * checked with the expected sequence number for the current iteration
+ * (This is decremented in each iteration of the loop).
+
+ * If the sequence numbers do not match, then checks are made (for
+ * the unlikely scenarios where the current slot sequence number is 
+ * equal to the first missing packet's sequence number, and where
+ * somehow, packets which have greater sequence numbers than allowed for 
+ * the current window)
+
+ * If the sequence numbers DO match, then the flag 'rxing' is
+ * checked. The semantics for this flag is that : If any packet with a
+ * greater sequence number than the current packet (and hence in the
+ * previous iteration of the for loop) has been acked, then the 'rxing'
+ * flag is set to 1, to imply that all the packets of lower sequence
+ * number, for which the ack->window[] element does not indicate that the 
+ * packet has been received, must be retransmitted.
+ * 
+ ***********************************************************************/
+
+
 
 void IntegrateAckDatagram(ExplicitDgram dg)
 {
   OtherNode node; DgramAck *ack; ImplicitDgram idg;
-  int i; unsigned int slot, rxing, dgseqno, seqno;
-  
+  int i; unsigned int slot, rxing, dgseqno, seqno, diff, ackseqno;
+  unsigned int tmp;
+
   node = nodes_by_pe[dg->srcpe];
   ack = ((DgramAck*)(dg->data));
+  memcpy(&ackseqno, &(ack->window[Cmi_window_size]), sizeof(unsigned int));
   dgseqno = dg->seqno;
   seqno = (dgseqno + Cmi_window_size) & DGRAM_SEQNO_MASK;
   slot = seqno % Cmi_window_size;
   rxing = 0;
   node->stat_recv_ack++;
   LOG(Cmi_clock, Cmi_nodestart, 'R', node->nodestart, dg->seqno);
+
+  tmp = node->recv_ack_seqno;
+  /* check that the ack being received is actually appropriate */
+  if ( !((node->recv_ack_seqno >= 
+	  ((DGRAM_SEQNO_MASK >> 1) + (DGRAM_SEQNO_MASK >> 2))) &&
+	 (ackseqno < (DGRAM_SEQNO_MASK >> 1))) &&
+       (ackseqno <= node->recv_ack_seqno))
+    {
+      FreeExplicitDgram(dg);
+      return;
+    } 
+  /* higher ack so adjust */
+  node->recv_ack_seqno = ackseqno;
+  
   for (i=Cmi_window_size-1; i>=0; i--) {
     slot--; if (slot== ((unsigned int)-1)) slot+=Cmi_window_size;
     seqno = (seqno-1) & DGRAM_SEQNO_MASK;
@@ -1994,6 +2352,8 @@ void IntegrateAckDatagram(ExplicitDgram dg)
     if (idg) {
       if (idg->seqno == seqno) {
 	if (ack->window[i]) {
+	  /* remove those that have been received and are within a window
+	     of the first missing packet */
 	  node->stat_ack_pkts++;
 	  LOG(Cmi_clock, Cmi_nodestart, 'r', node->nodestart, seqno);
 	  node->send_window[slot] = 0;
@@ -2007,9 +2367,26 @@ void IntegrateAckDatagram(ExplicitDgram dg)
 	  }
 	  node->send_queue_h = idg;
 	}
-      } else if (((idg->seqno - dgseqno) & DGRAM_SEQNO_MASK)>=Cmi_window_size){
+      } else {
+        diff = dgseqno >= idg->seqno ? 
+	  ((dgseqno - idg->seqno) & DGRAM_SEQNO_MASK) :
+	  ((dgseqno + (DGRAM_SEQNO_MASK - idg->seqno) + 1) & DGRAM_SEQNO_MASK);
+	  
+	if ((diff <= 0) || (diff > Cmi_window_size))
+	{
+	  continue;
+	}
+
+        if (dgseqno < idg->seqno)
+        {
+          continue;
+        }
+        if (dgseqno == idg->seqno)
+        {
+	  continue;
+        }
 	node->stat_ack_pkts++;
-	LOG(Cmi_clock, Cmi_nodestart, 'r', node->nodestart, idg->seqno);
+	LOG(Cmi_clock, Cmi_nodestart, 'o', node->nodestart, idg->seqno);
 	node->send_window[slot] = 0;
 	DiscardImplicitDgram(idg);
       }
@@ -2023,6 +2400,7 @@ void ReceiveDatagram()
   ExplicitDgram dg; int ok, magic;
   MallocExplicitDgram(dg);
   ok = recv(dataskt,(char*)(dg->data),Cmi_max_dgram_size,0);
+  /*ok = recvfrom(dataskt,(char*)(dg->data),Cmi_max_dgram_size,0, 0, 0);*/
   if (ok<0) KillEveryoneCode(37489437);
   dg->len = ok;
   if (ok >= DGRAM_HEADER_SIZE) {
@@ -2035,9 +2413,26 @@ void ReceiveDatagram()
   } else FreeExplicitDgram(dg);
 }
 
+
+/***********************************************************************
+ * CommunicationServer()
+ * 
+ * This function does the scheduling of the tasks related to the
+ * message sends and receives. It is called from the CmiGeneralSend()
+ * function, and periodically from the CommunicationInterrupt() (in case 
+ * of the single processor version), and from the comm_thread (for the
+ * SMP version). Based on which of the data/control read/write sockets
+ * are ready, the corresponding tasks are called
+ *
+ ***********************************************************************/
 static void CommunicationServer()
 {
   LOG(GetClock(), Cmi_nodestart, 'I', 0, 0);
+  if (terrupt)
+  {
+      return;
+  }
+  terrupt++;
   while (1) {
     Cmi_clock = GetClock();
     if (Cmi_clock > Cmi_check_last + Cmi_check_delay) {
@@ -2051,6 +2446,7 @@ static void CommunicationServer()
     if (dataskt_ready_write) { if (TransmitDatagram()) continue; }
     break;
   }
+  terrupt--;
 }
 
 /******************************************************************************
@@ -2096,6 +2492,12 @@ void CmiNotifyIdle()
  *
  * CmiGeneralSend
  *
+ * Description: This is a generic message sending routine. All the
+ * converse message send functions are implemented in terms of this
+ * function. (By setting appropriate flags (eg freemode) that tell
+ * CmiGeneralSend() how exactly to handle the particular case of
+ * message send)
+ *
  *****************************************************************************/
 
 CmiCommHandle CmiGeneralSend(int pe, int size, int freemode, char *data)
@@ -2104,6 +2506,8 @@ CmiCommHandle CmiGeneralSend(int pe, int size, int freemode, char *data)
 
   if (freemode == 'S') {
     char *copy = (char *)CmiAlloc(size);
+  if (!copy)
+      fprintf(stderr, "%d: Out of mem\n", Cmi_mynode);
     memcpy(copy, data, size);
     data = copy; freemode = 'F';
   }
