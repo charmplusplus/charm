@@ -80,14 +80,18 @@ class ComlibSectionHashObject {
     //Other processors to send this message to
     int npes;
     int *pelist;
+
+    void *msg;
     
     ComlibSectionHashObject(): indices(0) {
         npes = 0;
         pelist = NULL;
+	msg = NULL;
     }
 
     ~ComlibSectionHashObject() {
         delete pelist;
+	//delete msg;
     }
 };
 

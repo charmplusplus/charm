@@ -10,6 +10,8 @@ class DirectMulticastStrategy: public CharmStrategy {
  protected:
     //   int handlerId;    
     ComlibSectionInfo sinfo;
+
+    int isPersistent; 
     
     //Array section support
     CkHashtableT<ComlibSectionHashKey, ComlibSectionHashObject *> sec_ht; 
@@ -44,7 +46,7 @@ class DirectMulticastStrategy: public CharmStrategy {
     DirectMulticastStrategy(CkMigrateMessage *m): CharmStrategy(m){}
                 
     //Array constructor
-    DirectMulticastStrategy(CkArrayID aid);
+    DirectMulticastStrategy(CkArrayID aid, int isPersistent = 0);
         
     //Destuctor
     ~DirectMulticastStrategy();

@@ -36,11 +36,14 @@ void *DMHandler(void *msg){
 }
 */
 
-DirectMulticastStrategy::DirectMulticastStrategy(CkArrayID aid)
+DirectMulticastStrategy::DirectMulticastStrategy(CkArrayID aid, 
+						 int isPersistent)
     :  CharmStrategy() {
 
     ainfo.setDestinationArray(aid);
     setType(ARRAY_STRATEGY);
+
+    this->isPersistent = isPersistent;
 }
 
 //Destroy all old built routes
@@ -158,17 +161,35 @@ void DirectMulticastStrategy::doneInserting(){
     //Do nothing! Its a bracketed strategy
 }
 
+extern void CmiReference(void *);
+
 //Send the multicast message the local array elements. The message is 
 //copied and sent if elements exist. 
 void DirectMulticastStrategy::localMulticast(envelope *env, 
                                              ComlibSectionHashObject *obj) {
     int nIndices = obj->indices.size();
     
+    //If the library is set to persistent. 
+    //The message is stored in the library. The applications should 
+    //use the message as a readonly and it exists till the next one 
+    //comes along
+    
+    if(obj->msg != NULL) {
+	delete obj->msg;
+	obj->msg = NULL;
+    } 
+    
     if(nIndices > 0) {
-        void *msg = EnvToUsr(env);
-        void *msg1 = msg;
+	void *msg = EnvToUsr(env);
+	void *msg1 = msg;
         
         msg1 = CkCopyMsg(&msg);
+	
+	if(isPersistent) {
+	    CmiReference(UsrToEnv(msg1));
+	    obj->msg = (void *)UsrToEnv(msg1);
+	}
+	
         ComlibArrayInfo::localMulticast(&(obj->indices), UsrToEnv(msg1));
     }    
 }
@@ -204,6 +225,7 @@ void DirectMulticastStrategy::remoteMulticast(envelope *env,
 void DirectMulticastStrategy::pup(PUP::er &p){
 
     CharmStrategy::pup(p);
+    p | isPersistent; 
 }
 
 void DirectMulticastStrategy::beginProcessing(int numElements){
@@ -284,9 +306,6 @@ void DirectMulticastStrategy::handleNewMulticastMessage(envelope *env) {
     sec_ht.put(key) = new_obj;
 
     remoteMulticast(env, new_obj);
-    
-    if(new_obj->indices.size() > 0)
-        ComlibArrayInfo::localMulticast(&(new_obj->indices), newenv);    
-    else        
-        CmiFree(newenv);                
+    localMulticast(newenv, new_obj); //local multicast always copies
+    CmiFree(newenv);                
 }
