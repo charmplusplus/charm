@@ -746,6 +746,7 @@ extern void CkStartQD(const CkCallback& cb);
 #include "sdag.h"
 #include "ckcheckpoint.h"
 #include "ckarrayreductionmgr.h"
+#include "trace.h"
 
 #endif
 

@@ -800,8 +800,12 @@ void CkArray::recvBroadcast(CkMessage *m)
 	//Run through the list of local elements
 	int idx=0;
 	ArrayElement *el;
-	while (NULL!=(el=elements->next(idx)))
+	while (NULL!=(el=elements->next(idx))) {
 		broadcaster->deliver(msg,el);
+#if CMK_BLUEGENE_CHARM
+                BgEntrySplit();
+#endif
+	}
 }
 
 
