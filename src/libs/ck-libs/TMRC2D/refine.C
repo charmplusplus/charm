@@ -55,7 +55,7 @@ CDECL void REFINE2D_NewMesh(int meshID,int nEl,int nGhost,int nnodes,const int *
   MPI_Barrier(MPI_COMM_WORLD);
   CkWaitQD();
 }
-FDECL void FTN_NAME(REFINE2D_NEWMESH,refine2d_newmesh)
+/*FDECL void FTN_NAME(REFINE2D_NEWMESH,refine2d_newmesh)
 (int *nEl,int *nGhost,int nnodes,const int *conn,const int *gid,const int *boundaries)
 {
   TCHARM_API_TRACE("REFINE2D_NewMesh", "refine");
@@ -65,7 +65,7 @@ FDECL void FTN_NAME(REFINE2D_NEWMESH,refine2d_newmesh)
   CtvAccess(_refineChunk)->newMesh(*nEl, *nGhost,conn, gid, nnodes, boundaries, 1);
   MPI_Barrier(MPI_COMM_WORLD);
   CkWaitQD();
-}
+}*/
 
 /********************** Splitting ******************/
 class refineResults {

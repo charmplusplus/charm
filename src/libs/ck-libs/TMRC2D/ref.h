@@ -1,6 +1,13 @@
 #ifndef REF_H
 #define REF_H
 #include <charm++.h>
+#include "charm-api.h"
+#include "ckvector3d.h"
+#include "pup_mpi.h"
+#include "tcharm.h"
+
+#include "fem.h"
+#include "fem_mesh.h"
 
 #define TMRDEBUG(x) x
 //#define TMRDEBUG(x) 
