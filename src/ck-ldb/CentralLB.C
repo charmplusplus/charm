@@ -22,11 +22,7 @@ CkGroupID loadbalancer;
 int * lb_ptr;
 int load_balancer_created;
 
-CreateLBFunc_Def(CentralLB);
-
-static void lbinit(void) {
-  LBRegisterBalancer("CentralLB", CreateCentralLB, AllocateCentralLB, "CentralLB base class");
-}
+CreateLBFunc_Def(CentralLB, "CentralLB base class");
 
 static void getPredictedLoad(CentralLB::LDStats* stats, int count, 
 		             LBMigrateMsg *, double *peLoads, 

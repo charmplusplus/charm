@@ -35,16 +35,7 @@
 #define UPPER_FACTOR 0.67
 #define MAX_WEIGHT 5.0
 
-CreateLBFunc_Def(Comm1LB);
-
-static void lbinit(void) {
-  LBRegisterBalancer("Comm1LB", 
-                     CreateComm1LB, 
-                     AllocateComm1LB, 
-		     "another variation of CommLB");
-}
-
-#include "Comm1LB.def.h"
+CreateLBFunc_Def(Comm1LB, "another variation of CommLB");
 
 Comm1LB::Comm1LB(const CkLBOptions &opt): CentralLB(opt)
 {
@@ -270,6 +261,7 @@ void Comm1LB::work(CentralLB::LDStats* stats, int count)
   }
 }
 
+#include "Comm1LB.def.h"
 
 /*@}*/
 

@@ -69,23 +69,31 @@ public:
   double * expectedLoad;
 };
 
-// for a FooLB, the following macro defines function:
+// for a FooLB, the following macro defines these functions for each LB:
 // CreateFooLB(): which register with LBDatabase with sequence ticket
-// and 
+// , 
 // AllocateFooLB(): which only locally allocate the class
+// static void lbinit(): which is an init call
 #if CMK_LBDB_ON
-#define CreateLBFunc_Def(x)		\
+#define CreateLBFunc_Def(x, str)		\
 void Create##x(void) { 	\
   int seqno = LBDatabaseObj()->getLoadbalancerTicket();	\
   CProxy_##x::ckNew(CkLBOptions(seqno)); 	\
 }	\
 BaseLB *Allocate##x(void) { \
   return new x((CkMigrateMessage*)NULL);	\
+}	\
+static void lbinit(void) {	\
+  LBRegisterBalancer(#x,	\
+                     Create##x,	\
+                     Allocate##x,	\
+                     str);	\
 }
 #else		/* CMK_LBDB_ON */
-#define CreateLBFunc_Def(x)	\
+#define CreateLBFunc_Def(x, str)	\
 void Create##x(void) {} 	\
-BaseLB *Allocate##x(void) { return NULL; }
+BaseLB *Allocate##x(void) { return NULL; }	\
+static void lbinit(void) {}
 #endif
 
 #endif

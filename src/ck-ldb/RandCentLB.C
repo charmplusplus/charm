@@ -22,13 +22,7 @@ Status:
 
 #include "RandCentLB.h"
 
-CreateLBFunc_Def(RandCentLB);
-
-static void lbinit(void) {
-  LBRegisterBalancer("RandCentLB", CreateRandCentLB, AllocateRandCentLB, "Assign objects to processors randomly");
-}
-
-#include "RandCentLB.def.h"
+CreateLBFunc_Def(RandCentLB, "Assign objects to processors randomly");
 
 RandCentLB::RandCentLB(const CkLBOptions &opt): CentralLB(opt)
 {
@@ -73,5 +67,6 @@ void RandCentLB::work(CentralLB::LDStats* stats, int count)
   }
 }
 
+#include "RandCentLB.def.h"
 
 /*@}*/

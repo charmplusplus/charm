@@ -16,16 +16,7 @@
 
 #include "RefineCommLB.h"
 
-CreateLBFunc_Def(RefineCommLB);
-
-static void lbinit(void) {
-  LBRegisterBalancer("RefineCommLB", 
-                     CreateRefineCommLB, 
-                     AllocateRefineCommLB, 
-                     "Average load among processors by moving objects away from overloaded processor, communication aware");
-}
-
-#include "RefineCommLB.def.h"
+CreateLBFunc_Def(RefineCommLB, "Average load among processors by moving objects away from overloaded processor, communication aware");
 
 RefineCommLB::RefineCommLB(const CkLBOptions &opt): RefineLB(opt)
 {
@@ -77,5 +68,6 @@ void RefineCommLB::work(CentralLB::LDStats* stats, int count)
 #endif
 };
 
+#include "RefineCommLB.def.h"
 
 /*@}*/

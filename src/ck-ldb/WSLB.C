@@ -28,15 +28,7 @@
 #define VACATE_AFTER 30
 #define UNVACATE_AFTER 15
 
-CreateLBFunc_Def(WSLB);
-
-static void lbinit(void) {
-  LBRegisterBalancer("WSLB", 
-                     CreateWSLB, 
-		     AllocateWSLB, 
-                     "Workstation load balancer");
-}
-
+CreateLBFunc_Def(WSLB, "Workstation load balancer");
 
 void WSLB::staticMigrated(void* data, LDObjHandle h, int waitBarrier)
 {

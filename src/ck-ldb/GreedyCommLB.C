@@ -30,16 +30,7 @@ Status:
 #define alpha PER_MESSAGE_SEND_OVERHEAD  /*Startup time per message, seconds*/
 #define beeta PER_BYTE_SEND_OVERHEAD     /*Long-message time per byte, seconds*/
 
-CreateLBFunc_Def(GreedyCommLB);
-
-static void lbinit(void) {
-  LBRegisterBalancer("GreedyCommLB", 
-		     CreateGreedyCommLB, 
-		     AllocateGreedyCommLB, 
-		     "Greedy algorithm which takes communication graph into account");
-}
-
-#include "GreedyCommLB.def.h"
+CreateLBFunc_Def(GreedyCommLB, "Greedy algorithm which takes communication graph into account");
 
 #include "manager.h"
 
@@ -299,6 +290,7 @@ void GreedyCommLB::work(CentralLB::LDStats* _stats, int count)
     delete [] object_graph;
 }
 
+#include "GreedyCommLB.def.h"
 
 /*@}*/
 

@@ -16,16 +16,7 @@
 
 #include "RefineLB.h"
 
-CreateLBFunc_Def(RefineLB);
-
-static void lbinit(void) {
-  LBRegisterBalancer("RefineLB", 
-                     CreateRefineLB, 
-                     AllocateRefineLB, 
-                     "Move objects away from overloaded processor to reach average");
-}
-
-#include "RefineLB.def.h"
+CreateLBFunc_Def(RefineLB, "Move objects away from overloaded processor to reach average");
 
 RefineLB::RefineLB(const CkLBOptions &opt): CentralLB(opt)
 {
@@ -69,5 +60,7 @@ void RefineLB::work(CentralLB::LDStats* stats, int count)
   Refiner::FreeProcs(from_procs);
   Refiner::FreeProcs(to_procs);
 };
+
+#include "RefineLB.def.h"
 
 /*@}*/

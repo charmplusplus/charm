@@ -23,17 +23,7 @@
 #define PER_MESSAGE_RECV_OVERHEAD   0.0
 #define PER_BYTE_RECV_OVERHEAD      0.0
 
-CreateLBFunc_Def(NeighborCommLB);
-
-static void lbinit(void) {
-//  LBSetDefaultCreate(CreateNeighborCommLB);
-  LBRegisterBalancer("NeighborCommLB", 
-                     CreateNeighborCommLB, 
-                     AllocateNeighborCommLB, 
-                     "The neighborhood load balancer with communication");
-}
-
-#include "NeighborCommLB.def.h"
+CreateLBFunc_Def(NeighborCommLB, "The neighborhood load balancer with communication");
 
 NeighborCommLB::NeighborCommLB(const CkLBOptions &opt):NborBaseLB(opt)
 {
@@ -319,5 +309,6 @@ bool _lb_debug2=0;
 #endif
 };
 
+#include "NeighborCommLB.def.h"
 
 /*@}*/

@@ -14,6 +14,8 @@
  status:
   * support processor avail bitvector
   * support nonmigratable attrib
+      nonmigratable object load is added to its processor's background load
+      and the nonmigratable object is not taken in the objData array
 */
 
 #include <charm++.h>
@@ -22,16 +24,7 @@
 #include "cklists.h"
 #include "GreedyLB.h"
 
-CreateLBFunc_Def(GreedyLB);
-
-static void lbinit(void) {
-  LBRegisterBalancer("GreedyLB", 
-                     CreateGreedyLB, 
-                     AllocateGreedyLB, 
-                     "always assign the heaviest obj onto lightest loaded processor.");
-}
-
-#include "GreedyLB.def.h"
+CreateLBFunc_Def(GreedyLB, "always assign the heaviest obj onto lightest loaded processor.");
 
 GreedyLB::GreedyLB(const CkLBOptions &opt): CentralLB(opt)
 {
@@ -238,7 +231,7 @@ void GreedyLB::work(CentralLB::LDStats* stats, int count)
   delete [] objData;
 }
 
-
+#include "GreedyLB.def.h"
 
 /*@}*/
 

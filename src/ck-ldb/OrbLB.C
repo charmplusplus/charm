@@ -23,13 +23,7 @@
 
 //#define DEBUG
 
-CreateLBFunc_Def(OrbLB);
-
-static void lbinit(void) {
-  LBRegisterBalancer("OrbLB", CreateOrbLB, AllocateOrbLB, "partition objects based on coordinates");
-}
-
-#include "OrbLB.def.h"
+CreateLBFunc_Def(OrbLB, "partition objects based on coordinates");
 
 OrbLB::OrbLB(const CkLBOptions &opt): CentralLB(opt)
 {
@@ -477,7 +471,6 @@ void OrbLB::work(CentralLB::LDStats* stats, int count)
 #endif
 }
 
-
-
+#include "OrbLB.def.h"
 
 /*@}*/

@@ -46,14 +46,7 @@ extern "C" {
 
 
 
-CreateLBFunc_Def(RecBisectBfLB);
-
-static void lbinit(void) {
-//        LBSetDefaultCreate(CreateRecBisectBfLB);
-  LBRegisterBalancer("RecBisectBfLB", CreateRecBisectBfLB, AllocateRecBisectBfLB, "Recursive partitioning with Breadth first enumeration");
-}
-
-#include "RecBisectBfLB.def.h"
+CreateLBFunc_Def(RecBisectBfLB, "Recursive partitioning with Breadth first enumeration");
 
 RecBisectBfLB::RecBisectBfLB(const CkLBOptions &opt): CentralLB(opt)
 {
@@ -332,5 +325,6 @@ void RecBisectBfLB::recursivePartition(int numParts, Graph *g,
   }  
 }
 
+#include "RecBisectBfLB.def.h"
 
 /*@}*/

@@ -259,7 +259,7 @@ void _loadbalancerInit()
       CkPrintf("LB> Topology %s\n", _lbtopo);
     }
     if (_lb_args.ignoreBgLoad())
-      CmiPrintf("LB> Load balancer only balance migratable object.\n");
+      CmiPrintf("LB> Load balancer ignores processor background load.\n");
     if (_lb_args.samePeSpeed())
       CmiPrintf("LB> Load balancer assumes all CPUs are same.\n");
     if (_lb_args.useCpuTime())

@@ -16,14 +16,7 @@
 
 #include "MetisLB.h"
 
-CreateLBFunc_Def(MetisLB);
-
-static void lbinit(void) {
-//        LBSetDefaultCreate(CreateMetisLB);
-  LBRegisterBalancer("MetisLB", CreateMetisLB, AllocateMetisLB, "Use Metis(tm) to partition object graph");
-}
-
-#include "MetisLB.def.h"
+CreateLBFunc_Def(MetisLB, "Use Metis(tm) to partition object graph");
 
 MetisLB::MetisLB(const CkLBOptions &opt): CentralLB(opt)
 {
@@ -301,5 +294,7 @@ void MetisLB::work(CentralLB::LDStats* stats, int count)
   if(newmap != origmap)
     delete[] newmap;
 }
+
+#include "MetisLB.def.h"
 
 /*@}*/

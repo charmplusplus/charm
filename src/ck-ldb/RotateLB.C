@@ -16,20 +16,8 @@
 
 #include "RotateLB.h"
 
-CreateLBFunc_Def (RotateLB);
 
-
-/**************************************************************************
-**
-*/
-static void lbinit (void)
-{
-  LBRegisterBalancer ("RotateLB",
-		      CreateRotateLB,
-		      AllocateRotateLB,
-		      "Rotate each object to the next higher PE");
-}
-
+CreateLBFunc_Def (RotateLB, "Rotate each object to the next higher PE");
 
 /**************************************************************************
 **
