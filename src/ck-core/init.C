@@ -558,7 +558,7 @@ void _initCharm(int unused_argc, char **argv)
 #endif
 	{
 		CpvAccess(_qd) = new QdState();
-#ifndef CMK_CPV_IS_SMP
+#if !defined(CMK_CPV_IS_SMP) && !CMK_SHARED_VARS_UNIPROCESSOR
 		CpvAccessOther(_qd, 1) = new QdState(); // for i/o interrupt
 #endif
         }
