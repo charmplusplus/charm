@@ -111,10 +111,18 @@ void GenerateStructsFns(ofstream& top, ofstream& bot)
     }
 
     for (e=c->entries; e!=NULL; e=e->next ) {
-      sprintf(str,"extern int _CK_ep_%s_%s;",c->name,e->name) ;
+      if(e->isMessage()) {
+        sprintf(str,"extern int _CK_ep_%s_%s_%s;",c->name,e->name,e->msgtype->name) ;
+      } else {
+        sprintf(str,"extern int _CK_ep_%s_%s;",c->name,e->name) ;
+      }
       top << str << endl ;
       if (!c->isExtern()) {
-        sprintf(str,"int _CK_ep_%s_%s = _CK_%s_id[0] ;",c->name,e->name,thismodule->name) ;
+        if(e->isMessage()) {
+          sprintf(str,"int _CK_ep_%s_%s_%s = _CK_%s_id[0] ;",c->name,e->name,e->msgtype->name,thismodule->name) ;
+        } else {
+          sprintf(str,"int _CK_ep_%s_%s = _CK_%s_id[0] ;",c->name,e->name,thismodule->name) ;
+        }
         bot << str << endl ;
       }
     } // endfor e
@@ -144,8 +152,13 @@ void GenerateStructsFns(ofstream& top, ofstream& bot)
 
       // Is this a threaded EP
       if (e->isThreaded()){
-        sprintf(str,"void _CK_call_threaded_%s_%s(void *velt)",
-          c->name,e->name);
+        if(e->isMessage()) {
+          sprintf(str,"void _CK_call_threaded_%s_%s_%s(void *velt)",
+            c->name,e->name,e->msgtype->name);
+        } else {
+          sprintf(str,"void _CK_call_threaded_%s_%s(void *velt)",
+            c->name,e->name);
+        }
         bot << str << endl ;
         bot << "{" << endl ;
         bot << "\tElement *elt = (Element *) velt;" << endl;
@@ -160,8 +173,13 @@ void GenerateStructsFns(ofstream& top, ofstream& bot)
         bot << "\tCthSuspend();" << endl;
         bot << "}" << endl ;
 
-        sprintf(str,"void _CK_call_%s_%s(void *m, void *obj)",
-          c->name,e->name);
+        if(e->isMessage()) {
+          sprintf(str,"void _CK_call_%s_%s_%s(void *m, void *obj)",
+            c->name,e->name,e->msgtype->name);
+        } else {
+          sprintf(str,"void _CK_call_%s_%s(void *m, void *obj)",
+            c->name,e->name);
+        }
         bot << str << endl ;
         bot << "{" << endl ;
         bot << "\tCthThread t;" << endl;
@@ -171,9 +189,15 @@ void GenerateStructsFns(ofstream& top, ofstream& bot)
         bot << "\telement->chareblock = CpvAccess(currentChareBlock) ;"
             << endl;
 
-        sprintf(str,
-          "\tt = CthCreate( (CthVoidFn) _CK_call_threaded_%s_%s, (void *) element,%d);",
-          c->name,e->name,e->get_stackSize()) ;
+        if(e->isMessage()) {
+          sprintf(str,
+            "\tt = CthCreate( (CthVoidFn) _CK_call_threaded_%s_%s_%s, (void *) element,%d);",
+            c->name,e->name,e->msgtype->name,e->get_stackSize()) ;
+        } else {
+          sprintf(str,
+            "\tt = CthCreate( (CthVoidFn) _CK_call_threaded_%s_%s, (void *) element,%d);",
+            c->name,e->name,e->get_stackSize()) ;
+        }
         bot << str << endl;
         bot << "\tCthSetStrategyDefault(t);" << endl;
         bot << "\tCthAwaken(t);" << endl;
@@ -181,8 +205,13 @@ void GenerateStructsFns(ofstream& top, ofstream& bot)
         bot << "}" << endl ;
 
       } else { // NOT threaded
-        sprintf(str,"void _CK_call_%s_%s(void *m, void *obj)",
-          c->name,e->name);
+        if(e->isMessage()) {
+          sprintf(str,"void _CK_call_%s_%s_%s(void *m, void *obj)",
+            c->name,e->name,e->msgtype->name);
+        } else {
+          sprintf(str,"void _CK_call_%s_%s(void *m, void *obj)",
+            c->name,e->name);
+        }
         bot << str << endl ;
         bot << "{" << endl ;
 
@@ -356,14 +385,27 @@ void GenerateRegisterCalls(ofstream& top, ofstream& bot)
 
     for  ( Entry *ep=chare->entries; ep!=NULL; ep=ep->next ) {
 
-      if ( chare->chareboc == CHARE ) 
-        sprintf(str,
-         "_CK_ep_%s_%s = registerEp(\"%s\", (FUNCTION_PTR)&_CK_call_%s_%s, 1,",
-         chare->name, ep->name, ep->name, chare->name,ep->name) ;
-      else
-       sprintf(str,
-       "_CK_ep_%s_%s = registerBocEp(\"%s\", (FUNCTION_PTR)&_CK_call_%s_%s, 1,",
-         chare->name, ep->name, ep->name, chare->name,ep->name) ;
+      if ( chare->chareboc == CHARE ) {
+        if(ep->isMessage()) {
+          sprintf(str,
+           "_CK_ep_%s_%s_%s = registerEp(\"%s\", (FUNCTION_PTR)&_CK_call_%s_%s_%s, 1,",
+           chare->name, ep->name, ep->msgtype->name, ep->name, chare->name,ep->name,ep->msgtype->name) ;
+        } else {
+          sprintf(str,
+           "_CK_ep_%s_%s = registerEp(\"%s\", (FUNCTION_PTR)&_CK_call_%s_%s, 1,",
+           chare->name, ep->name, ep->name, chare->name,ep->name) ;
+        }
+      } else {
+       if(ep->isMessage()) {
+         sprintf(str,
+         "_CK_ep_%s_%s_%s = registerBocEp(\"%s\", (FUNCTION_PTR)&_CK_call_%s_%s_%s, 1,",
+           chare->name, ep->name, ep->msgtype->name, ep->name, chare->name,ep->name, ep->msgtype->name) ;
+       } else {
+         sprintf(str,
+         "_CK_ep_%s_%s = registerBocEp(\"%s\", (FUNCTION_PTR)&_CK_call_%s_%s, 1,",
+           chare->name, ep->name, ep->name, chare->name,ep->name) ;
+       }
+      }
 
       bot << str ;
 
