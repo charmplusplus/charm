@@ -116,7 +116,8 @@ CmiStartFn mymain()
   return 0;
 }
 
-main(int argc,char *argv[])
+int main(int argc,char *argv[])
 {
   ConverseInit(argc,argv,(CmiStartFn)mymain,0,0);
+  return 0;
 }
