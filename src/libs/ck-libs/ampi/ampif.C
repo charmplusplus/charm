@@ -135,6 +135,7 @@ FDECL {
 #define mpi_migrate FTN_NAME( MPI_MIGRATE , mpi_migrate )
 #define mpi_setmigratable FTN_NAME (MPI_SETMIGRATABLE , mpi_setmigratable )
 #define mpi_checkpoint FTN_NAME( MPI_CHECKPOINT , mpi_checkpoint )
+#define mpi_memcheckpoint FTN_NAME( MPI_MEMCHECKPOINT , mpi_memcheckpoint )
 
 /* MPI-2 */
 #define mpi_type_get_envelope FTN_NAME ( MPI_TYPE_GET_ENVELOPE , mpi_type_get_envelope )
@@ -796,6 +797,10 @@ void mpi_get_userdata(int* dn, void *data)
 
 void mpi_checkpoint(char *dname){
   AMPI_Checkpoint(dname);
+}
+
+void mpi_memcheckpoint(){
+  AMPI_MemCheckpoint();
 }
 
 void mpi_comm_remote_size(int *comm, int *size, int *ierr){
