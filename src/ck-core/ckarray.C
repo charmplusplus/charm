@@ -825,6 +825,7 @@ void CProxy_ArrayBase::ckBroadcast(CkArrayMessage *msg, int ep) const
 	  ckDelegatedTo()->ArrayBroadcast(ep,msg,_aid);
 	else 
 	{ //Broadcast message via serializer node
+	  _TRACE_CREATION_DETAILED(UsrToEnv(msg), ep);
 	  int serializer=0;//1623802937%CkNumPes();
 	  if (CkMyPe()==serializer)
 	  {
