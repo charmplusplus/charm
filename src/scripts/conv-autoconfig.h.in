@@ -42,6 +42,9 @@
 /* Allows gcc x86 assembly. */
 #undef CMK_GCC_X86_ASM
 
+/* whether PAPI exists */
+#undef CMK_HAS_COUNTER_PAPI
+
 /* wether has elf.h */
 #undef CMK_HAS_ELF_H
 

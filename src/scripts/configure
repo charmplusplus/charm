@@ -1811,6 +1811,24 @@ cat >>confdefs.h <<_ACEOF
 _ACEOF
 
 
+#### check if PAPI exists ####
+cat > $t <<EOT
+#include <stdio.h>
+#include <papi.h>
+
+int main() {
+    int Events[2] = { PAPI_TOT_CYC, PAPI_FP_INS };
+    if (PAPI_start_counters(Events, 2) != PAPI_OK) return 1;
+    return 0;
+}
+EOT
+test_link "whether PAPI exists" "yes" "no" "-lpapi"
+
+cat >>confdefs.h <<_ACEOF
+#define CMK_HAS_COUNTER_PAPI $pass
+_ACEOF
+
+
 #### test if it can build shared library ####
 cat > $t <<EOT
 extern int foo();

@@ -497,6 +497,20 @@ EOT
 test_cxx "whether has stdint.h " "yes" "no" ""
 AC_DEFINE_UNQUOTED(CMK_HAS_STDINT_H, $pass, [whether has stdint.h])
 
+#### check if PAPI exists ####
+cat > $t <<EOT
+#include <stdio.h>
+#include <papi.h>
+                                                                                
+int main() {
+    int Events[[2]] = { PAPI_TOT_CYC, PAPI_FP_INS };
+    if (PAPI_start_counters(Events, 2) != PAPI_OK) return 1;
+    return 0;
+}
+EOT
+test_link "whether PAPI exists" "yes" "no" "-lpapi"
+AC_DEFINE_UNQUOTED(CMK_HAS_COUNTER_PAPI, $pass, [whether PAPI exists])
+
 #### test if it can build shared library ####
 cat > $t <<EOT
 extern int foo();
