@@ -4,13 +4,14 @@
 
 #define MAX_STREAMING_MESSAGE_SIZE 2048*2
 
-
 class StreamingStrategy : public CharmStrategy {
  protected:
     CkQ<CharmMessageHolder *> *streamingMsgBuf;
     int *streamingMsgCount;
     int PERIOD, bufferMax;
     CmiBool shortMsgPackingFlag, idleFlush;
+
+    int streaming_handler_id; //Getting rid of multiple send
 
     /// Flush all messages destined for this processor:
     void flushPE(int destPE);

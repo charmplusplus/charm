@@ -1,21 +1,33 @@
+
 //Broadcast strategy for charm++ programs using the net version
-//This stategy will wonly work for groups.
 //This strategy implements a tree based broadcast
-//I will extent it for arrays later.
 //Developed by Sameer Kumar 04/10/04
 
+//Extend for array sections later
+
 #include "BroadcastStrategy.h"
+#include "ComlibManager.h"
 
 CkpvExtern(CkGroupID, cmgrID);
 extern int sfactor;
 
 static void recv_bcast_handler(void *msg) {
-    int instid = CmiGetXHandler(msg);
+    CmiMsgHeaderExt *conv_header = (CmiMsgHeaderExt *) msg;
+    int instid = conv_header->stratid;
+
     BroadcastStrategy *bstrat = (BroadcastStrategy *)
         CProxy_ComlibManager(CkpvAccess(cmgrID)).ckLocalBranch()->getStrategy(instid);
     
     bstrat->handleMessage((char *)msg);    
 }
+
+
+//Initialize the hypercube variables
+void BroadcastStrategy::initHypercube() {
+    logp = log((double) CkNumPes())/log(2.0);
+    logp = ceil(logp);
+}
+
 
 //Constructor, 
 //Can read spanning factor from command line
@@ -25,18 +37,44 @@ BroadcastStrategy::BroadcastStrategy(int topology) :
     if(sfactor > 0)
         spanning_factor = sfactor;
     
+    setType(GROUP_STRATEGY);
+    initHypercube();
+}
+
+//Array Constructor
+//Can read spanning factor from command line
+BroadcastStrategy::BroadcastStrategy(CkArrayID aid, int topology) : 
+    CharmStrategy(), _topology(topology) {
+        
+    setType(ARRAY_STRATEGY);
+    ainfo.setDestinationArray(aid);
+    
+    spanning_factor = DEFAULT_BROADCAST_SPANNING_FACTOR;
+    if(sfactor > 0)
+        spanning_factor = sfactor;    
+
+    initHypercube();
+    //if(topology == USE_HYPERCUBE)
+    //  CkPrintf("Warning: hypercube only works on powers of two PES\n");
 }
 
 
 //Receives the message and sends it along the spanning tree.
 void BroadcastStrategy::insertMessage(CharmMessageHolder *cmsg){
-    CkPrintf("[%d] BROADCASTING\n", CkMyPe());
+    //CkPrintf("[%d] BROADCASTING\n", CkMyPe());
 
     char *msg = cmsg->getCharmMessage();
-    if(_topology == USE_HYPERCUBE) {
-        envelope *env = UsrToEnv(msg);
-        env->setSrcPe(0);    
-    }
+
+    envelope *env = UsrToEnv(msg);
+    CmiMsgHeaderExt *conv_header = (CmiMsgHeaderExt *) env;
+
+    conv_header->root = 0;        //Use root later
+    if(_topology == USE_HYPERCUBE) 
+        conv_header->xhdl = 0;
+    else
+        //conv_header->root = CkMyPe();
+        conv_header->xhdl = CkMyPe();
+    
     handleMessage((char *)UsrToEnv(msg));
     
     delete cmsg;
@@ -63,13 +101,16 @@ void BroadcastStrategy::handleMessage(char *msg) {
 void BroadcastStrategy::handleTree(char *msg){
     
     envelope *env = (envelope *)msg;
-    int startpe = env->getSrcPe();
+    CmiMsgHeaderExt *conv_header = (CmiMsgHeaderExt *) msg;
+
+    int startpe = conv_header->xhdl;
     int size = env->getTotalsize();
     
     CkAssert(startpe>=0 && startpe < CkNumPes());
     
     CmiSetHandler(msg, handlerId);
-    CmiSetXHandler(msg, getInstance());    
+    
+    conv_header->stratid = getInstance();
     
     //Sending along the spanning tree
     //Gengbins tree building code stolen from the MPI machine layer    
@@ -92,47 +133,68 @@ void BroadcastStrategy::handleTree(char *msg){
         CmiSyncSend(p, size, msg);
     }
 
-    CkSendMsgBranch(env->getEpIdx(), EnvToUsr(env), CkMyPe(), 
-                    env->getGroupNum());
+    if(getType() == GROUP_STRATEGY)
+        CkSendMsgBranch(env->getEpIdx(), EnvToUsr(env), CkMyPe(), 
+                        env->getGroupNum());
+    else if(getType() == ARRAY_STRATEGY)
+        ainfo.localBroadcast(env);        
 }
 
 
 void BroadcastStrategy::handleHypercube(char *msg){
     envelope *env = (envelope *)msg;
-    int curcycle = env->getSrcPe();
+
+    CmiMsgHeaderExt *conv_header = (CmiMsgHeaderExt *) msg;
+    //int curcycle = conv_header->root;
+    int curcycle = conv_header->xhdl;
+
     int i;
     int size = env->getTotalsize();
-    
-    double logp = CkNumPes();
-    logp = log(logp)/log(2.0);
-    logp = ceil(logp);
-    
+        
     //CkPrintf("In hypercube %d, %d\n", (int)logp, curcycle); 
     
     /* assert(startpe>=0 && startpe<_Cmi_numpes); */
     CmiSetHandler(msg, handlerId);
-    CmiSetXHandler(msg, getInstance());    
+
+    conv_header->stratid = getInstance();
+
+    //Copied from system hypercube message passing
 
     for (i = logp - curcycle - 1; i >= 0; i--) {
         int p = CkMyPe() ^ (1 << i);
 
         int newcycle = ++curcycle;
         //CkPrintf("%d --> %d, %d\n", CkMyPe(), p, newcycle); 
+        
+        //conv_header->root = newcycle;
+        conv_header->xhdl = newcycle;
 
-        env->setSrcPe(newcycle);
-        if(p < CkNumPes()) {
-            CmiSyncSendFn(p, size, msg);
-        }
+        if(p >= CkNumPes()) {
+            p &= (-1) << i;
+            
+            //loadbalancing
+            if (p < CkNumPes())
+                p += (CkMyPe() - 
+                      (CkMyPe() & ((-1) << i))) % (CkNumPes() - p);
+        }     
+        
+        if(p < CkNumPes())
+            CmiSyncSendFn(p, size, msg);                    
     }
-
-    CkSendMsgBranch(env->getEpIdx(), EnvToUsr(env), CkMyPe(), 
-                    env->getGroupNum());
+    
+    if(getType() == GROUP_STRATEGY)
+        CkSendMsgBranch(env->getEpIdx(), EnvToUsr(env), CkMyPe(), 
+                        env->getGroupNum());
+    else if(getType() == ARRAY_STRATEGY)
+        ainfo.localBroadcast(env);        
 }
 
 
 //Pack the group id and the entry point of the user message
 void BroadcastStrategy::pup(PUP::er &p){
-    Strategy::pup(p);    
+    CharmStrategy::pup(p);    
+
     p | spanning_factor;
     p | _topology;
+    p | logp;
 }

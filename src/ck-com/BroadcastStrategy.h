@@ -13,15 +13,21 @@
 
 class BroadcastStrategy : public CharmStrategy {
 
-    int handlerId;
-    int spanning_factor;
-    int _topology;
+    int _topology;         //Topology to use Tree or Hypercube
+
+    int handlerId;          //broadcast handler id
+    int spanning_factor;    //the spanning factor of the tree
+
+    double logp;       //ceil of log of number of processors
+
+    void initHypercube();      
 
     void handleTree(char *msg);
-    void handleHypercube(char *msg);
+    void handleHypercube(char *msg);    
 
  public:
     BroadcastStrategy(int topology = USE_HYPERCUBE);
+    BroadcastStrategy(CkArrayID aid, int topology = USE_HYPERCUBE);
     BroadcastStrategy(CkMigrateMessage *){}
     void insertMessage(CharmMessageHolder *msg);
     void doneInserting();
