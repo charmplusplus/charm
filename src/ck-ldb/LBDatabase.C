@@ -103,13 +103,13 @@ LBDBInit::LBDBInit(CkArgMsg *m)
   // NullLB is the default
   if (!lbFn) lbFn = CreateNullLB;
   (lbFn)();
-#endif
-  delete m;
 
   if (CkpvAccess(doSimulation)) {
     CmiPrintf("Charm++> Entering Load Balancer Simulation Mode ... \n");
     CProxy_LBDatabase(lbdb).ckLocalBranch()->StartLB();
   }
+#endif
+  delete m;
 }
 
 void _loadbalancerInit()
