@@ -12,6 +12,8 @@
 #include "ampiEvents.h" /*** for trace generation for projector *****/
 #include "ampiProjections.h"
 
+#define CART_TOPOL 1
+
 /* change this define to "x" to trace all send/recv's */
 #define MSG_ORDER_DEBUG(x) /* empty */
 #define STARTUP_DEBUG(x) /* ckout<<"[pe "<<CkMyPe()<<"] "<< x <<endl; */
@@ -547,6 +549,10 @@ TCharm *ampiParent::registerAmpi(ampi *ptr,ampiCommStruct s,bool forMigration)
        splitChildRegister(s);
      } else if (isGroup(comm)) {
        groupChildRegister(s);
+     } else if (isCart(comm)) {
+       cartChildRegister(s);
+     } else if (isGraph(comm)) {
+       graphChildRegister(s);
      }else
        CkAbort("ampiParent recieved child with bad communicator");
   }
@@ -670,8 +676,22 @@ public:
 		:nextSplitComm(nextSplitComm_), color(color_), key(key_), rank(rank_) {}
 };
 
-void ampi::split(int color,int key,MPI_Comm *dest)
+/* "type" may indicate whether call is for a cartesian topology etc. */
+
+void ampi::split(int color,int key,MPI_Comm *dest, int type)
 {
+  if (type == CART_TOPOL) {
+	ampiSplitKey splitKey(parent->getNextCart(),color,key,getRank());
+	int rootIdx=myComm.getIndexForRank(0);
+	CkCallback cb(CkIndex_ampi::splitPhase1(0),CkArrayIndex1D(rootIdx),myComm.getProxy());
+	contribute(sizeof(splitKey),&splitKey,CkReduction::concat,cb);
+
+	thread->suspend(); //Resumed by ampiParent::cartChildRegister
+	MPI_Comm newComm=parent->getNextCart()-1;
+	*dest=newComm;
+
+  }
+  else {
 	ampiSplitKey splitKey(parent->getNextSplit(),color,key,getRank());
 	int rootIdx=myComm.getIndexForRank(0);
 	CkCallback cb(CkIndex_ampi::splitPhase1(0),CkArrayIndex1D(rootIdx),myComm.getProxy());
@@ -680,6 +700,8 @@ void ampi::split(int color,int key,MPI_Comm *dest)
 	thread->suspend(); //Resumed by ampiParent::splitChildRegister
 	MPI_Comm newComm=parent->getNextSplit()-1;
 	*dest=newComm;
+  }
+
 }
 
 extern "C" int compareAmpiSplitKey(const void *a_, const void *b_) {
@@ -806,6 +828,103 @@ void ampiParent::groupChildRegister(const ampiCommStruct &s) {
   groupComm[idx]=new ampiCommStruct(s);
   thread->resume(); //Matches suspend at end of ampi::split
 }
+
+/* Virtual topology communicator creation */
+
+void ampi::cartCreate(const groupStruct vec,MPI_Comm* newcomm){
+  int rootIdx=vec[0];
+  tmpVec = vec;
+  CkCallback cb(CkIndex_ampi::cartCreatePhase1(NULL),CkArrayIndex1D(rootIdx),myComm.getProxy());
+  
+  MPI_Comm nextcart = parent->getNextCart();
+  contribute(sizeof(nextcart), &nextcart,CkReduction::max_int,cb);
+  
+  if(getPosOp(thisIndex,vec)>=0){
+    thread->suspend(); //Resumed by ampiParent::cartChildRegister
+     MPI_Comm retcomm = parent->getNextCart()-1;
+     *newcomm = retcomm;
+  }else
+    *newcomm = MPI_COMM_NULL;
+}
+
+void ampi::cartCreatePhase1(CkReductionMsg *msg){
+  MPI_Comm *nextCartComm = (int *)msg->getData();
+  
+  CkArrayOptions opts;
+  opts.bindTo(parentProxy);
+  opts.setNumInitial(0);
+  CkArrayID unusedAID;
+  ampiCommStruct unusedComm;
+  CProxy_ampi newAmpi=CProxy_ampi::ckNew(unusedAID,unusedComm,opts);
+  newAmpi.doneInserting(); //<- Meaning, I need to do my own creation race resolution
+    
+  groupStruct indices = tmpVec;
+  ampiCommStruct newCommstruct = ampiCommStruct(*nextCartComm,newAmpi,indices.
+						size(),indices);
+  for(int i=0;i<indices.size();i++){
+    int newIdx=indices[i];
+    newAmpi[newIdx].insert(parentProxy,newCommstruct);
+  }
+  delete msg;
+}
+
+void ampiParent::cartChildRegister(const ampiCommStruct &s) {
+  int idx=s.getComm()-MPI_COMM_FIRST_CART;
+  if (cartComm.size()<=idx) {
+    cartComm.resize(idx+1);
+    cartComm.length()=idx+1;
+  }
+  cartComm[idx]=new ampiCommStruct(s);
+  thread->resume(); //Matches suspend at end of ampi::cartCreate
+}
+
+void ampi::graphCreate(const groupStruct vec,MPI_Comm* newcomm){
+  int rootIdx=vec[0];
+  tmpVec = vec;
+  CkCallback cb(CkIndex_ampi::graphCreatePhase1(NULL),CkArrayIndex1D(rootIdx),
+		myComm.getProxy());
+  MPI_Comm nextgraph = parent->getNextGraph();
+  contribute(sizeof(nextgraph), &nextgraph,CkReduction::max_int,cb);
+  
+  if(getPosOp(thisIndex,vec)>=0){
+    thread->suspend(); //Resumed by ampiParent::graphChildRegister
+    MPI_Comm retcomm = parent->getNextGraph()-1;
+    *newcomm = retcomm;
+  }else
+    *newcomm = MPI_COMM_NULL;
+}
+
+void ampi::graphCreatePhase1(CkReductionMsg *msg){
+  MPI_Comm *nextGraphComm = (int *)msg->getData();
+
+  CkArrayOptions opts;
+  opts.bindTo(parentProxy);
+  opts.setNumInitial(0);
+  CkArrayID unusedAID;
+  ampiCommStruct unusedComm;
+  CProxy_ampi newAmpi=CProxy_ampi::ckNew(unusedAID,unusedComm,opts);
+  newAmpi.doneInserting(); //<- Meaning, I need to do my own creation race resolution
+
+  groupStruct indices = tmpVec;
+  ampiCommStruct newCommstruct = ampiCommStruct(*nextGraphComm,newAmpi,indices
+						.size(),indices);
+  for(int i=0;i<indices.size();i++){
+    int newIdx=indices[i];
+    newAmpi[newIdx].insert(parentProxy,newCommstruct);
+  }
+  delete msg;
+}
+
+void ampiParent::graphChildRegister(const ampiCommStruct &s) {
+  int idx=s.getComm()-MPI_COMM_FIRST_GRAPH;
+  if (graphComm.size()<=idx) {
+    graphComm.resize(idx+1);
+    graphComm.length()=idx+1;
+  }
+  graphComm[idx]=new ampiCommStruct(s);
+  thread->resume(); //Matches suspend at end of ampi::graphCreate
+}
+
 
 //------------------------ communication -----------------------
 const ampiCommStruct &universeComm2proxy(MPI_Comm universeNo)
@@ -2140,7 +2259,7 @@ CDECL
 int MPI_Comm_split(int src,int color,int key,int *dest)
 {
   AMPIAPI("MPI_Comm_split");
-  getAmpiInstance(src)->split(color,key,dest);
+  getAmpiInstance(src)->split(color,key,dest, 0);
   return 0;
 }
 
@@ -2490,6 +2609,435 @@ void FTN_NAME(MPI_REGISTER_MAIN,mpi_register_main)
   { // I'm responsible for building the TCHARM threads:
     ampiCreateMain(mainFn,name,nameLen);
   }
+}
+
+CDECL
+int MPI_Cart_map(MPI_Comm comm, int ndims, int *dims, int *periods,
+		 int *newrank) {
+  AMPIAPI("MPI_Cart_map");
+  
+  MPI_Comm_rank(comm, newrank);
+  
+  return 0;
+}
+
+CDECL
+int MPI_Graph_map(MPI_Comm comm, int nnodes, int *index, int *edges,
+		  int *newrank) {
+  AMPIAPI("MPI_Graph_map");
+  MPI_Comm_rank(comm, newrank);
+  
+  return 0;
+}
+
+CDECL
+int MPI_Cart_create(MPI_Comm comm_old, int ndims, int *dims, int *periods,
+                   int reorder, MPI_Comm *comm_cart) {
+  
+  AMPIAPI("MPI_Cart_create");
+  
+  /* Create new cartesian communicator. No attention is being paid to mapping
+     virtual processes to processors, which ideally should be handled by the
+     load balancer with input from virtual topology information.
+     
+     No reorder done here. reorder input is ignored, but still stored in the
+     communicator with other VT info.
+  */
+  
+  int newrank;
+  MPI_Cart_map(comm_old, ndims, dims, periods, &newrank);//no change in rank 
+
+  ampiParent *ptr = getAmpiParent();
+  groupStruct vec = ptr->group2vec(ptr->comm2group(comm_old));
+  getAmpiInstance(comm_old)->cartCreate(vec, comm_cart);
+  ampiCommStruct &c = ptr->getCart(*comm_cart);
+  c.setndims(ndims);
+  
+  CkPupBasicVec<int> dimsv;
+  CkPupBasicVec<int> periodsv;
+
+  for (int i = 0; i < ndims; i++) {
+    dimsv.push_back(dims[i]);
+    periodsv.push_back(periods[i]);
+    if ((periods[i] != 0) && (periods[i] != 1))
+      CkAbort("MPI_Cart_create: periods should be all booleans\n");
+  }
+
+  c.setdims(dimsv);
+  c.setperiods(periodsv);
+
+  return 0;
+}
+
+CDECL
+int MPI_Graph_create(MPI_Comm comm_old, int nnodes, int *index, int *edges,
+		     int reorder, MPI_Comm *comm_graph) {
+  AMPIAPI("MPI_Graph_create");
+  
+  /* No mapping done */
+  int newrank;
+  MPI_Graph_map(comm_old, nnodes, index, edges, &newrank);
+  
+  ampiParent *ptr = getAmpiParent();
+  groupStruct vec = ptr->group2vec(ptr->comm2group(comm_old));
+  getAmpiInstance(comm_old)->graphCreate(vec, comm_graph);
+  
+  ampiCommStruct &c = ptr->getGraph(*comm_graph);
+  c.setnvertices(nnodes);
+
+  CkPupBasicVec<int> index_;
+  CkPupBasicVec<int> edges_;
+
+  for (int i = 0; i < nnodes; i++)
+    index_.push_back(index[i]);
+  
+  c.setindex(index_);
+
+  for (int i = 0; i < index[nnodes - 1]; i++)
+    edges_.push_back(edges[i]);
+
+  c.setedges(edges_);
+
+  return 0;
+}
+
+CDECL
+int MPI_Topo_test(MPI_Comm comm, int *status) {
+  AMPIAPI("MPI_Topo_test");
+  
+  ampiParent *ptr = getAmpiParent();
+  
+  if (ptr->isCart(comm))
+    *status = MPI_CART;
+  else if (ptr->isGraph(comm))
+    *status = MPI_GRAPH;
+  else *status = MPI_UNDEFINED;
+  
+  return 0;
+}
+
+CDECL
+int MPI_Cartdim_get(MPI_Comm comm, int *ndims) {
+  AMPIAPI("MPI_Cartdim_get");
+
+  *ndims = getAmpiParent()->getCart(comm).getndims();
+
+  return 0;
+}
+
+CDECL
+int MPI_Cart_get(MPI_Comm comm, int maxdims, int *dims, int *periods, 
+		 int *coords){
+  int ndims;
+
+  AMPIAPI("MPI_Cart_get");
+
+  ampiCommStruct &c = getAmpiParent()->getCart(comm);
+  ndims = c.getndims();
+
+  CkPupBasicVec<int> dims_, periods_;
+   
+  int rank;
+
+  MPI_Comm_rank(comm, &rank);
+
+  dims_ = c.getdims();
+  periods_ = c.getperiods();
+  
+  for (int i = 0; i < maxdims; i++) {
+    dims[i] = dims_[i];
+    periods[i] = periods_[i];
+  }
+
+  for (int i = ndims - 1; i >= 0; i--) {
+    if (i < maxdims)
+      coords[i] = rank % dims_[i];
+    rank = (int) (rank / dims_[i]);
+  }
+
+  return 0;
+}
+
+CDECL
+int MPI_Cart_rank(MPI_Comm comm, int *coords, int *rank) {
+  AMPIAPI("MPI_Cart_rank");
+
+  ampiCommStruct &c = getAmpiParent()->getCart(comm);
+  int ndims = c.getndims();
+  CkPupBasicVec<int> dims = c.getdims();
+  CkPupBasicVec<int> periods = c.getperiods();
+
+  int prod = 1;
+  int r = 0;
+
+  for (int i = ndims - 1; i >= 0; i--) {
+    if ((coords[i] < 0) || (coords[i] >= dims[i]))
+      if (periods[i] == 1)
+	if (coords[i] > 0)
+	  coords[i] %= dims[i];
+	else 
+	  coords[i] += (((-coords[i] / dims[i]) + 1) * dims[i]) % dims[i];
+    r += prod * coords[i];
+    prod *= dims[i];
+  }
+
+  *rank = r;
+
+  return 0;
+}
+
+CDECL
+int MPI_Cart_coords(MPI_Comm comm, int rank, int maxdims, int *coords) {
+  AMPIAPI("MPI_Cart_coords");
+
+  ampiCommStruct &c = getAmpiParent()->getCart(comm);
+  int ndims = c.getndims();
+  CkPupBasicVec<int> dims = c.getdims();
+
+  for (int i = ndims - 1; i >= 0; i--) {
+    if (i < maxdims)
+      coords[i] = rank % dims[i];
+    rank = (int) (rank / dims[i]);
+  }
+  
+  return 0;
+}
+
+CDECL
+int MPI_Cart_shift(MPI_Comm comm, int direction, int disp, int *rank_source, 
+		   int *rank_dest) {
+  AMPIAPI("MPI_Cart_shift");
+  
+  ampiCommStruct &c = getAmpiParent()->getCart(comm);
+  int ndims = c.getndims();
+  CkPupBasicVec<int> dims = c.getdims();
+  CkPupBasicVec<int> periods = c.getperiods();
+  int coords[ndims];
+
+  MPI_Comm_rank(comm, rank_source);
+  MPI_Cart_coords(comm, *rank_source, ndims, coords);
+
+  if ((direction < 0) || (direction >= ndims))
+    CkAbort("MPI_Cart_shift: direction not within dimensions range");
+		       
+  coords[direction] += disp;
+  if (coords[direction] < 0)
+    if (periods[direction] == 1) {     
+      coords[direction] += dims[direction];
+      MPI_Cart_rank(comm, coords, rank_dest);
+    }
+    else 
+      *rank_dest = MPI_PROC_NULL;
+  else
+    MPI_Cart_rank(comm, coords, rank_dest);
+
+return 0;
+}
+
+CDECL
+int MPI_Graphdims_get(MPI_Comm comm, int *nnodes, int *nedges) {
+  AMPIAPI("MPI_Graphdim_get");
+
+  ampiCommStruct &c = getAmpiParent()->getGraph(comm);
+  *nnodes = c.getnvertices();
+  CkPupBasicVec<int> index = c.getindex();
+  *nedges = index[(*nnodes) - 1];
+  
+  return 0;
+}
+
+CDECL
+int MPI_Graph_get(MPI_Comm comm, int maxindex, int maxedges, int *index, 
+		  int *edges) {
+  AMPIAPI("MPI_Graph_get");
+
+  ampiCommStruct &c = getAmpiParent()->getGraph(comm);
+
+  CkPupBasicVec<int> index_ = c.getindex();
+  CkPupBasicVec<int> edges_ = c.getedges();
+
+  if (maxindex > index_.size())
+    maxindex = index_.size();
+
+  for (int i = 0; i < maxindex; i++)
+    index[i] = index_[i];
+
+  for (int i = 0; i < maxedges; i++)
+    edges[i] = edges_[i];
+
+  return 0;
+} 
+
+CDECL
+int MPI_Graph_neighbors_count(MPI_Comm comm, int rank, int *nneighbors) {
+  AMPIAPI("MPI_Graph_neighbors_count");
+
+  ampiCommStruct &c = getAmpiParent()->getGraph(comm);
+
+  CkPupBasicVec<int> index = c.getindex();
+
+  if ((rank >= index.size()) || (rank < 0))
+    CkAbort("MPI_Graph_neighbors_count: rank not within range");
+
+  if (rank == 0)
+    *nneighbors = index[rank];
+  else 
+    *nneighbors = index[rank] - index[rank - 1];
+
+  return 0;
+}
+
+CDECL
+int MPI_Graph_neighbors(MPI_Comm comm, int rank, int maxneighbors, 
+			int *neighbors) {
+  AMPIAPI("MPI_Graph_neighbors");
+
+  ampiCommStruct &c = getAmpiParent()->getGraph(comm);
+  CkPupBasicVec<int> index = c.getindex();
+  CkPupBasicVec<int> edges = c.getedges();
+  
+  int numneighbors = (rank == 0) ? index[rank] : index[rank] - index[rank - 1];
+  if (maxneighbors > numneighbors)
+    maxneighbors = numneighbors;
+
+  if (maxneighbors < 0)
+    CkAbort("MPI_Graph_neighbors: maxneighbors < 0");
+
+  if ((rank >= index.size()) || (rank < 0))
+    CkAbort("MPI_Graph_neighbors: rank not within range");
+
+  if (rank == 0)
+    for (int i = 0; i < maxneighbors; i++)
+      neighbors[i] = edges[i];
+
+  for (int i = 0; i < maxneighbors; i++)
+    neighbors[i] = edges[index[rank - 1] + i];
+
+  return 0;
+}
+
+/* Factorization code by Orion. Idea thrashed out by Orion and Prakash */
+ 
+/**
+  Return the integer "d'th root of n"-- the largest
+  integer r such that
+        r^d <= n
+*/
+int integerRoot(int n,int d) {
+        double epsilon=0.001; /* prevents roundoff in "floor" */
+        return (int)floor(pow(n+epsilon,1.0/d));
+}
+
+/**
+  Factorize "n" into "d" factors, stored in "dims[0..d-1]".
+  All the factors must be greater than or equal to m.
+  The factors are chosen so that they are all as near together
+  as possible (technically, chosen so that the increasing-size
+  ordering is lexicagraphically as large as possible).
+*/
+
+bool factors(int n, int d, int *dims, int m) {
+        if (d==1)
+        { /* Base case */
+                if (n>=m) { /* n is an acceptable factor */
+                        dims[0]=n;
+                        return true;
+                }
+        }
+        else { /* induction case */
+                int k_up=integerRoot(n,d);
+                for (int k=k_up;k>=m;k--)
+                if (n%k==0) { /* k divides n-- try it as a factor */
+                        dims[0]=k;
+                        if (factors(n/k,d-1,&dims[1],k))
+                                return true;
+                }
+        }
+        /* If we fall out here, there were no factors available */
+        return false;
+}
+
+CDECL
+int MPI_Dims_create(int nnodes, int ndims, int *dims) {
+  AMPIAPI("MPI_Dims_create");
+
+  int n, d, *pdims;
+
+  n = nnodes;
+  d = ndims;
+
+  for (int i = 0; i < ndims; i++)
+    if (dims[i] != 0)
+      if (n % dims[i] != 0)
+	CkAbort("MPI_Dims_Create: Value in dimensions array infeasible!");
+      else {
+	n = n / dims[i];
+	d--;
+      }
+  
+  pdims = (int *) malloc(sizeof(int) * d);
+  
+  if (!factors(n, d, pdims, 1))
+    CkAbort("MPI_Dims_Create: Factorization failed. Wonder why?");
+
+  int j = 0;
+  for (int i = 0; i < ndims; i++)
+    if (dims[i] == 0) {
+      dims[i] = pdims[j];
+      j++;
+    }
+	 
+  return 0;
+}
+
+/* Implemented with call to MPI_Comm_Split. Color and key are single integer
+   encodings of the lost and preserved dimensions, respectively, 
+   of the subgraphs.
+*/
+
+CDECL
+int MPI_Cart_sub(MPI_Comm comm, int *remain_dims, MPI_Comm *newcomm) {
+  AMPIAPI("MPI_Cart_sub");
+
+  int color, key, *coords, ndims, rank;
+  
+  MPI_Comm_rank(comm, &rank);
+  ampiCommStruct &c = getAmpiParent()->getCart(comm);
+  ndims = c.getndims();
+  CkPupBasicVec<int> dims = c.getdims();
+  int num_remain_dims = 0;
+
+  coords = (int *) malloc(sizeof(int) * ndims);
+  MPI_Cart_coords(comm, rank, ndims, coords);
+
+  for (int i = 0; i < ndims; i++)
+    if (remain_dims[i]) {
+      /* key single integer encoding*/
+      key = key * dims[i] + coords[i];
+      num_remain_dims++;
+    }
+    else
+      /* color */
+      color = color * dims[i] + coords[i];
+  
+  getAmpiInstance(comm)->split(color, key, newcomm, CART_TOPOL); 
+
+  ampiCommStruct &newc = getAmpiParent()->getCart(*newcomm);
+  newc.setndims(num_remain_dims);
+  CkPupBasicVec<int> dimsv;
+  CkPupBasicVec<int> periods = c.getperiods();
+  CkPupBasicVec<int> periodsv;
+
+  for (int i = 0; i < ndims; i++) 
+    if (remain_dims[i]) {
+      dimsv.push_back(dims[i]);
+      periodsv.push_back(periods[i]);
+    }
+  
+  newc.setdims(dimsv);
+  newc.setperiods(periodsv);
+
+  return 0;
 }
 
 void _registerampif(void)

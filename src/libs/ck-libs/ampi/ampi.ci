@@ -16,6 +16,9 @@ module ampi {
     entry void reduceResult(CkReductionMsg *m);
     entry void splitPhase1(CkReductionMsg *msg);
     entry void commCreatePhase1(CkReductionMsg *msg);
+    entry void cartCreatePhase1(CkReductionMsg *msg);
+    entry void graphCreatePhase1(CkReductionMsg *msg);
+
   };
   group ampiWorlds {
     entry ampiWorlds();

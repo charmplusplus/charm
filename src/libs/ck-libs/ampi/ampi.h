@@ -148,6 +148,9 @@ This is needed so we can call the routine as a new thread.
 #define MPI_BOR       11
 #define MPI_BXOR      12
 
+#define MPI_GRAPH 1
+#define MPI_CART 2
+
 /* This is one less than the system-tags defined in ampiimpl.h.
  * This is so that the tags used by the system dont clash with user-tags.
  * MPI standard requires this to be at least 2^15.
@@ -159,9 +162,10 @@ typedef int MPI_Group;
 
 #define MPI_COMM_FIRST_SPLIT (MPI_Comm)(1000000) /*Communicator from a "split"*/
 #define MPI_COMM_FIRST_GROUP (MPI_Comm)(2000000) /*Communicator from a process group*/
-#define MPI_COMM_FIRST_RESVD (MPI_Comm)(3000000) /*Communicator reserved for now*/
+#define MPI_COMM_FIRST_CART (MPI_Comm)(3000000) /*Communicator from a cartesian virtual topology*/
+#define MPI_COMM_FIRST_GRAPH (MPI_Comm)(4000000) /*Communicator from a generic graph virtual topology*/
+#define MPI_COMM_FIRST_RESVD (MPI_Comm)(5000000) /*Communicator reserved for now*/
 #define MPI_COMM_SELF (MPI_Comm)(7000000)
-
 #define MPI_COMM_WORLD (MPI_Comm)(8000000) /*Start of universe*/
 #define MPI_MAX_COMM_WORLDS 8
 extern MPI_Comm MPI_COMM_UNIVERSE[MPI_MAX_COMM_WORLDS];
@@ -361,22 +365,31 @@ int MPI_Comm_free(MPI_Comm *comm);
 /* MPI_Attr_delete */
 
 /***topologies***/
-/* MPI_Cart_create */
-/* MPI_Dims_create */
-/* MPI_Graph_create */
-/* MPI_Topo_test */
-/* MPI_Cartdim_get */
-/* MPI_Cart_get */
-/* MPI_Cart_rank */
-/* MPI_Cart_coords */
-/* MPI_Cart_shift */
-/* MPI_Cart_sub */
-/* MPI_Cart_map */
-/* MPI_Graphdims_get */
-/* MPI_Graph_get */
-/* MPI_Graph_neighbors_count */
-/* MPI_Graph_neighbors */
-/* MPI_Graph_map */
+
+int MPI_Cart_create(MPI_Comm comm_old, int ndims, int *dims, int *periods,
+		    int reorder, MPI_Comm *comm_cart);
+int MPI_Graph_create(MPI_Comm comm_old, int nnodes, int *index, int *edges,
+		     int reorder, MPI_Comm *comm_graph);
+int MPI_Topo_test(MPI_Comm comm, int *status);
+int MPI_Cart_map(MPI_Comm comm, int ndims, int *dims, int *periods,
+                 int *newrank);
+int MPI_Graph_map(MPI_Comm comm, int nnodes, int *index, int *edges,
+		  int *newrank);
+int MPI_Cartdim_get(MPI_Comm comm, int *ndims);
+int MPI_Cart_get(MPI_Comm comm, int maxdims, int *dims, int *periods,
+		 int *coords);
+int MPI_Cart_rank(MPI_Comm comm, int *coords, int *rank);
+int MPI_Cart_coords(MPI_Comm comm, int rank, int maxdims, int *coords);
+int MPI_Cart_shift(MPI_Comm comm, int direction, int disp, int *rank_source, 
+		   int *rank_dest);
+int MPI_Graphdims_get(MPI_Comm comm, int *nnodes, int *nedges);
+int MPI_Graph_get(MPI_Comm comm, int maxindex, int maxedges, int *index, 
+		  int *edges); 
+int MPI_Graph_neighbors_count(MPI_Comm comm, int rank, int *nneighbors);
+int MPI_Graph_neighbors(MPI_Comm comm, int rank, int maxneighbors, 
+			int *neighbors); 
+int MPI_Dims_create(int nnodes, int ndims, int *dims);
+int MPI_Cart_sub(MPI_Comm comm, int *remain_dims, MPI_Comm *newcomm);
 
 /***environment management***/
 int MPI_Get_processor_name(char *name, int *resultlen);

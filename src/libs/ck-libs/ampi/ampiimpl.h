@@ -23,6 +23,16 @@ class ampiCommStruct {
 	int size; //Number of processes in communicator
 	int isWorld; //1 if ranks are 0..size-1?
 	CkPupBasicVec<int> indices;  //indices[r] gives the array index for rank r
+	// cartesian virtual topology parameters
+	int ndims;
+	CkPupBasicVec<int> dims;
+	CkPupBasicVec<int> periods;
+	
+	// graph virtual topology parameters
+	int nvertices;
+	CkPupBasicVec<int> index;
+	CkPupBasicVec<int> edges;
+
 public:
 	ampiCommStruct(int ignored=0) {size=-1;isWorld=-1;}
 	ampiCommStruct(MPI_Comm comm_,const CkArrayID &id_,int size_)
@@ -60,12 +70,40 @@ public:
 
 	int getSize(void) const {return size;}
 
+	/* For cartesian topologies 
+	   Hack -- fix this
+	*/
+	inline int getndims() {return ndims;}
+	inline CkPupBasicVec<int> getdims() {return dims;}
+	inline CkPupBasicVec<int> getperiods() {return periods;}
+	
+	inline void setndims(int ndims_) {ndims = ndims_; }
+	inline void setdims(CkPupBasicVec<int> dims_) { dims = dims_; }
+	inline void setperiods(CkPupBasicVec<int> periods_) { periods = 
+								periods_; }
+
+	/* Similar hack for graph vt */
+	inline int getnvertices() {return nvertices;}
+	inline CkPupBasicVec<int> getindex() {return index;}
+	inline CkPupBasicVec<int> getedges() {return edges;}
+	
+	inline void setnvertices(int nvertices_) {nvertices = nvertices_; }
+	inline void setindex(CkPupBasicVec<int> index_) { index = index_; }
+	inline void setedges(CkPupBasicVec<int> edges_) { edges = 
+								edges_; }
+	
 	void pup(PUP::er &p) {
 		p|comm;
 		p|ampiID;
 		p|size;
 		p|isWorld;
 		p|indices;
+		p|ndims;
+		p|dims;
+		p|periods;
+		p|nvertices;
+		p|index;
+		p|edges;
 	}
 };
 PUPmarshall(ampiCommStruct);
@@ -552,6 +590,9 @@ class ampiParent : public CBase_ampiParent {
 
     CkPupPtrVec<ampiCommStruct> splitComm; //Communicators from MPI_Comm_split
     CkPupPtrVec<ampiCommStruct> groupComm; //Communicators from MPI_Comm_group
+    CkPupPtrVec<ampiCommStruct> cartComm;  //Communicators from MPI_Cart_create
+    CkPupPtrVec<ampiCommStruct> graphComm; //Communicators from MPI_Graph_create
+
     CkPupPtrVec<groupStruct> groups; // "Wild" groups that don't have a communicator
 
     inline int isSplit(MPI_Comm comm) const {
@@ -565,7 +606,7 @@ class ampiParent : public CBase_ampiParent {
     void splitChildRegister(const ampiCommStruct &s);
 
     inline int isGroup(MPI_Comm comm) const {
-      return (comm>=MPI_COMM_FIRST_GROUP && comm<MPI_COMM_FIRST_RESVD);
+      return (comm>=MPI_COMM_FIRST_GROUP && comm<MPI_COMM_FIRST_CART);
     }
     const ampiCommStruct &getGroup(MPI_Comm comm) {
       int idx=comm-MPI_COMM_FIRST_GROUP;
@@ -578,6 +619,10 @@ class ampiParent : public CBase_ampiParent {
       return (group>=0 && group<groups.size());
     }
 
+    void cartChildRegister(const ampiCommStruct &s);
+    
+    void graphChildRegister(const ampiCommStruct &s);
+    
 public:
     ampiParent(MPI_Comm worldNo_,CProxy_TCharm threads_,ComlibInstanceHandle comlib_);
     ampiParent(CkMigrateMessage *msg);
@@ -596,6 +641,29 @@ public:
     //Grab the next available split/group communicator
     MPI_Comm getNextSplit(void) const {return MPI_COMM_FIRST_SPLIT+splitComm.size();}
     MPI_Comm getNextGroup(void) const {return MPI_COMM_FIRST_GROUP+groupComm.size();}
+    MPI_Comm getNextCart(void) const {return MPI_COMM_FIRST_CART+cartComm.size
+();}
+    MPI_Comm getNextGraph(void) const {return MPI_COMM_FIRST_GRAPH+graphComm.size();}
+
+    inline int isCart(MPI_Comm comm) const {
+      return (comm>=MPI_COMM_FIRST_CART && comm<MPI_COMM_FIRST_GRAPH);
+    }
+    
+    ampiCommStruct &getCart(MPI_Comm comm) {
+      int idx=comm-MPI_COMM_FIRST_CART;
+      if (idx>=cartComm.size()) CkAbort("Bad cartesian communicator used");
+      return *cartComm[idx];
+    }
+    
+    inline int isGraph(MPI_Comm comm) const {
+      return (comm>=MPI_COMM_FIRST_GRAPH && comm<MPI_COMM_FIRST_RESVD);
+    }
+
+    ampiCommStruct &getGraph(MPI_Comm comm) {
+      int idx=comm-MPI_COMM_FIRST_GRAPH;
+      if (idx>=graphComm.size()) CkAbort("Bad graph communicator used");
+      return *graphComm[idx];
+    }
 
     void pup(PUP::er &p);
 
@@ -609,6 +677,8 @@ public:
       if (comm==worldNo) return worldStruct;
       if (isSplit(comm)) return getSplit(comm);
       if (isGroup(comm)) return getGroup(comm);
+      if (isCart(comm)) return getCart(comm);
+      if (isGraph(comm)) return getGraph(comm);
       return universeComm2proxy(comm);
     }
     inline ampi *comm2ampi(MPI_Comm comm) {
@@ -623,13 +693,21 @@ public:
          const ampiCommStruct &st=getGroup(comm);
 	 return st.getProxy()[thisIndex].ckLocal();
       }
+      if (isCart(comm)) {
+	const ampiCommStruct &st = getCart(comm);
+	return st.getProxy()[thisIndex].ckLocal();
+      }
+      if (isGraph(comm)) {
+	const ampiCommStruct &st = getGraph(comm);
+	return st.getProxy()[thisIndex].ckLocal();
+      }
       if (comm>MPI_COMM_WORLD) return worldPtr; //Use MPI_WORLD ampi for cross-world messages:
       CkAbort("Invalid communicator used!");
     }
 
     inline int hasComm(const MPI_Group group){
       MPI_Comm comm = (MPI_Comm)group;
-      return (comm==MPI_COMM_WORLD || comm==worldNo || isSplit(comm) || isGroup(comm));
+      return (comm==MPI_COMM_WORLD || comm==worldNo || isSplit(comm) || isGroup(comm) || isCart(comm) || isGraph(comm));
     }
     inline const groupStruct group2vec(MPI_Group group){
       if(hasComm(group))
@@ -706,6 +784,8 @@ class ampi : public CBase_ampi {
     void reduceResult(CkReductionMsg *m);
     void splitPhase1(CkReductionMsg *msg);
     void commCreatePhase1(CkReductionMsg *msg);
+    void cartCreatePhase1(CkReductionMsg *m);
+    void graphCreatePhase1(CkReductionMsg *m);
 
   public: // to be used by MPI_* functions
 
@@ -725,8 +805,10 @@ class ampi : public CBase_ampi {
     int iprobe(int t,int s,int comm,int *sts);
     void bcast(int root, void* buf, int count, int type,MPI_Comm comm);
     static void bcastraw(void* buf, int len, CkArrayID aid);
-    void split(int color,int key,MPI_Comm *dest);
+    void split(int color,int key,MPI_Comm *dest, int type);
     void commCreate(const groupStruct vec,MPI_Comm *newcomm);
+    void cartCreate(const groupStruct vec, MPI_Comm *newcomm);
+    void graphCreate(const groupStruct vec, MPI_Comm *newcomm);
 
     inline int getRank(void) const {return myRank;}
     inline int getSize(void) const {return myComm.getSize();}
