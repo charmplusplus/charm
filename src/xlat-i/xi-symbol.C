@@ -19,11 +19,12 @@ int fortranMode;
 // Make the name lower case
 char* fortranify(const char *s)
 {
-  char *retVal = new char[strlen(s)+1];
-  int i;
-  for(i = 0; i < strlen(s); i++)
+  int i, len = strlen(s);
+  char *retVal;
+  retVal = new char[len+1];
+  for(i = 0; i < len; i++)
     retVal[i] = tolower(s[i]);
-  retVal[strlen(s)+1] = 0;
+  retVal[len+1] = 0;
 
   return retVal;
 }
