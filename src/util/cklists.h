@@ -58,6 +58,14 @@ class CkQ : private CkNoncopyable {
       block[first] = elt;
       len++;
     }
+    // insert an element at pos.
+    void insert(int pos, const T &elt) {
+      while(len==blklen || pos>=blklen) _expand();
+      for (int i=len; i>pos; i--)
+        block[(i+first)%blklen] = block[(i-1+first)%blklen];
+      block[(pos+first)%blklen] = elt;
+      len++;
+    }
     //Peek at the n'th item from the queue
     T& operator[](size_t n) 
     {
