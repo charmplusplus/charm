@@ -501,8 +501,6 @@ void InitCallTable::enumerateInitCalls()
   for (i=0; i<initProcCalls.length(); i++) initProcCalls[i]();
 }
 
-extern int flag;
-
 void _initCharm(int unused_argc, char **argv)
 { 
 	int inCommThread = (CmiMyRank() == CmiMyNodeSize());
@@ -644,7 +642,6 @@ void _initCharm(int unused_argc, char **argv)
 
 	if(_doRestart){
 		_allStats = new Stats*[CkNumPes()];
-		flag = 0;
 		CkRestartMain(_restartDir);
 		_initDone();
 	}else if(CkMyPe()==0){

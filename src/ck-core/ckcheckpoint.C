@@ -19,7 +19,6 @@ More documentation goes here...
 #endif
 
 CkGroupID _sysChkptMgr;
-int flag;
 
 typedef struct _GroupInfo{
 	CkGroupID gID;
@@ -274,7 +273,7 @@ void CkRestartMain(const char* dirname){
 	PUP::fromDisk pGroups(fGroups);
 	for(i=0;i<numGroups;i++) {
 		CkGroupID gID = tmpInfo[i].gID;
-		CkpvAccess(_groupIDTable)->push_back(gID);
+		//CkpvAccess(_groupIDTable)->push_back(gID);
 		int eIdx = (tmpInfo[i].useDefCtor)?(tmpInfo[i].DefCtor):(tmpInfo[i].MigCtor);
 		void *m = CkAllocSysMsg();
 		envelope* env = UsrToEnv((CkMessage *)m);
