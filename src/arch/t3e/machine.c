@@ -465,6 +465,7 @@ ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
   McInit();
   CthInit(argv);
   ConverseCommonInit(argv);
+  for(argc=0;argv[argc];argc++);
   if (initret==0)
   {
     fn(argc,argv);
