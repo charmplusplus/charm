@@ -18,7 +18,7 @@
 
 extern int comm_debug;
 #if CMK_OPTIMIZE
-#define ComlibPrintf  (void)
+inline void ComlibPrintf(...) {}
 #else
 #define ComlibPrintf if(comm_debug) CmiPrintf
 #endif
