@@ -4,6 +4,7 @@ Performance statistics collection.
 Orion Sky Lawlor, olawlor@acm.org, 2004/8/18
 */
 #include <stdio.h>
+#include "converse.h"
 #include "stats.h"
 
 using stats::op_t;
@@ -17,7 +18,7 @@ stats::stats *stats::get(void)
 }
 
 // stats::swap support
-static op_t last_op=stats::op_null;
+static op_t last_op={stats::op_null};
 static double last_op_start=0;
 op_t stats::swap(op_t op)
 {
@@ -42,8 +43,13 @@ public:
 static stats::op_info_t op_info[stats::op_max];
 int stats::op_len;
 static op_t addOp(const stats::op_info_t &i) {
+	if (stats::op_len==stats::op_max) {
+		CmiAbort("Registered too many operations!\n");
+	}
 	op_info[stats::op_len]=i;
-	return stats::op_len++;
+	op_t ret;
+	ret.idx=stats::op_len++;
+	return ret;
 }
 
 op_t stats::time_op(const char *shortName,const char *desc_)
@@ -64,7 +70,7 @@ void stats::stats::print(FILE *f,const char *what,double scale,double thresh) co
 {
 	fprintf(f,"%s stats { \n",what);
 	for (int op=1;op<op_len;op++) 
-		if (t[op]*scale>thresh) {
+		if (t[op]*scale>0) {
 			double val=t[op]*scale;
 			op_info_t &i=op_info[op];
 			const char *units=i.units;

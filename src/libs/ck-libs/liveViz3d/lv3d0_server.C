@@ -10,6 +10,7 @@
 #include <map>
 #include <algorithm>
 #include "stats.h"
+#include "LBDatabase.h" /* for set_avail_vector */
 
 #include "lv3d0.decl.h" //For LV3D0_ViewMsg
 void _registerlv3d1(void);
@@ -222,6 +223,8 @@ public:
 	/// Send everything we're ready to send.
 	void progress(void) {
 		// printf("progress: bucket=%d\n",bucket_bytes);
+		if (CmiLongSendQueue(CmiNodeOf(masterProcessor),LV3D0_toMaster_bytesMax))
+			return; /* too many outstanding messages already! */
 		while ((!isEmpty()) && (bucket_bytes>0 || LV3D_disable_ship_throttle)) 
 		{
 			LV3D0_ViewMsg *v=extract(begin());
@@ -443,14 +446,45 @@ static stats::op_t op_time=stats::time_op("cmi.time","Elapsed wall-clock time");
 static stats::op_t op_unknown=stats::time_op("cmi.unknown","Unaccounted-for time");
 static stats::op_t op_idle=stats::time_op("cmi.idle","Time spent waiting for data");
 
+
+static CcsDelayedReply statsReply;
+
 /// Reduction handler, used to print statistics.
 static void printStats(void *rednMsg) {
 	CkReductionMsg *m=(CkReductionMsg *)rednMsg;
-	const stats::stats *s=(const stats::stats *)m->getData();
-	s->print(stdout,"total",1.0);
-	s->print(stdout,"per_second",1.0/s->t[op_time]);
-	s->print(stdout,"per_pe-second",1.0/(CkNumPes()*s->t[op_time]));
-	printf("\n");
+	
+	// FIXME: make stats::print return a std::string, instead
+	//  of this horrible "print to a file and read it back" business.
+	
+	char tmpFileName[100];
+	sprintf(tmpFileName,"/tmp/stats.%d.%d",CkMyPe(),(int)getpid());
+	FILE *f=fopen(tmpFileName,"w");
+	int len=0; void *buf=0;
+	if (f!=NULL) {
+		/* write stats to temp file */
+		const stats::stats *s=(const stats::stats *)m->getData();
+		s->print(f,"total",1.0);
+		s->print(f,"per_second",1.0/s->get(op_time));
+		s->print(f,"per_pe-second",1.0/(CkNumPes()*s->get(op_time)));
+		fclose(f);
+		
+		/* Read stats back */
+		f=fopen(tmpFileName,"r");
+		fseek(f,0,SEEK_END);
+		len=ftell(f);
+		buf=malloc(len);
+		fseek(f,0,SEEK_SET);
+		fread(buf,1,len,f);
+		fclose(f);
+		
+		/* print to screen */
+		write(1,buf,len);
+		printf("\n");
+	
+	}
+	unlink(tmpFileName);
+	CcsSendDelayedReply(statsReply,len,buf);
+	free(buf);
 	delete m;
 }
 
@@ -461,29 +495,47 @@ static void perfmanager_stats_idle(void *ptr,double timer)
 }
 
 class LV3D_PerfManager : public CBase_LV3D_PerfManager {
+	double startTime;
 public:
 	LV3D_PerfManager(void) {
 		zero();
 		CcdCallOnConditionKeep(CcdPROCESSOR_BEGIN_IDLE,perfmanager_stats_idle,0);
 		CcdCallOnConditionKeep(CcdPROCESSOR_END_IDLE,perfmanager_stats_idle,0);
+		
+		/* Don't let the load balancer move stuff onto node 0: */
+		char *bitmap=new char[CkNumPes()];
+		for (int i=0;i<CkNumPes();i++)
+			bitmap[i]=(i!=masterProcessor);
+		set_avail_vector(bitmap);
 	}
 	void zero(void) { /* zero out collected statistics */
 		stats::stats *s=stats::get();
 		stats::swap(op_unknown); // so unknown gets zerod out
 		s->zero();
 		s->add(1.0,op_pes);
-		s->add(stats::time(),op_time);
+		startTime=stats::time();
 		stats::swap(op_unknown);
 	}
 	void collect(void) { /* contribute current stats to reduction */
 		stats::stats *s=stats::get();
-		if (CkMyPe()==0) s->t[op_time]=stats::time()-s->t[op_time];
-		else s->t[op_time]=0;
+		if (CkMyPe()==0) s->set(stats::time()-startTime,op_time);
+		else s->set(0,op_time);
 		stats::swap(op_unknown);
 		contribute(sizeof(double)*stats::op_len,&s->t[0],CkReduction::sum_double,
 			CkCallback(printStats));
 		zero();
 	}
+	void traceOn(void) {
+		traceBegin();
+	}
+	void startBalance(void) {
+		LBClearLoads();
+		LBTurnInstrumentOn();
+	}
+	void doneBalance(void) {
+		LBTurnInstrumentOff();
+	}
+	void throttle(int throttleOn) { LV3D_disable_ship_throttle=!throttleOn; }
 };
 
 
@@ -611,14 +663,27 @@ extern "C" void LV3D0_flush(char *msg) {
 }
 
 /*
-"lv3d_balance" CCS handler:
-	Run load balancing.
+"lv3d_startbal" CCS handler:
+	Begin a load balancing phase.  Normally followed by 
+	some rendering, then an endbalance.
 */
-extern "C" void LV3D0_balance(char *msg) 
+extern "C" void LV3D0_startbalance(char *msg) 
 {
-	CkPrintf("CCS call to LV3D0_balance\n");
-	theMgr->doBalance();
+	CkPrintf("CCS call to LV3D0_startbalance\n");
+	perfMgr.startBalance();
 	CmiFree(msg);
+}
+/*
+"lv3d_endbal" CCS handler:
+	Go to sync.  Exactly one end must follow 
+	each startbalance call.
+*/
+extern "C" void LV3D0_endbalance(char *msg) 
+{
+	CkPrintf("CCS call to LV3D0_endbalance\n");
+	theMgr->doBalance();
+	perfMgr.doneBalance();
+	LV3D0_qd(msg); /* wait for quiescence */
 }
 
 /*
@@ -643,9 +708,19 @@ extern "C" void LV3D0_zero(char *msg)
 extern "C" void LV3D0_stats(char *msg) 
 {
 	CkPrintf("Printing statistics\n");
+	statsReply=CcsDelayReply();
 	perfMgr.collect();
 	CmiFree(msg);
 }
+/// lv3d_trace CCS handler: turn on tracing
+extern "C" void LV3D0_trace(char *msg) 
+{
+	CkPrintf("Tracing turned on\n");
+	perfMgr.traceOn();
+	CmiFree(msg);
+}
+extern "C" void LV3D0_throttle0(char *msg) { perfMgr.throttle(0); CmiFree(msg); }
+extern "C" void LV3D0_throttle1(char *msg) { perfMgr.throttle(1); CmiFree(msg); }
 
 /**
 Register for libsixty redraw requests.  This routine
@@ -662,10 +737,14 @@ void LV3D0_Init(LV3D_Universe *clientUniverse,LV3D_ServerMgr *mgr)
 	CcsRegisterHandler("lv3d_newViewpoint",(CmiHandler)LV3D0_newViewpoint);
 	CcsRegisterHandler("lv3d_getViews",(CmiHandler)LV3D0_getViews);
 	CcsRegisterHandler("lv3d_qd",(CmiHandler)LV3D0_qd);
-	CcsRegisterHandler("lv3d_balance",(CmiHandler)LV3D0_balance);
+	CcsRegisterHandler("lv3d_startbal",(CmiHandler)LV3D0_startbalance);
+	CcsRegisterHandler("lv3d_endbal",(CmiHandler)LV3D0_endbalance);
 	CcsRegisterHandler("lv3d_quit",(CmiHandler)LV3D0_quit);
 	CcsRegisterHandler("lv3d_zero",(CmiHandler)LV3D0_zero);
 	CcsRegisterHandler("lv3d_stats",(CmiHandler)LV3D0_stats);
+	CcsRegisterHandler("lv3d_trace",(CmiHandler)LV3D0_trace);
+	CcsRegisterHandler("lv3d_throttle0",(CmiHandler)LV3D0_throttle0);
+	CcsRegisterHandler("lv3d_throttle1",(CmiHandler)LV3D0_throttle1);
 	CProxy_LV3D0_Manager::ckNew();
 	perfMgr=CProxy_LV3D_PerfManager::ckNew();
 }
@@ -674,8 +753,8 @@ void LV3D0_Init(LV3D_Universe *clientUniverse,LV3D_ServerMgr *mgr)
  Per-processor initialization routine:
 */
 void LV3D0_ProcInit(void) {
-	LV3D0_toMaster_bytesPer=LV3D0_toMaster_bytesPer*2/CkNumPes();
-	LV3D0_toMaster_bytesMax=LV3D0_toMaster_bytesMax*2/CkNumPes();
+	LV3D0_toMaster_bytesPer=LV3D0_toMaster_bytesPer/CkNumPes();
+	LV3D0_toMaster_bytesMax=LV3D0_toMaster_bytesMax/CkNumPes();
 }
 void LV3D0_NodeInit(void) {
 	CkViewNodeInit();

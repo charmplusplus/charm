@@ -29,7 +29,10 @@ namespace stats {
 	/**
 	  Describes a particular operation, such as a kind of drawing.
 	*/
-	typedef unsigned int op_t;
+	class op_t {
+	public:
+		int idx;
+	};
 	
 	/// Can only define up to this many operations (to avoid dynamic allocation)
 	enum {op_null=0, op_max=100};
@@ -59,7 +62,11 @@ namespace stats {
 			for (int op=0;op<op_len;op++) t[op]=0.0;
 		}
 		/// Add this value to this accumulator.
-		void add(double val,op_t op) {t[op]+=val;}
+		void add(double val,op_t op) {t[op.idx]+=val;}
+
+		/// Look up the value in this accumulator.
+		double get(op_t op) const {return t[op.idx];}
+		void set(double val,op_t op) {t[op.idx]=val;}
 		
 		/// Add everything in this object, scaled by scale, to us.
 		void add(const stats &s,double scale=1.0) {

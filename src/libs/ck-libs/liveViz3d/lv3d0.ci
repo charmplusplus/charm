@@ -20,6 +20,10 @@ module lv3d0 {
 		entry LV3D_PerfManager(void);
 		entry void zero(void);
 		entry void collect(void);
+		entry void traceOn(void);
+		entry void startBalance(void);
+		entry void doneBalance(void);
+		entry void throttle(int throttleOn);
 	};
 	initproc void LV3D0_ProcInit(void);
 	initnode void LV3D0_NodeInit(void);
