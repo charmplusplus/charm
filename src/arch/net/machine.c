@@ -422,6 +422,9 @@ static int wait_readable(fd, sec) int fd; int sec;
  * host) and from the command-line arguments.  Once read in, it is never
  * modified.
  *
+ * There should be an option, such as "++tune atm" or something like
+ * that, which controls all the tuning parameters at once.
+ *
  *****************************************************************************/
 
 int           Cmi_numpes;    /* Total number of processors */
@@ -436,6 +439,13 @@ static int    Cmi_self_IP;
 static int    Cmi_host_port;
 static char   Cmi_host_IP_str[16];
 static char   Cmi_self_IP_str[16];
+
+static int    Cmi_max_dgram_size   = 2048;
+static int    Cmi_os_buffer_size   = 50000;
+static int    Cmi_window_size      = 50;
+static double Cmi_delay_retransmit = 0.050;
+static double Cmi_ack_delay        = 0.025;
+static int    Cmi_dgram_max_data   = 2040;
 
 static void parse_netstart()
 {
@@ -778,8 +788,6 @@ int node, nbr;
  *****************************************************************************/
 
 #define DGRAM_HEADER_SIZE 8
-#define DGRAM_MAX_DATA (CMK_DGRAM_MAX_SIZE - DGRAM_HEADER_SIZE)
-#define DGRAM_MAX_INTS (DGRAM_MAX_DATA / sizeof(int))
 #define DGRAM_MAGIC 0x1234
 
 #define CmiMsgHeaderSetLength(msg, len) (((int*)(msg))[2] = (len))
@@ -831,7 +839,7 @@ typedef struct ExplicitDgramStruct
   struct ExplicitDgramStruct *next;
   int  srcpe, rank, seqno;
   unsigned int  len;
-  unsigned char data[CMK_DGRAM_MAX_SIZE];
+  unsigned char data[1];
 }
 *ExplicitDgram;
 
@@ -862,10 +870,10 @@ typedef struct OtherNodeStruct
   int                      asm_fill;
   char                    *asm_msg;
   
-  ExplicitDgram            recv_window[CMK_DGRAM_WINDOW_SIZE];
+  ExplicitDgram           *recv_window;
   unsigned int             recv_next;
   
-  ImplicitDgram            send_window[CMK_DGRAM_WINDOW_SIZE];
+  ImplicitDgram           *send_window;
   void                    *send_queue;
   unsigned int             send_next;
 }
@@ -915,7 +923,8 @@ static OutgoingMsg   Cmi_freelist_outgoing;
 
 #define MallocExplicitDgram(dg) {\
   ExplicitDgram d = Cmi_freelist_explicit;\
-  if (d==0) d = ((ExplicitDgram)malloc(sizeof(struct ExplicitDgramStruct)));\
+  if (d==0) d = ((ExplicitDgram)malloc \
+		   (sizeof(struct ExplicitDgramStruct) + Cmi_max_dgram_size));\
   else Cmi_freelist_explicit = d->next;\
   dg = d;\
 }
@@ -935,7 +944,7 @@ static OutgoingMsg   Cmi_freelist_outgoing;
  *
  *****************************************************************************/
 
-#define LOGGING 1
+#define LOGGING 0
 
 #if LOGGING
 
@@ -958,14 +967,14 @@ static void log_done()
   close(f);
 }
 
-static void log_printf(va_alist) va_dcl
+static int log_printf(va_alist) va_dcl
 {
   char *f; int len;
   va_list p;
   va_start(p);
   f = va_arg(p, char *);
   if (log_size >= 1000000) return;
-  vsprintf(log + log_size, f, p);
+  vsprintf(log+log_size, f, p);
   log_size += strlen(log+log_size);
 }
 
@@ -992,11 +1001,12 @@ static int        ctrlport, dataport, ctrlskt, dataskt;
 
 static OtherNode *nodes_by_pe;  /* OtherNodes indexed by processor number */
 static OtherNode  nodes;        /* Indexed only by ``node number'' */
+
 static int        Cmi_shutdown_done;
 static CmiMutex   Cmi_scanf_mutex;
 static char      *Cmi_scanf_data;
 static int        Cmi_shutdown_done; 
-static double     Cmi_clock;
+static int        Cmi_clock;
 
 static void *transmit_queue;
 static void *retransmit_queue;
@@ -1474,6 +1484,10 @@ static void node_addresses_store(addrs) char *addrs;
   for (i=0; i<Cmi_numnodes; i++) {
     OtherNode node = ntab + i;
     node->send_queue = FIFO_Create();
+    node->send_window =
+      (ImplicitDgram*)calloc(Cmi_window_size, sizeof(ImplicitDgram));
+    node->recv_window =
+      (ExplicitDgram*)calloc(Cmi_window_size, sizeof(ExplicitDgram));
     for (j=0; j<node->nodesize; j++)
       bype[j + node->nodestart] = node;
   }
@@ -1580,7 +1594,7 @@ int CmiScanf(va_alist) va_dcl
 int TransmitAcknowledgement()
 {
   OtherNode node; int i, extra;
-  struct { DgramHeader head; int others[CMK_DGRAM_WINDOW_SIZE]; } ack;
+  struct { DgramHeader head; int others[1024]; } ack;
   
   node = (OtherNode)FIFO_Peek(ack_queue);
   if (node == 0) return 0;
@@ -1590,14 +1604,18 @@ int TransmitAcknowledgement()
   DgramHeaderMake(&ack, DGRAM_ACKNOWLEDGE,
 		  Cmi_nodestart, 0x1234, node->recv_next);
   extra = 0;
-  for (i=0; i<CMK_DGRAM_WINDOW_SIZE; i++) {
+  for (i=0; i<Cmi_window_size; i++) {
     if (node->recv_window[i]) {
       ack.others[extra] = node->recv_window[i]->seqno;
       extra++;
     }
   }
-  LOG(("%1.4f %d A %d %d\n",
+  LOG(("%1.4f %d A %d %d",
        Cmi_clock, Cmi_nodestart,node->nodestart,node->recv_next));
+  for (i=0; i<Cmi_window_size; i++)
+    if (node->recv_window[i])
+      LOG((" %d", node->recv_window[i]->seqno));
+  LOG(("\n"));
   sendto(dataskt, (char *)&ack,
 	 DGRAM_HEADER_SIZE + extra * sizeof(int), 0,
 	 (struct sockaddr *)&(node->addr),
@@ -1611,7 +1629,7 @@ void ScheduleAcknowledgement(OtherNode node)
 {
   node->ack_count++;
   if (node->ack_count == 1) {
-    node->ack_time = Cmi_clock + CMK_DGRAM_ACK_DELAY;
+    node->ack_time = Cmi_clock + Cmi_ack_delay;
     FIFO_EnQueue(ack_queue, (void *)node);
   }
 }
@@ -1657,11 +1675,11 @@ int TransmitDatagram()
   FIFO_DeQueue(transmit_queue, &dg);
   if (dg) {
     TransmitImplicitDgram(dg);
-    dg->nextxmit = Cmi_clock + CMK_DGRAM_DELAY_RETRANSMIT;
+    dg->nextxmit = Cmi_clock + Cmi_delay_retransmit;
     FIFO_EnQueue(retransmit_queue, (void *)dg);
     return 1;
   }
-    
+  
   while (1) {
     dg = (ImplicitDgram)FIFO_Peek(retransmit_queue);
     if (dg == 0) return 0;
@@ -1673,7 +1691,7 @@ int TransmitDatagram()
     if (dg->nextxmit > Cmi_clock) return 0;
     FIFO_Pop(retransmit_queue);
     TransmitImplicitDgram(dg);
-    dg->nextxmit = Cmi_clock + CMK_DGRAM_DELAY_RETRANSMIT;
+    dg->nextxmit = Cmi_clock + Cmi_delay_retransmit;
     FIFO_EnQueue(retransmit_queue, (void *)dg);
     return 1;
   }
@@ -1687,7 +1705,7 @@ void MoveDatagramsIntoSendWindow(OtherNode node)
     dg = (ImplicitDgram)FIFO_Peek(node->send_queue);
     if (dg == 0) break;
     seqno = dg->seqno;
-    slot = seqno % CMK_DGRAM_WINDOW_SIZE;
+    slot = seqno % Cmi_window_size;
     if (node->send_window[slot]) break;
     FIFO_Pop(node->send_queue);
     node->send_window[slot] = dg;
@@ -1723,10 +1741,10 @@ void DeliverViaNetwork(OutgoingMsg ogm, OtherNode node, int rank)
   
   size = ogm->size - DGRAM_HEADER_SIZE;
   data = ogm->data + DGRAM_HEADER_SIZE;
-  while (size > DGRAM_MAX_DATA) {
-    EnqueueOutgoingDgram(ogm, data, DGRAM_MAX_DATA, node, rank);
-    data += DGRAM_MAX_DATA;
-    size -= DGRAM_MAX_DATA;
+  while (size > Cmi_dgram_max_data) {
+    EnqueueOutgoingDgram(ogm, data, Cmi_dgram_max_data, node, rank);
+    data += Cmi_dgram_max_data;
+    size -= Cmi_dgram_max_data;
   }
   EnqueueOutgoingDgram(ogm, data, size, node, rank);
   MoveDatagramsIntoSendWindow(node);
@@ -1823,7 +1841,7 @@ void AssembleReceivedDatagrams(OtherNode node)
   unsigned int next, slot; ExplicitDgram dg;
   next = node->recv_next;
   while (1) {
-    slot = (next % CMK_DGRAM_WINDOW_SIZE);
+    slot = (next % Cmi_window_size);
     dg = node->recv_window[slot];
     if (dg == 0) break;
     AssembleDatagram(node, dg);
@@ -1835,15 +1853,14 @@ void AssembleReceivedDatagrams(OtherNode node)
 
 void IntegrateMessageDatagram(ExplicitDgram dg)
 {
-  unsigned int seqno, slot; OtherNode node; char *p;
+  unsigned int seqno, slot; OtherNode node;
 
-  p = log + log_size;
   LOG(("%1.4f %d M %d %d\n", Cmi_clock, Cmi_nodestart, dg->srcpe, dg->seqno));
   node = nodes_by_pe[dg->srcpe];
   seqno = dg->seqno;
   ScheduleAcknowledgement(node);
-  if (((seqno - node->recv_next)&DGRAM_SEQNO_MASK) < CMK_DGRAM_WINDOW_SIZE) {
-    slot = (seqno % CMK_DGRAM_WINDOW_SIZE);
+  if (((seqno - node->recv_next)&DGRAM_SEQNO_MASK) < Cmi_window_size) {
+    slot = (seqno % Cmi_window_size);
     if (node->recv_window[slot] == 0) {
       node->recv_window[slot] = dg;
       if (seqno == node->recv_next)
@@ -1852,12 +1869,11 @@ void IntegrateMessageDatagram(ExplicitDgram dg)
     }
   }
   FreeExplicitDgram(dg);
-  if (*p==0) *((int*)0)=0;
 }
 
 void IntegrateAcknowledgement(OtherNode node, unsigned int seqno)
 {
-  unsigned int slot = (seqno % CMK_DGRAM_WINDOW_SIZE);
+  unsigned int slot = (seqno % Cmi_window_size);
   ImplicitDgram idg;
 
   idg = node->send_window[slot];
@@ -1870,21 +1886,23 @@ void IntegrateAcknowledgement(OtherNode node, unsigned int seqno)
 void IntegrateAckDatagram(ExplicitDgram dg)
 {
   unsigned int seqno; int i, count, *data;
-  OtherNode node; 
+  OtherNode node;
   
   node = nodes_by_pe[dg->srcpe];
-  LOG(("%1.4f %d R %d %d\n", 
+  data = ((int*)(dg->data + DGRAM_HEADER_SIZE));
+  count = (dg->len - DGRAM_HEADER_SIZE) / sizeof(int);
+  LOG(("%1.4f %d R %d %d", 
        Cmi_clock, Cmi_nodestart, node->nodestart, dg->seqno));
-  data = ((int*)(dg->data)) + 1;
-  count = (dg->len / sizeof(int)) - 1;
-  for (i=1; i<=CMK_DGRAM_WINDOW_SIZE; i++) {
+  for (i=1; i<=Cmi_window_size; i++) {
     seqno = (dg->seqno - i) & DGRAM_SEQNO_MASK;
     IntegrateAcknowledgement(node, seqno);
   }
   while (count) {
+    LOG((" %d", *data));
     IntegrateAcknowledgement(node, *data);
     count--; data++;
   }
+  LOG(("\n"));
   MoveDatagramsIntoSendWindow(node);
   FreeExplicitDgram(dg);
 }
@@ -1893,7 +1911,7 @@ void ReceiveDatagram()
 {
   ExplicitDgram dg; int ok, magic;
   MallocExplicitDgram(dg);
-  ok = recv(dataskt,dg->data,CMK_DGRAM_MAX_SIZE,0);
+  ok = recv(dataskt,dg->data,Cmi_max_dgram_size,0);
   if (ok<0) KillEveryoneCode(37489437);
   dg->len = ok;
   if (ok >= DGRAM_HEADER_SIZE) {
@@ -1906,7 +1924,7 @@ void ReceiveDatagram()
   } else FreeExplicitDgram(dg);
 }
 
-void CommunicationServer()
+static void CommunicationServer()
 {
   if (CmiMemBusy()) return;
   LOG(("%1.4f %d I\n", GetClock(), Cmi_nodestart));
@@ -2073,7 +2091,7 @@ char **argv;
   transmit_queue = FIFO_Create();
   retransmit_queue = FIFO_Create();
   ack_queue = FIFO_Create();
-  skt_datagram(&dataport, &dataskt, CMK_DGRAM_BUF_SIZE);
+  skt_datagram(&dataport, &dataskt, Cmi_os_buffer_size);
   skt_server(&ctrlport, &ctrlskt);
   KillInit();
   ctrl_sendone(120,"notify-die %s %d\n",Cmi_self_IP_str,ctrlport);
