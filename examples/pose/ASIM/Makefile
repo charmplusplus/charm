@@ -11,7 +11,7 @@
 
 OPTS=-O#-DCMK_OPTIMIZE=1 -DCMK_MEMCHECKS_OFF=1
 
-CHARMBASE=../../../
+CHARMBASE=../../..
 CHARMBIN=$(CHARMBASE)/bin
 CHARMINC=$(CHARMBASE)/include
 
@@ -50,7 +50,7 @@ summary:    $(PGM).summary
 
 $(PGM):	$(SIM_OBJECTS) 
 	$(CHARMC) $(SIM_OBJECTS) $(OTHER) $(LIBS) -o $(PGM) \
-	-lpose -language charm++
+	-module pose -language charm++
 
 $(PGM).alt:	$(SIM_OBJECTS) 
 	$(CHARMC) $(SIM_OBJECTS) $(OTHER) $(LIBS) -o $(PGM).alt \
