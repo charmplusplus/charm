@@ -1,2 +1,2 @@
 
-. ./conv-mach-scld.sh
+. $CHARMINC/conv-mach-scyld.sh
