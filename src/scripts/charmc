@@ -38,7 +38,7 @@ OVERRIDE_LDXX=""
 #Generic options, passed to everything
 OPTS=""
 #Specific options
-OPTS_CPP=""
+OPTS_CPP="-DCHARM=1 "
 OPTS_LDRO="" 
 OPTS_CC=""
 OPTS_CXX="" 
