@@ -24,7 +24,7 @@ void traceResume(void);
 void traceSuspend(void);
 void traceAwaken(CthThread t);
 void traceUserEvent(int);
-void traceUserBracketEvent(int, double);
+void traceUserBracketEvent(int, double, double);
 int  traceRegisterUserEvent(const char*, int e
 #ifdef __cplusplus
 =-1

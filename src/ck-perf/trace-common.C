@@ -174,11 +174,11 @@ void traceUserEvent(int e)
 }
 
 extern "C"
-void traceUserBracketEvent(int e, double beginT)
+void traceUserBracketEvent(int e, double beginT, double endT)
 {
 #ifndef CMK_OPTIMIZE
   if (CpvAccess(traceOn))
-    CkpvAccess(_traces)->userBracketEvent(e, beginT);
+    CkpvAccess(_traces)->userBracketEvent(e, beginT, endT);
 #endif
 }
 

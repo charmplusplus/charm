@@ -502,11 +502,11 @@ void TraceProjections::userEvent(int e)
   _logPool->add(USER_EVENT, e, 0, TraceTimer(),curevent++,CkMyPe());
 }
 
-void TraceProjections::userBracketEvent(int e, double bt)
+void TraceProjections::userBracketEvent(int e, double bt, double et)
 {
   // two events record Begin/End of event e.
   _logPool->add(USER_EVENT_PAIR, e, 0, TraceTimer(bt), curevent, CkMyPe());
-  _logPool->add(USER_EVENT_PAIR, e, 0, TraceTimer(), curevent++, CkMyPe());
+  _logPool->add(USER_EVENT_PAIR, e, 0, TraceTimer(et), curevent++, CkMyPe());
 }
 
 void TraceProjections::creation(envelope *e, int num)

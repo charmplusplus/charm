@@ -34,7 +34,7 @@ class Trace {
     // a user event has just occured
     virtual void userEvent(int eventID) {}
     // a pair of begin/end user event has just occured
-    virtual void userBracketEvent(int eventID, double bt) {}
+    virtual void userBracketEvent(int eventID, double bt, double et) {}
     // creation of message(s)
     virtual void creation(envelope *, int num=1) {}
     // ???
@@ -89,7 +89,7 @@ public:
     inline int length() const { return n; }
 
     inline void userEvent(int e) { ALLDO(userEvent(e));}
-    inline void userBracketEvent(int e,double t) {ALLDO(userBracketEvent(e,t));}
+    inline void userBracketEvent(int e,double bt, double et) {ALLDO(userBracketEvent(e,bt,et));}
     inline void creation(envelope *env, int num=1) { ALLDO(creation(env, num));}
     inline void beginExecute(envelope *env) {ALLDO(beginExecute(env));}
     inline void beginExecute(int event,int msgType,int ep,int srcPe, int mlen) {ALLDO(beginExecute(event, msgType, ep, srcPe, mlen));}
