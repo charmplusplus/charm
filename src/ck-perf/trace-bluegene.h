@@ -24,9 +24,8 @@ class TraceBluegene : public Trace {
  public:
     TraceBluegene(char** argv);
     ~TraceBluegene();
+    virtual void setTraceOnPE(int flag) { _traceOn = 1; }  // always on
     int traceOnPE() { return 1; }
-    //   void* userBracketEvent(int e, double bt, double et);
-    //    void userBracketEvent(char* name,double bt, double et,char* msg,void** parentLogPtr);
     void getForwardDep(void* log, void** fDepPtr);
     void getForwardDepForAll(void** logs1, void** logs2, int logsize,void* fDepPtr);
     void tlineEnd(void** parentLogPtr);

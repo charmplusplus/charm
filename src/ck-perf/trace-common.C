@@ -16,6 +16,7 @@
 #include "charm.h"
 #include "middle.h"
 #include "cklists.h"
+#include "ckliststring.h"
 
 #include "trace.h"
 #include "trace-common.h"
@@ -45,9 +46,7 @@ int traceBluegeneLinked=0;			// if trace-bluegene is linked
 CkpvDeclare(double, traceInitTime);
 CkpvDeclare(double, traceInitCpuTime);
 CpvDeclare(int, traceOn);
-#if CMK_TRACE_IN_CHARM
 CkpvDeclare(int, traceOnPe);
-#endif
 
 CkpvDeclare(int, CtrLogBufSize);
 CkpvDeclare(char*, traceRoot);
@@ -72,17 +71,8 @@ static void traceCommonInit(char **argv)
   CkpvInitialize(char*, traceRoot);
   CpvAccess(traceOn) = 0;
   CpvAccess(_traceCoreOn)=0; //projector
-#if CMK_TRACE_IN_CHARM
   CkpvInitialize(int, traceOnPe);
   CkpvAccess(traceOnPe) = 1;
-#if 0
-  // example for choosing subset of processors for tracing
-  CkpvAccess(traceOnPe) = 0;
-  if (CkMyPe() < 20 && CkMyPe() > 15) CkpvAccess(traceOnPe) = 1;
-  // must include pe 0
-  if (CkMyPe()==0) CkpvAccess(traceOnPe) = 1;
-#endif
-#endif
   CkpvAccess(CtrLogBufSize) = LogBufSize;
   if (CmiGetArgIntDesc(argv,"+logsize",&CkpvAccess(CtrLogBufSize), "Log entries to buffer per I/O"))
     if (CkMyPe() == 0) 
@@ -195,6 +185,30 @@ extern "C" void traceEnd(void) {
   CpvAccess(traceOn) = 0;
 }
 
+static int checkTraceOnPe(char **argv)
+{
+  int i;
+  int traceOnPE = 1;
+  char *procs = NULL;
+#if CMK_BLUEGENE_CHARM
+  // check bgconfig file for settings
+  traceOnPE=0;
+  if (BgTraceProjectionOn(CkMyPe())) traceOnPE = 1;
+#endif
+  if (CmiGetArgStringDesc(argv, "+traceprocessors", &procs, "A list of processors to trace, e.g. 0,10,20-30"))
+  {
+    CkListString procList(strdup(procs));
+    traceOnPE = procList.includes(CkMyPe());
+  }
+  // must include pe 0, otherwise sts file is not generated
+  if (CkMyPe()==0) traceOnPE = 1;
+#if !CMK_TRACE_IN_CHARM
+  /* skip communication thread */
+  traceOnPE = traceOnPE && (CkMyRank() != CkMyNodeSize());
+#endif
+  return traceOnPE;
+}
+
 /// defined in moduleInit.C
 void _createTraces(char **argv);
 
@@ -211,8 +225,14 @@ static inline void _traceInit(char **argv)
   // common init
   traceCommonInit(argv);
 
+  // check if trace is turned on/off for this pe
+  CkpvAccess(traceOnPe) = checkTraceOnPe(argv);
+
   // in moduleInit.C
   _createTraces(argv);
+
+  // set trace on/off
+  CkpvAccess(_traces)->setTraceOnPE(CkpvAccess(traceOnPe));
 
   if (CkpvAccess(_traces)->length() && !CmiGetArgFlagDesc(argv,"+traceoff","Disable tracing"))
     traceBegin();
@@ -345,7 +365,7 @@ void traceCharmClose(void)
 */
 extern "C"
 void traceAddThreadListeners(CthThread tid, envelope *e) {
-  CkpvAccess(_traces)->traceAddThreadListeners(tid, e);
+  _TRACE_ONLY(CkpvAccess(_traces)->traceAddThreadListeners(tid, e));
 }
 
 #if 0

@@ -599,7 +599,7 @@ void LogEntry::pup(PUP::er &p)
       break;
     case BEGIN_PROCESSING:
       if (p.isPacking()) {
-        irecvtime = (int)(1.0e6*recvTime);
+        irecvtime = (int)(recvTime==-1?-1:1.0e6*recvTime);
         icputime = (int)(1.0e6*cputime);
       }
       p|mIdx; p|eIdx; p|itime; p|event; p|pe; 
@@ -700,7 +700,7 @@ void LogEntry::pup(PUP::er &p)
 TraceProjections::TraceProjections(char **argv): 
 curevent(0), inEntry(0), computationStarted(0)
 {
-  if (TRACE_CHARM_PE() == 0) return;
+  if (CkpvAccess(traceOnPe) == 0) return;
 
   CtvInitialize(int,curThreadEvent);
   CtvAccess(curThreadEvent)=0;
@@ -797,13 +797,11 @@ void TraceProjections::traceClose(void)
   if(CkMyPe()==0){
     _logPool->writeSts(this);
   }
-  if (TRACE_CHARM_PE()) {
-    CkpvAccess(_trace)->endComputation();
-    delete _logPool;		// will write
-    // remove myself from traceArray so that no tracing will be called.
-    CkpvAccess(_traces)->removeTrace(this);
+  CkpvAccess(_trace)->endComputation();
+  delete _logPool;		// will write
+  // remove myself from traceArray so that no tracing will be called.
+  CkpvAccess(_traces)->removeTrace(this);
 //    delete CkpvAccess(_trace);
-  }
 //  free(CkpvAccess(traceRoot));
 }
 

@@ -28,15 +28,11 @@ extern int _dummyMsg, _dummyChare, _dummyEP;
 /* CW Support for Thread Listener interface */
 extern "C" void traceAddThreadListeners(CthThread tid, envelope *e);
 
-// trace_in_charm means only do trace for Charm++ level
-// traceOnPe controls if charm pe will generate trace logs
-#if CMK_TRACE_IN_CHARM
+// trace_in_charm means only do trace for Charm++ level, skip converse tracing
+// Cpv traceOnPe controls if charm pe will generate trace logs (a default value)
+// while traceOnPe flag in each trace module can also control independently if 
+// tracing is wanted for each module
 CkpvExtern(int, traceOnPe);
-#  define TRACE_CHARM_PE()  (CkpvAccess(traceOnPe))
-#else
-          /* skip communication thread */
-#  define TRACE_CHARM_PE()  (CkMyRank() != CkMyNodeSize())
-#endif
 
 // A hack. We need to somehow tell the pup framework what size
 // long_long is wrt PAPI.
@@ -49,8 +45,12 @@ typedef CMK_TYPEDEF_INT8 LONG_LONG_PAPI;
 // Base class of all tracing strategies.
 // 
 class Trace {
+  protected:
+    int _traceOn;
   public:
-    virtual int traceOnPE() { return TRACE_CHARM_PE(); }
+    Trace(): _traceOn(0) {}
+    virtual void setTraceOnPE(int flag) { _traceOn = flag; }
+    virtual inline int traceOnPE() { return _traceOn; }
     // turn trace on/off, note that charm will automatically call traceBegin()
     // at the beginning of every run unless the command line option "+traceoff"
     // is specified
@@ -132,14 +132,6 @@ class Trace {
 #define ALLDO(x) for (int i=0; i<length(); i++) if (traces[i]->traceOnPE()) traces[i]->x
 #define ALLREVERSEDO(x) for (int i=length()-1; i>=0; i--) if (traces[i]->traceOnPE()) traces[i]->x
 
-#ifndef CMK_OPTIMIZE
-#  define _TRACE_ONLY(code) do{if(CpvAccess(traceOn)){ code; }} while(0)
-#  define _TRACE_ALWAYS(code) do{ code; } while(0)
-#else
-#  define _TRACE_ONLY(code) /*empty*/
-#  define _TRACE_ALWAYS(code) /*empty*/
-#endif
-
 /// Array of Traces modules,  every event raised will go through every Trace module.
 class TraceArray {
 private:
@@ -149,6 +141,7 @@ private:
 public:
     TraceArray(): n(0) {}
     inline void addTrace(Trace *tr) { traces.push_back(tr); n++;}
+    inline void setTraceOnPE(int flag) { for (int i=0; i<length(); i++) traces[i]->setTraceOnPE(flag); }
     // to allow traceCLose() to be called multiple times, remove trace module
     // from the array in each individual trace, and clean up (clearTrace)
     // after the loop.
@@ -218,11 +211,19 @@ public:
 
     /* calls for thread listener registration for each trace module */
     inline void traceAddThreadListeners(CthThread tid, envelope *e) {
-	_TRACE_ONLY(ALLDO(traceAddThreadListeners(tid, e)));
+      ALLDO(traceAddThreadListeners(tid, e));
     }
 };
 
 CkpvExtern(TraceArray*, _traces);
+
+#ifndef CMK_OPTIMIZE
+#  define _TRACE_ONLY(code) do{if(CpvAccess(traceOn)){ code; }} while(0)
+#  define _TRACE_ALWAYS(code) do{ code; } while(0)
+#else
+#  define _TRACE_ONLY(code) /*empty*/
+#  define _TRACE_ALWAYS(code) /*empty*/
+#endif
 
 extern "C" {
 #include "conv-trace.h"

@@ -113,8 +113,6 @@ void SumLogPool::addEventType(int eventType, double time)
 
 SumLogPool::SumLogPool(char *pgm) : numBins(0), phaseTab(MAX_PHASES) 
 {
-   if (TRACE_CHARM_PE() == 0) return; // blue gene related
-
    // TBD: Can this be moved to initMem?
    poolSize = CkpvAccess(binCount);
    if (poolSize % 2) poolSize++;	// make sure it is even
@@ -433,7 +431,8 @@ void BinEntry::write(FILE* fp)
 
 TraceSummary::TraceSummary(char **argv):binStart(0.0),bin(0.0),msgNum(0)
 {
-  char *tmpStr;
+  if (CkpvAccess(traceOnPe) == 0) return;
+
   CkpvInitialize(int, binCount);
   CkpvInitialize(double, binSize);
   CkpvInitialize(double, version);
@@ -479,13 +478,11 @@ void TraceSummary::traceClose(void)
 {
   if(CkMyPe()==0)
       _logPool->writeSts();
-  if (TRACE_CHARM_PE()) {
-    CkpvAccess(_trace)->endComputation();
-    // destructor call the write()
-    delete _logPool;
-    // remove myself from traceArray so that no tracing will be called.
-    CkpvAccess(_traces)->removeTrace(this);
-  }
+  CkpvAccess(_trace)->endComputation();
+  // destructor call the write()
+  delete _logPool;
+  // remove myself from traceArray so that no tracing will be called.
+  CkpvAccess(_traces)->removeTrace(this);
 }
 
 void TraceSummary::beginExecute(CmiObjId *tid)
@@ -641,7 +638,7 @@ void TraceSummaryBOC::askSummary(int size)
 {
   if (CkpvAccess(_trace) == NULL) return;
 
-  int traced = TRACE_CHARM_PE();
+  int traced = CkpvAccess(_trace)->traceOnPE();
 
   BinEntry *bins = new BinEntry[size+1];
   bins[size] = traced;		// last element is the traced pe count
