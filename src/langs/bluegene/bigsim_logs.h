@@ -9,14 +9,35 @@
 
 extern int bgcorroff;
 
+// identifier for a message which records the source node that generate
+// this message and a message sequence number (_msgID)
+class BgMsgID
+{
+private:
+  int _node;		// node number where the message is created
+  int _msgID;		// local index number on pe
+
+public:
+  BgMsgID(): _node(-1), _msgID(-1) {}
+  BgMsgID(int p, int m): _node(p), _msgID(m) {}
+  void pup(PUP::er &p) {
+    p|_node; p|_msgID;
+  }
+  inline int operator == (const BgMsgID &m) {
+    return _node == m._node && _msgID == m._msgID;
+  }
+  int node() { return _node; }
+  int msgID() { return _msgID; }
+};
+
 /**
   a message sent event in timeline
 */
-class bgMsgEntry {
-  friend class bgTimeLog;
+class BgMsgEntry {
+  friend class BgTimeLog;
 public:
   int msgID;
-  int dstPe;		// dest bg node in global sequence
+  int dstPe;          // dest bg node in global sequence
   double sendTime;	// msg sending offset in the event
   double recvTime;	// predicted recv time with delay
 #if DELAY_SEND
@@ -25,9 +46,9 @@ public:
   CmiInt2 tID;		// destination worker thread ID
   int msgsize;		// message size
 private:
-  bgMsgEntry() {}
+  BgMsgEntry() {}
 public:
-  bgMsgEntry(char *msg, int node, int tid, int local);
+  BgMsgEntry(char *msg, int node, int tid, int local);
   inline void print() {
     CmiPrintf("msgID:%d sent:%f recvtime:%f dstPe:%d\n", msgID, sendTime, recvTime, dstPe);
   }
@@ -73,12 +94,11 @@ class BgTimeLineRec;
   one time log for an handler function;
   it record a list of message sent events in an execution of handler
 */
-class bgTimeLog {
+class BgTimeLog {
 public:
   int ep;
   int seqno;
-  int srcnode;        // source bg node  (srcnode,msgID) is the source msg
-  int msgID;
+  BgMsgID  msgId;	// incoming message that generates this log
 
   double recvTime;	//Time at which the message was received in 'inbuffer'
   double startTime, endTime;
@@ -87,24 +107,24 @@ public:
 
 //  int threadNum;	// by guna, for seq load balancing  ???
 
-  CkVec< bgMsgEntry * > msgs;
+  CkVec< BgMsgEntry * > msgs;
   CkVec< bgEvents * > evts;
-  CkVec< bgTimeLog* > backwardDeps;
-  CkVec< bgTimeLog* > forwardDeps;
+  CkVec< BgTimeLog* > backwardDeps;
+  CkVec< BgTimeLog* > forwardDeps;
   char doCorrect;
   char flag;
   char name[20];
 
   friend class BgTimeLineRec;
 public:
-  bgTimeLog(bgTimeLog *);
-  bgTimeLog(char *msg, char *str=NULL);
-  bgTimeLog(): ep(-1), recvTime(.0), startTime(.0), endTime(.0), msgID(-1), 
+  BgTimeLog(BgTimeLog *);
+  BgTimeLog(char *msg, char *str=NULL);
+  BgTimeLog(): ep(-1), recvTime(.0), startTime(.0), endTime(.0),
 	       execTime(.0), effRecvTime(INVALIDTIME), seqno(0), doCorrect(1) 
     {strcpy(name,"dummyname");}
-  bgTimeLog(int epc, char* name, double sTime, double eTime);
-  bgTimeLog(int epc, char* name, double sTime);
-  ~bgTimeLog();
+  BgTimeLog(int epc, char* name, double sTime, double eTime);
+  BgTimeLog(int epc, char* name, double sTime);
+  ~BgTimeLog();
 
   inline void setExecTime() {
            execTime = endTime - startTime;
@@ -113,7 +133,7 @@ public:
            CmiAssert(execTime >= 0.0);
          }
   inline void addMsg(char *msg, int node, int tid, int local) { 
-           msgs.push_back(new bgMsgEntry(msg, node, tid, local)); 
+           msgs.push_back(new BgMsgEntry(msg, node, tid, local)); 
          }
   void closeLog();
   void print(int node, int th);
@@ -124,11 +144,11 @@ public:
 
   // add backward dep of the log corresponent to msg
   void addMsgBackwardDep(BgTimeLineRec &tlinerec, void* msg);
-  void addBackwardDep(bgTimeLog* log);
+  void addBackwardDep(BgTimeLog* log);
   //takes a list of Logs on which this log is dependent (backwardDeps) 
-  void addBackwardDeps(CkVec<bgTimeLog*> logs);
+  void addBackwardDeps(CkVec<BgTimeLog*> logs);
   void addBackwardDeps(CkVec<void*> logs);
-  int bDepExists(bgTimeLog* log);			// by guna
+  int bDepExists(BgTimeLog* log);			// by guna
   //Returns earliest time by which all backward dependents ended  
   // return the last eff recv time
   double getEndOfBackwardDeps() {
@@ -148,13 +168,13 @@ public:
       evts[i]->update(startTime ,recvTime, e);
   }
   inline double key() { return effRecvTime; }
-  inline int compareKey(bgTimeLog* otherLog){
+  inline int compareKey(BgTimeLog* otherLog){
     if(((isZero(effRecvTime-otherLog->effRecvTime))&&(seqno < otherLog->seqno))
        ||(isLess(effRecvTime,otherLog->effRecvTime)))
       return -1;
     return 1;
   }
-  inline int isEqual(bgTimeLog* otherLog){
+  inline int isEqual(BgTimeLog* otherLog){
     return (otherLog==this);
   }
   void pup(PUP::er &p);
@@ -171,7 +191,7 @@ public:
 /**
   Timeline for a VP
 */
-typedef CkQ< bgTimeLog *> BgTimeLine;
+typedef CkQ< BgTimeLog *> BgTimeLine;
 
 /**
   A wrapper for CkQ of BgTimeLine
@@ -185,10 +205,10 @@ public:
   int         correctSendIdx;
   int 	      counter;
   double      minCorrection;
-  bgTimeLog  *bgCurLog;		/* current unfinished log */
-  bgTimeLog  *bgPrevLog;	/* previous log that should make dependency */
+  BgTimeLog  *bgCurLog;		/* current unfinished log */
+  BgTimeLog  *bgPrevLog;	/* previous log that should make dependency */
 #if DELAY_SEND
-  CkQ<bgTimeLog *>   sendingLogs;	// send buffered
+  CkQ<BgTimeLog *>   sendingLogs;	// send buffered
 #endif
 public:
   BgTimeLineRec(): timeline(1024), commit(0), counter(1), correctSendIdx(0), 
@@ -199,13 +219,13 @@ public:
   ~BgTimeLineRec() {
       for (int i=0; i<timeline.length(); i++)  delete timeline[i];
     }
-  bgTimeLog * operator[](size_t n) {
+  BgTimeLog * operator[](size_t n) {
 	CmiAssert(n!=(size_t)-1);
         return timeline[n];
     }
   int length() { return timeline.length(); }
   // special enq which will assign seqno
-  void enq(bgTimeLog *log, int isnew) {
+  void enq(BgTimeLog *log, int isnew) {
 	log->seqno = counter++;
   	timeline.enq(log);
 #if DELAY_SEND
@@ -220,7 +240,7 @@ public:
     double total=0.0;
     int tlineLen = length();
     for(int i=0;i<tlineLen;i++) {
-      bgTimeLog *log = timeline[i];
+      BgTimeLog *log = timeline[i];
       total += log->execTime;
       *numRealMsgs += log->msgs.length();
     }
@@ -229,26 +249,28 @@ public:
   inline void clearSendingLogs() {
 #if DELAY_SEND
     while (!sendingLogs.isEmpty()) {
-      bgTimeLog *log = sendingLogs.deq();
+      BgTimeLog *log = sendingLogs.deq();
       log->send();
     }
 #endif
   }
   void logEntryStart(char *m);
 //  void logEntryCommit();
-  void logEntryInsert(bgTimeLog* log);
-  void logEntryStart(bgTimeLog* log);
+  void logEntryInsert(BgTimeLog* log);
+  void logEntryStart(BgTimeLog* log);
   void logEntryClose();
   void logEntrySplit();
-  bgTimeLog *getTimeLogOnThread(int srcnode, int msgID, int *index);
+  BgTimeLog *getTimeLogOnThread(const BgMsgID &msgId, int *index);
 
   void pup(PUP::er &p);
 };
 
 // BigSim log function API
 int BgIsInALog(BgTimeLineRec &tlinerec);
-bgTimeLog *BgCurrentLog(BgTimeLineRec &tlinerec);
-bgTimeLog *BgStartLogByName(BgTimeLineRec &tlinerec, int ep, char *name, double starttime, bgTimeLog *prevLog);
+BgTimeLog *BgLastLog(BgTimeLineRec &tlinerec);
+void BgAddBackwardDep(BgTimeLog *curlog, BgTimeLog* deplog);
+BgTimeLog *BgStartLogByName(BgTimeLineRec &tlinerec, int ep, char *name, double starttime, BgTimeLog *prevLog);
+void BgEndLastLog(BgTimeLineRec &tlinerec);
 
 int BgLoadTraceSummary(char *fname, int &totalProcs, int &numX, int &numY, int &numZ, int &numCth, int &numWth, int &numPes);
 void BgReadProc(int procNum, int numWth ,int numPes, int totalProcs, int* allNodeOffsets, BgTimeLineRec& tlinerec);

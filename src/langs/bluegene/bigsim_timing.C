@@ -7,7 +7,7 @@
 
 #define INTEGRITY_CHECK		1
 
-typedef minHeap<bgTimeLog *>  BgTimelogHeap;
+typedef minHeap<BgTimeLog *>  BgTimelogHeap;
 
 /*** CPVs ***/
 
@@ -65,9 +65,9 @@ void BgInitTiming()
 
 void *BgCreateEvent(int eidx)
 {
-  bgTimeLog *entry = new bgTimeLog();
+  BgTimeLog *entry = new BgTimeLog();
   entry->ep = eidx;
-  entry->srcnode = BgMyNode();
+  entry->msgId = BgMsgID(BgMyNode(), -1);
   entry->startTime = BgGetCurTime();
   return (void *)entry;
 }
@@ -97,7 +97,7 @@ void BgResetRecvTime()
   if (genTimeLog) {
     int len = tTIMELINE.length();
     if (len) {
-      bgTimeLog *log = tTIMELINE[len-1];
+      BgTimeLog *log = tTIMELINE[len-1];
       log->recvTime = log->effRecvTime = log->startTime;
       log->doCorrect = 0;
     }
@@ -124,7 +124,7 @@ void BgLogEntryCommit(BgTimeLineRec &tlinerec) {
   }
 }
 
-inline int adjustTimeLog(bgTimeLog* log, BgTimeLine& tline, 
+inline int adjustTimeLog(BgTimeLog* log, BgTimeLine& tline, 
                          int mynode, int sendImmediately)
 {
    	double tAdjust = log->startTime-log->oldStartTime;
@@ -134,7 +134,7 @@ inline int adjustTimeLog(bgTimeLog* log, BgTimeLine& tline,
 
 	for(int i=0; i<log->msgs.length(); i++) 
 	{
-            bgMsgEntry *msgEntry = log->msgs[i];
+            BgMsgEntry *msgEntry = log->msgs[i];
 	    // update new msg send and recv time
 //	    msgEntry->sendtime += tAdjust;
 	    msgEntry->recvTime += tAdjust;
@@ -149,12 +149,11 @@ inline int adjustTimeLog(bgTimeLog* log, BgTimeLine& tline,
 
 	    // send correction messages
 	    bgCorrectionMsg *msg = (bgCorrectionMsg *)CmiAlloc(sizeof(bgCorrectionMsg));
-	    msg->msgID = msgEntry->msgID;
-	    msg->tID = msgEntry->tID;
+	    msg->msgId = BgMsgID(nodeInfo::Local2Global(mynode), msgEntry->msgID);
+            msg->tID = msgEntry->tID;
 	    //msg->tAdjust is absolute recvTime at destination node
 	    msg->tAdjust = msgEntry->recvTime;  // new recvTime
-	    msg->destNode = msgEntry->dstPe;
-	    msg->srcNode = nodeInfo::Local2Global(mynode);
+            msg->destNode = msgEntry->dstPe;
 		
 	    CmiSetHandler(msg, CpvAccess(bgCorrectionHandler));
 #if ! USE_MULTISEND
@@ -191,7 +190,7 @@ int BgGetIndexFromTime(double effT, int seqno, BgTimeLineRec &tlinerec)
   int low = startIdx, high = commit;
   while(low<high) {
     idx = (low + high)/2;
-    bgTimeLog *curLog = tlinerec[idx];  
+    BgTimeLog *curLog = tlinerec[idx];  
     if(isLess(effT, curLog->effRecvTime) ||
          (isEqual(effT, curLog->effRecvTime) && curLog->seqno > seqno)) {
       high = idx;
@@ -209,7 +208,7 @@ int BgGetIndexFromTime(double effT, int seqno, BgTimeLineRec &tlinerec)
 }
 
 // tLog can be (1) a nromal entry function, or (2) a sdag
-void BgGetMsgStartTime(bgTimeLog* tLog, BgTimeLineRec &tline, int* index)
+void BgGetMsgStartTime(BgTimeLog* tLog, BgTimeLineRec &tline, int* index)
 {
 	/* ASSUMPTION: BgGetMsgStartTime is called only if necessary */
 
@@ -229,7 +228,7 @@ void BgGetMsgStartTime(bgTimeLog* tLog, BgTimeLineRec &tline, int* index)
 #if 1
 	while(low<high) {
 	  idx = (low + high)/2;
-	  bgTimeLog *curLog = tline[idx];  
+	  BgTimeLog *curLog = tline[idx];  
 	  if( (isEqual(effRecvTime, curLog->effRecvTime) && curLog->seqno > tLog->seqno)|| isLess(effRecvTime, curLog->effRecvTime)) {
 	    high = idx;
 	  }
@@ -249,7 +248,7 @@ void BgGetMsgStartTime(bgTimeLog* tLog, BgTimeLineRec &tline, int* index)
 */
 	// only need to search to "commit", since only this part is sorted.
 	for(idx=startIdx;idx<commit;idx++) {
-	  bgTimeLog *curLog = tline[idx];
+	  BgTimeLog *curLog = tline[idx];
 	  CmiAssert(curLog->effRecvTime>=0.0);
 	  if (curLog->effRecvTime > effRecvTime) break;
           if (curLog->effRecvTime==effRecvTime && tLog->seqno<curLog->seqno) break;
@@ -261,12 +260,12 @@ void BgGetMsgStartTime(bgTimeLog* tLog, BgTimeLineRec &tline, int* index)
 }
 
 
-void updateEffRecvTime(minHeap<bgTimeLog*>* inpQPtr, bgTimeLog *log){
+void updateEffRecvTime(minHeap<BgTimeLog*>* inpQPtr, BgTimeLog *log){
   int i,j;
   if (log) {
     int nChanged=0;
     for (i=0; i<log->forwardDeps.length();i++) {
-      bgTimeLog *l = log->forwardDeps[i];
+      BgTimeLog *l = log->forwardDeps[i];
 #if INTEGRITY_CHECK
       for(j=0;j<inpQPtr->length();j++) 
         if ((*inpQPtr)[j] == l) break;
@@ -338,7 +337,7 @@ static void BgIntegrityCheck(BgTimeLine &tline)
 #endif
 }
   
-int BgGetTimeLineIndexByRecvTime(BgTimeLineRec &tlinerec, bgTimeLog *tlog, int mynode, int tID)
+int BgGetTimeLineIndexByRecvTime(BgTimeLineRec &tlinerec, BgTimeLog *tlog, int mynode, int tID)
 {
   int index;
   BgGetMsgStartTime(tlog, tlinerec, &index);
@@ -353,8 +352,8 @@ int BgAdjustTimeLineFromIndex(int index, BgTimeLineRec &tlinerec, int mynode)
   int len = tlinerec.length();
   if (index >= len) return 0;
 
-  // CkQ <bgTimeLog*> insertList;
-  minHeap<bgTimeLog*> insertList;
+  // CkQ <BgTimeLog*> insertList;
+  minHeap<BgTimeLog*> insertList;
   BgTimeLine &tline = tlinerec.timeline;
 
   processCount ++;
@@ -365,7 +364,7 @@ int BgAdjustTimeLineFromIndex(int index, BgTimeLineRec &tlinerec, int mynode)
   // search for the min recv time
   int commit = tlinerec.commit;
   for (i=commit; i<tline.length(); i++) {
-    bgTimeLog *clog = tline[i];
+    BgTimeLog *clog = tline[i];
     int idx;
     BgGetMsgStartTime(clog, tlinerec, &idx);
     if (idx < commit) commit = idx;
@@ -393,7 +392,7 @@ int BgAdjustTimeLineFromIndex(int index, BgTimeLineRec &tlinerec, int mynode)
   updateEffRecvTime(&insertList, NULL);
 
   //Move entries from insertList to tline
-  bgTimeLog* temp = NULL;
+  BgTimeLog* temp = NULL;
   while(!insertList.isEmpty()){
 
     //   temp = getLeastERTLog(tlinerec, &insertList, temp); 
@@ -440,8 +439,8 @@ int BgAdjustTimeLineByIndex(int oldIdx, double tAdjustAbs, BgTimeLineRec &tliner
 
   int idx,i,newIdx,commit;;
   double startTime=0;
-  //CkQ <bgTimeLog*> insertList;
-  bgTimeLog *tlog, *clog, *temp = NULL;
+  //CkQ <BgTimeLog*> insertList;
+  BgTimeLog *tlog, *clog, *temp = NULL;
   BgTimeLine &tline = tlinerec.timeline;
   int len = tline.length();
 
@@ -475,7 +474,7 @@ CmiPrintf("BgAdjustTimeLineByIndex BEGIN\n");
 //  processCount ++;
 //  if (processCount%1000 == 0) CmiPrintf("[%d:%d] BgAdjustTimeLineByIndex: procCount:%d %f %d:%d\n", CmiMyPe(), mynode, processCount, tline[oldIdx]->endTime*1000.0, idx, len);
 
-  minHeap<bgTimeLog*> insertList(len-idx);
+  minHeap<BgTimeLog*> insertList(len-idx);
 
   //Two pass initialization
   //First Pass: Infinite ERT for all but the first
@@ -544,7 +543,7 @@ void BgFinishCorrection(BgTimeLineRec &tlinerec, int mynode, int tid, int idx, i
 #if !LIMITED_SEND
   int c=0;
   for(int i=idx;i<tline.length();i++) {
-    bgTimeLog *log = tline[i];
+    BgTimeLog *log = tline[i];
     int send=sendImmediately;
 #if DELAY_SEND
      if(!send) {
@@ -647,21 +646,21 @@ int BgAdjustTimeLineInsert(BgTimeLineRec &tlinerec)
   return minIdx;
 }
 
-bgTimeLog *BgGetTimeLog(BgTimeLineRec *tline, CmiInt2 tID, int srcnode, int msgID, int *index)
+BgTimeLog *BgGetTimeLog(BgTimeLineRec *tline, CmiInt2 tID, const BgMsgID &msgId, int *index)
 {
   if (tID == ANYTHREAD) {
     for (int i=0; i<cva(bgMach).numWth; i++) {
-      bgTimeLog *tlog = tline[i].getTimeLogOnThread(srcnode, msgID, index);
+      BgTimeLog *tlog = tline[i].getTimeLogOnThread(msgId, index);
       if (tlog) return tlog;
     }
     return NULL;
   }
   else {
-    return tline[tID].getTimeLogOnThread(srcnode, msgID, index);
+    return tline[tID].getTimeLogOnThread(msgId, index);
   }
 }
 
-int BgAdjustTimeLineForward(int srcnode, int msgID, double tAdjustAbs, BgTimeLineRec &tline, int mynode, int tid)
+int BgAdjustTimeLineForward(const BgMsgID &msgId, double tAdjustAbs, BgTimeLineRec &tline, int mynode, int tid)
 {
   /* ASSUMPTION: BgAdjustTimeLineForward is called only if necessary */
   /* ASSUMPTION: no error testing needed */
@@ -669,7 +668,7 @@ int BgAdjustTimeLineForward(int srcnode, int msgID, double tAdjustAbs, BgTimeLin
 
   int idxOld = tline.length()-1;
   while (idxOld >= 0)  {
-    if (tline[idxOld]->msgID == msgID && tline[idxOld]->srcnode == srcnode) break;
+    if (tline[idxOld]->msgId == msgId) break;
     idxOld--;
   }
 
@@ -693,7 +692,7 @@ void bgAddProjEvent(void *data, int idx, double t, bgEventCallBackFn fn, void *u
   BgTimeLineRec &tlinerec = tTIMELINEREC;
   BgTimeLine &tline = tlinerec.timeline;
   CmiAssert(tline.length() > 0);
-  bgTimeLog *tlog = tline[tline.length()-1];
+  BgTimeLog *tlog = tline[tline.length()-1];
   // make sure this time log entry is not closed
   //if ((tlog->endTime == 0.0) ||(t <= tlog->endTime)) 
   // if the last log is closed, this is a standalone event
@@ -701,7 +700,7 @@ void bgAddProjEvent(void *data, int idx, double t, bgEventCallBackFn fn, void *u
     // ignore standalone event
     // return;
     double endT = tlog->endTime;
-    tlog = new bgTimeLog(-1, "standalone", endT, endT);	
+    tlog = new BgTimeLog(-1, "standalone", endT, endT);	
     tlog->recvTime = tlog->effRecvTime = endT;
     tlinerec.enq(tlog, 0);
   }
@@ -747,7 +746,7 @@ static inline int handleCorrectionMsg(int mynode, BgTimeLineRec *logs, bgCorrect
 	    // search for the msg
             BgTimeLine &tline = logs[tID].timeline;	
 	    for (int j=0; j<tline.length(); j++)
-	      if (tline[j]->msgID==m->msgID && tline[j]->srcnode==m->srcNode) {
+	      if (tline[j]->msgId == m->msgId) {
 		  found = 1; break; 
 	      }
             if (found) break;
@@ -759,7 +758,7 @@ static inline int handleCorrectionMsg(int mynode, BgTimeLineRec *logs, bgCorrect
 	}
 	//CmiPrintf("tAdjust: %f\n", m->tAdjust);
 	BgTimeLineRec &tlinerec = logs[tID];
-	if (BgAdjustTimeLineForward(m->srcNode, m->msgID, m->tAdjust, tlinerec, mynode, tID) == 0) {
+	if (BgAdjustTimeLineForward(m->msgId, m->tAdjust, tlinerec, mynode, tID) == 0) {
 	    // if delayCheckFlag == 0, it is ok to get rid of this msg
 	    if (!programExit) return 0;
 	}
@@ -783,14 +782,14 @@ static inline int batchHandleCorrectionMsg(int mynode, BgTimeLineRec *tlinerecs,
   int len = cmsg.length();
   int minIdx = -1;
   double minTime = INVALIDTIME;
-  bgTimeLog *minLog = NULL;
+  BgTimeLog *minLog = NULL;
   tlinerec.minCorrection = INVALIDTIME;
   BGSTATE2(2,"batchHandleCorrectionMsg (bgnode:%d len:%d) {", mynode, len);
   for (i=0; i<len; i++) {
     bgCorrectionMsg *cm = cmsg.deq();
     if (cm->tAdjust >= 0.) {
       int oldIdx;
-      bgTimeLog *tlog = tlinerec.getTimeLogOnThread(cm->srcNode, cm->msgID, &oldIdx);
+      BgTimeLog *tlog = tlinerec.getTimeLogOnThread(cm->msgId, &oldIdx);
       if (tlog==NULL) {
 //	if (!programExit) {             // HACK ?
 	if (1) {
@@ -926,7 +925,7 @@ static void enqueueCorrectionMsg(int nodeidx, bgCorrectionMsg* m)
     int msgLen = cmsg.length();
     for (int i=0; i<msgLen; i++) {
       bgCorrectionMsg* cm = cmsg[i];
-      if (cm->msgID == m->msgID && cm->srcNode == m->srcNode && cm->tID == m->tID) {
+      if (cm->msgId == m->msgId && cm->tID == m->tID) {
         cm->tAdjust = m->tAdjust;
 	removed = 1;
         stateCounters.corrMsgCCCnt++;
@@ -1067,9 +1066,9 @@ static double findLeastTime()
       bgCorrectionMsg* cmsg = cmsgQ[i]; 
       if (cmsg->tAdjust>.0){
 	int index;
-	bgTimeLog* tlog;
+	BgTimeLog* tlog;
 	//Comapre startTime
-	tlog = BgGetTimeLog(tlinerecs, cmsg->tID, cmsg->srcNode, cmsg->msgID, &index);
+	tlog = BgGetTimeLog(tlinerecs, cmsg->tID, cmsg->msgId, &index);
 	if(tlog != NULL){
 	  if(tlog->startTime < minT)
 	    minT = tlog->startTime;

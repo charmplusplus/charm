@@ -71,14 +71,14 @@ inline int isEqual(double v1, double v2){
             BgTimeLineRec &tlinerec = tTIMELINEREC;	\
             int n = tlinerec.length();			\
             if (n>0) {					\
-              bgTimeLog *tlog = tlinerec[n-1];		\
+              BgTimeLog *tlog = tlinerec[n-1];		\
 	      if (tlog->endTime == 0.0)			\
                 tlog->addMsg(m, node, tid, local);	\
 	      else {	 /* standalone msg */		\
 		  /*CmiAssert(0);*/ 			\
 		  /*double curT = CmiBgMsgRecvTime(m);*/		\
 		  double curT = BgGetTime();		\
-		  bgTimeLog *newLog = new bgTimeLog(-1, "addMsg", curT, curT); \
+		  BgTimeLog *newLog = new BgTimeLog(-1, "addMsg", curT, curT); \
 		  newLog->recvTime = newLog->effRecvTime = curT;	\
                   newLog->addMsg(m, node, tid, local);		\
 		  tlinerec.logEntryInsert(newLog);		\

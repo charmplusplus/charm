@@ -1134,15 +1134,14 @@ extern "C" int CmiSwitchToPE(int pe)
 extern void processCorrectionMsg(int nodeidx);
 
 // return the msg pointer, and the index of the message in the affinity queue.
-static inline char* searchInAffinityQueue(int nodeidx, int msgID, int srcnode, CmiInt2 tID, int &index)
+static inline char* searchInAffinityQueue(int nodeidx, BgMsgID &msgId, CmiInt2 tID, int &index)
 {
   CmiAssert(tID != ANYTHREAD);
   ckMsgQueue &affinityQ = cva(nodeinfo)[nodeidx].affinityQ[tID];
   for (int i=0; i<affinityQ.length(); i++)  {
       char *msg = affinityQ[i];
-      int m_msgID = CmiBgMsgID(msg);
-      int m_srcnode = CmiBgMsgSrcPe(msg);
-      if (msgID == m_msgID && srcnode == m_srcnode) {
+      BgMsgID md = BgMsgID(CmiBgMsgSrcPe(msg), CmiBgMsgID(msg));
+      if (msgId == md) {
         index = i;
         return msg;
       }
@@ -1151,10 +1150,10 @@ static inline char* searchInAffinityQueue(int nodeidx, int msgID, int srcnode, C
 }
 
 // return the msg pointer, thread id and the index of the message in the affinity queue.
-static char* searchInAffinityQueueInNode(int nodeidx, int msgID, int srcnode, CmiInt2 &tID, int &index)
+static char* searchInAffinityQueueInNode(int nodeidx, BgMsgID &msgId, CmiInt2 &tID, int &index)
 {
   for (tID=0; tID<cva(bgMach).numWth; tID++) {
-    char *msg = searchInAffinityQueue(nodeidx, msgID, srcnode, tID, index);
+    char *msg = searchInAffinityQueue(nodeidx, msgId, tID, index);
     if (msg) return msg;
   }
   return NULL;
@@ -1168,10 +1167,10 @@ int updateRealMsgs(bgCorrectionMsg *cm, int nodeidx)
   CmiInt2 tID = cm->tID;
   int index;
   if (tID == ANYTHREAD) {
-    msg = searchInAffinityQueueInNode(nodeidx, cm->msgID, cm->srcNode, tID, index);
+    msg = searchInAffinityQueueInNode(nodeidx, cm->msgId, tID, index);
   }
   else {
-    msg = searchInAffinityQueue(nodeidx, cm->msgID, cm->srcNode, tID, index);
+    msg = searchInAffinityQueue(nodeidx, cm->msgId, tID, index);
   }
   if (msg == NULL) return 0;
 
@@ -1287,8 +1286,8 @@ static void sendCorrectionStats()
 	int tlen = tlinerec.length();
 	if (tlen>maxTimelineLen) maxTimelineLen=tlen;
 	if (tlen<minTimelineLen) minTimelineLen=tlen;
-        totalMem = tlen*sizeof(bgTimeLog);
-//CmiPrintf("[%d node:%d] bgTimeLog: %dK len:%d size of bglog: %d bytes\n", CmiMyPe(), nodeidx, totalMem/1000, tlen, sizeof(bgTimeLog));
+        totalMem = tlen*sizeof(BgTimeLog);
+//CmiPrintf("[%d node:%d] BgTimeLog: %dK len:%d size of bglog: %d bytes\n", CmiMyPe(), nodeidx, totalMem/1000, tlen, sizeof(BgTimeLog));
 #if 0
         for (int i=0; i< tlinerec.length(); i++) {
           numMsgs += tlinerec[i]->msgs.length();
@@ -1350,15 +1349,14 @@ void correctMsgTime(char *msg)
    if (!correctTimeLog) return;
 //   if (CkMsgDoCorrect(msg) == 0) return;
 
-   int msgID = CmiBgMsgID(msg);
-   int srcnode = CmiBgMsgSrcPe(msg);
+   BgMsgID msgId(CmiBgMsgSrcPe(msg), CmiBgMsgID(msg));
    CmiInt2 tid = CmiBgMsgThreadID(msg);
 
    bgCorrectionQ &cmsg = cva(nodeinfo)[tMYNODEID].cmsg;
    int len = cmsg.length();
    for (int i=0; i<len; i++) {
      bgCorrectionMsg* m = cmsg[i];
-     if (msgID == m->msgID && srcnode == m->srcNode && tid == m->tID) {
+     if (msgId == m->msgId && tid == m->tID) {
         if (m->tAdjust < 0.0) return;
         //CmiPrintf("correctMsgTime from %e to %e\n", CmiBgMsgRecvTime(msg), m->tAdjust);
 	CmiBgMsgRecvTime(msg) = m->tAdjust;

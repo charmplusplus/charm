@@ -49,13 +49,12 @@ class bgCorrectionMsg
 {
 public:
   char     core[CmiBlueGeneMsgHeaderSizeBytes];
-  int      msgID;	
-  CmiInt2 tID;		// destination worker thread ID
+  BgMsgID  msgId;
+  CmiInt2  tID;		// destination worker thread ID
 			// it can be:  -1:   for any thread which was not known
 			//            < -100: for each thread except one
   double   tAdjust;	// new absolute value of recvTime at destPe
-  int 	   destNode;
-  int      srcNode;
+  int      destNode;
 public:
   double key() { return tAdjust; }
   int compareKey(bgCorrectionMsg* otherMsg)
@@ -70,12 +69,11 @@ extern void BgInitTiming();
 extern void BgMsgSetTiming(char *msg);
 extern int BgAdjustTimelineByIndex(int idxOld, double tAdjustAbs, BgTimeLineRec &tline);
 extern int BgAdjustTimeLineInsert(BgTimeLineRec &tline);
-extern int BgAdjustTimeLineForward(int src, int msgID, double tAdjustAbs, BgTimeLineRec &tline, int mynode, int tid);
+extern int BgAdjustTimeLineForward(const BgMsgID &msgId, double tAdjustAbs, BgTimeLineRec &tline, int mynode, int tid);
 extern void BgPrintThreadTimeLine(int node, int th, BgTimeLine &tline);
 extern void BgFinishCorrection(BgTimeLineRec &tlinerec, int mynode, int tid, int idx, int send=1);
 extern void BgSendBufferedCorrMsgs();
-extern bgTimeLog *BgGetTimeLog(BgTimeLineRec *tline, CmiInt2 tID, int srcnode, int msgID, int *index);
-extern int BgGetTimeLineIndexByRecvTime(BgTimeLineRec &, bgTimeLog *, int, int);
+extern int BgGetTimeLineIndexByRecvTime(BgTimeLineRec &, BgTimeLog *, int, int);
 extern int BgAdjustTimeLineFromIndex(int index, BgTimeLineRec &tlinerec, int mynode);
 extern int BgGetIndexFromTime(double effT, int seqno, BgTimeLineRec &tline);
 extern void BgSendPendingCorrections(BgTimeLineRec &tlinerec, int mynode);
@@ -99,12 +97,12 @@ extern void BgLogEntryCommit(BgTimeLineRec &tlinerec);
             BgTimeLineRec &tlinerec = tTIMELINEREC;	\
             int n = tlinerec.length();			\
             if (n>0) {					\
-              bgTimeLog *tlog = tlinerec[n-1];		\
+              BgTimeLog *tlog = tlinerec[n-1];		\
 	      if (tlog->endTime == 0.0)			\
                 tlog->addMsg(m, node, tid, local);	\
 	      else {	 /* standalone msg */		\
 		  double curT = CmiBgMsgRecvTime(m);		\
-		  bgTimeLog *newLog = new bgTimeLog(-1, "addMsg", curT, curT); \
+		  BgTimeLog *newLog = new BgTimeLog(-1, "addMsg", curT, curT); \
 		  newLog->recvTime = newLog->effRecvTime = curT;	\
                   newLog->addMsg(m, node, tid, local);		\
 		  tlinerec.logEntryInsert(newLog);			\

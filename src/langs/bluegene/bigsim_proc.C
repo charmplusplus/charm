@@ -76,7 +76,7 @@ void BgScheduler(int nmsg)
     if (BgIsInALog(tTIMELINEREC)) {
       isinterrupt = 1;
       BgLogEntryCommit(tTIMELINEREC);
-      tTIMELINEREC.bgPrevLog = BgCurrentLog(tTIMELINEREC);
+      tTIMELINEREC.bgPrevLog = BgLastLog(tTIMELINEREC);
     }
   }
   stopVTimer();
@@ -87,8 +87,8 @@ void BgScheduler(int nmsg)
   startVTimer();
   if (genTimeLog && isinterrupt) 
   {
-    bgTimeLog *curlog = BgCurrentLog(tTIMELINEREC);
-    bgTimeLog *newLog = BgStartLogByName(tTIMELINEREC, -1, "BgSchedulerEnd", BgGetCurTime(), curlog);
+    BgTimeLog *curlog = BgLastLog(tTIMELINEREC);
+    BgTimeLog *newLog = BgStartLogByName(tTIMELINEREC, -1, "BgSchedulerEnd", BgGetCurTime(), curlog);
   }
 }
 
