@@ -6,6 +6,7 @@
 #include "envelope.h"
 #include "commlib.h"
 
+
 #define USE_DIRECT 0
 #define USE_TREE 1
 #define USE_MESH 2
