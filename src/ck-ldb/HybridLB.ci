@@ -5,15 +5,21 @@ extern module BaseLB;
 
 include "NeighborLBMsg.h";
 include "CentralLBMsg.h";
+include "HybridLBMsg.h";
 
 group [migratable] HybridLB: BaseLB {
   entry void HybridLB(const CkLBOptions &);  
-  entry void ReceiveStats(CkMarshalledCLBStatsMessage data);
+  entry void ProcessAtSync();
+  entry void ReceiveStats(CkMarshalledCLBStatsMessage data, int level);
   entry void ResumeClients(CkReductionMsg *msg);
   entry void ResumeClients(void);
   entry void ReceiveMigration(LBMigrateMsg*);	
-  entry void Loadbalancing();	
-  entry void NotifyMigrationDone();	
+  entry void ObjMigrated(LDObjData data, int level);
+  entry void Loadbalancing(int level);	
+  entry void NotifyObjectMigrationDone(int);	
+  entry void StartCollectInfo();
+  entry void CollectInfo(Location loc[n], int n, int fromlevel);	
+  entry void PropagateInfo(Location loc[n], int n, int fromlevel);
 };
 
 };
