@@ -104,19 +104,11 @@ The header file is StreamingStrategy.h.
 The following are the steps to use the communication library 
 in a user program.
 
-\subsubsection{Compiling the library}
-
-To use the communications library it needs to be compiled first.
-
-\begin{verbatim}
-cd charm/tmp/libs/ck-libs/commlib;
-make;
-\end{verbatim}
-
 \subsubsection{Compiling User Code}
+
 All user programs that use the communcation library should use the
-linker option -module commlib.For Example \\ 
-charmc -o pgm pgm.o -module commlib
+linker option -module comlib.For Example \\ 
+charmc -o pgm pgm.o -module comlib
 
 \subsubsection {Calling the Library from User Code}
 Calls to the communication library have to be made at two places in
