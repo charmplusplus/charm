@@ -705,7 +705,8 @@ MBLK_Test_update(int *status)
     CkError("MBLK_Test_update  called from outside driver\n");
     return MBLK_FAILURE;
   }
-  return getCurChunk()->test_update();
+  *status=getCurChunk()->test_update();
+  return MBLK_SUCCESS; 
 }
 
 CDECL int
