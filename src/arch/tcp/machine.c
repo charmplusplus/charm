@@ -97,13 +97,13 @@ return (void *)(res+8);
 int CmiSize(blk)
 void *blk;
 {
-return ((int *)(blk-8))[0];
+return ((int *)(((char *)blk)-8))[0];
 }
 
 void CmiFree(blk)
 void *blk;
 {
-free(blk-8);
+free(((char *)blk)-8);
 }
 
 /*****************************************************************************
