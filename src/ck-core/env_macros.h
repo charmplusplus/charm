@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.2  1995-07-12 16:28:45  jyelon
+ * Revision 2.3  1995-07-19 22:15:35  jyelon
+ * *** empty log message ***
+ *
+ * Revision 2.2  1995/07/12  16:28:45  jyelon
  * *** empty log message ***
  *
  * Revision 2.1  1995/06/08  17:07:12  gursoy
@@ -45,28 +48,51 @@
 #ifndef ENV_MACROS_H
 #define ENV_MACROS_H
 
+/*
+ * Notes on saving envelope size:
+ *
+ * This envelope is huge because it contains fields for every kind of
+ * message that charm sends.  Instead, should be changed to a union.
+ *
+ * PackID can probably be made a function of EP, and thus removed.
+ * save 8 bits.
+ *
+ * I am sure we can get rid of chare_magic_number.  Must move sizeData
+ * elsewhere.  Seems like other_id and ref might be able to hold it.
+ * Also, seems like chareDataPtr might be able to hold it, although
+ * not sure about boc_num.  Also, seems like other_id, ref might be
+ * mergeable.
+ *
+ * No need for vid info in envelope.  Save 16 bits for onPE.
+ *
+ * queueing can be shortened to 3 bits.  Save 5 bits.
+ * priosize can be shortened to 13 bits.  Save 3 bits.
+ *
+ */
+
 typedef struct envelope {
   unsigned int core1;
   /* core1 is the first word of the core's fields */
 
-  unsigned int   i_tag1;
-  unsigned int   i_tag2;
-  unsigned int   i_tag3;
-  unsigned int   destPE;
+  unsigned int   i_tag1;  /* Totalsize 24 bits.  Packid 8 bits. */
+  unsigned int   i_tag2;  /* Count, vidBlockPtr, chareBlockPtr, or boc_num */
+  unsigned int   i_tag3;  /* sizeData or chare_magic_number */
 
-  unsigned short onPE;
-  unsigned short ref;
+  unsigned short onPE;    /* Incomprehensible. Used only for VID's. */
+  unsigned short destPE;  /* destination PE */
 
-  unsigned short EP;
-  unsigned short s_tag1;
+  unsigned short EP;      /* probably the entry point to call */
+  unsigned short ref;     /* Reference number - for dagger only */
 
+  unsigned short s_tag1;  /* (isVID,vidEP) or  other_id */
   unsigned short priosize;
-  unsigned char  queueing;
+
   unsigned char  c_tag1;
+  unsigned char  queueing;
   
 #ifdef DEBUGGING_MODE
-  int            pe;
-  int            event;
+  int            pe;     /* Source PE??? Used only for logging. */
+  int            event;  /* Some sort of event number. Used only for logging.*/
 #endif 
 
 } ENVELOPE;
@@ -181,8 +207,6 @@ typedef struct envelope {
 #define GetEnv_event(e)	        	(env(e)->event)
 #define GetEnv_ref(e)                   (env(e)->ref)
 #define GetEnv_onPE(e)                  (env(e)->onPE)
-#define GetEnv_priosize(e)              (env(e)->priosize)
-#define GetEnv_queueing(e)              (env(e)->queueing)
 #define GetEnv_EP(e) 			(env(e)->EP)
 
 #define SetEnv_destPE(e,x) 		(env(e)->destPE=(x))
@@ -190,15 +214,20 @@ typedef struct envelope {
 #define SetEnv_event(e,x)		(env(e)->event=(x))
 #define SetEnv_ref(e,x)                 (env(e)->ref=(x))
 #define SetEnv_onPE(e,x)                (env(e)->onPE=(x))
-#define SetEnv_priosize(e,x)            (env(e)->priosize=(x))
-#define SetEnv_queueing(e,x)            (env(e)->queueing=(x))
 #define SetEnv_EP(e,x) 		        (env(e)->EP=(x))
+
+#define GetEnv_queueing(e)    (env(e)->queueing)
+#define GetEnv_priosize(e)    (env(e)->priosize)
+#define SetEnv_queueing(e,x)  (env(e)->queueing=(x))
+#define SetEnv_priosize(e,x)  (env(e)->priosize=(x))
+
+#define SetEnv_prioinfo(e, q, p) (env(e)->queueing=(q),env(e)->priosize=(p))
 
 /*********************************/
 /* Navigating the priority field */
 /*********************************/
 
-#define GetEnv_priowords(e) ((env(e)->priosize+INTBITS-1)/INTBITS)
+#define GetEnv_priowords(e) ((GetEnv_priosize(e)+INTBITS-1)/INTBITS)
 #define GetEnv_priobytes(e) (GetEnv_priowords(e)*sizeof(int))
 #define GetEnv_prioend(e) (((char *)(e))+GetEnv_TotalSize(e))
 #define GetEnv_priobgn(e) (GetEnv_prioend(e)-GetEnv_priobytes(e))

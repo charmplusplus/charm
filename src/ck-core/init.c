@@ -12,11 +12,14 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.7  1995-07-12 16:28:45  jyelon
+ * Revision 2.8  1995-07-19 22:15:26  jyelon
+ * *** empty log message ***
+ *
+ * Revision 2.7  1995/07/12  16:28:45  jyelon
  * *** empty log message ***
  *
  * Revision 2.6  1995/06/29  21:43:17  narain
- * Added LdbCreateBoc, Removed call to LdbBocInit in SysBocInit
+ * Added CldCreateBoc
  *
  * Revision 2.5  1995/06/29  15:54:09  gursoy
  * fixed a CpvAccess -- ReadBufIndex
@@ -207,7 +210,7 @@ char **argv;
 				 * to modify this somewhat */
 		CpvAccess(InsideDataInit) = 1;
 
-		LdbCreateBoc();
+		CldCreateBoc();
 
 		CpvAccess(InsideDataInit) = 0;
 
@@ -397,7 +400,7 @@ ENVELOPE       *envelope;
 
 SysPeriodicCheckInit()
 {
-	LdbPeriodicCheckInit();
+	CldPeriodicCheckInit();
 }
 
 
@@ -639,7 +642,7 @@ InitializeEPTables()
 /* Adding entry points for system branch office chares. */
 AddSysBocEps()
 {
-	LdbAddSysBocEps();
+	CldAddSysBocEps();
 	QDAddSysBocEps();
 	VidAddSysBocEps();
 	WOVAddSysBocEps();
@@ -738,7 +741,6 @@ ENVELOPE *DeQueueBocInitMsgs()
 
 SysBocInit()
 {
-/*	LdbBocInit(); */
 	QDBocInit();
 	VidBocInit();
 	TblBocInit();

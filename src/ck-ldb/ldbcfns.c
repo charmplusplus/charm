@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.2  1995-07-09 17:50:46  narain
+ * Revision 2.3  1995-07-19 22:15:21  jyelon
+ * *** empty log message ***
+ *
+ * Revision 2.2  1995/07/09  17:50:46  narain
  * Made changes in tokens registered with Scheduler.. debugged code.
  *
  * Revision 2.1  1995/07/07  01:06:48  narain
@@ -31,18 +34,18 @@ static char ident[] = "@(#)$Header$";
 
 CpvDeclare(int, LDB_ELEM_SIZE);
 
-void ldbModuleInit()
+void CldModuleInit()
 {
   CpvInitialize(int, LDB_ELEM_SIZE);
 
-  CpvAccess(LDB_ELEM_SIZE) = getLdbSize();
+  CpvAccess(LDB_ELEM_SIZE) = CldGetLdbSize();
 }
 
 void CldPickFreeChare(void **a)
 {
 }
 
-LdbAddSysBocEps()
+CldAddSysBocEps()
 {
 }
 

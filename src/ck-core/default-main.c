@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.8  1995-07-12 20:59:58  brunner
+ * Revision 2.9  1995-07-19 22:15:24  jyelon
+ * *** empty log message ***
+ *
+ * Revision 2.8  1995/07/12  20:59:58  brunner
  * Added argv[0] to perfModuleInit() call, so performance data files
  * can use the prgram name in the log file name.
  *
@@ -78,7 +81,7 @@ char *argv[];
   registerModuleInit();
   statModuleInit();
   tblModuleInit(); 
-  ldbModuleInit();
+  CldModuleInit();
   perfModuleInit(argv[0]); /* pass program name */
 
   if (CmiMyRank() == 0) CmiNodeBarrier();
@@ -88,18 +91,6 @@ char *argv[];
   CpvAccess(CsdStopFlag)=0;
 
   CsdScheduler(-1) ;
-
-/**** Josh's old code
-  while (1) {
-    void *msg;
-    msg = CsdGetMsg();
-    if (msg) (CmiGetHandlerFunction(msg))(msg);
-    if (CpvAccess(CsdStopFlag)) break;
-    if (!CpvAccess(disable_sys_msgs))
-        { if (CpvAccess(numHeapEntries) > 0) TimerChecks();
-          if (CpvAccess(numCondChkArryElts) > 0) PeriodicChecks(); }
-  }
-****/
 
   EndCharm();
   ConverseExit() ;

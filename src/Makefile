@@ -42,7 +42,7 @@ CHARMC=../bin/charmc $(OPTS)
 #
 ###############################################################################
 
-ALLHEADERS=acc.h c++interface.h chare.h ckdefs.h common.h communication.h condsend.h const.h core_macros.h dagger.h dtable.h env_macros.h globals.h mono.h msg_macros.h prio_macros.h qd.h stat.h sys_macros.h table.h tbl.h trans_decls.h trans_defs.h trans_externs.h user_macros.h vid.h wrtone.h converse.h conv-mach.h internal.h quiescence.h performance.h dag.h generic_redn.h pglib.h
+ALLHEADERS=acc.h c++interface.h chare.h ckdefs.h common.h communication.h condsend.h const.h dagger.h dtable.h env_macros.h globals.h mono.h msg_macros.h prio_macros.h qd.h stat.h sys_macros.h table.h tbl.h trans_decls.h trans_defs.h trans_externs.h user_macros.h vid.h wrtone.h converse.h conv-mach.h internal.h quiescence.h performance.h dag.h generic_redn.h pglib.h
 
 ALLINTERFACES=GENERIC-ACC.int GENERIC-HIST.int GENERIC-REDN.int barrier_redn.int cache.int dacc_count.int dacc_hist.int dcountredn.int dmaxredn.int dminredn.int dprodredn.int dsumredn.int facc_count.int facc_hist.int fcountredn.int fmaxredn.int fminredn.int fprodredn.int fsumredn.int iacc_count.int iacc_hist.int icountredn.int imaxredn.int iminredn.int iprodredn.int isumredn.int pg.int
 
@@ -77,47 +77,14 @@ dirs+sources:
 
 CVHEADERS=converse.h conv-conds.h conv-mach.h 
 
-CVLIBS_QS=libconv-qs-super.o libconv-qs-fifo.o libconv-qs-lifo.o # libconv-qs-bfifo.o libconv-qs-ififo.o libconv-qs-bstack.o libconv-qs-istack.o libconv-qs-newfifo.o libconv-qs-replay.o libconv-qs-rand.o libconv-qs-fifolifo.o
-
 CVLIBS=libconv-core.o $(CVLIBS_QS)
+
+LIBCONV_CORE=convcore.o conv-conds.o machine.o spantree.o queueing.o fifo.o
 
 converse: basics $(CVLIBS) cmk_extras
 
-libconv-core.o: convcore.o conv-conds.o machine.o spantree.o fifo.o
-	$(CHARMC) -cp ../lib/ -o $@ convcore.o conv-conds.o machine.o spantree.o fifo.o
-
-libconv-qs-super.o: qs.super.c
-	$(CHARMC) -cp ../lib/ -o $@ qs.super.c
-
-libconv-qs-fifo.o: qs.fifo.c
-	$(CHARMC) -cp ../lib/ -o $@ qs.fifo.c
-
-libconv-qs-lifo.o: qs.lifo.c
-	$(CHARMC) -cp ../lib/ -o $@ qs.lifo.c
-
-libconv-qs-fifolifo.o: qs.fifolifo.c
-	$(CHARMC) -cp ../lib/ -o $@ qs.fifolifo.c
-
-libconv-qs-newfifo.o: qs.newfifo.c
-	$(CHARMC) -cp ../lib/ -o $@ qs.newfifo.c
-
-libconv-qs-ififo.o: qs.ififo.c
-	$(CHARMC) -cp ../lib/ -o $@ qs.ififo.c
-
-libconv-qs-istack.o: qs.istack.c
-	$(CHARMC) -cp ../lib/ -o $@ qs.istack.c
-
-libconv-qs-bfifo.o: qs.bfifo.c
-	$(CHARMC) -cp ../lib/ -o $@ qs.bfifo.c
-
-libconv-qs-bstack.o: qs.bstack.c
-	$(CHARMC) -cp ../lib/ -o $@ qs.bstack.c
-
-libconv-qs-rand.o: qs.rand.c
-	$(CHARMC) -cp ../lib/ -o $@ qs.rand.c
-
-libconv-qs-replay.o: qs.replay.c
-	$(CHARMC) -cp ../lib/ -o $@ qs.replay.c
+libconv-core.o: $(LIBCONV_CORE)
+	$(CHARMC) -cp ../lib/ -o $@ $(LIBCONV_CORE)
 
 fifo.o: fifo.c $(CVHEADERS)
 	$(CHARMC) fifo.c
@@ -131,9 +98,11 @@ machine.o: machine.c $(CVHEADERS)
 convcore.o: convcore.c $(CVHEADERS)
 	$(CHARMC) convcore.c
 
+queueing.o: queueing.c
+	$(CHARMC) queueing.c
+
 conv-conds.o: conv-conds.c $(CVHEADERS)
 	$(CHARMC) conv-conds.c
-
 
 cmk_extras:
 	csh -fc 'source conv-mach.csh ; set echo ; $$CMK_EXTRAS'

@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.4  1995-07-12 16:28:45  jyelon
+ * Revision 2.5  1995-07-19 22:15:33  jyelon
+ * *** empty log message ***
+ *
+ * Revision 2.4  1995/07/12  16:28:45  jyelon
  * *** empty log message ***
  *
  * Revision 2.3  1995/06/29  21:31:10  narain
@@ -48,12 +51,12 @@
 #define ALL_NODES_EXCEPT_ME (-2)
 
 /* Constant values for queueing in envelope */
-#define CK_QUEUEING_BFIFO 0
-#define CK_QUEUEING_BLIFO 1
-#define CK_QUEUEING_IFIFO 2
-#define CK_QUEUEING_ILIFO 3
-#define CK_QUEUEING_FIFO 4
-#define CK_QUEUEING_LIFO 5
+#define CK_QUEUEING_FIFO  CQS_QUEUEING_FIFO
+#define CK_QUEUEING_LIFO  CQS_QUEUEING_LIFO
+#define CK_QUEUEING_IFIFO CQS_QUEUEING_IFIFO
+#define CK_QUEUEING_ILIFO CQS_QUEUEING_ILIFO
+#define CK_QUEUEING_BFIFO CQS_QUEUEING_BFIFO
+#define CK_QUEUEING_BLIFO CQS_QUEUEING_BLIFO
 
 /* define the System BocNum's corresponding to system BOCs
    e.g LoadBalancing, Quiescence, Also Increment the NumSysBoc

@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.6  1995-07-12 16:28:45  jyelon
+ * Revision 2.7  1995-07-19 22:15:28  jyelon
+ * *** empty log message ***
+ *
+ * Revision 2.6  1995/07/12  16:28:45  jyelon
  * *** empty log message ***
  *
  * Revision 2.5  1995/07/06  22:42:11  narain
@@ -22,10 +25,10 @@
  * *** empty log message ***
  *
  * Revision 2.3  1995/07/05  19:38:31  narain
- * No LdbFillBlock and StripMsg while InsideDataInit
+ * No CldFillBlock and CldStripMsg while InsideDataInit
  *
  * Revision 2.2  1995/06/29  21:44:50  narain
- * Added macros for Ldb_StripMsg and Ldb_NewChare_FromNet
+ * Added macros for CldStripMsg and CldNewChareFromNet
  *
  * Revision 2.1  1995/06/08  17:07:12  gursoy
  * Cpv macro changes done
@@ -115,7 +118,7 @@ ENVELOPE *env;
 {
 	/* send to ldb strategy to extract load information if user message */
         if(CpvAccess(InsideDataInit))
-	   LdbStripLDB(LDB_ELEMENT_PTR(env));
+	   CldStripLdb(LDB_ELEMENT_PTR(env));
 
 	switch (GetEnv_category(env)) {
 	case IMMEDIATEcat :
@@ -128,8 +131,11 @@ ENVELOPE *env;
 
         	if (!GetEnv_destPeFixed(env)) { 
 			/* if destPeFixed==0, msg is always USERcat */
-                	Ldb_NewSeed_FromNet(env, LDB_ELEMENT_PTR(env),
-					    CkLdbSend);
+                	CldNewSeedFromNet(env, LDB_ELEMENT_PTR(env),
+					    CkLdbSend,
+                                            GetEnv_queueing(env),
+                                            GetEnv_priosize(env),
+                                            GetEnv_priobgn(env));
 		}
 		else 
 			CkEnqueue(env);

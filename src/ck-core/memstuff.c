@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.4  1995-07-12 16:28:45  jyelon
+ * Revision 2.5  1995-07-19 22:15:30  jyelon
+ * *** empty log message ***
+ *
+ * Revision 2.4  1995/07/12  16:28:45  jyelon
  * *** empty log message ***
  *
  * Revision 2.3  1995/06/29  21:49:07  narain
@@ -95,8 +98,7 @@ unsigned int msgbytes;
   CkMemError(envptr);
   SetEnv_isPACKED(envptr, NO_PACK);
   SetEnv_TotalSize_packid(envptr, totalsize, 0);
-  SetEnv_priosize(envptr, 0);
-  SetEnv_queueing(envptr, CK_QUEUEING_FIFO);
+  SetEnv_prioinfo(envptr, CK_QUEUEING_FIFO, 0);
   return((void *)USER_MSG_PTR(envptr));
 }
 
@@ -191,8 +193,7 @@ unsigned int priobits;
     env = (ENVELOPE *)CmiAlloc(totalsize);
     CkMemError(env);
 
-    SetEnv_priosize(env, priobits);
-    SetEnv_queueing(env, CK_QUEUEING_BFIFO);
+    SetEnv_prioinfo(env, CK_QUEUEING_BFIFO, priobits);
 
     if (CsvAccess(MsgToStructTable)[msgno].packfn != NULL)
     {

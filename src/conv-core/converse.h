@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.8  1995-07-11 18:10:26  jyelon
+ * Revision 2.9  1995-07-19 22:18:54  jyelon
+ * *** empty log message ***
+ *
+ * Revision 2.8  1995/07/11  18:10:26  jyelon
  * Added CsdEnqueueFifo, etc.
  *
  * Revision 2.7  1995/07/11  16:52:37  gursoy
@@ -181,6 +184,15 @@ int   CmiScanf  CMK_PROTO(());
 #define CmiScanf  scanf
 #endif
 
+/******** CONSTANTS FOR CONVERSE QUEUEING SYSTEM ********/
+
+#define CQS_QUEUEING_FIFO 0
+#define CQS_QUEUEING_LIFO 1
+#define CQS_QUEUEING_IFIFO 2
+#define CQS_QUEUEING_ILIFO 3
+#define CQS_QUEUEING_BFIFO 4
+#define CQS_QUEUEING_BLIFO 5
+
 /******** PROTOTYPES FOR CSD FUNCTIONS AND MACROS ********/
 
 CpvExtern(void*, CsdSchedQueue);
@@ -191,13 +203,11 @@ CpvExtern(int, CsdStopFlag);
 #define CsdExitScheduler()  (CpvAccess(CsdStopFlag)=1)
 #endif 
 
-#define CsdEnqueue(x)         (CqsEnqueue(CpvAccess(CsdSchedQueue),x))
+#define CsdEnqueueGeneral(x,s,i,p)\
+    (CqsEnqueueGeneral(CpvAccess(CsdSchedQueue),x,s,i,p))
 #define CsdEnqueueFifo(x)     (CqsEnqueueFifo(CpvAccess(CsdSchedQueue),x))
 #define CsdEnqueueLifo(x)     (CqsEnqueueLifo(CpvAccess(CsdSchedQueue),x))
-#define CsdEnqueueBFifo(x,l,p)(CqsEnqueueBFifo(CpvAccess(CsdSchedQueue),x,l,p))
-#define CsdEnqueueBLifo(x,l,p)(CqsEnqueueBLifo(CpvAccess(CsdSchedQueue),x,l,p))
-#define CsdEnqueueIFifo(x,p)  (CqsEnqueueIFifo(CpvAccess(CsdSchedQueue),x,p))
-#define CsdEnqueueILifo(x,p)  (CqsEnqueueILifo(CpvAccess(CsdSchedQueue),x,p))
+#define CsdEnqueue(x)         (CqsEnqueueFifo(CpvAccess(CsdSchedQueue),x))
 
 #define CsdEmpty()     (CqsEmpty(CpvAccess(CsdSchedQueue)))
 

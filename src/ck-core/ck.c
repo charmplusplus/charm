@@ -12,14 +12,17 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.4  1995-07-12 16:28:45  jyelon
+ * Revision 2.5  1995-07-19 22:15:22  jyelon
+ * *** empty log message ***
+ *
+ * Revision 2.4  1995/07/12  16:28:45  jyelon
  * *** empty log message ***
  *
  * Revision 2.3  1995/07/06  22:42:11  narain
  * Changes for LDB interface revision
  *
  * Revision 2.2  1995/06/29  21:38:00  narain
- * Added #define Ldb_NewChare_FromLocal, and code for CkMakeFreeCharesMessage,
+ * Added #define CldNewChareFromLocal, and code for CkMakeFreeCharesMessage,
  * CkQueueFreeCharesMessage, and SetNewChareMsg
  *
  * Revision 2.1  1995/06/08  17:09:41  gursoy
@@ -346,11 +349,6 @@ int DestPe;
 	SetEnv_onPE(env, CmiMyPe());
 	SetEnv_EP(env, Entry);
 
-	TRACE(CmiPrintf("[%d] CreateChare: cat=%d, type=%d, size=%d, pe=%d, EP=%d\n",
-	    CmiMyPe(), GetEnv_category(env), GetEnv_msgType(env),
-	    GetEnv_sizeData(env), GetEnv_onPE(env),
-	    GetEnv_EP(env)));
-
 	if (vid != NULL_VID)
 	{
 		vidblock   = (VID_BLOCK *)  CmiAlloc(sizeof(VID_BLOCK));
@@ -384,7 +382,7 @@ int DestPe;
 
 
 	/********************  SANJEEV May 24, 93 **************************/
-	/* The Ldb_NewChare_FromLocal, FIFO_EnQueue, and CkCheck_and_Send
+	/* The CldNewChareFromLocal, FIFO_EnQueue, and CkCheck_and_Send
    calls were moved inside this if-then-else  */
 
 	trace_creation(GetEnv_msgType(env), Entry, env);
@@ -395,7 +393,11 @@ int DestPe;
 		SetEnv_destPeFixed(env, 0);
 		CmiSetHandler(env,CsvAccess(CallProcessMsg_Index)) ;
 		if (CmiNumPe() > 1) 
-		  Ldb_NewSeed_FromLocal(env, LDB_ELEMENT_PTR(env), CkLdbSend);
+		  CldNewSeedFromLocal(env, LDB_ELEMENT_PTR(env),
+                    CkLdbSend,
+                    GetEnv_queueing(env),
+                    GetEnv_priosize(env),
+                    GetEnv_priobgn(env));
 		else 
 		  CkEnqueue(env);
 	      }
@@ -541,24 +543,8 @@ void CkLdbSend(msgst, destPe)
 CkEnqueue(env)
 void *env;
 {
-  switch (GetEnv_queueing(env)) {
-  case CK_QUEUEING_BFIFO: 
-    CsdEnqueueBFifo(env, GetEnv_priosize(env), GetEnv_priobgn(env));
-    break;
-  case CK_QUEUEING_BLIFO:
-    CsdEnqueueBLifo(env, GetEnv_priosize(env), GetEnv_priobgn(env));
-    break;
-  case CK_QUEUEING_IFIFO:
-    CsdEnqueueIFifo(env, *(int *)GetEnv_priobgn(env));
-    break;
-  case CK_QUEUEING_ILIFO:
-    CsdEnqueueILifo(env, *(int *)GetEnv_priobgn(env));
-    break;
-  case CK_QUEUEING_FIFO:
-    CsdEnqueueFifo(env);
-    break;
-  case CK_QUEUEING_LIFO:
-    CsdEnqueueLifo(env);
-    break;
-  }
+  CsdEnqueueGeneral(env,
+    GetEnv_queueing(env),
+    GetEnv_priosize(env),
+    GetEnv_priobgn(env));
 }
