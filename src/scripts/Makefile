@@ -43,10 +43,10 @@ libs: convlibs charmlibs
 	cd libs; make otherlibs OPTS='$(OPTS)'
 
 test-all: all
-	(cd ../pgms ; make test-all)
+	cd ../pgms ; make test-all  OPTS='$(OPTS)'
 
 test-converse: converse
-	(cd ../pgms ; make test-converse)
+	cd ../pgms ; make test-converse  OPTS='$(OPTS)'
 
 CHARMC=../bin/charmc $(CHARMOPTS) $(OPTS)
 
@@ -152,8 +152,8 @@ conv-host-if-needed:
 	if [ -f conv-host.c ] ; then make conv-host OPTS='$(OPTS)' ; fi
 
 QuickThreads/libckqt.a:
-	. conv-mach.sh;cd QuickThreads;./configure $$CMK_QT
-	cd QuickThreads ; make qt
+	. ./conv-mach.sh;cd QuickThreads;./configure $$CMK_QT
+	cd QuickThreads ; make qt  OPTS='$(OPTS)'
 	cp QuickThreads/libqt.a ../lib/libckqt.a
 
 conv-host: conv-host.c

@@ -424,6 +424,8 @@ then
 # <------------------ End C Shell -----------------------------
 fi
 
+Debug "Found charmbin..."
+
 if [ -n "$MACHTYPE" ]
 then
     if [ -d $CHARMBIN/../../$MACHTYPE/bin ]
@@ -454,7 +456,7 @@ cd $ORIGDIR
 #
 ##############################################################################
 
-if [ ! -r $CHARMINC/conv-mach.sh ]
+if [ ! -r "$CHARMINC/conv-mach.sh" ]
 then
 	Abort "Can't find conv-mach.sh in $CHARMINC directory."
 fi
@@ -737,16 +739,21 @@ esac
 #
 ##############################################################################
 
-Debug "About to check TRACEMODE=$TRACEMODE and BALANCE=$BALANCE..."
+Debug "About to check TRACEMODE=$TRACEMODE..."
 
 # Check for valid choice of TRACEMODE
 
-[ -e $CHARMLIB/libtrace-none.a ] || Abort "trace libraries not installed."
+[ -r "$CHARMLIB/libtrace-none.a" ] || Abort "trace libraries not installed."
+
+Debug "trace libraries exist..."
 
 [ -z "$TRACEMODE" ] && TRACEMODE="none"
 
-[ ! -e $CHARMLIB/libtrace-$TRACEMODE.a ] && Abort "charmc : No such tracemode $TRACEMODE"
+Debug "trace $TRACEMODE selected.."
 
+[ ! -r "$CHARMLIB/libtrace-$TRACEMODE.a" ] && Abort "charmc : No such tracemode $TRACEMODE"
+
+Debug "About to check BALANCE=$BALANCE..."
 
 # Check for valid choice of BALANCE
 
@@ -758,9 +765,14 @@ then
     BALANCE=replay
 fi
 
+Debug "About to get extension..."
+
 BAL_EXT=`getExtention $BALANCE`
 if [ -z "$BAL_EXT" ]
 then
+
+Debug "got extension=$BAL_EXT ..."
+
 # Balance has no extention-- is a library reference
     BAL_OBJ="$CHARMLIB/libldb-$BALANCE.o"
 else
@@ -770,7 +782,7 @@ fi
 
 Debug "Finished with BAL_OBJ=$BAL_OBJ, TRACEMODE=$TRACEMODE..."
 
-if [ ! -e "$BAL_OBJ" ]
+if [ ! -r "$BAL_OBJ" ]
 then
 	if [ "$BALANCE" = "$BAL_OBJ" ]
 	then
@@ -817,7 +829,7 @@ esac
 #
 ########################################################################
 
-if [ -e $CHARMBIN/conv-host ]
+if [ -x $CHARMBIN/conv-host ]
 then
 	DoNoErrCheck $RM conv-host
 	Do $CP $CHARMBIN/conv-host conv-host
