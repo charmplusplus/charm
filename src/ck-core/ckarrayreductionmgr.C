@@ -132,10 +132,13 @@ CkReductionMsg *CkArrayReductionMgr::reduceMessages(void){
 
 void CkArrayReductionMgr::pup(PUP::er &p){
 	NodeGroup::pup(p);
-	p(size);p(redNo);p(count);
+	p(redNo);p(count);
 	p|my_msgs;
 	p|my_futureMsgs;
-	if(p.isUnpacking()) lockCount = CmiCreateLock();
+	if(p.isUnpacking()) {
+	  size = CkMyNodeSize();
+	  lockCount = CmiCreateLock();
+	}
 }
 
 #include "CkArrayReductionMgr.def.h"

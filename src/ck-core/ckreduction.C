@@ -647,7 +647,7 @@ void CkReductionMgr::pup(PUP::er &p)
   p|finalMsgs;
   p|adjVec;
   p|nodeProxy;
-  p | storedCallback;
+  p|storedCallback;
   if(p.isUnpacking()){
     thisProxy = thisgroup;
     lcount=0;
@@ -1620,13 +1620,14 @@ void CkNodeReductionMgr::pup(PUP::er &p)
   IrrGroup::pup(p);
   p(redNo);
   p(inProgress); p(creating); p(startRequested);
-  p(gcount); p(lcount);
+  p(lcount);
   p(nContrib); p(nRemote);
   p(interrupt);
   p|msgs;
   p|futureMsgs;
   p|futureRemoteMsgs;
   if(p.isUnpacking()) {
+    gcount=CkNumNodes();
     thisProxy = thisgroup;
     lockEverything = CmiCreateLock();
   }
