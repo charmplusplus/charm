@@ -29,10 +29,10 @@ In the {\tt .h} file, we define \uw{GroupType} as follows:
 \end{tabbing}
 
 A group is identified by a globally unique group identifier, whose type is
-\kw{CkGroupID}. \index{CkGroupID}This identifier is common to all of the 
-group's branches and can be obtained from the variable \keyword{thisgroup},
-\index{thisgroup}which is a public local variable of the \keyword{Group} 
-superclass.  For groups, \kw{thishandle} \index{thishandle} is the handle of 
+\kw{CkGroupID}. This identifier is common to all of the 
+group's branches and can be obtained from the variable \kw{thisgroup},
+ which is a public local variable of the \kw{Group} 
+superclass.  For groups, \kw{thishandle} is the handle of 
 the particular branch in which the function is executing: it is 
 a normal chare handle.
 
@@ -80,7 +80,7 @@ CProxy_G g(gid);
 
 Before sending a message to a \index{group}group via an entry
 method, we need to get a proxy of that group using the group identifier (a
-\index{CkGroupID}\kw{CkGroupID}). The syntax for obtaining the proxy or a proxy
+\kw{CkGroupID}). The syntax for obtaining the proxy or a proxy
 pointer is:
 
 \begin{tabbing} ~~~~ \=~~~~ \=~~~~ \=~~~~ \=~~~~ \=~~~~ \=~~~~ \=~~~~ \=~~~~
@@ -128,13 +128,13 @@ the following notation:
 
 ((\uw{GroupType}*)\kw{CkLocalBranch}(\kw{CkGroupID} {\it groupID}))-$>${\it
 DataMember}, and \\ ((\uw{GroupType}*)\kw{CkLocalBranch}(\kw{CkGroupID} {\it
-groupID}))-$>$\uw{method}().  \index{CkLocalBranch}
+groupID}))-$>$\uw{method}(). 
 
 Thus a dynamically created \index{chare}chare can call a public method of a
 group without needing to know which processor it actually resides: the method
 executes in the local \index{branch}branch of the group.  Once a proxy to the local branch of a group is obtained, that branch can be thought of as a regular object.  Its public methods can return values, and its public data is readily accessible.   
 
-\index{CkLocalBranch}\kw{CkLocalBranch} returns a generic ({\tt void
+\kw{CkLocalBranch} returns a generic ({\tt void
 *}) pointer.  It needs to be
 cast to a pointer of appropriate classe before invoking methods or
 accessing data members. \charmpp\ provides another way to do this using
