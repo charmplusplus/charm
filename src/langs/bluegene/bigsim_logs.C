@@ -328,6 +328,14 @@ void BgTimeLog::pup(PUP::er &p){
       else
 	p|forwardDeps[i]->seqno;
     }
+
+/*
+    // a sanity check for floatable events
+    if (msgId == BgMsgID(-1,-1) && backwardDeps.length() == 0 && recvTime == -1.0) {
+      CmiPrintf("Potential error in log: (a floating event) \n");
+      print(-1,-1);
+    }
+*/
 }
 
 // create a log with msg and insert into timeline
