@@ -368,8 +368,6 @@ void CkMulticastMgr::ArraySectionSend(int ep,void *m, CkArrayID a, CkSectionCook
 
 //CmiPrintf("ArraySend send to myself: %d\n", msgSize);
 
-  CProxy_CkMulticastMgr  mCastGrp(thisgroup);
-
   register envelope *env = UsrToEnv(m);
   CkPackMessage(&env);
   m = EnvToUsr(env);
@@ -378,7 +376,12 @@ void CkMulticastMgr::ArraySectionSend(int ep,void *m, CkArrayID a, CkSectionCook
   msg->_cookie = s;
   msg->ep = ep;
 
-  mCastGrp[s.pe].recvMsg(msg);
+  if (s.pe == CmiMyPe())
+    recvMsg(msg);
+  else {
+    CProxy_CkMulticastMgr  mCastGrp(thisgroup);
+    mCastGrp[s.pe].recvMsg(msg);
+  }
 }
 
 void CkMulticastMgr::recvMsg(multicastGrpMsg *msg)
