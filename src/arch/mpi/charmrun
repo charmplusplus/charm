@@ -63,7 +63,9 @@ then
 		extra='-machinefile $PBS_NODEFILE'
 		;;
 	tg-login*)
-		ncpus="#PBS -l ncpus=$pes"
+		# always ppn=2
+		nodes=`expr \( $pes + 1 \) / 2`
+		ppn='#PBS -l nodes='$nodes':ppn=2'
 		extra='-machinefile $PBS_NODEFILE'
 		;;
 	co-login*.ncsa.uiuc.edu)
