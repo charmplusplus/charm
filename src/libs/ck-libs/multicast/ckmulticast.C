@@ -178,7 +178,7 @@ void CkMulticastMgr::initCookie(CkSectionCookie s)
   DEBUGF(("init: %d elems %p\n", n, s.val));
   multicastSetupMsg *msg = new (n, n, 0) multicastSetupMsg;
   msg->nIdx = n;
-  msg->parent = CkSectionCookie();
+  msg->parent = CkSectionCookie(NULL);
   msg->rootSid = s;
   msg->redNo = entry->red.redNo;
   CkArray *array = CProxy_ArrayBase(s.aid).ckLocalBranch();
