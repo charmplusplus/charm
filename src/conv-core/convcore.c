@@ -850,7 +850,9 @@ void (*handler)();
 void CsdBeginIdle(void)
 {
   CcdCallBacks();
+#ifndef CMK_OPTIMIZE
   _LOG_E_PROC_IDLE(); 	/* projector */
+#endif
   CcdRaiseCondition(CcdPROCESSOR_BEGIN_IDLE) ;
 }
 
@@ -861,7 +863,9 @@ void CsdStillIdle(void)
 
 void CsdEndIdle(void)
 {
+#ifndef CMK_OPTIMIZE	
   _LOG_E_PROC_BUSY(); 	/* projector */
+#endif
   CcdRaiseCondition(CcdPROCESSOR_BEGIN_BUSY) ;
 }
 
@@ -871,10 +875,14 @@ void CmiHandleMessage(void *msg)
  	CpvAccess(cQdState)->mProcessed++;
 */
 	 CmiHandlerInfo *h;
+#ifndef CMK_OPTIMIZE	
 	_LOG_E_HANDLER_BEGIN(CmiGetHandler(msg)); /* projector */
+#endif
 	h=&CmiGetHandlerInfo(msg);
 	(h->hdlr)(msg,h->userPtr);
+#ifndef CMK_OPTIMIZE	
 	_LOG_E_HANDLER_END(CmiGetHandler(msg)); 	/* projector */
+#endif
 }
 
 #if CMK_CMIDELIVERS_USE_COMMON_CODE
