@@ -904,10 +904,51 @@ void ComlibManager::lbUpdate(LBMigrateMsg *msg) {
     CkFreeMsg(msg);
 }
 
+CkDelegateData* ComlibManager::ckCopyDelegateData(CkDelegateData *data) {
+    ComlibInstanceHandle *inst = new ComlibInstanceHandle
+        (*((ComlibInstanceHandle *)data));
+    return inst;
+}
+
+
+CkDelegateData * ComlibManager::DelegatePointerPup(PUP::er &p,
+                                                   CkDelegateData *pd) {
+    ComlibInstanceHandle *inst; 
+    if(!p.isUnpacking()) 
+        inst = (ComlibInstanceHandle *) pd;
+    
+    if(p.isUnpacking()) 
+        //Call migrate constructor
+        inst = new ComlibInstanceHandle();
+    
+    inst->pup(p);
+    return inst;
+}    
+
 
 void ComlibDelegateProxy(CProxy *proxy){
     CProxy_ComlibManager cgproxy(CkpvAccess(cmgrID));
     proxy->ckDelegate(cgproxy.ckLocalBranch());
+}
+
+void ComlibAssociateProxy(CharmStrategy *strat, CProxy &proxy) {
+    ComlibInstanceHandle *cinst = new ComlibInstanceHandle
+        (CkGetComlibInstance());
+
+    cinst->setStrategy(strat);
+    
+    CProxy_ComlibManager cgproxy(CkpvAccess(cmgrID));
+    proxy.ckDelegate(cgproxy.ckLocalBranch(), cinst);
+} 
+
+void ComlibBegin(CProxy &proxy) {
+    ComlibInstanceHandle *cinst = (ComlibInstanceHandle *)proxy.ckDelegatedPtr();
+    cinst->beginIteration();
+} 
+
+void ComlibEnd(CProxy &proxy) {
+    ComlibInstanceHandle *cinst = (ComlibInstanceHandle *)proxy.ckDelegatedPtr();
+    cinst->endIteration();
 }
 
 ComlibInstanceHandle CkCreateComlibInstance(){
@@ -949,7 +990,7 @@ public:
 };
 
 //Called by user code
-ComlibInstanceHandle::ComlibInstanceHandle(){
+ComlibInstanceHandle::ComlibInstanceHandle() : CkDelegateData() {
     _instid = -1;
     _dmid.setZero();
     _srcPe = -1;
@@ -957,21 +998,28 @@ ComlibInstanceHandle::ComlibInstanceHandle(){
 }
 
 //Called by user code
-ComlibInstanceHandle::ComlibInstanceHandle(const ComlibInstanceHandle &h){
+ComlibInstanceHandle::ComlibInstanceHandle(const ComlibInstanceHandle &h) 
+    : CkDelegateData() {
+    _instid = h._instid;
+    _dmid = h._dmid;
+    toForward = h.toForward;        
+
+    ComlibPrintf("In Copy Constructor\n");
+    _srcPe = h._srcPe;
+
+    reset();
+    ref();
+}
+
+ComlibInstanceHandle& ComlibInstanceHandle::operator=(ComlibInstanceHandle &h) {
     _instid = h._instid;
     _dmid = h._dmid;
     toForward = h.toForward;
-
-    ComlibPrintf("In Copy Constructor\n");
-
-    //We DO NOT copy the source processor
-    //Source PE is initialized here
     _srcPe = h._srcPe;
-}
-
-void ComlibInstanceHandle::init(){
-    CProxy_ComlibManager cgproxy(CkpvAccess(cmgrID));    
-    *this = (cgproxy.ckLocalBranch())->createInstance();
+    
+    reset();
+    ref();
+    return *this;
 }
 
 //Called by the communication library
@@ -985,7 +1033,7 @@ ComlibInstanceHandle::ComlibInstanceHandle(int instid, CkGroupID dmid){
 void ComlibInstanceHandle::beginIteration() { 
     CProxy_ComlibManager cgproxy(_dmid);
 
-    ComlibPrintf("Instance Handle beginIteration %d, %d\n", CkMyPe(), _srcPe);
+    ComlibPrintf("Instance Handle beginIteration %d, %d, %d\n", CkMyPe(), _srcPe, _instid);
 
     //User forgot to make the instance handle a readonly or pass it
     //into the constructor of an array and is using it directly from

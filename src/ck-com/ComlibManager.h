@@ -56,9 +56,8 @@ class ComlibMulticastMsg : public CkMcastBaseMsg,
 class ComlibManager;
 
 //An Instance of the communication library.
-class ComlibInstanceHandle {
+class ComlibInstanceHandle : public CkDelegateData {
  private:    
-    
     int _instid;
     CkGroupID _dmid;
     int _srcPe;
@@ -69,8 +68,9 @@ class ComlibInstanceHandle {
     ComlibInstanceHandle(const ComlibInstanceHandle &h);
     ComlibInstanceHandle(int instid, CkGroupID dmid);    
    
+    ComlibInstanceHandle &operator=(ComlibInstanceHandle &h);
+
     void setForwardingOnMigration(){toForward = 1;} 
-    void init();
     void beginIteration();
     void endIteration();
     
@@ -83,6 +83,10 @@ class ComlibInstanceHandle {
 
     friend class ComlibManager;
     void pup(PUP::er &p) {
+
+        if(p.isUnpacking())
+             reset();        
+
         p | _instid;
         p | _dmid;
         p | _srcPe;
@@ -222,34 +226,22 @@ class ComlibManager: public CkDelegateMgr {
     //Returns the processor on which the comlib sees the array element
     //belonging to
     inline int getLastKnown(CkArrayID a, CkArrayIndexMax &idx) {
-        /*
-        ClibGlobalArrayIndex cidx;
-        cidx.aid = a;
-        cidx.idx = idx;
-        int pe = locationTable->get(cidx);
-
-        if(pe == 0) {
-            //Array element does not exist in the table
-
-            CkArray *array = CkArrayID::CkLocalBranch(a);
-            pe = array->lastKnown(idx) + CkNumPes();
-            locationTable->put(cidx) = pe;
-        }
-        //CkPrintf("last pe = %d \n", pe - CkNumPes());
-
-        return pe - CkNumPes();
-        */
         return ComlibGetLastKnown(a, idx);
     }
+
+    CkDelegateData* ckCopyDelegateData(CkDelegateData *data); 
+    CkDelegateData *DelegatePointerPup(PUP::er &p,CkDelegateData *pd);
 };
 
 void ComlibDelegateProxy(CProxy *proxy);
+void ComlibAssociateProxy(CharmStrategy *strat, CProxy &proxy); 
+void ComlibBegin(CProxy &proxy);    
+void ComlibEnd(CProxy &proxy);    
 
 ComlibInstanceHandle CkCreateComlibInstance();
 ComlibInstanceHandle CkGetComlibInstance();
 ComlibInstanceHandle CkGetComlibInstance(int id);
 void ComlibResetSectionProxy(CProxySection_ArrayBase *sproxy);
-
 
 //Only Called when the strategies are not being created in main::main
 void ComlibDoneCreating(); 

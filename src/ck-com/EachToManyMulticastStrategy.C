@@ -235,7 +235,7 @@ void EachToManyMulticastStrategy::pup(PUP::er &p){
 
     int count = 0;
     ComlibPrintf("[%d] Each To many::pup %s\n", CkMyPe(), 
-                 ((p.isPacking()==0)?("UnPacking"):("Packing")));
+                 ((!p.isUnpacking() == 0)?("UnPacking"):("Packing")));
 
     CharmStrategy::pup(p);
 
