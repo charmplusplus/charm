@@ -8,22 +8,34 @@
 /**************************************************************************
  *
  * SKT - simple TCP and UDP socket routines.  
- *  All IP addresses and sockets are taken and returned 
+ *  All port numbers are taken and returned 
  *  in *host* byte order.  This means you can hardcode port
- *  numbers and IP addresses in the code normally, and they
- *  will be properly translated everywhere.
+ *  numbers in the code normally, and they will be properly 
+ *  translated even on little-endian machines.
  *
  *  SOCKET is just a #define for "unsigned int".
+ *
+ *  skt_ip_t is a flat bytes structure to hold an IP address--
+ *  this is either 4 bytes (for IPv4) or 16 bytes (for IPv6).
+ *  It is always in network byte order.
  *
  *  Errors are handled in the library by calling a user-overridable
  *  abort function.
  * 
- * unsigned long skt_my_ip(void)
+ * skt_ip_t skt_my_ip(void)
  *   - return the IP address of the current machine.
  *
- * unsigned long skt_lookup_ip(const char *name)
- *   - return the IP address of the given machine.
+ * skt_ip_t skt_lookup_ip(const char *name)
+ *   - return the IP address of the given machine (DNS or dotted decimal).
  *     Returns 0 on failure.
+ *
+ * char *skt_print_ip(char *dest,skt_ip_t addr)
+ *   - Print the given IP address to the given destination as
+ *     dotted decimal.  Dest must be at least 130 bytes long, 
+ *     and will be returned.
+ *
+ * int skt_ip_match(skt_ip_t a,skt_ip_t b)
+ *   - Return 1 if the given IP addresses are identical.
  *
  * SOCKET skt_datagram(unsigned int *port, int bufsize)
  *
@@ -39,13 +51,13 @@
  *     Performs the whole socket/bind/listen procedure.  
  *     Returns the actual port of the socket and the file descriptor.
  *
- * SOCKET skt_accept(SOCKET src_fd,unsigned int *pip, unsigned int *port)
+ * SOCKET skt_accept(SOCKET src_fd,skt_ip_t *pip, unsigned int *port)
  *
  *   - accepts a TCP connection to the specified server socket.  Returns the
  *     IP of the caller, the port number of the caller, and the file
  *     descriptor to talk to the caller.
  *
- * SOCKET skt_connect(unsigned int ip, int port, int timeout)
+ * SOCKET skt_connect(skt_ip_t ip, int port, int timeout)
  *
  *   - Opens a TCP connection to the specified server.  Returns a socket for
  *     communication.
@@ -83,6 +95,8 @@
 #define SOCKET int
 #define SOCKET_ERROR (-1)
 #define INVALID_SOCKET (SOCKET)(~0)
+typedef struct {int tag;} skt_ip_t;
+
 #else /*Use actual sockets*/
 
 /*Preliminaries*/
@@ -91,7 +105,6 @@
 #include <winsock.h>
 static void sleep(int secs) {Sleep(1000*secs);}
 
-void skt_init(void);/*Is a function*/
 #else
   /*For non-windows (UNIX) systems:*/
 #include <sys/time.h>
@@ -102,15 +115,21 @@ void skt_init(void);/*Is a function*/
 #include <netdb.h>
 #include <unistd.h>
 #include <fcntl.h>
+
 #ifndef SOCKET
 #define SOCKET int
 #define INVALID_SOCKET (SOCKET)(~0)
 #define SOCKET_ERROR (-1)
 #endif /*def SOCKET*/
 
-#define skt_init() /*not needed on UNIX systems*/
 #endif /*WIN32*/
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+/*Initialization*/
+void skt_init(void);
 
 /*Error and idle handling*/
 typedef void (*skt_idleFn)(void);
@@ -119,19 +138,26 @@ void skt_set_idle(skt_idleFn f);
 skt_abortFn skt_set_abort(skt_abortFn f);
 
 /*DNS*/
-unsigned long skt_my_ip(void);
-unsigned long skt_lookup_ip(const char *name);
-unsigned long skt_innode_my_ip(void);		/* inner node version */
-unsigned long skt_innode_lookup_ip(const char *name);
-struct sockaddr_in skt_build_addr(unsigned int IP,unsigned int port);
+typedef struct { /*IPv4 IP address*/
+	unsigned char data[4];
+} skt_ip_t;
+extern skt_ip_t skt_invalid_ip;
+skt_ip_t skt_my_ip(void);
+skt_ip_t skt_lookup_ip(const char *name);
+skt_ip_t skt_innode_my_ip(void);	/* inner node version */
+skt_ip_t skt_innode_lookup_ip(const char *name);
+
+char *skt_print_ip(char *dest,skt_ip_t addr);
+int skt_ip_match(skt_ip_t a,skt_ip_t b);
+struct sockaddr_in skt_build_addr(skt_ip_t IP,unsigned int port);
 
 /*UDP*/
 SOCKET skt_datagram(unsigned int *port, unsigned int bufsize);
 
 /*TCP*/
 SOCKET skt_server(unsigned int *port);
-SOCKET skt_accept(SOCKET src_fd, unsigned int *pip, unsigned int *port);
-SOCKET skt_connect(unsigned int ip, int port, int timeout);
+SOCKET skt_accept(SOCKET src_fd, skt_ip_t *pip, unsigned int *port);
+SOCKET skt_connect(skt_ip_t ip, int port, int timeout);
 
 /*Utility*/
 void skt_close(SOCKET fd);
@@ -140,6 +166,10 @@ int skt_select1(SOCKET fd,int msec);
 /*Blocking Send/Recv*/
 int skt_sendN(SOCKET hSocket,const void *pBuff,int nBytes);
 int skt_recvN(SOCKET hSocket,      void *pBuff,int nBytes);
+
+#ifdef __cplusplus
+};
+#endif
 
 #endif /*!CMK_NO_SOCKETS*/
 
@@ -172,6 +202,10 @@ memory (use ChMessage_free).  If you prefer, you may
 receive sizeof(ChMessageHeader) header bytes, then 
 header->len data bytes on any socket yourself.
 */
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 typedef struct {
   unsigned char data[4];/*4-byte, big-endian integer*/
 } ChMessageInt_t;
@@ -201,6 +235,17 @@ void ChMessage_new(const char *type,unsigned int len,
 		   ChMessage *dst);
 int ChMessage_send(SOCKET fd,const ChMessage *src); /*You must free after send*/
 
+typedef struct {
+	ChMessageInt_t nPE;
+	ChMessageInt_t dataport;
+        skt_ip_t IP;
+} ChNodeinfo;
+
+typedef struct {
+        ChMessageInt_t nodeNo;
+        ChNodeinfo info;
+} ChSingleNodeinfo;
+
 /******* CCS Message type (included here for convenience) *******/
 #define CCS_HANDLERLEN 32 /*Maximum length for the handler field*/
 typedef struct {
@@ -208,6 +253,10 @@ typedef struct {
   ChMessageInt_t pe;/*Destination processor number*/
   char handler[CCS_HANDLERLEN];/*Handler name for message to follow*/
 } CcsMessageHeader;
+
+#ifdef __cplusplus
+};
+#endif
 
 #endif /*SOCK_ROUTINES_H*/
 

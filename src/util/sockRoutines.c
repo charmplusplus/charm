@@ -58,6 +58,15 @@ void skt_close(SOCKET fd)
 	closesocket(fd);
 }
 #else /*UNIX Systems:*/
+static void skt_SIGPIPE_handler(int sig) {
+	fprintf(stderr,"Caught SIGPIPE.\n");
+	signal(SIGPIPE,skt_SIGPIPE_handler);
+}
+
+void skt_init(void)
+{
+	signal(SIGPIPE,skt_SIGPIPE_handler);
+}
 void skt_close(SOCKET fd)
 {
 	close(fd);
@@ -127,86 +136,116 @@ int skt_select1(SOCKET fd,int msec)
   return 0;/*Timed out*/
 }
 
-unsigned long skt_my_ip(void)
-{  
-  static unsigned long ip = 0;/*Cached IP address*/
-  unsigned long self_ip=0x7F000001u;/*Host byte order 127.0.0.1*/
+
+/******* DNS *********/
+skt_ip_t skt_invalid_ip={0};
+
+skt_ip_t skt_my_ip(void)
+{
   char hostname[1000];
   
-  if (ip==0) 
-  {
-    if (gethostname(hostname, 999)==0) 
-		ip=skt_lookup_ip(hostname);
-  }
-  if (ip==0) ip=self_ip;
-  return ip;
+  if (gethostname(hostname, 999)==0)
+      return skt_lookup_ip(hostname);
+
+  return skt_invalid_ip;
 }
 
-unsigned long skt_lookup_ip(const char *name)
+static int skt_parse_dotted(const char *str,skt_ip_t *ret)
 {
-  const unsigned int inval=0xffFFffFFu;
-  unsigned long ret;
-  ret=inet_addr(name);/*Try dotted decimal*/
-  if (ret!=inval && ntohl(ret)!=inval) 
-	  return ntohl(ret);
+  int i,v;
+  *ret=skt_invalid_ip;
+  for (i=0;i<sizeof(skt_ip_t);i++) {
+    if (1!=sscanf(str,"%d",&v)) return 0;
+    if (v<0 || v>255) return 0;
+    while (isdigit(*str)) str++; /* Advance over number */
+    if (i!=sizeof(skt_ip_t)-1) { /*Not last time:*/
+      if (*str!='.') return 0; /*Check for dot*/
+    } else { /*Last time:*/
+      if (*str!=0) return 0; /*Check for end-of-string*/
+    }
+    str++;
+    ret->data[i]=(unsigned char)v;
+  }
+  return 1;
+}
+
+skt_ip_t skt_lookup_ip(const char *name)
+{
+  skt_ip_t ret=skt_invalid_ip;
+  /*First try to parse the name as dotted decimal*/
+  if (skt_parse_dotted(name,&ret))
+    return ret;
   else {/*Try a DNS lookup*/
     struct hostent *h = gethostbyname(name);
-    unsigned long ip;
-    if (h==0) return 0;
-    ip=ntohl(*((unsigned int *)(h->h_addr_list[0])));
-    return ip;
+    if (h==0) return skt_invalid_ip;
+    memcpy(&ret,h->h_addr_list[0],h->h_length);
+    return ret;
   }
 }
 
 /* these 2 functions will return the inner node IP, special for
    Linux Scyld.  G. Zheng 
 */
-unsigned long skt_innode_my_ip(void)
+skt_ip_t skt_innode_my_ip(void)
 {  
-  static unsigned long ip = 0;/*Cached IP address*/
-  unsigned long self_ip=0x7F000001u;/*Host byte order 127.0.0.1*/
-  char hostname[1000];
-  
 #if CMK_SCYLD
   /* on Scyld, the hostname is just the node number */
+  char hostname[200];
   sprintf(hostname, "%d", bproc_currnode());
-  ip=skt_innode_lookup_ip(hostname);
+  return skt_innode_lookup_ip(hostname);
 #else
-  ip = skt_my_ip();
+  return skt_my_ip();
 #endif
-  return ip;
 }
 
-unsigned long skt_innode_lookup_ip(const char *name)
+skt_ip_t skt_innode_lookup_ip(const char *name)
 {
 #if CMK_SCYLD
   struct sockaddr_in addr;
   int len = sizeof(struct sockaddr_in);
   if (-1 == bproc_nodeaddr(atoi(name), &addr, &len)) {
-    return 0;
+    return (skt_ip_t)0;
   }
   else {
-    return ntohl(addr.sin_addr.s_addr);
+    skt_ip_t ret;
+    memcpy(&ret,&addr.sin_addr.s_addr,sizeof(ret));
+    return ret;
   }
 #else
   return skt_lookup_ip(name);
 #endif
 }
 
-
-struct sockaddr_in skt_build_addr(unsigned int IP,unsigned int port)
+/*Write as dotted decimal*/
+char *skt_print_ip(char *dest,skt_ip_t addr)
+{
+  char *o=dest;
+  int i;
+  for (i=0;i<sizeof(addr);i++) {
+    const char *trail=".";
+    if (i==sizeof(addr)-1) trail=""; /*No trailing separator dot*/
+    sprintf(o,"%d%s",(int)addr.data[i],trail);
+    o+=strlen(o);
+  }
+  return dest;
+}
+int skt_ip_match(skt_ip_t a,skt_ip_t b)
+{
+  return 0==memcmp(&a,&b,sizeof(a));
+}
+struct sockaddr_in skt_build_addr(skt_ip_t IP,unsigned int port)
 {
   struct sockaddr_in ret={0};
   ret.sin_family=AF_INET;
   ret.sin_port = htons((short)port);
-  ret.sin_addr.s_addr = htonl(IP);
-  return ret;
+  memcpy(&ret.sin_addr.s_addr,&IP,sizeof(IP));
+  return ret;  
 }
 
 SOCKET skt_datagram(unsigned int *port, unsigned int bufsize)
 {  
   int connPort=(port==NULL)?0:*port;
-  struct sockaddr_in addr=skt_build_addr(INADDR_ANY,connPort);
+  struct sockaddr_in addr=skt_build_addr(skt_invalid_ip,connPort);
   int                len;
   SOCKET             ret;
   
@@ -241,7 +280,7 @@ SOCKET skt_server(unsigned int *port)
   SOCKET             ret;
   int                len;
   int connPort=(port==NULL)?0:*port;
-  struct sockaddr_in addr=skt_build_addr(0,connPort);
+  struct sockaddr_in addr=skt_build_addr(skt_invalid_ip,connPort);
   
 retry:
   ret = socket(PF_INET, SOCK_STREAM, 0);
@@ -262,7 +301,7 @@ retry:
   return ret;
 }
 
-SOCKET skt_accept(SOCKET src_fd, unsigned int *pip, unsigned int *port)
+SOCKET skt_accept(SOCKET src_fd,skt_ip_t *pip, unsigned int *port)
 {
   int len;
   struct sockaddr_in addr={0};
@@ -276,12 +315,12 @@ retry:
   }
   
   if (port!=NULL) *port=ntohs(addr.sin_port);
-  if (pip!=NULL) *pip=ntohl(addr.sin_addr.s_addr);
+  if (pip!=NULL) memcpy(pip,&addr.sin_addr.s_addr,sizeof(*pip));
   return ret;
 }
 
 
-SOCKET skt_connect(unsigned int ip, int port, int timeout)
+SOCKET skt_connect(skt_ip_t ip, int port, int timeout)
 {
   struct sockaddr_in addr=skt_build_addr(ip,port);
   int                ok, begin;
@@ -321,7 +360,7 @@ int skt_recvN(SOCKET hSocket,void *buff,int nBytes)
   {
     if (0==skt_select1(hSocket,60*1000))
 	return skt_abort(93610,"Timeout on socket recv!");
-    nRead = recv(hSocket,pBuff,nLeft,0);
+    nRead = recv(hSocket,pBuff,nLeft,0); /* MSG_NOSIGNAL); */
     if (nRead<=0)
     {
        if (nRead==0) return skt_abort(93620,"Socket closed before recv.");
@@ -345,7 +384,7 @@ int skt_sendN(SOCKET hSocket,const void *buff,int nBytes)
   nLeft = nBytes;
   while (0 < nLeft)
   {
-    nWritten = send(hSocket,pBuff,nLeft,0);
+    nWritten = send(hSocket,pBuff,nLeft,0); /* MSG_NOSIGNAL); */
     if (nWritten<=0)
     {
           if (nWritten==0) return skt_abort(93720,"Socket closed before send.");

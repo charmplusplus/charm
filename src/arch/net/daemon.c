@@ -48,7 +48,7 @@ int main()
   int myfd;
   
   int remotefd;         /* Remote Process Connecting */
-  int remoteIP;         /* Remote Process's IP */
+  skt_ip_t remoteIP;         /* Remote Process's IP */
   unsigned int remotePortNumber; /* Port on which remote port is connecting */
   
   taskStruct task;      /* Information about the task to be performed */
@@ -74,6 +74,7 @@ int main()
   myfd=skt_server(&myPortNumber);
   
   while(1) {
+    char ip_str[200];
     char *argLine; /* Argument list for called program */
     char statusCode;/*Status byte sent back to requestor*/
     
@@ -84,9 +85,10 @@ int main()
     remotefd=skt_accept(myfd, &remoteIP, &remotePortNumber); 
     
     curTime=time(NULL);
-    fprintf(logfile,"Connection from IP 0x%08x, port %d"
-	    "on %s",remoteIP,remotePortNumber,ctime(&curTime));
-	fflush(logfile);
+    fprintf(logfile,"Connection from IP %s, port %d at %s",
+	    skt_print_ip(ip_str,remoteIP),remotePortNumber,
+	    ctime(&curTime));
+    fflush(logfile);
     
     /* Recv the task to be done */
     skt_recvN(remotefd, (BYTE *)&task, sizeof(task));
@@ -100,7 +102,8 @@ int main()
 	      "Received execution request with the wrong magic number 0x%08x!\n"
 	      "This could indicate someone is trying to hack your system.\n\n\n",ChMessageInt(task.magic));
       fflush(logfile);
-	  continue; /*DON'T execute this command (could be evil!)*/
+      skt_close(remotefd);
+      continue; /*DON'T execute this command (could be evil!)*/
     }
     
     /* Allocate memory for arguments*/
@@ -122,10 +125,10 @@ int main()
 
     /*Send status byte back to requestor*/
     skt_sendN(remotefd,(BYTE *)&statusCode,sizeof(char));
-	skt_close(remotefd);
+    skt_close(remotefd);
 
     /*Free recv'd arguments*/
-	free(argLine);
+    free(argLine);
   }
   return 0;  
 }
@@ -147,15 +150,15 @@ are double-null terminated.
 void envCat(char *dest,LPTSTR oldEnv)
 {
   char *src=oldEnv;
-  dest+=strlen(dest);//Advance to end of dest
-  dest++;//Advance past terminating NULL character
+  dest+=strlen(dest);/*Advance to end of dest*/
+  dest++;/*Advance past terminating NULL character*/
   while ((*src)!='\0') {
-    int adv=strlen(src)+1;//Length of newly-copied string plus NULL
-    strcpy(dest,src);//Copy another environment string
-    dest+=adv;//Advance past newly-copied string and NULL
-    src+=adv;//Ditto for src
+    int adv=strlen(src)+1;/*Length of newly-copied string plus NULL*/
+    strcpy(dest,src);/*Copy another environment string*/
+    dest+=adv;/*Advance past newly-copied string and NULL*/
+    src+=adv;/*Ditto for src*/
   }
-  *dest='\0';//Paste on final terminating NULL character
+  *dest='\0';/*Paste on final terminating NULL character*/
   FreeEnvironmentStrings(oldEnv);
 }
 

@@ -10,8 +10,8 @@
 /*This is the structure that is passed to the Daemon when
 you want it to start a process.
 */
-#define DAEMON_MAXPATHLEN 1024
-#define DAEMON_MAXENV 128
+#define DAEMON_MAXPATHLEN 512
+#define DAEMON_MAXENV 256
 typedef struct {
 	char pgm[DAEMON_MAXPATHLEN]; /*Name of executable to run (no ".exe" needed)*/
 	char cwd[DAEMON_MAXPATHLEN];/*Directory in which to start program*/
@@ -73,3 +73,8 @@ const char *daemon_status2msg(char statusCode)
 			return daemon_errtab[i].reason;
 	return "unknown error.";
 }
+
+
+
+
+
