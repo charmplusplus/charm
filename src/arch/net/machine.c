@@ -1299,6 +1299,39 @@ void CmiDestroyLock(CmiNodeLock lk)
 
 void CmiYield() { thr_yield(); }
 
+static mutex_t barrier_mutex;
+CpvDeclare(int, local_sense);
+static volatile int sense;
+static volatile int count;
+
+void CmiNodeBarrierInit()
+{
+  CmiPrintf("Barrier init called\n");
+  count=CmiNodeSize(CmiNodeOf(CmiMyPe()));
+  sense=1;
+  CpvInitialize(int, local_sense);
+  CpvAccess(local_sense)=1;
+}
+
+void CmiNodeBarrier()
+{
+  CmiPrintf("Barrier called\n");
+  CpvAccess(local_sense)= 1-CpvAccess(local_sense);
+  mutex_lock(&barrier_mutex);
+  count--;
+  mutex_unlock(&barrier_mutex);
+  if (count ==0) {
+        count=CmiNodeSize(CmiNodeOf(CmiMyPe()));
+        sense=CpvAccess(local_sense);
+  }
+  else
+        while (sense != CpvAccess(local_sense)) {
+                CmiPrintf("barrier blocking\n");
+                thr_yield();
+        }
+}
+
+
 #define CmiGetStateN(n) (Cmi_state_vector+(n))
 
 static mutex_t comm_mutex;
