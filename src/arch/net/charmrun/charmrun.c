@@ -1194,7 +1194,13 @@ char *input_scanf_chars(fmt)
   static int fd; static FILE *file;
   fflush(stdout);
   if (file==0) {
-	char *tmp=tmpnam(NULL);/*This was once /tmp/fnord*/
+#if CMK_USE_MKSTEMP
+    char tmp[128];
+    strcpy(tmp, "/tmp/fnordXXXXXX");
+    mkstemp(tmp);
+#else
+    char *tmp=tmpnam(NULL);/*This was once /tmp/fnord*/
+#endif
     unlink(tmp);
     fd = open(tmp,O_RDWR | O_CREAT | O_TRUNC);
     if (fd<0) { 
