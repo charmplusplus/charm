@@ -29,7 +29,7 @@ main::main(CkArgMsg *m)
   config.readConfig(m);
 
   if(!config.use_transceiver) {
-  BgLoadTraceSummary("bgTrace", totalBGProcs, numX, numY, numZ, numCth, numWth, numPes);
+  if (-1==BgLoadTraceSummary("bgTrace", totalBGProcs, numX, numY, numZ, numCth, numWth, numPes)) CmiAbort("Failed");
   CkPrintf("bgtrace: totalBGProcs=%d X=%d Y=%d Z=%d #Cth=%d #Wth=%d #Pes=%d\n",
 	   totalBGProcs, numX, numY, numZ, numCth, numWth, numPes);
   netLength = numX;
