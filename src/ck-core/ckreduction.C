@@ -336,6 +336,7 @@ void CkReductionMgr::ReductionStarting(CkReductionNumberMsg *m)
     DEBR((AA"Ignoring parent's late request to start #%d\n"AB,m->num));
   delete m;
 }
+
 //Sent to root of reduction tree with reduction contribution
 // of migrants that missed the main reduction.
 void CkReductionMgr::LateMigrantMsg(CkReductionMsg *m)
@@ -354,6 +355,7 @@ void CkReductionMgr::MigrantDied(CkReductionNumberMsg *m)
  // CkPrintf("[%d,%d]Migrant Died called\n",CkMyNode(),CkMyPe());	 		  
   adj(m->num).gcount--;//He won't be contributing to this one.
   finishReduction();
+  delete m;
 }
 //Sent up the reduction tree with reduced data
 void CkReductionMgr::RecvMsg(CkReductionMsg *m)
@@ -583,6 +585,7 @@ CkReductionMsg *CkReductionMgr::reduceMessages(void)
 
   //Go back through the vector, deleting old messages
   for (i=0;i<nMsgs;i++) delete msgArr[i];
+  delete [] msgArr;
 
   //Set the message counts
   ret->redNo=redNo;
