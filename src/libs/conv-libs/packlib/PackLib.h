@@ -54,14 +54,13 @@ public:
   int buffer_size() const { return bytes + sizeof(int); };
 
   PackErr fill_buffer(void *const buffer, int buf_bytes) {
-    char* buf_ptr = static_cast<char *const>(buffer);
+    char* buf_ptr = static_cast<char*>(buffer);
     if (buf_bytes >= sizeof(int))
       *(static_cast<int*>(buffer)) = buf_bytes;
     buf_ptr += sizeof(int);
     buf_bytes -= sizeof(int);
       
     item* cur_item;
-    int inum=0;
     while (cur_item = dequeue()) {
       const void* item_ptr;
 
@@ -257,60 +256,60 @@ class Unpacker {
 public:
   Unpacker(const void *const _buffer) {
     buffer = _buffer;
-    bufsz = *(static_cast<const int *const>(buffer)) - sizeof(int);
+    bufsz = *(static_cast<const int*>(buffer)) - sizeof(int);
     buf_ptr = static_cast<const char*>(buffer) + sizeof(int);
   };
     
   PackErr unpack(char *const i) { 
-    return unpack_item(static_cast<void *const>(i), sizeof(char));
+    return unpack_item(static_cast<void*>(i), sizeof(char));
   };
   PackErr unpack(unsigned char *const i) { 
-    return unpack_item(static_cast<void *const>(i), sizeof(unsigned char));
+    return unpack_item(static_cast<void*>(i), sizeof(unsigned char));
   };
   PackErr unpack(int *const i) { 
-    return unpack_item(static_cast<void *const>(i), sizeof(int));
+    return unpack_item(static_cast<void*>(i), sizeof(int));
   };
   PackErr unpack(unsigned int *const i) {
-    return unpack_item(static_cast<void *const>(i), sizeof(unsigned int));
+    return unpack_item(static_cast<void*>(i), sizeof(unsigned int));
   };
   PackErr unpack(long *const i) { 
-    return unpack_item(static_cast<void *const>(i), sizeof(long));
+    return unpack_item(static_cast<void*>(i), sizeof(long));
   };
   PackErr unpack(unsigned long *const i) {
-    return unpack_item(static_cast<void *const>(i), sizeof(unsigned long));
+    return unpack_item(static_cast<void*>(i), sizeof(unsigned long));
   };
   PackErr unpack(float *const i) {
-    return unpack_item(static_cast<void *const>(i), sizeof(float));
+    return unpack_item(static_cast<void*>(i), sizeof(float));
   };
   PackErr unpack(double *const i) {
-    return unpack_item(static_cast<void *const>(i), sizeof(double));
+    return unpack_item(static_cast<void*>(i), sizeof(double));
   };
   PackErr unpack(char *const i,const int items) { 
-    return unpack_item(static_cast<void *const>(i), sizeof(char)*items);
+    return unpack_item(static_cast<void*>(i), sizeof(char)*items);
   };
   PackErr unpack(unsigned char *const i,const int items) { 
-    return unpack_item(static_cast<void *const>(i), 
+    return unpack_item(static_cast<void*>(i), 
 		       sizeof(unsigned char)*items);
   };
   PackErr unpack(int *const i,const int items) { 
-    return unpack_item(static_cast<void *const>(i), sizeof(int)*items);
+    return unpack_item(static_cast<void*>(i), sizeof(int)*items);
   };
   PackErr unpack(unsigned int *const i,const int items) {
-    return unpack_item(static_cast<void *const>(i), 
+    return unpack_item(static_cast<void*>(i), 
 		       sizeof(unsigned int)*items);
   };
   PackErr unpack(long *const i,const int items) { 
-    return unpack_item(static_cast<void *const>(i), sizeof(long)*items);
+    return unpack_item(static_cast<void*>(i), sizeof(long)*items);
   };
   PackErr unpack(unsigned long *const i,const int items) {
-    return unpack_item(static_cast<void *const>(i),
+    return unpack_item(static_cast<void*>(i),
 		       sizeof(unsigned long)*items);
   };
   PackErr unpack(float *const i,const int items) {
-    return unpack_item(static_cast<void *const>(i), sizeof(float)*items);
+    return unpack_item(static_cast<void*>(i), sizeof(float)*items);
   };
   PackErr unpack(double *const i,const int items) {
-    return unpack_item(static_cast<void *const>(i), sizeof(double)*items);
+    return unpack_item(static_cast<void*>(i), sizeof(double)*items);
   };
 
  private:
