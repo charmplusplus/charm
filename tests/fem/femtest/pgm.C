@@ -133,13 +133,15 @@ void testEqual(double is,double shouldBe,const char *what) {
 	}
 }
 
-void testAssert(int shouldBe,const char *what) {
+void testAssert(int shouldBe,const char *what,int myPartition=-1) 
+{
+	if (myPartition==-1) myPartition=FEM_My_Partition();
 	if (shouldBe)
-		CkPrintf("[chunk %d] %s test passed.\n",FEM_My_Partition(),what);
+		CkPrintf("[chunk %d] %s test passed.\n",myPartition,what);
 	else /*test failed-- should not be*/
 	{
 		CkPrintf("[chunk %d] %s test FAILED! (pe %d)\n",
-			FEM_My_Partition(),what,CkMyPe());
+			myPartition,what,CkMyPe());
 		CkAbort("FEM Test failed\n");
 	}
 }
@@ -267,8 +269,11 @@ driver(void)
 	    testAssert(elements[elList[i]].val>thresh,"Ghost list contents test");
     }
 
+    double *nodeOut=new double[nnodes];
     FEM_Set_Node(nnodes,1);
-    FEM_Set_Node_Data((double *)nodes);
+    for (i=0;i<nnodes;i++) nodeOut[i]=nodes[i].val;
+    FEM_Set_Node_Data(nodeOut);
+    delete[] nodeOut;
     FEM_Update_Mesh(1+t,0);
   }
 
@@ -291,7 +296,7 @@ mesh_updated(int param)
   double sum=0;
   for (int i=0;i<nnodes;i++)
     sum+=ndata[i];
-  testAssert(sum==reduceValues[param-1],"mesh_updated");
+  testAssert(sum==reduceValues[param-1],"mesh_updated",0);
 }
 
 extern "C" void
