@@ -47,7 +47,7 @@ extern "C" void initTraceCore(char** argv)
 
   CpvInitialize(TraceCore*, _traceCore);
   	CpvAccess(_traceCore) = new TraceCore(argv);
-  initCharmProjections();
+ // initCharmProjections();
  // initAmpiProjections();
 }
 
