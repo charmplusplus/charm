@@ -36,6 +36,7 @@ class strat; // defined later in strat.h
 #include "rep.h"
 #include "strat.h"
 #include "sim.h"
+#include "sim.decl.h"
 #include "opt.h"
 #include "opt2.h"
 #include "opt3.h"

@@ -279,6 +279,8 @@ class sim : public ArrayElement1D {
   void ReportLBdata();
   /// Migrate this poser to processor indicated in m
   void Migrate(destMsg *m) { migrateMe(m->destPE); }
+  /// Terminate this poser 
+  void Terminate() { objID->terminus(); }
   /// Return this poser's unique index on PVT branch
   int PVTindex() { return myPVTidx; }
   /// Test active flag

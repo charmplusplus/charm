@@ -169,6 +169,8 @@ void pose::stop(void)
 #else
   CkPrintf("Sequential Endtime Approximation: %d\n", POSE_GlobalClock);
 #endif
+  // Call sequential termination here...
+  POSE_Objects.Terminate();
 #endif
 #ifdef POSE_STATS_ON
   CkPrintf("%d PE Simulation finished at %f. Gathering stats...\n", 

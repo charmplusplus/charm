@@ -6,7 +6,7 @@
 #include <limits.h>
 
 /// Uncomment to run POSE is sequential mode
-//#define SEQUENTIAL_POSE 1
+#define SEQUENTIAL_POSE 1
 
 /// Uncomment to gather and print POSE statistics set
 #define POSE_STATS_ON 1
@@ -35,7 +35,7 @@
 #endif 
 
 /// Synchronization strategy constants
-#define MAX_ITERATIONS 100  // maximum forward executions per Step call
+#define MAX_ITERATIONS 10  // maximum forward executions per Step call
 #define STORE_RATE 10       // default checkpoint rate: 1 for every n events
 #define SPEC_WINDOW 100      // speculative event window size
 #define MIN_LEASH 10        // min speculative window for adaptive strategy

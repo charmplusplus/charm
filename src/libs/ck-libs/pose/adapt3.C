@@ -55,14 +55,14 @@ void adapt3::Step()
   */
   // Revise behavior for next run
   if (!rbFlag && (ev->timestamp > -1)) timeLeash = eq->largest - lastGVT;
-  //  else if (!rbFlag && (timeLeash < avgTimeLeash)) timeLeash += LEASH_FLEX;
-  //if (timeLeash > lastGVT) timeLeash = lastGVT;
+  else if (!rbFlag && (timeLeash < avgTimeLeash)) timeLeash += LEASH_FLEX;
+  if (timeLeash > lastGVT) timeLeash = lastGVT;
   /*
   if (parent->thisIndex == RANDOM_OBJECT)
     CkPrintf("New leash=%d\n", timeLeash);
   */
   // Uh oh!  Too much speculation going on!  Pull in the leash...
-  //if (specEventCount > (1.25*eventCount)) timeLeash = avgTimeLeash/2;
+  if (specEventCount > (1.25*eventCount)) timeLeash = avgTimeLeash/2;
   
   rbFlag = 0;
 }
