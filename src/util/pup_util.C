@@ -134,16 +134,15 @@ void PUP::fromDisk::bytes(void *p,int n,size_t itemSize,dataType /*t*/)
 /** Paged Disk PUP::ers's*/
 CpvDeclare(pup_pagetable *,_pagetable);
 void PUP::_pupModuleInit(){
+	CpvInitialize(pup_pagetable *,_pagetable);
 	CpvAccess(_pagetable) = new pup_pagetable;
 	CpvAccess(_pagetable)->freelist = NULL;
 	CpvAccess(_pagetable)->table = NULL;
 	CpvAccess(_pagetable)->maxblk=0;
-	char fName[100];
-	sprintf(fName,"_data%d.dat",CkMyPe());
-	FILE *fp = fopen(fName,"wb");
-	fclose(fp);
-	fp = fopen(fName,"r+b");
-	CpvAccess(_pagetable)->fp = fp;
+	sprintf(CpvAccess(_pagetable)->fName,"_data%d.dat",CkMyPe());
+	CpvAccess(_pagetable)->fp = fopen(CpvAccess(_pagetable)->fName,"wb");
+	fclose(CpvAccess(_pagetable)->fp);
+	CpvAccess(_pagetable)->fp = fopen(CpvAccess(_pagetable)->fName,"r+b");
 }
 
 void PUP::toPagedDisk::addpageentry(){

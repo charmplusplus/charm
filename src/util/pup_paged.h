@@ -20,5 +20,6 @@ typedef struct {
 	pup_pageentry *table; 
 	int maxblk; // the number of blocks that have been written out by now
 	FILE *fp;
+	char fName[100];
 } pup_pagetable;
 #endif
