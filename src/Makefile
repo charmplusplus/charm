@@ -102,7 +102,7 @@ CVHEADERS=converse.h conv-mach.h
 
 CVLIBS=libconv-core.a $(CVLIBS_QS)
 
-LIBCONV_CORE=convcore.o conv-conds.o machine.o spantree.o queueing.o fifo.o threads.o msgmgr.o memory.o
+LIBCONV_CORE=threads.o convcore.o conv-conds.o machine.o spantree.o queueing.o fifo.o msgmgr.o memory.o
 
 converse: basics $(CVLIBS) cmk_extras
 
@@ -111,6 +111,9 @@ libconv-core.a: $(LIBCONV_CORE)
 
 fifo.o: fifo.c $(CVHEADERS)
 	$(CHARMC) fifo.c
+
+threads.o: threads.c $(CVHEADERS)
+	$(CHARMC) -use-reliable-cc -NO threads.c
 
 spantree.o: spantree.c $(CVHEADERS)
 	$(CHARMC) spantree.c
@@ -126,9 +129,6 @@ queueing.o: queueing.c $(CVHEADERS)
 
 conv-conds.o: conv-conds.c $(CVHEADERS)
 	$(CHARMC) conv-conds.c
-
-threads.o: threads.c $(CVHEADERS)
-	$(CHARMC) threads.c
 
 msgmgr.o: msgmgr.c $(CVHEADERS)
 	$(CHARMC) msgmgr.c
@@ -504,7 +504,7 @@ sfilter++lex: xp-sfilter
 ###############################################################################
 
 clean: cmk_clean
-	rm -f charmreplay charmxlat charmfilter charm++xlat charm++filter
+	rm -f charmreplay charmxlat charmfilter charmxlat++ charmfilter++
 	rm -f conv-host
 	rm -f TAGS basics dirs+sources cmk_extras core
 	rm -f core #*#
