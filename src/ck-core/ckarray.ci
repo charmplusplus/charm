@@ -15,6 +15,7 @@ module CkArray {
     entry void AckMigratedElement(ArrayElementAckMessage *);
     entry void UpdateLocation(ArrayElementUpdateMessage *);
     entry void RecvReductionMessage(ArrayReductionMessage *);
+    entry void DummyAtSync(void);
   };
 
   message ArrayElementCreateMessage;

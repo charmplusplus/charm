@@ -149,6 +149,7 @@ public:
   int num_local(void) { return numLocalElements; };
   int ckGetGroupId(void) { return thisgroup; }
   ArrayElement *getElement(int idx) { return elementIDs[idx].element; }
+  void DummyAtSync(void);
 
   //Register a function to be called once the reduction is complete--
   //  need only be called on PE 0 (but is harmless otherwise).
@@ -161,6 +162,7 @@ public:
   static void staticQueryLoad(LDOMHandle _h);
   static void staticResumeFromSync(void* data);
   static void staticRecvAtSync(void* data);
+  static void staticDummyResumeFromSync(void* data);
 #endif
 
   typedef enum {creating, here, moving_to, arriving, at} ElementState;
@@ -176,6 +178,7 @@ private:
   void RegisterElementForSync(int index);
   void AtSync(int index);
   void ResumeFromSync(int index);
+  void DummyResumeFromSync();
   void RecvAtSync();
 #endif
 
@@ -215,6 +218,7 @@ private:
 #if CMK_LBDB_ON
   LDOMHandle myHandle;
   LBDatabase *the_lbdb;
+  LDBarrierClient dummyBarrierHandle;
 #endif
   PtrQ *bufferedForElement;
   PtrQ *bufferedMigrated; 

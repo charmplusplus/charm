@@ -141,10 +141,25 @@ void Array1D::RecvMapID(ArrayMap *mPtr, int mHandle)
   // Tell the lbdb that I'm registering objects, until I'm done
   // registering them.
   the_lbdb->RegisteringObjects(myHandle);
+
+  // Add myself as a local barrier receiver, so I know when I might
+  // be registering objects.
+  the_lbdb->
+    AddLocalBarrierReceiver(reinterpret_cast<LDBarrierFn>(staticRecvAtSync),
+ 			      static_cast<void*>(this));
+  // Also, add a dummy local barrier client, so there will always be
+  // something to call DoneRegisteringObjects()
+  dummyBarrierHandle = the_lbdb->AddLocalBarrierClient(
+    reinterpret_cast<LDResumeFn>(staticDummyResumeFromSync),
+    static_cast<void*>(this));
+
+  // Activate the AtSync for this one immediately.  Note, that since
+  // we have not yet called DoneRegisteringObjects(), nothing
+  // will happen yet.
+  CProxy_Array1D(thisgroup).DummyAtSync(CkMyPe());
 #endif
 
-  for(i=0; i < numElements; i++)
-  {
+  for(i=0; i < numElements; i++) {
     elementIDs[i].originalPE = elementIDs[i].pe = map->procNum(mapHandle, i);
     elementIDs[i].curHop = 0;
     if (elementIDs[i].pe != CkMyPe())
@@ -500,6 +515,17 @@ void Array1D::UpdateLocation(ArrayElementUpdateMessage* msg)
   delete msg;
 }
 
+void Array1D::DummyAtSync()
+{
+  //  CkPrintf("[%d] DummyAtSync called\n",CkMyPe());
+  // Since this is in the .ci file, and I can't use the #ifdef there,
+  // I'll have to always declare the function, but only call the
+  // load balancer if LBDB is on
+#if CMK_LBDB_ON
+  the_lbdb->AtLocalBarrier(dummyBarrierHandle);
+#endif
+}
+
 #if CMK_LBDB_ON
 
 void Array1D::staticMigrate(LDObjHandle _h, int _dest)
@@ -543,13 +569,20 @@ void Array1D::QueryLoad(LDOMHandle _h)
 void Array1D::RegisterElementForSync(int index)
 {
   //  CkPrintf("[%d] Registering element %d for barrier\n",CkMyPe(),index);
-  if (elementIDsReported == 1) { // This is the first element reported
-    // If this is a sync array, register a sync callback so I can
-    // inform the db when I start registering objects 
-    the_lbdb->
-      AddLocalBarrierReceiver(reinterpret_cast<LDBarrierFn>(staticRecvAtSync),
-			      static_cast<void*>(this));
-  }
+//   if (elementIDsReported == 1) { // This is the first element reported
+//     // If this is a sync array, register a sync callback so I can
+//     // inform the db when I start registering objects 
+//     the_lbdb->
+//       AddLocalBarrierReceiver(reinterpret_cast<LDBarrierFn>(staticRecvAtSync),
+// 			      static_cast<void*>(this));
+
+//     // Also, add a dummy local barrier client, so there will always be
+//     // something to call DoneRegisteringObjects()
+//     the_lbdb->AddLocalBarrierClient(
+//       reinterpret_cast<LDResumeFn>(staticDummyResumeFromSync),
+//       static_cast<void*>(this));
+//     CProxy_Array1D(thisgroup).dummyAtSync();
+//   }
     
   elementIDs[index].uses_barrier = CmiTrue;  
   elementIDs[index].barrierData.me = this;
@@ -559,6 +592,20 @@ void Array1D::RegisterElementForSync(int index)
     AddLocalBarrierClient(reinterpret_cast<LDResumeFn>(staticResumeFromSync),
 			  static_cast<void*>(&elementIDs[index].barrierData));
 
+}
+
+void Array1D::staticDummyResumeFromSync(void* data)
+{
+  Array1D* me = static_cast<Array1D*>(data);
+  me->DummyResumeFromSync();
+}
+
+void Array1D::DummyResumeFromSync()
+{
+  //  CkPrintf("[%d] DummyResume called\n",CkMyPe());
+  the_lbdb->DoneRegisteringObjects(myHandle);
+  CProxy_Array1D(thisgroup).DummyAtSync(CkMyPe());
+  //  CkPrintf("[%d] DummyResume done\n",CkMyPe());
 }
 
 void Array1D::staticRecvAtSync(void* data)
