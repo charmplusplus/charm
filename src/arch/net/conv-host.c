@@ -1805,6 +1805,7 @@ int req_handle_princ(line)
     char *line;
 {
   printf("%s",line+6);
+  fflush(stdout);
   return REQ_OK;
 }
 
@@ -1905,13 +1906,6 @@ void req_run_saved()
       fprintf(stderr,"bad request: %s\n",t->request);
       free(t);
     } else free(t);
-  }
-}
-
-req_serve_client(f)
-    FILE *f;
-{
-  while (1) {
   }
 }
 
