@@ -269,8 +269,8 @@ public:
   void *val;    // point to mCastCookie
   int redNo;
 public:
-  CkSectionCookie(): val(NULL), redNo(0) {pe = CmiMyPe();}
-  CkSectionCookie(void *p): val(p), redNo(0) { pe = CmiMyPe();};
+  CkSectionCookie(): val(NULL), redNo(0) {pe = CkMyPe();}
+  CkSectionCookie(void *p): val(p), redNo(0) { pe = CkMyPe();};
   CkSectionCookie(int e, void *p, int r):  pe(e), val(p), redNo(r) {}
 };
 
