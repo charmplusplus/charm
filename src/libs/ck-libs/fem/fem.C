@@ -402,10 +402,17 @@ CDECL int FEM_Mesh_default_read(void)  /* return default fem_mesh used for read 
 {
 	return 102;
 }
+FORTRAN_AS_C_RETURN(int,
+	FEM_MESH_DEFAULT_READ,FEM_Mesh_default_read,fem_mesh_default_read,
+	(void),())
+
 CDECL int FEM_Mesh_default_write(void) /* return default fem_mesh used for write (set) calls below */
 {
 	return 103;
 }
+FORTRAN_AS_C_RETURN(int,
+	FEM_MESH_DEFAULT_WRITE,FEM_Mesh_default_write,fem_mesh_default_write,
+	(void),())
 
 FEM_Mesh *FEMchunk::meshLookup(int fem_mesh,const char *callingRoutine) {
 	switch (fem_mesh) {
