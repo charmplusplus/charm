@@ -275,6 +275,7 @@ extern int CmiRankOf(int pe);
 #define CMK_CPV_IS_SMP Sleep(0);
 
 extern void CmiNodeBarrier(void);
+extern void CmiNodeAllBarrier(void);
 #define CmiSvAlloc CmiAlloc
 
 typedef HANDLE CmiNodeLock;
