@@ -12,7 +12,11 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.11  1995-11-02 20:23:20  sanjeev
+ * Revision 2.12  1995-11-02 22:50:47  knauff
+ * Switched #include "c++interface.h" and #include <stdio.h> to fix
+ * problems on SP.
+ *
+ * Revision 2.11  1995/11/02  20:23:20  sanjeev
  * added CFunctionRefToName
  *
  * Revision 2.10  1995/10/31  23:15:22  knauff
@@ -51,9 +55,6 @@
  ***************************************************************************/
 static char ident[] = "@(#)$Header$";
 
-
-#include <stdio.h>
-
 #include <varargs.h>
 #include "chare.h"
 #include "msg_macros.h"
@@ -62,7 +63,7 @@ static char ident[] = "@(#)$Header$";
 
 #include "c++interface.h"
 
-
+#include <stdio.h>
 
 /* this is the handle of the main chare, used in place of MainChareID */
 /* If you make these Cpv or Csv, you have to change the charm++ xlator too */
