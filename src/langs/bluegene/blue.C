@@ -45,7 +45,7 @@ void nodeBCastMsgHandlerFunc(char *msg);
 void threadBCastMsgHandlerFunc(char *msg);
 void bgCorrectionFunc(char *msg);
 
-extern "C" void defaultBgHandler(char *);
+extern "C" void defaultBgHandler(char *, void *);
 
 CpvStaticDeclare(msgQueue *,inBuffer);	/* emulate the fix-size inbuffer */
 CpvStaticDeclare(CmmTable *,msgBuffer);	/* buffer when inBuffer is full */
@@ -109,8 +109,11 @@ public:
 HandlerTable::HandlerTable()
 {
     handlerTableCount = 1;
-    handlerTable = (BgHandler *)malloc(MAX_HANDLERS * sizeof(BgHandler));
-    for (int i=0; i<MAX_HANDLERS; i++) handlerTable[i] = defaultBgHandler;
+    handlerTable = (BgHandlerInfo *)malloc(MAX_HANDLERS * sizeof(BgHandlerInfo));
+    for (int i=0; i<MAX_HANDLERS; i++) {
+      handlerTable[i].fnPtr = defaultBgHandler;
+      handlerTable[i].userPtr = NULL;
+    }
 }
 
 inline int HandlerTable::registerHandler(BgHandler h)
@@ -120,7 +123,8 @@ inline int HandlerTable::registerHandler(BgHandler h)
     int cur = handlerTableCount++;
     if (cur >= MAX_HANDLERS)
       CmiAbort("BG> HandlerID exceed the maximum.\n");
-    handlerTable[cur] = h;
+    handlerTable[cur].fnPtr = (BgHandlerEx)h;
+    handlerTable[cur].userPtr = NULL;
     return cur;
 }
 
@@ -129,10 +133,20 @@ inline void HandlerTable::numberHandler(int idx, BgHandler h)
     ASSERT(!cva(inEmulatorInit));
     if (idx >= handlerTableCount || idx < 1)
       CmiAbort("BG> HandlerID exceed the maximum!\n");
-    handlerTable[idx] = h;
+    handlerTable[idx].fnPtr = (BgHandlerEx)h;
+    handlerTable[idx].userPtr = NULL;
 }
 
-inline BgHandler HandlerTable::getHandle(int handler)
+inline void HandlerTable::numberHandlerEx(int idx, BgHandlerEx h, void *uPtr)
+{
+    ASSERT(!cva(inEmulatorInit));
+    if (idx >= handlerTableCount || idx < 1)
+      CmiAbort("BG> HandlerID exceed the maximum!\n");
+    handlerTable[idx].fnPtr = h;
+    handlerTable[idx].userPtr = uPtr;
+}
+
+inline BgHandlerInfo * HandlerTable::getHandle(int handler)
 {
 #if 0
     if (handler >= handlerTableCount) {
@@ -141,7 +155,7 @@ inline BgHandler HandlerTable::getHandle(int handler)
     }
 #endif
     if (handler >= handlerTableCount) return NULL;
-    return handlerTable[handler];
+    return &handlerTable[handler];
 }
 
 /**
@@ -184,7 +198,7 @@ nodeInfo::~nodeInfo()
       low level API
 *****************************************************************************/
 
-extern "C" void defaultBgHandler(char *null)
+extern "C" void defaultBgHandler(char *null, void *uPtr)
 {
   CmiAbort("BG> Invalid Handler called!\n");
 }
@@ -216,6 +230,21 @@ void BgNumberHandler(int idx, BgHandler h)
   }
   else {
     tHANDLETAB.numberHandler(idx, h);
+  }
+#endif
+}
+
+void BgNumberHandlerEx(int idx, BgHandlerEx h, void *uPtr)
+{
+  ASSERT(!cva(inEmulatorInit));
+#if CMK_BLUEGENE_NODE
+  tMYNODE->handlerTable.numberHandlerEx(idx,h,uPtr);
+#else
+  if (tTHREADTYPE == COMM_THREAD) {
+    tMYNODE->handlerTable.numberHandlerEx(idx,h,uPtr);
+  }
+  else {
+    tHANDLETAB.numberHandlerEx(idx,h,uPtr);
   }
 #endif
 }
@@ -756,18 +785,20 @@ static inline void ProcessMessage(char *msg)
   int handler = CmiBgMsgHandle(msg);
   DEBUGF(("[%d] call handler %d\n", BgMyNode(), handler));
 
-  BgHandler entryFunc;
+  BgHandlerInfo *handInfo;
+  BgHandlerEx entryFunc;
 #if  CMK_BLUEGENE_NODE
-  entryFunc = tMYNODE->handlerTable.getHandle(handler);
+  handInfo = tMYNODE->handlerTable.getHandle(handler);
 #else
-  entryFunc = tHANDLETAB.getHandle(handler);
-  if (entryFunc == NULL) entryFunc = tMYNODE->handlerTable.getHandle(handler);
+  handInfo = tHANDLETAB.getHandle(handler);
+  if (handInfo == NULL) handInfo = tMYNODE->handlerTable.getHandle(handler);
 #endif
 
-  if (entryFunc == NULL) {
+  if (handInfo == NULL) {
     CmiPrintf("[%d] invalid handler: %d. \n", tMYNODEID, handler);
     CmiAbort("");
   }
+  entryFunc = handInfo->fnPtr;
 
   CmiSetHandler(msg, CmiBgMsgHandle(msg));
 
@@ -777,7 +808,7 @@ static inline void ProcessMessage(char *msg)
   else if (timingMethod == BG_ELAPSE)
     tSTARTTIME = tCURRTIME;
 
-  entryFunc(msg);
+  entryFunc(msg, handInfo->userPtr);
 
   if (timingMethod == BG_WALLTIME) {
     tCURRTIME += (CmiWallTimer()-tSTARTTIME);

@@ -52,8 +52,15 @@ typedef enum WorkType {LARGE_WORK, SMALL_WORK} WorkType;
 
 /**
    user handler function prototype 
+   mimic the Converse Handler data structure
 */
-typedef void (*BgHandler) (char *);
+typedef void (*BgHandler) (char *msg);
+typedef void (*BgHandlerEx) (char *msg, void *userPtr);
+
+typedef struct {
+        BgHandlerEx fnPtr;
+        void *userPtr;
+} BgHandlerInfo;
 
 /***********  user defined functions called by bluegene ***********/
 /** 
@@ -116,6 +123,7 @@ int  BgGetGlobalWorkerThreadID();
 */
 int  BgRegisterHandler(BgHandler h);
 void BgNumberHandler(int, BgHandler h);
+void BgNumberHandlerEx(int, BgHandlerEx h, void *userPtr);
 
 /************************ send packet functions ************************/
 /**

@@ -48,12 +48,13 @@ typedef CkQ<bgCorrectionMsg *> 	    bgCorrectionQ;
 class HandlerTable {
 public:
   int          handlerTableCount; 
-  BgHandler *  handlerTable;     
+  BgHandlerInfo *  handlerTable;     
 public:
   HandlerTable();
   inline int registerHandler(BgHandler h);
   inline void numberHandler(int idx, BgHandler h);
-  inline BgHandler getHandle(int handler);
+  inline void numberHandlerEx(int idx, BgHandlerEx h, void *userPtr);
+  inline BgHandlerInfo* getHandle(int handler);
 #if 0
   HandlerTable()
   {
@@ -78,7 +79,7 @@ public:
       CmiAbort("BG> HandlerID exceed the maximum!\n");
     handlerTable[idx] = h;
   }
-  inline BgHandler getHandle(int handler)
+  inline BgHandlerInfo getHandle(int handler)
   {
 #if 0
     if (handler >= handlerTableCount) {
@@ -106,6 +107,8 @@ CtvExtern(threadInfo *, threadinfo);
 #define tSTARTTIME	tMYNODE->startTime
 #define tCURRTIME	cta(threadinfo)->currTime
 #define tHANDLETAB	cta(threadinfo)->handlerTable
+#define tHANDLETABFNPTR	cta(threadinfo)->handlerTable.fnPtr
+#define tHANDLETABUSERPTR	cta(threadinfo)->handlerTable.userPtr
 #define tMYX		tMYNODE->x
 #define tMYY		tMYNODE->y
 #define tMYZ		tMYNODE->z
