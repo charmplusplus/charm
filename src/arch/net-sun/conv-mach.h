@@ -8,7 +8,10 @@
  ***************************************************************************
  *
  * $Log$
- * Revision 2.21  1996-07-24 22:33:01  milind
+ * Revision 2.22  1996-08-08 17:18:28  milind
+ * changed to use getrusage instead of times.
+ *
+ * Revision 2.21  1996/07/24 22:33:01  milind
  * changed CMK_SIZE_T to unsigned long.
  *
  * Revision 2.20  1996/07/16  17:23:37  jyelon
@@ -108,9 +111,9 @@
 #define CMK_THREADS_USE_ALLOCA_WITH_PRAGMA                 0
 #define CMK_THREADS_USE_JB_TWEAKING                        0
 
-#define CMK_TIMER_USE_GETRUSAGE                            0
+#define CMK_TIMER_USE_GETRUSAGE                            1
 #define CMK_TIMER_USE_SPECIAL                              0
-#define CMK_TIMER_USE_TIMES                                1
+#define CMK_TIMER_USE_TIMES                                0
 
 #define CMK_VECTOR_SEND_USES_COMMON_CODE                        0
 #define CMK_VECTOR_SEND_USES_SPECIAL_CODE                        1
