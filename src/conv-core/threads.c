@@ -515,6 +515,7 @@ Suspend: finds the next thread to execute, and resumes it
 void CthSuspend(void)
 {
   CthThread next;
+	struct CthThreadListener *l;
   CthThreadBase *cur=B(CthCpvAccess(CthCurrent));
 
   if (cur->suspendable == 0)
@@ -523,7 +524,6 @@ void CthSuspend(void)
 	/*
 		Call the suspend function on listeners
 	*/
-	struct CthThreadListener *l;
 	for(l=cur->listener;l!=NULL;l=l->next){
 			l->suspend(l);
 	}
