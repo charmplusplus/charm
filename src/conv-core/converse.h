@@ -13,9 +13,14 @@
 #include "conv-autoconfig.h"
 #endif
 
-/**** DEAL WITH DIFFERENCES: KERNIGHAN-RITCHIE-C, ANSI-C, AND C++ ****/
-
+/* Paste the tokens x and y together, without any space between them.
+   The ANSI way to do this is the bizarre ## "token-pasting" 
+   preprocessor operator.
+ */
 #define CMK_CONCAT(x,y) x##y
+/* Tag variable y as being from unit x: */
+#define CMK_TAG(x,y) x##y##_
+
 
 #include "pup_c.h"
 
@@ -70,13 +75,13 @@ extern int Cmi_numpes;
 #define CmiNodeOf(pe)       (pe)
 #define CmiRankOf(pe)       0
 
-#define CpvDeclare(t,v) t CMK_CONCAT(Cpv_Var_,v)
-#define CpvExtern(t,v)  extern t CMK_CONCAT(Cpv_Var_,v)
-#define CpvStaticDeclare(t,v) static t CMK_CONCAT(Cpv_Var_,v)
+#define CpvDeclare(t,v) t CMK_TAG(Cpv_,v)
+#define CpvExtern(t,v)  extern t CMK_TAG(Cpv_,v)
+#define CpvStaticDeclare(t,v) static t CMK_TAG(Cpv_,v)
 #define CpvInitialize(t,v) do {} while(0)
 #define CpvInitialized(v) 1
-#define CpvAccess(v) CMK_CONCAT(Cpv_Var_,v)
-#define CpvAccessOther(v, r) CMK_CONCAT(Cpv_Var_,v)
+#define CpvAccess(v) CMK_TAG(Cpv_,v)
+#define CpvAccessOther(v, r) CMK_TAG(Cpv_,v)
 
 extern void CmiMemLock();
 extern void CmiMemUnlock();
@@ -187,16 +192,16 @@ extern int Cmi_numpes;
 #define CmiNodeOf(pe)          0
 #define CmiRankOf(pe)          (pe)
 
-#define CpvDeclare(t,v) t* CMK_CONCAT(Cpv_Var_,v)
-#define CpvExtern(t,v)  extern t* CMK_CONCAT(Cpv_Var_,v)
-#define CpvStaticDeclare(t,v) static t* CMK_CONCAT(Cpv_Var_,v)
+#define CpvDeclare(t,v) t* CMK_TAG(Cpv_,v)
+#define CpvExtern(t,v)  extern t* CMK_TAG(Cpv_,v)
+#define CpvStaticDeclare(t,v) static t* CMK_TAG(Cpv_,v)
 #define CpvInitialize(t,v)\
-  do  { if (CMK_CONCAT(Cpv_Var_,v)==0)\
-        { CMK_CONCAT(Cpv_Var_,v) = CpvInit_Alloc(t,CmiNumPes()); }}\
+  do  { if (CMK_TAG(Cpv_,v)==0)\
+        { CMK_TAG(Cpv_,v) = CpvInit_Alloc(t,CmiNumPes()); }}\
   while(0)
-#define CpvInitialized(v) (0!=CMK_CONCAT(Cpv_Var_,v))
-#define CpvAccess(v) CMK_CONCAT(Cpv_Var_,v)[CmiMyPe()]
-#define CpvAccessOther(v, r) CMK_CONCAT(Cpv_Var_,v)[r]
+#define CpvInitialized(v) (0!=CMK_TAG(Cpv_,v))
+#define CpvAccess(v) CMK_TAG(Cpv_,v)[CmiMyPe()]
+#define CpvAccessOther(v, r) CMK_TAG(Cpv_,v)[r]
 
 #define CmiMemLock() 0
 #define CmiMemUnlock() 0
@@ -290,30 +295,30 @@ for each processor in the node.
 */
 #ifdef CMK_CPV_IS_SMP
 
-#define CpvDeclare(t,v) t* CMK_CONCAT(Cpv_Var_,v)
-#define CpvExtern(t,v)  extern t* CMK_CONCAT(Cpv_Var_,v)
-#define CpvStaticDeclare(t,v) static t* CMK_CONCAT(Cpv_Var_,v)
+#define CpvDeclare(t,v) t* CMK_TAG(Cpv_,v)
+#define CpvExtern(t,v)  extern t* CMK_TAG(Cpv_,v)
+#define CpvStaticDeclare(t,v) static t* CMK_TAG(Cpv_,v)
 #define CpvInitialize(t,v)\
     do { \
        if (CmiMyRank()) { \
 		while (!CpvInitialized(v)) CMK_CPV_IS_SMP \
        } else { \
-	       CMK_CONCAT(Cpv_Var_,v)=CpvInit_Alloc(t,1+CmiMyNodeSize());\
+	       CMK_TAG(Cpv_,v)=CpvInit_Alloc(t,1+CmiMyNodeSize());\
        } \
     } while(0)
-#define CpvInitialized(v) (0!=CMK_CONCAT(Cpv_Var_,v))
-#define CpvAccess(v) CMK_CONCAT(Cpv_Var_,v)[CmiMyRank()]
-#define CpvAccessOther(v, r) CMK_CONCAT(Cpv_Var_,v)[r]
+#define CpvInitialized(v) (0!=CMK_TAG(Cpv_,v))
+#define CpvAccess(v) CMK_TAG(Cpv_,v)[CmiMyRank()]
+#define CpvAccessOther(v, r) CMK_TAG(Cpv_,v)[r]
 
 #endif
 
 /*Csv are the same almost everywhere:*/
 #ifndef CsvDeclare
-#define CsvDeclare(t,v) t CMK_CONCAT(Csv_Var_,v)
-#define CsvStaticDeclare(t,v) static t CMK_CONCAT(Csv_Var_,v)
-#define CsvExtern(t,v) extern t CMK_CONCAT(Csv_Var_,v)
+#define CsvDeclare(t,v) t CMK_TAG(Csv_,v)
+#define CsvStaticDeclare(t,v) static t CMK_TAG(Csv_,v)
+#define CsvExtern(t,v) extern t CMK_TAG(Csv_,v)
 #define CsvInitialize(t,v) do{}while(0)
-#define CsvAccess(v) CMK_CONCAT(Csv_Var_,v)
+#define CsvAccess(v) CMK_TAG(Csv_,v)
 #endif
 
 
