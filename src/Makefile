@@ -89,9 +89,9 @@ dirs+sources:
 	@echo
 	rm -f ../../bin ; ln -s `cat .vdir`/bin ../../bin
 	find . -type l -exec rm {} \;
-	find ../../src/Common -type f \! -name Entries \! -name Entries.Log \! -name Root \! -name Repository -exec ln -s {} . \;
-	find ../../src/`cat .vdir` -type f \! -name Entries \! -name Entries.Log \! -name Root \! -name Repository -exec ln -s {} . \;
-	if [ -d ../../src/Common.`cat .gdir` ] ; then find ../../src/Common.`cat .gdir` -type f \! -name Entries \! -name Entries.Log \! -name Root \! -name Repository -exec ln -s {} . \; ; fi
+	find ../../src/Common -name CVS -prune -o -name pJava -prune -o -name pvmc -prune -o -name mdPerl -prune -o -type f -exec ln -s {} . \;
+	find ../../src/`cat .vdir` -name CVS -prune -o -type f -exec ln -s {} . \;
+	if [ -d ../../src/Common.`cat .gdir` ] ; then find ../../src/Common.`cat .gdir` -name CVS -prune -o -type f -exec ln -s {} . \; ; fi
 	@echo
 	@echo 'Gathering quickthreads tree.'
 	@echo

@@ -3,6 +3,8 @@
 #define CPTHREADS_H
 
 #include <converse.h>
+/* for size_t */
+#include <sys/types.h>
 
 #define CPTHREAD_THREADS_MAX     1000000000
 #define CPTHREAD_KEYS_MAX        1000000000
