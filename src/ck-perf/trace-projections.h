@@ -55,17 +55,6 @@ class LogEntry {
 #if defined(WIN32) || CMK_MULTIPLE_DELETE
     void operator delete(void *, void *) { }
 #endif
-    // **CW** For backward compatibility, the previous signature is provided.
-    void write(FILE *fp);
-    // **CW** Simple delta encoding implementation
-    double write(FILE *fp, double prevTime, double *timeErr);
-    void writeBinary(FILE *fp);
-#if CMK_PROJECTIONS_USE_ZLIB
-    // **CW** for backward compatibility, the previous signature is provided.
-    void writeCompressed(gzFile fp);
-    // **CW** Simple delta encoding implementation
-    double writeCompressed(gzFile fp, double prevTime, double *timeErr);
-#endif
     void pup(PUP::er &p);
 };
 
@@ -108,11 +97,7 @@ class LogPool {
     void openLog(const char *mode);
     void closeLog(void);
     void writeLog(void);
-    void write(void);
-    void writeBinary(void);
-#if CMK_PROJECTIONS_USE_ZLIB
-    void writeCompressed(void);
-#endif
+    void write(int writedelta);
     void writeSts(void);
     void add(unsigned char type,unsigned short mIdx,unsigned short eIdx,double time,int event,int pe, int ml=0, CmiObjId* id=0, double recvT=0.);
     void addCreationMulticast(unsigned short mIdx,unsigned short eIdx,double time,int event,int pe, int ml=0, CmiObjId* id=0, double recvT=0., int num=0, int *pelist=NULL);
@@ -171,7 +156,6 @@ class toProjectionsFile : public toTextFile {
   virtual void bytes(void *p,int n,size_t itemSize,dataType t);
  public:
   //Begin writing to this file, which should be opened for ascii write.
-  // Closes file when deleted.
   toProjectionsFile(FILE *f_) :toTextFile(f_) {}
 };
 class fromProjectionsFile : public fromTextFile {
@@ -179,9 +163,19 @@ class fromProjectionsFile : public fromTextFile {
   virtual void bytes(void *p,int n,size_t itemSize,dataType t);
  public:
   //Begin writing to this file, which should be opened for ascii read.
-  // Closes file when deleted.
   fromProjectionsFile(FILE *f_) :fromTextFile(f_) {}
 };
+
+#if CMK_PROJECTIONS_USE_ZLIB
+class toProjectionsGZFile : public PUP::er {
+  gzFile f;
+ protected:
+  virtual void bytes(void *p,int n,size_t itemSize,dataType t);
+ public:
+  //Begin writing to this gz file, which should be opened for gz write.
+  toProjectionsGZFile(gzFile f_) :er(IS_PACKING), f(f_) {}
+};
+#endif
 
 
 #endif

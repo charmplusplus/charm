@@ -112,27 +112,15 @@ void LogPool::closeLog(void)
 {
 #if CMK_PROJECTIONS_USE_ZLIB
   if(compressed) {
-    if (nonDeltaLog) {
-      gzclose(zfp);
-    }
-    if (deltaLog) {
-      gzclose(deltazfp);
-    }
+    if (nonDeltaLog) gzclose(zfp);
+    if (deltaLog) gzclose(deltazfp);
   } else {
-    if (nonDeltaLog) {
-      fclose(fp);
-    }
-    if (deltaLog) {
-      fclose(deltafp);
-    }
+    if (nonDeltaLog) fclose(fp);
+    if (deltaLog)  fclose(deltafp); 
   }
 #else
-  if (nonDeltaLog) {
-    fclose(fp);
-  }
-  if (deltaLog) {
-    fclose(deltafp);
-  }
+  if (nonDeltaLog)  fclose(fp);
+  if (deltaLog) fclose(deltafp);
 #endif
 }
 /**
@@ -311,59 +299,54 @@ void LogPool::writeLog(void)
 {
   OPEN_LOG
   writeHeader();
-  if(binary) writeBinary();
-#if CMK_PROJECTIONS_USE_ZLIB
-  else if(compressed) writeCompressed();
-#endif
-  else write();
+  if (nonDeltaLog) write(0);
+  if (deltaLog) write(1);
   CLOSE_LOG
 }
 
-void LogPool::write(void) 
+void LogPool::write(int writedelta) 
 {
   // **CW** Simple delta encoding implementation
   // prevTime has to be maintained as an object variable because
   // LogPool::write may be called several times depending on the
   // +logsize value.
-  toProjectionsFile p(fp);
-  for(UInt i=0; i<numEntries; i++) {
-    if (nonDeltaLog) {
-      pool[i].pup(p);
-    }
-    if (deltaLog) {
-      prevTime = pool[i].write(deltafp, prevTime, &timeErr);
-    }
+  PUP::er *p = NULL;
+  if (binary) {
+    p = new PUP::toDisk(writedelta?deltafp:fp);
   }
-}
-
-void LogPool::writeBinary(void) {
-  // **CW** The binary format does not benefit from delta encoding
-  // hence it will not employ prevTime.
-#if 0
-  for(UInt i=0; i<numEntries; i++)
-    pool[i].writeBinary(fp);
-#else
-  PUP::toDisk p(fp);
-  for(UInt i=0; i<numEntries; i++) {
-      pool[i].pup(p);
-  }
-#endif
-}
-
 #if CMK_PROJECTIONS_USE_ZLIB
-void LogPool::writeCompressed(void) {
-  // **CW** Simple delta encoding implementation. The compressed format
-  // _may_ benefit from the encoding, so for now, it is added.
+  else if (compressed) {
+    p = new toProjectionsGZFile(writedelta?deltazfp:zfp);
+  }
+#endif
+  else {
+    p = new toProjectionsFile(writedelta?deltafp:fp);
+  }
+  CmiAssert(p);
   for(UInt i=0; i<numEntries; i++) {
-    if (nonDeltaLog) {
-      pool[i].writeCompressed(zfp); // for non-delta implementation
+    if (!writedelta) {
+      pool[i].pup(*p);
     }
-    if (deltaLog) {
-      prevTime = pool[i].writeCompressed(deltazfp, prevTime, &timeErr);
+    else {	// delta
+      double time = pool[i].time;
+      if (pool[i].type != BEGIN_COMPUTATION && pool[i].type != END_COMPUTATION)
+      {
+        double timeDiff = (time-prevTime)*1.0e6;
+        UInt intTimeDiff = (UInt)timeDiff;
+        timeErr += timeDiff - intTimeDiff; /* timeErr is never >= 2.0 */
+        if (timeErr > 1.0) {
+          timeErr -= 1.0;
+          intTimeDiff++;
+        }
+        pool[i].time = intTimeDiff/1.0e6;
+      }
+      pool[i].pup(*p);
+      pool[i].time = time;	// restore time value
+      prevTime = time;
     }
   }
+  delete p;
 }
-#endif
 
 void LogPool::writeSts(void)
 {
@@ -544,189 +527,6 @@ void LogEntry::pup(PUP::er &p)
   p|ret;
 }
 
-// **CW** Wrapper method for backward compatible signature (and behavior)
-// of the write method.
-void LogEntry::write(FILE* fp)
-{
-  // the error value is ignored here
-  double dummyErr = 0.0;
-  write(fp, 0.0, &dummyErr);
-}
-
-// **CW** Simple delta encoding implementation. The timestamp of the current
-// entry is returned and passed to the next entry's write call.
-#define write_LogEntry(fp, printfn) 	\
-{  \
-  printfn(fp, "%d ", type);  \
-  \
-  double timeDiff = (time-prevTime)*1.0e6;  \
-  UInt intTimeDiff = (UInt)timeDiff;  \
-  *timeErr += timeDiff - intTimeDiff; /* timeErr is never >= 2.0 */ \
-  if (*timeErr > 1.0) {  \
-    *timeErr -= 1.0;  \
-    intTimeDiff++;  \
-  }  \
-  \
-  switch (type) {  \
-    case USER_EVENT:  \
-    case USER_EVENT_PAIR:  \
-      printfn(fp, "%d %u %d %d\n", mIdx, intTimeDiff, event, pe);  \
-      break;  \
-    case BEGIN_IDLE:  \
-    case END_IDLE:  \
-    case BEGIN_PACK:  \
-    case END_PACK:  \
-    case BEGIN_UNPACK:  \
-    case END_UNPACK:  \
-      printfn(fp, "%u %d\n", intTimeDiff, pe);  \
-      break;  \
-    case BEGIN_PROCESSING:  \
-      printfn(fp, "%d %d %u %d %d %d %d %d %d %d\n", mIdx, eIdx,   \
-	      intTimeDiff, event, pe, msglen, (UInt)(recvTime*1.e6),   \
-	      id.id[0], id.id[1], id.id[2]);  \
-      break;  \
-    case CREATION:  \
-      printfn(fp, "%d %d %u %d %d %d %d\n", mIdx, eIdx, intTimeDiff,   \
-	      event, pe, msglen, (UInt)(recvTime*1.e6));  \
-      break;  \
-    case CREATION_MULTICAST:  \
-      printfn(fp, "%d %d %u %d %d %d %d %d ", mIdx, eIdx, intTimeDiff,   \
-	      event, pe, msglen, (UInt)(recvTime*1.e6), numpes);  \
-      if (pes == NULL) {  \
-	printfn(fp, "-1\n");  \
-      } else {  \
-	for (int i=0; i<numpes; i++) {  \
-	  printfn(fp, "%d ", pes[i]);  \
-	}  \
-	printfn(fp, "\n");  \
-      }  \
-      break;  \
-    case END_PROCESSING:  \
-    case MESSAGE_RECV:  \
-      printfn(fp, "%d %d %u %d %d %d\n", mIdx, eIdx, intTimeDiff,  \
-	      event, pe, msglen);  \
-      break;  \
-  \
-    case ENQUEUE:  \
-    case DEQUEUE:  \
-      printfn(fp, "%d %u %d %d\n", mIdx, intTimeDiff, event, pe);  \
-      break;  \
-  \
-    case BEGIN_INTERRUPT:  \
-    case END_INTERRUPT:  \
-      printfn(fp, "%u %d %d\n", intTimeDiff, event, pe);  \
-      break;  \
-  \
-      /* **CW** absolute timestamps are used here to support a quick  \
-      // way of determining the total time of a run in projections  \
-      // visualization.  */ \
-    case BEGIN_COMPUTATION:  \
-    case END_COMPUTATION:  \
-      printfn(fp, "%u\n", (UInt)(time*1.e6));  \
-      break;  \
-  \
-    default:  \
-      CmiError("***Internal Error*** Wierd Event %d.\n", type);  \
-      break;  \
-  }  \
-  return time;  \
-}
-
-double LogEntry::write(FILE* fp, double prevTime, double *timeErr)
-{
-  write_LogEntry(fp, fprintf);
-}
-
-#if CMK_PROJECTIONS_USE_ZLIB
-// **CW** backward compatibility wrapper
-void LogEntry::writeCompressed(gzFile zfp)
-{
-  double dummyErr = 0.0;
-  writeCompressed(zfp, 0.0, &dummyErr);
-}
-
-double LogEntry::writeCompressed(gzFile zfp, double prevTime, double *timeErr)
-{
-  write_LogEntry(zfp, gzprintf);
-}
-#endif
-
-#if 0
-// use pup now
-void LogEntry::writeBinary(FILE* fp)
-{
-  UInt ttime = (UInt) (time*1.0e6);
-
-  fwrite(&type,sizeof(UChar),1,fp);
-
-  switch (type) {
-    case USER_EVENT:
-    case USER_EVENT_PAIR:
-      fwrite(&mIdx,sizeof(UShort),1,fp);
-      fwrite(&ttime,sizeof(UInt),1,fp);
-      fwrite(&event,sizeof(int),1,fp);
-      fwrite(&pe,sizeof(int),1,fp);
-      break;
-
-    case BEGIN_IDLE:
-    case END_IDLE:
-    case BEGIN_PACK:
-    case END_PACK:
-    case BEGIN_UNPACK:
-    case END_UNPACK:
-      fwrite(&ttime,sizeof(UInt),1,fp);
-      fwrite(&pe,sizeof(int),1,fp);
-      break;
-
-    case CREATION: {
-      fwrite(&mIdx,sizeof(UShort),1,fp);
-      fwrite(&eIdx,sizeof(UShort),1,fp);
-      fwrite(&ttime,sizeof(UInt),1,fp);
-      fwrite(&event,sizeof(int),1,fp);
-      fwrite(&pe,sizeof(int),1,fp);
-      fwrite(&msglen,sizeof(int),1,fp);
-      
-      double duration = (UInt)(recvTime*1.e6);
-      fwrite(&duration,sizeof(UInt),1,fp);
-      break;
-    }
-    case BEGIN_PROCESSING:
-    case END_PROCESSING:
-      fwrite(&mIdx,sizeof(UShort),1,fp);
-      fwrite(&eIdx,sizeof(UShort),1,fp);
-      fwrite(&ttime,sizeof(UInt),1,fp);
-      fwrite(&event,sizeof(int),1,fp);
-      fwrite(&pe,sizeof(int),1,fp);
-      fwrite(&msglen,sizeof(int),1,fp);
-      break;
-
-    case ENQUEUE:
-    case DEQUEUE:
-      fwrite(&mIdx,sizeof(UShort),1,fp);
-      fwrite(&ttime,sizeof(UInt),1,fp);
-      fwrite(&event,sizeof(int),1,fp);
-      fwrite(&pe,sizeof(int),1,fp);
-      break;
-
-    case BEGIN_INTERRUPT:
-    case END_INTERRUPT:
-      fwrite(&ttime,sizeof(UInt),1,fp);
-      fwrite(&event,sizeof(int),1,fp);
-      fwrite(&pe,sizeof(int),1,fp);
-      break;
-
-    case BEGIN_COMPUTATION:
-    case END_COMPUTATION:
-      fwrite(&ttime,sizeof(UInt),1,fp);
-      break;
-
-    default:
-      CmiError("***Internal Error*** Wierd Event %d.\n", type);
-      break;
-  }
-}
-#endif
-
 TraceProjections::TraceProjections(char **argv): curevent(0), isIdle(0), inEntry(0)
 {
   if (TRACE_CHARM_PE() == 0) return;
@@ -739,22 +539,17 @@ TraceProjections::TraceProjections(char **argv): curevent(0), isIdle(0), inEntry
   int compressed = CmiGetArgFlagDesc(argv,"+gz-trace","Write log files pre-compressed with gzip");
 #endif
 
-  // **CW** default to delta log encoding. The user may choose to do
+  // **CW** default to non delta log encoding. The user may choose to do
   // create both logs (for debugging) or just the old log timestamping
   // (for compatibility).
   // Generating just the non delta log takes precedence over generating
   // both logs (if both arguments appear on the command line).
-  deltaLog = 1;
-  nonDeltaLog = CmiGetArgFlagDesc(argv, "+logNonDelta",
-				  "Generate Delta encoded and simple timestamped log files");
-  int oldLogOnly = CmiGetArgFlagDesc(argv, "+logNonDeltaOnly", 
-				     "No Delta Encoding for Log Files");
+
   // switch to OLD log format until everything works // Gengbin
-  oldLogOnly = 1;
-  if (oldLogOnly) {
-    deltaLog = 0;
-    nonDeltaLog = 1;
-  }
+  nonDeltaLog = 1;
+  deltaLog = 0;
+  deltaLog = CmiGetArgFlagDesc(argv, "+logDelta",
+				  "Generate Delta encoded and simple timestamped log files");
 
   _logPool = new LogPool(CkpvAccess(traceRoot));
   _logPool->setBinary(binary);
@@ -1012,7 +807,7 @@ void TraceProjections::endComputation(void)
   _logPool->add(END_COMPUTATION, 0, 0, TraceTimer(), -1, -1);
 }
 
-// special PUP:ers for handling trace projections logs
+// specialized PUP:ers for handling trace projections logs
 void toProjectionsFile::bytes(void *p,int n,size_t itemSize,dataType t)
 {
   for (int i=0;i<n;i++) 
@@ -1057,4 +852,26 @@ void fromProjectionsFile::bytes(void *p,int n,size_t itemSize,dataType t)
     default: CmiAbort("Unrecognized pup type code!");
     };
 }
+
+#if CMK_PROJECTIONS_USE_ZLIB
+void toProjectionsGZFile::bytes(void *p,int n,size_t itemSize,dataType t)
+{
+  for (int i=0;i<n;i++) 
+    switch(t) {
+    case Tchar: gzprintf(f,"%c",((char *)p)[i]); break;
+    case Tuchar:
+    case Tbyte: gzprintf(f,"%d",((unsigned char *)p)[i]); break;
+    case Tshort: gzprintf(f," %d",((short *)p)[i]); break;
+    case Tushort: gzprintf(f," %u",((unsigned short *)p)[i]); break;
+    case Tint: gzprintf(f," %d",((int *)p)[i]); break;
+    case Tuint: gzprintf(f," %u",((unsigned int *)p)[i]); break;
+    case Tlong: gzprintf(f," %ld",((long *)p)[i]); break;
+    case Tulong: gzprintf(f," %lu",((unsigned long *)p)[i]); break;
+    case Tfloat: gzprintf(f," %.7g",((float *)p)[i]); break;
+    case Tdouble: gzprintf(f," %.15g",((double *)p)[i]); break;
+    default: CmiAbort("Unrecognized pup type code!");
+    };
+}
+#endif
+
 /*@}*/
