@@ -27,9 +27,9 @@ This is needed so we can call the routine as a new thread.
 #  define main MPI_Main
 #endif
 
-/* MPI prototypes and #defines here */
-#define MPI_SUCCESS 			0
+/********************** MPI-1.1 prototypes and defines ***************************/
 /* MPI-1 Errors */
+#define MPI_SUCCESS 			0
 #define MPI_ERR_BUFFER			1
 #define MPI_ERR_COUNT                   2
 #define MPI_ERR_TYPE                    3
@@ -49,7 +49,7 @@ This is needed so we can call the routine as a new thread.
 #define MPI_ERR_INTERN                  17
 #define MPI_ERR_IN_STATUS               18
 #define MPI_ERR_PENDING                 19
-/* MPI-2 Errors follow */
+/* MPI-2 Errors */
 #define MPI_ERR_ACCESS			20
 #define MPI_ERR_AMODE			21
 #define MPI_ERR_ASSERT			22
@@ -87,31 +87,36 @@ This is needed so we can call the routine as a new thread.
 #define MPI_ERR_LASTCODE                53
 /* 0=MPI_SUCCESS<MPI_ERRs(...)<MPI_ERR<=MPI_ERR_LASTCODE */
 
+#define MPI_MAX_PROCESSOR_NAME	256
+#define MPI_MAX_ERROR_STRING	256
+
 /* these values have to match values in ampif.h */
-#define MPI_DATATYPE_NULL -1
-#define MPI_DOUBLE 0
-#define MPI_INT 1
-#define MPI_FLOAT 2
-#define MPI_COMPLEX 3
-#define MPI_LOGICAL 4
-#define MPI_CHAR 5
-#define MPI_BYTE 6
-#define MPI_PACKED 7
-#define MPI_SHORT  8
-#define MPI_LONG  9
-#define MPI_UNSIGNED_CHAR  10
-#define MPI_UNSIGNED_SHORT  11
-#define MPI_UNSIGNED    12
-#define MPI_UNSIGNED_LONG  13
-#define MPI_LONG_DOUBLE  14
-#define MPI_FLOAT_INT 15
-#define MPI_DOUBLE_INT 16
-#define MPI_LONG_INT 17
-#define MPI_2INT 18
-#define MPI_SHORT_INT 19
-#define MPI_LONG_DOUBLE_INT 20
-#define MPI_2FLOAT 21
-#define MPI_2DOUBLE 22
+#define MPI_DATATYPE_NULL    -1
+#define MPI_DOUBLE            0
+#define MPI_INT               1
+#define MPI_FLOAT             2
+#define MPI_COMPLEX           3
+#define MPI_LOGICAL           4
+#define MPI_CHAR              5
+#define MPI_BYTE              6
+#define MPI_PACKED            7
+#define MPI_SHORT             8
+#define MPI_LONG              9
+#define MPI_UNSIGNED_CHAR     10
+#define MPI_UNSIGNED_SHORT    11
+#define MPI_UNSIGNED          12
+#define MPI_UNSIGNED_LONG     13
+#define MPI_LONG_DOUBLE       14
+#define MPI_FLOAT_INT         15
+#define MPI_DOUBLE_INT        16
+#define MPI_LONG_INT          17
+#define MPI_2INT              18
+#define MPI_SHORT_INT         19
+#define MPI_LONG_DOUBLE_INT   20
+#define MPI_2FLOAT            21
+#define MPI_2DOUBLE           22
+#define MPI_LB                23
+#define MPI_UB                24
 
 #define MPI_ANY_SOURCE   (-1)
 #define MPI_ANY_TAG      (-1)
@@ -119,6 +124,9 @@ This is needed so we can call the routine as a new thread.
 #define MPI_GROUP_NULL   (-1)
 #define MPI_COMM_NULL    (-1)
 #define MPI_TYPE_NULL    (-1)
+#define MPI_PROC_NULL    (-1)
+#define MPI_KEYVAL_INVALID (-1)
+#define MPI_BOTTOM	 0
 
 #define MPI_UNDEFINED    (-32766)
 
@@ -126,19 +134,19 @@ This is needed so we can call the routine as a new thread.
 #define MPI_SIMILAR	1
 #define MPI_UNEQUAL	2
 
-#define MPI_OP_NULL 0
-#define MPI_MAX 1
-#define MPI_MIN 2
-#define MPI_SUM 3
-#define MPI_PROD 4
-#define MPI_MAXLOC 5
-#define MPI_MINLOC 6
-#define MPI_LAND 7
-#define MPI_LOR 8
-#define MPI_LXOR 9
-#define MPI_BAND 10
-#define MPI_BOR 11
-#define MPI_BXOR 12
+#define MPI_OP_NULL   0
+#define MPI_MAX       1
+#define MPI_MIN       2
+#define MPI_SUM       3
+#define MPI_PROD      4
+#define MPI_MAXLOC    5
+#define MPI_MINLOC    6
+#define MPI_LAND      7
+#define MPI_LOR       8
+#define MPI_LXOR      9
+#define MPI_BAND      10
+#define MPI_BOR       11
+#define MPI_BXOR      12
 
 /* This is one less than the system-tags defined in ampiimpl.h.
  * This is so that the tags used by the system dont clash with user-tags.
@@ -164,15 +172,42 @@ typedef int MPI_Request;
 typedef struct {
   int MPI_TAG, MPI_SOURCE, MPI_COMM, MPI_LENGTH;
 } MPI_Status;
+#define MPI_STATUS_IGNORE (MPI_Status *)0
 
 typedef int MPI_Datatype;
 typedef int MPI_Aint;
 
+typedef int MPI_Errhandler;
+#define MPI_ERRORS_RETURN	1
+#define MPI_ERRORS_ARE_FATAL	2
+
+typedef void (MPI_Handler_function)(MPI_Comm *, int *, ...);
+typedef int  (MPI_Copy_function)(MPI_Comm oldcomm, int keyval,
+                    void *extra_state, void *attribute_val_in,
+                    void *attribute_val_out, int *flag);
+typedef int  (MPI_Delete_function)(MPI_Comm comm, int keyval,
+                          void *attribute_val, void *extra_state);
+typedef void (MPI_User_function)( void *invec, void *inoutvec, int *len,
+                      MPI_Datatype *datatype);
+
+#define MPI_NULL_COPY_FN 1
+#define MPI_DUP_FN	 2
 
 #include "pup_c.h"
 
 typedef void (*MPI_PupFn)(pup_er, void*);
 
+/********************** MPI-2 prototypes and defines ***************************/
+/* for the datatype decoders */
+#define MPI_COMBINER_NAMED         1
+#define MPI_COMBINER_CONTIGUOUS    2
+#define MPI_COMBINER_VECTOR        3
+#define MPI_COMBINER_HVECTOR       4
+#define MPI_COMBINER_INDEXED       5
+#define MPI_COMBINER_HINDEXED      6
+#define MPI_COMBINER_STRUCT        7
+
+/********************** MPI-1.1 Functions ***************************/
 /***pt2pt***/
 int MPI_Send(void *msg, int count, MPI_Datatype type, int dest,
              int tag, MPI_Comm comm);
@@ -198,7 +233,7 @@ int MPI_Waitany(int count, MPI_Request *request, int *index, MPI_Status *sts);
 int MPI_Testany(int count, MPI_Request *request, int *index, int *flag, MPI_Status *status);
 int MPI_Waitall(int count, MPI_Request *request, MPI_Status *sts);
 int MPI_Testall(int count, MPI_Request *request, int *flag, MPI_Status *sts);
-// int MPI_Waitsome(int incount, MPI_Request *array_of_requests, int *outcount, int *array_of_indices, MPI_Status *array_of_statuses)
+/* int MPI_Waitsome(int incount, MPI_Request *array_of_requests, int *outcount, int *array_of_indices, MPI_Status *array_of_statuses) */
 /* MPI_Testsome */
 int MPI_Request_free(MPI_Request *request);
 /* MPI_Cancel */
@@ -234,12 +269,14 @@ int  MPI_Type_struct(int count, int* arrBLength, MPI_Aint* arrDisp,
                       MPI_Datatype *oldType, MPI_Datatype *newType);
 int MPI_Type_commit(MPI_Datatype *datatype);
 int MPI_Type_free(MPI_Datatype *datatype);
-int  MPI_Type_extent(MPI_Datatype datatype, MPI_Aint *extent);
-int  MPI_Type_size(MPI_Datatype datatype, int *size);
-/* MPI_Type_lb */
-/* MPI_Type_ub */
-/* MPI_Get_elements */
-/* MPI_Address */
+int MPI_Type_extent(MPI_Datatype datatype, MPI_Aint *extent);
+int MPI_Type_size(MPI_Datatype datatype, int *size);
+
+int MPI_Type_lb(MPI_Datatype datatype, MPI_Aint* displacement);
+int MPI_Type_ub(MPI_Datatype datatype, MPI_Aint* displacement);
+int MPI_Address(void* location, MPI_Aint *address);
+int MPI_Get_elements(MPI_Status *status, MPI_Datatype datatype, int *count);
+
 int MPI_Pack(void *inbuf, int incount, MPI_Datatype dtype, void *outbuf,
               int outsize, int *position, MPI_Comm comm);
 int MPI_Unpack(void *inbuf, int insize, int *position, void *outbuf,
@@ -265,6 +302,9 @@ int MPI_Scatterv(void *sendbuf, int *sendcounts, int *displs, MPI_Datatype sendt
 int MPI_Allgather(void *sendbuf, int sendcount, MPI_Datatype sendtype,
                   void *recvbuf, int recvcount, MPI_Datatype recvtype,
                   MPI_Comm comm);
+int MPI_Iallgather(void *sendbuf, int sendcount, MPI_Datatype sendtype,
+                  void *recvbuf, int recvcount, MPI_Datatype recvtype,
+                  MPI_Comm comm, MPI_Request* request);
 int MPI_Allgatherv(void *sendbuf, int sendcount, MPI_Datatype sendtype,
                    void *recvbuf, int *recvcounts, int *displs,
                    MPI_Datatype recvtype, MPI_Comm comm) ;
@@ -279,8 +319,12 @@ int MPI_Ialltoall(void *sendbuf, int sendcount, MPI_Datatype sendtype,
                  MPI_Comm comm, MPI_Request *request);
 int MPI_Reduce(void *inbuf, void *outbuf, int count, int type,
                MPI_Op op, int root, MPI_Comm comm);
+int MPI_Ireduce(void *sendbuf, void *recvbuf, int count, int type,
+                 MPI_Op op, int root, MPI_Comm comm, MPI_Request *request);
 int MPI_Allreduce(void *inbuf, void *outbuf, int count, int type,
                   MPI_Op op, MPI_Comm comm);
+int MPI_Iallreduce(void *inbuf, void *outbuf, int count, int type,
+                  MPI_Op op, MPI_Comm comm, MPI_Request *request);
 int MPI_Reduce_scatter(void* sendbuf, void* recvbuf, int *recvcounts,
                        MPI_Datatype datatype, MPI_Op op, MPI_Comm comm);
 
@@ -342,12 +386,13 @@ int MPI_Comm_free(MPI_Comm *comm);
 
 /***environment management***/
 /* MPI_Get_processor_name */
-/* MPI_Errhandler_create */
-/* MPI_Errhandler_set */
-/* MPI_Errhandler_get */
-/* MPI_Errhandler_free */
+int MPI_Errhandler_create(MPI_Handler_function *function, MPI_Errhandler *errhandler);
+int MPI_Errhandler_set(MPI_Comm comm, MPI_Errhandler errhandler);
+int MPI_Errhandler_get(MPI_Comm comm, MPI_Errhandler *errhandler);
+int MPI_Errhandler_free(MPI_Errhandler *errhandler);
 int MPI_Error_string(int errorcode, char *string, int *resultlen);
-/* MPI_Error_class */
+int MPI_Error_class(int errorcode, int *errorclass);
+
 double MPI_Wtime(void);
 /* double MPI_Wtick(void); */
 int MPI_Init(int *argc, char*** argv); /* FORTRAN VERSION MISSING */
@@ -360,7 +405,6 @@ void MPI_Print(char *str);
 int MPI_Register(void *, MPI_PupFn);
 void MPI_Migrate(void);
 void MPI_Checkpoint(char *dname);
-void MPI_Restart(char *dname);
 void *MPI_Get_userdata(int);
 
 /*Create a new threads array and attach to it*/
@@ -369,8 +413,6 @@ void MPI_Register_main(MPI_MainFn mainFn, const char *name);
 
 /*Attach a new AMPI to each existing threads array element*/
 void MPI_Attach(const char *name);
-
-int MPI_Ireduce(void *sendbuf, void *recvbuf, int count, int type, MPI_Op op, int root, MPI_Comm comm, MPI_Request *request);
 
 #include "ampiProjections.h"
 #ifdef __cplusplus

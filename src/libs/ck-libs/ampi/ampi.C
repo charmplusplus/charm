@@ -15,6 +15,11 @@
 /* change this define to "x" to trace all send/recv's */
 #define MSG_ORDER_DEBUG(x) /* empty */
 #define STARTUP_DEBUG(x) /* ckout<<"[pe "<<CkMyPe()<<"] "<< x <<endl; */
+#if 0
+#define AMPI_DEBUG CkPrintf
+#else
+#define AMPI_DEBUG /* empty */
+#endif
 
 //------------- startup -------------
 static mpi_comm_worlds mpi_worlds;
@@ -1002,6 +1007,10 @@ ampi *getAmpiInstance(MPI_Comm comm) {
   return ptr;
 }
 
+static AmpiRequestList *getReqs(void) {
+  return &(getAmpiParent()->ampiReqs);
+}
+
 CDECL void MPI_Migrate(void)
 {
   AMPIAPI("MPI_Migrate");
@@ -1108,15 +1117,14 @@ CDECL
 int MPI_Recv(void *msg, int count, MPI_Datatype type, int src, int tag,
               MPI_Comm comm, MPI_Status *status)
 {
-  AMPIAPI("MPI_Recv");
-  ampi *ptr = getAmpiInstance(comm);
-  
-	//CkPrintf("dedede%d[[",CpvAccess(_traceCoreOn));if(CpvAccess(_traceCoreOn) !=0) ampi_endProcessing(ptr->thisIndex); else CkPrintf("]]]] %ddededededededede\n",CpvAccess(_traceCoreOn)); 
-	
+	AMPIAPI("MPI_Recv");
+	ampi *ptr = getAmpiInstance(comm);
+
+	//CkPrintf("dedede%d[[",CpvAccess(_traceCoreOn));if(CpvAccess(_traceCoreOn) !=0) ampi_endProcessing(ptr->thisIndex); else CkPrintf("]]]] %ddededededededede\n",CpvAccess(_traceCoreOn));
 	_LOG_E_END_AMPI_PROCESSING(ptr->thisIndex)
 	ptr->recv(tag,src,msg,count,type, comm, (int*) status);
 	_LOG_E_BEGIN_AMPI_PROCESSING(ptr->thisIndex,src,count)
-  
+
 	return 0;
 }
 
@@ -1365,9 +1373,8 @@ int MPI_Reduce(void *inbuf, void *outbuf, int count, int type, MPI_Op op,
 
   if (ptr->thisIndex == rootIdx){
   /*HACK: Use recv() to block until reduction data comes back*/
-
-	_LOG_E_END_AMPI_PROCESSING(ptr->thisIndex)
- 	ptr->recv(MPI_REDUCE_TAG, MPI_REDUCE_SOURCE, outbuf, count, type, MPI_REDUCE_COMM);
+  _LOG_E_END_AMPI_PROCESSING(ptr->thisIndex)
+  ptr->recv(MPI_REDUCE_TAG, MPI_REDUCE_SOURCE, outbuf, count, type, MPI_REDUCE_COMM);
   _LOG_E_BEGIN_AMPI_PROCESSING(ptr->thisIndex,-1,count)
   }
  return 0;
@@ -1392,6 +1399,28 @@ int MPI_Allreduce(void *inbuf, void *outbuf, int count, int type,
   _LOG_E_END_AMPI_PROCESSING(ptr->thisIndex)
   ptr->recv(MPI_REDUCE_TAG, MPI_REDUCE_SOURCE, outbuf, count, type, MPI_REDUCE_COMM);
   _LOG_E_BEGIN_AMPI_PROCESSING(ptr->thisIndex,-2,count)
+  return 0;
+}
+
+CDECL
+int MPI_Iallreduce(void *inbuf, void *outbuf, int count, int type,
+                  MPI_Op op, MPI_Comm comm, MPI_Request* request)
+{
+  AMPIAPI("MPI_Allreduce");
+  ampi *ptr = getAmpiInstance(comm);
+  if(comm==MPI_COMM_SELF) {
+    // Just do a local copy: no need to do a reduction:
+    return copyRednData(ptr->getDDT()->getType(type),inbuf,outbuf,count);
+  }
+  CkReductionMsg *msg=makeRednMsg(ptr->getDDT()->getType(type),inbuf,count,type,op);
+  CkCallback allreduceCB(CkIndex_ampi::reduceResult(0),ptr->getProxy());
+  msg->setCallback(allreduceCB);
+  ptr->contribute(msg);
+
+  // using irecv instead recv to non-block the call and get request pointer
+  AmpiRequestList* reqs = getReqs();
+  IReq *newreq = new IReq(outbuf,count,type,MPI_REDUCE_SOURCE,MPI_REDUCE_TAG,MPI_REDUCE_COMM);
+  *request = reqs->insert(newreq);
   return 0;
 }
 
@@ -1431,19 +1460,6 @@ CDECL
 double MPI_Wtime(void)
 {
   return TCHARM_Wall_timer();
-}
-
-
-//void ampiPersRequests::pup(PUP::er &p) {
-//This was Milind's explanation for not pup'ing persistent requests (it's a lie):
-  // persistent comm requests will have to be re-registered after
-  // migration anyway, so no need to pup them
-  // migrate is called only when all irequests are complete, so no need
-  // to pup them as well.
-
-
-static AmpiRequestList *getReqs(void) {
-  return &(getAmpiParent()->ampiReqs);
 }
 
 int PersReq::start(){
@@ -1500,7 +1516,7 @@ int MPI_Wait(MPI_Request *request, MPI_Status *sts)
   if(*request == MPI_REQUEST_NULL)
     return 0;
   AmpiRequestList* reqs = getReqs();
-  CkPrintf("MPI_Wait: request=%d, reqs.size=%d, &reqs=%d\n",*request,reqs->size(),reqs);
+  AMPI_DEBUG("MPI_Wait: request=%d, reqs.size=%d, &reqs=%d\n",*request,reqs->size(),reqs);
   (*reqs)[*request]->wait(sts);
   (*reqs)[*request]->free();
   return 0;
@@ -1565,8 +1581,8 @@ void ATAReq::complete(MPI_Status *sts){
 	int i;
 	for(i=0;i<count;i++){
   _LOG_E_END_AMPI_PROCESSING(getAmpiInstance(myreqs[i].comm)->thisIndex)
-		getAmpiInstance(myreqs[i].comm)->recv(myreqs[i].tag, myreqs[i].src, myreqs[i].buf,
-				myreqs[i].count, myreqs[i].type, myreqs[i].comm, (int*)sts);
+	getAmpiInstance(myreqs[i].comm)->recv(myreqs[i].tag, myreqs[i].src, myreqs[i].buf,
+			myreqs[i].count, myreqs[i].type, myreqs[i].comm, (int*)sts);
   _LOG_E_BEGIN_AMPI_PROCESSING(getAmpiInstance(myreqs[i].comm)->thisIndex,myreqs[i].src,myreqs[i].count)
 	}
 }
@@ -1685,7 +1701,7 @@ int MPI_Type_indexed(int count, int* arrBlength, int* arrDisp,
 }
 
 extern  "C"  
-int MPI_Type_hindexed(int count, int* arrBlength, MPI_Aint* arrDisp, 
+int MPI_Type_hindexed(int count, int* arrBlength, MPI_Aint* arrDisp,
                        MPI_Datatype oldtype, MPI_Datatype*  newtype)
 {
   AMPIAPI("MPI_Type_hindexed");
@@ -1722,7 +1738,7 @@ CDECL
 int MPI_Type_extent(MPI_Datatype datatype, MPI_Aint *extent)
 {
   AMPIAPI("MPI_Type_extent");
-  getDDT()->getExtent(datatype);
+  *extent = getDDT()->getExtent(datatype);
   return 0;
 }
 
@@ -1770,7 +1786,8 @@ int MPI_Irecv(void *buf, int count, MPI_Datatype type, int src,
 }
 
 CDECL
-int MPI_Ireduce(void *sendbuf, void *recvbuf, int count, int type, MPI_Op op, int root, MPI_Comm comm, MPI_Request *request)
+int MPI_Ireduce(void *sendbuf, void *recvbuf, int count, int type, MPI_Op op,
+                 int root, MPI_Comm comm, MPI_Request *request)
 {
   AMPIAPI("MPI_Ireduce");
   if(comm==MPI_COMM_SELF) return 0;
@@ -1791,6 +1808,88 @@ int MPI_Ireduce(void *sendbuf, void *recvbuf, int count, int type, MPI_Op op, in
 }
 
 CDECL
+int MPI_Allgather(void *sendbuf, int sendcount, MPI_Datatype sendtype,
+                  void *recvbuf, int recvcount, MPI_Datatype recvtype,
+                  MPI_Comm comm)
+{
+  AMPIAPI("MPI_Allgather");
+  if(comm==MPI_COMM_SELF) return 0;
+  ampi *ptr = getAmpiInstance(comm);
+  int size = ptr->getSize();
+  int i;
+
+  // commlib support
+  CProxy_ampi arrproxy = ptr->getProxy();
+  ComlibDelegateProxy(&arrproxy);
+
+  ptr->getComlib().beginIteration();
+  for(i=0;i<size;i++) {
+    ptr->delesend(MPI_GATHER_TAG, ptr->getRank(), sendbuf, sendcount,
+                  sendtype, i, comm, arrproxy);
+#ifndef CMK_OPTIMIZE
+    int size=0;
+    MPI_Type_size(sendtype,&size);
+    _LOG_E_AMPI_MSG_SEND(MPI_GATHER_TAG,i,sendcount,size)
+#endif
+  }
+  ptr->getComlib().endIteration();
+
+  MPI_Status status;
+  CkDDT_DataType* dttype = ptr->getDDT()->getType(recvtype) ;
+  int itemsize = dttype->getSize(recvcount) ;
+
+  for(i=0;i<size;i++) {
+    MPI_Recv(((char*)recvbuf)+(itemsize*i), recvcount, recvtype,
+             i, MPI_GATHER_TAG, comm, &status);
+  }
+  return 0;
+}
+
+CDECL
+int MPI_Iallgather(void *sendbuf, int sendcount, MPI_Datatype sendtype,
+                    void *recvbuf, int recvcount, MPI_Datatype recvtype,
+                    MPI_Comm comm, MPI_Request* request)
+{
+  AMPIAPI("MPI_Iallgather");
+  if(comm==MPI_COMM_SELF) return 0;
+  ampi *ptr = getAmpiInstance(comm);
+  int size = ptr->getSize();
+  int i;
+
+  // commlib support
+  CProxy_ampi arrproxy = ptr->getProxy();
+  ComlibDelegateProxy(&arrproxy);
+
+  ptr->getComlib().beginIteration();
+  for(i=0;i<size;i++) {
+    ptr->delesend(MPI_GATHER_TAG, ptr->getRank(), sendbuf, sendcount,
+                  sendtype, i, comm, arrproxy);
+#ifndef CMK_OPTIMIZE
+    int size=0;
+    MPI_Type_size(sendtype,&size);
+    _LOG_E_AMPI_MSG_SEND(MPI_GATHER_TAG,i,sendcount,size)
+#endif
+  }
+  ptr->getComlib().endIteration();
+
+  MPI_Status status;
+  CkDDT_DataType* dttype = ptr->getDDT()->getType(recvtype) ;
+  int itemsize = dttype->getSize(recvcount) ;
+
+  // copy+paste from MPI_Irecv
+  AmpiRequestList* reqs = getReqs();
+  ATAReq *newreq = new ATAReq(size);
+  for(i=0;i<size;i++){
+    if(newreq->addReq(((char*)recvbuf)+(itemsize*i),recvcount,recvtype,i,MPI_GATHER_TAG,comm)!=(i+1))
+      CkAbort("MPI_Iallgather: Error adding requests into ATAReq!");
+  }
+  *request = reqs->insert(newreq);
+  AMPI_DEBUG("MPI_Iallgather: request=%d, reqs.size=%d, &reqs=%d\n",*request,reqs->size(),reqs);
+
+  return 0;
+}
+
+CDECL
 int MPI_Allgatherv(void *sendbuf, int sendcount, MPI_Datatype sendtype,
                    void *recvbuf, int *recvcounts, int *displs,
                    MPI_Datatype recvtype, MPI_Comm comm)
@@ -1800,9 +1899,22 @@ int MPI_Allgatherv(void *sendbuf, int sendcount, MPI_Datatype sendtype,
   ampi *ptr = getAmpiInstance(comm);
   int size = ptr->getSize();
   int i;
+
+  // commlib support
+  CProxy_ampi arrproxy = ptr->getProxy();
+  ComlibDelegateProxy(&arrproxy);
+
+  ptr->getComlib().beginIteration();
   for(i=0;i<size;i++) {
-    MPI_Send(sendbuf, sendcount, sendtype, i, MPI_GATHER_TAG, comm);
+    ptr->delesend(MPI_GATHER_TAG, ptr->getRank(), sendbuf, sendcount,
+                  sendtype, i, comm, arrproxy);
+#ifndef CMK_OPTIMIZE
+    int size=0;
+    MPI_Type_size(sendtype,&size);
+    _LOG_E_AMPI_MSG_SEND(MPI_GATHER_TAG,i,sendcount,size)
+#endif
   }
+  ptr->getComlib().endIteration();
 
   MPI_Status status;
   CkDDT_DataType* dttype = ptr->getDDT()->getType(recvtype) ;
@@ -1816,26 +1928,26 @@ int MPI_Allgatherv(void *sendbuf, int sendcount, MPI_Datatype sendtype,
 }
 
 CDECL
-int MPI_Allgather(void *sendbuf, int sendcount, MPI_Datatype sendtype,
-                  void *recvbuf, int recvcount, MPI_Datatype recvtype,
-                  MPI_Comm comm)
+int MPI_Gather(void *sendbuf, int sendcount, MPI_Datatype sendtype,
+               void *recvbuf, int recvcount, MPI_Datatype recvtype,
+               int root, MPI_Comm comm)
 {
-  AMPIAPI("MPI_Allgather");
+  AMPIAPI("MPI_Gather");
   if(comm==MPI_COMM_SELF) return 0;
   ampi *ptr = getAmpiInstance(comm);
   int size = ptr->getSize();
   int i;
-  for(i=0;i<size;i++) {
-    MPI_Send(sendbuf, sendcount, sendtype, i, MPI_GATHER_TAG, comm);
-  }
+  MPI_Send(sendbuf, sendcount, sendtype, root, MPI_GATHER_TAG, comm);
 
-  MPI_Status status;
-  CkDDT_DataType* dttype = ptr->getDDT()->getType(recvtype) ;
-  int itemsize = dttype->getSize(recvcount) ;
+  if(ptr->getRank()==root) {
+    MPI_Status status;
+    CkDDT_DataType* dttype = ptr->getDDT()->getType(recvtype) ;
+    int itemsize = dttype->getSize(recvcount) ;
 
-  for(i=0;i<size;i++) {
-    MPI_Recv(((char*)recvbuf)+(itemsize*i), recvcount, recvtype,
-             i, MPI_GATHER_TAG, comm, &status);
+    for(i=0;i<size;i++) {
+      MPI_Recv(((char*)recvbuf)+(itemsize*i), recvcount, recvtype,
+               i, MPI_GATHER_TAG, comm, &status);
+    }
   }
   return 0;
 }
@@ -1867,27 +1979,27 @@ int MPI_Gatherv(void *sendbuf, int sendcount, MPI_Datatype sendtype,
 }
 
 CDECL
-int MPI_Gather(void *sendbuf, int sendcount, MPI_Datatype sendtype,
-               void *recvbuf, int recvcount, MPI_Datatype recvtype,
-               int root, MPI_Comm comm)
+int MPI_Scatter(void *sendbuf, int sendcount, MPI_Datatype sendtype,
+                void *recvbuf, int recvcount, MPI_Datatype recvtype,
+                int root, MPI_Comm comm)
 {
-  AMPIAPI("MPI_Gather");
+  AMPIAPI("MPI_Scatter");
   if(comm==MPI_COMM_SELF) return 0;
   ampi *ptr = getAmpiInstance(comm);
   int size = ptr->getSize();
   int i;
-  MPI_Send(sendbuf, sendcount, sendtype, root, MPI_GATHER_TAG, comm);
 
   if(ptr->getRank()==root) {
-    MPI_Status status;
-    CkDDT_DataType* dttype = ptr->getDDT()->getType(recvtype) ;
-    int itemsize = dttype->getSize(recvcount) ;
-
+    CkDDT_DataType* dttype = ptr->getDDT()->getType(sendtype) ;
+    int itemsize = dttype->getSize(sendcount) ;
     for(i=0;i<size;i++) {
-      MPI_Recv(((char*)recvbuf)+(itemsize*i), recvcount, recvtype,
-               i, MPI_GATHER_TAG, comm, &status);
+      MPI_Send(((char*)sendbuf)+(itemsize*i), sendcount, sendtype,
+               i, MPI_SCATTER_TAG, comm);
     }
   }
+  MPI_Status status;
+  MPI_Recv(recvbuf, recvcount, recvtype, root, MPI_SCATTER_TAG, comm, &status);
+
   return 0;
 }
 
@@ -1917,74 +2029,6 @@ int MPI_Scatterv(void *sendbuf, int *sendcounts, int *displs, MPI_Datatype sendt
 }
 
 CDECL
-int MPI_Scatter(void *sendbuf, int sendcount, MPI_Datatype sendtype,
-                void *recvbuf, int recvcount, MPI_Datatype recvtype,
-                int root, MPI_Comm comm)
-{
-  AMPIAPI("MPI_Scatter");
-  if(comm==MPI_COMM_SELF) return 0;
-  ampi *ptr = getAmpiInstance(comm);
-  int size = ptr->getSize();
-  int i;
-
-  if(ptr->getRank()==root) {
-    CkDDT_DataType* dttype = ptr->getDDT()->getType(sendtype) ;
-    int itemsize = dttype->getSize(sendcount) ;
-    for(i=0;i<size;i++) {
-      MPI_Send(((char*)sendbuf)+(itemsize*i), sendcount, sendtype,
-               i, MPI_SCATTER_TAG, comm);
-    }
-  }
-  MPI_Status status;
-  MPI_Recv(recvbuf, recvcount, recvtype, root, MPI_SCATTER_TAG, comm, &status);
-
-  return 0;
-}
-
-CDECL
-int MPI_Alltoallv(void *sendbuf, int *sendcounts, int *sdispls,
-                  MPI_Datatype sendtype, void *recvbuf, int *recvcounts,
-                  int *rdispls, MPI_Datatype recvtype, MPI_Comm comm)
-{
-  AMPIAPI("MPI_Alltoallv");
-  if(comm==MPI_COMM_SELF) return 0;
-  ampi *ptr = getAmpiInstance(comm);
-  int size = ptr->getSize();
-  CkDDT_DataType* dttype = ptr->getDDT()->getType(sendtype) ;
-  int itemsize = dttype->getSize() ;
-  int i;
-
-  // commlib support
-  CProxy_ampi arrproxy = ptr->getProxy();
-  //arrproxy.ckDelegate(ptr->getComlib());
-  ComlibDelegateProxy(&arrproxy);
-
-  ptr->getComlib().beginIteration();
-  for(i=0;i<size;i++) {
-    ptr->delesend(MPI_GATHER_TAG,ptr->getRank(),((char*)sendbuf)+(itemsize*sdispls[i]),sendcounts[i],
-                  sendtype, i, comm, arrproxy);
-#ifndef CMK_OPTIMIZE
-    int size=0;
-    MPI_Type_size(sendtype,&size);
-    _LOG_E_AMPI_MSG_SEND(MPI_GATHER_TAG,i,sendcounts[i],size)
-#endif
-  }
-  ptr->getComlib().endIteration();
-
-  MPI_Status status;
-  dttype = ptr->getDDT()->getType(recvtype) ;
-  itemsize = dttype->getSize() ;
-
-  for(i=0;i<size;i++) {
-    _LOG_E_END_AMPI_PROCESSING(ptr->thisIndex)
-    ptr->recv(MPI_GATHER_TAG,i,((char*)recvbuf)+(itemsize*rdispls[i]),
-              recvcounts[i], recvtype, comm, (int*)&status);
-    _LOG_E_BEGIN_AMPI_PROCESSING(ptr->thisIndex,i,recvcounts[i])
-  }
-  return 0;
-}
-
-CDECL
 int MPI_Alltoall(void *sendbuf, int sendcount, MPI_Datatype sendtype,
                  void *recvbuf, int recvcount, MPI_Datatype recvtype,
                  MPI_Comm comm)
@@ -1999,7 +2043,6 @@ int MPI_Alltoall(void *sendbuf, int sendcount, MPI_Datatype sendtype,
 
   // commlib support
   CProxy_ampi arrproxy = ptr->getProxy();
-  //arrproxy.ckDelegate(ptr->getComlib());
   ComlibDelegateProxy(&arrproxy);
 
   ptr->getComlib().beginIteration();
@@ -2019,10 +2062,8 @@ int MPI_Alltoall(void *sendbuf, int sendcount, MPI_Datatype sendtype,
   itemsize = dttype->getSize(recvcount) ;
 
   for(i=0;i<size;i++) {
-    _LOG_E_END_AMPI_PROCESSING(ptr->thisIndex)
-    ptr->recv(MPI_GATHER_TAG,i,((char*)recvbuf)+(itemsize*i),
-              recvcount,recvtype, comm, (int*)&status);
-    _LOG_E_BEGIN_AMPI_PROCESSING(ptr->thisIndex,i,recvcount)
+    MPI_Recv(((char*)recvbuf)+(itemsize*i), recvcount, recvtype,
+              i, MPI_GATHER_TAG, comm, &status);
   }
   return 0;
 }
@@ -2042,7 +2083,6 @@ int MPI_Ialltoall(void *sendbuf, int sendcount, MPI_Datatype sendtype,
 
   // commlib support
   CProxy_ampi arrproxy = ptr->getProxy();
-  //arrproxy.ckDelegate(ptr->getComlib());
   ComlibDelegateProxy(&arrproxy);
 
   ptr->getComlib().beginIteration();
@@ -2062,10 +2102,50 @@ int MPI_Ialltoall(void *sendbuf, int sendcount, MPI_Datatype sendtype,
   ATAReq *newreq = new ATAReq(size);
   for(i=0;i<size;i++){
     if(newreq->addReq(((char*)recvbuf)+(itemsize*i),recvcount,recvtype,i,MPI_GATHER_TAG,comm)!=(i+1))
-      CkAbort("Error adding requests into ATAReq!");
+      CkAbort("MPI_Ialltoall: Error adding requests into ATAReq!");
   }
   *request = reqs->insert(newreq);
-  CkPrintf("MPI_Ialltoall: request=%d, reqs.size=%d, &reqs=%d\n",*request,reqs->size(),reqs);
+  AMPI_DEBUG("MPI_Ialltoall: request=%d, reqs.size=%d, &reqs=%d\n",*request,reqs->size(),reqs);
+  return 0;
+}
+
+CDECL
+int MPI_Alltoallv(void *sendbuf, int *sendcounts, int *sdispls,
+                  MPI_Datatype sendtype, void *recvbuf, int *recvcounts,
+                  int *rdispls, MPI_Datatype recvtype, MPI_Comm comm)
+{
+  AMPIAPI("MPI_Alltoallv");
+  if(comm==MPI_COMM_SELF) return 0;
+  ampi *ptr = getAmpiInstance(comm);
+  int size = ptr->getSize();
+  CkDDT_DataType* dttype = ptr->getDDT()->getType(sendtype) ;
+  int itemsize = dttype->getSize() ;
+  int i;
+
+  // commlib support
+  CProxy_ampi arrproxy = ptr->getProxy();
+  ComlibDelegateProxy(&arrproxy);
+
+  ptr->getComlib().beginIteration();
+  for(i=0;i<size;i++) {
+    ptr->delesend(MPI_GATHER_TAG,ptr->getRank(),((char*)sendbuf)+(itemsize*sdispls[i]),sendcounts[i],
+                  sendtype, i, comm, arrproxy);
+#ifndef CMK_OPTIMIZE
+    int size=0;
+    MPI_Type_size(sendtype,&size);
+    _LOG_E_AMPI_MSG_SEND(MPI_GATHER_TAG,i,sendcounts[i],size)
+#endif
+  }
+  ptr->getComlib().endIteration();
+
+  MPI_Status status;
+  dttype = ptr->getDDT()->getType(recvtype) ;
+  itemsize = dttype->getSize() ;
+
+  for(i=0;i<size;i++) {
+    MPI_Recv(((char*)recvbuf)+(itemsize*rdispls[i]), recvcounts[i], recvtype,
+             i, MPI_GATHER_TAG, comm, &status);
+  }
   return 0;
 }
 
@@ -2101,12 +2181,41 @@ int MPI_Abort(int comm, int errorcode)
 }
 
 CDECL
-int MPI_Get_count(MPI_Status *sts, MPI_Datatype dtype, int *count)
-{
+int MPI_Get_count(MPI_Status *sts, MPI_Datatype dtype, int *count){
   AMPIAPI("MPI_Get_count");
-  CkDDT_DataType* dttype = getDDT()->getType(dtype) ;
+  CkDDT_DataType* dttype = getDDT()->getType(dtype);
   int itemsize = dttype->getSize() ;
   *count = sts->MPI_LENGTH/itemsize;
+  return 0;
+}
+
+CDECL
+int MPI_Type_lb(MPI_Datatype dtype, MPI_Aint* displacement){
+  AMPIAPI("MPI_Type_lb");
+  *displacement = getDDT()->getLB(dtype);
+  return 0;
+}
+
+CDECL
+int MPI_Type_ub(MPI_Datatype dtype, MPI_Aint* displacement){
+  AMPIAPI("MPI_Type_ub");
+  *displacement = getDDT()->getUB(dtype);
+  return 0;
+}
+
+CDECL
+int MPI_Address(void* location, MPI_Aint *address){
+  AMPIAPI("MPI_Address");
+  *address = (MPI_Aint)((char *)location);
+  return 0;
+}
+
+CDECL
+int MPI_Get_elements(MPI_Status *sts, MPI_Datatype dtype, int *count){
+  AMPIAPI("MPI_Get_elements");
+  CkDDT_DataType* dttype = getDDT()->getType(dtype) ;
+  int basesize = dttype->getBaseSize() ;
+  *count = sts->MPI_LENGTH/basesize;
   return 0;
 }
 
@@ -2143,6 +2252,44 @@ int MPI_Pack_size(int incount,MPI_Datatype datatype,MPI_Comm comm,int *sz)
 }
 
 /* Error handling */
+#if defined(USE_STDARG)
+void error_handler(MPI_Comm *, int *, ...);
+#else
+void error_handler ( MPI_Comm *, int * );
+#endif
+
+CDECL
+int MPI_Errhandler_create(MPI_Handler_function *function, MPI_Errhandler *errhandler){
+	AMPIAPI("MPI_Errhandler_create");
+	return MPI_SUCCESS;
+}
+
+CDECL
+int MPI_Errhandler_set(MPI_Comm comm, MPI_Errhandler errhandler){
+	AMPIAPI("MPI_Errhandler_set");
+	return MPI_SUCCESS;
+}
+
+CDECL
+int MPI_Errhandler_get(MPI_Comm comm, MPI_Errhandler *errhandler){
+	AMPIAPI("MPI_Errhandler_get");
+	return MPI_SUCCESS;
+}
+
+CDECL
+int MPI_Errhandler_free(MPI_Errhandler *errhandler){
+	AMPIAPI("MPI_Errhandler_free");
+	return MPI_SUCCESS;
+}
+
+CDECL
+int MPI_Error_class(int errorcode, int *errorclass){
+	AMPIAPI("MPI_Error_class");
+	*errorclass = errorcode;
+	return MPI_SUCCESS;
+}
+
+
 CDECL
 int MPI_Error_string(int errorcode, char *string, int *resultlen)
 {
@@ -2310,13 +2457,6 @@ int MPI_Comm_create(MPI_Comm comm, MPI_Group group, MPI_Comm* newcomm)
 
 /* Charm++ Extentions to MPI standard: */
 CDECL
-void MPI_Restart(char *dname)
-{
-  AMPIAPI("MPI_Restart");
-  CkPrintf("MPI_Restart not finished.\n");
-}
-
-CDECL
 void MPI_Checkpoint(char *dname)
 {
   AMPIAPI("MPI_Checkpoint");
@@ -2370,4 +2510,12 @@ void _registerampif(void)
 {
   _registerampi();
 }
+
+// Hack for some weird MPIR_* functions
+int MPIR_Err_setmsg( int errclass, int errkind,
+                     const char *routine_name,
+                     const char *generic_string,
+                     const char *default_string, ... )
+{ /* empty */ }
+
 #include "ampi.def.h"
