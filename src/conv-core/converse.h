@@ -573,6 +573,9 @@ typedef void (*CmiStartFn)(int argc, char **argv);
 
 /********* CSD - THE SCHEDULER ********/
 
+CpvExtern(int, _ccd_numchecks);
+extern void  *CmiGetNonLocal(void);
+extern void   CmiNotifyIdle(void);
 extern  int CsdScheduler(int);
 #define CsdSetNotifyIdle(f1,f2) do {CpvAccess(CsdNotifyIdle)=(f1);\
                                  CpvAccess(CsdNotifyBusy)=(f2);} while(0)
@@ -741,7 +744,7 @@ void   CmiDeliverSpecificMsg(int handler);
 #if !CMK_DEBUG_MODE
 #define CmiHandleMessage(msg) (CmiGetHandlerFunction(msg))(msg)
 #else
-void   CmiHandleMessage(void *msg);
+#define CmiHandleMessage(msg) Cpd_CmiHandleMessage(msg)
 #endif
 
 /******** CQS: THE QUEUEING SYSTEM ********/
@@ -1094,56 +1097,7 @@ void CcdRaiseCondition(int condnum);
 
 /******** Parallel Debugger *********/
 
-#if CMK_DEBUG_MODE
-
-#include "conv-ccs.h"
-
-CpvExtern(void *, debugQueue);
-
-void CpdInit(void);
-void CpdFreeze(void);
-void CpdUnFreeze(void);
-
-void CpdInitializeObjectTable();
-void CpdInitializeHandlerArray();
-void CpdInitializeBreakPoints();
-
-#define MAX_NUM_HANDLERS 1000
-typedef char* (*hndlrIDFunction)(char *);
-typedef hndlrIDFunction handlerType[MAX_NUM_HANDLERS][2];
-void handlerArrayRegister(int, hndlrIDFunction, hndlrIDFunction);
-
-typedef int (*indirectionFunction)(char *);
-typedef indirectionFunction indirectionType[MAX_NUM_HANDLERS];
-
-typedef char* (*symbolTableFunction)(void);
-typedef symbolTableFunction symbolTableType[MAX_NUM_HANDLERS];
-
-void symbolTableFnArrayRegister(int hndlrID, int noOfBreakPoints,
-				symbolTableFunction f, indirectionFunction g);
-char* getSymbolTableInfo();
-int isBreakPoint(char *msg);
-int isEntryPoint(char *msg);
-void setBreakPoints(char *);
-char *getBreakPoints();
-
-char* getObjectList();
-char* getObjectContents(int);
-
-void msgListCache();
-void msgListCleanup();
-
-char* genericViewMsgFunction(char *msg, int type);
-char* getMsgListSched();
-char* getMsgListPCQueue();
-char* getMsgListFIFO();
-char* getMsgListDebug();
-char* getMsgContentsSched(int index);
-char* getMsgContentsPCQueue(int index);
-char* getMsgContentsFIFO(int index);
-char* getMsgContentsDebug(int index);
-
-#endif
+#include "debug-conv.h"
 
 /* Command-Line-Argument handling */
 int CmiGetArgString(char **argv,const char *arg,char **optDest);
