@@ -2,12 +2,12 @@ DIRS=util charm++ converse ampi fem
 
 test:
 	for d in $(DIRS); do \
-		(cd $$d; $(MAKE) test OPTS='$(OPTS)' || exit 1) || exit 1; \
+		(cd $$d && $(MAKE) test OPTS='$(OPTS)' || exit 1) || exit 1; \
 	done
 
 bgtest:
 	for d in charm++ ampi fem; do \
-		(cd $$d; $(MAKE) bgtest OPTS='$(OPTS)' || exit 1) || exit 1; \
+		(cd $$d && $(MAKE) bgtest OPTS='$(OPTS)' || exit 1) || exit 1; \
 	done
 
 test-converse:
@@ -23,7 +23,7 @@ test-fem:
 	cd fem; $(MAKE) test OPTS='$(OPTS)'
 
 clean:
-	for d in $(DIRS); do (cd $$d; $(MAKE) clean OPTS='$(OPTS)'); done
+	for d in $(DIRS); do (cd $$d && $(MAKE) clean OPTS='$(OPTS)'); done
 	rm -f TAGS #*#
 	rm -f core *~
 
