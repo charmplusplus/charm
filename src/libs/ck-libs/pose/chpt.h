@@ -66,6 +66,7 @@ void chpt<StateType>::checkpoint(StateType *data)
   if (myStrat->currentEvent->timestamp > 
       myStrat->currentEvent->prev->timestamp) {
     myStrat->currentEvent->cpData = new StateType;
+    myStrat->currentEvent->cpData->copy = 1;
     *((StateType *)myStrat->currentEvent->cpData) = *data;
 //#ifdef POSE_STATS_ON
 //    localStats->Checkpoint();

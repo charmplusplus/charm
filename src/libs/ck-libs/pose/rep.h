@@ -15,8 +15,9 @@ class rep
  public:
   int ovt;                 // the object's virtual time
   int myHandle;            // the objects unique handle
-  rep() { ovt = 0; }
-  rep(int init_ovt) { ovt = init_ovt; }
+  int copy;                // flag to signify if this is a checkpoint copy
+  rep() { ovt = 0; copy = 0; }
+  rep(int init_ovt) { ovt = init_ovt; copy = 0; }
   virtual ~rep() { }
   void init(eventMsg *m);  // call at start of constructor
   int OVT() { return ovt; }
