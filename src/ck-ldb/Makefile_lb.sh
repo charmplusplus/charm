@@ -1,5 +1,5 @@
 #!/bin/sh
-LOADBALANCERS="DummyLB ComboCentLB RandCentLB RecBisectBfLB MetisLB RefineLB RefineCommLB GreedyCommLB Comm1LB GreedyLB NeighborLB NeighborCommLB GreedyRefLB OrbLB RandRefLB WSLB"
+LOADBALANCERS="DummyLB ComboCentLB RandCentLB RandRefLB RefineLB RefineCommLB GreedyLB GreedyRefLB GreedyCommLB Comm1LB OrbLB RecBisectBfLB MetisLB NeighborLB NeighborCommLB WSLB"
 
 out="Makefile_lb"
 
