@@ -12,7 +12,10 @@
 % REVISION HISTORY:
 %
 % $Log$
-% Revision 1.9  1995-11-17 17:19:37  brunner
+% Revision 1.10  1996-10-01 18:33:04  wilmarth
+% Fixed ftp path, .Z -> .gz, .inc -> .int ...tlw
+%
+% Revision 1.9  1995/11/17 17:19:37  brunner
 % Incorporated proofreading comments from 11-16 afternoon
 %
 % Revision 1.8  1995/11/01  22:13:37  jyelon
@@ -68,15 +71,15 @@ workstations running SunOS 4.X, download {\tt net-sun.tar.Z}:
     230-                 Dept. of Computer Science FTP server.
     230-
     230 Guest login ok, access restrictions apply.
-    ftp> cd pub/CHARM/CHARM.4.5
+    ftp> cd pub/research-groups/CHARM/CHARM.4.5
     250 CWD command successful.
     ftp> binary
     200 Type set to I.
-    ftp> get net-sun.tar.Z
+    ftp> get net-sun.tar.gz
     200 PORT command successful.
-    150 Opening BINARY mode data connection for net-sun.tar.Z (648211 bytes).
+    150 Opening BINARY mode data connection for net-sun.tar.gz (648211 bytes).
     226 Transfer complete.
-    local: net-sun.tar.Z remote: net-sun.tar.Z
+    local: net-sun.tar.gz remote: net-sun.tar.gz
     648211 bytes received in 38 seconds (17 Kbytes/s)
     ftp> quit
 \end{verbatim}
@@ -85,7 +88,7 @@ Now that you have downloaded it, you are ready to install it: uncompress it,
 untar it, and move the directory thereby created to {\tt /usr/local/charm}:
 
 \begin{verbatim}
-    % uncompress net-sun.tar.Z
+    % gunzip net-sun.tar.gz
     % tar xf net-sun.tar
     % mv net-sun /usr/local/charm
 \end{verbatim}
@@ -229,7 +232,7 @@ start with {\tt conv} (eg, converse) is charm-related:
     % cd /usr/local/charm/include
     % mkdir save
     % mv conv* save
-    % rm *.h *.inc
+    % rm *.h *.int
     % mv save/* .
     % rmdir save
 \end{verbatim}
