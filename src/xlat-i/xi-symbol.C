@@ -1507,7 +1507,7 @@ void Entry::genDefs(XStr& str)
 {
   str << "/* DEFS: "; print(str); str << " */\n";
   genEpIdxDef(str);
-  if(container->getChareType()==SGROUP || container->getChareType()==SNODEGROUP) {
+  if(container->getChareType()==SGROUP||container->getChareType()==SNODEGROUP){
     genGroupDefs(str);
   } else if (container->getChareType()==SARRAY) {
     genArrayDefs(str);
@@ -1584,6 +1584,62 @@ void Entry::genDefs(XStr& str)
       str << ") msg);\n";
     }
     str << "  CkSendToFuture(ref, retMsg, src);\n";
+    str << "}\n";
+  } else if (isExclusive()) {
+    if(container->getChareType() != SNODEGROUP) {
+      cerr << "Only entry methods of a nodegroup can be exclusive." << endl;
+      exit(1);
+    }
+    if(isConstructor()) {
+      cerr << "Constructors cannot be exclusive methods." << endl;
+      exit(1);
+    }
+    if(param==0) {
+      cerr << "Entry methods must specify a message parameter: ";
+      cerr << "use void if necessary\n";
+      exit(1);
+    }
+    if(container->isTemplated())
+      container->genSpec(str);
+    str << " void ";
+    container->genProxyName(str);
+    if(container->isTemplated())
+      container->genVars(str);
+    str << "::_call_";
+    genEpIdx(str);
+    str << "(void* msg, ";
+    str << container->getBaseName();
+    if(container->isTemplated())
+      container->genVars(str);
+    str<< "* obj)\n";
+    str << "{\n";
+    str << "  if(CmiTryLock(obj->__nodelock)) {\n";
+    str << "    "; 
+    container->genProxyName(str);
+    if(container->isTemplated())
+      container->genVars(str);
+    str << " pobj(CkGetNodeGroupID());\n";
+    str << "    pobj." << name << "(";
+    if(param->isVoid()) {
+      str << "CkMyNode());\n";
+      str << "    CkFreeSysMsg(msg);\n";
+    } else {
+      str << "(";
+      param->print(str);
+      str << ") msg, CkMyNode());\n";
+    }
+    str << "    return;\n";
+    str << "  }\n";
+    str << "  obj->" << name << "(";
+    if(param->isVoid()) {
+      str << ");\n";
+      str << "  CkFreeSysMsg(msg);\n";
+    } else {
+      str << "(";
+      param->print(str);
+      str << ") msg);\n";
+    }
+    str << "  CmiUnlock(obj->__nodelock);\n";
     str << "}\n";
   } else {
     if(container->isTemplated())

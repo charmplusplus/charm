@@ -47,7 +47,7 @@ ModuleList *modlist;
 %token STACKSIZE
 %token THREADED
 %token TEMPLATE
-%token SYNC
+%token SYNC EXCLUSIVE
 %token VOID
 %token PACKED
 %token VARSIZE
@@ -447,6 +447,8 @@ EAttrib		: THREADED
 		{ $$ = STHREADED; }
 		| SYNC
 		{ $$ = SSYNC; }
+		| EXCLUSIVE
+		{ $$ = SLOCKED; }
 		;
 
 OptType		: /* Empty */

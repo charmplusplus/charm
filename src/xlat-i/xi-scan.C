@@ -1605,6 +1605,7 @@ struct rwtable rwtable[] = {
   "template",	TEMPLATE,
   "class",	CLASS,
   "sync",	SYNC,
+  "exclusive",	EXCLUSIVE,
   "void",	VOID,
   "mainchare",	MAINCHARE,
   "packed",     PACKED,

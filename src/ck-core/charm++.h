@@ -49,7 +49,9 @@ class NodeGroup : public Chare {
   protected:
     int thisgroup;
   public:
-    NodeGroup() { thisgroup = CkGetNodeGroupID(); }
+    CmiNodeLock __nodelock;
+    NodeGroup() { thisgroup=CkGetNodeGroupID(); __nodelock=CmiCreateLock();}
+    ~NodeGroup() { CmiDestroyLock(__nodelock); }
 };
 
 class _CK_CID {
