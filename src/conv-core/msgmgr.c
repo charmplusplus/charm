@@ -102,7 +102,7 @@ int del;
   }
 }
 
-// match the first ntags tags and return the last tag
+/* match the first ntags tags and return the last tag */
 int CmmGetLastTag(t,ntags,tags)
 CmmTable t;
 int ntags;
@@ -118,6 +118,7 @@ int* tags;
     }
     enth = &(ent->next);
   }
+  return -1;
 }
 
 int CmmEntries(t)
