@@ -53,8 +53,8 @@ class strat; // defined later in strat.h
 void POSE_init(); 
 void POSE_init(int ET); 
 void POSE_init(int IDflag, int ET); 
-/// Start POSE simulation timer and event processing
-void POSE_start(); 
+/// Start POSE simulation timer
+void POSE_startTimer(); 
 /// Use Inactivity Detection to terminate program
 void POSE_useID();
 

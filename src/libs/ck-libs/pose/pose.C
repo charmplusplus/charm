@@ -106,6 +106,10 @@ void POSE_init(int IDflag, int ET) // can specify both
 #else
     CkPrintf("Using endTime of %d for termination.\n", POSE_endtime);
 #endif
+  sim_timer = CmiWallTimer(); 
+}
+
+void POSE_startTimer() {
   CkPrintf("Starting simulation...\n"); 
   sim_timer = CmiWallTimer(); 
 }
@@ -120,12 +124,6 @@ void POSE_useID()
 void POSE_useET(POSE_TimeType et) 
 {
   CkPrintf("WARNING: POSE_useET obsolete. See POSE_init params.\n");
-}
-
-/// Start POSE simulation timer and event processing
-void POSE_start()
-{
-  CkPrintf("WARNING: POSE_Start obsolete.\n");
 }
 
 /// Specify an optional callback to be called when simulation terminates
