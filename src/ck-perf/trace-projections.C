@@ -50,6 +50,7 @@ On T3E, we need to have file number control by open/close files only when needed
   #define CLOSE_LOG
 #endif
 
+
 void LogPool::openLog(const char *mode)
 {
 #if CMK_PROJECTIONS_USE_ZLIB
@@ -176,6 +177,8 @@ LogPool::~LogPool()
 
 void LogPool::writeLog(void)
 {
+  postProcessLog();
+
   OPEN_LOG
   if(binary) writeBinary();
 #if CMK_PROJECTIONS_USE_ZLIB
@@ -237,6 +240,32 @@ void LogPool::add(UChar type,UShort mIdx,UShort eIdx,double time,int event,int p
     new (&pool[numEntries++]) LogEntry(writeTime, BEGIN_INTERRUPT);
     new (&pool[numEntries++]) LogEntry(TraceTimer(), END_INTERRUPT);
   }
+#if CMK_BLUEGENE_CHARM
+  switch (type) {
+    case BEGIN_PROCESSING:
+    case END_PROCESSING:
+    case CREATION:
+    case BEGIN_PACK:
+    case END_PACK:
+    case BEGIN_UNPACK:
+    case END_UNPACK:
+      bgAddProjEvent(this, time);
+  }
+#endif
+}
+
+#if CMK_BLUEGENE_CHARM
+static void updateProjLog(void *data, double t)
+{
+  ((LogEntry *)data)->adjustTime(t);
+}
+#endif
+
+void LogPool::postProcessLog()
+{
+#if CMK_BLUEGENE_CHARM
+  bgUpdateProj(updateProjLog);
+#endif
 }
 
 void LogEntry::write(FILE* fp)
@@ -537,6 +566,7 @@ void TraceProjections::beginExecute(envelope *e)
     beginExecute(e->getEvent(),e->getMsgtype(),e->getEpIdx(),e->getSrcPe(),e->getTotalsize());
   }
 }
+
 void TraceProjections::beginExecute(int event,int msgType,int ep,int srcPe, int mlen)
 {
   execEvent=event;

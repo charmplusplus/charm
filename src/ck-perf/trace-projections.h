@@ -27,16 +27,6 @@
 /// a log entry in trace projection
 class LogEntry {
   public:
-    void *operator new(size_t s) {void*ret=malloc(s);_MEMCHECK(ret);return ret;}
-    void *operator new(size_t, void *ptr) { return ptr; }
-    void operator delete(void *ptr) { free(ptr); }
-#ifdef WIN32
-    void operator delete(void *, void *) { }
-#endif
-    LogEntry() {}
-    LogEntry(double tm, UChar t, UShort m=0, UShort e=0, int ev=0, int p=0, int ml=0) { 
-      type = t; mIdx = m; eIdx = e; event = ev; pe = p; time = tm; msglen = ml;
-    }
     double time;
     int event;
     int pe;
@@ -44,11 +34,23 @@ class LogEntry {
     UShort eIdx;
     UChar type; 
     int msglen;
+  public:
+    LogEntry() {}
+    LogEntry(double tm, UChar t, UShort m=0, UShort e=0, int ev=0, int p=0, int ml=0) { 
+      type = t; mIdx = m; eIdx = e; event = ev; pe = p; time = tm; msglen = ml;
+    }
+    void *operator new(size_t s) {void*ret=malloc(s);_MEMCHECK(ret);return ret;}
+    void *operator new(size_t, void *ptr) { return ptr; }
+    void operator delete(void *ptr) { free(ptr); }
+#ifdef WIN32
+    void operator delete(void *, void *) { }
+#endif
     void write(FILE *fp);
     void writeBinary(FILE *fp);
 #if CMK_PROJECTIONS_USE_ZLIB
     void writeCompressed(gzFile fp);
 #endif
+    inline void adjustTime(double deltaT) {  time += deltaT; }
 };
 
 /// log pool in trace projection
@@ -84,6 +86,7 @@ class LogPool {
 #endif
     void writeSts(void);
     void add(UChar type,UShort mIdx,UShort eIdx,double time,int event,int pe, int ml=0);
+    void postProcessLog();
 };
 
 /// class for recording trace projections events 
