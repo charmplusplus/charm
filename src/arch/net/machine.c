@@ -795,7 +795,8 @@ static void CmiPushPE(int pe,void *msg)
   CmiState cs=CmiGetStateN(pe);
   MACHSTATE1(2,"Pushing message into %d's queue",pe);
 #if CMK_IMMEDIATE_MSG
-  if (CpvAccess(CmiImmediateMsgHandlerIdx) && (CmiGetHandler(msg) == CpvAccessOther(CmiImmediateMsgHandlerIdx,0))) {
+  if ((CmiGetHandler(msg) == CpvAccessOther(CmiImmediateMsgHandlerIdx,pe))) {
+    *(int *)msg = pe;         /* store the rank in msg header */
     CdsFifo_Enqueue(CsvAccess(NodeState).imm, msg);
     return;
   }
@@ -1688,11 +1689,25 @@ void CmiReleaseCommHandle(CmiCommHandle handle)
 #if CMK_IMMEDIATE_MSG
 void CmiHandleImmediate()
 {
-   while (!CdsFifo_Empty(CsvAccess(NodeState).imm)) {
-     void *msg = CdsFifo_Dequeue(CsvAccess(NodeState).imm);
+   if (CdsFifo_Empty(CsvAccess(NodeState).imm)) return;
+   {
+   void *msg;
+#ifdef CMK_CPV_IS_SMP
+   CmiState cs = CmiGetState();
+   int oldRank = cs->rank;
+#endif
+   while (msg = CdsFifo_Dequeue(CsvAccess(NodeState).imm)) {
 /*CmiPrintf("[%d] CmiHandleMessage\n", CmiMyNode());*/
-     CmiCommHandleMessage(msg);
+     /* switch to the worker thread */
+#ifdef CMK_CPV_IS_SMP
+     cs->rank = *(int*)msg;
+#endif
+     CmiHandleMessage(msg);
 /*CmiPrintf("[%d] CmiHandleMessage done\n", CmiMyNode());*/
+   }
+#ifdef CMK_CPV_IS_SMP
+   cs->rank = oldRank;
+#endif
    }
 }
 

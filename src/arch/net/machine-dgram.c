@@ -283,7 +283,7 @@ static void node_addresses_store(ChMessage *msg)
   ChMessageInt_t *n32=(ChMessageInt_t *)msg->data;
   ChNodeinfo *d=(ChNodeinfo *)(n32+1);
   int nodestart;
-  int i,j;
+  int i,j,n;
   Cmi_numnodes=ChMessageInt(n32[0]);
   
   if ((sizeof(ChMessageInt_t)+sizeof(ChNodeinfo)*Cmi_numnodes)
@@ -312,7 +312,11 @@ static void node_addresses_store(ChMessage *msg)
     nodestart+=nodes[i].nodesize;
   }
   Cmi_numpes=nodestart;
-  nodes_by_pe = (OtherNode*)malloc(Cmi_numpes * sizeof(OtherNode));
+  n = Cmi_numpes;
+#ifdef CMK_CPV_IS_SMP
+  n += Cmi_numnodes;
+#endif
+  nodes_by_pe = (OtherNode*)malloc(n * sizeof(OtherNode));
   _MEMCHECK(nodes_by_pe);
   for (i=0; i<Cmi_numnodes; i++) {
     OtherNode node = nodes + i;
@@ -320,6 +324,13 @@ static void node_addresses_store(ChMessage *msg)
     for (j=0; j<node->nodesize; j++)
       nodes_by_pe[j + node->nodestart] = node;
   }
+#ifdef CMK_CPV_IS_SMP
+  /* index for communication threads */
+  for (i=Cmi_numpes; i<Cmi_numpes+Cmi_numnodes; i++) {
+    OtherNode node = nodes + i-Cmi_numpes;
+    nodes_by_pe[i] = node;
+  }
+#endif
 }
 
 /**
