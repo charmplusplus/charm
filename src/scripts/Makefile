@@ -45,19 +45,19 @@ FEM: charm++ CONVLIBS FEMC LIBS FEMF
 
 FEMC: charm++ LIBS
 
-FEMF: FEMC libconv-utilf.a
+FEMF: FEMC
 
 MBLOCK: AMPI MBLOCKC MBLOCKF
 
 MBLOCKC: charm++ LIBS
 
-MBLOCKF: MBLOCKC libconv-utilf.a
+MBLOCKF: MBLOCKC
 
 AMPI: charm++ CONVLIBS AMPIC AMPIF
 
 AMPIC: charm++ LIBS
 
-AMPIF: AMPIC libconv-utilf.a
+AMPIF: AMPIC
 
 f90charm: charm++ libf90charm.a
 
@@ -272,11 +272,11 @@ libconv-cplus-y.a: machine.c $(CVHEADERS)
 libconv-cplus-n.a: machine.c $(CVHEADERS)
 	$(CHARMC) -cp ../lib/ -o $@ -DFOR_CPLUS=0 machine.c
 
-libconv-util.a: $(LIBCONV_UTIL)
+libconv-util.a: $(LIBCONV_UTIL) libconv-utilf.a
 	$(CHARMC) -cp ../lib/ -o $@ $(LIBCONV_UTIL)
 
 libconv-utilf.a: $(LIBCONV_UTILF)
-	-@$(CHARMC) -cp ../lib/ -o $@ $(LIBCONV_UTILF)
+	$(CHARMC) -cp ../lib/ -o $@ $(LIBCONV_UTILF)
 
 libccs-client.a: ccs-client.o
 	$(CHARMC) -cp ../lib/ -o $@ ccs-client.o
