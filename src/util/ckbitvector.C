@@ -63,7 +63,7 @@ CkBitVector::CkBitVector(prio_t value, prio_t choices) {
 
   // Okay they didn't. Figure out how many bits I need to represent the
   // choices
-  usedBits = log2(choices);
+  usedBits = ilog2(choices);
   if ( usedBits != 0 ) {
     data = new prio_t[chunks(usedBits)];
     data[0] = value << (chunkBits() - usedBits);
