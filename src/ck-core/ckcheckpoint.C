@@ -92,13 +92,16 @@ void CkCheckpointMgr::Checkpoint(const char *dirname,CkCallback& cb){
 			((CkLocMgr*)(obj))->iterate(saver);
 		}
 	}
-	if(CkMyPe()!=0)
-		DEBCHK("[%d]CkCheckpointMgr::Checkpoint DONE.\n",CkMyPe());
-	else{
-		CkPrintf("[%d]CkCheckpointMgr::Checkpoint DONE. Invoking callback.\n",CkMyPe());
-		cb.send();
-		//CkStartQD(cb);
-	}
+	restartCB = cb;
+	DEBCHK("[%d]restartCB installed\n",CkMyPe());
+	CkCallback localcb(CkIndex_CkCheckpointMgr::SendRestartCB(NULL),thisgroup);
+	contribute(sizeof(int),&numGroups,CkReduction::sum_int,localcb);
+}
+
+void CkCheckpointMgr::SendRestartCB(CkReductionMsg *m){ 
+	delete m; 
+	DEBCHK("[%d]Sending out the cb\n",CkMyPe());
+	restartCB.send(); 
 }
 
 // handle readonly table and data
