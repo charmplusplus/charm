@@ -127,9 +127,8 @@ class worker {
     p(msgIdx); p(gsIdx);
     p(data, 100);
   }
-  void dump(int pdb_level) {
-    chpt<state_worker>::dump(pdb_level+1);
-    pdb_indent(pdb_level);
+  void dump() {
+    chpt<state_worker>::dump();
     CkPrintf("[worker: ");
   }
   void doWork();
