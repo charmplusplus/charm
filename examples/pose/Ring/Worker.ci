@@ -1,0 +1,16 @@
+message WorkerData;
+message SmallWorkMsg;
+message MediumWorkMsg;
+message LargeWorkMsg;
+
+poser worker : sim adapt4 chpt {
+  entry worker(WorkerData *);
+  // Event methods
+  entry [event] void workSmall(SmallWorkMsg *);
+  entry [event] void workMedium(MediumWorkMsg *);
+  entry [event] void workLarge(LargeWorkMsg *);
+};
+
+
+
+
