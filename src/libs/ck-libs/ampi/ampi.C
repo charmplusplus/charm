@@ -705,6 +705,7 @@ int ampiParent::freeKeyval(int *keyval){
 		return -1;
 	delete kvlist[*keyval];
 	kvlist[*keyval] = NULL;
+	*keyval = MPI_KEYVAL_INVALID;
 	return 0;
 }
 
