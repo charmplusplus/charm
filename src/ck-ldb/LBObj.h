@@ -35,7 +35,7 @@ public:
   ~LBObj() { };
 
   void DepositHandle(const LDObjHandle &_h) {
-    CkAssert(_h == myhandle.id);
+    CkAssert(_h.id == myhandle.id);
     myhandle = _h;
     data.handle = myhandle;
     data.omHandle = _h.omhandle;
