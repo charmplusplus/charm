@@ -175,6 +175,10 @@ class TCharm: public ArrayElement1D
 	inline void activateHeap(void) {
 		CmiIsomallocBlockListActivate(heapBlocks);
 	}
+	//Disable migratable memory
+	inline void deactivateHeap(void) {
+		CmiIsomallocBlockListActivate(NULL);
+	}
 };
 
 //Controls array startup, ready, run and shutdown
