@@ -25,7 +25,7 @@ void handler(char *bit_map)
 	CkPrintf("%d, ",bit_map[i]);
 
     if((CkMyPe() == 0) && (load_balancer_created))
-	LBDatabaseObj()->set_avail_vector(bit_map);
+	set_avail_vector(bit_map);
 }
 
 void manager_init(){    

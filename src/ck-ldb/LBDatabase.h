@@ -223,6 +223,11 @@ void TurnManualLBOn();
 void TurnManualLBOff();
 
 inline LBDatabase* LBDatabaseObj() { return LBDatabase::Object(); }
+
+inline void set_avail_vector(char * bitmap) {
+  LBDatabaseObj()->set_avail_vector(bitmap);
+}
+
 #endif /* LDATABASE_H */
 
 /*@}*/
