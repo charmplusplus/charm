@@ -599,7 +599,7 @@ any callback functions.}
 \desc{This call causes CsdScheduler to stop invoking callback functions
 for idle and busy norifications.}
 
-\function{void CsdSetNotifyIdle((void fIdle)(void), (void fBusy)(void))}
+\function{void CsdSetNotifyIdle(void (* fIdle)(void), void (* fBusy)(void))}
 \index{CsdSetNotifyIdle}
 \desc{This call registers the functions to be called when CsdScheduler becomes
 idle (\param{fIdle}) or busy (\param{fBusy}). These functions can be
