@@ -49,25 +49,6 @@ void CldHandler(char *msg)
   CsdEnqueueGeneral(msg, queueing, priobits, prioptr);
 }
 
-void CldEnqueueMulti(int npes, int *pes, void *msg, int infofn)
-{
-  int len, queueing, priobits,i; unsigned int *prioptr;
-  CldInfoFn ifn = (CldInfoFn)CmiHandlerToFunction(infofn);
-  CldPackFn pfn;
-CmiAbort("CldEnqueueMulti!\n");
-  ifn(msg, &pfn, &len, &queueing, &priobits, &prioptr);
-  if (pfn) {
-    pfn(&msg);
-    ifn(msg, &pfn, &len, &queueing, &priobits, &prioptr);
-  }
-  CldSwitchHandler((char *)msg, CpvAccess(CldHandlerIndex));
-  CmiSetInfo(msg,infofn);
-  for(i=0;i<npes;i++) {
-    CmiSyncSend(pes[i], len, (char *)msg);
-  }
-  CmiFree(msg);
-}
-
 #if CMK_BLUEGENE_NODE
 static int BgMyPe() { return BgMyNode(); }
 static int BgNumPes() { int x,y,z; BgGetSize(&x, &y, &z); return (x*y*z); }
@@ -113,6 +94,26 @@ static int BgNumPes() { return BgNumNodes()*BgGetNumWorkThread(); }
                                     CmiGetHandler(msg), LARGE_WORK, len, msg);
 #endif
 
+void CldEnqueueMulti(int npes, int *pes, void *msg, int infofn)
+{
+  int len, queueing, priobits,i; unsigned int *prioptr;
+  CldInfoFn ifn = (CldInfoFn)CmiHandlerToFunction(infofn);
+  CldPackFn pfn;
+  ifn(msg, &pfn, &len, &queueing, &priobits, &prioptr);
+  if (pfn) {
+    pfn(&msg);
+    ifn(msg, &pfn, &len, &queueing, &priobits, &prioptr);
+  }
+/*
+  CldSwitchHandler((char *)msg, CpvAccess(CldHandlerIndex));
+  CmiSetInfo(msg,infofn);
+*/
+  for(i=0;i<npes;i++) {
+    char *dupmsg = CmiCopyMsg(msg, len);
+    BGSENDPE(pes[i], dupmsg, len);
+  }
+  CmiFree(msg);
+}
 
 void CldEnqueue(int pe, void *msg, int infofn)
 {
