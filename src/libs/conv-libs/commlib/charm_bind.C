@@ -1,0 +1,43 @@
+/***************************************************
+ * File : charm_bind.C
+ *
+ * Author: Krishnan V
+ *
+ * Charm++ binding. Uses charm++ messages
+ ****************************************************/
+#include "charm++.h"
+#include "commlib.h"
+
+//void CComlibEachToManyMulticast(id, ep, msg, bocnum, npe, pelist, ref)
+void CComlibEachToManyMulticast(comID id, int ep, void *msg, int bocnum, int npe, int *pelist)
+{
+  if (msg == NULL) {
+  	//EachToManyMulticastWithRef(id, 0, (void *)msg, npe, pelist, ref);
+  	EachToManyMulticast(id, 0, (void *)msg, npe, pelist);
+	return;
+  }
+  	
+  ENVELOPE *env;
+  int len, queueing, priobits; unsigned int *prioptr;
+  CldInfoFn ifn = (CldInfoFn)CmiHandlerToFunction(CpvAccess(CkInfo_Index));
+  CldPackFn pfn;
+ 
+  env = ENVELOPE_UPTR(msg);
+
+  int type=BroadcastBocMsg;
+  SetEnv_msgType(env, type);
+  SetEnv_boc_num(env, bocnum);
+  SetEnv_EP(env, ep);
+ 
+  ifn((void *)env, &pfn, &len, &queueing, &priobits, &prioptr);
+  if (pfn) {
+      pfn(&env);
+      ifn((void *)env, &pfn, &len, &queueing, &priobits, &prioptr);
+  }
+  CmiSetHandler(env,CpvAccess(HANDLE_INCOMING_MSG_Index));
+  //EachToManyMulticastWithRef(id, len, (void *)env, npe, pelist, ref);
+  EachToManyMulticast(id, len, (void *)env, npe, pelist);
+  if((type!=QdBocMsg)&&(type!=QdBroadcastBocMsg)&&(type!=LdbMsg))
+    QDCountThisCreation(npe);
+}
+
