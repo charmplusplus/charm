@@ -125,7 +125,7 @@ void eventQueue::CommitEvents(sim *obj, int ts)
 void eventQueue::SetCurrentPtr(Event *e) { 
   Event *tmp = e;
   // Check possible error conditions
-  CmiAssert(e->done == 0);
+  CmiAssert((e->done == 0) || (e->done == -1)); // e is not done or a sentinel
   CmiAssert(currentPtr->done != 2);
   currentPtr = e; // move currentPtr to e
   if ((currentPtr == backPtr) && (eqh->top)) { // moved currentPtr to backPtr
