@@ -5,9 +5,6 @@
  * $Revision$
  *****************************************************************************/
 
-#include <unistd.h>
-#include <fcntl.h>
-
 #include <charm++.h>
 #include <LBDatabase.h>
 #include "CentralLB.h"
@@ -255,39 +252,57 @@ CLBMigrateMsg* CentralLB::Strategy(LDStats* stats,int count)
   return msg;
 }
 
-void CentralLB::dumpLDStats(LDStats* statsList, char *file)
+void CentralLB::dumpLDStats(CentralLB::LDStats* statsList, char *file)
 {
-  int fd = open(file, O_WRONLY|O_CREAT|O_TRUNC, 0644);
-  if (fd == -1){
+  FILE *fp = fopen(file, "wb");
+  if (fp == NULL){
      perror("dumpLDStats");
      return;
   }
   for (int i=0; i<CkNumPes(); i++) 
   {
-     write(fd, &statsList[i], sizeof(LDStats));
-     write(fd, statsList[i].objData, sizeof(LDObjData)*statsList[i].n_objs);
-     write(fd, statsList[i].commData, sizeof(LDCommData)*statsList[i].n_comm);
+     fwrite(&statsList[i], sizeof(LDStats), 1, fp);
+     fwrite(statsList[i].objData, sizeof(LDObjData), statsList[i].n_objs, fp);
+     fwrite(statsList[i].commData, sizeof(LDCommData), statsList[i].n_comm, fp);
   }
-  close(fd);
+  fclose(fp);
 }
 
 CentralLB::LDStats* CentralLB::loadLDStats(char *file, int pe)
 {
-  int fd = open(file, O_RDONLY);
-  if (fd == -1){
+  unsigned int nread;
+  FILE *fp = fopen(file, "rb");
+  if (fp == NULL){
      perror("loadLDStats");
      return NULL;
   }
   LDStats* statsList = new LDStats[pe];
   for (int i=0; i<pe; i++) 
   {
-     if (read(fd, &statsList[i], sizeof(LDStats)) <= 0) { perror("loadLDStats"); return NULL; }
-     statsList[i].objData = new LDObjData[statsList[i].n_objs];
-     if (statsList[i].n_objs && read(fd, statsList[i].objData, sizeof(LDObjData)*statsList[i].n_objs) <= 0) { perror("loadLDStats"); return NULL; }
-     statsList[i].commData = new LDCommData[statsList[i].n_comm];
-     if (statsList[i].n_comm && read(fd, statsList[i].commData, sizeof(LDCommData)*statsList[i].n_comm) <= 0) { perror("loadLDStats"); return NULL; }
+    if (fread(&statsList[i], sizeof(LDStats), 1, fp) < sizeof(LDStats)) {
+      if (ferror(fp)) {
+	perror("loadLDStats"); 
+	return NULL;
+      }
+    }
+    statsList[i].objData = new LDObjData[statsList[i].n_objs];
+    if (statsList[i].n_objs) {
+      nread = fread(statsList[i].objData, sizeof(LDObjData), statsList[i].n_objs, fp);
+      if (nread < statsList[i].n_objs*sizeof(LDObjData) && ferror(fp)) { 
+	perror("loadLDStats"); 
+	return NULL; 
+      }
+    }
+    statsList[i].commData = new LDCommData[statsList[i].n_comm];
+    if (statsList[i].n_comm) {
+      nread = fread(statsList[i].commData, sizeof(LDCommData), statsList[i].n_comm, fp); 
+      if (nread < statsList[i].n_comm*sizeof(LDCommData) && ferror(fp)) { 
+	perror("loadLDStats"); 
+	return NULL; 
+      }
+    }
+    fclose(fp);
   }
-  close(fd);
   return statsList;
 }
 
@@ -356,3 +371,20 @@ CLBMigrateMsg* CLBMigrateMsg::unpack(void *m)
 }
 
 #endif
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
