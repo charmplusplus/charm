@@ -13,4 +13,5 @@
        external tcharm_done
 
        external tcharm_readonly_globals
+       external tcharm_init
 

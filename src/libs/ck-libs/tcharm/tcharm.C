@@ -708,5 +708,19 @@ CDECL double TCharmWallTimer(void)
   }
 }
 
+//These silly routines are used for serial startup:
+extern void _initCharm(int argc, char **argv);
+CDECL void TCharmInit(int *argc,char ***argv) {
+	ConverseInit(*argc, *argv, (CmiStartFn) _initCharm,1,1);
+	_initCharm(*argc,*argv);
+}
+
+FDECL void FTN_NAME(TCHARM_INIT,tcharm_init)(void) 
+{
+	int argc=1;
+	char *argv[2]={"foo",NULL};
+	ConverseInit(argc,argv, (CmiStartFn) _initCharm,1,1);
+	_initCharm(argc,argv);
+}
 
 #include "tcharm.def.h"

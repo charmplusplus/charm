@@ -60,6 +60,9 @@ void TCharmDone(void);
 /*Get the local wall clock*/
 double TCharmWallTimer(void);
 
+/*Standalone startup routine*/
+void TCharmInit(int *argc,char ***argv);
+
 #ifdef __cplusplus
 };
 #endif
