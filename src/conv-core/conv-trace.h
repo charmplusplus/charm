@@ -20,7 +20,7 @@ void traceBeginIdle(void);
 void traceEndIdle(void);
 void traceResume(void);
 void traceSuspend(void);
-void traceAwaken(void);
+void traceAwaken(CthThread t);
 void traceUserEvent(int);
 int  traceRegisterUserEvent(const char*);
 void traceClose(void);
@@ -30,6 +30,5 @@ void traceEnd(void);
 #ifndef CMK_OPTIMIZE
 CpvExtern(int, traceOn);
 #endif
-CpvExtern(CthThread, curThread);
 
 #endif

@@ -127,8 +127,6 @@ typedef struct CthThreadBase
 
   char      *data;       /* thread private data */
   int        datasize;   /* size of thread-private data, in bytes */
-
-  int        Event;      /* For tracing (?) */
 } CthThreadBase;
 
 /*Macros to convert between base and specific thread types*/
@@ -145,8 +143,6 @@ static void CthThreadBaseInit(CthThreadBase *th)
 
   th->data=0;
   th->datasize=0;
-
-  th->Event = 0;
 
   CthSetStrategyDefault(S(th));
 }
@@ -194,7 +190,6 @@ void CthPupBase(pup_er p,CthThreadBase *t)
 	pup_bytes(p,&t->choosefn,sizeof(t->choosefn));
 	pup_bytes(p,&t->next,sizeof(t->next));
 	pup_int(p,&t->suspendable);
-	pup_int(p,&t->Event);
 	pup_int(p,&t->datasize);
 	if (pup_isUnpacking(p)) { 
 		t->data = (char *) malloc(t->datasize);_MEMCHECK(t->data);
@@ -207,11 +202,6 @@ static void CthThreadFinished(CthThread t)
 	B(t)->exiting=1;
 	CthSuspend();
 }
-
-/* For tracing module */
-void setEvent(CthThread t, int event) { B(t)->Event = event; }
-int getEvent(CthThread t) { return B(t)->Event; }
-
 
 /*********** Thread-local storage *********/
 
@@ -276,15 +266,17 @@ static void CthBaseResume(CthThread t)
   CthFixData(t); /*Thread-local storage may have changed in other thread.*/
   CthCpvAccess(CthCurrent) = t;
   CthCpvAccess(CthData) = B(t)->data;
+
+#ifndef CMK_OPTIMIZE
+  if(CpvAccess(traceOn))
+    traceResume();
+#endif
 }
 
 
 /*
 Suspend: finds the next thread to execute, and resumes it
 */
-#if CMK_WEB_MODE
-void usageStop();
-#endif
 void CthSuspend(void)
 {
   CthThread next;
@@ -296,9 +288,6 @@ void CthSuspend(void)
   if(CpvAccess(traceOn))
     traceSuspend();
 #endif
-#if CMK_WEB_MODE
-  usageStop();
-#endif
   CthResume(next);
 }
 
@@ -306,9 +295,8 @@ void CthAwaken(CthThread th)
 {
   if (B(th)->awakenfn == 0) CthNoStrategy();
 #ifndef CMK_OPTIMIZE
-  CpvAccess(curThread) = th;
   if(CpvAccess(traceOn))
-    traceAwaken();
+    traceAwaken(th);
 #endif
   B(th)->awakenfn(th, CQS_QUEUEING_FIFO, 0, 0);
 }
@@ -323,9 +311,8 @@ void CthAwakenPrio(CthThread th, int s, int pb, unsigned int *prio)
 {
   if (B(th)->awakenfn == 0) CthNoStrategy();
 #ifndef CMK_OPTIMIZE
-  CpvAccess(curThread) = th;
   if(CpvAccess(traceOn))
-    traceAwaken();
+    traceAwaken(th);
 #endif
   B(th)->awakenfn(th, s, pb, prio);
 }
