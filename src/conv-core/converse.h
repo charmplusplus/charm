@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.73  1997-07-31 00:28:25  jyelon
+ * Revision 2.74  1997-10-29 18:47:05  jyelon
+ * Added CmiHandlerToFunction
+ *
+ * Revision 2.73  1997/07/31 00:28:25  jyelon
  * *** empty log message ***
  *
  * Revision 2.72  1997/07/30 17:31:06  jyelon
@@ -365,9 +368,8 @@ extern void CmiNumberHandler CMK_PROTO((int, CmiHandler));
 
 #define CmiGetHandler(env)  (CmiHandlerAccess(env))
 #define CmiSetHandler(env,x)  (CmiHandlerAccess(env) = (x))
-
-#define CmiGetHandlerFunction(env)\
-    (CpvAccess(CmiHandlerTable)[CmiGetHandler(env)])
+#define CmiHandlerToFunction(n) (CpvAccess(CmiHandlerTable)[n])
+#define CmiGetHandlerFunction(env) (CmiHandlerToFunction(CmiGetHandler(env)))
 
 void    *CmiAlloc  CMK_PROTO((int size));
 int      CmiSize   CMK_PROTO((void *));
