@@ -1,0 +1,25 @@
+mainmodule ampi {
+  readonly int migHandle;
+  readonly CkChareID mainhandle;
+
+  mainchare main {
+    entry main();
+    entry void done(void);
+    entry [threaded] void qd(void);
+  };
+  group BlockMap : ArrayMap {
+    entry BlockMap(void);
+  };
+
+  message MigrateInfo;
+
+  group migrator {
+    entry migrator(void);
+    entry void migrateElement(MigrateInfo *);
+  }
+
+  array ampi : TempoArray {
+    entry ampi();
+    entry [threaded] void run(void);
+  }
+}

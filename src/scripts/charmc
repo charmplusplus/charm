@@ -561,7 +561,7 @@ case "$LANGUAGE" in
 "c"|"C"|"c++"|"C++")
 	[ -z "$SEQUENTIAL" ] && Abort "Language $LANGUAGE is for sequential programs"
 	;;
-"charm"|"charm++"|"converse"|"converse++"|"idl")
+"charm"|"charm++"|"converse"|"converse++"|"idl"|"ampi"|"ampif")
 	[ -z "$SEQUENTIAL" ] || Abort "Language $LANGUAGE is for parallel programs"
 	;;
 *)
@@ -823,6 +823,14 @@ case "$LANGUAGE" in
 "idl")
 	Do $CMK_LDXX $OPTS_LDXX -o $OBJECT \
 		$LANG_LIBS -lconv-cplus-y $CORE_LIBS -lidl -lm $CMK_LIBS
+	;;
+"ampi")
+	Do $CMK_LDXX $OPTS_LDXX -o $OBJECT \
+		$LANG_LIBS -lconv-cplus-y $CORE_LIBS -lampi -lm $CMK_LIBS
+	;;
+"ampif")
+	Do $CMK_LDXX $OPTS_LDXX -o $OBJECT \
+		$LANG_LIBS -lconv-cplus-y $CORE_LIBS -lampif -lm $CMK_LIBS
 	;;
 "converse")
 	Do $CMK_LD $OPTS_LD -o $OBJECT \

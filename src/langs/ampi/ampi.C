@@ -1,0 +1,426 @@
+#include "ampiimpl.h"
+
+extern void _initCharm(int argc, char **argv);
+
+extern "C" void conversemain_(int *argc,char _argv[][80],int length[])
+{
+  int i;
+  char **argv = new char*[*argc+2];
+
+  for(i=0;i <= *argc;i++) {
+    if (length[i] < 100) {
+      _argv[i][length[i]]='\0';
+      argv[i] = &(_argv[i][0]);
+    } else {
+      argv[i][0] = '\0';
+    }
+  }
+  argv[*argc+1]=0;
+  
+  ConverseInit(*argc, argv, _initCharm, 0, 0);
+}
+
+CkChareID mainhandle;
+
+main::main(CkArgMsg *m)
+{
+  CProxy_migrator::ckNew();
+  int nblocks = ampi::numBlocks();
+  numDone = 0;
+  delete m;
+  CkGroupID mapID = CProxy_BlockMap::ckNew();
+  // CProxy_ampi jarray(nblocks, mapID);
+  CProxy_ampi jarray(nblocks);
+  for(int i=0; i< nblocks; i++)
+    jarray[i].run();
+  mainhandle = thishandle;
+}
+
+void
+main::qd(void)
+{
+  // CkWaitQD();
+  CkPrintf("Created Elements\n");
+  CProxy_ampi jarray(arr);
+  int nblocks = ampi::numBlocks();
+  for(int i=0; i< nblocks; i++)
+    jarray[i].run();
+  return;
+}
+
+void
+main::done(void)
+{
+  numDone++;
+  if(numDone==ampi::numBlocks()) {
+    ckout << "Exiting" << endl;
+    CkExit();
+  }
+}
+
+int migHandle;
+
+CtvDeclare(ampi *, ampiPtr);
+CtvDeclare(int, numMigrateCalls);
+extern "C" void main_(void);
+static Array1D *ampiArray;
+
+extern "C" void get_size_(int *, int *, int *, int *);
+extern "C" void pack_(char*,int*,int*,int*,float*,int*,int*,int*);
+extern "C" void unpack_(char*,int*,int*,int*,float*,int*,int*,int*);
+
+ampi::ampi(ArrayElementCreateMessage *msg) : TempoArray(msg)
+{
+  ampiArray = thisArray;
+  nrequests = 0;
+  // delete msg;
+}
+
+ampi::ampi(ArrayElementMigrateMessage *msg) : TempoArray(msg)
+{
+  //CkPrintf("[%d] called migration constructor\n", thisIndex);
+  nrequests = 0;
+  ampiArray = thisArray;
+  void *buf = msg->packData;
+  totsize = *(int *)buf;
+  buf = (void *) ((int *)buf + 1);
+  csize = *(int *)buf;
+  buf = (void *) ((int *)buf + 1);
+  isize = *(int *)buf;
+  buf = (void *) ((int *)buf + 1);
+  rsize = *(int *)buf;
+  buf = (void *) ((int *)buf + 1);
+  fsize = *(int *)buf;
+  buf = (void *) ((int *)buf + 1);
+  packedBlock = malloc(totsize);
+  memcpy(packedBlock, buf, totsize);
+  buf = (void *) ((char *)buf + totsize);
+  thread_id = CthUnpackThread(buf);
+  CthAwaken(thread_id);
+  finishMigration(); 
+  delete msg;
+  //CkPrintf("[%d] finished migration constructor\n", thisIndex);
+}
+
+int
+ampi::packsize(void)
+{
+  return 5*sizeof(int) + totsize + CthPackBufSize(thread_id);
+}
+
+void
+ampi::pack(void *buf)
+{
+  TempoMessage *msg;
+  int itags[2];
+  void *data; 
+  int len;
+  itags[0] = TEMPO_ANY; itags[1] = TEMPO_ANY;
+  // resend pending messages in table
+  while((msg=(TempoMessage *)CmmGet(tempoMessages, 2, itags, 0))) {
+    ckTempoSendElem(msg->tag1, msg->tag2, msg->data, msg->length, thisIndex);
+  }
+  *(int *)buf = totsize;
+  buf = (void *) ((int *)buf + 1);
+  *(int *)buf = csize;
+  buf = (void *) ((int *)buf + 1);
+  *(int *)buf = isize;
+  buf = (void *) ((int *)buf + 1);
+  *(int *)buf = rsize;
+  buf = (void *) ((int *)buf + 1);
+  *(int *)buf = fsize;
+  buf = (void *) ((int *)buf + 1);
+  memcpy(buf, packedBlock, totsize);
+  free(packedBlock);
+  buf = (void *) ((char *)buf + totsize);
+  CthPackThread(thread_id, buf);
+}
+
+void
+ampi::run(void)
+{
+  static int initCtv = 0;
+  int myIdx = getIndex();
+  ampi *myThis;
+
+  if(!initCtv) {
+    CtvInitialize(ampi *, ampiPtr);
+    CtvInitialize(int, numMigrateCalls);
+    initCtv = 1;
+  }
+  CtvAccess(ampiPtr) = this;
+  CtvAccess(numMigrateCalls) = 0;
+
+  //CkPrintf("[%d] main_ called\n", getIndex());
+  main_();
+  myThis = (ampi*) ampiArray->getElement(myIdx);
+  //CkPrintf("[%d] main_ finished\n", myThis->getIndex());
+
+  // itersDone();
+
+  myThis->ckTempoBarrier();
+  if(myThis->getIndex()==0)
+    CmiAbort("");
+  else
+    CthSuspend();
+}
+
+extern "C" void migrate_(void *gptr)
+{
+  ampi *ptr = CtvAccess(ampiPtr);;
+  CtvAccess(numMigrateCalls)++;
+  // migrate to next processor every 2 iterations
+  if(CtvAccess(numMigrateCalls)%2 == 0) {
+    int index = ptr->getIndex();
+    int where = (CkMyPe()+1) % CkNumPes();
+    if(where == CkMyPe())
+      return;
+    CProxy_migrator pmg(migHandle);
+    pmg.migrateElement(new MigrateInfo(ptr, where), CkMyPe());
+    int csize, isize, rsize, fsize;
+    get_size_(&csize, &isize, &rsize, &fsize);
+    int totsize = MyAlign8(csize)+isize+rsize+fsize;
+    void *pb = malloc(totsize);
+    char *cb = (char *)pb;
+    int *ib = (int *) (cb+MyAlign8(csize));
+    float *rb = (float *)(ib+isize/sizeof(int));
+    int *fb = (int *)(rb+rsize/sizeof(float));
+    pack_(cb, &csize, ib, &isize, rb, &rsize, fb, &fsize);
+    ptr->csize = csize; ptr->isize = isize; ptr->rsize = rsize; 
+    ptr->fsize = fsize; ptr->totsize = totsize; ptr->packedBlock = pb;
+    //CkPrintf("[%d] Migrating from %d to %d\n", index, CkMyPe(), where);
+    CthSuspend();
+    //CkPrintf("[%d] awakened on %d \n", index, CkMyPe());
+    CtvAccess(ampiPtr) = ptr = (ampi*) ampiArray->getElement(index);
+    pb = ptr->packedBlock; csize = ptr->csize; isize = ptr->isize;
+    rsize = ptr->rsize; fsize = ptr->fsize;
+    cb = (char *)pb;
+    ib = (int *) (cb+MyAlign8(csize));
+    rb = (float *)(ib+isize/sizeof(int));
+    fb = (int *)(rb+rsize/sizeof(float));
+    unpack_(cb, &csize, ib, &isize, rb, &rsize, fb, &fsize);
+    free(pb);
+    //CkPrintf("[%d] Migrated to %d\n", index, CkMyPe());
+  }
+}
+
+extern "C" void mpi_init_(int *ierr)
+{
+  *ierr = 0;
+}
+
+extern "C" void mpi_comm_rank_(int *comm, int *rank, int *ierr)
+{
+  *ierr = 0;
+  *rank = CtvAccess(ampiPtr)->getIndex();
+}
+
+extern "C" void mpi_comm_size_(int *comm, int *size, int *ierr)
+{
+  *ierr = 0;
+  *size = CtvAccess(ampiPtr)->getSize();
+}
+
+extern "C" void mpi_finalize_(int *ierr)
+{
+  *ierr = 0;
+}
+
+// these values have to match values in mpi.f90
+
+#define CMPI_DOUBLE_PRECISION 0
+#define CMPI_INTEGER 1
+#define CMPI_REAL 2
+#define CMPI_COMPLEX 3
+#define CMPI_LOGICAL 4
+#define CMPI_CHARACTER 5
+#define CMPI_BYTE 6
+#define CMPI_PACKED 7
+
+#define CMPI_MAX 1
+#define CMPI_MIN 2
+#define CMPI_SUM 3
+#define CMPI_PROD 4
+
+static int typesize(int type, int count)
+{
+  switch(type) {
+    case CMPI_DOUBLE_PRECISION : return count*sizeof(double);
+    case CMPI_INTEGER : return count*sizeof(int);
+    case CMPI_REAL : return count*sizeof(float);
+    case CMPI_COMPLEX: return 2*count*sizeof(double);
+    case CMPI_LOGICAL: return 2*count*sizeof(int);
+    case CMPI_CHARACTER: return count*sizeof(char);
+    case CMPI_BYTE:
+    case CMPI_PACKED:
+    default:
+      return 2*count;
+  }
+}
+
+extern "C" void mpi_send_(void *msg, int *count, int *type, int *dest, 
+                          int *tag, int *comm, int *ierr)
+{
+  int size = typesize(*type, *count);
+  ampi *ptr = CtvAccess(ampiPtr);
+  //CkPrintf("[%d] sending %d bytes to %d tagged %d\n", ptr->getIndex(), 
+           //size, *dest, *tag);
+  ptr->ckTempoSendElem(*tag, ptr->getIndex(), msg, size, *dest);
+  *ierr = 0;
+}
+
+extern "C" void mpi_recv_(void *msg, int *count, int *type, int *src,
+                          int *tag, int *comm, int *status, int *ierr)
+{
+  int size = typesize(*type, *count);
+  ampi *ptr = CtvAccess(ampiPtr);
+  //CkPrintf("[%d] waits for %d bytes tagged %d\n", ptr->getIndex(), size, *tag);
+  ptr->ckTempoRecv(*tag, *src, msg, size);
+  //CkPrintf("[%d] received %d bytes tagged %d\n", ptr->getIndex(), size, *tag);
+  *ierr = 0;
+}
+
+extern "C" void mpi_sendrecv_(void *sndbuf, int *sndcount, int *sndtype, 
+                              int *dest, int *sndtag, void *rcvbuf, 
+                              int *rcvcount, int *rcvtype, int *src, 
+                              int *rcvtag, int *comm, int *status, int *ierr)
+{
+  mpi_send_(sndbuf, sndcount, sndtype, dest, sndtag, comm, ierr);
+  mpi_recv_(rcvbuf, rcvcount, rcvtype, src, rcvtag, comm, status, ierr);
+}
+
+extern "C" void mpi_barrier_(int *comm, int *ierr)
+{
+  ampi *ptr = CtvAccess(ampiPtr);
+  //CkPrintf("[%d] Barrier called\n", ptr->getIndex());
+  ptr->ckTempoBarrier();
+  //CkPrintf("[%d] Barrier finished\n", ptr->getIndex());
+  *ierr = 0;
+}
+
+#define CMPI_BCAST_TAG 999
+
+extern "C" void mpi_bcast_(void *buf, int *count, int *type, int *root, 
+                           int *comm, int *ierr)
+{
+  int size = typesize(*type, *count);
+  ampi *ptr = CtvAccess(ampiPtr);
+  //CkPrintf("[%d] Broadcast called size=%d\n", ptr->getIndex(), size);
+  ptr->ckTempoBcast(((*root)==ptr->getIndex())?1:0, CMPI_BCAST_TAG, buf, size);
+  //CkPrintf("[%d] Broadcast finished\n", ptr->getIndex());
+  *ierr = 0;
+}
+
+static void optype(int inop, int intype, int *outop, int *outtype)
+{
+  switch(inop) {
+    case CMPI_MAX : *outop = TEMPO_MAX; break;
+    case CMPI_MIN : *outop = TEMPO_MIN; break;
+    case CMPI_SUM : *outop = TEMPO_SUM; break;
+    case CMPI_PROD : *outop = TEMPO_PROD; break;
+    default:
+      ckerr << "Op " << inop << " not supported." << endl;
+      CmiAbort("exiting");
+  }
+  switch(intype) {
+    case CMPI_REAL : *outtype = TEMPO_FLOAT; break;
+    case CMPI_INTEGER : *outtype = TEMPO_INT; break;
+    case CMPI_DOUBLE_PRECISION : *outtype = TEMPO_DOUBLE; break;
+    default:
+      ckerr << "Type " << intype << " not supported." << endl;
+      CmiAbort("exiting");
+  }
+}
+
+extern "C" void mpi_reduce_(void *inbuf, void *outbuf, int *count, int *type,
+                            int *op, int *root, int *comm, int *ierr)
+{
+  int myop, mytype;
+  optype(*op, *type, &myop, &mytype);
+  ampi *ptr = CtvAccess(ampiPtr);
+  //CkPrintf("[%d] reduction called\n", ptr->getIndex());
+  ptr->ckTempoReduce(*root,myop,inbuf,outbuf,*count,mytype);
+  //CkPrintf("[%d] reduction finished\n", ptr->getIndex());
+}
+
+extern "C" void mpi_allreduce_(void *inbuf,void *outbuf,int *count,int *type,
+                               int *op, int *comm, int *ierr)
+{
+  int myop, mytype;
+  optype(*op, *type, &myop, &mytype);
+  ampi *ptr = CtvAccess(ampiPtr);
+  //CkPrintf("[%d] Allreduce called\n", ptr->getIndex());
+  ptr->ckTempoAllReduce(myop,inbuf,outbuf,*count,mytype);
+  //CkPrintf("[%d] Allreduce finished\n", ptr->getIndex());
+}
+
+extern "C" double mpi_wtime_(void)
+{
+  return CmiWallTimer();
+}
+
+extern "C" void mpi_start_(int *reqnum, int *ierr)
+{
+  ampi *ptr = CtvAccess(ampiPtr);
+  if(*reqnum >= ptr->nrequests) {
+    CmiAbort("Invalid Comm Request..\n");
+  }
+  PersReq *req = &(ptr->requests[*reqnum]);
+  if(req->sndrcv == 1) { // send request
+    // CkPrintf("[%d] sending buf=%p, size=%d, tag=%d to %d\n", ptr->getIndex(),
+             // req->buf, req->size, req->tag, req->proc);
+    ptr->ckTempoSendElem(req->tag, ptr->getIndex(), req->buf, req->size, req->proc);
+  } else { // recv request
+    ptr->ckTempoRecv(req->tag, req->proc, req->buf, req->size);
+    // CkPrintf("[%d] received buf=%p, size=%d, tag=%d from %d\n", ptr->getIndex(),
+             // req->buf, req->size, req->tag, req->proc);
+  }
+  *ierr = 0;
+}
+
+extern "C" void mpi_waitall_(int *count, int *request, int *status, int *ierr)
+{
+  *ierr = 0;
+}
+
+extern "C" void mpi_recv_init_(void *buf, int *count, int *type, int *srcpe,
+                               int *tag, int *comm, int *req, int *ierr)
+{
+  ampi *ptr = CtvAccess(ampiPtr);
+  if(ptr->nrequests == 100) {
+    CmiAbort("Too many persistent commrequests.\n");
+  }
+  int size = typesize(*type, *count);
+  ptr->requests[ptr->nrequests].sndrcv = 2;
+  ptr->requests[ptr->nrequests].buf = buf;
+  ptr->requests[ptr->nrequests].size = size;
+  ptr->requests[ptr->nrequests].proc = *srcpe;
+  ptr->requests[ptr->nrequests].tag = *tag;
+  *req = ptr->nrequests;
+  ptr->nrequests ++;
+  *ierr = 0;
+  // CkPrintf("[%d] recv request %d buf=%p, count=%d size=%d, tag=%d, from %d\n",
+            // ptr->getIndex(), ptr->nrequests-1, buf, *count, size, *tag, *srcpe);
+}
+
+extern "C" void mpi_send_init_(void *buf, int *count, int *type, int *destpe,
+                               int *tag, int *comm, int *req, int *ierr)
+{
+  ampi *ptr = CtvAccess(ampiPtr);
+  if(ptr->nrequests == 100) {
+    CmiAbort("Too many persistent commrequests.\n");
+  }
+  int size = typesize(*type, *count);
+  ptr->requests[ptr->nrequests].sndrcv = 1;
+  ptr->requests[ptr->nrequests].buf = buf;
+  ptr->requests[ptr->nrequests].size = size;
+  ptr->requests[ptr->nrequests].proc = *destpe;
+  ptr->requests[ptr->nrequests].tag = *tag;
+  *req = ptr->nrequests;
+  ptr->nrequests ++;
+  *ierr = 0;
+  // CkPrintf("[%d] send request %d buf=%p, count=%d size=%d, tag=%d, to %d\n",
+           // ptr->getIndex(), ptr->nrequests-1, buf, *count, size, *tag, *destpe);
+}
+
+#include "ampi.def.h"

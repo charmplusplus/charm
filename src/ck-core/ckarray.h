@@ -113,6 +113,8 @@ public:
 private:
   CkChareID arrayChareID;
   CkGroupID arrayGroupID;
+
+protected:
   Array1D *thisArray;
 };
 

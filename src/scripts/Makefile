@@ -23,7 +23,7 @@
 
 SHELL=/bin/sh
 
-all: charm++ libs IDL tsm sm pvm sdag
+all: charm++ libs ampi IDL tsm sm pvm sdag
 
 charm++: converse charmxi charmlibs
 
@@ -36,6 +36,8 @@ sm: converse libsm.a
 pvm: converse libpvmc.a
 
 sdag: charm++ sdagx libsdag.a
+
+ampi: charm++ libampi.a libampif.a
 
 translators: sdagx charmxi conv-cpm charmidl
 
@@ -69,7 +71,8 @@ ALLHEADERS=charm++.h ckstream.h charm.h cpthreads.h converse.h \
 	RefineLB.h MetisLB.h  Comm1LB.h \
 	HeapCentLB.h Set.h elements.h heap.h conv-ccs.h \
 	NborBaseLB.h NeighborLB.h \
-	WSLB.h CkLists.h GreedyRefLB.h RandRefLB.h CommLB.h CommLBHeap.h
+	WSLB.h CkLists.h GreedyRefLB.h RandRefLB.h CommLB.h CommLBHeap.h \
+	ampi.h ampif.h
 
 ALLINTERFACES=idl.ci
 
@@ -105,6 +108,7 @@ dirs+sources:
 	./gatherflat ../../src/Common/ck-ldb           .
 	./gatherflat ../../src/Common/langs/simplemsg  .
 	./gatherflat ../../src/Common/langs/pvmc       .
+	./gatherflat ../../src/Common/langs/ampi       .
 	./gatherflat ../../src/Common/langs/sdag/xlator       .
 	./gatherflat ../../src/Common/langs/sdag/runtime      .
 	./gatherflat ../../src/Common/xlat-i           .
@@ -151,7 +155,8 @@ CVHEADERS=converse.h conv-mach.h conv-mach.sh \
           ../include/tempo.decl.h tempo.def.h \
           ../include/waitqd.decl.h waitqd.def.h \
 	  ../include/CommLB.decl.h CommLB.def.h  \
-	  ../include/Comm1LB.decl.h Comm1LB.def.h 
+	  ../include/Comm1LB.decl.h Comm1LB.def.h  \
+	  ../include/ampi.decl.h ampi.def.h
 
 TRACELIBS=libtrace-none.a libtrace-projections.a libtrace-summary.a
 
@@ -263,6 +268,7 @@ CKHEADERS=ck.h ckstream.h envelope.h init.h qd.h charm.h charm++.h trace.h \
 	  RefineLB.h HeapCentLB.h CommLB.h Comm1LB.h\
 	  MetisLB.h NborBaseLB.h \
 	  NeighborLB.h WSLB.h GreedyRefLB.h RandRefLB.h CkLists.h \
+          ampi.h ampif.h \
 	  $(CVHEADERS)
 
 CK_LIBS_CORE=libck.a
@@ -342,6 +348,12 @@ libtrace-summary.a: $(LIBTRACE_SUMM)
 
 ../include/CkFutures.decl.h : CkFutures.decl.h
 	/bin/cp CkFutures.decl.h ../include
+
+../include/ampi.decl.h : ampi.decl.h
+	/bin/cp ampi.decl.h ../include
+
+ampi.decl.h ampi.def.h : ampi.ci charmxi
+	$(CHARMC) ampi.ci
 
 CkFutures.decl.h CkFutures.def.h : ckfutures.ci charmxi
 	$(CHARMC) ckfutures.ci
@@ -612,6 +624,18 @@ pvmc_groups.o: pvmc_groups.c pvmc.h pvm3.h
 
 pvmc_main.o: pvmc_main.c pvmc.h pvm3.h
 	$(CHARMC) -o $@ pvmc_main.c
+
+libampi.a: ampi.o
+	$(CHARMC) -cp ../lib -o libampi.a ampi.o
+
+libampif.a: ampi.o futil.o
+	$(CHARMC) -cp ../lib -o libampif.a ampi.o futil.o
+
+ampi.o: ampi.C ampi.h ampiimpl.h ampi.decl.h ampi.def.h
+	$(CHARMC) -c ampi.C
+
+futil.o: futil.f90 ampif.h
+	$(CHARMC) -c futil.f90
 
 libsdag.a: CDep.o
 	$(CHARMC) -cp ../lib -o libsdag.a CDep.o
