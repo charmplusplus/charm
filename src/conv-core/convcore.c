@@ -799,9 +799,9 @@ int CsdScheduler(int maxmsgs)
       maxmsgs--; if (maxmsgs==0) return maxmsgs;
       if (CpvAccess(CsdStopFlag) != cycle) return maxmsgs;
     } else {
-      if(pollmode) return maxmsgs;
       if (!isIdle) {isIdle=1;CsdBeginIdle();}
       else CsdStillIdle();
+      if(pollmode) return maxmsgs;
       if (CpvAccess(CsdStopFlag) != cycle) {
 	CsdEndIdle();
 	return maxmsgs;
