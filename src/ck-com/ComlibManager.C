@@ -76,8 +76,8 @@ void ComlibManager::init(){
     
     strategyCreated = CmiFalse;
 
-    CpvInitialize(ClibLocationTableType*, locationTable);
-    CpvAccess(locationTable) = new CkHashtableT <ClibGlobalArrayIndex, int>;
+    CkpvInitialize(ClibLocationTableType*, locationTable);
+    CkpvAccess(locationTable) = new CkHashtableT <ClibGlobalArrayIndex, int>;
 
     CkpvInitialize(int, RecvmsgHandle);
     CkpvAccess(RecvmsgHandle) =CkRegisterHandler((CmiHandler)recv_array_msg);
@@ -204,7 +204,7 @@ void ComlibManager::broadcastStrategies() {
     }
 
     CProxy_ComlibManager cgproxy(CkpvAccess(cmgrID));
-    cgproxy.receiveTable(sw, *CpvAccess(locationTable));
+    cgproxy.receiveTable(sw, *CkpvAccess(locationTable));
 }
 
 //Called when the array/group element starts sending messages
@@ -282,10 +282,10 @@ void ComlibManager::receiveTable(StrategyWrapper &sw,
     clibIteration ++;
     receivedTable = 1;
 
-    delete CpvAccess(locationTable);
-    CpvAccess(locationTable) =  NULL;
+    delete CkpvAccess(locationTable);
+    CkpvAccess(locationTable) =  NULL;
 
-    CpvAccess(locationTable) = new CkHashtableT<ClibGlobalArrayIndex, int>;
+    CkpvAccess(locationTable) = new CkHashtableT<ClibGlobalArrayIndex, int>;
 
     CkHashtableIterator *ht_iterator = htable.iterator();
     ht_iterator->seekStart();
@@ -533,7 +533,7 @@ void ComlibManager::GroupSend(CkDelegateData *pd,int ep, void *msg, int onPE, Ck
     }
     
     ((CmiMsgHeaderExt *)env)->stratid = curStratID;
-    CkpvAccess(_qd)->create(1);
+    CpvAccess(_qd)->create(1);
 
     env->setMsgtype(ForBocMsg);
     env->setEpIdx(ep);
@@ -636,7 +636,7 @@ void ComlibManager::ArraySectionSend(CkDelegateData *pd,int ep, void *m,
 void ComlibManager::GroupBroadcast(CkDelegateData *pd,int ep,void *m,CkGroupID g) {
     register envelope * env = UsrToEnv(m);
 
-    CkpvAccess(_qd)->create(1);
+    CpvAccess(_qd)->create(1);
 
     env->setMsgtype(ForBocMsg);
     env->setEpIdx(ep);
