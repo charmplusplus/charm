@@ -7,7 +7,7 @@ extern void _initCharm(int argc, char **argv);
 
 CkChareID mainhandle;
 
-extern "C" void conversemain_(int *argc,char _argv[][80],int length[])
+extern "C" void FTN_NAME(CONVERSEMAIN, conversemain)(int *argc,char _argv[][80],int length[])
 {
   int i;
   char **argv = new char*[*argc+2];

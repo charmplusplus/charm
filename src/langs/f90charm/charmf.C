@@ -24,22 +24,22 @@ extern "C" int typesize(int type, int count)
   }
 }         
 
-extern "C" void ckexit_()
+extern "C" void FTN_NAME(CKEXIT, ckexit)()
 {
   CkExit();
 }
 
-extern "C" void ckmype_(int *pe)
+extern "C" void FTN_NAME(CKMYPE, ckmype)(int *pe)
 {
   *pe = CkMyPe();
 }
 
-extern "C" void cknumpes_(int *npe)
+extern "C" void FTN_NAME(CKNUMPES, cknumpes)(int *npe)
 {
   *npe = CkNumPes();
 }
 
-extern "C" void ckprintf_(const char *format, ...)
+extern "C" void FTN_NAME(CKPRINTF, ckprintf)(const char *format, ...)
 {
   int ifmt, format_len, str_len=0, temp_len, flag;
   int *i; float *f; double *d;

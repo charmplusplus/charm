@@ -1,3 +1,4 @@
+#include "charm-api.h"
 
 #define CMPI_DOUBLE_PRECISION 0
 #define CMPI_INTEGER 1
@@ -9,3 +10,4 @@
 #define CMPI_PACKED 7 
 
 extern "C" int typesize(int type, int count);
+
