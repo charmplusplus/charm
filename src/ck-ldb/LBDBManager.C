@@ -309,7 +309,6 @@ void LBDB::DumpDatabase()
 
 int LBDB::useMem() {
   int size = sizeof(LBDB);
-  int i=0;
   size += oms.length() * sizeof(LBOM);
   size += objs.length() * sizeof(LBObj);
   size += migrateCBList.length() * sizeof(MigrateCBList);

@@ -208,7 +208,7 @@ void OrbLB::quicksort(int x)
 
 void OrbLB::mapPartitionsToNodes()
 {
-  int i,j,k;
+  int i,j;
 #if 1
   for (i=0; i<P; i++) partitions[i].node = i;
 #else

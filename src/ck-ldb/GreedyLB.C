@@ -105,7 +105,7 @@ GreedyLB::BuildObjectArray(CentralLB::LDStats* stats,
   HeapData *objData;
 
   *objCount = 0;
-  int pe, obj;
+  int obj;
   *objCount += stats->n_objs;
 
 //for (obj = 0; obj < stats[pe].n_objs; obj++)

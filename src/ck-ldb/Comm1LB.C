@@ -180,7 +180,7 @@ void init(alloc_struct **a, graph * object_graph, int l, int b){
 LBMigrateMsg* Comm1LB::Strategy(CentralLB::LDStats* stats, int count)
 {
   int pe,obj,com;
-  double load_pe=0.0,mean_load =0.0;
+  double mean_load =0.0;
   ObjectRecord *x;
 
   //  CkPrintf("[%d] Comm1LB strategy\n",CkMyPe());

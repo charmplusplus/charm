@@ -60,7 +60,6 @@ void RandRefLB::work(CentralLB::LDStats* stats, int count)
   refiner.Refine(count,stats,from_procs,to_procs);
 
   for(obj=0; obj < stats->n_objs; obj++) {
-      LDObjData &oData = stats->objData[obj];
       if (stats->from_proc[obj] != to_procs[obj]) {
 	// CkPrintf("[%d] Obj %d migrating from %d to %d\n",
 	// 		 CkMyPe(),obj,stats->from_proc[obj],to_procs[obj]);

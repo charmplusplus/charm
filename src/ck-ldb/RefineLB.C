@@ -45,7 +45,7 @@ CmiBool RefineLB::QueryBalanceNow(int _step)
 
 LBMigrateMsg* RefineLB::Strategy(CentralLB::LDStats* stats, int count)
 {
-  int obj, pe;
+  int obj;
 
   //  CkPrintf("[%d] RefineLB strategy\n",CkMyPe());
 

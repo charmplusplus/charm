@@ -553,7 +553,6 @@ void CentralLB::readStatsMsgs(const char* filename) {
 
 void CentralLB::writeStatsMsgs(const char* filename) {
 
-  int i;
   FILE *f = fopen(filename, "w");
   if (f == NULL) 
     CmiAbort("writeStatsMsgs failed to open the output file!\n");

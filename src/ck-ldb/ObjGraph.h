@@ -59,7 +59,6 @@ public:
 
   double LoadOf(int i) {
     const Node n = GraphNode(i);
-    const int pe = n.proc;
     const int index = n.index;
     return stats->objData[index].wallTime;
   };
