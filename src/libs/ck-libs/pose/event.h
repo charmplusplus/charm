@@ -3,7 +3,7 @@
     spawned events in and event's spawned event list */
 #ifndef EVENT_H
 #define EVENT_H
-extern int assert(int);
+//extern int assert(int);
 #include "envelope.h"
 
 /// List to store records of events spawned by a certain event
