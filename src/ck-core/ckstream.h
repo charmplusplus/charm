@@ -11,15 +11,17 @@
 #include <string.h>
 #include <stdio.h>
 
+#define BUF_MAXLEN  16384
+
 class _CkOStream {
   private:
     int _isErr;
     size_t _buflen, _actlen;
-    char _obuf[16384];
+    char _obuf[BUF_MAXLEN];
     char _tbuf[1024];
   public:
     _CkOStream(int isErr=0) { 
-      _buflen=16384; 
+      _buflen=BUF_MAXLEN; 
       _actlen=1;
       _isErr = isErr; 
       _obuf[0] = '\0'; 
@@ -74,18 +76,18 @@ class _CkErrStream : public _CkOStream {
     _CkErrStream() : _CkOStream(1) {}
 };
 
-CpvExtern(_CkOutStream*, _ckout);
-CpvExtern(_CkErrStream*, _ckerr);
+CkpvExtern(_CkOutStream*, _ckout);
+CkpvExtern(_CkErrStream*, _ckerr);
 
 class CkOutStream {
   public:
   CkOutStream& operator << (_CkOStream& (*f)(_CkOStream &)) {
-    f(*CpvAccess(_ckout));
+    f(*CkpvAccess(_ckout));
     return *this;
   }
 #define OUTSHIFTLEFT(type) \
   CkOutStream& operator << (type x) { \
-    *CpvAccess(_ckout) << x; \
+    *CkpvAccess(_ckout) << x; \
     return *this; \
   }
     OUTSHIFTLEFT(int);
@@ -105,12 +107,12 @@ class CkOutStream {
 class CkErrStream {
   public:
   CkErrStream& operator << (_CkOStream& (*f)(_CkOStream &)) {
-    f(*CpvAccess(_ckerr));
+    f(*CkpvAccess(_ckerr));
     return *this;
   }
 #define ERRSHIFTLEFT(type) \
   CkErrStream& operator << (type x) { \
-    *CpvAccess(_ckerr) << x; \
+    *CkpvAccess(_ckerr) << x; \
     return *this; \
   }
     ERRSHIFTLEFT(int);
