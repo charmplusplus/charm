@@ -56,7 +56,6 @@ CentralLB::CentralLB()
   lbname = "CentralLB";
   mystep = 0;
   //  CkPrintf("Construct in %d\n",CkMyPe());
-  theLbdb = CProxy_LBDatabase(lbdb).ckLocalBranch();
 
   // create and turn on by default
   receiver = theLbdb->

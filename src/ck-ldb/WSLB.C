@@ -57,7 +57,6 @@ WSLB::WSLB()
     CkPrintf("[%d] WSLB created\n",CkMyPe());
 
   mystep = 0;
-  theLbdb = CProxy_LBDatabase(lbdb).ckLocalBranch();
   theLbdb->
     AddLocalBarrierReceiver((LDBarrierFn)(staticAtSync),(void*)(this));
   theLbdb->

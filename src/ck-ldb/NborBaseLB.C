@@ -45,7 +45,6 @@ NborBaseLB::NborBaseLB()
 {
   lbname = "NborBaseLB";
   mystep = 0;
-  theLbdb = CProxy_LBDatabase(lbdb).ckLocalBranch();
   theLbdb->
     AddLocalBarrierReceiver((LDBarrierFn)(staticAtSync),
 			    (void*)(this));
