@@ -19,7 +19,7 @@ void adapt3::Step()
     timeLeash = eq->largest - lastGVT;
     //if (rbFlag) timeLeash = (timeLeash + avgRBoffset)/2;
     if (specEventCount > (specTol*eventCount)) 
-      timeLeash = eq->currentPtr->timestamp - lastGVT;
+      timeLeash = 1; //eq->currentPtr->timestamp - lastGVT;
   }
   // Shorten the leash as we near POSE_endtime
   if ((POSE_endtime > POSE_UnsetTS) && (lastGVT + timeLeash > POSE_endtime))
