@@ -15,9 +15,9 @@ UChar _defaultQueueing = CK_QUEUEING_FIFO;
 UInt  _printCS = 0;
 UInt  _printSS = 0;
 
-UInt  _numInitMsgs = 0;
 UInt  _numExpectInitMsgs = 0;
-UInt  _numInitNodeMsgs = 0;
+UInt  _numInitMsgs = 0;
+CksvDeclare(UInt,_numInitNodeMsgs);
 int   _infoIdx;
 int   _charmHandlerIdx;
 int   _initHandlerIdx;
@@ -25,10 +25,8 @@ int   _bocHandlerIdx;
 int   _nodeBocHandlerIdx;
 int   _qdHandlerIdx;
 int   _triggerHandlerIdx;
-int   _triggersSent = 0;
 int   _mainDone = 0;
-
-CsvDeclare(CmiNodeLock, _nodeLock);
+static int   _triggersSent = 0;
 
 CkOutStream ckout;
 CkErrStream ckerr;
@@ -41,9 +39,12 @@ CkpvDeclare(CkGroupID, _currentGroupRednMgr);
 CkpvDeclare(CkGroupID,   _currentNodeGroup);
 CkpvDeclare(GroupTable*, _groupTable);
 CkpvDeclare(UInt, _numGroups);
-CsvDeclare(UInt,_numNodeGroups);
-CsvDeclare(GroupTable*, _nodeGroupTable) = 0;
 CkpvDeclare(CkCoreState *, _coreState);
+
+CksvDeclare(UInt, _numNodeGroups);
+CksvDeclare(GroupTable*, _nodeGroupTable);
+CksvDeclare(CmiNodeLock, _nodeLock);
+CksvStaticDeclare(PtrVec*,_nodeBocInitVec);
 
 CkpvDeclare(Stats*, _myStats);
 CkpvDeclare(MsgPool*, _msgPool);
@@ -54,8 +55,6 @@ CkpvDeclare(_CkErrStream*, _ckerr);
 CkpvStaticDeclare(int,  _numInitsRecd); /* UInt changed to int */
 CkpvStaticDeclare(PtrQ*, _buffQ);
 CkpvStaticDeclare(PtrVec*, _bocInitVec);
-
-static PtrVec* _nodeBocInitVec;
 
 static int    _exitHandlerIdx;
 
@@ -237,7 +236,7 @@ static inline void _processBufferedNodeBocInits(void)
   CkNumberHandlerEx(_nodeBocHandlerIdx,(CmiHandlerEx)_processHandler,
   	CkpvAccess(_coreState));
   register int i = 0;
-  PtrVec &inits=*_nodeBocInitVec;
+  PtrVec &inits=*CksvAccess(_nodeBocInitVec);
   register int len = inits.size();
   for(i=0; i<len; i++) {
     envelope *env = inits[i];
@@ -274,7 +273,7 @@ static int _charmLoadEstimator(void)
 static void _sendTriggers(void)
 {
   int i, num, first;
-  CmiLock(CsvAccess(_nodeLock));
+  CmiLock(CksvAccess(_nodeLock));
   if (_triggersSent == 0) 
   {
     _triggersSent++;
@@ -288,7 +287,7 @@ static void _sendTriggers(void)
 	CmiSyncSend(first+i, env->getTotalsize(), (char *)env);
     CmiFree(env);
   }
-  CmiUnlock(CsvAccess(_nodeLock));
+  CmiUnlock(CksvAccess(_nodeLock));
 }
 
 static inline void _initDone(void)
@@ -309,7 +308,7 @@ static inline void _initDone(void)
 
 static void _triggerHandler(envelope *env)
 {
-  if (_numExpectInitMsgs && CkpvAccess(_numInitsRecd) + _numInitNodeMsgs == _numExpectInitMsgs)
+  if (_numExpectInitMsgs && CkpvAccess(_numInitsRecd) + CksvAccess(_numInitNodeMsgs) == _numExpectInitMsgs)
   {
     DEBUGF(("Calling Init Done from _triggerHandler\n"));
     _initDone();
@@ -341,10 +340,10 @@ static void _initHandler(void *msg)
       CkpvAccess(_bocInitVec)->insert(env->getGroupNum().idx, env);
       break;
     case NodeBocInitMsg:
-      CmiLock(CsvAccess(_nodeLock));
-      _numInitNodeMsgs++;
-      _nodeBocInitVec->insert(env->getGroupNum().idx, env);
-      CmiUnlock(CsvAccess(_nodeLock));
+      CmiLock(CksvAccess(_nodeLock));
+      CksvAccess(_numInitNodeMsgs)++;
+      CksvAccess(_nodeBocInitVec)->insert(env->getGroupNum().idx, env);
+      CmiUnlock(CksvAccess(_nodeLock));
       CpvAccess(_qd)->process();
       break;
     case ROMsgMsg:
@@ -362,7 +361,7 @@ static void _initHandler(void *msg)
     default:
       CmiAbort("Internal Error: Unknown-msg-type. Contact Developers.\n");
   }
-  if(_numExpectInitMsgs&&(CkpvAccess(_numInitsRecd)+_numInitNodeMsgs==_numExpectInitMsgs)) {
+  if(_numExpectInitMsgs&&(CkpvAccess(_numInitsRecd)+CksvAccess(_numInitNodeMsgs)==_numExpectInitMsgs)) {
     _initDone();
   }
 }
@@ -441,9 +440,11 @@ void _initCharm(int unused_argc, char **argv)
 	CkpvInitialize(MsgPool*, _msgPool);
 	CkpvInitialize(CkCoreState *, _coreState);
 
-	CsvInitialize(UInt, _numNodeGroups);
-	CsvInitialize(GroupTable*,  _nodeGroupTable);
-	CsvInitialize(CmiNodeLock, _nodeLock);
+	CksvInitialize(UInt, _numNodeGroups);
+	CksvInitialize(GroupTable*,  _nodeGroupTable);
+	CksvInitialize(CmiNodeLock, _nodeLock);
+	CksvInitialize(PtrVec*,_nodeBocInitVec);
+	CksvInitialize(UInt,_numInitNodeMsgs);
 
 	CkpvInitialize(_CkOutStream*, _ckout);
 	CkpvInitialize(_CkErrStream*, _ckerr);
@@ -453,21 +454,22 @@ void _initCharm(int unused_argc, char **argv)
 	CkpvAccess(_groupTable) = new GroupTable;
 	CkpvAccess(_groupTable)->init();
 	CkpvAccess(_numGroups) = 1; // make 0 an invalid group number
-	CsvAccess(_numNodeGroups) = 1;
 	CkpvAccess(_buffQ) = new PtrQ();
 	CkpvAccess(_bocInitVec) = new PtrVec();
 	
 	if(CkMyRank()==0) 
 	{
-		CsvAccess(_nodeLock) = CmiCreateLock();
-		CsvAccess(_nodeGroupTable) = new GroupTable();
-		CsvAccess(_nodeGroupTable)->init();
-		_nodeBocInitVec = new PtrVec();
+	  	CksvAccess(_numNodeGroups) = 1; //make 0 an invalid group number
+          	CksvAccess(_numInitNodeMsgs) = 0;
+		CksvAccess(_nodeLock) = CmiCreateLock();
+		CksvAccess(_nodeGroupTable) = new GroupTable();
+		CksvAccess(_nodeGroupTable)->init();
+		CksvAccess(_nodeBocInitVec) = new PtrVec();
 	}
   
 	CmiNodeBarrier();
 #ifdef __BLUEGENE__
-	if(CkMyRank()==0) 
+	if(BgNodeRank()==0) 
 #endif
 	{
 		CpvAccess(_qd) = new QdState();
@@ -485,7 +487,7 @@ void _initCharm(int unused_argc, char **argv)
 	_bocHandlerIdx = CkRegisterHandler((CmiHandler)_initHandler);
 	_nodeBocHandlerIdx = CkRegisterHandler((CmiHandler)_initHandler);
 #ifdef __BLUEGENE__
-	if(CkMyRank()==0) 
+	if(BgNodeRank()==0) 
 #endif
 	{
 	_qdHandlerIdx = CmiRegisterHandler((CmiHandler)_qdHandler);
@@ -500,7 +502,17 @@ void _initCharm(int unused_argc, char **argv)
 
 	_futuresModuleInit(); // part of futures implementation is a converse module
 	_loadbalancerInit();
+
+#if CMK_TRACE_IN_CHARM
+        // initialize trace module in ck
+        traceCharmInit(argv);
+#endif
+
+#ifdef __BLUEGENE__
+	if(BgNodeRank()==0) 
+#else
 	if(CkMyRank()==0)  /* Register */
+#endif
 	{
 		CmiArgGroup("Charm++",NULL);
 		_parseCommandLineOpts(argv);
@@ -521,10 +533,6 @@ void _initCharm(int unused_argc, char **argv)
 		CkRegisterMainModule();
 	}
 
-#if CMK_TRACE_IN_CHARM
-        // initialize trace module in ck
-        traceCharmInit(argv);
-#endif
 	_TRACE_BEGIN_COMPUTATION();
 	CkpvAccess(_myStats) = new Stats();
 	CkpvAccess(_msgPool) = new MsgPool();

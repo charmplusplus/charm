@@ -8,6 +8,8 @@
 #undef CkMyPe
 #undef CkNumPes
 #undef CkMyRank
+#undef CkMyNode
+#undef CkNumNodes
 
 #undef CmiSyncSend
 #undef CmiSyncSendAndFree
@@ -15,6 +17,13 @@
 #undef CmiSyncBroadcastAndFree
 #undef CmiSyncBroadcastAll
 #undef CmiSyncBroadcastAllAndFree
+
+#undef CmiSyncNodeSend
+#undef CmiSyncNodeSendAndFree
+#undef CmiSyncNodeBroadcast
+#undef CmiSyncNodeBroadcastAndFree
+#undef CmiSyncNodeBroadcastAll
+#undef CmiSyncNodeBroadcastAllAndFree
 
 #define CkRegisterHandler(x)        BgRegisterHandler((BgHandler)(x))
 #define CkNumberHandler(n, x)       BgNumberHandler(n, (BgHandler)(x))
@@ -39,7 +48,8 @@ namespace BGConverse {
 
 inline int CkMyPe() { return BgMyNode(); }
 inline int CkNumPes() { int x,y,z; BgGetSize(&x, &y, &z); return (x*y*z); }
-inline int CkMyRank() { return BgMyRank(); }
+inline int CkMyRank() { return 0; }
+inline int BgNodeRank() { return BgMyRank(); }
 
 static inline void CmiSyncSend(int pe, int nb, char *m) 
 {
@@ -106,12 +116,20 @@ static inline void CmiSyncBroadcastAllAndFree(int nb, char *m)
 #define CkpvAccess	   BpvAccess
 #define CkpvAccessOther	   BpvAccessOther
 
+#define CksvDeclare 	   BnvDeclare
+#define CksvExtern 	   BnvExtern
+#define CksvStaticDeclare  BnvStaticDeclare
+#define CksvInitialize 	   BnvInitialize
+#define CksvAccess	   BnvAccess
 
 namespace BGConverse {
 
 static inline int CkMyPe() { return BgGetGlobalWorkerThreadID(); }
-static inline int CkNumPes() { return BgGetTotalSize()*BgGetNumWorkThread(); }
-static inline int CkMyRank() { return BgMyRank()*BgGetNumWorkThread()+BgGetThreadID(); }
+static inline int CkNumPes() { return BgNumNodes()*BgGetNumWorkThread(); }
+static inline int CkMyRank() { return BgGetThreadID(); }
+static inline int BgNodeRank() { return BgMyRank()*BgGetNumWorkThread()+BgGetThreadID(); }
+static inline int CkMyNode() { return BgMyNode(); }
+static inline int CkNumNodes() { return BgNumNodes(); }
 
 static inline void CmiSyncSend(int pe, int nb, char *m) 
 {
@@ -165,6 +183,54 @@ static inline void CmiSyncBroadcastAllAndFree(int nb, char *m)
   BgThreadBroadcastAllPacket(CmiGetHandler(m), LARGE_WORK, nb, m);
 }
 
+static inline void CmiSyncNodeSend(int node, int nb, char *m)
+{
+  int x,y,z,t;
+  char *dupm = (char *)CmiAlloc(nb);
+
+//CmiPrintf("[%d] CmiSyncNodeSend handle:%d\n", CkMyPe(), CmiGetHandler(m));
+  memcpy(dupm, m, nb);
+  BgGetXYZ(node, &x, &y, &z);
+  BgSendPacket(x,y,z, ANYTHREAD, CmiGetHandler(m), LARGE_WORK, nb, dupm);
+}
+
+static inline void CmiSyncNodeSendAndFree(int node, int nb, char *m)
+{
+  int x,y,z,t;
+//CmiPrintf("[%d] CmiSyncNodeSendAndFree handle:%d\n", CkMyPe(), CmiGetHandler(m));
+  BgGetXYZ(node, &x, &y, &z);
+  BgSendPacket(x,y,z, ANYTHREAD, CmiGetHandler(m), LARGE_WORK, nb, m);
+}
+
+static inline void CmiSyncNodeBroadcast(int nb, char *m)
+{
+  char *dupm = (char *)CmiAlloc(nb);
+//CmiPrintf("[%d] CmiSyncBroadcast handle:%d\n", CkMyPe(), CmiGetHandler(m));
+  memcpy(dupm, m, nb);
+  BgBroadcastPacketExcept(CkMyNode(), ANYTHREAD, CmiGetHandler(m), LARGE_WORK, nb, dupm);
+}
+
+static inline void CmiSyncNodeBroadcastAndFree(int nb, char *m)
+{
+//CmiPrintf("CmiSyncBroadcastAndFree handle:%d node:%d tid:%d\n", CmiGetHandler(m), BgMyNode(), BgGetThreadID());
+  BgBroadcastPacketExcept(CkMyNode(), ANYTHREAD, CmiGetHandler(m), LARGE_WORK, nb, m);
+}
+
+static inline void CmiSyncNodeBroadcastAll(int nb, char *m)
+{
+  char *dupm = (char *)CmiAlloc(nb);
+//CmiPrintf("CmiSyncBroadcastAll: handle:%d\n", CmiGetHandler(m));
+  memcpy(dupm, m, nb);
+  BgBroadcastAllPacket(CmiGetHandler(m), LARGE_WORK, nb, dupm);
+}
+
+static inline void CmiSyncNodeBroadcastAllAndFree(int nb, char *m)
+{
+//CmiPrintf("CmiSyncBroadcastAllAndFree: handle:%d\n", CmiGetHandler(m));
+  /* broadcast to all nodes */
+  BgBroadcastAllPacket(CmiGetHandler(m), LARGE_WORK, nb, m);
+}
+
 }  /* end of namespace */
 
 #endif
@@ -180,7 +246,6 @@ static inline void BgCharmExit()
 }
 
 }
-
 
 
 

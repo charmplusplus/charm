@@ -89,17 +89,17 @@ extern unsigned int    _printCS;
 extern unsigned int    _printSS;
 
 extern int     _infoIdx;
-extern unsigned int    _numInitMsgs;
-extern unsigned int    _numInitNodeMsgs;
 extern int     _charmHandlerIdx;
 extern int     _initHandlerIdx;
 extern int     _bocHandlerIdx;
 extern int     _nodeBocHandlerIdx;
 extern int     _qdHandlerIdx;
+extern unsigned int   _numInitMsgs;
 
-CsvExtern(GroupTable*,  _nodeGroupTable);
-CsvExtern(CmiNodeLock, _nodeLock);
-CsvExtern(unsigned int, _numNodeGroups);
+CksvExtern(unsigned int,  _numInitNodeMsgs);
+CksvExtern(GroupTable*,  _nodeGroupTable);
+CksvExtern(CmiNodeLock, _nodeLock);
+CksvExtern(unsigned int, _numNodeGroups);
 
 CkpvExtern(CkGroupID,_currentGroup);
 

@@ -10,6 +10,12 @@
 #define CkpvAccess	CpvAccess
 #define CkpvAccessOther	CpvAccessOther
 
+#define CksvDeclare 	   CsvDeclare
+#define CksvExtern 	   CsvExtern
+#define CksvStaticDeclare  CsvStaticDeclare
+#define CksvInitialize 	   CsvInitialize
+#define CksvAccess	   CsvAccess
+
 #undef CkMyPe
 #undef CkNumPes
 

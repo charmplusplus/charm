@@ -169,9 +169,9 @@ void *CkLocalBranch(CkGroupID gID) {
 extern "C"
 void *CkLocalNodeBranch(CkGroupID groupID)
 {
-  CmiLock(CsvAccess(_nodeLock));
-  void *retval = CsvAccess(_nodeGroupTable)->find(groupID).getObj();
-  CmiUnlock(CsvAccess(_nodeLock));
+  CmiLock(CksvAccess(_nodeLock));
+  void *retval = CksvAccess(_nodeGroupTable)->find(groupID).getObj();
+  CmiUnlock(CksvAccess(_nodeLock));
   return retval;
 }
 
@@ -260,10 +260,10 @@ void _createNodeGroupMember(CkGroupID groupID, int eIdx, void *msg)
   register int gIdx = _entryTable[eIdx]->chareIdx;
   register void *obj = malloc(_chareTable[gIdx]->size);
   _MEMCHECK(obj);
-  CmiLock(CsvAccess(_nodeLock));
-  CsvAccess(_nodeGroupTable)->find(groupID).setObj(obj);
-  CmiUnlock(CsvAccess(_nodeLock));
-  PtrQ *ptrq = CsvAccess(_nodeGroupTable)->find(groupID).getPending();
+  CmiLock(CksvAccess(_nodeLock));
+  CksvAccess(_nodeGroupTable)->find(groupID).setObj(obj);
+  CmiUnlock(CksvAccess(_nodeLock));
+  PtrQ *ptrq = CksvAccess(_nodeGroupTable)->find(groupID).getPending();
   if(ptrq) {
     void *pending;
     while((pending=ptrq->deq())!=0)
@@ -330,7 +330,7 @@ void _createNodeGroup(CkGroupID groupID, envelope *env)
     env = UsrToEnv(msg);
     CmiSetHandler(env, _bocHandlerIdx);
     _numInitMsgs++;
-    _numInitNodeMsgs++;
+    CksvAccess(_numInitNodeMsgs)++;
     CmiSyncNodeBroadcast(env->getTotalsize(), (char *)env);
     CpvAccess(_qd)->create(CkNumNodes()-1);
     if(env->isPacked() && _msgTable[msgIdx]->unpack) {
@@ -364,12 +364,12 @@ static CkGroupID _groupCreate(envelope *env)
 static CkGroupID _nodeGroupCreate(envelope *env)
 {
   register CkGroupID groupNum;
-  CmiLock(CsvAccess(_nodeLock));                // change for proc 0 and other processors
+  CmiLock(CksvAccess(_nodeLock));                // change for proc 0 and other processors
   if(CkMyNode() == 0)				// should this be CkMyPe() or CkMyNode()?
-          groupNum.idx = CsvAccess(_numNodeGroups)++;
+          groupNum.idx = CksvAccess(_numNodeGroups)++;
    else
-          groupNum.idx = _getGroupIdx(CkNumNodes(),CkMyNode(),CsvAccess(_numNodeGroups)++);
-  CmiUnlock(CsvAccess(_nodeLock));
+          groupNum.idx = _getGroupIdx(CkNumNodes(),CkMyNode(),CksvAccess(_numNodeGroups)++);
+  CmiUnlock(CksvAccess(_nodeLock));
   _createNodeGroup(groupNum, env);
   return groupNum;
 }
@@ -518,14 +518,14 @@ static inline void _processForNodeBocMsg(CkCoreState *ck,envelope *env)
 {
   register CkGroupID groupID = env->getGroupNum();
   register void *obj;
-  CmiLock(CsvAccess(_nodeLock));
-  obj = CsvAccess(_nodeGroupTable)->find(groupID).getObj();
+  CmiLock(CksvAccess(_nodeLock));
+  obj = CksvAccess(_nodeGroupTable)->find(groupID).getObj();
   if(!obj) { // groupmember not yet created
-    CsvAccess(_nodeGroupTable)->find(groupID).enqMsg(env);
-    CmiUnlock(CsvAccess(_nodeLock));
+    CksvAccess(_nodeGroupTable)->find(groupID).enqMsg(env);
+    CmiUnlock(CksvAccess(_nodeLock));
     return;
   }
-  CmiUnlock(CsvAccess(_nodeLock));
+  CmiUnlock(CksvAccess(_nodeLock));
   ck->process();
   env->setMsgtype(ForChareMsg);
   env->setObjPtr(obj);
@@ -949,9 +949,9 @@ void CkSendMsgNodeBranchInline(int eIdx, void *msg, int node, CkGroupID gID)
 {
   if (node==CkMyNode()) 
   { 
-    CmiLock(CsvAccess(_nodeLock));
-    void *obj = CsvAccess(_nodeGroupTable)->find(gID).getObj();
-    CmiUnlock(CsvAccess(_nodeLock));
+    CmiLock(CksvAccess(_nodeLock));
+    void *obj = CksvAccess(_nodeGroupTable)->find(gID).getObj();
+    CmiUnlock(CksvAccess(_nodeLock));
     if (obj!=NULL) 
     { //Just directly call the group:
       envelope *env=UsrToEnv(msg);
