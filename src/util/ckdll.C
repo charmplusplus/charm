@@ -41,6 +41,9 @@ CkDll::~CkDll() {
 }
 
 const char *CkDll::extension=0;
+static void deleteFile(const char *fileName) { }
+
+#define CMK_SCRATCH_PATH ""
 #endif
 
 
