@@ -5,12 +5,12 @@
 PairCalculator::PairCalculator(CkMigrateMessage *m) { }
 	
 
-PairCalculator::PairCalculator(bool sym, int grainSize, int s, int blkSize,  int op1,  FuncType fn1, int op2,  FuncType fn2, CkCallback cb, CkGroupID gid, CkArrayID cb_aid, int cb_ep) 
+PairCalculator::PairCalculator(bool sym, int grainSize, int s, int blkSize,  int op1,  FuncType fn1, int op2,  FuncType fn2, CkCallback cb, CkGroupID gid, CkArrayID cb_aid, int cb_ep, bool conserveMemory=true) 
 {
 #ifdef _PAIRCALC_DEBUG_ 
   CkPrintf("[PAIRCALC] [%d %d %d %d] inited\n", thisIndex.w, thisIndex.x, thisIndex.y, thisIndex.z);
 #endif 
-
+  this->conserveMemory=conserveMemory;
   this->symmetric = sym;
   this->grainSize = grainSize;
   this->S = s;
@@ -28,7 +28,7 @@ PairCalculator::PairCalculator(bool sym, int grainSize, int s, int blkSize,  int
   numRecd = 0;
   numExpected = grainSize;
 
-  kUnits=5;     // trial non streaming
+  kUnits=5;  //streaming unit only really used in NOGEMM, but could be used under other conditions
 
 #ifdef NOGEMM  
   kLeftOffset= new int[numExpected];
@@ -80,6 +80,7 @@ PairCalculator::pup(PUP::er &p)
   p|op2;
   p|fn1;
   p|fn2;
+  p|conserveMemory;
 #ifdef NOGEMM
   p|kRightCount;
   p|kLeftCount;
@@ -219,8 +220,11 @@ PairCalculator::calculatePairs_gemm(int size, complex *points, int sender, bool 
   /* To make this work, we transpose the first matrix (A). 
      In C++ it appears to be: 
    * (ydima X ydimb) = (ydima X xdima) X (xdimb X ydimb)
-   * Which would be wrong.
-   * We're using fortran BLAS, so the actual multiplication is: 
+
+   * Which would be wrong, this works because we're using fortran
+   * BLAS, which has a transposed perspective (column major), so the
+   * actual multiplication is:
+   *
    * (xdima X xdimb) = (xdima X ydima) X (ydimb X xdimb)
    *
    * Since xdima==xdimb==numExpected==grainSize this gives us the
@@ -691,6 +695,19 @@ PairCalculator::acceptResult(int size, double *matrix1, double *matrix2)
   if(symmetric && thisIndex.x != thisIndex.y){
       delete [] othernewData;
   }
+  if(conserveMemory)
+  {
+      // clear the right and left they'll get reallocated on the next pass
+
+      delete [] inDataLeft[0];
+      for (int i = 0; i < numExpected; i++)
+	inDataLeft[i] = NULL;
+      if(!symmetric || (symmetric&&thisIndex.x!=thisIndex.y)) {
+	delete [] inDataRight[0];
+	for (int i = 0; i < numExpected; i++)
+	  inDataRight[i] = NULL;
+      }
+    }
 }
 
 void 

@@ -5,7 +5,7 @@
 void createPairCalculator(bool sym, int s, int grainSize, int numZ, int* z, int op1, 
                           FuncType f1, int op2, FuncType f2, CkCallback cb, 
                           PairCalcID* pcid, int cb_ep, CkArrayID cb_aid, 
-                          int comlib_flag, CkGroupID *mapid, int flag_dp) {
+                          int comlib_flag, CkGroupID *mapid, int flag_dp, int conserveMemory) {
 
   //CkPrintf("create pair calculator %d, %d\n", s, grainSize);
 
@@ -40,7 +40,7 @@ void createPairCalculator(bool sym, int s, int grainSize, int numZ, int* z, int 
   ComlibInstanceHandle bcastInstance = CkGetComlibInstance();
   bcastInstance.setStrategy(bstrat);
 
-  pcid->Init(pairCalculatorProxy.ckGetArrayID(), pairCalcReducerProxy.ckGetGroupID(), grainSize, blkSize, s, sym, comlib_flag, bcastInstance, flag_dp);
+  pcid->Init(pairCalculatorProxy.ckGetArrayID(), pairCalcReducerProxy.ckGetGroupID(), grainSize, blkSize, s, sym, comlib_flag, bcastInstance, flag_dp, conserveMemory);
   
   
   if(mapid) {
@@ -128,6 +128,7 @@ void startPairCalcLeft(PairCalcID* pcid, int n, complex* ptr, int myS, int myZ){
   int S = pcid->S;
   int symmetric = pcid->Symmetric;
   bool flag_dp = pcid->isDoublePacked;
+  bool conserveMemory = pcid->conserveMemory;
 
   x = myZ;
   s1 = (myS/grainSize) * grainSize;
