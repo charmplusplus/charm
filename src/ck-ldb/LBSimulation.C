@@ -21,35 +21,37 @@ int LBSimulation::procsChanged = 0;          /// flag if the number of procs has
 
 LBSimulation::LBSimulation(int numPes_) : numPes(numPes_)
 {
-	peLoads = new double [numPes];
-	bgLoads = new double [numPes];
+	lbinfo.peLoads = new double [numPes];
+	lbinfo.bgLoads = new double [numPes];
 	for(int i = 0; i < numPes; i++)
-		peLoads[i] = bgLoads[i] = 0.0;
+		lbinfo.peLoads[i] = lbinfo.bgLoads[i] = 0.0;
 }
 
 LBSimulation::~LBSimulation()
 {
- 	delete [] peLoads;
- 	delete [] bgLoads;
+ 	delete [] lbinfo.peLoads;
+ 	delete [] lbinfo.bgLoads;
 }
 
 void LBSimulation::reset()
 {
   for(int i = 0; i < numPes; i++)
-    peLoads[i] = bgLoads[i] = 0.0;
+    lbinfo.peLoads[i] = lbinfo.bgLoads[i] = 0.0;
 }
 
 void LBSimulation::SetProcessorLoad(int pe, double load, double bgload)
 {
 	CkAssert(0 <= pe && pe < numPes);
-	peLoads[pe] = load;
-	bgLoads[pe] = bgload;
+	lbinfo.peLoads[pe] = load;
+	lbinfo.bgLoads[pe] = bgload;
 }
 
 void LBSimulation::PrintSimulationResults()
 {
   int i;
   double minLoad, maxLoad, sum, average;
+  double *peLoads = lbinfo.peLoads;
+  double *bgLoads = lbinfo.bgLoads;
   sum = .0;
   sum = minLoad = maxLoad = peLoads[0];
   for (i = 1; i < numPes; i++) {
@@ -65,18 +67,21 @@ void LBSimulation::PrintSimulationResults()
     CmiPrintf("\n");
   }
   CmiPrintf("Min : %f	Max : %f	Average: %f\n", minLoad, maxLoad, average);
-  CmiPrintf("MinObj : %f	MaxObj : %f\n", minObjLoad, maxObjLoad, average);
+  CmiPrintf("MinObj : %f	MaxObj : %f\n", lbinfo.minObjLoad, lbinfo.maxObjLoad, average);
 }
 
 void LBSimulation::PrintDifferences(LBSimulation *realSim, CentralLB::LDStats *stats)
 {
+  double *peLoads = lbinfo.peLoads;
+  double *realPeLoads = realSim->lbinfo.peLoads;
+
   // the number of procs during the simulation and the real execution must be checked by the caller!
   int i;
   // here to print the differences between the predicted (this) and the real (real)
   CmiPrintf("Differences between predicted and real balance:\n");
   CmiPrintf("PE   (Predicted Load) (Real Predicted)  (Difference)  (Real CPU)  (Prediction Error)\n");
   for(i = 0; i < numPes; ++i) {
-    CmiPrintf("%-4d %13f %16f %15f %12f %14f\n", i, peLoads[i], realSim->peLoads[i], peLoads[i]-realSim->peLoads[i],
-	      stats->procs[i].total_walltime-stats->procs[i].idletime, realSim->peLoads[i]-(stats->procs[i].total_walltime-stats->procs[i].idletime));
+    CmiPrintf("%-4d %13f %16f %15f %12f %14f\n", i, peLoads[i], realPeLoads[i], peLoads[i]-realPeLoads[i],
+	      stats->procs[i].total_walltime-stats->procs[i].idletime, realPeLoads[i]-(stats->procs[i].total_walltime-stats->procs[i].idletime));
   }
 }

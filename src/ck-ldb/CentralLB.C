@@ -24,9 +24,11 @@ int load_balancer_created;
 
 CreateLBFunc_Def(CentralLB, "CentralLB base class");
 
-static void getPredictedLoad(CentralLB::LDStats* stats, int count, 
-		             LBMigrateMsg *, double *peLoads, 
-			     double &, double &, int considerComm);
+void getLoadInfo(CentralLB::LDStats* stats, int count, 
+		             LBInfo &info, int considerComm);
+
+static void getPredictedLoadWithMsg(CentralLB::LDStats* stats, int count, 
+		             LBMigrateMsg *, LBInfo &info, int considerComm);
 
 /*
 void CreateCentralLB()
@@ -349,8 +351,8 @@ void CentralLB::LoadBalance()
 //  calculate predicted load
 //  very time consuming though, so only happen when debugging is on
   if (_lb_args.debug()) {
-      double minObjLoad, maxObjLoad;
-      getPredictedLoad(statsData, clients, migrateMsg, migrateMsg->expectedLoad, minObjLoad, maxObjLoad, 1);
+      LBInfo info(migrateMsg->expectedLoad, NULL);
+      getPredictedLoadWithMsg(statsData, clients, migrateMsg, info, 1);
   }
 
   //  CkPrintf("calling recv migration\n");
@@ -614,7 +616,7 @@ void CentralLB::work(LDStats* stats,int count)
     struct ProcStats &proc = stats->procs[pe];
 
     CkPrintf(
-      "Proc %d Sp %d Total time (wall,cpu) = %f %f Idle = %f Bg = %f %f\n",
+      "Proc %d Sp %d Total time (wall,cpu) = (%f %f) Idle = %f Bg = (%f %f)\n",
       pe,proc.pe_speed,proc.total_walltime,proc.total_cputime,
       proc.idletime,proc.bg_walltime,proc.bg_cputime);
   }
@@ -733,7 +735,7 @@ void CentralLB::simulationRead() {
     readStatsMsgs(simFileName);
     free(simFileName);
 
-    // allocate simResults (only the first step
+    // allocate simResults (only the first step)
     if (simResults == NULL) {
       simResults = new LBSimulation(LBSimulation::simProcs);
       realResults = new LBSimulation(LBSimulation::simProcs);
@@ -844,26 +846,35 @@ void CentralLB::writeStatsMsgs(const char* filename)
 
 // calculate the predicted wallclock/cpu load for every processors
 // considering communication overhead if considerComm is true
-static void getPredictedLoad(CentralLB::LDStats* stats, int count, 
-                             LBMigrateMsg *msg, double *peLoads, 
-                             double &minObjLoad, double &maxObjLoad,
-			     int considerComm)
+void getPredictedLoadWithMsg(CentralLB::LDStats* stats, int count, 
+                      LBMigrateMsg *msg, LBInfo &info, 
+		      int considerComm)
 {
 #if CMK_LBDB_ON
-        int i, pe;
-
-        minObjLoad = 1.0e20;	// I suppose no object load is beyond this
-	maxObjLoad = 0.0;
-
 	stats->makeCommHash();
 
  	// update to_proc according to migration msgs
-	for(i = 0; i < msg->n_moves; i++) {
+	for(int i = 0; i < msg->n_moves; i++) {
 	  MigrateInfo &mInfo = msg->moves[i];
 	  int idx = stats->getHash(mInfo.obj.objID(), mInfo.obj.omID());
 	  CmiAssert(idx != -1);
           stats->to_proc[idx] = mInfo.to_pe;
 	}
+
+	getLoadInfo(stats, count, info, considerComm);
+}
+
+
+void getLoadInfo(CentralLB::LDStats* stats, int count, 
+		             LBInfo &info, int considerComm)
+{
+	int i, pe;
+	double *peLoads = info.peLoads;
+        double minObjLoad = 1.0e20;  // I suppose no object load is beyond this
+	double maxObjLoad = 0.0;
+
+	CmiAssert(peLoads);
+	stats->makeCommHash();
 
 	for(pe = 0; pe < count; pe++)
     	  peLoads[pe] = stats->procs[pe].bg_walltime;
@@ -930,6 +941,14 @@ static void getPredictedLoad(CentralLB::LDStats* stats, int count,
 	  delete [] byteRecvCount;
 	  delete [] byteSentCount;
 	}
+
+        // get background load
+	if (info.bgLoads)
+    	  for(pe = 0; pe < count; pe++)
+    	   info.bgLoads[pe] = stats->procs[pe].bg_walltime;
+
+ 	info.minObjLoad = minObjLoad;
+ 	info.maxObjLoad = maxObjLoad;
 #endif
 }
 
@@ -937,13 +956,9 @@ void CentralLB::findSimResults(LDStats* stats, int count, LBMigrateMsg* msg, LBS
 {
     CkAssert(simResults != NULL && count == simResults->numPes);
     // estimate the new loads of the processors. As a first approximation, this is the
-    // get background load
-    for(int pe = 0; pe < count; pe++)
-    	  simResults->bgLoads[pe] = stats->procs[pe].bg_walltime;
     // sum of the cpu times of the objects on that processor
     double startT = CkWallTimer();
-    getPredictedLoad(stats, count, msg, simResults->peLoads, 
-		     simResults->minObjLoad, simResults->maxObjLoad,1);
+    getPredictedLoadWithMsg(stats, count, msg, simResults->lbinfo, 1);
     CmiPrintf("getPredictedLoad finished in %fs\n", CkWallTimer()-startT);
 }
 

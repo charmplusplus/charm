@@ -32,6 +32,16 @@ class LBSimulation;
 /// for backward compatibility
 typedef LBMigrateMsg  CLBMigrateMsg;
 
+class LBInfo
+{
+public:
+  double *peLoads; 
+  double *bgLoads; 
+  double minObjLoad, maxObjLoad;
+  LBInfo(): peLoads(NULL), bgLoads(NULL), minObjLoad(0.0), maxObjLoad(0.0) {}
+  LBInfo(double *p, double *bg): peLoads(p), bgLoads(bg), minObjLoad(0.0), maxObjLoad(0.0) {}
+};
+
 class CentralLB : public BaseLB
 {
 private:
@@ -286,6 +296,9 @@ public:
   ~CLBStatsMsg();
   void pup(PUP::er &p);
 }; 
+
+// compute load distribution info
+void getLoadInfo(CentralLB::LDStats* stats, int count, LBInfo &info, int considerComm);
 
 #endif /* CENTRALLB_H */
 

@@ -29,9 +29,7 @@ public:
   void PrintSimulationResults();
   void PrintDifferences(LBSimulation *realSim, CentralLB::LDStats *stats);
 private:
-  double* peLoads;
-  double* bgLoads;
-  double  minObjLoad, maxObjLoad;
+  LBInfo  lbinfo;
   int numPes;
   friend class CentralLB;   // so that we don't have to provide little get/put functions
 };
