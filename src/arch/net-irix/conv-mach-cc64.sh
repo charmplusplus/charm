@@ -1,0 +1,17 @@
+CMK_CPP_C='cc -64 -E '
+CMK_CC='cc  -w -64 '
+CMK_CC_RELIABLE='cc  -w -64 '
+CMK_CC_FASTEST='cc  -w -64 '
+CMK_CXX='CC -w -64 '
+CMK_CXXPP='CC -E -w -64 '
+
+CMK_CF90='f90 -64 '
+
+CMK_LD='cc -w -64 '
+CMK_LDXX='CC -w -64 '
+CMK_SEQ_CC='cc -w -64 '
+CMK_SEQ_LD='cc -w -64 '
+CMK_SEQ_CXX='CC -w -64 '
+CMK_SEQ_LDXX='CC -w -64 '
+CMK_F90LIBS='-L/usr/lib64 -lfortran -lftn'
+CMK_QT='origin'
