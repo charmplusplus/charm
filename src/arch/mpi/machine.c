@@ -118,6 +118,8 @@ static SMSG_LIST *end_sent=0;
 
 static int Cmi_dim;
 
+static int no_outstanding_sends=0; /*FLAG: consume outstanding Isends in scheduler loop*/
+
 #if NODE_0_IS_CONVHOST
 int inside_comm = 0;
 #endif
@@ -468,6 +470,12 @@ void *CmiGetNonLocal(void)
   CmiIdleLock_checkMessage(&cs->idle);
   msg =  PCQueuePop(cs->recv); 
 #if ! CMK_SMP
+  if (no_outstanding_sends) {
+    while (MsgQueueLen>0) {
+      CmiReleaseSentMessages();
+      PumpMsgs();
+    }
+  }
   if(!msg) {
     CmiReleaseSentMessages();
     if (PumpMsgs())
@@ -1004,6 +1012,14 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
   idleblock = CmiGetArgFlag(argv, "+idleblocking");
   if (idleblock && Cmi_mynode == 0) {
     CmiPrintf("Charm++: Running in idle blocking mode.\n");
+  }
+
+#if CMK_NO_OUTSTANDING_SENDS
+  no_outstanding_sends=1;
+#endif
+  if (CmiGetArgInt(argv,"+no_outstanding_sends",&no_outstanding_sends) && Cmi_mynode == 0) {
+     CmiPrintf("Charm++: Will%s consume outstanding sends in scheduler loop\n",
+     	no_outstanding_sends?"":" not");
   }
   Cmi_numpes = Cmi_numnodes * Cmi_mynodesize;
   Cmi_nodestart = Cmi_mynode * Cmi_mynodesize;
