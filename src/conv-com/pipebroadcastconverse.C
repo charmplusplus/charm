@@ -22,7 +22,7 @@ void PipeBroadcastConverse::commonInit(){
   seqNumber = 0;
 }
 
-extern void propagate_handler(void *);
+//extern void propagate_handler(void *);
 
 void propagate_handler_frag(void *message) {
   int instid = CmiGetXHandler(message);
