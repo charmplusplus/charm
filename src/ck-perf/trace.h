@@ -189,8 +189,8 @@ extern "C" {
 #define _TRACE_END_PACK() _TRACE_ONLY(CkpvAccess(_traces)->endPack())
 #define _TRACE_BEGIN_UNPACK() _TRACE_ONLY(CkpvAccess(_traces)->beginUnpack())
 #define _TRACE_END_UNPACK() _TRACE_ONLY(CkpvAccess(_traces)->endUnpack())
-#define _TRACE_BEGIN_COMPUTATION() _TRACE_ONLY(CkpvAccess(_traces)->beginComputation())
-#define _TRACE_END_COMPUTATION() _TRACE_ONLY(CkpvAccess(_traces)->endComputation())
+#define _TRACE_BEGIN_COMPUTATION() (CkpvAccess(_traces)->beginComputation())
+#define _TRACE_END_COMPUTATION() (CkpvAccess(_traces)->endComputation())
 #define _TRACE_ENQUEUE(env) _TRACE_ONLY(CkpvAccess(_traces)->enqueue(env))
 #define _TRACE_DEQUEUE(env) _TRACE_ONLY(CkpvAccess(_traces)->dequeue(env))
 
