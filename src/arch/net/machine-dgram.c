@@ -5,6 +5,14 @@
   Orion Sky Lawlor, olawlor@acm.org, 7/25/2001
 */
 
+/**
+  converse basic message header:
+  d0 d1 d2 d3:  DgramHeader
+  d4 d5:        msg length
+  hdl:          handler
+  xhdl:         extended handler
+*/
+
 #define DGRAM_HEADER_SIZE 8
 
 #define CmiMsgHeaderSetLength(msg, len) (((int*)(msg))[2] = (len))
