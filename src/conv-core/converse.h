@@ -8,6 +8,8 @@
 #ifndef CONVERSE_H
 #define CONVERSE_H
 
+#include <stdlib.h>
+
 #include "conv-config.h"
 
 /* Paste the tokens x and y together, without any space between them.
