@@ -82,7 +82,6 @@ CentralLB::CentralLB()
     statsMsgsList[i] = 0;
 
   statsData = new LDStats;
-  statsData->procs = new ProcStats[CkNumPes()];
 
   myspeed = theLbdb->ProcessorSpeed();
   theLbdb->CollectStatsOn();
@@ -104,6 +103,8 @@ CentralLB::CentralLB()
 CentralLB::~CentralLB()
 {
   CkPrintf("Going away\n");
+  delete [] statsMsgsList;
+  delete [] avail_vector;
   theLbdb->
     RemoveStartLBFn((LDStartLBFn)(staticStartLB));
 }

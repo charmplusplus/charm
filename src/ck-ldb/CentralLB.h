@@ -37,7 +37,7 @@ class CentralLB : public CBase_CentralLB
 {
 public:
   CentralLB();
-  ~CentralLB();
+  virtual ~CentralLB();
   CentralLB(CkMigrateMessage *m):CBase_CentralLB(m) {}
 
   int useDefCtor(void){ return 1; }
@@ -83,19 +83,19 @@ public:
     struct ProcStats  *procs;
     int count;
     
-    int n_objs;
+    int   n_objs;
     int   n_migrateobjs;
     LDObjData* objData;
-    int  *from_proc, *to_proc;
-    int n_comm;
+    int   n_comm;
     LDCommData* commData;
+    int  *from_proc, *to_proc;
 
     int *objHash; 
     int  hashSize;
 
     LDStats(): n_objs(0), n_migrateobjs(0), n_comm(0), 
                objData(NULL), commData(NULL), from_proc(NULL), to_proc(NULL), 
-               objHash(NULL) {}
+               objHash(NULL) {  procs = new ProcStats[CkNumPes()]; }
     void assign(int oid, int pe) { CmiAssert(procs[pe].available); to_proc[oid] = pe; }
       // build hash table
     void makeCommHash();
