@@ -26,11 +26,9 @@ void adapt3::Step()
   if ((POSE_endtime > POSE_UnsetTS) && (lastGVT + timeLeash > POSE_endtime))
     timeLeash = POSE_endtime - lastGVT;
   while ((ev->timestamp > POSE_UnsetTS) && 
-	 (ev->timestamp <= lastGVT + timeLeash) && 
-	 (iter < MAX_ITERATIONS)) { // do all events at & under timeLeash
+	 (ev->timestamp <= lastGVT + timeLeash)) { // do events w/in timeLeash
     currentEvent = ev;
     ev->done = 2;
-    //CkPrintf("About to do event "); ev->evID.dump(); CkPrintf("...\n");
     specEventCount++;
     eventCount++;
     parent->ResolveFn(ev->fnIdx, ev->msg); // execute it
@@ -59,13 +57,12 @@ void adapt3::Step()
   // Revise behavior for next run
   if (!rbFlag && (ev->timestamp > -1)) timeLeash = eq->largest - lastGVT;
   else if (!rbFlag && (timeLeash < avgTimeLeash)) timeLeash += LEASH_FLEX;
-  if (timeLeash > lastGVT) timeLeash = lastGVT;
   // Uh oh!  Too much speculation going on!  Pull in the leash...
-  if (specEventCount > (1.25*eventCount)) timeLeash = avgTimeLeash/2;
+  if (specEventCount > (1.1*eventCount)) timeLeash = 1;
   /*
   if (parent->thisIndex == RANDOM_OBJECT)
     CkPrintf("New leash=%d\n", timeLeash);
-  */  
+  */
   rbFlag = 0;
 }
 
