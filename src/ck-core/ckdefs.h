@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.3  1995-06-13 19:19:07  gursoy
+ * Revision 2.4  1995-06-14 20:18:55  gursoy
+ * *** empty log message ***
+ *
+ * Revision 2.3  1995/06/13  19:19:07  gursoy
  * CkAlloc and CkFree are added for backward compatibilty
  *
  * Revision 2.2  1995/06/13  14:33:55  gursoy
@@ -57,6 +60,13 @@
 #define BranchCall(x)		x
 #define PrivateCall(x)		x
 
+#ifdef CMK_COMPILER_LIKES_STATIC_PROTO
+#define PROTO_PUB_PRIV static
+#endif
+
+#ifdef CMK_COMPILER_HATES_STATIC_PROTO
+#define PROTO_PUB_PRIV 
+#endif
 
 #define _CK_Find		TblFind
 #define _CK_Delete		TblDelete
