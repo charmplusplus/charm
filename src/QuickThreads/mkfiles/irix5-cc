@@ -1,12 +1,13 @@
 
-CC=cc -32 -I. -O
+CC=cc -n32 -I. -O
+AS=as -n32
 
 all: qt stp testpgm
 
 qt:
 	ln -s md/mips.h qtmd.h
 	$(CC) -c -o qt.o qt.c
-	as -o qtmds.o md/mips-irix5.s
+	$(AS) -o qtmds.o md/mips-irix5.s
 	ar q libqt.a qt.o qtmds.o
 
 stp:
@@ -15,5 +16,5 @@ stp:
 
 testpgm:
 	$(CC) -c meas.c
-	as -o qtmdb.o md/mips_b.s
+	$(AS) -o qtmdb.o md/mips_b.s
 	$(CC) -o run meas.o qtmdb.o libstp.a libqt.a

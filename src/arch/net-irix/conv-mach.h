@@ -32,8 +32,8 @@
 
 #define CMK_MACHINE_NAME                                   "net-irix"
 
-#define CMK_MALLOC_USE_GNU_MALLOC                          1
-#define CMK_MALLOC_USE_OS_BUILTIN                          0
+#define CMK_MALLOC_USE_GNU_MALLOC                          0
+#define CMK_MALLOC_USE_OS_BUILTIN                          1
 
 #define CMK_MEMORY_PAGESIZE                                8192
 #define CMK_MEMORY_PROTECTABLE                             0
@@ -89,14 +89,14 @@
 #define CMK_TIMER_USE_SPECIAL                              0
 #define CMK_TIMER_USE_TIMES                                1
 
-#define CMK_TYPEDEF_INT2 unknown
-#define CMK_TYPEDEF_INT4 unknown
-#define CMK_TYPEDEF_INT8 unknown
-#define CMK_TYPEDEF_UINT2 unknown
-#define CMK_TYPEDEF_UINT4 unknown
-#define CMK_TYPEDEF_UINT8 unknown
-#define CMK_TYPEDEF_FLOAT4 unknown
-#define CMK_TYPEDEF_FLOAT8 unknown
+#define CMK_TYPEDEF_INT2 short
+#define CMK_TYPEDEF_INT4 int
+#define CMK_TYPEDEF_INT8 long
+#define CMK_TYPEDEF_UINT2 unsigned short
+#define CMK_TYPEDEF_UINT4 unsigned int
+#define CMK_TYPEDEF_UINT8 unsigned long
+#define CMK_TYPEDEF_FLOAT4 float
+#define CMK_TYPEDEF_FLOAT8 double
 
 
 #define CMK_VECTOR_SEND_USES_COMMON_CODE                   1

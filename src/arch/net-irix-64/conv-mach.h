@@ -2,10 +2,10 @@
 #define _CONV_MACH_H
 
 #define CMK_ASYNC_NOT_NEEDED                               0
-#define CMK_ASYNC_USE_FIOASYNC_AND_FIOSETOWN               1
+#define CMK_ASYNC_USE_FIOASYNC_AND_FIOSETOWN               0
 #define CMK_ASYNC_USE_FIOASYNC_AND_SIOCSPGRP               0
 #define CMK_ASYNC_USE_FIOSSAIOSTAT_AND_FIOSSAIOOWN         0
-#define CMK_ASYNC_USE_F_SETFL_AND_F_SETOWN                 0
+#define CMK_ASYNC_USE_F_SETFL_AND_F_SETOWN                 1
 
 #define CMK_CCS_AVAILABLE                                  1
 
@@ -22,8 +22,11 @@
 #define CMK_CSDEXITSCHEDULER_SET_CSDSTOPFLAG               1
 
 #define CMK_DEFAULT_MAIN_USES_COMMON_CODE                  1
+#define CMK_DEFAULT_MAIN_USES_SIMULATOR_CODE               0
 
 #define CMK_FIX_HP_CONNECT_BUG                             0
+
+#define CMK_GETPAGESIZE_AVAILABLE                          0
 
 #define CMK_IS_HETERO                                      1
 
@@ -92,14 +95,14 @@
 #define CMK_TIMER_USE_SPECIAL                              0
 #define CMK_TIMER_USE_TIMES                                1
 
-#define CMK_TYPEDEF_INT2 unknown
-#define CMK_TYPEDEF_INT4 unknown
-#define CMK_TYPEDEF_INT8 unknown
-#define CMK_TYPEDEF_UINT2 unknown
-#define CMK_TYPEDEF_UINT4 unknown
-#define CMK_TYPEDEF_UINT8 unknown
-#define CMK_TYPEDEF_FLOAT4 unknown
-#define CMK_TYPEDEF_FLOAT8 unknown
+#define CMK_TYPEDEF_INT2 short
+#define CMK_TYPEDEF_INT4 int
+#define CMK_TYPEDEF_INT8 long
+#define CMK_TYPEDEF_UINT2 unsigned short
+#define CMK_TYPEDEF_UINT4 unsigned int
+#define CMK_TYPEDEF_UINT8 unsigned long
+#define CMK_TYPEDEF_FLOAT4 float
+#define CMK_TYPEDEF_FLOAT8 double
 
 
 #define CMK_VECTOR_SEND_USES_COMMON_CODE                   1
