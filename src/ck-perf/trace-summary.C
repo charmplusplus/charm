@@ -291,7 +291,7 @@ void TraceSummary::beginExecute(envelope *e)
   }  
 }
 
-void TraceSummary::beginExecute(int event,int msgType,int ep,int srcPe)
+void TraceSummary::beginExecute(int event,int msgType,int ep,int srcPe, int mlen)
 {
   execEp=ep;
   double t = CmiWallTimer();

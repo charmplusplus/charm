@@ -41,8 +41,8 @@ class LogEntry {
     void operator delete(void *, void *) { }
 #endif
     LogEntry() {}
-    LogEntry(double tm, UChar t, UShort m=0, UShort e=0, int ev=0, int p=0) { 
-      type = t; mIdx = m; eIdx = e; event = ev; pe = p; time = tm;
+    LogEntry(double tm, UChar t, UShort m=0, UShort e=0, int ev=0, int p=0, int ml=0) { 
+      type = t; mIdx = m; eIdx = e; event = ev; pe = p; time = tm; msglen = ml;
     }
     double time;
     int event;
@@ -50,6 +50,7 @@ class LogEntry {
     UShort mIdx;
     UShort eIdx;
     UChar type; 
+    int msglen;
     void write(FILE *fp);
     void writeBinary(FILE *fp);
 };
@@ -71,7 +72,7 @@ class LogPool {
         pool[i].writeBinary(fp);
     }
     void writeSts(void);
-    void add(UChar type,UShort mIdx,UShort eIdx,double time,int event,int pe);
+    void add(UChar type,UShort mIdx,UShort eIdx,double time,int event,int pe, int ml=0);
 };
 
 class TraceProjections : public Trace {
@@ -86,7 +87,7 @@ class TraceProjections : public Trace {
     void userEvent(int e);
     void creation(envelope *e, int num=1);
     void beginExecute(envelope *e);
-    void beginExecute(int event,int msgType,int ep,int srcPe);
+    void beginExecute(int event,int msgType,int ep,int srcPe,int ml);
     void endExecute(void);
     void beginIdle(void);
     void endIdle(void);

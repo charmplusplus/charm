@@ -17,9 +17,13 @@ static int _numEvents = 0;
 static int warned = 0;
 static int _threadMsg, _threadChare, _threadEP;
 
+#ifdef CMK_OPTIMIZE
 #define OPTIMIZED_VERSION 	\
 	if (!warned) { warned=1; 	\
 	CmiPrintf("\n\n!!!! Warning: traceUserEvent not availbale in optimized version!!!!\n\n\n"); }
+#else
+#define OPTIMIZED_VERSION /*empty*/
+#endif
 
 /*
 On T3E, we need to have file number control by open/close files only when needed.
@@ -131,10 +135,10 @@ void LogPool::writeSts(void)
   fclose(sts);
 }
 
-void LogPool::add(UChar type,UShort mIdx,UShort eIdx,double time,int event,int pe) 
+void LogPool::add(UChar type,UShort mIdx,UShort eIdx,double time,int event,int pe, int ml) 
 {
   new (&pool[numEntries++])
-    LogEntry(time, type, mIdx, eIdx, event, pe);
+    LogEntry(time, type, mIdx, eIdx, event, pe, ml);
   if(poolSize==numEntries) {
     double writeTime = CkTimer();
     if(binary) writeBinary(); else write();
@@ -165,7 +169,7 @@ void LogEntry::write(FILE* fp)
     case CREATION:
     case BEGIN_PROCESSING:
     case END_PROCESSING:
-      fprintf(fp, "%d %d %u %d %d\n", mIdx, eIdx, (UInt) (time*1.0e6), event, pe);
+      fprintf(fp, "%d %d %u %d %d %d\n", mIdx, eIdx, (UInt) (time*1.0e6), event, pe, msglen);
       break;
 
     case ENQUEUE:
@@ -221,6 +225,7 @@ void LogEntry::writeBinary(FILE* fp)
       fwrite(&ttime,sizeof(UInt),1,fp);
       fwrite(&event,sizeof(int),1,fp);
       fwrite(&pe,sizeof(int),1,fp);
+      fwrite(&msglen,sizeof(int),1,fp);
       break;
 
     case ENQUEUE:
@@ -318,7 +323,7 @@ void TraceProjections::creation(envelope *e, int num)
     e->setEvent(curevent);
     for(int i=0; i<num; i++) {
       CpvAccess(_logPool)->add(CREATION,type,e->getEpIdx(),CmiWallTimer(),
-                               curevent+i,CmiMyPe());
+                               curevent+i,CmiMyPe(),e->getTotalsize());
     }
     curevent += num;
   }
@@ -332,16 +337,16 @@ void TraceProjections::beginExecute(envelope *e)
     CpvAccess(_logPool)->add(BEGIN_PROCESSING,ForChareMsg,_threadEP,CmiWallTimer(),
                              execEvent,CmiMyPe());
   } else {
-    beginExecute(e->getEvent(),e->getMsgtype(),e->getEpIdx(),e->getSrcPe());
+    beginExecute(e->getEvent(),e->getMsgtype(),e->getEpIdx(),e->getSrcPe(),e->getTotalsize());
   }
 }
-void TraceProjections::beginExecute(int event,int msgType,int ep,int srcPe)
+void TraceProjections::beginExecute(int event,int msgType,int ep,int srcPe, int mlen)
 {
   execEvent=event;
   execEp=ep;
   execPe=srcPe;
   CpvAccess(_logPool)->add(BEGIN_PROCESSING,msgType,ep,CmiWallTimer(),
-                             event,srcPe);
+                             event,srcPe, mlen);
 }
 
 void TraceProjections::endExecute(void)

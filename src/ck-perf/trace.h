@@ -23,7 +23,7 @@ class Trace {
     virtual void userEvent(int) {}
     virtual void creation(envelope *, int num=1) {}
     virtual void beginExecute(envelope *) {}
-    virtual void beginExecute(int event,int msgType,int ep,int srcPe) {}
+    virtual void beginExecute(int event,int msgType,int ep,int srcPe,int ml) {}
     virtual void endExecute(void) {}
     virtual void beginIdle(void) {}
     virtual void endIdle(void) {}
@@ -63,7 +63,7 @@ public:
     inline void userEvent(int e) { ALLDO(userEvent(e));}
     inline void creation(envelope *env, int num=1) { ALLDO(creation(env, num));}
     inline void beginExecute(envelope *env) {ALLDO(beginExecute(env));}
-    inline void beginExecute(int event,int msgType,int ep,int srcPe) {ALLDO(beginExecute(event, msgType, ep, srcPe));}
+    inline void beginExecute(int event,int msgType,int ep,int srcPe, int mlen) {ALLDO(beginExecute(event, msgType, ep, srcPe, mlen));}
     inline void endExecute(void) {ALLDO(endExecute());}
     inline void beginIdle(void) {ALLDO(beginIdle());}
     inline void endIdle(void) {ALLDO(endIdle());}
@@ -112,8 +112,8 @@ extern "C" {
 #define _TRACE_CREATION_1(env) _TRACE_ONLY(CpvAccess(_traces)->creation(env))
 #define _TRACE_CREATION_N(env, num) _TRACE_ONLY(CpvAccess(_traces)->creation(env, num))
 #define _TRACE_BEGIN_EXECUTE(env) _TRACE_ONLY(CpvAccess(_traces)->beginExecute(env))
-#define _TRACE_BEGIN_EXECUTE_DETAILED(evt,typ,ep,src) \
-	_TRACE_ONLY(CpvAccess(_traces)->beginExecute(evt,typ,ep,src))
+#define _TRACE_BEGIN_EXECUTE_DETAILED(evt,typ,ep,src,mlen) \
+	_TRACE_ONLY(CpvAccess(_traces)->beginExecute(evt,typ,ep,src,mlen))
 #define _TRACE_END_EXECUTE() _TRACE_ONLY(CpvAccess(_traces)->endExecute())
 #define _TRACE_BEGIN_IDLE() _TRACE_ONLY(CpvAccess(_traces)->beginIdle())
 #define _TRACE_END_IDLE() _TRACE_ONLY(CpvAccess(_traces)->endIdle())

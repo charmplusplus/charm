@@ -195,7 +195,7 @@ class TraceSummary : public Trace {
     void userEvent(int e);
     void creation(envelope *e, int num=1);
     void beginExecute(envelope *e);
-    void beginExecute(int event,int msgType,int ep,int srcPe);
+    void beginExecute(int event,int msgType,int ep,int srcPe, int mlen=0);
     void endExecute(void);
     void beginIdle(void);
     void endIdle(void);
