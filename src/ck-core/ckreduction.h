@@ -234,6 +234,8 @@ public:
 	// if it didn't come from a previous reduction function.
 	inline int isFromUser(void) const {return sourceFlag==-1;}
 
+	~CkReductionMsg();
+
 //Implementation-only fields (don't access these directly!)
 	//Msg runtime support
 	static void *alloc(int msgnum, size_t size, int *reqSize, int priobits);

@@ -455,23 +455,18 @@ void CkReductionMgr::finishReduction(void)
   }
   DEBR((AA"Reducing data... %d %d\n"AB,nContrib,(lcount+adj(redNo).lcount)));
   CkReductionMsg *result=reduceMessages();
+  result->redNo=redNo;
+  result->gcount+=gcount+adj(redNo).gcount;
+  result->secondaryCallback = result->callback;
+  result->callback = CkCallback(CkIndex_CkReductionMgr::ArrayReductionHandler(NULL),0,thisProxy);
 
   //CkPrintf("[%d] Got all local Messages in finishReduction %d in redNo %d\n",CkMyPe(),nContrib,redNo);
-
-  /* reduce the messages and then store the callback specified in the message ***/
-  CkReductionMsg *ret =CkReductionMsg::buildNew(result->getSize(),result->getData(),result->getReducer());
-  ret->redNo = redNo;
-  ret->userFlag= result->userFlag;
-  ret->sourceFlag = result->sourceFlag;
-  ret->gcount=result->gcount+gcount+adj(redNo).gcount;
-  ret->callback = CkCallback(CkIndex_CkReductionMgr::ArrayReductionHandler(NULL),0,thisProxy);
-  ret->secondaryCallback = result->callback;
 
 #if DEBUGRED
   CkPrintf("[%d,%d]Callback for redNo %d in group %d  mesggcount=%d localgcount=%d\n",CkMyNode(),CkMyPe(),redNo,thisgroup.idx,ret->gcount,gcount);
 #endif
     
-  nodeProxy[CkMyNode()].ckLocalBranch()->contributeArrayReduction(ret);
+  nodeProxy[CkMyNode()].ckLocalBranch()->contributeArrayReduction(result);
 
   //House Keeping Operations will have to check later what needs to be changed
   redNo++;
@@ -763,6 +758,7 @@ void CkReductionMgr :: endArrayReduction(){
 
 //ReductionMessage default private constructor-- does nothing
 CkReductionMsg::CkReductionMsg(){}
+CkReductionMsg::~CkReductionMsg(){}
 
 //This define gives the distance from the start of the CkReductionMsg
 // object to the start of the user data area (just below last object field)
@@ -776,7 +772,7 @@ CkReductionMsg *CkReductionMsg::buildNew(int NdataSize,const void *srcData,
   int len[1];
   len[0]=NdataSize;
   CkReductionMsg *ret = new(len,0)CkReductionMsg();
-
+  
   ret->dataSize=NdataSize;
   if (srcData!=NULL)
     memcpy(ret->data,srcData,NdataSize);
