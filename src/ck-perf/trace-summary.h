@@ -36,8 +36,8 @@ class LogEntry {
     LogEntry(double tm, UChar t, UShort m=0, UShort e=0, int ev=0, int p=0) { 
       type = t; mIdx = m; eIdx = e; event = ev; pe = p; time = tm;
     }
-    LogEntry(int idx, double t=0.0, int p=0) { 
-      index = idx; time = t; pe = p;
+    LogEntry(double t, int p=0) { 
+      time = t; pe = p;
     }
     double getTime() { return time; }
     void setTime(double t) { time = t; }
@@ -49,8 +49,6 @@ class LogEntry {
     UShort eIdx;
     UChar type; 
     void write(FILE *fp);
-
-    UInt  index;
 };
 
 class LogPool {
@@ -72,7 +70,7 @@ class LogPool {
       sprintf(pestr, "%d", CkMyPe());
       int len = strlen(pgm) + strlen(".log.") + strlen(pestr) + 1;
       char *fname = new char[len];
-      sprintf(fname, "%s.%s.log", pgm, pestr);
+      sprintf(fname, "%s.%s.sum", pgm, pestr);
       fp = fopen(fname, "w");
       delete[] fname;
       if(!fp)
@@ -104,9 +102,9 @@ class LogPool {
       }
     }
     // TODO
-    void add(int index, double time, int pe) {
+    void add(double time, int pe) {
       new (&pool[numEntries++])
-        LogEntry(index, time, pe);
+        LogEntry(time, pe);
       if(poolSize==numEntries) {
 /*
         write();
