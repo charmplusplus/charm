@@ -93,7 +93,7 @@ void multisend_moduleinit()
   CpvInitialize(int, multisend_replies);
   
   CpvAccess(multisend_index)=(int *)CmiAlloc(nMulti*sizeof(int));
-  for (int m=0;m<nMulti;m++) {
+  for (m=0;m<nMulti;m++) {
     multisend_info *i=(multisend_info *)CmiAlloc(sizeof(multisend_info));
     i->me=m;
     CpvAccess(multisend_index)[m]=CmiRegisterHandlerEx(

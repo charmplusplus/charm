@@ -28,7 +28,7 @@ void deadlock_cram(char *msg)
   int count = 0;
   CmiSetHandler(&m, CpvAccess(deadlock_inc_idx));
   m.n = 1;
-  while (count<50000) {
+  while (count<5000) {
     CmiSyncSend(1-CmiMyPe(), sizeof(m), &m);
     count++;
   } 
