@@ -23,6 +23,14 @@ then resume the thread when the results arrive.
 #include <limits.h>
 #include <float.h> /*for FLT_MIN on non-Suns*/
 
+/*STUPID HACK for AMPIlib: define its globals here.
+*/
+CkChareID ampimain::handle;
+ampi_comm_struct ampimain::ampi_comms[AMPI_MAX_COMM];
+int ampimain::ncomms = 0;
+
+
+
 CkChareID _mainhandle;
 CkArrayID _femaid;
 int _nchunks;
@@ -598,6 +606,7 @@ combine(const DType& dt, int op)
 /******************************* CHUNK *********************************/
 
 chunk::chunk(void)
+	:ampi(new AmpiStartMsg(0))
 {
   usesAtSync = CmiTrue;
   ntypes = 0;
@@ -1565,7 +1574,7 @@ void
 chunk::pup(PUP::er &p)
 {
 //Pup superclass
-  ArrayElement1D::pup(p);
+  ampi::pup(p);
 
   if(p.isDeleting())
   { //Resend saved messages to myself

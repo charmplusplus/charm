@@ -8,7 +8,10 @@ Orion Sky Lawlor, olawlor@acm.org, 9/28/00
 #define _FEM_IMPL_H
 
 #include <stdio.h>
+
+class collision{ }; //<- needed by parCollide.decl.h
 #include "fem.decl.h"
+#include "ampiimpl.h"
 #include "fem.h"
 
 extern CkChareID _mainhandle;
@@ -190,7 +193,7 @@ class ChunkMsg : public CMessage_ChunkMsg {
 #define MAXDT 20
 #define FEM_MAXUDATA 20
 
-class chunk : public ArrayElement1D
+class chunk : public ampi
 {
 //Stored_mesh keeps the initial mesh passed to run(), if any
 //  If this is non-NULL, all the mesh fields below point into it.
@@ -231,7 +234,7 @@ private:
   int doneCalled;
 
   chunk(void);
-  chunk(CkMigrateMessage *msg): ArrayElement1D(msg) {stored_mesh=NULL;}
+  chunk(CkMigrateMessage *msg): ampi(msg) {stored_mesh=NULL;}
   ~chunk();
   
   void serialSwitch(ChunkMsg *);
@@ -294,6 +297,7 @@ private:
   void thread_resume(void);  //Start thread running again
   void start_running(void)
   {
+    ampi::prepareCtv();
     thisArray->the_lbdb->ObjectStart(ldHandle);
   }
   void stop_running(void)

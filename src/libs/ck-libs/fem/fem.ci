@@ -1,4 +1,6 @@
 mainmodule fem {
+  extern module ampi;
+  extern module threadCollide;
   extern module MetisLB;
   readonly CkChareID _mainhandle;
   readonly CkArrayID _femaid;
