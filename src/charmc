@@ -122,10 +122,6 @@ while ($argindex <= $#argv)
             @ argindex = $argindex + 1
             breaksw
 
-        case "-purify"
-            set PURIFY = yes
-            breaksw
-
         case "-ld-option"
             set OPTS_LD=( $OPTS_LD $argv[$argindex] )
             @ argindex = $argindex + 1
@@ -422,42 +418,6 @@ end
 
 ##############################################################################
 #
-# Add module-init.TMP.o to OBJECTFILES if a MOD_LIST or MOD_FILE is specified.
-#
-##############################################################################
-
-if ( $?MOD_FILE ) then
-  if (! -e $MOD_FILE) then
-    echo 'No such module file '$MOD_FILE
-    goto failure
-  endif
-  if ( $?MOD_LIST ) then
-    echo 'You specified both -modules and -module_list, this is illegal.'
-    goto failure
-  endif
-  set MOD_LIST=(`cat $MOD_FILE`)
-endif
-
-if ( $?MOD_LIST ) then
-    rm -f module-init.TMP.c module-init.TMP.o
-    echo Modules: $MOD_LIST
-    echo " " > module-init.TMP.c
-    foreach i ( $MOD_LIST)
-      echo 'extern void _CK_'$i'_init();' >> module-init.TMP.c
-    end
-    echo '_CK_module_init_fn()' >> module-init.TMP.c
-      echo '{' >> module-init.TMP.c
-    foreach i ( $MOD_LIST)
-      echo '      _CK_'$i'_init();' >> module-init.TMP.c
-    end
-    echo '}' >> module-init.TMP.c
-    $CMK_CC $OPTS_CC -c module-init.TMP.c
-    if ($status) goto failure
-    set OBJECTFILES = ($OBJECTFILES module-init.TMP.o)
-endif
-
-##############################################################################
-#
 # Link-Step: there are three kinds of link-phases.
 #
 # 1. If $OBJECT is a ".a" file, a library is created from $OBJECTFILES.
@@ -510,10 +470,14 @@ endsw
 # Check for valid choice of QUEUE
 # Check for valid choice of BALANCE
 # Check for compatibility among BALANCE, QUEUE, and EXECMODE
+# Create module-init.TMP.o
+# Do the linkage.
 #
 ##############################################################################
 
 exelink:
+
+# Check for valid choice of EXECMODE
 
 if ($?EXECMODE == 0) set EXECMODE=notrace
 
@@ -529,14 +493,17 @@ else
    endif
 endif
 
+# Check for valid choice of QUEUE
+
 if ($?QUEUE == 0) set QUEUE=fifo
 
 if (! -e $CHARMLIB/libconv-qs-$QUEUE.a) then
-   echo "No queue strategy $QUEUE"
-   echo "current choices are:
+   echo "charmc: Unknown queueing strategy $QUEUE"
    (cd $CHARMLIB ; ls -al libconv-qs-*)
    goto failure
 endif
+
+# Check for valid choice of BALANCE
 
 if ($?BALANCE == 0) set BALANCE=rand
 
@@ -546,7 +513,7 @@ if (! -e $CHARMLIB/lib${LIBCLASS}-ldb-$BALANCE.a) then
    goto failure
 endif
 
-# Check that execmode is compatible with queue and balance
+# Check that EXECMODE is compatible with QUEUE and BALANCE
 
 if ($EXECMODE == replay) then
     if ($?QUEUE == 0) set QUEUE=replay
@@ -561,13 +528,51 @@ if ($EXECMODE == replay) then
     set BALANCE=replay
 endif
 
+# Check that BALANCE is compatible with QUEUE
+
 if ( $BALANCE == btok ) then
     if ( ($QUEUE != bfifo) && ($QUEUE != bstack) ) then
         echo "WARNING : btok strategy needs bfifo or bstack queueing strategy"
     endif
 endif
 
-echo "linking $OBJECT with -language $LANGUAGE"
+# Create module-init.TMP.o, if needed.
+
+if ( $?MOD_FILE ) then
+  if (! -e $MOD_FILE) then
+    echo 'No such module file '$MOD_FILE
+    goto failure
+  endif
+  if ( $?MOD_LIST ) then
+    echo 'You specified both -modules and -module_list, this is illegal.'
+    goto failure
+  endif
+  set MOD_LIST=(`cat $MOD_FILE`)
+endif
+
+if (( $?MOD_LIST == 0) && (-e module.list)) then
+    set MOD_LIST=(`cat module.list`)
+endif
+
+if ( $?MOD_LIST ) then
+    rm -f module-init.TMP.c module-init.TMP.o
+    echo Modules: $MOD_LIST
+    echo " " > module-init.TMP.c
+    foreach i ( $MOD_LIST)
+      echo 'extern void _CK_'$i'_init();' >> module-init.TMP.c
+    end
+    echo '_CK_module_init_fn()' >> module-init.TMP.c
+      echo '{' >> module-init.TMP.c
+    foreach i ( $MOD_LIST)
+      echo '      _CK_'$i'_init();' >> module-init.TMP.c
+    end
+    echo '}' >> module-init.TMP.c
+    $CMK_CC $OPTS_CC -c module-init.TMP.c
+    if ($status) goto failure
+    set OBJECTFILES = ($OBJECTFILES module-init.TMP.o)
+endif
+
+# Identify the libraries to use
 
 set LIBRARIES = ($LIBRARIES \
 	-l${LIBCLASS}-core-$EXECMODE \
@@ -582,6 +587,10 @@ if ($?MAINOBJ) then
 else
    set LIBRARIES=(-l${LIBCLASS}-defmain $LIBRARIES)
 endif
+
+# Perform the Linkage
+
+echo "linking $OBJECT with -language $LANGUAGE"
 
 if ($?VERBOSE) echo "$LOADER $OPTS_LD -o $OBJECT $OBJECTFILES -L$CHARMLIB $LIBRARIES"
 $LOADER $OPTS_LD -o $OBJECT $OBJECTFILES -L$CHARMLIB $LIBRARIES
