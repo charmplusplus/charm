@@ -423,6 +423,21 @@ static stats::op_t op_deposit_views=stats::count_op("deposit.views","CkView coun
 static stats::op_t op_deposit_bytes=stats::count_op("deposit.bytes","CkView sizes","bytes");
 static stats::op_t op_deposit_pixels=stats::count_op("deposit.pixels","CkView pixels","pixels");
 
+
+/// Destination to write incoming views to, or 0 if none (the normal case).
+CkpvStaticDeclare(FILE *,LV3D_save_views);
+static double LV3D_save_viewStart=0; ///< Time at view start
+static stats::op_t op_save=stats::time_op("save.time","Time spent saving views to disk");
+static void LV3D_save_view(LV3D0_ViewMsg *v) {
+	stats::op_sentry stats_sentry(op_save);
+	double t=CkWallTimer()-LV3D_save_viewStart;
+	FILE *f=CkpvAccess(LV3D_save_views);
+	if (1!=fwrite(&t,sizeof(t),1,f)) CmiAbort("Can't write to saved view file!\n");
+	if (1!=fwrite(v->view,v->view_size,1,f)) CmiAbort("Can't write to saved view file!\n");
+	delete v;
+}
+
+
 /**
   Send this view back to this client.
   You must set the view's id and prio fields.
@@ -432,6 +447,7 @@ void LV3D0_Deposit(CkView *v,int clientID) {
 	s->add(1.0,op_deposit_views);
 	s->add(v->pixels,op_deposit_pixels);
 	LV3D0_ViewMsg *vm=LV3D0_ViewMsg::new_(v);
+	if (CkpvAccess(LV3D_save_views)) {LV3D_save_view(vm); return;}
 	s->add(vm->view_size,op_deposit_bytes);
 	if (LV3D_disable_ship) {delete vm; return;}
 	vm->clientID=clientID;
@@ -515,6 +531,7 @@ public:
 		s->add(1.0,op_pes);
 		startTime=stats::time();
 		stats::swap(op_unknown);
+		LV3D_save_viewStart=CkWallTimer(); //< HACK!
 	}
 	void collect(void) { /* contribute current stats to reduction */
 		stats::stats *s=stats::get();
@@ -524,6 +541,10 @@ public:
 		contribute(sizeof(double)*stats::op_len,&s->t[0],CkReduction::sum_double,
 			CkCallback(printStats));
 		zero();
+		if (CkpvAccess(LV3D_save_views)) {
+			fclose(CkpvAccess(LV3D_save_views));
+			CkpvAccess(LV3D_save_views)=0;
+		}
 	}
 	void traceOn(void) {
 		traceBegin();
@@ -753,6 +774,16 @@ void LV3D0_Init(LV3D_Universe *clientUniverse,LV3D_ServerMgr *mgr)
  Per-processor initialization routine:
 */
 void LV3D0_ProcInit(void) {
+	CkpvInitialize(FILE *,LV3D_save_views);
+	CkpvAccess(LV3D_save_views)=0;
+	char *fNamePat=0;
+	if (CmiGetArgStringDesc(CkGetArgv(),"+LV3D_save_views",&fNamePat,"Save rendered views to a file with this pattern.  Use like '/tmp/foo.%d.peviews'")) {
+		char fName[1024];
+		sprintf(fName,fNamePat,CkMyPe());
+		FILE *f=fopen(fName,"wb");
+		if (f==NULL) CmiAbort("Couldn't create save view file!\n");
+		CkpvAccess(LV3D_save_views)=f;
+	}
 	LV3D0_toMaster_bytesPer=LV3D0_toMaster_bytesPer/CkNumPes();
 	LV3D0_toMaster_bytesMax=LV3D0_toMaster_bytesMax/CkNumPes();
 }
