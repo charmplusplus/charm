@@ -276,7 +276,7 @@ void CkPupNodeGroupData(PUP::er &p)
 // handle chare array elements for this processor
 void CkPupArrayElementsData(PUP::er &p)
 {
-	int i;
+ 	int i;
 	// safe in both packing/unpakcing at this stage
         int numGroups = CkpvAccess(_groupIDTable)->size();
 
@@ -308,7 +308,7 @@ void CkPupArrayElementsData(PUP::er &p)
 	  }
 	}
 	// finish up
-        for(int i=0;i<numGroups;i++) {
+        for(i=0;i<numGroups;i++) {
                 IrrGroup *obj = CkpvAccess(_groupTable)->find((*CkpvAccess(_groupIDTable))[i]).getObj();
 	  	obj->ckJustMigrated();
 	}
