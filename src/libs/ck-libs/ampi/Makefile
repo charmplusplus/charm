@@ -11,7 +11,7 @@ LIB=libmoduleampi
 LIBDIR=$(CDIR)/lib
 DEST=$(LIBDIR)/$(LIB).a
 DESTF=$(LIBDIR)/$(LIB)f.a
-COMPATLIB=$(LIBDIR)/libmoduleampi-compat.a
+COMPATLIB=$(LIBDIR)/libampi-compat.a
 
 all: AMPI AMPIF $(COMPATLIB)
 

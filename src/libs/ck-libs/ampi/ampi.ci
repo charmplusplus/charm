@@ -4,7 +4,7 @@ module ampi {
   
   message AmpiMsg;
  
-  initcall void ampiNodeInit(void);
+  initnode void ampiNodeInit(void);
   readonly mpi_comm_worlds mpi_worlds;
   readonly int mpi_nworlds;
 
