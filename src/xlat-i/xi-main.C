@@ -37,7 +37,7 @@ public:
       val = "";
     }
   }
-  char *match(char *k) { if (!strcmp(k, key)) return val; }
+  char *match(char *k) { if (!strcmp(k, key)) return val; return NULL; }
 };
 
 static TList<MacroDefinition *> macros;
