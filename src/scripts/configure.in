@@ -432,25 +432,25 @@ if test -r conftest.o
 then
   AC_CACHE_VAL(fortran_postfix,
 
-  NAME=`nm conftest.o | grep "foo_foo__"`
+  NAME=`$CMK_NM conftest.o | grep "foo_foo__"`
   if test "$NAME" != ""
   then
     fortran_postfix=TWOSCORE
     AC_DEFINE_UNQUOTED(CMK_FORTRAN_USES_TWOSCORE, 1)
   else
-    NAME=`nm conftest.o | grep "foo_foo_"`
+    NAME=`$CMK_NM conftest.o | grep "foo_foo_"`
     if test "$NAME" != ""
     then
       fortran_postfix=ONESCORE
       AC_DEFINE_UNQUOTED(CMK_FORTRAN_USES_ONESCORE, 1)
     else
-      NAME=`nm conftest.o | grep "foo_foo"`
+      NAME=`$CMK_NM conftest.o | grep "foo_foo"`
       if test "$NAME" != ""
       then
         fortran_postfix=NOSCORE
         AC_DEFINE_UNQUOTED(CMK_FORTRAN_USES_NOSCORE, 1)
       else
-        NAME=`nm conftest.o | grep "FOO_FOO"`
+        NAME=`$CMK_NM conftest.o | grep "FOO_FOO"`
         if test "$NAME" != ""
         then
           fortran_postfix=ALLCAPS
@@ -466,6 +466,8 @@ then
   rm -f conftest.f conftest.o
   )
   AC_MSG_RESULT($fortran_postfix)
+else
+  AC_MSG_RESULT("Fortran compiler not working")
 fi
 
 

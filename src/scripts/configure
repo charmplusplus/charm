@@ -1039,7 +1039,7 @@ then
   if eval "test \"`echo '$''{'fortran_postfix'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
 else
-  NAME=`nm conftest.o | grep "foo_foo__"`
+  NAME=`$CMK_NM conftest.o | grep "foo_foo__"`
   if test "$NAME" != ""
   then
     fortran_postfix=TWOSCORE
@@ -1048,7 +1048,7 @@ else
 EOF
 
   else
-    NAME=`nm conftest.o | grep "foo_foo_"`
+    NAME=`$CMK_NM conftest.o | grep "foo_foo_"`
     if test "$NAME" != ""
     then
       fortran_postfix=ONESCORE
@@ -1057,7 +1057,7 @@ EOF
 EOF
 
     else
-      NAME=`nm conftest.o | grep "foo_foo"`
+      NAME=`$CMK_NM conftest.o | grep "foo_foo"`
       if test "$NAME" != ""
       then
         fortran_postfix=NOSCORE
@@ -1066,7 +1066,7 @@ EOF
 EOF
 
       else
-        NAME=`nm conftest.o | grep "FOO_FOO"`
+        NAME=`$CMK_NM conftest.o | grep "FOO_FOO"`
         if test "$NAME" != ""
         then
           fortran_postfix=ALLCAPS
@@ -1087,6 +1087,8 @@ EOF
 fi
 
   echo "$ac_t""$fortran_postfix" 1>&6
+else
+  echo "$ac_t"""Fortran compiler not working"" 1>&6
 fi
 
 
@@ -1100,7 +1102,7 @@ case $version in
     # Extract the first word of "wget", so it can be a program name with args.
 set dummy wget; ac_word=$2
 echo $ac_n "checking for $ac_word""... $ac_c" 1>&6
-echo "configure:1104: checking for $ac_word" >&5
+echo "configure:1106: checking for $ac_word" >&5
 if eval "test \"`echo '$''{'ac_cv_prog_WGET'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
 else
@@ -1129,7 +1131,7 @@ fi
     # Extract the first word of "lynx", so it can be a program name with args.
 set dummy lynx; ac_word=$2
 echo $ac_n "checking for $ac_word""... $ac_c" 1>&6
-echo "configure:1133: checking for $ac_word" >&5
+echo "configure:1135: checking for $ac_word" >&5
 if eval "test \"`echo '$''{'ac_cv_prog_LYNX'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
 else
@@ -1158,7 +1160,7 @@ fi
     # Extract the first word of "telnet", so it can be a program name with args.
 set dummy telnet; ac_word=$2
 echo $ac_n "checking for $ac_word""... $ac_c" 1>&6
-echo "configure:1162: checking for $ac_word" >&5
+echo "configure:1164: checking for $ac_word" >&5
 if eval "test \"`echo '$''{'ac_cv_prog_TELNET'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
 else
@@ -1187,7 +1189,7 @@ fi
     # Extract the first word of "uudecode", so it can be a program name with args.
 set dummy uudecode; ac_word=$2
 echo $ac_n "checking for $ac_word""... $ac_c" 1>&6
-echo "configure:1191: checking for $ac_word" >&5
+echo "configure:1193: checking for $ac_word" >&5
 if eval "test \"`echo '$''{'ac_cv_prog_UUDECODE'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
 else

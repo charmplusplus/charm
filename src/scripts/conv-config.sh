@@ -38,6 +38,7 @@ CMK_LD_SHARED="-shared"
 [ -z "$CMK_QT" ] && CMK_QT='generic'
 [ -z "$CMK_LD" ] && CMK_LD="$CMK_CC"
 [ -z "$CMK_LDXX" ] && CMK_LDXX="$CMK_CXX"
+[ -z "$CMK_NM" ] && CMK_NM='nm '
 
 [ -z "$CMK_CF90_FIXED" ] && CMK_CF90_FIXED="$CMK_CF90"
 [ -z "$CMK_CC_RELIABLE" ] && CMK_CC_RELIABLE="$CMK_CC"
