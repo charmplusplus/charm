@@ -46,7 +46,8 @@ void* CkAllocBuffer(void *msg, int bufsize)
 extern "C"
 void  CkFreeMsg(void *msg)
 {
-  CmiFree(UsrToEnv(msg));
+  if (msg!=NULL)
+	CmiFree(UsrToEnv(msg));
 }
 
 // cannot simply copy all fields because srcMsg could be varsize msg
