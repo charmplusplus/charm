@@ -5,7 +5,8 @@ CHARMC=$(CHARMDIR)/bin/charmc $(OPTS)
 OBJS=cst_nl.o pgm.o 
 OBJS1=cst_nl.o pgm-coarsen.o
 
-DEST=$(CHARMDIR)/lib/libmodulerefine.a
+LIB=libmodulerefine
+DEST=$(CHARMDIR)/lib/$(LIB).a
 LOBJS=ref.o edge.o element.o tri.o refine.o femrefine.o
 HEADERS=refine.h refinef.h femrefine.h femrefinef.h
 
@@ -27,7 +28,7 @@ cst_nl.o: cst_nl.C pgm.h
 	$(CHARMC) -c cst_nl.C
 
 $(DEST): $(LOBJS) $(HEADERS)
-	$(AR) cr $@ $(LOBJS)
+	$(CHARMC) $(LOBJS) -o $@
 	cp $(HEADERS) $(CHARMDIR)/include/
 
 refine.o: refine.C refine.h tri.h
