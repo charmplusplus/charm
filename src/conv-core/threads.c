@@ -111,6 +111,10 @@
 #include "conv-trace.h"
 #include <sys/types.h>
 
+#ifndef CMK_STACKSIZE_DEFAULT
+#define CMK_STACKSIZE_DEFAULT 32768
+#endif
+
 #if ! CMK_THREADS_BUILD_DEFAULT
 #undef CMK_THREADS_USE_JCONTEXT
 #undef CMK_THREADS_USE_CONTEXT
@@ -414,7 +418,7 @@ static void CthBaseInit(char **argv)
   CpvAccess(_numSwitches) = 0;
 
   CthCpvInitialize(int,  _defaultStackSize);
-  CthCpvAccess(_defaultStackSize)=32768;
+  CthCpvAccess(_defaultStackSize)=CMK_STACKSIZE_DEFAULT;
   CmiGetArgIntDesc(argv,"+stacksize",&CthCpvAccess(_defaultStackSize),
   	"Default user-level thread stack size");  
   
