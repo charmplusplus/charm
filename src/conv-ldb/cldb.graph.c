@@ -3,13 +3,18 @@
 #define PERIODE 100
 #define THRESHOLD 20.0
 
+char *CldGetStrategy(void)
+{
+  return "graph";
+}
+
 CpvDeclare(int, CldRecycle);
 CpvDeclare(int, CldLoadResponseHandlerIndex);
 CpvDeclare(int, CldRequestResponseHandlerIndex);
 
 int CldAvgNeighborLoad()
 {
-  int sum=CsdLength(), i;
+  int sum=CldEstimate(), i;
   
   for (i=0; i<CpvAccess(numNeighbors); i++)
     sum += CpvAccess(neighbors)[i].load;
@@ -21,7 +26,7 @@ void CldSendLoad()
   loadmsg msg;
 
   msg.pe = CmiMyPe();
-  msg.load = CsdLength();
+  msg.load = CldEstimate();
   CmiSetHandler(&msg, CpvAccess(CldLoadResponseHandlerIndex));
   CmiSyncMulticast(CpvAccess(neighborGroup), sizeof(loadmsg), &msg);
   CpvAccess(CldLoadBalanceMessages) += CpvAccess(numNeighbors);
@@ -90,7 +95,7 @@ void CldBalance()
   int totalUnderAvg=0, numUnderAvg=0, maxUnderAvg=0;
 
   avgLoad = CldAvgNeighborLoad();
-  overload = CsdLength() - avgLoad;
+  overload = CldEstimate() - avgLoad;
   if (overload > CldCountTokens())
     overload = CldCountTokens();
   

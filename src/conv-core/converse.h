@@ -888,8 +888,13 @@ typedef void (*CldInfoFn)(void *msg,
                           int *priobits, 
                           unsigned int **prioptr);
 
+typedef int (*CldEstimator)(void);
+
 int CldRegisterInfoFn(CldInfoFn fn);
 int CldRegisterPackFn(CldPackFn fn);
+void CldRegisterEstimator(CldEstimator fn);
+int CldEstimate(void);
+char *CldGetStrategy(void);
 
 void CldEnqueue(int pe, void *msg, int infofn);
 

@@ -1,5 +1,10 @@
 #include "converse.h"
 
+char *CldGetStrategy(void)
+{
+  return "rand";
+}
+
 CpvDeclare(int, CldRelocatedMessages);
 CpvDeclare(int, CldLoadBalanceMessages);
 CpvDeclare(int, CldMessageChunks);

@@ -14,6 +14,32 @@
  * CldCountTokens tells you how many tokens are currently retreivable.
  */
 
+typedef struct {
+  int count;
+  CldEstimator fns[16];
+} CldEstimatorTable;
+ 
+CpvStaticDeclare(CldEstimatorTable, _estfns);
+
+void CldRegisterEstimator(CldEstimator fn)
+{
+  CpvAccess(_estfns).fns[CpvAccess(_estfns).count++] = fn;
+}
+
+int CldEstimate(void)
+{
+  CldEstimatorTable *estab = &(CpvAccess(_estfns));
+  int i, load=0;
+  for(i=0; i<estab->count; i++)
+    load += (*(estab->fns[i]))();
+  return load;
+}
+
+static int CsdEstimator(void)
+{
+  return CsdLength();
+}
+
 int CldRegisterInfoFn(CldInfoFn fn)
 {
   return CmiRegisterHandler((CmiHandler)fn);
@@ -116,6 +142,9 @@ void CldModuleGeneralInit()
   CldProcInfo proc;
 
   CpvInitialize(CldProcInfo, CldProc);
+  CpvInitialize(CldEstimatorTable, _estfns);
+  CpvAccess(_estfns).count = 0;
+  CldRegisterEstimator(CsdEstimator);
   CpvAccess(CldProc) = (CldProcInfo)CmiAlloc(sizeof(struct CldProcInfo_s));
   proc = CpvAccess(CldProc);
   proc->load = 0;

@@ -1,6 +1,11 @@
 #include "converse.h"
 #include <math.h>
 
+char *CldGetStrategy(void)
+{
+  return "spray";
+}
+
 #define CYCLE_MILLISECONDS 500
 #define DEBUGGING_OUTPUT 0
 
@@ -36,7 +41,7 @@ void CldPropagateLoad(double load);
 
 void CldInitiateReduction()
 {
-  double load = CsdLength();
+  double load = CldEstimate();
   peinfo *pinf = &(CpvAccess(peinf));
   pinf->load_reported = load;
   CldPropagateLoad(load);
@@ -71,14 +76,14 @@ void CldReduceHandler(struct loadmsg *msg)
 void CldAverageHandler(struct loadmsg *msg)
 {
   peinfo *pinf = &(CpvAccess(peinf));
-  double load = CsdLength();
+  double load = CldEstimate();
   double average = (msg->load_total / CmiNumPes());
   int rebalance;
   if (load < (average+10) * 1.2) rebalance=0;
   else rebalance = (load - average);
   if (DEBUGGING_OUTPUT)
     CmiPrintf("PE %d load=%6d average=%6d rebalance=%d\n", 
-	      CmiMyPe(), CsdLength(), (int)average, rebalance);
+	      CmiMyPe(), CldEstimate(), (int)average, rebalance);
   pinf->rebalance = rebalance;
   CcdCallFnAfter((CcdVoidFn)CldInitiateReduction, 0, CYCLE_MILLISECONDS);
 }

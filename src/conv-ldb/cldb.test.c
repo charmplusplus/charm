@@ -3,6 +3,11 @@
 #define PERIOD 100
 #define MAXMSGBFRSIZE 100000
 
+char *CldGetStrategy(void)
+{
+  return "test";
+}
+
 CpvDeclare(int, CldHandlerIndex);
 CpvDeclare(int, CldBalanceHandlerIndex);
 CpvDeclare(int, CldRelocatedMessages);
@@ -71,7 +76,7 @@ void CldDistributeTokens()
   int destPe = (CmiMyPe()+1)%CmiNumPes();
   int numToSend;
 
-  numToSend = CsdLength() / 2;
+  numToSend = CldEstimate() / 2;
   if (numToSend > CldCountTokens())
     numToSend = CldCountTokens() / 2;
 
