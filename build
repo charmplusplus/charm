@@ -9,13 +9,14 @@ syntax() {
   echo ''
   echo 'Usage: build <target> <version> <options> [charmc-options ...]'
   echo ''
-  echo '<targets>: converse charm++ LIBS AMPI bluegene pose'
+  echo '<targets>: converse charm++ LIBS AMPI FEM bluegene pose'
   echo '<targets>: doc ps-doc pdf-doc html-doc'
   if test $more = 1
   then
   echo ''
   echo '  charm++         compile Charm++ core only'
-  echo '  AMPI            compile Adaptive MPI'
+  echo '  AMPI            compile Adaptive MPI on top of Charm++'
+  echo '  FEM             compile FEM framework'
   echo '  LIBS            compile additional parallel libraries with Charm++ core'
   echo '  bluegene        build additional BigSim libraries'
   echo '  pose            build POSE parallel discrete event simulator'
