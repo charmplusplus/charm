@@ -289,7 +289,7 @@ void GenerateStructsFns(ofstream& top, ofstream& bot)
       bot << "\tm->unpack(in) ;\n}" << endl ;
     } else {
       bot << "\t(*out) = (void *) in ;" << endl ;
-      sprintf(str,"\t((%s *)out)->unpack(in) ;\n}\n",m->name);
+      sprintf(str,"\t((%s *)(*out))->unpack(in) ;\n}\n",m->name);
       bot << str;
     }
   }
