@@ -895,24 +895,24 @@ add_slots(slotset *ss, int sslot, int nslots)
 static void
 grab_slots(slotset *ss, int sslot, int nslots)
 {
-  int pos;
+  int pos, eslot, e;
+  eslot = sslot + nslots;
   for (pos=0; pos < (ss->maxbuf); pos++)
   {
     if (ss->buf[pos].nslots == 0)
       continue;
-    if(sslot >= ss->buf[pos].startslot && nslots <= ss->buf[pos].nslots)
+    e = ss->buf[pos].startslot + ss->buf[pos].nslots;
+    if(sslot >= ss->buf[pos].startslot && eslot <= e)
     {
       int old_nslots;
       old_nslots = ss->buf[pos].nslots;
       ss->buf[pos].nslots = sslot - ss->buf[pos].startslot;
-      ss->emptyslots -= nslots;
+      ss->emptyslots -= (old_nslots - ss->buf[pos].nslots);
       add_slots(ss, sslot + nslots, old_nslots - ss->buf[pos].nslots - nslots);
       return;
     }
   }
-  /*
   CmiAbort("requested a non-existent slotblock\n");
-  */
 }
 
 /*
@@ -960,6 +960,18 @@ delete_slotset(slotset* ss)
 {
   free(ss->buf);
   free(ss);
+}
+
+static void
+print_slots(slotset *ss)
+{
+  int i;
+  CmiPrintf("[%d] maxbuf = %d\n", CmiMyPe(), ss->maxbuf);
+  CmiPrintf("[%d] emptyslots = %d\n", CmiMyPe(), ss->emptyslots);
+  for(i=0;i<ss->maxbuf;i++) {
+    if(ss->buf[i].nslots)
+      CmiPrintf("[%d] (%d, %d) \n", CmiMyPe(), ss->buf[i].startslot, ss->buf[i].nslots);
+  }
 }
 
 /*
@@ -1143,7 +1155,7 @@ map_slots(int slot, int nslots)
   pa = mmap((void*) addr, sz*nslots, 
             PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_FIXED,
             CpvAccess(zerofd), 0);
-  if(pa == (void*)(-1))
+  if((pa==((void*)(-1))) || (pa != (void*)addr))
     CmiAbort("mmap call failed to allocate requested memory.\n");
   return pa;
 }
@@ -1328,7 +1340,6 @@ CthStackCreate(CthThread t, CthVoidFn fn, void *arg, int slotnum, int nslots)
   int size = CpvAccess(_stksize);
   t->slotnum = slotnum;
   t->nslots = nslots;
-  grab_slots(CpvAccess(myss), slotnum, nslots);
   stack = (qt_t*) map_slots(slotnum, nslots);
   _MEMCHECK(stack);
   stackbase = QT_SP(stack, size);
@@ -1364,6 +1375,8 @@ CthVoidFn fn; void *arg; int size;
   }
   else
   {
+    grab_slots(CpvAccess(myss), slotnum, nslots);
+    print_slots(CpvAccess(myss));
     CthStackCreate(result, fn, arg, slotnum, nslots);
   }
   return result;
@@ -1478,23 +1491,23 @@ CthThread CthPup(pup_er p, CthThread t)
     _MEMCHECK(stack);
     if(stack != t->stack)
       CmiAbort("Stack pointers do not match after migration!!\n");  
-    grab_slots(CpvAccess(myss), t->slotnum, t->nslots);
-#if 0
     if(homePe == CmiMyPe())
     {
+      CmiPrintf("[%d] grabbing (%d, %d)\n", CmiMyPe(), t->slotnum, t->nslots);
       grab_slots(CpvAccess(myss), t->slotnum, t->nslots);
+      print_slots(CpvAccess(myss));
     } else {
       slotmsg *msg = (slotmsg*) CmiAlloc(sizeof(slotmsg));
+      _MEMCHECK(msg);
       msg->pe = CmiMyPe();
       msg->slot = t->slotnum;
       t->slotnum = (-2);
       msg->nslots = t->nslots;
       msg->t = t;
-      CmiPrintf("[%d] Sending request to %d\n", CmiMyPe(), homePe);
+      CmiPrintf("[%d] Sending request to %d for (%d,%d)\n", CmiMyPe(), homePe, msg->slot, msg->nslots);
       CmiSetHandler(msg, CpvAccess(reqSpecHdlr));
       CmiSyncSendAndFree(homePe, sizeof(slotmsg), msg);
     }
-#endif
   }
   pup_bytes(p, (void*)t->data, t->datasize);
 
