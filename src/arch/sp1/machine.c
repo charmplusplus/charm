@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.12  1997-03-19 04:31:52  jyelon
+ * Revision 2.13  1997-03-21 20:06:55  milind
+ * Fixed a prototype mismatch.
+ *
+ * Revision 2.12  1997/03/19 04:31:52  jyelon
  * Redesigned ConverseInit
  *
  * Revision 2.11  1997/02/13 09:31:56  jyelon
@@ -433,7 +436,7 @@ void ConverseExit()
   exit(0);
 }
 
-ConverseInit(argc, argv, fn, usched, initret)
+void ConverseInit(argc, argv, fn, usched, initret)
 int argc;
 char *argv[];
 CmiStartFn fn;

@@ -1,9 +1,9 @@
 ############################################################################
 # RCS INFORMATION:
 #
-# 	$RCSfile$
-# 	$Author$	$Locker$		$State$
-#	$Revision$	$Date$
+#  $RCSfile$
+#  $Author$ $Locker$  $State$
+# $Revision$ $Date$
 #
 ############################################################################
 # DESCRIPTION:
@@ -12,7 +12,10 @@
 # REVISION HISTORY:
 #
 # $Log$
-# Revision 2.20  1997-03-14 20:25:43  milind
+# Revision 2.21  1997-03-21 20:06:54  milind
+# Fixed a prototype mismatch.
+#
+# Revision 2.20  1997/03/14 20:25:43  milind
 # Changed optimization options to compilers and linkers.
 #
 # Revision 2.19  1997/02/02 07:33:55  milind
@@ -78,34 +81,34 @@
 #
 ############################################################################
 
-set CMK_CPP_CHARM		= '/usr/lib/cpp -D_NO_PROTO '
-set CMK_CPP_C                   = '/usr/lib/cpp -D_NO_PROTO '
-set CMK_LDRO			= 'ld -r -o '
-set CMK_LDRO_WORKS=1
-set CMK_CC			= 'mpcc '
-set CMK_CC_RELIABLE		= 'mpcc '
-set CMK_CC_FASTEST		= 'mpcc '
-set CMK_CXX			= 'mpCC '
-set CMK_CXXPP			= 'xlC -E '
-set CMK_CF77			= 'mpxlf'
-set CMK_C_DEBUG                 = '-g'
-set CMK_C_OPTIMIZE              = '-O3 -qstrict -Q -qarch=pwr -qtune=pwr -qipa '
-set CMK_CXX_DEBUG               = '-g'
-set CMK_CXX_OPTIMIZE            = '-O3 -qstrict -Q -qarch=pwr -qtune=pwr -qipa '
-set CMK_LD			= 'mpcc -us -Q -qarch=pwr -qtune=pwr -qipa '
-set CMK_LDXX			= 'mpCC -us -Q -qarch=pwr -qtune=pwr -qipa '
-set CMK_LD77			= ''
-set CMK_M4			= 'm4'
-set CMK_SUF			= 'o'
-set CMK_AR                      = 'ar cq'
-set CMK_RANLIB			= 'true'
-set CMK_LIBS			= '-bnso -bI:/lib/syscalls.exp'
-set CMK_SEQ_LIBS                = ''
-set CMK_SEQ_CC			= 'gcc'
-set CMK_SEQ_LD			= 'gcc'
-set CMK_SEQ_CXX			= 'g++'
-set CMK_SEQ_LDXX		= 'g++'
-set CMK_NM			= 'nm'
-set CMK_NM_FILTER		= "colrm 1 11 | sed -e 's/\.//'"
-set CMK_CPP_SUFFIX="i"
-set CMK_XLATPP='charmxlat++ '
+set CMK_CPP_CHARM    = '/usr/lib/cpp -D_NO_PROTO '
+set CMK_CPP_C        = '/usr/lib/cpp -D_NO_PROTO '
+set CMK_LDRO         = 'ld -r -o '
+set CMK_LDRO_WORKS   = 1
+set CMK_CC           = 'mpcc '
+set CMK_CC_RELIABLE  = 'mpcc '
+set CMK_CC_FASTEST   = 'mpcc '
+set CMK_CXX          = 'mpCC '
+set CMK_CXXPP        = 'xlC -E '
+set CMK_CF77         = 'mpxlf'
+set CMK_C_DEBUG      = '-g'
+set CMK_C_OPTIMIZE   = '-O3 -qstrict -Q -qarch=pwr -qtune=pwr  '
+set CMK_CXX_DEBUG    = '-g'
+set CMK_CXX_OPTIMIZE = '-O3 -qstrict -Q -qarch=pwr -qtune=pwr  '
+set CMK_LD           = 'mpcc -us '
+set CMK_LDXX         = 'mpCC -us '
+set CMK_LD77         = ''
+set CMK_M4           = 'm4'
+set CMK_SUF          = 'o'
+set CMK_AR           = 'ar cq'
+set CMK_RANLIB       = 'true'
+set CMK_LIBS         = '-bnso -bI:/lib/syscalls.exp'
+set CMK_SEQ_LIBS     = ''
+set CMK_SEQ_CC       = 'gcc'
+set CMK_SEQ_LD       = 'gcc'
+set CMK_SEQ_CXX      = 'g++'
+set CMK_SEQ_LDXX     = 'g++'
+set CMK_NM           = '/bin/nm'
+set CMK_NM_FILTER    = "grep '|extern|' | sed -e 's/ *|.*//'"
+set CMK_CPP_SUFFIX   = "i"
+set CMK_XLATPP       = 'charmxlat++ '
