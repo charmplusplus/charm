@@ -189,6 +189,8 @@ typedef struct {
 
 /*
  * Requests to load balancer
+ *   FIXME: these routines don't seem to exist anywhere-- are they obsolete?
+ *   Are the official versions now in LBDatabase.h?
  */
 void LBBalance(void *param);
 void LBCollectStatsOn(void);

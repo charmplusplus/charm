@@ -438,6 +438,11 @@ void LBTurnInstrumentOff() {
     _lb_args.statsOn() = 0;
 #endif
 }
+void LBClearLoads() {
+#if CMK_LBDB_ON
+  LBDatabase::Object()->ClearLoads(); 
+#endif
+}
 
 void LBTurnPredictorOn(LBPredictorFunction *model) {
 #if CMK_LBDB_ON

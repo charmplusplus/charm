@@ -315,6 +315,7 @@ void LBChangePredictor(LBPredictorFunction *model);
 
 void LBTurnInstrumentOn();
 void LBTurnInstrumentOff();
+void LBClearLoads();
 
 inline LBDatabase* LBDatabaseObj() { return LBDatabase::Object(); }
 
