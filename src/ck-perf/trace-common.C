@@ -35,13 +35,19 @@ static int warned = 0;
 #define OPTIMIZE_WARNING /*empty*/
 #endif
 
-CkpvDeclare(TraceArray*, _traces);
+CkpvDeclare(TraceArray*, _traces);		// lists of all trace modules
+
+/* trace for bluegene */
+class TraceBluegene;
+CkpvDeclare(TraceBluegene*, _tracebg);
+int traceBluegeneLinked=0;			// if trace-bluegene is linked
 
 CkpvDeclare(double, traceInitTime);
 CpvDeclare(int, traceOn);
 #if CMK_TRACE_IN_CHARM
 CkpvDeclare(int, traceOnPe);
 #endif
+
 CkpvDeclare(int, CtrLogBufSize);
 CkpvDeclare(char*, traceRoot);
 
@@ -49,7 +55,6 @@ int _threadMsg, _threadChare, _threadEP;
 int _packMsg, _packChare, _packEP;
 int _unpackMsg, _unpackChare, _unpackEP;
 int _dummyMsg, _dummyChare, _dummyEP;
-
 
 /// decide parameters from command line
 static void traceCommonInit(char **argv)
@@ -96,7 +101,6 @@ static void traceCommonInit(char **argv)
     _MEMCHECK(CkpvAccess(traceRoot));
     strcpy(CkpvAccess(traceRoot), argv[0]);
   }
-  
   
 #ifdef __BLUEGENE__
   if(BgNodeRank()==0) {
@@ -213,7 +217,7 @@ void traceMessageRecv(char *msg, int pe)
 extern "C"
 void traceResume(CmiObjId *tid)
 {
-    CkpvAccess(_traces)->beginExecute(tid);
+    _TRACE_ONLY(CkpvAccess(_traces)->beginExecute(tid));
     if(CpvAccess(_traceCoreOn))
 	    resumeTraceCore();
 }
@@ -221,7 +225,7 @@ void traceResume(CmiObjId *tid)
 extern "C"
 void traceSuspend(void)
 {
-  CkpvAccess(_traces)->endExecute();
+  _TRACE_ONLY(CkpvAccess(_traces)->endExecute());
 }
 
 extern "C"

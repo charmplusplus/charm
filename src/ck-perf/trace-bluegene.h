@@ -10,18 +10,16 @@
 */
 /*@{*/
 
-
 #ifndef _TRACE_BLUEGENE_H
 #define _TRACE_BLUEGENE_H
 
 #include "trace.h"
-#include "blue.h"
-#include "blue_impl.h"
 
+// TraceBluegene is subclass of Trace, 
+// it defines Blue Gene specific tracing subroutines.
 class TraceBluegene : public Trace {
 
  private:
-    bgTimeLog* currLog;
     FILE* stsfp;
     FILE* pfp;
  public:
@@ -33,8 +31,9 @@ class TraceBluegene : public Trace {
     void getForwardDep(void* log, void** fDepPtr);
     void getForwardDepForAll(void** logs1, void** logs2, int logsize,void* fDepPtr);
     void tlineEnd(void** parentLogPtr);
-    void bgBeginExec(char* name,void** parentLogPtr);
-    void bgEndExec(void);
+    void bgDummyBeginExec(char* name,void** parentLogPtr);
+    void bgBeginExec(char* msg);
+    void bgEndExec(int);
     void userBracketEvent(char* name, double bt, double et, void** parentLogPtr);
     void userBracketEvent(char* name, double bt, double et, void** parentLogPtr, CkVec<void*> bgLogList);
     void bgPrint(char* str);
@@ -44,6 +43,43 @@ class TraceBluegene : public Trace {
     void traceClose();
 };
 
+CkpvExtern(TraceBluegene*, _tracebg);
+extern int traceBluegeneLinked;
+
+#ifndef CMK_OPTIMIZE
+#  define _TRACE_BG_ONLY(code) do{if(traceBluegeneLinked && CpvAccess(traceOn)){ code; }} while(0)
+#else
+#  define _TRACE_BG_ONLY(code) /*empty*/
+#endif
+
+// for Sdag only
+// fixme - think of better api for tracing sdag code
+#define BgPrint(x)  _TRACE_BG_ONLY(CkpvAccess(_tracebg)->bgPrint(x))
+#define _TRACE_BG_BEGIN_EXECUTE_NOMSG(x,pLogPtr)  _TRACE_BG_ONLY(CkpvAccess(_tracebg)->bgDummyBeginExec(x,pLogPtr))
+#define _TRACE_BG_BEGIN_EXECUTE(msg)  _TRACE_BG_ONLY(CkpvAccess(_tracebg)->bgBeginExec(msg))
+#define _TRACE_BG_END_EXECUTE(commit)   _TRACE_BG_ONLY(CkpvAccess(_tracebg)->bgEndExec(commit))
+#define _TRACE_BG_TLINE_END(pLogPtr) _TRACE_BG_ONLY(CkpvAccess(_tracebg)->tlineEnd(pLogPtr))
+#define _TRACE_BG_FORWARD_DEPS(logs1,logs2,size,fDep)  _TRACE_BG_ONLY(CkpvAccess(_tracebg)->getForwardDepForAll(logs1,logs2, size,fDep))
+#define _TRACE_BG_USER_EVENT_BRACKET(x,bt,et,pLogPtr) _TRACE_BG_ONLY(CkpvAccess(_tracebg)->userBracketEvent(x,bt,et,pLogPtr))
+#define _TRACE_BGLIST_USER_EVENT_BRACKET(x,bt,et,pLogPtr,bgLogList) _TRACE_BG_ONLY(CkpvAccess(_tracebg)->userBracketEvent(x,bt,et,pLogPtr,bgLogList))
+
+/* tracing for Blue Gene - before trace projector era */
+#if !defined(CMK_OPTIMIZE) && CMK_TRACE_IN_CHARM
+# define TRACE_BG_SUSPEND()     \
+        if(CpvAccess(traceOn)) traceSuspend();  \
+        _TRACE_BG_END_EXECUTE(1);
+# define TRACE_BG_RESUME(t, msg)        \
+        _TRACE_BG_BEGIN_EXECUTE((char *)UsrToEnv(msg)); \
+        if(CpvAccess(traceOn)) CthTraceResume(t);
+# define TRACE_BG_START(t, str) \
+        void* _bgParentLog = NULL;      \
+        _TRACE_BG_BEGIN_EXECUTE_NOMSG(str, &_bgParentLog);      \
+        if(CpvAccess(traceOn)) CthTraceResume(t);
+#else
+# define TRACE_BG_SUSPEND()
+# define TRACE_BG_RESUME(t, msg)
+# define TRACE_BG_START(t, str)
+#endif   /* CMK_TRACE_IN_CHARM */
 
 #endif
 

@@ -89,14 +89,6 @@ class Trace {
     virtual void traceWriteSts() {}
     // do any clean-up necessary for tracing
     virtual void traceClose() {}
-    // only for Blue Gene
-    virtual void tlineEnd(void** parentLogPtr){}
-    virtual void bgBeginExec(char* name,void** pLogPtr){}
-    virtual void bgEndExec(){}
-    virtual void bgPrint(char* str){}
-    virtual void getForwardDepForAll(void** logs1,void** logs2, int size ,void* fDepPtr){}
-    virtual void userBracketEvent(char* name, double bt, double et, void** parentLogPtr){}
-    virtual void userBracketEvent(char* name, double bt, double et, void** parentLogPtr, CkVec<void*> bgLogList){}
 };
 
 #define ALLDO(x) for (int i=0; i<length(); i++) if (traces[i]->traceOnPE()) traces[i]->x
@@ -162,16 +154,6 @@ public:
     inline void traceClose() {ALLDO(traceClose()); clearTrace();}
     inline void traceBegin() {ALLDO(traceBegin());}
     inline void traceEnd() {ALLDO(traceEnd());}
-    // only for Blue Gene
-    inline void tlineEnd(void** pLogPtr){ALLDO(tlineEnd(pLogPtr));}
-    inline void bgBeginExec(char* name,void** pLogPtr){ALLDO(bgBeginExec(name,pLogPtr));}
-    inline void bgEndExec(){ALLDO(bgEndExec());}
-    inline void bgPrint(char* str){ALLDO(bgPrint(str));}
-    inline void getForwardDepForAll(void** logs1, void**logs2,int size,void* fDepPtr){ALLDO(getForwardDepForAll(logs1, logs2,size,fDepPtr));}
-    inline void userBracketEvent(char* name,double bt, double et, void** pLogPtr) {ALLDO(userBracketEvent(name,bt,et,pLogPtr));}
-    inline void userBracketEvent(char* name,double bt, double et, void** pLogPtr, CkVec<void*> bgLogList) {ALLDO(userBracketEvent(name,bt,et,pLogPtr,bgLogList))
-;}
-
 };
 
 CkpvExtern(TraceArray*, _traces);
@@ -208,16 +190,7 @@ extern "C" {
 #define _TRACE_ENQUEUE(env) _TRACE_ONLY(CkpvAccess(_traces)->enqueue(env))
 #define _TRACE_DEQUEUE(env) _TRACE_ONLY(CkpvAccess(_traces)->dequeue(env))
 
-// for Sdag only
-// fixme - think of better api for tracing sdag code
-#define BgPrint(x)  _TRACE_ONLY(CkpvAccess(_traces)->bgPrint(x))
-#define _TRACE_BG_BEGIN_EXECUTE(x,pLogPtr)  _TRACE_ONLY(CkpvAccess(_traces)->bgBeginExec(x,pLogPtr))
-#define _TRACE_BG_END_EXECUTE()   _TRACE_ONLY(CkpvAccess(_traces)->bgEndExec())
-#define _TRACE_BG_TLINE_END(pLogPtr) _TRACE_ONLY(CkpvAccess(_traces)->tlineEnd(pLogPtr))
-#define _TRACE_BG_FORWARD_DEPS(logs1,logs2,size,fDep)  _TRACE_ONLY(CkpvAccess(_traces)->getForwardDepForAll(logs1,logs2, size,fDep))
-#define _TRACE_BG_USER_EVENT_BRACKET(x,bt,et,pLogPtr) _TRACE_ONLY(CkpvAccess(_traces)->userBracketEvent(x,bt,et,pLogPtr))
-#define _TRACE_BGLIST_USER_EVENT_BRACKET(x,bt,et,pLogPtr,bgLogList) _TRACE_ONLY(CkpvAccess(_traces)->userBracketEvent(x,bt,et,pLogPtr,bgLogList))
-
+#include "trace-bluegene.h"
 
 #endif
 

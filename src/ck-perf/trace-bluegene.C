@@ -15,14 +15,15 @@
 #include "charm++.h"
 #include "trace-common.h"
 #include "trace-bluegene.h"
+#include "blue.h"
+#include "blue_impl.h"
 
-CkpvStaticDeclare(Trace*, _tracebg);
-
-extern int traceBluegeneLinked;
+#undef DEBUGF
+#define DEBUGF(x)  // CmiPrintf x
 
 void _createTracebluegene(char** argv)
 {
-  //DEBUGF(("%d createTraceBluegene\n", CkMyPe()));
+  DEBUGF(("%d createTraceBluegene\n", CkMyPe()));
   CkpvInitialize(Trace*, _tracebg);
   CkpvAccess(_tracebg) = new  TraceBluegene(argv);
   CkpvAccess(_traces)->addTrace(CkpvAccess(_tracebg));
@@ -52,10 +53,10 @@ TraceBluegene::TraceBluegene(char** argv): stsfp(NULL), pfp(NULL)
     if(stsfp==0)
       CmiAbort("Cannot open Bluegene sts file for writing.\n");
   }
-  currLog = NULL;
 }
 
 void TraceBluegene::traceClose() {
+  DEBUGF(("%d TraceBluegene::traceClose\n", CkMyPe()));
   bgUpdateProj(2);
   if(pfp != 0)  fclose(pfp);
   if((CkMyPe() == 0)&&(stsfp !=0)) fclose(stsfp);
@@ -90,11 +91,9 @@ void TraceBluegene::tlineEnd(void** parentLogPtr){
 }
 
 
-void TraceBluegene::bgBeginExec(char* name,void** parentLogPtr){
-
-
+void TraceBluegene::bgDummyBeginExec(char* name,void** parentLogPtr)
+{
   if (!genTimeLog) return;
-
   bgTimeLog* newLog = new bgTimeLog(_threadEP,name,BgGetCurTime());
   if(*parentLogPtr)
     newLog->addBackwardDep(*(bgTimeLog**)parentLogPtr);
@@ -102,10 +101,20 @@ void TraceBluegene::bgBeginExec(char* name,void** parentLogPtr){
   *parentLogPtr = newLog;
 }
 
-
-void TraceBluegene::bgEndExec()
+void TraceBluegene::bgBeginExec(char* msg)
 {
-  tTIMELINEREC.logEntryClose();
+  if (!genTimeLog) return;
+  bgTimeLog* newLog = new bgTimeLog(msg);
+  tTIMELINEREC.logEntryStart(newLog);
+}
+
+void TraceBluegene::bgEndExec(int commit)
+{
+  if (!genTimeLog) return;
+  if (commit) 
+    BgLogEntryCommit(tTIMELINEREC);
+  else
+    tTIMELINEREC.logEntryClose();
 }
 
 
@@ -149,7 +158,6 @@ void TraceBluegene::userBracketEvent(char* name, double bt, double et, void** pa
   if(*parentLogPtr)
     newLog->addBackwardDep(*(bgTimeLog**)parentLogPtr);
   *parentLogPtr = newLog;
-  currLog = newLog;
   tTIMELINEREC.logEntryInsert(newLog);
 }
 
@@ -161,7 +169,6 @@ void TraceBluegene::userBracketEvent(char* name, double bt, double et, void** pa
   bgTimeLog* newLog = new bgTimeLog(_threadEP,name,bt,et);
   newLog->addBackwardDeps(bgLogList);
   *parentLogPtr = newLog;
-  currLog = newLog;
   tTIMELINEREC.logEntryInsert(newLog);
 }
 
