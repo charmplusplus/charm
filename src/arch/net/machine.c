@@ -2059,6 +2059,7 @@ static void sendPerMsgHandler(char *msg)
   msgSize -= 2*sizeof(void *);
   destAddr = *(void **)(msg + msgSize);
   destSizeAddr = *(void **)(msg + msgSize + sizeof(void*));
+/*CmiPrintf("msgSize:%d destAddr:%p, destSizeAddr:%p\n", msgSize, destAddr, destSizeAddr);*/
   CmiSetHandler(msg, CmiGetXHandler(msg));
   *((int *)destSizeAddr) = msgSize;
   memcpy(destAddr, msg, msgSize);
@@ -2077,12 +2078,12 @@ void CmiSendPersistentMsg(PersistentHandle h, int destPE, int size, void *m)
 
 /*CmiPrintf("[%d] CmiSendPersistentMsg h=%p hdl=%d destpe=%d destAddress=%p size=%d\n", CmiMyPe(), *phs, CmiGetHandler(m), slot->destPE, slot->destAddress, size);*/
 
-  if (slot->destAddress) {
+  if (slot->destAddress[0]) {
     int newsize = size + sizeof(void *)*2;
     char *newmsg = (char*)CmiAlloc(newsize);
     memcpy(newmsg, m, size);
-    memcpy(newmsg+size, &slot->destAddress, sizeof(void *));
-    memcpy(newmsg+size+sizeof(void*), &slot->destSizeAddress, sizeof(void *));
+    memcpy(newmsg+size, &slot->destAddress[0], sizeof(void *));
+    memcpy(newmsg+size+sizeof(void*), &slot->destSizeAddress[0], sizeof(void *));
     CmiFree(m);
     CmiMsgHeaderSetLength(newmsg, size + sizeof(void *)*2);
     CmiSetXHandler(newmsg, CmiGetHandler(newmsg));
@@ -2125,14 +2126,16 @@ void CmiSyncSendPersistent(int destPE, int size, char *msg, PersistentHandle h)
 }
 
 /* called in PumpMsgs */
-void PumpPersistent()
+int PumpPersistent()
 {
   PersistentReceivesTable *slot = persistentReceivesTableHead;
+  int status = 0;
   while (slot) {
-    if (slot->recvSize)
+    unsigned int size = *(slot->recvSizePtr[0]);
+    if (size > 0)
     {
-      int size = slot->recvSize;
-      void *msg = slot->messagePtr;
+      char *msg = slot->messagePtr[0];
+/*CmiPrintf("size: %d msg:%p %p\n", size, msg, slot->messagePtr);*/
 
 #if 0
       void *dupmsg;
@@ -2153,10 +2156,12 @@ void PumpPersistent()
       if (CMI_BROADCAST_ROOT(msg))
           SendSpanningChildren(size, msg);
 #endif
-      slot->recvSize = 0;
+      *(slot->recvSizePtr[0]) = 0;
+      status = 1;
     }
     slot = slot->next;
   }
+  return status;
 }
 
 void *PerAlloc(int size)
