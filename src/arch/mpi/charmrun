@@ -56,6 +56,10 @@ then
 		;;
 	co-login*.ncsa.uiuc.edu)
 		mem='#PBS -l mem=500mb'
+		ncpus="#PBS -l ncpus=$pes"
+		;;
+	*)
+		ncpus="#PBS -l ncpus=$pes"
 		;;
 	esac
         cat > $script << EOF
@@ -66,7 +70,7 @@ then
 # This determines the number of nodes and pes (here $nodes and $pes):
 $ppn
 #
-#PBS -l ncpus=$pes
+$ncpus
 #
 # This determines the wall-clock time limit (here 5 minutes):
 #PBS -l walltime=5:00
