@@ -127,40 +127,147 @@ n -= (V-1);
 #endif
 
 static void AddEdges(EdgeListType *EdgeList, int V, int n)
-   /* Add more edges to make up a total of E edges */
-{int i,j,w,x,y;
-/* first add edges for a C-way spanning tree.*/
-int c1;
-if (C>1) c1 = C-1;
+	/* Add more edges to make up a total of E edges */
+  {	int i,j,w,x,y,k;
+	int c1,max,maxi;
+	int varr[V][2];
+	int varrlen,count=0;
+	int flag=0;
 
-for (i=0; i< V/c1; i++)
-  for (j=0; j<c1; j++) {
-      w = c1*i + j +1; 
-      /* printf("considering (%d, %d)\n", i, w);  */
-      if (w < V) {
-	addEdge(EdgeList,i,w);
-	/* printf(" --- added.\n"); */
-      }
-      else /*printf(" not added.\n")*/; 
-  }
+	/* first add edges for a C-way spanning tree.*/
+	
+	if (C>1) c1 = C-1;
 
-n -= (V-1);
+	for (i=0; i< V/c1; i++)
+	  for (j=0; j<c1; j++) {
+	      w = c1*i + j +1; 
+	      if (w < V) {
+		addEdge(EdgeList,i,w);
+		count++;
+	      }
+	  }
+	
+	/*varr is array of vertices and free connection for each vertex*/
+	
+	for(i=0;i<V;i++)
+		for (j=0;j<2;j++)
+			varr[i][j]=0;	
+	j=0;
+	for (i=0;i<V;i++)
+		if(connections(i)<C)
+		{
+		 varr[j][0]=i;
+		 varr[j][1]=C-connections(i);
+		 j++;
+		}
+	varrlen=j;
+	
+	/*for all edges except last 10 , edge is formed by randomly selecting vertices from varr*/
 
-for (i=0; i<n; i++) 
-   {
-     do {
-	   x = rand() % V;
-        } while (connections(x) >= C);
-     do {
-	   y = rand() % V;
-        } while ((y == x) || connections(y) >= C);
-     if (edgeExists(x,y)) {
-          if (i==n-1) addspEdge(EdgeList,x,y);
-          else i--;
-     }
-     else  
-       addEdge(EdgeList, x, y);
-   }
+	n -= count;
+	if (n>10)
+	for (j=0; j<n-10; j++) 
+	   {
+	     flag=0;
+	     do {
+		     x = rand() % varrlen;
+		     do {
+			     y = rand() % varrlen;
+		        } while (y == x) ;
+	     }while (edgeExists(varr[x][0],varr[y][0]));
+	     addEdge(EdgeList, varr[x][0], varr[y][0]);
+             
+             varr[x][1]=varr[x][1]-1;
+	     varr[y][1]=varr[y][1]-1;
+
+	     /*If no free connections left for a vertex remove it from varr */	
+
+	     if (varr[x][1]==0) {
+				 flag=1;
+				 for (i=x;i<varrlen-1;i++)
+				 {	
+				   varr[i][0]=varr[i+1][0];
+				   varr[i][1]=varr[i+1][1];
+				 }
+				 varrlen--;
+	     }
+	     if ((y>x)&&(flag)) {
+				         
+				 	if (varr[y-1][1]==0)   
+							{
+							  for (i=y-1;i<varrlen-1;i++)
+								{	
+							 	 varr[i][0]=varr[i+1][0];
+								 varr[i][1]=varr[i+1][1];
+								}
+				 			  varrlen--;
+							}
+				}			        
+             else if (varr[y][1]==0) {
+				 for (i=y;i<varrlen-1;i++)
+					{	
+				 	 varr[i][0]=varr[i+1][0];
+					 varr[i][1]=varr[i+1][1];
+					}
+				 varrlen--;
+				}
+	   }
+
+	/*for last 10 edges, first vertex is one with max free connections and other vertex is randomly chosen */
+
+	if (n>10) k=10; else k = n;
+	for (j=0;j<k;j++)
+		{
+				flag=0;
+				max=0;
+				maxi=0;
+				for (i=0;i<varrlen;i++)
+					if (varr[i][1]>max) { max=varr[i][1];maxi=i;}
+				x = maxi;
+				do {
+				     y = rand() % varrlen;
+				   } while (y == x) ;
+				if (j==k-1) addspEdge(EdgeList,varr[x][0],varr[y][0]);
+			        else do {
+				     		y = rand() % varrlen;
+				          } while (y == x);
+				if ((j!=k-1)||(!edgeExists(varr[x][0],varr[y][0])))
+				addEdge(EdgeList,varr[x][0],varr[y][0]); 
+				varr[x][1]=varr[x][1]-1;
+	     			varr[y][1]=varr[y][1]-1;
+						
+				if (varr[x][1]==0) 
+					{
+					 flag=1;
+					 for (i=x;i<varrlen-1;i++)
+						{	
+				 		 varr[i][0]=varr[i+1][0];
+						 varr[i][1]=varr[i+1][1];
+						}
+					 varrlen--;
+					}	
+				if ((y>x)&&(flag))         
+					{
+				         if (varr[y-1][1]==0)   
+							{
+							  for (i=y-1;i<varrlen-1;i++)
+								{	
+							 	 varr[i][0]=varr[i+1][0];
+								 varr[i][1]=varr[i+1][1];
+								}
+				 			  varrlen--;
+							}
+					}			        
+		             	else if (varr[y][1]==0)
+					{
+						 for (i=y;i<varrlen-1;i++)
+							{	
+					 		 varr[i][0]=varr[i+1][0];
+							 varr[i][1]=varr[i+1][1];
+							}
+						 varrlen--;
+					}
+			}	      
 }
 
 void fillAdjArray(Edge *edges, VerticesListType *vlist, int V, int E);
