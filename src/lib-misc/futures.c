@@ -41,7 +41,7 @@ sendToFuture(void *m, int key)
 }
 
 
-setFutureHandler (void *m)
+void setFutureHandler (void *m)
 {
 CmiGrabBuffer(m);
 setFuture( *((int *) ((char *)m + CmiMsgHeaderSizeBytes)), m);
