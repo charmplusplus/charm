@@ -175,7 +175,7 @@ void DirectMulticastStrategy::localMulticast(envelope *env,
     //comes along
     
     if(obj->msg != NULL) {
-	delete obj->msg;
+        CmiFree(obj->msg);
 	obj->msg = NULL;
     } 
     
