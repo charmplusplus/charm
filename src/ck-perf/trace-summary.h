@@ -129,7 +129,6 @@ class LogPool {
     }
     ~LogPool() {
       write();
-      fprintf(fp, "\n");
       fclose(fp);
       // free memory for mark
       if (markcount > 0)
