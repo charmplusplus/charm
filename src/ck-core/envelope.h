@@ -268,10 +268,12 @@ class MsgPool {
   public:
     MsgPool();
     void *get(void) {
+      /* CkAllocSysMsg() called in .def.h is not thread of sigio safe */
+      if (CmiImmIsRunning()) return _alloc();
       return (num ? msgs[--num] : _alloc());
     }
     void put(void *m) {
-      if (num==MAXMSGS)
+      if (num==MAXMSGS && CmiImmIsRunning())
         CkFreeMsg(m);
       else
         msgs[num++] = m;
