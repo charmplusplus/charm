@@ -745,9 +745,10 @@ Array::genSubDecls(XStr& str)
   {/*Collective, indexible version*/    
     str << "    CK_DISAMBIG_ARRAY("<<super<<")\n";
 
-    str<< //Build a simple, empty array (named _mapped to avoid ambiguity with 1D ckNew(nElem))
-      "    static CkArrayID ckNew(void) {return CkArrayID(ckCreateArray());}\n"
-      "    static CkArrayID ckNew_mapped(CkGroupID mapID) {return CkArrayID(ckCreateArray(mapID));}\n";
+    str<< //Build a simple, empty array
+      "    static CkArrayID ckNew(void) {return ckCreateArray(0,0,0);}\n"
+      "    static CkArrayID ckNew_mapped(CkGroupID mapID) {return ckCreateArray(0,mapID,0);}\n"
+      "    static CkArrayID ckNew_bound(CkArrayID toArray) {return ckCreateArray(0,0,toArray);}\n";
 
     XStr etype; etype<<Prefix::ProxyElement<<type;
     if (indexSuffix!=(const char*)"none")
