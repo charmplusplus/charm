@@ -13,7 +13,7 @@ CpvExtern(int, CldLoadNotify);
 
 CpvExtern(CmiNodeLock, cldLock);
 
-void CldMultipleSend(int pe, int numToSend, int rank);
+void CldMultipleSend(int pe, int numToSend, int rank, int immed);
 void CldSetPEBitVector(const char *);
 
 int  CldLoad(void);

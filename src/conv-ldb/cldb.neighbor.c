@@ -25,11 +25,11 @@ extern char *_lbtopo;			/* topology name string */
 void gengraph(int, int, int, int *, int *);
 
 CpvStaticDeclare(CldProcInfo, CldData);
-CpvDeclare(int, CldLoadResponseHandlerIndex);
-CpvDeclare(int, CldAskLoadHandlerIndex);
-CpvDeclare(int, MinLoad);
-CpvDeclare(int, MinProc);
-CpvDeclare(int, Mindex);
+CpvStaticDeclare(int, CldLoadResponseHandlerIndex);
+CpvStaticDeclare(int, CldAskLoadHandlerIndex);
+CpvStaticDeclare(int, MinLoad);
+CpvStaticDeclare(int, MinProc);
+CpvStaticDeclare(int, Mindex);
 
 void LoadNotifyFn(int l)
 {
@@ -64,7 +64,7 @@ static void CldStillIdle(void *dummy)
   double now = CmiWallTimer();
   double lt = cldData->lastCheck;
   /* only ask for work every 20ms */
-  if (cldData->sent && (lt!=-1 && now-lt< 0.020)) return;
+  if (cldData->sent && (lt!=-1 && now-lt< PERIOD*0.001)) return;
   cldData->lastCheck = now;
 
   myload = CldLoad();
@@ -120,7 +120,7 @@ static void CldAskLoadHandler(requestmsg *msg)
       if (CpvAccess(neighbors)[i].pe == receiver) break;
     CmiAssert(i<CpvAccess(numNeighbors));
     CpvAccess(neighbors)[i].load += sendLoad;
-    CldMultipleSend(receiver, sendLoad, rank);
+    CldMultipleSend(receiver, sendLoad, rank, 0);
 #if 0
 #if !defined(CMK_OPTIMIZE) && TRACE_USEREVENTS
     /* this is dangerous since projections logging is not thread safe */
@@ -209,7 +209,14 @@ void CldBalance()
             numToMove = overload;
           overload -= numToMove;
 	  CpvAccess(neighbors)[j].load += numToMove;
-          CldMultipleSend(CpvAccess(neighbors)[j].pe, numToMove, CmiMyRank());
+          CldMultipleSend(CpvAccess(neighbors)[j].pe, 
+			  numToMove, CmiMyRank(), 
+#if CMK_SMP
+			  0
+#else
+			  1
+#endif
+                          );
         }
       }
   }
@@ -218,6 +225,7 @@ void CldBalance()
   traceUserBracketEvent(CpvAccess(CldData)->balanceEvt, startT, CmiWallTimer());
 #endif
   CcdCallFnAfterOnPE((CcdVoidFn)CldBalance, NULL, PERIOD, CmiMyPe());
+
 }
 
 void CldLoadResponseHandler(loadmsg *msg)
@@ -422,7 +430,7 @@ static void CldComputeNeighborData()
 #if 0
   {
   char buf[512], *ptr;
-  sprintf(buf, "Neighors (%d) for: %d = ", npe, CmiMyPe());
+  sprintf(buf, "Neighors for PE %d (%d): ", CmiMyPe(), npe);
   ptr = buf + strlen(buf);
   for (i=0; i<npe; i++) {
     CmiAssert(pes[i] < CmiNumPes() && pes[i] != CmiMyPe());

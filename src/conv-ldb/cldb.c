@@ -147,6 +147,7 @@ void CldPutToken(char *msg)
   /* add token to the scheduler */
   CmiSetHandler(tok, proc->tokenhandleridx);
   ifn(msg, &pfn, &len, &queueing, &priobits, &prioptr);
+  /* not sigio or thread safe */
   CsdEnqueueGeneral(tok, queueing, priobits, prioptr);
   CmiUnlock(CpvAccess(cldLock));
 }
@@ -259,7 +260,11 @@ void CldModuleGeneralInit(char **argv)
   registerLBTopos();
 }
 
-void CldMultipleSend(int pe, int numToSend, int rank)
+/* function can be called in an immediate handler at node level
+   rank specify the rank of processor for the node to represent
+   This function can also send as immeidate messages
+*/
+void CldMultipleSend(int pe, int numToSend, int rank, int immed)
 {
   char **msgs;
   int len, queueing, priobits, *msgSizes, i, numSent, done=0, parcelSize;
@@ -285,6 +290,7 @@ void CldMultipleSend(int pe, int numToSend, int rank)
 	msgSizes[i] = len;
 	parcelSize += len;
 	CldSwitchHandler(msgs[i], CpvAccessOther(CldBalanceHandlerIndex, rank));
+        if (immed) CmiBecomeImmediate(msgs[i]);
       }
       else {
 	done = 1;
@@ -298,15 +304,18 @@ void CldMultipleSend(int pe, int numToSend, int rank)
       }
     }
     if (numSent > 1) {
-      CmiMultipleSend(pe, numSent, msgSizes, msgs);
+      if (immed)
+        CmiMultipleIsend(pe, numSent, msgSizes, msgs);
+      else
+        CmiMultipleSend(pe, numSent, msgSizes, msgs);
       for (i=0; i<numSent; i++)
 	CmiFree(msgs[i]);
       CpvAccessOther(CldRelocatedMessages, rank) += numSent;
       CpvAccessOther(CldMessageChunks, rank)++;
     }
     else if (numSent == 1) {
-      CmiSyncSend(pe, msgSizes[0], msgs[0]);
-      CmiFree(msgs[0]);
+      if (immed) CmiBecomeImmediate(msgs[0]);
+      CmiSyncSendAndFree(pe, msgSizes[0], msgs[0]);
       CpvAccessOther(CldRelocatedMessages, rank)++;
       CpvAccessOther(CldMessageChunks, rank)++;
     }
