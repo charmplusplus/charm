@@ -350,7 +350,7 @@ void CHostHandler(char *msg)
  
   if(numRegistered == CmiNumPes()){
     if (serverFlag == 1)  {
-      CmiPrintf("%s\nServer IP = %u, Server port = %u $\n", CMK_CCS_VERSION, (CmiInt4) nodeIPs[0], nodePorts[0]);
+      CmiPrintf("ccs: %s\nccs: Server IP = %u, Server port = %u $\n", CMK_CCS_VERSION, (CmiInt4) nodeIPs[0], nodePorts[0]);
     }
   }
 }
