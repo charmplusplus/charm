@@ -1590,7 +1590,7 @@ CmiCommHandle CmiGeneralSend(int pe, int size, int freemode, char *data)
     data = copy; freemode = 'F';
   }
   if (pe == cs->pe) 
-#ifndef CMK_CPV_IS_SMP
+#if ! CMK_SMP
   if (!immRunning) /* CdsFifo_Enqueue, below, isn't SIGIO or thread safe.  
                       The SMP comm thread never gets here, because of the pe test. */
 #endif
