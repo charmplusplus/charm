@@ -5,6 +5,7 @@
  * $Revision$
  *****************************************************************************/
 
+#include <stdlib.h>
 #include "trace.h"
 #include "stdlib.h"
 
