@@ -98,6 +98,7 @@ typedef struct {
   inline const LDOMHandle &omHandle() const { return handle.omhandle; }
   inline const LDOMid &omID() const { return handle.omhandle.id; }
   inline const LDObjid &objID() const { return handle.id; }
+  inline const LDObjid &id() const { return handle.id; }
 #endif
 } LDObjData;
 
