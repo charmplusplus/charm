@@ -561,6 +561,7 @@ int   arg_verbose;
 char *arg_nodelist;
 char *arg_nodegroup;
 char *arg_runscript; /* script to run the node-program with */
+char *arg_charmrunip;
 
 int   arg_debug;
 int   arg_debug_no_pause;
@@ -619,6 +620,7 @@ void arg_init(int argc, char **argv)
 #endif
   pparam_flag(&arg_local,	local_def, "local", "Start node programs locally without daemon");
   pparam_flag(&arg_usehostname,  0, "usehostname", "Send nodes our symbolic hostname instead of IP address");
+  pparam_str(&arg_charmrunip,    0, "useip",      "Use IP address provided for charmrun IP");
 #if CMK_USE_RSH
   pparam_flag(&arg_debug,         0, "debug",         "Run each node under gdb in an xterm window");
   pparam_flag(&arg_debug_no_pause,0, "debug-no-pause","Like debug, except doesn't pause at beginning");
@@ -1587,12 +1589,15 @@ void req_start_server(void)
 {
   skt_ip_t ip=skt_innode_my_ip();
   if (arg_local)
-    /* local execution, use localhost always */
+      /* local execution, use localhost always */
     strcpy(server_addr, "127.0.0.1");
   else if (arg_usehostname || skt_ip_match(ip,skt_lookup_ip("127.0.0.1")))
-    /*Use symbolic host name as charmrun address*/
+      /*Use symbolic host name as charmrun address*/
     gethostname(server_addr,sizeof(server_addr));
-  else
+  else if (arg_charmrunip != NULL)
+      /* user specify the IP at +useip */
+    strcpy(server_addr, arg_charmrunip);
+  else 
     skt_print_ip(server_addr,ip);
 
   server_port = 0;
