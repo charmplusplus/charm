@@ -433,10 +433,14 @@ CkMigratable::~CkMigratable() {
 	thisIndexMax.nInts=-123456;
 }
 
+void CkMigratable::CkAbort(const char *why) const {
+	CkError("CkMigratable '%s' aborting:\n",_chareTable[thisChareType]->name);
+	::CkAbort(why);
+}
 
 void CkMigratable::ResumeFromSync(void)
 {
-	CkAbort("No ResumeFromSync() defined for this array element!\n");
+	CkAbort("::ResumeFromSync() not defined for this array element!\n");
 }
 #if CMK_LBDB_ON  //For load balancing:
 void CkMigratable::ckFinishConstruction(void) 
@@ -786,12 +790,15 @@ public:
 			/*This indicates something is seriously wrong--
 			  buffers should be short-lived.*/
 			CkPrintf("%d stale array message(s) found!\n",buffer.length());
-			CkPrintf("Addressed to %s--",idx2str(idx));
+			CkArrayMessage *msg=buffer.deq();
+			CkPrintf("Addressed to: ");
+			CkPrintEntryMethod(msg->array_ep());
+			CkPrintf(" index %s\n",idx2str(idx));
 			if (myLocMgr->isHome(idx)) 
-				CkPrintf("is this an out-of-bounds array index?\n");
+				CkPrintf("is this an out-of-bounds array index, or was it never created?\n");
 			else //Idx is a remote-home index
 				CkPrintf("why weren't they forwarded?\n");
-      
+			
 			CkAbort("Stale array manager message(s)!\n");
 		}
 		return CmiFalse;

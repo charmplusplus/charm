@@ -225,6 +225,9 @@ public:
 	  {return myRec->invokeEntry(this,msg,epIdx);}
 
 protected:
+  //More verbose form of abort
+  virtual void CkAbort(const char *str) const;
+
   CmiBool usesAtSync;//You must set this in the constructor to use AtSync().
   virtual void ResumeFromSync(void);
   CmiBool barrierRegistered;//True iff barrier handle below is set

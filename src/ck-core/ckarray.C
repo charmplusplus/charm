@@ -23,7 +23,7 @@ Orion Sky Lawlor, olawlor@acm.org
 
 /************************** Debugging Utilities **************/
 
-//For debugging: convert given index to a string
+//For debugging: convert given index to a string (NOT threadsafe)
 static const char *idx2str(const CkArrayIndex &ind)
 {
   static char retBuf[80];
@@ -141,6 +141,14 @@ void ArrayElement::pup(PUP::er &p)
   p(bcastNo);
   reductionInfo.pup(p);
 }
+
+//More verbose form of abort
+void ArrayElement::CkAbort(const char *str) const
+{
+	CkError("Array element at index %s aborting:\n",
+		idx2str(thisIndexMax));
+	CkMigratable::CkAbort(str);
+} 
 
 /*********************** Spring Cleaning *****************
 Periodically (every minute or so) remove expired broadcasts 

@@ -284,6 +284,9 @@ public:
 protected:
   CkArray *thisArray;//My source array
   CkArrayID thisArrayID;//My source array's ID
+
+  //More verbose form of abort
+  virtual void CkAbort(const char *str) const;
   
 private:
 //Array implementation methods:   
