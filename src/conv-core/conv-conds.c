@@ -362,10 +362,13 @@ void CcdCallBacks(void)
   /* Figure out how many times to skip Ccd processing */
   double currTime = CmiWallTimer();
   double elapsed = currTime - o->lastCheck;
+  int nMsgs=o->nSkip-CpvAccess(_ccd_numchecks);
   if (elapsed>0) /* Try to wait about 5 ms between time checks */
-     o->nSkip = (int)(5.0e-3*o->nSkip/elapsed);
+     o->nSkip = (int)(5.0e-3*nMsgs/elapsed);
   else
     o->nSkip *= 2;
+  if (o->nSkip<1) o->nSkip=1;
+  if (o->nSkip>2000) o->nSkip=2000;
   CpvAccess(_ccd_numchecks) = o->nSkip;
   o->lastCheck=currTime;
   
