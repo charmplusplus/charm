@@ -27,9 +27,9 @@ void CmiAbort(const char *message)
  * 
  ****************************************************************************/
 
-int        Cmi_mype;
-int        Cmi_myrank;
-int        Cmi_numpes;
+int        _Cmi_mype;
+int        _Cmi_myrank;
+int        _Cmi_numpes;
 int        Cmi_nodesize;
 int        Cmi_stacksize = 64000;
 char     **CmiArgv;
@@ -72,7 +72,7 @@ static void CmiNext()
     index = (index+1) % CmiNumPes();
     if (index == orig) exit(0);
   }
-  Cmi_mype = index;
+  _Cmi_mype = index;
   CthResume(t);
 }
 
@@ -250,8 +250,8 @@ static void CmiParseArgs(argv)
 char **argv;
 {
   CmiGetArgInt(argv,"++stacksize",&Cmi_stacksize);
-  Cmi_numpes=1;
-  CmiGetArgInt(argv,"+p",&Cmi_numpes);
+  _Cmi_numpes=1;
+  CmiGetArgInt(argv,"+p",&_Cmi_numpes);
   if (CmiNumPes()<1) {
     printf("Error: must specify number of processors to simulate with +pXXX\n",CmiNumPes());
     exit(1);
@@ -316,7 +316,7 @@ int usched, initret;
     CmiBarred[i] = 0;
     CmiQueues[i] = CdsFifo_Create();
   }
-  Cmi_mype = 0;
+  _Cmi_mype = 0;
   argv = CmiInitPE();
   if (initret==0) {
     fn(CmiGetArgc(argv), argv);
@@ -328,9 +328,9 @@ int usched, initret;
 #if CMK_CONDS_USE_SPECIAL_CODE
 int CmiSwitchToPE(int newpe)
 {
-  int oldpe = Cmi_mype;
+  int oldpe = _Cmi_mype;
   if (newpe == CcdIGNOREPE) return CcdIGNOREPE;
-  Cmi_mype = newpe;
+  _Cmi_mype = newpe;
   return oldpe;
 }
 #endif

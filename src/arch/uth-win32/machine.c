@@ -27,9 +27,9 @@ void CmiAbort(const char *message)
  * 
  ****************************************************************************/
 
-int        Cmi_mype;
-int        Cmi_myrank;
-int        Cmi_numpes;
+int        _Cmi_mype;
+int        _Cmi_myrank;
+int        _Cmi_numpes;
 int        Cmi_nodesize;
 int        Cmi_stacksize = 64000;
 char     **CmiArgv;
@@ -72,7 +72,7 @@ static void CmiNext()
     index = (index+1) % CmiNumPes();
     if (index == orig) exit(0);
   }
-  Cmi_mype = index;
+  _Cmi_mype = index;
   CthResume(t);
 }
 
@@ -245,7 +245,7 @@ char **argv;
       Cmi_stacksize = atoi(*argp);
       DeleteArg(argp);
     } else if ((strcmp(*argp,"+p")==0)&&(argp[1])) {
-      Cmi_numpes = atoi(argp[1]);
+      _Cmi_numpes = atoi(argp[1]);
       argp+=2;
     } else if (sscanf(*argp, "+p%d", &CmiNumPes()) == 1) {
       argp+=1;
@@ -326,7 +326,7 @@ int usched, initret;
     CmiBarred[i] = 0;
     CmiQueues[i] = CdsFifo_Create();
   }
-  Cmi_mype = 0;
+  _Cmi_mype = 0;
   argv = CmiInitPE();
   if (initret==0) {
     fn(CountArgs(argv), argv);
