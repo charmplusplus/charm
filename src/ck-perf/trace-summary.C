@@ -20,7 +20,7 @@ static int _threadMsg, _threadChare, _threadEP;
 static int _packMsg, _packChare, _packEP;
 static int _unpackMsg, _unpackChare, _unpackEP;
 CpvDeclare(double, binSize);
-CpvDeclare(int, version);
+CpvDeclare(double, version);
 
 extern "C" void setEvent(CthThread t, int event);
 extern "C" int getEvent(CthThread t);
@@ -225,7 +225,12 @@ void LogPool::write(void)
 {
   int i;
   unsigned int j;
-  fprintf(fp, "ver:%3.1f %d/%d count:%d ep:%d interval:%le phases:%d\n", CpvAccess(version), CmiMyPe(), CmiNumPes(), numEntries, _numEntries, CpvAccess(binSize), phaseTab.numPhasesCalled());
+  fprintf(fp, "ver:%3.1f %d/%d count:%d ep:%d interval:%le", CpvAccess(version), CmiMyPe(), CmiNumPes(), numEntries, _numEntries, CpvAccess(binSize));
+  if (CpvAccess(version)>=3.0)
+  {
+    fprintf(fp, " phases:%d", phaseTab.numPhasesCalled());
+  }
+  fprintf(fp, "\n");
   // write bin time
   for(j=0; j<numEntries; j++)
     pool[j].write(fp);
