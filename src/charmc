@@ -439,8 +439,8 @@ switch ($OBJECT)
             if ($status) goto failure
         endif
     else
-        if ( $?VERBOSE ) echo $CMK_LDRO $OBJECT $OBJECTFILES
-        $CMK_LDRO $OBJECT $OBJECTFILES
+        if ( $?VERBOSE ) echo $CMK_LDRO $OBJECT $OPTS_LD $OBJECTFILES
+        $CMK_LDRO $OBJECT $OPTS_LD $OBJECTFILES
         if ($status) goto failure
     endif
     goto copyobj
@@ -469,7 +469,7 @@ endsw
 # Check for valid choice of QUEUE
 # Check for valid choice of BALANCE
 # Check for compatibility among BALANCE, QUEUE, and EXECMODE
-# Create MODULES.TMP.o
+# Create CHARMC-MOD.TMP.o
 # Do the linkage.
 #
 ##############################################################################
@@ -542,80 +542,82 @@ if ( $BALANCE == btok ) then
     endif
 endif
 
-# Identify the libraries to use
-
-switch ($LANGUAGE)
-    case "charm"
-        set OBJECTFILES = ($OBJECTFILES \
-        	$CHARMLIB/lib${LIBCLASS}-core-$EXECMODE.o \
-        	$CHARMLIB/lib${LIBCLASS}-ldb-$BALANCE.o \
-        	$CHARMLIB/lib${LIBCLASS}-cplus-n.o \
-        	$CHARMLIB/libconv-core.o \
-        	$CHARMLIB/libconv-qs-$QUEUE.o )
-	set LOADER=($CMK_LD)
-        breaksw
-    case "charm++"
-        if ($?MAINOBJ == 0) set MAINOBJ=$CHARMLIB/lib${LIBCLASS}-defmain.o
-        set OBJECTFILES = ($OBJECTFILES \
-        	$CHARMLIB/lib${LIBCLASS}-core-$EXECMODE.o \
-        	$CHARMLIB/lib${LIBCLASS}-ldb-$BALANCE.o \
-        	$CHARMLIB/lib${LIBCLASS}-cplus-y.o \
-        	$CHARMLIB/libconv-core.o \
-        	$CHARMLIB/libconv-qs-$QUEUE.o )
-	set LOADER=($CMK_LDXX)
-        breaksw
-    case "converse"
-        set OBJECTFILES = ($OBJECTFILES \
-        	$CHARMLIB/libconv-core.o \
-        	$CHARMLIB/libconv-qs-$QUEUE.o )
-	set LOADER=($CMK_LD)
-        breaksw
-endsw
-
-set LIBRARIES = ($LIBRARIES $CMK_LIBS -lm)
-
-# Perform preliminary Linkage of user's object files and charm libraries.
+# Bind together user-specified objects and libraries,
+# thereby creating CHARMC-USR.TMP.o and CHARMC-USR.TMP.nm
 
 echo "linking $OBJECT with -language $LANGUAGE"
 
-set DELETE=(PRE.TMP.o $DELETE)
-if ($?VERBOSE) echo "$CMK_LDRO PRE.TMP.o $OBJECTFILES -L$CHARMLIB $LIBRARIES"
-$CMK_LDRO PRE.TMP.o $OBJECTFILES -L$CHARMLIB $LIBRARIES
+set DELETE=(CHARMC-USR.TMP.o CHARMC-USR.TMP.nm $DELETE)
+if ($?VERBOSE) echo "$CMK_LDRO CHARMC-USR.TMP.o $OPTS_LD $OBJECTFILES -L$CHARMLIB $LIBRARIES"
+$CMK_LDRO CHARMC-USR.TMP.o $OPTS_LD $OBJECTFILES -L$CHARMLIB $LIBRARIES
 if ($status) goto failure
+nm CHARMC-USR.TMP.o | csh -fc "$CMK_NM_FILTER" > CHARMC-USR.TMP.nm
+if ($status) goto failure
+
+# Scan user-object for initialization functions, create CHARMC-MOD.TMP.o
+
+if ($?VERBOSE) echo "Creating CHARMC-MOD.TMP.c"
+set DELETE=(CHARMC-MOD.TMP.dat CHARMC-MOD.TMP.c CHARMC-MOD.TMP.o $DELETE)
+rm -f CHARMC-MOD.TMP.dat CHARMC-MOD.TMP.c CHARMC-MOD.TMP.o
+awk '(/^_CK_.*_init$/&&(\!/^_CK_.*_struct_init$/)) { print substr($1, 5, length($1)-9); }' < CHARMC-USR.TMP.nm | sort | uniq > CHARMC-MOD.TMP.dat
+echo 'Modules: '`cat CHARMC-MOD.TMP.dat`
+awk '{print "extern void _CK_"$1"_init();";}' < CHARMC-MOD.TMP.dat >> CHARMC-MOD.TMP.c
+echo '_CK_module_init_fn()' >> CHARMC-MOD.TMP.c
+echo '{' >> CHARMC-MOD.TMP.c
+awk '{print "_CK_"$1"_init();";}' < CHARMC-MOD.TMP.dat >> CHARMC-MOD.TMP.c
+echo '}' >> CHARMC-MOD.TMP.c
+
+if ($?VERBOSE) echo $CMK_CC $OPTS_CC -c CHARMC-MOD.TMP.c
+$CMK_CC $OPTS_CC -c CHARMC-MOD.TMP.c
+if ($status) goto failure
+
+# Scan user-object for charm_main, if none, set MAINOBJ
+
+set MAINOBJ=$CHARMLIB/lib${LIBCLASS}-defmain.o
+if { (egrep '^charm_main$' < CHARMC-USR.TMP.nm >& /dev/null) } set MAINOBJ=
+
+# Perform final linkage
+
+switch ($LANGUAGE)
+    case "charm"
+	set LOADER=($CMK_LD $OPTS_LD -o $OBJECT \
+		      CHARMC-USR.TMP.o CHARMC-MOD.TMP.o $MAINOBJ \
+        	      $CHARMLIB/lib${LIBCLASS}-core-$EXECMODE.o \
+        	      $CHARMLIB/lib${LIBCLASS}-ldb-$BALANCE.o \
+        	      $CHARMLIB/lib${LIBCLASS}-cplus-n.o \
+        	      $CHARMLIB/libconv-core.o \
+        	      $CHARMLIB/libconv-qs-$QUEUE.o \
+		      $CMK_LIBS -lm )
+        breaksw
+    case "charm++"
+        set LOADER =($CMK_LDXX $OPTS_LD -o $OBJECT \
+		      CHARMC-USR.TMP.o CHARMC-MOD.TMP.o $MAINOBJ \
+                      $CHARMLIB/lib${LIBCLASS}-core-$EXECMODE.o \
+        	      $CHARMLIB/lib${LIBCLASS}-ldb-$BALANCE.o \
+        	      $CHARMLIB/lib${LIBCLASS}-cplus-y.o \
+        	      $CHARMLIB/libconv-core.o \
+        	      $CHARMLIB/libconv-qs-$QUEUE.o \
+		      $CMK_LIBS -lm )
+        breaksw
+    case "converse"
+        set LOADER = ($CMK_LD $OPTS_LD -o $OBJECT \
+		      CHARMC-USR.TMP.o CHARMC-MOD.TMP.o $MAINOBJ \
+        	      $CHARMLIB/libconv-core.o \
+        	      $CHARMLIB/libconv-qs-$QUEUE.o \
+		      $CMK_LIBS -lm )
+        breaksw
+endsw
+
+if ($?VERBOSE) echo $LOADER
+$LOADER
+if ($status) goto failure
+
+# Copy conv-host
 
 if (-e $CHARMBIN/conv-host) then
     /bin/rm -f conv-host
     /bin/ln -s $CHARMBIN/conv-host conv-host
 endif
-
-# Create MODULES.TMP.o
-
-if ($?VERBOSE) echo "Creating MODULES.TMP.c"
-set DELETE=(MODULES.TMP.nm MODULES.TMP.dat MODULES.TMP.c MODULES.TMP.o $DELETE)
-rm -f MODULES.TMP.nm MODULES.TMP.dat MODULES.TMP.c MODULES.TMP.o
-$CMK_NM PRE.TMP.o > MODULES.TMP.nm
-csh -fc "$CMK_NM_FILTER" < MODULES.TMP.nm | awk '(/^_CK_.*_init$/&&(\!/^_CK_.*_struct_init$/)) { print substr($1, 5, length($1)-9); }' | sort | uniq > MODULES.TMP.dat
-echo 'Modules: '`cat MODULES.TMP.dat`
-awk '{print "extern void _CK_"$1"_init();";}' < MODULES.TMP.dat >> MODULES.TMP.c
-echo '_CK_module_init_fn()' >> MODULES.TMP.c
-echo '{' >> MODULES.TMP.c
-awk '{print "_CK_"$1"_init();";}' < MODULES.TMP.dat >> MODULES.TMP.c
-echo '}' >> MODULES.TMP.c
-
-if ($?VERBOSE) echo $CMK_CC $OPTS_CC -c MODULES.TMP.c
-$CMK_CC $OPTS_CC -c MODULES.TMP.c
-if ($status) goto failure
-
-# Decide whether or not to add defmain.
-
-set MAINOBJ=$CHARMLIB/lib${LIBCLASS}-defmain.o
-if { (egrep '^charm_main$' MODULES.TMP.nm >& /dev/null) } set MAINOBJ=
-
-# Perform final linkage
-
-if ($?VERBOSE) echo $LOADER $OPTS_LD -o $OBJECT PRE.TMP.o MODULES.TMP.o $MAINOBJ
-$LOADER $OPTS_LD -o $OBJECT PRE.TMP.o MODULES.TMP.o $MAINOBJ
-if ($status) goto failure
 
 ########################################################################
 #
