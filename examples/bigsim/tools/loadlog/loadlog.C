@@ -14,6 +14,7 @@ int main()
   printf("Loading bgTrace ... \n");
   int status = BgLoadTraceSummary("bgTrace", totalProcs, numX, numY, numZ, numCth, numWth, numPes);
   if (status == -1) exit(1);
+  printf("========= BgLog Version: %d ========= \n", bglog_version);
   printf("Found %d (%dx%dx%d:%dw-%dc) simulated procs on %d real procs.\n", totalProcs, numX, numY, numZ, numWth, numCth, numPes);
                                                                                 
   int* allNodeOffsets = BgLoadOffsets(totalProcs,numPes);
