@@ -315,24 +315,41 @@ see which one is suitable for the programs behaviour. Currently, this feature is
 the centralized load balancing strategies. For this, the load balancing framework
 accepts the following command line options:
 \begin{enumerate}
-\item {\em +LBDump StepNo}\\
-      This will dump the instrument/communication data collected by the load balancing framework
-	  during the load balancing step {\em StepNo} into a file on the disk. The name of the file
-	  is given by the {\em +LBDumpFile} option. After dumping the data, the program exists.
+\item {\em +LBDump StepStart}\\
+        This will dump the instrument/communication data collected by the load balancing framework
+	starting from the load balancing step {\em StepStart} into a file on the disk. The name of the file
+	is given by the {\em +LBDumpFile} option.
+\item {\em +LBDumpSteps StepsNo}\\
+        This option specify for how many steps to dump the data to the disk. If omitted, default value is 1.
+	The program will exit after StepsNo files are dumped.
 \item {\em +LBDumpFile FileName}\\
-	This option specified the name of the file into which to dump the load balancing data. If this
-	option is not specified, the framework uses the default file {\tt lbdata.dat}.
-\item {\em +LBSim} \\
+	This option specified the base name of the file into which to dump the load balancing data. If this
+	option is not specified, the framework uses the default file {\tt lbdata.dat}. Since multistep is allowed,
+	to this base name it is added the step number in the form {\tt Filename.#}; this apply to both dump and
+	simulation.
+\item {\em +LBSim StepStart}\\
 	This option instructs the framework to do the simulation during the first load balancing step.
 	When this option is specified, the load balancing data from the file specified in the {\em +LBDumpFile}
-	option will be read and this data will be used for the load balancing. The program will then print
-	the results of the load balancing and exit.
+	option, with the addition of the step number, will be read and this data
+	will be used for the load balancing. The program will print the results
+	of the balancing for a number of steps given by the {\em +LBSimSteps} option, and then will exit.
+\item {\em +LBSimSteps StepsNo}\\
+        This options has the same meaning of {\em +LBDumpSteps}, exept that apply for the simulation mode.
+	Default value is 1.
+\item {\em +LBSimProcs}\\
+        This option may change the number of processors target of the load balancer strategy. It may be used to test
+	the load balancer in conditions where some processor crashes or someone becomes available. If this number is not
+	changed since the original run, starting from the second step file the program will print other additional
+	information about how the simulated load differ from the real load during the run (considering all
+	strategies that were applied while running). This may be used to test the validity of a load balancer
+	prediction over the reality. If the strategies used during run and simulation differ, the additional data
+	printed may be unuseful.
 \end{enumerate}
 As an example, we can collect tha data for a 1000 processor run of a program using:
 \begin{alltt}
-./charmrun pgm +p 1000 +balancer RandCentLB +LBDump 0 +LBDumpFile dump.dat
+./charmrun pgm +p 1000 +balancer RandCentLB +LBDump 2 +LBDumpSteps 4 +LBDumpFile dump.dat
 \end{alltt}
-And then, we can use this data to observe various centralized strategies using:
+This will collect data on files data.dat.{2,3,4,5}. Then, we can use this data to observe various centralized strategies using:
 \begin{alltt}
-./charmrun pgm +balancer <Strategy to test> +LBSim +LBDumpFile
+./charmrun pgm +balancer <Strategy to test> +LBSim 2 +LBSimSteps 4 +LBDumpFile dump.dat [+LBSimProcs 900]
 \end{alltt}
