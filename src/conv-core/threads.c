@@ -13,7 +13,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 1.9  1995-09-27 22:23:15  jyelon
+ * Revision 1.10  1995-09-30 11:48:15  jyelon
+ * Fixed a bug (CthSetVar(t,...) failed when t is current thread.)
+ *
+ * Revision 1.9  1995/09/27  22:23:15  jyelon
  * Many bug-fixes.  Added Cpv macros to threads package.
  *
  * Revision 1.8  1995/09/26  18:30:46  jyelon
@@ -409,6 +412,7 @@ void *val;
 {
   int i;
   int data_count = thr->data_count;
+  if (thr == thread_current) *var = val;
   for (i=0; i<data_count; i++)
     if (var == thr->data_var[i])
       { thr->data_val[i]=val; return; }
