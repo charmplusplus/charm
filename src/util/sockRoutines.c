@@ -284,13 +284,17 @@ retry:
   if (port!=NULL) *port = ntohs(addr.sin_port);
   return ret;
 }
-
 SOCKET skt_server(unsigned int *port)
+{
+  return skt_server_ip(port,NULL);
+}
+
+SOCKET skt_server_ip(unsigned int *port,skt_ip_t *ip)
 {
   SOCKET             ret;
   int                len;
   int connPort=(port==NULL)?0:*port;
-  struct sockaddr_in addr=skt_build_addr(skt_invalid_ip,connPort);
+  struct sockaddr_in addr=skt_build_addr((ip==NULL)?skt_invalid_ip:*ip,connPort);
   
 retry:
   ret = socket(PF_INET, SOCK_STREAM, 0);
@@ -308,6 +312,7 @@ retry:
 	  return skt_abort(93486,"Error getting name on server socket.");
 
   if (port!=NULL) *port = ntohs(addr.sin_port);
+  if (ip!=NULL) memcpy(ip, &addr.sin_addr, sizeof(*ip));
   return ret;
 }
 

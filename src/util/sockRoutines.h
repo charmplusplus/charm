@@ -51,6 +51,14 @@
  *     Performs the whole socket/bind/listen procedure.  
  *     Returns the actual port of the socket and the file descriptor.
  *
+ * SOCKET skt_server_ip(unsigned int *port,skt_ip_t *ip)
+ *
+ *   - create a TCP server socket on the given port and IP
+ *     Use 0 for any port and skt_invalid_ip for any IP.  
+ *     Performs the whole socket/bind/listen procedure.  
+ *     Returns the actual port and IP address of the socket 
+ *     and the file descriptor.
+ *
  * SOCKET skt_accept(SOCKET src_fd,skt_ip_t *pip, unsigned int *port)
  *
  *   - accepts a TCP connection to the specified server socket.  Returns the
