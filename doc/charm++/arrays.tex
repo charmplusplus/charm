@@ -578,9 +578,12 @@ a implemented as a global barrier.
 
 \subsubsection{Array Section}
 
-\charmpp{} now supports array section. Array section is a collection of array 
-elements. Multicast and reduction within the section is supported via a 
-ckmulticast library. 
+\charmpp{} now supports array section. Array section is a subset of array 
+elements in a chare array. You can do multicast in a section proxy.
+
+optimized section multicast and reduction library is also provided via 
+CkMulticast module. 
+
 You can construct an array section using:
 
 \begin{alltt}
@@ -595,10 +598,90 @@ is local to the section, like these:
 
 \begin{alltt}
   CProxySection_Hello proxy;
-  proxy.someEntry(...)		// multicast
-  proxy[0].someEntry(...)	// send to the first element in the section.
+  proxy.someEntry(...)          // multicast
+  proxy[0].someEntry(...)       // send to the first element in the section.
 \end{alltt}
 
+You can move the section proxy in a message to another processor, and still 
+safely invoke the entry functions in the section proxy.
+
+In the multicast example above, number of section members of the messages are 
+sent to all memebers one by one, which is considered inefficient when multiple 
+section members are at same processor, in which case the messages can be 
+combined into one. To optimize the communication and in order to support the
+section reduction, a separate library(module) CkMulticast is provided.
+
+To use the library, you need to compile and install CkMulticast library and 
+link your applications against the library using -module:
+
+\begin{alltt}
+  # compile and install the CkMulticast library, do this only once
+  cd charm/net-linux/tmp/libs/ck-libs/multicast
+  make
+
+  # link CkMulticast library using -module
+  charmc  -o hello hello.o -module CkMulticast -language charm++ 
+\end{alltt}
+
+CkMulticast library is implemented as a communication delegation for a 
+section proxy. Once an array section proxy is delegated, all the messages sent
+from the section proxy will be routed to the local delegation branch. 
+To use the CkMulticast delegation, you need to create the CkMulticastMgr Group 
+first, and setup the delegation in section proxy:
+
+\begin{alltt}
+  CProxySection_Hello sectProxy = CProxySection_Hello::ckNew(helloArrayID, elems, numElems);
+  CkGroupID mCastGrpId = CProxy_CkMulticastMgr::ckNew();
+  CkMulticastMgr *mcastGrp = CProxy_CkMulticastMgr(mCastGrpId).ckLocalBranch();
+
+  sectProxy.ckDelegate(mCastGrpId);  //section proxy knows who is the delegation
+  mcastGrp->setSection(sectProxy);   //delegation knows whom to delegate
+
+  sectProxy.someEntry(...)           //multicast via delegation library as before
+\end{alltt}
+
+Note, in CkMulticast library, all messages sent in multicast must inherit 
+from CkMcastBaseMsg:
+
+\begin{alltt}
+class HiMsg : public CkMcastBaseMsg, public CMessage_HiMsg
+\{
+public:
+  int *data;
+\};
+\end{alltt}
+
+Because of this restriction, no parameter marshalling can be used for multicast
+with CkMulticast library.
+
+To use section reduction, you need to first register a reduction callback to
+the CkMulticastMgr delegation:
+
+\begin{alltt}
+  CProxySection_Hello sectProxy;
+  CkMulticastMgr *mcastGrp = CProxy_CkMulticastMgr(mCastGrpId).ckLocalBranch();
+  mcastGrp->setReductionClient(sectProxy, callback, userData);
+\end{alltt}
+
+When array element in a section contributes to the reduction, it need to 
+retrieve the section cookie from the multicast msg, and use the cookie when
+talking to the delegation:
+
+\begin{alltt}
+  CkSectionCookie cookie;
+
+  void SayHi(HiMsg *msg)
+  {
+    CkGetSectionCookie(cookie, msg);     // get cookie
+    int data = thisIndex;
+    mcastGrp->contribute(sizeof(int), &data, CkReduction::sum_int, cookie);
+  }
+\end{alltt}
+
+Note, cookie is retrieved from the multicast message and contains information
+about the multicast section spanning tree information and reduction counter.
+You need to keep this cookie for next uses(i.e. define cookie outside of the 
+entry function).
 
 \subsubsection{Array Syntax Changes}
 
