@@ -50,6 +50,8 @@ then
 	rm -f $result
 # Some machine specific 
 	USE_LSF=0
+# 10 minutes	
+	walllimit=10
 	queue_stat=qstat
 	queue_qsub=qsub
 	queue_kill=qdel
@@ -89,7 +91,7 @@ $ppn
 #
 $ncpus
 #
-#PBS -l walltime=20:00
+#PBS -l walltime=$walllimit:00
 #
 $mem
 #
@@ -119,7 +121,7 @@ EOF
 # The lines starting with #PBS are queuing system flags:
 #
 #BSUB -J autobuild
-#BSUB -W 0:20
+#BSUB -W 0:$walllimit
 #BSUB -n $pes
 #BSUB -o $output
 
