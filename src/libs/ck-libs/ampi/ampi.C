@@ -2028,7 +2028,8 @@ int ATAReq::wait(MPI_Status *sts){
 	return 0;
 }
 
-inline static int _AMPI_Wait(MPI_Request *request, MPI_Status *sts, int freereq=1)
+CDECL
+int AMPI_Wait(MPI_Request *request, MPI_Status *sts)
 {
   AMPIAPI("AMPI_Wait");
   if(*request == MPI_REQUEST_NULL)
@@ -2036,31 +2037,32 @@ inline static int _AMPI_Wait(MPI_Request *request, MPI_Status *sts, int freereq=
   AmpiRequestList* reqs = getReqs();
   AMPI_DEBUG("MPI_Wait: request=%d, reqs.size=%d, &reqs=%d\n",*request,reqs->size(),reqs);
   (*reqs)[*request]->wait(sts);
-  if (freereq) reqs->free(*request);
+  if((*reqs)[*request]->getType() != 1) { // only free non-blocking request
+    reqs->free(*request);
+    *request = MPI_REQUEST_NULL;
+  }
   return 0;
-}
-
-CDECL
-int AMPI_Wait(MPI_Request *request, MPI_Status *sts)
-{
-  return _AMPI_Wait(request, sts, 1);
 }
 
 CDECL
 int AMPI_Waitall(int count, MPI_Request request[], MPI_Status sts[])
 {
-  int i;
   AMPIAPI("AMPI_Waitall");
-  for(i=0;i<count;i++) {
-    _AMPI_Wait(&request[i], sts+i, 0);    // delay the free of memory
-  }
+  int i;
   AmpiRequestList* reqs = getReqs();
+  for(i=0;i<count;i++) {
+    if(request[i] == MPI_REQUEST_NULL) continue;
+    (*reqs)[request[i]]->wait(sts+i);
+  }
 #if CMK_BLUEGENE_CHARM
   TRACE_BG_AMPI_WAITALL(reqs);   // setup forward and backward dependence
 #endif
   // free memory of requests
-  for(i=0;i<count;i++)
+  for(i=0;i<count;i++){ // only free non-blocking request
+    if(request[i] == MPI_REQUEST_NULL) continue;
     reqs->free(request[i]);
+    request[i] = MPI_REQUEST_NULL;
+  }
   return 0;
 }
 
@@ -2150,8 +2152,11 @@ int AMPI_Test(MPI_Request *request, int *flag, MPI_Status *sts)
   }
   AmpiRequestList* reqs = getReqs();
   if(1 == (*flag = (*reqs)[*request]->test(sts))){
-    (*reqs)[*request]->complete(sts);
-    reqs->free(*request);
+    if((*reqs)[*request]->getType() != 1) { // only free non-blocking request
+      (*reqs)[*request]->complete(sts);
+      reqs->free(*request);
+      *request = MPI_REQUEST_NULL;
+    }
   }
   return 0;
 }
@@ -2254,7 +2259,7 @@ int AMPI_Type_contiguous(int count, MPI_Datatype oldtype,
   return 0;
 }
 
-extern  "C"
+CDECL
 int AMPI_Type_vector(int count, int blocklength, int stride,
                      MPI_Datatype oldtype, MPI_Datatype*  newtype)
 {
@@ -2263,7 +2268,7 @@ int AMPI_Type_vector(int count, int blocklength, int stride,
   return 0 ;
 }
 
-extern  "C"  
+CDECL
 int AMPI_Type_hvector(int count, int blocklength, MPI_Aint stride, 
                       MPI_Datatype oldtype, MPI_Datatype*  newtype)
 {
@@ -2272,7 +2277,7 @@ int AMPI_Type_hvector(int count, int blocklength, MPI_Aint stride,
   return 0 ;
 }
 
-extern  "C"  
+CDECL
 int AMPI_Type_indexed(int count, int* arrBlength, int* arrDisp, 
                       MPI_Datatype oldtype, MPI_Datatype*  newtype)
 {
@@ -2281,7 +2286,7 @@ int AMPI_Type_indexed(int count, int* arrBlength, int* arrDisp,
   return 0 ;
 }
 
-extern  "C"  
+CDECL
 int AMPI_Type_hindexed(int count, int* arrBlength, MPI_Aint* arrDisp,
                        MPI_Datatype oldtype, MPI_Datatype*  newtype)
 {
@@ -2290,7 +2295,7 @@ int AMPI_Type_hindexed(int count, int* arrBlength, MPI_Aint* arrDisp,
   return 0 ;
 }
 
-extern  "C"  
+CDECL
 int AMPI_Type_struct(int count, int* arrBlength, int* arrDisp, 
                      MPI_Datatype* oldtype, MPI_Datatype*  newtype)
 {
