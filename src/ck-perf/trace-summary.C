@@ -182,7 +182,7 @@ void LogPool::shrink(void)
   }
   numEntries /= 2;
   CpvAccess(binSize) *= 2;
-CkPrintf("Shrinked binsize: %f !!!!\n", CpvAccess(binSize));
+//CkPrintf("Shrinked binsize: %f !!!!\n", CpvAccess(binSize));
 }
 
 void LogEntry::write(FILE* fp)
