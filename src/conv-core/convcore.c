@@ -21,6 +21,10 @@
 #include "traceCoreCommon.h"    /* projector */
 #include "machineEvents.h"     /* projector */
 
+#if CMK_OUT_OF_CORE
+#include "conv-ooc.h"
+#endif
+
 CpvExtern(int, _traceCoreOn);   /* projector */
 extern void CcdModuleInit(char **);
 extern void CmiMemoryInit(char **);
