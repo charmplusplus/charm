@@ -112,13 +112,6 @@ void sim::Commit()
 {
   if (active < 0)
     return;
-  //#ifdef POSE_STATS_ON
-  //  int tstat = localStats->TimerRunning();
-  //  if (!tstat)
-  //    localStats->TimerStart(MISC_TIMER);
-  //  else localStats->SwitchTimer(MISC_TIMER);
-  //#endif
-
 #ifdef POSE_STATS_ON
   int tstat = localStats->TimerRunning();
   if (!tstat)

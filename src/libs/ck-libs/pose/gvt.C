@@ -96,7 +96,7 @@ void PVT::setGVT(GVTMsg *m)
 #endif
   simdone = m->done;
   estGVT = m->estGVT;
-  CmiAssert((optPVT < 0) || (estGVT <= optPVT));
+  //  CmiAssert((optPVT < 0) || (estGVT <= optPVT));
   SendsAndRecvs->PurgeBelow(estGVT);
   if (m->resize < 0)
     SendsAndRecvs->shrink();
@@ -129,8 +129,11 @@ void PVT::objRemove(int pvtIdx)
 void PVT::objUpdate(int timestamp, int sr)
 {
   CmiAssert(timestamp >= estGVT);
-  if ((sr == SEND) || (sr == RECV))
+  if ((sr == SEND) || (sr == RECV)) {
     SendsAndRecvs->Insert(timestamp, sr);
+    //    CkPrintf("Received %s at timestamp %d!\n", (sr==SEND)?"SEND":"RECV", 
+    //	     timestamp);
+  }
   else 
     CkPrintf("ERROR: PVT::objUpdate(%d, %d) has invalid sr value\n",
 	     timestamp, sr);
@@ -148,8 +151,11 @@ void PVT::objUpdate(int pvtIdx, int safeTime, int timestamp, int sr)
       ((objs.objs[index].ovt > safeTime) || (objs.objs[index].ovt < 0)))
     objs.objs[index].ovt = safeTime;
 
-  if ((sr == SEND) || (sr == RECV))
+  if ((sr == SEND) || (sr == RECV)) {
     SendsAndRecvs->Insert(timestamp, sr);
+    //    CkPrintf("Received %s at timestamp %d!\n", (sr==SEND)?"SEND":"RECV", 
+    //	     timestamp);
+  }
   // sr could be -1 in which case we just ignore it here
 }
 
@@ -189,9 +195,7 @@ void GVT::runGVT(UpdateMsg *m)
   localStats->TimerStart(GVT_TIMER);
 #endif
   estGVT = m->optPVT;
-  nextLBstart = m->nextLB;
-  SendsAndRecvs->FreeTable();
-  SendsAndRecvs->SetOffset(m->conPVT);
+  //nextLBstart = m->nextLB;
   CkFreeMsg(m);
   CProxy_PVT p(ThePVT);
   p.startPhase();  // start the PVT phase of the GVT algorithm
@@ -238,28 +242,32 @@ void GVT::computeGVT(UpdateMsg *m)
 	else estGVT = conGVT;
     }
     
-    if (estGVT < 0) inactive++;
+    if (estGVT < 0) {
+      inactive++; 
+      if (inactive == 1) inactiveTime = lastGVT;
+    }
     else inactive = 0;
 
     // STEP 2: Check if send/recv activity provides lower possible estimate
-    int unmatchedMsg;
+    int earliestMsg;
     if ((estGVT > lastGVT) || (estGVT < 0)) {
-      unmatchedMsg = SendsAndRecvs->FindDifferenceTimestamp();
-      if ((unmatchedMsg < estGVT) || (estGVT < 0))
-	estGVT = unmatchedMsg;
-      //SendsAndRecvs->dump();
+      earliestMsg = SendsAndRecvs->FindDiff();
+      if ((earliestMsg >= lastGVT) && ((earliestMsg < estGVT) || (estGVT < 0)))
+	estGVT = earliestMsg;
     }
 
     //CkPrintf("opt=%d con=%d lastGVT=%d lastMsg=%d\n", 
-    //optGVT, conGVT, lastGVT, unmatchedMsg);
+    //optGVT, conGVT, lastGVT, earliestMsg);
     
     // STEP 3: In times of inactivity, GVT must be set to lastGVT
-    if ((estGVT < 0) && (lastGVT < 0)) { estGVT = 0; }
+    if ((estGVT < 0) && (lastGVT < 0)) estGVT = 0;
+    else if (estGVT < 0) estGVT = lastGVT;
     
     // STEP 4: If all has gone well, estimate >= previous estimate
     if ((estGVT < lastGVT) && (estGVT >= 0)) {
       CkPrintf("ERROR: new GVT estimate %d less than last one %d!\n",
 	       estGVT, lastGVT);
+      CkAbort("FATAL ERROR: GVT exiting...\n");
       SendsAndRecvs->dump();
     }
     
@@ -272,12 +280,12 @@ void GVT::computeGVT(UpdateMsg *m)
       term = 1;
     }
     else if (inactive > 5) {
-      CkPrintf("Simulation inactive at time: %d\n", estGVT);
+      CkPrintf("Simulation inactive at time: %d\n", inactiveTime);
       term = 1;
     }
 
     // STEP 6: Report the new GVT estimate to all PVT branches
-    SendsAndRecvs->PurgeBelow(estGVT);
+    // SendsAndRecvs->PurgeBelow(estGVT);
     int testResult = SendsAndRecvs->TestThreshold();
 
     gmsg->estGVT = estGVT;
@@ -308,12 +316,9 @@ void GVT::computeGVT(UpdateMsg *m)
       localStats->SwitchTimer(GVT_TIMER);
 #endif
 #endif
-
+      SendsAndRecvs->FreeTable();
       UpdateMsg *umsg = new UpdateMsg;
       umsg->optPVT = estGVT;
-      umsg->conPVT = SendsAndRecvs->offset;
-      umsg->gvtW = SendsAndRecvs->gvtWindow;
-      umsg->numB = SendsAndRecvs->numBuckets;
       g[(CkMyPe()+1) % CkNumPes()].runGVT(umsg);
     }
     optGVT = conGVT = -1;

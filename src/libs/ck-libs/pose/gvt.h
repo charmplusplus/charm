@@ -64,7 +64,7 @@ public:
 class GVT : public Group { // GVT chare
 private:
   int estGVT;                        // GVT estimates
-  int inactive;                      // #iterations since change in state
+  int inactive, inactiveTime;        // #iterations since change in state
   int nextLBstart;                   // #iterations since last LB run
   SRtable *SendsAndRecvs, *LastSR;   // Send and Recv events
 #ifdef POSE_STATS_ON

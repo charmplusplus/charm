@@ -126,13 +126,7 @@ void eventQueue::CommitEvents(sim *obj, int ts)
        else*/ 
     if (commitPtr->prev->cpData)
       delete commitPtr->prev->cpData; 
-#ifdef POSE_STATS_ON
-    obj->localStats->SwitchTimer(MISC_TIMER);
-#endif
     delete commitPtr->prev;  // delete committed event
-#ifdef POSE_STATS_ON
-    obj->localStats->SwitchTimer(SIM_TIMER);
-#endif
   }
   commitPtr->prev = frontPtr;  // reattach front sentinel node
   frontPtr->next = commitPtr;

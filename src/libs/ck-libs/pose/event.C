@@ -32,12 +32,12 @@ Event::~Event()
 {                                   
   SpawnedEvent *tmp;
 
-  double start=CmiWallTimer();
+  //  double start=CmiWallTimer();
   delete msg;
-  double elapsed=CmiWallTimer()-start;
-  if (elapsed>50e-6) {
-    CkPrintf("delete msg(%p) took %.6f\n", (void *)msg,elapsed);
-  }
+  //double elapsed=CmiWallTimer()-start;
+  //  if (elapsed>50e-6) {
+  //    CkPrintf("delete msg(%p) took %.6f\n", (void *)msg,elapsed);
+  //  }
   free(commitBfr);
   while (spawnedList) {  // purge list of spawned events
     tmp = spawnedList;

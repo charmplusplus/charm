@@ -143,28 +143,29 @@ class SRtable {
     //sanitize();
   }
   int TestThreshold() {
+    //sanitize();
     if (inBuckets == 0) {
       //CkPrintf("^^^^^^^^^^  EXPAND WINDOW!!!     %d\n", inBuckets);
-      expand();
+      //expand();
       return 1;
     }
     else if (inBuckets > TBL_THRESHOLD) {
       //CkPrintf("vvvvvvvvvv  SHRINK WINDOW!!!     %d\n", inBuckets);
-      shrink();
+      //shrink();
       return -1;
     }
     //CkPrintf("----------  WINDOW FINE     %d\n", inBuckets);
     return 0;
   }
   void Insert(int timestamp, int srSt); // insert s/r at timestamp
-  int FindDifferenceTimestamp() {
+  int FindDiff() {
     //sanitize();
-    // return timestamp with first difference in sends and recvs
     int result;
     for (int i=0; i<numBuckets; i++)
-      if ((result = sends[i].diffBucket(recvs[i])) > -1)
+      if ((result = sends[i].diffBucket(recvs[i])) != -1)
 	return result;
-    return gvtWindow + offset;
+    return -1;
+    //sanitize();
   }
   void PurgeBelow(int ts);      // purge table below timestamp ts
   void FileResiduals();         // try to file each residual event in table
@@ -182,6 +183,7 @@ class SRtable {
       if (!recycTail) recycTail = residualsTail;
       residuals = residualsTail = NULL;
     }
+    offset = -1;
     //sanitize();
   }
   UpdateMsg *packTable();

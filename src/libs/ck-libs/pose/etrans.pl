@@ -1038,6 +1038,7 @@ sub posefuncmap
 	    $output.="int _POSE_handle = ".$segments[3].";\n";
 	    $output.="int _POSE_atTime = ".$segments[4].";\n" if ($#segments>=4);
 	    $output.=$msg."->Timestamp(_POSE_handle);\n";
+	    $output.="if ((".$segments[2]."<0) || (".$segments[2].">=INT_MAX)) CkAbort(\"ERROR: Sending to invalid array index!\\n\");\n";
 	    $output.="(*(CProxy_".$sim." *)&POSE_Objects)[".$segments[2]."].insert(".$msg;
 	    if ($#segments>=4) {
 	      $output.=",_POSE_atTime";
@@ -1066,6 +1067,7 @@ sub posefuncmap
 		  $output.=$msg."->Timestamp(ovt+(_POSE_timeOffset));\n";
 		  $output.="pvt->objUpdate(ovt+(_POSE_timeOffset), SEND);\n";
 		  $output.="$msg->fromPE = CkMyPe();\n";
+		  $output.="if ((_POSE_handle<0) || (_POSE_handle>=INT_MAX)) CkAbort(\"ERROR: Sending to invalid array index!\\n\");\n";
 		  $output.="(* (CProxy_".$segments[2]." *)&POSE_Objects)[_POSE_handle].".$segments[1].";\n";
 		  $output.="int _destPE = POSE_Objects.ckLocalBranch()->lastKnown(CkArrayIndex1D(_POSE_handle));\n";
 		  $output.="parent->srVector[_destPE]++;\n";
@@ -1077,6 +1079,7 @@ sub posefuncmap
 		  $output.="int _POSE_timeOffset = ".$segments[4].";\n";
 		  $output.="registerTimestamp(_POSE_handle, ".$msg.",_POSE_timeOffset);\n";
 		  $output.="$msg->fromPE = CkMyPe();\n";
+		  $output.="if ((_POSE_handle<0) || (_POSE_handle>=INT_MAX)) CkAbort(\"ERROR: Sending to invalid array index!\\n\");\n";
 		  $output.="(* (CProxy_".$segments[2]." *)&POSE_Objects)[_POSE_handle].".$segments[1].";\n";
 		  $output.="int _destPE = POSE_Objects.ckLocalBranch()->lastKnown(CkArrayIndex1D(_POSE_handle));\n";
 		  $output.="parent->srVector[_destPE]++;\n";
@@ -1101,6 +1104,7 @@ sub posefuncmap
 		    $output.=$msg."->Timestamp(_POSE_atTime);\n";
 		    $output.="pvt->objUpdate(_POSE_atTime, SEND);\n";
 		    $output.="$msg->fromPE = CkMyPe();\n";
+		    $output.="if ((_POSE_handle<0) || (_POSE_handle>=INT_MAX)) CkAbort(\"ERROR: Sending to invalid array index!\\n\");\n";
 		    $output.="(*(CProxy_".$segments[2]." *)&POSE_Objects)[_POSE_handle].".$segments[1].";\n";
 		    $output.="int _destPE = POSE_Objects.ckLocalBranch()->lastKnown(CkArrayIndex1D(_POSE_handle));\n";
 		    $output.="parent->srVector[_destPE]++;\n";
@@ -1115,6 +1119,7 @@ sub posefuncmap
 		    $output.="if (!CpvAccess(stateRecovery)) {\n";
 		    $output.="registerTimestamp(_POSE_handle, ".$msg.", _POSE_atTime);\n";
 		    $output.="$msg->fromPE = CkMyPe();\n";
+		    $output.="if ((_POSE_handle<0) || (_POSE_handle>=INT_MAX)) CkAbort(\"ERROR: Sending to invalid array index!\\n\");\n";
 		    $output.="(* (CProxy_".$segments[2]." *)&POSE_Objects)[_POSE_handle].".$segments[1].";\n";
 		    $output.="int _destPE = POSE_Objects.ckLocalBranch()->lastKnown(CkArrayIndex1D(_POSE_handle));\n";
 		    $output.="parent->srVector[_destPE]++;\n";
@@ -1137,6 +1142,7 @@ sub posefuncmap
 		      $output.=$msg."->Timestamp(ovt+(_POSE_timeOffset));\n";
 		      $output.="pvt->objUpdate(ovt+(_POSE_timeOffset), SEND);\n";
 		      $output.="$msg->fromPE = CkMyPe();\n";
+		      $output.="if ((parent->thisIndex<0) || (parent->thisIndex>=INT_MAX)) CkAbort(\"ERROR: Sending to invalid array index!\\n\");\n";
 		      $output.="(* (CProxy_".$simobjtype." *)&POSE_Objects)[parent->thisIndex].".$segments[1].";\n";
 		      $output.="parent->srVector[CkMyPe()]++;\n";
 		      $output.="}\n";
@@ -1146,6 +1152,7 @@ sub posefuncmap
 		      $output.="if (!CpvAccess(stateRecovery)) {\n";
 		      $output.="registerTimestamp(parent->thisIndex, ".$msg.", _POSE_timeOffset);\n";
 		      $output.="$msg->fromPE = CkMyPe();\n";
+		      $output.="if ((parent->thisIndex<0) || (parent->thisIndex>=INT_MAX)) CkAbort(\"ERROR: Sending to invalid array index!\\n\");\n";
 		      $output.="(* (CProxy_".$simobjtype." *)&POSE_Objects)[parent->thisIndex].".$segments[1].";\n";
 		      $output.="parent->srVector[CkMyPe()]++;\n";
 		      $output.="}\n";

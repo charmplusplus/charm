@@ -91,7 +91,8 @@ void SRtable::PurgeBelow(int ts)
 {
   //sanitize();
   int start = (ts - offset)/bktSz, i;
-  if (ts <= offset) return;  // purge nothing
+  if (ts < offset+bktSz) { // purge nothing: ts is in zero-th bucket
+  }
   else if (ts >= offset + gvtWindow) { // purge everything in buckets
     offset = offset + gvtWindow;
     int bktOffset;
@@ -198,7 +199,7 @@ UpdateMsg *SRtable::packTable()
   int count=0, i;
   SRentry *j;
 
-  for (i=0; i<numBuckets; i++)
+  for (i=0; i<numBuckets; i++) 
     count = count + sends[i].count + recvs[i].count;
   um = new (count, 8*sizeof(int)) UpdateMsg;
   um->msgCount = count;
@@ -228,7 +229,7 @@ UpdateMsg *SRtable::packTable()
 
 void SRtable::addEntries(UpdateMsg *um)
 {
-  //sanitize();
+  //  sanitize();
   int i, bkt;
   SRentry *entry;
 
@@ -237,6 +238,9 @@ void SRtable::addEntries(UpdateMsg *um)
     int oldNumBuckets = numBuckets;
     gvtWindow = um->gvtW;
     numBuckets = um->numB;
+    if (offset == -1)
+      offset = um->offset;
+    //CmiAssert(offset == um->offset);
     // move all elements to residuals
     for (i=0; i<oldNumBuckets; i++) {
       sends[i].emptyOutBucket(residuals, residualsTail);
@@ -252,6 +256,7 @@ void SRtable::addEntries(UpdateMsg *um)
     SetOffset(offset);
     FileResiduals();
   }
+  else if (offset == -1)  SetOffset(um->offset);
 
   // now move the new stuff in
   for (i=0; i<um->msgCount; i++) {
@@ -305,7 +310,7 @@ void SRtable::expand()
   SRentry *tmp;
 
   if (gvtWindow > MAX_GVT_WINDOW) return;
-  gvtWindow = gvtWindow+8;
+  gvtWindow = gvtWindow*2;
   numBuckets = gvtWindow/8;
   // move all elements to residuals
   for (i=0; i<oldNumBuckets; i++) {
@@ -334,6 +339,7 @@ void SRtable::sanitize()
   int totalCount=0, bktCount;
   SRentry *current;
   for (int i=0; i<numBuckets; i++) {
+    CmiAssert(sends[i].offset == offset+i*bktSz);
     bktCount = 0;
     current = sends[i].bucket;
     CmiAssert((sends[i].bucket && sends[i].bucketTail) || 
