@@ -9,6 +9,7 @@ module EveryLB {
    extern module GreedyLB;
    extern module GreedyCommLB;
    extern module GreedyAgentLB;
+   extern module GridCommLB;
    extern module Comm1LB;
    extern module OrbLB;
    extern module RecBisectBfLB;
@@ -17,6 +18,6 @@ module EveryLB {
    extern module NeighborLB;
    extern module NeighborCommLB;
    extern module WSLB;
-   extern module GridCommLB;
+   extern module HybridLB;
    initnode void initEveryLB(void);
 };
