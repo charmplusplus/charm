@@ -88,14 +88,21 @@ void GreedyLB::HeapSort(HeapData *data, int heapSize, HeapCmp cmp)
 	int i;
 	HeapData key;
 
+        int origSize = heapSize;
 	BuildHeap(data, heapSize, cmp);
-	for (i=heapSize; i > 0; i--) {
-		key = data[0];
-		data[0] = data[i];
-		data[i] = key;
-		heapSize--;
-		Heapify(data, 0, heapSize, cmp);
+        for (i=heapSize; i > 0; i--) {
+               key = data[0];
+               data[0] = data[i];
+               data[i] = key;
+               heapSize--;
+               Heapify(data, 0, heapSize, cmp);
 	}
+	// after HeapSort, the data are in reverse order
+        for (i=0; i<(origSize+1)/2; i++) {
+          key = data[i];
+          data[i] = data[origSize-i];
+          data[origSize-i] = key;
+        }
 }
 
 GreedyLB::HeapData* 
@@ -103,15 +110,12 @@ GreedyLB::BuildObjectArray(CentralLB::LDStats* stats,
                              int count, int *objCount)
 {
   HeapData *objData;
-
-  *objCount = 0;
   int obj;
-  *objCount += stats->n_objs;
 
 //for (obj = 0; obj < stats[pe].n_objs; obj++)
 //if (stats[pe].objData[obj].migratable == CmiTrue) (*objCount)++; 
 
-  objData  = new HeapData[*objCount];
+  objData  = new HeapData[stats->n_objs];
   *objCount = 0; 
   for(obj=0; obj < stats->n_objs; obj++) {
     LDObjData &oData = stats->objData[obj];
@@ -128,6 +132,11 @@ GreedyLB::BuildObjectArray(CentralLB::LDStats* stats,
   }
   
   HeapSort(objData, *objCount-1, GT);
+/*
+for (int i=0; i<*objCount; i++)
+  CmiPrintf("%f ", objData[i].load);
+CmiPrintf("\n");
+*/
   return objData;
 }
 
