@@ -206,7 +206,7 @@ public:// <- should be protected, but causes errors.
 	CProxy_CkArrayBase(const CkArrayID &aid) {_aid=aid._aid;_idx=NULL;}
 	CProxy_CkArrayBase(const CkArrayID &aid,CkArrayIndex *idx)
 	  {_aid=aid._aid;_idx=idx;}
-        virtual ~CProxy_CkArrayBase() { if(_idx) { delete _idx; _idx=0; } }
+        ~CProxy_CkArrayBase() { if(_idx) { delete _idx; _idx=0; } }
 	
 	void insertAtIdx(int ctorIndex,int chareType,int onPE,const CkArrayIndex &idx,CkArrayMessage *m=NULL);
 
