@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.0  1995-06-29 21:19:36  narain
+ * Revision 2.1  1995-07-09 17:54:13  narain
+ * Cleaned up working version.. interfaces with functions in ldbcfns.c
+ *
+ * Revision 2.0  1995/06/29  21:19:36  narain
  * *** empty log message ***
  *
  ***************************************************************************/
@@ -45,6 +48,17 @@ typedef struct {
 	int timeLoadSent;
 } LDB_STATUS;
 
+extern int CldAddToken();
+extern int CldPickSeedAndSend();
+
+#ifndef TRUE
+#define TRUE 1
+#endif
+
+#ifndef FALSE
+#define FALSE 0
+#endif
+
 
 #define MAXINT  0xffff
 #define MINHOPS	1
@@ -62,9 +76,9 @@ typedef struct {
 #define MODERATE 2
 #define HEAVY 3
 
-export_to_C setLdbSize()
+export_to_C getLdbSize()
 {
-       CpvAccess(LDB_ELEM_SIZE) = sizeof(LDB_ELEMENT);
+       return sizeof(LDB_ELEMENT);
 }
 
 
@@ -75,64 +89,68 @@ export_to_C LdbCreateBoc()
   CreateBoc(LDB, LDB@BranchInit, msg);
 }
 
-export_to_C LdbFillLDB(ldb)
-LDB_ELEMENT *ldb;
+export_to_C LdbFillLDB(destPe, ldb)
+int destPe;
+void *ldb;
 {
-	BranchCall(CpvAccess(LdbBocNum), LDB@FillLDB(ldb));
+	BranchCall(ReadValue(LdbBocNum), LDB@FillLDB(destPe, (LDB_ELEMENT *)ldb));
 }
 
 export_to_C LdbStripLDB(ldb)
-LDB_ELEMENT *ldb;
+void *ldb;
 {
-	BranchCall(CpvAccess(LdbBocNum), LDB@StripLDB(ldb));
+	BranchCall(ReadValue(LdbBocNum), LDB@StripLDB((LDB_ELEMENT *)ldb));
 }
 
 
-export_to_C Ldb_NewMsg_FromNet(msg) 
-void *msg;
+export_to_C Ldb_NewSeed_FromNet(msgst, ldb, sendfn) 
+void *msgst, *ldb;
+void (*sendfn)();
 {
-	BranchCall(CpvAccess(LdbBocNum), LDB@NewMsg_FromNet(msg) );
+	BranchCall(ReadValue(LdbBocNum), LDB@NewMsg_FromNet(msgst, ldb, sendfn));
 }
 
-export_to_C Ldb_NewMsg_FromLocal(msg)
-void *msg;
+export_to_C Ldb_NewSeed_FromLocal(msgst, ldb, sendfn)
+void *msgst, *ldb;
+void (*sendfn)();
 {
-	BranchCall(CpvAccess(LdbBocNum), LDB@NewMsg_FromLocal(msg) );
+	BranchCall(ReadValue(LdbBocNum), LDB@NewMsg_FromLocal(msgst, ldb, sendfn));
 }
 
 export_to_C LdbProcessMsg(msgPtr, localdataPtr)
 void *msgPtr, *localdataPtr;
 {
-	BranchCall(CpvAccess(LdbBocNum), LDB@ProcessMsg(msgPtr, localdataPtr));
+	BranchCall(ReadValue(LdbBocNum), LDB@ProcessMsg(msgPtr, localdataPtr));
 }
 
 export_to_C LdbProcessorIdle()
 {
-	BranchCall(CpvAccess(LdbBocNum), LDB@ProcessorIdle());
+	BranchCall(ReadValue(LdbBocNum), LDB@ProcessorIdle());
 }
 
 export_to_C void LdbPeriodicRedist()
 {
-	BranchCall(CpvAccess(LdbBocNum), LDB@PeriodicRedist());
+	BranchCall(ReadValue(LdbBocNum), LDB@PeriodicRedist());
 }
 
 export_to_C void LdbPeriodicStatus()
 {
-	BranchCall(CpvAccess(LdbBocNum), LDB@PeriodicStatus());
+	BranchCall(ReadValue(LdbBocNum), LDB@PeriodicStatus());
 }
 
 export_to_C void LdbPeriodicCheckInit()
 {
-	BranchCall(CpvAccess(LdbBocNum), LDB@PeriodicCheckInit());
+	BranchCall(ReadValue(LdbBocNum), LDB@PeriodicCheckInit());
 }
 
 BranchOffice LDB {
 
 /* ..... ..... ..... ..... ..... ..... ..... ..... ..... ..... ..... ..... */
 
-int	numNeighbours;
+int numNeighbours;
 int * neighboursList;
 int lastPeZeroLoadIndex;
+int numPe;	
 int LdbBoc;
 int myPE;
 LDB_STATUS * statusList;
@@ -145,7 +163,7 @@ int lowMark, highMark;
 int deltaLoad;
 int deltaRedist;
 int deltaStatus;
-BOOLEAN	saturated; /* is the system (estimated to be) saturated? 1:0 */
+int	saturated; /* is the system (estimated to be) saturated? 1:0 */
 
 /* ..... ..... ..... ..... ..... ..... ..... ..... ..... ..... ..... ..... */
 
@@ -156,11 +174,11 @@ int peNum;
 
     if (peNum >=0)
     {
-    	i = McNeighboursIndex(myPE, peNum);
+    	i = CmiNeighboursIndex(myPE, peNum);
     	if (i > -1)
     	{
-	 	statusList[i].myLoadSent = QsMyLoad();
-	 	/*statusList[i].timeLoadSent = McTimer();*/
+	 	statusList[i].myLoadSent = CldMyLoad();
+	 	/*statusList[i].timeLoadSent = CmiTimer();*/
     	}
     }
 }
@@ -216,13 +234,14 @@ private UpdateMinMaxHops()
 }
 
 
-private Strategy(msg)
-void *msg;
+private Strategy(msg, ldbptr, sendfn)
+void *msg, *ldbptr;
+void (*sendfn)();
 {
     LDB_ELEMENT * ldb;
     int MyPeLoad;
 
-    ldb = LDB_UPTR(msg);
+    ldb = (LDB_ELEMENT *)ldbptr;
     ldb->srcPE = myPE;
     ldb->msgHops++;
 
@@ -233,14 +252,14 @@ void *msg;
     if (ldb->msgHops < minHops)
     {
 	PrivateCall(SentUpdateStatus(leastLoadedPe));
-	SEND_TO(msg, leastLoadedPe);
+	(*sendfn)(msg, leastLoadedPe);
     }
     /* Msg has travelled maxHops, time to enqueue and process it on this node */
     else if (ldb->msgHops >= maxHops)
     {
 
 	TRACE(CkPrintf("LdbNodeStrategy:Node %d: Hops>=maxHops(%d), Enqueue Msg 0x%x\n", myPE, maxHops, msg));
-	QsEnqUsrMsg(msg);
+	CldAddToken(msg, sendfn);
     }
     /* Msg has travelled between minHops and maxHops */
     else /* ( (minHops <= ldb->msgHops) && (ldb->msgHops < maxHops) ) */
@@ -250,25 +269,25 @@ void *msg;
 	    /* Lightly loaded neighbourhood: Send it to least loaded PE */
 	  case LIGHT:
 	    PrivateCall(SentUpdateStatus(leastLoadedPe));
-	    SEND_TO(msg, leastLoadedPe);
+	    (*sendfn)(msg, leastLoadedPe);
 	    break;
 
 	  case MODERATE:
-	    MyPeLoad = QsMyLoad();
+	    MyPeLoad = CldMyLoad();
 	    if (MyPeLoad - leastLoad > deltaLoad)
 	      {
 		/* Update the load status for the least loaded PE */
 		PrivateCall(SentUpdateStatus(leastLoadedPe));
-		SEND_TO(msg, leastLoadedPe);
+		(*sendfn)(msg, leastLoadedPe);
 	      }
 	    else
-	      QsEnqUsrMsg(msg);
+	      CldAddToken(msg, sendfn);
 	    break;
 
     	    /*  Heavily Loaded Neighbourhood:
        	        maxHops = 0, such that NewChares are Enqueued at local PE.  */
 	  case HEAVY:
-	    QsEnqUsrMsg(msg);
+	    CldAddToken(msg, sendfn);
 	    break;
 	}
     }
@@ -280,7 +299,7 @@ LDB_ELEMENT * ldb;
 {
     int i;
 
-    i = McNeighboursIndex(myPE, ldb->srcPE);
+    i = CmiNeighboursIndex(myPE, ldb->srcPE);
     if (i > -1)
     {
         statusList[i].peLoad = ldb->piggybackLoad;
@@ -323,18 +342,22 @@ entry BranchInit : (message DUMMYMSG * dmsg)
 	LDB_ELEMENT *ldb;
 
 	TRACE(CkPrintf("Enter Node LdbInit()\n"));
-	CpvAccess(LdbBocNum) = LdbBoc = MyBocNum();
+	LdbBocNum = LdbBoc = MyBocNum();
+	ReadInit(LdbBocNum);
 	numPe = CmiNumPe();
 	myPE = CmiMyPe();
 	numNeighbours = CmiNumNeighbours(myPE);
 	lastPeZeroLoadIndex = 0;
+
+	Cldbtokensinit();
+
 	if (numPe > 1)
 	{
 	    neighboursList = (int *) CmiAlloc( numNeighbours * sizeof(int) );
-            CkMemError(neighboursList);
-	    McGetNodeNeighbours(myPE, neighboursList );
+/*            CkMemError(neighboursList); */
+	    CmiGetNodeNeighbours(myPE, neighboursList );
 	    statusList = (LDB_STATUS *) CmiAlloc(numNeighbours * sizeof(LDB_STATUS)); 
-            CkMemError(statusList);
+/*            CkMemError(statusList); */
 	    PrivateCall(PrintNodeNeighbours());
 
 	    for (i=0; i < numNeighbours; i++)
@@ -365,11 +388,13 @@ entry BranchInit : (message DUMMYMSG * dmsg)
 	      PrivateCall(SentUpdateStatus(neighboursList[i]));
 	    
 	      statusMsg = (DUMMY_MSG *) CkAllocMsg(DUMMY_MSG);
-	      CkMemError(statusMsg);
-	      ldb = LDB_UPTR(statusMsg);
+/*	      CkMemError(statusMsg);  */
+
+/*	      ldb = LDB_UPTR(statusMsg); 
 	      ldb->srcPE = myPE;
 	      ldb->msgHops = 100;
 	      ldb->piggybackLoad =0;
+*/
 	      ImmSendMsgBranch(RecvStatus, statusMsg, neighboursList[i]);
 	    }
 	}
@@ -393,45 +418,46 @@ public StripLDB(ldb)
 LDB_ELEMENT *ldb;
 {
     if ((numPe > 1) && (ldb->srcPE != myPE) 
-        &&  (ldb->srcPE != McHostPeNum()))
+        &&  (ldb->srcPE != CmiNumPe()))
     		PrivateCall(RecvUpdateStatus(ldb));
 }
 
 
-public NewMsg_FromNet(x)
-void *x;
+public NewMsg_FromNet(msgst, ldb, sendfn)
+void *msgst, *ldb;
+void (*sendfn)();
 {
-	PrivateCall(Strategy(x));
+	PrivateCall(Strategy(msgst, ldb, sendfn));
 }
 
 
-public NewMsg_FromLocal(x)
-void *x;
+public NewMsg_FromLocal(msgst, ldbptr, sendfn)
+void *msgst, *ldbptr;
+void (*sendfn)();
 {
     LDB_ELEMENT * ldb;
 
-    ldb = LDB_UPTR(x);
+    ldb = (LDB_ELEMENT *)ldbptr;
     ldb->msgHops = 0;  /* This stmt and the previous two moved here
  			  on 5/22/93, by Sanjay   */
-    PrivateCall(Strategy(x));
+    PrivateCall(Strategy(msgst, ldbptr, sendfn));
 }
 
 /* 
    This performs the ACWN strategy for Load Balancing.
    Load is balanced only if the number of PEs are > 1.
 */
-public FillLDB(ldb)
+public FillLDB(destPe, ldb)
+int destPe;
 LDB_ELEMENT *ldb;
 {
-  int destpe;
 
     ldb->srcPE = myPE;
-    ldb->piggybackLoad = QsMyLoad();
+    ldb->piggybackLoad = CldMyLoad();
     /* ldb->msgHops = 0; shouldn't be here. Moved to NewChare From Local
 	on 5/22/93 by Sanjay */
-    destpe = DestPE_LDB(ldb);
-    if (destpe != McHostPeNum())
-      PrivateCall(SentUpdateStatus(destpe));
+    if (destPe != CmiNumPe())
+      PrivateCall(SentUpdateStatus(destPe));
 }
 
 
@@ -444,19 +470,13 @@ ChareNumType bocNum;
 
  if (maxHops > 0) /* if Neighbourhood NOT in a HEAVY state */
  {
-    MyPeLoad = QsMyLoad();
+    MyPeLoad = CldMyLoad();
     leastLoad = MAXINT;
     PrivateCall(LeastLoadPe());
 
     if ( (MyPeLoad - leastLoad) > deltaRedist )
-    {
-	QsPickFreeChareMsg(&msg);
-	if (msg)
-	{
+	if (CldPickSeedAndSend(leastLoadedPe))
 	    PrivateCall(SentUpdateStatus(leastLoadedPe));
-	    SEND_FIXED_TO(msg, TRUE, leastLoadedPe);
-	}
-    }
  }
 
     /* call LdbPeriodicRedist() AGAIN after REDIST_UPDATE_INTERVAL time */
@@ -471,7 +491,7 @@ ChareNumType bocNum;
     int MyPeLoad;
     LDB_ELEMENT * ldb;
 
-    MyPeLoad = QsMyLoad();
+    MyPeLoad = CldMyLoad();
 
     for (i=0; i < numNeighbours; i++)
         if ( abs(MyPeLoad - statusList[i].myLoadSent) > deltaStatus )
@@ -480,9 +500,11 @@ ChareNumType bocNum;
 	  
 	  /* fill the LdbBlock with load status */
 	  statusMsg = (DUMMY_MSG *)CkAllocMsg(DUMMY_MSG);
-	  CkMemError(statusMsg);
-	  ldb = LDB_UPTR(statusMsg);
+/* 	  CkMemError(statusMsg); */
+
+/*	  ldb = LDB_UPTR(statusMsg);  Could'nt this be done by the fillblk? 
 	  ldb->piggybackLoad = MyPeLoad;
+*/
 	  PrivateCall(SentUpdateStatus(neighboursList[i]));
 	  ImmSendMsgBranch(RecvStatus, statusMsg, neighboursList[i]) ;  
 	}
@@ -503,8 +525,8 @@ public void PeriodicCheckInit()
 {
  if (numPe > 1)
  {  
-   CallBocAfter(LdbPeriodicRedist, CpvAccess(LdbBocNum), REDIST_UPDATE_INTERVAL);
-   CallBocAfter(LdbPeriodicStatus, CpvAccess(LdbBocNum), STATUS_UPDATE_INTERVAL); 
+   CallBocAfter(LdbPeriodicRedist, ReadValue(LdbBocNum), REDIST_UPDATE_INTERVAL);
+   CallBocAfter(LdbPeriodicStatus, ReadValue(LdbBocNum), STATUS_UPDATE_INTERVAL); 
  }
 }
 
