@@ -69,10 +69,10 @@ class CkSectionInfo {
 	sInfo.sCookie.redNo=r;
     }
     inline int &get_pe() { return pe; }
-    inline int &get_redNo() {CmiAssert(type==MulticastMsg); 
-    return sInfo.sCookie.redNo; }
+    inline int &get_redNo() { CmiAssert(type==MulticastMsg); 
+                              return sInfo.sCookie.redNo; }
     inline void * &get_val() { CmiAssert(type==MulticastMsg); 
-    return sInfo.sCookie.val; }
+                               return sInfo.sCookie.val; }
 };
 
 PUPbytes(CkSectionInfo) //FIXME: write a real pup routine

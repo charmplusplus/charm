@@ -325,6 +325,8 @@ public:
 		:CProxy_ArrayBase(cs.ckGetArrayID()),
 		 _sid(cs.ckGetArrayID(), cs.ckGetArrayElements(), cs.ckGetNumElements()) {}
 
+	void ckSectionDelegate(CkDelegateMgr *d) 
+		{ ckDelegate(d); d->initDelegateMgr(this); }
 //	void ckInsert(CkArrayMessage *m,int ctor,int onPe);
 	void ckSend(CkArrayMessage *m, int ep) ;
 

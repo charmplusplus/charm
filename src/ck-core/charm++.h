@@ -405,6 +405,7 @@ public:
 
 /**************************** CkDelegateMgr **************************/
 
+class CProxy;
 //an "interface" class-- all delegated messages are routed via a DelegateMgr.
 // The default action is to deliver the message directly.
 class CkDelegateMgr : public IrrGroup {
@@ -422,6 +423,7 @@ class CkDelegateMgr : public IrrGroup {
     virtual void ArraySend(int ep,void *m,const CkArrayIndexMax &idx,CkArrayID a);
     virtual void ArrayBroadcast(int ep,void *m,CkArrayID a);
     virtual void ArraySectionSend(int ep,void *m,CkArrayID a,CkSectionID &s);
+    virtual void initDelegateMgr(CProxy *proxy)  {}
 };
 
 
