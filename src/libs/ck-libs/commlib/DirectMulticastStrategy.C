@@ -257,6 +257,7 @@ void DirectMulticastStrategy::localMulticast(CkVec<CkArrayIndexMax>*vec,
         }
         
         newenv->setUsed(0);        
+        //CkUnpackMessage(&newenv);
         CProxyElement_ArrayBase ap(destArrayID, idx);
         ap.ckSend((CkArrayMessage *)newmsg, newenv->array_ep());
     }

@@ -51,10 +51,13 @@ void RingMulticastStrategy::doneInserting(){
                 CmiSyncSend(dest_pe, env->getTotalsize(), (char *)env); 
             
             if(isDestinationArray) {
+                /*
                 if(robj != NULL)
                     localMulticast(&robj->indices, env);
                 else
                     localMulticast(&localDestIndices, env);
+                */
+                CmiSyncSendAndFree(CkMyPe(), env->getTotalsize(), (char *)env);
             }
             else {
                 CmiSetHandler(env, _charmHandlerIdx);
@@ -113,7 +116,7 @@ void RingMulticastStrategy::handleMulticastMessage(void *msg){
     ComlibPrintf("[%d] In handle multicast message %d\n", CkMyPe(), status);
 
     if(status == COMLIB_MULTICAST_ALL) {                        
-        if(!isEndOfRing(nextPE, src_pe)) {
+        if(src_pe != CkMyPe() && !isEndOfRing(nextPE, src_pe)) {
             ComlibPrintf("[%d] Forwarding Message to %d\n", CkMyPe(), nextPE);
             CmiSyncSend(nextPE, env->getTotalsize(), (char *)env); 
         }
@@ -121,7 +124,7 @@ void RingMulticastStrategy::handleMulticastMessage(void *msg){
         //Multicast to all destination elements on current processor        
         ComlibPrintf("[%d] Local multicast sending all %d\n", CkMyPe(), 
                      localDestIndices.size());
-
+        
         localMulticast(&localDestIndices, env);
     }   
     else if(status == COMLIB_MULTICAST_NEW_SECTION){        
@@ -135,8 +138,9 @@ void RingMulticastStrategy::handleMulticastMessage(void *msg){
             createHashObject(ccmsg->nIndices, ccmsg->indices);
         
         envelope *usrenv = (envelope *) ccmsg->usrMsg;
+        
         envelope *newenv = (envelope *)CmiAlloc(usrenv->getTotalsize());
-        memcpy(newenv, ccmsg->usrMsg, usrenv->getTotalsize());
+        memcpy(newenv, usrenv, usrenv->getTotalsize());
 
         localMulticast(&robj->indices, newenv);
 
@@ -150,7 +154,7 @@ void RingMulticastStrategy::handleMulticastMessage(void *msg){
         
         sec_ht.put(key) = robj;
 
-        if(!isEndOfRing(robj->nextPE, src_pe)) {
+        if(src_pe != CkMyPe() && !isEndOfRing(robj->nextPE, src_pe)) {
             ComlibPrintf("[%d] Forwarding Message of %d to %d\n", CkMyPe(), 
                          cbmsg->_cookie.pe, robj->nextPE);
             CkPackMessage(&env);
@@ -170,17 +174,19 @@ void RingMulticastStrategy::handleMulticastMessage(void *msg){
         if(robj == NULL)
             CkAbort("Destination indices is NULL\n");
         
-        if(!isEndOfRing(robj->nextPE, src_pe)) {
+        if(src_pe != CkMyPe() && !isEndOfRing(robj->nextPE, src_pe)) {
             CmiSyncSend(robj->nextPE, env->getTotalsize(), (char *)env);
-            ComlibPrintf("[%d] Forwarding Message to %d\n", CkMyPe(), robj->nextPE);
+            ComlibPrintf("[%d] Forwarding Message to %d\n", CkMyPe(), 
+                         robj->nextPE);
         }
-
+        
         localMulticast(&robj->indices, env);
     }
 }
 
 void RingMulticastStrategy::initSectionID(CkSectionID *sid){
-    
+
+    ComlibPrintf("Ring Init section ID\n");
     sid->pelist = NULL;
     sid->npes = 0;
 
