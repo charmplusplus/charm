@@ -516,13 +516,50 @@ static void _processNewVChareMsg(CkCoreState *ck,envelope *env)
   _invokeEntry(env->getEpIdx(),env,obj);
 }
 
-/************** Message Receive ****************/
+/************** Receive: Chares *************/
 
 static inline void _processForChareMsg(CkCoreState *ck,envelope *env)
 {
   register int epIdx = env->getEpIdx();
   register void *obj = env->getObjPtr();
   _invokeEntry(epIdx,env,obj);
+}
+
+static inline void _processFillVidMsg(CkCoreState *ck,envelope *env)
+{
+  register VidBlock *vptr = (VidBlock *) env->getVidPtr();
+  _CHECK_VALID(vptr, "FillVidMsg: Not a valid VIdPtr\n");
+  register CkChareID *pcid = (CkChareID *) EnvToUsr(env);
+  _CHECK_VALID(pcid, "FillVidMsg: Not a valid pCid\n");
+  vptr->fill(pcid->onPE, pcid->objPtr);
+  CmiFree(env);
+}
+
+static inline void _processForVidMsg(CkCoreState *ck,envelope *env)
+{
+  VidBlock *vptr = (VidBlock *) env->getVidPtr();
+  _CHECK_VALID(vptr, "ForVidMsg: Not a valid VIdPtr\n");
+  _SET_USED(env, 1);
+  vptr->send(env);
+}
+
+/************** Receive: Groups ****************/
+
+/**
+ This message is sent to this groupID--prepare to 
+ handle this message by looking up the group,
+ and possibly stashing the message.
+*/
+IrrGroup *_lookupGroup(CkCoreState *ck,envelope *env,const CkGroupID &groupID)
+{
+	IrrGroup *obj = ck->localBranch(groupID);
+	if (obj==NULL) { /* groupmember not yet created: stash message */
+		ck->getGroupTable()->find(groupID).enqMsg(env);
+	}
+	else { /* will be able to process message */
+		ck->process();
+	}
+	return obj;
 }
 
 static inline void _deliverForBocMsg(CkCoreState *ck,int epIdx,envelope *env,IrrGroup *obj)
@@ -534,14 +571,10 @@ static inline void _deliverForBocMsg(CkCoreState *ck,int epIdx,envelope *env,Irr
 static inline void _processForBocMsg(CkCoreState *ck,envelope *env)
 {
   register CkGroupID groupID =  env->getGroupNum();
-  register IrrGroup *obj = ck->localBranch(groupID);
-  if(!obj) { // groupmember not yet created
-    ck->getGroupTable()->find(groupID).enqMsg(env);
-    return;
+  register IrrGroup *obj = _lookupGroup(ck,env,env->getGroupNum());
+  if(obj) { 
+    _deliverForBocMsg(ck,env->getEpIdx(),env,obj);
   }
-  ck->process();
-  register int epIdx = env->getEpIdx();
-  _deliverForBocMsg(ck,epIdx,env,obj);
 }
 
 static inline void _deliverForNodeBocMsg(CkCoreState *ck,envelope *env,void *obj)
@@ -584,24 +617,6 @@ static inline void _processForNodeBocMsg(CkCoreState *ck,envelope *env)
   _STATS_RECORD_PROCESS_NODE_BRANCH_1();
 }
 
-static inline void _processFillVidMsg(CkCoreState *ck,envelope *env)
-{
-  register VidBlock *vptr = (VidBlock *) env->getVidPtr();
-  _CHECK_VALID(vptr, "FillVidMsg: Not a valid VIdPtr\n");
-  register CkChareID *pcid = (CkChareID *) EnvToUsr(env);
-  _CHECK_VALID(pcid, "FillVidMsg: Not a valid pCid\n");
-  vptr->fill(pcid->onPE, pcid->objPtr);
-  CmiFree(env);
-}
-
-static inline void _processForVidMsg(CkCoreState *ck,envelope *env)
-{
-  VidBlock *vptr = (VidBlock *) env->getVidPtr();
-  _CHECK_VALID(vptr, "ForVidMsg: Not a valid VIdPtr\n");
-  _SET_USED(env, 1);
-  vptr->send(env);
-}
-
 void _processBocInitMsg(CkCoreState *ck,envelope *env)
 {
   register CkGroupID groupID = env->getGroupNum();
@@ -616,6 +631,23 @@ void _processNodeBocInitMsg(CkCoreState *ck,envelope *env)
   CkCreateLocalNodeGroup(groupID, epIdx, env);
 }
 
+/************** Receive: Arrays *************/
+
+static void _processArrayEltInitMsg(CkCoreState *ck,envelope *env) {
+  CkArray *mgr=(CkArray *)_lookupGroup(ck,env,env->getsetArrayMgr());
+  if (mgr) {
+    _SET_USED(env, 0);
+    mgr->insertElement((CkMessage *)EnvToUsr(env));
+  }
+}
+static void _processArrayEltMsg(CkCoreState *ck,envelope *env) {
+  CkArray *mgr=(CkArray *)_lookupGroup(ck,env,env->getsetArrayMgr());
+  if (mgr) {
+    _SET_USED(env, 0);
+    mgr->getLocMgr()->deliverInline((CkMessage *)EnvToUsr(env));
+  }
+}
+
 /**
  * This is the main converse-level handler used by all of Charm++.
  */
@@ -628,33 +660,14 @@ void _processHandler(void *converseMsg,CkCoreState *ck)
   }
 #endif
   switch(env->getMsgtype()) {
-    case NewChareMsg :
-      ck->process();
-      if(env->isPacked()) CkUnpackMessage(&env);
-      _processNewChareMsg(ck,env);
-      _STATS_RECORD_PROCESS_CHARE_1();
-      break;
-    case NewVChareMsg :
-      ck->process();
-      if(env->isPacked()) CkUnpackMessage(&env);
-      _processNewVChareMsg(ck,env);
-      _STATS_RECORD_PROCESS_CHARE_1();
-      break;
+// Group support
     case BocInitMsg :
-      ck->process();
-      if(env->isPacked()) CkUnpackMessage(&env);
+      ck->process(); if(env->isPacked()) CkUnpackMessage(&env);
       _processBocInitMsg(ck,env);
       break;
     case NodeBocInitMsg :
-      ck->process();
-      if(env->isPacked()) CkUnpackMessage(&env);
+      ck->process(); if(env->isPacked()) CkUnpackMessage(&env);
       _processNodeBocInitMsg(ck,env);
-      break;
-    case ForChareMsg :
-      ck->process();
-      if(env->isPacked()) CkUnpackMessage(&env);
-      _processForChareMsg(ck,env);
-      _STATS_RECORD_PROCESS_MSG_1();
       break;
     case ForBocMsg :
       // QD processing moved inside _processForBocMsg because it is conditional
@@ -668,6 +681,33 @@ void _processHandler(void *converseMsg,CkCoreState *ck)
       _processForNodeBocMsg(ck,env);
       // stats record moved to _processForNodeBocMsg because it is conditional
       break;
+      
+// Array support
+    case ArrayEltInitMsg:
+      if(env->isPacked()) CkUnpackMessage(&env);
+      _processArrayEltInitMsg(ck,env);
+      break;
+    case ForArrayEltMsg:
+      if(env->isPacked()) CkUnpackMessage(&env);
+      _processArrayEltMsg(ck,env);
+      break;
+    
+// Chare support
+    case NewChareMsg :
+      ck->process(); if(env->isPacked()) CkUnpackMessage(&env);
+      _processNewChareMsg(ck,env);
+      _STATS_RECORD_PROCESS_CHARE_1();
+      break;
+    case NewVChareMsg :
+      ck->process(); if(env->isPacked()) CkUnpackMessage(&env);
+      _processNewVChareMsg(ck,env);
+      _STATS_RECORD_PROCESS_CHARE_1();
+      break;
+    case ForChareMsg :
+      ck->process(); if(env->isPacked()) CkUnpackMessage(&env);
+      _processForChareMsg(ck,env);
+      _STATS_RECORD_PROCESS_MSG_1();
+      break;
     case ForVidMsg   :
       ck->process();
       _processForVidMsg(ck,env);
@@ -676,8 +716,9 @@ void _processHandler(void *converseMsg,CkCoreState *ck)
       ck->process();
       _processFillVidMsg(ck,env);
       break;
+    
     default:
-      CmiAbort("Internal Error: Unknown-msg-type. Contact Developers.\n");
+      CmiAbort("Fatal Charm++ Error> Unknown msg-type in _processHandler.\n");
   }
 }
 
@@ -1061,6 +1102,35 @@ void _ckModuleInit(void) {
 	index_skipCldHandler = CkRegisterHandler((CmiHandler)_skipCldHandler);
 }
 
+
+/************** Send: Arrays *************/
+
+extern void CkArrayManagerInsert(int onPe,void *msg);
+extern void CkArrayManagerDeliver(int onPe,void *msg);
+
+static void _prepareOutgoingArrayMsg(envelope *env,int type)
+{
+  _CHECK_USED(env);
+  _SET_USED(env, 1);
+  env->setMsgtype(type);
+  CmiSetHandler(env, _charmHandlerIdx);
+  CpvAccess(_qd)->create();
+}
+
+extern "C"
+void CkArrayManagerInsert(int pe,void *msg,CkGroupID aID) {
+  register envelope *env = UsrToEnv(msg);
+  env->getsetArrayMgr()=aID;
+  _prepareOutgoingArrayMsg(env,ArrayEltInitMsg);
+  _skipCldEnqueue(pe, env, _infoIdx);
+}
+extern "C"
+void CkArrayManagerDeliver(int pe,void *msg) {
+  register envelope *env = UsrToEnv(msg);
+  _prepareOutgoingArrayMsg(env,ForArrayEltMsg);
+  _skipCldEnqueue(pe, env, _infoIdx);
+}
+
 //------------------- Message Watcher (record/replay) ----------------
 
 CkMessageWatcher::~CkMessageWatcher() {}
@@ -1159,24 +1229,14 @@ void CkMessageWatcherInit(char **argv,CkCoreState *ck) {
 		ck->watcher=new CkMessageReplay(openReplayFile("r"));
 }
 
-
-
 int CkMessageToEpIdx(void *msg) {
         envelope *env=UsrToEnv(msg);
-        int ep=env->getEpIdx();
-        if (ep==CkIndex_CkLocMgr::deliverInline(0)
-         || ep==CkIndex_CkArray::recvBroadcast(0))
-        { // It's actually an array message:
-                ep=env->array_ep();
-        }
-        return ep;
+	int ep=env->getEpIdx();
+	if (ep==CkIndex_CkArray::recvBroadcast(0))
+		return env->getsetArrayBcastEp();
+	else
+		return ep;
 }
-
-
-
-
-
-
 
 
 #include "CkMarshall.def.h"

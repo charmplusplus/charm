@@ -40,6 +40,8 @@
 #define StatMsg        12
 #define NodeBocInitMsg 13
 #define ForNodeBocMsg  14
+#define ArrayEltInitMsg 15
+#define ForArrayEltMsg  16
 
 typedef unsigned int   UInt;
 typedef unsigned short UShort;
@@ -68,15 +70,14 @@ public:
 	CkGroupID g; //GroupID
 	CkNodeGroupID rednMgr; //Reduction manager for this group (constructor only!)
 	int epoch; //"epoch" this group was created during (0--mainchare, 1--later)
+	UShort arrayEp; // Used only for array broadcasts
       } group;
       struct s_array{ //For arrays only
-	CkGroupID loc; //Location manager GID
+	CkArrayIndexStruct index;//Array element index
+	int listenerData[CK_ARRAYLISTENER_MAXLEN]; //For creation
 	CkGroupID arr; //Array manager GID
 	UChar hopCount;//number of times message has been routed
-	UShort epIdx;//Array element entry point
-	int listenerData[CK_ARRAYLISTENER_MAXLEN]; //For creation
-	UInt srcPe;//Original sender
-	CkArrayIndexStruct index;//Array element index
+    	UChar ifNotThere; //what to do if array element is missing
       } array;
       struct s_roData { //RODataMsg
       	UInt count;
@@ -91,7 +92,6 @@ public:
     	UChar queueing:4; //Queueing strategy (FIFO, LIFO, PFIFO, ...)
     	UChar isPacked:1;
     	UChar isUsed:1;
-    	UChar ifNotThere:2; //Used by arrays
 	UChar isImmediate:1;   //Used by immediate msgs
     };
 private:
@@ -129,8 +129,6 @@ private:
     void   setMsgIdx(const UChar idx) { attribs.msgIdx = idx; }
     UInt   getTotalsize(void) const { return totalsize; }
     void   setTotalsize(const UInt s) { totalsize = s; }
-    UChar  getIfNotThere(void) const { return attribs.ifNotThere; }
-    void   setIfNotThere(const UChar s) { attribs.ifNotThere = s; }
     UChar  isPacked(void) const { return attribs.isPacked; }
     void   setPacked(const UChar p) { attribs.isPacked = p; }
     UShort getPriobits(void) const { return priobits; }
@@ -139,18 +137,6 @@ private:
     UShort getPrioBytes(void) const { return getPrioWords()*sizeof(int); }
     void*  getPrioPtr(void) const { 
       return (void *)((char *)this + totalsize - getPrioBytes());
-    }
-    UInt   getCount(void) const { 
-      CkAssert(getMsgtype()==RODataMsg); return type.roData.count; 
-    }
-    void   setCount(const UInt c) { 
-      CkAssert(getMsgtype()==RODataMsg); type.roData.count = c; 
-    }
-    UInt   getRoIdx(void) const { 
-      CkAssert(getMsgtype()==ROMsgMsg); return type.roMsg.roIdx; 
-    }
-    void   setRoIdx(const UInt r) { 
-      CkAssert(getMsgtype()==ROMsgMsg); type.roMsg.roIdx = r; 
     }
     static envelope *alloc(const UChar type, const UInt size=0, const UShort prio=0)
     {
@@ -165,20 +151,26 @@ private:
       _SET_USED(env, 0);
       return env;
     }
-    UShort getEpIdx(void) const {
-      CkAssert(getMsgtype()==NewChareMsg || getMsgtype()==NewVChareMsg
-          || getMsgtype()==ForChareMsg || getMsgtype()==ForVidMsg
-          || getMsgtype()==BocInitMsg || getMsgtype()==NodeBocInitMsg
-          || getMsgtype()==ForBocMsg || getMsgtype()==ForNodeBocMsg);
-      return epIdx;
+    UShort getEpIdx(void) const { return epIdx; }
+    void   setEpIdx(const UShort idx) { epIdx = idx; }
+    UInt   getSrcPe(void) const { return pe; }
+    void   setSrcPe(const UInt s) { pe = s; }
+
+// Readonly-specific fields
+    UInt   getCount(void) const { 
+      CkAssert(getMsgtype()==RODataMsg); return type.roData.count; 
     }
-    void   setEpIdx(const UShort idx) {
-      CkAssert(getMsgtype()==NewChareMsg || getMsgtype()==NewVChareMsg
-          || getMsgtype()==ForChareMsg || getMsgtype()==ForVidMsg
-          || getMsgtype()==BocInitMsg || getMsgtype()==NodeBocInitMsg
-          || getMsgtype()==ForBocMsg || getMsgtype()==ForNodeBocMsg);
-      epIdx = idx;
+    void   setCount(const UInt c) { 
+      CkAssert(getMsgtype()==RODataMsg); type.roData.count = c; 
     }
+    UInt   getRoIdx(void) const { 
+      CkAssert(getMsgtype()==ROMsgMsg); return type.roMsg.roIdx; 
+    }
+    void   setRoIdx(const UInt r) { 
+      CkAssert(getMsgtype()==ROMsgMsg); type.roMsg.roIdx = r; 
+    }
+    
+ // Chare-specific fields
     UInt isForAnyPE(void) { 
       CkAssert(getMsgtype()==NewChareMsg || getMsgtype()==NewVChareMsg); 
       return type.chare.forAnyPe; 
@@ -197,14 +189,14 @@ private:
           || getMsgtype()==FillVidMsg);
       type.chare.ptr = p;
     }
-    UInt   getSrcPe(void) const { return pe; }
-    void   setSrcPe(const UInt s) { pe = s; }
     void*  getObjPtr(void) const { 
       CkAssert(getMsgtype()==ForChareMsg); return type.chare.ptr; 
     }
     void   setObjPtr(void *p) { 
       CkAssert(getMsgtype()==ForChareMsg); type.chare.ptr = p; 
     }
+
+// Group-specific fields
     CkGroupID   getGroupNum(void) const {
       CkAssert(getMsgtype()==BocInitMsg || getMsgtype()==ForBocMsg
           || getMsgtype()==NodeBocInitMsg || getMsgtype()==ForNodeBocMsg);
@@ -215,23 +207,22 @@ private:
           || getMsgtype()==NodeBocInitMsg || getMsgtype()==ForNodeBocMsg);
       type.group.g = g;
     }
-    CkArrayIndexMax &array_index(void) {return 
-        *(CkArrayIndexMax *)&type.array.index;}
-    
-    unsigned short &array_ep(void) {return type.array.epIdx;}
-    unsigned char &array_hops(void) {return type.array.hopCount;}
-    CkGroupID &array_mgr(void) {return type.array.arr;}
-    unsigned int &array_srcPe(void) {return type.array.srcPe;}
-    int *array_listenerData(void) {return type.array.listenerData;}
-
-    void setRednMgr(CkNodeGroupID r){
-	type.group.rednMgr = r;
-    }
-    CkNodeGroupID getRednMgr(){
-    	return type.group.rednMgr;
-    }
     void setGroupEpoch(int epoch) { type.group.epoch=epoch; }
     int getGroupEpoch(void) { return type.group.epoch; }
+    void setRednMgr(CkNodeGroupID r){ type.group.rednMgr = r; }
+    CkNodeGroupID getRednMgr(){ return type.group.rednMgr; }
+
+// Array-specific fields
+    CkGroupID &getsetArrayMgr(void) {return type.array.arr;}
+    UShort &getsetArrayEp(void) {return epIdx;}
+    UShort &getsetArrayBcastEp(void) {return type.group.arrayEp;}
+    UInt &getsetArraySrcPe(void) {return pe;}
+    UChar &getsetArrayHops(void) {return type.array.hopCount;}
+    int getArrayIfNotThere(void) {return type.array.ifNotThere;}
+    void setArrayIfNotThere(int nt) {type.array.ifNotThere=nt;}
+    int *getsetArrayListenerData(void) {return type.array.listenerData;}
+    CkArrayIndexMax &getsetArrayIndex(void) 
+    	{return *(CkArrayIndexMax *)&type.array.index;}
 };
 
 inline envelope *UsrToEnv(const void *const msg) {

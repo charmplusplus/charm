@@ -15,6 +15,7 @@ public:
   //These routines are implementation utilities
   inline CkArrayIndexMax &array_index(void);
   unsigned short &array_ep(void);
+  unsigned short &array_ep_bcast(void);
   unsigned char &array_hops(void);
   unsigned int array_getSrcPe(void);
   unsigned int array_ifNotThere(void);
@@ -71,6 +72,7 @@ typedef enum {
 
 class CkArrayElementMigrateMessage : public CMessage_CkArrayElementMigrateMessage {
 public:
+	CkArrayIndexMax idx; // Array index that is migrating
 	int length;//Size in bytes of the packed data
 	double* packData;
 };

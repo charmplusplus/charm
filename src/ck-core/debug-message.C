@@ -106,18 +106,19 @@ void envelope::pup(PUP::er &p) {
 		p((void *)&(type.chare.ptr),sizeof(void *));
 		p(type.chare.forAnyPe);
 		break;
-	case BocInitMsg: case ForNodeBocMsg:
+	case BocInitMsg: case ForNodeBocMsg: case ForBocMsg:
 		p|type.group.g;
+		p|type.group.rednMgr;
+		p|type.group.epoch;
+		p|type.group.arrayEp;
 		break;
-	case ForBocMsg:
-		p|type.array.loc;
+	case ArrayEltInitMsg: case ForArrayEltMsg:
 		p|type.array.arr;
-		p(type.array.hopCount);
-		p(type.array.epIdx);
-		p(type.array.listenerData,CK_ARRAYLISTENER_MAXLEN);
-		p(type.array.srcPe);
 		p(type.array.index.nInts);
 		p(type.array.index.index,CK_ARRAYINDEX_MAXLEN);
+		p(type.array.listenerData,CK_ARRAYLISTENER_MAXLEN);
+		p(type.array.hopCount);
+		p(type.array.ifNotThere);
 		break;
 	case RODataMsg:
 		p(type.roData.count);

@@ -233,6 +233,10 @@ extern void CkDeliverMessageReadonly(int epIdx,const void *msg,void *object);
 extern void *CkLocalBranch(CkGroupID gID);
 extern void *CkLocalNodeBranch(CkGroupID gID);
 extern void *CkLocalChare(const CkChareID *chare);
+
+extern void CkArrayManagerInsert(int onPe,void *msg,CkGroupID aID);
+extern void CkArrayManagerDeliver(int onPe,void *msg);
+
 /*@}*/
 
 

@@ -65,7 +65,7 @@ static const char *idx2str(const ArrayElement *el)
 
 inline CkArrayIndexMax &CkArrayMessage::array_index(void)
 {
-	return UsrToEnv((void *)this)->array_index();
+	return UsrToEnv((void *)this)->getsetArrayIndex();
 }
 
 /*********************** CkVerboseListener ******************/
@@ -331,8 +331,7 @@ void CProxy_ArrayBase::ckInsertIdx(CkArrayMessage *m,int ctor,int onPe,
   }
   
   DEBC((AA"Proxy inserting element %s on Pe %d\n"AB,idx2str(idx),onPe));
-  CProxy_CkArray ap(_aid);
-  ap[onPe].insertElement(m);
+  CkArrayManagerInsert(onPe,m,_aid);
 }
 
 void CProxyElement_ArrayBase::ckInsert(CkArrayMessage *m,int ctorIndex,int onPe)
@@ -462,8 +461,8 @@ void CkArray::pup(PUP::er &p){
 void CkArray::prepareCtorMsg(CkMessage *m,int &onPe,const CkArrayIndex &idx)
 {
   envelope *env=UsrToEnv((void *)m);
-  env->array_index()=idx;
-  int *listenerData=env->array_listenerData();
+  env->getsetArrayIndex()=idx;
+  int *listenerData=env->getsetArrayListenerData();
   CK_ARRAYLISTENER_STAMP_LOOP(listenerData);
   if (onPe==-1) onPe=homePe(idx);
   if (onPe!=CkMyPe()) //Let the local manager know where this el't is
@@ -491,7 +490,7 @@ ArrayElement *CkArray::allocate(int elChareType,const CkArrayIndex &idx,
 	init.thisArray=this;
 	init.thisArrayID=thisgroup;
 	if (msg) /*Have to *copy* data because msg will be deleted*/
-	  memcpy(init.listenerData,UsrToEnv(msg)->array_listenerData(),
+	  memcpy(init.listenerData,UsrToEnv(msg)->getsetArrayListenerData(),
 		 sizeof(init.listenerData));
 	init.fromMigration=fromMigration;
 	
@@ -500,7 +499,7 @@ ArrayElement *CkArray::allocate(int elChareType,const CkArrayIndex &idx,
 	return (ArrayElement *)malloc(elSize);
 }
 
-/// This method is called by the user to add an element.
+/// This method is called by ck.C or the user to add an element.
 CmiBool CkArray::insertElement(CkMessage *me)
 {
   CK_MAGICNUMBER_CHECK
@@ -548,7 +547,7 @@ CmiBool CkArray::demandCreateElement(const CkArrayIndex &idx,
 	
 	if ((onPe!=CkMyPe()) || (type==CkDeliver_queue)) {
 		DEBC((AA"Forwarding demand-creation request for %s to %d\n"AB,idx2str(idx),onPe));
-		thisProxy[onPe].insertElement(m);
+		CkArrayManagerInsert(onPe,m,thisgroup);
 	} else /* local message, non-queued */ {
 		//Call local constructor directly
 		DEBC((AA"Demand-creating %s\n"AB,idx2str(idx)));
@@ -570,10 +569,10 @@ void CkArray::insertInitial(const CkArrayIndex &idx,void *ctorMsg)
 inline void msg_prepareSend(CkArrayMessage *msg, int ep,CkArrayID aid)
 {
 	envelope *env=UsrToEnv((void *)msg);
-	env->array_mgr()=aid;
-	env->array_srcPe()=CkMyPe();
-	env->array_ep()=ep;
-	env->array_hops()=0;
+	env->getsetArrayMgr()=aid;
+	env->getsetArraySrcPe()=CkMyPe();
+	env->setEpIdx(ep);
+	env->getsetArrayHops()=0;
 }
 inline void msg_prepareSendImmediate(CkArrayMessage *msg, int ep,CkArrayID aid)
 {
@@ -714,7 +713,7 @@ CmiBool CkArrayBroadcaster::deliver(CkArrayMessage *bcast,ArrayElement *el)
   int &elBcastNo=getData(el);
   elBcastNo++;
   DEBB((AA"Delivering broadcast %d to element %s\n"AB,elBcastNo,idx2str(el)));
-  int epIdx=bcast->array_ep();
+  int epIdx=bcast->array_ep_bcast();
   return el->ckInvokeEntry(epIdx,bcast,CmiFalse);
 }
 
@@ -766,7 +765,7 @@ void CkBroadcastMsgArray(int entryIndex, void *msg, CkArrayID aID)
 
 void CProxy_ArrayBase::ckBroadcast(CkArrayMessage *msg, int ep) const
 {
-	msg_prepareSend(msg,ep,ckGetArrayID());
+	msg->array_ep_bcast()=ep;
 	if (ckIsDelegated()) //Just call our delegateMgr
 	  ckDelegatedTo()->ArrayBroadcast(ep,msg,_aid);
 	else 

@@ -114,27 +114,31 @@ void CkArrayIndex::pup(PUP::er &p)
 /*********************** Array Messages ************************/
 inline CkArrayIndexMax &CkArrayMessage::array_index(void)
 {
-	return UsrToEnv((void *)this)->array_index();
+	return UsrToEnv((void *)this)->getsetArrayIndex();
 }
 unsigned short &CkArrayMessage::array_ep(void)
 {
-	return UsrToEnv((void *)this)->array_ep();
+	return UsrToEnv((void *)this)->getsetArrayEp();
+}
+unsigned short &CkArrayMessage::array_ep_bcast(void)
+{
+	return UsrToEnv((void *)this)->getsetArrayBcastEp();
 }
 unsigned char &CkArrayMessage::array_hops(void)
 {
-	return UsrToEnv((void *)this)->array_hops();
+	return UsrToEnv((void *)this)->getsetArrayHops();
 }
 unsigned int CkArrayMessage::array_getSrcPe(void)
 {
-	return UsrToEnv((void *)this)->array_srcPe();
+	return UsrToEnv((void *)this)->getsetArraySrcPe();
 }
 unsigned int CkArrayMessage::array_ifNotThere(void)
 {
-	return UsrToEnv((void *)this)->getIfNotThere();
+	return UsrToEnv((void *)this)->getArrayIfNotThere();
 }
 void CkArrayMessage::array_setIfNotThere(unsigned int i)
 {
-	UsrToEnv((void *)this)->setIfNotThere(i);
+	UsrToEnv((void *)this)->setArrayIfNotThere(i);
 }
 unsigned int CkArrayMessage::array_isImmediate(void)
 {
@@ -716,8 +720,8 @@ void CkLocRec_local::addedElement(void)
 {
 	//Push everything in the half-created queue into the system--
 	// anything not ready yet will be put back in.
-	while (!halfCreated.isEmpty())
-		myLocMgr->getLocalProxy().deliverInline(halfCreated.deq());
+	while (!halfCreated.isEmpty()) 
+		CkArrayManagerDeliver(CkMyPe(),halfCreated.deq());
 }
 
 CmiBool CkLocRec_local::isObsolete(int nSprings,const CkArrayIndex &idx_)
@@ -745,10 +749,10 @@ CmiBool CkLocRec_local::invokeEntry(CkMigratable *obj,void *msg,
 #ifndef CMK_OPTIMIZE
 	if (msg) { /* Tracing: */
 		envelope *env=UsrToEnv(msg);
-	//	CkPrintf("ckLocation.C beginExecuteDetailed %d %d \n",env->getEvent(),env->array_srcPe());
+	//	CkPrintf("ckLocation.C beginExecuteDetailed %d %d \n",env->getEvent(),env->getsetArraySrcPe());
 		if (_entryTable[epIdx]->traceEnabled)
 			_TRACE_BEGIN_EXECUTE_DETAILED(env->getEvent(),
-		    		 ForChareMsg,epIdx,env->array_srcPe(), env->getTotalsize(), idx.getProjectionID());
+		    		 ForChareMsg,epIdx,env->getsetArraySrcPe(), env->getTotalsize(), idx.getProjectionID());
 	}
 #endif
 	if (doFree) 
@@ -771,13 +775,13 @@ CmiBool CkLocRec_local::invokeEntry(CkMigratable *obj,void *msg,
 CmiBool CkLocRec_local::deliver(CkArrayMessage *msg,CkDeliver_t type)
 {
 	if (type==CkDeliver_queue) { /*Send via the message queue */
-		myLocMgr->getLocalProxy().deliverInline(msg);
+		CkArrayManagerDeliver(CkMyPe(),msg);
 		return CmiTrue;
 	}
 	else
 	{
 		CkMigratable *obj=myLocMgr->lookupLocal(localIdx,
-			UsrToEnv(msg)->array_mgr());
+			UsrToEnv(msg)->getsetArrayMgr());
 		if (obj==NULL) {//That sibling of this object isn't created yet!
 			if (msg->array_ifNotThere()!=CkArray_IfNotThere_buffer) {
 				return myLocMgr->demandCreateElement(msg,CkMyPe(),type);
@@ -893,7 +897,7 @@ public:
 		if (type==CkDeliver_immediate)
 		  myLocMgr->getProxy()[onPe].deliverImmediate(msg);
 		else /* normal message */
-		  myLocMgr->getProxy()[onPe].deliverInline(msg);
+		  CkArrayManagerDeliver(onPe,msg);
 		return CmiTrue;
 	}
 	//Return if this element is now obsolete
@@ -1286,15 +1290,15 @@ CmiBool CkLocMgr::deliverUnknown(CkArrayMessage *msg,CkDeliver_t type)
 		if (type==CkDeliver_immediate) 
 			thisProxy[onPe].deliverImmediate(msg);
 		else
-			thisProxy[onPe].deliverInline(msg);
+			CkArrayManagerDeliver(onPe,msg);
 		return CmiTrue;
 	}
 	else
 	{ // We *are* the home processor:
 	//Check if the element's array manager has been registered yet:
-	  CkArrMgr *mgr=managers.find(UsrToEnv((void *)msg)->array_mgr()).mgr;
+	  CkArrMgr *mgr=managers.find(UsrToEnv((void *)msg)->getsetArrayMgr()).mgr;
 	  if (!mgr) { //No manager yet-- postpone the message (stupidly)
-	    thisProxy[CkMyPe()].deliverInline(msg); 
+	    CkArrayManagerDeliver(CkMyPe(),msg); 
 	  }
 	  else { // Has a manager-- must buffer the message
 	    DEBC((AA"Adding buffer for unknown element %s\n"AB,idx2str(idx)));
@@ -1322,14 +1326,14 @@ CmiBool CkLocMgr::demandCreateElement(CkArrayMessage *msg,int onPe,CkDeliver_t t
 	if (onPe==-1) 
 	{ //Decide where element needs to live
 		if (msg->array_ifNotThere()==CkArray_IfNotThere_createhere) 
-			onPe=UsrToEnv(msg)->array_srcPe();
+			onPe=UsrToEnv(msg)->getsetArraySrcPe();
 		else //Createhome
 			onPe=homePe(idx);
 	}
 	
 	//Find the manager and build the element
 	DEBC((AA"Demand-creating element %s on pe %d\n"AB,idx2str(idx),onPe));
-	CkArrMgr *mgr=managers.find(UsrToEnv((void *)msg)->array_mgr()).mgr;
+	CkArrMgr *mgr=managers.find(UsrToEnv((void *)msg)->getsetArrayMgr()).mgr;
 	if (!mgr) CkAbort("Tried to demand-create for nonexistent arrMgr");
 	return mgr->demandCreateElement(idx,onPe,ctor,type);
 }
@@ -1469,8 +1473,8 @@ void CkLocMgr::migrate(CkLocRec_local *rec,int toPe)
 	int doubleSize=bufSize/sizeof(double)+1;
 	CkArrayElementMigrateMessage *msg = 
 		new (doubleSize, 0) CkArrayElementMigrateMessage;
+	msg->idx=idx;
 	msg->length=bufSize;
-	CkArrayMessage *amsg=(CkArrayMessage *)msg;
 	{
 		PUP::toMem p(msg->packData); 
 		p.becomeDeleting(); 
@@ -1483,8 +1487,7 @@ void CkLocMgr::migrate(CkLocRec_local *rec,int toPe)
 			CkAbort("Array element's pup routine has a direction mismatch.\n");
 		}
 	}
-	amsg->array_index()=idx;
-	DEBM((AA"Migrated index size %s\n"AB,idx2str(amsg->array_index())));	
+	DEBM((AA"Migrated index size %s\n"AB,idx2str(idx)));	
 
 //Send off message and delete old copy
 	thisProxy[toPe].migrateIncoming(msg);
@@ -1499,7 +1502,7 @@ void CkLocMgr::migrate(CkLocRec_local *rec,int toPe)
 void CkLocMgr::migrateIncoming(CkArrayElementMigrateMessage *msg)
 {
 	CkArrayMessage *amsg=(CkArrayMessage *)msg;
-	const CkArrayIndex &idx=amsg->array_index();
+	const CkArrayIndex &idx=msg->idx;
 	PUP::fromMem p(msg->packData); 
 	
 	int nMsgMan;
