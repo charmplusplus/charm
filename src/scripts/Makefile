@@ -719,7 +719,10 @@ comlib.decl.h : ComlibManager.ci charmxi
 
 COMLIB_OBJS = ComlibManager.o $(STRATEGY_OBJS) $(CONVERSE_COM_OBJS)
 
-comlib_objs: $(L)/libmodulecomlib.a
+comlib_objs: $(L)/libmodulecomlib.a $(L)/libconvcom.a
+
+$(L)/libconvcom.a: $(COMLIB_OBJS)
+	$(CHARMC) -o $(L)/libconvcom.a $(CONVERSE_COM_OBJS)
 
 #for backward compatibility, keep libmodulecommlib.a with double m.
 $(L)/libmodulecomlib.a: $(COMLIB_OBJS)
