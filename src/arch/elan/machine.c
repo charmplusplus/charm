@@ -849,7 +849,7 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
 				   (ELAN_QUEUE *)elan_q,
 				   /*elan_main2elan(elan_base->state, q),*/
 				   nslots /*elan_base->tport_nslots*/, 
-				   1024 /*elan_base->tport_smallmsg*/,
+				   elan_base->tport_smallmsg,
 				   elan_base->tport_bigmsg,
 				   elan_base->waitType, elan_base->retryCount,
 				   &(elan_base->shm_key),
