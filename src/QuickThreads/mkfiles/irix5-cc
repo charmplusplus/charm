@@ -1,6 +1,6 @@
 
-CC=cc -n32 -I. -O
-AS=as -n32
+CC=cc -32 -I. -O
+AS=as -32
 
 all: qt stp testpgm
 
