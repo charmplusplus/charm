@@ -31,8 +31,8 @@ goto begin
   if not exist %version%\nul mkdir %version%
   if not exist %version%\tmp\nul mkdir %version%\tmp
 
-  echo Copying src\Common.win32\Makefile.win32 to %version%\tmp
-  xcopy /q src\Common.win32\Makefile.win32 %version%\tmp 
+  echo Copying src\Common\scripts\Makefile.win32 to %version%\tmp
+  xcopy /q src\Common\scripts\Makefile.win32 %version%\tmp 
 
   echo Copying files...
   xcopy /d /q     src\Common\conv-core\*  %version%\tmp
@@ -42,7 +42,7 @@ goto begin
   xcopy /d /q     src\Common\xlat-i\*     %version%\tmp
   xcopy /d /q     src\Common\xlatcpm\*    %version%\tmp
   xcopy /d /q     src\Common\conv-ldb\*   %version%\tmp
-  xcopy /d /q     src\Common.win32\*.*    %version%\tmp
+  xcopy /d /q /i /s    src\Common.net\*        %version%\tmp
   xcopy /d /q     src\%version%\*.*       %version%\tmp
   xcopy /d /q     src\Common\langs\ampi\*.* %version%\tmp
 
