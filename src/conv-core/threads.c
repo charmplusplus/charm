@@ -13,7 +13,11 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 1.13  1995-10-13 18:14:10  jyelon
+ * Revision 1.14  1995-10-13 22:33:36  jyelon
+ * There was some bizzare test in CthCreate which I think was supposed
+ * to check for failure of some kind, but it didn't work.
+ *
+ * Revision 1.13  1995/10/13  18:14:10  jyelon
  * K&R changes, etc.
  *
  * Revision 1.12  1995/10/10  06:15:23  jyelon
@@ -358,9 +362,7 @@ CthVoidFn fn; void *arg; int size;
   result->awakenfn = 0;
   result->choosefn = 0;
   result->data_count = 0;
-  erralloc = (char *)alloca(offs) - newsp;
-  if (ABS(erralloc) >= SLACK) 
-    { printf("error #83742.\n"); exit(1); }
+  alloca(offs);
   if (setjmp(result->jb)) {
     if (thread_exiting)
       { CmiFree(thread_exiting); thread_exiting=0; }
