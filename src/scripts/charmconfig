@@ -758,7 +758,7 @@ fi
 
 
 #go get libpthread.a from charm website
-if test $version = net-linux-smp  || test $version = mpi-linux-vmi
+if test $version = net-linux-smp  || test $version = mpi-linux-vmi || test $version = mpi-linux-vmi-pgcc
 then
   if test ! -f ../lib/libpthread.a
   then
