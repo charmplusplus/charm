@@ -111,7 +111,8 @@ void CentralLB::ProcessAtSync()
   const int osz = theLbdb->GetObjDataSz();
   const int csz = theLbdb->GetCommDataSz();
   
-  CLBStatsMsg* msg = new(osz, csz, CkNumPes(), 0) CLBStatsMsg;
+  int npes = CkNumPes();
+  CLBStatsMsg* msg = new(osz, csz, npes, 0) CLBStatsMsg;
   msg->from_pe = CkMyPe();
   // msg->serial = rand();
   msg->serial = CrnRand();
