@@ -17,6 +17,8 @@ ps:
 	( cd ampi; $(LNCMD); $(MAKE) ps )
 	( cd bluegene; $(LNCMD); $(MAKE) ps )
 	( cd mblock; $(LNCMD); $(MAKE) ps )
+	( cd projections; $(LNCMD); $(MAKE) ps )
+	( cd tcharm; $(LNCMD); $(MAKE) ps )
 
 pdf:
 	if [ ! -d $(IDIR)/pdf ] ; then mkdir $(IDIR)/pdf ; fi
@@ -31,6 +33,8 @@ pdf:
 	( cd ampi; $(LNCMD); $(MAKE) pdf )
 	( cd bluegene; $(LNCMD); $(MAKE) pdf )
 	( cd mblock; $(LNCMD); $(MAKE) pdf )
+	( cd projections; $(LNCMD); $(MAKE) pdf )
+	( cd tcharm; $(LNCMD); $(MAKE) pdf )
 
 html:
 	if [ ! -d $(IDIR)/html ] ; then mkdir $(IDIR)/html ; fi
@@ -45,6 +49,8 @@ html:
 	( cd ampi; $(LNCMD); $(MAKE) html )
 	( cd bluegene; $(LNCMD); $(MAKE) html )
 	( cd mblock; $(LNCMD); $(MAKE) html )
+	( cd projections; $(LNCMD); $(MAKE) html )
+	( cd tcharm; $(LNCMD); $(MAKE) html )
 
 doc:
 	( cd install; $(LNCMD); $(MAKE) doc )
@@ -58,6 +64,8 @@ doc:
 	( cd ampi; $(LNCMD); $(MAKE) doc )
 	( cd bluegene; $(LNCMD); $(MAKE) doc )
 	( cd mblock; $(LNCMD); $(MAKE) doc )
+	( cd projections; $(LNCMD); $(MAKE) doc )
+	( cd tcharm; $(LNCMD); $(MAKE) doc )
 
 web:
 	( cd install; $(LNCMD); $(MAKE) web )
@@ -71,6 +79,8 @@ web:
 	( cd ampi; $(LNCMD); $(MAKE) web )
 	( cd bluegene; $(LNCMD); $(MAKE) web )
 	( cd mblock; $(LNCMD); $(MAKE) web )
+	( cd projections; $(LNCMD); $(MAKE) web )
+	( cd tcharm; $(LNCMD); $(MAKE) web )
 
 clean:
 	( cd install; $(RMCMD); $(MAKE) clean )
@@ -84,3 +94,5 @@ clean:
 	( cd ampi; $(RMCMD); $(MAKE) clean )
 	( cd bluegene; $(RMCMD); $(MAKE) clean )
 	( cd mblock; $(RMCMD); $(MAKE) clean )
+	( cd projections; $(LNCMD); $(MAKE) clean )
+	( cd tcharm; $(LNCMD); $(MAKE) clean )
