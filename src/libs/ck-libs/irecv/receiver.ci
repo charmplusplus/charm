@@ -1,6 +1,8 @@
 module receiver {
 
-message [varsize] receiverMsg;
+message receiverMsg {
+  char buf[];
+};
 
 array [1D] receiver
 {

@@ -25,6 +25,7 @@ public:
   int size;
   char *buf;
 
+/*
   static void *alloc(int mnum, size_t size, int *sizes, int pbits)
   {
     int stmp = sizes[0]*sizeof(char);
@@ -48,6 +49,7 @@ public:
     m->buf = (char *)((char*)&(m->buf) + (size_t)(m->buf));
     return m;
   }
+*/
 };
 
 
@@ -63,6 +65,7 @@ private:
   void *cb_data;
 
   typedef struct _tblEntry {
+    receiverMsg *msg;
     char *buf;
     int size;
   } tblEntry;
@@ -89,7 +92,7 @@ public:
   void ready2go();
 
 private:
-  void sendTo(int tag, char *pointer, int size, int from, int refno);
+  void sendTo(receiverMsg *, int tag, char *pointer, int size, int from, int refno);
   void recvAlready();
   void pupCmmTable(CmmTable &t, PUP::er &p);
 

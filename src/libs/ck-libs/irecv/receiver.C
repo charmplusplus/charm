@@ -44,7 +44,7 @@ receiver::~receiver()
 #define MIN(a,b) (a)<(b)?(a):(b)
 
 // other receiver send message here (active send)
-void receiver::sendTo(int tag, char *pointer, int size, int from, int refno)
+void receiver::sendTo(receiverMsg *msg, int tag, char *pointer, int size, int from, int refno)
 {
   int tags[3], ret_tags[3];
 
@@ -55,6 +55,7 @@ void receiver::sendTo(int tag, char *pointer, int size, int from, int refno)
   if (req) {
     //  irecv called before; copy buffer
     memcpy(req->buf, pointer, MIN(size, req->size)); 
+    delete msg;
     delete req;
 
     recvAlready();
@@ -63,8 +64,7 @@ void receiver::sendTo(int tag, char *pointer, int size, int from, int refno)
     // msg come before irecv called
     tags[0] = tag; tags[1] = from; tags[2] = refno;
     req = new tblEntry;
-    req->buf = new char[size];
-    memcpy(req->buf, pointer, size); 
+    req->msg = msg;
     req->size = size;
     CmmPut(msgTbl, 3, tags, req);
   }
@@ -73,14 +73,12 @@ void receiver::sendTo(int tag, char *pointer, int size, int from, int refno)
 
 void receiver::generic(receiverMsg *msg)
 {
-  sendTo(msg->tag, msg->buf, msg->size, msg->sendFrom, msg->refno);
-  delete msg;
+  sendTo(msg, msg->tag, msg->buf, msg->size, msg->sendFrom, msg->refno);
 }
 
 void receiver::syncSend(receiverMsg *msg)
 {
-  sendTo(msg->tag, msg->buf, msg->size, msg->sendFrom, msg->refno);
-  delete msg;
+  sendTo(msg, msg->tag, msg->buf, msg->size, msg->sendFrom, msg->refno);
 }
 
 extern "C" int typesize(int type, int count)
@@ -102,10 +100,11 @@ extern "C" int typesize(int type, int count)
 void receiver::isend(void *buf, int count, int datatype, int dest, int tag, int refno)
 {
  int size = typesize(datatype, count);
- receiverMsg * d = new (&size, 0) receiverMsg;
+ receiverMsg * d = new (size, 0) receiverMsg;
  d->tag = tag;
  d->sendFrom = thisIndex;
  d->refno = refno;
+ d->size = size;
  memcpy(d->buf, buf, size);
  CProxy_receiver B(thisArrayID);
  B[dest].generic(d);
@@ -121,8 +120,8 @@ void receiver::irecv(void *buf, int count, int datatype, int source, int tag, in
 
   if (req) {
     // send called before; copy buffer into
-    memcpy(buf, req->buf, MIN(size, req->size));
-    delete [] req->buf;
+    memcpy(buf, req->msg->buf, MIN(size, req->size));
+    delete req->msg;
     delete req;
   }
   else {
