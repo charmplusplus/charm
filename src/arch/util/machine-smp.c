@@ -269,18 +269,25 @@ void CmiDestroyLock(CmiNodeLock lk)
 
 void CmiYield(void) { sched_yield(); }
 
-int barrier;
-pthread_cond_t barrier_cond;
-pthread_mutex_t barrier_mutex;
+int barrier = 0;
+pthread_cond_t barrier_cond = PTHREAD_COND_INITIALIZER;
+pthread_mutex_t barrier_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 void CmiNodeBarrierCount(int nThreads)
 {
+  static int level = 0;
+  int cur = level;
   pthread_mutex_lock(&barrier_mutex);
+  /*CmiPrintf("[%d] CmiNodeBarrierCount: %d of %d count:%d\n", CmiMyPe(), barrier, nThreads, count);*/
   barrier++;
-  if(barrier != nThreads)
-    pthread_cond_wait(&barrier_cond, &barrier_mutex);
+  if(barrier != nThreads) {
+      /* occasionally it wakes up without having reach the count */
+    while(cur == level)
+      pthread_cond_wait(&barrier_cond, &barrier_mutex);
+  }
   else{
     barrier = 0;
+    level++;
     pthread_cond_broadcast(&barrier_cond);
   }
   pthread_mutex_unlock(&barrier_mutex);
