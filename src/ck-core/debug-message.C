@@ -31,7 +31,7 @@
 */
 void CkPupMessage(PUP::er &p,void **atMsg,int fast_and_dirty) {
 	UChar type;
-	int size,prioBits,convHeaderSize;
+	int size,prioBits,envSize;
 	envelope *env=UsrToEnv(*atMsg);
 	unsigned char wasPacked=0;
 	p.comment("Begin Charm++ Message {");
@@ -42,14 +42,14 @@ void CkPupMessage(PUP::er &p,void **atMsg,int fast_and_dirty) {
 		type=env->getMsgtype();
 		size=env->getTotalsize();
 		prioBits=env->getPriobits();
-		convHeaderSize=CmiReservedHeaderSize;
+		envSize=sizeof(envelope);
 	}
 	p(type);
 	p(wasPacked);
 	p(size);
 	p(prioBits);
-	p(convHeaderSize);	// converse header, different on platforms
-	int userSize=size-sizeof(envelope)-sizeof(int)*PW(prioBits);
+	p(envSize);
+	int userSize=size-envSize-sizeof(int)*PW(prioBits);
 	if (p.isUnpacking())
 		env=_allocEnv(type,userSize,prioBits);
 	if (fast_and_dirty == 1) {
@@ -57,16 +57,10 @@ void CkPupMessage(PUP::er &p,void **atMsg,int fast_and_dirty) {
 	  p((void *)env,size);
 	} 
  	else if (fast_and_dirty == 2) {
-	  if (p.isUnpacking()) {   // ignore converse header when unpacking
-	    char *buf = new char[size];
-	    p((void *)buf,size);
-	    memcpy((char*)env+CmiReservedHeaderSize, buf+convHeaderSize, 
-			size-convHeaderSize);
-	    delete [] buf;
-	  }
-	  else {
-	    p((void *)env,size);
-	  }
+	    /*Pup header in detail and message separately.*/
+	    /* note that it can be that sizeof(envelope) != envSize */
+	    env->pup(p);
+	    p((char*)env+sizeof(envelope),size-envSize);
  	}
 	else 
 	{ /*Pup each field separately, which allows debugging*/
@@ -89,7 +83,11 @@ void CkPupMessage(PUP::er &p,void **atMsg,int fast_and_dirty) {
 
 void envelope::pup(PUP::er &p) {
 	//message type, totalsize, and priobits are already pup'd (above)
-	p((void *)core,CmiMsgHeaderSizeBytes);
+	int convHeaderSize;
+	if (!p.isUnpacking()) convHeaderSize = CmiReservedHeaderSize;
+	p(convHeaderSize);
+	//puping converse hdr hopefully not go beyond boundry
+	p((void *)core,convHeaderSize);
 	p(ref);
 	p((void *)&attribs,sizeof(attribs));
 	p(epIdx);
