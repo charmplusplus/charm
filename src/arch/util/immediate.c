@@ -5,6 +5,14 @@
 
 static int immRunning=0; /* if set, somebody's inside an immediate message */
 
+int CmiIsImmRunning()
+{
+#if CMK_IMMEDIATE_MSG && CMK_NET_VERSION && ! defined(CMK_CPV_IS_SMP)
+  if (!Cmi_netpoll) return immRunning;
+#endif
+  return 0;
+}
+
 #if CMK_IMMEDIATE_MSG
 
 /* SMP: These variables are protected by immRecvLock. */
@@ -57,7 +65,8 @@ SMP: This routine must be called holding immRecvLock
  */
 static void CmiHandleImmediateMessage(void *msg) {
   int handlerNo=CmiGetXHandler(msg);
-  CmiHandlerInfo *h=&CpvAccessOther(CmiHandlerTable,0)[handlerNo];
+//  CmiHandlerInfo *h=&CpvAccessOther(CmiHandlerTable,0)[handlerNo];
+  CmiHandlerInfo *h=&CpvAccess(CmiHandlerTable)[handlerNo];
 
   MACHLOCK_ASSERT(immRunning,"CmiHandleImmediateMessage");
   CQdProcess(CpvAccess(cQdState),1);
@@ -105,9 +114,4 @@ void CmiHandleImmediate()
    CmiUnlock(CsvAccess(NodeState).immRecvLock);
 }
 
-#else
-int CmiImmediateInline()
-{
-  return 0;
-}
 #endif
