@@ -56,7 +56,7 @@ then
 	hostname=`hostname`
 	case "$hostname" in
 	turing*.turing.uiuc.edu) 
-		ppn='#PBS -l nodes='$pes':ppn=1'
+		ppn='#PBS -l nodes='$pes':ppn=1:myr2'
 		extra='-machinefile $PBS_NODEFILE'
 		;;
 	tg-login*)
@@ -85,32 +85,27 @@ then
 # This is a charmrun-generated PBS batch job script.
 # The lines starting with #PBS are queuing system flags:
 #
-# This determines the number of nodes and pes (here $nodes and $pes):
 $ppn
 #
 $ncpus
 #
-# This determines the wall-clock time limit (here 5 minutes):
 #PBS -l walltime=20:00
 #
 $mem
 #
-# Queue name (see info about other queues in web documentation)
 #PBS -q $PBS_QUEUE
 #
-# Job name (default = name of script file)
 #PBS -N autobuild
 #
 #PBS -j oe
 #
-# Filename for standard output (default = <job_name>.o<job_id>)
 #PBS -o $output
-#
+
 cd $indir
 
-# This is the actual command to run the job:
 cat \$PBS_NODEFILE
 $mpirun -np $pes $extra $args
+
 # Save mpirun exit status
 status=\$?
 echo \$status > $result
@@ -122,11 +117,10 @@ EOF
 #!/bin/sh
 # This is a charmrun-generated PBS batch job script.
 # The lines starting with #PBS are queuing system flags:
-
+#
 #BSUB -J autobuild
 #BSUB -W 0:20
 #BSUB -n $pes
-# Filename for standard output (default = <job_name>.o<job_id>)
 #BSUB -o $output
 
 cd $indir
@@ -184,10 +178,10 @@ End() {
 			retry=`expr $retry + 1`
 			if test $retry -gt 6
 			then
-				echo "Charmrun> abort!"
+				echo "Charmrun> too many errors, abort!"
 				exit 1
 			else
-				sleep 10
+				sleep 15
 			fi
 		else
 # job still in queue
