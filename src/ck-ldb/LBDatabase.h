@@ -4,6 +4,8 @@
 #include "lbdb.h"
 #include "LBDatabase.decl.h"
 
+extern CkGroupID lbdb;
+
 class LBDBInit : public Chare {
   public:
     LBDBInit(CkArgMsg*);

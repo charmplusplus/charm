@@ -838,6 +838,7 @@ void
 Readonly::genDecls(XStr& str)
 {
   str << "/* DECLS: "; print(str); str << " */\n";
+  /*
   if(container) { // local static var
   } else { // global var
     str << "extern ";
@@ -849,12 +850,24 @@ Readonly::genDecls(XStr& str)
       dims->print(str);
     str << ";";
   }
+  */
 }
 
 void
 Readonly::genDefs(XStr& str)
 {
   str << "/* DEFS: "; print(str); str << " */\n";
+  if(container) { // local static var
+  } else { // global var
+    str << "extern ";
+    type->print(str);
+    if(msg)
+      str << "*";
+    str << " "<<name;
+    if(dims)
+      dims->print(str);
+    str << ";";
+  }
 }
 
 void

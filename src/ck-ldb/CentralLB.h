@@ -4,6 +4,7 @@
 #include <LBDatabase.h>
 #include "CentralLB.decl.h"
 
+extern CkGroupID loadbalancer;
 
 void CreateCentralLB();
 

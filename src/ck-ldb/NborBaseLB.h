@@ -4,6 +4,7 @@
 #include <LBDatabase.h>
 #include "NborBaseLB.decl.h"
 
+extern CkGroupID nborBaselb;
 
 void CreateNborBaseLB();
 
