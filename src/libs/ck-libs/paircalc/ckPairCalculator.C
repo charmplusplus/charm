@@ -528,9 +528,9 @@ PairCalculator::sumPartialResult(partialResultMsg *msg)
 	  // CkPrintf("[%d %d %d %d]: sending to [%d %d]  \n",thisIndex.w,thisIndex.x,thisIndex.y,thisIndex.z,thisIndex.y+i+thisIndex.x/grainSize*psumblocksize,thisIndex.w);
 	  CkCallback mycb(msg->cb.d.array.ep, CkArrayIndex2D(/*thisIndex.y/grainSize+i+thisIndex.x/grainSize*psumblocksize*/thisIndex.y+i+thisIndex.x/grainSize*psumblocksize, thisIndex.w), msg->cb.d.array.id);
 	
-          mySendMsg *outmsg = new (N*psumblocksize,0)mySendMsg; // msg with newData (size N)
-          memcpy(outmsg->data, newData+i*psumblocksize, N*psumblocksize * sizeof(complex));
-          outmsg->N = N*psumblocksize;
+          mySendMsg *outmsg = new (N,0)mySendMsg; // msg with newData (size N)
+          memcpy(outmsg->data, newData+i*psumblocksize, N* sizeof(complex));
+          outmsg->N = N;
           
           mycb.send(outmsg);
       }
@@ -596,6 +596,7 @@ PairCalculator::sumPartialResult(int size, complex *result, int offset, CkCallba
       CkCallback mycb(cb.d.array.ep, CkArrayIndex2D(thisIndex.y+j, thisIndex.w), cb.d.array.id);
       mySendMsg *msg = new (N, 0)mySendMsg; // msg with newData (size N)
       memcpy(msg->data, newData+j*N, N * sizeof(complex));
+      msg->N=N;
       mycb.send(msg);
     }
     sumPartialCount = 0;
