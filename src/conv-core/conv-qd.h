@@ -9,7 +9,7 @@ struct ConvQdMsg;
 struct ConvQdState;
 typedef struct ConvQdMsg    *CQdMsg;
 typedef struct ConvQdState  *CQdState;
-typedef void (*CQdVoidFn)(void *userParam);
+typedef CcdVoidFn CQdVoidFn;
 
 CpvExtern(CQdState, cQdState);
 
