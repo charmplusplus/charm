@@ -2,7 +2,7 @@ CDIR=../../../..
 CHARMC=$(CDIR)/bin/charmc $(OPTS)
 
 # Directory where Magic software headers live:
-MGC=mgc
+MGC=.
 MGCOBJS=$(MGC)/MgcIntr3DTetrTetr.o  $(MGC)/MgcMath.o  $(MGC)/MgcPlane.o \
 	$(MGC)/MgcTetrahedron.o  $(MGC)/MgcVector3.o
 
@@ -57,7 +57,7 @@ clean:
 .SUFFIXES: .C .cpp
 
 .C.o:
-	$(CHARMC) -c $< -o $@
+	$(CHARMC) -c $<
 
 .cpp.o:
-	$(CHARMC) -c $< -o $@
+	$(CHARMC) -c $< 

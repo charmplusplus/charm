@@ -1,3 +1,5 @@
+Mgc* files
+
 Magic Software computational geometry routines,
 downloaded from
 	http://www.magic-software.com/http://www.magic-software.com/http://www.magic-software.com/http://www.magic-software.com/http://www.magic-software.com/http://www.magic-software.com/httphttp://www.magic-software.com/

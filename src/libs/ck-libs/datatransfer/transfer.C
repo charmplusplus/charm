@@ -8,7 +8,7 @@
 #include <vector> //for std::vector 
 #include "tetmesh.h" 
 #include "charm++.h" 
-#include "mgc/MgcIntr3DTetrTetr.h"
+#include "MgcIntr3DTetrTetr.h"
 using namespace Mgc;
 
 /**
