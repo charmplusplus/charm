@@ -619,7 +619,7 @@ void CkReductionMgr::pup(PUP::er &p)
   p|futureMsgs;
   p|futureRemoteMsgs;
   p|finalMsgs;
-  p|adjVec;
+  pupCkVec(p,adjVec);
   p|nodeProxy;
   p | storedCallback;
   if(p.isUnpacking()){
