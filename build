@@ -23,9 +23,15 @@ syntax() {
 printOption() {
   echo
   ( cd src/$BASEVERSION; 
-    str=`ls conv-mach-*.h 2>/dev/null | sed 's/conv-mach-\([^.]*\).h/\1/'`; 
+    str=`ls conv-mach-*.h 2>/dev/null | sed 's/conv-mach-\([^.]*\).h/\1/'`;
+    cd ../..
+    if [ -d src/Common.${ARCH} ]
+    then
+      cd src/Common.$ARCH
+      str="$str `ls conv-mach-*.h 2>/dev/null | sed 's/conv-mach-\([^.]*\).h/\1/'`";
+    fi
     printf 'supported options: '
-    echo $str )
+    echo $str)
   echo
   exit 1
 }
@@ -41,7 +47,20 @@ CheckDir() {
   done
 }
 
-  [ $# -lt 2 ] && syntax
+TestIfSupported() {
+  if [ ! -f src/$VERSION/conv-mach-$1.h ] && [ ! -f src/Common.$ARCH/conv-mach-$1.h ]
+  then
+    echo; 
+    echo "Error> option: $1 is not supported in this version!"; 
+    printOption
+  fi
+}
+
+
+# start
+
+[ $# -lt 2 ] && syntax
+
 
 MAKEOPTS=""
 OPTS=""
@@ -50,6 +69,7 @@ COMPILER=""
 BASEDIR=
 LIBDIR=
 INCDIR=
+ARCH=
 
 while [ ! $# -eq 0 ]
 do
@@ -59,27 +79,17 @@ do
 	  ;;
     *)
           PROGRAM=$1 ; shift
-          VERSION=$1; BASEVERSION=$1; shift
+          VERSION=$1; BASEVERSION=$1; ARCH=`echo $1 | sed -e 's@-.*@@'`; shift
           test "$1" = "help" && printOption
           while [ ! $# -eq 0 ]
           do
             case "$1" in
 	    "pgcc"|"icc"|"cxx"|"kcc"|"cc"|"cc64"|"acc"|"gcc3"|"mpcc")
-                if [ ! -f src/$VERSION/conv-mach-$1.h ]
-                then
-                  echo; 
-		  echo "Error> option: $1 is not supported in this version!"; 
-                  printOption
-                fi
+                TestIfSupported $1
                 COMPILER=$1; shift
 	        ;;
             "gm"|"vmi"|"scyld"|"smp"|"tcp")
-                if [ ! -f src/$VERSION/conv-mach-$1.h ]
-                then
-                  echo; 
-		  echo "Error> option: $1 is not supported in this version!";
-                  printOption
-                fi
+                TestIfSupported $1
                 MORE="$MORE $1"; shift
 		;;
     	    "--basedir")
@@ -196,10 +206,16 @@ then
     for i in $MORE
     do
 #      touch $VERSION/tmp/$i
-      echo '/* '"src/$BASEVERSION/conv-mach-$i.h"' */' >> $ConvHeader
-      cat src/$BASEVERSION/conv-mach-$i.h >> $ConvHeader
-      echo '# '"src/$BASEVERSION/conv-mach-$i.sh" >> $ConvSh
-      cat src/$BASEVERSION/conv-mach-$i.sh >> $ConvSh
+      if [ -f src/$BASEVERSION/conv-mach-$i.h ]
+      then
+        CONVFILEDIR="src/$BASEVERSION/"
+      else
+        CONVFILEDIR="src/Common.$ARCH"
+      fi
+      echo '/* '"$CONVFILEDIR/conv-mach-$i.h"' */' >> $ConvHeader
+      cat $CONVFILEDIR/conv-mach-$i.h >> $ConvHeader
+      echo '# '"$CONVFILEDIR/conv-mach-$i.sh" >> $ConvSh
+      cat $CONVFILEDIR/conv-mach-$i.sh >> $ConvSh
     done
   fi
 fi
