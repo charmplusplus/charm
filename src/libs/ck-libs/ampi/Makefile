@@ -7,8 +7,10 @@ COMPAT=compat_ampius.o compat_ampifus.o \
        compat_ampim.o compat_ampifm.o compat_ampicm.o
 OBJS=ampi.o ampif.o $(COMPAT)
 
-DEST=$(CDIR)/lib/libmoduleampi.a
-DESTF=$(CDIR)/lib/libmoduleampif.a
+LIB=libmoduleampi
+LIBDIR=$(CDIR)/lib
+DEST=$(LIBDIR)/$(LIB).a
+DESTF=$(LIBDIR)/$(LIB)f.a
 
 all: AMPI AMPIF
 
@@ -19,11 +21,13 @@ AMPIF: $(DESTF)
 
 $(DEST): $(OBJS) headers
 	$(CHARMC) $(OBJS) -o $@
+	cp $(LIB).dep $(LIBDIR)/$(LIB).dep
 
 $(DESTF): $(OBJS) headers
 	-$(CHARMC) -c ampimod.f90
 	-$(CHARMC) -cpmod ../../../../include mpiincl.M
 	-$(CHARMC) $(OBJS) ampimod.o -o $@
+	-cp $(LIB)f.dep $(LIBDIR)/$(LIB)f.dep
 
 headers: $(HEADERS)
 	cp $(HEADERS) $(CDIR)/include/
