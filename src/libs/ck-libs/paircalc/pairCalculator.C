@@ -173,6 +173,10 @@ void startPairCalcRight(PairCalcID* pcid, int n, complex* ptr, int myS, int myZ)
 }
 
 void finishPairCalc(PairCalcID* pcid, int n, double *ptr) {
+    finishPairCalc2(pcid, n, ptr, NULL);
+}
+
+void finishPairCalc2(PairCalcID* pcid, int n, double *ptr1, double *ptr2) {
 #ifdef _DEBUG_
   CkPrintf("     Calc Finish\n");
 #endif
@@ -187,8 +191,12 @@ void finishPairCalc(PairCalcID* pcid, int n, double *ptr) {
       bcastInstance.beginIteration();
   }
 
-  pairCalcReducerProxy.broadcastEntireResult(n, ptr, pcid->Symmetric);
-  
+  if(ptr2==NULL){
+      pairCalcReducerProxy.broadcastEntireResult(n, ptr1, pcid->Symmetric);
+  }
+  else {
+      pairCalcReducerProxy.broadcastEntireResult(n, ptr1, ptr2, pcid->Symmetric);
+  }
   if(pcid->useComlib) {
       bcastInstance.endIteration();
   }

@@ -18,6 +18,7 @@ module ckPairCalculator {
 
    		entry void calculatePairs(int size, complex points[size], int, bool, bool);
 		entry void acceptResult(int size, double matrix[size]);
+		entry void acceptResult(int size, double matrix1[size], double matrix2[size]);
 	  	entry void sumPartialResult(int size, complex result[size], int offset);
 	  	entry void sumPartialResult(partialResultMsg *msg);
 	  	entry void sumPartialResult(priorSumMsg *msg);
@@ -25,7 +26,8 @@ module ckPairCalculator {
 
 	group PairCalcReducer {
 		entry PairCalcReducer();
-		entry void broadcastEntireResult(int size, double matrix[size], bool symmtype);			
+		entry void broadcastEntireResult(int size, double matrix[size], bool symmtype);	
+		entry void broadcastEntireResult(int size, double matrix1[size], double matrix2[size], bool symmtype);			
 		entry void startMachineReduction(void);
 	};
 

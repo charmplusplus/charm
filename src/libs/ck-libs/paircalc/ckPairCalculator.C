@@ -420,13 +420,21 @@ PairCalculator::calculatePairs(int size, complex *points, int sender, bool fromR
 #endif
 }
 
-
 void
 PairCalculator::acceptResult(int size, double *matrix)
+{
+    acceptResult(size, matrix, NULL);
+}
+
+void
+PairCalculator::acceptResult(int size, double *matrix1, double *matrix2)
 {
 #ifdef _PAIRCALC_DEBUG_
   CkPrintf("[%d %d %d %d]: Accept Result with size %d\n", thisIndex.w, thisIndex.x, thisIndex.y, thisIndex.z, size);
 #endif
+
+  bool unitcoef = false;
+  if(matrix2==NULL) unitcoef = true;
 
   complex *mynewData = new complex[N*grainSize];
 
@@ -451,9 +459,16 @@ PairCalculator::acceptResult(int size, double *matrix)
       int iN=i*N;
       complex *newiNdata=&mynewData[iN];
       for (int j = 0; j < grainSize; j++){ 
-	m = matrix[iSindex + j];
-	for (int p = size1; p < size1+PARTITION_SIZE; p++)
-	  newiNdata[p] += inDataLeft[j][p] * m;
+	  m = matrix1[iSindex + j];
+	  for (int p = size1; p < size1+PARTITION_SIZE; p++)
+	    newiNdata[p] += inDataLeft[j][p] * m;
+      }
+      if(!unitcoef){
+	  for (int j = 0; j < grainSize; j++){ 
+	    m = matrix2[iSindex + j];
+	    for (int p = size1; p < size1+PARTITION_SIZE; p++)
+		newiNdata[p] += inDataRight[j][p] * m;
+	  }
       }
     }
   }
@@ -464,9 +479,16 @@ PairCalculator::acceptResult(int size, double *matrix)
       int iN=i*N;
       complex *newiNdata=&mynewData[iN];
       for (int j = 0; j < grainSize; j++){ 
-	m = matrix[iSindex + j];
-	for (int p = start_offset; p < N; p++)
-	  newiNdata[p] += inDataLeft[j][p] * m;
+	  m = matrix1[iSindex + j];
+	  for (int p = start_offset; p < N; p++)
+	    newiNdata[p] += inDataLeft[j][p] * m;
+      }
+      if(!unitcoef){
+	  for (int j = 0; j < grainSize; j++){ 
+	    m = matrix2[iSindex + j];
+	    for (int p = start_offset; p < N; p++)
+		newiNdata[p] += inDataRight[j][p] * m;
+	  }
       }
     }
   }
@@ -486,22 +508,20 @@ PairCalculator::acceptResult(int size, double *matrix)
   complex beta=complex(0.0,0.0);
   char transform='N';
   char transformT='T';
-  complex *leftptr = inDataLeft[0];
-  complex *rightptr = inDataRight[0];
 
   index = thisIndex.x*S + thisIndex.y;
   memset(amatrix, 0, matrixSize*sizeof(complex));
   double *localMatrix;
   double * outMatrix;
   for(int i=0;i<grainSize;i++){
-    localMatrix = (matrix+index+i*S);
+    localMatrix = (matrix1+index+i*S);
     outMatrix   = (double*)(amatrix+i*grainSize);
     DCOPY(&grainSize,localMatrix,&incx, outMatrix,&incy);
   }
 
   for (int i = 0; i < grainSize; i++) {
     for (int j = 0; j < grainSize; j++){ 
-      m = matrix[index + j + i*S];
+      m = matrix1[index + j + i*S];
       if(m!=amatrix[i*grainSize+j].re){CkPrintf("Dcopy broken in back path: %2.5g != %2.5g \n",
       						m, amatrix[i*grainSize+j].re);}
     }
@@ -509,12 +529,35 @@ PairCalculator::acceptResult(int size, double *matrix)
 
   ZGEMM(&transform, &transformT, &n_in, &m_in, &k_in, &alpha, &(inDataLeft[0][0]), &n_in, 
         &(amatrix[0]), &k_in, &beta, &(mynewData[0]), &n_in);
+
+  if(!unitcoef){
+
+  beta=complex(1.0,0.0);  // C = alpha*A*B + beta*C
+
+  for(int i=0;i<grainSize;i++){
+    localMatrix = (matrix2+index+i*S);
+    outMatrix   = (double*)(amatrix+i*grainSize);
+    DCOPY(&grainSize,localMatrix,&incx, outMatrix,&incy);
+  }
+
+  for (int i = 0; i < grainSize; i++) {
+    for (int j = 0; j < grainSize; j++){ 
+      m = matrix2[index + j + i*S];
+      if(m!=amatrix[i*grainSize+j].re){CkPrintf("Dcopy broken in back path: %2.5g != %2.5g \n",
+						m, amatrix[i*grainSize+j]);}
+    }
+  }
+
+  ZGEMM(&transform, &transformT, &n_in, &m_in, &k_in, &alpha, &(inDataRight[0][0]), &n_in, 
+        &(amatrix[0]), &k_in, &beta, &(mynewData[0]), &n_in);
+  }
+
   /*
   if(symmetric && thisIndex.x != thisIndex.y){
     index = thisIndex.x*S + thisIndex.y;
-    localMatrix=matrix+index;
+    localMatrix=matrix1+index;
     for(int i=0;i<grainSize;i++){
-      localMatrix=matrix+index+i*S;
+      localMatrix=matrix1+index+i*S;
       outMatrix   = (double*)(amatrix+i*grainSize);
       DCOPY(&grainSize,localMatrix,&incx,outMatrix,&incy);
     }
@@ -535,9 +578,14 @@ PairCalculator::acceptResult(int size, double *matrix)
   index = thisIndex.y*S + thisIndex.x;
   for (int i = 0; i < grainSize; i++) {
     for (int j = 0; j < grainSize; j++){ 
-      m = matrix[index + j + i*S];
+      m = matrix1[index + j + i*S];
       for (int p = 0; p < N; p++){
 	mynewData[p + i*N] += leftptr[j*N + p] * m;
+	if(!unitcoef){
+	  m = matrix2[index + j + i*S];
+	  for (int p = 0; p < N; p++){
+	    mynewData[p + i*N] += rightptr[j*N + p] * m;
+	  }
       }
     }
   }
@@ -547,7 +595,7 @@ PairCalculator::acceptResult(int size, double *matrix)
       memset(othernewData, 0, N*grainSize*sizeof(complex));
       for (int i = 0; i < grainSize; i++) {
 	  for (int j = 0; j < grainSize; j++){ 
-	      m = matrix[index + j + i*S];
+	      m = matrix1[index + j + i*S];
 	      for (int p = 0; p < N; p++)
 		  othernewData[p + i*N] += rightptr[j*N + p] * m;
 	  }
@@ -773,6 +821,12 @@ void
 PairCalcReducer::broadcastEntireResult(int size, double* matrix, bool symmtype){
   for (int i = 0; i < localElements[symmtype].length(); i++)
     (localElements[symmtype])[i]->acceptResult(size, matrix); 
+}
+
+void
+PairCalcReducer::broadcastEntireResult(int size, double* matrix1, double* matrix2, bool symmtype){
+  for (int i = 0; i < localElements[symmtype].length(); i++)
+    (localElements[symmtype])[i]->acceptResult(size, matrix1, matrix2); 
 }
 
 void

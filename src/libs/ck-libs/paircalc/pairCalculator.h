@@ -59,6 +59,8 @@ void startPairCalcRight(PairCalcID* aid, int n, complex* ptr, int myS, int myZ);
 
 extern "C" void finishPairCalc(PairCalcID* aid, int n, double *ptr);
 
+extern "C" void finishPairCalc2(PairCalcID* pcid, int n, double *ptr1, double *ptr2);
+
 void startPairCalcLeftAndFinish(PairCalcID* pcid, int n, complex* ptr, int myS, int myZ);
 
 void startPairCalcRightAndFinish(PairCalcID* pcid, int n, complex* ptr, int myS, int myZ);

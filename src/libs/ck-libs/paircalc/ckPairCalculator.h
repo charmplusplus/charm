@@ -13,12 +13,11 @@
 //#define _PAIRCALC_DEBUG_
 
 // Optimize flags: 
-//#define _PAIRCALC_FIRSTPHASE_STREAM_
+#define _PAIRCALC_FIRSTPHASE_STREAM_
 #define _PAIRCALC_USE_ZGEMM_
 // Flags not yet correct
 //#define _PAIRCALC_SECONDPHASE_LOADBAL_
 
-//#define FORTRANUNDERSCORE
 
 #ifdef FORTRANUNDERSCORE
 #define ZGEMM zgemm_ 
@@ -102,6 +101,7 @@ class PairCalculator: public CBase_PairCalculator {
   ~PairCalculator();
   void calculatePairs(int, complex *, int, bool, bool); 
   void acceptResult(int size, double *matrix);
+  void acceptResult(int size, double *matrix1, double *matrix2);
   void sumPartialResult(int size, complex *result, int offset);
   void sumPartialResult(priorSumMsg *msg);
   void sumPartialResult(partialResultMsg *msg);
@@ -157,6 +157,7 @@ class PairCalcReducer : public Group {
   }
   ~PairCalcReducer() {}
   void broadcastEntireResult(int size, double* matrix, bool symmtype);
+  void broadcastEntireResult(int size, double* matrix1, double* matrix2, bool symmtype);
   void doRegister(PairCalculator *, bool);
 
   void acceptContribute(int size, double* matrix, CkCallback cb, bool isAllReduce, bool symmtype);
