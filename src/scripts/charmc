@@ -853,7 +853,7 @@ case "$LANGUAGE" in
         PRE_LIBRARIES="$PRE_LIBRARIES -lfem"
 	;;
 "femf")
-        PRE_LIBRARIES="$PRE_LIBRARIES -lfem"
+        PRE_LIBRARIES="$PRE_LIBRARIES -lfemf"
         POST_LIBRARIES="$POST_LIBRARIES $CMK_F90LIBS"
 	;;
 "f90charm")
