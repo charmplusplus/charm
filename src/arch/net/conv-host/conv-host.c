@@ -1879,8 +1879,7 @@ prog rsh_start(nodeno)
 }
 
 
-#if CMK_CONV_HOST_CSH_UNAVAILABLE
-void rsh_pump(p, nodeno, rank0no, argv)
+void rsh_pump_sh(p, nodeno, rank0no, argv)
     prog p; int nodeno, rank0no; char **argv;
 {
   char *arg_nodeprog_r,*arg_currdir_r;
@@ -2051,8 +2050,8 @@ void rsh_pump(p, nodeno, rank0no, argv)
   prog_flush(p);
   
 }
-#else
-void rsh_pump(p, nodeno, rank0no, argv)
+
+void rsh_pump_csh(p, nodeno, rank0no, argv)
     prog p; int nodeno, rank0no; char **argv;
 {
   char *arg_nodeprog_r,*arg_currdir_r;
@@ -2223,8 +2222,17 @@ void rsh_pump(p, nodeno, rank0no, argv)
   prog_flush(p);
   
 }
-#endif
 
+
+void rsh_pump(p, nodeno, rank0no, argv)
+    prog p; int nodeno, rank0no; char **argv;
+{
+#if CMK_CONV_HOST_CSH_UNAVAILABLE
+  rsh_pump_sh(p, nodeno, rank0no, argv);
+#else
+  rsh_pump_csh(p, nodeno, rank0no, argv);
+#endif
+}
 
 void start_nodes_rsh(void)
 {
