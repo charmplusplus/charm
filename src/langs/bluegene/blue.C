@@ -1282,7 +1282,7 @@ CmiStartFn bgMain(int argc, char **argv)
   /* check if all bluegene node size and thread information are set */
   BGARGSCHECK;
 
-  timerFunc = BgGetCurTime;
+  timerFunc = BgGetTime;
 
   BgInitTiming();		// timing module
 

@@ -16,7 +16,6 @@ CpvStaticDeclare(int, msgCounter);
 CpvDeclare(int, heartbeatHandler);
 CpvDeclare(int, heartbeatBcastHandler);
 
-int bgSkipEndFlag=0;
 int traceBluegeneLinked=0;
 extern int programExit;
 static int deadlock = 0;

@@ -6,6 +6,8 @@
 int genTimeLog = 0;			// was 1 for guna 's seq correction
 int correctTimeLog = 0;
 int bgcorroff = 0;
+int bgSkipEndFlag=0;
+
 extern BgTimeLineRec* currTline;
 extern int currTlineIdx;
 
@@ -111,7 +113,7 @@ bgTimeLog::bgTimeLog(char *msg)
 {
   strcpy(name,"msgep");
   ep = msg?CmiBgMsgHandle(msg):-1;
-  startTime = BgGetCurTime();
+  startTime = timerFunc();
   recvTime = msg?CmiBgMsgRecvTime(msg):0;//startTime;
   endTime = 0.0;
   execTime = 0.0;
@@ -206,29 +208,24 @@ void bgTimeLog::addBackwardDeps(CkVec<void*> logs){
 
 void BgTimeLineRec::logEntryStart(char *m) {
   if (!genTimeLog) return;
-  if (tTHREADTYPE == WORK_THREAD) {
-      CmiAssert(bgCurLog == NULL);
-      bgCurLog = new bgTimeLog(m);
-      enq(bgCurLog, 1);
-  }
+  CmiAssert(bgCurLog == NULL);
+  bgCurLog = new bgTimeLog(m);
+  enq(bgCurLog, 1);
 }
 
 void BgTimeLineRec::logEntryCommit() {
   if (!genTimeLog) return;
-  if (tTHREADTYPE == WORK_THREAD) 
-  {
-      if(bgSkipEndFlag == 0)
+  if(bgSkipEndFlag == 0)
 	timeline[timeline.length()-1]->closeLog();
-      else
+  else
         bgSkipEndFlag=0;
-      if (correctTimeLog) {
+  if (correctTimeLog) {
 	BgAdjustTimeLineInsert(*this);
 	if (timeline.length()) 
           tCURRTIME = timeline[timeline.length()-1]->endTime;
 	clearSendingLogs();
-      }
-      bgCurLog = NULL;
   }
+  bgCurLog = NULL;
 }
 
 void BgTimeLineRec::logEntryInsert(bgTimeLog* log)
@@ -247,19 +244,15 @@ void BgTimeLineRec::logEntryStart(bgTimeLog* log)
 
 void BgTimeLineRec::logEntryClose() {
   if (!genTimeLog) return;
-  if (tTHREADTYPE == WORK_THREAD) 
-  {
-    bgTimeLog *lastlog = timeline[timeline.length()-1];
-    CmiAssert(bgCurLog == lastlog);
-    lastlog->closeLog();
-    bgCurLog = NULL;
-  }
+  bgTimeLog *lastlog = timeline[timeline.length()-1];
+  CmiAssert(bgCurLog == lastlog);
+  lastlog->closeLog();
+  bgCurLog = NULL;
 }
 
 void BgTimeLineRec::logEntrySplit()
 {
   if (!genTimeLog) return;
-  CmiAssert(tTHREADTYPE == WORK_THREAD);
   CmiAssert(bgCurLog != NULL);
   bgTimeLog *rootLog = bgCurLog;
   if (bgSkipEndFlag == 0) {
@@ -271,7 +264,7 @@ void BgTimeLineRec::logEntrySplit()
   }
 
   // make up a new bglog to start, setting up dependencies.
-  bgTimeLog *newLog = new bgTimeLog(-1, "broadcast", BgGetTime());
+  bgTimeLog *newLog = new bgTimeLog(-1, "broadcast", timerFunc());
   newLog->addBackwardDep(rootLog);
   logEntryInsert(newLog);
   bgCurLog = newLog;
