@@ -10,11 +10,8 @@
 */
 /*@{*/
 
-#ifndef  WIN32
-#include <unistd.h>
-#endif
-#include <charm++.h>
-#include <BaseLB.h>
+#include "charm++.h"
+#include "BaseLB.h"
 #include "NborBaseLB.h"
 #include "NborBaseLB.def.h"
 
@@ -135,7 +132,7 @@ void NborBaseLB::AtSync()
 
   // Tell our own node that we are ready
   CkMarshalledNLBStatsMessage mmsg(NULL);
-  ReceiveStats(mmsg);
+  thisProxy[CkMyPe()].ReceiveStats(mmsg);
 #endif
 }
 
@@ -445,9 +442,19 @@ CkMarshalledNLBStatsMessage::~CkMarshalledNLBStatsMessage() {
 
 void CkMarshalledNLBStatsMessage::pup(PUP::er &p)
 {
+  int isnull;
+  if (p.isPacking()) isnull = (msg==NULL?1:0);
+  p|isnull;
+  if (p.isUnpacking()) {
+    if (!isnull) msg = new NLBStatsMsg;
+    else msg = NULL;
+  }
+  if (msg) msg->pup(p);
+#if 0
   if (p.isUnpacking()) msg = new NLBStatsMsg;
   else CmiAssert(msg);
   msg->pup(p);
+#endif
 }
 
 
