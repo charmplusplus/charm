@@ -1260,7 +1260,7 @@ class ampi : public CBase_ampi {
 	       MPI_Aint targdisp, int targcnt, MPI_Datatype targtype, WinStruct win);
     int winGet(void *orgaddr, int orgcnt, MPI_Datatype orgtype, int rank, 
 	       MPI_Aint targdisp, int targcnt, MPI_Datatype targtype, WinStruct win);
-    void winRemotePut(int orgcnt, char* orgaddr, MPI_Datatype orgtype,
+    void winRemotePut(int orgtotalsize, char* orgaddr, int orgcnt, MPI_Datatype orgtype,
 		      MPI_Aint targdisp, int targcnt, MPI_Datatype targtype, 
 		      int winIndex, CkFutureID ftHandle, int pe_src);
     void winRemoteGet(int orgcnt, MPI_Datatype orgtype, MPI_Aint targdisp, 
@@ -1273,9 +1273,10 @@ class ampi : public CBase_ampi {
     int winAccumulate(void *orgaddr, int orgcnt, MPI_Datatype orgtype, int rank,
 	    	      MPI_Aint targdisp, int targcnt, MPI_Datatype targtype, 
 		      MPI_Op op, WinStruct win);
-    void winRemoteAccumulate(int orgcnt, char* orgaddr, MPI_Datatype orgtype, MPI_Aint targdisp,
-			     int targcnt, MPI_Datatype targtype, MPI_Op op, int winIndex, 
-			     CkFutureID ftHandle, int pe_src);
+    void winRemoteAccumulate(int orgtotalsize, char* orgaddr, int orgcnt, MPI_Datatype orgtype, MPI_Aint targdisp, 
+	  		    int targcnt, MPI_Datatype targtype, 
+		            MPI_Op op, int winIndex, CkFutureID ftHandle, 
+			    int pe_src);
     void winSetName(WinStruct win, char *name);
     void winGetName(WinStruct win, char *name, int *length);
     win_obj* getWinObjInstance(WinStruct win); 

@@ -23,13 +23,13 @@ module ampi {
     entry void intercommCreatePhase1(CkReductionMsg *msg);
     entry void intercommMergePhase1(CkReductionMsg *msg);
     entry void setRemoteProxy(CProxy_ampi rproxy);
-    entry void winRemotePut(int orgcnt, char orgaddr[orgcnt], MPI_Datatype orgtype, 
+    entry void winRemotePut(int orgtotalsize, char orgaddr[orgtotalsize], int orgcnt, MPI_Datatype orgtype, 
 			   MPI_Aint targdisp, int targcnt, MPI_Datatype targtype, int winIndex,
 			   CkFutureID ftHandle, int pe_src);
     entry void winRemoteGet(int orgcnt, MPI_Datatype orgtype,
 			   MPI_Aint targdisp, int targcnt, MPI_Datatype targtype, int winIndex,
 			   CkFutureID ftHandle, int pe_src);
-    entry void winRemoteAccumulate(int orgcnt, char orgaddr[orgcnt], MPI_Datatype orgtype, 
+    entry void winRemoteAccumulate(int orgtotalsize, char orgaddr[orgtotalsize], int orgcnt, MPI_Datatype orgtype, 
 				  MPI_Aint targdisp, int targcnt, MPI_Datatype targtype, 
 				  MPI_Op op, int winIndex, CkFutureID ftHandle, int pe_src);
     entry void winRemoteLock(int lock_type, int winIndex, CkFutureID ftHandle, int pe_src, int requestRank);

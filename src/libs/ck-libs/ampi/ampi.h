@@ -577,6 +577,9 @@ int AMPI_Type_get_contents(MPI_Datatype datatype, int max_integers, int max_addr
 #define MPI_MAX_OBJECT_NAME 255  // name length for COMM, TYPE and WIN
 #define MPI_MAX_INFO_KEY 255
 #define MPI_MAX_INFO_VAL 1024
+#define MPI_LOCK_SHARED  54   
+#define MPI_LOCK_EXCLUSIVE 55
+#define MPI_WIN_NULL -1
 
 typedef int MPI_Info;
 typedef int MPI_Win;
