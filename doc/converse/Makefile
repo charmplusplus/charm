@@ -12,7 +12,10 @@
 # REVISION HISTORY:
 #
 # $Log$
-# Revision 1.15  2000-06-22 22:12:56  milind
+# Revision 1.16  2000-06-22 22:38:00  milind
+# Minor fixes.
+#
+# Revision 1.15  2000/06/22 22:12:56  milind
 # made proper clean.
 #
 # Revision 1.14  2000/06/22 22:08:15  milind
@@ -113,5 +116,5 @@ all: ps html pdf install
 clean:	
 	rm -f *.ilg *.aux *.log *.dvi *.idx *.toc *~ index.tex manual.out
 
-veryclean:
+veryclean: clean
 	rm -rf *.ps *.pdf manual/

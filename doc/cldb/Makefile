@@ -27,8 +27,8 @@ install:
 all: ps pdf html install
 
 clean:
-	rm -f *.ilg *.aux *.log *.dvi *.idx *.toc index.tex *.blg *.bbl
+	rm -f *.ilg *.aux *.log *.dvi *.idx *.toc index.tex *.blg *.bbl HowToLB.out
 
-veryclean:
+veryclean: clean
 	rm -rf *.ps *.pdf HowToLB/
 

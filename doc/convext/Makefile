@@ -14,7 +14,10 @@
 # REVISION HISTORY:
 #
 # $Log$
-# Revision 1.7  2000-06-22 22:21:07  milind
+# Revision 1.8  2000-06-22 22:38:03  milind
+# Minor fixes.
+#
+# Revision 1.7  2000/06/22 22:21:07  milind
 # Added table of contents to the PDF file, and also cleaned up the clean
 # target.
 #
@@ -53,6 +56,7 @@ ps:
 
 html:
 	make clean
+	touch index.tex
 	latex manual.tex
 	latex2html -local_icons manual.tex
 
@@ -78,8 +82,8 @@ install:
 all: ps html pdf install
 
 clean:
-	rm -f *.ilg *.aux *.log *.dvi *.idx *.toc index.tex *.blg *.bbl
+	rm -f *.ilg *.aux *.log *.dvi *.idx *.toc index.tex *.blg *.bbl manual.out
 
-veryclean:
+veryclean: clean
 	rm -rf *.ps *.pdf manual/
 

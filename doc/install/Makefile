@@ -12,7 +12,10 @@
 # REVISION HISTORY:
 #
 # $Log$
-# Revision 1.8  2000-06-22 22:21:08  milind
+# Revision 1.9  2000-06-22 22:38:05  milind
+# Minor fixes.
+#
+# Revision 1.8  2000/06/22 22:21:08  milind
 # Added table of contents to the PDF file, and also cleaned up the clean
 # target.
 #
@@ -78,6 +81,6 @@ all: ps pdf html install
 clean:
 	rm -f *.ilg *.aux *.log *.dvi *.idx *.toc index.tex *.blg *.bbl
 
-veryclean:
+veryclean: clean
 	rm -rf *.ps *.pdf manual/
 

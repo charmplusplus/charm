@@ -41,6 +41,6 @@ all: ps pdf html install
 clean:
 	rm -f *.ilg *.aux *.log *.dvi *.idx *.toc index.tex *.blg *.bbl
 
-veryclean:
+veryclean: clean
 	rm -rf *.ps *.pdf manual/
 
