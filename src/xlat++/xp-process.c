@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.5  1995-11-02 23:22:52  sanjeev
+ * Revision 2.6  1995-11-04 00:10:56  sanjeev
+ * fixes for nCUBE
+ *
+ * Revision 2.5  1995/11/02  23:22:52  sanjeev
  * preprocessor problems fixes
  *
  * Revision 2.4  1995/10/11  17:55:49  sanjeev
@@ -275,8 +278,9 @@ void GenerateStructsFns()
                                         fprintf(outfile,"\tnew (obj) main(argc,argv) ;\n}\n") ;
 				}
                 		else {
-                       			fprintf(outfile,"\targc = 0 ;\n") ;
-                       			fprintf(outfile,"\targv = 0 ;\n") ;
+					/* next two statements to prevent CC from cribbing */
+                                        fprintf(outfile,"\tchar *junk2=argv[0];\n") ;
+                                        fprintf(outfile,"\targc = (int)junk ;\n") ;
                        		/*	fprintf(outfile,"\t((main *)obj)->_CKmain() ;\n") ; */
                                         fprintf(outfile,"\tnew (obj) main() ;\n}\n") ;
                 		}
