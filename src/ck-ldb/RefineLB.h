@@ -35,7 +35,6 @@ protected:
   int numComputes;
   double averageLoad;
 
-public:
   double overLoad;
 
 public:
