@@ -137,7 +137,7 @@ public:
   /// ENTRY: Gathers PVT reports; calculates and broadcasts GVT to PVTs
   void computeGVT(UpdateMsg *); 
   /// Adds incoming send/recv information to a list
-  void addSR(SRentry **SRs, SRentry e);
+  void addSR(SRentry **SRs, SRentry *e, int og, int ne);
 };
 
 #endif

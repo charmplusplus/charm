@@ -21,9 +21,8 @@ class adapt3 : public opt3 {
  public:
   adapt3() { 
     timeLeash = SPEC_WINDOW; STRAT_T = ADAPT3_T; 
-    //specTol = 1.0 + 0.1*(log((double)CkNumPes())/log(2.0));
-    specTol = 1.1;
-    if (specTol > 1.5) specTol = 1.5;
+    specTol = 1.0 + 0.1*(log((double)CkNumPes())/log(2.0));
+    if (specTol > 1.4) specTol = 1.4;
   }
   virtual void Step();
 };

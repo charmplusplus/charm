@@ -238,7 +238,6 @@ void GVT::computeGVT(UpdateMsg *m)
   CProxy_GVT g(TheGVT);
   GVTMsg *gmsg = new GVTMsg;
   int lastGVT = 0;
-  register int i;
   static int optGVT = POSE_UnsetTS, conGVT = POSE_UnsetTS, done=0;
   static int earliestMsg=POSE_UnsetTS;
   static SRentry *SRs = NULL;
@@ -253,11 +252,7 @@ void GVT::computeGVT(UpdateMsg *m)
     if ((conGVT < 0) || ((m->conPVT > POSE_UnsetTS) && (m->conPVT < conGVT)))
       conGVT = m->conPVT;
     // add send/recv info to SRs
-    for (i=0; i<m->numEntries; i++) {
-      if ((m->SRs[i].timestamp < optGVT) || (optGVT == POSE_UnsetTS))
-	addSR(&SRs, m->SRs[i]);
-      else i = m->numEntries;
-    }
+    addSR(&SRs, m->SRs, optGVT, m->numEntries);
     done++;
   }
   CkFreeMsg(m);
@@ -381,43 +376,51 @@ void GVT::computeGVT(UpdateMsg *m)
 #endif
 }
 
-void GVT::addSR(SRentry **SRs, SRentry e)
+void GVT::addSR(SRentry **SRs, SRentry *e, int og, int ne)
 {
-  SRentry *tmp;
-  if (!(*SRs)) { // no entries yet
-    (*SRs) = new SRentry(e.timestamp, (SRentry *)NULL);
-    (*SRs)->sends = e.sends;
-    (*SRs)->recvs = e.recvs;
-  }
-  else {
-    if (e.timestamp < (*SRs)->timestamp) { // goes before first entry
-      (*SRs) = new SRentry(e.timestamp, (*SRs));
-      (*SRs)->sends = e.sends;
-      (*SRs)->recvs = e.recvs;
-    }
-    else if (e.timestamp == (*SRs)->timestamp) { // goes in first entry
-      (*SRs)->sends = (*SRs)->sends + e.sends;
-      (*SRs)->recvs = (*SRs)->recvs + e.recvs;
-    }
-    else { // search for position
-      tmp = (*SRs);
-      while (tmp->next && (e.timestamp > tmp->next->timestamp))
-	tmp = tmp->next;
-      if (!tmp->next) { // goes at end of SRs
-	tmp->next = new SRentry(e.timestamp, (SRentry *)NULL);
-	tmp->next->sends = tmp->next->sends + e.sends;
-	tmp->next->recvs = tmp->next->recvs + e.recvs;
-      }
-      else if (e.timestamp == tmp->next->timestamp) { //goes in tmp->next
-	tmp->next->sends = tmp->next->sends + e.sends;
-	tmp->next->recvs = tmp->next->recvs + e.recvs;
-      }
-      else { // goes after tmp but before tmp->next
-	tmp->next = new SRentry(e.timestamp, tmp->next);
-	tmp->next->sends = tmp->next->sends + e.sends;
-	tmp->next->recvs = tmp->next->recvs + e.recvs;
-      }
-    }
-  }
+  register int i;
+  SRentry *tab = (*SRs);
+  SRentry *tmp = tab;
 
+  for (i=0; i<ne; i++) {
+    if ((e[i].timestamp < og) || (og == POSE_UnsetTS)) {
+      if (!tmp) { // no entries yet
+	tab = new SRentry(e[i].timestamp, (SRentry *)NULL);
+	tab->sends = e[i].sends;
+	tab->recvs = e[i].recvs;
+	tmp = tab;
+      }
+      else {
+	if (e[i].timestamp < tmp->timestamp) { // goes before first entry
+	  CkPrintf("WARNING: Fix code, this case shouldn't happen!\n");
+	}
+	else if (e[i].timestamp == tmp->timestamp) { // goes in first entr
+	  tmp->sends = tmp->sends + e[i].sends;
+	  tmp->recvs = tmp->recvs + e[i].recvs;
+	}
+	else { // search for position
+	  while (tmp->next && (e[i].timestamp > tmp->next->timestamp))
+	    tmp = tmp->next;
+	  if (!tmp->next) { // goes at end of SRs
+	    tmp->next = new SRentry(e[i].timestamp, (SRentry *)NULL);
+	    tmp->next->sends = tmp->next->sends + e[i].sends;
+	    tmp->next->recvs = tmp->next->recvs + e[i].recvs;
+	    tmp = tmp->next;
+	  }
+	  else if (e[i].timestamp == tmp->next->timestamp) {//goes in tmp->next
+	    tmp->next->sends = tmp->next->sends + e[i].sends;
+	    tmp->next->recvs = tmp->next->recvs + e[i].recvs;
+	    tmp = tmp->next;
+	  }
+	  else { // goes after tmp but before tmp->next
+	    tmp->next = new SRentry(e[i].timestamp, tmp->next);
+	    tmp->next->sends = tmp->next->sends + e[i].sends;
+	    tmp->next->recvs = tmp->next->recvs + e[i].recvs;
+	    tmp = tmp->next;
+	  }
+	}
+      }
+    }
+    else break;
+  }
 }
