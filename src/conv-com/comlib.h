@@ -34,6 +34,7 @@ enum{BCAST=0,TREE, GRID, HCUBE};
 
 #define MAXNUMMSGS 1000
 
+#define PERSISTENT_BUFSIZE 65536
 
 typedef struct {
     int refno;
