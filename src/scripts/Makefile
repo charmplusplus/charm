@@ -25,7 +25,7 @@ SHELL=/bin/sh
 
 all: charm++ libs ampi IDL tsm sm pvm sdag
 
-charm++: converse charmxi
+charm++: converse libck.a charmxi
 
 for-namd: charm++ pvm ampic
 
