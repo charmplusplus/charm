@@ -154,7 +154,9 @@ overall load while simultaneously minimizing communication overhead.
 \subsection{AMPI Status}
 
 Currently all the MPI-1.1 Standard functions are supported in \ampi{}, with a
-collection of our extentions explained in detail in this manual.
+collection of our extentions explained in detail in this manual. One-sided
+communication calls in MPI-2 are supported, but they are not taking advantage
+of RMA features yet.
 
 \begin{alltt}
 MPI_Migrate	MPI_Checkpoint	MPI_Restart	MPI_Register	MPI_Get_userda	'
