@@ -84,6 +84,7 @@ typedef struct {
 } CkChareID;
 
 typedef int CkGroupID;
+typedef int CkFutureID;
 
 /******************************************************************************
  *
@@ -150,13 +151,13 @@ extern int  CkGetSrcNode(void *msg);
 extern void* CkRemoteCall(int eIdx, void *msg, CkChareID *chare);
 extern void* CkRemoteBranchCall(int eIdx, void *msg, CkGroupID gID, int pe);
 extern void* CkRemoteNodeBranchCall(int eIdx, void *msg, CkGroupID gID, int node);
-extern int CkRemoteCallAsync(int eIdx, void *msg, CkChareID *chare);
-extern int CkRemoteBranchCallAsync(int eIdx, void *msg, CkGroupID gID, int pe);
-extern int CkRemoteNodeBranchCallAsync(int eIdx, void *msg, CkGroupID gID, int node);
-extern void* CkWaitFuture(int futNum);
-extern void CkReleaseFuture(int futNum);
-extern int CkProbeFuture(int futNum);
-extern void  CkSendToFuture(int futNum, void *msg, int pe);
+extern CkFutureID CkRemoteCallAsync(int eIdx, void *msg, CkChareID *chare);
+extern CkFutureID CkRemoteBranchCallAsync(int eIdx, void *msg, CkGroupID gID, int pe);
+extern CkFutureID CkRemoteNodeBranchCallAsync(int eIdx, void *msg, CkGroupID gID, int node);
+extern void* CkWaitFuture(CkFutureID futNum);
+extern void CkReleaseFuture(CkFutureID futNum);
+extern int CkProbeFuture(CkFutureID futNum);
+extern void  CkSendToFuture(CkFutureID futNum, void *msg, int pe);
 
 /******************************************************************************
  *

@@ -60,7 +60,7 @@ static int createFuture(void)
 }
 
 extern "C"
-void CkReleaseFuture(int handle)
+void CkReleaseFuture(CkFutureID handle)
 {
   FutureState *fs = &(CpvAccess(futurestate));
   Future *fut = (fs->array)+handle;
@@ -69,7 +69,7 @@ void CkReleaseFuture(int handle)
 }
 
 extern "C"
-int CkProbeFuture(int handle)
+int CkProbeFuture(CkFutureID handle)
 {
   FutureState *fs = &(CpvAccess(futurestate));
   Future *fut = (fs->array)+handle;
@@ -77,7 +77,7 @@ int CkProbeFuture(int handle)
 }
 
 extern "C"
-void *CkWaitFuture(int handle)
+void *CkWaitFuture(CkFutureID handle)
 {
   CthThread self = CthSelf();
   FutureState *fs = &(CpvAccess(futurestate));
@@ -93,7 +93,7 @@ void *CkWaitFuture(int handle)
   return value;
 }
 
-static void setFuture(int handle, void *pointer)
+static void setFuture(CkFutureID handle, void *pointer)
 {
   CthThread t;
   FutureState *fs = &(CpvAccess(futurestate));
@@ -129,7 +129,7 @@ class  FutureMain : public Chare {
 };
 
 extern "C" 
-int CkRemoteBranchCallAsync(int ep, void *m, CkGroupID group, int PE)
+CkFutureID CkRemoteBranchCallAsync(int ep, void *m, CkGroupID group, int PE)
 { 
   envelope *env = UsrToEnv(m);
   int i = createFuture();
@@ -149,7 +149,7 @@ void *CkRemoteBranchCall(int ep, void *m, CkGroupID group, int PE)
 }
 
 extern "C" 
-int CkRemoteNodeBranchCallAsync(int ep, void *m, CkGroupID group, int node)
+CkFutureID CkRemoteNodeBranchCallAsync(int ep, void *m, CkGroupID group, int node)
 { 
   envelope *env = UsrToEnv(m);
   int i = createFuture();
@@ -169,7 +169,7 @@ void *CkRemoteNodeBranchCall(int ep, void *m, CkGroupID group, int node)
 }
 
 extern "C" 
-int CkRemoteCallAsync(int ep, void *m, CkChareID *ID)
+CkFutureID CkRemoteCallAsync(int ep, void *m, CkChareID *ID)
 { 
   envelope *env = UsrToEnv(m);
   int i = createFuture();
@@ -199,7 +199,7 @@ public:
 };
 
 extern "C" 
-void CkSendToFuture(int futNum, void *m, int PE)
+void CkSendToFuture(CkFutureID futNum, void *m, int PE)
 {
   UsrToEnv(m)->setRef(futNum);
   fBOC.SetFuture((FutureInitMsg *)m,PE);
