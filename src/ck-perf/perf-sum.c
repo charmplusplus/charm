@@ -11,8 +11,11 @@
  ***************************************************************************
  * REVISION HISTORY:
  *      $Log$
- *      Revision 2.9  1995-10-30 14:31:12  jyelon
- *      Fixed an obvious bug, but there's probably still more.
+ *      Revision 2.10  1995-10-30 22:29:57  sanjeev
+ *      converted static variable in CollectPerfFromNodes to Cpv
+ *
+ * Revision 2.9  1995/10/30  14:31:12  jyelon
+ * Fixed an obvious bug, but there's probably still more.
  *
  * Revision 2.8  1995/10/27  21:37:45  jyelon
  * changed NumPe --> NumPes
@@ -65,6 +68,7 @@ CpvDeclare(int,now);
 CpvDeclare(int,timestep);
 CpvDeclare(int,init_time);
 CpvDeclare(int,start_processing_time);
+CpvDeclare(int,num_childmsgs);
 
 CpvExtern(int,RecdStatMsg);
 
@@ -83,6 +87,8 @@ char *prog_name;
   CpvInitialize(int,timestep);
   CpvInitialize(int,init_time);
   CpvInitialize(int,start_processing_time);
+  CpvInitialize(int,num_childmsgs);
+
   sprintf(nodename,"%d",CmiMyPe());
   program_name(prog_name,nodename);
 }
@@ -358,15 +364,14 @@ PERF_MSG *msg;
 void  *localdataptr;
 {
 	int mype;
-	static int recd = 0;
 
-	recd++;
+	CpvAccess(num_childmsgs)++;
 	add_log(msg);
 	mype = CmiMyPe();
 
-TRACE(CmiPrintf("[%d] CollectPerf..: recd=%d,  span=%d\n",
-		mype, recd, CmiNumSpanTreeChildren(mype)));
-	if (recd == CmiNumSpanTreeChildren(mype))
+TRACE(CmiPrintf("[%d] CollectPerf..: num_childmsgs=%d,  span=%d\n",
+		mype, CpvAccess(num_childmsgs), CmiNumSpanTreeChildren(mype)));
+	if (CpvAccess(num_childmsgs) == CmiNumSpanTreeChildren(mype))
 	{
 		CpvAccess(RecdPerfMsg) = 1;
 		if (mype != 0)
