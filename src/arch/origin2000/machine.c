@@ -5,6 +5,7 @@
 #include <sys/pda.h>
 #include <ulocks.h>
 #include <math.h>
+#include <stdlib.h>
 #include "converse.h"
 #include <time.h>
 
@@ -57,7 +58,7 @@ void CmiMemUnlock() {membusy=0;}
 void CmiAbort(char *message)
 {
   CmiError(message);
-  abort();
+  exit(1);
 }
 
 int CmiAsyncMsgSent(CmiCommHandle msgid)
