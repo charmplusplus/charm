@@ -361,22 +361,14 @@ class vertex
   }
   void add(int nbr)
   {
-    int i;
-    // check to see if nbr already exists
-    // if yes, return
-    for (i=0; i<nn; i++)
-    {
-      if (nbrs[i] == nbr)
-        return;
-    }
-    // otherwise see if nbrs is full
+    // see if nbrs is full
     // if yes, allocate more space, and copy existing nbrs there
     // delete old space
     if (sn <= nn)
     {
       sn *= 2;
       int *tnbrs = new int[sn];
-      for (i=0; i<nn; i++)
+      for (int i=0; i<nn; i++)
         tnbrs[i] = nbrs[i];
       delete[] nbrs;
       nbrs = tnbrs;
@@ -415,11 +407,13 @@ mesh2graph(int ne, int esize, int *conn, int *xadj)
     v[i].init(esize);
   for (i=0; i<(ne-1); i++)
   {
-    for (j=0; j<esize; j++)
+    if(i%100 == 0) printf("processing element %d\n", i);
+    for (k=i+1; k<ne; k++)
     {
-      int n1 = conn[i*esize+j];
-      for (k=i+1; k<ne; k++)
+      int found = 0;
+      for (j=0; j<esize && !found; j++)
       {
+        int n1 = conn[i*esize+j];
         for (l=0; l<esize; l++)
         {
           int n2 = conn[k*esize+l];
@@ -427,6 +421,8 @@ mesh2graph(int ne, int esize, int *conn, int *xadj)
           {
             v[i].add(k);
             v[k].add(i);
+            found = 1;
+            break;
           }
         }
       }
@@ -481,6 +477,7 @@ main (int argc, char **argv)
   }
   int nparts = atoi(argv[2]);
   int nelems, nnodes, ctype;
+  printf("reading mesh file...\n");
   fscanf(fp, "%d%d%d", &nelems, &nnodes, &ctype);
 #if MAP_GRAPH
   int esize = ctype;
@@ -497,6 +494,7 @@ main (int argc, char **argv)
       fscanf(fp, "%d", &conn[i*esize+j]);
   }
   fclose(fp);
+  printf("finished reading mesh file...\n");
   int ecut;
   int *epart = new int[nelems]; CHK(epart);
   for(i=0;i<nelems;i++)
@@ -507,12 +505,16 @@ main (int argc, char **argv)
   {
 #if MAP_GRAPH
     int *xadj = new int[nelems+1]; CHK(xadj);
+    printf("calling mesh2graph...\n");
     int *adjncy = mesh2graph(nelems, esize, conn, xadj);
+    printf("mesh2graph returned...\n");
     int wgtflag = 0; // no weights associated with elements or edges
     int opts[5];
     opts[0] = 0; //use default values
+    printf("calling metis partitioner...\n");
     METIS_PartGraphKway(&nelems, xadj, adjncy, 0, 0, &wgtflag, &numflag, 
                         &nparts, opts, &ecut, epart);
+    printf("metis partitioner returned...\n");
 #else
     int *npart = new int[nnodes]; CHK(npart);
     METIS_PartMeshNodal(&nelems, &nnodes, conn, &ctype, &numflag, 
@@ -520,11 +522,15 @@ main (int argc, char **argv)
     delete[] npart;
 #endif
   }
+  printf("calling mapper...\n");
   ChunkMsg **msgs = new ChunkMsg*[nparts]; CHK(msgs);
   fem_map(nelems, nnodes, esize, conn, nparts, epart, msgs);
+  printf("mapper returned...\n");
   delete[] epart;
   delete[] conn;
+  printf("writing partitions...\n");
   write_partitions(msgs, nparts, esize);
+  printf("partitions written...\n");
   for (i=0;i<nparts;i++) 
     delete msgs[i];
   delete[] msgs;
