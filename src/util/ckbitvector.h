@@ -30,9 +30,9 @@ class CkBitVector {
 
  public:
   static prio_t log2(prio_t val) {
-    prio_t log = 0;
-    if ( val != 0 ) {
-      while ( val > (1<<log) ) { log++; }
+    prio_t log = 0u;
+    if ( val != 0u ) {
+      while ( val > (1u<<log) ) { log++; }
     }
     return log;
   }
