@@ -10,6 +10,10 @@
  *
  ***************************************************************************
  * REVISION HISTORY:
+ *      $Log$
+ *      Revision 2.2  1995-07-06 22:42:54  narain
+ *      Corrected usage of LdbBocNum to StatisticBocNum
+ *
  *
  ***************************************************************************/
 static char ident[] = "@(#)$Header$";
@@ -40,7 +44,6 @@ CpvDeclare(int,init_time);
 CpvDeclare(int,start_processing_time);
 
 CpvExtern(int,RecdStatMsg);
-CpvExtern(int,LdbBocNum);
 
 init_globals()
 {
@@ -294,7 +297,7 @@ TRACE(CmiPrintf("[%d] Send out perf message to %d\n",
 		mype, CmiSpanTreeParent(mype)));
 
 	GeneralSendMsgBranch(StatPerfCollectNodes_EP, msg,
-		CmiSpanTreeParent(mype), USERcat, BocMsg, CpvAccess(LdbBocNum));
+		CmiSpanTreeParent(mype), USERcat, BocMsg, StatisticBocNum);
 }
 
 
