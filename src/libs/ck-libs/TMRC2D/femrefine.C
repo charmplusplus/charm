@@ -468,7 +468,7 @@ void FEM_REFINE2D_Coarsen(int meshID,int nodeID,double *coord,int elemID,double 
 				}else{
 						printf("[%d] WEIRD -- REPLACE operation for invalid element %d \n",CkMyPe(),operation.data.rddata.elemID);
 				}
-				printf("---------Replace invalidating node %d with %d \n",operation.data.rddata.oldNodeID,operation.data.rddata.newNodeID);
+				printf("---------Replace invalidating node %d with %d in element %d\n",operation.data.rddata.oldNodeID,operation.data.rddata.newNodeID,operation.data.rddata.elemID);
 				break;
 				default:
 					printf("[%d] WEIRD -- COARSENDATA type == invalid \n",CkMyPe());
