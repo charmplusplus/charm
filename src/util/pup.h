@@ -456,18 +456,18 @@ public:\
 
 //Definitions to include exactly once at file scope
 #define PUPable_def(className) \
-	PUP::able *className##::call_PUP_constructor(void) \
+	PUP::able *className::call_PUP_constructor(void) \
 		{ return new className((CkMigrateMessage *)0);}\
-	const PUP::able::PUP_ID &className##::get_PUP_ID(void) const\
-		{ return className##::my_PUP_ID; }\
-	PUP::able::PUP_ID className##::my_PUP_ID;\
-	void className##::register_PUP_ID(void)\
+	const PUP::able::PUP_ID &className::get_PUP_ID(void) const\
+		{ return className::my_PUP_ID; }\
+	PUP::able::PUP_ID className::my_PUP_ID;\
+	void className::register_PUP_ID(void)\
 		{my_PUP_ID=register_constructor(#className,\
-		              className##::call_PUP_constructor);}\
+		              className::call_PUP_constructor);}\
 
 //Code to execute exactly once at program start time
 #define PUPable_reg(className) \
-    className##::register_PUP_ID();
+    className::register_PUP_ID();
 
 };//<- End "namespace" PUP
 

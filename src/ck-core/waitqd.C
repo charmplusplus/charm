@@ -57,7 +57,7 @@ void waitqd_QDChare::waitQD(void) {
     waitStarted = 1;
     threadList = (void*) CdsFifo_Create();
     CdsFifo_Enqueue((CdsFifo) threadList, (void *)CthSelf());
-    CkStartQD(EntryIndex(waitqd_QDChare, onQD, CkQdMsg), &thishandle);
+    CkStartQD(CProxy_waitqd_QDChare::ckIdx_onQD((CkQdMsg*)0), &thishandle);
   }
   CthSuspend();
 }
