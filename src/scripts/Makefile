@@ -83,7 +83,7 @@ jade: charm++ msa
 	cd langs/jade && $(MAKE)
 
 fftlib: charm++
-	cd libs/cklibs/fftlib && $(MAKE)
+	cd libs/ck-libs/fftlib && $(MAKE)
 
 # This should be done offline, since the user does not need to compile
 # parser files, etc.  All they need is the libjade + include files,
@@ -161,7 +161,7 @@ CVHEADERS=cpthreads.h converse.h conv-trace.h conv-random.h conv-qd.h \
 # This is a bit unusual, but makes client linking simpler.
 UTILHEADERS=pup.h pupf.h pup_c.h pup_stl.h pup_toNetwork.h pup_toNetwork4.h pup_paged.h \
 	ckimage.h ckdll.h ckhashtable.h ckbitvector.h cklists.h \
-	ckstatistics.h ckvector3d.h conv-lists.h RTH.h \
+	ckstatistics.h ckvector3d.h conv-lists.h RTH.h ckcomplex.h \
 	sockRoutines.h sockRoutines.c
 
 CKHEADERS=ck.h ckstream.h envelope.h init.h qd.h charm.h charm++.h \
@@ -194,7 +194,7 @@ CKHEADERS=ck.h ckstream.h envelope.h init.h qd.h charm.h charm++.h \
 	  EachToManyMulticastStrategy.h MsgPacker.h StreamingStrategy.h \
 	  NodeMulticast.h PipeBroadcastStrategy.h MeshStreamingStrategy.h \
           PrioStreaming.h MPIStrategy.h MsgPacker.h StreamingStrategy.h \
-	  $(CVHEADERS)
+	  BroadcastStrategy.h $(CVHEADERS)
 
 ALLHEADERS=$(CKHEADERS) \
     simplemsg.h sm.h pvmc.h pvm3.h sdag.h \
@@ -298,7 +298,7 @@ LIBCONV_CORE= convcore.o conv-conds.o queueing.o msgmgr.o \
 	traceCore.o traceCoreCommon.o \
 	converseProjections.o machineProjections.o \
 	quiescence.o isomalloc.o \
-	global-nop.o 
+	global-nop.o
 
 #############################################
 #
