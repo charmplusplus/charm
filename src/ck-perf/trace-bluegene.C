@@ -61,10 +61,11 @@ void TraceBluegene::traceClose() {
 TraceBluegene::~TraceBluegene(){
 }
 
+extern char *bgtraceroot;
 void TraceBluegene::creatFiles()
 {
-  char* fname = new char[15];
-  sprintf(fname,"bgPrintFile%d",CkMyPe());
+  char* fname = new char[1024];
+  sprintf(fname, "%sbgPrintFile.%d", bgtraceroot?bgtraceroot:"", CkMyPe()); 
   pfp = fopen(fname,"w");     
   if(pfp==NULL)
     CmiAbort("Cannot open Bluegene print file for writing.\n");
