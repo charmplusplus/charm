@@ -230,7 +230,9 @@ void _registerDone(void)
   CpdListRegister(new CpdSimpleListAccessor("charm/readonlyMsg",_readonlyMsgs.size(),pupReadonlyMsg));
  
   CpdListRegister(new CpdSimpleListAccessor("charm/arrayelements", CkpvAccess(_groupIDTable)->length(), pupArray));
+#if CMK_CCS_AVAILABLE
   CpdCharmInit();
+#endif
 }
 
 //Print a debugging version of this entry method index:
