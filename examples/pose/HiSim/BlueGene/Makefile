@@ -48,7 +48,7 @@ all:
 
 	make $(OBJDIR)/InitNetwork.o  $(OBJDIR)/util.o
 
-	cd ../tmp; /bin/rm -f moduleinit.o; $(CHARMC) *.o $(OTHER) $(LIBS) -o $(PGM) -module pose -ltrace-projections -language charm++ -module commlib
+	cd ../tmp; /bin/rm -f moduleinit.o; $(CHARMC) *.o $(OTHER) $(LIBS) -o $(PGM) -module pose -ltrace-projections -language charm++ 
 
 $(OBJDIR)/InitNetwork.o: InitNetwork.C
 	$(CHARMC) -o $@ -seq InitNetwork.C -I../Main -I./
