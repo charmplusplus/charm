@@ -280,7 +280,7 @@ objBlock[AST className, boolean insertMigrateConstructor]
 	;
 
 ctorDef
-	:	#(c:CTOR_DEF modifiers methodHead
+	:	#(c:CTOR_DEF modifiers { J.startBlock(); } methodHead
             {
                 J.tmp.push("");
                 AST modifiers = #c.getFirstChild();
@@ -312,6 +312,7 @@ ctorDef
             }
             ctorSList
             {
+                J.endBlock();
                 J.tmp.pop();
                 J.indentLevel--;
                 J.c.append(J.indent() + "}\n");// J.nl(J.h);
@@ -320,7 +321,7 @@ ctorDef
 	;
 
 methodDecl
-	:	#(METHOD_DEF modifiers typeSpec methodHead)
+	:	#(METHOD_DEF modifiers typeSpec { J.startBlock(); } methodHead { J.endBlock(); })
 	;
 
 methodDef[AST className]
@@ -328,7 +329,7 @@ methodDef[AST className]
             { J.startBlock(); }
             mh:methodHead
             {
-//                 System.out.println("MethodDef " + #mh.getText());
+                System.out.println("MethodDef " + #mh.getText());
 
                 J.tmp.push(new String(mh.getText()));
                 //System.out.println("Method: " + #m.toStringTree());
@@ -618,8 +619,12 @@ variableDef[boolean classVarq, boolean outputOnNewLine]
 
 // called from methodHead, handled there
 // called from handler, TBD
+// Adds parameter to localStack.
 parameterDef
-	:	#(PARAMETER_DEF modifiers typeSpec IDENT {}) // @@ if in methodHead, add parameter to localstack
+	:	#(p:PARAMETER_DEF modifiers typeSpec i:IDENT {
+                    J.localStack.push(i.getText());
+                    J.localStackShadow.push(p);
+            })
 	;
 
 objectinitializer
@@ -646,7 +651,7 @@ arrayInitializer
 	;
 
 methodHead // done in methodDef, ctorDef; TBD methodDecl
-	:	IDENT #( PARAMETERS (parameterDef)* ) (throwsClause)?
+	:	IDENT #( PARAMETERS (p:parameterDef)* ) (throwsClause)?
 	;
 
 throwsClause
@@ -719,7 +724,7 @@ stat
 	|	#("throw" et:expression { J.fatalError(et, "throw not supported yet");})
 	|	#("synchronized" expression stat)
 	|	t:tryBlock { J.fatalError(t, "try not supported yet");}
-	|	slist // nested SLIST // done
+	|	{ J.startBlock(); } slist { J.endBlock(); } // nested SLIST // done
 	|	EMPTY_STAT { J.c.append(";\n"); } // done
 	;
 
@@ -732,7 +737,7 @@ tryBlock
 	;
 
 handler
-	:	#( "catch" parameterDef slist )
+	:	#( "catch" { J.startBlock(); } parameterDef slist { J.endBlock(); } )
 	;
 
 elist // done as part of printExpression
