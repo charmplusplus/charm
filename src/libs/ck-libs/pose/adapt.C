@@ -8,13 +8,13 @@ void adapt::Step()
   static POSE_TimeType lastGVT = localPVT->getGVT();
   int iter=0;
 
+  rbFlag = 0;
   if (!parent->cancels.IsEmpty()) CancelUnexecutedEvents();
-  if (eq->RBevent) {
-    timeLeash = MIN_LEASH; // shrink speculative window
-    Rollback(); 
-  }
+  if (eq->RBevent) Rollback(); 
   if (!parent->cancels.IsEmpty()) CancelEvents();
 
+  if (rbFlag) timeLeash = MIN_LEASH;
+  else if (timeLeash < MAX_LEASH) timeLeash += LEASH_FLEX; //expand spec window
   // Shorten the leash as we near POSE_endtime
   if ((POSE_endtime > POSE_UnsetTS) && (lastGVT + timeLeash > POSE_endtime))
     timeLeash = POSE_endtime - lastGVT + 1;
@@ -35,6 +35,5 @@ void adapt::Step()
 #ifdef POSE_STATS_ON
   if (iter > 0) localStats->Loop();
 #endif  
-  if (timeLeash < MAX_LEASH) timeLeash += LEASH_FLEX; // expand spec window
 }
 

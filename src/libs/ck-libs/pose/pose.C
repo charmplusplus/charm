@@ -43,7 +43,6 @@ void POSE_init(int IDflag, int ET) // can specify both
   // Create the communication library for POSE
   POSE_commlib_insthndl = CkGetComlibInstance();
   // Create the communication strategy for POSE
-  //DummyStrategy *strategy = new DummyStrategy();
   //StreamingStrategy *strategy =new StreamingStrategy(COMM_TIMEOUT,COMM_MAXMSG);
   PrioStreaming *strategy =new PrioStreaming(COMM_TIMEOUT,COMM_MAXMSG);
   //Register the strategy

@@ -8,16 +8,16 @@ void adapt3::Step()
   static POSE_TimeType lastGVT = localPVT->getGVT();
   int iter=0;
   double critStart;
-  rbFlag = 0;
- 
+
+  //rbFlag = 0;
   if (!parent->cancels.IsEmpty()) CancelUnexecutedEvents();
   if (eq->RBevent) Rollback();
   if (!parent->cancels.IsEmpty()) CancelEvents();
  
   if (eq->currentPtr->timestamp > POSE_UnsetTS) {
     timeLeash = eq->largest - lastGVT;
-    if (rbFlag) timeLeash = (timeLeash + avgRBoffset)/2;
-    else if (specEventCount > (1.5*eventCount)) 
+    //if (rbFlag) timeLeash = (timeLeash + avgRBoffset)/2;
+    if (specEventCount > (specTol*eventCount)) 
       timeLeash = eq->currentPtr->timestamp - lastGVT;
   }
   // Shorten the leash as we near POSE_endtime
@@ -60,6 +60,5 @@ void adapt3::Step()
     localStats->Loop();
 #endif
   }
-  rbFlag = 0;
 }
  
