@@ -1300,6 +1300,8 @@ void CthSchedInit()
   CpvInitialize(int      , CthResumeNormalThreadIdx);
   CpvInitialize(int      , CthResumeSchedulingThreadIdx);
 
+  CpvInitialize(CthThread, curThread);
+
   CpvAccess(CthMainThread) = CthSelf();
   CpvAccess(CthSchedulingThread) = CthSelf();
   CpvAccess(CthSleepingStandins) = 0;
