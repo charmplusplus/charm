@@ -87,7 +87,7 @@ public:
       m = new cancelMsg(); // build a cancel message
       m->evID = ev->evID;
       m->timestamp = ev->timestamp;
-      m->setPriority(m->timestamp - POSE_TimeMax);
+      m->setPriority((m->timestamp-1) - POSE_TimeMax);
       localPVT->objUpdate(ev->timestamp, SEND);
       //char str[20];
       //CkPrintf("[%d] SEND(cancel) %s at %d...\n", CkMyPe(), ev->evID.sdump(str), ev->timestamp);      
