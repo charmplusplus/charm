@@ -281,7 +281,8 @@ static void KillOnAllSigs(int sigNo)
 {
   char _s[100];
   const char *sig=" received signal";
-  if (sigNo==SIGSEGV) sig=": segmentation violation.\nDid you dereference a null pointer?";
+  if (sigNo==SIGSEGV) sig=": segmentation violation.\n"
+	"Try running with '++debug', or linking with '-memory paranoid'";
   if (sigNo==SIGFPE) sig=": floating point exception.\nDid you divide by zero?";
   if (sigNo==SIGILL) sig=": illegal instruction";
   if (sigNo==SIGBUS) sig=": bus error";
