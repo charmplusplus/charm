@@ -36,22 +36,22 @@ public:
   virtual void neighbors(int mype, int* _n, int &nb);
 };
 
-class LBTopo_mesh2d: public LBTopology {
+class LBTopo_torus2d: public LBTopology {
 private:
   int width;
   int goodcoor(int, int);
 public:
-  LBTopo_mesh2d(int p);
+  LBTopo_torus2d(int p);
   virtual int max_neighbors();
   virtual void neighbors(int mype, int* _n, int &nb);
 };
 
-class LBTopo_mesh3d: public LBTopology {
+class LBTopo_torus3d: public LBTopology {
 private:
   int width;
   int goodcoor(int, int, int);
 public:
-  LBTopo_mesh3d(int p);
+  LBTopo_torus3d(int p);
   virtual int max_neighbors();
   virtual void neighbors(int mype, int* _n, int &nb);
 };

@@ -16,7 +16,7 @@ CpvDeclare(int, CldMessageChunks);
 CpvDeclare(int, CldLoadNotify);
 extern void LoadNotifyFn(int);
 
-char* _lbtopo = "mesh2d";
+char* _lbtopo = "torus2d";
 
 /* Estimator stuff.  Of any use? */
 /*

@@ -36,20 +36,20 @@ void LBTopo_ring::neighbors(int mype, int* _n, int &nb)
 
 //  MESH 2D
 
-LBTOPO_MACRO(LBTopo_mesh2d);
+LBTOPO_MACRO(LBTopo_torus2d);
 
-LBTopo_mesh2d::LBTopo_mesh2d(int p): LBTopology(p) 
+LBTopo_torus2d::LBTopo_torus2d(int p): LBTopology(p) 
 {
   width = (int)sqrt(p*1.0);
   if (width * width < npes) width++;
 }
 
-int LBTopo_mesh2d::max_neighbors()
+int LBTopo_torus2d::max_neighbors()
 {
   return 4;
 }
 
-int LBTopo_mesh2d::goodcoor(int x, int y)
+int LBTopo_torus2d::goodcoor(int x, int y)
 {
   if (x<0 || x>=width) return -1;
   if (y<0 || y>=width) return -1;
@@ -63,7 +63,7 @@ static int checkuniq(int *arr, int nb, int val) {
   return 1;
 }
 
-void LBTopo_mesh2d::neighbors(int mype, int* _n, int &nb)
+void LBTopo_torus2d::neighbors(int mype, int* _n, int &nb)
 {
   int next;
   int x = mype/width;
@@ -95,21 +95,21 @@ void LBTopo_mesh2d::neighbors(int mype, int* _n, int &nb)
 
 //  MESH 3D
 
-LBTOPO_MACRO(LBTopo_mesh3d);
+LBTOPO_MACRO(LBTopo_torus3d);
 
-LBTopo_mesh3d::LBTopo_mesh3d(int p): LBTopology(p) 
+LBTopo_torus3d::LBTopo_torus3d(int p): LBTopology(p) 
 {
   width = 1;
   while ( (width+1) * (width+1) * (width+1) <= npes) width++;
   if (width * width * width < npes) width++;
 }
 
-int LBTopo_mesh3d::max_neighbors()
+int LBTopo_torus3d::max_neighbors()
 {
   return 6;
 }
 
-int LBTopo_mesh3d::goodcoor(int x, int y, int z)
+int LBTopo_torus3d::goodcoor(int x, int y, int z)
 {
   if (x<0 || x>=width) return -1;
   if (y<0 || y>=width) return -1;
@@ -119,7 +119,7 @@ int LBTopo_mesh3d::goodcoor(int x, int y, int z)
   return -1;
 }
 
-void LBTopo_mesh3d::neighbors(int mype, int* _n, int &nb)
+void LBTopo_torus3d::neighbors(int mype, int* _n, int &nb)
 {
   int x = mype/(width*width);
   int k = mype%(width*width);
@@ -192,8 +192,8 @@ void registerLBTopos()
 {
   if (lbTopoMap.length()==0) {
   lbTopoMap.push_back(new LBTopoMap("ring", createLBTopo_ring));
-  lbTopoMap.push_back(new LBTopoMap("mesh2d", createLBTopo_mesh2d));
-  lbTopoMap.push_back(new LBTopoMap("mesh3d", createLBTopo_mesh3d));
+  lbTopoMap.push_back(new LBTopoMap("torus2d", createLBTopo_torus2d));
+  lbTopoMap.push_back(new LBTopoMap("torus3d", createLBTopo_torus3d));
   lbTopoMap.push_back(new LBTopoMap("graph", createLBTopo_graph));
   }
 }
