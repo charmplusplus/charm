@@ -1,0 +1,22 @@
+mainmodule bench {
+  readonly CkChareID mid;
+  readonly CProxy_Bench arr;
+  readonly int nElements;
+  readonly int fraction;
+
+  message [varsize] BenchMessage;
+
+  mainchare Main {
+    entry Main(CkArgMsg *m);
+    entry void send(void);
+    entry void done(void);
+  };
+
+  array [1D] Bench {
+    entry Bench(ComlibInstanceHandle cinst);
+    entry void sendMessage(void);
+    entry void receiveMessage(BenchMessage *);
+    entry void start(int);
+  };        	
+
+};
