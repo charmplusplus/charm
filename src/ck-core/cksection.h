@@ -12,45 +12,67 @@
 
   Extracted from charm++.h into separate file on 6/22/2003 by
   Gengbin Zheng.
+
+  Modified to make it suitable for the Communication Library by 
+  Sameer Kumar.
 */
 
 #ifndef _CKMULTICAST_H
 #define _CKMULTICAST_H
 
 #define  MulticastMsg          1
-#define  COMMLIB_MULTICAST_MESSAGE    2
+#define  COMLIB_MULTICAST_MESSAGE    2
+
+#define COMLIB_MULTICAST_ALL 0
+#define COMLIB_MULTICAST_OLD_SECTION 1
+#define COMLIB_MULTICAST_NEW_SECTION 2
 
 class CkSectionInfo {
  public:
     CkArrayID aid;
     int pe;
     union section_type {
-        struct sec_mcast {	// used for section multicast
+        struct sec_mcast {    // used for section multicast
             int redNo;
             void *val;        // point to mCastCookie
         } 
         sCookie;
-        struct commlibInfo{  // used for commlib
-            int  instId;	//the instance of the comm.lib.
-            int  nIndices;      //number of local array indices to be sent to, 0 for all
+
+        struct commlibInfo{     // used for commlib
+            int  instId;	//the instance of the comm. lib.
+            
+            // This field indicates local array indices to multicast to:
+            // COMLIB_MULTICAST_ALL for all local elements, 
+            // COMLIB_MULTICAST_NEW_SECTION, elements are attached 
+            // to this message
+            // COMLIB_MULTICAST_OLD_SECTION use previously created section
+            char status;      
+            int id;      //Used to compare section ID's
         } 
         cInfo;
+
     } sInfo;
-    char  type;
+    char type;
     
     CkSectionInfo()  {
         type = 0; pe = -1;
         sInfo.sCookie.val=NULL; sInfo.sCookie.redNo=0;
+        sInfo.cInfo.instId = 0;
+        sInfo.cInfo.status = 0;
+        sInfo.cInfo.id     = 0;
     }
+
     CkSectionInfo(int t) {
 	type = t; pe = -1;
 	switch (type) {
 	case MulticastMsg:
-            sInfo.sCookie.val=NULL; sInfo.sCookie.redNo=0;
+            sInfo.sCookie.val=NULL; 
+            sInfo.sCookie.redNo=0;
             break;
-        case COMMLIB_MULTICAST_MESSAGE:
+        case COMLIB_MULTICAST_MESSAGE:
             sInfo.cInfo.instId=0;
-            sInfo.cInfo.nIndices=0;
+            sInfo.cInfo.status=0;
+            sInfo.cInfo.id=0;
             break;
 	default:
             CmiAssert(0);
@@ -83,6 +105,13 @@ public:
   CkSectionInfo   _cookie;		// used by array section multicast
   CkArrayIndexMax *_elems;
   int _nElems;
+  
+  //Two reasons, (i) potentially extend sections to groups. (ii) For
+  //array sections these point to the processors (ranks in the
+  //commlib) the destinations array elements are on.
+  int *pelist;    
+  int npes;
+  
 public:
   CkSectionID(): _elems(NULL), _nElems(0) {}
   CkSectionID(const CkSectionID &sid);

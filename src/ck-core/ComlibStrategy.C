@@ -64,7 +64,8 @@ void Strategy::pup(PUP::er &p){
     p | gid;
     p | nIndices;
     p | nsrcpes;
-    
+    p | isStrategyBracketed;
+
     if(p.isUnpacking()) {
         if(nIndices > 0) 
             elements = new CkArrayIndexMax[nIndices];
@@ -87,10 +88,11 @@ CharmMessageHolder::CharmMessageHolder(char * msg, int proc) {
     dest_proc = proc;
     isDummy = 0;
 
-    nIndices =0;
+    //nIndices =0;
+    sec_id = NULL;
     npes = 0;
     
-    indexlist = 0;
+    //indexlist = 0;
     pelist = 0;
 }
 
@@ -98,9 +100,11 @@ CharmMessageHolder::~CharmMessageHolder() {
     
     if(pelist != NULL && npes > 0)
         delete[] pelist;
-
-    if(indexlist != NULL && nIndices > 0)
-        delete [] indexlist;
+    
+    /*
+      if(indexlist != NULL && nIndices > 0)
+      delete [] indexlist;
+    */
 }
 
 char * CharmMessageHolder::getCharmMessage(){

@@ -14,11 +14,15 @@ class CharmMessageHolder {
     //wants to send the data to.
     int npes;
     int *pelist;
-
+    
+    /*//Using Section ID instead
     //For array multicast
     int nIndices;
     CkArrayIndexMax *indexlist;
+    */
     
+    CkSectionID *sec_id;
+
     CharmMessageHolder(char * msg, int dest_proc);
     ~CharmMessageHolder();
 
@@ -37,6 +41,7 @@ class Strategy : public PUP::able{
  protected:
     int isArray;
     int isGroup;
+    int isStrategyBracketed;
 
     CkArrayID aid;
     CkGroupID gid;
@@ -55,9 +60,11 @@ class Strategy : public PUP::able{
 
     void setSourceArray(CkArrayID aid, CkArrayIndexMax *e=0, int nind=0);
     void setSourceGroup(CkGroupID gid, int *srcpelist=0, int nsrcpes=0) ;    
-    
+    void setBracketed(){isStrategyBracketed = 1;}
+
     int isSourceArray(){return isArray;}
     int isSourceGroup(){return isGroup;}
+    int isBracketed(){return isStrategyBracketed;}
 
     void getSourceArray(CkArrayID &aid, CkArrayIndexMax *&e, int &nind);
     void getSourceGroup(CkGroupID &gid, int *&pelist, int &npes);
