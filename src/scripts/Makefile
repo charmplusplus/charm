@@ -41,7 +41,7 @@ pvm: converse libpvmc.a
 AMR: charm++ LIBS
 	cd libs/ck-libs/amr; make all OPTS='$(OPTS)'
 
-FEM: AMPI FEMC FEMF
+FEM: charm++ CONVLIBS libAMPILIB.a FEMC LIBS FEMF
 
 FEMC: charm++ LIBS
 
@@ -53,7 +53,7 @@ MBLOCKC: charm++ LIBS
 
 MBLOCKF: MBLOCKC libconv-utilf.a
 
-AMPI: AMPIC AMPIF libAMPILIB.a
+AMPI: AMPIC libAMPILIB.a AMPIF
 
 AMPIC: charm++ CONVLIBS libAMPI.a
 
@@ -206,7 +206,8 @@ MEMLIBS=$(L)/libmemory-default.o $(L)/libmemory-os.o $(L)/libmemory-gnu.o \
 
 CVLIBS=libconv-core.a \
 	libconv-cplus-n.a libconv-cplus-y.a libconv-util.a \
-	$(CLBLIBS) $(TRACELIBS) $(MEMLIBS)
+	$(CLBLIBS) $(TRACELIBS) $(MEMLIBS) \
+	libccs-client.a
 
 LIBCONV_CORE=threads.o convcore.o conv-conds.o queueing.o msgmgr.o \
 	cpm.o cpthreads.o futures.o cldb.o random.o trace-common.o \
@@ -254,6 +255,9 @@ libconv-util.a: $(LIBCONV_UTIL)
 libconv-utilf.a: $(LIBCONV_UTILF)
 	$(CHARMC) -cp ../lib/ -o $@ $(LIBCONV_UTILF)
 
+libccs-client.a: ccs-client.o
+	$(CHARMC) -cp ../lib/ -o $@ $<
+
 cpm.o: cpm.c $(CVHEADERS)
 	$(CHARMC) cpm.c
 
@@ -267,7 +271,10 @@ conv-ccs.o: conv-ccs.c $(CVHEADERS)
 	$(CHARMC) conv-ccs.c
 
 ccs-builtins.o: ccs-builtins.C $(CVHEADERS)
-	$(CHARMC) ccs-builtins.C
+	$(CHARMC) $<
+
+ccs-client.o: ccs-client.c
+	$(CHARMC) $<
 
 sockRoutines.o: sockRoutines.c $(CVHEADERS) $(UTILHEADERS)
 	$(CHARMC) sockRoutines.c
@@ -318,8 +325,8 @@ pup_c.o: pup_c.C $(UTILHEADERS)
 	$(CHARMC) -o pup_c.o pup_c.C
 
 pup_f.o: pup_f.f90
-	$(CHARMC) -c pup_f.f90
-	$(CHARMC) -cpmod ../include pupmod.M
+	-$(CHARMC) -c pup_f.f90
+	-$(CHARMC) -cpmod ../include pupmod.M
 
 ckhashtable.o: ckhashtable.C ckhashtable.h
 	$(CHARMC) -o ckhashtable.o ckhashtable.C
