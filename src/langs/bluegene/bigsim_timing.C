@@ -162,7 +162,7 @@ void BgAdjustTimeLineInsert(BgTimeLine &tline)
 	/* adjust all entries following 'idx' in timeline */
 	while(idx < tline.length()-1) {
 		tAdjust = max(tline[idx]->endTime,tline[idx+1]->recvTime) - tline[idx+1]->startTime;
-		if(tAdjust <= 0)	// log fits in the idle time; would never be -ve
+		if(tAdjust <= 0.0)	// log fits in the idle time; would never be -ve
 			return;
 		else {
 			idx++;
@@ -208,7 +208,7 @@ int BgAdjustTimeLineForward(int msgID, double tAdjustAbs, BgTimeLine &tline)
   	while(idx < idxOld) {
   	  tAdjust = max(tline[idx]->endTime,tline[idx+1]->recvTime) - 
                         tline[idx+1]->startTime;
-  	  if(tAdjust <= 0)	// log fits in the idle time, would never be -ve
+  	  if(tAdjust <= 0.0)	// log fits in the idle time, would never be -ve
   		break;
   	  else {
   		idx++;
@@ -220,7 +220,7 @@ int BgAdjustTimeLineForward(int msgID, double tAdjustAbs, BgTimeLine &tline)
   	while(idx < tline.length()) {
   	  tAdjust = max(tline[idx-1]->endTime,tline[idx]->recvTime) - 
                         tline[idx]->startTime;
-  	  if(tAdjust >= 0)	// would never be positive
+  	  if(tAdjust >= 0.0)	// would never be positive
   		break;
   	  else {
   		tline[idx]->adjustTimeLog(tAdjust);
@@ -233,7 +233,7 @@ int BgAdjustTimeLineForward(int msgID, double tAdjustAbs, BgTimeLine &tline)
   	while(idx < tline.length()-1) {
   	  tAdjust = max(tline[idx]->endTime,tline[idx+1]->recvTime) - 
                         tline[idx+1]->startTime;
-  	  if(tAdjust <= 0)	// log fits in the idle time
+  	  if(tAdjust <= 0.0)	// log fits in the idle time
   		break;
   	  else {
   		idx++;
@@ -246,7 +246,7 @@ int BgAdjustTimeLineForward(int msgID, double tAdjustAbs, BgTimeLine &tline)
   		tAdjust = tline[idxOld]->recvTime - tline[idxOld]->startTime;
   	  else
   		tAdjust = max(tline[idxOld-1]->endTime,tline[idxOld]->recvTime) - tline[idxOld]->startTime;
-  	  if(tAdjust >= 0)	// would never be positive
+  	  if(tAdjust >= 0.0)	// would never be positive
   		break;
   	  else {
   		tline[idxOld]->adjustTimeLog(tAdjust);
