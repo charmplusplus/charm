@@ -17,7 +17,6 @@ inline bool orthogonal(const CkVector3d &a,const CkVector3d &b) {
 }
 
 /// Fill our projection matrix m with values from E, R, X, Y, Z
-///   Assert: X, Y, and Z are orthogonal
 void CkViewpoint::buildM(void) {
 	// if (!(orthogonal(X,Y) && orthogonal(Y,Z) && orthogonal(X,Z)))
 	//	osl::bad("Camera axes are non-orthogonal");
@@ -34,16 +33,37 @@ void CkViewpoint::buildM(void) {
 	CkVector3d sX=X/X.magSqr();
 	CkVector3d sY=Y/Y.magSqr();
 	
-	// Compute skew factors and skewed axes
-	double skew_x=sX.dot(R-E), skew_y=sY.dot(R-E), skew_z=Z.dot(R-E);
-	CkVector3d gX=skew_x*Z-skew_z*sX;
-	CkVector3d gY=skew_y*Z-skew_z*sY;
+	if (isPerspective) 
+	{
+		// Compute skew factors and skewed axes
+		double skew_x=sX.dot(R-E), skew_y=sY.dot(R-E), skew_z=Z.dot(R-E);
+		CkVector3d gX=skew_x*Z-skew_z*sX;
+		CkVector3d gY=skew_y*Z-skew_z*sY;
+		
+		// Assign values to the matrix
+		m(0,0)=gX.x; m(0,1)=gX.y; m(0,2)=gX.z; m(0,3)=-gX.dot(E); 
+		m(1,0)=gY.x; m(1,1)=gY.y; m(1,2)=gY.z; m(1,3)=-gY.dot(E); 
+		m(2,0)=0;    m(2,1)=0;    m(2,2)=0;    m(2,3)=-skew_z;
+		m(3,0)=-Z.x; m(3,1)=-Z.y; m(3,2)=-Z.z; m(3,3)=Z.dot(E); 
+	}
+	else /* orthographic projection */
+	{
+		CkVector3d sZ=Z/Z.magSqr();
+		m(0,0)=sX.x; m(0,1)=sX.y; m(0,2)=sX.z; m(0,3)=-sX.dot(R); 
+		m(1,0)=sY.x; m(1,1)=sY.y; m(1,2)=sY.z; m(1,3)=-sY.dot(R); 
+		m(2,0)=sZ.x; m(2,1)=sZ.y; m(2,2)=sZ.z; m(2,3)=-sZ.dot(R);
+		m(3,0)=0;    m(3,1)=0;    m(3,2)=0;    m(3,3)=1.0; 
+	}
 	
-	// Assign values to the matrix
-	m(0,0)=gX.x; m(0,1)=gX.y; m(0,2)=gX.z; m(0,3)=-gX.dot(E); 
-	m(1,0)=gY.x; m(1,1)=gY.y; m(1,2)=gY.z; m(1,3)=-gY.dot(E); 
-	m(2,0)=0;    m(2,1)=0;    m(2,2)=0;    m(2,3)=-skew_z;
-	m(3,0)=-Z.x; m(3,1)=-Z.y; m(3,2)=-Z.z; m(3,3)=Z.dot(E); 
+#if CMK_USE_INTEL_SSE
+	// Copy values to proj rows:
+	for (int i=0;i<4;i++) {
+		projX[i]=(float)m(0,i); 
+		projY[i]=(float)m(1,i); 
+		projZ[i]=(float)m(2,i); 
+		projW[i]=(float)m(3,i); 
+	}
+#endif
 }
 
 /// Build a camera at eye point E pointing toward R, with up vector Y.
@@ -51,10 +71,38 @@ void CkViewpoint::buildM(void) {
 CkViewpoint::CkViewpoint(const CkVector3d &E_,const CkVector3d &R_,CkVector3d Y_)
 	:E(E_), R(R_), Y(Y_), wid(-1), ht(-1)
 {
+	isPerspective=true;
 	Z=(E-R).dir(); //Make view plane orthogonal to eye-origin line
 	X=Y.cross(Z).dir();
 	Y=Z.cross(X).dir();
 	// assert: X, Y, and Z are orthogonal
+	buildM();
+}
+
+/// Build a camera at eye point E for view plane with origin R
+///  and X and Y as pixel sizes.  Note X and Y must be orthogonal.
+CkViewpoint::CkViewpoint(const CkVector3d &E_,const CkVector3d &R_,
+	const CkVector3d &X_,const CkVector3d &Y_,int w,int h)
+	:E(E_), R(R_), X(X_), Y(Y_), wid(w), ht(h)
+{
+	isPerspective=true;
+	/*
+	if (!orthogonal(X,Y))
+		CmiAbort("Non-orthogonal X and Y passed to Camera::Camera");
+	*/
+	Z=X.cross(Y).dir();
+	buildM();
+}
+
+/// Build an orthogonal camera for a view plane with origin R
+///  and X and Y as pixel sizes, and the given Z axis.
+/// This is a difficult-to-use, but completely general routine.
+CkViewpoint::CkViewpoint(const CkVector3d &R_,
+	const CkVector3d &X_,const CkVector3d &Y_,const CkVector3d &Z_,
+	int w,int h,bool yesThisIsPerspective)
+	:E(R_), R(R_), X(X_), Y(Y_), Z(Z_), wid(w), ht(h)
+{
+	isPerspective=false;
 	buildM();
 }
 
@@ -74,25 +122,32 @@ void CkViewpoint::discretize(int w,int h,double hFOV) {
 /// Like discretize, but flips the Y axis (for typical raster viewing)
 void CkViewpoint::discretizeFlip(int w,int h,double hFOV) {
 	discretize(w,h,hFOV);
-	R+=Y*h;
+	flip();
+}
+
+/// Flip the image's Y axis (for typical raster viewing)
+void CkViewpoint::flip(void) {
+	R+=Y*ht;
 	Y*=-1;
 	buildM();
 }
 
-
-/// Build a camera at eye point E for view plane with origin R
-///  and X and Y as pixel sizes.  Note X and Y must be orthogonal.
-CkViewpoint::CkViewpoint(const CkVector3d &E_,const CkVector3d &R_,
-	const CkVector3d &X_,const CkVector3d &Y_,int w,int h)
-	:E(E_), R(R_), X(X_), Y(Y_), wid(w), ht(h)
+/// Extract a window with this width and height, with origin at this pixel
+void CkViewpoint::window(int w,int h, int x,int y)
 {
-	if (!orthogonal(X,Y))
-		CmiAbort("Non-orthogonal X and Y passed to Camera::Camera");
-	Z=X.cross(Y).dir();
+	R+=X*x+Y*y;
+	wid=w; ht=h;
 	buildM();
 }
 
+/// Make this perspective camera orthogonal-- turn off perspective.
+void CkViewpoint::disablePerspective(void)
+{
+	isPerspective=false;
+	buildM();
+}
 
+#ifdef __CK_PUP_H
 void CkViewpoint::pup(PUP::er &p) {
 	p.comment("CkViewpoint {");
 	p.comment("axes");
@@ -103,10 +158,12 @@ void CkViewpoint::pup(PUP::er &p) {
 	p|E;
 	p.comment("width and height");
 	p|wid; p|ht;
+	p.comment("perspective");
+	p|isPerspective;
 	p.comment("} CkViewpoint");
 	if (p.isUnpacking()) buildM();
 }
-
+#endif
 
 //Return an OpenGL-compatible projection matrix for this viewpoint:
 void CkViewpoint::makeOpenGL(double *dest,double z_near,double z_far) const {

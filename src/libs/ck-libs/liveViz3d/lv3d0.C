@@ -1,0 +1,80 @@
+/*
+  Implementation of the simplest server portion 
+  of the liveViz3d library.
+  
+  Orion Sky Lawlor, olawlor@acm.org, 2003/9/13
+*/
+#include "lv3d0.h"
+
+#ifdef CMK_LIVEVIZ3D_CLIENT
+#  include "ogl/main.h"
+#  include "ogl/util.h"
+#endif
+
+/// Private class that stores object data for the universe client side.
+class LV3D_Universe_Table {
+	CkHashtableT<CkViewableID,CkView *> table;
+public:
+	void add(CkView *v) {
+		delete table.get(v->id);
+		table.put(v->id)=v;
+	}
+	
+	CkView *lookup(const CkViewableID &src) {
+		return table.get(src);
+	}
+	
+	void render(const CkViewpoint &vp) {
+#ifdef CMK_LIVEVIZ3D_CLIENT
+		CkHashtableIterator *it=table.iterator();
+		void *obj;
+		while (NULL!=(obj=it->next())) {
+			CkView *v=*(CkView **)obj;
+			v->render(1.0);
+		}
+		delete it;
+#endif
+	}
+};
+
+LV3D_Universe::~LV3D_Universe() {
+	if (object_table) delete object_table;
+}
+void LV3D_Universe::pup(PUP::er &p) {
+	PUP::able::pup(p);
+	if (object_table) CkAbort("Cannot migrate a LV3D_Universe with objects!\n");
+}
+
+/**
+  Add this view to the universe.  This is called
+  once per incoming network view on the client.
+  This call transfers ownership of the view.
+*/
+void LV3D_Universe::viewResponse(CkView *v) {
+	if (!object_table) {
+		object_table=new LV3D_Universe_Table;
+	}
+	v->ref();
+	object_table->add(v);
+#ifdef CMK_LIVEVIZ3D_CLIENT
+	oglRepaint(10);
+#endif
+}
+
+CkView *LV3D_Universe::lookup(const CkViewableID &src) {
+	if (object_table) 
+		return object_table->lookup(src);
+	else
+		return NULL;
+}
+
+/**
+  Draw the world to this camera using OpenGL calls.  
+  This routine is called once per frame on the client.
+*/
+void LV3D_Universe::render(const CkViewpoint &vp) {
+	if (object_table) object_table->render(vp);
+}
+
+PUPable_def(LV3D_Universe);
+

@@ -1,0 +1,198 @@
+/**
+  Interface to server portion of a more complicated
+  interface to the liveViz3d library-- it defines a 
+  single array of objects, each of which represent a 
+  single CkViewable.
+
+  Orion Sky Lawlor, olawlor@acm.org, 2003
+*/
+#include "lv3d1_server.h"
+
+/************** LV3D_Array: client interface & render requests ************
+Represents the list of objects to be viewed in the scene.
+*/
+class impl_LV3D_Array {
+	LV3D_Array *array;
+	
+	CkViewable *viewable; // Should be array of viewables
+	
+// All this state should be per-client:
+	CkView *view; // Should be per-viewable
+	// Throw out old views
+	void flush(void) {
+		if (view) view->unref();
+		view=NULL;
+		renderRequested=false;
+	}
+	bool renderRequested;
+	CkViewpoint renderViewpoint;
+	int renderFrameID;
+	void renderUpdate(const LV3D_ViewpointMsg *m) {
+		renderViewpoint=m->viewpoint;
+		renderFrameID=m->frameID;
+	}
+	
+	CkViewableID makeViewableID(int vi) {
+		CkViewableID ret;
+		int i;
+		for (i=0;i<array->thisIndexMax.nInts;i++)
+			ret.id[i]=array->thisIndexMax.data()[i];
+		for (;i<3;i++)
+			ret.id[i]=0;
+		ret.id[3]=vi;
+		return ret;
+	}
+	void status(const char *where) {
+		// CkPrintf("[%d] %s",array->thisIndexMax.data()[0],where);
+	}
+public:
+	impl_LV3D_Array(LV3D_Array *array_) :array(array_) {
+		viewable=NULL;
+		view=NULL;
+		renderRequested=false;
+	}
+	~impl_LV3D_Array() {
+		/* viewables belong to caller; do not delete them */
+		flush();
+	}
+	
+	inline void add(CkViewable *v_) {
+		if (viewable) CkAbort("LV3D_Array::addViewable> Added too many viewables!\n");
+		viewable=v_;
+	}
+	inline void remove(CkViewable *v_) {
+		if (!viewable) CkAbort("LV3D_Array::removeViewable> No viewable to remove!\n");
+		if (viewable!=v_)  CkAbort("LV3D_Array::removeViewable> Can't remove wrong viewable!\n");
+		viewable=NULL;
+		flush();
+	}
+	
+	inline void newClient(int clientID) {
+		// FIXME: reinitialize that clientID here.
+		flush();
+	}
+	
+	/**
+	  This request is broadcast every time a client viewpoint changes.
+	  Internally, it asks the stored CkViewables if they should redraw,
+	  and if so, queues up a LV3D_RenderMsg.
+	 */
+	void viewpoint(const LV3D_ViewpointMsg *m) {
+		if (renderRequested) 
+		{ // Already wanting to render-- just update the viewpoint:
+	status("Updating pending render...\n");
+			renderUpdate(m);
+		}
+		else if (!view || viewable->shouldRender(m->viewpoint,*view)) 
+		{ // Need to ask for a new rendering:
+	status("Reqesting rendering...\n");
+			renderRequested=true;
+			renderUpdate(m);
+			
+			int prioAdj=0;
+			array->thisProxy[array->thisIndexMax].LV3D_Render(
+				LV3D_RenderMsg::new_(
+					m->clientID,m->frameID,0,prioAdj
+				)
+			);
+		}
+	}
+	
+	/**
+	  This method is used to prioritize rendering.
+	*/
+	void render(const LV3D_RenderMsg *m) {
+	status("Rendering...\n");
+		flush();
+		CkView *v=viewable->renderView(renderViewpoint);
+		if (v) {
+			view=v;
+			view->id=makeViewableID(0);
+			view->prio=renderFrameID-m->prioAdj;
+			LV3D0_Deposit(view,m->clientID);
+		}
+	}
+	
+};
+
+/* The array itself just forwards everything to the impl_LV3D_Array */
+void LV3D_Array::init(void) {
+	impl=new impl_LV3D_Array(this);
+}
+
+void LV3D_Array::addViewable(CkViewable *v) {
+	impl->add(v);
+}
+void LV3D_Array::removeViewable(CkViewable *v) {
+	impl->remove(v);
+}
+void LV3D_Array::pup(PUP::er &p) {
+	CBase_LV3D_Array::pup(p);
+	/* everything in impl can be thrown out during a migration */
+}
+	
+LV3D_Array::~LV3D_Array() {
+	delete[] impl;
+	impl=NULL;
+}
+	
+// Network-called methods:
+/**
+  This request is broadcast every time a client connects.
+*/
+void LV3D_Array::LV3D_NewClient(int clientID) 
+{
+	impl->newClient(clientID);
+}
+	
+/**
+  This request is broadcast every time a client viewpoint changes.
+  Internally, it asks the stored CkViewables if they should redraw,
+  and if so, queues up a LV3D_RenderMsg.
+ */
+void LV3D_Array::LV3D_Viewpoint(LV3D_ViewpointMsg *m) 
+{
+	impl->viewpoint(m);
+}
+
+/**
+  This method is used to prioritize rendering.
+*/
+void LV3D_Array::LV3D_Render(LV3D_RenderMsg *m)
+{
+	impl->render(m);
+	LV3D_RenderMsg::delete_(m);
+}
+
+/**************** Network Messages **************/
+
+/// Make a prioritized LV3D_RenderMsg:
+LV3D_RenderMsg *LV3D_RenderMsg::new_(
+	int client,int frame,int viewable,int prioAdj) 
+{
+	int prioBits=8*sizeof(prioAdj);
+	LV3D_RenderMsg *m=new (prioBits) LV3D_RenderMsg;
+	m->clientID=client;
+	m->frameID=frame;
+	m->viewableID=viewable;
+	m->prioAdj=prioAdj;
+	unsigned int *p=(unsigned int *)CkPriorityPtr(m);
+	p[0]=0x80000000u+(frame-prioAdj);
+	CkSetQueueing(m,CK_QUEUEING_BFIFO);
+	return m;
+}
+void LV3D_RenderMsg::delete_(LV3D_RenderMsg *m) {
+	delete m;
+}
+
+void LV3D1_Init(const CkBbox3d &box,CkArrayID aid)
+{
+	// Broadcast to LV3D_Viewpoint when the viewpoint changes.
+	CkCallback frameUpdate(CkIndex_LV3D_Array::LV3D_Viewpoint(0),aid);
+	LV3D0_Init(new LV3D_Universe(),frameUpdate);
+}
+
+
+
+
+#include "lv3d1.def.h"

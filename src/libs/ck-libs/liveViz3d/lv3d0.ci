@@ -1,0 +1,14 @@
+module lv3d0 {
+	message LV3D_ViewpointMsg;
+	
+	message LV3D0_ViewMsg {
+		unsigned char view[];
+	};
+
+	group LV3D0_Manager {
+		entry LV3D0_Manager(void);
+		entry void addView(LV3D0_ViewMsg *m);
+	};
+	initproc void LV3D0_ProcInit(void);
+	initnode void LV3D0_NodeInit(void);
+};

@@ -8,8 +8,22 @@ Orion Sky Lawlor, olawlor@acm.org, 2003/3/28
 #ifndef __UIUC_PPL_CHARM_VIEWPOINT_H
 #define __UIUC_PPL_CHARM_VIEWPOINT_H
 
+#ifndef CMK_USE_INTEL_SSE
+
+#if defined (__SSE__)
+#  define CMK_USE_INTEL_SSE 1
+#endif
+
+#endif
+
+#if CMK_USE_INTEL_SSE
+#include <xmmintrin.h>
+#endif
+
 #include "ckvector3d.h"
-#include "pup.h"
+#ifdef __CHARMC__
+#  include "pup.h"
+#endif
 
 /**
  * A start point and a direction
@@ -21,8 +35,12 @@ public:
 	CkRay() {}
 	CkRay(const CkVector3d &s,const CkVector3d &d)
 		:pos(s), dir(d) {}
-	
+
+	CkVector3d at(double t) const {return pos+t*dir;}	
+
+#ifdef __CK_PUP_H
 	void pup(PUP::er &p) {p|pos; p|dir;}
+#endif
 };
 
 /**
@@ -44,19 +62,55 @@ public:
 		for (int c=0;c<4;c++) data[rDest][c]+=s*data[rSrc][c];
 	}
 	
+#ifdef __CK_PUP_H
 	void pup(PUP::er &p) {
 		p(&data[0][0],16);
 	}
+#endif
 };
 
 /// Horrific hack: we don't have 2d vectors, so ignore z part of a 3d vector:
 typedef CkVector3d CkVector2d;
+
+#if CMK_USE_INTEL_SSE
+/* sse utility routines */
+
+/*
+  Return the sum of all 4 floats in this SSE register.
+  Computes the sum in all words, because it's just as cheap
+  as computing it in just one.
+*/
+inline __m128 _ck_SSE_reduce(__m128 r) {
+	/* r = a b c d
+	   swapLo = b a d c
+	   sumLo = a+b b+a c+d d+c
+	   swapHi = c+d c+d a+b a+b
+	   sum = 4 copies of a+b+d+c
+	 */
+		__m128 swapLo = _mm_shuffle_ps(r,r, _MM_SHUFFLE(2,3,0,1));
+		__m128 sumLo = _mm_add_ps(r,swapLo);
+		__m128 swapHi = _mm_shuffle_ps(sumLo,sumLo, _MM_SHUFFLE(1,1,3,3));
+		__m128 sum = _mm_add_ps(sumLo,swapHi);
+		return sum;
+}
+
+/* 
+  Take the 4-float dot product of these two vectors, which
+  must be 16-byte aligned. 
+*/
+inline __m128 _ck_SSE_dot(__m128 a,__m128 b) {
+	return _ck_SSE_reduce(_mm_mul_ps(a,b));
+}
+#endif
 
 /**
  * Describes a method for converting universe locations to screen pixels
  * and back again: a projection matrix.
  */
 class CkViewpoint {
+#if CMK_USE_INTEL_SSE
+	float projX[4], projY[4], projZ[4], projW[4];
+#endif
 	CkVector3d E; //< Eye point (PHIGS Projection Reference Point)
 	CkVector3d R; //< Projection plane origin (PHIGS View Reference Point)
 	CkVector3d X,Y; //< Pixel-length axes of projection plane (Y is PHIGS View Up Vector)
@@ -64,8 +118,9 @@ class CkViewpoint {
 	CkMatrix3d m; //< 4x4 projection matrix: universe to screen pixels
 	int wid,ht; //< Width and height of view plane, in pixels
 	
+	bool isPerspective; //< If true, perspective projection is enabled.
+	
 	/// Fill our projection matrix m with values from E, R, X, Y, Z
-	///   Assert: X, Y, and Z are orthogonal
 	void buildM(void);
 public:
 	/// Build a camera at eye point E pointing toward R, with up vector Y.
@@ -73,6 +128,22 @@ public:
 	/// This is an easy-to-use, but restricted (no off-axis) routine.
 	/// It is normally followed by discretize or discretizeFlip.
 	CkViewpoint(const CkVector3d &E_,const CkVector3d &R_,CkVector3d Y_=CkVector3d(0,1,1.0e-8));
+	
+	/// Build a camera at eye point E for view plane with origin R
+	///  and X and Y as pixel sizes.  Note X and Y must be orthogonal.
+	/// This is a difficult-to-use, but completely general routine.
+	CkViewpoint(const CkVector3d &E_,const CkVector3d &R_,
+		const CkVector3d &X_,const CkVector3d &Y_,int w,int h);
+	
+	/// Build an orthogonal camera for a view plane with origin R
+	///  and X and Y as pixel sizes, and the given Z axis.
+	/// This is a difficult-to-use, but completely general routine.
+	CkViewpoint(const CkVector3d &R_,
+		const CkVector3d &X_,const CkVector3d &Y_,const CkVector3d &Z_,
+		int w,int h,bool yesThisIsPerspective);
+	
+	/// Make this perspective camera orthogonal-- turn off perspective.
+	void disablePerspective(void);
 	
 	/// Make this camera, fresh-built with the above constructor, have
 	///  this X and Y resolution and horizontal full field-of-view (degrees).
@@ -83,12 +154,11 @@ public:
 	/// Like discretize, but flips the Y axis (for typical raster viewing)
 	void discretizeFlip(int w,int h,double hFOV);
 	
+	/// Flip the image's Y axis (for typical raster viewing)
+	void flip(void);
 	
-	/// Build a camera at eye point E for view plane with origin R
-	///  and X and Y as pixel sizes.  Note X and Y must be orthogonal.
-	/// This is a difficult-to-use, but completely general routine.
-	CkViewpoint(const CkVector3d &E_,const CkVector3d &R_,
-		const CkVector3d &X_,const CkVector3d &Y_,int w,int h);
+	/// Extract a window with this width and height, with origin at this pixel
+	void window(int w,int h, int x,int y);
 	
 	/// For use by pup:
 	CkViewpoint() { wid=ht=-1; }
@@ -114,8 +184,11 @@ public:
 	inline const CkMatrix3d &getMatrix(void) const {return m;}
 	
 	/// Project this point into the camera volume.
-	///  The projected point is (return.x,return.y);
-	///  return.z is 1.0/depth: +inf at the eye to 1 at the projection plane
+	///  The projected screen point is (return.x,return.y);
+	///
+	///  return.z is 1.0/depth: +inf at the eye to 1 at the projection plane.
+	///  This is the "perspective scale value"; the screen size 
+	///  multiplier needed because of perspective.
 	inline CkVector3d project(const CkVector3d &in) const {
 		float w=1.0f/(float)(
 		  m(3,0)*in.x+m(3,1)*in.y+m(3,2)*in.z+m(3,3)
@@ -138,6 +211,31 @@ public:
 		  0.0
 		);
 	}
+#if CMK_USE_INTEL_SSE
+	inline void project_noz(const float *in,int *x,int *y) const {
+	/*
+	   Here's what we're trying to do:
+		float w=1.0f/(float)(
+		  in[0]*projW[0]+in[1]*projW[1]+in[2]*projW[2]+in[3]*projW[3]
+		);
+		return CkVector2d(
+		  w*(in[0]*projX[0]+in[1]*projX[1]+in[2]*projX[2]+in[3]*projX[3]),
+		  w*(in[0]*projY[0]+in[1]*projY[1]+in[2]*projY[2]+in[3]*projY[3]),
+		  0.0
+		);
+	*/
+		__m128 inR=_mm_load_ps((float *)in);
+		
+		__m128 w=_mm_rcp_ss(_ck_SSE_dot(inR,_mm_load_ps((float *)projW)));
+		
+		*x=_mm_cvttss_si32(_mm_mul_ss(w,
+			_ck_SSE_dot(inR,_mm_load_ps((float *)projX))
+		));
+		*y=_mm_cvttss_si32(_mm_mul_ss(w,
+			_ck_SSE_dot(inR,_mm_load_ps((float *)projY))
+		));
+	}
+#endif
 	
 	/// Backproject this view plane point into world coordinates
 	inline CkVector3d viewplane(const CkVector2d &v) const {
@@ -170,9 +268,11 @@ public:
 		if (screen.y>ht) screen.y=ht;
 	}
 	//Return a 16-entry OpenGL-compatible projection matrix for this viewpoint
-	void makeOpenGL(double *dest,double near,double far) const;
+	void makeOpenGL(double *dest,double z_near,double z_far) const;
 	
+#ifdef __CK_PUP_H
 	void pup(PUP::er &p);
+#endif
 };
 
 /// X, Y, and Z axes: a right-handed frame, used for navigation
@@ -211,6 +311,12 @@ public:
 	void nudge(double dx,double dy) {
 		x()+=dx*z();
 		y()+=dy*z();
+		ortho(); normalize();
+	}
+	//Rotate around our +Z axis by this differential amount.
+	void rotate(double dz) {
+		x()+=dz*y();
+		y()-=dz*x();
 		ortho(); normalize();
 	}
 };

@@ -1,0 +1,119 @@
+/**
+  Interface to server portion of a more complicated
+  interface to the liveViz3d library-- it defines a 
+  single array of objects, each of which represent a 
+  single CkViewable.
+
+  Orion Sky Lawlor, olawlor@acm.org, 2003
+*/
+#ifndef __UIUC_CHARM_LV3D_SERVER_1_H
+#define __UIUC_CHARM_LV3D_SERVER_1_H
+
+#include "lv3d0_server.h"
+#include "lv3d1.decl.h" /* for message superclasses */
+
+/**
+ * Register for lv3d redraw requests.  This routine
+ * must be called exactly once on processor 0 of the server.
+ * The array, which must inherit from LV3D_Array,
+ * will be used for all communication.
+ */
+void LV3D1_Init(const CkBbox3d &box,CkArrayID LV3D_ArrayID);
+
+
+/**
+  This message is used to prioritize rendering requests.
+  It's always allocated using its "new_" method, so a 
+   priority is always attached.
+ FIXME: add ability to thread a single render request,
+   so rendering can suspend in the middle.
+ FIXME: handle requestID wraparound.
+*/
+class LV3D_RenderMsg : public CMessage_LV3D_RenderMsg {
+public:
+	int clientID; //Unique identifier for this client
+	int frameID; //0 is first frame, then incrementing
+	int viewableID; //Viewable to render
+	int prioAdj; // Priority adjustment
+	
+	/** Allocate a prioritized Render message for this viewpoint.
+	  prioAdj is a non-negative integer framenumber adjustment which 
+	  indicates the estimated importance of the rendering. 
+	  
+	  The actual priority computation is:
+	  	priority = frame - prioAdj;
+	  where the lowest priority gets rendered first. 
+	  
+	  This means the most ancient request (and hence the most glaring
+	  visual error) gets rendered first; and the highest "prioAdj"
+	  value gets rendered first.
+	  
+	FIXME: improve this prioritization algorithm.
+	*/
+	static LV3D_RenderMsg *new_(int client,int frame,int viewable,int prioAdj);
+	static void delete_(LV3D_RenderMsg *m);
+};
+
+
+class impl_LV3D_Array;
+
+/**
+ This array holds all the visible objects in one liveViz3d
+ computation.  Users should inherit all their visible classes
+ from this kind of array element.
+ 
+Rationale:
+ By keeping all viewables in one big array, we can update 
+ the viewpoint using a single broadcast.  The sensible alternative
+ of keeping several different arrays (e.g., one array of tiles,
+ one of buildings, one of trees) would result in multiple broadcasts,
+ and make addressing more complicated.
+*/
+class LV3D_Array : public CBase_LV3D_Array {
+	impl_LV3D_Array *impl;
+	void init();
+public:
+	LV3D_Array(void) {init();}
+	LV3D_Array(CkMigrateMessage *m) :CBase_LV3D_Array(m) {init();}
+	
+	/**
+	 Add this viewable to our set.  The viewable is still
+	 owned by the caller, but must survive until removed or
+	 the element is destroyed.
+	 
+	 This routine is often called exactly one per array 
+	 element lifetime, and often from the constructor 
+	 or pup routine.
+	 
+	 For liveViz, the array element basically only exists 
+	 to provide network access for this CkViewable.
+	 
+	 There is a small fixed limit on the number of CkViewables 
+	 you can add.  1 is safe.
+	*/
+	void addViewable(CkViewable *v);
+	void removeViewable(CkViewable *v);
+	
+	virtual void pup(PUP::er &p);
+	~LV3D_Array();
+	
+// Network-called methods:
+	/**
+	  This request is broadcast every time a client connects.
+	 */
+	virtual void LV3D_NewClient(int clientID);
+	
+	/**
+	  This request is broadcast every time a client viewpoint changes.
+	  Internally, it asks the stored CkViewables if they should redraw,
+	  and if so, queues up a LV3DRenderMsg.
+	 */
+	virtual void LV3D_Viewpoint(LV3D_ViewpointMsg *m);
+	
+	/**
+	  This method is used to prioritize rendering.
+	*/
+	virtual void LV3D_Render(LV3D_RenderMsg *m);
+};
+
+#endif

@@ -8,14 +8,15 @@ Orion Sky Lawlor, olawlor@acm.org, 8/28/2002
 #ifndef __UIUC_PPL_CHARM_VIEWABLE_H
 #define __UIUC_PPL_CHARM_VIEWABLE_H
 
+#include "charm.h"
 #include "ckvector3d.h"
 #include "ckimage.h"
 #include "ckviewpoint.h"
 #include "ckhashtable.h"
 
-
-
 /// A CkViewableID uniquely identifies a CkViewable across processors.
+///  The first 3 ints of the id are the array index; the last int
+///   is the viewable inside that array index.
 ///   This object can be used in a CkHashtable.
 class CkViewableID {
 public:
@@ -75,7 +76,8 @@ public:
 	///   more references, delete this object.
 	inline void unref(void) {
 		refCount--;
-		if (refCount<=0) delete this;
+		if (refCount<0) CkAbort("Trying to unref deleted object!\n");
+		if (refCount==0) delete this;
 	}
 };
 
@@ -83,39 +85,70 @@ public:
 /***************** Abstract Interface **************/
 
 /**
- * A style for drawing this texture.
+ * A CkView is a texture image that can stand in for a CkViewable.
+ * Subclasses contain some texture representation (e.g., one RGBA
+ * texture).  This class is sent from the server, which generates
+ * CkViews, to the client, which displays them.  CkViews travel
+ * around in the parallel machine inside liveViz3dViewMsg objects.
+ * 
+ * CkView's are reference counted-- use ref() and unref() to save
+ * copying, and always allocate them with a plain "new".
  */
-class CkTexStyle {
+class CkView : public PUP::able, public CkReferenceCounted {
 public:
-	/// These are the universe locations of the four 
-	///  corners of our texture image.
-	CkVector3d corners[4];
+	/// This is the viewable we describe.
+	///  This field is set by LiveViz3dArray, not CkViewable.
+	CkViewableID id;
+	const CkViewableID &getViewable(void) const {return id;}
 	
-	void pup(PUP::er &p);
+	/// This is our approximate network priority. Prio==0 is highest.
+	///  This field is set by LiveViz3dArray, not CkViewable.
+	int prio;
+	
+	/// CkView subclasses are PUP::able's.
+	///  This means they should have a migration constructor,
+	///  working pup routine, and appropriate PUPable declarations.
+	/// (CLIENT AND SERVER).
+	PUPable_abstract(CkView);
+	
+	/// PUP this CkView and its image or geometry data.
+	/// (CLIENT AND SERVER).
+	virtual void pup(PUP::er &p);
+	
+	/// Render our image to the current OpenGL context.
+	///  So the server can link without OpenGL, all OpenGL 
+	///   calls made by this routine should be protected 
+	///   by an ifdef CMK_LIVEVIZ3D_CLIENT
+	///  (CLIENT ONLY)
+	virtual void render(double alpha) =0;
 };
 
+/// Call this routine once per node at startup--
+///  it registers all the PUPable CkView's.
+void CkViewNodeInit(void);
+
 /**
- * A CkView is a texture image that can stand in for a CkViewable.
- * CkView's must always be allocated on the heap, and are often 
- * actually subclasses containing Viewable-specific data.
+ * An object that can be "viewed"-- turned into an image.
  */
-class CkView : public CkReferenceCounted {
+class CkViewable {
 public:
-	/// This is the viewable we describe
-	CkViewableID id;
+	virtual ~CkViewable();
 	
-	/// This is the texture image of our CkViewable.
-	CkImage *tex;
+	/**
+	 * Return true if this object needs to be redrawn,
+	 *   false if oldView is acceptable from the new viewpoint.
+	 * oldView is always a CkView returned from a previous call to 
+	 *   "render".
+	 */
+	virtual bool shouldRender(const CkViewpoint &univ2screen,const CkView &oldView) =0;
 	
-	/// This is how and where to draw the texture.
-	CkTexStyle style;
-	
-	CkImage &getImage(void) {return *tex;}
-	const CkImage &getImage(void) const {return *tex;}
-	
-	const CkVector3d &getCorner(int i) const {return style.corners[i];}
-	
-	const CkViewableID &getViewable(void) const {return id;}
+	/**
+	 * Draw this object from this point of view, and return
+	 * the resulting image (or NULL if none is appropriate).  
+	 * The output CkView will be unref()'d exactly once after
+	 * each call to render.
+	 */
+	virtual CkView *renderView(const CkViewpoint &univ2screen) =0;
 };
 
 /**
@@ -128,29 +161,84 @@ public:
 	virtual ~CkViewConsumer();
 	
 	/**
-	 * Add this (new?) view to our list.
-	 * The incoming CkView will be ref()'d if it is kept.
+	 * Add this view to our list.  
+	 * The incoming CkView will be unref()'d exactly once
+	 * as a result of this call-- this is an ownership transfer.
 	 */
 	virtual void add(CkView *view) =0;
 };
 
+/***************** Basic Implementations **************/
+
+class oglTexture; // Forward declaration-- defined in oglutil.h on client
+
 /**
- * An object that can be "viewed"-- turned into an image.
- */
-class CkViewable {
+ Performs a simple zero-encoding of blank image pixels
+ at each end of the image scanlines.  This happens during
+ the pup routine.
+*/
+class CkImageCompressor {
+	// source/destination image
+	CkAllocImage *img;
 public:
-	virtual ~CkViewable();
-	
-	/**
-	 * Pass an appropriate view of this object, from this viewpoint,
-	 * to this consumer.  Normally calls dest.add at least once.
-	 */
-	virtual void view(const CkViewpoint &univ2screen,CkViewConsumer &dest) =0;
+	CkImageCompressor(CkAllocImage *img_) :img(img_) { }
+	void pup(PUP::er &p);
 };
 
-/***************** Tiny Implementations **************/
 /**
- * This trivial viewable always shows a fixed image, regardless of 
+ * The simplest kind of CkView: a single, flat 
+ * quadrilateral OpenGL texture.  You specify the 
+ * texture, corners, and draw style.
+ */
+class CkQuadView : public CkView {
+public:
+	/// These are the universe locations of the four 
+	///  corners of our texture image.  
+	///    corners[0]==image.getPixel(0,0)
+	///    corners[1]==image.getPixel(w-1,0)
+	///    corners[2]==image.getPixel(0,h-1)
+	///    corners[3]==image.getPixel(w-1,h-1)
+	///  
+	CkVector3d corners[4];
+
+// (CLIENT AND SERVER)
+	virtual void pup(PUP::er &p);
+	PUPable_decl(CkQuadView);
+	virtual ~CkQuadView();
+	
+// (SERVER ONLY)
+private:
+	/// Our texture image-- only valid on server side.
+	CkAllocImage s_tex;
+	CkImageCompressor x_tex;
+public:
+	/**
+	  Create a new quad view to display a new texture.
+	   n_colors should be 1 (greyscale, luminance),
+	   3 (rgb, no alpha) or 4 (premultiplied rgba).
+	   
+	   Be sure to set the "corners" and "id" fields after making this call.
+	   (SERVER ONLY)
+	 */
+	CkQuadView(int w,int h,int n_colors);
+	
+	CkAllocImage &getImage(void) {return s_tex;}
+	const CkAllocImage &getImage(void) const {return s_tex;}
+
+// (CLIENT ONLY)
+private:
+	oglTexture *c_tex;
+public:
+	/// Migration constructor-- prepare for pup.
+	/// (CLIENT ONLY)
+	CkQuadView(CkMigrateMessage *m);
+	
+	virtual void render(double alpha);
+};
+
+
+/**
+ * This trivial viewable always shows a fixed quadview, regardless of 
  *  the viewpoint--that is, it's just a single, fixed-texture polygon.
  */
 class CkFixedViewable : public CkViewable {
@@ -162,30 +250,17 @@ public:
 	CkFixedViewable(CkView *v_) :v(v_) {v->ref();}
 	~CkFixedViewable() {v->unref();}
 	
-	virtual void view(const CkViewpoint &univ2screen,CkViewConsumer &dest) {
-		dest.add(v);
+	// We never need to redraw:
+	virtual bool shouldRender(const CkViewpoint &univ2screen,const CkView &oldView)
+	{	
+		return false;
+	}
+	// "rendering" just means returning our fixed CkView.
+	virtual CkView *renderView(const CkViewpoint &univ2screen) {
+		v->ref(); // semantics of return operation
+		return v;
 	}
 };
-
-/**
- * A heap-allocated texture image.
- */
-class CkAllocView : public CkView {
-	CkAllocImage img;
-public:
-	/// Make a new texture image of this size.
-	///  Be sure to set corners[0..3] after this call.
-	CkAllocView(int w,int h)
-		:img(w,h,4) { tex=&img; }
-	CkAllocImage &getImage(void) {return img;}
-	const CkAllocImage &getImage(void) const {return img;}
-	
-	CkAllocView() {tex=&img;}
-	void pup(PUP::er &p);
-};
-
-void pup_pack(PUP::er &p,CkView &v);
-CkAllocView *pup_unpack(PUP::er &p);
 
 /***************** Implementations based on Interest Points **************/
 
@@ -219,10 +294,14 @@ public:
 PUPmarshall(CkInterestSet);
 
 
-/// An interestView keeps track of the 3d location and projection of 
-///  some of its source object's points.  This lets it evaluate reprojection 
-///  error.
-class CkInterestView : public CkAllocView {
+/// An interestView is a QuadView that keeps track of 
+///  the 3d location and projection of 
+///  some of its source object's points. 
+///  This lets it evaluate reprojection error on the server.
+/// 
+///  It gets shippped across the network as a regular CkQuadView--
+///  so it has no pup routine.
+class CkInterestView : public CkQuadView {
 	//These are the true universe locations of our interest points:
 	CkInterestSet univ;
 	//These are the texture-projected locations of the interest points:
@@ -236,8 +315,10 @@ class CkInterestView : public CkAllocView {
 	}
 public:
 	/// Initialize this view for these interest points,
-	///   from this viewpoint.
-	CkInterestView(int w,int h,const CkInterestSet &univ_,
+	///   from this viewpoint.  Sets the corners initially
+	///   as the z=0 projection of our texture's corners.
+	CkInterestView(int w,int h,int n_colors,
+		const CkInterestSet &univ_,
 		const CkViewpoint &univ2texture);
 	
 	/// Evaluate the root-mean-square error, in pixels, between the
@@ -247,8 +328,6 @@ public:
 	/// Evaluate the maximum error, in pixels, between the
 	/// projection of our texture and the projection of the true object.
 	double maxError(const CkViewpoint &univ2screen) const;
-	
-	void pup(PUP::er &p);
 };
 
 
@@ -260,55 +339,59 @@ public:
  * and when views are out-of-date.
  */
 class CkInterestViewable : public CkViewable {
-	CkInterestView *last; // Previous (set of) views
-	void flushLast(void) {
-		if (last!=NULL) {
-			last->unref();
-			last=NULL;
-		}
-	}
-	CkViewableID id; /// Our unique, cross-processor ID
 	CkInterestSet interest; /// Our 3D interest points
 	CkVector3d center; /// Our 3D center point
 protected:
-	void setViewableID(const CkViewableID &id_) {id=id_;}
 	void setUnivPoints(const CkInterestSet &univPoints_) {
 		interest=univPoints_;
 		center=interest.getMean();
 	}
+	void setCenter(const CkVector3d &center_) {center=center_;}
 public:
-	/// Be sure to set id and interest from your constructor.
-	CkInterestViewable();
-	~CkInterestViewable();
+	/// Be sure to set interest points from your constructor.
+	CkInterestViewable() {}
+	
+	/// Default implementation checks the rms reprojection error.
+	virtual bool shouldRender(const CkViewpoint &univ2screen,const CkView &oldView);
 	
 	/**
-	 * Search for an appropriate existing view for this viewpoint.
-	 * If none exists, render a new view.
+	 * Use newViewpoint and renderImage to build a new CkInterestView.
 	 */
-	virtual void view(const CkViewpoint &univ2screen,CkViewConsumer &dest);
+	virtual CkView *renderView(const CkViewpoint &univ2screen);
 	
 	/**
-	 * Return true if this view is appropriate for use from this viewpoint.
-	 * Default implementation checks the rms reprojection error.
-	 */
-	virtual bool goodView(const CkViewpoint &univ2screen,CkInterestView *testView);
-	
-	/**
-	 * Create a new texture viewpoint for this new universe viewpoint.
+	 * Create a new texture viewpoint (univ2texture)
+	 * for this new universe viewpoint (univ2screen).
 	 * Default implementation just windows the universe viewpoint
-	 * to fit the new texture.
+	 * to fit the new texture.  Returns false if no viewpoint
+	 * is possible or appropriate.
 	 */
-	virtual CkViewpoint newViewpoint(const CkViewpoint &univ2screen);
-	
+	virtual bool newViewpoint(const CkViewpoint &univ2screen,CkViewpoint &univ2texture);
 	
 	/**
 	 * Subclass-overridden routine:
-	 * Render yourself into this new RGBA image.
+	 * Render yourself into this new, uninitialized RGBA image.
 	 */
-	virtual void render(const CkViewpoint &vp,CkImage &dest) =0;
+	virtual void renderImage(const CkViewpoint &vp,CkImage &dest) =0;
 };
 
-
+/**
+ * A CkPointViewable is a trivial little viewer for a cloud of points.
+ * Because it draws all points as a single pixel, it's not 
+ * resolution-independent, and hence looks pretty bad.
+ */
+class CkPointViewable : public CkInterestViewable {
+        int nPts;
+	CkBbox3d box;
+	float *pts; // Point locations-- 4*nPts
+public:
+	CkPointViewable(int nPts_);
+	void add(const CkVector3d &v);
+	void done(void);
+	~CkPointViewable();
+	
+	void renderImage(const CkViewpoint &vp,CkImage &dest);
+};
 
 
 
