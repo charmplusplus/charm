@@ -342,43 +342,66 @@ int CstatPrintMemStats()
  *
  *****************************************************************************/
 
-CpvDeclare(CmiHandler*, CmiHandlerTable);
+CpvDeclare(CmiHandlerInfo*, CmiHandlerTable);
 CpvStaticDeclare(int  , CmiHandlerCount);
 CpvStaticDeclare(int  , CmiHandlerLocal);
 CpvStaticDeclare(int  , CmiHandlerGlobal);
 CpvDeclare(int,         CmiHandlerMax);
 
-void CmiNumberHandler(n, h)
-int n; CmiHandler h;
-{
-  CmiHandler *tab;
-  int         max = CpvAccess(CmiHandlerMax);
-
-  tab = CpvAccess(CmiHandlerTable);
-  if (n >= max) {
-    int newmax = ((n<<1)+10);
-    int bytes = max*sizeof(CmiHandler);
-    int newbytes = newmax*sizeof(CmiHandler);
-    CmiHandler *new = (CmiHandler*)malloc(newbytes);
-    _MEMCHECK(new);
-    memcpy(new, tab, bytes);
-    memset(((char *)new)+bytes, 0, (newbytes-bytes));
-    free(tab); tab=new;
+static void CmiExtendHandlerTable(int atLeastLen) {
+    int max = CpvAccess(CmiHandlerMax);
+    int newmax = (atLeastLen+(atLeastLen>>2)+32);
+    int bytes = max*sizeof(CmiHandlerInfo);
+    int newbytes = newmax*sizeof(CmiHandlerInfo);
+    CmiHandlerInfo *nu = (CmiHandlerInfo*)malloc(newbytes);
+    CmiHandlerInfo *tab = CpvAccess(CmiHandlerTable);
+    _MEMCHECK(nu);
+    memcpy(nu, tab, bytes);
+    memset(((char *)nu)+bytes, 0, (newbytes-bytes));
+    free(tab); tab=nu;
     CpvAccess(CmiHandlerTable) = tab;
     CpvAccess(CmiHandlerMax) = newmax;
-  }
-  tab[n] = h;
 }
 
-int CmiRegisterHandler(h)
-CmiHandler h;
+void CmiNumberHandler(int n, CmiHandler h)
+{
+  CmiHandlerInfo *tab;
+  if (n >= CpvAccess(CmiHandlerMax)) CmiExtendHandlerTable(n);
+  tab = CpvAccess(CmiHandlerTable);
+  tab[n].hdlr = (CmiHandlerEx)h; /* LIE!  This assumes extra pointer will be ignored!*/
+  tab[n].userPtr = 0;
+}
+void CmiNumberHandlerEx(int n, CmiHandlerEx h,void *userPtr) {
+  CmiHandlerInfo *tab;
+  if (n >= CpvAccess(CmiHandlerMax)) CmiExtendHandlerTable(n);
+  tab = CpvAccess(CmiHandlerTable);
+  tab[n].hdlr = h;
+  tab[n].userPtr=userPtr;
+}
+
+#if CMI_LOCAL_GLOBAL_AVAILABLE /*Leave room for local and global handlers*/
+#  define DIST_BETWEEN_HANDLERS 3
+#else /*No local or global handlers; ordinary handlers are back-to-back*/
+#  define DIST_BETWEEN_HANDLERS 1
+#endif
+
+int CmiRegisterHandler(CmiHandler h)
 {
   int Count = CpvAccess(CmiHandlerCount);
   CmiNumberHandler(Count, h);
-  CpvAccess(CmiHandlerCount) = Count+3;
+  CpvAccess(CmiHandlerCount) = Count+DIST_BETWEEN_HANDLERS;
+  return Count;
+}
+int CmiRegisterHandlerEx(CmiHandlerEx h,void *userPtr)
+{
+  int Count = CpvAccess(CmiHandlerCount);
+  CmiNumberHandlerEx(Count, h, userPtr);
+  CpvAccess(CmiHandlerCount) = Count+DIST_BETWEEN_HANDLERS;
   return Count;
 }
 
+
+#if CMI_LOCAL_GLOBAL_AVAILABLE
 int CmiRegisterHandlerLocal(h)
 CmiHandler h;
 {
@@ -398,6 +421,7 @@ CmiHandler h;
   CpvAccess(CmiHandlerGlobal) = Global+3;
   return Global;
 }
+#endif
 
 static void CmiHandlerInit()
 {
@@ -409,9 +433,8 @@ static void CmiHandlerInit()
   CpvAccess(CmiHandlerCount)  = 0;
   CpvAccess(CmiHandlerLocal)  = 1;
   CpvAccess(CmiHandlerGlobal) = 2;
-  CpvAccess(CmiHandlerMax) = 100;
-  CpvAccess(CmiHandlerTable) = (CmiHandler *)malloc(100*sizeof(CmiHandler)) ;
-  _MEMCHECK(CpvAccess(CmiHandlerTable));
+  CpvAccess(CmiHandlerMax) = 0; /* Table will be extended on the first registration*/
+  CpvAccess(CmiHandlerTable) = NULL;
 }
 
 
@@ -722,7 +745,8 @@ void CmiHandleMessage(void *msg)
 /* this is wrong because it counts the Charm++ messages in sched queue
  	CpvAccess(cQdState)->mProcessed++;
 */
- 	(CmiGetHandlerFunction(msg))(msg);
+	CmiHandlerInfo *h=&CmiGetHandlerInfo(msg);
+	(h->hdlr)(msg,h->userPtr);
 }
 
 #if CMK_CMIDELIVERS_USE_COMMON_CODE

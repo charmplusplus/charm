@@ -330,7 +330,8 @@ typedef CMK_TYPEDEF_FLOAT4    CmiFloat4;
 typedef CMK_TYPEDEF_FLOAT8    CmiFloat8;
 
 typedef void  *CmiCommHandle;
-typedef void (*CmiHandler)();
+typedef void (*CmiHandler)(void *msg);
+typedef void (*CmiHandlerEx)(void *msg,void *userPtr);
 
 typedef struct CMK_MSG_HEADER_BASIC CmiMsgHeaderBasic;
 typedef struct CMK_MSG_HEADER_EXT   CmiMsgHeaderExt;
@@ -340,7 +341,12 @@ typedef struct CMK_MSG_HEADER_EXT   CmiMsgHeaderExt;
 
 /******** CMI, CSD: MANY LOW-LEVEL OPERATIONS ********/
 
-CpvExtern(CmiHandler*, CmiHandlerTable);
+typedef struct {
+	CmiHandlerEx hdlr;
+	void *userPtr;
+} CmiHandlerInfo;
+
+CpvExtern(CmiHandlerInfo*, CmiHandlerTable);
 CpvExtern(int,         CmiHandlerMax);
 CpvExtern(void*,       CsdSchedQueue);
 #if CMK_NODE_QUEUE_AVAILABLE
@@ -349,10 +355,14 @@ CsvExtern(CmiNodeLock, CsdNodeQueueLock);
 #endif
 CpvExtern(int,         CsdStopFlag);
 
-extern int CmiRegisterHandler(CmiHandler);
+extern int CmiRegisterHandler(CmiHandler h);
+extern int CmiRegisterHandlerEx(CmiHandlerEx h,void *userPtr);
+#if CMI_LOCAL_GLOBAL_AVAILABLE
 extern int CmiRegisterHandlerLocal(CmiHandler);
 extern int CmiRegisterHandlerGlobal(CmiHandler);
-extern void CmiNumberHandler(int, CmiHandler);
+#endif
+extern void CmiNumberHandler(int n, CmiHandler h);
+extern void CmiNumberHandlerEx(int n, CmiHandlerEx h,void *userPtr);
 
 #define CmiGetHandler(m)  (((CmiMsgHeaderExt*)m)->hdl)
 #define CmiGetXHandler(m) (((CmiMsgHeaderExt*)m)->xhdl)
@@ -362,7 +372,9 @@ extern void CmiNumberHandler(int, CmiHandler);
 #define CmiSetXHandler(m,v) do {((((CmiMsgHeaderExt*)m)->xhdl)=(v));} while(0)
 #define CmiSetInfo(m,v)     do {((((CmiMsgHeaderExt*)m)->info)=(v));} while(0)
 
-#define CmiHandlerToFunction(n) (CpvAccess(CmiHandlerTable)[n])
+#define CmiHandlerToInfo(n) (CpvAccess(CmiHandlerTable)[n])
+#define CmiHandlerToFunction(n) (CmiHandlerToInfo(n).hdlr)
+#define CmiGetHandlerInfo(env) (CmiHandlerToInfo(CmiGetHandler(env)))
 #define CmiGetHandlerFunction(env) (CmiHandlerToFunction(CmiGetHandler(env)))
 
 void    *CmiAlloc(int size);

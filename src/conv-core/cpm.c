@@ -210,7 +210,8 @@ CpvDeclare(int, CpmThread2_Index);
 void CpmThread3(void *msg)
 {
   int *env = (int *)CpmEnv(msg);
-  CpvAccess(CmiHandlerTable)[env[0]](msg);
+  CmiHandlerInfo *h=&CmiHandlerToInfo(env[0]);
+  (h->hdlr)(msg,h->userPtr);
   CmiFree(msg);
   CthFree(CthSelf()); CthSuspend();
 }
