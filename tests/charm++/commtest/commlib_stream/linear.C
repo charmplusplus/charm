@@ -12,6 +12,8 @@
 #include "hello.decl.h"
 #include "StreamingStrategy.h"
 #include "MeshStreamingStrategy.h"
+#include "DummyStrategy.h"
+
 
 /*readonly*/ CProxy_Main mainProxy;
 /*readonly*/ int nElements;
@@ -65,13 +67,17 @@ public:
         
         //mstrat->enableShortArrayMessagePacking();
         
+	DummyStrategy *dstrat = new DummyStrategy();
+
         ss_inst = CkGetComlibInstance();
         mss_inst = CkGetComlibInstance();
 	samp_inst = CkGetComlibInstance();
+	dummy_inst = CkGetComlibInstance();
 
         ss_inst.setStrategy(strat); 
         mss_inst.setStrategy(mstrat); 
-	samp_inst.setStrategy(sstrat);         
+	samp_inst.setStrategy(sstrat);     
+	dummy_inst.setStrategy(dstrat);
 
         startTime=CkWallTimer();
         CkPrintf("Starting ring...\n");
@@ -87,18 +93,20 @@ public:
 	    char stype[256];
 
             if(step_count == 1)
-                sprintf(stype, "");
+	      sprintf(stype, "");
             else if(step_count == 2)
-	        sprintf(stype, "Mesh ");
+	      sprintf(stype, "Mesh ");
             else if(step_count == 3)
-                sprintf(stype, "SAMP ");
+	      sprintf(stype, "SAMP ");
+	    else if(step_count == 4)
+	      sprintf(stype, "NO ");
 
             CkPrintf("%sStreaming Performance %g us/msg on %d pes and %d elements\n", 
                      stype, 
                      (CkWallTimer()-startTime)*1e6/(MAX_COUNT * MAX_PER_ITR), 
                      CkNumPes(), nElements);
 
-            if(step_count < 3) {
+            if(step_count < 4) {
                 arr.start();
                 step_count ++;
                 recv_count = 0;
@@ -129,9 +137,11 @@ public:
 	    ss_inst.beginIteration();
         else if(step_count == 1)            
             mss_inst.beginIteration();
-        else
+        else if(step_count == 2)
             samp_inst.beginIteration();            
-        
+        else
+	    dummy_inst.beginIteration();
+
         step_count++;
 
         recv_count = 0;        
