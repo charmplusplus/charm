@@ -140,7 +140,7 @@ CLBMigrateMsg* CommLB::Strategy(CentralLB::LDStats* stats, int count)
 
   CkVector migrateInfo;
 
-  alloc_array = new (double *)[count+1];
+  alloc_array = new double *[count+1];
 
   nobj =0;
   for(pe=0; pe < count; pe++) 
@@ -213,7 +213,7 @@ CLBMigrateMsg* CommLB::Strategy(CentralLB::LDStats* stats, int count)
   alloc(pe,maxid,stats[spe].objData[mpos].wallTime);
   if(pe != spe){
     //      CkPrintf("**Moving from %d to %d\n",spe,pe);
-    MigrateInfo* migrateMe;
+    MigrateInfo* migrateMe = new MigrateInfo;
     migrateMe->obj = stats[spe].objData[mpos].handle;
     migrateMe->from_pe = spe;
     migrateMe->to_pe = pe;
@@ -243,7 +243,7 @@ CLBMigrateMsg* CommLB::Strategy(CentralLB::LDStats* stats, int count)
 
     if(minpe != spe){
       //      CkPrintf("**Moving from %d to %d\n",spe,minpe);
-      MigrateInfo *migrateMe;
+      MigrateInfo *migrateMe = new MigrateInfo;
       migrateMe->obj = stats[spe].objData[mpos].handle;
       migrateMe->from_pe = spe;
       migrateMe->to_pe = minpe;
