@@ -518,6 +518,22 @@ foreach FILE ($FILES)
         set OBJECTFILES=( $OBJECTFILES $BASE.o )
       endif
       breaksw
+    case "*.c"
+      ($ECHOCMD ; $CMK_CC $OPTS_CC -I$CHARMINC -c $BASE.c -o $BASE.o)
+      if ($status) goto failure
+      if ($?OBJECT) then
+	if ($OBJECT != $BASE.o) set DELETE=( $DELETE $BASE.o )
+        set OBJECTFILES=( $OBJECTFILES $BASE.o )
+      endif
+      breaksw
+    case "*.s"
+      ($ECHOCMD ; $CMK_CC $OPTS_CC -I$CHARMINC -c $BASE.s -o $BASE.o)
+      if ($status) goto failure
+      if ($?OBJECT) then
+	if ($OBJECT != $BASE.o) set DELETE=( $DELETE $BASE.o )
+        set OBJECTFILES=( $OBJECTFILES $BASE.o )
+      endif
+      breaksw
     case "*.C"
       ($ECHOCMD ; $CMK_CXX $OPTS_CXX -I$CHARMINC -c $BASE.C -o $BASE.o)
       if ($status) goto failure

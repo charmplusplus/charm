@@ -85,6 +85,14 @@ dirs+sources:
 	find ../../src/`cat .vdir` -type f \! -name Entries \! -name Root \! -name Repository -exec ln -s {} . \;
 	if [ -d ../../src/Common.`cat .gdir` ] ; then find ../../src/Common.`cat .gdir` -type f \! -name Entries \! -name Root \! -name Repository -exec ln -s {} . \; ; fi
 	@echo
+	@echo 'Gathering quickthreads tree.'
+	@echo
+	rm -rf QuickThreads
+	(cd ../../src ; find QuickThreads -type d -print) | sed -e 's@^@mkdir @' | sh
+	rt=`(cd ../../src ; pwd)` ; (cd ../../src ; find QuickThreads -type f -print) | awk '{ print "ln -s '$$rt'/"$$1" "$$1; }' > tmp.sh
+	sh tmp.sh
+	rm -f tmp.sh
+	@echo
 	@echo 'Gathering test-programs in '`cat .vdir`/pgms
 	@echo
 	rm -rf ../pgms
@@ -118,10 +126,16 @@ CVLIBS=libconv-core.a libconv-cplus-n.a libconv-cplus-y.a
 
 LIBCONV_CORE=threads.o convcore.o conv-conds.o spantree.o queueing.o fifo.o msgmgr.o memory.o cpm.o
 
-converse: basics $(CVLIBS) conv-host-if-needed conv-cpm
+converse: basics ../include/qt.h $(CVLIBS) conv-host-if-needed conv-cpm
 
 conv-host-if-needed:
 	if [ -f conv-host.c ] ; then make conv-host OPTS='$(OPTS)' ; fi
+
+../include/qt.h:
+	csh -fc 'source conv-mach.csh;cd QuickThreads;./configure $$CMK_QT;make'
+	cp QuickThreads/libqt.a ../lib/libqt.a
+	cp QuickThreads/qtmd.h ../include/qtmd.h
+	cp QuickThreads/qt.h ../include/qt.h
 
 conv-host: conv-host.c
 	../bin/charmc -cp ../bin -seq -DNOTIFY -o conv-host-notify conv-host.c
@@ -145,7 +159,7 @@ fifo.o: fifo.c $(CVHEADERS)
 	$(CHARMC) fifo.c
 
 threads.o: threads.c $(CVHEADERS)
-	$(CHARMC) -use-reliable-cc -NO threads.c
+	$(CHARMC) -use-reliable-cc -I. -NO threads.c
 
 spantree.o: spantree.c $(CVHEADERS)
 	$(CHARMC) spantree.c
@@ -548,6 +562,7 @@ clean:
 	rm -f core *~
 
 veryclean: clean
+	rm -rf QuickThreads
 	rm -rf dirs+sources
 	rm -rf ../bin
 	rm -rf ../lib
