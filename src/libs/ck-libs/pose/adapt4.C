@@ -6,7 +6,7 @@ void adapt4::Step()
 {
   Event *ev;
   POSE_TimeType lastGVT = localPVT->getGVT();
-  static int itersAllowed=-1, iter=0, offset=-1, theMaxLeash=10, 
+  static int itersAllowed=-1, iter=0, offset=-1, theMaxLeash=POSE_TimeMax/2, 
     objUsage = MAX_USAGE * STORE_RATE;
   double critStart;
 
@@ -16,14 +16,20 @@ void adapt4::Step()
   if (!parent->cancels.IsEmpty()) CancelEvents();
   parent->Status();
 
-  if (rbFlag) { 
+  if (rbFlag) { // adjust leash according to rollback
     if (timeLeash > avgRBoffset)
       timeLeash = avgRBoffset;
     else timeLeash = avgRBoffset/2;
   }
-  else if (timeLeash < theMaxLeash) {
-    timeLeash++;
+  else if (timeLeash < theMaxLeash) { // adjust according to state
+    if (eq->currentPtr->timestamp > POSE_UnsetTS) { // adjust to next event
+      if (eq->currentPtr->timestamp - lastGVT >= timeLeash)
+	timeLeash++;
+      // else leave it alone
+    }
+    // no next event; leave it alone
   }
+  // Put leash back into reasonable bounds
   if (timeLeash > theMaxLeash) {
     timeLeash = theMaxLeash;
   }
