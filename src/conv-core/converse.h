@@ -6,7 +6,6 @@
 #endif
 
 
-
 /**** DEAL WITH DIFFERENCES: KERNIGHAN-RITCHIE-C, ANSI-C, AND C++ ****/
 
 #if CMK_PREPROCESSOR_CANNOT_DO_CONCATENATION
@@ -381,6 +380,8 @@ typedef struct CMK_MSG_HEADER_EXT   CmiMsgHeaderExt;
 CpvExtern(CmiHandler*, CmiHandlerTable);
 CpvExtern(int,         CmiHandlerMax);
 CpvExtern(void*,       CsdSchedQueue);
+CsvExtern(void*,       CsdNodeQueue);
+CsvExtern(CmiNodeLock, NodeQueueLock);
 CpvExtern(int,         CsdStopFlag);
 CpvExtern(CmiHandler,  CsdNotifyIdle);
 CpvExtern(CmiHandler,  CsdNotifyBusy);
@@ -456,6 +457,23 @@ void     CmiFree   CMK_PROTO((void *));
 double   CmiTimer      CMK_PROTO(());
 double   CmiWallTimer  CMK_PROTO(());
 double   CmiCpuTimer   CMK_PROTO(());
+
+#if CMK_NODE_QUEUE_AVAILABLE
+
+#define CsdNodeEnqueueGeneral(x,s,i,p) {CmiLock(CsvAccess(NodeQueueLock));\
+    CqsEnqueueGeneral(CsvAccess(CsdNodeQueue),(x),(s),(i),(p)); \
+    CmiUnlock(CsvAccess(NodeQueueLock));}
+#define CsdNodeEnqueue(x)     {CmiLock(CsvAccess(NodeQueueLock));\
+			       CqsEnqueueFifo(CsvAccess(CsdNodeQueue),(x));\
+			       CmiUnlock(CsvAccess(NodeQueueLock));}
+
+#else
+
+#define CsdNodeEnqueueGeneral(x,s,i,p)  CsdEnqueueGeneral(x,s,i,p)
+#define CsdNodeEnqueue(x)  		CsdEnqueue(x)
+
+#endif
+
 
 #define CsdEnqueueGeneral(x,s,i,p)\
     (CqsEnqueueGeneral(CpvAccess(CsdSchedQueue),(x),(s),(i),(p)))
@@ -536,17 +554,38 @@ void          CmiSyncVectorSend         CMK_PROTO((int, int, int *, char **));
 CmiCommHandle CmiAsyncVectorSend        CMK_PROTO((int, int, int *, char **));
 void          CmiSyncVectorSendAndFree  CMK_PROTO((int, int, int *, char **));
 
+void          CmiSyncNodeSendFn             CMK_PROTO((int, int, char *));
+CmiCommHandle CmiAsyncNodeSendFn            CMK_PROTO((int, int, char *));
+void          CmiFreeNodeSendFn             CMK_PROTO((int, int, char *));
+
+void          CmiSyncNodeBroadcastFn        CMK_PROTO((int, char *));
+CmiCommHandle CmiAsyncNodeBroadcastFn       CMK_PROTO((int, char *));
+void          CmiFreeNodeBroadcastFn        CMK_PROTO((int, char *));
+
+void          CmiSyncNodeBroadcastAllFn     CMK_PROTO((int, char *));
+CmiCommHandle CmiAsyncNodeBroadcastAllFn    CMK_PROTO((int, char *));
+void          CmiFreeNodeBroadcastAllFn     CMK_PROTO((int, char *));
+
 #define CmiSyncSend(p,s,m)              (CmiSyncSendFn((p),(s),(char *)(m)))
+#define CmiSyncNodeSend(p,s,m)          (CmiSyncNodeSendFn((p),(s),(char *)(m)))
 #define CmiAsyncSend(p,s,m)             (CmiAsyncSendFn((p),(s),(char *)(m)))
+#define CmiAsyncNodeSend(p,s,m)             (CmiAsyncNodeSendFn((p),(s),(char *)(m)))
 #define CmiSyncSendAndFree(p,s,m)       (CmiFreeSendFn((p),(s),(char *)(m)))
+#define CmiSyncNodeSendAndFree(p,s,m)       (CmiFreeNodeSendFn((p),(s),(char *)(m)))
 
 #define CmiSyncBroadcast(s,m)           (CmiSyncBroadcastFn((s),(char *)(m)))
+#define CmiSyncNodeBroadcast(s,m)           (CmiSyncNodeBroadcastFn((s),(char *)(m)))
 #define CmiAsyncBroadcast(s,m)          (CmiAsyncBroadcastFn((s),(char *)(m)))
+#define CmiAsyncNodeBroadcast(s,m)          (CmiAsyncNodeBroadcastFn((s),(char *)(m)))
 #define CmiSyncBroadcastAndFree(s,m)    (CmiFreeBroadcastFn((s),(char *)(m)))
+#define CmiSyncNodeBroadcastAndFree(s,m)    (CmiFreeNodeBroadcastFn((s),(char *)(m)))
 
 #define CmiSyncBroadcastAll(s,m)        (CmiSyncBroadcastAllFn((s),(char *)(m)))
+#define CmiSyncNodeBroadcastAll(s,m)        (CmiSyncNodeBroadcastAllFn((s),(char *)(m)))
 #define CmiAsyncBroadcastAll(s,m)       (CmiAsyncBroadcastAllFn((s),(char *)(m)))
+#define CmiAsyncNodeBroadcastAll(s,m)       (CmiAsyncNodeBroadcastAllFn((s),(char *)(m)))
 #define CmiSyncBroadcastAllAndFree(s,m) (CmiFreeBroadcastAllFn((s),(char *)(m)))
+#define CmiSyncNodeBroadcastAllAndFree(s,m) (CmiFreeNodeBroadcastAllFn((s),(char *)(m)))
 
 #define CmiSyncListSend(n,l,s,m)        (CmiSyncListSendFn((n),(l),(s),(char *)(m)))
 #define CmiAsyncListSend(n,l,s,m)       (CmiAsyncListSendFn((n),(l),(s),(char *)(m)))
@@ -555,6 +594,7 @@ void          CmiSyncVectorSendAndFree  CMK_PROTO((int, int, int *, char **));
 #define CmiSyncMulticast(g,s,m)         (CmiSyncMulticastFn((g),(s),(char*)(m)))
 #define CmiAsyncMulticast(g,s,m)        (CmiAsyncMulticastFn((g),(s),(char*)(m)))
 #define CmiSyncMulticastAndFree(g,s,m)  (CmiFreeMulticastFn((g),(s),(char*)(m)))
+
 
 /******** CMI MESSAGE RECEPTION ********/
 
@@ -889,6 +929,7 @@ void CcsSendReply CMK_PROTO((unsigned int ip, unsigned int port, int size, void 
 #define CcsSendReply(i,p,s,r)
 
 #endif
+
 
 typedef struct rngen_
 {
