@@ -33,18 +33,6 @@ public:
 class LBDatabase;
 #endif
 
-#define IMMEDIATE               CmiTrue
-#define NOT_IMMEDIATE		CmiFalse
-
-#define MessageIndex(mt)        CMessage_##mt##::__idx
-#define ChareIndex(ct)          CkIndex_##ct##::__idx
-#define EntryIndex(ct,ep,mt)    CkIndex_##ct##::ep##((mt *)0)
-#define ConstructorIndex(ct,mt) EntryIndex(ct,ckNew,mt)
-
-typedef int MessageIndexType;
-typedef int ChareIndexType;
-typedef int EntryIndexType;
-
 //Forward declarations
 class CkArray;
 class ArrayElement;
@@ -546,6 +534,9 @@ public:
 
 	/// Return the "last-known" location (returns a processor number)
 	int lastKnown(const CkArrayIndex &idx) const;
+
+	/// Return true if this array element lives on another processor
+	bool isRemote(const CkArrayIndex &idx,int *onPe) const;
 
 	/// Pass each of our locations (each separate array index) to this destination.
 	void iterate(CkLocIterator &dest);

@@ -1613,6 +1613,19 @@ int CkLocMgr::lastKnown(const CkArrayIndex &idx) const {
 	if (pe==-1) return homePe(idx);
 	else return pe;
 }
+/// Return true if this array element lives on another processor
+bool CkLocMgr::isRemote(const CkArrayIndex &idx,int *onPe) const
+{
+	CkLocMgr *vthis=(CkLocMgr *)this;//Cast away "const"
+	CkLocRec *rec=vthis->elementNrec(idx);
+	if (rec==NULL || rec->type()!=CkLocRec::remote) 
+		return false; /* not definitely a remote element */
+	else /* element is indeed remote */
+	{
+		*onPe=rec->lookupProcessor();
+		return true;
+	}
+}
 
 static const char *rec2str[]={
     "base (INVALID)",//Base class (invalid type)

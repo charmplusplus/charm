@@ -10,6 +10,42 @@ the run-time load balancer.
 Elements can also receive broadcasts and participate in
 reductions.
 
+Here's a list, valid in 2003/12, of all the different 
+code paths used to create array elements:
+
+1.) Initial inserts: all at once
+CProxy_foo::ckNew(msg,n);
+ CProxy_ArrayBase::ckCreateArray
+  CkArray::CkArray
+   CkLocMgr::populateInitial(numInitial)
+    for (idx=...)
+     if (map->procNum(idx)==thisPe) 
+      CkArray::insertInitial
+       CkArray::prepareCtorMsg
+       CkArray::insertElement
+
+2.) Initial inserts: one at a time
+fooProxy[idx].insert(msg,n);
+ CProxy_ArrayBase::ckInsertIdx
+  CkArray::prepareCtorMsg
+  CkArrayManagerInsert
+   CkArray::insertElement
+
+3.) Demand creation (receive side)
+CkLocMgr::deliver
+ CkLocMgr::deliverUnknown
+  CkLocMgr::demandCreateElement
+   CkArray::demandCreateElement
+    CkArray::prepareCtorMsg
+    CkArrayManagerInsert or direct CkArray::insertElement
+
+4.) Migration (receive side)
+CkLocMgr::migrateIncoming
+ CkLocMgr::pupElementsFor
+  CkArray::allocateMigrated
+
+
+
 Converted from 1-D arrays 2/27/2000 by
 Orion Sky Lawlor, olawlor@acm.org
 */
@@ -505,6 +541,12 @@ CmiBool CkArray::insertElement(CkMessage *me)
   CK_MAGICNUMBER_CHECK
   CkArrayMessage *m=(CkArrayMessage *)me;
   const CkArrayIndex &idx=m->array_index();
+  int onPe;
+  if (locMgr->isRemote(idx,&onPe)) 
+  { /* element's sibling lives somewhere else, so insert there */
+  	CkArrayManagerInsert(onPe,me,thisgroup);
+	return CmiFalse;
+  }
   int ctorIdx=m->array_ep();
   int chareType=_entryTable[ctorIdx]->chareIdx;
   ArrayElement *elt=allocate(chareType,idx,me,CmiFalse);
