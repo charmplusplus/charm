@@ -156,6 +156,27 @@ CkReductionMsg *LXOR(int nMsg,CkReductionMsg **msgs)
 	return retmsg;
 }
 
+CkReductionMsg *ComplexSum(int nMsg,CkReductionMsg **msgs)
+{
+	int size = msgs[0]->getSize();
+	int count = size/sizeof(mpiComplex);
+	mpiComplex *m;
+	mpiComplex *ret = new mpiComplex [count];
+	// assuming nMsg > 0
+	m = (mpiComplex*)msgs[0]->getData();
+	for(int j=0;j<count;j++)  ret[j] = m[j];
+	for(int i=1;i<nMsg;i++){
+		m = (mpiComplex *)msgs[i]->getData();
+		for(int j=0;j<count;j++){
+			ret[j].re += m[j].re;
+			ret[j].im += m[j].im;
+		}
+	}
+	CkReductionMsg *retmsg = CkReductionMsg::buildNew(size,ret);
+	delete [] ret;
+	return retmsg;
+}
+
 template <class Type>
 CkReductionMsg *BAND(int nMsg,CkReductionMsg **msgs
 #if STUPID_SUN_TEMPLATES
@@ -253,6 +274,7 @@ typedef long double longdouble;
 MAXMIN_MAP_TYPES(MAXMIN_REDUCER)
 BITWISE_MAP_TYPES(BITWISE_REDUCER)
 CkReduction::reducerType LXORReducer;
+CkReduction::reducerType ComplexSumReducer;
 
 // Instantiate the maxLoc/minLoc templates
 #if STUPID_SUN_TEMPLATES
@@ -292,6 +314,7 @@ static void ampiSetupReductions(void) {
   MAXMIN_MAP_TYPES(MAXMIN_REGISTER)
   BITWISE_MAP_TYPES(BITWISE_REGISTER)
   LXORReducer=CkReduction::addReducer(LXOR);
+  ComplexSumReducer=CkReduction::addReducer(ComplexSum);
 }
 
 
@@ -1815,6 +1838,7 @@ getReductionType(int type, int op)
         case MPI_FLOAT : mytype = CkReduction::sum_float; break;
         case MPI_INT : mytype = CkReduction::sum_int; break;
         case MPI_DOUBLE : mytype = CkReduction::sum_double; break;
+        case MPI_COMPLEX : mytype = ComplexSumReducer; break;
         default:
           ckerr << "Type " << type << " with Op " << op << " not supported." << endl;
           CmiAbort("exiting");

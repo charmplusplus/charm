@@ -25,8 +25,9 @@ typedef int MPI_Info;
 #define WIN_SUCCESS 	0
 #define WIN_ERROR 	1
 
-class ampi;
+typedef struct mpiComplex_{ double re, im; } mpiComplex;
 
+class ampi;
 class lockQueueEntry {
 public:
   int requestRank;
