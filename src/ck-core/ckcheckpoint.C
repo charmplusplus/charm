@@ -119,7 +119,7 @@ void CkCheckpointMgr::Checkpoint(const char *dirname, CkCallback& cb){
 	  fclose(fNodeGroups);
   	}
 
-	//DEBCHK("[%d]CkCheckpointMgr::Checkpoint called dirname={%s}\n",CkMyPe(),dirname);
+	DEBCHK(("[%d]CkCheckpointMgr::Checkpoint called dirname={%s}\n",CkMyPe(),dirname));
 	sprintf(fileName,"%s/arr_%d.dat",dirname, CkMyPe());
 	FILE *datFile=fopen(fileName,"wb");
 	if (datFile==NULL) CkAbort("Could not create data file");
@@ -130,14 +130,14 @@ void CkCheckpointMgr::Checkpoint(const char *dirname, CkCallback& cb){
 	system("sync");
 
 	restartCB = cb;
-	DEBCHK("[%d]restartCB installed\n",CkMyPe());
+	DEBCHK(("[%d]restartCB installed\n",CkMyPe()));
 	CkCallback localcb(CkIndex_CkCheckpointMgr::SendRestartCB(NULL),0,thisgroup);
 	contribute(0,NULL,CkReduction::sum_int,localcb);
 }
 
 void CkCheckpointMgr::SendRestartCB(CkReductionMsg *m){ 
 	delete m; 
-	DEBCHK("[%d]Sending out the cb\n",CkMyPe());
+	DEBCHK(("[%d]Sending out the cb\n",CkMyPe()));
 	CkPrintf("Checkpoint to disk finished in %fs, sending out the cb...\n", CmiWallTimer() - chkptStartTimer);
 	restartCB.send(); 
 }
@@ -158,7 +158,7 @@ void CkPupROData(PUP::er &p)
 void CkPupMainChareData(PUP::er &p)
 {
 	int nMains=_mainTable.size();
-	DEBCHK("[%d] CkPupMainChareData %s: nMains = %d\n", CkMyPe(),p.typeString(),nMains);
+	DEBCHK(("[%d] CkPupMainChareData %s: nMains = %d\n", CkMyPe(),p.typeString(),nMains));
 	for(int i=0;i<nMains;i++){  /* Create all mainchares */
 		ChareInfo *entry = _chareTable[_mainTable[i]->chareIdx];
 		int entryMigCtor = entry->getMigCtor();
@@ -166,7 +166,7 @@ void CkPupMainChareData(PUP::er &p)
 			Chare* obj;
 			if (p.isUnpacking()) {
 				int size = entry->size;
-				DEBCHK("MainChare PUP'ed: name = %s, idx = %d, size = %d\n", entry->name, i, size);
+				DEBCHK(("MainChare PUP'ed: name = %s, idx = %d, size = %d\n", entry->name, i, size));
 				obj = (Chare*)malloc(size);
 				_MEMCHECK(obj);
 				_mainTable[i]->setObj(obj);
@@ -202,7 +202,7 @@ void CkPupGroupData(PUP::er &p)
           else 
 	    CkpvAccess(_numGroups) = 1;
 	}
-	DEBCHK("[%d] CkPupGroupData %s: numGroups = %d\n", CkMyPe(),p.typeString(),numGroups);
+	DEBCHK(("[%d] CkPupGroupData %s: numGroups = %d\n", CkMyPe(),p.typeString(),numGroups));
 
 	GroupInfo *tmpInfo = new GroupInfo [numGroups];
 	if (!p.isUnpacking()) {
@@ -212,8 +212,7 @@ void CkPupGroupData(PUP::er &p)
 		tmpInfo[i].MigCtor = _chareTable[ent.getcIdx()]->migCtor;
 		tmpInfo[i].DefCtor = _chareTable[ent.getcIdx()]->defCtor;
 		strncpy(tmpInfo[i].name,_chareTable[ent.getcIdx()]->name,255);
-		DEBCHK("[%d] CkPupGroupData: %s group %s \n",
-			CkMyPe(), p.typeString(), tmpInfo[i].name);
+		DEBCHK(("[%d] CkPupGroupData: %s group %s \n", CkMyPe(), p.typeString(), tmpInfo[i].name));
 
 		if(tmpInfo[i].MigCtor==-1) {
 			char buf[512];
@@ -241,8 +240,7 @@ void CkPupGroupData(PUP::er &p)
 	  IrrGroup *gobj = CkpvAccess(_groupTable)->find(gID).getObj();
 	  // if using migration constructor, you'd better have a pup
           gobj->pup(p);
-          DEBCHK("Group PUP'ed: gid = %d, name = %s\n",
-			gobj->ckGetGroupID().idx, tmpInfo[i].name);
+          DEBCHK(("Group PUP'ed: gid = %d, name = %s\n",gobj->ckGetGroupID().idx, tmpInfo[i].name));
 	}
 	delete [] tmpInfo;
 }
@@ -259,7 +257,7 @@ void CkPupNodeGroupData(PUP::er &p)
 	  if(CkMyPe()==0){ CksvAccess(_numNodeGroups) = numNodeGroups+1; }
 	  else { CksvAccess(_numNodeGroups) = 1; }
 	}
-	DEBCHK("[%d] CkPupNodeGroupData %s: numNodeGroups = %d\n",CkMyPe(),p.typeString(),numNodeGroups);
+	DEBCHK(("[%d] CkPupNodeGroupData %s: numNodeGroups = %d\n",CkMyPe(),p.typeString(),numNodeGroups));
 
 	GroupInfo *tmpInfo = new GroupInfo [numNodeGroups];
 	if (!p.isUnpacking()) {
@@ -289,9 +287,7 @@ void CkPupNodeGroupData(PUP::er &p)
 		TableEntry ent2 = CksvAccess(_nodeGroupTable)->find(gID);
 		IrrGroup *obj = ent2.getObj();
 		obj->pup(p);
-		DEBCHK("Nodegroup PUP'ed: gid = %d, name = %s\n",
-			obj->ckGetGroupID().idx,
-			_chareTable[ent2.getcIdx()]->name);
+		DEBCHK(("Nodegroup PUP'ed: gid = %d, name = %s\n",obj->ckGetGroupID().idx,_chareTable[ent2.getcIdx()]->name));
 	}
 	delete [] tmpInfo;
 }
@@ -322,7 +318,7 @@ void CkPupArrayElementsData(PUP::er &p)
 	}
 	p|numElements;
 
-	DEBCHK("[%d] CkPupArrayElementsData %s numGroups:%d numElements:%d \n",CkMyPe(),p.typeString(), numGroups, numElements);
+	DEBCHK(("[%d] CkPupArrayElementsData %s numGroups:%d numElements:%d \n",CkMyPe(),p.typeString(), numGroups, numElements));
 
 	if (!p.isUnpacking())
 	{
@@ -425,7 +421,7 @@ void CkRestartMain(const char* dirname){
 	CkPupROData(pRO);
 	pRO|cb;
 	fclose(fRO);
-	DEBCHK("[%d]CkRestartMain: readonlys restored\n",CkMyPe());
+	DEBCHK(("[%d]CkRestartMain: readonlys restored\n",CkMyPe()));
 
 	// restore mainchares
 	sprintf(filename,"%s/MainChares.dat",dirname);
@@ -434,7 +430,7 @@ void CkRestartMain(const char* dirname){
 		PUP::fromDisk pMain(fMain);
 		CkPupMainChareData(pMain);
 		fclose(fMain);
-		DEBCHK("[%d]CkRestartMain: mainchares restored\n",CkMyPe());
+		DEBCHK(("[%d]CkRestartMain: mainchares restored\n",CkMyPe()));
 		//bdcastRO(); // moved to CkPupMainChareData()
 	}
 	
@@ -466,8 +462,7 @@ void CkRestartMain(const char* dirname){
 	}
 
 	// for each location, restore arrays
-	//DEBCHK("[%d]Trying to find location manager\n",CkMyPe());
-	DEBCHK("[%d]Number of PE: %d -> %d\n",CkMyPe(),_numPes,CkNumPes());
+	DEBCHK(("[%d]Number of PE: %d -> %d\n",CkMyPe(),_numPes,CkNumPes()));
 	if(CkMyPe() < _numPes) 	// in normal range: restore, otherwise, do nothing
           for (i=0; i<_numPes;i++) {
             if (i%CkNumPes() == CkMyPe()) {
