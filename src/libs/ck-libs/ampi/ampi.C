@@ -762,16 +762,16 @@ ampi::~ampi()
 }
 
 // ----------------- Added by Yan for one-sided communication ---------
-inline int ampiParent::addWinStruct(WinStruct* win) { 
+int ampiParent::addWinStruct(WinStruct* win) { 
 	winStructList.push_back(win);
 	return winStructList.size()-1;
 }
 
-inline WinStruct ampiParent::getWinStruct(MPI_Win win) {
+WinStruct ampiParent::getWinStruct(MPI_Win win) {
 	return *(winStructList[(int)win]);
 }
    
-inline void ampiParent::removeWinStruct(WinStruct win) {/*winStructList.remove(win);*/}
+void ampiParent::removeWinStruct(WinStruct win) {/*winStructList.remove(win);*/}
 
 int
 ampi::winPut(void *orgaddr, int orgcnt, MPI_Datatype orgtype, int rank, 
