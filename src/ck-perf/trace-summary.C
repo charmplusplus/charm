@@ -22,6 +22,7 @@
 
 CkpvStaticDeclare(TraceSummary*, _trace);
 static int _numEvents = 0;
+#define NUM_DUMMY_EPS 9
 static int _threadMsg, _threadChare, _threadEP;
 static int _packMsg, _packChare, _packEP;
 static int _unpackMsg, _unpackChare, _unpackEP;
@@ -29,6 +30,7 @@ CkpvDeclare(double, binSize);
 CkpvDeclare(double, version);
 
 int sumonly = 0;
+int sumDetail = 0;
 
 /**
   For each TraceFoo module, _createTraceFoo() must be defined.
@@ -77,6 +79,7 @@ SumLogPool::~SumLogPool()
   if (!sumonly) {
   write();
   fclose(fp);
+  if (sumDetail) fclose(sdfp);
   }
   // free memory for mark
   if (markcount > 0)
@@ -86,6 +89,8 @@ SumLogPool::~SumLogPool()
   }
   delete[] pool;
   delete[] epInfo;
+  delete[] cpuTime;
+  delete[] numExecutions;
 }
 
 void SumLogPool::addEventType(int eventType, double time)
@@ -102,27 +107,42 @@ void SumLogPool::addEventType(int eventType, double time)
 
 SumLogPool::SumLogPool(char *pgm) : numBins(0), phaseTab(MAX_PHASES) 
 {
-   if (TRACE_CHARM_PE() == 0) return;
-   int i;
+   if (TRACE_CHARM_PE() == 0) return; // blue gene related
+
+   // TBD: Can this be moved to initMem?
    poolSize = CkpvAccess(CtrLogBufSize);
    if (poolSize % 2) poolSize++;	// make sure it is even
    pool = new BinEntry[poolSize];
    _MEMCHECK(pool);
-   char pestr[10];
-   sprintf(pestr, "%d", CkMyPe());
-   int len = strlen(pgm) + strlen(".sum.") + strlen(pestr) + 1;
-   char *fname = new char[len+1];
-   sprintf(fname, "%s.%s.sum", pgm, pestr);
+
    fp = NULL;
+   sdfp = NULL;
    //CmiPrintf("TRACE: %s:%d\n", fname, errno);
    if (!sumonly) {
+    char pestr[10];
+    sprintf(pestr, "%d", CkMyPe());
+    int len = strlen(pgm) + strlen(".sumd.") + strlen(pestr) + 1;
+    char *fname = new char[len+1];
+
+    sprintf(fname, "%s.%s.sum", pgm, pestr);
     do {
       fp = fopen(fname, "w+");
     } while (!fp && errno == EINTR);
-    delete[] fname;
     if(!fp) {
       CmiAbort("Cannot open Summary Trace File for writing...\n");
     }
+
+    if (sumDetail) {
+        sprintf(fname, "%s.%s.sumd", pgm, pestr);
+        do {
+            sdfp = fopen(fname, "w+");
+        } while (!sdfp && errno == EINTR);
+        if(!sdfp) {
+            CmiAbort("Cannot open Detailed Summary Trace File for writing...\n");
+        }
+    }
+
+    delete[] fname;
    }
 
    // event
@@ -142,10 +162,31 @@ SumLogPool::SumLogPool(char *pgm) : numBins(0), phaseTab(MAX_PHASES)
 
 void SumLogPool::initMem()
 {
-   epInfoSize = _numEntries+10;
+   epInfoSize = _numEntries + NUM_DUMMY_EPS + 1; // keep a spare EP
    epInfo = new SumEntryInfo[epInfoSize];
    _MEMCHECK(epInfo);
+
+   cpuTime = NULL;
+   numExecutions = NULL;
+   if (sumDetail) {
+       cpuTime = new double[poolSize*epInfoSize];
+       _MEMCHECK(cpuTime);
+       numExecutions = new int[poolSize*epInfoSize];
+       _MEMCHECK(numExecutions);
+
+        int i, e;
+        for(i=0; i<poolSize; i++) {
+            for(e=0; e< epInfoSize; e++) {
+                setCPUtime(i,e,0.0);
+                setNumExecutions(i,e,0);
+            }
+        }
+   }
 }
+
+int SumLogPool::getUtilization(int interval, int ep) {
+    return (int)(getCPUtime(interval, ep) * 100.0 / CkpvAccess(binSize)); 
+};
 
 void SumLogPool::write(void) 
 {
@@ -220,6 +261,63 @@ void SumLogPool::write(void)
   {
     phaseTab.write(fp);
   }
+
+  // write summary details
+  if (sumDetail) {
+        fprintf(sdfp, "ver:%3.1f cpu:%d/%d numIntervals:%d numEPs:%d intervalSize:%e\n",
+                CkpvAccess(version), CkMyPe(), CkNumPes(),
+                numBins, _numEntries, CkpvAccess(binSize));
+
+        // Write out CPU Utilization based on cpuTime
+        // Run length encoding (RLE) along EP axis
+        fprintf(sdfp, "CPUutilizationPerEPperInterval\n");
+        unsigned int e, i;
+        for(e=0; e<_numEntries; e++) {
+            int last=getUtilization(0, e);
+            fprintf(sdfp, "%4d", last);
+            int count=1;
+            for(i=1; i<numBins; i++) {
+                int u = getUtilization(i, e);
+                if (last == u) {
+                    count++;
+                }
+                else {
+                    if (count > 1) fprintf(sdfp, "+%d", count);
+                    fprintf(sdfp, "%4d", u);
+                    last = u;
+                    count = 1;
+                }
+            }
+            if (count > 1) fprintf(sdfp, "+%d", count);
+            fprintf(sdfp, "\n");
+        }
+        fprintf(sdfp, "\n");
+
+        // Write out numExecutions
+        // Run length encoding (RLE) along EP axis
+        fprintf(sdfp, "EPCallTimePerInterval\n");
+        for(e=0; e<_numEntries; e++) {
+            int last=getNumExecutions(0, e);
+            fprintf(sdfp, "%4d", last);
+            int count=1;
+            for(i=1; i<numBins; i++) {
+                int u = getNumExecutions(i, e);
+                if (last == u) {
+                    count++;
+                }
+                else {
+                    if (count > 1) fprintf(sdfp, "+%d", count);
+                    fprintf(sdfp, "%4d", u);
+                    last = u;
+                    count = 1;
+                }
+            }
+            if (count > 1) fprintf(sdfp, "+%d", count);
+            fprintf(sdfp, "\n");
+        }
+        fprintf(sdfp, "\n");
+
+  }
 }
 
 void SumLogPool::writeSts(void)
@@ -245,12 +343,15 @@ void SumLogPool::writeSts(void)
   fclose(stsfp);
 }
 
+// Called once per interval
 void SumLogPool::add(double time, int pe) 
 {
   new (&pool[numBins++]) BinEntry(time);
   if(poolSize==numBins) shrink();
 }
 
+// Called once per run of an EP
+// adds 'time' to EP's time, increments epCount
 void SumLogPool::setEp(int epidx, double time) 
 {
   if (epidx >= epInfoSize) {
@@ -262,6 +363,32 @@ void SumLogPool::setEp(int epidx, double time)
   phaseTab.setEp(epidx, time);
 }
 
+// Called once from endExecute, this function updates the intervals.
+void SumLogPool::updateSummaryDetail(int epIdx, double startTime, double endTime)
+{
+        if (epIdx >= epInfoSize) {
+            CmiAbort("Too many entry points!!\n");
+        }
+
+        double binSz = CkpvAccess(binSize);
+        int startingBinIdx = (int)(startTime/binSz);
+        int endingBinIdx = (int)(endTime/binSz);
+
+        if (startingBinIdx == endingBinIdx) {
+            addToCPUtime(startingBinIdx, epIdx, endTime - startTime);
+        } else if (startingBinIdx < endingBinIdx) { // EP spans intervals
+            addToCPUtime(startingBinIdx, epIdx, (startingBinIdx+1)*binSz - startTime);
+            while(++startingBinIdx < endingBinIdx)
+                addToCPUtime(startingBinIdx, epIdx, binSz);
+            addToCPUtime(endingBinIdx, epIdx, endTime - endingBinIdx*binSz);
+        } else {
+            CmiAbort("Error: end time of EP is less than start time\n");
+        }
+
+        incNumExecutions(startingBinIdx, epIdx);
+};
+
+// Shrinks poop[], cpuTime[], and numExecutions[]
 void SumLogPool::shrink(void)
 {
 //  double t = CmiWallTimer();
@@ -270,6 +397,10 @@ void SumLogPool::shrink(void)
   for (int i=0; i<entries; i++)
   {
      pool[i].setTime(pool[i*2].getTime() + pool[i*2+1].getTime());
+     for (int e=0; e < epInfoSize; e++) {
+         setCPUtime(i, e, getCPUtime(i*2, e) + getCPUtime(i*2+1, e));
+         setNumExecutions(i, e, getNumExecutions(i*2, e) + getNumExecutions(i*2+1, e));
+     }
   }
   numBins = entries;
   CkpvAccess(binSize) *= 2;
@@ -303,7 +434,7 @@ TraceSummary::TraceSummary(char **argv):curevent(0),binStart(0.0),bin(0.0),msgNu
   	"CPU usage log time resolution");
   CmiGetArgDoubleDesc(argv,"+version",&CkpvAccess(version),
   	"Write this .sum file version");
-  
+
   epThreshold = 0.001; 
   CmiGetArgDoubleDesc(argv,"+epThreshold",&epThreshold,
   	"Execution time histogram lower bound");
@@ -312,6 +443,9 @@ TraceSummary::TraceSummary(char **argv):curevent(0),binStart(0.0),bin(0.0),msgNu
   	"Execution time histogram bin size");
 
   sumonly = CmiGetArgFlagDesc(argv, "+sumonly", "merge histogram bins on processor 0");
+  // +sumonly overrides +sumDetail
+  if (!sumonly)
+      sumDetail = CmiGetArgFlagDesc(argv, "+sumDetail", "more detailed summary info");
 
   _logPool = new SumLogPool(CkpvAccess(traceRoot));
   execEp=INVALIDEP;
@@ -398,6 +532,10 @@ void TraceSummary::endExecute(void)
      ts = nts;
   }
   bin += t - ts;
+
+  if (sumDetail)
+      _logPool->updateSummaryDetail(execEp, start, t);
+
   execEp = INVALIDEP;
 }
 
@@ -409,6 +547,7 @@ void TraceSummary::beginPack(void)
 void TraceSummary::endPack(void)
 {
     _logPool->setEp(_packEP, CmiWallTimer() - packstart);
+    _logPool->updateSummaryDetail(_packEP,  TraceTimer(packstart), TraceTimer(CmiWallTimer()));
 }
 
 void TraceSummary::beginUnpack(void)
@@ -419,6 +558,7 @@ void TraceSummary::beginUnpack(void)
 void TraceSummary::endUnpack(void)
 {
     _logPool->setEp(_unpackEP, CmiWallTimer()-unpackstart);
+    _logPool->updateSummaryDetail(_unpackEP,  TraceTimer(unpackstart), TraceTimer(CmiWallTimer()));
 }
 
 void TraceSummary::beginComputation(void)
@@ -460,6 +600,7 @@ void TraceSummary::endComputation(void)
        bin=0.0;
        ts += CkpvAccess(binSize);
      }
+
   }
 }
 

@@ -19,7 +19,7 @@
 #include "ck.h"
 #include "trace-common.h"
 
-// time in seconds
+// initial bin size, time in seconds
 #define  BIN_SIZE	0.001
 
 #define  MAX_MARKS       256
@@ -169,7 +169,7 @@ class SumLogPool {
     UInt poolSize;
     UInt numBins;
     BinEntry *pool;	/**< bins */
-    FILE *fp, *stsfp ;
+    FILE *fp, *stsfp, *sdfp ;
 
     SumEntryInfo  *epInfo;
     UInt epInfoSize;
@@ -183,6 +183,27 @@ class SumLogPool {
 
     /// for phases
     PhaseTable phaseTab;
+
+    /// for Summary-Detail
+    double *cpuTime;    //[MAX_INTERVALS * MAX_ENTRIES];
+    int *numExecutions; //[MAX_INTERVALS * MAX_ENTRIES];
+
+    inline double getCPUtime(unsigned int interval, unsigned int ep){
+        return cpuTime[interval*epInfoSize+ep]; }
+    inline void setCPUtime(unsigned int interval, unsigned int ep, double val){
+        cpuTime[interval*epInfoSize+ep] = val; }
+    inline double addToCPUtime(unsigned int interval, unsigned int ep, double val){
+        cpuTime[interval*epInfoSize+ep] += val;
+        return cpuTime[interval*epInfoSize+ep]; }
+    inline int getNumExecutions(unsigned int interval, unsigned int ep){
+        return numExecutions[interval*epInfoSize+ep]; }
+    inline void setNumExecutions(unsigned int interval, unsigned int ep, unsigned int val){
+        numExecutions[interval*epInfoSize+ep] = val; }
+    inline int incNumExecutions(unsigned int interval, unsigned int ep){
+        ++numExecutions[interval*epInfoSize+ep];
+        return numExecutions[interval*epInfoSize+ep]; }
+    inline int getUtilization(int interval, int ep);
+
   public:
     SumLogPool(char *pgm);
     ~SumLogPool();
@@ -201,6 +222,7 @@ class SumLogPool {
     void startPhase(int phase) { phaseTab.startPhase(phase); }
     BinEntry *bins() { return pool; }
     int getNumEntries() { return numBins; }
+    void updateSummaryDetail(int epIdx, double startTime, double endTime);
 };
 
 /// class for recording trace summary events 
