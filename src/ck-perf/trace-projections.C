@@ -555,6 +555,8 @@ void TraceProjections::traceClose(void)
   if (TRACE_CHARM_PE()) {
     CkpvAccess(_trace)->endComputation();
     delete _logPool;		// will write
+    // remove myself from traceArray so that no tracing will be called.
+    CkpvAccess(_traces)->removeTrace(this);
 //    delete CkpvAccess(_trace);
   }
 //  free(CkpvAccess(traceRoot));

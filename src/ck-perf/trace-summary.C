@@ -488,6 +488,8 @@ void TraceSummary::traceClose(void)
     CkpvAccess(_trace)->endComputation();
     // destructor call the write()
     delete _logPool;
+    // remove myself from traceArray so that no tracing will be called.
+    CkpvAccess(_traces)->removeTrace(this);
   }
 }
 

@@ -88,6 +88,13 @@ private:
 public:
     TraceArray(): n(0) {}
     inline void addTrace(Trace *tr) { traces.push_back(tr); n++;}
+    inline void removeTrace(Trace *tr) {    // remove a Trace from TraceArray
+        int i;
+        for (i=0; i<n; i++) if (tr == traces[i]) break;
+        CmiAssert(i<n);
+        traces.remove(i);
+        n--;
+    }
     inline const int length() const { return n; }
 
     inline void userEvent(int e) { ALLDO(userEvent(e));}
