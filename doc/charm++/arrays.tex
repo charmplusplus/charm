@@ -722,8 +722,7 @@ it can serve as multicast/reduction delegation for all array sections:
   CkGroupID mCastGrpId = CProxy_CkMulticastMgr::ckNew();
   CkMulticastMgr *mcastGrp = CProxy_CkMulticastMgr(mCastGrpId).ckLocalBranch();
 
-  sectProxy.ckDelegate(mCastGrpId);  //section proxy knows who is the delegation
-  mcastGrp->setSection(sectProxy);   //delegation knows whom to delegate
+  sectProxy.ckSectionDelegate(mCastGrpId);  // initialize section proxy
 
   sectProxy.someEntry(...)           //multicast via delegation library as before
 \end{alltt}
