@@ -131,7 +131,7 @@ void TransmitAckDatagram(OtherNode node)
   int retval;
   
   seqno = node->recv_next;
-  MACHSTATE1(2,"  TransmitAckDgram [%d]",seqno)
+  MACHSTATE2(2,"  TransmitAckDgram [seq %d to 'pe' %d]",seqno,node->nodestart)
   DgramHeaderMake(&ack, DGRAM_ACKNOWLEDGE, Cmi_nodestart, Cmi_charmrun_pid, seqno);
   LOG(Cmi_clock, Cmi_nodestart, 'A', node->nodestart, seqno);
   for (i=0; i<Cmi_window_size; i++) {
@@ -165,7 +165,8 @@ void TransmitImplicitDgram(ImplicitDgram dg)
   OtherNode dest;
   int retval;
   
-  MACHSTATE2(2,"  TransmitImplicitDgram (%d bytes) [%d]",dg->datalen,dg->seqno)
+  MACHSTATE3(2,"  TransmitImplicitDgram (%d bytes) [seq %d to 'pe' %d]",
+	     dg->datalen,dg->seqno,dg->dest->nodestart)
   len = dg->datalen;
   data = dg->dataptr;
   head = (DgramHeader *)(data - DGRAM_HEADER_SIZE);
@@ -187,7 +188,8 @@ void TransmitImplicitDgram1(ImplicitDgram dg)
   OtherNode dest;
   int retval;
 
-  MACHSTATE2(4,"  RETransmitImplicitDgram (%d bytes) [%d]",dg->datalen,dg->seqno)
+  MACHSTATE3(4,"  RETransmitImplicitDgram (%d bytes) [seq %d to 'pe' %d]",
+	     dg->datalen,dg->seqno,dg->dest->nodestart)
   len = dg->datalen;
   data = dg->dataptr;
   head = (DgramHeader *)(data - DGRAM_HEADER_SIZE);
@@ -331,7 +333,8 @@ void DeliverViaNetwork(OutgoingMsg ogm, OtherNode node, int rank)
   int size; char *data;
   OtherNode myNode = nodes+CmiMyNode();
 
-  MACHSTATE1(2,"DeliverViaNetwork %d-byte message",ogm->size);
+  MACHSTATE2(2,"DeliverViaNetwork %d-byte message to pe %d",
+	     ogm->size,node->nodestart+rank);
   size = ogm->size - DGRAM_HEADER_SIZE;
   data = ogm->data + DGRAM_HEADER_SIZE;
   writeableDgrams++;
@@ -364,7 +367,7 @@ void AssembleDatagram(OtherNode node, ExplicitDgram dg)
   unsigned int size; char *msg;
   OtherNode myNode = nodes+CmiMyNode();
   
-  MACHSTATE1(2,"  AssembleDatagram [%d]",dg->seqno)
+  MACHSTATE2(2,"  AssembleDatagram [seq %d from 'pe' %d]",dg->seqno,node->nodestart)
   LOG(Cmi_clock, Cmi_nodestart, 'X', dg->srcpe, dg->seqno);
   msg = node->asm_msg;
   if (msg == 0) {
@@ -394,7 +397,7 @@ void AssembleDatagram(OtherNode node, ExplicitDgram dg)
     } else {
 #if CMK_NODE_QUEUE_AVAILABLE
          if (node->asm_rank==DGRAM_NODEMESSAGE) {
-	   PCQueuePush(CsvAccess(NodeRecv), msg);
+	   CmiPushNode(msg);
          }
 	 else
 #endif
@@ -453,7 +456,7 @@ void IntegrateMessageDatagram(ExplicitDgram dg)
   unsigned int slot; OtherNode node;
 
   LOG(Cmi_clock, Cmi_nodestart, 'M', dg->srcpe, dg->seqno);
-  MACHSTATE1(2,"  IntegrateMessageDatagram [%d]",dg->seqno)
+  MACHSTATE2(2,"  IntegrateMessageDatagram [seq %d from pe %d]",dg->seqno,dg->srcpe)
   node = nodes_by_pe[dg->srcpe];
   node->stat_recv_pkt++;
   seqno = dg->seqno;
@@ -619,6 +622,7 @@ void ReceiveDatagram()
   /*ok = recvfrom(dataskt,(char*)(dg->data),Cmi_max_dgram_size,0, 0, 0);*/
   /* if (ok<0) { perror("recv"); KillEveryoneCode(37489437); } */
   if (ok < 0) {
+    MACHSTATE1(4,"  recv dgram failed (errno=%d)",errno)
     FreeExplicitDgram(dg);
     if (errno == EINTR) return;  /* A SIGIO interrupted the receive */
     if (errno == EAGAIN) return; /* Just try again later */
@@ -632,12 +636,17 @@ void ReceiveDatagram()
   dg->len = ok;
   if (ok >= DGRAM_HEADER_SIZE) {
     DgramHeaderBreak(dg->data, dg->rank, dg->srcpe, magic, dg->seqno);
+    MACHSTATE3(2,"  recv dgram [seq %d, for rank %d, from pe %d]",
+	       dg->seqno,dg->rank,dg->srcpe)
     if (magic == (Cmi_charmrun_pid&DGRAM_MAGIC_MASK)) {
       if (dg->rank == DGRAM_ACKNOWLEDGE)
 	IntegrateAckDatagram(dg);
       else IntegrateMessageDatagram(dg);
     } else FreeExplicitDgram(dg);
-  } else FreeExplicitDgram(dg);
+  } else {
+    MACHSTATE1(4,"  recv dgram failed (len=%d)",ok)
+    FreeExplicitDgram(dg);
+  }
 }
 
 
@@ -660,13 +669,13 @@ static void CommunicationServer(int sleepTime)
     return;
   });
   LOG(GetClock(), Cmi_nodestart, 'I', 0, 0);
-  MACHSTATE2(sleepTime?3:2,"CommunicationsServer(%d,%d)",
+  MACHSTATE2(1,"CommunicationsServer(%d,%d)",
 	     sleepTime,writeableAcks||writeableDgrams)  
 #if !CMK_SHARED_VARS_UNAVAILABLE /*SMP mode: comm. lock is precious*/
   if (sleepTime!=0) {/*Sleep *without* holding the comm. lock*/
-    MACHSTATE(2,"CommServer going to sleep (NO LOCK)");
+    MACHSTATE(1,"CommServer going to sleep (NO LOCK)");
     if (CheckSocketsReady(sleepTime)<=0) {
-      MACHSTATE(2,"CommServer finished without anything happening.");
+      MACHSTATE(1,"CommServer finished without anything happening.");
     }
   }
   sleepTime=0;
@@ -677,6 +686,7 @@ static void CommunicationServer(int sleepTime)
   if (sleepTime&&CmiGetState()->idle.hasMessages) sleepTime=0;
   while (CheckSocketsReady(sleepTime)>0) {
     int again=0;
+      MACHSTATE(2,"CheckSocketsReady returned true");
     sleepTime=0;
     if (ctrlskt_ready_read) {again=1;ctrl_getone();}
     if (dataskt_ready_read) {again=1;ReceiveDatagram();}
@@ -694,7 +704,7 @@ static void CommunicationServer(int sleepTime)
     }
   }
   CmiCommUnlock();
-  MACHSTATE(2,"} CommunicationServer") 
+  MACHSTATE(1,"} CommunicationServer") 
 }
 
 
