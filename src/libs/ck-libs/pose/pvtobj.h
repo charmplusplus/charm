@@ -19,6 +19,8 @@ class pvtObjectNode {
   short int present;
   /// The synchronization strategy of the poser (OPTIMISTIC or CONSERVATIVE)
   short int sync; 
+  /// Time spent executing events on this object within a DOP_QUANTA
+  double qdo;
  public:
   /// A pointer to the actual poser
   sim *localObjPtr;
@@ -26,7 +28,7 @@ class pvtObjectNode {
   pvtObjectNode() { present = 0; }
   /// Sets all data fields
   void set(int ts, int idx, short int on, short int s, sim *p) {
-    ovt = ts;  index = idx;  present = on;  sync = s; localObjPtr = p;
+    ovt = ts; index = idx; present = on; sync = s; localObjPtr = p; qdo = 0.0;
   }
   /// Sets ovt to -1 to indicate idle
   void setIdle() { ovt = -1; }
@@ -40,6 +42,12 @@ class pvtObjectNode {
   int getOVT() { return ovt; }
   /// Set ovt to st
   void setOVT(int st) { ovt = st; }
+  /// Add time to qdo
+  void addQdoTime(double t) { qdo += t; }
+  /// Return qdo
+  double getQdo() { return qdo; }
+  /// Reset qdo at start of quanta
+  void resetQdo() { qdo = 0.0; }
   /// Dump data fields
   void dump() {
     if (localObjPtr == NULL)
@@ -68,6 +76,8 @@ class pvtObjects {
   pvtObjectNode *objs;
   /// Basic Constructor: preallocates space for 100 objects
   pvtObjects();    
+  /// Get number of objects in the list
+  int getNumObjs() { return numObjs; }
   /// Get number of spaces in use in list
   int getNumSpaces() { return numSpaces; }
   /// Set posers to idle (ovt==-1)

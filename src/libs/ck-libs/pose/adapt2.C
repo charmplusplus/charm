@@ -46,6 +46,9 @@ void adapt2::Step()
     ev->done = 1; // complete the event execution
     eq->ShiftEvent(); // shift to next event
     ev = eq->currentPtr;
+#ifdef POSE_STATS_ON
+    localPVT->addToObjQdo(parent->PVTindex(), localStats->getLastEventTime());
+#endif
   }
 #ifdef POSE_STATS_ON
   if (iter > 0) localStats->Loop();

@@ -47,6 +47,8 @@ private:
   /// Time accumulators
   double rollbackTime, totalTime, gvtTime, simTime, cpTime, canTime, 
     lbTime, miscTime, maxDo, minDo; 
+  /// Duration of last event (for use by DOP stats)
+  double lastEventTime;
 public:
   /// Basic Constructor
   localStat(void) {
@@ -81,6 +83,8 @@ public:
   void SendStats();
   /// Query which timer is active
   int TimerRunning() { return (whichStat); }
+  /// Return lastEventTime
+  double getLastEventTime() { return lastEventTime; }
 };
 
 /// Entity to gather stats from each PE and prepare final report
@@ -140,6 +144,7 @@ inline void localStat::TimerStop()
 	maxDo = eventTime;
       if ((minDo < 0.0) || (minDo > eventTime))
 	minDo = eventTime;
+      lastEventTime = eventTime;
       break;
     }
   case RB_TIMER: rollbackTime += now - rbt; break;
@@ -171,6 +176,7 @@ inline void localStat::SwitchTimer(int timer)
 	maxDo = eventTime;
       if ((minDo < 0.0) || (minDo > eventTime))
 	minDo = eventTime;
+      lastEventTime = eventTime;
       break;
     }    
   case RB_TIMER: rollbackTime += now - rbt; break;

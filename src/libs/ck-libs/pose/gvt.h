@@ -101,6 +101,10 @@ class PVT : public Group {
   void objUpdate(int timestamp, int sr); 
   /// Update PVT with safeTime and send/recv table at timestamp
   void objUpdate(int pvtIdx, int safeTime, int timestamp, int sr);
+  /// Add time to object's Qdo (for DOP calculations)
+  void addToObjQdo(int pvtIdx, double t);
+  /// Calculate local DOP information
+  void DOPcalc();
 };
 
 /// GVT chare group for estimating GVT
