@@ -1,3 +1,14 @@
+#ifdef  WIN32
+#include "queueing.h"
+extern int CldLoad();
+extern int CldCountTokens();
+extern void CldSwitchHandler(char *, int);
+extern void CldRestoreHandler(char *);
+extern void CldPutToken(char *);
+extern void CqsEnqueueGeneral(Queue, void *, unsigned int, unsigned int, unsigned int*);
+extern void CldModuleGeneralInit();
+#endif
+
 #include "cldb.graph.h"
 #define PERIOD 20                /* default: 30 */
 #define MAXOVERLOAD 1
