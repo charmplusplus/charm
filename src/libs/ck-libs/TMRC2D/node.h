@@ -81,15 +81,15 @@ class node {  // a 2D double coordinate
       return 0;
     }
     else if (l < lockLength) {
-      CkPrintf("TMRC2D: .........SPIN w/l=%f edge=%d,%d node %f,%f... held w/l=%f edge=%d,%d\n", l, e.idx, e.cid, x, y, lockLength, lockHolder.idx, lockHolder.cid);
+      /*CkPrintf("TMRC2D: .........SPIN w/l=%f edge=%d,%d node %f,%f... held w/l=%f edge=%d,%d\n", l, e.idx, e.cid, x, y, lockLength, lockHolder.idx, lockHolder.cid);
       while (theLock) CthYield();
       theLock = 1;
       lockLength = l;
       lockHolder = e;
       CkPrintf("TMRC2D: .........(c) LOCK w/l=%f edge=%d,%d node %f,%f\n", l, e.idx, e.cid, x, y);
-      return 1;
-      //TMRDEBUG(CkPrintf("TMRC2D: [%d] .........(c) FAIL w/l=%f edge=%d,%d node %f,%f... held w/l=%f edge=%d,%d\n", CkMyPe(), l, e.idx, e.cid, x, y, lockLength, lockHolder.idx, lockHolder.cid);)
-      //return 0;
+      return 1;*/
+      TMRDEBUG(CkPrintf("TMRC2D: [%d] .........(c) FAIL w/l=%f edge=%d,%d node %f,%f... held w/l=%f edge=%d,%d\n", CkMyPe(), l, e.idx, e.cid, x, y, lockLength, lockHolder.idx, lockHolder.cid);)
+      return 0;
     }
     CkPrintf("WARNING: node::lock: unhandled case.\n");
     return 0;

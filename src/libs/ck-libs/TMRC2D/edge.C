@@ -112,28 +112,50 @@ int edge::collapse(elemRef requester, node kNode, node dNode, elemRef kNbr,
   if (pending && (waitingFor == requester)) { // collapsed; awaiting requester
     DEBUGREF(CkPrintf("TMRC2D: [%d] ......edge::collapse: ** PART 2! ** On edge=%d on chunk=%d, requester=(%d,%d) with nbr=(%d,%d)\n", myRef.cid, myRef.idx, myRef.cid, requester.cid, requester.idx, nbr.cid, nbr.idx);)
     *first = 0;
-    DEBUGREF(CkPrintf("TMRC2D: [%d] ......dNode=%f,%f kNode=%f,%f incidence=%f,%f\n", myRef.cid, dNode.X(), dNode.Y(), kNode.X(), kNode.Y(), incidentNode.X(), incidentNode.Y());)
+    //DEBUGREF(CkPrintf("TMRC2D: [%d] ......dNode=%f,%f kNode=%f,%f incidence=%f,%f\n", myRef.cid, dNode.X(), dNode.Y(), kNode.X(), kNode.Y(), incidentNode.X(), incidentNode.Y());)
+
     if (dNode == incidentNode) { // incidence as planned
-      DEBUGREF(CkPrintf("TMRC2D: [%d] ......moving node %f,%f to %f,%f deleting node %f,%f\n", myRef.cid, kNode.X(),kNode.Y(),newNode.X(),newNode.Y(),dNode.X(),dNode.Y());)
+      //DEBUGREF(CkPrintf("TMRC2D: [%d] ......moving node %f,%f to %f,%f deleting node %f,%f\n", myRef.cid, kNode.X(),kNode.Y(),newNode.X(),newNode.Y(),dNode.X(),dNode.Y());)
       for (int i=0; i<C->numChunks; i++) { // unlocks kNode and dNode
 	mesh[i].nodeReplaceDelete(kNode, dNode, newNode);
       }
-      DEBUGREF(CkPrintf("TMRC2D: [%d] ......removing edge %d on %d\n", myRef.cid, myRef.idx, myRef.cid);)
+      //DEBUGREF(CkPrintf("TMRC2D: [%d] ......removing edge %d on %d\n", myRef.cid, myRef.idx, myRef.cid);)
       C->removeEdge(myRef.idx);
       return 1; 
     }
     else { // incidence is on kNode
-      DEBUGREF(CkPrintf("TMRC2D: [%d] ......moving node %f,%f to %f,%f deleting node %f,%f \n", myRef.cid, dNode.X(),dNode.Y(),newNode.X(),newNode.Y(),kNode.X(),kNode.Y());)
+      //DEBUGREF(CkPrintf("TMRC2D: [%d] ......moving node %f,%f to %f,%f deleting node %f,%f \n", myRef.cid, dNode.X(),dNode.Y(),newNode.X(),newNode.Y(),kNode.X(),kNode.Y());)
       for (int i=0; i<C->numChunks; i++) { // unlocks kNode and dNode
 	mesh[i].nodeReplaceDelete(dNode, kNode, newNode);
       }
-      DEBUGREF(CkPrintf("TMRC2D: [%d] ......removing edge %d on %d\n", myRef.cid, myRef.idx, myRef.cid);)
+      //DEBUGREF(CkPrintf("TMRC2D: [%d] ......removing edge %d on %d\n", myRef.cid, myRef.idx, myRef.cid);)
       C->removeEdge(myRef.idx);
+      FEM_Node *theNodes = &(C->meshPtr->node);
+      int dNodeIdx = C->getNode(dNode);
+      int kNodeIdx = C->getNode(kNode);
+      FEM_Comm_Rec *dNodeRec = (FEM_Comm_Rec *)(theNodes->shared.getRec(dNodeIdx));
+      FEM_Comm_Rec *kNodeRec = (FEM_Comm_Rec *)(theNodes->shared.getRec(kNodeIdx));
+      intMsg *im;
+      int i, chunk;
+      for (i=0; i<dNodeRec->getShared(); i++) {
+	chunk = dNodeRec->getChk(i);
+	mesh[chunk].unlockChunk(myRef.cid, myRef.idx);
+      }
+      for (i=0; i<kNodeRec->getShared(); i++) {
+	chunk = kNodeRec->getChk(i);
+	mesh[chunk].unlockChunk(myRef.cid, myRef.idx);
+      }
+      /*
+      mesh[requester.cid].unlockChunk(myRef.cid, myRef.idx);
+      if (nbr.cid != requester.cid) {
+	mesh[nbr.cid].unlockChunk(myRef.cid, myRef.idx);
+      }
+      */
       return 0; 
     }
   }
   else if (pending) { // can't collapse a second time yet; waiting for nbr elem
-  DEBUGREF(CkPrintf("TMRC2D: [%d] ......edge::collapse: ** Pending on (%d,%d)! ** On edge=%d on chunk=%d, requester=%d on chunk=%d\n", myRef.cid, waitingFor.cid, waitingFor.idx, myRef.idx, myRef.cid, requester.idx, requester.cid);)
+    DEBUGREF(CkPrintf("TMRC2D: [%d] ......edge::collapse: ** Pending on (%d,%d)! ** On edge=%d on chunk=%d, requester=%d on chunk=%d\n", myRef.cid, waitingFor.cid, waitingFor.idx, myRef.idx, myRef.cid, requester.idx, requester.cid);)
     return -1;
   }
   else { // Need to do the collapse
@@ -141,6 +163,7 @@ int edge::collapse(elemRef requester, node kNode, node dNode, elemRef kNbr,
     DEBUGREF(CkPrintf("TMRC2D: [%d] ......edge::collapse: ** PART 1! ** On edge=%d on chunk=%d, requester==(%d,%d) with nbr=(%d,%d)\n", myRef.cid, myRef.idx, myRef.cid, requester.cid, requester.idx, nbr.cid, nbr.idx);)
     length = kNode.distance(dNode);
     *first = 1;
+    /*
     DEBUGREF(CkPrintf("TMRC2D: [%d] ......LOCK start... edge=%d requester=%d nbr=%d\n", myRef.cid, myRef.idx, requester.idx, nbr.idx);)
     intMsg *im;
     // lock nbr's opnode
@@ -172,6 +195,63 @@ int edge::collapse(elemRef requester, node kNode, node dNode, elemRef kNbr,
 	return -1;
       }
     }
+    */
+    // Lock the cloud of chunks around dNode and kNode
+    FEM_Node *theNodes = &(C->meshPtr->node);
+    int dNodeIdx = C->getNode(dNode);
+    int kNodeIdx = C->getNode(kNode);
+    FEM_Comm_Rec *dNodeRec = (FEM_Comm_Rec *)(theNodes->shared.getRec(dNodeIdx));
+    FEM_Comm_Rec *kNodeRec = (FEM_Comm_Rec *)(theNodes->shared.getRec(kNodeIdx));
+    intMsg *im;
+    int i, chunk;
+    for (i=0; i<dNodeRec->getShared(); i++) {
+      chunk = dNodeRec->getChk(i);
+      im = mesh[chunk].lockChunk(myRef.cid, myRef.idx, length);
+      while (im->anInt != 1) {
+	if (im->anInt == 0) { 
+	  CkFreeMsg(im); 
+	  return -1; 
+	}
+	else if (im->anInt == -1) { CkFreeMsg(im); CthYield(); }
+	im = mesh[chunk].lockChunk(myRef.cid, myRef.idx, length);
+      }
+    }
+    for (i=0; i<kNodeRec->getShared(); i++) {
+      chunk = kNodeRec->getChk(i);
+      im = mesh[chunk].lockChunk(myRef.cid, myRef.idx, length);
+      while (im->anInt != 1) {
+	if (im->anInt == 0) { 
+	  CkFreeMsg(im); 
+	  return -1; 
+	}
+	else if (im->anInt == -1) { CkFreeMsg(im); CthYield(); }
+	im = mesh[chunk].lockChunk(myRef.cid, myRef.idx, length);
+      }
+    }
+
+    /*
+    intMsg *im = mesh[requester.cid].lockChunk(myRef.cid, myRef.idx, length);
+    while (im->anInt != 1) {
+      if (im->anInt == 0) { 
+	CkFreeMsg(im); 
+	return -1; 
+      }
+      else if (im->anInt == -1) { CkFreeMsg(im); CthYield(); }
+      im = mesh[requester.cid].lockChunk(myRef.cid, myRef.idx, length);
+    }
+    if ((nbr.cid > -1) && (nbr.cid != requester.cid)) {
+      intMsg *im = mesh[nbr.cid].lockChunk(myRef.cid, myRef.idx, length);
+      while (im->anInt != 1) {
+	if (im->anInt == 0) { 
+	  mesh[requester.cid].unlockChunk(myRef.cid, myRef.idx);
+	  CkFreeMsg(im); 
+	  return -1; 
+	}
+	else if (im->anInt == -1) { CkFreeMsg(im); CthYield(); }
+	im = mesh[nbr.cid].lockChunk(myRef.cid, myRef.idx, length);
+      }
+    }
+    */
     // both nodes locked
     DEBUGREF(CkPrintf("TMRC2D: [%d] ......edge::collapse: LOCKS obtained... On edge=%d on chunk=%d, requester==(%d,%d) with nbr=(%d,%d)\n", myRef.cid, myRef.idx, myRef.cid, requester.cid, requester.idx, nbr.cid, nbr.idx);)
     setPending();
@@ -189,14 +269,30 @@ int edge::collapse(elemRef requester, node kNode, node dNode, elemRef kNbr,
       mesh[nbr.cid].coarsenElement(nbr.idx, nbrArea*1.01+0.000000000000000001);
     }
     else {
-      DEBUGREF(CkPrintf("TMRC2D: [%d] ......moving node %f,%f to %f,%f, deleting %f,%f\n", myRef.cid, kNode.X(),kNode.Y(),newNode.X(),newNode.Y(),dNode.X(),dNode.Y());)
+      //DEBUGREF(CkPrintf("TMRC2D: [%d] ......moving node %f,%f to %f,%f, deleting %f,%f\n", myRef.cid, kNode.X(),kNode.Y(),newNode.X(),newNode.Y(),dNode.X(),dNode.Y());)
       for (int i=0; i<C->numChunks; i++) { // unlocks kNode and dNode
 	mesh[i].nodeReplaceDelete(kNode, dNode, newNode);
       }
-      DEBUGREF(CkPrintf("TMRC2D: [%d] ......removing edge %d\n", myRef.cid, myRef.idx);)
+      //DEBUGREF(CkPrintf("TMRC2D: [%d] ......removing edge %d\n", myRef.cid, myRef.idx);)
       C->removeEdge(myRef.idx);
+      //mesh[requester.cid].unlockChunk(myRef.cid, myRef.idx);
+      FEM_Node *theNodes = &(C->meshPtr->node);
+      int dNodeIdx = C->getNode(dNode);
+      int kNodeIdx = C->getNode(kNode);
+      FEM_Comm_Rec *dNodeRec = (FEM_Comm_Rec *)(theNodes->shared.getRec(dNodeIdx));
+      FEM_Comm_Rec *kNodeRec = (FEM_Comm_Rec *)(theNodes->shared.getRec(kNodeIdx));
+      intMsg *im;
+      int i, chunk;
+      for (i=0; i<dNodeRec->getShared(); i++) {
+	chunk = dNodeRec->getChk(i);
+	mesh[chunk].unlockChunk(myRef.cid, myRef.idx);
+      }
+      for (i=0; i<kNodeRec->getShared(); i++) {
+	chunk = kNodeRec->getChk(i);
+	mesh[chunk].unlockChunk(myRef.cid, myRef.idx);
+      }
+      return 1;
     }
-    return 1;
   }
 }
 

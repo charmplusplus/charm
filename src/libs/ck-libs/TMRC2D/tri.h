@@ -92,15 +92,14 @@ class refineResults; //Used by refinement API to store intermediate results
 class coarsenResults; 
 
 typedef struct prioLockStruct {
-  int holder;
+  int holderIdx;
+  int holderCid;
   double prio;
   prioLockStruct *next;
 } *prioLockRequests;
 
 // ---------------------------- Chare Arrays -------------------------------
 class chunk : public TCharmClient1D {
-	//meshID passed in from FEM framework.
-	int meshID;
   // current sizes of arrays allocated for the mesh
   int sizeElements, sizeEdges, sizeNodes;
   // first empty slot in each mesh array
@@ -143,6 +142,9 @@ class chunk : public TCharmClient1D {
   // edges, and nodes located on this chunk; numGhosts is numElements
   // plus number of ghost elements surrounding this chunk
   int cid, numElements, numEdges, numNodes, numGhosts, numChunks;
+  //meshID passed in from FEM framework.
+  int meshID;
+  FEM_Mesh *meshPtr;
 
   refineResults *refineResultsStorage;
   coarsenResults *coarsenResultsStorage;
@@ -158,7 +160,7 @@ class chunk : public TCharmClient1D {
   // range of occupied slots in each mesh array
   int elementSlots, edgeSlots, nodeSlots;
 
-  int lock, lockHolder, lockCount;
+  int lock, lockHolderIdx, lockHolderCid, lockCount;
   double lockPrio;
   prioLockRequests lockList;
 
@@ -199,6 +201,7 @@ class chunk : public TCharmClient1D {
   intMsg *nodeLockup(node n, double l, edgeRef start);
   intMsg *opnodeLockup(int elemID, double l, edgeRef e);
   void opnodeUnlock(int elemID, edgeRef e);
+  int getNode(node n);
   void nodeUnlock(node n);
   void nodeUpdate(node n, node newNode);
   void nodeDelete(node n, node ndReplace);
@@ -228,8 +231,8 @@ class chunk : public TCharmClient1D {
 
   // *** These methods are part of the interface with the FEM framework ***
   // create a chunk's mesh data
-  void newMesh(int meshID,int nEl, int nGhost,const int *conn_,const int *gid_, 
-	       int nnodes, const int *boundaries, int idxOffset);
+  void newMesh(int meshID_,int nEl, int nGhost,const int *conn_,const 
+	       int *gid_, int nnodes, const int *boundaries, int idxOffset);
   // Sets target areas specified by desiredArea, starts refining
   void multipleRefine(double *desiredArea, refineClient *client);
   // Sets target areas specified by desiredArea, starts coarsening
@@ -265,12 +268,12 @@ class chunk : public TCharmClient1D {
   void out_print();
   void dump();
 
-  intMsg *lockChunk(int lh, double prio);
-  void unlockChunk(int lh);
-  int lockLocalChunk(int lh, double prio);
-  void unlockLocalChunk(int lh);
-  void removeLock(int lh);
-  void insertLock(int lh, double prio);
+  intMsg *lockChunk(int lhc, int lhi, double prio);
+  void unlockChunk(int lhc, int lhi);
+  int lockLocalChunk(int lhc, int lhi, double prio);
+  void unlockLocalChunk(int lhc, int lhi);
+  void removeLock(int lhc, int lhi);
+  void insertLock(int lhc, int lhi, double prio);
 };
 
 #endif

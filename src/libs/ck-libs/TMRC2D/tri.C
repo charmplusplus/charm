@@ -22,7 +22,8 @@ chunk::chunk(chunkMsg *m)
     additions(0), debug_counter(0), refineInProgress(0), coarsenInProgress(0),
     modified(0), meshLock(0), meshExpandFlag(0), 
     numElements(0), numEdges(0), numNodes(0), numGhosts(0), theClient(NULL),
-    elementSlots(0), edgeSlots(0), nodeSlots(0)
+    elementSlots(0), edgeSlots(0), nodeSlots(0), lock(0), lockCount(0),
+    lockHolderIdx(-1), lockHolderCid(-1), lockPrio(-1.0), lockList(NULL)
 {
   refineResultsStorage=NULL;
   cid = thisIndex;
@@ -114,14 +115,15 @@ void chunk::coarseningElements()
 	   (theElements[i].getArea() == 0.0))) {
 	// element i has higher target area or no area -- needs coarsening
 	cCount++;
-	DEBUGREF(CkPrintf("TMRC2D: [%d] Coarsen element %d: area=%f target=%f\n", cid, i, theElements[i].getArea(), theElements[i].getTargetArea());)
+	//DEBUGREF(CkPrintf("TMRC2D: [%d] Coarsen element %d: area=%f target=%f\n", cid, i, theElements[i].getArea(), theElements[i].getTargetArea());)
 	modified = 1; // something's bound to change
 	theElements[i].coarsen(); // coarsen the element
       }
       i++;
+      CthYield(); // give other chunks on the same PE a chance
     }
     DEBUGREF(CkPrintf("TMRC2D: [%d] ||||| %d elems out of %d need coarsening ||||\n", cid, cCount, elementSlots);)
-    CthYield(); // give other chunks on the same PE a chance
+    //CthYield(); // give other chunks on the same PE a chance
   }
   coarsenInProgress = 0;  // turn coarsen loop off
   //dump();
@@ -196,6 +198,19 @@ void chunk::opnodeUnlock(int elemID, edgeRef e)
 {
   accessLock();
   theElements[elemID].unlockOpNode(e);
+  releaseLock();
+}
+
+int chunk::getNode(node n)
+{
+  accessLock();
+  for (int i=0; i<nodeSlots; i++) {
+    if (theNodes[i].isPresent() && (n == theNodes[i])) {
+      return i;
+    }
+  }
+  CkPrintf("ERROR: chunk::getNode: Node [%2.8f,%2.8f] not found!\n", n.X(), n.Y());
+  CkAssert(0);
   releaseLock();
 }
 
@@ -718,7 +733,7 @@ void chunk::updateNodeCoords(int nNode, double *coord, int nEl)
     first = 0;
   }
   DEBUGREF(CkPrintf("TMRC2D: [%d] In updateNodeCoords after CkWaitQD: edges sent=%d edge recvd=%d\n", cid, edgesSent, edgesRecvd);)
- // sanityCheck(); // quietly make sure mesh is in shape
+  sanityCheck(); // quietly make sure mesh is in shape
   // do some error checking
   //CkAssert(nEl == numElements);
   if (nEl != numElements) {
@@ -798,7 +813,8 @@ void chunk::newMesh(int meshID_,int nEl, int nGhost, const int *conn_, const int
 {
   int i, j;
   DEBUGREF(CkPrintf("TMRC2D: [%d] In newMesh...\n", cid);)
-	meshID = meshID_;
+  meshID = meshID_;
+  meshPtr = FEM_Mesh_lookup(meshID, "chunk::newMesh");
   numElements=nEl;
   numGhosts = nGhost;
   allocMesh(nEl);
@@ -1063,74 +1079,75 @@ void chunk::dump()
     }		 
 }
 
-intMsg *chunk::lockChunk(int lh, double prio)
+intMsg *chunk::lockChunk(int lhc, int lhi, double prio)
 {
   intMsg *im = new intMsg;
-  im->anInt = lockLocalChunk(lh, prio);
+  im->anInt = lockLocalChunk(lhc, lhi, prio);
   return im;
 }
 
-int chunk::lockLocalChunk(int lh, double prio)
-{ // priority is given to the higher prio, lower lh
+int chunk::lockLocalChunk(int lhc, int lhi, double prio)
+{ // priority is given to the lower prio, lower lh
   // each chunk can have at most one lock reservation
   // if a chunk holds a lock, it cannot have a reservation
   if (!lock) { // this chunk is UNLOCKED
     // remove previous lh reservation; insert this reservation
     // then check first reservation
-    removeLock(lh);
-    insertLock(lh, prio);
-    if ((lockList->prio == prio) && (lockList->holder == lh)) {
-      prioLockStruct *tmp = lockList;
-      //CkPrintf("[%d]LOCK chunk %d by %d prio %.10f LOCKED(was %d[%d:%.10f])\n",
-      //	       CkMyPe(), cid, lh, prio, lock, lockHolder, lockPrio);
-      lock = 1; lockHolder = lh; lockPrio = prio; lockCount = 1;
+    removeLock(lhc, lhi);
+    insertLock(lhc, lhi, prio);
+    if ((lockList->prio == prio) && (lockList->holderIdx == lhi)
+	&& (lockList->holderCid == lhc)) {
+      CkPrintf("[%d]LOCK chunk %d by %d on %d prio %.10f LOCKED(was %d[%don%d:%.10f])\n", CkMyPe(), cid, lhi, lhc, prio, lock, lockHolderIdx, lockHolderCid, lockPrio);
+      lock = 1; lockHolderCid = lhc; lockHolderIdx = lhi; lockPrio = prio; 
+      //lockCount = 1;
       lockList = lockList->next;
-      free(tmp);
       return 1;
     }
-    removeLock(lh);
-    //    CkPrintf("[%d]LOCK chunk %d by %d prio %.10f REFUSED (was %d[%d:%.10f])\n",
-    //	     CkMyPe(), cid, lh, prio, lock, lockHolder, lockPrio);
+    removeLock(lhc, lhi);
+    CkPrintf("[%d]LOCK chunk %d by %d on %d prio %.10f REFUSED (was %d[%don%d:%.10f])\n", CkMyPe(), cid, lhi, lhc, prio, lock, lockHolderIdx, lockHolderCid, lockPrio);
     return 0;
   }
   else { // this chunk is LOCKED
-    if ((prio == lockPrio) && (lh == lockHolder)) {
-      lockCount++;
+    if ((prio == lockPrio) && (lhi == lockHolderIdx) && (lhc == lockHolderCid)) {
+      //lockCount++;
+      CkPrintf("[%d]LOCK chunk %d by %d on %d prio %.10f HELD (was %d[%don%d:%.10f])\n", CkMyPe(), cid, lhi, lhc, prio, lock, lockHolderIdx, lockHolderCid, lockPrio);
       return 1;
     }
-    if (lh == lockHolder) {
-      CkPrintf("ERROR: chunk holding lock trying to relock with different prio! lockHolder=%d prio=%f newprio=%f\n", lockHolder, lockPrio, prio);
-      CmiAssert(lh != lockHolder);
+    if ((lhi == lockHolderIdx) && (lhc == lockHolderCid)) {
+      CkPrintf("ERROR: lockholder %d on %d trying to relock with different prio! prio=%f newprio=%f\n", lhi, lhc, lockPrio, prio);
+      CmiAssert(!((lhi == lockHolderIdx) && (lhc == lockHolderCid)));
     }
-    removeLock(lh);
-    insertLock(lh, prio);
-    if ((lockList->prio == prio) && (lockList->holder == lh)) {
-      if ((prio > lockPrio) ||
-	  ((prio == lockPrio) && (lh < lockHolder))) { // lh might be next
-	//	CkPrintf("[%d]LOCK chunk %d by %d prio %.10f RESERVED (was %d[%d:%.10f])\n",
-	//		 CkMyPe(), cid, lh, prio, lock, lockHolder, lockPrio);
-	return -1; 
+    /*
+    removeLock(lhc, lhi);
+    insertLock(lhc, lhi, prio);
+    if ((lockList->prio == prio) && (lockList->holderIdx == lhi) && (lockList->holderCid == lhc)) {
+      if ((prio <= lockPrio) && (lhc < lockHolderCid)) { // lh might be next
+	CkPrintf("[%d]LOCK chunk %d by %d on %d prio %.10f SPIN (was %d[%don%d:%.10f])\n", CkMyPe(), cid, lhi, lhc, prio, lock, lockHolderIdx, lockHolderCid, lockPrio);
+	return 0; 
       }
     }
-    removeLock(lh);
-    //    CkPrintf("[%d]LOCK chunk %d by %d prio %.10f REFUSED (was %d[%d:%.10f])\n",
-    //	     CkMyPe(), cid, lh, prio, lock, lockHolder, lockPrio);
+    removeLock(lhc, lhi);
+    */
+    CkPrintf("[%d]LOCK chunk %d by %d on %d prio %.10f REFUSED (was %d[%don%d:%.10f])\n", CkMyPe(), cid, lhi, lhc, prio, lock, lockHolderIdx, lockHolderCid, lockPrio);
     return 0;
   }
 }
 
-void chunk::insertLock(int lh, double prio)
+void chunk::insertLock(int lhc, int lhi, double prio)
 {
   prioLockStruct *newLock, *tmp;
   
   newLock = (prioLockStruct *)malloc(sizeof(prioLockStruct));
   newLock->prio = prio;
-  newLock->holder = lh;
+  newLock->holderIdx = lhi;
+  newLock->holderCid = lhc;
   newLock->next = NULL;
   if (!lockList) lockList = newLock;
   else {
-    if ((prio > lockList->prio) || 
-	(prio == lockList->prio) && (lh < lockList->holder)) {
+    if ((prio < lockList->prio) || 
+	((prio == lockList->prio) && (lhc < lockList->holderCid)) ||
+	((prio == lockList->prio) && (lhc == lockList->holderCid) && 
+	 (lhi < lockList->holderIdx))) {
       // insert before first element in lockList
       newLock->next = lockList;
       lockList = newLock;
@@ -1138,8 +1155,10 @@ void chunk::insertLock(int lh, double prio)
     else { 
       tmp = lockList;
       while (tmp->next) {
-	if ((prio < tmp->next->prio) || ((prio == tmp->next->prio) &&
-					 (lh > tmp->next->holder)))
+	if ((prio > tmp->next->prio) || 
+	    ((prio == tmp->next->prio) && (lhc > tmp->next->holderCid)) ||
+	    ((prio == tmp->next->prio) && (lhc == tmp->next->holderCid) &&
+	     (lhi > tmp->next->holderIdx))) 
 	  tmp = tmp->next;
 	else break;
       }
@@ -1149,16 +1168,17 @@ void chunk::insertLock(int lh, double prio)
   }
 }
 
-void chunk::removeLock(int lh) 
+void chunk::removeLock(int lhc, int lhi) 
 {
   prioLockStruct *tmp = lockList, *del;
   if (!lockList) return;
-  if (tmp->holder == lh) {
+  if ((tmp->holderCid == lhc) && (tmp->holderIdx == lhi)) {
     lockList = lockList->next;
     free(tmp);
   }
   else {
-    while (tmp->next && (tmp->next->holder != lh))
+    while (tmp->next && 
+	   ((tmp->next->holderCid != lhc) || (tmp->next->holderIdx != lhi)))
       tmp = tmp->next;
     if (tmp->next) {
       del = tmp->next;
@@ -1168,21 +1188,22 @@ void chunk::removeLock(int lh)
   }
 }
 
-void chunk::unlockChunk(int lh)
+void chunk::unlockChunk(int lhc, int lhi)
 {
-  unlockLocalChunk(lh);
+  unlockLocalChunk(lhc, lhi);
 }
 
-void chunk::unlockLocalChunk(int lh)
+void chunk::unlockLocalChunk(int lhc, int lhi)
 {
-  if (lockHolder == lh) {
-    lockCount--;
-    if (lockCount == 0) {
+  if ((lockHolderIdx == lhi) && (lockHolderCid == lhc)) {
+    //lockCount--;
+    //if (lockCount == 0) {
       lock = 0; 
-      lockHolder = -1;
+      lockHolderIdx = -1;
+      lockHolderCid = -1;
       lockPrio = -1.0;
-      //CkPrintf("[%d]UNLOCK chunk %d by holder %d\n", CkMyPe(), cid, lh);
-    }
+      CkPrintf("[%d]UNLOCK chunk %d by holder %d on %d\n", CkMyPe(), cid, lhi, lhc);
+      //}
   }
 }
 

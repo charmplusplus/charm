@@ -234,9 +234,21 @@ void element::collapse(int shortEdge)
   orig_keep = nodes[keepNode];
   orig_del = nodes[delNode];
 
+  /*
+  DEBUGREF(CkPrintf("TMRC2D: [%d] ...LOCKing opnode=%d\n", myRef.cid, nodes[opnode]);)
+  for (int i=0; i<C->numChunks; i++) {
+    intMsg *im = mesh[i].nodeLockup(C->theNodes[nodes[opnode]], length, edges[shortEdge]);
+    if (im->anInt == 0) {
+      for (int j=i-1; j>=0; j--) {
+	mesh[j].nodeUnlock(C->theNodes[nodes[opnode]]);
+      }
+      return;
+    }
+  }
+  */
+
   // find coords of node to collapse to based on boundary conditions
   node newNode;
-  // check boundary conditions
   if ((kBound == 0) && (dBound == 0)) { // both interior; collapse to midpoint
     newNode=C->theNodes[nodes[keepNode]].midpoint(C->theNodes[nodes[delNode]]);
     newNode.boundary = 0;
@@ -286,20 +298,6 @@ void element::collapse(int shortEdge)
     }
   }
 
-  // get length of shortEdge for prioritizing locks
-  double length = 
-    C->theNodes[nodes[keepNode]].distance(C->theNodes[nodes[delNode]]);
-  DEBUGREF(CkPrintf("TMRC2D: [%d] ...LOCKing opnode=%d\n", myRef.cid, nodes[opnode]);)
-  for (int i=0; i<C->numChunks; i++) {
-    intMsg *im = mesh[i].nodeLockup(C->theNodes[nodes[opnode]], length, edges[shortEdge]);
-    if (im->anInt == 0) {
-      for (int j=i-1; j>=0; j--) {
-	mesh[j].nodeUnlock(C->theNodes[nodes[opnode]]);
-      }
-      return;
-    }
-  }
-
   // collapse the edge; takes care of neighbor element
   result = edges[shortEdge].collapse(myRef, C->theNodes[nodes[keepNode]],
 				     C->theNodes[nodes[delNode]], keepNbr,
@@ -331,10 +329,12 @@ void element::collapse(int shortEdge)
     DEBUGREF(CkPrintf("TMRC2D: [%d] theClient->collapse(%d, %d, %d, %2.10f, %2.10f\n", myRef.cid, myRef.idx, orig_keep, orig_del, newNode.X(), newNode.Y());)
     // remove self
     C->removeElement(myRef.idx);
+    /*
     // unlock opnode
     for (int i=0; i<C->numChunks; i++) {
       mesh[i].nodeUnlock(C->theNodes[nodes[opnode]]);
     }
+    */
   }
   else if (result == 0) {
     // collapse successful, but first half of collapse decided to keep delNode
@@ -369,16 +369,20 @@ void element::collapse(int shortEdge)
 			   newNode.X(), newNode.Y(), flag);
     // remove self
     C->removeElement(myRef.idx);
+    /*
     // unlock opnode
     for (int i=0; i<C->numChunks; i++) {
       mesh[i].nodeUnlock(C->theNodes[nodes[opnode]]);
     }
+    */
   }
   else {
+    /*
     // unlock opnode
     for (int i=0; i<C->numChunks; i++) {
       mesh[i].nodeUnlock(C->theNodes[nodes[opnode]]);
     }
+    */
   }
 }
 
