@@ -292,6 +292,8 @@ void LogEntry::write(FILE* fp)
       fprintf(fp, "%d %d %u %d %d %d %d %d %d %d\n", mIdx, eIdx, (UInt) (time*1.0e6), event, pe, msglen, (UInt)(recvTime*1.e6), id.id[0], id.id[1], id.id[2]);
       break;
     case CREATION:
+      fprintf(fp, "%d %d %u %d %d %d %d\n", mIdx, eIdx, (UInt) (time*1.0e6), event, pe, msglen, (UInt)(recvTime*1.e6));
+      break;
     case END_PROCESSING:
     case MESSAGE_RECV:
       fprintf(fp, "%d %d %u %d %d %d\n", mIdx, eIdx, (UInt) (time*1.0e6), event, pe, msglen);
@@ -543,18 +545,19 @@ void TraceProjections::userBracketEvent(int e, double bt, double et)
   _logPool->add(USER_EVENT_PAIR, e, 0, TraceTimer(et), curevent++, CkMyPe());
 }
 
-void TraceProjections::creation(envelope *e, int num)
+void TraceProjections::creation(envelope *e, double startT, int num)
 {
+  double curTime = TraceTimer();
   if(e==0) {
     CtvAccess(curThreadEvent)=curevent;
-    _logPool->add(CREATION,ForChareMsg,_threadEP,TraceTimer(),
-                             curevent++,CkMyPe());
+    _logPool->add(CREATION,ForChareMsg,_threadEP,curTime,
+                    curevent++,CkMyPe(), 0, 0, 0.0);
   } else {
     int type=e->getMsgtype();
     e->setEvent(curevent);
     for(int i=0; i<num; i++) {
-      _logPool->add(CREATION,type,e->getEpIdx(),TraceTimer(),
-                               curevent+i,CkMyPe(),e->getTotalsize());
+      _logPool->add(CREATION,type,e->getEpIdx(), curTime,
+                    curevent+i,CkMyPe(),e->getTotalsize(), 0, curTime-startT);
     }
     curevent += num;
   }

@@ -180,7 +180,7 @@ extern "C"
 void traceAwaken(CthThread t)
 {
 #if ! CMK_TRACE_IN_CHARM
-  CkpvAccess(_traces)->creation(0);
+  CkpvAccess(_traces)->creation(0, 0.0);
 #endif
 }
 
@@ -269,6 +269,11 @@ int  traceAvailable()
 #else
   return CkpvAccess(_traces)->length()>0;
 #endif
+}
+
+double CmiTraceTimer()
+{
+  return TraceTimer();
 }
 
 /*@}*/

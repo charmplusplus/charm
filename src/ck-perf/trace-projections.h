@@ -113,7 +113,7 @@ class TraceProjections : public Trace {
     TraceProjections(char **argv);
     void userEvent(int e);
     void userBracketEvent(int e, double bt, double et);
-    void creation(envelope *e, int num=1);
+    void creation(envelope *e, double t, int num=1);
     void beginExecute(envelope *e);
     void beginExecute(CmiObjId  *tid);
     void beginExecute(int event,int msgType,int ep,int srcPe,int ml);
