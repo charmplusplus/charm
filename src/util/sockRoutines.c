@@ -20,6 +20,15 @@
 #include "sockRoutines.h"
 #ifndef CMK_NO_SOCKETS /*<- for ASCI Red*/
 
+#if CMK_USE_CONVERSE
+#  include "converse.h" /* use real CmiTmpAlloc/Free */
+#else /* fake CmiTmpAlloc/Free via malloc */
+#  define CMI_TMP_SKIP
+#  define CmiTmpAlloc(size) malloc(size)
+#  define CmiTmpFree(ptr) free(ptr)
+#endif
+
+
 /*Just print out error message and exit*/
 static int default_skt_abort(int code,const char *msg)
 {
@@ -442,18 +451,22 @@ int skt_sendN(SOCKET hSocket,const void *buff,int nBytes)
   really should use writev on machines where it's available. 
 */
 #define skt_sendV_max (16*1024)
-static char sendvbuf[skt_sendV_max];
+
 int skt_sendV(SOCKET fd,int nBuffers,const void **bufs,int *lens)
 {
 	int b,len=0;
 	for (b=0;b<nBuffers;b++) len+=lens[b];
 	if (len<=skt_sendV_max) { /*Short message: Copy and do one big send*/
-		char *dest=sendvbuf;
+		char *buf=CmiTmpAlloc(skt_sendV_max);
+		char *dest=buf;
+		int ret;
 		for (b=0;b<nBuffers;b++) {
 			memcpy(dest,bufs[b],lens[b]);
 			dest+=lens[b];
 		}
-		return skt_sendN(fd,sendvbuf,len);
+		ret=skt_sendN(fd,buf,len);
+		CmiTmpFree(buf);
+		return ret;
 	}
 	else { /*Big message: Just send one-by-one as usual*/
 		int ret;

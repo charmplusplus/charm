@@ -672,8 +672,9 @@ void PUP::fromTextFile::comment(const char *message)
   
   if (c!='!') return; //This isn't the start of a comment
   //Skip over the whole line containing the comment:
-  char commentBuf[1024];
+  char *commentBuf=(char *)CmiTmpAlloc(1024);
   fgets(commentBuf,1024,f);
+  CmiTmpFree(commentBuf);
 }
 
 
