@@ -1,0 +1,28 @@
+extern message ArrayElementCreateMessage;
+extern message ArrayElementMigrateMessage;
+
+readonly int bocnum;
+
+message NeighborMsg;
+message GoMsg;
+message RedMsg;
+
+chare main
+{
+  entry main();
+};
+
+chare Cell
+{
+  entry Cell(ArrayElementCreateMessage *);
+  entry Cell(ArrayElementMigrateMessage *);
+  entry neighbor_data(NeighborMsg *);
+//  entry go_nogo(GoMsg *);
+};
+
+group Reduce
+{
+  entry Reduce(RedMsg *);
+  entry Recv_data(RedMsg *);
+  entry Recv_bcast(RedMsg *);
+};
