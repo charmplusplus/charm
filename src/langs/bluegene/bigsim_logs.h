@@ -191,7 +191,7 @@ public:
   }
   bgTimeLog * operator[](size_t n)
   {
-	CmiAssert(n!=-1);
+	CmiAssert(n!=(size_t)-1);
         return timeline[n];
   }
   int length() { return timeline.length(); }

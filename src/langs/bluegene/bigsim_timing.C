@@ -998,7 +998,7 @@ void bgCorrectionFunc(char *msg)
 #if DELAY_CHECK
     // when delay checking, just return after enqueue the corr msg.
     return;
-#endif
+#else
 #if !THROTTLE_WORK
     //only correct message every 0.02s, otherwise msgs are queued
     if (CmiWallTimer() - lastCheck < 0.02 && delayCheckFlag ) {
@@ -1015,6 +1015,7 @@ void bgCorrectionFunc(char *msg)
     else {
       processCorrectionMsg(nodeidx);
     }
+#endif
 }
 
 /******************************************************************************
