@@ -972,6 +972,7 @@ nodetab_host *nodetab_getinfo(int i)
   return nodetab_table[i];
 }
 
+/*These routines all take *PE* numbers (NOT node numbers!)*/
 char        *nodetab_name(int i)     { return nodetab_getinfo(i)->name; }
 pathfixlist  nodetab_pathfixes(int i){ return nodetab_getinfo(i)->pathfixes; }
 char        *nodetab_ext(int i)      { return nodetab_getinfo(i)->ext; }
@@ -1022,7 +1023,7 @@ void nodeinfo_add(const ChSingleNodeinfo *in,SOCKET ctrlfd)
         }
         i.dataport=ChMessageInt_new(nodetab_dataport(nt));
 #else
-	i.IP=nodetab_ip(node);
+	i.IP=nodetab_ip(nt);
 #endif
 	nodeinfo_arr[node]=i;
 	for (pe=0;pe<nodetab_cpus(nt);pe++)
