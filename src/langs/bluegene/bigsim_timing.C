@@ -83,7 +83,7 @@ void BgAdjustTimeLineInsert(bgTimingLog* tlog, BgTimeLine &tline)
 		idx++;
 	
 	/* store entry corresponding to 'msg' in timeline at 'idx' */
-	tline->insert(idx, tlog);
+	tline.insert(idx, tlog);
 
 	/* adjust all entries following 'idx' in timeline */
 	while(idx < tline.length()-1) {
@@ -92,7 +92,7 @@ void BgAdjustTimeLineInsert(bgTimingLog* tlog, BgTimeLine &tline)
 			break; 
 		else {
 			idx++;
-			tline[idx]->adjustTimeLog(tAdjust);
+			tline[idx]->adjustTimingLog(tAdjust);
 		}
 	}
 }
@@ -106,13 +106,13 @@ void BgAdjustTimeLineForward(int msgID, double tAdjust, BgTimeLine &tline)
 
 	//FIXME is remove implemented ?
 	/* remove entry at 'idx' from timeline */
-	bgTimingLog* tlog = (bgTimingLog*)(tline->remove(idx));
+//	bgTimingLog* tlog = (bgTimingLog*)(tline->remove(idx));
 
 	/* adjust timing of 'tlog' */
-	tlog->adjustTimingLog(tAdjust);
+//	tlog->adjustTimingLog(tAdjust);
 
 	/* insert entry at proper place in timeline */
-    BgAdjustTimeLineInit(bgTimingLog* tlog, BgTimeLine &tline);
+//    BgAdjustTimeLineInit(bgTimingLog* tlog, BgTimeLine &tline);
 }
 
 void BgPrintThreadTimeLine(int pe, int th, BgTimeLine &tline)
