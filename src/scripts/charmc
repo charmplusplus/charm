@@ -502,9 +502,9 @@ fi
 
 if [ -n "$SEQUENTIAL" ]
 then
-    CMK_CC="$CMK_SEQ_CC"
+    CMK_CC="$CMK_SEQ_CC -DCMK_SEQUENTIAL=1 "
     CMK_LD="$CMK_SEQ_LD"
-    CMK_CXX="$CMK_SEQ_CXX" 
+    CMK_CXX="$CMK_SEQ_CXX -DCMK_SEQUENTIAL=1 " 
     CMK_LDXX="$CMK_SEQ_LDXX" 
     if [ -n "$CMK_SEQ_AR" ]
     then
