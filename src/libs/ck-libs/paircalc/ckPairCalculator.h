@@ -7,7 +7,7 @@
 #include "BroadcastStrategy.h"
 
 // Flag to use sparse reduction or regular reduction
-//#define _SPARSECONT_ 
+#define _SPARSECONT_ 
 
 // Debugging flag for Verbose output
 //#define _PAIRCALC_DEBUG_
@@ -17,6 +17,8 @@
 #define _PAIRCALC_USE_ZGEMM_
 // Flags not yet correct
 //#define _PAIRCALC_SECONDPHASE_LOADBAL_
+
+#define _FUNDER_
 
 #ifdef _FUNDER_
 #define ZGEMM zgemm_ 

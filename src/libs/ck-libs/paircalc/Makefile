@@ -1,4 +1,4 @@
-FFTW_HOME=/home/net/yanshi/work/cpaimd/fftw
+FFTW_HOME=/expand8/home/yanshi/fftw
 CHARMC=$(CDIR)/bin/charmc $(OPTS) $(FLAGS)
 
 CDIR=../../../..
