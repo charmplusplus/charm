@@ -380,8 +380,10 @@ CkBitVector & CkBitVector::Concat(CkBitVector const &b) {
   return *this;
 }
 
+
+
 // Spit out the bit vector in chunk-sized chunks
-Ck_std_ostream& operator<< (Ck_std_ostream& ckos, CkBitVector const b ) {
+CkOutStream& operator<< (CkOutStream& ckos, CkBitVector const b ) {
   if ( b.data ) {
     char *buff = new char[b.usedBits+1];
     for ( int i = b.usedBits-1 ; i >= 0 ; i-- ) {
@@ -389,11 +391,26 @@ Ck_std_ostream& operator<< (Ck_std_ostream& ckos, CkBitVector const b ) {
     }
     buff[b.usedBits] = '\0';
     ckos << buff;
-    delete [] buff;
+    delete buff;
   }
 
   return ckos;
 }
+
+CkErrStream& operator<< (CkErrStream& ckes, CkBitVector const b ) {
+  if ( b.data ) {
+    char *buff = new char[b.usedBits+1];
+    for ( int i = b.usedBits-1 ; i >= 0 ; i-- ) {
+      buff[(b.usedBits-1)-i] = (b.Test(i) ? '1' : '0');
+    }
+    buff[b.usedBits] = '\0';
+    ckes << buff;
+    delete buff;
+  }
+
+  return ckes;
+}
+
 
 
 // Pack and unpack this bugger!

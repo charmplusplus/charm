@@ -429,8 +429,7 @@ $(L)/libmemory-isomalloc.o: memory-isomalloc.c $(MEM_DEPS)
 
 CK_LIBS_CORE=libck.a
 
-LIBCK_CORE=trace-common.o init.o register.o qd.o ck.o ckstream.o \
-	main.o msgalloc.o ckfutures.o \
+LIBCK_CORE=trace-common.o init.o register.o qd.o ck.o main.o msgalloc.o ckfutures.o \
            debug-message.o ckcallback.o cklocation.o ckarray.o ckreduction.o ckarrayreductionmgr.o\
            tempo.o waitqd.o LBDatabase.o lbdb.o charisma.o ckcheckpoint.o\
            LBDBManager.o LBComm.o LBObj.o LBMachineUtil.o \
@@ -491,9 +490,6 @@ debug-message.o: debug-message.C $(CKHEADERS)
 
 ck.o: ck.C $(CKHEADERS)
 	$(CHARMC) -o ck.o ck.C
-
-ckstream.o: ckstream.C $(CKHEADERS)
-	$(CHARMC) -o ckstream.o ckstream.C
 
 waitqd.o: waitqd.C $(CKHEADERS)
 	$(CHARMC) -o waitqd.o waitqd.C
