@@ -1108,8 +1108,10 @@ static CthThread CthThreadInit(void)
 static void CthThreadFree(CthThread t)
 {
   CthThreadBaseFree(&t->base);
-  if (t->protlen!=0)
+  if (t->protlen!=0) {
     CthMemoryUnprotect(t->protect, t->protlen);
+    free(t->stack);
+  }
   free(t);
 }
 
