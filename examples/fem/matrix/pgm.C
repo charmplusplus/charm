@@ -11,7 +11,7 @@ Orion Sky Lawlor, olawlor@acm.org, 1/27/2003
 #include "tcharmc.h"
 #include "fem.h"
 #include "netfem.h"
-#include "ifem_c.h"
+#include "ifemc.h"
 
 //Number of time steps to simulate
 int tsteps=10;
