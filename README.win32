@@ -1,7 +1,7 @@
 
                           Charm++ for Win32
 
-       Copyright (C) 1989-2000 Regents of the University of Illinois
+       Copyright (C) 1989-2004 Regents of the University of Illinois
 
 You can compile charm++ under Windows9x/2000/NT with VC++ plus Cygwin.
 Cygwin are ports of the popular GNU development tools and utilities for 
@@ -28,7 +28,15 @@ To compile charm with VC++:
    have to merge the settings in VCVARS32.BAT into your environment varaibles 
    settings(the most important one is the PATH varaible)  
 
-3. Now you can compile Charm++ like Unix, for example:
+3. This step is optional if you have installed Microsoft Visual Studio under 
+   the following (default) location: 
+     /Program Files/Microsoft Visual Studio/Vc98.
+   In case it is not at this directory, edit the following (text) files to 
+   modify them to point to your visual studio c++ compiler directory:
+    src\arch\win32\unix2nt_ar
+    src\arch\win32\unix2nt_cc  
+
+4. Now you can compile Charm++ like Unix, for example:
 
    ./build charm++ net-win32
 
