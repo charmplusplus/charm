@@ -14,6 +14,7 @@ CMK_LDXX="$CMK_CXX -w"
 CMK_AR="$CMK_CXX -ar -o"
 CMK_RANLIB='true'
 CMK_LIBS=' -lckqt -lfastm '
+CMK_LD_LIBRARY_PATH="-rpath $CHARMLIBSO/"
 CMK_NM='nm'
 CMK_NM_FILTER="grep '|GLOB |' | sed -e 's/.*|//'"
 CMK_QT='origin'
