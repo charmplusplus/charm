@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.22  1995-09-29 09:51:44  jyelon
+ * Revision 2.23  1995-09-30 15:03:15  jyelon
+ * A few changes for threaded-uniprocessor version.
+ *
+ * Revision 2.22  1995/09/29  09:51:44  jyelon
  * Many corrections, added protos, CmiGet-->CmiDeliver, etc.
  *
  * Revision 2.21  1995/09/27  22:23:15  jyelon
@@ -159,7 +162,9 @@ extern void *CmiSvAlloc CMK_PROTO((int));
 #define CpvDeclare(t,v) t* CMK_CONCAT(Cpv_Var_,v)
 #define CpvExtern(t,v)  extern t* CMK_CONCAT(Cpv_Var_,v)
 #define CpvStaticDeclare(t,v) static t* CMK_CONCAT(Cpv_Var_,v)
-#define CpvInitialize(t,v) if (Cmi_mype == 0) CMK_CONCAT(Cpv_Var_,v) = (t *) CmiAlloc(Cmi_numpe*sizeof(t)); else;
+#define CpvInitialize(t,v)\
+    { if (CMK_CONCAT(Cpv_Var_,v)==0)\
+        { CMK_CONCAT(Cpv_Var_,v) = (t *)CmiAlloc(Cmi_numpe*sizeof(t)); }}
 #define CpvAccess(v) CMK_CONCAT(Cpv_Var_,v)[Cmi_mype]
 
 #define CsvDeclare(t,v) t CMK_CONCAT(Csv_Var_,v)
@@ -169,7 +174,7 @@ extern void *CmiSvAlloc CMK_PROTO((int));
 #define CsvAccess(v) CMK_CONCAT(Csv_Var_,v)
 
 #define CmiMyRank() Cmi_mype
-#define CmiNodeBarrier()
+extern void CmiNodeBarrier();
 #define CmiSvAlloc CmiAlloc
 
 #endif
