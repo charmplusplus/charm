@@ -52,7 +52,13 @@ public:
 	const int *data(void) const {return (&nInts)+1;}
 	
 	void pup(PUP::er &p);
+
+    //These routines allow CkArrayIndex to be used in
+    //  a CkHashtableT
 	CkHashCode hash(void) const;
+	static CkHashCode staticHash(const void *a,size_t);
+	int compare(const CkArrayIndex &ind) const;
+	static int staticCompare(const void *a,const void *b,size_t);
 };
 
 //Simple ArrayIndex classes: the key is just integer indices.

@@ -78,19 +78,12 @@ inline CkHashCode CkArrayIndex::hash(void) const
 		ret +=circleShift(d[i],10+11*i)+circleShift(d[i],9+7*i);
 	return ret;
 }
+CkHashCode CkArrayIndex::staticHash(const void *v,size_t)
+	{return ((const CkArrayIndex *)v)->hash();}
 
-//General (length-independent) hash/compare functions
-CkHashCode CkArrayIndex_hashN(const void *keyData,size_t /*len*/)
+inline int CkArrayIndex::compare(const CkArrayIndex &i2) const
 {
-	return ((CkArrayIndexMax *)keyData)->hash();
-}
-inline CkHashCode CkArrayIndex_hashN_fast(const CkArrayIndexMax &key)
-{
-	return key.hash();
-}
-
-inline int CkArrayIndex_compareN_fast(const CkArrayIndexMax &i1,const CkArrayIndexMax &i2)
-{
+	const CkArrayIndex &i1=*this;
 #if ONEDONLY
 	return i1.data()[0]==i2.data()[0];
 #else
@@ -105,11 +98,10 @@ inline int CkArrayIndex_compareN_fast(const CkArrayIndexMax &i1,const CkArrayInd
 	return 1;
 #endif
 }
-int CkArrayIndex_compareN(const void *k1,const void *k2,size_t /*len*/)
+int CkArrayIndex::staticCompare(const void *k1,const void *k2,size_t /*len*/)
 {
-	return CkArrayIndex_compareN_fast(
-		*(const CkArrayIndexMax *)k1,
-		*(const CkArrayIndexMax *)k2);
+	return ((const CkArrayIndex *)k1)->
+		compare(*(const CkArrayIndex *)k2);
 }
 
 void CkArrayIndex::pup(PUP::er &p) 
@@ -657,21 +649,20 @@ static void abort_out_of_bounds(const CkArrayIndex &idx)
 // Aborts with index out-of-bounds error if not found.
 CkArrayRec *CkArray::elementRec(const CkArrayIndex &idx)
 {
+#if CMK_OPTIMIZE
+//Assume the element will be found
+	return hash.getRef(*(CkArrayIndexMax *)&idx);
+#else
+//Include an out-of-bounds check if the element isn't found
 	CkArrayRec *rec=elementNrec(idx);
 	if (rec==NULL) abort_out_of_bounds(idx);
 	return rec;
+#endif
 }
-
 
 CkArrayRec *CkArray::elementNrec(const CkArrayIndex &idx)
 {
-#if CMK_TEMPLATE_MEMBERS_BROKEN
-	return hash.get(*(CkArrayIndexMax *)&idx); //Slower version
-#else
-		return hash.template get_fast<
-			CkArrayIndex_hashN_fast,CkArrayIndex_compareN_fast 
-		  >(*(CkArrayIndexMax *)&idx);
-#endif
+	return hash.get(*(CkArrayIndexMax *)&idx);
 }
 
 /*********************** Spring Cleaning *****************
@@ -852,7 +843,7 @@ CkGroupID CProxy_ArrayBase::ckCreateArray(CkGroupID mapID,int numInitial)
 
 CkArray::CkArray(CkMigrateMessage *) :
         thisproxy(thisgroup), CkReductionMgr(),
-	hash(17,0.75,CkArrayIndex_hashN,CkArrayIndex_compareN)
+	hash(17,0.3)
 {
   CkArray_magic=CkArray_MAGIC;
   CcdCallFnAfter((CcdVoidFn)springCheck,
@@ -861,7 +852,7 @@ CkArray::CkArray(CkMigrateMessage *) :
 
 CkArray::CkArray(CkArrayCreateMsg *msg) :
         thisproxy(thisgroup), CkReductionMgr(),
-	hash(17,0.3,CkArrayIndex_hashN,CkArrayIndex_compareN)
+	hash(17,0.3)
 {
   CkArray_magic=CkArray_MAGIC;
   CpvInitialize(ArrayElement_initInfo,initInfo);
