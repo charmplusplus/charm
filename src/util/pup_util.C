@@ -18,6 +18,7 @@ virtual functions are defined here.
 #include <ctype.h>
 #include "charm.h"
 #include "pup.h"
+#include "pup_toNetwork4.h"
 #include "ckhashtable.h"
 
 PUP::er::~er() {}
@@ -131,6 +132,90 @@ void PUP::toDisk::bytes(void *p,int n,size_t itemSize,dataType /*t*/)
 	{fwrite(p,itemSize,n,F);}
 void PUP::fromDisk::bytes(void *p,int n,size_t itemSize,dataType /*t*/)
 	{fread(p,itemSize,n,F);}
+
+
+/****************** toNetwork4 ********************
+Pack/unpack to 4-byte network-byte-order integer/float.
+This makes it easy to use platform-neutral on-the-wire types.
+*/
+
+void PUP_toNetwork4_sizer::bytes(void *p,int n,size_t itemSize,PUP::dataType t)
+{
+	switch (t) {
+	case PUP::Tchar: //Strings and bytes get copied as-is
+	case PUP::Tbyte:
+		nBytes+=n;
+		break;
+	default: //Everything else goes as a network int
+		nBytes+=n*4;
+	}
+}
+
+void PUP_toNetwork4_pack::bytes(void *p,int n,size_t itemSize,PUP::dataType t)
+{
+	int i;
+	switch (t) {
+	case PUP::Tchar: //Strings and bytes get copied as-is
+	case PUP::Tuchar:
+	case PUP::Tbyte:
+		memcpy(buf,p,n);
+		buf+=n;
+		break;
+#define casePUP_toNetwork4_type(enumName,typeName,writeAs) \
+	case PUP::enumName: \
+	        for (i=0;i<n;i++) \
+		  w((writeAs)( ((typeName *)p)[i] ));\
+	        break
+			
+	casePUP_toNetwork4_type(Tfloat,float,float);
+	casePUP_toNetwork4_type(Tdouble,double,float);
+	case PUP::Tushort: //Fallthrough (no special treatment)
+	casePUP_toNetwork4_type(Tshort,short,int);
+	case PUP::Tuint: 
+	casePUP_toNetwork4_type(Tint,int,int);
+       	case PUP::Tulong: 
+       	casePUP_toNetwork4_type(Tlong,long,int);
+       	casePUP_toNetwork4_type(Tbool,bool,int);
+       	case PUP::Tsync:
+       		break; //Ignore
+       	default: 
+       		CkAbort("Unrecognized type passed to PUP_toNetwork4_pack!\n");
+       	}
+#undef casePUP_toNetwork4_type
+}
+
+void PUP_toNetwork4_unpack::bytes(void *p,int n,size_t itemSize,PUP::dataType t)
+{
+	int i;
+	switch (t) {
+	case PUP::Tchar: //Strings and bytes get copied as-is
+	case PUP::Tuchar:
+	case PUP::Tbyte:
+		memcpy(p,buf,n);
+		buf+=n;
+		break;
+#define casePUP_toNetwork4_type(enumName,typeName,readAs) \
+	case PUP::enumName: \
+	        for (i=0;i<n;i++) \
+		  ((typeName *)p)[i]=(typeName)read_##readAs();\
+	        break
+		
+	casePUP_toNetwork4_type(Tfloat,float,float);
+	casePUP_toNetwork4_type(Tdouble,double,float);
+	case PUP::Tushort: //Fallthrough (no special treatment)
+	casePUP_toNetwork4_type(Tshort,short,int);
+	case PUP::Tuint: 
+	casePUP_toNetwork4_type(Tint,int,int);
+       	case PUP::Tulong: 
+       	casePUP_toNetwork4_type(Tlong,long,int);
+       	casePUP_toNetwork4_type(Tbool,bool,int);
+       	case PUP::Tsync:
+       		break; //Ignore
+       	default: 
+       		CkAbort("Unrecognized type passed to PUP_toNetwork4_unpack!\n");
+       	}
+}
+
 
 /****************** Seek support *******************
 For seeking:
@@ -408,7 +493,7 @@ void PUP::toTextUtil::bytes(void *p,int n,size_t itemSize,dataType t) {
     /*Add trailing quote and newline*/
     sprintf(o,"\";\n");o+=strlen(o);
     endLine();
-  } else if (t==Tbyte)
+  } else if (t==Tbyte || t==Tuchar)
   { /*Byte data is written out in hex (rather than decimal) */
     beginEnv("byte %d",n);
     const unsigned char *c=(const unsigned char *)p;
@@ -485,6 +570,7 @@ void PUP::toTextFile::bytes(void *p,int n,size_t itemSize,dataType t)
   for (int i=0;i<n;i++) 
     switch(t) {
     case Tchar: fprintf(f," '%c'",((char *)p)[i]); break;
+    case Tuchar:
     case Tbyte: fprintf(f," %02X",((unsigned char *)p)[i]); break;
     case Tshort: fprintf(f," %d",((short *)p)[i]); break;
     case Tushort: fprintf(f," %u",((unsigned short *)p)[i]); break;
@@ -538,6 +624,7 @@ void PUP::fromTextFile::bytes(void *p,int n,size_t itemSize,dataType t)
       if (1!=fscanf(f," '%c'",&((char *)p)[i]))
 	parseError("Could not match character");
       break;
+    case Tuchar:
     case Tbyte: ((unsigned char *)p)[i]=(unsigned char)readInt("%02X"); break;
     case Tshort:((short *)p)[i]=(short)readInt(); break;
     case Tushort: ((unsigned short *)p)[i]=(unsigned short)readUint(); break;
