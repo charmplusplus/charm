@@ -156,6 +156,23 @@ class CkSparseContiguousReducer
     /* contribute on behalf of chare calling this function */
     elem->contribute(size, ptr, type, cb);
   }
+
+  /* 
+     This function is same as contribute. The only difference is that, 
+     it contributes data "added" to this object
+  */
+  void contribute(ArrayElement *elem, CkReduction::reducerType type){
+    int size = r.getNumElements()*sizeof(T) + sizeof(int) + sizeof(CkDataSegHeader);
+    unsigned char *ptr = new (unsigned char)[size];
+    int count = 1;
+    /* pack data */
+    memcpy(ptr, &count, sizeof(int));
+    memcpy(ptr + sizeof(int), &r, sizeof(CkDataSegHeader));
+    memcpy(ptr + sizeof(int) + sizeof(CkDataSegHeader), data,
+    r.getNumElements()*sizeof(T));
+    /* contribute on behalf of chare calling this function */
+    elem->contribute(size, ptr, type);
+  }
 };
 
 /* 
