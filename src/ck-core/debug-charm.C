@@ -1,5 +1,5 @@
 /*****************************************************************************
- * A few useful built-in CPD handlers.
+ * A few useful built-in CPD and CCS handlers.
  *****************************************************************************/
 
 #include <stdio.h>
@@ -11,7 +11,12 @@
 #include "converse.h"
 #include "ckhashtable.h"
 #include "conv-ccs.h"
+#include "debug-charm.h"
 #include "sockRoutines.h"
+#include "charm.h"
+#include "middle.h"
+#include "cklists.h"
+#include "register.h"
 //#include "queueing.h"
 
 #if CMK_CCS_AVAILABLE
@@ -19,99 +24,186 @@
 #include "ck.h"
 
 
-class ArrayElementExamineIterator : public CkLocIterator {
+/************ Array Element CPD Lists ****************/
+
+/**
+  Count array elements going by until they reach this 
+  range (lo to hi), then start passing them to dest.
+*/
+template <class T>
+class CkArrayElementRangeIterator : public CkLocIterator {
 private:
-   int *indexData;
-   int nInts;
+   T *dest;
+   CkArray *mgr;
+   int cur,lo,hi;
 public:
-   ArrayElementExamineIterator( int * _idxData, int _n) :indexData(_idxData), nInts(_n){}
-   ~ArrayElementExamineIterator() {}
-   void addLocation (CkLocation & loc)
-   {
-     const CkArrayIndex &idx = loc.getIndex();
-     const int * idxData = idx.data();
-     int flag = 1;
-     if (nInts != idx.nInts) flag = 0;
-     else
-        for(int i=0; i < idx.nInts; i++)
-        {
-          if (idxData[i] != indexData[i])
-          {
-             flag = 0;
-             break;
-          }   
-        }
-     if (flag) 
-     {
-         int bufLen = 0;
-           {
-              PUP::sizerText p;
-              loc.pupCpdData(p);
-              bufLen=p.size();
-           }
-          char *buf=new char[bufLen];
-           {
-              PUP::toText p(buf);
-              loc.pupCpdData(p);
-              if (p.size()!=bufLen)
-                CmiError("ERROR! Sizing/packing length mismatch for pup function in showCpdData!\n");
-           }
- 
-         CcsSendReply(bufLen, (void *)buf);
-      }
-    
+   CkArrayElementRangeIterator(T *dest_,int l,int h) 
+   	:dest(dest_),mgr(0),cur(0),lo(l),hi(h) {}
+   
+   /** Call add for every in-range array element on this processor */
+   void iterate(void)
+   { /* Walk the groupTable for arrays (FIXME: get rid of _groupIDTable) */
+     int numGroups=CkpvAccess(_groupIDTable)->size();
+     for(int i=0;i<numGroups;i++) {
+        IrrGroup *obj = CkpvAccess(_groupTable)->find((*CkpvAccess(_groupIDTable))[i]).getObj();
+	if (obj->isArrMgr()) 
+	{ /* This is an array manager: examine its array elements */
+	  mgr=(CkArray *)obj;
+	  mgr->getLocMgr()->iterate(*this);
+	}
+     }
    }
+   
+   // Called by location manager's iterate function
+   virtual void addLocation (CkLocation &loc)
+   {
+     if (cur>=lo && cur<hi) 
+     { /* This element is in our range-- look it up */
+       dest->add(cur,mgr->lookup(loc.getIndex()));
+     }
+     cur++;
+   }
+   
+   // Return the number of total array elements seen so far.
+   int getCount(void) {return cur;}
 };
 
-/* passed a message in the form Array:<groupid>;Element:<index>
-In <index> each field separated by : */
-void CpdExamineArrayElement(char *msg)
+class ignoreAdd {
+public: void add(int cur,ArrayElement *elt) {}
+};
+
+/** Coarse: examine array element names */
+class CpdList_arrayElementNames : public CpdListAccessor {
+  PUP::er *pp; // Only used while inside pup routine.
+public:
+  virtual const char * getPath(void) const {return "charm/arrayElementNames";}
+  virtual int getLength(void) const {
+    CkArrayElementRangeIterator<ignoreAdd> it(0,0,0);
+    it.iterate();
+    return it.getCount();
+  }
+  virtual void pup(PUP::er &p, CpdListItemsRequest &req) {
+    pp=&p;
+    CkArrayElementRangeIterator<CpdList_arrayElementNames> it(this,req.lo,req.hi);
+    it.iterate(); // calls "add" for in-range elements
+  }
+  void add(int cur,ArrayElement *elt) 
+  { // Just grab the name and nothing else:
+         PUP::er &p=*pp;
+	 beginItem(p,cur);
+         p.comment("name");
+	 char *n=elt->ckDebugChareName();
+	 p(n,strlen(n));
+	 free(n);
+  }
+};
+
+/** Detailed: examine array element data */
+class CpdList_arrayElements : public CpdListAccessor {
+  PUP::er *pp; // Only used while inside pup routine.
+public:
+  virtual const char * getPath(void) const {return "charm/arrayElements";}
+  virtual int getLength(void) const {
+    CkArrayElementRangeIterator<ignoreAdd> it(0,0,0);
+    it.iterate();
+    return it.getCount();
+  }
+  virtual void pup(PUP::er &p, CpdListItemsRequest &req) {
+    pp=&p;
+    CkArrayElementRangeIterator<CpdList_arrayElements> it(this,req.lo,req.hi);
+    it.iterate(); // calls "add" for in-range elements
+  }
+  void add(int cur,ArrayElement *elt) 
+  { // Pup the element data
+         PUP::er &p=*pp;
+	 beginItem(p,cur);
+	 elt->ckDebugPup(p);
+  }
+};
+
+/************ Message CPD Lists ****************/
+CpvCExtern(void *,debugQueue);
+
+
+// Interpret data in a message in a user-friendly way.
+//  Ignores most of the envelope fields used by CkPupMessage,
+//  and instead concentrates on user data
+void CpdPupMessage(PUP::er &p, void *msg)
 {
-  char parameter[250];
-  char arrayid[100];
-  char elementid[100];
-  char * buf = NULL;
-  int idxData[10];
-  int nInts = 0;
-  int groupid;
-  sscanf(msg+CmiMsgHeaderSizeBytes, "%s", parameter);
-  if(buf = strstr(parameter, ";"))
-  {
-     int i = strlen(parameter) - strlen(buf);
-     strncpy(arrayid, parameter+6, i-6);
-     groupid = atoi(arrayid);
-     nInts = 0;
-     char * tmp = buf + 1 + 8;
-     while (buf = strtok(tmp, ":"))
-     {
-        idxData[nInts] = atoi(buf);
-        nInts++;
-        tmp = NULL;
-      }
-  }
-  if (nInts && strlen(arrayid))
-  {
-    IrrGroup * c = NULL;
-    if (c = (CkpvAccess(_groupTable)->find((*CkpvAccess(_groupIDTable))[groupid])).getObj())
-    {
-       ArrayElementExamineIterator itr(idxData, nInts);
-       if (c->isLocMgr())
-          ((CkLocMgr*)(c))->iterate(itr);
-    }
-  }
+  envelope *env=UsrToEnv(msg);
+  int wasPacked=env->isPacked();
+  int size=env->getTotalsize();
+  int prioBits=env->getPriobits();
+  PUPn(wasPacked);
+  PUPn(prioBits);
+  int userSize=size-sizeof(envelope)-sizeof(int)*PW(prioBits);
+  PUPn(userSize);
+  
+  p.synchronize(PUP::sync_last_system);
+  
+  int ep=CkMessageToEpIdx(msg);
+  PUPn(ep);
+  
+  if (_entryTable[ep]->messagePup!=NULL) 
+    _entryTable[ep]->messagePup(p,msg);
+  else
+    CkMessage::ckDebugPup(p,msg);
 }
 
-#include "charm.h"
-#include "middle.h"
-#include "cklists.h"
-#include "register.h"
+//Cpd Lists for local and scheduler queues
+class CpdList_localQ : public CpdListAccessor {
+
+public:
+  CpdList_localQ() {}
+  virtual const char * getPath(void) const {return "converse/localqueue";}
+  virtual int getLength(void) const {
+    int x = CdsFifo_Length((CdsFifo)(CpvAccess(debugQueue)));
+    //CmiPrintf("*******Returning fifo length %d*********\n", x);
+    //return CdsFifo_Length((CdsFifo)(CpvAccess(CmiLocalQueue)));
+    return x;
+  }
+  virtual void pup(PUP::er &p, CpdListItemsRequest &req) {
+    int length = CdsFifo_Length((CdsFifo)(CpvAccess(debugQueue)));
+    void ** messages = CdsFifo_Enumerate(CpvAccess(debugQueue));
+    int curObj=0;
+    
+    for(curObj=req.lo; curObj<req.hi; curObj++)
+    if ((curObj>=0) && (curObj<length))
+    {
+        beginItem(p,curObj);
+        void *msg=messages[curObj]; /* converse message */
+	int isCharm=0;
+        const char *type="Converse";
+        p.comment("name");
+        char name[128];
+	if (CmiGetHandler(msg)==_charmHandlerIdx) {isCharm=1; type="Local Charm";}
+	if (CmiGetXHandler(msg)==_charmHandlerIdx) {isCharm=1; type="Network Charm";}
+        sprintf(name,"%s %d: %s (%d)","Message",curObj,type,CmiGetHandler(msg));
+        p(name, strlen(name));
+	
+	if (isCharm) 
+	{ /* charm message */
+	  p.synchronize(PUP::sync_begin_object);
+	  envelope *env=(envelope *)msg;
+	  CkUnpackMessage(&env);
+	  messages[curObj]=env;
+          CpdPupMessage(p, EnvToUsr(env));
+          //CkPupMessage(p, &messages[curObj], 0);
+	  p.synchronize(PUP::sync_end_object);
+	}
+    }
+
+  }
+};
+
+
+/****************** Breakpoints and other debug support **************/
 
 typedef CkHashtableTslow<int,EntryInfo *> CpdBpFuncTable_t;
 
 
 extern void CpdFreeze(void);
 extern void CpdUnFreeze(void);
-extern int CkMessageToEpIdx(void *msg);
 
 
 CpvStaticDeclare(int, _debugMsg);
@@ -301,77 +393,6 @@ void CpdStartGdb(void)
 #endif
 }
 
-CpvCExtern(void *,debugQueue);
-
-
-//following function should interpret data in a message
-//as of now replicate's CkPupMessage function's functionality
-//to do
-void CpdPupMessage(PUP::er &p, void *msg)
-{
-
-  UChar type;
-  int size,prioBits,envSize;
-
-  /* pup this simple flag so that we can handle the NULL msg */
-  int isNull = (msg == NULL);   // be overwritten when unpacking
-  p(isNull);
-  if (isNull) { msg = NULL; return; }
-  envelope *env=UsrToEnv(msg);
-  unsigned char wasPacked=0;
-  p.comment("Begin Charm++ Message {");
-  wasPacked=env->isPacked();
-  type=env->getMsgtype();
-  size=env->getTotalsize();
-  prioBits=env->getPriobits();
-  envSize=sizeof(envelope);
-  p(type);
-  p(wasPacked);
-  p(size);
-  p(prioBits);
-  p(envSize);
-  int userSize=size-envSize-sizeof(int)*PW(prioBits);
- 
-  p.comment("} End Charm++ Message");
-}
-
-//Cpd Lists for local and scheduler queues
-class CpdList_localQ : public CpdListAccessor {
-
-public:
-  CpdList_localQ() {}
-  virtual const char * getPath(void) const {return "converse/localqueue";}
-  virtual int getLength(void) const {
-    int x = CdsFifo_Length((CdsFifo)(CpvAccess(debugQueue)));
-    //CmiPrintf("*******Returning fifo length %d*********\n", x);
-    //return CdsFifo_Length((CdsFifo)(CpvAccess(CmiLocalQueue)));
-    return x;
-  }
-  virtual void pup(PUP::er &p, CpdListItemsRequest &req) {
-    void ** messages = CdsFifo_Enumerate(CpvAccess(debugQueue));
-    int curObj=0;
-    if ((req.lo>=0) && (req.lo<= getLength()) && (req.hi<=getLength()))
-    {
-       for(curObj=req.lo; curObj<req.hi; curObj++)
-       {
-        beginItem(p,curObj);
-        p.comment("name");
-        char buf[128];
-        sprintf(buf,"%s%d","Message",curObj);
-        p(buf, strlen(buf));
-        CpdPupMessage(p, messages[curObj]);
-        //CkPupMessage(p, &messages[curObj], 0);
-       }
-    }
-
-  }
-};
-
-
-
-extern void CpdExamineArrayElement(char *);
-
-void CpdListRegister(CpdListAccessor *acc);
 
 void CpdCharmInit()
 {
@@ -382,8 +403,9 @@ void CpdCharmInit()
   CcsRegisterHandler("ccs_continue_break_point",(CmiHandler)CpdContinueFromBreakPoint);
   CcsRegisterHandler("ccs_debug_quit",(CmiHandler)CpdQuitDebug);
   CcsRegisterHandler("ccs_debug_startgdb",(CmiHandler)CpdStartGdb);
-  CcsRegisterHandler("ccs_examine_arrayelement",(CmiHandler)CpdExamineArrayElement);
   CpdListRegister(new CpdList_localQ());
+  CpdListRegister(new CpdList_arrayElementNames());
+  CpdListRegister(new CpdList_arrayElements());
 }
 
 

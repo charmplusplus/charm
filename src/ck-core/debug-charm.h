@@ -11,6 +11,11 @@
 
 #include "pup.h"
 
+//These pup functions are useful in CpdLists, as they document the name
+//  of the variable.  Your object must be named "c" (a hack).
+#define PCOM(field) p.comment(#field); p(c->field);
+#define PCOMS(field) p.comment(#field); p((char *)c->field,strlen(c->field));
+
 /* CpdList functions for C++ */
 class CpdListAccessor { /* Abstract superclass */
 protected:
