@@ -3436,7 +3436,6 @@ void ConverseExit()
 void exitDelay(void)
 {
   printf("Program finished.\n");
-  getchar();
 }
 
 void ConverseInit(int argc, char **argv, CmiStartFn fn, int usc, int ret)
@@ -3444,7 +3443,6 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usc, int ret)
   WSADATA wsaData;
   int     inCrt, outCrt;
   FILE    *hIn,  *hOut;
-//  HANDLE  inHandle, outHandle;
 
   WSAStartup(0x0002, &wsaData);
 
