@@ -312,12 +312,12 @@ retry:
   if (port!=NULL) *port = (int)ntohs(addr.sin_port);
   return ret;
 }
-SOCKET skt_server(int *port)
+SOCKET skt_server(unsigned int *port)
 {
   return skt_server_ip(port,NULL);
 }
 
-SOCKET skt_server_ip(int *port,skt_ip_t *ip)
+SOCKET skt_server_ip(unsigned int *port,skt_ip_t *ip)
 {
   SOCKET             ret;
   socklen_t          len;
@@ -347,7 +347,7 @@ retry:
   return ret;
 }
 
-SOCKET skt_accept(SOCKET src_fd,skt_ip_t *pip, int *port)
+SOCKET skt_accept(SOCKET src_fd,skt_ip_t *pip, unsigned int *port)
 {
   socklen_t len;
   struct sockaddr_in addr={0};

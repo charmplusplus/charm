@@ -170,9 +170,9 @@ struct sockaddr_in skt_build_addr(skt_ip_t IP,int port);
 SOCKET skt_datagram(int *port, int bufsize);
 
 /*TCP*/
-SOCKET skt_server(int *port);
-SOCKET skt_server_ip(int *port,skt_ip_t *ip);
-SOCKET skt_accept(SOCKET src_fd, skt_ip_t *pip, int *port);
+SOCKET skt_server(unsigned int *port);
+SOCKET skt_server_ip(unsigned int *port,skt_ip_t *ip);
+SOCKET skt_accept(SOCKET src_fd, skt_ip_t *pip, unsigned int *port);
 SOCKET skt_connect(skt_ip_t ip, int port, int timeout);
 
 /*Utility*/
