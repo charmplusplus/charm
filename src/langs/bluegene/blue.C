@@ -1262,7 +1262,7 @@ void correctMsgTime(char *msg)
 		TimeLog correction with trace projection
 *****************************************************************************/
 
-void bgAddProjEvent(void *data, double t)
+void bgAddProjEvent(void *data, double t, bgEventCallBackFn fn)
 {
   if (!genTimeLog) return;
   CmiAssert(tTHREADTYPE == WORK_THREAD);
@@ -1271,17 +1271,17 @@ void bgAddProjEvent(void *data, double t)
   CmiAssert(log.length() > 0);
   bgTimeLog *tline = log[log.length()-1];
   // make sure this time log entry is not closed
-  if (tline->endTime == 0.0) tline->addEvent(data, t);
+  if (tline->endTime == 0.0) tline->addEvent(data, t, fn);
 }
 
 
 // trace projections callback update projections with new timestamp after
 // timing correction
-void bgUpdateProj(bgEventCallBackFn fn, void *usrPtr)
+void bgUpdateProj(void *usrPtr)
 {
   BgTimeLine &log = tTIMELINE;
   for (int i=0; i< log.length(); i++) {
-      log[i]->updateEvents(fn, usrPtr);
+      log[i]->updateEvents(usrPtr);
   }
 }
 

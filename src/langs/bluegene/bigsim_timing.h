@@ -46,10 +46,11 @@ class bgEvents {
 private:
   void*   data;         // e.g. can be pointer to trace projection log entry
   double  rTime;	// relative time from the start entry
+  bgEventCallBackFn  callbackFn;
 public:
-  bgEvents(void *d, double t): data(d), rTime(t) {}
-  inline void update(bgEventCallBackFn fn, double startT, double recvT, void *usrPtr) {
-    fn(data, startT+rTime, recvT, usrPtr);
+  bgEvents(void *d, double t, bgEventCallBackFn fn): data(d), rTime(t), callbackFn(fn) {}
+  inline void update(double startT, double recvT, void *usrPtr) {
+    callbackFn(data, startT+rTime, recvT, usrPtr);
   }
 };
 
@@ -76,10 +77,12 @@ public:
   void write(FILE *fp);
 
   void adjustTimeLog(double tAdjust);
-  inline void addEvent(void *data, double absT) { evts.push_back(new bgEvents(data, absT-startTime)); }
-  inline void updateEvents(bgEventCallBackFn fn, void *usrPtr) {
+  inline void addEvent(void *data, double absT, bgEventCallBackFn fn) { 
+    evts.push_back(new bgEvents(data, absT-startTime, fn)); 
+  }
+  inline void updateEvents(void *usrPtr) {
     for (int i=0; i<evts.length(); i++)
-      evts[i]->update(fn, startTime, recvTime, usrPtr);
+      evts[i]->update(startTime, recvTime, usrPtr);
   }
 };
 
