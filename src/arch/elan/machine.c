@@ -17,6 +17,14 @@ Developed by Sameer Kumar
 #include "machine.h"
 #include "pcqueue.h"
 
+/* copy from elan/version.h */
+#ifndef QSNETLIBS_VERSION_CODE
+#define QSNETLIBS_VERSION(a,b,c)        (((a) << 16) + ((b) << 8) + (c))
+#else   /* fake one */
+#define QSNETLIBS_VERSION(a,b,c)        (((a) << 16) + ((b) << 8) + (c))
+#define QSNETLIBS_VERSION_CODE          QSNETLIBS_VERSION(1,2,0)
+#endif
+
 #define MAX_QLEN 1000
 #define MAX_BYTES 10000000
 
@@ -1411,7 +1419,14 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
   localSmallBufferQueue = PCQueueCreate();
   localMidBufferQueue = PCQueueCreate();
 
-  if (!(elan_base = elan_baseInit())) {
+  if (!(elan_base = 
+#if QSNETLIBS_VERSION_CODE > QSNETLIBS_VERSION(1,4,11)
+	elan_baseInit(0)
+#else
+	elan_baseInit()
+#endif
+     ))
+  {
       perror("Failed elan_baseInit()");
       exit(1);
   }
@@ -1436,6 +1451,9 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
 				   nslots /*elan_base->tport_nslots*/, 
 				   elan_base->tport_smallmsg,
 				   MID_MESSAGE_SIZE, //elan_base->tport_bigmsg,
+#if QSNETLIBS_VERSION_CODE > QSNETLIBS_VERSION(1,4,11)
+	 			   elan_base->tport_stripemsg,
+#endif
 				   elan_base->waitType, elan_base->retryCount,
 				   &(elan_base->shm_key),
 				   elan_base->shm_fifodepth, 
