@@ -23,6 +23,9 @@ generalized by Orion Lawlor November 2001.
 #include <stdio.h>
 #include <stdlib.h>
 
+/*Integral type to be used for pointer arithmetic:*/
+typedef unsigned long memRange_t;
+
 /*Size in bytes of a single slot*/
 static int slotsize;
 
@@ -35,10 +38,10 @@ static char *isomallocEnd=NULL;
 
 /*Utility conversion functions*/
 static int addr2slot(void *addr) {
-	return (((char *)addr)-isomallocStart)/slotsize;
+	return (((char *)addr)-isomallocStart)/(memRange_t)slotsize;
 }
 static void *slot2addr(int slot) {
-	return isomallocStart+slotsize*slot;
+	return isomallocStart+((memRange_t)slotsize)*((memRange_t)slot);
 }
 static int slot2pe(int slot) {
 	return slot/numslots;
@@ -346,7 +349,6 @@ static void map_bad(int s,int n)
 CpvStaticDeclare(slotset *, myss); /*My managed slots*/
 
 /*This struct describes a range of virtual addresses*/
-typedef unsigned long memRange_t;
 typedef struct {
   char *start; /*First byte of region*/
   memRange_t len; /*Number of bytes in region*/
@@ -367,8 +369,18 @@ static void *__static_data_loc(void)
   return (void *)&__dummy;
 }
 
-static char *pmin(char *a,char *b) {return (a<b)?a:b;}
-static char *pmax(char *a,char *b) {return (a>b)?a:b;}
+/*Pointer comparison is in these subroutines, because
+  comparing arbitrary pointers is nonportable and tricky.
+*/
+static int pointer_lt(const char *a,const char *b) {
+	return ((memRange_t)a)<((memRange_t)b);
+}
+static int pointer_ge(const char *a,const char *b) {
+	return ((memRange_t)a)>=((memRange_t)b);
+}
+
+static char *pmin(char *a,char *b) {return pointer_lt(a,b)?a:b;}
+static char *pmax(char *a,char *b) {return pointer_lt(a,b)?b:a;}
 
 /*Check if this memory location is usable.  
   If not, return 1.
@@ -395,7 +407,6 @@ static void check_range(char *start,char *end,memRegion_t *max)
   memRange_t len;
   memRange_t searchQuantStart=128u*1024*1024; /*Shift search location by this far*/
   memRange_t searchQuant;
-  void *addr;
   char *initialStart=start, *initialEnd=end;
 
   if (start>=end) return; /*Ran out of hole*/
@@ -409,7 +420,7 @@ static void check_range(char *start,char *end,memRegion_t *max)
   searchQuant=searchQuantStart;
   while (bad_range(start)) {
 	start=initialStart+searchQuant;
-        if (start>=end) return; /*Ran out of hole*/
+        if (pointer_ge(start,end)) return; /*Ran out of hole*/
 	searchQuant*=2; /*Exponential search*/
         if (searchQuant==0) return; /*SearchQuant overflowed-- no good memory anywhere*/
   }
@@ -418,7 +429,7 @@ static void check_range(char *start,char *end,memRegion_t *max)
   searchQuant=searchQuantStart;
   while (bad_range(end-slotsize)) {
 	end=initialEnd-searchQuant;
-        if (start>=end) return; /*Ran out of hole*/
+        if (pointer_ge(start,end)) return; /*Ran out of hole*/
 	searchQuant*=2;
         if (searchQuant==0) return; /*SearchQuant overflowed-- no good memory anywhere*/
   }
@@ -452,10 +463,10 @@ static memRegion_t find_free_region(memRegion_t *used,int nUsed,int atLeast)
     char *holeEnd=(void *)(-1);
     
     /*Shrink the hole by all others*/ 
-    for (j=0;j<nUsed && holeStart<holeEnd;j++) {
-      if ((memRange_t)used[j].start<(memRange_t)holeStart) 
+    for (j=0;j<nUsed && pointer_lt(holeStart,holeEnd);j++) {
+      if (pointer_lt(used[j].start,holeStart)) 
         holeStart=pmax(holeStart,used[j].start+used[j].len);
-      else if ((memRange_t)used[j].start<(memRange_t)holeEnd) 
+      else if (pointer_lt(used[j].start,holeEnd)) 
         holeEnd=pmin(holeEnd,used[j].start);
     } 
 
@@ -710,7 +721,8 @@ void CmiIsomallocFree(CmiIsomallocBlock *b)
 /*Return true if this address is in the region managed by isomalloc*/
 int CmiIsomallocInRange(void *addr)
 {
-	return (isomallocStart<=((char *)addr)) && (((char *)addr)<isomallocEnd);
+	return pointer_ge((char *)addr,isomallocStart) && 
+	       pointer_lt((char*)addr,isomallocEnd);
 }
 
 void CmiIsomallocInit(char **argv)
