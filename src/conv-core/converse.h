@@ -496,9 +496,9 @@ void    *CmiAlloc(int size);
 int      CmiSize(void *);
 void     CmiFree(void *);
 
-double   CmiTimer();
-double   CmiWallTimer();
-double   CmiCpuTimer();
+double   CmiTimer(void);
+double   CmiWallTimer(void);
+double   CmiCpuTimer(void);
 
 #if CMK_NODE_QUEUE_AVAILABLE
 
@@ -1081,12 +1081,16 @@ typedef void (*CcdVoidFn)();
 #define CcdQUIESCENCE 4
 
 void CcdCallFnAfter(CcdVoidFn fnp, void *arg, unsigned int msecs);
-void CcdPeriodicallyCall(CcdVoidFn fnp, void *arg);
+int CcdPeriodicCall(CcdVoidFn fnp, void *arg);
+int CcdPeriodicCallKeep(CcdVoidFn fnp, void *arg);
+int CcdCallOnCondition(int condnum, CcdVoidFn fnp, void *arg);
+int CcdCallOnConditionKeep(int condnum, CcdVoidFn fnp, void *arg);
+void CcdCancelPeriodicCall(int idx);
+void CcdCancelPeriodicCallKeep(int idx);
+void CcdCancelCallOnCondition(int condnum, int idx);
+void CcdCancelCallOnConditionKeep(int condnum, int idx);
 
 void CcdRaiseCondition(int condnum);
-void CcdCallOnCondition(int condnum, CcdVoidFn fnp, void *arg);
-
-void CcdCallBacks();
 
 /******** Parallel Debugger *********/
 

@@ -75,8 +75,7 @@ void  *CmiGetNonLocalNodeQ();
 void  *CmiGetNonLocal();
 void   CmiNotifyIdle();
 
-CpvDeclare(int, disable_sys_msgs);
-CpvExtern(int,    CcdCheckNum) ;
+CpvExtern(int, _ccd_numchecks) ;
 CpvDeclare(void*, CsdSchedQueue);
 #if CMK_NODE_QUEUE_AVAILABLE
 CsvDeclare(void*, CsdNodeQueue);
@@ -598,6 +597,8 @@ void (*handler)();
  *****************************************************************************/
 
 
+extern void CcdCallBacks(void);
+
 CpvDeclare(CmiHandler, CsdNotifyIdle);
 CpvDeclare(CmiHandler, CsdNotifyBusy);
 CpvDeclare(int, CsdStopNotifyFlag);
@@ -806,9 +807,8 @@ int CsdScheduler(int maxmsgs)
 	return maxmsgs;
       }
     }
-    if (CpvAccess(CcdCheckNum)-- <= 0)
-      if (!CpvAccess(disable_sys_msgs))
-        CcdCallBacks();
+    if (CpvAccess(_ccd_numchecks)-- <= 0)
+      CcdCallBacks();
   }
 }
 
@@ -972,14 +972,12 @@ void CthSchedInit()
 void CsdInit(argv)
   char **argv;
 {
-  CpvInitialize(int,   disable_sys_msgs);
   CpvInitialize(void *, CsdSchedQueue);
   CpvInitialize(int,   CsdStopFlag);
   CpvInitialize(int,   CsdStopNotifyFlag);
   CpvInitialize(CmiHandler,   CsdNotifyIdle);
   CpvInitialize(CmiHandler,   CsdNotifyBusy);
   
-  CpvAccess(disable_sys_msgs) = 0;
   CpvAccess(CsdSchedQueue) = (void *)CqsCreate();
 
 #if CMK_NODE_QUEUE_AVAILABLE
