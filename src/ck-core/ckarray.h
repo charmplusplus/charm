@@ -598,8 +598,8 @@ public:
 /// Broadcast communication:
   void sendBroadcast(CkMessage *msg);
   void recvBroadcast(CkMessage *msg);
-  void sendImmediateBroadcast(CkMessage *msg);
-  void recvImmediateBroadcast(CkMessage *msg);
+  void sendExpeditedBroadcast(CkMessage *msg);
+  void recvExpeditedBroadcast(CkMessage *msg) { recvBroadcast(msg); }
 
   void pup(PUP::er &p);
   void ckJustMigrated(void){ doneInserting(); }

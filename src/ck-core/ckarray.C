@@ -840,14 +840,14 @@ void CProxy_ArrayBase::ckBroadcast(CkArrayMessage *msg, int ep, int opts) const
 	  {
 		DEBB((AA"Sending array broadcast\n"AB));
 		if (skipsched)
-			CProxy_CkArray(_aid).recvImmediateBroadcast(msg);
+			CProxy_CkArray(_aid).recvExpeditedBroadcast(msg);
 		else
 			CProxy_CkArray(_aid).recvBroadcast(msg);
 	  } else {
 		DEBB((AA"Forwarding array broadcast to serializer node %d\n"AB,serializer));
 		CProxy_CkArray ap(_aid);
 		if (skipsched)
-			ap[serializer].sendImmediateBroadcast(msg);
+			ap[serializer].sendExpeditedBroadcast(msg);
 		else
 			ap[serializer].sendBroadcast(msg);
 	  }
@@ -861,11 +861,11 @@ void CkArray::sendBroadcast(CkMessage *msg)
 	//Broadcast the message to all processors
 	thisProxy.recvBroadcast(msg);
 }
-void CkArray::sendImmediateBroadcast(CkMessage *msg)
+void CkArray::sendExpeditedBroadcast(CkMessage *msg)
 {
 	CK_MAGICNUMBER_CHECK
 	//Broadcast the message to all processors
-	thisProxy.recvImmediateBroadcast(msg);
+	thisProxy.recvExpeditedBroadcast(msg);
 }
 
 /// Increment broadcast count; deliver to all local elements
@@ -883,11 +883,6 @@ void CkArray::recvBroadcast(CkMessage *m)
                 BgEntrySplit();
 #endif
 	}
-}
-
-void CkArray::recvImmediateBroadcast(CkMessage *m)
-{
-  	recvBroadcast(m);
 }
 
 #include "CkArray.def.h"
