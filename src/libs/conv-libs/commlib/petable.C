@@ -17,6 +17,7 @@
 #include <converse.h>
 #include "commlib.h"
 #include "petable.h"
+#include "converse.h"
 
 #define BIGBUFFERSIZE 10240
 #define PTPREALLOC    100
@@ -244,7 +245,7 @@ int PeTable :: TotalMsgSize(int npe, int *pelist, int *nm, int *nd)
   return(totsize);
 }
 
-#if 0
+#if CONVERSE_VERSION_ELAN
 #include "queueing.h"
 extern Queue localMsgBuf;
 #define SIZEFIELD(m) ((int *)((char *)(m)-2*sizeof(int)))[0]
@@ -282,7 +283,7 @@ char * PeTable ::ExtractAndPack(comID id, int ufield, int npe, int *pelist, int 
   *length += msg_offset;
   char *p;
 
-#if 0
+#if CONVERSE_VERSION_ELAN
   if(combcount == 128)
     combcount = 0;
   if ((*length) < MAXBUFSIZE) {
@@ -363,7 +364,7 @@ char * PeTable ::ExtractAndPack(comID id, int ufield, int npe, int *pelist, int 
      	PACK(int, offset); 
 	if (--(PeList[index][j]->refCount) <=0) {
 
-#if 0
+#if CONVERSE_VERSION_ELAN
 	  // Return message to localMessageBuf
 	  if(SIZEFIELD(PeList[index][j]->msg) == ELAN_MESSAGE_SIZE)
 	    CqsEnqueue(localMsgBuf, PeList[index][j]->msg);
@@ -397,7 +398,7 @@ char * PeTable ::ExtractAndPack(comID id, int ufield, int npe, int *pelist, int 
 
   *length=actual_msgsize+headersize;
   //  ComlibPrintf("actual=%d, len=%d , %d\n", actual_msgsize+headersize, *length, nummsgs);
-#if 0
+#if CONVERSE_VERSION_ELAN
   if (l1 < MAXBUFSIZE) 
     ((CmiMsgHeaderBasic *)p)->type = 2;
 #endif
