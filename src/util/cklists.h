@@ -208,10 +208,14 @@ class CkVec : private CkSTLHelper<T> {
 
 /// Default pup routine for CkVec: pup each of the elements
 template <class T>
-inline void operator|(PUP::er &p,CkVec<T> &vec) {
+inline void pupCkVec(PUP::er &p,CkVec<T> &vec) {
     int l=vec.pupbase(p);
     for (int i=0;i<l;i++) p|vec[i];
 }
+
+/// Default pup routine for CkVec: pup each of the elements
+template <class T>
+inline void operator|(PUP::er &p,CkVec<T> &vec) {pupCkVec(p,vec);}
 
 
 ///A vector of basic types, which can be pupped as an array
