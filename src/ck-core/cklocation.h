@@ -229,8 +229,9 @@ CkpvExtern(int,CkSaveRestorePrefetch);
 #endif
 
 class CkMigratable : public Chare {
-private:
+protected:
   CkLocRec_local *myRec;
+private:
   int thisChareType;//My chare type
   void commonInit(void);
 public:
@@ -484,6 +485,7 @@ public:
 
 	///Done inserting elements for now
 	void doneInserting(void);
+	void startInserting(void);
 
 //Advisories:
 	///This index now lives on the given processor-- update local records
@@ -570,6 +572,7 @@ private:
 	void removeFromTable(const CkArrayIndex &idx);
 
 	friend class CkLocation; //so it can call pupElementsFor
+	friend class ArrayElement;
 	void pupElementsFor(PUP::er &p,CkLocRec_local *rec,
 		CkElementCreation_t type, int forCpd = 0);
 

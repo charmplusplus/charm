@@ -1069,7 +1069,9 @@ void CkLocMgr::flushStates(void)
   while (NULL!=(objp=it->next(&keyp))) {
     CkLocRec *rec=*(CkLocRec **)objp;
     CkArrayIndex &idx=*(CkArrayIndex *)keyp;
-    if (rec->type()==CkLocRec::buffering) {
+    switch (rec->type()) {
+    case CkLocRec::buffering:
+    case CkLocRec::remote:
       hash.remove(*(CkArrayIndexMax *)&idx);
       delete rec;
       it->seek(-1);//retry this hash slot
@@ -1762,6 +1764,10 @@ void CkLocMgr::recvAtSync()
 	the_lbdb->RegisteringObjects(myLBHandle);
 }
 
+void CkLocMgr::startInserting(void)
+{
+	the_lbdb->RegisteringObjects(myLBHandle);
+}
 void CkLocMgr::doneInserting(void)
 {
 	the_lbdb->DoneRegisteringObjects(myLBHandle);
