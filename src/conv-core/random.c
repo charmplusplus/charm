@@ -61,7 +61,7 @@ void CrnInit(void)
 
 /* Initialize random number stream */
 
-void CrnInitState(CrnState *genptr, int seed, int type)
+void CrnInitStream(CrnStream *genptr, int seed, int type)
 {
   int gennum = CmiMyPe()+CpvAccess(nstreams)*CmiNumPes();
   int i;
@@ -99,19 +99,19 @@ void CrnInitState(CrnState *genptr, int seed, int type)
               genptr->state[1] = st1; \
               genptr->state[2] = st2;}
 
-double CrnDouble(CrnState *genptr)
+double CrnDouble(CrnStream *genptr)
 {
   advance_state(genptr);	/* next state in sequence */
   return  genptr->state[2]*TWO_M20 + genptr->state[1]*TWO_M42 +
     genptr->state[0]*TWO_M64;
 } 
 
-int CrnInt(CrnState *genptr)
+int CrnInt(CrnStream *genptr)
 {
   return (int) (CrnDouble(genptr)*0x80000000U);
 } 
 
-float CrnFloat(CrnState *genptr)
+float CrnFloat(CrnStream *genptr)
 {
     return (float) CrnDouble(genptr);
 }

@@ -894,12 +894,12 @@ typedef struct rngen_
 {
   unsigned int prime;
   double state[3], multiplier[3];/* simulate 64 bit arithmetic */
-} CrnState;
+} CrnStream;
 
-void CrnInitState(CrnState *, int, int);
-int CrnInt(CrnState *);
-double CrnDouble(CrnState *);
-float CrnFloat(CrnState *);
+void CrnInitStream(CrnStream *, int, int);
+int CrnInt(CrnStream *);
+double CrnDouble(CrnStream *);
+float CrnFloat(CrnStream *);
 
 /**** DEAL WITH DIFFERENCES: KERNIGHAN-RITCHIE-C, ANSI-C, AND C++ ****/
 
