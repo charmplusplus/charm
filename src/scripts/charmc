@@ -996,7 +996,7 @@ for module in $MODULES; do
     echo "extern void _register$module(void);" >> $modInitSrc
 done
 for trace in $TRACEMODE; do
-    if test $trace = "summary"
+    if test $trace = "summary" || test $trace = "all"
     then
       echo "  extern void _registerTraceSummary();" >> $modInitSrc
     fi
@@ -1012,7 +1012,7 @@ for module in $MODULES; do
     echo "  _register$module();" >> $modInitSrc
 done
 for trace in $TRACEMODE; do
-    if test $trace = "summary"
+    if test $trace = "summary" || test $trace = "all"
     then
       echo "  _registerTraceSummary();" >> $modInitSrc
     fi
