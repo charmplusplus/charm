@@ -229,7 +229,7 @@ void _registerDone(void)
   CpdListRegister(new CpdSimpleListAccessor("charm/readonly",_readonlyTable.size(),pupReadonly));
   CpdListRegister(new CpdSimpleListAccessor("charm/readonlyMsg",_readonlyMsgs.size(),pupReadonlyMsg));
  
-  CpdListRegister(new CpdSimpleListAccessor("charm/arrayelements", CpvAccess(_groupIDTable)->length(), pupArray));
+  CpdListRegister(new CpdSimpleListAccessor("charm/arrayelements", CkpvAccess(_groupIDTable)->length(), pupArray));
   CpdCharmInit();
 }
 
