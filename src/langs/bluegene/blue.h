@@ -24,6 +24,8 @@ typedef struct CMK_MSG_HEADER_BLUEGENE   CmiBlueGeneMsgHeader;
 #define CmiBgMsgNodeID(m)  (((CmiBlueGeneMsgHeader*)m)->nd)
 #define CmiBgMsgThreadID(m)  (((CmiBlueGeneMsgHeader*)m)->tID)
 #define CmiBgMsgHandle(m)  (((CmiBlueGeneMsgHeader*)m)->hID)
+#define CmiBgMsgID(m)      (((CmiBlueGeneMsgHeader*)m)->msgID)
+#define CmiBgMsgSrcPe(m)   (((CmiBlueGeneMsgHeader*)m)->srcPe)
 
 	/* when send packets, this means it is a non-affinity message */
 #define ANYTHREAD   ((CmiUInt2)-1)

@@ -17,11 +17,12 @@
 
 #include "cklists.h"
 
-#define  DEBUGF(x)   // CmiPrintf x;
+#define  DEBUGF(x)    // CmiPrintf x;
 
 #include "blue.h"
 
 #include "blue_impl.h"         // implementation header file
+#include "blue_timing.h" 	// timing module
 
 template<class T> class bgQueue;
 
@@ -125,6 +126,9 @@ public:
   char *udata;			/* node specific data pointer */
   double startTime;		/* start time for a thread */
   char started;			/* flag indicate if this node is started */
+ 
+  // for timing
+  BgTimeLine *timelines;
 
 public:
   nodeInfo(): udata(NULL), started(0) {
@@ -134,6 +138,8 @@ public:
     threadTable = new CthThread[cva(numWth)+cva(numCth)];
 
     affinityQ = new ckMsgQueue[cva(numWth)];
+
+    timelines = new BgTimeLine[cva(numWth)];
   }
 
   ~nodeInfo() {
@@ -156,7 +162,7 @@ class threadInfo {
 public:
   short id;
 //  int globalId;
-  ThreadType  type;
+  ThreadType  type;		/* worker or communication thread */
   CthThread me;			/* Converse thread handler */
   nodeInfo *myNode;		/* the node belonged to */
   double  currTime;		/* thread timer */
@@ -338,7 +344,7 @@ static double MSGTIME(int ox, int oy, int oz, int nx, int ny, int nz)
   int ncorners = 2;
   ncorners -= (xd?0:1 + yd?0:1 + zd?0:1);
   ncorners = (ncorners<0)?0:ncorners;
-  return (ncorners*CYCLES_PER_CORNER + (xd+yd+zd)*CYCLES_PER_HOP)*CYCLE_TIME_FACTOR;
+  return (ncorners*CYCLES_PER_CORNER + (xd+yd+zd)*CYCLES_PER_HOP)*CYCLE_TIME_FACTOR*1E-6;
 }
 
 /* send will copy data to msg buffer */
@@ -352,6 +358,9 @@ void sendPacket_(int x, int y, int z, int threadID, int handlerID, WorkType type
   CmiBgMsgType(sendmsg) = type;
   CmiBgMsgLength(sendmsg) = numbytes;
   CmiBgMsgRecvTime(sendmsg) = MSGTIME(tMYX, tMYY, tMYZ, x,y,z) + BgGetTime();
+
+  // timing
+  BG_ADDMSG(sendmsg);
 
   if (local)
     addBgNodeInbuffer(sendmsg, tMYNODEID);
@@ -588,6 +597,9 @@ static void ProcessMessage(char *msg)
   }
 #endif
   CmiSetHandler(msg, CmiBgMsgHandle(msg));
+  // timing
+  BG_ADDENTRY(msg);
+
   BnvAccess(handlerTable)[handler](msg);
 }
 
@@ -776,6 +788,8 @@ CmiStartFn bgMain(int argc, char **argv)
 
   /* check if all bluegene node size and thread information are set */
   BGARGSCHECK;
+
+  BgInitTiming();		// timing module
 
   bgSize = cva(numX)*cva(numY)*cva(numZ);
 
