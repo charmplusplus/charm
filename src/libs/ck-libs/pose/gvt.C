@@ -41,7 +41,8 @@ void PVT::startPhase()
   objs.Wake(); // wake objects to make sure all have reported
   // compute PVT
   optPVT = conPVT = POSE_UnsetTS;
-  for (i=0; i<objs.getNumSpaces(); i++)
+  int end = objs.getNumSpaces();
+  for (i=0; i<end; i++)
     if (objs.objs[i].isPresent()) {
       if (objs.objs[i].isOptimistic()) { // check optPVT 
 	if ((optPVT < 0) || ((objs.objs[i].getOVT() < optPVT) && 
@@ -99,12 +100,12 @@ void PVT::setGVT(GVTMsg *m)
   localStats->TimerStart(GVT_TIMER);
 #endif
   CProxy_PVT p(ThePVT);
+  p[CkMyPe()].startPhase();
   estGVT = m->estGVT;
   simdone = m->done;
   CkFreeMsg(m);
   waitForFirst = 1;
   objs.Commit();
-  p[CkMyPe()].startPhase();
 #ifdef POSE_STATS_ON
   localStats->TimerStop();
 #endif

@@ -21,6 +21,6 @@ module gvt {
   group GVT {
     entry GVT(void);
     entry void runGVT(UpdateMsg *);
-    entry [expedited] void computeGVT(UpdateMsg *);
+    entry void computeGVT(UpdateMsg *);
   };
 };
