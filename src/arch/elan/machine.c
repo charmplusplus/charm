@@ -907,8 +907,9 @@ void CmiFreeBroadcastAllFn(int size, char *msg)  /* All including me */
 
 void ConverseExit(void)
 {
-  while(!CmiAllAsyncMsgsSent()) {
+  while(!CmiAllAsyncMsgsSent() || cur_unsent ) {
     PumpMsgs(0);
+    ElanSendQueuedMessages();
     CmiReleaseSentMessages();
   }
 
