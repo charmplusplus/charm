@@ -947,13 +947,7 @@ static size_t __libc_pagesize;
 #undef malloc_getpagesize
 #define malloc_getpagesize __libc_pagesize
 
-#else /* _LIBC */
-
-#if __STD_C
-extern Void_t*     sbrk(ptrdiff_t);
-#else
-extern Void_t*     sbrk();
-#endif
+#else /* not _LIBC */
 
 #ifndef MORECORE
 #define MORECORE sbrk
