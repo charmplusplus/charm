@@ -268,12 +268,12 @@ stat:	typeDefinition[null]
                         String i0 = e.getStr("n01");  String iFinal = e.getStr("n11"); String iDelta = "1"; // @@
                         String iOP = e.getStr("OP1");
                         if (!iOP.equalsIgnoreCase("<="))
-                            J.fatalError(fo, "strip-mining only supports <= in for-condition");
+                            J.fatalError(fo, "strip-mining only supports <= in for-condition outer loop. "+iOP);
                         String j = e.getStr("i2");
                         String j0 = e.getStr("n02");  String jFinal = e.getStr("n12"); String jDelta = "1"; // @@
                         String jOP = e.getStr("OP2");
                         if (!jOP.equalsIgnoreCase("<="))
-                            J.fatalError(fo, "strip-mining only supports <= in for-condition");
+                            J.fatalError(fo, "strip-mining only supports <= in for-condition inner loop. "+jOP);
                         String arr = e.getStr("arr");
                         String arrType = "double"; // @@ hardcoded
 
@@ -282,21 +282,21 @@ stat:	typeDefinition[null]
 
                         s.append("{\n");
                         s.append("int accessMode=-1; int accessPattern=-1;\n");
-                        s.append("int COLS="+arr+".getCols();\n");
+                        s.append("int MAJOR_SIZE=("+arr+".getArrayLayout() == MSA_ROW_MAJOR)?"+arr+".getCols():"+arr+".getRows();\n");
                         s.append("int numEntriesPerPage="+arr+".getNumEntriesPerPage();\n");
                         s.append("int i0="+i0+"; int iFinal="+iFinal+"; int iDelta="+iDelta+";\n");
                         s.append("int j0="+j0+"; int jFinal="+jFinal+"; int jDelta="+jDelta+";\n");
                         s.append("\n");
                         s.append("int _i = i0; int _j = j0;\n");
                         s.append("do {\n");
-                        s.append("int index = _i * COLS + _j;\n");
+                        s.append("int index = ("+arr+".getArrayLayout() == MSA_ROW_MAJOR)?"+arr+".getIndex(_i,_j):"+arr+".getIndex(_j,_i);\n"); // @@ should be accessPattern
                         s.append("int indexSt = (index/numEntriesPerPage)*numEntriesPerPage;\n");
                         s.append(arrType+" pi = addressof("+arr+".getPageBottom(index,Write_Fault));\n"); // @@ pointer, addressof, accessMode
                         s.append("int indexEnd = indexSt + numEntriesPerPage -1;\n");
-                        s.append("int iSt = indexSt/COLS;\n");
-                        s.append("int iN = indexEnd/COLS;\n");
-                        s.append("int jSt= indexSt % COLS;\n");
-                        s.append("int jN= indexEnd % COLS;\n");
+                        s.append("int iSt = indexSt/MAJOR_SIZE;\n");
+                        s.append("int iN = indexEnd/MAJOR_SIZE;\n");
+                        s.append("int jSt= indexSt % MAJOR_SIZE;\n");
+                        s.append("int jN= indexEnd % MAJOR_SIZE;\n");
                         s.append("\n");
                         s.append("for (; _i"+iOP+"_JADE_MIN(iFinal, iN); _i+="+iDelta+") {\n");
                         s.append("int jEnd;\n");
@@ -304,7 +304,7 @@ stat:	typeDefinition[null]
                         s.append("if (_j>jFinal) _j = j0;\n");
                         s.append("\n");
                         s.append("for(; _j"+jOP+"jEnd; _j+=jDelta) {\n");
-                        s.append(arrType+" newname = addressof(pi[((_i-iSt)*COLS+_j-jSt)]);\n"); // @@ pointer, addressof
+                        s.append(arrType+" newname = addressof(pi[((_i-iSt)*MAJOR_SIZE+_j-jSt)]);\n"); // @@ pointer, addressof
                         s.append(i+"=_i;"+j+"=_j;\n");
                         s.append("{ body |= body; }\n"); // body of user loop
                         s.append("}\n");
@@ -333,8 +333,9 @@ stat:	typeDefinition[null]
                         if (true) {
                         // Prepare the new strip-mined code
                         ASTJ newCode = J.parseString(s.toString());
-                            newCode.setVerboseStringConversion(true, getTokenNames());
+                        newCode.setVerboseStringConversion(true, getTokenNames());
                         System.out.println(newCode.toStringTree(0));
+                        newCode.setVerboseStringConversion(false, null);
 
                         // Find the body of the original code
                         // For a two-level loop, we skip the inner loop
