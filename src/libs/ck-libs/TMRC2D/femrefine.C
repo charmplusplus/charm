@@ -7,6 +7,11 @@
 #include "ckhashtable.h"
 #include <assert.h>
 
+
+//#define DEBUGINT(x) x
+#define DEBUGINT(x) 
+
+
 class intdual{
 	private:
 		int x,y;
@@ -103,12 +108,12 @@ void FEM_REFINE2D_Split(int meshID,int nodeID,double *coord,int elemID,double *d
 /*	for(int k=0;k<nnodes;k++){
 		printf(" node %d ( %.6f %.6f )\n",k,coord[2*k+0],coord[2*k+1]);
 	}*/
-	printf("%d %d \n",nnodes,nelems);	
+	DEBUGINT(printf("%d %d \n",nnodes,nelems));	
 	REFINE2D_Split(nnodes,coord,nelems,desiredAreas);
 	
   
 	int nSplits=REFINE2D_Get_Split_Length();
-	printf("called REFINE2D_Split nSplits = %d \n",nSplits);
+	DEBUGINT(printf("called REFINE2D_Split nSplits = %d \n",nSplits));
 
 	if(nSplits == 0){
 		return;
@@ -187,7 +192,7 @@ void FEM_REFINE2D_Split(int meshID,int nodeID,double *coord,int elemID,double *d
 		if((flags & 0x1) || (flags & 0x2)){
 			//new node 
 			D = cur_nodes;
-      CkPrintf("---- Adding node %d\n",D);					
+      DEBUGINT(CkPrintf("---- Adding node %d\n",D));			
 		/*	lastA=A;
 			lastB=B;
 			lastD=D;*/
@@ -278,22 +283,22 @@ void FEM_REFINE2D_Split(int meshID,int nodeID,double *coord,int elemID,double *d
 		//add a new triangle
 		/*TODO: replace  FEM_ELEM with parameter*/
 		int newTri =  FEM_Mesh_get_length(meshID,elemID);
-    CkPrintf("---- Adding triangle %d after splitting %d \n",newTri,tri);
+    DEBUGINT(CkPrintf("---- Adding triangle %d after splitting %d \n",newTri,tri));
 		elem->setLength(newTri+1);
 		D = newnodes.get(intdual(A,B));
 		for(int j=0;j<elemattrs->size();j++){
 			if((*elemattrs)[j]->getAttr() == FEM_CONN){
-				CkPrintf("elem attr conn code %d \n",(*elemattrs)[j]->getAttr());
+				DEBUGINT(CkPrintf("elem attr conn code %d \n",(*elemattrs)[j]->getAttr()));
 				//it is a connectivity attribute.. get the connectivity right
 				FEM_IndexAttribute *connAttr = (FEM_IndexAttribute *)(*elemattrs)[j];
 				AllocTable2d<int> &table = connAttr->get();
-				CkPrintf("Table of connectivity attribute starts at %p width %d \n",table[0],connAttr->getWidth());
+				DEBUGINT(CkPrintf("Table of connectivity attribute starts at %p width %d \n",table[0],connAttr->getWidth()));
 				int *oldRow = table[tri];
 				int *newRow = table[newTri];
 				for (int i=0;i<3;i++){
 		      if (oldRow[i]==A){
 						oldRow[i]=D;	
-						CkPrintf("In triangle %d %d replaced by %d \n",tri,A,D);
+						DEBUGINT(CkPrintf("In triangle %d %d replaced by %d \n",tri,A,D));
 					}
 				}	
 				for (int i=0; i<3; i++) {
@@ -307,7 +312,7 @@ void FEM_REFINE2D_Split(int meshID,int nodeID,double *coord,int elemID,double *d
 						newRow[i] = A;
 					}	
    			}
-				CkPrintf("New Triangle %d  (%d %d %d) conn %p\n",newTri,newRow[0],newRow[1],newRow[2],newRow);
+				DEBUGINT(CkPrintf("New Triangle %d  (%d %d %d) conn %p\n",newTri,newRow[0],newRow[1],newRow[2],newRow));
 			}else{
 				FEM_Attribute *elattr = (FEM_Attribute *)(*elemattrs)[j];
 				if(elattr->getAttr() < FEM_ATTRIB_FIRST){ 
@@ -340,7 +345,7 @@ void FEM_REFINE2D_Split(int meshID,int nodeID,double *coord,int elemID,double *d
 		}
 		
 	}
-	printf("Cordinate list length %d \n",coordVec.size()/2);
+	DEBUGINT(printf("Cordinate list length %d \n",coordVec.size()/2));
 	IDXL_Sort_2d(FEM_Comm_shared(meshID,nodeID),coordVec.getVec());
 	int read = FEM_Mesh_is_get(meshID) ;
 	assert(read);
@@ -416,7 +421,7 @@ void FEM_REFINE2D_Coarsen(int meshID,int nodeID,double *coord,int elemID,double 
 		}
 	}
 
-	printf("coarsen %d %d \n",nodeCount,elemCount);	
+	DEBUGINT(printf("coarsen %d %d \n",nodeCount,elemCount));	
 	REFINE2D_Coarsen(nodeCount,coord,elemCount,desiredAreas);
 	int nCollapses = REFINE2D_Get_Collapse_Length();
 
@@ -442,7 +447,7 @@ void FEM_REFINE2D_Coarsen(int meshID,int nodeID,double *coord,int elemID,double 
 					coord[2*nodeToKeep] = operation.data.cdata.newX;
 					coord[2*nodeToKeep+1] = operation.data.cdata.newY;
 					validNodeData[nodeToThrow] = 0;
-					printf("---------Collapse <%d,%d> invalidating node %d \n",nodeToKeep,nodeToThrow,nodeToThrow);
+					DEBUGINT(printf("---------Collapse <%d,%d> invalidating node %d \n",nodeToKeep,nodeToThrow,nodeToThrow));
 				}
 				validElemData[tri] = 0;
 				connData[3*tri] = connData[3*tri+1] = connData[3*tri+2] = -1;
@@ -452,7 +457,7 @@ void FEM_REFINE2D_Coarsen(int meshID,int nodeID,double *coord,int elemID,double 
 					coord[2*(operation.data.udata.nodeID)] = operation.data.udata.newX;
 					coord[2*(operation.data.udata.nodeID)+1] = operation.data.udata.newY;
 				}else{
-					printf("[%d] WEIRD -- update operation for invalid node %d \n",CkMyPe(),operation.data.udata.nodeID);
+					DEBUGINT(printf("[%d] WEIRD -- update operation for invalid node %d \n",CkMyPe(),operation.data.udata.nodeID));
 				}
 				break;
 			case REPLACE:
@@ -463,15 +468,15 @@ void FEM_REFINE2D_Coarsen(int meshID,int nodeID,double *coord,int elemID,double 
 							validNodeData[operation.data.rddata.oldNodeID]=0;
 						}
 					}else{
-						printf("[%d] WEIRD -- REPLACE operation for element %d specifies different node number %d \n",CkMyPe(),operation.data.rddata.elemID,operation.data.rddata.oldNodeID);
+						DEBUGINT(printf("[%d] WEIRD -- REPLACE operation for element %d specifies different node number %d \n",CkMyPe(),operation.data.rddata.elemID,operation.data.rddata.oldNodeID));
 					}
 				}else{
-						printf("[%d] WEIRD -- REPLACE operation for invalid element %d \n",CkMyPe(),operation.data.rddata.elemID);
+						DEBUGINT(printf("[%d] WEIRD -- REPLACE operation for invalid element %d \n",CkMyPe(),operation.data.rddata.elemID));
 				}
-				printf("---------Replace invalidating node %d with %d in element %d\n",operation.data.rddata.oldNodeID,operation.data.rddata.newNodeID,operation.data.rddata.elemID);
+				DEBUGINT(printf("---------Replace invalidating node %d with %d in element %d\n",operation.data.rddata.oldNodeID,operation.data.rddata.newNodeID,operation.data.rddata.elemID));
 				break;
 				default:
-					printf("[%d] WEIRD -- COARSENDATA type == invalid \n",CkMyPe());
+					DEBUGINT(printf("[%d] WEIRD -- COARSENDATA type == invalid \n",CkMyPe()));
 					CmiAbort("COARSENDATA type == invalid");
 		}
 	/*	int tri,nodeToThrow,nodeToKeep,flag,idxbase;

@@ -43,7 +43,7 @@ void chunk::addRemoteEdge(int elem, int localEdge, edgeRef er)
       (theElements[elem].edges[localEdge].idx > -1))
     CkPrintf("TMRC2D: [%d] WARNING: addRemoteEdge replacing non-null edgeRef!\n", cid);
   theElements[elem].set(localEdge, er);
-  CkPrintf("TMRC2D: [%d] addRemoteEdge on element %d", cid, elem);
+  DEBUGREF(CkPrintf("TMRC2D: [%d] addRemoteEdge on element %d", cid, elem);)
   edgesRecvd++;
   releaseLock();
 }
@@ -113,15 +113,15 @@ void chunk::coarseningElements()
 	   (theElements[i].getArea() == 0.0))) {
 	// element i has higher target area or no area -- needs coarsening
 	cCount++;
-	CkPrintf("TMRC2D: [%d] Coarsen element %d: area=%f target=%f\n", cid, 
-		 i, theElements[i].getArea(), theElements[i].getTargetArea());
+	DEBUGREF(CkPrintf("TMRC2D: [%d] Coarsen element %d: area=%f target=%f\n", cid, 
+		 i, theElements[i].getArea(), theElements[i].getTargetArea());)
 	modified = 1; // something's bound to change
 	theElements[i].coarsen(); // coarsen the element
       }
       i++;
     }
-    CkPrintf("TMRC2D: [%d] ||||| %d elems out of %d need coarsening ||||\n", 
-	     cid, cCount, elementSlots);
+    DEBUGREF(CkPrintf("TMRC2D: [%d] ||||| %d elems out of %d need coarsening ||||\n", 
+	     cid, cCount, elementSlots);)
     CthYield(); // give other chunks on the same PE a chance
   }
   coarsenInProgress = 0;  // turn coarsen loop off
@@ -165,7 +165,7 @@ splitOutMsg *chunk::collapse(int idx, elemRef e, node kn, node dn,
 
 void chunk::collapseHelp(int idx, edgeRef er, node n1, node n2)
 {
-  CkPrintf("TMRC2D: [%d] WARNING! chunk::collapseHelp called but not implemented!\n", cid);
+  DEBUGREF(CkPrintf("TMRC2D: [%d] WARNING! chunk::collapseHelp called but not implemented!\n", cid);)
   //  theElements[idx].collapseHelp(er, n1, n2);
 }
 
@@ -221,8 +221,8 @@ void chunk::nodeUpdate(node n, node newNode)
       theNodes[i].boundary = newNode.boundary;
       theNodes[i].unlock();
       theClient->nodeUpdate(i, newNode.X(), newNode.Y());
-      CkPrintf("TMRC2D: [%d] theClient->nodeUpdate(%d, %2.10f, %2.10f\n", cid, 
-	       i, newNode.X(), newNode.Y());
+      DEBUGREF(CkPrintf("TMRC2D: [%d] theClient->nodeUpdate(%d, %2.10f, %2.10f\n", cid, 
+	       i, newNode.X(), newNode.Y());)
       break;
     }
   }
@@ -256,8 +256,8 @@ void chunk::nodeDelete(node n, node ndReplace)
     theNodes[nIdx].boundary = ndReplace.boundary;
     theNodes[nIdx].unlock();
     theClient->nodeUpdate(nIdx, ndReplace.X(), ndReplace.Y());
-    CkPrintf("TMRC2D: [%d] theClient->nodeUpdate(%d, %2.10f, %2.10f\n", cid, 
-	     nIdx, ndReplace.X(), ndReplace.Y());
+    DEBUGREF(CkPrintf("TMRC2D: [%d] theClient->nodeUpdate(%d, %2.10f, %2.10f\n", cid, 
+	     nIdx, ndReplace.X(), ndReplace.Y());)
   }
   else {
     removeNode(nIdx);
@@ -268,8 +268,8 @@ void chunk::nodeDelete(node n, node ndReplace)
 	  if (theElements[j].nodes[k] == nIdx) {
 	    theElements[j].nodes[k] = rIdx;
 	    theClient->nodeReplaceDelete(j, k, nIdx, rIdx);
-	    CkPrintf("TMRC2D: [%d]theClient->nodeReplaceDelete(%d, %d, %d, %d\n",
-		     cid, j, k, nIdx, rIdx);
+	    DEBUGREF(CkPrintf("TMRC2D: [%d]theClient->nodeReplaceDelete(%d, %d, %d, %d\n",
+		     cid, j, k, nIdx, rIdx);)
 	  }
 	}
       }
@@ -301,8 +301,8 @@ void chunk::nodeReplaceDelete(node kn, node dn, node nn)
       theNodes[kIdx].set(nn.X(), nn.Y());
       theNodes[kIdx].boundary = nn.boundary;
       theClient->nodeUpdate(kIdx, nn.X(), nn.Y());
-      CkPrintf("TMRC2D: [%d] (a)theClient->nodeUpdate(%d, %2.10f, %2.10f\n", cid, 
-	       kIdx, nn.X(), nn.Y());
+      DEBUGREF(CkPrintf("TMRC2D: [%d] (a)theClient->nodeUpdate(%d, %2.10f, %2.10f\n", cid, 
+	       kIdx, nn.X(), nn.Y());)
     }
     return;
   }
@@ -311,8 +311,8 @@ void chunk::nodeReplaceDelete(node kn, node dn, node nn)
     theNodes[dIdx].boundary = nn.boundary;
     theNodes[dIdx].unlock();
     theClient->nodeUpdate(dIdx, nn.X(), nn.Y());
-    CkPrintf("TMRC2D: [%d] (b)theClient->nodeUpdate(%d, %2.10f, %2.10f\n", cid, 
-	     dIdx, nn.X(), nn.Y());
+    DEBUGREF(CkPrintf("TMRC2D: [%d] (b)theClient->nodeUpdate(%d, %2.10f, %2.10f\n", cid, 
+	     dIdx, nn.X(), nn.Y());)
   }
   else {
     removeNode(dIdx);
@@ -320,16 +320,16 @@ void chunk::nodeReplaceDelete(node kn, node dn, node nn)
     theNodes[kIdx].set(nn.X(), nn.Y());
     theNodes[kIdx].boundary = nn.boundary;
     theClient->nodeUpdate(kIdx, nn.X(), nn.Y());
-    CkPrintf("TMRC2D: [%d] (c)theClient->nodeUpdate(%d, %2.10f, %2.10f\n", cid, 
-	     kIdx, nn.X(), nn.Y());
+    DEBUGREF(CkPrintf("TMRC2D: [%d] (c)theClient->nodeUpdate(%d, %2.10f, %2.10f\n", cid, 
+	     kIdx, nn.X(), nn.Y());)
     for (int j=0; j<elementSlots; j++) {
       if (theElements[j].isPresent()) {
 	for (int k=0; k<3; k++) {
 	  if (theElements[j].nodes[k] == dIdx) {
 	    theElements[j].nodes[k] = kIdx;
 	    theClient->nodeReplaceDelete(j, k, dIdx, kIdx);
-	    CkPrintf("TMRC2D: [%d]theClient->nodeReplaceDelete(%d, %d, %d, %d\n",
-		     cid, j, k, dIdx, kIdx);
+	    DEBUGREF(CkPrintf("TMRC2D: [%d]theClient->nodeReplaceDelete(%d, %d, %d, %d\n",
+		     cid, j, k, dIdx, kIdx);)
 	  }
 	}
       }
@@ -389,7 +389,7 @@ void chunk::updateElementEdge(int idx, objRef oldval, objRef newval)
 
 void chunk::updateReferences(int idx, objRef oldval, objRef newval)
 {
-  CkPrintf("TMRC2D: [%d] WARNING! chunk::updateReferences called but not implemented!\n", cid);
+  DEBUGREF(CkPrintf("TMRC2D: [%d] WARNING! chunk::updateReferences called but not implemented!\n", cid);)
   /*
   int i;
   nodeRef ov, nv;
@@ -515,7 +515,7 @@ void chunk::adjustMesh()
   if (sizeElements <= elementSlots+100) {
     adjustFlag();
     adjustLock();
-    CkPrintf("TMRC2D: [%d] Adjusting mesh size...\n", cid);
+    DEBUGREF(CkPrintf("TMRC2D: [%d] Adjusting mesh size...\n", cid);)
     sizeElements += 100;
     sizeEdges += 300;
     sizeNodes += 300;
@@ -528,7 +528,7 @@ void chunk::adjustMesh()
       theNodes[i].present = 0;
     for (i=edgeSlots; i<sizeEdges; i++)
       theEdges[i].present = 0;
-    CkPrintf("TMRC2D: [%d] Done adjusting mesh size...\n", cid);
+    DEBUGREF(CkPrintf("TMRC2D: [%d] Done adjusting mesh size...\n", cid);)
     adjustRelease();
   }
 }
@@ -548,7 +548,7 @@ intMsg *chunk::addNode(node n)
 
 edgeRef chunk::addEdge()
 {
-  CkPrintf("TMRC2D: [%d] Adding edge %d\n", cid, numEdges);
+  DEBUGREF(CkPrintf("TMRC2D: [%d] Adding edge %d\n", cid, numEdges);)
   edgeRef eRef(cid, firstFreeEdge);
   theEdges[firstFreeEdge].set(firstFreeEdge, cid, this);
   theEdges[firstFreeEdge].reset();
@@ -580,8 +580,8 @@ elemRef chunk::addElement(int n1, int n2, int n3)
 elemRef chunk::addElement(int n1, int n2, int n3,
 			  edgeRef er1, edgeRef er2, edgeRef er3)
 {
-  CkPrintf("TMRC2D: [%d] New element %d added with nodes %d, %d and %d\n", 
-	   cid, firstFreeElement, n1, n2, n3);
+  DEBUGREF(CkPrintf("TMRC2D: [%d] New element %d added with nodes %d, %d and %d\n", 
+	   cid, firstFreeElement, n1, n2, n3);)
   elemRef eRef(cid, firstFreeElement);
   theElements[firstFreeElement].set(cid, firstFreeElement, this);
   theElements[firstFreeElement].set(n1, n2, n3, er1, er2, er3);
@@ -600,7 +600,7 @@ elemRef chunk::addElement(int n1, int n2, int n3,
 
 void chunk::removeNode(int n)
 {
-  CkPrintf("TMRC2D: [%d] Removing node %d\n", cid, n);
+  DEBUGREF(CkPrintf("TMRC2D: [%d] Removing node %d\n", cid, n);)
   if (theNodes[n].present) {
     theNodes[n].present = 0;
     theNodes[n].reset();
@@ -614,7 +614,7 @@ void chunk::removeNode(int n)
 
 void chunk::removeEdge(int n)
 {
-  CkPrintf("TMRC2D: [%d] Removing edge %d\n", cid, n);
+  DEBUGREF(CkPrintf("TMRC2D: [%d] Removing edge %d\n", cid, n);)
   if (theEdges[n].present) {
     theEdges[n].present = 0;
     theEdges[n].reset();
@@ -624,12 +624,14 @@ void chunk::removeEdge(int n)
     }
     numEdges--;
   }
-  else CkPrintf("TMRC2D: [%d] WARNING: chunk::removeEdge(%d): edge not present\n", cid, n);
+  else{
+		DEBUGREF(CkPrintf("TMRC2D: [%d] WARNING: chunk::removeEdge(%d): edge not present\n", cid, n);)
+	}	
 }
 
 void chunk::removeElement(int n)
 {
-  CkPrintf("TMRC2D: [%d] Removing element %d\n", cid, n);
+  DEBUGREF(CkPrintf("TMRC2D: [%d] Removing element %d\n", cid, n);)
   if (theElements[n].present) {
     theElements[n].present = 0;
     theElements[n].clear();
@@ -639,7 +641,9 @@ void chunk::removeElement(int n)
     }
     numElements--;
   }
-  else CkPrintf("TMRC2D: [%d] WARNING: chunk::removeElement(%d): element not present\n", cid, n);
+  else{
+		DEBUGREF(CkPrintf("TMRC2D: [%d] WARNING: chunk::removeElement(%d): element not present\n", cid, n);)
+	}	
 }
 
 // these two functions produce debugging output by printing somewhat
@@ -717,16 +721,22 @@ void chunk::out_print()
 void chunk::updateNodeCoords(int nNode, double *coord, int nEl)
 {
   int i;
-  CkPrintf("TMRC2D: [%d] updateNodeCoords: edges sent=%d edge recvd=%d\n", 
-	   cid, edgesSent, edgesRecvd);
+  DEBUGREF(CkPrintf("TMRC2D: [%d] updateNodeCoords...\n", cid);)
+  if (first) {
+    CkWaitQD();
+    first = 0;
+  }
+  DEBUGREF(CkPrintf("TMRC2D: [%d] In updateNodeCoords after CkWaitQD: edges sent=%d edge recvd=%d\n", cid, edgesSent, edgesRecvd);)
   sanityCheck(); // quietly make sure mesh is in shape
   // do some error checking
   //CkAssert(nEl == numElements);
-  if (nEl != numElements) 
-    CkPrintf("TMRC2D: [%d] WARNING: nEl=%d passed in updateNodeCoords does not match TMRC2D numElements=%d!\n", cid, nEl, numElements);
+  if (nEl != numElements) {
+    DEBUGREF(CkPrintf("TMRC2D: [%d] WARNING: nEl=%d passed in updateNodeCoords does not match TMRC2D numElements=%d!\n", cid, nEl, numElements);)
+	}
   //CkAssert(nNode == numNodes);
-  if (nNode != numNodes) 
-    CkPrintf("TMRC2D: [%d] WARNING: nNode=%d passed in updateNodeCoords does not match TMRC2D numNodes=%d!\n", cid, nNode, numNodes);
+  if (nNode != numNodes){
+    DEBUGREF(CkPrintf("TMRC2D: [%d] WARNING: nNode=%d passed in updateNodeCoords does not match TMRC2D numNodes=%d!\n", cid, nNode, numNodes);)
+	}	
   // update node coordinates from coord
   for (i=0; i<nodeSlots; i++)
     if (theNodes[i].isPresent()) {
@@ -737,13 +747,13 @@ void chunk::updateNodeCoords(int nNode, double *coord, int nEl)
   // recalculate and cache new areas for each element
   for (i=0; i<elementSlots; i++) 
     if (theElements[i].isPresent())  theElements[i].calculateArea();
-  CkPrintf("TMRC2D: [%d] updateNodeCoords DONE.\n", cid);
+  DEBUGREF(CkPrintf("TMRC2D: [%d] updateNodeCoords DONE.\n", cid);)
 }
 
 void chunk::multipleRefine(double *desiredArea, refineClient *client)
 {
   int i;
-  CkPrintf("TMRC2D: [%d] multipleRefine....\n", cid);
+  DEBUGREF(CkPrintf("TMRC2D: [%d] multipleRefine....\n", cid);)
   theClient = client; // initialize refine client associated with this chunk
   //Uncomment this dump call to see TMRC2D's mesh config
   //dump();
@@ -758,7 +768,7 @@ void chunk::multipleRefine(double *desiredArea, refineClient *client)
    refineInProgress = 1;
    mesh[cid].refiningElements();
   }
-  CkPrintf("TMRC2D: [%d] multipleRefine DONE.\n", cid);
+  DEBUGREF(CkPrintf("TMRC2D: [%d] multipleRefine DONE.\n", cid);)
   CkWaitQD();
 }
 
@@ -766,7 +776,7 @@ void chunk::multipleCoarsen(double *desiredArea, refineClient *client)
 {
   int i;
   double precThrshld, area;
-  CkPrintf("TMRC2D: [%d] multipleCoarsen....\n", cid);
+  DEBUGREF(CkPrintf("TMRC2D: [%d] multipleCoarsen....\n", cid);)
   theClient = client; // initialize refine client associated with this chunk
   //Uncomment this dump call to see TMRC2D's mesh config
   //dump();
@@ -777,7 +787,7 @@ void chunk::multipleCoarsen(double *desiredArea, refineClient *client)
     if ((theElements[i].isPresent()) &&
 	(desiredArea[i] > area+precThrshld)) {
       theElements[i].resetTargetArea(desiredArea[i]);
-      CkPrintf("TMRC2D: [%d] Setting target on element %d to %1.10e\n", cid, i, desiredArea[i]);
+      DEBUGREF(CkPrintf("TMRC2D: [%d] Setting target on element %d to %1.10e\n", cid, i, desiredArea[i]);)
     }
   }
 
@@ -787,7 +797,7 @@ void chunk::multipleCoarsen(double *desiredArea, refineClient *client)
    coarsenInProgress = 1;
    mesh[cid].coarseningElements();
   }
-  CkPrintf("TMRC2D: [%d] multipleCoarsen DONE.\n", cid);
+  DEBUGREF(CkPrintf("TMRC2D: [%d] multipleCoarsen DONE.\n", cid);)
   CkWaitQD();
 }
 
@@ -795,7 +805,7 @@ void chunk::newMesh(int nEl, int nGhost, const int *conn_, const int *gid_,
 		    int nnodes, const int *boundaries, int idxOffset)
 {
   int i, j;
-  CkPrintf("TMRC2D: [%d] In newMesh...\n", cid);
+  DEBUGREF(CkPrintf("TMRC2D: [%d] In newMesh...\n", cid);)
   numElements=nEl;
   numGhosts = nGhost;
   allocMesh(nEl);
@@ -840,8 +850,8 @@ void chunk::newMesh(int nEl, int nGhost, const int *conn_, const int *gid_,
   }
   delete[] conn;
   delete[] gid;
-  CkPrintf("TMRC2D: [%d] newMesh DONE; chunk created with %d elements.\n", 
-	   cid, numElements);
+  DEBUGREF(CkPrintf("TMRC2D: [%d] newMesh DONE; chunk created with %d elements.\n", 
+	   cid, numElements);)
 }
 
 void chunk::deriveEdges(int *conn, int *gid)
@@ -852,9 +862,9 @@ void chunk::deriveEdges(int *conn, int *gid)
   edgeRef newEdge;
 
   deriveNodes(); // now numNodes and theNodes have values
-  CkPrintf("TMRC2D: [%d] Deriving edges...\n", cid);
+  DEBUGREF(CkPrintf("TMRC2D: [%d] Deriving edges...\n", cid);)
   for (i=0; i<elementSlots; i++) {
-    CkPrintf("TMRC2D: [%d] Deriving edges for element %d...\n", cid, i);
+    DEBUGREF(CkPrintf("TMRC2D: [%d] Deriving edges for element %d...\n", cid, i);)
     elemRef myRef(cid,i);
     for (j=0; j<3; j++) {
       n1localIdx = j;
@@ -898,7 +908,7 @@ void chunk::deriveEdges(int *conn, int *gid)
   firstFreeNode = numNodes;
   edgeSlots = numEdges;
   firstFreeEdge = numEdges;
-  CkPrintf("TMRC2D: [%d] Done deriving edges...\n", cid);
+  DEBUGREF(CkPrintf("TMRC2D: [%d] Done deriving edges...\n", cid);)
 }
 
 void chunk::deriveNodes()
@@ -906,7 +916,7 @@ void chunk::deriveNodes()
   int i, j;
   int aNode;
 
-  CkPrintf("TMRC2D: [%d] Deriving nodes...\n", cid);
+  DEBUGREF(CkPrintf("TMRC2D: [%d] Deriving nodes...\n", cid);)
   numNodes = 0;
   for (i=0; i<elementSlots; i++) {
     for (j=0; j<3; j++) {
@@ -918,8 +928,8 @@ void chunk::deriveNodes()
       theNodes[aNode].boundary = 0;
     }
   }
-  CkPrintf("TMRC2D: [%d] NumNodes = %d; max node idx = %d\n", cid, numNodes, numNodes-1);
-  CkPrintf("TMRC2D: [%d] Done deriving nodes.\n", cid);
+  DEBUGREF(CkPrintf("TMRC2D: [%d] NumNodes = %d; max node idx = %d\n", cid, numNodes, numNodes-1);)
+  DEBUGREF(CkPrintf("TMRC2D: [%d] Done deriving nodes.\n", cid);)
 }
 
 int chunk::edgeLocal(elemRef e1, elemRef e2)
@@ -960,22 +970,22 @@ void chunk::deriveBoundaries(int *conn, int *gid)
 {
   int edgeIdx;
   elemRef nbrRef;
-  CkPrintf("TMRC2D: [%d] WARNING! Null list of boundary flags passed to newMesh...\n ...I hope you didn't want coarsening to work!\n", cid);
-  CkPrintf("TMRC2D: [%d] WARNING! Attempting to derive single boundary information -- corners will be ignored!\n", cid);
+  DEBUGREF(CkPrintf("TMRC2D: [%d] WARNING! Null list of boundary flags passed to newMesh...\n ...I hope you didn't want coarsening to work!\n", cid);)
+  DEBUGREF(CkPrintf("TMRC2D: [%d] WARNING! Attempting to derive single boundary information -- corners will be ignored!\n", cid);)
   for (int i=0; i<numElements; i++) {
     for (int j=0; j<3; j++) {
       edgeIdx = getNbrRefOnEdge(theElements[i].nodes[j], 
 				theElements[i].nodes[(j+1)%3], 
 				conn, numGhosts, gid, i, &nbrRef); 
-      CkPrintf("TMRC2D: [%d] Neighbor is (%d, %d)\n",
-	       cid,nbrRef.idx,nbrRef.cid);
+      DEBUGREF(CkPrintf("TMRC2D: [%d] Neighbor is (%d, %d)\n",
+	       cid,nbrRef.idx,nbrRef.cid);)
       if ((nbrRef.idx == -1) && (nbrRef.cid == -1)) {
-	CkPrintf("TMRC2D: [%d] Marking node %d as a boundary.\n", cid,
-		 theElements[i].nodes[j] );
+	DEBUGREF(CkPrintf("TMRC2D: [%d] Marking node %d as a boundary.\n", cid,
+		 theElements[i].nodes[j] );)
 	theNodes[theElements[i].nodes[j]].boundary = 1;
 	theNodes[theElements[i].nodes[(j+1)%3]].boundary = 1;
-	CkPrintf("TMRC2D: [%d] Marking node %d as a boundary.\n", cid,
-		 theElements[i].nodes[(j+1)%3] );
+	DEBUGREF(CkPrintf("TMRC2D: [%d] Marking node %d as a boundary.\n", cid,
+		 theElements[i].nodes[(j+1)%3] );)
       }
     }
   }
@@ -983,7 +993,7 @@ void chunk::deriveBoundaries(int *conn, int *gid)
 
 void chunk::tweakMesh()
 {
-  CkPrintf("TMRC2D: [%d] WARNING! chunk::tweakMesh called but not implemented!\n", cid);
+  DEBUGREF(CkPrintf("TMRC2D: [%d] WARNING! chunk::tweakMesh called but not implemented!\n", cid);)
   /*
   for (int i=0; i<numElements; i++) 
     theElements[i].tweakNodes();
@@ -992,7 +1002,7 @@ void chunk::tweakMesh()
 
 void chunk::improveChunk()
 {
-  CkPrintf("TMRC2D: [%d] WARNING! chunk::improveChunk called but not implemented!\n", cid);
+  DEBUGREF(CkPrintf("TMRC2D: [%d] WARNING! chunk::improveChunk called but not implemented!\n", cid);)
   /*
   for (int i=0; i<numNodes; i++) 
     if (!theNodes[i].border) {
@@ -1004,7 +1014,7 @@ void chunk::improveChunk()
 
 void chunk::improve()
 {
-  CkPrintf("TMRC2D: [%d] WARNING! chunk::improve called but not implemented!\n", cid);
+  DEBUGREF(CkPrintf("TMRC2D: [%d] WARNING! chunk::improve called but not implemented!\n", cid);)
   /*
   for (int i=0; i<20; i++) {
     mesh.tweakMesh();
@@ -1015,7 +1025,7 @@ void chunk::improve()
 
 void chunk::sanityCheck(void)
 {
-  CkPrintf("TMRC2D: [%d] running sanity check...\n", cid);
+  DEBUGREF(CkPrintf("TMRC2D: [%d] running sanity check...\n", cid);)
   int i;
   if (numElements<0 || (int)theElements.size()<numElements)
         CkAbort("sc-> TMRC2D: numElements or vector size insane!");
@@ -1041,26 +1051,29 @@ void chunk::sanityCheck(void)
   for (i=0; i<nodeSlots; i++)
     if (theNodes[i].isPresent())
       theNodes[i].sanityCheck(cid, i);
-  CkPrintf("TMRC2D: [%d] sanity check PASSED.\n", cid);
+  DEBUGREF(CkPrintf("TMRC2D: [%d] sanity check PASSED.\n", cid);)
 }
 
 void chunk::dump()
 {
   int i;
-  CkPrintf("TMRC2D: [%d] has %d elements, %d nodes and %d edges:\n", cid, 
-	   numElements, numNodes, numEdges);
+  DEBUGREF(CkPrintf("TMRC2D: [%d] has %d elements, %d nodes and %d edges:\n", cid, 
+	   numElements, numNodes, numEdges);)
   for (i=0; i<elementSlots; i++) 
-    if (theElements[i].isPresent())
-      CkPrintf("TMRC2D: [%d] Element %d nodes %d %d %d edges [%d,%d] [%d,%d] [%d,%d]\n", cid, i, theElements[i].nodes[0], theElements[i].nodes[1], theElements[i].nodes[2], theElements[i].edges[0].cid, theElements[i].edges[0].idx, theElements[i].edges[1].cid, theElements[i].edges[1].idx, theElements[i].edges[2].cid, theElements[i].edges[2].idx);
+    if (theElements[i].isPresent()){
+      DEBUGREF(CkPrintf("TMRC2D: [%d] Element %d nodes %d %d %d edges [%d,%d] [%d,%d] [%d,%d]\n", cid, i, theElements[i].nodes[0], theElements[i].nodes[1], theElements[i].nodes[2], theElements[i].edges[0].cid, theElements[i].edges[0].idx, theElements[i].edges[1].cid, theElements[i].edges[1].idx, theElements[i].edges[2].cid, theElements[i].edges[2].idx);)
+		}	
   for (i=0; i<nodeSlots; i++)
-    if (theNodes[i].isPresent())
-      CkPrintf("TMRC2D: [%d] Node %d has coordinates (%f,%f)\n", cid, i, theNodes[i].X(),
-	       theNodes[i].Y());
+    if (theNodes[i].isPresent()){
+      DEBUGREF(CkPrintf("TMRC2D: [%d] Node %d has coordinates (%f,%f)\n", cid, i, theNodes[i].X(),
+	       theNodes[i].Y());)
+		}		 
   for (i=0; i<edgeSlots; i++)
-    if (theEdges[i].isPresent())
-      CkPrintf("TMRC2D: [%d] Edge %d has elements [%d,%d] and [%d,%d]\n", cid, i, 
+    if (theEdges[i].isPresent()){
+      DEBUGREF(CkPrintf("TMRC2D: [%d] Edge %d has elements [%d,%d] and [%d,%d]\n", cid, i, 
 	       theEdges[i].elements[0].cid, theEdges[i].elements[0].idx, 
-	       theEdges[i].elements[1].cid, theEdges[i].elements[1].idx);
+	       theEdges[i].elements[1].cid, theEdges[i].elements[1].idx);)
+		}		 
 }
 
 #include "refine.def.h"
