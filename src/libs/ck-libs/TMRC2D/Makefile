@@ -2,19 +2,26 @@ OPTS=-g -Wall #-O -DCMK_OPTIMIZE=1 -DCMK_MEMCHECKS_OFF=1
 CHARMDIR=../../../../
 CHARMC=$(CHARMDIR)/bin/charmc $(OPTS)
 
-OBJS=cst_nl.o pgm.o
+OBJS=cst_nl.o pgm.o 
+OBJS1=cst_nl.o pgm-coarsen.o
 
 DEST=$(CHARMDIR)/lib/libmodulerefine.a
 LOBJS=ref.o edge.o element.o tri.o refine.o femrefine.o
 HEADERS=refine.h refinef.h femrefine.h femrefinef.h
 
-all: $(DEST) pgm
+all: $(DEST) pgm coarse
 
 pgm: $(DEST) $(OBJS)
 	$(CHARMC) -L. -o pgm $(OBJS) -language fem -module netfem -module refine -memory paranoid
 
+coarse: $(DEST) $(OBJS1)
+	$(CHARMC) -L. -o coarse $(OBJS1) -language fem -module netfem -module refine -memory paranoid
+
 pgm.o: pgm.C pgm.h
 	$(CHARMC) -c pgm.C
+
+pgm-coarsen.o: pgm-coarsen.C pgm.h
+	$(CHARMC) -c pgm-coarsen.C
 
 cst_nl.o: cst_nl.C pgm.h
 	$(CHARMC) -c cst_nl.C

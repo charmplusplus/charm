@@ -61,12 +61,13 @@ public:
    *   -Update connectivity for source triangle
    *   -Add new triangle DBC.
    */
-  virtual void split(int triNo,int edgeOfTri,int movingNode,double frac) =0;
-  virtual void split(int triNo,int edgeOfTri,int movingNode,double frac,int flag) =0;
-  //  virtual void collapse(int triNo,int edgeOfTri,int movingNode,double frac,int flag) =0;
+  virtual void split(int triNo,int edgeOfTri,int movingNode,double frac) {};
+  virtual void split(int triNo,int edgeOfTri,int movingNode,double frac,int flag) {};
+  virtual void collapse(int elementID,int collapseEdge,int nodeToKeep,double nX,double nY,int flag) {};
 };
 
 class refineResults; //Used by refinement API to store intermediate results
+class coarsenResults; 
 
 // ---------------------------- Chare Arrays -------------------------------
 class chunk : public TCharmClient1D {
@@ -114,6 +115,7 @@ class chunk : public TCharmClient1D {
   int cid, numElements, numEdges, numNodes, numGhosts, numChunks;
 
   refineResults *refineResultsStorage;
+  coarsenResults *coarsenResultsStorage;
 
   // the chunk's components, left public for sanity's sake
   std::vector<element> theElements;

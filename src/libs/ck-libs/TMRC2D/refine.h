@@ -105,6 +105,10 @@ int REFINE2D_Get_Split_Length(void);
 void REFINE2D_Get_Split(int splitNo,const int *conn,
 	int *tri,int *A,int *B,int *C,double *frac,int *flags);
 
+
+void REFINE2D_Coarsen(int nNode,double *coord,int nEl,double *desiredArea);
+
+
 /**
  * Check to make sure our connectivity and the refine connectivity agree.
  */

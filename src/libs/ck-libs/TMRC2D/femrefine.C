@@ -210,3 +210,19 @@ void FEM_REFINE2D_Split(int meshID,int nodeID,double *coord,int elemID,double *d
 FDECL void FTN_NAME(FEM_REFINE2D_SPLIT,fem_refine2d_split)(int *meshID,int *nodeID,double *coord,int *elemID,double *desiredAreas){
 	FEM_REFINE2D_Split(*meshID,*nodeID,coord,*elemID,desiredAreas);
 }
+
+
+
+
+void FEM_REFINE2D_Coarsen(int meshID,int nodeID,double *coord,int elemID,double *desiredAreas){
+	int nnodes = FEM_Mesh_get_length(meshID,nodeID);
+	int nelems = FEM_Mesh_get_length(meshID,elemID);
+
+/*	for(int k=0;k<nnodes;k++){
+		printf(" node %d ( %.6f %.6f )\n",k,coord[2*k+0],coord[2*k+1]);
+	}*/
+	printf("coarsen %d %d \n",nnodes,nelems);	
+	REFINE2D_Coarsen(nnodes,coord,nelems,desiredAreas);
+	
+}  
+

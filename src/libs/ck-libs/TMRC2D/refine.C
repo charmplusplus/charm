@@ -125,6 +125,7 @@ public:
 	}
 };
 
+
 class resultsRefineClient : public refineClient {
   refineResults *res;
 public:
@@ -143,6 +144,22 @@ public:
 
 };
 
+class coarsenResults {
+	int nResults;
+public:
+	coarsenResults(){nResults=0;}
+};
+
+
+class resultsCoarsenClient : public refineClient {
+  coarsenResults *res;
+public:
+  resultsCoarsenClient(coarsenResults *res_) : res(res_){};
+  void collapse(int elementID,int collapseEdge,int nodeToKeep,double nX,double nY,int flag){
+  }
+};
+
+
 // this function should be called from a thread
 CDECL void REFINE2D_Split(int nNode,double *coord,int nEl,double *desiredArea)
 {
@@ -157,6 +174,22 @@ CDECL void REFINE2D_Split(int nNode,double *coord,int nEl,double *desiredArea)
   C->multipleRefine(desiredArea, &client);
   CkWaitQD();
 }
+
+CDECL void REFINE2D_Coarsen(int nNode,double *coord,int nEl,double *desiredArea)
+{
+  TCHARM_API_TRACE("REFINE2D_Coarsen", "coarsen");
+  chunk *C = CtvAccess(_refineChunk);
+  if (!C)
+    CkAbort("REFINE2D_Split failed> Did you forget to call REFINE2D_Attach?");
+  C->coarsenResultsStorage=new coarsenResults;
+  resultsCoarsenClient client(C->coarsenResultsStorage);
+
+  C->updateNodeCoords(nNode, coord, nEl);
+  C->multipleCoarsen(desiredArea, &client);
+  CkWaitQD();
+}
+
+
 FDECL void FTN_NAME(REFINE2D_SPLIT,refine2d_split)
    (int *nNode,double *coord,int *nEl,double *desiredArea)
 {

@@ -44,6 +44,8 @@ void FEM_REFINE2D_Newmesh(int meshID,int nodeID,int elemID);
 
 void FEM_REFINE2D_Split(int meshID,int nodeID,double *coord,int elemID,double *desiredAreas);
 
+void FEM_REFINE2D_Coarsen(int meshID,int nodeID,double *coord,int elemID,double *desiredAreas);
+
 
 #ifdef __cplusplus
 };
