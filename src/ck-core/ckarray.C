@@ -704,6 +704,7 @@ void CkArrayBroadcaster::incoming(CkArrayMessage *msg)
 {
   DEBB((AA"Received broadcast %d\n"AB,bcastNo));
   bcastNo++;
+  CmiMemoryMarkBlock(((char *)UsrToEnv(msg))-sizeof(CmiChunkHeader));
   oldBcasts.enq((CkArrayMessage *)msg);//Stash the message for later use
 }
 
