@@ -8,11 +8,10 @@
 /**
   converse basic message header:
   d0 d1 d2 d3:  DgramHeader
-  d4 d5:        msg length
+  d4 d5:        msg length (32-bit number)
   hdl:          handler
   xhdl:         extended handler
 */
-
 #define DGRAM_HEADER_SIZE 8
 
 #define CmiMsgHeaderSetLength(msg, len) (((int*)(msg))[2] = (len))
@@ -31,12 +30,13 @@
 #define DGRAM_BROADCAST     (0xFE)
 #define DGRAM_ACKNOWLEDGE   (0xFF)
 
-/*typedef struct { char data[DGRAM_HEADER_SIZE]; } DgramHeader;*/
+/* DgramHeader overlays the first 4 fields of the converse CMK_MSG_HEADER_BASIC,
+   defined in conv-common.h.  As such, its size and alignment are critical. */
 typedef struct {
         unsigned int seqno:32;  /* seq number in send window */
         unsigned int srcpe:16;  /* CmiMyPe of the sender */
-        unsigned char dstrank;  /* rank of destination processor */
-        unsigned char magic;    /* Low 8 bits of charmrun PID */
+        unsigned int dstrank:8; /* rank of destination processor */
+        unsigned int magic:8;   /* Low 8 bits of charmrun PID */
 } DgramHeader;
 
 
@@ -120,6 +120,9 @@ static void extract_args(char **argv)
   Cmi_comm_periodic_delay=(int)(1000*Cmi_delay_retransmit);
   if (Cmi_comm_periodic_delay>60) Cmi_comm_periodic_delay=60;
   Cmi_comm_clock_delay=(int)(1000*Cmi_ack_delay);
+  if (sizeof(DgramHeader)!=DGRAM_HEADER_SIZE) {
+    CmiAbort("DatagramHeader in machine-dgram.c is the wrong size!\n");
+  }
 }
 
 /* Compare seqnos using modular arithmetic-- currently unused
