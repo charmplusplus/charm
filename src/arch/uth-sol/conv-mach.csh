@@ -43,3 +43,4 @@ set CMK_SEQ_LDXX='g++'
 set CMK_NM='nm'
 set CMK_NM_FILTER='grep "|GLOB" | sed -e "s@.*|@@"'
 set CMK_CPP_SUFFIX="ii"
+set CMK_XLATPP='charmxlat++ '

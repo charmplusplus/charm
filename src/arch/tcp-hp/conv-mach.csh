@@ -12,7 +12,10 @@
 # REVISION HISTORY:
 #
 # $Log$
-# Revision 2.15  1996-07-02 21:25:22  jyelon
+# Revision 2.16  1996-08-01 21:11:12  jyelon
+# added two options to charmxlat++   -w -p
+#
+# Revision 2.15  1996/07/02 21:25:22  jyelon
 # *** empty log message ***
 #
 # Revision 2.14  1996/04/16 22:45:34  jyelon
@@ -82,3 +85,4 @@ set CMK_SEQ_LDXX='g++'
 set CMK_NM='nm'
 set CMK_NM_FILTER="grep '|extern|' | sed -e 's@ *|.*@@'"
 set CMK_CPP_SUFFIX="ii"
+set CMK_XLATPP='charmxlat++ '

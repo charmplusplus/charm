@@ -43,3 +43,4 @@ set CMK_SEQ_LDXX='CC'
 set CMK_NM='nm'
 set CMK_NM_FILTER="grep '|extern|' | awk '{print "'$'"1;}'"
 set CMK_CPP_SUFFIX="i"
+set CMK_XLATPP='charmxlat++ '

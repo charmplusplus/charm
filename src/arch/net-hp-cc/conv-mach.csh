@@ -12,7 +12,10 @@
 # REVISION HISTORY:
 #
 # $Log$
-# Revision 1.1  1996-04-30 19:51:39  brunner
+# Revision 1.2  1996-08-01 21:11:12  jyelon
+# added two options to charmxlat++   -w -p
+#
+# Revision 1.1  1996/04/30 19:51:39  brunner
 # Initial revision
 #
 #
@@ -47,3 +50,4 @@ set CMK_SEQ_LDXX='CC -D_HPUX_SOURCE '
 set CMK_NM='nm'
 set CMK_NM_FILTER="grep '|extern|' | sed -e 's@ *|.*@@'"
 set CMK_CPP_SUFFIX="ii"
+set CMK_XLATPP='charmxlat++ '

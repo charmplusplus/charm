@@ -43,3 +43,4 @@ set CMK_SEQ_LDXX='CC'
 set CMK_NM='nnm'
 set CMK_NM_FILTER="grep '|GLOB' | colrm 1 56"
 set CMK_CPP_SUFFIX="i"
+set CMK_XLATPP='charmxlat++ '
