@@ -257,6 +257,7 @@ CmiCommHandle CmiAsyncSendFn(int destPE, int size, char *msg)
   while (MsgQueueLen > request_max) {
 	/*printf("Waiting for %d messages to be sent\n", MsgQueueLen);*/
 	CmiReleaseSentMessages();
+	PumpMsgs();
   }
   if (MPI_SUCCESS != MPI_Isend((void *)msg,size,MPI_BYTE,destPE,TAG,MPI_COMM_WORLD,&(msg_tmp->req))) 
     CmiAbort("CmiAsyncSendFn: MPI_Isend failed!\n");
