@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.1  1995-10-27 21:35:54  jyelon
+ * Revision 2.2  1995-10-27 22:09:16  jyelon
+ * Changed Cmi to Ck in all charm files.
+ *
+ * Revision 2.1  1995/10/27  21:35:54  jyelon
  * changed NumPe --> NumPes
  *
  * Revision 2.0  1995/06/29  21:19:36  narain
@@ -148,7 +151,7 @@ entry BranchInit : (message DUMMYMSG * dmsg)
 	CpvAccess(LDB_ELEM_SIZE) = sizeof(LDB_ELEMENT);
 	numPe = CkNumPes();
 	myPE = CkMyPe();
-	numNeighbours = CmiNumNeighbours(myPE);
+	numNeighbours = CkNumNeighbours(myPE);
 	SendingIdleMsg = 0;	
 }
 

@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.1  1995-10-27 21:35:54  jyelon
+ * Revision 2.2  1995-10-27 22:09:16  jyelon
+ * Changed Cmi to Ck in all charm files.
+ *
+ * Revision 2.1  1995/10/27  21:35:54  jyelon
  * changed NumPe --> NumPes
  *
  * Revision 2.0  1995/06/29  21:19:36  narain
@@ -332,14 +335,14 @@ entry BranchInit : (message DUMMYMSG * dmsg)
 	CpvAccess(LdbBocNum) = LdbBoc = MyBocNum();
 	numPe = CkNumPes();
 	myPE = CkMyPe();
-	numNeighbours = CmiNumNeighbours(myPE);
+	numNeighbours = CkNumNeighbours(myPE);
 	lastPeZeroLoadIndex = 0;
 	if (numPe > 1)
 	{
-	    neighboursList = (int *) CmiAlloc( numNeighbours * sizeof(int) );
+	    neighboursList = (int *) CkAlloc( numNeighbours * sizeof(int) );
             CkMemError(neighboursList);
 	    McGetNodeNeighbours(myPE, neighboursList );
-	    statusList = (LDB_STATUS *) CmiAlloc(numNeighbours * sizeof(LDB_STATUS)); 
+	    statusList = (LDB_STATUS *) CkAlloc(numNeighbours * sizeof(LDB_STATUS)); 
             CkMemError(statusList);
 	    PrivateCall(PrintNodeNeighbours());
 

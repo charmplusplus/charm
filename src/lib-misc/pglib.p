@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 1.2  1995-10-27 21:42:06  jyelon
+ * Revision 1.3  1995-10-27 22:09:16  jyelon
+ * Changed Cmi to Ck in all charm files.
+ *
+ * Revision 1.2  1995/10/27  21:42:06  jyelon
  * changed CmiNumPe --> CkNumPes
  *
  * Revision 1.1  1995/06/13  11:32:16  jyelon
@@ -81,7 +84,7 @@ BranchOffice ProcessGroups
 	int i,j,d=0 ;
 
 	CkFreeMsg(pgmsg) ;
-	me = CmiMyPe() ;
+	me = CkMyPe() ;
 	totalBocs = CkNumPes() ;
 
 	/* Set the size of the hash table.  If for some reason the user
@@ -113,7 +116,7 @@ BranchOffice ProcessGroups
 	currGid->groupInfo.spanNumChildren=PrivateCall(PgDefaultSpanTreeNumChildren(me)) ;
 	PrivateCall(PgDefaultSpanTreeChild(me,currGid->groupInfo.spanChildren)) ;
 	currGid->groupInfo.totalGroupSize = CkNumPes() ;
-	currGid->groupInfo.groupRank = CmiMyPe() ;
+	currGid->groupInfo.groupRank = CkMyPe() ;
 	
 	/* Since we don't have any partitions yet, clear copy list */
 	currGid->groupInfo.copyInfo = NULL ;
@@ -1323,7 +1326,7 @@ ChareNumType retBoc ;
     int rootProc ;
     PARTITION_AT_ROOT *partMsg ;
     RootGidType *currGid ;
-    me = CmiMyPe() ;
+    me = CkMyPe() ;
 
     outstandingPartitionRequests++ ;
     

@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 1.1  1995-06-13 11:31:15  jyelon
+ * Revision 1.2  1995-10-27 22:09:16  jyelon
+ * Changed Cmi to Ck in all charm files.
+ *
+ * Revision 1.1  1995/06/13  11:31:15  jyelon
  * Initial revision
  *
  * Revision 1.1  1995/06/13  10:06:34  jyelon
@@ -79,10 +82,10 @@ BranchOffice reduce {
 	gid = msg->gid ;
 	pgBoc = msg->pgBoc ;
 	
-	me = CmiMyPe() ;
+	me = CkMyPe() ;
 	if(gid == 0) {
-	    myParent = CmiSpanTreeParent(me) ;
-	    numChildren = CmiNumSpanTreeChildren(me) ;
+	    myParent = CkSpanTreeParent(me) ;
+	    numChildren = CkNumSpanTreeChildren(me) ;
 	}
 	else {
 	    myParent = PG::PgMySpanTreeParent(pgBoc, gid) ;

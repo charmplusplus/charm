@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.4  1995-10-27 21:35:54  jyelon
+ * Revision 2.5  1995-10-27 22:09:16  jyelon
+ * Changed Cmi to Ck in all charm files.
+ *
+ * Revision 2.4  1995/10/27  21:35:54  jyelon
  * changed NumPe --> NumPes
  *
  * Revision 2.3  1995/08/14  18:39:44  brunner
@@ -187,7 +190,7 @@ int peNum;
 
     if (peNum >=0)
     {
-    	i = CmiNeighboursIndex(myPE, peNum);
+    	i = CkNeighboursIndex(myPE, peNum);
     	if (i > -1)
     	{
 	 	statusList[i].myLoadSent = CldMyLoad();
@@ -312,7 +315,7 @@ LDB_ELEMENT * ldb;
 {
     int i;
 
-    i = CmiNeighboursIndex(myPE, ldb->srcPE);
+    i = CkNeighboursIndex(myPE, ldb->srcPE);
     if (i > -1)
     {
         statusList[i].peLoad = ldb->piggybackLoad;
@@ -359,17 +362,17 @@ entry BranchInit : (message DUMMYMSG * dmsg)
 	ReadInit(LdbBocNum);
 	numPe = CkNumPes();
 	myPE = CkMyPe();
-	numNeighbours = CmiNumNeighbours(myPE);
+	numNeighbours = CkNumNeighbours(myPE);
 	lastPeZeroLoadIndex = 0;
 
 	Cldbtokensinit();
 
 	if (numPe > 1)
 	{
-	    neighboursList = (int *) CmiAlloc( numNeighbours * sizeof(int) );
+	    neighboursList = (int *) CkAlloc( numNeighbours * sizeof(int) );
 /*            CkMemError(neighboursList); */
-	    CmiGetNodeNeighbours(myPE, neighboursList );
-	    statusList = (LDB_STATUS *) CmiAlloc(numNeighbours * sizeof(LDB_STATUS)); 
+	    CkGetNodeNeighbours(myPE, neighboursList );
+	    statusList = (LDB_STATUS *) CkAlloc(numNeighbours * sizeof(LDB_STATUS)); 
 	    
 /*            CkMemError(statusList); */
 	    PrivateCall(PrintNodeNeighbours());

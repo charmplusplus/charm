@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 1.1  1995-06-13 11:32:16  jyelon
+ * Revision 1.2  1995-10-27 22:09:16  jyelon
+ * Changed Cmi to Ck in all charm files.
+ *
+ * Revision 1.1  1995/06/13  11:32:16  jyelon
  * Initial revision
  *
  * Revision 1.1  1995/06/13  10:06:34  jyelon
@@ -54,8 +57,8 @@ BranchOffice reduce {
       { 
 
           flag = 0;
-          cnt = cntval = CmiNumSpanTreeChildren(CmiMyPe()) + 1;
-          parent = CmiSpanTreeParent(CmiMyPe());
+          cnt = cntval = CkNumSpanTreeChildren(CkMyPe()) + 1;
+          parent = CkSpanTreeParent(CkMyPe());
           CkFreeMsg(msg);
 
       }
@@ -109,7 +112,7 @@ BranchOffice reduce {
     void     (*fptr)();
     void     *id; 
       {  
-          if (flag) CkPrintf("[%d] REDUCTIONLIB : error\n",CmiMyPe());
+          if (flag) CkPrintf("[%d] REDUCTIONLIB : error\n",CkMyPe());
           send_result_flag = 1; 
           r_type = R_BY_FUNCTION;
           if (id == NULL) 
@@ -129,7 +132,7 @@ BranchOffice reduce {
     EntryNumType ep;
     void         *id;
        {
-          if (flag) CkPrintf("[%d] REDUCTIONLIB:error\n",CmiMyPe());
+          if (flag) CkPrintf("[%d] REDUCTIONLIB:error\n",CkMyPe());
           send_result_flag = 1;
           r_type = R_BY_MESSAGE;
           if (id == NULL) 

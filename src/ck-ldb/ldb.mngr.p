@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.3  1995-10-27 21:35:54  jyelon
+ * Revision 2.4  1995-10-27 22:09:16  jyelon
+ * Changed Cmi to Ck in all charm files.
+ *
+ * Revision 2.3  1995/10/27  21:35:54  jyelon
  * changed NumPe --> NumPes
  *
  * Revision 2.2  1995/08/21  15:10:34  brunner
@@ -202,7 +205,7 @@ MSGINFO *new_MSGINFO(msg, ldb, sendfn)
 void *msg, *ldb, (*sendfn)();
 {
    MSGINFO *ret;
-   ret = (struct msginfo *)CmiAlloc(sizeof(MSGINFO));
+   ret = (struct msginfo *)CkAlloc(sizeof(MSGINFO));
 
    ret->msg = msg;
    ret->ldb = ldb;
@@ -583,9 +586,6 @@ BranchOffice LDB {
 	if (PrivateCall(EmptyQueue())) 
 	  {
 	    fixed = (!CONTROLLER(least_loaded_pe))?  TRUE: FALSE;
-	    
-	    TRACE(CkPrintf("[%d] LdbStrategy: x = 0x%x, size = %d,dest = %d\n",
-			   myPE, x, CmiSize(x), x->destPE));
 	    (*sendfn)(msg, least_loaded_pe);
 	    PrivateCall(increment_load(least_loaded_pe));
 	  }
