@@ -1104,6 +1104,7 @@ char **arg_argv;
 int    arg_argc;
 
 int   arg_requested_pes;
+int   arg_verbose;
 int   arg_debug;
 int   arg_debug_no_pause;
 int   arg_in_xterm;
@@ -1126,9 +1127,10 @@ arg_init(argc, argv)
   static char buf[1024]; int len, i;
   
   pparam_defint ("p"             ,  MAX_NODES);
+  pparam_defflag("verbose"           );
   pparam_defflag("debug"             );
   pparam_defflag("debug-no-pause"    );
-  pparam_defflag("server"    );
+  pparam_defflag("server"            );
   pparam_defflag("in-xterm"          );
   pparam_defint ("maxrsh"        ,  5);
   pparam_defstr ("nodelist"      ,  0);
@@ -1136,8 +1138,10 @@ arg_init(argc, argv)
   
   pparam_doc("p",             "number of processes to create");
   pparam_doc("in-xterm",      "Run each node in an xterm window");
+  pparam_doc("verbose",       "Print diagnostic messages");
   pparam_doc("debug",         "Run each node under gdb in an xterm window");
   pparam_doc("debug-no-pause","Like debug, except doesn't pause at beginning");
+  pparam_doc("server",        "Enable client-server mode");
   pparam_doc("maxrsh",        "Maximum number of rsh's to run at a time");
   pparam_doc("nodelist",      "file containing list of nodes");
   pparam_doc("nodegroup",     "which group of nodes to use");
@@ -1152,6 +1156,7 @@ arg_init(argc, argv)
 
   arg_requested_pes  = pparam_getint("p");
   arg_in_xterm       = pparam_getflag("in-xterm");
+  arg_verbose        = pparam_getflag("verbose");
   arg_debug          = pparam_getflag("debug");
   arg_debug_no_pause = pparam_getflag("debug-no-pause");
   arg_server         = pparam_getflag("server");

@@ -1416,6 +1416,7 @@ void CcsSendReply(unsigned int ip, unsigned int port, int size, void *msg)
 
 void ConverseCommonInit(char **argv)
 {
+  CmiTimerInit();
   CstatsInit(argv);
   CcdModuleInit(argv);
   CmiHandlerInit();

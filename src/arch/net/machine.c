@@ -2188,7 +2188,6 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usc, int ret)
 	       Cmi_self_IP_str,ctrlport,Cmi_numpes-1);
   node_addresses_obtain();
   Cmi_scanf_mutex = CmiCreateLock();
-  CmiTimerInit();
   CmiStartThreads();
   ConverseInitPE();
   if (ret==0) {
