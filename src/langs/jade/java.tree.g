@@ -7,7 +7,8 @@ package jade;
 //class preamble
 import jade.JJ.ASTJ;
 import jade.JJ.J;
-import java.io.*;
+import java.io.PrintWriter;
+import java.io.FileWriter;
 
 }
 

@@ -5,7 +5,7 @@ package jade;
 
 {
 // java.g class preamble
-import jade.JJ.*;
+import jade.JJ.ClassNode;
 }
 
 /** Java 1.3 Recognizer
