@@ -542,12 +542,6 @@ if ( $BALANCE == btok ) then
     endif
 endif
 
-# Decide whether or not to add defmain.
-
-if (! { (grep charm_main MODULES.TMP.nm >& /dev/null) }) then
-	set MAINOBJ=$CHARMLIB/lib${LIBCLASS}-defmain.o
-endif
-
 # Identify the libraries to use
 
 switch ($LANGUAGE)
@@ -557,8 +551,7 @@ switch ($LANGUAGE)
         	$CHARMLIB/lib${LIBCLASS}-ldb-$BALANCE.o \
         	$CHARMLIB/lib${LIBCLASS}-cplus-n.o \
         	$CHARMLIB/libconv-core.o \
-        	$CHARMLIB/libconv-qs-$QUEUE.o \
-		$MAINOBJ )
+        	$CHARMLIB/libconv-qs-$QUEUE.o )
 	set LOADER=($CMK_LD)
         breaksw
     case "charm++"
@@ -568,8 +561,7 @@ switch ($LANGUAGE)
         	$CHARMLIB/lib${LIBCLASS}-ldb-$BALANCE.o \
         	$CHARMLIB/lib${LIBCLASS}-cplus-y.o \
         	$CHARMLIB/libconv-core.o \
-        	$CHARMLIB/libconv-qs-$QUEUE.o \
-		$MAINOBJ )
+        	$CHARMLIB/libconv-qs-$QUEUE.o )
 	set LOADER=($CMK_LDXX)
         breaksw
     case "converse"
@@ -582,12 +574,26 @@ endsw
 
 set LIBRARIES = ($LIBRARIES $CMK_LIBS -lm)
 
+# Perform preliminary Linkage of user's object files and charm libraries.
+
+echo "linking $OBJECT with -language $LANGUAGE"
+
+set DELETE=(PRE.TMP.o $DELETE)
+if ($?VERBOSE) echo "$CMK_LDRO PRE.TMP.o $OBJECTFILES -L$CHARMLIB $LIBRARIES"
+$CMK_LDRO PRE.TMP.o $OBJECTFILES -L$CHARMLIB $LIBRARIES
+if ($status) goto failure
+
+if (-e $CHARMBIN/conv-host) then
+    /bin/rm -f conv-host
+    /bin/ln -s $CHARMBIN/conv-host conv-host
+endif
+
 # Create MODULES.TMP.o
 
 if ($?VERBOSE) echo "Creating MODULES.TMP.c"
 set DELETE=(MODULES.TMP.nm MODULES.TMP.dat MODULES.TMP.c MODULES.TMP.o $DELETE)
 rm -f MODULES.TMP.nm MODULES.TMP.dat MODULES.TMP.c MODULES.TMP.o
-$CMK_NM $OBJECTFILES > MODULES.TMP.nm
+$CMK_NM PRE.TMP.o > MODULES.TMP.nm
 csh -fc "$CMK_NM_FILTER" < MODULES.TMP.nm | awk '(/^_CK_.*_init$/&&(\!/^_CK_.*_struct_init$/)) { print substr($1, 5, length($1)-9); }' | sort | uniq > MODULES.TMP.dat
 echo 'Modules: '`cat MODULES.TMP.dat`
 awk '{print "extern void _CK_"$1"_init();";}' < MODULES.TMP.dat >> MODULES.TMP.c
@@ -601,19 +607,17 @@ $CMK_CC $OPTS_CC -c MODULES.TMP.c
 if ($status) goto failure
 set OBJECTFILES = ($OBJECTFILES MODULES.TMP.o)
 
-# Perform the Linkage
+# Decide whether or not to add defmain.
 
-echo "linking $OBJECT with -language $LANGUAGE"
-
-if ($?VERBOSE) echo "$LOADER $OPTS_LD -o $OBJECT $OBJECTFILES -L$CHARMLIB $LIBRARIES"
-$LOADER $OPTS_LD -o $OBJECT $OBJECTFILES -L$CHARMLIB $LIBRARIES
-
-if ($status) goto failure
-
-if (-e $CHARMBIN/conv-host) then
-    /bin/rm -f conv-host
-    /bin/ln -s $CHARMBIN/conv-host conv-host
+if (! { (egrep '^charm_main$' MODULES.TMP.nm >& /dev/null) }) then
+	set OBJECTFILES=($CHARMLIB/lib${LIBCLASS}-defmain.o $OBJECTFILES)
 endif
+
+# Perform final linkage
+
+if ($?VERBOSE) echo $LOADER $OPTS_LD -o $OBJECT $OBJECTFILES -L$CHARMLIB $LIBRARIES
+$LOADER $OPTS_LD -o $OBJECT $OBJECTFILES -L$CHARMLIB $LIBRARIES
+if ($status) goto failure
 
 ########################################################################
 #
