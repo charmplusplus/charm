@@ -9,9 +9,9 @@ class envelope;
 
 class Trace {
   public:
-    virtual void userEvent(int e) {}
-    virtual void creation(envelope *e, int num=1) {}
-    virtual void beginExecute(envelope *e) {}
+    virtual void userEvent(int) {}
+    virtual void creation(envelope *, int num=1) {}
+    virtual void beginExecute(envelope *) {}
     virtual void endExecute(void) {}
     virtual void beginIdle(void) {}
     virtual void endIdle(void) {}
@@ -21,8 +21,8 @@ class Trace {
     virtual void endUnpack(void) {}
     virtual void beginCharmInit(void) {}
     virtual void endCharmInit(void) {}
-    virtual void enqueue(envelope *e) {}
-    virtual void dequeue(envelope *e) {}
+    virtual void enqueue(envelope *) {}
+    virtual void dequeue(envelope *) {}
     virtual void beginComputation(void) {}
     virtual void endComputation(void) {}
 };

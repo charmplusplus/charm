@@ -265,21 +265,13 @@ void TraceProjections::endUnpack(void)
   CpvAccess(_logPool)->add(END_UNPACK, 0, 0, CmiTimer(), 0, CmiMyPe());
 }
 
-void TraceProjections::beginCharmInit(void)
-{
-}
+void TraceProjections::beginCharmInit(void) {}
 
-void TraceProjections::endCharmInit(void)
-{
-}
+void TraceProjections::endCharmInit(void) {}
 
-void TraceProjections::enqueue(envelope *e)
-{
-}
+void TraceProjections::enqueue(envelope *) {}
 
-void TraceProjections::dequeue(envelope *e)
-{
-}
+void TraceProjections::dequeue(envelope *) {}
 
 void TraceProjections::beginComputation(void)
 {

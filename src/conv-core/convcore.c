@@ -2503,7 +2503,7 @@ void CcsSendReply(unsigned int ip, unsigned int port, int size, void *msg)
 
 #if CMK_SYNCHRONIZE_ON_TCP_CLOSE
   shutdown(fd, 1);
-  while (read(fd, &c, 1)==EINTR);
+  { char c; while (read(fd, &c, 1)==EINTR); }
   close(fd);
 #else
   close(fd);
