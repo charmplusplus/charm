@@ -17,7 +17,7 @@
 #ifndef _CONV_MACH_H
 #define _CONV_MACH_H
 
-#define CMK_MACHINE_NAME "net-sol"
+#define CMK_MACHINE_NAME "tcp-sol"
 
 #define CmiMsgHeaderSizeBytes 8
 
