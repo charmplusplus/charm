@@ -24,15 +24,19 @@ syntax() {
 }
 
 printOption() {
-  echo
-  ( str=`cd $src/$BASEVERSION; ls conv-mach-*.h 2>/dev/null | sed 's/conv-mach-\([^.]*\).h/\1/'`;
-    if [ -d $src/${ARCH} ]
-    then
-      str="$str `cd $src/$ARCH; ls conv-mach-*.h 2>/dev/null | sed 's/conv-mach-\([^.]*\).h/\1/'`";
-    fi
-    printf 'supported options: '
-    echo $str)
-  echo
+  for prefix in cc conv-mach
+  do
+    str="Supported compilers:"
+    [ "$prefix" = "conv-mach" ] && str="Supported options:"
+    opts=""
+    for dir in $OPT_DIRS
+    do
+#         echo "Checking for $prefix in $dir"
+          files=`cd $dir; ls $prefix-*.h 2>/dev/null`
+          opts="$opts "`echo $files | sed 's/'$prefix'-\([^.]*\).h/\1/g'`
+    done 
+    echo $str $opts
+  done
   exit 1
 }
 
@@ -47,23 +51,30 @@ CheckDir() {
   done
 }
 
-TestIfSupported() {
-  if [ ! -f $src/$VERSION/conv-mach-$1.h ] && [ ! -f $src/$ARCH/conv-mach-$1.h ]
-  then
-    echo; 
-    echo "Error> option: $1 is not supported in this version!"; 
-    printOption
-  fi
+TestIfCompiler() {
+  for dir in $OPT_DIRS
+  do
+    [ -f $dir/cc-$1.sh ] && return 1
+  done  
+  return 0
+}
+
+TestIfOption() {
+  for dir in $OPT_DIRS
+  do
+    [ -f $dir/conv-mach-$1.h ] && return 1 
+  done
+  
+  echo "Error> option: $1 is not supported in this version!"; 
+  printOption
 }
 
 
 # start
 
-[ $# -lt 2 ] && syntax
-
-
 MAKEOPTS=""
 OPTS=""
+BOPTS=""
 MORE=""
 COMPILER=""
 BASEDIR=
@@ -71,27 +82,17 @@ LIBDIR=
 INCDIR=
 ARCH=
 
+[ $# -lt 2 ] && syntax
+PROGRAM=$1
+shift
+VERSION=$1; BASEVERSION=$1; ARCH=`echo $1 | sed -e 's@-.*@@'`
+shift
+
+OPT_DIRS="$src/$BASEVERSION $src/$ARCH $src/common"
+
 while [ ! $# -eq 0 ]
 do
   case "$1" in
-    -*) 
-          MAKEOPTS="$MAKEOPTS $1"; shift
-	  ;;
-    *)
-          PROGRAM=$1 ; shift
-          VERSION=$1; BASEVERSION=$1; ARCH=`echo $1 | sed -e 's@-.*@@'`; shift
-          test "$1" = "help" && printOption
-          while [ ! $# -eq 0 ]
-          do
-            case "$1" in
-	    "pgcc"|"ecc"|"icc"|"cxx"|"kcc"|"cc"|"cc64"|"acc"|"gcc3"|"mpcc"|"lcs")
-                TestIfSupported $1
-                COMPILER=$1; shift
-	        ;;
-            "gm"|"vmi"|"scyld"|"smp"|"tcp"|"bluegene")
-                TestIfSupported $1
-                MORE="$MORE $1"; shift
-		;;
     	    "--basedir")
           	shift; CheckDir $1/include $1/lib
           	LIBDIR="$LIBDIR -L$1/lib";
@@ -121,33 +122,54 @@ do
 		CheckDir $dir
           	INCDIR="$INCDIR -I$dir"; shift
  	  	;;
-            *)
-                OPTS="$OPTS $1"; shift
-		;;
- 	    esac
-	  done
+    -*) 
+# We hit a real compiler option (like -g, or -Dfoo),
+# so just copy over all remaining options
+          while [ ! $# -eq 0 ]
+          do
+            OPTS="$OPTS $1"; shift
+          done
 	  ;;
+    "help")
+	printOption
+	;;
+    *)
+# This has to be a build-time option (like "smp", "gcc3", or "kcc")
+        TestIfCompiler $1
+        if [ $? -eq 1 ] 
+        then
+# It specifies a compiler:
+          if [ ! -z "$COMPILER" ] 
+          then
+              echo "Error> Tried to specify two compilers: $COMPILER and $1"
+              printOption
+          fi
+          COMPILER=$1
+        else
+# It specifies some other option:
+          TestIfOption $1
+          BOPTS="$BOPTS $1"
+        fi
+        shift
+	;;
   esac
 done
 
 [ "x$VERSION" = "x" ] && syntax
-	
+
 [ -f $src/$BASEVERSION/conv-mach.h ] || syntax
 
-#generate VERSION name combining all options.
-if test -n "$MORE"
+#generate VERSION name combining all the build-time options.
+if test -n "$BOPTS"
 then
-  MORE=`echo $MORE | awk  '{ for (i = 1; i <= NF; ++i) print $i }' | sort`
-  for i in $MORE
+  echo "Selected Compiler: $COMPILER"
+  echo "Selected Options: $BOPTS"
+  SORTED=`echo $BOPTS | awk  '{ for (i = 1; i <= NF; ++i) print $i }' | sort`
+  BOPTS_WITHCOMPILER=`echo $SORTED $COMPILER`
+  for i in $BOPTS_WITHCOMPILER
   do
     VERSION=$VERSION-$i
   done
-fi
-
-if test -n "$COMPILER"
-then
-  VERSION=$VERSION-$COMPILER
-  MORE="$COMPILER $MORE"
 fi
 
 [ -d $VERSION ] || echo "Creating dir: $VERSION" 
@@ -196,29 +218,25 @@ chmod +x $ConvUsr
 #special options
 ConvHeader="$VERSION/tmp/conv-mach-opt.h"
 ConvSh="$VERSION/tmp/conv-mach-opt.sh"
-if test ! -f $ConvHeader
+echo "Generating $ConvHeader, conv-mach-opt.sh"
+/bin/rm -f $ConvHeader  $ConvSh
+touch $ConvHeader
+echo '[ -z "$CHARMINC" ] && CHARMINC="."' > $ConvSh
+if test -n "$BOPTS"
 then
-  echo "Generating $ConvHeader, conv-mach-opt.sh"
-  /bin/rm -f $ConvHeader  $ConvSh
-  touch $ConvHeader; touch $ConvSh
-  if test -n "$MORE"
-  then
-    for i in $MORE
+    for i in $BOPTS
     do
-#      touch $VERSION/tmp/$i
-      if [ -f $src/$BASEVERSION/conv-mach-$i.h ]
-      then
-        CONVFILEDIR="$src/$BASEVERSION/"
-      else
-        CONVFILEDIR="$src/$ARCH"
-      fi
-      echo '/* '"$CONVFILEDIR/conv-mach-$i.h"' */' >> $ConvHeader
-      cat $CONVFILEDIR/conv-mach-$i.h >> $ConvHeader
-      echo '# '"$CONVFILEDIR/conv-mach-$i.sh" >> $ConvSh
-      cat $CONVFILEDIR/conv-mach-$i.sh >> $ConvSh
+      echo '#include "'conv-mach-$i.h'"' >> $ConvHeader
+      echo '. $CHARMINC/'"conv-mach-$i.sh" >> $ConvSh
     done
-  fi
 fi
+if test -n "$COMPILER"
+then
+      i="$COMPILER"
+      echo '#include "'cc-$i.h'"' >> $ConvHeader
+      echo '. $CHARMINC/'"cc-$i.sh" >> $ConvSh
+fi
+
 
 echo $BASEVERSION > $VERSION/tmp/.vdir
 
