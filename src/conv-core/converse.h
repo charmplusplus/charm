@@ -209,6 +209,7 @@ extern int Cmi_numpes;
 #define CmiMemLock() 0
 #define CmiMemUnlock() 0
 extern void CmiNodeBarrier();
+extern void CmiNodeAllBarrier();
 #define CmiSvAlloc CmiAlloc
 
 typedef int *CmiNodeLock;
