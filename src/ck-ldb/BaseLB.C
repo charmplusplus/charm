@@ -17,7 +17,6 @@
 
 BaseLB::BaseLB() {
   CkpvAccess(numLoadBalancers) ++;
-CmiPrintf("[%d] BaseLB created! numLB=%d\n", CkMyPe(),CkpvAccess(numLoadBalancers));
   if (CkpvAccess(numLoadBalancers) - CkpvAccess(hasNullLB) > 1)
     CmiAbort("Error: try to create more than one load balancer strategies!");
   lbname = "Unknown";
