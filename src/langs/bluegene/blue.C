@@ -53,9 +53,10 @@ CpvDeclare(int,bgCorrectionHandler);
 CpvDeclare(int,exitHandler);
 
 /* message handlers */
-CmiHandler msgHandlerFunc(char *msg);
-CmiHandler nodeBCastMsgHandlerFunc(char *msg);
-CmiHandler threadBCastMsgHandlerFunc(char *msg);
+void msgHandlerFunc(char *msg);
+void nodeBCastMsgHandlerFunc(char *msg);
+void threadBCastMsgHandlerFunc(char *msg);
+void bgCorrectionFunc(char *msg);
 
 extern "C" void defaultBgHandler(char *);
 
@@ -401,7 +402,7 @@ void sendPacket(int x, int y, int z, int msgSize,char *msg)
 }
 
 /* handler to process the msg */
-CmiHandler msgHandlerFunc(char *msg)
+void msgHandlerFunc(char *msg)
 {
   /* bgmsg is CmiMsgHeaderSizeBytes offset of original message pointer */
   int nodeID = CmiBgMsgNodeID(msg);
@@ -416,10 +417,9 @@ CmiHandler msgHandlerFunc(char *msg)
   else {
     CmiAbort("Invalid message!");
   }
-  return 0;
 }
 
-CmiHandler nodeBCastMsgHandlerFunc(char *msg)
+void nodeBCastMsgHandlerFunc(char *msg)
 {
   /* bgmsg is CmiMsgHeaderSizeBytes offset of original message pointer */
   int nodeID = CmiBgMsgNodeID(msg);
@@ -447,10 +447,9 @@ CmiHandler nodeBCastMsgHandlerFunc(char *msg)
     addBgNodeInbuffer(dupmsg, i);
     count ++;
   }
-  return 0;
 }
 
-CmiHandler threadBCastMsgHandlerFunc(char *msg)
+void threadBCastMsgHandlerFunc(char *msg)
 {
   /* bgmsg is CmiMsgHeaderSizeBytes offset of original message pointer */
   int nodeID = CmiBgMsgNodeID(msg);
@@ -477,53 +476,11 @@ CmiHandler threadBCastMsgHandlerFunc(char *msg)
     }
   }
   CmiFree(msg);
-  return 0;
-}
-
-/****************************************************************************************
-			TimeLog correction
-****************************************************************************************/
-static inline int handleCorrectionMsg(BgTimeLine *logs, bgCorrectionMsg *m)
-{
-	CmiUInt2 tID = m->tID;
-	if (tID == ANYTHREAD) {
-	  int found = 0;
-	  for (tID=0; tID<cva(numWth); tID++) {
-        BgTimeLine &tline = logs[tID];	
-		for (int j=0; j<tline.length(); j++)
-		  if (tline[j]->msgID == m->msgID) { found = 1; break; }
-		if (found) break;    
-	  }
-	  if (!found) {
-//	    CmiPrintf("Correction message arrived early. \n");
-		return 0;
-	  }
-	}
-	BgAdjustTimeLineForward(m->msgID, m->tAdjust, logs[tID]);
-	CmiFree(m);
-	return 1;
-}
-
-void bgCorrectionFunc(char *msg)
-{
-    int i;
-	bgCorrectionMsg* m = (bgCorrectionMsg*)msg;
-	int nodeidx = nodeInfo::Global2Local(m->destNode);	
-    bgCorrectionQ &cmsg = cva(nodeinfo)[nodeidx].cmsg;
-    BgTimeLine *logs = cva(nodeinfo)[nodeidx].timelines;
-
-	cmsg.enq(m);
-	int len = cmsg.length();
-    for (i=0; i<len; i++) {
-	  bgCorrectionMsg *cm = cmsg.deq();
-	  if (handleCorrectionMsg(logs, cm) == 0)
-	    cmsg.enq(cm);
-	}
 }
 
 #define ABS(x) (((x)<0)? -(x) : (x))
 
-static double MSGTIME(int ox, int oy, int oz, int nx, int ny, int nz)
+static inline double MSGTIME(int ox, int oy, int oz, int nx, int ny, int nz)
 {
   int xd=ABS(ox-nx), yd=ABS(oy-ny), zd=ABS(oz-nz);
   int ncorners = 2;
@@ -554,7 +511,7 @@ void sendPacket_(int x, int y, int z, int threadID, int handlerID, WorkType type
 }
 
 /* broadcast will copy data to msg buffer */
-void nodeBroadcastPacketExcept_(int node, CmiUInt2 threadID, int handlerID, WorkType type, int numbytes, char* sendmsg)
+static inline void nodeBroadcastPacketExcept_(int node, CmiUInt2 threadID, int handlerID, WorkType type, int numbytes, char* sendmsg)
 {
   CmiSetHandler(sendmsg, cva(nBcastMsgHandler));	
   if (node >= 0)
@@ -576,7 +533,7 @@ void nodeBroadcastPacketExcept_(int node, CmiUInt2 threadID, int handlerID, Work
 }
 
 /* broadcast will copy data to msg buffer */
-void threadBroadcastPacketExcept_(int node, CmiUInt2 threadID, int handlerID, WorkType type, int numbytes, char* sendmsg)
+static inline void threadBroadcastPacketExcept_(int node, CmiUInt2 threadID, int handlerID, WorkType type, int numbytes, char* sendmsg)
 {
   CmiSetHandler(sendmsg, cva(tBcastMsgHandler));	
   if (node >= 0)
@@ -664,6 +621,7 @@ void BgGetSize(int *sx, int *sy, int *sz)
   *sx = cva(numX); *sy = cva(numY); *sz = cva(numZ);
 }
 
+/* return the total number of Blue gene nodes */
 int BgGetTotalSize()
 {
   return bgSize;
@@ -693,6 +651,7 @@ int BgMyRank()
   return tMYNODEID;
 }
 
+/* return my serialed blue gene node number */
 int BgMyNode()
 {
 #ifndef CMK_OPTIMIZE
@@ -701,7 +660,8 @@ int BgMyNode()
   return nodeInfo::XYZ2Global(tMYX, tMYY, tMYZ);
 }
 
-int BgNodeToPE(int node)         /* return a real processor number from a bg node */
+/* return a real processor number from a bg node */
+int BgNodeToPE(int node)
 {
   return nodeInfo::Global2PE(node);
 }
@@ -875,6 +835,8 @@ static inline void ProcessMessage(char *msg)
   tSTARTTIME = CmiWallTimer();
 }
 
+void correctTime(char *msg);
+
 void comm_thread(threadInfo *tinfo)
 {
   /* set the thread-private threadinfo */
@@ -907,6 +869,9 @@ void comm_thread(threadInfo *tinfo)
       ProcessMessage(msg);
     }
     else {
+#if BLUEGENE_TIMING
+      correctTime(msg);
+#endif
       if (CmiBgMsgThreadID(msg) == ANYTHREAD) {
         DEBUGF(("anythread, call addBgNodeMessage\n"));
         addBgNodeMessage(msg);			/* non-affinity message */
@@ -1184,4 +1149,65 @@ extern "C" int CmiSwitchToPE(int pe)
 }
 #endif
 
+
+/*****************************************************************************
+			TimeLog correction
+*****************************************************************************/
+
+static inline int handleCorrectionMsg(BgTimeLine *logs, bgCorrectionMsg *m)
+{
+	CmiUInt2 tID = m->tID;
+	if (tID == ANYTHREAD) {
+	  int found = 0;
+	  for (tID=0; tID<cva(numWth); tID++) {
+            BgTimeLine &tline = logs[tID];	
+	    for (int j=0; j<tline.length(); j++)
+	      if (tline[j]->msgID == m->msgID) { found = 1; break; }
+	    if (found) break;    
+	  }
+	  if (!found) {
+//	    CmiPrintf("Correction message arrived early. \n");
+		return 0;
+	  }
+	}
+	BgAdjustTimeLineForward(m->msgID, m->tAdjust, logs[tID]);
+	CmiFree(m);
+	return 1;
+}
+
+// entry function for correction msgs
+void bgCorrectionFunc(char *msg)
+{
+    int i;
+    bgCorrectionMsg* m = (bgCorrectionMsg*)msg;
+    int nodeidx = nodeInfo::Global2Local(m->destNode);	
+    bgCorrectionQ &cmsg = cva(nodeinfo)[nodeidx].cmsg;
+    BgTimeLine *logs = cva(nodeinfo)[nodeidx].timelines;
+
+    cmsg.enq(m);
+    int len = cmsg.length();
+    for (i=0; i<len; i++) {
+      bgCorrectionMsg *cm = cmsg.deq();
+      if (handleCorrectionMsg(logs, cm) == 0) cmsg.enq(cm);
+    }
+}
+
+// update arrive time from buffer messages
+void correctTime(char *msg)
+{
+   if (!correctTimeLog) return;
+   bgCorrectionQ &cmsg = cva(nodeinfo)[tMYNODEID].cmsg;
+   int msgID = CmiBgMsgID(msg);
+//CmiPrintf("[%d] check: %d len:%d\n", tMYNODEID, msgID, cmsg.length());
+   int removed = 0;
+   for (int i=0; i<cmsg.length(); i++) {
+     bgCorrectionMsg* m = cmsg[i-removed];
+     if (msgID == m->msgID) {
+//CmiPrintf("correct: %d %f\n", msgID, m->tAdjust);
+	CmiBgMsgRecvTime(msg) += m->tAdjust;
+        cmsg.remove(i-removed);
+	removed++;
+     }
+   }
+}
 
