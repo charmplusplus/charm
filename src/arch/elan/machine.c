@@ -76,8 +76,8 @@ int MID_MESSAGE_SIZE=65536;     /* Queue for larger messages
 
 #define NON_BLOCKING_MSG  16     /* Message sizes greater 
                                     than this will be sent asynchronously*/
-#define RECV_MSG_Q_SIZE 20
-#define MID_MSG_Q_SIZE  8
+#define RECV_MSG_Q_SIZE 8
+#define MID_MSG_Q_SIZE  4
 
 ELAN_EVENT *esmall[RECV_MSG_Q_SIZE], *emid[MID_MSG_Q_SIZE], *elarge;
 
