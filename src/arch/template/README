@@ -15,6 +15,13 @@ the same meaning as the two conv-mach files. In this case, the normal
 "conv-mach-smp.h" file. Thus, this second file need to take care of the
 definitions already made by the former one.
 
+The decision whether to implement a fully new machine.c, or base to an already
+existing one, should be made primarly on who will start the job in the target
+machine. For example the program directly (charmrun in net- versions), mpirun in
+mpi- versions, qsub, psub of any other scheduler. In particular, if it is
+required that the program itself starts the job, then net- version is a good
+option.
+
 The files contain the following information:
 
 * conv-mach.sh
