@@ -5,6 +5,7 @@
 #include <stdio.h>
 #include "charm++.h"
 
+#define CkDDT_MAXTYPE         100
 #define DDTDEBUG /* CkPrintf */
 
 #define CkDDT_TYPE_NULL      -1
@@ -35,12 +36,12 @@
 #define CkDDT_UB              24
 #define CkDDT_LONG_LONG_INT   25
 
-#define CkDDT_CONTIGUOUS      44
-#define CkDDT_VECTOR          45
-#define CkDDT_HVECTOR         46
-#define CkDDT_INDEXED         47
-#define CkDDT_HINDEXED        48
-#define CkDDT_STRUCT          49
+#define CkDDT_CONTIGUOUS      36
+#define CkDDT_VECTOR          37
+#define CkDDT_HVECTOR         38
+#define CkDDT_INDEXED         39
+#define CkDDT_HINDEXED        40
+#define CkDDT_STRUCT          41
 
 /* for the datatype decoders */
 #define CkDDT_COMBINER_NAMED         1
@@ -85,7 +86,7 @@ class CkDDT ;
 
 class CkDDT_DataType {
 
-  private:
+  protected:
     int datatype;
     int refCount;
 
@@ -100,7 +101,6 @@ class CkDDT_DataType {
     int baseExtent;
     CkDDT_DataType *baseType;
     int baseIndex;
-    int oldtype;  // = CkDDT::types[baseIndex]
 
   public:
     CkDDT_DataType() { } ;
@@ -135,7 +135,7 @@ class CkDDT_DataType {
 class CkDDT_Contiguous : public CkDDT_DataType {
  public:
   CkDDT_Contiguous() { };
-  CkDDT_Contiguous(int count, int index, CkDDT_DataType* oldType, int oldtype);
+  CkDDT_Contiguous(int count, int index, CkDDT_DataType* oldType);
   CkDDT_Contiguous(const CkDDT_Contiguous& obj) ;
   CkDDT_Contiguous& operator=(const CkDDT_Contiguous& obj);
   virtual int serialize(char* userdata, char* buffer, int num, int dir);
@@ -161,7 +161,7 @@ class CkDDT_Vector : public CkDDT_DataType {
     int strideLength ;
   public:
     CkDDT_Vector(int count, int blklen, int stride, int index,
-               CkDDT_DataType* type, int oldtype);
+                CkDDT_DataType* type);
     CkDDT_Vector(const CkDDT_Vector& obj) ;
     CkDDT_Vector& operator=(const CkDDT_Vector& obj);
     CkDDT_Vector() { } ;
@@ -189,7 +189,7 @@ class CkDDT_HVector : public CkDDT_Vector {
   public:
     CkDDT_HVector() { } ;
     CkDDT_HVector(int nCount,int blength,int strideLen,int index,
-                CkDDT_DataType* type, int oldtype);
+                CkDDT_DataType* type);
     ~CkDDT_HVector() { } ;
     CkDDT_HVector(const CkDDT_HVector& obj) ;
     CkDDT_HVector& operator=(const CkDDT_HVector& obj);
@@ -220,7 +220,7 @@ class CkDDT_Indexed : public CkDDT_DataType {
   public:
 
     CkDDT_Indexed(int count, int* arrBlock, int* arrDisp, int index,
-                CkDDT_DataType* type, int oldtype);
+                CkDDT_DataType* type);
     CkDDT_Indexed(const CkDDT_Indexed& obj);
     CkDDT_Indexed& operator=(const CkDDT_Indexed& obj) ;
     CkDDT_Indexed() { } ;
@@ -248,7 +248,7 @@ class CkDDT_HIndexed : public CkDDT_Indexed {
   public:
     CkDDT_HIndexed() { } ;
     CkDDT_HIndexed(int count, int* arrBlock, int* arrDisp, int index, 
-                 CkDDT_DataType* type, int oldtype);
+                 CkDDT_DataType* type);
     CkDDT_HIndexed(const CkDDT_HIndexed& obj);
     CkDDT_HIndexed& operator=(const CkDDT_HIndexed& obj) ;
     virtual int serialize(char* userdata, char* buffer, int num, int dir);
@@ -277,12 +277,11 @@ class CkDDT_Struct : public CkDDT_DataType {
     int* arrayDisplacements ;
     int* index;
     CkDDT_DataType** arrayDataType;
-    int* oldtypes;
 
   public:
     CkDDT_Struct() { } ;
     CkDDT_Struct(int count, int* arrBlock, int* arrDisp, int *index,
-               CkDDT_DataType **type, int* oldtypes);
+               CkDDT_DataType **type);
     CkDDT_Struct(const CkDDT_Struct& obj);
     CkDDT_Struct& operator=(const CkDDT_Struct& obj) ;
     virtual int serialize(char* userdata, char* buffer, int num, int dir);
@@ -320,7 +319,7 @@ class CkDDT {
   CkDDT(void*) {} // emulates migration constructor
   CkDDT()
   {
-    max_types = 50;
+    max_types = CkDDT_MAXTYPE;
     typeTable = new CkDDT_DataType*[max_types];
     types = new int[max_types];
     typeTable[0] = new CkDDT_DataType(CkDDT_DOUBLE);
@@ -380,7 +379,7 @@ class CkDDT {
     int i;
     for(i=num_types ; i < max_types; i++)
     {
-      typeTable[i] = 0;
+      typeTable[i] = NULL;
       types[i] = CkDDT_TYPE_NULL ;
     }
   }

@@ -100,10 +100,11 @@ void
 CkDDT::freeType(int* index)
 {
   // FIXME: Use reference counting
-  delete typeTable[*index];
+/*  delete typeTable[*index];
   typeTable[*index] = 0 ;
   types[*index] = CkDDT_TYPE_NULL ;
   *index = -1 ;
+*/
 }
 
 CkDDT::~CkDDT()
@@ -123,12 +124,14 @@ CkDDT::~CkDDT()
 int
 CkDDT::isContig(int nIndex)
 {
+/*
   return !(types[nIndex]==CkDDT_VECTOR||
   	   types[nIndex]==CkDDT_HVECTOR||
 	   types[nIndex]==CkDDT_INDEXED||
 	   types[nIndex]==CkDDT_HINDEXED||
 	   types[nIndex]==CkDDT_STRUCT);
-  //getType(nIndex)->isContig();
+*/
+  return getType(nIndex)->isContig();
 }
 
 int
@@ -174,8 +177,8 @@ int CkDDT::getContents(int nIndex, int ni, int na, int nd, int i[], int a[], int
 void
 CkDDT::newContiguous(int count, CkDDT_Type oldType, CkDDT_Type *newType)
 {
-  int index = *newType =  getNextFreeIndex() ;
-  CkDDT_DataType *type  = new CkDDT_Contiguous(count, index, typeTable[oldType], types[oldType]);
+  int index = *newType = getNextFreeIndex() ;
+  CkDDT_DataType *type = new CkDDT_Contiguous(count, oldType, typeTable[oldType]);
   typeTable[index] = type ;
   types[index] = CkDDT_CONTIGUOUS ;
 }
@@ -184,11 +187,10 @@ void
 CkDDT::newVector(int count, int blocklength, int stride,
                  CkDDT_Type oldType, CkDDT_Type* newType)
 {
-  int index = *newType =  getNextFreeIndex() ;
-  CkDDT_DataType* type =
-    new CkDDT_Vector(count, blocklength, stride, index, typeTable[oldType], types[oldType]);
-  typeTable[index] = type ;
-  types[index] = CkDDT_VECTOR ;
+  int index = *newType = getNextFreeIndex() ;
+  CkDDT_DataType* type = new CkDDT_Vector(count, blocklength, stride, oldType, typeTable[oldType]);
+  typeTable[index] = type;
+  types[index] = CkDDT_VECTOR ;           
 }
 
 void
@@ -197,7 +199,7 @@ CkDDT::newHVector(int count, int blocklength, int stride,
 {
   int index = *newType =  getNextFreeIndex() ;
   CkDDT_DataType* type =
-    new CkDDT_HVector(count, blocklength, stride, index, typeTable[oldtype], types[oldtype]);
+    new CkDDT_HVector(count, blocklength, stride, oldtype, typeTable[oldtype]);
   typeTable[index] = type ;
   types[index] = CkDDT_HVECTOR ;
 }
@@ -208,7 +210,7 @@ CkDDT::newIndexed(int count, int* arrbLength, int* arrDisp,
 {
   int index = *newType =  getNextFreeIndex() ;
   CkDDT_DataType* type =
-    new CkDDT_Indexed(count, arrbLength, arrDisp, index, typeTable[oldtype], types[oldtype]);
+    new CkDDT_Indexed(count, arrbLength, arrDisp, oldtype, typeTable[oldtype]);
   typeTable[index] = type ;
   types[index] = CkDDT_INDEXED ;
 }
@@ -219,7 +221,7 @@ CkDDT::newHIndexed(int count, int* arrbLength, int* arrDisp,
 {
   int index = *newType =  getNextFreeIndex() ;
   CkDDT_DataType* type =
-    new CkDDT_HIndexed(count, arrbLength, arrDisp, index, typeTable[oldtype], types[oldtype]);
+    new CkDDT_HIndexed(count, arrbLength, arrDisp, oldtype, typeTable[oldtype]);
   typeTable[index] = type ;
   types[index] = CkDDT_HINDEXED ;
 }
@@ -230,13 +232,11 @@ CkDDT::newStruct(int count, int* arrbLength, int* arrDisp,
 {
   int index = *newType =  getNextFreeIndex() ;
   CkDDT_DataType **olddatatypes = new CkDDT_DataType*[count];
-  int* oldtypes = new int[count];
   for(int i=0;i<count;i++){
     olddatatypes[i] = typeTable[oldtype[i]];
-    oldtypes[i] = types[oldtype[i]];
   }
   CkDDT_DataType* type =
-    new CkDDT_Struct(count, arrbLength, arrDisp, oldtype, olddatatypes, oldtypes);
+    new CkDDT_Struct(count, arrbLength, arrDisp, oldtype, olddatatypes);
   typeTable[index] = type ;
   types[index] = CkDDT_STRUCT ;
 }
@@ -320,7 +320,6 @@ CkDDT_DataType::CkDDT_DataType(int type):datatype(type)
       break;
     case CkDDT_LONG_LONG_INT:
       size = sizeof(long long int);
-      break;
     default:
       size = 0;
   }
@@ -339,7 +338,7 @@ CkDDT_DataType::CkDDT_DataType(const CkDDT_DataType& obj)
   count = obj.count ;
   baseType = obj.baseType;
   baseIndex = obj.baseIndex;
-  oldtype = obj.oldtype;
+  iscontig = obj.iscontig;
 }
 
 
@@ -356,7 +355,7 @@ CkDDT_DataType::operator=(const CkDDT_DataType& obj)
   count = obj.count ;
   baseType = obj.baseType;
   baseIndex = obj.baseIndex;
-  oldtype = obj.oldtype;
+  iscontig = obj.iscontig;
 
   return *this;
 }
@@ -437,7 +436,6 @@ CkDDT_DataType::pupType(PUP::er  &p, CkDDT* ddt)
   p(baseSize);
   p(baseExtent);
   p(baseIndex);
-  p(oldtype);
   p(lb);
   p(ub);
   p(iscontig);
@@ -456,25 +454,27 @@ int CkDDT_DataType::getContents(int ni, int na, int nd, int i[], int a[], int d[
   return -1;
 }
 
-CkDDT_Contiguous::CkDDT_Contiguous(int nCount, int bindex, CkDDT_DataType* oldType, int oldtype_)
+CkDDT_Contiguous::CkDDT_Contiguous(int nCount, int bindex, CkDDT_DataType* oldType)
 {
-  count = nCount ;
-
-  oldtype = oldtype_;
+  datatype = CkDDT_CONTIGUOUS;
+  
+  count = nCount;
   baseType = oldType;
   baseIndex = bindex;
   baseSize = baseType->getSize();
   baseExtent = baseType->getExtent();
   size = count * baseSize ;
   extent = count * baseExtent ;
-
+  iscontig = 1;
+  
   lb = baseType->getLB();
   ub = lb + extent;
-
+  iscontig = oldType->isContig();
 }
 
 CkDDT_Contiguous::CkDDT_Contiguous(const CkDDT_Contiguous& obj)
 {
+  datatype = obj.datatype;
   size = obj.size ;
   extent = obj.extent ;
   count = obj.count ;
@@ -482,9 +482,9 @@ CkDDT_Contiguous::CkDDT_Contiguous(const CkDDT_Contiguous& obj)
   baseExtent = obj.baseExtent ;
   baseType = obj.baseType ;
   baseIndex = obj.baseIndex;
-  oldtype = obj.oldtype;
   lb = baseType->getLB();
   ub = lb + extent;
+  iscontig = obj.iscontig;  
 }
 
 CkDDT_Contiguous&
@@ -493,6 +493,7 @@ CkDDT_Contiguous::operator=(const CkDDT_Contiguous& obj)
   if(this == &obj)
     return *this ;
 
+  datatype = obj.datatype;
   size = obj.size ;
   extent = obj.extent ;
   count = obj.count ;
@@ -500,10 +501,9 @@ CkDDT_Contiguous::operator=(const CkDDT_Contiguous& obj)
   baseExtent = obj.baseExtent ;
   baseType = obj.baseType ;
   baseIndex = obj.baseIndex;
-  oldtype = obj.oldtype;
   lb = obj.lb;
   ub = obj.ub;
-
+  iscontig = obj.iscontig;  
   return *this ;
 }
 
@@ -522,15 +522,16 @@ CkDDT_Contiguous::serialize(char* userdata, char* buffer, int num, int dir)
 void
 CkDDT_Contiguous::pupType(PUP::er &p, CkDDT *ddt)
 {
+  p(datatype);
   p(size);
   p(extent);
   p(count);
   p(baseSize);
   p(baseExtent);
   p(baseIndex);
-  p(oldtype);
   p(lb);
   p(ub);
+  p(iscontig);
   if(p.isUnpacking()) baseType = ddt->getType(baseIndex);
 }
 
@@ -544,14 +545,14 @@ int CkDDT_Contiguous::getEnvelope(int *ni, int *na, int *nd, int *combiner){
 
 int CkDDT_Contiguous::getContents(int ni, int na, int nd, int i[], int a[], int d[]){
   i[0] = count;
-  d[0] = oldtype;
+  d[0] = baseIndex;
   return 0;
 }
 
-CkDDT_Vector::CkDDT_Vector(int nCount, int blength, int stride, int bindex, CkDDT_DataType* type, int oldtype_)
+CkDDT_Vector::CkDDT_Vector(int nCount, int blength, int stride, int bindex, CkDDT_DataType* type)
 {
+  datatype = CkDDT_VECTOR;
   count = nCount ;
-  oldtype = oldtype_;
   blockLength = blength ;
   strideLength = stride ;
 
@@ -565,6 +566,7 @@ CkDDT_Vector::CkDDT_Vector(int nCount, int blength, int stride, int bindex, CkDD
 
   lb = baseType->getLB();
   ub = lb + extent;
+  iscontig = 0;  
 }
 
 int
@@ -584,6 +586,7 @@ CkDDT_Vector::serialize(char* userdata, char* buffer, int num, int dir)
 void
 CkDDT_Vector::pupType(PUP::er &p, CkDDT* ddt)
 {
+  p(datatype);
   p(size);
   p(extent);
   p(count);
@@ -592,9 +595,9 @@ CkDDT_Vector::pupType(PUP::er &p, CkDDT* ddt)
   p(blockLength);
   p(strideLength);
   p(baseIndex);
-  p(oldtype);
   p(lb);
   p(ub);
+  p(iscontig);
   if(p.isUnpacking()) baseType = ddt->getType(baseIndex);
 }
 
@@ -610,15 +613,15 @@ int CkDDT_Vector::getContents(int ni, int na, int nd, int i[], int a[], int d[])
   i[0] = count;
   i[1] = blockLength;
   i[2] = strideLength;
-  d[0] = oldtype;
+  d[0] = baseIndex;
   return 0;
 }
 
 CkDDT_HVector::CkDDT_HVector(int nCount, int blength, int stride,  int bindex,
-                         CkDDT_DataType* type, int oldtype_)
+                         CkDDT_DataType* type)
 {
+  datatype = CkDDT_HVECTOR;
   count = nCount ;
-  oldtype = oldtype_;
   blockLength = blength ;
   strideLength = stride ;
 
@@ -632,6 +635,7 @@ CkDDT_HVector::CkDDT_HVector(int nCount, int blength, int stride,  int bindex,
 
   lb = baseType->getLB();
   ub = lb + extent;
+  iscontig = 0;  
 }
 
 int
@@ -666,16 +670,16 @@ int CkDDT_HVector::getContents(int ni, int na, int nd, int i[], int a[], int d[]
   i[0] = count;
   i[1] = blockLength;
   a[0] = strideLength;
-  d[0] = oldtype;
+  d[0] = baseIndex;
   return 0;
 }
 
 CkDDT_Indexed::CkDDT_Indexed(int nCount, int* arrBlock, int* arrDisp, int bindex,
-                         CkDDT_DataType* base, int oldtype_)
+                         CkDDT_DataType* base)
 {
+  datatype = CkDDT_INDEXED;
   count = nCount ;
-  oldtype = oldtype_;
-
+  
   baseType = base;
   baseIndex = bindex;
 
@@ -694,6 +698,7 @@ CkDDT_Indexed::CkDDT_Indexed(int nCount, int* arrBlock, int* arrDisp, int bindex
 
   lb = baseType->getLB();
   ub = lb + extent;
+  iscontig = 0;  
 }
 
 int
@@ -724,16 +729,17 @@ CkDDT_Indexed::~CkDDT_Indexed()
 void
 CkDDT_Indexed::pupType(PUP::er &p, CkDDT* ddt)
 {
+  p(datatype);
   p(size);
   p(extent);
   p(count);
   p(baseSize);
   p(baseExtent);
   p(baseIndex);
-  p(oldtype);
   p(lb);
   p(ub);
-
+  p(iscontig);
+  
   if(p.isUnpacking() )  arrayBlockLength = new int[count] ;
   p(arrayBlockLength, count);
 
@@ -757,16 +763,16 @@ int CkDDT_Indexed::getContents(int ni, int na, int nd, int i[], int a[], int d[]
     i[z+1] = arrayBlockLength[z];
     i[z+i[0]+1] = arrayDisplacements[z];
   }
-  d[0] = oldtype;
+  d[0] = baseIndex;
   return 0;
 }
 
 CkDDT_HIndexed::CkDDT_HIndexed(int nCount, int* arrBlock, int* arrDisp,  int bindex,
-                           CkDDT_DataType* base, int oldtype_)
+                           CkDDT_DataType* base)
 {
+  datatype = CkDDT_HINDEXED;
   count = nCount ;
-  oldtype = oldtype_;
-
+  
   baseType = base;
   baseIndex = bindex;
 
@@ -785,6 +791,7 @@ CkDDT_HIndexed::CkDDT_HIndexed(int nCount, int* arrBlock, int* arrDisp,  int bin
 
   lb = baseType->getLB();
   ub = lb + extent;
+  iscontig = 0;  
 }
 
 int
@@ -826,23 +833,24 @@ int CkDDT_HIndexed::getContents(int ni, int na, int nd, int i[], int a[], int d[
     i[z+1] = arrayBlockLength[z];
     a[z] = arrayDisplacements[z];
   }
-  d[0] = oldtype;
+  d[0] = baseIndex;
   return 0;
 }
 
 CkDDT_Struct::CkDDT_Struct(int nCount, int* arrBlock,
-                       int* arrDisp, int *bindex, CkDDT_DataType** arrBase, int* oldtypes_)
+                       int* arrDisp, int *bindex, CkDDT_DataType** arrBase)
 {
   int basesize ;
   int baseextent ;
   int idxLB=-1, idxUB=-1;
-  count = nCount ;
   int lblb, ubub; // lb and ub collected from LB and UB types
+
+  datatype = CkDDT_STRUCT;
+  count = nCount ;
 
   arrayBlockLength = new int[count] ;
   arrayDisplacements = new int[count] ;
   arrayDataType = new CkDDT_DataType*[count];
-  oldtypes = new int[count];
   index = new int[count];
   //check this...
 
@@ -851,7 +859,6 @@ CkDDT_Struct::CkDDT_Struct(int nCount, int* arrBlock,
     arrayBlockLength[i] = arrBlock[i] ;
     arrayDisplacements[i] = arrDisp[i] ;
     arrayDataType[i] =  arrBase[i];
-    oldtypes[i] = oldtypes_[i];
     index[i] = bindex[i];
     basesize = arrayDataType[i]->getSize();
     baseextent = arrayDataType[i]->getExtent();
@@ -882,6 +889,7 @@ CkDDT_Struct::CkDDT_Struct(int nCount, int* arrBlock,
   if(ub > ubub) ub = ubub;
   if(lb < lblb) lb = lblb;
   extent = ub - lb;
+  iscontig = 0;  
 }
 
 int
@@ -906,23 +914,23 @@ CkDDT_Struct::serialize(char* userdata, char* buffer, int num, int dir)
 void
 CkDDT_Struct::pupType(PUP::er &p, CkDDT* ddt)
 {
+  p(datatype);
   p(size);
   p(extent);
   p(count);
   p(lb);
   p(ub);
+  p(iscontig);
   if(p.isUnpacking())
   {
     arrayBlockLength = new int[count] ;
     arrayDisplacements = new int[count] ;
     index = new int[count] ;
     arrayDataType = new CkDDT_DataType*[count] ;
-    oldtypes = new int[count];
   }
   p(arrayBlockLength, count);
   p(arrayDisplacements, count);
   p(index, count);
-  p(oldtypes, count);
 
   if(p.isUnpacking())
     for(int i=0 ; i < count; i++)
@@ -942,7 +950,7 @@ int CkDDT_Struct::getContents(int ni, int na, int nd, int i[], int a[], int d[])
   for(int z=0;z<i[0];z++){
     i[z+1] = arrayBlockLength[z];
     a[z] = arrayDisplacements[z];
-    d[z] = oldtypes[z];
+    d[z] = index[z];
   }
   return 0;
 }
