@@ -220,11 +220,11 @@ static void CmiPushPE(int pe,void *msg)
   }
 #endif
   CmiIdleLock_addMessage(&cs->idle); 
-#ifndef CMK_SMP
+#ifdef CMK_SMP
   CmiCommLock();
 #endif
   PCQueuePush(cs->recv,msg);
-#ifndef CMK_SMP
+#ifdef CMK_SMP
   CmiCommUnlock();
 #endif
 }
