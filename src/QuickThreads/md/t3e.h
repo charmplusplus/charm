@@ -19,7 +19,7 @@
 typedef unsigned long qt_word_t;
 
 
-/* Stack layout on the Alpha:
+/* Stack layout on the T3E:
 
    Integer:
 
@@ -49,9 +49,6 @@ typedef unsigned long qt_word_t;
    | f4
    | f3
    | f2
-   | r26
-   +---
-   | padding
    | r29
    | r15
    | r14
@@ -63,29 +60,6 @@ typedef unsigned long qt_word_t;
    | r26	on startup === qt_start		<--- qt.sp
    +---
 
-   Conventions for varargs startup:
-
-   |  :
-   | arg6
-   | iarg5
-   |  :
-   | iarg0
-   | farg5
-   |  :
-   | farg0
-   +---
-   | padding
-   | r29
-   | r15
-   | r14
-   | r13
-   | r12	on startup === `startup'
-   | r11	on startup === `vuserf'
-   | r10	on startup === `cleanup'
-   | r9		on startup === `qt'
-   | r26	on startup === qt_vstart	<--- qt.sp
-   +---
-
    Note: this is a pretty cheap/sleazy way to get things going,
    but ``there must be a better way.''  For instance, some varargs
    parameters could be loaded in to integer registers, or the return
@@ -94,21 +68,15 @@ typedef unsigned long qt_word_t;
 
 /* Stack must be 16-byte aligned. */
 #define QT_STKALIGN	(16)
-
-/* How much space is allocated to hold all the crud for
-   initialization: 7 registers times 8 bytes/register. */
-
-#define QT_STKBASE	(10 * 8)
+#define QT_STKBASE	256
 #define QT_VSTKBASE	QT_STKBASE
 
-
 /* Offsets of various registers. */
-#define QT_R26	0
-#define QT_R9	1
-#define QT_R10	2
-#define QT_R11	3
-#define QT_R12	4
-
+#define QT_R26	11
+#define QT_R9	12
+#define QT_R10	13
+#define QT_R11	14
+#define QT_R12	15
 
 /* When a never-before-run thread is restored, the return pc points
    to a fragment of code that starts the thread running.  For

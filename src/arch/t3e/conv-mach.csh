@@ -45,4 +45,4 @@ set CMK_NM='nm'
 set CMK_NM_FILTER="grep ' T ' | awk '{print "'$'"3;}'"
 set CMK_CPP_SUFFIX="i"
 set CMK_XLATPP='charmxlat++ '
-set CMK_QT='t3e'
+set CMK_QT='cray-t3e-cc'
