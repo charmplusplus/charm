@@ -16,17 +16,49 @@ static char ident[] = "@(#)$Header$";
 
 #include <stdio.h>
 #include "converse.h"
-#ifdef CMK_USLEEP_WHEN_PROCESSOR_IDLE
+#include <errno.h>
+
+#if CMK_WHEN_PROCESSOR_IDLE_USLEEP
 #include <sys/types.h>
 #include <sys/time.h>
 #endif
 
+#if CMK_TIMER_USE_TIMES
+#include <sys/times.h>
+#include <limits.h>
+#include <unistd.h>
+#endif
+
+#if CMK_TIMER_USE_GETRUSAGE
+#include <sys/rusage.h>
+#endif
+
+/*****************************************************************************
+ *
+ * Unix Stub Functions
+ *
+ ****************************************************************************/
+
+#if CMK_STRERROR_USE_SYS_ERRLIST
+extern char *sys_errlist[];
+char *strerror(i) int i; { return sys_errlist[i]; }
+#endif
+
+#if CMK_SIGHOLD_USE_SIGMASK
+int sighold(sig) int sig;
+{ if (sigblock(sigmask(sig)) < 0) return -1;
+  else return 0; }
+int sigrelse(sig) int sig;
+{ if (sigsetmask(sigblock(0)&(~sigmask(sig))) < 0) return -1;
+  else return 0; }
+#endif
+
 #define MAX_HANDLERS 512
 
-void        *CmiGetNonLocal();
+void  *CmiGetNonLocal();
 
 CpvDeclare(int, disable_sys_msgs);
-CpvExtern(int, CcdNumChecks) ;
+CpvExtern(int,    CcdNumChecks) ;
 CpvDeclare(void*, CsdSchedQueue);
 CpvDeclare(int,   CsdStopFlag);
 
@@ -127,6 +159,224 @@ static void CmiHandlerInit()
     (CmiHandler *)CmiAlloc((MAX_HANDLERS + 1) * sizeof(CmiHandler)) ;
 }
 
+/******************************************************************************
+ *
+ * CmiTimer
+ *
+ * Here are two possible implementations of CmiTimer.  Some machines don't
+ * select either, and define the timer in machine.c instead.
+ *
+ *****************************************************************************/
+
+#if CMK_TIMER_USE_TIMES
+
+static double  clocktick;
+static int     inittime_wallclock;
+static int     inittime_virtual;
+
+void CmiTimerInit()
+{
+  struct tms temp;
+  inittime_wallclock = times(&temp);
+  inittime_virtual = temp.tms_utime + temp.tms_stime;
+  clocktick = 1.0 / (sysconf(_SC_CLK_TCK));
+}
+
+double CmiWallTimer()
+{
+  struct tms temp;
+  double currenttime;
+  int now;
+
+  now = times(&temp);
+  currenttime = (now - inittime_wallclock) * clocktick;
+  return (currenttime);
+}
+
+double CmiCpuTimer()
+{
+  struct tms temp;
+  double currenttime;
+  int now;
+
+  times(&temp);
+  now = temp.tms_stime + temp.tms_utime;
+  currenttime = (now - inittime_virtual) * clocktick;
+  return (currenttime);
+}
+
+double CmiTimer()
+{
+  return CmiCpuTimer();
+}
+
+#endif
+
+#if CMK_TIMER_USE_GETRUSAGE
+
+static double inittime_wallclock;
+static double inittime_virtual;
+
+void CmiTimerInit()
+{
+  struct timeval tv;
+  struct rusage ru;
+  gettimeofday(&tv);
+  inittime_wallclock = (tv.tv_sec * 1.0) + (tv.tv_usec*0.000001);
+  getrusage(0, &ru); 
+  inittime_virtual =
+    (ru.ru_utime.tv_sec * 1.0)+(ru.ru_utime.tv_usec * 0.000001) +
+    (ru.ru_stime.tv_sec * 1.0)+(ru.ru_stime.tv_usec * 0.000001);
+}
+
+double CmiCpuTimer()
+{
+  struct rusage ru;
+  double currenttime;
+
+  getrusage(0, &ru);
+  currenttime =
+    (ru.ru_utime.tv_sec * 1.0)+(ru.ru_utime.tv_usec * 0.000001) +
+    (ru.ru_stime.tv_sec * 1.0)+(ru.ru_stime.tv_usec * 0.000001);
+  return currenttime - inittime_virtual;
+}
+
+double CmiWallTimer()
+{
+  struct timeval tv;
+  double currenttime;
+
+  getttimeofday(&tv);
+  currenttime = (tv.tv_sec * 1.0) + (tv.tv_usec * 0.000001);
+  return currenttime - inittime_wallclock;
+}
+
+double CmiTimer()
+{
+  return CmiCpuTimer();
+}
+
+#endif
+
+
+/******************************************************************************
+ *
+ * CmiEnableAsyncIO
+ *
+ * Some possible versions of CmiEnableAsyncIO.  Not all machines use CmiEnableAsyncIO,
+ * but it's common enough to belong in the common code.
+ *
+ *****************************************************************************/
+
+#if CMK_ASYNC_USE_FIOASYNC_AND_FIOSETOWN
+#include <sys/filio.h>
+void CmiEnableAsyncIO(fd)
+int fd;
+{
+  int pid = getpid();
+  int async = 1;
+  if ( ioctl(fd, FIOSETOWN, &pid) < 0  ) {
+    CmiError("setting socket owner: %s\n", strerror(errno)) ;
+    exit(1);
+  }
+  if ( ioctl(fd, FIOASYNC, &async) < 0 ) {
+    CmiError("setting socket async: %s\n", strerror(errno)) ;
+    exit(1);
+  }
+}
+#endif
+
+#if CMK_ASYNC_USE_FIOASYNC_AND_SIOCSPGRP
+#include <sys/filio.h>
+void CmiEnableAsyncIO(fd)
+int fd;
+{
+  int pid = -getpid();
+  int async = 1;
+  if ( ioctl(fd, SIOCSPGRP, &pid) < 0  ) {
+    CmiError("setting socket owner: %s\n", strerror(errno)) ;
+    exit(1);
+  }
+  if ( ioctl(fd, FIOASYNC, &async) < 0 ) {
+    CmiError("setting socket async: %s\n", strerror(errno)) ;
+    exit(1);
+  }
+}
+#endif
+
+#if CMK_ASYNC_USE_FIOSSAIOSTAT_AND_FIOSSAIOOWN
+#include <sys/ioctl.h>
+void CmiEnableAsyncIO(fd)
+int fd;
+{
+  int pid = getpid();
+  int async = 1;
+  if ( ioctl(fd, FIOSSAIOOWN, &pid) < 0  ) {
+    CmiError("setting socket owner: %s\n", strerror(errno)) ;
+    exit(1);
+  }
+  if ( ioctl(fd, FIOSSAIOSTAT, &async) < 0 ) {
+    CmiError("setting socket async: %s\n", strerror(errno)) ;
+    exit(1);
+  }
+}
+#endif
+
+#if CMK_ASYNC_USE_F_SETFL_AND_F_SETOWN
+#include <fcntl.h>
+void CmiEnableAsyncIO(fd)
+int fd;
+{
+  if ( fcntl(fd, F_SETOWN, getpid()) < 0 ) {
+    CmiError("setting socket owner: %s\n", strerror(errno)) ;
+    exit(1);
+  }
+  if ( fcntl(fd, F_SETFL, FASYNC) < 0 ) {
+    CmiError("setting socket async: %s\n", strerror(errno)) ;
+    exit(1);
+  }
+}
+#endif
+
+#if CMK_SIGNAL_USE_SIGACTION
+#include <signal.h>
+void CmiSignal(sig, handler)
+int sig;
+void (*handler)();
+{
+  struct sigaction in, out ;
+  in.sa_handler = handler;
+  sigemptyset(&in.sa_mask);
+  in.sa_flags = 0;
+  sigaction(sig, &in, &out);
+}
+#endif
+
+#if CMK_SIGNAL_USE_SIGACTION_WITH_RESTART
+#include <signal.h>
+void CmiSignal(sig, handler)
+int sig;
+void (*handler)();
+{
+  struct sigaction in, out ;
+  in.sa_handler = handler ;
+  sigemptyset(&in.sa_mask);
+  in.sa_flags = SA_RESTART; 
+  if(sigaction(sig, &in, &out) == -1)
+      exit(1);
+}
+#endif
+
+#if CMK_SIGNAL_IS_A_BUILTIN
+#include <signal.h>
+void CmiSignal(sig, handler)
+int sig;
+void (*handler)();
+{
+  signal(sig, handler) ;
+}
+#endif
+
 /*****************************************************************************
  *
  * The following are the CmiDeliverXXX functions.  A common implementation
@@ -189,7 +439,7 @@ static void CmiHandlerInit()
  *
  *****************************************************************************/
 
-#ifdef CMK_USES_COMMON_CMIDELIVERS
+#if CMK_CMIDELIVERS_USE_COMMON_CODE
 
 CpvStaticDeclare(int, CmiBufferGrabbed);
 CpvExtern(void*, CmiLocalQueue);
@@ -277,7 +527,7 @@ int handler;
   }
 }
 
-#endif /* CMK_USES_COMMON_CMIDELIVERS */
+#endif /* CMK_CMIDELIVERS_USE_COMMON_CODE */
 
 /*****************************************************************************
  *
@@ -376,7 +626,7 @@ int maxmsgs;
       if (CpvAccess(CsdStopFlag)) return maxmsgs;
       maxmsgs--; if (maxmsgs==0) return maxmsgs;
     } else { /* Processor is idle */
-#ifdef CMK_USLEEP_WHEN_PROCESSOR_IDLE
+#if CMK_WHEN_PROCESSOR_IDLE_USLEEP
       struct timeval tv;
       tv.tv_usec=10000; tv.tv_sec=0;
       select(0,0,0,0,&tv);
@@ -431,7 +681,7 @@ char **argv;
   CmiInterruptsInit();
   CmiInitMc(argv);
   CsdInit(argv);
-#ifdef CMK_CTHINIT_IS_IN_CONVERSEINIT
+#if CMK_CTHINIT_IS_IN_CONVERSEINIT
   CthInit(argv);
 #endif
   CthSchedInit();

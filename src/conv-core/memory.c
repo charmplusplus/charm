@@ -6,9 +6,9 @@
  * There are several possible implementations provided here, each machine can
  * choose whichever one is best using one of the following flags.
  *
- * CMK_USE_OS_MALLOC
- * CMK_USE_GNU_MALLOC
- * CMK_USE_GNU_MALLOC_WITH_INTERRUPT_SUPPORT
+ * CMK_MALLOC_USE_OS_BUILTIN
+ * CMK_MALLOC_USE_GNU
+ * CMK_MALLOC_USE_GNU_WITH_INTERRUPT_SUPPORT
  *
  *****************************************************************************/
 
@@ -16,13 +16,13 @@
 
 /*****************************************************************************
  *
- * CMK_USE_OS_MALLOC
+ * CMK_MALLOC_USE_OS_BUILTIN
  *
  * Just use the OS's built-in malloc.  All we provide is CmiMemoryInit.
  *
  *****************************************************************************/
 
-#ifdef CMK_USE_OS_MALLOC
+#if CMK_MALLOC_USE_OS_BUILTIN
 
 void CmiMemoryInit(argv)
   char **argv;
@@ -33,14 +33,14 @@ void CmiMemoryInit(argv)
 
 /*****************************************************************************
  *
- * CMK_USE_GNU_MALLOC
+ * CMK_MALLOC_USE_GNU
  *
  * The GNU memory allocator is a good all-round memory allocator for
  * distributed memory machines.  It has no support for shared memory.
  *
  *****************************************************************************/
 
-#ifdef CMK_USE_GNU_MALLOC
+#if CMK_MALLOC_USE_GNU
 
 void CmiMemoryInit(argv)
   char **argv;
@@ -54,7 +54,7 @@ void CmiMemoryInit(argv)
 
 /*****************************************************************************
  *
- * CMK_USE_GNU_MALLOC_WITH_INTERRUPT_SUPPORT
+ * CMK_MALLOC_USE_GNU_WITH_INTERRUPT_SUPPORT
  *
  * This setting uses the GNU memory allocator, however, it surrounds every
  * memory routines with CmiInterruptsBlock and CmiInterruptsRelease (to make
@@ -70,7 +70,7 @@ void CmiMemoryInit(argv)
  * 
  *****************************************************************************/
 
-#ifdef CMK_USE_GNU_MALLOC_WITH_INTERRUPT_SUPPORT
+#if CMK_MALLOC_USE_GNU_WITH_INTERRUPT_SUPPORT
 
 #define malloc   CmiMemory_Gnu_malloc
 #define free     CmiMemory_Gnu_free
@@ -164,4 +164,4 @@ char *valloc(size)
     return result;
 }
 
-#endif /* CMK_USE_GNU_MALLOC_WITH_INTERRUPT_SUPPORT */
+#endif /* CMK_MALLOC_USE_GNU_WITH_INTERRUPT_SUPPORT */

@@ -13,7 +13,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 1.22  1996-07-02 21:01:39  jyelon
+ * Revision 1.23  1996-07-15 21:00:49  jyelon
+ * Moved some code into common, changed mach-flags from #ifdef to #if
+ *
+ * Revision 1.22  1996/07/02 21:01:39  jyelon
  * Added CMK_THREADS_USE_JB_TWEAKING
  *
  * Revision 1.21  1995/10/31 19:53:21  jyelon
@@ -198,15 +201,15 @@
  *
  *****************************************************************************/
 
-#ifdef CMK_THREADS_USE_ALLOCA_WITH_HEADER_FILE
+#if CMK_THREADS_USE_ALLOCA_WITH_HEADER_FILE
 #include <alloca.h>
 #endif
 
-#ifdef CMK_THREADS_USE_ALLOCA_WITH_PRAGMA
+#if CMK_THREADS_USE_ALLOCA_WITH_PRAGMA
 #pragma alloca
 #endif
 
-#ifdef CMK_THREADS_USE_ALLOCA
+#if CMK_THREADS_USE_ALLOCA
 #include <stdio.h>
 #include <setjmp.h>
 #include <sys/types.h>
@@ -425,7 +428,7 @@ int size;
  *
  ****************************************************************************/
 
-#ifdef CMK_THREADS_USE_JB_TWEAKING
+#if CMK_THREADS_USE_JB_TWEAKING
 
 #include <stdio.h>
 #include <setjmp.h>
@@ -670,7 +673,7 @@ int size;
  *
  *****************************************************************************/
 
-#ifdef CMK_THREADS_USE_EATSTACK
+#if CMK_THREADS_USE_EATSTACK
 #include <setjmp.h>
 #include <sys/types.h>
 
@@ -948,7 +951,7 @@ char **argv;
  *
  *****************************************************************************/
 
-#ifdef CMK_THREADS_UNAVAILABLE
+#if CMK_THREADS_UNAVAILABLE
 
 static void CthFail()
 {
