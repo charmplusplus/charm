@@ -21,6 +21,9 @@ char ** avail_vector_address;
 int * lb_ptr;
 int load_balancer_created;
 
+// the default file in which the load balancing data will be dumped
+const char defaultDumpFileName[] = "lbdata.dat";
+
 #if CMK_LBDB_ON
 
 void CreateCentralLB()
@@ -37,7 +40,7 @@ void set_avail_vector(char * bitmap){
 	    *lb_ptr = count;
 	    assigned = 1;
 	}
-    }   
+    }
 }
 
 void CentralLB::staticStartLB(void* data)
@@ -126,7 +129,7 @@ void CentralLB::ProcessAtSync()
   // Send stats
   const int osz = theLbdb->GetObjDataSz();
   const int csz = theLbdb->GetCommDataSz();
-  
+
   int npes = CkNumPes();
   CLBStatsMsg* msg = new(osz, csz, npes, 0) CLBStatsMsg;
   msg->from_pe = CkMyPe();
@@ -156,7 +159,7 @@ void CentralLB::ProcessAtSync()
       int num_proc = CkNumPes();
       for(int proc = 0; proc < num_proc; proc++){
 	  msg->avail_vector[proc] = avail_vector[proc];
-      } 
+      }
       msg->next_lb = new_ld_balancer;
   }
 
@@ -184,7 +187,7 @@ void CentralLB::ReceiveStats(CLBStatsMsg *m)
       new_ld_balancer = m->next_lb;
       int num_proc = CkNumPes();
       for(int proc = 0; proc < num_proc; proc++)
-	  avail_vector[proc] = m->avail_vector[proc]; 
+	  avail_vector[proc] = m->avail_vector[proc];
   }
 
   DEBUGF(("ReceiveStats from %d step: %d\n", pe, mystep));
@@ -216,8 +219,18 @@ void CentralLB::ReceiveStats(CLBStatsMsg *m)
 //    CkPrintf("Before setting bitmap\n");
     for(proc = 0; proc < clients; proc++)
       statsDataList[proc].available = (CmiBool)avail_vector[proc];
-    
+
 //    CkPrintf("Before Calling Strategy\n");
+
+	// if this is the step at which we need to dump the database
+	if(step() == CkpvAccess(dumpStep))
+	{
+		// here we are supposed to dump the database
+		writeStatsMsgs((CkpvAccess(dumpFile) != NULL) ? CkpvAccess(dumpFile) : defaultDumpFileName);
+		CmiPrintf("LBDump: Dumped the load balancing data.\n");
+		CkExit();
+		return;
+	}
 
     LBMigrateMsg* migrateMsg = Strategy(statsDataList,clients);
 
@@ -253,7 +266,7 @@ void CentralLB::ReceiveStats(CLBStatsMsg *m)
     double strat_end_time = CmiWallTimer();
     //     CkPrintf("Strat elapsed time %f\n",strat_end_time-strat_start_time);
   }
-  
+
 }
 
 // test if sender and receiver in a commData is nonmigratable.
@@ -451,8 +464,6 @@ void CentralLB::writeStatsMsgs(const char* filename) {
   for (i = 0; i < stats_msg_count; i++) {
     CkPupMessage(p, (void **)&statsMsgsList[i], 0);
   }
-
-  fclose(f);
   CmiPrintf("writeStatsMsgs to %s\n", filename);
 }
 
