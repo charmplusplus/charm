@@ -761,9 +761,9 @@ static void CommunicationInterrupt(int ignored)
   {
     /*Make sure any malloc's we do in here are NOT migratable:*/
     CmiIsomallocBlockList *oldList=CmiIsomallocBlockListActivate(NULL);
-    Cmi_myrank=1;
+//    Cmi_myrank=1;
     CommunicationServerThread(0);
-    Cmi_myrank=0;
+//    Cmi_myrank=0;
     CmiIsomallocBlockListActivate(oldList);
   }
   MACHSTATE(2,"--END SIGIO--")
@@ -1897,6 +1897,13 @@ static void set_signals(void)
 */
 static void obtain_idleFn(void) {sleep(0);}
 
+static int net_default_skt_abort(int code,const char *msg)
+{
+  fprintf(stderr,"Fatal socket error: code %d-- %s\n",code,msg);
+  machine_exit(1);
+  return -1;
+}
+
 void ConverseInit(int argc, char **argv, CmiStartFn fn, int usc, int everReturn)
 {
 #if MACHINE_DEBUG
@@ -1932,6 +1939,9 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usc, int everReturn)
   MACHSTATE2(5,"Init: (netpoll=%d), (idlepoll=%d)",Cmi_netpoll,Cmi_idlepoll);
 
   skt_init();
+  /* use special abort handler instead of default_skt_abort to 
+     prevent exit trapped by atexit_check() due to the exit() call  */
+  skt_set_abort(net_default_skt_abort);
   atexit(machine_atexit_check);
   parse_netstart();
   extract_args(argv);
