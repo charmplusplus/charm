@@ -113,6 +113,20 @@ init(void)
   delete[] nodes;
   delete[] elements;
   delete[] noData;
+
+#if 0 //Test out the serial split routines
+  int nchunks=10;
+  printf("Splitting into %d pieces:\n");
+  FEM_Serial_Split(nchunks);
+  for (int i=0;i<nchunks;i++) {
+    FEM_Serial_Begin(i);
+    int node,elem,ignored;
+    FEM_Get_Node(&node,&ignored);
+    FEM_Get_Elem(0,&elem,&ignored,&ignored);
+    printf(" partition[%d] has %d nodes, %d elems\n",i,node,elem);
+  }
+  FEM_Done();
+#endif
 }
 
 typedef struct _node {
