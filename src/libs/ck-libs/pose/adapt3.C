@@ -94,6 +94,8 @@ void adapt3::Step()
   if (timeLeash < avgTimeLeash) // average out
     timeLeash += (avgTimeLeash-timeLeash)/2;
   else timeLeash -= (timeLeash-avgTimeLeash)/2;
+  if (specEventCount > 1.5 * eventCount)
+    timeLeash /= 2;
   // reaction to future
   if (timeLeash < (eq->largest - lastGVT)) // speculate
     timeLeash += (eq->largest - (timeLeash+lastGVT))/2;

@@ -34,11 +34,16 @@ void PVT::startPhase()
 #ifdef POSE_STATS_ON
   localStats->TimerStart(GVT_TIMER);
 #endif
+  CkPrintf("foo 1\n");
   CProxy_GVT g(TheGVT);
   static int gvtTurn = 0;
   int i;
 
+  CkPrintf("foo 2\n");
+
   objs.Wake(); // wake objects to make sure all have reported
+
+  CkPrintf("foo 3\n");
 
   // compute PVT
   optPVT = conPVT = POSE_UnsetTS;
@@ -60,6 +65,7 @@ void PVT::startPhase()
       CkAssert(simdone || (optPVT >= estGVT)||(optPVT == POSE_UnsetTS)||(estGVT == POSE_UnsetTS));
       CkAssert(simdone || (conPVT >= estGVT)||(conPVT == POSE_UnsetTS)||(estGVT == POSE_UnsetTS));
     }
+  CkPrintf("foo 4\n");
 
   // pack PVT data
   // (1) Find out the local PVT from optPVT and conPVT
@@ -68,8 +74,11 @@ void PVT::startPhase()
   if ((iterMin < pvt) && (iterMin > POSE_UnsetTS)) pvt = iterMin;
   if (waitForFirst) {
     waitForFirst = 0;
+    CkPrintf("foo 4.1\n");
     SendsAndRecvs->Restructure(estGVT, pvt, POSE_UnsetTS);
+    CkPrintf("foo 4.2\n");
   }
+  CkPrintf("foo 5\n");
   // (2) Pack the SRtable data into the message
   UpdateMsg *um = SendsAndRecvs->PackTable(pvt);
   // (3) Add the PVT info to the message
@@ -77,6 +86,7 @@ void PVT::startPhase()
   um->conPVT = conPVT;
   um->runGVTflag = 0;
 
+  CkPrintf("foo 6\n");
   // send data to GVT estimation
   if (simdone) // transmit final info to GVT on PE 0
     g[0].computeGVT(um);              
@@ -84,11 +94,14 @@ void PVT::startPhase()
     g[gvtTurn].computeGVT(um);           // transmit info to GVT
     gvtTurn = (gvtTurn + 1) % CkNumPes();  // calculate next GVT location
   }
+
+  CkPrintf("foo 7\n");
   objs.SetIdle(); // Set objects to idle
   iterMin = POSE_UnsetTS;
 #ifdef POSE_STATS_ON
   localStats->TimerStop();
 #endif
+  CkPrintf("foo 8\n");
 }
 
 /// ENTRY: receive GVT estimate; wake up objects
