@@ -2105,9 +2105,11 @@ void CmiInitImmediateMsg(void)
 }
 
 #if !CMK_IMMEDIATE_MSG
+#if !CMK_MACHINE_PROGRESS_DEFINED
 void CmiProbeImmediateMsg()
 {
 }
+#endif
 #endif 
 
 /******** Idle timeout module (+idletimeout=30) *********/
