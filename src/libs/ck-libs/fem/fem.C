@@ -78,8 +78,8 @@ static FEM_Mesh* _meshptr = 0;
 //Maps element number to (0-based) chunk number, allocated with new[]
 static int *_elem2chunk=NULL;
 
-static int nGhostLayers=0;
-static ghostLayer ghostLayers[10];
+
+static FEM_Ghost ghosts;
 static ghostLayer *curGhostLayer=NULL;
 
 //Partitions and splits the current serial mesh into the given number of pieces
@@ -91,8 +91,7 @@ static void mesh_split(int _nchunks,MeshChunkOutput *out) {
     	fem_partition(_meshptr,_nchunks,elem2chunk);
     }
     //Build communication lists and split mesh data
-    fem_split(_meshptr,_nchunks,elem2chunk,
-	      nGhostLayers,ghostLayers,out);
+    fem_split(_meshptr,_nchunks,elem2chunk,ghosts,out);
     //Blow away old partitioning
     delete[] elem2chunk; _elem2chunk=NULL;
     delete _meshptr; _meshptr=NULL;
@@ -431,6 +430,13 @@ static const FEM_Mesh *getMesh(void) {
     return _meshptr;
   }
 }
+
+/********** Symmetries **********/
+#if 0
+CDECL fixme:
+	int nNodes=getMesh()->node.n;
+	ghosts.setSymmetries(copyArray(inCanon,nNodes,0),...);
+#endif
 
 /********** Sparse data ********/
 void FEM_Sparse::allocate(int n_) //Allocate storage for data and nodes of n tuples
@@ -1725,7 +1731,7 @@ FDECL void FTN_NAME(FEM_GET_NODE_NUMBERS,fem_get_node_numbers)
 CDECL void FEM_Add_Ghost_Layer(int nodesPerTuple,int doAddNodes)
 {
 	FEMAPI("FEM_Add_Ghost_Layer");
-	curGhostLayer=&ghostLayers[nGhostLayers++];
+	curGhostLayer=ghosts.addLayer();
 	curGhostLayer->nodesPerTuple=nodesPerTuple;
 	curGhostLayer->addNodes=(doAddNodes!=0);
 	curGhostLayer->elem.makeLonger(getMesh()->elem.size());
