@@ -16,6 +16,14 @@
        integer, parameter :: MPI_MIN = 2
        integer, parameter :: MPI_SUM = 3
        integer, parameter :: MPI_PROD = 4
+       integer, parameter :: MPI_MAXLOC = 5
+       integer, parameter :: MPI_MINLOC = 6
+       integer, parameter :: MPI_LAND = 7
+       integer, parameter :: MPI_LOR = 8
+       integer, parameter :: MPI_LXOR = 9
+       integer, parameter :: MPI_BAND = 10
+       integer, parameter :: MPI_BOR = 11
+       integer, parameter :: MPI_BXOR = 12
 
        integer, parameter :: MPI_ANY_SOURCE = -1
        integer, parameter :: MPI_ANY_TAG = -1

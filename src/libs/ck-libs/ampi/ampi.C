@@ -18,7 +18,6 @@ int MPI_COMM_UNIVERSE[MPI_MAX_COMM_WORLDS]; /*Accessed by user code*/
 
 
 // ------------ maxLoc/minLoc reduction support -----------
-
 // The Sun CC compiler (and possibly others) *can't* build
 //  a function pointer from a template without a templated
 //  argument in the argument list.  Hence these dummy arguments.
@@ -66,7 +65,7 @@ CkReductionMsg *minLoc(int nMsg,CkReductionMsg **msgs
 #if STUPID_SUN_TEMPLATES
 		       ,VType ignored1,IType ignored2
 #endif
-		       ) 
+		       )
 {
   class PairType{
   public:
@@ -97,6 +96,98 @@ CkReductionMsg *minLoc(int nMsg,CkReductionMsg **msgs
   return retmsg;
 }
 
+// ------------ logical/bitwise and/or/xor reduction support -----------
+// Logical operations are for integer (sometimes disguised as logical)
+// Bitwise operations are for both integer and byte
+// Logical AND and OR have been implemented in Charm++
+CkReductionMsg *LXOR(int nMsg,CkReductionMsg **msgs)
+{
+	int size = msgs[0]->getSize();
+	int count = size/sizeof(int);
+	int *m;
+	int *ret = new int [count];
+	// assuming nMsg > 0
+	m = (int*)msgs[0]->getData();
+	for(int j=0;j<count;j++)  ret[j] = m[j];
+	for(int i=1;i<nMsg;i++){
+		m = (int *)msgs[i]->getData();
+		for(int j=0;j<count;j++)  ret[j] = (ret[j]&&(!m[j]))||(!(ret[j])&&m[j]); //emulate ^^
+	}
+	CkReductionMsg *retmsg = CkReductionMsg::buildNew(size,ret);
+	delete [] ret;
+	return retmsg;
+}
+
+template <class Type>
+CkReductionMsg *BAND(int nMsg,CkReductionMsg **msgs
+#if STUPID_SUN_TEMPLATES
+		       ,Type ignored
+#endif
+			)
+{
+	int size = msgs[0]->getSize();
+	int count = size/sizeof(Type);
+	Type *m;
+	Type *ret = new Type [count];
+	// assuming nMsg > 0
+	m = (Type *)msgs[0]->getData();
+	for(int j=0;j<count;j++)  ret[j] = m[j];
+	for(int i=1;i<nMsg;i++){
+		m = (Type *)msgs[i]->getData();
+		for(int j=0;j<count;j++)  ret[j] = (m[j] & ret[j]);
+	}
+	CkReductionMsg *retmsg = CkReductionMsg::buildNew(size,ret);
+	delete [] ret;
+	return retmsg;
+}
+
+template <class Type>
+CkReductionMsg *BOR(int nMsg,CkReductionMsg **msgs
+#if STUPID_SUN_TEMPLATES
+		       ,Type ignored
+#endif
+			)
+{
+	int size = msgs[0]->getSize();
+	int count = size/sizeof(Type);
+	Type *m;
+	Type *ret = new Type [count];
+	// assuming nMsg > 0
+	m = (Type *)msgs[0]->getData();
+	for(int j=0;j<count;j++)  ret[j] = m[j];
+	for(int i=1;i<nMsg;i++){
+		m = (Type *)msgs[i]->getData();
+		for(int j=0;j<count;j++)  ret[j] = (m[j] | ret[j]);
+	}
+	CkReductionMsg *retmsg = CkReductionMsg::buildNew(size,ret);
+	delete [] ret;
+	return retmsg;
+}
+
+template <class Type>
+CkReductionMsg *BXOR(int nMsg,CkReductionMsg **msgs
+#if STUPID_SUN_TEMPLATES
+		       ,Type ignored
+#endif
+			)
+{
+	int size = msgs[0]->getSize();
+	int count = size/sizeof(Type);
+	Type *m;
+	Type *ret = new Type [count];
+	// assuming nMsg > 0
+	m = (Type *)msgs[0]->getData();
+	for(int j=0;j<count;j++)  ret[j] = m[j];
+	for(int i=1;i<nMsg;i++){
+		m = (Type *)msgs[i]->getData();
+		for(int j=0;j<count;j++)  ret[j] = (m[j] ^ ret[j]);
+	}
+	CkReductionMsg *retmsg = CkReductionMsg::buildNew(size,ret);
+	delete [] ret;
+	return retmsg;
+}
+
+
 typedef long double longdouble;
 
 // This hideous little macro calls its argument for
@@ -111,25 +202,37 @@ typedef long double longdouble;
   MACRO(maxLoc,short,int) MACRO(minLoc,short,int) \
   MACRO(maxLoc,longdouble,int) MACRO(minLoc,longdouble,int) \
   MACRO(maxLoc,float,float) MACRO(minLoc,float,float) \
-  MACRO(maxLoc,double,double) MACRO(minLoc,double,double) 
+  MACRO(maxLoc,double,double) MACRO(minLoc,double,double)
+#define BITWISE_MAP_TYPES(MACRO) \
+  MACRO(BAND,int) MACRO(BAND,char) \
+  MACRO(BOR,int) MACRO(BOR,char) \
+  MACRO(BXOR,int) MACRO(BXOR,char)
 
 // Declare the maxLoc/minLoc reducerTypes
 #define MAXMIN_REDUCER(fn,V,I) \
 	CkReduction::reducerType fn##V##I##Reducer;
+#define BITWISE_REDUCER(fn,T) \
+	CkReduction::reducerType fn##T##Reducer;
 MAXMIN_MAP_TYPES(MAXMIN_REDUCER)
+BITWISE_MAP_TYPES(BITWISE_REDUCER)
+CkReduction::reducerType LXORReducer;
 
 // Instantiate the maxLoc/minLoc templates
 #if STUPID_SUN_TEMPLATES
 #  define MAXMIN_INSTANTIATE(fn,V,I) \
   template CkReductionMsg *fn<V,I>(int n,CkReductionMsg **m,V,I); \
   typedef CkReductionMsg *(* fn##V##I##Type)(int n,CkReductionMsg **m,V,I);
+#  define BITWISE_INSTANTIATE(fn,T) \
+  template CkReductionMsg *fn<T>(int n,CkReductionMsg **m,T);\
+  typedef CkReductionMsg *(* fn##T##Type)(int n,CkReductionMsg **m,T);
 #else
 #  define MAXMIN_INSTANTIATE(fn,V,I) \
   template CkReductionMsg *fn<V,I>(int n,CkReductionMsg **m);
+#  define BITWISE_INSTANTIATE(fn,T) \
+  template CkReductionMsg *fn<T>(int n,CkReductionMsg **m);
 #endif
 MAXMIN_MAP_TYPES(MAXMIN_INSTANTIATE)
-
-
+BITWISE_MAP_TYPES(BITWISE_INSTANTIATE)
 
 int _ampi_fallback_setup_count;
 CDECL void MPI_Setup(void);
@@ -179,13 +282,20 @@ static void ampiNodeInit(void)
 #  define MAXMIN_REGISTER(fn,V,I) \
     fn##V##I##Reducer = CkReduction::addReducer( \
 	(CkReduction::reducerFn)(fn##V##I##Type)fn);
+#  define BITWISE_REGISTER(fn,T) \
+    fn##T##Reducer = CkReduction::addReducer( \
+	(CkReduction::reducerFn)(fn##T##Type)fn);
 #else
   /* Sane compiler: just specify template using <> */
 #  define MAXMIN_REGISTER(fn,V,I) \
     fn##V##I##Reducer = CkReduction::addReducer(fn<V,I>);
+#  define BITWISE_REGISTER(fn,T) \
+    fn##T##Reducer = CkReduction::addReducer(fn<T>);
 #endif
   MAXMIN_MAP_TYPES(MAXMIN_REGISTER)
-  
+  BITWISE_MAP_TYPES(BITWISE_REGISTER)
+  LXORReducer=CkReduction::addReducer(LXOR);
+
   nodeinit_has_been_called=1;
 }
 
@@ -968,7 +1078,7 @@ getReductionType(int type, int op)
         case MPI_INT : mytype = CkReduction::max_int; break;
         case MPI_DOUBLE : mytype = CkReduction::max_double; break;
         default:
-          ckerr << "Type " << type << " not supported." << endl;
+          ckerr << "Type " << type << " with Op " << op << " not supported." << endl;
           CmiAbort("exiting");
       }
       break;
@@ -978,7 +1088,7 @@ getReductionType(int type, int op)
         case MPI_INT : mytype = CkReduction::min_int; break;
         case MPI_DOUBLE : mytype = CkReduction::min_double; break;
         default:
-          ckerr << "Type " << type << " not supported." << endl;
+          ckerr << "Type " << type << " with Op " << op << " not supported." << endl;
           CmiAbort("exiting");
       }
       break;
@@ -988,7 +1098,7 @@ getReductionType(int type, int op)
         case MPI_INT : mytype = CkReduction::sum_int; break;
         case MPI_DOUBLE : mytype = CkReduction::sum_double; break;
         default:
-          ckerr << "Type " << type << " not supported." << endl;
+          ckerr << "Type " << type << " with Op " << op << " not supported." << endl;
           CmiAbort("exiting");
       }
       break;
@@ -998,7 +1108,7 @@ getReductionType(int type, int op)
         case MPI_INT : mytype = CkReduction::product_int; break;
         case MPI_DOUBLE : mytype = CkReduction::product_double; break;
         default:
-          ckerr << "Type " << type << " not supported." << endl;
+          ckerr << "Type " << type << " with Op " << op << " not supported." << endl;
           CmiAbort("exiting");
       }
       break;
@@ -1013,7 +1123,7 @@ getReductionType(int type, int op)
 	case MPI_2FLOAT : mytype = maxLocfloatfloatReducer; break;
 	case MPI_2DOUBLE : mytype = maxLocdoubledoubleReducer; break;
         default:
-          ckerr << "Type " << type << " not supported." << endl;
+          ckerr << "Type " << type << " with Op " << op << " not supported." << endl;
           CmiAbort("exiting");
       }
       break;
@@ -1028,12 +1138,66 @@ getReductionType(int type, int op)
 	case MPI_2FLOAT : mytype = minLocfloatfloatReducer; break;
 	case MPI_2DOUBLE : mytype = minLocdoubledoubleReducer; break;
         default:
-          ckerr << "Type " << type << " not supported." << endl;
+          ckerr << "Type " << type << " with Op " << op << " not supported." << endl;
+          CmiAbort("exiting");
+      }
+      break;
+    case MPI_BAND :
+      switch(type) {
+        case MPI_INT : mytype = BANDintReducer; break;
+        case MPI_BYTE : mytype = BANDcharReducer; break;
+        default:
+          ckerr << "Type " << type << " with Op " << op << " not supported." << endl;
+          CmiAbort("exiting");
+      }
+      break;
+    case MPI_BOR :
+      switch(type) {
+        case MPI_INT : mytype = BORintReducer; break;
+        case MPI_BYTE : mytype = BORcharReducer; break;
+        default:
+          ckerr << "Type " << type << " with Op " << op << " not supported." << endl;
+          CmiAbort("exiting");
+      }
+      break;
+    case MPI_BXOR :
+      switch(type) {
+        case MPI_INT : mytype = BXORintReducer; break;
+        case MPI_BYTE : mytype = BXORcharReducer; break;
+        default:
+          ckerr << "Type " << type << " with Op " << op << " not supported." << endl;
+          CmiAbort("exiting");
+      }
+      break;
+    case MPI_LAND :
+      switch(type) {
+        case MPI_INT :
+        case MPI_LOGICAL : mytype = CkReduction::logical_and; break;
+        default:
+          ckerr << "Type " << type << " with Op " << op << " not supported." << endl;
+          CmiAbort("exiting");
+      }
+      break;
+    case MPI_LOR :
+      switch(type) {
+        case MPI_INT :
+        case MPI_LOGICAL : mytype = CkReduction::logical_or; break;
+        default:
+          ckerr << "Type " << type << " with Op " << op << " not supported." << endl;
+          CmiAbort("exiting");
+      }
+      break;
+    case MPI_LXOR :
+      switch(type) {
+        case MPI_INT :
+        case MPI_LOGICAL : mytype = LXORReducer; break;
+        default:
+          ckerr << "Type " << type << " with Op " << op << " not supported." << endl;
           CmiAbort("exiting");
       }
       break;
     default:
-      ckerr << "Op " << op << " not supported." << endl;
+      ckerr << "Type " << type << " with Op " << op << " not supported." << endl;
       CmiAbort("exiting");
   }
   return mytype;

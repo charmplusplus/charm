@@ -77,6 +77,12 @@ This is needed so we can call the routine as a new thread.
 #define MPI_PROD 4
 #define MPI_MAXLOC 5
 #define MPI_MINLOC 6
+#define MPI_LAND 7
+#define MPI_LOR 8
+#define MPI_LXOR 9
+#define MPI_BAND 10
+#define MPI_BOR 11
+#define MPI_BXOR 12
 
 /* This is one less than the system-tags defined in ampiimpl.h.
  * This is so that the tags used by the system dont clash with user-tags.
