@@ -63,7 +63,7 @@ void Refiner::create(int count, CentralLB::LDStats* stats, int** procs)
     LDObjData *odata = stats[j].objData;
     const int osz = stats[j].n_objs;  
     for(i=0; i < osz; i++) {
-      if (odata[i].migratable)
+      if (odata[i].migratable == CmiTrue)
       {
         computes[index].id = odata[i].id;
         computes[index].handle = odata[i].handle;
@@ -75,9 +75,9 @@ void Refiner::create(int count, CentralLB::LDStats* stats, int** procs)
         index ++;
       }
       else {
-	// if not migratable, add load to processor background
-        processors[j].backgroundLoad += odata[i].cpuTime;
-	numComputes --;
+	// put this compute into background load
+	processors[j].backgroundLoad += odata[i].cpuTime;
+        numComputes --;
       }
     }
   }
@@ -110,11 +110,11 @@ void Refiner::computeAverage()
 {
   int i;
   double total = 0;
-  for (i=0; i<numComputes; i++)
-    total += computes[i].load;
+  for (i=0; i<numComputes; i++) total += computes[i].load;
 
   for (i=0; i<P; i++)
-    total += processors[i].backgroundLoad;
+    if (processors[i].available == CmiTrue) 
+	total += processors[i].backgroundLoad;
 
   averageLoad = total/P;
 }
@@ -122,12 +122,29 @@ void Refiner::computeAverage()
 double Refiner::computeMax()
 {
   int i;
-  double max = processors[0].load;
-  for (i=1; i<P; i++) {
-    if (processors[i].load > max)
+  double max = -1.0;
+  for (i=0; i<P; i++) {
+    if (processors[i].available == CmiTrue && processors[i].load > max)
       max = processors[i].load;
   }
   return max;
+}
+
+int Refiner::isHeavy(processorInfo *p)
+{
+  if (p->available == CmiTrue) 
+     return p->load > overLoad*averageLoad;
+  else {
+     return p->computeSet->numElements() != 0;
+  }
+}
+
+int Refiner::isLight(processorInfo *p)
+{
+  if (p->available == CmiTrue) 
+     return p->load < averageLoad;
+  else 
+     return 0;
 }
 
 int Refiner::refine()
@@ -138,11 +155,13 @@ int Refiner::refine()
   Set *lightProcessors = new Set();
   int i;
   for (i=0; i<P; i++) {
-    if (processors[i].load > overLoad*averageLoad) {
+//    if (processors[i].load > overLoad*averageLoad) {
+    if (isHeavy(&processors[i])) {  
       //      CkPrintf("Processor %d is HEAVY: load:%f averageLoad:%f!\n",
       //	       i, processors[i].load, averageLoad);
       heavyProcessors->insert((InfoRecord *) &(processors[i]));
-    } else if (processors[i].load < averageLoad) {
+//    } else if (processors[i].load < averageLoad) {
+    } else if (isLight(&processors[i])) {
       //      CkPrintf("Processor %d is LIGHT: load:%f averageLoad:%f!\n",
       //	       i, processors[i].load, averageLoad);
       lightProcessors->insert((InfoRecord *) &(processors[i]));
@@ -208,9 +227,11 @@ int Refiner::refine()
     if (bestP->load > averageLoad)
       lightProcessors->remove(bestP);
     
-    if (donor->load > overLoad*averageLoad)
+//    if (donor->load > overLoad*averageLoad)
+    if (isHeavy(donor))
       heavyProcessors->insert((InfoRecord *) donor);
-    else if (donor->load < averageLoad)
+//    else if (donor->load < averageLoad)
+    else if (isLight(donor))
       lightProcessors->insert((InfoRecord *) donor);
   }  
   return finish;

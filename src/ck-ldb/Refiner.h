@@ -35,6 +35,8 @@ private:
   void deAssign(computeInfo *c, processorInfo *pRec);
   void computeAverage();
   double computeMax();
+  int isHeavy(processorInfo *p);
+  int isLight(processorInfo *p);
 
   double overLoad;
   double averageLoad;
