@@ -8,11 +8,6 @@
 #ifndef _CONV_MACH_H
 #define _CONV_MACH_H
 
-#define CMK_CCS_AVAILABLE                                  0
-#define CMK_WEB_MODE                                       0
-#define CMK_DEBUG_MODE                                     0
-#define CMK_USE_PERSISTENT_CCS                             0
-
 #define CMK_CMIDELIVERS_USE_COMMON_CODE                    1
 #define CMK_CMIDELIVERS_USE_SPECIAL_CODE                   0
 
@@ -22,7 +17,6 @@
 #define CMK_GETPAGESIZE_AVAILABLE                          0
 
 #define CMK_HANDLE_SIGUSR                                  1
-
 
 #define CMK_MALLOC_USE_GNU_MALLOC                          0
 #define CMK_MALLOC_USE_OS_BUILTIN                          1
@@ -52,15 +46,13 @@
 #define CMK_SHARED_VARS_SUN_THREADS                        0
 #define CMK_SHARED_VARS_UNIPROCESSOR                       0
 
-#define CMK_SIGNAL_NOT_NEEDED                              1
+#define CMK_SIGNAL_NOT_NEEDED                              0
 #define CMK_SIGNAL_USE_SIGACTION                           0
-#define CMK_SIGNAL_USE_SIGACTION_WITH_RESTART              0
+#define CMK_SIGNAL_USE_SIGACTION_WITH_RESTART              1
 
 #define CMK_SPANTREE_MAXSPAN                               4
 #define CMK_SPANTREE_USE_COMMON_CODE                       1
 #define CMK_SPANTREE_USE_SPECIAL_CODE                      0
-
-
 
 #define CMK_THREADS_REQUIRE_NO_CPV                         0
 #define CMK_THREADS_COPY_STACK                             0
@@ -81,14 +73,16 @@
 #define CMK_VECTOR_SEND_USES_COMMON_CODE                   1
 #define CMK_VECTOR_SEND_USES_SPECIAL_CODE                  0
 
-
 #define CMK_WHEN_PROCESSOR_IDLE_BUSYWAIT                   1
 #define CMK_WHEN_PROCESSOR_IDLE_USLEEP                     0
 
 #define CMK_USE_HP_MAIN_FIX                                0
 #define CMK_DONT_USE_HP_MAIN_FIX                           1
 
-
+#define CMK_CCS_AVAILABLE                                  1
+#define NODE_0_IS_CONVHOST                                 1
+#define CMK_WEB_MODE                                       1
+#define CMK_DEBUG_MODE                                     0
 
 #define CMK_LBDB_ON					   1
 #define CMK_LBDB_OFF					   0

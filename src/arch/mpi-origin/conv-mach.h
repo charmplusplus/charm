@@ -8,8 +8,6 @@
 #ifndef _CONV_MACH_H
 #define _CONV_MACH_H
 
-#define CMK_CCS_AVAILABLE                                  1
-
 #define CMK_CMIDELIVERS_USE_COMMON_CODE                    1
 #define CMK_CMIDELIVERS_USE_SPECIAL_CODE                   0
 
@@ -96,9 +94,10 @@
 #define CMK_USE_HP_MAIN_FIX                                0
 #define CMK_DONT_USE_HP_MAIN_FIX                           1
 
+#define CMK_CCS_AVAILABLE                                  1
 #define NODE_0_IS_CONVHOST                                 1
-#define CMK_DEBUG_MODE                                     0
 #define CMK_WEB_MODE                                       1
+#define CMK_DEBUG_MODE                                     0
 
 #define CMK_LBDB_ON					   1
 #define CMK_LBDB_OFF					   0
