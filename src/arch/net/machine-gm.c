@@ -5,6 +5,7 @@
   * CmiNotifyIdle()
   * DeliverViaNetwork()
   * CommunicationServer()
+  * CommunicationServerThread()
 
   written by 
   Gengbin Zheng, gzheng@uiuc.edu  4/22/2001
@@ -255,6 +256,15 @@ static void CommunicationServer(int withDelayMs)
   MACHSTATE(2,"} CommunicationServer")
 }
 
+/* similar to CommunicationServer, but it is called by communication thread
+   or in interrupt */
+static void CommunicationServerThread(int sleepTime)
+{
+  CommunicationServer(sleepTime);
+#if CMK_IMMEDIATE_MSG
+  CmiHandleImmediate();
+#endif
+}
 
 static void processMessage(char *msg, int len)
 {

@@ -249,6 +249,7 @@ int  portFinish = 0;
 #define PRINTBUFSIZE 16384
 
 static void CommunicationServer(int withDelayMs);
+static void CommunicationServerThread(int withDelayMs);
 extern int CmemInsideMem();
 extern void CmemCallWhenMemAvail();
 static void ConverseRunPE(int everReturn);
@@ -744,7 +745,7 @@ static void CommunicationInterrupt(int ignored)
   {
     /*Make sure any malloc's we do in here are NOT migratable:*/
     CmiIsomallocBlockList *oldList=CmiIsomallocBlockListActivate(NULL);
-    CommunicationServer(0);
+    CommunicationServerThread(0);
     CmiIsomallocBlockListActivate(oldList);
   }
   MACHSTATE(2,"--END SIGIO--")
@@ -1516,10 +1517,8 @@ CmiCommHandle CmiGeneralNodeSend(int pe, int size, int freemode, char *data)
   CmiCommLock();
   DeliverOutgoingNodeMessage(ogm);
   CmiCommUnlock();
-#if CMK_SHARED_VARS_UNAVAILABLE
   /* Check if any packets have arrived recently (preserves kernel network buffers). */
   CommunicationServer(0);
-#endif
   return (CmiCommHandle)ogm;
 }
 #endif
@@ -1568,10 +1567,8 @@ CmiCommHandle CmiGeneralSend(int pe, int size, int freemode, char *data)
   CmiCommLock();
   DeliverOutgoingMessage(ogm);
   CmiCommUnlock();
-#if CMK_SHARED_VARS_UNAVAILABLE
   /* Check if any packets have arrived recently (preserves kernel network buffers). */
   CommunicationServer(0);
-#endif
   return (CmiCommHandle)ogm;
 }
 
@@ -1742,7 +1739,7 @@ void CmiHandleImmediate()
 
 void CmiProbeImmediateMsg()
 {
-  CommunicationServer(0);
+  CommunicationServerThread(0);
 }
 #endif
 

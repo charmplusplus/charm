@@ -6,6 +6,7 @@
   * CmiNotifyIdle()
   * DeliverViaNetwork()
   * CommunicationServer()
+  * CommunicationServerThread()
 
   written by 
   Gengbin Zheng, 12/21/2001
@@ -47,7 +48,7 @@ static void CmiNotifyBeginIdle(CmiIdleState *s)
 static void CmiNotifyStillIdle(CmiIdleState *s)
 {
 #if CMK_SHARED_VARS_UNAVAILABLE
-  CommunicationServer(1);
+  CommunicationServerThread(1);
 #else
   /*Comm. thread will listen on sockets-- just sleep*/
   CmiIdleLock_sleep(&CmiGetState()->idle,5);
@@ -264,6 +265,16 @@ static void CommunicationServer(int sleepTime)
   }
   CmiCommUnlock();
   MACHSTATE(2,"} CommunicationServer") 
+}
+
+/* similar to CommunicationServer, but it is called by communication thread
+   or in interrupt */
+static void CommunicationServerThread(int sleepTime)
+{
+  CommunicationServer(sleepTime);
+#if CMK_IMMEDIATE_MSG
+  CmiHandleImmediate();
+#endif
 }
 
 static void IntegrateMessageDatagram(char *msg, int len)
