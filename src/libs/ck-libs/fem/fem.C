@@ -480,46 +480,87 @@ FEM_Num_Partitions(void)
   return _nchunks;
 }
 
+void FEM_Print(char *str)
+{
+  chunk *cptr = CtvAccess(_femptr);
+  CkPrintf("[%d] %s\n", cptr->thisIndex, str);
+}
+
 // Fortran Bindings
 
 extern "C" int
-fem_create_field_(int *bt, int *vl, int *io, int *d)
+#if CMK_FORTRAN_USES_ALLCAPS
+FEM_CREATE_FIELD
+#else
+fem_create_field_
+#endif
+  (int *bt, int *vl, int *io, int *d)
 {
   return FEM_Create_Field(*bt, *vl, *io, *d);
 }
 
 extern "C" void
-fem_update_field_(int *fid, void *nodes)
+#if CMK_FORTRAN_USES_ALLCAPS
+FEM_UPDATE_FIELD
+#else
+fem_update_field_
+#endif
+  (int *fid, void *nodes)
 {
   FEM_Update_Field(*fid, nodes);
 }
 
 extern "C" void
-fem_reduce_field_(int *fid, void *nodes, void *outbuf, int *op)
+#if CMK_FORTRAN_USES_ALLCAPS
+FEM_REDUCE_FIELD
+#else
+fem_reduce_field_
+#endif
+  (int *fid, void *nodes, void *outbuf, int *op)
 {
   FEM_Reduce_Field(*fid, nodes, outbuf, *op);
 }
 
 extern "C" void
-fem_reduce_(int *fid, void *inbuf, void *outbuf, int *op)
+#if CMK_FORTRAN_USES_ALLCAPS
+FEM_REDUCE
+#else
+fem_reduce_
+#endif
+  (int *fid, void *inbuf, void *outbuf, int *op)
 {
   FEM_Reduce(*fid, inbuf, outbuf, *op);
 }
 
 extern "C" void
-fem_read_field_(int *fid, void *nodes, char *fname)
+#if CMK_FORTRAN_USES_ALLCAPS
+FEM_READ_FIELD
+#else
+fem_read_field_
+#endif
+  (int *fid, void *nodes, char *fname)
 {
   FEM_Read_Field(*fid, nodes, fname);
 }
 
 extern "C" int
-fem_my_partition_(void)
+#if CMK_FORTRAN_USES_ALLCAPS
+FEM_MY_PARTITION
+#else
+fem_my_partition_
+#endif
+  (void)
 {
   return FEM_My_Partition();
 }
 
 extern "C" int
-fem_num_partitions_(void)
+#if CMK_FORTRAN_USES_ALLCAPS
+FEM_NUM_PARTITIONS
+#else
+fem_num_partitions_
+#endif
+  (void)
 {
   return FEM_Num_Partitions();
 }
@@ -527,9 +568,30 @@ fem_num_partitions_(void)
 // Utility functions for Fortran
 
 extern "C" int
-offsetof_(void *first, void *second)
+#if CMK_FORTRAN_USES_ALLCAPS
+OFFSETOF
+#else
+offsetof_
+#endif
+  (void *first, void *second)
 {
   return (int)((char *)second - (char*)first);
+}
+
+extern "C" void 
+#if CMK_FORTRAN_USES_ALLCAPS
+FEM_PRINT
+#else
+fem_print_
+#endif
+  (char *str, int len)
+{
+  chunk *ptr = CtvAccess(_femptr);
+  char *tmpstr = new char[len+1];
+  memcpy(tmpstr,str,len);
+  tmpstr[len] = '\0';
+  FEM_Print(tmpstr);
+  delete[] tmpstr;
 }
 
 #include "fem.def.h"

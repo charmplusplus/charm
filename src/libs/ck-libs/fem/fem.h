@@ -140,6 +140,7 @@ void FEM_Reduce(int fid, void *inbuf, void *outbuf, int op);
 int FEM_My_Partition(void);
 int FEM_Num_Partitions(void);
 void FEM_Read_Field(int fid, void *nodes, char *fname);
+void FEM_Print(char *str);
 
 // Fortran Bindings
 
@@ -151,6 +152,7 @@ extern "C" int fem_my_partition_(void);
 extern "C" int fem_num_partitions_(void);
 // FIXME: correct fortran-c interoperability issue for passing character arrays
 extern "C" void fem_read_field_(int *fid, void *nodes, char *fname);
+extern "C" void fem_print_(char *str, int len);
 
 // Utility functions for Fortran
 
