@@ -819,6 +819,35 @@ else
   echo "$ac_t""no" 1>&6
 fi
 
+    # Extract the first word of "telnet", so it can be a program name with args.
+set dummy telnet; ac_word=$2
+echo $ac_n "checking for $ac_word""... $ac_c" 1>&6
+echo "configure:826: checking for $ac_word" >&5
+if eval "test \"`echo '$''{'ac_cv_prog_TELNET'+set}'`\" = set"; then
+  echo $ac_n "(cached) $ac_c" 1>&6
+else
+  if test -n "$TELNET"; then
+  ac_cv_prog_TELNET="$TELNET" # Let the user override the test.
+else
+  IFS="${IFS= 	}"; ac_save_ifs="$IFS"; IFS=":"
+  ac_dummy="$PATH"
+  for ac_dir in $ac_dummy; do
+    test -z "$ac_dir" && ac_dir=.
+    if test -f $ac_dir/$ac_word; then
+      ac_cv_prog_TELNET="telnet "
+      break
+    fi
+  done
+  IFS="$ac_save_ifs"
+fi
+fi
+TELNET="$ac_cv_prog_TELNET"
+if test -n "$TELNET"; then
+  echo "$ac_t""$TELNET" 1>&6
+else
+  echo "$ac_t""no" 1>&6
+fi
+
     
     URL='http://charm.cs.uiuc.edu/distrib/libpthread.a'
     printf "getting libpthread.a from $URL ..."
@@ -828,12 +857,15 @@ fi
     elif test -n "$LYNX"
     then
       (cd ../lib; $LYNX -source $URL > libpthread.a)
+    elif test -n "$TELNET"
+    then
+      (chmod +x ./get_libpthread; ./get_libpthread | $TELNET charm.cs.uiuc.edu 80 > .uulib ; uudecode .uulib; rm -f .uulib; mv libpthread.a ../lib)
     fi
     if test ! -f ../lib/libpthread.a
     then
       echo "failed"
       echo "#####################################################################"
-      echo "You must install wget or lynx to get libpthread.a from charm website."
+      echo "wget, lynx or telnet must be installed to get libpthread.a from charm website."
       echo "#####################################################################"
       exit 1
     else
@@ -977,6 +1009,7 @@ s%@mandir@%$mandir%g
 s%@FCL@%$FCL%g
 s%@WGET@%$WGET%g
 s%@LYNX@%$LYNX%g
+s%@TELNET@%$TELNET%g
 
 CEOF
 EOF
