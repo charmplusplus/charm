@@ -43,6 +43,7 @@ static void die(const char *str) {
 /**schak*/
 void resize_nodes(void *data,int *len,int *max);
 void resize_elems(void *data,int *len,int *max);
+void resize_edges(void *data,int *len,int *max);
 
 #define NANCHECK 1 /*Check for NaNs at each timestep*/
 
@@ -53,6 +54,7 @@ init(void)
 
   const char *eleName="xxx.1.ele";
   const char *nodeName="xxx.1.node";
+	const char *edgeName="xxx.1.edge";
   int nPts=0; //Number of nodes
   vector2d *pts=0; //Node coordinates
 
@@ -89,6 +91,10 @@ init(void)
 	}
 	double *td = new double[nPts];
 	FEM_Register_array(FEM_Mesh_default_write(),FEM_NODE,FEM_DATA+5,td,FEM_DOUBLE,1);
+	/*boundary value for nodes*/
+	int *nodeBoundary = new int[nPts];
+	FEM_Register_array(FEM_Mesh_default_write(),FEM_NODE,FEM_BOUNDARY,nodeBoundary,FEM_INT,1);
+	
 
   int nEle=0;
   int *ele=NULL;
@@ -132,20 +138,53 @@ init(void)
   const static int tri2edge[6]={0,1, 1,2, 2,0};
   FEM_Add_ghost_elem(0,3,tri2edge);
   
+	//open and read the .edge (edge connectivity file) needed for boundary values
+	int nEdge;
+	int *edgeConn;
+	int *edgeBoundary;
+	{
+		char line[1024];
+    FILE *f=fopen(edgeName,"r");
+    if (f==NULL) die("Can't open edge file!");
+    fgets(line,1024,f);
+    if (1!=sscanf(line,"%d",&nEdge)) die("Can't read number of elements!");
+    edgeConn = new int[2*nEdge];
+		edgeBoundary = new int[nEdge];
+		for(int i=0;i<nEdge;i++){
+			int edgeNo;
+			if (NULL==fgets(line,1024,f)) die("Can't read edge input line!");
+			if (4 != sscanf(line,"%d%d%d%d",&edgeNo,&edgeConn[i*2+0],&edgeConn[i*2+1],&edgeBoundary[i])){
+				die("Can't parse edge input line!");
+			}
+			edgeConn[i*2+0]--;
+			edgeConn[i*2+1]--;		
+		}
+		fclose(f);
+	}
+	printf("Number of edges %d \n",nEdge);
+	FEM_Register_entity(FEM_Mesh_default_write(),FEM_SPARSE,NULL,nEdge,nEdge,resize_edges);
+	FEM_Register_array(FEM_Mesh_default_write(),FEM_SPARSE,FEM_CONN,edgeConn,FEM_INDEX_0,2);
+	FEM_Register_array(FEM_Mesh_default_write(),FEM_SPARSE,FEM_BOUNDARY,edgeBoundary,FEM_INT,1);
   CkPrintf("Finished with init\n");
 }
 
 struct myGlobals {
   int nnodes,maxnodes;
   int nelems,maxelems;
+	int nedges,maxedges;
   int *conn; //Element connectivity table
 
   vector2d *coord; //Undeformed coordinates of each node
   vector2d *R_net, *d, *v, *a; //Physical fields of each node
   double *m_i; //Inverse of mass at each node
   int m_i_fid; //Field ID for m_i
-  
+ 	int *nodeBoundary; //node boundary
+	
   double *S11, *S22, *S12; //Stresses for each element
+	
+	
+	int *edgeConn;//edge Connectivity table
+	int *edgeBoundary;//edge boundary value
 };
 
 void pup_myGlobals(pup_er p,myGlobals *g) 
@@ -153,8 +192,11 @@ void pup_myGlobals(pup_er p,myGlobals *g)
   FEM_Print("-------- called pup routine -------");
   pup_int(p,&g->nnodes);
   pup_int(p,&g->nelems);
+	pup_int(p,&g->nedges);
   pup_int(p,&g->maxelems);
   pup_int(p,&g->maxnodes);
+	pup_int(p,&g->maxedges);
+	
   int nnodes=g->nnodes, nelems=g->nelems;
   if (pup_isUnpacking(p)) {
     g->coord=new vector2d[g->maxnodes];
@@ -164,9 +206,14 @@ void pup_myGlobals(pup_er p,myGlobals *g)
     g->v=new vector2d[g->maxnodes];//Node velocity
     g->a=new vector2d[g->maxnodes];
     g->m_i=new double[g->maxnodes];
+		g->nodeBoundary = new int[g->maxnodes];
+		
     g->S11=new double[g->maxelems];
     g->S22=new double[g->maxelems];
     g->S12=new double[g->maxelems];
+		
+		g->edgeConn = new int[2*g->maxedges];
+		g->edgeBoundary = new int[g->maxedges];
   }
   pup_doubles(p,(double *)g->coord,2*nnodes);
   pup_ints(p,(int *)g->conn,3*nelems);
@@ -175,9 +222,15 @@ void pup_myGlobals(pup_er p,myGlobals *g)
   pup_doubles(p,(double *)g->v,2*nnodes);
   pup_doubles(p,(double *)g->a,2*nnodes);
   pup_doubles(p,(double *)g->m_i,nnodes);
+	pup_ints(p,(int *)g->nodeBoundary,nnodes);
+	
   pup_doubles(p,(double *)g->S11,nelems);
   pup_doubles(p,(double *)g->S22,nelems);
   pup_doubles(p,(double *)g->S12,nelems);
+	
+	pup_ints(p,(int *)g->edgeConn,2*g->nedges);
+	pup_ints(p,(int *)g->edgeBoundary,g->nedges);
+	
   if (pup_isDeleting(p)) {
     delete[] g->coord;
     delete[] g->conn;
@@ -186,9 +239,12 @@ void pup_myGlobals(pup_er p,myGlobals *g)
     delete[] g->v;
     delete[] g->a;
     delete[] g->m_i;
-	delete[] g->S11;
-	delete[] g->S22;
-	delete[] g->S12;
+		delete[] g->nodeBoundary;
+		delete[] g->S11;
+		delete[] g->S22;
+		delete[] g->S12;
+		delete[] g->edgeConn;
+		delete[] g->edgeBoundary;
   }
 }
 
@@ -310,6 +366,7 @@ void init_myGlobal(myGlobals *g){
 	g->m_i = NULL;
 	g->conn = NULL;
 	g->S11 = g->S22 = g->S12 = NULL;
+	g->edgeConn = g->edgeBoundary = NULL;
 }
 
 
@@ -320,6 +377,7 @@ void resize_nodes(void *data,int *len,int *max){
 
 	vector2d *coord=g->coord,*R_net=g->R_net,*d=g->d,*v=g->v,*a=g->a;
 	double *m_i=g->m_i;
+	int *nodeBoundary = g->nodeBoundary;
 	
 	
 	g->coord=new vector2d[*max];
@@ -331,6 +389,7 @@ void resize_nodes(void *data,int *len,int *max){
   g->v=new vector2d[g->maxnodes];//Node velocity
   g->a=new vector2d[g->maxnodes];//Node accelleration
   g->m_i=new double[g->maxnodes];//Node mass
+	g->nodeBoundary = new int[g->maxnodes];//Node boundary
 	
 	if(coord != NULL){
 		for(int k=0;k<*len;k++){
@@ -344,6 +403,7 @@ void resize_nodes(void *data,int *len,int *max){
 	FEM_Register_array(FEM_Mesh_default_read(),FEM_NODE,FEM_DATA+3,(void *)g->v,FEM_DOUBLE,2);
 	FEM_Register_array(FEM_Mesh_default_read(),FEM_NODE,FEM_DATA+4,(void *)g->a,FEM_DOUBLE,2);
 	FEM_Register_array_layout(FEM_Mesh_default_read(),FEM_NODE,FEM_DATA+5,(void *)g->m_i,g->m_i_fid);
+	FEM_Register_array(FEM_Mesh_default_read(),FEM_NODE,FEM_BOUNDARY,(void *)g->nodeBoundary,FEM_INT,1);
 
 	for(int k=0;k<*len;k++){
 		printf("after resize node %d ( %.6f %.6f )\n",k,g->coord[k].x,g->coord[k].y);
@@ -357,7 +417,7 @@ void resize_nodes(void *data,int *len,int *max){
 		delete [] v;
 		delete [] a;
 		delete [] m_i;
-		
+		delete [] nodeBoundary;
 	}
 
 };
@@ -392,6 +452,25 @@ void resize_elems(void *data,int *len,int *max){
 	}
 };
 
+void resize_edges(void *data,int *len,int *max){
+	printf("[%d] resize edges called len %d max %d\n",FEM_My_partition(),*len,*max);
+	FEM_Register_entity(FEM_Mesh_default_read(),FEM_SPARSE,data,*len,*max,resize_edges);
+	myGlobals *g = (myGlobals *)data;
+	
+	int *conn = g->edgeConn;
+	int *bound = g->edgeBoundary;
+
+	g->maxedges = *max;	
+	g->edgeConn = new int[2*(*max)];
+	g->edgeBoundary = new int[(*max)];
+	
+	FEM_Register_array(FEM_Mesh_default_read(),FEM_SPARSE,FEM_CONN,(void *)g->edgeConn,FEM_INDEX_0,2);	
+	FEM_Register_array(FEM_Mesh_default_read(),FEM_SPARSE,FEM_BOUNDARY,(void *)g->edgeBoundary,FEM_INT,1);
+	if(conn != NULL){
+		delete [] conn;
+		delete [] bound;	
+	}
+}
 
 
 
@@ -406,7 +485,6 @@ void repeat_after_split(void *data){
 	calcMasses(*g);
 };
 
-void outputMesh(int *elem,double *node,int ne,int nn,char *str);
 
 extern "C" void
 driver(void)
@@ -441,6 +519,10 @@ CkPrintf("[%d] end init\n",myChunk);
   g.maxelems=g.nelems;
 
 	resize_elems((void *)&g,&g.nelems,&g.maxelems);
+	
+	g.nedges = FEM_Mesh_get_length(FEM_Mesh_default_read(),FEM_SPARSE);
+	g.maxedges = g.nedges;
+	resize_edges((void *)&g,&g.nedges,&g.maxedges);
 
 	FEM_REFINE2D_Newmesh(FEM_Mesh_default_read(),FEM_NODE,FEM_ELEM);
   
@@ -461,19 +543,18 @@ CkPrintf("[%d] end init\n",myChunk);
   
   for (i=0;i<g.nelems;i++){
     checkTriangle(g,i);
-  }	
-  sleep(5);
+	}	
+
   //Timeloop
   if (CkMyPe()==0){
     CkPrintf("Entering timeloop\n");
-  }	
-  //  int tSteps=0x70FF00FF;
-  int tSteps=100;
+	}	
+  int tSteps=0x70FF00FF;
   calcMasses(g);
   double startTime=CkWallTimer();
   double curArea=2.0e-5;
   for (int t=0;t<tSteps;t++) {
-    /*    if (1) { //Structural mechanics
+    if (1) { //Structural mechanics
     	//Compute forces on nodes exerted by elements
 			CST_NL(g.coord,g.conn,g.R_net,g.d,matConst,g.nnodes,g.nelems,g.S11,g.S22,g.S12);
 	
@@ -483,14 +564,14 @@ CkPrintf("[%d] end init\n",myChunk);
 	    //Advance node positions
 			advanceNodes(dt,g.nnodes,g.coord,g.R_net,g.a,g.v,g.d,g.m_i,(t%4)==0);
     
-    }*/
+    }
 
     //Debugging/perf. output
     double curTime=CkWallTimer();
     double total=curTime-startTime;
     startTime=curTime;
-/*    if (CkMyPe()==0 && (t%64==0))
-	    CkPrintf("%d %.6f sec for loop %d \n",CkNumPes(),total,t);*/
+    if (CkMyPe()==0 && (t%64==0))
+	    CkPrintf("%d %.6f sec for loop %d \n",CkNumPes(),total,t);
  /*   if (0 && t%16==0) {
 	    CkPrintf("    Triangle 0:\n");
 	    for (int j=0;j<3;j++) {
@@ -502,12 +583,13 @@ CkPrintf("[%d] end init\n",myChunk);
 //    if (t%512==0)
 //      FEM_Migrate();
 
+    if (t%128==0) { //Refinement:
       vector2d *loc=new vector2d[2*g.nnodes];
       for (i=0;i<g.nnodes;i++) {
 				loc[i]=g.coord[i];//+g.d[i];
       }
       double *areas=new double[g.nelems];
-      curArea=curArea*0.499;
+      curArea=curArea*0.98;
       for (i=0;i<g.nelems;i++) {
       #if 0
         double origArea=8e-8; //Typical triangle size
@@ -522,7 +604,7 @@ CkPrintf("[%d] end init\n",myChunk);
       CkPrintf("[%d] Starting refinement step: %d nodes, %d elements to %.3g\n",
 	       myChunk,g.nnodes,g.nelems,curArea);
 			
-			FEM_REFINE2D_Split(FEM_Mesh_default_read(),FEM_NODE,(double *)loc,FEM_ELEM,areas);
+			FEM_REFINE2D_Split(FEM_Mesh_default_read(),FEM_NODE,(double *)loc,FEM_ELEM,areas,FEM_SPARSE);
 			repeat_after_split((void *)&g);
 
 			
@@ -532,6 +614,7 @@ CkPrintf("[%d] end init\n",myChunk);
       CkPrintf("[%d] Done with refinement step: %d nodes, %d elements\n",
 	       myChunk,g.nnodes,g.nelems);
       
+    }
     
     if (1) { //Publish data to the net
 	    NetFEM n=NetFEM_Begin(myChunk,t,2,NetFEM_POINTAT);
@@ -548,32 +631,9 @@ CkPrintf("[%d] end init\n",myChunk);
 	    NetFEM_End(n);
     }
   }
-	
-//	outputMesh(g.conn,(double *)g.coord,g.nelems,g.nnodes,"out.1024");
+
   if (CkMyPe()==0)
     CkPrintf("Driver finished\n");
 }
 
-void outputMesh(int *elem,double *node,int ne,int nn,char *str){
-	if(FEM_Num_partitions() != 1){
-		CkPrintf("This can be used to output a mesh only when there is one chunk\n");
-		return;
-	}
-	char fEle[100];
-	char fNode[100];
-	sprintf(fEle,"%s.ele",str);
-	FILE *fp = fopen(fEle,"w");
-	fprintf(fp,"%d 3 0\n",ne);
-	for(int i=0;i<ne;i++){
-		fprintf(fp,"%d %d %d %d \n",i+1,elem[3*i]+1,elem[3*i+1]+1,elem[3*i+2]+1);
-	}
-	fclose(fp);
-	
-	sprintf(fNode,"%s.node",str);
-	fp = fopen(fNode,"w");
-	fprintf(fp,"%d 2 0 0\n",nn);
-	for(int i=0;i<nn;i++){
-		fprintf(fp,"%d %.10lf %.10lf \n",i+1,node[2*i],node[2*i+1]);
-	}
-	fclose(fp);
-}
+

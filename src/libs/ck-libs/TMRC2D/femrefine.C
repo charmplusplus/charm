@@ -11,7 +11,11 @@ class intdual{
 		int x,y;
 	public:
 		intdual(int _x,int _y){
-			x = _x; y=_y;
+			if(_x <= _y){
+ 				x = _x; y=_y;
+ 			}else{
+ 				x = _y; y= _x;
+ 			}
 		}
 		int getx(){return x;};
 		int gety(){return y;};
@@ -79,7 +83,7 @@ FDECL void FTN_NAME(FEM_REFINE2D_NEWMESH,fem_refine2d_newmesh)(int *meshID,int *
 
 
 
-void FEM_REFINE2D_Split(int meshID,int nodeID,double *coord,int elemID,double *desiredAreas){
+void FEM_REFINE2D_Split(int meshID,int nodeID,double *coord,int elemID,double *desiredAreas,int sparseID){
 	int nnodes = FEM_Mesh_get_length(meshID,nodeID);
 	int nelems = FEM_Mesh_get_length(meshID,elemID);
 
@@ -121,9 +125,41 @@ void FEM_REFINE2D_Split(int meshID,int nodeID,double *coord,int elemID,double *d
 	}
 	AllocTable2d<int> &connTable = ((FEM_IndexAttribute *)connAttr)->get();
 
-
 	//hashtable to store the new node number as a function of the two old numbers
 	CkHashtableT<intdual,int> newnodes;
+	
+	/*
+		Get the FEM_BOUNDARY data of sparse elements and load it into a hashtable
+		indexed by the 2 node ids that make up the edge. The data in the hashtable
+		is the index number of the sparse element
+	*/
+	FEM_Entity *sparse;
+	CkVec<FEM_Attribute *> *sparseattrs;
+	FEM_Attribute *sparseConnAttr, *sparseBoundaryAttr;
+	AllocTable2d<int> *sparseConnTable, *sparseBoundaryTable;
+	CkHashtableT<intdual,int> nodes2sparse;
+	if(sparseID != -1){
+		sparse = FEM_Entity_lookup(meshID,sparseID,"REFINE2D_Mesh_sparse");
+		sparseattrs = sparse->getAttrVec();
+		sparseConnAttr = sparse->lookup(FEM_CONN,"REFINE2D_Mesh_sparse");
+		sparseConnTable = &(((FEM_IndexAttribute *)sparseConnAttr)->get());
+		sparseBoundaryAttr = sparse->lookup(FEM_BOUNDARY,"REFINE2D_Mesh_sparse");
+		if(sparseBoundaryAttr == NULL){
+			 CkAbort("Specified sparse elements without boundary conditions");
+		}
+		/*
+			since the default value in the hashtable is 0, to 
+			distinguish between uninserted keys and the sparse element
+			with index 0, the index of the sparse elements is incremented
+			by 1 while inserting.
+		*/
+//		printf("[%d] Sparse elements\n",FEM_My_partition());
+		for(int j=0;j<sparse->size();j++){
+			int *cdata = (*sparseConnTable)[j];
+	//		printf("%d < %d,%d > \n",j,cdata[0],cdata[1]);
+			nodes2sparse.put(intdual(cdata[0],cdata[1])) = j+1;
+		}
+	}	
 	
   for (int splitNo=0;splitNo<nSplits;splitNo++){
     int tri,A,B,C,D;
@@ -150,6 +186,28 @@ void FEM_REFINE2D_Split(int meshID,int nodeID,double *coord,int elemID,double *d
 				if(a->getAttr()<FEM_ATTRIB_TAG_MAX){
 					FEM_DataAttribute *d = (FEM_DataAttribute *)a;
 					d->interpolate(A,B,D,frac);
+				}else{
+						/*The boundary value of a new node should be the 
+						boundary value of the edge(sparse element) that contains
+						the two nodes */
+						if(a->getAttr() == FEM_BOUNDARY){
+							if(sparseID != -1){
+								int sidx = nodes2sparse.get(intdual(A,B))-1;
+								if(sidx == -1){
+									CkAbort("no sparse element between these 2 nodes, are they really connected ??");
+								}
+								sparseBoundaryTable = &(((FEM_DataAttribute *)sparseBoundaryAttr)->getInt());
+								int boundaryVal = ((*sparseBoundaryTable)[sidx])[0];
+								(((FEM_DataAttribute *)a)->getInt()[D])[0] = boundaryVal;
+							}else{
+								/*
+									if sparse elements don't exist then just do simple
+									interpolation
+								*/
+								FEM_DataAttribute *d = (FEM_DataAttribute *)a;
+								d->interpolate(A,B,D,frac);
+							}
+						}
 				}	
 			}
 			int AandB[2];
@@ -162,6 +220,47 @@ void FEM_REFINE2D_Split(int meshID,int nodeID,double *coord,int elemID,double *d
 				coordVec.push_back(Dx);
 				coordVec.push_back(Dy);
 				newnodes.put(intdual(A,B))=D;
+			/*
+				add the new sparse element <D,B> and modify the connectivity of the old one
+				from <A,B> to <A,D> and change the hashtable to reflect that change
+			*/
+			if(sparseID != -1){
+				int oldsidx = nodes2sparse.get(intdual(A,B))-1;
+				int newsidx = sparse->size();
+				sparse->setLength(newsidx+1);
+				for(int satt = 0;satt<sparseattrs->size();satt++){
+					if((*sparseattrs)[satt]->getAttr() == FEM_CONN){
+						/*
+							change the conn of the old sparse to A,D
+							and new one to B,D
+						*/
+						sparseConnTable = &(((FEM_IndexAttribute *)sparseConnAttr)->get());
+						int *oldconn = (*sparseConnTable)[oldsidx];
+						int *newconn = (*sparseConnTable)[newsidx];
+						oldconn[0] = A;
+						oldconn[1] = D;
+						
+						newconn[0] = D;
+						newconn[1] = B;
+						
+//						printf("<%d,%d> edge being split into <%d,%d> <%d,%d> \n",A,B,A,D,D,B);
+					}else{
+						/*
+							apart from conn copy everything else
+						*/
+						FEM_Attribute *attr = (FEM_Attribute *)(*sparseattrs)[satt];
+						attr->copyEntity(newsidx,*attr,oldsidx);
+					}
+				}
+				/*
+					modify the hashtable - delete the old edge
+					and the new ones
+				*/
+				nodes2sparse.remove(intdual(A,B));
+				nodes2sparse.put(intdual(A,D)) = oldsidx+1;
+				nodes2sparse.put(intdual(D,B)) = newsidx+1;
+			}
+				
 		}
 		//add a new triangle
 		/*TODO: replace  FEM_ELEM with parameter*/
@@ -179,8 +278,10 @@ void FEM_REFINE2D_Split(int meshID,int nodeID,double *coord,int elemID,double *d
 				int *oldRow = table[tri];
 				int *newRow = table[newTri];
 				for (int i=0;i<3;i++){
-		      if (oldRow[i]==A) oldRow[i]=D;	
-					CkPrintf("In triangle %d %d replaced by %d \n",tri,A,D);
+		      if (oldRow[i]==A){
+						oldRow[i]=D;	
+						CkPrintf("In triangle %d %d replaced by %d \n",tri,A,D);
+					}
 				}	
 				for (int i=0; i<3; i++) {
 		      if (oldRow[i] == B){
@@ -196,10 +297,34 @@ void FEM_REFINE2D_Split(int meshID,int nodeID,double *coord,int elemID,double *d
 				CkPrintf("New Triangle %d  (%d %d %d) conn %p\n",newTri,newRow[0],newRow[1],newRow[2],newRow);
 			}else{
 				FEM_Attribute *elattr = (FEM_Attribute *)(*elemattrs)[j];
+				if(elattr->getAttr() < FEM_ATTRIB_FIRST){ 
 					elattr->copyEntity(newTri,*elattr,tri);
+				}
 			}
 		}
-
+		if(sparseID != -1){
+			/*
+				add the sparse element (edge between C and D)
+			*/
+			int cdidx = sparse->size();
+			sparse->setLength(cdidx+1);
+			for(int satt = 0; satt < sparseattrs->size();satt++){
+					if((*sparseattrs)[satt]->getAttr() == FEM_CONN){
+						sparseConnTable = &(((FEM_IndexAttribute *)sparseConnAttr)->get());
+						int *cdconn = (*sparseConnTable)[cdidx];
+						cdconn[0]=C;
+						cdconn[1]=D;
+					}
+					if((*sparseattrs)[satt]->getAttr() == FEM_BOUNDARY){
+						/*
+							An edge connecting C and D has to be an internal edge
+						*/
+						sparseBoundaryTable = &(((FEM_DataAttribute *)sparseBoundaryAttr)->getInt());
+						((*sparseBoundaryTable)[cdidx])[0] = 0;
+					}
+			}
+			nodes2sparse.put(intdual(C,D)) = cdidx+1;
+		}
 		
 	}
 	printf("Cordinate list length %d \n",coordVec.size()/2);

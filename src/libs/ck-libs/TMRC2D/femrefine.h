@@ -46,7 +46,7 @@ void FEM_REFINE2D_Newmesh(int meshID,int nodeID,int elemID);
 		desiredAreas - desiredArea[i] gives the desired area of element i.
 */
 
-void FEM_REFINE2D_Split(int meshID,int nodeID,double *coord,int elemID,double *desiredAreas);
+void FEM_REFINE2D_Split(int meshID,int nodeID,double *coord,int elemID,double *desiredAreas,int sparseID=-1);
 
 void FEM_REFINE2D_Coarsen(int meshID,int nodeID,double *coord,int elemID,double *desiredAreas);
 
