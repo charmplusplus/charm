@@ -5,7 +5,7 @@
  * $Revision$
  *****************************************************************************/
 
-/* adapted from Sanjay Kale's pplKalloc by Eric Bohm */
+/* adapted by Eric Bohm from Sanjay Kale's pplKalloc */
 
 
 /* An extremely simple implementation of memory allocation
@@ -16,9 +16,9 @@
    plenty fast.
 */
 
-#define CMI_POOL_HEADER_SIZE 8
 
-#include "converse.h"
+#include "cmipool.h"
+
 CpvDeclare(char **, bins);
 CpvDeclare(int *, binLengths);
 CpvDeclare(int, maxBin);
@@ -34,21 +34,16 @@ CpvDeclare(int, numFrees);
   it belongs. I.e. the lg(block size).
 */
 
+/* TODO wrap ifndef CMK_OPTIMIZE around the stats collection bits */
 
-void printList(char *p) 
-{
-  printf("Free list is: -----------\n");
-  while (p != 0) {
-    printf("next ptr is %d. ", (int) p);
-    char ** header = p-CMI_POOL_HEADER_SIZE;
-    printf("header is at: %d, and contains: %d \n", (int) header, (int) (*header));
-    p = *header;
-  }
-  printf("End of Free list: -----------\n");
+/* TODO figure out where we should apply CmiMemLock in here */
 
-}
+/* Once it all works inline it */
 
-inline void CmiPoolAllocInit(int numBins)
+extern void *malloc_nomigrate(size_t size);
+extern void free_nomigrate(void *mem);
+
+void CmiPoolAllocInit(int numBins)
 {
   int i;
   CpvInitialize(char **, bins);
@@ -64,61 +59,76 @@ inline void CmiPoolAllocInit(int numBins)
   for (i=0; i<numBins; i++) CpvAccess(bins)[i] = NULL;
   for (i=0; i<numBins; i++) CpvAccess(binLengths)[i] = 0;
 
-  CpvAccess(numKallocs) = CpvAccess(numMallocs) = CpvAccess(numFrees) = 0;
+    CpvAccess(numKallocs) =  CpvAccess(numMallocs) =  CpvAccess(numFrees) = 0;
 }
 
-inline void * CmiPoolAlloc(unsigned int numBytes)
+void * CmiPoolAlloc(unsigned int numBytes)
 {
   char *p, *next;
-  int bin,n;
-  bin = 0;
-
-  /* this could be speeded up.. I think*/
-  numBytes += CMI_POOL_HEADER_SIZE; 
-  n = numBytes;
+  int bin=0;
+  int n=numBytes+CMI_POOL_HEADER_SIZE;
+  int *header;
   /* get 8 more bytes, so I can store a header to the left*/
+  numBytes = n;
   while (n !=0) /* find the bin*/
     {     
       n = n >> 1;
       bin++;
     }
-  /* even 0 size messages go in bin 1 leaving 0 bin for too bigs */
-  if(bin<CpvAccess(maxBin) && CpvAccess(bins)[bin] != NULL) /* message not too big */
+  /* even 0 size messages go in bin 1 leaving 0 bin for oversized */
+  if(bin<CpvAccess(maxBin))
     {
-      CpvAccess(numKallocs)++;
-      /* store some info in the header*/
-      p = CpvAccess(bins)[bin];
-      next = (char *) *((char **)(p -CMI_POOL_HEADER_SIZE)); /*next pointer from the header*/
-      CpvAccess(bins)[bin] = next;
-      CpvAccess(binLengths)[bin]--;
+      CmiAssert(bin>0);
+      if(CpvAccess(bins)[bin] != NULL) 
+	{
+	  /*	  CmiPrintf("p\n");*/
+	  CpvAccess(numKallocs)++;
+	  /* store some info in the header*/
+	  p = CpvAccess(bins)[bin];
+	  /*next pointer from the header*/
+
+	  /* this conditional should not be necessary
+	     as the header next pointer should contain NULL
+	     for us when there is nothing left in the pool */
+	  if(--CpvAccess(binLengths)[bin])
+	      CpvAccess(bins)[bin] = (char *) *((char **)(p -CMI_POOL_HEADER_SIZE)); 
+	  else  /* there is no next */
+	      CpvAccess(bins)[bin] = NULL;
+	}
+      else
+	{
+	  /*  CmiPrintf("np %d\n",bin);*/
+
+	  CpvAccess(numMallocs)++;
+	  /* Round up the allocation to the max for this bin */
+	   p =(char *) malloc_nomigrate(1 << bin) + CMI_POOL_HEADER_SIZE;
+	}
     }
   else
     {
-      /* just revert to the standard malloc for big things */
-      char * header = malloc_nomigrate(numBytes);
-      p = header + CMI_POOL_HEADER_SIZE;
-      bin=0;
+      /*  CmiPrintf("u b%d v %d\n",bin,CpvAccess(maxBin));  */
+      /* just revert to malloc for big things and set bin 0 */
+      p = (char *) malloc_nomigrate(numBytes) + CMI_POOL_HEADER_SIZE;
+      bin=0; 
     }
-  int *header =  p-CMI_POOL_HEADER_SIZE;
+  header = (int *) (p-CMI_POOL_HEADER_SIZE);
   *header = bin; /* stamp the bin number on the header.*/
   return p;
 }
 
 
-inline void * CmiPoolFree(char * p) 
+ void * CmiPoolFree(char * p) 
 {
-  int bin;
-  char ** header;
+  char **header = (char **)( p - CMI_POOL_HEADER_SIZE);
+  int bin = (int) *header;
+  /*  CmiPrintf("f%d\n",bin,CpvAccess(maxBin));  */
   if(bin==0)
     {
-      free_nomigrate(p-CMI_POOL_HEADER_SIZE);
+      free_nomigrate(header);
     }
   else
     {
       CpvAccess(numFrees)++;
-      header = p - CMI_POOL_HEADER_SIZE;
-      bin = (int) *header;
-  
       /* add to the begining of the list at CpvAccess(bins)[bin]*/
       *header =  CpvAccess(bins)[bin]; 
       CpvAccess(bins)[bin] = p;
@@ -126,14 +136,13 @@ inline void * CmiPoolFree(char * p)
     }
 }
 
-inline void  CmiPoolAllocStats()
+ void  CmiPoolAllocStats()
 {
   int i;
-  printf("numKallocs: %d\n", CpvAccess(numKallocs));
-  printf("numMallocs: %d\n", CpvAccess(numMallocs));
-  printf("numFrees: %d\n", CpvAccess(numFrees));
+  CmiPrintf("numKallocs: %d\n", CpvAccess(numKallocs));
+  CmiPrintf("numFrees: %d\n", CpvAccess(numFrees));
   /*  for (i=0; i<=CpvAccess(maxbin); i++) */
-  /*   { printf("binLength[%d] : %d\n", i, CpvAccess(binLengths)[i]);}*/
+  /*   { CmiPrintf("binLength[%d] : %d\n", i, CpvAccess(binLengths)[i]);}*/
 }
 
-/* theoretically we should put a pool cleanup function in here */
+/* theoretically we should have a pool cleanup function in here */
