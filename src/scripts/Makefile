@@ -104,8 +104,9 @@ SEQCHARMC=../bin/charmc -seq $(CHARMOPTS)
 #
 ###############################################################################
 
-CVHEADERS=cpthreads.h converse.h conv-trace.h trace.h conv-ccs.h \
-      debug-conv.h conv-autoconfig.h \
+CVHEADERS=cpthreads.h converse.h conv-trace.h trace.h \
+      conv-ccs.h ccs-client.c ccs-client.h ccs-auth.c ccs-auth.h CcsServer.java \
+      debug-conv.h debug-charm.h conv-autoconfig.h \
       conv-mach.h conv-mach-opt.h conv-mach.sh conv-mach-opt.sh\
       CkFutures.decl.h CkArray.decl.h CkReduction.decl.h \
       LBDatabase.decl.h CentralLB.decl.h \
@@ -166,6 +167,7 @@ dirs+sources:
 	../../src/Common/scripts/gatherflat ../../src/Common/scripts .
 	./gatherflat ../../src/Common/conv-core        .
 	./gatherflat ../../src/Common/conv-ldb         .
+	./gatherflat ../../src/Common/conv-ccs         .
 	./gatherflat ../../src/Common/ck-core          .
 	./gatherflat ../../src/Common/util             .
 	./gatherflat ../../src/Common/ck-perf          .
@@ -208,8 +210,8 @@ CVLIBS=libconv-core.a \
 
 LIBCONV_CORE=threads.o convcore.o conv-conds.o queueing.o msgmgr.o \
 	cpm.o cpthreads.o futures.o cldb.o random.o trace-common.o \
-	debug-conv.o debug-message.o debug-object.o info.o \
-	generate.o edgelist.o conv-ccs.o quiescence.o 
+	debug-conv.o generate.o edgelist.o conv-ccs.o ccs-builtins.o \
+	quiescence.o 
 
 LIBCONV_UTIL=pup_util.o pup_xlater.o pup_c.o ckhashtable.o sockRoutines.o conv-lists.o
 
@@ -217,7 +219,7 @@ LIBCONV_UTILF=pup_f.o
 
 converse: basics QuickThreads/libqt.a $(CVLIBS) charmrun-target conv-cpm
 
-charmrun-target: daemon-target
+charmrun-target: daemon-target sockRoutines.c sockRoutines.h ccs-server.c ccs-server.h
 	if [ -d charmrun ] ; then ( cd charmrun ; make OPTS='$(OPTS)' ) ; fi
 	if [ -f charmrun ] ; then ( cp charmrun ../bin ) ; fi
 
@@ -263,6 +265,9 @@ convcore.o: convcore.c $(CVHEADERS)
 
 conv-ccs.o: conv-ccs.c $(CVHEADERS)
 	$(CHARMC) conv-ccs.c
+
+ccs-builtins.o: ccs-builtins.C $(CVHEADERS)
+	$(CHARMC) $<
 
 sockRoutines.o: sockRoutines.c $(CVHEADERS) $(UTILHEADERS)
 	$(CHARMC) sockRoutines.c
@@ -366,7 +371,7 @@ $(L)/libmemory-cache.o: memory-cache.c $(MEM_DEPS)
 CK_LIBS_CORE=libck.a
 
 LIBCK_CORE=init.o register.o qd.o ck.o main.o msgalloc.o ckfutures.o \
-           ckarray.o ckreduction.o \
+           debug-message.o ckarray.o ckreduction.o \
            tempo.o waitqd.o LBDatabase.o lbdb.o \
 	   LBDBManager.o LBComm.o LBObj.o LBMachineUtil.o Refiner.o \
 	   ObjGraph.o \
@@ -460,14 +465,8 @@ qd.o: qd.C $(CKHEADERS)
 main.o: main.C $(CKHEADERS)
 	$(CHARMC) -o main.o main.C
 
-debug-object.o: debug-object.h debug-object.C $(CKHEADERS)
-	$(CHARMC) -o debug-object.o debug-object.C
-
 debug-message.o: debug-message.C $(CKHEADERS)
-	$(CHARMC) -o debug-message.o debug-message.C
-
-info.o:	info.C $(CKHEADERS)
-	$(CHARMC) -o info.o info.C
+	$(CHARMC) -I. $<
 
 ck.o: ck.C $(CKHEADERS)
 	$(CHARMC) -o ck.o ck.C
@@ -570,15 +569,15 @@ RandRefLB.o: RandRefLB.C $(CKHEADERS)
 
 
 ## Tracing libraries (profiling, -tracemode)
-LIBTRACE_NONE=trace-none.o
+LIBTRACE_NONE=trace-none.o trace-common.o
 $(L)/libtrace-none.a: $(LIBTRACE_NONE)
 	$(CHARMC) -o $@ $(LIBTRACE_NONE)
 
-LIBTRACE_PROJ=trace-projections.o
+LIBTRACE_PROJ=trace-projections.o trace-common.o
 $(L)/libtrace-projections.a: $(LIBTRACE_PROJ)
 	$(CHARMC) -o $@ $(LIBTRACE_PROJ)
 
-LIBTRACE_SUMM=trace-summary.o
+LIBTRACE_SUMM=trace-summary.o trace-common.o
 $(L)/libtrace-summary.a: $(LIBTRACE_SUMM)
 	$(CHARMC) -o $@ $(LIBTRACE_SUMM)
 
