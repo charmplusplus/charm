@@ -370,8 +370,8 @@ foreach FILE ($FILES)
       echo '}' >> $TMP.P.c
       echo '#line 1 "'$BASE.P'"' >> $TMP.P.c
       /bin/cat $BASE.P >> $TMP.P.c
-      if ($?VERBOSE) echo "$CMK_CPP $OPTS_CPP -I$CHARMINC $TMP.P.c > $TMP.cpp"
-      $CMK_CPP $OPTS_CPP -I$CHARMINC $TMP.P.c > $TMP.cpp
+      if ($?VERBOSE) echo "$CMK_CXX -E $OPTS_CPP -I$CHARMINC $TMP.P.c > $TMP.cpp"
+      $CMK_CXX -E $OPTS_CPP -I$CHARMINC $TMP.P.c > $TMP.cpp
       if ($?VERBOSE) echo "$CHARMBIN/charmfilter++ $TMP.cpp | $CMK_M4 > $TMP.space"
       $CHARMBIN/charmfilter++ $TMP.cpp | $CMK_M4 > $TMP.space
       if ($?VERBOSE) echo "$CHARMBIN/charmxlat++ $TMP.space $TMP.C"
