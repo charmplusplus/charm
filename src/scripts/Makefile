@@ -29,8 +29,6 @@ all: charm++ bluegene LIBS AMPI f90charm TSM SM PVM doc
 
 charm++: converse $(L)/libck.a loadbalancers charmxi default_libs
 
-bluegene: charm++ $(L)/libconv-bluegene.a METIS multicast
-
 bgampi: bluegene AMPI
 
 TSM: converse $(L)/libtsm.a
@@ -901,6 +899,8 @@ loadbalancers: $(LOADBALANCERS) $(L)/libmoduleEveryLB.a
 #
 ###############################################################################
 
+bluegene: charm++ $(L)/libconv-bluegene.a $(L)/libconv-bluegene-logs.a METIS
+
 # old (Charm++) Blue Gene emulator
 BlueGene.decl.h BlueGene.def.h : BlueGene.ci charmxi
 	$(CHARMC) BlueGene.ci
@@ -910,17 +910,30 @@ $(L)/libbluegene.a: BlueGene.C BlueGene.h BlueGene.decl.h BlueGene.def.h
 	$(CHARMC) -o $@ BlueGene.o
 
 # (Converse) Blue Gene emulator
-blue.o:  blue_impl.h blue_timing.h blue.C $(CVHEADERS)
+BLUE_HEADERS = blue_types.h blue_timing.h blue_defs.h blue_logs.h blue.h blue_impl.h
+BLUE_OBJS = blue.o blue_init.o blue_timing.o
+BLUE_IO_OBJS = blue_IO.o blue_logs.o
+
+blue.o:  blue.C $(BLUE_HEADERS) $(CVHEADERS)
 	$(CHARMC) -c blue.C
 
-blue_timing.o:  blue_impl.h blue_timing.C blue_timing.h $(CVHEADERS)
+blue_timing.o:  blue_timing.C $(BLUE_HEADERS) $(CVHEADERS)
 	$(CHARMC) -c blue_timing.C
 
-blue_init.o:  blue_impl.h blue_init.C $(CVHEADERS)
+blue_init.o:  blue_init.C $(BLUE_HEADERS) $(CVHEADERS)
 	$(CHARMC) -c blue_init.C
 
-$(L)/libconv-bluegene.a: blue.o blue_init.o blue_timing.o
-	$(CHARMC) -o $@ blue.o blue_init.o blue_timing.o
+blue_logs.o:  blue_logs.C $(BLUE_HEADERS) $(CVHEADERS)
+	$(CHARMC) -c blue_logs.C
+
+blue_IO.o:  blue_IO.C $(BLUE_HEADERS) $(CVHEADERS)
+	$(CHARMC) -c blue_IO.C
+
+$(L)/libconv-bluegene.a: $(BLUE_OBJS)
+	$(CHARMC) -o $@  $(BLUE_OBJS)
+
+$(L)/libconv-bluegene-logs.a: $(BLUE_IO_OBJS)
+	$(CHARMC) -o $@  $(BLUE_IO_OBJS)
 
 ###############################################################################
 #
