@@ -747,6 +747,9 @@ static void CommunicationServerThread(int sleepTime)
 #if CMK_IMMEDIATE_MSG
   CmiHandleImmediate();
 #endif
+#if CMK_PERSISTENT_COMM
+  PumpPersistent();
+#endif
 }
 
 void CmiMachineInit()

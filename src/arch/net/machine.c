@@ -246,6 +246,10 @@ int  portFinish = 0;
 #  include <sys/file.h>
 #endif
 
+#if CMK_PERSISTENT_COMM
+#include "persist_impl.h"
+#endif
+
 #define PRINTBUFSIZE 16384
 
 static void CommunicationServer(int withDelayMs);
@@ -1631,6 +1635,14 @@ CmiCommHandle CmiGeneralSend(int pe, int size, int freemode, char *data)
     }
   }
 
+#if CMK_PERSISTENT_COMM
+  if (phs) {
+      CmiAssert(phsSize == 1);
+      CmiSendPersistentMsg(*phs, pe, size, data);
+      return NULL;
+  }
+#endif
+
   ogm=PrepareOutgoing(cs,pe,size,freemode,data);
   CmiCommLock();
   DeliverOutgoingMessage(ogm);
@@ -2034,5 +2046,132 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usc, int everReturn)
 }
 
 
+#if CMK_PERSISTENT_COMM
 
+int persistentSendMsgHandlerIdx;
 
+static void sendPerMsgHandler(char *msg)
+{
+  int msgSize;
+  void *destAddr, *destSizeAddr;
+
+  msgSize = CmiMsgHeaderGetLength(msg);
+  msgSize -= 2*sizeof(void *);
+  destAddr = *(void **)(msg + msgSize);
+  destSizeAddr = *(void **)(msg + msgSize + sizeof(void*));
+  CmiSetHandler(msg, CmiGetXHandler(msg));
+  *((int *)destSizeAddr) = msgSize;
+  memcpy(destAddr, msg, msgSize);
+}
+
+void CmiSendPersistentMsg(PersistentHandle h, int destPE, int size, void *m)
+{
+  CmiAssert(h!=NULL);
+  PersistentSendsTable *slot = (PersistentSendsTable *)h;
+  CmiAssert(slot->used == 1);
+  CmiAssert(slot->destPE == destPE);
+  if (size > slot->sizeMax) {
+    CmiPrintf("size: %d sizeMax: %d\n", size, slot->sizeMax);
+    CmiAbort("Abort: Invalid size\n");
+  }
+
+/*CmiPrintf("[%d] CmiSendPersistentMsg h=%p hdl=%d destpe=%d destAddress=%p size=%d\n", CmiMyPe(), *phs, CmiGetHandler(m), slot->destPE, slot->destAddress, size);*/
+
+  if (slot->destAddress) {
+    int newsize = size + sizeof(void *)*2;
+    char *newmsg = (char*)CmiAlloc(newsize);
+    memcpy(newmsg, m, size);
+    memcpy(newmsg+size, &slot->destAddress, sizeof(void *));
+    memcpy(newmsg+size+sizeof(void*), &slot->destSizeAddress, sizeof(void *));
+    CmiFree(m);
+    CmiMsgHeaderSetLength(newmsg, size + sizeof(void *)*2);
+    CmiSetXHandler(newmsg, CmiGetHandler(newmsg));
+    CmiSetHandler(newmsg, persistentSendMsgHandlerIdx);
+    phs = NULL; phsSize = 0;
+    CmiSyncSendAndFree(slot->destPE, newsize, newmsg);
+  }
+  else {
+#if 1
+    if (slot->messageBuf != NULL) {
+      CmiPrintf("Unexpected message in buffer on %d\n", CmiMyPe());
+      CmiAbort("");
+    }
+    slot->messageBuf = m;
+    slot->messageSize = size;
+#else
+    /* normal send */
+    PersistentHandle  *phs_tmp = phs;
+    int phsSize_tmp = phsSize;
+    phs = NULL; phsSize = 0;
+    CmiPrintf("[%d]Slot sending message directly\n", CmiMyPe());
+    CmiSyncSendAndFree(slot->destPE, size, m);
+    phs = phs_tmp; phsSize = phsSize_tmp;
+#endif
+  }
+}
+
+void CmiSyncSendPersistent(int destPE, int size, char *msg, PersistentHandle h)
+{
+  char *dupmsg = (char *) CmiAlloc(size);
+  memcpy(dupmsg, msg, size);
+
+  /*  CmiPrintf("Setting root to %d\n", 0); */
+  if (CmiMyPe()==destPE) {
+    CQdCreate(CpvAccess(cQdState), 1);
+    CdsFifo_Enqueue(CpvAccess(CmiLocalQueue),dupmsg);
+  }
+  else
+    CmiSendPersistentMsg(h, destPE, size, dupmsg);
+}
+
+/* called in PumpMsgs */
+void PumpPersistent()
+{
+  PersistentReceivesTable *slot = persistentReceivesTableHead;
+  while (slot) {
+    if (slot->recvSize)
+    {
+      int size = slot->recvSize;
+      void *msg = slot->messagePtr;
+
+#if 0
+      void *dupmsg;
+      dupmsg = CmiAlloc(size);
+      
+      _MEMCHECK(dupmsg);
+      memcpy(dupmsg, msg, size);
+      msg = dupmsg;
+#else
+      /* return messagePtr directly and user MUST make sure not to delete it. */
+      /*CmiPrintf("[%d] %p size:%d rank:%d root:%d\n", CmiMyPe(), msg, size, CMI_DEST_RANK(msg), CMI_BROADCAST_ROOT(msg));*/
+
+#endif
+
+      CmiPushPE(CMI_DEST_RANK(msg), msg);
+#if CMK_BROADCAST_SPANNING_TREE
+      if (CMI_BROADCAST_ROOT(msg))
+          SendSpanningChildren(size, msg);
+#endif
+      slot->recvSize = 0;
+    }
+    slot = slot->next;
+  }
+}
+
+void *PerAlloc(int size)
+{
+  return CmiAlloc(size);
+}
+                                                                                
+void PerFree(char *msg)
+{
+    CmiFree(msg);
+}
+
+void persist_machine_init() 
+{
+  persistentSendMsgHandlerIdx =
+       CmiRegisterHandler((CmiHandler)sendPerMsgHandler);
+}
+
+#endif
