@@ -1,0 +1,14 @@
+CHARMC=../../../bin/charmc $(OPTS)
+
+pgm: test.o
+	$(CHARMC) -o pgm test.o -language ampi
+
+test.o: test.c
+	$(CHARMC) -c test.c
+
+clean:
+	rm -f *.o *.mod pgm *~ conv-host charmrun
+
+test: pgm
+	./charmrun ./pgm +p2 +vp4
+
