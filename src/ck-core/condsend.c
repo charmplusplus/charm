@@ -12,17 +12,17 @@ typedef struct {
 } CallBocStuff;
 
 /* Function implemented but not to be used .. */
-static void SendMsgIfConditionArises  CMK_PROTO((int condnum, int entry, void *msg, int size, ChareIDType *cid));
+static void SendMsgIfConditionArises(int condnum, int entry, void *msg, int size, ChareIDType *cid);
 
-void CallBocIfConditionArises CMK_PROTO((int condnum, FUNCTION_PTR fnp, int bocNum));
+void CallBocIfConditionArises(int condnum, FUNCTION_PTR fnp, int bocNum);
 
-void SendMsgAfter CMK_PROTO((unsigned int deltaT, int entry, void *msg, int size, ChareIDType *cid));
+void SendMsgAfter(unsigned int deltaT, int entry, void *msg, int size, ChareIDType *cid);
 
-void CallBocAfter CMK_PROTO((FUNCTION_PTR fnp, int bocNum, unsigned int deltaT));
+void CallBocAfter(FUNCTION_PTR fnp, int bocNum, unsigned int deltaT);
 
-void CallBocOnCondition CMK_PROTO((FUNCTION_PTR fnp, int bocNum));
+void CallBocOnCondition(FUNCTION_PTR fnp, int bocNum);
 
-int NoDelayedMsgs CMK_PROTO((void));
+int NoDelayedMsgs(void);
 
 
 CpvStaticDeclare(int, outstanding_sends);

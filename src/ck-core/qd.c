@@ -159,7 +159,7 @@ void QDBocInit()
     
     CpvAccess(myPe)        = CmiMyPe();
     CpvAccess(mainPe)      = 0;
-    CpvAccess(rootPe)      = CmiSpanTreeRoot();
+    CpvAccess(rootPe)      = 0;
     CpvAccess(numKids)     = CmiNumSpanTreeChildren(CpvAccess(myPe));
     CpvAccess(parentPe)    = (CpvAccess(myPe) == CpvAccess(rootPe)) ? CpvAccess(mainPe) : CmiSpanTreeParent(CpvAccess(myPe));
     CpvAccess(quiescenceStarted) = 0;

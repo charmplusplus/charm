@@ -388,11 +388,11 @@ typedef unsigned int PVECTOR;
 #define GetEnv_prioend(e) ((unsigned int *)(((char *)(e))+GetEnv_TotalSize(e)))
 #define GetEnv_priobgn(e) ((unsigned int *)(((char *)(e))+GetEnv_TotalSize(e)-GetEnv_priobytes(e)))
 
-extern unsigned int *CkPrioPtrFn       CMK_PROTO((void *));
-extern int           CkPrioSizeBitsFn  CMK_PROTO((void *));
-extern int           CkPrioSizeBytesFn CMK_PROTO((void *));
-extern int           CkPrioSizeWordsFn CMK_PROTO((void *));
-extern void          CkPrioConcatFn    CMK_PROTO((void *,void *,unsigned int));
+extern unsigned int *CkPrioPtrFn(void *);
+extern int           CkPrioSizeBitsFn(void *);
+extern int           CkPrioSizeBytesFn(void *);
+extern int           CkPrioSizeWordsFn(void *);
+extern void          CkPrioConcatFn(void *,void *,unsigned int);
 
 #define CkPrioPtr(msg)       (CkPrioPtrFn((void *)(msg)))
 #define CkPrioSizeBits(msg)  (CkPrioSizeBitsFn((void *)(msg)))
@@ -607,8 +607,8 @@ FUNCTION_PTR _CK_9GetMonoCompareFn();
 #define CkSpanTreeParent        CmiSpanTreeParent
 #define  CSpanTreeParent        CmiSpanTreeParent
 
-#define CkSpanTreeRoot          CmiSpanTreeRoot
-#define  CSpanTreeRoot          CmiSpanTreeRoot
+#define CkSpanTreeRoot          0
+#define  CSpanTreeRoot          0
 
 #define CkSpanTreeChildren      CmiSpanTreeChildren
 #define  CSpanTreeChildren      CmiSpanTreeChildren
@@ -659,7 +659,7 @@ FUNCTION_PTR _CK_9GetMonoCompareFn();
 #define McTotalNumPe() CmiNumPes()   
 #define McSpanTreeInit() CmiSpanTreeInit()
 #define McSpanTreeParent(node) CmiSpanTreeParent(node)
-#define McSpanTreeRoot() CmiSpanTreeRoot()
+#define McSpanTreeRoot() 0
 #define McSpanTreeChild(node, children) CmiSpanTreeChildren(node, children)
 #define McNumSpanTreeChildren(node) CmiNumSpanTreeChildren(node)
 #define McSendToSpanTreeLeaves(size, msg) CmiSendToSpanTreeLeaves(size, msg)

@@ -96,7 +96,7 @@ void *msgptr_,*localdataptr_;
 		CkMemError(ackMsg);
 		ackMsg->wovID = newWovMsg->wovID;
 
-		if(CmiMyPe() == CmiSpanTreeRoot()) {
+		if(CmiMyPe() == 0) {
 TRACE(CmiPrintf("[%d]:: NodeWrtOnceVar...Ack to Host for wovID %d\n",
 				CmiMyPe() ,ackMsg->wovID);)
 			HostReceiveAcknowledge(ackMsg, bocData);
@@ -139,7 +139,7 @@ TRACE(CmiPrintf("[%d]:: NodeRecvAck...wovID = %d, kids left = %d\n",
 		CkMemError(ackMsg);
 		ackMsg->wovID = theMsg->wovID;
 
-		if(CmiMyPe() == CmiSpanTreeRoot())
+		if(CmiMyPe() == 0)
 			    HostReceiveAcknowledge(ackMsg, bocData);
 		else
 			    GeneralSendMsgBranch(CsvAccess(CkEp_WOV_RcvAck), ackMsg, 

@@ -91,7 +91,7 @@ ACC_DATA *mydata;
 
 	if (CmiNumSpanTreeChildren(mydata->Penum) == 0)
 	{
-		if (mydata->Penum == CmiSpanTreeRoot())
+		if (mydata->Penum == 0)
 			SendMsg(mydata->EP,  GetAccMsgPtr(mydata),
 				&(mydata->CID)); 
 		else
@@ -121,7 +121,7 @@ ACC_DATA *mydata;
 	mydata->NumChildren--;
 	if (mydata->NumChildren <= 0)
 	{
-		if (mydata->Penum == CmiSpanTreeRoot())
+		if (mydata->Penum == 0)
 			SendMsg(mydata->EP, GetAccMsgPtr(mydata),
 				&(mydata->CID)); 
 		else

@@ -8,42 +8,12 @@
 
 /**** DEAL WITH DIFFERENCES: KERNIGHAN-RITCHIE-C, ANSI-C, AND C++ ****/
 
-#if CMK_PREPROCESSOR_CANNOT_DO_CONCATENATION
-#define CMK_CONCAT(x,y) y
-#endif
-
-#if CMK_PREPROCESSOR_USES_ANSI_STANDARD_CONCATENATION
 #define CMK_CONCAT(x,y) x##y
-#endif
 
 /* the following flags denote properties of the C compiler,  */
 /* not the C++ compiler.  If this is C++, ignore them.       */
 #ifdef __cplusplus
-#undef CMK_PROTOTYPES_FAIL
-#undef CMK_PROTOTYPES_WORK
-#define CMK_PROTOTYPES_FAIL 0
-#define CMK_PROTOTYPES_WORK 1
-#undef CMK_PREPROCESSOR_CANNOT_DO_CONCATENATION
-#undef CMK_PREPROCESSOR_USES_ANSI_STANDARD_CONCATENATION
-#define CMK_PREPROCESSOR_CANNOT_DO_CONCATENATION 0
-#define CMK_PREPROCESSOR_USES_ANSI_STANDARD_CONCATENATION 1
 extern "C" {
-#endif
-
-#if CMK_PROTOTYPES_WORK
-#define CMK_PROTO(x) x
-#endif
-
-#if CMK_PROTOTYPES_FAIL
-#define CMK_PROTO(x) ()
-#endif
-
-#if CMK_STATIC_PROTO_WORKS
-#define CMK_STATIC_PROTO static
-#endif
-
-#if CMK_STATIC_PROTO_FAILS
-#define CMK_STATIC_PROTO extern
 #endif
 
 /******************************************************************************
@@ -137,8 +107,8 @@ extern int Cmi_mynodesize;
 
 extern void CmiMemLock();
 extern void CmiMemUnlock();
-extern void CmiNodeBarrier CMK_PROTO((void));
-extern void *CmiSvAlloc CMK_PROTO((int));
+extern void CmiNodeBarrier(void);
+extern void *CmiSvAlloc(int);
 
 typedef cps_mutex_t *CmiNodeLock;
 extern CmiNodeLock CmiCreateLock(void);
@@ -188,7 +158,7 @@ extern int CmiRankOf(int pe);
 
 extern void CmiMemLock();
 extern void CmiMemUnlock();
-extern void CmiNodeBarrier CMK_PROTO((void));
+extern void CmiNodeBarrier(void);
 #define CmiSvAlloc CmiAlloc
 
 
@@ -241,7 +211,7 @@ extern int CmiRankOf(int pe);
 
 extern void CmiMemLock();
 extern void CmiMemUnlock();
-extern void CmiNodeBarrier CMK_PROTO((void));
+extern void CmiNodeBarrier(void);
 #define CmiSvAlloc CmiAlloc
 
 
@@ -389,10 +359,10 @@ CpvExtern(CmiHandler,  CsdNotifyIdle);
 CpvExtern(CmiHandler,  CsdNotifyBusy);
 CpvExtern(int,         CsdStopNotifyFlag);
 
-extern int CmiRegisterHandler CMK_PROTO((CmiHandler));
-extern int CmiRegisterHandlerLocal CMK_PROTO((CmiHandler));
-extern int CmiRegisterHandlerGlobal CMK_PROTO((CmiHandler));
-extern void CmiNumberHandler CMK_PROTO((int, CmiHandler));
+extern int CmiRegisterHandler(CmiHandler);
+extern int CmiRegisterHandlerLocal(CmiHandler);
+extern int CmiRegisterHandlerGlobal(CmiHandler);
+extern void CmiNumberHandler(int, CmiHandler);
 
 /*
  * I'm planning on doing the byte-order conversion slightly differently
@@ -452,30 +422,51 @@ extern void CmiNumberHandler CMK_PROTO((int, CmiHandler));
 #define CmiHandlerToFunction(n) (CpvAccess(CmiHandlerTable)[n])
 #define CmiGetHandlerFunction(env) (CmiHandlerToFunction(CmiGetHandler(env)))
 
-void    *CmiAlloc  CMK_PROTO((int size));
-int      CmiSize   CMK_PROTO((void *));
-void     CmiFree   CMK_PROTO((void *));
+void    *CmiAlloc(int size);
+int      CmiSize(void *);
+void     CmiFree(void *);
 
-double   CmiTimer      CMK_PROTO(());
-double   CmiWallTimer  CMK_PROTO(());
-double   CmiCpuTimer   CMK_PROTO(());
+double   CmiTimer();
+double   CmiWallTimer();
+double   CmiCpuTimer();
 
 #if CMK_NODE_QUEUE_AVAILABLE
 
-#define CsdNodeEnqueueGeneral(x,s,i,p) {CmiLock(CsvAccess(NodeQueueLock));\
-    CqsEnqueueGeneral(CsvAccess(CsdNodeQueue),(x),(s),(i),(p)); \
-    CmiUnlock(CsvAccess(NodeQueueLock));}
-#define CsdNodeEnqueue(x)     {CmiLock(CsvAccess(NodeQueueLock));\
-			       CqsEnqueueFifo(CsvAccess(CsdNodeQueue),(x));\
-			       CmiUnlock(CsvAccess(NodeQueueLock));}
+#define CsdNodeEnqueueGeneral(x,s,i,p) { \
+          CmiLock(CsvAccess(NodeQueueLock));\
+          CqsEnqueueGeneral(CsvAccess(CsdNodeQueue),(x),(s),(i),(p)); \
+          CmiUnlock(CsvAccess(NodeQueueLock)); \
+        }
+#define CsdNodeEnqueueFifo(x)     { \
+          CmiLock(CsvAccess(NodeQueueLock));\
+          CqsEnqueueFifo(CsvAccess(CsdNodeQueue),(x)); \
+          CmiUnlock(CsvAccess(NodeQueueLock)); \
+        }
+#define CsdNodeEnqueueLifo(x)     { \
+          CqsEnqueueLifo(CsvAccess(CsdNodeQueue),(x))); \
+          CmiUnlock(CsvAccess(NodeQueueLock)); \
+        }
+#define CsdNodeEnqueue(x)     { \
+          CmiLock(CsvAccess(NodeQueueLock));\
+          CqsEnqueueFifo(CsvAccess(CsdNodeQueue),(x));\
+          CmiUnlock(CsvAccess(NodeQueueLock)); \
+        }
+
+#define CsdNodeEmpty()            (CqsEmpty(CpvAccess(CsdNodeQueue)))
+#define CsdNodeLength()           (CqsLength(CpvAccess(CsdNodeQueue)))
 
 #else
 
-#define CsdNodeEnqueueGeneral(x,s,i,p)  CsdEnqueueGeneral(x,s,i,p)
-#define CsdNodeEnqueue(x)  		CsdEnqueue(x)
+#define CsdNodeEnqueueGeneral(x,s,i,p)  (CsdEnqueueGeneral(x,s,i,p))
+#define CsdNodeEnqueueFifo(x)     (CqsEnqueueFifo(CpvAccess(CsdSchedQueue),(x)))
+#define CsdNodeEnqueueLifo(x)     (CqsEnqueueLifo(CpvAccess(CsdSchedQueue),(x)))
+#define CsdNodeEnqueue(x)         (CsdEnqueue(x))
+#define CsdNodeEmpty()            (CqsEmpty(CpvAccess(CsdSchedQueue)))
+#define CsdNodeLength()           (CqsLength(CpvAccess(CsdSchedQueue)))
 
 #endif
 
+extern int CqsEmpty(void *);
 
 #define CsdEnqueueGeneral(x,s,i,p)\
     (CqsEnqueueGeneral(CpvAccess(CsdSchedQueue),(x),(s),(i),(p)))
@@ -486,9 +477,9 @@ double   CmiCpuTimer   CMK_PROTO(());
 #define CsdLength()           (CqsLength(CpvAccess(CsdSchedQueue)))
 
 #if CMK_CMIPRINTF_IS_A_BUILTIN
-void  CmiPrintf CMK_PROTO((char *, ...));
-void  CmiError  CMK_PROTO((char *, ...));
-int   CmiScanf  CMK_PROTO((char *, ...));
+void  CmiPrintf(char *, ...);
+void  CmiError(char *, ...);
+int   CmiScanf(char *, ...);
 #endif
 
 #if CMK_CMIPRINTF_IS_JUST_PRINTF
@@ -499,35 +490,72 @@ int   CmiScanf  CMK_PROTO((char *, ...));
 #define CmiScanf  scanf
 #endif
 
-typedef void (*CmiStartFn) CMK_PROTO((int argc, char **argv));
+typedef void (*CmiStartFn)(int argc, char **argv);
 
 /********* CSD - THE SCHEDULER ********/
 
-extern  int CsdScheduler CMK_PROTO((int));
+extern  int CsdScheduler(int);
 #define CsdSetNotifyIdle(f1,f2) {CpvAccess(CsdNotifyIdle)=(f1);\
                                  CpvAccess(CsdNotifyBusy)=(f2);}
 #define CsdStartNotifyIdle() (CpvAccess(CsdStopNotifyFlag)=0)
 #define CsdStopNotifyIdle() (CpvAccess(CsdStopNotifyFlag)=1)
 
 #if CMK_CSDEXITSCHEDULER_IS_A_FUNCTION
-extern void CsdExitScheduler CMK_PROTO((void));
+extern void CsdExitScheduler(void);
 #endif 
 
 #if CMK_CSDEXITSCHEDULER_SET_CSDSTOPFLAG
 #define CsdExitScheduler()  (CpvAccess(CsdStopFlag)++)
 #endif
 
-void     CmiGrabBuffer           CMK_PROTO((void **ppbuf));
-int      CmiSpanTreeRoot         CMK_PROTO(()) ;
-int      CmiNumSpanTreeChildren  CMK_PROTO((int)) ;
-int      CmiSpanTreeParent       CMK_PROTO((int)) ;
-void     CmiSpanTreeChildren     CMK_PROTO((int node, int *children)) ;
+void     CmiGrabBuffer(void **ppbuf);
 
-/******** Node level Trees *********************/
-int      CmiNodeSpanTreeRoot         CMK_PROTO(()) ;
-int      CmiNumNodeSpanTreeChildren  CMK_PROTO((int)) ;
-int      CmiNodeSpanTreeParent       CMK_PROTO((int)) ;
-void     CmiNodeSpanTreeChildren     CMK_PROTO((int node, int *children)) ;
+#if CMK_SPANTREE_USE_COMMON_CODE
+
+#define W  (CMK_SPANTREE_MAXSPAN)
+#define NN (CmiNumNodes())
+#define CmiNodeSpanTreeParent(n) ((n)?(((n)-1)/W):(-1))
+#define CmiNodeSpanTreeChildren(n,c) {\
+          int _i; \
+          for(_i=0; _i<W; _i++) { \
+            int _x = (n)*W+_i+1; \
+            if(_x<NN) (c)[_i]=_x; \
+          }\
+        }
+#define CmiNumNodeSpanTreeChildren(n) ((((n)+1)*W<NN)? W : \
+          ((((n)*W+1)>=NN)?0:((NN-1)-(n)*W)))
+#define R(p) (CmiRankOf(p))
+#define NF(n) (CmiNodeFirst(n))
+#define SP(n) (CmiNodeSpanTreeParent(n))
+#define ND(p) (CmiNodeOf(p))
+#define NS(p) (CmiNodeSize(ND(p)))
+#define CmiSpanTreeParent(p) ((p)?(R(p)?(NF(ND(p))+R(p)/W):NF(SP(ND(p)))):(-1))
+#define C(p) (((R(p)+1)*W<NS(p))?W:(((R(p)*W+1)>=NS(p))?0:((NS(p)-1)-R(p)*W)))
+#define SC(p) (CmiNumNodeSpanTreeChildren(ND(p)))
+#define CmiNumSpanTreeChildren(p) (R(p)?C(p):(SC(p)+C(p)))
+#define CmiSpanTreeChildren(p,c) {\
+          int _i,_c=0; \
+          if(R(p)==0) { \
+            for(_i=0;_i<W;_i++) { \
+              int _x = ND(p)*W+_i+1; \
+              if(_x<NN) (c)[_c++]=NF(_x); \
+            }\
+          } \
+          for(_i=0;_i<W;_i++) { \
+            int _x = R(p)*W+_i+1; \
+            if(_x<NS(p)) (c)[_c++]=NF(ND(p))+_x; \
+          }\
+        }
+#endif
+
+#if CMK_SPANTREE_USE_SPECIAL_CODE
+int      CmiSpanTreeNumChildren(int) ;
+int      CmiSpanTreeParent(int) ;
+void     CmiSpanTreeChildren(int node, int *children);
+int      CmiNodeSpanTreeNumChildren(int);
+int      CmiNodeSpanTreeParent(int) ;
+void     CmiNodeSpanTreeChildren(int node, int *children) ;
+#endif
 
 /****** MULTICAST GROUPS ******/
 
@@ -538,43 +566,29 @@ void     CmiLookupGroup(CmiGroup grp, int *npes, int **pes);
 
 /****** CMI MESSAGE TRANSMISSION ******/
 
-void          CmiSyncSendFn             CMK_PROTO((int, int, char *));
-CmiCommHandle CmiAsyncSendFn            CMK_PROTO((int, int, char *));
-void          CmiFreeSendFn             CMK_PROTO((int, int, char *));
+void          CmiSyncSendFn(int, int, char *);
+CmiCommHandle CmiAsyncSendFn(int, int, char *);
+void          CmiFreeSendFn(int, int, char *);
 
-void          CmiSyncBroadcastFn        CMK_PROTO((int, char *));
-CmiCommHandle CmiAsyncBroadcastFn       CMK_PROTO((int, char *));
-void          CmiFreeBroadcastFn        CMK_PROTO((int, char *));
+void          CmiSyncBroadcastFn(int, char *);
+CmiCommHandle CmiAsyncBroadcastFn(int, char *);
+void          CmiFreeBroadcastFn(int, char *);
 
-void          CmiSyncBroadcastAllFn     CMK_PROTO((int, char *));
-CmiCommHandle CmiAsyncBroadcastAllFn    CMK_PROTO((int, char *));
-void          CmiFreeBroadcastAllFn     CMK_PROTO((int, char *));
+void          CmiSyncBroadcastAllFn(int, char *);
+CmiCommHandle CmiAsyncBroadcastAllFn(int, char *);
+void          CmiFreeBroadcastAllFn(int, char *);
 
-void          CmiSyncListSendFn         CMK_PROTO((int, int *, int, char*));
-CmiCommHandle CmiAsyncListSendFn        CMK_PROTO((int, int *, int, char*));
-void          CmiFreeListSendFn         CMK_PROTO((int, int *, int, char*));
+void          CmiSyncListSendFn(int, int *, int, char*);
+CmiCommHandle CmiAsyncListSendFn(int, int *, int, char*);
+void          CmiFreeListSendFn(int, int *, int, char*);
 
-void          CmiSyncMulticastFn        CMK_PROTO((CmiGroup, int, char*));
-CmiCommHandle CmiAsyncMulticastFn       CMK_PROTO((CmiGroup, int, char*));
-void          CmiFreeMulticastFn        CMK_PROTO((CmiGroup, int, char*));
+void          CmiSyncMulticastFn(CmiGroup, int, char*);
+CmiCommHandle CmiAsyncMulticastFn(CmiGroup, int, char*);
+void          CmiFreeMulticastFn(CmiGroup, int, char*);
 
-void          CmiSyncVectorSend         CMK_PROTO((int, int, int *, char **));
-CmiCommHandle CmiAsyncVectorSend        CMK_PROTO((int, int, int *, char **));
-void          CmiSyncVectorSendAndFree  CMK_PROTO((int, int, int *, char **));
-
-#if CMK_NODE_QUEUE_AVAILABLE
-void          CmiSyncNodeSendFn             CMK_PROTO((int, int, char *));
-CmiCommHandle CmiAsyncNodeSendFn            CMK_PROTO((int, int, char *));
-void          CmiFreeNodeSendFn             CMK_PROTO((int, int, char *));
-
-void          CmiSyncNodeBroadcastFn        CMK_PROTO((int, char *));
-CmiCommHandle CmiAsyncNodeBroadcastFn       CMK_PROTO((int, char *));
-void          CmiFreeNodeBroadcastFn        CMK_PROTO((int, char *));
-
-void          CmiSyncNodeBroadcastAllFn     CMK_PROTO((int, char *));
-CmiCommHandle CmiAsyncNodeBroadcastAllFn    CMK_PROTO((int, char *));
-void          CmiFreeNodeBroadcastAllFn     CMK_PROTO((int, char *));
-#endif
+void          CmiSyncVectorSend(int, int, int *, char **);
+CmiCommHandle CmiAsyncVectorSend(int, int, int *, char **);
+void          CmiSyncVectorSendAndFree(int, int, int *, char **);
 
 #define CmiSyncSend(p,s,m)              (CmiSyncSendFn((p),(s),(char *)(m)))
 #define CmiAsyncSend(p,s,m)             (CmiAsyncSendFn((p),(s),(char *)(m)))
@@ -588,6 +602,28 @@ void          CmiFreeNodeBroadcastAllFn     CMK_PROTO((int, char *));
 #define CmiAsyncBroadcastAll(s,m)       (CmiAsyncBroadcastAllFn((s),(char *)(m)))
 #define CmiSyncBroadcastAllAndFree(s,m) (CmiFreeBroadcastAllFn((s),(char *)(m)))
 
+#define CmiSyncListSend(n,l,s,m)        (CmiSyncListSendFn((n),(l),(s),(char *)(m)))
+#define CmiAsyncListSend(n,l,s,m)       (CmiAsyncListSendFn((n),(l),(s),(char *)(m)))
+#define CmiSyncListSendAndFree(n,l,s,m) (CmiFreeListSendFn((n),(l),(s),(char *)(m)))
+
+#define CmiSyncMulticast(g,s,m)         (CmiSyncMulticastFn((g),(s),(char*)(m)))
+#define CmiAsyncMulticast(g,s,m)        (CmiAsyncMulticastFn((g),(s),(char*)(m)))
+#define CmiSyncMulticastAndFree(g,s,m)  (CmiFreeMulticastFn((g),(s),(char*)(m)))
+
+#if CMK_NODE_QUEUE_AVAILABLE
+void          CmiSyncNodeSendFn(int, int, char *);
+CmiCommHandle CmiAsyncNodeSendFn(int, int, char *);
+void          CmiFreeNodeSendFn(int, int, char *);
+
+void          CmiSyncNodeBroadcastFn(int, char *);
+CmiCommHandle CmiAsyncNodeBroadcastFn(int, char *);
+void          CmiFreeNodeBroadcastFn(int, char *);
+
+void          CmiSyncNodeBroadcastAllFn(int, char *);
+CmiCommHandle CmiAsyncNodeBroadcastAllFn(int, char *);
+void          CmiFreeNodeBroadcastAllFn(int, char *);
+#endif
+
 #if CMK_NODE_QUEUE_AVAILABLE
 #define CmiSyncNodeSend(p,s,m)          (CmiSyncNodeSendFn((p),(s),(char *)(m)))
 #define CmiAsyncNodeSend(p,s,m)             (CmiAsyncNodeSendFn((p),(s),(char *)(m)))
@@ -599,30 +635,36 @@ void          CmiFreeNodeBroadcastAllFn     CMK_PROTO((int, char *));
 #define CmiAsyncNodeBroadcastAll(s,m)       (CmiAsyncNodeBroadcastAllFn((s),(char *)(m)))
 #define CmiSyncNodeBroadcastAllAndFree(s,m) (CmiFreeNodeBroadcastAllFn((s),(char *)(m)))
 #else
-#define CmiSyncNodeSend                CmiSyncSend
-#define CmiAsyncNodeSend               CmiAsyncSend
-#define CmiSyncNodeSendAndFree         CmiSyncNodeSendAndFree
-#define CmiSyncNodeBroadcast           CmiSyncNodeBroadcast
-#define CmiAsyncNodeBroadcast          CmiAsyncNodeBroadcast
-#define CmiSyncNodeBroadcastAndFree    CmiSyncNodeBroadcastAndFree
-#define CmiSyncNodeBroadcastAll        CmiSyncNodeBroadcastAll
-#define CmiAsyncNodeBroadcastAll       CmiAsyncNodeBroadcastAll
-#define CmiSyncNodeBroadcastAllAndFree CmiSyncNodeBroadcastAllAndFree
+#define CmiSyncNodeSend(n,s,m)        CmiSyncSend(CmiNodeFirst(n),s,m)
+#define CmiAsyncNodeSend(n,s,m)       CmiAsyncSend(CmiNodeFirst(n),s,m)
+#define CmiSyncNodeSendAndFree(n,s,m) CmiSyncSendAndFree(CmiNodeFirst(n),s,m)
+#define CmiSyncNodeBroadcast(s,m)           { \
+          int _i; \
+          for(_i=0; _i<CmiNumNodes(); _i++) \
+            if(_i != CmiMyNode()) \
+              CmiSyncSend(CmiNodeFirst(_i),s,m); \
+        }
+#define CmiAsyncNodeBroadcast(s,m)          CmiSyncNodeBroadcast(s,m)
+#define CmiSyncNodeBroadcastAndFree(s,m)    { \
+          CmiSyncNodeBroadcast(s,m); \
+          CmiFree(m); \
+        }
+#define CmiSyncNodeBroadcastAll(s,m)           { \
+          int _i; \
+          for(_i=0; _i<CmiNumNodes(); _i++) \
+            CmiSyncSend(CmiNodeFirst(_i),s,m); \
+        }
+#define CmiAsyncNodeBroadcastAll(s,m)       CmiSyncNodeBroadcastAll(s,m)
+#define CmiSyncNodeBroadcastAllAndFree(s,m) { \
+          CmiSyncNodeBroadcastAll(s,m); \
+          CmiFree(m); \
+        }
 #endif
-
-#define CmiSyncListSend(n,l,s,m)        (CmiSyncListSendFn((n),(l),(s),(char *)(m)))
-#define CmiAsyncListSend(n,l,s,m)       (CmiAsyncListSendFn((n),(l),(s),(char *)(m)))
-#define CmiSyncListSendAndFree(n,l,s,m) (CmiFreeListSendFn((n),(l),(s),(char *)(m)))
-
-#define CmiSyncMulticast(g,s,m)         (CmiSyncMulticastFn((g),(s),(char*)(m)))
-#define CmiAsyncMulticast(g,s,m)        (CmiAsyncMulticastFn((g),(s),(char*)(m)))
-#define CmiSyncMulticastAndFree(g,s,m)  (CmiFreeMulticastFn((g),(s),(char*)(m)))
-
 
 /******** CMI MESSAGE RECEPTION ********/
 
-int    CmiDeliverMsgs          CMK_PROTO((int maxmsgs));
-void   CmiDeliverSpecificMsg   CMK_PROTO((int handler));
+int    CmiDeliverMsgs(int maxmsgs);
+void   CmiDeliverSpecificMsg(int handler);
 
 /******** CQS: THE QUEUEING SYSTEM ********/
 
@@ -640,26 +682,26 @@ typedef struct CthThreadStruct *CthThread;
 typedef void        (*CthVoidFn)();
 typedef CthThread   (*CthThFn)();
 
-int        CthImplemented  CMK_PROTO((void));
+int        CthImplemented(void);
 
-CthThread  CthSelf     CMK_PROTO((void));
-CthThread  CthCreate   CMK_PROTO((CthVoidFn, void *, int));
-void       CthResume   CMK_PROTO((CthThread));
-void       CthFree     CMK_PROTO((CthThread));
+CthThread  CthSelf(void);
+CthThread  CthCreate(CthVoidFn, void *, int);
+void       CthResume(CthThread);
+void       CthFree(CthThread);
 
-void       CthSuspend             CMK_PROTO((void));
-void       CthAwaken              CMK_PROTO((CthThread));
-void       CthSetStrategy         CMK_PROTO((CthThread, CthVoidFn, CthThFn));
-void       CthSetStrategyDefault  CMK_PROTO((CthThread));
-void       CthYield               CMK_PROTO((void));
+void       CthSuspend(void);
+void       CthAwaken(CthThread);
+void       CthSetStrategy(CthThread, CthVoidFn, CthThFn);
+void       CthSetStrategyDefault(CthThread);
+void       CthYield(void);
 
-void       CthSetNext CMK_PROTO((CthThread t, CthThread next));
-CthThread  CthGetNext CMK_PROTO((CthThread t));
+void       CthSetNext(CthThread t, CthThread next);
+CthThread  CthGetNext(CthThread t);
 
-void       CthAutoYield           CMK_PROTO((CthThread t, int flag));
-double     CthAutoYieldFreq       CMK_PROTO((CthThread t));
-void       CthAutoYieldBlock      CMK_PROTO((void));
-void       CthAutoYieldUnblock    CMK_PROTO((void));
+void       CthAutoYield(CthThread t, int flag);
+double     CthAutoYieldFreq(CthThread t);
+void       CthAutoYieldBlock(void);
+void       CthAutoYieldUnblock(void);
 
 /****** CTH: THREAD-PRIVATE VARIABLES ******/
 
@@ -682,7 +724,7 @@ void       CthAutoYieldUnblock    CMK_PROTO((void));
 #endif
 
 CthCpvExtern(char *,CthData);
-extern int CthRegister CMK_PROTO((int));
+extern int CthRegister(int);
 #define CtvDeclare(t,v)         typedef t CtvType##v; CsvDeclare(int,CtvOffs##v);
 #define CtvStaticDeclare(t,v)   typedef t CtvType##v; CsvStaticDeclare(int,CtvOffs##v);
 #define CtvExtern(t,v)          typedef t CtvType##v; CsvExtern(int,CtvOffs##v);
@@ -701,7 +743,7 @@ extern int CthRegister CMK_PROTO((int));
 
 typedef struct CpmDestinationStruct *CpmDestination;
 
-typedef void *(*CpmSender) CMK_PROTO((CpmDestination, int, void *));
+typedef void *(*CpmSender)(CpmDestination, int, void *);
 
 struct CpmDestinationStruct
 {
@@ -713,16 +755,16 @@ struct CpmDestinationStruct
 #define CpmALL (-1)
 #define CpmOTHERS (-2)
 
-CpmDestination CpmSend CMK_PROTO((int pe));
-CpmDestination CpmMakeThread CMK_PROTO((int pe));
-CpmDestination CpmMakeThreadSize CMK_PROTO((int pe, int size));
-CpmDestination CpmEnqueueFIFO CMK_PROTO((int pe));
-CpmDestination CpmEnqueueLIFO CMK_PROTO((int pe));
-CpmDestination CpmEnqueueIFIFO CMK_PROTO((int pe, int prio));
-CpmDestination CpmEnqueueILIFO CMK_PROTO((int pe, int prio));
-CpmDestination CpmEnqueueBFIFO CMK_PROTO((int pe, int priobits, int *prioptr));
-CpmDestination CpmEnqueueBLIFO CMK_PROTO((int pe, int priobits, int *prioptr));
-CpmDestination CpmEnqueue CMK_PROTO((int pe,int qs,int priobits,int *prioptr));
+CpmDestination CpmSend(int pe);
+CpmDestination CpmMakeThread(int pe);
+CpmDestination CpmMakeThreadSize(int pe, int size);
+CpmDestination CpmEnqueueFIFO(int pe);
+CpmDestination CpmEnqueueLIFO(int pe);
+CpmDestination CpmEnqueueIFIFO(int pe, int prio);
+CpmDestination CpmEnqueueILIFO(int pe, int prio);
+CpmDestination CpmEnqueueBFIFO(int pe, int priobits, int *prioptr);
+CpmDestination CpmEnqueueBLIFO(int pe, int priobits, int *prioptr);
+CpmDestination CpmEnqueue(int pe,int qs,int priobits,int *prioptr);
 
 /***********************************************************************
  *
@@ -837,11 +879,11 @@ void CfutureInit();
 typedef void (*CldPackFn)(void *msg);
 
 typedef void (*CldInfoFn)(void *msg, 
-			  CldPackFn *packer,
-			  int *len,
-			  int *queueing,
-			  int *priobits, 
-			  unsigned int **prioptr);
+                          CldPackFn *packer,
+                          int *len,
+                          int *queueing,
+                          int *priobits, 
+                          unsigned int **prioptr);
 
 int CldRegisterInfoFn(CldInfoFn fn);
 int CldRegisterPackFn(CldPackFn fn);
@@ -855,16 +897,16 @@ typedef struct CmmTableStruct *CmmTable;
 #define CmmWildCard (-1)
 
 CmmTable   CmmNew();
-void       CmmFree CMK_PROTO((CmmTable t));
-void       CmmPut CMK_PROTO((CmmTable t, int ntags, int *tags, void *msg));
-void      *CmmFind CMK_PROTO((CmmTable t, int ntags, int *tags, int *returntags, int del));
+void       CmmFree(CmmTable t);
+void       CmmPut(CmmTable t, int ntags, int *tags, void *msg);
+void      *CmmFind(CmmTable t, int ntags, int *tags, int *returntags, int del);
 #define    CmmGet(t,nt,tg,rt)   (CmmFind((t),(nt),(tg),(rt),1))
 #define    CmmProbe(t,nt,tg,rt) (CmmFind((t),(nt),(tg),(rt),0))
 
 /******** ConverseInit and ConverseExit ********/
 
-void ConverseInit CMK_PROTO((int, char**, CmiStartFn, int, int));
-void ConverseExit CMK_PROTO((void));
+void ConverseInit(int, char**, CmiStartFn, int, int);
+void ConverseExit(void);
 
 void CmiAbort(char *);
 
@@ -922,11 +964,11 @@ typedef void (*CcdVoidFn)();
 
 #define CcdPROCESSORIDLE 1
 
-void CcdCallFnAfter CMK_PROTO((CcdVoidFn fnp, void *arg, unsigned int msecs));
-void CcdPeriodicallyCall CMK_PROTO((CcdVoidFn fnp, void *arg));
+void CcdCallFnAfter(CcdVoidFn fnp, void *arg, unsigned int msecs);
+void CcdPeriodicallyCall(CcdVoidFn fnp, void *arg);
 
-void CcdRaiseCondition CMK_PROTO((int condnum));
-void CcdCallOnCondition CMK_PROTO((int condnum, CcdVoidFn fnp, void *arg));
+void CcdRaiseCondition(int condnum);
+void CcdCallOnCondition(int condnum, CcdVoidFn fnp, void *arg);
 
 void CcdCallBacks();
 
@@ -936,9 +978,9 @@ void CcdCallBacks();
 
 CpvExtern(void *, debugQueue);
 
-void CpdInit CMK_PROTO((void));
-void CpdFreeze CMK_PROTO((void));
-void CpdUnFreeze CMK_PROTO((void));
+void CpdInit(void);
+void CpdFreeze(void);
+void CpdUnFreeze(void);
 
 void CpdInitializeObjectTable();
 void CpdInitializeHandlerArray();
@@ -971,7 +1013,7 @@ char* getMsgContentsDebug(int index);
 #endif
 
 #if CMK_WEB_MODE
-void CWebInit CMK_PROTO((void));
+void CWebInit(void);
 #endif
 
 #if CMK_CMIDELIVERS_USE_COMMON_CODE
@@ -982,12 +1024,12 @@ CpvExtern(void*, CmiLocalQueue);
 /******* Converse Client Server *****/
 
 #if CMK_CCS_AVAILABLE
-void CcsUseHandler CMK_PROTO((char *id, int hdlr));
-int CcsRegisterHandler CMK_PROTO((char *id, CmiHandler fn));
-int CcsEnabled CMK_PROTO((void));
-int CcsIsRemoteRequest CMK_PROTO((void));
-void CcsCallerId CMK_PROTO((unsigned int *pip, unsigned int *pport));
-void CcsSendReply CMK_PROTO((unsigned int ip, unsigned int port, int size, void *reply));
+void CcsUseHandler(char *id, int hdlr);
+int CcsRegisterHandler(char *id, CmiHandler fn);
+int CcsEnabled(void);
+int CcsIsRemoteRequest(void);
+void CcsCallerId(unsigned int *pip, unsigned int *pport);
+void CcsSendReply(unsigned int ip, unsigned int port, int size, void *reply);
 #else
 #define CcsInit()
 #define CcsUseHandler(x,y)

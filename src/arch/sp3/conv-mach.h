@@ -43,11 +43,10 @@
 #define CMK_MULTICAST_LIST_USE_COMMON_CODE                 1
 #define CMK_MULTICAST_GROUP_USE_COMMON_CODE                1
 
-#define CMK_PREPROCESSOR_CANNOT_DO_CONCATENATION           0
-#define CMK_PREPROCESSOR_USES_ANSI_STANDARD_CONCATENATION  1
+#define CMK_NODE_QUEUE_AVAILABLE                           0
 
-#define CMK_PROTOTYPES_FAIL                                0
-#define CMK_PROTOTYPES_WORK                                1
+#define CMK_REDUCTION_USES_COMMON_CODE                     1
+#define CMK_REDUCTION_USES_SPECIAL_CODE                    0
 
 #define CMK_RSH_IS_A_COMMAND                               0
 #define CMK_RSH_NOT_NEEDED                                 1
@@ -71,9 +70,6 @@
 #define CMK_SPANTREE_MAXSPAN                               4
 #define CMK_SPANTREE_USE_COMMON_CODE                       1
 #define CMK_SPANTREE_USE_SPECIAL_CODE                      0
-
-#define CMK_STATIC_PROTO_FAILS                             0
-#define CMK_STATIC_PROTO_WORKS                             1
 
 #define CMK_STRERROR_IS_A_BUILTIN                          1
 #define CMK_STRERROR_USE_SYS_ERRLIST                       0

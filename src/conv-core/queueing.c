@@ -243,9 +243,9 @@ Queue q;
   return q->maxlen;
 }
 
-int CqsEmpty(q)
-Queue q;
+int CqsEmpty(void *_q)
 {
+  Queue q = (Queue) _q;;
   return (q->length == 0);
 }
 

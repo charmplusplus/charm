@@ -159,7 +159,7 @@ void CldModuleInit()
   pinf->load_count = 0;
   pinf->spantree_children = CmiNumSpanTreeChildren(CmiMyPe());
   pinf->spantree_parent = CmiSpanTreeParent(CmiMyPe());
-  pinf->spantree_root = CmiSpanTreeRoot();
+  pinf->spantree_root = 0;
   pinf->rebalance = 0;
   CldModuleGeneralInit();
   CldInitiateReduction();

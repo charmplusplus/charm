@@ -924,10 +924,8 @@ void CmiStateInit(int pe, int rank, CmiState state)
     CsvInitialize(PCQueue, NodeRecv);
     state->noderecv=PCQueueCreate();
     CsvAccess(NodeRecv)=state->noderecv;
-    CmiNodeBarrier();
   } else {
     CsvInitialize(PCQueue, NodeRecv);
-    CmiNodeBarrier();
     state->noderecv=CsvAccess(NodeRecv);
   }
 #endif
@@ -1385,9 +1383,9 @@ void CmiDestroyLock(CmiNodeLock lk)
 
 void CmiYield() { thr_yield(); }
 
-int barrier;
-cond_t barrier_cond;
-mutex_t barrier_mutex;
+int barrier = 0;
+cond_t barrier_cond = DEFAULTCV;
+mutex_t barrier_mutex = DEFAULTMUTEX;
 
 void CmiNodeBarrier(void)
 {
@@ -2287,12 +2285,9 @@ void AssembleDatagram(OtherNode node, ExplicitDgram dg)
          if (node->asm_rank==DGRAM_NODEMESSAGE) {
 	   PCQueuePush(CmiGetStateN(0)->noderecv, msg);
          }
-	 else {
+	 else
 #endif
 	   PCQueuePush(CmiGetStateN(node->asm_rank)->recv, msg);
-#if CMK_NODE_QUEUE_AVAILABLE
-	 }
-#endif
     }
     node->asm_msg = 0;
     myNode->recd_msgs++;
@@ -2580,14 +2575,7 @@ char *CmiGetNonLocalNodeQ()
   void *result = PCQueuePop(cs->noderecv);
   return (char *) result;
 }
-#else
-
-char *CmiGetNonLocalNodeQ()
-{
-}
-
 #endif
-
 
 char *CmiGetNonLocal()
 {
@@ -2654,11 +2642,6 @@ CmiCommHandle CmiGeneralNodeSend(int pe, int size, int freemode, char *data)
   CmiCommUnlock();
   return (CmiCommHandle)ogm;
 }
-
-#else
-
-#define CmiGeneralNodeSend(p,s,m,d) CmiGeneralSend(p,s,m,d)
-
 #endif
 
 /******************************************************************************

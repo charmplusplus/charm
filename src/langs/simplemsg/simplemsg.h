@@ -1,11 +1,9 @@
 
 #define CsmWildCard CmmWildCard
 
-void CsmTVSend
-  CMK_PROTO((int pe, int ntags, int *tags, void *buf, int buflen));
+void CsmTVSend(int pe, int ntags, int *tags, void *buf, int buflen);
 
-void CsmTVRecv
-  CMK_PROTO((int ntags, int *tags, void *buf, int buflen, int *rtags));
+void CsmTVRecv (int ntags, int *tags, void *buf, int buflen, int *rtags);
 
 #define CsmTSend(pe, tag, buf, buflen)\
   { int CsmTag=(tag); CsmTVSend(pe, 1, &CsmTag, buf, buflen); }
