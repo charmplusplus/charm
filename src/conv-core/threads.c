@@ -472,6 +472,10 @@ void CthPupBase(pup_er p,CthThreadBase *t,int useMigratable)
 		/*Pup the stack pointer as raw bytes*/
 		pup_bytes(p,&t->stack,sizeof(t->stack));
 	}
+	if (pup_isUnpacking(p)) { 
+		/* FIXME:  restore thread listener */
+		t->listener = NULL;
+	}
 }
 
 static void CthThreadFinished(CthThread t)
