@@ -83,15 +83,17 @@ EOF
 	chmod 755 $script
 	jobid=`qsub $script`
 	echo "Job enqueued under job ID $jobid"
+	retry=0
 # Wait for the job to complete, by checking its status
 	while [ true ]
 	do
 		qstat $jobid > tmp.$$
-		if [ ! $? -eq 0 ]
+		exitstatus=$?
+		if [ -f $output ]
 		then
 # The job is done-- print its output			
 			rm tmp.$$ $script
-			if `grep 'End of program' $output > /dev/null 2>/dev/null`
+			if `grep 'End of program' $output > /dev/null 2>&1`
                         then
                                 exec cat $output
                         else
@@ -103,6 +105,21 @@ EOF
 # The job is still queued or running-- print status and wait
 		tail -1 tmp.$$
 		rm tmp.$$
-		sleep 5
+		if test $exitstatus -ne 0
+                then
+# retry a few times when error occurs
+                        retry=`expr $retry + 1`
+                        if test $retry -gt 6
+                        then
+                                echo "Charmrun> too many errors, abort!"
+                                exit 1
+                        else
+                                sleep 15
+                        fi
+                else
+# job still in queue
+                        retry=0
+                        sleep 20
+                fi
 	done
 fi
