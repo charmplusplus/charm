@@ -10,6 +10,16 @@
 */
 /*@{*/
 
+/*
+Summary:
+  support processor avail bitvector
+  support nonmigratable attrib
+
+  rewritten by Gengbin Zheng to use the new load balancer database and hash table;
+  modified to recognize the nonmigratable attrib of an object 
+  by Gengbin Zheng, 7/28/2003
+*/
+
 #include <charm++.h>
 #include <stdio.h>
 
@@ -151,32 +161,42 @@ LBMigrateMsg* CommLB::Strategy(CentralLB::LDStats* _stats, int count)
     
     //  CkPrintf("[%d] CommLB strategy\n",CkMyPe());
     stats = _stats; 
-    
-    alloc_array = new double *[count+1];
-    
     nobj = stats->n_objs;
-    
-    ObjectHeap maxh(nobj+1);
-    for(obj=0; obj < stats->n_objs; obj++) {
-//	    load_pe += stats[pe].objData[obj].wallTime;
-	    x = new ObjectRecord;
-	    x->id = obj;
-	    x->pos = obj;
-	    x->load = stats->objData[obj].wallTime;
-	    x->pe = stats->from_proc[obj];
-	    maxh.insert(x);
-    }
-
     npe = count;
 
     stats->makeCommHash();
-
+    
+    alloc_array = new double *[count+1];
+    
     object_graph = new graph[nobj];
 
     for(pe=0;pe <= count;pe++)
 	alloc_array[pe] = new double[nobj +1];
 
     init(alloc_array,object_graph,npe,nobj);
+
+    // handle non migratable object, assign them to same processor now
+
+    // only build heap with migratable objects, mapping nonmigratable objects to the same processors
+    ObjectHeap maxh(nobj+1);
+    for(obj=0; obj < stats->n_objs; obj++) {
+      LDObjData &objData = stats->objData[obj];
+      int onpe = stats->from_proc[obj];
+      if (!objData.migratable) {
+        alloc(onpe, obj, objData.wallTime);
+        if (!stats->procs[onpe].available) {
+	  CmiAbort("Load balancer is not be able to move a nonmigratable object out of an unavailable processor.\n");
+        }
+      }
+      else {
+        x = new ObjectRecord;
+        x->id = obj;
+        x->pos = obj;
+        x->load = objData.wallTime;
+        x->pe = onpe;
+        maxh.insert(x);
+      }
+    }
 
     int xcoord=0,ycoord=0;
 
@@ -235,8 +255,7 @@ LBMigrateMsg* CommLB::Strategy(CentralLB::LDStats* _stats, int count)
 	minpe = first_avail_pe;
 	
 	for(pe = first_avail_pe +1; pe < count; pe++){
-	    if(stats->procs[pe].available == 0)
-		continue;
+	    if(stats->procs[pe].available == 0) continue;
 	    
 	    temp = compute_com(maxid,pe);
 	    
