@@ -1005,7 +1005,7 @@ static CthThread CthCreateInner(CthVoidFn fn,void *arg,int size,int migratable)
 #if CMK_STACK_GROWDOWN
   stack = stack+size-2048;
 #elif CMK_STACK_GROWUP
-  stack = stack+8192;
+/*  stack = stack+8192; */
 #else
   #error "Must define stack grow up or down in conv-mach.h!"
   CmiAbort("Must define stack grow up or down in conv-mach.h!\n");
