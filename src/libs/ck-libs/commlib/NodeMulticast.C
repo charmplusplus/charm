@@ -102,9 +102,9 @@ void NodeMulticast::recvHandler(void *msg) {
     env->setUsed(0);
     ComlibPrintf("In receive Handler\n");
     if(mode == ARRAY_MODE) {
-        env->array_mgr()=mAid;
-	env->array_ep()=entryPoint;
-	env->array_hops()=0;	
+        env->getsetArrayMgr()=mAid;
+	env->getsetArrayEp()=entryPoint;
+	env->getsetArrayHops()=0;	
 	CkUnpackMessage(&env);
 
 	for(int count = 0; count < pes_per_node; count ++){
@@ -118,7 +118,7 @@ void NodeMulticast::recvHandler(void *msg) {
 		void *newcharmmsg = CkCopyMsg(&charm_msg); 
 		envelope* newenv = UsrToEnv(newcharmmsg);
 		CProxyElement_ArrayBase ap(mAid, idx_arr[itr]);		
-		newenv->array_index()=idx_arr[itr];
+		newenv->getsetArrayIndex()=idx_arr[itr];
 		ap.ckSend((CkArrayMessage *)newcharmmsg, entryPoint);
 	    }
 	}
@@ -208,7 +208,7 @@ void NodeMulticast::doneInserting(){
         env = UsrToEnv(msg);
 	
 	if(mode == ARRAY_MODE)
-	    env->array_srcPe()=CkMyPe();
+	    env->getsetArraySrcPe()=CkMyPe();
 	CkPackMessage(&env);
 
         CmiSetHandler(env, NodeMulticastHandlerId);

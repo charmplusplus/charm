@@ -543,7 +543,7 @@ void EachToManyMulticastStrategy::localMulticast(CkVec<CkArrayIndexMax>*vec,
         }
         
         CProxyElement_ArrayBase ap(destArrayID, idx);
-        ap.ckSend((CkArrayMessage *)newmsg, newenv->array_ep());
+        ap.ckSend((CkArrayMessage *)newmsg, newenv->getsetArrayEp());
     }
 }
 
@@ -580,11 +580,11 @@ ComlibMulticastMsg * EachToManyMulticastStrategy::getNewMulticastMessage
         memcpy(msg->usrMsg, env, sizes[1] * sizeof(char));         
         envelope *newenv = UsrToEnv(msg);
         
-        newenv->array_mgr() = env->array_mgr();
-        newenv->array_srcPe() = env->array_srcPe();
-        newenv->array_ep() = env->array_ep();
-        newenv->array_hops() = env->array_hops();
-        newenv->array_index() = env->array_index();
+        newenv->getsetArrayMgr() = env->getsetArrayMgr();
+        newenv->getsetArraySrcPe() = env->getsetArraySrcPe();
+        newenv->getsetArrayEp() = env->getsetArrayEp();
+        newenv->getsetArrayHops() = env->getsetArrayHops();
+        newenv->getsetArrayIndex() = env->getsetArrayIndex();
 
         CkPackMessage(&newenv);        
         return (ComlibMulticastMsg *)EnvToUsr(newenv);

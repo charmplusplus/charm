@@ -239,7 +239,7 @@ void DirectMulticastStrategy::localMulticast(CkVec<CkArrayIndexMax>*vec,
         return;
     }
     
-    int ep = env->array_ep();
+    int ep = env->getsetArrayEp();
     CkUnpackMessage(&env);
     for(int count = 0; count < nelements; count ++){        
         CkArrayIndexMax idx = (*vec)[count];
@@ -312,11 +312,11 @@ ComlibMulticastMsg * DirectMulticastStrategy::getNewMulticastMessage
         memcpy(msg->usrMsg, env, sizes[1] * sizeof(char));         
         envelope *newenv = UsrToEnv(msg);
         
-        newenv->array_mgr() = env->array_mgr();
-        newenv->array_srcPe() = env->array_srcPe();
-        newenv->array_ep() = env->array_ep();
-        newenv->array_hops() = env->array_hops();
-        newenv->array_index() = env->array_index();
+        newenv->getsetArrayMgr() = env->getsetArrayMgr();
+        newenv->getsetArraySrcPe() = env->getsetArraySrcPe();
+        newenv->getsetArrayEp() = env->getsetArrayEp();
+        newenv->getsetArrayHops() = env->getsetArrayHops();
+        newenv->getsetArrayIndex() = env->getsetArrayIndex();
 
         CkPackMessage(&newenv);        
         return (ComlibMulticastMsg *)EnvToUsr(newenv);

@@ -29,13 +29,13 @@ MsgPacker::MsgPacker(CkQ<CharmMessageHolder *> &msgq, int n_msgs){
         CkPackMessage(&env);
 
         if(count == 0) {
-            aid = env->array_mgr();
+            aid = env->getsetArrayMgr();
             if(aid.isZero()) CkAbort("Array packing set and ArrayID is zero");
         }        
         
-        msgList[count].epIdx = env->array_ep();
+        msgList[count].epIdx = env->getsetArrayEp();
         msgList[count].size = env->getTotalsize() - sizeof(envelope);
-        msgList[count].idx = env->array_index();
+        msgList[count].idx = env->getsetArrayIndex();
         msgList[count].data = cmsg->getCharmMessage();
 
         if(msgList[count].size > MAX_MESSAGE_SIZE)
@@ -105,9 +105,9 @@ void MsgPacker::deliver(CombinedMessage *cmb_msg){
         }
         else {
             envelope *env = (envelope *)CmiAlloc(sizeof(envelope) + size);
-            env->array_mgr() = aid;
-            env->array_index() = idx;
-            env->array_ep() = ep;
+            env->getsetArrayMgr() = aid;
+            env->getsetArrayIndex() = idx;
+            env->getsetArrayEp() = ep;
             env->setPacked(0); //We have already unpakced it.
             void *data = EnvToUsr(env);
 

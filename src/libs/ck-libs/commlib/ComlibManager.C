@@ -27,9 +27,9 @@ void recv_msg(void *msg){
     env->setUsed(0);
     CkUnpackMessage(&env);
 
-    CProxyElement_ArrayBase ap(env->array_mgr(), env->array_index());
+    CProxyElement_ArrayBase ap(env->getsetArrayMgr(), env->getsetArrayIndex());
     ComlibPrintf("%d:Array Base created\n", CkMyPe());
-    ap.ckSend((CkArrayMessage *)EnvToUsr(env), env->array_ep());
+    ap.ckSend((CkArrayMessage *)EnvToUsr(env), env->getsetArrayEp());
     
     ComlibPrintf("%d:Out of recv_msg\n", CkMyPe());
     return;
@@ -367,11 +367,11 @@ void ComlibManager::ArraySend(int ep, void *msg,
 
     register envelope * env = UsrToEnv(msg);
     
-    env->array_mgr()=a;
-    env->array_srcPe()=CkMyPe();
-    env->array_ep()=ep;
-    env->array_hops()=0;
-    env->array_index()=idx;
+    env->getsetArrayMgr()=a;
+    env->getsetArraySrcPe()=CkMyPe();
+    env->getsetArrayEp()=ep;
+    env->getsetArrayHops()=0;
+    env->getsetArrayIndex()=idx;
     env->setUsed(0);
     
     CkPackMessage(&env);
@@ -455,11 +455,11 @@ void ComlibManager::ArrayBroadcast(int ep,void *m,CkArrayID a){
     ComlibPrintf("[%d] Array Broadcast \n", CkMyPe());
 
     register envelope * env = UsrToEnv(m);
-    env->array_mgr()=a;
-    env->array_srcPe()=CkMyPe();
-    env->array_ep()=ep;
-    env->array_hops()=0;
-    env->array_index()= dummyArrayIndex;
+    env->getsetArrayMgr()=a;
+    env->getsetArraySrcPe()=CkMyPe();
+    env->getsetArrayEp()=ep;
+    env->getsetArrayHops()=0;
+    env->getsetArrayIndex()= dummyArrayIndex;
     
     CmiSetHandler(env, CpvAccess(RecvmsgHandle));
 
@@ -485,11 +485,11 @@ void ComlibManager::ArraySectionSend(int ep, void *m, CkArrayID a,
     ComlibPrintf("[%d] Array Section Send \n", CkMyPe());
 
     register envelope * env = UsrToEnv(m);
-    env->array_mgr()=a;
-    env->array_srcPe()=CkMyPe();
-    env->array_ep()=ep;
-    env->array_hops()=0;
-    env->array_index()= dummyArrayIndex;
+    env->getsetArrayMgr()=a;
+    env->getsetArraySrcPe()=CkMyPe();
+    env->getsetArrayEp()=ep;
+    env->getsetArrayHops()=0;
+    env->getsetArrayIndex()= dummyArrayIndex;
     
     CmiSetHandler(env, CpvAccess(RecvmsgHandle));
     
