@@ -482,6 +482,11 @@ void TraceSummary::traceClose(void)
   }
 }
 
+void TraceSummary::beginExecute(CmiObjId *tid)
+{
+  beginExecute(-1,-1,_threadEP,-1);
+}
+
 void TraceSummary::beginExecute(envelope *e)
 {
   // no message means thread execution
@@ -741,7 +746,7 @@ void TraceSummaryBOC::write(void)
 
 extern "C" void CombineSummary()
 {
-CmiPrintf("[%d] CombineSummary called!\n", CkMyPe());
+//CmiPrintf("[%d] CombineSummary called!\n", CkMyPe());
   if (sumonly) {
 CmiPrintf("[%d] Sum Only start!\n", CkMyPe());
     CProxy_TraceSummaryBOC(traceSummaryGID).askSummary();
