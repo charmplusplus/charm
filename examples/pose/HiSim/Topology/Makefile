@@ -1,4 +1,5 @@
-OPTS=-g #-DCMK_OPTIMIZE=1 -DCMK_MEMCHECKS_OFF=1
+OPTS=-g -Dcompile #-DCMK_OPTIMIZE=1 -DCMK_MEMCHECKS_OFF=1
+
 
 include ../Makefile.common
 
