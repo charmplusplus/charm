@@ -220,10 +220,12 @@ template <class KEY, class OBJ>
 class CkHashtableT:public CkHashtableTslow<KEY,OBJ> {
 public:
 	//Constructor-- create an empty hash table of at least the given size
+	CkHashtableT(int initLen=5,float NloadFactor=0.5)
+		:CkHashtableTslow<KEY,OBJ>(initLen,NloadFactor,KEY::staticHash,KEY::staticCompare)
+	{}
 	CkHashtableT(
-		int initLen=5,float NloadFactor=0.5,
-		CkHashFunction Nhash=KEY::staticHash,
-		CkHashCompare Ncompare=KEY::staticCompare)
+		int initLen,float NloadFactor,
+		CkHashFunction Nhash,CkHashCompare Ncompare)
 		:CkHashtableTslow<KEY,OBJ>(initLen,NloadFactor,Nhash,Ncompare)
 	 {}
 	
@@ -231,11 +233,11 @@ public:
 		int i=key.hash()%len;
 		while(true) {//Assumes key or empty slot will be found
 			entry_t *cur=table+i*(sizeof(KEY)+sizeof(OBJ));
+			//An empty slot indicates the key is not here
+			if (-17==*(int *)cur) return OBJ(0);
 			//Is this the key?
 			if (key.compare(*(const KEY *)cur))
 				return *(OBJ *)(cur+sizeof(KEY));
-			//An empty slot indicates the key is not here
-			if (-17==*(int *)cur) return OBJ(0);
 			inc(i);
 		};
 	}
@@ -251,6 +253,7 @@ public:
 		};
 	}
 };
+
 /*A useful adaptor class for using basic (memory only)
   types like int, short, char, etc. as hashtable keys.
  */
