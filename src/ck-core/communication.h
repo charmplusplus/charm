@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.11  1995-07-25 00:29:31  jyelon
+ * Revision 2.12  1995-09-07 05:25:48  gursoy
+ * added new macros related with HANDLE_INIT_MSg handler
+ *
+ * Revision 2.11  1995/07/25  00:29:31  jyelon
  * *** empty log message ***
  *
  * Revision 2.10  1995/07/24  01:54:40  jyelon
@@ -182,5 +185,21 @@
 	CmiSyncBroadcastAllAndFree(CmiSize(env),env);\
         }
 
+
+
+#define CkCheck_and_BcastInitNFNL(env) { \
+        ClrEnv_LdbFull(env);\
+        PACK(env); \
+        CmiSetHandler(env,CsvAccess(HANDLE_INIT_MSG_Index)); \
+	CmiSyncBroadcast(CmiSize(env),env); UNPACK(env);  \
+        }
+
+
+#define CkCheck_and_BcastInitNL(env) { \
+	ClrEnv_LdbFull(env);\
+	PACK(env); \
+	CmiSetHandler(env,CsvAccess(HANDLE_INIT_MSG_Index)); \
+	CmiSyncBroadcast(CmiSize(env),env); CmiFree(env);  \
+	}
 
 #endif
