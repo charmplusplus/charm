@@ -1,10 +1,11 @@
-\subsection{Checkpoint/Restart}
+\section{Checkpoint/Restart}
 \index{Checkpoint/Restart}
 \label{sec:checkpoint}
 
-\charmpp{} offers basic fault tolerance capabilities through its 
+\charmpp{} offers a range of fault tolerance capabilities through its 
 checkpoint/restart mechanism. Usual Chare array-based \charmpp{} application 
-can be checkpointed to disk files and later on restarting from the files.
+including AMPI application can be checkpointed to disk files and later 
+on restarting from the files.
 
 The basic idea behind this is straightforward: Checkpointing an 
 application is like migrating its parallel objects from the processors
@@ -12,7 +13,12 @@ onto disks, and restarting is the reverse. Thanks to the migration
 utilities like PUP'ing(Section~\ref{sec:pup}), users can decide what 
 data to save in checkpoints and how to save them.
 
+Two schemes of fault tolerance protocols are implemented.
+
+\subsection{Disk-based Checkpoint/Restart}
+
 \subsubsection{Checkpointing}
+\label{sec:diskcheckpoint}
 	The API to checkpoint the application is:
 
 \begin{alltt} 
@@ -105,4 +111,82 @@ other type holding the final result for each timestep. The programmer
 can take advantage of the flexibility by omitting PUP'er routine empty
 for intermediate objects, and do save/restore only for the important 
 objects. 
+
+\subsection{Double Memory/Disk Checkpoint/Restart}
+\label{sec:MemCheckpointing}
+
+The previous disk-based fault-tolerance scheme is a very basic scheme in 
+that when a failure occurs, the whole program gets killed and the user has to
+manually restart the application from the checkpoint files.
+The double checkpoint/restart protocol described in this subsection
+provides an automatic fault tolerance solution. When a failure occurs,
+the program can automatically detect the failure and restart from the 
+checkpoint.
+Further, this fault-tolerance protocol does not rely on any reliable
+storage (as needed in the previous method). 
+Instead, it stores two copies of checkpoint data to two different
+locations (can be memory or disk).
+This double checkpointing ensures the availability of one checkpoint in case
+the other is lost. 
+The double in-memory checkpoint/restart scheme is useful and efficient
+for applications with small memory footprint at the checkpoint state. 
+The double in-disk variation stores checkpoints into local disk, thus 
+can be useful for applications with large memory footprint. 
+%Its advantage is to reduce the recovery
+%overhead to seconds when a failure occurs.
+%Currently, this scheme only supports Chare array-based Charm++ applications.
+
+
+\subsubsection{Checkpointing}
+
+The function that user can call to initiate a checkpointing in a Chare 
+array-based application is: 
+
+\begin{alltt}
+      void CkStartMemCheckpoint(CkCallback &cb)
+\end{alltt}
+
+where {\it cb} has the same meaning as in the Section~\ref{sec:diskcheckpoint} .
+Just like the above disk checkpoint described, it is up to programmer what to save.
+The programmer is responsible for choosing when to activate checkpointing so that
+the size of a global checkpoint state can be minimal.
+
+In AMPI applications, user just needs to call the following function to 
+start checkpointing:
+
+\begin{alltt}
+      void AMPI_MemCheckpoint()
+\end{alltt}
+
+\subsubsection{Restarting}
+
+When a processor crashes, the restart protocol will be automatically
+invoked to recover all objects using the last checkpoints. And then the program
+will continue to run on the survived processors. This is based on the assumption
+that there are no extra processors to replace the crashed ones. 
+
+However, if there are a pool of extra processors to replace the crashed ones, 
+the fault-toerlance protocol can also take advantage of this to grab one
+free processor and let the program run on the same number of processors 
+as before crash. 
+In order to achieve this, \charmpp{} needs to be compiled with the marco option
+ {\it CK\_NO\_PROC\_POOL} turned on.
+
+
+\subsubsection{Double in-disk checkpoint/restart}
+
+A variation of double memory checkpoint/restart,
+{\it double in-disk checkpoint/restart},
+can be applied to applcaitions with large memory footprint.
+In this scheme, instead of storing checkpoints in the memory, it stores 
+them in the local disk.
+The checkpoint files are named "ckpt[CkMyPe]-[idx]-XXXXXX" and are stored under /tmp.
+
+A programmer can use runtime option {\it +ftc\_disk} to switch to this mode.
+For example:
+
+\begin{alltt}
+   ./charmrun hello +p8 +ftc_disk
+\end{alltt} 
+
 
