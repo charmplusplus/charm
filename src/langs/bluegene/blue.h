@@ -187,9 +187,13 @@ void BgSetNodeData(char *data);
 #define BG_ELAPSE      1
 #define BG_WALLTIME    2
 
+typedef void (*bgEventCallBackFn) (void *data, double adjust);
+
 void BgElapse(double t);
 
 void *BgCreateEvent(int eidx);
+void bgAddProjEvent(void *data, double t);
+void bgUpdateProj(bgEventCallBackFn fn);
 
 #if defined(__cplusplus)
 }

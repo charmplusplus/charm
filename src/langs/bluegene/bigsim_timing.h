@@ -39,8 +39,6 @@ public:
 
 };
 
-typedef void (*bgEventCallBackFn) (void *data, double adjust);
-
 /**
   event for higher level of tracing like trace projections
 */
