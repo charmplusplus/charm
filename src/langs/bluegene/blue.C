@@ -1048,15 +1048,17 @@ CmiStartFn bgMain(int argc, char **argv)
   timingMethod = BG_ELAPSE;
   if(CmiGetArgFlag(argv, "+bgwalltime"))  timingMethod = BG_WALLTIME;
 
-  CmiPrintf("BG info> Simulating %dx%dx%d nodes with %d comm + %d work threads each.\n", cva(numX), cva(numY), cva(numZ), cva(numCth), cva(numWth));
-  if (timingMethod == BG_ELAPSE) 
-    CmiPrintf("BG info> Using BgElapse calls for timing method. \n");
-  else if (timingMethod == BG_WALLTIME)
-    CmiPrintf("BG info> Using WallTimer for timing method. \n");
-  if (genTimeLog)
-    CmiPrintf("BG info> Generating timing log. \n");
-  if (correctTimeLog)
-    CmiPrintf("BG info> Perform timing log correction. \n");
+  if (CmiMyPe() == 0) {
+    CmiPrintf("BG info> Simulating %dx%dx%d nodes with %d comm + %d work threads each.\n", cva(numX), cva(numY), cva(numZ), cva(numCth), cva(numWth));
+    if (timingMethod == BG_ELAPSE) 
+      CmiPrintf("BG info> Using BgElapse calls for timing method. \n");
+    else if (timingMethod == BG_WALLTIME)
+      CmiPrintf("BG info> Using WallTimer for timing method. \n");
+    if (genTimeLog)
+      CmiPrintf("BG info> Generating timing log. \n");
+    if (correctTimeLog)
+      CmiPrintf("BG info> Perform timing log correction. \n");
+  }
 
   arg_argv = argv;
   arg_argc = CmiGetArgc(argv);
