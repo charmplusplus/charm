@@ -37,8 +37,8 @@ declaration.  The syntax for this is as follows:
 entry [\uw{attribute1}, ..., \uw{attributeN}] void \uw{EntryMethod}(\uw{parameters});
 \end{alltt}
 
-\charmpp{} currently offers four attributes that one may give an entry method:
-\kw{threaded}, \kw{sync}, \kw{exclusive}, \kw{immediate}.
+\charmpp{} currently offers five attributes that one may give an entry method:
+\kw{threaded}, \kw{sync}, \kw{exclusive}, \kw{immediate}, \kw{skipscheduler}.
 
 \index{threaded}Threaded \index{entry method}entry methods are simply entry
 methods which are run in their own nonpremptible threads.  To make an
@@ -73,6 +73,15 @@ Immediate messages are implicitly ``exclusive'' on each node, that is
 one execution of immediate message will not be interrupted by another.
 Function \kw{CmiProbeImmediateMsg()} can be called in users code to 
 probe and process immediate messages periodically.
+
+\index{skipscheduler}{\bf Skipscheduler} entry methods are entry functions 
+that skip Charm++'s priority-based message queue. It is useful for messages 
+that require prompt processing however in the situation when immediate message 
+does not apply. Compared with immediate message, it provides a more general
+solution that works for all Charm++ objects, i.e. Chare, Group, NodeGroup 
+and Chare Array. However, skipscheduler message still needs to be 
+scheduled in low level Converse message queue and be processed in the order 
+of arrival. It may still suffer from long running entry methods.
 
 
 
