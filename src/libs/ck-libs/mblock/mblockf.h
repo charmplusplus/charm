@@ -23,6 +23,7 @@
        external :: MBLK_Get_nblocks
        external :: MBLK_Get_myblock
        external :: MBLK_Get_blocksize
+       external :: MBLK_Get_nodelocs
        external :: MBLK_Get_extent
        real*8, external :: MBLK_Timer
        external :: MBLK_Print

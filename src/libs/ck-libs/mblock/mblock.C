@@ -572,6 +572,34 @@ MBLK_Get_blocksize(int *dim)
   return MBLK_SUCCESS;
 }
 
+CDECL int 
+MBLK_Get_nodelocs(const int *nodedim,double *nodeloc) {
+  MBLOCKAPI("MBLK_Get_nodelocs");
+  if(TCharm::getState() != inDriver) {
+    CkError("MBLK_Get_nodelocs  called from outside driver\n");
+    return MBLK_FAILURE;
+  }
+  block *b=getCurMBlockChunk()->b;
+  blockDim d = b->getDim();
+  for (int i=0;i<3;i++)
+    if (nodedim[i]!=d[i]) {
+      CkError("MBLK_Get_nodelocs: your nodedim is %d; mine is %d!\n",
+      	nodedim[i],d[i]);
+      return MBLK_FAILURE;
+    }
+  
+  blockLoc i;
+  BLOCKSPAN_FOR(i,blockSpan(blockLoc(0,0,0),d)) {
+     int idx=d[i];
+     vector3d v=b->getLoc(i);
+     nodeloc[3*idx+0]=v.x;
+     nodeloc[3*idx+1]=v.y;
+     nodeloc[3*idx+2]=v.z;
+  }
+  
+  return MBLK_SUCCESS;
+}
+
 CDECL double 
 MBLK_Timer(void)
 {
@@ -796,6 +824,12 @@ FDECL void FTN_NAME(MBLK_GET_BLOCKSIZE, mblk_get_blocksize)
   (int *dims, int *ret)
 {
   *ret = MBLK_Get_blocksize(dims);
+}
+
+FDECL void FTN_NAME(MBLK_GET_NODELOCS,mblk_get_nodelocs)
+  (const int *nodedim,double *nodeloc,int *ret) 
+{
+  *ret = MBLK_Get_nodelocs(nodedim,nodeloc);
 }
 
 FDECL double FTN_NAME(MBLK_TIMER, mblk_timer)

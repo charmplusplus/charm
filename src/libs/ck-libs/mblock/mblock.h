@@ -36,6 +36,7 @@ extern "C" {
   int MBLK_Get_nblocks(int *n);
   int MBLK_Get_myblock(int *m);
   int MBLK_Get_blocksize(int *dims); /*Fetch interior dimensions, in voxels*/
+  int MBLK_Get_nodelocs(const int *nodedim,double *nodeloc); 
   double MBLK_Timer(void);
   void MBLK_Print(const char *str);
   void MBLK_Print_block(void);

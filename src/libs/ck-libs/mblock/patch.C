@@ -133,9 +133,17 @@ block::block(const char *filePrefix,int blockNo)
   
   //Read the mesh locations themselves
   sprintf(fName,"%s%05d.mblk",filePrefix,blockNo);
-  FILE *fm=fopen(fName,"rb");
+  FILE *fm=fopen(fName,"r");
+  if (fm==NULL) abort("Can't open .mblk file!");
+  int sizes;
+  if (3!=fscanf(fm,"%d%d%d",&sizes,&sizes,&sizes)) abort("Can't parse .mblk file's header");
   locs=new vector3d[dim.getSize()];
-  fread(&locs[0],sizeof(vector3d),dim.getSize(),fm);
+  blockLoc i;
+  BLOCKSPAN_FOR(i,blockSpan(blockLoc(0,0,0),dim)) {
+    double x,y,z;
+    if (3!=fscanf(fm,"%lf%lf%lf",&x,&y,&z)) abort("Can't parse .mblk file's location");
+    locs[dim[i]]=vector3d(x,y,z);
+  }
   fclose(fm);
 }
 
