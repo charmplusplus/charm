@@ -488,6 +488,7 @@ void parallelTransfer_c::transfer(progress_t &progress) {
 	for (d=0;d<destMesh.getTets();d++) {
 		double trueVolume=destMesh.getTetVolume(d);
 		double volErr=fabs(destVolumes[d]-trueVolume);
+		// double accumScale=1.0/trueVolume; // testing version: uncompensated
 		double accumScale=1.0/destVolumes[d]; //Reverse volume weighting
 		double relErr=volErr*accumScale;
 #if OSL_CG3D_DEBUG
