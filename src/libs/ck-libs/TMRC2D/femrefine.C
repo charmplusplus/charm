@@ -46,11 +46,16 @@ FDECL void FTN_NAME(FEM_REFINE2D_INIT,fem_refine2d_init)(void)
 
 
 
-void FEM_REFINE2D_Newmesh(int meshID,int nodeID,int elemID){
+void FEM_REFINE2D_Newmesh(int meshID,int nodeID,int elemID,int nodeBoundary){
 	int nelems = FEM_Mesh_get_length(meshID,elemID);
 	int	nghost = FEM_Mesh_get_length(meshID,elemID+FEM_GHOST);
 	int total = nghost + nelems;
 	int *tempMesh = new int[3*total];
+	int nnodes = FEM_Mesh_get_length(meshID,nodeID);
+	int *tempBoundaries=NULL;
+	if(nodeBoundary){
+		tempBoundaries = new int[nnodes];
+	}
 	FEM_Mesh_data(meshID,elemID,FEM_CONN,&tempMesh[0],0,nelems,FEM_INDEX_0,3);
 	FEM_Mesh_data(meshID,elemID+FEM_GHOST,FEM_CONN,&tempMesh[3*nelems],0,nghost,FEM_INDEX_0,3);
 
@@ -72,8 +77,15 @@ void FEM_REFINE2D_Newmesh(int meshID,int nodeID,int elemID){
   int gid_fid=FEM_Create_field(FEM_INT,2,0,2*sizeof(int));
   FEM_Update_ghost_field(gid_fid,0,gid);
 	
+	if(nodeBoundary){
+		FEM_Mesh_data(meshID,nodeID,FEM_BOUNDARY,tempBoundaries,0,nnodes,FEM_INT,1);
+	}
+	
   /*Set up refinement framework*/
-  REFINE2D_NewMesh(nelems,total,(int *)tempMesh,gid);
+  REFINE2D_NewMesh(nelems,total,(int *)tempMesh,gid,tempBoundaries);
+	if(tempBoundaries){
+		delete [] tempBoundaries;
+	}
 	delete [] gid;
 	delete [] tempMesh;
 }

@@ -32,9 +32,10 @@ void FEM_REFINE2D_Init();
  meshID - mesh to refine
  nodeID - FEM_NODE +t .. which type of nodes to refine
  elemID - FEM_ELEM +t .. which type of element to refine
+ nodeBoundary - nodeBoundary marks whether nodes have boundary flags
 */
 
-void FEM_REFINE2D_Newmesh(int meshID,int nodeID,int elemID);
+void FEM_REFINE2D_Newmesh(int meshID,int nodeID,int elemID,int nodeBoundary=0);
 
 /* This function refines a mesh, to the desired degree and updates the FEM mesh.
 	 Arguments

@@ -542,7 +542,7 @@ driver(void)
       NetFEM n=NetFEM_Begin(myChunk,t,2,NetFEM_WRITE);
       int count=0;
       double *vcoord = new double[2*g.nnodes];
-			int *maptovalid = new int[g.nnodes];
+	int *maptovalid = new int[g.nnodes];
       for(int i=0;i<g.nnodes;i++){
 	if(g.validNode[i]){
 	  vcoord[2*count] = ((double *)g.coord)[2*i];

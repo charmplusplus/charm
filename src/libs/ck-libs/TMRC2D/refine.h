@@ -38,8 +38,11 @@ void REFINE2D_Init(void);
  * gid maps an element number to a chunk number and local number on that
  * chunk.  These are stored at gid[i*2+0] (chunk number) and gid[i*2+1]
  * (local number).
+ * 
+ * boundaries is the boundary flags for nodes. boundaries may be null,
+ * if the user doesnt specify boundary flags
  */
-void REFINE2D_NewMesh(int nEl,int nGhost,const int *conn,const int *gid);
+void REFINE2D_NewMesh(int nEl,int nGhost,const int *conn,const int *gid,const int *boundaries);
 
 /**
  * Refine the mesh so each element has, at most, the given desired area.
