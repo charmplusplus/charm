@@ -335,6 +335,12 @@ void Refiner::Refine(int count, CentralLB::LDStats* stats,
 
   computeAverage();
 
+  if (_lb_args.debug()>=2)  {
+    CkPrintf("Old PE load: ");
+    for (i=0; i<count; i++) CkPrintf("%f ", processors[i].load);
+    CkPrintf("\n");
+  }
+
   multirefine();
 
   int nmoves = 0;
@@ -352,6 +358,13 @@ void Refiner::Refine(int count, CentralLB::LDStats* stats,
       c = (computeInfo *) processors[pe].computeSet->
 	             next((Iterator *)&nextCompute);
     }
+  }
+  if (_lb_args.debug()>=2)  {
+    CkPrintf("New PE load: ");
+    for (i=0; i<count; i++) CkPrintf("%f ", processors[i].load);
+    CkPrintf("\n");
+    for (i=0; i<numComputes; i++) CkPrintf("%d ", new_p[i]);
+    CkPrintf("\n");
   }
   if (_lb_args.debug()) CkPrintf("Refiner: moving %d obejcts. \n", nmoves);
   delete [] computes;
