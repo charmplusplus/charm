@@ -13,6 +13,7 @@
 #include "pcqueue.h"
 
 #define MAX_QLEN 200
+#define MAX_BYTES 1000000
 
 /*
   To reduce the buffer used in broadcast and distribute the load from 
@@ -67,7 +68,9 @@ CpvDeclare(void*, CmiLocalQueue);
 #define SIZEFIELD(m) ((int *)((char *)(m)-2*sizeof(int)))[0]
 
 static int MsgQueueLen=0;
+static int MsgQueueBytes=0;
 static int request_max;
+static int request_bytes;
 
 #include "queueing.h"
 
@@ -206,7 +209,7 @@ static int CmiAllAsyncMsgsSent(void)
     if(!done)
       return 0;
     msg_tmp = msg_tmp->next;
-    MsgQueueLen--;
+    //    MsgQueueLen--;
    }
    return 1;
 }
@@ -258,6 +261,8 @@ static void CmiReleaseSentMessages(void)
 
     if(done) {
       MsgQueueLen--;
+      MsgQueueBytes -= msg_tmp->size;
+
       /* Release the message */
       temp = msg_tmp->next;
       if(prev==0)  /* first message */
@@ -266,14 +271,14 @@ static void CmiReleaseSentMessages(void)
         prev->next = temp;
       
       if(CMI_MSG_TYPE(msg_tmp->msg) == 1) {
-	//if(SIZEFIELD(msg_tmp->msg) == SMALL_MESSAGE_SIZE)
-	//CqsEnqueue(localMsgBuf, msg_tmp->msg);
+	if(SIZEFIELD(msg_tmp->msg) == SMALL_MESSAGE_SIZE)
+	  CqsEnqueue(localMsgBuf, msg_tmp->msg);
 	/*
 	  else if (SIZEFIELD(msg_tmp->msg) == NAMD_MESSAGE_SIZE)
 	  CqsEnqueue(namdMsgBuf, msg_tmp->msg);
 	*/
-	//else
-	CmiFree(msg_tmp->msg);
+	else
+	  CmiFree(msg_tmp->msg);
       }
       if(CMI_MSG_TYPE(msg_tmp->msg) == 1) {
 	// Dont do any thing the message has been statically allocated
@@ -293,7 +298,7 @@ static void CmiReleaseSentMessages(void)
 #ifndef CMK_OPTIMIZE 
   double rel_end_time = CmiWallTimer();
   if(rel_end_time > rel_start_time + 5.0/1e6)
-    traceUserBracketEvent(20, rel_start_time, rel_end_time);
+    traceUserBracketEvent(20, rel_start_time);
 #endif
 }
 
@@ -345,10 +350,10 @@ int PumpMsgs(int retflag)
 	//if(CmiMyPe() == 0)
 	//	CmiPrintf("%d:Posting %d, %d\n", CmiMyPe(), ecount, post_idx);
 
-	//if(!CqsEmpty(localMsgBuf))
-	//CqsDequeue(localMsgBuf, &sbuf[ecount]);
-	//else
-	sbuf[ecount] = (char *) CmiAlloc(SMALL_MESSAGE_SIZE + 64);
+	if(!CqsEmpty(localMsgBuf))
+	  CqsDequeue(localMsgBuf, &sbuf[ecount]);
+	else
+	  sbuf[ecount] = (char *) CmiAlloc(SMALL_MESSAGE_SIZE);
 	
 	esmall[ecount] = elan_tportRxStart(elan_port, 0, 0, 0, -1, TAG_SMALL, sbuf[ecount], SMALL_MESSAGE_SIZE);
 	recv_small_done[ecount] = 1;
@@ -438,7 +443,7 @@ int PumpMsgs(int retflag)
 #ifndef CMK_OPTIMIZE 
       double pmp_end_time = CmiWallTimer();
       if(pmp_end_time > pmp_start_time + 5.0/1e6)
-	traceUserBracketEvent(10, pmp_start_time, pmp_end_time);
+	traceUserBracketEvent(10, pmp_start_time);
 #endif
       return recd;    
     }
@@ -447,7 +452,7 @@ int PumpMsgs(int retflag)
 #ifndef CMK_OPTIMIZE 
       double pmp_end_time = CmiWallTimer();
       if(pmp_end_time > pmp_start_time + 5.0/1e6)
-	traceUserBracketEvent(10, pmp_start_time, pmp_end_time);
+	traceUserBracketEvent(10, pmp_start_time);
 #endif
       return flg;
     }
@@ -521,8 +526,9 @@ CmiCommHandle ElanSendFn(int destPE, int size, char *msg, int flag)
   msg_tmp = (SMSG_LIST *) CmiAlloc(sizeof(SMSG_LIST));
   msg_tmp->msg = msg;
   msg_tmp->next = 0;
+  msg_tmp->size = size;
 
-  while ((MsgQueueLen > request_max) && (!flag)){
+  while ((MsgQueueLen > request_max) && (!flag) && (MsgQueueBytes > request_bytes)){
     CmiReleaseSentMessages();
     PumpMsgs(0);
   }
@@ -533,6 +539,8 @@ CmiCommHandle ElanSendFn(int destPE, int size, char *msg, int flag)
 				 TAG_SMALL:TAG_LARGE, msg, size);
   
   MsgQueueLen++;
+  MsgQueueBytes += size;
+
   if(sent_msgs==0)
     sent_msgs = msg_tmp;
   else
@@ -563,10 +571,10 @@ void CmiFreeSendFn(int destPE, int size, char *msg)
     if(size <= NON_BLOCKING_MSG) {
       (void)elan_tportTxWait(elan_tportTxStart(elan_port, 0, destPE, CmiMyPe(), TAG_SMALL, msg, size));
 
-      //if(SIZEFIELD(msg) == SMALL_MESSAGE_SIZE)
-      //CqsEnqueue(localMsgBuf, msg);
-      //else
-      CmiFree(msg);
+      if(SIZEFIELD(msg) == SMALL_MESSAGE_SIZE)
+	CqsEnqueue(localMsgBuf, msg);
+      else
+	CmiFree(msg);
     }
     else
       CmiAsyncSendFn(destPE, size, msg);
@@ -575,7 +583,7 @@ void CmiFreeSendFn(int destPE, int size, char *msg)
 #ifndef CMK_OPTIMIZE 
   double snd_end_time = CmiWallTimer();
   if(snd_end_time > snd_start_time + 5.0/1e6)
-    traceUserBracketEvent(10, snd_start_time, snd_end_time);
+    traceUserBracketEvent(30, snd_start_time);
 #endif
 }
 
@@ -829,7 +837,11 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
  /* CmiSpanTreeInit();*/
   i=0;
   request_max=MAX_QLEN;
+  request_bytes = MAX_BYTES;
+  
   CmiGetArgInt(argv,"+requestmax",&request_max);
+  CmiGetArgInt(argv,"+requestbytes",&request_bytes);
+
   /*printf("request max=%d\n", request_max);*/
   if (CmiGetArgFlag(argv,"++debug"))
   {   /*Pause so user has a chance to start and attach debugger*/
