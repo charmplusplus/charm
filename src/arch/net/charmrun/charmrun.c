@@ -1741,6 +1741,8 @@ void req_client_connect(void)
 	if (arg_verbose) printf("Charmrun> IP tables sent.\n");
 }
 
+#ifndef CMK_BPROC
+
 void start_one_node_rsh(int rank0no);
 void finish_one_node(int rank0no);
 
@@ -1775,6 +1777,8 @@ void req_client_start_and_connect(void)
 	  req_handle_initnodetab(NULL,req_clients[client]);
 	if (arg_verbose) printf("Charmrun> IP tables sent.\n");
 }
+
+#endif
 
 /*Start the server socket the clients will connect to.*/
 void req_start_server(void)
