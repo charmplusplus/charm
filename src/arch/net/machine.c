@@ -1439,6 +1439,7 @@ static void node_addresses_obtain(char **argv)
   	CommLock hasn't been initialized yet-- 
   	use non-locking version*/
   	ctrl_sendone_nolock("initnode",(const char *)&me,sizeof(me),NULL,0);
+        MACHSTATE(5,"send initnode");
   
   	/*We get the other node addresses from a message sent
   	  back via the charmrun control port.*/
@@ -2112,8 +2113,6 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usc, int everReturn)
   if (CmiGetArgFlagDesc(argv,"+asyncio","Use async IO")) Cmi_asyncio = 1;
   if (CmiGetArgFlagDesc(argv,"+asynciooff","Don not use async IO")) Cmi_asyncio = 0;
 
-  MACHSTATE2(5,"Init: (netpoll=%d), (idlepoll=%d)",Cmi_netpoll,Cmi_idlepoll);
-
   skt_init();
   /* use special abort handler instead of default_skt_abort to 
      prevent exit trapped by atexit_check() due to the exit() call  */
@@ -2132,6 +2131,8 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usc, int everReturn)
   }
 #endif
 
+  MACHSTATE2(5,"Init: (netpoll=%d), (idlepoll=%d)",Cmi_netpoll,Cmi_idlepoll);
+
   skt_set_idle(obtain_idleFn);
   if (!skt_ip_match(Cmi_charmrun_IP,_skt_invalid_ip)) {
   	set_signals();
@@ -2144,7 +2145,7 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usc, int everReturn)
 #endif
 	MACHSTATE2(5,"skt_connect at dataskt:%d Cmi_charmrun_port:%d",dataskt, Cmi_charmrun_port);
   	Cmi_charmrun_fd = skt_connect(Cmi_charmrun_IP, Cmi_charmrun_port, 1800);
-	MACHSTATE1(5,"Opened data socket at port %d",dataport);
+	MACHSTATE2(5,"Opened connection to charmrun at socket %d, dataport=%d", Cmi_charmrun_fd, dataport);
 	CmiStdoutInit();
   } else {/*Standalone operation*/
   	printf("Charm++: standalone mode (not using charmrun)\n");
@@ -2155,13 +2156,14 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usc, int everReturn)
   CmiMachineInit(argv);
 
   node_addresses_obtain(argv);
+  MACHSTATE(5,"node_addresses_obtain done");
 
 #if CMK_USE_TCP
   open_tcp_sockets();
 #endif
 
   skt_set_idle(CmiYield);
-  Cmi_check_delay = 2.0+0.5*_Cmi_numnodes;
+  Cmi_check_delay = 1.0+0.25*_Cmi_numnodes;
   if (Cmi_charmrun_fd==-1) /*Don't bother with check in standalone mode*/
 	Cmi_check_delay=1.0e30;
 
