@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.15  1995-10-19 20:38:08  jyelon
+ * Revision 2.16  1995-10-19 20:40:17  jyelon
+ * void * -> char *
+ *
+ * Revision 2.15  1995/10/19  20:38:08  jyelon
  * unsigned int -> int
  *
  * Revision 2.14  1995/10/13  20:05:13  jyelon
@@ -67,7 +70,6 @@ static char ident[] = "@(#)$Header$";
 #include <memory.h>
 #include <cps.h>
 #include "converse.h"
-#include "conv-conds.h"
 
 
 #define FreeFn		free
@@ -275,7 +277,7 @@ void *CmiGetNonLocal()
 void CmiSyncSendFn(destPE, size, msg)
 int destPE;
 int size;
-void         *msg;
+char *msg;
 {
     /* Send the message of "size" bytes to the destPE.
        Return only after the message has been sent, i.e.,
@@ -300,7 +302,7 @@ void         *msg;
 CmiCommHandle CmiAsyncSendFn(destPE, size, msg)
 int destPE;
 int size;
-void         *msg;
+char *msg;
 {
     CmiSyncSendFn(destPE, size, msg); 
     return 0;
@@ -310,7 +312,7 @@ void         *msg;
 void CmiFreeSendFn(destPE, size, msg)
 int destPE;
 int size;
-void         *msg;
+char  *msg;
 {
     CmiSyncSendFn(destPE,size,msg);
     CmiFree(msg);
@@ -318,7 +320,7 @@ void         *msg;
 
 void CmiSyncBroadcastFn(size, msg)
 int  size;
-void *msg;
+char *msg;
 {
        int i;
        for(i=0; i<CmiNumPe(); i++)
@@ -327,7 +329,7 @@ void *msg;
 
 CmiCommHandle CmiAsyncBroadcastFn(size, msg)
 int  size;
-void *msg;
+char *msg;
 {
     CmiSyncBroadcastFn(size, msg);
     return 0;
@@ -335,7 +337,7 @@ void *msg;
 
 void CmiFreeBroadcastFn(size, msg)
 int  size;
-void *msg;
+char *msg;
 {
     CmiSyncBroadcastFn(size,msg);
     CmiFree(msg);
@@ -343,7 +345,7 @@ void *msg;
 
 void CmiSyncBroadcastAllFn(size, msg)
 int  size;
-void *msg;
+char *msg;
 {
     void *env;
     void *buf;
@@ -367,7 +369,7 @@ void *msg;
 
 CmiCommHandle CmiAsyncBroadcastAllFn(size, msg)
 int  size;
-void *msg;
+char *msg;
 {
     CmiSyncBroadcastAllFn(size, msg);
     return 0; 
@@ -376,7 +378,7 @@ void *msg;
 
 void CmiFreeBroadcastAllFn(size, msg)
 int  size;
-void *msg;
+char *msg;
 {
     int i;
     for(i=0; i<CmiNumPe(); i++)
