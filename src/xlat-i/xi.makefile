@@ -1,4 +1,4 @@
-all: xi-grammar.tab.h xi-grammar.tab.C xi-scan.C sdag/trans.c
+all: xi-grammar.tab.h xi-grammar.tab.C xi-scan.C sdag/sdag-trans.c
 
 xi-grammar.tab.h xi-grammar.tab.C: xi-grammar.y
 	bison -y -d xi-grammar.y
@@ -9,5 +9,5 @@ xi-scan.C: xi-scan.l
 	flex xi-scan.l
 	mv lex.yy.c xi-scan.C
 
-sdag/trans.c: sdag/trans.l
-	flex -Psl -osdag/trans.c sdag/trans.l
+sdag/sdag-trans.c: sdag/trans.l
+	flex -Psl -osdag/sdag-trans.c sdag/trans.l
