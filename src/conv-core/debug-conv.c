@@ -22,6 +22,8 @@ int freezePort;
 char* breakPointHeader;
 char* breakPointContents;
 
+extern int ccs_socket_ready;
+
 /***************************************************
   The CCS interface to the debugger
 */
