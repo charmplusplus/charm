@@ -122,7 +122,7 @@ dirs+sources:
 
 CVHEADERS=converse.h conv-mach.h conv-mach.csh
 
-TRACELIBS=libck-trace-none.a libck-trace-summary.a libck-trace-projections.a
+TRACELIBS=libtrace-none.a libtrace-summary.a libtrace-projections.a
 
 CVLIBS=libconv-core.a libconv-cplus-n.a libconv-cplus-y.a libldb-rand.o $(TRACELIBS)
 
