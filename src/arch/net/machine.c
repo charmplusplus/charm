@@ -878,11 +878,11 @@ static void extract_args(argv)
 char **argv;
 {
   setspeed_eth();
-  if (CmiGetArgFlag(argv,"++atm"))
+  if (CmiGetArgFlag(argv,"+atm"))
     setspeed_atm();
-  if (CmiGetArgFlag(argv,"++eth"))
+  if (CmiGetArgFlag(argv,"+eth"))
     setspeed_eth();
-  if (CmiGetArgFlag(argv,"++stats"))
+  if (CmiGetArgFlag(argv,"+stats"))
     Cmi_print_stats = 1;
   Cmi_dgram_max_data = Cmi_max_dgram_size - DGRAM_HEADER_SIZE;
   Cmi_half_window = Cmi_window_size >> 1;
