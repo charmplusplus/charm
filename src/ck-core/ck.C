@@ -74,6 +74,7 @@ void CkDelegateMgr::ArraySectionSend(int ep,void *m, CkArrayID a,CkSectionCookie
 
 CkSectionID::CkSectionID(const CkArrayID &aid, const CkArrayIndexMax *elems, const int nElems): _nElems(nElems) {
   _cookie.aid = aid;
+  _cookie.pe = CkMyPe();
   _elems = new CkArrayIndexMax[nElems];
   for (int i=0; i<nElems; i++) _elems[i] = elems[i];
 }
