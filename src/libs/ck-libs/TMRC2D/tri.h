@@ -99,6 +99,8 @@ typedef struct prioLockStruct {
 
 // ---------------------------- Chare Arrays -------------------------------
 class chunk : public TCharmClient1D {
+	//meshID passed in from FEM framework.
+	int meshID;
   // current sizes of arrays allocated for the mesh
   int sizeElements, sizeEdges, sizeNodes;
   // first empty slot in each mesh array
@@ -226,7 +228,7 @@ class chunk : public TCharmClient1D {
 
   // *** These methods are part of the interface with the FEM framework ***
   // create a chunk's mesh data
-  void newMesh(int nEl, int nGhost,const int *conn_,const int *gid_, 
+  void newMesh(int meshID,int nEl, int nGhost,const int *conn_,const int *gid_, 
 	       int nnodes, const int *boundaries, int idxOffset);
   // Sets target areas specified by desiredArea, starts refining
   void multipleRefine(double *desiredArea, refineClient *client);

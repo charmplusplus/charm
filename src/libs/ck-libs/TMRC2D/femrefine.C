@@ -8,8 +8,8 @@
 #include <assert.h>
 
 
-//#define DEBUGINT(x) x
-#define DEBUGINT(x) 
+#define DEBUGINT(x) x
+//#define DEBUGINT(x) 
 
 
 class intdual{
@@ -23,8 +23,8 @@ class intdual{
  				x = _y; y= _x;
  			}
 		}
-		int getx(){return x;};
-		int gety(){return y;};
+		inline int getx(){return x;};
+		inline int gety(){return y;};
 		inline CkHashCode hash() const {
 			return (CkHashCode)(x+y);
 		}
@@ -87,7 +87,7 @@ void FEM_REFINE2D_Newmesh(int meshID,int nodeID,int elemID,int nodeBoundary){
 	}
 	
   /*Set up refinement framework*/
-  REFINE2D_NewMesh(nelems,total,nnodes,(int *)tempMesh,gid,tempBoundaries);
+  REFINE2D_NewMesh(meshID,nelems,total,nnodes,(int *)tempMesh,gid,tempBoundaries);
 	if(tempBoundaries){
 		delete [] tempBoundaries;
 	}
@@ -447,7 +447,7 @@ void FEM_REFINE2D_Coarsen(int meshID,int nodeID,double *coord,int elemID,double 
 					coord[2*nodeToKeep] = operation.data.cdata.newX;
 					coord[2*nodeToKeep+1] = operation.data.cdata.newY;
 					validNodeData[nodeToThrow] = 0;
-					DEBUGINT(printf("---------Collapse <%d,%d> invalidating node %d \n",nodeToKeep,nodeToThrow,nodeToThrow));
+					DEBUGINT(printf("---------Collapse <%d,%d> invalidating node %d and element %d \n",nodeToKeep,nodeToThrow,nodeToThrow,tri));
 				}
 				validElemData[tri] = 0;
 				connData[3*tri] = connData[3*tri+1] = connData[3*tri+2] = -1;

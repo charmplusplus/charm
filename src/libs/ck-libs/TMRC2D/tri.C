@@ -793,11 +793,12 @@ void chunk::multipleCoarsen(double *desiredArea, refineClient *client)
   CkWaitQD();
 }
 
-void chunk::newMesh(int nEl, int nGhost, const int *conn_, const int *gid_, 
+void chunk::newMesh(int meshID_,int nEl, int nGhost, const int *conn_, const int *gid_, 
 		    int nnodes, const int *boundaries, int idxOffset)
 {
   int i, j;
   DEBUGREF(CkPrintf("TMRC2D: [%d] In newMesh...\n", cid);)
+	meshID = meshID_;
   numElements=nEl;
   numGhosts = nGhost;
   allocMesh(nEl);

@@ -467,7 +467,7 @@ driver(void)
     CkPrintf("Entering timeloop\n");
   }	
   //  int tSteps=0x70FF00FF;
-  int tSteps=20;
+  int tSteps=1;
   int z=13;
   calcMasses(g);
   double startTime=CkWallTimer();
@@ -570,6 +570,7 @@ driver(void)
       double *vnodeid = new double[g.nnodes];
       int *maptovalid = new int[g.nnodes];
       for(int i=0;i<g.nnodes;i++){
+				maptovalid[i] = -1;
 	if(g.validNode[i]){
 	  vcoord[2*count] = ((double *)g.coord)[2*i];
 	  vcoord[2*count+1] = ((double *)g.coord)[2*i+1];

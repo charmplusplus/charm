@@ -43,7 +43,7 @@ void REFINE2D_Init(void);
  * if the user doesnt specify boundary flags.
  * nnodes specifies the number of nodes 
  */
-void REFINE2D_NewMesh(int nEl,int nGhost,int nnodes,const int *conn,const int *gid,const int *boundaries);
+void REFINE2D_NewMesh(int meshID,int nEl,int nGhost,int nnodes,const int *conn,const int *gid,const int *boundaries);
 
 /**
  * Refine the mesh so each element has, at most, the given desired area.
