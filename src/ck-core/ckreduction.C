@@ -173,6 +173,27 @@ CkReductionMgr::CkReductionMgr()//Constructor
   DEBR((AA"In reductionMgr constructor at %d \n"AB,this));
 }
 
+void CkReductionMgr::flushStates()
+{
+  // CmiPrintf("[%d] CkReductionMgr::flushState\n", CkMyPe());
+  redNo=0;
+  completedRedNo = -1;
+  inProgress=CmiFalse;
+  creating=CmiFalse;
+  gcount=lcount=0;
+  startRequested=CmiFalse;
+//  nContrib=nRemote=0;
+
+  while (!msgs.isEmpty()) { delete msgs.deq(); }
+  while (!futureMsgs.isEmpty()) delete futureMsgs.deq();
+  while (!futureRemoteMsgs.isEmpty()) delete futureRemoteMsgs.deq();
+  while (!finalMsgs.isEmpty()) delete finalMsgs.deq();
+
+  adjVec.length()=0;
+
+  nodeProxy[CkMyNode()].ckLocalBranch()->flushStates();
+}
+
 //////////// Reduction Manager Client API /////////////
 
 //Add the given client function.  Overwrites any previous client.
@@ -1140,6 +1161,26 @@ CkNodeReductionMgr::CkNodeReductionMgr()//Constructor
   creating=CmiFalse;
   interrupt = 0;
   DEBR((AA"In NodereductionMgr constructor at %d \n"AB,this));
+}
+
+void CkNodeReductionMgr::flushStates()
+{
+ if(CkMyRank() == 0){
+  // CmiPrintf("[%d] CkNodeReductionMgr::flushState\n", CkMyPe());
+  redNo=0;
+  inProgress=CmiFalse;
+
+  startRequested=CmiFalse;
+  gcount=CkNumNodes();
+  lcount=1;
+  nContrib=nRemote=0;
+
+  creating=CmiFalse;
+  interrupt = 0;
+  while (!msgs.isEmpty()) { delete msgs.deq(); }
+  while (!futureMsgs.isEmpty()) delete futureMsgs.deq();
+  while (!futureRemoteMsgs.isEmpty()) delete futureRemoteMsgs.deq();
+  }
 }
 
 //////////// Reduction Manager Client API /////////////

@@ -18,6 +18,18 @@ CkArrayReductionMgr::CkArrayReductionMgr(){
 	ctorDoneFlag = 1;
 };
 
+void CkArrayReductionMgr::flushStates(){
+  if(CkMyRank()== 0){
+    // CmiPrintf("[%d] CkArrayReductionMgr::flushState\n", CkMyPe());
+    redNo=0;
+    count = 0;
+    while (!my_msgs.isEmpty())  delete my_msgs.deq();
+    while (!my_futureMsgs.isEmpty()) delete my_futureMsgs.deq();
+    reductionInfo.redNo = 0;
+    CkNodeReductionMgr::flushStates();
+  }
+}
+
 void CkArrayReductionMgr::collectAllMessages(){
 	if(count == size){
 		ARPRINT("[%d] CollectAll messages  for %d with %d\n",CkMyNode(),redNo,count);

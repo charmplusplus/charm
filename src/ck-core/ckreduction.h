@@ -130,6 +130,8 @@ public:
 	void ArrayReductionHandler(CkReductionMsg *m);
 	void endArrayReduction();
 
+	virtual CmiBool isReductionMgr(void){ return CmiTrue; }
+	void flushStates();
 private:
 
 

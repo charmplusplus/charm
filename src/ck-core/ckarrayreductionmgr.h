@@ -20,6 +20,7 @@ class CkArrayReductionMgr : public NodeGroup{
 		CkArrayReductionMgr(CkMigrateMessage *m):NodeGroup(m) {}
 		void contributeArrayReduction(CkReductionMsg *m);
 		CkReductionMsg *reduceMessages(void);
+                void flushStates();
 		virtual void pup(PUP::er &p);
 };
 #endif

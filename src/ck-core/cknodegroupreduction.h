@@ -147,6 +147,7 @@ public:
 	void RecvMsg(CkReductionMsg *m);
 	void doRecvMsg(CkReductionMsg *m);
 
+        void flushStates();	// flush state varaibles
 
 private:
 //Data members
@@ -215,6 +216,7 @@ private:
 
 //A NodeGroup that contribute to reductions
 class NodeGroup : public CkNodeReductionMgr {
+  protected:
     contributorInfo reductionInfo;//My reduction information
   public:
     CmiNodeLock __nodelock;
