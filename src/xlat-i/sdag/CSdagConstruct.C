@@ -740,6 +740,15 @@ void SdagConstruct::generateWhen(XStr& op)
      generateCall(op, *stateVarsChildren);
      op << ");\n";
   }
+
+  el = elist;
+  while (el != NULL){
+    e = el->entry;
+    if (e->paramIsMarshalled() == 1) {
+        op << "       delete " << e->getEntryName() << "_msg;\n";
+    }
+    el = el->next;
+  }
   op << "       return 1;\n";
   op << "    } else {\n";
 
