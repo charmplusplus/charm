@@ -10,7 +10,7 @@
 double *reduceValues=NULL;
 
 //Number of time steps to simulate
-int tsteps=0;
+int tsteps=10;
 
 extern "C" void
 pupMyGlobals(pup_er p) 
@@ -259,7 +259,7 @@ driver(void)
 
     FEM_Barrier();
 
-#if 0 /* This seems to hang (why?) */
+#if 0 /*FIXME: This seems to hang */
     //Get a list of ghost elements with large values
     FEM_Exchange_Ghost_Lists(0,elListLen,elList);
     elListLen=FEM_Get_Ghost_List_Length();
@@ -276,12 +276,14 @@ driver(void)
     }
 #endif
 
+#if 0 /*FIXME: This fails on more than two processors*/
     double *nodeOut=new double[nnodes];
     FEM_Set_Node(nnodes,1);
     for (i=0;i<nnodes;i++) nodeOut[i]=nodes[i].val;
     FEM_Set_Node_Data(nodeOut);
     delete[] nodeOut;
     FEM_Update_Mesh(1+t,0);
+#endif
   }
 
   double localSum = 1.0,globalSum;
