@@ -129,6 +129,10 @@ int event, pe;
 
         case BEGIN_IDLE:
         case END_IDLE:
+        case BEGIN_PACK:
+        case END_PACK:
+        case BEGIN_UNPACK:
+        case END_UNPACK:
                 fprintf(fp, "%u %d", time, pe);
                 break;
 

@@ -192,6 +192,30 @@ void trace_end_idle(void)
   add_to_buffer(END_IDLE, 0, 0, CkUTimer(), 0, CmiMyPe());
 }
 
+void trace_begin_pack(void)
+{
+  /* msgtype, entry, and event are not used */
+  add_to_buffer(BEGIN_PACK, 0, 0, CkUTimer(), 0, CmiMyPe());
+}
+
+void trace_end_pack(void)
+{
+  /* msgtype, entry, and event are not used */
+  add_to_buffer(END_PACK, 0, 0, CkUTimer(), 0, CmiMyPe());
+}
+
+void trace_begin_unpack(void)
+{
+  /* msgtype, entry, and event are not used */
+  add_to_buffer(BEGIN_UNPACK, 0, 0, CkUTimer(), 0, CmiMyPe());
+}
+
+void trace_end_unpack(void)
+{
+  /* msgtype, entry, and event are not used */
+  add_to_buffer(END_UNPACK, 0, 0, CkUTimer(), 0, CmiMyPe());
+}
+
 void trace_begin_charminit(void) 
 {
     int *msg;

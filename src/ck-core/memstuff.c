@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.16  1997-10-29 23:52:48  milind
+ * Revision 2.17  1998-02-03 21:27:45  milind
+ * Added pack and unpack events to tracing modules.
+ *
+ * Revision 2.16  1997/10/29 23:52:48  milind
  * Fixed CthInitialize bug on uth machines.
  *
  * Revision 2.15  1997/03/24 23:09:35  milind
@@ -84,6 +87,7 @@
 
 #define align(var) ((var+sizeof(void *)-1)&(~(sizeof(void *)-1)))
 
+#include "trace.h" 
 #include "globals.h" 
 #include "trans_defs.h"
 #include "trans_decls.h"

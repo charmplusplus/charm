@@ -13,6 +13,10 @@
 #define  USER_EVENT                 13
 #define  BEGIN_IDLE		    14
 #define  END_IDLE		    15
+#define  BEGIN_PACK	16
+#define  END_PACK	17
+#define  BEGIN_UNPACK	18
+#define  END_UNPACK	19
 
 
 #define  NUMBER_DISPLAYS	7

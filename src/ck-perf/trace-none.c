@@ -43,6 +43,11 @@ void trace_begin_idle(void)
 void trace_end_idle(void)
 {}
 
+void trace_begin_pack(void){}
+void trace_end_pack(void){}
+void trace_begin_unpack(void){}
+void trace_end_unpack(void){}
+
 void trace_begin_computation(void)
 {}
 

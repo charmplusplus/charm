@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.18  1997-12-03 22:25:34  milind
+ * Revision 2.19  1998-02-03 21:27:45  milind
+ * Added pack and unpack events to tracing modules.
+ *
+ * Revision 2.18  1997/12/03 22:25:34  milind
  * Earlier bug-fix was not a fix at all.
  *
  * Revision 2.17  1997/12/03 21:40:00  milind
@@ -125,8 +128,12 @@
 { \
         void *unpackedUsrMsg; \
         void *usrMsg = USER_MSG_PTR(envelope); \
+	if(CpvAccess(traceOn)) \
+		trace_begin_unpack(); \
         (*(CsvAccess(MsgToStructTable)[GetEnv_packid(envelope)].unpackfn)) \
                 (usrMsg, &unpackedUsrMsg); \
+	if(CpvAccess(traceOn)) \
+		trace_end_unpack(); \
         if (usrMsg != unpackedUsrMsg) \
         /* else unpacked in place */ \
         { \
@@ -154,8 +161,12 @@
                 /* make it +ve to connote a packed msg */ \
                 SetEnv_isPACKED(env, PACKED); \
                 usermsg = USER_MSG_PTR(env); \
+		if(CpvAccess(traceOn)) \
+			trace_begin_pack(); \
                 (*(CsvAccess(MsgToStructTable)[GetEnv_packid(env)].packfn)) \
                         (usermsg, &packedmsg, &size); \
+		if(CpvAccess(traceOn)) \
+			trace_end_pack(); \
                 if (usermsg != packedmsg) { \
                         /* Free the usermsg here. */ \
                         CkFreeMsg(usermsg); \
