@@ -12,18 +12,22 @@
 
 class CStateVar {
   public:
-    XStr *isconst;
     int isVoid;
-    XStr *type1;
-    XStr *type2;
-    XStr *allPtrs;
+    XStr *type;
     int numPtrs;
     XStr *name;
     XStr *byRef;
     XStr *arrayLength;
     int isMsg;
-    CStateVar(XStr *c, int v, XStr *t1, XStr *t2, XStr *p, int np, XStr *n, XStr *r, XStr *a, int m) : isconst(c), isVoid(v), type1(t1), type2(t2), allPtrs(p), numPtrs(np), name(n), byRef(r), arrayLength(a), isMsg(m) {}
-
+    CStateVar(int v, char *t, int np, const char *n, XStr *r, const char *a, int m) : isVoid(v), numPtrs(np),  byRef(r), isMsg(m)
+ 	{ 
+	  if (t != NULL) { type = new XStr(t); } 
+	  else {type = NULL;}
+	  if (n != NULL) { name = new XStr(n); }
+	  else { name = NULL; }
+	  if (a != NULL) {arrayLength = new XStr(a); }
+	  else { arrayLength = NULL; }
+	}
 };
 
 #endif
