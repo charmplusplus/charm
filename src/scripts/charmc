@@ -1338,7 +1338,7 @@ then
 fi
 
 ################# Build the module initialization function ##################
-modInitName="moduleinit"
+modInitName="moduleinit$$"
 modInitSrc="$modInitName.C"
 modInitObj="$modInitName.o"
 DoNoErrCheck $RM $modInitSrc $modInitObj > /dev/null 2>&1
