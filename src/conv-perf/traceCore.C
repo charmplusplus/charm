@@ -6,8 +6,6 @@
 #include <assert.h>
 
 #include "converse.h"
-#include "charm++.h"
-#include "trace-common.h"
 #include "traceCore.h"
 #include "traceCoreCommon.h"
 
