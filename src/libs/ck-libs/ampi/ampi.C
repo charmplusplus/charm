@@ -201,6 +201,7 @@ void ampi::pup(PUP::er &p)
   if(!p.isUserlevel())
     ArrayElement1D::pup(p);//Pack superclass
   p(commidx);
+  // TODO: Make the messages also part of the saved and restored state
   if(p.isDeleting())
   {//Resend saved messages to myself
     AmpiMsg *msg;

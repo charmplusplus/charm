@@ -142,6 +142,26 @@ class AmpiMsg : public CMessage_AmpiMsg {
   }
   static void *pack(AmpiMsg *in) { return (void *) in; }
   static AmpiMsg *unpack(void *in) { return new (in) AmpiMsg; }
+  static AmpiMsg* pup(PUP::er &p, AmpiMsg *m)
+  {
+    int length, tag1, tag2, comm;
+    if(p.isPacking() || p.isSizing()) {
+      tag1 = m->tag1;
+      tag2 = m->tag2;
+      comm = m->comm;
+      length = m->length;
+    }
+    p(tag1); p(tag2); p(comm); p(length);
+    if(p.isUnpacking()) {
+      m = new AmpiMsg(tag1, tag2, length, comm);
+    }
+    p(m->data, length);
+    if(p.isDeleting()) {
+      delete m;
+      m = 0;
+    }
+    return m;
+  }
 };
 
 #define AMPI_MAXUDATA 20
