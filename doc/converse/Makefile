@@ -1,49 +1,12 @@
-DOCDIR=..
-WEBDIR=/expand8/www/ppl_manuals
+# Stub makefile for LaTeX PPL manual
+FILE=manual
+TEX=$(FILE).tex ccs.tex cmi.tex conditions.tex cpvmacros.tex isomalloc.tex \
+	index.tex queue.tex simulator.tex threads.tex thsync.tex usermain.tex
+DEST=converse
+LATEX2HTML=$(L2H) -split 5
+PROJECT_LINK='<a href="http://charm.cs.uiuc.edu/research/converse">Converse Homepage</a><br>'
 
-all: ps pdf html
+include ../Makefile.common
 
-ps:
+index.tex:
 	touch index.tex
-	latex manual.tex
-	latex manual.tex
-	if [ -f manual.idx ] ; then makeindex -o index.tex manual.idx ; fi
-	latex manual.tex
-	dvips -o manual.ps manual.dvi
-
-html:
-	touch index.tex
-	-@ln -s ../pplmanual.* .
-	latex manual.tex
-	latex2html -local_icons manual.tex
-
-pdf:
-	touch index.tex
-	pdflatex manual.tex
-	if [ -f manual.idx ] ; then makeindex -o index.tex manual.idx ; fi
-	pdflatex manual.tex
-
-doc:
-	make all
-	if [ ! -d $(DOCDIR) ] ; then mkdir $(DOCDIR) ; fi
-	if [ ! -d $(DOCDIR)/ps ] ; then mkdir $(DOCDIR)/ps ; fi
-	if [ ! -d $(DOCDIR)/pdf ] ; then mkdir $(DOCDIR)/pdf ; fi
-	if [ ! -d $(DOCDIR)/html ] ; then mkdir $(DOCDIR)/html ; fi
-	/bin/cp manual.ps $(DOCDIR)/ps/converse.ps
-	/bin/cp manual.pdf $(DOCDIR)/pdf/converse.pdf
-	/bin/rm -rf $(DOCDIR)/html/converse
-	/bin/cp -R manual $(DOCDIR)/html/converse
-
-web:
-	make all
-	/bin/cp manual.ps $(WEBDIR)/ps/converse.ps
-	/bin/cp manual.pdf $(WEBDIR)/pdf/converse.pdf
-	/bin/rm -rf $(WEBDIR)/html/converse
-	/bin/cp -R manual $(WEBDIR)/html/converse
-	find $(WEBDIR) -type f -exec chmod 664 {} \;
-	find $(WEBDIR) -type d -exec chmod 775 {} \;
-
-clean:
-	/bin/rm -f *.ps *.pdf *.ilg *.aux *.log *.dvi *.idx *.toc 
-	/bin/rm -f index.tex *.blg *.bbl
-	/bin/rm -rf manual
