@@ -31,7 +31,7 @@ fem_mesh.o: fem_mesh.C crack.h
 	$(CHARMC) -c fem_mesh.C
 
 pgm: $(FEM_OBJS)
-	$(CHARMC) -o pgm $(FEM_OBJS) -language fem 
+	$(CHARMC) -o pgm $(FEM_OBJS) -language fem -module netfem
 
 # Simple serial program
 serial_main.o: serial_main.C crack.h
@@ -40,6 +40,9 @@ serial_main.o: serial_main.C crack.h
 serial: $(SERIAL_OBJS)
 	$(CHARMC) -o serial $(SERIAL_OBJS) -seq -language c++
 
+
+test: pgm
+	./charmrun ./pgm +p2 +vp4
 
 clean:
 	rm -rf *.o pgm *.sts *.log *.bak *~ SunWS_cache ii_files ti_files

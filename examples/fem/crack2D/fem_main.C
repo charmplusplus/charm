@@ -4,6 +4,7 @@
 #include <fstream.h>
 #include <stddef.h>
 #include "crack.h"
+#include "netfem.h"
 #include "charm++.h" // for CkWallTimer, CkPrintf, etc.
 
 void crack_abort(const char *why)
@@ -56,6 +57,25 @@ _DELAY_(int microsecs)
   while(upto > CmiCpuTimer());
 }
 
+
+void uploadNetFEM(MeshData *m,int timeStep) {
+   NetFEM n=NetFEM_Begin(FEM_My_partition(),timeStep,2,NetFEM_POINTAT);
+   NetFEM_Nodes_field(n,m->nn,NetFEM_Field(Node,pos),m->nodes,"Position (m)");
+    NetFEM_Vector_field(n,m->nodes,NetFEM_Field(Node,disp),"Displacement (m)");
+    NetFEM_Vector_field(n,m->nodes,NetFEM_Field(Node,vel),"Velocity (m/s)");
+    NetFEM_Scalar_field(n,m->nodes,1,NetFEM_Field(Node,xM),"Mass (Kg)");
+   
+   NetFEM_Elements_field(n,m->ne,6,NetFEM_Field(Vol,conn),0, m->vols,"Triangles");
+    NetFEM_Scalar_field(n,m->vols,3, NetFEM_Field(Vol,s11l), "S11");
+    NetFEM_Scalar_field(n,m->vols,3, NetFEM_Field(Vol,s12l), "S12");
+    NetFEM_Scalar_field(n,m->vols,3, NetFEM_Field(Vol,s22l), "S22");
+   
+   NetFEM_Elements_field(n,m->nc,6,NetFEM_Field(Coh,conn),0, m->cohs,"Cohesive");
+    NetFEM_Scalar_field(n,m->vols,3, NetFEM_Field(Coh,Sthresh), "Sthresh");
+   
+   NetFEM_End(n);
+}
+
 extern "C" void
 driver(void)
 {
@@ -106,13 +126,8 @@ driver(void)
     
     nodeFinishStep(&gd->mesh, &sl, t);
     
-    if (myid==0) { //For debugging, print the status of my node 0:
-      Node *n=&gd->mesh.nodes[0];
-      int g=-1; //Global number of my node 0
-      FEM_Mesh_get_data(fem_mesh,FEM_NODE,FEM_GLOBALNO, &g, 
-              0,1, FEM_INDEX_0,1);
-      CkPrintf("t=%d  node=%d  d=(%g,%g)  v=(%g,%g)\n",
-           t, g, n->disp.x,n->disp.y, n->vel.x,n->vel.y);
+    if (1) { //Output data to NetFEM:
+      uploadNetFEM(&gd->mesh,t);
     }
     
     if(0 && myid==79 && t>35) // Add fake load imbalance
