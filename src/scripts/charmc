@@ -717,7 +717,7 @@ Debug "About to compile..."
 
 for FILE in `echo $FILES`
 do
-	BASE=`stripExtention $FILE`
+	BASE=`stripExtention \`basename $FILE\``
 	TMP=`basename $FILE`".TMP"
 	FILE_EXT=`getExtention $FILE`
 	if [ "$FILE_EXT" != ".o" -a "$FILE_EXT" != ".M" -a "$FILE_EXT" != ".ci" ]
