@@ -206,6 +206,7 @@ Module::generate()
   declstr<<"#define _DECL_" << name << "_H_"<<endx;
   declstr<<"#include \"charm++.h\""<<endx;
   clist->genDecls(declstr);
+  declstr<<"extern void _register"<<name<<"(void);"<<endx;
   declstr<<"#endif"<<endx;
   defstr<<"#ifndef _DEFS_" << name << "_H_"<<endx;
   defstr<<"#define _DEFS_" << name << "_H_"<<endx;
