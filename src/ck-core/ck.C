@@ -688,6 +688,20 @@ static void _skipCldEnqueue(int pe,envelope *env, int infoFn)
 #   define  _skipCldEnqueue   CldEnqueue
 #endif
 
+static void _noCldEnqueue(int pe, envelope *env)
+{
+  if (pe == CkMyPe()) {
+    CmiHandleMessage(env);
+  } else {
+    CkPackMessage(&env);
+    int len=env->getTotalsize();
+    if (pe==CLD_BROADCAST) { CmiSyncBroadcastAndFree(len, (char *)env); }
+    else if (pe==CLD_BROADCAST_ALL) { CmiSyncBroadcastAllAndFree(len, (char *)env); }
+    else CmiSyncSendAndFree(pe, len, (char *)env);
+  }
+}
+
+
 static int _prepareMsg(int eIdx,void *msg,const CkChareID *pCid)
 {
   register envelope *env = UsrToEnv(msg);
@@ -734,6 +748,7 @@ void CkSendMsg(int entryIdx, void *msg,const CkChareID *pCid)
     CldEnqueue(destPE, env, _infoIdx);
   }
 }
+
 extern "C"
 void CkSendMsgInline(int entryIndex, void *msg, const CkChareID *pCid)
 {
@@ -749,6 +764,36 @@ void CkSendMsgInline(int entryIndex, void *msg, const CkChareID *pCid)
     CkSendMsg(entryIndex,msg,pCid);
 }
 
+extern "C"
+void CkSendMsgImmediate(int entryIdx, void *msg, const CkChareID *pCid)
+{
+  register envelope *env = UsrToEnv(msg);
+#if CMK_IMMEDIATE_MSG
+//CmiPrintf("[%d] CkSendMsgImmediate called.\n", CkMyPe());
+  if (pCid->onPE==CkMyPe())
+  { //Just directly call the chare (skip QD handling & scheduler)
+    if (env->isPacked()) CkUnpackMessage(&env);
+    _STATS_RECORD_PROCESS_MSG_1();
+    _SET_USED(env, 0);
+    // don't trace
+   _entryTable[entryIdx]->call(msg, pCid->objPtr);
+  }
+  else {
+    int destPE=_prepareMsg(entryIdx,msg,pCid);
+    CmiSetHandler(env, CpvAccessOther(CmiImmediateMsgHandlerIdx,0));
+    CmiSetXHandler(env, _charmHandlerIdx);
+    // go into VidBlock when destPE is -1
+    if (destPE!=-1) {
+      _TRACE_CREATION_1(env);
+      CpvAccess(_qd)->create();
+      _noCldEnqueue(destPE, env);
+    }
+  }
+#else
+  CkSendMsgInline(entryIdx, msg, pCid);
+#endif
+}
+
 static inline envelope *_prepareMsgBranch(int eIdx,void *msg,CkGroupID gID,int type)
 {
   register envelope *env = UsrToEnv(msg);
@@ -759,6 +804,14 @@ static inline envelope *_prepareMsgBranch(int eIdx,void *msg,CkGroupID gID,int t
   env->setGroupNum(gID);
   env->setSrcPe(CkMyPe());
   CmiSetHandler(env, _charmHandlerIdx);
+  return env;
+}
+
+static inline envelope *_prepareImmediateMsgBranch(int eIdx,void *msg,CkGroupID gID,int type)
+{
+  envelope *env = _prepareMsgBranch(eIdx, msg, gID, type);
+  CmiSetHandler(env, CpvAccessOther(CmiImmediateMsgHandlerIdx,0));
+  CmiSetXHandler(env, _charmHandlerIdx);
   return env;
 }
 
@@ -805,6 +858,24 @@ void CkSendMsgBranchInline(int eIdx, void *msg, int destPE, CkGroupID gID)
   }
   //Can't inline-- send the usual way
   CkSendMsgBranch(eIdx,msg,destPE,gID);
+}
+
+extern "C"
+void CkSendMsgBranchImmediate(int eIdx, void *msg, int pe, CkGroupID gID)
+{
+#if CMK_IMMEDIATE_MSG
+  register envelope *env = _prepareImmediateMsgBranch(eIdx,msg,gID,ForBocMsg);
+  if(pe==CLD_BROADCAST_ALL) {
+    _TRACE_CREATION_N(env, CkNumPes());
+  } else {
+    _TRACE_CREATION_1(env);
+  }
+  _noCldEnqueue(pe, env);
+  _STATS_RECORD_SEND_BRANCH_1();
+  CpvAccess(_qd)->create();
+#else
+  CkSendMsgBranchInline(eIdx, msg, pe, gID);
+#endif
 }
 
 extern "C"

@@ -277,6 +277,7 @@ public:
 	
 	void ckInsert(CkArrayMessage *m,int ctor,int onPe);
 	void ckSend(CkArrayMessage *m, int ep) const;
+	void ckSendImmediate(CkArrayMessage *m, int ep) const;
 	void *ckSendSync(CkArrayMessage *m, int ep) const;
 	const CkArrayIndex &ckGetIndex() const {return _idx;}
 
@@ -317,6 +318,7 @@ public:
 	
 //	void ckInsert(CkArrayMessage *m,int ctor,int onPe);
 	void ckSend(CkArrayMessage *m, int ep) ;
+	void ckSendImmediate(CkArrayMessage *m, int ep) ;
 
 //	ArrayElement *ckLocal(void) const;
 	inline CkSectionCookie &ckGetSectionCookie() {return _sid._cookie;}
@@ -524,8 +526,8 @@ public:
   /// Deliver message to this element (directly if local)
   inline void deliver(CkMessage *m) 
 	  {locMgr->deliver(m);}
-  inline void deliverViaQueue(CkMessage *m) 
-	  {locMgr->deliverViaQueue(m);}
+  inline void deliverViaQueue(CkMessage *m, CmiBool immediate=NOT_IMMEDIATE) 
+	  {locMgr->deliverViaQueue(m, immediate);}
   /// Fetch a local element via its index (return NULL if not local)
   inline ArrayElement *lookup(const CkArrayIndex &index)
 	  {return (ArrayElement *)locMgr->lookup(index,thisgroup);}

@@ -637,7 +637,7 @@ CmiBool CkLocRec_local::invokeEntry(CkMigratable *obj,void *msg,int epIdx) {
 	return CmiTrue;
 }
 
-CmiBool CkLocRec_local::deliver(CkArrayMessage *msg,CmiBool viaScheduler)
+CmiBool CkLocRec_local::deliver(CkArrayMessage *msg,CmiBool viaScheduler, CmiBool immediate)
 {
 	if (viaScheduler) {
 		myLocMgr->getLocalProxy().deliver(msg);
@@ -692,7 +692,7 @@ public:
   
 	virtual RecType type(void) {return dead;}
   
-	virtual CmiBool deliver(CkArrayMessage *msg,CmiBool viaScheduler) {
+	virtual CmiBool deliver(CkArrayMessage *msg,CmiBool viaScheduler, CmiBool imm) {
 		CkPrintf("Dead array element is %s.\n",idx2str(msg->array_index()));
 		CkAbort("Send to dead array element!\n");
 		return CmiFalse;
@@ -754,12 +754,15 @@ public:
 	virtual RecType type(void) {return remote;}
   
 	//Send a message for this element.
-	virtual CmiBool deliver(CkArrayMessage *msg,CmiBool viaScheduler) {
+	virtual CmiBool deliver(CkArrayMessage *msg,CmiBool viaScheduler, CmiBool immediate=CmiFalse) {
 		access();//Update our modification date
 		msg->array_hops()++;
 		DEBS((AA"   Forwarding message for element %s to %d (REMOTE)\n"AB,
 		      idx2str(msg->array_index()),onPe));
-		myLocMgr->getProxy()[onPe].deliver(msg);
+		if (!immediate)
+		  myLocMgr->getProxy()[onPe].deliver(msg);
+		else
+		  myLocMgr->getProxy()[onPe].deliverImmediate(msg);
 		return CmiTrue;
 	}
 	//Return if this element is now obsolete
@@ -803,12 +806,12 @@ public:
 	//Send (or buffer) a message for this element.
 	//  If idx==NULL, the index is packed in the message.
 	//  If idx!=NULL, the index must be packed in the message.
-	virtual CmiBool deliver(CkArrayMessage *msg,CmiBool viaScheduler) {
+	virtual CmiBool deliver(CkArrayMessage *msg,CmiBool viaScheduler,CmiBool immed) {
 		DEBS((AA" Queued message for %s\n"AB,idx2str(msg->array_index())));
 		buffer.enq(msg);
 		return CmiTrue;
 	}
-  
+ 
 	//This is called when this ArrayRec is about to be replaced.
 	// We dump all our buffered messages off on the next guy,
 	// who should know what to do with them.
@@ -1076,7 +1079,7 @@ void CkLocMgr::removeFromTable(const CkArrayIndex &idx) {
 
 /************************** LocMgr: MESSAGING *************************/
 /// Deliver message to this element, going via the scheduler if local
-void CkLocMgr::deliverViaQueue(CkMessage *m) {
+void CkLocMgr::deliverViaQueue(CkMessage *m, CmiBool immediate) {
 	magic.check();
 	CkArrayMessage *msg=(CkArrayMessage *)m;
 	const CkArrayIndex &idx=msg->array_index();
@@ -1086,8 +1089,8 @@ void CkLocMgr::deliverViaQueue(CkMessage *m) {
 #endif
 	CkLocRec *rec=elementNrec(idx);
 	if (rec!=NULL)
-		rec->deliver(msg,CmiTrue);
-	else deliverUnknown(msg);
+		rec->deliver(msg,CmiTrue,immediate);
+	else deliverUnknown(msg, immediate);
 }
 /// Deliver message directly to this element
 CmiBool CkLocMgr::deliver(CkMessage *m) {
@@ -1099,11 +1102,22 @@ CmiBool CkLocMgr::deliver(CkMessage *m) {
 	if (rec!=NULL)
 		return rec->deliver(msg,CmiFalse);
 	else 
-		return deliverUnknown(msg);
+		return deliverUnknown(msg, NOT_IMMEDIATE);
+}
+CmiBool CkLocMgr::deliverImmediate(CkMessage *m) {	// entry
+	magic.check();
+	CkArrayMessage *msg=(CkArrayMessage *)m;
+	const CkArrayIndex &idx=msg->array_index();
+	DEBS((AA"deliver %s\n"AB,idx2str(idx)));
+	CkLocRec *rec=elementNrec(idx);
+	if (rec!=NULL)
+		return rec->deliver(msg,CmiFalse,IMMEDIATE);
+	else 
+		return deliverUnknown(msg, IMMEDIATE);
 }
 
 /// This index is not hashed-- somehow figure out what to do.
-CmiBool CkLocMgr::deliverUnknown(CkArrayMessage *msg)
+CmiBool CkLocMgr::deliverUnknown(CkArrayMessage *msg, CmiBool immediate)
 {
 	magic.check();
 	const CkArrayIndex &idx=msg->array_index();
@@ -1112,7 +1126,10 @@ CmiBool CkLocMgr::deliverUnknown(CkArrayMessage *msg)
 	{// Forward the message to its home processor
 		DEBM((AA"Forwarding message for unknown %s\n"AB,idx2str(idx)));
 		msg->array_hops()++;
-		thisProxy[onPe].deliver(msg);
+		if (immediate)
+		  thisProxy[onPe].deliverImmediate(msg);
+		else
+		  thisProxy[onPe].deliver(msg);
 		return CmiTrue;
 	}
 	else

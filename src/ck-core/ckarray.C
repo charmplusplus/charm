@@ -505,6 +505,16 @@ inline void msg_prepareSend(CkArrayMessage *msg, int ep,CkArrayID aid)
 	env->array_ep()=ep;
 	env->array_hops()=0;
 }
+inline void msg_prepareSendImmediate(CkArrayMessage *msg, int ep,CkArrayID aid)
+{
+	envelope *env=UsrToEnv((void *)msg);
+	env->array_mgr()=aid;
+	env->array_srcPe()=CkMyPe();
+	env->array_ep()=ep;
+	env->array_hops()=0;
+	CmiSetHandler(env, CpvAccessOther(CmiImmediateMsgHandlerIdx,0));
+  	CmiSetXHandler(env, _charmHandlerIdx);
+}
 void CProxyElement_ArrayBase::ckSend(CkArrayMessage *msg, int ep) const
 {
 #ifndef CMK_OPTIMIZE
@@ -531,6 +541,29 @@ void *CProxyElement_ArrayBase::ckSendSync(CkArrayMessage *msg, int ep) const
 	return CkWaitReleaseFuture(f);
 }
 
+void CProxyElement_ArrayBase::ckSendImmediate(CkArrayMessage *msg, int ep) const
+{
+#if CMK_IMMEDIATE_MSG
+#ifndef CMK_OPTIMIZE
+	//Check our array index for validity
+	if (_idx.nInts<0) CkAbort("Array index length is negative!\n");
+	if (_idx.nInts>CK_ARRAYINDEX_MAXLEN)
+		CkAbort("Array index length (nInts) is too long-- did you "
+			"use bytes instead of integers?\n");
+#endif
+	msg_prepareSendImmediate(msg,ep,ckGetArrayID());
+	msg->array_index()=_idx;//Insert array index
+	if (ckIsDelegated()) //Just call our delegateMgr
+	  ckDelegatedTo()->ArraySend(ep,msg,_idx,ckGetArrayID());
+	else 
+	{ //Usual case: a direct send
+	  ckLocalBranch()->deliverViaQueue(msg, IMMEDIATE);
+	}
+#else
+	ckSend(msg, ep);
+#endif
+}
+
 void CProxySection_ArrayBase::ckSend(CkArrayMessage *msg, int ep)
 {
 	if (ckIsDelegated()) //Just call our delegateMgr
@@ -547,6 +580,10 @@ void CProxySection_ArrayBase::ckSend(CkArrayMessage *msg, int ep)
 	    ap.ckSend((CkArrayMessage *)msg,ep);
 	  }
         }
+}
+void CProxySection_ArrayBase::ckSendImmediate(CkArrayMessage *msg, int ep)
+{
+  ckSend(msg, ep);
 }
 
 void CkSendMsgArray(int entryIndex, void *msg, CkArrayID aID, const CkArrayIndex &idx)

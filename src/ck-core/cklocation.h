@@ -30,6 +30,9 @@ public:
 class LBDatabase;
 #endif
 
+#define IMMEDIATE               CmiTrue
+#define NOT_IMMEDIATE		CmiFalse
+
 #define MessageIndex(mt)        CMessage_##mt##::__idx
 #define ChareIndex(ct)          CkIndex_##ct##::__idx
 #define EntryIndex(ct,ep,mt)    CkIndex_##ct##::ep##((mt *)0)
@@ -125,7 +128,7 @@ public:
   virtual RecType type(void)=0;
   
   /// Accept a message for this element
-  virtual CmiBool deliver(CkArrayMessage *m,CmiBool viaScheduler)=0;
+  virtual CmiBool deliver(CkArrayMessage *m,CmiBool viaScheduler,CmiBool immediate=CmiFalse)=0;
   
   /// This is called when this ArrayRec is about to be replaced.
   /// It is only used to deliver buffered element messages.
@@ -165,7 +168,7 @@ public:
    *  Accept a message for this element.
    *  Returns false if the element died during the receive.
    */
-  virtual CmiBool deliver(CkArrayMessage *m,CmiBool viaScheduler);
+  virtual CmiBool deliver(CkArrayMessage *m,CmiBool viaScheduler, CmiBool immediate=CmiFalse);
   
   /** Invoke the given entry method on this element.
    *   Returns false if the element died during the receive.
@@ -392,7 +395,7 @@ public:
 		CkMigratable *elt,int ctorIdx,void *ctorMsg);
 	
 	///Deliver message to this element, going via the scheduler if local
-	void deliverViaQueue(CkMessage *m);
+	void deliverViaQueue(CkMessage *m, CmiBool immediate=NOT_IMMEDIATE);
 
 	///Done inserting elements for now
 	void doneInserting(void);
@@ -445,6 +448,7 @@ public:
 
 //Communication:
 	CmiBool deliver(CkMessage *m);
+	CmiBool deliverImmediate(CkMessage *m);
 	void migrateIncoming(CkArrayElementMigrateMessage *msg);
 	void updateLocation(const CkArrayIndexMax &idx,int nowOnPe);
 	void reclaimRemote(const CkArrayIndexMax &idx,int deletedOnPe);
@@ -467,7 +471,7 @@ private:
 	void removeFromTable(const CkArrayIndex &idx);
 
 	void pupElementsFor(PUP::er &p,CkLocRec_local *rec);
-	CmiBool deliverUnknown(CkArrayMessage *msg);
+	CmiBool deliverUnknown(CkArrayMessage *msg, CmiBool immediate);
 
 //Data Members:
 	//Map array ID to manager and elements
