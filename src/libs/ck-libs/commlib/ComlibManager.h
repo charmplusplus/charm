@@ -62,15 +62,17 @@ class ComlibInstanceHandle {
     
     int _instid;
     CkGroupID _dmid;
-    
+
     ComlibInstanceHandle();
     ComlibInstanceHandle(int instid, CkGroupID dmid);    
     //    ComlibInstanceHandle(ComlibInstanceHandle &that);
     
+    void init();
     void beginIteration();
     void endIteration();
     
     CkGroupID getComlibManagerID();
+    void setStrategy(Strategy *);
 };
 
 PUPbytes(ComlibInstanceHandle);
@@ -87,7 +89,7 @@ class ComlibManager: public CkDelegateMgr {
     int strategyID; //Identifier of the strategy
 
     StrategyTable strategyTable[MAX_NSTRAT]; //A table of strategy pointers
-    CkQ<Strategy *> ListOfStrategies;
+    CkVec<Strategy *> ListOfStrategies;
     int nstrats, curStratID, prevStratID;      
     //Number of strategies created by the user.
 
@@ -150,7 +152,8 @@ class ComlibManager: public CkDelegateMgr {
         {return &strategyTable[instid];}
 
     //To create a new strategy, returns handle to the strategy table;
-    ComlibInstanceHandle createInstance(Strategy *);  
+    ComlibInstanceHandle createInstance();  
+    void registerStrategy(int pos, Strategy *s);
 
     void doneCreating();             //Done creating instances
 

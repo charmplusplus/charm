@@ -131,13 +131,17 @@ void ComlibManager::barrier2(){
 }
 
 //Registers a set of strategies with the communication library
-ComlibInstanceHandle ComlibManager::createInstance(Strategy *strat) {
+ComlibInstanceHandle ComlibManager::createInstance() {
   
-  ListOfStrategies.enq(strat);
-  nstrats++;
+    ListOfStrategies.insertAtEnd(NULL);
+    nstrats++;
+    
+    ComlibInstanceHandle cinst(nstrats - 1, CpvAccess(cmgrID));  
+    return cinst;
+}
 
-  ComlibInstanceHandle cinst(nstrats - 1, CpvAccess(cmgrID));  
-  return cinst;
+void ComlibManager::registerStrategy(int pos, Strategy *strat) {
+    ListOfStrategies[pos] = strat;
 }
 
 //End of registering function, if barriers have been reached send them over
@@ -150,11 +154,10 @@ void ComlibManager::doneCreating() {
 
     StrategyWrapper sw;
     sw.s_table = new Strategy* [nstrats];
-    //    Strategy *aStrategy = ListOfStrategies.deq();
     sw.nstrats = nstrats;
     
     for (int count=0; count<nstrats; count++)
-        sw.s_table[count] = ListOfStrategies.deq();
+        sw.s_table[count] = ListOfStrategies[count];
 
     CProxy_ComlibManager cgproxy(CpvAccess(cmgrID));
     cgproxy.receiveTable(sw);
@@ -650,12 +653,14 @@ void ComlibManager::prioEndIteration(PrioMsg *pmsg){
     delete pmsg;
 }
 */
+/*
+ComlibInstanceHandle ComlibCreateInstance(){
+    CProxy_ComlibManager cgproxy(CpvAccess(cmgrID));    
+    return (cgproxy.ckLocalBranch())->createInstance();
+}
 
 ComlibInstanceHandle ComlibRegisterStrategy(Strategy *s){
-    CProxy_ComlibManager cgproxy(CpvAccess(cmgrID));    
-    ComlibInstanceHandle cinst;
-    cinst = (cgproxy.ckLocalBranch())->createInstance(s);
-    return cinst;
+    
 }
 
 ComlibInstanceHandle ComlibRegisterStrategy(Strategy *s, CkArrayID aid){
@@ -676,6 +681,7 @@ ComlibInstanceHandle ComlibRegisterStrategy(Strategy *s, CkGroupID gid){
     cinst = (cgproxy.ckLocalBranch())->createInstance(s);
     return cinst;
 }
+*/
 
 void ComlibDelegateProxy(CProxy *proxy){
     CProxy_ComlibManager cgproxy(CpvAccess(cmgrID));
@@ -689,17 +695,26 @@ public:
     }
 };
 
-ComlibInstanceHandle::ComlibInstanceHandle(){}
+//Called by user code
+ComlibInstanceHandle::ComlibInstanceHandle(){
+}
+
+void ComlibInstanceHandle::init(){
+    CProxy_ComlibManager cgproxy(CpvAccess(cmgrID));    
+    *this = (cgproxy.ckLocalBranch())->createInstance();
+}
+
+//Called by the communication library
 ComlibInstanceHandle::ComlibInstanceHandle(int instid, CkGroupID dmid){
     _instid = instid;
     _dmid   = dmid;
 }
 
 /*
-ComlibInstanceHandle::ComlibInstanceHandle(ComlibInstanceHandle &that){
-    _instid = that._instid;
-    _dmid   = that._dmid;
-}        
+  ComlibInstanceHandle::ComlibInstanceHandle(ComlibInstanceHandle &that){
+  _instid = that._instid;
+  _dmid   = that._dmid;
+  }        
 */
 
 void ComlibInstanceHandle::beginIteration() { 
@@ -711,6 +726,11 @@ void ComlibInstanceHandle::beginIteration() {
 void ComlibInstanceHandle::endIteration() {
     CProxy_ComlibManager cgproxy(_dmid);
     (cgproxy.ckLocalBranch())->endIteration();
+}
+
+void ComlibInstanceHandle::setStrategy(Strategy *s) {
+    CProxy_ComlibManager cgproxy(_dmid);
+    (cgproxy.ckLocalBranch())->registerStrategy(_instid, s);
 }
 
 CkGroupID ComlibInstanceHandle::getComlibManagerID() {return _dmid;}    
