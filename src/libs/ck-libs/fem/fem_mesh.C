@@ -179,8 +179,8 @@ void FEM_Register_array(int fem_mesh,int entity,int attr,
 		for(int i=0;i<len;i++){
 			printf("%d -> (%d %d %d) \n",i+1,connd[3*i],connd[3*i+1],connd[3*i+2]);
 		}
-	}*/
-	printf("firstItem %d \n",firstItem);
+	}
+	printf("firstItem %d \n",firstItem);*/
 	FEM_Register_array_layout(fem_mesh,entity,attr,data,firstItem,lo);
 }
 
@@ -216,11 +216,11 @@ FEM_Register_entity(int fem_mesh,int entity,void *data,
 /**TODO: add the fortran api for registration*/
 
 FORTRAN_AS_C(FEM_REGISTER_ARRAY,FEM_Register_array,fem_register_array,
-	(int *fem_mesh,int *entity,int *attr,void *data,int *datatype,int *width),(*fem_mesh,*entity,*attr,data,*datatype,*width,1))
+	(int *fem_mesh,int *entity,int *attr,void *data,int *datatype,int *width),(*fem_mesh,*entity,*attr,data,*datatype,*width,0))
 
 
 FORTRAN_AS_C(FEM_REGISTER_ARRAY_LAYOUT,FEM_Register_array_layout,fem_register_array_layout,
-	(int *fem_mesh,int *entity,int *attr,void *data,int *layout),(*fem_mesh,*entity,*attr,data,*layout,1))
+	(int *fem_mesh,int *entity,int *attr,void *data,int *layout),(*fem_mesh,*entity,*attr,data,*layout,0))
 
 FORTRAN_AS_C(FEM_REGISTER_ENTITY,FEM_Register_entity,fem_register_entity,
 	(int *fem_mesh,int *entity,void *data,int *len,int *max,FEM_Mesh_alloc_fn fn),(*fem_mesh,*entity,data,*len,*max,fn))
