@@ -17,8 +17,9 @@ public:
 
   HeapCentLB();
 private:
-  void           Heapify(HeapData *, int, int);
-  void           InsertObject(HeapData *, int);
+  void           Heapify(HeapData*, int, int);
+  void           HeapSort(HeapData*, int);
+	void           BuildHeap(HeapData*, int);
   HeapData*      BuildCpuArray(CentralLB::LDStats*, int, int *);      
   HeapData*      BuildObjectArray(CentralLB::LDStats*, int, int *);      
   CmiBool        QueryBalanceNow(int step);

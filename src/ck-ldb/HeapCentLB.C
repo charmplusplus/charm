@@ -47,16 +47,26 @@ void HeapCentLB::Heapify(HeapData *heap, int node, int heapSize)
   }    
 }
 
-
-//Inserts object into appropriate sorted position in the object array
-void HeapCentLB::InsertObject(HeapData *objData, int index)
+void HeapCentLB::BuildHeap(HeapData *data, int heapSize)
 {
-  HeapData key = objData[index];
-  
-  int i;
-  for(i = index-1; i >= 0 && objData[i].load < key.load; i--)
-    objData[i+1] = objData[i];
-  objData[i+1] = key;
+	int i;
+	for(i=heapSize/2; i >= 0; i--)
+		Heapify(data, i, heapSize);
+}
+
+void HeapCentLB::HeapSort(HeapData *data, int heapSize)
+{
+	int i;
+	HeapData key;
+
+	BuildHeap(data, heapSize);
+	for (i=heapSize; i > 0; i--) {
+		key = data[0];
+		data[0] = data[i];
+		data[i] = key;
+		heapSize--;
+		Heapify(data, 0, heapSize);
+	}
 }
 
 HeapCentLB::HeapData* 
@@ -80,9 +90,9 @@ HeapCentLB::BuildObjectArray(CentralLB::LDStats* stats,
           stats[pe].objData[obj].wallTime * stats[pe].pe_speed;
         objData[*objCount].pe = pe;
         objData[*objCount].id = obj;
-        InsertObject(objData, (*objCount)++);
+        (*objCount)++;
       }
-
+	HeapSort(objData, *objCount-1);
   return objData;
 }
 
@@ -104,21 +114,22 @@ HeapCentLB::BuildCpuArray(CentralLB::LDStats* stats,
   for (pe=0; pe < count; pe++) {
     data[*peCount].load = 0.0;
     peData = &(stats[pe]);
-
-    for (obj = 0; obj < peData->n_objs; obj++) 
-      if (peData->objData[obj].migratable == CmiFalse) 
-        data[*peCount].load -= 
-          peData->objData[obj].wallTime * peData->pe_speed;
+ 
+    if (peData->available == CmiTrue) {
+ 
+			for (obj = 0; obj < peData->n_objs; obj++) { 
+				if (peData->objData[obj].migratable == CmiFalse) 
+					data[*peCount].load -= 
+						peData->objData[obj].wallTime * peData->pe_speed;
+			}
         
-     if (peData->available == CmiTrue) {
-      data[*peCount].load += 
+			data[*peCount].load += 
         (peData->total_walltime - peData->bg_walltime) * peData->pe_speed;
       data[*peCount].pe = data[*peCount].id = pe;
-      InsertObject(data, *peCount);
       (*peCount)++;
     }
   }
-  
+  BuildHeap(data, *peCount-1);
   return data;
 }
 
