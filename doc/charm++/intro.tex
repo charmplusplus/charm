@@ -1,7 +1,5 @@
 \chapter{Introduction}
 
-%update as you wish
-
 This manual describes \charmpp, an object oriented portable parallel
 programming language based on \CC. Its program structure, execution
 model, interface language constructs and runtime system calls are
@@ -17,14 +15,13 @@ philosophy please refer to the following papers :\\
     Proceedings of the Conference on Object Oriented Programming,
     Systems, Languages and Applications (OOPSLA), September 1993.
 }.
-% Change to citations in appendices. 
 
 \charmpp\ has continuously evolved since the OOPSLA 1993 paper.  The earlier
 versions modified the \CC\ syntax to support \charmpp\ primitives, and
 contained a full-fledged \charmpp\ translator that parsed the \charmpp\
 syntactic extensions as well as the \CC\ syntax to produce a \CC\ program,
 which was later compiled using a \CC\ compiler.  The current version does not
-augment the C++ syntax, and does not use a \charmpp\ translator as in previous
+augment the \CC{} syntax, and does not use a \charmpp\ translator as in previous
 versions. Instead, the older constructs are converted to calls into the runtime
 library, several new constructs are added, and minimal language constructs are
 used to describe the interfaces.
@@ -43,19 +40,11 @@ Currently the parallel platforms supported by \charmpp\ are the IBM SP, SGI
 Origin2000, Cray T3E, Intel Paragon, a single workstation or a network of
 workstations from Sun Microsystems (Solaris), IBM RS-6000 (AIX) SGI (IRIX 5.3
 or 6.4), HP (HP-UX), and Intel x86 (Linux, Windows NT).  \charmpp\ programs can
-run without changing the source on all these platforms.  Please see the {\sl
-Charm++/Converse Installation and Usage Manual} for details about installing,
-compiling and running \charmpp\ programs.
-
-For a description of the C-based {\sc Charm} parallel programming system,
-please refer to the {\sl Charm Programming Language Manual} and the {\sl
-Tutorial Introduction to Charm}\footnote{{\sc Charm} is no longer actively
-supported and maintained, and these manuals are kept only for offering the
-historical perspectives.}.
+run without changing the source on all these platforms.  Please see the
+\charmpp{}/\converse{} Installation and Usage Manual for details about
+installing, compiling and running \charmpp\ programs.
 
 \section{Overview}
-
-%update as you wish
 
 \charmpp\ is an object oriented parallel language. What sets \charmpp\ apart
 from traditional programming models such as message passing and shared variable
@@ -83,10 +72,10 @@ The programmer-visible entities in a \charmpp\ program are:
 \end{itemize}
 
 \charmpp\ starts a program by creating a single \index{chare} instance of each
-{\em mainchare} on processor 0, and invokes constructor methods of these chare.
-Typically, these chares then creates a number of other \index{chare} chares,
-possibly on other processors, which can simultaneously work to solve the
-problem at hand.
+{\em mainchare} on processor 0, and invokes constructor methods of these
+chares.  Typically, these chares then creates a number of other \index{chare}
+chares, possibly on other processors, which can simultaneously work to solve
+the problem at hand.
 
 Each \index{chare}chare contains a number of \index{entry method}{\em entry
 methods}, which are methods that can be invoked from remote processors. The
@@ -112,8 +101,6 @@ The following sections provide detailed information about various features of
 \charmpp\ programming system.
 
 \section{History}
-
-%update with history up to 5.0 version
 
 The {\sc Charm} software was developed as a group effort of the Parallel
 Programming Laboratory at the University of Illinois at Urbana-Champaign.
@@ -148,25 +135,6 @@ hence referred simply as {\bf \charmpp}.  In early 1999, the runtime system of
 \charmpp\ was formally named the Charm Kernel, and was rewritten in \CC.
 Several new features were added. The interface language underwent significant
 changes, and the macros that replaced the syntactic extensions in original
-\charmpp, were replaced by natural \CC\ constructs.
-
-
-\section{Notation Used}
-
-Small code samples used to illustrate syntax specifications throughout
-this document will use the following typeface conventions:
-
-\begin{itemize}
-\item Language keywords appear as boldface words: \kw{chare}.
-\item User-defined types and function names appear in a sans serif font:
-\uw{chareName}. 
-\item User-defined variables appear italicized: {\it myChare}.
-\item All other code appears in the same font as the regular text of
-this document.
-\end{itemize}
-
-Longer code samples of actual code will appear in the standard
-typewriter font. 
-
-
-
+\charmpp, were replaced by natural \CC\ constructs. Late 1999, and early
+2000 reflected several additions to \charmpp{}, when a load balancing
+framework and migratable objects were added to \charmpp{}.

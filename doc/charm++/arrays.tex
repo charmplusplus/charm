@@ -1,11 +1,11 @@
 \section{Chare Arrays}
 
-Chare arrays \index{arrays} are arbitrarily-sized collections of chares.
-The entire array is has a globally unique identifier of type 
-\kw{CkArrayID}, and each element has a unique index of type
-\kw{CkArrayIndex}.  A \kw{CkArrayIndex} can be a single integer (i.e., 1D
-array), several integers (i.e., a multidimentional array), or 
-an arbitrary string of bytes (e.g., a binary tree index).
+Chare arrays \index{arrays} are arbitrarily-sized collections of chares.  The
+entire array is has a globally unique identifier of type \kw{CkArrayID}, and
+each element has a unique index of type \kw{CkArrayIndex}.  A \kw{CkArrayIndex}
+can be a single integer (i.e. 1D array), several integers (i.e. a
+multidimentional array), or an arbitrary string of bytes (e.g. a binary tree
+index).
 
 In most respects, array elements are identical to chares.  Differences
 include variations in the creation and remote invocation syntax, to
@@ -20,42 +20,40 @@ contribute to array reductions.
 You can declare a one-dimentional \index{array}\index{chare array}chare array
 as:
 
-\begin{verbatim}
+\begin{alltt}
 //In the .ci file:
-array [1D] A {
+array [1D] A \{
   entry A();
   entry void someEntry(M1 *);
-};
+\};
 
 //In the .h file:
-class M1:public CMessage_M1 {
+class M1:public CMessage_M1 \{
 //...message fields...
-};
+\};
 
-class A : public ArrayElement1D {
+class A : public ArrayElement1D \{
   public:
     A(void);
     A(CkMigrateMessage *);
 
     void someEntry(M1 *);
-};
-\end{verbatim}
+\};
+\end{alltt}
 
-Note A's odd migration constructor, which is normally empty:
+Note \uw{A}'s odd migration constructor, which is normally empty:
 
-\begin{verbatim}
+\begin{alltt}
 //In the .C file:
 A::A(void)
-{
+\{
   //...your constructor code...
-}
-A::A(CkMigrateMessage *m) { }
-\end{verbatim}
+\}
+A::A(CkMigrateMessage *m) \{ \}
+\end{alltt}
 
 Read the section ``Migratable Array Elements'' for more
-information on the \kw{CkMigrateMessage}
-constructor. 
-
+information on the \kw{CkMigrateMessage} constructor. 
 
 \subsection{Inserting and Destroying Array Elements}
 
@@ -65,28 +63,28 @@ routine.  You insert elements into the array with the
 the array with \kw{CProxy\_Array::doneInserting}.
 
 To create a 1D \index{array}array containing elements indexed 
-(0, 1, ..., num\_elements-1), you can use the shorter:
+(0, 1, ..., \uw{num\_elements}-1), you can use the shorter:
 
-\begin{verbatim}
+\begin{alltt}
 CProxy_A a = CProxy_A::ckNew(num_elements);
-\end{verbatim}
+\end{alltt}
 
-If A has a constructor that takes a message, you can use
+If \uw{A} has a constructor that takes a message, you can use
 
-\begin{verbatim}
+\begin{alltt}
 CProxy_A a = CProxy_A::ckNew(msg,num_elements);
-\end{verbatim}
-
+\end{alltt}
 
 If you don't have a 1D array or don't want a contiguous range
 of elements, you insert array elements dynamically using the 
 \kw{insert} and \kw{doneInserting} methods:
-\begin{verbatim}
-CProxy_A a = CProxy_A::ckNew();//<- note no arguments
-a[17].insert();//<- could also pass a message to constructor
-a[43].insert();//<- could use a different message or constructor here
+
+\begin{alltt}
+CProxy_A a = CProxy_A::ckNew(); //<- note no arguments
+a[17].insert(); //<- could also pass a message to constructor
+a[43].insert(); //<- could use a different message or constructor here
 a.doneInserting(); //<- needed because we used insert.
-\end{verbatim}
+\end{alltt}
 
 Insertion allows you to create sparse or multidimentional arrays,
 send a different message to each element, and specify the PE to create 
@@ -104,22 +102,24 @@ call actually does anything.  You may even \kw{insert} or \kw{destroy}
 elements after a call to \kw{doneInserting}, with different semantics-- 
 see the reduction manager and load balancer sections for details.
 
+To summarize, if your constructor takes no message, you can use \kw{ckNew} 
+and \kw{insert} as:
 
-To summarize, if your constructor takes no message, you can use \kw{ckNew} and \kw{insert} as:
-\begin{verbatim}
+\begin{alltt}
 With 1D elements: ckNew(numInitial); //<- doesn't need doneInserting
 No elements:      ckNew(); //<- will need doneInserting
 Default PE:       insert();
 Specific PE:      insert(onPE);
-\end{verbatim}
+\end{alltt}
 
 And if your constructor takes a message:
-\begin{verbatim}
+
+\begin{alltt}
 With 1D elements: ckNew(msg, numInitial); //<- doesn't need doneInserting
 No elements:      ckNew(); //<- will need doneInserting
 Default PE:       insert(msg);
 Specific PE:      insert(msg,onPE);
-\end{verbatim}
+\end{alltt}
 
 The system chooses the default PE to create an array element on
 based on the element's index: 1D indices map to processors in
@@ -127,47 +127,49 @@ a round-robin fashion; other indices map based on a hash function
 applied to the index.
 
 To destroy an array element-- detach it from the array
-call its destructor, and release its memory--invoke its ``destroy'' 
-entry point, as:
-\begin{verbatim}
+call its destructor, and release its memory--invoke its \kw{destroy} 
+entry method, as:
+
+\begin{alltt}
 a3(x,y,z).destroy();
-\end{verbatim}
+\end{alltt}
 
 After destroying an element, you may insert a new element at
 its index.
 
-
 \subsection{Messages and Broadcasts}
 
-\charmpp contains direct support for 1D, 2D, 3D, and user-defined
+\charmpp{} contains direct support for 1D, 2D, 3D, and user-defined
 index arrays.  These arrays can be declared as:
 
-\begin{verbatim}
+\begin{alltt}
 //In the .ci file:
 message MyMsg;
-array [1D] A1 {entry A1();entry void e(MyMsg *m);}
-array [2D] A2 {entry A2();entry void e(MyMsg *m);}
-array [3D] A3 {entry A3();entry void e(MyMsg *m);}
-array [Foo] AF {entry AF();entry void e(MyMsg *m);}
-\end{verbatim}
+array [1D] A1 \{ entry A1(); entry void e(MyMsg *m);\}
+array [2D] A2 \{ entry A2(); entry void e(MyMsg *m);\}
+array [3D] A3 \{ entry A3(); entry void e(MyMsg *m);\}
+array [Foo] AF \{ entry AF(); entry void e(MyMsg *m);\}
+\end{alltt}
 
-The last declaration expects an array index of type CkArrayIndexFoo,
-which must be defined before including the .decl.h file 
-(see ``Defining a new array index type'' below).  Also, charm++.h must be included before the definition of the CkArrayIndexFoo type. 
+The last declaration expects an array index of type \uw{CkArrayIndexFoo},
+which must be defined before including the \texttt{.decl.h} file 
+(see ``Defining a new array index type'' below).  
+Also, \texttt{charm++.h} must be included before the definition of the 
+\uw{CkArrayIndexFoo} type. 
 
-\begin{verbatim}
+\begin{alltt}
 //In the .h file:
-class MyMsg: public CMessage_MyMsg {
+class MyMsg: public CMessage_MyMsg \{
 public: 
   int val;
-  MyMsg(int i) {val=i;}
-}
-class A1:public ArrayElement1D {public: A1(){} ...};
-class A2:public ArrayElement2D {public: A2(){} ...};
-class A3:public ArrayElement3D {public: A3(){} ...};
-class AF:public ArrayElement {public: AF(){} ...};
+  MyMsg(int i) \{val=i;\}
+\}
+class A1:public ArrayElement1D \{ public: A1()\{\} ...\};
+class A2:public ArrayElement2D \{ public: A2()\{\} ...\};
+class A3:public ArrayElement3D \{ public: A3()\{\} ...\};
+class AF:public ArrayElement \{ public: AF()\{\} ...\};
 //(the migration constructors have been omitted for clarity)
-\end{verbatim}
+\end{alltt}
 
 You can insert elements or invoke methods on the elements of these
 arrays by specifying the array index in parentheses.  For 1D 
@@ -181,7 +183,7 @@ Messages sent to migrating elements will be delivered after
 the migrating element arrives.  It is an error to send 
 a message to a deleted array element.
 
-\begin{verbatim}
+\begin{alltt}
 //In the .C file:
 int x,y,z;
 CProxy_A1 a1=CProxy_A1::ckNew();
@@ -206,7 +208,8 @@ aF[new CkArrayIndexFoo(...)].insert();
 aF.doneInserting();
 aF[new CkArrayIndexFoo(...)].e(new MyMsg(7);
 
-\end{verbatim}
+\end{alltt}
+
 With user-defined index types, you must pass a fresh index 
 (allocated with new) to a [] or () call in order to create an element proxy.
 System will delete the index in the destructor for the element proxy.
@@ -214,9 +217,9 @@ System will delete the index in the destructor for the element proxy.
 To broadcast a message to all the current elements of an array, 
 simply omit the index, as:
 
-\begin{verbatim}
+\begin{alltt}
 a3.e(new MyMsg(7)); //<- invokes e(7) on each array element
-\end{verbatim}
+\end{alltt}
 
 \subsection{Migratable Array Elements}
 Array objects can \index{migrate}migrate from one PE to another.
@@ -225,9 +228,9 @@ might migrate array elements to better balance the load between
 processors.  For an array element to migrate, it must implement
 a pack/unpack or ``pup'' method:
 
-\begin{verbatim}
+\begin{alltt}
 //In the .h file:
-class A2:public ArrayElement2D {
+class A2:public ArrayElement2D \{
 private: //My data members:
     int nt;
     unsigned char chr;
@@ -237,21 +240,21 @@ private: //My data members:
 public:	
     //...other declarations
 
-    virtual void pup(PUP::er &p);
-};
+    virtual void pup(PUP::er \&p);
+\};
 
 //In the .C file:
-void A2::pup(PUP::er &p)
-{
-    ArrayElement2D::pup(p);//<- call superclass's pup routine
+void A2::pup(PUP::er \&p)
+\{
+    ArrayElement2D::pup(p); //<- call superclass's pup routine
     p(nt);
     p(chr);
     p(flt,7);
     p(numDbl);
     if (p.isUnpacking()) dbl=new double[numDbl];
     p(dbl,numDbl);
-}
-\end{verbatim}
+\}
+\end{alltt}
 
 You can apply a \kw{PUP::er} to any primitive variable
 (as with ``p(nt)'') or array of primitive variables-- there,
@@ -265,12 +268,12 @@ passing different types of \kw{PUP::er}s to it.  You can determine
 what type of \kw{PUP::er} has been passed to you with the
 \kw{isPacking()}, \kw{isUnpacking()}, and \kw{isSizing()} calls.
 
-An array element can migrate by calling the \uw{migrateMe(destination
-processor)} member function-- this call must be the last action
+An array element can migrate by calling the \kw{migrateMe}(\uw{destination
+processor}) member function-- this call must be the last action
 in an element entry point.  The system can also migrate array elements
 for load balancing (see the ``Load Balancing Chare Arrays'' chapter).
 
-To migrate your array element to another processor, the \charmpp 
+To migrate your array element to another processor, the \charmpp{}
 runtime will:
 
 \begin{itemize}
@@ -301,39 +304,39 @@ conversion if needed.
 To easily pack user-defined types, we recommend adding
 a \uw{pup} method to the user-defined type:
 
-\begin{verbatim}
+\begin{alltt}
 class myData 
-{
+\{
 private:
     int a,b;
     char c;
 public:
     ...
-    void pup(PUP::er &p) {
+    void pup(PUP::er \&p) \{
         p(a);
         p(b);
         p(c);
-    }
-};
+    \}
+\};
 
 //... array element can now easily pack myData as:
 class myElement:public ArrayElement1D 
-{
+\{
 private:
     myData d;
 public:
     ...
-    void pup(PUP::er &p)
-    {
-        ArrayElement1D::pup(p);//Call superclass
+    void pup(PUP::er \&p)
+    \{
+        ArrayElement1D::pup(p); //Call superclass
         d.pup(p); //<- pack/unpacks myData
-    }
-};
-\end{verbatim}
+    \}
+\};
+\end{alltt}
 
 
 \subsection{Load Balancing Chare Arrays}
-\charmpp includes a run-time load balancer which works
+\charmpp{} includes a run-time load balancer which works
 on array elements.  The idea is to run programs more efficiently
 by migrating array elements away from overloaded processors.
 To use the load balancer, you must make your elements migratable
@@ -352,7 +355,7 @@ an entry method.
 
 For the AtSync method, set \kw{usesAtSync} to true in your 
 array element constructor.  When an element is ready to migrate,
-call \kw{ArrayElement::AtSync}.  Once all elements have reached AtSync, 
+call \kw{ArrayElement::AtSync}.  Once all elements have reached \kw{AtSync}, 
 the load balancer runs and may migrate elements.  Once
 all migrations are complete, the load balancer calls 
 \kw{ArrayElement::ResumeFromSync}.  You must ensure no messages are
@@ -360,18 +363,18 @@ sent to an array element between its calls to \kw{AtSync} and
 \kw{ResumeFromSync}. \kw{AtSync}/\kw{ResumeFromSync} is currently
 a implemented as a global barrier.
 
-
-
 \subsection{Reductions on Chare Arrays}
 A \index{reduction}reduction applies a single operation (e.g. add,
 max, min, ...) to data items scattered across many processors and
-collects the result in one place.  \charmpp supports reductions on the
+collects the result in one place.  \charmpp{} supports reductions on the
 elements of a Chare array.
 
-The data to be reduced comes from each array element, which must call the contribute method:
-\begin{verbatim}
+The data to be reduced comes from each array element, 
+which must call the \kw{contribute} method:
+
+\begin{alltt}
 ArrayElement::contribute(int nBytes,void *data,ReducerType type);
-\end{verbatim}
+\end{alltt}
 
 This call contributes \kw{nBytes} bytes starting at \kw{data} to the
 reduction \kw{type} (see reduction types, below).  Unlike sending a
@@ -383,22 +386,26 @@ reduction will complete properly even if array elements are migrated
 or deleted.
 
 If we want to sum each array element's single integer myInt, we would use:
-\begin{verbatim}
+
+\begin{alltt}
     //Inside any array element method
     int myInt=get_myInt();
-    contribute(sizeof(int),(void *)&myInt,CkReduction::sum_int);
-\end{verbatim}
+    contribute(sizeof(int),(void *)\&myInt,CkReduction::sum_int);
+\end{alltt}
 
 The built-in reduction types (see below) can also handle arrays of
 numbers.  For example, if each element of an array has a pair of
 doubles \uw{forces}[2] which need to be summed up (separately) across
 all array elements, from each array element call:
-\begin{verbatim}
+
+\begin{alltt}
     //Inside any array element method
     double forces[2]=get_my_forces();
     contribute(2*sizeof(double),(void *)forces,CkReduction::sum_double);
-\end{verbatim}
-Note that since C++ arrays (like \uw{forces}[2]) are already pointers, we don't use (void *)\&forces.
+\end{alltt}
+
+Note that since C++ arrays (like \uw{forces}[2]) are already pointers, we 
+don't use (void *)\&\uw{forces}.
 
 
 After the data is reduced, it is passed to a ``client'' function on
@@ -406,20 +413,20 @@ node zero.  This is an ordinary C or C++ function that you pass to
 \kw{CProxy\_Array::setReductionClient}.  Reduction clients are
 typically registered from your main Chare's constructor, as in:
 
-\begin{verbatim}
+\begin{alltt}
 //Outside any class definition:
 void myClient(void *param,int dataSize,void *data)
-{
+\{
   double *forceSum=(double *)data;
   cout<<``First force sum is ``<<forceSum[0]<<endl;
   cout<<``Second force sum is ``<<forceSum[1]<<endl;
-}
+\}
 
 ...
     //Inside main::main
     CProxy_A a=CProxy_A::ckNew();
     a.setReductionClient(myClient,(void *)NULL);
-\end{verbatim}
+\end{alltt}
 
 This simple client prints out the double values received, and does not
 use the \uw{param} value passed in (\kw{NULL}, in this case).  The
@@ -428,7 +435,10 @@ fashion; but the data will be deleted after the handler returns.
 
 
 \subsection{Built-in Array Reduction Types}
-\charmpp includes several built-in reduction types, used to combine the contributions from different array elements.  Any of them may be passed as an \kw{ArrayReductionFn} type to \kw{ArrayElement::contribute}.
+
+\charmpp{} includes several built-in reduction types, used to combine the
+contributions from different array elements.  Any of them may be passed as an
+\kw{ArrayReductionFn} type to \kw{ArrayElement::contribute}.
 
 The first four reductions (sum, product, max, and min) work on int,
 float, or double data as indicated by the suffix.  The logical
@@ -438,127 +448,147 @@ pass the correct number of bytes to
 \kw{ArrayElement}::\kw{contribute}.
 
 \begin{enumerate}
-\item \kw{CkReduction::sum\_int}, \kw{\_float}, \kw{\_double}-- the result will be the sum of the given numbers.
 
-\item \kw{CkReduction::product\_int}, \kw{\_float}, \kw{\_double}-- the result will be the product of the given numbers.
+\item \kw{CkReduction::sum\_int}, \kw{sum\_float}, \kw{sum\_double}-- the
+result will be the sum of the given numbers.
 
-\item \kw{CkReduction::max\_int}, \kw{\_float}, \kw{\_double}-- the result will be the largest of the given numbers.
+\item \kw{CkReduction::product\_int}, \kw{product\_float},
+\kw{product\_double}-- the result will be the product of the given numbers.
 
-\item \kw{CkReduction::min\_int}, \kw{\_float}, \kw{\_double}-- the result will be the smallest of the given numbers.
+\item \kw{CkReduction::max\_int}, \kw{max\_float}, \kw{max\_double}-- the
+result will be the largest of the given numbers.
 
-\item \kw{CkReduction::and}-- the result will be the logical AND of the given integers.  0 is false, nonzero is true.
+\item \kw{CkReduction::min\_int}, \kw{min\_float}, \kw{min\_double}-- the
+result will be the smallest of the given numbers.
 
-\item \kw{CkReduction::or}-- the result will be the logical OR of the given integers.
+\item \kw{CkReduction::and}-- the result will be the logical AND of the given
+integers.  0 is false, nonzero is true.
 
-\item \kw{CkReduction::set}-- the result will be a verbatim concatenation of all the contributed data, separated into \kw{CkReduction::setElement} records.  The data contributed can be of any length, and can vary across array elements or reductions.  To extract the data from each element, see the description below.
+\item \kw{CkReduction::or}-- the result will be the logical OR of the given
+integers.
+
+\item \kw{CkReduction::set}-- the result will be a verbatim concatenation of
+all the contributed data, separated into \kw{CkReduction::setElement} records.
+The data contributed can be of any length, and can vary across array elements
+or reductions.  To extract the data from each element, see the description
+below.
 
 \end{enumerate}
 
 
-\kw{CkReduction::set} returns a collection of \kw{CkReduction::setElement} objects, one per contribution.  This class has definition:
-\begin{verbatim}
-class CkReduction::setElement {
+\kw{CkReduction::set} returns a collection of \kw{CkReduction::setElement}
+objects, one per contribution.  This class has definition:
+
+\begin{alltt}
+class CkReduction::setElement 
+\{
 public:
   int dataSize;//The length of the data array below
   char data[];//The (dataSize-long) array of data
   CkReduction::setElement *next(void);
-};
-\end{verbatim}
+\};
+\end{alltt}
 
-To extract the contribution of each array element from a reduction set, use the \uw{next} routine repeatedly:
-\begin{verbatim}
+To extract the contribution of each array element from a reduction set, use the
+\uw{next} routine repeatedly:
+
+\begin{alltt}
   //Inside a reduction handler-- 
   //  data is our reduced data from CkReduction_set
   CkReduction::setElement *cur=(CkReduction::setElement *)data;
   while (cur!=NULL)
-  {
+  \{
     ... //Use cur->dataSize and cur->data
     //Now advance to the next element's contribution
     cur=cur->next();
-  }
-\end{verbatim}
+  \}
+\end{alltt}
 
-The reduction set order is undefined.  Add a source field to your contribution if you need to know which array element gave a particular contribution.
+The reduction set order is undefined.  Add a source field to your contribution
+if you need to know which array element gave a particular contribution.
 
 \subsection{Defining a new array index type}
-\charmpp array indices are arbitrary collections of bytes.
+
+\charmpp{} array indices are arbitrary collections of bytes.
 To define a new array index, you create an ordinary C++ class 
 which inherits from \kw{CkArrayIndex} and overrides the \kw{getKey} method.  
 For example, if you have a structure or class named ``foo'', you 
 can use a \uw{foo} object as an array index by defining the class:
 
-\begin{verbatim}
-class CkArrayIndexFoo:public CkArrayIndex {
+\begin{alltt}
+class CkArrayIndexFoo:public CkArrayIndex \{
 public:
     foo f;
 
-    CkArrayIndexFoo(const foo &in) {f=in;}
+    CkArrayIndexFoo(const foo \&in) \{f=in;\}
 
     //This method returns the length of and a pointer to the index data.
     //The returned pointer must be aligned to at least an integer boundary.
-    virtual const unsigned char *getKey(/*out*/ int &nBytes) const {
+    virtual const unsigned char *getKey(/*out*/ int \&nBytes) const \{
       	nBytes=sizeof(foo);
-        return (const unsigned char *)&f;
-    }
-};
-\end{verbatim}
+        return (const unsigned char *)\&f;
+    \}
+\};
+\end{alltt}
 
 You can then declare an array indexed by \uw{foo} objects with
 
-\begin{verbatim}
+\begin{alltt}
 //in the .ci file:
-array [Foo] AF {entry AF(); ... }
+array [Foo] AF \{ entry AF(); ... \}
 
 //in the .h file:
-class AF:public ArrayElement {public: AF() {} ... }
+class AF:public ArrayElement \{ public: AF() \{\} ... \}
 
 //in the .C file:
     foo f;
     CProxy_AF a=CProxy_AF::ckNew();
     a[new CkArrayIndexFoo(f)].insert();
     ...
-\end{verbatim}
+\end{alltt}
 
 Inside an \kw{ArrayElement}, you can get the bytes of your index
 from the ``thisindex'' variable, which has type \kw{CkArrayIndexGeneric*}.  
 It may be more convenient, however, to inherit from \kw{ArrayElementT} a 
-class templated in the index type foo (stored as ``thisIndex'').
+class templated in the index type \uw{foo} (stored as ``thisIndex'').
 For example:
 
-\begin{verbatim}
+\begin{alltt}
 //.ci file unchanged
 //in the .h file:
-class AF:public ArrayElementT<foo> {public: AF() {} ... }
+class AF:public ArrayElementT<foo> \{public: AF() \{\} ... \}
 
 //in the .C file:
 AF::AF()
-{
+\{
     foo myF=thisIndex;
     functionTakingFoo(myF);
-}
-\end{verbatim}
+\}
+\end{alltt}
 
 
 \subsection{Array Syntax Changes}
+
 The syntax for arrays changed in April, 2000 in the following ways:
 
 \begin{itemize}
 
-\item CkAID is obsolete, and replaced with CkArrayID.  In general,
-you should now use CProxy's instead of CkArrayID's because the syntax
+\item \kw{CkAID} is obsolete, and replaced with \kw{CkArrayID}.  In general,
+you should now use CProxy's instead of \kw{CkArrayID}'s because the syntax
 is more palatable and the compiler can do static type checking.
 
 \item The translator syntax for arrays now includes the index type,
-e.g. ``array [1D] foo { ... }''.
+e.g. ``array [1D] foo \{ ... \}''.
 
 \item Messages sent to array elements need no longer inherit from 
 \kw{ArrayMessage}.
 
-\item Array elements for 1D arrays must inherit from ArrayElement1D
-to use a 1D thisIndex.  You may still inherit from ArrayElement, but you
-won't have a thisIndex.
+\item Array elements for 1D arrays must inherit from \kw{ArrayElement1D} to use
+a 1D \kw{thisIndex}.  You may still inherit from \kw{ArrayElement}, but you
+won't have a \kw{thisIndex}.
 
-\item You may have multiple array constructors; each can now take a user-defined message, or no message.  
+\item You may have multiple array constructors; each can now take a
+user-defined message, or no message.  
 
 \item The \kw{ArrayElementCreateMessage} constructor is obsolete;
 as are the \kw{finishConstruction} and \kw{finishMigration} calls. No
@@ -571,12 +601,15 @@ constructor need explicitly call its superclass.
 the migration constructor have been replaced by a unified pack/unpack 
 ``pup'' routine.
 
-\item For load balancing, the \kw{uses\_at\_sync} variable is now called \kw{usesAtSync}.
+\item For load balancing, the \kw{uses\_at\_sync} variable is now called
+\kw{usesAtSync}.
 
-\item \kw{CkReduction\_sum\_int} is now an enumeration, not a function pointer, and now called \kw{CkReduction::sum\_int}.
+\item \kw{CkReduction\_sum\_int} is now an enumeration, not a function pointer,
+and now called \kw{CkReduction::sum\_int}.
 
-\item \function{CkRegisterArrayReductionHandler(proxy,fn,param)}
-is now proxy.setReductionClient(fn,param).
+\item \function{CkRegisterArrayReductionHandler(proxy,fn,param)} is now
+proxy.setReductionClient(fn,param). 
+
 \end{itemize}
 
 

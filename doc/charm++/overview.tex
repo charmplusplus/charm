@@ -1,4 +1,4 @@
-\chapter{Charm++ Overview}
+\chapter{\charmpp{} Overview}
 
 We think that \charmpp\ is easy to use if you are familiar with object-based
 programming. (But of course that is our opinion, if your opinion differs, you
@@ -12,10 +12,12 @@ the object, and only the methods of that class can manipulate that data. A
 method that has the same name as the class is a ``blessed'' method, called a
 ``Constructor'' for that class.  Constructor method is typically responsible
 for initializing the encapsulated data of an object. Each method, including the
-constructor can optionally be
-supplied data in the form of parameters (or arguments). In \CC, one can create objects with the {\tt new} operator that returns a pointer to the object. This pointer can be used to refer to the object, and call methods on that object.
+constructor can optionally be supplied data in the form of parameters (or
+arguments). In \CC, one can create objects with the {\tt new} operator that
+returns a pointer to the object. This pointer can be used to refer to the
+object, and call methods on that object.
 
-\charmpp is built on top of \CC, and also based on ``encapsulation''. Similar
+\charmpp{} is built on top of \CC, and also based on ``encapsulation''. Similar
 to \CC, \charmpp\ entities can contain private data, and public methods. The
 major difference is that these methods can be invoked from remote processors
 asynchronously.  Asynchronous method invocation implies that the caller does
@@ -92,12 +94,12 @@ array is a collection of arbitrary number of migratable chares, mapped to
 processors according to a user-defined map group.
 
 Every \charmpp\ program must have at least one \kw{mainchare}.  There can be
-only one instance of this, which is created on processor 0 when
-the \charmpp\ program starts up.  Execution of a \charmpp\ program begins with
-Charm Kernel constructing all the designated \kw{mainchare}s.  Typically, the
-\kw{mainchare} constructor starts the computation by creating other chares and
-chare \index{group} groups.  It can also be used to initialize shared
-\kw{readonly} objects.
+only one instance of this, which is created on processor 0 when the \charmpp\
+program starts up.  Execution of a \charmpp\ program begins with Charm Kernel
+constructing all the designated \kw{mainchare}s.  Typically, the \kw{mainchare}
+constructor starts the computation by creating other chares and chare
+\index{group} groups.  It can also be used to initialize shared \kw{readonly}
+objects.
 
 The only method of communication between processors in \charmpp\ is
 asynchronous \index{entry method} entry method invocation on remote chares. For
@@ -121,15 +123,14 @@ allow entry methods to be executed in separate user-level threads.  These
 making {\em synchronous} calls to remote object methods that return results in
 messages.
 
-\charmpp\ program execution is terminated by the 
-\kw{CkExit} call. This call is not the same as in Unix:
-it merely informs the Charm Kernel that all computations on all processors must
-be terminated, and then returns to the user program: the programmer should make
-sure that no work is done by the method after \kw{CkExit} is called.
-Charm Kernel ensures that no messages are processed and no entry methods are
-called after the currently executing entry method completes. \kw{CkExit}
-need not be called on all processors; it is enough to call it from just one
-processor at the end of the computation.
+\charmpp\ program execution is terminated by the \kw{CkExit} call. This call is
+not the same as in Unix: it merely informs the Charm Kernel that all
+computations on all processors must be terminated, and then returns to the user
+program: the programmer should make sure that no work is done by the method
+after \kw{CkExit} is called.  Charm Kernel ensures that no messages are
+processed and no entry methods are called after the currently executing entry
+method completes. \kw{CkExit} need not be called on all processors; it is
+enough to call it from just one processor at the end of the computation.
 
 \section{Entities in \charmpp\ programs}
 
@@ -138,17 +139,17 @@ This section describes various entities in a typical \charmpp\ program.
 \subsection{Sequential Objects}
 
 A \charmpp\ program typically contains a number of sequential objects. These
-objects are similar to the objects in C++, except that they {\em should not
+objects are similar to the objects in \CC, except that they {\em should not
 have any static data members}\footnote{ This restriction makes \charmpp\
 programs portable across distributed and shared memory architectures, as well
 as clusters of shared memory multiprocessors. If one feels that these
 restrictions are too severe, one is encouraged to look at the portability
 macros of Converse, that make it possible to write portable programs in
-presence of global or static variables.  }. These objects are created
-synchronously on the local processor (using a {\tt new} operator in C++), and
+presence of global or static variables.}. These objects are created
+synchronously on the local processor (using a {\tt new} operator in \CC), and
 their methods could be synchronously invoked only from the local processor.
-These objects are not known to the \charmpp\ runtime system, and
-thus they need not be mentioned in the module interface files.
+These objects are not known to the \charmpp\ runtime system, and thus they need
+not be mentioned in the module interface files.
 
 \subsection{Messages}
 
@@ -160,9 +161,9 @@ special class that is generated by the \charmpp\ interface translator.  Another
 variation of communication objects is conditionally packed and unpacked. This
 variation should be used when one wants to send messages that contain pointers
 to the data rather than the actual data to other processors. This type of
-communication objects contains two methods: \kw{pack}, and \kw{unpack}.
-These messages are specified differently in the interface file for the module.
-The third variation of communication objects is called {\em varsize} messages.
+communication objects contains two methods: \kw{pack}, and \kw{unpack}.  These
+messages are specified differently in the interface file for the module.  The
+third variation of communication objects is called {\em varsize} messages.
 Varsize messages is an effective optimization on conditionally packed messages,
 and have to be made known to the \charmpp\ runtime using a special keyword in
 the interface file.
@@ -172,9 +173,9 @@ the interface file.
 Chares are the most important entities in a \charmpp\ program. These concurrent
 objects are different from sequential \CC\ objects in many ways. Syntactically,
 Chares are instances of \CC\  classes that are derived from a system-provided
-class called \kw{Chare}. Also, in addition to the usual \CC\ private and
-public data and method members, they contain some public methods called {\em
-entry methods}. These entry methods do not return anything (they are {\tt void}
+class called \kw{Chare}. Also, in addition to the usual \CC\ private and public
+data and method members, they contain some public methods called {\em entry
+methods}. These entry methods do not return anything (they are {\tt void}
 methods), and take at most one argument, which is a pointer to a message.
 Chares are {\em accessed} using a proxy (an object of a specialized class
 generated by the \charmpp\ interface translator) or using a handle (a \kw{
@@ -190,16 +191,16 @@ interface file.
 \subsection{Chare Groups}
 
 Chare Groups\footnote{ These were called Branch Office Chares (BOC) in earlier
-version of Charm.  } are a special type of concurrent objects.  Each chare
-group is a collection of chares, with one representative (group member) on each
+version of Charm.} are a special type of concurrent objects.  Each chare group
+is a collection of chares, with one representative (group member) on each
 processor. All the members of a chare group share a globally unique name
-(handle, defined by Charm kernel to be of type \kw{CkGroupID}). An entire
-chare group could be addressed using this global handle, and an individual
-member of a chare group can be addressed using the global handle, and a
-processor number. Chare groups are instances of \CC\ classes subclassed from a
-system-provided class called \kw{Group}. The Charm kernel has to be notified
-that these chares are semantically different, and therefore chare groups have a
-different declaration in the interface specification file.
+(handle, defined by Charm kernel to be of type \kw{CkGroupID}). An entire chare
+group could be addressed using this global handle, and an individual member of
+a chare group can be addressed using the global handle, and a processor number.
+Chare groups are instances of \CC\ classes subclassed from a system-provided
+class called \kw{Group}. The Charm kernel has to be notified that these chares
+are semantically different, and therefore chare groups have a different
+declaration in the interface specification file.
 
 \subsection{Chare Nodegroups}
 

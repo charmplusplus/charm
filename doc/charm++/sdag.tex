@@ -1,62 +1,42 @@
 \chapter{Structured Dagger}
 
-\newcommand{\sdag}{Structured Dagger}
-\newcommand{\charm}{Charm}
-%\newcommand{\charmpp}{Charm++}
-\newcommand{\wb}{when-block}
-\newcommand{\dagg}{Dagger}
-\newcommand{\md}{message-driven}
-\newcommand{\Md}{Message-driven}
-\newcommand{\MD}{Message-Driven}
-
-\charmpp\ is based on the \MD\ parallel programming paradigm.
-The \md\ programming style avoids the use of blocking receives and
-allows overlap of computation and communication by scheduling
-computations depending on availability of data.  This programing style
-enables \charmpp\ programs to
-tolerate communication latencies adaptively. Threads suffer from loss of
-performance due to context-switching overheads and limited scalability
-due to large and unpredictable stack memory requirements, when used 
-in a data-driven manner to
-coordinate a sequence of remotely triggered actions.
+\charmpp\ is based on the Message-Driven parallel programming paradigm.  The
+message-drivern programming style avoids the use of blocking receives and
+allows overlap of computation and communication by scheduling computations
+depending on availability of data.  This programing style enables \charmpp\
+programs to tolerate communication latencies adaptively. Threads suffer from
+loss of performance due to context-switching overheads and limited scalability
+due to large and unpredictable stack memory requirements, when used in a
+data-driven manner to coordinate a sequence of remotely triggered actions.
 
 The need to sequence remotely triggered actions
 arises in many situations. Let us consider an example:
 
-\begin{figure}
+\begin{figure}[ht]
 \begin{center}
-\frame{
-\begin{minipage}[t]{3in}
-{\small
-{\tt
-\begin{tabbing}
-xx\=xx\=xx\=xx\=xx\=xx\=xx\kill
-\>      class compute\_object : public {\bf Chare} \{ \\
-\>      private:\\
-\>\>      int         count;\\
-\>\>      Patch       *first, *second;\\
-\>      public:\\
-\>\>      compute\_object(MSG *msg) \{\\
-\>\>  \>    count = 2; MyChareID(\&chareid); \\
-\>\>  \>    PatchManager->Get(msg->first\_index, recv\_first, \&thishandle,NOWAIT);\\
-\>\>  \>    PatchManager->Get(msg->second\_index, recv\_second, \&thishandle,NOWAIT);\\
-\>\>      \}\\
-\>\>      void recv\_first(PATCH\_MSG *msg) \{ \\
-\>\>  \>     first = msg->patch; \\
-\>\>  \>     filter(first); \\
-\>\>  \>     if (--count == 0 ) computeInteractions(first,second);\\
-\>\>      \} \\
-\>\>      void recv\_second(PATCH\_MSG *msg)\{\\
-\>\>  \>     second = msg->patch; \\
-\>\>  \>     filter(second); \\
-\>\>  \>     if (--count == 0) computeInteractions(first,second);\\
-\>\>      \} \\
-\>     \}
-\end{tabbing}
-}
-}
-\end{minipage}
-}
+\begin{alltt}
+      class compute_object : public Chare \{
+      private:
+      int         count;
+      Patch       *first, *second;
+      public:
+      compute_object(MSG *msg) \{
+      count = 2; MyChareID(\&chareid);
+      PatchManager->Get(msg->first_index, recv_first, \&thishandle,NOWAIT);
+      PatchManager->Get(msg->second_index, recv_second, \&thishandle,NOWAIT);
+      \}
+      void recv_first(PATCH_MSG *msg) \{
+       first = msg->patch;
+       filter(first);
+       if (--count == 0 ) computeInteractions(first,second);
+      \} 
+      void recv_second(PATCH_MSG *msg)\{
+       second = msg->patch;
+       filter(second);
+       if (--count == 0) computeInteractions(first,second);
+      \}
+     \}
+\end{alltt}
 \end{center}
 \caption{Compute Object in a Molecular Dynamics Application}
 \label{figchareexample}
@@ -101,128 +81,105 @@ message buffers, which complicates program development significantly.
 Threads are typically used to perform the abovementioned sequencing.
 Lets us code our previous example using threads.
 
-\begin{figure}
+\begin{figure}[ht]
 \begin{center}
-\frame{
-\begin{minipage}[t]{3in}
-{\small
-{\tt
-\begin{tabbing}
-xx\=xx\=xx\=xx\=xx\=xx\=xx\kill
-\>void compute\_thread(int first\_index, int second\_index)\\
-\>\{\\
-\>\>getPatch(first\_index);\\
-\>\>getPatch(second\_index);\\
-\>\>threadId[0] = createThread(recvFirst);\\
-\>\>threadId[1] = createThread(recvSecond);\\
-\>\>threadJoin(2, threadId);\\
-\>\>computeInteractions(first, second);\\
-\>\}\\
-\>void recvFirst(void)\\
-\>\{\\
-\>\>recv(first, sizeof(Patch), ANY\_PE, FIRST\_TAG);\\
-\>\>filter(first);\\
-\>\}\\
-\>void recvSecond(void)\\
-\>\{\\
-\>\>recv(second, sizeof(Patch), ANY\_PE, SECOND\_TAG);\\
-\>\>filter(second);\\
-\>\}\\
-\end{tabbing}
-}
-}
-\end{minipage}
-}
+\begin{alltt}
+void compute_thread(int first_index, int second_index)
+\{
+    getPatch(first_index);
+    getPatch(second_index);
+    threadId[0] = createThread(recvFirst);
+    threadId[1] = createThread(recvSecond);
+    threadJoin(2, threadId);
+    computeInteractions(first, second);
+  \}
+  void recvFirst(void)
+  \{
+    recv(first, sizeof(Patch), ANY_PE, FIRST_TAG);
+    filter(first);
+  \}
+  void recvSecond(void)
+  \{
+    recv(second, sizeof(Patch), ANY_PE, SECOND_TAG);
+    filter(second);
+  \}
+\end{alltt}
 \end{center}
 \caption{Compute Thread in a Molecular Dynamics Application}
 \label{figthreadexample}
 \end{figure}
 
+Contrast the compute chare-object example in figure~\ref{figchareexample} with
+a thread-based implementation of the same scheme in
+figure~\ref{figthreadexample}. Functions \uw{getFirst}, and \uw{getSecond} send
+messages asynchronously to the PatchManager, requesting that the specified
+patches be sent to them, and return immediately. Since these messages with
+patches could arrive in any order, two threads, \uw{recvFirst} and
+\uw{recvSecond}, are created. These threads block, waiting for messages to
+arrive. After each message arrives, each thread performs the filtering
+operation. The main thread waits for these two threads to complete, and then
+computes the pairwise interactions. Though the programming complexity of
+buffering the messages and maintaining the counters has been eliminated in this
+implementation, considerable overhead in the form of thread creation, and
+synchronization in the form of {\em join} has been added. Let us now code the
+same example in \sdag. It reduces the parallel programming complexity without
+adding any significant overhead.
 
-Contrast the compute chare-object example in
-figure~\ref{figchareexample} with a thread-based implementation of the
-same scheme in figure~\ref{figthreadexample}. Functions \uw{getFirst}, 
-and \uw{getSecond} send messages asynchronously to the
-PatchManager, requesting that the specified patches be sent to them,
-and return immediately. Since these messages with patches could arrive
-in any order, two threads, \uw{recvFirst} and \uw{recvSecond}, are
-created. These threads block, waiting for messages to arrive. After
-each message arrives, each thread performs the filtering
-operation. The main thread waits for these two threads to complete,
-and then computes the pairwise interactions. Though the programming
-complexity of buffering the messages and maintaining the counters has
-been eliminated in this implementation, considerable overhead in the
-form of thread creation, and synchronization in the form of {\em join}
-has been added. Let us now code the same example in \sdag. It reduces the
-parallel programming complexity without adding any significant
-overhead.
-
-\begin{figure}
+\begin{figure}[ht]
 \begin{center}
-\frame{
-\begin{minipage}[t]{3in}
-{\small
-{\tt
-\begin{tabbing}
-xx\=xx\=xx\=xx\=xx\=xx\kill
-\>{\bf class} compute\_object \\
-\>\>{\bf sdagentry} compute\_object(MSG *msg)\{ \\
-\>\>\>{\bf atomic} \{\\
-\>\>\>\> PatchManager->Get(msg->first\_index,\dots); \\
-\>\>\>\> PatchManager->Get(msg->second\_index,\dots); \\
-\>\>\>\} \\
-\>\>\>{\bf overlap} \{\\
-\>\>\>\>{\bf when} recv\_first(Patch *first) {\bf atomic} \{ filter(first); \}\\
-\>\>\>\>{\bf when} recv\_second(Patch *second) {\bf atomic} \{ filter(second); \}\\
-\>\>\>\}\\
-\>\>\>{\bf atomic} \{ computeInteractions(first, second); \}\\
-\>\>\}\\
-\>\}
-\end{tabbing}
-}
-}
-\end{minipage}
-}
+\begin{alltt}
+  class compute_object
+    sdagentry compute_object(MSG *msg)\{
+      atomic \{
+         PatchManager->Get(msg->first_index,\dots);
+         PatchManager->Get(msg->second_index,\dots);
+      \}
+      overlap \{
+        when recv_first(Patch *first) atomic \{ filter(first); \}
+        when recv_second(Patch *second) atomic \{ filter(second); \}
+      \}
+      atomic \{ computeInteractions(first, second); \}
+    \}
+  \}
+\end{alltt}
 \end{center}
 \caption{\sdag\ Implementation of the Compute Object}
 \label{figsdagexample}
 \end{figure}
 
-\sdag\ is a coordination language built on top of
-\charmpp\ that supports the sequencing mentioned above,
-while overcoming limitations of thread-based languages, and
-facilitating a clear expression of flow of control within the object
-without losing the performance benefits of adaptive message-driven
-execution.  In other words, \sdag\ is a structured notation for
-specifying intra-process control dependences in message-driven
-programs. It combines the efficiency of message-driven execution with
-the explicitness of control specification. \sdag\ allows easy
-expression of dependences among messages and computations and also
-among computations within the same object using when-blocks and
-various structured constructs.  \sdag\ is adequate for expressing
-control-dependencies that form a series-parallel control-flow graph.
-\sdag\ has been developed on top of \charmpp\. \sdag\ allows
-\charmpp\ entry methods (in chares, groups or arrays) to specify
-code (a when-block body) to be executed upon occurrence of certain events. 
-These events (or guards of a when-block) are entry methods of the object that
-can be invoked remotely. While writing a \sdag\ program, one has to declare these
-entries in \charmpp\ interface file. The implementation of the
-entry methods that contain the when-block is written using the \sdag\
-language. Grammar of \sdag\ is given in the EBNF form below.
+\sdag\ is a coordination language built on top of \charmpp\ that supports the
+sequencing mentioned above, while overcoming limitations of thread-based
+languages, and facilitating a clear expression of flow of control within the
+object without losing the performance benefits of adaptive message-driven
+execution.  In other words, \sdag\ is a structured notation for specifying
+intra-process control dependences in message-driven programs. It combines the
+efficiency of message-driven execution with the explicitness of control
+specification. \sdag\ allows easy expression of dependences among messages and
+computations and also among computations within the same object using
+when-blocks and various structured constructs.  \sdag\ is adequate for
+expressing control-dependencies that form a series-parallel control-flow graph.
+\sdag\ has been developed on top of \charmpp\. \sdag\ allows \charmpp\ entry
+methods (in chares, groups or arrays) to specify code (a when-block body) to be
+executed upon occurrence of certain events.  These events (or guards of a
+when-block) are entry methods of the object that can be invoked remotely. While
+writing a \sdag\ program, one has to declare these entries in \charmpp\
+interface file. The implementation of the entry methods that contain the
+when-block is written using the \sdag\ language. Grammar of \sdag\ is given in
+the EBNF form below.
 
 \section{Grammar}
 
 \subsection{Tokens}
 
-\begin{verbatim}
-  <ident> = Valid C++ identifier 
-  <int-expr> = Valid C++ integer expression 
-  <c++-code> = Valid C++ code 
-\end{verbatim}
+\begin{alltt}
+  <ident> = Valid \CC{} identifier 
+  <int-expr> = Valid \CC{} integer expression 
+  <\CC{}-code> = Valid \CC{} code 
+\end{alltt}
 
 \subsection{Grammar in EBNF Form}
 
-\begin{verbatim}
+\begin{alltt}
 <sdag> := <class-decl> <sdagentry>+ 
 
 <class-decl> := "class" <ident> 
@@ -230,7 +187,7 @@ language. Grammar of \sdag\ is given in the EBNF form below.
 <sdagentry> := "sdagentry" <ident> "(" <ident> "*" <ident> ")" <body> 
 
 <body> := <stmt> 
-        | "{" <stmt>+ "}" 
+        | "\{" <stmt>+ "\}" 
 
 <stmt> := <overlap-stmt> 
         | <when-stmt> 
@@ -242,7 +199,7 @@ language. Grammar of \sdag\ is given in the EBNF form below.
 
 <overlap-stmt> := "overlap" <body> 
 
-<atomic-stmt> := "atomic" "{" <c++-code> "}" 
+<atomic-stmt> := "atomic" "\{" <\CC-code> "\}" 
 
 <if-stmt> := "if" "(" <int-expr> ")" <body> [<else-stmt>] 
 
@@ -263,11 +220,9 @@ language. Grammar of \sdag\ is given in the EBNF form below.
 
 <entry> := <ident> [ "[" <int-expr> "]" ] "(" <ident> "*" <ident> ")" 
   
-\end{verbatim}
+\end{alltt}
 
 
 For more details regarding \sdag, look at the examples located in
 {\tt pgms/sdag} directory in the \charmpp\ distribution.
-
-
 
