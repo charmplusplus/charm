@@ -22,8 +22,9 @@ NormalSlabArray::doFFT(int src_id, int dst_id)
     // allocating the data for sending to destination side
     complex *sendData = new complex[fftinfo.srcPlanesPerSlab * fftinfo.destPlanesPerSlab * lineSize];
     complex *temp;
-    int i;
-    for(i = 0; i < fftinfo.srcSize[0]; i += fftinfo.destPlanesPerSlab) {
+    // i <> pe if destPlanesPerSlab is not 1
+    int pe, i;
+    for(i = 0, pe = 0; i < fftinfo.srcSize[0]; i += fftinfo.destPlanesPerSlab, pe++) {
 	int ti;
 	temp = sendData;
 	for(ti = i; ti < i + fftinfo.destPlanesPerSlab; ti++)
@@ -34,7 +35,7 @@ NormalSlabArray::doFFT(int src_id, int dst_id)
 		temp += lineSize;
 	    }
 	
-	fftinfo.destProxy(i).acceptDataForFFT(lineSize * fftinfo.srcPlanesPerSlab * fftinfo.destPlanesPerSlab, sendData, thisIndex, dst_id);
+	fftinfo.destProxy(pe).acceptDataForFFT(lineSize * fftinfo.srcPlanesPerSlab * fftinfo.destPlanesPerSlab, sendData, thisIndex, dst_id);
     }
     delete [] sendData;
 }
@@ -96,8 +97,8 @@ NormalSlabArray::doIFFT(int src_id, int dst_id)
     
     complex *sendData = new complex[fftinfo.srcPlanesPerSlab * fftinfo.destPlanesPerSlab * lineSize];
     complex *temp;
-    int i;
-    for (i = 0; i < fftinfo.destSize[0]; i += fftinfo.srcPlanesPerSlab) {
+    int i, pe;
+    for (i = 0, pe = 0; i < fftinfo.destSize[0]; i += fftinfo.srcPlanesPerSlab, pe++) {
 	int ti;
 	temp = sendData;
 	for (ti = i; ti < i + fftinfo.srcPlanesPerSlab; ti++)
@@ -107,7 +108,7 @@ NormalSlabArray::doIFFT(int src_id, int dst_id)
 		       sizeof(complex) * lineSize);
 		temp += lineSize;
 	    }
-	fftinfo.srcProxy(i).acceptDataForIFFT(lineSize * fftinfo.destPlanesPerSlab * fftinfo.srcPlanesPerSlab, sendData, thisIndex, dst_id);
+	fftinfo.srcProxy(pe).acceptDataForIFFT(lineSize * fftinfo.destPlanesPerSlab * fftinfo.srcPlanesPerSlab, sendData, thisIndex, dst_id);
     }
     delete [] sendData;
 }
