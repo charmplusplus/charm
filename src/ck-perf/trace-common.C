@@ -123,8 +123,7 @@ extern "C"
 void traceMessageRecv(char *msg, int pe)
 {
 #if ! CMK_TRACE_IN_CHARM
-  if (CkIsCharmMessage(msg))
-    CkpvAccessOther(_traces, CmiRankOf(pe))->messageRecv(msg, pe);
+  CkpvAccessOther(_traces, CmiRankOf(pe))->messageRecv(msg, pe);
 #endif
 }
 
@@ -206,5 +205,18 @@ void traceCharmClose(void)
   CkpvAccess(_traces)->traceClose();
 #endif
 }
+
+#if 0
+// helper functions
+int CkIsCharmMessage(char *msg)
+{
+//CmiPrintf("getMsgtype: %d %d %d %d %d\n", ((envelope *)msg)->getMsgtype(), CmiGetHandler(msg), CmiGetXHandler(msg), _charmHandlerIdx, index_skipCldHandler);
+  if ((CmiGetHandler(msg) == _charmHandlerIdx) &&
+         (CmiGetHandlerFunction(msg) == (CmiHandler)_processHandler))
+    return 1;
+  if (CmiGetXHandler(msg) == _charmHandlerIdx) return 1;
+  return 0;
+}
+#endif
 
 /*@}*/
