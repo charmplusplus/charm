@@ -47,6 +47,7 @@ void EachToManyStrategy::insertMessage(CharmMessageHolder *cmsg){
     ComlibPrintf("EachToMany: insertMessage\n");
 
     messageBuf->enq(cmsg);
+    messageCount ++;
 }
 
 void EachToManyStrategy::doneInserting(){
@@ -76,10 +77,7 @@ void EachToManyStrategy::doneInserting(){
         EachToManyMulticast(comid, UsrToEnv(msg)->getTotalsize(), 
                             UsrToEnv(msg), 1, 
                             &procMap[cmsg->dest_proc]);
-        CharmMessageHolder *prev = cmsg;
-        cmsg = cmsg->next;
-        if(prev != NULL)
-            delete prev;                //foobar getrid of the delete
+	delete cmsg; 
     }
     messageCount = 0;
 }

@@ -59,7 +59,7 @@ Strategy* createStrategy(int s, int n){
 //An initialization routine which does prelimnary initialization of the 
 //communications library and registers the strategies with the PUP:able interface.
 void initComlibManager(void){
-  //    comm_debug = 1;
+    comm_debug = 1;
     ComlibInit();
     ComlibPrintf("Init Call\n");
     //Called once on each processor 
