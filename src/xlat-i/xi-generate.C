@@ -14,6 +14,7 @@ int moduleHasMain = 0;
 
 void GenerateStructsFns(ofstream& top, ofstream& bot) ;
 void GenerateRegisterCalls(ofstream& top, ofstream& bot) ;
+void GenerateProxies(ofstream& top, ofstream& bot);
 
 
 void Generate(char *interfacefile)
@@ -41,6 +42,7 @@ void Generate(char *interfacefile)
 
   GenerateStructsFns(top, bot) ;
   GenerateRegisterCalls(top, bot) ;
+  GenerateProxies(top, bot);
 
   top << "#endif\n";
   bot << "#endif\n";
@@ -489,5 +491,284 @@ if (moduleHasMain)
   bot << "\n}\n" ;
 }
 
+static void
+spew(ofstream &strm, const char *ostr,
+     char *a1 = "ERROR", char *a2 = "ERROR",
+     char *a3 = "ERROR", char *a4 = "ERROR",
+     char *a5 = "ERROR")
+{
+  int i;
+  for(i=0; i<strlen(ostr); i++){
+    switch(ostr[i]){
+    case '\01':
+      strm << a1; break;
+    case '\02':
+      strm << a2; break;
+    case '\03':
+      strm << a3; break;
+    case '\04':
+      strm << a4; break;
+    case '\05':
+      strm << a5; break;
+    default:
+      strm << ostr[i];
+    }
+  }
+}
 
+const char *CImessage = // msgType
+"class \01;\n"
+"class CMessage_\01 : public comm_object {\n"
+"  public:\n"
+"    void *operator new(CMK_SIZE_T size, void *ptr) { return ptr; }\n"
+"    void *operator new(CMK_SIZE_T size) {\n"
+"      return (void *)GenericCkAlloc(MsgIndex(\01), size, 0) ;\n"
+"    };\n"
+"    void *operator new(CMK_SIZE_T size, int priobits) {\n"
+"      return (void *)GenericCkAlloc(MsgIndex(\01), size, priobits) ;\n"
+"    };\n"
+"    void *operator new(CMK_SIZE_T size, int *sizes) {\n"
+"      return (void *)((ALLOCFNPTR)(CsvAccess(MsgToStructTable)[MsgIndex(\01)].alloc))(MsgIndex(\01), size, sizes, 0);\n"
+"    };\n"
+"    void *operator new(CMK_SIZE_T size, int priobits, int *sizes) {\n"
+"      return (void *)((ALLOCFNPTR)(CsvAccess(MsgToStructTable)[MsgIndex(\01)].alloc))(MsgIndex(\01), size, sizes, priobits);\n"
+"    };\n"
+"};\n"
+;
+
+const char *CIAsyncCreateProto = // charename, msgname
+"extern void CAsync_\01(\02 *m);\n"
+;
+
+const char *CIAsyncCreateImpl = // charename, msgname
+"void CAsync_\01(\02 *m) {\n"
+"  new_chare(\01, \02, m);\n"
+"};\n"
+;
+
+const char *CIProxyClassStart = // classname
+"class \01;\n"
+"class CProxy_\01 {\n"
+"  private:\n"
+"    ChareIDType cid;\n"
+"    CProxy_\01() {};\n"
+"  public:\n"
+"    CProxy_\01(ChareIDType _cid) { cid = _cid; };\n"
+;
+
+const char *CIProxyClassConstructor = // classname, msgname
+"    CProxy_\01(\02 *m, int pe=CK_PE_ANY) {\n"
+"      new_chare2(\01, \02, m, &cid, pe);\n"
+"    };\n"
+"    int _ptr_\01(\02 *m) {\n"
+"      return GetEntryPtr(\01,\01,\02);\n"
+"    };\n"
+;
+
+const char *CIProxyClassMethod = // classname, methodname, msgname
+"    void \02(\03 *m) {\n"
+"      CSendMsg(\01, \02, \03, m, &cid);\n"
+"    };\n"
+"    int _ptr_\02(\03 *m) {\n"
+"      return GetEntryPtr(\01,\02,\03);\n"
+"    };\n"
+;
+
+const char *CIProxyClassRetMethod = // classname, methodname, msgname, retmsg
+"    \04 *\02(\03 *m) {\n"
+"      return (\04 *) CRemoteCallFn(GetEntryPtr(\01,\02,\03), m, &cid);\n"
+"    };\n"
+"    int _ptr_\02(\03 *m) {\n"
+"      return GetEntryPtr(\01,\02,\03);\n"
+"    };\n"
+;
+
+const char *CIProxyClassEnd =
+"    ChareIDType _getCid(void) { return cid; }; \n"
+"    void _setCid(ChareIDType _cid) { cid = _cid; }; \n"
+"};\n"
+;
+
+const char *CIProxyMainStart =
+"class main;\n"
+"class CProxy_main {\n"
+"  private:\n"
+"  int dummy;\n"
+"  public:\n"
+"    CProxy_main() {};\n"
+;
+
+const char *CIProxyMainMethod = // methodname, msgname
+"    void \01(\02 *m) {\n"
+"      CSendMsg(main, \01, \02, m, &mainhandle);\n"
+"    };\n"
+"    int _ptr_\01(\02 *m) {\n"
+"      return GetEntryPtr(main,\01,\02);\n"
+"    };\n"
+;
+
+const char *CIProxyMainRetMethod = // methodname, msgname, retmsg
+"    \03 *\01(\02 *m) {\n"
+"      return (\03 *) CRemoteCallFn(GetEntryPtr(main,\01,\02), m, &mainhandle);\n"
+"    };\n"
+"    int _ptr_\01(\02 *m) {\n"
+"      return GetEntryPtr(main,\01,\02);\n"
+"    };\n"
+;
+
+const char *CIProxyMainEnd =
+"};\n"
+"extern CProxy_main mainproxy;\n"
+;
+
+const char *CIProxyMainDef =
+"CProxy_main mainproxy;\n"
+;
+
+const char *CIProxyGroupStart = // classname
+"class \01;\n"
+"class CProxy_\01 {\n"
+"  private:\n"
+"    int bocid;\n"
+"    CProxy_\01() {};\n"
+"  public:\n"
+"    CProxy_\01(int _bocid) { bocid = _bocid; };\n"
+;
+
+const char *CIProxyGroupConstructor = // classname, msgname
+"    CProxy_\01(\02 *m) {\n"
+"      bocid = new_group(\01, \02, m);\n"
+"    };\n"
+"    CProxy_\01(\02 *m, int retEP, ChareIDType *retID) {\n"
+"      new_group2(\01, \02, m, retEP, retID);\n"
+"    };\n"
+"    int _ptr_\01(\02 *m) {\n"
+"      return GetEntryPtr(\01,\01,\02);\n"
+"    };\n"
+;
+
+const char *CIProxyGroupMethod = // classname, methodname, msgname
+"    void \02(\03 *m) {\n"
+"      CBroadcastMsgBranch(\01, \02, \03, m, bocid);\n"
+"    };\n"
+"    void \02(\03 *m, int onPE) {\n"
+"      CSendMsgBranch(\01, \02, \03, m, bocid, onPE);\n"
+"    };\n"
+"    int _ptr_\02(\03 *m) {\n"
+"      return GetEntryPtr(\01,\02,\03);\n"
+"    };\n"
+;
+
+const char *CIProxyGroupRetMethod = // classname, methodname, msgname, retmsg
+"    \04 *\02(\03 *m, int onPE) {\n"
+"      return (\04 *) CRemoteCallBranchFn(GetEntryPtr(\01,\02,\03), m, bocid, onPE);\n"
+"    };\n"
+"    int _ptr_\02(\03 *m) {\n"
+"      return GetEntryPtr(\01,\02,\03);\n"
+"    };\n"
+;
+
+const char *CIProxyGroupEnd = // classname
+"    int _getBocid(void) { return bocid; }; \n"
+"    void _setBocid(int _bocid) { bocid = _bocid; }; \n"
+"    \01 *_localBranch(void) {\n"
+"      return (\01 *) CLocalBranch(\01, bocid);\n"
+"    };\n"
+"};\n"
+;
+
+void GenerateProxies(ofstream& top, ofstream& bot)
+{
+  char str[2048];
+
+  Message *m;
+  Chare *c;
+  Entry *e;
+
+  /* Output superclasses for message types */
+  for ( m=thismodule->messages; m!=NULL; m=m->next ) {
+    if (m->isExtern())
+      continue;
+    spew(top, CImessage, m->name);
+  }
+
+  /* Output Async Creation Methods for chares */
+  for(c=thismodule->chares; c!=NULL; c=c->next) {
+    // do not emit creation method for groups
+    if(c->chareboc != CHARE)
+      continue;
+    // Do not emit creation method for main chare
+    if(strcmp(c->name, "main")==0)
+      continue;
+    for(e=c->entries;e!=NULL;e=e->next) {
+      if(strcmp(c->name, e->name)==0) {
+        spew(top, CIAsyncCreateProto, c->name, e->msgtype->name);
+        spew(bot, CIAsyncCreateImpl, c->name, e->msgtype->name);
+      }
+    }
+  }
+  /* Output Proxy Classes for chares */
+  for(c=thismodule->chares; c!=NULL; c=c->next) {
+    if(c->chareboc == CHARE) {
+      if(strcmp(c->name,"main")==0) {
+        spew(top, CIProxyMainStart);
+        for(e=c->entries;e!=NULL;e=e->next) {
+          if(strcmp(c->name, e->name)==0) {
+            continue;
+          } else {
+            // is a method, not constructor
+            if(e->isReturnMsg()) {
+              // method is a blocking method
+              spew(top, CIProxyMainRetMethod, e->name, e->msgtype->name,
+                        e->returnMsg->name);
+            } else {
+              // method is an ordinary method
+              spew(top, CIProxyMainMethod, e->name, e->msgtype->name);
+            }
+          }
+        }
+        spew(top, CIProxyMainEnd);
+        spew(bot, CIProxyMainDef);
+      } else {
+        spew(top, CIProxyClassStart, c->name);
+        for(e=c->entries;e!=NULL;e=e->next) {
+          if(strcmp(c->name, e->name)==0) {
+            // Constructor
+            spew(top, CIProxyClassConstructor, c->name, e->msgtype->name);
+          } else {
+            // is a method, not constructor
+            if(e->isReturnMsg()) {
+              // method is a blocking method
+              spew(top, CIProxyClassRetMethod, c->name, e->name, 
+                        e->msgtype->name, e->returnMsg->name);
+            } else {
+              // method is an ordinary method
+              spew(top, CIProxyClassMethod, c->name, e->name, e->msgtype->name);
+            }
+          }
+        }
+        spew(top, CIProxyClassEnd);
+      }
+    } else {
+      spew(top, CIProxyGroupStart, c->name);
+      for(e=c->entries;e!=NULL;e=e->next) {
+        if(strcmp(c->name, e->name)==0) {
+          // Constructor
+          spew(top, CIProxyGroupConstructor, c->name, e->msgtype->name);
+        } else {
+          // is a method, not constructor
+          if(e->isReturnMsg()) {
+            // method is a blocking method
+            spew(top, CIProxyGroupRetMethod, c->name, e->name, e->msgtype->name,
+                      e->returnMsg->name);
+          } else {
+            // method is an ordinary method
+            spew(top, CIProxyGroupMethod, c->name, e->name, e->msgtype->name);
+          }
+        }
+      }
+      spew(top, CIProxyGroupEnd, c->name);
+    }
+  }
+}
 
