@@ -13,7 +13,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 1.7  1995-09-26 18:26:00  jyelon
+ * Revision 1.8  1995-09-26 18:30:46  jyelon
+ * *** empty log message ***
+ *
+ * Revision 1.7  1995/09/26  18:26:00  jyelon
  * Added CthSetStrategyDefault, and cleaned up a bit.
  *
  * Revision 1.6  1995/09/20  17:22:14  jyelon
@@ -257,7 +260,7 @@ static int       thread_growsdown;
 int CthImplemented()
     { return 1; }
 
-static void CthInit()
+void CthInit()
 {
   char *sp1 = alloca(8);
   char *sp2 = alloca(8);
