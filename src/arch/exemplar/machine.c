@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.3  1995-06-16 21:42:10  gursoy
+ * Revision 2.4  1995-06-28 15:31:54  gursoy
+ * *** empty log message ***
+ *
+ * Revision 2.3  1995/06/16  21:42:10  gursoy
  * fixed CmiSyncSend: size field is copied now
  *
  * Revision 2.2  1995/06/09  21:22:00  gursoy
@@ -251,13 +254,14 @@ void         *msg;
     for(i=0; i<CmiNumPe(); i++)
        if (CmiMyPe() != i) CmiSyncSend(i,size,msg);
 
-
     buf=(void *)CmiAlloc(size);
+
     if(buf==(void *)0)
         {
                 printf("Cannot allocate memory!\n");
                 exit(1);
         }
+
     mycpy((unsigned long long *)buf,(unsigned long long *)msg,size);
     FIFO_EnQueue(CmiLocalQueue,buf);
 }
@@ -289,21 +293,20 @@ void         *msg;
     /* Send the message of "size" bytes to the destPE.
        Return only after the message has been sent, i.e.,
        the buffer (msg) is free for re-use. */
-        void *buf;
-        char *buf2;
+        char *buf;
 
         buf=(void *)g_malloc(size+8);
-        buf2 = (char *)buf;
-        buf2 += 8;
+        ((int *)buf)[0]=size;
+        buf += 8;
 
         if(buf==(void *)0)
         {
                 printf("Cannot allocate memory!\n");
                 exit(1);
         }
-        mycpy((unsigned long long *)buf2,(unsigned long long *)msg,size);
-        ((int *)buf)[0]=size;
-        McQueueAddToBack(MsgQueue[destPE],buf2); 
+
+        mycpy((unsigned long long *)buf,(unsigned long long *)msg,size);
+        McQueueAddToBack(MsgQueue[destPE],buf); 
 }
 
 
