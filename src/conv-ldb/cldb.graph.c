@@ -104,10 +104,10 @@ int CldGetRandomNeighborOrSelf()
 
 void CldPeriodicBalanceInit()
 {
-  int len, msgPos, myPe;
+  int len, myPe;
   int i;
   
-  void *msg;
+  char *msg, *msgPos;
   
   /* Send CldLoadRequestHandler to all neighbors: */
   /* Construct msg with CmiMyPe() in it */
@@ -118,8 +118,8 @@ void CldPeriodicBalanceInit()
 
   /* Temp solution to CmiSyncMulticastAndFree bug */
   for (i=0; i<CpvAccess(numNeighbors); i++){
-    msg = (void *)CmiAlloc(len);
-    msgPos = (int)(msg + CmiMsgHeaderSizeBytes);
+    msg = (char *)CmiAlloc(len);
+    msgPos = (msg + CmiMsgHeaderSizeBytes);
     memcpy((void *)msgPos, &myPe, sizeof(int));
     msgPos += sizeof(int);
     CmiSetHandler(msg, CpvAccess(CldLoadRequestHandlerIndex));
@@ -177,10 +177,10 @@ void CldBalance()
     }
 }
 
-void CldLoadRequestHandler(void *msg)
+void CldLoadRequestHandler(char *msg)
 {
-  int srcpe, msgPos, len, myPe, myLoad;
-  void *newmsg;
+  int srcpe, len, myPe, myLoad;
+  char *newmsg, *msgPos;
 
   /* CmiError("On %d: Begin CldLoadRequestHandler\n", CmiMyPe()); */
   CmiGrabBuffer((void **)&msg);
@@ -193,9 +193,9 @@ void CldLoadRequestHandler(void *msg)
   myPe = CmiMyPe();
   myLoad = CldCountTokens();
   len = CmiMsgHeaderSizeBytes + 2*sizeof(int) + sizeof(void *);
-  newmsg = (void *)CmiAlloc(len);
+  newmsg = (char *)CmiAlloc(len);
   
-  msgPos = (int)(newmsg + CmiMsgHeaderSizeBytes);
+  msgPos = (newmsg + CmiMsgHeaderSizeBytes);
   memcpy((void *)msgPos, &myPe, sizeof(int));
   msgPos += sizeof(int);
   memcpy((void *)msgPos, &myLoad, sizeof(int));
@@ -206,7 +206,7 @@ void CldLoadRequestHandler(void *msg)
   /* CmiError("On %d: End CldLoadRequestHandler\n", CmiMyPe()); */
 }
 
-void CldLoadResponseHandler(void *msg)
+void CldLoadResponseHandler(char *msg)
 {
   int load, pe;
 
