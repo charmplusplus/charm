@@ -36,7 +36,7 @@ void PVT::startPhase()
 #endif
   CProxy_GVT g(TheGVT);
   static int gvtTurn = 0;
-  int i;
+  register int i;
 
   objs.Wake(); // wake objects to make sure all have reported
   // compute PVT
@@ -141,9 +141,7 @@ void PVT::objUpdate(POSE_TimeType timestamp, int sr)
     waitForFirst = 0;
     SendsAndRecvs->Restructure(estGVT, timestamp, sr);
   }
-  else { 
-    SendsAndRecvs->Insert(timestamp, sr);
-  }
+  else SendsAndRecvs->Insert(timestamp, sr);
 #ifdef POSE_STATS_ON
   if (tstat)
     localStats->SwitchTimer(tstat);
@@ -153,21 +151,16 @@ void PVT::objUpdate(POSE_TimeType timestamp, int sr)
 
 }
 
-/// Update PVT with safeTime and send/recv table at timestamp
-void PVT::objUpdate(int pvtIdx, POSE_TimeType safeTime, POSE_TimeType timestamp, int sr)
+/// Update PVT with safeTime
+void PVT::objUpdateOVT(int pvtIdx, POSE_TimeType safeTime)
 {
-  int index = (pvtIdx-CkMyPe())/1000;
-
-  //CmiAssert((timestamp >= estGVT) || (timestamp == POSE_UnsetTS) || (estGVT == POSE_UnsetTS));
   CmiAssert(simdone || (safeTime >= estGVT) || (safeTime == POSE_UnsetTS));
+  int index = (pvtIdx-CkMyPe())/1000;
   // minimize the non-idle OVT
   if ((safeTime > POSE_UnsetTS) && 
       ((objs.objs[index].getOVT() > safeTime) || 
        (objs.objs[index].getOVT() < 0)))
     objs.objs[index].setOVT(safeTime);
-  //CkPrintf("[%d] %d's safeTime is %d\n", CkMyPe(), index, safeTime);
-  //if ((sr == SEND) || (sr == RECV)) SendsAndRecvs->Insert(timestamp, sr);
-  // sr could be POSE_UnsetTS in which case we just ignore it here
 }
 
 /// Basic Constructor
@@ -221,7 +214,8 @@ void GVT::computeGVT(UpdateMsg *m)
   CProxy_PVT p(ThePVT);
   CProxy_GVT g(TheGVT);
   GVTMsg *gmsg = new GVTMsg;
-  int lastGVT = 0, i;
+  int lastGVT = 0;
+  register int i;
   static int optGVT = POSE_UnsetTS, conGVT = POSE_UnsetTS, done=0;
   static int earliestMsg=POSE_UnsetTS;
   static SRentry *SRs = NULL;

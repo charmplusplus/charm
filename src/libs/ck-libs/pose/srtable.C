@@ -11,8 +11,9 @@
 /// Basic constructor
 SRtable::SRtable() 
 { 
+  register int i;
   offset = b = size_b = numOverflow = 0;
-  for (int i=0; i<MAX_B; i++) {
+  for (i=0; i<MAX_B; i++) {
     buckets[i] = end_bucket[i] = NULL;
     numEntries[i] = sends[i] = recvs[i] = 0;
   }
@@ -120,13 +121,14 @@ void SRtable::Restructure(POSE_TimeType newGVTest, POSE_TimeType firstTS,
 #ifdef SR_SANITIZE
   sanitize();
 #endif
+  register int i;
   // Backup the table to make new one in its place
   int keepBkt = (newGVTest-offset)/size_b;
   int b_old = b, size_b_old = size_b, offset_old = offset;
   SRentry *buckets_old[MAX_B], *overflow_old = overflow, *tmp;
   int sends_old[MAX_B], recvs_old[MAX_B];
   int ofSends_old = ofSends, ofRecvs_old = ofRecvs;
-  for (int i=0; i<b_old; i++) {
+  for (i=0; i<b_old; i++) {
     buckets_old[i] = buckets[i];
     buckets[i] = end_bucket[i] = NULL;
     sends_old[i] = sends[i];
@@ -142,12 +144,12 @@ void SRtable::Restructure(POSE_TimeType newGVTest, POSE_TimeType firstTS,
   size_b = 1 + (firstTS - offset)/b;
 
   if (keepBkt < b_old) {
-    for (int j=0; j<keepBkt; j++) { // throw all these away
-      tmp = buckets_old[j];
+    for (i=0; i<keepBkt; i++) { // throw all these away
+      tmp = buckets_old[i];
       while (tmp) {
-	buckets_old[j] = tmp->next;
+	buckets_old[i] = tmp->next;
 	delete tmp;
-	tmp = buckets_old[j];
+	tmp = buckets_old[i];
       }
     }
     // carefully sort through this bucket
@@ -158,35 +160,33 @@ void SRtable::Restructure(POSE_TimeType newGVTest, POSE_TimeType firstTS,
       else Insert(tmp);
       tmp = buckets_old[keepBkt];
     }
-    for (int j=keepBkt+1; j<b_old; j++) { // keep all of these
-      tmp = buckets_old[j];
+    for (i=keepBkt+1; i<b_old; i++) { // keep all of these
+      tmp = buckets_old[i];
       while (tmp) {
-	buckets_old[j] = tmp->next;
+	buckets_old[i] = tmp->next;
 	Insert(tmp);
-	tmp = buckets_old[j];
+	tmp = buckets_old[i];
       }
     }
-  }
-  else { // throw all buckets away
-    for (int j=0; j<b_old; j++) {
-      tmp = buckets_old[j];
-      while (tmp) {
-	buckets_old[j] = tmp->next;
-	delete tmp;
-	tmp = buckets_old[j];
-      }
-    }
-  }
-
-  tmp = overflow_old;
-  if (keepBkt < b_old) { // keep all of overflow
+    tmp = overflow_old;
+    // keep all of overflow
     while (tmp) {
       overflow_old = tmp->next;
       Insert(tmp);
       tmp = overflow_old;
     }
   }
-  else { // carefully sort through overflow
+  else { // throw all buckets away
+    for (i=0; i<b_old; i++) {
+      tmp = buckets_old[i];
+      while (tmp) {
+	buckets_old[i] = tmp->next;
+	delete tmp;
+	tmp = buckets_old[i];
+      }
+    }
+    tmp = overflow_old;
+    // carefully sort through overflow
     while (tmp) {
       overflow_old = tmp->next;
       if (tmp->timestamp < offset) delete tmp;
@@ -207,6 +207,7 @@ UpdateMsg *SRtable::PackTable(POSE_TimeType pvt)
 #ifdef SR_SANITIZE
   sanitize();
 #endif
+  register int i;
   int packSize = 0, nEntries = 0, entryIdx = 0, nBkts = 0;
   int destBkt = (pvt-offset)/size_b;  // which bucket?
   SRentry *tmp;
@@ -217,12 +218,12 @@ UpdateMsg *SRtable::PackTable(POSE_TimeType pvt)
     nEntries += numOverflow;
     nBkts = b-1;
   }
-  for (int i=0; i<=nBkts; i++) nEntries += numEntries[i];
+  for (i=0; i<=nBkts; i++) nEntries += numEntries[i];
 
   packSize = nEntries * sizeof(SRentry);
   UpdateMsg *um = new (packSize, 0) UpdateMsg;
-  for (int j=0; j<=nBkts; j++) {
-    tmp = buckets[j];
+  for (i=0; i<=nBkts; i++) {
+    tmp = buckets[i];
     while (tmp) {
       um->SRs[entryIdx] = *tmp;
       entryIdx++;
@@ -251,13 +252,14 @@ void SRtable::PartialSortTable(POSE_TimeType pvt)
 #ifdef SR_SANITIZE
   sanitize();
 #endif
+  register int i;
   int sortall = 0, sortTo, destBkt = (pvt-offset)/size_b;  // which bucket?
   sortTo = destBkt;
   if (destBkt >= b) {
     sortall = 1; 
     sortTo = b-1;
   }
-  for (int i=0; i<=sortTo; i++) CompressAndSortBucket(i, 0);
+  for (i=0; i<=sortTo; i++) CompressAndSortBucket(i, 0);
   if (sortall) CompressAndSortBucket(b, 1);
 #ifdef SR_SANITIZE
   sanitize();
@@ -373,8 +375,9 @@ void SRtable::FreeTable()
 #ifdef SR_SANITIZE
   sanitize();
 #endif
+  register int i;
   SRentry *tmp;
-  for (int i=0; i<b; i++) {
+  for (i=0; i<b; i++) {
     tmp = buckets[i];
     while (tmp) { 
       buckets[i] = tmp->next;

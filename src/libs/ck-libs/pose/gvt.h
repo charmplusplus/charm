@@ -99,7 +99,7 @@ class PVT : public Group {
   /// Update send/recv table at timestamp
   void objUpdate(POSE_TimeType timestamp, int sr); 
   /// Update PVT with safeTime and send/recv table at timestamp
-  void objUpdate(int pvtIdx, POSE_TimeType safeTime, POSE_TimeType timestamp, int sr);
+  void objUpdateOVT(int pvtIdx, POSE_TimeType safeTime);
 };
 
 /// GVT chare group for estimating GVT

@@ -16,39 +16,38 @@ void pvtObjectNode::sanitize()
 /// Basic Constructor: preallocates space for 100 objects
 pvtObjects::pvtObjects() 
 { 
+  register int i;
   numObjs = numSpaces = firstEmpty = 0; 
   size = 100;
   if (!(objs = (pvtObjectNode *)malloc(100 * sizeof(pvtObjectNode)))) {
     CkPrintf("ERROR: pvtObjects::pvtObjects: OUT OF MEMORY!\n");
     CkExit();
   }
-  for (int i=0; i<size; i++) objs[i].set(-1, -1, 0, 0, NULL);
-}
-
-/// Set posers to idle (ovt==-1)
-void pvtObjects::SetIdle()
-{
-  for (int i=0; i<numSpaces; i++) objs[i].setIdle();
+  for (i=0; i<size; i++) objs[i].set(-1, -1, 0, 0, NULL);
 }
 
 /// Wake up all posers in list
-void pvtObjects::Wake()
+void pvtObjects::Wake() 
 {
-  for (int i=0; i<numSpaces; i++)
+  register int i;
+  for (i=0; i<numSpaces; i++)
     if (objs[i].isPresent()) (objs[i].localObjPtr)->Status();
 }
-  
+
 /// Call Commit on all posers
-void pvtObjects::Commit()
+void pvtObjects::Commit() 
 {
-  for (int i=0; i<numSpaces; i++)
+  register int i;
+  for (i=0; i<numSpaces; i++)
     if (objs[i].isPresent()) (objs[i].localObjPtr)->Commit();
 }
-  
+
+
 /// Insert poser in list
 int pvtObjects::Insert(int index, int ovt, int sync, sim *myPtr)
 {
-  int idx, i;
+  int idx;
+  register int i;
   if (numObjs < size) { // insert in empty space
     idx = firstEmpty;
     if (firstEmpty == numSpaces) // all spaces occupied up to end of list
@@ -80,20 +79,13 @@ int pvtObjects::Insert(int index, int ovt, int sync, sim *myPtr)
   return idx;
 }
 
-/// Delete a poser from the list
-void pvtObjects::Delete(int idx)
-{
-  objs[idx].set(-1, -1, 0, 0, NULL);
-  numObjs--;
-  if (idx < firstEmpty) firstEmpty = idx; // recalculate firstEmpty
-}
-
 /// Dump data fields
 void pvtObjects::dump()
 {
+  register int i;
   CkPrintf("numObjs=%d numSpaces=%d firstEmpty=%d size=%d\n", 
 	   numObjs, numSpaces, firstEmpty, size);
-  for (int i=0; i<numSpaces; i++) {
+  for (i=0; i<numSpaces; i++) {
     CkPrintf("[%d] ", i);
     objs[i].dump();
     CkPrintf("\n");
@@ -101,7 +93,9 @@ void pvtObjects::dump()
 }
 
 /// Check validity of data fields
-void pvtObjects::sanitize() {
+void pvtObjects::sanitize() 
+{
+  register int i;
   CmiAssert(numObjs >= 0);
   CmiAssert(numSpaces >= 0);
   CmiAssert(size >= 0);

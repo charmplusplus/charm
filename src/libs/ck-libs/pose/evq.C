@@ -402,11 +402,12 @@ void eventQueue::dump()
 void eventQueue::pup(PUP::er &p) 
 {
   Event *tmp;
+  register int i;
   int countlist = 0;
   if (p.isUnpacking()) { // UNPACKING
     p(countlist); // unpack count of events in list
     tmp = frontPtr; // front & backPtrs should already exist
-    for (int i=0; i<countlist; i++) { // unpack countlist events
+    for (i=0; i<countlist; i++) { // unpack countlist events
       tmp->next = new Event;
       tmp->next->prev = tmp;
       tmp->next->next = NULL;
@@ -430,7 +431,7 @@ void eventQueue::pup(PUP::er &p)
     }
     p(countlist); // pack event count
     tmp = frontPtr->next;
-    for (int i=0; i<countlist; i++) { // pack each event
+    for (i=0; i<countlist; i++) { // pack each event
       tmp->pup(p);
       tmp = tmp->next;
     }

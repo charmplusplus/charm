@@ -81,17 +81,24 @@ class pvtObjects {
   /// Get number of spaces in use in list
   int getNumSpaces() { return numSpaces; }
   /// Set posers to idle (ovt==-1)
-  void SetIdle();                             
+  void SetIdle() { 
+    register int i; 
+    for (i=0; i<numSpaces; i++) objs[i].setIdle();
+  }                           
   /// Wake up all posers in list
-  void Wake();                                
+  void Wake();
   /// Call Commit on all posers
-  void Commit();                              
+  void Commit();
   /// Insert poser in list
   /** Inserts an object in the list in the firstEmpty slot, expanding the list
       size if necessary */
   int Insert(int index, int ovt, int sync, sim *myPtr); 
   /// Delete a poser from the list
-  void Delete(int idx);                       
+  void Delete(int idx) {
+    objs[idx].set(-1, -1, 0, 0, NULL);
+    numObjs--;
+    if (idx < firstEmpty) firstEmpty = idx; // recalculate firstEmpty
+  }                       
   /// Dump data fields
   void dump();
   /// Check validity of data fields
