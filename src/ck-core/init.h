@@ -135,7 +135,9 @@ CksvExtern(unsigned int,  _numInitNodeMsgs);
 CksvExtern(CmiNodeLock, _nodeLock);
 CksvExtern(GroupTable*,  _nodeGroupTable);
 CksvExtern(GroupIDTable, _nodeGroupIDTable);
+CksvExtern(CmiImmediateLockType, _nodeGroupTableImmLock);
 CksvExtern(unsigned int, _numNodeGroups);
+
 CkpvExtern(int, _charmEpoch);
 
 CkpvExtern(CkGroupID,_currentGroup);
@@ -144,6 +146,7 @@ CkpvExtern(CkGroupID, _currentGroupRednMgr);
 
 CkpvExtern(GroupTable*, _groupTable);
 CkpvExtern(GroupIDTable*, _groupIDTable);
+CkpvExtern(CmiImmediateLockType, _groupTableImmLock);
 CkpvExtern(unsigned int, _numGroups);
 
 CkpvExtern(char **,Ck_argv);
