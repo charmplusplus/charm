@@ -74,6 +74,7 @@ static void startTCharmThread(TCharmInitMsg *msg)
 	CtvAccess(_curTCharm)->activateHeap();
 	typedef void (*threadFn_t)(void *);
 	((threadFn_t)msg->threadFn)(msg->data);
+	CmiIsomallocBlockListActivate(NULL); //Turn off migratable memory
 	CtvAccess(_curTCharm)->done();
 }
 
