@@ -59,6 +59,21 @@ public:
 	void pup(PUP::er& p){ IrrGroup::pup(p); }
 };
 
+typedef struct _GroupInfo{
+        CkGroupID gID;
+        int MigCtor, DefCtor;
+        int useDefCtor;
+        char name[256];
+} GroupInfo;
+PUPbytes(GroupInfo)
+PUPmarshall(GroupInfo)
+
+// utility functions to pup system global tables
+void CkPupROData(PUP::er &p);
+void CkPupMainChareData(PUP::er &p);
+GroupInfo * CkPupGroupData(PUP::er &p, int &numGroups);
+GroupInfo *CkPupNodeGroupData(PUP::er &p, int &numNodeGroups);
+
 void CkStartCheckpoint(char* dirname,const CkCallback& cb);
 void CkRestartMain(const char* dirname);
 

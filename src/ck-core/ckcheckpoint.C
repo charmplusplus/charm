@@ -20,13 +20,6 @@ More documentation goes here...
 
 CkGroupID _sysChkptMgr;
 
-typedef struct _GroupInfo{
-	CkGroupID gID;
-	int MigCtor, DefCtor;
-	int useDefCtor;
-	char name[256];
-} GroupInfo;
-
 static void bdcastRO(void){
 	int i;
 	//Determine the size of the RODataMessage
@@ -42,6 +35,7 @@ static void bdcastRO(void){
 	env->setSrcPe(CkMyPe());
 	CmiSetHandler(env, _roHandlerIdx);
 	CmiSyncBroadcastAndFree(env->getTotalsize(), (char *)env);
+	CpvAccess(_qd)->create(CkNumPes()-1);
 }
 
 // Print out an array index to this string as decimal fields
@@ -103,7 +97,151 @@ void CkCheckpointMgr::Checkpoint(const char *dirname,CkCallback& cb){
 	else{
 		CkPrintf("[%d]CkCheckpointMgr::Checkpoint DONE. Invoking callback.\n",CkMyPe());
 		cb.send();
+		//CkStartQD(cb);
 	}
+}
+
+// handle readonly table and data
+void CkPupROData(PUP::er &p)
+{
+	int _numReadonlies;
+	if (p.isPacking()) _numReadonlies=_readonlyTable.size();
+        p|_numReadonlies;
+	if (p.isUnpacking()) {
+	  if (_numReadonlies != _readonlyTable.size())
+		CkAbort("You cannot add readonlies and restore from checkpoint...");
+	}
+	for(int i=0;i<_numReadonlies;i++) _readonlyTable[i]->pupData(p);
+}
+
+void CkPupMainChareData(PUP::er &p)
+{
+	int nMains=_mainTable.size();
+	for(int i=0;i<nMains;i++){  /* Create all mainchares */
+		int entryMigCtor = _chareTable[_mainTable[i]->chareIdx]->getMigCtor();
+		if(entryMigCtor!=-1){
+			Chare* obj = (Chare *)_mainTable[i]->getObj();
+			if (p.isUnpacking()) {
+				int size = _chareTable[_mainTable[i]->chareIdx]->size;
+				obj = (Chare*)malloc(size);
+				_MEMCHECK(obj);
+				_mainTable[i]->setObj(obj);
+				void *m = CkAllocSysMsg();
+				_entryTable[entryMigCtor]->call(m, obj);
+			}
+			else 
+			 	obj = (Chare *)_mainTable[i]->getObj();
+			obj->pup(p);
+		}
+	}
+}
+
+// handle GroupTable and data
+GroupInfo *CkPupGroupData(PUP::er &p, int &numGroups)
+{
+	int i;
+
+	if (!p.isUnpacking()) {
+	  numGroups = CkpvAccess(_groupIDTable)->size();
+	  DEBCHK("[%d]CkStartCheckpoint: numGroups = %d\n",CkMyPe(),numGroups);
+	}
+	p|numGroups;
+	if (p.isUnpacking()) {
+	  if(CkMyPe()==0) { CkpvAccess(_numGroups) = numGroups+1; }else{ CkpvAccess(_numGroups) = 1; }
+	}
+
+	GroupInfo *tmpInfo = new GroupInfo [numGroups];
+	if (!p.isUnpacking()) {
+	  for(i=0;i<numGroups;i++) {
+		tmpInfo[i].gID = (*CkpvAccess(_groupIDTable))[i];
+		TableEntry ent = CkpvAccess(_groupTable)->find(tmpInfo[i].gID);
+		tmpInfo[i].useDefCtor = ent.getObj()->useDefCtor();
+		tmpInfo[i].MigCtor = _chareTable[ent.getcIdx()]->migCtor;
+		tmpInfo[i].DefCtor = _chareTable[ent.getcIdx()]->defCtor;
+		strncpy(tmpInfo[i].name,_chareTable[ent.getcIdx()]->name,255);
+		DEBCHK("[%d]CkStartCheckpoint: group %s has useDefCtor=%d\n",CkMyPe(),
+			tmpInfo[i].name,tmpInfo[i].useDefCtor);
+
+		if(tmpInfo[i].useDefCtor==0 && tmpInfo[i].MigCtor==-1) {
+			char buf[512];
+			sprintf(buf,"Group %s needs a migration constructor and PUP'er routine for restart.\n",
+				     tmpInfo[i].name);
+			CkAbort(buf);
+		}
+	  }
+  	}
+	for (i=0; i<numGroups; i++) p|tmpInfo[i];
+
+	for(i=0;i<numGroups;i++) {
+		CkGroupID gID = tmpInfo[i].gID;
+		if (p.isUnpacking()) {
+		  //CkpvAccess(_groupIDTable)->push_back(gID);
+		  int eIdx = (tmpInfo[i].useDefCtor)?(tmpInfo[i].DefCtor):(tmpInfo[i].MigCtor);
+		  void *m = CkAllocSysMsg();
+		  envelope* env = UsrToEnv((CkMessage *)m);
+		  CkCreateLocalGroup(gID, eIdx, env);
+		}
+		IrrGroup *gobj = CkpvAccess(_groupTable)->find(gID).getObj();
+		if(!tmpInfo[i].useDefCtor){
+                        gobj->pup(p);
+                        DEBCHK("Group PUP'ed: gid = %d, name = %s\n",
+				gobj->ckGetGroupID().idx,
+				tmpInfo[i].name);
+		}else{
+                        DEBCHK("Group NOT PUP'ed : gid = %d, name = %s\n",
+				gobj->ckGetGroupID().idx,
+				tmpInfo[i].name);
+		}
+	}
+	return tmpInfo;
+}
+
+// handle NodeGroupTable and data
+GroupInfo *CkPupNodeGroupData(PUP::er &p, int &numNodeGroups)
+{
+	int i;
+	if (!p.isUnpacking()) {
+	  numNodeGroups = CksvAccess(_nodeGroupIDTable).size();
+	  DEBCHK("[%d]CkStartCheckpoint: numNodeGroups = %d\n",CkMyPe(),numNodeGroups);
+	}
+	p|numNodeGroups;
+	if (p.isUnpacking()) {
+	  if(CkMyPe()==0){ CksvAccess(_numNodeGroups) = numNodeGroups+1; }
+	  else { CksvAccess(_numNodeGroups) = 1; }
+	}
+
+	GroupInfo *tmpInfo2 = new GroupInfo [numNodeGroups];
+	if (!p.isUnpacking()) {
+	  for(i=0;i<numNodeGroups;i++) {
+		tmpInfo2[i].gID = CksvAccess(_nodeGroupIDTable)[i];
+		TableEntry ent2 = CksvAccess(_nodeGroupTable)->find(tmpInfo2[i].gID);
+		tmpInfo2[i].MigCtor = _chareTable[ent2.getcIdx()]->migCtor;
+		if(tmpInfo2[i].MigCtor==-1) {
+			char buf[512];
+			sprintf(buf,"NodeGroup %s either need a migration constructor and\n\
+				     declared as [migratable] in .ci to be able to checkpoint.",\
+				     _chareTable[ent2.getcIdx()]->name);
+			CkAbort(buf);
+		}
+	  }
+	}
+	for (i=0; i<numNodeGroups; i++) p|tmpInfo2[i];
+	for(i=0;i<numNodeGroups;i++) {
+		CkGroupID gID = tmpInfo2[i].gID;
+		if (p.isUnpacking()) {
+			CksvAccess(_nodeGroupIDTable).push_back(gID);
+			int eIdx = tmpInfo2[i].MigCtor;
+			void *m = CkAllocSysMsg();
+			envelope* env = UsrToEnv((CkMessage *)m);
+			CkCreateLocalNodeGroup(gID, eIdx, env);
+		}
+		TableEntry ent2 = CksvAccess(_nodeGroupTable)->find(gID);
+		ent2.getObj()->pup(p);
+		DEBCHK("Nodegroup PUP'ed: gid = %d, name = %s\n",
+			ent2.getObj()->ckGetGroupID().idx,
+			_chareTable[ent2.getcIdx()]->name);
+	}
+	return tmpInfo2;
 }
 
 void CkStartCheckpoint(char* dirname,const CkCallback& cb){
@@ -118,10 +256,8 @@ void CkStartCheckpoint(char* dirname,const CkCallback& cb){
 	if(!fRO) CkAbort("Failed to create checkpoint file for readonly data!");
 	int _numPes = CkNumPes();
 	fwrite(&_numPes,sizeof(int),1,fRO);
-	int _numReadonlies=_readonlyTable.size();
-	fwrite(&_numReadonlies,sizeof(int),1,fRO);
 	PUP::toDisk pRO(fRO);
-	for(i=0;i<_numReadonlies;i++) _readonlyTable[i]->pupData(pRO);
+	CkPupROData(pRO);
 	fwrite(&cb,sizeof(CkCallback),1,fRO);
 	fclose(fRO);
 
@@ -131,95 +267,29 @@ void CkStartCheckpoint(char* dirname,const CkCallback& cb){
 		FILE* fMain = fopen(filename,"wb");
 		if(!fMain) CkAbort("Failed to open checkpoint file for mainchare data!");
 		PUP::toDisk pMain(fMain);
-		int nMains=_mainTable.size();
-		for(i=0;i<nMains;i++){  /* Create all mainchares */
-			int entryMigCtor = _chareTable[_mainTable[i]->chareIdx]->getMigCtor();
-			if(entryMigCtor!=-1){
-				Chare* obj = (Chare *)_mainTable[i]->getObj();
-				obj->pup(pMain);
-			}
-		}
+		CkPupMainChareData(pMain);
 		fclose(fMain);
 	}
 	
 	// save groups into Groups.dat
 	// content of the file: numGroups, GroupInfo[numGroups], _groupTable(PUP'ed), groups(PUP'ed)
-	int numGroups = CkpvAccess(_groupIDTable)->size();
 	sprintf(filename,"%s/Groups.dat",dirname);
 	FILE* fGroups = fopen(filename,"wb");
 	if(!fGroups) CkAbort("Failed to create checkpoint file for group table!");
-	fwrite(&numGroups,sizeof(UInt),1,fGroups);
-	DEBCHK("[%d]CkStartCheckpoint: numGroups = %d\n",CkMyPe(),numGroups);
-
-	GroupInfo *tmpInfo = new GroupInfo [numGroups];
-	TableEntry ent;
-	for(i=0;i<numGroups;i++) {
-		tmpInfo[i].gID = (*CkpvAccess(_groupIDTable))[i];
-		ent = CkpvAccess(_groupTable)->find(tmpInfo[i].gID);
-		tmpInfo[i].useDefCtor = ent.getObj()->useDefCtor();
-		tmpInfo[i].MigCtor = _chareTable[ent.getcIdx()]->migCtor;
-		tmpInfo[i].DefCtor = _chareTable[ent.getcIdx()]->defCtor;
-		strncpy(tmpInfo[i].name,_chareTable[ent.getcIdx()]->name,255);
-		DEBCHK("[%d]CkStartCheckpoint: group %s has useDefCtor=%d\n",CkMyPe(),
-			tmpInfo[i].name,tmpInfo[i].useDefCtor);
-
-		if(tmpInfo[i].useDefCtor==0 && tmpInfo[i].MigCtor==-1) {
-			char buf[512];
-			sprintf(buf,"Group %s needs a migration constructor and PUP'er routine for restart.\n",
-				     tmpInfo[i].name);
-			CkAbort(buf);
-		}
-	}
-	if(numGroups != fwrite(tmpInfo,sizeof(GroupInfo),numGroups,fGroups)) CkAbort("error writing groupinfo");
-
 	PUP::toDisk pGroups(fGroups);
-	for(i=0;i<numGroups;i++) {
-		if(!tmpInfo[i].useDefCtor){
-                        CkpvAccess(_groupTable)->find(tmpInfo[i].gID).getObj()->pup(pGroups);
-                        DEBCHK("Group PUP'ed in: gid = %d, name = %s\n",
-				CkpvAccess(_groupTable)->find(tmpInfo[i].gID).getObj()->ckGetGroupID().idx,
-				tmpInfo[i].name);
-		}else{
-                        DEBCHK("Group NOT PUP'ed in: gid = %d, name = %s\n",
-				CkpvAccess(_groupTable)->find(tmpInfo[i].gID).getObj()->ckGetGroupID().idx,
-				tmpInfo[i].name);
-		}
-	}
-	delete [] tmpInfo;
+	int numGroups;
+	GroupInfo *tmpInfo = CkPupGroupData(pGroups, numGroups);
+ 	delete [] tmpInfo;
 	fclose(fGroups);
 
 	// save nodegroups into NodeGroups.dat
 	// content of the file: numNodeGroups, GroupInfo[numNodeGroups], _nodeGroupTable(PUP'ed), nodegroups(PUP'ed)
-	int numNodeGroups = CksvAccess(_nodeGroupIDTable).size();
 	sprintf(filename,"%s/NodeGroups.dat",dirname);
 	FILE* fNodeGroups = fopen(filename,"wb");
 	if(!fNodeGroups) CkAbort("Failed to create checkpoint file for nodegroup table!");
-	fwrite(&numNodeGroups,sizeof(UInt),1,fNodeGroups);
-	DEBCHK("[%d]CkStartCheckpoint: numNodeGroups = %d\n",CkMyPe(),numNodeGroups);
-
-	GroupInfo *tmpInfo2 = new GroupInfo [numNodeGroups];
-	TableEntry ent2;
-	for(i=0;i<numNodeGroups;i++) {
-		tmpInfo2[i].gID = CksvAccess(_nodeGroupIDTable)[i];
-		ent2 = CksvAccess(_nodeGroupTable)->find(tmpInfo2[i].gID);
-		tmpInfo2[i].MigCtor = _chareTable[ent2.getcIdx()]->migCtor;
-		if(tmpInfo2[i].MigCtor==-1) {
-			char buf[512];
-			sprintf(buf,"NodeGroup %s either need a migration constructor and\n\
-				     declared as [migratable] in .ci to be able to checkpoint.",\
-				     _chareTable[ent2.getcIdx()]->name);
-			CkAbort(buf);
-		}
-	}
-	if(numNodeGroups != fwrite(tmpInfo2,sizeof(GroupInfo),numNodeGroups,fNodeGroups)) CkAbort("error writing nodegroupinfo");
 	PUP::toDisk pNodeGroups(fNodeGroups);
-	for(i=0;i<numNodeGroups;i++) {
-		ent2 = CksvAccess(_nodeGroupTable)->find(tmpInfo2[i].gID);
-		ent2.getObj()->pup(pNodeGroups);
-		DEBCHK("Nodegroup PUP'ed in: gid = %d, name = %s\n",
-			ent2.getObj()->ckGetGroupID().idx,
-			_chareTable[ent2.getcIdx()]->name);
-	}
+	int numNodeGroups;
+	GroupInfo *tmpInfo2 = CkPupNodeGroupData(pNodeGroups, numNodeGroups);
 	delete [] tmpInfo2;
 	fclose(fNodeGroups);
 
@@ -283,12 +353,8 @@ void CkRestartMain(const char* dirname){
 	if(!fRO) CkAbort("Failed to open checkpoint file for readonly data!");
 	int _numPes = -1;
 	fread(&_numPes,sizeof(int),1,fRO);
-	int _numReadonlies=-1;
-	fread(&_numReadonlies,sizeof(int),1,fRO);
-	if (_numReadonlies != _readonlyTable.size())
-		CkAbort("You cannot add readonlies and restore from checkpoint...");
 	PUP::fromDisk pRO(fRO);
-	for(i=0;i<_numReadonlies;i++) _readonlyTable[i]->pupData(pRO);
+	CkPupROData(pRO);
 	fread(&cb,sizeof(CkCallback),1,fRO);
 	fclose(fRO);
 	DEBCHK("[%d]CkRestartMain: readonlys restored\n",CkMyPe());
@@ -298,19 +364,7 @@ void CkRestartMain(const char* dirname){
 	FILE* fMain = fopen(filename,"rb");
 	if(fMain && CkMyPe()==0){ // only main chares have been checkpointed, we restart on PE0
 		PUP::fromDisk pMain(fMain);
-		int nMains=_mainTable.size();
-		for(i=0;i<nMains;i++){  /* Create all mainchares */
-			int entryMigCtor = _chareTable[_mainTable[i]->chareIdx]->getMigCtor();
-			if(entryMigCtor!=-1){
-				int size = _chareTable[_mainTable[i]->chareIdx]->size;
-				void *obj = malloc(size);
-				_MEMCHECK(obj);
-				_mainTable[i]->setObj(obj);
-				void *m = CkAllocSysMsg();
-				_entryTable[entryMigCtor]->call(m, obj);
-				((Chare *)obj)->pup(pMain);
-			}
-		}
+		CkPupMainChareData(pMain);
 		fclose(fMain);
 		DEBCHK("[%d]CkRestartMain: mainchares restored\n",CkMyPe());
 		bdcastRO(); // to update mainchare proxy	
@@ -321,30 +375,8 @@ void CkRestartMain(const char* dirname){
 	sprintf(filename,"%s/Groups.dat",dirname);
 	FILE* fGroups = fopen(filename,"rb");
 	if(!fGroups) CkAbort("Failed to open checkpoint file for group table!");
-	fread(&numGroups,sizeof(UInt),1,fGroups);
-	if(CkMyPe()==0) { CkpvAccess(_numGroups) = numGroups+1; }else{ CkpvAccess(_numGroups) = 1; }
-	//CkpvAccess(_numGroups) = 1;
-
-	GroupInfo *tmpInfo = new GroupInfo [numGroups];
-	if(numGroups != fread(tmpInfo,sizeof(GroupInfo),numGroups,fGroups)) CkAbort("error reading groupinfo");
-
 	PUP::fromDisk pGroups(fGroups);
-	for(i=0;i<numGroups;i++) {
-		CkGroupID gID = tmpInfo[i].gID;
-		//CkpvAccess(_groupIDTable)->push_back(gID);
-		int eIdx = (tmpInfo[i].useDefCtor)?(tmpInfo[i].DefCtor):(tmpInfo[i].MigCtor);
-		void *m = CkAllocSysMsg();
-		envelope* env = UsrToEnv((CkMessage *)m);
-		CkCreateLocalGroup(gID, eIdx, env);
-		if (!tmpInfo[i].useDefCtor){
-			CkpvAccess(_groupTable)->find(gID).getObj()->pup(pGroups);
-			DEBCHK("Group PUP'ed out: gid = %d, name = %s\n",
-				CkpvAccess(_groupTable)->find(gID).getObj()->ckGetGroupID().idx,tmpInfo[i].name);
-		}else{
-			DEBCHK("Group NOT PUP'ed out: gid = %d, name = %s\n",
-				CkpvAccess(_groupTable)->find(gID).getObj()->ckGetGroupID().idx,tmpInfo[i].name);
-	    }
-	}
+	GroupInfo *tmpInfo = CkPupGroupData(pGroups, numGroups);
 	fclose(fGroups);
 
 	// restore nodegroups
@@ -353,26 +385,10 @@ void CkRestartMain(const char* dirname){
 		sprintf(filename,"%s/NodeGroups.dat",dirname);
 		FILE* fNodeGroups = fopen(filename,"rb");
 		if(!fNodeGroups) CkAbort("Failed to open checkpoint file for nodegroup table!");
-		fread(&numNodeGroups,sizeof(UInt),1,fNodeGroups);
-		if(CkMyPe()==0){ CksvAccess(_numNodeGroups) = numNodeGroups+1; }
-		else { CksvAccess(_numNodeGroups) = 1; }
-
-		GroupInfo* tmpInfo2 = new GroupInfo [numNodeGroups];
-		if(numNodeGroups != fread(tmpInfo2,sizeof(GroupInfo),numNodeGroups,fNodeGroups)) CkAbort("error reading nodegroupinfo");
-
 		PUP::fromDisk pNodeGroups(fNodeGroups);
-		for(i=0;i<numNodeGroups;i++) {
-			CkGroupID gID = tmpInfo2[i].gID;
-			CksvAccess(_nodeGroupIDTable).push_back(gID);
-			int eIdx = tmpInfo2[i].MigCtor;
-			void *m = CkAllocSysMsg();
-			envelope* env = UsrToEnv((CkMessage *)m);
-			CkCreateLocalNodeGroup(gID, eIdx, env);
-			CksvAccess(_nodeGroupTable)->find(gID).getObj()->pup(pNodeGroups);
-			DEBCHK("Nodegroup PUP'ed out: gid = %d, name = %s\n",CksvAccess(_nodeGroupTable)->find(gID).getObj()->ckGetGroupID().idx,_chareTable[CksvAccess(_nodeGroupTable)->find(gID).getcIdx()]->name);
-		}
-		fclose(fNodeGroups);
+		GroupInfo *tmpInfo2 = CkPupNodeGroupData(pNodeGroups, numNodeGroups);
 		delete [] tmpInfo2;
+		fclose(fNodeGroups);
 	}
 
 	// for each location, restore arrays
@@ -399,6 +415,9 @@ void CkRestartMain(const char* dirname){
 	if(CkMyPe()==0) {
 		DEBCHK("[%d]CkRestartMain done. sending out callback.\n",CkMyPe());
 		cb.send();
+	}
+	else {
+		DEBCHK("[%d]CkRestartMain done. \n",CkMyPe());
 	}
 }
 
