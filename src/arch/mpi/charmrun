@@ -43,14 +43,24 @@ else
         output="$indir/charmrun_script.$$.stdout"
         echo "Submitting batch job for> mpirun -np $pes $args"
         echo " using the command> qsub $script"
+	mpirun=`which mpirun`
+# Some machine specific 
+	hostname=`hostname`
+	if [ $hostname = 'turing-2.turing.uiuc.edu' ] 
+	then 
+		ppn='#PBS -l nodes='$pes':ppn=1'
+		extra='-machinefile $PBS_NODEFILE'
+	fi
         cat > $script << EOF
 #!/bin/sh
 # This is a charmrun-generated PBS batch job script.
 # The lines starting with #PBS are queuing system flags:
 
 # This determines the number of nodes and pes (here $nodes and $pes):
+$ppn
+#
 #PBS -l ncpus=$pes
-
+#
 # This determines the wall-clock time limit (here 5 minutes):
 #PBS -l walltime=5:00
 
@@ -78,16 +88,20 @@ else
 cd $indir
 
 # This is the actual command to run the job:
-mpirun -np $pes $args
+cat \$PBS_NODEFILE
+$mpirun -np $pes $extra $args
 EOF
         chmod 755 $script
-        jobid=`qsub $script|tail -1`
+	while [ -z "$jobid" ]
+	do
+          jobid=`qsub $script|tail -1`
+	done
 	echo "Job enqueued under job ID $jobid"
 # Wait for the job to complete, by checking its status
         while [ true ]
         do
                 qstat $jobid > tmp.$$
-                if [ ! $? -eq 0 ]
+                if test ! $? -eq 0 -a -f $output
                 then
 # The job is done-- print its output
                         rm tmp.$$
