@@ -1,3 +1,6 @@
+
+#define CMK_SMP						   1
+
 #undef CMK_NODE_QUEUE_AVAILABLE
 #define CMK_NODE_QUEUE_AVAILABLE                           1
 
