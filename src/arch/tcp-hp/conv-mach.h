@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.8  1995-09-29 09:50:07  jyelon
+ * Revision 2.9  1995-09-30 15:04:25  jyelon
+ * Added CMK_CTHINIT_IS_IN_MAIN, etc.
+ *
+ * Revision 2.8  1995/09/29  09:50:07  jyelon
  * CmiGet-->CmiDeliver, added protos, etc.
  *
  * Revision 2.7  1995/09/22  17:54:52  sanjeev
@@ -45,6 +48,9 @@
 
 #ifndef _CONV_MACH_H
 #define _CONV_MACH_H
+
+/* #define CMK_CTHINIT_IS_IN_MAIN */
+#define CMK_CTHINIT_IS_IN_CONVERSEINIT
 
 /* #define CMK_CSDEXITSCHEDULER_IS_A_FUNCTION */
 #define CMK_CSDEXITSCHEDULER_SET_CSDSTOPFLAG
