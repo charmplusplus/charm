@@ -16,6 +16,7 @@ Load-balancing test program:
 #include "LBDatabase.h"
 #include "Topo.h"
 #include "CentralLB.h"
+#include "DummyLB.h"
 #include "RandCentLB.h"
 #include "RecBisectBfLB.h"
 #include "RefineLB.h"
@@ -73,8 +74,11 @@ static const struct {
   LBCreateFn create;//Strategy routine
 } StratTable[]={
   {"none",
-   "none - The null load balancer, collect data, do nothing",
+   "none - The null load balancer, collect data, print data",
    CreateCentralLB},
+  {"dummy",
+   "dummy - The null load balancer, collect data, do nothing",
+   CreateDummyLB},
   {"neighbor",
    "neighbor - The neighborhood load balancer",
    CreateNeighborLB},
