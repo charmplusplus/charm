@@ -31,7 +31,6 @@ class CParseNode {
     int numPtrs;
     int isVoid; 
     int needsParamMarshalling;
-    int isOverlaped;
     CParseNode *con1, *con2, *con3, *con4;
     TList<CParseNode*> *constructs;
     TList<CStateVar*> estateVars;
@@ -40,7 +39,7 @@ class CParseNode {
     CParseNode *next;
     int nextBeginOrEnd;
     CEntry *entryPtr;
-    CParseNode(EToken t, CLexer *cLexer, CParser *cParser, int overlaps);
+    CParseNode(EToken t, CLexer *cLexer, CParser *cParser );
     CParseNode(EToken t, CLexer *cLexer, CParser *cParser, CToken *tokA, CToken *tokB, int pointers);
     CParseNode(EToken t, XStr *txt) : type(t), text(txt), con1(0), con2(0),
                                          con3(0), con4(0), constructs(0) {}

@@ -720,6 +720,8 @@ void CParseNode::generateWhen(XStr& op)
   for(el=elist->begin(); !elist->end(); el=elist->next()) {
      if (el->isVoid == 1) {
         op <<"       CkFreeSysMsg((void *) "<<el->con1->text->charstar() <<"_buf->msg);\n";
+        op << "       __cDep->removeMessage(" << el->con1->text->charstar() <<
+              "_buf);\n";
         op << "      delete " << el->con1->text->charstar() << "_buf;\n";
      }
      else if (el->needsParamMarshalling == 1) {

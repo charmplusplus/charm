@@ -104,13 +104,12 @@ static void syntaxError(CLexer *cLexer)
   exit(1);
 }
 
-CParseNode::CParseNode(EToken t, CLexer *cLexer, CParser *cParser, int overlaps)
+CParseNode::CParseNode(EToken t, CLexer *cLexer, CParser *cParser)
 {
   CToken *tok;
   CToken *tok1;
   int numberOfPointers;
   int count;
-  isOverlaped = 0;
 
   type = t; text = 0; constructs = new TList<CParseNode*>();
   con1 = con2 = con3 = con4 = 0;
@@ -119,27 +118,25 @@ CParseNode::CParseNode(EToken t, CLexer *cLexer, CParser *cParser, int overlaps)
       tok = cParser->lookForToken(IDENT);
       con1 = new CParseNode(IDENT, tok->text);
       tok = cParser->lookForToken(LP); delete tok;
-      con2 = new CParseNode(PARAMLIST, cLexer, cParser, 0); 
+      con2 = new CParseNode(PARAMLIST, cLexer, cParser); 
       tok = cLexer->getNextToken();
       if(tok->type == LBRACE) {
         delete tok;
-        constructs->append(new CParseNode(SLIST, cLexer, cParser, 0));
+        constructs->append(new CParseNode(SLIST, cLexer, cParser));
       } else
-        constructs->append(new CParseNode(tok->type, cLexer, cParser, 0));
+        constructs->append(new CParseNode(tok->type, cLexer, cParser));
       break;
     case OVERLAP:
-      isOverlaped = 1;
       tok = cLexer->getNextToken();
       if(tok->type == LBRACE) {
         delete tok;
-        constructs->append(new CParseNode(OLIST, cLexer, cParser, 1 ));
+        constructs->append(new CParseNode(OLIST, cLexer, cParser ));
       } else {
-        constructs->append(new CParseNode(tok->type, cLexer, cParser, 1));
+        constructs->append(new CParseNode(tok->type, cLexer, cParser));
       }
       break;
     case WHEN:
-      isOverlaped = overlaps; 
-      con1 = new CParseNode(ELIST, cLexer, cParser, overlaps);
+      con1 = new CParseNode(ELIST, cLexer, cParser);
       tok = cLexer->getNextToken();
       if(tok->type == LBRACE) {
         delete tok;
@@ -149,22 +146,21 @@ CParseNode::CParseNode(EToken t, CLexer *cLexer, CParser *cParser, int overlaps)
            delete tok;
         }
         else
-           constructs->append(new CParseNode(SLIST, cLexer, cParser, overlaps));
+           constructs->append(new CParseNode(SLIST, cLexer, cParser));
       } else {
-        constructs->append(new CParseNode(tok->type, cLexer, cParser, overlaps));
+        constructs->append(new CParseNode(tok->type, cLexer, cParser));
       }
       break;
     case IF:
-      isOverlaped = overlaps;
       tok = cParser->lookForToken(LP); delete tok;
       tok = cLexer->getMatchedCode("( ", LP, RP);
       con1 = new CParseNode(INT_EXPR, tok->text);
       tok = cLexer->getNextToken();
       if(tok->type == LBRACE) {
         delete tok;
-        constructs->append(new CParseNode(SLIST, cLexer, cParser, overlaps));
+        constructs->append(new CParseNode(SLIST, cLexer, cParser ));
       } else {
-        constructs->append(new CParseNode(tok->type, cLexer, cParser, overlaps));
+        constructs->append(new CParseNode(tok->type, cLexer, cParser ));
       }
       tok = cLexer->lookAhead();
       if (tok->type != ELSE) {
@@ -172,20 +168,18 @@ CParseNode::CParseNode(EToken t, CLexer *cLexer, CParser *cParser, int overlaps)
       }
       delete tok;
       tok = cLexer->getNextToken(); delete tok;
-      con2 = new CParseNode(ELSE, cLexer, cParser, overlaps);
+      con2 = new CParseNode(ELSE, cLexer, cParser );
       break;
     case ELSE:
-      isOverlaped = overlaps;
       tok = cLexer->getNextToken();
       if(tok->type == LBRACE) {
         delete tok;
-        constructs->append(new CParseNode(SLIST, cLexer, cParser, overlaps));
+        constructs->append(new CParseNode(SLIST, cLexer, cParser));
       } else {
-        constructs->append(new CParseNode(tok->type, cLexer, cParser, overlaps));
+        constructs->append(new CParseNode(tok->type, cLexer, cParser));
       }
       break;
     case FOR:
-      isOverlaped = overlaps;
       tok = cParser->lookForToken(LP); delete tok;
       tok = cLexer->getIntExpr(SEMICOLON);
       con1 = new CParseNode(INT_EXPR, tok->text);
@@ -199,26 +193,24 @@ CParseNode::CParseNode(EToken t, CLexer *cLexer, CParser *cParser, int overlaps)
       tok = cLexer->getNextToken();
       if(tok->type == LBRACE) {
         delete tok;
-        constructs->append(new CParseNode(SLIST, cLexer, cParser, overlaps));
+        constructs->append(new CParseNode(SLIST, cLexer, cParser ));
       } else {
-        constructs->append(new CParseNode(tok->type, cLexer, cParser, overlaps));
+        constructs->append(new CParseNode(tok->type, cLexer, cParser));
       }
       break;
     case WHILE:
-      isOverlaped = overlaps;
       tok = cParser->lookForToken(LP); delete tok;
       tok = cLexer->getMatchedCode("( ", LP, RP);
       con1 = new CParseNode(INT_EXPR, tok->text);
       tok = cLexer->getNextToken();
       if(tok->type == LBRACE) {
         delete tok;
-        constructs->append(new CParseNode(SLIST, cLexer, cParser, overlaps));
+        constructs->append(new CParseNode(SLIST, cLexer, cParser));
       } else {
-        constructs->append(new CParseNode(tok->type, cLexer, cParser, overlaps));
+        constructs->append(new CParseNode(tok->type, cLexer, cParser ));
       }
       break;
     case ATOMIC:
-      isOverlaped = overlaps;
       tok = cParser->lookForToken(LBRACE); delete tok;
       tok = cLexer->getMatchedCode("{ ", LBRACE, RBRACE);
       text = tok->text;
@@ -240,29 +232,25 @@ CParseNode::CParseNode(EToken t, CLexer *cLexer, CParser *cParser, int overlaps)
       break;
     case OLIST:
     case SLIST:
-      isOverlaped = overlaps;
       tok = cLexer->getNextToken();
       while(tok->type != RBRACE) {
         if (tok->type == LBRACE) {
           delete tok;
-          constructs->append(new CParseNode(SLIST, cLexer, cParser, overlaps));
+          constructs->append(new CParseNode(SLIST, cLexer, cParser ));
         } else {
-          constructs->append(new CParseNode(tok->type, cLexer, cParser, overlaps));
+          constructs->append(new CParseNode(tok->type, cLexer, cParser));
         }
         tok = cLexer->getNextToken();
       }
-      isOverlaped = overlaps;
       break;
     case ELIST:
-      isOverlaped = overlaps;
       tok = cLexer->lookAhead();
       while (tok->type == IDENT) {
-        constructs->append(new CParseNode(ENTRY, cLexer, cParser, overlaps));
+        constructs->append(new CParseNode(ENTRY, cLexer, cParser));
         tok = cLexer->lookAhead();
       }
       break;
     case ENTRY:
-      isOverlaped = overlaps;
       tok = cParser->lookForToken(IDENT);
       con1 = new CParseNode(IDENT, tok->text);
       tok = cParser->lookForToken2(LB, LP);
@@ -274,7 +262,7 @@ CParseNode::CParseNode(EToken t, CLexer *cLexer, CParser *cParser, int overlaps)
         tok = cParser->lookForToken(RB); delete tok;
         tok = cParser->lookForToken(LP); delete tok;
       }
-      con3 = new CParseNode(PARAMLIST, cLexer, cParser, overlaps);
+      con3 = new CParseNode(PARAMLIST, cLexer, cParser );
       isVoid = con3->isVoid;
       tok = cLexer->lookAhead();
       if(tok->type == COMMA) {
@@ -283,7 +271,6 @@ CParseNode::CParseNode(EToken t, CLexer *cLexer, CParser *cParser, int overlaps)
       }
       break;
     case FORALL:
-      isOverlaped = overlaps;
       tok = cParser->lookForToken(LB); delete tok;
       tok = cParser->lookForToken(IDENT);
       con1 = new CParseNode(IDENT, tok->text);
@@ -301,13 +288,12 @@ CParseNode::CParseNode(EToken t, CLexer *cLexer, CParser *cParser, int overlaps)
       tok = cLexer->getNextToken();
       if(tok->type == LBRACE) {
         delete tok;
-        constructs->append(new CParseNode(SLIST, cLexer, cParser, overlaps));
+        constructs->append(new CParseNode(SLIST, cLexer, cParser));
       } else {
-        constructs->append(new CParseNode(tok->type, cLexer, cParser, overlaps));
+        constructs->append(new CParseNode(tok->type, cLexer, cParser ));
       }
       break;
    case PARAMLIST:
-      isOverlaped = overlaps;
       tok = cLexer->lookAhead();
       if (tok->type == RP)  {
             isVoid = 1;
@@ -316,7 +302,7 @@ CParseNode::CParseNode(EToken t, CLexer *cLexer, CParser *cParser, int overlaps)
          isVoid = 0;
      
       while (tok->type != RP) {
-        CParseNode *parameter1 = new CParseNode(PARAMETER, cLexer, cParser, overlaps);
+        CParseNode *parameter1 = new CParseNode(PARAMETER, cLexer, cParser);
 	if (parameter1->isVoid == 1) {
 	   isVoid = 1;
         }
@@ -330,9 +316,8 @@ CParseNode::CParseNode(EToken t, CLexer *cLexer, CParser *cParser, int overlaps)
       tok = cParser->lookForToken(RP); delete tok;
       break;
    case PARAMETER:
-      isOverlaped = overlaps;
       tok = cLexer->lookAhead();
-      con1 = new CParseNode(VARTYPE, cLexer, cParser, overlaps);  // con1 holds the type
+      con1 = new CParseNode(VARTYPE, cLexer, cParser);  // con1 holds the type
       isVoid = con1->isVoid;
       con2 = 0; con3 = 0; con4 = 0;
       tok = cLexer->lookAhead();
@@ -377,13 +362,12 @@ CParseNode::CParseNode(EToken t, CLexer *cLexer, CParser *cParser, int overlaps)
       }
       break;
    case VARTYPE:
-      isOverlaped = overlaps;
       isVoid = 0;
       tok = cLexer->getNextToken();
       con1 = 0; con2 = 0; con3 = 0; con4 = 0;
       if (tok->type == CONST) {
          con1 = new CParseNode(CONST, tok->text);
-	 con2 = new CParseNode(VARTYPE, cLexer, cParser, overlaps);
+	 con2 = new CParseNode(VARTYPE, cLexer, cParser);
       }
       else {
         if ((tok->type == INT) || (tok->type == LONG) || (tok->type == SHORT) || (tok->type == DOUBLE) 
@@ -432,17 +416,16 @@ CParseNode::CParseNode(EToken t, CLexer *cLexer, CParser *cParser, int overlaps)
       }
       else if (tok->type == LP) {
          tok = cLexer->getNextToken(); delete tok;
-         con4 = new CParseNode(FUNCTYPE, cLexer, cParser, overlaps);
+         con4 = new CParseNode(FUNCTYPE, cLexer, cParser);
       }
       break;
     case FUNCTYPE:
-      isOverlaped =overlaps;
       tok = cParser->lookForToken(STAR); delete tok;     
       tok = cParser->lookForToken(IDENT);
       con1 = new CParseNode(IDENT, tok->text);
       tok = cParser->lookForToken(RP); delete tok;
       tok = cParser->lookForToken(LP); delete tok;
-      con2 = new CParseNode(PARAMLIST, cLexer, cParser, overlaps);
+      con2 = new CParseNode(PARAMLIST, cLexer, cParser);
       break;
     default:
       syntaxError(cLexer);
