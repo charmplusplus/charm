@@ -103,7 +103,7 @@ extern "C" int LDRunningObject(LDHandle _h, LDObjHandle* _o)
   } else return 0;
 }
 
-extern "C" void LDObjectStart(LDObjHandle _h)
+extern "C" void LDObjectStart(const LDObjHandle &_h)
 {
   LBDB *const db = (LBDB*)(_h.omhandle.ldb.handle);
 
@@ -117,7 +117,7 @@ extern "C" void LDObjectStart(LDObjHandle _h)
   }
 }
 
-extern "C" void LDObjectStop(LDObjHandle _h)
+extern "C" void LDObjectStop(const LDObjHandle &_h)
 {
   LBDB *const db = (LBDB*)(_h.omhandle.ldb.handle);
   LBObj *const obj = db->LbObj(_h);
@@ -130,7 +130,7 @@ extern "C" void LDObjectStop(LDObjHandle _h)
   db->NoRunningObj();
 }
 
-extern "C" void LDSend(LDOMHandle destOM, LDObjid destid, unsigned int bytes)
+extern "C" void LDSend(const LDOMHandle &destOM, const LDObjid &destid, unsigned int bytes)
 {
   LBDB *const db = (LBDB*)(destOM.ldb.handle);
   if (db->StatsOn())
@@ -306,12 +306,12 @@ extern "C" int LDProcessorSpeed()
   return wps;
 }
 
-CmiBool LDOMidEqual(const LDOMid i1, const LDOMid i2)
+CmiBool LDOMidEqual(const LDOMid &i1, const LDOMid &i2)
 {
  return (CmiBool)(i1.id == i2.id);
 }
 
-CmiBool LDObjIDEqual(const LDObjid i1, const LDObjid i2)
+CmiBool LDObjIDEqual(const LDObjid &i1, const LDObjid &i2)
 {
   return (CmiBool)(i1.id[0] == i2.id[0] 
 	 && i1.id[1] == i2.id[1] && i1.id[2] == i2.id[2] 

@@ -130,7 +130,7 @@ void LBDB::DoneRegisteringObjects(LDOMHandle _h)
 }
 
 
-void LBDB::Send(LDOMHandle destOM, LDObjid destid, unsigned int bytes)
+void LBDB::Send(const LDOMHandle &destOM, const LDObjid &destid, unsigned int bytes)
 {
   LBCommData* item_ptr;
 

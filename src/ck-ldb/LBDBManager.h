@@ -82,12 +82,12 @@ public:
   void DoneRegisteringObjects(LDOMHandle _h);
 
   inline LBOM *LbOM(LDOMHandle h) { return oms[h.handle]; };
-  inline LBObj *LbObj(LDObjHandle h) { return objs[h.handle]; };
+  inline LBObj *LbObj(const LDObjHandle &h) const { return objs[h.handle]; };
   void DumpDatabase(void);
   inline void TurnStatsOn(void) {statsAreOn = CmiTrue; machineUtil.StatsOn();}
   inline void TurnStatsOff(void) {statsAreOn = CmiFalse;machineUtil.StatsOff();}
-  inline CmiBool StatsOn(void) { return statsAreOn; };
-  void Send(LDOMHandle destOM, LDObjid destid, unsigned int bytes);
+  inline CmiBool StatsOn(void) const { return statsAreOn; };
+  void Send(const LDOMHandle &destOM, const LDObjid &destid, unsigned int bytes);
   int ObjDataCount();
   void GetObjData(LDObjData *data);
   inline int CommDataCount() { 
@@ -110,12 +110,12 @@ public:
   };
   void BackgroundLoad(double* walltime, double* cputime);
   void ClearLoads(void);
-  inline void SetRunningObj(LDObjHandle _h) {
+  inline void SetRunningObj(const LDObjHandle &_h) {
     runningObj = _h; obj_running = CmiTrue;
   };
   inline void NoRunningObj() { obj_running = CmiFalse; };
-  inline CmiBool ObjIsRunning() { return obj_running; };
-  inline LDObjHandle RunningObj() { return runningObj; };
+  inline CmiBool ObjIsRunning() const { return obj_running; };
+  inline const LDObjHandle &RunningObj() const { return runningObj; };
   
   inline LDBarrierClient AddLocalBarrierClient(LDResumeFn fn, void* data) { 
     return localBarrier.AddClient(fn,data);

@@ -129,9 +129,9 @@ void LDUnregisterObj(LDObjHandle h);
 
 void LDObjTime(LDObjHandle h, double walltime, double cputime);
 int LDRunningObject(LDHandle _h, LDObjHandle* _o );
-void LDObjectStart(LDObjHandle _h);
-void LDObjectStop(LDObjHandle _h);
-void LDSend(LDOMHandle destOM, LDObjid destid, unsigned int bytes);
+void LDObjectStart(const LDObjHandle &_h);
+void LDObjectStop(const LDObjHandle &_h);
+void LDSend(const LDOMHandle &destOM, const LDObjid &destid, unsigned int bytes);
 
 void LDMessage(LDObjHandle from, 
 	       LDOMid toOM, LDObjid *toID, int bytes);
@@ -188,8 +188,8 @@ void LDRemoveLocalBarrierReceiver(LDHandle lbdb,LDBarrierReceiver h);
 void LDAtLocalBarrier(LDHandle lbdb, LDBarrierClient h);
 void LDResumeClients(LDHandle lbdb);
 int LDProcessorSpeed();
-CmiBool LDOMidEqual(const LDOMid i1, const LDOMid i2);
-CmiBool LDObjIDEqual(const LDObjid i1, const LDObjid i2);
+CmiBool LDOMidEqual(const LDOMid &i1, const LDOMid &i2);
+CmiBool LDObjIDEqual(const LDObjid &i1, const LDObjid &i2);
 
 #ifdef __cplusplus
 }
