@@ -18,20 +18,16 @@ void TCHARM_User_setup(void);
 
 void TCHARM_Call_fallback_setup(void);
 
-/**** Routines you can call from UserNodeSetup: ****/
-
-/*Register readonly global variables-- these will be broadcast
-after init and available in driver.*/
-typedef void (*TCpupReadonlyGlobal)(pup_er p);
-void TCHARM_Readonly_globals(TCpupReadonlyGlobal fn);
-
-/**** Routines you can call from UserSetup: ****/
+/**** Routines you can call to create threads: ****/
 
 /*Set the size of the thread stack*/
 void TCHARM_Set_stack_size(int newStackSize);
 
 /*Exit the program when these threads are finished. */
 void TCHARM_Set_exit(void);
+
+/*Get the number of chunks we expect based on the command line*/
+int TCHARM_Get_num_chunks(void);
 
 /*Create a new array of threads, which will be bound to by subsequent libraries*/
 typedef void (*TCHARM_Thread_start_fn)(void);
@@ -41,9 +37,6 @@ void TCHARM_Create(int nThreads,TCHARM_Thread_start_fn threadFn);
 typedef void (*TCHARM_Thread_data_start_fn)(void *threadData);
 void TCHARM_Create_data(int nThreads,TCHARM_Thread_data_start_fn threadFn,
 		  void *threadData,int threadDataLen);
-
-/*Get the number of chunks we expect based on the command line*/
-int TCHARM_Get_num_chunks(void);
 
 
 /**** Routines you can call from the thread (driver) ****/

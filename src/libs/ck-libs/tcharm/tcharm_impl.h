@@ -17,28 +17,6 @@ Orion Sky Lawlor, olawlor@acm.org, 11/19/2001
 #include "cklists.h"
 #include "memory-isomalloc.h"
 
-PUPbytes(TCpupReadonlyGlobal);
-
-//User's readonly global variables, set exactly once after initialization
-class TCharmReadonlys {
-	CkVec<TCpupReadonlyGlobal> entries;
- public:
-	void add(TCpupReadonlyGlobal fn);
-	void add(const TCharmReadonlys &r);
-	
-	inline int size(void) const {return entries.size();}
-	
-	//Pup the readonly *functions* (for shipping)
-	void pup(PUP::er &p);
-
-	//Pups the readonly *data*
-	void pupData(PUP::er &p);
-	
-	//Pups all registered readonlys	
-	static void pupAll(PUP::er &p);
-};
-PUPmarshall(TCharmReadonlys);
-
 class TCharmTraceLibList;
 
 #include "tcharm.decl.h"
@@ -72,12 +50,8 @@ class TCharmInitMsg : public CMessage_TCharmInitMsg {
 		:threadFn(threadFn_), opts(opts_) {}
 };
 
-//Current computation location
-typedef enum {inNodeSetup,inInit,inDriver,inFramework,inPup} inState;
-
 //Thread-local variables:
 CtvExtern(TCharm *,_curTCharm);
-CkpvExtern(inState,_stateTCharm);
 
 CDECL {typedef void (*TCpupUserDataC)(pup_er p,void *data);};
 FDECL {typedef void (*TCpupUserDataF)(pup_er p,void *data);};
@@ -166,12 +140,6 @@ class TCharm: public CBase_TCharm
 
 	void ResumeFromSync(void);
 
-#ifdef CMK_OPTIMIZE
-	static inline void check(void) {}
-#else
-	static void check(void);
-#endif
-
  public:
 	TCharm(TCharmInitMsg *initMsg);
 	TCharm(CkMigrateMessage *);
@@ -206,9 +174,14 @@ class TCharm: public CBase_TCharm
 	int add(const UserData &d);
 	void *lookupUserData(int ud);
 	
-	inline static TCharm *get(void) {check(); return CtvAccess(_curTCharm);}
-	inline static inState getState(void) {return CkpvAccess(_stateTCharm);}
-	inline static void setState(inState to) {CkpvAccess(_stateTCharm)=to;}
+	inline static TCharm *get(void) {
+		TCharm *c=getNULL();
+#ifndef CMK_OPTIMIZE
+		if (!c) ::CkAbort("TCharm has not been initialized!\n");
+#endif
+		return c;
+	}
+	inline static TCharm *getNULL(void) {return CtvAccess(_curTCharm);}
 	inline CthThread getThread(void) {return tid;}
 	inline const CProxy_TCharm &getProxy(void) const {return threadInfo.tProxy;}
 	inline int getElement(void) const {return threadInfo.thisElement;}
@@ -219,18 +192,14 @@ class TCharm: public CBase_TCharm
 	inline void startTiming(void) {ckStartTiming();}
 
 	//Block our thread, run the scheduler, and come back
-	inline void schedule(void) {
-		stopTiming();
-		CthYield();
-		startTiming();
-	}
+	void schedule(void);
 
 	//As above, but start/stop the thread itself, too.
 	void stop(void); //Blocks; will not return until "start" called.
 	void start(void);
 	//Aliases:
 	inline void suspend(void) {stop();}
-	inline void resume(void) {start();}
+	inline void resume(void) { if (isStopped) start();}
 
 	//Go to sync, block, possibly migrate, and then resume
 	void migrate(void);

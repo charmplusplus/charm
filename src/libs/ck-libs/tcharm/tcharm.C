@@ -18,7 +18,6 @@ Orion Sky Lawlor, olawlor@acm.org, 11/19/2001
 #endif
 
 CtvDeclare(TCharm *,_curTCharm);
-CkpvDeclare(inState,_stateTCharm);
 
 static int lastNumChunks=0;
 
@@ -61,8 +60,6 @@ void TCharm::nodeInit(void)
 {
   CtvInitialize(TCharm *,_curTCharm);
   CtvAccess(_curTCharm)=NULL;
-  CkpvInitialize(inState,_stateTCharm);
-  TCharm::setState(inInit);
 
   tcharm_initted=1;
 }
@@ -103,7 +100,7 @@ void TCHARM_Api_trace(const char *routineName,const char *libraryName)
 
 static void startTCharmThread(TCharmInitMsg *msg)
 {
-	TCharm::setState(inDriver);
+	DBGX("thread started");
 	CtvAccess(_curTCharm)->activateHeap();
 	typedef void (*threadFn_t)(void *);
 	((threadFn_t)msg->threadFn)(msg->data);
@@ -131,7 +128,6 @@ TCharm::TCharm(TCharmInitMsg *initMsg_)
 #endif
   }
   CtvAccessOther(tid,_curTCharm)=this;
-  TCharm::setState(inInit);
   isStopped=true;
   resumeAfterMigration=false;
   exitWhenDone=initMsg->opts.exitWhenDone;
@@ -188,13 +184,11 @@ void TCharm::pup(PUP::er &p) {
   }
 
   //Pack all user data
-  TCharm::setState(inPup);
   s.seek(0);
   p(nUd);
   for(int i=0;i<nUd;i++)
     ud[i].pup(p);
   p|sud;
-  TCharm::setState(inFramework);
 
   if (!p.isUnpacking())
   {//In this case, pack the thread & heap after the user data
@@ -279,25 +273,28 @@ void *TCharm::lookupUserData(int i) {
 void TCharm::run(void)
 {
   DBG("TCharm::run()");
-  start();
+  if (tcharm_nothreads) {/*Call user routine directly*/
+	  startTCharmThread(initMsg);
+  } 
+  else /* start the thread as usual */
+  	  start();
 }
 
 //Block the thread until start()ed again.
 void TCharm::stop(void)
 {
-  if (isStopped) return; //Nothing to do
 #ifndef CMK_OPTIMIZE
-  DBG("suspending thread");
   if (tid != CthSelf())
     CkAbort("Called TCharm::stop from outside TCharm thread!\n");
   if (tcharm_nothreads)
     CkAbort("Cannot make blocking calls using +tcharm_nothreads!\n");
 #endif
-  isStopped=true;
   stopTiming();
-  TCharm::setState(inFramework);
+  isStopped=true;
+  DBG("thread suspended");
   CthSuspend();
-  TCharm::setState(inDriver);
+  DBG("thread resumed");
+  isStopped=false;
   /*We have to do the get() because "this" may have changed
     during a migration-suspend.*/
   TCharm::get()->startTiming();
@@ -306,14 +303,16 @@ void TCharm::stop(void)
 //Resume the waiting thread
 void TCharm::start(void)
 {
-  if (!isStopped) return; //Already started
   isStopped=false;
-  TCharm::setState(inDriver);
-  DBG("awakening thread");
-  if (tcharm_nothreads) /*Call user routine directly*/
-	  startTCharmThread(initMsg);
-  else /*Jump to thread normally*/
-	  CthAwaken(tid);
+  DBG("thread resuming soon");
+  CthAwaken(tid);
+}
+
+//Block our thread, schedule, and come back:
+void TCharm::schedule(void) {
+  DBG("thread schedule");
+  start(); // Calls CthAwaken
+  stop(); // Calls CthSuspend
 }
 
 //Go to sync, block, possibly migrate, and then resume
@@ -334,15 +333,6 @@ void TCharm::ResumeFromSync(void)
   start();
 }
 
-#ifndef CMK_OPTIMIZE
-//Make sure we're actually in driver
-void TCharm::check(void)
-{
-	if (getState()!=inDriver)
-		::CkAbort("TCharm> Can only use that routine from within driver!\n");
-}
-#endif
-
 
 /****** TcharmClient ******/
 void TCharmClient1D::ckJustMigrated(void) {
@@ -358,119 +348,8 @@ void TCharmClient1D::pup(PUP::er &p) {
 
 CkArrayID TCHARM_Get_threads(void) {
 	TCHARMAPI("TCHARM_Get_threads");
-	if (TCharm::getState()!=inDriver)
-		CkAbort("Can only call TCHARM_Get_threads from driver!\n");
 	return TCharm::get()->getProxy();
 }
-
-/****** Readonlys *****/
-static int tcharm_readonlygroup_created=0;
-static TCharmReadonlys *initial_readonlies=NULL;
-TCharmReadonlys &getInitialReadonlies(void) {
-	if (!initial_readonlies) initial_readonlies=new TCharmReadonlys;
-	return *initial_readonlies;
-}
-CProxy_TCharmReadonlyGroup tcharm_readonlygroup;
-
-class TCharmReadonlyGroup : public CBase_TCharmReadonlyGroup {
-public:
-	TCharmReadonlys all;
-	
-	TCharmReadonlyGroup(CkMigrateMessage* m){ /* empty */ }
-	TCharmReadonlyGroup(TCharmReadonlys &r,int len,const char *data)
-	{
-		add(r,len,data);
-	}
-	
-	void add(TCharmReadonlys &r,int len,const char *data) {
-		// Unpack these readonlies:
-		PUP::fromMem p(data);
-		r.pupData(p);
-		// Add to our list:
-		all.add(r);
-	}
-	
-	void pup(PUP::er &p) {
-		all.pup(p);
-		all.pupData(p);
-	}
-};
-
-// Send out this set of readonlies to the readonly group:
-static void send_readonlies(TCharmReadonlys &r) {
-	int len; {PUP::sizer p; r.pupData(p); len=p.size();}
-	char *data=new char[len];
-	{PUP::toMem p(data); r.pupData(p);}
-	tcharm_readonlygroup.add(r,len,data);
-	delete[] data;
-}
-
-class TCharmReadonlyMain : public CBase_TCharmReadonlyMain {
-public:
-    TCharmReadonlyMain(void) {
-    	TCharmReadonlys &r=getInitialReadonlies();
-	int len; {PUP::sizer p; r.pupData(p); len=p.size();}
-	char *data=new char[len];
-	{PUP::toMem p(data); r.pupData(p);}
-        tcharm_readonlygroup=CProxy_TCharmReadonlyGroup::ckNew(r,len,data);
-	delete[] data;
-	tcharm_readonlygroup_created=1;
-    }
-};
-
-void TCharmReadonlys::add(TCpupReadonlyGlobal fn)
-{
-	entries.push_back(fn);
-}
-void TCharmReadonlys::add(const TCharmReadonlys &r) {
-	for (unsigned int i=0;i<r.entries.size();i++)
-		entries.push_back(r.entries[i]);
-}
-
-//Pup the readonly *functions* (for shipping)
-void TCharmReadonlys::pup(PUP::er &p) {
-	p|entries;
-}
-
-//Pups the readonly *data*
-void TCharmReadonlys::pupData(PUP::er &p) {
-	for (unsigned int i=0;i<entries.size();i++)
-		(entries[i])((pup_er)&p);
-}
-
-//Pups all readonly data registered so far.
-void TCharmReadonlys::pupAll(PUP::er &p) {
-	if (!tcharm_readonlygroup_created)
-		CkAbort("TCharmReadonlys::pupAll can only be called after the TCHARM main");
-	TCharmReadonlys &all=tcharm_readonlygroup.ckLocalBranch()->all;
-	int n=all.size();
-	p|n;
-	if (n!=all.size())
-		CkAbort("TCharmReadonly list length mismatch!\n");
-	all.pupData(p);
-}
-
-CDECL void TCHARM_Readonly_globals(TCpupReadonlyGlobal fn)
-{
-	if (!tcharm_readonlygroup_created) 
-	{ // Readonly message hasn't gone out yet: just add to list.
-	  // Because this routine can be called from nodesetup,
-	  //  TCHARMAPI isn't safe yet.
-		getInitialReadonlies().add(fn);
-	} 
-	else /* tcharm_readonlygroup_created */
-	{ // Late addition: Broadcast our copy of the readonly data:
-		TCHARMAPI("TCHARM_Readonly_globals");
-		TCharmReadonlys r; r.add(fn);
-		send_readonlies(r);
-	}
-}
-FDECL void FTN_NAME(TCHARM_READONLY_GLOBALS,tcharm_readonly_globals)
-	(TCpupReadonlyGlobal fn)
-{
-	TCHARM_Readonly_globals(fn);
-}
-
 
 /************* Startup/Shutdown Coordination Support ************/
 
@@ -489,7 +368,7 @@ void TCharm::barrier(void) {
 void TCharm::atBarrier(CkReductionMsg *m) {
 	DBGX("clients all at barrier");
 	delete m;
-	thisProxy.run(); //Just restart everybody
+	thisProxy.start(); //Just restart everybody
 }
 
 //Called when the thread is done running
@@ -588,8 +467,6 @@ CDECL void TCHARM_Create_data(int nThreads,
 		  void *threadData,int threadDataLen)
 {
 	TCHARMAPI("TCHARM_Create_data");
-	if (TCharm::getState()!=inInit)
-		CkAbort("TCharm> Can only create threads from in init!\n");
 	TCharmInitMsg *msg=new (threadDataLen,0) TCharmInitMsg(
 		(CthVoidFn)threadFn,g_tcharmOptions);
 	msg->numElements=nThreads;
@@ -652,10 +529,7 @@ CDECL int TCHARM_Element(void)
 CDECL int TCHARM_Num_elements(void)
 { 
 	TCHARMAPI("TCHARM_Num_elements");
-	if (TCharm::getState()==inDriver)
-		return TCharm::get()->getNumElements();
-	else
-		return lastNumChunks;
+	return TCharm::get()->getNumElements();
 }
 
 FDECL int FTN_NAME(TCHARM_ELEMENT,tcharm_element)(void) 
@@ -703,8 +577,7 @@ CDECL void TCHARM_Set_global(int globalID,void *new_value,TCHARM_Pup_global_fn p
 	if (tc->sud.length()<=globalID)
 	{ //We don't have room for this ID yet: make room
 		int newLen=2*globalID;
-		tc->sud.setSize(newLen);
-		tc->sud.length()=newLen;
+		tc->sud.resize(newLen);
 	}
 	tc->sud[globalID]=TCharm::UserData((TCHARM_Pup_fn) pup_or_NULL,new_value);
 }
@@ -749,8 +622,9 @@ FORTRAN_AS_C(TCHARM_BARRIER,TCHARM_Barrier,tcharm_barrier,(void),())
 CDECL void TCHARM_Done(void)
 {
 	TCHARMAPI("TCHARM_Done");
-	if (TCharm::getState()!=inDriver) CkExit();
-	else TCharm::get()->done();
+	TCharm *c=TCharm::getNULL();
+	if (!c) CkExit();
+	else c->done();
 }
 FORTRAN_AS_C(TCHARM_DONE,TCHARM_Done,tcharm_done,(void),())
 
@@ -758,9 +632,10 @@ FORTRAN_AS_C(TCHARM_DONE,TCHARM_Done,tcharm_done,(void),())
 CDECL double TCHARM_Wall_timer(void)
 {
   TCHARMAPI("TCHARM_Wall_timer");
-  if(TCharm::getState()!=inDriver) return CkWallTimer();
+  TCharm *c=TCharm::getNULL();
+  if(!c) return CkWallTimer();
   else { //Have to apply current thread's time offset
-    return CkWallTimer()+TCharm::get()->getTimeOffset();
+    return CkWallTimer()+c->getTimeOffset();
   }
 }
 

@@ -4,20 +4,11 @@ module tcharm {
   };
   array [1D] TCharm {
     entry TCharm(TCharmInitMsg *initMsg);
-    entry void run(void);
     entry void atBarrier(CkReductionMsg *);
     entry void atExit(CkReductionMsg *);
     entry void migrateDelayed(int destPE);
+    entry void start(void);
     initproc void procInit(void);
     initnode void nodeInit(void);
-  };
-  
-  readonly CProxy_TCharmReadonlyGroup tcharm_readonlygroup;
-  group [migratable] TCharmReadonlyGroup {
-    entry TCharmReadonlyGroup(TCharmReadonlys r,int len,char data[len]);
-    entry void add(TCharmReadonlys r,int len,char data[len]);
-  };
-  mainchare TCharmReadonlyMain {
-    entry TCharmReadonlyMain(void);
   };
 };
