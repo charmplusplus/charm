@@ -96,6 +96,8 @@ int setJcontext (const uJcontext_t *u)
  pointer (ebp), this is all that's needed.
 */
 			__asm { mov esp, new_sp };
+#elifdef __CYGWIN__
+			asm ( "mov %0, %%esp\n"::"m"(new_sp));
 #elif 0 /* Blue Gene/Light gcc PPC assembly version: */
 			asm __volatile__ ("mr 1,%0" :: "r"(new_sp));
 #else /* Portable alloca version */
