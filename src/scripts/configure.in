@@ -162,7 +162,7 @@ cat > $t <<EOT
 __int64 foo(void) { return 17; }
 EOT
 test_cxx "whether __int64 works" "ok" "no" ""
-AC_DEFINE_UNQUOTED([CMK___int64_DEFINED], 1, [wether __int64 works])
+AC_DEFINE_UNQUOTED([CMK___int64_DEFINED], 1, [whether __int64 works])
 
 #### Check long double ####
 cat > $t <<EOT
@@ -284,6 +284,39 @@ public:
 EOT
 test_cxx "whether operator delete can be overloaded in same class" "ok" "no" ""
 AC_DEFINE_UNQUOTED(CMK_MULTIPLE_DELETE, $strictpass, [whether operator delete can be overloaded in same class])
+
+
+#### test if we can use gcc x86 assembly like this ####
+cat > $t <<EOT
+double foo(void)
+{
+  unsigned long long int v;
+  int *lo=0+(int *)&v;
+  int *hi=1+(int *)&v;
+  __asm__ __volatile__(
+      "rdtsc; movl %%edx,%0; movl %%eax,%1"
+      : /* output  */ "=m" (*hi), "=m" (*lo)
+      : /* input */
+      : /* trashes */ "%edx", "%eax"
+  );
+  return v;
+}
+EOT
+test_cxx "whether GCC x86 assembly works" "yes" "no" ""
+AC_DEFINE_UNQUOTED(CMK_GCC_X86_ASM, $strictpass, [Allows gcc x86 assembly.])
+
+#### test if we can use gcc IA64 assembly like this ####
+cat > $t <<EOT
+double foo(void)
+{
+        unsigned long long int x;
+	__asm__ __volatile__("mov %0=ar.itc" : "=r"(x) :: "memory");
+        return x;
+}
+EOT
+test_cxx "whether GCC IA64 assembly works" "yes" "no" ""
+AC_DEFINE_UNQUOTED(CMK_GCC_IA64_ASM, $strictpass, [Allows gcc IA64 assembly.])
+
 
 ################### Syscalls and Libraries ###################
 

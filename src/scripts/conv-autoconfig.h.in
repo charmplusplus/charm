@@ -33,6 +33,12 @@
 /* TWOSCORE */
 #undef CMK_FORTRAN_USES_TWOSCORE
 
+/* Allows gcc IA64 assembly. */
+#undef CMK_GCC_IA64_ASM
+
+/* Allows gcc x86 assembly. */
+#undef CMK_GCC_X86_ASM
+
 /* whether has alloca.h */
 #undef CMK_HAS_ALLOCA
 
@@ -96,7 +102,7 @@
 /* whether the std:: names for STL work */
 #undef CMK_USE_STL
 
-/* wether __int64 works */
+/* whether __int64 works */
 #undef CMK___int64_DEFINED
 
 /* Define to the address where bug reports for this package should be sent. */
