@@ -2033,7 +2033,7 @@ void gen_mod_tail()
   fprintf(file_cpm, "CpvInitialize(int, CpmIPRIO);\n");
   for (i=0; i<mod_len; i++) {
     fprintf(file_cpm, "CpvInitialize(int, CpmIndex_%s);\n", mod_funcs[i]);
-    fprintf(file_cpm, "CpvAccess(CpmIndex_%s) = CmiRegisterHandler(CpmRecv_%s);\n",
+    fprintf(file_cpm, "CpvAccess(CpmIndex_%s) = CmiRegisterHandler((CmiHandler)CpmRecv_%s);\n",
 	  mod_funcs[i], mod_funcs[i]);
   }
   fprintf(file_cpm, "}\n");
