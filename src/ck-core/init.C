@@ -565,14 +565,12 @@ void _initCharm(int unused_argc, char **argv)
 	CmiNodeAllBarrier();
 
 	if(_doRestart){
-CkPrintf("[%d]Restarting...\n",CkMyPe());
 		register int i;
 		_allStats = new Stats*[CkNumPes()];
 		CkRestartMain(_restartDir);
 		//if(CkMyPe()==0)
 		_initDone();
 	}else if(CkMyPe()==0){
-CkPrintf("[%d]Not restarting... you never know...\n",CkMyPe());
 		_allStats = new Stats*[CkNumPes()];
 		register int i;
 		for(i=0;i<_numMains;i++)  /* Create all mainchares */
