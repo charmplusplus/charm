@@ -13,6 +13,9 @@ Orion Sky Lawlor, olawlor@acm.org, 10/28/2001
 
 #include "toNetwork4.h"
 
+#include "tcharm.h"
+#define NETFEMAPI(routineName) TCHARM_API_TRACE(routineName,"netfem")
+
 //Describes what to do with incoming data
 class NetFEM_flavor {
 public:	
@@ -123,6 +126,7 @@ CDECL NetFEM NetFEM_Begin(
 	int flavor /*What to do with data (point at, write, or copy)*/
 ) 
 {
+	NETFEMAPI("NetFEM_Begin");
 	//On one processor, this is our only chance to network!
 	if (CkNumPes()==1) CthYield();
 	return (NetFEM)(new NetFEM_updatePackage(dim,timestep,flavor));
@@ -133,6 +137,7 @@ FDECL NetFEMF FTN_NAME(NETFEM_BEGIN,netfem_begin)(int *d,int *t,int *f)
 }
 
 CDECL void NetFEM_End(NetFEM n) { /*Publish these updates*/
+	NETFEMAPI("NetFEM_End");
 	getState()->add(N);
 }
 FDECL void FTN_NAME(NETFEM_END,netfem_end)(NetFEMF nf) {
@@ -144,12 +149,14 @@ FDECL void FTN_NAME(NETFEM_END,netfem_end)(NetFEMF nf) {
    In 3D, node i has location (loc[3*i+0],loc[3*i+1],loc[3*i+2])
 */
 CDECL void NetFEM_Nodes(NetFEM n,int nNodes,double *loc,const char *name) {
+	NETFEMAPI("NetFEM_Nodes");
 	N->addNodes(new NetFEM_nodes(nNodes,N->getDim(),loc,name));
 }
 
 FDECL void FTN_NAME(NETFEM_NODES,netfem_nodes)
 	(NetFEMF nf,int *nNodes,double *loc,FTN_STR_DECL)
 {
+	NETFEMAPI("NetFEM_nodes");
 	NF->addNodes(new NetFEM_nodes(*nNodes,NF->getDim(),loc,FTN_STR));
 }
 
@@ -158,12 +165,14 @@ FDECL void FTN_NAME(NETFEM_NODES,netfem_nodes)
 */
 CDECL void NetFEM_Elements(NetFEM n,int nEl,int nodePerEl,int *conn,const char *name)
 {
+	NETFEMAPI("NetFEM_Elements");
 	N->addElems(new NetFEM_elems(nEl,nodePerEl,conn,0,name));
 }
 
 FDECL void FTN_NAME(NETFEM_ELEMENTS,netfem_elements)
 	(NetFEMF nf,int *nEl,int *nodePerEl,int *conn,FTN_STR_DECL)
 {
+	NETFEMAPI("NetFEM_elements");
 	NF->addElems(new NetFEM_elems(*nEl,*nodePerEl,conn,1,FTN_STR));
 }
 /*--------------------------------------------------
@@ -174,12 +183,14 @@ CDECL void NetFEM_Vector_Field(NetFEM n,double *start,
 	int init_offset,int distance,
 	const char *name)
 {
+	NETFEMAPI("NetFEM_Vector_Field");
 	NetFEM_item::format fmt(N->getDim(),init_offset,distance);
 	N->getItem()->add(start,fmt,name,true);
 }
 FDECL void FTN_NAME(NETFEM_VECTOR_FIELD,netfem_vector_field)
 	(NetFEMF nf,double *start,int *init_offset,int *distance,FTN_STR_DECL)
 {
+	NETFEMAPI("NetFEM_vector_field");
 	CkShortStr s=FTN_STR;
 	NetFEM_Vector_Field((NetFEM)NF,start,*init_offset,*distance,s);
 }
@@ -206,6 +217,7 @@ CDECL void NetFEM_Scalar_Field(NetFEM n,double *start,
 	int vec_len,int init_offset,int distance,
 	const char *name)
 {
+	NETFEMAPI("NetFEM_Scalar_Field");
 	NetFEM_item::format fmt(vec_len,init_offset,distance);
 	N->getItem()->add(start,fmt,name,false);
 }
@@ -214,6 +226,7 @@ FDECL void FTN_NAME(NETFEM_SCALAR_FIELD,netfem_scalar_field)
 	(NetFEMF nf,double *start,int *veclen,int *init_offset,
 	 int *distance,FTN_STR_DECL)
 {
+	NETFEMAPI("NetFEM_scalar_field");
 	CkShortStr s=FTN_STR;
 	NetFEM_Scalar_Field((NetFEM)NF,start,*veclen,*init_offset,*distance,s);
 }
