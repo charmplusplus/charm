@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.35  1995-10-31 19:53:21  jyelon
+ * Revision 2.36  1996-01-03 23:18:37  sanjeev
+ * CmiSize prototype should have void * argument
+ *
+ * Revision 2.35  1995/10/31 19:53:21  jyelon
  * Added 'CMK_THREADS_USE_ALLOCA_WITH_PRAGMA'
  *
  * Revision 2.34  1995/10/27  22:37:08  jyelon
@@ -257,7 +260,7 @@ extern int CmiRegisterHandler CMK_PROTO((CmiHandler));
     (CpvAccess(CmiHandlerTable)[CmiGetHandler(env)])
 
 void    *CmiAlloc  CMK_PROTO((int size));
-int      CmiSize   CMK_PROTO(());
+int      CmiSize   CMK_PROTO((void *));
 void     CmiFree   CMK_PROTO((void *));
 
 double   CmiTimer  CMK_PROTO(());
