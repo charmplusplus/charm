@@ -17,13 +17,16 @@ static char ident[] = "@(#)$Header$";
 #include <stdio.h>
 #include "converse.h"
 #include "conv-mach.h"
+#include "conv-conds.h"
 
 #define MAX_HANDLERS 512
 
 void        *CmiGetNonLocal();
 
+CpvDeclare(int, disable_sys_msgs);
 CsvDeclare(CmiHandler*, CmiHandlerTable);
 CpvExtern(void*, CmiLocalQueue);
+CpvExtern(int, CcdNumChecks) ;
 CpvStaticDeclare(int, handlerCount);
 CpvDeclare(void*, CsdSchedQueue);
 CpvDeclare(int,   CsdStopFlag);
@@ -48,6 +51,9 @@ CpvStaticDeclare(int, CstatPrintMemStatsFlag);
 
 void convcoreModuleInit()
 {
+     CpvInitialize(int, disable_sys_msgs);
+     CpvAccess(disable_sys_msgs) = 0;
+
      CpvInitialize(int, CstatsMaxChareQueueLength);
      CpvInitialize(int, CstatsMaxForChareQueueLength);
      CpvInitialize(int, CstatsMaxFixedChareQueueLength);
@@ -100,6 +106,7 @@ char **argv;
   if (CmiMyRank() != 0) CmiNodeBarrier();
 
   convcoreModuleInit();
+  conv_condsModuleInit() ;
 
   if (CmiMyRank() == 0) 
   {
@@ -252,34 +259,43 @@ CsdInit(char **argv)
   CpvAccess(CsdSchedQueue) = CqsCreate();
 }
 
-void *CsdGetMsg()
-{
-  int *msg ;
-  
-  if ((msg = CmiGetMsg()) != NULL)
-    return msg;
-  
-  if ( !CqsEmpty(CpvAccess(CsdSchedQueue)) ) {
-    CqsDequeue(CpvAccess(CsdSchedQueue),&msg);
-    return msg ;
-  }
-  
-  return NULL ;
-}
 
 void CsdScheduler(counter)
 int counter;
 {
-  int *msg;
+	int *msg;
   
-  while (1) {
-    msg = CsdGetMsg();
-    if (msg)
-      (CmiGetHandlerFunction(msg))(msg);
-    if (CpvAccess(CsdStopFlag)) break;
-    counter--;
-    if (counter==0) break;
-  }
+	while (1) {
+		/* This is CmiDeliverMsgs */
+		while ( (msg = CmiGetMsg()) != NULL ) {
+			(CmiGetHandlerFunction(msg))(msg);
+
+			if (CpvAccess(CsdStopFlag)) return;
+			counter--;
+			if (counter==0) return;
+		}
+
+		/* Check Scheduler queue */
+  		if ( !CqsEmpty(CpvAccess(CsdSchedQueue)) ) {
+    			CqsDequeue(CpvAccess(CsdSchedQueue),&msg);
+			(CmiGetHandlerFunction(msg))(msg);
+
+			if (CpvAccess(CsdStopFlag)) return;
+			counter--;
+			if (counter==0) return;
+
+			if (!CpvAccess(disable_sys_msgs)) {
+				if (CpvAccess(CcdNumChecks) > 0) {
+					CcdTimerChecks();
+					CcdPeriodicChecks(); 
+				}
+			}
+  		}
+		else { /* Processor is idle */
+			CcdRaiseCondition(CcdPROCESSORIDLE) ;
+			if (CpvAccess(CsdStopFlag)) return;
+		}
+	}
 }
  
 /*****************************************************************************
