@@ -8,7 +8,7 @@ CpvDeclare(int, CldRequestResponseHandlerIndex);
 
 int CldAvgNeighborLoad()
 {
-  int sum=CldCountTokens(), i;
+  int sum=CsdLength(), i;
   
   for (i=0; i<CpvAccess(numNeighbors); i++)
     sum += CpvAccess(neighbors)[i].load;
@@ -21,10 +21,8 @@ void CldSendLoad()
   int i;
 
   msg.pe = CmiMyPe();
-  msg.load = CldCountTokens();
+  msg.load = CsdLength();
   CmiSetHandler(&msg, CpvAccess(CldLoadResponseHandlerIndex));
-/*  for (i=0; i<CpvAccess(numNeighbors); i++)
-    CmiSyncSend(CpvAccess(neighbors)[i].pe, sizeof(loadmsg), &msg); */
   CmiSyncMulticast(CpvAccess(neighborGroup), sizeof(loadmsg), &msg);
   CpvAccess(CldLoadBalanceMessages) += CpvAccess(numNeighbors);
 }
@@ -92,7 +90,9 @@ void CldBalance()
   int totalUnderAvg=0, numUnderAvg=0, maxUnderAvg=0;
 
   avgLoad = CldAvgNeighborLoad();
-  overload = CldCountTokens() - avgLoad;
+  overload = CsdLength() - avgLoad;
+  if (overload > CldCountTokens())
+    overload = CldCountTokens();
   
   if ((float)overload > (THRESHOLD/100.0 * (float)avgLoad)) {
     for (i=0; i<CpvAccess(numNeighbors); i++)
@@ -128,8 +128,6 @@ void CldLoadResponseHandler(loadmsg *msg)
     }
 }	
 
-void CldRedo();
-
 void CldRequestTokens()
 {
   requestmsg msg;
@@ -137,19 +135,10 @@ void CldRequestTokens()
 
   msg.pe = CmiMyPe();
   CmiSetHandler(&msg, CpvAccess(CldRequestResponseHandlerIndex));
-/*  for (i=0; i<CpvAccess(numNeighbors); i++) 
-    CmiSyncSend(CpvAccess(neighbors)[i].pe, sizeof(requestmsg), &msg); */
   CmiSyncMulticast(CpvAccess(neighborGroup), sizeof(requestmsg), &msg);
   CpvAccess(CldLoadBalanceMessages) += CpvAccess(numNeighbors);
-  CcdCallFnAfter((CcdVoidFn)CldRedo, NULL, PERIODE);
 }
- 
-void CldRedo()
-{
-  if (CldCountTokens() == 0)
-    CldRequestTokens();
-}
- 
+
 void CldRequestResponseHandler(requestmsg *msg)
 {
   int pe, numToSend;
@@ -183,7 +172,6 @@ void CldEnqueue(int pe, void *msg, int infofn)
   int len, queueing, priobits; unsigned int *prioptr;
   CldInfoFn ifn = (CldInfoFn)CmiHandlerToFunction(infofn);
   CldPackFn pfn;
-  static int first = 1;
 
   if ((pe == CLD_ANYWHERE) && (CmiNumPes() > 1)) {
     ifn(msg, &pfn, &len, &queueing, &priobits, &prioptr);
@@ -209,20 +197,15 @@ void CldEnqueue(int pe, void *msg, int infofn)
       CmiSyncBroadcastAllAndFree(len, msg);
     else CmiSyncSendAndFree(pe, len, msg);
   }
-
-  if (first == 1) {
-    first = 0;
-    if (CmiNumPes() > 1) {
-      CldBalance(); 
-      CldRequestTokens();
-    }
-  }
 }
 
-void CldNotify(int load)
+void CldNotifyIdle()
 {
-  if (load == 2)
-    CldRequestTokens(); 
+  CldRequestTokens(); 
+}
+
+void CldNotifyBusy()
+{
 }
 
 void CldReadNeighborData()
@@ -267,8 +250,13 @@ void CldGraphModuleInit()
     CmiRegisterHandler(CldLoadResponseHandler);
   CpvAccess(CldRequestResponseHandlerIndex) = 
     CmiRegisterHandler(CldRequestResponseHandler);
-  CldReadNeighborData();
 
+  if (CmiNumPes() > 1) { 
+    CldReadNeighborData();
+    CldBalance(); 
+    CsdSetNotifyIdle(CldNotifyIdle, CldNotifyBusy);
+    CsdStartNotifyIdle();
+  }
 }
 
 void CldModuleInit()
