@@ -25,7 +25,6 @@
 
 static gm_alarm_t gmalarm;
 
-
 /******************************************************************************
  *
  * Send messages pending queue (used internally)
@@ -79,6 +78,7 @@ void dequeue_sending()
 static void alarmcallback (void *context);
 static int processEvent(gm_recv_event_t *e);
 static void send_progress();
+static void alarmInterrupt(int arg);
 
 /******************************************************************************
  *
@@ -243,11 +243,15 @@ static void CommunicationServer(int withDelayMs)
   terrupt++;
 #endif
   CmiCommLock();
+
+  /* ping moved to alarmInterrupt */
+/*
   Cmi_clock = GetClock();
   if (Cmi_clock > Cmi_check_last + Cmi_check_delay) {
     ctrl_sendone_nolock("ping",NULL,0,NULL,0);
     Cmi_check_last = Cmi_clock;
   }
+*/
 
   while (1) {
     CheckSocketsReady(0);
@@ -353,7 +357,6 @@ void DeliverViaNetwork(OutgoingMsg ogm, OtherNode node, int rank)
                         send_callback, buf);
 }
 
-
 void CmiMachineInit()
 {
   gm_status_t status;
@@ -401,5 +404,33 @@ void CmiMachineInit()
 #if CMK_MSGPOOL
   msgpool[msgNums++]  = gm_dma_malloc(gmport, maxMsgSize);
 #endif
+
+  CmiSignal(SIGALRM, 0, 0, alarmInterrupt);
+
+  {
+    struct itimerval i;
+    /*This will send us a SIGALRM every Cmi_tickspeed microseconds,
+    which will call the alarmInterrupt routine above.*/
+    i.it_interval.tv_sec = 0;
+    i.it_interval.tv_usec = Cmi_tickspeed;
+    i.it_value.tv_sec = 0;
+    i.it_value.tv_usec = Cmi_tickspeed;
+    setitimer(ITIMER_REAL, &i, NULL);
+  }
+}
+
+/* this will ensure that node program make sure charmrun is still there */
+static void alarmInterrupt(int arg)
+{
+  if (comm_flag) return;
+  if (memflag) return;
+
+  CmiCommLock();
+  Cmi_clock = GetClock();
+  if (Cmi_clock > Cmi_check_last + Cmi_check_delay) {
+    ctrl_sendone_nolock("ping",NULL,0,NULL,0);
+    Cmi_check_last = Cmi_clock;
+  }
+  CmiCommUnlock();
 }
 

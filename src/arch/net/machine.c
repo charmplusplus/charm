@@ -246,7 +246,7 @@ static SOCKET       dataskt;
  *
  *****************************************************************************/
 
-static void charmrun_exit(int status)
+static void machine_exit(int status)
 {
 #if CMK_USE_GM
   gm_finalize();
@@ -261,7 +261,7 @@ static void charmrun_abort(const char*);
 static void KillEveryone(const char *msg)
 {
   charmrun_abort(msg);
-  charmrun_exit(1);
+  machine_exit(1);
 }
 
 static void KillEveryoneCode(n)
@@ -270,7 +270,7 @@ int n;
   char _s[100];
   sprintf(_s, "[%d] Fatal error #%d\n", CmiMyPe(), n);
   charmrun_abort(_s);
-  charmrun_exit(1);
+  machine_exit(1);
 }
 
 static void KillOnAllSigs(int sigNo)
@@ -286,7 +286,7 @@ static void KillOnAllSigs(int sigNo)
   
   sprintf(_s, "ERROR> Node program on PE %d%s\n", CmiMyPe(),sig);
   charmrun_abort(_s);
-  charmrun_exit(1);
+  machine_exit(1);
 }
 
 #if !defined(_WIN32) || defined(__CYGWIN__)
@@ -481,7 +481,7 @@ void CmiAbort(const char *message)
   *(int *)NULL = 0; /*Write to null, causing bus error*/
 #else
   charmrun_abort(message);
-  charmrun_exit(1);
+  machine_exit(1);
 #endif
 }
 
@@ -1635,7 +1635,7 @@ CpvStaticDeclare(char *, internal_printf_buffer);
 
 static int sendone_abort_fn(int code,const char *msg) {
 	fprintf(stderr,"Socket error %d in ctrl_sendone! %s\n",code,msg);
-	charmrun_exit(1);
+	machine_exit(1);
 	return -1;
 }
 
@@ -1694,7 +1694,7 @@ static void ctrl_getone()
     fprintf(stderr,"aborting: %s\n",msg.data);
     log_done();
     ConverseCommonExit();
-    charmrun_exit(0);
+    machine_exit(0);
 #if CMK_CCS_AVAILABLE
   } else if (strcmp(msg.header.type, "req_fw")==0) {
     CcsImplHeader *hdr=(CcsImplHeader *)msg.data;
