@@ -2,50 +2,19 @@
 
 The calls in this chapter can be used to put together runtime systems
 for languages that support threads.
+This threads package, like most thread packages, provides basic
+functionality like creating threads, destroying threads, yielding, 
+suspending, and awakening a suspended thread. In
+addition, it provides facilities whereby you can write your own thread
+schedulers.  
 
-To use the threads package, you must include {\tt converse.h} and link
-with the converse library.  Note: threads are not implemented on all
-hardware platforms.  Although a program that calls thread-functions
-will {em link} on all platforms, it won't necessarily {\tt execute}.
-Attempting to initialize the threads package on a machine that does
-not support threads will result in an error message.
+\section{Basic Thread Calls}
 
-This threads package, like most thread packages, provides a function
-for creating threads, one for destroying threads, one for explicitly
-transferring control to another thread, and one for retrieving the
-currently-executing thread.  Note that these functions do not include
-any intelligent strategy for choosing which thread executes when: in
-other words, they provide no scheduler.
-
-However, though the threads package does not provide an actual
-scheduler, it does assume that the user is going to need one.
-Therefore, it defines an interface to which all schedulers can comply.
-This makes it possible for users to write blocking code (eg, locks,
-barriers, etc) without knowing exactly how the scheduler will work.
-The scheduler interface consists of an awaken function and a suspend
-function, provided by whomever implements the scheduler.  The awaken
-function is called by the thread user to notify the scheduler that a
-particular thread wants the CPU.  The scheduler is expected to respond
-to this by inserting the thread into a ready-queue or something
-similar.  The suspend function tells the scheduler that the current
-thread no longer wants the CPU, whereupon the scheduler must choose
-another thread to execute instead.  No stipulation is made about how
-the scheduler chooses the thread to execute next, except that the
-thread must want the CPU. (Eg, somebody must have declared that the
-thread wants the CPU using the awaken-function.)
-
-The threads-package makes it possible to associate private data
-with a thread.  To this end, we provide functions for storing and
-retrieving arbitrary user data in the thread-object.
-
-Finally, as a convenience to converse users, we provide a function
-that causes a thread to be automatically scheduled by the converse
-scheduler {\tt CsdScheduler}.
-
-\function{int CthImplemented()}
-\index{CthImplemented}
-\desc{Returns true if the current hardware platform supports the threads
-functions described below.}
+Note: in this section, we refer to the ready-queue.  By default, this
+means the central scheduler queue previously described in section
+\ref{schedqueue}.  There are hooks that enable you to change which
+ready-queue a thread uses, but unless you've taken explicit action,
+you can assume the threads are all using the main ready-queue.
 
 \function{typedef struct CthThreadStruct *CthThread;}
 \index{CthThread}
@@ -63,12 +32,6 @@ a function that returns nothing.}
 \desc{This is a type defined in {\tt threads.h}.  It represents
 a function that returns a CthThread.}
 
-\function{void CthInit()}
-\index{CthInit}
-\desc{Caution: you must call either {\tt ConverseInit} {\tt or} {\tt
-CthInit} before calling any of the thread functions described below,
-but you must {\tt not} call both.}
-
 \function{CthThread CthSelf()}
 \index{CthSelf}
 \desc{Returns the currently-executing thread.  Note: even the initial
@@ -76,29 +39,16 @@ flow of control that inherently existed when the program began
 executing {\tt main} counts as a thread.  You may retrieve that thread
 object using {\tt CthSelf} and use it like any other.}
 
-\function{void CthResume(CthThread t)}
-\index{CthResume}
-\desc{Immediately transfers control to thread {\tt t}.  Note:
-normally, the user of a thread package wouldn't explicitly choose
-which thread to transfer to.  Instead, the user would rely upon a
-scheduler to choose the next thread.  Therefore, this routine is
-primarily intended for people who are implementing schedulers, not for
-end-users.  End-users should probably call {\tt CthSuspend} or {\tt
-CthAwaken} (see below).  Likewise, programmers implementing locks,
-barriers, and other synchronization devices should also probably
-rely on {\tt CthSuspend} and {\tt CthAwaken}.}
-
 \function{CthThread CthCreate(CthVoidFn fn, void *arg, int size)}
 \index{CthCreate}
 \desc{Creates a new thread object.  The thread is not given control
-yet.  The thread is not passed to any scheduler.  When (and if) the
-thread eventually receives control, it will begin executing the
-specified function {\tt fn} with the specified argument.  The {\tt size}
+yet.  To make the thread execute, you must push it into the
+ready-queue, using CthAwaken below.  When (and if) the thread
+eventually receives control, it will begin executing the specified
+function {\tt fn} with the specified argument.  The {\tt size}
 parameter specifies the stack size in bytes, 0 means use the default
-size.
-
-Caution: almost all threads are created with CthCreate, but not all.
-In particular, the one initial thread of control that came into
+size.  Caution: almost all threads are created with CthCreate, but not
+all.  In particular, the one initial thread of control that came into
 existence when your program was first {\tt exec}'d was not created
 with {\tt CthCreate}, but it can be retrieved (say, by calling {\tt
 CthSelf} in {\tt main}), and it can be used like any other {\tt
@@ -114,45 +64,91 @@ thread suspends.  This is how a thread terminates itself: it calls
 
 \function{void CthSuspend()}
 \index{CthSuspend}
-\desc{This is part of the scheduler-interface.  When a scheduler is
-being used, threads should call {\tt CthSuspend} when they wish to
-give up control of the CPU.  {\tt CthSuspend} will then automatically
-transfer control to some other thread that wants the CPU.  {\tt
-CthSuspend} will select the thread to transfer control to by calling a
-user-supplied ``choose-next'' function (see {\tt CthSetStrategy}
-below).}
+\desc{Causes the current thread to stop executing, and control to be
+transferred to some other thread in the ready-queue.  The suspended
+thread will not start executing again until somebody pushes it into 
+the ready queue again, using CthAwaken below.}
 
 \function{void CthAwaken(CthThread t)}
 \index{CthAwaken}
-\desc{This is part of the scheduler-interface.  When a scheduler is
-being used, this function should be used to notify the scheduler that
-thread {\tt t} wants the CPU.  This will enable the scheduler to
-select thread {\tt t} for execution at some point in the future.
-In actuality, {\tt CthAwaken} simply calls the user-supplied ``awaken''
-function (see {\tt CthSetStrategy} below).  It is illegal to call
-{\tt CthAwaken} on a thread which has already been awakened, unless
-the thread has been scheduled since the last awaken.}
+\desc{Pushes a thread into the ready queue.  Caution: a thread must only
+be in the ready-queue once.  Pushing it in twice is a crashable error.}
+
+\function{void CthYield()}
+\index{CthYield}
+\desc{This function is part of the scheduler-interface.  It simply
+executes {\tt \{ CthAwaken(CthSelf()); CthSuspend(); \} }.  This combination
+gives up control temporarily, but ensures that control will eventually
+return.}
+
+\section{Thread Scheduling Hooks}
+
+Normally, when you CthAwaken a thread, it goes into the primary
+ready-queue: namely, the main Converse queue described in section
+\ref{schedqueue}.  However, it is possible to hook a thread to make
+it go into a different ready-queue.  That queue doesn't have to be
+priority-queue: it could be FIFO, or LIFO, or in fact it could handle
+its threads in any complicated order you desire.  This is a powerful
+way to implement your own scheduling policies for threads.
+
+To achieve this, you must first implement a new kind of ready-queue.
+You must implement a function that inserts threads into this queue.
+The function must have this prototype:
+
+{\bf void awakenfn(CthThread t);}
+
+When a thread suspends, it must choose a new thread to transfer control
+to.  You must implement a function that makes the decision: which thread
+should the current thread transfer to.  This function must have this
+prototype:
+
+{\bf CthThread choosefn();}
+
+Typically, the choosefn would choose a thread from your ready-queue.
+Alternately, it might choose to always transfer control to a central
+scheduling thread.
+
+You then configure individual threads to actually use this new
+ready-queue.  This is done using CthSetStrategy:
 
 \function{void CthSetStrategy(CthThread t, CthVoidFn awakenfn, CthThFn choosefn)}
 \index{CthSetStrategy}
-\desc{This is part of the scheduler-interface.  It should be used by
-the creator of thread {\tt t} to specify the scheduling functions to
-be used for thread {\tt t}.  The scheduling functions must have the
-following prototypes:
-\begin{itemize}
+\desc{Causes the thread to use the specified \param{awakefn} whenever
+you CthAwaken it, and the specified \param{choosefn} whenever you
+CthSuspend it.}
 
-\item{{\tt void awakenfn(CthThread t);}}
+CthSetStrategy alters the behavior of CthSuspend and CthAwaken.
+Normally, when a thread is awakened with CthAwaken, it gets inserted
+into the main ready-queue.  Setting the thread's {\tt awakenfn} will
+cause the thread to be inserted into your ready-queue instead.
+Similarly, when a thread suspends using CthSuspend, it normally
+transfers control to some thread in the main ready-queue.  Setting the
+thread's {\tt choosefn} will cause it to transfer control to a thread
+chosen by your {\tt choosefn} instead.
 
-\item{{\tt CthThread choosefn();}}
+You may reset a thread to its normal behavior using CthSetStrategyDefault:
 
-\end{itemize}
-These functions must be provided on a per-thread basis.  (Eg, if you
-{\tt CthAwaken} a thread {\tt X}, then {\tt X}'s {\tt awakenfn} will
-be called.  If a thread {\tt Y} calls {\tt CthSuspend}, then thread
-{\tt Y}'s {\tt choosefn} will be called to pick the next thread.)  Of
-course, you may use the same functions for all threads (the common
-case), but the specification on a per-thread basis gives you maximum
-flexibility in controlling scheduling.
+\function{void CthSetStrategyDefault(CthThread t)}
+\index{CthSetStrategyDefault}
+\desc{Restores the value of \param{awakefn} and \param{choosefn} to
+their default values.  This implies that the next time you CthAwaken
+the specified thread, it will be inserted into the normal ready-queue.}
+
+Keep in mind that this only resolves the issue of how threads get into
+your ready-queue, and how those threads suspend.  To actually make
+everything ``work out'' requires additional planning: you have to make
+sure that control gets transferred to everywhere it needs to go.
+
+Scheduling threads may need to use this function as well:
+
+\function{void CthResume(CthThread t)}
+\index{CthResume}
+\desc{Immediately transfers control to thread {\tt t}.  This routine is
+primarily intended for people who are implementing schedulers, not for
+end-users.  End-users should probably call {\tt CthSuspend} or {\tt
+CthAwaken} (see below).  Likewise, programmers implementing locks,
+barriers, and other synchronization devices should also probably rely
+on {\tt CthSuspend} and {\tt CthAwaken}.}
 
 A final caution about the {\tt choosefn}: it may only return a thread
 that wants the CPU, eg, a thread that has been awakened using the {\tt
@@ -169,17 +165,10 @@ done, and the {\tt choosefn} should call {\tt exit}.
 
 There is one minor exception to the rule stated above (``the scheduler
 may not resume a thread unless it has been declared that the thread
-wants the CPU using the {\tt awakefn}'').  If a thread {\tt t} is
-part of the scheduling module, it is permitted for the scheduling
-module to resume {\tt t} whenever it so desires: presumably, the
-scheduling module knows when its threads want the CPU.}
-
-\function{void CthYield()}
-\index{CthYield}
-\desc{This function is part of the scheduler-interface.  It simply
-executes {\tt \{ CthAwaken(CthSelf()); CthSuspend(); \} }.  This combination
-gives up control temporarily, but ensures that control will eventually
-return.}
+wants the CPU using the {\tt awakefn}'').  If a thread {\tt t} is part
+of the scheduling module, it is permitted for the scheduling module to
+resume {\tt t} whenever it so desires: presumably, the scheduling
+module knows when its threads want the CPU.
 
 \internal{
 \function{void CthSetVar(CthThread t, void **var, void *val)}
@@ -222,14 +211,3 @@ other.}
 {\tt CthSetVar} when {\tt t} is {\it not} executing.  Returns the value
 that {\tt var} will be set to when {\tt t} is running.}
 }
-
-\function{void CthSetStrategyDefault(CthThread t)}
-\index{CthSetStrategyDefault}
-\desc{This the simple scheduler provided to converse users as a
-convenience.  Calling this function on a thread {\tt t} causes thread
-{\tt t} to be scheduled by the built-in converse scheduler {\tt
-CsdScheduler}.  Awakening thread {\tt t} will cause it to be inserted
-into the {\tt CsdScheduler} queue, and it will then be resumed when it
-gets to the head of the queue.  If it then suspends, it will return
-control to the thread running the {\tt CsdScheduler}.}
-

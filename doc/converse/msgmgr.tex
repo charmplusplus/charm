@@ -1,12 +1,8 @@
-\chapter{Tag Matching and Message Storage}
+\chapter{Tag Matching and the Message Manager}
 
-The calls in this chapter can be used to put together runtime systems
-for languages that support tag-based message retrieval.
-
-\section{Message Manager Calls}
-
-To use the message manager, you must include {\tt converse.h} and
-link with the converse library.
+The message manager is a data structure that can be used to put together
+runtime systems for languages that support tag-based message
+retrieval.
 
 The purpose of the message manager is to store, index, and retrieve
 messages according to a set of integer tags.  It provides functions to
@@ -14,6 +10,10 @@ create tables, functions to insert messages into tables (specifying
 their tags), and functions to selectively retrieve messages from
 tables according to their tags.  Wildcard tags can be specified in
 both storage and retrieval.
+
+
+To use the message manager, you must include {\tt converse.h} and
+link with the converse library.
 
 In actuality, the term ``message manager'' is unnecessarily specific.
 The message manager can store and retrieve arbitrary pointers

@@ -76,6 +76,27 @@ registration techniques.  One may use all three registration methods
 in a program.  The system guarantees that no numbering conflicts will
 occur as a result of this combination.
 
+\section{Writing Handler Functions}
+
+A message handler function is just a C function that accepts a void
+pointer (to a message buffer) as an argument, and returns nothing.  The
+handler may use the message buffer until it returns, at which time
+Converse will automatically free the message buffer.  This behavior
+can be overrided using CmiGrabBuffer:
+
+\function{void CmiGrabBuffer(void **pbuf)}
+\index{CmiGrabBuffer}
+\desc{A handler function receives a pointer to a message buffer
+as an argument.  Normally, it is supposed to copy the data out of the
+message buffer before it returns, at which time Converse automatically
+frees the message buffer.  However, a handler function may use
+CmiGrabBuffer to claim ownership of the message buffer (and therefore
+prevent Converse from freeing it).  Assuming, for example, that the
+handler function called its argument {\tt msg}, it would call {\tt
+CmiGrabBuffer(\&msg)}.  Afterward, {\tt msg} contains a pointer to the
+message, or a copy of it.  From that point forward, it is the user's
+responsibility to free the message using \param{CmiFree.}}
+
 \section{Building Messages}
 
 To send a message, one first creates a buffer to hold the message.
@@ -122,48 +143,93 @@ handler number.}
 \desc{This call returns the handler of a message in the form of a
 function pointer.}
 
-\function{void CmiGrabBuffer(void **pbuf)}
-\index{CmiGrabBuffer}
-\desc{A handler function receives a pointer to a message buffer
-as an argument.  Normally, it is supposed to copy the data out of the
-message buffer, and then return, at which time Converse automatically
-frees the message buffer.  However, a handler function may use
-CmiGrabBuffer to claim ownership of the message buffer (and therefore
-prevent Converse from freeing it).  Assuming, for example, that the
-handler function called its argument {\tt msg}, it would call {\tt
-CmiGrabBuffer(\&msg)}.  Afterward, {\tt msg} contains a pointer to the
-message, or a copy of it.  From that point forward, it is the user's
-responsibility to free the message using \param{CmiFree.}}
-
 \section{Sending Messages}
 
-The following functions allow you to send messages:
+The following functions allow you to send messages.  Our model is that
+the data starts out in the message buffer, and from there gets
+transferred ``into the network''.  The data stays ``in the network''
+for a while, and eventually appears on the target processor.  Using
+that model, each of these send-functions is a device that transfers
+data into the network.  None of these functions wait for the data to
+be delivered.
+
+On some machines, the network accepts data rather slowly.  We don't
+want the process to sit idle, waiting for the network to accept the
+data.  So, we provide several variations on each send function:
+
+\begin{itemize}
+
+\item{{\bf sync}: a version that is as simple as possible, pushing the
+data into the network and not returning until the data is ``in the
+network''.  As soon as a sync function returns, you can reuse the
+message buffer.}
+
+\item{{\bf async}: a version that returns almost instantaneously, and then
+continues working in the background.  The background job transfers the
+data from the message buffer into the network.  Since the background job
+is still using the message buffer when the function returns, you can't
+reuse the message buffer immediately.  The background job sets a flag
+when it is done and you can reuse the message buffer.}
+
+\item{{\bf sync and free}: a version that returns almost instantaneously,
+and then continues working in the background.  The background job
+transfers the data from the message buffer into the network.  When the
+background job finishes, it {\tt CmiFree}s the message buffer.  In
+this situation, you can't reuse the message buffer at all.  Of course,
+to use a function of this type, you must allocate the message buffer
+using {\tt CmiAlloc}.}
+
+\end{itemize}
 
 \function{void CmiSyncSend(unsigned int destPE, unsigned int size, void *msg)}
 \index{CmiSyncSend}
-
 \desc{Sends \param{msg} of size \param{size} bytes to processor
-\param{destPE}.  The call does not return until the data has been
-copied from the user-provided message buffer into system buffers.
-Therefore, once this call returns, you are free to reuse the
-message buffer immediately.}
+\param{destPE}.  When it returns, you may reuse the message buffer.}
 
 \function{void CmiSyncSendAndFree(unsigned int destPE, unsigned int size, void *msg)}
 \index{CmiSyncSendAndFree}
 \desc{Sends \param{msg} of size \param{size} bytes to processor
-\param{destPE} and then {\tt CmiFree}s the message buffer \param{msg}.
-Caution: the message buffer {\em must} have been allocated using {\tt
-CmiAlloc}.}
+\param{destPE}.  When it returns, the message buffer has been freed
+using {\tt CmiFree}}
 
 \function{CmiCommHandle CmiAsyncSend(unsigned int destPE, unsigned int size, void *msg)}
 \index{CmiAsyncSend}
-\desc{Sends a message of size \param{size} bytes to processor
-\param{destPE}.  This function returns before the data has even been
-copied out of the user's message buffer.  Therefore, the Converse
-user must leave the message buffer alone for a time after calling
-this function.  This function returns a communication handle which
-can be tested to determine whether or not the buffer can be reused
-yet.}
+\desc{Sends \param{msg} of size \param{size} bytes to processor
+\param{destPE}.  It returns a communication handle which can be
+tested using CmiAsyncMsgSent: when this returns true, you may reuse
+the message buffer.}
+
+\function{void CmiSyncVectorSend(int destPE, int len, int sizes[], char *msgComps[])}
+\desc{Concatenates several pieces of data and sends them to processor
+\param{destPE}.  The data consists of \param{len} pieces residing in
+different areas of memory, which are logically concatenated.  The
+\param{msgComps} array contains pointers to the pieces; the size of
+\param{msgComps[i]} is taken from \param{sizes[i]}. 
+When it returns, \param{sizes}, \param{msgComps} and the message
+components specified in \param{msgComps} can be immediately reused.}
+
+\function{void CmiSyncVectorSendAndFree(int destPE, int len, int sizes[], char *msgComps[])}
+\desc{Concatenates several pieces of data and sends them to processor
+\param{destPE}.  The data consists of \param{len} pieces residing in
+different areas of memory, which are logically concatenated.  The
+\param{msgComps} array contains pointers to the pieces; the size of
+\param{msgComps[i]} is taken from \param{sizes[i]}. 
+The message components specified in \param{msgComps} are {\tt
+CmiFree}d by this function therefore, they should be dynamically
+allocated using \param{CmiAlloc()}.  However, the \param{sizes} and
+\param{msgComps} array themselves are not freed.}
+
+\function{CmiCommHandle CmiAsyncVectorSend(int destPE, int len, int sizes[], char *msgComps[])}
+\desc{Concatenates several pieces of data and sends them to processor
+\param{destPE}.  The data consists of \param{len} pieces residing in
+different areas of memory, which are logically concatenated.  The
+\param{msgComps} array contains pointers to the pieces; the size of
+\param{msgComps[i]} is taken from \param{sizes[i]}. 
+The individual pieces of data as well as the arrays \param{sizes} and
+\param{msgComps} should not be overwritten or freed before the
+communication is complete.  This function returns a communication
+handle which can be tested using CmiAsyncMsgSent: when this returns
+true, the input parameters can be reused.}
 
 \function{int CmiAsyncMsgSent(CmiCommHandle handle)}
 \index{CmiAsyncMsgSent}
@@ -175,39 +241,6 @@ be reused.}
 \index{CmiReleaseCommHandle}
 \desc{Releases the communication handle \param{handle} and
 associated resources. It does not free the message buffer.}
-
-\function{void CmiSyncVectorSend(int destPE, int len, int sizes[], char *msgComps[])}
-\desc{Synchronous send of data to processor
-\param{destPE}.  The data consists of \param{len} pieces residing in
-different areas of memory, which are logically concatenated.  The
-\param{msgComps} array contains pointers to the pieces; the size of
-\param{msgComps[i]} is taken from \param{sizes[i]}. 
-\param{sizes}, \param{msgComps} and the message components specified in
-\param{msgComps} could be reused after the function call returns.
-}
-
-\function{void CmiSyncVectorSendAndFree(int destPE, int len, int sizes[], char *msgComps[])}
-\desc{Synchronous send of data to processor
-\param{destPE}.  The data consists of \param{len} pieces residing in
-different areas of memory, which are logically concatenated.  The
-\param{msgComps} array contains pointers to the pieces; the size of
-\param{msgComps[i]} is taken from \param{sizes[i]}. 
-The message components specified in \param{msgComps} are {\tt
-CmiFree}d by this function therefore, they should be dynamically
-allocated using \param{CmiAlloc()}.  However, the \param{sizes} and
-\param{msgComps} array themselves are not freed.}
-
-\function{CmiCommHandle CmiAsyncVectorSend(int destPE, int len, int sizes[], char *msgComps[])}
-\desc{Initiates an asynchronous send of data to processor
-\param{destPE}.  The data consists of \param{len} pieces residing in
-different areas of memory, which are logically concatenated.  The
-\param{msgComps} array contains pointers to the pieces; the size of
-\param{msgComps[i]} is taken from \param{sizes[i]}. 
-This function returns a communication handle which could be used to enquire
-about the status of communication using \param{CmiAsyncMsgSent()}.
-Individual pieces of data as well as the arrays \param{sizes} and
-\param{msgComps} should not be overwritten or freed before the
-communication is complete.}
 
 \section{Broadcasting Messages}
 
@@ -256,6 +289,7 @@ could be used to check the status of this send using
 freed before the communication is complete.}
 
 \section{Scheduling Messages}
+\label{schedqueue}
 
 The scheduler queue is a powerful priority queue.  The following
 functions can be used to place messages into the scheduler queue.
@@ -264,24 +298,95 @@ they reach the front of the queue, they trigger handler functions,
 just like messages transmitted with Cmi functions.  Note that unlike
 the Cmi send functions, these cannot move messages across processors.
 
+Every message inserted into the queue has a priority associated with
+it.  Converse priorities are arbitrary-precision numbers between 0 and
+1.  Priorities closer to 0 get processed first, priorities closer to 1
+get processed last.  Arbitrary-precision priorities are very useful in
+AI search-tree applications. Suppose we have a heuristic suggesting
+that tree node N1 should be searched before tree node N2. We therefore
+designate that node N1 and its descendants will use high priorities,
+and that node N2 and its descendants will use lower priorities. We
+have effectively split the range of possible priorities in two. If
+several such heuristics fire in sequence, we can easily split the
+priority range in two enough times that no significant bits remain,
+and the search begins to fail for lack of meaningful priorities to
+assign. The solution is to use arbitrary-precision priorities, aka
+bitvector priorities.
+
+These arbitrary-precision numbers are represented as bit-strings: for
+example, the bit-string ``0011000101'' represents the binary number
+(.0011000101).  The format of the bit-string is as follows: the
+bit-string is represented as an array of unsigned integers. The most
+significant bit of the first integer contains the first bit of the
+bitvector.  The remaining bits of the first integer contain the next
+31 bits of the bitvector.  Subsequent integers contain 32 bits
+each. If the size of the bitvector is not a multiple of 32, then the
+last integer contains 0 bits for padding in the least-significant bits
+of the integer.
+
+Some people only want regular integers as priorities.  For
+simplicity's sake, we provide an easy way to convert integer
+priorities to Converse's built-in representation.
+
+In addition to priorities, you may choose to enqueue a message
+``LIFO'' or ``FIFO''.  Enqueueing a message ``FIFO'' simply pushes it
+behind all the other messages of the same priority.  Enqueueing a
+message ``LIFO'' pushes it in front of other messages of the same
+priority.
+
+Messages sent using the CMI functions take precedence over everything
+in the scheduler queue, regardless of priority.
+
 \function{void CsdEnqueueGeneral(void *Message, int strategy, int priobits, int *prioptr)}
 \index{CsdEnqueueGeneral}
-\desc{This call enqueues a message to the scheduler's queue, to be processed in 
-accordance with the queueing \param{strategy}. \param{priobits} and
-\param{prioptr} specify information about priority associated with the message
-if prioritized queueing strategies are used. \param{strategy} can take values 
-defined in {\tt converse.h} depending upon the queueing strategy (FIFO or LIFO)
-and the nature of priority information used (none, integer or bit-vector).
-These predefined constants are: 
-{\tt CQS\_QUEUEING\_FIFO}, {\tt CQS\_QUEUEING\_LIFO},
-{\tt CQS\_QUEUEING\_IFIFO}, {\tt CQS\_QUEUEING\_ILIFO},
-{\tt CQS\_QUEUEING\_BFIFO}, and\\  {\tt CQS\_QUEUEING\_BLIFO}.
-This call is usually made from
-a message handler when the message is not to be processed immediately,
-but may be processed later (e.g. depending on the message's priority).
-Also, it is used to enqueue local ready entities, such as threads.
-\note{It is necessary to grab the ownership of the message buffer before queuing
-because on returning from the handler, the system can reuse the buffer.}}
+\desc{This call enqueues a message to the scheduler's queue, to
+be sorted according to its priority and the queueing \param{strategy}.
+The meaning of the \param{priobits} and \param{prioptr} fields depend
+on the value of \param{strategy}, which can be any of the following:
+
+\begin{itemize}
+\item{{\tt CQS\_QUEUEING\_BFIFO}: the priobits and prioptr point to
+a bit-string representing an arbitrary-precision priority.  The message
+is pushed behind all other message of this priority.}
+
+\item{{\tt CQS\_QUEUEING\_BLIFO}: the priobits and prioptr point to
+a bit-string representing an arbitrary-precision priority.  The message
+is pushed in front all other message of this priority.}
+
+\item{{\tt CQS\_QUEUEING\_IFIFO}: the prioptr is a pointer to a
+signed integer.  The integer is converted to a bit-string priority,
+normalizing so that the integer zero is converted to the bit-string
+``1000...'' (the ``middle'' priority).  To be more specific, the
+conversion is performed by adding 0x80000000 to the integer, and then
+treating the resulting 32-bit quantity as a 32-bit bitvector priority.
+The message is pushed behind all other messages of this priority.}
+
+\item{{\tt CQS\_QUEUEING\_ILIFO}: the prioptr is a pointer to a
+signed integer.  The integer is converted to a bit-string priority,
+normalizing so that the integer zero is converted to the bit-string
+``1000...'' (the ``middle'' priority).  To be more specific, the
+conversion is performed by adding 0x80000000 to the integer, and then
+treating the resulting 32-bit quantity as a 32-bit bitvector priority.
+The message is pushed in front of all other messages of this
+priority.}
+
+\item{{\tt CQS\_QUEUEING\_FIFO}: the prioptr and priobits are ignored.
+The message is enqueued with the middle priority ``1000...'', and is
+pushed behind all other messages with this priority.}
+
+\item{{\tt CQS\_QUEUEING\_FIFO}: the prioptr and priobits are ignored.
+The message is enqueued with the middle priority ``1000...'', and is
+pushed in front of all other messages with this priority.}
+
+\end{itemize}
+
+Caution: the priority itself is {\em not copied} by the scheduler.
+Therefore, if you pass a pointer to a priority into the scheduler, you
+must not overwrite or free that priority until after the message has
+emerged from the scheduler's queue.  It is normal to actually store
+the priority {\em in the message itself}, though it is up to the user
+to actually arrange storage for the priority.
+}
 
 \function {void CsdEnqueue(void *Message)}
 \index{CsdEnqueue}
@@ -294,7 +399,6 @@ provided here for backward compatibility.}
 \desc{This macro is a shorthand for 
 {\tt CsdEnqueueGeneral(Message, CQS\_QUEUEING\_FIFO,0, NULL)} 
 provided here for backward compatibility.}
-
 
 \function{void CsdEnqueueLifo(void *Message)}
 \index{CsdEnqueueLifo}
@@ -330,19 +434,16 @@ to wait for: it does not allow any other event to occur.
 \index{CsdScheduler}
 \desc{This call invokes the Converse scheduler, which repeatedly
 delivers messages to their handlers (i.e. invokes the handler for each
-message it selects).  Each message header encodes a pointer to its
-handler as described in the next chapter. 
-In each iteration, the scheduler first looks for any
-message that  has arrived from another processor, and delivers it.
+message it selects).  In each iteration, the scheduler first looks for
+any message that has arrived from another processor, and delivers it.
 If there isn't any, it selects a message from the locally enqueued
-messages (see below), and delivers it.
-The {\tt NumberOfMessages}
-parameter specifies how many messages should be processed (i.e. delivered
-to their handlers). If set to -1, the scheduler continues delivering
+messages, and delivers it.  The {\tt NumberOfMessages} parameter
+specifies how many messages should be processed (i.e. delivered to
+their handlers). If set to -1, the scheduler continues delivering
 messages until CsdExitScheduler() is called from a message handler.
-if {\tt NumberOfMessages} is 0, the scheduler continues delivering messages
-until it exhausts its supply of messages (i.e. becomes idle) or some 
-handler calls CsdExitScheduler().}
+if {\tt NumberOfMessages} is 0, the scheduler continues delivering
+messages until it exhausts its supply of messages (i.e. becomes idle)
+or some handler calls CsdExitScheduler().}
 
 \function{int CmiDeliverMsgs(int MaxMsgs)}
 \index{CmiDeliverMsgs}
@@ -351,26 +452,20 @@ corresponding handler functions for arrived messages. This function
 returns after either the network message queue becomes empty or after
 \param{MaxMsgs} messages have been retrieved and their handlers called. 
 It returns the difference between total messages delivered and \param{MaxMsgs}.
-The handler is given a pointer to the message as  its parameter.
-Normally, the delivered message is owned by CMI,  and so the handler
-should not free it, or store it for later use.  
-If the handler wishes to  use the message later (for example, by
-enqueueing the message with the scheduler), it must call
-\param{CmiGrabBuffer()} to
-acquire the  ownership of the message buffer.}
+The handler is given a pointer to the message as  its parameter.}
 
 \function{void CmiDeliverSpecificMsg(int HandlerId)}
 \index{CmiDeliverSpecificMsg}
-\desc{Retrieves messages from the network queue and delivers the first message
-with its handler field equal to \param{HandlerId}. This functions queues
-the remaining messages retrieved from the network. It returns after the 
-invoked handler function returns.}
+\desc{Retrieves messages from the network queue and delivers the first
+message with its handler field equal to \param{HandlerId}. This functions
+leaves alone all other messages. It returns after the invoked handler
+function returns.}
 
 \function {void CsdExitScheduler(void)}
 \index{CsdExitScheduler}
-\desc{This call causes the scheduler
-to stop processing messages when control has returned back to it.
-The scheduler then returns to its calling routine.}
+\desc{This call causes CsdScheduler to stop processing messages when
+control has returned back to it. The scheduler then returns to its
+calling routine.}
 
 \internal{
 \section{Global Pointer}

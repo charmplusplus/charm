@@ -12,7 +12,10 @@
 % REVISION HISTORY:
 %
 % $Log$
-% Revision 1.6  1997-06-25 06:53:48  jyelon
+% Revision 1.7  1997-06-26 05:16:22  jyelon
+% Still improving manual.
+%
+% Revision 1.6  1997/06/25 06:53:48  jyelon
 % Just trying to make this whole manual make more sense.
 %
 % Revision 1.5  1995/11/16 22:11:11  milind
@@ -35,23 +38,30 @@
 
 \chapter{Machine Model and Global Variables}
 
-The machine model assumed by Converse consists of a collection of
-nodes, where each node comprises of a number of processors that
-share memory. In addition, each of the processors could have multiple
-threads running on them which share code and data but have different
-stacks. On networks of workstations or distributed memory MIMD
-machines, number of processors in each node is assumed to be one and on
-machines that do not have native thread support, there is only one
-thread per processor. Converse provides functions to determine rank of
-a processor within a node and a consistent access/modification
-mechanism to manipulate global variables.
+Converse treats the parallel machine as a collection of nodes, where
+each node comprises of a number of processors that share memory.  In
+some cases, the number of processors per node may be exactly one.  In
+addition, each of the processors may have multiple threads running on
+them which share code and data but have different stacks.
 
-\section{Global Variables}
+Different vendors are not consistent about how they treat global and static
+variables.  Most vendors write C compilers in which global variables are
+shared among all the processors in the node.  A few vendors write C
+compilers where each processor has its own copy of the global variables.
+In theory, it would also be possible to design the compiler so that
+each thread has its own copy of the global variables.
 
-Global variables are allowed in Converse via specific macros.  These macros 
-ensure that the program runs portably on various parallel machines. 
-Three classes of global variables are supported: node-private,
-process-private, and thread-private variables. 
+The lack of consistency across vendors, makes it very hard to write a
+portable program.  The fact that most vendors make the globals shared
+is inconvenient as well, usually, you don't want your globals to be
+shared.  For these reasons, we added ``pseudoglobals'' to Converse.
+These act much like C global and static variables, except that you have
+explicit control over the degree of sharing.
+
+\section{Converse PseudoGlobals}
+
+Three classes of pseudoglobal variables are supported: node-private,
+process-private, and thread-private variables.
 
 \begin{description}
 \item[Node-private global variables] are specific to a node. They are
@@ -63,16 +73,16 @@ process-private, and thread-private variables.
 \end{description}
 
 There are five macros for each class. These macros are for
-declaration, static declaration, extern declaration, initialization, and
-access. The declaration, static and extern specifications have the same
-meaning as in C. In order to support portability, however, the global
-variables must be installed properly, by using the initialization macros.
-For example, if the underlying machine is a simulator for the machine model 
-supported by Converse, then the thread-private variables must be turned into 
-arrays of variables.  Initialize and Access macros hide these details from 
-the user.  It is possible to use global variables without these macros, 
-as supported by the underlying machine, but at the expense of portability.
-
+declaration, static declaration, extern declaration, initialization,
+and access. The declaration, static and extern specifications have the
+same meaning as in C. In order to support portability, however, the
+global variables must be installed properly, by using the
+initialization macros.  For example, if the underlying machine is a
+simulator for the machine model supported by Converse, then the
+thread-private variables must be turned into arrays of variables.
+Initialize and Access macros hide these details from the user.  It is
+possible to use global variables without these macros, as supported by
+the underlying machine, but at the expense of portability.
 
 Macros for node-private variables:
 \begin{verbatim}
@@ -118,23 +128,23 @@ CtvAccess(variable)
 \index{CtvAccess}
 
 
-    A sample code to illustrate the usage of the macros is provided
-    in Figure~\ref{fig:cpv}.
-    There are a few rules that user must pay attention: The
-    {\tt type} and {\tt variable} fields of the macros must be a single
-    word. Therefore, structures or pointer types can be used by defining
-    new types with the {\tt typedef}. In the sample code, for example,
-    a {\tt struct point} type is redefined with a {\tt typedef} as {\tt Point}
-    in order to use it in the macros. Similarly,  the access macros contain
-    only the name of the global variable. Any indexing or member access
-    must be outside of the macro as shown in the sample code 
-    (function {\tt func1}). Finally, all the global variables must be
-    installed before they are used. One way to do this systematically is
-    to provide a module-init function for each file (in the sample code - 
-    {\tt ModuleInit()}. The module-init functions of each file, then, can be 
-    called at the beginning of execution to complete the installations of 
-    all global variables.
-    
+A sample code to illustrate the usage of the macros is provided
+in Figure~\ref{fig:cpv}.
+There are a few rules that user must pay attention: The
+{\tt type} and {\tt variable} fields of the macros must be a single
+word. Therefore, structures or pointer types can be used by defining
+new types with the {\tt typedef}. In the sample code, for example,
+a {\tt struct point} type is redefined with a {\tt typedef} as {\tt Point}
+in order to use it in the macros. Similarly,  the access macros contain
+only the name of the global variable. Any indexing or member access
+must be outside of the macro as shown in the sample code 
+(function {\tt func1}). Finally, all the global variables must be
+installed before they are used. One way to do this systematically is
+to provide a module-init function for each file (in the sample code - 
+{\tt ModuleInit()}. The module-init functions of each file, then, can be 
+called at the beginning of execution to complete the installations of 
+all global variables.
+
 \begin{figure}
 \begin{verbatim}
 File Module1.c
