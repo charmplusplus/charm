@@ -279,6 +279,63 @@ int handler;
 
 #endif /* CMK_USES_COMMON_CMIDELIVERS */
 
+/*****************************************************************************
+ *
+ * threads: common code.
+ *
+ * This section contains the following functions, which are common across
+ * all implementations:
+ *
+ * void CthSchedInit()
+ *
+ *     This must be called before calling CthSetStrategyDefault.
+ *
+ * void CthSetStrategyDefault(CthThread t)
+ *
+ *     Sets the scheduling strategy for thread t to be the default strategy.
+ *     All threads, when created, are set for the default strategy.  The
+ *     default strategy is to awaken threads by inserting them into the
+ *     main CsdScheduler queue, and to suspend them by returning control
+ *     to the thread running the CsdScheduler.
+ *
+ *****************************************************************************/
+
+CpvStaticDeclare(CthThread, CthSchedThreadVar);
+CpvStaticDeclare(int, CthSchedResumeIndex);
+
+static CthThread CthSchedThread()
+{
+  return CpvAccess(CthSchedThreadVar);
+}
+
+static void CthSchedResume(t)
+CthThread t;
+{
+  CpvAccess(CthSchedThreadVar) = CthSelf();
+  CthResume(t);
+}
+
+static void CthSchedEnqueue(t)
+CthThread t;
+{
+  CmiSetHandler(t, CpvAccess(CthSchedResumeIndex));
+  CsdEnqueueFifo(t);
+}
+
+void CthSchedInit()
+{
+  CpvInitialize(CthThread, CthSchedThreadVar);
+  CpvInitialize(int, CthSchedResumeIndex);
+  CpvAccess(CthSchedResumeIndex) = CmiRegisterHandler(CthSchedResume);
+}
+
+void CthSetStrategyDefault(t)
+CthThread t;
+{
+  CthSetStrategy(t, CthSchedEnqueue, CthSchedThread);
+}
+
+
 /***************************************************************************
  *
  * 

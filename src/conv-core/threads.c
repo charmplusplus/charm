@@ -13,7 +13,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 1.17  1995-10-19 04:19:47  jyelon
+ * Revision 1.18  1995-10-19 18:21:39  jyelon
+ * moved CthSetStrategyDefault to convcore.c
+ *
+ * Revision 1.17  1995/10/19  04:19:47  jyelon
  * A correction to eatstack.
  *
  * Revision 1.16  1995/10/18  22:20:17  jyelon
@@ -149,13 +152,7 @@
  *     (the common case), but the specification on a per-thread basis gives
  *     you maximum flexibility in controlling scheduling.
  *
- * void CthSetStrategyDefault(CthThread t)
- *
- *     Sets the scheduling strategy for thread t to be the default strategy.
- *     All threads, when created, are set for the default strategy.  The
- *     default strategy is to awaken threads by inserting them into the
- *     main CsdScheduler queue, and to suspend them by returning control
- *     to the thread running the CsdScheduler.
+ *     See also: common code, CthSetStrategyDefault.
  *
  * void CthYield()
  *
@@ -172,53 +169,6 @@
  *****************************************************************************/
  
 #include "converse.h"
-
-/*****************************************************************************
- *
- * threads: common code.
- *
- * This section contains the following functions, which are common across
- * all implementations:
- *
- * CthSetStrategyDefault
- *
- *****************************************************************************/
-
-CpvStaticDeclare(CthThread, CthSchedThreadVar);
-CpvStaticDeclare(int, CthSchedResumeIndex);
-
-static CthThread CthSchedThread()
-{
-  return CpvAccess(CthSchedThreadVar);
-}
-
-static void CthSchedResume(t)
-CthThread t;
-{
-  CpvAccess(CthSchedThreadVar) = CthSelf();
-  CthResume(t);
-}
-
-static void CthSchedEnqueue(t)
-CthThread t;
-{
-  CmiSetHandler(t, CpvAccess(CthSchedResumeIndex));
-  CsdEnqueueFifo(t);
-}
-
-void CthSchedInit()
-{
-  CpvInitialize(CthThread, CthSchedThreadVar);
-  CpvInitialize(int, CthSchedResumeIndex);
-  CpvAccess(CthSchedResumeIndex) = CmiRegisterHandler(CthSchedResume);
-}
-
-void CthSetStrategyDefault(t)
-CthThread t;
-{
-  CthSetStrategy(t, CthSchedEnqueue, CthSchedThread);
-}
-
 
 /*****************************************************************************
  *
@@ -472,8 +422,8 @@ int size;
 #include <setjmp.h>
 #include <sys/types.h>
 
-#define STACKSIZE_MAIN 256000
-#define STACKSIZE_STD   64000
+#define STACKSIZE_STD   65536
+#define STACKSIZE_MAIN  (65536*4)
 
 CMK_STATIC_PROTO void CthClipTop CMK_PROTO((int));
 
@@ -740,9 +690,8 @@ char **argv;
  *
  * threads: implementation CMK_THREADS_UNAVAILABLE
  *
- * This particular implementation of threads works on most machines that
- * support alloca.  So far, all workstations that we have tested can run this
- * version.
+ * This is a set of stubs I can use as a stopgap to get converse to compile
+ * on machines to which I haven't yet ported threads.
  *
  *****************************************************************************/
 
