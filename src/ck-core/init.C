@@ -539,18 +539,20 @@ void _initCharm(int argc, char **argv)
 			register void *roMsg = (void *) *((char **)(_readonlyMsgs[i]->pMsg));
 			if(roMsg==0)
 				continue;
+			//Pack the message and send it to all other processors
 			register envelope *env = UsrToEnv(roMsg);
 			register int msgIdx = env->getMsgIdx();
 			env->setSrcPe(CkMyPe());
 			env->setMsgtype(ROMsgMsg);
 			env->setRoIdx(i);
 			CmiSetHandler(env, _initHandlerIdx);
-			if (!env->isPacked() &&  _msgTable[msgIdx]->pack)
-				CkPackMessage(&env);
+			CkPackMessage(&env);
 			CmiSyncBroadcast(env->getTotalsize(), (char *)env);
-			if (env->isPacked() && _msgTable[msgIdx]->unpack)
-				CkUnpackMessage(&env);
 			CpvAccess(_qd)->create(CkNumPes()-1);
+			
+			//For processor 0, unpack and re-set the global
+			CkUnpackMessage(&env);
+			_processROMsgMsg(env);
 			_numInitMsgs++;
 		}
 		register int roSize = 0;
