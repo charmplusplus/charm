@@ -9,7 +9,7 @@
 #include "charm-api.h"
 
 // user's thread start routine
-CDECL void armciStart(void);
+CDECL void armciStart(int argc, char **argv);
 
 // API extensions for use with the TCharm substrate
 CDECL void ARMCI_Attach(void);

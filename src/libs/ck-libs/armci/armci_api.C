@@ -21,6 +21,7 @@ int ARMCI_Finalize(void) {
 }
 
 // basic copy operations
+
 // src is local memory, dst is remote address
 int ARMCI_Put(void *src, void *dst, int bytes, int proc) {
   TCHARM_API_TRACE("ARMCI_Put", "armci");
@@ -34,6 +35,17 @@ int ARMCI_Get(void *src, void *dst, int bytes, int proc) {
   ArmciVirtualProcessor *vp = CtvAccess(_armci_ptr);
   return vp->get(src, dst, bytes, proc);
 }
+
+// strided copy operations
+
+int ARMCI_PutS(void *src_ptr, int src_stride_ar[], 
+	       void *dst_ptr, int dst_stride_ar[],
+	       int count[], int stride_levels, int proc) {
+  char *buffer;
+  
+  return 0;
+}
+	       
 
 // global completion operations
 
@@ -59,3 +71,21 @@ int ARMCI_Malloc(void *ptr_arr[], int bytes) {
   return vp->requestAddresses(ptr_arr, bytes);
 }
 
+// CmiIsomalloc does not return a value and no indication is given about
+// the success nor failure of the operation. Hence, it is assumed always
+// that free works.
+int ARMCI_Free(void *address) {
+  TCHARM_API_TRACE("ARMCI_Free", "armci");
+  CmiIsomallocBlockListFree(address);
+  return 0;
+}
+
+// cleanup operations
+
+void ARMCI_Cleanup(void) {
+  // do nothing?
+}
+
+void ARMCI_Error(char *message, int code) {
+  ckerr << "armci error: " << message << " | code = " << code << endl;
+}
