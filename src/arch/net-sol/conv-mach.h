@@ -90,5 +90,6 @@
 /* #define CMK_HAVE_WAITFLAGS_H */
 #define CMK_HAVE_SYS_WAIT_H
 
+#define CMK_SIZE_T long unsigned int
 
 #endif
