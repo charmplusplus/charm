@@ -844,6 +844,8 @@ CmiBool CkLocRec_local::invokeEntry(CkMigratable *obj,void *msg,
 CmiBool CkLocRec_local::deliver(CkArrayMessage *msg,CkDeliver_t type,CmiBool doFree)
 {
 	if (type==CkDeliver_queue) { /*Send via the message queue */
+		if (doFree == CmiFalse)
+			msg = (CkArrayMessage *)CkCopyMsg((void **)&msg);
 		CkArrayManagerDeliver(CkMyPe(),msg);
 		return CmiTrue;
 	}
@@ -852,6 +854,8 @@ CmiBool CkLocRec_local::deliver(CkArrayMessage *msg,CkDeliver_t type,CmiBool doF
 		CkMigratable *obj=myLocMgr->lookupLocal(localIdx,
 			UsrToEnv(msg)->getsetArrayMgr());
 		if (obj==NULL) {//That sibling of this object isn't created yet!
+			if (doFree == CmiFalse)
+				msg = (CkArrayMessage *)CkCopyMsg((void **)&msg);
 			if (msg->array_ifNotThere()!=CkArray_IfNotThere_buffer) {
 				return myLocMgr->demandCreateElement(msg,CkMyPe(),type);
 			}
@@ -999,6 +1003,8 @@ public:
 		msg->array_hops()++;
 		DEBS((AA"   Forwarding message for element %s to %d (REMOTE)\n"AB,
 		      idx2str(msg->array_index()),onPe));
+		if (doFree == CmiFalse)
+			msg = (CkArrayMessage *)CkCopyMsg((void **)&msg);
 		CkArrayManagerDeliver(onPe,msg);
 		return CmiTrue;
 	}
@@ -1043,6 +1049,8 @@ public:
 	//Buffer a message for this element.
 	virtual CmiBool deliver(CkArrayMessage *msg,CkDeliver_t type,CmiBool doFree=CmiTrue) {
 		DEBS((AA" Queued message for %s\n"AB,idx2str(msg->array_index())));
+		if (doFree == CmiFalse)
+			msg = (CkArrayMessage *)CkCopyMsg((void **)&msg);
 		buffer.enq(msg);
 		return CmiTrue;
 	}
@@ -1404,7 +1412,11 @@ void CkLocMgr::deliver(CkMessage *m,CkDeliver_t type,CmiBool doFree) {
 	}
 #endif
 	if (rec!=NULL) rec->deliver(msg,type,doFree);
-	else /* rec==NULL*/ deliverUnknown(msg,type);
+	else /* rec==NULL*/ {
+		if (doFree == CmiFalse)
+			msg = (CkArrayMessage *)CkCopyMsg((void **)&msg);
+		deliverUnknown(msg,type);
+	}
 }
 
 /// This index is not hashed-- somehow figure out what to do.
