@@ -279,8 +279,11 @@ static void ccd_heap_update(double ctime)
      separated from the removal phase because executing
      an entry may change the heap. 
   */
-  for (i=0;i<ne;i++)
+  for (i=0;i<ne;i++) {
+      int old = CmiSwitchToPE(e[i].cb.pe);
       (*(e[i].cb.fn))(e[i].cb.arg);
+      CmiSwitchToPE(old);
+  }
 }
 
 void CcdCallBacksReset(void *ignored);
