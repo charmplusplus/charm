@@ -191,7 +191,8 @@ void CkReductionMgr::contributorDied(contributorInfo *ci)
 	}
 	
 	//Add to the global count for all his future messages (wherever they are)
-	for (int r=redNo;r<ci->redNo;r++)
+	int r;
+	for (r=redNo;r<ci->redNo;r++)
 	{//He already contributed to this reduction, but won't show up in global count.
 		DEBR((AA"Dead guy %p left contribution for #%d\n"AB,ci,r));
 		adj(r).gcount++;
@@ -199,7 +200,7 @@ void CkReductionMgr::contributorDied(contributorInfo *ci)
 	
 	lcount--;
 	//He's already contributed to several reductions here
-	for (int r=redNo;r<ci->redNo;r++)
+	for (r=redNo;r<ci->redNo;r++)
 		adj(r).lcount++;//He'll be contributing to r here
 	
 	finishReduction();
@@ -367,7 +368,8 @@ void CkReductionMgr::finishReduction(void)
 	DEBR((AA"Reduction %d finished!\n"AB,redNo));
 	redNo++;
 	//Shift the count adjustment vector down one slot (to match new redNo)
-	for (int i=1;i<adjVec.length();i++)
+	int i;
+	for (i=1;i<adjVec.length();i++)
 		adjVec[i-1]=adjVec[i];
 	adjVec.length()--;
 	inProgress=false;
@@ -375,7 +377,7 @@ void CkReductionMgr::finishReduction(void)
 	nRemote=nContrib=0;
 
 	//Look through the future queue for messages we can now handle
-	int i,n=futureMsgs.length();
+	int n=futureMsgs.length();
 	for (i=0;i<n;i++)
 	{
 		CkReductionMsg *m=futureMsgs.deq();
@@ -435,7 +437,8 @@ CkReductionMsg *CkReductionMgr::reduceMessages(void)
 	CkReduction::reducerType r=CkReduction::invalid;
 	int msgs_gcount=0;//Reduced gcount
 	int msgs_nSources=0;//Reduced nSources
-	for (int i=0;i<nMsgs;i++)
+	int i;
+	for (i=0;i<nMsgs;i++)
 	{
 		CkReductionMsg *m=msgs[i];
 		msgs_gcount+=m->gcount;
@@ -461,7 +464,7 @@ CkReductionMsg *CkReductionMgr::reduceMessages(void)
 	}
 	
 	//Go back through the vector, deleting old messages
-	for (int i=0;i<nMsgs;i++) delete msgs[i];
+	for (i=0;i<nMsgs;i++) delete msgs[i];
 	
 	//Set the message counts
 	ret->redNo=redNo;
