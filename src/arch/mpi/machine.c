@@ -269,8 +269,25 @@ void CmiBarrier()
         CmiAbort("Timernit: MPI_Barrier failed!\n");
 }
 
+/* CmiBarrierZero make sure node 0 is the last one exiting the barrier */
 void CmiBarrierZero()
 {
+  int i;
+  if (CmiMyRank() == 0) {
+    char msg[1];
+    MPI_Status sts;
+    if (CmiMyNode() == 0)  {
+      for (i=0; i<CmiNumNodes()-1; i++) {
+        if (MPI_SUCCESS != MPI_Recv(msg,1,MPI_BYTE,MPI_ANY_SOURCE,TAG, MPI_COMM_WORLD,&sts))
+          printf("MPI_Recv failed!\n");
+      }
+    }
+    else {
+      if (MPI_SUCCESS != MPI_Send((void *)msg,1,MPI_BYTE,0,TAG,MPI_COMM_WORLD))
+         printf("MPI_Send failed!\n");
+    }
+  }
+  CmiNodeAllBarrier();
 }
 
 typedef struct ProcState {
