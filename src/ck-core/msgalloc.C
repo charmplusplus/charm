@@ -50,11 +50,10 @@ void  CkFreeMsg(void *msg)
 	CmiFree(UsrToEnv(msg));
 }
 
-// cannot simply copy all fields because srcMsg could be varsize msg
 
 extern "C"
 void* CkCopyMsg(void **pMsg)
-{
+{// cannot simply memcpy, because srcMsg could be varsize msg
   register void *srcMsg = *pMsg;
   register envelope *env = UsrToEnv(srcMsg);
   register unsigned char msgidx = env->getMsgIdx();
@@ -100,3 +99,16 @@ MsgPool::MsgPool()
     msgs[i] = _alloc();
   num = MAXMSGS;
 }
+
+CkMarshallMsg *CkAllocateMarshallMsgNoninline(int size,const CkEntryOptions *opts)
+{
+	//Allocate the message
+	CkMarshallMsg *m=new (size,opts->getPriorityBits())CkMarshallMsg;
+	//Copy the user's priority data into the message
+	envelope *env=UsrToEnv(m);
+	memcpy(env->getPrioPtr(),opts->getPriorityPtr(),env->getPrioBytes());
+	//Set the message's queueing type
+	env->setQueueing((unsigned char)opts->getQueueing());
+	return m;
+}
+

@@ -27,8 +27,14 @@ public: static int __idx;
 PUPmarshallBytes(CkChareID)
 PUPmarshallBytes(CkGroupID)
 
-
-class CkMessage { //Superclass of all Charm++ messages
+/**
+ * CkMessage is the superclass of all Charm++ messages.
+ * Typically, a message foo inherits from CMessage_foo, which
+ * inherits from CkMessage.  In the internals of Charm++,
+ * messages are often represented by bare "void *"s, which is 
+ * silly and dangerous.
+ */
+class CkMessage { 
 	//Don't use these: use CkCopyMsg
 	CkMessage(const CkMessage &);
 	void operator=(const CkMessage &);
@@ -63,6 +69,60 @@ class CkMarshalledMessage {
 	void pup(PUP::er &p) {CkPupMessage(p,&msg,1);}
 };
 PUPmarshall(CkMarshalledMessage);
+
+/**
+ * CkEntryOptions describes the options associated
+ * with an entry method invocation, which include
+ * the message priority and queuing strategy.
+ * It is only used with parameter marshalling.
+ */
+class CkEntryOptions : public CkNoncopyable {
+	int queueingtype; //CK_QUEUEING type
+	int prioBits; //Number of bits of priority to use
+	typedef unsigned int prio_t; //Datatype used to represent priorities
+	const prio_t *prioPtr; //Points to message priority values
+	prio_t prioStore; //For short priorities, stores the priority value
+public:
+	CkEntryOptions(void) {
+		queueingtype=CK_QUEUEING_FIFO;
+		prioBits=0;
+		prioPtr=NULL;
+	}
+	
+	inline void setPriority(prio_t integerPrio) {
+		queueingtype=CK_QUEUEING_IFIFO;
+		prioBits=8*sizeof(integerPrio);
+		prioPtr=&prioStore;
+		prioStore=integerPrio;
+	}
+	inline void setPriority(int prioBits_,const prio_t *prioPtr_) {
+		queueingtype=CK_QUEUEING_BFIFO;
+		prioBits=prioBits_;
+		prioPtr=prioPtr_;
+	}
+	
+	inline void setQueueing(int queueingtype_) {queueingtype=queueingtype_;}
+	
+	///These are used by CkAllocateMarshallMsg, below:
+	inline int getQueueing(void) const {return queueingtype;}
+	inline int getPriorityBits(void) const {return prioBits;}
+	inline const prio_t *getPriorityPtr(void) const {return prioPtr;}
+};
+
+#include "CkMarshall.decl.h"
+//This is the message type marshalled parameters get packed into:
+class CkMarshallMsg : public CMessage_CkMarshallMsg {
+public: 
+	char *msgBuf;
+};
+
+CkMarshallMsg *CkAllocateMarshallMsgNoninline(int size,const CkEntryOptions *opts);
+inline CkMarshallMsg *CkAllocateMarshallMsg(int size,const CkEntryOptions *opts=NULL)
+{
+	if (opts==NULL) return new (size,0)CkMarshallMsg;
+	else return CkAllocateMarshallMsgNoninline(size,opts);
+}
+
 
 //A queue-of-messages, like CkMsgQ<CkReductionMsg>
 template <class MSG>
@@ -205,15 +265,6 @@ public:
 PUPmarshall(CkSectionID)
 
 #include "ckcallback.h"
-
-//Used by parameter marshalling:
-#include "CkMarshall.decl.h"
-//This is the message type marshalled parameters get packed into:
-class CkMarshallMsg : public CMessage_CkMarshallMsg {
-public: 
-	char *msgBuf;
-};
-
 
 /********************* Superclass of all Chares ******************/
 #if CMK_MULTIPLE_DELETE
