@@ -11,9 +11,13 @@
  ***************************************************************************
  * REVISION HISTORY:
  *      $Log$
- *      Revision 2.4  1995-07-12 20:23:47  brunner
- *      Changed global variable time to now, to avoid conflict with
- *      system function time.
+ *      Revision 2.5  1995-07-12 21:36:20  brunner
+ *      Added prog_name to perfModuleInit(), so argv[0] can be used
+ *      to generate a unique tace file name.
+ *
+ * Revision 2.4  1995/07/12  20:23:47  brunner
+ * Changed global variable time to now, to avoid conflict with
+ * system function time.
  *
  * Revision 2.3  1995/07/10  22:29:40  brunner
  * Created perfModuleInit() to handle CPV macros
@@ -52,8 +56,11 @@ CpvDeclare(int,start_processing_time);
 
 CpvExtern(int,RecdStatMsg);
 
-perfModuleInit()
+perfModuleInit(prog_name)
+char *prog_name;
 {
+  char nodename[80];
+
   CpvInitialize(char*,pgm);
   CpvInitialize(int,RecdPerfMsg);
   CpvInitialize(int,display_index);
@@ -64,6 +71,8 @@ perfModuleInit()
   CpvInitialize(int,timestep);
   CpvInitialize(int,init_time);
   CpvInitialize(int,start_processing_time);
+  sprintf(nodename,"%d",CmiMyPe());
+  program_name(prog_name,nodename);
 }
 
 trace_creation(msg_type, entry, envelope)

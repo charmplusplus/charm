@@ -12,7 +12,11 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.3  1995-07-11 20:34:38  knauff
+ * Revision 2.4  1995-07-12 21:36:20  brunner
+ * Added prog_name to perfModuleInit(), so argv[0] can be used
+ * to generate a unique tace file name.
+ *
+ * Revision 2.3  1995/07/11  20:34:38  knauff
  * Changed 'uint' to 'un_int' to avoid crashes with gcc v 2.5.8
  * (on the SP, at least)
  *
@@ -80,8 +84,11 @@ CpvExtern(int,chareCount);
 CpvExtern(int,pseudoCount);
 CpvExtern(int,msgCount);
 
-perfModuleInit()
+perfModuleInit(prog_name)
+char *prog_name;
 {
+  char nodename[80];
+
   CpvInitialize(char*,pgm);
   CpvInitialize(char*,machine);
   CpvInitialize(char*,log_file_name);
@@ -96,6 +103,8 @@ perfModuleInit()
   CpvInitialize(int,begin_event);
   CpvInitialize(un_int,begin_processing_time);
   CpvInitialize(FILE*,state_file_fd);
+  sprintf(nodename,"%d",CmiMyPe());
+  program_name(prog_name,nodename);
 }
 
 void PrintStsFile(str)
