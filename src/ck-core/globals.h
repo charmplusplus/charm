@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.7  1995-09-06 21:48:50  jyelon
+ * Revision 2.8  1995-09-07 05:26:14  gursoy
+ * introduced new global variables used by HANDLE_INIT_MSG
+ *
+ * Revision 2.7  1995/09/06  21:48:50  jyelon
  * Eliminated 'CkProcess_BocMsg', using 'CkProcess_ForChareMsg' instead.
  *
  * Revision 2.6  1995/09/01  02:13:17  jyelon
@@ -114,6 +117,7 @@ CpvExtern(int, LDB_ELEM_SIZE);
 
 /* Handlers for various message-types */
 CsvExtern(int, HANDLE_INCOMING_MSG_Index);
+CsvExtern(int, HANDLE_INIT_MSG_Index);
 CsvExtern(int, CkProcIdx_ForChareMsg);
 CsvExtern(int, CkProcIdx_DynamicBocInitMsg);
 CsvExtern(int, CkProcIdx_NewChareMsg);
@@ -169,3 +173,15 @@ CsvExtern(int, CkEp_Ldb_NbrStatus);
 
 CsvExtern(int, NumSysBocEps);
 
+
+
+/* Initialization phase count variables for synchronization */
+CpvExtern(int,CkInitCount);
+CpvExtern(int,CkCountArrived);
+
+
+/* Buffer for the non-init messages received during the initialization phase */
+CpvExtern(void*, CkBuffQueue);
+
+/* Initialization phase flag : 1 if in the initialization phase */
+CpvExtern(int, CkInitPhase);

@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.5  1995-09-06 21:48:50  jyelon
+ * Revision 2.6  1995-09-07 05:26:38  gursoy
+ * introduced new global variables used by HANDLE_INIT_MSG
+ *
+ * Revision 2.5  1995/09/06  21:48:50  jyelon
  * Eliminated 'CkProcess_BocMsg', using 'CkProcess_ForChareMsg' instead.
  *
  * Revision 2.4  1995/09/01  02:13:17  jyelon
@@ -124,6 +127,7 @@ CsvDeclare(int, MainChareLanguage);
 
 /* Handlers for various message-types */
 CsvDeclare(int, HANDLE_INCOMING_MSG_Index);
+CsvDeclare(int, HANDLE_INIT_MSG_Index);
 CsvDeclare(int, CkProcIdx_ForChareMsg);
 CsvDeclare(int, CkProcIdx_DynamicBocInitMsg);
 CsvDeclare(int, CkProcIdx_NewChareMsg);
@@ -178,6 +182,28 @@ CsvDeclare(int, CkEp_Ldb_NbrStatus);
 
 CsvDeclare(int, NumSysBocEps);
 
+
+/* Initialization phase count variables for synchronization */
+CpvDeclare(int,CkInitCount);
+CpvDeclare(int,CkCountArrived);
+
+
+/* Buffer for the non-init messages received during the initialization phase */
+CpvDeclare(void*, CkBuffQueue);
+
+
+/* Initialization phase flag : 1 if in the initialization phase */
+CpvDeclare(int, CkInitPhase);
+
+
+
+
+
+
+
+
+
+
 void globalsModuleInit()
 {
    CpvInitialize(int, PAD_SIZE);
@@ -212,6 +238,11 @@ void globalsModuleInit()
    CpvInitialize(int, _CK_13PackMsgCount);
    CpvInitialize(int, _CK_13ChareEPCount);
    CpvInitialize(int, _CK_13TotalMsgCount);
+   CpvInitialize(int, CkInitPhase);
+   CpvInitialize(int, CkInitCount);
+   CpvInitialize(int, CkCountArrived);
+   CpvInitialize(void*, CkBuffQueue); 
+
 
    CpvAccess(NumReadMsg)             = 0; 
    CpvAccess(InsideDataInit)         = 0;
@@ -226,5 +257,10 @@ void globalsModuleInit()
    CpvAccess(PrintSummaryStat)       = 0;
    CpvAccess(numHeapEntries)         = 0;  
    CpvAccess(numCondChkArryElts)     = 0; 
+   CpvAccess(CkInitPhase)            = 1;
+   CpvAccess(CkInitCount)            = 0;
+   CpvAccess(CkCountArrived)         = 0; 
+   CpvAccess(CkBuffQueue)            = NULL;   
+
    if (CmiMyRank() == 0) CsvAccess(MainChareLanguage)  = -1;
 }
