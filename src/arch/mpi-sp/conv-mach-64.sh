@@ -3,6 +3,10 @@ CMK_CC='mpcc_r -q64 '
 CMK_CXX='mpCC_r -q64 -qstaticinline '
 CMK_LD="$CMK_CC -b64 "
 CMK_LDXX="$CMK_CXX -b64 "
+CMK_SEQ_CC='xlc_r -q64'
+CMK_SEQ_LD='xlc_r -b64'
+CMK_SEQ_CXX='xlC_r -qstaticinline -q64'
+CMK_SEQ_LDXX='xlC_r -b64'
 CMK_CF77='mpxlf_r -q64 '
 CMK_CF90='mpxlf90_r -q64 -qsuffix=f=f90' 
 CMK_CF90_FIXED='mpxlf90_r -q64 ' 
