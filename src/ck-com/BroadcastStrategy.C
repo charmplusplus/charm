@@ -30,7 +30,7 @@ BroadcastStrategy::BroadcastStrategy(int topology) :
 
 //Receives the message and sends it along the spanning tree.
 void BroadcastStrategy::insertMessage(CharmMessageHolder *cmsg){
-    CkPrintf("[%d] BRAODCASTING\n", CkMyPe());
+    CkPrintf("[%d] BROADCASTING\n", CkMyPe());
 
     char *msg = cmsg->getCharmMessage();
     if(_topology == USE_HYPERCUBE) {
