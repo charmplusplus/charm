@@ -33,7 +33,7 @@
 #define CMK_SIGNAL_USE_SIGACTION_WITH_RESTART              0
 
 #define CMK_THREADS_REQUIRE_NO_CPV                         0
-#define CMK_THREADS_USE_CONTEXT                            1
+#define CMK_THREADS_USE_CONTEXT                            0
 
 #define CMK_TIMER_USE_GETRUSAGE                            0
 #define CMK_TIMER_USE_SPECIAL                              1
