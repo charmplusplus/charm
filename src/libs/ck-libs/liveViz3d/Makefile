@@ -16,6 +16,7 @@ OBJS=$(LV3D_CLIENT_OBJS) lv3d0_server.o lv3d1_server.o
 
 $(DEST): $(OBJS) $(COMPAT) headers
 	$(CHARMC) $(OBJS) $(COMPAT) -o $@
+	cp liveViz3d.dep $(CDIR)/lib/libmoduleliveViz3d.dep
 
 headers: $(HEADERS)
 	cp $(HEADERS) $(CDIR)/include/

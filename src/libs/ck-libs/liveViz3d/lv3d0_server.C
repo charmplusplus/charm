@@ -11,7 +11,9 @@
 #include <algorithm>
 
 #include "lv3d0.decl.h" //For LV3D0_ViewMsg
-#include "lv3d1.decl.h" //For LV3D1 registration (for .def file)
+void _registerlv3d1(void);
+void _registerliveViz(void);
+// #include "lv3d1.decl.h" //For LV3D1 registration (for .def file)
 
 static /* readonly */ CProxy_LV3D0_Manager mgrProxy;
 #define masterProcessor 0

@@ -5,5 +5,6 @@ module lv3d1 {
 		entry void LV3D_NewClient(int clientID);
 		entry [nokeep] void LV3D_Viewpoint(LV3D_ViewpointMsg *m);
 		entry void LV3D_Render(LV3D_RenderMsg *m);
+		entry void LV3D_FlatRender(liveVizRequestMsg *m);
 	};
 };

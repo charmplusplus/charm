@@ -31,6 +31,13 @@ void CkView::pup(PUP::er &p) {
 
 /***************** CkImageCompressor *****************/
 
+/**
+  Compress an image by encoding away pixels with alpha==0
+  on the start and end of each row.
+  
+  FIXME: doesn't work in binary across platforms *unless*
+    the PUP::er is xlating.
+*/
 void CkImageCompressor::pup(PUP::er &p) {
 	img->CkImage::pup(p);
 	int wid=img->getWidth(), ht=img->getHeight();
@@ -338,12 +345,19 @@ bool CkInterestViewable::newViewpoint(const CkViewpoint &univ2screen,CkViewpoint
 //   (Note: OpenGL textures *MUST* be a power of two in both directions)
 //   ( for mipmapping, the textures must also be square )
 	double inset=2; //Pixels to expand output region by (to ensure a clean border)
+	
+	 int target_w=(int)(r.wid()+2*inset), target_h=(int)(r.ht()+2*inset);
+#if 0 /* for OpenGL: power-of-two textures */
 	const int start_sz=4, max_sz=512;
 	int wid=start_sz, ht =start_sz;  // Proposed size
 	// Scale up size until both width and height are acceptable.
-	while ((wid<r.wid()+2*inset) || (ht<r.ht()+2*inset)) {
+	while ((wid<target_w) || (ht<target_h)) {
 		ht*=2; wid*=2;
 	}
+#else /* for liveViz: non-power-of-two textures */
+	int max_sz=2048;
+	int wid=target_w, ht=target_h;
+#endif
 	
 //Create our new view in the plane of our center, 
 //  using a perspective-scaled version of the old axes:

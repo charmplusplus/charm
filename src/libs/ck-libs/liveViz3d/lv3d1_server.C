@@ -114,6 +114,10 @@ public:
 		LV3D_RenderMsg::delete_(m);
 	}
 	
+#if LV3D_USE_FLAT
+	void LV3D_FlatRender(liveVizRequestMsg *m,LV3D_Array *arr);
+#endif
+	
 };
 
 /* The array itself just forwards everything to the impl_LV3D_Array */
@@ -153,6 +157,7 @@ void LV3D_Array::LV3D_NewClient(int clientID)
  */
 void LV3D_Array::LV3D_Viewpoint(LV3D_ViewpointMsg *m) 
 {
+	LV3D_Prepare();
 	impl->viewpoint(m);
 }
 
@@ -161,8 +166,60 @@ void LV3D_Array::LV3D_Viewpoint(LV3D_ViewpointMsg *m)
 */
 void LV3D_Array::LV3D_Render(LV3D_RenderMsg *m)
 {
+	LV3D_Prepare();
 	impl->render(m);
 }
+
+/**
+  This entry method is only used when rendering to
+    plain old server-assembled liveViz 2d.
+*/
+void LV3D_Array::LV3D_FlatRender(liveVizRequestMsg *m)
+{
+#if LV3D_USE_FLAT
+	LV3D_Prepare();
+	impl->LV3D_FlatRender(m,this);
+#endif
+}
+
+void LV3D_Array::LV3D_Prepare(void) {}
+
+#if LV3D_USE_FLAT
+void impl_LV3D_Array::LV3D_FlatRender(liveVizRequestMsg *m,LV3D_Array *arr)
+{
+	if (!viewable) { /* nothing to show */
+	  liveVizDeposit(m, 0,0, 0,0, 0, arr);
+	  return;
+	}
+	CkViewpoint vp;
+	liveVizRequestUnpack(m,vp);
+	CkQuadView *v=(CkQuadView *)viewable->renderView(vp);
+	CkVector3d topLeft=vp.project(v->corners[0]);
+	CkAllocImage &src=v->getImage(); // FIXME: assumed to be RGBA
+	int w=src.getWidth(), h=src.getHeight();
+	CkAllocImage dest(w, h, 3);
+	int x,y;
+	for (y=0;y<h;y++) {
+		unsigned char *i=src.getPixel(0,y);
+		const int ip=4; /*byte size of pixel */
+		int r, g, b; /* byte offsets from pixel start */
+		if (src.getLayout()==CkImage::layout_reversed)
+			{r=2; g=1; b=0;}
+		else
+			{r=1; g=2; b=3;}
+		unsigned char *o=dest.getPixel(0,y);
+		const int op=3; /*byte size of pixel*/
+		for (x=0;x<w;x++) {
+			o[op*x+0] = i[x*ip+r];
+			o[op*x+1] = i[x*ip+g];
+			o[op*x+2] = i[x*ip+b];
+		}
+	}
+	x=(int)(topLeft.x+0.5), y=(int)(topLeft.y+0.5);
+	liveVizDeposit(m, x,y, w,h, dest.getData(), arr);
+	delete v;
+}
+#endif
 
 /**************** Network Messages **************/
 
@@ -190,6 +247,11 @@ void LV3D1_Init(const CkBbox3d &box,CkArrayID aid,LV3D_Universe *theUniverse)
 	// Broadcast to LV3D_Viewpoint when the viewpoint changes.
 	CkCallback frameUpdate(CkIndex_LV3D_Array::LV3D_Viewpoint(0),aid);
 	LV3D0_Init(theUniverse,frameUpdate);
+#if LV3D_USE_FLAT
+	// Broadcast to LV3D_FlatRender for 2D views.
+	CkCallback flatUpdate(CkIndex_LV3D_Array::LV3D_FlatRender(0),aid);
+	liveVizInit(liveVizConfig(true,false),aid,flatUpdate);
+#endif
 }
 
 

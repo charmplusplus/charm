@@ -10,7 +10,16 @@
 #define __UIUC_CHARM_LV3D_SERVER_1_H
 
 #include "lv3d0_server.h"
+
+#define LV3D_USE_FLAT 1 /* include link to liveViz 2D image assembly */
+#if LV3D_USE_FLAT
+#include "liveViz.h"
+#else
+class liveVizRequestMsg;
+#endif
+
 #include "lv3d1.decl.h" /* for message superclasses */
+
 
 /**
  * Register for lv3d redraw requests.  This routine
@@ -104,6 +113,11 @@ public:
 	virtual void LV3D_NewClient(int clientID);
 	
 	/**
+	  Prepare to handle a call.  Can be used to add viewables lazily.
+	*/
+	virtual void LV3D_Prepare(void);
+	
+	/**
 	  This request is broadcast every time a client viewpoint changes.
 	  Internally, it asks the stored CkViewables if they should redraw,
 	  and if so, queues up a LV3DRenderMsg.
@@ -114,6 +128,12 @@ public:
 	  This method is used to prioritize rendering.
 	*/
 	virtual void LV3D_Render(LV3D_RenderMsg *m);
+	
+	/**
+	  This entry method is only used when rendering to
+	  plain old server-assembled liveViz 2d.
+	*/
+	virtual void LV3D_FlatRender(liveVizRequestMsg *m);
 };
 
 #endif
