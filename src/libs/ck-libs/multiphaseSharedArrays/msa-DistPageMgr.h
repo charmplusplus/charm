@@ -21,6 +21,9 @@ struct MSA_WriteSpan_t {
 };
 
 template<class T> class DefaultEntry;
+template <class ENTRY, class MERGER,
+          unsigned int ENTRIES_PER_PAGE>
+         class MSA_PageT;
 #include "msa.decl.h"
 
 using namespace std;
@@ -360,8 +363,8 @@ public:
 
 /** This is the interface used to perform the accumulate operation on
     an Entry.  T is the data type.  It may be a primitive one or a
-    class.  It must support the default constructor, assignment, copy
-    constructor, += operator, typecast from int 0, 1, and pup.
+    class.  It must support the default constructor, assignment, +=
+    operator if yiu use accumulate, typecast from int 0, 1, and pup.
 */
 template <class T>
 class DefaultEntry {
@@ -386,9 +389,10 @@ public:
 };
 
 //================================================================
-// THIS CODE IS UNUSED AS YET.
 
 /**
+  UNUSED
+
   Holds the untyped data for one MSA page.
   This is the interface MSA_CacheGroup uses to access a cached page.
   MSA_CacheGroup asks the templated code to create a MSA_Page
@@ -421,20 +425,30 @@ template <
 	class MERGER=DefaultEntry<ENTRY>,
 	unsigned int ENTRIES_PER_PAGE=MSA_DEFAULT_ENTRIES_PER_PAGE
 >
-class MSA_PageT : public MSA_Page {
+class MSA_PageT {
 	/** The contents of this page: array of ENTRIES_PER_PAGE items */
 	ENTRY *data;
 	/** Merger object */
 	MERGER m;
+    bool do_not_delete;
 
 public:
-	MSA_PageT() {
+	MSA_PageT():do_not_delete(false) {
 		data=new ENTRY[ENTRIES_PER_PAGE];
 		for (int i=0;i<ENTRIES_PER_PAGE;i++)
 			data[i]=m.getIdentity();
 	}
+    // This constructor is used in PageArray to quickly convert an
+    // array of ENTRY into an MSA_PageT.  So we just make a copy of
+    // the pointer.  When it comes time to destruct the object, we
+    // need to ensure we do NOT delete the data but just discard the
+    // pointer.
+	MSA_PageT(ENTRY *d):data(d), do_not_delete(true) {
+    }
 	virtual ~MSA_PageT() {
-		delete[] data;
+ 		if (do_not_delete==false) {
+            delete [] data;
+        }
 	}
 	
 	virtual void pup(PUP::er &p) {
@@ -442,13 +456,13 @@ public:
 			p|data[i];
 	}
 
-	virtual void merge(MSA_Page &otherPage) {
+	virtual void merge(MSA_PageT<ENTRY, MERGER, ENTRIES_PER_PAGE> &otherPage) {
 		for (int i=0;i<ENTRIES_PER_PAGE;i++)
 			m.accumulate(data[i],otherPage.data[i]);
 	}
 
 	// These accessors might be used by the templated code.
-// 	inline ENTRY &operator[](int i) {return data[i];}
+ 	inline ENTRY &operator[](int i) {return data[i];}
 // 	inline const ENTRY &operator[](int i) const {return data[i];}
 };
 
@@ -457,6 +471,8 @@ public:
 template <class ENTRY_TYPE, class ENTRY_OPS_CLASS,unsigned int ENTRIES_PER_PAGE>
 class MSA_CacheGroup : public Group
 {
+    typedef MSA_PageT<ENTRY_TYPE, ENTRY_OPS_CLASS, ENTRIES_PER_PAGE> page_t;
+
 protected:
     ENTRY_OPS_CLASS *entryOpsObject;
     unsigned int numberOfWorkerThreads;      // number of worker threads across all processors for this shared array
@@ -569,7 +585,7 @@ protected:
         if(nu == NULL && resident_pages < max_resident_pages)
         {
             nu = new ENTRY_TYPE[ENTRIES_PER_PAGE];
-	    resident_pages++;
+            resident_pages++;
         }
 
         // else swap out one of the pages
@@ -712,12 +728,12 @@ protected:
     //   Note that this is INCORRECT when writes to pages overlap!
     inline void sendNonRLEChangesToPageArray(const unsigned int page) // @@@
     {
-        pageArray[page].ReceivePage(pageTable[page], ENTRIES_PER_PAGE, CkMyPe(), stateN(page)->state);
+        pageArray[page].PAReceivePage(pageTable[page], ENTRIES_PER_PAGE, CkMyPe(), stateN(page)->state);
     }
     
     // Send the page data as an RLE block.
     // this function assumes that there are no overlapping writes in the list
-    inline void sendRLEChangesToPageArray(const unsigned int page) // @@@
+    inline void sendRLEChangesToPageArray(const unsigned int page)
     {
         ENTRY_TYPE *writePage=pageTable[page];
         int nSpans=stateN(page)->writeSpans(writeSpans);
@@ -832,15 +848,16 @@ public:
     inline void accumulate(unsigned int page, const ENTRY_TYPE* entry, unsigned int offset)
     {
         accessPage(page,Accumulate_Fault);
-	stateN(page)->write(offset);
+        stateN(page)->write(offset);
         combine(page, entry, offset);
     }
 
     /// A requested page has arrived from the network.
     ///  nEntriesInPage_ = num entries being sent (0 for empty page, num entries otherwise)
-    inline void ReceivePage(unsigned int page, ENTRY_TYPE* pageData, int size)
+    inline void ReceivePage(unsigned int page, page_t &pageData, int size)
     {
-        // the page we requested for has been received
+        CkAssert(0==size || ENTRIES_PER_PAGE == size);
+        // the page we requested has been received
         ENTRY_TYPE *nu=makePage(page);
         if(size!=0)
         {
@@ -1175,6 +1192,7 @@ template<class ENTRY_TYPE, class ENTRY_OPS_CLASS,unsigned int ENTRIES_PER_PAGE>
 class MSA_PageArray : public ArrayElement1D
 {
     typedef CProxy_MSA_CacheGroup<ENTRY_TYPE, ENTRY_OPS_CLASS, ENTRIES_PER_PAGE> CProxy_CacheGroup_t;
+    typedef MSA_PageT<ENTRY_TYPE, ENTRY_OPS_CLASS, ENTRIES_PER_PAGE> page_t;
     
 protected:
     ENTRY_TYPE *epage;
@@ -1250,13 +1268,14 @@ public:
     inline void GetPage(int pe)
     {
         if(epage == NULL)
-            cache[pe].ReceivePage(pageNo(), (ENTRY_TYPE*)NULL, 0); // send empty page
+            cache[pe].ReceivePage(pageNo(), page_t((ENTRY_TYPE*)NULL), 0); // send empty page
         else
-            cache[pe].ReceivePage(pageNo(), epage, ENTRIES_PER_PAGE);  // send page with data
+            cache[pe].ReceivePage(pageNo(), page_t(epage), ENTRIES_PER_PAGE);  // send page with data
     }
 
     /// Receive a non-runlength encoded page from the network:
-    inline void ReceivePage(ENTRY_TYPE *pageData,
+    // @@ TBD: ERROR: This does not work for  varsize pages.
+    inline void PAReceivePage(ENTRY_TYPE *pageData,
                             int pe, MSA_Page_Fault_t pageState)
     {
         allocatePage(pageState);
