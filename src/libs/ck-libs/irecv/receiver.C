@@ -129,7 +129,7 @@ int
 receiver::iAlltoAll(void *sendbuf, int sendcount, int sendtype, 
 	            void *recvbuf, int recvcount, int recvtype, int refno)
 {
-  int nPe = getSize();  // should be number of elements in array1D
+  int nPe = getArraySize();  // should be number of elements in array1D
   int tag = GATHER_TAG;	// special tag
   int i;
   for (i=0; i<nPe; i++) {
@@ -148,7 +148,7 @@ receiver::iAlltoAllv(void *sendbuf, int *sendcount, int *sdispls, int sendtype,
                      void *recvbuf, int *recvcount, int *rdispls, int recvtype,
                      int refno)
 {
-  int nPe = getSize();  // should be number of elements in array1D
+  int nPe = getArraySize();  // should be number of elements in array1D
   int tag = GATHER_TAG;	// special tag
   int i;
   for (i=0; i<nPe; i++) {
