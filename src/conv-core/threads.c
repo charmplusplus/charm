@@ -984,6 +984,7 @@ Written by Gengbin Zheng around April 2001
 
 #include <signal.h>
 #include <ucontext.h>
+#include <errno.h>
 
 struct CthThreadStruct
 {
@@ -1097,6 +1098,10 @@ static CthThread CthCreateInner(CthVoidFn fn,void *arg,int size,int migratable)
   result->context.uc_stack.ss_flags = 0;
   result->context.uc_link = 0;
   makecontext(&result->context, (void (*) (void))CthStartThread, 2, fn, arg);
+  if(errno !=0) { 
+    perror("makecontext"); 
+    CmiAbort("CthCreateInner: makecontext failed.\n");
+  }
   return result;  
 }
 
