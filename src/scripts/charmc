@@ -518,7 +518,7 @@ do
 		OPTS="$OPTS $arg"
 		;;
 
-	-l*)
+	-l*|*.a)
 		if [ -n "$POST_LANGUAGE" ]
 		then
 			POST_LIBRARIES=`AppendList $POST_LIBRARIES $arg`
