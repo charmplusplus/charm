@@ -5,11 +5,11 @@
  * $Revision$
  *****************************************************************************/
 
-#include <iostream.h>
-#include <fstream.h>
 #include <stdlib.h>
 #include "xi-symbol.h"
 #include <ctype.h> // for tolower()
+#include <fstream>
+using std::ofstream;
 
 int fortranMode;
 const char *cur_file;
