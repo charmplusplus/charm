@@ -93,7 +93,7 @@ init(void)
 	for(int ii=0;ii<nPts;ii++){
 		validNodes[ii]=1;
 	}
-	FEM_Register_array(FEM_Mesh_default_write(),FEM_NODE,FEM_VALID,td,FEM_BYTE,1);
+	FEM_Register_array(FEM_Mesh_default_write(),FEM_NODE,FEM_VALID,validNodes,FEM_BYTE,1);
 
 
   int nEle=0;
