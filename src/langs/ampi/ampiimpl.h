@@ -110,7 +110,8 @@ class ArgsInfo : public CMessage_ArgsInfo {
 class DirMsg : public CMessage_DirMsg {
   public:
     char *dname;
-    DirMsg(char* d) { dname = d; }
+    DirMsg(char* d) { dname = new char[strlen(d)+1]; strcpy(dname, d); }
+    ~DirMsg() { delete[] dname; }
     static void *pack(DirMsg *m)
     {
       void *buf = CkAllocBuffer(m, strlen(m->dname)+1);
@@ -121,8 +122,7 @@ class DirMsg : public CMessage_DirMsg {
     static DirMsg* unpack(void *buf)
     {
       DirMsg *m = (DirMsg*) CkAllocBuffer(buf, sizeof(DirMsg));
-      m->dname = new char[strlen((char*)buf)+1];
-      strcpy(m->dname, (char*)buf);
+      m = new ((void*)m) DirMsg((char*)buf);
       CkFreeMsg(buf);
       return m;
     }
@@ -169,8 +169,10 @@ class ampi : public ArrayElement1D {
       } else {
         CkError("Cannot checkpoint to file %s! Continuing...\n");
       }
-      CthAwaken(thread_id);
-      thread_id = 0;
+      if(cthread_id) {
+        CthAwaken(cthread_id);
+        cthread_id = 0;
+      }
       return;
     }
     void checkpoint(DirMsg *msg)
@@ -194,8 +196,10 @@ class ampi : public ArrayElement1D {
       if(fp!=0) {
         PUP::fromDisk p(fp); p.becomeUserlevel();
         pup(p);
-        CthAwaken(thread_id);
-        thread_id = 0;
+        if(cthread_id) {
+          CthAwaken(cthread_id);
+          cthread_id = 0;
+        }
       } else {
         CkAbort("Canot open restart file for reading!\n");
       }
@@ -224,6 +228,8 @@ class ampi : public ArrayElement1D {
     int commidx;
     CmmTable msgs;
     CthThread thread_id;
+    CthThread mthread_id;
+    CthThread cthread_id;
     int nbcasts;
     PersReq requests[100];
     int nrequests;
@@ -239,10 +245,10 @@ class ampi : public ArrayElement1D {
     virtual void start(void); // should be overloaded in derived class
     void ResumeFromSync(void)
     {
-      if (thread_id)
+      if (mthread_id)
       {
-        CthAwaken(thread_id);
-        thread_id = 0;
+        CthAwaken(mthread_id);
+        mthread_id = 0;
       }
     }
 };

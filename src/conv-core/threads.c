@@ -910,7 +910,9 @@ grab_slots(slotset *ss, int sslot, int nslots)
       return;
     }
   }
+  /*
   CmiAbort("requested a non-existent slotblock\n");
+  */
 }
 
 /*
@@ -1476,6 +1478,8 @@ CthThread CthPup(pup_er p, CthThread t)
     _MEMCHECK(stack);
     if(stack != t->stack)
       CmiAbort("Stack pointers do not match after migration!!\n");  
+    grab_slots(CpvAccess(myss), t->slotnum, t->nslots);
+#if 0
     if(homePe == CmiMyPe())
     {
       grab_slots(CpvAccess(myss), t->slotnum, t->nslots);
@@ -1490,6 +1494,7 @@ CthThread CthPup(pup_er p, CthThread t)
       CmiSetHandler(msg, CpvAccess(reqSpecHdlr));
       CmiSyncSendAndFree(homePe, sizeof(slotmsg), msg);
     }
+#endif
   }
   pup_bytes(p, (void*)t->data, t->datasize);
 

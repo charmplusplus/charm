@@ -71,6 +71,8 @@ ampi::ampi(AmpiStartMsg *msg)
   delete msg;
   msgs = CmmNew();
   thread_id = 0;
+  cthread_id = 0;
+  mthread_id = 0;
   nbcasts = 0;
   nrequests = 0;
   myDDT = new DDT() ;
@@ -147,6 +149,8 @@ ampi::recv(int t1, int t2, void* buf, int count, int type, int comm)
     thread_id = CthSelf();
     stop_running();
     CthSuspend();
+    if(thread_id != 0)
+      CkAbort("thread_id not 0 upon return !!\n");
     start_running();
   }
   if (msg->length < len) {
@@ -214,8 +218,14 @@ void ampi::pup(PUP::er &p)
   PUP::seekBlock s(p,2);
   if (p.isUnpacking()) 
   {//In this case, unpack the thread before the user data
+    thread_id = 0;
+    cthread_id = 0;
+    mthread_id = 0;
   	s.seek(1);
-  	thread_id = CthPup((pup_er) &p, thread_id);
+  	if(p.isUserlevel())
+      cthread_id = CthPup((pup_er) &p, cthread_id);
+    else
+      mthread_id = CthPup((pup_er) &p, mthread_id);
   }
   //Pack all user data
   s.seek(0);
@@ -229,7 +239,10 @@ void ampi::pup(PUP::er &p)
   if (p.isPacking() || p.isSizing()) 
   {//In this case, pack the thread after the user data
   	s.seek(1);
-  	thread_id = CthPup((pup_er) &p, thread_id);
+  	if(p.isUserlevel())
+      cthread_id = CthPup((pup_er) &p, cthread_id);
+    else
+      mthread_id = CthPup((pup_er) &p, mthread_id);
   }
   s.endBlock(); //End of seeking block
 
@@ -241,7 +254,10 @@ void ampi::pup(PUP::er &p)
   if(p.isUnpacking())
   {
     msgs = CmmNew();
-    CtvAccessOther(thread_id, ampiPtr) = this;
+  	if(p.isUserlevel())
+      CtvAccessOther(cthread_id, ampiPtr) = this;
+    else
+      CtvAccessOther(mthread_id, ampiPtr) = this;
     myDDT = new DDT((void*)0);
     nrequests = 0;
     nirequests = 0;
@@ -316,13 +332,15 @@ extern "C" void
 AMPI_Migrate(void)
 {
   ampi *ptr = CtvAccess(ampiPtr);
-  ptr->thread_id = CthSelf();
+  ptr->mthread_id = CthSelf();
   int idx = ptr->thisIndex;
   CProxy_ampi aproxy(ampimain::ampi_comms[ptr->commidx].aid);
   aproxy[idx].migrate();
   ptr->stop_running();
   CthSuspend();
   ptr = CtvAccess(ampiPtr);
+  if(ptr->mthread_id != 0)
+    CkAbort("mthread_id not 0 upon return !!\n");
   ptr->start_running();
 }
 
@@ -331,13 +349,15 @@ AMPI_Checkpoint(char *dirname)
 {
   mkdir(dirname, 0777);
   ampi *ptr = CtvAccess(ampiPtr);
-  ptr->thread_id = CthSelf();
+  ptr->cthread_id = CthSelf();
   int idx = ptr->thisIndex;
   CProxy_ampi aproxy(ampimain::ampi_comms[ptr->commidx].aid);
   aproxy[idx].checkpoint(new DirMsg(dirname));
   ptr->stop_running();
   CthSuspend();
   ptr = CtvAccess(ampiPtr);
+  if(ptr->cthread_id != 0)
+    CkAbort("cthread_id not 0 upon return !!\n");
   ptr->start_running();
 }
 
