@@ -159,7 +159,16 @@ extern "C" void LDChangePredictor(LDHandle _db, void *model)
 extern "C" void LDCollectStatsOn(LDHandle _db)
 {
   LBDB *const db = (LBDB*)(_db.handle);
-  db->TurnStatsOn();
+
+  if (!db->StatsOn()) {
+    if (db->ObjIsRunning()) {
+       // stats on in the middle of an entry, start timer
+      const LDObjHandle &oh = db->RunningObj();
+      LBObj *obj = db->LbObj(oh);
+      obj->StartTimer();
+    }
+    db->TurnStatsOn();
+  }
 }
 
 extern "C" void LDCollectStatsOff(LDHandle _db)
