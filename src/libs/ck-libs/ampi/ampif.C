@@ -59,7 +59,7 @@ FDECL {
 void mpi_init_universe(int *unicomm)
 {
   AMPIAPI("mpi_init_universe");
-  for(int i=0;i<mpi_ncomms; i++)
+  for(int i=0;i<mpi_nworlds; i++)
   {
     unicomm[i] = MPI_COMM_UNIVERSE[i];
   }

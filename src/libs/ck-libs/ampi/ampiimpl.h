@@ -84,7 +84,7 @@ public:
 #include "charm-api.h"
 #include <sys/stat.h> // for mkdir
 
-extern int mpi_ncomms;
+extern int mpi_nworlds;
 
 #define MPI_BCAST_TAG  MPI_TAG_UB+10
 #define MPI_BARR_TAG   MPI_TAG_UB+11

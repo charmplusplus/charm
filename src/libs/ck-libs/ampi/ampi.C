@@ -5,14 +5,15 @@
  * $Revision$
  *****************************************************************************/
 
+#define exit exit /*Supress definition of exit in ampi.h*/
 #include "ampiimpl.h"
 // for strlen
 #include <string.h>
 
 //------------- startup -------------
 static mpi_comm_worlds mpi_worlds;
-static int mpi_nworlds;
 
+int mpi_nworlds; /*Accessed by ampif*/
 int MPI_COMM_UNIVERSE[MPI_MAX_COMM_WORLDS]; /*Accessed by user code*/
 
 int _ampi_fallback_setup_count;
@@ -537,7 +538,7 @@ ampi::bcast(int root, void* buf, int count, int type,MPI_Comm destcomm)
   int rootDex=dest.getIndexForRank(root);
   if(rootDex==thisIndex) {
     /* Broadcast my message to the array proxy */
-    dest.getProxy().generic(makeAmpiMsg(MPI_BCAST_TAG,root,buf,count,type,destcomm,-1));
+    dest.getProxy().generic(makeAmpiMsg(MPI_BCAST_TAG,nbcasts,buf,count,type,destcomm,-1));
   }
   recv(MPI_BCAST_TAG, nbcasts, buf, count, type, destcomm);
   nbcasts++;
@@ -688,10 +689,6 @@ int MPI_Bcast(void *buf, int count, MPI_Datatype type, int root,
                          MPI_Comm comm)
 {
   AMPIAPI("MPI_Bcast");
-  if(comm != MPI_COMM_WORLD)
-  {
-    CkAbort("AMPI> Cannot have global operations across communicators.\n");
-  }
   ampi *ptr = getAmpiInstance(comm);
   ptr->bcast(root, buf, count, type,comm);
   return 0;
@@ -1189,10 +1186,6 @@ int MPI_Allgatherv(void *sendbuf, int sendcount, MPI_Datatype sendtype,
                    MPI_Datatype recvtype, MPI_Comm comm) 
 {
   AMPIAPI("MPI_Allgatherv");
-  if(comm != MPI_COMM_WORLD)
-  {
-    CkAbort("AMPI> Cannot have global operations across communicators.\n");
-  }
   ampi *ptr = getAmpiInstance(comm);
   int size = ptr->getSize();
   int i;
@@ -1217,10 +1210,6 @@ int MPI_Allgather(void *sendbuf, int sendcount, MPI_Datatype sendtype,
                   MPI_Comm comm)
 {
   AMPIAPI("MPI_Allgather");
-  if(comm != MPI_COMM_WORLD)
-  {
-    CkAbort("AMPI> Cannot have global operations across communicators.\n");
-  }
   ampi *ptr = getAmpiInstance(comm);
   int size = ptr->getSize();
   int i;
@@ -1245,10 +1234,6 @@ int MPI_Gatherv(void *sendbuf, int sendcount, MPI_Datatype sendtype,
                 MPI_Datatype recvtype, int root, MPI_Comm comm)
 {
   AMPIAPI("MPI_Gatherv");
-  if(comm != MPI_COMM_WORLD)
-  {
-    CkAbort("AMPI> Cannot have global operations across communicators.\n");
-  }
   ampi *ptr = getAmpiInstance(comm);
   int size = ptr->getSize();
   int i;
@@ -1274,10 +1259,6 @@ int MPI_Gather(void *sendbuf, int sendcount, MPI_Datatype sendtype,
                int root, MPI_Comm comm)
 {
   AMPIAPI("MPI_Gather");
-  if(comm != MPI_COMM_WORLD)
-  {
-    CkAbort("AMPI> Cannot have global operations across communicators.\n");
-  }
   ampi *ptr = getAmpiInstance(comm);
   int size = ptr->getSize();
   int i;
@@ -1302,10 +1283,6 @@ int MPI_Alltoallv(void *sendbuf, int *sendcounts, int *sdispls,
                   int *rdispls, MPI_Datatype recvtype, MPI_Comm comm)
 {
   AMPIAPI("MPI_Alltoallv");
-  if(comm != MPI_COMM_WORLD)
-  {
-    CkAbort("AMPI> Cannot have global operations across communicators.\n");
-  }
   ampi *ptr = getAmpiInstance(comm);
   int size = ptr->getSize();
   CkDDT_DataType* dttype = ptr->getDDT()->getType(sendtype) ;
@@ -1333,10 +1310,6 @@ int MPI_Alltoall(void *sendbuf, int sendcount, MPI_Datatype sendtype,
                  MPI_Comm comm)
 {
   AMPIAPI("MPI_Alltoall");
-  if(comm != MPI_COMM_WORLD)
-  {
-    CkAbort("AMPI> Cannot have global operations across communicators.\n");
-  }
   ampi *ptr = getAmpiInstance(comm);
   int size = ptr->getSize();
   CkDDT_DataType* dttype = ptr->getDDT()->getType(sendtype) ;
@@ -1498,6 +1471,15 @@ FDECL void FTN_NAME(MPI_ATTACH,mpi_attach)(const char *name,int nameLen)
 	ampiAttach(name,nameLen);
 }
 
+CDECL void MPI_Exit(int /*exitCode*/)
+{
+	AMPIAPI("MPI_Exit");
+	TCharmDone();
+}
+FDECL void FTN_NAME(MPI_EXIT,mpi_exit)(int *exitCode)
+{
+	MPI_Exit(*exitCode);
+}
 
 void _registerampif(void)
 {

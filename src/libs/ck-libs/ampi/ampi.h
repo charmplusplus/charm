@@ -27,6 +27,15 @@ This is needed so we can call the routine as a new thread.
 #  define main MPI_Main
 #endif
 
+/*
+Silently convert calls to "exit(n)" to calls to TCharmDone().
+This is needed because an unordered exit is an error in charm.
+*/
+void MPI_Exit(int exitCode);
+#ifndef exit
+#  define exit MPI_Exit
+#endif
+
 
 /* MPI prototypes and #defines here */
 #define MPI_SUCCESS 0
