@@ -23,6 +23,8 @@ then resume the thread when the results arrive.
 #include <limits.h>
 #include <float.h> /*for FLT_MIN on non-Suns*/
 
+CDECL void fem_impl_call_init(void);
+
 FDECL void FTN_NAME(INIT,init)(void);
 FDECL void FTN_NAME(DRIVER,driver)(void);
 FDECL void FTN_NAME(MESH_UPDATED,mesh_updated)(int *userParameter);
@@ -42,7 +44,7 @@ static void FEMfallbackSetup(void)
 	if (CmiGetArgFlag(argv,"-write")) initFlags|=FEM_INIT_WRITE;
 	TCharmCreate(nChunks,callDrivers);
 	if (!(initFlags&FEM_INIT_READ)) {
-		init();
+		fem_impl_call_init(); // init();
 		FTN_NAME(INIT,init)();
 	}
         FEM_Attach(initFlags);
