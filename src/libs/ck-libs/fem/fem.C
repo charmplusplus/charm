@@ -25,7 +25,7 @@ void FEM_Abort(const char *msg) {
 	CkAbort(msg);
 }
 void FEM_Abort(const char *callingRoutine,const char *sprintf_msg,
-   int int0=0,int int1=0, int int2=0) 
+   int int0,int int1, int int2) 
 {
 	char userSprintf[1024];
 	char msg[1024];
