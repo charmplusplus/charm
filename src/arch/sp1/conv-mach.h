@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.12  1995-11-01 23:14:39  knauff
+ * Revision 2.13  1996-01-17 08:04:13  jyelon
+ * added CmiMsgHeaderSizeBytes
+ *
+ * Revision 2.12  1995/11/01 23:14:39  knauff
  * Changed CMK_SIZE_T to unsigned long
  *
  * Revision 2.11  1995/10/31  20:38:39  jyelon
@@ -57,6 +60,8 @@
 #define _CONV_MACH_H
 
 #define CMK_MACHINE_NAME "sp1"
+
+#define CmiMsgHeaderSizeBytes 4
 
 /* #define CMK_USE_GNU_MALLOC */
 /* #define CMK_USE_GNU_MALLOC_WITH_INTERRUPT_SUPPORT */

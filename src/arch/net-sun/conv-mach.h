@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.13  1995-10-31 20:38:39  jyelon
+ * Revision 2.14  1996-01-17 08:04:13  jyelon
+ * added CmiMsgHeaderSizeBytes
+ *
+ * Revision 2.13  1995/10/31 20:38:39  jyelon
  * Added CMK_USLEEP_WHEN_PROCESSOR_IDLE
  *
  * Revision 2.12  1995/10/20  17:27:00  sanjeev
@@ -51,6 +54,8 @@
 #define _CONV_MACH_H
 
 #define CMK_MACHINE_NAME "net-sun"
+
+#define CmiMsgHeaderSizeBytes 4
 
 /* #define CMK_USE_OS_MALLOC */
 /* #define CMK_USE_GNU_MALLOC */

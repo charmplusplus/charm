@@ -19,6 +19,8 @@
 
 #define CMK_MACHINE_NAME "exemplar"
 
+#define CmiMsgHeaderSizeBytes 4
+
 /* #define CMK_USE_GNU_MALLOC */
 /* #define CMK_USE_GNU_MALLOC_WITH_INTERRUPT_SUPPORT */
 #define CMK_USE_OS_MALLOC
