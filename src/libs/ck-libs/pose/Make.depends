@@ -31,6 +31,7 @@ eventID.o: eventID.C eventID.h ../../../../include/charm++.h \
   ../../../../include/ComlibArrayListener.h \
   ../../../../include/ComlibStrategy.h \
   ../../../../include/convcomlibstrategy.h \
+  ../../../../include/ComlibLearner.h \
   ../../../../include/CkFutures.decl.h ../../../../include/charisma.h \
   ../../../../include/charisma.decl.h ../../../../include/tempo.h \
   ../../../../include/tempo.decl.h ../../../../include/waitqd.h \
@@ -72,6 +73,7 @@ stats.o: stats.C ../../../../include/charm++.h \
   ../../../../include/ComlibArrayListener.h \
   ../../../../include/ComlibStrategy.h \
   ../../../../include/convcomlibstrategy.h \
+  ../../../../include/ComlibLearner.h \
   ../../../../include/CkFutures.decl.h ../../../../include/charisma.h \
   ../../../../include/charisma.decl.h ../../../../include/tempo.h \
   ../../../../include/tempo.decl.h ../../../../include/waitqd.h \
@@ -80,54 +82,14 @@ stats.o: stats.C ../../../../include/charm++.h \
   ../../../../include/CkCheckpoint.decl.h \
   ../../../../include/ckarrayreductionmgr.h ../../../../include/trace.h \
   ../../../../include/trace-bluegene.h stats.h stats.decl.h pose_config.h \
-  stats.def.h
+  ../../../../include/StreamingStrategy.h \
+  ../../../../include/ComlibManager.h ../../../../include/envelope.h \
+  ../../../../include/comlib.h ../../../../include/router.h \
+  ../../../../include/convcomlibmanager.h \
+  ../../../../include/ComlibStats.h ../../../../include/comlib.decl.h \
+  ../../../../include/MeshStreamingStrategy.h \
+  ../../../../include/PrioStreaming.h stats.def.h
 	$(CHARMC) -o stats.o stats.C
-pose.o: pose.C pose.h pose.decl.h ../../../../include/charm++.h \
-  ../../../../include/charm.h ../../../../include/converse.h \
-  ../../../../include/conv-config.h ../../../../include/conv-common.h \
-  ../../../../include/conv-mach.h ../../../../include/conv-autoconfig.h \
-  ../../../../include/conv-mach-opt.h ../../../../include/pup_c.h \
-  ../../../../include/conv-cpm.h ../../../../include/conv-cpath.h \
-  ../../../../include/conv-qd.h ../../../../include/conv-random.h \
-  ../../../../include/conv-lists.h ../../../../include/conv-trace.h \
-  ../../../../include/persistent.h ../../../../include/debug-conv.h \
-  ../../../../include/pup.h ../../../../include/middle.h \
-  ../../../../include/middle-conv.h ../../../../include/cklists.h \
-  ../../../../include/ckbitvector.h ../../../../include/ckstream.h \
-  ../../../../include/init.h ../../../../include/ckhashtable.h \
-  ../../../../include/debug-charm.h ../../../../include/CkMarshall.decl.h \
-  ../../../../include/cksection.h ../../../../include/ckcallback.h \
-  ../../../../include/conv-ccs.h ../../../../include/sockRoutines.h \
-  ../../../../include/ccs-server.h ../../../../include/ckobjQ.h \
-  ../../../../include/ckreduction.h \
-  ../../../../include/CkReduction.decl.h \
-  ../../../../include/cknodegroupreduction.h \
-  ../../../../include/CkArrayReductionMgr.decl.h \
-  ../../../../include/ckmemcheckpoint.h \
-  ../../../../include/CkMemCheckpoint.decl.h \
-  ../../../../include/readonly.h ../../../../include/ckarray.h \
-  ../../../../include/cklocation.h ../../../../include/LBDatabase.h \
-  ../../../../include/lbdb.h ../../../../include/LBDatabase.decl.h \
-  ../../../../include/NullLB.decl.h ../../../../include/BaseLB.decl.h \
-  ../../../../include/CkLocation.decl.h \
-  ../../../../include/CkArray.decl.h \
-  ../../../../include/ComlibArrayListener.h \
-  ../../../../include/ComlibStrategy.h \
-  ../../../../include/convcomlibstrategy.h \
-  ../../../../include/CkFutures.decl.h ../../../../include/charisma.h \
-  ../../../../include/charisma.decl.h ../../../../include/tempo.h \
-  ../../../../include/tempo.decl.h ../../../../include/waitqd.h \
-  ../../../../include/waitqd.decl.h ../../../../include/sdag.h \
-  ../../../../include/ckcheckpoint.h \
-  ../../../../include/CkCheckpoint.decl.h \
-  ../../../../include/ckarrayreductionmgr.h ../../../../include/trace.h \
-  ../../../../include/trace-bluegene.h pose_config.h eventID.h mempool.h \
-  mempool.decl.h srtable.h stats.h stats.decl.h cancel.h event.h \
-  ../../../../include/envelope.h eqheap.h pvtobj.h lbObject.h ldbal.h \
-  ldbal.decl.h gvt.h gvt.decl.h evq.h rep.h strat.h sim.h sim.decl.h \
-  opt.h opt2.h opt3.h spec.h adapt.h adapt2.h adapt3.h cons.h chpt.h \
-  pose.def.h
-	$(CHARMC) -o pose.o pose.C
 srtable.o: srtable.C ../../../../include/charm++.h \
   ../../../../include/charm.h ../../../../include/converse.h \
   ../../../../include/conv-config.h ../../../../include/conv-common.h \
@@ -160,6 +122,7 @@ srtable.o: srtable.C ../../../../include/charm++.h \
   ../../../../include/ComlibArrayListener.h \
   ../../../../include/ComlibStrategy.h \
   ../../../../include/convcomlibstrategy.h \
+  ../../../../include/ComlibLearner.h \
   ../../../../include/CkFutures.decl.h ../../../../include/charisma.h \
   ../../../../include/charisma.decl.h ../../../../include/tempo.h \
   ../../../../include/tempo.decl.h ../../../../include/waitqd.h \
@@ -168,11 +131,17 @@ srtable.o: srtable.C ../../../../include/charm++.h \
   ../../../../include/CkCheckpoint.decl.h \
   ../../../../include/ckarrayreductionmgr.h ../../../../include/trace.h \
   ../../../../include/trace-bluegene.h srtable.h pose.h pose.decl.h \
-  pose_config.h eventID.h mempool.h mempool.decl.h stats.h stats.decl.h \
-  cancel.h event.h ../../../../include/envelope.h eqheap.h pvtobj.h \
-  lbObject.h ldbal.h ldbal.decl.h gvt.h gvt.decl.h evq.h rep.h strat.h \
-  sim.h sim.decl.h opt.h opt2.h opt3.h spec.h adapt.h adapt2.h adapt3.h \
-  cons.h chpt.h
+  pose_config.h ../../../../include/StreamingStrategy.h \
+  ../../../../include/ComlibManager.h ../../../../include/envelope.h \
+  ../../../../include/comlib.h ../../../../include/router.h \
+  ../../../../include/convcomlibmanager.h \
+  ../../../../include/ComlibStats.h ../../../../include/comlib.decl.h \
+  ../../../../include/MeshStreamingStrategy.h \
+  ../../../../include/PrioStreaming.h eventID.h mempool.h mempool.decl.h \
+  stats.h stats.decl.h cancel.h event.h eqheap.h pvtobj.h lbObject.h \
+  ldbal.h ldbal.decl.h gvt.h gvt.decl.h evq.h rep.h sim.decl.h strat.h \
+  sim.h opt.h opt2.h opt3.h spec.h adapt.h adapt2.h adapt3.h cons.h seq.h \
+  chpt.h
 	$(CHARMC) -o srtable.o srtable.C
 cancel.o: cancel.C eventID.h ../../../../include/charm++.h \
   ../../../../include/charm.h ../../../../include/converse.h \
@@ -206,6 +175,7 @@ cancel.o: cancel.C eventID.h ../../../../include/charm++.h \
   ../../../../include/ComlibArrayListener.h \
   ../../../../include/ComlibStrategy.h \
   ../../../../include/convcomlibstrategy.h \
+  ../../../../include/ComlibLearner.h \
   ../../../../include/CkFutures.decl.h ../../../../include/charisma.h \
   ../../../../include/charisma.decl.h ../../../../include/tempo.h \
   ../../../../include/tempo.decl.h ../../../../include/waitqd.h \
@@ -214,10 +184,16 @@ cancel.o: cancel.C eventID.h ../../../../include/charm++.h \
   ../../../../include/CkCheckpoint.decl.h \
   ../../../../include/ckarrayreductionmgr.h ../../../../include/trace.h \
   ../../../../include/trace-bluegene.h pose.h pose.decl.h pose_config.h \
-  mempool.h mempool.decl.h srtable.h stats.h stats.decl.h cancel.h \
-  event.h ../../../../include/envelope.h eqheap.h pvtobj.h lbObject.h \
-  ldbal.h ldbal.decl.h gvt.h gvt.decl.h evq.h rep.h strat.h sim.h \
-  sim.decl.h opt.h opt2.h opt3.h spec.h adapt.h adapt2.h adapt3.h cons.h \
+  ../../../../include/StreamingStrategy.h \
+  ../../../../include/ComlibManager.h ../../../../include/envelope.h \
+  ../../../../include/comlib.h ../../../../include/router.h \
+  ../../../../include/convcomlibmanager.h \
+  ../../../../include/ComlibStats.h ../../../../include/comlib.decl.h \
+  ../../../../include/MeshStreamingStrategy.h \
+  ../../../../include/PrioStreaming.h mempool.h mempool.decl.h srtable.h \
+  stats.h stats.decl.h cancel.h event.h eqheap.h pvtobj.h lbObject.h \
+  ldbal.h ldbal.decl.h gvt.h gvt.decl.h evq.h rep.h sim.decl.h strat.h \
+  sim.h opt.h opt2.h opt3.h spec.h adapt.h adapt2.h adapt3.h cons.h seq.h \
   chpt.h
 	$(CHARMC) -o cancel.o cancel.C
 mempool.o: mempool.C ../../../../include/charm++.h \
@@ -252,6 +228,7 @@ mempool.o: mempool.C ../../../../include/charm++.h \
   ../../../../include/ComlibArrayListener.h \
   ../../../../include/ComlibStrategy.h \
   ../../../../include/convcomlibstrategy.h \
+  ../../../../include/ComlibLearner.h \
   ../../../../include/CkFutures.decl.h ../../../../include/charisma.h \
   ../../../../include/charisma.decl.h ../../../../include/tempo.h \
   ../../../../include/tempo.decl.h ../../../../include/waitqd.h \
@@ -260,11 +237,17 @@ mempool.o: mempool.C ../../../../include/charm++.h \
   ../../../../include/CkCheckpoint.decl.h \
   ../../../../include/ckarrayreductionmgr.h ../../../../include/trace.h \
   ../../../../include/trace-bluegene.h pose.h pose.decl.h pose_config.h \
-  eventID.h mempool.h mempool.decl.h srtable.h stats.h stats.decl.h \
-  cancel.h event.h ../../../../include/envelope.h eqheap.h pvtobj.h \
-  lbObject.h ldbal.h ldbal.decl.h gvt.h gvt.decl.h evq.h rep.h strat.h \
-  sim.h sim.decl.h opt.h opt2.h opt3.h spec.h adapt.h adapt2.h adapt3.h \
-  cons.h chpt.h mempool.def.h
+  ../../../../include/StreamingStrategy.h \
+  ../../../../include/ComlibManager.h ../../../../include/envelope.h \
+  ../../../../include/comlib.h ../../../../include/router.h \
+  ../../../../include/convcomlibmanager.h \
+  ../../../../include/ComlibStats.h ../../../../include/comlib.decl.h \
+  ../../../../include/MeshStreamingStrategy.h \
+  ../../../../include/PrioStreaming.h eventID.h mempool.h mempool.decl.h \
+  srtable.h stats.h stats.decl.h cancel.h event.h eqheap.h pvtobj.h \
+  lbObject.h ldbal.h ldbal.decl.h gvt.h gvt.decl.h evq.h rep.h sim.decl.h \
+  strat.h sim.h opt.h opt2.h opt3.h spec.h adapt.h adapt2.h adapt3.h \
+  cons.h seq.h chpt.h mempool.def.h
 	$(CHARMC) -o mempool.o mempool.C
 pvtobj.o: pvtobj.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/charm.h ../../../../include/converse.h \
@@ -298,6 +281,7 @@ pvtobj.o: pvtobj.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/ComlibArrayListener.h \
   ../../../../include/ComlibStrategy.h \
   ../../../../include/convcomlibstrategy.h \
+  ../../../../include/ComlibLearner.h \
   ../../../../include/CkFutures.decl.h ../../../../include/charisma.h \
   ../../../../include/charisma.decl.h ../../../../include/tempo.h \
   ../../../../include/tempo.decl.h ../../../../include/waitqd.h \
@@ -305,11 +289,18 @@ pvtobj.o: pvtobj.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/ckcheckpoint.h \
   ../../../../include/CkCheckpoint.decl.h \
   ../../../../include/ckarrayreductionmgr.h ../../../../include/trace.h \
-  ../../../../include/trace-bluegene.h pose_config.h eventID.h mempool.h \
-  mempool.decl.h srtable.h stats.h stats.decl.h cancel.h event.h \
-  ../../../../include/envelope.h eqheap.h pvtobj.h lbObject.h ldbal.h \
-  ldbal.decl.h gvt.h gvt.decl.h evq.h rep.h strat.h sim.h sim.decl.h \
-  opt.h opt2.h opt3.h spec.h adapt.h adapt2.h adapt3.h cons.h chpt.h
+  ../../../../include/trace-bluegene.h pose_config.h \
+  ../../../../include/StreamingStrategy.h \
+  ../../../../include/ComlibManager.h ../../../../include/envelope.h \
+  ../../../../include/comlib.h ../../../../include/router.h \
+  ../../../../include/convcomlibmanager.h \
+  ../../../../include/ComlibStats.h ../../../../include/comlib.decl.h \
+  ../../../../include/MeshStreamingStrategy.h \
+  ../../../../include/PrioStreaming.h eventID.h mempool.h mempool.decl.h \
+  srtable.h stats.h stats.decl.h cancel.h event.h eqheap.h pvtobj.h \
+  lbObject.h ldbal.h ldbal.decl.h gvt.h gvt.decl.h evq.h rep.h sim.decl.h \
+  strat.h sim.h opt.h opt2.h opt3.h spec.h adapt.h adapt2.h adapt3.h \
+  cons.h seq.h chpt.h
 	$(CHARMC) -o pvtobj.o pvtobj.C
 lbObject.o: lbObject.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/charm.h ../../../../include/converse.h \
@@ -343,6 +334,7 @@ lbObject.o: lbObject.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/ComlibArrayListener.h \
   ../../../../include/ComlibStrategy.h \
   ../../../../include/convcomlibstrategy.h \
+  ../../../../include/ComlibLearner.h \
   ../../../../include/CkFutures.decl.h ../../../../include/charisma.h \
   ../../../../include/charisma.decl.h ../../../../include/tempo.h \
   ../../../../include/tempo.decl.h ../../../../include/waitqd.h \
@@ -350,11 +342,18 @@ lbObject.o: lbObject.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/ckcheckpoint.h \
   ../../../../include/CkCheckpoint.decl.h \
   ../../../../include/ckarrayreductionmgr.h ../../../../include/trace.h \
-  ../../../../include/trace-bluegene.h pose_config.h eventID.h mempool.h \
-  mempool.decl.h srtable.h stats.h stats.decl.h cancel.h event.h \
-  ../../../../include/envelope.h eqheap.h pvtobj.h lbObject.h ldbal.h \
-  ldbal.decl.h gvt.h gvt.decl.h evq.h rep.h strat.h sim.h sim.decl.h \
-  opt.h opt2.h opt3.h spec.h adapt.h adapt2.h adapt3.h cons.h chpt.h
+  ../../../../include/trace-bluegene.h pose_config.h \
+  ../../../../include/StreamingStrategy.h \
+  ../../../../include/ComlibManager.h ../../../../include/envelope.h \
+  ../../../../include/comlib.h ../../../../include/router.h \
+  ../../../../include/convcomlibmanager.h \
+  ../../../../include/ComlibStats.h ../../../../include/comlib.decl.h \
+  ../../../../include/MeshStreamingStrategy.h \
+  ../../../../include/PrioStreaming.h eventID.h mempool.h mempool.decl.h \
+  srtable.h stats.h stats.decl.h cancel.h event.h eqheap.h pvtobj.h \
+  lbObject.h ldbal.h ldbal.decl.h gvt.h gvt.decl.h evq.h rep.h sim.decl.h \
+  strat.h sim.h opt.h opt2.h opt3.h spec.h adapt.h adapt2.h adapt3.h \
+  cons.h seq.h chpt.h
 	$(CHARMC) -o lbObject.o lbObject.C
 ldbal.o: ldbal.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/charm.h ../../../../include/converse.h \
@@ -388,6 +387,7 @@ ldbal.o: ldbal.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/ComlibArrayListener.h \
   ../../../../include/ComlibStrategy.h \
   ../../../../include/convcomlibstrategy.h \
+  ../../../../include/ComlibLearner.h \
   ../../../../include/CkFutures.decl.h ../../../../include/charisma.h \
   ../../../../include/charisma.decl.h ../../../../include/tempo.h \
   ../../../../include/tempo.decl.h ../../../../include/waitqd.h \
@@ -395,12 +395,18 @@ ldbal.o: ldbal.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/ckcheckpoint.h \
   ../../../../include/CkCheckpoint.decl.h \
   ../../../../include/ckarrayreductionmgr.h ../../../../include/trace.h \
-  ../../../../include/trace-bluegene.h pose_config.h eventID.h mempool.h \
-  mempool.decl.h srtable.h stats.h stats.decl.h cancel.h event.h \
-  ../../../../include/envelope.h eqheap.h pvtobj.h lbObject.h ldbal.h \
-  ldbal.decl.h gvt.h gvt.decl.h evq.h rep.h strat.h sim.h sim.decl.h \
-  opt.h opt2.h opt3.h spec.h adapt.h adapt2.h adapt3.h cons.h chpt.h \
-  ldbal.def.h
+  ../../../../include/trace-bluegene.h pose_config.h \
+  ../../../../include/StreamingStrategy.h \
+  ../../../../include/ComlibManager.h ../../../../include/envelope.h \
+  ../../../../include/comlib.h ../../../../include/router.h \
+  ../../../../include/convcomlibmanager.h \
+  ../../../../include/ComlibStats.h ../../../../include/comlib.decl.h \
+  ../../../../include/MeshStreamingStrategy.h \
+  ../../../../include/PrioStreaming.h eventID.h mempool.h mempool.decl.h \
+  srtable.h stats.h stats.decl.h cancel.h event.h eqheap.h pvtobj.h \
+  lbObject.h ldbal.h ldbal.decl.h gvt.h gvt.decl.h evq.h rep.h sim.decl.h \
+  strat.h sim.h opt.h opt2.h opt3.h spec.h adapt.h adapt2.h adapt3.h \
+  cons.h seq.h chpt.h ldbal.def.h
 	$(CHARMC) -o ldbal.o ldbal.C
 gvt.o: gvt.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/charm.h ../../../../include/converse.h \
@@ -434,6 +440,7 @@ gvt.o: gvt.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/ComlibArrayListener.h \
   ../../../../include/ComlibStrategy.h \
   ../../../../include/convcomlibstrategy.h \
+  ../../../../include/ComlibLearner.h \
   ../../../../include/CkFutures.decl.h ../../../../include/charisma.h \
   ../../../../include/charisma.decl.h ../../../../include/tempo.h \
   ../../../../include/tempo.decl.h ../../../../include/waitqd.h \
@@ -441,12 +448,18 @@ gvt.o: gvt.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/ckcheckpoint.h \
   ../../../../include/CkCheckpoint.decl.h \
   ../../../../include/ckarrayreductionmgr.h ../../../../include/trace.h \
-  ../../../../include/trace-bluegene.h pose_config.h eventID.h mempool.h \
-  mempool.decl.h srtable.h stats.h stats.decl.h cancel.h event.h \
-  ../../../../include/envelope.h eqheap.h pvtobj.h lbObject.h ldbal.h \
-  ldbal.decl.h gvt.h gvt.decl.h evq.h rep.h strat.h sim.h sim.decl.h \
-  opt.h opt2.h opt3.h spec.h adapt.h adapt2.h adapt3.h cons.h chpt.h \
-  gvt.def.h ../../../../include/qd.h
+  ../../../../include/trace-bluegene.h pose_config.h \
+  ../../../../include/StreamingStrategy.h \
+  ../../../../include/ComlibManager.h ../../../../include/envelope.h \
+  ../../../../include/comlib.h ../../../../include/router.h \
+  ../../../../include/convcomlibmanager.h \
+  ../../../../include/ComlibStats.h ../../../../include/comlib.decl.h \
+  ../../../../include/MeshStreamingStrategy.h \
+  ../../../../include/PrioStreaming.h eventID.h mempool.h mempool.decl.h \
+  srtable.h stats.h stats.decl.h cancel.h event.h eqheap.h pvtobj.h \
+  lbObject.h ldbal.h ldbal.decl.h gvt.h gvt.decl.h evq.h rep.h sim.decl.h \
+  strat.h sim.h opt.h opt2.h opt3.h spec.h adapt.h adapt2.h adapt3.h \
+  cons.h seq.h chpt.h gvt.def.h ../../../../include/qd.h
 	$(CHARMC) -o gvt.o gvt.C
 event.o: event.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/charm.h ../../../../include/converse.h \
@@ -480,6 +493,7 @@ event.o: event.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/ComlibArrayListener.h \
   ../../../../include/ComlibStrategy.h \
   ../../../../include/convcomlibstrategy.h \
+  ../../../../include/ComlibLearner.h \
   ../../../../include/CkFutures.decl.h ../../../../include/charisma.h \
   ../../../../include/charisma.decl.h ../../../../include/tempo.h \
   ../../../../include/tempo.decl.h ../../../../include/waitqd.h \
@@ -487,11 +501,18 @@ event.o: event.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/ckcheckpoint.h \
   ../../../../include/CkCheckpoint.decl.h \
   ../../../../include/ckarrayreductionmgr.h ../../../../include/trace.h \
-  ../../../../include/trace-bluegene.h pose_config.h eventID.h mempool.h \
-  mempool.decl.h srtable.h stats.h stats.decl.h cancel.h event.h \
-  ../../../../include/envelope.h eqheap.h pvtobj.h lbObject.h ldbal.h \
-  ldbal.decl.h gvt.h gvt.decl.h evq.h rep.h strat.h sim.h sim.decl.h \
-  opt.h opt2.h opt3.h spec.h adapt.h adapt2.h adapt3.h cons.h chpt.h
+  ../../../../include/trace-bluegene.h pose_config.h \
+  ../../../../include/StreamingStrategy.h \
+  ../../../../include/ComlibManager.h ../../../../include/envelope.h \
+  ../../../../include/comlib.h ../../../../include/router.h \
+  ../../../../include/convcomlibmanager.h \
+  ../../../../include/ComlibStats.h ../../../../include/comlib.decl.h \
+  ../../../../include/MeshStreamingStrategy.h \
+  ../../../../include/PrioStreaming.h eventID.h mempool.h mempool.decl.h \
+  srtable.h stats.h stats.decl.h cancel.h event.h eqheap.h pvtobj.h \
+  lbObject.h ldbal.h ldbal.decl.h gvt.h gvt.decl.h evq.h rep.h sim.decl.h \
+  strat.h sim.h opt.h opt2.h opt3.h spec.h adapt.h adapt2.h adapt3.h \
+  cons.h seq.h chpt.h
 	$(CHARMC) -o event.o event.C
 eqheap.o: eqheap.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/charm.h ../../../../include/converse.h \
@@ -525,6 +546,7 @@ eqheap.o: eqheap.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/ComlibArrayListener.h \
   ../../../../include/ComlibStrategy.h \
   ../../../../include/convcomlibstrategy.h \
+  ../../../../include/ComlibLearner.h \
   ../../../../include/CkFutures.decl.h ../../../../include/charisma.h \
   ../../../../include/charisma.decl.h ../../../../include/tempo.h \
   ../../../../include/tempo.decl.h ../../../../include/waitqd.h \
@@ -532,11 +554,18 @@ eqheap.o: eqheap.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/ckcheckpoint.h \
   ../../../../include/CkCheckpoint.decl.h \
   ../../../../include/ckarrayreductionmgr.h ../../../../include/trace.h \
-  ../../../../include/trace-bluegene.h pose_config.h eventID.h mempool.h \
-  mempool.decl.h srtable.h stats.h stats.decl.h cancel.h event.h \
-  ../../../../include/envelope.h eqheap.h pvtobj.h lbObject.h ldbal.h \
-  ldbal.decl.h gvt.h gvt.decl.h evq.h rep.h strat.h sim.h sim.decl.h \
-  opt.h opt2.h opt3.h spec.h adapt.h adapt2.h adapt3.h cons.h chpt.h
+  ../../../../include/trace-bluegene.h pose_config.h \
+  ../../../../include/StreamingStrategy.h \
+  ../../../../include/ComlibManager.h ../../../../include/envelope.h \
+  ../../../../include/comlib.h ../../../../include/router.h \
+  ../../../../include/convcomlibmanager.h \
+  ../../../../include/ComlibStats.h ../../../../include/comlib.decl.h \
+  ../../../../include/MeshStreamingStrategy.h \
+  ../../../../include/PrioStreaming.h eventID.h mempool.h mempool.decl.h \
+  srtable.h stats.h stats.decl.h cancel.h event.h eqheap.h pvtobj.h \
+  lbObject.h ldbal.h ldbal.decl.h gvt.h gvt.decl.h evq.h rep.h sim.decl.h \
+  strat.h sim.h opt.h opt2.h opt3.h spec.h adapt.h adapt2.h adapt3.h \
+  cons.h seq.h chpt.h
 	$(CHARMC) -o eqheap.o eqheap.C
 evq.o: evq.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/charm.h ../../../../include/converse.h \
@@ -570,6 +599,7 @@ evq.o: evq.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/ComlibArrayListener.h \
   ../../../../include/ComlibStrategy.h \
   ../../../../include/convcomlibstrategy.h \
+  ../../../../include/ComlibLearner.h \
   ../../../../include/CkFutures.decl.h ../../../../include/charisma.h \
   ../../../../include/charisma.decl.h ../../../../include/tempo.h \
   ../../../../include/tempo.decl.h ../../../../include/waitqd.h \
@@ -577,11 +607,18 @@ evq.o: evq.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/ckcheckpoint.h \
   ../../../../include/CkCheckpoint.decl.h \
   ../../../../include/ckarrayreductionmgr.h ../../../../include/trace.h \
-  ../../../../include/trace-bluegene.h pose_config.h eventID.h mempool.h \
-  mempool.decl.h srtable.h stats.h stats.decl.h cancel.h event.h \
-  ../../../../include/envelope.h eqheap.h pvtobj.h lbObject.h ldbal.h \
-  ldbal.decl.h gvt.h gvt.decl.h evq.h rep.h strat.h sim.h sim.decl.h \
-  opt.h opt2.h opt3.h spec.h adapt.h adapt2.h adapt3.h cons.h chpt.h
+  ../../../../include/trace-bluegene.h pose_config.h \
+  ../../../../include/StreamingStrategy.h \
+  ../../../../include/ComlibManager.h ../../../../include/envelope.h \
+  ../../../../include/comlib.h ../../../../include/router.h \
+  ../../../../include/convcomlibmanager.h \
+  ../../../../include/ComlibStats.h ../../../../include/comlib.decl.h \
+  ../../../../include/MeshStreamingStrategy.h \
+  ../../../../include/PrioStreaming.h eventID.h mempool.h mempool.decl.h \
+  srtable.h stats.h stats.decl.h cancel.h event.h eqheap.h pvtobj.h \
+  lbObject.h ldbal.h ldbal.decl.h gvt.h gvt.decl.h evq.h rep.h sim.decl.h \
+  strat.h sim.h opt.h opt2.h opt3.h spec.h adapt.h adapt2.h adapt3.h \
+  cons.h seq.h chpt.h
 	$(CHARMC) -o evq.o evq.C
 sim.o: sim.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/charm.h ../../../../include/converse.h \
@@ -615,6 +652,7 @@ sim.o: sim.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/ComlibArrayListener.h \
   ../../../../include/ComlibStrategy.h \
   ../../../../include/convcomlibstrategy.h \
+  ../../../../include/ComlibLearner.h \
   ../../../../include/CkFutures.decl.h ../../../../include/charisma.h \
   ../../../../include/charisma.decl.h ../../../../include/tempo.h \
   ../../../../include/tempo.decl.h ../../../../include/waitqd.h \
@@ -622,12 +660,18 @@ sim.o: sim.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/ckcheckpoint.h \
   ../../../../include/CkCheckpoint.decl.h \
   ../../../../include/ckarrayreductionmgr.h ../../../../include/trace.h \
-  ../../../../include/trace-bluegene.h pose_config.h eventID.h mempool.h \
-  mempool.decl.h srtable.h stats.h stats.decl.h cancel.h event.h \
-  ../../../../include/envelope.h eqheap.h pvtobj.h lbObject.h ldbal.h \
-  ldbal.decl.h gvt.h gvt.decl.h evq.h rep.h strat.h sim.h sim.decl.h \
-  opt.h opt2.h opt3.h spec.h adapt.h adapt2.h adapt3.h cons.h chpt.h \
-  sim.def.h
+  ../../../../include/trace-bluegene.h pose_config.h \
+  ../../../../include/StreamingStrategy.h \
+  ../../../../include/ComlibManager.h ../../../../include/envelope.h \
+  ../../../../include/comlib.h ../../../../include/router.h \
+  ../../../../include/convcomlibmanager.h \
+  ../../../../include/ComlibStats.h ../../../../include/comlib.decl.h \
+  ../../../../include/MeshStreamingStrategy.h \
+  ../../../../include/PrioStreaming.h eventID.h mempool.h mempool.decl.h \
+  srtable.h stats.h stats.decl.h cancel.h event.h eqheap.h pvtobj.h \
+  lbObject.h ldbal.h ldbal.decl.h gvt.h gvt.decl.h evq.h rep.h sim.decl.h \
+  strat.h sim.h opt.h opt2.h opt3.h spec.h adapt.h adapt2.h adapt3.h \
+  cons.h seq.h chpt.h sim.def.h
 	$(CHARMC) -o sim.o sim.C
 rep.o: rep.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/charm.h ../../../../include/converse.h \
@@ -661,6 +705,7 @@ rep.o: rep.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/ComlibArrayListener.h \
   ../../../../include/ComlibStrategy.h \
   ../../../../include/convcomlibstrategy.h \
+  ../../../../include/ComlibLearner.h \
   ../../../../include/CkFutures.decl.h ../../../../include/charisma.h \
   ../../../../include/charisma.decl.h ../../../../include/tempo.h \
   ../../../../include/tempo.decl.h ../../../../include/waitqd.h \
@@ -668,11 +713,18 @@ rep.o: rep.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/ckcheckpoint.h \
   ../../../../include/CkCheckpoint.decl.h \
   ../../../../include/ckarrayreductionmgr.h ../../../../include/trace.h \
-  ../../../../include/trace-bluegene.h pose_config.h eventID.h mempool.h \
-  mempool.decl.h srtable.h stats.h stats.decl.h cancel.h event.h \
-  ../../../../include/envelope.h eqheap.h pvtobj.h lbObject.h ldbal.h \
-  ldbal.decl.h gvt.h gvt.decl.h evq.h rep.h strat.h sim.h sim.decl.h \
-  opt.h opt2.h opt3.h spec.h adapt.h adapt2.h adapt3.h cons.h chpt.h
+  ../../../../include/trace-bluegene.h pose_config.h \
+  ../../../../include/StreamingStrategy.h \
+  ../../../../include/ComlibManager.h ../../../../include/envelope.h \
+  ../../../../include/comlib.h ../../../../include/router.h \
+  ../../../../include/convcomlibmanager.h \
+  ../../../../include/ComlibStats.h ../../../../include/comlib.decl.h \
+  ../../../../include/MeshStreamingStrategy.h \
+  ../../../../include/PrioStreaming.h eventID.h mempool.h mempool.decl.h \
+  srtable.h stats.h stats.decl.h cancel.h event.h eqheap.h pvtobj.h \
+  lbObject.h ldbal.h ldbal.decl.h gvt.h gvt.decl.h evq.h rep.h sim.decl.h \
+  strat.h sim.h opt.h opt2.h opt3.h spec.h adapt.h adapt2.h adapt3.h \
+  cons.h seq.h chpt.h
 	$(CHARMC) -o rep.o rep.C
 strat.o: strat.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/charm.h ../../../../include/converse.h \
@@ -706,6 +758,7 @@ strat.o: strat.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/ComlibArrayListener.h \
   ../../../../include/ComlibStrategy.h \
   ../../../../include/convcomlibstrategy.h \
+  ../../../../include/ComlibLearner.h \
   ../../../../include/CkFutures.decl.h ../../../../include/charisma.h \
   ../../../../include/charisma.decl.h ../../../../include/tempo.h \
   ../../../../include/tempo.decl.h ../../../../include/waitqd.h \
@@ -713,11 +766,18 @@ strat.o: strat.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/ckcheckpoint.h \
   ../../../../include/CkCheckpoint.decl.h \
   ../../../../include/ckarrayreductionmgr.h ../../../../include/trace.h \
-  ../../../../include/trace-bluegene.h pose_config.h eventID.h mempool.h \
-  mempool.decl.h srtable.h stats.h stats.decl.h cancel.h event.h \
-  ../../../../include/envelope.h eqheap.h pvtobj.h lbObject.h ldbal.h \
-  ldbal.decl.h gvt.h gvt.decl.h evq.h rep.h strat.h sim.h sim.decl.h \
-  opt.h opt2.h opt3.h spec.h adapt.h adapt2.h adapt3.h cons.h chpt.h
+  ../../../../include/trace-bluegene.h pose_config.h \
+  ../../../../include/StreamingStrategy.h \
+  ../../../../include/ComlibManager.h ../../../../include/envelope.h \
+  ../../../../include/comlib.h ../../../../include/router.h \
+  ../../../../include/convcomlibmanager.h \
+  ../../../../include/ComlibStats.h ../../../../include/comlib.decl.h \
+  ../../../../include/MeshStreamingStrategy.h \
+  ../../../../include/PrioStreaming.h eventID.h mempool.h mempool.decl.h \
+  srtable.h stats.h stats.decl.h cancel.h event.h eqheap.h pvtobj.h \
+  lbObject.h ldbal.h ldbal.decl.h gvt.h gvt.decl.h evq.h rep.h sim.decl.h \
+  strat.h sim.h opt.h opt2.h opt3.h spec.h adapt.h adapt2.h adapt3.h \
+  cons.h seq.h chpt.h
 	$(CHARMC) -o strat.o strat.C
 seq.o: seq.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/charm.h ../../../../include/converse.h \
@@ -751,6 +811,7 @@ seq.o: seq.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/ComlibArrayListener.h \
   ../../../../include/ComlibStrategy.h \
   ../../../../include/convcomlibstrategy.h \
+  ../../../../include/ComlibLearner.h \
   ../../../../include/CkFutures.decl.h ../../../../include/charisma.h \
   ../../../../include/charisma.decl.h ../../../../include/tempo.h \
   ../../../../include/tempo.decl.h ../../../../include/waitqd.h \
@@ -758,11 +819,18 @@ seq.o: seq.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/ckcheckpoint.h \
   ../../../../include/CkCheckpoint.decl.h \
   ../../../../include/ckarrayreductionmgr.h ../../../../include/trace.h \
-  ../../../../include/trace-bluegene.h pose_config.h eventID.h mempool.h \
-  mempool.decl.h srtable.h stats.h stats.decl.h cancel.h event.h \
-  ../../../../include/envelope.h eqheap.h pvtobj.h lbObject.h ldbal.h \
-  ldbal.decl.h gvt.h gvt.decl.h evq.h rep.h strat.h sim.h sim.decl.h \
-  opt.h opt2.h opt3.h spec.h adapt.h adapt2.h adapt3.h cons.h chpt.h
+  ../../../../include/trace-bluegene.h pose_config.h \
+  ../../../../include/StreamingStrategy.h \
+  ../../../../include/ComlibManager.h ../../../../include/envelope.h \
+  ../../../../include/comlib.h ../../../../include/router.h \
+  ../../../../include/convcomlibmanager.h \
+  ../../../../include/ComlibStats.h ../../../../include/comlib.decl.h \
+  ../../../../include/MeshStreamingStrategy.h \
+  ../../../../include/PrioStreaming.h eventID.h mempool.h mempool.decl.h \
+  srtable.h stats.h stats.decl.h cancel.h event.h eqheap.h pvtobj.h \
+  lbObject.h ldbal.h ldbal.decl.h gvt.h gvt.decl.h evq.h rep.h sim.decl.h \
+  strat.h sim.h opt.h opt2.h opt3.h spec.h adapt.h adapt2.h adapt3.h \
+  cons.h seq.h chpt.h
 	$(CHARMC) -o seq.o seq.C
 cons.o: cons.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/charm.h ../../../../include/converse.h \
@@ -796,6 +864,7 @@ cons.o: cons.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/ComlibArrayListener.h \
   ../../../../include/ComlibStrategy.h \
   ../../../../include/convcomlibstrategy.h \
+  ../../../../include/ComlibLearner.h \
   ../../../../include/CkFutures.decl.h ../../../../include/charisma.h \
   ../../../../include/charisma.decl.h ../../../../include/tempo.h \
   ../../../../include/tempo.decl.h ../../../../include/waitqd.h \
@@ -803,11 +872,18 @@ cons.o: cons.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/ckcheckpoint.h \
   ../../../../include/CkCheckpoint.decl.h \
   ../../../../include/ckarrayreductionmgr.h ../../../../include/trace.h \
-  ../../../../include/trace-bluegene.h pose_config.h eventID.h mempool.h \
-  mempool.decl.h srtable.h stats.h stats.decl.h cancel.h event.h \
-  ../../../../include/envelope.h eqheap.h pvtobj.h lbObject.h ldbal.h \
-  ldbal.decl.h gvt.h gvt.decl.h evq.h rep.h strat.h sim.h sim.decl.h \
-  opt.h opt2.h opt3.h spec.h adapt.h adapt2.h adapt3.h cons.h chpt.h
+  ../../../../include/trace-bluegene.h pose_config.h \
+  ../../../../include/StreamingStrategy.h \
+  ../../../../include/ComlibManager.h ../../../../include/envelope.h \
+  ../../../../include/comlib.h ../../../../include/router.h \
+  ../../../../include/convcomlibmanager.h \
+  ../../../../include/ComlibStats.h ../../../../include/comlib.decl.h \
+  ../../../../include/MeshStreamingStrategy.h \
+  ../../../../include/PrioStreaming.h eventID.h mempool.h mempool.decl.h \
+  srtable.h stats.h stats.decl.h cancel.h event.h eqheap.h pvtobj.h \
+  lbObject.h ldbal.h ldbal.decl.h gvt.h gvt.decl.h evq.h rep.h sim.decl.h \
+  strat.h sim.h opt.h opt2.h opt3.h spec.h adapt.h adapt2.h adapt3.h \
+  cons.h seq.h chpt.h
 	$(CHARMC) -o cons.o cons.C
 opt.o: opt.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/charm.h ../../../../include/converse.h \
@@ -841,6 +917,7 @@ opt.o: opt.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/ComlibArrayListener.h \
   ../../../../include/ComlibStrategy.h \
   ../../../../include/convcomlibstrategy.h \
+  ../../../../include/ComlibLearner.h \
   ../../../../include/CkFutures.decl.h ../../../../include/charisma.h \
   ../../../../include/charisma.decl.h ../../../../include/tempo.h \
   ../../../../include/tempo.decl.h ../../../../include/waitqd.h \
@@ -848,11 +925,18 @@ opt.o: opt.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/ckcheckpoint.h \
   ../../../../include/CkCheckpoint.decl.h \
   ../../../../include/ckarrayreductionmgr.h ../../../../include/trace.h \
-  ../../../../include/trace-bluegene.h pose_config.h eventID.h mempool.h \
-  mempool.decl.h srtable.h stats.h stats.decl.h cancel.h event.h \
-  ../../../../include/envelope.h eqheap.h pvtobj.h lbObject.h ldbal.h \
-  ldbal.decl.h gvt.h gvt.decl.h evq.h rep.h strat.h sim.h sim.decl.h \
-  opt.h opt2.h opt3.h spec.h adapt.h adapt2.h adapt3.h cons.h chpt.h
+  ../../../../include/trace-bluegene.h pose_config.h \
+  ../../../../include/StreamingStrategy.h \
+  ../../../../include/ComlibManager.h ../../../../include/envelope.h \
+  ../../../../include/comlib.h ../../../../include/router.h \
+  ../../../../include/convcomlibmanager.h \
+  ../../../../include/ComlibStats.h ../../../../include/comlib.decl.h \
+  ../../../../include/MeshStreamingStrategy.h \
+  ../../../../include/PrioStreaming.h eventID.h mempool.h mempool.decl.h \
+  srtable.h stats.h stats.decl.h cancel.h event.h eqheap.h pvtobj.h \
+  lbObject.h ldbal.h ldbal.decl.h gvt.h gvt.decl.h evq.h rep.h sim.decl.h \
+  strat.h sim.h opt.h opt2.h opt3.h spec.h adapt.h adapt2.h adapt3.h \
+  cons.h seq.h chpt.h
 	$(CHARMC) -o opt.o opt.C
 opt2.o: opt2.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/charm.h ../../../../include/converse.h \
@@ -886,6 +970,7 @@ opt2.o: opt2.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/ComlibArrayListener.h \
   ../../../../include/ComlibStrategy.h \
   ../../../../include/convcomlibstrategy.h \
+  ../../../../include/ComlibLearner.h \
   ../../../../include/CkFutures.decl.h ../../../../include/charisma.h \
   ../../../../include/charisma.decl.h ../../../../include/tempo.h \
   ../../../../include/tempo.decl.h ../../../../include/waitqd.h \
@@ -893,11 +978,18 @@ opt2.o: opt2.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/ckcheckpoint.h \
   ../../../../include/CkCheckpoint.decl.h \
   ../../../../include/ckarrayreductionmgr.h ../../../../include/trace.h \
-  ../../../../include/trace-bluegene.h pose_config.h eventID.h mempool.h \
-  mempool.decl.h srtable.h stats.h stats.decl.h cancel.h event.h \
-  ../../../../include/envelope.h eqheap.h pvtobj.h lbObject.h ldbal.h \
-  ldbal.decl.h gvt.h gvt.decl.h evq.h rep.h strat.h sim.h sim.decl.h \
-  opt.h opt2.h opt3.h spec.h adapt.h adapt2.h adapt3.h cons.h chpt.h
+  ../../../../include/trace-bluegene.h pose_config.h \
+  ../../../../include/StreamingStrategy.h \
+  ../../../../include/ComlibManager.h ../../../../include/envelope.h \
+  ../../../../include/comlib.h ../../../../include/router.h \
+  ../../../../include/convcomlibmanager.h \
+  ../../../../include/ComlibStats.h ../../../../include/comlib.decl.h \
+  ../../../../include/MeshStreamingStrategy.h \
+  ../../../../include/PrioStreaming.h eventID.h mempool.h mempool.decl.h \
+  srtable.h stats.h stats.decl.h cancel.h event.h eqheap.h pvtobj.h \
+  lbObject.h ldbal.h ldbal.decl.h gvt.h gvt.decl.h evq.h rep.h sim.decl.h \
+  strat.h sim.h opt.h opt2.h opt3.h spec.h adapt.h adapt2.h adapt3.h \
+  cons.h seq.h chpt.h
 	$(CHARMC) -o opt2.o opt2.C
 opt3.o: opt3.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/charm.h ../../../../include/converse.h \
@@ -931,6 +1023,7 @@ opt3.o: opt3.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/ComlibArrayListener.h \
   ../../../../include/ComlibStrategy.h \
   ../../../../include/convcomlibstrategy.h \
+  ../../../../include/ComlibLearner.h \
   ../../../../include/CkFutures.decl.h ../../../../include/charisma.h \
   ../../../../include/charisma.decl.h ../../../../include/tempo.h \
   ../../../../include/tempo.decl.h ../../../../include/waitqd.h \
@@ -938,11 +1031,18 @@ opt3.o: opt3.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/ckcheckpoint.h \
   ../../../../include/CkCheckpoint.decl.h \
   ../../../../include/ckarrayreductionmgr.h ../../../../include/trace.h \
-  ../../../../include/trace-bluegene.h pose_config.h eventID.h mempool.h \
-  mempool.decl.h srtable.h stats.h stats.decl.h cancel.h event.h \
-  ../../../../include/envelope.h eqheap.h pvtobj.h lbObject.h ldbal.h \
-  ldbal.decl.h gvt.h gvt.decl.h evq.h rep.h strat.h sim.h sim.decl.h \
-  opt.h opt2.h opt3.h spec.h adapt.h adapt2.h adapt3.h cons.h chpt.h
+  ../../../../include/trace-bluegene.h pose_config.h \
+  ../../../../include/StreamingStrategy.h \
+  ../../../../include/ComlibManager.h ../../../../include/envelope.h \
+  ../../../../include/comlib.h ../../../../include/router.h \
+  ../../../../include/convcomlibmanager.h \
+  ../../../../include/ComlibStats.h ../../../../include/comlib.decl.h \
+  ../../../../include/MeshStreamingStrategy.h \
+  ../../../../include/PrioStreaming.h eventID.h mempool.h mempool.decl.h \
+  srtable.h stats.h stats.decl.h cancel.h event.h eqheap.h pvtobj.h \
+  lbObject.h ldbal.h ldbal.decl.h gvt.h gvt.decl.h evq.h rep.h sim.decl.h \
+  strat.h sim.h opt.h opt2.h opt3.h spec.h adapt.h adapt2.h adapt3.h \
+  cons.h seq.h chpt.h
 	$(CHARMC) -o opt3.o opt3.C
 spec.o: spec.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/charm.h ../../../../include/converse.h \
@@ -976,6 +1076,7 @@ spec.o: spec.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/ComlibArrayListener.h \
   ../../../../include/ComlibStrategy.h \
   ../../../../include/convcomlibstrategy.h \
+  ../../../../include/ComlibLearner.h \
   ../../../../include/CkFutures.decl.h ../../../../include/charisma.h \
   ../../../../include/charisma.decl.h ../../../../include/tempo.h \
   ../../../../include/tempo.decl.h ../../../../include/waitqd.h \
@@ -983,11 +1084,18 @@ spec.o: spec.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/ckcheckpoint.h \
   ../../../../include/CkCheckpoint.decl.h \
   ../../../../include/ckarrayreductionmgr.h ../../../../include/trace.h \
-  ../../../../include/trace-bluegene.h pose_config.h eventID.h mempool.h \
-  mempool.decl.h srtable.h stats.h stats.decl.h cancel.h event.h \
-  ../../../../include/envelope.h eqheap.h pvtobj.h lbObject.h ldbal.h \
-  ldbal.decl.h gvt.h gvt.decl.h evq.h rep.h strat.h sim.h sim.decl.h \
-  opt.h opt2.h opt3.h spec.h adapt.h adapt2.h adapt3.h cons.h chpt.h
+  ../../../../include/trace-bluegene.h pose_config.h \
+  ../../../../include/StreamingStrategy.h \
+  ../../../../include/ComlibManager.h ../../../../include/envelope.h \
+  ../../../../include/comlib.h ../../../../include/router.h \
+  ../../../../include/convcomlibmanager.h \
+  ../../../../include/ComlibStats.h ../../../../include/comlib.decl.h \
+  ../../../../include/MeshStreamingStrategy.h \
+  ../../../../include/PrioStreaming.h eventID.h mempool.h mempool.decl.h \
+  srtable.h stats.h stats.decl.h cancel.h event.h eqheap.h pvtobj.h \
+  lbObject.h ldbal.h ldbal.decl.h gvt.h gvt.decl.h evq.h rep.h sim.decl.h \
+  strat.h sim.h opt.h opt2.h opt3.h spec.h adapt.h adapt2.h adapt3.h \
+  cons.h seq.h chpt.h
 	$(CHARMC) -o spec.o spec.C
 adapt.o: adapt.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/charm.h ../../../../include/converse.h \
@@ -1021,6 +1129,7 @@ adapt.o: adapt.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/ComlibArrayListener.h \
   ../../../../include/ComlibStrategy.h \
   ../../../../include/convcomlibstrategy.h \
+  ../../../../include/ComlibLearner.h \
   ../../../../include/CkFutures.decl.h ../../../../include/charisma.h \
   ../../../../include/charisma.decl.h ../../../../include/tempo.h \
   ../../../../include/tempo.decl.h ../../../../include/waitqd.h \
@@ -1028,11 +1137,18 @@ adapt.o: adapt.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/ckcheckpoint.h \
   ../../../../include/CkCheckpoint.decl.h \
   ../../../../include/ckarrayreductionmgr.h ../../../../include/trace.h \
-  ../../../../include/trace-bluegene.h pose_config.h eventID.h mempool.h \
-  mempool.decl.h srtable.h stats.h stats.decl.h cancel.h event.h \
-  ../../../../include/envelope.h eqheap.h pvtobj.h lbObject.h ldbal.h \
-  ldbal.decl.h gvt.h gvt.decl.h evq.h rep.h strat.h sim.h sim.decl.h \
-  opt.h opt2.h opt3.h spec.h adapt.h adapt2.h adapt3.h cons.h chpt.h
+  ../../../../include/trace-bluegene.h pose_config.h \
+  ../../../../include/StreamingStrategy.h \
+  ../../../../include/ComlibManager.h ../../../../include/envelope.h \
+  ../../../../include/comlib.h ../../../../include/router.h \
+  ../../../../include/convcomlibmanager.h \
+  ../../../../include/ComlibStats.h ../../../../include/comlib.decl.h \
+  ../../../../include/MeshStreamingStrategy.h \
+  ../../../../include/PrioStreaming.h eventID.h mempool.h mempool.decl.h \
+  srtable.h stats.h stats.decl.h cancel.h event.h eqheap.h pvtobj.h \
+  lbObject.h ldbal.h ldbal.decl.h gvt.h gvt.decl.h evq.h rep.h sim.decl.h \
+  strat.h sim.h opt.h opt2.h opt3.h spec.h adapt.h adapt2.h adapt3.h \
+  cons.h seq.h chpt.h
 	$(CHARMC) -o adapt.o adapt.C
 adapt2.o: adapt2.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/charm.h ../../../../include/converse.h \
@@ -1066,6 +1182,7 @@ adapt2.o: adapt2.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/ComlibArrayListener.h \
   ../../../../include/ComlibStrategy.h \
   ../../../../include/convcomlibstrategy.h \
+  ../../../../include/ComlibLearner.h \
   ../../../../include/CkFutures.decl.h ../../../../include/charisma.h \
   ../../../../include/charisma.decl.h ../../../../include/tempo.h \
   ../../../../include/tempo.decl.h ../../../../include/waitqd.h \
@@ -1073,11 +1190,18 @@ adapt2.o: adapt2.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/ckcheckpoint.h \
   ../../../../include/CkCheckpoint.decl.h \
   ../../../../include/ckarrayreductionmgr.h ../../../../include/trace.h \
-  ../../../../include/trace-bluegene.h pose_config.h eventID.h mempool.h \
-  mempool.decl.h srtable.h stats.h stats.decl.h cancel.h event.h \
-  ../../../../include/envelope.h eqheap.h pvtobj.h lbObject.h ldbal.h \
-  ldbal.decl.h gvt.h gvt.decl.h evq.h rep.h strat.h sim.h sim.decl.h \
-  opt.h opt2.h opt3.h spec.h adapt.h adapt2.h adapt3.h cons.h chpt.h
+  ../../../../include/trace-bluegene.h pose_config.h \
+  ../../../../include/StreamingStrategy.h \
+  ../../../../include/ComlibManager.h ../../../../include/envelope.h \
+  ../../../../include/comlib.h ../../../../include/router.h \
+  ../../../../include/convcomlibmanager.h \
+  ../../../../include/ComlibStats.h ../../../../include/comlib.decl.h \
+  ../../../../include/MeshStreamingStrategy.h \
+  ../../../../include/PrioStreaming.h eventID.h mempool.h mempool.decl.h \
+  srtable.h stats.h stats.decl.h cancel.h event.h eqheap.h pvtobj.h \
+  lbObject.h ldbal.h ldbal.decl.h gvt.h gvt.decl.h evq.h rep.h sim.decl.h \
+  strat.h sim.h opt.h opt2.h opt3.h spec.h adapt.h adapt2.h adapt3.h \
+  cons.h seq.h chpt.h
 	$(CHARMC) -o adapt2.o adapt2.C
 adapt3.o: adapt3.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/charm.h ../../../../include/converse.h \
@@ -1111,6 +1235,7 @@ adapt3.o: adapt3.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/ComlibArrayListener.h \
   ../../../../include/ComlibStrategy.h \
   ../../../../include/convcomlibstrategy.h \
+  ../../../../include/ComlibLearner.h \
   ../../../../include/CkFutures.decl.h ../../../../include/charisma.h \
   ../../../../include/charisma.decl.h ../../../../include/tempo.h \
   ../../../../include/tempo.decl.h ../../../../include/waitqd.h \
@@ -1118,9 +1243,2356 @@ adapt3.o: adapt3.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/ckcheckpoint.h \
   ../../../../include/CkCheckpoint.decl.h \
   ../../../../include/ckarrayreductionmgr.h ../../../../include/trace.h \
-  ../../../../include/trace-bluegene.h pose_config.h eventID.h mempool.h \
-  mempool.decl.h srtable.h stats.h stats.decl.h cancel.h event.h \
-  ../../../../include/envelope.h eqheap.h pvtobj.h lbObject.h ldbal.h \
-  ldbal.decl.h gvt.h gvt.decl.h evq.h rep.h strat.h sim.h sim.decl.h \
-  opt.h opt2.h opt3.h spec.h adapt.h adapt2.h adapt3.h cons.h chpt.h
+  ../../../../include/trace-bluegene.h pose_config.h \
+  ../../../../include/StreamingStrategy.h \
+  ../../../../include/ComlibManager.h ../../../../include/envelope.h \
+  ../../../../include/comlib.h ../../../../include/router.h \
+  ../../../../include/convcomlibmanager.h \
+  ../../../../include/ComlibStats.h ../../../../include/comlib.decl.h \
+  ../../../../include/MeshStreamingStrategy.h \
+  ../../../../include/PrioStreaming.h eventID.h mempool.h mempool.decl.h \
+  srtable.h stats.h stats.decl.h cancel.h event.h eqheap.h pvtobj.h \
+  lbObject.h ldbal.h ldbal.decl.h gvt.h gvt.decl.h evq.h rep.h sim.decl.h \
+  strat.h sim.h opt.h opt2.h opt3.h spec.h adapt.h adapt2.h adapt3.h \
+  cons.h seq.h chpt.h
 	$(CHARMC) -o adapt3.o adapt3.C
+pose.o: pose.C pose.h pose.decl.h ../../../../include/charm++.h \
+  ../../../../include/charm.h ../../../../include/converse.h \
+  ../../../../include/conv-config.h ../../../../include/conv-common.h \
+  ../../../../include/conv-mach.h ../../../../include/conv-autoconfig.h \
+  ../../../../include/conv-mach-opt.h ../../../../include/pup_c.h \
+  ../../../../include/conv-cpm.h ../../../../include/conv-cpath.h \
+  ../../../../include/conv-qd.h ../../../../include/conv-random.h \
+  ../../../../include/conv-lists.h ../../../../include/conv-trace.h \
+  ../../../../include/persistent.h ../../../../include/debug-conv.h \
+  ../../../../include/pup.h ../../../../include/middle.h \
+  ../../../../include/middle-conv.h ../../../../include/cklists.h \
+  ../../../../include/ckbitvector.h ../../../../include/ckstream.h \
+  ../../../../include/init.h ../../../../include/ckhashtable.h \
+  ../../../../include/debug-charm.h ../../../../include/CkMarshall.decl.h \
+  ../../../../include/cksection.h ../../../../include/ckcallback.h \
+  ../../../../include/conv-ccs.h ../../../../include/sockRoutines.h \
+  ../../../../include/ccs-server.h ../../../../include/ckobjQ.h \
+  ../../../../include/ckreduction.h \
+  ../../../../include/CkReduction.decl.h \
+  ../../../../include/cknodegroupreduction.h \
+  ../../../../include/CkArrayReductionMgr.decl.h \
+  ../../../../include/ckmemcheckpoint.h \
+  ../../../../include/CkMemCheckpoint.decl.h \
+  ../../../../include/readonly.h ../../../../include/ckarray.h \
+  ../../../../include/cklocation.h ../../../../include/LBDatabase.h \
+  ../../../../include/lbdb.h ../../../../include/LBDatabase.decl.h \
+  ../../../../include/NullLB.decl.h ../../../../include/BaseLB.decl.h \
+  ../../../../include/CkLocation.decl.h \
+  ../../../../include/CkArray.decl.h \
+  ../../../../include/ComlibArrayListener.h \
+  ../../../../include/ComlibStrategy.h \
+  ../../../../include/convcomlibstrategy.h \
+  ../../../../include/ComlibLearner.h \
+  ../../../../include/CkFutures.decl.h ../../../../include/charisma.h \
+  ../../../../include/charisma.decl.h ../../../../include/tempo.h \
+  ../../../../include/tempo.decl.h ../../../../include/waitqd.h \
+  ../../../../include/waitqd.decl.h ../../../../include/sdag.h \
+  ../../../../include/ckcheckpoint.h \
+  ../../../../include/CkCheckpoint.decl.h \
+  ../../../../include/ckarrayreductionmgr.h ../../../../include/trace.h \
+  ../../../../include/trace-bluegene.h pose_config.h \
+  ../../../../include/StreamingStrategy.h \
+  ../../../../include/ComlibManager.h ../../../../include/envelope.h \
+  ../../../../include/comlib.h ../../../../include/router.h \
+  ../../../../include/convcomlibmanager.h \
+  ../../../../include/ComlibStats.h ../../../../include/comlib.decl.h \
+  ../../../../include/MeshStreamingStrategy.h \
+  ../../../../include/PrioStreaming.h eventID.h mempool.h mempool.decl.h \
+  srtable.h stats.h stats.decl.h cancel.h event.h eqheap.h pvtobj.h \
+  lbObject.h ldbal.h ldbal.decl.h gvt.h gvt.decl.h evq.h rep.h sim.decl.h \
+  strat.h sim.h opt.h opt2.h opt3.h spec.h adapt.h adapt2.h adapt3.h \
+  cons.h seq.h chpt.h pose.def.h
+	$(CHARMC) -o pose.o pose.C
+eventID.seq.o: eventID.C eventID.h ../../../../include/charm++.h \
+  /usr/include/stdlib.h /usr/include/features.h /usr/include/sys/cdefs.h \
+  /usr/include/gnu/stubs.h \
+  /usr/lib/gcc-lib/i586-suse-linux/3.3.3/include/stddef.h \
+  /usr/include/bits/waitflags.h /usr/include/bits/waitstatus.h \
+  /usr/include/endian.h /usr/include/bits/endian.h /usr/include/xlocale.h \
+  /usr/include/sys/types.h /usr/include/bits/types.h \
+  /usr/include/bits/wordsize.h /usr/include/bits/typesizes.h \
+  /usr/include/time.h /usr/include/sys/select.h \
+  /usr/include/bits/select.h /usr/include/bits/sigset.h \
+  /usr/include/bits/time.h /usr/include/sys/sysmacros.h \
+  /usr/include/bits/pthreadtypes.h /usr/include/bits/sched.h \
+  /usr/include/alloca.h /usr/include/memory.h /usr/include/string.h \
+  ../../../../include/charm.h ../../../../include/converse.h \
+  ../../../../include/conv-config.h ../../../../include/conv-common.h \
+  ../../../../include/conv-mach.h ../../../../include/conv-autoconfig.h \
+  ../../../../include/conv-mach-opt.h /usr/include/stdint.h \
+  /usr/include/bits/wchar.h ../../../../include/pup_c.h \
+  ../../../../include/conv-cpm.h ../../../../include/conv-cpath.h \
+  ../../../../include/conv-qd.h ../../../../include/conv-random.h \
+  ../../../../include/conv-lists.h ../../../../include/conv-trace.h \
+  ../../../../include/persistent.h ../../../../include/debug-conv.h \
+  ../../../../include/pup.h /usr/include/stdio.h /usr/include/libio.h \
+  /usr/include/_G_config.h /usr/include/wchar.h /usr/include/gconv.h \
+  /usr/lib/gcc-lib/i586-suse-linux/3.3.3/include/stdarg.h \
+  /usr/include/bits/stdio_lim.h /usr/include/bits/sys_errlist.h \
+  ../../../../include/middle.h ../../../../include/middle-conv.h \
+  ../../../../include/cklists.h ../../../../include/ckbitvector.h \
+  ../../../../include/ckstream.h ../../../../include/init.h \
+  /usr/include/g++/new /usr/include/g++/cstddef \
+  /usr/include/g++/exception ../../../../include/ckhashtable.h \
+  ../../../../include/debug-charm.h ../../../../include/CkMarshall.decl.h \
+  ../../../../include/cksection.h ../../../../include/ckcallback.h \
+  ../../../../include/conv-ccs.h ../../../../include/sockRoutines.h \
+  /usr/include/sys/time.h /usr/include/sys/socket.h \
+  /usr/include/sys/uio.h /usr/include/bits/uio.h \
+  /usr/include/bits/socket.h \
+  /usr/lib/gcc-lib/i586-suse-linux/3.3.3/include/limits.h \
+  /usr/lib/gcc-lib/i586-suse-linux/3.3.3/include/syslimits.h \
+  /usr/include/limits.h /usr/include/bits/posix1_lim.h \
+  /usr/include/bits/local_lim.h /usr/include/linux/limits.h \
+  /usr/include/bits/posix2_lim.h /usr/include/bits/xopen_lim.h \
+  /usr/include/bits/sockaddr.h /usr/include/asm/socket.h \
+  /usr/include/asm/sockios.h /usr/include/netinet/in.h \
+  /usr/include/bits/in.h /usr/include/bits/byteswap.h \
+  /usr/include/arpa/inet.h /usr/include/netdb.h /usr/include/rpc/netdb.h \
+  /usr/include/bits/siginfo.h /usr/include/bits/netdb.h \
+  /usr/include/unistd.h /usr/include/bits/posix_opt.h \
+  /usr/include/bits/environments.h /usr/include/bits/confname.h \
+  /usr/include/getopt.h /usr/include/fcntl.h /usr/include/bits/fcntl.h \
+  /usr/include/sys/stat.h /usr/include/bits/stat.h \
+  ../../../../include/ccs-server.h ../../../../include/ckobjQ.h \
+  ../../../../include/ckreduction.h \
+  ../../../../include/CkReduction.decl.h \
+  ../../../../include/cknodegroupreduction.h \
+  ../../../../include/CkArrayReductionMgr.decl.h \
+  ../../../../include/ckmemcheckpoint.h \
+  ../../../../include/CkMemCheckpoint.decl.h \
+  ../../../../include/readonly.h /usr/include/g++/typeinfo \
+  ../../../../include/ckarray.h ../../../../include/cklocation.h \
+  ../../../../include/LBDatabase.h /usr/include/math.h \
+  /usr/include/bits/huge_val.h /usr/include/bits/huge_valf.h \
+  /usr/include/bits/huge_vall.h /usr/include/bits/inf.h \
+  /usr/include/bits/nan.h /usr/include/bits/mathdef.h \
+  /usr/include/bits/mathcalls.h ../../../../include/lbdb.h \
+  ../../../../include/LBDatabase.decl.h ../../../../include/NullLB.decl.h \
+  ../../../../include/BaseLB.decl.h ../../../../include/CkLocation.decl.h \
+  ../../../../include/CkArray.decl.h \
+  ../../../../include/ComlibArrayListener.h \
+  ../../../../include/ComlibStrategy.h \
+  ../../../../include/convcomlibstrategy.h \
+  ../../../../include/ComlibLearner.h \
+  ../../../../include/CkFutures.decl.h ../../../../include/charisma.h \
+  ../../../../include/charisma.decl.h ../../../../include/tempo.h \
+  ../../../../include/tempo.decl.h ../../../../include/waitqd.h \
+  ../../../../include/waitqd.decl.h ../../../../include/sdag.h \
+  ../../../../include/ckcheckpoint.h \
+  ../../../../include/CkCheckpoint.decl.h \
+  ../../../../include/ckarrayreductionmgr.h ../../../../include/trace.h \
+  ../../../../include/trace-bluegene.h
+	$(CHARMC) -o eventID.seq.o -DSEQUENTIAL_POSE=1 eventID.C
+stats.seq.o: stats.C ../../../../include/charm++.h /usr/include/stdlib.h \
+  /usr/include/features.h /usr/include/sys/cdefs.h \
+  /usr/include/gnu/stubs.h \
+  /usr/lib/gcc-lib/i586-suse-linux/3.3.3/include/stddef.h \
+  /usr/include/bits/waitflags.h /usr/include/bits/waitstatus.h \
+  /usr/include/endian.h /usr/include/bits/endian.h /usr/include/xlocale.h \
+  /usr/include/sys/types.h /usr/include/bits/types.h \
+  /usr/include/bits/wordsize.h /usr/include/bits/typesizes.h \
+  /usr/include/time.h /usr/include/sys/select.h \
+  /usr/include/bits/select.h /usr/include/bits/sigset.h \
+  /usr/include/bits/time.h /usr/include/sys/sysmacros.h \
+  /usr/include/bits/pthreadtypes.h /usr/include/bits/sched.h \
+  /usr/include/alloca.h /usr/include/memory.h /usr/include/string.h \
+  ../../../../include/charm.h ../../../../include/converse.h \
+  ../../../../include/conv-config.h ../../../../include/conv-common.h \
+  ../../../../include/conv-mach.h ../../../../include/conv-autoconfig.h \
+  ../../../../include/conv-mach-opt.h /usr/include/stdint.h \
+  /usr/include/bits/wchar.h ../../../../include/pup_c.h \
+  ../../../../include/conv-cpm.h ../../../../include/conv-cpath.h \
+  ../../../../include/conv-qd.h ../../../../include/conv-random.h \
+  ../../../../include/conv-lists.h ../../../../include/conv-trace.h \
+  ../../../../include/persistent.h ../../../../include/debug-conv.h \
+  ../../../../include/pup.h /usr/include/stdio.h /usr/include/libio.h \
+  /usr/include/_G_config.h /usr/include/wchar.h /usr/include/gconv.h \
+  /usr/lib/gcc-lib/i586-suse-linux/3.3.3/include/stdarg.h \
+  /usr/include/bits/stdio_lim.h /usr/include/bits/sys_errlist.h \
+  ../../../../include/middle.h ../../../../include/middle-conv.h \
+  ../../../../include/cklists.h ../../../../include/ckbitvector.h \
+  ../../../../include/ckstream.h ../../../../include/init.h \
+  /usr/include/g++/new /usr/include/g++/cstddef \
+  /usr/include/g++/exception ../../../../include/ckhashtable.h \
+  ../../../../include/debug-charm.h ../../../../include/CkMarshall.decl.h \
+  ../../../../include/cksection.h ../../../../include/ckcallback.h \
+  ../../../../include/conv-ccs.h ../../../../include/sockRoutines.h \
+  /usr/include/sys/time.h /usr/include/sys/socket.h \
+  /usr/include/sys/uio.h /usr/include/bits/uio.h \
+  /usr/include/bits/socket.h \
+  /usr/lib/gcc-lib/i586-suse-linux/3.3.3/include/limits.h \
+  /usr/lib/gcc-lib/i586-suse-linux/3.3.3/include/syslimits.h \
+  /usr/include/limits.h /usr/include/bits/posix1_lim.h \
+  /usr/include/bits/local_lim.h /usr/include/linux/limits.h \
+  /usr/include/bits/posix2_lim.h /usr/include/bits/xopen_lim.h \
+  /usr/include/bits/sockaddr.h /usr/include/asm/socket.h \
+  /usr/include/asm/sockios.h /usr/include/netinet/in.h \
+  /usr/include/bits/in.h /usr/include/bits/byteswap.h \
+  /usr/include/arpa/inet.h /usr/include/netdb.h /usr/include/rpc/netdb.h \
+  /usr/include/bits/siginfo.h /usr/include/bits/netdb.h \
+  /usr/include/unistd.h /usr/include/bits/posix_opt.h \
+  /usr/include/bits/environments.h /usr/include/bits/confname.h \
+  /usr/include/getopt.h /usr/include/fcntl.h /usr/include/bits/fcntl.h \
+  /usr/include/sys/stat.h /usr/include/bits/stat.h \
+  ../../../../include/ccs-server.h ../../../../include/ckobjQ.h \
+  ../../../../include/ckreduction.h \
+  ../../../../include/CkReduction.decl.h \
+  ../../../../include/cknodegroupreduction.h \
+  ../../../../include/CkArrayReductionMgr.decl.h \
+  ../../../../include/ckmemcheckpoint.h \
+  ../../../../include/CkMemCheckpoint.decl.h \
+  ../../../../include/readonly.h /usr/include/g++/typeinfo \
+  ../../../../include/ckarray.h ../../../../include/cklocation.h \
+  ../../../../include/LBDatabase.h /usr/include/math.h \
+  /usr/include/bits/huge_val.h /usr/include/bits/huge_valf.h \
+  /usr/include/bits/huge_vall.h /usr/include/bits/inf.h \
+  /usr/include/bits/nan.h /usr/include/bits/mathdef.h \
+  /usr/include/bits/mathcalls.h ../../../../include/lbdb.h \
+  ../../../../include/LBDatabase.decl.h ../../../../include/NullLB.decl.h \
+  ../../../../include/BaseLB.decl.h ../../../../include/CkLocation.decl.h \
+  ../../../../include/CkArray.decl.h \
+  ../../../../include/ComlibArrayListener.h \
+  ../../../../include/ComlibStrategy.h \
+  ../../../../include/convcomlibstrategy.h \
+  ../../../../include/ComlibLearner.h \
+  ../../../../include/CkFutures.decl.h ../../../../include/charisma.h \
+  ../../../../include/charisma.decl.h ../../../../include/tempo.h \
+  ../../../../include/tempo.decl.h ../../../../include/waitqd.h \
+  ../../../../include/waitqd.decl.h ../../../../include/sdag.h \
+  ../../../../include/ckcheckpoint.h \
+  ../../../../include/CkCheckpoint.decl.h \
+  ../../../../include/ckarrayreductionmgr.h ../../../../include/trace.h \
+  ../../../../include/trace-bluegene.h stats.h stats.decl.h pose_config.h \
+  ../../../../include/StreamingStrategy.h \
+  ../../../../include/ComlibManager.h ../../../../include/envelope.h \
+  ../../../../include/comlib.h ../../../../include/router.h \
+  ../../../../include/convcomlibmanager.h \
+  ../../../../include/ComlibStats.h ../../../../include/comlib.decl.h \
+  ../../../../include/MeshStreamingStrategy.h /usr/include/assert.h \
+  ../../../../include/PrioStreaming.h stats.def.h
+	$(CHARMC) -o stats.seq.o -DSEQUENTIAL_POSE=1 stats.C
+srtable.seq.o: srtable.C /usr/include/stdio.h /usr/include/features.h \
+  /usr/include/sys/cdefs.h /usr/include/gnu/stubs.h \
+  /usr/lib/gcc-lib/i586-suse-linux/3.3.3/include/stddef.h \
+  /usr/include/bits/types.h /usr/include/bits/wordsize.h \
+  /usr/include/bits/typesizes.h /usr/include/libio.h \
+  /usr/include/_G_config.h /usr/include/wchar.h /usr/include/bits/wchar.h \
+  /usr/include/gconv.h \
+  /usr/lib/gcc-lib/i586-suse-linux/3.3.3/include/stdarg.h \
+  /usr/include/bits/stdio_lim.h /usr/include/bits/sys_errlist.h \
+  /usr/include/string.h /usr/include/xlocale.h /usr/include/stdlib.h \
+  /usr/include/bits/waitflags.h /usr/include/bits/waitstatus.h \
+  /usr/include/endian.h /usr/include/bits/endian.h \
+  /usr/include/sys/types.h /usr/include/time.h /usr/include/sys/select.h \
+  /usr/include/bits/select.h /usr/include/bits/sigset.h \
+  /usr/include/bits/time.h /usr/include/sys/sysmacros.h \
+  /usr/include/bits/pthreadtypes.h /usr/include/bits/sched.h \
+  /usr/include/alloca.h ../../../../include/charm++.h \
+  /usr/include/memory.h ../../../../include/charm.h \
+  ../../../../include/converse.h ../../../../include/conv-config.h \
+  ../../../../include/conv-common.h ../../../../include/conv-mach.h \
+  ../../../../include/conv-autoconfig.h \
+  ../../../../include/conv-mach-opt.h /usr/include/stdint.h \
+  ../../../../include/pup_c.h ../../../../include/conv-cpm.h \
+  ../../../../include/conv-cpath.h ../../../../include/conv-qd.h \
+  ../../../../include/conv-random.h ../../../../include/conv-lists.h \
+  ../../../../include/conv-trace.h ../../../../include/persistent.h \
+  ../../../../include/debug-conv.h ../../../../include/pup.h \
+  ../../../../include/middle.h ../../../../include/middle-conv.h \
+  ../../../../include/cklists.h ../../../../include/ckbitvector.h \
+  ../../../../include/ckstream.h ../../../../include/init.h \
+  /usr/include/g++/new /usr/include/g++/cstddef \
+  /usr/include/g++/exception ../../../../include/ckhashtable.h \
+  ../../../../include/debug-charm.h ../../../../include/CkMarshall.decl.h \
+  ../../../../include/cksection.h ../../../../include/ckcallback.h \
+  ../../../../include/conv-ccs.h ../../../../include/sockRoutines.h \
+  /usr/include/sys/time.h /usr/include/sys/socket.h \
+  /usr/include/sys/uio.h /usr/include/bits/uio.h \
+  /usr/include/bits/socket.h \
+  /usr/lib/gcc-lib/i586-suse-linux/3.3.3/include/limits.h \
+  /usr/lib/gcc-lib/i586-suse-linux/3.3.3/include/syslimits.h \
+  /usr/include/limits.h /usr/include/bits/posix1_lim.h \
+  /usr/include/bits/local_lim.h /usr/include/linux/limits.h \
+  /usr/include/bits/posix2_lim.h /usr/include/bits/xopen_lim.h \
+  /usr/include/bits/sockaddr.h /usr/include/asm/socket.h \
+  /usr/include/asm/sockios.h /usr/include/netinet/in.h \
+  /usr/include/bits/in.h /usr/include/bits/byteswap.h \
+  /usr/include/arpa/inet.h /usr/include/netdb.h /usr/include/rpc/netdb.h \
+  /usr/include/bits/siginfo.h /usr/include/bits/netdb.h \
+  /usr/include/unistd.h /usr/include/bits/posix_opt.h \
+  /usr/include/bits/environments.h /usr/include/bits/confname.h \
+  /usr/include/getopt.h /usr/include/fcntl.h /usr/include/bits/fcntl.h \
+  /usr/include/sys/stat.h /usr/include/bits/stat.h \
+  ../../../../include/ccs-server.h ../../../../include/ckobjQ.h \
+  ../../../../include/ckreduction.h \
+  ../../../../include/CkReduction.decl.h \
+  ../../../../include/cknodegroupreduction.h \
+  ../../../../include/CkArrayReductionMgr.decl.h \
+  ../../../../include/ckmemcheckpoint.h \
+  ../../../../include/CkMemCheckpoint.decl.h \
+  ../../../../include/readonly.h /usr/include/g++/typeinfo \
+  ../../../../include/ckarray.h ../../../../include/cklocation.h \
+  ../../../../include/LBDatabase.h /usr/include/math.h \
+  /usr/include/bits/huge_val.h /usr/include/bits/huge_valf.h \
+  /usr/include/bits/huge_vall.h /usr/include/bits/inf.h \
+  /usr/include/bits/nan.h /usr/include/bits/mathdef.h \
+  /usr/include/bits/mathcalls.h ../../../../include/lbdb.h \
+  ../../../../include/LBDatabase.decl.h ../../../../include/NullLB.decl.h \
+  ../../../../include/BaseLB.decl.h ../../../../include/CkLocation.decl.h \
+  ../../../../include/CkArray.decl.h \
+  ../../../../include/ComlibArrayListener.h \
+  ../../../../include/ComlibStrategy.h \
+  ../../../../include/convcomlibstrategy.h \
+  ../../../../include/ComlibLearner.h \
+  ../../../../include/CkFutures.decl.h ../../../../include/charisma.h \
+  ../../../../include/charisma.decl.h ../../../../include/tempo.h \
+  ../../../../include/tempo.decl.h ../../../../include/waitqd.h \
+  ../../../../include/waitqd.decl.h ../../../../include/sdag.h \
+  ../../../../include/ckcheckpoint.h \
+  ../../../../include/CkCheckpoint.decl.h \
+  ../../../../include/ckarrayreductionmgr.h ../../../../include/trace.h \
+  ../../../../include/trace-bluegene.h srtable.h pose.h pose.decl.h \
+  pose_config.h ../../../../include/StreamingStrategy.h \
+  ../../../../include/ComlibManager.h ../../../../include/envelope.h \
+  ../../../../include/comlib.h ../../../../include/router.h \
+  ../../../../include/convcomlibmanager.h \
+  ../../../../include/ComlibStats.h ../../../../include/comlib.decl.h \
+  ../../../../include/MeshStreamingStrategy.h /usr/include/assert.h \
+  ../../../../include/PrioStreaming.h eventID.h mempool.h mempool.decl.h \
+  stats.h stats.decl.h cancel.h event.h eqheap.h pvtobj.h lbObject.h \
+  ldbal.h ldbal.decl.h gvt.h gvt.decl.h evq.h rep.h sim.decl.h strat.h \
+  sim.h opt.h opt2.h opt3.h spec.h adapt.h adapt2.h adapt3.h cons.h seq.h \
+  chpt.h
+	$(CHARMC) -o srtable.seq.o -DSEQUENTIAL_POSE=1 srtable.C
+cancel.seq.o: cancel.C eventID.h ../../../../include/charm++.h \
+  /usr/include/stdlib.h /usr/include/features.h /usr/include/sys/cdefs.h \
+  /usr/include/gnu/stubs.h \
+  /usr/lib/gcc-lib/i586-suse-linux/3.3.3/include/stddef.h \
+  /usr/include/bits/waitflags.h /usr/include/bits/waitstatus.h \
+  /usr/include/endian.h /usr/include/bits/endian.h /usr/include/xlocale.h \
+  /usr/include/sys/types.h /usr/include/bits/types.h \
+  /usr/include/bits/wordsize.h /usr/include/bits/typesizes.h \
+  /usr/include/time.h /usr/include/sys/select.h \
+  /usr/include/bits/select.h /usr/include/bits/sigset.h \
+  /usr/include/bits/time.h /usr/include/sys/sysmacros.h \
+  /usr/include/bits/pthreadtypes.h /usr/include/bits/sched.h \
+  /usr/include/alloca.h /usr/include/memory.h /usr/include/string.h \
+  ../../../../include/charm.h ../../../../include/converse.h \
+  ../../../../include/conv-config.h ../../../../include/conv-common.h \
+  ../../../../include/conv-mach.h ../../../../include/conv-autoconfig.h \
+  ../../../../include/conv-mach-opt.h /usr/include/stdint.h \
+  /usr/include/bits/wchar.h ../../../../include/pup_c.h \
+  ../../../../include/conv-cpm.h ../../../../include/conv-cpath.h \
+  ../../../../include/conv-qd.h ../../../../include/conv-random.h \
+  ../../../../include/conv-lists.h ../../../../include/conv-trace.h \
+  ../../../../include/persistent.h ../../../../include/debug-conv.h \
+  ../../../../include/pup.h /usr/include/stdio.h /usr/include/libio.h \
+  /usr/include/_G_config.h /usr/include/wchar.h /usr/include/gconv.h \
+  /usr/lib/gcc-lib/i586-suse-linux/3.3.3/include/stdarg.h \
+  /usr/include/bits/stdio_lim.h /usr/include/bits/sys_errlist.h \
+  ../../../../include/middle.h ../../../../include/middle-conv.h \
+  ../../../../include/cklists.h ../../../../include/ckbitvector.h \
+  ../../../../include/ckstream.h ../../../../include/init.h \
+  /usr/include/g++/new /usr/include/g++/cstddef \
+  /usr/include/g++/exception ../../../../include/ckhashtable.h \
+  ../../../../include/debug-charm.h ../../../../include/CkMarshall.decl.h \
+  ../../../../include/cksection.h ../../../../include/ckcallback.h \
+  ../../../../include/conv-ccs.h ../../../../include/sockRoutines.h \
+  /usr/include/sys/time.h /usr/include/sys/socket.h \
+  /usr/include/sys/uio.h /usr/include/bits/uio.h \
+  /usr/include/bits/socket.h \
+  /usr/lib/gcc-lib/i586-suse-linux/3.3.3/include/limits.h \
+  /usr/lib/gcc-lib/i586-suse-linux/3.3.3/include/syslimits.h \
+  /usr/include/limits.h /usr/include/bits/posix1_lim.h \
+  /usr/include/bits/local_lim.h /usr/include/linux/limits.h \
+  /usr/include/bits/posix2_lim.h /usr/include/bits/xopen_lim.h \
+  /usr/include/bits/sockaddr.h /usr/include/asm/socket.h \
+  /usr/include/asm/sockios.h /usr/include/netinet/in.h \
+  /usr/include/bits/in.h /usr/include/bits/byteswap.h \
+  /usr/include/arpa/inet.h /usr/include/netdb.h /usr/include/rpc/netdb.h \
+  /usr/include/bits/siginfo.h /usr/include/bits/netdb.h \
+  /usr/include/unistd.h /usr/include/bits/posix_opt.h \
+  /usr/include/bits/environments.h /usr/include/bits/confname.h \
+  /usr/include/getopt.h /usr/include/fcntl.h /usr/include/bits/fcntl.h \
+  /usr/include/sys/stat.h /usr/include/bits/stat.h \
+  ../../../../include/ccs-server.h ../../../../include/ckobjQ.h \
+  ../../../../include/ckreduction.h \
+  ../../../../include/CkReduction.decl.h \
+  ../../../../include/cknodegroupreduction.h \
+  ../../../../include/CkArrayReductionMgr.decl.h \
+  ../../../../include/ckmemcheckpoint.h \
+  ../../../../include/CkMemCheckpoint.decl.h \
+  ../../../../include/readonly.h /usr/include/g++/typeinfo \
+  ../../../../include/ckarray.h ../../../../include/cklocation.h \
+  ../../../../include/LBDatabase.h /usr/include/math.h \
+  /usr/include/bits/huge_val.h /usr/include/bits/huge_valf.h \
+  /usr/include/bits/huge_vall.h /usr/include/bits/inf.h \
+  /usr/include/bits/nan.h /usr/include/bits/mathdef.h \
+  /usr/include/bits/mathcalls.h ../../../../include/lbdb.h \
+  ../../../../include/LBDatabase.decl.h ../../../../include/NullLB.decl.h \
+  ../../../../include/BaseLB.decl.h ../../../../include/CkLocation.decl.h \
+  ../../../../include/CkArray.decl.h \
+  ../../../../include/ComlibArrayListener.h \
+  ../../../../include/ComlibStrategy.h \
+  ../../../../include/convcomlibstrategy.h \
+  ../../../../include/ComlibLearner.h \
+  ../../../../include/CkFutures.decl.h ../../../../include/charisma.h \
+  ../../../../include/charisma.decl.h ../../../../include/tempo.h \
+  ../../../../include/tempo.decl.h ../../../../include/waitqd.h \
+  ../../../../include/waitqd.decl.h ../../../../include/sdag.h \
+  ../../../../include/ckcheckpoint.h \
+  ../../../../include/CkCheckpoint.decl.h \
+  ../../../../include/ckarrayreductionmgr.h ../../../../include/trace.h \
+  ../../../../include/trace-bluegene.h pose.h pose.decl.h pose_config.h \
+  ../../../../include/StreamingStrategy.h \
+  ../../../../include/ComlibManager.h ../../../../include/envelope.h \
+  ../../../../include/comlib.h ../../../../include/router.h \
+  ../../../../include/convcomlibmanager.h \
+  ../../../../include/ComlibStats.h ../../../../include/comlib.decl.h \
+  ../../../../include/MeshStreamingStrategy.h /usr/include/assert.h \
+  ../../../../include/PrioStreaming.h mempool.h mempool.decl.h srtable.h \
+  stats.h stats.decl.h cancel.h event.h eqheap.h pvtobj.h lbObject.h \
+  ldbal.h ldbal.decl.h gvt.h gvt.decl.h evq.h rep.h sim.decl.h strat.h \
+  sim.h opt.h opt2.h opt3.h spec.h adapt.h adapt2.h adapt3.h cons.h seq.h \
+  chpt.h
+	$(CHARMC) -o cancel.seq.o -DSEQUENTIAL_POSE=1 cancel.C
+mempool.seq.o: mempool.C ../../../../include/charm++.h \
+  /usr/include/stdlib.h /usr/include/features.h /usr/include/sys/cdefs.h \
+  /usr/include/gnu/stubs.h \
+  /usr/lib/gcc-lib/i586-suse-linux/3.3.3/include/stddef.h \
+  /usr/include/bits/waitflags.h /usr/include/bits/waitstatus.h \
+  /usr/include/endian.h /usr/include/bits/endian.h /usr/include/xlocale.h \
+  /usr/include/sys/types.h /usr/include/bits/types.h \
+  /usr/include/bits/wordsize.h /usr/include/bits/typesizes.h \
+  /usr/include/time.h /usr/include/sys/select.h \
+  /usr/include/bits/select.h /usr/include/bits/sigset.h \
+  /usr/include/bits/time.h /usr/include/sys/sysmacros.h \
+  /usr/include/bits/pthreadtypes.h /usr/include/bits/sched.h \
+  /usr/include/alloca.h /usr/include/memory.h /usr/include/string.h \
+  ../../../../include/charm.h ../../../../include/converse.h \
+  ../../../../include/conv-config.h ../../../../include/conv-common.h \
+  ../../../../include/conv-mach.h ../../../../include/conv-autoconfig.h \
+  ../../../../include/conv-mach-opt.h /usr/include/stdint.h \
+  /usr/include/bits/wchar.h ../../../../include/pup_c.h \
+  ../../../../include/conv-cpm.h ../../../../include/conv-cpath.h \
+  ../../../../include/conv-qd.h ../../../../include/conv-random.h \
+  ../../../../include/conv-lists.h ../../../../include/conv-trace.h \
+  ../../../../include/persistent.h ../../../../include/debug-conv.h \
+  ../../../../include/pup.h /usr/include/stdio.h /usr/include/libio.h \
+  /usr/include/_G_config.h /usr/include/wchar.h /usr/include/gconv.h \
+  /usr/lib/gcc-lib/i586-suse-linux/3.3.3/include/stdarg.h \
+  /usr/include/bits/stdio_lim.h /usr/include/bits/sys_errlist.h \
+  ../../../../include/middle.h ../../../../include/middle-conv.h \
+  ../../../../include/cklists.h ../../../../include/ckbitvector.h \
+  ../../../../include/ckstream.h ../../../../include/init.h \
+  /usr/include/g++/new /usr/include/g++/cstddef \
+  /usr/include/g++/exception ../../../../include/ckhashtable.h \
+  ../../../../include/debug-charm.h ../../../../include/CkMarshall.decl.h \
+  ../../../../include/cksection.h ../../../../include/ckcallback.h \
+  ../../../../include/conv-ccs.h ../../../../include/sockRoutines.h \
+  /usr/include/sys/time.h /usr/include/sys/socket.h \
+  /usr/include/sys/uio.h /usr/include/bits/uio.h \
+  /usr/include/bits/socket.h \
+  /usr/lib/gcc-lib/i586-suse-linux/3.3.3/include/limits.h \
+  /usr/lib/gcc-lib/i586-suse-linux/3.3.3/include/syslimits.h \
+  /usr/include/limits.h /usr/include/bits/posix1_lim.h \
+  /usr/include/bits/local_lim.h /usr/include/linux/limits.h \
+  /usr/include/bits/posix2_lim.h /usr/include/bits/xopen_lim.h \
+  /usr/include/bits/sockaddr.h /usr/include/asm/socket.h \
+  /usr/include/asm/sockios.h /usr/include/netinet/in.h \
+  /usr/include/bits/in.h /usr/include/bits/byteswap.h \
+  /usr/include/arpa/inet.h /usr/include/netdb.h /usr/include/rpc/netdb.h \
+  /usr/include/bits/siginfo.h /usr/include/bits/netdb.h \
+  /usr/include/unistd.h /usr/include/bits/posix_opt.h \
+  /usr/include/bits/environments.h /usr/include/bits/confname.h \
+  /usr/include/getopt.h /usr/include/fcntl.h /usr/include/bits/fcntl.h \
+  /usr/include/sys/stat.h /usr/include/bits/stat.h \
+  ../../../../include/ccs-server.h ../../../../include/ckobjQ.h \
+  ../../../../include/ckreduction.h \
+  ../../../../include/CkReduction.decl.h \
+  ../../../../include/cknodegroupreduction.h \
+  ../../../../include/CkArrayReductionMgr.decl.h \
+  ../../../../include/ckmemcheckpoint.h \
+  ../../../../include/CkMemCheckpoint.decl.h \
+  ../../../../include/readonly.h /usr/include/g++/typeinfo \
+  ../../../../include/ckarray.h ../../../../include/cklocation.h \
+  ../../../../include/LBDatabase.h /usr/include/math.h \
+  /usr/include/bits/huge_val.h /usr/include/bits/huge_valf.h \
+  /usr/include/bits/huge_vall.h /usr/include/bits/inf.h \
+  /usr/include/bits/nan.h /usr/include/bits/mathdef.h \
+  /usr/include/bits/mathcalls.h ../../../../include/lbdb.h \
+  ../../../../include/LBDatabase.decl.h ../../../../include/NullLB.decl.h \
+  ../../../../include/BaseLB.decl.h ../../../../include/CkLocation.decl.h \
+  ../../../../include/CkArray.decl.h \
+  ../../../../include/ComlibArrayListener.h \
+  ../../../../include/ComlibStrategy.h \
+  ../../../../include/convcomlibstrategy.h \
+  ../../../../include/ComlibLearner.h \
+  ../../../../include/CkFutures.decl.h ../../../../include/charisma.h \
+  ../../../../include/charisma.decl.h ../../../../include/tempo.h \
+  ../../../../include/tempo.decl.h ../../../../include/waitqd.h \
+  ../../../../include/waitqd.decl.h ../../../../include/sdag.h \
+  ../../../../include/ckcheckpoint.h \
+  ../../../../include/CkCheckpoint.decl.h \
+  ../../../../include/ckarrayreductionmgr.h ../../../../include/trace.h \
+  ../../../../include/trace-bluegene.h pose.h pose.decl.h pose_config.h \
+  ../../../../include/StreamingStrategy.h \
+  ../../../../include/ComlibManager.h ../../../../include/envelope.h \
+  ../../../../include/comlib.h ../../../../include/router.h \
+  ../../../../include/convcomlibmanager.h \
+  ../../../../include/ComlibStats.h ../../../../include/comlib.decl.h \
+  ../../../../include/MeshStreamingStrategy.h /usr/include/assert.h \
+  ../../../../include/PrioStreaming.h eventID.h mempool.h mempool.decl.h \
+  srtable.h stats.h stats.decl.h cancel.h event.h eqheap.h pvtobj.h \
+  lbObject.h ldbal.h ldbal.decl.h gvt.h gvt.decl.h evq.h rep.h sim.decl.h \
+  strat.h sim.h opt.h opt2.h opt3.h spec.h adapt.h adapt2.h adapt3.h \
+  cons.h seq.h chpt.h mempool.def.h
+	$(CHARMC) -o mempool.seq.o -DSEQUENTIAL_POSE=1 mempool.C
+pvtobj.seq.o: pvtobj.C pose.h pose.decl.h ../../../../include/charm++.h \
+  /usr/include/stdlib.h /usr/include/features.h /usr/include/sys/cdefs.h \
+  /usr/include/gnu/stubs.h \
+  /usr/lib/gcc-lib/i586-suse-linux/3.3.3/include/stddef.h \
+  /usr/include/bits/waitflags.h /usr/include/bits/waitstatus.h \
+  /usr/include/endian.h /usr/include/bits/endian.h /usr/include/xlocale.h \
+  /usr/include/sys/types.h /usr/include/bits/types.h \
+  /usr/include/bits/wordsize.h /usr/include/bits/typesizes.h \
+  /usr/include/time.h /usr/include/sys/select.h \
+  /usr/include/bits/select.h /usr/include/bits/sigset.h \
+  /usr/include/bits/time.h /usr/include/sys/sysmacros.h \
+  /usr/include/bits/pthreadtypes.h /usr/include/bits/sched.h \
+  /usr/include/alloca.h /usr/include/memory.h /usr/include/string.h \
+  ../../../../include/charm.h ../../../../include/converse.h \
+  ../../../../include/conv-config.h ../../../../include/conv-common.h \
+  ../../../../include/conv-mach.h ../../../../include/conv-autoconfig.h \
+  ../../../../include/conv-mach-opt.h /usr/include/stdint.h \
+  /usr/include/bits/wchar.h ../../../../include/pup_c.h \
+  ../../../../include/conv-cpm.h ../../../../include/conv-cpath.h \
+  ../../../../include/conv-qd.h ../../../../include/conv-random.h \
+  ../../../../include/conv-lists.h ../../../../include/conv-trace.h \
+  ../../../../include/persistent.h ../../../../include/debug-conv.h \
+  ../../../../include/pup.h /usr/include/stdio.h /usr/include/libio.h \
+  /usr/include/_G_config.h /usr/include/wchar.h /usr/include/gconv.h \
+  /usr/lib/gcc-lib/i586-suse-linux/3.3.3/include/stdarg.h \
+  /usr/include/bits/stdio_lim.h /usr/include/bits/sys_errlist.h \
+  ../../../../include/middle.h ../../../../include/middle-conv.h \
+  ../../../../include/cklists.h ../../../../include/ckbitvector.h \
+  ../../../../include/ckstream.h ../../../../include/init.h \
+  /usr/include/g++/new /usr/include/g++/cstddef \
+  /usr/include/g++/exception ../../../../include/ckhashtable.h \
+  ../../../../include/debug-charm.h ../../../../include/CkMarshall.decl.h \
+  ../../../../include/cksection.h ../../../../include/ckcallback.h \
+  ../../../../include/conv-ccs.h ../../../../include/sockRoutines.h \
+  /usr/include/sys/time.h /usr/include/sys/socket.h \
+  /usr/include/sys/uio.h /usr/include/bits/uio.h \
+  /usr/include/bits/socket.h \
+  /usr/lib/gcc-lib/i586-suse-linux/3.3.3/include/limits.h \
+  /usr/lib/gcc-lib/i586-suse-linux/3.3.3/include/syslimits.h \
+  /usr/include/limits.h /usr/include/bits/posix1_lim.h \
+  /usr/include/bits/local_lim.h /usr/include/linux/limits.h \
+  /usr/include/bits/posix2_lim.h /usr/include/bits/xopen_lim.h \
+  /usr/include/bits/sockaddr.h /usr/include/asm/socket.h \
+  /usr/include/asm/sockios.h /usr/include/netinet/in.h \
+  /usr/include/bits/in.h /usr/include/bits/byteswap.h \
+  /usr/include/arpa/inet.h /usr/include/netdb.h /usr/include/rpc/netdb.h \
+  /usr/include/bits/siginfo.h /usr/include/bits/netdb.h \
+  /usr/include/unistd.h /usr/include/bits/posix_opt.h \
+  /usr/include/bits/environments.h /usr/include/bits/confname.h \
+  /usr/include/getopt.h /usr/include/fcntl.h /usr/include/bits/fcntl.h \
+  /usr/include/sys/stat.h /usr/include/bits/stat.h \
+  ../../../../include/ccs-server.h ../../../../include/ckobjQ.h \
+  ../../../../include/ckreduction.h \
+  ../../../../include/CkReduction.decl.h \
+  ../../../../include/cknodegroupreduction.h \
+  ../../../../include/CkArrayReductionMgr.decl.h \
+  ../../../../include/ckmemcheckpoint.h \
+  ../../../../include/CkMemCheckpoint.decl.h \
+  ../../../../include/readonly.h /usr/include/g++/typeinfo \
+  ../../../../include/ckarray.h ../../../../include/cklocation.h \
+  ../../../../include/LBDatabase.h /usr/include/math.h \
+  /usr/include/bits/huge_val.h /usr/include/bits/huge_valf.h \
+  /usr/include/bits/huge_vall.h /usr/include/bits/inf.h \
+  /usr/include/bits/nan.h /usr/include/bits/mathdef.h \
+  /usr/include/bits/mathcalls.h ../../../../include/lbdb.h \
+  ../../../../include/LBDatabase.decl.h ../../../../include/NullLB.decl.h \
+  ../../../../include/BaseLB.decl.h ../../../../include/CkLocation.decl.h \
+  ../../../../include/CkArray.decl.h \
+  ../../../../include/ComlibArrayListener.h \
+  ../../../../include/ComlibStrategy.h \
+  ../../../../include/convcomlibstrategy.h \
+  ../../../../include/ComlibLearner.h \
+  ../../../../include/CkFutures.decl.h ../../../../include/charisma.h \
+  ../../../../include/charisma.decl.h ../../../../include/tempo.h \
+  ../../../../include/tempo.decl.h ../../../../include/waitqd.h \
+  ../../../../include/waitqd.decl.h ../../../../include/sdag.h \
+  ../../../../include/ckcheckpoint.h \
+  ../../../../include/CkCheckpoint.decl.h \
+  ../../../../include/ckarrayreductionmgr.h ../../../../include/trace.h \
+  ../../../../include/trace-bluegene.h pose_config.h \
+  ../../../../include/StreamingStrategy.h \
+  ../../../../include/ComlibManager.h ../../../../include/envelope.h \
+  ../../../../include/comlib.h ../../../../include/router.h \
+  ../../../../include/convcomlibmanager.h \
+  ../../../../include/ComlibStats.h ../../../../include/comlib.decl.h \
+  ../../../../include/MeshStreamingStrategy.h /usr/include/assert.h \
+  ../../../../include/PrioStreaming.h eventID.h mempool.h mempool.decl.h \
+  srtable.h stats.h stats.decl.h cancel.h event.h eqheap.h pvtobj.h \
+  lbObject.h ldbal.h ldbal.decl.h gvt.h gvt.decl.h evq.h rep.h sim.decl.h \
+  strat.h sim.h opt.h opt2.h opt3.h spec.h adapt.h adapt2.h adapt3.h \
+  cons.h seq.h chpt.h
+	$(CHARMC) -o pvtobj.seq.o -DSEQUENTIAL_POSE=1 pvtobj.C
+lbObject.seq.o: lbObject.C pose.h pose.decl.h \
+  ../../../../include/charm++.h /usr/include/stdlib.h \
+  /usr/include/features.h /usr/include/sys/cdefs.h \
+  /usr/include/gnu/stubs.h \
+  /usr/lib/gcc-lib/i586-suse-linux/3.3.3/include/stddef.h \
+  /usr/include/bits/waitflags.h /usr/include/bits/waitstatus.h \
+  /usr/include/endian.h /usr/include/bits/endian.h /usr/include/xlocale.h \
+  /usr/include/sys/types.h /usr/include/bits/types.h \
+  /usr/include/bits/wordsize.h /usr/include/bits/typesizes.h \
+  /usr/include/time.h /usr/include/sys/select.h \
+  /usr/include/bits/select.h /usr/include/bits/sigset.h \
+  /usr/include/bits/time.h /usr/include/sys/sysmacros.h \
+  /usr/include/bits/pthreadtypes.h /usr/include/bits/sched.h \
+  /usr/include/alloca.h /usr/include/memory.h /usr/include/string.h \
+  ../../../../include/charm.h ../../../../include/converse.h \
+  ../../../../include/conv-config.h ../../../../include/conv-common.h \
+  ../../../../include/conv-mach.h ../../../../include/conv-autoconfig.h \
+  ../../../../include/conv-mach-opt.h /usr/include/stdint.h \
+  /usr/include/bits/wchar.h ../../../../include/pup_c.h \
+  ../../../../include/conv-cpm.h ../../../../include/conv-cpath.h \
+  ../../../../include/conv-qd.h ../../../../include/conv-random.h \
+  ../../../../include/conv-lists.h ../../../../include/conv-trace.h \
+  ../../../../include/persistent.h ../../../../include/debug-conv.h \
+  ../../../../include/pup.h /usr/include/stdio.h /usr/include/libio.h \
+  /usr/include/_G_config.h /usr/include/wchar.h /usr/include/gconv.h \
+  /usr/lib/gcc-lib/i586-suse-linux/3.3.3/include/stdarg.h \
+  /usr/include/bits/stdio_lim.h /usr/include/bits/sys_errlist.h \
+  ../../../../include/middle.h ../../../../include/middle-conv.h \
+  ../../../../include/cklists.h ../../../../include/ckbitvector.h \
+  ../../../../include/ckstream.h ../../../../include/init.h \
+  /usr/include/g++/new /usr/include/g++/cstddef \
+  /usr/include/g++/exception ../../../../include/ckhashtable.h \
+  ../../../../include/debug-charm.h ../../../../include/CkMarshall.decl.h \
+  ../../../../include/cksection.h ../../../../include/ckcallback.h \
+  ../../../../include/conv-ccs.h ../../../../include/sockRoutines.h \
+  /usr/include/sys/time.h /usr/include/sys/socket.h \
+  /usr/include/sys/uio.h /usr/include/bits/uio.h \
+  /usr/include/bits/socket.h \
+  /usr/lib/gcc-lib/i586-suse-linux/3.3.3/include/limits.h \
+  /usr/lib/gcc-lib/i586-suse-linux/3.3.3/include/syslimits.h \
+  /usr/include/limits.h /usr/include/bits/posix1_lim.h \
+  /usr/include/bits/local_lim.h /usr/include/linux/limits.h \
+  /usr/include/bits/posix2_lim.h /usr/include/bits/xopen_lim.h \
+  /usr/include/bits/sockaddr.h /usr/include/asm/socket.h \
+  /usr/include/asm/sockios.h /usr/include/netinet/in.h \
+  /usr/include/bits/in.h /usr/include/bits/byteswap.h \
+  /usr/include/arpa/inet.h /usr/include/netdb.h /usr/include/rpc/netdb.h \
+  /usr/include/bits/siginfo.h /usr/include/bits/netdb.h \
+  /usr/include/unistd.h /usr/include/bits/posix_opt.h \
+  /usr/include/bits/environments.h /usr/include/bits/confname.h \
+  /usr/include/getopt.h /usr/include/fcntl.h /usr/include/bits/fcntl.h \
+  /usr/include/sys/stat.h /usr/include/bits/stat.h \
+  ../../../../include/ccs-server.h ../../../../include/ckobjQ.h \
+  ../../../../include/ckreduction.h \
+  ../../../../include/CkReduction.decl.h \
+  ../../../../include/cknodegroupreduction.h \
+  ../../../../include/CkArrayReductionMgr.decl.h \
+  ../../../../include/ckmemcheckpoint.h \
+  ../../../../include/CkMemCheckpoint.decl.h \
+  ../../../../include/readonly.h /usr/include/g++/typeinfo \
+  ../../../../include/ckarray.h ../../../../include/cklocation.h \
+  ../../../../include/LBDatabase.h /usr/include/math.h \
+  /usr/include/bits/huge_val.h /usr/include/bits/huge_valf.h \
+  /usr/include/bits/huge_vall.h /usr/include/bits/inf.h \
+  /usr/include/bits/nan.h /usr/include/bits/mathdef.h \
+  /usr/include/bits/mathcalls.h ../../../../include/lbdb.h \
+  ../../../../include/LBDatabase.decl.h ../../../../include/NullLB.decl.h \
+  ../../../../include/BaseLB.decl.h ../../../../include/CkLocation.decl.h \
+  ../../../../include/CkArray.decl.h \
+  ../../../../include/ComlibArrayListener.h \
+  ../../../../include/ComlibStrategy.h \
+  ../../../../include/convcomlibstrategy.h \
+  ../../../../include/ComlibLearner.h \
+  ../../../../include/CkFutures.decl.h ../../../../include/charisma.h \
+  ../../../../include/charisma.decl.h ../../../../include/tempo.h \
+  ../../../../include/tempo.decl.h ../../../../include/waitqd.h \
+  ../../../../include/waitqd.decl.h ../../../../include/sdag.h \
+  ../../../../include/ckcheckpoint.h \
+  ../../../../include/CkCheckpoint.decl.h \
+  ../../../../include/ckarrayreductionmgr.h ../../../../include/trace.h \
+  ../../../../include/trace-bluegene.h pose_config.h \
+  ../../../../include/StreamingStrategy.h \
+  ../../../../include/ComlibManager.h ../../../../include/envelope.h \
+  ../../../../include/comlib.h ../../../../include/router.h \
+  ../../../../include/convcomlibmanager.h \
+  ../../../../include/ComlibStats.h ../../../../include/comlib.decl.h \
+  ../../../../include/MeshStreamingStrategy.h /usr/include/assert.h \
+  ../../../../include/PrioStreaming.h eventID.h mempool.h mempool.decl.h \
+  srtable.h stats.h stats.decl.h cancel.h event.h eqheap.h pvtobj.h \
+  lbObject.h ldbal.h ldbal.decl.h gvt.h gvt.decl.h evq.h rep.h sim.decl.h \
+  strat.h sim.h opt.h opt2.h opt3.h spec.h adapt.h adapt2.h adapt3.h \
+  cons.h seq.h chpt.h
+	$(CHARMC) -o lbObject.seq.o -DSEQUENTIAL_POSE=1 lbObject.C
+ldbal.seq.o: ldbal.C pose.h pose.decl.h ../../../../include/charm++.h \
+  /usr/include/stdlib.h /usr/include/features.h /usr/include/sys/cdefs.h \
+  /usr/include/gnu/stubs.h \
+  /usr/lib/gcc-lib/i586-suse-linux/3.3.3/include/stddef.h \
+  /usr/include/bits/waitflags.h /usr/include/bits/waitstatus.h \
+  /usr/include/endian.h /usr/include/bits/endian.h /usr/include/xlocale.h \
+  /usr/include/sys/types.h /usr/include/bits/types.h \
+  /usr/include/bits/wordsize.h /usr/include/bits/typesizes.h \
+  /usr/include/time.h /usr/include/sys/select.h \
+  /usr/include/bits/select.h /usr/include/bits/sigset.h \
+  /usr/include/bits/time.h /usr/include/sys/sysmacros.h \
+  /usr/include/bits/pthreadtypes.h /usr/include/bits/sched.h \
+  /usr/include/alloca.h /usr/include/memory.h /usr/include/string.h \
+  ../../../../include/charm.h ../../../../include/converse.h \
+  ../../../../include/conv-config.h ../../../../include/conv-common.h \
+  ../../../../include/conv-mach.h ../../../../include/conv-autoconfig.h \
+  ../../../../include/conv-mach-opt.h /usr/include/stdint.h \
+  /usr/include/bits/wchar.h ../../../../include/pup_c.h \
+  ../../../../include/conv-cpm.h ../../../../include/conv-cpath.h \
+  ../../../../include/conv-qd.h ../../../../include/conv-random.h \
+  ../../../../include/conv-lists.h ../../../../include/conv-trace.h \
+  ../../../../include/persistent.h ../../../../include/debug-conv.h \
+  ../../../../include/pup.h /usr/include/stdio.h /usr/include/libio.h \
+  /usr/include/_G_config.h /usr/include/wchar.h /usr/include/gconv.h \
+  /usr/lib/gcc-lib/i586-suse-linux/3.3.3/include/stdarg.h \
+  /usr/include/bits/stdio_lim.h /usr/include/bits/sys_errlist.h \
+  ../../../../include/middle.h ../../../../include/middle-conv.h \
+  ../../../../include/cklists.h ../../../../include/ckbitvector.h \
+  ../../../../include/ckstream.h ../../../../include/init.h \
+  /usr/include/g++/new /usr/include/g++/cstddef \
+  /usr/include/g++/exception ../../../../include/ckhashtable.h \
+  ../../../../include/debug-charm.h ../../../../include/CkMarshall.decl.h \
+  ../../../../include/cksection.h ../../../../include/ckcallback.h \
+  ../../../../include/conv-ccs.h ../../../../include/sockRoutines.h \
+  /usr/include/sys/time.h /usr/include/sys/socket.h \
+  /usr/include/sys/uio.h /usr/include/bits/uio.h \
+  /usr/include/bits/socket.h \
+  /usr/lib/gcc-lib/i586-suse-linux/3.3.3/include/limits.h \
+  /usr/lib/gcc-lib/i586-suse-linux/3.3.3/include/syslimits.h \
+  /usr/include/limits.h /usr/include/bits/posix1_lim.h \
+  /usr/include/bits/local_lim.h /usr/include/linux/limits.h \
+  /usr/include/bits/posix2_lim.h /usr/include/bits/xopen_lim.h \
+  /usr/include/bits/sockaddr.h /usr/include/asm/socket.h \
+  /usr/include/asm/sockios.h /usr/include/netinet/in.h \
+  /usr/include/bits/in.h /usr/include/bits/byteswap.h \
+  /usr/include/arpa/inet.h /usr/include/netdb.h /usr/include/rpc/netdb.h \
+  /usr/include/bits/siginfo.h /usr/include/bits/netdb.h \
+  /usr/include/unistd.h /usr/include/bits/posix_opt.h \
+  /usr/include/bits/environments.h /usr/include/bits/confname.h \
+  /usr/include/getopt.h /usr/include/fcntl.h /usr/include/bits/fcntl.h \
+  /usr/include/sys/stat.h /usr/include/bits/stat.h \
+  ../../../../include/ccs-server.h ../../../../include/ckobjQ.h \
+  ../../../../include/ckreduction.h \
+  ../../../../include/CkReduction.decl.h \
+  ../../../../include/cknodegroupreduction.h \
+  ../../../../include/CkArrayReductionMgr.decl.h \
+  ../../../../include/ckmemcheckpoint.h \
+  ../../../../include/CkMemCheckpoint.decl.h \
+  ../../../../include/readonly.h /usr/include/g++/typeinfo \
+  ../../../../include/ckarray.h ../../../../include/cklocation.h \
+  ../../../../include/LBDatabase.h /usr/include/math.h \
+  /usr/include/bits/huge_val.h /usr/include/bits/huge_valf.h \
+  /usr/include/bits/huge_vall.h /usr/include/bits/inf.h \
+  /usr/include/bits/nan.h /usr/include/bits/mathdef.h \
+  /usr/include/bits/mathcalls.h ../../../../include/lbdb.h \
+  ../../../../include/LBDatabase.decl.h ../../../../include/NullLB.decl.h \
+  ../../../../include/BaseLB.decl.h ../../../../include/CkLocation.decl.h \
+  ../../../../include/CkArray.decl.h \
+  ../../../../include/ComlibArrayListener.h \
+  ../../../../include/ComlibStrategy.h \
+  ../../../../include/convcomlibstrategy.h \
+  ../../../../include/ComlibLearner.h \
+  ../../../../include/CkFutures.decl.h ../../../../include/charisma.h \
+  ../../../../include/charisma.decl.h ../../../../include/tempo.h \
+  ../../../../include/tempo.decl.h ../../../../include/waitqd.h \
+  ../../../../include/waitqd.decl.h ../../../../include/sdag.h \
+  ../../../../include/ckcheckpoint.h \
+  ../../../../include/CkCheckpoint.decl.h \
+  ../../../../include/ckarrayreductionmgr.h ../../../../include/trace.h \
+  ../../../../include/trace-bluegene.h pose_config.h \
+  ../../../../include/StreamingStrategy.h \
+  ../../../../include/ComlibManager.h ../../../../include/envelope.h \
+  ../../../../include/comlib.h ../../../../include/router.h \
+  ../../../../include/convcomlibmanager.h \
+  ../../../../include/ComlibStats.h ../../../../include/comlib.decl.h \
+  ../../../../include/MeshStreamingStrategy.h /usr/include/assert.h \
+  ../../../../include/PrioStreaming.h eventID.h mempool.h mempool.decl.h \
+  srtable.h stats.h stats.decl.h cancel.h event.h eqheap.h pvtobj.h \
+  lbObject.h ldbal.h ldbal.decl.h gvt.h gvt.decl.h evq.h rep.h sim.decl.h \
+  strat.h sim.h opt.h opt2.h opt3.h spec.h adapt.h adapt2.h adapt3.h \
+  cons.h seq.h chpt.h ldbal.def.h
+	$(CHARMC) -o ldbal.seq.o -DSEQUENTIAL_POSE=1 ldbal.C
+gvt.seq.o: gvt.C pose.h pose.decl.h ../../../../include/charm++.h \
+  /usr/include/stdlib.h /usr/include/features.h /usr/include/sys/cdefs.h \
+  /usr/include/gnu/stubs.h \
+  /usr/lib/gcc-lib/i586-suse-linux/3.3.3/include/stddef.h \
+  /usr/include/bits/waitflags.h /usr/include/bits/waitstatus.h \
+  /usr/include/endian.h /usr/include/bits/endian.h /usr/include/xlocale.h \
+  /usr/include/sys/types.h /usr/include/bits/types.h \
+  /usr/include/bits/wordsize.h /usr/include/bits/typesizes.h \
+  /usr/include/time.h /usr/include/sys/select.h \
+  /usr/include/bits/select.h /usr/include/bits/sigset.h \
+  /usr/include/bits/time.h /usr/include/sys/sysmacros.h \
+  /usr/include/bits/pthreadtypes.h /usr/include/bits/sched.h \
+  /usr/include/alloca.h /usr/include/memory.h /usr/include/string.h \
+  ../../../../include/charm.h ../../../../include/converse.h \
+  ../../../../include/conv-config.h ../../../../include/conv-common.h \
+  ../../../../include/conv-mach.h ../../../../include/conv-autoconfig.h \
+  ../../../../include/conv-mach-opt.h /usr/include/stdint.h \
+  /usr/include/bits/wchar.h ../../../../include/pup_c.h \
+  ../../../../include/conv-cpm.h ../../../../include/conv-cpath.h \
+  ../../../../include/conv-qd.h ../../../../include/conv-random.h \
+  ../../../../include/conv-lists.h ../../../../include/conv-trace.h \
+  ../../../../include/persistent.h ../../../../include/debug-conv.h \
+  ../../../../include/pup.h /usr/include/stdio.h /usr/include/libio.h \
+  /usr/include/_G_config.h /usr/include/wchar.h /usr/include/gconv.h \
+  /usr/lib/gcc-lib/i586-suse-linux/3.3.3/include/stdarg.h \
+  /usr/include/bits/stdio_lim.h /usr/include/bits/sys_errlist.h \
+  ../../../../include/middle.h ../../../../include/middle-conv.h \
+  ../../../../include/cklists.h ../../../../include/ckbitvector.h \
+  ../../../../include/ckstream.h ../../../../include/init.h \
+  /usr/include/g++/new /usr/include/g++/cstddef \
+  /usr/include/g++/exception ../../../../include/ckhashtable.h \
+  ../../../../include/debug-charm.h ../../../../include/CkMarshall.decl.h \
+  ../../../../include/cksection.h ../../../../include/ckcallback.h \
+  ../../../../include/conv-ccs.h ../../../../include/sockRoutines.h \
+  /usr/include/sys/time.h /usr/include/sys/socket.h \
+  /usr/include/sys/uio.h /usr/include/bits/uio.h \
+  /usr/include/bits/socket.h \
+  /usr/lib/gcc-lib/i586-suse-linux/3.3.3/include/limits.h \
+  /usr/lib/gcc-lib/i586-suse-linux/3.3.3/include/syslimits.h \
+  /usr/include/limits.h /usr/include/bits/posix1_lim.h \
+  /usr/include/bits/local_lim.h /usr/include/linux/limits.h \
+  /usr/include/bits/posix2_lim.h /usr/include/bits/xopen_lim.h \
+  /usr/include/bits/sockaddr.h /usr/include/asm/socket.h \
+  /usr/include/asm/sockios.h /usr/include/netinet/in.h \
+  /usr/include/bits/in.h /usr/include/bits/byteswap.h \
+  /usr/include/arpa/inet.h /usr/include/netdb.h /usr/include/rpc/netdb.h \
+  /usr/include/bits/siginfo.h /usr/include/bits/netdb.h \
+  /usr/include/unistd.h /usr/include/bits/posix_opt.h \
+  /usr/include/bits/environments.h /usr/include/bits/confname.h \
+  /usr/include/getopt.h /usr/include/fcntl.h /usr/include/bits/fcntl.h \
+  /usr/include/sys/stat.h /usr/include/bits/stat.h \
+  ../../../../include/ccs-server.h ../../../../include/ckobjQ.h \
+  ../../../../include/ckreduction.h \
+  ../../../../include/CkReduction.decl.h \
+  ../../../../include/cknodegroupreduction.h \
+  ../../../../include/CkArrayReductionMgr.decl.h \
+  ../../../../include/ckmemcheckpoint.h \
+  ../../../../include/CkMemCheckpoint.decl.h \
+  ../../../../include/readonly.h /usr/include/g++/typeinfo \
+  ../../../../include/ckarray.h ../../../../include/cklocation.h \
+  ../../../../include/LBDatabase.h /usr/include/math.h \
+  /usr/include/bits/huge_val.h /usr/include/bits/huge_valf.h \
+  /usr/include/bits/huge_vall.h /usr/include/bits/inf.h \
+  /usr/include/bits/nan.h /usr/include/bits/mathdef.h \
+  /usr/include/bits/mathcalls.h ../../../../include/lbdb.h \
+  ../../../../include/LBDatabase.decl.h ../../../../include/NullLB.decl.h \
+  ../../../../include/BaseLB.decl.h ../../../../include/CkLocation.decl.h \
+  ../../../../include/CkArray.decl.h \
+  ../../../../include/ComlibArrayListener.h \
+  ../../../../include/ComlibStrategy.h \
+  ../../../../include/convcomlibstrategy.h \
+  ../../../../include/ComlibLearner.h \
+  ../../../../include/CkFutures.decl.h ../../../../include/charisma.h \
+  ../../../../include/charisma.decl.h ../../../../include/tempo.h \
+  ../../../../include/tempo.decl.h ../../../../include/waitqd.h \
+  ../../../../include/waitqd.decl.h ../../../../include/sdag.h \
+  ../../../../include/ckcheckpoint.h \
+  ../../../../include/CkCheckpoint.decl.h \
+  ../../../../include/ckarrayreductionmgr.h ../../../../include/trace.h \
+  ../../../../include/trace-bluegene.h pose_config.h \
+  ../../../../include/StreamingStrategy.h \
+  ../../../../include/ComlibManager.h ../../../../include/envelope.h \
+  ../../../../include/comlib.h ../../../../include/router.h \
+  ../../../../include/convcomlibmanager.h \
+  ../../../../include/ComlibStats.h ../../../../include/comlib.decl.h \
+  ../../../../include/MeshStreamingStrategy.h /usr/include/assert.h \
+  ../../../../include/PrioStreaming.h eventID.h mempool.h mempool.decl.h \
+  srtable.h stats.h stats.decl.h cancel.h event.h eqheap.h pvtobj.h \
+  lbObject.h ldbal.h ldbal.decl.h gvt.h gvt.decl.h evq.h rep.h sim.decl.h \
+  strat.h sim.h opt.h opt2.h opt3.h spec.h adapt.h adapt2.h adapt3.h \
+  cons.h seq.h chpt.h gvt.def.h ../../../../include/qd.h
+	$(CHARMC) -o gvt.seq.o -DSEQUENTIAL_POSE=1 gvt.C
+event.seq.o: event.C pose.h pose.decl.h ../../../../include/charm++.h \
+  /usr/include/stdlib.h /usr/include/features.h /usr/include/sys/cdefs.h \
+  /usr/include/gnu/stubs.h \
+  /usr/lib/gcc-lib/i586-suse-linux/3.3.3/include/stddef.h \
+  /usr/include/bits/waitflags.h /usr/include/bits/waitstatus.h \
+  /usr/include/endian.h /usr/include/bits/endian.h /usr/include/xlocale.h \
+  /usr/include/sys/types.h /usr/include/bits/types.h \
+  /usr/include/bits/wordsize.h /usr/include/bits/typesizes.h \
+  /usr/include/time.h /usr/include/sys/select.h \
+  /usr/include/bits/select.h /usr/include/bits/sigset.h \
+  /usr/include/bits/time.h /usr/include/sys/sysmacros.h \
+  /usr/include/bits/pthreadtypes.h /usr/include/bits/sched.h \
+  /usr/include/alloca.h /usr/include/memory.h /usr/include/string.h \
+  ../../../../include/charm.h ../../../../include/converse.h \
+  ../../../../include/conv-config.h ../../../../include/conv-common.h \
+  ../../../../include/conv-mach.h ../../../../include/conv-autoconfig.h \
+  ../../../../include/conv-mach-opt.h /usr/include/stdint.h \
+  /usr/include/bits/wchar.h ../../../../include/pup_c.h \
+  ../../../../include/conv-cpm.h ../../../../include/conv-cpath.h \
+  ../../../../include/conv-qd.h ../../../../include/conv-random.h \
+  ../../../../include/conv-lists.h ../../../../include/conv-trace.h \
+  ../../../../include/persistent.h ../../../../include/debug-conv.h \
+  ../../../../include/pup.h /usr/include/stdio.h /usr/include/libio.h \
+  /usr/include/_G_config.h /usr/include/wchar.h /usr/include/gconv.h \
+  /usr/lib/gcc-lib/i586-suse-linux/3.3.3/include/stdarg.h \
+  /usr/include/bits/stdio_lim.h /usr/include/bits/sys_errlist.h \
+  ../../../../include/middle.h ../../../../include/middle-conv.h \
+  ../../../../include/cklists.h ../../../../include/ckbitvector.h \
+  ../../../../include/ckstream.h ../../../../include/init.h \
+  /usr/include/g++/new /usr/include/g++/cstddef \
+  /usr/include/g++/exception ../../../../include/ckhashtable.h \
+  ../../../../include/debug-charm.h ../../../../include/CkMarshall.decl.h \
+  ../../../../include/cksection.h ../../../../include/ckcallback.h \
+  ../../../../include/conv-ccs.h ../../../../include/sockRoutines.h \
+  /usr/include/sys/time.h /usr/include/sys/socket.h \
+  /usr/include/sys/uio.h /usr/include/bits/uio.h \
+  /usr/include/bits/socket.h \
+  /usr/lib/gcc-lib/i586-suse-linux/3.3.3/include/limits.h \
+  /usr/lib/gcc-lib/i586-suse-linux/3.3.3/include/syslimits.h \
+  /usr/include/limits.h /usr/include/bits/posix1_lim.h \
+  /usr/include/bits/local_lim.h /usr/include/linux/limits.h \
+  /usr/include/bits/posix2_lim.h /usr/include/bits/xopen_lim.h \
+  /usr/include/bits/sockaddr.h /usr/include/asm/socket.h \
+  /usr/include/asm/sockios.h /usr/include/netinet/in.h \
+  /usr/include/bits/in.h /usr/include/bits/byteswap.h \
+  /usr/include/arpa/inet.h /usr/include/netdb.h /usr/include/rpc/netdb.h \
+  /usr/include/bits/siginfo.h /usr/include/bits/netdb.h \
+  /usr/include/unistd.h /usr/include/bits/posix_opt.h \
+  /usr/include/bits/environments.h /usr/include/bits/confname.h \
+  /usr/include/getopt.h /usr/include/fcntl.h /usr/include/bits/fcntl.h \
+  /usr/include/sys/stat.h /usr/include/bits/stat.h \
+  ../../../../include/ccs-server.h ../../../../include/ckobjQ.h \
+  ../../../../include/ckreduction.h \
+  ../../../../include/CkReduction.decl.h \
+  ../../../../include/cknodegroupreduction.h \
+  ../../../../include/CkArrayReductionMgr.decl.h \
+  ../../../../include/ckmemcheckpoint.h \
+  ../../../../include/CkMemCheckpoint.decl.h \
+  ../../../../include/readonly.h /usr/include/g++/typeinfo \
+  ../../../../include/ckarray.h ../../../../include/cklocation.h \
+  ../../../../include/LBDatabase.h /usr/include/math.h \
+  /usr/include/bits/huge_val.h /usr/include/bits/huge_valf.h \
+  /usr/include/bits/huge_vall.h /usr/include/bits/inf.h \
+  /usr/include/bits/nan.h /usr/include/bits/mathdef.h \
+  /usr/include/bits/mathcalls.h ../../../../include/lbdb.h \
+  ../../../../include/LBDatabase.decl.h ../../../../include/NullLB.decl.h \
+  ../../../../include/BaseLB.decl.h ../../../../include/CkLocation.decl.h \
+  ../../../../include/CkArray.decl.h \
+  ../../../../include/ComlibArrayListener.h \
+  ../../../../include/ComlibStrategy.h \
+  ../../../../include/convcomlibstrategy.h \
+  ../../../../include/ComlibLearner.h \
+  ../../../../include/CkFutures.decl.h ../../../../include/charisma.h \
+  ../../../../include/charisma.decl.h ../../../../include/tempo.h \
+  ../../../../include/tempo.decl.h ../../../../include/waitqd.h \
+  ../../../../include/waitqd.decl.h ../../../../include/sdag.h \
+  ../../../../include/ckcheckpoint.h \
+  ../../../../include/CkCheckpoint.decl.h \
+  ../../../../include/ckarrayreductionmgr.h ../../../../include/trace.h \
+  ../../../../include/trace-bluegene.h pose_config.h \
+  ../../../../include/StreamingStrategy.h \
+  ../../../../include/ComlibManager.h ../../../../include/envelope.h \
+  ../../../../include/comlib.h ../../../../include/router.h \
+  ../../../../include/convcomlibmanager.h \
+  ../../../../include/ComlibStats.h ../../../../include/comlib.decl.h \
+  ../../../../include/MeshStreamingStrategy.h /usr/include/assert.h \
+  ../../../../include/PrioStreaming.h eventID.h mempool.h mempool.decl.h \
+  srtable.h stats.h stats.decl.h cancel.h event.h eqheap.h pvtobj.h \
+  lbObject.h ldbal.h ldbal.decl.h gvt.h gvt.decl.h evq.h rep.h sim.decl.h \
+  strat.h sim.h opt.h opt2.h opt3.h spec.h adapt.h adapt2.h adapt3.h \
+  cons.h seq.h chpt.h
+	$(CHARMC) -o event.seq.o -DSEQUENTIAL_POSE=1 event.C
+eqheap.seq.o: eqheap.C pose.h pose.decl.h ../../../../include/charm++.h \
+  /usr/include/stdlib.h /usr/include/features.h /usr/include/sys/cdefs.h \
+  /usr/include/gnu/stubs.h \
+  /usr/lib/gcc-lib/i586-suse-linux/3.3.3/include/stddef.h \
+  /usr/include/bits/waitflags.h /usr/include/bits/waitstatus.h \
+  /usr/include/endian.h /usr/include/bits/endian.h /usr/include/xlocale.h \
+  /usr/include/sys/types.h /usr/include/bits/types.h \
+  /usr/include/bits/wordsize.h /usr/include/bits/typesizes.h \
+  /usr/include/time.h /usr/include/sys/select.h \
+  /usr/include/bits/select.h /usr/include/bits/sigset.h \
+  /usr/include/bits/time.h /usr/include/sys/sysmacros.h \
+  /usr/include/bits/pthreadtypes.h /usr/include/bits/sched.h \
+  /usr/include/alloca.h /usr/include/memory.h /usr/include/string.h \
+  ../../../../include/charm.h ../../../../include/converse.h \
+  ../../../../include/conv-config.h ../../../../include/conv-common.h \
+  ../../../../include/conv-mach.h ../../../../include/conv-autoconfig.h \
+  ../../../../include/conv-mach-opt.h /usr/include/stdint.h \
+  /usr/include/bits/wchar.h ../../../../include/pup_c.h \
+  ../../../../include/conv-cpm.h ../../../../include/conv-cpath.h \
+  ../../../../include/conv-qd.h ../../../../include/conv-random.h \
+  ../../../../include/conv-lists.h ../../../../include/conv-trace.h \
+  ../../../../include/persistent.h ../../../../include/debug-conv.h \
+  ../../../../include/pup.h /usr/include/stdio.h /usr/include/libio.h \
+  /usr/include/_G_config.h /usr/include/wchar.h /usr/include/gconv.h \
+  /usr/lib/gcc-lib/i586-suse-linux/3.3.3/include/stdarg.h \
+  /usr/include/bits/stdio_lim.h /usr/include/bits/sys_errlist.h \
+  ../../../../include/middle.h ../../../../include/middle-conv.h \
+  ../../../../include/cklists.h ../../../../include/ckbitvector.h \
+  ../../../../include/ckstream.h ../../../../include/init.h \
+  /usr/include/g++/new /usr/include/g++/cstddef \
+  /usr/include/g++/exception ../../../../include/ckhashtable.h \
+  ../../../../include/debug-charm.h ../../../../include/CkMarshall.decl.h \
+  ../../../../include/cksection.h ../../../../include/ckcallback.h \
+  ../../../../include/conv-ccs.h ../../../../include/sockRoutines.h \
+  /usr/include/sys/time.h /usr/include/sys/socket.h \
+  /usr/include/sys/uio.h /usr/include/bits/uio.h \
+  /usr/include/bits/socket.h \
+  /usr/lib/gcc-lib/i586-suse-linux/3.3.3/include/limits.h \
+  /usr/lib/gcc-lib/i586-suse-linux/3.3.3/include/syslimits.h \
+  /usr/include/limits.h /usr/include/bits/posix1_lim.h \
+  /usr/include/bits/local_lim.h /usr/include/linux/limits.h \
+  /usr/include/bits/posix2_lim.h /usr/include/bits/xopen_lim.h \
+  /usr/include/bits/sockaddr.h /usr/include/asm/socket.h \
+  /usr/include/asm/sockios.h /usr/include/netinet/in.h \
+  /usr/include/bits/in.h /usr/include/bits/byteswap.h \
+  /usr/include/arpa/inet.h /usr/include/netdb.h /usr/include/rpc/netdb.h \
+  /usr/include/bits/siginfo.h /usr/include/bits/netdb.h \
+  /usr/include/unistd.h /usr/include/bits/posix_opt.h \
+  /usr/include/bits/environments.h /usr/include/bits/confname.h \
+  /usr/include/getopt.h /usr/include/fcntl.h /usr/include/bits/fcntl.h \
+  /usr/include/sys/stat.h /usr/include/bits/stat.h \
+  ../../../../include/ccs-server.h ../../../../include/ckobjQ.h \
+  ../../../../include/ckreduction.h \
+  ../../../../include/CkReduction.decl.h \
+  ../../../../include/cknodegroupreduction.h \
+  ../../../../include/CkArrayReductionMgr.decl.h \
+  ../../../../include/ckmemcheckpoint.h \
+  ../../../../include/CkMemCheckpoint.decl.h \
+  ../../../../include/readonly.h /usr/include/g++/typeinfo \
+  ../../../../include/ckarray.h ../../../../include/cklocation.h \
+  ../../../../include/LBDatabase.h /usr/include/math.h \
+  /usr/include/bits/huge_val.h /usr/include/bits/huge_valf.h \
+  /usr/include/bits/huge_vall.h /usr/include/bits/inf.h \
+  /usr/include/bits/nan.h /usr/include/bits/mathdef.h \
+  /usr/include/bits/mathcalls.h ../../../../include/lbdb.h \
+  ../../../../include/LBDatabase.decl.h ../../../../include/NullLB.decl.h \
+  ../../../../include/BaseLB.decl.h ../../../../include/CkLocation.decl.h \
+  ../../../../include/CkArray.decl.h \
+  ../../../../include/ComlibArrayListener.h \
+  ../../../../include/ComlibStrategy.h \
+  ../../../../include/convcomlibstrategy.h \
+  ../../../../include/ComlibLearner.h \
+  ../../../../include/CkFutures.decl.h ../../../../include/charisma.h \
+  ../../../../include/charisma.decl.h ../../../../include/tempo.h \
+  ../../../../include/tempo.decl.h ../../../../include/waitqd.h \
+  ../../../../include/waitqd.decl.h ../../../../include/sdag.h \
+  ../../../../include/ckcheckpoint.h \
+  ../../../../include/CkCheckpoint.decl.h \
+  ../../../../include/ckarrayreductionmgr.h ../../../../include/trace.h \
+  ../../../../include/trace-bluegene.h pose_config.h \
+  ../../../../include/StreamingStrategy.h \
+  ../../../../include/ComlibManager.h ../../../../include/envelope.h \
+  ../../../../include/comlib.h ../../../../include/router.h \
+  ../../../../include/convcomlibmanager.h \
+  ../../../../include/ComlibStats.h ../../../../include/comlib.decl.h \
+  ../../../../include/MeshStreamingStrategy.h /usr/include/assert.h \
+  ../../../../include/PrioStreaming.h eventID.h mempool.h mempool.decl.h \
+  srtable.h stats.h stats.decl.h cancel.h event.h eqheap.h pvtobj.h \
+  lbObject.h ldbal.h ldbal.decl.h gvt.h gvt.decl.h evq.h rep.h sim.decl.h \
+  strat.h sim.h opt.h opt2.h opt3.h spec.h adapt.h adapt2.h adapt3.h \
+  cons.h seq.h chpt.h
+	$(CHARMC) -o eqheap.seq.o -DSEQUENTIAL_POSE=1 eqheap.C
+evq.seq.o: evq.C pose.h pose.decl.h ../../../../include/charm++.h \
+  /usr/include/stdlib.h /usr/include/features.h /usr/include/sys/cdefs.h \
+  /usr/include/gnu/stubs.h \
+  /usr/lib/gcc-lib/i586-suse-linux/3.3.3/include/stddef.h \
+  /usr/include/bits/waitflags.h /usr/include/bits/waitstatus.h \
+  /usr/include/endian.h /usr/include/bits/endian.h /usr/include/xlocale.h \
+  /usr/include/sys/types.h /usr/include/bits/types.h \
+  /usr/include/bits/wordsize.h /usr/include/bits/typesizes.h \
+  /usr/include/time.h /usr/include/sys/select.h \
+  /usr/include/bits/select.h /usr/include/bits/sigset.h \
+  /usr/include/bits/time.h /usr/include/sys/sysmacros.h \
+  /usr/include/bits/pthreadtypes.h /usr/include/bits/sched.h \
+  /usr/include/alloca.h /usr/include/memory.h /usr/include/string.h \
+  ../../../../include/charm.h ../../../../include/converse.h \
+  ../../../../include/conv-config.h ../../../../include/conv-common.h \
+  ../../../../include/conv-mach.h ../../../../include/conv-autoconfig.h \
+  ../../../../include/conv-mach-opt.h /usr/include/stdint.h \
+  /usr/include/bits/wchar.h ../../../../include/pup_c.h \
+  ../../../../include/conv-cpm.h ../../../../include/conv-cpath.h \
+  ../../../../include/conv-qd.h ../../../../include/conv-random.h \
+  ../../../../include/conv-lists.h ../../../../include/conv-trace.h \
+  ../../../../include/persistent.h ../../../../include/debug-conv.h \
+  ../../../../include/pup.h /usr/include/stdio.h /usr/include/libio.h \
+  /usr/include/_G_config.h /usr/include/wchar.h /usr/include/gconv.h \
+  /usr/lib/gcc-lib/i586-suse-linux/3.3.3/include/stdarg.h \
+  /usr/include/bits/stdio_lim.h /usr/include/bits/sys_errlist.h \
+  ../../../../include/middle.h ../../../../include/middle-conv.h \
+  ../../../../include/cklists.h ../../../../include/ckbitvector.h \
+  ../../../../include/ckstream.h ../../../../include/init.h \
+  /usr/include/g++/new /usr/include/g++/cstddef \
+  /usr/include/g++/exception ../../../../include/ckhashtable.h \
+  ../../../../include/debug-charm.h ../../../../include/CkMarshall.decl.h \
+  ../../../../include/cksection.h ../../../../include/ckcallback.h \
+  ../../../../include/conv-ccs.h ../../../../include/sockRoutines.h \
+  /usr/include/sys/time.h /usr/include/sys/socket.h \
+  /usr/include/sys/uio.h /usr/include/bits/uio.h \
+  /usr/include/bits/socket.h \
+  /usr/lib/gcc-lib/i586-suse-linux/3.3.3/include/limits.h \
+  /usr/lib/gcc-lib/i586-suse-linux/3.3.3/include/syslimits.h \
+  /usr/include/limits.h /usr/include/bits/posix1_lim.h \
+  /usr/include/bits/local_lim.h /usr/include/linux/limits.h \
+  /usr/include/bits/posix2_lim.h /usr/include/bits/xopen_lim.h \
+  /usr/include/bits/sockaddr.h /usr/include/asm/socket.h \
+  /usr/include/asm/sockios.h /usr/include/netinet/in.h \
+  /usr/include/bits/in.h /usr/include/bits/byteswap.h \
+  /usr/include/arpa/inet.h /usr/include/netdb.h /usr/include/rpc/netdb.h \
+  /usr/include/bits/siginfo.h /usr/include/bits/netdb.h \
+  /usr/include/unistd.h /usr/include/bits/posix_opt.h \
+  /usr/include/bits/environments.h /usr/include/bits/confname.h \
+  /usr/include/getopt.h /usr/include/fcntl.h /usr/include/bits/fcntl.h \
+  /usr/include/sys/stat.h /usr/include/bits/stat.h \
+  ../../../../include/ccs-server.h ../../../../include/ckobjQ.h \
+  ../../../../include/ckreduction.h \
+  ../../../../include/CkReduction.decl.h \
+  ../../../../include/cknodegroupreduction.h \
+  ../../../../include/CkArrayReductionMgr.decl.h \
+  ../../../../include/ckmemcheckpoint.h \
+  ../../../../include/CkMemCheckpoint.decl.h \
+  ../../../../include/readonly.h /usr/include/g++/typeinfo \
+  ../../../../include/ckarray.h ../../../../include/cklocation.h \
+  ../../../../include/LBDatabase.h /usr/include/math.h \
+  /usr/include/bits/huge_val.h /usr/include/bits/huge_valf.h \
+  /usr/include/bits/huge_vall.h /usr/include/bits/inf.h \
+  /usr/include/bits/nan.h /usr/include/bits/mathdef.h \
+  /usr/include/bits/mathcalls.h ../../../../include/lbdb.h \
+  ../../../../include/LBDatabase.decl.h ../../../../include/NullLB.decl.h \
+  ../../../../include/BaseLB.decl.h ../../../../include/CkLocation.decl.h \
+  ../../../../include/CkArray.decl.h \
+  ../../../../include/ComlibArrayListener.h \
+  ../../../../include/ComlibStrategy.h \
+  ../../../../include/convcomlibstrategy.h \
+  ../../../../include/ComlibLearner.h \
+  ../../../../include/CkFutures.decl.h ../../../../include/charisma.h \
+  ../../../../include/charisma.decl.h ../../../../include/tempo.h \
+  ../../../../include/tempo.decl.h ../../../../include/waitqd.h \
+  ../../../../include/waitqd.decl.h ../../../../include/sdag.h \
+  ../../../../include/ckcheckpoint.h \
+  ../../../../include/CkCheckpoint.decl.h \
+  ../../../../include/ckarrayreductionmgr.h ../../../../include/trace.h \
+  ../../../../include/trace-bluegene.h pose_config.h \
+  ../../../../include/StreamingStrategy.h \
+  ../../../../include/ComlibManager.h ../../../../include/envelope.h \
+  ../../../../include/comlib.h ../../../../include/router.h \
+  ../../../../include/convcomlibmanager.h \
+  ../../../../include/ComlibStats.h ../../../../include/comlib.decl.h \
+  ../../../../include/MeshStreamingStrategy.h /usr/include/assert.h \
+  ../../../../include/PrioStreaming.h eventID.h mempool.h mempool.decl.h \
+  srtable.h stats.h stats.decl.h cancel.h event.h eqheap.h pvtobj.h \
+  lbObject.h ldbal.h ldbal.decl.h gvt.h gvt.decl.h evq.h rep.h sim.decl.h \
+  strat.h sim.h opt.h opt2.h opt3.h spec.h adapt.h adapt2.h adapt3.h \
+  cons.h seq.h chpt.h
+	$(CHARMC) -o evq.seq.o -DSEQUENTIAL_POSE=1 evq.C
+sim.seq.o: sim.C pose.h pose.decl.h ../../../../include/charm++.h \
+  /usr/include/stdlib.h /usr/include/features.h /usr/include/sys/cdefs.h \
+  /usr/include/gnu/stubs.h \
+  /usr/lib/gcc-lib/i586-suse-linux/3.3.3/include/stddef.h \
+  /usr/include/bits/waitflags.h /usr/include/bits/waitstatus.h \
+  /usr/include/endian.h /usr/include/bits/endian.h /usr/include/xlocale.h \
+  /usr/include/sys/types.h /usr/include/bits/types.h \
+  /usr/include/bits/wordsize.h /usr/include/bits/typesizes.h \
+  /usr/include/time.h /usr/include/sys/select.h \
+  /usr/include/bits/select.h /usr/include/bits/sigset.h \
+  /usr/include/bits/time.h /usr/include/sys/sysmacros.h \
+  /usr/include/bits/pthreadtypes.h /usr/include/bits/sched.h \
+  /usr/include/alloca.h /usr/include/memory.h /usr/include/string.h \
+  ../../../../include/charm.h ../../../../include/converse.h \
+  ../../../../include/conv-config.h ../../../../include/conv-common.h \
+  ../../../../include/conv-mach.h ../../../../include/conv-autoconfig.h \
+  ../../../../include/conv-mach-opt.h /usr/include/stdint.h \
+  /usr/include/bits/wchar.h ../../../../include/pup_c.h \
+  ../../../../include/conv-cpm.h ../../../../include/conv-cpath.h \
+  ../../../../include/conv-qd.h ../../../../include/conv-random.h \
+  ../../../../include/conv-lists.h ../../../../include/conv-trace.h \
+  ../../../../include/persistent.h ../../../../include/debug-conv.h \
+  ../../../../include/pup.h /usr/include/stdio.h /usr/include/libio.h \
+  /usr/include/_G_config.h /usr/include/wchar.h /usr/include/gconv.h \
+  /usr/lib/gcc-lib/i586-suse-linux/3.3.3/include/stdarg.h \
+  /usr/include/bits/stdio_lim.h /usr/include/bits/sys_errlist.h \
+  ../../../../include/middle.h ../../../../include/middle-conv.h \
+  ../../../../include/cklists.h ../../../../include/ckbitvector.h \
+  ../../../../include/ckstream.h ../../../../include/init.h \
+  /usr/include/g++/new /usr/include/g++/cstddef \
+  /usr/include/g++/exception ../../../../include/ckhashtable.h \
+  ../../../../include/debug-charm.h ../../../../include/CkMarshall.decl.h \
+  ../../../../include/cksection.h ../../../../include/ckcallback.h \
+  ../../../../include/conv-ccs.h ../../../../include/sockRoutines.h \
+  /usr/include/sys/time.h /usr/include/sys/socket.h \
+  /usr/include/sys/uio.h /usr/include/bits/uio.h \
+  /usr/include/bits/socket.h \
+  /usr/lib/gcc-lib/i586-suse-linux/3.3.3/include/limits.h \
+  /usr/lib/gcc-lib/i586-suse-linux/3.3.3/include/syslimits.h \
+  /usr/include/limits.h /usr/include/bits/posix1_lim.h \
+  /usr/include/bits/local_lim.h /usr/include/linux/limits.h \
+  /usr/include/bits/posix2_lim.h /usr/include/bits/xopen_lim.h \
+  /usr/include/bits/sockaddr.h /usr/include/asm/socket.h \
+  /usr/include/asm/sockios.h /usr/include/netinet/in.h \
+  /usr/include/bits/in.h /usr/include/bits/byteswap.h \
+  /usr/include/arpa/inet.h /usr/include/netdb.h /usr/include/rpc/netdb.h \
+  /usr/include/bits/siginfo.h /usr/include/bits/netdb.h \
+  /usr/include/unistd.h /usr/include/bits/posix_opt.h \
+  /usr/include/bits/environments.h /usr/include/bits/confname.h \
+  /usr/include/getopt.h /usr/include/fcntl.h /usr/include/bits/fcntl.h \
+  /usr/include/sys/stat.h /usr/include/bits/stat.h \
+  ../../../../include/ccs-server.h ../../../../include/ckobjQ.h \
+  ../../../../include/ckreduction.h \
+  ../../../../include/CkReduction.decl.h \
+  ../../../../include/cknodegroupreduction.h \
+  ../../../../include/CkArrayReductionMgr.decl.h \
+  ../../../../include/ckmemcheckpoint.h \
+  ../../../../include/CkMemCheckpoint.decl.h \
+  ../../../../include/readonly.h /usr/include/g++/typeinfo \
+  ../../../../include/ckarray.h ../../../../include/cklocation.h \
+  ../../../../include/LBDatabase.h /usr/include/math.h \
+  /usr/include/bits/huge_val.h /usr/include/bits/huge_valf.h \
+  /usr/include/bits/huge_vall.h /usr/include/bits/inf.h \
+  /usr/include/bits/nan.h /usr/include/bits/mathdef.h \
+  /usr/include/bits/mathcalls.h ../../../../include/lbdb.h \
+  ../../../../include/LBDatabase.decl.h ../../../../include/NullLB.decl.h \
+  ../../../../include/BaseLB.decl.h ../../../../include/CkLocation.decl.h \
+  ../../../../include/CkArray.decl.h \
+  ../../../../include/ComlibArrayListener.h \
+  ../../../../include/ComlibStrategy.h \
+  ../../../../include/convcomlibstrategy.h \
+  ../../../../include/ComlibLearner.h \
+  ../../../../include/CkFutures.decl.h ../../../../include/charisma.h \
+  ../../../../include/charisma.decl.h ../../../../include/tempo.h \
+  ../../../../include/tempo.decl.h ../../../../include/waitqd.h \
+  ../../../../include/waitqd.decl.h ../../../../include/sdag.h \
+  ../../../../include/ckcheckpoint.h \
+  ../../../../include/CkCheckpoint.decl.h \
+  ../../../../include/ckarrayreductionmgr.h ../../../../include/trace.h \
+  ../../../../include/trace-bluegene.h pose_config.h \
+  ../../../../include/StreamingStrategy.h \
+  ../../../../include/ComlibManager.h ../../../../include/envelope.h \
+  ../../../../include/comlib.h ../../../../include/router.h \
+  ../../../../include/convcomlibmanager.h \
+  ../../../../include/ComlibStats.h ../../../../include/comlib.decl.h \
+  ../../../../include/MeshStreamingStrategy.h /usr/include/assert.h \
+  ../../../../include/PrioStreaming.h eventID.h mempool.h mempool.decl.h \
+  srtable.h stats.h stats.decl.h cancel.h event.h eqheap.h pvtobj.h \
+  lbObject.h ldbal.h ldbal.decl.h gvt.h gvt.decl.h evq.h rep.h sim.decl.h \
+  strat.h sim.h opt.h opt2.h opt3.h spec.h adapt.h adapt2.h adapt3.h \
+  cons.h seq.h chpt.h sim.def.h
+	$(CHARMC) -o sim.seq.o -DSEQUENTIAL_POSE=1 sim.C
+rep.seq.o: rep.C pose.h pose.decl.h ../../../../include/charm++.h \
+  /usr/include/stdlib.h /usr/include/features.h /usr/include/sys/cdefs.h \
+  /usr/include/gnu/stubs.h \
+  /usr/lib/gcc-lib/i586-suse-linux/3.3.3/include/stddef.h \
+  /usr/include/bits/waitflags.h /usr/include/bits/waitstatus.h \
+  /usr/include/endian.h /usr/include/bits/endian.h /usr/include/xlocale.h \
+  /usr/include/sys/types.h /usr/include/bits/types.h \
+  /usr/include/bits/wordsize.h /usr/include/bits/typesizes.h \
+  /usr/include/time.h /usr/include/sys/select.h \
+  /usr/include/bits/select.h /usr/include/bits/sigset.h \
+  /usr/include/bits/time.h /usr/include/sys/sysmacros.h \
+  /usr/include/bits/pthreadtypes.h /usr/include/bits/sched.h \
+  /usr/include/alloca.h /usr/include/memory.h /usr/include/string.h \
+  ../../../../include/charm.h ../../../../include/converse.h \
+  ../../../../include/conv-config.h ../../../../include/conv-common.h \
+  ../../../../include/conv-mach.h ../../../../include/conv-autoconfig.h \
+  ../../../../include/conv-mach-opt.h /usr/include/stdint.h \
+  /usr/include/bits/wchar.h ../../../../include/pup_c.h \
+  ../../../../include/conv-cpm.h ../../../../include/conv-cpath.h \
+  ../../../../include/conv-qd.h ../../../../include/conv-random.h \
+  ../../../../include/conv-lists.h ../../../../include/conv-trace.h \
+  ../../../../include/persistent.h ../../../../include/debug-conv.h \
+  ../../../../include/pup.h /usr/include/stdio.h /usr/include/libio.h \
+  /usr/include/_G_config.h /usr/include/wchar.h /usr/include/gconv.h \
+  /usr/lib/gcc-lib/i586-suse-linux/3.3.3/include/stdarg.h \
+  /usr/include/bits/stdio_lim.h /usr/include/bits/sys_errlist.h \
+  ../../../../include/middle.h ../../../../include/middle-conv.h \
+  ../../../../include/cklists.h ../../../../include/ckbitvector.h \
+  ../../../../include/ckstream.h ../../../../include/init.h \
+  /usr/include/g++/new /usr/include/g++/cstddef \
+  /usr/include/g++/exception ../../../../include/ckhashtable.h \
+  ../../../../include/debug-charm.h ../../../../include/CkMarshall.decl.h \
+  ../../../../include/cksection.h ../../../../include/ckcallback.h \
+  ../../../../include/conv-ccs.h ../../../../include/sockRoutines.h \
+  /usr/include/sys/time.h /usr/include/sys/socket.h \
+  /usr/include/sys/uio.h /usr/include/bits/uio.h \
+  /usr/include/bits/socket.h \
+  /usr/lib/gcc-lib/i586-suse-linux/3.3.3/include/limits.h \
+  /usr/lib/gcc-lib/i586-suse-linux/3.3.3/include/syslimits.h \
+  /usr/include/limits.h /usr/include/bits/posix1_lim.h \
+  /usr/include/bits/local_lim.h /usr/include/linux/limits.h \
+  /usr/include/bits/posix2_lim.h /usr/include/bits/xopen_lim.h \
+  /usr/include/bits/sockaddr.h /usr/include/asm/socket.h \
+  /usr/include/asm/sockios.h /usr/include/netinet/in.h \
+  /usr/include/bits/in.h /usr/include/bits/byteswap.h \
+  /usr/include/arpa/inet.h /usr/include/netdb.h /usr/include/rpc/netdb.h \
+  /usr/include/bits/siginfo.h /usr/include/bits/netdb.h \
+  /usr/include/unistd.h /usr/include/bits/posix_opt.h \
+  /usr/include/bits/environments.h /usr/include/bits/confname.h \
+  /usr/include/getopt.h /usr/include/fcntl.h /usr/include/bits/fcntl.h \
+  /usr/include/sys/stat.h /usr/include/bits/stat.h \
+  ../../../../include/ccs-server.h ../../../../include/ckobjQ.h \
+  ../../../../include/ckreduction.h \
+  ../../../../include/CkReduction.decl.h \
+  ../../../../include/cknodegroupreduction.h \
+  ../../../../include/CkArrayReductionMgr.decl.h \
+  ../../../../include/ckmemcheckpoint.h \
+  ../../../../include/CkMemCheckpoint.decl.h \
+  ../../../../include/readonly.h /usr/include/g++/typeinfo \
+  ../../../../include/ckarray.h ../../../../include/cklocation.h \
+  ../../../../include/LBDatabase.h /usr/include/math.h \
+  /usr/include/bits/huge_val.h /usr/include/bits/huge_valf.h \
+  /usr/include/bits/huge_vall.h /usr/include/bits/inf.h \
+  /usr/include/bits/nan.h /usr/include/bits/mathdef.h \
+  /usr/include/bits/mathcalls.h ../../../../include/lbdb.h \
+  ../../../../include/LBDatabase.decl.h ../../../../include/NullLB.decl.h \
+  ../../../../include/BaseLB.decl.h ../../../../include/CkLocation.decl.h \
+  ../../../../include/CkArray.decl.h \
+  ../../../../include/ComlibArrayListener.h \
+  ../../../../include/ComlibStrategy.h \
+  ../../../../include/convcomlibstrategy.h \
+  ../../../../include/ComlibLearner.h \
+  ../../../../include/CkFutures.decl.h ../../../../include/charisma.h \
+  ../../../../include/charisma.decl.h ../../../../include/tempo.h \
+  ../../../../include/tempo.decl.h ../../../../include/waitqd.h \
+  ../../../../include/waitqd.decl.h ../../../../include/sdag.h \
+  ../../../../include/ckcheckpoint.h \
+  ../../../../include/CkCheckpoint.decl.h \
+  ../../../../include/ckarrayreductionmgr.h ../../../../include/trace.h \
+  ../../../../include/trace-bluegene.h pose_config.h \
+  ../../../../include/StreamingStrategy.h \
+  ../../../../include/ComlibManager.h ../../../../include/envelope.h \
+  ../../../../include/comlib.h ../../../../include/router.h \
+  ../../../../include/convcomlibmanager.h \
+  ../../../../include/ComlibStats.h ../../../../include/comlib.decl.h \
+  ../../../../include/MeshStreamingStrategy.h /usr/include/assert.h \
+  ../../../../include/PrioStreaming.h eventID.h mempool.h mempool.decl.h \
+  srtable.h stats.h stats.decl.h cancel.h event.h eqheap.h pvtobj.h \
+  lbObject.h ldbal.h ldbal.decl.h gvt.h gvt.decl.h evq.h rep.h sim.decl.h \
+  strat.h sim.h opt.h opt2.h opt3.h spec.h adapt.h adapt2.h adapt3.h \
+  cons.h seq.h chpt.h
+	$(CHARMC) -o rep.seq.o -DSEQUENTIAL_POSE=1 rep.C
+strat.seq.o: strat.C pose.h pose.decl.h ../../../../include/charm++.h \
+  /usr/include/stdlib.h /usr/include/features.h /usr/include/sys/cdefs.h \
+  /usr/include/gnu/stubs.h \
+  /usr/lib/gcc-lib/i586-suse-linux/3.3.3/include/stddef.h \
+  /usr/include/bits/waitflags.h /usr/include/bits/waitstatus.h \
+  /usr/include/endian.h /usr/include/bits/endian.h /usr/include/xlocale.h \
+  /usr/include/sys/types.h /usr/include/bits/types.h \
+  /usr/include/bits/wordsize.h /usr/include/bits/typesizes.h \
+  /usr/include/time.h /usr/include/sys/select.h \
+  /usr/include/bits/select.h /usr/include/bits/sigset.h \
+  /usr/include/bits/time.h /usr/include/sys/sysmacros.h \
+  /usr/include/bits/pthreadtypes.h /usr/include/bits/sched.h \
+  /usr/include/alloca.h /usr/include/memory.h /usr/include/string.h \
+  ../../../../include/charm.h ../../../../include/converse.h \
+  ../../../../include/conv-config.h ../../../../include/conv-common.h \
+  ../../../../include/conv-mach.h ../../../../include/conv-autoconfig.h \
+  ../../../../include/conv-mach-opt.h /usr/include/stdint.h \
+  /usr/include/bits/wchar.h ../../../../include/pup_c.h \
+  ../../../../include/conv-cpm.h ../../../../include/conv-cpath.h \
+  ../../../../include/conv-qd.h ../../../../include/conv-random.h \
+  ../../../../include/conv-lists.h ../../../../include/conv-trace.h \
+  ../../../../include/persistent.h ../../../../include/debug-conv.h \
+  ../../../../include/pup.h /usr/include/stdio.h /usr/include/libio.h \
+  /usr/include/_G_config.h /usr/include/wchar.h /usr/include/gconv.h \
+  /usr/lib/gcc-lib/i586-suse-linux/3.3.3/include/stdarg.h \
+  /usr/include/bits/stdio_lim.h /usr/include/bits/sys_errlist.h \
+  ../../../../include/middle.h ../../../../include/middle-conv.h \
+  ../../../../include/cklists.h ../../../../include/ckbitvector.h \
+  ../../../../include/ckstream.h ../../../../include/init.h \
+  /usr/include/g++/new /usr/include/g++/cstddef \
+  /usr/include/g++/exception ../../../../include/ckhashtable.h \
+  ../../../../include/debug-charm.h ../../../../include/CkMarshall.decl.h \
+  ../../../../include/cksection.h ../../../../include/ckcallback.h \
+  ../../../../include/conv-ccs.h ../../../../include/sockRoutines.h \
+  /usr/include/sys/time.h /usr/include/sys/socket.h \
+  /usr/include/sys/uio.h /usr/include/bits/uio.h \
+  /usr/include/bits/socket.h \
+  /usr/lib/gcc-lib/i586-suse-linux/3.3.3/include/limits.h \
+  /usr/lib/gcc-lib/i586-suse-linux/3.3.3/include/syslimits.h \
+  /usr/include/limits.h /usr/include/bits/posix1_lim.h \
+  /usr/include/bits/local_lim.h /usr/include/linux/limits.h \
+  /usr/include/bits/posix2_lim.h /usr/include/bits/xopen_lim.h \
+  /usr/include/bits/sockaddr.h /usr/include/asm/socket.h \
+  /usr/include/asm/sockios.h /usr/include/netinet/in.h \
+  /usr/include/bits/in.h /usr/include/bits/byteswap.h \
+  /usr/include/arpa/inet.h /usr/include/netdb.h /usr/include/rpc/netdb.h \
+  /usr/include/bits/siginfo.h /usr/include/bits/netdb.h \
+  /usr/include/unistd.h /usr/include/bits/posix_opt.h \
+  /usr/include/bits/environments.h /usr/include/bits/confname.h \
+  /usr/include/getopt.h /usr/include/fcntl.h /usr/include/bits/fcntl.h \
+  /usr/include/sys/stat.h /usr/include/bits/stat.h \
+  ../../../../include/ccs-server.h ../../../../include/ckobjQ.h \
+  ../../../../include/ckreduction.h \
+  ../../../../include/CkReduction.decl.h \
+  ../../../../include/cknodegroupreduction.h \
+  ../../../../include/CkArrayReductionMgr.decl.h \
+  ../../../../include/ckmemcheckpoint.h \
+  ../../../../include/CkMemCheckpoint.decl.h \
+  ../../../../include/readonly.h /usr/include/g++/typeinfo \
+  ../../../../include/ckarray.h ../../../../include/cklocation.h \
+  ../../../../include/LBDatabase.h /usr/include/math.h \
+  /usr/include/bits/huge_val.h /usr/include/bits/huge_valf.h \
+  /usr/include/bits/huge_vall.h /usr/include/bits/inf.h \
+  /usr/include/bits/nan.h /usr/include/bits/mathdef.h \
+  /usr/include/bits/mathcalls.h ../../../../include/lbdb.h \
+  ../../../../include/LBDatabase.decl.h ../../../../include/NullLB.decl.h \
+  ../../../../include/BaseLB.decl.h ../../../../include/CkLocation.decl.h \
+  ../../../../include/CkArray.decl.h \
+  ../../../../include/ComlibArrayListener.h \
+  ../../../../include/ComlibStrategy.h \
+  ../../../../include/convcomlibstrategy.h \
+  ../../../../include/ComlibLearner.h \
+  ../../../../include/CkFutures.decl.h ../../../../include/charisma.h \
+  ../../../../include/charisma.decl.h ../../../../include/tempo.h \
+  ../../../../include/tempo.decl.h ../../../../include/waitqd.h \
+  ../../../../include/waitqd.decl.h ../../../../include/sdag.h \
+  ../../../../include/ckcheckpoint.h \
+  ../../../../include/CkCheckpoint.decl.h \
+  ../../../../include/ckarrayreductionmgr.h ../../../../include/trace.h \
+  ../../../../include/trace-bluegene.h pose_config.h \
+  ../../../../include/StreamingStrategy.h \
+  ../../../../include/ComlibManager.h ../../../../include/envelope.h \
+  ../../../../include/comlib.h ../../../../include/router.h \
+  ../../../../include/convcomlibmanager.h \
+  ../../../../include/ComlibStats.h ../../../../include/comlib.decl.h \
+  ../../../../include/MeshStreamingStrategy.h /usr/include/assert.h \
+  ../../../../include/PrioStreaming.h eventID.h mempool.h mempool.decl.h \
+  srtable.h stats.h stats.decl.h cancel.h event.h eqheap.h pvtobj.h \
+  lbObject.h ldbal.h ldbal.decl.h gvt.h gvt.decl.h evq.h rep.h sim.decl.h \
+  strat.h sim.h opt.h opt2.h opt3.h spec.h adapt.h adapt2.h adapt3.h \
+  cons.h seq.h chpt.h
+	$(CHARMC) -o strat.seq.o -DSEQUENTIAL_POSE=1 strat.C
+seq.seq.o: seq.C pose.h pose.decl.h ../../../../include/charm++.h \
+  /usr/include/stdlib.h /usr/include/features.h /usr/include/sys/cdefs.h \
+  /usr/include/gnu/stubs.h \
+  /usr/lib/gcc-lib/i586-suse-linux/3.3.3/include/stddef.h \
+  /usr/include/bits/waitflags.h /usr/include/bits/waitstatus.h \
+  /usr/include/endian.h /usr/include/bits/endian.h /usr/include/xlocale.h \
+  /usr/include/sys/types.h /usr/include/bits/types.h \
+  /usr/include/bits/wordsize.h /usr/include/bits/typesizes.h \
+  /usr/include/time.h /usr/include/sys/select.h \
+  /usr/include/bits/select.h /usr/include/bits/sigset.h \
+  /usr/include/bits/time.h /usr/include/sys/sysmacros.h \
+  /usr/include/bits/pthreadtypes.h /usr/include/bits/sched.h \
+  /usr/include/alloca.h /usr/include/memory.h /usr/include/string.h \
+  ../../../../include/charm.h ../../../../include/converse.h \
+  ../../../../include/conv-config.h ../../../../include/conv-common.h \
+  ../../../../include/conv-mach.h ../../../../include/conv-autoconfig.h \
+  ../../../../include/conv-mach-opt.h /usr/include/stdint.h \
+  /usr/include/bits/wchar.h ../../../../include/pup_c.h \
+  ../../../../include/conv-cpm.h ../../../../include/conv-cpath.h \
+  ../../../../include/conv-qd.h ../../../../include/conv-random.h \
+  ../../../../include/conv-lists.h ../../../../include/conv-trace.h \
+  ../../../../include/persistent.h ../../../../include/debug-conv.h \
+  ../../../../include/pup.h /usr/include/stdio.h /usr/include/libio.h \
+  /usr/include/_G_config.h /usr/include/wchar.h /usr/include/gconv.h \
+  /usr/lib/gcc-lib/i586-suse-linux/3.3.3/include/stdarg.h \
+  /usr/include/bits/stdio_lim.h /usr/include/bits/sys_errlist.h \
+  ../../../../include/middle.h ../../../../include/middle-conv.h \
+  ../../../../include/cklists.h ../../../../include/ckbitvector.h \
+  ../../../../include/ckstream.h ../../../../include/init.h \
+  /usr/include/g++/new /usr/include/g++/cstddef \
+  /usr/include/g++/exception ../../../../include/ckhashtable.h \
+  ../../../../include/debug-charm.h ../../../../include/CkMarshall.decl.h \
+  ../../../../include/cksection.h ../../../../include/ckcallback.h \
+  ../../../../include/conv-ccs.h ../../../../include/sockRoutines.h \
+  /usr/include/sys/time.h /usr/include/sys/socket.h \
+  /usr/include/sys/uio.h /usr/include/bits/uio.h \
+  /usr/include/bits/socket.h \
+  /usr/lib/gcc-lib/i586-suse-linux/3.3.3/include/limits.h \
+  /usr/lib/gcc-lib/i586-suse-linux/3.3.3/include/syslimits.h \
+  /usr/include/limits.h /usr/include/bits/posix1_lim.h \
+  /usr/include/bits/local_lim.h /usr/include/linux/limits.h \
+  /usr/include/bits/posix2_lim.h /usr/include/bits/xopen_lim.h \
+  /usr/include/bits/sockaddr.h /usr/include/asm/socket.h \
+  /usr/include/asm/sockios.h /usr/include/netinet/in.h \
+  /usr/include/bits/in.h /usr/include/bits/byteswap.h \
+  /usr/include/arpa/inet.h /usr/include/netdb.h /usr/include/rpc/netdb.h \
+  /usr/include/bits/siginfo.h /usr/include/bits/netdb.h \
+  /usr/include/unistd.h /usr/include/bits/posix_opt.h \
+  /usr/include/bits/environments.h /usr/include/bits/confname.h \
+  /usr/include/getopt.h /usr/include/fcntl.h /usr/include/bits/fcntl.h \
+  /usr/include/sys/stat.h /usr/include/bits/stat.h \
+  ../../../../include/ccs-server.h ../../../../include/ckobjQ.h \
+  ../../../../include/ckreduction.h \
+  ../../../../include/CkReduction.decl.h \
+  ../../../../include/cknodegroupreduction.h \
+  ../../../../include/CkArrayReductionMgr.decl.h \
+  ../../../../include/ckmemcheckpoint.h \
+  ../../../../include/CkMemCheckpoint.decl.h \
+  ../../../../include/readonly.h /usr/include/g++/typeinfo \
+  ../../../../include/ckarray.h ../../../../include/cklocation.h \
+  ../../../../include/LBDatabase.h /usr/include/math.h \
+  /usr/include/bits/huge_val.h /usr/include/bits/huge_valf.h \
+  /usr/include/bits/huge_vall.h /usr/include/bits/inf.h \
+  /usr/include/bits/nan.h /usr/include/bits/mathdef.h \
+  /usr/include/bits/mathcalls.h ../../../../include/lbdb.h \
+  ../../../../include/LBDatabase.decl.h ../../../../include/NullLB.decl.h \
+  ../../../../include/BaseLB.decl.h ../../../../include/CkLocation.decl.h \
+  ../../../../include/CkArray.decl.h \
+  ../../../../include/ComlibArrayListener.h \
+  ../../../../include/ComlibStrategy.h \
+  ../../../../include/convcomlibstrategy.h \
+  ../../../../include/ComlibLearner.h \
+  ../../../../include/CkFutures.decl.h ../../../../include/charisma.h \
+  ../../../../include/charisma.decl.h ../../../../include/tempo.h \
+  ../../../../include/tempo.decl.h ../../../../include/waitqd.h \
+  ../../../../include/waitqd.decl.h ../../../../include/sdag.h \
+  ../../../../include/ckcheckpoint.h \
+  ../../../../include/CkCheckpoint.decl.h \
+  ../../../../include/ckarrayreductionmgr.h ../../../../include/trace.h \
+  ../../../../include/trace-bluegene.h pose_config.h \
+  ../../../../include/StreamingStrategy.h \
+  ../../../../include/ComlibManager.h ../../../../include/envelope.h \
+  ../../../../include/comlib.h ../../../../include/router.h \
+  ../../../../include/convcomlibmanager.h \
+  ../../../../include/ComlibStats.h ../../../../include/comlib.decl.h \
+  ../../../../include/MeshStreamingStrategy.h /usr/include/assert.h \
+  ../../../../include/PrioStreaming.h eventID.h mempool.h mempool.decl.h \
+  srtable.h stats.h stats.decl.h cancel.h event.h eqheap.h pvtobj.h \
+  lbObject.h ldbal.h ldbal.decl.h gvt.h gvt.decl.h evq.h rep.h sim.decl.h \
+  strat.h sim.h opt.h opt2.h opt3.h spec.h adapt.h adapt2.h adapt3.h \
+  cons.h seq.h chpt.h
+	$(CHARMC) -o seq.seq.o -DSEQUENTIAL_POSE=1 seq.C
+cons.seq.o: cons.C pose.h pose.decl.h ../../../../include/charm++.h \
+  /usr/include/stdlib.h /usr/include/features.h /usr/include/sys/cdefs.h \
+  /usr/include/gnu/stubs.h \
+  /usr/lib/gcc-lib/i586-suse-linux/3.3.3/include/stddef.h \
+  /usr/include/bits/waitflags.h /usr/include/bits/waitstatus.h \
+  /usr/include/endian.h /usr/include/bits/endian.h /usr/include/xlocale.h \
+  /usr/include/sys/types.h /usr/include/bits/types.h \
+  /usr/include/bits/wordsize.h /usr/include/bits/typesizes.h \
+  /usr/include/time.h /usr/include/sys/select.h \
+  /usr/include/bits/select.h /usr/include/bits/sigset.h \
+  /usr/include/bits/time.h /usr/include/sys/sysmacros.h \
+  /usr/include/bits/pthreadtypes.h /usr/include/bits/sched.h \
+  /usr/include/alloca.h /usr/include/memory.h /usr/include/string.h \
+  ../../../../include/charm.h ../../../../include/converse.h \
+  ../../../../include/conv-config.h ../../../../include/conv-common.h \
+  ../../../../include/conv-mach.h ../../../../include/conv-autoconfig.h \
+  ../../../../include/conv-mach-opt.h /usr/include/stdint.h \
+  /usr/include/bits/wchar.h ../../../../include/pup_c.h \
+  ../../../../include/conv-cpm.h ../../../../include/conv-cpath.h \
+  ../../../../include/conv-qd.h ../../../../include/conv-random.h \
+  ../../../../include/conv-lists.h ../../../../include/conv-trace.h \
+  ../../../../include/persistent.h ../../../../include/debug-conv.h \
+  ../../../../include/pup.h /usr/include/stdio.h /usr/include/libio.h \
+  /usr/include/_G_config.h /usr/include/wchar.h /usr/include/gconv.h \
+  /usr/lib/gcc-lib/i586-suse-linux/3.3.3/include/stdarg.h \
+  /usr/include/bits/stdio_lim.h /usr/include/bits/sys_errlist.h \
+  ../../../../include/middle.h ../../../../include/middle-conv.h \
+  ../../../../include/cklists.h ../../../../include/ckbitvector.h \
+  ../../../../include/ckstream.h ../../../../include/init.h \
+  /usr/include/g++/new /usr/include/g++/cstddef \
+  /usr/include/g++/exception ../../../../include/ckhashtable.h \
+  ../../../../include/debug-charm.h ../../../../include/CkMarshall.decl.h \
+  ../../../../include/cksection.h ../../../../include/ckcallback.h \
+  ../../../../include/conv-ccs.h ../../../../include/sockRoutines.h \
+  /usr/include/sys/time.h /usr/include/sys/socket.h \
+  /usr/include/sys/uio.h /usr/include/bits/uio.h \
+  /usr/include/bits/socket.h \
+  /usr/lib/gcc-lib/i586-suse-linux/3.3.3/include/limits.h \
+  /usr/lib/gcc-lib/i586-suse-linux/3.3.3/include/syslimits.h \
+  /usr/include/limits.h /usr/include/bits/posix1_lim.h \
+  /usr/include/bits/local_lim.h /usr/include/linux/limits.h \
+  /usr/include/bits/posix2_lim.h /usr/include/bits/xopen_lim.h \
+  /usr/include/bits/sockaddr.h /usr/include/asm/socket.h \
+  /usr/include/asm/sockios.h /usr/include/netinet/in.h \
+  /usr/include/bits/in.h /usr/include/bits/byteswap.h \
+  /usr/include/arpa/inet.h /usr/include/netdb.h /usr/include/rpc/netdb.h \
+  /usr/include/bits/siginfo.h /usr/include/bits/netdb.h \
+  /usr/include/unistd.h /usr/include/bits/posix_opt.h \
+  /usr/include/bits/environments.h /usr/include/bits/confname.h \
+  /usr/include/getopt.h /usr/include/fcntl.h /usr/include/bits/fcntl.h \
+  /usr/include/sys/stat.h /usr/include/bits/stat.h \
+  ../../../../include/ccs-server.h ../../../../include/ckobjQ.h \
+  ../../../../include/ckreduction.h \
+  ../../../../include/CkReduction.decl.h \
+  ../../../../include/cknodegroupreduction.h \
+  ../../../../include/CkArrayReductionMgr.decl.h \
+  ../../../../include/ckmemcheckpoint.h \
+  ../../../../include/CkMemCheckpoint.decl.h \
+  ../../../../include/readonly.h /usr/include/g++/typeinfo \
+  ../../../../include/ckarray.h ../../../../include/cklocation.h \
+  ../../../../include/LBDatabase.h /usr/include/math.h \
+  /usr/include/bits/huge_val.h /usr/include/bits/huge_valf.h \
+  /usr/include/bits/huge_vall.h /usr/include/bits/inf.h \
+  /usr/include/bits/nan.h /usr/include/bits/mathdef.h \
+  /usr/include/bits/mathcalls.h ../../../../include/lbdb.h \
+  ../../../../include/LBDatabase.decl.h ../../../../include/NullLB.decl.h \
+  ../../../../include/BaseLB.decl.h ../../../../include/CkLocation.decl.h \
+  ../../../../include/CkArray.decl.h \
+  ../../../../include/ComlibArrayListener.h \
+  ../../../../include/ComlibStrategy.h \
+  ../../../../include/convcomlibstrategy.h \
+  ../../../../include/ComlibLearner.h \
+  ../../../../include/CkFutures.decl.h ../../../../include/charisma.h \
+  ../../../../include/charisma.decl.h ../../../../include/tempo.h \
+  ../../../../include/tempo.decl.h ../../../../include/waitqd.h \
+  ../../../../include/waitqd.decl.h ../../../../include/sdag.h \
+  ../../../../include/ckcheckpoint.h \
+  ../../../../include/CkCheckpoint.decl.h \
+  ../../../../include/ckarrayreductionmgr.h ../../../../include/trace.h \
+  ../../../../include/trace-bluegene.h pose_config.h \
+  ../../../../include/StreamingStrategy.h \
+  ../../../../include/ComlibManager.h ../../../../include/envelope.h \
+  ../../../../include/comlib.h ../../../../include/router.h \
+  ../../../../include/convcomlibmanager.h \
+  ../../../../include/ComlibStats.h ../../../../include/comlib.decl.h \
+  ../../../../include/MeshStreamingStrategy.h /usr/include/assert.h \
+  ../../../../include/PrioStreaming.h eventID.h mempool.h mempool.decl.h \
+  srtable.h stats.h stats.decl.h cancel.h event.h eqheap.h pvtobj.h \
+  lbObject.h ldbal.h ldbal.decl.h gvt.h gvt.decl.h evq.h rep.h sim.decl.h \
+  strat.h sim.h opt.h opt2.h opt3.h spec.h adapt.h adapt2.h adapt3.h \
+  cons.h seq.h chpt.h
+	$(CHARMC) -o cons.seq.o -DSEQUENTIAL_POSE=1 cons.C
+opt.seq.o: opt.C pose.h pose.decl.h ../../../../include/charm++.h \
+  /usr/include/stdlib.h /usr/include/features.h /usr/include/sys/cdefs.h \
+  /usr/include/gnu/stubs.h \
+  /usr/lib/gcc-lib/i586-suse-linux/3.3.3/include/stddef.h \
+  /usr/include/bits/waitflags.h /usr/include/bits/waitstatus.h \
+  /usr/include/endian.h /usr/include/bits/endian.h /usr/include/xlocale.h \
+  /usr/include/sys/types.h /usr/include/bits/types.h \
+  /usr/include/bits/wordsize.h /usr/include/bits/typesizes.h \
+  /usr/include/time.h /usr/include/sys/select.h \
+  /usr/include/bits/select.h /usr/include/bits/sigset.h \
+  /usr/include/bits/time.h /usr/include/sys/sysmacros.h \
+  /usr/include/bits/pthreadtypes.h /usr/include/bits/sched.h \
+  /usr/include/alloca.h /usr/include/memory.h /usr/include/string.h \
+  ../../../../include/charm.h ../../../../include/converse.h \
+  ../../../../include/conv-config.h ../../../../include/conv-common.h \
+  ../../../../include/conv-mach.h ../../../../include/conv-autoconfig.h \
+  ../../../../include/conv-mach-opt.h /usr/include/stdint.h \
+  /usr/include/bits/wchar.h ../../../../include/pup_c.h \
+  ../../../../include/conv-cpm.h ../../../../include/conv-cpath.h \
+  ../../../../include/conv-qd.h ../../../../include/conv-random.h \
+  ../../../../include/conv-lists.h ../../../../include/conv-trace.h \
+  ../../../../include/persistent.h ../../../../include/debug-conv.h \
+  ../../../../include/pup.h /usr/include/stdio.h /usr/include/libio.h \
+  /usr/include/_G_config.h /usr/include/wchar.h /usr/include/gconv.h \
+  /usr/lib/gcc-lib/i586-suse-linux/3.3.3/include/stdarg.h \
+  /usr/include/bits/stdio_lim.h /usr/include/bits/sys_errlist.h \
+  ../../../../include/middle.h ../../../../include/middle-conv.h \
+  ../../../../include/cklists.h ../../../../include/ckbitvector.h \
+  ../../../../include/ckstream.h ../../../../include/init.h \
+  /usr/include/g++/new /usr/include/g++/cstddef \
+  /usr/include/g++/exception ../../../../include/ckhashtable.h \
+  ../../../../include/debug-charm.h ../../../../include/CkMarshall.decl.h \
+  ../../../../include/cksection.h ../../../../include/ckcallback.h \
+  ../../../../include/conv-ccs.h ../../../../include/sockRoutines.h \
+  /usr/include/sys/time.h /usr/include/sys/socket.h \
+  /usr/include/sys/uio.h /usr/include/bits/uio.h \
+  /usr/include/bits/socket.h \
+  /usr/lib/gcc-lib/i586-suse-linux/3.3.3/include/limits.h \
+  /usr/lib/gcc-lib/i586-suse-linux/3.3.3/include/syslimits.h \
+  /usr/include/limits.h /usr/include/bits/posix1_lim.h \
+  /usr/include/bits/local_lim.h /usr/include/linux/limits.h \
+  /usr/include/bits/posix2_lim.h /usr/include/bits/xopen_lim.h \
+  /usr/include/bits/sockaddr.h /usr/include/asm/socket.h \
+  /usr/include/asm/sockios.h /usr/include/netinet/in.h \
+  /usr/include/bits/in.h /usr/include/bits/byteswap.h \
+  /usr/include/arpa/inet.h /usr/include/netdb.h /usr/include/rpc/netdb.h \
+  /usr/include/bits/siginfo.h /usr/include/bits/netdb.h \
+  /usr/include/unistd.h /usr/include/bits/posix_opt.h \
+  /usr/include/bits/environments.h /usr/include/bits/confname.h \
+  /usr/include/getopt.h /usr/include/fcntl.h /usr/include/bits/fcntl.h \
+  /usr/include/sys/stat.h /usr/include/bits/stat.h \
+  ../../../../include/ccs-server.h ../../../../include/ckobjQ.h \
+  ../../../../include/ckreduction.h \
+  ../../../../include/CkReduction.decl.h \
+  ../../../../include/cknodegroupreduction.h \
+  ../../../../include/CkArrayReductionMgr.decl.h \
+  ../../../../include/ckmemcheckpoint.h \
+  ../../../../include/CkMemCheckpoint.decl.h \
+  ../../../../include/readonly.h /usr/include/g++/typeinfo \
+  ../../../../include/ckarray.h ../../../../include/cklocation.h \
+  ../../../../include/LBDatabase.h /usr/include/math.h \
+  /usr/include/bits/huge_val.h /usr/include/bits/huge_valf.h \
+  /usr/include/bits/huge_vall.h /usr/include/bits/inf.h \
+  /usr/include/bits/nan.h /usr/include/bits/mathdef.h \
+  /usr/include/bits/mathcalls.h ../../../../include/lbdb.h \
+  ../../../../include/LBDatabase.decl.h ../../../../include/NullLB.decl.h \
+  ../../../../include/BaseLB.decl.h ../../../../include/CkLocation.decl.h \
+  ../../../../include/CkArray.decl.h \
+  ../../../../include/ComlibArrayListener.h \
+  ../../../../include/ComlibStrategy.h \
+  ../../../../include/convcomlibstrategy.h \
+  ../../../../include/ComlibLearner.h \
+  ../../../../include/CkFutures.decl.h ../../../../include/charisma.h \
+  ../../../../include/charisma.decl.h ../../../../include/tempo.h \
+  ../../../../include/tempo.decl.h ../../../../include/waitqd.h \
+  ../../../../include/waitqd.decl.h ../../../../include/sdag.h \
+  ../../../../include/ckcheckpoint.h \
+  ../../../../include/CkCheckpoint.decl.h \
+  ../../../../include/ckarrayreductionmgr.h ../../../../include/trace.h \
+  ../../../../include/trace-bluegene.h pose_config.h \
+  ../../../../include/StreamingStrategy.h \
+  ../../../../include/ComlibManager.h ../../../../include/envelope.h \
+  ../../../../include/comlib.h ../../../../include/router.h \
+  ../../../../include/convcomlibmanager.h \
+  ../../../../include/ComlibStats.h ../../../../include/comlib.decl.h \
+  ../../../../include/MeshStreamingStrategy.h /usr/include/assert.h \
+  ../../../../include/PrioStreaming.h eventID.h mempool.h mempool.decl.h \
+  srtable.h stats.h stats.decl.h cancel.h event.h eqheap.h pvtobj.h \
+  lbObject.h ldbal.h ldbal.decl.h gvt.h gvt.decl.h evq.h rep.h sim.decl.h \
+  strat.h sim.h opt.h opt2.h opt3.h spec.h adapt.h adapt2.h adapt3.h \
+  cons.h seq.h chpt.h
+	$(CHARMC) -o opt.seq.o -DSEQUENTIAL_POSE=1 opt.C
+opt2.seq.o: opt2.C pose.h pose.decl.h ../../../../include/charm++.h \
+  /usr/include/stdlib.h /usr/include/features.h /usr/include/sys/cdefs.h \
+  /usr/include/gnu/stubs.h \
+  /usr/lib/gcc-lib/i586-suse-linux/3.3.3/include/stddef.h \
+  /usr/include/bits/waitflags.h /usr/include/bits/waitstatus.h \
+  /usr/include/endian.h /usr/include/bits/endian.h /usr/include/xlocale.h \
+  /usr/include/sys/types.h /usr/include/bits/types.h \
+  /usr/include/bits/wordsize.h /usr/include/bits/typesizes.h \
+  /usr/include/time.h /usr/include/sys/select.h \
+  /usr/include/bits/select.h /usr/include/bits/sigset.h \
+  /usr/include/bits/time.h /usr/include/sys/sysmacros.h \
+  /usr/include/bits/pthreadtypes.h /usr/include/bits/sched.h \
+  /usr/include/alloca.h /usr/include/memory.h /usr/include/string.h \
+  ../../../../include/charm.h ../../../../include/converse.h \
+  ../../../../include/conv-config.h ../../../../include/conv-common.h \
+  ../../../../include/conv-mach.h ../../../../include/conv-autoconfig.h \
+  ../../../../include/conv-mach-opt.h /usr/include/stdint.h \
+  /usr/include/bits/wchar.h ../../../../include/pup_c.h \
+  ../../../../include/conv-cpm.h ../../../../include/conv-cpath.h \
+  ../../../../include/conv-qd.h ../../../../include/conv-random.h \
+  ../../../../include/conv-lists.h ../../../../include/conv-trace.h \
+  ../../../../include/persistent.h ../../../../include/debug-conv.h \
+  ../../../../include/pup.h /usr/include/stdio.h /usr/include/libio.h \
+  /usr/include/_G_config.h /usr/include/wchar.h /usr/include/gconv.h \
+  /usr/lib/gcc-lib/i586-suse-linux/3.3.3/include/stdarg.h \
+  /usr/include/bits/stdio_lim.h /usr/include/bits/sys_errlist.h \
+  ../../../../include/middle.h ../../../../include/middle-conv.h \
+  ../../../../include/cklists.h ../../../../include/ckbitvector.h \
+  ../../../../include/ckstream.h ../../../../include/init.h \
+  /usr/include/g++/new /usr/include/g++/cstddef \
+  /usr/include/g++/exception ../../../../include/ckhashtable.h \
+  ../../../../include/debug-charm.h ../../../../include/CkMarshall.decl.h \
+  ../../../../include/cksection.h ../../../../include/ckcallback.h \
+  ../../../../include/conv-ccs.h ../../../../include/sockRoutines.h \
+  /usr/include/sys/time.h /usr/include/sys/socket.h \
+  /usr/include/sys/uio.h /usr/include/bits/uio.h \
+  /usr/include/bits/socket.h \
+  /usr/lib/gcc-lib/i586-suse-linux/3.3.3/include/limits.h \
+  /usr/lib/gcc-lib/i586-suse-linux/3.3.3/include/syslimits.h \
+  /usr/include/limits.h /usr/include/bits/posix1_lim.h \
+  /usr/include/bits/local_lim.h /usr/include/linux/limits.h \
+  /usr/include/bits/posix2_lim.h /usr/include/bits/xopen_lim.h \
+  /usr/include/bits/sockaddr.h /usr/include/asm/socket.h \
+  /usr/include/asm/sockios.h /usr/include/netinet/in.h \
+  /usr/include/bits/in.h /usr/include/bits/byteswap.h \
+  /usr/include/arpa/inet.h /usr/include/netdb.h /usr/include/rpc/netdb.h \
+  /usr/include/bits/siginfo.h /usr/include/bits/netdb.h \
+  /usr/include/unistd.h /usr/include/bits/posix_opt.h \
+  /usr/include/bits/environments.h /usr/include/bits/confname.h \
+  /usr/include/getopt.h /usr/include/fcntl.h /usr/include/bits/fcntl.h \
+  /usr/include/sys/stat.h /usr/include/bits/stat.h \
+  ../../../../include/ccs-server.h ../../../../include/ckobjQ.h \
+  ../../../../include/ckreduction.h \
+  ../../../../include/CkReduction.decl.h \
+  ../../../../include/cknodegroupreduction.h \
+  ../../../../include/CkArrayReductionMgr.decl.h \
+  ../../../../include/ckmemcheckpoint.h \
+  ../../../../include/CkMemCheckpoint.decl.h \
+  ../../../../include/readonly.h /usr/include/g++/typeinfo \
+  ../../../../include/ckarray.h ../../../../include/cklocation.h \
+  ../../../../include/LBDatabase.h /usr/include/math.h \
+  /usr/include/bits/huge_val.h /usr/include/bits/huge_valf.h \
+  /usr/include/bits/huge_vall.h /usr/include/bits/inf.h \
+  /usr/include/bits/nan.h /usr/include/bits/mathdef.h \
+  /usr/include/bits/mathcalls.h ../../../../include/lbdb.h \
+  ../../../../include/LBDatabase.decl.h ../../../../include/NullLB.decl.h \
+  ../../../../include/BaseLB.decl.h ../../../../include/CkLocation.decl.h \
+  ../../../../include/CkArray.decl.h \
+  ../../../../include/ComlibArrayListener.h \
+  ../../../../include/ComlibStrategy.h \
+  ../../../../include/convcomlibstrategy.h \
+  ../../../../include/ComlibLearner.h \
+  ../../../../include/CkFutures.decl.h ../../../../include/charisma.h \
+  ../../../../include/charisma.decl.h ../../../../include/tempo.h \
+  ../../../../include/tempo.decl.h ../../../../include/waitqd.h \
+  ../../../../include/waitqd.decl.h ../../../../include/sdag.h \
+  ../../../../include/ckcheckpoint.h \
+  ../../../../include/CkCheckpoint.decl.h \
+  ../../../../include/ckarrayreductionmgr.h ../../../../include/trace.h \
+  ../../../../include/trace-bluegene.h pose_config.h \
+  ../../../../include/StreamingStrategy.h \
+  ../../../../include/ComlibManager.h ../../../../include/envelope.h \
+  ../../../../include/comlib.h ../../../../include/router.h \
+  ../../../../include/convcomlibmanager.h \
+  ../../../../include/ComlibStats.h ../../../../include/comlib.decl.h \
+  ../../../../include/MeshStreamingStrategy.h /usr/include/assert.h \
+  ../../../../include/PrioStreaming.h eventID.h mempool.h mempool.decl.h \
+  srtable.h stats.h stats.decl.h cancel.h event.h eqheap.h pvtobj.h \
+  lbObject.h ldbal.h ldbal.decl.h gvt.h gvt.decl.h evq.h rep.h sim.decl.h \
+  strat.h sim.h opt.h opt2.h opt3.h spec.h adapt.h adapt2.h adapt3.h \
+  cons.h seq.h chpt.h
+	$(CHARMC) -o opt2.seq.o -DSEQUENTIAL_POSE=1 opt2.C
+opt3.seq.o: opt3.C pose.h pose.decl.h ../../../../include/charm++.h \
+  /usr/include/stdlib.h /usr/include/features.h /usr/include/sys/cdefs.h \
+  /usr/include/gnu/stubs.h \
+  /usr/lib/gcc-lib/i586-suse-linux/3.3.3/include/stddef.h \
+  /usr/include/bits/waitflags.h /usr/include/bits/waitstatus.h \
+  /usr/include/endian.h /usr/include/bits/endian.h /usr/include/xlocale.h \
+  /usr/include/sys/types.h /usr/include/bits/types.h \
+  /usr/include/bits/wordsize.h /usr/include/bits/typesizes.h \
+  /usr/include/time.h /usr/include/sys/select.h \
+  /usr/include/bits/select.h /usr/include/bits/sigset.h \
+  /usr/include/bits/time.h /usr/include/sys/sysmacros.h \
+  /usr/include/bits/pthreadtypes.h /usr/include/bits/sched.h \
+  /usr/include/alloca.h /usr/include/memory.h /usr/include/string.h \
+  ../../../../include/charm.h ../../../../include/converse.h \
+  ../../../../include/conv-config.h ../../../../include/conv-common.h \
+  ../../../../include/conv-mach.h ../../../../include/conv-autoconfig.h \
+  ../../../../include/conv-mach-opt.h /usr/include/stdint.h \
+  /usr/include/bits/wchar.h ../../../../include/pup_c.h \
+  ../../../../include/conv-cpm.h ../../../../include/conv-cpath.h \
+  ../../../../include/conv-qd.h ../../../../include/conv-random.h \
+  ../../../../include/conv-lists.h ../../../../include/conv-trace.h \
+  ../../../../include/persistent.h ../../../../include/debug-conv.h \
+  ../../../../include/pup.h /usr/include/stdio.h /usr/include/libio.h \
+  /usr/include/_G_config.h /usr/include/wchar.h /usr/include/gconv.h \
+  /usr/lib/gcc-lib/i586-suse-linux/3.3.3/include/stdarg.h \
+  /usr/include/bits/stdio_lim.h /usr/include/bits/sys_errlist.h \
+  ../../../../include/middle.h ../../../../include/middle-conv.h \
+  ../../../../include/cklists.h ../../../../include/ckbitvector.h \
+  ../../../../include/ckstream.h ../../../../include/init.h \
+  /usr/include/g++/new /usr/include/g++/cstddef \
+  /usr/include/g++/exception ../../../../include/ckhashtable.h \
+  ../../../../include/debug-charm.h ../../../../include/CkMarshall.decl.h \
+  ../../../../include/cksection.h ../../../../include/ckcallback.h \
+  ../../../../include/conv-ccs.h ../../../../include/sockRoutines.h \
+  /usr/include/sys/time.h /usr/include/sys/socket.h \
+  /usr/include/sys/uio.h /usr/include/bits/uio.h \
+  /usr/include/bits/socket.h \
+  /usr/lib/gcc-lib/i586-suse-linux/3.3.3/include/limits.h \
+  /usr/lib/gcc-lib/i586-suse-linux/3.3.3/include/syslimits.h \
+  /usr/include/limits.h /usr/include/bits/posix1_lim.h \
+  /usr/include/bits/local_lim.h /usr/include/linux/limits.h \
+  /usr/include/bits/posix2_lim.h /usr/include/bits/xopen_lim.h \
+  /usr/include/bits/sockaddr.h /usr/include/asm/socket.h \
+  /usr/include/asm/sockios.h /usr/include/netinet/in.h \
+  /usr/include/bits/in.h /usr/include/bits/byteswap.h \
+  /usr/include/arpa/inet.h /usr/include/netdb.h /usr/include/rpc/netdb.h \
+  /usr/include/bits/siginfo.h /usr/include/bits/netdb.h \
+  /usr/include/unistd.h /usr/include/bits/posix_opt.h \
+  /usr/include/bits/environments.h /usr/include/bits/confname.h \
+  /usr/include/getopt.h /usr/include/fcntl.h /usr/include/bits/fcntl.h \
+  /usr/include/sys/stat.h /usr/include/bits/stat.h \
+  ../../../../include/ccs-server.h ../../../../include/ckobjQ.h \
+  ../../../../include/ckreduction.h \
+  ../../../../include/CkReduction.decl.h \
+  ../../../../include/cknodegroupreduction.h \
+  ../../../../include/CkArrayReductionMgr.decl.h \
+  ../../../../include/ckmemcheckpoint.h \
+  ../../../../include/CkMemCheckpoint.decl.h \
+  ../../../../include/readonly.h /usr/include/g++/typeinfo \
+  ../../../../include/ckarray.h ../../../../include/cklocation.h \
+  ../../../../include/LBDatabase.h /usr/include/math.h \
+  /usr/include/bits/huge_val.h /usr/include/bits/huge_valf.h \
+  /usr/include/bits/huge_vall.h /usr/include/bits/inf.h \
+  /usr/include/bits/nan.h /usr/include/bits/mathdef.h \
+  /usr/include/bits/mathcalls.h ../../../../include/lbdb.h \
+  ../../../../include/LBDatabase.decl.h ../../../../include/NullLB.decl.h \
+  ../../../../include/BaseLB.decl.h ../../../../include/CkLocation.decl.h \
+  ../../../../include/CkArray.decl.h \
+  ../../../../include/ComlibArrayListener.h \
+  ../../../../include/ComlibStrategy.h \
+  ../../../../include/convcomlibstrategy.h \
+  ../../../../include/ComlibLearner.h \
+  ../../../../include/CkFutures.decl.h ../../../../include/charisma.h \
+  ../../../../include/charisma.decl.h ../../../../include/tempo.h \
+  ../../../../include/tempo.decl.h ../../../../include/waitqd.h \
+  ../../../../include/waitqd.decl.h ../../../../include/sdag.h \
+  ../../../../include/ckcheckpoint.h \
+  ../../../../include/CkCheckpoint.decl.h \
+  ../../../../include/ckarrayreductionmgr.h ../../../../include/trace.h \
+  ../../../../include/trace-bluegene.h pose_config.h \
+  ../../../../include/StreamingStrategy.h \
+  ../../../../include/ComlibManager.h ../../../../include/envelope.h \
+  ../../../../include/comlib.h ../../../../include/router.h \
+  ../../../../include/convcomlibmanager.h \
+  ../../../../include/ComlibStats.h ../../../../include/comlib.decl.h \
+  ../../../../include/MeshStreamingStrategy.h /usr/include/assert.h \
+  ../../../../include/PrioStreaming.h eventID.h mempool.h mempool.decl.h \
+  srtable.h stats.h stats.decl.h cancel.h event.h eqheap.h pvtobj.h \
+  lbObject.h ldbal.h ldbal.decl.h gvt.h gvt.decl.h evq.h rep.h sim.decl.h \
+  strat.h sim.h opt.h opt2.h opt3.h spec.h adapt.h adapt2.h adapt3.h \
+  cons.h seq.h chpt.h
+	$(CHARMC) -o opt3.seq.o -DSEQUENTIAL_POSE=1 opt3.C
+spec.seq.o: spec.C pose.h pose.decl.h ../../../../include/charm++.h \
+  /usr/include/stdlib.h /usr/include/features.h /usr/include/sys/cdefs.h \
+  /usr/include/gnu/stubs.h \
+  /usr/lib/gcc-lib/i586-suse-linux/3.3.3/include/stddef.h \
+  /usr/include/bits/waitflags.h /usr/include/bits/waitstatus.h \
+  /usr/include/endian.h /usr/include/bits/endian.h /usr/include/xlocale.h \
+  /usr/include/sys/types.h /usr/include/bits/types.h \
+  /usr/include/bits/wordsize.h /usr/include/bits/typesizes.h \
+  /usr/include/time.h /usr/include/sys/select.h \
+  /usr/include/bits/select.h /usr/include/bits/sigset.h \
+  /usr/include/bits/time.h /usr/include/sys/sysmacros.h \
+  /usr/include/bits/pthreadtypes.h /usr/include/bits/sched.h \
+  /usr/include/alloca.h /usr/include/memory.h /usr/include/string.h \
+  ../../../../include/charm.h ../../../../include/converse.h \
+  ../../../../include/conv-config.h ../../../../include/conv-common.h \
+  ../../../../include/conv-mach.h ../../../../include/conv-autoconfig.h \
+  ../../../../include/conv-mach-opt.h /usr/include/stdint.h \
+  /usr/include/bits/wchar.h ../../../../include/pup_c.h \
+  ../../../../include/conv-cpm.h ../../../../include/conv-cpath.h \
+  ../../../../include/conv-qd.h ../../../../include/conv-random.h \
+  ../../../../include/conv-lists.h ../../../../include/conv-trace.h \
+  ../../../../include/persistent.h ../../../../include/debug-conv.h \
+  ../../../../include/pup.h /usr/include/stdio.h /usr/include/libio.h \
+  /usr/include/_G_config.h /usr/include/wchar.h /usr/include/gconv.h \
+  /usr/lib/gcc-lib/i586-suse-linux/3.3.3/include/stdarg.h \
+  /usr/include/bits/stdio_lim.h /usr/include/bits/sys_errlist.h \
+  ../../../../include/middle.h ../../../../include/middle-conv.h \
+  ../../../../include/cklists.h ../../../../include/ckbitvector.h \
+  ../../../../include/ckstream.h ../../../../include/init.h \
+  /usr/include/g++/new /usr/include/g++/cstddef \
+  /usr/include/g++/exception ../../../../include/ckhashtable.h \
+  ../../../../include/debug-charm.h ../../../../include/CkMarshall.decl.h \
+  ../../../../include/cksection.h ../../../../include/ckcallback.h \
+  ../../../../include/conv-ccs.h ../../../../include/sockRoutines.h \
+  /usr/include/sys/time.h /usr/include/sys/socket.h \
+  /usr/include/sys/uio.h /usr/include/bits/uio.h \
+  /usr/include/bits/socket.h \
+  /usr/lib/gcc-lib/i586-suse-linux/3.3.3/include/limits.h \
+  /usr/lib/gcc-lib/i586-suse-linux/3.3.3/include/syslimits.h \
+  /usr/include/limits.h /usr/include/bits/posix1_lim.h \
+  /usr/include/bits/local_lim.h /usr/include/linux/limits.h \
+  /usr/include/bits/posix2_lim.h /usr/include/bits/xopen_lim.h \
+  /usr/include/bits/sockaddr.h /usr/include/asm/socket.h \
+  /usr/include/asm/sockios.h /usr/include/netinet/in.h \
+  /usr/include/bits/in.h /usr/include/bits/byteswap.h \
+  /usr/include/arpa/inet.h /usr/include/netdb.h /usr/include/rpc/netdb.h \
+  /usr/include/bits/siginfo.h /usr/include/bits/netdb.h \
+  /usr/include/unistd.h /usr/include/bits/posix_opt.h \
+  /usr/include/bits/environments.h /usr/include/bits/confname.h \
+  /usr/include/getopt.h /usr/include/fcntl.h /usr/include/bits/fcntl.h \
+  /usr/include/sys/stat.h /usr/include/bits/stat.h \
+  ../../../../include/ccs-server.h ../../../../include/ckobjQ.h \
+  ../../../../include/ckreduction.h \
+  ../../../../include/CkReduction.decl.h \
+  ../../../../include/cknodegroupreduction.h \
+  ../../../../include/CkArrayReductionMgr.decl.h \
+  ../../../../include/ckmemcheckpoint.h \
+  ../../../../include/CkMemCheckpoint.decl.h \
+  ../../../../include/readonly.h /usr/include/g++/typeinfo \
+  ../../../../include/ckarray.h ../../../../include/cklocation.h \
+  ../../../../include/LBDatabase.h /usr/include/math.h \
+  /usr/include/bits/huge_val.h /usr/include/bits/huge_valf.h \
+  /usr/include/bits/huge_vall.h /usr/include/bits/inf.h \
+  /usr/include/bits/nan.h /usr/include/bits/mathdef.h \
+  /usr/include/bits/mathcalls.h ../../../../include/lbdb.h \
+  ../../../../include/LBDatabase.decl.h ../../../../include/NullLB.decl.h \
+  ../../../../include/BaseLB.decl.h ../../../../include/CkLocation.decl.h \
+  ../../../../include/CkArray.decl.h \
+  ../../../../include/ComlibArrayListener.h \
+  ../../../../include/ComlibStrategy.h \
+  ../../../../include/convcomlibstrategy.h \
+  ../../../../include/ComlibLearner.h \
+  ../../../../include/CkFutures.decl.h ../../../../include/charisma.h \
+  ../../../../include/charisma.decl.h ../../../../include/tempo.h \
+  ../../../../include/tempo.decl.h ../../../../include/waitqd.h \
+  ../../../../include/waitqd.decl.h ../../../../include/sdag.h \
+  ../../../../include/ckcheckpoint.h \
+  ../../../../include/CkCheckpoint.decl.h \
+  ../../../../include/ckarrayreductionmgr.h ../../../../include/trace.h \
+  ../../../../include/trace-bluegene.h pose_config.h \
+  ../../../../include/StreamingStrategy.h \
+  ../../../../include/ComlibManager.h ../../../../include/envelope.h \
+  ../../../../include/comlib.h ../../../../include/router.h \
+  ../../../../include/convcomlibmanager.h \
+  ../../../../include/ComlibStats.h ../../../../include/comlib.decl.h \
+  ../../../../include/MeshStreamingStrategy.h /usr/include/assert.h \
+  ../../../../include/PrioStreaming.h eventID.h mempool.h mempool.decl.h \
+  srtable.h stats.h stats.decl.h cancel.h event.h eqheap.h pvtobj.h \
+  lbObject.h ldbal.h ldbal.decl.h gvt.h gvt.decl.h evq.h rep.h sim.decl.h \
+  strat.h sim.h opt.h opt2.h opt3.h spec.h adapt.h adapt2.h adapt3.h \
+  cons.h seq.h chpt.h
+	$(CHARMC) -o spec.seq.o -DSEQUENTIAL_POSE=1 spec.C
+adapt.seq.o: adapt.C pose.h pose.decl.h ../../../../include/charm++.h \
+  /usr/include/stdlib.h /usr/include/features.h /usr/include/sys/cdefs.h \
+  /usr/include/gnu/stubs.h \
+  /usr/lib/gcc-lib/i586-suse-linux/3.3.3/include/stddef.h \
+  /usr/include/bits/waitflags.h /usr/include/bits/waitstatus.h \
+  /usr/include/endian.h /usr/include/bits/endian.h /usr/include/xlocale.h \
+  /usr/include/sys/types.h /usr/include/bits/types.h \
+  /usr/include/bits/wordsize.h /usr/include/bits/typesizes.h \
+  /usr/include/time.h /usr/include/sys/select.h \
+  /usr/include/bits/select.h /usr/include/bits/sigset.h \
+  /usr/include/bits/time.h /usr/include/sys/sysmacros.h \
+  /usr/include/bits/pthreadtypes.h /usr/include/bits/sched.h \
+  /usr/include/alloca.h /usr/include/memory.h /usr/include/string.h \
+  ../../../../include/charm.h ../../../../include/converse.h \
+  ../../../../include/conv-config.h ../../../../include/conv-common.h \
+  ../../../../include/conv-mach.h ../../../../include/conv-autoconfig.h \
+  ../../../../include/conv-mach-opt.h /usr/include/stdint.h \
+  /usr/include/bits/wchar.h ../../../../include/pup_c.h \
+  ../../../../include/conv-cpm.h ../../../../include/conv-cpath.h \
+  ../../../../include/conv-qd.h ../../../../include/conv-random.h \
+  ../../../../include/conv-lists.h ../../../../include/conv-trace.h \
+  ../../../../include/persistent.h ../../../../include/debug-conv.h \
+  ../../../../include/pup.h /usr/include/stdio.h /usr/include/libio.h \
+  /usr/include/_G_config.h /usr/include/wchar.h /usr/include/gconv.h \
+  /usr/lib/gcc-lib/i586-suse-linux/3.3.3/include/stdarg.h \
+  /usr/include/bits/stdio_lim.h /usr/include/bits/sys_errlist.h \
+  ../../../../include/middle.h ../../../../include/middle-conv.h \
+  ../../../../include/cklists.h ../../../../include/ckbitvector.h \
+  ../../../../include/ckstream.h ../../../../include/init.h \
+  /usr/include/g++/new /usr/include/g++/cstddef \
+  /usr/include/g++/exception ../../../../include/ckhashtable.h \
+  ../../../../include/debug-charm.h ../../../../include/CkMarshall.decl.h \
+  ../../../../include/cksection.h ../../../../include/ckcallback.h \
+  ../../../../include/conv-ccs.h ../../../../include/sockRoutines.h \
+  /usr/include/sys/time.h /usr/include/sys/socket.h \
+  /usr/include/sys/uio.h /usr/include/bits/uio.h \
+  /usr/include/bits/socket.h \
+  /usr/lib/gcc-lib/i586-suse-linux/3.3.3/include/limits.h \
+  /usr/lib/gcc-lib/i586-suse-linux/3.3.3/include/syslimits.h \
+  /usr/include/limits.h /usr/include/bits/posix1_lim.h \
+  /usr/include/bits/local_lim.h /usr/include/linux/limits.h \
+  /usr/include/bits/posix2_lim.h /usr/include/bits/xopen_lim.h \
+  /usr/include/bits/sockaddr.h /usr/include/asm/socket.h \
+  /usr/include/asm/sockios.h /usr/include/netinet/in.h \
+  /usr/include/bits/in.h /usr/include/bits/byteswap.h \
+  /usr/include/arpa/inet.h /usr/include/netdb.h /usr/include/rpc/netdb.h \
+  /usr/include/bits/siginfo.h /usr/include/bits/netdb.h \
+  /usr/include/unistd.h /usr/include/bits/posix_opt.h \
+  /usr/include/bits/environments.h /usr/include/bits/confname.h \
+  /usr/include/getopt.h /usr/include/fcntl.h /usr/include/bits/fcntl.h \
+  /usr/include/sys/stat.h /usr/include/bits/stat.h \
+  ../../../../include/ccs-server.h ../../../../include/ckobjQ.h \
+  ../../../../include/ckreduction.h \
+  ../../../../include/CkReduction.decl.h \
+  ../../../../include/cknodegroupreduction.h \
+  ../../../../include/CkArrayReductionMgr.decl.h \
+  ../../../../include/ckmemcheckpoint.h \
+  ../../../../include/CkMemCheckpoint.decl.h \
+  ../../../../include/readonly.h /usr/include/g++/typeinfo \
+  ../../../../include/ckarray.h ../../../../include/cklocation.h \
+  ../../../../include/LBDatabase.h /usr/include/math.h \
+  /usr/include/bits/huge_val.h /usr/include/bits/huge_valf.h \
+  /usr/include/bits/huge_vall.h /usr/include/bits/inf.h \
+  /usr/include/bits/nan.h /usr/include/bits/mathdef.h \
+  /usr/include/bits/mathcalls.h ../../../../include/lbdb.h \
+  ../../../../include/LBDatabase.decl.h ../../../../include/NullLB.decl.h \
+  ../../../../include/BaseLB.decl.h ../../../../include/CkLocation.decl.h \
+  ../../../../include/CkArray.decl.h \
+  ../../../../include/ComlibArrayListener.h \
+  ../../../../include/ComlibStrategy.h \
+  ../../../../include/convcomlibstrategy.h \
+  ../../../../include/ComlibLearner.h \
+  ../../../../include/CkFutures.decl.h ../../../../include/charisma.h \
+  ../../../../include/charisma.decl.h ../../../../include/tempo.h \
+  ../../../../include/tempo.decl.h ../../../../include/waitqd.h \
+  ../../../../include/waitqd.decl.h ../../../../include/sdag.h \
+  ../../../../include/ckcheckpoint.h \
+  ../../../../include/CkCheckpoint.decl.h \
+  ../../../../include/ckarrayreductionmgr.h ../../../../include/trace.h \
+  ../../../../include/trace-bluegene.h pose_config.h \
+  ../../../../include/StreamingStrategy.h \
+  ../../../../include/ComlibManager.h ../../../../include/envelope.h \
+  ../../../../include/comlib.h ../../../../include/router.h \
+  ../../../../include/convcomlibmanager.h \
+  ../../../../include/ComlibStats.h ../../../../include/comlib.decl.h \
+  ../../../../include/MeshStreamingStrategy.h /usr/include/assert.h \
+  ../../../../include/PrioStreaming.h eventID.h mempool.h mempool.decl.h \
+  srtable.h stats.h stats.decl.h cancel.h event.h eqheap.h pvtobj.h \
+  lbObject.h ldbal.h ldbal.decl.h gvt.h gvt.decl.h evq.h rep.h sim.decl.h \
+  strat.h sim.h opt.h opt2.h opt3.h spec.h adapt.h adapt2.h adapt3.h \
+  cons.h seq.h chpt.h
+	$(CHARMC) -o adapt.seq.o -DSEQUENTIAL_POSE=1 adapt.C
+adapt2.seq.o: adapt2.C pose.h pose.decl.h ../../../../include/charm++.h \
+  /usr/include/stdlib.h /usr/include/features.h /usr/include/sys/cdefs.h \
+  /usr/include/gnu/stubs.h \
+  /usr/lib/gcc-lib/i586-suse-linux/3.3.3/include/stddef.h \
+  /usr/include/bits/waitflags.h /usr/include/bits/waitstatus.h \
+  /usr/include/endian.h /usr/include/bits/endian.h /usr/include/xlocale.h \
+  /usr/include/sys/types.h /usr/include/bits/types.h \
+  /usr/include/bits/wordsize.h /usr/include/bits/typesizes.h \
+  /usr/include/time.h /usr/include/sys/select.h \
+  /usr/include/bits/select.h /usr/include/bits/sigset.h \
+  /usr/include/bits/time.h /usr/include/sys/sysmacros.h \
+  /usr/include/bits/pthreadtypes.h /usr/include/bits/sched.h \
+  /usr/include/alloca.h /usr/include/memory.h /usr/include/string.h \
+  ../../../../include/charm.h ../../../../include/converse.h \
+  ../../../../include/conv-config.h ../../../../include/conv-common.h \
+  ../../../../include/conv-mach.h ../../../../include/conv-autoconfig.h \
+  ../../../../include/conv-mach-opt.h /usr/include/stdint.h \
+  /usr/include/bits/wchar.h ../../../../include/pup_c.h \
+  ../../../../include/conv-cpm.h ../../../../include/conv-cpath.h \
+  ../../../../include/conv-qd.h ../../../../include/conv-random.h \
+  ../../../../include/conv-lists.h ../../../../include/conv-trace.h \
+  ../../../../include/persistent.h ../../../../include/debug-conv.h \
+  ../../../../include/pup.h /usr/include/stdio.h /usr/include/libio.h \
+  /usr/include/_G_config.h /usr/include/wchar.h /usr/include/gconv.h \
+  /usr/lib/gcc-lib/i586-suse-linux/3.3.3/include/stdarg.h \
+  /usr/include/bits/stdio_lim.h /usr/include/bits/sys_errlist.h \
+  ../../../../include/middle.h ../../../../include/middle-conv.h \
+  ../../../../include/cklists.h ../../../../include/ckbitvector.h \
+  ../../../../include/ckstream.h ../../../../include/init.h \
+  /usr/include/g++/new /usr/include/g++/cstddef \
+  /usr/include/g++/exception ../../../../include/ckhashtable.h \
+  ../../../../include/debug-charm.h ../../../../include/CkMarshall.decl.h \
+  ../../../../include/cksection.h ../../../../include/ckcallback.h \
+  ../../../../include/conv-ccs.h ../../../../include/sockRoutines.h \
+  /usr/include/sys/time.h /usr/include/sys/socket.h \
+  /usr/include/sys/uio.h /usr/include/bits/uio.h \
+  /usr/include/bits/socket.h \
+  /usr/lib/gcc-lib/i586-suse-linux/3.3.3/include/limits.h \
+  /usr/lib/gcc-lib/i586-suse-linux/3.3.3/include/syslimits.h \
+  /usr/include/limits.h /usr/include/bits/posix1_lim.h \
+  /usr/include/bits/local_lim.h /usr/include/linux/limits.h \
+  /usr/include/bits/posix2_lim.h /usr/include/bits/xopen_lim.h \
+  /usr/include/bits/sockaddr.h /usr/include/asm/socket.h \
+  /usr/include/asm/sockios.h /usr/include/netinet/in.h \
+  /usr/include/bits/in.h /usr/include/bits/byteswap.h \
+  /usr/include/arpa/inet.h /usr/include/netdb.h /usr/include/rpc/netdb.h \
+  /usr/include/bits/siginfo.h /usr/include/bits/netdb.h \
+  /usr/include/unistd.h /usr/include/bits/posix_opt.h \
+  /usr/include/bits/environments.h /usr/include/bits/confname.h \
+  /usr/include/getopt.h /usr/include/fcntl.h /usr/include/bits/fcntl.h \
+  /usr/include/sys/stat.h /usr/include/bits/stat.h \
+  ../../../../include/ccs-server.h ../../../../include/ckobjQ.h \
+  ../../../../include/ckreduction.h \
+  ../../../../include/CkReduction.decl.h \
+  ../../../../include/cknodegroupreduction.h \
+  ../../../../include/CkArrayReductionMgr.decl.h \
+  ../../../../include/ckmemcheckpoint.h \
+  ../../../../include/CkMemCheckpoint.decl.h \
+  ../../../../include/readonly.h /usr/include/g++/typeinfo \
+  ../../../../include/ckarray.h ../../../../include/cklocation.h \
+  ../../../../include/LBDatabase.h /usr/include/math.h \
+  /usr/include/bits/huge_val.h /usr/include/bits/huge_valf.h \
+  /usr/include/bits/huge_vall.h /usr/include/bits/inf.h \
+  /usr/include/bits/nan.h /usr/include/bits/mathdef.h \
+  /usr/include/bits/mathcalls.h ../../../../include/lbdb.h \
+  ../../../../include/LBDatabase.decl.h ../../../../include/NullLB.decl.h \
+  ../../../../include/BaseLB.decl.h ../../../../include/CkLocation.decl.h \
+  ../../../../include/CkArray.decl.h \
+  ../../../../include/ComlibArrayListener.h \
+  ../../../../include/ComlibStrategy.h \
+  ../../../../include/convcomlibstrategy.h \
+  ../../../../include/ComlibLearner.h \
+  ../../../../include/CkFutures.decl.h ../../../../include/charisma.h \
+  ../../../../include/charisma.decl.h ../../../../include/tempo.h \
+  ../../../../include/tempo.decl.h ../../../../include/waitqd.h \
+  ../../../../include/waitqd.decl.h ../../../../include/sdag.h \
+  ../../../../include/ckcheckpoint.h \
+  ../../../../include/CkCheckpoint.decl.h \
+  ../../../../include/ckarrayreductionmgr.h ../../../../include/trace.h \
+  ../../../../include/trace-bluegene.h pose_config.h \
+  ../../../../include/StreamingStrategy.h \
+  ../../../../include/ComlibManager.h ../../../../include/envelope.h \
+  ../../../../include/comlib.h ../../../../include/router.h \
+  ../../../../include/convcomlibmanager.h \
+  ../../../../include/ComlibStats.h ../../../../include/comlib.decl.h \
+  ../../../../include/MeshStreamingStrategy.h /usr/include/assert.h \
+  ../../../../include/PrioStreaming.h eventID.h mempool.h mempool.decl.h \
+  srtable.h stats.h stats.decl.h cancel.h event.h eqheap.h pvtobj.h \
+  lbObject.h ldbal.h ldbal.decl.h gvt.h gvt.decl.h evq.h rep.h sim.decl.h \
+  strat.h sim.h opt.h opt2.h opt3.h spec.h adapt.h adapt2.h adapt3.h \
+  cons.h seq.h chpt.h
+	$(CHARMC) -o adapt2.seq.o -DSEQUENTIAL_POSE=1 adapt2.C
+adapt3.seq.o: adapt3.C pose.h pose.decl.h ../../../../include/charm++.h \
+  /usr/include/stdlib.h /usr/include/features.h /usr/include/sys/cdefs.h \
+  /usr/include/gnu/stubs.h \
+  /usr/lib/gcc-lib/i586-suse-linux/3.3.3/include/stddef.h \
+  /usr/include/bits/waitflags.h /usr/include/bits/waitstatus.h \
+  /usr/include/endian.h /usr/include/bits/endian.h /usr/include/xlocale.h \
+  /usr/include/sys/types.h /usr/include/bits/types.h \
+  /usr/include/bits/wordsize.h /usr/include/bits/typesizes.h \
+  /usr/include/time.h /usr/include/sys/select.h \
+  /usr/include/bits/select.h /usr/include/bits/sigset.h \
+  /usr/include/bits/time.h /usr/include/sys/sysmacros.h \
+  /usr/include/bits/pthreadtypes.h /usr/include/bits/sched.h \
+  /usr/include/alloca.h /usr/include/memory.h /usr/include/string.h \
+  ../../../../include/charm.h ../../../../include/converse.h \
+  ../../../../include/conv-config.h ../../../../include/conv-common.h \
+  ../../../../include/conv-mach.h ../../../../include/conv-autoconfig.h \
+  ../../../../include/conv-mach-opt.h /usr/include/stdint.h \
+  /usr/include/bits/wchar.h ../../../../include/pup_c.h \
+  ../../../../include/conv-cpm.h ../../../../include/conv-cpath.h \
+  ../../../../include/conv-qd.h ../../../../include/conv-random.h \
+  ../../../../include/conv-lists.h ../../../../include/conv-trace.h \
+  ../../../../include/persistent.h ../../../../include/debug-conv.h \
+  ../../../../include/pup.h /usr/include/stdio.h /usr/include/libio.h \
+  /usr/include/_G_config.h /usr/include/wchar.h /usr/include/gconv.h \
+  /usr/lib/gcc-lib/i586-suse-linux/3.3.3/include/stdarg.h \
+  /usr/include/bits/stdio_lim.h /usr/include/bits/sys_errlist.h \
+  ../../../../include/middle.h ../../../../include/middle-conv.h \
+  ../../../../include/cklists.h ../../../../include/ckbitvector.h \
+  ../../../../include/ckstream.h ../../../../include/init.h \
+  /usr/include/g++/new /usr/include/g++/cstddef \
+  /usr/include/g++/exception ../../../../include/ckhashtable.h \
+  ../../../../include/debug-charm.h ../../../../include/CkMarshall.decl.h \
+  ../../../../include/cksection.h ../../../../include/ckcallback.h \
+  ../../../../include/conv-ccs.h ../../../../include/sockRoutines.h \
+  /usr/include/sys/time.h /usr/include/sys/socket.h \
+  /usr/include/sys/uio.h /usr/include/bits/uio.h \
+  /usr/include/bits/socket.h \
+  /usr/lib/gcc-lib/i586-suse-linux/3.3.3/include/limits.h \
+  /usr/lib/gcc-lib/i586-suse-linux/3.3.3/include/syslimits.h \
+  /usr/include/limits.h /usr/include/bits/posix1_lim.h \
+  /usr/include/bits/local_lim.h /usr/include/linux/limits.h \
+  /usr/include/bits/posix2_lim.h /usr/include/bits/xopen_lim.h \
+  /usr/include/bits/sockaddr.h /usr/include/asm/socket.h \
+  /usr/include/asm/sockios.h /usr/include/netinet/in.h \
+  /usr/include/bits/in.h /usr/include/bits/byteswap.h \
+  /usr/include/arpa/inet.h /usr/include/netdb.h /usr/include/rpc/netdb.h \
+  /usr/include/bits/siginfo.h /usr/include/bits/netdb.h \
+  /usr/include/unistd.h /usr/include/bits/posix_opt.h \
+  /usr/include/bits/environments.h /usr/include/bits/confname.h \
+  /usr/include/getopt.h /usr/include/fcntl.h /usr/include/bits/fcntl.h \
+  /usr/include/sys/stat.h /usr/include/bits/stat.h \
+  ../../../../include/ccs-server.h ../../../../include/ckobjQ.h \
+  ../../../../include/ckreduction.h \
+  ../../../../include/CkReduction.decl.h \
+  ../../../../include/cknodegroupreduction.h \
+  ../../../../include/CkArrayReductionMgr.decl.h \
+  ../../../../include/ckmemcheckpoint.h \
+  ../../../../include/CkMemCheckpoint.decl.h \
+  ../../../../include/readonly.h /usr/include/g++/typeinfo \
+  ../../../../include/ckarray.h ../../../../include/cklocation.h \
+  ../../../../include/LBDatabase.h /usr/include/math.h \
+  /usr/include/bits/huge_val.h /usr/include/bits/huge_valf.h \
+  /usr/include/bits/huge_vall.h /usr/include/bits/inf.h \
+  /usr/include/bits/nan.h /usr/include/bits/mathdef.h \
+  /usr/include/bits/mathcalls.h ../../../../include/lbdb.h \
+  ../../../../include/LBDatabase.decl.h ../../../../include/NullLB.decl.h \
+  ../../../../include/BaseLB.decl.h ../../../../include/CkLocation.decl.h \
+  ../../../../include/CkArray.decl.h \
+  ../../../../include/ComlibArrayListener.h \
+  ../../../../include/ComlibStrategy.h \
+  ../../../../include/convcomlibstrategy.h \
+  ../../../../include/ComlibLearner.h \
+  ../../../../include/CkFutures.decl.h ../../../../include/charisma.h \
+  ../../../../include/charisma.decl.h ../../../../include/tempo.h \
+  ../../../../include/tempo.decl.h ../../../../include/waitqd.h \
+  ../../../../include/waitqd.decl.h ../../../../include/sdag.h \
+  ../../../../include/ckcheckpoint.h \
+  ../../../../include/CkCheckpoint.decl.h \
+  ../../../../include/ckarrayreductionmgr.h ../../../../include/trace.h \
+  ../../../../include/trace-bluegene.h pose_config.h \
+  ../../../../include/StreamingStrategy.h \
+  ../../../../include/ComlibManager.h ../../../../include/envelope.h \
+  ../../../../include/comlib.h ../../../../include/router.h \
+  ../../../../include/convcomlibmanager.h \
+  ../../../../include/ComlibStats.h ../../../../include/comlib.decl.h \
+  ../../../../include/MeshStreamingStrategy.h /usr/include/assert.h \
+  ../../../../include/PrioStreaming.h eventID.h mempool.h mempool.decl.h \
+  srtable.h stats.h stats.decl.h cancel.h event.h eqheap.h pvtobj.h \
+  lbObject.h ldbal.h ldbal.decl.h gvt.h gvt.decl.h evq.h rep.h sim.decl.h \
+  strat.h sim.h opt.h opt2.h opt3.h spec.h adapt.h adapt2.h adapt3.h \
+  cons.h seq.h chpt.h
+	$(CHARMC) -o adapt3.seq.o -DSEQUENTIAL_POSE=1 adapt3.C
+pose.seq.o: pose.C pose.h pose.decl.h ../../../../include/charm++.h \
+  /usr/include/stdlib.h /usr/include/features.h /usr/include/sys/cdefs.h \
+  /usr/include/gnu/stubs.h \
+  /usr/lib/gcc-lib/i586-suse-linux/3.3.3/include/stddef.h \
+  /usr/include/bits/waitflags.h /usr/include/bits/waitstatus.h \
+  /usr/include/endian.h /usr/include/bits/endian.h /usr/include/xlocale.h \
+  /usr/include/sys/types.h /usr/include/bits/types.h \
+  /usr/include/bits/wordsize.h /usr/include/bits/typesizes.h \
+  /usr/include/time.h /usr/include/sys/select.h \
+  /usr/include/bits/select.h /usr/include/bits/sigset.h \
+  /usr/include/bits/time.h /usr/include/sys/sysmacros.h \
+  /usr/include/bits/pthreadtypes.h /usr/include/bits/sched.h \
+  /usr/include/alloca.h /usr/include/memory.h /usr/include/string.h \
+  ../../../../include/charm.h ../../../../include/converse.h \
+  ../../../../include/conv-config.h ../../../../include/conv-common.h \
+  ../../../../include/conv-mach.h ../../../../include/conv-autoconfig.h \
+  ../../../../include/conv-mach-opt.h /usr/include/stdint.h \
+  /usr/include/bits/wchar.h ../../../../include/pup_c.h \
+  ../../../../include/conv-cpm.h ../../../../include/conv-cpath.h \
+  ../../../../include/conv-qd.h ../../../../include/conv-random.h \
+  ../../../../include/conv-lists.h ../../../../include/conv-trace.h \
+  ../../../../include/persistent.h ../../../../include/debug-conv.h \
+  ../../../../include/pup.h /usr/include/stdio.h /usr/include/libio.h \
+  /usr/include/_G_config.h /usr/include/wchar.h /usr/include/gconv.h \
+  /usr/lib/gcc-lib/i586-suse-linux/3.3.3/include/stdarg.h \
+  /usr/include/bits/stdio_lim.h /usr/include/bits/sys_errlist.h \
+  ../../../../include/middle.h ../../../../include/middle-conv.h \
+  ../../../../include/cklists.h ../../../../include/ckbitvector.h \
+  ../../../../include/ckstream.h ../../../../include/init.h \
+  /usr/include/g++/new /usr/include/g++/cstddef \
+  /usr/include/g++/exception ../../../../include/ckhashtable.h \
+  ../../../../include/debug-charm.h ../../../../include/CkMarshall.decl.h \
+  ../../../../include/cksection.h ../../../../include/ckcallback.h \
+  ../../../../include/conv-ccs.h ../../../../include/sockRoutines.h \
+  /usr/include/sys/time.h /usr/include/sys/socket.h \
+  /usr/include/sys/uio.h /usr/include/bits/uio.h \
+  /usr/include/bits/socket.h \
+  /usr/lib/gcc-lib/i586-suse-linux/3.3.3/include/limits.h \
+  /usr/lib/gcc-lib/i586-suse-linux/3.3.3/include/syslimits.h \
+  /usr/include/limits.h /usr/include/bits/posix1_lim.h \
+  /usr/include/bits/local_lim.h /usr/include/linux/limits.h \
+  /usr/include/bits/posix2_lim.h /usr/include/bits/xopen_lim.h \
+  /usr/include/bits/sockaddr.h /usr/include/asm/socket.h \
+  /usr/include/asm/sockios.h /usr/include/netinet/in.h \
+  /usr/include/bits/in.h /usr/include/bits/byteswap.h \
+  /usr/include/arpa/inet.h /usr/include/netdb.h /usr/include/rpc/netdb.h \
+  /usr/include/bits/siginfo.h /usr/include/bits/netdb.h \
+  /usr/include/unistd.h /usr/include/bits/posix_opt.h \
+  /usr/include/bits/environments.h /usr/include/bits/confname.h \
+  /usr/include/getopt.h /usr/include/fcntl.h /usr/include/bits/fcntl.h \
+  /usr/include/sys/stat.h /usr/include/bits/stat.h \
+  ../../../../include/ccs-server.h ../../../../include/ckobjQ.h \
+  ../../../../include/ckreduction.h \
+  ../../../../include/CkReduction.decl.h \
+  ../../../../include/cknodegroupreduction.h \
+  ../../../../include/CkArrayReductionMgr.decl.h \
+  ../../../../include/ckmemcheckpoint.h \
+  ../../../../include/CkMemCheckpoint.decl.h \
+  ../../../../include/readonly.h /usr/include/g++/typeinfo \
+  ../../../../include/ckarray.h ../../../../include/cklocation.h \
+  ../../../../include/LBDatabase.h /usr/include/math.h \
+  /usr/include/bits/huge_val.h /usr/include/bits/huge_valf.h \
+  /usr/include/bits/huge_vall.h /usr/include/bits/inf.h \
+  /usr/include/bits/nan.h /usr/include/bits/mathdef.h \
+  /usr/include/bits/mathcalls.h ../../../../include/lbdb.h \
+  ../../../../include/LBDatabase.decl.h ../../../../include/NullLB.decl.h \
+  ../../../../include/BaseLB.decl.h ../../../../include/CkLocation.decl.h \
+  ../../../../include/CkArray.decl.h \
+  ../../../../include/ComlibArrayListener.h \
+  ../../../../include/ComlibStrategy.h \
+  ../../../../include/convcomlibstrategy.h \
+  ../../../../include/ComlibLearner.h \
+  ../../../../include/CkFutures.decl.h ../../../../include/charisma.h \
+  ../../../../include/charisma.decl.h ../../../../include/tempo.h \
+  ../../../../include/tempo.decl.h ../../../../include/waitqd.h \
+  ../../../../include/waitqd.decl.h ../../../../include/sdag.h \
+  ../../../../include/ckcheckpoint.h \
+  ../../../../include/CkCheckpoint.decl.h \
+  ../../../../include/ckarrayreductionmgr.h ../../../../include/trace.h \
+  ../../../../include/trace-bluegene.h pose_config.h \
+  ../../../../include/StreamingStrategy.h \
+  ../../../../include/ComlibManager.h ../../../../include/envelope.h \
+  ../../../../include/comlib.h ../../../../include/router.h \
+  ../../../../include/convcomlibmanager.h \
+  ../../../../include/ComlibStats.h ../../../../include/comlib.decl.h \
+  ../../../../include/MeshStreamingStrategy.h /usr/include/assert.h \
+  ../../../../include/PrioStreaming.h eventID.h mempool.h mempool.decl.h \
+  srtable.h stats.h stats.decl.h cancel.h event.h eqheap.h pvtobj.h \
+  lbObject.h ldbal.h ldbal.decl.h gvt.h gvt.decl.h evq.h rep.h sim.decl.h \
+  strat.h sim.h opt.h opt2.h opt3.h spec.h adapt.h adapt2.h adapt3.h \
+  cons.h seq.h chpt.h pose.def.h
+	$(CHARMC) -o pose.seq.o -DSEQUENTIAL_POSE=1 pose.C
