@@ -33,6 +33,10 @@
 
 #define EPSILON      (1e-9)
 
+#ifdef max
+#undef max
+#undef min
+#endif
 #define max(a,b) ((a)>=(b)?(a):(b))
 #define min(a,b) ((a)<=(b)?(a):(b))
 #define ABS(x)   ((x)>=0?(x):(-x))
