@@ -25,8 +25,8 @@ public: static int __idx;
 #include "init.h"
 #include "debug-charm.h"
 
-PUPmarshallBytes(CkChareID)
-PUPmarshallBytes(CkGroupID)
+PUPbytes(CkChareID)
+PUPbytes(CkGroupID)
 
 /**
  * CkMessage is the superclass of all Charm++ messages.
@@ -265,7 +265,7 @@ public:
   CkSectionCookie(void *p): val(p), redNo(0) { pe = CkMyPe();};
   CkSectionCookie(int e, void *p, int r):  pe(e), val(p), redNo(r) {}
 };
-PUPmarshallBytes(CkSectionCookie) //FIXME: write a real pup routine
+PUPbytes(CkSectionCookie) //FIXME: write a real pup routine
 
 class CkSectionID {
 public:
