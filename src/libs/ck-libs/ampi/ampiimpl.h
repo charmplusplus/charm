@@ -257,6 +257,8 @@ Represents an MPI request that has been initiated
 using Isend, Irecv, Ialltoall, Send_init, etc.
 */
 class AmpiRequest {
+protected:
+	bool isvalid;
 public:
 	AmpiRequest(){ }
 	/// Close this request (used by free and cancel)
@@ -277,8 +279,9 @@ public:
 	///  returning a valid MPI error code.
 	virtual int wait(MPI_Status *sts) =0;
 
-	/// Frees up the request
-	virtual int free(void){ /* mark it invalid? */ return 0; }
+	/// Frees up the request: invalidate it
+	virtual inline void free(void){ isvalid=false; }
+	inline bool isValid(void){ return isvalid; }
 
 	/// Returns the type of request: 1-PersReq, 2-IReq, 3-ATAReq
 	virtual int getType(void) =0;
@@ -298,7 +301,7 @@ public:
 		MPI_Comm comm_, int sndrcv_) :
 		buf(buf_), count(count_), type(type_), src(src_), tag(tag_),
 		comm(comm_), sndrcv(sndrcv_)
-		{ /* empty */ }
+		{ isvalid=true; }
 	~PersReq(){ }
 	int start();
 	CmiBool test(MPI_Status *sts);
@@ -317,7 +320,7 @@ class IReq : public AmpiRequest {
 public:
 	IReq(void *buf_, int count_, int type_, int src_, int tag_, MPI_Comm comm_):
 	     buf(buf_), count(count_), type(type_), src(src_), tag(tag_), comm(comm_)
-	     { /* empty */ }
+	     { isvalid=true; }
 	~IReq(){ }
 	CmiBool test(MPI_Status *sts);
 	void complete(MPI_Status *sts);
@@ -340,7 +343,7 @@ class ATAReq : public AmpiRequest {
 	int count;
 	int idx;
 public:
-	ATAReq(int c_):count(c_),idx(0) { myreqs = new Request [c_]; }
+	ATAReq(int c_):count(c_),idx(0) { myreqs = new Request [c_]; isvalid=true; }
 	~ATAReq(void) { if(myreqs) delete [] myreqs; }
 	int addReq(void *buf_, int count_, int type_, int src_, int tag_, MPI_Comm comm_){
 		myreqs[idx].buf=buf_;	myreqs[idx].count=count_;
@@ -353,6 +356,72 @@ public:
 	int wait(MPI_Status *sts);
 	inline int getCount(void){ return count; }
 	inline int getType(void){ return 3; }
+	inline void free(void){ isvalid=false; delete [] myreqs; }
+};
+
+/// Special CkVec<AmpiRequest*> for AMPI. Most code copied from cklist.h
+class AmpiRequestList : private CkSTLHelper<AmpiRequest *> {
+    AmpiRequest** block; //Elements of vector
+    int blklen; //Allocated size of block
+    int len; //Number of used elements in block
+    void makeBlock(int blklen_,int len_) {
+       block=new AmpiRequest* [blklen_];
+       blklen=blklen_; len=len_;
+    }
+    void freeBlock(void) {
+       len=0; blklen=0;
+       delete[] block; block=NULL;
+    }
+    void copyFrom(const AmpiRequestList &src) {
+       makeBlock(src.blklen, src.len);
+       elementCopy(block,src.block,blklen);
+    }
+  public:
+    AmpiRequestList() {block=NULL;blklen=len=0;}
+    ~AmpiRequestList() { freeBlock(); }
+    AmpiRequestList(const AmpiRequestList &src) {copyFrom(src);}
+    AmpiRequestList(int size) { makeBlock(size,size); }
+    AmpiRequestList &operator=(const AmpiRequestList &src) {
+      freeBlock();
+      copyFrom(src);
+      return *this;
+    }
+
+    AmpiRequest* operator[](size_t n) { return block[n]; }
+
+    int size(void) const {return len;}
+    void setSize(int blklen_) {
+      AmpiRequest **oldBlock=block;
+      makeBlock(blklen_,len);
+      elementCopy(block,oldBlock,len);
+      delete[] oldBlock; //WARNING: leaks if element copy throws exception
+    }
+    //Grow to contain at least this position:
+    void growAtLeast(int pos) {
+      if (pos>=blklen) setSize(pos*2+16);
+    }
+    void insertAt(int pos, AmpiRequest* elt) {
+      if (pos>=len) {
+        growAtLeast(pos);
+        len=pos+1;
+      }
+      block[pos] = elt;
+    }
+    void push_back(AmpiRequest* elt) {insertAt(len,elt);}
+    int insert(AmpiRequest* elt){
+      //search for invalidated slot
+      for(int i=0;i<len;i++)
+        if(!block[i]->isValid()){
+	  block[i] = elt;
+	  return i;
+        }
+      push_back(elt);
+      return len-1;
+    }
+
+    /// PUPer is empty because there shouldn't be any
+    /// outstanding requests at migration.
+    void pup(PUP::er &p) { /* empty */ }
 };
 
 //A simple destructive-copy memory buffer
@@ -611,7 +680,7 @@ public:
 
     CkDDT myDDTsto;
     CkDDT *myDDT;
-    CkVec<AmpiRequest *> ampiReqs;
+    AmpiRequestList ampiReqs;
 };
 
 

@@ -460,7 +460,7 @@ void ampiParent::pup(PUP::er &p) {
   p|splitComm;
   p|groupComm;
   p|groups;
-  // FIXME: add p|ampiReqs
+  p|ampiReqs;
 }
 void ampiParent::prepareCtv(void) {
   thread=threads[thisIndex].ckLocal();
@@ -1389,7 +1389,7 @@ double MPI_Wtime(void)
   // to pup them as well.
 
 
-static CkVec<AmpiRequest *> *getReqs(void) {
+static AmpiRequestList *getReqs(void) {
   return &(getAmpiParent()->ampiReqs);
 }
 
@@ -1405,7 +1405,7 @@ CDECL
 int MPI_Start(MPI_Request *request)
 {
   AMPIAPI("MPI_Start");
-  CkVec<AmpiRequest *> *reqs = getReqs();
+  AmpiRequestList *reqs = getReqs();
   if(-1==(*reqs)[*request]->start()){
     CkAbort("MPI_Start could be used only on persistent communication requests!");
   }
@@ -1439,10 +1439,10 @@ int MPI_Wait(MPI_Request *request, MPI_Status *sts)
   AMPIAPI("MPI_Wait");
   if(*request == MPI_REQUEST_NULL)
     return 0;
-  CkVec<AmpiRequest *>* reqs = getReqs();
+  AmpiRequestList* reqs = getReqs();
   CkPrintf("MPI_Wait: request=%d, reqs.size=%d, &reqs=%d\n",*request,reqs->size(),reqs);
   (*reqs)[*request]->wait(sts);
-  /* FIXME: free up the request here! */
+  (*reqs)[*request]->free();
   return 0;
 }
 
@@ -1513,10 +1513,10 @@ int MPI_Test(MPI_Request *request, int *flag, MPI_Status *sts)
     *flag = 1;
     return 0;
   }
-  CkVec<AmpiRequest *>* reqs = getReqs();
+  AmpiRequestList* reqs = getReqs();
   if(1 == (*flag = (*reqs)[*request]->test(sts))){
     (*reqs)[*request]->complete(sts);
-    /* FIXME: free up the request here! */
+    (*reqs)[*request]->free();
   }
   return 0;
 }
@@ -1551,10 +1551,8 @@ CDECL
 int MPI_Request_free(MPI_Request *request){
   AMPIAPI("MPI_Request_free");
   if(*request==MPI_REQUEST_NULL) return 0;
-  CkVec<AmpiRequest *>* reqs = getReqs();
-  if(-1==(*reqs)[*request]->free()){
-    CkAbort("MPI_Request_free failed!");
-  }
+  AmpiRequestList* reqs = getReqs();
+  (*reqs)[*request]->free();
   return 0;
 }
 
@@ -1563,10 +1561,9 @@ int MPI_Recv_init(void *buf, int count, int type, int src, int tag,
                    MPI_Comm comm, MPI_Request *req)
 {
   AMPIAPI("MPI_Recv_init");
-  CkVec<AmpiRequest *>* reqs = getReqs();
+  AmpiRequestList* reqs = getReqs();
   PersReq *newreq = new PersReq(buf,count,type,src,tag,comm,2);
-  *req = reqs->size();
-  reqs->push_back(newreq);
+  *req = reqs->insert(newreq);
   return 0;
 }
 
@@ -1575,10 +1572,9 @@ int MPI_Send_init(void *buf, int count, int type, int dest, int tag,
                    MPI_Comm comm, MPI_Request *req)
 {
   AMPIAPI("MPI_Send_init");
-  CkVec<AmpiRequest *>* reqs = getReqs();
+  AmpiRequestList* reqs = getReqs();
   PersReq *newreq = new PersReq(buf,count,type,dest,tag,comm,1);
-  *req = reqs->size();
-  reqs->push_back(newreq);
+  *req = reqs->insert(newreq);
   return 0;
 }
 
@@ -1701,10 +1697,9 @@ int MPI_Irecv(void *buf, int count, MPI_Datatype type, int src,
               int tag, MPI_Comm comm, MPI_Request *request)
 {
   AMPIAPI("MPI_Irecv");
-  CkVec<AmpiRequest *>* reqs = getReqs();
+  AmpiRequestList* reqs = getReqs();
   IReq *newreq = new IReq(buf,count,type,src,tag,comm);
-  *request = reqs->size();
-  reqs->push_back(newreq);
+  *request = reqs->insert(newreq);
   return 0;
 }
 
@@ -1722,10 +1717,9 @@ int MPI_Ireduce(void *sendbuf, void *recvbuf, int count, int type, MPI_Op op, in
 
   if (ptr->thisIndex == rootIdx){
     // using irecv instead recv to non-block the call and get request pointer
-    CkVec<AmpiRequest *>* reqs = getReqs();
+    AmpiRequestList* reqs = getReqs();
     IReq *newreq = new IReq(recvbuf,count,type,0,MPI_REDUCE_TAG,comm);
-    *request = reqs->size();
-    reqs->push_back(newreq);
+    *request = reqs->insert(newreq);
   }
   return 0;
 }
@@ -2000,14 +1994,13 @@ int MPI_Ialltoall(void *sendbuf, int sendcount, MPI_Datatype sendtype,
   ptr->getComlib()->endIteration();
 
   // copy+paste from MPI_Irecv
-  CkVec<AmpiRequest *>* reqs = getReqs();
+  AmpiRequestList* reqs = getReqs();
   ATAReq *newreq = new ATAReq(size);
   for(i=0;i<size;i++){
     if(newreq->addReq(((char*)recvbuf)+(itemsize*i),recvcount,recvtype,i,MPI_GATHER_TAG,comm)!=(i+1))
       CkAbort("Error adding requests into ATAReq!");
   }
-  *request = reqs->size();
-  reqs->push_back(newreq);
+  *request = reqs->insert(newreq);
   CkPrintf("MPI_Ialltoall: request=%d, reqs.size=%d, &reqs=%d\n",*request,reqs->size(),reqs);
   return 0;
 }
