@@ -69,7 +69,7 @@ void MPIStrategy::doneInserting(){
     //PMPI_Barrier(groupComm);
     
     ComlibPrintf("[%d] Calling All to all\n", CkMyPe());
-    PMPI_Alltoall(mpi_sndbuf, MPI_MAX_MSG_SIZE, MPI_CHAR, mpi_recvbuf, 
+    MPI_Alltoall(mpi_sndbuf, MPI_MAX_MSG_SIZE, MPI_CHAR, mpi_recvbuf, 
                   MPI_MAX_MSG_SIZE, MPI_CHAR, groupComm);
     
     ComlibPrintf("[%d] All to all finished\n", CkMyPe());
@@ -101,9 +101,9 @@ void MPIStrategy::pup(PUP::er &p) {
     if(p.isUnpacking()){
 #if CHARM_MPI
         if(npes < CkNumPes()){
-            PMPI_Comm_group(MPI_COMM_WORLD, &groupWorld);
-            PMPI_Group_incl(groupWorld, npes, pelist, &group);
-            PMPI_Comm_create(MPI_COMM_WORLD, group, &groupComm);
+            MPI_Comm_group(MPI_COMM_WORLD, &groupWorld);
+            MPI_Group_incl(groupWorld, npes, pelist, &group);
+            MPI_Comm_create(MPI_COMM_WORLD, group, &groupComm);
         }
         else groupComm = MPI_COMM_WORLD;
 #endif
