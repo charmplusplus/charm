@@ -29,7 +29,7 @@ all:
 	@echo '  make charm'
 	@echo '  make charm++'
 
-charm: converse charmlibs charmxlat libcharm charmreplay
+charm: converse charmxlat charmlibs libcharm charmreplay
 
 charm++: charm charmxlat++ charm++libs
 
@@ -131,6 +131,9 @@ convcore.o: convcore.c $(CVHEADERS)
 conv-conds.o: conv-conds.c $(CVHEADERS)
 	$(CHARMC) conv-conds.c
 
+converse.h:	conversedefn1.h conversetypes.h conversedefn2.h
+
+
 cmk_extras:
 	csh -fc 'source conv-mach.csh ; set echo ; $$CMK_EXTRAS'
 	touch cmk_extras
@@ -156,9 +159,9 @@ cmk_clean:
 CKHEADERS=chare.h const.h msg_macros.h prio_macros.h env_macros.h globals.h\
 	  sys_macros.h communication.h performance.h $(CVHEADERS)
 
-CK_LDB_N=libckn-ldb-acwn.o libckn-ldb-rand.o # libckn-ldb-mngr.o libckn-ldb-priomngr.o libckn-ldb-recv.o libckn-ldb-tok.o libckn-ldb-btok.o
+CK_LDB_N=libckn-ldb-rand.o  libckn-ldbvars.o #libckn-ldb-acwn.o  libckn-ldb-mngr.o libckn-ldb-priomngr.o libckn-ldb-recv.o libckn-ldb-tok.o libckn-ldb-btok.o
 
-CK_LDB_D=libckd-ldb-acwn.o libckd-ldb-rand.o # libckd-ldb-mngr.o libckd-ldb-priomngr.o libckd-ldb-recv.o libckd-ldb-tok.o libckd-ldb-btok.o
+CK_LDB_D= libckd-ldb-rand.o libckd-ldbvars.o #libckd-ldb-acwn.o libckd-ldb-mngr.o libckd-ldb-priomngr.o libckd-ldb-recv.o libckd-ldb-tok.o libckd-ldb-btok.o libckd-ldbvars.o
 
 CK_CPLUS_N=libckn-cplus-n.o
 
@@ -198,53 +201,61 @@ LIBCKD_CORE_REPLAY=$(LIBCKD_CORE) perf-repl.d.o perfio.d.o main.r.o ck.r.o
 libckd-core-replay.o: $(LIBCKD_CORE)
 	$(CHARMC) -cp ../lib/ -o $@ $(LIBCKD_CORE)
 
-libckn-ldb-acwn.o: ldb.acwn.c
-	$(CHARMC) -cp ../lib/ -o $@ ldb.acwn.c
+libckn-ldb-acwn.o: ldb.acwn.p ldb.h
+	$(CHARMC) -cp ../lib/ -o $@ ldb.acwn.p
 
-libckd-ldb-acwn.o: ldb.acwn.c
-	$(CHARMC) -cp ../lib/ -o $@ ldb.acwn.c -DDEBUGGING_MODE
+libckd-ldb-acwn.o: ldb.acwn.p ldb.h
+	$(CHARMC) -cp ../lib/ -o $@ ldb.acwn.p -DDEBUGGING_MODE
 
-libckn-ldb-rand.o: ldb.rand.c
-	$(CHARMC) -cp ../lib/ -o $@ ldb.rand.c
+libckn-ldb-rand.o: ldb.rand.p ldb.h
+	$(CHARMC) -cp ../lib/ -o $@ ldb.rand.p
 
-libckd-ldb-rand.o: ldb.rand.c
-	$(CHARMC) -cp ../lib/ -o $@ ldb.rand.c -DDEBUGGING_MODE
+libckd-ldb-rand.o: ldb.rand.p ldb.h
+	$(CHARMC) -cp ../lib/ -o $@ ldb.rand.p -DDEBUGGING_MODE
 
-libckn-ldb-mngr.o: ldb.mngr.c
-	$(CHARMC) -cp ../lib/ -o $@ ldb.mngr.c
+libckn-ldb-mngr.o: ldb.mngr.p ldb.h
+	$(CHARMC) -cp ../lib/ -o $@ ldb.mngr.p
 
-libckd-ldb-mngr.o: ldb.mngr.c
-	$(CHARMC) -cp ../lib/ -o $@ ldb.mngr.c -DDEBUGGING_MODE
+libckd-ldb-mngr.o: ldb.mngr.p ldb.h
+	$(CHARMC) -cp ../lib/ -o $@ ldb.mngr.p -DDEBUGGING_MODE
 
-libckn-ldb-priomngr.o: ldb.priomngr.c
-	$(CHARMC) -cp ../lib/ -o $@ ldb.priomngr.c
+libckn-ldb-priomngr.o: ldb.priomngr.p ldb.h
+	$(CHARMC) -cp ../lib/ -o $@ ldb.priomngr.p
 
-libckd-ldb-priomngr.o: ldb.priomngr.c
-	$(CHARMC) -cp ../lib/ -o $@ ldb.priomngr.c -DDEBUGGING_MODE
+libckd-ldb-priomngr.o: ldb.priomngr.p ldb.h
+	$(CHARMC) -cp ../lib/ -o $@ ldb.priomngr.p -DDEBUGGING_MODE
 
-libckn-ldb-tok.o: ldb.tok.c
-	$(CHARMC) -cp ../lib/ -o $@ ldb.tok.c
+libckn-ldb-tok.o: ldb.tok.p ldb.h
+	$(CHARMC) -cp ../lib/ -o $@ ldb.tok.p
 
-libckd-ldb-tok.o: ldb.tok.c
-	$(CHARMC) -cp ../lib/ -o $@ ldb.tok.c -DDEBUGGING_MODE
+libckd-ldb-tok.o: ldb.tok.p ldb.h
+	$(CHARMC) -cp ../lib/ -o $@ ldb.tok.p -DDEBUGGING_MODE
 
-libckn-ldb-btok.o: ldb.btok.c
-	$(CHARMC) -cp ../lib/ -o $@ ldb.btok.c
+libckn-ldb-btok.o: ldb.btok.p ldb.h
+	$(CHARMC) -cp ../lib/ -o $@ ldb.tok.p -DBITVECTOR
 
-libckd-ldb-btok.o: ldb.btok.c
-	$(CHARMC) -cp ../lib/ -o $@ ldb.btok.c -DDEBUGGING_MODE
+libckd-ldb-btok.o: ldb.btok.p ldb.h
+	$(CHARMC) -cp ../lib/ -o $@ ldb.btok.p -DDEBUGGING_MODE  -DBITVECTOR
 
-libckn-ldb-replay.o: ldb.replay.c
-	$(CHARMC) -cp ../lib/ -o $@ ldb.replay.c
+libckn-ldb-repl.o: ldb.repl.p ldb.h
+	$(CHARMC) -cp ../lib/ -o $@ ldb.repl.p
 
-libckd-ldb-replay.o: ldb.replay.c
-	$(CHARMC) -cp ../lib/ -o $@ ldb.replay.c -DDEBUGGING_MODE
+libckd-ldb-repl.o: ldb.repl.p ldb.h
+	$(CHARMC) -cp ../lib/ -o $@ ldb.repl.p -DDEBUGGING_MODE
 
-libckn-ldb-recv.o: ldb.recv.c
-	$(CHARMC) -cp ../lib/ -o $@ ldb.recv.c
+libckn-ldb-recv.o: ldb.recv.p ldb.h
+	$(CHARMC) -cp ../lib/ -o $@ ldb.recv.p
 
-libckd-ldb-recv.o: ldb.recv.c
-	$(CHARMC) -cp ../lib/ -o $@ ldb.recv.c -DDEBUGGING_MODE
+libckd-ldb-recv.o: ldb.recv.p ldb.h
+	$(CHARMC) -cp ../lib/ -o $@ ldb.recv.p -DDEBUGGING_MODE
+
+ldb.h:	conversedefns.h
+	
+libckn-ldbvars.o: ldbvars.c
+	$(CHARMC) -cp ../lib/ -o $@ ldbvars.c
+
+libckd-ldbvars.o: ldbvars.c
+	$(CHARMC) -cp ../lib/ -o $@ ldbvars.c -DDEBUGGING_MODE
 
 libckn-cplus-n.o: dummy.cplus.c
 	$(CHARMC) -cp ../lib/ -o $@ dummy.cplus.c
@@ -579,3 +590,5 @@ clean: cmk_clean
 	rm -rf ../bin
 	rm -rf ../lib
 	rm -rf ../include
+
+
