@@ -78,11 +78,12 @@ void IDXL_List::pup(PUP::er &p)
 
 void IDXL_List::sort2d(double *coord){
 	double *dist = new double[shared.size()];
-	for(int i=0;i<shared.size();i++){
+	int i;
+	for(i=0;i<shared.size();i++){
 		int idx = shared[i];
 		dist[i] = coord[2*idx]*coord[2*idx]+coord[2*idx+1]*coord[2*idx+1];
 	}
-	for(int i=0;i<shared.size();i++){
+	for(i=0;i<shared.size();i++){
 		for(int j=i;j<shared.size();j++){
 			if(dist[i] > dist[j]){
 				int k = shared[j];
