@@ -1583,6 +1583,7 @@ void ConverseInit (int argc, char **argv, CmiStartFn start_function,
   int startup_type;
   char *a;
   char *key;
+  char *ready_key;
 
 
   DEBUG_PRINT ("ConverseInit() called.\n");
@@ -1648,17 +1649,41 @@ void ConverseInit (int argc, char **argv, CmiStartFn start_function,
     CmiAbort ("Fatal error during startup phase.");
   }
 
+  /* Create the FIFOs for holding local and remote messages. */
+  /* NOTE: This needs to come here due to a race condition where some
+           processes may open their connections and start sending messages
+           before all of the other processes are started, and we need to
+           be able to deal with this situation.                           */
+  CpvAccess (CmiLocalQueue) = CdsFifo_Create ();
+  CpvAccess (CMI_VMI_RemoteQueue) = CdsFifo_Create ();
+
   /* Open connections. */
   if (CMI_VMI_Open_Connections (key) < 0) {
     CmiAbort ("Fatal error during connection setup phase.");
   }
 
-  /* Free memory. */
-  free (key);
+  /* Prepare the ready key for re-re-synchronization with the CRM. */
+  /* This is needed because some processes may open all of their connections
+     before all other processes finish opening their connections.  When the
+     fast processes finish and start sending messages (e.g., spanning
+     broadcasts) there is a problem when later nodes try to deal with
+     these messages properly.                                               */
+  ready_key = (char *) malloc (strlen (key) + 13);
+  if (!ready_key) {
+    DEBUG_PRINT ("Unable to allocate space for ready key.");
+    return (-1);
+  }
+  sprintf (ready_key, "%s:Ready\0", key);
 
-  /* Create the FIFOs for holding local and remote messages. */
-  CpvAccess (CmiLocalQueue) = CdsFifo_Create ();
-  CpvAccess (CMI_VMI_RemoteQueue) = CdsFifo_Create ();
+  /* Re-re-register with the CRM. */
+  if (CMI_VMI_CRM_Register (ready_key, _Cmi_numpes, FALSE) < -1) {
+    DEBUG_PRINT ("Unable to re-re-synchronize with all processes.");
+    return (-1);
+  }
+
+  /* Free memory. */
+  free (ready_key);
+  free (key);
 
   DEBUG_PRINT ("ConverseInit() is starting the main processing loop.\n");
 
