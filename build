@@ -25,13 +25,10 @@ syntax() {
 
 printOption() {
   echo
-  ( cd $src/$BASEVERSION; 
-    str=`ls conv-mach-*.h 2>/dev/null | sed 's/conv-mach-\([^.]*\).h/\1/'`;
-    cd ../..
+  ( str=`cd $src/$BASEVERSION; ls conv-mach-*.h 2>/dev/null | sed 's/conv-mach-\([^.]*\).h/\1/'`;
     if [ -d $src/${ARCH} ]
     then
-      cd $src/$ARCH
-      str="$str `ls conv-mach-*.h 2>/dev/null | sed 's/conv-mach-\([^.]*\).h/\1/'`";
+      str="$str `cd $src/$ARCH; ls conv-mach-*.h 2>/dev/null | sed 's/conv-mach-\([^.]*\).h/\1/'`";
     fi
     printf 'supported options: '
     echo $str)
