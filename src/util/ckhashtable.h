@@ -90,7 +90,7 @@ protected:
 	int len;//Vertical dimention of below array (best if prime)
 	unsigned short kb,ob;//Bytes per key; bytes per object. eb=kb+ob
 	unsigned short eb; //Bytes per hash entry-- horizontal dimention of below array
-	typedef char *entry_t;
+	typedef char entry_t;
 	entry_t *table;//Storage for keys and objects (len rows; eb columns)
 	
 	int nObj;//Number of objects actually stored (0..len)
@@ -154,15 +154,14 @@ public:
 // in a hash table (without knowing all the keys).
 class CkHashtableIterator {
 protected:
-	typedef char *entry_t;
-	entry_t *table;
+	char *table;
 	int len; short kb,ob,eb;
 	int curNo;//Table index of current object (to be returned next)
 	//Return the start of the i'th entry in the hash table
-	entry_t *entry(int i) const {return (entry_t *)(table+i*eb);}
+	char *entry(int i) const {return table+i*eb;}
 public:
 	CkHashtableIterator(void *Ntable,int Nlen,
-		int Nkb,int Nob) :table((entry_t *)Ntable),len(Nlen),kb(Nkb),ob(Nob) 
+		int Nkb,int Nob):table((char *)Ntable),len(Nlen),kb(Nkb),ob(Nob) 
 		{curNo=0;eb=kb+ob;}
 	
 	//Seek to start of hash table
@@ -232,7 +231,7 @@ public:
 	OBJ get(const KEY &key) {
 		int i=key.hash()%len;
 		while(true) {//Assumes key or empty slot will be found
-			CkHashtable::entry_t *cur=table+i*(sizeof(KEY)+sizeof(OBJ));
+			char *cur=table+i*(sizeof(KEY)+sizeof(OBJ));
 			//An empty slot indicates the key is not here
 			if (-17==*(int *)cur) return OBJ(0);
 			//Is this the key?
@@ -245,7 +244,7 @@ public:
 	OBJ &getRef(const KEY &key) {
 		int i=key.hash()%len;
 		while(true) {//Assumes key or empty slot will be found
-			CkHashtable::entry_t *cur=table+i*(sizeof(KEY)+sizeof(OBJ));
+			char *cur=table+i*(sizeof(KEY)+sizeof(OBJ));
 			//Is this the key?
 			if (key.compare(*(const KEY *)cur))
 				return *(OBJ *)(cur+sizeof(KEY));

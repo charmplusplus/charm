@@ -269,7 +269,7 @@ int CkHashtableIterator::hasNext(void)
 void *CkHashtableIterator::next(void **retKey)
 {
   while (curNo<len) {
-    entry_t *cur=entry(curNo++);
+    char *cur=entry(curNo++);
     if (!keyEmpty(e2k(cur))) {
       //Here's the next object
       if (retKey) *retKey=e2k(cur);
