@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.39  1996-04-07 19:16:52  jyelon
+ * Revision 2.40  1996-04-15 23:57:04  jyelon
+ * *** empty log message ***
+ *
+ * Revision 2.39  1996/04/07 19:16:52  jyelon
  * Corrected bug in CmiInterruptsRelease (could lead to reentering sighandler)
  *
  * Revision 2.38  1996/02/14 20:46:11  jyelon
@@ -361,12 +364,12 @@ void   CmiDeliverSpecificMsg   CMK_PROTO((int handler));
 
 /******** CQS: THE QUEUEING SYSTEM ********/
 
-#define CQS_QUEUEING_FIFO 0
-#define CQS_QUEUEING_LIFO 1
-#define CQS_QUEUEING_IFIFO 2
-#define CQS_QUEUEING_ILIFO 3
-#define CQS_QUEUEING_BFIFO 4
-#define CQS_QUEUEING_BLIFO 5
+#define CQS_QUEUEING_FIFO 2
+#define CQS_QUEUEING_LIFO 3
+#define CQS_QUEUEING_IFIFO 4
+#define CQS_QUEUEING_ILIFO 5
+#define CQS_QUEUEING_BFIFO 6
+#define CQS_QUEUEING_BLIFO 7
 
 /****** CTH: THE THREADS PACKAGE ******/
 
