@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.7  1995-10-11 19:30:33  sanjeev
+ * Revision 2.8  1995-10-12 20:14:15  sanjeev
+ * fixed problems while compiling with CC
+ *
+ * Revision 2.7  1995/10/11  19:30:33  sanjeev
  * removed CPlus_ChareExit
  *
  * Revision 2.6  1995/10/11  17:54:40  sanjeev
@@ -41,6 +44,7 @@ static char ident[] = "@(#)$Header$";
 
 
 #include <stdio.h>
+
 #include <varargs.h>
 #include "chare.h"
 #include "msg_macros.h"
@@ -48,6 +52,8 @@ static char ident[] = "@(#)$Header$";
 #include "performance.h"
 
 #include "c++interface.h"
+
+
 
 /* this is the handle of the main chare, used in place of MainChareID */
 /* If you make these Cpv or Csv, you have to change the charm++ xlator too */
@@ -76,21 +82,21 @@ extern "C" void *CPlus_CallMonoInit(int id, void *msg) ;
 
 
 void *
-comm_object::operator new(int size) 
+comm_object::operator new(size_t size) 
 {
 	CmiPrintf("[%d] ERROR: wrong new operator for message allocation\n",CmiMyPe()) ;
 	return (void *)0;
 }
 
 void *
-_CK_Object::operator new(int size) 
+_CK_Object::operator new(size_t size) 
 {
 	CmiPrintf("[%d] ERROR: wrong new operator for chare object allocation\n",CmiMyPe()) ;
 	return (void *)0;
 }
 
 void * 
-_CK_Object::operator new(int size, void *buf) 
+_CK_Object::operator new(size_t size, void *buf) 
 {
         return buf ;
 }
