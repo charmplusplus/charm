@@ -99,8 +99,6 @@ class chunk : public TCharmClient1D {
   // private helper methods used by FEM interface functions
   void deriveNodes();
   int edgeLocal(elemRef e1, elemRef e2);
-  int findEdge(int n1, int n2);
-  int addNewEdge(int n1, int n2);
   int getNbrRefOnEdge(int n1, int n2, int *conn, int nGhost, int *gid, 
 		      int idx, elemRef *er);
   int hasEdge(int n1, int n2, int *conn, int idx);
@@ -128,9 +126,7 @@ class chunk : public TCharmClient1D {
   void sanityCheck(void);
  
   // entry methods
-  void addNode(nodeMsg *);
-  void addEdge(edgeMsg *);
-  void addElement(elementMsg *);
+  void addNode(int idx, double x, double y);
 
   void freshen();
   void deriveBorderNodes();
@@ -143,45 +139,42 @@ class chunk : public TCharmClient1D {
   void deriveEdges(int *conn, int *gid);
 
   // This initiates a refinement for a single element
-  void refineElement(refineMsg *);
+  void refineElement(int idx, double area);
   // This loops through all elements performing refinements as needed
   void refiningElements();
 
   // This initiates a coarsening for a single element
-  void coarsenElement(coarsenMsg *);
+  void coarsenElement(int idx, double area);
   // This loops through all elements performing coarsenings as needed
   void coarseningElements();
 
   // The following methods simply provide remote access to local data
   // See above for details of each
-  nodeMsg *getNode(intMsg *);
-  refMsg *getEdge(collapseMsg *);
-  void setBorder(intMsg *);
-  intMsg *safeToMoveNode(nodeMsg *);
-  splitOutMsg *split(splitInMsg *);
-  void collapseHelp(collapseMsg *);
-  void checkPending(refMsg *);
-  void checkPending(drefMsg *);
-  void updateNode(updateMsg *);
-  void updateElement(updateMsg *);
-  void updateElementEdge(updateMsg *);
-  void updateReferences(updateMsg *);
-  doubleMsg *getArea(intMsg *);
-  nodeMsg *midpoint(intMsg *);
-  intMsg *setPending(intMsg *);
-  void unsetPending(intMsg *);
-  intMsg *isPending(intMsg *);
-  intMsg *lockNode(intMsg *);
-  void unlockNode(intMsg *);
-  refMsg *getNeighbor(refMsg *);
-  refMsg *getNotNode(refMsg *);
-  refMsg *getNotElem(refMsg *);
-  intMsg *isLongestEdge(refMsg *);
-  void setTargetArea(doubleMsg *);
-  void resetTargetArea(doubleMsg *);
-  void updateEdges(edgeUpdateMsg *);
-  void updateNodeCoords(nodeMsg *);
-  void reportPos(nodeMsg *);
+  nodeMsg *getNode(int n);
+  refMsg *getEdge(int idx, edgeRef er, node n1, node n2);
+  void setBorder(int n);
+  intMsg *safeToMoveNode(int idx, double x, double y);
+  splitOutMsg *split(int idx, elemRef e, node in, node fn);
+  void collapseHelp(int idx, edgeRef er, node n1, node n2);
+  void checkPending(int idx, objRef aRef);
+  void checkPending(int idx, objRef aRef1, objRef aRef2);
+  void updateElement(int idx, objRef oldval, objRef newval);
+  void updateElementEdge(int idx, objRef oldval, objRef newval);
+  void updateReferences(int idx, objRef oldval, objRef newval);
+  doubleMsg *getArea(int n);
+  intMsg *setPending(int n);
+  void unsetPending(int n);
+  intMsg *isPending(int n);
+  intMsg *lockNode(int n);
+  void unlockNode(int n);
+  refMsg *getNeighbor(int idx, objRef aRef);
+  refMsg *getNotElem(int idx, objRef aRef);
+  intMsg *isLongestEdge(int idx, objRef aRef);
+  void setTargetArea(int idx, double aDouble);
+  void resetTargetArea(int idx, double aDouble);
+  void updateEdges(int idx, edgeRef e0, edgeRef e1, edgeRef e2);
+  void updateNodeCoords(int idx, double x, double y);
+  void reportPos(int idx, double x, double y);
 
   // meshLock methods
   void accessLock();  // waits until meshExpandFlag not set, then decs meshLock
@@ -204,7 +197,7 @@ class chunk : public TCharmClient1D {
 
 
   // add an edge on a remote chunk
-  void addRemoteEdge(remoteEdgeMsg *);
+  void addRemoteEdge(int elem, int localEdge, edgeRef er);
 
   // local methods
   // These access and set local flags
@@ -216,14 +209,14 @@ class chunk : public TCharmClient1D {
   // these methods allow for run-time additions/modifications to the chunk
   void allocMesh(int nEl);
   void adjustMesh();
-  nodeRef *addNode(node& n);
-  edgeRef *addEdge(nodeRef& nr1, nodeRef& nr2);
-  elemRef *addElement(nodeRef& nr1, nodeRef& nr2, nodeRef& nr3);
-  elemRef *addElement(nodeRef& nr1, nodeRef& nr2, nodeRef& nr3,
-		      edgeRef& er1, edgeRef& er2, edgeRef& er3);
-  void removeNode(intMsg *);
-  void removeEdge(intMsg *);
-  void removeElement(intMsg *);
+  int addNode(node n);
+  edgeRef addEdge();
+  elemRef addElement(int n1, int n2, int n3);
+  elemRef addElement(int n1, int n2, int n3,
+		      edgeRef er1, edgeRef er2, edgeRef er3);
+  void removeNode(int n);
+  void removeEdge(int n);
+  void removeElement(int n);
   // prints a snapshot of the chunk to file
   void debug_print(int c);
   void out_print();

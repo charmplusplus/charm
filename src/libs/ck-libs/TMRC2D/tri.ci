@@ -5,22 +5,8 @@ module refine {
   // ----------------------------- Messages ---------------------------------
   message chunkMsg;
   message nodeMsg;
-  message edgeMsg;
-  message remoteEdgeMsg;
-  message elementMsg;
-  message femElementMsg;
-  message ghostElementMsg;
-  message refineMsg;
-  message coarsenMsg;
-  message collapseMsg;
-  message splitInMsg;
   message splitOutMsg;
-  message updateMsg;
-  message specialRequestMsg;
-  message specialResponseMsg;
   message refMsg; 
-  message drefMsg; 
-  message edgeUpdateMsg;
   message intMsg;
   message doubleMsg;
 
@@ -30,43 +16,37 @@ module refine {
 
   // ---------------------------- Chare Arrays ------------------------------
   array [1D] chunk {
-/*
-    entry chunk();
-    entry chunk(intMsg *);
-*/
     entry chunk(chunkMsg *);
-    entry void addRemoteEdge(remoteEdgeMsg *);
-    entry void refineElement(refineMsg *);
+    entry void addRemoteEdge(int, int, edgeRef);
+    entry void refineElement(int, double);
     entry [threaded] void refiningElements();	
-    entry void coarsenElement(coarsenMsg *);
+    entry void coarsenElement(int, double);
     entry [threaded] void coarseningElements();	
-    entry [sync] nodeMsg *getNode(intMsg *);
-    entry [sync] refMsg *getEdge(collapseMsg *);
-    entry [sync] void setBorder(intMsg *);
-    entry [sync] intMsg *safeToMoveNode(nodeMsg *);
-    entry [sync] splitOutMsg *split(splitInMsg *);
-    entry [sync] void collapseHelp(collapseMsg *);
-    entry void checkPending(refMsg *);
-    entry void checkPending(drefMsg *);
-    entry [sync] void updateElement(updateMsg *);
-    entry [sync] void updateElementEdge(updateMsg *);
-    entry void updateReferences(updateMsg *);
-    entry [sync, threaded] doubleMsg *getArea(intMsg *);
-    entry [sync, threaded] nodeMsg *midpoint(intMsg *);
-    entry [sync] intMsg *setPending(intMsg *);
-    entry [sync] void unsetPending(intMsg *);
-    entry [sync] intMsg *isPending(intMsg *);
-    entry [sync] intMsg *lockNode(intMsg *);
-    entry [sync] void unlockNode(intMsg *);
-    entry [sync, threaded] intMsg *isLongestEdge(refMsg *);
-    entry [sync] refMsg *getNeighbor(refMsg *);
-    entry [sync] refMsg *getNotNode(refMsg *);
-    entry [sync] refMsg *getNotElem(refMsg *);
-    entry [sync] void setTargetArea(doubleMsg *);
-    entry [sync] void resetTargetArea(doubleMsg *);
-    entry [sync] void updateEdges(edgeUpdateMsg *);
-    entry [sync] void updateNodeCoords(nodeMsg *);
-    entry void reportPos(nodeMsg *);
+    entry [sync] nodeMsg *getNode(int);
+    entry [sync] refMsg *getEdge(int, edgeRef, node, node);
+    entry [sync] void setBorder(int);
+    entry [sync] intMsg *safeToMoveNode(int, double, double);
+    entry [sync] splitOutMsg *split(int, elemRef, node, node);
+    entry [sync] void collapseHelp(int, edgeRef, node, node);
+    entry void checkPending(int, objRef);
+    entry void checkPending(int, objRef, objRef);
+    entry [sync] void updateElement(int, objRef, objRef);
+    entry [sync] void updateElementEdge(int, objRef, objRef);
+    entry void updateReferences(int, objRef, objRef);
+    entry [sync, threaded] doubleMsg *getArea(int);
+    entry [sync] intMsg *setPending(int);
+    entry [sync] void unsetPending(int);
+    entry [sync] intMsg *isPending(int);
+    entry [sync] intMsg *lockNode(int);
+    entry [sync] void unlockNode(int);
+    entry [sync, threaded] intMsg *isLongestEdge(int, objRef);
+    entry [sync] refMsg *getNeighbor(int, objRef);
+    entry [sync] refMsg *getNotElem(int, objRef);
+    entry [sync] void setTargetArea(int, double);
+    entry [sync] void resetTargetArea(int, double);
+    entry [sync] void updateEdges(int, edgeRef, edgeRef, edgeRef);
+    entry [sync] void updateNodeCoords(int, double, double);
+    entry void reportPos(int, double, double);
     entry [sync, threaded] void print();
     entry [sync, threaded] void out_print();
     entry void freshen();
@@ -75,12 +55,9 @@ module refine {
     entry void improveChunk();
     entry [sync, threaded] void improve();
  
-    entry void addNode(nodeMsg *);
-    entry void addEdge(edgeMsg *);
-    entry void addElement(elementMsg *);
-    entry [sync] void removeNode(intMsg *);
-    entry [sync] void removeEdge(intMsg *);
-    entry [sync] void removeElement(intMsg *);
-    entry [sync] void updateNode(updateMsg *);
+    entry void addNode(int, double, double);
+    entry [sync] void removeNode(int);
+    entry [sync] void removeEdge(int);
+    entry [sync] void removeElement(int);
   };
 };

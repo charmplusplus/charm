@@ -4,19 +4,19 @@
 #define NODE_H
 
 #include <math.h>
+#include "ref.h"
 #define DIM 2
 
 class elemRef;
-class nodeRef;
 class edgeRef;
 
 class node {  // a 2D double coordinate
   double x, y;  // the double 2D coordinate
-  int reports;
-  double sumReports[DIM];  // for mesh improvement
-  int theLock;
+  int reports;  // for smoothing
+  double sumReports[DIM];  // for smoothing
+  int theLock; // locking is for coarsening
  public:
-  int border;
+  int border; // mesh boundary info
   
   node() {
     x=-1.0; y=-1.0; theLock = reports = border = 0; 
@@ -46,8 +46,13 @@ class node {  // a 2D double coordinate
     sumReports[0] = n.sumReports[0];  sumReports[1] = n.sumReports[1];
     return *this; 
   }
+  void pup(PUP::er &p) {
+    p(x); p(y); p(reports); p(theLock); p(border); p(sumReports, DIM);
+  }
   double X() { return x; }
   double Y() { return y; }
+  int lock() { return (theLock ? 0 : theLock = 1); }
+  void unlock() { theLock = 0; }
   double distance(const node& n) { // get distance to n
     double dx = n.x - x, dy = n.y - y;
     return (sqrt ((dx * dx) + (dy * dy)));
@@ -59,6 +64,8 @@ class node {  // a 2D double coordinate
     double a=(x + n.x) / 2.0, b=(y + n.y) / 2.0;
     return node(a, b);
   }
+
+  // mesh smoothing methods (NOT USED)
   void improvePos() {
     x = sumReports[0]/reports;
     y = sumReports[1]/reports;
@@ -75,12 +82,12 @@ class node {  // a 2D double coordinate
     return 1;
   }
   int safeToMove(node m, elemRef E0, edgeRef e0, edgeRef e1, 
-		 nodeRef n1, nodeRef n2, nodeRef n3) {
+		 node n1, node n2, node n3) {
     /*    node nbrs[100], intersectionPt;
     int nbrCount = 2, result;
     elemRef Ei, Eold = E0;
     edgeRef ei, eold = e1;
-    nodeRef ni;
+    node ni;
     */
     if (border) return 0;  // this node on border; don't move it
     return 1;
@@ -111,8 +118,6 @@ class node {  // a 2D double coordinate
     return 1;
     */
   }
-  int lock() { return (theLock ? 0 : theLock = 1); }
-  void unlock() { theLock = 0; }
   int findIntersection(node m, node pi, node pj, node mi) {
     // find intersection point mi of lines defined by (this,m) and (pi,pj)
     double num, den, ua;
@@ -132,6 +137,10 @@ class node {  // a 2D double coordinate
 	    ((mi.X() >= m.X()) && (mi.X() <= x)))
 	   && (((mi.Y() >= y) && (mi.Y() <= m.Y())) ||
 	       ((mi.Y() >= m.Y()) && (mi.Y() <= y))));
+  }
+  void sanityCheck(int cid, int idx) {
+    if ((x == -1.0) && (y == -1.0))
+      CkPrintf("TMRC2D: sanityCheck WARNING: node %d on chunk %d has default coordinate values.\n", idx, cid);
   }
 };
 

@@ -34,40 +34,103 @@ class element {  // triangular elements defined by three node references,
                    2_______1
 	               2                              */
  public:
-  nodeRef nodes[3];
+  int nodes[3];
   edgeRef edges[3];
   elemRef myRef;
   chunk *C;
 
-  element(); // Basic element constructor
+  /// Basic element constructor
+  element() {   targetArea = currentArea = -1.0;  present = 1; }
   element(int cid, int idx, chunk *C) { set(); set(cid, idx, C); }
-  element(nodeRef *n);
-  element(nodeRef *n, edgeRef *e);
-  element(nodeRef& n1, nodeRef& n2, nodeRef& n3, 
-	  edgeRef& e1, edgeRef& e2, edgeRef& e3);
-  element(int cid, int idx, chunk *C, nodeRef& n1, nodeRef& n2, nodeRef& n3, 
-	  edgeRef& e1, edgeRef& e2, edgeRef& e3);
-  element(const element& e);
-  element& operator=(const element& e);
-    
-  void set(); // equivalent to constructor initializations
-  void set(int cid, int idx, chunk *myChk) { set(); myRef.set(cid, idx); C = myChk;}
-  void set(nodeRef *n);
-  void set(nodeRef *n, edgeRef *e);
-  void set(nodeRef& n1, nodeRef& n2, nodeRef& n3, 
-	  edgeRef& e1, edgeRef& e2, edgeRef& e3);
+  element(int *n) { set();  set(n); }
+  element(int *n, edgeRef *e) { set();  set(n, e); }
+  element(int n1, int n2, int n3, edgeRef e1, edgeRef e2, edgeRef e3) {
+    set();  set(n1, n2, n3, e1, e2, e3);
+  }
+  element(int cid, int idx, chunk *C, int n1, int n2, int n3, 
+	  edgeRef e1, edgeRef e2, edgeRef e3) {
+    set();  set(cid, idx, C);  set(n1, n2, n3, e1, e2, e3);
+  }
+  /// Copy constructor
+  element(const element& e) {
+    targetArea = e.targetArea;  currentArea = e.currentArea;
+    present = e.present;
+    for (int i=0; i<3; i++) {
+      nodes[i] = e.nodes[i];  edges[i] = e.edges[i];
+    }
+    myRef = e.myRef;  C = e.C;
+  }
+  /// Assignment
+  element& operator=(const element& e) { 
+    targetArea = e.targetArea;  currentArea = e.currentArea; 
+    present = e.present;
+    for (int i=0; i<3; i++) { 
+      nodes[i] = e.nodes[i];  edges[i] = e.edges[i];
+    }
+    myRef = e.myRef;  C = e.C;
+    return *this; 
+  }
+
+  /// Basic set operation
+  void set() { targetArea = currentArea = -1.0;  present = 1; } 
+  void set(int c, int i, chunk *ck) { set(); myRef.set(c, i); C = ck; }
+  void set(int *n) { present = 1; for (int i=0; i<3; i++)  nodes[i] = n[i]; }
+  void set(int *n, edgeRef *e) {
+    present = 1;
+    for (int i=0; i<3; i++) {
+      nodes[i] = n[i];
+      edges[i] = e[i];
+    }
+  }
+  void set(int n1, int n2, int n3) {
+    present = 1;
+    nodes[0] = n1;  nodes[1] = n2;  nodes[2] = n3;
+  }
+  void set(int n1, int n2, int n3, edgeRef e1, edgeRef e2, edgeRef e3) {
+    present = 1;
+    nodes[0] = n1;  nodes[1] = n2;  nodes[2] = n3;
+    edges[0] = e1;  edges[1] = e2;  edges[2] = e3;
+  }
+  void set(edgeRef& e1, edgeRef& e2, edgeRef& e3) {
+    present = 1;  edges[0] = e1;  edges[1] = e2;  edges[2] = e3;
+  }
   void set(int idx, edgeRef e) { edges[idx] = e; }
-  void set(edgeRef& e1, edgeRef& e2, edgeRef& e3);
 
-  void update(edgeRef& oldval, edgeRef& newval);
-  void update(nodeRef& oldval, nodeRef& newval);
+  /// Update an old edgeRef with a new one
+  void update(edgeRef& oldval, edgeRef& newval) {
+    CkAssert((edges[0]==oldval) || (edges[1]==oldval) || (edges[2]==oldval));
+    if (edges[0] == oldval) edges[0] = newval;
+    else if (edges[1] == oldval) edges[1] = newval;
+    else edges[2] = newval;
+  }
+  /// Update an old node with a new one
+  void update(int oldNode, int newNode) {
+    CkAssert((nodes[0]==oldNode)||(nodes[1]==oldNode)||(nodes[2]==oldNode));
+    if (nodes[0] == oldNode) nodes[0] = newNode;
+    else if (nodes[1] == oldNode) nodes[1] = newNode;
+    else if (nodes[2] == oldNode) nodes[2] = newNode;
+  }
 
-  nodeRef& getNode(int nodeIdx) { return nodes[nodeIdx]; }
-  edgeRef& getEdge(int edgeIdx) { return edges[edgeIdx]; }
-  int getEdgeIdx(edgeRef e);
-  int getNodeIdx(nodeRef n);
-  elemRef getElement(int edgeIdx);
-  edgeRef& getEdge(edgeRef eR, nodeRef nR);
+  /// Given index of a node on this element, return node's index in node array
+  int getNode(int nodeIdx) { return nodes[nodeIdx]; }
+  /// Given index of an edge on this element, return the edgeRef for the edge
+  edgeRef getEdge(int edgeIdx) { return edges[edgeIdx]; }
+  /// Given an edgeRef, find its index on this element
+  int getEdgeIdx(edgeRef e) {
+    CkAssert((e==edges[0]) || (e==edges[1]) || (e==edges[2]));
+    if (edges[0] == e) return 0;
+    else if (edges[1] == e) return 1;
+    else return 2;
+  }
+  /// Given a node array index, find its index on this element
+  int getNodeIdx(int n) {
+    CkAssert((n==nodes[0]) || (n==nodes[1]) || (n==nodes[2]));
+    if (nodes[0] == n) return 0;
+    else if (nodes[1] == n) return 1;
+    else return 2;
+  }
+  /// Given an edge index on this element, get the neighboring elemRef 
+  elemRef getElement(int edgeIdx) { return edges[edgeIdx].get(myRef); }
   
   void clear() { present = 0; }
   int isPresent() { return present; }
@@ -75,9 +138,12 @@ class element {  // triangular elements defined by three node references,
   // getArea & calculateArea both set currentArea; getArea returns it
   // minimizeTargetArea initializes or minimizes targetArea
   // getTargetArea & getCachedArea provide access to targetArea & currentArea
-  double getArea();
+  double getArea() { calculateArea();  return currentArea; }
   void calculateArea();
-  void minimizeTargetArea(double area);
+  void minimizeTargetArea(double area) {
+    if (((targetArea > area) || (targetArea < 0.0))  &&  (area >= 0.0))
+      targetArea = area;
+  }
   void resetTargetArea(double area) { targetArea = area; }
   void setTargetArea(double area) { 
     if ((area < targetArea) || (targetArea < 0.0)) targetArea = area; }
@@ -90,18 +156,18 @@ class element {  // triangular elements defined by three node references,
 
   // coarsen will delete this element (and possibly a neighbor) by squishing 
   // its shortest edge to that edge's midpoint.
-  void coarsen();
-  void collapse(int shortEdge, int n1, int n2, int e1, int e2);
-  void collapseHelp(edgeRef shortEdgeRef, nodeRef n1ref, nodeRef n2ref);
+  //void coarsen();
+  //void collapse(int shortEdge, int n1, int n2, int e1, int e2);
+  //void collapseHelp(edgeRef shortEdgeRef, node n1, node n2);
 
   // These are helper methods.
   int findLongestEdge();
-  int findShortestEdge();
+  //int findShortestEdge();
   int isLongestEdge(edgeRef& e);
 
   // Mesh improvement stuff
-  void tweakNodes();
-  node tweak(node n[3], int i);
+  //void tweakNodes();
+  //node tweak(node n[3], int i);
 
   void sanityCheck(chunk *c,elemRef shouldRef);
 };

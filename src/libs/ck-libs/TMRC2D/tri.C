@@ -14,10 +14,11 @@ void refineChunkInit(void) {
 }
 
 chunk::chunk(chunkMsg *m)
-  : TCharmClient1D(m->myThreads), numElements(0), numEdges(0), numNodes(0), 
-    numGhosts(0), sizeElements(0), sizeEdges(0), sizeNodes(0),
+  : TCharmClient1D(m->myThreads), sizeElements(0), sizeEdges(0), sizeNodes(0),
     additions(0), debug_counter(0), refineInProgress(0), coarsenInProgress(0),
-    modified(0), meshLock(0), meshExpandFlag(0), theClient(NULL)
+    modified(0), meshLock(0), meshExpandFlag(0), 
+    numElements(0), numEdges(0), numNodes(0), numGhosts(0), theClient(NULL)
+
 {
   refineResultsStorage=NULL;
   cid = thisIndex;
@@ -27,40 +28,27 @@ chunk::chunk(chunkMsg *m)
   thread->resume();
 }
 
-void chunk::addNode(nodeMsg *m)
+void chunk::addNode(int idx, double x, double y)
 {
-  theNodes[numNodes].set(m->x, m->y);
-  CkFreeMsg(m);
+  accessLock();
+  theNodes[idx].set(x, y);
   numNodes++;
+  releaseLock();
 }
 
-void chunk::addEdge(edgeMsg *m)
+void chunk::addRemoteEdge(int elem, int localEdge, edgeRef er)
 {
-  theEdges[numEdges].set(this);
-  theEdges[numEdges].set(m->nodes[0], m->nodes[1], m->elements[0], m->elements[1]);
-  CkFreeMsg(m);
-  numEdges++;
+  accessLock();
+  theElements[elem].set(localEdge, er);
+  releaseLock();
 }
 
-void chunk::addRemoteEdge(remoteEdgeMsg *m)
-{
-  theElements[m->elem].set(m->localEdge, m->er);
-  CkFreeMsg(m);
-}
-
-void chunk::addElement(elementMsg *m)
-{
-  theElements[numElements].set(cid, numElements, this);
-  theElements[numElements].set(m->nodes, m->edges);
-  CkFreeMsg(m);
-  numElements++;
-}
-
-void chunk::refineElement(refineMsg *m)
+void chunk::refineElement(int idx, double area)
 {
   // we indicate a need for refinement by reducing an element's targetArea
-  theElements[m->idx].setTargetArea(m->area);
-  CkFreeMsg(m);
+  accessLock();
+  theElements[idx].setTargetArea(area);
+  releaseLock();
   modified = 1;  // flag a change in one of the chunk's elements
   if (!refineInProgress) { // if refine loop not running
     refineInProgress = 1;
@@ -97,12 +85,11 @@ void chunk::refiningElements()
 
 
 // This initiates a coarsening for a single element
-void chunk::coarsenElement(coarsenMsg *m)
+void chunk::coarsenElement(int idx, double area)
 {
   // we indicate a need for coarsening by increasing an element's targetArea
-  if (!theElements[m->idx].isPresent()) return;
-  theElements[m->idx].resetTargetArea(m->area);
-  CkFreeMsg(m);
+  if (!theElements[idx].isPresent()) return;
+  theElements[idx].resetTargetArea(area);
   modified = 1;  // flag a change in one of the chunk's elements
   if (!coarsenInProgress) { // if coarsen loop not running
     coarsenInProgress = 1;
@@ -113,6 +100,8 @@ void chunk::coarsenElement(coarsenMsg *m)
 // This loops through all elements performing coarsenings as needed
 void chunk::coarseningElements()
 {
+  CkPrintf("TMRC2D: WARNING! chunk::coarseningElements called but not implemented!\n");
+  /*
   int i;
 
   while (modified) { // try to coarsen elements until no changes occur
@@ -132,229 +121,214 @@ void chunk::coarseningElements()
     CthYield(); // give other chunks on the same PE a chance
   }
   coarsenInProgress = 0;  // turn coarsen loop off
+  */
 }
 
 // many remote access methods follow
-nodeMsg *chunk::getNode(intMsg *im)
+nodeMsg *chunk::getNode(int n)
 {
   nodeMsg *nm = new nodeMsg;
-  nm->x = theNodes[im->anInt].X();
-  nm->y = theNodes[im->anInt].Y();
-  CkFreeMsg(im);
+  accessLock();
+  nm->x = theNodes[n].X();
+  nm->y = theNodes[n].Y();
+  releaseLock();
   return nm;
 }
 
-refMsg *chunk::getEdge(collapseMsg *cm)
+refMsg *chunk::getEdge(int idx, edgeRef er, node n1, node n2)
 {
+  CkPrintf("TMRC2D: WARNING! chunk::getEdge called but not implemented!\n");
   refMsg *rm = new refMsg;
-  rm->aRef = theElements[cm->idx].getEdge(cm->er, cm->nr1);
-  CkFreeMsg(cm);
+  /*
+  rm->aRef = theElements[idx].getEdge(er, n1);
+  */
   return rm;
 }
 
-void chunk::setBorder(intMsg *im)
+void chunk::setBorder(int n)
 {
-  theNodes[im->anInt].setBorder();
-  CkFreeMsg(im);
+  accessLock();
+  theNodes[n].setBorder();
+  releaseLock();
 }
 
-intMsg *chunk::safeToMoveNode(nodeMsg *nm)
+intMsg *chunk::safeToMoveNode(int idx, double x, double y)
 {
-  node foo(nm->x, nm->y);
+  node foo(x, y);
   intMsg *im = new intMsg;
-  im->anInt = theNodes[nm->idx].safeToMove(foo);
-  CkFreeMsg(nm);
+  accessLock();
+  im->anInt = theNodes[idx].safeToMove(foo);
+  releaseLock();
   return im;
 }
 
-splitOutMsg *chunk::split(splitInMsg *sim)
+splitOutMsg *chunk::split(int idx, elemRef e, node in, node fn)
 {
   splitOutMsg *som = new splitOutMsg;
-  int foo;
-  som->result = theEdges[sim->idx].split(&(som->n), &(som->e), sim->n, 
-					   sim->e, &foo);
-  CkFreeMsg(sim);
+  accessLock();
+  som->result = theEdges[idx].split(&(som->n), &(som->e), in, fn, e, 
+				    &(som->local), &(som->first), 
+				    &(som->nullNbr));
+  releaseLock();
   return som;
 }
 
-void chunk::collapseHelp(collapseMsg *cm)
+void chunk::collapseHelp(int idx, edgeRef er, node n1, node n2)
 {
-  theElements[cm->idx].collapseHelp(cm->er, cm->nr1, cm->nr2);
-  CkFreeMsg(cm);
+  CkPrintf("TMRC2D: WARNING! chunk::collapseHelp called but not implemented!\n");
+  //  theElements[idx].collapseHelp(er, n1, n2);
 }
 
-void chunk::checkPending(refMsg *rm)
+void chunk::checkPending(int idx, objRef aRef)
 {
   elemRef eRef;
-  eRef.idx = rm->aRef.idx; eRef.cid = rm->aRef.cid;
-  theEdges[rm->idx].checkPending(eRef);
-  CkFreeMsg(rm);
+  eRef.idx = aRef.idx; eRef.cid = aRef.cid;
+  accessLock();
+  theEdges[idx].checkPending(eRef);
+  releaseLock();
 }
 
-void chunk::checkPending(drefMsg *rm)
+void chunk::checkPending(int idx, objRef aRef1, objRef aRef2)
 {
   elemRef eRef1, eRef2;
-  eRef1.idx = rm->aRef1.idx; eRef1.cid = rm->aRef1.cid;
-  eRef2.idx = rm->aRef2.idx; eRef2.cid = rm->aRef2.cid;
-  theEdges[rm->idx].checkPending(eRef1, eRef2);
-  CkFreeMsg(rm);
+  eRef1.idx = aRef1.idx; eRef1.cid = aRef1.cid;
+  eRef2.idx = aRef2.idx; eRef2.cid = aRef2.cid;
+  accessLock();
+  theEdges[idx].checkPending(eRef1, eRef2);
+  releaseLock();
 }
 
-void chunk::updateNode(updateMsg *um)
-{
-  nodeRef ov, nv;
-  ov.idx = um->oldval.idx;   ov.cid = um->oldval.cid; 
-  nv.idx = um->newval.idx;   nv.cid = um->newval.cid; 
-  theEdges[um->idx].update(ov, nv);
-  CkFreeMsg(um);
-}
-
-void chunk::updateElement(updateMsg *um)
+void chunk::updateElement(int idx, objRef oldval, objRef newval)
 {
   elemRef ov, nv;
-  ov.idx = um->oldval.idx;   ov.cid = um->oldval.cid; 
-  nv.idx = um->newval.idx;   nv.cid = um->newval.cid; 
-  theEdges[um->idx].update(ov, nv);
-  CkFreeMsg(um);
+  ov.idx = oldval.idx;   ov.cid = oldval.cid; 
+  nv.idx = newval.idx;   nv.cid = newval.cid; 
+  accessLock();
+  theEdges[idx].update(ov, nv);
+  releaseLock();
 }
 
-void chunk::updateElementEdge(updateMsg *um)
+void chunk::updateElementEdge(int idx, objRef oldval, objRef newval)
 {
   edgeRef ov, nv;
-  ov.idx = um->oldval.idx;   ov.cid = um->oldval.cid; 
-  nv.idx = um->newval.idx;   nv.cid = um->newval.cid; 
-  theElements[um->idx].update(ov, nv);
-  CkFreeMsg(um);
+  ov.idx = oldval.idx;   ov.cid = oldval.cid; 
+  nv.idx = newval.idx;   nv.cid = newval.cid; 
+  accessLock();
+  theElements[idx].update(ov, nv);
+  releaseLock();
 }
 
-void chunk::updateReferences(updateMsg *um)
+void chunk::updateReferences(int idx, objRef oldval, objRef newval)
 {
+  CkPrintf("TMRC2D: WARNING! chunk::updateReferences called but not implemented!\n");
+  /*
   int i;
   nodeRef ov, nv;
-  ov.idx = um->oldval.idx;   ov.cid = um->oldval.cid; 
-  nv.idx = um->newval.idx;   nv.cid = um->newval.cid;
+  ov.idx = oldval.idx;   ov.cid = oldval.cid; 
+  nv.idx = newval.idx;   nv.cid = newval.cid;
   for (i=0; i<numElements; i++)
     theElements[i].update(ov, nv);
   for (i=0; i<numEdges; i++)
     theEdges[i].updateSilent(ov, nv);
-  CkFreeMsg(um);
+  */
 }
 
-doubleMsg *chunk::getArea(intMsg *im)
+doubleMsg *chunk::getArea(int n)
 {
   doubleMsg *dm = new doubleMsg;
   accessLock();
-  dm->aDouble = theElements[im->anInt].getArea();
-  CkFreeMsg(im);
+  dm->aDouble = theElements[n].getArea();
   releaseLock();
   return dm;
 }
 
-nodeMsg *chunk::midpoint(intMsg *im)
-{
-  nodeMsg *nm = new nodeMsg;
-  node result;
-  accessLock();
-  theEdges[im->anInt].midpoint(result);
-  CkFreeMsg(im);
-  releaseLock();
-  nm->x = result.X();
-  nm->y = result.Y();
-  return nm;
-}
-
-intMsg *chunk::setPending(intMsg *im)
+intMsg *chunk::setPending(int n)
 {
   intMsg *rm = new intMsg;
-  if (theEdges[im->anInt].isPending())
+  accessLock();
+  if (theEdges[n].isPending())
     rm->anInt = 0;
   else {
-    theEdges[im->anInt].setPending();
+    theEdges[n].setPending();
     rm->anInt = 1;
   }
-  CkFreeMsg(im);
+  releaseLock();
   return rm;
 }
 
-void chunk::unsetPending(intMsg *im)
+void chunk::unsetPending(int n)
 {
-  theEdges[im->anInt].unsetPending();
-  CkFreeMsg(im);
+  accessLock();
+  theEdges[n].unsetPending();
+  releaseLock();
 }
 
 
-intMsg *chunk::isPending(intMsg *im)
+intMsg *chunk::isPending(int n)
 {
   intMsg *rm = new intMsg;
-  rm->anInt = theEdges[im->anInt].isPending();
-  CkFreeMsg(im);
+  accessLock();
+  rm->anInt = theEdges[n].isPending();
+  releaseLock();
   return rm;
 }
 
-intMsg *chunk::lockNode(intMsg *im)
+intMsg *chunk::lockNode(int n)
 {
   intMsg *rm = new intMsg;
-  rm->anInt = theNodes[im->anInt].lock();
-  CkFreeMsg(im);
+  accessLock();
+  rm->anInt = theNodes[n].lock();
+  releaseLock();
   return rm;
 }
 
-void chunk::unlockNode(intMsg *im)
+void chunk::unlockNode(int n)
 {
-  theNodes[im->anInt].unlock();
-  CkFreeMsg(im);
+  accessLock();
+  theNodes[n].unlock();
+  releaseLock();
 }
 
-intMsg *chunk::isLongestEdge(refMsg *rm)
+intMsg *chunk::isLongestEdge(int idx, objRef aRef)
 {
   intMsg *im = new intMsg;
   edgeRef eRef;
-
+  eRef.idx = aRef.idx; eRef.cid = aRef.cid;
   accessLock();
-  eRef.idx = rm->aRef.idx; eRef.cid = rm->aRef.cid;
-  im->anInt = theElements[rm->idx].isLongestEdge(eRef);
-  CkFreeMsg(rm);
+  im->anInt = theElements[idx].isLongestEdge(eRef);
   releaseLock();
   return im;
 }
 
-refMsg *chunk::getNeighbor(refMsg *gm)
+refMsg *chunk::getNeighbor(int idx, objRef aRef)
 {
   refMsg *rm = new refMsg;
   elemRef er, ar;
-  ar.cid = gm->aRef.cid; ar.idx = gm->aRef.idx;
-  er = theEdges[gm->idx].getNot(ar);
-  CkFreeMsg(gm);
+  ar.cid = aRef.cid; ar.idx = aRef.idx;
+  accessLock();
+  er = theEdges[idx].getNot(ar);
+  releaseLock();
   rm->aRef = er;
   return rm;
 }
 
-refMsg *chunk::getNotNode(refMsg *gm)
-{
-  refMsg *rm = new refMsg;
-  nodeRef er, ar;
-  ar.cid = gm->aRef.cid; ar.idx = gm->aRef.idx;
-  er = theEdges[gm->idx].getNot(ar);
-  CkFreeMsg(gm);
-  rm->aRef = er;
-  return rm;
-}
-
-refMsg *chunk::getNotElem(refMsg *gm)
+refMsg *chunk::getNotElem(int idx, objRef aRef)
 {
   refMsg *rm = new refMsg;
   elemRef er, ar;
-  ar.cid = gm->aRef.cid; ar.idx = gm->aRef.idx;
-  er = theEdges[gm->idx].getNot(ar);
-  CkFreeMsg(gm);
+  ar.cid = aRef.cid; ar.idx = aRef.idx;
+  accessLock();
+  er = theEdges[idx].getNot(ar);
+  releaseLock();
   rm->aRef = er;
   return rm;
 }
 
-void chunk::setTargetArea(doubleMsg *dm)
+void chunk::setTargetArea(int idx, double aDouble)
 {
-  theElements[dm->idx].setTargetArea(dm->aDouble);
-  CkFreeMsg(dm);
+  accessLock();
+  theElements[idx].setTargetArea(aDouble);
+  releaseLock();
   modified = 1;
   if (!refineInProgress) {
     refineInProgress = 1;
@@ -362,30 +336,34 @@ void chunk::setTargetArea(doubleMsg *dm)
   }
 }
 
-void chunk::resetTargetArea(doubleMsg *dm)
+void chunk::resetTargetArea(int idx, double aDouble)
 {
-  theElements[dm->idx].resetTargetArea(dm->aDouble);
-  CkFreeMsg(dm);
+  accessLock();
+  theElements[idx].resetTargetArea(aDouble);
+  releaseLock();
   modified = 1;
 }
 
-void chunk::updateEdges(edgeUpdateMsg *em)
+void chunk::updateEdges(int idx, edgeRef e0, edgeRef e1, edgeRef e2)
 {
-  theElements[em->idx].set(em->e0, em->e1, em->e2);
-  CkFreeMsg(em);
+  accessLock();
+  theElements[idx].set(e0, e1, e2);
+  releaseLock();
 }
 
-void chunk::updateNodeCoords(nodeMsg *m)
+void chunk::updateNodeCoords(int idx, double x, double y)
 {
-  theNodes[m->idx].set(m->x, m->y);
-  CkFreeMsg(m);
+  accessLock();
+  theNodes[idx].set(x, y);
+  releaseLock();
 }
 
-void chunk::reportPos(nodeMsg *m)
+void chunk::reportPos(int idx, double x, double y)
 {
-  node z(m->x, m->y);
-  theNodes[m->idx].reportPos(z);
-  CkFreeMsg(m);
+  node z(x, y);
+  accessLock();
+  theNodes[idx].reportPos(z);
+  releaseLock();
 }
 
 // the following methods are for run-time additions and modifications
@@ -449,34 +427,29 @@ void chunk::adjustMesh()
   }
 }
 
-nodeRef *chunk::addNode(node& n)
+int chunk::addNode(node n)
 {
-  nodeRef *nRef = new nodeRef(cid, numNodes);
   theNodes[numNodes] = n;
   numNodes++;
-  return nRef;
+  return (numNodes - 1);
 }
 
 
-edgeRef *chunk::addEdge(nodeRef& nr1, nodeRef& nr2)
+edgeRef chunk::addEdge()
 {
-  edgeRef *eRef = new edgeRef(cid, numEdges);
-  nodeRef n[2] = {nr1, nr2};
-  elemRef e[2];
-
-  theEdges[numEdges].set(this);
-  theEdges[numEdges].set(n, e);
+  CkPrintf("TMRC2D: Adding edge %d to chunk %d\n", numEdges, cid);
+  edgeRef eRef(cid, numEdges);
+  theEdges[numEdges].set(numEdges, cid, this);
+  theEdges[numEdges].reset();
   numEdges++;
   return eRef;
 }
 
-elemRef *chunk::addElement(nodeRef& nr1, nodeRef& nr2, nodeRef& nr3)
+elemRef chunk::addElement(int n1, int n2, int n3)
 {
-  elemRef *eRef = new elemRef(cid, numElements);
-  nodeRef n[3] = {nr1, nr2, nr3};
-
+  elemRef eRef(cid, numElements);
   theElements[numElements].set(cid, numElements, this);
-  theElements[numElements].set(n);
+  theElements[numElements].set(n1, n2, n3);
   theElements[numElements].calculateArea();
   numElements++;
   modified = 1;
@@ -487,15 +460,13 @@ elemRef *chunk::addElement(nodeRef& nr1, nodeRef& nr2, nodeRef& nr3)
   return eRef;
 }
 
-elemRef *chunk::addElement(nodeRef& nr1, nodeRef& nr2, nodeRef& nr3,
-			   edgeRef& er1, edgeRef& er2, edgeRef& er3)
+elemRef chunk::addElement(int n1, int n2, int n3,
+			  edgeRef er1, edgeRef er2, edgeRef er3)
 {
-  elemRef *eRef = new elemRef(cid, numElements);
-  nodeRef n[3] = {nr1, nr2, nr3};
-  edgeRef e[3] = {er1, er2, er3}; 
-
+  CkPrintf("TMRC2D: New element added with nodes %d, %d and %d\n", n1, n2, n3);
+  elemRef eRef(cid, numElements);
   theElements[numElements].set(cid, numElements, this);
-  theElements[numElements].set(n, e);
+  theElements[numElements].set(n1, n2, n3, er1, er2, er3);
   theElements[numElements].calculateArea();
   numElements++;
   modified = 1;
@@ -506,21 +477,18 @@ elemRef *chunk::addElement(nodeRef& nr1, nodeRef& nr2, nodeRef& nr3,
   return eRef;
 }
 
-void chunk::removeNode(intMsg *im)
+void chunk::removeNode(int n)
 {
-  theNodes[im->anInt].reset();
-  CkFreeMsg(im);
+  theNodes[n].reset();
 }
 
-void chunk::removeEdge(intMsg *im)
+void chunk::removeEdge(int n)
 {
-  CkFreeMsg(im);
 }
 
-void chunk::removeElement(intMsg *im)
+void chunk::removeElement(int n)
 {
-  theElements[im->anInt].clear();
-  CkFreeMsg(im);
+  theElements[n].clear();
 }
 
 
@@ -549,7 +517,7 @@ void chunk::debug_print(int c)
   for (i=0; i<numElements; i++) {
     if (theElements[i].isPresent()) {
       for (j=0; j<3; j++) {
-	n = theElements[i].getNode(j).get();
+	n = theNodes[theElements[i].getNode(j)];
 	fprintf(fp, "%f %f   ", n.X(), n.Y());
       }
       fprintf(fp, "%d %f\n", i, theElements[i].getTargetArea());
@@ -578,17 +546,14 @@ void chunk::out_print()
   for (i=0; i<numNodes; i++)
     fprintf(fp, "    %f %f\n", theNodes[i].X(), theNodes[i].Y());
   for (i=0; i<numEdges; i++) {
-    fprintf(fp, " %d %d ", theEdges[i].nodes[0].idx, theEdges[i].nodes[0].cid);
-    fprintf(fp, " %d %d ", theEdges[i].nodes[1].idx, theEdges[i].nodes[1].cid);
-    fprintf(fp, "   ");
     fprintf(fp, " %d %d ", theEdges[i].elements[0].idx, theEdges[i].elements[0].cid);
     fprintf(fp, " %d %d\n", theEdges[i].elements[1].idx, theEdges[i].elements[1].cid);
   }
   for (i=0; i<numElements; i++) {
     if (theElements[i].isPresent()) {
-      fprintf(fp, " %d %d ", theElements[i].nodes[0].idx, theElements[i].nodes[0].cid);
-      fprintf(fp, " %d %d ", theElements[i].nodes[1].idx, theElements[i].nodes[1].cid);
-      fprintf(fp, " %d %d ", theElements[i].nodes[2].idx, theElements[i].nodes[2].cid);
+      fprintf(fp, " %d ", theElements[i].nodes[0]);
+      fprintf(fp, " %d ", theElements[i].nodes[1]);
+      fprintf(fp, " %d ", theElements[i].nodes[2]);
       fprintf(fp, "   ");
       fprintf(fp, " %d %d ", theElements[i].edges[0].idx, theElements[i].edges[0].cid);
       fprintf(fp, " %d %d ", theElements[i].edges[1].idx, theElements[i].edges[1].cid);
@@ -602,18 +567,19 @@ void chunk::out_print()
 void chunk::updateNodeCoords(int nNode, double *coord, int nEl)
 {
   int i;
-
   CkPrintf("TMRC2D: updateNodeCoords...\n");
   // do some error checking
   CkAssert(nEl == numElements);
   CkAssert(nNode == numNodes);
-  
   // update node coordinates from coord
-  for (i=0; i<numNodes; i++)
+  for (i=0; i<numNodes; i++) {
+    if ((theNodes[i].X() != coord[2*i]) || (theNodes[i].Y() != coord[2*i+1]))
+      CkPrintf("TMRC2D: updateNodeCoords WARNING: coords changed for node %d on chunk %d: Were %f,%f; now %f,%f\n", i, cid, theNodes[i].X(), theNodes[i].Y(), coord[2*i], coord[2*i + 1]);
     theNodes[i].set(coord[2*i], coord[2*i + 1]);
-    
+  }
   // recalculate and cache new areas for each element
   for (i=0; i<numElements; i++) theElements[i].calculateArea();
+  sanityCheck();
   CkPrintf("TMRC2D: updateNodeCoords DONE.\n");
 }
 
@@ -631,8 +597,10 @@ void chunk::multipleRefine(double *desiredArea, refineClient *client)
   
   // start the refinement loop
   modified = 1;
-  refineInProgress = 1;
-  mesh[cid].refiningElements();
+  if (!refineInProgress) {
+   refineInProgress = 1;
+   mesh[cid].refiningElements();
+  }
   CkPrintf("TMRC2D: multipleRefine DONE.\n");
 }
 
@@ -641,23 +609,25 @@ void chunk::multipleRefine(double *desiredArea, refineClient *client)
 void chunk::newMesh(int nEl, int nGhost, const int *conn_, const int *gid_, int idxOffset)
 {
   int i, j;
+  CkPrintf("TMRC2D: newMesh on chunk %d...\n", cid);
   numElements=nEl;
   numGhosts = nGhost;
   allocMesh(nEl);
   int *conn = new int[3*numGhosts];
   int *gid = new int[2*numGhosts];
 
-  CkPrintf("TMRC2D: newMesh...\n");
   // add elements to chunk
   for (i=0; i<numElements; i++) {
-    nodeRef nodes[3];
-    for (j=0; j<3; j++) {
+    int nodes[3];
+    edgeRef edges[3];
+     for (j=0; j<3; j++) {
       int c=conn_[i*3+j]-idxOffset;
-      conn[i*3 + j]=c;
-      nodes[j].set(cid, c);
-    }
+      conn[i*3 + j] = c;
+      nodes[j] = c;
+      edges[j].reset();
+     }
     theElements[i].set(cid, i, this);
-    theElements[i].set(nodes);
+    theElements[i].set(nodes, edges);
     gid[i*2] = cid;
     gid[i*2 + 1] = i;
   }
@@ -672,112 +642,92 @@ void chunk::newMesh(int nEl, int nGhost, const int *conn_, const int *gid_, int 
 
   // derive edges from elements on this chunk
   deriveEdges(conn, gid);
-  sanityCheck();
   delete[] conn;
   delete[] gid;
-  CkPrintf("TMRC2D: newMesh DONE.\n");
+  CkPrintf("TMRC2D: newMesh DONE; chunk created with %d elements.\n", 
+	   numElements);
 }
 
 void chunk::deriveEdges(int *conn, int *gid)
 {
   // need to add edges to the chunk, and update all edgeRefs on all elements
   // also need to add nodes to the chunk
-  int i, j, n1, n2, e, newEdge;
-  elemRef nullRef, myRef, nbrRef;
-  edgeRef er;
+  int i, j, n1localIdx, n2localIdx;
+  edgeRef newEdge;
 
   deriveNodes(); // now numNodes and theNodes have values
+  
+  CkPrintf("TMRC2D: Deriving edges...\n");
   for (i=0; i<numElements; i++) {
-    myRef.set(cid, i);
+    elemRef myRef(cid,i);
     for (j=0; j<3; j++) {
-      // get endpoints n1 and n2 for edge j
-      if (j != 2) n1 = conn[i*3];
-      else n1 = conn[i*3 + 1];
-      if (j != 0) n2 = conn[i*3 + 2];
-      else n2 = conn[i*3 + 1];
-      
-      CkAssert(n1 >-1);
-      CkAssert(n2 >-1);
+      n1localIdx = j;
+      n2localIdx = (j+1) % 3;
 
-      // look for edge (n1, n2) 
-      if ((e = findEdge(n1, n2)) != -1) { 
-	// an edge between n1 & n2 has been added already at theEdges[e]
-	theEdges[e].update(nullRef, myRef); // point edge at elem i
-	// point elem i's edge j at the edge
-	er.cid = cid; er.idx = e;
-	theElements[i].set(j, er);
-      }
-      else { // no local edge yet exists
+      // look for edge
+      if (theElements[i].edges[j] == nullRef) { // the edge doesn't exist yet
 	// get nbr ref
-	int edgeIdx = getNbrRefOnEdge(n1, n2, conn, numGhosts, gid, i, &nbrRef); 
+	elemRef nbrRef;
+	int edgeIdx = getNbrRefOnEdge(theElements[i].nodes[n1localIdx], 
+				      theElements[i].nodes[n2localIdx], 
+				      conn, numGhosts, gid, i, &nbrRef); 
 	if (edgeLocal(myRef, nbrRef)) { // make edge here
-	  newEdge = addNewEdge(n1, n2);
+	  CkPrintf("TMRC2D: Edge local...\n");
+	  newEdge = addEdge();
+	  CkPrintf("TMRC2D: New edge (%d,%d) added between nodes %d and %d\n",
+		   newEdge.cid, newEdge.idx, theElements[i].nodes[n1localIdx], 
+		   theElements[i].nodes[n2localIdx]);
 	  // point edge to the two neighboring elements
-	  theEdges[newEdge].update(nullRef, myRef);
-	  theEdges[newEdge].update(nullRef, nbrRef);
+	  theEdges[newEdge.idx].update(nullRef, myRef);
+	  theEdges[newEdge.idx].update(nullRef, nbrRef);
 	  // point elem i's edge j at the edge
-	  er.cid = cid; er.idx = newEdge;
-	  theElements[i].set(j, er);
-	  // if not on border, point nbrRef at the edge
-	  if (nbrRef.cid != -1) {
-	    CkAssert(edgeIdx > -1);
-	    remoteEdgeMsg *rem = new remoteEdgeMsg;
-	    rem->elem = nbrRef.idx;
-	    rem->er = er;
-	    rem->localEdge = edgeIdx;
-	    mesh[nbrRef.cid].addRemoteEdge(rem);
+	  theElements[i].set(j, newEdge);
+	  // point nbrRef at the edge
+	  if (nbrRef.cid==cid) { // Local neighbor
+	    CkPrintf("TMRC2D: On chunk %d, element %d adding edgeRef for (%d,%d) to local neighbor %d...\n", cid, i, cid, newEdge.idx, nbrRef.idx);
+	    theElements[nbrRef.idx].set(edgeIdx, newEdge);
 	  }
+	  else if (nbrRef.cid != -1) // Remote neighbor
+	    mesh[nbrRef.cid].addRemoteEdge(nbrRef.idx, edgeIdx, newEdge);
 	}
-	// else edge will be made on a different chunk
+	else {
+	  // else edge will be made on a different chunk
+	  CkPrintf("TMRC2D: Edge non-local: myRef=(%d,%d) nbrRef=(%d,%d)...\n",
+		   myRef.cid, myRef.idx, nbrRef.cid, nbrRef.idx);
+	}
       }
     }
   }
+  CkPrintf("TMRC2D: Done deriving edges...\n");
 }
 
 void chunk::deriveNodes()
 {
   int i, j;
-  nodeRef nr;
+  int aNode;
 
+  CkPrintf("TMRC2D: Deriving nodes...\n");
   numNodes = 0;
   for (i=0; i<numElements; i++) {
     for (j=0; j<3; j++) {
-      nr = theElements[i].getNode(j);
-      if ((nr.idx + 1) > numNodes)
-	numNodes = nr.idx + 1;
+      aNode = theElements[i].nodes[j];
+      CkAssert(aNode > -1);
+      if ((aNode + 1) > numNodes)
+	numNodes = aNode + 1;
     }
   }
   CkPrintf("TMRC2D: NumNodes = %d; max node idx = %d\n", numNodes, numNodes-1);
+  CkPrintf("TMRC2D: Done deriving nodes.\n");
 }
 
 int chunk::edgeLocal(elemRef e1, elemRef e2)
 {
-  return ((e1.cid == e2.cid) || (e1.idx >= e2.idx));
-}
-
-int chunk::findEdge(int n1, int n2)
-{
-  int i;
-  nodeRef nr[2];
-
-  for (i=0; i<numEdges; i++) {
-    nr[0] = theEdges[i].get(0);
-    nr[1] = theEdges[i].get(1);
-    if (((nr[0].idx == n1) && (nr[1].idx == n2)) ||
-	((nr[1].idx == n1) && (nr[0].idx == n2)))
-      return i;
-  }
-  return -1;
-}
-
-int chunk::addNewEdge(int n1, int n2)
-{
-  nodeRef n[2];
-  n[0].set(cid, n1);   n[1].set(cid, n2);
-  theEdges[numEdges].set(this);
-  theEdges[numEdges].set(n);
-  numEdges++;
-  return numEdges-1;
+  CkPrintf("TMRC2D: e1=(%d,%d) e2=(%d,%d) reporting local=%d\n", e1.cid, 
+	   e1.idx, e2.cid, e2.idx, 
+	   ((e1.cid==-1 || e2.cid==-1) || (e1.cid > e2.cid) ||
+	    ((e1.cid == e2.cid) && (e1.idx < e2.idx))));
+  return ((e1.cid==-1 || e2.cid==-1) || (e1.cid > e2.cid) ||
+	  ((e1.cid == e2.cid) && (e1.idx < e2.idx)));
 }
 
 int chunk::getNbrRefOnEdge(int n1, int n2, int *conn, int nGhost, int *gid, 
@@ -785,7 +735,6 @@ int chunk::getNbrRefOnEdge(int n1, int n2, int *conn, int nGhost, int *gid,
 {
   int i, e;
   er->set(-1, -1);
-
   for (i=idx+1; i<nGhost; i++)
     if ((e = hasEdge(n1, n2, conn, i)) != -1) {
       er->set(gid[i*2], gid[i*2+1]);
@@ -814,58 +763,69 @@ void chunk::freshen()
 
 void chunk::deriveBorderNodes()
 {
+  CkPrintf("TMRC2D: WARNING! chunk::deriveBorderNodes called but not implemented!\n");
+  /*
   elemRef nullRef;
-
   for (int i=0; i<numEdges; i++) {
     if ((theEdges[i].elements[0] == nullRef) || 
 	(theEdges[i].elements[1] == nullRef)) {
-      CkPrintf("Edge %d on chunk %d is on border; node %d on chunk %d and node %d on chunk %d also on border\n", i, thisIndex, theEdges[i].nodes[0].idx, theEdges[i].nodes[0].cid, theEdges[i].nodes[1].idx, theEdges[i].nodes[1].cid);
       theEdges[i].nodes[0].setBorder();
       theEdges[i].nodes[1].setBorder();
     }
   }
+  */
 }
 
 void chunk::tweakMesh()
 {
+  CkPrintf("TMRC2D: WARNING! chunk::tweakMesh called but not implemented!\n");
+  /*
   for (int i=0; i<numElements; i++) 
     theElements[i].tweakNodes();
+  */
 }
 
 void chunk::improveChunk()
 {
+  CkPrintf("TMRC2D: WARNING! chunk::improveChunk called but not implemented!\n");
+  /*
   for (int i=0; i<numNodes; i++) 
     if (!theNodes[i].border) {
       theNodes[i].improvePos();
     }
     else CkPrintf("Not adjusting node %d on chunk %d\n", i, thisIndex);
-
+  */
 }
 
 void chunk::improve()
 {
+  CkPrintf("TMRC2D: WARNING! chunk::improve called but not implemented!\n");
+  /*
   for (int i=0; i<20; i++) {
     mesh.tweakMesh();
     CkWaitQD();
     mesh.improveChunk();
     CkWaitQD();
   }
+  */
 }
 
 void chunk::sanityCheck(void)
 {
-  int i;
   CkPrintf("TMRC2D: running sanity check...\n");
+  int i;
   if (numElements<0 || (int)theElements.size()<numElements)
         CkAbort("-> TMRC2D: numElements or vector size insane!");
   if (numEdges<0 || (int)theEdges.size()<numEdges)
         CkAbort("-> TMRC2D: numEdges or vector size insane!");
   if (numNodes<0 || (int)theNodes.size()<numNodes)
         CkAbort("-> TMRC2D: numNodes or vector size insane!");
-  for (i=0;i<numElements;i++)
-    theElements[i].sanityCheck(this,elemRef(cid,i));
-  for (i=0;i<numEdges;i++)
-    theEdges[i].sanityCheck(this,edgeRef(cid,i));
+  for (i=0; i<numElements; i++)
+    theElements[i].sanityCheck(this, elemRef(cid,i));
+  for (i=0; i<numEdges; i++)
+    theEdges[i].sanityCheck(this, edgeRef(cid,i));
+  for (i=0; i<numNodes; i++)
+    theNodes[i].sanityCheck(cid, i);
   CkPrintf("TMRC2D: sanity check PASSED.\n");
 }
 

@@ -8,118 +8,79 @@
 
 class edge {
  public:
-  int pending;
+  int pending, newNodeIdx;
   elemRef waitingFor;
-  nodeRef *newNodeRef, incidentNode;
-  edgeRef *newEdgeRef;
+  node newNode, incidentNode, fixNode;
+  edgeRef newEdgeRef; // half of this edge: from newNode to incidentNode
   chunk *C;
-  nodeRef nodes[2];     // the nodes that define the edge
+  edgeRef myRef;
   elemRef elements[2];  // the elements on either side of the edge
   edge() { pending = 0; }
-  edge(chunk *myChk) { pending = 0; set(myChk); }
-  edge(nodeRef n1, nodeRef n2, elemRef e1, elemRef e2, int p) {
-    nodes[0] = n1;  nodes[1] = n2;  elements[0] = e1;  elements[1] = e2;
-    pending = p; 
+  edge(int idx, int cid, chunk *myChk) { 
+    pending = 0; myRef.set(cid, idx); C = myChk; 
   }
-  edge(nodeRef n1, nodeRef n2, elemRef e1, elemRef e2) {
-    nodes[0] = n1;  nodes[1] = n2;  elements[0] = e1;  elements[1] = e2;
-    pending = 0; 
+  edge(elemRef e1, elemRef e2, int p) {
+    elements[0] = e1;  elements[1] = e2;  pending = p; 
+  }
+  edge(elemRef e1, elemRef e2) {
+    elements[0] = e1;  elements[1] = e2;  pending = 0; 
   }
   edge(const edge& e) {
-    for (int i=0; i<2; i++) {
-      nodes[i] = e.nodes[i];
-      elements[i] = e.elements[i];
-    }
+    for (int i=0; i<2; i++)  elements[i] = e.elements[i];
     pending = e.pending;
+    newNodeIdx = e.newNodeIdx;
     C = e.C;
     waitingFor = e.waitingFor;
-    newNodeRef = e.newNodeRef;
+    newNode = e.newNode;
     incidentNode = e.incidentNode;
+    fixNode = e.fixNode;
     newEdgeRef = e.newEdgeRef;
+    myRef = e.myRef;
   }
-  void set(chunk *myChk)  { C = myChk; }
-  void set(nodeRef n1, nodeRef n2, elemRef e1, elemRef e2) {
-    nodes[0] = n1;  nodes[1] = n2;  elements[0] = e1;  elements[1] = e2;
+  void set(int idx, int cid, chunk *myChk)  { 
+    pending = 0; myRef.set(cid, idx); C = myChk; 
   }
-  void set(nodeRef *n) {
-    nodes[0] = n[0]; nodes[1] = n[1];
+  void set(elemRef e1, elemRef e2) { elements[0] = e1;  elements[1] = e2; }
+  void set(elemRef *e) { elements[0] = e[0]; elements[1] = e[1]; }
+  void reset();
+  edge& operator=(const edge& e) { 
+    for (int i=0; i<2; i++)  elements[i] = e.elements[i];
+    pending = e.pending;
+    newNodeIdx = e.newNodeIdx;
+    C = e.C;
+    waitingFor = e.waitingFor;
+    newNode = e.newNode;
+    incidentNode = e.incidentNode;
+    fixNode = e.fixNode;
+    newEdgeRef = e.newEdgeRef;
+    myRef = e.myRef;
+    return *this; 
   }
-  void set(nodeRef *n, elemRef *e) {
-    nodes[0] = n[0]; nodes[1] = n[1]; elements[0] = e[0]; elements[1] = e[1];
+  void update(elemRef oldval, elemRef newval) {
+    CkAssert((elements[0] == oldval) || (elements[1] == oldval) || 
+	     (elements[0] == newval) || (elements[1] == newval));
+    if ((elements[0] == oldval) && !(elements[1] == newval))  
+      elements[0] = newval;
+    else if ((elements[1] == oldval) && !(elements[0] == newval))
+      elements[1] = newval;
   }
-  void update(nodeRef oldval, nodeRef newval) {
-    CkAssert((nodes[0] == oldval) || (nodes[1] == oldval));
-    if (nodes[0] == oldval) nodes[0] = newval;
-    else if (nodes[1] == oldval) nodes[1] = newval;
-  }
-  void updateSilent(nodeRef oldval, nodeRef newval) {
-    if (nodes[0] == oldval) nodes[0] = newval;
-    else if (nodes[1] == oldval) nodes[1] = newval;
-  }
-  void update(elemRef oldval, elemRef newval);
-  nodeRef& get(int idx) { 
-    if ((idx < 0) || (idx > 1)) 
-      CkPrintf("ERROR: nodeRef& edge::get(int idx):\n ---> Invalid idx.\n");
-    return nodes[idx];
-  }
-  elemRef& getElement(int idx) { 
-    if ((idx < 0) || (idx > 1)) 
-      CkPrintf("ERROR: elemRef& edge::get(int idx):\n ---> Invalid idx.\n");
+  elemRef& getElement(int idx) {
+    CkAssert((idx==0) || (idx==1));
     return elements[idx];
   }
-  nodeRef& getNot(nodeRef nr) {
-    if (nodes[0] == nr) return nodes[1];
-    else if (nodes[1] == nr) return nodes[0];
-    else {
-      CkPrintf("WARNING: nodeRef *edge::getNot(nodeRef nr):\n ---> No match for nr.\n");
-      return nodes[0];
-    }
-  }
-  elemRef& getNot(elemRef er){
+  elemRef& getNot(elemRef er) {
+    CkAssert((elements[0] == er) || (elements[1] == er));
     if (elements[0] == er) return elements[1];
-    else if (elements[1] == er) return elements[0];
-    else {
-      CkPrintf("WARNING: elemRef *edge::getNot(elemRef er):\n ---> No match for er.\n");
-      return elements[0];
-    }
-  }
-  double length() {             // accesses node coords to compute edge length
-    node n[2];
-    double result;
-    
-    n[0] = nodes[0].get();
-    n[1] = nodes[1].get();
-    result = n[0].distance(n[1]); // find distance between two nodes
-    return result;
-  }
-
-  void midpoint(node& result) {  // compute edge midpoint and place in result
-    node n[2];
-    
-    n[0] = nodes[0].get();
-    n[1] = nodes[1].get();
-    n[0].midpoint(n[1], result); // find midpoint between two nodes
+    else return elements[0];
   }
   void setPending() { pending = 1; }
-  void unsetPending() { pending = 0; }
+  void unsetPending() { reset(); }
   int isPending() { return pending; }
   void checkPending(elemRef e);
   void checkPending(elemRef e, elemRef ne);
-  edge& operator=(const edge& e) { 
-    for (int i=0; i<2; i++) { 
-      nodes[i] = e.nodes[i]; elements[i] = e.elements[i];
-    }
-    pending = e.pending;
-    C = e.C;
-    waitingFor = e.waitingFor;
-    newNodeRef = e.newNodeRef;
-    incidentNode = e.incidentNode;
-    newEdgeRef = e.newEdgeRef;
-    return *this; 
-  }
-  int split(nodeRef *m, edgeRef *e_prime, nodeRef othernode, elemRef eRef, 
-	    int *local);
-  void sanityCheck(chunk *c,edgeRef shouldRef);
+  int split(int *m, edgeRef *e_prime, node iNode, node fNode, 
+	    elemRef requester, int *local, int *first, int *nullNbr);
+  void sanityCheck(chunk *c, edgeRef shouldRef);
 };
 
 #endif
