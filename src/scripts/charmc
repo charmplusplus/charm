@@ -647,6 +647,10 @@ if [ "$LANGUAGE" = "charm++" -a -n "$CMK_BLUEGENE" ]
 then
         LANGUAGE="bgcharm++"
 fi
+if [ "$LANGUAGE" = "bgcharm++" ]
+then
+	TRACEMODE="$TRACEMODE bluegene"
+fi
 
 if [ "$BUILD_SHARE" = "1" -a -n "$CMK_NO_BUILD_SHARED" ]
 then
