@@ -225,9 +225,11 @@ public:
   inline void ckStopTiming(void) {myRec->stopTiming();}
   //Begin load balancer measurements again (e.g., after CthSuspend)
   inline void ckStartTiming(void) {myRec->startTiming();}
+  inline LBDatabase *getLBDB(void) const {return myRec->getLBDB();}
 #else
   inline void ckStopTiming(void) { }
   inline void ckStartTiming(void) { }
+  inline LBDatabase *getLBDB(void) const {return NULL;}
 #endif
   //Initiate a migration to the given processor
   inline void ckMigrate(int toPe) {myRec->migrateMe(toPe);}
