@@ -12,28 +12,26 @@ INCLUDE=-I$(FFTW_HOME)/include
 COMPILER=$(CHARMC) $(INCLUDE)
 
 LIB=libmoduleckPairCalculator.a
-LIBDEST=$(CDIR)/lib/$(LIB)
 LIBOBJ=ckPairCalculator.o pairCalculator.o 
+
 HEADERS= $(CDIR)/include/pairCalculator.h\
+	 $(CDIR)/include/util.h \
          $(CDIR)/include/ckPairCalculator.h\
          $(CDIR)/include/ckPairCalculator.decl.h\
          $(CDIR)/include/ckPairCalculator.def.h\
 
-
-all:$(LIBDEST)  $(HEADERS)
+all: $(LIB)  $(HEADERS)
 
 $(HEADERS): pairCalculator.h ckPairCalculator.h ckPairCalculator.decl.h 
 	/bin/cp pairCalculator.h $(CDIR)/include
 	/bin/cp ckPairCalculator.h $(CDIR)/include
+	/bin/cp util.h $(CDIR)/include
 	/bin/cp ckPairCalculator.decl.h $(CDIR)/include
 	/bin/cp ckPairCalculator.def.h $(CDIR)/include
 
-$(LIBDEST): $(LIBOBJ)
-	rm -f $(LIB); ar -qc $(LIBDEST) $(LIBOBJ)
-
-libmoduleckPairCalculator.a: pairCalculator.o ckPairCalculator.o 
-	$(COMPILER) -o libmoduleckPairCalculator.a pairCalculator.o ckPairCalculator.o -module CkSparseContiguousReducer 
-	/bin/cp libmoduleckPairCalculator.a $(CDIR)/lib/.
+$(LIB): pairCalculator.o ckPairCalculator.o 
+	$(COMPILER) -o $(LIB) $(LIBOBJ) -module CkSparseContiguousReducer
+	/bin/cp $(LIB) $(CDIR)/lib/
 
 ckPairCalculator.o: ckPairCalculator.C ckPairCalculator.h ckPairCalculator.decl.h 
 	$(COMPILER)  ckPairCalculator.C
@@ -42,16 +40,16 @@ pairCalculator.o: pairCalculator.C pairCalculator.h ckPairCalculator.h ckPairCal
 	$(COMPILER)  pairCalculator.C
 
 ckPairCalculator.decl.h: ckPairCalculator.ci
-	$(CHARMC) $<
+	$(CHARMC) ckPairCalculator.ci 
 
 myTest: myTest.o $(all)
 	$(COMPILER) -o myTest myTest.o -module ckPairCalculator -module CkSparseContiguousReducer
 
 myTest.o: myTest.C myTest.decl.h
-	$(COMPILER) $<
+	$(COMPILER) myTest.C
 
 myTest.decl.h: myTest.ci
-	$(COMPILER) $<
+	$(COMPILER) myTest.ci
 
 clean:
 	rm -f core 

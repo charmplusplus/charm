@@ -27,12 +27,12 @@ class PairCalcID {
   }
 };
 
-void createPairCalculator(bool sym, int w, int numZ, int* z, int op1, FuncType f1, int op2, FuncType f2, const CkCallback cb, PairCalcID* aid);
+extern "C" void createPairCalculator(bool sym, int w, int numZ, int* z, int op1, FuncType f1, int op2, FuncType f2, const CkCallback cb, PairCalcID* aid);
 
 void startPairCalcLeft(PairCalcID* aid, int n, complex* ptr, int myS, int myZ);
 
 void startPairCalcRight(PairCalcID* aid, int n, complex* ptr, int myS, int myZ);
 
-void finishPairCalc(PairCalcID* aid, int n, complex*ptr, int myS, int myZ, const CkCallback cb);
+extern "C" void finishPairCalc(PairCalcID* aid, int n, complex*ptr, int myS, int myZ, const CkCallback cb);
 
 #endif
