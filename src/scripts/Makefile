@@ -109,7 +109,7 @@ SEQCHARMC=../bin/charmc -seq $(CHARMOPTS)
 
 CVHEADERS=cpthreads.h converse.h conv-trace.h trace.h charm-api.h\
       conv-ccs.h ccs-client.c ccs-client.h ccs-auth.c ccs-auth.h CcsServer.java \
-      debug-conv.h debug-charm.h conv-autoconfig.h \
+      memory-isomalloc.h debug-conv.h debug-charm.h conv-autoconfig.h \
       conv-common.h conv-mach.h conv-mach-opt.h conv-mach.sh conv-mach-opt.sh \
       CkMarshall.decl.h CkArray.decl.h CkLocation.decl.h CkReduction.decl.h \
       CkFutures.decl.h LBDatabase.decl.h CentralLB.decl.h NullLB.decl.h \
@@ -208,7 +208,7 @@ dirs+sources:
 CLBLIBS=$(L)/libldb-rand.o $(L)/libldb-spray.o $(L)/libldb-graph.o $(L)/libldb-test.o $(L)/libldb-bluegene.o
 TRACELIBS=$(L)/libtrace-projections.a $(L)/libtrace-summary.a
 MEMLIBS=$(L)/libmemory-default.o $(L)/libmemory-os.o $(L)/libmemory-gnu.o \
-   $(L)/libmemory-verbose.o $(L)/libmemory-paranoid.o
+   $(L)/libmemory-verbose.o $(L)/libmemory-paranoid.o $(L)/libmemory-isomalloc.o
 
 CVLIBS=libconv-core.a \
 	libconv-cplus-n.a libconv-cplus-y.a libconv-util.a \
@@ -385,6 +385,9 @@ $(L)/libmemory-paranoid.o: memory-paranoid.c $(MEM_DEPS)
 
 $(L)/libmemory-cache.o: memory-cache.c $(MEM_DEPS)
 	-$(CHARMC) -o $@ -DCMK_MEMORY_BUILD_CACHE memory.c
+
+$(L)/libmemory-isomalloc.o: memory-isomalloc.c $(MEM_DEPS)
+	-$(CHARMC) -o $@ -DCMK_MEMORY_BUILD_ISOMALLOC memory.c
 
 ###############################################################################
 #
