@@ -37,6 +37,7 @@ class IFEM_Solve_shared_comm : public ILSI_Comm {
 	IDXL_Layout_t shared_fid, reduce_fid;
 	IDXL_t shared_idxl;
 	
+	//User-written matrix-vector product routine
 	IFEM_Matrix_product_c A_c;
 	IFEM_Matrix_product_f A_f;
 	void *ptr;
@@ -70,16 +71,9 @@ public:
 	
 	/// Compute dest = A src, where A is the square stiffness matrix.
 	virtual void matrixVectorProduct(const double *src,double *dest) {
-		//Zero out dest
-		int n=length*width;
-		for (int i=0;i<n;i++) dest[i]=0;
-		
-		//Call user routine to add local elements to dest
+		//Call user routine to do product
 		if (A_c) (A_c)(ptr,length,width,src,dest);
 		else /*A_f*/ (A_f)(ptr,&length,&width,src,dest);
-		
-		//Call FEM to add in remote elements to dest
-		IDXL_Comm_sendsum(0,shared_idxl,shared_fid,dest);
 	}
 	
 	/// Do a parallel dot product of these two vectors
@@ -98,8 +92,6 @@ public:
 		IDXL_Layout_destroy(shared_fid);
 	}
 };
-
-
 
 CDECL void 
 IFEM_Solve_shared(ILSI_Solver s,ILSI_Param *p,
@@ -122,10 +114,148 @@ FTN_NAME(IFEM_SOLVE_SHARED,ifem_solve_shared)
 	const double *b, double *x)
 {
 	IFEM_Solve_shared_comm comm(*fem_mesh,*fem_entity,*length,*width);
-	comm.set_f(A,ptr);
+	comm.set_f(A,ptr); //<- this is the only difference between C and Fortran versions.
 	
-	int n=(*length) * (*width);
+	int n=*length* *width;
 	(s)(p,&comm,n,b,x);
+}
+
+/************* Boundary Condition wrapper **************/
+
+/**
+ * Wrapper for user matrix-vector multiply that applies
+ * "essential" boundary conditions.
+ *
+ * The basic idea is that given a problem
+ *    A x = b
+ * where x is only partially unknowns--that is, if x=u+c (Unknowns and boundary Conditions)
+ *    A u + A c = b
+ * so there's an equivalent all-unknown system
+ *    A u = b - A c = b'
+ * Now for A u = b', we have to just zero out all the boundary conditions.
+ */
+class BCapplier {
+	//User-written matrix-vector product routine to call
+	IFEM_Matrix_product_c A_c;
+	IFEM_Matrix_product_f A_f;
+	void *ptr;
+	
+	inline void userMultiply(int length,int width,const double *src,double *dest) {
+		//Call user routine to do product
+		if (A_c) (A_c)(ptr,length,width,src,dest);
+		else /*A_f*/ (A_f)(ptr,&length,&width,src,dest);
+	}
+	
+	/**
+	 * Definition of boundary conditions:
+	 *  for (i=0;i<bcCount;i++)
+	 *     assert(x[at(i)]==bcValue[i])
+	 */
+	int bcCount; //Length of below arrays
+	int idxBase;
+	const int *bcDOF; //Degree-of-freedom (vector index) to apply BC to
+	inline int at(int bcIdx) { return bcDOF[bcIdx]-idxBase; }
+	const double *bcValue; //Imposed value of BC
+	
+public:
+	BCapplier(int cnt_,int base_,const int *dof_,const double *value_) 
+		:A_c(0), A_f(0), ptr(0), bcCount(cnt_), idxBase(base_),
+		 bcDOF(dof_), bcValue(value_)
+	{
+	}
+	
+	// You have to register one of these
+	void set_c(IFEM_Matrix_product_c A,void *ptr_) {
+		A_c=A; ptr=ptr_;
+	}
+	void set_f(IFEM_Matrix_product_f A,void *ptr_) {
+		A_f=A; ptr=ptr_;
+	}
+	
+	// Do the calculation to compute x:
+	void solve(ILSI_Solver s,ILSI_Param *p,
+		int fem_mesh, int fem_entity,int length,int width,
+		const double *b,double *x);
+	
+	// Do an A u matrix-vector multiply
+	void multiply(int length,int width,const double *u,double *Au) {
+		int i;
+		// Make sure u[bc's] is zero--like zeroing out column of A
+		//  for (i=0;i<bcCount;i++) assert(u[at(i)]==0.0);
+		
+		//Call user routine to do ordinary multiply
+		userMultiply(length,width,u,Au);
+		
+		// In-place zero out boundary parts of Au--
+		//  This is like zeroing out the BC rows of A
+		for (i=0;i<bcCount;i++) Au[at(i)]=0.0;
+	}
+};
+
+extern "C" void
+BCapplier_multiply(void *ptr,int length,int width,const double *src,double *dest)
+{
+	BCapplier *bc=(BCapplier *)ptr;
+	bc->multiply(length,width,src,dest);
+}
+
+void BCapplier::solve(ILSI_Solver s,ILSI_Param *p,
+		int fem_mesh, int fem_entity,int length,int width,
+		const double *b,double *x)
+{
+// Subtract off boundary conditions (converts b into b'==b-A c)
+	int i,DOFs=length*width;
+	// Compute A c (response of system to fixed boundary conditions)
+	double *c=new double[DOFs];
+	for (i=0;i<DOFs;i++) c[i]=0;
+	for (i=0;i<bcCount;i++) c[at(i)]=bcValue[i];
+	double *Ac=new double[DOFs];
+	userMultiply(length,width,c,Ac);
+	
+	// Compute new boundary conditions b'
+	double *bPrime=c; //Re-use storage
+	for (i=0;i<DOFs;i++) bPrime[i]=b[i]-Ac[i];
+	delete[] Ac;
+	
+	// Zero out known parts of bPrime and x
+	for (i=0;i<bcCount;i++) {
+		x[at(i)]=0.0;
+		bPrime[at(i)]=0.0;
+	}
+	
+// Solve A u = b'
+	IFEM_Solve_shared(s,p, fem_mesh,fem_entity,length,width,
+		BCapplier_multiply,this,bPrime,x);
+	
+	delete[] c;
+	
+// Insert known boundary values back into x
+	for (i=0;i<bcCount;i++) x[at(i)]=bcValue[i];
+}
+
+CDECL void 
+IFEM_Solve_shared_bc(ILSI_Solver s,ILSI_Param *p,
+	int fem_mesh, int fem_entity,int length,int width,
+	int bcCount, const int *bcDOF, const double *bcValue,
+	IFEM_Matrix_product_c A, void *ptr, 
+	const double *b, double *x)
+{
+	BCapplier bc(bcCount,0,bcDOF,bcValue);
+	bc.set_c(A,ptr);
+	bc.solve(s,p,fem_mesh,fem_entity,length,width,b,x);
+}
+
+FDECL void 
+FTN_NAME(IFEM_SOLVE_SHARED_BC,ifem_solve_shared_bc)
+	(ILSI_Solver s,ILSI_Param *p,
+	int *fem_mesh, int *fem_entity,int *length,int *width,
+	int *bcCount,const int *bcDOF,const double *bcValue,
+	IFEM_Matrix_product_f A, void *ptr, 
+	const double *b, double *x)
+{
+	BCapplier bc(*bcCount,1,bcDOF,bcValue);
+	bc.set_f(A,ptr);
+	bc.solve(s,p,*fem_mesh,*fem_entity,*length,*width,b,x);
 }
 
 
