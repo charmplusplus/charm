@@ -175,16 +175,16 @@ class CkMsgQ : public CkQ<MSG *> {
 public:
 	~CkMsgQ() { //Delete the messages in the queue:
 		MSG *m;
-		while (NULL!=(m=deq())) CkFreeMsg(m);
+		while (NULL!=(m=this->deq())) CkFreeMsg(m);
 	}
 	void pup(PUP::er &p) {
-		int l=length();
+		int l=this->length();
 		p(l);
 		for (int i=0;i<l;i++) {
 			MSG *m=NULL;
-			if (!p.isUnpacking()) m=deq();
+			if (!p.isUnpacking()) m=this->deq();
 			CkPupMessage(p,(void **)&m);
-			enq(m);
+			this->enq(m);
 		}
 	}
 	friend void operator|(PUP::er &p,CkMsgQ<MSG> &v) {v.pup(p);}

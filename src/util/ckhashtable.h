@@ -6,10 +6,10 @@ class.  A Hashtable stores key/object pairs
 so that an arbitrary key can be accessed in 
 constant time.
 
-This is a simple Hashtable implementation, with the interface
-shamelessly stolen from java.util.Hashtable.  It dynamically
-rehashes when the table gets too full.  Both the key and
-object are treated as arbitrary fixed-length runs of bytes.
+This is a complicated non-chaining Hashtable implementation.
+It dynamically rehashes when the table gets too full.  
+Both the key and object are treated as arbitrary fixed-length 
+runs of bytes.
 
 Key hashing and comparison are handled by function pointers,
 so the keys can be interpreted any way you like.  The default
@@ -319,29 +319,29 @@ public:
 	
 	//Return the object, or "0" if it doesn't exist
 	OBJ get(const KEY &key) const {
-		int i=key.hash()%len;
+		int i=key.hash()%this->len;
 		while(1) {//Assumes key or empty slot will be found
-			char *cur=entry(i);
+			char *cur=this->entry(i);
 			//An empty slot indicates the key is not here
-			if (layout.isEmpty(cur)){ 
+			if (this->layout.isEmpty(cur)){ 
 				return OBJ(0);
 			}
 			//Is this the key?
-			if (key.compare(*(KEY *)layout.getKey(cur)))
-				return *(OBJ *)layout.getObject(cur);
-			inc(i);
+			if (key.compare(*(KEY *)this->layout.getKey(cur)))
+				return *(OBJ *)this->layout.getObject(cur);
+			this->inc(i);
 		};
 	}
 	//Use this version when you're sure the entry exists--
 	// avoids the test for an empty entry
 	OBJ &getRef(const KEY &key) {
-		int i=key.hash()%len;
+		int i=key.hash()%this->len;
 		while(1) {//Assumes key or empty slot will be found
-			char *cur=entry(i);
+			char *cur=this->entry(i);
 			//Is this the key?
-			if (key.compare(*(KEY *)layout.getKey(cur)))
-				return *(OBJ *)layout.getObject(cur);
-			inc(i);
+			if (key.compare(*(KEY *)this->layout.getKey(cur)))
+				return *(OBJ *)this->layout.getObject(cur);
+			this->inc(i);
 		};
 	}
 	void pup(PUP::er &p){

@@ -203,22 +203,22 @@ public:
 	AllocTable2d(int cols_=0,int rows_=0,T fill_=0) 
 		:BasicTable2d<T>(NULL,cols_,rows_), max(0), fill(fill_),allocTable(NULL)
 	{
-		if (rows>0) allocate(rows);
+		if (this->rows>0) allocate(this->rows);
 	}
 	~AllocTable2d() {if(allocTable != NULL){delete[] allocTable;}}
 	/// Make room for this many rows
 	void allocate(int rows_) { 
-		allocate(width(),rows_);
+		allocate(this->width(),rows_);
 	}
 	/// Make room for this many cols & rows
 	void allocate(int cols_,int rows_,int max_=0) { 
-		if (cols_==cols && rows_<max) {
+		if (cols_==this->cols && rows_<max) {
 			//We have room--just update the size:
-			rows=rows_;
+			this->rows=rows_;
 			return;
 		}
 		if (max_==0) { //They gave no suggested size-- pick one:
-			if (rows_==rows+1) //Growing slowly: grab a little extra
+			if (rows_==this->rows+1) //Growing slowly: grab a little extra
 				max_=10+rows_+(rows_>>2); 
 			else // for a big change, just go with the minimum needed: 
 				max_=rows_;
@@ -227,43 +227,43 @@ public:
 		if(max_ == 0){
 			max_ = rows_;
 		} */
-		int oldRows=rows;
-		cols=cols_;
-		rows=rows_;
-		max=max_;
-		table=new T[max*cols];
+		int oldRows=this->rows;
+		this->cols=cols_;
+		this->rows=rows_;
+		this->max=max_;
+		this->table=new T[max*this->cols];
 		//Preserve old table entries (FIXME: assumes old cols is unchanged)
 		int copyRows=0;
 		if (allocTable!=NULL) { 
 			copyRows=oldRows;
 			if (copyRows>max) copyRows=max;
-			memcpy(table,allocTable,sizeof(T)*cols*copyRows);
+			memcpy(this->table,allocTable,sizeof(T)*this->cols*copyRows);
 			delete[] allocTable;
 		}else{
 			for (int r=copyRows;r<max;r++)
 				setRow(r,fill);
 		}
-		allocTable = table;
+		allocTable = this->table;
 		//Zero out new table entries:
 	}
 	
 	/// Pup routine and operator|:
 	void pup(PUP::er &p) {
-		p|rows; p|cols;
-		if (table==NULL) allocate(rows);
-		p(table,rows*cols); //T better be a basic type, or this won't compile!
+		p|this->rows; p|this->cols;
+		if (this->table==NULL) allocate(this->rows);
+		p(this->table,this->rows*this->cols); //T better be a basic type, or this won't compile!
 	}
 	friend void operator|(PUP::er &p,AllocTable2d<T> &t) {t.pup(p);}
 
 	/// Add a row to the table (by analogy with std::vector):
 	T *push_back(void) {
-		if (rows>=max) 
+		if (this->rows>=max) 
 		{ //Not already enough room for the new row:
 			int newMax=max+(max/4)+16; //Grow 25% longer
-			allocate(cols,rows,newMax);
+			allocate(this->cols,this->rows,newMax);
 		}
-		rows++;
-		return getRow(rows-1);
+		this->rows++;
+		return getRow(this->rows-1);
 	}
 
 	/** to support replacement of attribute data by user 
@@ -275,9 +275,9 @@ public:
 			delete [] allocTable;
 			allocTable = NULL;
 		}	
-		table = user;
-		printf("table changed to %p \n",table);
-		rows = len;
+		this->table = user;
+		printf("table changed to %p \n",this->table);
+		this->rows = len;
 		max = max;
 	}
 };

@@ -82,24 +82,24 @@ public:
 	
 	inline int length(void) const {return super::length();}
 	inline int size(void) const {return super::length();}
-	inline int &length(void) {return getLength();}
+	inline int &length(void) {return this->getLength();}
 	inline int capacity(void) const {return max;}
 	
 	T *detachBuffer(void) {
 		T *ret=(T *)buf.getData();
 		buf.detachBuffer();
-		set(NULL,0);
+		this->set(NULL,0);
 		max=0;
 		return ret;
 	}
 	void empty(void) {reallocate(0);}
 	void push_back(const T& v) {
 		grow(length()+1);
-		at(getLength()++)=v;
+		at(this->getLength()++)=v;
 	}
 	//Push without checking bounds
 	void push_fast(const T& v) {
-		at(getLength()++)=v;
+		at(this->getLength()++)=v;
 	}
 	void grow(int min) {
 		if (min>max) resize(min+max+8);
@@ -115,7 +115,7 @@ public:
 	void reallocate(int Len) {
 		buf.reallocate(Len*sT);
 		setData((T*)buf.getData());
-		setLength(0);
+		this->setLength(0);
 		max=Len;
 	}
 };

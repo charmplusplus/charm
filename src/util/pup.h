@@ -740,7 +740,7 @@ public:
 	
 	/// Look at the object held by this class.  Does *not* hand over
 	/// deletion responsiblity.
-	inline operator T& () { return *peek(); }
+	inline operator T& () { return *this->peek(); }
 	
 	inline void pup(PUP::er &p) {CkPointer<T>::pup(p);}
 	
