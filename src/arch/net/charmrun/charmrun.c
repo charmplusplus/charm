@@ -982,7 +982,7 @@ void nodeinfo_add(const ChSingleNodeinfo *in,SOCKET ctrlfd)
 	i.nPE=ChMessageInt_new(nodetab_cpus(nt));
 	i.IP=nodetab_ip(node);
 #if CMK_USE_GM
-        if (ChMessageInt(in->dataport)==0) {
+        if (ChMessageInt(i.dataport)==0) {
           fprintf(stderr, "Error> Node %d:%s, cannot open GM gm_port %d!\n", nt, nodetab_name(nt), nodetab_dataport(nt));
           portOk = 0;
         }
