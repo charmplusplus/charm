@@ -1,4 +1,3 @@
-OPTS= -O 
 CHARMC= ../../../../bin/charmc $(OPTS)
 OBJS=packc.o packf77.o
 MYINCPATH= ../../../../include

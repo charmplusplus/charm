@@ -1,4 +1,3 @@
-OPTS= -O 
 CHARMC= ../../../../bin/charmc $(OPTS)
 OBJS=commlib.o gridrouter.o de.o treerouter.o petable.o overlapper.o \
      rsend.o bcast.o

@@ -1,5 +1,4 @@
-COPTS=-g
-CHARMC=../../../../bin/charmc $(COPTS)
+CHARMC=../../../../bin/charmc $(OPTS)
 
 all: libcms.a
 
