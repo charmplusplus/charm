@@ -7,6 +7,7 @@
 #define CkpvExtern 	CpvExtern
 #define CkpvStaticDeclare  CpvStaticDeclare
 #define CkpvInitialize 	CpvInitialize
+#define CkpvInitialized CpvInitialized
 #define CkpvAccess	CpvAccess
 #define CkpvAccessOther	CpvAccessOther
 

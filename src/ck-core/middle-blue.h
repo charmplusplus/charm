@@ -54,6 +54,7 @@
 #define CkpvExtern 	BnvExtern
 #define CkpvStaticDeclare  BnvStaticDeclare
 #define CkpvInitialize 	BnvInitialize
+#define CkpvInitialized BnvInitialized
 #define CkpvAccess	BnvAccess
 #define CkpvAccessOther	BnvAccessOther
 
@@ -128,6 +129,7 @@ static inline void CmiSyncBroadcastAllAndFree(int nb, char *m)
 #define CkpvExtern 	   BpvExtern
 #define CkpvStaticDeclare  BpvStaticDeclare
 #define CkpvInitialize 	   BpvInitialize
+#define CkpvInitialized    BpvInitialized
 #define CkpvAccess	   BpvAccess
 #define CkpvAccessOther	   BpvAccessOther
 
