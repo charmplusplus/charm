@@ -350,10 +350,13 @@ void CkMulticastMgr::reset(CkSectionCookie s)
 void CkMulticastMgr::ArraySectionSend(int ep,void *m, CkArrayID a, CkSectionCookie &s)
 {
 //CmiPrintf("ArraySectionSend\n");
-  CkSectionCookie *thisSectId = &s;
 
-  if (thisSectId->pe == CmiMyPe()) {
-    mCastEntry *entry = (mCastEntry *)thisSectId->val;   
+  if (s.pe == CmiMyPe()) {
+    mCastEntry *entry = (mCastEntry *)s.val;   
+    if (entry == NULL) {
+      CmiAbort("Unknown array section, Did you forget to register the array section to CkMulticastMgr using setSection()?");
+    }
+
     // make sure I am the newest one
     if (entry->newc) {
       do { entry=entry->newc; } while (entry->newc);
@@ -365,11 +368,10 @@ void CkMulticastMgr::ArraySectionSend(int ep,void *m, CkArrayID a, CkSectionCook
   register envelope *env = UsrToEnv(m);
   int msgSize = env->getTotalsize();
 
-  // send to spanning tree children
 //CmiPrintf("ArraySend send to myself: %d\n", msgSize);
   CProxy_CkMulticastMgr  mCastGrp(thisgroup);
   multicastGrpMsg *newmsg = new (msgSize, 0) multicastGrpMsg;
-  newmsg->cookie = *thisSectId;
+  newmsg->cookie = s;
   newmsg->aId = a;
   newmsg->ep = ep;
   newmsg->msgsize = msgSize;
@@ -377,7 +379,7 @@ void CkMulticastMgr::ArraySectionSend(int ep,void *m, CkArrayID a, CkSectionCook
   memcpy(newmsg->msg, env, msgSize);
   CkFreeMsg(m);
 
-  mCastGrp[thisSectId->pe].recvMsg(newmsg);
+  mCastGrp[s.pe].recvMsg(newmsg);
 
 /*
   if (entry->flag == COOKIE_NOTREADY) {
