@@ -918,7 +918,7 @@ case "$OBJECT" in
 	Do $CMK_RANLIB $OBJECT
 	destDir="$OBJECT.dir"
 	[ -n "$COPYTO" ] && destDir="$COPYTO/$OBJECT.dir"
-	DoNoErrCheck mkdir $destDir
+	[ ! -d $destDir ] && DoNoErrCheck mkdir $destDir
 	Do cp $OBJECTFILES $destDir
 	Copyobj
 	;;
