@@ -227,6 +227,8 @@ int  CmiScanf();
 char *strchr(), *strrchr(), *strdup();
 #endif
 
+#define PRINTBUFSIZE 16384
+
 static void CommunicationServer();
 extern int CmemInsideMem();
 extern void CmemCallWhenMemAvail();
@@ -1611,6 +1613,8 @@ static void CmiStartThreads()
 #endif
 
 CpvDeclare(void *, CmiLocalQueue);
+static char ctrl_sendone_buffer[PRINTBUFSIZE];
+CpvStaticDeclare(char *, internal_printf_buffer);
 
 /****************************************************************************
  *
@@ -1623,14 +1627,14 @@ CpvDeclare(void *, CmiLocalQueue);
 
 static void ctrl_sendone(va_alist) va_dcl
 {
-  char buffer[1024];
   char *f; int fd, delay; char c;
+  char *buffer = ctrl_sendone_buffer;
   va_list p;
   va_start(p);
   delay = va_arg(p, int);
   f = va_arg(p, char *);
-  vsprintf(buffer, f, p);
   CmiCommLock();
+  vsprintf(buffer, f, p);
   writeall(Cmi_host_fd, buffer, strlen(buffer)+1);
   CmiCommUnlock();
 }
@@ -1780,14 +1784,14 @@ static void node_addresses_store(addrs) char *addrs;
 
 static void InternalPrintf(f, l) char *f; va_list l;
 {
-  char buffer[8192];
+  char *buffer = CpvAccess(internal_printf_buffer);
   vsprintf(buffer, f, l);
   ctrl_sendone(120, "print %s", buffer);
 }
 
 static void InternalError(f, l) char *f; va_list l;
 {
-  char buffer[8192];
+  char *buffer = CpvAccess(internal_printf_buffer);
   vsprintf(buffer, f, l);
   ctrl_sendone(120, "printerr %s", buffer);
 }
@@ -2586,6 +2590,8 @@ void CmiReleaseCommHandle(CmiCommHandle handle)
 void ConverseInitPE()
 {
   CmiState cs = CmiGetState();
+  CpvInitialize(char *, internal_printf_buffer);
+  CpvAccess(internal_printf_buffer) = (char *) malloc(PRINTBUFSIZE);
   CthInit(Cmi_argv);
   ConverseCommonInit(Cmi_argv);
   CpvInitialize(void *,CmiLocalQueue);
