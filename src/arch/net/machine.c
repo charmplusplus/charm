@@ -464,9 +464,12 @@ char *CopyMsg(char *msg, int len)
  ************************************************************************/
 
 static int  Cmi_truecrash;
-
+static int already_aborting=0;
 void CmiAbort(const char *message)
 {
+  if (already_aborting) machine_exit(1);
+  already_aborting=1;
+  
   CmiError("------------- Processor %d Exiting: Called CmiAbort ------------\n"
   	"Reason: %s\n",CmiMyPe(),message);
   CmiPrintStackTrace(0);
