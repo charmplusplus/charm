@@ -38,6 +38,10 @@ public:
 		   storedClientParam(NULL), redNo(0) {}
 };
 
+#define COOKIE_NOTREADY 0
+#define COOKIE_READY    1
+#define COOKIE_OLD      2
+
 // BOC entry for one array section
 class mCastEntry {
 public:
@@ -55,9 +59,6 @@ public:
 
 private:
   char flag;
-  static const char COOKIE_NOTREADY=0;
-  static const char COOKIE_READY=1;
-  static const char COOKIE_OLD=2;
 public:
   mCastEntry(): flag(COOKIE_NOTREADY), oldc(NULL), newc(NULL), needRebuild(0){}
   mCastEntry(mCastEntry *);
@@ -598,7 +599,7 @@ void CkMulticastMgr::recvRedMsg(ReductionMsg *msg)
   }
 }
 
-void CkMulticastMgr::releaseFutureReduceMsgs(mCastEntry *entry)
+void CkMulticastMgr::releaseFutureReduceMsgs(mCastEntryPtr entry)
 {
   CProxy_CkMulticastMgr  mCastGrp(thisgroup);
 
@@ -610,7 +611,7 @@ void CkMulticastMgr::releaseFutureReduceMsgs(mCastEntry *entry)
 }
 
 // these messages have to be sent to root
-void CkMulticastMgr::releaseBufferedReduceMsgs(mCastEntry *entry)
+void CkMulticastMgr::releaseBufferedReduceMsgs(mCastEntryPtr entry)
 {
   int i;
   CProxy_CkMulticastMgr  mCastGrp(thisgroup);
@@ -632,7 +633,7 @@ void CkMulticastMgr::releaseBufferedReduceMsgs(mCastEntry *entry)
   entry->red.futureMsgs.length() = 0;
 }
 
-void CkMulticastMgr::updateRedNo(mCastEntry *entry, int red)
+void CkMulticastMgr::updateRedNo(mCastEntryPtr entry, int red)
 {
 //CmiPrintf("[%d] updateRedNo entry:%p to %d\n", CmiMyPe(), entry, red);
   entry->red.redNo = red;

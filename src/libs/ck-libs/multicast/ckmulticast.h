@@ -12,12 +12,13 @@ typedef mCastEntry * mCastEntryPtr;
 
 #include "CkMulticast.decl.h"
 
+#define MAGIC 88
+
 class CkMcastBaseMsg {
 public:
   char magic;
   unsigned int _gpe, _redNo;
   void *_cookie;
-  static const char MAGIC = 88 ;
 public:
   CkMcastBaseMsg() { magic = MAGIC; }
   static inline int checkMagic(CkMcastBaseMsg *m) { return m->magic == MAGIC; }
@@ -49,14 +50,14 @@ class CkMulticastMgr: public CkDelegateMgr {
     void rebuild(CkSectionCookie &);
     // entry
     void recvRedMsg(ReductionMsg *msg);
-    void updateRedNo(mCastEntry *, int red);
+    void updateRedNo(mCastEntryPtr, int red);
   public:
     typedef ReductionMsg *(*reducerFn)(int nMsg,ReductionMsg **msgs);
   private:
     enum {MAXREDUCERS=256};
     static reducerFn reducerTable[MAXREDUCERS];
-    void releaseFutureReduceMsgs(mCastEntry *entry);
-    void releaseBufferedReduceMsgs(mCastEntry *entry);
+    void releaseFutureReduceMsgs(mCastEntryPtr entry);
+    void releaseBufferedReduceMsgs(mCastEntryPtr entry);
 };
 
 
