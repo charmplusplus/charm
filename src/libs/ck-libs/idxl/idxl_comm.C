@@ -3,7 +3,6 @@ IDXL--C++ structures used by idxl library.
 
 Orion Sky Lawlor, olawlor@acm.org, 1/7/2003
 */
-#include "charm++.h"
 #include "idxl.h"
 
 /*Rec: lists the chunks that share a single entity.

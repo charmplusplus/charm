@@ -9,7 +9,6 @@ Orion Sky Lawlor, olawlor@acm.org, 7/17/2002
 #ifndef __CHARM_TCHARMLIB_H
 #define __CHARM_TCHARMLIB_H
 
-#include "tcharm_impl.h"
 
 /*
 Library "fallback setup" routine.
@@ -27,6 +26,12 @@ In case of multiple fallback setups, the last one wins.
 */
 typedef void (*TCHARM_Fallback_setup_fn)(void);
 void TCHARM_Set_fallback_setup(TCHARM_Fallback_setup_fn f);
+
+
+
+#ifndef FEM_ALONE
+
+#include "tcharm_impl.h"
 
 /*
 This "start" call finds the currently running set of tcharm threads,
@@ -109,5 +114,14 @@ used for debugging printouts, with "+tcharm_trace myLibName".
 #endif
 void TCHARM_Api_trace(const char *routineName,const char *libraryName);
 
+
+
+
+#else /* FEM_ALONE */
+
+#  include "tcharmc.h"
+#  define TCHARM_API_TRACE(routineName,libraryName) /* empty */
+
+#endif
 
 #endif /*def(thisHeader)*/

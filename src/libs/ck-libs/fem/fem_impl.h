@@ -10,8 +10,8 @@ Orion Sky Lawlor, olawlor@acm.org, 9/28/00
 #include <stdio.h>
 
 #include "charm-api.h"
-#include "tcharm.h"
 #include "ckvector3d.h"
+#include "tcharm.h"
 #include "fem.h"
 
 #include "fem_mesh.h"
@@ -193,7 +193,6 @@ public:
   // Global index in default communicator
   int thisIndex;
 
-  CkMagicNumber<double> magic;
 #ifdef CMK_OPTIMIZE /* Skip the check, for speed. */
   inline void check(const char *where) { }
 #else /* Do an extensive self-check */
@@ -305,7 +304,6 @@ FEM_Partition &FEM_curPartition(void);
 
 //Declare this at the start of every API routine:
 #define FEMAPI(routineName) TCHARM_API_TRACE(routineName,"fem")
-
 
 
 /*Partition this mesh's elements into n chunks,

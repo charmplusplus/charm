@@ -7,9 +7,11 @@ Orion Sky Lawlor, olawlor@acm.org, 1/7/2003
 #ifndef __CHARM_IDXL_COMM_H
 #define __CHARM_IDXL_COMM_H
 
-#ifndef _CHARMPP_H_
-#  include "charm++.h"
-#endif
+#include "pup.h"
+#include "cklists.h"
+#include "ckhashtable.h"
+#include "charm.h"
+
 
 /**
  * IDXL_Share describes how one entity is shared with one other chunk.

@@ -5,6 +5,7 @@ Orion Sky Lawlor, olawlor@acm.org, 12/20/2002
 
 FEM Implementation file: mesh creation and user-data manipulation.
 */
+#include <assert.h>
 #include "fem.h"
 #include "fem_impl.h"
 #include "charm-api.h" /*for CDECL, FTN_NAME*/
@@ -18,7 +19,7 @@ FEM_Comm_Holder::FEM_Comm_Holder(FEM_Comm *sendComm, FEM_Comm *recvComm)
 	idx=-1; 
 }
 void FEM_Comm_Holder::registerIdx(IDXL_Chunk *c) {
-	CkAssert(owner==NULL);
+	assert(owner==NULL);
 	owner=c;
 	if (idx!=-1) // had an old index: try to get it back
 		idx=owner->addStatic(&comm,idx);

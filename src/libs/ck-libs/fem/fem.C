@@ -389,7 +389,6 @@ int *CkCopyArray(const int *src,int len,int indexBase)
 /***** Mesh getting and setting state ****/
 #ifndef CMK_OPTIMIZE
 void FEMchunk::check(const char *where) {
-	magic.check(where,0,this);
 	// CkPrintf("[%d] FEM> %s\n",thisIndex,where);
 }
 #endif
@@ -793,7 +792,6 @@ FDECL int FTN_NAME(FOFFSETOF,foffsetof)
 FDECL void FTN_NAME(FEM_PRINT,fem_print)
   (char *str, int len)
 {
-  TCharmAPIRoutine apiRoutineSentry;
   char *tmpstr = new char[len+1]; CHK(tmpstr);
   memcpy(tmpstr,str,len);
   tmpstr[len] = '\0';
