@@ -19,6 +19,7 @@ extern void CmiMemoryInit(char **);
 extern void CldModuleInit(void);
 extern int  CqsPrioGT(prio, prio);
 extern prio CqsGetPriority(Queue);
+#define DEBUGF(x)  printf x
 #endif
 
 /*
@@ -113,8 +114,6 @@ CsvDeclare(void*, CsdNodeQueue);
 CsvDeclare(CmiNodeLock, CsdNodeQueueLock);
 #endif
 CpvDeclare(int,   CsdStopFlag);
-
-
 
 /*****************************************************************************
  *
@@ -797,7 +796,7 @@ int CsdScheduler(int maxmsgs)
   CpvExtern(int, freezeModeFlag);
 #endif
 
-  int *msg;
+  int *msg, csdMsgFlag = 0; /* To signal a message coming from the CsdNodeQueue */
   void *localqueue = CpvAccess(CmiLocalQueue);
   int cycle = CpvAccess(CsdStopFlag);
   
@@ -822,6 +821,7 @@ int CsdScheduler(int maxmsgs)
 
         if(msg != 0){
           if(strncmp((char *)((char *)msg+CmiMsgHeaderSizeBytes),"req",3)!=0) {
+            /*CQdCreate(CpvAccess(cQdState), 1);*/
             CsdEndIdle();
             FIFO_EnQueue(CpvAccess(debugQueue), msg);
             continue;
@@ -839,6 +839,7 @@ int CsdScheduler(int maxmsgs)
 #endif
       if (msg==0) FIFO_DeQueue(localqueue, (void **)&msg);
 #if CMK_NODE_QUEUE_AVAILABLE
+      csdMsgFlag = 0;
       if (msg==0) msg = CmiGetNonLocalNodeQ();
       if (msg==0 && !CqsEmpty(CsvAccess(CsdNodeQueue))
                  && !CqsPrioGT(CqsGetPriority(CsvAccess(CsdNodeQueue)), 
@@ -846,9 +847,11 @@ int CsdScheduler(int maxmsgs)
         CmiLock(CsvAccess(CsdNodeQueueLock));
         CqsDequeue(CsvAccess(CsdNodeQueue),&msg);
         CmiUnlock(CsvAccess(CsdNodeQueueLock));
+		csdMsgFlag = 1;
       }
 #endif
-      if (msg==0) CqsDequeue(CpvAccess(CsdSchedQueue),&msg);
+	  if (msg && (!csdMsgFlag)) CQdProcess(CpvAccess(cQdState), 1);
+	  if (msg==0) CqsDequeue(CpvAccess(CsdSchedQueue),&msg);
       if (msg) {
         CmiHandleMessage(msg);
         maxmsgs--;
@@ -873,6 +876,7 @@ int CsdScheduler(int maxmsgs)
 
       if(msg != 0){
 	if(strncmp((char *)((char *)msg+CmiMsgHeaderSizeBytes),"req",3)!=0){
+          /*CQdCreate(CpvAccess(cQdState), 1);*/
 	  CsdEndIdle();
 	  FIFO_EnQueue(CpvAccess(debugQueue), msg);
 	  continue;
@@ -890,6 +894,7 @@ int CsdScheduler(int maxmsgs)
 #endif
     if (msg==0) FIFO_DeQueue(localqueue, (void**)&msg);
 #if CMK_NODE_QUEUE_AVAILABLE
+	csdMsgFlag = 0;
     if (msg==0) msg = CmiGetNonLocalNodeQ();
     if (msg==0 && !CqsEmpty(CsvAccess(CsdNodeQueue))
                && !CqsPrioGT(CqsGetPriority(CsvAccess(CsdNodeQueue)), 
@@ -897,9 +902,11 @@ int CsdScheduler(int maxmsgs)
       CmiLock(CsvAccess(CsdNodeQueueLock));
       CqsDequeue(CsvAccess(CsdNodeQueue),&msg);
       CmiUnlock(CsvAccess(CsdNodeQueueLock));
+	  csdMsgFlag = 1;
     }
 #endif
-    if (msg==0) CqsDequeue(CpvAccess(CsdSchedQueue),&msg);
+    if (msg && (!csdMsgFlag)) CQdProcess(CpvAccess(cQdState), 1);
+	if (msg==0) CqsDequeue(CpvAccess(CsdSchedQueue),&msg);
     if (msg) {
       CsdEndIdle();
       CmiHandleMessage(msg);
@@ -931,6 +938,7 @@ int handler;
     else      FIFO_DeQueue(localqueue, (void**)&msg);
     if (msg) {
       if (CmiGetHandler(msg)==handler) {
+	CQdProcess(CpvAccess(cQdState), 1);
 	CsdEndIdle();
 	CmiHandleMessage(msg);
 	return;
@@ -1669,6 +1677,7 @@ void ConverseCommonInit(char **argv)
   CmiGroupInit();
   CmiMulticastInit();
   CmiInitMultipleSend();
+  CQdInit();
 #if CMK_CCS_AVAILABLE
   CcsInit();
 #endif

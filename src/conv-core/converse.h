@@ -1066,6 +1066,7 @@ typedef void (*CcdVoidFn)();
 #define CcdPROCESSORIDLE 1
 #define CcdSIGUSR1 2
 #define CcdSIGUSR2 3
+#define CcdQUIESCENCE 4
 
 void CcdCallFnAfter(CcdVoidFn fnp, void *arg, unsigned int msecs);
 void CcdPeriodicallyCall(CcdVoidFn fnp, void *arg);
@@ -1142,6 +1143,33 @@ void CWebPlateDataDeposit (int timestep, int cellx, int celly,
 CpvExtern(void*, CmiLocalQueue);
 #endif
 
+/*****************************************************************************
+ *
+ *    Converse Quiescence Detection
+ *
+ *****************************************************************************/
+
+struct ConvQdMsg;
+struct ConvQdState;
+typedef struct ConvQdMsg    *CQdMsg;
+typedef struct ConvQdState  *CQdState;
+typedef CcdVoidFn CQdVoidFn; 
+
+CpvExtern(CQdState, cQdState);
+
+void CQdInit(void);
+void CQdCreate(CQdState, int);
+void CQdProcess(CQdState, int);
+int  CQdGetCreated(CQdState);
+int  CQdGetProcessed(CQdState);
+void CQdRegisterCallback(CQdVoidFn, void *);
+void CmiStartQD(CQdVoidFn, void *);
+
+/*****************************************************************************
+ *
+ *    Converse Random Numbers
+ *
+ *****************************************************************************/
 
 typedef struct rngen_
 {
