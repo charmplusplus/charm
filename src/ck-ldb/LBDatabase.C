@@ -190,6 +190,10 @@ void _loadbalancerInit()
   /******************* SIMULATION *******************/
   // get the step number at which to dump the LB database
   CmiGetArgIntDesc(argv, "+LBDump", &LBSimulation::dumpStep, "Dump the LB state from this step");
+  if (LBSimulation::dumpStep < 0) {
+    CmiPrintf("LB> Argument LBDump (%d) negative, setting to 0\n",LBSimulation::dumpStep);
+    LBSimulation::dumpStep = 0;
+  }
   CmiGetArgIntDesc(argv, "+LBDumpSteps", &LBSimulation::dumpStepSize, "Dump the LB state for this amount of steps");
   if (LBSimulation::dumpStepSize <= 0) {
     CmiPrintf("LB> Argument LBDumpSteps (%d) too small, setting to 1\n",LBSimulation::dumpStepSize);
