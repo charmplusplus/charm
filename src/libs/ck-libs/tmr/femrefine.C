@@ -60,19 +60,30 @@ void FEM_REFINE2D_Split(int meshID,int nodeID,double *coord,int elemID,double *d
 	int nnodes = FEM_Mesh_get_length(meshID,nodeID);
 	int nelems = FEM_Mesh_get_length(meshID,elemID);
 
-	for(int k=0;k<nnodes;k++){
+/*	for(int k=0;k<nnodes;k++){
 		printf(" node %d ( %.6f %.6f )\n",k,coord[2*k+0],coord[2*k+1]);
-	}
+	}*/
 	printf("%d %d \n",nnodes,nelems);	
 	REFINE2D_Split(nnodes,coord,nelems,desiredAreas);
 	printf("called REFINE2D_Split\n");
 	
-	int lastA=-1,lastB=-1,lastD=-1;
   
 	int nSplits=REFINE2D_Get_Split_Length();
+	if(nSplits == 0){
+		return;
+	}
+
+	/*Copy the cordinates of the nodes into a vector, 
+		the cordinates of the new nodes will be inserted
+		into this vector and will be used to sort all the
+		nodes on the basis of the distance from origin
+	*/
+	CkVec<double> coordVec;
+	for(int i=0;i<nnodes*2;i++){
+		coordVec.push_back(coord[i]);
+	}
 	
 	/*find out the attributes of the node 
-		TODO: replace FEM_NODE by paramter that specifies node type
 	*/
 	FEM_Entity *e=FEM_Entity_lookup(meshID,nodeID,"REFINE2D_Mesh");
 	CkVec<FEM_Attribute *> *attrs = e->getAttrVec();
@@ -96,16 +107,13 @@ void FEM_REFINE2D_Split(int meshID,int nodeID,double *coord,int elemID,double *d
 
 
 		REFINE2D_Get_Split(splitNo,(int *)(connData),&tri,&A,&B,&C,&frac,&flags);
-		if((A == lastA && B == lastB ) || (A == lastB && B == lastA)){
-			//node already exists
-			D = lastD;
-		}else{
+		if((flags & 0x1) || (flags & 0x2)){
 			//new node 
 			D = cur_nodes;
       CkPrintf("---- Adding node %d\n",D);					
-			lastA=A;
+		/*	lastA=A;
 			lastB=B;
-			lastD=D;
+			lastD=D;*/
       if (A>=cur_nodes) CkAbort("Calculated A is invalid!");
       if (B>=cur_nodes) CkAbort("Calculated B is invalid!");
 			e->setLength(cur_nodes+1);
@@ -120,11 +128,15 @@ void FEM_REFINE2D_Split(int meshID,int nodeID,double *coord,int elemID,double *d
       AandB[0]=A;
 		  AandB[1]=B;
       /* Add a new node D between A and B */
-		  IDXL_Add_entity(FEM_Comm_shared(meshID,nodeID),D,2,AandB);
+			  IDXL_Add_entity(FEM_Comm_shared(meshID,nodeID),D,2,AandB);
+				double Dx = coord[2*A]*(1-frac)+frac*coord[2*B];
+				double Dy = coord[2*A+1]*(1-frac)+frac*coord[2*B+1];				
+				coordVec.push_back(Dx);
+				coordVec.push_back(Dy);
 		}
 		//add a new triangle
 		/*TODO: replace  FEM_ELEM with parameter*/
-		int newTri = FEM_Mesh_get_length(meshID,elemID);
+		int newTri =  FEM_Mesh_get_length(meshID,elemID);
     CkPrintf("---- Adding triangle %d after splitting %d \n",newTri,tri);
 		elem->setLength(newTri+1);
 		for(int j=0;j<elemattrs->size();j++){
@@ -160,7 +172,9 @@ void FEM_REFINE2D_Split(int meshID,int nodeID,double *coord,int elemID,double *d
 
 		
 	}
-
+	printf("Cordinate list length %d \n",coordVec.size()/2);
+	IDXL_Sort_2d(FEM_Comm_shared(meshID,nodeID),coordVec.getVec());
+	
 }
 
 FDECL void FTN_NAME(FEM_REFINE2D_SPLIT,fem_refine2d_split)(int *meshID,int *nodeID,double *coord,int *elemID,double *desiredAreas){
