@@ -7,8 +7,10 @@ processor is executing an entry point, and no messages are awaiting processing.
 \kw{CkWaitQD}.
 
 \kw{CkStartQD} registers with the system a callback that should be made the
-next time \index{quiescence}quiescence is detected.  \kw{CkStartQD} takes two
-parameters: an index corresponding to the entry function that is to be called,
+next time \index{quiescence}quiescence is detected.  \kw{CkStartQD} has two
+variants which expect the following arguments: 
+\begin{enumerate}
+\item An index corresponding to the entry function that is to be called,
 and a handle to the chare on which that entry function should be called.  The
 syntax of this call looks like this:
 
@@ -30,6 +32,14 @@ the desired entry method, \uw{EntryMethod} is the name of that entry method,
 and \uw{parameters} are the parameters taken by the method.
 These parameters are only used to resolve the proper \uw{EntryMethod};
 they are otherwise ignored.
+
+\item A \um{CkCallback} object. The syntax of this call looks like:
+\begin{alltt}
+  CkStartQD(const CkCallback& cb);
+\end{alltt}
+
+Upon quiescence detection, specified callback is called with no parameters.
+\end{enumerate}
 
 \kw{CkWaitQD}, by contrast, does not register a callback.  Rather,
 \kw{CkWaitQD} blocks and does not return until \index{quiescence}quiescence is
