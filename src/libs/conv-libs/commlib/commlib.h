@@ -16,8 +16,13 @@
 #define NULL 0
 #endif
 
-#define ComlibPrintf if(comm_debug) CmiPrintf
 extern int comm_debug;
+#if CMK_OPTIMIZE
+#define ComlibPrintf(x1, x2)
+#else
+#define ComlibPrintf if(comm_debug) CmiPrintf
+#endif
+
 
 enum{BCAST=0,TREE, GRID, HCUBE, RSEND};  
 #define MAXNUMMSGS 1000
