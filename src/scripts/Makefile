@@ -197,7 +197,7 @@ LIBCONV_UTIL=pup_util.o pup_xlater.o pup_c.o ckhashtable.o sockRoutines.o conv-l
 
 LIBCONV_UTILF=pup_f.o
 
-converse: basics QuickThreads/libckqt.a $(CVLIBS) charmrun-target conv-cpm
+converse: basics QuickThreads/libqt.a $(CVLIBS) charmrun-target conv-cpm
 
 charmrun-target: daemon-target
 	if [ -d charmrun ] ; then ( cd charmrun ; make OPTS='$(OPTS)' ) ; fi
@@ -210,7 +210,7 @@ daemon-target: sockRoutines.o
 		sockRoutines.o -o ../bin/charmd_faceless; fi 
 	touch daemon-target
 
-QuickThreads/libckqt.a:
+QuickThreads/libqt.a:
 	. ./conv-mach.sh;cd QuickThreads;./configure $$CMK_QT
 	rm -f QuickThreads/libqt.a
 	cd QuickThreads ; make qt  OPTS='$(OPTS)'
