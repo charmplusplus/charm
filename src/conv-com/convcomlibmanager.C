@@ -93,7 +93,7 @@ void initComlibManager(){
     CsvInitialize(int, pipeBcastPropagateHandle);
     CsvInitialize(int, pipeBcastPropagateHandle_frag);
     //CsvAccess(pipeBcastPropagateHandle) = CmiRegisterHandler((CmiHandler)propagate_handler);
-    CsvAccess(pipeBcastPropagateHandle_frag) = CmiRegisterHandler((CmiHandler)propagate_handler_frag);
+    CsvAccess(pipeBcastPropagateHandle_frag) = CkRegisterHandler((CmiHandler)propagate_handler_frag);
     
     PUPable_reg(Strategy);
     PUPable_reg(RouterStrategy);
