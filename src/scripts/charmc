@@ -594,16 +594,15 @@ Copyobj() {
 	do
 		if [ "a$COPY" != "a$OBJECT" ] 
 		then
-			[ -d $COPY ] && COPY="$COPY/$OBJECT"
+			[ -d $COPY ] && COPY="$COPY/"
 			if [ -n "$IS_WINDOWS" ] ; then
 				if [ -r "$OBJECT.exe" ] ; then
 # Object is (probably) an executable-- append
 				echo "Appending .exe to object file name"
 				OBJECT="$OBJECT.exe"
-				COPY="$COPY.exe"
 				fi
 			fi
-			DoNoErrCheck $RM $COPY 
+			[ ! -d $COPY ] && DoNoErrCheck $RM $COPY 
 			Do $CP $OBJECT $COPY
 		fi
 	done
