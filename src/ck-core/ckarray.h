@@ -541,7 +541,8 @@ public:
 
 //Creation:
   /// Create-after-migrate:
-  virtual CkMigratable *allocateMigrated(int elChareType,const CkArrayIndex &idx);
+  virtual CkMigratable *allocateMigrated(int elChareType,const CkArrayIndex &idx,
+		  	CkElementCreation_t type);
 
   /// Prepare creation message:
   void prepareCtorMsg(CkMessage *m,int &onPe,const CkArrayIndex &idx);

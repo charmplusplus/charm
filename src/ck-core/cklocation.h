@@ -406,6 +406,10 @@ public:
 	virtual void addLocation(CkLocation &loc) =0;
 };
 
+enum CkElementCreation_t {
+  CkElementCreation_migrate=2, // Create object for normal migration arrival
+  CkElementCreation_resume=3, // Create object after checkpoint
+};
 /// Abstract superclass of all array manager objects 
 class CkArrMgr {
 public:
@@ -417,7 +421,8 @@ public:
 	
 	/// Create an uninitialized element after migration
 	///  The element's constructor will be called immediately after.
-	virtual CkMigratable *allocateMigrated(int elChareType,const CkArrayIndex &idx);
+	virtual CkMigratable *allocateMigrated(int elChareType,
+		const CkArrayIndex &idx,CkElementCreation_t type) =0;
 
 	/// Demand-create an element at this index on this processor
 	///  Returns true if the element was successfully added;
@@ -547,7 +552,8 @@ private:
 	void removeFromTable(const CkArrayIndex &idx);
 
 	friend class CkLocation; //so it can call pupElementsFor
-	void pupElementsFor(PUP::er &p,CkLocRec_local *rec);
+	void pupElementsFor(PUP::er &p,CkLocRec_local *rec,
+		CkElementCreation_t type);
 
 	/// Call this member function on each element of this location:
 	typedef void (CkMigratable::* CkMigratable_voidfn_t)(void);

@@ -1337,7 +1337,7 @@ const CkArrayIndex &CkLocation::getIndex(void) const {
 }
 
 void CkLocation::pup(PUP::er &p) {
-	mgr->pupElementsFor(p,rec);
+	mgr->pupElementsFor(p,rec,CkElementCreation_migrate);
 }
 
 CkLocIterator::~CkLocIterator() {}
@@ -1362,12 +1362,8 @@ void CkLocMgr::iterate(CkLocIterator &dest) {
 
 /************************** LocMgr: MIGRATION *************************/
 
-CkMigratable *CkArrMgr::allocateMigrated(int elChareType,const CkArrayIndex &idx)
-{
-	return (CkMigratable *)malloc(_chareTable[elChareType]->size);
-}
-
-void CkLocMgr::pupElementsFor(PUP::er &p,CkLocRec_local *rec)
+void CkLocMgr::pupElementsFor(PUP::er &p,CkLocRec_local *rec,
+		CkElementCreation_t type)
 {
 	p.comment("-------- Array Location --------");
 	register ManagerRec *m;
@@ -1386,7 +1382,7 @@ void CkLocMgr::pupElementsFor(PUP::er &p,CkLocRec_local *rec)
 		p(elCType);
 		if (p.isUnpacking() && elCType!=-1) {
 			//Create the element
-			CkMigratable *elt=m->mgr->allocateMigrated(elCType,rec->getIndex());
+			CkMigratable *elt=m->mgr->allocateMigrated(elCType,rec->getIndex(),type);
 			int migCtorIdx=_chareTable[elCType]->getMigCtor();
 			//Insert into our tables and call migration constructor
 			if (!addElementToRec(rec,m,elt,migCtorIdx,NULL)) return;
@@ -1434,7 +1430,7 @@ void CkLocMgr::migrate(CkLocRec_local *rec,int toPe)
 	{ 
 		PUP::sizer p; 
 		p(nManagers);
-		pupElementsFor(p,rec);
+		pupElementsFor(p,rec,CkElementCreation_migrate);
 		bufSize=p.size(); 
 	}
 	
@@ -1448,7 +1444,7 @@ void CkLocMgr::migrate(CkLocRec_local *rec,int toPe)
 		PUP::toMem p(msg->packData); 
 		p.becomeDeleting(); 
 		p(nManagers);
-		pupElementsFor(p,rec);
+		pupElementsFor(p,rec,CkElementCreation_migrate);
 		if (p.size()!=bufSize) {
 			CkError("ERROR! Array element claimed it was %d bytes to a"
 				"sizing PUP::er, but copied %d bytes into the packing PUP::er!\n",
@@ -1490,7 +1486,7 @@ void CkLocMgr::migrateIncoming(CkArrayElementMigrateMessage *msg)
 	CkLocRec_local *rec=createLocal(idx,CmiTrue,CmiFalse /* home told on departure */ );
 	
 	//Create the new elements as we unpack the message
-	pupElementsFor(p,rec);
+	pupElementsFor(p,rec,CkElementCreation_migrate);
 	if (p.size()!=msg->length) {
 		CkError("ERROR! Array element claimed it was %d bytes to a"
 			"packing PUP::er, but %d bytes in the unpacking PUP::er!\n",
@@ -1513,7 +1509,7 @@ void CkLocMgr::resume(const CkArrayIndex &idx, PUP::er &p)
 	CkLocRec_local *rec=createLocal(idx,CmiTrue,CmiTrue /* home doesn't know yet */ );
 
 	//Create the new elements as we unpack the message
-	pupElementsFor(p,rec);
+	pupElementsFor(p,rec,CkElementCreation_resume);
 
 	callMethod(rec,&CkMigratable::ckJustMigrated);
 }

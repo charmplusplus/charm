@@ -79,13 +79,20 @@ Group::Group()
 	contributorStamped(&reductionInfo);
 	contributorCreated(&reductionInfo);
 	doneCreatingContributors();
-	nodeProxyPtr = new CProxy_CkArrayReductionMgr(CkpvAccess(_currentGroupRednMgr));
+#if DEBUGRED
+	CkPrintf("[%d,%d]Creating nodeProxy with gid %d\n",CkMyNode(),CkMyPe(),CkpvAccess(_currentGroupRednMgr));
+#endif			
+	CProxy_CkArrayReductionMgr nodetemp(CkpvAccess(_currentGroupRednMgr));
+	nodeProxy = nodetemp;
+
 }
 
 CK_REDUCTION_CONTRIBUTE_METHODS_DEF(Group,
 				    ((CkReductionMgr *)this),
 				    reductionInfo);
 CK_REDUCTION_CLIENT_DEF(CProxy_Group,(CkReductionMgr *)CkLocalBranch(_ck_gid));
+
+
 
 CkGroupInitCallback::CkGroupInitCallback(void) {}
 /*
@@ -154,8 +161,7 @@ they're passed to the user's client function.
 
 CkReductionMgr::CkReductionMgr()//Constructor
   : thisProxy(thisgroup)
-{
-  storedCallback=NULL;
+{ 
   redNo=0;
   completedRedNo = -1;
   inProgress=CmiFalse;
@@ -172,14 +178,13 @@ CkReductionMgr::CkReductionMgr()//Constructor
 //Add the given client function.  Overwrites any previous client.
 void CkReductionMgr::ckSetReductionClient(CkCallback *cb)
 {
-  DEBR((AA"Setting reductionClient in ReductionMgr groupid %d\n"AB,thisgroup.idx));
+  DEBR((AA"Setting reductionClient in ReductionMgr groupid %d in nodeProxy %p\n"AB,thisgroup.idx,&nodeProxy));
 
   if (CkMyPe()!=0)
-	  CkError("WARNING: ckSetReductionClient should only be called from processor zero!\n");
-  delete storedCallback;
-  storedCallback=cb;
+	  CkError("WARNING: ckSetReductionClient should only be called from processor zero!\n");  
+  storedCallback=*cb;
   CkCallback *callback =new CkCallback(CkIndex_CkReductionMgr::ArrayReductionHandler(0),thishandle);
-  (*nodeProxyPtr).ckSetReductionClient(callback);
+  nodeProxy.ckSetReductionClient(callback);
 }
 
 ///////////////////////////// Contributor ////////////////////////
@@ -296,7 +301,7 @@ void CkReductionMgr::contributorArriving(contributorInfo *ci)
 // Each contributor must contribute exactly once to the each reduction.
 void CkReductionMgr::contribute(contributorInfo *ci,CkReductionMsg *m)
 {
-	DEBR((AA"Contributor %p contributed for %d in grp %d\n"AB,ci,ci->redNo,thisgroup.idx));
+  DEBR((AA"Contributor %p contributed for %d in grp %d\n"AB,ci,ci->redNo,thisgroup.idx));
   m->ci=ci;
   m->redNo=ci->redNo++;
   m->sourceFlag=-1;//A single contribution
@@ -394,7 +399,7 @@ void CkReductionMgr::startReduction(int number)
 	int temp = completedRedNo;
 	if(temp < 0)
 		temp = 0;  
-	for(int i=temp;i<=number;i++){  
+	for(int i=temp;i<=number;i++){
 		DEBR((AA"Asking all child PEs to start #%d \n"AB,i));
 		thisProxy.ReductionStarting(new CkReductionNumberMsg(i));
 	}
@@ -461,15 +466,12 @@ void CkReductionMgr::finishReduction(void)
   ret->gcount=result->gcount+gcount+adj(redNo).gcount;
   ret->callback = CkCallback(CkIndex_CkReductionMgr::ArrayReductionHandler(NULL),0,thisProxy);
   ret->secondaryCallback = result->callback;
-  /*secondaryStoredCallback = new CkCallback();
-  *secondaryStoredCallback = result->callback;*/
-#if DEBUGRED 
-  CkPrintf("[%d,%d]Callback for redNo %d in group %d id %p Invalid=%d\n",CkMyNode(),CkMyPe(),redNo,thisgroup.idx,ret->secondaryCallback,ret->secondaryCallback.isInvalid());
-#endif
-  //callbackQ.enq(secondaryStoredCallback);
 
-  //CkPrintf("[%d]Passing things up the NodeGroup reduction tree for redNo %d at %0.6f\n",CkMyPe(),redNo,CmiWallTimer());
-  (*nodeProxyPtr)[CkMyNode()].ckLocalBranch()->contributeArrayReduction(ret);
+#if DEBUGRED 
+  CkPrintf("[%d,%d]Callback for redNo %d in group %d  mesggcount=%d localgcount=%d\n",CkMyNode(),CkMyPe(),redNo,thisgroup.idx,ret->gcount,gcount);
+#endif
+    
+  nodeProxy[CkMyNode()].ckLocalBranch()->contributeArrayReduction(ret);
 
   //House Keeping Operations will have to check later what needs to be changed
   redNo++;
@@ -612,14 +614,24 @@ void CkReductionMgr::pup(PUP::er &p)
   p(redNo);
   p(completedRedNo);
   p(inProgress); p(creating); p(startRequested);
-  p(gcount); p(lcount);
   p(nContrib); p(nRemote);
   p|msgs;
   p|futureMsgs;
   p|futureRemoteMsgs;
   p|finalMsgs;
   p|adjVec;
-  if(p.isUnpacking()) thisProxy = thisgroup;
+  p|nodeProxy;
+  p | storedCallback;
+  if(p.isUnpacking()){
+    thisProxy = thisgroup;
+    lcount=0;
+    gcount=0;	
+    
+  }
+
+#ifdef DEBUGRED
+    CkPrintf("[%d,%d] pupping _____________  gcount = %d \n",CkMyNode(),CkMyPe(),gcount);
+#endif
 }
 
 
@@ -631,7 +643,9 @@ void CkReductionMgr::ArrayReductionHandler(CkReductionMsg *m){
 	finalMsgs.enq(m);
 	//CkPrintf("ArrayReduction Handler Invoked for %d \n",m->redNo);
 	adj(m->redNo).mainRecvd = 1;
-//	CkPrintf("~~~~~~~~~~~~~ ArrayReductionHandler Callback called for redNo %d with mesgredNo %d at %.6f %d\n",completedRedNo,m->redNo,CmiWallTimer());
+#if DEBUGRED	
+	CkPrintf("~~~~~~~~~~~~~ ArrayReductionHandler Callback called for redNo %d with mesgredNo %d at %.6f %d\n",completedRedNo,m->redNo,CmiWallTimer());
+#endif	
 	endArrayReduction();
 }
 
@@ -673,7 +687,9 @@ void CkReductionMgr :: endArrayReduction(){
 
 	}
 	numMsgs = tempMsgs.length();
-//	CkPrintf("[%d]Total = %d %d Sources = %d Number of Messages %d Adj(Completed redno).mainRecvd %d\n",CkMyPe(),msgs_gcount,  adj(completedRedNo+1).gcount,msgs_nSources,numMsgs,adj(completedRedNo+1).mainRecvd);
+#if DEBUGRED
+	CkPrintf("[%d]Total = %d %d Sources = %d Number of Messages %d Adj(Completed redno).mainRecvd %d\n",CkMyPe(),msgs_gcount,  adj(completedRedNo+1).gcount,msgs_nSources,numMsgs,adj(completedRedNo+1).mainRecvd);
+#endif	
 	if(numMsgs == 0){
 		return;
 	}
@@ -721,8 +737,8 @@ void CkReductionMgr :: endArrayReduction(){
 #endif
 	if (!ret->secondaryCallback.isInvalid())
 	    ret->secondaryCallback.send(ret);
-    else if (storedCallback!=NULL)
-	    storedCallback->send(ret);
+    else if (!storedCallback.isInvalid())
+	    storedCallback.send(ret);
     else{
 #if DEBUGRED
 	    CkPrintf("No reduction client for group %d \n",thisgroup.idx);
@@ -1088,6 +1104,7 @@ void NodeGroup::pup(PUP::er &p)
 void CProxy_NodeGroup::ckSetReductionClient(CkCallback *cb) const {
   DEBR(("in CksetReductionClient for CProxy_NodeGroup %d\n",CkLocalNodeBranch(_ck_gid)));
  ((CkNodeReductionMgr *)CkLocalNodeBranch(_ck_gid))->ckSetReductionClient(cb);
+  //ckLocalNodeBranch()->ckSetReductionClient(cb);
  }
 
 CK_REDUCTION_CONTRIBUTE_METHODS_DEF(NodeGroup,
@@ -1162,11 +1179,8 @@ void CkNodeReductionMgr::contribute(contributorInfo *ci,CkReductionMsg *m)
 
 void CkNodeReductionMgr::contributeWithCounter(contributorInfo *ci,CkReductionMsg *m,int count)
 {
-
-
   m->ci=ci;
   m->redNo=ci->redNo++;
-
   m->gcount=count;
 #if DEBUGRED
  CkPrintf("[%d,%d] contributewithCounter started for %d at %0.6f{{{\n",CkMyNode(),CkMyPe(),m->redNo,CmiWallTimer());
@@ -1359,10 +1373,18 @@ void CkNodeReductionMgr::finishReduction(void)
 #if DEBUGRED
    CkPrintf("[%d,%d]------------------- END OF REDUCTION %d with %d remote contributions passed to client function at %.6f\n",CkMyNode(),CkMyPe(),redNo,nRemote,CkWallTimer());
 #endif
-    if (!result->callback.isInvalid())
+    if (!result->callback.isInvalid()){
+#if DEBUGRED
+	    CkPrintf("[%d,%d] message Callback used \n",CkMyNode(),CkMyPe());
+#endif	    
 	    result->callback.send(result);
-    else if (storedCallback!=NULL)
+    }
+    else if (storedCallback!=NULL){
+#if DEBUGRED
+	    CkPrintf("[%d,%d] stored Callback used \n",CkMyNode(),CkMyPe());
+#endif
 	    storedCallback->send(result);
+    }
     else{
     		DEBR((AA"Invalid Callback at %d %d\n"AB,result->callback,storedCallback));
 	    CkAbort("No reduction client!\n"
@@ -1501,6 +1523,7 @@ CkReductionMsg *CkNodeReductionMgr::reduceMessages(void)
 
   while(NULL!=(m=msgs.deq()))
   {
+    DEBR((AA"***** gcount=%d; sourceFlag=%d\n"AB,m->gcount,m->nSources()));	  
     msgs_gcount+=m->gcount;
     if (m->sourceFlag!=0)
     { //This is a real message from an element, not just a placeholder

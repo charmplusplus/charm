@@ -405,7 +405,10 @@ CkArray::CkArray(CkArrayOptions &c,CkMarshalledMessage &initMsg,CkNodeGroupID no
   locMgr->populateInitial(numInitial,initMsg.getMessage(),this);
 
   ///adding code for Reduction using nodegroups
-  nodeProxyPtr = new CProxy_CkArrayReductionMgr(nodereductionID);
+
+  CProxy_CkArrayReductionMgr  nodetemp(nodereductionID);  
+  nodeProxy = nodetemp;
+  //nodeProxy = new CProxy_CkArrayReductionMgr (nodereductionID);
 }
 
 CkArray::CkArray(CkMigrateMessage *m)
@@ -442,26 +445,38 @@ void CkArray::pup(PUP::er &p){
 	}
 }
 
+#define CK_ARRAYLISTENER_STAMP_LOOP(listenerData) do {\
+  int dataOffset=0; \
+  for (int lNo=0;lNo<listeners.size();lNo++) { \
+    CkArrayListener *l=listeners[lNo]; \
+    l->ckElementStamp(&listenerData[dataOffset]); \
+    dataOffset+=l->ckGetLen(); \
+  } \
+} while (0)
+
 //Called on send side to prepare array constructor message
 void CkArray::prepareCtorMsg(CkMessage *m,int &onPe,const CkArrayIndex &idx)
 {
   envelope *env=UsrToEnv((void *)m);
   env->array_index()=idx;
   int *listenerData=env->array_listenerData();
-  int dataOffset=0;
-  for (int lNo=0;lNo<listeners.size();lNo++) {
-    CkArrayListener *l=listeners[lNo];
-    l->ckElementStamp(&listenerData[dataOffset]);
-    dataOffset+=l->ckGetLen();
-  }
+  CK_ARRAYLISTENER_STAMP_LOOP(listenerData);
   if (onPe==-1) onPe=homePe(idx);
   if (onPe!=CkMyPe()) //Let the local manager know where this el't is
   	getLocMgr()->inform(idx,onPe);
 }
 
-CkMigratable *CkArray::allocateMigrated(int elChareType,const CkArrayIndex &idx)
+CkMigratable *CkArray::allocateMigrated(int elChareType,const CkArrayIndex &idx,
+			CkElementCreation_t type)
 {
-	return allocate(elChareType,idx,NULL,CmiTrue);
+	ArrayElement *ret=allocate(elChareType,idx,NULL,CmiTrue);
+	if (type==CkElementCreation_resume) 
+	{ // HACK: Re-stamp elements on checkpoint resume--
+	  //  this restores, e.g., reduction manager's gcount
+		int *listenerData=ret->listenerData;
+		CK_ARRAYLISTENER_STAMP_LOOP(listenerData);
+	}
+	return ret;
 }
 ArrayElement *CkArray::allocate(int elChareType,const CkArrayIndex &idx,
 		     CkMessage *msg,CmiBool fromMigration) 

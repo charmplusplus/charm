@@ -74,6 +74,7 @@ CkReductionMsg *CkArrayReductionMgr::reduceMessages(void){
 
 	while(NULL!=(m=my_msgs.deq()))
 	{
+
 		msgs_gcount+=m->gcount;
 		if (m->sourceFlag!=0)
 		{ //This is a real message from an element, not just a placeholder
