@@ -95,7 +95,7 @@ class PVT : public Group {
   /// Returns termination flag
   int done() { return simdone; }
   /// Register poser with PVT
-  int objRegister(int arrIdx, int safeTime, int sync, sim *myPtr);
+  int objRegister(int arrIdx, POSE_TimeType safeTime, int sync, sim *myPtr);
   /// Unregister poser from PVT
   void objRemove(int pvtIdx);
   /// Update send/recv table at timestamp
@@ -139,7 +139,7 @@ public:
   /// ENTRY: Gathers PVT reports; calculates and broadcasts GVT to PVTs
   void computeGVT(UpdateMsg *); 
   /// Adds incoming send/recv information to a list
-  void addSR(SRentry **SRs, SRentry *e, int og, int ne);
+  void addSR(SRentry **SRs, SRentry *e, POSE_TimeType og, int ne);
 };
 
 #endif

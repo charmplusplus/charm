@@ -144,7 +144,7 @@ void PVT::setGVT(GVTMsg *m)
 }
 
 /// Register poser with PVT
-int PVT::objRegister(int arrIdx, int safeTime, int sync, sim *myPtr)
+int PVT::objRegister(int arrIdx, POSE_TimeType safeTime, int sync, sim *myPtr)
 {
   int i = objs.Insert(arrIdx, -1, sync, myPtr); // add to object list
   return(i*1000 + CkMyPe());                          // return unique PVT idx
@@ -255,9 +255,10 @@ void GVT::computeGVT(UpdateMsg *m)
   CProxy_PVT p(ThePVT);
   CProxy_GVT g(TheGVT);
   GVTMsg *gmsg = new GVTMsg;
-  int lastGVT = 0;
-  static int optGVT = POSE_UnsetTS, conGVT = POSE_UnsetTS, done=0;
-  static int earliestMsg=POSE_UnsetTS;
+  POSE_TimeType lastGVT = 0;
+  static POSE_TimeType optGVT = POSE_UnsetTS, conGVT = POSE_UnsetTS;
+  static int done=0;
+  static POSE_TimeType earliestMsg=POSE_UnsetTS;
   static SRentry *SRs = NULL;
   static int startOffset = 0;
 
@@ -402,7 +403,7 @@ void GVT::computeGVT(UpdateMsg *m)
 #endif
 }
 
-void GVT::addSR(SRentry **SRs, SRentry *e, int og, int ne)
+void GVT::addSR(SRentry **SRs, SRentry *e, POSE_TimeType og, int ne)
 {
   register int i;
   SRentry *tab = (*SRs);
