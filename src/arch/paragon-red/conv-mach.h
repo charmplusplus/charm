@@ -28,7 +28,6 @@
 #define CMK_CSDEXITSCHEDULER_IS_A_FUNCTION                 0
 #define CMK_CSDEXITSCHEDULER_SET_CSDSTOPFLAG               1
 
-#define CMK_FIX_HP_CONNECT_BUG                             0
 
 #define CMK_GETPAGESIZE_AVAILABLE                          0
 
@@ -36,7 +35,6 @@
 
 #define CMK_IS_HETERO                                      0
 
-#define CMK_MACHINE_NAME                                   "paragon-red"
 
 #define CMK_MALLOC_USE_GNU_MALLOC                          0
 #define CMK_MALLOC_USE_OS_BUILTIN                          1
@@ -80,12 +78,7 @@
 #define CMK_SPANTREE_USE_COMMON_CODE                       1
 #define CMK_SPANTREE_USE_SPECIAL_CODE                      0
 
-#define CMK_STRERROR_IS_A_BUILTIN                          1
-#define CMK_STRERROR_USE_SYS_ERRLIST                       0
 
-#define CMK_STRINGS_USE_OWN_DECLARATIONS                   0
-#define CMK_STRINGS_USE_STRINGS_H                          0
-#define CMK_STRINGS_USE_STRING_H                           1
 
 #define CMK_SYNCHRONIZE_ON_TCP_CLOSE                       0
 
@@ -109,9 +102,6 @@
 #define CMK_VECTOR_SEND_USES_COMMON_CODE                   1
 #define CMK_VECTOR_SEND_USES_SPECIAL_CODE                  0
 
-#define CMK_WAIT_NOT_NEEDED                                1
-#define CMK_WAIT_USES_SYS_WAIT_H                           0
-#define CMK_WAIT_USES_WAITFLAGS_H                          0
 
 #define CMK_WHEN_PROCESSOR_IDLE_BUSYWAIT                   1
 #define CMK_WHEN_PROCESSOR_IDLE_USLEEP                     0
@@ -119,20 +109,12 @@
 #define CMK_USE_HP_MAIN_FIX                                0
 #define CMK_DONT_USE_HP_MAIN_FIX                           1
 
-#define CMK_COMPILEMODE_ORIG                               0
-#define CMK_COMPILEMODE_ANSI                               1
 
 #define CMK_LBDB_ON					   1
 #define CMK_LBDB_OFF					   0
 
-#define CMK_STL_USE_DOT_H                                  0
-#define CMK_STL_DONT_USE_DOT_H                             1
 
-#define CMK_BOOL_DEFINED				   0
-#define CMK_BOOL_UNDEFINED				   1
 
-#define CMK_CPP_CAST_ILLEGAL                               0
-#define CMK_CPP_CAST_LEGAL                                 1
 
 #endif
 
