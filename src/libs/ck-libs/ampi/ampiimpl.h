@@ -1074,6 +1074,7 @@ public:
       if(isInGroups(group))
         return *groups[group];
       CkAbort("ampiParent::group2vec: Invalid group id!");
+      return *groups[0]; //meaningless return
     }
     inline MPI_Group saveGroupStruct(groupStruct vec){
       int idx = groups.size();

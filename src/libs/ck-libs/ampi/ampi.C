@@ -47,17 +47,18 @@ typedef struct { float val; float idx; } FloatFloat;
 typedef struct { double val; double idx; } DoubleDouble;
 
 void MPI_MAX( void *invec, void *inoutvec, int *len, MPI_Datatype *datatype){
+  int i;
   switch (*datatype) {
   case MPI_INT:
-    for(int i=0;i<(*len);i++)
+    for(i=0;i<(*len);i++)
       if(((int *)invec)[i] > ((int *)inoutvec)[i]) ((int *)inoutvec)[i] = ((int *)invec)[i];
     break;
   case MPI_FLOAT:
-    for(int i=0;i<(*len);i++)
+    for(i=0;i<(*len);i++)
       if(((float *)invec)[i] > ((float *)inoutvec)[i]) ((float *)inoutvec)[i] = ((float *)invec)[i];
     break;
   case MPI_DOUBLE:
-    for(int i=0;i<(*len);i++)
+    for(i=0;i<(*len);i++)
       if(((double *)invec)[i] > ((double *)inoutvec)[i]) ((double *)inoutvec)[i] = ((double *)invec)[i];
     break;
   default:
@@ -66,17 +67,18 @@ void MPI_MAX( void *invec, void *inoutvec, int *len, MPI_Datatype *datatype){
   }
 }
 void MPI_MIN( void *invec, void *inoutvec, int *len, MPI_Datatype *datatype){
+  int i;
   switch (*datatype) {
   case MPI_INT:
-    for(int i=0;i<(*len);i++)
+    for(i=0;i<(*len);i++)
       if(((int *)invec)[i] < ((int *)inoutvec)[i]) ((int *)inoutvec)[i] = ((int *)invec)[i];
     break;
   case MPI_FLOAT:
-    for(int i=0;i<(*len);i++)
+    for(i=0;i<(*len);i++)
       if(((float *)invec)[i] < ((float *)inoutvec)[i]) ((float *)inoutvec)[i] = ((float *)invec)[i];
     break;
   case MPI_DOUBLE:
-    for(int i=0;i<(*len);i++)
+    for(i=0;i<(*len);i++)
       if(((double *)invec)[i] < ((double *)inoutvec)[i]) ((double *)inoutvec)[i] = ((double *)invec)[i];
     break;
   default:
@@ -85,21 +87,22 @@ void MPI_MIN( void *invec, void *inoutvec, int *len, MPI_Datatype *datatype){
   }
 }
 void MPI_SUM( void *invec, void *inoutvec, int *len, MPI_Datatype *datatype){
+  int i;
   switch (*datatype) {
   case MPI_INT:
-    for(int i=0;i<(*len);i++)
+    for(i=0;i<(*len);i++)
       ((int *)inoutvec)[i] += ((int *)invec)[i];
     break;
   case MPI_FLOAT:
-    for(int i=0;i<(*len);i++)
+    for(i=0;i<(*len);i++)
       ((float *)inoutvec)[i] += ((float *)invec)[i];
     break;
   case MPI_DOUBLE:
-    for(int i=0;i<(*len);i++)
+    for(i=0;i<(*len);i++)
       ((double *)inoutvec)[i] += ((double *)invec)[i];
     break;
   case MPI_COMPLEX:
-    for(int i=0;i<(*len);i++){
+    for(i=0;i<(*len);i++){
       ((AmpiComplex *)inoutvec)[i].re += ((AmpiComplex *)invec)[i].re;
       ((AmpiComplex *)inoutvec)[i].im += ((AmpiComplex *)invec)[i].im;
     }
@@ -110,17 +113,18 @@ void MPI_SUM( void *invec, void *inoutvec, int *len, MPI_Datatype *datatype){
   }
 }
 void MPI_PROD( void *invec, void *inoutvec, int *len, MPI_Datatype *datatype){
+  int i;
   switch (*datatype) {
   case MPI_INT:
-    for(int i=0;i<(*len);i++)
+    for(i=0;i<(*len);i++)
       ((int *)inoutvec)[i] *= ((int *)invec)[i];
     break;
   case MPI_FLOAT:
-    for(int i=0;i<(*len);i++)
+    for(i=0;i<(*len);i++)
       ((float *)inoutvec)[i] *= ((float *)invec)[i];
     break;
   case MPI_DOUBLE:
-    for(int i=0;i<(*len);i++)
+    for(i=0;i<(*len);i++)
       ((double *)inoutvec)[i] *= ((double *)invec)[i];
     break;
   default:
@@ -129,10 +133,11 @@ void MPI_PROD( void *invec, void *inoutvec, int *len, MPI_Datatype *datatype){
   }
 }
 void MPI_LAND( void *invec, void *inoutvec, int *len, MPI_Datatype *datatype){
+  int i;  
   switch (*datatype) {
   case MPI_INT:
   case MPI_LOGICAL:
-    for(int i=0;i<(*len);i++)
+    for(i=0;i<(*len);i++)
       ((int *)inoutvec)[i] = ((int *)inoutvec)[i] && ((int *)invec)[i];
     break;
   default:
@@ -141,13 +146,14 @@ void MPI_LAND( void *invec, void *inoutvec, int *len, MPI_Datatype *datatype){
   }
 }
 void MPI_BAND( void *invec, void *inoutvec, int *len, MPI_Datatype *datatype){
+  int i; 
   switch (*datatype) {
   case MPI_INT:
-    for(int i=0;i<(*len);i++)
+    for(i=0;i<(*len);i++)
       ((int *)inoutvec)[i] = ((int *)inoutvec)[i] & ((int *)invec)[i];
     break;
   case MPI_BYTE:
-    for(int i=0;i<(*len);i++)
+    for(i=0;i<(*len);i++)
       ((char *)inoutvec)[i] = ((char *)inoutvec)[i] & ((char *)invec)[i];
     break;
   default:
@@ -156,10 +162,11 @@ void MPI_BAND( void *invec, void *inoutvec, int *len, MPI_Datatype *datatype){
   }
 }
 void MPI_LOR( void *invec, void *inoutvec, int *len, MPI_Datatype *datatype){
+  int i;  
   switch (*datatype) {
   case MPI_INT:
   case MPI_LOGICAL:
-    for(int i=0;i<(*len);i++)
+    for(i=0;i<(*len);i++)
       ((int *)inoutvec)[i] = ((int *)inoutvec)[i] || ((int *)invec)[i];
     break;
   default:
@@ -168,13 +175,14 @@ void MPI_LOR( void *invec, void *inoutvec, int *len, MPI_Datatype *datatype){
   }
 }
 void MPI_BOR( void *invec, void *inoutvec, int *len, MPI_Datatype *datatype){
+  int i;  
   switch (*datatype) {
   case MPI_INT:
-    for(int i=0;i<(*len);i++)
+    for(i=0;i<(*len);i++)
       ((int *)inoutvec)[i] = ((int *)inoutvec)[i] | ((int *)invec)[i];
     break;
   case MPI_BYTE:
-    for(int i=0;i<(*len);i++)
+    for(i=0;i<(*len);i++)
       ((char *)inoutvec)[i] = ((char *)inoutvec)[i] & ((char *)invec)[i];
     break;
   default:
@@ -183,10 +191,11 @@ void MPI_BOR( void *invec, void *inoutvec, int *len, MPI_Datatype *datatype){
   }
 }
 void MPI_LXOR( void *invec, void *inoutvec, int *len, MPI_Datatype *datatype){
+  int i;  
   switch (*datatype) {
   case MPI_INT:
   case MPI_LOGICAL:
-    for(int i=0;i<(*len);i++)
+    for(i=0;i<(*len);i++)
       ((int *)inoutvec)[i] = (((int *)inoutvec)[i]&&(!((int *)invec)[i]))||(!(((int *)inoutvec)[i])&&((int *)invec)[i]); //emulate ^^
     break;
   default:
@@ -195,13 +204,14 @@ void MPI_LXOR( void *invec, void *inoutvec, int *len, MPI_Datatype *datatype){
   }
 }
 void MPI_BXOR( void *invec, void *inoutvec, int *len, MPI_Datatype *datatype){
+  int i;  
   switch (*datatype) {
   case MPI_INT:
-    for(int i=0;i<(*len);i++)
+    for(i=0;i<(*len);i++)
       ((int *)inoutvec)[i] = ((int *)inoutvec)[i] ^ ((int *)invec)[i];
     break;
   case MPI_BYTE:
-    for(int i=0;i<(*len);i++)
+    for(i=0;i<(*len);i++)
       ((char *)inoutvec)[i] = ((char *)inoutvec)[i] ^ ((char *)invec)[i];
     break;
   default:
@@ -210,44 +220,45 @@ void MPI_BXOR( void *invec, void *inoutvec, int *len, MPI_Datatype *datatype){
   }
 }
 void MPI_MAXLOC( void *invec, void *inoutvec, int *len, MPI_Datatype *datatype){
+  int i;  
   switch (*datatype) {
   case MPI_FLOAT_INT:
-    for(int i=0;i<(*len);i++)
+    for(i=0;i<(*len);i++)
       if(((FloatInt *)invec)[i].val > ((FloatInt *)inoutvec)[i].idx)
         ((FloatInt *)inoutvec)[i] = ((FloatInt *)invec)[i];
     break;
   case MPI_DOUBLE_INT:
-    for(int i=0;i<(*len);i++)
+    for(i=0;i<(*len);i++)
       if(((DoubleInt *)invec)[i].val > ((DoubleInt *)inoutvec)[i].idx)
         ((DoubleInt *)inoutvec)[i] = ((DoubleInt *)invec)[i];
     break;
   case MPI_LONG_INT:
-    for(int i=0;i<(*len);i++)
+    for(i=0;i<(*len);i++)
       if(((LongInt *)invec)[i].val > ((LongInt *)inoutvec)[i].idx)
         ((LongInt *)inoutvec)[i] = ((LongInt *)invec)[i];
     break;
   case MPI_2INT:
-    for(int i=0;i<(*len);i++)
+    for(i=0;i<(*len);i++)
       if(((IntInt *)invec)[i].val > ((IntInt *)inoutvec)[i].idx)
         ((IntInt *)inoutvec)[i] = ((IntInt *)invec)[i];
     break;
   case MPI_SHORT_INT:
-    for(int i=0;i<(*len);i++)
+    for(i=0;i<(*len);i++)
       if(((ShortInt *)invec)[i].val > ((ShortInt *)inoutvec)[i].idx)
         ((ShortInt *)inoutvec)[i] = ((ShortInt *)invec)[i];
     break;
   case MPI_LONG_DOUBLE_INT:
-    for(int i=0;i<(*len);i++)
+    for(i=0;i<(*len);i++)
       if(((LongdoubleInt *)invec)[i].val > ((LongdoubleInt *)inoutvec)[i].idx)
         ((LongdoubleInt *)inoutvec)[i] = ((LongdoubleInt *)invec)[i];
     break;
   case MPI_2FLOAT:
-    for(int i=0;i<(*len);i++)
+    for(i=0;i<(*len);i++)
       if(((FloatFloat *)invec)[i].val > ((FloatFloat *)inoutvec)[i].idx)
         ((FloatFloat *)inoutvec)[i] = ((FloatFloat *)invec)[i];
     break;
   case MPI_2DOUBLE:
-    for(int i=0;i<(*len);i++)
+    for(i=0;i<(*len);i++)
       if(((DoubleDouble *)invec)[i].val > ((DoubleDouble *)inoutvec)[i].idx)
         ((DoubleDouble *)inoutvec)[i] = ((DoubleDouble *)invec)[i];
     break;
@@ -257,44 +268,45 @@ void MPI_MAXLOC( void *invec, void *inoutvec, int *len, MPI_Datatype *datatype){
   }
 }
 void MPI_MINLOC( void *invec, void *inoutvec, int *len, MPI_Datatype *datatype){
+  int i;  
   switch (*datatype) {
   case MPI_FLOAT_INT:
-    for(int i=0;i<(*len);i++)
+    for(i=0;i<(*len);i++)
       if(((FloatInt *)invec)[i].val < ((FloatInt *)inoutvec)[i].idx)
         ((FloatInt *)inoutvec)[i] = ((FloatInt *)invec)[i];
     break;
   case MPI_DOUBLE_INT:
-    for(int i=0;i<(*len);i++)
+    for(i=0;i<(*len);i++)
       if(((DoubleInt *)invec)[i].val < ((DoubleInt *)inoutvec)[i].idx)
         ((DoubleInt *)inoutvec)[i] = ((DoubleInt *)invec)[i];
     break;
   case MPI_LONG_INT:
-    for(int i=0;i<(*len);i++)
+    for(i=0;i<(*len);i++)
       if(((LongInt *)invec)[i].val < ((LongInt *)inoutvec)[i].idx)
         ((LongInt *)inoutvec)[i] = ((LongInt *)invec)[i];
     break;
   case MPI_2INT:
-    for(int i=0;i<(*len);i++)
+    for(i=0;i<(*len);i++)
       if(((IntInt *)invec)[i].val < ((IntInt *)inoutvec)[i].idx)
         ((IntInt *)inoutvec)[i] = ((IntInt *)invec)[i];
     break;
   case MPI_SHORT_INT:
-    for(int i=0;i<(*len);i++)
+    for(i=0;i<(*len);i++)
       if(((ShortInt *)invec)[i].val < ((ShortInt *)inoutvec)[i].idx)
         ((ShortInt *)inoutvec)[i] = ((ShortInt *)invec)[i];
     break;
   case MPI_LONG_DOUBLE_INT:
-    for(int i=0;i<(*len);i++)
+    for(i=0;i<(*len);i++)
       if(((LongdoubleInt *)invec)[i].val < ((LongdoubleInt *)inoutvec)[i].idx)
         ((LongdoubleInt *)inoutvec)[i] = ((LongdoubleInt *)invec)[i];
     break;
   case MPI_2FLOAT:
-    for(int i=0;i<(*len);i++)
+    for(i=0;i<(*len);i++)
       if(((FloatFloat *)invec)[i].val < ((FloatFloat *)inoutvec)[i].idx)
         ((FloatFloat *)inoutvec)[i] = ((FloatFloat *)invec)[i];
     break;
   case MPI_2DOUBLE:
-    for(int i=0;i<(*len);i++)
+    for(i=0;i<(*len);i++)
       if(((DoubleDouble *)invec)[i].val < ((DoubleDouble *)inoutvec)[i].idx)
         ((DoubleDouble *)inoutvec)[i] = ((DoubleDouble *)invec)[i];
     break;
@@ -1144,6 +1156,7 @@ const ampiCommStruct &universeComm2CommStruct(MPI_Comm universeNo)
     return mpi_worlds[worldDex].comm;
   }
   CkAbort("Bad communicator passed to universeComm2CommStruct");
+  return mpi_worlds[0].comm; // meaningless return
 }
 
 void ampi::block(void){
@@ -1699,6 +1712,7 @@ int AMPI_Reduce(void *inbuf, void *outbuf, int count, int type, MPI_Op op,
                int root, MPI_Comm comm)
 {
   AMPIAPI("AMPI_Reduce");
+  if(op == MPI_OP_NULL) CkAbort("MPI_Reduce called with MPI_OP_NULL!!!");
   if(getAmpiParent()->isInter(comm)) CkAbort("MPI_Reduce not allowed for Inter-communicator!");
   if(comm==MPI_COMM_SELF) return copyDatatype(comm,type,count,inbuf,outbuf);
   ampi *ptr = getAmpiInstance(comm);
@@ -1720,6 +1734,7 @@ int AMPI_Allreduce(void *inbuf, void *outbuf, int count, int type,
                   MPI_Op op, MPI_Comm comm)
 {
   AMPIAPI("AMPI_Allreduce");
+  if(op == MPI_OP_NULL) CkAbort("MPI_Allreduce called with MPI_OP_NULL!!!");
   if(getAmpiParent()->isInter(comm)) CkAbort("MPI_Allreduce not allowed for Inter-communicator!");
   if(comm==MPI_COMM_SELF) return copyDatatype(comm,type,count,inbuf,outbuf);
   ampi *ptr = getAmpiInstance(comm);
@@ -1739,6 +1754,7 @@ int AMPI_Iallreduce(void *inbuf, void *outbuf, int count, int type,
                    MPI_Op op, MPI_Comm comm, MPI_Request* request)
 {
   AMPIAPI("AMPI_Allreduce");
+  if(op == MPI_OP_NULL) CkAbort("MPI_Iallreduce called with MPI_OP_NULL!!!");
   if(getAmpiParent()->isInter(comm)) CkAbort("MPI_Iallreduce not allowed for Inter-communicator!");
   ampi *ptr = getAmpiInstance(comm);
   if(comm==MPI_COMM_SELF) {
@@ -2279,6 +2295,7 @@ int AMPI_Ireduce(void *sendbuf, void *recvbuf, int count, int type, MPI_Op op,
                  int root, MPI_Comm comm, MPI_Request *request)
 {
   AMPIAPI("AMPI_Ireduce");
+  if(op == MPI_OP_NULL) CkAbort("MPI_Ireduce called with MPI_OP_NULL!!!");
   if(comm==MPI_COMM_SELF) return copyDatatype(comm,type,count,sendbuf,recvbuf);
   ampi *ptr = getAmpiInstance(comm);
   CkReductionMsg *msg=makeRednMsg(ptr->getDDT()->getType(type),sendbuf,count,type,op);
