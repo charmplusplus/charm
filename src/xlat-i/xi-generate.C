@@ -247,7 +247,7 @@ void GenerateStructsFns(ofstream& top, ofstream& bot)
 
 
 
-  /* for allocked MsgTypes output the pack - unpack stub functions */
+  /* for allocked MsgTypes output the alloc stub functions */
   for ( m=thismodule->messages; m!=NULL; m=m->next ) {
     if ( !m->allocked )
       continue ;
@@ -277,14 +277,21 @@ void GenerateStructsFns(ofstream& top, ofstream& bot)
 
 
     sprintf(str,"static void _CK_unpack_%s(void *in, void **out)\n{\n",
-      m->name);
+	    m->name);
     bot << str ;
-    sprintf(str,
+    if (!m->allocked)  // Varsize message don't need alloc
+    {
+      sprintf(str,
       "\t%s * m = (%s *)GenericCkAlloc(_CK_msg_%s,sizeof(%s),0) ;\n",
       m->name, m->name, m->name, m->name) ;
-    bot << str ;
-    bot << "\t(*out) = (void *) m ;" << endl ;
-    bot << "\tm->unpack(in) ;\n}" << endl ;
+      bot << str ;
+      bot << "\t(*out) = (void *) m ;" << endl ;
+      bot << "\tm->unpack(in) ;\n}" << endl ;
+    } else {
+      bot << "\t(*out) = (void *) in ;" << endl ;
+      sprintf(str,"\t((%s *)out)->unpack(in) ;\n}\n",m->name);
+      bot << str;
+    }
   }
 
 
