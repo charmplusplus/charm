@@ -89,6 +89,7 @@ CLBMigrateMsg* MetisLB::Strategy(CentralLB::LDStats* stats, int count,
 */
 CLBMigrateMsg* MetisLB::Strategy(CentralLB::LDStats* stats, int count)
 {
+  int option=0; // Future optional parameter
   // CkPrintf("[%d] MetisLB strategy\n",CkMyPe());
   CkVector migrateInfo;
 
@@ -230,10 +231,12 @@ CLBMigrateMsg* MetisLB::Strategy(CentralLB::LDStats* stats, int count)
 	  (maxtotal_walltime-stats[m].bg_walltime);
       }
       // set up the different weights
-      float *tpwgts = new float[count];
+      //  Float doesn't compile.  I'll try making it an int array
+      //      float *tpwgts = new float[count];
+      int *tpwgts = new int[count];
       for (m=0; m<count; m++) {
-	tpwgts[m] = stats[m].pe_speed * 
-	  (maxtotal_walltime-stats[m].bg_walltime) / totaltimeAllPe;
+	tpwgts[m] = (int)(0.5 + 100 * stats[m].pe_speed * 
+	  (maxtotal_walltime-stats[m].bg_walltime) / totaltimeAllPe);
       }
       if (count > 8)
 	METIS_WPartGraphKway(&numobjs, xadj, adjncy, objwt, edgewt, 
@@ -247,7 +250,7 @@ CLBMigrateMsg* MetisLB::Strategy(CentralLB::LDStats* stats, int count)
     }
     else if (MULTI_CONSTRAINT == option) {
       CkPrintf("Metis load balance strategy: ");
-      CkPrintf("multiple constraints not implemented yet.\n";
+      CkPrintf("multiple constraints not implemented yet.\n");
     }
   }
   CkPrintf("Post-LDB Statistics step %d\n", step());
