@@ -46,28 +46,31 @@ main(int argc, char **argv)
 */
 
 static void printOut(VerticesListType *vertices);
+static void copyOut(VerticesListType *vertices, int *npe, int *pes);
 static void initGraph(void);
 static void diameter(void);
 static void AddEdges(EdgeListType *EdgeList, int V, int n);
 
-void gengraph(int pV, int pC, int pseed)
+void gengraph(int pV, int pC, int pseed, int *pes, int *npe, int tofile)
 { int i;
   EdgeListType * EdgeList;
   /* VerticesListType * vertices; */
   extern EdgeListType * InitEdgeList();
   char dircmd[20], dirname[10];
 
-
   V = pV;
   C = pC;
   seed = pseed;
   
+  if (CmiMyPe() == 0)
   CmiPrintf("for %d PEs, connectivity %d... ", V, C);
 
   /* make a directory */
+  if (tofile && CmiMyPe() == 0) {
   sprintf(dirname, "graph%d", V);
   sprintf(dircmd, "mkdir %s", dirname);
   system(dircmd);
+  }
   
   /* for (i=0; i<seed; i++) rand(); */
   for (i=0; i<seed; i++) CrnRand();
@@ -78,8 +81,12 @@ void gengraph(int pV, int pC, int pseed)
   AddEdges(EdgeList, V, E); 
   /*  vertices = (VerticesListType *) InitVertices(EdgeList, V,E); */
 
-  printOut(&graph); 
-  diameter();
+  if (tofile) {
+    if (CmiMyPe()==0) printOut(&graph);
+  }
+  else copyOut(&graph, npe, pes);
+
+  if (CmiMyPe()==0) diameter();
 }
 
 
@@ -106,13 +113,11 @@ n -= (V-1);
    {
      do {
        do {
-	 x = rand() % V;
-	 /* x = CrnRand() % V; */
+	 x = CrnRand() % V;
        } while (connections(x) >= C);
        do {
-	 y = rand() % V;
-	 /* y = CrnRand() % V; */
-       } while ((y == x) || connections(y) >= C);
+	 y = CrnRand() % V;
+       } while ((y== x) || connections(y) >= C);
      } while (edgeExists(x,y));
      addEdge(EdgeList, x, y);
    }
@@ -247,6 +252,20 @@ static void sort(int *adj, int fromIndex, int toIndex)
 	    }
 	}
     }
+}
+
+static void copyOut(VerticesListType *vertices, int *npe, int *pes)
+{ 
+ int i;
+ int * adj;
+ Vertex * vertexRecs;
+ 
+ adj = vertices->adjArray;
+ vertexRecs = vertices->vertexArray;
+
+ *npe = vertexRecs[CmiMyPe()].degree;
+ for (i=0; i<vertexRecs[CmiMyPe()].degree; i++)
+       pes[i] = adj[ vertexRecs[CmiMyPe()].adjListInd + i ];
 }
 
 static void printOut(VerticesListType *vertices)
