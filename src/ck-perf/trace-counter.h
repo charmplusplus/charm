@@ -38,6 +38,7 @@ class StatTable {
     //!   3. total time in us spent for each entry
     void write(FILE* fp);
     void clear();
+    inline int numStats() { return numStats_; }
 
   private:
     //! struct to maintain statistics
