@@ -407,6 +407,16 @@ private:
 # define CK_ARRAYLISTENER_MAXLEN 3
 #endif
   int listenerData[CK_ARRAYLISTENER_MAXLEN];
+
+#if CMK_MEM_CHECKPOINT
+friend class CkMemCheckPT;
+protected:
+  int budPEs[2];
+private:
+  void init_checkpt();
+#endif
+public:
+  void inmem_checkpoint(CkArrayCheckPTReqMessage *m);
 };
 inline int *CkArrayListener::ckGetData(ArrayElement *el) const
   {return &el->listenerData[dataOffset];}
@@ -626,8 +636,7 @@ private:
   CkArrayReducer *reducer; //Read-only copy of default reducer
   CkArrayBroadcaster *broadcaster; //Read-only copy of default broadcaster
 public:
-  int isCkArray() { return 1; }
-  void flushStates() { CK_ARRAYLISTENER_LOOP(listeners, l->flushState()); }
+  void flushStates() { CkReductionMgr::flushStates(); CK_ARRAYLISTENER_LOOP(listeners, l->flushState()); }
 };
 /*@}*/
 

@@ -190,6 +190,10 @@ void ArrayElement::initBasics(void)
 ArrayElement::ArrayElement(void) 
 {
 	initBasics();
+#if CMK_MEM_CHECKPOINT
+        init_checkpt();
+#endif
+
 }
 ArrayElement::ArrayElement(CkMigrateMessage *m) 
 {
@@ -238,6 +242,9 @@ void ArrayElement::pup(PUP::er &p)
   if (p.isUnpacking())
   	thisArray=thisArrayID.ckLocalBranch();
   p(listenerData,CK_ARRAYLISTENER_MAXLEN);
+#if CMK_MEM_CHECKPOINT
+  p(budPEs, 2);
+#endif
 }
 
 /// A more verbose form of abort

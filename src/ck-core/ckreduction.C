@@ -269,6 +269,10 @@ far into the future.  The adj() vector is what saves us here.
 */
 void CkReductionMgr::contributorDied(contributorInfo *ci)
 {
+#if CMK_MEM_CHECKPOINT
+  // ignore from listener if it is during restart from crash
+  if (CkInRestarting()) return;
+#endif
   DEBR((AA"Contributor %p(%d) died\n"AB,ci,ci->redNo));
   //We lost a contributor
   gcount--;

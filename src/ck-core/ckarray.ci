@@ -25,6 +25,8 @@ module CkArray {
     entry ArrayElement();
     //Calls destructor:
     entry void ckDestroy(void);
+    // CMK_MEM_CHECKPOINT
+    entry void inmem_checkpoint(CkArrayCheckPTReqMessage *);
   };
 
 
