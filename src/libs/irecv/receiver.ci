@@ -6,6 +6,7 @@ array [1D] receiver
 {
   entry receiver();
   entry void generic(receiverMsg *);
+  entry [sync, threaded] void syncSend(receiverMsg *);
   entry void ready2go(void);
 };
 

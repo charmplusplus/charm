@@ -43,6 +43,7 @@ receiver::~receiver()
 
 #define MIN(a,b) (a)<(b)?(a):(b)
 
+// other receiver send message here (active send)
 void receiver::sendTo(int tag, char *pointer, int size, int from, int refno)
 {
   int tags[3], ret_tags[3];
@@ -76,6 +77,12 @@ void receiver::generic(receiverMsg *msg)
   delete msg;
 }
 
+void receiver::syncSend(receiverMsg *msg)
+{
+  sendTo(msg->tag, msg->buf, msg->size, msg->sendFrom, msg->refno);
+  delete msg;
+}
+
 static int typesize(int type, int count)
 {
   switch(type) {
@@ -92,9 +99,9 @@ static int typesize(int type, int count)
   }
 }
 
-void receiver::isend(void *buf, int size, int dest, int tag, int refno)
+void receiver::isend(void *buf, int count, int datatype, int dest, int tag, int refno)
 {
-// int size = typesize(datatype, count);
+ int size = typesize(datatype, count);
  receiverMsg * d = new (&size, 0) receiverMsg;
  d->tag = tag;
  d->sendFrom = thisIndex;
@@ -104,10 +111,10 @@ void receiver::isend(void *buf, int size, int dest, int tag, int refno)
  B[dest].generic(d);
 }
 
-void receiver::irecv(void *buf, int size, int source, int tag, int refno)
+void receiver::irecv(void *buf, int count, int datatype, int source, int tag, int refno)
 {
   int tags[3], ret_tags[3];
-//  int size = typesize(datatype, count);
+  int size = typesize(datatype, count);
 
   tags[0] = tag; tags[1] = source; tags[2] = refno;
   tblEntry *req = (tblEntry *)CmmGet(msgTbl, 3, tags, ret_tags);
@@ -127,6 +134,31 @@ void receiver::irecv(void *buf, int size, int source, int tag, int refno)
     req->size = size;
     CmmPut(reqTbl, 3, tags, req);
   }
+}
+
+int receiver::iAlltoAll(void *sendbuf, int sendcount, int sendtype, 
+	      void *recvbuf, int recvcount, int recvtype, int refno)
+{
+  int nPe = getSize();  // should be number of elements in array1D
+  int tag = 65535;	// special tag
+  int i;
+  for (i=0; i<nPe; i++) 
+      isend(((char *)sendbuf)+i*typesize(sendtype, sendcount), sendcount, sendtype, i, tag, refno);
+  for (i=0; i<nPe; i++) 
+      irecv(((char *)recvbuf)+i*typesize(recvtype, recvcount), recvcount, recvtype, i, tag, refno);
+  return 0;
+}
+
+int receiver::iAlltoAllv(void *sendbuf, int *sendcount, int *sdispls, int sendtype, void *recvbuf, int *recvcount, int *rdispls, int recvtype, int refno)
+{
+  int nPe = getSize();  // should be number of elements in array1D
+  int tag = 65535;	// special tag
+  int i;
+  for (i=0; i<nPe; i++) 
+      isend(((char *)sendbuf)+sdispls[i]*typesize(sendtype, 1), sendcount[i], sendtype, i, tag, refno);
+  for (i=0; i<nPe; i++) 
+      irecv(((char *)recvbuf)+rdispls[i]*typesize(recvtype, 1), recvcount[i], recvtype, i, tag, refno);
+  return 0;
 }
 
 void receiver::iwaitAll(recvCallBack f, void *data, int ref)

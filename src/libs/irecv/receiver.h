@@ -74,13 +74,18 @@ public:
   ~receiver();
 
   // interface
-  void isend(void *buf, int size, int dest, int tag, int refno);
-  void irecv(void *buf, int size, int source, int tag, int refno);   
+  void isend(void *buf, int count, int datatype, int dest, int tag, int refno);
+  void irecv(void *buf, int count, int datatype, int source, int tag, int refno);   
+  int iAlltoAll(void *sendbuf, int sendcount, int sendtype, 
+		 void *recvbuf, int recvcount, int recvtype, int refno);
+  int iAlltoAllv(void *sendbuf, int *sendcount, int *sdispls, int sendtype, 
+	 void *recvbuf, int *recvcount, int *rdispls, int recvtype, int refno);
   void iwaitAll(int refno);
   void iwaitAll(recvCallBack f, void *data, int refno);     // for fortran
 
   // entry
   void generic(receiverMsg *);
+  void syncSend(receiverMsg *);
   void ready2go();
 
 private:
