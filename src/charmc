@@ -605,18 +605,19 @@ echo '}' >> MODULES.TMP.c
 if ($?VERBOSE) echo $CMK_CC $OPTS_CC -c MODULES.TMP.c
 $CMK_CC $OPTS_CC -c MODULES.TMP.c
 if ($status) goto failure
-set OBJECTFILES = ($OBJECTFILES MODULES.TMP.o)
 
 # Decide whether or not to add defmain.
 
 if (! { (egrep '^charm_main$' MODULES.TMP.nm >& /dev/null) }) then
-	set OBJECTFILES=($CHARMLIB/lib${LIBCLASS}-defmain.o $OBJECTFILES)
+	set MAINOBJ=($CHARMLIB/lib${LIBCLASS}-defmain.o $OBJECTFILES)
+else
+	set MAINOBJ=
 endif
 
 # Perform final linkage
 
-if ($?VERBOSE) echo $LOADER $OPTS_LD -o $OBJECT $OBJECTFILES -L$CHARMLIB $LIBRARIES
-$LOADER $OPTS_LD -o $OBJECT $OBJECTFILES -L$CHARMLIB $LIBRARIES
+if ($?VERBOSE) echo $LOADER $OPTS_LD -o $OBJECT PRE.TMP.o MODULES.TMP.o $MAINOBJ
+$LOADER $OPTS_LD -o $OBJECT PRE.TMP.o MODULES.TMP.o $MAINOBJ
 if ($status) goto failure
 
 ########################################################################
