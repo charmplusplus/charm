@@ -377,9 +377,16 @@ static void CmiStartThreads(char **argv)
 void  CmiNodeBarrier(void) {
   CmiNodeBarrierCount(CmiMyNodeSize());
 }
+
 /* Wait for all worker threads as well as comm. thread */
+/* unfortunately this could also be called in a non smp version, e.g.
+   net-win32 */
 void CmiNodeAllBarrier(void) {
+#ifdef CMK_CPV_IS_SMP
   CmiNodeBarrierCount(CmiMyNodeSize()+1);
+#else
+  CmiNodeBarrierCount(CmiMyNodeSize());
+#endif
 }
 
 #endif
