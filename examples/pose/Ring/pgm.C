@@ -92,14 +92,14 @@ main::main(CkArgMsg *m)
     //wd->dump();
     (*(CProxy_worker *) &POSE_Objects)[i].insert(wd, dest);
   }
-  */
-  /*
+
   SmallWorkMsg *sm = new SmallWorkMsg;
   memset(sm->data, 0, SM_MSG_SZ*sizeof(int));
   sm->fromPE = -1;
   sm->Timestamp(0);
   (*(CProxy_worker *) &POSE_Objects).workSmall(sm);
   */
+  POSE_startTimer();
 }
 
 void main::buildMap(int numObjs, int dist)

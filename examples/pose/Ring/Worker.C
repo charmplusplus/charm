@@ -127,6 +127,7 @@ void worker::doWork()
     sm->fromPE = myHandle;
     // local ring
     POSE_invoke(workSmall(sm), worker, ((myHandle%numObjs)+1)%numObjs + (numObjs*CkMyPe()), 0);
+    // global ring
     //POSE_invoke(workSmall(sm), worker, (myHandle+1)%totalObjs, 0);
     //CkPrintf("%d sending small work to %d at %d. Sent=%d\n",myHandle,((myHandle%numObjs)+1)%numObjs + (numObjs*CkMyPe()),ovt,sent);
   }
