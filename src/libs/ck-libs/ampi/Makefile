@@ -1,4 +1,4 @@
-CDIR=$(HOME)/ampi/charm
+CDIR=../../../..
 CHARMC=$(CDIR)/bin/charmc $(OPTS)
 
 HEADERS=ampi.h ampif.h ampiimpl.h ampiProjections.h ampiOOQ.h
