@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.3  1995-09-29 09:50:07  jyelon
+ * Revision 2.4  1995-10-19 18:18:24  jyelon
+ * added "converse.h"
+ *
+ * Revision 2.3  1995/09/29  09:50:07  jyelon
  * CmiGet-->CmiDeliver, added protos, etc.
  *
  * Revision 2.2  1995/09/20  15:57:05  sanjeev
@@ -29,7 +32,8 @@
  *
  ***************************************************************************/
 static char ident[] = "@(#)$Header$";
-#include "converse.h"
+
+#include <converse.h>
 
 /**************************
 **

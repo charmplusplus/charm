@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.6  1995-10-02 19:28:29  knauff
+ * Revision 2.7  1995-10-19 18:18:24  jyelon
+ * added "converse.h"
+ *
+ * Revision 2.6  1995/10/02  19:28:29  knauff
  * Fixed the call to CmiAsyncSendFn in CmiSendToSpanTreeLeaves, so I
  * don't need the '#include machine.h' after all.
  *
@@ -38,7 +41,7 @@
 static char ident[] = "@(#)$Header$";
 
 /* This file contains all the spanning tree functions */
-#include "converse.h"
+#include <converse.h>
 
 #define MAXSPAN    4          /* The maximum permitted span on 
 				 each node of the spanning tree */
