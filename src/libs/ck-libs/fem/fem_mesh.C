@@ -818,7 +818,7 @@ void FEM_Entity::setAscendingGlobalno(void) {
 	}
 }
 void FEM_Entity::copyOldGlobalno(const FEM_Entity &e) {
-	if ((!hasGlobalno()) && e.hasGlobalno() && size()==e.size()) {
+	if ((!hasGlobalno()) && e.hasGlobalno() && size()>=e.size()) {
 		for (int i=0;i<size();i++) 
 			setGlobalno(i,e.getGlobalno(i));
 	}
