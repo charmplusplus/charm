@@ -566,71 +566,86 @@ public:\
 
 
 //Holds a pointer to a (possibly dynamically allocated) PUP::able.
+//  Extracting the pointer hands the deletion responsibility over.
 //  This is used by parameter marshalling, which doesn't work well 
-//  with pointers.
+//  with bare pointers.
+//   CkPointer<T> t   is the parameter-marshalling equivalent of   T *t
 extern "C" void CmiAbort(const char *msg);
 template <class T>
-class PUPable_marshall {
+class CkPointer {
 	T *allocated; //Pointer that PUP dynamically allocated for us (recv only)
 	T *ptr; //Read-only pointer
 
 #if 0 /* Private (do-not-use) copy constructor.  This prevents allocated from being
          deleted twice--once in the original, and again in the copy.*/
-	PUPable_marshall(const PUPable_marshall<T> &src); // Don't use this!
+	CkPointer(const CkPointer<T> &src); // Don't use this!
 #else /* Some compilers, like gcc3, have a hideous bug that causes them to *demand*
          a public copy constructor when a class is used to initialize a const-reference
 	 from a temporary.  The public copy constructor should never be called, though. */
 public:
-	PUPable_marshall(const PUPable_marshall<T> &src) {
+	CkPointer(const CkPointer<T> &src) {
 		CmiAbort("PUPable_marshall's cannot be passed by value.  Pass them only by reference!");
 	}
 #endif
-
+protected:
+	T *peek(void) {return ptr;}
 public:
-	/// Marshall this object.
 	/// Used on the send side, and does *not* delete the object.
-	PUPable_marshall(T *src) { 
+	CkPointer(T *src)  ///< Marshall this object.
+	{ 
 		allocated=0; //Don't ever delete src
 		ptr=src;
 	}
 	
-	/// Marshall this object.
-	/// Used on the send side, and does *not* delete the object.
-	PUPable_marshall(T &src) { 
-		allocated=0; //Don't ever delete &src
-		ptr=&src;
-	}
-	
 	/// Begin completely empty: used on marshalling recv side.
-	PUPable_marshall(void) { 
+	CkPointer(void) { 
 		ptr=allocated=0;
 	}
 	
-	~PUPable_marshall() {
-		if (allocated) delete allocated;
-	}
+	~CkPointer() { if (allocated) delete allocated; }
 	
-	/// Access the object held by this class:
-	operator T* () { return ptr; }
-	
-	/// Remove the held object from this class.
-	/// You are then responsible for deallocating the pointer.
-	T *release(void) { 
-		allocated=0;
-		return ptr;
-	}
+	/// Extract the object held by this class.  
+	///  Deleting the pointer is now the user's responsibility
+	inline operator T* () { allocated=0; return ptr; }
 	
 	inline void pup(PUP::er &p) {
 		bool ptrWasNull=(ptr==0);
-		p|ptr;
+		
+		PUP::able *ptr_able=ptr; // T must inherit from PUP::able!
+		p|ptr_able; //Pack as a PUP::able *
+		ptr=(T *)ptr_able;
+		
 		if (ptrWasNull) 
 		{ //PUP just allocated a new object for us-- 
 		  // make sure it gets deleted eventually.
 			allocated=ptr;
 		}
 	}
-	friend inline void operator|(PUP::er &p,PUPable_marshall<T> &v) {v.pup(p);}
+	friend inline void operator|(PUP::er &p,CkPointer<T> &v) {v.pup(p);}
 };
+#define PUPable_marshall CkPointer
+
+//Like CkPointer, but keeps deletion responsibility forever.
+//   CkReference<T> t  is the parameter-marshalling equivalent of   T &t
+template<class T>
+class CkReference : private CkPointer<T> {
+public:
+	/// Used on the send side, and does *not* delete the object.
+	CkReference(T &src)   ///< Marshall this object.
+		:CkPointer<T>(&src) { }
+	
+	/// Begin completely empty: used on the recv side.
+	CkReference(void) {}
+	
+	/// Look at the object held by this class.  Does *not* hand over
+	/// deletion responsiblity.
+	inline operator T& () { return *peek(); }
+	
+	inline void pup(PUP::er &p) {CkPointer<T>::pup(p);}
+	
+	friend inline void operator|(PUP::er &p,CkReference<T> &v) {v.pup(p);}
+};
+
 
 /******** PUP via pipe: another way to access PUP::ers *****
 The parameter marshalling system pups each variable v using just:
