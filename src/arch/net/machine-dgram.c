@@ -29,17 +29,17 @@ typedef struct { char data[DGRAM_HEADER_SIZE]; } DgramHeader;
 typedef struct { DgramHeader head; char window[1024]; } DgramAck;
 
 #define DgramHeaderMake(ptr, dstrank, srcpe, magic, seqno) { \
-   ((unsigned short *)ptr)[0] = srcpe; \
-   ((unsigned short *)ptr)[1] = ((magic & DGRAM_MAGIC_MASK)<<8) | dstrank; \
-   ((unsigned int *)ptr)[1] = seqno; \
+   ((unsigned int *)ptr)[0] = seqno; \
+   ((unsigned short *)ptr)[2] = srcpe; \
+   ((unsigned short *)ptr)[3] = ((magic & DGRAM_MAGIC_MASK)<<8) | dstrank; \
 }
 
 #define DgramHeaderBreak(ptr, dstrank, srcpe, magic, seqno) { \
    unsigned short tmp; \
-   srcpe = ((unsigned short *)ptr)[0]; \
-   tmp = ((unsigned short *)ptr)[1]; \
+   seqno = ((unsigned int *)ptr)[0]; \
+   srcpe = ((unsigned short *)ptr)[2]; \
+   tmp = ((unsigned short *)ptr)[3]; \
    dstrank = (tmp&0xFF); magic = (tmp>>8); \
-   seqno = ((unsigned int *)ptr)[1]; \
 }
 
 #define PE_BROADCAST_OTHERS (-1)
