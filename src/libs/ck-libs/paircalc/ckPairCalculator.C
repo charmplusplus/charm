@@ -94,15 +94,16 @@ PairCalculator::calculatePairs(int size, complex *points, int sender, bool fromR
 #endif
   int offset = -1;
   complex **inData;
-  if(fromRow || (symmetric && thisIndex.x == thisIndex.y)){
+  if (fromRow) {
     offset = sender - thisIndex.x;
     inData = inDataLeft;
-    //    kLeftOffset[kLeftCount++]=offset;
   }
   else {
     offset = sender - thisIndex.y;
     inData = inDataRight;
-    //    kRighttOffset[kRightCount++]=offset;
+  }
+  if(symmetric && thisIndex.x == thisIndex.y){
+    inData = inDataLeft;
   }
 
   N = size;                                                             
@@ -274,7 +275,7 @@ PairCalculator::acceptResult(int size, double *matrix, int rowNum, CkCallback cb
    * add new message and entry method for sumPartial result
    * to avoid message copying.
    */
-  /*  if(!symmetric){
+  if(!symmetric){
     CkArrayIndexIndex4D idx(thisIndex.w, 0, thisIndex.y, thisIndex.z);
     thisProxy(idx).sumPartialResult(N*grainSize, mynewData, thisIndex.z, cb);
   }
@@ -286,9 +287,8 @@ PairCalculator::acceptResult(int size, double *matrix, int rowNum, CkCallback cb
       thisProxy(idx).sumPartialResult(N*grainSize, mynewData, thisIndex.z, cb);  
     }
   }
-  */
+  /*
   // commenting the reduction split out since it doesn't work yet.
-
 
   int segments=S/grainSize;
   if(S%grainSize!=0)
@@ -320,7 +320,7 @@ PairCalculator::acceptResult(int size, double *matrix, int rowNum, CkCallback cb
 	}
       }
     }
-
+  */
   delete [] mynewData;
 }
 
