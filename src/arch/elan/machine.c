@@ -75,6 +75,7 @@ Queue localMsgBuf;
 
 int outstandingMsgs[3000];
 int ppn_factor = 1;                    //The size affinity group for preventing stretches.
+int stretchFlag = 0;
 
 static void ConverseRunPE(int everReturn);
 
@@ -340,6 +341,8 @@ static void CmiReleaseSentMessages(void)
   double rel_end_time = CmiWallTimer();
   if(rel_end_time > rel_start_time + 50/1e6)
     traceUserBracketEvent(20, rel_start_time, rel_end_time);
+  if((rel_end_time > rel_start_time + 5/1e3) && stretchFlag)
+    CmiPrintf("%d:Stretched Release Sent Msgs at %5.3lfs of %5.5lf ms\n", CmiMyPe(), rel_end_time, (rel_end_time - rel_start_time)*1e3);
 #endif
 #endif
 }
@@ -475,6 +478,8 @@ int PumpMsgs(int retflag)
       double pmp_end_time = CmiWallTimer();
       if(pmp_end_time > pmp_start_time + 50/1e6)
 	traceUserBracketEvent(10, pmp_start_time, pmp_end_time);
+      if((pmp_end_time > pmp_start_time + 5/1e3) && stretchFlag)
+	CmiPrintf("%d:Stretched Pump Msgs at %5.3lfs of %5.5lf ms\n", CmiMyPe(), pmp_end_time, (pmp_end_time - pmp_start_time)*1e3);
 #endif
 #endif
       return recd;    
@@ -484,8 +489,10 @@ int PumpMsgs(int retflag)
 #ifndef CMK_OPTIMIZE 
 #if ! CMK_TRACE_IN_CHARM
       double pmp_end_time = CmiWallTimer();
-      if(pmp_end_time > pmp_start_time + 10/1e6)
+      if(pmp_end_time > pmp_start_time + 50/1e6)
 	traceUserBracketEvent(10, pmp_start_time, pmp_end_time);
+      if((pmp_end_time > pmp_start_time + 5/1e3) && stretchFlag)
+	CmiPrintf("%d:Stretched Pump Msgs at %5.3lfs of %5.5lf ms\n", CmiMyPe(), pmp_end_time, (pmp_end_time - pmp_start_time)*1e3);
 #endif
 #endif
       return flg;
@@ -712,8 +719,6 @@ CmiCommHandle CmiAsyncSendFn(int destPE, int size, char *msg){
   return ElanSendFn(destPE, size, msg, 0);
 }
 
-int stretchFlag = 0;
-
 void CmiFreeSendFn(int destPE, int size, char *msg)
 {
 #ifndef CMK_OPTIMIZE 
@@ -747,8 +752,8 @@ void CmiFreeSendFn(int destPE, int size, char *msg)
   double snd_end_time = CmiWallTimer();
   if(snd_end_time > snd_start_time + 5/1e6) 
     traceUserBracketEvent(30, snd_start_time, snd_end_time);
-  if((snd_end_time > snd_start_time + 5/1e4) && stretchFlag)
-      CmiPrintf("%d:Stretched Send to %d\n", CmiMyPe(), destPE);
+  if((snd_end_time > snd_start_time + 5/1e3) && stretchFlag)
+      CmiPrintf("%d:Stretched Send to %d at %5.3lfs of %5.5lf ms\n", CmiMyPe(), destPE, snd_end_time, (snd_end_time - snd_start_time)*1e3);
 #endif
 #endif
 }
@@ -961,7 +966,7 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
 
   if ((elan_q = elan_allocQueue(elan_base->state)) == NULL) {
     
-    perror( "elan_allocQueue failed" );
+    perror( "elan_gallocQueue failed" );
     exit (1);
   }
   
@@ -1033,9 +1038,13 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
     rms_nodes = atoi(getenv("RMS_NODES"));
   if(getenv("RMS_PROCS") != NULL)
     rms_procs = atoi(getenv("RMS_PROCS"));
-  ppn_factor = 4 * (rms_procs/rms_nodes);   //4 nodes is the stretch group affinity
+  ppn_factor = (rms_procs/rms_nodes);   //4 nodes is the stretch group affinity
   if(ppn_factor == 0)   //debug
     ppn_factor = 1;
+
+  //ppn_factor = 1;
+
+  //CmiPrintf("ppn_factor = %d\n", ppn_factor);
 
   CmiStartThreads(argv);
   ConverseRunPE(initret);
