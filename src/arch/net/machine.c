@@ -1513,6 +1513,7 @@ static OutgoingMsg PrepareOutgoing(CmiState cs,int pe,int size,int freemode,char
   OutgoingMsg ogm;
   MallocOutgoingMsg(ogm);
   CmiMsgHeaderSetLength(data, size);
+  MACHSTATE2(2,"Preparing outgoing message for pe %d, size %d",pe,size);
   ogm->size = size;
   ogm->data = data;
   ogm->src = cs->pe;
@@ -1765,6 +1766,14 @@ static void ConverseRunPE(int everReturn)
   CpvInitialize(void *,CmiLocalQueue);
   CpvAccess(CmiLocalQueue) = cs->localqueue;
 
+#if MACHINE_DEBUG_LOG
+  {
+    char ln[200];
+    sprintf(ln,"debugLog.%d",CmiMyNode());
+    debugLog=fopen(ln,"w");
+  }
+#endif
+
   /* all non 0 rank use the copied one while rank 0 will modify the actual argv */
   if (CmiMyRank())
     CmiMyArgv = CmiCopyArgs(Cmi_argvcopy);
@@ -1823,14 +1832,6 @@ static void ConverseRunPE(int everReturn)
     /*Initialize the clock*/
     Cmi_clock=GetClock();
   }
-
-#if MACHINE_DEBUG_LOG
-  {
-    char ln[200];
-    sprintf(ln,"debugLog.%d",CmiMyPe());
-    debugLog=fopen(ln,"w");
-  }
-#endif
 
   /* communication thread */
   if (CmiMyRank() == CmiMyNodeSize()) {
