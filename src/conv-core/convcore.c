@@ -87,7 +87,8 @@ char **argv;
   }
 }
 
-int CstatMemory(int i)
+int CstatMemory(i)
+int i;
 {
   return 0;
 }
@@ -240,15 +241,14 @@ int handler;
 CsdInit(char **argv)
 {
   void *CqsCreate();
-  CpvAccess(CsdSchedQueue) = CqsCreate();
 
   CpvInitialize(int, disable_sys_msgs);
-  CpvAccess(disable_sys_msgs) = 0;
-  
   CpvInitialize(int,   CmiHandlerCount);
   CpvInitialize(void*, CsdSchedQueue);
   CpvInitialize(int,   CsdStopFlag);
   
+  CpvAccess(disable_sys_msgs) = 0;
+  CpvAccess(CsdSchedQueue) = CqsCreate();
   CpvAccess(CsdStopFlag)  = 0;
 }
 
@@ -326,7 +326,10 @@ char **argv;
   CmemInit(argv);
   CmiInit(argv);
   CsdInit(argv);
+#ifdef CMK_CTHINIT_IS_IN_CONVERSEINIT
   CthInit(argv);
+#endif
+  CthSchedInit();
 }
 
 ConverseExit()
