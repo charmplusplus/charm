@@ -1,0 +1,95 @@
+\documentstyle[psfig,11pt,epsf]{report}
+\setcounter{topnumber}{2}
+\def\topfraction{1}
+\setcounter{bottomnumber}{1}
+\def\bottomfraction{1}
+\setcounter{totalnumber}{3}
+\def\textfraction{0.2}
+\def\floatpagefraction{0.8}
+ 
+\setlength{\parindent}{0.0in}
+\setlength{\parskip}{0.1in}
+\setlength{\textwidth}{6.5in}
+\setlength{\itemindent}{1in}
+\setlength{\textheight}{9.5in}
+\addtolength{\oddsidemargin}{0in}
+\addtolength{\topmargin}{-0.4in}
+ 
+\textwidth 6.4in
+\textheight 8.9in
+\topmargin -.4in
+\oddsidemargin 0.25in
+\evensidemargin 0.25in
+\parskip 0.1in
+
+
+\begin{document}
+
+\begin{center}
+
+{\Large \bf Futures library}
+\end{center}
+This library supports the {\em future} abstraction, defined and used by
+Halstead and other researchers. The library itself provides only
+local (sequential) functions. If necessary, the user (or a language
+implementor who wishes to use futures) can send converse messages
+across processors, and have their handlers set the future's values.
+
+{\large \bf futuresInitialize}
+
+\verb#futuresInitialize()#
+
+This function initializes the futures module. It can deal with
+repeated (redundant) initializations, without losing information
+entered after the previous initialization. Currently, 100 distinct
+future values may be alive at any moment on each processor. This
+number will be made a parameter to the futuresInitialize function in
+future versions.
+
+{\large \bf createFuture}
+
+\verb#int createFuture()#
+
+Returns an integer key designating the future-value-holder just
+created.
+
+
+{\large \bf setFuture}
+
+\verb#setFuture(int key, void*pointer)#
+
+Sets the value of the future indicate by the key to the given pointer.
+All the threads waiting for the future specified by the key are
+awakened. (Each such thread, when it resumes, will return from the
+waitFuture function with the \verb#pointer# as its return value.)
+
+{\large \bf sendToFuture}
+
+\verb#sendToFuture(void *m, int key)#
+
+Makes an entry in the scheduler's queue that will (when scheduled) set
+the future value, and awaken the waiting threads. This is an
+asynchronous version of \verb#setFuture#. 
+
+
+{\large \bf  waitFuture}
+
+\verb#void* waitFuture (int key, int free)#
+
+The caller for this function must be a thread. If the future value is
+ready (i.e. set by \verb#setFuture# or \verb#sendToFuture#), the
+function returns immediately with a pointer to the value. Otherwise,
+the calling thread suspends, and the call returns after another thread
+has set the future value. This call can be made before or after the future
+is set.
+
+destroyFuture(int key)
+
+Allows  the key to be used for other futures.
+
+{\large \bf Bugs:} Currently, there is no way to destroy a future, so that its key
+is available for another future. In particular, the number of futures
+a program can ever use is limited to 100! This is a sever limitation,
+but is easy to fix, in the next version.
+
+\end{document}
