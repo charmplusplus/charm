@@ -81,8 +81,6 @@
 /* #define CMK_SIGNAL_IS_A_BUILTIN */
 #define CMK_SIGNAL_USE_SIGACTION_AND_SIGEMPTYSET
 
-#define CMK_MAX_DGRAM_SIZE 4096
-
 /* #define CMK_STRERROR_IS_A_BUILTIN */
 #define CMK_STRERROR_USE_SYS_ERRLIST
 
@@ -100,3 +98,10 @@
 #define CMK_SIZE_T unsigned int
 
 #endif
+
+
+#define CMK_MAX_DGRAM_SIZE 2048
+#define DGRAM_BUF_SIZE 50000
+#define WINDOW_SIZE 24             /* size of sliding window : set to 
+				    (DGRAM_BUF_SIZE/CMK_MAX_DGRAM_SIZE) -1 */
+
