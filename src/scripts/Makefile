@@ -139,7 +139,7 @@ dirs+sources:
 	./gatherflat ../../src/Common/xlatcpm          .
 	./gathertree ../../src/QuickThreads QuickThreads
 	./gathertree ../../src/Common/libs libs
-	./gatherflat ../../src/Common.`cat .gdir`      .
+	./gathertree ../../src/Common.`cat .gdir`      .
 	./gatherflat ../../src/`cat .vdir`             .
 	./gathertree ../../pgms ../pgms
 	./gathertree ../../doc doc
@@ -185,20 +185,12 @@ LIBCONV_CORE=threads.o convcore.o conv-conds.o queueing.o fifo.o msgmgr.o memory
 converse: basics QuickThreads/libckqt.a $(CVLIBS) conv-host-if-needed conv-cpm
 
 conv-host-if-needed:
-	if [ -f conv-host.c ] ; then make conv-host OPTS='$(OPTS)' ; fi
+	if [ -d conv-host ] ; then ( cd conv-host ; make OPTS='$(OPTS)' ) ; fi
 
 QuickThreads/libckqt.a:
 	. ./conv-mach.sh;cd QuickThreads;./configure $$CMK_QT
 	cd QuickThreads ; make qt  OPTS='$(OPTS)'
 	cp QuickThreads/libqt.a ../lib/libckqt.a
-
-conv-host: conv-host.c
-	../bin/charmc $(OPTS) -c -seq -DSILENT conv-host.c
-	../bin/charmc $(OPTS) -cp ../bin -seq -o conv-host-silent conv-host.o
-	../bin/charmc $(OPTS) -c -seq -DNOTIFY conv-host.c
-	../bin/charmc $(OPTS) -cp ../bin -seq -o conv-host-notify conv-host.o
-	cp conv-host-notify conv-host
-	cp conv-host ../bin/conv-host
 
 convlibs: converse
 	cd libs; make convlibs OPTS='$(OPTS)'
@@ -1000,14 +992,15 @@ idl.decl.h idl.def.h: charmxi idl.ci
 ###############################################################################
 
 clean:
-	rm -f conv-host conv-host-notify conv-host-silent charmxi conv-cpm
+	rm -f charmxi conv-cpm
 	rm -f TAGS basics cmk_extras core
 	rm -f core *.a
 	rm -f core *.o
 	rm -f core #*#
 	rm -f core *~
+	if [ -d conv-host ] ; then ( cd conv-host ; make clean ) ; fi
 	( cd doc; make clean )
-	(cd libs; make clean )
+	( cd libs; make clean )
 
 veryclean:
 	rm -rf ../bin
