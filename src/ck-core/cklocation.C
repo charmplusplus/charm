@@ -1585,7 +1585,7 @@ void CkLocMgr::migratableList(CkLocRec_local *rec, CkVec<CkMigratable *> &list)
 
         for (m=firstManager;m!=NULL;m=m->next) {
                 CkMigratable *elt=m->element(localIdx);
-                list.push_back(elt);
+                if (elt) list.push_back(elt);
         }
 }
 
