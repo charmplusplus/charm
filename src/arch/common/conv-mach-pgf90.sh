@@ -1,0 +1,10 @@
+PG_DIR="/usr/local/pgi4/linux86"
+COMMENT="Use pgf90 fortran compiler in $PG_DIR"
+CMK_CF77="$PG_DIR/bin/pgf77 "
+CMK_CF90="$PG_DIR/bin/pgf90 "
+CMK_CF90_FIXED="$CMK_CF90 -Mfixed "
+CMK_F90LIBS='-L$PG_DIR/lib -lpgf90 -lpgf90_rpm1 -lpgf902 -lpgf90rtl -lpgftnrtl -lm -lpgc '
+CMK_F90_MODINC="-module "
+CMK_MOD_NAME_ALLCAPS=""
+CMK_MOD_EXT="mod"
+CMK_F90_USE_MODDIR=""
