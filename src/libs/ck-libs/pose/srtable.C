@@ -16,6 +16,7 @@ SRtable::SRtable()
   gvtWindow = 16;
   numBuckets = 2;
   residuals = residualsTail = recyc = recycTail = NULL;
+  recycCount = 0;
   inBuckets = offset = 0;
   bktSz = gvtWindow / numBuckets;
   sends = (SRbucket *)malloc(numBuckets*sizeof(SRbucket));
