@@ -30,3 +30,4 @@ CMK_QT='generic'
 CMK_XIOPTS=''
 CMK_F90LIBS='-lvast90 -lg2c'
 CMK_MOD_EXT="vo"
+CMK_POST_EXE='.exe'
