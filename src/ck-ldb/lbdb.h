@@ -79,8 +79,8 @@ typedef struct {
   int messages;
   int bytes;
 #ifdef __cplusplus
-  inline CmiBool from_proc() const { return src_proc != -1; }
-  inline CmiBool to_proc() const { return dest_proc != -1; }
+  inline int from_proc() const { return (src_proc != -1); }
+  inline int to_proc() const { return (dest_proc != -1); }
 #endif
 } LDCommData;
 

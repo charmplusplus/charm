@@ -66,7 +66,7 @@ public:
   inline int key() const { return mykey; };
   CmiBool equal(const LBCommData _d2) const;
 
-  inline CmiBool from_proc() const { return src_proc != -1; }
+  inline int from_proc() const { return (src_proc != -1); }
 private:
   LBCommData() {};
   
