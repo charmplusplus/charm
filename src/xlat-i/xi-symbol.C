@@ -258,8 +258,13 @@ Module::generate()
   clist->genReg(defstr);
   defstr << "}\n";
   if(isMain()) {
+    if (fortranMode) defstr << "extern void _registerf90main(void);\n";
+    defstr << "extern \"C\" void CkRegisterMainModule(void) {\n";
+    if (fortranMode) { // For Fortran90
+      defstr << "  // FORTRAN\n";
+      defstr << "  _registerf90main();\n";
+    }
     defstr << 
-    "extern \"C\" void CkRegisterMainModule(void) {\n"
     "  _register"<<name<<"();\n"
     "  _REGISTER_DONE();\n"
     "}\n";
