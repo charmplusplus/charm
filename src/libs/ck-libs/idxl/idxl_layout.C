@@ -15,12 +15,12 @@ arrays.
 int IDXL_Layout::type_size(int dataType,const char *callingRoutine)
 {
     switch(dataType) {
-      case IDXL_BYTE : return 1; break;
-      case IDXL_INT : return sizeof(int); break;
-      case IDXL_REAL : return sizeof(float); break;
-      case IDXL_DOUBLE : return sizeof(double); break;
-      case IDXL_INDEX_0 : return sizeof(int); break;
-      case IDXL_INDEX_1 : return sizeof(int); break;
+      case IDXL_BYTE : return 1;
+      case IDXL_INT : return sizeof(int);
+      case IDXL_REAL : return sizeof(float);
+      case IDXL_DOUBLE : return sizeof(double);
+      case IDXL_INDEX_0 : return sizeof(int);
+      case IDXL_INDEX_1 : return sizeof(int);
       default: IDXL_Abort(callingRoutine,"Expected an IDXL data type, but got %d",dataType);
     }
     return -1;
@@ -29,10 +29,13 @@ int IDXL_Layout::type_size(int dataType,const char *callingRoutine)
 const char *IDXL_Layout::type_name(int dataType,const char *callingRoutine) 
 {
     switch(dataType) {
-      case IDXL_BYTE : return "IDXL_BYTE"; break;
-      case IDXL_INT : return "IDXL_INT"; break;
-      case IDXL_REAL : return "IDXL_REAL"; break;
-      case IDXL_DOUBLE : return "IDXL_DOUBLE"; break;
+      case IDXL_BYTE : return "IDXL_BYTE";
+      case IDXL_INT : return "IDXL_INT";
+      case IDXL_REAL : return "IDXL_REAL";
+      case IDXL_DOUBLE : return "IDXL_DOUBLE";
+      case IDXL_INDEX_0 : return "IDXL_INDEX_0";
+      case IDXL_INDEX_1 : return "IDXL_INDEX_1";
+      default: break;
     }
     return "(unknown IDXL datatype)";
 }
@@ -299,6 +302,7 @@ IDXL_Layout_t IDXL_Layout_List::put(const IDXL_Layout &dt) {
 		}
 	// if we get here, the table is full:
 	IDXL_Abort("","Registered too many IDXL_Layouts! (only have room for %d)",MAX_DT);
+	return 0; // For whining compilers
 }
 void IDXL_Layout_List::destroy(IDXL_Layout_t l,const char *callingRoutine) {
 	check(l,callingRoutine);
