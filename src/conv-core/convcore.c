@@ -39,6 +39,8 @@ extern int hostport, hostskt;
 extern int hostskt_ready_read;
 extern unsigned int *nodeIPs;
 extern unsigned int *nodePorts;
+extern void skt_server(int *, int *);
+extern void CommunicationServer();
 #endif
 
 /*****************************************************************************

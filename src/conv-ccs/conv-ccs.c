@@ -20,8 +20,8 @@ int serverFlag = 0;
 extern int inside_comm;
 CpvExtern(int, strHandlerID);
 
-static int hostport, hostskt;
-static int hostskt_ready_read;
+int hostport, hostskt;
+int hostskt_ready_read;
 
 CpvStaticDeclare(int, CHostHandlerIndex);
 static unsigned int *nodeIPs;
@@ -65,7 +65,7 @@ void writeall(int fd, char *buf, int size)
   }
 }
 
-static void skt_server(ppo, pfd)
+void skt_server(ppo, pfd)
 unsigned int *ppo;
 unsigned int *pfd;
 {
@@ -329,7 +329,7 @@ void CHostGetOne()
 #endif
 }
 
-static void CommunicationServer()
+void CommunicationServer()
 {
   if(inside_comm)
     return;
@@ -348,7 +348,7 @@ void CHostHandler(char *msg)
  
   if(numRegistered == CmiNumPes()){
     if (serverFlag == 1)  {
-      CmiPrintf("Persistent CCS = %d\nCCS Version = %s\nServer IP = %u, Server port = %u $\n", CMK_USE_PERSISTENT_CCS, CMK_CCS_VERSION, (CmiInt4) nodeIPs[0], nodePorts[0]);
+      CmiPrintf("%s\nServer IP = %u, Server port = %u $\n", CMK_CCS_VERSION, (CmiInt4) nodeIPs[0], nodePorts[0]);
     }
   }
 }
