@@ -13,7 +13,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 1.23  1996-07-15 21:00:49  jyelon
+ * Revision 1.24  1996-10-24 20:51:50  milind
+ * Removed the additional token after one #endif.
+ *
+ * Revision 1.23  1996/07/15 21:00:49  jyelon
  * Moved some code into common, changed mach-flags from #ifdef to #if
  *
  * Revision 1.22  1996/07/02 21:01:39  jyelon
@@ -648,7 +651,7 @@ int size;
   return result;
 }
 
-#endif CMK_THREADS_USE_JB_TWEAKING
+#endif
 
 /*****************************************************************************
  *
