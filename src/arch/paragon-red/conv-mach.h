@@ -66,6 +66,10 @@
 
 #define CMK_SIZE_T                                         unsigned long
 
+#define CMK_SPANTREE_MAXSPAN                               4
+#define CMK_SPANTREE_USE_COMMON_CODE                       1
+#define CMK_SPANTREE_USE_SPECIAL_CODE                      0
+
 #define CMK_STATIC_PROTO_FAILS                             0
 #define CMK_STATIC_PROTO_WORKS                             1
 

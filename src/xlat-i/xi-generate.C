@@ -537,21 +537,21 @@ const char *CImessage = // msgType
 ;
 
 const char *CIAsyncChareCreateProto = // charename, msgname
-"extern void CAsync_\01(\02 *m, int onPE=CK_PE_ANY);\n"
+"extern void CNew_\01(\02 *m, int onPE=CK_PE_ANY);\n"
 ;
 
 const char *CIAsyncChareCreateImpl = // charename, msgname
-"void CAsync_\01(\02 *m, int onPE) {\n"
+"void CNew_\01(\02 *m, int onPE) {\n"
 "  new_chare2(\01, \02, m, (ChareIDType *)0, onPE);\n"
 "};\n"
 ;
 
 const char *CIAsyncGroupCreateProto = // groupname, msgname
-"extern int CAsync_\01(\02 *m);\n"
+"extern int CNew_\01(\02 *m);\n"
 ;
 
 const char *CIAsyncGroupCreateImpl = // groupname, msgname
-"int CAsync_\01(\02 *m) {\n"
+"int CNew_\01(\02 *m) {\n"
 "  return new_group(\01, \02, m);\n"
 "};\n"
 ;

@@ -8,7 +8,13 @@
  ***************************************************************************
  *
  * $Log$
- * Revision 1.1  1998-12-18 23:40:49  pramacha
+ * Revision 1.2  1998-12-28 05:56:03  milind
+ * Removed spantree.c from each machine directory, and provided
+ * a common spantree.c. One can provide machine-specific implementations
+ * using appropriate CMK_SPANTREE constant defined in conv-mach.h.
+ * Currently, all machines use common code.
+ *
+ * Revision 1.1  1998/12/18 23:40:49  pramacha
  * Integrated Debugging-Interface-related changes.
  *
  * Revision 1.8  1998/06/15 22:11:16  jyelon
@@ -172,6 +178,10 @@
 #define CMK_SIGNAL_USE_SIGACTION_WITH_RESTART              0
 
 #define CMK_SIZE_T                                         unsigned int
+
+#define CMK_SPANTREE_MAXSPAN                               4
+#define CMK_SPANTREE_USE_COMMON_CODE                       1
+#define CMK_SPANTREE_USE_SPECIAL_CODE                      0
 
 #define CMK_STATIC_PROTO_FAILS                             0
 #define CMK_STATIC_PROTO_WORKS                             1
