@@ -7,7 +7,7 @@ or object into a memory buffer or disk file, and then read
 the object back later.  The library can also handle translating
 between different machine representations for integers and floats.
 
-Typically, the user has to write separate functions for buffer 
+Originally, you had to write separate functions for buffer 
 sizing, pack to memory, unpack from memory, pack to disk, and 
 unpack from disk.  These functions all perform the exact same function--
 namely, they list the members of the array, struct, or object.
@@ -96,7 +96,6 @@ typedef unsigned char myByte;
 //Forward declarations
 class er;
 class able;
-class xlater;
 
 //Used for out-of-order unpacking
 class seekBlock {
@@ -597,18 +596,31 @@ public:
 
 };
 
-//Declarations to include in a PUP::able's body
+//Declarations to include in a PUP::able's body.
+//  Convenient, but only usable if class is not inside a namespace.
 #define PUPable_decl(className) \
+    PUPable_decl_inside(className) \
+    friend inline void operator|(PUP::er &p,className &a) {a.pup(p);}\
+    friend inline void operator|(PUP::er &p,className* &a) {\
+	PUP::able *pa=a;  p(&pa);  a=(className *)pa;\
+    }
+
+//PUPable_decl for classes inside a namespace: inside body
+#define PUPable_decl_inside(className) \
 private: \
     static PUP::able *call_PUP_constructor(void); \
     static PUP::able::PUP_ID my_PUP_ID;\
 public:\
     virtual const PUP::able::PUP_ID &get_PUP_ID(void) const; \
-    static void register_PUP_ID(void); \
-    friend inline void operator|(PUP::er &p,className &a) {a.pup(p);}\
-    friend inline void operator|(PUP::er &p,className* &a) {\
+    static void register_PUP_ID(void);
+
+//PUPable_decl for classes inside a namespace: in header at file scope
+#define PUPable_decl_outside(className) \
+    inline void operator|(PUP::er &p,className &a) {a.pup(p);}\
+    inline void operator|(PUP::er &p,className* &a) {\
 	PUP::able *pa=a;  p(&pa);  a=(className *)pa;\
     }
+
 
 //Declarations to include in an abstract PUP::able's body.
 //  Abstract PUP::ables do not need def or reg.
