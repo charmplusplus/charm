@@ -13,7 +13,7 @@
 #include "pcqueue.h"
 
 #define MAX_QLEN 200
-#define MAX_BYTES 1000000
+#define MAX_BYTES 100000
 
 /*
   To reduce the buffer used in broadcast and distribute the load from 
@@ -551,7 +551,7 @@ CmiCommHandle ElanSendFn(int destPE, int size, char *msg, int flag)
   msg_tmp->next = 0;
   msg_tmp->size = size;
 
-  while ((MsgQueueLen > request_max) && (!flag) && (MsgQueueBytes > request_bytes)){
+  while ((MsgQueueLen > request_max || MsgQueueBytes > request_bytes) && (!flag)){
     CmiReleaseSentMessages();
     PumpMsgs(0);
   }
