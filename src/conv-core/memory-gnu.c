@@ -3350,6 +3350,9 @@ public_fREe(Void_t* mem)
 #if HAVE_MMAP
   if (chunk_is_mmapped(p))                       /* release mmapped memory. */
   {
+#ifndef CMK_OPTIMIZE
+    memory_allocated -= chunksize(p);
+#endif
     munmap_chunk(p);
     return;
   }
@@ -3735,6 +3738,10 @@ public_mALLOPt(int p, int v)
   return result;
 }
 
+#ifndef CMK_OPTIMIZE
+extern int memory_allocated;
+#endif
+
 /*
   ------------------------------ malloc ------------------------------
 */
@@ -3771,6 +3778,10 @@ _int_malloc(mstate av, size_t bytes)
   */
 
   checked_request2size(bytes, nb);
+
+#ifndef CMK_OPTIMIZE
+  memory_allocated += nb;
+#endif
 
   /*
     If the size qualifies as a fastbin, first check corresponding bin.
@@ -4141,6 +4152,9 @@ _int_free(mstate av, Void_t* mem)
   if (mem != 0) {
     p = mem2chunk(mem);
     size = chunksize(p);
+#ifndef CMK_OPTIMIZE
+    memory_allocated -= size;
+#endif
 
     check_inuse_chunk(av, p);
 

@@ -44,6 +44,10 @@
 
 #endif
 
+#ifndef CMK_OPTIMIZE
+int memory_allocated = 0;
+#endif
+
 /*Rank of the processor that's currently holding the CmiMemLock,
 or -1 if nobody has it.  Only set when malloc might be reentered.
 */
@@ -109,6 +113,7 @@ void CmiMemoryInit(argv)
 void *malloc_reentrant(size_t size) { return malloc(size); }
 void free_reentrant(void *mem) { free(mem); }
 
+int CmiMemoryWatermark() { return 0; }
 #else 
 /*************************************************************
 *Not* using the system malloc-- first pick the implementation:
@@ -287,6 +292,15 @@ void *malloc_reentrant(size_t size) {
 void free_reentrant(void *mem)
 {
   REENTRANT_MEM_LOCK_AROUND( meta_free(mem); )
+}
+
+int CmiMemoryWatermark()
+{
+#ifndef CMK_OPTIMIZE
+  return memory_allocated;
+#else
+  return 0;
+#endif
 }
 
 #endif /* ! CMK_MEMORY_BUILD_BUILTIN*/
