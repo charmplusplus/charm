@@ -91,5 +91,11 @@
 /* snables smp support if set to 1 */
 #define CMK_SMP                                            0
 
-#endif
+/* Other possible definitions:
 
+In fault tolerant architectures, CK_MEM_CHECKPOINT can be set. In this case the
+extended header must contain also another field called "pn" (phase number).
+
+*/
+
+#endif
