@@ -9,7 +9,7 @@
 #include <string.h>
 #include <stdlib.h>
 
-#ifdef _WINDOWS
+#ifdef _WIN32
 #include <windows.h>
 #include <sys/types.h>
 #include <process.h>
