@@ -38,16 +38,16 @@ Here are the two terms often used in \charmpp{} load balancing framework:
 Listed below are the available load balancers and their brief 
 descriptions:
 \begin{itemize}
-\item \kw{RefineLB}:     Move objects away from the most overloaded processors to reach average;
-\item \kw{RandCentLB}:   Randomly assign objects to processors;
-\item \kw{RandRefLB}:    Randomly assign objects to processors, then refine;
-\item \kw{RecBisectBfLB}:        Recursively partition with Breadth first enumeration;
-\item \kw{MetisLB}:      Use Metis(tm) to partitioning object communication graph;
-\item \kw{CommLB}:       Greedy algorithm which takes communication graph into account;
-\item \kw{Comm1LB}:      another variation of CommLB;
-\item \kw{HeapCentLB}:   Similar to RefineLB, but using heap to sort by load;
-\item \kw{GreedyRefLB}:  Apply greedy, then refine;
-\item \kw{NeighborLB}:   A neighborhood load balancer
+\item {\bf RefineLB}:     Move objects away from the most overloaded processors to reach average;
+\item {\bf RandCentLB}:   Randomly assign objects to processors;
+\item {\bf RandRefLB}:    Randomly assign objects to processors, then refine;
+\item {\bf RecBisectBfLB}:        Recursively partition with Breadth first enumeration;
+\item {\bf MetisLB}:      Use Metis(tm) to partitioning object communication graph;
+\item {\bf CommLB}:       Greedy algorithm which takes communication graph into account;
+\item {\bf Comm1LB}:      another variation of CommLB;
+\item {\bf HeapCentLB}:   Similar to RefineLB, but using heap to sort by load;
+\item {\bf GreedyRefLB}:  Apply greedy, then refine;
+\item {\bf NeighborLB}:   A neighborhood load balancer
 \end{itemize}
 
 It is up to the users to choose which load balancing algorithm for the 
@@ -193,6 +193,36 @@ switches back to the automatic Load balancing mode (using or not using AtSync).
 
 \end{enumerate}
 
+\subsubsection{Other utility functions}
+
+There are several utility functions that can be called in applications to
+configure the load balancer, etc. These functions are:
+
+\begin{itemize}
+\item {\bf setMigratable(CmiBool migratable)}: is a member function of array
+      element. This function can be called 
+      in an array element constructor to tell load balancer wether this object
+      is migratable or not\footnote{Currently not all load balancers 
+      recognize this setting though.}.
+\item {\bf lbdb->SetLBPeriod(double s)}: this function can be called 
+      anywhere\footnote{except that it must be called after LBDatabase 
+      has been initialized in Charm++ init phase, so for example global 
+      variable constructor is not a good place to call it.} to regulate 
+      the load balancing period. It tells load balancer not to start next 
+      load balancing in less than s seconds. This can be used to prevent 
+      load balancing from occuring too often in 
+      {\em automatic without sync mode}. Here is how to use it:
+      \begin{alltt}
+// if used in an array element
+LBDatabase *lbdb = getLBDB();
+lbdb->SetLBPeriod(5);
+
+// if used outside of an array element
+// must be called after load balancer is initialized.
+LBDatabase *lbdb = LBDatabase::Object();
+lbdb->SetLBPeriod(5);
+\end{alltt}
+\end{itemize}
 
 \subsubsection{Compiler and run-time options to use load balancing module}
 \label{lbOption}
