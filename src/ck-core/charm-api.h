@@ -26,13 +26,16 @@ libraries written in Charm for other languages.
 */
 #if CMK_FORTRAN_USES_ALLCAPS
 # define FTN_NAME(caps,nocaps) caps  /*Declare name in all caps*/
+#elif CMK_FORTRAN_USES_TWOSCORE
+# define FTN_NAME(caps,nocaps) nocaps##__ /*No caps, two underscores*/
+#elif CMK_FORTRAN_USES_ONESCORE
+# define FTN_NAME(caps,nocaps) nocaps##_ /*No caps, one underscore*/
+#elif CMK_FORTRAN_USES_NOSCORE
+# define FTN_NAME(caps,nocaps) nocaps /*No caps, no underscore*/
 #else
-# if CMK_FORTRAN_USES_x__
-#  define FTN_NAME(caps,nocaps) nocaps##__ /*No caps, two underscores*/
-# else
-#  define FTN_NAME(caps,nocaps) nocaps##_ /*No caps, one underscore*/
-# endif /*__*/
-#endif /*ALLCAPS*/
+/* # error "Did not set fortran name mangling scheme" */
+# define FTN_NAME(caps,nocaps) NONMANGLED_##nocaps
+#endif
 
 #endif /*Def(thisHeader) */
 
