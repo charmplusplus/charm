@@ -38,7 +38,7 @@ CkpvDeclare(void*,       _currentChare);
 CkpvDeclare(int,         _currentChareType);
 CkpvDeclare(CkGroupID,   _currentGroup);
 CkpvDeclare(CkGroupID,   _currentNodeGroup);
-CkpvDeclare(GroupTable, _groupTable);
+CkpvDeclare(GroupTable*, _groupTable);
 CkpvDeclare(UInt, _numGroups);
 UInt _numNodeGroups;
 GroupTable* _nodeGroupTable = 0;
@@ -431,7 +431,7 @@ void _initCharm(int unused_argc, char **argv)
 	CkpvInitialize(int,   _currentChareType);
 	CkpvInitialize(CkGroupID, _currentGroup);
 	CkpvInitialize(CkGroupID, _currentNodeGroup);
-	CkpvInitialize(GroupTable, _groupTable);
+	CkpvInitialize(GroupTable*, _groupTable);
 	CkpvInitialize(UInt, _numGroups);
 //	CkpvInitialize(UInt, _numNodeGroups);
 	CkpvInitialize(int, _numInitsRecd);
@@ -445,7 +445,8 @@ void _initCharm(int unused_argc, char **argv)
 
 	CkpvInitialize(Stats*, _myStats);
 
-	CkpvAccess(_groupTable).init();
+	CkpvAccess(_groupTable) = new GroupTable;
+	CkpvAccess(_groupTable)->init();
 	CkpvAccess(_numGroups) = 1; // make 0 an invalid group number
 	_numNodeGroups = 1;
 	CkpvAccess(_buffQ) = new PtrQ();

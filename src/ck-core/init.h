@@ -99,14 +99,14 @@ extern int     _qdHandlerIdx;
 extern CmiNodeLock _nodeLock;
 
 CkpvExtern(CkGroupID,_currentGroup);
-CkpvExtern(GroupTable, _groupTable);
+CkpvExtern(GroupTable*, _groupTable);
 CkpvExtern(unsigned int, _numGroups);
 extern unsigned int _numNodeGroups;
 CpvExtern(char **,Ck_argv);
 
 static inline IrrGroup *_localBranch(CkGroupID gID)
 {
-  return CkpvAccess(_groupTable).find(gID).getObj();
+  return CkpvAccess(_groupTable)->find(gID).getObj();
 }
 
 extern GroupTable*  _nodeGroupTable;

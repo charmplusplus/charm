@@ -248,8 +248,8 @@ void _createGroupMember(CkGroupID groupID, int eIdx, void *msg)
   register int gIdx = _entryTable[eIdx]->chareIdx;
   register void *obj = malloc(_chareTable[gIdx]->size);
   _MEMCHECK(obj);
-  CkpvAccess(_groupTable).find(groupID).setObj(obj);
-  PtrQ *ptrq = CkpvAccess(_groupTable).find(groupID).getPending();
+  CkpvAccess(_groupTable)->find(groupID).setObj(obj);
+  PtrQ *ptrq = CkpvAccess(_groupTable)->find(groupID).getPending();
   if(ptrq) {
     void *pending;
     while((pending=ptrq->deq())!=0)
