@@ -1,20 +1,20 @@
 
-CC=gcc -I.
+CHARMC = ../../bin/charmc -seq -I.
 
 all: qt stp testpgm
 
 qt: md/setjmp_d.h qt.c md/setjmp.c
 	rm -f qtmd.h
-	ln -s md/setjmp_d.h qtmd.h
-	$(CC) -pedantic -Wall -c -o qt.o qt.c
-	$(CC) -c -o qtmds.o md/setjmp.c
-	ar q libqt.a qt.o qtmds.o
+	../system_ln md/setjmp_d.h qtmd.h
+	$(CHARMC) -pedantic -Wall -c -o qt.o qt.c
+	$(CHARMC) -c -o qtmds.o md/setjmp.c
+	$(CHARMC) -cp ../ -o libqt.a qt.o qtmds.o 
 
 stp:
-	$(CC) -c stp.c
-	ar q libstp.a stp.o
+	$(CHARMC) -c stp.c
+	$(CHARMC) -o libstp.a stp.o
 
 testpgm:
-	$(CC) -c meas.c
-	$(CC) -c -o qtmdb.o md/setjmp_b.c
-	$(CC) -o run meas.o qtmdb.o libstp.a libqt.a
+	$(CHARMC) -c meas.c
+	$(CHARMC) -c -o qtmdb.o md/setjmp_b.c
+	$(CHARMC) -o run meas.o qtmdb.o libstp.a libqt.a
