@@ -490,6 +490,10 @@ CthCpvStatic(CthThread,  CthPrevious);
 CthCpvStatic(int,        CthExiting);
 CthCpvStatic(int,        CthDatasize);
 
+typedef CthThread threadTable[100];
+CthCpvStatic(threadTable, exitThreads);
+CthCpvStatic(int, 	nExit);
+
 static void CthThreadInit(CthThread t)
 {
   t->awakenfn = 0;
@@ -535,6 +539,8 @@ void CthInit(char **argv)
   CthCpvInitialize(CthThread,  CthPrevious);
   CthCpvInitialize(int,        CthDatasize);
   CthCpvInitialize(int,        CthExiting);
+  CthCpvInitialize(int,        nExit);
+  CthCpvInitialize(threadTable,        exitThreads);
 
   t = (CthThread)malloc(sizeof(struct CthThreadStruct));
   _MEMCHECK(t);
@@ -545,8 +551,10 @@ void CthInit(char **argv)
   CthCpvAccess(CthCurrent)=t;
   CthCpvAccess(CthDatasize)=1;
   CthCpvAccess(CthExiting)=0;
+  CthCpvAccess(nExit)=0;
   CthSetStrategyDefault(t);
   fiber = ConvertThreadToFiber(t);
+  _MEMCHECK(fiber);
   t->fiber = fiber;
 }
 
@@ -555,44 +563,74 @@ CthThread CthSelf()
   return CthCpvAccess(CthCurrent);
 }
 
+void *CthAbortHelp(CthThread old)
+{
+  if (old->data) free(old->data);
+  if (old->fiber) DeleteFiber((PVOID)old->fiber);
+  free(old);
+  return (void *) 0;
+}
+
+static void CthClearThreads()
+{
+  int i,p,m;
+  int n = CthCpvAccess(nExit);
+  CthThread tc = CthCpvAccess(CthCurrent);
+  CthThread tp = CthCpvAccess(CthPrevious);
+  m = n;
+  p=0;
+  for (i=0; i<m; i++) {
+    CthThread t = CthCpvAccess(exitThreads)[i];
+    if (t && t != tc && t != tp) {
+      CthAbortHelp(t);
+      CthCpvAccess(nExit) --;
+    }
+    else {
+      if (p != i) CthCpvAccess(exitThreads)[p] = t;
+      p++;
+    }
+  }
+  if (m!=p)
+  for (i=m; i<n; i++,p++) {
+      CthCpvAccess(exitThreads)[p] = CthCpvAccess(exitThreads)[i];
+  }
+}
+
 void CthFree(CthThread t)
 {
+  /* store into exiting threads table to avoid delete thread itself */
+  CthCpvAccess(exitThreads)[CthCpvAccess(nExit)++] = t;
   if (t==CthCpvAccess(CthCurrent)) 
   {
     CthCpvAccess(CthExiting) = 1;
   } 
   else 
   {
+    CthClearThreads();
+/*  was
     if (t->data) free(t->data);
     DeleteFiber(t->fiber);
     free(t);
+*/
   }
 }
 
-static void *CthAbortHelp(CthThread old)
-{
-  if (old->data) free(old->data);
-  DeleteFiber(old->fiber);
-  free(old);
-  return (void *) 0;
-}
-
-
+#if 0
 void CthFiberBlock(CthThread t)
 {
   CthThread tp;
   
   SwitchToFiber(t->fiber);
   tp = CthCpvAccess(CthPrevious);
-#ifndef __CYGWIN__
   if (tp != 0 && tp->killed == 1)
     CthAbortHelp(tp);
-#endif
 }
+#endif
 
 void CthResume(CthThread t)
 {
   CthThread tc;
+
   tc = CthCpvAccess(CthCurrent);
   if (t == tc) return;
   CpvAccess(_numSwitches)++;
@@ -600,6 +638,7 @@ void CthResume(CthThread t)
   CthCpvAccess(CthCurrent) = t;
   CthCpvAccess(CthData) = t->data;
   CthCpvAccess(CthPrevious)=tc;
+#if 0
   if (CthCpvAccess(CthExiting)) 
   {
     CthCpvAccess(CthExiting)=0;
@@ -608,27 +647,45 @@ void CthResume(CthThread t)
   } 
   else 
     CthFiberBlock(t);
-  
+#endif
+  SwitchToFiber(t->fiber);
 }
 
-static void CthOnly(void *arg, void *vt, qt_userf_t fn)
+#if 0
+void CthOnly(void *arg, void *vt, qt_userf_t fn)
 {
   fn(arg);
   CthCpvAccess(CthExiting) = 1;
+CthCpvAccess(exitThreads)[CthCpvAccess(nExit)++] = CthSelf();
   CthSuspend();
 }
+#endif
 
 VOID CALLBACK FiberSetUp(PVOID fiberData)
 {
   void **ptr = (void **) fiberData;
+  qt_userf_t* fn = (qt_userf_t *)ptr[0];
+  void *arg = ptr[1];
+  CthThread  t = CthSelf();
+
+/*was:
   CthOnly((void *)ptr[1], 0, ptr[0]);
+*/
+
+  CthClearThreads();
+
+  fn(arg);
+
+  CthCpvAccess(CthExiting) = 1;
+  CthCpvAccess(exitThreads)[CthCpvAccess(nExit)++] = t;
+  CthSuspend();
 }
 
 CthThread CthCreate(CthVoidFn fn, void *arg, int size)
 {
   CthThread result; 
   void**    fiberData;
-  fiberData = (void *) malloc(2*sizeof(void *));
+  fiberData = (void**)malloc(2*sizeof(void *));
   fiberData[0] = (void *)fn;
   fiberData[1] = arg;
   
@@ -650,7 +707,7 @@ void CthSuspend()
   if(!(CthCpvAccess(CthCurrent)->suspendable))
     CmiAbort("trying to suspend main thread!!\n");
   if (CthCpvAccess(CthCurrent)->choosefn == 0) CthNoStrategy();
-    next = CthCpvAccess(CthCurrent)->choosefn();
+  next = CthCpvAccess(CthCurrent)->choosefn();
 #ifndef CMK_OPTIMIZE
   if(CpvAccess(traceOn))
     traceSuspend();
