@@ -55,6 +55,8 @@ static TCharmTraceLibList tcharm_tracelibs;
 static int tcharm_nomig=0, tcharm_nothreads=0;
 static int tcharm_stacksize=1*1024*1024; /*Default stack size is 1MB*/
 static int tcharm_initted=0;
+CkpvDeclare(int, mapCreated);
+static CkGroupID mapID;
 
 void TCharm::nodeInit(void)
 {
@@ -66,6 +68,9 @@ void TCharm::procInit(void)
   CtvAccess(_curTCharm)=NULL;
   tcharm_initted=1;
   CtgInit();
+
+  CkpvInitialize(int, mapCreated);
+  CkpvAccess(mapCreated) = 0;
 
   // called on every pe to eat these arguments
   char **argv=CkGetArgv();
@@ -566,15 +571,13 @@ FDECL void FTN_NAME(TCHARM_CREATE_DATA,tcharm_create_data)
 		  void *threadData,int *threadDataLen)
 { TCHARM_Create_data(*nThreads,threadFn,threadData,*threadDataLen); }
 
-static int mapCreated=0;
-static CkGroupID mapID;
 CkGroupID CkCreatePropMap(void);
 
 static CProxy_TCharm TCHARM_Build_threads(TCharmInitMsg *msg)
 {
   char** argv = CkGetArgv();
   CkArrayOptions opts(msg->numElements);
-  if (!mapCreated) {
+  if (CkpvAccess(mapCreated)==0) {
     char* mapping;
     if (0!=CmiGetArgString(argv, "+mapping", &mapping)){
       if(0==strcmp(mapping,"BLOCK_MAP")){
@@ -588,7 +591,7 @@ static CProxy_TCharm TCHARM_Build_threads(TCharmInitMsg *msg)
     } else {
       mapID=CkCreatePropMap();
     }
-    mapCreated=1;
+    CkpvAccess(mapCreated)=1;
   }
   opts.setMap(mapID);
   int nElem=msg->numElements; //<- save it because msg will be deleted.
