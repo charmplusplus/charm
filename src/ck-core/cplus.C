@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.3  1995-09-14 18:43:47  gursoy
+ * Revision 2.4  1995-09-26 19:46:35  sanjeev
+ * moved new operator here
+ *
+ * Revision 2.3  1995/09/14  18:43:47  gursoy
  * fixed the paranthesis error which showed up after the previous fix
  *
  * Revision 2.2  1995/09/14  18:41:43  gursoy
@@ -63,6 +66,11 @@ extern "C" void *CPlus_CallMonoInit(int id, void *msg) ;
 
 
 
+void *
+comm_object::operator new(int size) 
+{
+	CmiPrintf("[%d] ERROR: wrong new operator for message allocation\n",CmiMyPe()) ;
+}
 
 void CPlus_ChareExit()
 {
