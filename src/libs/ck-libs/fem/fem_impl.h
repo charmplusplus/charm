@@ -23,25 +23,7 @@ Orion Sky Lawlor, olawlor@acm.org, 9/28/00
 
 // Verbose abort routine used by FEM framework:
 void FEM_Abort(const char *msg);
-void FEM_Abort(const char *callingRoutine,const char *sprintf_msg,int int0=0,int int1=0,int int2=0);
-
-class FEMinit {
- public:
-	int numElements;
-	CkArrayID threads;
-	int flags;
-	CkChareID coordinator;
-	FEMinit() {}
-	FEMinit(int ne_,const CkArrayID &t_,int f_,const CkChareID &c_)
-		:numElements(ne_),threads(t_),flags(f_),coordinator(c_) {}
-	void pup(PUP::er &p) {
-		p|numElements;
-		p|threads;
-		p|flags;
-		p|coordinator;
-	}
-};
-PUPmarshall(FEMinit);
+void FEM_Abort(const char *caller,const char *sprintf_msg,int int0=0,int int1=0,int int2=0);
 
 /*This class describes a local-to-global index mapping, used in FEM_Print.
 The default is the identity mapping.*/
@@ -64,8 +46,7 @@ public:
 	{
 		int oldSize=vec.size(), newSize=toHaveElement+1;
 		if (oldSize>=newSize) return; //Nothing to do
-		vec.setSize(newSize);
-		vec.length()=newSize;
+		vec.resize(newSize);
 		for (int j=oldSize;j<newSize;j++)
 			vec[j]=new T;
 	}
@@ -108,50 +89,6 @@ public:
 };
 typedef ArrayPtrT<int> intArrayPtr;
 
-
-/// Describes how to call the serial meshUpdated routine:
-class CallMeshUpdated {
-	int val; //Value to pass to function below
-	FEM_Update_mesh_fn cfn; //if 0, skip meshUpdated call
-	FEM_Update_mesh_fortran_fn ffn; //if 0, skip f90 meshUpdated call
-public:
-	CallMeshUpdated() 
-		:val(0), cfn(0), ffn(0) {}
-	CallMeshUpdated(FEM_Update_mesh_fn cfn_,int val_) 
-		:val(val_), cfn(cfn_), ffn(0) {}
-	CallMeshUpdated(FEM_Update_mesh_fortran_fn ffn_,int val_) 
-		:val(val_), cfn(0), ffn(ffn_) {}
-	/// Call the user's meshUpdated function:
-	void call(void) 
-	{ 
-		if (cfn) { cfn(val); }
-		if (ffn) { ffn(&val); }
-	}
-};
-PUPbytes(CallMeshUpdated);
-
-class UpdateMeshChunk {
-public:
-	FEM_Mesh m; //The mesh to update
-	
-	int updateCount; //Mesh update serial number
-	int fromChunk; //Source chunk
-	CallMeshUpdated meshUpdated;
-	int doWhat; //If 0, do nothing; if 1, repartition; if 2, resume
-	
-	UpdateMeshChunk() {
-		updateCount=fromChunk=doWhat=0;
-	}
-	void pup(PUP::er &p) {
-		m.pup(p);
-		p.comment(" UpdateMesh data: ");	
-		p(updateCount); p(fromChunk);
-		p|meshUpdated;
-		p(doWhat);
-	}
-};
-PUPbytes(UpdateMeshChunk);
-
 /* Unmarshall into a heap-allocated copy */
 template<class T>
 class marshallNewHeapCopy {
@@ -170,25 +107,91 @@ public:
 	operator T *() {return cur;}
 	friend void operator|(PUP::er &p,marshallNewHeapCopy<T> &h) {h.pup(p);}
 };
-typedef marshallNewHeapCopy<UpdateMeshChunk> marshallUpdateMeshChunk;
 typedef marshallNewHeapCopy<FEM_Mesh> marshallMeshChunk;
 
 
-#include "fem.decl.h"
+/// Keeps a list of dynamically-allocated T objects,
+///  indexed by a user-carried, persistent "int".
+template<class T>
+class FEM_T_List {
+	CkPupPtrVec<T> list; // Vector of T's
+protected:
+	int FIRST_DT; // User index of first T
+	int size(void) const {return list.size();}
+	
+	/// If this isn't a valid, allocated index, abort.
+	inline void check(int l,const char *caller) const {
+		if (l<FIRST_DT || l>=FIRST_DT+list.size() || list[l-FIRST_DT]==NULL) 
+			badIndex(l,caller);
+	}
+	
+	void badIndex(int l,const char *caller) const {
+		if (l<FIRST_DT || l>FIRST_DT+list.size()) bad(l,0,caller);
+		else bad(l,1,caller);
+	}
+public:
+	FEM_T_List(int FIRST_DT_) :FIRST_DT(FIRST_DT_) {}
+	void pup(PUP::er &p) { p|list; }
+	
+	/// This routine is called when we're passed an invalid T index.
+	virtual void bad(int l,int bad_code,const char *caller) const =0;
+	
+	/// Insert a new T (allocated with "new"), returning the user index:
+	int put(T *t) {
+		for (unsigned int i=0;i<list.size();i++) 
+			if (list[i]==NULL) {
+				list[i]=t;
+				return FIRST_DT+i;
+			}
+		int ret=list.size();
+		list.push_back(t);
+		return FIRST_DT+ret;
+	}
+	
+	/// Get this T given its user index.
+	inline T *lookup(int l,const char *caller) const {
+		check(l,caller);
+		return list[l-FIRST_DT];
+	}
+	
+	/// Free this T
+	void destroy(int l,const char *caller) {
+		check(l,caller);
+		list[l-FIRST_DT].destroy();
+	}
+	
+	/// Clear all stored T's:
+	void empty(void) {
+		for (int i=0;i<list.size();i++) list[i].destroy();
+	}
+};
+class FEM_Mesh_list : public FEM_T_List<FEM_Mesh> {
+	typedef FEM_T_List<FEM_Mesh> super;
+public:
+	FEM_Mesh_list() :super(FEM_MESH_FIRST) { }
+	
+	virtual void bad(int l,int bad_code,const char *caller) const;
+	
+	int put(FEM_Mesh *m) {
+		m->registerIDXL(IDXL_Chunk::get("FEM_Mesh_list"));
+		return super::put(m);
+	}
+};
 
 #define CHK(p) do{if((p)==0)CkAbort("FEM>Memory Allocation failure.");}while(0)
 
-class FEMchunk : public IDXL_Chunk
+class FEMchunk 
 {
-  typedef IDXL_Chunk super;
 public:
-// updated_mesh keeps the still-being-assembled next mesh chunk.
-// It is created and written by the FEM_Set routines called from driver.
-  UpdateMeshChunk *updated_mesh;
-  int updateCount; //Number of mesh updates
+  FEM_Mesh_list meshes;
+  int default_read;
+  int default_write;
+  
+  // Default communicator to use
+  FEM_Comm_t defaultComm;
 
-  //The current finite-element mesh
-  FEM_Mesh *cur_mesh;
+  // Global index in default communicator
+  int thisIndex;
 
   CkMagicNumber<double> magic;
 #ifdef CMK_OPTIMIZE /* Skip the check, for speed. */
@@ -198,41 +201,33 @@ public:
 #endif
 
 private:
-  FEMinit init;
-
-  CProxy_FEMchunk thisproxy;
-  TCharm *thread;
-  IDXL_Comm_t comm;
-  
-  void *reductionBuf; //Place to return reduction result
-  
-  typedef enum {INVALID_UPDATE,NODE_UPDATE,GHOST_UPDATE} updateType_t;
-  
-  CkVec<int> listTmp;//List of local entities 
-  int listCount; //Number of lists received
-  bool listSuspended;
-  bool finishListExchange(const FEM_Comm &l);
-
+  CkVec<int> listTmp;//List of local entities, for ghost list exchange
+ 
   void initFields(void);
-  void setMesh(FEM_Mesh *msg=0);
 
  public:
-
-  int tsize;
-
-  FEMchunk(const FEMinit &init);
+  FEMchunk(FEM_Comm_t defaultComm_);
   FEMchunk(CkMigrateMessage *msg);
+  void pup(PUP::er &p);
   ~FEMchunk();
-
-  void ckJustMigrated(void);
-
-  void run(void);
-  void run(marshallMeshChunk &);
-  void reductionResult(int length,const char *data);
-  void updateMesh(int doWhat);
-  void meshUpdated(marshallMeshChunk &);
-  void meshUpdatedComplete(void) {thread->resume();}
   
+  /// Return this thread's single static FEMchunk instance:
+  static FEMchunk *get(const char *caller);
+  
+  inline FEM_Mesh *lookup(int fem_mesh,const char *caller) {
+     return meshes.lookup(fem_mesh,caller);
+  }
+
+  inline FEM_Mesh *getMesh(const char *caller) 
+  	{return meshes.lookup(default_read,caller);}
+  inline FEM_Mesh *setMesh(const char *caller) 
+  	{return meshes.lookup(default_write,caller);}
+
+  void print(int fem_mesh,int idxBase);
+  int getPrimary(int nodeNo) { return getMesh("getPrimary")->node.getPrimary(nodeNo); }
+  const FEM_Comm &getComm(void) {return getMesh("getComm")->node.shared;}
+
+  // Basically everything below here should be moved to IDXL:
   void exchangeGhostLists(int elemType,int inLen,const int *inList,int idxbase);
   void recvList(int elemType,int fmChk,int nIdx,const int *idx);
   const CkVec<int> &getList(void) {return listTmp;}
@@ -240,16 +235,7 @@ private:
   
   void reduce_field(int idxl_datatype, const void *nodes, void *outbuf, int op);
   void reduce(int idxl_datatype, const void *inbuf, void *outbuf, int op);
-  void readField(int idxl_datatype, void *nodes, const char *fname);
-  void print(int idxBase);
-  
-  FEM_Mesh &getMesh(void) { return *cur_mesh; }
-  int getPrimary(int nodeNo) { return cur_mesh->node.getPrimary(nodeNo); }
-  const FEM_Comm &getComm(void) const {return cur_mesh->node.shared;}
-  static FEMchunk *lookup(const char *callingRoutine);
-  FEM_Mesh *meshLookup(int fem_mesh,const char *callingRoutine);
-
-  void pup(PUP::er &p);
+  void readField(int idxl_datatype, void *nodes, const char *fname);  
 };
 
 
@@ -329,7 +315,6 @@ void FEM_Mesh_split(FEM_Mesh *mesh,int nchunks,const int *elem2chunk,
 
 //Make a new[]'d copy of this (len-entry) array, changing the index as spec'd
 int *CkCopyArray(const int *src,int len,int indexBase);
-const FEM_Mesh *FEM_Get_FEM_Mesh(void);
 FEM_Ghost &FEM_Set_FEM_Ghost(void);
 
 /*\@}*/

@@ -413,9 +413,9 @@ FDECL void FTN_NAME(FEM_ADD_LINEAR_PERIODICITY,fem_add_linear_periodicity)(
 
 CDECL void FEM_Sym_coordinates(int elType,double *d_locs)
 {
-	FEMAPI("FEM_Sym_coordinates");
+	const char *caller="FEM_Sym_coordinates"; FEMAPI(caller);
 	
-	const FEM_Mesh *m=FEM_Get_FEM_Mesh();
+	const FEM_Mesh *m=FEMchunk::get(caller)->getMesh(caller);
 	const FEM_Entity &real_c=m->getCount(elType);
 	const FEM_Entity &c=real_c.getGhost()[0];
 	const FEM_Symmetries_t *sym=c.getSymmetries();
@@ -438,15 +438,15 @@ FDECL void FTN_NAME(FEM_SYM_COORDINATES,fem_sym_coordinates)
 
 CDECL void FEM_Set_sym_nodes(const int *canon,const int *sym)
 {
-	FEMAPI("FEM_Set_sym_nodes");
-	int n=FEM_Get_FEM_Mesh()->node.size();
+	const char *caller="FEM_Set_sym_nodes"; FEMAPI(caller);
+	int n=FEMchunk::get(caller)->setMesh(caller)->node.size();
 	FEM_Set_FEM_Ghost().setSymmetries(n,CkCopyArray(canon,n,0),sym);
 }
 FDECL void FTN_NAME(FEM_SET_SYM_NODES,fem_set_sym_nodes)
 	(const int *canon,const int *sym)
 {
-	FEMAPI("FEM_Set_Sym_Nodes");
-	int n=FEM_Get_FEM_Mesh()->node.size();
+	const char *caller="FEM_Set_sym_nodes"; FEMAPI(caller);
+	int n=FEMchunk::get(caller)->setMesh(caller)->node.size();
 	FEM_Set_FEM_Ghost().setSymmetries(n,CkCopyArray(canon,n,1),sym);
 }
 

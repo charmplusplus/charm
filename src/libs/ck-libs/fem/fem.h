@@ -6,6 +6,10 @@ C interface file
 #include "pup_c.h"  /* for pup_er */
 #include "idxlc.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /* datatypes: keep in sync with femf.h and idxl */
 #define FEM_BYTE   IDXL_BYTE
 #define FEM_INT    IDXL_INT
@@ -31,14 +35,19 @@ C interface file
 #define FEM_INIT_READ    2
 #define FEM_INIT_WRITE   4
 
+#define FEM_MESH_OUTPUT 0
+#define FEM_MESH_UPDATE 1
+#define FEM_MESH_FINALIZE 2
+  typedef void (*FEM_Update_mesh_fn)(int userTag);
+  typedef void (*FEM_Update_mesh_fortran_fn)(int *userTag);
 
-#ifdef __cplusplus
-extern "C" {
-#endif
   typedef void (*FEM_PupFn)(pup_er, void*);
+  
+  /* This should be MPI_Comm, but I want it for Fortran too */
+  typedef int FEM_Comm_t; 
 
-  /* Attach a new FEM chunk to this MPI communicator */
-  void FEM_Init(int comm);
+  /* Initialize the FEM framework (must have called MPI_Init) */
+  void FEM_Init(FEM_Comm_t defaultCommunicator);
 
   /*Utility*/
   int FEM_My_partition(void);
@@ -47,31 +56,28 @@ extern "C" {
   void FEM_Done(void);
   void FEM_Print(const char *str);
   void FEM_Print_partition(void);
+  void FEM_Mesh_print(int fem_mesh);
 
 /* Mesh manipulation */
+#define FEM_MESH_FIRST 1650000000 /*This is the first mesh ID:*/
   /* mesh creation */
-  int FEM_Mesh_create_serial(int mesh_sid); /* build new serial mesh, for setting */
-  int FEM_Mesh_get_serial(int mesh_sid); /* find existing serial mesh, for getting */
-  
-  int FEM_Mesh_create(int mesh_context); /* build new parallel mesh, for setting */
-  int FEM_Mesh_get_files(const char *baseName,int mesh_context); /* read parallel mesh from files */
-  void FEM_Mesh_set_files(int fem_mesh,const char *baseName); /* write parallel mesh to files */
-  void FEM_Mesh_destroy(int fem_mesh); /* delete this (parallel or serial) mesh */
-  
-  int FEM_Mesh_is_get(int fem_mesh); /* return 1 if this is a readable mesh */
-  int FEM_Mesh_is_set(int fem_mesh); /* return 1 if this is a writing mesh */
-  
-  /* mesh update */
-#define FEM_MESH_OUTPUT 0
-#define FEM_MESH_UPDATE 1
-#define FEM_MESH_FINALIZE 2
-  typedef void (*FEM_Update_mesh_fn)(int userTag);
-  typedef void (*FEM_Update_mesh_fortran_fn)(int *userTag);
-  int FEM_Mesh_partition(int mesh_sid); /* partition this serial mesh */
-  void FEM_Mesh_assemble(int src_fem_mesh,int dst_mesh_sid,
-  	FEM_Update_mesh_fn fn, int userTag); /* reassemble partitioned mesh and call fn */
-  
+  int FEM_Mesh_allocate(void); /* build new mesh */
+  void FEM_Mesh_deallocate(int fem_mesh); /* delete this local mesh */
 
+  int FEM_Mesh_read(const char *prefix,int partNo,int nParts);
+  void FEM_Mesh_write(int fem_mesh,const char *prefix,int partNo,int nParts); 
+
+  int FEM_Mesh_assemble(int nParts,const int *srcMeshes);
+  void FEM_Mesh_partition(int fem_mesh,int nParts,int *destMeshes);
+  
+  int FEM_Mesh_recv(int fromRank,int tag,FEM_Comm_t comm_context);
+  void FEM_Mesh_send(int fem_mesh,int toRank,int tag,FEM_Comm_t comm_context);
+
+  int FEM_Mesh_reduce(int fem_mesh,int toRank,FEM_Comm_t comm_context);
+  int FEM_Mesh_broadcast(int fem_mesh,int fromRank,FEM_Comm_t comm_context);
+
+  void FEM_Mesh_copy_globalno(int src_mesh,int dest_mesh);
+  
 /* Mesh entity codes: (keep in sync with femf.h) */
 #define FEM_ENTITY_FIRST 1610000000 /*This is the first entity code:*/
 #define FEM_NODE (FEM_ENTITY_FIRST+0) /*The unique node type*/
@@ -100,7 +106,6 @@ extern "C" {
 #define FEM_SYMMETRIES (FEM_ATTRIB_FIRST+6) /* Symmetries present (width=1, datatype=FEM_BYTE) */
 #define FEM_NODE_PRIMARY (FEM_ATTRIB_FIRST+7) /* This chunk owns this node (nodes only; width=1, datatype=FEM_BYTE) */
 #define FEM_ATTRIB_LAST (FEM_ATTRIB_FIRST+10) /*This is the last valid attribute code*/
-
 
   /* The basics: */
   void FEM_Mesh_set_conn(int fem_mesh,int entity,
@@ -136,6 +141,14 @@ extern "C" {
   const char *FEM_Get_entity_name(int entity,char *storage);
   const char *FEM_Get_attr_name(int attr,char *storage);
   const char *FEM_Get_datatype_name(int datatype,char *storage);
+
+  int FEM_Mesh_is_get(int fem_mesh); /* return 1 if this is a readable mesh */
+  int FEM_Mesh_is_set(int fem_mesh); /* return 1 if this is a writing mesh */
+  void FEM_Mesh_become_get(int fem_mesh); /* Make this a readable mesh */
+  void FEM_Mesh_become_set(int fem_mesh); /* Make this a writing mesh */
+
+  typedef void (*FEM_Userdata_fn)(pup_er p,void *data);
+  void FEM_Mesh_pup(int fem_mesh,int dataTag,FEM_Userdata_fn fn,void *data);
 
 /* ghosts and spatial symmetries */
 #define FEM_Is_ghost_index(idx) ((idx)<-1)
@@ -176,6 +189,8 @@ extern "C" {
 /* Backward compatability routines: */
   int FEM_Mesh_default_read(void);  /* return mesh used for get calls below */
   int FEM_Mesh_default_write(void); /* return mesh used for set calls below */
+  void FEM_Mesh_set_default_read(int fem_mesh);
+  void FEM_Mesh_set_default_write(int fem_mesh);
   
   void FEM_Exchange_ghost_lists(int who,int nIdx,const int *localIdx);
   int FEM_Get_ghost_list_length(void);

@@ -311,7 +311,7 @@ splitter::splitter(FEM_Mesh *mesh_,const int *elem2chunk_,int nChunks_)
 	}
 	
 	gNode=new chunkList[mesh->node.size()];
-	gElem.setSize(mesh->elem.size());
+	gElem.resize(mesh->elem.size());
 	for (int t=0;t<mesh->elem.size();t++) {
 		if (mesh->elem.has(t))
 			gElem[t]=new chunkList[mesh->elem[t].size()];
@@ -397,6 +397,8 @@ FEM_Mesh *splitter::createMesh(int c)
 {
 	int t;
 	FEM_Mesh &dest=*chunks[c];
+
+	dest.udata=mesh->udata;
 	
 //Add each local real node
 	FEM_Node *destNode=&dest.node;
@@ -1085,7 +1087,9 @@ FEM_Mesh *FEM_Mesh_assemble(int nChunks,FEM_Mesh **chunks)
 	FEM_Mesh *m=new FEM_Mesh;
 	for(c=0; c<nChunks;c++) //Union up all possible shapes
 		m->copyShape(*chunks[c]);
-
+	
+	m->udata=chunks[0]->udata;
+	
 // Copy over nodes:
 	FEM_Entity_numberer nodeNum;
 	for(c=0; c<nChunks;c++) nodeNum.mark(chunks[c]->node);

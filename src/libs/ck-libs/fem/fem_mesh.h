@@ -297,7 +297,7 @@ class FEM_Attribute {
 	
 	//Abort with a nice error message saying: 
 	// Our <field> was previously set to <cur>; it cannot now be <next>
-	void bad(const char *field,bool forRead,int cur,int next,const char *callingRoutine) const;
+	void bad(const char *field,bool forRead,int cur,int next,const char *caller) const;
 	
 protected:
 	/**
@@ -335,19 +335,19 @@ public:
 	 * Default implementation calls setLength on our owning entity
 	 * and tries to call allocate().
 	 */
-	void setLength(int l,const char *callingRoutine="");
+	void setLength(int l,const char *caller="");
 	
 	/**
 	 * Set our width (number of values per row) to this value.
 	 * The default implementation sets width and tries to call allocate().
 	 */
-	void setWidth(int w,const char *callingRoutine="");
+	void setWidth(int w,const char *caller="");
 	
 	/**
 	 * Set our datatype (e.g., FEM_INT, FEM_DOUBLE) to this value.
 	 * The default implementation sets width and tries to call allocate().
 	 */
-	void setDatatype(int dt,const char *callingRoutine="");
+	void setDatatype(int dt,const char *caller="");
 	
 	/**
 	 * Copy our width and datatype from this attribute.
@@ -375,7 +375,7 @@ public:
 	 *    }
 	 */
 	virtual void set(const void *src, int firstItem,int length, 
-		const IDXL_Layout &layout, const char *callingRoutine);
+		const IDXL_Layout &layout, const char *caller);
 	
 	/**
 	 * Extract this quantity of user data.  Length and layout are
@@ -387,7 +387,7 @@ public:
 	 *    }
 	 */
 	virtual void get(void *dest, int firstItem,int length,
-		const IDXL_Layout &layout, const char *callingRoutine) const;
+		const IDXL_Layout &layout, const char *caller) const;
 	
 	/// Copy everything associated with src[srcEntity] into our dstEntity.
 	virtual void copyEntity(int dstEntity,const FEM_Attribute &src,int srcEntity) =0;
@@ -416,10 +416,10 @@ public:
 	const AllocTable2d<unsigned char> &getChar(void) const {return *char_data;}
 	
 	virtual void set(const void *src, int firstItem,int length, 
-		const IDXL_Layout &layout, const char *callingRoutine);
+		const IDXL_Layout &layout, const char *caller);
 	
 	virtual void get(void *dest, int firstItem,int length, 
-		const IDXL_Layout &layout, const char *callingRoutine) const;
+		const IDXL_Layout &layout, const char *caller) const;
 	
 	/// Copy src[srcEntity] into our dstEntity.
 	virtual void copyEntity(int dstEntity,const FEM_Attribute &src,int srcEntity);
@@ -442,7 +442,7 @@ public:
 		 * You're expected to abort or throw or exit if something is wrong.
 		 */
 		virtual void check(int row,const BasicTable2d<int> &table,
-			const char *callingRoutine) const =0;
+			const char *caller) const =0;
 	};
 private:
 	typedef FEM_Attribute super;
@@ -459,10 +459,10 @@ public:
 	const AllocTable2d<int> &get(void) const {return idx;}
 	
 	virtual void set(const void *src, int firstItem,int length, 
-		const IDXL_Layout &layout, const char *callingRoutine);
+		const IDXL_Layout &layout, const char *caller);
 	
 	virtual void get(void *dest, int firstItem,int length,
-		const IDXL_Layout &layout, const char *callingRoutine) const;
+		const IDXL_Layout &layout, const char *caller) const;
 	
 	/// Copy src[srcEntity] into our dstEntity.
 	virtual void copyEntity(int dstEntity,const FEM_Attribute &src,int srcEntity);
@@ -524,7 +524,7 @@ protected:
 	 * have to override this method.  Entities with fixed fields that are
 	 * known beforehand should just call add() from their constructor.
 	 */
-	virtual void create(int attr,const char *callingRoutine);
+	virtual void create(int attr,const char *caller);
 	
 	/// Add this attribute to this kind of Entity.
 	/// This superclass is responsible for eventually deleting the attribute.
@@ -572,7 +572,7 @@ public:
 	 * create the entity (using the create method below) or abort if it's
 	 * not found.
 	 */
-	FEM_Attribute *lookup(int attr,const char *callingRoutine);
+	FEM_Attribute *lookup(int attr,const char *caller);
 	
 	/**
 	 * Get a list of the attribute numbers for this entity.
@@ -639,7 +639,7 @@ class FEM_Node : public FEM_Entity {
 	FEM_DataAttribute *primary; 
 	void allocatePrimary(void);
 protected:
-	virtual void create(int attr,const char *callingRoutine);
+	virtual void create(int attr,const char *caller);
 public:
 	FEM_Comm shared; //Shared nodes
 	FEM_Comm_Holder sharedIDXL; //IDXL interface to shared nodes
@@ -726,7 +726,7 @@ class FEM_Sparse : public FEM_Elem {
 	void allocateElem(void);
 	const FEM_Mesh &mesh; //Reference to enclosing mesh, for error checking
 protected:
-	virtual void create(int attr,const char *callingRoutine);
+	virtual void create(int attr,const char *caller);
 public:
 	FEM_Sparse(const FEM_Mesh &mesh_, FEM_Sparse *ghost_);
 	void pup(PUP::er &p);
@@ -743,9 +743,67 @@ public:
 };
 PUPmarshall(FEM_Sparse);
 
+/** Describes a user function to pup a piece of mesh data 
+*/
+class FEM_Userdata_pupfn {
+	FEM_Userdata_fn fn;
+	void *data;
+public:
+	FEM_Userdata_pupfn(FEM_Userdata_fn fn_,void *data_)
+		:fn(fn_), data(data_) {}
+	/// Call user's pup routine using this PUP::er
+	void pup(PUP::er &p) {
+		(fn)((pup_er)&p,data);
+	}
+};
 
-void FEM_Index_Check(const char *callingRoutine,const char *entityType,int type,int maxType);
-void FEM_Is_NULL(const char *callingRoutine,const char *entityType,int type);
+/** Describes one piece of generic unassociated mesh data.
+*/
+class FEM_Userdata_item {
+	CkVec<char> data; ///< Serialized data from user's pup routine
+public:
+	int tag; //User-assigned identifier
+	FEM_Userdata_item(int tag_=-1) {tag=tag_;}
+	
+	/// Return true if we have stored data.
+	bool hasStored(void) const {return data.size()!=0;}
+	
+	/// Store this userdata inside us:
+	void store(FEM_Userdata_pupfn &f) {
+		data.resize(PUP::size(f));
+		PUP::toMemBuf(f,&data[0],data.size());
+	}
+	/// Extract this userdata from our stored copy:
+	void restore(FEM_Userdata_pupfn &f) {
+		PUP::fromMemBuf(f,&data[0],data.size());
+	}
+	
+	/// Save our stored data to this PUP::er
+	void pup(PUP::er &p) {
+		p|tag;
+		p|data;
+	}
+};
+
+/** Describes all the unassociated data in a mesh. 
+*/
+class FEM_Userdata_list {
+	CkVec<FEM_Userdata_item> list;
+public:
+	FEM_Userdata_item &find(int tag) {
+		for (int i=0;i<list.size();i++)
+			if (list[i].tag==tag)
+				return list[i];
+		// It's not in the list-- add it.
+		list.push_back(FEM_Userdata_item(tag));
+		return list[list.size()-1];
+	}
+	void pup(PUP::er &p) {p|list;}
+};
+
+
+void FEM_Index_Check(const char *caller,const char *entityType,int type,int maxType);
+void FEM_Is_NULL(const char *caller,const char *entityType,int type);
 
 /**
  * This class describes several different types of a certain kind 
@@ -791,10 +849,10 @@ public:
 	inline int size(void) const {return types.size();}
 	
 	/// Return a read-only copy of this type, or else abort if type isn't set.
-	const T &get(int type,const char *callingRoutine="") const {
-		FEM_Index_Check(callingRoutine,name,type,types.size());
+	const T &get(int type,const char *caller="") const {
+		FEM_Index_Check(caller,name,type,types.size());
 		const T *ret=types[type];
-		if (ret==NULL) FEM_Is_NULL(callingRoutine,name,type);
+		if (ret==NULL) FEM_Is_NULL(caller,name,type);
 		return *ret;
 	}
 	
@@ -805,8 +863,8 @@ public:
 	}
 	
 	/// Return a writable copy of this type, calling new T(mesh) if it's not there
-	T &set(int type,const char *callingRoutine="") {
-		if (type<0) FEM_Index_Check(callingRoutine,name,type,types.size());
+	T &set(int type,const char *caller="") {
+		if (type<0) FEM_Index_Check(caller,name,type,types.size());
 		while (types.size()<=type) types.push_back(NULL); //Make room for new type
 		if (types[type]==NULL) { //Have to allocate a new T:
 			T *ghost=new T(mesh,NULL);
@@ -834,8 +892,8 @@ class FEM_Mesh : public CkNoncopyable {
 	FEM_Sym_List symList;
 	bool m_isSetting;
 	
-	void checkElemType(int elType,const char *callingRoutine) const;
-	void checkSparseType(int uniqueID,const char *callingRoutine) const; 
+	void checkElemType(int elType,const char *caller) const;
+	void checkSparseType(int uniqueID,const char *caller) const; 
 public:
 	FEM_Mesh();
 	void pup(PUP::er &p); //For migration
@@ -850,6 +908,9 @@ public:
 	
 	/// The different sparse types in this mesh:
 	FEM_Entity_Types<FEM_Sparse> sparse;
+	
+	/// The unassociated user data for this mesh:
+	FEM_Userdata_list udata;
 	
 	/// The symmetries that apply to this mesh:
 	void setSymList(const FEM_Sym_List &src) {symList=src;}
@@ -873,8 +934,8 @@ public:
 	int chkET(int elType) const; //Check this element type-- abort if it's bad
 	
 	/// Look up this FEM_Entity type in this mesh, or abort if it's not valid.
-	FEM_Entity *lookup(int entity,const char *callingRoutine);
-	const FEM_Entity *lookup(int entity,const char *callingRoutine) const;
+	FEM_Entity *lookup(int entity,const char *caller);
+	const FEM_Entity *lookup(int entity,const char *caller) const;
 	
 	/// Set/get direction control:
 	inline bool isSetting(void) const {return m_isSetting;}
@@ -895,9 +956,9 @@ public:
 	int getEntities(int *entites);
 }; 
 PUPmarshall(FEM_Mesh);
-FEM_Mesh *FEM_Mesh_lookup(int fem_mesh,const char *callingRoutine);
-FEM_Entity *FEM_Entity_lookup(int fem_mesh,int entity,const char *callingRoutine);
-FEM_Attribute *FEM_Attribute_lookup(int fem_mesh,int entity,int attr,const char *callingRoutine);
+FEM_Mesh *FEM_Mesh_lookup(int fem_mesh,const char *caller);
+FEM_Entity *FEM_Entity_lookup(int fem_mesh,int entity,const char *caller);
+FEM_Attribute *FEM_Attribute_lookup(int fem_mesh,int entity,int attr,const char *caller);
 
 void FEM_Mesh_data_layout(int fem_mesh,int entity,int attr, 	
   	void *data, int firstItem,int length, const IDXL_Layout &layout);
@@ -905,9 +966,9 @@ void FEM_Mesh_data_layout(int fem_mesh,int entity,int attr,
 /// Reassemble split chunks into a single mesh
 FEM_Mesh *FEM_Mesh_assemble(int nchunks,FEM_Mesh **chunks);
 
-FILE *FEM_openMeshFile(int chunkNo,int nchunks,bool forRead);
-FEM_Mesh *FEM_Mesh_read(int chunkNo,int nChunks,const char *dirName);
-void FEM_Mesh_write(FEM_Mesh *m,int chunkNo,int nChunks,const char *dirName);
+FILE *FEM_openMeshFile(const char *prefix,int chunkNo,int nchunks,bool forRead);
+FEM_Mesh *FEM_readMesh(const char *prefix,int chunkNo,int nChunks);
+void FEM_writeMesh(FEM_Mesh *m,const char *prefix,int chunkNo,int nChunks);
 
 /*\@}*/
 

@@ -53,6 +53,7 @@
        external FEM_Mesh_data
        external FEM_Mesh_data_layout
        external FEM_Mesh_data_offset
+       external FEM_Mesh_pup
        
        external FEM_Set_Mesh
 
@@ -104,37 +105,101 @@
        subroutine FEM_Init(comm) 
            integer,intent(in) :: comm
        end subroutine
-       function FEM_My_Partition()
-          integer  :: FEM_My_Partition
+       integer function FEM_My_Partition()
        end function FEM_My_Partition
-       function FEM_Num_Partitions()
-         integer  :: FEM_Num_Partitions
+       integer function FEM_Num_Partitions()
        end function 
-       function FEM_Timer()
-         double precision  :: FEM_Timer
+       double precision function FEM_Timer()
        end function
        subroutine FEM_Done()
        end subroutine
        subroutine FEM_Print_partition()
        end subroutine
+       subroutine FEM_Mesh_print(mesh)
+          integer, intent(in) :: mesh
+       end subroutine
+       
+       integer function FEM_Mesh_create()
+       end function
+       subroutine FEM_Mesh_destroy(mesh) 
+          integer, intent(in) :: mesh
+       end subroutine
+       
+       integer function FEM_Mesh_read(prefix,partNo,nParts)
+          integer, intent(in) :: partNo,nParts
+          character (LEN=*), intent(in) :: prefix
+       end function
+       subroutine FEM_Mesh_write(mesh,prefix,partNo,nParts) 
+          integer, intent(in) :: mesh
+          integer, intent(in) :: partNo,nParts
+          character (LEN=*), intent(in) :: prefix
+       end subroutine
+       
+       integer function FEM_Mesh_assemble(nParts,parts)
+          integer, intent(in) :: nParts
+          integer, intent(in) :: parts(nParts)
+       end function
+       subroutine FEM_Mesh_partition(mesh,nParts,parts) 
+          integer, intent(in) :: mesh
+          integer, intent(in) :: nParts
+          integer, intent(out) :: parts(nParts)
+       end subroutine
+       
+       integer function FEM_Mesh_recv(source,tag,comm)
+          integer, intent(in) :: source,tag,comm
+       end function
+       subroutine FEM_Mesh_send(mesh,source,tag,comm) 
+          integer, intent(in) :: mesh
+          integer, intent(in) :: source,tag,comm
+       end subroutine
+       
+       integer function FEM_Mesh_reduce(mesh,master,tag,comm)
+          integer, intent(in) :: mesh
+          integer, intent(in) :: master,tag,comm
+       end function
+       integer function FEM_Mesh_broadcast(mesh,master,tag,comm) 
+          integer, intent(in) :: mesh
+          integer, intent(in) :: master,tag,comm
+       end function
+       
+       
+       integer function FEM_Mesh_default_read()
+       end function
+       integer function FEM_Mesh_default_write()
+       end function
+       subroutine FEM_Mesh_set_default_read(mesh)
+         integer, intent(in) :: mesh
+       end subroutine
+       subroutine FEM_Mesh_set_default_write(mesh)
+         integer, intent(in) :: mesh
+       end subroutine
        
        function FEM_Mesh_get_length(mesh,ent)
          integer, intent(in) :: mesh,ent
-	 integer :: FEM_Mesh_get_length
+         integer :: FEM_Mesh_get_length
        end function
        subroutine FEM_Mesh_set_length(mesh,ent,newLength)
          integer, intent(in) :: mesh,ent,newLength
        end subroutine
        function FEM_Mesh_get_width(mesh,ent)
          integer, intent(in) :: mesh,ent
-	 integer :: FEM_Mesh_get_width
+         integer :: FEM_Mesh_get_width
        end function
        subroutine FEM_Mesh_set_width(mesh,ent,attr,newWidth)
          integer, intent(in) :: mesh,ent,attr,newWidth
        end subroutine
        function FEM_Mesh_get_datatype(mesh,ent,attr)
          integer, intent(in) :: mesh,ent,attr
-	 integer :: FEM_Mesh_get_datatype
+         integer :: FEM_Mesh_get_datatype
+       end function
+       
+       integer function FEM_Mesh_get_entities(mesh,entities)
+         integer, intent(in) :: mesh
+         integer, intent(out) :: entities(:)
+       end function
+       integer function FEM_Mesh_get_attributes(mesh,entity,attrs)
+         integer, intent(in) :: mesh, entity
+         integer, intent(out) :: attrs(:)
        end function
        
        
@@ -157,28 +222,11 @@
           integer  :: FEM_Comm_ghost
        end function 
        
-       
-       function FEM_Mesh_default_read()
-         integer :: FEM_Mesh_default_read
-       end function
-       function FEM_Mesh_default_write()
-         integer :: FEM_Mesh_default_write
-       end function
-       
-       integer function FEM_Mesh_get_entities(mesh,entities)
-         integer, intent(in) :: mesh
-         integer, intent(out) :: entities(:)
-       end function
-       integer function FEM_Mesh_get_attributes(mesh,entity,attrs)
-         integer, intent(in) :: mesh, entity
-         integer, intent(out) :: attrs(:)
-       end function
-       
        function FEM_Get_node_ghost()
          integer :: FEM_Get_node_ghost
        end function
        function FEM_Get_elem_ghost(elemType)
-	 integer, intent(in) :: elemType
+         integer, intent(in) :: elemType
          integer :: FEM_Get_elem_ghost
        end function    
 

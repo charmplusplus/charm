@@ -297,9 +297,109 @@ FDECL void FTN_NAME(FEM_SET_MESH,fem_set_mesh)
 	FTN_NAME(FEM_SET_ELEM_CONN_R,fem_set_elem_conn_r) (&elType,conn);
 }
 
-/*
-CDECL void FEM_Update_mesh(FEM_Update_mesh_fn callFn,int userValue,int doWhat) {
-	FEM_Mesh_assemble(S, -1, -1, userValue?callFn:0, userValue, doWhat);
+/*************************************************
+Mesh assembly/disassembly.  This really only makes
+sense when you read it together with femmain.C.
+*/
+
+class updateState {
+	int doWhat;
+	MPI_Comm comm;
+	int myRank, master;
+	int oldMesh, splitMesh;
+public:
+	updateState(int doWhat_) :doWhat(doWhat_) {
+		comm=(MPI_Comm)FEMchunk::get("FEM_Update_mesh")->defaultComm;
+		MPI_Comm_rank(comm,&myRank);
+		master=0;
+		oldMesh=splitMesh=-1;
+	}
+	
+	bool pre(void) {
+		/* Assemble mesh from default write */
+		int mesh=FEM_Mesh_default_write();
+		oldMesh=FEM_Mesh_default_read();
+		FEM_Mesh_copy_globalno(oldMesh,mesh);
+		int serialMesh=FEM_Mesh_reduce(mesh,master,(FEM_Comm_t)comm);
+		FEM_Mesh_deallocate(mesh);
+		FEM_Mesh_set_default_read(serialMesh);
+		if (myRank==master) {
+			if (doWhat==FEM_MESH_UPDATE) {
+				splitMesh=FEM_Mesh_allocate();
+				FEM_Mesh_set_default_write(splitMesh);
+			}
+			return true;
+		}
+		else
+			return false;
+	}
+	void post(void) {
+		if (doWhat==FEM_MESH_FINALIZE)
+			MPI_Barrier(comm);
+		if (doWhat==FEM_MESH_UPDATE) 
+		{ /* Partition the new serial mesh */
+			int newMesh=FEM_Mesh_broadcast(splitMesh,master,(FEM_Comm_t)comm);
+			if (myRank==master) FEM_Mesh_deallocate(splitMesh);
+			FEM_Mesh_set_default_read(newMesh);
+		}
+		else /* no update, switch back to old read mesh */
+			FEM_Mesh_set_default_read(oldMesh);
+		FEM_Mesh_set_default_write(FEM_Mesh_allocate());
+	}
+};
+
+CDECL void FEM_Update_mesh(FEM_Update_mesh_fn callFn,int userValue,int doWhat) 
+{
+  updateState update(doWhat);
+  if (update.pre() && 0 != userValue)
+  	(callFn)(userValue);
+  update.post();
 }
 
+FDECL void FTN_NAME(FEM_UPDATE_MESH,fem_update_mesh)
+  (FEM_Update_mesh_fortran_fn callFn,int *userValue,int *doWhat) 
+{ 
+  updateState update(*doWhat);
+  if (update.pre() && (0 != *userValue))
+  	(callFn)(userValue);
+  update.post();
+}
+
+/******************************************
+FEM_Serial: these routines are only used by Rocflu's
+mesh prep/post utilities.
 */
+static int *splitMesh=NULL;
+static int splitChunks=0;
+CDECL void FEM_Serial_split(int nchunks) {
+	splitChunks=nchunks;
+	splitMesh=new int[splitChunks];
+	FEM_Mesh_partition(FEM_Mesh_default_write(),splitChunks,splitMesh);
+}
+FORTRAN_AS_C(FEM_SERIAL_SPLIT,FEM_Serial_split,fem_serial_split, (int *n),(*n))
+
+CDECL void FEM_Serial_begin(int chunkNo) {
+	FEM_Mesh_write(splitMesh[chunkNo],"fem_mesh",chunkNo,splitChunks);
+	FEM_Mesh_set_default_read(splitMesh[chunkNo]);
+}
+FORTRAN_AS_C(FEM_SERIAL_BEGIN,FEM_Serial_begin,fem_serial_begin, (int *c),(*c-1))
+
+
+CDECL void FEM_Serial_read(int chunkNo,int nChunks) {
+	if (splitMesh==NULL) {
+		splitChunks=nChunks;
+		splitMesh=new int[splitChunks];
+	}
+	splitMesh[chunkNo]=FEM_Mesh_read("fem_mesh",chunkNo,splitChunks);
+}
+FORTRAN_AS_C(FEM_SERIAL_READ,FEM_Serial_read,fem_serial_read, (int *c,int *n),(*c-1,*n))
+
+CDECL void FEM_Serial_assemble(void) {
+	int serialMesh=FEM_Mesh_assemble(splitChunks,splitMesh);
+	for (int i=0;i<splitChunks;i++)
+		FEM_Mesh_deallocate(splitMesh[i]);
+	FEM_Mesh_set_default_read(serialMesh);
+}
+FORTRAN_AS_C(FEM_SERIAL_ASSEMBLE,FEM_Serial_assemble,fem_serial_assemble,(void),())
+
+

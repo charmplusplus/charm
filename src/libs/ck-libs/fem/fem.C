@@ -27,426 +27,332 @@ then resume the thread when the results arrive.
 void FEM_Abort(const char *msg) {
 	CkAbort(msg);
 }
-void FEM_Abort(const char *callingRoutine,const char *sprintf_msg,
+void FEM_Abort(const char *caller,const char *sprintf_msg,
    int int0,int int1, int int2) 
 {
 	char userSprintf[1024];
 	char msg[1024];
 	sprintf(userSprintf,sprintf_msg,int0,int1,int2);
 	sprintf(msg,"FEM Routine %s fatal error:\n          %s",
-		callingRoutine,userSprintf);
+		caller,userSprintf);
 	FEM_Abort(msg);
 }
 
+/*******************************************************
+  Communication tools
+*/
 
-CDECL void fem_impl_call_init(void);
-
-FDECL void FTN_NAME(INIT,init)(void);
-FDECL void FTN_NAME(DRIVER,driver)(void);
-static int initFlags=0;
-
-/*Startup:*/
-static void callDrivers(void) {
-	FEM_Init(initFlags);
-        driver();
-#ifndef CMK_FORTRAN_USES_NOSCORE
-        FTN_NAME(DRIVER,driver)();
-#endif
-}
-
-
-static void FEMfallbackSetup(void)
-{
-	if (!(initFlags&FEM_INIT_READ)) {
-		fem_impl_call_init(); // init();
-#ifndef CMK_FORTRAN_USES_NOSCORE
-		FTN_NAME(INIT,init)();
-#endif
+#define checkMPI(err) checkMPIerr(err,__FILE__,__LINE__);
+inline void checkMPIerr(int mpi_err,const char *file,int line) {
+	if (mpi_err!=MPI_SUCCESS) {
+		CkError("MPI Routine returned error %d at %s:%d\n",
+			mpi_err,file,line);
+		CkAbort("MPI Routine returned error code");
 	}
-	int nChunks=TCHARM_Get_num_chunks();
-	TCHARM_Create(nChunks,callDrivers);
 }
 
-//_femptr gives the current chunk, and is only
-// valid in routines called from driver().
-CtvStaticDeclare(FEMchunk*, _femptr);
-
-PUPable_def(FEM_Sym_Linear);
-void FEMnodeInit(void) {
-	PUPable_reg(FEM_Sym_Linear);
-	CtvInitialize(FEMchunk*, _femptr);
-	TCHARM_Set_fallback_setup(FEMfallbackSetup);
-	CmiArgGroup("Library","FEM Framework");
-	char **argv=CkGetArgv();
-	if (CmiGetArgFlagDesc(argv,"-read","Skip init()--read mesh from files")) 
-		initFlags|=FEM_INIT_READ;
-	if (CmiGetArgFlagDesc(argv,"-write","Skip driver()--write mesh to files")) 
-		initFlags|=FEM_INIT_WRITE;
+/// Return the number of dt's in the next message from/tag/comm
+int myMPI_Incoming(MPI_Datatype dt,int from,int tag,MPI_Comm comm) {
+	MPI_Status sts;
+	checkMPI(MPI_Probe(from,tag,comm,&sts));
+	int len; checkMPI(MPI_Get_count(&sts,dt,&len));
+	return len;
 }
 
-static void 
-_allReduceHandler(void *proxy_v, int datasize, void *data)
-{
-  // the reduction handler is called on processor 0
-  CProxy_FEMchunk &proxy=*(CProxy_FEMchunk *)proxy_v;
-  // broadcast the reduction results to all array elements
-  proxy.reductionResult(datasize,(char *)data);
+/// MPI_Recv, but using a T with a pup routine
+template <class T>
+inline void MPI_Recv_pup(T &t, int from,int tag,MPI_Comm comm) {
+	int len=myMPI_Incoming(MPI_BYTE,from,tag,comm);
+	MPI_Status sts;
+	char *buf=new char[len];
+	checkMPI(MPI_Recv(buf,len,MPI_BYTE, from,tag,comm,&sts));
+	PUP::fromMemBuf(t,buf,len);
+	delete[] buf;
 }
 
+/// MPI_Send, but using a T with a pup routine
+template <class T>
+inline void MPI_Send_pup(T &t, int to,int tag,MPI_Comm comm) {
+	int len=PUP::size(t); char *buf=new char[len];
+	PUP::toMemBuf(t,buf,len);
+	checkMPI(MPI_Send(buf,len,MPI_BYTE, to,tag,comm));
+	delete[] buf;
+}
 
-//These fields give the current serial mesh
-// (NULL if none).  They are only valid during
-// init, mesh_updated, and finalize.
-static FEM_Mesh*  _srcSerialMesh = 0; //Mesh user reads from (during mesh_updated)
-static FEM_Mesh* _destSerialMesh = 0; //Mesh user writes into (during init)
+/******** Startup and initialization *******/
 
 //Maps element number to (0-based) chunk number, allocated with new[]
 static int *_elem2chunk=NULL;
 
-// Throw away all the current serial meshes
-static void freeSerialMeshes(void) {
-    delete[] _elem2chunk; _elem2chunk=NULL;
-    delete _srcSerialMesh; _srcSerialMesh=NULL;
-    delete _destSerialMesh; _destSerialMesh=NULL;
-}
-
-
 static FEM_Ghost ghosts;
 static ghostLayer *curGhostLayer=NULL;
 
-//Partitions and splits the current serial mesh into the given number of pieces
-static void mesh_split(int _nchunks,FEM_Mesh_Output *out) {
+static void FEM_Mesh_partition(FEM_Mesh *src,int _nchunks,FEM_Mesh_Output *out) {
     if (_elem2chunk==NULL) 
     {//Partition the elements ourselves
-    	_elem2chunk=new int[_destSerialMesh->nElems()];
-    	FEM_Mesh_partition(_destSerialMesh,_nchunks,_elem2chunk);
+    	_elem2chunk=new int[src->nElems()];
+    	FEM_Mesh_partition(src,_nchunks,_elem2chunk);
     }
-    _destSerialMesh->setAscendingGlobalno();
+    src->setAscendingGlobalno();
     //Build communication lists and split mesh data
-    FEM_Mesh_split(_destSerialMesh,_nchunks,_elem2chunk,ghosts,out);
-    freeSerialMeshes();
+    FEM_Mesh_split(src,_nchunks,_elem2chunk,ghosts,out);
 }
 
-class FEM_Mesh_Writer : public FEM_Mesh_Output {
-  int nchunks;
-public:
-  FEM_Mesh_Writer(int nc) :nchunks(nc) {}
-  void accept(int chunkNo,FEM_Mesh *chk);
-};
+// This is our TCharm global ID:
+enum {FEM_globalID=33};
 
-void FEM_Mesh_Writer::accept(int chunkNo,FEM_Mesh *chk)
+CDECL void pupFEM_Chunk(pup_er cp) {
+	PUP::er &p=*(PUP::er *)cp;
+	FEMchunk *c=(FEMchunk *)TCHARM_Get_global(FEM_globalID);
+	if (c==NULL) {
+		c=new FEMchunk((CkMigrateMessage *)0);
+		TCHARM_Set_global(FEM_globalID,c,pupFEM_Chunk);
+	}
+	c->pup(p);
+	if (p.isDeleting())
+		delete c;
+}
+FEMchunk *FEMchunk::get(const char *caller) {
+	FEMchunk *c=(FEMchunk *)TCHARM_Get_global(FEM_globalID);
+	if(!c) FEM_Abort(caller,"FEM is not initialized");
+	return c;
+}
+
+CDECL void FEM_Init(FEM_Comm_t defaultComm)
 {
-	FEM_Mesh_write(chk,chunkNo,nchunks,NULL);
-	delete chk;
-}
-
-class FEM_Mesh_Sender : public FEM_Mesh_Output {
-	CProxy_FEMchunk dest;
-public:
-	FEM_Mesh_Sender(const CProxy_FEMchunk &dest_)
-		:dest(dest_) {}
-	void accept(int chunkNo,FEM_Mesh *chk)
-	{
-		dest[chunkNo].run(chk);
-		delete chk;
+	IDXL_Init();
+	if (!TCHARM_Get_global(FEM_globalID)) {
+		FEMchunk *c=new FEMchunk(defaultComm);
+		TCHARM_Set_global(FEM_globalID,c,pupFEM_Chunk);
 	}
-};
-
-static void RestoreTCharmGlobals(int _nchunks) {
-  PUP::fromTextFile pg(FEM_openMeshFile(_nchunks,_nchunks,true));
-  TCharmReadonlys::pupAll(pg);
-}
-static void SaveTCharmGlobals(int _nchunks) {
-  PUP::toTextFile pg(FEM_openMeshFile(_nchunks,_nchunks,false));
-  TCharmReadonlys::pupAll(pg);
-}
-
-static void FEM_Attach(int comm)
-{
-	FEMAPI("FEM_Attach");
-	CkArrayID threadsAID; int _nchunks;
-	CkArrayOptions opts=TCHARM_Attach_start(&threadsAID,&_nchunks);
-	
-	int flags=initFlags;
-	if (flags&FEM_INIT_WRITE) 
-	{ //First save the user's globals (if any):
-		SaveTCharmGlobals(_nchunks);
-		
-		//Split the mesh and write it out
-		FEM_Mesh_Writer w(_nchunks);
-		mesh_split(_nchunks,&w);
-		CkExit();
-	}
-	if (flags&FEM_INIT_READ)
-	{ //Restore the user's globals on PE 0-- they'll get copied elsewhere
-	  RestoreTCharmGlobals(_nchunks);
-	}
-	
-	//Create a new chunk array
-	CProxy_FEMcoordinator coord=CProxy_FEMcoordinator::ckNew(_nchunks);
-	FEMinit init(_nchunks,threadsAID,flags,coord);
-	
-	CProxy_FEMchunk chunks= CProxy_FEMchunk::ckNew(init,opts);
-	chunks.setReductionClient(_allReduceHandler, new CProxy_FEMchunk(chunks));
-	coord.setArray(chunks);
-	
-	//Send the mesh out to the chunks
-	if (_destSerialMesh!=NULL) 
-	{ //Partition the serial mesh online
-		FEM_Mesh_Sender s(chunks);
-		mesh_split(_nchunks,&s);
-	} else /*NULL==mesh*/ 
-	{ //Each chunk will just read the mesh locally
-		chunks.run();
-	}
-}
-
-CDECL void FEM_Init(int comm)
-{
-	if (TCHARM_Element()==0) 
-		FEM_Attach(comm);
-	FEMchunk *c=(FEMchunk *)TCharm::get()->semaGet(FEM_TCHARM_SEMAID);
 }
 FORTRAN_AS_C(FEM_INIT,FEM_Init,fem_init, (int *comm), (*comm))
 
-//This coordinator manages mesh reassembly for a FEM array:
-class FEMcoordinator : public Chare {
-	int nChunks; //Number of array elements total
-	CProxy_FEMchunk femChunks;
-	FEM_Mesh **cmsgs; //Messages from/for array elements
-	int updateCount; //Number of mesh updates so far
-	CkQ<UpdateMeshChunk *> futureUpdates;
-	CkQ<UpdateMeshChunk *> curUpdates; 
-	int numdone; //Length of curUpdates 
-public:
-	FEMcoordinator(int nChunks_) 
-		:nChunks(nChunks_)
-	{
-		cmsgs=new FEM_Mesh*[nChunks]; CHK(cmsgs);		
-		numdone=0;
-		updateCount=1;
-	}
-	~FEMcoordinator() {
-		delete[] cmsgs;
-	}
-	
-	void setArray(const CkArrayID &fem_) {femChunks=fem_;}
-	void updateMesh(marshallUpdateMeshChunk &chk);
-};
-
-class FEM_Mesh_Update : public FEM_Mesh_Output {
-	CProxy_FEMchunk dest;
-public:
-	FEM_Mesh_Update(const CProxy_FEMchunk &dest_)
-		:dest(dest_) {}
-	void accept(int chunkNo,FEM_Mesh *chk)
-	{
-		dest[chunkNo].meshUpdated(chk);
-		delete chk;
-	}
-};
-
-//Called by a chunk on FEM_Update_Mesh
-void FEMcoordinator::updateMesh(marshallUpdateMeshChunk &chk)
-{
-  UpdateMeshChunk *msg=chk;
-  if (msg->updateCount>updateCount) {
-    //This is a message for a future update-- save it for later
-    futureUpdates.enq(msg);
-  } else if (msg->updateCount<updateCount) 
-    FEM_Abort("FEM_Update_mesh","Received mesh chunk from iteration %d while on iteration %d",
-    	msg->updateCount,updateCount);
-  else /*(msg->updateCount==updateCount)*/{
-    int _nchunks=nChunks;
-    //A chunk for the current mesh
-    curUpdates.enq(msg);
-    while (curUpdates.length()==_nchunks) {
-      //We have all the chunks of the current mesh-- process them and start over
-      int i;
-      //Save what to do with the mesh
-      CallMeshUpdated meshUpdated;
-      int doWhat;
-      
-      for (i=0;i<_nchunks;i++) {
-      	UpdateMeshChunk *m=curUpdates.deq();
-	cmsgs[m->fromChunk]=&m->m;
-	meshUpdated=m->meshUpdated;
-	doWhat=m->doWhat;
-      }
-      //Assemble the current chunks into a serial mesh
-      freeSerialMeshes();
-      _srcSerialMesh=FEM_Mesh_assemble(_nchunks,cmsgs);
-      //Blow away the old chunks
-      for (i=0;i<_nchunks;i++) {
-      	delete cmsgs[i];
-      	cmsgs[i]=NULL;
-      }
-
-      //Now that the mesh is assembled, handle it
-      TCharm::setState(inInit);
-      meshUpdated.call();
-      TCharm::setState(inDriver);
-      
-      if (doWhat==FEM_MESH_UPDATE) { /*repartition the mesh*/
-        if (_srcSerialMesh==NULL) CkAbort("FEM> Never created a new mesh during mesh_updated!");
-	FEM_Mesh_Update u(femChunks);
-	mesh_split(_nchunks,&u);
-      } else if (doWhat==FEM_MESH_FINALIZE) { /*just broadcast meshUpdatedComplete*/
-        femChunks.meshUpdatedComplete();
-      }
-      freeSerialMeshes();
-
-      //Check for relevant messages in the future buffer
-      updateCount++;
-      for (i=0;i<futureUpdates.length();i++)
-	if (futureUpdates[i]->updateCount==updateCount) {
-	  curUpdates.enq(futureUpdates[i]);
-	  futureUpdates[i--]=futureUpdates.deq();
-	}
-    }
-  }
-  
-}
+// This lets FEM be a "-module", too.  (Normally comes from .ci file...)
+void _registerfem(void) {}
 
 /*******************************************************
-  Code used only by serial framework "setup" code-- they want
-  to set the mesh, partition, and get the mesh out piece by piece.
+  Mesh basics
 */
-class FEM_Mesh_Storer : public FEM_Mesh_Output {
-  int nchunks;
-  FEM_Mesh **chks;
-public:
-  FEM_Mesh_Storer(int nc) :nchunks(nc) {
-    typedef FEM_Mesh* FEM_Mesh_Ptr;
-    chks=new FEM_Mesh_Ptr[nc];
-  }
-  ~FEM_Mesh_Storer() {
-    for (int i=0;i<nchunks;i++) delete chks[i];
-    delete[] chks;
-  }
-  void accept(int chunkNo,FEM_Mesh *chk) {
-    chks[chunkNo]=chk;
-  }
-  void useChunk(int i) {
-    if (i<0 || i>=nchunks) 
-    	FEM_Abort("FEM_Serial_begin","Invalid index %d: must be between 0 and %d",i,nchunks);
-    FEM_Mesh_write(chks[i],i,nchunks,NULL);
-    _srcSerialMesh=chks[i];
-  }
-};
-
-static FEM_Mesh_Storer *meshChunkStore=NULL;
-CDECL void FEM_Serial_split(int npieces) {
-  FEMAPI("FEM_Serial_split");
-  meshChunkStore=new FEM_Mesh_Storer(npieces);
-  mesh_split(npieces,meshChunkStore);
-  SaveTCharmGlobals(npieces);
-}
-FDECL void FTN_NAME(FEM_SERIAL_SPLIT,fem_serial_split)(int *npieces)
-{ 
-  FEM_Serial_split(*npieces); 
+void FEM_Mesh_list::bad(int l,int bad_code,const char *caller) const {
+	if (bad_code==0)
+		FEM_Abort(caller,"Invalid FEM Mesh ID %d (should be like %d)",
+			l,FEM_MESH_FIRST);
+	else /* bad_code==1 */
+		FEM_Abort(caller,"Re-used a deleted FEM Mesh ID %d",l);
 }
 
-CDECL void FEM_Serial_begin(int chunkNo) {
-  FEMAPI("FEM_Serial_begin");
-  if (!meshChunkStore) FEM_Abort("Can't call FEM_Serial_begin before FEM_Serial_split!");
-  meshChunkStore->useChunk(chunkNo);
-}
-FDECL void FTN_NAME(FEM_SERIAL_BEGIN,fem_serial_begin)(int *pieceNo)
+CDECL int 
+FEM_Mesh_allocate(void) /* build new mesh */  
 {
-  FEM_Serial_begin(*pieceNo-1);
+	const char *caller="FEM_Mesh_allocate";FEMAPI(caller);
+	FEMchunk *c=FEMchunk::get(caller);
+	FEM_Mesh *m=new FEM_Mesh;
+	m->becomeSetting();
+	m->registerIDXL(IDXL_Chunk::get(caller));
+	return c->meshes.put(m);
+}
+FORTRAN_AS_C_RETURN(int,
+	FEM_MESH_ALLOCATE,FEM_Mesh_allocate,fem_mesh_allocate, (void),())
+
+CDECL void 
+FEM_Mesh_deallocate(int fem_mesh) /* delete this local mesh */
+{
+	const char *caller="FEM_Mesh_deallocate";FEMAPI(caller);
+	FEMchunk *c=FEMchunk::get(caller);
+	c->meshes.destroy(fem_mesh,caller);
+}
+FORTRAN_AS_C(FEM_MESH_DEALLOCATE,FEM_Mesh_deallocate,fem_mesh_deallocate, (int *m),(*m))
+
+/* Mesh I/O */
+CDECL int 
+FEM_Mesh_read(const char *prefix,int partNo,int nParts) /* read parallel mesh from file */
+{
+	const char *caller="FEM_Mesh_read";FEMAPI(caller);
+	FEMchunk *c=FEMchunk::get(caller);
+	return c->meshes.put(FEM_readMesh(prefix,partNo,nParts));
+}
+FDECL int
+FTN_NAME(FEM_MESH_READ,fem_mesh_read)(const char *n,int *partNo,int *nParts,int len) {
+	char *s=new char[len+1]; strncpy(s,n,len); s[len]=(char)0;
+	int ret=FEM_Mesh_read(s,*partNo,*nParts);
+	delete[] s;
+	return ret;
 }
 
+CDECL void 
+FEM_Mesh_write(int fem_mesh,const char *prefix,int partNo,int nParts) /* write parallel mesh to files */
+{
+	const char *caller="FEM_Mesh_write";FEMAPI(caller);
+	FEMchunk *c=FEMchunk::get(caller);
+	FEM_writeMesh(c->meshes.lookup(fem_mesh,caller),prefix,partNo,nParts);
+}
+FDECL void
+FTN_NAME(FEM_MESH_WRITE,fem_mesh_write)(int *m,const char *n,int *partNo,int *nParts,int len) {
+	char *s=new char[len+1]; strncpy(s,n,len); s[len]=(char)0;
+	FEM_Mesh_write(*m,s,*partNo,*nParts);
+	delete[] s;
+}
 
-/*******************************************************
-  Code used only by serial framework "reassembly" code-- they want
-  to setup each mesh partition, then get the whole mesh out at once.
-*/
+/* Mesh assembly/disassembly */
+CDECL int 
+FEM_Mesh_assemble(int nParts,const int *srcMeshes) {
+	const char *caller="FEM_Mesh_assemble";FEMAPI(caller);
+	FEMchunk *c=FEMchunk::get(caller);
+	FEM_Mesh **chunks=new FEM_Mesh*[nParts];
+	for (int p=0;p<nParts;p++) chunks[p]=c->meshes.lookup(srcMeshes[p],caller);
+	int ret=c->meshes.put(FEM_Mesh_assemble(nParts,chunks));
+	delete[] chunks;
+	return ret;
+}
+FORTRAN_AS_C_RETURN(int,FEM_MESH_ASSEMBLE,FEM_Mesh_assemble,fem_mesh_assemble,
+	(int *nParts,const int *src),(*nParts,src))
 
-class FEM_Serial_reassembly {
-	int nChunks; //Number of chunks in the mesh
-	CkVec<FEM_Mesh *> msgs; //Partitioned mesh pieces (or NULL)
-	int lastRead; //Number of last-read chunk
-	
-	//Set the number of global chunks:
-	void setChunks(int n) {
-		nChunks=n;
-		CkPrintf("FEM> Will do serial reassembly for %d chunks\n",n);
-		msgs.setSize(n);
-		for (int i=0;i<n;i++) msgs[i]=NULL;
-	}
-	
-	//Check this chunk number for validity
-	void check(int c) {
-		if (c<0 || c>=nChunks) 
-			FEM_Abort("FEM_Serial reassembly","Invalid chunk number %d",c);
-	}
-	
-	// Read this chunk out of the global mesh:
-	void pushChunk(int c) {
-		check(c);
-		if (msgs[c]!=NULL) 
-			FEM_Abort("FEM_Serial reassembly","Tried to set chunk %d twice!",c);
-		if (_destSerialMesh==NULL) 
-			FEM_Abort("FEM_Serial reassembly","Never created a new mesh for chunk %d",c);
-		//Copy old global numbers into new mesh:
-		_destSerialMesh->copyOldGlobalno(*_srcSerialMesh);
-		msgs[c]=_destSerialMesh; //Mesh the user's set up
-		_destSerialMesh=0;
-	}
-	
+class FEM_Mesh_Partition_List : public FEM_Mesh_Output {
+	FEMchunk *c;
+	int *dest;
 public:
-	FEM_Serial_reassembly() 
-	{
-		lastRead=-1;
-		nChunks=-1;
-	}
+	FEM_Mesh_Partition_List(FEMchunk *c_, int *dest_)
+		:c(c_), dest(dest_) {}
 	
-	void read(int chunkNo,int nc) {
-		if (nChunks==-1) setChunks(nc);
-		check(chunkNo);
-		if (lastRead!=-1) pushChunk(lastRead);
-		freeSerialMeshes();
-		_srcSerialMesh=FEM_Mesh_read(chunkNo,nChunks,NULL);
-		_srcSerialMesh->becomeGetting();
-		lastRead=chunkNo;
-	}
-	
-	void reassemble(void) {
-		if (lastRead!=-1) pushChunk(lastRead);
-		freeSerialMeshes();
-		_srcSerialMesh=FEM_Mesh_assemble(nChunks,&msgs[0]);
-		_srcSerialMesh->becomeGetting();
-		for (int i=0;i<nChunks;i++) {
-			delete msgs[i]; msgs[i]=NULL;
-		}
-	}
-	
-	static FEM_Serial_reassembly *get(void) {
-		static FEM_Serial_reassembly *assembler=NULL;
-		if (assembler==NULL) assembler=new FEM_Serial_reassembly();
-		return assembler;
+	void accept(int chunkNo,FEM_Mesh *m) {
+		dest[chunkNo]=c->meshes.put(m);
 	}
 };
 
-CDECL void FEM_Serial_read(int chunkNo,int nChunks) {
-  FEMAPI("FEM_Serial_read");
-  FEM_Serial_reassembly::get()->read(chunkNo,nChunks);
+CDECL void 
+FEM_Mesh_partition(int fem_mesh,int nParts,int *destMeshes) {
+	const char *caller="FEM_Mesh_partition"; FEMAPI(caller);
+	FEMchunk *c=FEMchunk::get(caller);
+	FEM_Mesh_Partition_List l(c,destMeshes);
+	FEM_Mesh_partition(c->lookup(fem_mesh,caller),nParts,&l);
 }
-FDECL void FTN_NAME(FEM_SERIAL_READ,fem_serial_read)(int *c,int *n)
+FORTRAN_AS_C(FEM_MESH_PARTITION,FEM_Mesh_partition,fem_mesh_partition,
+	(int *mesh,int *nParts,int *dest),(*mesh,*nParts,dest))
+
+/* Mesh communication */
+
+CDECL int 
+FEM_Mesh_recv(int fromRank,int tag,FEM_Comm_t comm_context)
 {
-  FEM_Serial_read(*c-1,*n);
+	const char *caller="FEM_Mesh_recv";FEMAPI(caller);
+	FEMchunk *c=FEMchunk::get(caller);
+	marshallNewHeapCopy<FEM_Mesh> m;
+	MPI_Recv_pup(m,fromRank,tag,(MPI_Comm)comm_context);
+	return c->meshes.put(m);
+}
+FORTRAN_AS_C_RETURN(int,FEM_MESH_RECV,FEM_Mesh_recv,fem_mesh_recv, 
+	(int *from,int *tag,int *comm),(*from,*tag,*comm))
+
+CDECL void 
+FEM_Mesh_send(int fem_mesh,int toRank,int tag,FEM_Comm_t comm_context)
+{
+	const char *caller="FEM_Mesh_send";FEMAPI(caller);
+	FEMchunk *c=FEMchunk::get(caller);
+	marshallNewHeapCopy<FEM_Mesh> m(c->meshes.lookup(fem_mesh,caller));
+	MPI_Send_pup(m,toRank,tag,(MPI_Comm)comm_context);
+}
+FORTRAN_AS_C(FEM_MESH_SEND,FEM_Mesh_send,fem_mesh_send, 
+	(int *mesh,int *to,int *tag,int *comm),(*mesh,*to,*tag,*comm))
+
+
+CDECL int 
+FEM_Mesh_reduce(int fem_mesh,int masterRank,FEM_Comm_t comm_context)
+{
+	int tag=89374;
+	int myRank; MPI_Comm_rank((MPI_Comm)comm_context,&myRank);
+	if (myRank!=masterRank) 
+	{ /* I'm a slave-- send to master: */
+		FEM_Mesh_send(fem_mesh,masterRank,tag,comm_context);
+		return 0;
+	}
+	else /* myRank==masterRank */ 
+	{ /* I'm the master-- recv the mesh pieces and assemble */
+		int p, nParts; MPI_Comm_size((MPI_Comm)comm_context,&nParts);
+		int *parts=new int[nParts];
+		for (p=0;p<nParts;p++)
+			if (p!=masterRank) /* recv from rank p */
+				parts[p]=FEM_Mesh_recv(p,tag,comm_context);
+			else
+				parts[p]=fem_mesh; /* my part */
+		int new_mesh=FEM_Mesh_assemble(nParts,parts);
+		for (p=0;p<nParts;p++)
+			if (p!=masterRank) /* Delete received meshes */
+				FEM_Mesh_deallocate(parts[p]);
+		delete[] parts;
+		return new_mesh;
+	}
+}
+FORTRAN_AS_C_RETURN(int,FEM_MESH_REDUCE,FEM_Mesh_reduce,fem_mesh_reduce, 
+	(int *mesh,int *rank,int *comm),(*mesh,*rank,*comm))
+
+CDECL int 
+FEM_Mesh_broadcast(int fem_mesh,int masterRank,FEM_Comm_t comm_context)
+{
+	int tag=89375;
+	int myRank; MPI_Comm_rank((MPI_Comm)comm_context,&myRank);
+	if (myRank==masterRank) 
+	{ /* I'm the master-- split up and send */
+		int p, nParts; MPI_Comm_size((MPI_Comm)comm_context,&nParts);
+		int *parts=new int[nParts];
+		FEM_Mesh_partition(fem_mesh,nParts,parts);
+		int new_mesh=0;
+		for (p=0;p<nParts;p++)
+			if (p!=masterRank) { /* Send off received meshes */
+				FEM_Mesh_send(parts[p],p,tag,comm_context);
+				FEM_Mesh_deallocate(parts[p]);
+			}
+			else /* Just keep my own partition */
+				new_mesh=parts[p];
+		return new_mesh;
+	}
+	else
+	{ /* I'm a slave-- recv new mesh from master: */
+		return FEM_Mesh_recv(masterRank,tag,comm_context);
+	}
+}
+FORTRAN_AS_C_RETURN(int,FEM_MESH_BROADCAST,FEM_Mesh_broadcast,fem_mesh_broadcast, 
+	(int *mesh,int *rank,int *comm),(*mesh,*rank,*comm))
+
+
+CDECL void 
+FEM_Mesh_copy_globalno(int src_mesh,int dest_mesh)
+{
+	const char *caller="FEM_Mesh_copy_globalno";FEMAPI(caller);
+	FEMchunk *c=FEMchunk::get(caller);
+	c->lookup(dest_mesh,caller)->
+		copyOldGlobalno(*c->lookup(src_mesh,caller));
 }
 
-CDECL void FEM_Serial_assemble(void) {
-  FEMAPI("FEM_Serial_assemble");
-  FEM_Serial_reassembly::get()->reassemble();
+/* Tiny accessors */
+CDECL int FEM_Mesh_default_read(void)  /* return default fem_mesh used for read (get) calls below */
+{
+	return FEMchunk::get("FEM_Mesh_default_read")->default_read;
 }
-FDECL void FTN_NAME(FEM_SERIAL_ASSEMBLE,fem_serial_assemble)(void)
-{ 
-  FEM_Serial_assemble(); 
-}
+FORTRAN_AS_C_RETURN(int,
+	FEM_MESH_DEFAULT_READ,FEM_Mesh_default_read,fem_mesh_default_read,
+	(void),())
 
+CDECL int FEM_Mesh_default_write(void) /* return default fem_mesh used for write (set) calls below */
+{
+	return FEMchunk::get("FEM_Mesh_default_write")->default_write;
+}
+FORTRAN_AS_C_RETURN(int,
+	FEM_MESH_DEFAULT_WRITE,FEM_Mesh_default_write,fem_mesh_default_write,
+	(void),())
+
+CDECL void FEM_Mesh_set_default_read(int fem_mesh)
+{
+	FEMchunk::get("FEM_Mesh_set_default_read")->default_read=fem_mesh;
+}
+FORTRAN_AS_C(FEM_MESH_SET_DEFAULT_READ,FEM_Mesh_set_default_read,fem_mesh_set_default_read,
+	(int *m),(*m))
+CDECL void FEM_Mesh_set_default_write(int fem_mesh)
+{
+	FEMchunk::get("FEM_Mesh_set_default_write")->default_write=fem_mesh;
+}
+FORTRAN_AS_C(FEM_MESH_SET_DEFAULT_WRITE,FEM_Mesh_set_default_write,fem_mesh_set_default_write,
+	(int *m),(*m))
 
 /********************** Mesh Creation ************************/
 /*Utility*/
@@ -465,94 +371,23 @@ int *CkCopyArray(const int *src,int len,int indexBase)
 #ifndef CMK_OPTIMIZE
 void FEMchunk::check(const char *where) {
 	magic.check(where,0,this);
-	if (thisIndex<0 || thisIndex> thread->getNumElements()
-		|| thisIndex!=thread->getElement() ) 
-	{
-		CkError("FEM Chunk corrupted at %s (thisIndex==%d)\n",
-			where,thisIndex);
-		CkAbort("FEM Chunk is corrupted");
-	}
+	// CkPrintf("[%d] FEM> %s\n",thisIndex,where);
 }
 #endif
 
-FEMchunk *FEMchunk::lookup(const char *callingRoutine) {
-	if(TCharm::getState()!=inDriver) 
-		FEM_Abort(callingRoutine,"Can only be called from driver (from parallel context)");
-	FEMchunk *ret=CtvAccess(_femptr);
-	ret->check("FEMchunk::lookup");
-	return ret;
-}
-
 static FEM_Mesh *setMesh(void) {
-  if(TCharm::getState()==inDriver) {
-    FEMchunk *cptr = CtvAccess(_femptr);
-    if (cptr->updated_mesh==NULL) {
-      cptr->updated_mesh=new UpdateMeshChunk;
-    }
-    return &cptr->updated_mesh->m;
-  } else {
-    //Called from init, finalize, or meshUpdate
-    if (_destSerialMesh==NULL) {
-      _destSerialMesh=new FEM_Mesh;
-      _destSerialMesh->becomeSetting();
-    }
-    return _destSerialMesh;
-  }
+  const char *caller="::setMesh";
+  return FEMchunk::get(caller)->setMesh(caller);
 }
 
 static const FEM_Mesh *getMesh(void) {
-  if(TCharm::getState()==inDriver) {
-    FEMchunk *cptr = CtvAccess(_femptr);
-    return &cptr->getMesh();
-  } else {
-    //Called from init, finalize, or meshUpdate
-    if (_srcSerialMesh==NULL) {
-      FEM_Abort("FEM: Cannot get serial mesh-- it was never set!\n");
-    }
-    return _srcSerialMesh;
-  }
-}
-const FEM_Mesh *FEM_Get_FEM_Mesh(void) {
-	return getMesh();
+  const char *caller="::getMesh";
+  return FEMchunk::get(caller)->getMesh(caller);
 }
 
-CDECL int FEM_Mesh_default_read(void)  /* return default fem_mesh used for read (get) calls below */
-{
-	return 102;
+FEM_Mesh *FEM_Mesh_lookup(int fem_mesh,const char *caller) {
+	return FEMchunk::get(caller)->lookup(fem_mesh,caller);
 }
-FORTRAN_AS_C_RETURN(int,
-	FEM_MESH_DEFAULT_READ,FEM_Mesh_default_read,fem_mesh_default_read,
-	(void),())
-
-CDECL int FEM_Mesh_default_write(void) /* return default fem_mesh used for write (set) calls below */
-{
-	return 103;
-}
-FORTRAN_AS_C_RETURN(int,
-	FEM_MESH_DEFAULT_WRITE,FEM_Mesh_default_write,fem_mesh_default_write,
-	(void),())
-
-FEM_Mesh *FEMchunk::meshLookup(int fem_mesh,const char *callingRoutine) {
-	switch (fem_mesh) {
-	case 102: return cur_mesh;
-	case 103: return ::setMesh();
-	default: //Invalid mesh ID:
-		FEM_Abort(callingRoutine,"Invalid fem_mesh ID %d",fem_mesh);
-		return NULL; //<- for whining compilers
-	};
-}
-
-
-FEM_Mesh *FEM_Mesh_lookup(int fem_mesh,const char *callingRoutine) {
-	switch (fem_mesh) {
-	case 102: return (FEM_Mesh *)getMesh();
-	case 103: return setMesh();
-	default: //Invalid mesh ID:
-		FEM_Abort(callingRoutine,"Invalid fem_mesh ID %d",fem_mesh);
-		return NULL; //<- for whining compilers
-	};
-}
-
 
 /****** Custom Partitioning API *******/
 static void Set_Partition(int *elem2chunk,int indexBase) {
@@ -577,73 +412,41 @@ FDECL void FTN_NAME(FEM_SET_PARTITION,fem_set_partition)
 
 /******************************* CHUNK *********************************/
 
-FEMchunk::FEMchunk(const FEMinit &init_)
-	:super(init_.threads), init(init_), thisproxy(thisArrayID)
+FEMchunk::FEMchunk(FEM_Comm_t defaultComm_)
+	:defaultComm(defaultComm_)
 {
+  default_read=-1;
+  default_write=-1;
+  checkMPI(MPI_Comm_rank((MPI_Comm)defaultComm,&thisIndex));
   initFields();
-
-  updated_mesh=NULL;
-  cur_mesh=NULL;
-
-  updateCount=1; //Number of mesh updates
-
-//Field updates:
-  reductionBuf=NULL;
-  listCount=0;listSuspended=false;
 }
 FEMchunk::FEMchunk(CkMigrateMessage *msg)
-	:super(msg), thisproxy(thisArrayID)
 {
-  updated_mesh=NULL;
-  cur_mesh=NULL;
-  reductionBuf=NULL;	
-  listCount=0;listSuspended=false;
+  initFields();
+}
+
+void FEMchunk::pup(PUP::er &p)
+{
+//Pup superclass (none)
+
+// Pup the meshes
+  p|default_read;
+  p|default_write;
+  p|meshes;
+  
+  p|defaultComm;
+  p|thisIndex;
+}
+
+PUPable_def(FEM_Sym_Linear);
+//Update fields after creation/migration
+void FEMchunk::initFields(void)
+{
+  PUPable_reg(FEM_Sym_Linear);
 }
 
 FEMchunk::~FEMchunk()
 {
-	delete updated_mesh;
-	delete cur_mesh;
-}
-
-//Update fields after creation/migration
-void FEMchunk::initFields(void)
-{
-  CProxy_TCharm tp(init.threads);
-  thread=tp[thisIndex].ckLocal();
-  if (thread==NULL) CkAbort("FEM can't locate its thread!\n");
-  CtvAccessOther(thread->getThread(),_femptr)=this;
-}
-void FEMchunk::ckJustMigrated(void)
-{
-  super::ckJustMigrated(); //Call superclass
-  initFields();
-}
-
-void
-FEMchunk::run(marshallMeshChunk &msg)
-{
-  setMesh(msg);
-  thread->semaPut(FEM_TCHARM_SEMAID,this);
-}
-
-void
-FEMchunk::run(void)
-{
-  setMesh();
-  thread->semaPut(FEM_TCHARM_SEMAID,this);
-}
-
-void
-FEMchunk::setMesh(FEM_Mesh *msg)
-{
-  if (cur_mesh!=NULL) delete cur_mesh;
-  if(msg==0) { /*Read mesh from file*/
-    cur_mesh=FEM_Mesh_read(thisIndex,init.numElements,NULL);
-  } else {
-    cur_mesh=msg;
-  }
-  cur_mesh->registerIDXL(this);
 }
 
 
@@ -652,11 +455,12 @@ FEMchunk::reduce_field(int fid, const void *nodes, void *outbuf, int op)
 {
   check("reduce_field precondition");
   // first reduce over local nodes
-  const IDXL_Layout &dt = layouts.get(fid,"FEM_Reduce_field");
+  const IDXL_Layout &dt = IDXL_Layout_List::get().get(fid,"FEM_Reduce_field");
   const byte *src = (const byte *) nodes;
   reduction_initialize(dt,outbuf,op);
   reduction_combine_fn fn=reduction_combine(dt,op);
-  for(int i=0; i<cur_mesh->node.size(); i++) {
+  int nNodes=getMesh("reduce_field")->node.size();
+  for(int i=0; i<nNodes; i++) {
     if(getPrimary(i)) {
       fn((byte *)outbuf, src, &dt);
     }
@@ -670,99 +474,41 @@ FEMchunk::reduce_field(int fid, const void *nodes, void *outbuf, int op)
 void
 FEMchunk::reduce(int fid, const void *inbuf, void *outbuf, int op)
 {
+  const char *caller="FEM_Reduce";
   check("reduce precondition");
-  const IDXL_Layout &dt = layouts.get(fid,"FEM_Reduce");
+  const IDXL_Layout &dt = IDXL_Layout_List::get().get(fid,caller);
   int len = dt.compressedBytes();
-  if(numElements==1) {
-    memcpy(outbuf,inbuf,len);
-    return;
-  }
-  CkReduction::reducerType rtype;
-  switch(op) {
-    case FEM_SUM:
-      switch(dt.type) {
-        case FEM_INT: rtype = CkReduction::sum_int; break;
-        case FEM_REAL: rtype = CkReduction::sum_float; break;
-        case FEM_DOUBLE: rtype = CkReduction::sum_double; break;
-      }
-      break;
-    case FEM_PROD:
-      switch(dt.type) {
-        case FEM_INT: rtype = CkReduction::product_int; break;
-        case FEM_REAL: rtype = CkReduction::product_float; break;
-        case FEM_DOUBLE: rtype = CkReduction::product_double; break;
-      }
-      break;
-    case FEM_MAX:
-      switch(dt.type) {
-        case FEM_INT: rtype = CkReduction::max_int; break;
-        case FEM_REAL: rtype = CkReduction::max_float; break;
-        case FEM_DOUBLE: rtype = CkReduction::max_double; break;
-      }
-      break;
-    case FEM_MIN:
-      switch(dt.type) {
-        case FEM_INT: rtype = CkReduction::min_int; break;
-        case FEM_REAL: rtype = CkReduction::min_float; break;
-        case FEM_DOUBLE: rtype = CkReduction::min_double; break;
-      }
-      break;
-  }
-  contribute(len, (void *)inbuf, rtype);
-  reductionBuf = outbuf;
-  thread->suspend();
-  check("reduce precondition");
-}
-
-void
-FEMchunk::reductionResult(int length,const char *data)
-{
-  check("reductionResult");
-  memcpy(reductionBuf, data, length);
-  reductionBuf=NULL;
-  thread->resume();
-}
-
-//Called by user to ask us to contribute our updated mesh chunk
-void 
-FEMchunk::updateMesh(int doWhat) {
-  check("updateMesh precondition");
-  if (updated_mesh==NULL)
-    CkAbort("FEM_Update_Mesh> You must first set the mesh before updating it!\n");
+  // MPI does not allow inbuf==outbuf, so make a copy:
+  char *tmpbuf=new char[len];
+  memcpy(tmpbuf,inbuf,len);
+  // Map IDXL datatypes to MPI:
+  MPI_Datatype mpidt;
+  switch (dt.type) {
+  case IDXL_BYTE: mpidt=MPI_BYTE; break;
+  case IDXL_INT: mpidt=MPI_INT; break;
+  case IDXL_REAL: mpidt=MPI_FLOAT; break;
+  case IDXL_DOUBLE: mpidt=MPI_DOUBLE; break;
+  default: FEM_Abort(caller,"cannot map FEM datatype %d to MPI",dt.type); break;
+  };
   
-  if (cur_mesh) {
-     updated_mesh->m.copyOldGlobalno(*cur_mesh);
-     if (doWhat==FEM_MESH_UPDATE) { /* Get rid of the original mesh--we'll update it soon */
-       delete cur_mesh;
-       cur_mesh=NULL;
-     }
-  }
-  
-  updated_mesh->doWhat=doWhat;
-  updated_mesh->updateCount=updateCount++;
-  updated_mesh->fromChunk=thisIndex;
-
-  //Send the mesh off to the coordinator
-  CProxy_FEMcoordinator coord(init.coordinator);
-  coord.updateMesh(updated_mesh);
-  delete updated_mesh;
-  updated_mesh=NULL;
-  if (doWhat!=FEM_MESH_OUTPUT)
-    thread->suspend();//Sleep until repartitioned mesh arrives
-  check("updateMesh postcondition");
-}
-
-//Called by coordinator with a new, repartitioned mesh chunk for us
-void 
-FEMchunk::meshUpdated(marshallMeshChunk &msg) {
-  setMesh(msg); //Read in the new mesh
-  thread->resume();  //Start computing again
+  MPI_Op mpiop;
+  switch (op) {
+  case IDXL_SUM: mpiop=MPI_SUM; break;
+  case IDXL_PROD: mpiop=MPI_PROD; break;
+  case IDXL_MAX: mpiop=MPI_MAX; break;
+  case IDXL_MIN: mpiop=MPI_MIN; break;
+  default: FEM_Abort(caller,"cannot map FEM operation %d to MPI",op); break;
+  };
+  MPI_Comm comm=(MPI_Comm)defaultComm;
+  MPI_Allreduce(tmpbuf,outbuf,dt.width,mpidt,mpiop,comm);
+  delete[] tmpbuf;
+  check("reduce postcondition");
 }
 
 void
 FEMchunk::readField(int fid, void *nodes, const char *fname)
 {
-  const IDXL_Layout &dt = layouts.get(fid,"FEM_Read_field");
+  const IDXL_Layout &dt = IDXL_Layout_List::get().get(fid,"FEM_Read_field");
   int type = dt.type;
   int width = dt.width;
   int offset = dt.offset;
@@ -788,7 +534,9 @@ FEMchunk::readField(int fid, void *nodes, const char *fname)
     case FEM_DOUBLE: fmt = "%lf%n"; break;
     default: CkAbort("FEM_Read_field doesn't support that data type");
   }
-  for(i=0;i<cur_mesh->node.size();i++) {
+  FEM_Mesh *cur_mesh=getMesh("FEM_Read_field");
+  int nNodes=cur_mesh->node.size();
+  for(i=0;i<nNodes;i++) {
     // skip lines to the next local node 
     // (FIXME: assumes nodes are in ascending global order, which they ain't)
     int target=cur_mesh->node.getGlobalno(i);
@@ -812,21 +560,6 @@ FEMchunk::readField(int fid, void *nodes, const char *fname)
 }
 
 /******************************* C Bindings **********************************/
-static FEMchunk *getCurChunk(void) 
-{
-  FEMchunk *cptr=CtvAccess(_femptr);
-  if (cptr==NULL) 
-    CkAbort("Routine can only be called from driver()!\n");
-  return cptr;
-}
-
-CDECL void FEM_Update_mesh(FEM_Update_mesh_fn callFn,int userValue,int doWhat) 
-{ 
-  FEMAPI("FEM_Update_mesh");
-  FEMchunk *chk=getCurChunk();
-  chk->updated_mesh->meshUpdated=CallMeshUpdated(callFn,userValue);
-  chk->updateMesh(doWhat); 
-}
 
 CDECL int FEM_Register(void *_ud,FEM_PupFn _pup_ud)
 {
@@ -878,22 +611,22 @@ FEM_Update_field(int fid, void *nodes)
 CDECL void
 FEM_Reduce_field(int fid, const void *nodes, void *outbuf, int op)
 {
-  FEMAPI("FEM_Reduce_field");
-  getCurChunk()->reduce_field(fid, nodes, outbuf, op);
+  const char *caller="FEM_Reduce_field"; FEMAPI(caller);
+  FEMchunk::get(caller)->reduce_field(fid, nodes, outbuf, op);
 }
 
 CDECL void
 FEM_Reduce(int fid, const void *inbuf, void *outbuf, int op)
 {
-  FEMAPI("FEM_Reduce");
-  getCurChunk()->reduce(fid, inbuf, outbuf, op);
+  const char *caller="FEM_Reduce";FEMAPI(caller);
+  FEMchunk::get(caller)->reduce(fid, inbuf, outbuf, op);
 }
 
 CDECL void
 FEM_Read_field(int fid, void *nodes, const char *fname)
 {
-  FEMAPI("FEM_Read_field");
-  getCurChunk()->readField(fid, nodes, fname);
+  const char *caller="FEM_Read_field";FEMAPI(caller);
+  FEMchunk::get(caller)->readField(fid, nodes, fname);
 }
 
 CDECL int
@@ -917,66 +650,54 @@ FEM_Timer(void)
 CDECL void 
 FEM_Print(const char *str)
 {
-  TCharmAPIRoutine apiRoutineSentry;
-  if(TCharm::getState()==inDriver) {
-    FEMchunk *cptr = getCurChunk();
-    cptr->check("FEM_Print");
-    CkPrintf("[%d] %s\n", cptr->thisIndex, str);
-  } else {
-    CkPrintf("%s\n", str);
-  }
+  const char *caller="FEM_Print"; FEMAPI(caller);
+  FEMchunk *cptr = FEMchunk::get(caller);
+  CkPrintf("[%d] %s\n", cptr->thisIndex, str);
 }
 
-static void do_print_partition(int idxBase) {
-  FEMAPI("FEM_Print_Partition");
-  if(TCharm::getState()==inDriver) {
-    FEMchunk *cptr = getCurChunk();
-    cptr->check("FEM_Print_partition");
-    cptr->print(idxBase);
-  } else {
-    ((FEM_Mesh *)getMesh())->print(idxBase);
-  }
+static void do_print_partition(int fem_mesh,int idxBase) {
+  
+  const char *caller="FEM_Mesh_print"; FEMAPI(caller);
+  FEMchunk *cptr = FEMchunk::get(caller);
+  cptr->print(fem_mesh,idxBase);
 }
 
 CDECL void 
-FEM_Print_partition(void)
+FEM_Mesh_print(int fem_mesh)
 {
-  do_print_partition(0);
+  do_print_partition(fem_mesh,0);
+}
+
+CDECL void
+FEM_Print_partition(void) {
+  do_print_partition(FEM_Mesh_default_read(),0);
 }
 
 CDECL int FEM_Get_comm_partners(void)
 {
-	FEMAPI("FEM_Get_Comm_Partners");
-	return getCurChunk()->getComm().size();
+	const char *caller="FEM_Get_Comm_Partners"; FEMAPI(caller);
+	return FEMchunk::get(caller)->getComm().size();
 }
 CDECL int FEM_Get_comm_partner(int partnerNo)
 {
-	FEMAPI("FEM_Get_Comm_Partner");
-	return getCurChunk()->getComm().getLocalList(partnerNo).getDest();
+	const char *caller="FEM_Get_Comm_Partner"; FEMAPI(caller);
+	return FEMchunk::get(caller)->getComm().getLocalList(partnerNo).getDest();
 }
 CDECL int FEM_Get_comm_count(int partnerNo)
 {
-	FEMAPI("FEM_Get_Comm_Count");
-	return getCurChunk()->getComm().getLocalList(partnerNo).size();
+	const char *caller="FEM_Get_Comm_Count"; FEMAPI(caller);
+	return FEMchunk::get(caller)->getComm().getLocalList(partnerNo).size();
 }
 CDECL void FEM_Get_comm_nodes(int partnerNo,int *nodeNos)
 {
-	FEMAPI("FEM_Get_comm_nodes");
-	const int *nNo=getCurChunk()->getComm().getLocalList(partnerNo).getVec();
+	const char *caller="FEM_Get_comm_nodes"; FEMAPI(caller);
+	const int *nNo=FEMchunk::get(caller)->getComm().getLocalList(partnerNo).getVec();
 	int len=FEM_Get_comm_count(partnerNo);
 	for (int i=0;i<len;i++)
 		nodeNos[i]=nNo[i];
 }
 
 /************************ Fortran Bindings *********************************/
-FDECL void FTN_NAME(FEM_UPDATE_MESH,fem_update_mesh)
-  (FEM_Update_mesh_fortran_fn callFn,int *userValue,int *doWhat) 
-{ 
-  FEMAPI("FEM_Update_mesh");
-  FEMchunk *chk=getCurChunk();
-  chk->updated_mesh->meshUpdated=CallMeshUpdated(callFn,*userValue);
-  chk->updateMesh(*doWhat);
-}
 
 FDECL int FTN_NAME(FEM_REGISTER,fem_register)
   (void *userData,FEM_PupFn _pup_ud)
@@ -1065,10 +786,13 @@ FDECL void FTN_NAME(FEM_PRINT,fem_print)
   delete[] tmpstr;
 }
 
-FDECL void FTN_NAME(FEM_PRINT_PARTITION,fem_print_partition)
-  (void)
+FDECL void FTN_NAME(FEM_MESH_PRINT,fem_mesh_print)
+  (int *m)
 {
-  do_print_partition(1);
+  do_print_partition(*m,1);
+}
+FDECL void FTN_NAME(FEM_PRINT_PARTITION,fem_print_partition)(void) {
+  do_print_partition(FEM_Mesh_default_read(),0);
 }
 
 FDECL void FTN_NAME(FEM_DONE,fem_done)
@@ -1095,8 +819,9 @@ FDECL int FTN_NAME(FEM_GET_COMM_COUNT,fem_get_comm_count)
 FDECL void FTN_NAME(FEM_GET_COMM_NODES,fem_get_comm_nodes)
 	(int *pNo,int *nodeNos)
 {
+	const char *caller="FEM_GET_COMM_NODES"; FEMAPI(caller);
 	int partnerNo=*pNo-1;
-	const int *nNo=getCurChunk()->getComm().getLocalList(partnerNo).getVec();
+	const int *nNo=FEMchunk::get(caller)->getComm().getLocalList(partnerNo).getVec();
 	int len=FEM_Get_comm_count(partnerNo);
 	for (int i=0;i<len;i++)
 		nodeNos[i]=nNo[i]+1;
@@ -1104,8 +829,6 @@ FDECL void FTN_NAME(FEM_GET_COMM_NODES,fem_get_comm_nodes)
 
 /******************** Ghost Layers *********************/
 FEM_Ghost &FEM_Set_FEM_Ghost(void) {
-	if(TCharm::getState()==inDriver)
-		CkAbort("FEM: Cannot call ghost or symmetry routines from driver!");
 	return ghosts;
 }
 
@@ -1185,13 +908,17 @@ void FEMchunk::exchangeGhostLists(int elemType,
 	     int inLen,const int *inList,int idxbase)
 {
 	check("exchangeGhostLists");
-	const FEM_Comm &cnt=cur_mesh->getCount(elemType).getGhostSend();
+	FEM_Mesh *cur_mesh=getMesh("exchangeGhostLists");
+	const FEM_Entity &e=cur_mesh->getCount(elemType);
+	const FEM_Comm &cnt=e.getGhostSend();
+	int tag=89376;
+	MPI_Comm comm=(MPI_Comm)defaultComm;
 	
-//Send off a list to each neighbor
-	int nChk=cnt.size();
+//Send build an index list for each of our neighbors
+	int i,chk,nChk=cnt.size();
 	CkVec<int> *outIdx=new CkVec<int>[nChk];
 	//Loop over (the shared entries in) the input list
-	for (int i=0;i<inLen;i++) {
+	for (i=0;i<inLen;i++) {
 		int localNo=inList[i]-idxbase;
 		const FEM_Comm_Rec *rec=cnt.getRec(localNo);
 		if (NULL==rec) continue; //This entity isn't shared
@@ -1201,83 +928,76 @@ void FEMchunk::exchangeGhostLists(int elemType,
 			outIdx[localChk].push_back(rec->getIdx(s));
 		}
 	}
-	//Send off the comm. idx list to each chk:
-	for (int chk=0;chk<nChk;chk++) {
-		thisproxy[cnt.getLocalList(chk).getDest()].recvList(
-			elemType,thisIndex,
-			outIdx[chk].size(), outIdx[chk].getVec()
-		);
-	}
-	delete[] outIdx;
-	
-//Check if the replies have all arrived
-	if (!finishListExchange(cur_mesh->getCount(elemType).getGhostRecv())){
-		listSuspended=true;
-		thread->suspend(); //<- sleep until all lists arrive
-	}
-	else //We have everything we need-- reset and continue
-		listCount=0;
-}
 
-void FEMchunk::recvList(int elemType,int fmChk,int nIdx,const int *idx)
-{
-	check("recvList");
-	int i;
-	const FEM_Entity &e=cur_mesh->getCount(elemType);
-	int firstGhost=e.size();
-	const FEM_Comm_List &l=e.getGhostRecv().getList(fmChk);
-	for (i=0;i<nIdx;i++)
-		listTmp.push_back(firstGhost+l[idx[i]]);
-	listCount++;
-	finishListExchange(cur_mesh->getCount(elemType).getGhostRecv());
-}
-bool FEMchunk::finishListExchange(const FEM_Comm &l)
-{
-	if (listCount<l.size()) return false; //Not finished yet!
-	if (listSuspended) {
-		listSuspended=false;
-		thread->resume();
-		listCount=0;
+//Send off the comm. idx list to each chk:
+	MPI_Request *sends=new MPI_Request[nChk];
+	for (chk=0;chk<nChk;chk++) {
+		checkMPI(MPI_Isend(outIdx[chk].getVec(),outIdx[chk].size(),MPI_INT,
+			cnt.getLocalList(chk).getDest(),tag,comm,&sends[chk]));
 	}
-	return true;
+	
+//Wait until all the replies have arrived
+	int listStart=0;
+	for (chk=0;chk<e.getGhostRecv().size();chk++) {
+		int src=e.getGhostRecv().getLocalList(chk).getDest();
+		int nRecv=myMPI_Incoming(MPI_INT,src,tag,comm);
+		listTmp.resize(listStart+nRecv);
+		int *list=&listTmp[listStart];
+		MPI_Status sts;
+		checkMPI(MPI_Recv(list,nRecv,MPI_INT,src,tag,comm,&sts));
+		// Convert from comm. list entries to real ghost indices,
+		//  by looking up in the comm. list:
+		int firstGhost=e.size();
+		const FEM_Comm_List &l=e.getGhostRecv().getLocalList(chk);
+		for (i=0;i<nRecv;i++)
+			list[i]=firstGhost+l[list[i]];
+		listStart+=nRecv;
+	}
+	
+// Finish the communication and free buffers
+	MPI_Status *sts=new MPI_Status[nChk];
+	checkMPI(MPI_Waitall(nChk,sends,sts));
+	delete[] sts;
+	delete[] sends;
+	delete[] outIdx;
 }
 
 //List exchange API
 CDECL void FEM_Exchange_ghost_lists(int elemType,int nIdx,const int *localIdx)
 {
-	FEMAPI("FEM_Exchange_Ghost_Lists");
-	getCurChunk()->exchangeGhostLists(elemType,nIdx,localIdx,0);
+	const char *caller="FEM_Exchange_Ghost_Lists"; FEMAPI(caller);
+	FEMchunk::get(caller)->exchangeGhostLists(elemType,nIdx,localIdx,0);
 }
 FDECL void FTN_NAME(FEM_EXCHANGE_GHOST_LISTS,fem_exchange_ghost_lists)
 	(int *elemType,int *nIdx,const int *localIdx)
 {
-	FEMAPI("FEM_exchange_ghost_lists");
-	getCurChunk()->exchangeGhostLists(*elemType,*nIdx,localIdx,1);
+	const char *caller="FEM_exchange_ghost_lists"; FEMAPI(caller);
+	FEMchunk::get(caller)->exchangeGhostLists(*elemType,*nIdx,localIdx,1);
 }
 CDECL int FEM_Get_ghost_list_length(void) 
 {
-	FEMAPI("FEM_Get_Ghost_List_Length");
-	return getCurChunk()->getList().size();
+	const char *caller="FEM_Get_Ghost_List_Length"; FEMAPI(caller);
+	return FEMchunk::get(caller)->getList().size();
 }
 FDECL int FTN_NAME(FEM_GET_GHOST_LIST_LENGTH,fem_get_ghost_list_length)(void)
 { return FEM_Get_ghost_list_length();}
 
 CDECL void FEM_Get_ghost_list(int *dest)
 {
-	FEMAPI("FEM_Get_Ghost_List");
+	const char *caller="FEM_Get_Ghost_List"; FEMAPI(caller);
 	int i,len=FEM_Get_ghost_list_length();
-	const int *src=getCurChunk()->getList().getVec();
+	const int *src=FEMchunk::get(caller)->getList().getVec();
 	for (i=0;i<len;i++) dest[i]=src[i];
-	getCurChunk()->emptyList();
+	FEMchunk::get(caller)->emptyList();
 }
 FDECL void FTN_NAME(FEM_GET_GHOST_LIST,fem_get_ghost_list)
 	(int *dest)
 {
-	FEMAPI("FEM_get_ghost_list");
+	const char *caller="FEM_get_ghost_list"; FEMAPI(caller);
 	int i,len=FEM_Get_ghost_list_length();
-	const int *src=getCurChunk()->getList().getVec();
+	const int *src=FEMchunk::get(caller)->getList().getVec();
 	for (i=0;i<len;i++) dest[i]=src[i]+1;
-	getCurChunk()->emptyList();
+	FEMchunk::get(caller)->emptyList();
 }
 
 
@@ -1356,36 +1076,9 @@ void FEM_Mesh::print(int idxBase)
 }
 
 void
-FEMchunk::print(int idxBase)
+FEMchunk::print(int fem_mesh,int idxBase)
 {
   CkPrintf("-------------------- Chunk %d --------------------\n",thisIndex);
-  cur_mesh->print(idxBase);
+  lookup(fem_mesh,"FEM_Mesh_print")->print(idxBase);
   CkPrintf("\n\n");
 }  
-  
-
-/***************** Mesh Utility Classes **********/
-
-void
-FEMchunk::pup(PUP::er &p)
-{
-//Pup superclass
-  super::pup(p);
-
-// Pup the mesh fields
-  bool hasUpdate=(updated_mesh!=NULL);
-  p(hasUpdate);
-  if(p.isUnpacking())
-  {
-    cur_mesh=new FEM_Mesh;
-    if (hasUpdate) updated_mesh=new UpdateMeshChunk;
-  }
-  if (hasUpdate) updated_mesh->pup(p);
-  cur_mesh->pup(p);
-  p|updateCount;
-
-//Pup all other fields
-  init.pup(p);
-}
-
-#include "fem.def.h"

@@ -134,7 +134,7 @@ FEM_Mesh_data_layout(int fem_mesh,int entity,int attr,
 {
 	const char *caller="FEM_Mesh_data_layout";
 	FEM_Mesh_data_layout(fem_mesh,entity,attr,data,firstItem,length,
-		getLayouts().get(layout,caller));
+		IDXL_Layout_List::get().get(layout,caller));
 }
 FORTRAN_AS_C(FEM_MESH_DATA_LAYOUT,FEM_Mesh_data_layout,fem_mesh_data_layout,
 	(int *fem_mesh,int *entity,int *attr,void *data,int *firstItem,int *length,int *layout),
@@ -159,12 +159,27 @@ FORTRAN_AS_C(FEM_MESH_DATA_OFFSET,FEM_Mesh_data_offset,fem_mesh_data_offset,
 	 *type,*width,*offset,*distance,*skew)
 )
 
-// Accessor API:
+// User data API:
+CDECL void 
+FEM_Mesh_pup(int fem_mesh,int dataTag,FEM_Userdata_fn fn,void *data) {
+	const char *caller="FEM_Mesh_pup"; FEMAPI(caller);
+	FEM_Mesh *m=FEM_Mesh_lookup(fem_mesh,caller);
+	FEM_Userdata_item &i=m->udata.find(dataTag);
+	FEM_Userdata_pupfn f(fn,data);
+	if (m->isSetting()) i.store(f);
+	else /* m->isGetting() */ {
+		if (!i.hasStored())
+			FEM_Abort(caller,"Never stored any user data at tag %d",dataTag);
+		i.restore(f);
+	}
+}
+FORTRAN_AS_C(FEM_MESH_PUP,FEM_Mesh_pup,fem_mesh_pup,
+	(int *m,int *t,FEM_Userdata_fn fn,void *data), (*m,*t,fn,data))
 
+// Accessor API:
 CDECL void 
 FEM_Mesh_set_length(int fem_mesh,int entity,int newLength) {
-	const char *caller="FEM_Mesh_set_length";
-	FEMAPI(caller);
+	const char *caller="FEM_Mesh_set_length"; FEMAPI(caller);
 	checkIsSet(fem_mesh,true,caller);
 	FEM_Entity_lookup(fem_mesh,entity,caller)->setLength(newLength);
 }
@@ -176,8 +191,7 @@ FORTRAN_AS_C(FEM_MESH_SET_LENGTH,FEM_Mesh_set_length,fem_mesh_set_length,
 
 CDECL int 
 FEM_Mesh_get_length(int fem_mesh,int entity) {
-	const char *caller="FEM_Mesh_get_length";
-	FEMAPI(caller);
+	const char *caller="FEM_Mesh_get_length"; FEMAPI(caller);
 	int len=FEM_Entity_lookup(fem_mesh,entity,caller)->size();
 	if (len==-1) return 0; //Special marker value-- shouldn't make it outside...
 	return len;
@@ -242,13 +256,24 @@ FORTRAN_AS_C_RETURN(int,
 	(int *fem_mesh),(*fem_mesh)
 )
 
+CDECL void 
+FEM_Mesh_become_get(int fem_mesh) /* Make this a readable mesh */
+{ FEM_Mesh_lookup(fem_mesh,"FEM_Mesh_become_get")->becomeGetting(); }
+FORTRAN_AS_C(FEM_MESH_BECOME_GET,FEM_Mesh_become_get,fem_mesh_become_get, (int *m),(*m))
+
+CDECL void 
+FEM_Mesh_become_set(int fem_mesh)
+{ FEM_Mesh_lookup(fem_mesh,"FEM_Mesh_become_get")->becomeSetting(); }
+FORTRAN_AS_C(FEM_MESH_BECOME_SET,FEM_Mesh_become_set,fem_mesh_become_set, (int *m),(*m))
+
+
 CDECL IDXL_t 
 FEM_Comm_shared(int fem_mesh,int entity) {
 	const char *caller="FEM_Comm_shared";
-	FEMAPI(caller);  FEMchunk *fem=FEMchunk::lookup(caller);
+	FEMAPI(caller); 
 	if (entity!=FEM_NODE) FEM_Abort(caller,"Only shared nodes supported");
 	return FEM_Mesh_lookup(fem_mesh,caller)->node.
-		sharedIDXL.getIndex(fem);
+		sharedIDXL.getIndex(IDXL_Chunk::get(caller));
 }
 FORTRAN_AS_C_RETURN(int,
 	FEM_COMM_SHARED,FEM_Comm_shared,fem_comm_shared,
@@ -258,10 +283,10 @@ FORTRAN_AS_C_RETURN(int,
 CDECL IDXL_t 
 FEM_Comm_ghost(int fem_mesh,int entity) {
 	const char *caller="FEM_Comm_ghost";
-	FEMAPI(caller); FEMchunk *fem=FEMchunk::lookup(caller);
+	FEMAPI(caller);
 	FEM_Entity *e=FEM_Entity_lookup(fem_mesh,entity,caller);
 	if (e->isGhost()) FEM_Abort(caller,"Can only call FEM_Comm_ghost on real entity type");
-	return e->ghostIDXL.getIndex(fem);
+	return e->ghostIDXL.getIndex(IDXL_Chunk::get(caller));
 }
 FORTRAN_AS_C_RETURN(int,
 	FEM_COMM_GHOST,FEM_Comm_ghost,fem_comm_ghost,
@@ -1086,6 +1111,13 @@ void FEM_Mesh::pup(PUP::er &p)  //For migration
 	symList.pup(p);
 	
 	p|m_isSetting;
+
+	p.comment("-------------- Mesh data --------------");
+	udata.pup(p);
+
+/* NOTE: for backward file compatability (fem_mesh_vp files),
+   be sure to add new stuff at the *end* of this routine--
+   it will be read as zeros for old files. */
 }
 
 void FEM_Mesh::registerIDXL(IDXL_Chunk *c) {
@@ -1186,12 +1218,11 @@ int FEM_Mesh::getEntities(int *entities) {
 	return len;
 }
 
-static const char *meshFileNames="fem_mesh_vp%d_%d.dat";
-
-FILE *FEM_openMeshFile(int chunkNo,int nchunks,bool forRead)
+FILE *FEM_openMeshFile(const char *prefix,int chunkNo,int nchunks,bool forRead)
 {
     char fname[256];
-    sprintf(fname, meshFileNames, nchunks, chunkNo);
+    static const char *meshFileNames="%s_vp%d_%d.dat";
+    sprintf(fname, meshFileNames, prefix, nchunks, chunkNo);
     FILE *fp = fopen(fname, forRead?"r":"w");
     CkPrintf("FEM> %s %s...\n",forRead?"Reading":"Writing",fname);  
     if(fp==0) {
@@ -1201,16 +1232,17 @@ FILE *FEM_openMeshFile(int chunkNo,int nchunks,bool forRead)
     return fp;
 }
 
-FEM_Mesh *FEM_Mesh_read(int chunkNo,int nChunks,const char *dirName)
+FEM_Mesh *FEM_readMesh(const char *prefix,int chunkNo,int nChunks)
 {
 	FEM_Mesh *ret=new FEM_Mesh;
-	PUP::fromTextFile p(FEM_openMeshFile(chunkNo,nChunks,true));
+	ret->becomeGetting();
+	PUP::fromTextFile p(FEM_openMeshFile(prefix,chunkNo,nChunks,true));
 	ret->pup(p);
 	return ret;
 }
-void FEM_Mesh_write(FEM_Mesh *m,int chunkNo,int nChunks,const char *dirName)
+void FEM_writeMesh(FEM_Mesh *m,const char *prefix,int chunkNo,int nChunks)
 {
-	PUP::toTextFile p(FEM_openMeshFile(chunkNo,nChunks,false));
+	PUP::toTextFile p(FEM_openMeshFile(prefix,chunkNo,nChunks,false));
 	m->pup(p);
 }
 
