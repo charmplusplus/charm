@@ -66,7 +66,7 @@ ALLHEADERS=charm++.h ckstream.h charm.h cpthreads.h converse.h \
 	lbdb.h LBDBManager.h LBComm.h LBOM.h LBObj.h LBMachineUtil.h \
 	Refiner.h CentralLB.h RandCentLB.h RefineLB.h MetisLB.h \
 	HeapCentLB.h Set.h elements.h heap.h conv-ccs.h NeighborLB.h \
-	WSLB.h CkLists.h GreedyRefLB.h
+	WSLB.h CkLists.h GreedyRefLB.h RandRefLB.h
 
 ALLINTERFACES=idl.ci
 
@@ -142,6 +142,7 @@ CVHEADERS=converse.h conv-mach.h conv-mach.sh \
           ../include/NeighborLB.decl.h NeighborLB.def.h \
           ../include/WSLB.decl.h WSLB.def.h \
           ../include/GreedyRefLB.decl.h GreedyRefLB.def.h \
+          ../include/RandRefLB.decl.h RandRefLB.def.h \
           ../include/tempo.decl.h tempo.def.h \
           ../include/waitqd.decl.h waitqd.def.h
 
@@ -251,7 +252,7 @@ CKHEADERS=ck.h ckstream.h envelope.h init.h qd.h charm.h charm++.h trace.h \
           ckfutures.h ckarray.h tempo.h waitqd.h LBDatabase.h lbdb.h \
 	  LBDBManager.h LBComm.h LBOM.h LBObj.h LBMachineUtil.h \
 	  Refiner.h CentralLB.h RandCentLB.h RefineLB.h HeapCentLB.h \
-	  MetisLB.h NeighborLB.h WSLB.h GreedyRefLB.h CkLists.h \
+	  MetisLB.h NeighborLB.h WSLB.h GreedyRefLB.h RandRefLB.h CkLists.h \
 	  $(CVHEADERS)
 
 CK_LIBS_CORE=libck.a
@@ -260,7 +261,8 @@ LIBCK_CORE=init.o register.o qd.o ck.o main.o msgalloc.o ckfutures.o \
            ckarray.o tempo.o waitqd.o LBDatabase.o lbdb.o \
 	   LBDBManager.o LBComm.o LBObj.o LBMachineUtil.o Refiner.o \
 	   CentralLB.o RandCentLB.o MetisLB.o RefineLB.o Set.o \
-           HeapCentLB.o heap.o NeighborLB.o WSLB.o GreedyRefLB.o
+           HeapCentLB.o heap.o NeighborLB.o WSLB.o GreedyRefLB.o \
+	   RandRefLB.o
 
 charmlibs: converse $(CK_LIBS_CORE)
 	cd libs; make charmlibs OPTS='$(OPTS)'
@@ -310,6 +312,9 @@ libtrace-summary.a: $(LIBTRACE_SUMM)
 ../include/GreedyRefLB.decl.h : GreedyRefLB.decl.h
 	/bin/cp GreedyRefLB.decl.h ../include
 
+../include/RandRefLB.decl.h : RandRefLB.decl.h
+	/bin/cp RandRefLB.decl.h ../include
+
 ../include/CkFutures.decl.h : CkFutures.decl.h
 	/bin/cp CkFutures.decl.h ../include
 
@@ -357,6 +362,9 @@ WSLB.decl.h WS.def.h : WSLB.ci charmxi
 
 GreedyRefLB.decl.h GreedyRefLB.def.h : GreedyRefLB.ci charmxi
 	$(CHARMC) GreedyRefLB.ci
+
+RandRefLB.decl.h RandRefLB.def.h : RandRefLB.ci charmxi
+	$(CHARMC) RandRefLB.ci
 
 init.o: init.C $(CKHEADERS)
 	$(CHARMC) -o init.o init.C
@@ -429,6 +437,9 @@ WSLB.o: WSLB.C $(CKHEADERS)
 
 GreedyRefLB.o: GreedyRefLB.C $(CKHEADERS)
 	$(CHARMC) -o GreedyRefLB.o GreedyRefLB.C
+
+RandRefLB.o: RandRefLB.C $(CKHEADERS)
+	$(CHARMC) -o RandRefLB.o RandRefLB.C
 
 qd.o: qd.C $(CKHEADERS)
 	$(CHARMC) -o qd.o qd.C
