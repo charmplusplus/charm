@@ -270,7 +270,7 @@ QuickThreads/libqt.a:
 	-@ test -d ../lib/libckqt.a.dir && /bin/rm -rf ../lib/libckqt.a.dir
 	-@ cp -r QuickThreads/libqt.a.dir ../lib/libckqt.a.dir
 
-METIS:
+METIS:  charm++
 	cd libs/conv-libs/metis; make OPTS='$(OPTS)'
 
 CONVLIBS: converse
