@@ -1,7 +1,9 @@
 #include "cksparsereducer.h"
 /*
-** All the reducer functions return a CkReductionMsg, which contains an array of sparseRec1D<dataType>.
-** For instance, if the reducer used was sparse_sum_int, then each record in the array will be of type sparseRec1D<int>
+** All the reducer functions return a CkReductionMsg, which contains an array of
+ sparseRec1D<dataType>.
+** For instance, if the reducer used was sparse_sum_int, then each record in the
+ array will be of type sparseRec1D<int>
 ** sparseRec1D<T> has following structure:
 ** template <class T>
 ** struct sparseRec1D
@@ -30,93 +32,68 @@ CkReduction::reducerType sparse_min_double;
 #define SIMPLE_SPARSE_REDUCTION(name,dataType,typeStr,loop) \
 static CkReductionMsg *name(int nMsg,CkReductionMsg **msg)\
 {\
-	int mergedDataSize=0, size2=0;\
+	int mergedDataSize=0, outDataSize=0;\
 	int sizeofRec = sizeof(sparseRec1D<dataType>);\
-	sparseRec1D<dataType> *mergedData, *arr2;\
-	/*find the maximum possible size of final data array*/\
+	sparseRec1D<dataType> *mergedData, *mergedDataEnd;\
+  sparseRec1D<dataType> *out, *mergeMsg, *mergeMsgEnd, *buff1, *buff2;\
+\
+  /*find the maximum possible size of final data array*/\
 	for(int i=0; i<nMsg; i++)\
-		mergedDataSize += msg[i]->getSize()/sizeofRec;\
+		outDataSize += msg[i]->getSize()/sizeofRec;\
 \
-	mergedData = new sparseRec1D<dataType>[mergedDataSize];\
-	arr2 = new sparseRec1D<dataType>[mergedDataSize];\
+	buff1 = new sparseRec1D<dataType>[outDataSize];\
+	buff2 = new sparseRec1D<dataType>[outDataSize];\
 \
-	mergedDataSize = 0;\
-	/*merge the n-sparse arrays. This is an inefficient algorithm, merges input sparse-arrays one by one to the final array*/\
+	outDataSize = 0;\
+	/*merge the n-sparse arrays. This is an inefficient algorithm, merges input
+ sparse-arrays one by one to the final array*/\
 	for(int i=0; i<nMsg; i++)\
-	{	/*swap the array pointers, so that 'arr2' holds the merged data for 1 to i-1 input arrays.*/\
-		/*mergedData is used to merge data from 'msg[i]' and 'arr2'*/\
-		sparseRec1D<dataType> *tempArr = arr2;\
+	{\
 \
-		arr2 = mergedData;\
-		size2 = mergedDataSize;\
+		mergedData = buff2;\
+    mergedDataEnd = mergedData + outDataSize;\
+		mergedDataSize = outDataSize;\
 \
-		mergedData = tempArr;\
-		mergedDataSize = 0;\
+    mergeMsg = (sparseRec1D<dataType> *)(msg[i]->getData());\
+    mergeMsgEnd = mergeMsg + (msg[i]->getSize()/sizeofRec);\
 \
-		int size = msg[i]->getSize()/sizeofRec;\
-		sparseRec1D<dataType> *temp = (sparseRec1D<dataType> *)(msg[i]->getData());\
-		/*merge arr2 and data in msg[i] to mergedData*/\
-		int index2=0, index=0;\
-		while((size!=0)&&(size2!=0))\
-		{\
-			if(arr2[index2].index < temp[index].index)\
-			{\
-				mergedData[mergedDataSize].index = arr2[index2].index;\
-				mergedData[mergedDataSize].data = arr2[index2].data;\
+		out = buff1;\
+		outDataSize = 0;\
 \
-				mergedDataSize++;\
-				size2--;\
-				index2++;\
-			}\
-			else\
-			if(arr2[index2].index > temp[index].index)\
-			{\
-				mergedData[mergedDataSize].index = temp[index].index;\
-				mergedData[mergedDataSize].data = temp[index].data;\
+    buff1 = mergedData;\
+    buff2 = out;\
 \
-				mergedDataSize++;\
-				size--;\
-				index++;\
-			}\
-			else\
-			{\
-				mergedData[mergedDataSize].index = arr2[index2].index;\
-				mergedData[mergedDataSize].data = arr2[index2].data;\
-				loop\
+		/*merge mergedData and data in msg to out*/\
+    while((mergedData != mergedDataEnd)&&(mergeMsg != mergeMsgEnd))\
+    {\
+      if(mergedData->index < mergeMsg->index)\
+        *out++ = *mergedData++;\
+      else\
+      if(mergedData->index > mergeMsg->index)\
+        *out++ = *mergeMsg++;\
+      else\
+      {\
+        out->index = mergedData->index;\
+        out->data = mergedData->data;\
+        loop\
+        out++; mergedData++; mergeMsg++;\
+      }\
+    }\
 \
-				mergedDataSize++;\
-				size2--;\
-				size--;\
-				index2++;\
-				index++;\
-			}\
-		}\
+    while(mergedData != mergedDataEnd)\
+      *out++ = *mergedData++;\
 \
-		while(size!=0)\
-		{\
-			mergedData[mergedDataSize].index = temp[index].index;\
-			mergedData[mergedDataSize].data = temp[index].data;\
+    while(mergeMsg != mergeMsgEnd)\
+      *out++ = *mergeMsg++;\
 \
-			mergedDataSize++;\
-			size--;\
-			index++;\
-		}\
+    outDataSize = out - buff2;\
+  }\
 \
-		while(size2!=0)\
-		{\
-			mergedData[mergedDataSize].index = arr2[index2].index;\
-			mergedData[mergedDataSize].data = arr2[index2].data;\
+  CkReductionMsg* m = CkReductionMsg::buildNew(outDataSize*sizeofRec, \
+(void*)buff2);\
 \
-			mergedDataSize++;\
-			size2--;\
-			index2++;\
-		}\
-	}\
-\
-	CkReductionMsg* m = CkReductionMsg::buildNew(mergedDataSize*sizeofRec, (void *)mergedData);\
-\
-	delete[] mergedData;\
-	delete[] arr2;\
+  delete[] buff1;\
+  delete[] buff2;\
 \
 	return m;\
 }
@@ -128,17 +105,23 @@ static CkReductionMsg *name(int nMsg,CkReductionMsg **msg)\
   SIMPLE_SPARSE_REDUCTION(nameBase##_double,double,"%f",loop)
 
 
-// Merge the sparse arrays passed by elements, summing the elements with same indices.
-SIMPLE_POLYMORPH_SPARSE_REDUCTION(_sparse_sum, mergedData[mergedDataSize].data += temp[index].data;)
+// Merge the sparse arrays passed by elements, summing the elements with same
+// indices.
+SIMPLE_POLYMORPH_SPARSE_REDUCTION(_sparse_sum, out->data += mergeMsg->data;)
 
-// Merge the sparse arrays passed by elements, multiplying the elements with same indices.
-SIMPLE_POLYMORPH_SPARSE_REDUCTION(_sparse_product, mergedData[mergedDataSize].data *= temp[index].data;)
+// Merge the sparse arrays passed by elements, multiplying the elements with
+// same indices.
+SIMPLE_POLYMORPH_SPARSE_REDUCTION(_sparse_product, out->data *= mergeMsg->data;)
 
-// Merge the sparse arrays passed by elements, keeping the largest of the elements with same indices.
-SIMPLE_POLYMORPH_SPARSE_REDUCTION(_sparse_max,if (mergedData[mergedDataSize].data<temp[index].data) mergedData[mergedDataSize].data=temp[index].data;)
+// Merge the sparse arrays passed by elements, keeping the largest of the
+// elements with same indices.
+SIMPLE_POLYMORPH_SPARSE_REDUCTION(_sparse_max, if((out->data)<(mergeMsg->data))
+ out->data=mergeMsg->data;)
 
-// Merge the sparse arrays passed by elements, keeping the smallest of the elements with same indices.
-SIMPLE_POLYMORPH_SPARSE_REDUCTION(_sparse_min,if (mergedData[mergedDataSize].data>temp[index].data) mergedData[mergedDataSize].data=temp[index].data;)
+// Merge the sparse arrays passed by elements, keeping the smallest of the
+// elements with same indices.
+SIMPLE_POLYMORPH_SPARSE_REDUCTION(_sparse_min,if((out->data)>(mergeMsg->data))
+ out->data=mergeMsg->data;)
 
 // register simple reducers for sparse arrays.
 void registerReducers(void)
