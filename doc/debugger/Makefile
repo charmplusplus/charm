@@ -4,7 +4,11 @@ TEX=$(FILE).tex
 DEST=debugger
 LATEX2HTML=$(L2H) -split 5
 
+FIG_TARGET=build_eps_fig
+FIG_CLEAN=figs/*.eps $(FIG_TARGET)
+
 include ../Makefile.common
 
-index.tex:
-	touch index.tex
+build_eps_fig:
+	cd figs; ./convert.sh
+	touch build_eps_fig
