@@ -14,6 +14,86 @@
 #include "EachToManyMulticastStrategy.h" /* for ComlibManager Strategy*/
 #include <string.h> /* for strlen */
 
+//------------------- added by YAN for one-sided communication -----------
+typedef int MPI_Info;
+
+/*************************************************************
+ * Local flags used for Win_obj class: 
+ *     WIN_ERROR -- the operation fails
+ *     WIN_SUCCESS -- the operation succeeds
+ *************************************************************/
+#define WIN_SUCCESS 	0
+#define WIN_ERROR 	1
+
+class ampi;
+
+class lockQueueEntry {
+public:
+  int requestRank;
+  int pe_src; 
+  int ftHandle; 
+  int lock_type;
+  lockQueueEntry (int _requestRank, int _pe_src, int _ftHandle, int _lock_type) 
+  	: requestRank(_requestRank), pe_src(_pe_src), ftHandle(_ftHandle),  lock_type(_lock_type) {}
+  lockQueueEntry () {}
+};
+
+typedef CkQ<lockQueueEntry> LockQueue;
+
+class win_obj {
+ public:
+  char* winName;
+  int winNameLeng;
+  int initflag; 
+  
+  void *baseAddr;
+  MPI_Aint winSize;
+  int disp_unit;
+  MPI_Comm comm;
+
+  int owner;   // Rank of owner of the lock, -1 if not locked
+  LockQueue *lockQueue;  // queue of waiting processors for the lock
+                     // top of queue is the one holding the lock
+                     // queue is empty if lock is not applied
+		         
+  void setName(const char *src,int len);
+  void getName(char *src,int *len);
+  
+ public:
+  void pup(PUP::er &p); 
+
+  win_obj();
+  win_obj(char *name, void *base, MPI_Aint size, int disp_unit, MPI_Comm comm);
+  ~win_obj();
+  
+  int create(char *name, void *base, MPI_Aint size, int disp_unit, 
+	     MPI_Comm comm);
+  int free();
+  
+  int put(void *orgaddr, int orgcnt, MPI_Datatype orgtype, 
+	  MPI_Aint targdisp, int targcnt, MPI_Datatype targtype);
+
+  int get(void *orgaddr, int orgcnt, MPI_Datatype orgtype, 
+	  MPI_Aint targdisp, int targcnt, MPI_Datatype targtype);
+  int accumulate(void *orgaddr, int orgcnt, MPI_Datatype orgtype, MPI_Aint targdisp, int targcnt, 
+  		  MPI_Datatype targtype, MPI_Op op);
+  int fence();
+	  
+  int lock(int requestRank, int pe_src, int ftHandle, int lock_type);
+  int unlock(int requestRank, int pe_src, int ftHandle);
+ 
+  int wait();
+  int post();
+  int start();
+  int complete();
+
+  void lockTopQueue();
+  void enqueue(int requestRank, int pe_src, int ftHandle, int lock_type);	
+  void dequeue();
+  bool emptyQueue();
+};
+//-----------------------End of code by YAN ----------------------
+
 class CProxy_ampi;
 class CProxyElement_ampi;
 
@@ -972,7 +1052,59 @@ class ampi : public CBase_ampi {
     */
     CmmTable msgs;
     int nbcasts;
+    //------------------------ Added by YAN ---------------------
+ private:
+    //win_obj winObjects;  
+    CkPupPtrVec<win_obj> winObjects;
+    	
+ public:
+    MPI_Win createWinInstance(void *base, MPI_Aint size, int disp_unit, MPI_Info info); 
+
+    int deleteWinInstance(win_obj *win);
+
+    int winGetGroup(MPI_Win win, MPI_Group *group); 
+
+    int winPut(void *orgaddr, int orgcnt, MPI_Datatype orgtype, int rank, 
+	       MPI_Aint targdisp, int targcnt, MPI_Datatype targtype, MPI_Win win);
+
+    int winGet(void *orgaddr, int orgcnt, MPI_Datatype orgtype, int rank, 
+	       MPI_Aint targdisp, int targcnt, MPI_Datatype targtype, MPI_Win win);
+
+
+    void winRemotePut(int orgcnt, char* orgaddr, MPI_Datatype orgtype,
+		      MPI_Aint targdisp, int targcnt, MPI_Datatype targtype, 
+		      int winIndex, CkFutureID ftHandle, int pe_src);
+
+    void winRemoteGet(int orgcnt, MPI_Datatype orgtype, MPI_Aint targdisp, 
+		      int targcnt, MPI_Datatype targtype, 
+    		      int winIndex, CkFutureID ftHandle, int pe_src);
+
+    int winLock(int lock_type, int rank, MPI_Win win);
+    int winUnlock(int rank, MPI_Win win);
+    
+    void winRemoteLock(int lock_type, int winIndex, CkFutureID ftHandle, int pe_src, int requestRank);
+    void winRemoteUnlock(int winIndex, CkFutureID ftHandle, int pe_src, int requestRank);
+    
+    int winAccumulate(void *orgaddr, int orgcnt, MPI_Datatype orgtype, int rank,
+	    	      MPI_Aint targdisp, int targcnt, MPI_Datatype targtype, 
+		      MPI_Op op, MPI_Win win);
+    
+    void winRemoteAccumulate(int orgcnt, char* orgaddr, MPI_Datatype orgtype, MPI_Aint targdisp, 
+	  		    int targcnt, MPI_Datatype targtype, 
+		            MPI_Op op, int winIndex, CkFutureID ftHandle, 
+			    int pe_src);
+
+    void winSetName(MPI_Win win, char *name);
+    void winGetName(MPI_Win win, char *name, int *length);
+			    	      
+    win_obj* getWinObjInstance(MPI_Win win); 
+    int getNewSemaId(); 
+	
+    //------------------------ End of code by YAN ---------------------
 };
+
+// ------------ Added by YAN --------------------------
+extern ampi *getAmpiInstance(MPI_Comm comm);
 
 //Use this to mark the start of AMPI interface routines:
 #define AMPIAPI(routineName) TCHARM_API_TRACE(routineName,"ampi")

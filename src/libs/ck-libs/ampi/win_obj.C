@@ -217,19 +217,17 @@ void win_obj::lockTopQueue() {
   lockQueue->insert(0, lq);
 }
 
-
+/* these four functions are yet to implement */
 int win_obj::wait(){
-
-  return WIN_SUCCESS;
+  return -1;
 }
-
 int win_obj::post(){
-
+  return -1;
 }
 int win_obj::start(){
-
+  return -1;
 }
 int win_obj::complete(){
-
+  return -1;
 }
 

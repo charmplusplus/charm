@@ -4,8 +4,6 @@
  * Author: Yan Shi (yanshi@uiuc.edu)
  * Last Revision: 2003/10/30 
  ******************************************************************************/
-
-//#include "MPI_Win.h"
 #include "ampiimpl.h"
 
 /*
@@ -28,9 +26,10 @@
  */
 // A collective call over all processes in the communicator
 // MPI_Win object created LOCALLY on all processes when the call returns
-int
-MPI_Win_create(void *base, MPI_Aint size, int disp_unit,
+CDECL
+int MPI_Win_create(void *base, MPI_Aint size, int disp_unit,
 	       MPI_Info info, MPI_Comm comm, MPI_Win *newwin){
+  AMPIAPI("MPI_Win_create");
   ampi *ptr = getAmpiInstance(comm);
  
   *newwin = ptr->createWinInstance(base, size, disp_unit, info);
@@ -50,9 +49,9 @@ MPI_Win_create(void *base, MPI_Aint size, int disp_unit,
  */
 // A collective call over all processes in the communicator
 // MPI_Win object deleted LOCALLY on all processes when the call returns
-int
-MPI_Win_free(MPI_Win *win){
-  
+CDECL
+int MPI_Win_free(MPI_Win *win){
+  AMPIAPI("MPI_Win_free");
   if(win==NULL) {
     return MPI_ERR_WIN;
   }
@@ -70,33 +69,34 @@ MPI_Win_free(MPI_Win *win){
   return MPI_SUCCESS;
 }
 
-
-int
-MPI_Win_delete_attr(MPI_Win win, int key){}
+CDECL
+int MPI_Win_delete_attr(MPI_Win win, int key){
+  AMPIAPI("MPI_Win_delete_attr");
+  return MPI_SUCCESS;
+}
 
 /*
  * ---Note : No atomicity for overlapping Puts. 
  * ---sync calls should be made on this window to ensure the 
  * ---correctness of the operation
  */
-int
-MPI_Put(void *orgaddr, int orgcnt, MPI_Datatype orgtype, int rank, 
+CDECL
+int MPI_Put(void *orgaddr, int orgcnt, MPI_Datatype orgtype, int rank, 
 	MPI_Aint targdisp, int targcnt, MPI_Datatype targtype, MPI_Win win){
-
+  AMPIAPI("MPI_Put");
   ampi *ptr = getAmpiInstance(win.comm);
   return ptr->winPut(orgaddr, orgcnt, orgtype, rank, targdisp, targcnt, targtype, win);
 }
-
 
 /*
  * ---Note : No atomicity for overlapping Gets. 
  * ---sync calls should be made on this window to ensure the 
  * ---correctness of the operation
  */
-int
-MPI_Get(void *orgaddr, int orgcnt, MPI_Datatype orgtype, int rank, 
+CDECL
+int MPI_Get(void *orgaddr, int orgcnt, MPI_Datatype orgtype, int rank, 
 	MPI_Aint targdisp, int targcnt, MPI_Datatype targtype, MPI_Win win){
-
+  AMPIAPI("MPI_Get");
   ampi *ptr = getAmpiInstance(win.comm);
   
   // winGet is a local function which will call the remote method on #rank processor 
@@ -116,13 +116,14 @@ MPI_Get(void *orgaddr, int orgcnt, MPI_Datatype orgtype, int rank,
  * ---??? Is this ensured by charm automatically???
  *
  */
-int 
-MPI_Accumulate(void *orgaddr, int orgcnt, MPI_Datatype orgtype, int rank,
+CDECL
+int MPI_Accumulate(void *orgaddr, int orgcnt, MPI_Datatype orgtype, int rank,
 		   MPI_Aint targdisp, int targcnt, MPI_Datatype targtype, 
 		   MPI_Op op, MPI_Win win) {
+  AMPIAPI("MPI_Accumulate");
   ampi *ptr = getAmpiInstance(win.comm);  		   
-  return  ptr->winAccumulate(orgaddr, orgcnt, orgtype, rank, targdisp, targcnt, targtype, 
-  			     op, win);   
+  return  ptr->winAccumulate(orgaddr, orgcnt, orgtype, rank, 
+                         targdisp, targcnt, targtype, op, win);   
 }
 
 
@@ -135,8 +136,9 @@ MPI_Accumulate(void *orgaddr, int orgcnt, MPI_Datatype orgtype, int rank,
  *     int assertion : program assertion, used to provide optimization hints
  *   Returns int : MPI_SUCCESS or MPI_ERR_WIN
  */
-int
-MPI_Win_fence(int assertion, MPI_Win win){
+CDECL
+int MPI_Win_fence(int assertion, MPI_Win win){
+  AMPIAPI("MPI_Win_fence");
   MPI_Comm comm = win.comm;
   ampi *ptr = getAmpiInstance(comm);
 
@@ -158,8 +160,9 @@ MPI_Win_fence(int assertion, MPI_Win win){
  *     int assertion : program assertion, used to provide optimization hints
  *   Returns int : MPI_SUCCESS or MPI_ERR_WIN
  */
-int 
-MPI_Win_lock(int lock_type, int rank, int assertion, MPI_Win win){
+CDECL
+int MPI_Win_lock(int lock_type, int rank, int assertion, MPI_Win win){
+  AMPIAPI("MPI_Win_lock");
   ampi *ptr = getAmpiInstance(win.comm);
 
   // process assertion here: HOW???  
@@ -178,8 +181,9 @@ MPI_Win_lock(int lock_type, int rank, int assertion, MPI_Win win){
  *   Returns int : MPI_SUCCESS or MPI_ERR_WIN
  */
 // The RMA call is completed both locally and remotely after unlock. 
-int 
-MPI_Win_unlock(int rank, MPI_Win win){
+CDECL
+int MPI_Win_unlock(int rank, MPI_Win win){
+  AMPIAPI("MPI_Win_unlock");
   ampi *ptr = getAmpiInstance(win.comm);
 
   // process assertion here: HOW???  
@@ -188,7 +192,7 @@ MPI_Win_unlock(int rank, MPI_Win win){
   return MPI_SUCCESS;
 }
 
-
+/* the following four functions are yet to implement */
 /*
  * int MPI_Win_post(MPI_Group group, int assertion, MPI_Win win)
  *   Opens a RMA access epoch for local window win.
@@ -200,25 +204,33 @@ MPI_Win_unlock(int rank, MPI_Win win){
  *     MPI_Group group : a group of processes 
  *   Returns int : MPI_SUCCESS or MPI_ERR_WIN
  */
-int 
-MPI_Win_post(MPI_Group group, int assertion, MPI_Win win){
+CDECL
+int MPI_Win_post(MPI_Group group, int assertion, MPI_Win win){
+  AMPIAPI("MPI_Win_post");
   ampi *ptr = getAmpiInstance(win.comm);
   //  ptr->winPost(group, win);
   return MPI_SUCCESS;
 }
 
-int 
-MPI_Win_wait(MPI_Win win){}
+CDECL
+int MPI_Win_wait(MPI_Win win){
+  AMPIAPI("MPI_Win_wait");
+  return MPI_SUCCESS;
+}
 
-int 
-MPI_Win_start(MPI_Group group, int assertion, MPI_Win win){
+CDECL
+int MPI_Win_start(MPI_Group group, int assertion, MPI_Win win){
+  AMPIAPI("MPI_Win_start");
   ampi *ptr = getAmpiInstance(win.comm);
   //  ptr->winStart(group, win);
   return MPI_SUCCESS;
 }
 
-int 
-MPI_Win_complete(MPI_Win win){}
+CDECL
+int MPI_Win_complete(MPI_Win win){
+  AMPIAPI("MPI_Win_complete");
+  return MPI_SUCCESS;
+}
 
 
 /*
@@ -233,8 +245,9 @@ MPI_Win_complete(MPI_Win win){}
  *   Return: 
  *     void* : address of the allocated memory
  */
-void* 
-MPI_Alloc_mem(MPI_Aint size, MPI_Info info, void *baseptr){
+CDECL
+void* MPI_Alloc_mem(MPI_Aint size, MPI_Info info, void *baseptr){
+  AMPIAPI("MPI_Alloc_mem");
   baseptr = malloc(size);
   return baseptr;
 }
@@ -244,34 +257,39 @@ MPI_Alloc_mem(MPI_Aint size, MPI_Info info, void *baseptr){
  * int MPI_Free_mem(void *base)
  *   Frees memory that was previous allocated by MPI_Alloc_mem call
  */
-int 
-MPI_Free_mem(void *baseptr){
+CDECL
+int MPI_Free_mem(void *baseptr){
+  AMPIAPI("MPI_Free_mem");
   free(baseptr);
   return MPI_SUCCESS;
 }
 
-int 
-MPI_Win_get_group(MPI_Win win, MPI_Group *group) {
+CDECL
+int MPI_Win_get_group(MPI_Win win, MPI_Group *group) {
+  AMPIAPI("MPI_Win_get_group");
   ampi *ptr = getAmpiInstance(win.comm);
   ptr->winGetGroup(win, group);
   return MPI_SUCCESS;
 
 }
 
-int
-MPI_Win_set_attr(MPI_Win win, int key, void* value) {
+CDECL
+int MPI_Win_set_attr(MPI_Win win, int key, void* value) {
+  AMPIAPI("MPI_Win_set_attr");
   return MPI_SUCCESS;
 }
 
-int
-MPI_Win_set_name(MPI_Win win, char *name) {
+CDECL
+int MPI_Win_set_name(MPI_Win win, char *name) {
+  AMPIAPI("MPI_Win_set_name");
   ampi *ptr = getAmpiInstance(win.comm);
   ptr->winSetName(win, name);
   return MPI_SUCCESS;
 }
 
-int
-MPI_Win_get_name(MPI_Win win, char *name, int *length) {
+CDECL
+int MPI_Win_get_name(MPI_Win win, char *name, int *length) {
+  AMPIAPI("MPI_Win_get_name");
   ampi *ptr = getAmpiInstance(win.comm);
   ptr->winGetName(win, name, length);
   return MPI_SUCCESS;
