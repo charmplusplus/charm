@@ -893,7 +893,9 @@ comlib.decl.h : ComlibManager.ci
 
 COMLIB_OBJS = ComlibManager.o $(STRATEGY_OBJS) $(CONVERSE_COM_OBJS)
 
-comlib_objs: $(COMLIB_OBJS)
+comlib_objs: $(L)/libmodulecomlib.a
+
+$(L)/libmodulecomlib.a: $(COMLIB_OBJS)
 	$(CHARMC) -o $(L)/libmodulecomlib.a $(COMLIB_OBJS)
 
 ###############################################################################
