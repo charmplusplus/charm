@@ -152,6 +152,7 @@ void CentralLB::Migrated(LDObjHandle h)
 
 void CentralLB::ReceiveStats(CLBStatsMsg *m)
 {
+  int proc;
   const int pe = m->from_pe;
   CkPrintf("Stats msg received, %d %d %d %d %p\n",
   	   pe,stats_msg_count,m->n_objs,m->serial,m);
@@ -189,7 +190,7 @@ void CentralLB::ReceiveStats(CLBStatsMsg *m)
     double strat_start_time = CmiWallTimer();
 
     CkPrintf("Before setting bitmap\n");
-    for(int proc = 0; proc < clients; proc++)
+    for(proc = 0; proc < clients; proc++)
       statsDataList[proc].available = avail_vector[proc];
     
     CkPrintf("Before Calling Strategy\n");
@@ -199,7 +200,7 @@ void CentralLB::ReceiveStats(CLBStatsMsg *m)
     CkPrintf("returned successfully\n");
     int num_proc = CkNumPes();
 
-    for(int proc = 0; proc < num_proc; proc++)
+    for(proc = 0; proc < num_proc; proc++)
 	migrateMsg->avail_vector[proc] = avail_vector[proc];
     migrateMsg->next_lb = new_ld_balancer;
 
