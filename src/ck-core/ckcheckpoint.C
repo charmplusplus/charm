@@ -85,6 +85,8 @@ void printIndex(const CkArrayIndex &idx,char *dest) {
 	}
 }
 
+static double chkptStartTimer;
+
 void CkCheckpointMgr::Checkpoint(const char *dirname, CkCallback& cb){
 	char fileName[1024];
 	// save groups into Groups.dat
@@ -118,13 +120,14 @@ void CkCheckpointMgr::Checkpoint(const char *dirname, CkCallback& cb){
 
 	restartCB = cb;
 	DEBCHK("[%d]restartCB installed\n",CkMyPe());
-	CkCallback localcb(CkIndex_CkCheckpointMgr::SendRestartCB(NULL),thisgroup);
+	CkCallback localcb(CkIndex_CkCheckpointMgr::SendRestartCB(NULL),0,thisgroup);
 	contribute(0,NULL,CkReduction::sum_int,localcb);
 }
 
 void CkCheckpointMgr::SendRestartCB(CkReductionMsg *m){ 
 	delete m; 
 	DEBCHK("[%d]Sending out the cb\n",CkMyPe());
+	CkPrintf("Checkpoint to disk finished in %fs, sedning out the cb...\n", CmiWallTimer() - chkptStartTimer);
 	restartCB.send(); 
 }
 
@@ -356,6 +359,7 @@ void CkPupProcessorData(PUP::er &p)
 void CkStartCheckpoint(char* dirname,const CkCallback& cb){
 	int i;
 	char filename[1024];
+	chkptStartTimer = CmiWallTimer();
 	CkPrintf("[%d] Checkpoint starting in %s\n", CkMyPe(), dirname);
 	CmiMkdir(dirname);
 	
