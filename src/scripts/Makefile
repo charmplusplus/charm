@@ -161,7 +161,7 @@ CKHEADERS=ck.h ckstream.h envelope.h init.h qd.h charm.h charm++.h \
 	  BaseLB.h CentralLB.h CentralLBMsg.h RandCentLB.h RecBisectBfLB.h \
 	  RefineLB.h RefineCommLB.h OrbLB.h GreedyLB.h GreedyCommLB.h \
 	  Comm1LB.h manager.h MetisLB.h NborBaseLB.h \
-	  NeighborLB.h WSLB.h GreedyRefLB.h RandRefLB.h \
+	  NeighborLB.h NeighborLBMsg.h WSLB.h GreedyRefLB.h RandRefLB.h \
           ComlibStrategy.h ComlibArrayListener.h \
 	  BlueGene.h middle.h middle-conv.h middle-blue.h \
 	  $(CVHEADERS)
