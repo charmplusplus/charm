@@ -92,7 +92,7 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
   requested_npe = 1; 
   CmiGetArgInt(argv,"+p",&requested_npe);
   CmiGetArgInt(argv,"++p",&requested_npe);
-  arena_size_meg = 16;
+  arena_size_meg = 128;
   CmiGetArgInt(argv,"+memsize",&arena_size_meg);
 
   if (requested_npe <= 0)
@@ -104,6 +104,7 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
 
   usconfig(CONF_INITUSERS, requested_npe+1);
   usconfig(CONF_ARENATYPE, US_SHAREDONLY);
+  /* this means the largest message size allowed is 128M */
   if(usconfig(CONF_INITSIZE,  (arena_size_meg * 1<<20))==(-1)) {
     CmiPrintf("Cannot set size of arena\n");
     abort();
