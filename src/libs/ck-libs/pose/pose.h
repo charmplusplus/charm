@@ -23,9 +23,9 @@
 // Strategy variables
 #define MAX_FUTURE_OFFSET 10000 // CancelList gets cancels w/ts < gvt+this
 #define STORE_RATE 1         // default store rate: 1 for every n events
-#define SPEC_WINDOW 30       // speculative event window
+#define SPEC_WINDOW 20       // speculative event window
 #define MIN_LEASH 0          // min spec window for adaptive strategy
-#define MAX_LEASH 100        // max  "     "     "     "        " 
+#define MAX_LEASH 50         // max  "     "     "     "        " 
 #define GVT_WINDOW 8         // GVT improvement limit; sets s/r table size
 #define GVT_bucket 1         // number of buckets to sort sends/recvs into
 #define TBL_THRESHOLD 2000   // max # entries in table before it shrinks
