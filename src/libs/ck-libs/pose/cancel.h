@@ -1,39 +1,60 @@
-// File: cancel.h
-// CancelList stores cancellation of event notices processed by a strat
-// Last Modified: 5.29.01 by Terry L. Wilmarth
-
+/// List to store event cancellations
 #ifndef CANCEL_H
 #define CANCEL_H
 
-class CancelNode { // CancelList is comprised of these nodes
+/// A single event cancellation
+class CancelNode { 
  public:
-  int timestamp;   // timestamp of event to be cancelled
-  eventID evID;    // eventID of event to be cancelled
+  /// Timestamp of event to be cancelled
+  int timestamp;   
+  /// Event ID of event to be cancelled
+  eventID evID;    
+  /// Next cancellation in list
   CancelNode *next;
+  /// Basic Constructor
   CancelNode() { }
+  /// Initializing Constructor
   CancelNode(int ts, eventID e) { timestamp = ts; evID = e; next = NULL; }
-  ~CancelNode() { }
+  /// Dump all datafields
   void dump() {
-    CkPrintf("[timestamp=%d ", timestamp);
-    evID.dump();
-    CkPrintf("] ");
+    CkPrintf("[timestamp=%d ", timestamp); evID.dump();  CkPrintf("] ");
   }
+  /// Pack/unpack/sizing operator
   void pup(PUP::er &p) { p(timestamp); evID.pup(p); }
 };
 
-class CancelList { // List to store incoming cancellations
+/// A list of event cancellations
+class CancelList { 
+  /// Number of cancellations in list
+  int count;
+  /// Timestamp of earliest cancellation in list
+  /** Set to -1 if no cancellations present */
+  int earliest;        
+  /// The list of cancellations
+  CancelNode *cancellations;
+  /// Pointer to a particular node in cancellations
+  CancelNode *current; 
  public:
-  int count, earliest;          // count of items in list; earliest timestamp 
-  CancelNode *cancellations, *current; // cancellations is the list of nodes;
-                                      // current points somewhere in the list
+  /// Initializing Constructor
   CancelList() { count = 0; earliest = -1; cancellations = current = NULL; }
-  void Insert(int ts, eventID e);    // inserts an event at beginning of list
-  CancelNode *GetItem(int eGVT);     // returns a pointer to a node in list;
-                                     // uses current to cycle through nodes
-  void RemoveItem(CancelNode *item);      // remove a node that was cancelled
-  int IsEmpty();                          // tests if CancelList is empty
-  void dump(int pdb_level);               // print the list contents
-  void pup(PUP::er &p);                   // pup the entire cancel list
+  /// Insert an event at beginning of cancellations list
+  /** Inserts an event at beginning of list; increments count and sets earliest
+      if applicable; sets current if list was previously empty */
+  void Insert(int ts, eventID e);    
+  /// Return a pointer to a node in list
+  /** Use current to cycle through nodes and give a different node each time
+      GetItem is called */
+  CancelNode *GetItem(int eGVT);     
+  /// Remove a specific cancellation from the list
+  void RemoveItem(CancelNode *item);      
+  /// Test if cancellations is empty
+  int IsEmpty();    
+  /// Return earliest timestamp
+  int getEarliest() { return earliest; }
+  /// Dump all data fields
+  void dump();               
+  /// Pack/unpack/sizing operator
+  void pup(PUP::er &p);                   
 };
 
 #endif

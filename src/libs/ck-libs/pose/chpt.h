@@ -1,34 +1,32 @@
-// File: chpt.h
-// Module for checkpointing representation to be used with optimistic strategy
-// Last Modified: 07.31.01 by Terry L. Wilmarth
-
+/// Checkpointing representation to be used with optimistic strategy
 #ifndef CHPT_H
 #define CHPT_H
 
-//----------------------------------------------------------------------------
-// rep class for checkpointing
+/// Templated checkpointing class derived from rep
+/** This class makes it possible for optimistic synchronization strategies
+    to automatically checkpoint objects of classes derived from this type. */
 template<class StateType> class chpt : public rep {
  public:
+  /// Basic Constructor
   chpt() { }
+  /// Destructor
   virtual ~chpt() { }
-  // timestamps event message, sets priority, and makes a record of the send
   void registerTimestamp(int idx, eventMsg *m, int offset);
-  void checkpoint(StateType *data);          // checkpoint the data
-  void restore(StateType *data);             // restore checkpointed data 
-  Event *getCommitEvent(Event *e);  // get event to rollback to
-  virtual void pup(PUP::er &p);
-  virtual void dump(int pdb_level);
+  /// Checkpoint the state
+  void checkpoint(StateType *data);          
+  /// Restore the state from a checkpoint
+  /** Used during a rollback by the Undo method:  if the event being undone is
+      not the final destination, we simply remove the checkpointed data; if the
+      event is the final target for the rollback, then we restore the data, and
+      remove the checkpointed data for it (it will be regenerated when the 
+      target event gets re-executed). */
+  void restore(StateType *data);
+  virtual void pup(PUP::er &p) { rep::pup(p); }
+  virtual void dump() { rep::dump(); }
 };
-//----------------------------------------------------------------------------
 
 
-//----------------------------------------------------------------------------
-// chpt methods defined below
-//----------------------------------------------------------------------------
-
-
-// timestamps event message, sets priority, and makes a record of the send;
-// additionally, notes the generated event as a spawn of the current one
+/// Timestamps event message, sets priority, and records in spawned list
 template<class StateType> 
 void chpt<StateType>::registerTimestamp(int idx, eventMsg *m, int offset)
 {
@@ -38,6 +36,7 @@ void chpt<StateType>::registerTimestamp(int idx, eventMsg *m, int offset)
   ((opt *)myStrat)->AddSpawnedEvent(idx, m->evID, m->timestamp);
 }
 
+/// Checkpoint the state
 template<class StateType>
 void chpt<StateType>::checkpoint(StateType *data)
 {
@@ -46,11 +45,7 @@ void chpt<StateType>::checkpoint(StateType *data)
   localStat *localStats = (localStat *)CkLocalBranch(theLocalStats);
   localStats->SwitchTimer(CP_TIMER);
 #endif
-  if (parent->myStrat->currentEvent->cpData) {
-    CkPrintf("ERROR: chpt::checkpoint: cpData exists already\n");
-    CkExit();
-  }
-
+  CmiAssert(!(parent->myStrat->currentEvent->cpData));
   if ((myStrat->currentEvent->timestamp > 
        myStrat->currentEvent->prev->timestamp) || (sinceLast == STORE_RATE)) {
     myStrat->currentEvent->cpData = new StateType;
@@ -59,17 +54,12 @@ void chpt<StateType>::checkpoint(StateType *data)
     sinceLast = 0;
   }
   else sinceLast++;
-  
 #ifdef POSE_STATS_ON
   localStats->SwitchTimer(DO_TIMER);
 #endif
 }
 
-// used during a rollback by the Undo method:  if the event being undone is
-// not the final destination, we simply remove the checkpointed data; if the
-// event is the final target for the rollback, then we restore the data, and
-// remove the checkpointed data for it (it will be regenerated when the 
-// target event gets re-executed).
+/// Restore the state from a checkpoint
 template<class StateType> 
 void chpt<StateType>::restore(StateType *data) 
 {
@@ -84,34 +74,6 @@ void chpt<StateType>::restore(StateType *data)
     delete myStrat->currentEvent->cpData;
     myStrat->currentEvent->cpData = NULL;
   }
-}
-
-// get event to rollback to prior to or including e
-template<class StateType>
-Event *chpt<StateType>::getCommitEvent(Event *e)
-{
-  Event *ev = e;
-  
-  while ((ev != parent->eq->frontPtr) && (!ev->cpData))
-    ev = ev->prev;
-  if (ev != parent->eq->frontPtr)
-    return ev;
-  else {
-    CkPrintf("[%d] WARNING: chpt::getCommitEvent: event is not checkpointed nor are any events prior to it; returning NULL event\n", CkMyPe());
-    return NULL;
-  }
-}
-
-template<class StateType>
-void chpt<StateType>::pup(PUP::er &p)
-{
-  rep::pup(p);
-}
-
-template<class StateType>
-void chpt<StateType>::dump(int pdb_level)
-{ 
-  rep::dump(pdb_level+1); pdb_indent(pdb_level); 
 }
 
 #endif

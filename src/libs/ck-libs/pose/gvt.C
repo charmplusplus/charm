@@ -49,17 +49,17 @@ void PVT::startPhase()
 
   // compute PVT
   optPVT = conPVT = -1;
-  for (i=0; i<objs.numSpaces; i++)
-    if (objs.objs[i].present) {
-      if (objs.objs[i].sync == OPTIMISTIC) { // check optPVT 
-	if ((optPVT < 0) || ((objs.objs[i].ovt < optPVT) && 
-			     (objs.objs[i].ovt >= 0))) 
-	  optPVT = objs.objs[i].ovt;
+  for (i=0; i<objs.getNumSpaces(); i++)
+    if (objs.objs[i].isPresent()) {
+      if (objs.objs[i].isOptimistic()) { // check optPVT 
+	if ((optPVT < 0) || ((objs.objs[i].getOVT() < optPVT) && 
+			     (objs.objs[i].getOVT() >= 0))) 
+	  optPVT = objs.objs[i].getOVT();
       }
-      else if (objs.objs[i].sync == CONSERVATIVE) { // check conPVT
-	if ((conPVT < 0) || ((objs.objs[i].ovt < conPVT) && 
-			     (objs.objs[i].ovt >= 0)))
-	  conPVT = objs.objs[i].ovt;
+      else if (objs.objs[i].isConservative()) { // check conPVT
+	if ((conPVT < 0) || ((objs.objs[i].getOVT() < conPVT) && 
+			     (objs.objs[i].getOVT() >= 0)))
+	  conPVT = objs.objs[i].getOVT();
       }
       CmiAssert((optPVT >= estGVT) || (optPVT == -1));
       CmiAssert((conPVT >= estGVT) || (conPVT == -1));
@@ -137,8 +137,9 @@ void PVT::objUpdate(int pvtIdx, int safeTime, int timestamp, int sr)
   CmiAssert((safeTime >= estGVT) || (safeTime == -1));
   // minimize the non-idle OVT
   if ((safeTime >= 0) && 
-      ((objs.objs[index].ovt > safeTime) || (objs.objs[index].ovt < 0)))
-    objs.objs[index].ovt = safeTime;
+      ((objs.objs[index].getOVT() > safeTime) || 
+       (objs.objs[index].getOVT() < 0)))
+    objs.objs[index].setOVT(safeTime);
   if ((sr == SEND) || (sr == RECV)) SendsAndRecvs->Insert(timestamp, sr);
   // sr could be -1 in which case we just ignore it here
 }

@@ -575,9 +575,9 @@ while (@line=split(' ',($thisline=getcodeline($inChandle)))) {
 	$outChandle->print("    }\n");
 	$outChandle->print("    ((state_$class *)objID)->pup(p);\n");
 	if ($rep{$class} eq "chpt") {
-	  $outChandle->print("    Event *ev = eq->frontPtr->next;\n");
+	  $outChandle->print("    Event *ev = eq->front()->next;\n");
 	  $outChandle->print("    int checkpointed;\n\n");
-	  $outChandle->print("    while (ev != eq->backPtr) {\n");
+	  $outChandle->print("    while (ev != eq->back()) {\n");
 	  $outChandle->print("      if (p.isUnpacking()) {\n");
 	  $outChandle->print("        p(checkpointed);\n");
 	  $outChandle->print("        if (checkpointed) {\n");

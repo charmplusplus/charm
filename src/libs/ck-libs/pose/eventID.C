@@ -5,37 +5,34 @@
 
 #include "eventID.h"
 
-// Change this to next possible value
+/// Get next value for eventID
 void eventID::incEventID() 
 {
   id++;
-  if (id == 0)
-    CkPrintf("NOTE: event ID rollover occurred!\n");
+  if (id == 0) CkPrintf("WARNING: event ID rollover occurred!\n");
 }
 
-// eventID assignment
+/// Assignment operator
 eventID& eventID::operator=(const eventID& e) 
 { 
-  id = e.id; 
-  pe = e.pe;
-  return *this;
+  id = e.id;  pe = e.pe;  return *this;
 }
 
-// eventID equality comparison
+/// Equality comparison operator
 int eventID::operator==(const eventID& obj) 
 {
   return ((id == obj.id) && (pe == obj.pe));
 }
 
-// eventID less/eq comparison
+/// Less than/equality comparison operator
 int eventID::operator<=(const eventID& obj) 
 {
   return ((pe < obj.pe) || ((pe == obj.pe) && (id <= obj.id)));
 }
 
-// Generates unique event IDs
+/// Generates and returns unique event IDs
 const eventID& GetEventID() {
-  static eventID theEventID;  // init to [0.pe] for each pe called on
+  static eventID theEventID;  // initializes to [0.pe] for each pe called on
   theEventID.incEventID();    
   return theEventID;
 }

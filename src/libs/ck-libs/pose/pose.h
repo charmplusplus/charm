@@ -47,6 +47,9 @@ extern int eventMsgsDiscarded;
 #define SEND 0
 #define RECV 1
 
+#define OPTIMISTIC 0
+#define CONSERVATIVE 1
+
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
@@ -139,7 +142,5 @@ class pose : public Chare {
   void exit();
   void quiesce() { CkPrintf("Your program has quiesced!\n"); POSE_stop(); }
 };
-
-void pdb_indent(int pdb_level);  // debug indentation
 
 #endif

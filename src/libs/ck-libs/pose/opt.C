@@ -66,9 +66,9 @@ void opt::Rollback()
   // find earliest event that must be undone
   recoveryPoint = RBevent;
   // skip forward over other stragglers
-  while ((recoveryPoint != eq->backPtr) && (recoveryPoint->done == 0)) 
+  while ((recoveryPoint != eq->back()) && (recoveryPoint->done == 0)) 
     recoveryPoint = recoveryPoint->next;
-  if (recoveryPoint == eq->backPtr) {
+  if (recoveryPoint == eq->back()) {
     CkPrintf("ERROR: opt::Rollback: no executed events between RBevent & backPtr.\n");
     CkExit();
   }
@@ -136,7 +136,7 @@ void opt::CancelEvents()
     while (!found) {  // loop until one is found, or exit fn if all examined
       //CkPrintf("[%d] Inside inner CancelEvents search loop w/%d events...\n", parent->thisIndex, parent->cancels.count);
       ev = eq->currentPtr;               // set search start point
-      if (ev == eq->backPtr) ev = ev->prev;
+      if (ev == eq->back()) ev = ev->prev;
       if (ev->timestamp <= it->timestamp) {
 	// search forward for 'it' from currentPtr to backPtr
 	while (!found && (ev->timestamp >= 0) && 
@@ -151,7 +151,7 @@ void opt::CancelEvents()
       }
       if (!found) { 
 	ev = eq->currentPtr;               // set search start point
-	if (ev == eq->backPtr) ev = ev->prev;
+	if (ev == eq->back()) ev = ev->prev;
 	if (ev->timestamp >= it->timestamp) {
 	  // ev->timestamp >= it->timestamp; so search backward
 	  while (!found && (ev->timestamp >= 0) && 
@@ -232,7 +232,7 @@ void opt::CancelEvents()
 
 int opt::SafeTime()
 {  // compute safe time for object
-  int ovt=userObj->OVT(), theTime=-1, ec=parent->cancels.earliest,
+  int ovt=userObj->OVT(), theTime=-1, ec=parent->cancels.getEarliest(),
     gvt=localPVT->getGVT(), worktime = eq->currentPtr->timestamp;
   
   if (!RBevent && (ec<0) && (worktime < 0) && (ovt <= gvt))  // idle object
@@ -266,14 +266,14 @@ void opt::RecoverState(Event *recoveryPoint)
   CpvAccess(stateRecovery) = 1;  // change forward execution behavior: recover state only
   // search for checkpoint
   ev = recoveryPoint->prev;
-  while ((ev != eq->frontPtr) && (!ev->cpData)) {
+  while ((ev != eq->front()) && (!ev->cpData)) {
     if (ev->commitBfrLen > 0)
       free(ev->commitBfr);
     ev->commitBfr = NULL;
     ev->commitBfrLen = 0;
     ev = ev->prev;
   }
-  if (ev == eq->frontPtr) {
+  if (ev == eq->front()) {
     CkPrintf("[%d] ERROR: opt::RecoverState: %d no prior checkpoints -- cannot recover state.\n", CkMyPe(), parent->thisIndex);
     return;
   }

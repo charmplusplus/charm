@@ -21,14 +21,6 @@ int eventMsgCount=0;
 int eventMsgsRecvd=0;
 int eventMsgsDiscarded=0;
 
-// Debugging statement indentation for pretty printing of data dumps
-void pdb_indent(int pdb_level)
-{
-  int i, indent=pdb_level * DEBUG_INDENT_INC;
-  for (i=0; i<indent; i++)
-    CkPrintf(" ");
-}
-
 // Main initialization function for all of POSE
 void POSE_init()
 {

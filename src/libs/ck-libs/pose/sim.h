@@ -1,47 +1,54 @@
-// File: sim.h
-// Module for basic simulation object; incorporates all other modules
-// Messages: eventMsg, cancelMsg, prioMsg
-// Classes: sim
-// Last Modified: 06.04.01 by Terry L. Wilmarth
-
+/// Sim is the base class for all poser entities
+/** This is the wrapper class that encapsulates synchronization strategy,
+    representation object and event queue, and manages the orchestration
+    of these components. 
+    This file also defines the three basic POSE messages: 
+    eventMsg, from which all user messages inherit; 
+    cancelMsg, for cancelling events; 
+    and prioMsg, a null message.
+    All three have a priority field which is set to the timestamp; thus all 
+    messages with earlier timestamp have higher priority. */
 #ifndef SIM_H
 #define SIM_H
-
 #include "sim.decl.h"
-//#include <cstdarg>
 #include <stdarg.h>
-//#include <ansidecl.h>
-//#define VA_OPEN(AP, VAR)        { va_list AP; va_start(AP, VAR); { struct Qdmy
-//#define VA_CLOSE(AP)            } va_end(AP); }
 
-extern CProxy_sim POSE_Objects;  // a global readonly proxy to the array of
-                                 // POSE simulation objects
-
-extern CkChareID POSE_Coordinator_ID;
-
+extern CProxy_sim POSE_Objects; // global readonly proxy to array of posers
+extern CkChareID POSE_Coordinator_ID; // handle for POSE coordinator object
 class sim;                       // needed for eventMsg definition below
 
-// Three basic POSE messages: eventMsg, from which all user messages inherit; 
-// cancelMsg, for cancelling events; and prioMsg, a null message.
-// All three have a priority field which is set to the timestamp; thus all 
-// messages with earlier timestamp have higher priority.
-
-// How events get around; all user event types inherit from this
+/// All user event messages inherit from this
+/** Adds timestamp and event ID to message, plus other info useful for the
+    underlying simulation layer.  Prioritized by default, and given a priority
+    based on the timestamp. Events which take no parameters must
+    still pass an eventMsg. */
 class eventMsg : public CMessage_eventMsg {
 public:
-  int timestamp;  // the event's timestamp
-  eventID evID;   // the event's globally unique ID
-  sim *parent;    // used when creating rep object
-  strat *str;     // used when creating rep object
-  int msgSize;    // used for message recycling
-  int fromPE;     // used for comm-based LB
+  /// The event's timestamp
+  int timestamp;  
+  /// The event's globally unique ID
+  eventID evID;   
+  /// The message size, used for message recycling (currently not used)
+  int msgSize;    
+  /// The sending PE, used for comm-based LB
+  int fromPE;     
+  /// Pointer to a poser wrapper; used to send the pointer to rep object
+  sim *parent;    
+  /// Pointer to synchronization strategy; used when creating rep object
+  strat *str;
+  /// Basic Constructor
   eventMsg() { }
+  /// Destructor
   virtual ~eventMsg() { }
+  /// Timestamps this message and generates a unique event ID
+  /** Timestamps this message and generates a unique event ID for the event
+      to be invoked on the receiving side.  Sets the priority of this
+      message to timestamp - INT_MAX. */
   void Timestamp(int t) { 
-    timestamp = t; evID = GetEventID(); 
-    setPriority(t-INT_MAX); 
+    timestamp = t;  evID = GetEventID();  setPriority(t-INT_MAX); 
   }
-  eventMsg& operator=(const eventMsg& obj) {  // assignment copies prio too
+  /// Assignment operator: copies priority too
+  eventMsg& operator=(const eventMsg& obj) {
     timestamp = obj.timestamp;
     evID = obj.evID;
     parent = obj.parent;
@@ -50,7 +57,9 @@ public:
     setPriority(timestamp-INT_MAX);
     return *this;
   }
-  void *operator new (size_t size) {  // allocates space for priority too
+  /// Allocates event message with space for priority
+  /** This can also handle event message recycling (currently off) */
+  void *operator new (size_t size) {  
     //EventMsgPool *localPool = (EventMsgPool *)CkLocalBranch(EvmPoolID);
     //if (localPool->CheckPool(MapSizeToIdx(size)))
     //return localPool->GetEventMsg(MapSizeToIdx(size));
@@ -72,97 +81,119 @@ public:
     //else
   //CkFreeMsg(p);
   //  }
-  void setPriority(int prio) {  // sets priority field
+  /// Set priority field and queuing strategy
+  void setPriority(int prio) {  
     *((int*)CkPriorityPtr(this)) = prio;
     CkSetQueueing(this, CK_QUEUEING_IFIFO);
   }
 };
 
-// Note the striking similarity to an eventMsg; but nothing derives from it
+/// Cancellation message
 class cancelMsg : public CMessage_cancelMsg {
 public:
-  eventID evID;           // only need this to find the event to cancel
-  int timestamp;          // but providing this as well makes finding it faster
-  void *operator new (size_t size) {  // allocate with priority field
+  /// Event to cancel
+  /** Only this is needed to find the event to cancel */
+  eventID evID;
+  /// Timestamp of event to be cancelled
+  /** Providing this makes finding the event faster */
+  int timestamp;          
+  /// Allocate cancellation message with priority field
+  void *operator new (size_t size) {  
     return CkAllocMsg(CMessage_cancelMsg::__idx, size, 8*sizeof(int));
   } 
+  /// Delete cancellation message
   void operator delete(void *p) {  CkFreeMsg(p);  }
-  void setPriority(int prio) {  // sets priority field
-    *((int*)CkPriorityPtr(this)) = prio;
-    CkSetQueueing(this, CK_QUEUEING_IFIFO);
-  }
-};
-
-// Prioritized null msg; comes in handy for sorting the Step calls
-class prioMsg : public CMessage_prioMsg {
-public:
-  void *operator new (size_t size) {
-    return CkAllocMsg(CMessage_eventMsg::__idx, size, 8*sizeof(int));
-  }
-  void operator delete(void *p) {  CkFreeMsg(p);  }
+  /// Set priority field and queuing strategy
   void setPriority(int prio) {
     *((int*)CkPriorityPtr(this)) = prio;
     CkSetQueueing(this, CK_QUEUEING_IFIFO);
   }
 };
 
+/// Prioritized null msg; used to sort Step calls
+class prioMsg : public CMessage_prioMsg {
+public:
+  /// Allocate prioritized message with priority field
+  void *operator new (size_t size) {
+    return CkAllocMsg(CMessage_eventMsg::__idx, size, 8*sizeof(int));
+  }
+  /// Delete prioritized message
+  void operator delete(void *p) {  CkFreeMsg(p);  }
+  /// Set priority field and queuing strategy
+  void setPriority(int prio) {
+    *((int*)CkPriorityPtr(this)) = prio;
+    CkSetQueueing(this, CK_QUEUEING_IFIFO);
+  }
+};
+
+/// Used to specify a destination processor to migrate to during load balancing
 class destMsg : public CMessage_destMsg {
 public:
   int destPE;
 };
 
 
-// The simulation object base class; all user simulation objects are 
-// translated to this object, which acts as a wrapper around the actual 
-// object to control the simulation behavior.
+/// Poser wrapper base class
+/** The poser base class: all user posers are translated to classes that
+    inherit from this class, and act as wrappers around the actual user 
+    object's representation to control the simulation behavior.  These 
+    objects are plugged into the POSE_objects array which is of this type. */
 class sim : public ArrayElement1D {
  protected:
-  int active; // set if Step message queued; sync strategy
+  /// Flag to indicate that a Step message is scheduled
+  /** Need to re-evaluate the need/function of this... also, how is it used
+      during load balancing... */
+  int active; 
  public:
-  int myPVTidx,  myLBidx;  // unique global IDs for this object on PVT and LB
-  int DOs, UNDOs;
+  /// This poser's event queue
+  eventQueue *eq;
+  /// This poser's synchronization strategy   
+  strat *myStrat;
+  /// This poser's user representation
+  rep *objID;       
+  /// List of incoming cancellations for this poser
+  CancelList cancels;
+  /// The local PVT to report to
+  PVT *localPVT;    
+  /// Unique global ID for this object on PVT branch
+  int myPVTidx;
+  /// Unique global ID for this object in load balancing data structures
+  int myLBidx;
+  /// Number of forward execution steps
+  /** Is this needed/used? This is load balancing data... */
+  int DOs;
+  /// Number of undone events
+  /** Is this needed/used? This is load balancing data... */
+  int UNDOs;
+  /// Synchronization strategy type (optimistic or conservative)
   int sync;
-  int *srVector;    // number of sends/recvs per PE
-  eventQueue *eq;   // the object's event queue
-  strat *myStrat;   // the object's simulation strategy
-  rep *objID;       // the user's simulated object
-  rep *recyc[1];
-  int recycCount;
-  PVT *localPVT;    // the local PVT to report to
+  /// Number of sends/recvs per PE
+  int *srVector;    
 #ifdef POSE_STATS_ON
+  /// The local statistics collector
   localStat *localStats; 
 #endif
 #ifdef LB_ON
+  /// The local load balancer
   LBgroup *localLBG;
 #endif
-  CancelList cancels;  // list of incoming cancellations
+  /// Basic Constructor
   sim(void);
   sim(CkMigrateMessage *) {};
+  /// Destructor
   virtual ~sim();
-  virtual void pup(PUP::er &p) {  // pup the entire simulation object
-    ArrayElement1D::pup(p);       // call parent class pup method
-
-    //if (p.isUnpacking()) CkPrintf("_%d ", CkMyPe());
-    /*
-    if (p.isUnpacking())
-      CkPrintf("[%d] sim %d is unpacking...\n", CkMyPe(), thisIndex);
-    else if (p.isPacking())
-      CkPrintf("[%d] sim %d is packing...\n", CkMyPe(), thisIndex);
-    else
-      CkPrintf("[%d] sim %d is sizing...\n", CkMyPe(), thisIndex);
-    */
+  /// Pack/unpack/sizing operator
+  virtual void pup(PUP::er &p) {
+    ArrayElement1D::pup(p); // call parent class pup method
     // pup simple types
     p(active); p(myPVTidx); p(myLBidx); p(sync); p(DOs); p(UNDOs);
-
     // pup event queue
     if (p.isUnpacking())
       eq = new eventQueue();
     eq->pup(p);
-
     // pup cancellations
     cancels.pup(p);
-
-    if (p.isUnpacking()) {        // reactivate migrated object
+    if (p.isUnpacking()) { // reactivate migrated object
 #ifdef POSE_STATS_ON
       localStats = (localStat *)CkLocalBranch(theLocalStats);
 #endif
@@ -170,13 +201,13 @@ class sim : public ArrayElement1D {
 #ifdef LB_ON
       localLBG = TheLBG.ckLocalBranch();
 #endif
-      recycCount = active = 0;
+      active = 0;
       myPVTidx = localPVT->objRegister(thisIndex, localPVT->getGVT(), sync, this);
 #ifdef LB_ON
       myLBidx = localLBG->objRegister(thisIndex, sync, this);
 #endif
     }
-    else if (p.isPacking()) {     // deactivate migrating object
+    else if (p.isPacking()) { // deactivate migrating object
       active = -1;
       localPVT->objRemove(myPVTidx);
 #ifdef LB_ON
@@ -184,73 +215,75 @@ class sim : public ArrayElement1D {
 #endif
     }
   }
-  void Step();                 // Creates a forward execution step with myStrat
-  void Step(prioMsg *m);       // Creates a prioritized step with myStrat
-  void Status();               // Reports SafeTimes to PVT
-  void Commit();               // Commit events based on new GVT value
-  void Cancel(cancelMsg *m);   // Add m to cancellation list
+  /// Start a forward execution step on myStrat
+  void Step();                 
+  /// Start a prioritized forward execution step on myStrat
+  void Step(prioMsg *m);       
+  /// Report safe time to PVT branch
+  void Status() { localPVT->objUpdate(myPVTidx, myStrat->SafeTime(), -1, -1); }
+  /// Commit events based on new GVT estimate
+  void Commit();               
+  /// Add m to cancellation list
+  void Cancel(cancelMsg *m); 
+  /// Report load information to local load balancer
   void ReportLBdata();
-  void Migrate(destMsg *m);
+  /// Migrate this poser to processor indicated in m
+  void Migrate(destMsg *m) { migrateMe(m->destPE); }
+  /// Return this poser's unique index on PVT branch
   int PVTindex() { return myPVTidx; }
+  /// Test active flag
   int IsActive() { return active; }
+  /// Set active flag
   void Activate() { active = 1; }
+  /// Unset active flag
   void Deactivate() { active = 0; }
-  virtual void ResolveFn(int fnIdx, void *msg);          // invoke method w/msg
-  virtual void ResolveCommitFn(int fnIdx, void *msg);    // invoke commit w/msg
-  void registerSent(int timestamp) { // Notify GVT of message send
+  /// Invoke an event on this poser according to fnIdx and pass it msg
+  /** ResolveFn is generated along with the rest of the wrapper object and
+      should handle all possible events on a poser. */
+  virtual void ResolveFn(int fnIdx, void *msg) { }
+  /// Invoke the commit version of an event to handle special behaviors
+  /** This invokes the <fn>_commit method that user provides.  It can be
+      used to perform special activities, statistics gathering, output, or
+      whatever the user wishes. */
+  virtual void ResolveCommitFn(int fnIdx, void *msg) { }
+  /// Notify the PVT of a message send
+  void registerSent(int timestamp) {
     localPVT->objUpdate(timestamp, SEND);
   }
-  void CommitPrintf (const char *Fmt, ...) {
+  /// Used for buffered output
+  /** Output is only printed when the event is committed */
+  void CommitPrintf(const char *Fmt, ...) {
     va_list ap;
     va_start(ap,Fmt);
     InternalCommitPrintf(Fmt, ap);
     va_end(ap);
   }
-  void CommitError (const char *Fmt, ...) {
+  /// Used for buffered output of error messages
+  /** Output is only printed when the event is committed */
+  void CommitError(const char *Fmt, ...) {
     va_list ap;
     va_start(ap,Fmt);
     InternalCommitPrintf(Fmt, ap);
     va_end(ap);
     eq->currentPtr->commitErr = 1;
   }
-  void CommitPrint(char *s) {       // Buffered output function
-    char *tmp;
-    if (!(tmp = (char *)malloc((eq->currentPtr->commitBfrLen + strlen(s) + 1) 
-			       * sizeof(char)))) {
-      CkPrintf("ERROR: sim::CommitPrint: OUT OF MEMORY!\n");
-      CkExit();
-    }
-    if (eq->currentPtr->commitBfr)
-      sprintf(tmp, "%s%s", eq->currentPtr->commitBfr, s); 
-    else
-      sprintf(tmp, "%s", s); 
-    eq->currentPtr->commitBfrLen = strlen(tmp) + 1;
-    free(eq->currentPtr->commitBfr);
-    eq->currentPtr->commitBfr = tmp;
-  }
-  void dump(int pdb_level);         // dump entire sim object
-  //  void CommitPrintf VPARAMS ((const char *Fmt, ...)) {
+  /// Dump all data fields
+  void dump();
  private:
+  /// Used by buffered print functions
   void InternalCommitPrintf (const char *Fmt, va_list ap) {
     char *tmp;
     size_t tmplen=eq->currentPtr->commitBfrLen + strlen(Fmt) + 1 +100;
-    if (!(tmp = (char *)malloc(tmplen //
-			       * sizeof(char)))) {
+    if (!(tmp = (char *)malloc(tmplen * sizeof(char)))) {
       CkPrintf("ERROR: sim::CommitPrintf: OUT OF MEMORY!\n");
       CkExit();
     }
-    //VA_FIXEDARG (ap, const char *, Fmt);
-    if ((eq->currentPtr->commitBfr)&&(eq->currentPtr->commitBfrLen))
-      {
-	strcpy(tmp,eq->currentPtr->commitBfr);
-	free(eq->currentPtr->commitBfr);
-	vsnprintf(tmp+strlen(tmp),tmplen,Fmt,  ap); 
-      }
-    else
-      {
-	vsnprintf(tmp,tmplen, Fmt,ap ); 
-      }
-    //      tmp=(char *) realloc(tmp,(strlen(tmp)+1)*sizeof(char));
+    if (eq->currentPtr->commitBfr && eq->currentPtr->commitBfrLen) {
+      strcpy(tmp, eq->currentPtr->commitBfr);
+      free(eq->currentPtr->commitBfr);
+      vsnprintf(tmp+strlen(tmp), tmplen, Fmt, ap); 
+    }
+    else vsnprintf(tmp, tmplen, Fmt, ap); 
     eq->currentPtr->commitBfrLen = strlen(tmp) + 1;  
     eq->currentPtr->commitBfr = tmp;
   }

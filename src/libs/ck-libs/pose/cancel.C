@@ -1,12 +1,8 @@
-// File: cancel.C
-// CancelList stores cancellation of event notices processed by a strat
-// Last Modified: 5.29.01 by Terry L. Wilmarth
-
+/// List to store event cancellations
 #include "eventID.h"
 #include "pose.h"
 
-// Inserts an event at beginning of list; increments count and sets earliest
-// if applicable; sets current if list was previously empty
+/// Insert an event at beginning of cancellations list
 void CancelList::Insert(int ts, eventID e) 
 {
   CancelNode *newnode = new CancelNode(ts, e);
@@ -19,8 +15,7 @@ void CancelList::Insert(int ts, eventID e)
   if (!current) current = newnode; // set current if list was empty
 }
 
-// Returns a pointer to a node in list; uses current to cycle through nodes
-// so as to return a new item each time GetItem is called
+/// Return a pointer to a node in list
 CancelNode *CancelList::GetItem(int eGVT) 
 {
   CancelNode *result, *start = current;
@@ -31,7 +26,7 @@ CancelNode *CancelList::GetItem(int eGVT)
   return result;
 }
 
-// Remove a node from the list (presumably one that was cancelled)
+/// Remove a specific cancellation from the list
 void CancelList::RemoveItem(CancelNode *item)
 {
   int isEarliest = (item->timestamp == earliest);
@@ -62,30 +57,22 @@ void CancelList::RemoveItem(CancelNode *item)
   }
 }
 
-// Tests if CancelList is empty, returning 1 if it is, 0 otherwise.
+/// Test if cancellations is empty
 int CancelList::IsEmpty() 
 { 
-  if ((count == 0) && (cancellations == NULL))
-    return 1;
-  else if ((count == 0) || (cancellations == NULL)) {
-    CkPrintf("ERROR: cancelList::IsEmpty: inconsistency between count=%d and cancellations=%x\n", 
-	     count, cancellations);
-    CkExit();
-  }
-  return 0;
+  CmiAssert(((count == 0) && (cancellations == NULL)) ||
+	    ((count > 0) && (cancellations != NULL)));
+  return (count == 0);
 }
 
-// Print the list contents
-void CancelList::dump(int pdb_level)
+/// Dump all data fields
+void CancelList::dump()
 {
-  int i=count;
   CancelNode *tmp = cancellations;
-  
-  if (!tmp) CkPrintf("[CANCELS: NULL]\n");
+  if (!tmp) CkPrintf("[[Earliest=%d of %d CANCELS: NULL]\n", earliest, count);
   else {
-    CkPrintf("[CANCELS: ");
+    CkPrintf("[Earliest=%d of %d CANCELS: ", earliest, count);
     while (tmp) {
-      i--;
       tmp->dump();
       tmp = tmp->next;
     }
@@ -93,7 +80,7 @@ void CancelList::dump(int pdb_level)
   }
 }
 
-// Pup the entire list contents
+/// Pack/unpack/sizing operator
 void CancelList::pup(PUP::er &p) 
 { 
   int i;
@@ -104,12 +91,12 @@ void CancelList::pup(PUP::er &p)
     if (i == 0) cancellations = NULL;
     while (i > 0) {
       if (i == count) {
-	tmp = new CancelNode();
+	tmp = new CancelNode;
 	tmp->pup(p);
 	cancellations = tmp;
       }
       else {
-	tmp->next = new CancelNode();
+	tmp->next = new CancelNode;
 	tmp = tmp->next;
 	tmp->pup(p);
       }

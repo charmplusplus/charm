@@ -59,7 +59,7 @@ void con::CancelEvents()
       ev = eq->currentPtr;                  // set search start point
 
       // look for "it" above currentPtr
-      if ((ev->timestamp <= it->timestamp) && (ev != eq->backPtr)) {
+      if ((ev->timestamp <= it->timestamp) && (ev != eq->back())) {
 	while ((ev->timestamp >= 0) && (ev->timestamp <= it->timestamp))
 	  if (ev->evID == it->evID) {
 	    found = 1;
@@ -71,7 +71,7 @@ void con::CancelEvents()
 	  if (found) ev = NULL;        // make ev NULL so we know it was deleted
 	}
       }
-      else if (ev != eq->backPtr) {    // current at back of queue; check the heap
+      else if (ev != eq->back()) {    // current at back of queue; check the heap
 	found = eq->eqh->DeleteEvent(it->evID, it->timestamp);
 	if (found) ev = NULL;          // make ev NULL so we know it was deleted
       }

@@ -1,44 +1,91 @@
-// File: pvtobj.h
-// Defines pvtObjects, a list that holds records of objects registered with 
-// a PVT.
-// Last Modified: 5.30.01 by Terry L. Wilmarth
-
+/// pvtObjects: a list to hold records of posers registered with a PVT branch.
+/** Implements a simple list of object records stored one per PVT branch.
+    Provides a means to perform common operations (gather safe times, fossil
+    colleciton, etc) on all registered objectssy on a processor. */
 #ifndef PVTOBJ_H
 #define PVTOBJ_H
 
-class pvtObjectNode {  // pvtObjects is a list of these nodes
+/// A pvtObjects entry for storing poser data
+/** This class is used in pvtObjects to store poser data local to a
+    processor. */
+class pvtObjectNode {
+  /// Last reported safe time of poser
+  int ovt;
+  /// Index of poser in POSE_Objects array
+  int index;  
+  /// Flag to indicate if object data is stored at this index
+  /** present==1 indicates that this node contains a valid object, present==0 
+      indicates the node can be recycled */
+  short int present;
+  /// The synchronization strategy of the poser (OPTIMISTIC or CONSERVATIVE)
+  short int sync; 
  public:
-  int ovt, index;  // last reported OVT of object; index in POSE_Objects array
+  /// A pointer to the actual poser
   sim *localObjPtr;
-  short int present, sync;  // present==1 indicates that this node 
-  // contains a valid object, present==0 indicates the node can be recycled; 
-  // sync refers to the synchronization strategy of the object (OPTIMISTIC or 
-  // CONSERVATIVE)
-  pvtObjectNode() { present = 0; }  // basic initialization
-  void Set(int ts, int idx, short int on, short int s) {
-    ovt = ts;  index = idx;  present = on;  sync = s;
+  /// Basic Constructor
+  pvtObjectNode() { present = 0; }
+  /// Sets all data fields
+  void set(int ts, int idx, short int on, short int s, sim *p) {
+    ovt = ts;  index = idx;  present = on;  sync = s; localObjPtr = p;
   }
-  void dump() {  // print the node contents
-    CkPrintf("ovt=%d index=%d present=%d sync=%s",
-	     ovt, index, present, (sync==0)?"OPT":"CON");
+  /// Sets ovt to -1 to indicate idle
+  void setIdle() { ovt = -1; }
+  /// Test present flag
+  int isPresent() { return present; }
+  /// Test if synchronization strategy is optimistic
+  int isOptimistic() { return (sync == OPTIMISTIC); }
+  /// Test if synchronization strategy is conservative
+  int isConservative() { return (sync == CONSERVATIVE); }
+  /// Return ovt
+  int getOVT() { return ovt; }
+  /// Set ovt to st
+  void setOVT(int st) { ovt = st; }
+  /// Dump data fields
+  void dump() {
+    if (localObjPtr == NULL)
+      CkPrintf("ovt=%d index=%d present=%d sync=%s ptr=NULL",
+	       ovt, index, present, (sync==0)?"OPT":"CON");
+    else 
+      CkPrintf("ovt=%d index=%d present=%d sync=%s ptr!=NULL",
+	       ovt, index, present, (sync==0)?"OPT":"CON");
   }
+  /// Check validity of data fields
+  void sanitize();
 };
 
-class pvtObjects {  // expandable list of nodes
+/// List to hold records of posers registered with a PVT branch.
+class pvtObjects {
+  /// Number of posers present in the list
+  int numObjs;
+  /// number of consecutive spaces in list that are or have been occupied
+  int numSpaces;
+  /// number of spaces allocated in objs
+  int size;
+  /// lowest index of an empty slot in objs
+  int firstEmpty; 
  public:
-  int numObjs, numSpaces, size, firstEmpty;  // numObjs is the actual number of
-  // objects present in the list;  numSpaces is the number of consecutive
-  // spaces in the list that are or have been occupied by object data; size is
-  // the space allocated in objs; firstEmpty is the lowest index of an empty 
-  // slot in objs
-  pvtObjectNode *objs;                        // the list of objects
-  pvtObjects();                               // basic initialization
-  void SetIdle();                             // sets objects to idle (ovt==-1)
-  void Wake();                                // wake up all objects
-  void Commit();                              // commit all objects
-  int Insert(int index, int ovt, int sync, sim *myPtr); //insert object in list
-  void Delete(int idx);                       // delete an object from the list
-  void dump();                                // print out the list contents
+  /// the list of posers
+  pvtObjectNode *objs;
+  /// Basic Constructor: preallocates space for 100 objects
+  pvtObjects();    
+  /// Get number of spaces in use in list
+  int getNumSpaces() { return numSpaces; }
+  /// Set posers to idle (ovt==-1)
+  void SetIdle();                             
+  /// Wake up all posers in list
+  void Wake();                                
+  /// Call Commit on all posers
+  void Commit();                              
+  /// Insert poser in list
+  /** Inserts an object in the list in the firstEmpty slot, expanding the list
+      size if necessary */
+  int Insert(int index, int ovt, int sync, sim *myPtr); 
+  /// Delete a poser from the list
+  void Delete(int idx);                       
+  /// Dump data fields
+  void dump();
+  /// Check validity of data fields
+  void sanitize();
 };
   
 #endif

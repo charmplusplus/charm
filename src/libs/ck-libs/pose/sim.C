@@ -1,22 +1,20 @@
-//  File: sim.C
-//  For header info, see sim.h.
-//  The sim base class implements the wrapper around the user's simulation
-//  classes.  It holds the event queue, the actual simulated object (rep), 
-//  a strategy, and a list of cancel messages. 
-//  Last modified: 07.31.01 by Terry Wilmarth
-
+/// Sim is the base class for all poser entities
 #include "pose.h"
 #include "sim.def.h"
 
+/// The array in which all posers are stored
 CProxy_sim POSE_Objects;
+/// Coordinates all startup and shutdown behaviors for POSE simulations
 CkChareID POSE_Coordinator_ID;
 
 #ifdef POSE_COMM_ON
+/// Used with the CommLib
 extern CkGroupID dmid;
 //extern int comm_debug;
 #endif
 
-sim::sim() // sim base constructor
+/// Basic Constructor
+sim::sim() 
 {
   localPVT = (PVT *)CkLocalBranch(ThePVT);
 #ifdef LB_ON
@@ -25,7 +23,7 @@ sim::sim() // sim base constructor
 #ifdef POSE_STATS_ON
   localStats = (localStat *)CkLocalBranch(theLocalStats);
 #endif
-  recycCount = active = DOs = UNDOs = 0;
+  active = DOs = UNDOs = 0;
   srVector = (int *)malloc(CkNumPes() * sizeof(int));
   for (int i=0; i<CkNumPes(); i++) srVector[i] = 0;
   eq = new eventQueue();
@@ -33,42 +31,41 @@ sim::sim() // sim base constructor
   objID = NULL;
 }
 
-sim::~sim() // basic destructor
+/// Destructor
+sim::~sim() 
 {
   delete(eq);
   delete(myStrat);
   delete(objID);
-  for (int i=0; i<recycCount; i++)
-    delete(recyc[i]);
 }
 
-// Creates a forward execution step with myStrat
+/// Start a forward execution step on myStrat
 void sim::Step()
 {
-  if (active < 0) return;  // object is migrating; deactivate it 
+  if (active < 0) return; // object is migrating; deactivate it 
 #ifdef POSE_STATS_ON
   int tstat = localStats->TimerRunning();
   if (!tstat)  localStats->TimerStart(SIM_TIMER);
   else localStats->SwitchTimer(SIM_TIMER);
 #endif
-  prioMsg *pm = new prioMsg;
-  switch (myStrat->STRAT_T) {
+  prioMsg *pm;
+  switch (myStrat->STRAT_T) { // step based on strategy type
   case CONS_T:
   case OPT_T:
-  case OPT2_T: // do it now!
+  case OPT2_T: // pass this step call directly to strategy
     myStrat->Step();
     break;
-  case OPT3_T: // prioritized step
+  case OPT3_T: // prioritize this step call if work exists
     if (eq->currentPtr->timestamp >= 0) {
+      pm = new prioMsg;
       pm->setPriority(eq->currentPtr->timestamp-INT_MAX);
       POSE_Objects[thisIndex].Step(pm);
     }
-    //else myStrat->Step();
     break;
   case SPEC_T:
-  case ADAPT_T: // non-prioritized step
-  case ADAPT2_T:
-    myStrat->Step(); // Call Step on strategy
+  case ADAPT_T:
+  case ADAPT2_T: // pass this step call directly to strategy
+    myStrat->Step();
     break;
   default: 
     CkPrintf("Invalid strategy type: %d\n", myStrat->STRAT_T); 
@@ -80,10 +77,11 @@ void sim::Step()
 #endif
 }
 
+/// Start a prioritized forward execution step on myStrat
 void sim::Step(prioMsg *m)
 {
   CkFreeMsg(m);
-  if (active < 0) return;  // object is migrating; deactivate it 
+  if (active < 0) return; // object is migrating; deactivate it 
 #ifdef POSE_STATS_ON
   int tstat = localStats->TimerRunning();
   if (!tstat)
@@ -98,45 +96,35 @@ void sim::Step(prioMsg *m)
 #endif
 }
 
-void sim::Status()
-{
-  //int st = myStrat->SafeTime();
-  //  if (st == localPVT->getGVT())
-  //    CkPrintf("Object %d has safeTime == GVT...\n", thisIndex);
-  //localPVT->objUpdate(myPVTidx, st, -1, -1);
-  localPVT = (PVT *)CkLocalBranch(ThePVT);
-  localPVT->objUpdate(myPVTidx, myStrat->SafeTime(), -1, -1);
-}
-
-// Commit whatever can be committed according to new GVT value
+/// Commit events based on new GVT estimate
 void sim::Commit()
 {
-  if (active < 0)  return;
+  if (active < 0)  return; // object is migrating
 #ifdef POSE_STATS_ON
   int tstat = localStats->TimerRunning();
   if (!tstat)  localStats->TimerStart(MISC_TIMER);
   else localStats->SwitchTimer(MISC_TIMER);
 #endif
   localPVT = (PVT *)CkLocalBranch(ThePVT);
-  if (localPVT->done() && (POSE_endtime == -1)) { //commit all events in queue
-    eq->CommitEvents(this, -1);
-    objID->terminus();
+  if (localPVT->done() && (POSE_endtime == -1)) { // simulation inactive
+    eq->CommitEvents(this, -1); // commit all events in queue
+    objID->terminus(); // call terminus on all posers
   }
-  else {
-    eq->CommitEvents(this, localPVT->getGVT());
-    if (localPVT->done())
-      objID->terminus();
+  else { 
+    eq->CommitEvents(this, localPVT->getGVT()); // commit events up to GVT
+    if (localPVT->done()) objID->terminus(); // if sim done, term posers
   }
 #ifdef POSE_STATS_ON
   localStats->SwitchTimer(SIM_TIMER);
 #endif
-  if (!localPVT->done())  Step();
+  if (!localPVT->done()) Step(); // not done; try stepping again
 #ifdef POSE_STATS_ON
   if (!tstat)  localStats->TimerStop();
   else localStats->SwitchTimer(tstat);
 #endif
 }
 
+/// Report load information to local load balancer
 void sim::ReportLBdata()
 {
 #ifdef LB_ON
@@ -157,44 +145,33 @@ void sim::ReportLBdata()
 #endif
 }
 
-void sim::Migrate(destMsg *m)
-{
-  migrateMe(m->destPE);
-}
-
-// Overidden by user code
-void sim::ResolveFn(int fnid, void *msg) { }
-void sim::ResolveCommitFn(int fnid, void *msg) { }
-
-// Add m to cancellation list
+/// Add m to cancellation list
 void sim::Cancel(cancelMsg *m) 
 {
 #ifdef POSE_STATS_ON
   localStats->TimerStart(CAN_TIMER);
 #endif
   localPVT = (PVT *)CkLocalBranch(ThePVT);
-  cancels.Insert(m->timestamp, m->evID);    // add to cancellations list
-  localPVT->objUpdate(m->timestamp, RECV);
+  cancels.Insert(m->timestamp, m->evID); // add to cancellations list
+  localPVT->objUpdate(m->timestamp, RECV); // tell PVT branch about recv
   CkFreeMsg(m);
 #ifdef POSE_STATS_ON
   localStats->SwitchTimer(SIM_TIMER);      
 #endif
-  myStrat->Step();
+  myStrat->Step(); // call Step to handle cancellation
 #ifdef POSE_STATS_ON
   localStats->TimerStop();
 #endif
 }
 
-// dump the entire sim object
-void sim::dump(int pdb_level)
+/// Dump all data fields
+void sim::dump()
 {
-  pdb_indent(pdb_level);
   CkPrintf("[SIM: active=%d sync=%d myPVTidx=%d ", active, sync, myPVTidx);
-  if (objID) objID->dump(pdb_level+1);
+  if (objID) objID->dump();
   else CkPrintf("objID=NULL\n");
-  eq->dump(pdb_level+1);
-  cancels.dump(pdb_level+1);
-  pdb_indent(pdb_level);
+  eq->dump();
+  cancels.dump();
   CkPrintf("end SIM]\n");
 }
 

@@ -1,7 +1,4 @@
-// File: stats.C
-// Modest statistics gathering facility.
-// Last Modified: 7.31.01 by Terry L. Wilmarth
-
+/// Modest statistics gathering facility for POSE
 #include "charm++.h"
 #include "stats.h"
 #include "stats.def.h"
@@ -11,7 +8,7 @@ CkGroupID theLocalStats;
 
 extern void POSE_exit();
 
-// Send local stats to global collector
+/// Send local stats to global collector
 void localStat::SendStats()
 {
   CProxy_globalStat gstat(theGlobalStats);
@@ -36,7 +33,7 @@ void localStat::SendStats()
   gstat.localStatReport(m);
 }
 
-// Basic constructor initializes all accumulators to 0. 
+// Basic Constructor
 globalStat::globalStat(void)
 {
   doAvg = doMax = rbAvg = rbMax = gvtAvg = gvtMax = simAvg = simMax = 
@@ -92,8 +89,7 @@ void globalStat::localStatReport(localStatSummary *m)
   reporting++;
 
   GvtTime = gvtAvg/totalGvts;
-  if (reporting == CkNumPes()) { // all local stats are in
-    // compute final values
+  if (reporting == CkNumPes()) { //all local stats are in; compute final values
     avgDo = doAvg / totalDos;
     doAvg /= CkNumPes();
     rbAvg /= CkNumPes();

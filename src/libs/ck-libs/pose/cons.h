@@ -16,7 +16,7 @@ class con : public strat {
     // its safe time
     int hightime = userObj->OVT(), lowtime;
     
-    if ((parent->cancels.earliest < 0) 
+    if ((parent->cancels.getEarliest() < 0) 
 	&& (eq->currentPtr->timestamp < 0)
 	&& (userObj->OVT() <= localPVT->getGVT()))
       return -1;  // this corresponds to an idle object; ignore its safe time
@@ -25,8 +25,8 @@ class con : public strat {
       hightime = eq->currentPtr->timestamp;
     
     lowtime = hightime;
-    if (parent->cancels.earliest >= 0)  // check cancellations
-      lowtime = parent->cancels.earliest;
+    if (parent->cancels.getEarliest() >= 0)  // check cancellations
+      lowtime = parent->cancels.getEarliest();
     
     if (lowtime < hightime)
       return lowtime;

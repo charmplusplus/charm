@@ -1,11 +1,9 @@
-// File: strat.h
-// Module for basic simulation strategy class for protocols such as 
-// optimistic and conservative.
-// Last Modified: 06.05.01 by Terry L. Wilmarth
-
+/// Simulation synchronization strategy base class
+/** Protocols such as optimistic and conservative inherit from this. */
 #ifndef STRAT_H
 #define STRAT_H
 
+/// Strategy types
 #define INIT_T -2
 #define CONS_T -1
 #define OPT_T 0
@@ -15,34 +13,53 @@
 #define ADAPT_T 4
 #define ADAPT2_T 5
 
+/// Base synchronization strategy class
 class strat
 {
  protected:
-  PVT *localPVT;
 #ifdef POSE_STATS_ON
   localStat *localStats;
 #endif
-  eventQueue *eq;   // pointer to the eventQueue in parent sim obj
-  rep *userObj;     // pointer to the user's representation in parent sim obj
-  sim *parent;      // pointer to the parent sim object
-  int parentIdx;    // array index of parent
+  /// Local PVT branch
+  PVT *localPVT;
+  /// Pointer to the eventQueue in the poser wrapper
+  eventQueue *eq;   
+  /// Pointer to the representation object in the poser wrapper
+  rep *userObj;     
+  /// Pointer to the poser wrapper
+  sim *parent;      
  public:
-  Event *RBevent;   // current rollback event
-  int STRAT_T;      // type of strategy; see defines above
-  Event *targetEvent,   // checkpoint state target event
-    *currentEvent;  // current event being executed
-  int voted;        // if this object's strategy has voted for a GVT run
-  strat();          // basic initialization constructor
+  /// Type of strategy; see #defines above
+  int STRAT_T;      
+  /// Target event pointer
+  /** Used by strategy to denote point in event queue to 1) rollback to
+      2) checkpoint up to etc. */
+  Event *targetEvent; 
+  /// Current event being executed  
+  Event *currentEvent;
+  /// Current event to rollback to
+  Event *RBevent;   
+  /// Basic Constructor
+  strat();
+  /// Destructor
   virtual ~strat() { }
-  void init(eventQueue *q, rep *obj, sim *p, int pIdx);  // init pointers
+  /// Initializer
+  void init(eventQueue *q, rep *obj, sim *p, int pIdx);
+  /// Initialize synchronization strategy type (optimistic or conservative)
   virtual void initSync() { }
-  virtual void Step(); // Strategy specific forward execution step.
-  virtual void Rollback() { }      // strategy specific rollback function
-  virtual void CancelEvents() { }  // strategy specific event cancellation
-  virtual int SafeTime() { return userObj->OVT(); }  // strategy-specific
+  /// Strategy-specific forward execution step
+  /** Code here MUST be overridden, but this gives a basic idea of how
+      a forward execution step should go.  Strategies must determine if it is
+      safe to execute an event. */
+  virtual void Step(); 
+  /// Strategy-specific rollback
+  virtual void Rollback() { }      
+  /// Strategy-specific event cancellation
+  virtual void CancelEvents() { }  
+  /// Calculate safe time (earliest time at which object can generate events)
+  virtual int SafeTime() { return userObj->OVT(); }
+  /// Set rollback point to event e
   void ResetRBevent(Event *e) { RBevent = e; }
-  Event *getCurrentEvent() { return currentEvent; }
-  Event *getTargetEvent() { return targetEvent; }
 };
 
 #endif

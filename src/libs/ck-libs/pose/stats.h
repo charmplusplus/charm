@@ -1,18 +1,14 @@
-// File: stats.h
-// Modest statistics gathering facility.
-// Counters for: rollbacks, undos, computes, speculative computes, 
-//    and checkpointed bytes
-// Timers for: rollback, speculative computation, total computation, 
-//    checkpointing time, simulation overhead, and gvt overhead, checkpointing 
-//    overhead and cancellation overhead.
-// Last Modified: 7.31.01 by Terry L. Wilmarth
-
+/// Modest statistics gathering facility for POSE
+/** Counters for: rollbacks, undos, computes, speculative computes,
+    and checkpointed bytes; Timers for: rollback, speculative
+    computation, total computation, checkpointing time, simulation
+    overhead, and gvt overhead, checkpointing overhead and
+    cancellation overhead */
 #ifndef STATS_H
 #define STATS_H
 #include "stats.decl.h"
 
-// Define POSE_STATS_ON to turn stats on. Off by default
-// #define POSE_STATS_ON
+// #define POSE_STATS_ON 1  // turn this on in pose.h
 
 // Timer flags
 #define DO_TIMER 1
@@ -28,7 +24,7 @@
 extern CkChareID theGlobalStats;
 extern CkGroupID theLocalStats;
 
-// Message to gather local stats from all PEs for printing
+/// Message to gather local stats from all PEs for printing
 class localStatSummary : public CMessage_localStatSummary {
 public:
   double doTime, rbTime, gvtTime, simTime, cpTime, canTime, lbTime, miscTime, 
@@ -37,39 +33,55 @@ public:
   int pe, dos, undos, gvts, maxChkPts;
 };
 
-// Gathers stats on a single PE
+/// Group to gather stats on a each PE separately
 class localStat : public Group {
 private:
-  short int whichStat; // current active timer: 0=do 1=rb 2=gvt 3=sim
+  /// Current active timer
+  short int whichStat;
+  /// Counters for various occurrences
   int rollbacks, dos, undos, gvts, chkPts, maxChkPts;  
-  long cpBytes;        // counts bytes checkpointed
-  double dot, rbt, gvtt, simt, cpt, cant, lbt, misct;  // timer start values
-  // time accumulators
+  /// Count of bytes checkpointed
+  long cpBytes;
+  /// Timer start values
+  double dot, rbt, gvtt, simt, cpt, cant, lbt, misct;
+  /// Time accumulators
   double rollbackTime, totalTime, gvtTime, simTime, cpTime, canTime, 
     lbTime, miscTime, maxDo, minDo; 
 public:
+  /// Basic Constructor
   localStat(void) {
-    whichStat = 0;
-    rollbacks = dos = undos = gvts = cpBytes = chkPts = maxChkPts = 0;
+    whichStat=rollbacks=dos=undos=gvts=cpBytes=chkPts=maxChkPts = 0;
     rollbackTime=totalTime=gvtTime=simTime=cpTime=canTime=lbTime=miscTime= 0.0;
     maxDo = minDo = -1.0;
   }
   localStat(CkMigrateMessage *) { };
-  void TimerStart(int timer);  // start the specified timer
-  void TimerStop();            // stop the currently active timer
-  void SwitchTimer(int timer); // switch to different timer, stopping active
-  void Do() { dos++; }         // increment event execution count
-  void Undo() { undos++; }         // increment event execution count
-  void GvtInc() { gvts++; }         // increment event execution count
-  void Rollback() { rollbacks++; }  // increment rollback count
+  /// Start the specified timer
+  void TimerStart(int timer);  
+  /// Stop the currently active timer
+  void TimerStop();            
+  /// Switch to different timer, stopping active timer
+  void SwitchTimer(int timer); 
+  /// Increment event forward execution count
+  void Do() { dos++; }         
+  /// Increment event rollback count
+  void Undo() { undos++; }    
+  /// Increment GVT estimation count     
+  void GvtInc() { gvts++; }   
+  /// Increment rollback count
+  void Rollback() { rollbacks++; }  
+  /// Increment checkpoint count and adjust max
   void Checkpoint() { chkPts++; if (chkPts > maxChkPts) maxChkPts = chkPts; }
+  /// Decrement checkpoint count
   void Reclaim() { chkPts--; }
-  void CPbytes(int n) { cpBytes += n; }  // add to checkpointed bytes count
-  void SendStats();           // send local stats to global collector
+  /// Add to checkpointed bytes count
+  void CPbytes(int n) { cpBytes += n; }  
+  /// Send local stats to global collector
+  void SendStats();
+  /// Query which timer is active
   int TimerRunning() { return (whichStat); }
-  
 };
 
+/// Entity to gather stats from each PE and prepare final report
 class globalStat : public Chare {
 private:
   double doAvg, doMax, rbAvg, rbMax, gvtAvg, gvtMax, simAvg, simMax, 
@@ -78,14 +90,15 @@ private:
   long cpBytes;
   int reporting, totalDos, totalUndos, totalGvts, maxChkPts;
 public:
+  /// Basic Constructor
   globalStat(void);
   globalStat(CkMigrateMessage *) { };
-  void localStatReport(localStatSummary *m); // receive, calc & print stats
+  /// Receive, calculate and print statistics
+  void localStatReport(localStatSummary *m); 
 };
 
 
 // All timer functions are inlined below
-
 // Start the specified timer.  If one is active, print warning, switch timer
 inline void localStat::TimerStart(int timer) 
 { 

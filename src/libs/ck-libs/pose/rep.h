@@ -1,44 +1,61 @@
-// File: rep.h
-// Module for basic representation class: what the user class becomes. It adds
-// minimal  functionality to the user's code, mostly OVT, and links back to 
-// the parent sim object.
-// Last Modified: 06.05.01 by Terry L. Wilmarth
-
+/// Base class to represent user object
+/** This is what the user class becomes. It adds minimal functionality
+    to the user's code, mostly OVT, and links back to the parent sim object. 
+    It also provides the derived templated class chpt for checkpointing. */
 #ifndef REP_H
 #define REP_H
 
+/// Base representation class
 class rep 
 {
  protected:
-  sim *parent;             // pointer to wrapper object
-  strat *myStrat;          // pointer to strategy
+  /// Pointer to poser wrapper
+  sim *parent;             
+  /// Pointer to synchronization strategy
+  strat *myStrat;          
  public:
-  int ovt;                 // the object's virtual time
-  int myHandle;            // the objects unique handle
-  int copy;                // flag to signify if this is a checkpoint copy
+  /// The object's virtual time (OVT)
+  int ovt;                 
+  /// the object's unique handle
+  /** Initialized to index of poser wrapper in POSE_objects array */
+  int myHandle;            
+  /// Flag to signify if this is a checkpointed copy of the real object
+  int copy;                
+  /// Basic Constructor
   rep() { ovt = 0; copy = 0; parent = NULL; myStrat = NULL; }
+  /// Initializing Constructor
   rep(int init_ovt) { ovt = init_ovt; copy = 0; }
+  /// Destructor
   virtual ~rep() { }
-  void init(eventMsg *m);  // call at start of constructor
+  /// Initializer called from poser wrapper constructor
+  void init(eventMsg *m);  
+  /// Return the OVT
   int OVT() { return ovt; }
+  /// Set the OVT to t
   void SetOVT(int t) { ovt = t; }
-  void elapse(int dt) { ovt += dt; }  // user calls to elapse time
-  void update(int t) { ovt = (ovt < t) ? t : ovt; }  // call at start of event
+  /// Elapse time by incrementing the OVT by dt
+  void elapse(int dt) { ovt += dt; }
+  /// Update the OVT at start of event to auto-elapse to event timestamp
+  /** If event has timestamp > OVT, OVT elapses to timestamp, otherwise
+      there is no change to OVT */
+  void update(int t) { ovt = (ovt < t) ? t : ovt; }
+  /// Called on every object at end of simulation
   virtual void terminus() { 
     //CkPrintf("Object %d terminus at time %d\n", myHandle, ovt);
   }
-  virtual Event *getCommitEvent(Event *e);  // get event to rollback to
-
-  // timestamps event message, sets priority, and makes a record of the send
+  /// Timestamps event message, sets priority, and records in spawned list
   virtual void registerTimestamp(int idx, eventMsg *m, unsigned int offset);
-
-  // required for checkpointing: must provide assignment in all derived classes
+  /// Assignment operator
+  /** Derived classes must provide assignment */
   virtual rep& operator=(const rep& obj) { 
     ovt = obj.ovt; 
     return *this;
   }
-  virtual void dump(int pdb_level);        // dump the entire rep object
-  virtual void pup(PUP::er &p) { p(ovt); } // pup the entire rep object
+  /// Dump all data fields
+  virtual void dump() { CkPrintf("[REP: ovt=%d]\n", ovt); }
+  /// Pack/unpack/sizing operator
+  /** Derived classes must provide pup */
+  virtual void pup(PUP::er &p) { p(ovt); p(myHandle); p(copy); }
 };
 
 #endif

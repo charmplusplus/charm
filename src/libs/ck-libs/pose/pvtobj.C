@@ -1,11 +1,19 @@
-// File: pvtobj.C
-// Defines pvtObjects, a list that holds records of objects registered with 
-// a PVT.
-// Last Modified: 5.30.01 by Terry L. Wilmarth
-
+/// pvtObjects: a list to hold records of posers registered with a PVT branch.
 #include "pose.h"
 
-// Basic initialization:  preallocates space for 100 objects
+/// Check validity of data fields
+void pvtObjectNode::sanitize() 
+{
+  CmiAssert((present == 0) || (present == 1));
+  if (present) {
+    CmiAssert(ovt >= -1);
+    CmiAssert(index >= 0);
+    CmiAssert((sync == OPTIMISTIC) || (sync == CONSERVATIVE));
+    CmiAssert((localObjPtr != NULL) && (localObjPtr->IsActive() < 2));
+  }
+}
+
+/// Basic Constructor: preallocates space for 100 objects
 pvtObjects::pvtObjects() 
 { 
   numObjs = numSpaces = firstEmpty = 0; 
@@ -14,38 +22,30 @@ pvtObjects::pvtObjects()
     CkPrintf("ERROR: pvtObjects::pvtObjects: OUT OF MEMORY!\n");
     CkExit();
   }
-  for (int i=0; i<size; i++) {
-    objs[i].present = 0;
-    objs[i].localObjPtr = NULL;
-  }
+  for (int i=0; i<size; i++) objs[i].set(-1, -1, 0, 0, NULL);
 }
 
-// Set all objects to idle (ovt = -1) in preparation for a PVT cycle
+/// Set posers to idle (ovt==-1)
 void pvtObjects::SetIdle()
 {
-  for (int i=0; i<numSpaces; i++)
-    if (objs[i].present)
-      objs[i].ovt = -1;
+  for (int i=0; i<numSpaces; i++) objs[i].setIdle();
 }
 
-// Wake all objects up
+/// Wake up all posers in list
 void pvtObjects::Wake()
 {
   for (int i=0; i<numSpaces; i++)
-    if (objs[i].present) 
-      (objs[i].localObjPtr)->Status();
+    if (objs[i].isPresent()) (objs[i].localObjPtr)->Status();
 }
   
-// Call commit for all objects
+/// Call Commit on all posers
 void pvtObjects::Commit()
 {
   for (int i=0; i<numSpaces; i++)
-    if (objs[i].present)
-      (objs[i].localObjPtr)->Commit();
+    if (objs[i].isPresent()) (objs[i].localObjPtr)->Commit();
 }
   
-// Insert an object in the list in the firstEmpty slot, expanding the list
-// size if necessary
+/// Insert poser in list
 int pvtObjects::Insert(int index, int ovt, int sync, sim *myPtr)
 {
   int idx, i;
@@ -53,14 +53,10 @@ int pvtObjects::Insert(int index, int ovt, int sync, sim *myPtr)
     idx = firstEmpty;
     if (firstEmpty == numSpaces) // all spaces occupied up to end of list
       numSpaces++;  // use a previously unused space
-    objs[idx].index = index;
-    objs[idx].ovt = ovt;
-    objs[idx].present = 1;
-    objs[idx].sync = sync;
-    objs[idx].localObjPtr = myPtr;
+    objs[idx].set(ovt, index, 1, sync, myPtr);
     numObjs++;
     for (i=firstEmpty+1; i<size; i++)  // reset firstEmpty
-      if (objs[i].present == 0) {
+      if (!objs[i].isPresent()) {
 	firstEmpty = i;
 	break;
       }
@@ -74,13 +70,9 @@ int pvtObjects::Insert(int index, int ovt, int sync, sim *myPtr)
       CkExit();
     }
     for (i=firstEmpty; i<size; i++)  // initialize new slots to empty
-      objs[i].present = 0;
+      objs[i].set(-1, -1, 0, 0, NULL);
     idx = firstEmpty;  // insert new object at firstEmpty
-    objs[idx].index = index;
-    objs[idx].ovt = ovt;
-    objs[idx].present = 1;
-    objs[idx].sync = sync;
-    objs[idx].localObjPtr = myPtr;
+    objs[idx].set(ovt, index, 1, sync, myPtr);
     numObjs++;
     numSpaces++;
     firstEmpty++;
@@ -88,17 +80,15 @@ int pvtObjects::Insert(int index, int ovt, int sync, sim *myPtr)
   return idx;
 }
 
-// Delete an object from the list
+/// Delete a poser from the list
 void pvtObjects::Delete(int idx)
 {
-  objs[idx].present = 0;
-  objs[idx].localObjPtr = NULL;
+  objs[idx].set(-1, -1, 0, 0, NULL);
   numObjs--;
-  if (idx < firstEmpty)  // recalculate firstEmpty
-    firstEmpty = idx;
+  if (idx < firstEmpty) firstEmpty = idx; // recalculate firstEmpty
 }
 
-// Print out the list contents
+/// Dump data fields
 void pvtObjects::dump()
 {
   CkPrintf("numObjs=%d numSpaces=%d firstEmpty=%d size=%d\n", 
@@ -108,4 +98,16 @@ void pvtObjects::dump()
     objs[i].dump();
     CkPrintf("\n");
   }
+}
+
+/// Check validity of data fields
+void pvtObjects::sanitize() {
+  CmiAssert(numObjs >= 0);
+  CmiAssert(numSpaces >= 0);
+  CmiAssert(size >= 0);
+  CmiAssert(firstEmpty >= 0);
+  CmiAssert(numObjs <= numSpaces);
+  CmiAssert(numSpaces <= size);
+  CmiAssert(firstEmpty < numSpaces);
+  for (int i=0; i<numSpaces; i++) objs[i].sanitize();
 }

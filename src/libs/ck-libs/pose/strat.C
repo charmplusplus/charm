@@ -1,52 +1,40 @@
-// File: strat.C
-// Module for basic simulation strategy class for protocols such as 
-// optimistic and conservative.
-// Last Modified: 06.05.01 by Terry L. Wilmarth
-
+/// Simulation synchronization strategy base class
 #include "pose.h"
 
-strat::strat() // basic initialization constructor
+/// Basic Constructor
+strat::strat() 
 {
+#ifdef POSE_STATS_ON
+  localStats = (localStat *)CkLocalBranch(theLocalStats);
+#endif
   eq = NULL;
   userObj = NULL;
   parent = NULL;
   currentEvent = targetEvent = RBevent = NULL;
-  voted = 0;
   localPVT = (PVT *)CkLocalBranch(ThePVT);
   STRAT_T = INIT_T;
-#ifdef POSE_STATS_ON
-  localStats = (localStat *)CkLocalBranch(theLocalStats);
-#endif
 }
 
-// initialize parent sim object pointers
+/// Initializer
 void strat::init(eventQueue *q, rep *obj, sim *p, int pIdx)
 {
-  eq = q;
-  userObj = obj;
-  parent = p;
-  parentIdx = pIdx;
-  initSync();
+  eq = q;  userObj = obj;  parent = p;  initSync();
 }
 
-// Strategy specific forward execution step.
-// Code here MUST be overridden, but this gives a basic idea of how
-// a forward execution step should go.  Strategies must determine if it is
-// safe to execute an event.
+/// Strategy-specific forward execution step
 void strat::Step()
 {
   Event *ev;
-
-  parent->Deactivate();        // since this is executing, there is no longer a
-                               // queued Step message, so deactivate
-  ev = eq->currentPtr;         // get event to execute
-  currentEvent = ev;           // set currentEvent
-  if (ev->timestamp >= 0) {    // make sure it's not the back sentinel
-    parent->ResolveFn(ev->fnIdx, ev->msg);  // execute it
-    ev->done = 1;              // mark it done
-    eq->ShiftEvent();          // shift to next event
-    // reactivate and re-enqueue Step message
+  parent->Deactivate(); // since this is executing, there is no longer a
+  // queued Step message, so deactivate
+  ev = eq->currentPtr; // get event to execute
+  currentEvent = ev; // set currentEvent
+  if (ev->timestamp >= 0) { // make sure it's not the back sentinel
+    ev->done = 2; // mark it executing
+    parent->ResolveFn(ev->fnIdx, ev->msg); // execute it
+    ev->done = 1; // mark it done
+    eq->ShiftEvent(); // shift to next event
     parent->Activate();
-    POSE_Objects[parentIdx].Step();
+    POSE_Objects[parent->thisIndex].Step();
   }
 }
