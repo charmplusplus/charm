@@ -320,7 +320,9 @@ static void *call_mmap_anywhere(size_t len) {
 
 /* Unmaps this address range */
 static void call_munmap(void *addr,size_t len) {
-  int retval = munmap(addr, len);
+  int retval;
+  if (addr == 0) return; /* NULL address is never mapped */ 
+  retval = munmap(addr, len);
   if (retval==(-1))
     CmiAbort("munmap call failed to deallocate requested memory.\n");
 }
