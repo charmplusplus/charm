@@ -249,7 +249,7 @@ static void *disabled_map(int nBytes)
 	if (!disabled_map_warned) {
 		disabled_map_warned=1;
 		if (CmiMyPe()==0)
-			CmiError("isomalloc.c> Warning: since mmap() doesn't work,"
+			CmiError("charm isomalloc.c> Warning: since mmap() doesn't work,"
 			" you won't be able to migrate threads\n");
 	}
 	return malloc(nBytes);
@@ -309,7 +309,7 @@ map_slots(int slot, int nslots)
   pa = mmap(addr, slotsize*nslots, 
             PROT_READ|PROT_WRITE, 
 #if CMK_HAS_MMAP_ANON
-	    MAP_PRIVATE|MAP_ANON,-1,
+	    MAP_PRIVATE|MAP_FIXED|MAP_ANON,-1,
 #else
 	    MAP_PRIVATE|MAP_FIXED,CpvAccess(zerofd),
 #endif
@@ -373,7 +373,8 @@ init_map(char **argv)
 static void map_failed(int s,int n)
 {
   void *addr=slot2addr(s);
-  CmiError("map failed to allocate %d bytes at %p.\n", slotsize*n, addr);
+  CmiError("charm isomalloc.c> map failed to allocate %d bytes at %p.\n",
+      slotsize*n, addr);
   CmiAbort("Exiting\n");
 }
 
