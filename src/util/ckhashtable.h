@@ -249,8 +249,13 @@ class CkHashtableTslow:public CkHashtable {
       char empty;
       OBJ o;
     };
-    return CkHashtableLayout(sizeof(KEY),offsetof(entry_t,empty),
-			     offsetof(entry_t,o),sizeof(OBJ),sizeof(entry_t));
+    // HACK: All I want is the offset from entry_t to empty and o;
+    //  but the compiler's "offsetof" keyword complains "non-POD type!".
+    entry_t *e=(entry_t *)0;
+    int emptyOffset=((char *)&e->empty)-(char *)e;
+    int oOffset=((char *)&e->o)-(char *)e;
+    return CkHashtableLayout(sizeof(KEY),emptyOffset,
+			     oOffset,sizeof(OBJ),sizeof(entry_t));
   }
 public:
 	//Constructor-- create an empty hash table of at least the given size
