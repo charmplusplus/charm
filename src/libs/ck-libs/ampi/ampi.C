@@ -679,17 +679,15 @@ int ampiParent::deleteAttr(MPI_Comm comm, int keyval){
 void ampi::init(void) {
   parent=NULL;
   thread=NULL;
-  parent=NULL;
-  thread=NULL;
+  msgs=NULL;
   resumeOnRecv=false;
   comlibEnabled=AMPI_COMLIB;
 }
 
 ampi::ampi()
 {
-  init();
-  msgs=NULL;
-  seqEntries=-1;
+  /* this constructor only exists so we can create an empty array during split */
+  CkAbort("Default ampi constructor should never be called");
 }
 
 ampi::ampi(CkArrayID parent_,const ampiCommStruct &s)
@@ -715,7 +713,8 @@ ampi::ampi(CkArrayID parent_,const ampiCommStruct &s)
 
 ampi::ampi(CkMigrateMessage *msg):CBase_ampi(msg)
 {
-  msgs=NULL;
+  init();
+  
   seqEntries=-1;
 }
 
