@@ -396,12 +396,12 @@ PairCalculator::acceptResult(int size, double *matrix, int rowNum, CkCallback cb
   if(S%grainSize!=0)
       segments+=1;
   int blocksize=grainSize/segments;
-  int priority=0xFF;
+  int priority=0xFFFFFFFF;
   if(!symmetric){    // Not right in value given!!!
     for(int segment=0;segment < segments;segment++)
       {  
 	CkArrayIndexIndex4D idx(thisIndex.w, segment*grainSize, thisIndex.y, thisIndex.z);
-	partialResultMsg *msg = new (N*blocksize*sizeof(complex), 8*sizeof(int) )partialResultMsg;
+	partialResultMsg *msg = new (N*blocksize, 8*sizeof(int) )partialResultMsg;
 	msg->N=N*blocksize;
 	memcpy(msg->result,mynewData+segment*N*blocksize,msg->N*sizeof(complex));
 	msg->cb= cb;
@@ -413,7 +413,7 @@ PairCalculator::acceptResult(int size, double *matrix, int rowNum, CkCallback cb
   else 
   {
     CkArrayIndexIndex4D idx(thisIndex.w, 0, thisIndex.y, thisIndex.z);
-    priorSumMsg *pmsg = new (N*grainSize*sizeof(complex), 8*sizeof(int) )priorSumMsg();
+    priorSumMsg *pmsg = new (N*grainSize, 8*sizeof(int) )priorSumMsg();
     pmsg->N=N*grainSize;
     memcpy(pmsg->result,mynewData, pmsg->N*sizeof(complex));
     pmsg->cb= cb;
@@ -422,7 +422,7 @@ PairCalculator::acceptResult(int size, double *matrix, int rowNum, CkCallback cb
     thisProxy(idx).sumPartialResult(pmsg);
     if (rowNum != thisIndex.x){
       CkArrayIndexIndex4D idx(thisIndex.w, 0, thisIndex.x, thisIndex.z);
-      priorSumMsg *pmsg = new (N*grainSize*sizeof(complex), 8*sizeof(int) )priorSumMsg();
+      priorSumMsg *pmsg = new (N*grainSize, 8*sizeof(int) )priorSumMsg();
       pmsg->N=N*grainSize;
       memcpy(pmsg->result,othernewData, pmsg->N*sizeof(complex));
       pmsg->cb= cb;
