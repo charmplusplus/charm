@@ -167,7 +167,7 @@ int skt_ip_match(skt_ip_t a,skt_ip_t b);
 struct sockaddr_in skt_build_addr(skt_ip_t IP,int port);
 
 /*UDP*/
-SOCKET skt_datagram(int *port, int bufsize);
+SOCKET skt_datagram(unsigned int *port, int bufsize);
 
 /*TCP*/
 SOCKET skt_server(unsigned int *port);

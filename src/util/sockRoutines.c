@@ -280,7 +280,7 @@ struct sockaddr_in skt_build_addr(skt_ip_t IP,int port)
   return ret;  
 }
 
-SOCKET skt_datagram(int *port, int bufsize)
+SOCKET skt_datagram(unsigned int *port, int bufsize)
 {  
   int connPort=(port==NULL)?0:*port;
   struct sockaddr_in addr=skt_build_addr(_skt_invalid_ip,connPort);
