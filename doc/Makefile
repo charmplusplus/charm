@@ -1,7 +1,7 @@
 IDIR=../../doc
 LNCMD=test ! -f pplmanual.sty && ln -f -s ../pplmanual.sty .
 RMCMD=rm -f ./pplmanual.sty
-DIRS=install converse convext charm++ libraries f90charm \
+DIRS=install converse convext charm++ libraries f90charm pose \
 	fem ifem netfem ampi bluegene mblock projections tcharm debugger
 
 all: ps pdf html
