@@ -1,0 +1,121 @@
+\subsection{Communication Optimizations Framework}
+
+The communications framework in charm++/converse is aimed at
+optimizing certain communication patterns. Currently the programmer
+has to specify which communication pattern. In future this is aimed at
+being automatic!
+
+The communications library uses the delegation framework. This is to
+make it transparent to the programmer. The communications library
+currently optimizes the following communication patterns. The
+parameter strategy to the communications library initialization
+specifies this.
+
+\begin{itemize} 
+\item Collective personalized communication. In this
+communication operation each array element sends a distinct message to
+many other array elements. The sending and receiving elements need not
+belong to the same array.  
+
+\item Collective multicast operation. Here
+each array element sends the same message to many other array
+elements.  
+
+\item Streaming. In this communication pattern each array
+element sends many small messages to other array elements but these
+sends are not synchronized and the library periodically collects
+messages and sends them to their destinations. The period is a
+parameter to the library.
+
+\end{itemize}
+
+To use the communications library it needs to be compiled first.
+
+\begin{verbatim}
+cd charm/tmp/libs/ck-libs/commlib;
+make;
+\end{verbatim}
+
+Calls to the communications library have to be made at three places in
+the user program. They are :
+
+\begin{enumerate}
+
+\item main.ci, \\
+\begin{verbatim}
+ extern module ComlibModule; 
+ readonly CkGroupID dmid; 
+\end{verbatim}
+
+\item main.C \\
+\begin{verbatim}
+ #include ''ComlibManager.h'' //Call this before all other includes!
+ CkGroupID dmid; 
+
+ //In main::main() 
+ //Initialize the library
+ dmid = CProxy_ComlibManager::ckNew(strategy); 
+ //Will be explained later
+ CProxy_ComlibManager(dmid).ckLocalBranch()->createId();
+\end{verbatim}
+
+\item In the array element \\
+\begin{verbatim}
+//Called in the constructor
+//Registers the array element with the communications framework
+(CProxy_ComlibManager(dmid).ckLocalBranch())->localElement();
+
+//Before calling an entry method whose message should go thorough the library 
+//the proxy has to be delegated
+array_proxy.ckDelegate(dmid);
+
+(CProxy_ComlibManager(dmid).ckLocalBranch())->beginIteration();
+array_proxy[index].entry();
+.....
+.....
+(CProxy_ComlibManager(dmid).ckLocalBranch())->endIteration();
+
+//Now all calls to array_proxy will go through the library.
+//So non library calls should use another proxy!
+//The begin and end calls do not have to be called for the streaming strategy.
+\end{verbatim}
+\end{enumerate}
+
+The parameter strategy specifies to the library which strategy to
+use. The following are the strategies currently supported.
+
+\begin{itemize} 
+
+\item USE\_DIRECT, USE\_MESH, USE\_HYPERCBE, USE\_GRID. These
+are strategies to optimize all to all personalized
+communication. USE\_DIRECT sends the message directly. USE\_MESH imposes
+a 2d Mesh virtual topology on the processors so now each processor
+sends messages to its neighbors in its row and column of the mesh
+which forward the messages to their correct
+destinations. USE\_HYPERCUBE and USE\_GRID impose a hypercube and a 3d
+Grid topologies on the processors. USE\_HYPERCUBE will do best for very
+small messages and small number of processors, 3d has better
+performance for slightly higher message sizes and then Mesh starts
+performing best. The programmer is encouraged to try out all the
+strategies.
+
+\item USE\_STREAMING, here on each processor the library waits for 10
+ms by default and sends all messages that are destined to a processor
+in one message. The period which is 10ms by default can be passed as a
+parameter to the communications library constructor.
+
+\end{itemize}
+
+The createId call in main::main initializes the library communications
+identifier. By default its assumed that array elements exist on all
+processors and will contribute to the collective communication
+operations. But if they dont then the set of processors in which the
+array elements are present needs to be passed to the library. So now
+the createId call will look like this :
+
+\begin{verbatim}
+ CProxy_ComlibManager(dmid).ckLocalBranch()->createId(pelist, npes);
+\end{verbatim}
+
+where pelist is an integer array giving the list of processors and
+npes is the length of that list.
