@@ -901,6 +901,8 @@ char **CmiCopyArgs(char **argv);
 CpvExtern(void*, CmiLocalQueue);
 #endif
 
+#include "conv-cpm.h"
+#include "conv-cpath.h"
 #include "conv-qd.h"
 #include "conv-random.h"
 #include "conv-lists.h"
