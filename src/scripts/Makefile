@@ -271,7 +271,7 @@ MEMLIBS=$(L)/libmemory-default.o $(L)/libmemory-os.o $(L)/libmemory-gnu.o \
 	  $(L)/libmemory-paranoid.o \
 	  $(L)/libmemory-leak.o $(L)/libmemory-isomalloc.o
 THREADLIBS=$(L)/libthreads-default.o $(L)/libthreads-qt.o 	\
- 	  $(L)/libthreads-context.o $(L)/libthreads-uJcontext.o \
+	  $(L)/libthreads-context.o $(L)/libthreads-uJcontext.o \
 	  $(L)/libthreads-pthreads.o $(L)/libthreads-fibers.o
 
 CVLIBS=$(L)/libconv-core.a \

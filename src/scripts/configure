@@ -1846,6 +1846,9 @@ _ACEOF
 
 
 #### check if PAPI exists ####
+echo "$CMK_USE_PAPI"
+if [ -n "$CMK_USE_PAPI" ]
+then
 cat > $t <<EOT
 #include <stdio.h>
 #include <papi.h>
@@ -1864,7 +1867,13 @@ _ACEOF
 
 if test $pass -eq 1
 then
+        cat >> ../include/conv-mach-opt.h <<EOT
+	// header added by configure script after detecting the presence
+	// of PAPI.
+        #include <papi.h>
+EOT
 	add_flag 'CMK_LIBS="$CMK_LIBS -lpapi"' "papi"
+fi
 fi
 
 #### test if it can build shared library ####

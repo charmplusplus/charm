@@ -524,6 +524,9 @@ test_cxx "whether has stdint.h " "yes" "no" ""
 AC_DEFINE_UNQUOTED(CMK_HAS_STDINT_H, $pass, [whether has stdint.h])
 
 #### check if PAPI exists ####
+echo "$CMK_USE_PAPI"
+if [[ -n "$CMK_USE_PAPI" ]]
+then
 cat > $t <<EOT
 #include <stdio.h>
 #include <papi.h>
@@ -538,7 +541,13 @@ test_link "whether PAPI exists" "yes" "no" "-lpapi"
 AC_DEFINE_UNQUOTED(CMK_HAS_COUNTER_PAPI, $pass, [whether PAPI exists])
 if test $pass -eq 1
 then 
+        cat >> ../include/conv-mach-opt.h <<EOT
+// header added by configure script after detecting the presence
+// of PAPI.
+#include <papi.h>
+EOT
 	add_flag 'CMK_LIBS="$CMK_LIBS -lpapi"' "papi"
+fi
 fi
 
 #### test if it can build shared library ####
