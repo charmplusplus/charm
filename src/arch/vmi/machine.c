@@ -69,6 +69,10 @@ CMI_VMI_Handle_T *CMI_VMI_Handles;
 volatile int CMI_VMI_AsyncMsgCount;
 
 
+/* This global variable is the count of nodes that have reached a barrier. */
+volatile int CMI_VMI_Barrier_Count;
+
+
 /*
   These global variables are the maximum number of (send and receive)
   handles and the next index within the handle array to allocate.
@@ -1105,7 +1109,9 @@ VMI_RECV_STATUS CMI_VMI_Stream_Receive_Handler (PVMI_CONNECT connection,
   status = VMI_Slab_Restore_State (slab, state);
   CMI_VMI_CHECK_SUCCESS (status, "VMI_Slab_Restore_State()");
 
-  if (CMI_VMI_MESSAGE_TYPE (msg) == CMI_VMI_MESSAGE_TYPE_STANDARD) {
+  if (CMI_VMI_MESSAGE_TYPE (msg) == CMI_VMI_MESSAGE_TYPE_BARRIER) {
+    CMI_VMI_Barrier_Count++;
+  } else if (CMI_VMI_MESSAGE_TYPE (msg) == CMI_VMI_MESSAGE_TYPE_STANDARD) {
 #if CMK_BROADCAST_SPANNING_TREE
     if (CMI_BROADCAST_ROOT (msg)) {
       /* Message is enqueued into CMI_VMI_RemoteQueue when send to all
@@ -1607,6 +1613,9 @@ void ConverseInit (int argc, char **argv, CmiStartFn start_function,
   /* Initialize the global asynchronous message count. */
   CMI_VMI_AsyncMsgCount = 0;
 
+  /* Initialize the global barrier messages count. */
+  CMI_VMI_Barrier_Count = 0;
+
   /* Initialize the maximum number of send and receive handles. */
   a = getenv ("CMI_VMI_MAXIMUM_HANDLES");
   if (a) {
@@ -1651,7 +1660,6 @@ void ConverseInit (int argc, char **argv, CmiStartFn start_function,
 
   /* Start up via the startup type selected. */
   switch (startup_type) {
-
     case CMI_VMI_STARTUP_TYPE_CRM:
       rc = CMI_VMI_Startup_CRM (key);
       break;
@@ -1727,6 +1735,9 @@ void ConverseExit ()
 
 
   DEBUG_PRINT ("ConverseExit() called.\n");
+
+  /* ConverseCommonExit() shuts down CCS and closes Projections logs. */
+  ConverseCommonExit ();
 
   /* Should close all VMI connections here. */
   /* There is a race condition here because not all processes may have
@@ -1827,6 +1838,100 @@ void CmiNotifyIdle ()
 
   status = VMI_Poll ();
   CMI_VMI_CHECK_SUCCESS (status, "VMI_Poll()");
+}
+
+
+
+/**************************************************************************
+** This is a simple barrier function, similar to the one implemented in the
+** net-linux-gm machine layer.  This routine assumes that there are few
+** messages in flight; I have not tested extensively with many outstanding
+** messages and there could very well be some nasty race conditions.
+**
+** This routine was implemented to allow clocks to be synchronized at
+** program startup time, so Projections timeline views do not show message
+** sends that appear after the corresponding message deliveries.
+**
+** THIS CODE ASSUMES THAT CMI_VMI_Barrier_Count IS INITIALIZED TO 0
+** DURING ConverseInit().  We cannot initialize it in this function due
+** to a race condition where Rank 0 might invoke CmiBarrer() much later
+** than other nodes in the computation.  In this case, it might have
+** already seen barrier messages coming in from the other nodes and
+** counted them in the stream receive handler prior to invoking
+** CmiBarrier().
+**
+** TODO: This routine should use spanning trees if this machine layer has
+** been configured for that type of message broadcast.
+*/
+void CmiBarrier ()
+{
+  VMI_STATUS status;
+  int num_processes;
+  CMI_VMI_Barrier_Message_T barrier_msg;
+  PVOID addrs[1];
+  ULONG sz[1];
+  int i;
+
+
+  if (CmiMyPe() == 0) {
+    num_processes = CmiNumPes() - 1;
+
+    while (CMI_VMI_Barrier_Count < num_processes) {
+      status = VMI_Poll ();
+      CMI_VMI_CHECK_SUCCESS (status, "VMI_Poll()");
+    }
+
+    CMI_VMI_Barrier_Count = 0;
+
+    num_processes++;
+
+    CMI_VMI_MESSAGE_TYPE (&barrier_msg) = CMI_VMI_MESSAGE_TYPE_BARRIER;
+
+#if CMK_BROADCAST_SPANNING_TREE
+    CMI_SET_BROADCAST_ROOT (&barrier_msg, 0);
+#endif
+
+    addrs[0] = (PVOID) &barrier_msg;
+    sz[0] = (ULONG) (sizeof (CMI_VMI_Barrier_Message_T));
+
+    for (i = 1; i < num_processes; i++) {
+      status = VMI_Stream_Send_Inline ((&CMI_VMI_Processes[i])->connection,
+				       addrs, sz, 1,
+				       sizeof (CMI_VMI_Barrier_Message_T));
+      CMI_VMI_CHECK_SUCCESS (status, "VMI_Stream_Send_Inline()");
+    }
+  } else {
+    CMI_VMI_MESSAGE_TYPE (&barrier_msg) = CMI_VMI_MESSAGE_TYPE_BARRIER;
+
+#if CMK_BROADCAST_SPANNING_TREE
+    CMI_SET_BROADCAST_ROOT (&barrier_msg, 0);
+#endif
+
+    addrs[0] = (PVOID) &barrier_msg;
+    sz[0] = (ULONG) (sizeof (CMI_VMI_Barrier_Message_T));
+
+    status = VMI_Stream_Send_Inline ((&CMI_VMI_Processes[0])->connection,
+				     addrs, sz, 1,
+				     sizeof (CMI_VMI_Barrier_Message_T));
+    CMI_VMI_CHECK_SUCCESS (status, "VMI_Stream_Send_Inline()");
+
+    while (CMI_VMI_Barrier_Count < 1) {
+      status = VMI_Poll ();
+      CMI_VMI_CHECK_SUCCESS (status, "VMI_Poll()");
+    }
+
+    CMI_VMI_Barrier_Count = 0;
+  }
+}
+
+
+
+/**************************************************************************
+**
+*/
+void CmiBarrierZero ()
+{
+  CmiBarrier ();
 }
 
 

@@ -155,6 +155,7 @@ typedef struct
 #define CMI_VMI_MESSAGE_TYPE(msg) ((CmiMsgHeaderBasic *)msg)->vmitype
 #define CMI_VMI_MESSAGE_TYPE_STANDARD   1
 #define CMI_VMI_MESSAGE_TYPE_RENDEZVOUS 2
+#define CMI_VMI_MESSAGE_TYPE_BARRIER    3
 
 
 
@@ -183,6 +184,11 @@ typedef struct
   int msgsize;
   VMI_virt_addr_t context;
 } CMI_VMI_Rendezvous_Message_T;
+
+typedef struct
+{
+  char header[CmiMsgHeaderSizeBytes];
+} CMI_VMI_Barrier_Message_T;
 
 #if CMK_PERSISTENT_COMM
 typedef struct
@@ -441,6 +447,8 @@ void *CmiGetNonLocal (void);
 void CmiMemLock ();
 void CmiMemUnlock ();
 void CmiNotifyIdle ();
+void CmiBarrier ();
+void CmiBarrierZero ();
 void CmiSyncSendFn (int destrank, int msgsize, char *msg);
 CmiCommHandle CmiAsyncSendFn (int destrank, int msgsize, char *msg);
 void CmiFreeSendFn (int destrank, int msgsize, char *msg);
