@@ -232,7 +232,7 @@ public:
 	OBJ get(const KEY &key) {
 		int i=key.hash()%len;
 		while(true) {//Assumes key or empty slot will be found
-			entry_t *cur=table+i*(sizeof(KEY)+sizeof(OBJ));
+			CkHashtable::entry_t *cur=table+i*(sizeof(KEY)+sizeof(OBJ));
 			//An empty slot indicates the key is not here
 			if (-17==*(int *)cur) return OBJ(0);
 			//Is this the key?
@@ -245,7 +245,7 @@ public:
 	OBJ &getRef(const KEY &key) {
 		int i=key.hash()%len;
 		while(true) {//Assumes key or empty slot will be found
-			entry_t *cur=table+i*(sizeof(KEY)+sizeof(OBJ));
+			CkHashtable::entry_t *cur=table+i*(sizeof(KEY)+sizeof(OBJ));
 			//Is this the key?
 			if (key.compare(*(const KEY *)cur))
 				return *(OBJ *)(cur+sizeof(KEY));
