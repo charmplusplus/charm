@@ -10,6 +10,8 @@
 
 #define CMK_CONVERSE_MPI                                   1
 
+#define CMK_MEMORY_PREALLOCATE_HACK			   1
+
 #define CMK_DEFAULT_MAIN_USES_COMMON_CODE                  1
 
 #define CMK_IS_HETERO                                      0
@@ -33,7 +35,7 @@
 #define CMK_SIGNAL_USE_SIGACTION_WITH_RESTART              1
 
 #define CMK_THREADS_USE_CONTEXT                            0
-#define CMK_THREADS_USE_PTHREADS                           1
+#define CMK_THREADS_USE_PTHREADS                           0
 
 #define CMK_SYNCHRONIZE_ON_TCP_CLOSE                       0
 
@@ -55,13 +57,11 @@
 #define CMK_WHEN_PROCESSOR_IDLE_BUSYWAIT                   1
 #define CMK_WHEN_PROCESSOR_IDLE_USLEEP                     0
 
-
 #define CMK_WEB_MODE                                       1
 #define CMK_DEBUG_MODE                                     0
 
 #define CMK_LBDB_ON					   1
 
-/*** for Cray-XT3 Red Strom ***/
 #define CMK_NO_SOCKETS                                     1
 
 #define CMK_CCS_AVAILABLE                                  0

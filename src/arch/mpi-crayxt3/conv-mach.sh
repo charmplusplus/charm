@@ -22,7 +22,7 @@ CMK_SEQ_LDXX="pgCC "
 CMK_SEQ_LIBS=""
 
 CMK_RANLIB="ranlib"
-CMK_QT="none"
+CMK_QT="generic64"
 
 CMK_F90LIBS=""
 CMK_MOD_NAME_ALLCAPS=1
