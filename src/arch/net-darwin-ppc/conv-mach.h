@@ -51,8 +51,6 @@
 #define CMK_TIMER_USE_SPECIAL                              0
 #define CMK_TIMER_USE_TIMES                                0
 
-#define CMK_NO_ISO_MALLOC				   1
-
 #define CMK_TYPEDEF_INT2 short
 #define CMK_TYPEDEF_INT4 int
 #define CMK_TYPEDEF_INT8 long long
