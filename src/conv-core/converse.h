@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.60  1997-04-03 20:32:11  milind
+ * Revision 2.61  1997-05-05 13:47:12  jyelon
+ * Revamped threads package using quickthreads.
+ *
+ * Revision 2.60  1997/04/03 20:32:11  milind
  * Fixed compilation problem due to differing prototype declaration of
  * CthAutoYield.
  *
@@ -637,17 +640,6 @@ void       CthAutoYieldUnblock    CMK_PROTO((void));
 
 #endif
 
-#if CMK_THREADS_UNAVAILABLE
-
-#define CtvDeclare(t,v)         CpvDeclare(t,v)
-#define CtvStaticDeclare(t,v)   CpvStaticDeclare(t,v)
-#define CtvExtern(t,v)          CpvExtern(t,v)
-#define CtvAccess(v)            CpvAccess(v)
-#define CtvInitialize(t,v)      CpvInitialize(t,v)
-
-#endif
-
-#if CMK_THREADS_USE_ALLOCA
 CthCpvExtern(char *,CthData);
 extern int CthRegister CMK_PROTO((int));
 #define CtvDeclare(t,v)         typedef t CtvType##v; CsvDeclare(int,CtvOffs##v);
@@ -655,42 +647,6 @@ extern int CthRegister CMK_PROTO((int));
 #define CtvExtern(t,v)          typedef t CtvType##v; CsvDeclare(int,CtvOffs##v);
 #define CtvAccess(v)            (*((CtvType##v *)(CthCpvAccess(CthData)+CsvAccess(CtvOffs##v))))
 #define CtvInitialize(t,v)      if (CmiMyRank()==0) (CsvAccess(CtvOffs##v)=CthRegister(sizeof(CtvType##v)));
-#endif /* CMK_THREADS_USE_ALLOCA */
-
-#if CMK_THREADS_USE_JB_TWEAKING
-CthCpvExtern(char *,CthData);
-extern int CthRegister CMK_PROTO((int));
-#define CtvDeclare(t,v)         typedef t CtvType##v; CsvDeclare(int,CtvOffs##v);
-#define CtvStaticDeclare(t,v)   typedef t CtvType##v; CsvDeclare(int,CtvOffs##v);
-#define CtvExtern(t,v)          typedef t CtvType##v; CsvDeclare(int,CtvOffs##v);
-#define CtvAccess(v)            (*((CtvType##v *)(CthCpvAccess(CthData)+CsvAccess(CtvOffs##v))))
-#define CtvInitialize(t,v)      if (CmiMyRank()==0) (CsvAccess(CtvOffs##v)=CthRegister(sizeof(CtvType##v)));
-#endif /* CMK_THREADS_USE_JB_TWEAKING */
-
-#if CMK_THREADS_USE_JB_TWEAKING_ORIGIN
-CthCpvExtern(char *,CthData);
-extern int CthRegister CMK_PROTO((int));
-#define CtvDeclare(t,v)         typedef t CtvType##v; CsvDeclare(int,CtvOffs##v);
-#define CtvStaticDeclare(t,v)   typedef t CtvType##v; CsvDeclare(int,CtvOffs##v);
-#define CtvExtern(t,v)          typedef t CtvType##v; CsvDeclare(int,CtvOffs##v);
-#define CtvAccess(v)            (*((CtvType##v *)(CthCpvAccess(CthData)+CsvAccess(CtvOffs##v))))
-#define CtvInitialize(t,v)      if (CmiMyRank()==0) (CsvAccess(CtvOffs##v)=CthRegister(sizeof(CtvType##v)));
-#endif /* CMK_THREADS_USE_JB_TWEAKING_ORIGIN */
-
-#if CMK_THREADS_USE_JB_TWEAKING_EXEMPLAR
-CthCpvExtern(char*,CthData);
-extern int CthRegister CMK_PROTO((int));
-#define CtvDeclare(t,v)         typedef t CtvType##v; CsvDeclare(int,CtvOffs##v);
-#define CtvStaticDeclare(t,v)   typedef t CtvType##v; CsvDeclare(int,CtvOffs##v);
-#define CtvExtern(t,v)          typedef t CtvType##v; CsvDeclare(int,CtvOffs##v);
-#define CtvAccess(v)            (*((CtvType##v *)(CthCpvAccess(CthData)+CsvAccess(CtvOffs##v))))
-#define CtvInitialize(t,v)      if (CmiMyRank()==0) (CsvAccess(CtvOffs##v)=CthRegister(sizeof(CtvType##v)));
-#endif /* CMK_THREADS_USE_JB_TWEAKING */
-
-#ifndef CtvDeclare
-error Barf.
-#endif
-
 
 /************************************************************************
  *
