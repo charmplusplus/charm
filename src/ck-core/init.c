@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.4  1995-06-20 14:54:24  gursoy
+ * Revision 2.5  1995-06-29 15:54:09  gursoy
+ * fixed a CpvAccess -- ReadBufIndex
+ *
+ * Revision 2.4  1995/06/20  14:54:24  gursoy
  * fixed readonly's
  *
  * Revision 2.3  1995/06/18  22:10:34  sanjeev
@@ -227,7 +230,7 @@ char **argv;
 #endif
 		/* create the buffer for the read only variables */
 		ReadBufMsg = (char *) CkAllocMsg(CsvAccess(ReadBuffSize));
-		CsvAccess(ReadBufIndex) = ReadBufMsg;
+		CpvAccess(ReadBufIndex) = ReadBufMsg;
 		if (CsvAccess(ReadBuffSize) > 0)
 			CkMemError(ReadBufMsg);
 
