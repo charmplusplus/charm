@@ -1727,6 +1727,8 @@ void start_nodes_daemon(void)
   argBuffer[0]=0;
   for (i=0;arg_argv[i];i++) 
   {
+    if (arg_verbose)
+      printf("Charmrun> packing arg: %s\n", arg_argv[i]);
     strcat(argBuffer," ");
     strcat(argBuffer,arg_argv[i]);
   }
@@ -1749,8 +1751,8 @@ void start_nodes_daemon(void)
     arg_nodeprog_r = pathextfix(arg_nodeprog_a, nodetab_pathfixes(nodeNumber), nodetab_ext(nodeNumber));
     strcpy(task.pgm,arg_nodeprog_r);
 
-	if (arg_verbose)
-	  printf("Charmrun> Starting node program %d on '%s' as %s.\n",nodeNumber,nodetab_name(pe0), arg_nodeprog_r);
+    if (arg_verbose)
+      printf("Charmrun> Starting node program %d on '%s' as %s.\n",nodeNumber,nodetab_name(pe0), arg_nodeprog_r);
 
     sprintf(task.env,"NETSTART=%s",create_netstart(nodeNumber));
 

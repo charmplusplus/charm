@@ -15,6 +15,7 @@
 #include <process.h>
 #else
 #include <errno.h>
+#include <sys/wait.h>
 typedef unsigned int BYTE;
 #endif
 #include <time.h>
@@ -54,6 +55,8 @@ int main()
   taskStruct task;      /* Information about the task to be performed */
   time_t curTime;
 
+  int doNext = 1;
+
   logfile=stdout;
 #ifdef FACELESS
   logfile=fopen("daemon.log","w+");
@@ -77,10 +80,29 @@ int main()
     char ip_str[200];
     char *argLine; /* Argument list for called program */
     char statusCode;/*Status byte sent back to requestor*/
+    fd_set  rfds;
+    struct timeval tmo;
+    int sstatus, wstatus;    /* status code for select and waitpid */
     
+    if (doNext) 
     fprintf(logfile,"\nListening for requests on port %d\n",myPortNumber);
 	fflush(logfile);
     
+    tmo.tv_sec = 5;               /* call waitpid every a few seconds */
+    tmo.tv_usec = 0;
+    FD_ZERO(&rfds);
+    FD_SET(myfd,&rfds);
+    sstatus=select(FD_SETSIZE, &rfds, 0, 0, &tmo);
+
+#ifndef _WIN32
+      /* test and get rid of zombie process */
+    waitpid(-1, &wstatus, WNOHANG);
+#endif
+    if (sstatus == 0) {
+      doNext = 0;
+      continue;
+    }
+
     /* Accept & log a TCP connection from a client */
     remotefd=skt_accept(myfd, &remoteIP, &remotePortNumber); 
     
@@ -116,9 +138,10 @@ int main()
     argLine[ChMessageInt(task.argLength)] = 0;
     
     fprintf(logfile,"Invoking '%s'\n"
+	    "and argLine '%s'\n"
 	    "and environment '%s'\n"
 	    "in '%s'\n",
-	    task.pgm,task.env,task.cwd);fflush(logfile);
+	    task.pgm,argLine,task.env,task.cwd);fflush(logfile);
     
     /* Finally, create the process*/
     statusCode=startProgram(task.pgm,argLine,task.cwd,task.env);
@@ -129,6 +152,8 @@ int main()
 
     /*Free recv'd arguments*/
     free(argLine);
+
+    doNext = 1;
   }
   return 0;  
 }
@@ -233,9 +258,10 @@ void goFaceless(void)
 		exit(0); /*Kill off the parent process, freeing terminal*/
 }
 
-char ** args2argv(const char *args,char **argv) {
+char ** args2argv(const char *args,char **argv,char *exe) {
 	int cur=0,len=strlen(args);
 	int argc=0;
+        argv[argc++] = exe;
 	while (cur<len) {
 		int start,end;
 		while (cur<len && args[cur]==' ') cur++;
@@ -254,8 +280,6 @@ char ** args2argv(const char *args,char **argv) {
 	return argv;
 }
 
-
-
 char startProgram(const char *exeName, const char *args, 
 				const char *cwd, char *env)
 {
@@ -270,7 +294,7 @@ char startProgram(const char *exeName, const char *args,
 		char **argv=(char **)malloc(sizeof(char *)*1000);
 		ret|=chdir(cwd);
 		putenv(env);
-#ifdef FACELESS
+#if 1
 		/*Redirect program's stdin, out, err to /dev/null*/
 		fd=open("/dev/null",O_RDWR);
 		dup2(fd,0);
@@ -278,7 +302,8 @@ char startProgram(const char *exeName, const char *args,
 		dup2(fd,2);
 #endif
 		for (fd=3;fd<1024;fd++) close(fd);
-		ret|=execvp(exeName,args2argv(args,argv));
+		ret|=execvp(exeName,args2argv(args,argv,exeName));
+		exit(1);
 	}
 	/*FIXME: parent needs to check on child's status, e.g., by 
 	  child sending SIGUSR2 back to parent on error.*/
