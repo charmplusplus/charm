@@ -180,7 +180,7 @@ extern "C"
 void traceAwaken(CthThread t)
 {
 #if ! CMK_TRACE_IN_CHARM
-  CkpvAccess(_traces)->creation(0, 0.0);
+  CkpvAccess(_traces)->creation(0);
 #endif
 }
 

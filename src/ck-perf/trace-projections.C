@@ -545,7 +545,7 @@ void TraceProjections::userBracketEvent(int e, double bt, double et)
   _logPool->add(USER_EVENT_PAIR, e, 0, TraceTimer(et), curevent++, CkMyPe());
 }
 
-void TraceProjections::creation(envelope *e, double startT, int num)
+void TraceProjections::creation(envelope *e, int num)
 {
   double curTime = TraceTimer();
   if(e==0) {
@@ -557,9 +557,25 @@ void TraceProjections::creation(envelope *e, double startT, int num)
     e->setEvent(curevent);
     for(int i=0; i<num; i++) {
       _logPool->add(CREATION,type,e->getEpIdx(), curTime,
-                    curevent+i,CkMyPe(),e->getTotalsize(), 0, curTime-startT);
+                    curevent+i,CkMyPe(),e->getTotalsize(), 0, 0.0);
     }
     curevent += num;
+  }
+}
+
+void TraceProjections::creationDone(int num)
+{
+  // modified the creation done time of the last num log entries
+  // FIXME: totally a hack
+  double curTime = TraceTimer();
+  int idx = _logPool->numEntries-1;
+  while (idx >=0 && num >0 ) {
+    LogEntry &log = _logPool->pool[idx];
+    if (log.type == CREATION) {
+      log.recvTime = curTime - log.time;
+      num --;
+    }
+    idx--;
   }
 }
 

@@ -36,7 +36,8 @@ class Trace {
     // a pair of begin/end user event has just occured
     virtual void userBracketEvent(int eventID, double bt, double et) {}
     // creation of message(s)
-    virtual void creation(envelope *, double t, int num=1) {}
+    virtual void creation(envelope *, int num=1) {}
+    virtual void creationDone(int num=1) {}
     // ???
     virtual void messageRecv(char *env, int pe) {}
     // **************************************************************
@@ -91,7 +92,8 @@ public:
 
     inline void userEvent(int e) { ALLDO(userEvent(e));}
     inline void userBracketEvent(int e,double bt, double et) {ALLDO(userBracketEvent(e,bt,et));}
-    inline void creation(envelope *env, double t, int num=1) { ALLDO(creation(env, t, num));}
+    inline void creation(envelope *env, int num=1) { ALLDO(creation(env, num));}
+    inline void creationDone(int num=1) { ALLDO(creationDone(num)); }
     inline void beginExecute(envelope *env) {ALLDO(beginExecute(env));}
     inline void beginExecute(CmiObjId *tid) {ALLDO(beginExecute(tid));}
     inline void beginExecute(int event,int msgType,int ep,int srcPe, int mlen) {ALLDO(beginExecute(event, msgType, ep, srcPe, mlen));}
@@ -143,8 +145,9 @@ CkpvExtern(int, traceOnPe);
 
 #define _TRACE_USER_EVENT(x) _TRACE_ONLY(CkpvAccess(_traces)->userEvent(x))
 #define _TRACE_USER_EVENT_BRACKET(x,bt,et) _TRACE_ONLY(CkpvAccess(_traces)->userBracketEvent(x,bt,et))
-#define _TRACE_CREATION_1(env, t) _TRACE_ONLY(CkpvAccess(_traces)->creation(env, t))
-#define _TRACE_CREATION_N(env, t, num) _TRACE_ONLY(CkpvAccess(_traces)->creation(env, t, num))
+#define _TRACE_CREATION_1(env) _TRACE_ONLY(CkpvAccess(_traces)->creation(env))
+#define _TRACE_CREATION_N(env, num) _TRACE_ONLY(CkpvAccess(_traces)->creation(env, num))
+#define _TRACE_CREATION_DONE(num) _TRACE_ONLY(CkpvAccess(_traces)->creationDone(num))
 #define _TRACE_BEGIN_EXECUTE(env) _TRACE_ONLY(CkpvAccess(_traces)->beginExecute(env))
 #define _TRACE_BEGIN_EXECUTE_DETAILED(evt,typ,ep,src,mlen) \
 	_TRACE_ONLY(CkpvAccess(_traces)->beginExecute(evt,typ,ep,src,mlen))
