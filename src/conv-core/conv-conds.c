@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.5  1995-07-07 14:42:49  gursoy
+ * Revision 2.6  1995-07-10 07:03:07  narain
+ * Made the timer field double
+ *
+ * Revision 2.5  1995/07/07  14:42:49  gursoy
  * fixed a bug (initialized PeriodicCalls to NULL)
  *
  * Revision 2.4  1995/06/26  19:46:14  sanjeev
@@ -54,9 +57,7 @@ CpvStaticDeclare(int, numHeapEntries);
 
 CpvDeclare(int, CcdNumChecks);
 
-
-
-
+extern double CmiTimer();
 
 void conv_condsModuleInit()
 {
@@ -146,9 +147,9 @@ void CcdRaiseCondition(condNum)
  *****************************************************************************/
 void CcdCallFnAfter(FN_PTR fnp, void *arg, unsigned int deltaT)
 {
-  unsigned int tPrime, currT;
+  double tPrime, currT;
   currT  = CmiTimer();                    /* get current time */
-  tPrime = currT + deltaT;               /* add delta to determine what time
+  tPrime = currT + (double)deltaT/1000.0; /* add delta to determine what time
 					    to actually execute fn */
   InsertInHeap(tPrime, fnp, arg); /* insert into tmr hp */
 } 
@@ -158,7 +159,7 @@ void CcdCallFnAfter(FN_PTR fnp, void *arg, unsigned int deltaT)
   ****************************************************************************/
 void CcdCallBacks()
 {
-  unsigned int currTime;
+  double currTime;
   int index;
   int i,j;
   FN_ARG *temp, *next;
@@ -194,7 +195,7 @@ void CcdCallBacks()
   These are internal functions
   ****************************************************************************/
 
-static void InsertInHeap(unsigned int theTime, FN_PTR fnp, void *arg)
+static void InsertInHeap(double theTime, FN_PTR fnp, void *arg)
 {
   int child, parent;
   
