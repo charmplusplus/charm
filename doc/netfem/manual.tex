@@ -22,7 +22,7 @@ the current state of a finite-element simulation, or any
 parallel program that computes on an unstructured mesh.
 NetFEM is designed to require very little effort to add
 to a program, and connects to the running program over
-the network via CCS.
+the network via the network protocol CCS (Converse Client/Server).
 
 
 \section{Compiling and Installing}
@@ -43,10 +43,10 @@ A more complicated example is in
   charm/pgms/charm++/fem/crack2D/.
 
 
-\section{Running NetFEM}
+\section{Running NetFEM Online}
 
-Once you have a NetFEM program, you run it and view 
-the results by starting the program with CCS enabled:
+Once you have a NetFEM program, you can run it and view 
+the results online by starting the program with CCS enabled:
 
 \begin{verbatim}
    foo.bar.edu>  ./charmrun ./myprogram +p2 ++server ++server-port 1234
@@ -56,8 +56,8 @@ the results by starting the program with CCS enabled:
 we use 1234.  Currently, NetFEM only works with one chunk per
 processor---that is, the -vp option cannot be used.
 
-You then start the NetFEM client, which can be downloaded
-for Linux or Windows from 
+To view the results online, you then start the NetFEM client, 
+which can be downloaded for Linux or Windows from 
 
 \begin{verbatim}
 http://charm.cs.uiuc.edu/research/fem/netfem/
@@ -65,12 +65,33 @@ http://charm.cs.uiuc.edu/research/fem/netfem/
 
 Enter the name of the machine running charmrun and
 the TCP port number into the NetFEM client---for example, 
-``foo.bar.edu:1234''.
+you might run:
+
+\begin{verbatim}
+  netfem foo.bar.edu:1234
+\end{verbatim}
 
 The NetFEM client will then connect to the program,
-download the most recent mesh, and display it.
+download the most recent mesh registered with 
+\kw{NetFEM\_POINTAT}, and display it.
+At any time, you can press the ``update'' button 
+to reload the latest mesh.
 
 
+\section{Running NetFEM Offline}
+
+Rather than using CCS as above, you can register your meshes
+using \kw{NetFEM\_WRITE}, which makes the server write out 
+binary output dump files.  For example, to view timestep 10,
+which is written to the ``NetFEM/10/`` directory, you'd 
+run the client program as:
+
+\begin{verbatim}
+  netfem NetFEM/10
+\end{verbatim}
+
+In offline mode, the ``update'' button fetches the next
+extant timestep directory.
 
 \section{Interface Basics}
 
@@ -143,10 +164,12 @@ mesh in the client.
 computation, you'd pass dim==2; in a 3D computation, dim==3.
 The client currently only supports 2D or 3D computations.
 
-\uw{flavor} specifies what to do with the data.  Currently, this
-must be \kw{NetFEM\_POINTAT}, which specifies that NetFEM should 
-only keep a pointer to the data rather than copy it out of your
-arrays.
+\uw{flavor} specifies what to do with the data.  This can
+take the value \kw{NetFEM\_POINTAT}, which is used in online visualization,
+and specifies that NetFEM should only keep a pointer to your data 
+rather than copy it out of your arrays.  Or it can take the value
+\kw{NetFEM\_WRITE}, which writes out the data to files named
+``NetFEM/\uw{step}/\uw{source}.dat'' for offline visualization. 
 
 
 \prototype{NetFEM\_End}
