@@ -36,6 +36,7 @@ class GroupIdxArray {
   //This non-inline version of "find", below, allows the (much simpler)
   // common case to be inlined.
   dtype& nonInlineFind(CkGroupID n) {
+      dtype *ret;
 #ifndef CMK_OPTIMIZE
       if (n.idx==0) CkAbort("Group ID is zero-- invalid!\n");
       else if (n.idx>=max) { CkAbort("Group ID is too large!\n");}
@@ -44,17 +45,17 @@ class GroupIdxArray {
       /*n.idx < 0*/
       { /*Groups created on processors other than 0 go into a hashtable:*/
         if(hashTab == NULL)
-                hashTab = CkCreateHashtable_int(sizeof(dtype),17);
+          hashTab = CkCreateHashtable_int(sizeof(dtype),17);
 
-        dtype *ret = (dtype *)CkHashtableGet(hashTab,&(n.idx));
+        ret = (dtype *)CkHashtableGet(hashTab,&(n.idx));
 
-        if(ret == NULL)                                 // insert data into the table
+        if(ret == NULL)               // insert data into the table
         {
-                ret = (dtype *)CkHashtablePut(hashTab,&(n.idx));
-                new (ret) dtype; //Call dtype's constructor (ICK!)
+          ret = (dtype *)CkHashtablePut(hashTab,&(n.idx));
+          new (ret) dtype; //Call dtype's constructor (ICK!)
         }
-        return *ret;
       }
+      return *ret;
    }
 
   public:
