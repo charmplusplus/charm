@@ -28,7 +28,7 @@ class liveVizGroup : public Group {
 public:
 	liveVizGroup(const liveVizConfig &cfg) {
 		lv_config=cfg;
-		contribute(0,0,CkReduction::sum_int,liveVizInitComplete);
+		contribute(0,0,CkReduction::sum_int,CkCallback(liveVizInitComplete));
 	}
 };
 
@@ -125,7 +125,7 @@ void liveVizDeposit(const liveVizRequest &req,
   }
 
 //Contribute this image to the reduction
-  msg->setCallback(vizReductionHandler);
+  msg->setCallback(CkCallback(vizReductionHandler));
   client->contribute(msg);
 }
 
