@@ -368,11 +368,14 @@ void AssembleDatagram(OtherNode node, ExplicitDgram dg)
   unsigned int size; char *msg;
   OtherNode myNode = nodes+CmiMyNode();
   
-  MACHSTATE2(2,"  AssembleDatagram [seq %d from 'pe' %d]",dg->seqno,node->nodestart)
+  MACHSTATE3(2,"  AssembleDatagram [seq %d from 'pe' %d, packet len %d]",
+  	dg->seqno,node->nodestart,dg->len)
   LOG(Cmi_clock, Cmi_nodestart, 'X', dg->srcpe, dg->seqno);
   msg = node->asm_msg;
   if (msg == 0) {
     size = CmiMsgHeaderGetLength(dg->data);
+    MACHSTATE3(4,"  Assemble new datagram seq %d from 'pe' %d, len %d",
+    	dg->seqno,node->nodestart,size)
     msg = (char *)CmiAlloc(size);
     if (!msg)
       fprintf(stderr, "%d: Out of mem\n", Cmi_mynode);
@@ -387,8 +390,13 @@ void AssembleDatagram(OtherNode node, ExplicitDgram dg)
     memcpy(msg + node->asm_fill, ((char*)(dg->data))+DGRAM_HEADER_SIZE, size);
     node->asm_fill += size;
   }
-  if (node->asm_fill > node->asm_total)
+  MACHSTATE3(2,"  AssembleDatagram: now have %d of %d bytes from %d",
+  	node->asm_fill, node->asm_total, node->nodestart)
+  if (node->asm_fill > node->asm_total) {
       fprintf(stderr, "\n\n\t\tLength mismatch!!\n\n");
+      MACHSTATE4(5,"Length mismatch seq %d, from 'pe' %d, fill %d, total %d",
+      	dg->seqno,node->nodestart,node->asm_fill,node->asm_total)
+  }
   if (node->asm_fill == node->asm_total) {
     if (node->asm_rank == DGRAM_BROADCAST) {
       int len = node->asm_total;
@@ -457,7 +465,8 @@ void IntegrateMessageDatagram(ExplicitDgram dg)
   unsigned int slot; OtherNode node;
 
   LOG(Cmi_clock, Cmi_nodestart, 'M', dg->srcpe, dg->seqno);
-  MACHSTATE2(2,"  IntegrateMessageDatagram [seq %d from pe %d]",dg->seqno,dg->srcpe)
+  MACHSTATE2(2,"  IntegrateMessageDatagram [seq %d from pe %d]", dg->seqno,dg->srcpe)
+
   node = nodes_by_pe[dg->srcpe];
   node->stat_recv_pkt++;
   seqno = dg->seqno;
@@ -618,6 +627,7 @@ void IntegrateAckDatagram(ExplicitDgram dg)
 void ReceiveDatagram()
 {
   ExplicitDgram dg; int ok, magic;
+  MACHLOCK_ASSERT(comm_flag,"ReceiveDatagram")
   MallocExplicitDgram(dg);
   ok = recv(dataskt,(char*)(dg->data),Cmi_max_dgram_size,0);
   /*ok = recvfrom(dataskt,(char*)(dg->data),Cmi_max_dgram_size,0, 0, 0);*/
@@ -667,10 +677,6 @@ void CmiHandleImmediate();
 static void CommunicationServer(int sleepTime)
 {
   unsigned int nTimes=0; /* Loop counter */
-  CmiCommLockOrElse({
-    MACHSTATE(4,"Attempted to re-enter comm. server!") 
-    return;
-  });
   LOG(GetClock(), Cmi_nodestart, 'I', 0, 0);
   MACHSTATE2(1,"CommunicationsServer(%d,%d)",
 	     sleepTime,writeableAcks||writeableDgrams)  
@@ -714,6 +720,7 @@ static void CommunicationServer(int sleepTime)
    or in interrupt */
 static void CommunicationServerThread(int sleepTime)
 {
+  MACHSTATE(2,"CommunicationServerThread");
   CommunicationServer(sleepTime);
 #if CMK_IMMEDIATE_MSG
   CmiHandleImmediate();

@@ -340,6 +340,7 @@ static void KillOnAllSigs(int sigNo)
   if (sigNo==SIGQUIT) sig="caught signal QUIT";
   if (sigNo==SIGTERM) sig="caught signal TERM";
   
+  MACHSTATE1(5,"     Caught signal %s ",sig);
   CmiError("------------- Processor %d Exiting: Caught Signal ------------\n"
   	"Signal: %s\n",CmiMyPe(),sig);
   if (0!=suggestion[0])
@@ -471,6 +472,7 @@ void CmiAbort(const char *message)
 {
   if (already_aborting) machine_exit(1);
   already_aborting=1;
+  MACHSTATE1(5,"CmiAbort(%s)",message);
   
   CmiError("------------- Processor %d Exiting: Called CmiAbort ------------\n"
   	"Reason: %s\n",CmiMyPe(),message);
@@ -725,19 +727,23 @@ void CmiMemUnlock() { memflag--; }
 
 static volatile int comm_flag=0;
 #define CmiCommLockOrElse(dothis) if (comm_flag!=0) dothis
-#if 1
+#ifndef MACHLOCK_DEBUG
 #  define CmiCommLock() (comm_flag=1)
-#else
+#  define CmiCommUnlock() (comm_flag=0)
+#else /* Error-checking flag locks */
 void CmiCommLock(void) {
-  if (comm_flag!=0) CmiAbort("Comm lock *not* reentrant!\n");
+  MACHLOCK_ASSERT(!comm_flag,"CmiCommLock");
   comm_flag=1;
 }
+void CmiCommUnlock(void) {
+  MACHLOCK_ASSERT(comm_flag,"CmiCommUnlock");
+  comm_flag=0;
+}
 #endif
-#define CmiCommUnlock() (comm_flag=0)
 
 static struct CmiStateStruct Cmi_state;
 int Cmi_mype;
-int Cmi_myrank;
+int Cmi_myrank=0; /* Normally zero; only 1 during SIGIO handling */
 #define CmiGetState() (&Cmi_state)
 #define CmiGetStateN(n) (&Cmi_state)
 
@@ -745,12 +751,19 @@ void CmiYield(void) { sleep(0); }
 
 static void CommunicationInterrupt(int ignored)
 {
-  if (memflag) return;
+  MACHLOCK_ASSERT(!Cmi_myrank,"CommunicationInterrupt");
+  if (memflag || comm_flag || immRunning) 
+  { /* Already busy inside malloc, comm, or immediate messages */
+    MACHSTATE(5,"--SKIPPING SIGIO--");
+    return;
+  }
   MACHSTATE(2,"--BEGIN SIGIO--")
   {
     /*Make sure any malloc's we do in here are NOT migratable:*/
     CmiIsomallocBlockList *oldList=CmiIsomallocBlockListActivate(NULL);
+    Cmi_myrank=1;
     CommunicationServerThread(0);
+    Cmi_myrank=0;
     CmiIsomallocBlockListActivate(oldList);
   }
   MACHSTATE(2,"--END SIGIO--")
@@ -766,7 +779,11 @@ static void CmiStartThreads(char **argv)
   
   CmiStateInit(Cmi_nodestart, 0, &Cmi_state);
   Cmi_mype = Cmi_nodestart;
-  Cmi_myrank = 0;
+
+  /* Prepare Cpv's for immediate messages: */
+  Cmi_myrank=1;
+  CommunicationServerInit();
+  Cmi_myrank=0;
   
 #if !CMK_ASYNC_NOT_NEEDED
   if (!Cmi_netpoll) {
@@ -780,7 +797,6 @@ static void CmiStartThreads(char **argv)
 #endif
 
 CpvDeclare(void *, CmiLocalQueue);
-CpvStaticDeclare(char *, internal_printf_buffer);
 
 
 #ifndef CmiMyPe
@@ -802,10 +818,11 @@ int CmiMyRank(void)
 static void CmiPushPE(int pe,void *msg)
 {
   CmiState cs=CmiGetStateN(pe);
-  MACHSTATE1(2,"Pushing message into %d's queue",pe);
+  MACHSTATE1(2,"Pushing message into %d's queue",pe);  
+  MACHLOCK_ASSERT(comm_flag,"CmiPushPE")
+
 #if CMK_IMMEDIATE_MSG
   if ((CmiGetHandler(msg) == CpvAccessOther(CmiImmediateMsgHandlerIdx,pe))) {
-    CMI_DEST_RANK(msg) = pe;         /* store the rank in msg header */
     CmiPushImmediateMsg(msg);
     return;
   }
@@ -821,14 +838,15 @@ static void CmiPushPE(int pe,void *msg)
 static void CmiPushNode(void *msg)
 {
   CmiState cs=CmiGetStateN(0);
-  MACHSTATE1(2,"Pushing message into node queue",pe);
+  MACHSTATE(2,"Pushing message into node queue");
+  MACHLOCK_ASSERT(comm_flag,"CmiPushNode")
+  
 #if CMK_IMMEDIATE_MSG
   if ((CmiGetHandler(msg) == CpvAccessOther(CmiImmediateMsgHandlerIdx,0))) {
-    CMI_DEST_RANK(msg) = 0;        /* store the rank in msg header, pretend 0 */
     CmiPushImmediateMsg(msg);
     return;
   }
-#endif
+#endif 
   PCQueuePush(CsvAccess(NodeState).NodeRecv,msg);
   /*Silly: always try to wake up processor 0, so at least *somebody*
     will be awake to handle the message*/
@@ -929,7 +947,8 @@ static void charmrun_abort(const char *s)
 static void ctrl_getone(void)
 {
   ChMessage msg;
-  MACHSTATE(2,"ctrl_getone");
+  MACHSTATE(2,"ctrl_getone")
+  MACHLOCK_ASSERT(comm_flag,"ctrl_getone")
   ChMessage_recv(Cmi_charmrun_fd,&msg);
 
   if (strcmp(msg.header.type,"die")==0) {
@@ -943,7 +962,7 @@ static void ctrl_getone(void)
 	/*Sadly, I *can't* do a:
       CcsImpl_netRequest(hdr,msg.data+sizeof(CcsImplHeader));
 	here, because I can't send converse messages in the
-	communcation thread.  I *can* poke this message into 
+	communication thread.  I *can* poke this message into 
 	any convenient processor's queue, though:  (OSL, 9/14/2000)
 	*/
 	int pe=0;/*<- node-local processor number. Any one will do.*/
@@ -983,7 +1002,7 @@ static void InternalWriteToTerminal(int isStdErr,const char *str,int len);
 static void InternalPrintf(const char *f, va_list l)
 {
   ChMessage replymsg;
-  char *buffer = CpvAccess(internal_printf_buffer);
+  char *buffer = CmiTmpAlloc(PRINTBUFSIZE);
   CmiStdoutFlush();
   vsprintf(buffer, f, l);
   if(Cmi_syncprint) {
@@ -996,12 +1015,13 @@ static void InternalPrintf(const char *f, va_list l)
   	  ctrl_sendone_locking("print", buffer,strlen(buffer)+1,NULL,0);
   }
   InternalWriteToTerminal(0,buffer,strlen(buffer));
+  CmiTmpFree(buffer);
 }
 
 static void InternalError(const char *f, va_list l)
 {
   ChMessage replymsg;
-  char *buffer = CpvAccess(internal_printf_buffer);
+  char *buffer = CmiTmpAlloc(PRINTBUFSIZE);
   CmiStdoutFlush();
   vsprintf(buffer, f, l);
   if(Cmi_syncprint) {
@@ -1014,6 +1034,7 @@ static void InternalError(const char *f, va_list l)
   	  ctrl_sendone_locking("printerr", buffer,strlen(buffer)+1,NULL,0);
   }
   InternalWriteToTerminal(1,buffer,strlen(buffer));
+  CmiTmpFree(buffer);
 }
 
 static int InternalScanf(char *fmt, va_list l)
@@ -1485,6 +1506,22 @@ void *CmiGetNonLocal(void)
 }
 
 
+/**
+ * Set up and OutgoingMsg structure for this message.
+ */
+static OutgoingMsg PrepareOutgoing(CmiState cs,int pe,int size,int freemode,char *data) {
+  OutgoingMsg ogm;
+  MallocOutgoingMsg(ogm);
+  CmiMsgHeaderSetLength(data, size);
+  ogm->size = size;
+  ogm->data = data;
+  ogm->src = cs->pe;
+  ogm->dst = pe;
+  ogm->freemode = freemode;
+  ogm->refcount = 0;
+  return (CmiCommHandle)ogm;	
+}
+
 #if CMK_NODE_QUEUE_AVAILABLE
 
 /******************************************************************************
@@ -1501,24 +1538,18 @@ void *CmiGetNonLocal(void)
 
 CmiCommHandle CmiGeneralNodeSend(int pe, int size, int freemode, char *data)
 {
+  
   CmiState cs = CmiGetState(); OutgoingMsg ogm;
 
   if (freemode == 'S') {
     char *copy = (char *)CmiAlloc(size);
-  if (!copy)
+    if (!copy)
       fprintf(stderr, "%d: Out of mem\n", Cmi_mynode);
     memcpy(copy, data, size);
     data = copy; freemode = 'F';
   }
 
-  MallocOutgoingMsg(ogm);
-  CmiMsgHeaderSetLength(data, size);
-  ogm->size = size;
-  ogm->data = data;
-  ogm->src = cs->pe;
-  ogm->dst = pe;
-  ogm->freemode = freemode;
-  ogm->refcount = 0;
+  ogm=PrepareOutgoing(cs,pe,size,freemode,data);
   CmiCommLock();
   DeliverOutgoingNodeMessage(ogm);
   CmiCommUnlock();
@@ -1526,7 +1557,9 @@ CmiCommHandle CmiGeneralNodeSend(int pe, int size, int freemode, char *data)
   CommunicationServer(0);
   return (CmiCommHandle)ogm;
 }
+
 #endif
+
 
 /******************************************************************************
  *
@@ -1551,8 +1584,12 @@ CmiCommHandle CmiGeneralSend(int pe, int size, int freemode, char *data)
     memcpy(copy, data, size);
     data = copy; freemode = 'F';
   }
-
-  if (pe == cs->pe) {
+  if (pe == cs->pe) 
+#ifndef CMK_CPV_IS_SMP
+  if (!immRunning) /* CdsFifo_Enqueue, below, isn't SIGIO or thread safe.  
+                      The SMP comm thread never gets here, because of the pe test. */
+#endif
+  {
     CdsFifo_Enqueue(cs->localqueue, data);
     if (freemode == 'A') {
       MallocOutgoingMsg(ogm);
@@ -1560,15 +1597,7 @@ CmiCommHandle CmiGeneralSend(int pe, int size, int freemode, char *data)
       return ogm;
     } else return 0;
   }
-  
-  MallocOutgoingMsg(ogm);
-  CmiMsgHeaderSetLength(data, size);
-  ogm->size = size;
-  ogm->data = data;
-  ogm->src = cs->pe;
-  ogm->dst = pe;
-  ogm->freemode = freemode;
-  ogm->refcount = 0;
+  ogm=PrepareOutgoing(cs,pe,size,freemode,data);
   CmiCommLock();
   DeliverOutgoingMessage(ogm);
   CmiCommUnlock();
@@ -1576,6 +1605,7 @@ CmiCommHandle CmiGeneralSend(int pe, int size, int freemode, char *data)
   CommunicationServer(0);
   return (CmiCommHandle)ogm;
 }
+
 
 void CmiSyncSendFn(int p, int s, char *m)
 { 
@@ -1732,9 +1762,6 @@ static void ConverseRunPE(int everReturn)
   char** CmiMyArgv;
   CmiNodeBarrier();
   cs = CmiGetState();
-  CpvInitialize(char *, internal_printf_buffer);  
-  CpvAccess(internal_printf_buffer) = (char *) malloc(PRINTBUFSIZE);
-  _MEMCHECK(CpvAccess(internal_printf_buffer));
   CpvInitialize(void *,CmiLocalQueue);
   CpvAccess(CmiLocalQueue) = cs->localqueue;
 
@@ -1744,23 +1771,16 @@ static void ConverseRunPE(int everReturn)
   else
     CmiMyArgv = Cmi_argv;
   CthInit(CmiMyArgv);
-#if MACHINE_DEBUG_LOG
-  {
-    char ln[200];
-    sprintf(ln,"debugLog.%d",CmiMyPe());
-    debugLog=fopen(ln,"w");
-  }
-#endif
-
-  /* better to show the status here */
-  if (Cmi_netpoll == 1 && CmiMyPe() == 0)
-    CmiPrintf("Charm++: scheduler running in netpoll mode.\n");
 
 #if CMK_USE_GM
   CmiCheckGmStatus();
 #endif
 
   ConverseCommonInit(CmiMyArgv);
+
+  /* better to show the status here */
+  if (Cmi_netpoll == 1 && CmiMyPe() == 0)
+    CmiPrintf("Charm++: scheduler running in netpoll mode.\n");
   
   CcdCallOnConditionKeep(CcdPROCESSOR_BEGIN_IDLE,
       (CcdVoidFn) CmiNotifyBeginIdle, (void *) s);
@@ -1803,6 +1823,14 @@ static void ConverseRunPE(int everReturn)
     /*Initialize the clock*/
     Cmi_clock=GetClock();
   }
+
+#if MACHINE_DEBUG_LOG
+  {
+    char ln[200];
+    sprintf(ln,"debugLog.%d",CmiMyPe());
+    debugLog=fopen(ln,"w");
+  }
+#endif
 
   if (!everReturn) {
     Cmi_startfn(CmiGetArgc(CmiMyArgv), CmiMyArgv);
@@ -1860,7 +1888,7 @@ static void obtain_idleFn(void) {sleep(0);}
 void ConverseInit(int argc, char **argv, CmiStartFn fn, int usc, int everReturn)
 {
 #if MACHINE_DEBUG
-  debugLog=stdout;
+  debugLog=NULL;
 #endif
 #if CMK_USE_HP_MAIN_FIX
 #if FOR_CPLUS

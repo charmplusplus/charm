@@ -241,10 +241,6 @@ static void CommunicationServer_nolock(int withDelayMs) {
 
 static void CommunicationServer(int withDelayMs)
 {
-  CmiCommLockOrElse({
-    MACHSTATE(3,"Attempted to re-enter comm. server!")
-    return;
-  });
   MACHSTATE1(2,"CommunicationServer(%d)",withDelayMs)
   LOG(GetClock(), Cmi_nodestart, 'I', 0, 0);
 
