@@ -53,6 +53,8 @@ This is needed so we can call the routine as a new thread.
 #define MPI_2INT 18
 #define MPI_SHORT_INT 19
 #define MPI_LONG_DOUBLE_INT 20
+#define MPI_2FLOAT 21
+#define MPI_2DOUBLE 22
 
 #define MPI_ANY_SOURCE   (-1)
 #define MPI_ANY_TAG      (-1)

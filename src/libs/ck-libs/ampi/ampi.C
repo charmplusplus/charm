@@ -22,6 +22,22 @@ template <class VType,class IType>
 CkReductionMsg *maxLoc(int nMsg,CkReductionMsg **msgs);
 template <class VType,class IType>
 CkReductionMsg *minLoc(int nMsg,CkReductionMsg **msgs);
+template CkReductionMsg *maxLoc<float,int>(int n,CkReductionMsg **m);
+template CkReductionMsg *minLoc<float,int>(int n,CkReductionMsg **m);
+template CkReductionMsg *maxLoc<double,int>(int n,CkReductionMsg **m);
+template CkReductionMsg *minLoc<double,int>(int n,CkReductionMsg **m);
+template CkReductionMsg *maxLoc<long,int>(int n,CkReductionMsg **m);
+template CkReductionMsg *minLoc<long,int>(int n,CkReductionMsg **m);
+template CkReductionMsg *maxLoc<int,int>(int n,CkReductionMsg **m);
+template CkReductionMsg *minLoc<int,int>(int n,CkReductionMsg **m);
+template CkReductionMsg *maxLoc<short,int>(int n,CkReductionMsg **m);
+template CkReductionMsg *minLoc<short,int>(int n,CkReductionMsg **m);
+template CkReductionMsg *maxLoc<long double,int>(int n,CkReductionMsg **m);
+template CkReductionMsg *minLoc<long double,int>(int n,CkReductionMsg **m);
+template CkReductionMsg *maxLoc<float,float>(int n,CkReductionMsg **m);
+template CkReductionMsg *minLoc<float,float>(int n,CkReductionMsg **m);
+template CkReductionMsg *maxLoc<double,double>(int n,CkReductionMsg **m);
+template CkReductionMsg *minLoc<double,double>(int n,CkReductionMsg **m);
 
 CkReduction::reducerType maxLocFloatIntReducer;
 CkReduction::reducerType minLocFloatIntReducer;
@@ -35,6 +51,10 @@ CkReduction::reducerType maxLocShortIntReducer;
 CkReduction::reducerType minLocShortIntReducer;
 CkReduction::reducerType maxLocLongDoubleIntReducer;
 CkReduction::reducerType minLocLongDoubleIntReducer;
+CkReduction::reducerType maxLoc2FloatReducer;
+CkReduction::reducerType minLoc2FloatReducer;
+CkReduction::reducerType maxLoc2DoubleReducer;
+CkReduction::reducerType minLoc2DoubleReducer;
 
 int _ampi_fallback_setup_count;
 CDECL void MPI_Setup(void);
@@ -90,6 +110,10 @@ static void ampiNodeInit(void)
   minLocShortIntReducer = CkReduction::addReducer(minLoc<short,int>);
   maxLocLongDoubleIntReducer = CkReduction::addReducer(maxLoc<long double,int>);
   minLocLongDoubleIntReducer = CkReduction::addReducer(minLoc<long double,int>);
+  maxLoc2FloatReducer = CkReduction::addReducer(maxLoc<float,float>);
+  minLoc2FloatReducer = CkReduction::addReducer(minLoc<float,float>);
+  maxLoc2DoubleReducer = CkReduction::addReducer(maxLoc<double,double>);
+  minLoc2DoubleReducer = CkReduction::addReducer(minLoc<double,double>);
 
   nodeinit_has_been_called=1;
 }
@@ -859,7 +883,7 @@ CkReductionMsg *maxLoc(int nMsg,CkReductionMsg **msgs) {
   int size = msgs[0]->getSize();
   int count = size/(sizeof(VType)+sizeof(IType));
   PairType *m;
-  PairType ret[count];
+  PairType *ret = new PairType [count];
 
   // assuming nMsg > 0
   m=(PairType *)msgs[0]->getData();
@@ -876,7 +900,9 @@ CkReductionMsg *maxLoc(int nMsg,CkReductionMsg **msgs) {
         }
       }
     }
-  return CkReductionMsg::buildNew(size,ret);
+  CkReductionMsg *retmsg = CkReductionMsg::buildNew(size,ret);
+  delete [] ret;
+  return retmsg;
 }
 
 template <class VType,class IType>
@@ -889,7 +915,7 @@ CkReductionMsg *minLoc(int nMsg,CkReductionMsg **msgs) {
   int size = msgs[0]->getSize();
   int count = size/(sizeof(VType)+sizeof(IType));
   PairType *m;
-  PairType ret[count];
+  PairType *ret = new PairType [count];
 
   // assuming nMsg > 0
   m=(PairType *)msgs[0]->getData();
@@ -905,7 +931,9 @@ CkReductionMsg *minLoc(int nMsg,CkReductionMsg **msgs) {
           ret[j].idx = m[j].idx;
         }
     }
-  return CkReductionMsg::buildNew(size,ret);
+  CkReductionMsg *retmsg = CkReductionMsg::buildNew(size,ret);
+  delete [] ret;
+  return retmsg;
 }
 
 static CkReduction::reducerType
@@ -961,6 +989,8 @@ getReductionType(int type, int op)
 	case MPI_2INT : mytype = maxLoc2IntReducer; break;
 	case MPI_SHORT_INT : mytype = maxLocShortIntReducer; break;
 	case MPI_LONG_DOUBLE_INT : mytype = maxLocLongDoubleIntReducer; break;
+	case MPI_2FLOAT : mytype = maxLoc2FloatReducer; break;
+	case MPI_2DOUBLE : mytype = maxLoc2DoubleReducer; break;
         default:
           ckerr << "Type " << type << " not supported." << endl;
           CmiAbort("exiting");
@@ -974,6 +1004,8 @@ getReductionType(int type, int op)
 	case MPI_2INT : mytype = minLoc2IntReducer; break;
 	case MPI_SHORT_INT : mytype = minLocShortIntReducer; break;
 	case MPI_LONG_DOUBLE_INT : mytype = minLocLongDoubleIntReducer; break;
+	case MPI_2FLOAT : mytype = minLoc2FloatReducer; break;
+	case MPI_2DOUBLE : mytype = minLoc2DoubleReducer; break;
         default:
           ckerr << "Type " << type << " not supported." << endl;
           CmiAbort("exiting");

@@ -8,6 +8,9 @@
        integer, parameter :: MPI_CHARACTER = 5
        integer, parameter :: MPI_BYTE = 6
        integer, parameter :: MPI_PACKED = 7
+       integer, parameter :: MPI_2REAL = 21
+       integer, parameter :: MPI_2DOUBLE_PRECISION = 22
+       integer, parameter :: MPI_2INTEGER = 18
 
        integer, parameter :: MPI_MAX = 1
        integer, parameter :: MPI_MIN = 2
