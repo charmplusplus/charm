@@ -269,10 +269,8 @@ QuickThreads/libqt.a:
 	-(CHARMINC=.; . ./conv-config.sh; \
 	  cp QuickThreads/libqt.$$CMK_SHARED_SUF ../lib_so && \
 	  cp QuickThreads/libqt.$$CMK_SHARED_SUF ../lib_so/libckqt.$$CMK_SHARED_SUF)
-	#-cp QuickThreads/libqt.so ../lib_so/libckqt.so
-	#-cp ../lib_so/libckqt.so ../lib_so/libqt.so
-	#-@ test -d ../lib/libckqt.a.dir && /bin/rm -rf ../lib/libckqt.a.dir
-	#-@ cp -r QuickThreads/libqt.a.dir ../lib/libckqt.a.dir
+#	-@ test -d ../lib/libckqt.a.dir && /bin/rm -rf ../lib/libckqt.a.dir
+#	-@ cp -r QuickThreads/libqt.a.dir ../lib/libckqt.a.dir
 
 METIS:  charm++
 	cd libs/conv-libs/metis; make OPTS='$(OPTS)'
