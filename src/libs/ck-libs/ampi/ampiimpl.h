@@ -10,31 +10,13 @@
 
 #include "ampi.h"
 #include "ampi.decl.h"
-
 #include "ddt.h"
 
 extern CkChareID mainhandle;
 
-/*
-class ampimain : public Chare
-{
-  int nblocks;
-  int numDone;
-  CkArrayID arr;
-  public:
-    ampimain(CkArgMsg *);
-    ampimain(CkMigrateMessage *m) {}
-    void done(void);
-    void qd(void);
-};
-
-static inline void itersDone(void) { CProxy_ampimain pm(mainhandle); pm.done(); }
-*/
-
 class BlockMap : public CkArrayMap {
  public:
-  BlockMap(void) {
-  }
+  BlockMap(void) {}
   BlockMap(CkMigrateMessage *m) {}
   int registerArray(CkArrayMapRegisterMessage *m) {
     delete m;
@@ -61,12 +43,14 @@ class PersReq {
   public:
     int sndrcv; // 1 if send , 2 if recv
     void *buf;
-    int size;
+    int count;
+    int type;
     int proc;
     int tag;
     int nextfree, prevfree;
 };
 
+// FIXME: Make this a packed message.
 class ArgsInfo : public CMessage_ArgsInfo {
   public:
     int argc;
@@ -74,7 +58,39 @@ class ArgsInfo : public CMessage_ArgsInfo {
     ArgsInfo(int c, char **v) { argc = c; argv = v; }
 };
 
-class ampi : public TempoArray {
+class AmpiMsg : public CMessage_AmpiMsg {
+ public:
+  int tag1, tag2, length;
+  void *data;
+
+  AmpiMsg(void) { data = (char *)this + sizeof(AmpiMsg); }
+  AmpiMsg(int t1, int t2, int l):tag1(t1),tag2(t2),length(l) {
+    data = (char *)this + sizeof(AmpiMsg);
+  }
+  static void *alloc(int msgnum, size_t size, int *sizes, int pbits) {
+    return CkAllocMsg(msgnum, size+sizes[0], pbits);
+  }
+  static void *pack(AmpiMsg *in) { return (void *) in; }
+  static AmpiMsg *unpack(void *in) { return new (in) AmpiMsg; }
+};
+
+class ampi : public ArrayElement1D {
+  private:
+    CmmTable msgs;
+    CthThread thread_id;
+    int nbcasts;
+  public: // entry methods
+    ampi(void);
+    ampi(CkMigrateMessage *msg); 
+    void run(ArgsInfo *);
+    void run(void);
+    void generic(AmpiMsg *);
+  public: // to be used by AMPI_* functions
+    void send(int t1, int t2, void* buf, int count, int type, int idx);
+    void recv(int t1, int t2, void* buf, int count, int type);
+    void barrier(void);
+    void bcast(int root, void* buf, int count, int type);
+    void reduce(int root, int op, void* inb, void *outb, int count, int type);
   public:
     int csize, isize, rsize, fsize;
     int totsize;
@@ -85,22 +101,14 @@ class ampi : public TempoArray {
     PersReq irequests[100];
     int nirequests;
     int firstfree;
-    int nbcasts; // to keep bcasts from mixing up
     void *packedBlock;
     int nReductions;
     int nAllReductions;
     int niRecvs, niSends, biRecv, biSend;
-	DDT	*myDDT ;
+    DDT *myDDT ;
 
-    ampi(void);
-    ampi(CkMigrateMessage *msg); 
-    
     virtual void pup(PUP::er &p);
-    
-    virtual void start(void);
-    
-    void run(ArgsInfo *);
-    void run(void);		// for C++ inheirt
+    virtual void start(void); // should be overloaded in derived class
 };
 
 extern int migHandle;

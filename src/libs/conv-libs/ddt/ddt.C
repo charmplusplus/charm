@@ -91,10 +91,10 @@ DDT::~DDT()
 
 
 int 
-DDT::getSize(int nIndex)
+DDT::getSize(int nIndex, int count)
 {
   DDT_DataType* dttype = getType(nIndex);
-  return dttype->getSize();
+  return count*dttype->getSize();
 }
 
 int 
@@ -105,7 +105,7 @@ DDT::getExtent(int nIndex)
 }
 
 int 
-DDT::Type_Contiguous(int count, DDT_Type oldType, DDT_Type *newType)
+DDT::newContiguous(int count, DDT_Type oldType, DDT_Type *newType)
 {
   int index = *newType =  getNextFreeIndex() ;
   DDT_DataType *type  = new DDT_Contiguous(count, typeTable[oldType]);
@@ -116,7 +116,7 @@ DDT::Type_Contiguous(int count, DDT_Type oldType, DDT_Type *newType)
 }
 
 int 
-DDT::Type_Vector(int count, int blocklength, int stride, 
+DDT::newVector(int count, int blocklength, int stride, 
                  DDT_Type oldType, DDT_Type* newType)
 {
   int index = *newType =  getNextFreeIndex() ;
@@ -130,7 +130,7 @@ DDT::Type_Vector(int count, int blocklength, int stride,
 }
 
 int 
-DDT::Type_HVector(int count, int blocklength, int stride, 
+DDT::newHVector(int count, int blocklength, int stride, 
                   DDT_Type oldtype, DDT_Type* newType)
 {
   int index = *newType =  getNextFreeIndex() ;
@@ -144,7 +144,7 @@ DDT::Type_HVector(int count, int blocklength, int stride,
 }
 
 int 
-DDT::Type_Indexed(int count, int* arrbLength, int* arrDisp, 
+DDT::newIndexed(int count, int* arrbLength, int* arrDisp, 
                   DDT_Type oldtype, DDT_Type* newType)
 {
   int index = *newType =  getNextFreeIndex() ;
@@ -158,7 +158,7 @@ DDT::Type_Indexed(int count, int* arrbLength, int* arrDisp,
 }
 
 int 
-DDT::Type_HIndexed(int count, int* arrbLength, int* arrDisp, 
+DDT::newHIndexed(int count, int* arrbLength, int* arrDisp, 
                    DDT_Type oldtype, DDT_Type* newType)
 {
   int index = *newType =  getNextFreeIndex() ;
@@ -172,8 +172,8 @@ DDT::Type_HIndexed(int count, int* arrbLength, int* arrDisp,
 }
 
 int 
-DDT::Type_Struct(int count, int* arrbLength, int* arrDisp, 
-                 DDT_Type* oldtype, DDT_Type* newType)
+DDT::newStruct(int count, int* arrbLength, int* arrDisp, 
+                 DDT_Type *oldtype, DDT_Type* newType)
 {
   int index = *newType =  getNextFreeIndex() ;
   DDT_DataType* type =  
@@ -265,20 +265,22 @@ DDT_DataType::operator=(const DDT_DataType& obj)
 }
 
 int 
-DDT_DataType::serialize(char* userdata, char* buffer, int dir)
+DDT_DataType::serialize(char* userdata, char* buffer, int num, int dir)
 {
-  if(dir) {
-    memcpy(buffer, userdata, size );
+  if(dir==1) {
+    memcpy(buffer, userdata, num*size );
+  } else if (dir==(-1)){
+    memcpy(userdata, buffer, num*size );
   } else {
-    memcpy(userdata, buffer, size );
+    CkAbort("DDT: Invalid dir in serialize.\n");
   }
   return size ;
 }
 
 int
-DDT_DataType::getSize(void)
+DDT_DataType::getSize(int num)
 {
-  return size ;
+  return num*size ;
 }
 
 int
@@ -350,13 +352,13 @@ DDT_Contiguous::operator=(const DDT_Contiguous& obj)
 }
 
 int 
-DDT_Contiguous::serialize(char* userdata, char* buffer, int dir)
+DDT_Contiguous::serialize(char* userdata, char* buffer, int num, int dir)
 {
   int bytesCopied  = 0  ;
-  for(int i = 0 ; i < count ; i ++) {
-    bytesCopied += baseType->serialize(userdata, buffer, dir);
-    buffer += baseSize ;
-    userdata += baseExtent ;
+  for(; num; num--) {
+    bytesCopied += baseType->serialize(userdata, buffer, count, dir);
+    buffer += (count*baseSize) ;
+    userdata += (count*baseExtent) ;
   }
   return bytesCopied ;
 }
@@ -389,19 +391,15 @@ DDT_Vector::DDT_Vector(int nCount, int blength, int stride, DDT_DataType* type)
 }
 
 int 
-DDT_Vector::serialize(char* userdata, char* buffer, int dir)
+DDT_Vector::serialize(char* userdata, char* buffer, int num, int dir)
 {
-  char* tbuf = userdata ;
   int  bytesCopied = 0  ;
-
-  for(int i = 0 ; i < count; i++) {
-    userdata = tbuf ;
-    for(int j = 0; j < blockLength; j++) {
-      bytesCopied += baseType->serialize(userdata, buffer, dir);
-      buffer += baseSize ;
-      userdata += baseExtent;
-    }  
-    tbuf += (strideLength * baseExtent) ;
+  for(;num;num--) {
+    for(int i = 0 ; i < count; i++) {
+      bytesCopied += baseType->serialize(userdata, buffer, blockLength, dir);
+      buffer += (blockLength*baseSize) ;
+      userdata += ((blockLength+strideLength)*baseExtent);
+    }
   }
   return bytesCopied ;
 }
@@ -436,19 +434,16 @@ DDT_HVector::DDT_HVector(int nCount, int blength, int stride,
 }
 
 int 
-DDT_HVector::serialize(char* userdata, char* buffer, int dir)
+DDT_HVector::serialize(char* userdata, char* buffer, int num, int dir)
 {
-  char* tbuf = userdata ;
   int  bytesCopied = 0 ;
 
-  for(int i = 0 ; i < count; i++) {
-    userdata = tbuf ;
-    for(int j = 0; j < blockLength; j++) {
-      bytesCopied += baseType->serialize(userdata, buffer, dir);
-      buffer += baseSize ;
-      userdata += baseExtent;
-    }  
-    tbuf += strideLength ;
+  for(;num;num--) {
+    for(int i = 0 ; i < count; i++) {
+      bytesCopied += baseType->serialize(userdata, buffer, blockLength, dir);
+      buffer += (blockLength*baseSize) ;
+      userdata += ((blockLength+strideLength)*baseExtent);
+    }
   }
   return bytesCopied ;
 }
@@ -481,17 +476,19 @@ DDT_Indexed::DDT_Indexed(int nCount, int* arrBlock, int* arrDisp,
 }
 
 int 
-DDT_Indexed::serialize(char* userdata, char* buffer, int dir)
+DDT_Indexed::serialize(char* userdata, char* buffer, int num, int dir)
 {
   char* tbuf = userdata ;
   int bytesCopied = 0 ;
 
-  for(int i = 0 ; i < count; i++) {
-    userdata = tbuf + baseSize * arrayDisplacements[i] ;
-    for(int j = 0; j < arrayBlockLength[i] ; j++) {
-      bytesCopied +=  baseType->serialize(userdata, buffer, dir);
-      buffer += baseSize ;
-      userdata += baseExtent ;
+  for(;num;num--) {
+    for(int i = 0 ; i < count; i++) {
+      userdata = tbuf + baseSize * arrayDisplacements[i] ;
+      for(int j = 0; j < arrayBlockLength[i] ; j++) {
+        bytesCopied +=  baseType->serialize(userdata, buffer, 1, dir);
+        buffer += baseSize ;
+        userdata += baseExtent ;
+      }
     }
   }
   return bytesCopied ;
@@ -543,17 +540,19 @@ DDT_HIndexed::DDT_HIndexed(int nCount, int* arrBlock, int* arrDisp,
 }
 
 int 
-DDT_HIndexed::serialize(char* userdata, char* buffer, int dir)
+DDT_HIndexed::serialize(char* userdata, char* buffer, int num, int dir)
 {
   char* tbuf = userdata ;
   int bytesCopied = 0 ;
 
-  for(int i = 0 ; i < count; i++) {
-    userdata = tbuf + arrayDisplacements[i] ;
-    for(int j = 0; j < arrayBlockLength[i] ; j++) {
-      bytesCopied += baseType->serialize(userdata, buffer, dir);
-      buffer += baseSize ;
-      userdata += baseExtent ;
+  for(;num;num--) {
+    for(int i = 0 ; i < count; i++) {
+      userdata = tbuf + arrayDisplacements[i] ;
+      for(int j = 0; j < arrayBlockLength[i] ; j++) {
+        bytesCopied += baseType->serialize(userdata, buffer, 1, dir);
+        buffer += baseSize ;
+        userdata += baseExtent ;
+      }
     }
   }
   return bytesCopied ;
@@ -566,7 +565,7 @@ DDT_HIndexed::pup(PUP::er &p)
 }
 
 DDT_Struct::DDT_Struct(DDT* ddt, int nCount, int* arrBlock, 
-                       int* arrDisp, DDT_Type* arrBase)
+                       int* arrDisp, DDT_Type *arrBase)
 {
   int basesize ;
   int baseextent ;
@@ -591,17 +590,19 @@ DDT_Struct::DDT_Struct(DDT* ddt, int nCount, int* arrBlock,
 }
 
 int 
-DDT_Struct::serialize(char* userdata, char* buffer, int dir)
+DDT_Struct::serialize(char* userdata, char* buffer, int num, int dir)
 {
   char* tbuf = userdata ;
   int bytesCopied = 0 ;
 
-  for(int i = 0 ; i < count ; i++) {
-    userdata = tbuf + arrayDisplacements[i] ;
-    for(int j = 0 ; j < arrayBlockLength[i] ; j++) {
-      bytesCopied += arrayDataType[i]->serialize(userdata, buffer, dir);
-      buffer += arrayDataType[i]->getSize();
-      userdata += arrayDataType[i]->getExtent();
+  for(;num;num--) {
+    for(int i = 0 ; i < count ; i++) {
+      userdata = tbuf + arrayDisplacements[i] ;
+      for(int j = 0 ; j < arrayBlockLength[i] ; j++) {
+        bytesCopied += arrayDataType[i]->serialize(userdata, buffer, 1, dir);
+        buffer += arrayDataType[i]->getSize();
+        userdata += arrayDataType[i]->getExtent();
+      }
     }
   }
   return bytesCopied ;

@@ -85,13 +85,13 @@ class DDT_DataType {
     DDT_DataType(const DDT_DataType& obj) ;
     DDT_DataType& operator=(const DDT_DataType& obj);
 
-    virtual int getSize();
+    virtual int getSize(int count=1);
     virtual int getExtent();
     virtual void inrRefCount() ;
     virtual int getRefCount() ;
     virtual void pup(PUP::er  &p) ;
 
-    virtual int serialize(char* userdata, char* buffer, int dir=1);
+    virtual int serialize(char* userdata, char* buffer, int num, int dir);
 };
 
 /*   
@@ -112,7 +112,7 @@ class DDT_Contiguous : public DDT_DataType {
   DDT_Contiguous(int count, DDT_DataType* oldType);
   DDT_Contiguous(const DDT_Contiguous& obj) ;
   DDT_Contiguous& operator=(const DDT_Contiguous& obj);
-  virtual int serialize(char* userdata, char* buffer, int dir=1);
+  virtual int serialize(char* userdata, char* buffer, int num, int dir);
   virtual  void pup(PUP::er  &p) ;
 };
 
@@ -141,7 +141,7 @@ class DDT_Vector : public DDT_DataType {
     DDT_Vector& operator=(const DDT_Vector& obj);
     DDT_Vector() { } ;
     ~DDT_Vector() { } ;
-    virtual int serialize(char* userdata, char* buffer, int dir=1);
+    virtual int serialize(char* userdata, char* buffer, int num, int dir);
     virtual  void pup(PUP::er  &p) ;
 };
 
@@ -167,7 +167,7 @@ class DDT_HVector : public DDT_Vector {
     ~DDT_HVector() { } ;
     DDT_HVector(const DDT_HVector& obj) ;
     DDT_HVector& operator=(const DDT_HVector& obj);
-    virtual int serialize(char* userdata, char* buffer, int dir=1);
+    virtual int serialize(char* userdata, char* buffer, int num, int dir);
     virtual void pup(PUP::er &p);
 };
 
@@ -198,7 +198,7 @@ class DDT_Indexed : public DDT_DataType {
     DDT_Indexed& operator=(const DDT_Indexed& obj) ;
     DDT_Indexed() { } ;
     ~DDT_Indexed() ;
-    virtual int serialize(char* userdata, char* buffer, int dir=1);
+    virtual int serialize(char* userdata, char* buffer, int num, int dir);
     virtual  void pup(PUP::er  &p) ;
 };
 
@@ -222,7 +222,7 @@ class DDT_HIndexed : public DDT_Indexed {
     DDT_HIndexed(int count, int* arrBlock, int* arrDisp, DDT_DataType* type);
     DDT_HIndexed(const DDT_HIndexed& obj);
     DDT_HIndexed& operator=(const DDT_HIndexed& obj) ;
-    virtual int serialize(char* userdata, char* buffer, int dir=1);
+    virtual int serialize(char* userdata, char* buffer, int num, int dir);
     virtual void pup(PUP::er &p);
 };
 
@@ -249,10 +249,10 @@ class DDT_Struct : public DDT_DataType {
 
   public:
     DDT_Struct() { } ;
-    DDT_Struct(DDT* ddt,int count, int* arrBlock, int* arrDisp, DDT_Type* type);
+    DDT_Struct(DDT* ddt,int count, int* arrBlock, int* arrDisp, DDT_Type *type);
     DDT_Struct(const DDT_Struct& obj);
     DDT_Struct& operator=(const DDT_Struct& obj) ;
-    virtual int serialize(char* userdata, char* buffer, int dir=1);
+    virtual int serialize(char* userdata, char* buffer, int num, int dir);
     virtual  void pup(PUP::er  &p) ;
 };
 
@@ -305,26 +305,24 @@ class DDT {
     nextFreeIndex = 15 ;
   }
 
-  int Type_Contiguous(int count, DDT_Type  oldType, DDT_Type* newType);
-  int Type_Vector(int count, int blocklength, int stride, 
-                  DDT_Type oldtype, DDT_Type* newtype);
-  int Type_HVector(int count, int blocklength, int stride, 
-                   DDT_Type oldtype, DDT_Type* newtype);
-  int Type_Indexed(int count, int* arrbLength, int* arrDisp , 
-                   DDT_Type oldtype, DDT_Type* newtype);
-  int Type_HIndexed(int count, int* arrbLength, int* arrDisp , 
-                    DDT_Type oldtype, DDT_Type* newtype);
-  int Type_Struct(int count, int* arrbLength, int* arrDisp , 
-                  DDT_Type* oldtype, DDT_Type* newtype);
+  int newContiguous(int count, DDT_Type  oldType, DDT_Type* newType);
+  int newVector(int count, int blocklength, int stride, DDT_Type oldtype, 
+                DDT_Type* newtype);
+  int newHVector(int count, int blocklength, int stride, DDT_Type oldtype, 
+                 DDT_Type* newtype);
+  int newIndexed(int count, int* arrbLength, int* arrDisp , DDT_Type oldtype, 
+                 DDT_Type* newtype);
+  int newHIndexed(int count, int* arrbLength, int* arrDisp , DDT_Type oldtype, 
+                  DDT_Type* newtype);
+  int newStruct(int count, int* arrbLength, int* arrDisp , DDT_Type *oldtype, 
+                DDT_Type* newtype);
   void  freeType(int* index);
   int   getNextFreeIndex(void) ;
-  void pup(PUP::er &p);
+  void  pup(PUP::er &p);
   DDT_DataType*  getType(int nIndex);
-  int  getSize(int nIndex);
-  int getExtent(int nIndex);
+  int  getSize(int nIndex, int count=1);
+  int  getExtent(int nIndex);
   ~DDT() ;
 };
-
-int  DDT_Send(DDT* ddt, void* msg, int count, DDT_Type  type, void* recvMsg);
 
 #endif
