@@ -1715,7 +1715,7 @@ void CmiHandleImmediate()
    intr = 0;
 }
 
-void CmiPollImmediateMsg()
+void CmiProbeImmediateMsg()
 {
   CommunicationServer(0);
 }
