@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.1  1995-06-18 21:56:02  sanjeev
+ * Revision 2.2  1995-06-19 16:36:04  sanjeev
+ * Integrated TimerChecks and PeriodicChecks
+ *
+ * Revision 2.1  1995/06/18  21:56:02  sanjeev
  * *** empty log message ***
  *
  * Revision 2.0  1995/06/18  21:25:44  sanjeev
@@ -143,11 +146,14 @@ void CcdCallFnAfter(FN_PTR fnp, void *arg, unsigned int deltaT)
 /*****************************************************************************
   If any of the CallFnAfter functions can now be called, call them 
   ****************************************************************************/
-void CcdTimerChecks()
+void CcdCallBacks()
 {
   unsigned int currTime;
   int index;
+  int i,j;
+  FN_ARG *temp;
   
+/* This was formerly TimerChecks() */
   currTime = CmiTimer();
   
   while ((CpvAccess(numHeapEntries) > 0) && CpvAccess(timerHeap)[1].timeVal < currTime)
@@ -155,17 +161,10 @@ void CcdTimerChecks()
       (*(CpvAccess(timerHeap)[1].fn))(CpvAccess(timerHeap)[1].arg);
       RemoveFromHeap(1);
     }
-} 
 
-/*****************************************************************************
-  Call the functions that have been added to the list of periodic functions
- *****************************************************************************/
+/* This was formerly PeriodicChecks() */
+/* Call the functions that have been added to the list of periodic functions */
 
-void CcdPeriodicChecks()
-{
-  int i,j;
-  FN_ARG *temp;
-  
   for(temp = CpvAccess(PeriodicCalls); temp; temp = temp->next) {
     (*(temp->fn))(temp->arg);
     CpvAccess(CcdNumChecks)--;

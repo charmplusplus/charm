@@ -283,17 +283,16 @@ int counter;
 			if (CpvAccess(CsdStopFlag)) return;
 			counter--;
 			if (counter==0) return;
-
-			if (!CpvAccess(disable_sys_msgs)) {
-				if (CpvAccess(CcdNumChecks) > 0) {
-					CcdTimerChecks();
-					CcdPeriodicChecks(); 
-				}
-			}
   		}
 		else { /* Processor is idle */
 			CcdRaiseCondition(CcdPROCESSORIDLE) ;
 			if (CpvAccess(CsdStopFlag)) return;
+		}
+
+		if (!CpvAccess(disable_sys_msgs)) {
+			if (CpvAccess(CcdNumChecks) > 0) {
+				CcdCallBacks();
+			}
 		}
 	}
 }
