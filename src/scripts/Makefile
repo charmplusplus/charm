@@ -187,11 +187,11 @@ cpthreads.o: cpthreads.c $(CVHEADERS)
 memory.o: memory.c $(CVHEADERS)
 	$(CHARMC) memory.c
 
-cldb.o: cldb.c $(CVHEADERS)
-	$(CHARMC) cldb.c
+cldb.o: cldb.c ../../src/Common/conv-ldb/cldb.h $(CVHEADERS)
+	$(CHARMC) -I../../src/Common/conv-ldb/ cldb.c
 
-libldb-rand.o: cldb.rand.c $(CVHEADERS)
-	$(CHARMC) -cp ../lib/ -o $@ cldb.rand.c
+libldb-rand.o: cldb.rand.c ../../src/Common/conv-ldb/cldb.h $(CVHEADERS)
+	$(CHARMC) -I../../src/Common/conv-ldb/ -cp ../lib/ -o $@ cldb.rand.c
 
 libldb-graph.o: cldb.graph.c ../../src/Common/conv-ldb/cldb.graph.h $(CVHEADERS)
 	$(CHARMC) -I../../src/Common/conv-ldb/ -cp ../lib/ -o $@ cldb.graph.c 
