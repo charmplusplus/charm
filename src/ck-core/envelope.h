@@ -140,7 +140,7 @@ private:
     }
     static envelope *alloc(const UChar type, const UInt size=0, const UShort prio=0)
     {
-      CkAssert(type>=NewChareMsg && type<=ForNodeBocMsg);
+      CkAssert(type>=NewChareMsg && type<=ForArrayEltMsg);
       register UInt tsize = sizeof(envelope)+_ALIGN(size)+sizeof(int)*PW(prio);
       register envelope *env = (envelope *)CmiAlloc(tsize);
       env->setMsgtype(type);
