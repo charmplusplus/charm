@@ -138,8 +138,3 @@ void CkMessage::pup(PUP::er &p) {
 	int userSize=env->getTotalsize()-sizeof(envelope)-env->getPrioBytes();
 	p((void *)this,userSize);
 }
-
-void CkMessage::setImmediate(CmiBool i) {
-	envelope *env=UsrToEnv((void *)this);
-	env->setImmediate(i);
-}

@@ -146,7 +146,6 @@ public:
     	UChar queueing:4; ///< Queueing strategy (FIFO, LIFO, PFIFO, ...)
     	UChar isPacked:1; ///< If true, message must be unpacked before use
     	UChar isUsed:1; ///< Marker bit to prevent message re-send.
-	UChar isImmediate:1;   ///< Used by immediate msgs
     };
 private:
     u_type type; ///< Depends on message type (attribs.mtype)
@@ -177,8 +176,6 @@ private:
 #else /* CMK_OPTIMIZE */
     inline void setUsed(const UChar u) {}
 #endif
-    UChar  isImmediate(void) { return attribs.isImmediate; }
-    void   setImmediate(const UChar u) { attribs.isImmediate=u; }
     UChar  getMsgIdx(void) const { return attribs.msgIdx; }
     void   setMsgIdx(const UChar idx) { attribs.msgIdx = idx; }
     UInt   getTotalsize(void) const { return totalsize; }
@@ -203,7 +200,6 @@ private:
       env->totalsize = tsize;
       env->priobits = prio;
       env->setPacked(0);
-      env->setImmediate(0);
       _SET_USED(env, 0);
       //for record-replay
       env->setEvent(0);

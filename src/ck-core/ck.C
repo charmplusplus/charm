@@ -1154,7 +1154,6 @@ void CkSendMsgNodeBranchImmediate(int eIdx, void *msg, int node, CkGroupID gID)
   register envelope *env = UsrToEnv(msg);
   int numPes;
   _TRACE_ONLY(numPes = (node==CLD_BROADCAST_ALL?CkNumNodes():1));
-  env->setImmediate(CmiFalse);
   env = _prepareImmediateMsgBranch(eIdx,msg,gID,ForNodeBocMsg);
   _TRACE_CREATION_N(env, numPes);
   _noCldNodeEnqueue(node, env);

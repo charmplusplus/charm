@@ -49,8 +49,6 @@ public:
 	
 	/// This is used to display message contents in the debugger.
 	static void ckDebugPup(PUP::er &p,void *msg);
-	
-        void setImmediate(CmiBool i);
 };
 class CMessage_CkMessage {
 public:
