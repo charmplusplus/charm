@@ -1835,7 +1835,7 @@ void ConverseCommonInit(char **argv)
 #ifndef CMK_OPTIMIZE
   traceInit(argv);
 /*initTraceCore(argv);*/ /* projector */
-#endif*/
+#endif
 
 #if CMK_CCS_AVAILABLE
   CcsInit(argv);
