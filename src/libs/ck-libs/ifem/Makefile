@@ -36,4 +36,4 @@ test: solver_test
 	./solver_test 100
 
 clean:
-	rm -rf *.a *.def.h *.decl.h *.o SunWS_cache $(DEST) headers
+	rm -rf *.a *.def.h *.decl.h *.o SunWS_cache $(DEST) solver_test headers
