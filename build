@@ -9,7 +9,7 @@ syntax() {
   echo ''
   echo 'Usage: build <target> <version> <options> [charmc-options ...]'
   echo ''
-  echo '<targets>: converse charm++ LIBS AMPI FEM bluegene pose'
+  echo '<targets>: converse charm++ LIBS AMPI FEM bluegene pose jade msa'
   echo '<targets>: doc ps-doc pdf-doc html-doc'
   if test $more = 1
   then
@@ -20,6 +20,8 @@ syntax() {
   echo '  LIBS            compile additional parallel libraries with Charm++ core'
   echo '  bluegene        build additional BigSim libraries'
   echo '  pose            build POSE parallel discrete event simulator'
+  echo '  jade            build Jade compiler (auto-builds charm++, msa)'
+  echo '  msa             build Multiphase Shared Arrays(MSA) library'
   echo ''
   fi
   echo '<versions>: ' 
