@@ -1764,8 +1764,7 @@ CDECL int FEM_Get_Node_Ghost(void) {
 	FEMAPI("FEM_Get_Node_Ghost");
 	return getMesh()->node.ghostStart;
 }
-FDECL int FTN_NAME(FEM_GET_NODE_GHOST,fem_get_node_ghost)(void)
-{
+FDECL int FTN_NAME(FEM_GET_NODE_GHOST,fem_get_node_ghost)(void) {
 	return 1+FEM_Get_Node_Ghost();
 }
 
@@ -1774,7 +1773,7 @@ CDECL int FEM_Get_Elem_Ghost(int elType) {
 	return getMesh()->getCount(elType).ghostStart;
 }
 CDECL int FTN_NAME(FEM_GET_ELEM_GHOST,fem_get_elem_ghost)(int *elType) {
-	return FEM_Get_Elem_Ghost(*elType-1);
+	return 1+FEM_Get_Elem_Ghost(*elType-1);
 }
 
 CDECL void FEM_Update_Ghost_Field(int fid, int elemType, void *data)
