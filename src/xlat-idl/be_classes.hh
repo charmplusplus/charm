@@ -69,14 +69,10 @@ trademarks or registered trademarks of Sun Microsystems, Inc.
 
 //----------------------------------------------------------------------
 #include <assert.h>
+typedef int boolean;
 #if !defined(__STDCPP__) && !defined(__KCC) && !defined(__sgi)
                        // Works for KCC linux
-typedef int bool;
-#endif
-// gzheng  
-// works for HP
-#ifndef bool
-typedef int bool;
+typedef int boolean;
 #endif
 const int FALSE = 0;
 const int TRUE = 1;
@@ -156,9 +152,9 @@ public:
 //  }
 
   // @@
-//   bool isChare(){};
-//   bool isBOC(){};
-//   bool doesInherit(){};
+//   boolean isChare(){};
+//   boolean isBOC(){};
+//   boolean doesInherit(){};
 
   // Narrowing
   DEF_NARROW_METHODS1(be_interface, AST_Interface);
@@ -251,7 +247,7 @@ private:
   int p_returnMarshallMessageNum;
 
 public:
-  bool isConstructor()
+  boolean isConstructor()
   {
     // Check if the op is a constructor.
     UTL_Scope *parent_scope = defined_in();
@@ -269,20 +265,20 @@ public:
       }
     return (strcmp(classname, methodname) == 0);
   }
-  bool hasOnlyMessageParameter()
+  boolean hasOnlyMessageParameter()
   {
     return FALSE; // @@
   };
 
-  bool hasNonVoidRetVal(void);
-  bool hasOutOrInoutParameter();
-  bool hasParameter()
+  boolean hasNonVoidRetVal(void);
+  boolean hasOutOrInoutParameter();
+  boolean hasParameter()
   {
     UTL_ScopeActiveIterator i(this, UTL_Scope::IK_decls);
     return (!(i.is_done()));
   }
 
-  bool isMarshallMessageNeeded()
+  boolean isMarshallMessageNeeded()
   {
     return hasParameter();
   }
@@ -292,7 +288,7 @@ public:
       p_marshallMessageNum = get_new_message_type_number();
     return p_marshallMessageNum;
   }
-  bool isReturnMessageNeeded(void);
+  boolean isReturnMessageNeeded(void);
   int getReturnMessageNumber()
   {
     if (p_returnMarshallMessageNum == -1)
@@ -300,7 +296,7 @@ public:
     return p_returnMarshallMessageNum;
   }
 
-  bool isThreaded(){ return p_isThreaded; };
+  boolean isThreaded(){ return p_isThreaded; };
   //  @@ need to move the threaded stuff from the ast to the be
   // void setThreaded(int i) { p_isThreaded = i; }
   // @@
@@ -334,15 +330,15 @@ public:
 	      UTL_StrList *p);
 
   // Convenience functions
-  bool isArray()
+  boolean isArray()
   {
     return field_type()->node_type() == AST_Decl::NT_array;
   };
-  bool isSequence()
+  boolean isSequence()
   {
     return field_type()->node_type() == AST_Decl::NT_sequence;
   };
-  bool isOutOrInout()
+  boolean isOutOrInout()
   {
     return ((direction() == AST_Argument::dir_OUT) ||
 	    (direction() == AST_Argument::dir_INOUT));

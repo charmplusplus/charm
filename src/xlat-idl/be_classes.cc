@@ -220,7 +220,7 @@ be_operation::be_operation(AST_Type *rt, AST_Operation::Flags fl,
 {
 }
 
-bool 
+boolean 
 be_operation::hasOutOrInoutParameter(void)
 {
   UTL_ScopeActiveIterator i(this, UTL_Scope::IK_decls);
@@ -238,13 +238,13 @@ be_operation::hasOutOrInoutParameter(void)
   return FALSE;
 }
 
-bool 
+boolean 
 be_operation::isReturnMessageNeeded(void)
 {
   return (hasNonVoidRetVal() || hasOutOrInoutParameter());
 }
 
-bool 
+boolean 
 be_operation::hasNonVoidRetVal(void)
 {
   // The retval can only be a base type
