@@ -9,9 +9,9 @@ HEADERS = msa.h msa-common.h msa-distArray.h msa-DistPageMgr.h $(MODULE).decl.h 
 		$(MODULE).def.h
 LIBDEST =  $(CDIR)/lib/
 
-all: $(LIBDEST)
+all: $(LIBDEST)$(LIB)
 
-$(LIBDEST) : $(LIB)
+$(LIBDEST)$(LIB) : $(LIB)
 	/bin/cp $(LIB) $(LIBDEST)
 
 $(LIB): $(LIBOBJ)
@@ -31,6 +31,6 @@ $(MODULE).decl.h: msa-DistPageMgr.ci
 	$(CHARMC) -c msa-DistPageMgr.ci
 
 clean:
-	rm -f conv-host *.o *.decl.h *.def.h core $(LIB)
+	rm -f conv-host *.o *.decl.h *.def.h core $(LIB) headers
 
 c: clean
