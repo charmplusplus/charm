@@ -32,14 +32,27 @@ void die(const char *why,int line)
 }
 
 // Make the name lower case
-char* fortranify(const char *s)
+char* fortranify(const char *s, const char *suff1="", const char *suff2="", const char *suff3="")
 {
-  int i, len = strlen(s);
+  int i, len1 = strlen(s), len2 = strlen(suff1), 
+         len3 = strlen(suff2), len4 = strlen(suff3);
+  int c = len1+len2+len3+len4;
+  char str[1024], strUpper[1024];
+  strcpy(str, s);
+  strcat(str, suff1);
+  strcat(str, suff2);
+  strcat(str, suff3);
+  for(i = 0; i < c+1; i++)
+    str[i] = tolower(str[i]);
+  for(i = 0; i < c+1; i++)
+    strUpper[i] = toupper(str[i]);
   char *retVal;
-  retVal = new char[len+1];
-  for(i = 0; i < len; i++)
-    retVal[i] = tolower(s[i]);
-  retVal[len] = 0;
+  retVal = new char[2*c+20];
+  strcpy(retVal, "FTN_NAME(");
+  strcat(retVal, strUpper);
+  strcat(retVal, ",");
+  strcat(retVal, str);
+  strcat(retVal, ")");
 
   return retVal;
 }
@@ -274,6 +287,7 @@ Module::generate()
   "#ifndef _DECL_"<<name<<"_H_\n"
   "#define _DECL_"<<name<<"_H_\n"
   "#include \"charm++.h\"\n";
+  if (fortranMode) declstr << "#include \"charm-api.h\"\n";
   clist->genDecls(declstr);
   declstr << "extern void _register"<<name<<"(void);\n";
   if(isMain()) {
@@ -917,7 +931,7 @@ Chare::genDefs(XStr& str)
     }
     // We have to generate the chare array itself
     str << "/* FORTRAN */\n";
-    str << "extern \"C\" void " << fortranify(baseName()) << "_allocate_(char **, void *, int *);\n";
+    str << "extern \"C\" void " << fortranify(baseName(), "_allocate") << "(char **, void *, int *);\n";
     str << "\n";
     str << "class " << baseName() << " : public ArrayElement1D\n";
     str << "{\n";
@@ -928,7 +942,7 @@ Chare::genDefs(XStr& str)
     str << "  {\n";
 //    str << "    CkPrintf(\"" << baseName() << " %d created\\n\",thisIndex);\n";
     str << "    CkArrayID *aid = &thisArrayID;\n";
-    str << "    " << fortranify(baseName()) << "_allocate_((char **)&user_data, &aid, &thisIndex);\n";
+    str << "    " << fortranify(baseName(), "_allocate") << "((char **)&user_data, &aid, &thisIndex);\n";
     str << "  }\n";
     str << "\n";
     str << "  " << baseName() << "(CkMigrateMessage *m)\n";
@@ -938,7 +952,7 @@ Chare::genDefs(XStr& str)
     str << "\n";
     str << "};\n";
     str << "\n";
-    str << "extern \"C\" void " << fortranify(baseName()) << "_cknew_(int *numElem, long *aindex)\n";
+    str << "extern \"C\" void " << fortranify(baseName(), "_cknew") << "(int *numElem, long *aindex)\n";
     str << "{\n";
     str << "    CkArrayID *aid = new CkArrayID;\n";
     str << "    *aid = CProxy_" << baseName() << "::ckNew(*numElem); \n";
@@ -1373,12 +1387,12 @@ Readonly::genDefs(XStr& str)
   }
 
   if (fortranMode) {
-      str << "extern \"C\" void set_"
-          << fortranify(name)
-          << "_(int *n) { " << name << " = *n; }\n";
-      str << "extern \"C\" void get_"
-          << fortranify(name)
-          << "_(int *n) { *n = " << name << "; }\n";
+      str << "extern \"C\" void "
+          << fortranify("set_", name)
+          << "(int *n) { " << name << " = *n; }\n";
+      str << "extern \"C\" void "
+          << fortranify("get_", name)
+          << "(int *n) { *n = " << name << "; }\n";
   }
 }
 
@@ -1910,7 +1924,7 @@ void Entry::genCall(XStr& str, const XStr &preCall)
     str << "/* FORTRAN */\n";
     str << "  int index = impl_obj->thisIndex;\n";
     str << "  " << fortranify(name)
-	<< "_((char **)(impl_obj->user_data), &index, ";
+	<< "((char **)(impl_obj->user_data), &index, ";
     param->unmarshallAddress(str); str<<");\n";
     str << "/* FORTRAN END */\n";
   }
@@ -1989,7 +2003,7 @@ void Entry::genDefs(XStr& str)
 
       // Declare the Fortran Entry Function
       // This is called from C++
-      str << "extern \"C\" void " << fortranify(name) << "_(char **, int*, ";
+      str << "extern \"C\" void " << fortranify(name) << "(char **, int*, ";
       param->printAddress(str);
       str << ");\n";
 
@@ -1997,10 +2011,8 @@ void Entry::genDefs(XStr& str)
       // This is called from Fortran to send the message to a chare.
       str << "extern \"C\" void "
         //<< container->proxyName() << "_" 
-          << fortranify("SendTo_")
-	  << fortranify(container->baseName())
-          << "_" << fortranify(name)
-          << "_(long* aindex, int *index, ";
+          << fortranify("SendTo_", container->baseName(), "_", name)
+          << "(long* aindex, int *index, ";
       param->printAddress(str);
       str << ")\n";
       str << "{\n";
