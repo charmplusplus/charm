@@ -825,8 +825,10 @@ static void CmiStartThreads(char **argv)
   if (Cmi_asyncio)
   {
     CmiSignal(SIGIO, 0, 0, CommunicationInterrupt);
-    if (dataskt!=-1) CmiEnableAsyncIO(dataskt);
-    if (Cmi_charmrun_fd!=-1) CmiEnableAsyncIO(Cmi_charmrun_fd);
+    if (!Cmi_netpoll) {
+      if (dataskt!=-1) CmiEnableAsyncIO(dataskt);
+      if (Cmi_charmrun_fd!=-1) CmiEnableAsyncIO(Cmi_charmrun_fd);
+    }
   }
 #endif
 }
@@ -1956,7 +1958,7 @@ static void ConverseRunPE(int everReturn)
   if (CmiMyRank()==0 && Cmi_charmrun_fd!=-1) {
     CcdCallOnConditionKeep(CcdPERIODIC_10ms, (CcdVoidFn) CmiStdoutFlush, NULL);
 #if CMK_SHARED_VARS_UNAVAILABLE
-    if (Cmi_netpoll == 1) {
+    if (!Cmi_asyncio) {
     /* gm cannot live with setitimer */
     CcdCallFnAfter((CcdVoidFn)pingCharmrunPeriodic,NULL,1000);
     }
@@ -2091,12 +2093,12 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usc, int everReturn)
   if (CmiGetArgFlagDesc(argv,"+idlesleep","Make sleep calls when idle")) Cmi_idlepoll = 0;
   Cmi_syncprint = CmiGetArgFlagDesc(argv,"+syncprint", "Flush each CmiPrintf to the terminal");
 
-  Cmi_asyncio= 1;
-  if (Cmi_netpoll) Cmi_asyncio = 0;     /* netpoll turn off async io */
-#if CMK_USE_GM
-  Cmi_asyncio = 1;			/* gm use async io */
+  Cmi_asyncio = 1;
+#if CMK_ASYNC_NOT_NEEDED
+  Cmi_asyncio = 0;
 #endif
   if (CmiGetArgFlagDesc(argv,"+asyncio","Use async IO")) Cmi_asyncio = 1;
+  if (CmiGetArgFlagDesc(argv,"+asynciooff","Don not use async IO")) Cmi_asyncio = 0;
 
   MACHSTATE2(5,"Init: (netpoll=%d), (idlepoll=%d)",Cmi_netpoll,Cmi_idlepoll);
 

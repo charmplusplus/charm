@@ -272,6 +272,12 @@ static void CommunicationServer(int sleepTime, int where)
   sleepTime=0;
 #endif
   CmiCommLock();
+  /* in netpoll mode, only perform service to stdout */
+  if (Cmi_netpoll && where == 1) {
+    if (CmiStdoutNeedsService()) {CmiStdoutService();}
+    CmiCommUnlock();
+    return;
+  }
   CommunicationsClock();
   /*Don't sleep if a signal has stored messages for us*/
   if (sleepTime&&CmiGetState()->idle.hasMessages) sleepTime=0;
