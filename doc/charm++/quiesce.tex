@@ -3,17 +3,17 @@
 In \charmpp, \index{quiescence}quiescence is defined as the state in which no
 processor is executing an entry point, and no messages are awaiting processing.
 
-\charmpp\ provides two facilities for detecting quiescence: \kw{CkStartQd} and
-\kw{CkWaitQd}.
+\charmpp\ provides two facilities for detecting quiescence: \kw{CkStartQD} and
+\kw{CkWaitQD}.
 
-\kw{CkStartQd} registers with the system a callback that should be made the
-next time \index{quiescence}quiescence is detected.  \kw{CkStartQd} takes two
+\kw{CkStartQD} registers with the system a callback that should be made the
+next time \index{quiescence}quiescence is detected.  \kw{CkStartQD} takes two
 parameters: an index corresponding to the entry function that is to be called,
 and a handle to the chare on which that entry function should be called.  The
 syntax of this call looks like this:
 
 \begin{alltt}
- CkStartQd(int Index, CkChareID* chareID);
+ CkStartQD(int Index, CkChareID* chareID);
 \end{alltt}
 
 To retrieve the corresponding index of a particular \index{entry method}entry
@@ -45,18 +45,18 @@ portions of the previously mentioned static method call.  Additionally, this
 macro method will not work with templated chares (refer to Section
 ~\ref{inheritance and templates} for details on templated chares).
 
-\kw{CkWaitQd}, however, does not register a callback.  Rather,
-\kw{CkWaitQd} blocks and does not return until \index{quiescence}quiescence is
+\kw{CkWaitQD}, however, does not register a callback.  Rather,
+\kw{CkWaitQD} blocks and does not return until \index{quiescence}quiescence is
 detected.  It takes no parameters and returns no value.  A call to
-\kw{CkWaitQd} simply looks like this: 
+\kw{CkWaitQD} simply looks like this: 
 
 \begin{alltt}
-  CkWaitQd();
+  CkWaitQD();
 \end{alltt}
 
-Keep in mind that \kw{CkWaitQd} should only be called from threaded
-\index{entry method}entry methods because a call to \kw{CkWaitQd} suspends the
+Keep in mind that \kw{CkWaitQD} should only be called from threaded
+\index{entry method}entry methods because a call to \kw{CkWaitQD} suspends the
 current thread of execution, and if it were called outside of a threaded entry
 method it would suspend the main thread of execution of the processor from
-which \kw{CkWaitQd} was called and the entire program would come to a grinding
+which \kw{CkWaitQD} was called and the entire program would come to a grinding
 halt on that processor.
