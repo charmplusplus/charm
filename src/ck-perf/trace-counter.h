@@ -10,9 +10,6 @@
 */
 /*@{*/
 
-// #define CMK_ORIGIN2000
-#ifdef CMK_ORIGIN2000
-
 #ifndef __trace_counter_h__
 #define __trace_counter_h__
 
@@ -51,6 +48,7 @@ class StatTable {
 
     Statistics* stats_;             // track stats for each entry point
     int         numStats_;          // size of statistics being tracked
+    // bool        error_;             // will be set to true if error writing info
 };
 
 // counter log pool
@@ -139,7 +137,5 @@ class TraceCounter : public Trace {
 };
 
 #endif  // __trace_counter_h__
-
-#endif // CMK_ORIGIN2000
 
 /*@}*/

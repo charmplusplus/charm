@@ -13,10 +13,10 @@
 #include "conv-mach.h"
 // #define CMK_ORIGIN2000
 #ifdef CMK_ORIGIN2000
-
 #include "trace-counter.h"
+#include "limits.h"  // for LONGLONG_MAX
 
-#define DEBUGF(x) CmiPrintf("%d/%d DEBUG: ", CkMyPe(), CkNumPes()); CmiPrintf x
+#define DEBUGF(x) // CmiPrintf("%d/%d DEBUG: ", CkMyPe(), CkNumPes()); CmiPrintf x
 #define VER 1.0
 
 // for performance monitoring
@@ -87,7 +87,7 @@ void _createTracecounter(char **argv)
   CpvAccess(_traces)->addTrace(CpvAccess(_trace));
 }
 
-StatTable::StatTable(char** args, int argc): stats_(NULL), numStats_(0) 
+StatTable::StatTable(char** args, int argc): stats_(NULL), numStats_(0)
 {
   DEBUGF(("StatTable::StatTable %08x size %d\n", this, argc));
 
