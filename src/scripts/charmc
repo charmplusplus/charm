@@ -666,7 +666,7 @@ do
 	DELETE="$DELETE $TMP.c $TMP.i"
 	DoNoErrCheck $RM $BASE.cpm.h $TMP.c
 	Do touch $BASE.cpm.h
-	Do $LN -s $FILE $TMP.c
+	Do $LN -f -s $FILE $TMP.c
 	Do $CMK_CPP_C $OPTSC $OPTS_CPP -I$CHARMINC $TMP.c > $TMP.i
 	Do $CHARMBIN/conv-cpm $TMP.i $BASE.cpm.h
 done
@@ -955,7 +955,7 @@ if [ -x $CHARMBIN/$targ ]
 then
 	DoNoErrCheck $RM $targ
 	Do $CP $CHARMBIN/$targ $targ
-	Do $LN -s $targ conv-host$POST_EXE
+	Do $LN -f -s $targ conv-host$POST_EXE
 fi
 
 Copyobj
