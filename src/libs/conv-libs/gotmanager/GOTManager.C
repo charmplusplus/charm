@@ -9,12 +9,14 @@ void GOTManager::createNewGOT(){
     int off, pos;
     int relt_size = 0, pltrelt_size = 0;
     int global_relt_size = 0, global_pltrelt_size = 0;
-    
-    int type, symindx, seg_size = 0, total_size;
+        
+    int type, symindx, total_size;
     char *sym_name;
     int dynamic_pos;
     int got_pos;
     int gmon_pos;
+
+    seg_size = 0;
 
     ELF_TYPE_Rel *relt;       //Relocation table
     ELF_TYPE_Rel *pltrelt;    //Procedure relocation table
@@ -111,6 +113,8 @@ void GOTManager::createNewGOT(){
     for(count = 0; count < total_size; count ++)
         ngot[count] =  _GLOBAL_OFFSET_TABLE_[count];
 
+    ngot_size = total_size;
+
     //Allocating memory for the new data segment
     new_data_seg = (char *) malloc(seg_size);
     pos = 3 + global_pltrelt_size;
@@ -160,24 +164,42 @@ void GOTManager::createNewGOT(){
 
 int GOTManager::isValidSymbol(char *name){
     
-    if((strncmp("_Z", name, 2) == 0) || (strncmp("Cpv_", name, 4) == 0)
-       || (strncmp("Csv_", name, 4) == 0) || (strncmp("Ctv_", name, 4) == 0))
+    if((strncmp("_", name, 2) == 0) || (strncmp("Cpv_", name, 4) == 0)
+       || (strncmp("Csv_", name, 4) == 0) || (strncmp("Ctv_", name, 4) == 0)
+       || (strncmp("ckout", name, 5) == 0) || (strncmp("stdout", name, 6) == 0)
+       || (strncmp("stderr", name, 6) == 0))
         return 0;
     
     return 1;
 }
 
-ELF_TYPE_Addr *temp;
+ELF_TYPE_Addr *_gotmanager_temp;
 
 void * GOTManager::swapGOT(){
     ELF_TYPE_Addr *oldgot= 0, *new_got = 0;
     
     oldgot = _GLOBAL_OFFSET_TABLE_;    
 
-    temp = ngot;
-    asm("movl temp, %ebx;");        
+    _gotmanager_temp = ngot;
+    asm("movl _gotmanager_temp, %ebx;");        
     
     //printf("testing values %d, %d\n", oldgot, new_got);
 
     return (void *)oldgot;
 }
+
+void GOTManager::restoreGOT(void *oldgot){
+
+    _gotmanager_temp = (ELF_TYPE_Addr *) oldgot;
+    asm("movl _gotmanager_temp, %ebx;");      
+}
+
+
+void GOTManager::pup(PUP::er &p) {
+    p | ngot_size;
+    p | seg_size;
+
+    p(new_data_seg, seg_size);
+    p(ngot, ngot_size);
+}
+

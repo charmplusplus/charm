@@ -30,6 +30,9 @@
 #include <strings.h>
 #include <errno.h>
 
+#include "converse.h"
+#include "pup.h"
+
 #define ALIGN8(x)       (int)((~7)&((x)+7))
 
 typedef Elf32_Addr ELF_TYPE_Addr;
@@ -45,8 +48,10 @@ extern ELF_TYPE_Dyn _DYNAMIC[];      //The Dynamic section table pointer
 class GOTManager{
 
     ELF_TYPE_Addr *ngot;     /* Pointer to the new global offset table*/
+    int ngot_size;
     char *new_data_seg;   /* Pointer to the new global data segment*/
-    
+    int seg_size;
+
     //Creates a new global offset table
     void createNewGOT();
 
@@ -58,4 +63,8 @@ class GOTManager{
 
     //Swaps the GOT to the new GOT and returns the old got
     void *swapGOT();
+    
+    virtual void pup(PUP::er &p);
+
+    static void restoreGOT(void *oldgot);        
 };
