@@ -1,0 +1,16 @@
+module NeighborLB {
+
+extern module LBDatabase;
+
+readonly CkGroupID loadbalancer;
+
+message[varsize] NLBStatsMsg;
+message[varsize] NLBMigrateMsg;
+
+group NeighborLB {
+  entry void NeighborLB(void);  
+  entry void ReceiveStats(NLBStatsMsg*);
+  entry void ReceiveMigration(NLBMigrateMsg*);	
+};
+
+};

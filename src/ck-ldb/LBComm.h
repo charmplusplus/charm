@@ -93,7 +93,7 @@ public:
   LBCommData* HashInsert(const LBCommData data);
   LBCommData* HashInsertUnique(const LBCommData data);
   LBCommData* HashSearch(const LBCommData data);
-  int CommCount() { CmiPrintf("Returning %d records\n",in_use); return in_use; };
+  int CommCount() { return in_use; };
   void GetCommData(LDCommData* data);
 	
 private:
