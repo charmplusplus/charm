@@ -3,8 +3,8 @@
 // a load balancer.
 // Last Modified: 11.05.01 by Terry L. Wilmarth
 
-#ifndef LBOBJ_H
-#define LBOBJ_H
+#ifndef LBOBJ1_H
+#define LBOBJ1_H
 
 class lbObjectNode {  // lbObjects is a list of these nodes
  public:
