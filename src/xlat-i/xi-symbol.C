@@ -1092,7 +1092,8 @@ void Entry::genChareDecl(XStr& str)
 
 void Entry::genGroupDecl(XStr& str)
 {  
-  char *node=container->isNodeGroup()?"Node":"";//Selects between NodeGroup and Group
+  //Selects between NodeGroup and Group
+  char *node = (char *)(container->isNodeGroup()?"Node":"");
 
   if(isConstructor()) {
     genGroupStaticConstructorDecl(str);
@@ -1151,7 +1152,7 @@ void Entry::genArrayDecl(XStr& str)
   if(isConstructor()) {
     genArrayStaticConstructorDecl(str);
   } else {
-    char *msg=param->isVoid()?"CkAllocMsg(0, sizeof(ArrayMessage),0)":"msg";
+    char *msg=(char *)(param->isVoid()?"CkAllocMsg(0, sizeof(ArrayMessage),0)":"msg");
     // entry method broadcast declaration
     str << "    "<<Virtual()<<retType<<" "<<name<<"("<<paramComma()<<"int index=-2) {\n";
     str << "      if(index==-2) index=_elem;\n";
@@ -1266,7 +1267,8 @@ void Entry::genGroupStaticConstructorDefs(XStr& str)
   if(container->isAbstract())
     return;
   
-  char *node=container->isNodeGroup()?"Node":"";//Selects between NodeGroup and Group
+  //Selects between NodeGroup and Group
+  char *node=(char *)(container->isNodeGroup()?"Node":"");
   
   str << makeDecl("CkGroupID")<<"::ckNew("<<paramType()<<")\n";
   str << "{\n"<<voidParamDecl();
