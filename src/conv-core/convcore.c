@@ -950,6 +950,8 @@ void CmiGroupInit()
   CpvAccess(CmiGroupCounter) = 0;
   CpvAccess(CmiGroupTable) =
     (GroupDef*)calloc(GROUPTAB_SIZE, sizeof(GroupDef));
+  if (CpvAccess(CmiGroupTable) == 0)
+    CmiAbort("Memory Allocation Error");
 }
 
 #endif
