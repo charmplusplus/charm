@@ -1074,6 +1074,7 @@ void CmiFreeSendFn(int destPE, int size, char *msg)
     } 
     else { 
         if(size <= NON_BLOCKING_MSG) {
+            CQdCreate(CpvAccess(cQdState), 1);
             (void)elan_tportTxWait(elan_tportTxStart(elan_port, 0, destPE, CmiMyPe(), TAG_SMALL, msg, size));
             CmiFree(msg);
         }
