@@ -12,7 +12,7 @@ typedef minHeap<BgTimeLog *>  BgTimelogHeap;
 /*** CPVs ***/
 
 CpvStaticDeclare(int,bgCorrectionHandler);
-CpvStaticDeclare(int, msgCounter);
+CpvDeclare(int, msgCounter);
 CpvDeclare(int, heartbeatHandler);
 CpvDeclare(int, heartbeatBcastHandler);
 

@@ -13,6 +13,8 @@ extern int  correctTimeLog;
 extern int  bgverbose;
 extern int  schedule_flag;
 
+CpvExtern(int, msgCounter);
+
 class StateCounters{
   public:
   int realMsgProcCnt,corrMsgProcCnt,corrMsgEnqCnt,corrMsgCCCnt,corrMsgRCCnt,corrMsgCRCnt;

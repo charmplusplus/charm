@@ -582,7 +582,8 @@ void BgSyncListSend(int npes, int *pes, int handlerID, WorkType type, int numbyt
 
     if (myNode->x == x && myNode->y == y && myNode->z == z) local = 1;
 
-    // timing
+    // timing and make sure all msgID are the same
+    if (i!=0) CpvAccess(msgCounter) --;
     BG_ADDMSG(sendmsg, CmiBgMsgNodeID(sendmsg), t, local, i==0?npes:-1);
 
     if (myNode->x == x && myNode->y == y && myNode->z == z)
