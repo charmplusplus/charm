@@ -434,6 +434,13 @@ void PUP::toTextUtil::bytes(void *p,int n,size_t itemSize,dataType t) {
       case Tfloat: sprintf(o,"float=%.7g;\n",((float *)p)[i]); break;
       case Tdouble: sprintf(o,"double=%.15g;\n",((double *)p)[i]); break;
       case Tbool: sprintf(o,"bool=%s;\n",((CmiBool *)p)[i]?"true":"false"); break;
+#if CMK_LONG_DOUBLE_DEFINED
+      case Tlongdouble: sprintf(o,"longdouble=%Lg;\n",((long double *)p)[i]);break;
+#endif
+#ifdef CMK_PUP_LONG_LONG
+      case Tlonglong: sprintf(o,"longlong=%lld;\n",((CMK_PUP_LONG_LONG *)p)[i]);break;
+      case Tulonglong: sprintf(o,"ulonglong=%llu;\n",((unsigned CMK_PUP_LONG_LONG *)p)[i]);break;
+#endif
       default: CmiAbort("Unrecognized pup type code!");
       }
       endLine();
@@ -482,6 +489,13 @@ void PUP::toTextFile::bytes(void *p,int n,size_t itemSize,dataType t)
     case Tfloat: fprintf(f," %.7g",((float *)p)[i]); break;
     case Tdouble: fprintf(f," %.15g",((double *)p)[i]); break;
     case Tbool: fprintf(f," %s",((CmiBool *)p)[i]?"true":"false"); break;
+#if CMK_LONG_DOUBLE_DEFINED
+    case Tlongdouble: fprintf(f," %Lg",((long double *)p)[i]);break;
+#endif
+#ifdef CMK_PUP_LONG_LONG
+    case Tlonglong: fprintf(f," %lld",((CMK_PUP_LONG_LONG *)p)[i]);break;
+    case Tulonglong: fprintf(f," %llu",((unsigned CMK_PUP_LONG_LONG *)p)[i]);break;
+#endif
     default: CmiAbort("Unrecognized pup type code!");
     };
   fprintf(f,"\n");
@@ -527,6 +541,25 @@ void PUP::fromTextFile::bytes(void *p,int n,size_t itemSize,dataType t)
     case Tulong:((unsigned long *)p)[i]=readUint(); break;
     case Tfloat: ((float *)p)[i]=(float)readDouble(); break;
     case Tdouble:((double *)p)[i]=readDouble(); break;
+#if CMK_LONG_DOUBLE_DEFINED
+    case Tlongdouble: {
+      long double ret=0;
+      if (1!=fscanf(f,"%Lg",&ret)) parseError("could not match long double");
+      ((long double *)p)[i]=ret;
+    } break;
+#endif
+#ifdef CMK_PUP_LONG_LONG
+    case Tlonglong: {
+      CMK_PUP_LONG_LONG ret=0;
+      if (1!=fscanf(f,"%lld",&ret)) parseError("could not match long long");
+      ((long double *)p)[i]=ret;
+    } break;
+    case Tulonglong: {
+      unsigned CMK_PUP_LONG_LONG ret=0;
+      if (1!=fscanf(f,"%llu",&ret)) parseError("could not match unsigned long long");
+      ((long double *)p)[i]=ret;
+    } break;
+#endif
     case Tbool: {
       char tmp[20];
       if (1!=fscanf(f," %20s",tmp)) parseError("could not read boolean string");

@@ -61,9 +61,8 @@ class bar {
 #endif
 
 #ifndef CHARM_H
-#  include <converse.h> // <- for CmiBool
+#  include <converse.h> // <- for CmiBool, CMK_* defines
 #endif
-
 
 //We need CkMigrateMessage only to distinguish the migration
 // constructor from all other constructors-- the type
@@ -72,13 +71,20 @@ typedef struct {int is_only_a_name;} CkMigrateMessage;
 
 class PUP {//<- Should be "namespace", once all compilers support them
  public:
+
+#if CMK_LONG_LONG_DEFINED
+#define CMK_PUP_LONG_LONG long long
+#elif CMK___int64_DEFINED
+#define CMK_PUP_LONG_LONG __int64
+#endif
+
  
 //Item data types-- these are used to do byte swapping, etc.
 typedef enum {
 //(this list must exactly match that in PUPer_xlate)
-  Tchar=0,Tshort, Tint, Tlong,
-  Tuchar,Tushort,Tuint,Tulong,
-  Tfloat,Tdouble,
+  Tchar=0,Tshort, Tint, Tlong, Tlonglong,
+  Tuchar,Tushort,Tuint,Tulong, Tulonglong,
+  Tfloat,Tdouble,Tlongdouble,
   Tbool,
   Tbyte,
   Tsync,
@@ -169,7 +175,14 @@ class er {
   void operator()(unsigned long &v)   {(*this)(&v,1);}
   void operator()(float &v)           {(*this)(&v,1);}
   void operator()(double &v)          {(*this)(&v,1);}
-  void operator()(CmiBool &v)            {(*this)(&v,1);}
+#if CMK_LONG_DOUBLE_DEFINED
+  void operator()(long double &v)     {(*this)(&v,1);}
+#endif
+  void operator()(CmiBool &v)         {(*this)(&v,1);}
+#ifdef CMK_PUP_LONG_LONG
+  void operator()(CMK_PUP_LONG_LONG &v) {(*this)(&v,1);}
+  void operator()(unsigned CMK_PUP_LONG_LONG &v) {(*this)(&v,1);}
+#endif
 
 //For arrays:
   //Integral types:
@@ -202,9 +215,21 @@ class er {
   void operator()(double *a,int nItems)
     {bytes((void *)a,nItems,sizeof(double),Tdouble);}
   
+#if CMK_LONG_DOUBLE_DEFINED
+  void operator()(long double *a,int nItems)
+    {bytes((void *)a,nItems,sizeof(long double),Tlongdouble);} 
+#endif
+   
   //For bools:
   void operator()(CmiBool *a,int nItems)
     {bytes((void *)a,nItems,sizeof(CmiBool),Tbool);}
+  
+#ifdef CMK_PUP_LONG_LONG
+  void operator()(CMK_PUP_LONG_LONG *a,int nItems)
+    {bytes((void *)a,nItems,sizeof(CMK_PUP_LONG_LONG),Tlonglong);} 
+  void operator()(unsigned CMK_PUP_LONG_LONG *a,int nItems) 
+    {bytes((void *)a,nItems,sizeof(unsigned CMK_PUP_LONG_LONG),Tulonglong);}
+#endif
   
   //For raw memory (n gives number of bytes)
   void operator()(void *a,int nBytes)
@@ -401,16 +426,16 @@ class machineInfo {
   typedef unsigned char myByte;
   myByte magic[4];//Magic number (to identify machineInfo structs)
   myByte version;//0-- current version
-  
+
   myByte intBytes[4]; //<- sizeof(char,short,int,long)
   myByte intFormat;//0-- big endian.  1-- little endian.
-  
+
   myByte floatBytes; //<- sizeof(...)
   myByte doubleBytes;
   myByte floatFormat;//0-- big endian IEEE.  1-- little endian IEEE.
-    
+
   myByte boolBytes;
-  
+
   myByte padding[2];//Padding to 16 bytes
 
   //Return true if our magic number is valid.
@@ -553,6 +578,14 @@ inline void operator|(PUP::er &p,unsigned long &t) {p(t);}
 inline void operator|(PUP::er &p,float &t) {p(t);}
 inline void operator|(PUP::er &p,double &t) {p(t);}
 inline void operator|(PUP::er &p,CmiBool &t) {p(t);}
+#if CMK_LONG_DOUBLE_DEFINED
+inline void operator|(PUP::er &p,long double &t) {p(t);}
+#endif
+#ifdef CMK_PUP_LONG_LONG
+inline void operator|(PUP::er &p,CMK_PUP_LONG_LONG &t) {p(t);}
+inline void operator|(PUP::er &p,unsigned CMK_PUP_LONG_LONG &t) {p(t);}
+#endif
+
 
 #define PUPmarshall(type) \
   inline void operator|(PUP::er &p,type &t) {t.pup(p);}

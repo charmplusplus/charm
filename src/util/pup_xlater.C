@@ -250,8 +250,13 @@ PUP::xlater::xlater(const PUP::machineInfo &src,PUP::er &fromData)
 	setConverterInt(src,cur,1,1,Tushort);
 	setConverterInt(src,cur,1,2,Tuint);
 	setConverterInt(src,cur,1,3,Tulong);
+	if (src.intFormat==cur.intFormat) //At worst, need to swap 8-byte integers:
+		convertFn[Tlonglong]=convertFn[Tulonglong]=cvt_null;
+	else
+		convertFn[Tlonglong]=convertFn[Tulonglong]=cvt_swap;
 	convertFn[Tfloat]=converterFloat(src,cur,src.floatBytes,cur.floatBytes);
 	convertFn[Tdouble]=converterFloat(src,cur,src.doubleBytes,cur.doubleBytes);
+	convertFn[Tlongdouble]=cvt_null; //<- a lie, but no better alternative
 	
 	if (src.boolBytes!=cur.boolBytes)
 		convertFn[Tbool]=cvt_bool;
@@ -262,8 +267,18 @@ PUP::xlater::xlater(const PUP::machineInfo &src,PUP::er &fromData)
 	setConverterInt(src,cur,0,2,Tsync);
 	
 	//Finish out the size table (integer portion is done by setConverterInt)
+#ifdef CMK_PUP_LONG_LONG
+	convertSize[Tlonglong]=convertSize[Tlonglong]=sizeof(CMK_PUP_LONG_LONG);
+#else
+	convertSize[Tlonglong]=convertSize[Tlonglong]=8;
+#endif
 	convertSize[Tfloat]=src.floatBytes;
 	convertSize[Tdouble]=src.doubleBytes;
+#if CMK_LONG_DOUBLE_DEFINED
+	convertSize[Tlongdouble]=sizeof(long double);
+#else
+	convertSize[Tlongdouble]=12; //<- again, a lie.  Need machineInfo.longdoubleSize!
+#endif
 	convertSize[Tbool]=src.boolBytes;
 	convertSize[Tbyte]=1;//Byte always takes one byte of storage
 }
