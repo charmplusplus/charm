@@ -88,8 +88,14 @@ test_link() {
 # $4: extra link option
 test_linkso() {
         AC_MSG_CHECKING("$1")
-	$CMK_LD -I../include -I. $CMK_LIBDIR $CMK_INCDIR $CMK_LD_SHARED $t -o testlink.$CMK_SHARED_SUF $4 > out 2>&1
-	test_result $? "$1" "$2" "$3"
+	$CMK_CXX -I../include -I. -c $CMK_INCDIR $t -o test.o $4 > out 2>&1
+        if test $? = 1
+        then
+          test_result 1 "$1" "$2" "$3"
+        else
+	  $CMK_LD -I../include -I. $CMK_LIBDIR $CMK_LD_SHARED test.o -o testlink.$CMK_SHARED_SUF $4 > out 2>&1
+	  test_result $? "$1" "$2" "$3"
+	fi
 	/bin/rm -f out testlink.$CMK_SHARED_SUF
 }
 
