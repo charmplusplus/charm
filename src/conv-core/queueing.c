@@ -195,7 +195,7 @@ unsigned int priobits, *priodata;
   static int cnt_nilesh=0;
 
 #ifdef FASTQ
-  //  printf("Hi I'm here %d\n",cnt_nilesh++);
+  /*  printf("Hi I'm here %d\n",cnt_nilesh++); */
 #endif
   /* Scan for priority in hash-table, and return it if present */
   hashval = priobits;
@@ -255,7 +255,7 @@ unsigned int priobits, *priodata;
       pe->ht_handle = (pq->hashtab+hashval);
       pq->hashtab[hashval] = pe;
     }
-    //    pe->ht_handle = &(pe);
+    /*    pe->ht_handle = &(pe); */
   }
   else
   {
@@ -267,7 +267,7 @@ unsigned int priobits, *priodata;
       pe->ht_handle = (pq->hashtab+hashval);
       pq->hashtab[hashval] = pe;
     }
-    //    pe->ht_handle = &(pe);
+    /*    pe->ht_handle = &(pe); */
   }
   if(!next)
     pq->hashtab[hashval] = pe;
@@ -289,7 +289,7 @@ unsigned int priobits, *priodata;
   heap[heappos] = pe;
 
 #ifdef FASTQ
-  //  printf("Hi I'm here222\n");
+  /*  printf("Hi I'm here222\n"); */
 #endif
   
   return &(pe->data);
@@ -308,7 +308,7 @@ prioq pq;
   static int cnt_nilesh1=0;
 
 #ifdef FASTQ
-  //  printf("Hi I'm here too!! %d\n",cnt_nilesh1++);
+  /*  printf("Hi I'm here too!! %d\n",cnt_nilesh1++); */
 #endif
   if (pq->heapnext==1) return 0;
   pe = heap[1];
@@ -330,7 +330,7 @@ prioq pq;
       else left_child=0;
     }
     else
-    {  // it is the root in the hashtable entry, so its ht_handle should be used by whoever is the new root
+      {  /* it is the root in the hashtable entry, so its ht_handle should be used by whoever is the new root */
       handle = pe->ht_handle;
     }
     
@@ -346,7 +346,7 @@ prioq pq;
     }
     else if(!pe->ht_right)
     {
-      //if the node does not have a right subtree, its left subtree root is the new child of its parent
+      /*if the node does not have a right subtree, its left subtree root is the new child of its parent */
       pe->ht_left->ht_parent=pe->ht_parent;
       if(pe->ht_parent)
       {
@@ -366,9 +366,9 @@ prioq pq;
     }
     else if(!pe->ht_left)
     {
-      //if the node does not have a left subtree, its right subtree root is the new child of its parent
+      /*if the node does not have a left subtree, its right subtree root is the new child of its parent */
       pe->ht_right->ht_parent=pe->ht_parent;
-      //pe->ht_right->ht_left=pe->ht_left;
+      /*pe->ht_right->ht_left=pe->ht_left; */
       if(pe->ht_parent)
       {
 	if(left_child) {
@@ -411,12 +411,12 @@ prioq pq;
     }
     else
     {
-      //if it has both subtrees, swap it with its successor
+      /*if it has both subtrees, swap it with its successor */
       for(pe=pe->ht_right; pe; )
       {
 	if(pe->ht_left) pe=pe->ht_left;
-	else  //found the sucessor
-	{ //take care of the connections
+	else  /*found the sucessor */
+	  { /*take care of the connections */
 	  if(old->ht_parent)
 	  {
 	    if(left_child) {
@@ -498,7 +498,7 @@ Queue CqsCreate(void)
   q->length = 0;
   q->maxlen = 0;
 #ifdef FASTQ
-  //  printf("\nIN fastq");
+  /*  printf("\nIN fastq"); */
 #endif
   CqsDeqInit(&(q->zeroprio));
   CqsPrioqInit(&(q->negprioq));

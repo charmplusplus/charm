@@ -7,7 +7,7 @@
 
 #ifndef QUEUEING_H
 #define QUEUEING_H
-//#define FASTQ
+/*#define FASTQ*/
 
 #ifdef __cplusplus
 extern "C" {
@@ -53,16 +53,16 @@ typedef struct prioqelt_struct
   struct prioqelt_struct *ht_parent; /* Pointer to the parent bucket in the hash table */
   struct prioqelt_struct **ht_handle; /* Pointer to pointer in the hashtable that points to me (!) */
   struct prio_struct pri;
-  //  int deleted;
+  /*  int deleted; */
 }
 *prioqelt;
 #endif
-
-//#ifndef FASTQ
-//#define PRIOQ_TABSIZE 1017
-//#else
+/*
+#ifndef FASTQ
 #define PRIOQ_TABSIZE 1017
-//#endif
+#else */
+#define PRIOQ_TABSIZE 1017
+/*#endif */
 
 /*#ifndef FASTQ*/
 typedef struct prioq_struct
@@ -84,8 +84,7 @@ typedef struct prioq1_struct
   prioqelt1 hashtab[PRIOQ_TABSIZE];
 }
 *prioq1;
-#endif
-*/
+/*#endif*/
 
 /*#ifndef FASTQ*/
 typedef struct Queue_struct
