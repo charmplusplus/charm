@@ -1127,7 +1127,7 @@ void *CsdNextMessage(CsdSchedulerState_t *s) {
 	  {
 	    CqsDequeue(s->schedQ,(void **)&msg);
 	    if (msg!=NULL) return msg;
-	    // This avoids a race condition with migration detected by megatest
+	    /* This avoids a race condition with migration detected by megatest*/
 	    msg=CdsFifo_Dequeue(s->localQ);
 	    if (msg!=NULL) return msg;	    
 	  }
