@@ -324,6 +324,12 @@ do
 		OPTS_CXX="$OPTS_CXX $arg"
 		;;
 
+	-LANG*)
+		echo "passing unrecognized option $arg to all compilers and linkers"
+		OPTS_CPP="$OPTS_CPP  $arg"
+		OPTS_CC="$OPTS_CC   $arg"
+		OPTS_CXX="$OPTS_CXX  $arg"
+		;;
 	-L*)
 		OPTS_LDRO="$OPTS_LDRO $arg"
 		OPTS_LD="$OPTS_LD   $arg"
