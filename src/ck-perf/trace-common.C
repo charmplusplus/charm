@@ -247,7 +247,9 @@ void traceMessageRecv(char *msg, int pe)
 
 // CMK_OPTIMIZE is already guarded in convcore.c
 // converse thread tracing is not supported in blue gene simulator
-// only AMPI threads are traced.
+// in BigSim, threads need to be traced manually (because virtual processors
+// themselves are implemented as threads and we don't want them to be traced
+// In BigSim, so far, only AMPI threads are traced.
 extern "C"
 void traceResume(CmiObjId *tid)
 {

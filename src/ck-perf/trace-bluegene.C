@@ -73,7 +73,7 @@ void TraceBluegene::creatFiles()
 
 void TraceBluegene::tlineEnd(void** parentLogPtr){
   if(genTimeLog)
-    *parentLogPtr = (void*)tTIMELINE[tTIMELINE.length()-1];
+    *parentLogPtr = (void*)BgLastLog(tTIMELINEREC);
   else
     *parentLogPtr = NULL;
 }
@@ -82,7 +82,7 @@ void TraceBluegene::bgDummyBeginExec(char* name,void** parentLogPtr)
 {
   if (!genTimeLog) return;
   startVTimer();
-  bgTimeLog* newLog = BgStartLogByName(tTIMELINEREC, _threadEP, name, BgGetCurTime(), *(bgTimeLog**)parentLogPtr);
+  BgTimeLog* newLog = BgStartLogByName(tTIMELINEREC, _threadEP, name, BgGetCurTime(), *(BgTimeLog**)parentLogPtr);
   *parentLogPtr = newLog;
 }
 
@@ -90,7 +90,7 @@ void TraceBluegene::bgBeginExec(char* msg, char *name)
 {
   if (!genTimeLog) return;
   startVTimer();
-  bgTimeLog* newLog = new bgTimeLog(msg, name);
+  BgTimeLog* newLog = new BgTimeLog(msg, name);
   tTIMELINEREC.logEntryStart(newLog);
 }
 
@@ -99,9 +99,9 @@ void TraceBluegene::bgAmpiBeginExec(char *msg, char *name, void *log)
 {
   if (!genTimeLog) return;
   startVTimer();
-  bgTimeLog* newLog = new bgTimeLog(_threadEP,name,BgGetCurTime());
+  BgTimeLog* newLog = new BgTimeLog(_threadEP,name,BgGetCurTime());
   tTIMELINEREC.logEntryStart(newLog);
-  newLog->addBackwardDep((bgTimeLog*)log);
+  newLog->addBackwardDep((BgTimeLog*)log);
   newLog->addMsgBackwardDep(tTIMELINEREC, msg);
 }
 
@@ -111,14 +111,14 @@ void TraceBluegene::bgEndExec(int commit)
   if (commit) 
     BgLogEntryCommit(tTIMELINEREC);
   else
-    tTIMELINEREC.logEntryClose();
+    BgEndLastLog(tTIMELINEREC);
   stopVTimer();
 }
 
 
 void TraceBluegene::getForwardDep(void* log, void** fDepPtr){
 
-  bgTimeLog* cLog = (bgTimeLog*) log;
+  BgTimeLog* cLog = (BgTimeLog*) log;
   
   if(cLog->forwardDeps.length() !=1) {
     cLog->write(stdout);
@@ -130,7 +130,7 @@ void TraceBluegene::getForwardDep(void* log, void** fDepPtr){
 void TraceBluegene::getForwardDepForAll(void** logs1, void** logs2, int logsize,void* fDepPtr){
   if(!genTimeLog) return;
 
-  bgTimeLog* cLog = (bgTimeLog*)fDepPtr;
+  BgTimeLog* cLog = (BgTimeLog*)fDepPtr;
 
   int i=0;
 
@@ -140,30 +140,29 @@ void TraceBluegene::getForwardDepForAll(void** logs1, void** logs2, int logsize,
       break;    
   
   if (i<logsize+1) {
-    cLog->addBackwardDep((bgTimeLog*)logs2[i]);
+    cLog->addBackwardDep((BgTimeLog*)logs2[i]);
   }
   // CmiAssert(i<logsize+1);
   
   for(int j=0;j<logsize;j++)   
-      cLog->addBackwardDep((bgTimeLog*)(logs1[j]));
+      cLog->addBackwardDep((BgTimeLog*)(logs1[j]));
 }
 
 void TraceBluegene::addBackwardDep(void *log)
 {
   if(!genTimeLog || log==NULL) return;
-  CmiAssert(tTIMELINE.length() > 0);
-  bgTimeLog  *parentLogPtr = (bgTimeLog*)tTIMELINE[tTIMELINE.length()-1];
+  BgTimeLog  *parentLogPtr = BgLastLog(tTIMELINEREC);
   CmiAssert(parentLogPtr);
-  parentLogPtr->addBackwardDep((bgTimeLog*)log);
+  BgAddBackwardDep(parentLogPtr, (BgTimeLog*)log);
 }
 
 void TraceBluegene::userBracketEvent(char* name, double bt, double et, void** parentLogPtr){
 
   if (!genTimeLog) return;
 
-  bgTimeLog* newLog = new bgTimeLog(_threadEP,name,bt,et);
+  BgTimeLog* newLog = new BgTimeLog(_threadEP,name,bt,et);
   if(*parentLogPtr)
-    newLog->addBackwardDep(*(bgTimeLog**)parentLogPtr);
+    newLog->addBackwardDep(*(BgTimeLog**)parentLogPtr);
   *parentLogPtr = newLog;
   tTIMELINEREC.logEntryInsert(newLog);
 }
@@ -173,7 +172,7 @@ void TraceBluegene::userBracketEvent(char* name, double bt, double et, void** pa
    
   if (!genTimeLog) return;
 
-  bgTimeLog* newLog = new bgTimeLog(_threadEP,name,bt,et);
+  BgTimeLog* newLog = new BgTimeLog(_threadEP,name,bt,et);
   newLog->addBackwardDeps(bgLogList);
   *parentLogPtr = newLog;
   tTIMELINEREC.logEntryInsert(newLog);
@@ -183,7 +182,7 @@ void TraceBluegene::userBracketEvent(char* name, double bt, double et, void** pa
 void TraceBluegene::bgPrint(char* str){
   if (!genTimeLog) return;
   bgAddProjEvent(strdup(str), -1, BgGetTime(), writeData, this, BG_EVENT_PRINT);
-
+  CmiPrintf(str, BgGetTime());
 }
 
 extern "C" void BgPrintf(char *str)
@@ -193,7 +192,7 @@ extern "C" void BgPrintf(char *str)
 
 extern "C" void BgSetStartEvent()
 {
-  bgTimeLog* log;
+  BgTimeLog* log;
   if(genTimeLog)
     log = tTIMELINE[tTIMELINE.length()-1];
   else
