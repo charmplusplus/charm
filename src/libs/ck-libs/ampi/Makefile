@@ -28,6 +28,8 @@ $(DESTF): $(OBJSF) headers
 
 headers: $(HEADERS)
 	cp $(HEADERS) $(CDIR)/include/
+	cp ampi.h $(CDIR)/include/mpi.h
+	cp mpiCC mpicc mpif77 mpif90 $(CDIR)/bin
 	touch headers
 
 $(COMPAT):
