@@ -2,7 +2,7 @@
 
 if [ -d $1 ] ; then
 
-SRC=`(cd $1 ; pwd)`
+SRC=$1
 DST=$2
 
 rm -f temp.f temp.l
