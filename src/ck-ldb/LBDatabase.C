@@ -29,6 +29,7 @@ CkpvDeclare(int, hasNullLB);         /**< true if NullLB is created */
 CkpvDeclare(int, lbdatabaseInited);  /**< true if lbdatabase is inited */
 
 int lb_debug=0;
+int lb_ignoreBgLoad=0;
 
 static LBDefaultCreateFn defaultCreate=NULL;
 void LBSetDefaultCreate(LBDefaultCreateFn f)
@@ -170,6 +171,13 @@ void _loadbalancerInit()
   CmiGetArgIntDesc(argv, "+LBSimProcs", &LBSimulation::simProcs, "Number of target processors.");
 
   lb_debug = CmiGetArgFlagDesc(argv, "+LBDebug", "Turn on LB debugging printouts");
+  lb_ignoreBgLoad = CmiGetArgFlagDesc(argv, "+LBObjOnly", "Load balancer only balance migratable object without considering the background load, etc");
+  if (CkMyPe() == 0) {
+    if (lb_debug)
+      CmiPrintf("LB> Load balancer running in verbose mode.\n");
+    if (lb_ignoreBgLoad)
+      CmiPrintf("LB> Load balancer only balance migratable object.\n");
+  }
 }
 
 int LBDatabase::manualOn = 0;

@@ -97,8 +97,8 @@ CmiBool LBCommData::equal(const LBCommData d2) const
     if (src_proc != d2.src_proc)
       return CmiFalse;
   } else {
-    if (!LDOMidEqual(srcOM, d2.srcOM)
-	|| !LDObjIDEqual(srcObj,d2.srcObj) )
+    if (!LDOMidEqual(srcObj.omID(), d2.srcObj.omID())
+	|| !LDObjIDEqual(srcObj.objID(),d2.srcObj.objID()) )
       return CmiFalse;
   }
   if (!LDOMidEqual(destOM,d2.destOM)
@@ -117,9 +117,9 @@ int LBCommData::compute_key()
     pcount = sprintf(kptr,"%d",src_proc);
     kptr += pcount;
   } else {
-    pcount = sprintf(kptr,"%d%d%d%d%d",srcOM.id.idx,
-		     srcObj.id[0],srcObj.id[1],
-		     srcObj.id[2],srcObj.id[3]);
+    pcount = sprintf(kptr,"%d%d%d%d%d",srcObj.omID().id.idx,
+		     srcObj.id.id[0],srcObj.id.id[1],
+		     srcObj.id.id[2],srcObj.id.id[3]);
     kptr += pcount;
   }
   pcount += sprintf(kptr,"%d%d%d%d%dXXXXXXXX",destOM.id.idx,
@@ -163,8 +163,8 @@ void LBCommTable::GetCommData(LDCommData* data)
 	out->src_proc = curtable->src_proc;
       } else {
 	out->src_proc = -1;
-	out->senderOM = curtable->srcOM;
-	out->sender = curtable->srcObj;
+	out->senderOM = curtable->srcObj.omID();
+	out->sender = curtable->srcObj.objID();
       }
       out->dest_proc = -1;
       out->receiverOM = curtable->destOM;

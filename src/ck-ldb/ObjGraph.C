@@ -107,12 +107,18 @@ ObjGraph::ObjGraph(int count, CentralLB::LDStats* _stats)
     const LDCommData newedgedata = stats[pe].commData[index];
 
     Node* from_node = find_node(newedgedata.senderOM,newedgedata.sender);
-    if (from_node == 0)
-      CkPrintf("ObjGraph::find_node: Didn't locate from node match!\n");
+    if (from_node == 0) {
+      if (!lb_ignoreBgLoad) 
+	CkPrintf("ObjGraph::find_node: Didn't locate from node match!\n");
+      continue;
+    }
 
     Node* to_node = find_node(newedgedata.receiverOM,newedgedata.receiver);
-    if (to_node == 0)
-      CkPrintf("ObjGraph::find_node: Didn't locate to node match!\n");
+    if (to_node == 0) {
+      if (!lb_ignoreBgLoad) 
+        CkPrintf("ObjGraph::find_node: Didn't locate to node match!\n");
+      continue;
+    }
 
     // Store the edge data in correct outgoing and incoming lists.
     newedge->from_node = from_node->node_index;

@@ -201,9 +201,16 @@ void CentralLB::ReceiveStats(CLBStatsMsg *m)
     statsMsgsList[pe] = m;
     statsDataList[pe].total_walltime = m->total_walltime;
     statsDataList[pe].total_cputime = m->total_cputime;
+    if (lb_ignoreBgLoad) {
+    statsDataList[pe].idletime = 0.0;
+    statsDataList[pe].bg_walltime = 0.0;
+    statsDataList[pe].bg_cputime = 0.0;
+    }
+    else {
     statsDataList[pe].idletime = m->idletime;
     statsDataList[pe].bg_walltime = m->bg_walltime;
     statsDataList[pe].bg_cputime = m->bg_cputime;
+    }
     statsDataList[pe].pe_speed = m->pe_speed;
     statsDataList[pe].utilization = 1.0;
     statsDataList[pe].available = CmiTrue;

@@ -62,6 +62,10 @@ typedef struct {
   LDOMHandle omhandle;
   LDObjid id;
   LDObjIndex  handle;
+#ifdef __cplusplus
+  inline const LDOMid &omID() const { return omhandle.id; }
+  inline const LDObjid &objID() const { return id; }
+#endif
 } LDObjHandle;
 
 typedef struct {

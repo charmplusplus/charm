@@ -228,7 +228,8 @@ LBMigrateMsg* CommLB::Strategy(CentralLB::LDStats* stats, int count)
 		xcoord = search(commData.sender, commData.senderOM);
 		ycoord = search(commData.receiver, commData.receiverOM);
 		if((xcoord == -1)||(ycoord == -1))
-		    CkAbort("Error in search\n");
+		    if (lb_ignoreBgLoad) continue;
+		    else CkAbort("Error in search\n");
 		add_graph(xcoord,ycoord,commData.bytes, commData.messages);
 	    }
         }

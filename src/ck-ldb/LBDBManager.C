@@ -186,18 +186,34 @@ int LBDB::ObjDataCount()
 {
   int nitems=0;
   int i;
+  if (lb_ignoreBgLoad) {
+  for(i=0; i < objCount; i++)
+    if ((objs[i])->registered && (objs[i])->data.migratable)
+      nitems++;
+  }
+  else {
   for(i=0; i < objCount; i++)
     if ((objs[i])->registered)
       nitems++;
+  }
   return nitems;
 }
 
 void LBDB::GetObjData(LDObjData *dp)
 {
+  if (lb_ignoreBgLoad) {
+  for(int i = 0; i < objs.length(); i++) {
+    LBObj* obj = objs[i];
+    if ( obj->registered && obj->data.migratable)
+      *dp++ = obj->ObjData();
+  }
+  }
+  else {
   for(int i = 0; i < objs.length(); i++) {
     LBObj* obj = objs[i];
     if ( obj->registered )
       *dp++ = obj->ObjData();
+  }
   }
 }
 

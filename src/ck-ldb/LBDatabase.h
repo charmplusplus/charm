@@ -25,6 +25,7 @@ CkpvExtern(int, hasNullLB);
 CkpvExtern(int, lbdatabaseInited);
 
 extern int lb_debug;
+extern int lb_ignoreBgLoad;
 
 typedef void (*LBDefaultCreateFn)(void);
 void LBSetDefaultCreate(LBDefaultCreateFn f);

@@ -32,8 +32,11 @@ public:
 
   LBCommData(LDObjHandle _srcObj, LDOMid _destOM, LDObjid _destObj) {
     src_proc = -1;
+/*
     srcObj = _srcObj.id;
     srcOM = _srcObj.omhandle.id;
+*/
+    srcObj = _srcObj;
     destOM = _destOM;
     destObj = _destObj;
     n_messages = 0;
@@ -45,7 +48,7 @@ public:
     src_proc = d.src_proc;
     if (!from_proc()) {
       srcObj = d.srcObj;
-      srcOM = d.srcOM;
+//      srcOM = d.srcOM;
     }
     destOM = d.destOM;
     destObj = d.destObj;
@@ -60,7 +63,7 @@ public:
     src_proc = d.src_proc;
     if (!from_proc()) { 
       srcObj = d.srcObj;
-      srcOM = d.srcOM;
+//      srcOM = d.srcOM;
     }
     destOM = d.destOM;
     destObj = d.destObj;
@@ -87,9 +90,9 @@ private:
 
   int mykey;
   int src_proc;
-//  LDObjHandle srcObj;
-  LDOMid srcOM;
-  LDObjid srcObj;
+  LDObjHandle srcObj;
+//  LDOMid srcOM;
+//  LDObjid srcObj;
   LDOMid destOM;
   LDObjid destObj;
   int n_messages;

@@ -171,13 +171,17 @@ LBMigrateMsg* MetisLB::Strategy(CentralLB::LDStats* stats, int count)
     for(i=0; i<csz; i++) {
       if(cdata[i].from_proc() || cdata[i].to_proc())
         continue;
+      // FIXME!
+      // senderID and recverID is not correct !!!
       int senderID = cdata[i].sender.id[0];
       int recverID = cdata[i].receiver.id[0];
+      CmiAssert(senderID < numobjs);
+      CmiAssert(recverID < numobjs);
       comm[senderID][recverID] += cdata[i].messages;
       comm[recverID][senderID] += cdata[i].messages;
     }
-  }
-  // ignore messages sent from an object to itself
+}
+// ignore messages sent from an object to itself
   for (i=0; i<numobjs; i++)
     comm[i][i] = 0;
 

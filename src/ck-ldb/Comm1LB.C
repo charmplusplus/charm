@@ -241,7 +241,8 @@ LBMigrateMsg* Comm1LB::Strategy(CentralLB::LDStats* stats, int count)
 	xcoord = search(stats[pe].commData[com].sender,stats[pe].commData[com].senderOM); 
 	ycoord = search(stats[pe].commData[com].receiver,stats[pe].commData[com].receiverOM);
 	if((xcoord == -1)||(ycoord == -1))
-	  CkPrintf("Error in search\n");
+	  if (lb_ignoreBgLoad) continue;
+	  else CkAbort("Error in search\n");
 	add_graph(xcoord,ycoord,stats[pe].commData[com].bytes, stats[pe].commData[com].messages);	
       }
   
