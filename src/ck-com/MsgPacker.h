@@ -38,18 +38,21 @@ inline short_envelope::~short_envelope(){
 }
 
 inline void short_envelope::pup(PUP::er &p){    
+  char nints = 0;
 
-    p | epIdx;
-    p | size;        
-    //p | idx;
-    
-    if(p.isUnpacking())
-        idx.nInts = 0;
+  p | epIdx;
+  p | size;        
+  //p | idx;
+  
+  //Complex pup of arrays, even want to save 3 bytes, GREEDY, GREEDY :)
+  if(!p.isUnpacking()) 
+    nints = idx.nInts;
 
-    p((char *)&(idx.nInts), 1);
-    p((int *)(idx.data()), idx.nInts);
-
-    p.pupCmiAllocBuf((void **)&data, size);
+  p | nints;
+  idx.nInts = nints;
+  p((int *)(idx.data()), idx.nInts);
+  
+  p.pupCmiAllocBuf((void **)&data, size);
 }
 
 struct CombinedMessage{
