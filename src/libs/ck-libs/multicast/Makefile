@@ -18,10 +18,12 @@ $(HEADERS): CkMulticast.decl.h ckmulticast.h
 $(LIBDEST): $(LIBOBJ)
 	$(CHARMC) -o $(LIBDEST) $(LIBOBJ) 
 
-ckmulticast.o: ckmulticast.C ckmulticast.h CkMulticast.decl.h CkMulticast.def.h
+ckmulticast.o: ckmulticast.C ckmulticast.h CkMulticast.decl.h
 	$(CHARMC) -c ckmulticast.C
 
-CkMulticast.decl.h CkMulticast.def.h : ckmulticast.ci
+CkMulticast.decl.h: CkMulticast.def.h
+
+CkMulticast.def.h : ckmulticast.ci
 	$(CHARMC) -c ckmulticast.ci
 
 clean:
