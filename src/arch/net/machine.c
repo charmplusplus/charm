@@ -1496,9 +1496,10 @@ CpvStaticDeclare(char *, internal_printf_buffer);
  *
  ****************************************************************************/
 
-static void sendone_abort_fn(int code,const char *msg) {
+static int sendone_abort_fn(int code,const char *msg) {
 	fprintf(stderr,"Socket error %d in ctrl_sendone! %s\n",code,msg);
 	exit(1);
+	return -1;
 }
 
 static void ctrl_sendone_nolock(const char *type,
@@ -1516,13 +1517,15 @@ static void ctrl_sendone_locking(const char *type,
 				const char *data1,int dataLen1,
 				const char *data2,int dataLen2)
 {
+  skt_abortFn oldAbort;
   CmiCommLock();
-  skt_set_abort(sendone_abort_fn);
+  oldAbort=skt_set_abort(sendone_abort_fn);
   ctrl_sendone_nolock(type,data1,dataLen1,data2,dataLen2);
+  skt_set_abort(oldAbort);
   CmiCommUnlock();
 }
 
-static void ignore_further_errors(int c,const char *msg) {exit(2);}
+static int ignore_further_errors(int c,const char *msg) {exit(2);return -1;}
 static void host_abort(const char *s)
 {
   skt_set_abort(ignore_further_errors);
@@ -1570,7 +1573,7 @@ static void ctrl_getone()
 #if CMK_CCS_AVAILABLE
 /*Deliver this reply data to this reply socket.
   The data is forwarded to CCS server via conv-host.*/
-void CcsImpl_reply(SOCKET replFd,int repLen,const char *repData)
+void CcsImpl_reply(SOCKET replFd,int repLen,const void *repData)
 {
   ChMessageInt_t skt=ChMessageInt_new(replFd);
   ctrl_sendone_locking("reply_fw",(const char *)&skt,sizeof(skt),

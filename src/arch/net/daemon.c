@@ -44,10 +44,11 @@ void envCat(char *dest,LPTSTR oldEnv)
 
 FILE *logfile=stdout;/*Status messages to standard output*/
 
-void abort_writelog(int code,const char *msg) {
+int abort_writelog(int code,const char *msg) {
 	fprintf(logfile,"Socket error %d-- %s!\n",code,msg);
 	fclose(logfile);
 	exit(3);
+	return -1;
 }
 
 int startProgram(const char *exeName, const char *args, 
