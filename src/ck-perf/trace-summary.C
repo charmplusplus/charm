@@ -429,6 +429,9 @@ void TraceSummary::beginComputation(void)
 
 void TraceSummary::endComputation(void)
 {
+  static int done = 0;
+  if (done) return;
+  done = 1;
   if (msgNum==0) {
 //CmiPrintf("Add at last: %d pe:%d time:%f msg:%d\n", index, CkMyPe(), bin, msgNum);
      _logPool->add(bin, CkMyPe());
@@ -471,6 +474,7 @@ void TraceSummaryBOC::askSummary()
 #endif
 #endif
 
+  CkpvAccess(_trace)->endComputation();
   int n = CkpvAccess(_trace)->pool()->getNumEntries();
   BinEntry *bins = CkpvAccess(_trace)->pool()->bins();
 #if 1
