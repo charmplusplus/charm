@@ -360,7 +360,7 @@ double GetClock()
 {
   struct timeval tv; int ok;
   ok = gettimeofday(&tv, NULL);
-  if (ok<0) KillEveryoneCode(9343112);
+  if (ok<0) { perror("gettimeofday"); KillEveryoneCode(9343112); }
   return (tv.tv_sec * 1.0 + tv.tv_usec * 1.0E-6);
 }
 
@@ -537,9 +537,9 @@ retry:
   if (bufsize) {
     int len = sizeof(int);
     ok = setsockopt(skt, SOL_SOCKET , SO_RCVBUF , (char *)&bufsize, len);
-    if (ok < 0) KillEveryoneCode(35782);
+    if (ok < 0) { perror("setsockopt 1"); KillEveryoneCode(35782); }
     ok = setsockopt(skt, SOL_SOCKET , SO_SNDBUF , (char *)&bufsize, len);
-    if (ok < 0) KillEveryoneCode(35783);
+    if (ok < 0) { perror("setsockopt 2"); KillEveryoneCode(35783); }
   }     
 
   *pfd = skt;
@@ -2537,7 +2537,7 @@ void ReceiveDatagram()
   MallocExplicitDgram(dg);
   ok = recv(dataskt,(char*)(dg->data),Cmi_max_dgram_size,0);
   /*ok = recvfrom(dataskt,(char*)(dg->data),Cmi_max_dgram_size,0, 0, 0);*/
-  if (ok<0) KillEveryoneCode(37489437);
+  if (ok<0) { perror("recv"); KillEveryoneCode(37489437); }
   dg->len = ok;
   if (ok >= DGRAM_HEADER_SIZE) {
     DgramHeaderBreak(dg->data, dg->rank, dg->srcpe, magic, dg->seqno);
