@@ -1,5 +1,12 @@
 DIRS=charm++ converse ampi fem bigsim
 
+
+
+all:
+	for d in $(DIRS); do \
+		(cd $$d; $(MAKE) OPTS='$(OPTS)' || exit 1) || exit 1; \
+	done
+
 test:
 	for d in $(DIRS); do \
 		(cd $$d; $(MAKE) test OPTS='$(OPTS)' || exit 1) || exit 1; \

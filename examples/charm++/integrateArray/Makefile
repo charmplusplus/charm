@@ -1,14 +1,16 @@
 # modify the path of CHARMC
 CHARMC=../../../bin/charmc $(OPTS)
 
+pgm: pgm.o
+	$(CHARMC) pgm.o  -o pgm -language charm++
+
+
 test: pgm
 	./charmrun +p4 pgm 1000000 100
 
 bgtest: pgm
 	./charmrun +p4 pgm 1000000 100 +x2 +y2 +z2
 
-pgm: pgm.o
-	$(CHARMC) pgm.o  -o pgm -language charm++
 
 # compile program with trace projections - performance trace library
 pgm_prof: pgm.o
