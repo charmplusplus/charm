@@ -1300,13 +1300,11 @@ echo $ECHO_N "checking \"$1\"... $ECHO_C" >&6
 test_link() {
         echo "$as_me:$LINENO: checking \"$1\"" >&5
 echo $ECHO_N "checking \"$1\"... $ECHO_C" >&6
-	echo "$CMK_CXX -I../include -I. -c $CMK_INCDIR $t -o test.o $4 > out 2>&1"
 	$CMK_CXX -I../include -I. -c $CMK_INCDIR $t -o test.o $4 > out 2>&1
         if test $? = 1
         then
           test_result 1 "$1" "$2" "$3"
         else
-	  echo "$CMK_LDXX -o testlink test.o $CMK_LIBDIR $4 > out 2>&1"
           $CMK_LDXX -o testlink test.o $CMK_LIBDIR $4 > out 2>&1
           test_result $? "$1" "$2" "$3"
         fi
@@ -1320,8 +1318,7 @@ echo $ECHO_N "checking \"$1\"... $ECHO_C" >&6
 test_link_one() {
         echo "$as_me:$LINENO: checking \"$1\"" >&5
 echo $ECHO_N "checking \"$1\"... $ECHO_C" >&6
-        echo "$CMK_CXX -I../include -I. $CMK_INCDIR $t -o testlink $4 > out 2>&1"
-        $CMK_CXX -I../include -I. $CMK_INCDIR $t -o testlink $4 > out 2>&1
+        $CMK_CXX -I../include -I. $CMK_INCDIR $CMK_LIBDIR $t -o testlink $4 > out 2>&1
         test_result $? "$1" "$2" "$3"
         /bin/rm -f out
 }
