@@ -8,5 +8,12 @@ Here is the steps for generating config file:
 
 3) doxygen <config>  --> actually build the docs
 
+Here charm.conf is a sample config file that reads the current 
+charm, to generate HTML documentation in html/.
 
-Here charm.conf is a sample config file that read charm from /www/charm and output documentation to /www/doxygen.
+Type "make install" to copy this HTML onto the 
+main website, at /www/doxygen.
+
+src/ contains doxygen-specific "source code",
+like the doxygen main page.
+
