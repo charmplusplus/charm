@@ -36,7 +36,7 @@ public:
   static void staticAtSync(void*);
   void AtSync(void); // Everything is at the PE barrier
 
-  void ReceiveStats(NLBStatsMsg *); 		// Receive stats on PE 0
+  void ReceiveStats(CkMarshalledNLBStatsMessage &m); 		// Receive stats on PE 0
   void ResumeClients();
   void ReceiveMigration(LBMigrateMsg *); 	// Receive migration data
 
@@ -124,7 +124,7 @@ private:
   double start_lb_time;
 };
 
-class NLBStatsMsg : public CMessage_NLBStatsMsg {
+class NLBStatsMsg {
 public:
   int from_pe;
   int serial;
@@ -140,6 +140,11 @@ public:
   LDObjData *objData;
   int n_comm;
   LDCommData *commData;
+public:
+  NLBStatsMsg(int osz, int csz);
+  NLBStatsMsg()  {}
+  ~NLBStatsMsg();
+  void pup(PUP::er &p);
 }; 
 
 #endif /* NBORBASELB_H */

@@ -3,14 +3,11 @@ module NborBaseLB {
 extern module LBDatabase;
 extern module BaseLB;
 
-message NLBStatsMsg {
-  LDObjData objData[];
-  LDCommData commData[];
-};
+include "NeighborLBMsg.h";
 
 group [migratable] NborBaseLB: BaseLB {
   entry void NborBaseLB(const CkLBOptions &);  
-  entry void ReceiveStats(NLBStatsMsg*);
+  entry void ReceiveStats(CkMarshalledNLBStatsMessage data);
   entry void ResumeClients(void);
   entry void ReceiveMigration(LBMigrateMsg*);	
 };

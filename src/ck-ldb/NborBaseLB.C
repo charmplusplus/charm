@@ -129,7 +129,8 @@ void NborBaseLB::AtSync()
   } else delete msg;
 
   // Tell our own node that we are ready
-  ReceiveStats((NLBStatsMsg*)0);
+  CkMarshalledNLBStatsMessage mmsg(NULL);
+  ReceiveStats(mmsg);
 }
 
 NLBStatsMsg* NborBaseLB::AssembleStats()
@@ -159,7 +160,7 @@ NLBStatsMsg* NborBaseLB::AssembleStats()
 
   const int osz = theLbdb->GetObjDataSz();
   const int csz = theLbdb->GetCommDataSz();
-  NLBStatsMsg* msg = new(osz, csz, 0)  NLBStatsMsg;
+  NLBStatsMsg* msg = new NLBStatsMsg(osz, csz);
 
   msg->from_pe = CkMyPe();
   // msg->serial = rand();
@@ -198,8 +199,9 @@ void NborBaseLB::Migrated(LDObjHandle h)
   }
 }
 
-void NborBaseLB::ReceiveStats(NLBStatsMsg *m)
+void NborBaseLB::ReceiveStats(CkMarshalledNLBStatsMessage &data)
 {
+  NLBStatsMsg *m = data.getMessage();
   if (neighbor_pes == 0) FindNeighbors();
 
   if (m == 0) { // This is from our own node
@@ -374,6 +376,48 @@ int NborBaseLB::NeighborIndex(int pe)
     }
     return peslot;
 }
+
+NLBStatsMsg::NLBStatsMsg(int osz, int csz) {
+  objData = new LDObjData[osz];
+  commData = new LDCommData[csz];
+}
+
+NLBStatsMsg::~NLBStatsMsg() {
+  delete [] objData;
+  delete [] commData;
+}
+
+void NLBStatsMsg::pup(PUP::er &p) {
+  int i;
+  p|from_pe;
+  p|serial;
+  p|pe_speed;
+  p|total_walltime; p|total_cputime;
+  p|idletime;
+  p|bg_walltime;   p|bg_cputime;
+  p|n_objs;
+  if (p.isUnpacking()) objData = new LDObjData[n_objs];
+  for (i=0; i<n_objs; i++) p|objData[i];
+  p|n_comm;
+  if (p.isUnpacking()) commData = new LDCommData[n_comm];
+  for (i=0; i<n_comm; i++) p|commData[i];
+}
+
+// CkMarshalledCLBStatsMessage is used in the marshalled parameter in
+// the entry function, it is just used to use to pup.
+// I don't use CLBStatsMsg directly as marshalled parameter because
+// I want the data pointer stored and not to be freed by the Charm++.
+CkMarshalledNLBStatsMessage::~CkMarshalledNLBStatsMessage() {
+  if (msg) delete msg;
+}
+
+void CkMarshalledNLBStatsMessage::pup(PUP::er &p)
+{
+  if (p.isUnpacking()) msg = new NLBStatsMsg;
+  else CmiAssert(msg);
+  msg->pup(p);
+}
+
 
 #endif
 

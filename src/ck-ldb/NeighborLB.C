@@ -58,8 +58,8 @@ LBMigrateMsg* NeighborLB::Strategy(NborBaseLB::LDStats* stats, int count)
   CkVec<MigrateInfo*> migrateInfo;
 
   if (myload > avgload) {
-    //    CkPrintf("[%d] OVERLOAD My load is %f, average load is %f\n",
-    //    	     CkMyPe(),myload,avgload);
+    if (_lb_debug) 
+      CkPrintf("[%d] OVERLOAD My load is %f, average load is %f\n", CkMyPe(),myload,avgload);
 
     // First, build heaps of other processors and my objects
     // Then assign objects to other processors until either
