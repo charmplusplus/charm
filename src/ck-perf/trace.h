@@ -210,7 +210,9 @@ public:
 
     /* calls for thread listener registration for each trace module */
     inline void traceAddThreadListeners(CthThread tid, envelope *e) {
+#ifndef CMK_OPTIMIZE /* do nothing if optimized codes are used */
       ALLDO(traceAddThreadListeners(tid, e));
+#endif
     }
 };
 
