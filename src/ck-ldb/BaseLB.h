@@ -51,8 +51,8 @@ struct MigrateInfo {
     LDObjHandle obj;
     int from_pe;
     int to_pe;
-    int ignore_arrival;	    // if an object is available for immediate migrate
-    MigrateInfo():  ignore_arrival(0) {}
+    int async_arrival;	    // if an object is available for immediate migrate
+    MigrateInfo():  async_arrival(0) {}
 };
 
 /**

@@ -22,10 +22,10 @@ class LBObj
 friend class LBDB;
 
 public:
-  LBObj(LBDB *_parentDB, const LDObjHandle &_h, void *usr_ptr = NULL, CmiBool _migratable=CmiTrue, CmiBool _ignoreArrival = CmiFalse) {
+  LBObj(LBDB *_parentDB, const LDObjHandle &_h, void *usr_ptr = NULL, CmiBool _migratable=CmiTrue, CmiBool _asyncArrival = CmiFalse) {
     data.handle = _h;
     data.migratable = _migratable;
-    data.ignoreArrival = _ignoreArrival;
+    data.asyncArrival = _asyncArrival;
     data.cpuTime = 0.;
     data.wallTime = 0.;
     userData = usr_ptr;
@@ -69,7 +69,7 @@ public:
   inline LDOMHandle &parentOM() { return data.handle.omhandle; }
   inline const LDObjHandle &GetLDObjHandle() const { return data.handle; }
   inline void SetMigratable(CmiBool mig) { data.migratable = mig; }
-  inline void SetReadyMigrate(CmiBool ready) { data.ignoreArrival = ready; }
+  inline void UseAsyncMigrate(CmiBool async) { data.asyncArrival = async; }
   inline LDObjData &ObjData() { return data; };
   inline void lastKnownLoad(double *c, double *w) {*c=lastCpuTime; *w=lastWallTime; }
   inline void *getUserData() { return  userData; }

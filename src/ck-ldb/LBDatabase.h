@@ -181,7 +181,7 @@ public:
   inline void EstObjLoad(LDObjHandle h, double load) { LDEstObjLoad(h,load); };
   inline void NonMigratable(LDObjHandle h) { LDNonMigratable(h); };
   inline void Migratable(LDObjHandle h) { LDMigratable(h); };
-  inline void UseReadyMigrate(LDObjHandle h, CmiBool flag) { LDReadyMigrate(h, flag); };
+  inline void UseAsyncMigrate(LDObjHandle h, CmiBool flag) { LDAsyncMigrate(h, flag); };
   inline void DumpDatabase(void) { LDDumpDatabase(myLDHandle); };
 
   /*
@@ -234,9 +234,9 @@ public:
   }
 
   inline void ClearLoads(void) { LDClearLoads(myLDHandle); };
-  inline void Migrate(LDObjHandle h, int dest) { LDMigrate(h,dest); };
+  inline int Migrate(LDObjHandle h, int dest) { return LDMigrate(h,dest); };
 
-  inline void Migrated(LDObjHandle h) { LDMigrated(h); };
+  inline void Migrated(LDObjHandle h, int waitBarrier=1) { LDMigrated(h, waitBarrier); };
 
   inline LDBarrierClient AddLocalBarrierClient(LDResumeFn fn, void* data) {
     return LDAddLocalBarrierClient(myLDHandle,fn,data);
