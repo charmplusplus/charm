@@ -5,6 +5,7 @@
  * $Revision$
  *****************************************************************************/
 
+#include <stdlib.h>
 #include "converse.h"
 
 typedef struct Cfuture_data_s

@@ -6,16 +6,14 @@
  *****************************************************************************/
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <errno.h>
-#ifndef WIN32
-#include <sys/file.h>
-#endif
 
 #include "converse.h"
 #include "conv-trace.h"
 #include "sockRoutines.h"
-
+#include "queueing.h"
 #include "conv-ccs.h"
 #include "ccs-server.h"
 
@@ -25,19 +23,9 @@ extern void CHostInit(int withCCS);
 extern void CHostProcess(void);
 #endif
 
-#ifdef WIN32
-#include "queueing.h"
-
-extern void CqsDequeue(Queue, void **);
-extern void CqsEnqueueFifo(Queue, void *);
-extern void CqsEnqueueGeneral(Queue, void *, unsigned int, unsigned int, unsigned int*);
 extern void CcdModuleInit(char **);
 extern void CmiMemoryInit(char **);
 extern void CldModuleInit(void);
-extern int  CqsPrioGT(prio, prio);
-extern prio CqsGetPriority(Queue);
-#define DEBUGF(x)  printf x
-#endif
 
 #if CMK_WHEN_PROCESSOR_IDLE_USLEEP
 #include <sys/types.h>
@@ -57,7 +45,6 @@ extern prio CqsGetPriority(Queue);
 
 #ifdef CMK_TIMER_USE_WIN32API
 #include <stdlib.h>
-#include <malloc.h>
 #include <time.h>
 #include <sys/types.h>
 #include <sys/timeb.h>
@@ -841,13 +828,13 @@ int CsdScheduler(int maxmsgs)
                && !CqsPrioGT(CqsGetPriority(CsvAccess(CsdNodeQueue)), 
                              CqsGetPriority(CpvAccess(CsdSchedQueue)))) {
       CmiLock(CsvAccess(CsdNodeQueueLock));
-      CqsDequeue(CsvAccess(CsdNodeQueue),&msg);
+      CqsDequeue(CsvAccess(CsdNodeQueue),(void **)&msg);
       CmiUnlock(CsvAccess(CsdNodeQueueLock));
 	  csdMsgFlag = 1;
     }
 #endif
     if (msg && (!csdMsgFlag)) CQdProcess(CpvAccess(cQdState), 1);
-	if (msg==0) CqsDequeue(CpvAccess(CsdSchedQueue),&msg);
+	if (msg==0) CqsDequeue(CpvAccess(CsdSchedQueue),(void **)&msg);
     if (msg) {
       CsdEndIdle();
       CmiHandleMessage(msg);
@@ -936,13 +923,12 @@ static CthThread CthSuspendNormalThread()
   return CpvAccess(CthSchedulingThread);
 }
 
-static void CthEnqueueSchedulingThread(CthThread t, int, int, int*);
+static void CthEnqueueSchedulingThread(CthThread t, int, int, unsigned int*);
 static CthThread CthSuspendSchedulingThread();
 
 static CthThread CthSuspendSchedulingThread()
 {
   CthThread succ = CpvAccess(CthSleepingStandins);
-  CthThread me = CthSelf();
 
   if (succ) {
     CpvAccess(CthSleepingStandins) = CthGetNext(succ);
@@ -987,13 +973,15 @@ static void CthResumeSchedulingThread(CthThread t)
   CthResume(t);
 }
 
-static void CthEnqueueNormalThread(CthThread t, int s, int pb, int *prio)
+static void CthEnqueueNormalThread(CthThread t, int s, 
+				   int pb,unsigned int *prio)
 {
   CmiSetHandler(t, CpvAccess(CthResumeNormalThreadIdx));
   CsdEnqueueGeneral(t, s, pb, prio);
 }
 
-static void CthEnqueueSchedulingThread(CthThread t, int s, int pb, int *prio)
+static void CthEnqueueSchedulingThread(CthThread t, int s, 
+				       int pb,unsigned int *prio)
 {
   CmiSetHandler(t, CpvAccess(CthResumeSchedulingThreadIdx));
   CsdEnqueueGeneral(t, s, pb, prio);
@@ -1031,10 +1019,8 @@ void CthSchedInit()
 void CsdInit(argv)
   char **argv;
 {
-  void *CqsCreate();
-
   CpvInitialize(int,   disable_sys_msgs);
-  CpvInitialize(void*, CsdSchedQueue);
+  CpvInitialize(void *, CsdSchedQueue);
   CpvInitialize(int,   CsdStopFlag);
   CpvInitialize(int,   CsdStopNotifyFlag);
   CpvInitialize(int,   CsdIdleDetectedFlag);
@@ -1042,14 +1028,14 @@ void CsdInit(argv)
   CpvInitialize(CmiHandler,   CsdNotifyBusy);
   
   CpvAccess(disable_sys_msgs) = 0;
-  CpvAccess(CsdSchedQueue) = CqsCreate();
+  CpvAccess(CsdSchedQueue) = (void *)CqsCreate();
 
 #if CMK_NODE_QUEUE_AVAILABLE
   CsvInitialize(CmiLock, CsdNodeQueueLock);
-  CsvInitialize(void*, CsdNodeQueue);
+  CsvInitialize(void *, CsdNodeQueue);
   if (CmiMyRank() ==0) {
 	CsvAccess(CsdNodeQueueLock) = CmiCreateLock();
-	CsvAccess(CsdNodeQueue) = CqsCreate();
+	CsvAccess(CsdNodeQueue) = (void *)CqsCreate();
   }
   CmiNodeBarrier();
 #endif

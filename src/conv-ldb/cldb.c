@@ -1,11 +1,6 @@
-#ifdef WIN32
+
 #include <stdlib.h>
 #include "queueing.h"
-extern void CqsEnqueueGeneral(Queue, void *, unsigned int, unsigned int, unsigned int *);
-extern void CmiHandleMessage(void *);
-extern unsigned int CqsLength(Queue);
-#endif
-
 #include "cldb.h"
 #include <math.h>
 

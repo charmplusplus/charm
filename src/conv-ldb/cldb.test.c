@@ -1,15 +1,7 @@
-#ifdef WIN32
-#include "queueing.h"
-extern void CldRestoreHandler(char *);
-extern void CqsEnqueueGeneral(Queue, void *, unsigned int, unsigned int, unsigned int*);
-extern void CldSwitchHandler(char *, int);
-extern void CldModuleGeneralInit();
-extern void CldPutToken(char *);
-extern int CldPresentPE(int);
-#endif
-
 #include "converse.h"
 #include "cldb.h"
+#include "queueing.h"
+#include <stdlib.h>
 
 void LoadNotifyFn(int l)
 {

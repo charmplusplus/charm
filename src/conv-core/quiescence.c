@@ -9,8 +9,9 @@
 #include "quiescence.h"
 #include <assert.h>
 #include <stdio.h>
+#include <stdlib.h>
 #ifndef  DEBUGF
-#define  DEBUGF(x) printf x 
+#define  DEBUGF(x) /*printf x*/ 
 #endif
 
 CpvDeclare(CQdState, cQdState);

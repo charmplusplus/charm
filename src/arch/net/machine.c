@@ -388,8 +388,8 @@ typedef struct PCQueueStruct
 }
 *PCQueue;
 
-static CircQueue Cmi_freelist_circqueuestruct = 0;
-int freeCount = 0;
+/* static CircQueue Cmi_freelist_circqueuestruct = 0;
+   static int freeCount = 0; */
 
 #define FreeCircQueueStruct(dg) {\
   CircQueue d;\
@@ -495,10 +495,9 @@ void PCQueuePush(PCQueue Q, char *data)
 
 void CmiAbort(const char *message)
 {
-  int *i = 0;
 #if CMK_TRUECRASH
   CmiPrintf("%s", message);
-  i[0] = 0;
+  *(int *)NULL = 0; /*Write to null, causing bus error*/
 #else
   host_abort(message);
 #endif
@@ -665,7 +664,7 @@ void CmiStateInit(int pe, int rank, CmiState state)
 }
 
 static ExplicitDgram Cmi_freelist_explicit;
-static OutgoingMsg   Cmi_freelist_outgoing;
+/*static OutgoingMsg   Cmi_freelist_outgoing;*/
 
 #define FreeImplicitDgram(dg) {\
   ImplicitDgram d=(dg);\
@@ -736,10 +735,7 @@ static int Cmi_print_stats = 0;
 /**
  * Printing Net Statistics -- milind
  */
-
-char statstr[10000];
-static unsigned int last_sum = 0;
-void printLog(void);
+static char statstr[10000];
 
 void printNetStatistics(void)
 {
@@ -939,9 +935,10 @@ void printLog(void)
 
 #if !LOGGING
 
-#define log_init() 0
-#define log_done() 0
-#define LOG(t,s,k,d,q) 0
+#define log_init() /*empty*/
+#define log_done() /*empty*/
+#define printLog() /*empty*/
+#define LOG(t,s,k,d,q) /*empty*/
 
 #endif
 
@@ -951,7 +948,8 @@ void printLog(void)
  *
  *****************************************************************************/
 
-static int       dataport, dataskt;
+static unsigned int dataport=0;
+static SOCKET       dataskt;
 
 static CmiNodeLock    Cmi_scanf_mutex;
 static double         Cmi_clock;
@@ -1509,11 +1507,9 @@ static void ctrl_sendone_nolock(const char *type,
 {
   ChMessageHeader hdr;
   ChMessageHeader_new(type,dataLen1+dataLen2,&hdr);
-  skt_sendN(Cmi_host_fd,(const unsigned char *)&hdr,sizeof(hdr));
-  if (dataLen1>0)
-    skt_sendN(Cmi_host_fd,(const unsigned char *)data1,dataLen1);
-  if (dataLen2>0)
-    skt_sendN(Cmi_host_fd,(const unsigned char *)data2,dataLen2);
+  skt_sendN(Cmi_host_fd,(const char *)&hdr,sizeof(hdr));
+  if (dataLen1>0) skt_sendN(Cmi_host_fd,data1,dataLen1);
+  if (dataLen2>0) skt_sendN(Cmi_host_fd,data2,dataLen2);
 }
 
 static void ctrl_sendone_locking(const char *type,
@@ -2485,7 +2481,6 @@ static void CommunicationServer(int withDelayMs)
 #if CMK_NODE_QUEUE_AVAILABLE
 char *CmiGetNonLocalNodeQ()
 {
-  CmiState cs = CmiGetState();
   char *result = 0;
   if(!PCQueueEmpty(CsvAccess(NodeRecv))) {
     CmiLock(CsvAccess(CmiNodeRecvLock));
@@ -2692,7 +2687,7 @@ void CmiSyncNodeBroadcastFn(int s, char *m)
 CmiCommHandle CmiAsyncNodeBroadcastFn(int s, char *m)
 { 
   CQdCreate(CpvAccess(cQdState), CmiNumNodes()-1);
-  CmiGeneralNodeSend(NODE_BROADCAST_OTHERS,s,'A',m); 
+  return CmiGeneralNodeSend(NODE_BROADCAST_OTHERS,s,'A',m);
 }
 
 void CmiFreeNodeBroadcastFn(int s, char *m)
@@ -2710,7 +2705,7 @@ void CmiSyncNodeBroadcastAllFn(int s, char *m)
 CmiCommHandle CmiAsyncNodeBroadcastAllFn(int s, char *m)
 { 
   CQdCreate(CpvAccess(cQdState), CmiNumNodes());
-  CmiGeneralNodeSend(NODE_BROADCAST_ALL,s,'A',m); 
+  return CmiGeneralNodeSend(NODE_BROADCAST_ALL,s,'A',m); 
 }
 
 void CmiFreeNodeBroadcastAllFn(int s, char *m)
@@ -2758,8 +2753,7 @@ static void ConverseRunPE(int everReturn)
   CpvInitialize(char **,CmiMyArgv);
   CpvAccess(internal_printf_buffer) = (char *) malloc(PRINTBUFSIZE);
   _MEMCHECK(CpvAccess(internal_printf_buffer));
-  if (CmiMyRank()) CpvAccess(CmiMyArgv) = CopyArgs(Cmi_argv);
-  else CpvAccess(CmiMyArgv) = Cmi_argv;
+  CpvAccess(CmiMyArgv) = CopyArgs(Cmi_argv);
   CthInit(CpvAccess(CmiMyArgv));
   ConverseCommonInit(CpvAccess(CmiMyArgv));
   CpvInitialize(void *,CmiLocalQueue);
@@ -2816,6 +2810,11 @@ static void machine_init(void)
 #endif /*CMK_TRUECRASH*/
 }
 
+/*Socket idle function to use before addresses have been
+  obtained.  During the real program, we idle with CmiYield.
+*/
+static void obtain_idleFn(void) {sleep(0);}
+
 void ConverseInit(int argc, char **argv, CmiStartFn fn, int usc, int everReturn)
 {
 #if CMK_USE_HP_MAIN_FIX
@@ -2826,15 +2825,17 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usc, int everReturn)
   Cmi_argv = argv; Cmi_startfn = fn; Cmi_usrsched = usc;
   machine_init();
 /*See the win32 debugging instructions below:
-  * putenv("NETSTART=0 2130706433 1596 241");/**/
+  * putenv("NETSTART=0 2130706433 1596 241"); **/
   parse_netstart();
   extract_args(argv);
   log_init();
   Cmi_scanf_mutex = CmiCreateLock();
 
+  skt_set_idle(obtain_idleFn);
   dataskt=skt_datagram(&dataport, Cmi_os_buffer_size);
   Cmi_host_fd = skt_connect(Cmi_host_IP, Cmi_host_port, 60);
   node_addresses_obtain();
+  skt_set_idle(CmiYield);
   Cmi_check_delay = 2.0+0.5*Cmi_numnodes;
   CmiStartThreads();
   ConverseRunPE(everReturn);

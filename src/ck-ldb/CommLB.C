@@ -56,7 +56,7 @@ void CommLB::alloc(int pe,int id,double load){
 }
 
 double CommLB::compute_com(int id, int pe){
-    int i,j,com_data=0,com_msg=0;
+    int j,com_data=0,com_msg=0;
     double total_time;
     graph * ptr;
     
@@ -76,7 +76,6 @@ double CommLB::compute_com(int id, int pe){
 }
 
 void CommLB::add_graph(int x, int y, int data, int nmsg){
-    int i,j;
     graph * ptr, *temp;
     
     ptr = &(object_graph[x]);  
@@ -105,7 +104,7 @@ void CommLB::add_graph(int x, int y, int data, int nmsg){
 }
   
 void CommLB::make_hash(){
-    int i, hash,j;
+    int i, hash;
     LDObjid oid;
     
     htable = new int[nobj];

@@ -5,16 +5,9 @@
  * $Revision$
  *****************************************************************************/
 
-#ifdef WIN32
+#include <stdlib.h>
 #include <string.h>
 #include "queueing.h"
-
-extern void CqsDequeue(Queue, void **);
-extern void CqsEnqueueFifo(Queue, void *);
-extern void CqsEnqueueLifo(Queue, void *);
-extern void CqsEnqueueGeneral(Queue, void *, unsigned int, unsigned int, unsigned int*);
-#endif
-
 #include <converse.h>
 
 static void CpmLSend(int pe, int len, void *msg)
@@ -65,7 +58,8 @@ typedef struct CpmDestinationEnq
 {
   void *(*sendfn)();
   int envsize;
-  int pe, qs, priobits, *prioptr;
+  int pe, qs, priobits;
+  unsigned int *prioptr;
 }
 *CpmDestinationEnq;
 
@@ -81,7 +75,7 @@ void CpmEnqueue2(void *msg)
   CmiGrabBuffer(&msg);
   env = (int *)CpmEnv(msg);
   CmiSetHandler(msg, env[0]);
-  CsdEnqueueGeneral(msg, env[1], env[2], env+3);
+  CsdEnqueueGeneral(msg, env[1], env[2], (unsigned int *)(env+3));
 }
 
 void *CpmEnqueue1(CpmDestinationEnq ctrl, int len, void *msg)
@@ -99,7 +93,7 @@ void *CpmEnqueue1(CpmDestinationEnq ctrl, int len, void *msg)
   return (void *) 0;
 }
 
-CpmDestination CpmEnqueue(int pe, int qs, int priobits, int *prioptr)
+CpmDestination CpmEnqueue(int pe, int qs, int priobits,unsigned int *prioptr)
 {
   int intbits = sizeof(int)*8;
   int prioints = (priobits+intbits-1) / intbits;
@@ -110,7 +104,7 @@ CpmDestination CpmEnqueue(int pe, int qs, int priobits, int *prioptr)
   return (CpmDestination)&CpvAccess(ctrlEnq);
 }
 
-CpvStaticDeclare(int, fiprio);
+CpvStaticDeclare(unsigned int, fiprio);
 
 CpmDestination CpmEnqueueIFIFO(int pe, int prio)
 {
@@ -118,7 +112,7 @@ CpmDestination CpmEnqueueIFIFO(int pe, int prio)
   return CpmEnqueue(pe, CQS_QUEUEING_IFIFO, sizeof(int)*8, &CpvAccess(fiprio));
 }
 
-CpvStaticDeclare(int, liprio);
+CpvStaticDeclare(unsigned int, liprio);
 
 CpmDestination CpmEnqueueILIFO(int pe, int prio)
 {
@@ -126,12 +120,12 @@ CpmDestination CpmEnqueueILIFO(int pe, int prio)
   return CpmEnqueue(pe, CQS_QUEUEING_ILIFO, sizeof(int)*8, &CpvAccess(liprio));
 }
 
-CpmDestination CpmEnqueueBFIFO(int pe, int priobits, int *prioptr)
+CpmDestination CpmEnqueueBFIFO(int pe, int priobits,unsigned int *prioptr)
 {
   return CpmEnqueue(pe, CQS_QUEUEING_BFIFO, priobits, prioptr);
 }
 
-CpmDestination CpmEnqueueBLIFO(int pe, int priobits, int *prioptr)
+CpmDestination CpmEnqueueBLIFO(int pe, int priobits,unsigned int *prioptr)
 {
   return CpmEnqueue(pe, CQS_QUEUEING_BLIFO, priobits, prioptr);
 }

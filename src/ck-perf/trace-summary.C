@@ -228,7 +228,7 @@ void LogPool::write(void)
 {
   int i;
   unsigned int j;
-  fprintf(fp, "ver:%3.1f %d/%d count:%d ep:%d interval:%le", CpvAccess(version), CmiMyPe(), CmiNumPes(), numEntries, _numEntries, CpvAccess(binSize));
+  fprintf(fp, "ver:%3.1f %d/%d count:%d ep:%d interval:%e", CpvAccess(version), CmiMyPe(), CmiNumPes(), numEntries, _numEntries, CpvAccess(binSize));
   if (CpvAccess(version)>=3.0)
   {
     fprintf(fp, " phases:%d", phaseTab.numPhasesCalled());

@@ -2,18 +2,12 @@
 #define PERIOD 20                /* default: 30 */
 #define MAXOVERLOAD 1
 
-#ifdef WIN32
+#include "converse.h"
 #include "queueing.h"
-extern int  CldLoad(void);
-extern int  CldCountTokens(void);
-extern void CldRestoreHandler(char *);
-extern void CldPutToken(char *);
-extern void CqsEnqueueGeneral(Queue, void *, unsigned int, unsigned int, unsigned int *);
-extern void CldSwitchHandler(char *, int);
-extern void CldModuleGeneralInit(void);
-#endif
+#include "cldb.h"
+#include <stdlib.h>
 
-extern gengraph(int, int, int);
+extern void gengraph(int, int, int);
 
 CpvDeclare(int, CldLoadResponseHandlerIndex);
 CpvDeclare(int, MinLoad);

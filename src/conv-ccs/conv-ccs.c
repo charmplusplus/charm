@@ -103,7 +103,7 @@ static void CpdDebugHandler(char *msg)
 {
   char *reply, *temp;
   int index;
-  int ip,ignored_port;
+  unsigned int ip,ignored_port;
   CcsCallerId(&ip,&ignored_port);
   if(CcsIsRemoteRequest()) {
     char name[128];

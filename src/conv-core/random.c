@@ -30,6 +30,7 @@
 
 #include "converse.h"
 #include <limits.h>
+#include <stdlib.h>
 
 #define MAX_STREAMS 15613
 /*

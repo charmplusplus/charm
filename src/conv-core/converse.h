@@ -77,15 +77,15 @@ extern int Cmi_numpes;
 
 extern void CmiMemLock();
 extern void CmiMemUnlock();
-#define CmiNodeBarrier() 0
+#define CmiNodeBarrier() /*empty*/
 #define CmiSvAlloc CmiAlloc
 
 typedef void *CmiNodeLock;
 #define CmiCreateLock() ((void *)0)
-#define CmiLock(lock) 0
-#define CmiUnlock(lock) 0
-#define CmiTryLock(lock) 0
-#define CmiDestroyLock(lock) do{}while(0)
+#define CmiLock(lock) /*empty*/
+#define CmiUnlock(lock) /*empty*/
+#define CmiTryLock(lock) /*empty*/
+#define CmiDestroyLock(lock) /*empty*/
 
 #endif
 
@@ -543,8 +543,6 @@ double   CmiCpuTimer();
 
 #endif
 
-extern int CqsEmpty(void *);
-
 #define CsdEnqueueGeneral(x,s,i,p)\
     (CqsEnqueueGeneral(CpvAccess(CsdSchedQueue),(x),(s),(i),(p)))
 #define CsdEnqueueFifo(x)     (CqsEnqueueFifo(CpvAccess(CsdSchedQueue),(x)))
@@ -754,6 +752,7 @@ void          CmiFreeNodeBroadcastAllFn(int, char *);
 
 int    CmiDeliverMsgs(int maxmsgs);
 void   CmiDeliverSpecificMsg(int handler);
+void   CmiHandleMessage(void *msg);
 
 /******** CQS: THE QUEUEING SYSTEM ********/
 
@@ -769,7 +768,8 @@ void   CmiDeliverSpecificMsg(int handler);
 typedef struct CthThreadStruct *CthThread;
 
 typedef void        (*CthVoidFn)();
-typedef void        (*CthAwkFn)(CthThread,int,int,int*);
+typedef void        (*CthAwkFn)(CthThread,int,
+				int prioBits,unsigned int *prioptr);
 typedef CthThread   (*CthThFn)();
 
 int        CthImplemented(void);
@@ -786,11 +786,11 @@ int        CthIsSuspendable(CthThread);
 
 void       CthSuspend(void);
 void       CthAwaken(CthThread);
-void       CthAwakenPrio(CthThread, int, int, int *);
+void       CthAwakenPrio(CthThread, int, int, unsigned int *);
 void       CthSetStrategy(CthThread, CthAwkFn, CthThFn);
 void       CthSetStrategyDefault(CthThread);
 void       CthYield(void);
-void       CthYieldPrio(int,int,int*);
+void       CthYieldPrio(int,int,unsigned int*);
 
 void       CthSetNext(CthThread t, CthThread next);
 CthThread  CthGetNext(CthThread t);
@@ -866,9 +866,9 @@ CpmDestination CpmEnqueueFIFO(int pe);
 CpmDestination CpmEnqueueLIFO(int pe);
 CpmDestination CpmEnqueueIFIFO(int pe, int prio);
 CpmDestination CpmEnqueueILIFO(int pe, int prio);
-CpmDestination CpmEnqueueBFIFO(int pe, int priobits, int *prioptr);
-CpmDestination CpmEnqueueBLIFO(int pe, int priobits, int *prioptr);
-CpmDestination CpmEnqueue(int pe,int qs,int priobits,int *prioptr);
+CpmDestination CpmEnqueueBFIFO(int pe, int priobits, unsigned int *prioptr);
+CpmDestination CpmEnqueueBLIFO(int pe, int priobits, unsigned int *prioptr);
+CpmDestination CpmEnqueue(int pe,int qs,int priobits,unsigned int *prioptr);
 
 /***********************************************************************
  *

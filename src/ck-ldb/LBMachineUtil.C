@@ -6,6 +6,7 @@
  *****************************************************************************/
 
 #include "LBMachineUtil.h"
+#include <stdlib.h>
 
 CpvStaticDeclare(void*,machineUtilPtr);
 

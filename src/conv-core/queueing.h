@@ -7,6 +7,11 @@
 
 #ifndef QUEUEING_H
 #define QUEUEING_H
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #ifndef CINTBITS
 #define CINTBITS ((unsigned int) (sizeof(int)*8))
 #endif
@@ -57,5 +62,25 @@ typedef struct Queue_struct
   struct prioq_struct posprioq;
 }
 *Queue;
+
+Queue CqsCreate(void);
+void CqsEnqueue(Queue, void *msg);
+void CqsEnqueueFifo(Queue, void *msg);
+void CqsEnqueueLifo(Queue, void *msg);
+void CqsEnqueueGeneral(Queue, void *msg,int strategy, 
+	       int priobits, unsigned int *prioPtr);
+
+void CqsEnumerateQueue(Queue q, void ***resp);
+void CqsDequeue(Queue, void **msgPtr);
+
+unsigned int CqsLength(Queue);
+unsigned int CqsMaxLength(Queue);
+int CqsEmpty(Queue);
+int  CqsPrioGT(prio, prio);
+prio CqsGetPriority(Queue);
+
+#ifdef __cplusplus
+};
+#endif
 
 #endif

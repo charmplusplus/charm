@@ -7,6 +7,12 @@
 #include "conv-mach.h"
 #include "converse.h"
 
+#include "../sockRoutines.h"
+#include "../sockRoutines.c"
+#include "../ccs-server.h"
+#include "../ccs-server.c"
+#include "../daemon.h"
+
 #include <stdio.h>
 #include <string.h>
 #include <ctype.h>
@@ -42,14 +48,6 @@
 #include <varargs.h>
 #define DIRSEP "/"
 #endif
-
-
-#include "../sockRoutines.h"
-#include "../sockRoutines.c"
-#include "../ccs-server.h"
-#include "../ccs-server.c"
-#include "../daemon.h"
-
 
 
 #if CMK_RSH_NOT_NEEDED /*No RSH-- use daemon to start node-programs*/
@@ -125,7 +123,6 @@ void ping_developers()
 #ifdef NOTIFY
   char               info[1000];
   struct sockaddr_in addr=skt_build_addr(0x80aef1d3,6571);
-  int                infoSize = 999;
   SOCKET             skt;
   
   skt = socket(AF_INET, SOCK_DGRAM, 0);
@@ -358,15 +355,6 @@ void pparam_str(char **where,char *defValue,
   def->doc=doc;
 }
 
-static ppdef pparam_hfind(lname)
-    char *lname;
-{
-  ppdef def = pparam_find(lname);
-  if (def) return def;
-  fprintf(stderr,"ERROR> No such program parameter %s\n",lname);
-  exit(1);
-}
-
 static int pparam_setdef(def, value)
     ppdef def; char *value;
 {
@@ -406,7 +394,7 @@ char *pparam_getdef(def)
   switch(def->type)
     {
     case 'i': sprintf(result,"%d", *def->where.i); return result;
-    case 'r': sprintf(result,"%lf",*def->where.r); return result;
+    case 'r': sprintf(result,"%f",*def->where.r); return result;
     case 's': return *def->where.s;
     case 'f': sprintf(result,"%d", *def->where.f); return result;
     }
@@ -696,19 +684,18 @@ char *nodetab_file_find()
     sprintf(buffer,"%s/.nodelist",getenv("HOME"));
   }
 #endif
-  if (probefile(buffer)) return strdup(buffer);
-  else {
-		/*Create a simple nodelist in the user's home*/
-		FILE *f=fopen(buffer,"w");
-		if (f==NULL) {
-          fprintf(stderr,"ERROR> Cannot create a 'nodelist' file.\n");
-          exit(1);
-		}
-		fprintf(f,"group main\nhost localhost\n");
-		fclose(f);
-		return strdup(buffer);
+  if (!probefile(buffer)) 
+  {
+    /*Create a simple nodelist in the user's home*/
+    FILE *f=fopen(buffer,"w");
+    if (f==NULL) {
+      fprintf(stderr,"ERROR> Cannot create a 'nodelist' file.\n");
+      exit(1);
+    }
+    fprintf(f,"group main\nhost localhost\n");
+    fclose(f);
   }
-  return NULL;
+  return strdup(buffer);
 }
 
 typedef struct nodetab_host {
@@ -844,7 +831,7 @@ void nodetab_init()
 	else {/*Not an option line*/
 		char *b1 = skipblanks(input_line), *e1 = skipstuff(b1);
 		char *b2 = skipblanks(e1), *e2 = skipstuff(b2);
-		char *b3 = skipblanks(e2), *e3 = skipstuff(b3);
+		char *b3 = skipblanks(e2);
 		if (subeqs(b1,e1,"host")) {
 			if (rightgroup) {
 				host=group;
@@ -1111,12 +1098,12 @@ int             req_ending=0;
 /* This is the only place where conv-host talks back to anyone. 
 */
 int req_reply(SOCKET fd, char *type, 
-	      const unsigned char *data, int dataLen)
+	      const char *data, int dataLen)
 {
   ChMessageHeader msg;
   if (fd == INVALID_SOCKET) return REQ_FAILED;
   ChMessageHeader_new(type,dataLen,&msg);
-  skt_sendN(fd,(const unsigned char *)&msg,sizeof(msg));
+  skt_sendN(fd,(const char *)&msg,sizeof(msg));
   skt_sendN(fd,data,dataLen);
   return REQ_OK;
 }
@@ -1146,9 +1133,9 @@ int req_handle_initnodetab(ChMessage *msg,SOCKET fd)
 	ChMessageInt_t nNodes=ChMessageInt_new(nodetab_rank0_size);
 	ChMessageHeader_new("initnodetab",sizeof(ChMessageInt_t)*(1+3*nodetab_rank0_size),
 		&hdr);
-	skt_sendN(fd,(const unsigned char *)&hdr,sizeof(hdr));
-	skt_sendN(fd,(const unsigned char *)&nNodes,sizeof(nNodes));
-	skt_sendN(fd,(const unsigned char *)nodeinfo_arr,
+	skt_sendN(fd,(const char *)&hdr,sizeof(hdr));
+	skt_sendN(fd,(const char *)&nNodes,sizeof(nNodes));
+	skt_sendN(fd,(const char *)nodeinfo_arr,
 		  sizeof(ChMessageInt_t)*3*nodetab_rank0_size);
 	return REQ_OK;
 }
@@ -1307,7 +1294,7 @@ void req_poll()
 
 
 
-static int server_ip,server_port;
+static unsigned int server_ip,server_port;
 static SOCKET server_fd;
 
 void client_connect_problem(int code,const char *msg)
@@ -1327,7 +1314,7 @@ void req_client_connect(void)
 	skt_set_abort(client_connect_problem);
 	for (client=0;client<req_nClients;client++)
 	{/*Wait for the next client to connect to our server port.*/
-		int clientIP,clientPort;/*These are actually ignored*/
+		unsigned int clientIP,clientPort;/*These are actually ignored*/
 		if (arg_verbose) printf("Conv-host> Waiting for client %d to connect.\n",client);
 		if (0==skt_select1(server_fd,60*1000))
 			client_connect_problem(client,"Timeout waiting for node-program to connect");
@@ -1371,11 +1358,13 @@ void req_start_server(void)
 void start_nodes_daemon(void);
 void start_nodes_rsh(void);
 
-main(argc, argv)
-    int argc; char **argv;
+static void fast_idleFn(void) {sleep(0);}
+
+int main(int argc, char **argv)
 {
   srand(time(0));
   skt_init();
+  skt_set_idle(fast_idleFn);
   /* CrnSrand((int) time(0)); */
   /* notify charm developers that charm is in use */
   ping_developers();
@@ -1424,8 +1413,6 @@ the node-programs, also known as conv-host clients.  We have to
 start nodetab_rank0_size processes on the remote machines.
 */
 
-typedef unsigned char BYTE;
-
 /*Ask the converse daemon running on each machine to start the node-programs.*/
 void start_nodes_daemon(void)
 {
@@ -1467,9 +1454,9 @@ void start_nodes_daemon(void)
 		     DAEMON_IP_PORT,30);
     if (fd!=INVALID_SOCKET)
     {/*Contact!  Ask the daemon to start the program*/
-      skt_sendN(fd, (BYTE *)&task, sizeof(task));
-      skt_sendN(fd, (BYTE *)argBuffer, strlen(argBuffer));
-      skt_recvN(fd, (BYTE *)&statusCode,sizeof(char));
+      skt_sendN(fd, (const char *)&task, sizeof(task));
+      skt_sendN(fd, (const char *)argBuffer, strlen(argBuffer));
+      skt_recvN(fd, &statusCode,sizeof(char));
     }
     if (statusCode!='G')
     {/*Something went wrong--*/
@@ -1589,7 +1576,7 @@ void xstr_free(s)
 void xstr_rexpand(l, nbytes)
     xstr l; int nbytes;
 {
-  int lspace, rspace, uspace, needed; char *nbuf;
+  int uspace, needed; char *nbuf;
   if (l->rend - l->rptr>=nbytes) { l->rptr += nbytes; return; }
   uspace = (l->rptr - l->lptr);
   needed = uspace + nbytes;
@@ -1607,7 +1594,7 @@ void xstr_rexpand(l, nbytes)
 void xstr_lexpand(l, nbytes)
     xstr l; int nbytes;
 {
-  int lspace, rspace, uspace, needed; char *nbuf;
+  int uspace, needed; char *nbuf;
   if (l->rend - l->rptr>=nbytes) { l->rptr += nbytes; return; }
   uspace = (l->rptr - l->lptr);
   needed = uspace + nbytes;
@@ -1737,7 +1724,7 @@ int prog_flush(c)
   xstr ibuf = c->ibuf;
   int ifd = c->ifd;
   
-  if (ibuf==0) return;
+  if (ibuf==0) return -1;
   while (xstr_lptr(ibuf)!=xstr_rptr(ibuf))
     {
       int nwrote = write(ifd, xstr_lptr(ibuf), xstr_len(ibuf));
@@ -1854,12 +1841,10 @@ prog rsh_start(nodeno)
   return rsh;
 }
 
-int rsh_pump(p, nodeno, rank0no, argv)
+void rsh_pump(p, nodeno, rank0no, argv)
     prog p; int nodeno, rank0no; char **argv;
 {
   char *arg_nodeprog_r,*arg_currdir_r;
-  static char buf[1024];
-  int len;
   xstr ibuf = p->ibuf;
   int randno = rand();
   /* int randno = CrnRand(); */
@@ -2048,7 +2033,6 @@ void start_nodes_rsh(void)
   int         rsh_node[200];
   int         rsh_nstarted;
   int         rsh_nfinished;
-  int         rsh_freeslot;
   int         rsh_maxsim;
   fd_set rfds; int i; prog p; int pe;
 

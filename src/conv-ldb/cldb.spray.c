@@ -4,21 +4,11 @@
  * $Date$
  * $Revision$
  *****************************************************************************/
-
-#ifdef WIN32
-#include <time.h>
-#include "queueing.h"
-
-extern void CldModuleGeneralInit();
-extern void CmiHandleMessage(void *);
-extern void CqsEnqueueGeneral(Queue, void *, unsigned int, unsigned int, unsigned int *);
-/*
-void srand48(long);
-long lrand48(void);
-*/
-#endif
-
 #include "converse.h"
+#include "queueing.h"
+#include "cldb.h"
+#include <time.h>
+#include <stdlib.h>
 #include <math.h>
 
 void LoadNotifyFn(int l)

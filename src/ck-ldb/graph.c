@@ -5,8 +5,9 @@
  * $Revision$
  *****************************************************************************/
 
-#include <converse.h>
+#include "converse.h"
 #include "graph.h"
+#include <stdlib.h>
 
 #define printf CmiPrintf
 void printPartition(Graph * g, int nodes[], int numNodes)

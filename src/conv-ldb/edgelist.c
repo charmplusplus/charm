@@ -6,11 +6,8 @@
  *****************************************************************************/
 
 /* The data structure/ ADT for the edge-list */
-#ifdef   WIN32
 #include <stdio.h>
 #include <stdlib.h>
-#endif
-
 #include "typedefs.h"
 
 extern VerticesListType graph;

@@ -14,21 +14,17 @@ Output form: directory graphN/ containing files graph0 ... graphN-1
 
 Modified from the original: changed output format, and converted main to a parametered function
 */
-#ifdef WIN32
 #include <stdio.h>
 #include <stdlib.h>
-#else
-#include "stdio.h"
-#endif
+
 /* comment this out to test and change CmiPrintf to printf */
 #include "converse.h"
 #include "typedefs.h"
 
-#ifdef WIN32
-extern int edgeExists(int, int);
+int addEdge(EdgeListType *l,int fm,int to);
+int edgeExists(int fm, int to);
 int isEmpty(Q*);
 int dequeue(Q*);
-#endif
 
 #define VMAX 2050
 int V; /* no. of vertices */
@@ -58,7 +54,6 @@ void gengraph(int pV, int pC, int pseed)
   EdgeListType * EdgeList;
   /* VerticesListType * vertices; */
   extern EdgeListType * InitEdgeList();
-  extern addEdge();
   char dircmd[20], dirname[10];
 
 

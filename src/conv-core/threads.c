@@ -102,11 +102,10 @@
  *
  *****************************************************************************/
  
-#ifdef WIN32
 #include <stdio.h>
 #include <stdlib.h>
-#include <malloc.h>
-#endif
+#include <string.h>
+#include <malloc.h> /*<- for memalign*/
 
 #include "converse.h"
 #ifndef  WIN32
@@ -1616,7 +1615,7 @@ void CthYield()
   CthSuspend();
 }
 
-void CthAwakenPrio(CthThread th, int s, int pb, int *prio)
+void CthAwakenPrio(CthThread th, int s, int pb, unsigned int *prio)
 {
   if (th->awakenfn == 0) CthNoStrategy();
   CpvAccess(curThread) = th;
@@ -1627,7 +1626,7 @@ void CthAwakenPrio(CthThread th, int s, int pb, int *prio)
   th->awakenfn(th, s, pb, prio);
 }
 
-void CthYieldPrio(int s, int pb, int *prio)
+void CthYieldPrio(int s, int pb, unsigned int *prio)
 {
   CthAwakenPrio(CthCpvAccess(CthCurrent), s, pb, prio);
   CthSuspend();

@@ -6,6 +6,7 @@
  *****************************************************************************/
 
 #include "trace.h"
+#include <stdlib.h>
 
 CpvDeclare(Trace*, _trace);
 CpvDeclare(int, traceOn);

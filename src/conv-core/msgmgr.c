@@ -5,6 +5,7 @@
  * $Revision$
  *****************************************************************************/
 
+#include <stdlib.h>
 #include <converse.h>
 
 typedef struct CmmEntryStruct *CmmEntry;
@@ -163,4 +164,6 @@ CmmTable CmmPup(pup_er p, CmmTable t)
     }
     return t;
   }
+  return NULL;/*<- never executed*/
 }
+

@@ -203,7 +203,6 @@ void CmiTimerInit(void);
 static void threadInit(void *arg)
 {
   USER_PARAMETERS *usrparam;
-  int i;
   usrparam = (USER_PARAMETERS *) arg;
 
 

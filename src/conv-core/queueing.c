@@ -227,7 +227,7 @@ prioq pq;
   return data;
 }
 
-Queue CqsCreate()
+Queue CqsCreate(void)
 {
   Queue q = (Queue)CmiAlloc(sizeof(struct Queue_struct));
   q->length = 0;
@@ -238,26 +238,23 @@ Queue CqsCreate()
   return q;
 }
 
-unsigned int CqsLength(q)
-Queue q;
+unsigned int CqsLength(Queue q)
 {
   return q->length;
 }
 
-unsigned int CqsMaxLength(q)
-Queue q;
+unsigned int CqsMaxLength(Queue q)
 {
   return q->maxlen;
 }
 
-int CqsEmpty(void *_q)
+int CqsEmpty(Queue q)
 {
-  Queue q = (Queue) _q;;
   return (q->length == 0);
 }
 
-void CqsEnqueueGeneral(q, data, strategy, priobits, prioptr)
-Queue q; void *data; unsigned int strategy, priobits, *prioptr;
+void CqsEnqueueGeneral(Queue q, void *data, int strategy, 
+           int priobits,unsigned int *prioptr)
 {
   deq d; int iprio;
   switch (strategy) {
@@ -300,30 +297,25 @@ Queue q; void *data; unsigned int strategy, priobits, *prioptr;
   q->length++; if (q->length>q->maxlen) q->maxlen=q->length;
 }
 
-void CqsEnqueueFifo(q, data)
-Queue q; void *data;
+void CqsEnqueueFifo(Queue q, void *data)
 {
   CqsDeqEnqueueFifo(&(q->zeroprio), data);
   q->length++; if (q->length>q->maxlen) q->maxlen=q->length;
 }
 
-void CqsEnqueueLifo(q, data)
-Queue q; void *data;
+void CqsEnqueueLifo(Queue q, void *data)
 {
   CqsDeqEnqueueLifo(&(q->zeroprio), data);
   q->length++; if (q->length>q->maxlen) q->maxlen=q->length;
 }
 
-void CqsEnqueue(q, data)
-Queue q; void *data;
+void CqsEnqueue(Queue q, void *data)
 {
   CqsDeqEnqueueFifo(&(q->zeroprio), data);
   q->length++; if (q->length>q->maxlen) q->maxlen=q->length;
 }
 
-void CqsDequeue(q, resp)
-Queue q;
-void **resp;
+void CqsDequeue(Queue q, void **resp)
 {
   if (q->length==0) 
     { *resp = 0; return; }
