@@ -2,7 +2,6 @@
 #define SPANTREE_BROADCAST 1
 #define UNIFORM_L          0 
 #define F1_L               1
-#define F2_L               2
 
 
 
@@ -14,7 +13,6 @@ static long      stream_f1;
 static int broadcast_flag;
 static int latency_flag;
 static REL_TIME latency_f1();
-static REL_TIME latency_f2();
 
 
 static comm_init()
@@ -25,7 +23,6 @@ static comm_init()
     net_load_s = 0;
     broadcast_flag = num.broadcast_flag; 
     latency_flag   = num.latency_flag;
-    srand(10);
     stream_f1 = (long) num.latency_argv2;
     ran1(&stream_f1);
 }
@@ -46,7 +43,6 @@ MSG *msg;
     switch (latency_flag) {
         case UNIFORM_L : delay =  COST_F(num.cost.net,msg->length); break;
         case F1_L      : delay = latency_f1(msg);          break;
-        case F2_L      : delay = latency_f2(msg);          break;
         default : error_msg("invalid latency function selection",100);
     } 
      
@@ -196,44 +192,4 @@ MSG *msg;
      d = num.cost.net.alpha + inc + num.cost.net.beta*msg->length;
 
      return d; 
-/*
-     double drand48();
-     REL_TIME d;
-
-     a message may experience additional latency :
-       0 .. num.latemcy_arv2*original_latency
-     d  = num.cost.net.alpha;
-     if ( drand48() < (double) num.latency_argv1 ) 
-        d  = d + (REL_TIME)(drand48() * (double) num.latency_argv2*(double) d);
-     return (d + num.cost.net.beta * msg->length );
-*/
-
-      
 }
-
-
-
-
-static REL_TIME latency_f2(msg)
-MSG *msg;
-{
-
-     double drand48();
-     REL_TIME d;
-
-/* 
-     message may experience additional latency :
-          original_latency +  num.latency_argv2
-*/
-        
-     d  = (REL_TIME) num.cost.net.alpha;
-     if ( drand48() < (double) num.latency_argv1 )
-        d  = d + (REL_TIME) num.latency_argv2;
-     return (d + (REL_TIME)(num.cost.net.beta * msg->length) );
-
-
-
-
-}
-
-
