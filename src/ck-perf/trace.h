@@ -29,6 +29,7 @@ class Trace {
     virtual void beginExecute(int event,int msgType,int ep,int srcPe,int ml) {}
     virtual void endExecute(void) {}
     virtual void beginIdle(void) {}
+    virtual void messageRecv(char *env, int pe) {}
     virtual void endIdle(void) {}
     virtual void beginPack(void) {}
     virtual void endPack(void) {}
@@ -66,6 +67,7 @@ public:
     inline void beginExecute(envelope *env) {ALLDO(beginExecute(env));}
     inline void beginExecute(int event,int msgType,int ep,int srcPe, int mlen) {ALLDO(beginExecute(event, msgType, ep, srcPe, mlen));}
     inline void endExecute(void) {ALLDO(endExecute());}
+    inline void messageRecv(char *env, int pe) {ALLDO(messageRecv(env, pe));}
     inline void beginIdle(void) {ALLDO(beginIdle());}
     inline void endIdle(void) {ALLDO(endIdle());}
     inline void beginPack(void) {ALLDO(beginPack());}
@@ -112,6 +114,7 @@ extern "C" {
 #define _TRACE_BEGIN_EXECUTE_DETAILED(evt,typ,ep,src,mlen) \
 	_TRACE_ONLY(CkpvAccess(_traces)->beginExecute(evt,typ,ep,src,mlen))
 #define _TRACE_END_EXECUTE() _TRACE_ONLY(CkpvAccess(_traces)->endExecute())
+#define _TRACE_MESSAGE_RECV(env, pe) _TRACE_ONLY(CkpvAccess(_traces)->messageRecv(env, pe))
 #define _TRACE_BEGIN_IDLE() _TRACE_ONLY(CkpvAccess(_traces)->beginIdle())
 #define _TRACE_END_IDLE() _TRACE_ONLY(CkpvAccess(_traces)->endIdle())
 #define _TRACE_BEGIN_PACK() _TRACE_ONLY(CkpvAccess(_traces)->beginPack())

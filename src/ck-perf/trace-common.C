@@ -118,6 +118,17 @@ extern "C" void traceCharmInit(char **argv)
 #endif
 }
 
+// CMK_OPTIMIZE is already guarded in convcore.c
+extern "C"
+void traceMessageRecv(char *msg, int pe)
+{
+#if ! CMK_TRACE_IN_CHARM
+  if (CkIsCharmMessage(msg))
+    CkpvAccessOther(_traces, CmiRankOf(pe))->messageRecv(msg, pe);
+#endif
+}
+
+// CMK_OPTIMIZE is already guarded in convcore.c
 extern "C"
 void traceResume(void)
 {

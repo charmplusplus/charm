@@ -85,6 +85,7 @@ class TraceProjections : public Trace {
     void beginExecute(envelope *e);
     void beginExecute(int event,int msgType,int ep,int srcPe,int ml);
     void endExecute(void);
+    void messageRecv(char *env, int pe);
     void beginIdle(void);
     void endIdle(void);
     void beginPack(void);

@@ -178,6 +178,7 @@ void LogEntry::write(FILE* fp)
     case CREATION:
     case BEGIN_PROCESSING:
     case END_PROCESSING:
+    case MESSAGE_RECV:
       fprintf(fp, "%d %d %u %d %d %d\n", mIdx, eIdx, (UInt) (time*1.0e6), event, pe, msglen);
       break;
 
@@ -371,6 +372,26 @@ void TraceProjections::endExecute(void)
     _logPool->add(END_PROCESSING,0,execEp,TraceTimer(),
                              execEvent,execPe);
   }
+}
+
+void TraceProjections::messageRecv(char *env, int pe)
+{
+#if 0
+  envelope *e = (envelope *)env;
+  int msgType = e->getMsgtype();
+  int ep = e->getEpIdx();
+#if 0
+  if (msgType==NewChareMsg || msgType==NewVChareMsg
+          || msgType==ForChareMsg || msgType==ForVidMsg
+          || msgType==BocInitMsg || msgType==NodeBocInitMsg
+          || msgType==ForBocMsg || msgType==ForNodeBocMsg)
+    ep = e->getEpIdx();
+  else
+    ep = _threadEP;
+#endif
+  _logPool->add(MESSAGE_RECV,msgType,ep,TraceTimer(),
+                             curevent++,e->getSrcPe(), e->getTotalsize());
+#endif
 }
 
 void TraceProjections::beginIdle(void)

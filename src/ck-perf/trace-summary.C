@@ -268,22 +268,6 @@ void TraceSummary::traceClose(void)
   delete _logPool;
 }
 
-void TraceSummary::traceBegin(void)
-{
-}
-
-void TraceSummary::traceEnd(void)
-{
-}
-
-void TraceSummary::userEvent(int e)
-{
-}
-
-void TraceSummary::creation(envelope *e, int num)
-{
-}
-
 void TraceSummary::beginExecute(envelope *e)
 {
   // no message means thread execution
@@ -335,14 +319,6 @@ void TraceSummary::endExecute(void)
   bin += t - ts;
 }
 
-void TraceSummary::beginIdle(void)
-{
-}
-
-void TraceSummary::endIdle(void)
-{
-}
-
 void TraceSummary::beginPack(void)
 {
     packstart = CmiWallTimer();
@@ -362,14 +338,6 @@ void TraceSummary::endUnpack(void)
 {
     _logPool->setEp(_unpackEP, CmiWallTimer()-unpackstart);
 }
-
-void TraceSummary::beginCharmInit(void) {}
-
-void TraceSummary::endCharmInit(void) {}
-
-void TraceSummary::enqueue(envelope *) {}
-
-void TraceSummary::dequeue(envelope *) {}
 
 void TraceSummary::beginComputation(void)
 {
