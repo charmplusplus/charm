@@ -360,7 +360,9 @@ static int PumpMsgsBlocking(void)
   if (!CqsEmpty(CpvAccess(CsdSchedQueue))) return;
   if (sent_msgs)  return;
 
-  // CmiPrintf("[%d] PumpMsgsBlocking. \n", CmiMyPe());
+#if 0
+  CmiPrintf("[%d] PumpMsgsBlocking. \n", CmiMyPe());
+#endif
 
   if (buf == NULL) buf = (char *) CmiAlloc(maxbytes);
 
@@ -943,10 +945,10 @@ static void ConverseRunPE(int everReturn)
   ConverseCommonInit(CmiMyArgv);
 
 #if CMK_SMP
-  CcdCallOnConditionKeep(CcdPROCESSOR_BEGIN_IDLE,CmiNotifyBeginIdle,(void *)s);
-  CcdCallOnConditionKeep(CcdPROCESSOR_STILL_IDLE,CmiNotifyStillIdle,(void *)s);
+  CcdCallOnConditionKeep(CcdPROCESSOR_BEGIN_IDLE,(CcdVoidFn)CmiNotifyBeginIdle,(void *)s);
+  CcdCallOnConditionKeep(CcdPROCESSOR_STILL_IDLE,(CcdVoidFn)CmiNotifyStillIdle,(void *)s);
 #else
-  CcdCallOnConditionKeep(CcdPROCESSOR_STILL_IDLE,CmiNotifyIdle,NULL);
+  CcdCallOnConditionKeep(CcdPROCESSOR_STILL_IDLE,(CcdVoidFn)CmiNotifyIdle,NULL);
 #endif
 
   if (!everReturn) {
