@@ -58,8 +58,8 @@ void
 XStr::spew(const char*b, const char *a1, const char *a2, const char *a3, 
            const char *a4, const char *a5)
 {
-  int i,len=strlen(b);
-  for(i=0; i<len; i++){
+  int i,length=strlen(b);
+  for(i=0; i<length; i++){
     switch(b[i]){
     case '\001':
       if(a1==0) {cout << "Internal Error\n"; abort();} append(a1); break;
