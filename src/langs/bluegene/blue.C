@@ -71,8 +71,11 @@ static char **arg_argv;
 CpvStaticDeclare(msgQueue *,inBuffer);	/* emulate the bluegene fix-size inbuffer */
 CpvStaticDeclare(CmmTable *,msgBuffer);	/* if inBuffer is full, put to this buffer */
 
-static int numX, numY, numZ;	/* size of bluegene nodes in cube */
-static int numCth, numWth;	/* number of threads */
+CpvStaticDeclare(int, numX);	/* size of bluegene nodes in cube */
+CpvStaticDeclare(int, numY);
+CpvStaticDeclare(int, numZ);
+CpvStaticDeclare(int, numCth);	/* number of threads */
+CpvStaticDeclare(int, numWth);
 CpvStaticDeclare(int, numNodes);	/* number of bg nodes on this PE */
 
 CpvStaticDeclare(int, inEmulatorInit);
@@ -100,8 +103,8 @@ CpvStaticDeclare(int, inEmulatorInit);
 #define ASSERT(x)	if (!(x)) { CmiPrintf("Assert failure at %s:%d\n", __FILE__,__LINE__); CmiAbort("Abort!"); }
 
 #define BGARGSCHECK   	\
-  if (numX==0 || numY==0 || numZ==0)  { CmiPrintf("\nMissing parameters for BlueGene machine size!\n<tip> use command line options: +x, +y, or +z.\n"); BgShutdown(); } \
-  if (numCth==0 || numWth==0) { CmiAbort("\nMissing parameters for number of communication/worker threads!\n<tip> use command line options: +cth or +wth.\n"); BgShutdown(); }
+  if (CpvAccess(numX)==0 || CpvAccess(numY)==0 || CpvAccess(numZ)==0)  { CmiPrintf("\nMissing parameters for BlueGene machine size!\n<tip> use command line options: +x, +y, or +z.\n"); BgShutdown(); } \
+  if (CpvAccess(numCth)==0 || CpvAccess(numWth)==0) { CmiAbort("\nMissing parameters for number of communication/worker threads!\n<tip> use command line options: +cth or +wth.\n"); BgShutdown(); }
 
 #define HANDLERCHECK(handler)	\
   if (CpvAccess(handlerTable)[handler] == NULL) {	\
@@ -166,11 +169,11 @@ public:
 public:
   nodeInfo(): udata(NULL), started(0) {
     commThQ = new threadQueue;
-    commThQ->initialize(numCth);
+    commThQ->initialize(CpvAccess(numCth));
 
-    threadTable = new CthThread[numWth+numCth];
+    threadTable = new CthThread[CpvAccess(numWth)+CpvAccess(numCth)];
 
-    affinityQ = new ckMsgQueue[numWth];
+    affinityQ = new ckMsgQueue[CpvAccess(numWth)];
   }
 
   ~nodeInfo() {
@@ -183,22 +186,22 @@ public:
   inline static int numLocalNodes()
   {
     int n, m;
-    n = (numX * numY * numZ) / CmiNumPes();
-    m = (numX * numY * numZ) % CmiNumPes();
+    n = (CpvAccess(numX) * CpvAccess(numY) * CpvAccess(numZ)) / CmiNumPes();
+    m = (CpvAccess(numX) * CpvAccess(numY) * CpvAccess(numZ)) % CmiNumPes();
     if (CmiMyPe() < m) n++;
     return n;
   }
 
     /* map global serial number to (x,y,z) ++++ */
   inline static void Global2XYZ(int seq, int *x, int *y, int *z) {
-    *x = seq / (numY * numZ);
-    *y = (seq - *x * numY * numZ) / numZ;
-    *z = (seq - *x * numY * numZ) % numZ;
+    *x = seq / (CpvAccess(numY) * CpvAccess(numZ));
+    *y = (seq - *x * CpvAccess(numY) * CpvAccess(numZ)) / CpvAccess(numZ);
+    *z = (seq - *x * CpvAccess(numY) * CpvAccess(numZ)) % CpvAccess(numZ);
   }
 
     /* calculate global serial number of (x,y,z) ++++ */
   inline static int XYZ2Global(int x, int y, int z) {
-    return x*(numY * numZ) + y*numZ + z;
+    return x*(CpvAccess(numY) * CpvAccess(numZ)) + y*CpvAccess(numZ) + z;
   }
 
     /* map (x,y,z) to emulator PE ++++ */
@@ -246,7 +249,7 @@ public:
 public:
   threadInfo(int _id, ThreadType _type, nodeInfo *_node): id(_id), type(_type), myNode(_node) {
     currTime=0.0;
-    if (id != -1) globalId = nodeInfo::Local2Global(_node->id)*(numCth+numWth)+_id;
+    if (id != -1) globalId = nodeInfo::Local2Global(_node->id)*(CpvAccess(numCth)+CpvAccess(numWth))+_id;
   }
   inline void setThread(CthThread t) { me = t; }
   inline CthThread getThread() { return me; }
@@ -328,7 +331,7 @@ void addBgNodeMessage(bgMsg *msgPtr)
 {
   /* find a idle worker thread */
   /* FIXME:  flat search is bad if there is many work threads */
-  for (int i=0; i<numWth; i++)
+  for (int i=0; i<CpvAccess(numWth); i++)
     if (tMYNODE->affinityQ[i].length() == 0)
     {
       /* this work thread is idle, schedule the msg here */
@@ -433,7 +436,7 @@ void broadcastPacket_(int bcasttype, int threadID, int handlerID, WorkType type,
 /* this function can be called by any thread */
 void BgSendNonLocalPacket(int x, int y, int z, int threadID, int handlerID, WorkType type, int numbytes, char * data)
 {
-  if (x<0 || y<0 || z<0 || x>=numX || y>=numY || z>=numZ) {
+  if (x<0 || y<0 || z<0 || x>=CpvAccess(numX) || y>=CpvAccess(numY) || z>=CpvAccess(numZ)) {
     CmiPrintf("Trying to send packet to a nonexisting node: (%d %d %d)!\n", x,y,z);
     CmiAbort("Abort!\n");
   }
@@ -469,14 +472,14 @@ void BgGetXYZ(int *x, int *y, int *z)
 
 void BgGetSize(int *sx, int *sy, int *sz)
 {
-  *sx = numX; *sy = numY; *sz = numZ;
+  *sx = CpvAccess(numX); *sy = CpvAccess(numY); *sz = CpvAccess(numZ);
 }
 
 /* can only called in emulatorinit */
 void BgSetSize(int sx, int sy, int sz)
 {
   ASSERT(CpvAccess(inEmulatorInit));
-  numX = sx; numY = sy; numZ = sz;
+  CpvAccess(numX) = sx; CpvAccess(numY) = sy; CpvAccess(numZ) = sz;
 }
 
 int BgGetThreadID()
@@ -504,24 +507,24 @@ void BgSetNodeData(char *data)
 
 int BgGetNumWorkThread()
 {
-  return numWth;
+  return CpvAccess(numWth);
 }
 
 void BgSetNumWorkThread(int num)
 {
   ASSERT(CpvAccess(inEmulatorInit));
-  numWth = num;
+  CpvAccess(numWth) = num;
 }
 
 int BgGetNumCommThread()
 {
-  return numCth;
+  return CpvAccess(numCth);
 }
 
 void BgSetNumCommThread(int num)
 {
   ASSERT(CpvAccess(inEmulatorInit));
-  numCth = num;
+  CpvAccess(numCth) = num;
 }
 
 double BgGetTime()
@@ -672,7 +675,7 @@ void BgNodeInitialize(nodeInfo *ninfo)
   tSTARTTIME = CmiWallTimer();
 
   /* creat work threads */
-  for (i=0; i< numWth; i++)
+  for (i=0; i< CpvAccess(numWth); i++)
   {
     threadInfo *tinfo = new threadInfo(i, WORK_THREAD, ninfo);
     t = CthCreate((CthVoidFn)work_thread, tinfo, 0);
@@ -683,9 +686,9 @@ void BgNodeInitialize(nodeInfo *ninfo)
   }
 
   /* creat communication thread */
-  for (i=0; i< numCth; i++)
+  for (i=0; i< CpvAccess(numCth); i++)
   {
-    threadInfo *tinfo = new threadInfo(i+numWth, COMM_THREAD, ninfo);
+    threadInfo *tinfo = new threadInfo(i+CpvAccess(numWth), COMM_THREAD, ninfo);
     t = CthCreate((CthVoidFn)comm_thread, tinfo, 0);
     tinfo->setThread(t);
     /* put to thread table */
@@ -715,14 +718,21 @@ CmiStartFn mymain(int argc, char **argv)
 {
   int i;
 
-  numX = numY = numZ = numCth = numWth = 0;
-
+  
   /* initialize all processor level data */
-  CmiGetArgInt(argv, "+x", &numX);
-  CmiGetArgInt(argv, "+y", &numY);
-  CmiGetArgInt(argv, "+z", &numZ);
-  CmiGetArgInt(argv, "+cth", &numCth);
-  CmiGetArgInt(argv, "+wth", &numWth);
+  CpvInitialize(int,numX);
+  CpvInitialize(int,numY);
+  CpvInitialize(int,numZ);
+  CpvInitialize(int,numCth);
+  CpvInitialize(int,numWth);
+  CpvAccess(numX) = CpvAccess(numY) = CpvAccess(numZ) = 0;
+  CpvAccess(numCth) = CpvAccess(numWth) = 0;
+
+  CmiGetArgInt(argv, "+x", &CpvAccess(numX));
+  CmiGetArgInt(argv, "+y", &CpvAccess(numY));
+  CmiGetArgInt(argv, "+z", &CpvAccess(numZ));
+  CmiGetArgInt(argv, "+cth", &CpvAccess(numCth));
+  CmiGetArgInt(argv, "+wth", &CpvAccess(numWth));
 
   arg_argv = argv;
   arg_argc = CmiGetArgc(argv);
