@@ -671,7 +671,35 @@ RandRefLB.o: RandRefLB.C RandRefLB.decl.h $(CKHEADERS)
 $(L)/libmoduleRandRefLB.a: RandRefLB.o
 	$(CHARMC) -o $(L)/libmoduleRandRefLB.a RandRefLB.o
 
-loadbalancers: $(LOADBALANCERS)
+EveryLB.o: EveryLB.C EveryLB.decl.h
+	$(CHARMC) -c EveryLB.C
+
+EveryLB.decl.h: EveryLB.ci
+	$(CHARMC) EveryLB.ci
+
+LB_OBJ=EveryLB.o \
+    RandCentLB.o \
+    RecBisectBfLB.o \
+    MetisLB.o \
+    RefineLB.o \
+    CommLB.o \
+    Comm1LB.o \
+    HeapCentLB.o \
+    NeighborLB.o \
+    WSLB.o \
+    GreedyRefLB.o \
+    RandRefLB.o \
+
+EveryLB.o: EveryLB.C EveryLB.decl.h
+	$(CHARMC) -c EveryLB.C
+
+EveryLB.decl.h: EveryLB.ci
+	$(CHARMC) EveryLB.ci
+
+$(L)/libmoduleEveryLB.a: $(LB_OBJ)
+	$(CHARMC) -o $(L)/libmoduleEveryLB.a $(LB_OBJ)
+
+loadbalancers: $(LOADBALANCERS) $(L)/libmoduleEveryLB.a
 
 ###############################################################################
 #
