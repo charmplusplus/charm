@@ -9,7 +9,7 @@ extern roarray<char, 1024>  appname;
 
 POSE_TimeType Task::convertToInt(double inp) 
 {
-  long long out = (long long)(inp*factor);
+  POSE_TimeType out = (long long)(inp*factor);
   if (out <0 && inp != -1.0) {
     CmiPrintf("Invalid value in convertToInt() - %ld %f\n", out, inp);
     CmiPrintf("Considering changing factor %e to a smaller value. \n", factor);
@@ -261,6 +261,7 @@ BGproc::BGproc(BGprocMsg *m)
 		       procNum/numWth,  procNum/numWth,
 		       procNum%numWth
 		       );
+	CmiAssert(taskList[i].receiveTime >= 0);
         POSE_invoke(executeTask(tm), BGproc, myHandle, taskList[i].receiveTime);
       }
     }
