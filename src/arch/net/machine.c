@@ -409,8 +409,11 @@ void writeall(int fd, char *buf, int size)
     retry:
     CmiYield();
     ok = write(fd, buf, size);
-    if ((ok<0)&&(errno==EBADF)) goto retry;
-    if (ok<=0) KillOnSIGPIPE();
+    if ((ok<0)&&((errno==EBADF)||(errno==EINTR))) goto retry;
+    if (ok<=0) {
+      fprintf(stderr, "Write failed ..\n");
+      KillOnSIGPIPE();
+    }
     size-=ok; buf+=ok;
   }
 }

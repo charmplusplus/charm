@@ -1798,10 +1798,11 @@ void req_serve_client(int workerno)
   req_node n;
   
   nread = xstr_read(buffer, worker->fd[0]);
-  if (nread<=0) {
+  if (nread<0) {
     fprintf(stderr,"aborting: node terminated abnormally.\n");
     exit(1);
   }
+  if(nread==0) return;
   while (1) {
     head = xstr_lptr(buffer);
     len = strlen(head);
