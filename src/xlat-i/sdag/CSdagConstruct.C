@@ -26,6 +26,7 @@ void SdagConstruct::numberNodes(void)
     case SOLIST: nodeNum = numOlists++; break;
     case SATOMIC: nodeNum = numAtomics++; break;
     case SFORWARD: nodeNum = numForwards++; break;
+    case SCONNECT: nodeNum = numConnects++; break;
     case SINT_EXPR:
     case SIDENT: 
     default:
@@ -96,6 +97,10 @@ void SdagConstruct::labelNodes(void)
       break;
     case SFORWARD: 
       sprintf(text, "_forward_%d", nodeNum); 
+      label = new XStr(text);
+      break;
+    case SCONNECT:
+      sprintf(text, "_connect_%s",connectEntry->charstar()); 
       label = new XStr(text);
       break;
     case SINT_EXPR:
@@ -215,6 +220,43 @@ void SdagConstruct::generateEntryList(TList<CEntry*>& CEntrylist, SdagConstruct 
     }
   }
 }
+ 
+void SdagConstruct::generateConnectEntries(XStr& op){
+   op << "  void " <<connectEntry->charstar() <<'(';
+   ParamList *pl = param;
+   XStr msgParams;
+   int i, numStars;
+   int count;
+   if (pl->isVoid() == 1) {
+     op << "void) {\n"; 
+   }
+   else if (pl->isMessage() == 1){
+     op << pl->getBaseName() <<" *" <<pl->getGivenName() <<") {\n";
+   }
+   else {
+    count = 0;
+    op << "CkMarshallMsg *" /*<< connectEntry->charstar()*/ <<"_msg) {\n";
+    msgParams <<"   char *impl_buf= _msg->msgBuf;\n";
+    param->beginUnmarshall(msgParams);
+   }
+   op << msgParams.charstar() <<"\n"; 
+   op << "  " <<text->charstar() <<"\n";
+
+   op << "  }\n";
+   
+}
+
+void SdagConstruct::generateConnectEntryList(TList<SdagConstruct*>& ConnectEList) {
+  if (type == SCONNECT)
+     ConnectEList.append(this);
+  if (constructs != 0) {
+    SdagConstruct *cn;
+    for(cn=constructs->begin(); !constructs->end(); cn=constructs->next()) {
+      cn->generateConnectEntryList(ConnectEList);
+    }
+  }
+
+}
 
 void SdagConstruct::propagateState(int uniqueVarNum)
 { 
@@ -261,12 +303,12 @@ void SdagConstruct::propagateState(int uniqueVarNum)
   TList<CStateVar*> *whensEntryMethodStateVars; 
   whensEntryMethodStateVars = new TList<CStateVar*>();
   for(cn=constructs->begin(); !constructs->end(); cn=constructs->next()) {
-     cn->propagateState(*stateVarsChildren, *whensEntryMethodStateVars , uniqueVarNum);
+     cn->propagateState(*stateVarsChildren, *whensEntryMethodStateVars , *publishesList, uniqueVarNum);
   }
 }
 
 
-void SdagConstruct::propagateState(TList<CStateVar*>& list, TList<CStateVar*>& wlist, int uniqueVarNum)
+void SdagConstruct::propagateState(TList<CStateVar*>& list, TList<CStateVar*>& wlist, TList<SdagConstruct*>& publist, int uniqueVarNum)
 {
   CStateVar *sv;
   int i;
@@ -382,7 +424,7 @@ void SdagConstruct::propagateState(TList<CStateVar*>& list, TList<CStateVar*>& w
         stateVars->append(sv);
       }
       stateVarsChildren = stateVars;
-      if(con2 != 0) con2->propagateState(list, wlist, uniqueVarNum);
+      if(con2 != 0) con2->propagateState(list, wlist,publist, uniqueVarNum);
       break;
     case SOLIST:
       stateVarsChildren = new TList<CStateVar*>();
@@ -403,11 +445,25 @@ void SdagConstruct::propagateState(TList<CStateVar*>& list, TList<CStateVar*>& w
     case SELSE:
     case SSLIST:
     case SOVERLAP:
+      for(sv=list.begin(); !list.end(); sv=list.next()) {
+        stateVars->append(sv);
+      }
+      stateVarsChildren = stateVars;
+      break;
     case SATOMIC:
       for(sv=list.begin(); !list.end(); sv=list.next()) {
         stateVars->append(sv);
       }
       stateVarsChildren = stateVars;
+      if (con1 != 0) {
+        publist.append(con1);
+        /*SdagConstruct *sc;
+        SdagConstruct *sc1;
+        for(sc =publist.begin(); !publist.end(); sc=publist.next()) {
+           for(sc1=sc->constructs->begin(); !sc->constructs->end(); sc1 = sc->constructs->next())
+           printf("Publist = %s\n", sc1->text->charstar());
+	}*/
+      }
       break;
     case SFORWARD:
       stateVarsChildren = new TList<CStateVar*>();
@@ -419,6 +475,7 @@ void SdagConstruct::propagateState(TList<CStateVar*>& list, TList<CStateVar*>& w
       }
 
       break;
+    case SCONNECT: 
     case SINT_EXPR:
     case SIDENT:
     case SENTRY:
@@ -433,9 +490,9 @@ void SdagConstruct::propagateState(TList<CStateVar*>& list, TList<CStateVar*>& w
   if (constructs != 0) {
     for(cn=constructs->begin(); !constructs->end(); cn=constructs->next()) {
       if (type == SWHEN)
-         cn->propagateState(*stateVarsChildren, *whensEntryMethodStateVars,  uniqueVarNum);
+         cn->propagateState(*stateVarsChildren, *whensEntryMethodStateVars, publist,  uniqueVarNum);
       else
-         cn->propagateState(*stateVarsChildren, wlist,  uniqueVarNum);
+         cn->propagateState(*stateVarsChildren, wlist, publist,  uniqueVarNum);
     }
  } 
 }
@@ -481,6 +538,9 @@ void SdagConstruct::generateCode(XStr& op)
     case SFORWARD:
       generateForward(op);
       break;
+    case SCONNECT:
+      generateConnect(op);
+      break;
     default:
       break;
   }
@@ -490,6 +550,28 @@ void SdagConstruct::generateCode(XStr& op)
       cn->generateCode(op);
     }
   }
+}
+
+void SdagConstruct::generateConnect(XStr& op) {
+  op << "  void " << label->charstar() << "() {\n";
+  op << "    int index;\n";
+  if ((param->isVoid() == 0) && (param->isMessage() == 0)) {
+     op << "    CkMarshallMsg *x;\n";  
+     op << "    index = CkIndex_Ar1::" <<connectEntry->charstar() <<"(x);\n";  //replace
+     op << "    CkCallback cb(index, CkArrayIndex1D(thisIndex), a1);\n";  // replace 
+  }
+  else if (param->isVoid() == 1) {
+     op << "    index = CkIndex_Ar1::" <<connectEntry->charstar() <<"(void);\n";  //replace
+     op << "    CkCallback cb(index, CkArrayIndex1D(thisIndex), a1);\n";  // replace 
+  }
+  else {
+     op << "    " << param->getBaseName() <<" *x;\n";  // replace
+     op << "    index = CkIndex_Ar1::" <<connectEntry->charstar() <<"(x);\n";  //replace
+     op << "    CkCallback cb(index, CkArrayIndex1D(thisIndex), a1);\n";  // replace 
+  }
+  op << "    myPublish->get_" <<connectEntry->charstar() <<"(cb);\n";  //replace - myPublish
+
+  op << "  }\n\n";  
 }
 
 void SdagConstruct::generateForward(XStr& op) {
@@ -644,6 +726,11 @@ void SdagConstruct::generateWhen(XStr& op)
   if (constructs != 0) {
     if (!constructs->empty() ) {
        op << "       " << constructs->front()->label->charstar() << "(";
+       generateCall(op, *stateVarsChildren);
+       op << ");\n";
+    }
+    else {
+       op << "       " << label->charstar() << "_end(";
        generateCall(op, *stateVarsChildren);
        op << ");\n";
     }
@@ -1105,6 +1192,12 @@ void SdagConstruct::generateSdagEntry(XStr& op)
   op << "  void " << con1->text->charstar() << "(";
   generatePrototype(op, *stateVars);
   op << ") {\n";
+  SdagConstruct *sc;
+  SdagConstruct *sc1;
+  for(sc =publishesList->begin(); !publishesList->end(); sc=publishesList->next()) {
+     for(sc1=sc->constructs->begin(); !sc->constructs->end(); sc1 = sc->constructs->next())
+        op << "    _connect_" << sc1->text->charstar() <<"();\n";
+     }
   // actual code here 
   op << "    " << constructs->front()->label->charstar() <<
         "(";
@@ -1125,6 +1218,7 @@ void SdagConstruct::generateAtomic(XStr& op)
   generatePrototype(op, *stateVars);
   op << ") {\n";
   op << "    " << text->charstar() << "\n";
+  SdagConstruct *cn;
   if(nextBeginOrEnd == 1)
     op << "    " << next->label->charstar() << "(";
   else
@@ -1133,6 +1227,41 @@ void SdagConstruct::generateAtomic(XStr& op)
   op << ");\n";
   op << "  }\n\n";
 }
+
+void SdagConstruct::generatePrototype(XStr& op, ParamList *list)
+{
+   ParamList *pl = list;
+   int count = 0;
+   int i, numStars;
+   if (pl->isVoid() == 1) {
+     op << "void"; 
+   }
+   else if (pl->isMessage() == 1){
+     op << pl->getBaseName() <<" *" <<pl->getGivenName() ;
+   }
+   else {
+     while(pl != NULL) {
+       if (count > 0)
+          op <<", ";
+       if (pl->isPointer() == 1) {
+         op <<pl->getBaseName(); 
+	 numStars = pl->getNumStars();
+	 for(i=0; i< numStars; i++)
+	   op <<"*";
+	 op <<" "<<pl->getGivenName();
+       }
+       else if (pl->isReference() == 1) 
+         op <<pl->getBaseName() <<"& " <<pl->getGivenName();
+       else if (pl->isArray() == 1) 
+         op <<pl->getBaseName() <<"* " <<pl->getGivenName();
+       else if ((pl->isBuiltin() == 1) || (pl->isNamed() == 1))
+         op <<pl->getBaseName() <<" " <<pl->getGivenName();
+       pl = pl->next;
+       count++;
+     }
+   }
+}
+
 
 void SdagConstruct::generatePrototype(XStr& op, TList<CStateVar*>& list)
 {
@@ -1191,14 +1320,28 @@ void SdagConstruct::setNext(SdagConstruct *n, int boe)
       next = n;
       nextBeginOrEnd = boe;
       {
+        SdagConstruct *notConnectNode = this;
         SdagConstruct *cn=constructs->begin();
         if (cn==0) // empty slist
           return;
+        else if (cn->type != SCONNECT)
+          notConnectNode = cn;
+        int flag = 1;
         SdagConstruct *nextNode=constructs->next();
         for(; nextNode != 0;) {
-          cn->setNext(nextNode, 1);
-          cn = nextNode;
-          nextNode = constructs->next();
+          if (nextNode->type != SCONNECT)
+            notConnectNode = nextNode;
+          flag = 1;
+	  while ((flag == 1) && (nextNode->type == SCONNECT)) {
+	    nextNode = constructs->next();
+            if (nextNode == 0)
+              flag = 0;
+	  }
+	  if (nextNode != 0) {
+            cn->setNext(nextNode, 1);
+            cn = nextNode;
+            nextNode = constructs->next();
+	  }
         }
         cn->setNext(this, 0);
       }
