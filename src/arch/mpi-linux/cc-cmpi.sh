@@ -11,6 +11,7 @@ CMK_CF77="cmpifc -ifc "
 CMK_CF90="cmpif90c -ifc "
 CMK_CF90_FIXED="cmpif90c -ifc "
 CMK_F90LIBS='-lifcore  '
+CMK_F77LIBS=$CMK_F90LIBS
 CMK_MOD_NAME_ALLCAPS=
 CMK_MOD_EXT="mod"
 CMK_F90_USE_MODDIR=
