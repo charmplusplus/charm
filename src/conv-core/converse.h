@@ -1130,6 +1130,11 @@ extern int _immRunning;
 #  define CmiImmIsRunning()       (0)
 #endif
 
+/******** Performance Counters ********/
+void CmiInitCounters();
+void CmiStartCounters(int events[], int numEvents);
+void CmiStopCounters(int events[], CMK_TYPEDEF_INT8 values[], int numEvents);
+
 /******** Trace ********/
 
 /* this is the type for thread ID, mainly used for projection. */
