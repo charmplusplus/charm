@@ -400,10 +400,10 @@ Seed load balancing involves the movement of object creation messages, or
 This load balancing scheme is used for load balancing 
 chares~\footnote{as opposed to chare arrays which are not balanced by seed load balancers}
  at creation time. 
-When the chare is created on a processor, there is no movement of chares
+When the chare is created on a processor, there is no movement of the chare
 due to the seed load balancer. 
 
-Several variations of strategies have been being designed and analyzed. 
+Several variations of strategies have been designed and analyzed. 
 \begin{enumerate}
 \item {\em random}\\  
  A strategy that places seeds randomly when they are created and does
@@ -411,14 +411,14 @@ no movement of seeds thereafter. This is used as the default seed
 load balancer.
 \item {\em spray}\\  
  a strategy which imposes a spanning tree organization on the processors,
- results in communication amongst neighborhood processors (parent and 
-children processors) to compute global average load via periodic reduction. 
+ results in communication via global reduction amongst all processors 
+ to compute global average load via periodic reduction. 
  It uses averaging of loads to determine how seeds should be
 distributed.
 \item {\em graph}\\  
  a strategy which imposes a dense graph organization on the processors,
  load exchange happens to neighbors only. The overloaded processors
- initiate the load balancing, where a processor send work to elsewhere
+ initiate the load balancing, where a processor send work to its neighbors
  when it becomes overloaded.
 \end{enumerate}
 
@@ -427,10 +427,12 @@ seed load balancer.
 
 \subsubsection{Compiler option}
 
-{\bf -balance foo} links with a seed load balancer module. 
+To choose a seed load balancer other than the default {\em rand} strategy,
+use link time command line option {\bf -balance foo}. 
+
 All seed laod balaner modules should be compiled in the form of library
-under charm/lib, named as libcldb-foo.a, where foo is the strategy 
-name also used in the link time option.
+under charm/lib, named as {\em libcldb-foo.a}, where {\em foo} is the strategy 
+name as is used in the link time option.
 
 
 
