@@ -550,6 +550,7 @@ void CkMulticastMgr::recvMsg(multicastGrpMsg *msg)
     //multicastGrpMsg *newm = (multicastGrpMsg *)CkCopyMsg((void **)&msg);
 //    CProxyElement_ArrayBase ap(msg->aid, entry->localElem[i]);
 //    ap.ckSend((CkArrayMessage *)newm, msg->ep);
+    // use CK_MSG_DONTFREE so that the message can be reused
     CkSendMsgArrayInline(msg->ep, msg, msg->aid, entry->localElem[i], CK_MSG_KEEP);
   }
   if (nLocal) {
