@@ -18,27 +18,21 @@ double *reduceValues=NULL;
 
 //Number of time steps to simulate
 int tsteps=10;
-const int dim=20;//Length (elements) of one side of the FEM mesh
+const int dim=29;//Length (elements) of one side of the FEM mesh
 const int np=4; //Nodes per element for a quad
 
 //Sum of sparse data[0] for both sets
 double sparseSum[2];
 
 extern "C" void
-pupMyGlobals(pup_er p) 
+pupMyGlobals(pup_er p,void *ignored) 
 {
-	//CkPrintf("pupMyGlobals on PE %d\n",CkMyPe());
+	CkPrintf("pupMyGlobals on PE %d\n",CkMyPe());
 	pup_int(p,&tsteps);
 	if (reduceValues==NULL)
 		reduceValues=new double[tsteps];
 	pup_doubles(p,reduceValues,tsteps);
 	pup_doubles(p,sparseSum,2);
-}
-
-extern "C" void
-TCHARM_User_node_setup(void)
-{
-	TCHARM_Readonly_globals(pupMyGlobals);
 }
 
 void printargs(void) {
@@ -49,11 +43,10 @@ void printargs(void) {
   CkPrintf("\n");
 }
 
-void tryPrint(void) {
-  int nNodes, ignored;
-  FEM_Get_node(&nNodes,&ignored);
+void tryPrint(int fem_mesh) {
+  int nNodes=FEM_Mesh_get_length(fem_mesh,FEM_NODE);
   if (nNodes<50) 
-    FEM_Print_partition();
+    FEM_Mesh_print(fem_mesh);
 }
 
 extern "C" void
@@ -148,6 +141,7 @@ init(void)
 	reduceValues[t]=reduceSum;
   }
   FEM_Set_node_data(noData);
+  FEM_Mesh_pup(FEM_Mesh_default_write(),0,pupMyGlobals,NULL);
 
   if (TEST_GHOST) {
   //Set up ghost layers:
@@ -260,7 +254,8 @@ driver(void)
   int ngnodes, ngelems; //Counts including ghosts
 
   FEM_Print("Starting driver...");
-printargs();
+  FEM_Mesh_pup(FEM_Mesh_default_read(),0,pupMyGlobals,NULL);
+  printargs();
   FEM_Get_node(&nnodes,&nnodeData);
   double *nodeData=new double[nnodeData*nnodes];
   FEM_Get_node_data(nodeData);  
@@ -272,7 +267,7 @@ printargs();
   FEM_Get_elem_data(0,elData);
 
   int myId = FEM_My_partition();
-  tryPrint();
+  tryPrint(FEM_Mesh_default_read());
   Node *nodes = new Node[nnodes];
   Element *elements = new Element[nelems];
   int doubleField=FEM_Create_simple_field(FEM_DOUBLE,1);
@@ -491,7 +486,7 @@ mesh_updated(int param)
   CkPrintf("mesh_updated(%d) called.\n",param);
   testEqual(param,123,"mesh_updated param");
 
-  tryPrint();
+  tryPrint(FEM_Mesh_default_read());
   
   FEM_Get_node(&nnodes,&dataPer);
   CkPrintf("Getting %d nodes (%d data per)\n",nnodes,dataPer);
