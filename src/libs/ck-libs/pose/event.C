@@ -24,6 +24,7 @@ Event::Event()
   next = prev = NULL;
   commitBfrLen = done = 0;
   fnIdx = timestamp = -1;
+  commitErr = 0;
 }
 
 // basic destructor
@@ -50,7 +51,7 @@ void Event::pup(PUP::er &p)
   SpawnedEvent *tmp = NULL;
   
   // simple data
-  evID.pup(p); p(fnIdx); p(timestamp); p(done); p(commitBfrLen); 
+  evID.pup(p); p(fnIdx); p(timestamp); p(done); p(commitBfrLen); p(commitErr);
   
   // commitBfr
   if (p.isUnpacking() && (commitBfrLen > 0)) {  // unpack non-empty commitBfr

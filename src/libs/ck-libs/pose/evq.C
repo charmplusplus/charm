@@ -111,8 +111,10 @@ void eventQueue::CommitEvents(sim *obj, Event *target)
     if (commitPtr->done != 1)                    // only commit executed events
       CkPrintf("ERROR: committing unexecuted event@%d\n",commitPtr->timestamp);
     obj->ResolveCommitFn(commitPtr->fnIdx, commitPtr->msg); // exec commit fn
-    if (commitPtr->commitBfrLen > 0)               // print buffered I/O
+    if (commitPtr->commitBfrLen > 0)  {             // print buffered I/O
       CkPrintf("%s", commitPtr->commitBfr);
+      if (commitPtr->commitErr) CmiAbort("Commit ERROR");
+    }
     commitPtr = commitPtr->next;
     /* if (obj->recycCount < 0)
       obj->recyc[obj->recycCount] = commitPtr->prev->cpData;

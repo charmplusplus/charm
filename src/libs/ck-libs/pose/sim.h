@@ -199,32 +199,18 @@ class sim : public ArrayElement1D {
   void registerSent(int timestamp) { // Notify GVT of message send
     localPVT->objUpdate(timestamp, SEND);
   }
-  //  void CommitPrintf VPARAMS ((const char *Fmt, ...)) {
   void CommitPrintf (const char *Fmt, ...) {
-    char *tmp;
-    size_t tmplen=eq->currentPtr->commitBfrLen + strlen(Fmt) + 1 +100;
     va_list ap;
-    if (!(tmp = (char *)malloc(tmplen //
-			       * sizeof(char)))) {
-      CkPrintf("ERROR: sim::CommitPrintf: OUT OF MEMORY!\n");
-      CkExit();
-    }
-    //VA_FIXEDARG (ap, const char *, Fmt);
     va_start(ap,Fmt);
-    if ((eq->currentPtr->commitBfr)&&(eq->currentPtr->commitBfrLen))
-      {
-	strcpy(tmp,eq->currentPtr->commitBfr);
-	free(eq->currentPtr->commitBfr);
-	vsnprintf(tmp+strlen(tmp),tmplen,Fmt,  ap); 
-      }
-    else
-      {
-	vsnprintf(tmp,tmplen, Fmt,ap ); 
-      }
+    InternalCommitPrintf(Fmt, ap);
     va_end(ap);
-    //      tmp=(char *) realloc(tmp,(strlen(tmp)+1)*sizeof(char));
-    eq->currentPtr->commitBfrLen = strlen(tmp) + 1;  
-    eq->currentPtr->commitBfr = tmp;
+  }
+  void CommitError (const char *Fmt, ...) {
+    va_list ap;
+    va_start(ap,Fmt);
+    InternalCommitPrintf(Fmt, ap);
+    va_end(ap);
+    eq->currentPtr->commitErr = 1;
   }
   void CommitPrint(char *s) {       // Buffered output function
     char *tmp;
@@ -242,6 +228,31 @@ class sim : public ArrayElement1D {
     eq->currentPtr->commitBfr = tmp;
   }
   void dump(int pdb_level);         // dump entire sim object
+  //  void CommitPrintf VPARAMS ((const char *Fmt, ...)) {
+ private:
+  void InternalCommitPrintf (const char *Fmt, va_list ap) {
+    char *tmp;
+    size_t tmplen=eq->currentPtr->commitBfrLen + strlen(Fmt) + 1 +100;
+    if (!(tmp = (char *)malloc(tmplen //
+			       * sizeof(char)))) {
+      CkPrintf("ERROR: sim::CommitPrintf: OUT OF MEMORY!\n");
+      CkExit();
+    }
+    //VA_FIXEDARG (ap, const char *, Fmt);
+    if ((eq->currentPtr->commitBfr)&&(eq->currentPtr->commitBfrLen))
+      {
+	strcpy(tmp,eq->currentPtr->commitBfr);
+	free(eq->currentPtr->commitBfr);
+	vsnprintf(tmp+strlen(tmp),tmplen,Fmt,  ap); 
+      }
+    else
+      {
+	vsnprintf(tmp,tmplen, Fmt,ap ); 
+      }
+    //      tmp=(char *) realloc(tmp,(strlen(tmp)+1)*sizeof(char));
+    eq->currentPtr->commitBfrLen = strlen(tmp) + 1;  
+    eq->currentPtr->commitBfr = tmp;
+  }
 };
 
 #endif
