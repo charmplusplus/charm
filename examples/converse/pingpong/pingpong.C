@@ -2,7 +2,7 @@
 #include <converse.h>
 
 enum {nCycles = 1 << 8 };
-enum { maxMsgSize = 1 << 13 };
+enum { maxMsgSize = 1 << 18 }; 
 
 CpvDeclare(int,msgSize);
 CpvDeclare(int,cycleNum);
@@ -18,7 +18,7 @@ CpvStaticDeclare(double,endCTime);
 void startRing()
 {
   CpvAccess(cycleNum) = 0;
-  CpvAccess(msgSize) = 100 * CpvAccess(sizeNum) + CmiMsgHeaderSizeBytes;
+  CpvAccess(msgSize) = (1 << CpvAccess(sizeNum)) + CmiMsgHeaderSizeBytes;
   //CmiPrintf("PE %d startRing allocating %d bytes, header=%d bytes\n",
 	    //CmiMyPe(),CpvAccess(msgSize),CmiMsgHeaderSizeBytes);
   CmiPrintf(

@@ -1,4 +1,4 @@
-CHARMC=../../../../bin/charmc $(OPTS)
+CHARMC=../../../bin/charmc $(OPTS)
 COMMON_OBJS=	config.o mesh.o node.o \
 	lst_NL.o lst_coh2.o
 FEM_OBJS=fem_main.o fem_mesh.o $(COMMON_OBJS)

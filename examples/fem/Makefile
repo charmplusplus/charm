@@ -1,7 +1,4 @@
-DIRS=1darray 3darray fancyarray \
-	darray dgroup \
-	group \
-	stl_array sdag
+DIRS=simple2D crack2D matrix
 
 test:
 	for d in $(DIRS); do \

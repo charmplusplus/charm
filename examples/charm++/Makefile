@@ -1,7 +1,6 @@
-DIRS=1darray 3darray fancyarray \
-	darray dgroup \
-	group \
-	stl_array sdag
+DIRS=hello integrate integrate2 integrateArray \
+	piArray queens RedExample \
+	ring rings speeds
 
 test:
 	for d in $(DIRS); do \

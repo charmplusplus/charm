@@ -300,7 +300,7 @@ void myMesh::solve(ILSI_Solver s) {
   if (myId==0) {
     CkPrintf("Solved-- %d iterations, %g residual\n",
     	(int)param.iterations,param.residual);
-    if (nnodes<50)
+    if (nnodes<10)
       for (int n=0;n<nnodes;n++) {
         int c;
         printf("  node %d  disp= ",n);

@@ -1,7 +1,4 @@
-DIRS=1darray 3darray fancyarray \
-	darray dgroup \
-	group \
-	stl_array sdag
+DIRS=megatest pingpong simplearrayhello lb_test chkpt commtest
 
 test:
 	for d in $(DIRS); do \

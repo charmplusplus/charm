@@ -1,4 +1,4 @@
-CHARMC=../../../../bin/charmc $(OPTS)
+CHARMC=../../../bin/charmc $(OPTS)
 
 pgm: pgm.o
 	$(CHARMC) pgm.o  -o pgm -language charm++

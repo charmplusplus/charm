@@ -4,9 +4,12 @@ MODULES = -module commlib
 
 OBJS = test.o benchmark.o
 
-all: test benchmark
+all: pgm benchmark
 
-test: test.o
+test: pgm
+	./charmrun ./pgm +p4 10
+
+pgm: test.o
 	$(CHARMC) -language charm++ -o $@ test.o $(MODULES) 
 
 test.decl.h: test.ci
@@ -25,6 +28,6 @@ benchmark.o: benchmark.C benchmark.decl.h benchmark.h
 	$(CHARMC) -c benchmark.C
 
 clean:
-	rm -f *.decl.h *.def.h *.o test benchmark charmrun *~
+	rm -f *.decl.h *.def.h *.o pgm benchmark charmrun *~
 
 new: clean all

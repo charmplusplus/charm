@@ -1,4 +1,4 @@
-DIRS=megampi creduce stacksize Cjacobi3D chkpt 
+DIRS=megampi stacksize chkpt 
 
 test:
 	for d in $(DIRS); do \
