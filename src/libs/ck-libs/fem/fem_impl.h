@@ -131,6 +131,7 @@ protected:
 	}
 public:
 	FEM_T_List(int FIRST_DT_) :FIRST_DT(FIRST_DT_) {}
+	virtual ~FEM_T_List() {}
 	void pup(PUP::er &p) { p|list; }
 	
 	/// This routine is called when we're passed an invalid T index.
@@ -138,7 +139,7 @@ public:
 	
 	/// Insert a new T (allocated with "new"), returning the user index:
 	int put(T *t) {
-		for (unsigned int i=0;i<list.size();i++) 
+		for (int i=0;i<list.size();i++) 
 			if (list[i]==NULL) {
 				list[i]=t;
 				return FIRST_DT+i;
