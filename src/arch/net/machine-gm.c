@@ -170,7 +170,12 @@ static void CommunicationServer(int withDelayMs)
   int size, len;
   char *msg, *buf;
 
+  CmiCommLockOrElse({
+    MACHSTATE(3,"Attempted to re-enter comm. server!")
+    return;
+  });
   LOG(GetClock(), Cmi_nodestart, 'I', 0, 0);
+/*
 #if CMK_SHARED_VARS_UNAVAILABLE
   if (terrupt)
   {
@@ -178,19 +183,30 @@ static void CommunicationServer(int withDelayMs)
   }
   terrupt++;
 #endif
+*/
+  CmiCommLock();
 
   while (1) {
-    CheckSocketsReady(withDelayMs,1);
+    CheckSocketsReady(withDelayMs);
+/*
     CmiCommLock();
+*/
     if (ctrlskt_ready_read) { ctrl_getone(); }
     e = gm_receive(gmport);
     if (!processEvent(e)) break;
+/*
     CmiCommUnlock();
+*/
   }
 
+/*
 #if CMK_SHARED_VARS_UNAVAILABLE
   terrupt--;
 #endif
+
+  CmiCommUnlock();
+  MACHSTATE(2,"} CommunicationServer")
+*/
 
 }
 
@@ -311,7 +327,7 @@ static void send_progress()
       OtherNode node = out->node;
       char *msg = out->msg;
       gm_send_with_callback(gmport, msg, out->size, out->length, 
-                            GM_LOW_PRIORITY, node->IP, node->dataport, 
+                            GM_LOW_PRIORITY, *(int *)&node->IP, node->dataport, 
                             send_callback, msg);
       dequeue_sending();
       free(out);
@@ -369,7 +385,7 @@ void EnqueueOutgoingDgram
     return;
   }
   gm_send_with_callback(gmport, buf, size, len, 
-                        GM_LOW_PRIORITY, node->IP, node->dataport, 
+                        GM_LOW_PRIORITY, *(int *)&node->IP, node->dataport, 
                         send_callback, buf);
 }
 
@@ -464,7 +480,7 @@ void CmiCheckGmStatus()
   for (i=0; i<Cmi_numnodes; i++) {
     gm_status_t status;
     char uid[6];
-    status = gm_node_id_to_unique_id(gmport, nodes[i].IP, uid);
+    status = gm_node_id_to_unique_id(gmport, *(int *)&nodes[i].IP, uid);
     if (status != GM_SUCCESS || ( uid[0]==0 && uid[1]== 0 
          && uid[2]==0 && uid[3]==0 && uid[4]==0 && uid[5]==0)) { 
       CmiPrintf("Error> gm node %d doesn't know node %d. \n", CmiMyPe(), i);
