@@ -73,8 +73,8 @@ HeapCentLB::BuildObjectArray(CentralLB::LDStats* stats,
 
   objData  = new HeapData[*objCount];
   *objCount = 0; 
-  for(int pe=0; pe < count; pe++)
-    for(int obj=0; obj < stats[pe].n_objs; obj++)
+  for(pe=0; pe < count; pe++)
+    for(obj=0; obj < stats[pe].n_objs; obj++)
       if (stats[pe].objData[obj].migratable == CmiTrue) {
         objData[*objCount].load = 
           stats[pe].objData[obj].wallTime * stats[pe].pe_speed;
@@ -94,17 +94,18 @@ HeapCentLB::BuildCpuArray(CentralLB::LDStats* stats,
   CentralLB::LDStats *peData;
   
   *peCount = 0;
-  for (int pe = 0; pe < count; pe++)
+  int pe, obj;
+  for (pe = 0; pe < count; pe++)
     if (stats[pe].available == CmiTrue) (*peCount)++;
 
   data = new HeapData[*peCount];
   
   *peCount = 0;
-  for (int pe=0; pe < count; pe++) {
+  for (pe=0; pe < count; pe++) {
     data[*peCount].load = 0.0;
     peData = &(stats[pe]);
 
-    for (int obj = 0; obj < peData->n_objs; obj++) 
+    for (obj = 0; obj < peData->n_objs; obj++) 
       if (peData->objData[obj].migratable == CmiFalse) 
         data[*peCount].load -= 
           peData->objData[obj].wallTime * peData->pe_speed;
