@@ -25,7 +25,7 @@ do
 $bal.def.h: $bal.decl.h
 
 $bal.decl.h: $bal.ci charmxi
-	\$(CHARMC) $bal.ci
+	\$(CHARMC) -intrinsic $bal.ci
 
 \$(L)/libmodule$bal.a: $bal.o $manager
 	\$(CHARMC) -o \$(L)/libmodule$bal.a $bal.o $manager
