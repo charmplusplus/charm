@@ -81,8 +81,8 @@ void addspEdge(EdgeList, v,w)
   EdgeList->next++;
 
   /* printf("adding edge: (%d, %d)\n", v, w); */
-  //((EdgeList->edges)[n]).node1 = v;
-  //(EdgeList->edges[n]).node2 = w;
+  /*((EdgeList->edges)[n]).node1 = v;*/
+  /*(EdgeList->edges[n]).node2 = w;*/
    for (i=0;i<n-1;i++)
      if (((EdgeList->edges[i]).node1!=v) && ((EdgeList->edges[i]).node2!=w)) 
 	{
