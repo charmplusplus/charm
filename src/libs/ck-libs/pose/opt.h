@@ -59,14 +59,15 @@ public:
       ec=parent->cancels.getEarliest(), gvt=localPVT->getGVT(), 
       worktime = eq->currentPtr->timestamp;
     // Object is idle; report -1
-    if (!(eq->RBevent) && (ec == POSE_UnsetTS) && (worktime == POSE_UnsetTS))
+    if ((ec == POSE_UnsetTS) && (worktime == POSE_UnsetTS))
       return POSE_UnsetTS;
-    if (eq->RBevent)  {
+    /*    if (eq->RBevent)  {
       theTime = eq->RBevent->timestamp;
       if ((ec < theTime) && (ec > POSE_UnsetTS))
 	theTime = ec;
     }
-    else if (ec > POSE_UnsetTS) {
+    else */
+    if (ec > POSE_UnsetTS) {
       theTime = ec;
       if ((worktime > POSE_UnsetTS) && (worktime < ec) && (ovt < worktime))
 	theTime = worktime;
@@ -82,7 +83,9 @@ public:
       if (ovt > worktime)
 	theTime = ovt;
     }
-    //CkPrintf("theTime=%d ovt=%d wt=%d ec=%d gvt=%d\n", theTime, ovt, worktime, ec, gvt);
+    /*if (!((theTime == POSE_UnsetTS) || (theTime >= gvt) ||
+	  (theTime == gvt-1)))
+	  CkPrintf("theTime=%d ovt=%d wt=%d ec=%d gvt=%d\n", theTime, ovt, worktime, ec, gvt); */
     CkAssert((theTime == POSE_UnsetTS) || (theTime >= gvt) ||
 	     (theTime == gvt-1));
     return theTime;

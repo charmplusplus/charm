@@ -268,7 +268,7 @@ void SRtable::MapToBuckets(SRentry *bkt, SRentry *endBkt, int *s,
 
 /// Compress and pack table into an UpdateMsg and return it
 UpdateMsg *SRtable::PackTable(POSE_TimeType pvt)
-{
+{ //check me
 #ifdef SR_SANITIZE
   sanitize();
 #endif
@@ -307,6 +307,9 @@ UpdateMsg *SRtable::PackTable(POSE_TimeType pvt)
     }
   }
   CkAssert(entryIdx <= nEntries);
+  //if ((um->SRs[0].timestamp < pvt) || (pvt == POSE_UnsetTS))
+  //CkPrintf("PE %d sending %d sr entries earliest=%d pvt=%d\n", CkMyPe(), 
+  //entryIdx, um->SRs[0].timestamp, pvt);
   um->numEntries = entryIdx;
 #ifdef SR_SANITIZE
   sanitize();

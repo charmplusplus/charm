@@ -67,6 +67,8 @@ class PVT : public Group {
   POSE_TimeType conPVT;
   /// Last GVT estimate
   POSE_TimeType estGVT;       
+  /// Last reported PVT estimate
+  POSE_TimeType repPVT;       
   /// Simulation termination flag
   int simdone;
   /// Minimum send/recv timestamp in this iteration
