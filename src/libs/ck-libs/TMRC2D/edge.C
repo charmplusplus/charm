@@ -111,42 +111,38 @@ int edge::collapse(elemRef requester, node kNode, node dNode, elemRef kNbr,
   *local = 0;
   if ((nbr.cid == -1) || (nbr.cid == requester.cid)) *local = 1;
   if (pending && (waitingFor == requester)) { // collapsed; awaiting requester
-    DEBUGREF(CkPrintf("TMRC2D: edge::collapse: ** PART 2! ** On edge=%d on chunk=%d, requester=(%d,%d) with nbr=(%d,%d)\n", myRef.idx, myRef.cid, requester.cid, requester.idx, nbr.cid, nbr.idx);)
+    DEBUGREF(CkPrintf("TMRC2D: {%d] edge::collapse: ** PART 2! ** On edge=%d on chunk=%d, requester=(%d,%d) with nbr=(%d,%d)\n", myRef.cid, myRef.idx, myRef.cid, requester.cid, requester.idx, nbr.cid, nbr.idx);)
     *first = 0;
-    DEBUGREF(CkPrintf("TMRC2D: dNode=%f,%f kNode=%f,%f incidence=%f,%f\n", 
-	     dNode.X(), dNode.Y(), kNode.X(), kNode.Y(), incidentNode.X(), 
-	     incidentNode.Y());)
+    DEBUGREF(CkPrintf("TMRC2D: [%d] dNode=%f,%f kNode=%f,%f incidence=%f,%f\n", myRef.cid, dNode.X(), dNode.Y(), kNode.X(), kNode.Y(), incidentNode.X(), incidentNode.Y());)
     if (dNode == incidentNode) { // incidence as planned
-      DEBUGREF(CkPrintf("TMRC2D: moving node %f,%f to %f,%f deleting node %f,%f\n", 
-	      kNode.X(),kNode.Y(),newNode.X(),newNode.Y(),dNode.X(),dNode.Y());)
+      DEBUGREF(CkPrintf("TMRC2D: [%d] moving node %f,%f to %f,%f deleting node %f,%f\n", myRef.cid, kNode.X(),kNode.Y(),newNode.X(),newNode.Y(),dNode.X(),dNode.Y());)
       for (int i=0; i<C->numChunks; i++) { // unlocks kNode and dNode
 	mesh[i].nodeReplaceDelete(kNode, dNode, newNode);
       }
-      DEBUGREF(CkPrintf("TMRC2D: removing edge %d on %d\n", myRef.idx, myRef.cid);)
+      DEBUGREF(CkPrintf("TMRC2D: [%d] removing edge %d on %d\n", myRef.cid, myRef.idx, myRef.cid);)
       C->removeEdge(myRef.idx);
       return 1; 
     }
     else { // incidence is on kNode
-      DEBUGREF(CkPrintf("TMRC2D: moving node %f,%f to %f,%f deleting node %f,%f \n", 
-	      dNode.X(),dNode.Y(),newNode.X(),newNode.Y(),kNode.X(),kNode.Y());)
+      DEBUGREF(CkPrintf("TMRC2D: [%d] moving node %f,%f to %f,%f deleting node %f,%f \n", myRef.cid, dNode.X(),dNode.Y(),newNode.X(),newNode.Y(),kNode.X(),kNode.Y());)
       for (int i=0; i<C->numChunks; i++) { // unlocks kNode and dNode
 	mesh[i].nodeReplaceDelete(dNode, kNode, newNode);
       }
-      DEBUGREF(CkPrintf("TMRC2D: removing edge %d on %d\n", myRef.idx, myRef.cid);)
+      DEBUGREF(CkPrintf("TMRC2D: [%d] removing edge %d on %d\n", myRef.cid, myRef.idx, myRef.cid);)
       C->removeEdge(myRef.idx);
       return 0; 
     }
   }
   else if (pending) { // can't collapse a second time yet; waiting for nbr elem
-  DEBUGREF(CkPrintf("TMRC2D: edge::collapse: ** Pending on (%d,%d)! ** On edge=%d on chunk=%d, requester=%d on chunk=%d\n", waitingFor.cid, waitingFor.idx, myRef.idx, myRef.cid, requester.idx, requester.cid);)
+  DEBUGREF(CkPrintf("TMRC2D: [%d] edge::collapse: ** Pending on (%d,%d)! ** On edge=%d on chunk=%d, requester=%d on chunk=%d\n", myRef.cid, waitingFor.cid, waitingFor.idx, myRef.idx, myRef.cid, requester.idx, requester.cid);)
     return -1;
   }
   else { // Need to do the collapse
     // need to lock adjacent nodes
-    DEBUGREF(CkPrintf("TMRC2D: edge::collapse: ** PART 1! ** On edge=%d on chunk=%d, requester==(%d,%d) with nbr=(%d,%d)\n", myRef.idx, myRef.cid, requester.cid, requester.idx, nbr.cid, nbr.idx);)
+    DEBUGREF(CkPrintf("TMRC2D: [%d] edge::collapse: ** PART 1! ** On edge=%d on chunk=%d, requester==(%d,%d) with nbr=(%d,%d)\n", myRef.cid, myRef.idx, myRef.cid, requester.cid, requester.idx, nbr.cid, nbr.idx);)
     length = kNode.distance(dNode);
     *first = 1;
-    DEBUGREF(CkPrintf("TMRC2D: LOCK start... edge=%d requester=%d nbr=%d\n", myRef.idx, requester.idx, nbr.idx);)
+    DEBUGREF(CkPrintf("TMRC2D: [%d] LOCK start... edge=%d requester=%d nbr=%d\n", myRef.cid, myRef.idx, requester.idx, nbr.idx);)
     intMsg *im;
     // lock nbr's opnode
     if (nbr.cid > -1) {
@@ -178,7 +174,7 @@ int edge::collapse(elemRef requester, node kNode, node dNode, elemRef kNbr,
       }
     }
     // both nodes locked
-    DEBUGREF(CkPrintf("TMRC2D: edge::collapse: LOCKS obtained... On edge=%d on chunk=%d, requester==(%d,%d) with nbr=(%d,%d)\n", myRef.idx, myRef.cid, requester.cid, requester.idx, nbr.cid, nbr.idx);)
+    DEBUGREF(CkPrintf("TMRC2D: [%d] edge::collapse: LOCKS obtained... On edge=%d on chunk=%d, requester==(%d,%d) with nbr=(%d,%d)\n", myRef.cid, myRef.idx, myRef.cid, requester.cid, requester.idx, nbr.cid, nbr.idx);)
     setPending();
     incidentNode = dNode;
     fixNode = kNode;
@@ -188,18 +184,18 @@ int edge::collapse(elemRef requester, node kNode, node dNode, elemRef kNbr,
     delNbr = dNbr;
     keepEdge = kEdge;
     delEdge = dEdge;
-    if (nbr.cid != -1) {
+    if (nbr.cid > -1) {
       waitingFor = nbr;
       double nbrArea = nbr.getArea();
-      mesh[nbr.cid].coarsenElement(nbr.idx, nbrArea*2.0 + 0.00000000000000001);
+      mesh[nbr.cid].coarsenElement(nbr.idx, nbrArea*1.01+0.000000000000000001);
     }
     else {
-      DEBUGREF(CkPrintf("TMRC2D: moving node %f,%f to %f,%f, deleting %f,%f\n", 
-	      kNode.X(),kNode.Y(),newNode.X(),newNode.Y(),dNode.X(),dNode.Y());)
+      DEBUGREF(CkPrintf("TMRC2D: [%d] moving node %f,%f to %f,%f, deleting %f,%f\n", 
+	      myRef.cid, kNode.X(),kNode.Y(),newNode.X(),newNode.Y(),dNode.X(),dNode.Y());)
       for (int i=0; i<C->numChunks; i++) { // unlocks kNode and dNode
 	mesh[i].nodeReplaceDelete(kNode, dNode, newNode);
       }
-      DEBUGREF(CkPrintf("TMRC2D: removing edge %d on %d\n", myRef.idx, myRef.cid);)
+      DEBUGREF(CkPrintf("TMRC2D: [%d] removing edge %d\n", myRef.cid, myRef.idx);)
       C->removeEdge(myRef.idx);
     }
     return 1;

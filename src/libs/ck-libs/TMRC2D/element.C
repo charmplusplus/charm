@@ -300,7 +300,7 @@ void element::collapse(int shortEdge)
   // get length of shortEdge for prioritizing locks
   double length = 
     C->theNodes[nodes[keepNode]].distance(C->theNodes[nodes[delNode]]);
-  DEBUGREF(CkPrintf("TMRC2D: LOCKing opnode=%d\n", nodes[opnode]);)
+  DEBUGREF(CkPrintf("TMRC2D: [%d] LOCKing opnode=%d\n", myRef.cid, nodes[opnode]);)
   for (int i=0; i<C->numChunks; i++) {
     intMsg *im = mesh[i].nodeLockup(C->theNodes[nodes[opnode]], length, edges[shortEdge]);
     if (im->anInt == 0) {
@@ -321,7 +321,7 @@ void element::collapse(int shortEdge)
   // clean up based on result of edge collapse
   if (result == 1) {
     // collapse successful; keepNode is node to keep
-    CkPrintf("TMRC2D: [%d] In collapse[%d](a) shortEdge=%d delEdge=%d keepEdge=%d opnode=%d delNode=%d keepNode=%d delNbr=%d keepNbr=%d\n", myRef.cid, myRef.idx, edges[shortEdge].idx, edges[delEdge].idx, edges[keepEdge].idx, nodes[opnode], orig_del, orig_keep, delNbr.idx, keepNbr.idx);
+    DEBUGREF(CkPrintf("TMRC2D: [%d] In collapse[%d](a) shortEdge=%d delEdge=%d keepEdge=%d opnode=%d delNode=%d keepNode=%d delNbr=%d keepNbr=%d\n", myRef.cid, myRef.idx, edges[shortEdge].idx, edges[delEdge].idx, edges[keepEdge].idx, nodes[opnode], orig_del, orig_keep, delNbr.idx, keepNbr.idx);)
     // tell delNbr to replace delEdge with keepEdge
     if (delNbr.cid != -1)
       mesh[delNbr.cid].updateElementEdge(delNbr.idx, edges[delEdge], 
