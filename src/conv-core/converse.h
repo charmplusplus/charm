@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.16  1995-09-20 15:04:45  jyelon
+ * Revision 2.17  1995-09-20 15:09:42  sanjeev
+ * fixed CmiFree, put int CmiSpanTree stuff
+ *
+ * Revision 2.16  1995/09/20  15:04:45  jyelon
  * *** empty log message ***
  *
  * Revision 2.15  1995/09/20  14:58:12  jyelon
@@ -202,7 +205,7 @@ CpvExtern(int, Cmi_numpe);
 
 void *CmiAlloc  CMK_PROTO((int size));
 int   CmiSize   CMK_PROTO(());
-void  CmiFree   CMK_PROTO(());
+void  CmiFree   CMK_PROTO((void *));
 
 double CmiTimer CMK_PROTO(());
 
@@ -217,6 +220,12 @@ int   CmiScanf  CMK_PROTO(());
 #define CmiError  printf
 #define CmiScanf  scanf
 #endif
+
+int CmiSpanTreeRoot CMK_PROTO(()) ;
+int CmiNumSpanTreeChildren CMK_PROTO((int)) ;
+int CmiSpanTreeParent CMK_PROTO((int)) ;
+void CmiSpanTreeChildren CMK_PROTO((int node, int *children)) ;
+
 
 /******** CONSTANTS FOR CONVERSE QUEUEING SYSTEM ********/
 
