@@ -8,7 +8,7 @@ BgTimeLineRec* currTline = NULL;
 int currTlineIdx=0;
 
 //Used for parallel file I/O
-void readProc(int procNum, int numWth ,int numPes, int totalProcs, int* allNodeOffsets, BgTimeLineRec& tlinerec){
+void BgReadProc(int procNum, int numWth ,int numPes, int totalProcs, int* allNodeOffsets, BgTimeLineRec& tlinerec){
 
   /*Right now works only for cyclicMapInfo - needs a more general scheme*/
   int nodeNum = procNum/numWth;
@@ -28,33 +28,57 @@ void readProc(int procNum, int numWth ,int numPes, int totalProcs, int* allNodeO
  
   sprintf(fName,"bgTrace%d",fileNum);
   FILE*  f = fopen(fName,"r");
+//  PUP::fromDisk p(f);
   PUP::fromDisk p(f);
+  PUP::machineInfo machInfo;
+  p((char *)&machInfo, sizeof(machInfo));
+  PUP::xlater p_xlater(machInfo, p);
 
   fseek(f,fileOffset,SEEK_SET);
-  tlinerec.pup(p);
+  tlinerec.pup(p_xlater);
   fclose(f);
 
   return;
 }
 
 
-int* loadOffsets(int totalProcs, int numPes){
+int* BgLoadOffsets(int totalProcs, int numPes){
 
   int* allProcOffsets = new int[totalProcs];
   int arrayOffset=0, procsInPe;
   char* d = new char[10];
-  FILE* f;
 
- //TODO: right now works only for BG/L, later have to pup number of worker and comm threads per node also
+  PUP::machineInfo machInfo;
   for (int i=0; i<numPes; i++){
     sprintf(d,"bgTrace%d",i);
-    f = fopen(d,"r");
+    FILE *f = fopen(d,"r");
     PUP::fromDisk p(f);
-    p|procsInPe;
+    p((char *)&machInfo, sizeof(machInfo));
+    PUP::xlater p_xlater(machInfo, p);
+    p_xlater|procsInPe;
 
-    p(allProcOffsets+arrayOffset,procsInPe);
+    p_xlater(allProcOffsets+arrayOffset,procsInPe);
     arrayOffset += procsInPe;
     fclose(f);
   }
   return  allProcOffsets;
 }
+
+
+int BgLoadTraceSummary(char *fname, int &totalProcs, int &numX, int &numY, int &numZ, int &numCth, int &numWth, int &numPes)
+{
+  PUP::machineInfo machInfo;
+
+  FILE* f = fopen(fname,"r");
+  PUP::fromDisk p(f);
+
+  p((char *)&machInfo, sizeof(machInfo));	// load machine info
+  PUP::xlater p_xlater(machInfo, p);
+  p_xlater|totalProcs;
+  p_xlater|numX; p_xlater|numY; p_xlater|numZ;
+  p_xlater|numCth;p_xlater|numWth;
+  p_xlater|numPes;
+  fclose(f);
+  return 0;
+}
+

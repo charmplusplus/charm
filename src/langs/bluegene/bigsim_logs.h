@@ -238,7 +238,8 @@ public:
   }
 };
 
-void readProc(int procNum, int numWth ,int numPes, int totalProcs, int* allNodeOffsets, BgTimeLineRec& tlinerec);
-int* loadOffsets(int totalProcs, int numPes);
+void BgReadProc(int procNum, int numWth ,int numPes, int totalProcs, int* allNodeOffsets, BgTimeLineRec& tlinerec);
+int* BgLoadOffsets(int totalProcs, int numPes);
+int BgLoadTraceSummary(char *fname, int &totalProcs, int &numX, int &numY, int &numZ, int &numCth, int &numWth, int &numPes);
 
 #endif

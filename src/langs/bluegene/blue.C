@@ -1639,6 +1639,8 @@ static void writeToDisk()
   //Num of simulated procs on this real pe
   int numProcs = cva(numNodes)*cva(numWth);
 
+  const PUP::machineInfo &machInfo = PUP::machineInfo::current();
+
   // write summary file on PE0
   if(CmiMyPe()==0){
     
@@ -1649,7 +1651,9 @@ static void writeToDisk()
 
     if(f2==NULL)
       CmiPrintf("Creating bgTrace failed\n");
+//    PUP::toDisk p(f2);
     PUP::toDisk p(f2);
+    p((char *)&machInfo, sizeof(machInfo));
     p|totalProcs;
     p|cva(numX); p|cva(numY); p|cva(numZ);
     p|cva(numCth);p|cva(numWth);
@@ -1664,16 +1668,18 @@ static void writeToDisk()
   sprintf(d,"bgTrace%d",CmiMyPe());
   FILE *f = fopen(d,"w");
  
-  int headerSize = (numProcs)*sizeof(int);
   int *procOffsets = new int[numProcs];
   if(f==NULL)
     CmiPrintf("Creating bgTrace%d failed\n",CmiMyPe());
   PUP::toDisk p(f);
   
+  p((char *)&machInfo, sizeof(machInfo));	// machine info
   p|numProcs;
 
   // CmiPrintf("Timelines are: \n");
-  fseek(f,headerSize,SEEK_CUR); 
+  int procTablePos = ftell(f);
+  int procTableSize = (numProcs)*sizeof(int);
+  fseek(f,procTableSize,SEEK_CUR); 
 
   for (int j=0; j<cva(numNodes); j++){
     for(int i=0;i<cva(numWth);i++){
@@ -1690,14 +1696,11 @@ static void writeToDisk()
     }
   }
   
-  fseek(f,sizeof(int),SEEK_SET);
+  fseek(f,procTablePos,SEEK_SET);
   p(procOffsets,numProcs);
   fclose(f);
 
   CmiPrintf("[%d] Wrote to disk for BG node:%d work:%d \n", CmiMyPe(), cva(numNodes),cva(numWth));
 }
-
-
-
 
 
