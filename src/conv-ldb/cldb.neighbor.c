@@ -1,5 +1,5 @@
 #include <stdlib.h>
-#include "cldb.graph.h"
+#include "cldb.neighbor.h"
 #define PERIOD 20                /* default: 30 */
 #define MAXOVERLOAD 1
 
@@ -323,9 +323,6 @@ static void CldComputeNeighborData()
 
 void CldGraphModuleInit(char **argv)
 {
-  FILE *fp;
-  char filename[20];
-  
   CpvInitialize(int, numNeighbors);
   CpvInitialize(int, MinLoad);
   CpvInitialize(int, Mindex);
@@ -348,6 +345,9 @@ void CldGraphModuleInit(char **argv)
 
   if (CmiNumPes() > 1) {
 #if 0
+    FILE *fp;
+    char filename[20];
+  
     sprintf(filename, "graph%d/graph%d", CmiNumPes(), CmiMyPe());
     if ((fp = fopen(filename, "r")) == 0)
       {
