@@ -41,8 +41,13 @@ void SRtable::Restructure(POSE_TimeType newGVTest, POSE_TimeType firstTS,
   POSE_TimeType long_i;
   // Backup the table to make new one in its place
   int sumS_old=0, sumR_old=0, sumS=0, sumR=0;
-  POSE_TimeType keepBkt = (newGVTest-offset)/size_b;
-  if (keepBkt < b)
+  POSE_TimeType keepBkt;
+  if (size_b == -1) { 
+    size_b = 1;
+    keepBkt = 0;
+  }
+  else keepBkt = (newGVTest-offset)/size_b;
+  if ((keepBkt < b)
     for (long_i=keepBkt; long_i<b; long_i++)
       CompressAndSortBucket(long_i, 0);
   CompressAndSortBucket(b, 1);
