@@ -501,6 +501,9 @@ void InitCallTable::enumerateInitCalls()
   for (i=0; i<initProcCalls.length(); i++) initProcCalls[i]();
 }
 
+CpvExtern(int, cmiArgDebugFlag);
+extern void CpdFreeze(void);
+
 void _initCharm(int unused_argc, char **argv)
 { 
 	int inCommThread = (CmiMyRank() == CmiMyNodeSize());
@@ -711,6 +714,15 @@ void _initCharm(int unused_argc, char **argv)
 ,
                                         CkpvAccess(_coreState));
         }
+
+#if CMK_CCS_AVAILABLE
+       if (CpvAccess(cmiArgDebugFlag))
+       { 
+          //CmiPrintf("In Parallel Debugging mode .....\n");
+          CpdFreeze();
+       }
+#endif
+
 }
 
 #ifdef __BLUEGENE__
