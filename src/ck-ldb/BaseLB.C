@@ -41,6 +41,11 @@ void BaseLB::unregister() {
   CkpvAccess(numLoadBalancers) --;
 }
 
+#else
+BaseLB::BaseLB() {}
+void BaseLB::unregister() {}
+#endif
+
 void* LBMigrateMsg::alloc(int msgnum, size_t size, int* array, int priobits)
 {
   int totalsize = size + array[0] * sizeof(MigrateInfo) 
@@ -80,11 +85,6 @@ LBMigrateMsg* LBMigrateMsg::unpack(void *m)
 
   return ret_val;
 }
-
-#else
-BaseLB::BaseLB() {}
-void BaseLB::unregister() {}
-#endif
 
 #include "BaseLB.def.h"
 
