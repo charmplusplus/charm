@@ -14,13 +14,13 @@
 #define _E_AMPI_END_FUNC 29
 
 /* Registering Macro */
-#define REGISTER_AMPI \
+#define REGISTER_AMPI LOGCONDITIONAL(\
 	{ RegisterLanguage(_AMPI_LANG_ID, "ampi\0"); \
 	  RegisterEvent(_AMPI_LANG_ID, _E_BEGIN_AMPI_PROCESSING); \
 	  RegisterEvent(_AMPI_LANG_ID, _E_END_AMPI_PROCESSING); \
 	  RegisterEvent(_AMPI_LANG_ID,_E_AMPI_MSG_SEND); \
 	  \
-	}
+	})
 #define _LOG_E_BEGIN_AMPI_PROCESSING(rank,src,count) { LOGCONDITIONAL(ampi_beginProcessing(rank,src,count));}
 #define _LOG_E_END_AMPI_PROCESSING(rank)		    { LOGCONDITIONAL(ampi_endProcessing(rank));}
 #define _LOG_E_AMPI_MSG_SEND(tag,dest,count,size)   { LOGCONDITIONAL(ampi_msgSend(tag,dest,count,size));}
