@@ -55,7 +55,7 @@ static void traceCommonInit(char **argv)
     if (CkMyPe() == 0) 
       CmiPrintf("Trace: logsize: %d\n", CkpvAccess(CtrLogBufSize));
   char *root;
-  if (CmiGetArgString(argv, "+trace-root", &root)) {
+  if (CmiGetArgString(argv, "+traceroot", &root)) {
     int i;
     for (i=strlen(argv[0])-1; i>=0; i--) if (argv[0][i] == '/') break;
     i++;
@@ -64,7 +64,7 @@ static void traceCommonInit(char **argv)
     strcat(CkpvAccess(traceRoot), "/");
     strcat(CkpvAccess(traceRoot), argv[0]+i);
     if (CkMyPe() == 0) 
-      CmiPrintf("Trace: trace-root: %s\n", CkpvAccess(traceRoot));
+      CmiPrintf("Trace: traceroot: %s\n", CkpvAccess(traceRoot));
   }
   else {
     CkpvAccess(traceRoot) = (char *) malloc(strlen(argv[0])+1);
