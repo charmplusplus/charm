@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.36  1996-01-03 23:18:37  sanjeev
+ * Revision 2.37  1996-01-17 08:04:56  jyelon
+ * *** empty log message ***
+ *
+ * Revision 2.36  1996/01/03 23:18:37  sanjeev
  * CmiSize prototype should have void * argument
  *
  * Revision 2.35  1995/10/31 19:53:21  jyelon
@@ -243,8 +246,6 @@ typedef int    CmiCommHandle;
 typedef void (*CmiHandler)();
 
 /******** CMI, CSD: MANY LOW-LEVEL OPERATIONS ********/
-
-#define CmiMsgHeaderSizeBytes 4
 
 CpvExtern(CmiHandler*, CmiHandlerTable);
 CpvExtern(void*,       CsdSchedQueue);
@@ -488,11 +489,11 @@ CpvExtern(CthVoidFn, CmiInterruptFuncSaved);
     { CpvAccess(CmiInterruptsBlocked)++; }
 
 #define CmiInterruptsRelease() { \
-    CpvAccess(CmiInterruptsBlocked)--; \
     if (CpvAccess(CmiInterruptsBlocked)==0) {\
         CthVoidFn f = CpvAccess(CmiInterruptFuncSaved);\
         if (f) { CpvAccess(CmiInterruptFuncSaved)=0; (f)(); }\
     }\
+    CpvAccess(CmiInterruptsBlocked)--; \
 }
 
 
