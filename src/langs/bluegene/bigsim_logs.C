@@ -20,7 +20,7 @@ double (*timerFunc) (void) = nullTimer;
 bgMsgEntry::bgMsgEntry(char *msg, int dstNode, int tid, int local)
 {
   msgID = CmiBgMsgID(msg);
-  sendTime = BgGetCurTime();
+  sendTime = timerFunc();
   recvTime = CmiBgMsgRecvTime(msg);
   dstPe = dstNode;
   tID = tid;                   // CmiBgMsgThreadID(msg);
