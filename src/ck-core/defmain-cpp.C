@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.18  1997-03-24 23:14:02  milind
+ * Revision 2.1  1997-07-07 23:17:32  jyelon
+ * Redesigned default-main so there's a C and a C++ version.
+ *
+ * Revision 2.18  1997/03/24 23:14:02  milind
  * Made Charm-runtime 64-bit safe by removing conversions of pointers to
  * integers. Also, removed charm runtime's dependence of unused argv[]
  * elements being 0. Also, added sim-irix-64 version. It works.
@@ -82,21 +85,19 @@
  ***************************************************************************/
 static char ident[] = "@(#)$Header$";
 
+extern "C" {
 #include "converse.h"
+void InitializeCharm(int argc, char **argv);
+void StartCharm(int argc, char **argv, void *whoknows);
+}
 
-CpvExtern(int, CsdStopFlag);
-
-void charm_init(argc, argv)
-int argc;
-char **argv;
+void charm_init(int argc, char **argv)
 {
   InitializeCharm(argc, argv);
   StartCharm(argc, argv, (void *)0);
 }
 
-main(argc, argv)
-int argc;
-char *argv[];
+main(int argc, char **argv)
 {
   ConverseInit(argc, argv, charm_init,0,0);
 }

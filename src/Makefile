@@ -34,7 +34,7 @@ all: charm++
 
 charm: converse charmxlat charmlibs libcharm
 
-charm++: converse charmxlat charmlibs charmxlat++ charmfilter++ charmxi libcharm libck-cplus-y.a
+charm++: converse charmxlat charmlibs charmxlat++ charmfilter++ charmxi libcharm libck-cplus-y.a libck-defmain-cpp.a
 
 translators: charmxlat charmfilter charmxlat++ charmfilter++ charmxi conv-cpm
 
@@ -77,8 +77,9 @@ dirs+sources:
 	@echo
 	@echo 'Gathering source code in '`cat .vdir`'/tmp'
 	@echo
-	if [ ! -d ../bin ] ; then mkdir ../bin ; fi
-	if [ ! -d ../lib ] ; then mkdir ../lib ; fi
+	rm -rf ../bin ; mkdir ../bin
+	rm -rf ../lib ; mkdir ../lib
+	rm -rf ../src ; mkdir ../src
 	rm -f ../../bin ; ln -s `cat .vdir`/bin ../../bin
 	find . -type l -exec rm {} \;
 	find ../../src/Common -type f \! -name Entries \! -name Root \! -name Repository -exec ln -s {} . \;
@@ -87,28 +88,26 @@ dirs+sources:
 	@echo
 	@echo 'Gathering quickthreads tree.'
 	@echo
-	rm -rf QuickThreads
-	(cd ../../src ; find QuickThreads -type d -print) | sed -e 's@^@mkdir @' | sh
+	rm -rf QuickThreads ../src/QuickThreads
+	(cd ../../src ; find QuickThreads -type d -print) | sed -e 's@^@mkdir @' > tmp.sh
+	sh tmp.sh ; cd ../src ; sh ../tmp/tmp.sh ; rm -f tmp.sh
 	rt=`(cd ../../src ; pwd)` ; (cd ../../src ; find QuickThreads -type f -print) | awk '{ print "ln -s '$$rt'/"$$1" "$$1; }' > tmp.sh
-	sh tmp.sh
-	rm -f tmp.sh
+	sh tmp.sh ; cd ../src ; sh ../tmp/tmp.sh ; rm -f tmp.sh
 	@echo
 	@echo 'Gathering test-programs in '`cat .vdir`/pgms
 	@echo
 	rm -rf ../pgms
 	(cd ../.. ; find pgms -type d -print) | sed -e 's@^@mkdir ../@' | sh
 	rt=`(cd ../.. ; pwd)` ; (cd ../.. ; find pgms -type f -print) | awk '{ print "ln -s '$$rt'/"$$1" ../"$$1; }' > tmp.sh
-	sh tmp.sh
-	rm -f tmp.sh
+	sh tmp.sh ; rm -f tmp.sh
 	@echo
-	@echo 'Gathering translator source in '`cat .vdir`'/src'
+	@echo 'Gathering translator source.'
 	@echo
-	rm -rf ../src ; mkdir ../src
-	cp xl-*.c xl-*.h ../src
-	cp xp-*.c xp-*.h ../src
-	cp xi-*.C xi-*.h ../src
-	cp conv-cpm.* ../src
-	cp Makefile ../src/Makefile
+	ln -s ../../src/Common/xlat/xl-*           ../src
+	ln -s ../../src/Common/xlat++/xp-*         ../src
+	ln -s ../../src/Common/xlat-i/xi-*         ../src
+	ln -s ../../src/Common/xlatcpm/conv-cpm.*  ../src
+	ln -s ../../src/Common/Makefile            ../src
 	@echo
 	@rm -f .vdir .gdir
 	touch dirs+sources
@@ -126,16 +125,15 @@ CVLIBS=libconv-core.a libconv-cplus-n.a libconv-cplus-y.a
 
 LIBCONV_CORE=threads.o convcore.o conv-conds.o spantree.o queueing.o fifo.o msgmgr.o memory.o cpm.o
 
-converse: basics ../include/qt.h $(CVLIBS) conv-host-if-needed conv-cpm
+converse: basics QuickThreads/libqt.a $(CVLIBS) conv-host-if-needed conv-cpm
 
 conv-host-if-needed:
 	if [ -f conv-host.c ] ; then make conv-host OPTS='$(OPTS)' ; fi
 
-../include/qt.h:
-	csh -fc 'source conv-mach.csh;cd QuickThreads;./configure $$CMK_QT;make'
-	cp QuickThreads/libqt.a ../lib/libqt.a
-	cp QuickThreads/qtmd.h ../include/qtmd.h
-	cp QuickThreads/qt.h ../include/qt.h
+QuickThreads/libqt.a:
+	csh -fc 'source conv-mach.csh;cd QuickThreads;./configure $$CMK_QT'
+	cd QuickThreads ; make qt
+	cp QuickThreads/libqt.a ../lib
 
 conv-host: conv-host.c
 	../bin/charmc -cp ../bin -seq -DNOTIFY -o conv-host-notify conv-host.c
@@ -159,7 +157,7 @@ fifo.o: fifo.c $(CVHEADERS)
 	$(CHARMC) fifo.c
 
 threads.o: threads.c $(CVHEADERS)
-	$(CHARMC) threads.c
+	$(CHARMC) -IQuickThreads threads.c
 
 spantree.o: spantree.c $(CVHEADERS)
 	$(CHARMC) spantree.c
@@ -192,11 +190,9 @@ CK_LIBS_CORE=libck-core-notrace.a libck-core-summary.a libck-core-projections.a
 
 CK_LIBS_LDB=libck-ldb-rand.o libck-ldb-acwn.o libck-ldb-mngr.o # libck-ldb-priomngr.o libck-ldb-recv.o libck-ldb-tok.o libck-ldb-btok.o
 
-CK_LIBS_CPLUS=libck-cplus-n.a
+CK_LIBS_CPLUS=libck-cplus-n.a libck-defmain-std.a
 
-CK_LIBS_MAIN=libck-defmain.a
-
-CK_LIBS=$(CK_LIBS_CORE) $(CK_LIBS_LDB) $(CK_LIBS_CPLUS) $(CK_LIBS_MAIN)
+CK_LIBS=$(CK_LIBS_CORE) $(CK_LIBS_LDB) $(CK_LIBS_CPLUS)
 
 LIBCK_CORE=common.o globals.o init.o register.o boc.o condsend.o qd.o vid.o rdonly.o stat.o wrtone.o acc.o mono.o tbl.o memstuff.o ldbcfns.o ck.o main.o
 
@@ -241,8 +237,8 @@ libck-ldb-recv.o: ldb.recv.p ldb.h $(CKHEADERS)
 libck-cplus-n.a: dummy.cplus.c $(CKHEADERS)
 	$(CHARMC) -cp ../lib/ -o $@ dummy.cplus.c
 
-libck-defmain.a: default-main.c $(CKHEADERS)
-	$(CHARMC) -cp ../lib/ -o $@ default-main.c
+libck-defmain-std.a: defmain-std.c $(CKHEADERS)
+	$(CHARMC) -cp ../lib/ -o $@ defmain-std.c
 
 ldbcfns.o: ldbcfns.c $(CKHEADERS)
 	$(CHARMC) -o ldbcfns.o ldbcfns.c
@@ -324,6 +320,9 @@ perf-proj.o : perf-proj.c performance.h $(CKHEADERS)
 
 libck-cplus-y.a: cplus.C c++interface.h $(CKHEADERS)
 	$(CHARMC) -cp ../lib/ -o $@ cplus.C
+
+libck-defmain-cpp.a: defmain-cpp.C $(CKHEADERS)
+	$(CHARMC) -cp ../lib/ -o $@ defmain-cpp.C
 
 ###############################################################################
 #
@@ -556,14 +555,18 @@ clean:
 	rm -f charmreplay charmxlat charmfilter charmxlat++ charmfilter++
 	rm -f conv-host conv-host-notify conv-host-silent charmxi conv-cpm
 	rm -f TAGS basics cmk_extras core
-	rm -f core #*#
 	rm -f core *.a
 	rm -f core *.o
+	rm -f core #*#
 	rm -f core *~
 
-veryclean: clean
-	rm -rf QuickThreads
-	rm -rf dirs+sources
+veryclean:
 	rm -rf ../bin
 	rm -rf ../lib
+	rm -rf ../src
+	rm -rf ../pgms
 	rm -rf ../include
+	mv Makefile .Makefile
+	rm -rf [a-z]* [A-Z]*
+	mv .Makefile Makefile
+	rm -rf .[a-z]* .[A-Z]*
