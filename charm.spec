@@ -19,9 +19,9 @@ Charm++ for Redhat
 %setup -n %{name}-%{version}
 bzip2 -dc  %{_sourcedir}/%{name}-%{version}.tar.bz2 | tar xvf -
 %build
-./build charm++ net-linux -O -DCMK_OPTIMIZE
+./build AMPI net-linux -O -DCMK_OPTIMIZE
 %clean
-rm -f $RPM_BUILD_ROOT
+rm -rf $RPM_BUILD_ROOT
 %install
 mkdir -p $RPM_BUILD_ROOT
 cd tmp; make DESTDIR=$RPM_BUILD_ROOT/usr/local/charm  install 
