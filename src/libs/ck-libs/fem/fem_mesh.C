@@ -361,6 +361,13 @@ FORTRAN_AS_C_RETURN(int,
 	(int *fem_mesh,int *entity),(*fem_mesh,*entity)
 )
 
+CDECL void 
+FEM_Mesh_create_node_elem_adjacency(int fem_mesh){
+	const char *caller="FEM_Mesh_create_node_elem_adjacency"; FEMAPI(caller);
+	FEM_Mesh *m=FEM_Mesh_lookup(fem_mesh,caller);
+	m->createElemNodeAdj();
+}
+
 
 // Internal API:
 void FEM_Mesh_data_layout(int fem_mesh,int entity,int attr, 	
@@ -891,6 +898,48 @@ void FEM_IndexAttribute::copyEntity(int dstEntity,const FEM_Attribute &src,int s
 	idx.setRow(dstEntity,csrc->idx.getRow(srcEntity));
 }
 
+/*************FEM_VarIndexAttribute***************/
+
+FEM_VarIndexAttribute::FEM_VarIndexAttribute(FEM_Entity *e,int myAttr)
+	:FEM_Attribute(e,myAttr)
+{
+	allocate(getMax(),getWidth(),getDatatype());
+	setDatatype(FEM_INT);
+};
+
+void FEM_VarIndexAttribute::pup(PUP::er &p){
+	super::pup(p);
+	p | idx;
+};
+
+void FEM_VarIndexAttribute::set(const void *src,int firstItem,int length,
+		const IDXL_Layout &layout,const char *caller){
+		printf("set not yet implemented for FEM_VarIndexAttribute \n");
+}
+
+void FEM_VarIndexAttribute::get(void *dest, int firstItem,int length,
+		const IDXL_Layout &layout, const char *caller) const{
+	 printf("get not yet implemented for FEM_VarIndexAttribute \n");
+			
+}
+
+void FEM_VarIndexAttribute::copyEntity(int dstEntity,const FEM_Attribute &_src,int srcEntity){
+	FEM_VarIndexAttribute &src = (FEM_VarIndexAttribute &)_src;
+	const CkVec<CkVec<ID> > &srcTable = src.get();
+	idx.insert(dstEntity,srcTable[srcEntity]);
+}
+
+void FEM_VarIndexAttribute::print(){
+	for(int i=0;i<idx.size();i++){
+		printf("%d -> ",i);
+		for(int j=0;j<idx[i].size();j++){
+			printf("(%d %d) ",((idx[i])[j]).type,((idx[i])[j]).id);
+		}
+		printf("\n");
+	}
+};
+
+
 /********************** Entity **************************/
 
 /// Return the human-readable version of this entity code.
@@ -1176,7 +1225,7 @@ void FEM_Entity::copyOldGlobalno(const FEM_Entity &e) {
 
 /********************** Node *****************/
 FEM_Node::FEM_Node(FEM_Node *ghost_) 
-	:FEM_Entity(ghost_), primary(0), sharedIDXL(&shared,&shared)
+	:FEM_Entity(ghost_), primary(0), sharedIDXL(&shared,&shared),elemAdjacency(0) 
 {}
 
 void FEM_Node::allocatePrimary(void) {
@@ -1198,14 +1247,64 @@ void FEM_Node::pup(PUP::er &p) {
 FEM_Node::~FEM_Node() {
 }
 
+void FEM_Node::allocateElemAdjacency(){
+	if(elemAdjacency){
+		delete elemAdjacency;
+	}
+	elemAdjacency = new FEM_VarIndexAttribute(this,FEM_NODE_ELEM_ADJACENCY);
+	add(elemAdjacency);
+}
+
 const char *FEM_Node::getName(void) const {return "FEM_NODE";}
 
 void FEM_Node::create(int attr,const char *caller) {
 	if (attr==FEM_NODE_PRIMARY) {
 		allocatePrimary();
 	} 
-	else  super::create(attr,caller);
+	else if(attr == FEM_NODE_ELEM_ADJACENCY) {
+		allocateElemAdjacency();
+	}else
+		super::create(attr,caller);
 }
+
+void FEM_Node::fillElemAdjacencyTable(int type,const FEM_Elem &elem){
+	int nodesPerElem = elem.getNodesPer();
+	CkVec<CkVec<var_id> > &adjacencyTable = elemAdjacency->get();
+	CkVec<CkVec<var_id> > &ghostAdjacencyTable = ((FEM_Node *)getGhost())->elemAdjacency->get();
+	for(int i=0;i<elem.size();i++){
+		const int *conn = elem.connFor(i);
+		printf("Type %d Elem %d ",type,i);
+		for(int j=0;j<nodesPerElem;j++){
+				int node = conn[j];
+				printf("%d ",node);
+				if(node >= 0){
+					adjacencyTable[node].push_back(var_id(type,i));
+				}else{
+					//its a ghost node
+					if(node == -1){
+						//invalid node.. shouldnt happen
+					}else{
+						node = -(node+2);
+						ghostAdjacencyTable[node].push_back(var_id(type,i));
+					}
+				}
+		}
+		printf("\n");
+	}
+};
+
+void FEM_Node::setElemAdjacency(int type, const FEM_Elem &elem){
+	fillElemAdjacencyTable(type,elem);
+	if(elem.getGhost() != NULL){
+		FEM_Elem *ghostElem = (FEM_Elem *)elem.getGhost();
+		fillElemAdjacencyTable(-(type+1),(*ghostElem));
+	}
+	CkVec<CkVec<var_id> > &adjacencyTable = elemAdjacency->get();
+		printf("Node to elem adjacency after adding type %d --\n",type);
+	elemAdjacency->print();
+	printf("----------------------------------------------\n");
+};
+
 
 /********************** Elem *****************/
 /// This checker verifies that FEM_Elem::conn's entries are valid node indices.
@@ -1482,6 +1581,14 @@ int FEM_Mesh::getEntities(int *entities) {
 		if (sparse.has(s)) entities[len++]=FEM_SPARSE+s;
 	return len;
 }
+
+void FEM_Mesh::createElemNodeAdj(){
+	node.lookup(FEM_NODE_ELEM_ADJACENCY,"FEM_Mesh::createElemNodeAdj");
+	for(int i=0;i<elem.size();i++){
+		node.setElemAdjacency(i,elem[i]);
+	}
+};
+
 
 FILE *FEM_openMeshFile(const char *prefix,int chunkNo,int nchunks,bool forRead)
 {

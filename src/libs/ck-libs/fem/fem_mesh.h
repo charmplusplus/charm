@@ -512,6 +512,62 @@ public:
 };
 PUPmarshall(FEM_IndexAttribute);
 
+/*
+	This table maps an entity to a list of integer indices 
+	of unknown length.
+	The node to element adjacency array is an example, where a node
+	is mapped to a list of element indices of unknown length.
+*/
+class FEM_VarIndexAttribute : public FEM_Attribute{
+public:
+ class ID{
+ 	public:
+ 		int type;
+		int id;
+		ID(){
+			type=-1;
+			id = -1;
+		};
+		ID(int _type,int _id){
+			type = _type;
+			id = _id;
+		};
+		virtual void pup(PUP::er &p){
+			p | type;
+			p | id;
+		};
+ };
+private:
+	typedef FEM_Attribute super;
+	CkVec<CkVec<ID> > idx;
+protected:
+	virtual void allocate(int length,int width,int datatype){
+		printf("allocating FEM_VarIndexAttribute for length %d \n",length);
+		idx.reserve(length);
+		for(int i=0;i<length;i++){
+			CkVec<ID> tempVec;
+			idx.insert(i,tempVec);
+		}
+	};
+public:
+	FEM_VarIndexAttribute(FEM_Entity *owner,int myAttr);
+	~FEM_VarIndexAttribute(){};
+	virtual void pup(PUP::er &p);
+	CkVec<CkVec<ID> > &get(){return idx;};
+	const CkVec<CkVec<ID> > &get() const {return idx;};
+	
+	virtual void set(const void *src,int firstItem,int length,
+		const IDXL_Layout &layout,const char *caller);
+
+	virtual void get(void *dest, int firstItem,int length,
+		const IDXL_Layout &layout, const char *caller) const;
+	
+	virtual void copyEntity(int dstEntity,const FEM_Attribute &src,int srcEntity);
+	
+	void print();
+};
+
+
 class l2g_t;
 /**
  * Describes an entire class of "entities"--nodes, elements, or sparse 
@@ -714,6 +770,8 @@ inline int FEM_Attribute::getMax(){ return e->getMax();}
  * Unlike elements, nodes have no connectivity; but they do have
  * special shared-nodes communications and a "primary" flag.
  */
+
+class FEM_Elem; 
 class FEM_Node : public FEM_Entity {
 	typedef FEM_Entity super;
 	
@@ -724,6 +782,13 @@ class FEM_Node : public FEM_Entity {
 	 */
 	FEM_DataAttribute *primary; 
 	void allocatePrimary(void);
+	
+	void allocateElemAdjacency();
+	/*
+		stores the node to element adjacency vector 
+	*/
+	FEM_VarIndexAttribute *elemAdjacency;
+	typedef FEM_VarIndexAttribute::ID var_id;
 protected:
 	virtual void create(int attr,const char *caller);
 public:
@@ -744,7 +809,9 @@ public:
 		if (primary==NULL) allocatePrimary();
 		primary->getChar()(nodeNo,0)=isPrimary;
 	}
-
+	void fillElemAdjacencyTable(int type,const FEM_Elem &elem);
+	void setElemAdjacency(int type,const FEM_Elem &elem);
+	
 	void print(const char *type,const IDXL_Print_Map &map);
 };
 PUPmarshall(FEM_Node);
@@ -1040,6 +1107,15 @@ public:
 	void print(int idxBase);//Write a human-readable description to CkPrintf
 	/// Extract a list of our entities:
 	int getEntities(int *entites);
+
+
+	/********** New methods ***********/
+	/*
+		This method creates the mapping from a node to all the elements that are 
+		incident on it . It assumes the presence of one layer of ghost nodes that
+		share a node.
+		*/
+	void createElemNodeAdj();
 }; 
 PUPmarshall(FEM_Mesh);
 FEM_Mesh *FEM_Mesh_lookup(int fem_mesh,const char *caller);
