@@ -81,7 +81,7 @@ inline Vector3 Vector3::operator- () const
     return Vector3(-x,-y,-z);
 }
 //----------------------------------------------------------------------------
-inline Vector3 Mgc::operator* (Real fScalar, const Vector3& rkVector)
+inline Vector3 operator* (Real fScalar, const Vector3& rkVector)
 {
     return Vector3(fScalar*rkVector.x,fScalar*rkVector.y,
         fScalar*rkVector.z);
