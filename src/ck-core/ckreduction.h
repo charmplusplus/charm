@@ -173,7 +173,8 @@ public:
 	void creatingContributors(void);
 	void doneCreatingContributors(void);
 	//Initializes a new contributor
-	void contributorCreated(contributorInfo *ci);
+	void contributorStamped(contributorInfo *ci);//Increment global number
+	void contributorCreated(contributorInfo *ci);//Increment local number
 	void contributorDied(contributorInfo *ci);//Don't expect more contributions
 	//Migrating away
 	void contributorLeaving(contributorInfo *ci);

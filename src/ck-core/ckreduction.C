@@ -66,6 +66,7 @@ waits for the migrant contributions to straggle in.
 Group::Group() 
 {
 	creatingContributors();
+	contributorStamped(&reductionInfo);
 	contributorCreated(&reductionInfo);
 	doneCreatingContributors();
 }
@@ -191,21 +192,31 @@ void CkReductionMgr::doneCreatingContributors(void)
   finishReduction();
 }
 
-//Initializes a new contributor
-void CkReductionMgr::contributorCreated(contributorInfo *ci)
+//A new contributor will be created
+void CkReductionMgr::contributorStamped(contributorInfo *ci)
 {
-  DEBR((AA"Contributor %p created\n"AB,ci));
-  //We've got another contributor
+  DEBR((AA"Contributor %p stamped\n"AB,ci));
+  //There is another contributor
   gcount++;
-  lcount++;
   if (inProgress) 
   {
     ci->redNo=redNo+1;//Created *during* reduction => contribute to *next* reduction
     adj(redNo).gcount--;//He'll wrongly be counted in the global count at end
-    adj(redNo).lcount--;//He won't contribute to the current reduction
   } else
     ci->redNo=redNo;//Created *before* reduction => contribute to *that* reduction
 }
+
+//A new contributor was actually created
+void CkReductionMgr::contributorCreated(contributorInfo *ci)
+{
+  DEBR((AA"Contributor %p created\n"AB,ci));
+  //We've got another contributor
+  lcount++;
+  //He may not need to contribute to some of our reductions:
+  for (int r=redNo;r<ci->redNo;r++)
+    adj(r).lcount--;//He won't be contributing to r here
+}
+
 /*Don't expect any more contributions from this one.
 This is rather horrifying because we now have to make 
 sure the global element count accurately reflects all the

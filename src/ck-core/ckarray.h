@@ -354,7 +354,6 @@ public:
 
 //Access & information routines
   inline CkLocMgr *getLocMgr(void) {return locMgr;}
-  inline int getBcastNo(void) const {return bcastNo;}
   inline int getNumInitial(void) const {return numInitial;}
   inline int homePe(const CkArrayIndex &idx) const {return locMgr->homePe(idx);}
 
@@ -374,6 +373,9 @@ public:
 //Creation:
   /// Create-after-migrate:
   virtual CkMigratable *allocateMigrated(int elChareType,const CkArrayIndex &idx);
+  
+  /// Prepare creation message:
+  void prepareCtorMsg(CkMessage *m,int &onPe,const CkArrayIndex &idx);
   
   /// Create initial array elements:
   virtual void insertInitial(const CkArrayIndex &idx,void *ctorMsg);
@@ -396,7 +398,7 @@ private:
 
 /// Allocate space for a new array element
   ArrayElement *allocate(int elChareType,const CkArrayIndex &idx,
-	int bcast,CmiBool fromMigration);
+	CkMessage *msg,CmiBool fromMigration);
   
 //Broadcast support
   int bcastNo;//Number of broadcasts received (also serial number)

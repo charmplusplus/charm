@@ -73,7 +73,7 @@ class ArrayElement_initInfo {
 public:
   CkArray *thisArray;
   CkArrayID thisArrayID;
-  int bcastNo,numInitial;
+  int bcastNo,redNo,numInitial;
   CmiBool fromMigration;
 };
 
@@ -86,8 +86,9 @@ void ArrayElement::initBasics(void)
   thisArrayID=info.thisArrayID;
   numElements=info.numInitial;
   bcastNo=info.bcastNo;
+  reductionInfo.redNo=info.redNo;
   if (!info.fromMigration)
-    thisArray->contributorCreated(&reductionInfo);
+	  thisArray->contributorCreated(&reductionInfo);
 }
 
 ArrayElement::ArrayElement(void) 
@@ -220,24 +221,12 @@ CkArrayID CProxy_ArrayBase::ckCreateEmptyArray(void)
 	return ckCreateArray((CkArrayMessage *)CkAllocSysMsg(),0,CkArrayOptions());
 }
 
-static void prepareArrayCtorMsg(CkArray *arr,CkArrayMessage *m,
-	   int &onPe,const CkArrayIndex &idx)
-{
-  m->array_index()=idx;
-  UsrToEnv((void *)m)->array_broadcastCount()=arr->getBcastNo();  
-  
-  if (onPe==-1) onPe=arr->homePe(idx);
-  if (onPe!=CkMyPe()) //Let the local manager know where this el't is
-  	arr->getLocMgr()->inform(idx,onPe);
-
-}
-
 void CProxy_ArrayBase::ckInsertIdx(CkArrayMessage *m,int ctor,int onPe,
 	const CkArrayIndex &idx)
 {
   if (m==NULL) m=(CkArrayMessage *)CkAllocSysMsg();
   m->array_ep()=ctor;
-  prepareArrayCtorMsg(ckLocalBranch(),m,onPe,idx);
+  ckLocalBranch()->prepareCtorMsg(m,onPe,idx);
   if (ckIsDelegated()) {
   	ckDelegatedTo()->ArrayCreate(ctor,m,idx,onPe,_aid);
   	return;
@@ -306,18 +295,38 @@ CkArray::CkArray(const CkArrayOptions &c,CkMarshalledMessage &initMsg)
   locMgr->populateInitial(numInitial,initMsg.getMessage(),this);
 }
 
+//Called on send side to prepare array constructor message
+void CkArray::prepareCtorMsg(CkMessage *m,int &onPe,const CkArrayIndex &idx)
+{
+  envelope *env=UsrToEnv((void *)m);
+  env->array_index()=idx;
+  env->array_broadcastCount()=bcastNo;
+  CkReductionMgr::contributorInfo cinfo;
+  contributorStamped(&cinfo);
+  env->array_reductionCount()=cinfo.redNo;
+  if (onPe==-1) onPe=homePe(idx);
+  if (onPe!=CkMyPe()) //Let the local manager know where this el't is
+  	getLocMgr()->inform(idx,onPe);
+}
+
 CkMigratable *CkArray::allocateMigrated(int elChareType,const CkArrayIndex &idx) 
 {
-	return allocate(elChareType,idx,-1,CmiTrue);
+	return allocate(elChareType,idx,NULL,CmiTrue);
 }
-ArrayElement *CkArray::allocate(int elChareType,const CkArrayIndex &idx,int bcast,CmiBool fromMigration) 
+ArrayElement *CkArray::allocate(int elChareType,const CkArrayIndex &idx,
+		     CkMessage *msg,CmiBool fromMigration) 
 {
 	//Stash the element's initialization information in the global "initInfo"
 	ArrayElement_initInfo &init=CkpvAccess(initInfo);
 	init.numInitial=numInitial;
 	init.thisArray=this;
 	init.thisArrayID=thisgroup;
-	init.bcastNo=bcast;
+	if (msg) {
+		envelope *env=UsrToEnv(msg);
+		init.bcastNo=env->array_broadcastCount();
+		init.redNo=env->array_reductionCount();
+	} else
+		init.bcastNo=init.redNo=-111;
 	init.fromMigration=fromMigration;
 	
 	//Build the element
@@ -333,7 +342,7 @@ CmiBool CkArray::insertElement(CkMessage *me)
   const CkArrayIndex &idx=m->array_index();
   int ctorIdx=m->array_ep();
   int chareType=_entryTable[ctorIdx]->chareIdx;
-  ArrayElement *elt=allocate(chareType,idx,UsrToEnv(m)->array_broadcastCount(),CmiFalse);
+  ArrayElement *elt=allocate(chareType,idx,me,CmiFalse);
   if (!locMgr->addElement(thisgroup,idx,elt,ctorIdx,(void *)m)) return CmiFalse;
   if (!bringBroadcastUpToDate(elt)) return CmiFalse;
   return CmiTrue;
@@ -366,7 +375,7 @@ void CkArray::remoteDoneInserting(void)
 CmiBool CkArray::demandCreateElement(const CkArrayIndex &idx,int onPe,int ctor)
 {
 	CkArrayMessage *m=(CkArrayMessage *)CkAllocSysMsg();
-	prepareArrayCtorMsg(this,m,onPe,idx);
+	prepareCtorMsg(m,onPe,idx);
 	m->array_ep()=ctor;
 	
 	if (onPe==CkMyPe()) //Call local constructor directly
@@ -380,7 +389,7 @@ void CkArray::insertInitial(const CkArrayIndex &idx,void *ctorMsg)
 {
 	CkArrayMessage *m=(CkArrayMessage *)ctorMsg;
 	int onPe=CkMyPe();
-	prepareArrayCtorMsg(this,m,onPe,idx);
+	prepareCtorMsg(m,onPe,idx);
 	insertElement(m);
 }
 
