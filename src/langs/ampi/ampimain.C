@@ -19,16 +19,6 @@ allReduceHandler(void *arg, int dataSize, void *data)
   }
 }
 
-#if AMPI_FORTRAN
-#if CMK_FORTRAN_USES_ALLCAPS
-  extern "C" void AMPI_SETUP(void);
-#else
-  extern "C" void ampi_setup_(void);
-#endif
-#else
-  extern "C" void AMPI_Setup(void);
-#endif
-
 extern void CreateMetisLB(void);
 
 ampimain::ampimain(CkArgMsg *m)
@@ -42,15 +32,7 @@ ampimain::ampimain(CkArgMsg *m)
     i++;
   CreateMetisLB();
   numDone = 0;
-#if AMPI_FORTRAN
-#if CMK_FORTRAN_USES_ALLCAPS
-  AMPI_SETUP();
-#else
-  ampi_setup_();
-#endif
-#else
-  AMPI_Setup();
-#endif
+  ampi_setup();
   nobjs = 0;
   char *dname;
   int isRestart;
@@ -111,16 +93,7 @@ ampimain::checkpointOnQd(void)
 }
 
 extern "C" void 
-#if AMPI_FORTRAN
-#if CMK_FORTRAN_USES_ALLCAPS
-  AMPI_REGISTER_MAIN
-#else
-  ampi_register_main_
-#endif
-#else
-  AMPI_Register_main
-#endif
-(void (*mainfunc)(int, char **))
+ampi_register_main(void (*mainfunc)(int, char **))
 {
   if(ampimain::ncomms == AMPI_MAX_COMM)
   {

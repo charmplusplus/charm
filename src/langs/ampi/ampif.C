@@ -3,14 +3,6 @@
 
 extern "C" {
 
-#if CMK_FORTRAN_USES_TWOSCORE
-#define FNAME(x) x##__
-#elif CMK_FORTRAN_USES_ONESCORE
-#define FNAME(x) x##_
-#else
-#define FNAME(x) x
-#endif
-
 #if CMK_FORTRAN_USES_ALLCAPS
 
 #define ampi_init_universe           AMPI_INIT_UNIVERSE

@@ -16,6 +16,32 @@
 
 #define AMPI_MAX_COMM 8
 
+#if CMK_FORTRAN_USES_TWOSCORE
+#define FNAME(x) x##__
+#elif CMK_FORTRAN_USES_ONESCORE
+#define FNAME(x) x##_
+#else
+#define FNAME(x) x
+#endif
+
+#if AMPI_FORTRAN
+#  if CMK_FORTRAN_USES_ALLCAPS
+#    define ampi_setup         AMPI_SETUP
+#    define ampi_register_main AMPI_REGISTER_MAIN
+#    define ampi_main          AMPI_MAIN
+#  else
+#    define ampi_setup         FNAME(ampi_setup)
+#    define ampi_register_main FNAME(ampi_register_main)
+#    define ampi_main          FNAME(ampi_main)
+#  endif
+#else
+#  define ampi_setup         AMPI_Setup
+#  define ampi_register_main AMPI_Register_main
+#  define ampi_main          AMPI_Main
+#endif
+
+extern "C" void ampi_setup(void);
+
 struct ampi_redn_spec
 {
   int type;
