@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.9  1995-11-07 00:03:48  sanjeev
+ * Revision 2.10  1995-11-07 00:41:00  sanjeev
+ * fixed bug
+ *
+ * Revision 2.9  1995/11/07  00:03:48  sanjeev
  * ReadInit moved
  *
  * Revision 2.8  1995/11/06  22:07:38  milind
@@ -169,10 +172,12 @@ export_to_C void CldPeriodicStatus()
 	BranchCall(ReadValue(LdbBocNum), LDB@PeriodicStatus());
 }
 
+/**
 export_to_C void CldPeriodicCheckInit()
 {
 	BranchCall(ReadValue(LdbBocNum), LDB@PeriodicCheckInit());
 }
+**/
 
 BranchOffice LDB {
 
@@ -374,8 +379,9 @@ entry BranchInit : (message DUMMYMSG * dmsg)
 	LDB_ELEMENT *ldb;
 
 	TRACE(CkPrintf("Enter Node LdbInit()\n"));
-	LdbBoc = MyBocNum();
-	CldPeriodicCheckInit();
+	LdbBocNum = LdbBoc = MyBocNum();
+        BranchCall(LdbBoc, LDB@PeriodicCheckInit());
+	/* CldPeriodicCheckInit(); */
 	numPe = CkNumPes();
 	myPE = CkMyPe();
 	numNeighbours = CmiNumNeighbours(myPE);
