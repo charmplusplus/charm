@@ -65,7 +65,7 @@ static void CldStillIdle(void *dummy)
 #endif
 
   myload = CldLoad();
-//  CmiAssert(myload == 0);
+/*  CmiAssert(myload == 0); */
   if (myload > 0) return;
 
   msg.pe = CmiMyPe();
@@ -74,7 +74,7 @@ static void CldStillIdle(void *dummy)
   CmiSyncMulticast(CpvAccess(neighborGroup), sizeof(loadmsg), &msg);
 
 #ifndef CMK_OPTIMIZE
-//  traceUserBracketEvent(cldData->idleEvt, startT, CmiWallTimer());
+  /* traceUserBracketEvent(cldData->idleEvt, startT, CmiWallTimer()); */
 #endif
 }
 
@@ -174,7 +174,7 @@ void CldBalance()
   }
   CldSendLoad();
 #ifndef CMK_OPTIMIZE
-//  traceUserBracketEvent(CpvAccess(CldData)->balanceEvt, startT, CmiWallTimer());
+/*  traceUserBracketEvent(CpvAccess(CldData)->balanceEvt, startT, CmiWallTimer()); */
 #endif
   CcdCallFnAfterOnPE((CcdVoidFn)CldBalance, NULL, PERIOD, CmiMyPe());
 /*  CcdCallBacksReset(0); */
