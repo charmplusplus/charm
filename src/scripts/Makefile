@@ -64,7 +64,8 @@ SEQCHARMC=../bin/charmc -seq $(CHARMOPTS)
 ALLHEADERS=charm++.h ckstream.h charm.h cpthreads.h converse.h \
 	conv-trace.h conv-mach.h simplemsg.h sm.h trace.h pvmc.h \
 	pvm3.h sdag.h CDep.h CCounter.h CMsgBuffer.h CWhenTrigger.h \
-	TList.h idl.h ckarray.h tempo.h waitqd.h LBDatabase.h \
+	ckarray.h ckreduction.h ckhashtable.h \
+	TList.h idl.h tempo.h waitqd.h LBDatabase.h \
 	lbdb.h LBDBManager.h LBComm.h LBOM.h LBObj.h LBMachineUtil.h \
 	Refiner.h ObjGraph.h CentralLB.h RandCentLB.h \
 	RecBisectBfLB.h graph.h fifoInt.h bitvecset.h \
@@ -140,6 +141,7 @@ dirs+sources:
 CVHEADERS=converse.h conv-mach.h conv-mach.sh \
           ../include/CkFutures.decl.h CkFutures.def.h \
           ../include/CkArray.decl.h CkArray.def.h \
+          ../include/CkReduction.decl.h CkReduction.def.h \
           ../include/LBDatabase.decl.h LBDatabase.def.h \
           ../include/CentralLB.decl.h CentralLB.def.h \
           ../include/RandCentLB.decl.h RandCentLB.def.h \
@@ -261,7 +263,8 @@ libldb-test.o: cldb.test.c $(CVHEADERS)
 ###############################################################################
 
 CKHEADERS=ck.h ckstream.h envelope.h init.h qd.h charm.h charm++.h trace.h \
-          ckfutures.h ckarray.h tempo.h waitqd.h LBDatabase.h lbdb.h \
+      ckfutures.h ckarray.h ckreduction.h ckhashtable.h \
+	  tempo.h waitqd.h LBDatabase.h lbdb.h \
 	  LBDBManager.h LBComm.h LBOM.h LBObj.h LBMachineUtil.h \
 	  Refiner.h ObjGraph.h heap.h elements.h CommLBHeap.h\
 	  CentralLB.h RandCentLB.h RecBisectBfLB.h \
@@ -274,7 +277,8 @@ CKHEADERS=ck.h ckstream.h envelope.h init.h qd.h charm.h charm++.h trace.h \
 CK_LIBS_CORE=libck.a
 
 LIBCK_CORE=init.o register.o qd.o ck.o main.o msgalloc.o ckfutures.o \
-           ckarray.o tempo.o waitqd.o LBDatabase.o lbdb.o \
+           ckarray.o ckreduction.o ckhashtable.o \
+           tempo.o waitqd.o LBDatabase.o lbdb.o \
 	   LBDBManager.o LBComm.o LBObj.o LBMachineUtil.o Refiner.o \
 	   ObjGraph.o \
 	   CentralLB.o RandCentLB.o \
@@ -300,9 +304,6 @@ libtrace-projections.a: $(LIBTRACE_PROJ)
 LIBTRACE_SUMM=trace-summary.o
 libtrace-summary.a: $(LIBTRACE_SUMM)
 	$(CHARMC) -cp ../lib/ -o $@ $(LIBTRACE_SUMM)
-
-../include/CkArray.decl.h : CkArray.decl.h
-	/bin/cp CkArray.decl.h ../include
 
 ../include/LBDatabase.decl.h : LBDatabase.decl.h
 	/bin/cp LBDatabase.decl.h ../include
@@ -370,14 +371,11 @@ tempo.decl.h tempo.def.h : tempo.ci charmxi
 waitqd.decl.h waitqd.def.h : waitqd.ci charmxi
 	$(CHARMC) waitqd.ci
 
-CkArray.decl.h CkArray.def.h : ckarray.ci charmxi
-	$(CHARMC) ckarray.ci
+CentralLB.decl.h Central.def.h : CentralLB.ci charmxi
+	$(CHARMC) CentralLB.ci
 
 LBDatabase.decl.h LBDatabase.def.h : LBDatabase.ci charmxi
 	$(CHARMC) LBDatabase.ci
-
-CentralLB.decl.h Central.def.h : CentralLB.ci charmxi
-	$(CHARMC) CentralLB.ci
 
 RandCentLB.decl.h RandCent.def.h : RandCentLB.ci charmxi
 	$(CHARMC) RandCentLB.ci
@@ -433,8 +431,29 @@ tempo.o: tempo.C $(CKHEADERS)
 waitqd.o: waitqd.C $(CKHEADERS)
 	$(CHARMC) -o waitqd.o waitqd.C
 
+
+CkReduction.decl.h CkReduction.def.h : ckreduction.ci charmxi
+	$(CHARMC) ckreduction.ci
+
+../include/CkReduction.decl.h : CkReduction.decl.h
+	/bin/cp CkReduction.decl.h ../include
+
+ckreduction.o: ckreduction.C $(CKHEADERS)
+	$(CHARMC) -o ckreduction.o ckreduction.C
+
+ckhashtable.o: ckhashtable.C $(CKHEADERS)
+	$(CHARMC) -o ckhashtable.o ckhashtable.C
+
+CkArray.decl.h CkArray.def.h : ckarray.ci charmxi
+	$(CHARMC) ckarray.ci
+
+../include/CkArray.decl.h : CkArray.decl.h
+	/bin/cp CkArray.decl.h ../include
+
 ckarray.o: ckarray.C $(CKHEADERS)
 	$(CHARMC) -o ckarray.o ckarray.C
+
+
 
 lbdb.o: lbdb.C $(CKHEADERS)
 	$(CHARMC) -o lbdb.o lbdb.C
