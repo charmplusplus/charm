@@ -25,6 +25,17 @@ Set::Set()
   head = (listNode *) 0;
 }
 
+Set::~Set()
+{
+  int n;
+  listNode *p = head;
+  while (p){
+    listNode *cur = p;
+    p = p->next;
+    delete cur;
+  }
+}
+
 void Set::insert(InfoRecord *info) 
 {
   if (!find(info))
@@ -106,7 +117,7 @@ InfoRecord * Set::next(Iterator *iter)
 
 int Set::numElements()
 {
-int n;
+  int n;
   n = 0;
   listNode *p = head;
   while (p){

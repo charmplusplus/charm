@@ -41,6 +41,7 @@ private:
 
 public:
  Set();
+ ~Set();
  void insert(InfoRecord *);
  int find(InfoRecord *) ;
  void remove(InfoRecord *);
