@@ -464,7 +464,7 @@ static void CmiIdleLock_checkMessage(CmiIdleLock *l) {
   l->hasMessages=0;
 }
 #else
-#define CmiIdleLock_sleep(x) /*empty*/
+#define CmiIdleLock_sleep(x, y) /*empty*/
 
 static void CmiIdleLock_init(CmiIdleLock *l) {
   l->hasMessages=0;
