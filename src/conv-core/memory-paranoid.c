@@ -95,6 +95,7 @@ Slot slot_first={&slot_first,&slot_first};
 
 int memory_checkfreq=100; /*Check entire heap every this many malloc/frees*/
 int memory_checkphase=0; /*malloc/free counter*/
+int memory_verbose=0; /*Print out every time we check the heap*/
 
 /*Check these padding bytes*/
 static void checkPad(char *pad,char *errMsg,void *ptr) {
@@ -152,10 +153,13 @@ void memory_check(void)
 		nBytes+=cur->userSize;
 		cur=cur->next;
 	}
-	nMegs=nBytes/(1024*1024);
-	nKb=(nBytes-(nMegs*1024*1024))/1024;
-	CmiPrintf("[%d] Heap checked-- clean. %d blocks / %d.%03d megs\n",
+	if (memory_verbose)
+	{
+	  int nMegs=nBytes/(1024*1024);
+	  int nKb=(nBytes-(nMegs*1024*1024))/1024;
+	  CmiPrintf("[%d] Heap checked-- clean. %d blocks / %d.%03d megs\n",
 		CmiMyPe(),nBlocks,nMegs,(int)(nKb*1000.0/1024.0)); 
+	}
 	memory_checkphase=0;
 }
 
@@ -243,6 +247,10 @@ static void meta_init(char **argv)
     status(" phaseflip");
     memory_fillphase=1;
   }
+  if (CmiGetArgInt(argv,"+memory_verbose")) {
+    status(" verbose");
+    memory_verbose=1;
+  }  
   if (CmiGetArgInt(argv,"+memory_fillphase",&memory_fillphase)) { 
     status(" phaseflip");
   }  
