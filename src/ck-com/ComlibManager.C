@@ -86,7 +86,7 @@ void ComlibManager::init(){
     prevStratID = -1;
     //prioEndIterationFlag = 1;
 
-    strategyTable = CpvAccess(conv_comm_ptr)->getStrategyTable();
+    strategyTable = CkpvAccess(conv_comm_ptr)->getStrategyTable();
     
     receivedTable = 0;
     flushTable = 0;
@@ -246,7 +246,7 @@ void ComlibManager::receiveTable(StrategyWrapper sw){
         //currently all strategies are being copied to all processors
         //later strategies will be selectively copied
         cur_strategy->setInstance(count);  
-        CpvAccess(conv_comm_ptr)->insertStrategy(cur_strategy);
+        CkpvAccess(conv_comm_ptr)->insertStrategy(cur_strategy);
         
         ComlibPrintf("[%d] Inserting strategy \n", CkMyPe());       
 
