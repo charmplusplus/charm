@@ -102,6 +102,11 @@ class QdState {
     void markProcessed(void) { oProcessed = mProcessed; }
     int isDirty(void) { return ((mProcessed > oProcessed) || cDirty); }
     void subtreeSetDirty(int d) { cDirty = cDirty || d; }
+    void flushStates() {
+      stage = mCreated = mProcessed = nReported = 0;
+      cCreated = 0; cProcessed = 0; cDirty = 0;
+      oProcessed = 0;
+    }
 };
 
 extern void _qdHandler(envelope *);
