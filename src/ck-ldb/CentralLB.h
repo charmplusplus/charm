@@ -93,6 +93,8 @@ private:
   int migrates_expected;
   int startFlag;
   double start_lb_time;
+
+  void writeStatsMsgs(const char* filename);
 };
 
 class CLBStatsMsg : public CMessage_CLBStatsMsg {

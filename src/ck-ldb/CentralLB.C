@@ -407,6 +407,20 @@ LBMigrateMsg* CentralLB::Strategy(LDStats* stats,int count)
   return msg;
 }
 
+void CentralLB::writeStatsMsgs(const char* filename) {
+
+  int i;
+  FILE *f = fopen(filename, "w");
+
+  PUP::toDisk p(f);
+  p|stats_msg_count;
+  for (i = 0; i < stats_msg_count; i++) {
+    CkPupMessage(p, (void **)&statsMsgsList[i], 0);
+  }
+
+  fclose(f);
+}
+
 #endif
 
 /*@}*/
