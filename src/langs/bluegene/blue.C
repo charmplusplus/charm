@@ -560,12 +560,18 @@ int BgNumNodes()
 /* return the bg node ID (local array index) */
 int BgMyRank()
 {
+#ifndef CMK_OPTIMIZE
+  if (tMYNODE == NULL) CmiAbort("Calling BgMyRank in the main thread!");
+#endif
   ASSERT(!cva(inEmulatorInit));
   return tMYNODEID;
 }
 
 int BgMyNode()
 {
+#ifndef CMK_OPTIMIZE
+  if (tMYNODE == NULL) CmiAbort("Calling BgMyNode in the main thread!");
+#endif
   return nodeInfo::XYZ2Global(tMYX, tMYY, tMYZ);
 }
 
@@ -908,6 +914,8 @@ CmiStartFn bgMain(int argc, char **argv)
     /* initialize a BG node and fire all threads */
     BgNodeInitialize(ninfo);
   }
+  // clear main thread.
+  cta(threadinfo)->myNode = NULL;
 
   return 0;
 }
@@ -917,4 +925,24 @@ int main(int argc,char *argv[])
   ConverseInit(argc,argv,(CmiStartFn)bgMain,0,0);
   return 0;
 }
+
+// for conv-conds:
+// if -2 untouch
+// if -1 main thread
+extern "C" int CmiSwitchToPE(int pe)
+{
+  if (pe == -2) return -2;
+  int oldpe;
+  if (tMYNODE == NULL) oldpe = -1;
+  else oldpe = BgMyNode();
+  if (pe == -1) {
+    cta(threadinfo)->myNode = NULL;
+  }
+  else {
+    int newpe = nodeInfo::Global2Local(pe);
+    cta(threadinfo)->myNode = cva(nodeinfo) + newpe;;
+  }
+  return oldpe;
+}
+
 

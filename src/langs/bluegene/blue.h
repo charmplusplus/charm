@@ -130,10 +130,10 @@ public:
     }
   }
 };
-#define BnvDeclare(T, v)    Cpv<T> CMK_CONCAT(Bnv_Var, v); 
-#define BnvStaticDeclare(T, v)    static Cpv<T> CMK_CONCAT(Bnv_Var, v); 
-#define BnvExtern(T, v)           extern Cpv<T> CMK_CONCAT(Bnv_Var, v);
-#define BnvInitialize(T, v)       CMK_CONCAT(Bnv_Var, v).init()
+#define BnvDeclare(T,v)        Cpv<T> CMK_CONCAT(Bnv_Var, v); 
+#define BnvStaticDeclare(T,v)  static Cpv<T> CMK_CONCAT(Bnv_Var, v); 
+#define BnvExtern(T,v)         extern Cpv<T> CMK_CONCAT(Bnv_Var, v);
+#define BnvInitialize(T,v)     CMK_CONCAT(Bnv_Var, v).init()
 #define BnvAccess(v)       CMK_CONCAT(Bnv_Var, v).data[CmiMyRank()][BgMyRank()]
 #endif
 
