@@ -14,6 +14,12 @@ COMPATLIB=$(LIBDIR)/libfem-compat.a
 
 FEMMAIN=$(LIBDIR)/libfemmain.o
 
+.SUFFIXES:
+.SUFFIXES: .c .o
+                                                                                
+.c.o:
+	$(CHARMC) -c $<
+
 all: $(DEST) $(COMPATLIB) $(FEMMAIN)
 
 $(DEST): $(OBJS) $(COMPAT) headers
@@ -27,13 +33,13 @@ headers: $(HEADERS)
 	cp $(HEADERS) $(CDIR)/include/
 	touch headers
 
-$(COMPAT):
-	@for o in $(COMPAT); \
-	do \
-	        file=`echo $$o | sed -e "s/\.o/.c/g"`; \
-	        echo "$(CHARMC) -c $$file..."; \
-	        $(CHARMC) -c $$file || exit 1; \
-	done
+compat_init.o: compat_init.c
+
+compat_finit.o: compat_finit.c
+
+compat_driver.o: compat_driver.c
+
+compat_fdriver.o: compat_fdriver.c
 
 fem.o: fem.C $(HEADDEP)
 	$(CHARMC) -c fem.C

@@ -24,7 +24,7 @@ $(LIB): $(LIBOBJ)
 cksparsecontiguousreducer.o: cksparsecontiguousreducer.C cksparsecontiguousreducer.h CkSparseContiguousReducer.decl.h CkSparseContiguousReducer.def.h
 	$(CHARMC) -c cksparsecontiguousreducer.C
 
-CkSparseContiguousReducer.decl.h: cksparsecontiguousreducer.ci
+CkSparseContiguousReducer.decl.h CkSparseContiguousReducer.def.h: cksparsecontiguousreducer.ci
 	$(CHARMC) -c cksparsecontiguousreducer.ci
 
 clean:

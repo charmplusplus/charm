@@ -21,7 +21,7 @@ $(LIBDEST): $(LIBOBJ)
 ckmulticast.o: ckmulticast.C ckmulticast.h CkMulticast.decl.h CkMulticast.def.h
 	$(CHARMC) -c ckmulticast.C
 
-CkMulticast.decl.h: ckmulticast.ci
+CkMulticast.decl.h CkMulticast.def.h : ckmulticast.ci
 	$(CHARMC) -c ckmulticast.ci
 
 clean:

@@ -15,6 +15,12 @@ OBJS2=tcharmmain.o
 LIB2=libmoduletcharmmain
 DEST2=$(LIBDIR)/$(LIB2).a
 
+.SUFFIXES:
+.SUFFIXES: .c .o
+
+.c.o:
+	$(CHARMC) -c $<
+
 all: $(DEST) $(COMPATLIB) $(DEST2)
 
 $(DEST): $(OBJS) headers
@@ -32,13 +38,15 @@ headers: $(HEADERS)
 	cp $(HEADERS) $(CDIR)/include/
 	touch headers
 
-$(COMPAT):
-	@for o in $(COMPAT); \
-	do \
-		file=`echo $$o | sed -e "s/\.o/.c/g"`; \
-		echo "$(CHARMC) -c $$file"; \
-		$(CHARMC) -c $$file || exit 1; \
-	done
+compat_uns.o: compat_uns.c
+
+compat_us.o: compat_us.c
+
+compat_funs.o: compat_funs.c
+
+compat_fus.o: compat_fus.c
+
+compat_regmm.o: compat_regmm.c
 
 tcharm.o: tcharm.C $(HEADERS)
 	$(CHARMC) -c tcharm.C

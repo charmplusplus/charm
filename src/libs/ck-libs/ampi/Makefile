@@ -13,6 +13,12 @@ DEST=$(LIBDIR)/$(LIB).a
 DESTF=$(LIBDIR)/$(LIB)f.a
 COMPATLIB=$(LIBDIR)/libampi-compat.a
 
+.SUFFIXES:
+.SUFFIXES: .C .o
+                                                                                
+.C.o:
+	$(CHARMC) -c $<
+
 all: AMPI AMPIF $(COMPATLIB)
 
 AMPI: $(DEST) 
@@ -40,13 +46,15 @@ headers: $(HEADERS)
 	cp mpiCC mpicc mpif77 mpif90 $(CDIR)/bin
 	touch headers
 
-$(COMPAT):
-	@for o in $(COMPAT); \
-	do \
-		file=`echo $$o | sed -e "s/\.o/.C/g"`; \
-		echo "$(CHARMC) -c $$file..."; \
-		$(CHARMC) -c $$file || exit 1; \
-	done
+compat_ampius.o: compat_ampius.C
+
+compat_ampifus.o: compat_ampifus.C
+
+compat_ampim.o: compat_ampim.C
+
+compat_ampifm.o: compat_ampifm.C
+
+compat_ampicm.o: compat_ampicm.C
 
 ampi.o: ampi.C $(HEADDEP)
 	$(CHARMC) -c ampi.C
