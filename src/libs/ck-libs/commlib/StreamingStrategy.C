@@ -2,8 +2,8 @@
 
 void call_endIteration(void *arg){
     //    CkPrintf("Calling Flush\n");
-    ((StreamingStrategy *)arg)->periodicFlush();
-    return;
+  ((StreamingStrategy *)arg)->periodicFlush();
+  return;
 }
 
 StreamingStrategy::StreamingStrategy(int period){
@@ -20,9 +20,9 @@ StreamingStrategy::StreamingStrategy(int period){
 }
 
 void StreamingStrategy::insertMessage(CharmMessageHolder *cmsg){
-    cmsg->next = streamingMsgBuf[cmsg->dest_proc];
-    streamingMsgBuf[cmsg->dest_proc] = cmsg;
-    streamingMsgCount[cmsg->dest_proc] ++;
+  cmsg->next = streamingMsgBuf[cmsg->dest_proc];
+  streamingMsgBuf[cmsg->dest_proc] = cmsg;
+  streamingMsgCount[cmsg->dest_proc] ++;
 }
 
 void StreamingStrategy::doneInserting(){
@@ -33,8 +33,6 @@ void StreamingStrategy::doneInserting(){
 void StreamingStrategy::periodicFlush(){
     CharmMessageHolder *cmsg;
         
-    //    CkPrintf("In Periodic Flush\n");
-
     int buf_size = 0, count = 0;
     for(count = 0; count < CkNumPes(); count ++) {
         //        CkPrintf("Streaming Strategy: Processing proc[%d], %d \n", 

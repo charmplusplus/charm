@@ -256,10 +256,11 @@ void ComlibManager::receiveTable(StrategyWrapper sw){
     if(flushTable){
         for(count = 0; count < nstrats; count ++){
             if(strategyTable[count].tmplist_top) {
-                CharmMessageHolder *cptr = strategyTable[count].tmplist_top;
+                CharmMessageHolder *tmp, *cptr = strategyTable[count].tmplist_top;
                 while(cptr != NULL) {
+		  tmp= cptr->next; 
                     strategyTable[count].strategy->insertMessage(cptr);
-                    cptr = cptr->next;
+                    cptr = tmp;
                 }
             }
              
@@ -305,14 +306,14 @@ void ComlibManager::ArraySend(int ep, void *msg,
 
     //CmiPrintf("Before Insert\n");
 
-    if(receivedTable)
-        strategyTable[curStratID].strategy->insertMessage(cmsg);
+    if (receivedTable)
+      strategyTable[curStratID].strategy->insertMessage(cmsg);
     else {
         flushTable = 1;
         cmsg->next = NULL;
         if(strategyTable[curStratID].tmplist_end) 
             strategyTable[curStratID].tmplist_end->next = cmsg;
-        else 
+        else
             strategyTable[curStratID].tmplist_top = cmsg;
         strategyTable[curStratID].tmplist_end = cmsg;
     }
