@@ -542,10 +542,15 @@ Chare::genRegisterMethodDef(XStr& str)
   "  __idx = CkRegisterChare(s, size);\n";
   // register all bases
   genIndexNames(str, "  _REGISTER_BASE(__idx, ",NULL, "::__idx);\n", "");
+  genSubRegisterMethodDef(str);
   if(list)
     list->genReg(str);
   str << "}\n";
   str << "#endif\n";
+}
+
+void
+Chare::genSubRegisterMethodDef(XStr& str) {
 }
 
 extern void sdag_trans(XStr& classname, XStr& input, XStr& output);
@@ -677,6 +682,16 @@ Group::Group(int ln, attrib_t Nattr,
 			bases_CBase = new TypeList(new NamedType("Group"), NULL);
 		}
 	}
+}
+
+
+void
+Group::genSubRegisterMethodDef(XStr& str) {	
+	if(!isTemplated()){
+		str << "   CkRegisterGroupIrr(__idx,"<<type<<"::isIrreducible());\n";
+	}else{
+		str << "   CkRegisterGroupIrr(__idx," <<type<<tvars() <<"::isIrreducible());\n";
+	}	
 }
 
 void

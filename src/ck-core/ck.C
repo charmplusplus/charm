@@ -339,7 +339,13 @@ void _createGroup(CkGroupID groupID, envelope *env)
   _SET_USED(env, 1);
   register int epIdx = env->getEpIdx();
   register int msgIdx = env->getMsgIdx();
-  CkNodeGroupID rednMgr = CProxy_CkArrayReductionMgr::ckNew();
+  int gIdx = _entryTable[epIdx]->chareIdx;  
+  CkNodeGroupID rednMgr;
+  if(_chareTable[gIdx]->isIrr == 0){
+	rednMgr = CProxy_CkArrayReductionMgr::ckNew();
+  }else{
+	rednMgr.setZero();
+  }
   env->setGroupNum(groupID);
   env->setSrcPe(CkMyPe());
   env->setRednMgr(rednMgr);

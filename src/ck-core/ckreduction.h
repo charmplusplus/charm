@@ -196,6 +196,7 @@ private:
 //Checkpointing utilities
 public:
 	virtual void pup(PUP::er &p);
+	static int isIrreducible(){ return 0;}
 };
 
 

@@ -550,6 +550,7 @@ class Chare : public TEntity {
     virtual void genSubDecls(XStr& str);
     virtual char *chareTypeName(void) {return (char *)"chare";}
     virtual char *proxyPrefix(void);
+    virtual void genSubRegisterMethodDef(XStr& str);
 };
 
 class MainChare : public Chare {
@@ -578,6 +579,7 @@ class Group : public Chare {
     	NamedType *t, TypeList *b=0, MemberList *l=0);
     virtual void genSubDecls(XStr& str);
     virtual char *chareTypeName(void) {return (char *) "group";}
+    virtual void genSubRegisterMethodDef(XStr& str);
 };
 
 class NodeGroup : public Group {

@@ -45,6 +45,7 @@ class ChareInfo {
     int defCtor,migCtor; //Default (no argument) and migration constructor indices
     int numbases;
     int bases[16];
+    int isIrr; /** for groups -- Is the group Irreducible */
     ChareInfo(const char *n, int s) : name(n), size(s), classIdx(1) {
       defCtor=migCtor=-1;
       numbases = 0;

@@ -133,6 +133,7 @@ extern int CkRegisterMsg(const char *name, CkPackFnPtr pack,
 extern int CkRegisterEp(const char *name, CkCallFnPtr call, int msgIdx, 
                         int chareIdx,int ck_ep_flags);
 
+extern void CkRegisterGroupIrr(int chareIndex,int isIrr);
 extern int CkRegisterChare(const char *name, int dataSz);
 extern int CkRegisterMainChare(int chareIndex, int epIndex);
 extern void CkRegisterDefaultCtor(int chareIndex, int ctorEpIndex);

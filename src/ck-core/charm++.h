@@ -351,6 +351,7 @@ class IrrGroup : public Chare {
     // Silly run-time type information
     virtual int isNodeGroup() { return 0; };
     virtual bool isLocMgr(void){ return false; }
+    static int isIrreducible(){ return 1;}
 };
 
 
@@ -390,6 +391,7 @@ public:
 //These overloads are needed to prevent ambiguity for multiple inheritance:
 	inline const CkChareID &ckGetChareID(void) const
 		{return ((Parent1 *)this)->ckGetChareID();}
+	static int isIrreducible(){ return (Parent1::isIrreducible() && Parent2::isIrreducible());}
 	CHARM_INPLACE_NEW
 };
 

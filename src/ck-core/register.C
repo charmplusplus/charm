@@ -81,6 +81,11 @@ int CkRegisterChare(const char *name, int dataSz)
   return _numChares++;
 }
 
+extern "C" 
+void CkRegisterGroupIrr(int chareIndex,int isIrr){
+	_chareTable[chareIndex]->isIrr = isIrr;
+}
+				
 extern "C"
 void CkRegisterDefaultCtor(int chareIdx, int ctorEpIdx)
 {
