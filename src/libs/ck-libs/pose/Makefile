@@ -39,7 +39,7 @@ $(LIBDEST):	$(OBJECTS)
 	/bin/cp $(CDIR)/lib_so/libmodulepose.so $(CDIR)/lib_so/libmoduleorigpose.so
 	/bin/cp -f  etrans.pl $(CHARMBIN)
 
-$(LIBSEQDEST): OPTS += -DSEQUENTIAL_POSE=1
+$(LIBSEQDEST): "OPTS += -DSEQUENTIAL_POSE=1"
 $(LIBSEQDEST): seqsync
 $(LIBSEQDEST): $(OBJECTS)
 	$(CHARMC) -o $(LIBSEQDEST) $(OBJECTS) 
