@@ -439,17 +439,33 @@ static void _processNewVChareMsg(envelope *env)
 
 /************** Message Receive ****************/
 
-static inline void _processForChareMsg(envelope *env)
+static inline void _deliverForChareMsg(int epIdx,envelope *env,void *obj)
 {
   register void *msg = EnvToUsr(env);
-  register int epIdx = env->getEpIdx();
-  register void *obj = env->getObjPtr();
   CkpvAccess(_currentChare) = obj;
   CkpvAccess(_currentChareType)=_entryTable[epIdx]->chareIdx;
   _TRACE_BEGIN_EXECUTE(env);
   _SET_USED(env, 0);
   _entryTable[epIdx]->call(msg, obj);
   _TRACE_END_EXECUTE();
+}
+
+
+static inline void _processForChareMsg(envelope *env)
+{
+  register int epIdx = env->getEpIdx();
+  register void *obj = env->getObjPtr();
+  _deliverForChareMsg(epIdx,env,obj);
+}
+
+static inline void _deliverForBocMsg(int epIdx,envelope *env,IrrGroup *obj)
+{
+  CmiBool tracingEnabled=obj->ckTracingEnabled();
+  if (tracingEnabled) _TRACE_BEGIN_EXECUTE(env);
+  _SET_USED(env, 0);
+  _entryTable[epIdx]->call(EnvToUsr(env), obj);
+  if (tracingEnabled) _TRACE_END_EXECUTE();
+  _STATS_RECORD_PROCESS_BRANCH_1();  
 }
 
 static inline void _processForBocMsg(envelope *env)
@@ -463,12 +479,7 @@ static inline void _processForBocMsg(envelope *env)
   CpvAccess(_qd)->process();
   CkpvAccess(_currentGroup) = groupID;
   register int epIdx = env->getEpIdx();
-  _SET_USED(env, 0);
-  CmiBool tracingEnabled=obj->ckTracingEnabled();
-  if (tracingEnabled) _TRACE_BEGIN_EXECUTE(env);
-  _entryTable[epIdx]->call(EnvToUsr(env), obj);
-  if (tracingEnabled) _TRACE_END_EXECUTE();
-  _STATS_RECORD_PROCESS_BRANCH_1();
+  _deliverForBocMsg(epIdx,env,obj);
 }
 
 static inline void _processForNodeBocMsg(envelope *env)
@@ -710,6 +721,20 @@ void CkSendMsg(int entryIdx, void *msg,const CkChareID *pCid)
     CldEnqueue(destPE, env, _infoIdx);
   }
 }
+extern "C"
+void CkSendMsgInline(int entryIndex, void *msg, const CkChareID *pCid)
+{
+  if (pCid->onPE==CkMyPe())
+  { //Just directly call the chare (skip QD handling & scheduler)
+    register envelope *env = (envelope *) msg;
+    if (env->isPacked()) CkUnpackMessage(&env);
+    _STATS_RECORD_PROCESS_MSG_1();
+    _deliverForChareMsg(entryIndex,env,pCid->objPtr);
+  }
+  else
+    //No way to inline a cross-processor message:
+    CkSendMsg(entryIndex,msg,pCid);
+}
 
 static inline envelope *_prepareMsgBranch(int eIdx,void *msg,CkGroupID gID,int type)
 {
@@ -750,6 +775,23 @@ void CkSendMsgBranch(int eIdx, void *msg, int pe, CkGroupID gID)
   _sendMsgBranch(eIdx, msg, gID, pe);
   _STATS_RECORD_SEND_BRANCH_1();
   CpvAccess(_qd)->create();
+}
+
+extern "C"
+void CkSendMsgBranchInline(int eIdx, void *msg, int destPE, CkGroupID gID)
+{
+  if (destPE==CkMyPe()) 
+  { 
+    IrrGroup *obj=(IrrGroup *)_localBranch(gID);
+    if (obj!=NULL) 
+    { //Just directly call the group:
+      envelope *env=UsrToEnv(msg);
+      _deliverForBocMsg(eIdx,env,obj);
+      return;
+    }
+  }
+  //Can't inline-- send the usual way
+  CkSendMsgBranch(eIdx,msg,destPE,gID);
 }
 
 extern "C"
