@@ -1475,6 +1475,7 @@ Entry::Entry(int l, int a, Type *r, char *n, ParamList *p, Value *sz) :
 void Entry::setChare(Chare *c) {
 	Member::setChare(c);
         // mainchare constructor parameter is not allowed
+	/*
         if (isConstructor()&&container->isMainChare() && param != NULL)
           if (!param->isCkArgMsgPtr())
            die("MainChare Constructor doesn't allow parameter!", line);
@@ -1487,6 +1488,14 @@ void Entry::setChare(Chare *c) {
 		else
 			t=new BuiltinType("void");
 		param=new ParamList(new Parameter(line,t));
+	}
+	Removed old treatment for CkArgMsg to allow argc, argv or void
+	constructors for mainchares.
+	*/
+	if (param==NULL) {
+	    Type *t;
+	    t=new BuiltinType("void");
+	    param=new ParamList(new Parameter(line,t));
 	}
 	entryCount=c->nextEntry();
 }
@@ -1951,7 +1960,12 @@ void Entry::genDefs(XStr& str)
   str << "{\n";
   if(isThreaded()) str << callThread(epStr());
   str << preMarshall;
-  param->beginUnmarshall(str);
+  bool isArgcArgv=false;
+  if (isConstructor() && container->isMainChare() && 
+      (!param->isVoid()) && (!param->isCkArgMsgPtr()))
+  	isArgcArgv=true;
+  else //Normal case: Unmarshall variables
+	param->beginUnmarshall(str);
   str << preCall;
   if (!isConstructor() && fortranMode) {
     str << "/* FORTRAN */\n";
@@ -1961,10 +1975,22 @@ void Entry::genDefs(XStr& str)
     param->unmarshallAddress(str); str<<");\n";
     str << "/* FORTRAN END */\n";
   }
-  else {
-  if(isConstructor()) str << "  new (impl_obj) "<<containerType;
-  else str << "  impl_obj->"<<name;
-  str<<"("; param->unmarshall(str); str<<");\n";
+  else { //Normal case: call regular method
+    if (isArgcArgv) str<<"  CkArgMsg *m=(CkArgMsg *)impl_msg;\n"; //Hack!
+  
+    if(isConstructor()) {//Constructor: call "new (obj) foo(parameters)"
+  	str << "  new (impl_obj) "<<containerType;
+    } else {//Regular entry method: call "obj->bar(parameters)"
+  	str << "  impl_obj->"<<name;
+    }
+    
+    if (isArgcArgv) { //Extract parameters from CkArgMsg (should be parameter marshalled)
+        str<<"(m->argc,m->argv);\n";
+	str<<"  delete m;\n";
+    }
+    else {//Normal case: unmarshall parameters (or just print message)
+        str<<"("; param->unmarshall(str); str<<");\n";
+    }
   }
   param->endUnmarshall(str);
   str << postCall;
@@ -1986,7 +2012,7 @@ void Entry::genReg(XStr& str)
   }
   str << ", __idx);\n";
   if (isConstructor()) {
-    if(container->isMainChare() && param->isCkArgMsgPtr())
+    if(container->isMainChare())
       str << "  CkRegisterMainChare(__idx, "<<epIdx(0)<<");\n";
     if(param->isVoid())
       str << "  CkRegisterDefaultCtor(__idx, "<<epIdx(0)<<");\n";
