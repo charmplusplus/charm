@@ -84,9 +84,23 @@ typedef struct PendingMsgStruct
 static PendingMsg  sendhead = NULL, sendtail = NULL;
 static int pendinglen = 0;
 
+/* reuse PendingMsg memory */
+static PendingMsg pend_freelist=NULL;
+
+#define FreePendingMsg(d) 	\
+  d->next = pend_freelist;\
+  pend_freelist = d;\
+
+#define MallocPendingMsg(d) \
+  d = pend_freelist;\
+  if (d==0) {d = ((PendingMsg)malloc(sizeof(struct PendingMsgStruct)));\
+             _MEMCHECK(d);\
+  } else pend_freelist = d->next;
+
 void enqueue_sending(char *msg, int length, OtherNode node, int size)
 {
-  PendingMsg pm = (PendingMsg) malloc(sizeof(struct PendingMsgStruct));
+  PendingMsg pm;
+  MallocPendingMsg(pm);
   pm->msg = msg;
   pm->length = length;
   pm->mach_id = node->mach_id;
@@ -110,12 +124,11 @@ void enqueue_sending(char *msg, int length, OtherNode node, int size)
 
 #define peek_sending() (sendhead)
 
-void dequeue_sending()
-{
-  if (sendhead == NULL) return;
-  sendhead = sendhead->next;
-  pendinglen --;
-}
+#define dequeue_sending()  \
+  if (sendhead != NULL) {	\
+    sendhead = sendhead->next;	\
+    pendinglen --;	\
+  }
 
 static void alarmcallback (void *context) {
   MACHSTATE(4,"GM Alarm callback executed")
@@ -132,9 +145,9 @@ static char *getErrorMsg(gm_status_t status);
  *
  *****************************************************************************/
 
-#define CMK_MSGPOOL  0
+#define CMK_MSGPOOL  1
 
-#define MAXMSGLEN  20
+#define MAXMSGLEN  200
 
 static char* msgpool[MAXMSGLEN];
 static int msgNums = 0;
@@ -423,7 +436,7 @@ void drop_send_callback(struct gm_port *p, void *context, gm_status_t status)
   putPool(msg);
 #endif
 
-  free(out);
+  FreePendingMsg(out);
 }
 
 void send_callback(struct gm_port *p, void *context, gm_status_t status)
@@ -462,9 +475,13 @@ void send_callback(struct gm_port *p, void *context, gm_status_t status)
 	if (out->retry_count > 4) CmiAbort("gm send_callback failed with too many timeouts");
  	CmiPrintf("gm send_callback timeout, send again (%d)\n", out->retry_count ++);
   	gm_free_send_token (gmport, GM_LOW_PRIORITY);
-        gm_send_with_callback(gmport, msg, out->size, out->length, 
+	if (gm_alloc_send_token(gmport, GM_LOW_PRIORITY)) {
+        	gm_send_with_callback(gmport, msg, out->size, out->length, 
                             GM_LOW_PRIORITY, out->mach_id, out->dataport, 
                             send_callback, out);
+	}
+	else
+		CmiAbort("Fatal error during resend!\n");
         return;
       }
       default:
@@ -480,7 +497,7 @@ void send_callback(struct gm_port *p, void *context, gm_status_t status)
 #endif
 
   gm_free_send_token (gmport, GM_LOW_PRIORITY);
-  free(out);
+  FreePendingMsg(out);
 
   /* since we have one free send token, start next send */
   send_progress();
@@ -710,29 +727,26 @@ void CmiMachineInit(char **argv)
   int dataport_max=16; /*number of largest GM port to check*/
   gm_status_t status;
   int device, i, j;
+  int retry = 10;
   char *buf;
   int mlen;
 
-  gmport = NULL;
-  if (dataport == -1) 
-  {
-#if 0
-    /* Can't do standalone mode without mucking with broadcast, etc. */
-    fprintf(stderr,
-    "ERROR: Standalone mode not supported under net-linux gm.\n"
-    "You must either run using charmrun or rebuild using just net-linux.\n");
-    machine_initiated_shutdown=1;
-    exit(1);
-#else
-    return;
-#endif
-  }
+  MACHSTATE(3,"CmiMachineInit {");
 
-  status = gm_init();
+  gmport = NULL;
+  /* standalone mode */
+  if (dataport == -1) return; 
+
+  /* try a few times init gm */
+  for (i=0; i<retry; i++) {
+    status = gm_init();
+    if (status == GM_SUCCESS) break;
+    sleep(1);
+  }
   if (status != GM_SUCCESS) { 
-  	printf("Cannot open GM library (does the machine have a GM card?)\n");
-  	gm_perror("gm_init", status); 
-	return; 
+    printf("Cannot open GM library (does the machine have a GM card?)\n");
+    gm_perror("gm_init", status); 
+    return; 
   }
   
   device = 0;
@@ -805,6 +819,7 @@ void CmiMachineInit(char **argv)
   /* alarm will ping charmrun */
   gm_initialize_alarm(&gmalarm);
 
+  MACHSTATE(3,"} CmiMachineInit");
 }
 
 void CmiMachineExit()
