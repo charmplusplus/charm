@@ -13,7 +13,7 @@
 
 /* change this define to "x" to trace all send/recv's */
 #define MSG_ORDER_DEBUG(x) /* empty */
-#define STARTUP_DEBUG(x) ckout<<"[pe "<<CkMyPe()<<"] "<< x <<endl;
+#define STARTUP_DEBUG(x) /* ckout<<"[pe "<<CkMyPe()<<"] "<< x <<endl; */
 
 //------------- startup -------------
 static mpi_comm_worlds mpi_worlds;
