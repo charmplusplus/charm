@@ -15,6 +15,8 @@
 // second
 #define  BIN_SIZE	0.001
 
+#define  MARKSIZE       256
+
 #define  CREATION           1
 #define  BEGIN_PROCESSING   2
 #define  END_PROCESSING     3
@@ -80,7 +82,7 @@ class LogPool {
     int *epCount;
     int epSize;
 
-    LogMark events[256];
+    LogMark events[MARKSIZE];
     int markcount;
   public:
     LogPool(char *pgm) {
@@ -119,7 +121,7 @@ class LogPool {
       };
 
       // event
-      for (i=0; i<256; i++) events[i].marks = NULL;
+      for (i=0; i<MARKSIZE; i++) events[i].marks = NULL;
       markcount = 0;
     }
     ~LogPool() {
@@ -127,6 +129,16 @@ class LogPool {
       write();
       fprintf(fp, "\n");
       fclose(fp);
+      // free memory for mark
+      if (markcount > 0)
+      for (int i=0; i<MARKSIZE; i++) {
+          MarkEntry *e=events[i].marks, *t;
+          while (e) {
+	      t = e;
+	      e = e->next;
+              delete t;
+          }
+      }
       delete[] pool;
     }
     void write(void) ;
