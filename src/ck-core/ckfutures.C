@@ -124,7 +124,7 @@ class  FutureMain : public Chare {
   public:
     FutureMain(CkArgMsg *m) {
       fBOC.ckSetGroupId(CProxy_FutureBOC::ckNew(new FutureInitMsg));
-      CkFreeMsg(m);
+      delete m;
     }
 };
 

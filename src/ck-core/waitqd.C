@@ -21,10 +21,11 @@ extern "C" void CkWaitQD(void) {
 }
   
 
-waitqd_QDChare::waitqd_QDChare(CkArgMsg *) {
+waitqd_QDChare::waitqd_QDChare(CkArgMsg *m) {
   waitStarted = 0;
   threadList = 0;
   waitqd_qdhandle = thishandle;
+  delete m;
 }
 
 void waitqd_QDChare::waitQD(void) {

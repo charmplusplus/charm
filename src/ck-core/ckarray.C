@@ -104,7 +104,6 @@ void Array1D::RecvMapID(ArrayMap *mPtr, CkChareID mHandle,
       elementIDs[i].state = creating;
       numLocalElements++;
 
-      CkChareID vid;
       ArrayElementCreateMessage *msg = new ArrayElementCreateMessage;
       
       msg->numElements = numElements;
@@ -112,7 +111,7 @@ void Array1D::RecvMapID(ArrayMap *mPtr, CkChareID mHandle,
       msg->groupID = thisgroup;
       msg->arrayPtr = this;
       msg->index = i;
-      CkCreateChare(elementChareType, elementConstType, msg, &vid, CkMyPe());
+      CkCreateChare(elementChareType, elementConstType, msg, 0, CkMyPe());
     }
   }
 }
