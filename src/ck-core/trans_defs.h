@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.9  1996-03-28 13:50:45  kale
+ * Revision 2.10  1997-08-21 14:51:59  milind
+ * Made CkUTimer as CmiWallTimer. On SP3 that did not matter.
+ *
+ * Revision 2.9  1996/03/28 13:50:45  kale
  *  added threaded field to ep_struct.  In preparation for supporting threaded
  * entry points.
  *
@@ -76,10 +79,10 @@
 
 #define CkTimer()  			(int)(CmiTimer() * 1000.0)
 #define CTimer()  			(int)(CmiTimer() * 1000.0)
-#define CkUTimer()			(int)(CmiTimer() * 1000000.0)
-#define CUTimer()			(int)(CmiTimer() * 1000000.0)
-#define CkHTimer()			(int)(CmiTimer() / 3600.0)
-#define CHTimer()			(int)(CmiTimer() / 3600.0)
+#define CkUTimer()			(int)(CmiWallTimer() * 1000000.0)
+#define CUTimer()			(int)(CmiWallTimer() * 1000000.0)
+#define CkHTimer()			(int)(CmiWallTimer() / 3600.0)
+#define CHTimer()			(int)(CmiWallTimer() / 3600.0)
 
 #define new_packbuffer			CkAllocPackBuffer
 
