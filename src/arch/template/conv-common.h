@@ -59,3 +59,9 @@
 
 /* Enables support for immediate messages if set to 1. */
 #define CMK_IMMEDIATE_MSG				   0
+
+/* This is needed to be 1 if the machine layer is used in some architectures
+   where there is no coprocessor, and to pull messages out of the network there
+   is the need of the processor intervention (like in BlueGene/L). 0 otherwise.
+ */
+#define CMK_MACHINE_PROGRESS_DEFINED                       0
