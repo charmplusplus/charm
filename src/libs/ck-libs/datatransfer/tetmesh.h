@@ -8,6 +8,7 @@
 
 #include <stdio.h> // For FILE *
 #include "ckvector3d.h"
+#include <vector>
 
 #define OSL_TETMESH_DEBUG 0
 
@@ -15,20 +16,18 @@
  * A 3d tetrahedral mesh.  Contains the connectivity only--no data.
  */
 class TetMesh {
-	int nTet; //< Number of tets in the mesh.
-	int *conn; //< Connectivity: 4 x nTet 0-based node indices.
-	int nPts; //< Number of points (vertices, nodes) in the mesh.
-	CkVector3d *pts; //< nPts 3d node locations.
-	
-	///Check these indices for in-range
-#if OSL_TETMESH_DEBUG /* Slow bounds checks */
-	void ct(int t) const;
-	void cp(int p) const;
-#else /* Fast unchecked version for production code */
-	inline void ct(int t) const {}
-	inline void cp(int p) const {}
-#endif
 public:
+	enum {nodePer=4}; ///< Nodes per tet.
+	
+	// Connectivity: 0-based node indices around our tet.
+	class conn_t {
+	public:
+		int nodes[TetMesh::nodePer];
+		conn_t() {nodes[0]=-1;}
+		conn_t(int a,int b,int c,int d)
+			{nodes[0]=a; nodes[1]=b; nodes[2]=c; nodes[3]=d;}
+	};
+	
 	/// Create a new empty mesh.
 	TetMesh();
 	/// Create a new mesh with this many tets and points.
@@ -40,25 +39,39 @@ public:
 	virtual void allocate(int nt,int np);
 	
 	/// Return the number of tets in the mesh
-	inline int getTets(void) const {return nTet;}
+	inline int getTets(void) const {return tet.size();}
 	/// Return the t'th tetrahedra's 0-based node indices
-	inline int *getTet(int t) {ct(t); return &conn[4*t];}
-	inline const int *getTet(int t) const {ct(t); return &conn[4*t];}
-	inline int *getTetConn(void) {return conn;}
-	inline const int *getTetConn(void) const {return conn;}
+	inline int *getTet(int t) {ct(t); return &(tet[t].nodes[0]);}
+	inline const int *getTet(int t) const {ct(t); return &(tet[t].nodes[0]);}
+	inline int *getTetConn(void) {return getTet(0);}
+	inline const int *getTetConn(void) const {return getTet(0);}
 	double getTetVolume(int t) const;
 	
 	/// Return the number of points (vertices, nodes) in the mesh
-	inline int getPoints(void) const {return nPts;}
+	inline int getPoints(void) const {return pts.size();}
 	/// Return the p'th vertex (0..getPoints()-1)
 	inline CkVector3d &getPoint(int p) {cp(p); return pts[p];}
 	inline const CkVector3d &getPoint(int p) const {cp(p); return pts[p];}
-	inline CkVector3d *getPointArray(void) {return pts;}
-	inline const CkVector3d *getPointArray(void) const {return pts;}
+	CkVector3d *getPointArray(void);
+	const CkVector3d *getPointArray(void) const;
 	
+	/// Simple mesh modification.  
+	///  The new number of the added object is returned.
+	int addTet(const conn_t &c) {tet.push_back(c); return tet.size()-1;}
+	int addPoint(const CkVector3d &pt) {pts.push_back(pt); return pts.size()-1;}
+
 private:
-	void deallocate(void);
-	void justAllocate(int nt,int np);
+	std::vector<conn_t> tet; //< Connectivity
+	std::vector<CkVector3d> pts; //< nPts 3d node locations.
+	
+	///Check these indices for in-range
+#if OSL_TETMESH_DEBUG /* Slow bounds checks */
+	void ct(int t) const;
+	void cp(int p) const;
+#else /* Fast unchecked version for production code */
+	inline void ct(int t) const {}
+	inline void cp(int p) const {}
+#endif
 };
 
 /// Print a debugging representation of this mesh, to stdout.

@@ -11,46 +11,40 @@
 
 #if OSL_TETMESH_DEBUG /* Slow bounds checks */
 void TetMesh::ct(int t) const {
-	if (t<0 || t>=nTet)
+	if (t<0 || t>=tet.size())
 		CkAbort("TetMesh::ct> Tet index out of bounds");
 }
 void TetMesh::cp(int p) const {
-	if (p<0 || p>=nPts)
+	if (p<0 || p>=pts.size())
 		CkAbort("TetMesh::cp> Point index out of bounds");
 	
 }
 
 #endif
 
-void TetMesh::justAllocate(int nt,int np) {
-	nTet=nt;
-	conn=new int[4*nTet];
-	nPts=np;
-	pts=new CkVector3d[nPts];
-}
-void TetMesh::deallocate(void) {
-	delete[] conn; conn=NULL;
-	delete[] pts; pts=NULL;
-}
-
 /// Create a new empty mesh.
 TetMesh::TetMesh() {
-	nTet=0; nPts=0;
-	conn=NULL; pts=NULL;
 }
 /// Create a new mesh with this many tets and points.
 TetMesh::TetMesh(int nt,int np) {
-	justAllocate(nt,np);
+	allocate(nt,np);
 }
 TetMesh::~TetMesh() {
-	TetMesh::deallocate();
 }
 
 /// Set the size of this mesh to be nt tets and np points.
 ///  Throws away the previous mesh.
 void TetMesh::allocate(int nt,int np) {
-	deallocate();
-	justAllocate(nt,np);
+	tet.resize(nt);
+	pts.resize(np);
+}
+
+// declaring these inline confuses the Intel C++ 7.1 compiler...
+CkVector3d *TetMesh::getPointArray(void) {
+	return &(pts[0]);
+}
+const CkVector3d *TetMesh::getPointArray(void) const {
+	return &(pts[0]);
 }
 
 /**
