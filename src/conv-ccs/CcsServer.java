@@ -49,6 +49,20 @@ public class CcsServer
    	InetAddress ip=InetAddress.getByName(host);
    	connect(ip,port,secretKey);
    }
+
+   /** Non-authenticated versions of the above*/
+   public CcsServer(InetAddress address, int port)
+   	throws IOException
+   {
+	this(address,port,null);
+   }
+   public CcsServer(String host,int port)
+   	throws IOException, UnknownHostException
+   {
+	this(host,port,null);
+   }
+
+
    /** Establish a connection with a running Converse program.
     *
     * @param init gives the CCS initialization string, printed by converse
