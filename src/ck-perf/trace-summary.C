@@ -358,7 +358,7 @@ void TraceSummary::endUnpack(void)
 
 void TraceSummary::beginComputation(void)
 {
-  if(CmiMyRank()==0) {
+  if(CkMyRank()==0) {
     _threadMsg = CkRegisterMsg("dummy_thread_msg", 0, 0, 0, 0);
     _threadChare = CkRegisterChare("dummy_thread_chare", 0);
     _threadEP = CkRegisterEp("dummy_thread_ep", 0, _threadMsg,_threadChare);
