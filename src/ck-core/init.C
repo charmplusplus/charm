@@ -329,6 +329,7 @@ void _initCharm(int argc, char **argv)
     CkRegisterChare("null", 0);
     CkRegisterEp("null", _nullFn, 0, 0);
     _registerCkFutures();
+    _registerCkArray();
     CkRegisterMainModule();
   }
   CpvAccess(_msgPool) = new MsgPool();

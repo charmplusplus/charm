@@ -3,6 +3,10 @@
 
 #include "converse.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /******************************************************************************
  *
  * Converse Concepts, renamed to CK
@@ -45,6 +49,21 @@
 
 /******************************************************************************
  *
+ * Message Allocation Calls
+ *
+ *****************************************************************************/
+
+extern void* CkAllocSysMsg(void);
+extern void  CkFreeSysMsg(void *msg);
+extern void* CkAllocMsg(int msgIdx, int msgBytes, int prioBits);
+extern void* CkAllocBuffer(void *msg, int bufsize);
+extern void  CkFreeMsg(void *msg);
+extern void* CkCopyMsg(void **pMsg);
+extern void  CkSetQueueing(void *msg, int strategy);
+extern void* CkPriorityPtr(void *msg);
+
+/******************************************************************************
+ *
  * Data Structures.
  *
  *****************************************************************************/
@@ -52,6 +71,9 @@
 typedef struct {
   int argc;
   char **argv;
+#ifdef __cplusplus
+  void operator delete(void *ptr) { CkFreeMsg(ptr); }
+#endif
 } CkArgMsg;
 
 typedef struct {
@@ -129,21 +151,6 @@ extern void CkStartQD(int entryIdx, CkChareID *chare);
 
 /******************************************************************************
  *
- * Message Allocation Calls
- *
- *****************************************************************************/
-
-extern void* CkAllocSysMsg(void);
-extern void  CkFreeSysMsg(void *msg);
-extern void* CkAllocMsg(int msgIdx, int msgBytes, int prioBits);
-extern void* CkAllocBuffer(void *msg, int bufsize);
-extern void  CkFreeMsg(void *msg);
-extern void* CkCopyMsg(void **pMsg);
-extern void  CkSetQueueing(void *msg, int strategy);
-extern void* CkPriorityPtr(void *msg);
-
-/******************************************************************************
- *
  * Miscellaneous Calls
  *
  *****************************************************************************/
@@ -153,4 +160,7 @@ extern void  CkGetChareID(CkChareID *pcid);
 extern int   CkGetGroupID(void);
 extern void  CkExit(void);
 
+#ifdef __cplusplus
+}
+#endif
 #endif

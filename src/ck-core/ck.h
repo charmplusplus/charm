@@ -7,9 +7,7 @@
 #define NDEBUG
 #include <assert.h>
 
-extern "C" {
 #include "charm.h"
-}
 
 #include "envelope.h"
 #include "init.h"
@@ -17,6 +15,7 @@ extern "C" {
 #include "register.h"
 #include "stats.h"
 #include "ckfutures.h"
+#include "ckarray.h"
 #include "ckstream.h"
 
 class VidBlock {

@@ -2,10 +2,7 @@
 #define _CHARMPP_H_
 
 #include <stdlib.h>
-
-extern "C" {
 #include "charm.h"
-}
 
 #if CMK_DEBUG_MODE
 class Chare;
@@ -63,5 +60,6 @@ class CkQdMsg {
 
 #include "ckstream.h"
 #include "CkFutures.decl.h"
+#include "CkArray.decl.h"
 
 #endif
