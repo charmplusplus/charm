@@ -45,11 +45,11 @@ class CParseNode {
     void numberNodes(void);
     void labelNodes(void);
     void generateEntryList(TList<CEntry*>&, CParseNode *);
-    void propagateState(void);
+    void propagateState(int);
     void generateCode(XStr& output);
     void setNext(CParseNode *, int);
   private:
-    void propagateState(TList<CStateVar*>&);
+    void propagateState(TList<CStateVar*>&, int);
     void generateWhen(XStr& op);
     void generateOverlap(XStr& op);
     void generateWhile(XStr& op);

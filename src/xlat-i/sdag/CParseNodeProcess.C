@@ -178,7 +178,7 @@ void CParseNode::generateEntryList(TList<CEntry*>& list, CParseNode *thisWhen)
 }
 
 
-void CParseNode::propagateState(void)
+void CParseNode::propagateState(int uniqueVarNum)
 { 
   int count = 0;
   int isMsg = 0;
@@ -242,8 +242,11 @@ void CParseNode::propagateState(void)
            }
 	   else 
              vType2 = 0;
-           if ((parameter1->con2 == 0) && (parameter1->con3 == 0))   // Type
-               sv = new CStateVar(constStr, 0, vType1, vType2, 0, 0, 0, byRef, 0, isMsg);
+           if ((parameter1->con2 == 0) && (parameter1->con3 == 0)) {  // Type
+	       XStr *name = new XStr("noname_"); *name<<uniqueVarNum;
+	       uniqueVarNum++;
+               sv = new CStateVar(constStr, 0, vType1, vType2, 0, 0, name, byRef, 0, isMsg);
+	   }
 	   else if ((parameter1->con2 != 0) && (parameter1->con3 == 0))   // Type Name
                sv = new CStateVar(constStr, 0,vType1, vType2, 0, 0, new XStr(*(parameter1->con2->text)),byRef,0, isMsg);
 	   else if ((parameter1->con2 != 0) && (parameter1->con3 != 0))   // Type Name [ArrayLength]
@@ -269,8 +272,11 @@ void CParseNode::propagateState(void)
 	   if ((numParameters == 1) && (vartype1->con3->numPtrs == 1))
 	      isMsg = 1;
 	       
-	   if ((parameter1->con2 == 0) && (parameter1->con3 == 0))
-              sv = new CStateVar(constStr, 0, vType1, vType2, pt, vartype1->con3->numPtrs, 0,byRef, 0, isMsg);
+	   if ((parameter1->con2 == 0) && (parameter1->con3 == 0)) {
+	      XStr *name = new XStr("noname_"); *name<<uniqueVarNum;
+	      uniqueVarNum++;
+              sv = new CStateVar(constStr, 0, vType1, vType2, pt, vartype1->con3->numPtrs, name,byRef, 0, isMsg);
+	   }
 	   else if ((parameter1->con2 != 0) && (parameter1->con3 == 0)) 
               sv = new CStateVar(constStr,0, vType1, vType2, pt, vartype1->con3->numPtrs, new XStr(*(parameter1->con2->text)), byRef, 0, isMsg);
 	   else if ((parameter1->con2 != 0) && (parameter1->con3 != 0))
@@ -288,11 +294,11 @@ void CParseNode::propagateState(void)
   stateVarsChildren = stateVars; 
   CParseNode *cn;
   for(cn=constructs->begin(); !constructs->end(); cn=constructs->next()) {
-    cn->propagateState(*stateVarsChildren);
+    cn->propagateState(*stateVarsChildren, uniqueVarNum);
   } 
 }
 
-void CParseNode::propagateState(TList<CStateVar*>& list)
+void CParseNode::propagateState(TList<CStateVar*>& list, int uniqueVarNum)
 {
   CStateVar *sv;
   stateVars = new TList<CStateVar*>();
@@ -407,8 +413,11 @@ void CParseNode::propagateState(TList<CStateVar*>& list)
 		     }	
 		     else 
 		        vType2 = 0;
-	             if ((parameter1->con2 == 0) && (parameter1->con3 == 0))
-                        sv = new CStateVar(constStr, 0, vType1, vType2, 0, 0, 0, byRef, 0, isMsg);
+	             if ((parameter1->con2 == 0) && (parameter1->con3 == 0)) {
+	                XStr *name = new XStr("noname_"); *name<<uniqueVarNum;
+	                uniqueVarNum++;
+                        sv = new CStateVar(constStr, 0, vType1, vType2, 0, 0, name, byRef, 0, isMsg);
+		     }
 	             else if ((parameter1->con2 != 0) && (parameter1->con3 == 0)) 
                         sv = new CStateVar(constStr, 0, vType1, vType2, 0, 0, new XStr(*(parameter1->con2->text)),byRef,0, isMsg);
 		     else if ((parameter1->con2 != 0) && (parameter1->con3 != 0))
@@ -435,8 +444,11 @@ void CParseNode::propagateState(TList<CStateVar*>& list)
                      vartype->append(*(pt));
 	             if ((numParameters == 1) && (type1->con3->numPtrs == 1))
 	                isMsg = 1;
-	             if ((parameter1->con2 == 0) && (parameter1->con3 == 0))
-                        sv = new CStateVar(constStr, 0,  vType1, vType2, pt, type1->con3->numPtrs, 0,byRef, 0, isMsg);
+	             if ((parameter1->con2 == 0) && (parameter1->con3 == 0)) {
+	                XStr *name = new XStr("noname_"); *name<<uniqueVarNum;
+	                uniqueVarNum++;
+                        sv = new CStateVar(constStr, 0,  vType1, vType2, pt, type1->con3->numPtrs, name,byRef, 0, isMsg);
+		     }
 	             else if ((parameter1->con2 != 0) && (parameter1->con3 == 0)) 
                         sv = new CStateVar(constStr, 0, vType1, vType2, pt, type1->con3->numPtrs, new XStr(*(parameter1->con2->text)),byRef,0, isMsg);
 		     else if ((parameter1->con2 != 0) && (parameter1->con3 != 0))
@@ -462,7 +474,7 @@ void CParseNode::propagateState(TList<CStateVar*>& list)
         stateVars->append(sv);
       }
       stateVarsChildren = stateVars;
-      if(con2 != 0) con2->propagateState(list);
+      if(con2 != 0) con2->propagateState(list, uniqueVarNum);
       break;
     case OLIST:
       stateVarsChildren = new TList<CStateVar*>();
@@ -502,7 +514,7 @@ void CParseNode::propagateState(TList<CStateVar*>& list)
   }
   CParseNode *cn;
   for(cn=constructs->begin(); !constructs->end(); cn=constructs->next()) {
-    cn->propagateState(*stateVarsChildren);
+    cn->propagateState(*stateVarsChildren, uniqueVarNum);
   }
 }
 

@@ -39,7 +39,7 @@ void CParsedFile::labelNodes(void)
 void CParsedFile::propagateState(void)
 {
   for(CParseNode *cn=nodeList.begin(); !nodeList.end(); cn=nodeList.next()) {
-    cn->propagateState();
+    cn->propagateState(0);
   }
 }
 
