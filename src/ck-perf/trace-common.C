@@ -301,7 +301,7 @@ double CmiTraceTimer()
   return TraceTimer();
 }
 
-void TraceArray::creation(envelope *env, int ep, int num=1)
+void TraceArray::creation(envelope *env, int ep, int num)
 { 
     if (_entryTable[ep]->traceEnabled)
         ALLDO(creation(env, ep, num));
