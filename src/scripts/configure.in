@@ -65,6 +65,29 @@ test_cxx "whether C++ bool works" "ok" "no"
 AC_DEFINE_UNQUOTED(CMK_BOOL_DEFINED, $pass)
 AC_DEFINE_UNQUOTED(CMK_BOOL_UNDEFINED, $fail)
 
+#### check explicit ####
+cat > $t <<EOT
+#include <stdlib.h>
+class er {
+ protected:
+   explicit er(unsigned int inType) {};
+};
+EOT
+test_cxx "whether C++ class explicit keyword works" "ok" "no"
+AC_DEFINE_UNQUOTED(CMK_EXPLICIT, $pass)
+
+#### check if signed char is same as char ####
+cat > $t <<EOT
+#include <stdlib.h>
+class er {
+ protected:
+   void operator()(char &v,const char *desc=NULL) {};
+   void operator()(signed char &v,const char *desc=NULL) {};
+};
+EOT
+test_cxx "whether C++ signed char and char differ" "yes" "no"
+AC_DEFINE_UNQUOTED(CMK_SIGNEDCHAR_DIFF_CHAR, $pass)
+
 cat > $t <<EOT
 int foo(float *t) {return *reinterpret_cast<int *>(t);}
 EOT
