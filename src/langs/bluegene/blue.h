@@ -124,7 +124,7 @@ public:
   Cpv(): data(NULL) {}
   inline void init() {
     if (data == NULL) {
-      data = new (d*)[CmiMyNodeSize()];
+      data = new d*[CmiMyNodeSize()];
       for (int i=0; i<CmiMyNodeSize(); i++)
         data[i] = new d[BgNumNodes()];
     }
