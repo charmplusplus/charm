@@ -1568,6 +1568,7 @@ void ConverseCommonInit(char **argv)
 #if CMK_CCS_AVAILABLE
   CcsInit(argv);
 #endif
+  CmiPersistentInit();
   CmiIsomallocInit(argv);
   CpdInit();
   CmiDeliversInit();

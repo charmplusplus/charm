@@ -927,6 +927,7 @@ CpvExtern(void*, CmiLocalQueue);
 #include "conv-random.h"
 #include "conv-lists.h"
 #include "conv-trace.h"
+#include "persistent.h"
 
 /**** DEAL WITH DIFFERENCES: KERNIGHAN-RITCHIE-C, ANSI-C, AND C++ ****/
 
