@@ -12,11 +12,6 @@
 #include "converse.h"
 #include <mpi.h>
 
-#ifndef _WIN32
-#include <sys/time.h>
-#include <sys/resource.h>           /* for setpriority */
-#endif
-
 #ifdef AMPI
 #  warning "We got the AMPI version of mpi.h, instead of the system version--"
 #  warning "   Try doing an 'rm charm/include/mpi.h' and building again."
@@ -1214,7 +1209,6 @@ static void ConverseRunPE(int everReturn)
 void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
 {
   int n,i;
-  int nicelevel = -100;      /* nice level for process */
 
 #if MACHINE_DEBUG
   debugLog=NULL;
@@ -1266,21 +1260,6 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
     if (!CmiGetArgFlag(argv,"++debug-no-pause"))
       sleep(10);
   }
-
-  CmiGetArgIntDesc(argv,"+nice",&nicelevel,"Set the process priority level");
-#ifndef _WIN32
-  /* call setpriority once on each process to set process's priority */
-  if (nicelevel != -100)  {
-    if (0!=setpriority(PRIO_PROCESS, 0, nicelevel))  {
-      CmiPrintf("[%d] setpriority failed with value %d. \n", _Cmi_mynode, nicelevel);
-      perror("setpriority");
-      CmiAbort("setpriority failed.");
-    }
-    else
-      CmiPrintf("[%d] Charm++: setpriority %d\n", _Cmi_mynode, nicelevel);
-  }
-#endif
-
 
   CmiTimerInit();
 

@@ -19,6 +19,10 @@
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>
+#ifndef _WIN32
+#include <sys/time.h>
+#include <sys/resource.h>
+#endif
 
 #include "converse.h"
 #include "conv-trace.h"
@@ -74,7 +78,7 @@ extern void CldModuleInit(char **);
 
 #include "quiescence.h"
 
-int cur_restart_phase = 0;
+int cur_restart_phase = 0;      /* checkpointing/restarting phase counter */
 
 /*****************************************************************************
  *
@@ -2007,6 +2011,24 @@ static void CIdleTimeoutInit(char **argv)
 extern void CrnInit(void);
 extern void CmiIsomallocInit(char **argv);
 
+static void CmiProcessPriority(char **argv)
+{
+#ifndef _WIN32
+  int nicelevel=-100;      /* process priority */
+  CmiGetArgIntDesc(argv,"+nice",&nicelevel,"Set the process priority level");
+  /* call setpriority once on each process to set process's priority */
+  if (CmiMyRank() == 0 && nicelevel != -100)  {
+    if (0!=setpriority(PRIO_PROCESS, 0, nicelevel))  {
+      CmiPrintf("[%d] setpriority failed with value %d. \n", CmiMyPe(), nicelevel);
+      perror("setpriority");
+      CmiAbort("setpriority failed.");
+    }
+    else
+      CmiPrintf("[%d] Charm++: setpriority %d\n", CmiMyPe(), nicelevel);
+  }
+#endif
+}
+
 void CommunicationServerInit()
 {
 #if CMK_IMMEDIATE_MSG
@@ -2026,6 +2048,7 @@ void ConverseCommonInit(char **argv)
   CmiHandlerInit();
   CIdleTimeoutInit(argv);
   
+  CmiProcessPriority(argv);
 #ifndef CMK_OPTIMIZE
   traceInit(argv);
 /*initTraceCore(argv);*/ /* projector */
