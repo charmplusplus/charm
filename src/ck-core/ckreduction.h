@@ -263,10 +263,13 @@ private:
         // for section multicast/reduction library
         CkSectionInfo sid;   // section cookie for multicast
         char rebuilt;          // indicate if the multicast tree needs rebuilt
+        int nFrags;
+        int fragNo;      // fragment of a reduction msg (when pipelined)
+                         // value = 0 to nFrags-1
 	double dataStorage;//Start of data array (so it's double-aligned)
 
 	int no;
-
+        
 	//Default constructor is private so you must use "buildNew", above
 	CkReductionMsg();
 };
