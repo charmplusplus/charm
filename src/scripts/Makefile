@@ -182,10 +182,11 @@ LIBCONV_UTIL=pup_util.o pup_xlater.o pup_c.o ckhashtable.o sockRoutines.o
 
 LIBCONV_UTILF=pup_f.o
 
-converse: basics QuickThreads/libckqt.a $(CVLIBS) conv-host-if-needed conv-cpm
+converse: basics QuickThreads/libckqt.a $(CVLIBS) charmrun-target conv-cpm
 
-conv-host-if-needed: 
-	if [ -d conv-host ] ; then ( cd conv-host ; make OPTS='$(OPTS)' ) ; fi
+charmrun-target: 
+	if [ -d charmrun ] ; then ( cd charmrun ; make OPTS='$(OPTS)' ) ; fi
+	if [ -f charmrun ] ; then ( cp charmrun ../bin ) ; fi
 
 QuickThreads/libckqt.a:
 	. ./conv-mach.sh;cd QuickThreads;./configure $$CMK_QT
