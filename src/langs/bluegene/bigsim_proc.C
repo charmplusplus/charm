@@ -72,6 +72,8 @@ void workThreadInfo::run()
   tSTARTTIME = CmiWallTimer();
 
 //  InitHandlerTable();
+  // before going into scheduler loop, call workStartFunc
+  // in bg charm++, it normally is initCharm
   if (workStartFunc) {
     DEBUGF(("[N%d] work thread %d start.\n", BgMyNode(), id));
     // timing
@@ -106,11 +108,11 @@ void workThreadInfo::run()
         fromQ2 = 1;
       }
     }
-    /* if no msg is ready, put it to sleep */
+    /* if no msg is ready, go back to sleep */
     if ( msg == NULL ) {
 //      tCURRTIME += (CmiWallTimer()-tSTARTTIME);
       CthSuspend();
-      DEBUGF(("[N%d] work thread T%d awakened.\n", BgMyNode(), id));
+      DEBUGF(("[N-%d] work thread T-%d awakened.\n", BgMyNode(), id));
       continue;
     }
 #if BLUEGENE_TIMING
