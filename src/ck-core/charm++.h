@@ -104,16 +104,36 @@ public:
 		prioStore=integerPrio;
 	}
 	inline void setPriority(int prioBits_,const prio_t *prioPtr_) {
+		if ( prioPtr != NULL && queueingtype != CK_QUEUEING_IFIFO ) {
+			delete [] prioPtr;
+			prioBits = 0;
+		}
 		queueingtype=CK_QUEUEING_BFIFO;
 		prioBits=prioBits_;
 		int dataLength = (prioBits + (sizeof(prio_t)*8 - 1)) /
 		                 (sizeof(prio_t)*8);
-		prio_t *tmp = new prio_t[dataLength];
-		memcpy(tmp, prioPtr_, dataLength);
-		prioPtr=tmp;
+		prioPtr = new prio_t[dataLength];
+		memcpy((void *)prioPtr, prioPtr_, dataLength*sizeof(unsigned int));
 	}
-	inline void setPriority(const CkBitVector &prioBitVector_) {
-		setPriority(prioBitVector_.usedBits, prioBitVector_.data);
+	inline void setPriority(const CkBitVector &cbv) {
+		if ( cbv.data != NULL ) {
+			if ( prioPtr != NULL && queueingtype != CK_QUEUEING_IFIFO ) {
+				delete [] prioPtr;
+				prioBits = 0;
+			}
+			queueingtype=CK_QUEUEING_BFIFO;
+			prioBits=cbv.usedBits;
+			int dataLength = (prioBits + (sizeof(prio_t)*8 - 1)) /
+		                 	(sizeof(prio_t)*8);
+			prioPtr = new prio_t[dataLength];
+			memcpy((void *)prioPtr, cbv.data, dataLength*sizeof(prio_t));
+		} else {
+			queueingtype=CK_QUEUEING_BFIFO;
+			prioBits=0;
+			int dataLength = 1;
+			prioPtr = new prio_t[dataLength];
+			prioPtr[0] = 0;
+		}
 	}
 	
 	inline void setQueueing(int queueingtype_) {queueingtype=queueingtype_;}
