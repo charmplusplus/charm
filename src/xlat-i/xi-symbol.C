@@ -984,12 +984,15 @@ void Entry::genChareDecl(XStr& str)
     retType->print(str);
     str << " " << name;
     str << "(";
-    assert(param!=0);
+    if(param == 0) {
+      cerr << "Entry methods must specify a message parameter: ";
+      cerr << "use void if necessary\n";
+      exit(1);
+    }
     param->print(str);
     str<< ");\n";
     // entry ptr declaration
     str << "    static int ckIdx_" << name << "(";
-    assert(param!=0);
     param->print(str);
     str<< ") { return __idx_"; 
     genEpIdx(str); 
