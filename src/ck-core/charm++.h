@@ -238,6 +238,27 @@ public:
 };
 PUPmarshall(CkArrayID)
 
+class CkSectionID {
+public:
+  CkArrayID aid;
+  int pe;
+  void *val;    // point to mCastCookie
+  int redNo;
+public:
+  CkSectionID(): redNo(0) {val = NULL; pe = CmiMyPe();}
+  CkSectionID(void *p): val(p), redNo(0) { pe = CmiMyPe();};
+  CkSectionID(int e, void *p, int r):  pe(e), val(p), redNo(r) { }
+/*
+  void pup(PUP::er &p) {
+    p | aid; 
+    p(pe); 
+    p((char *)&val, sizeof(void *)); 
+    p(redNo);
+  }
+*/
+};
+
+
 //(CProxy_ArrayBase is defined in ckarray.h)
 
 //an "interface" class-- all delegated messages are routed via a DelegateMgr.  
@@ -253,6 +274,7 @@ class CkDelegateMgr : public Group {
     virtual void ArrayCreate(int ep,void *m,const CkArrayIndexMax &idx,int onPE,CkArrayID a);
     virtual void ArraySend(int ep,void *m,const CkArrayIndexMax &idx,CkArrayID a);
     virtual void ArrayBroadcast(int ep,void *m,CkArrayID a);
+    virtual void ArraySectionSend(int ep,void *m,CkArrayID a,CkSectionID &s);
 };
 
 

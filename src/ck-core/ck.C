@@ -60,6 +60,14 @@ void CkDelegateMgr::ArrayBroadcast(int ep,void *m,CkArrayID a)
 	CProxy_ArrayBase ap(a);
 	ap.ckBroadcast((CkArrayMessage *)m,ep);
 }
+void CkDelegateMgr::ArraySectionSend(int ep,void *m, CkArrayID a,CkSectionID &s)
+{
+	CmiAbort("ArraySectionSend is not implemented!\n");
+/*
+	CProxyElement_ArrayBase ap(a,idx);
+	ap.ckSend((CkArrayMessage *)m,ep);
+*/
+}
 
 
 extern "C"

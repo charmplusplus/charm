@@ -116,6 +116,44 @@ PUPmarshall(CProxyElement_ArrayBase);
 	inline const CkArrayIndex &ckGetIndex() const \
 	  { return super::ckGetIndex(); }\
 
+
+class CProxySection_ArrayBase:public CProxy_ArrayBase {
+private:
+	CkSectionID _sid;
+	CkArrayIndexMax *_elems;
+	int _nElems;
+public:
+	CProxySection_ArrayBase() { }
+	CProxySection_ArrayBase(const CkArrayID &aid,
+		const CkArrayIndexMax *elems, const int nElems, CkGroupID dTo)
+		:CProxy_ArrayBase(aid,dTo), _nElems(nElems) { 
+		_elems = new CkArrayIndexMax[nElems];
+		for (int i=0; i<nElems; i++) _elems[i] = elems[i]; }
+	CProxySection_ArrayBase(const CkArrayID &aid, 
+		const CkArrayIndexMax *elems, const int nElems) 
+		:CProxy_ArrayBase(aid), _nElems(nElems) { 
+		_elems = new CkArrayIndexMax[nElems];
+		for (int i=0; i<nElems; i++) _elems[i] = elems[i]; }
+        ~CProxySection_ArrayBase() { delete [] _elems; }
+	
+	void ckInsert(CkArrayMessage *m,int ctor,int onPe);
+	void ckSend(CkArrayMessage *m, int ep) ;
+
+//	ArrayElement *ckLocal(void) const;
+	CkSectionID &ckGetSectionID() {return _sid;}
+        CkArrayIndexMax *ckGetArrayElements() { return _elems; }
+	int ckGetNumElements() { return _nElems; }
+	void pup(PUP::er &p);
+};
+PUPmarshall(CProxySection_ArrayBase);
+#define CK_DISAMBIG_ARRAY_SECTION(super) \
+	CK_DISAMBIG_ARRAY(super) \
+	inline void ckInsert(CkArrayMessage *m,int ctor,int onPe) \
+	  { super::ckInsert(m,ctor,onPe); }\
+	inline void ckSend(CkArrayMessage *m, int ep) \
+	  { super::ckSend(m,ep); }\
+
+
 /************************ Array Element *********************/
 
 class ArrayElement : public CkMigratable

@@ -277,6 +277,14 @@ void CProxyElement_ArrayBase::pup(PUP::er &p)
   p(_idx.data(),_idx.nInts);
 }
 
+void CProxySection_ArrayBase::pup(PUP::er &p)
+{
+  CProxy_ArrayBase::pup(p);
+  p | _sid;
+  p(_nElems);
+  if (p.isUnpacking()) _elems = new CkArrayIndexMax[_nElems];
+  for (int i=0; i< _nElems; i++) p(_elems[i].data(),_elems[i].nInts);
+}
 
 /*********************** CkArray Creation *************************/
 CkArray::CkArray(const CkArrayCreateInfo &c)
@@ -389,6 +397,15 @@ void CProxyElement_ArrayBase::ckSend(CkArrayMessage *msg, int ep) const
 	}
 }
 
+void CProxySection_ArrayBase::ckSend(CkArrayMessage *msg, int ep) 
+{
+	msg_prepareSend(msg,ep,ckGetArrayID());
+	if (ckIsDelegated()) //Just call our delegateMgr
+	  ckDelegatedTo()->ArraySectionSend(ep,msg,ckGetArrayID(),ckGetSectionID());
+	else // TODO add ckSend to all elements
+	  CmiAbort("CProxySection_ArrayBase: no delegation!");
+}
+
 
 /*********************** CkArray Broadcast ******************/
 
@@ -411,6 +428,8 @@ void CProxy_ArrayBase::ckBroadcast(CkArrayMessage *msg, int ep) const
 	  }
 	}
 }
+
+
 //Reflect a broadcast off this Pe:
 void CkArray::sendBroadcast(CkArrayMessage *msg)
 {

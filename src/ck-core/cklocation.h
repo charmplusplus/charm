@@ -85,6 +85,7 @@ public:
 		{copyFrom(that);}
 	CkArrayIndexMax &operator=(const CkArrayIndex &that) 
 		{copyFrom(that); return *this;}
+        void print() { CmiPrintf("%d: %d %d %d\n", nInts,index.data[0], index.data[1], index.data[2]); }
 };
 
 class CkArrayIndexStruct {
