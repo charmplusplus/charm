@@ -692,6 +692,7 @@ class Message : public TEntity {
 #define SCREATEHOME   0x80 //<- is a create-at-home-if-nonexistant
 #define SIMMEDIATE    0x100 //<- is a immediate
 #define SNOKEEP       0x200
+#define SSKIPSCHED    0x400 //<- is a message skipping charm scheduler
 
 /* An entry construct */
 class Entry : public Member {
@@ -758,6 +759,7 @@ class Entry : public Member {
     int isConstructor(void) { return !strcmp(name, container->baseName(0).get_string());}
     int isExclusive(void) { return (attribs & SLOCKED); }
     int isImmediate(void) { return (attribs & SIMMEDIATE); }
+    int isSkipscheduler(void) { return (attribs & SSKIPSCHED); }
     int isCreate(void) { return (attribs & SCREATEHERE)||(attribs & SCREATEHOME); }
     int isCreateHome(void) { return (attribs & SCREATEHOME); }
     int isCreateHere(void) { return (attribs & SCREATEHERE); }

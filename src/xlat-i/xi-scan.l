@@ -104,6 +104,7 @@ struct rwtable rwtable[] = {
   "sync",	SYNC,
   "exclusive",	EXCLUSIVE,
   "immediate",  IMMEDIATE,
+  "skipscheduler",  SKIPSCHED,
   "virtual",    VIRTUAL,
   "mainchare",	MAINCHARE,
   "packed",     PACKED,

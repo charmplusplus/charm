@@ -2001,7 +2001,7 @@ void Entry::genChareDecl(XStr& str)
 void Entry::genChareDefs(XStr& str)
 {
   if (isImmediate()) {
-      cerr << (char *)container->baseName() << ": Chare doesnot allow immediate message.\n";
+      cerr << (char *)container->baseName() << ": Chare does not allow immediate message.\n";
       exit(1);
   }
 
@@ -2020,7 +2020,9 @@ void Entry::genChareDefs(XStr& str)
       str << "    int destPE=CkChareMsgPrep("<<params<<");\n";
       str << "    if (destPE!=-1) ckDelegatedTo()->ChareSend(ckDelegatedPtr(),"<<params<<",destPE);\n";
       str << "  }\n";
-      str << "  else CkSendMsg("<<params<<");\n";
+      char *opts = "";
+      if (isSkipscheduler())  opts = ",CK_MSG_SKIPSCHEDULER";
+      str << "  else CkSendMsg("<<params<<opts<<");\n";
     }
     str << "}\n";
   }
@@ -2073,7 +2075,7 @@ void Entry::genArrayDecl(XStr& str)
 void Entry::genArrayDefs(XStr& str)
 {
   if (isImmediate()) {
-      cerr << (char *)container->baseName() << ": Chare Array doesnot allow immediate message.\n";
+      cerr << (char *)container->baseName() << ": Chare Array does not allow immediate message.\n";
       exit(1);
   }
 
@@ -2102,7 +2104,9 @@ void Entry::genArrayDefs(XStr& str)
         if (isImmediate())
           str << "  impl_amsg->array_setImmediate(CmiTrue);\n";
 */
-        str << "  ckSend(impl_amsg, "<<epIdx()<<");\n";
+        char *opts = "";
+        if (isSkipscheduler())  opts=",CK_MSG_SKIPSCHEDULER";
+        str << "  ckSend(impl_amsg, "<<epIdx()<<opts<<");\n";
       }
       else
         str << "  ckBroadcast(impl_amsg, "<<epIdx()<<");\n";
@@ -2143,13 +2147,13 @@ void Entry::genArrayStaticConstructorDefs(XStr& str)
 
 void Entry::genGroupDecl(XStr& str)
 {  
-  //Selects between NodeGroup and Group
-  char *node = (char *)(container->isNodeGroup()?"Node":"");
-  const char *immediate = isImmediate()?"Inline":"";
   if (isImmediate() && !container->isNodeGroup()) {
-      cerr << (char *)container->baseName() << ": Group doesnot allow immediate message.\n";
+      cerr << (char *)container->baseName() << ": Group does not allow immediate message.\n";
       exit(1);
   }
+
+  //Selects between NodeGroup and Group
+  char *node = (char *)(container->isNodeGroup()?"Node":"");
 
   if(isConstructor()) {
     genGroupStaticConstructorDecl(str);
@@ -2158,6 +2162,10 @@ void Entry::genGroupDecl(XStr& str)
     XStr params; params<<epIdx()<<", impl_msg";
     XStr paramg; paramg<<epIdx()<<", impl_msg, ckGetGroupID()";
     XStr parampg; parampg<<epIdx()<<", impl_msg, ckGetGroupPe(), ckGetGroupID()";
+    // append options parameter
+    XStr opts; opts<<",0";
+    if (isImmediate()) opts<<"+CK_MSG_IMMEDIATE";
+    else if (isSkipscheduler())  opts<<"+CK_MSG_SKIPSCHEDULER";
 
     if (isSync() && !container->isForElement()) return; //No sync broadcast
     
@@ -2177,7 +2185,7 @@ void Entry::genGroupDecl(XStr& str)
         str << "      if (ckIsDelegated()) {\n";
         str << "         Ck"<<node<<"GroupMsgPrep("<<paramg<<");\n";
 	str << "         ckDelegatedTo()->"<<node<<"GroupSend(ckDelegatedPtr(),"<<parampg<<");\n";
-        str << "      } else CkSendMsg"<<node<<"Branch"<<immediate<<"("<<parampg<<");\n";
+        str << "      } else CkSendMsg"<<node<<"Branch"<<"("<<parampg<<opts<<");\n";
       }
       else
       {// Broadcast
