@@ -160,7 +160,7 @@ done
 [ -f $src/$BASEVERSION/conv-mach.h ] || syntax
 
 #generate VERSION name combining all the build-time options.
-if test -n "$BOPTS"
+if [ -n "$BOPTS" -o -n "$COMPILER" ]
 then
   echo "Selected Compiler: $COMPILER"
   echo "Selected Options: $BOPTS"
