@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.1  1995-07-07 01:06:48  narain
+ * Revision 2.2  1995-07-09 17:50:46  narain
+ * Made changes in tokens registered with Scheduler.. debugged code.
+ *
+ * Revision 2.1  1995/07/07  01:06:48  narain
  * *** empty log message ***
  *
  * Revision 2.0  1995/07/07  00:43:58  narain
@@ -43,13 +46,13 @@ LdbAddSysBocEps()
 {
 }
 
-CpvDeclare(int, Cldcurrent_seednum);
 CpvDeclare(int, Cldnumseeds);
 
 typedef struct Cldtokholder {
-  int seed_num;
+  char msg_header[CmiMsgHeaderSizeBytes];
   void (*sendfn)();
   void *msgptr;
+  int sent_out;
   struct Cldtokholder *next;
 } CldTOK_HOLDER;
 
@@ -59,12 +62,14 @@ CpvDeclare(int, Cldhandlerid);
 
 CldTOK_HOLDER *new_CldTOK_HOLDER(void (*sendfn)(), void *msgptr)
 {
-  CldTOK_HOLDER *ret = (CldTOK_HOLDER *)malloc(sizeof(CldTOK_HOLDER));
-  ret->seed_num = CpvAccess(Cldcurrent_seednum)++;
+  CldTOK_HOLDER *ret = (CldTOK_HOLDER *)CmiAlloc(sizeof(CldTOK_HOLDER));
   CpvAccess(Cldnumseeds)++;
   ret->sendfn = sendfn;
   ret->msgptr = msgptr;
+  ret->sent_out = 0;
   ret->next = NULL;
+
+  return ret;
 }
 
 /******************************************************************
@@ -86,23 +91,24 @@ int CldAddToken(void *msg, void (*sendfn))
     CpvAccess(Cldtokenlist) = CpvAccess(Cldlasttoken) = newtok;
 
   /* Add a token in the scheduler's queue to call this strategy */
-  enqmsg = (void *)malloc(CmiMsgHeaderSizeBytes + sizeof(int));
-  CmiSetHandler(enqmsg, CpvAccess(Cldcurrent_seednum));
+
+  enqmsg = (void *)newtok;
+  CmiSetHandler(enqmsg, CpvAccess(Cldhandlerid));
   CsdEnqueue(enqmsg);
 }
 
 /*******************************************************************
  * Removes the token from the list of token's if it exists 
  *******************************************************************/
-CldTOK_HOLDER *CldRemoveToken(int seednum)
+int CldRemoveToken(CldTOK_HOLDER *tok)
 {
-  CldTOK_HOLDER *ret, *temp;
+  CldTOK_HOLDER *temp;
+
   if(CpvAccess(Cldtokenlist) == NULL)
-    return NULL;
-  if((CpvAccess(Cldtokenlist))->seed_num == seednum)
+    return 0;
+  if((CpvAccess(Cldtokenlist)) == tok)
     {
-      ret = CpvAccess(Cldtokenlist);
-      CpvAccess(Cldtokenlist) = ret->next;
+      CpvAccess(Cldtokenlist) = tok->next;
 
       if(CpvAccess(Cldtokenlist) == NULL) /* Empty token list */
 	CpvAccess(Cldlasttoken) = NULL; 
@@ -110,42 +116,45 @@ CldTOK_HOLDER *CldRemoveToken(int seednum)
   else
     {
       temp = CpvAccess(Cldtokenlist);
-      while(temp->next && temp->next->seed_num != seednum)
+      while(temp->next && temp->next != tok)
 	temp = temp->next;
       if(temp->next)
 	{
-	  ret = temp->next;
-	  temp->next = ret->next;
+	  temp->next = tok->next;
 
 	  if(temp->next == NULL)
 	    CpvAccess(Cldlasttoken) = temp; /* Update Cldlasttoken */
 	}
     }
-  if(ret != NULL)
+  if(tok->sent_out == 0) /* The number of seeds is decreased in the 
+			    CldPickFreeSeed call */
     CpvAccess(Cldnumseeds)--;
-  return ret;
+  return ((tok->sent_out)?0:1);
 }
 
 /********************************************************************
  * Handler for the Load balancer, gets the token out of the list and
  * calls its handler 
  ********************************************************************/
-Cldhandler(void *msg)
+void Cldhandler(void *msg)
 {
   CldTOK_HOLDER *tok;
-  void *dispmsg;
-  int seednum = (int)(*((char *)msg + CmiMsgHeaderSizeBytes));
-  if((tok = CldRemoveToken(seednum)) != NULL)
+  tok = (CldTOK_HOLDER *)msg;
+  if(CldRemoveToken(tok))
     (CmiGetHandlerFunction(tok->msgptr))(tok->msgptr);
 }
 
 
 int Cldbtokensinit()
 {
+  CpvInitialize(int, Cldnumseeds);
+  CpvInitialize(CldTOK_HOLDER*, Cldtokenlist);
+  CpvInitialize(CldTOK_HOLDER*, Cldlasttoken);
+  CpvInitialize(int, Cldhandlerid);
+
   CpvAccess(Cldtokenlist) = NULL;
   CpvAccess(Cldlasttoken) = NULL;
   CpvAccess(Cldnumseeds) = 0;
-  CpvAccess(Cldcurrent_seednum) = 0;
   CpvAccess(Cldhandlerid) = CmiRegisterHandler(Cldhandler);
 }
 
@@ -165,12 +174,14 @@ CldTOK_HOLDER *CldPickFreeSeed()
 {
   CldTOK_HOLDER *ret = NULL;
 
-  if(CpvAccess(Cldnumseeds))
+  ret = CpvAccess(Cldtokenlist);
+  while(ret && ret->sent_out)
+    ret = ret->next;
+  
+  if(ret)
     {
-      ret = CpvAccess(Cldtokenlist);
-      CpvAccess(Cldtokenlist) = ret->next;
+      ret->sent_out = 1;
       CpvAccess(Cldnumseeds)--;
-      
       if(CpvAccess(Cldnumseeds) == 0)
 	CpvAccess(Cldlasttoken) = NULL;
     }
@@ -192,3 +203,10 @@ int CldPickSeedAndSend(int pe)
     }
   return 0;
 }
+
+
+
+
+
+
+
