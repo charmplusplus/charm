@@ -398,5 +398,36 @@ class CkPupAblePtrVec : public CkVec< CkZeroPtr<T, CkPupAblePtr<T> > > {
 	friend void operator|(PUP::er &p,this_type &v) {v.pup(p);}
 };
 
+#define MAXMSGS 32
+
+// thread safe pool, also safe with sig io with immediate messages
+template <class T>
+class SafePool {
+  protected:
+    int num;
+    T msgs[MAXMSGS];
+    typedef T (*allocFn)();
+    typedef void (*freeFn)(T);
+    allocFn allocfn;
+    freeFn  freefn;
+  public:
+    SafePool(allocFn _afn, freeFn _ffn): allocfn(_afn), freefn(_ffn) {
+      for(int i=0;i<MAXMSGS;i++)
+        msgs[i] = allocfn();
+      num = MAXMSGS;
+    }
+    T get(void) {
+      /* CkAllocSysMsg() called in .def.h is not thread of sigio safe */
+      if (CmiImmIsRunning()) return allocfn();
+      return (num ? msgs[--num] : allocfn());
+    }
+    void put(T m) {
+      if (num==MAXMSGS || CmiImmIsRunning())
+        freefn(m);
+      else
+        msgs[num++] = m;
+    }
+};
+
 
 #endif
