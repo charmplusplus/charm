@@ -101,7 +101,7 @@ public:
 	/**
 	  This method is used to prioritize rendering.
 	*/
-	void render(const LV3D_RenderMsg *m) {
+	void render(LV3D_RenderMsg *m) {
 	status("Rendering...\n");
 		flush();
 		CkView *v=viewable->renderView(renderViewpoint);
@@ -111,6 +111,7 @@ public:
 			view->prio=renderFrameID-m->prioAdj;
 			LV3D0_Deposit(view,m->clientID);
 		}
+		LV3D_RenderMsg::delete_(m);
 	}
 	
 };
@@ -161,7 +162,6 @@ void LV3D_Array::LV3D_Viewpoint(LV3D_ViewpointMsg *m)
 void LV3D_Array::LV3D_Render(LV3D_RenderMsg *m)
 {
 	impl->render(m);
-	LV3D_RenderMsg::delete_(m);
 }
 
 /**************** Network Messages **************/

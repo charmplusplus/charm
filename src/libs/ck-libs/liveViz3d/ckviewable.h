@@ -4,7 +4,6 @@ converted into a texture map.
 
 Orion Sky Lawlor, olawlor@acm.org, 8/28/2002
 */
-
 #ifndef __UIUC_PPL_CHARM_VIEWABLE_H
 #define __UIUC_PPL_CHARM_VIEWABLE_H
 
@@ -355,7 +354,7 @@ public:
 	virtual bool shouldRender(const CkViewpoint &univ2screen,const CkView &oldView);
 	
 	/**
-	 * Use newViewpoint and renderImage to build a new CkInterestView.
+	 * Uses newViewpoint and renderImage to build a new CkInterestView.
 	 */
 	virtual CkView *renderView(const CkViewpoint &univ2screen);
 	
@@ -370,29 +369,10 @@ public:
 	
 	/**
 	 * Subclass-overridden routine:
-	 * Render yourself into this new, uninitialized RGBA image.
+	 * Render yourself into this new, *garbage-filled* ARGB image.
+	 * To change the image format, call dest.setLayout.
 	 */
 	virtual void renderImage(const CkViewpoint &vp,CkImage &dest) =0;
 };
-
-/**
- * A CkPointViewable is a trivial little viewer for a cloud of points.
- * Because it draws all points as a single pixel, it's not 
- * resolution-independent, and hence looks pretty bad.
- */
-class CkPointViewable : public CkInterestViewable {
-        int nPts;
-	CkBbox3d box;
-	float *pts; // Point locations-- 4*nPts
-public:
-	CkPointViewable(int nPts_);
-	void add(const CkVector3d &v);
-	void done(void);
-	~CkPointViewable();
-	
-	void renderImage(const CkViewpoint &vp,CkImage &dest);
-};
-
-
 
 #endif /*def(thisHeader)*/

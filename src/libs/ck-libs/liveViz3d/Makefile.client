@@ -1,10 +1,9 @@
 # Makefile fragment for inclusion by lv3d client program.
 #  The client doesn't include Charm++, so this isn't everything.
 
-LV3D_CLIENT_OBJS=ckpointviewable.o ckviewable.o ckviewpoint.o \
-	lv3d0.o
+LV3D_CLIENT_OBJS=ckviewable.o ckviewpoint.o lv3d0.o
 
-LV3D_CLIENT_SRC=ckpointviewable.cpp ckviewable.cpp ckviewpoint.cpp lv3d0.C lv3d1.C
+LV3D_CLIENT_SRC=ckviewable.cpp ckviewpoint.cpp lv3d0.C lv3d1.C
 
 $(LV3D_CLIENT_SRC):
 	ln -fs \

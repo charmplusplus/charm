@@ -1,4 +1,4 @@
-/*
+/**
 Describes a 3d object that can be "viewed"-- that is,
 converted into a texture map.
 
@@ -98,26 +98,27 @@ CkQuadView::CkQuadView(CkMigrateMessage *m)
 }
 
 #ifdef CMK_LIVEVIZ3D_CLIENT
-int oglImageFormat(const CkImage &img)
+oglTextureFormat_t oglImageFormat(const CkImage &img)
 {
+	oglTextureFormat_t fmt; fmt.type=GL_UNSIGNED_BYTE;
 	if (img.getLayout()==CkImage::layout_default)
 	{
 		switch (img.getColors()) {
-		case 1: return GL_LUMINANCE;
-		case 3: return GL_RGB;
-		case 4: return oglFormatARGB; /* special */
+		case 1: fmt.format=GL_LUMINANCE; break;
+		case 3: fmt.format=GL_RGB; break;
+		case 4: fmt.format=GL_BGRA; fmt.type=GL_UNSIGNED_INT_8_8_8_8_REV; break;
+		default: CkAbort("Unrecognized CkImage image format");
 		};
 	} else if (img.getLayout()==CkImage::layout_reversed)
 	{
 		switch (img.getColors()) {
-		case 1: return GL_LUMINANCE;
-		case 3: return GL_BGR;
-		case 4: return GL_BGRA;
+		case 1: fmt.format=GL_LUMINANCE; break;
+		case 3: fmt.format=GL_BGR; break;
+		case 4: fmt.format=GL_BGRA; break;
+		default: CkAbort("Unrecognized CkImage image format");
 		};
 	}
-	/* Woa-- I don't recognize this format! */
-	CkAbort("Unrecognized CkImage image format");
-	return -1;
+	return fmt;
 }
 
 static stats::op_t op_upload_pixels=stats::count_op("net.in","Uploaded texture pixels","pixels");
@@ -135,8 +136,9 @@ void CkQuadView::pup(PUP::er &p) {
 #ifdef CMK_LIVEVIZ3D_CLIENT
 	if (p.isUnpacking()) { /* immediately upload image to OpenGL */
 		int w=s_tex.getWidth(), h=s_tex.getHeight();
-		int format=oglImageFormat(s_tex);
-		c_tex=new oglTexture(s_tex.getData(),w,h,oglTexture_linear, format);
+		oglTextureFormat_t fmt=oglImageFormat(s_tex);
+		c_tex=new oglTexture(s_tex.getData(),w,h,oglTexture_linear, 
+			fmt.format,fmt.type);
 		stats::get()->add(w*h,op_upload_pixels);
 		
 		//Now that we've copied the view into GL, 
@@ -335,10 +337,11 @@ bool CkInterestViewable::newViewpoint(const CkViewpoint &univ2screen,CkViewpoint
 //Round up the texture size based on the onscreen size
 //   (Note: OpenGL textures *MUST* be a power of two in both directions)
 //   ( for mipmapping, the textures must also be square )
+	double inset=2; //Pixels to expand output region by (to ensure a clean border)
 	const int start_sz=4, max_sz=512;
 	int wid=start_sz, ht =start_sz;  // Proposed size
 	// Scale up size until both width and height are acceptable.
-	while ((wid<r.wid()) || (ht<r.ht())) {
+	while ((wid<r.wid()+2*inset) || (ht<r.ht()+2*inset)) {
 		ht*=2; wid*=2;
 	}
 	
@@ -350,10 +353,9 @@ bool CkInterestViewable::newViewpoint(const CkViewpoint &univ2screen,CkViewpoint
 	double perspectiveScale=eyeCenter/eyeViewplane;
 	// printf("PerspectiveScale=%f\n",perspectiveScale);
 	
-	double inset=1; //Pixels to expand output region by (to ensure a clean border)
 	// New axes are just scaled versions of old axes:
-	double Xscale=perspectiveScale; // *r.wid()/(wid-2*inset);
-	double Yscale=perspectiveScale; // *r.ht()/(ht-2*inset);
+	double Xscale=perspectiveScale;//*r.wid()/(wid-2*inset);
+	double Yscale=perspectiveScale;//*r.ht()/(ht-2*inset);
 	
 	// If the resulting texture is too big, scale it down:
 	if (wid>max_sz) { wid=max_sz; Xscale*=r.wid()/(wid-2*inset); }
