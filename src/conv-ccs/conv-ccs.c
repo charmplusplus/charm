@@ -1,3 +1,10 @@
+/*****************************************************************************
+ * $Source$
+ * $Author$
+ * $Date$
+ * $Revision$
+ *****************************************************************************/
+
 #include <stdlib.h>
 /* #include <sys/timer.h> */
 /* #include <sys/unistd.h>  (net-axp chokes on this, so if somebody needs */

@@ -1,3 +1,10 @@
+/*****************************************************************************
+ * $Source$
+ * $Author$
+ * $Date$
+ * $Revision$
+ *****************************************************************************/
+
 // This code is derived from RefineLB.C, and RefineLB.C should
 // be rewritten to use this, so there is no code duplication
 

@@ -1,3 +1,10 @@
+/*****************************************************************************
+ * $Source$
+ * $Author$
+ * $Date$
+ * $Revision$
+ *****************************************************************************/
+
 /*
 A small library of oft-used reductions for use in the 
 Array Reduction Manager.  This file is #include'd by
