@@ -461,6 +461,8 @@ void EnqueueOutgoingDgram
   len = dlen + DGRAM_HEADER_SIZE;
 
   /* allocate DMAable memory to prepare sending */
+  /* FIXME: another memory copy here from user buffer to DMAable buffer */
+  /* which however means the user buffer is untouched and can be reused */
 #if !CMK_MSGPOOL
   buf = (char *)gm_dma_malloc(gmport, len);
 #else
@@ -472,30 +474,19 @@ void EnqueueOutgoingDgram
   memcpy(buf+DGRAM_HEADER_SIZE, ptr, dlen);
   size = gm_min_size_for_length(len);
 
-  enqueue_sending(buf, len, node, size);
-  send_progress();
-#if 0
   /* if queue is not empty, enqueue msg. this is to guarantee the order */
   if (pendinglen != 0) {
     while (pendinglen == MAXPENDINGSEND) {
-      /* pending max len exceeded, busy wait until get a token */
-/*      CmiPrintf("pending max len exceeded.\n"); */
+      /* pending max len exceeded, busy wait until get a token 
+         Doing this surprisingly improve the performance by 2s for 200MB msg */
       MACHSTATE(4,"Polling until token available")
       CommunicationServer_nolock(0);
     }
     enqueue_sending(buf, len, node, size);
     return;
   }
-  /* see if we can get a send token from gm */
-  if (!gm_alloc_send_token(gmport, GM_LOW_PRIORITY)) {
-    /* save to pending send list */
-    enqueue_sending(buf, len, node, size);
-    return;
-  }
-  gm_send_with_callback(gmport, buf, size, len, 
-                        GM_LOW_PRIORITY, node->mach_id, node->dataport, 
-                        send_callback, buf);
-#endif
+  enqueue_sending(buf, len, node, size);
+  send_progress();
 }
 
 void DeliverViaNetwork(OutgoingMsg ogm, OtherNode node, int rank)
@@ -584,8 +575,8 @@ void CmiMachineInit()
 
     maxMsgSize = len;
 
-    if (i<5) num = 0;
-    else if (i<11 && i>6)  num = 20;
+    if (i<=5) num = 0;
+    else if (i<17 && i>5)  num = 20;
     else if (i>22) num = 1;
     for (j=0; j<num; j++) {
       buf = gm_dma_malloc(gmport, len);
