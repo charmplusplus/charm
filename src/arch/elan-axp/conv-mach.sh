@@ -11,5 +11,6 @@ CMK_LIBS='-lckqt -lelan'
 CMK_LD_LIBRARY_PATH="-rpath $CHARMLIBSO/"
 CMK_QT='axp-gcc'
 CMK_XIOPTS='-ansi'
-CMK_F90LIBS='-lUfor -lfor -lFutil'
+CMK_F90LIBS="-lUfor -lfor -lFutil"
+CMK_F77LIBS="$CMK_F90LIBS"
 CMK_MOD_EXT="mod"
