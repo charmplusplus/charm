@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 1.8  1998-03-05 17:15:06  milind
+ * Revision 1.9  1998-05-01 21:47:28  milind
+ * Fixed a bug in getNonLocal.
+ *
+ * Revision 1.8  1998/03/05 17:15:06  milind
  * Fixed conflicts.
  *
  * Revision 1.7  1998/02/13 23:56:06  pramacha
@@ -241,6 +244,8 @@ static void PumpMsgs(void)
 
 void *CmiGetNonLocal(void)
 {
+  CmiReleaseSentMessages();
+  PumpMsgs();
   return recdQueueRemoveFromFront();
 }
 
