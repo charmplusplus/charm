@@ -138,7 +138,7 @@ class TCharm: public CBase_TCharm
 	CtgGlobals threadGlobals; //Global data
 	void pupThread(PUP::er &p);
 
-	bool isStopped, resumeAfterMigration, exitWhenDone;
+	bool isStopped, resumeAfterMigration, exitWhenDone, skipResume;
 	ThreadInfo threadInfo;
 	double timeOffset; //Value to add to CkWallTimer to get my clock
 

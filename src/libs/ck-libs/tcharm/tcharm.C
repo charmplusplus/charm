@@ -144,6 +144,7 @@ TCharm::TCharm(TCharmInitMsg *initMsg_)
   CtvAccessOther(tid,_curTCharm)=this;
   isStopped=true;
   resumeAfterMigration=false;
+  skipResume=false;
   exitWhenDone=initMsg->opts.exitWhenDone;
   threadInfo.tProxy=CProxy_TCharm(thisArrayID);
   threadInfo.thisElement=thisIndex;
@@ -182,7 +183,7 @@ void TCharm::pup(PUP::er &p) {
   ArrayElement1D::pup(p);
 
   checkPupMismatch(p,5134,"before TCHARM");
-  p(isStopped); p(resumeAfterMigration); p(exitWhenDone);
+  p(isStopped); p(resumeAfterMigration); p(exitWhenDone); p(skipResume);
   p(threadInfo.thisElement);
   p(threadInfo.numElements);
   
@@ -367,6 +368,7 @@ void TCharm::stop(void)
 //Resume the waiting thread
 void TCharm::start(void)
 {
+  //  since this thread is scheduled, it is not a good idea to migrate 
   isStopped=false;
   DBG("thread resuming soon");
   CthAwaken(tid);
@@ -391,11 +393,12 @@ void TCharm::migrate(void)
 #endif
 }
 
-//Go to sync, block, possibly migrate, and then resume
+//calls atsync with async mode
 void TCharm::async_migrate(void)
 {
 #if CMK_LBDB_ON
-  DBG("going to sync");
+  DBG("going to sync at async mode");
+  skipResume = true;		// we resume immediately
   ReadyMigrate(false);
   AtSync(0);
   schedule();
@@ -405,9 +408,14 @@ void TCharm::async_migrate(void)
 #endif
 }
 
+/*
+Note:
+ thread can only migrate at the point when this is called
+*/
 void TCharm::allow_migrate(void)
 {
 #if CMK_LBDB_ON
+//  ReadyMigrate(true);
   int nextPe = MigrateToPe();
   if (nextPe != -1) {
     migrateTo(nextPe);
@@ -420,7 +428,7 @@ void TCharm::allow_migrate(void)
 //Resume from sync: start the thread again
 void TCharm::ResumeFromSync(void)
 {
-  start();
+  if (!skipResume) start();
 }
 
 
