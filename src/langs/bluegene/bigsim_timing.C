@@ -79,7 +79,7 @@ void *BgCreateEvent(int eidx)
 void BgEntrySplit()
 {
   stopVTimer();
-  tTIMELINEREC.logEntrySplit();
+  if (genTimeLog) tTIMELINEREC.logEntrySplit();
   startVTimer();
 }
 
