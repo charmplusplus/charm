@@ -1,28 +1,33 @@
-\subsection{\kw{initcall} routines}
+\subsection{\kw{initnode} and \kw{initproc} routines}
 \index{initcall}
 \label{initcall}
 \experimental{}
 Some registration routines need be executed exactly once
-everywhere before the computation begins.
-By declaring a regular \CC\ subroutine \index{initcall}
-\kw{initcall} in the .ci file, you ask \charmpp to execute 
-the routine exactly once on every node before the
-computation begins.
+before the computation begins. You may choose to 
+declare a regular  \CC\ subroutine \kw{initnode} in the .ci file
+to ask \charmpp to execute the routine exactly once on every node before the
+computation begins, or to declare a regular  \CC\ subroutine \kw{initproc}
+to be executed exactly once on every processor.
 
 \begin{alltt}
 module foo \{
-    initcall void fooGlobalInit(void);
+    initnode void fooNodeInit(void);
+    initproc void fooProcInit(void);
     chare bar \{
         ...
-        initcall void barInit(void);
+        initnode void barNodeInit(void);
+        initproc void barProcInit(void);
     \};
 \};
 \end{alltt}
 
-This code will execute the routines \uw{fooGlobalInit} and
-\uw{bar::barInit} before the main computation starts.
-These routines should only do registration, not computation--
-use a mainchare, which gets executed on only one processor,
+This code will execute the routines \uw{fooNodeInit} and static 
+\uw{bar::barNodeInit} once on every node and \uw{fooProcInit}
+and \uw{bar::barProcInit} on every processor before the main computation starts.
+Initnode calls are always executed before initproc calls.
+
+Note that these routines should only do registration, not computation--
+use a mainchare instead, which gets executed on only one processor,
 to begin the computation.  Initcall routines are typically
 used to do special registrations and global variable setup
 before the computation actually begins.
