@@ -36,7 +36,7 @@ static void callDrivers(void) {
 static void FEMfallbackSetup(void)
 {
 	int nChunks=TCharmGetNumChunks();
-	char **argv=TCharmArgv();
+	char **argv=CkGetArgv();
 	int initFlags=0;
 	if (CmiGetArgFlag(argv,"-read")) initFlags|=FEM_INIT_READ;
 	if (CmiGetArgFlag(argv,"-write")) initFlags|=FEM_INIT_WRITE;
