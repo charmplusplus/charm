@@ -79,10 +79,10 @@ return(i);
 int destroyFuture(int key)
      /* this function added on 7/22/97. -- sanjay */
 {
-  futures[ i].ready = FREE;
-  futures[ i].waiters = NULL;
-  CmiFree(futures[ i].value);
-  futures[ i].value = NULL;
+  futures[key].ready = FREE;
+  futures[key].waiters = NULL;
+  CmiFree(futures[key].value);
+  futures[key].value = NULL;
 
 }
 
