@@ -293,6 +293,11 @@ do
 		shift
 		;;
 
+	"-rpath")
+		OPTS_LDXX="$OPTS_LDXX -rpath $1"
+		shift
+		;;
+
 	"-c")
 # This is ignored.
 		;;
