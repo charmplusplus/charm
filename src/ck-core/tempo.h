@@ -106,6 +106,11 @@ class TempoArray : public ArrayElement1D, public Tempo
     void ckTempoReduce(int root, int op, void *inbuf, void *outbuf, int count,
                        int type);
     void ckTempoAllReduce(int op,void *inbuf,void *outbuf,int count,int type);
+    void pup(PUP::er& p)
+    {
+      ArrayElement1D::pup(p);
+      p(nGOps);
+    }
 };
 
 #endif
