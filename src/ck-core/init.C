@@ -201,7 +201,6 @@ static void _exitHandler(envelope *env)
       DEBUGF(("StatMsg on %d with %d\n", CkMyPe(), _numStatsRecd));
       if(_numStatsRecd==CkNumPes()) {
         _printStats();
-        _TRACE_END_COMPUTATION();
 #ifdef __BLUEGENE__
         BgShutdown();
 #else
@@ -374,6 +373,7 @@ static void _initHandler(void *msg)
 extern "C"
 void CkExit(void) 
 {
+  _TRACE_END_EXECUTE();
   CkNumberHandler(_charmHandlerIdx,(CmiHandler)_discardHandler);
   CkNumberHandler(_bocHandlerIdx, (CmiHandler)_discardHandler);
   CkNumberHandler(_nodeBocHandlerIdx, (CmiHandler)_discardHandler);
