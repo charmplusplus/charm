@@ -463,7 +463,7 @@ void  CmiError(const char *format, ...);
 
 #endif
 
-#if CMK_OPTIMIZE
+#ifdef CMK_OPTIMIZE
 #define CmiAssert(expr) ((void) 0)
 #else
 #if defined(__STDC__) || defined(__cplusplus)
