@@ -28,4 +28,8 @@ CMK_CPP_SUFFIX="ii"
 CMK_XLATPP='charmxlat++ '
 CMK_QT='generic'
 CMK_XIOPTS=''
-
+CMK_F90LIBS='-L/usr/absoft/lib -lf90math -lfio -lU77 -lf77math '
+CMK_MOD_NAME_ALLCAPS=1
+CMK_MOD_EXT="mod"
+CMK_F90_USE_MODDIR=1
+CMK_F90_MODINC="-p"
