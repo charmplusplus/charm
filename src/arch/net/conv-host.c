@@ -1493,6 +1493,8 @@ void nodetab_init()
   }
   while ((nodetab_size < arg_requested_pes)&&(arg_requested_pes!=MAX_NODES)) {
     nodetab_table[nodetab_size] = nodetab_table[nodetab_size-basicsize];
+    if(nodetab_table[nodetab_size]->rank == 0)
+      nodetab_rank0_table[nodetab_rank0_size++] = nodetab_size;
     nodetab_size++;
   }
   fclose(f);
