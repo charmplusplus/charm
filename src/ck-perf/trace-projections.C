@@ -574,10 +574,6 @@ void TraceProjections::endUnpack(void)
   _logPool->add(END_UNPACK, 0, 0, TraceTimer(), 0, CkMyPe());
 }
 
-void TraceProjections::beginCharmInit(void) {}
-
-void TraceProjections::endCharmInit(void) {}
-
 void TraceProjections::enqueue(envelope *) {}
 
 void TraceProjections::dequeue(envelope *) {}

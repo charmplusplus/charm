@@ -193,8 +193,6 @@ class TraceSummary : public Trace {
     void endPack(void);
     void beginUnpack(void);
     void endUnpack(void);
-    void beginCharmInit(void) {}
-    void endCharmInit(void) {}
     void enqueue(envelope *e) {}
     void dequeue(envelope *e) {}
     void beginComputation(void);
