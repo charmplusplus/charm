@@ -1,4 +1,5 @@
-// BlueGene simulator Code
+// File: blue.C
+// BlueGene Emulator Code based on Converse
 
 #include <stdio.h>
 #include <string.h>
@@ -8,7 +9,7 @@
 
 #include "blue.h"
 
-#define MAX_HANDLERS	16
+#define MAX_HANDLERS	32
 
 /* define system parameters */
 #define INBUFFER_SIZE	32
@@ -42,24 +43,36 @@ typedef bgQueue<bgMsg *>    msgQueue;
 typedef CkQ<bgMsg *> 	    ckMsgQueue;
 
 class nodeInfo;
+class threadInfo;
 
-class threadInfo {
-public:
-  int id;
-  ThreadType  type;
-  CthThread me;
-  nodeInfo *myNode;
-  double  currTime;
+/* process level variables */
+nodeInfo *nodeinfo;		/* represent a bluegene node */
 
-public:
-  threadInfo(int _id, ThreadType _type, nodeInfo *_node): id(_id), type(_type), myNode(_node) {
-    currTime=0.0;
-  }
-  inline void setThread(CthThread t) { me = t; }
-  inline CthThread getThread() { return me; }
-}; 
+CtvDeclare(threadInfo *, threadinfo);	/* represent a bluegene thread */
+
+CpvDeclare(int,msgHandler);
+CmiHandler msgHandlerFunc(char *msg);
+
+CpvDeclare(int,exitHandler);
+
+typedef void (*BgStartHandler) (int, char **);
+static BgHandler *handlerTable;
+
+static int arg_argc;
+static char **arg_argv;
+
+static msgQueue *inBuffer;	/* simulate the bluegene inbuffer */
+static CmmTable *msgBuffer;	/* if inBuffer is full, put to this buffer */
+
+static int numX, numY, numZ;	/* size of bluegene nodes in cube */
+static int numCth, numWth;	/* number of threads */
+static int numNodes;		/* number of bg nodes on this PE */
+
+static int inEmulatorInit=0;
+
 
 #define tMYID		CtvAccess(threadinfo)->id
+#define tMYGLOBALID	CtvAccess(threadinfo)->globalId
 #define tTHREADTYPE	CtvAccess(threadinfo)->type
 #define tMYNODE		CtvAccess(threadinfo)->myNode
 #define tSTARTTIME	tMYNODE->startTime
@@ -75,30 +88,7 @@ public:
 #define tTHREADTABLE    tMYNODE->threadTable
 #define tAFFINITYQ      tMYNODE->affinityQ[tMYID]
 #define tNODEQ          tMYNODE->nodeQ
-
-CtvDeclare(threadInfo *, threadinfo);	/* represent a bluegene thread */
-
-/* process level variables */
-nodeInfo *nodeinfo;		/* represent a bluegene node */
-
-CpvDeclare(int,msgHandler);
-CmiHandler msgHandlerFunc(char *msg);
-
-typedef void (*BgStartHandler) (int, char **);
-static BgHandler *handlerTable;
-static int bgNodeStartHandler;
-
-static int arg_argc;
-static char **arg_argv;
-
-static msgQueue *inBuffer;	/* simulate the bluegene inbuffer */
-static CmmTable *msgBuffer;	/* if inBuffer is full, put to this buffer */
-
-static int numX, numY, numZ;	/* size of bluegene nodes in cube */
-static int numCth, numWth;	/* number of threads */
-static int numNodes;		/* number of bg nodes on this PE */
-
-static int inglobalinit=0;
+#define tSTARTED        tMYNODE->started
 
 #define ASSERT(x)	if (!(x)) { CmiPrintf("Assert failure at %s:%d\n", __FILE__,__LINE__); CmiAbort("Abort!"); }
 
@@ -124,7 +114,7 @@ private:
   T *data;
   int fp, count, size;
 public:
-  bgQueue() { fp = count = 0; }
+  bgQueue(): data(NULL), fp(0), count(0) {};
   ~bgQueue() { delete[] data; }
   inline void initialize(int max) {  size = max; data = new T[max]; }
   T deq() {
@@ -163,9 +153,10 @@ public:
   ckMsgQueue *affinityQ;
   char *udata;
   double startTime;		/* start time for a thread */
+  char started;
 
 public:
-  nodeInfo(): udata(NULL) {
+  nodeInfo(): udata(NULL), started(0) {
     commThQ = new threadQueue;
     commThQ->initialize(numCth);
 
@@ -225,6 +216,32 @@ public:
 
 };	// end of nodeInfo
 
+/*****************************************************************************
+      ThreadInfo:  each thread has a thread private threadInfo structure.
+      It has a local id, a global serial id. 
+      myNode: the myNode field point to the node it belongs to.
+      currTime: is the elapse time for this thread;
+      me:   point to the CthThread converse thread handler.
+*****************************************************************************/
+
+class threadInfo {
+public:
+  int id;
+  int globalId;
+  ThreadType  type;
+  CthThread me;
+  nodeInfo *myNode;
+  double  currTime;
+
+public:
+  threadInfo(int _id, ThreadType _type, nodeInfo *_node): id(_id), type(_type), myNode(_node) {
+    currTime=0.0;
+    if (id != -1) globalId = nodeInfo::Local2Global(_node->id)*(numCth+numWth)+_id;
+  }
+  inline void setThread(CthThread t) { me = t; }
+  inline CthThread getThread() { return me; }
+}; 
+
 
 /*****************************************************************************
       low level API
@@ -237,11 +254,11 @@ extern "C" void defaultBgHandler(char *null)
 
 int BgRegisterHandler(BgHandler h)
 {
-  /* leave 0 as blank, so it can report error */
+  /* leave 0 as blank, so it can report error luckily */
   static int count=1;
   int cur = count++;
 
-  ASSERT(inglobalinit);
+  ASSERT(inEmulatorInit);
   if (cur >= MAX_HANDLERS)
     CmiAbort("BG> HandlerID exceed the maximum.\n");
   handlerTable[cur] = h;
@@ -253,7 +270,6 @@ int BgRegisterHandler(BgHandler h)
 bgMsg * getFullBuffer()
 {
   int tags[1], ret_tags[1];
-  char *last_data;
   bgMsg *data, *mb;
 
   /* I must be a communication thread */
@@ -409,7 +425,7 @@ void BgSendPacket(int x, int y, int z, int threadID, int handlerID, WorkType typ
 /* must be called in a communication or worker thread */
 void BgGetXYZ(int *x, int *y, int *z)
 {
-  ASSERT(!inglobalinit);
+  ASSERT(!inEmulatorInit);
   *x = tMYX; *y = tMYY; *z = tMYZ;
 }
 
@@ -421,7 +437,7 @@ void BgGetSize(int *sx, int *sy, int *sz)
 /* can only called in globalinit */
 void BgSetSize(int sx, int sy, int sz)
 {
-  ASSERT(inglobalinit);
+  ASSERT(inEmulatorInit);
   numX = sx; numY = sy; numZ = sz;
 }
 
@@ -431,6 +447,12 @@ int BgGetThreadID()
   return tMYID;
 }
 
+int BgGetGlobalThreadID()
+{
+  ASSERT(tTHREADTYPE == WORK_THREAD || tTHREADTYPE == COMM_THREAD);
+  return tMYGLOBALID;
+}
+
 char *BgGetNodeData()
 {
   return tUSERDATA;
@@ -438,7 +460,7 @@ char *BgGetNodeData()
 
 void BgSetNodeData(char *data)
 {
-  ASSERT(!inglobalinit);
+  ASSERT(!inEmulatorInit);
   tUSERDATA = data;
 }
 
@@ -449,7 +471,7 @@ int BgGetNumWorkThread()
 
 void BgSetNumWorkThread(int num)
 {
-  ASSERT(inglobalinit);
+  ASSERT(inEmulatorInit);
   numWth = num;
 }
 
@@ -460,7 +482,7 @@ int BgGetNumCommThread()
 
 void BgSetNumCommThread(int num)
 {
-  ASSERT(inglobalinit);
+  ASSERT(inEmulatorInit);
   numCth = num;
 }
 
@@ -481,14 +503,21 @@ double BgGetTime()
 /* TODO: need broadcast */
 void BgShutdown()
 {
+  int msgSize = CmiMsgHeaderSizeBytes;
+  void *sendmsg = CmiAlloc(msgSize);
+  CmiSetHandler(sendmsg, CpvAccess(exitHandler));
+  CmiSyncBroadcastAllAndFree(msgSize, sendmsg);
+  
+/*
   int i;
-  /* TODO: free memory */
+  // TODO: free memory 
   delete [] nodeinfo;
   delete [] inBuffer;
   for (i=0; i<numNodes; i++) CmmFree(msgBuffer[i]);
   delete [] msgBuffer;
 
   CmiAbort("\nBG> BlueGene simulator shutdown gracefully!\n");
+*/
 }
 
 /*****************************************************************************
@@ -497,13 +526,16 @@ void BgShutdown()
 
 void comm_thread(threadInfo *tinfo)
 {
-  CthThread worker;
-  int workerID;
-
   /* set the thread-private threadinfo */
   CtvAccess(threadinfo) = tinfo;
 
   tSTARTTIME = CmiWallTimer();
+
+  if (!tSTARTED) {
+    tSTARTED = 1;
+    BgNodeStart(arg_argc, arg_argv);
+  }
+
   for (;;) {
     bgMsg *msg = (bgMsg *)getFullBuffer();
     if (!msg) { 
@@ -518,39 +550,16 @@ void comm_thread(threadInfo *tinfo)
       if (msg->recvTime > tCURRTIME)  tCURRTIME = msg->recvTime;
       /* call user registered handler function */
       int handler = msg->handlerID;
-      if (handler == bgNodeStartHandler)
-        ((BgStartHandler)handlerTable[handler])(arg_argc, arg_argv);
-      else {
-        handlerTable[handler](msg->first);
-        CmiFree((char *)msg-CmiMsgHeaderSizeBytes); 
-      }
+      handlerTable[handler](msg->first);
+      CmiFree((char *)msg-CmiMsgHeaderSizeBytes); 
     }
     else {
-      if (msg->threadID == -1) {
+      if (msg->threadID == ANYTHREAD) {
         addBgNodeMessage(msg);
       }
       else {
         addBgThreadMessage(msg, msg->threadID);
       }
-/*
-      worker = NULL;
-      while (!worker) {
-        workerID = -1;
-	if (tWORKTHQ->isEmpty()) {
-          tCURRTIME += (CmiWallTimer()-tSTARTTIME);
-          CthYield();
-          tSTARTTIME = CmiWallTimer();
-	}
-	else {
-	  workerID = tWORKTHQ->deq();
-	  ASSERT(workerID < numCth+numWth && workerID >=0);
-	  break;
-	}
-      }
-      tWORKBUFFER(workerID) = msg;
-      worker = tTHREADTABLE[workerID];
-      CthAwaken(worker);
-*/
     }
     /* let other communication thread do their jobs */
     tCURRTIME += (CmiWallTimer()-tSTARTTIME);
@@ -561,11 +570,9 @@ void comm_thread(threadInfo *tinfo)
 
 void work_thread(threadInfo *tinfo)
 {
-  int id;
   int handler;
 
   CtvAccess(threadinfo) = tinfo;
-  id = tMYID;
 
   tSTARTTIME = CmiWallTimer();
   for (;;) {
@@ -635,9 +642,21 @@ void BgNodeInitialize(nodeInfo *ninfo)
     tTHREADTABLE[tinfo->id] = t;
     CthAwaken(t);
   }
+}
 
-  /* send a null message to itself to start bgnode */ 
-  BgSendLocalPacket(-1, bgNodeStartHandler, SMALL_WORK, 0, NULL);
+CmiHandler exitHandlerFunc(char *msg)
+{
+  if (CmiMyPe() == 0)
+    CmiPrintf("\nBG> BlueGene emulator shutdown gracefully!\n");
+
+  // TODO: free memory before exit
+  int i;
+  delete [] nodeinfo;
+  delete [] inBuffer;
+  for (i=0; i<numNodes; i++) CmmFree(msgBuffer[i]);
+  delete [] msgBuffer;
+
+  CsdExitScheduler();
 }
 
 CmiStartFn mymain(int argc, char **argv)
@@ -660,17 +679,17 @@ CmiStartFn mymain(int argc, char **argv)
   CpvInitialize(int,msgHandler);
   CpvAccess(msgHandler) = CmiRegisterHandler((CmiHandler) msgHandlerFunc);
 
+  CpvInitialize(int,exitHandler);
+  CpvAccess(exitHandler) = CmiRegisterHandler((CmiHandler) exitHandlerFunc);
+
   /* init handlerTable */
   handlerTable = (BgHandler *)malloc(MAX_HANDLERS * sizeof(BgHandler));
   for (i=0; i<MAX_HANDLERS; i++) handlerTable[i] = defaultBgHandler;
 
-  /* register user must defined BgNodeStart */
-  inglobalinit = 1;
-  bgNodeStartHandler = BgRegisterHandler((BgHandler)BgNodeStart);
-
+  inEmulatorInit = 1;
   /* call user defined BgEmulatorInit */
   BgEmulatorInit(arg_argc, arg_argv);
-  inglobalinit = 0;
+  inEmulatorInit = 0;
 
   /* check if all bluegene node size and thread information are set */
   BGARGSCHECK;
@@ -680,7 +699,7 @@ CmiStartFn mymain(int argc, char **argv)
   /* number of bg nodes on this PE */
   numNodes = nodeInfo::numLocalNodes();
 
-  inBuffer = new bgQueue<bgMsg*>[numNodes];
+  inBuffer = new msgQueue[numNodes];
   for (i=0; i<numNodes; i++) inBuffer[i].initialize(INBUFFER_SIZE);
   msgBuffer = new CmmTable[numNodes];
   for (i=0; i<numNodes; i++) msgBuffer[i] = CmmNew();

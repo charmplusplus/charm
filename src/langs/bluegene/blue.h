@@ -12,6 +12,9 @@
 extern "C" {
 #endif
 
+	/* when send packets, this means it is a non-affinity message */
+#define ANYTHREAD   -1
+
 /* API data structures */
 	/* define size of a work which helps communication threads schedule */
 typedef enum WorkType {LARGE_WORK, SMALL_WORK} WorkType;
@@ -34,6 +37,7 @@ int  BgGetNumCommThread();
 void BgSetNumCommThread(int num);
 
 int  BgGetThreadID();
+int  BgGetGlobalThreadID();
 
 	/* get and set user-defined node private data */
 char *BgGetNodeData();
