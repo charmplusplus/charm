@@ -26,7 +26,7 @@ COMPATLIB=$(LIBDIR)/libampi-compat.a
 	$(CHARMC) -c $<
 
 all: AMPI AMPIF $(COMPATLIB)
-	cd $(CDIR)/tmp; CHARMINC=.; . ./conv-config.sh; cd $(PWD); if test -n "$$CMK_AMPI_WITH_ROMIO" ; then (make AMPI-ROMIO); fi
+	-cd $(CDIR)/tmp; CHARMINC=.; . ./conv-config.sh; cd $(PWD); if test -n "$$CMK_AMPI_WITH_ROMIO" ; then (make AMPI-ROMIO); fi
 
 $(ROMIOMAKE): $(COMPATLIB)
 	cd romio && ./config.sh && cd .. 
