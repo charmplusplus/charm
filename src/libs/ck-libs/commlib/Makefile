@@ -68,4 +68,4 @@ cifiles: ComlibManager.ci
 	$(CHARMC) ComlibManager.ci
 
 clean:
-	rm -f *~ ComlibModule.decl.h ComlibModule.def.h *.o 
+	rm -f *~ ComlibModule.decl.h ComlibModule.def.h *.o $(LIB)
