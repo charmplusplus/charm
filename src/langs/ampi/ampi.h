@@ -25,6 +25,9 @@ extern "C" {
 #define MPI_BYTE 6
 #define MPI_PACKED 7
 
+#define MPI_COMM_WORLD 0
+#define MPI_ANY_SOURCE (-1)
+
 #define MPI_MAX 1
 #define MPI_MIN 2
 #define MPI_SUM 3
