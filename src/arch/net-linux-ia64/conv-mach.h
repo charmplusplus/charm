@@ -8,7 +8,6 @@
 #ifndef _CONV_MACH_H
 #define _CONV_MACH_H
 
-#include "conv-common.h"
 
 #define CMK_IA64                                           1
 
@@ -68,16 +67,12 @@
 #define CMK_WHEN_PROCESSOR_IDLE_BUSYWAIT                   1
 #define CMK_WHEN_PROCESSOR_IDLE_USLEEP                     0
 
-#define CMK_USE_HP_MAIN_FIX                                0
-#define CMK_DONT_USE_HP_MAIN_FIX                           1
 
 #define CMK_DEBUG_MODE					   0 
 #define CMK_WEB_MODE                                       1
 
 #define CMK_LBDB_ON					   1
-#define CMK_LBDB_OFF					   0
 
-#include "conv-mach-opt.h"
 
 #endif
 
