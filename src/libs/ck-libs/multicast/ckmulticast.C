@@ -4,7 +4,7 @@
 
 #include "ckmulticast.h"
 
-#define DEBUGF(x)   // CkPrintf x;
+#define DEBUGF(x)  //  CkPrintf x;
 
 #define MAXMCASTCHILDREN 2
 
@@ -21,6 +21,7 @@ typedef CkVec<CkArrayIndexMax>   arrayIndexList;
 typedef CkVec<CkSectionInfo>     sectionIdList;
 typedef CkVec<CkReductionMsg *>  reductionMsgs;
 typedef CkQ<int>                 PieceSize;
+typedef CkVec<LDObjid>          ObjKeyList;
 typedef unsigned char            byte;
 
 class reductionInfo {
@@ -70,6 +71,7 @@ public:
   sectionIdList children;       /**< children section list */
   int numChild;
   arrayIndexList allElem;	// only useful on root
+  ObjKeyList     allObjKeys;    // only useful on root for LB
   arrayIndexList localElem;
   int pe;			/**< should always be mype */
   CkSectionInfo rootSid;      /**< section ID of the root */
@@ -100,7 +102,7 @@ public:
                    next->red.redNo++;
               }
   inline void print() {
-    CmiPrintf("[%d] mCastEntry: %p, numChild: %d pe: %d asm_msg:%p asm_fill:%d\n", CkMyPe(), this, numChild, pe, asm_msg, asm_fill);
+    CmiPrintf("[%d] mCastEntry: %p, numChild: %d pe: %d flag: %d asm_msg:%p asm_fill:%d\n", CkMyPe(), this, numChild, pe, flag, asm_msg, asm_fill);
   }
 };
 
@@ -142,9 +144,15 @@ void _ckMulticastInit(void)
 mCastEntry::mCastEntry (mCastEntry *old): 
   oldc(NULL), newc(NULL), flag(COOKIE_NOTREADY)
 {
+  int i;
   parentGrp = old->parentGrp;
-  for (int i=0; i<old->allElem.length(); i++)
+  for (i=0; i<old->allElem.length(); i++)
     allElem.push_back(old->allElem[i]);
+#if CMK_LBDB_ON
+  CmiAssert(old->allElem.length() == old->allObjKeys.length());
+  for (i=0; i<old->allObjKeys.length(); i++)
+    allObjKeys.push_back(old->allObjKeys[i]);
+#endif
   pe = old->pe;
   red.storedCallback = old->red.storedCallback;
   red.storedClient = old->red.storedClient;
@@ -155,12 +163,19 @@ mCastEntry::mCastEntry (mCastEntry *old):
   asm_fill = 0;
 }
 
+extern LDObjid idx2LDObjid(const CkArrayIndex &idx);    // cklocation.C
+
 // call setup to return a sectionid.
 void CkMulticastMgr::setSection(CkSectionInfo &_id, CkArrayID aid, CkArrayIndexMax *al, int n)
 {
   mCastEntry *entry = new mCastEntry;
-  for (int i=0; i<n; i++)
+  for (int i=0; i<n; i++) {
     entry->allElem.push_back(al[i]);
+#if CMK_LBDB_ON
+    const LDObjid key = idx2LDObjid(al[i]);
+    entry->allObjKeys.push_back(key);
+#endif
+  }
 //  entry->aid = aid;
   _id.aid = aid;
   _id.get_val() = entry;		// allocate table for this section
@@ -181,6 +196,10 @@ void CkMulticastMgr::setSection(CProxySection_ArrayElement &proxy)
   const CkArrayIndexMax *al = proxy.ckGetArrayElements();
   for (int i=0; i<proxy.ckGetNumElements(); i++) {
     entry->allElem.push_back(al[i]);
+#if CMK_LBDB_ON
+    const LDObjid key = idx2LDObjid(al[i]);
+    entry->allObjKeys.push_back(key);
+#endif
   }
   _id.type = MulticastMsg;
   _id.aid = proxy.ckGetArrayID();
@@ -188,21 +207,69 @@ void CkMulticastMgr::setSection(CProxySection_ArrayElement &proxy)
   initCookie(_id);
 }
 
+// to recreate section
+// when root migrate
+void CkMulticastMgr::resetSection(CProxySection_ArrayElement &proxy)
+{
+  CkSectionID &sid = proxy.ckGetSectionID();
+  CkSectionInfo &info = proxy.ckGetSectionInfo();
+  mCastEntry *entry = new mCastEntry;
+
+  int oldpe = info.get_pe();
+  void *oldentry = info.get_val();
+  CmiAssert(oldpe != CkMyPe());
+
+  const CkArrayIndexMax *al = sid._elems;
+  prepareCookie(entry, sid, al, sid._nElems, info.aid);
+
+  // find reduction number
+  CProxy_CkMulticastMgr  mCastGrp(thisgroup);
+  mCastGrp[oldpe].retrieveCookie(CkSectionInfo(oldpe, oldentry, 0), info);
+}
+
+// prepare a mCastEntry entry and set up in CkSectionID
+void CkMulticastMgr::prepareCookie(mCastEntry *entry, CkSectionID &sid, const CkArrayIndexMax *al, int count, CkArrayID aid)
+{
+  for (int i=0; i<count; i++) {
+    entry->allElem.push_back(al[i]);
+#if CMK_LBDB_ON
+    const LDObjid key = idx2LDObjid(al[i]);
+    entry->allObjKeys.push_back(key);
+#endif
+  }
+  sid._cookie.type = MulticastMsg;
+  sid._cookie.aid = aid;
+  sid._cookie.get_val() = entry;	// allocate table for this section
+  sid._cookie.get_pe() = CkMyPe();
+}
+
 // this is used
 void CkMulticastMgr::initDelegateMgr(CProxy *cproxy)
 {
   CProxySection_ArrayBase *proxy = (CProxySection_ArrayBase *)cproxy;
-  CkSectionInfo &_id = proxy->ckGetSectionInfo();
+  CkSectionID &sid = proxy->ckGetSectionID();
   mCastEntry *entry = new mCastEntry;
 
   const CkArrayIndexMax *al = proxy->ckGetArrayElements();
-  for (int i=0; i<proxy->ckGetNumElements(); i++) {
-    entry->allElem.push_back(al[i]);
-  }
-  _id.type = MulticastMsg;
-  _id.aid = proxy->ckGetArrayID();
-  _id.get_val() = entry;		// allocate table for this section
-  initCookie(_id);
+  prepareCookie(entry, sid, al, proxy->ckGetNumElements(), proxy->ckGetArrayID());
+  initCookie(sid._cookie);
+}
+
+void CkMulticastMgr::retrieveCookie(CkSectionInfo s, CkSectionInfo srcInfo)
+{
+  mCastEntry *entry = (mCastEntry *)s.get_val();
+  CProxy_CkMulticastMgr  mCastGrp(thisgroup);
+  mCastGrp[srcInfo.get_pe()].recvCookieInfo(srcInfo, entry->red.redNo);
+}
+
+// now that we get reduction number from the old cookie,
+// we continue to build the spanning tree
+void CkMulticastMgr::recvCookieInfo(CkSectionInfo s, int red)
+{
+  mCastEntry *entry = (mCastEntry *)s.get_val();
+  entry->red.redNo = red;
+
+  initCookie(s);
 }
 
 void CkMulticastMgr::initCookie(CkSectionInfo s)
@@ -219,6 +286,7 @@ void CkMulticastMgr::initCookie(CkSectionInfo s)
   for (int i=0; i<n; i++) {
     msg->arrIdx[i] = entry->allElem[i];
     int ape = array->lastKnown(entry->allElem[i]);
+    CmiAssert(ape >=0 && ape < CkNumPes());
     msg->lastKnown[i] = ape;
   }
   CProxy_CkMulticastMgr  mCastGrp(thisgroup);
@@ -382,6 +450,7 @@ void CkMulticastMgr::rebuild(CkSectionInfo &sectId)
   while (curCookie->newc) curCookie = curCookie->newc;
   if (curCookie->isObsolete()) return;
 
+  //CmiPrintf("tree rebuild\n");
   mCastEntry *newCookie = new mCastEntry(curCookie);  // allocate table for this section
 
   // build a chain
@@ -414,23 +483,64 @@ void CkMulticastMgr::resetCookie(CkSectionInfo s)
   initCookie(s);
 }
 
-void CkMulticastMgr::ArraySectionSend(CkDelegateData *pd,int ep,void *m, CkArrayID a, CkSectionID &sid)
+void CkMulticastMgr::SimpleSend(int ep,void *m, CkArrayID a, CkSectionID &sid, int opts)
+{
+  DEBUGF(("[%d] SimpleSend: nElems:%d\n", CkMyPe(), sid._nElems));
+    // set an invalid cookie since we don't have it
+  ((multicastGrpMsg *)m)->_cookie = CkSectionInfo(-1, NULL, 0);
+  for (int i=0; i< sid._nElems-1; i++) {
+     CProxyElement_ArrayBase ap(a, sid._elems[i]);
+     void *newMsg=CkCopyMsg((void **)&m);
+     ap.ckSend((CkArrayMessage *)newMsg,ep,opts|CK_MSG_LB_NOTRACE);
+  }
+  if (sid._nElems > 0) {
+     CProxyElement_ArrayBase ap(a, sid._elems[sid._nElems-1]);
+     ap.ckSend((CkArrayMessage *)m,ep,opts|CK_MSG_LB_NOTRACE);
+  }
+}
+
+void CkMulticastMgr::ArraySectionSend(CkDelegateData *pd,int ep,void *m, CkArrayID a, CkSectionID &sid, int opts)
 {
   DEBUGF(("ArraySectionSend\n"));
 
+  multicastGrpMsg *msg = (multicastGrpMsg *)m;
+  msg->aid = a;
+  msg->ep = ep;
+
   CkSectionInfo &s = sid._cookie;
+  mCastEntry *entry;
+
   if (s.get_pe() == CkMyPe()) {
-    mCastEntry *entry = (mCastEntry *)s.get_val();   
+    entry = (mCastEntry *)s.get_val();   
     if (entry == NULL) {
       CmiAbort("Unknown array section, Did you forget to register the array section to CkMulticastMgr using setSection()?");
     }
 
-    // update entry pointer in case there is newer one.
+    // update entry pointer in case there is a newer one.
     if (entry->newc) {
       do { entry=entry->newc; } while (entry->newc);
       s.get_val() = entry;
     }
-    if (entry->needRebuild) rebuild(s);
+
+#if CMK_LBDB_ON
+    // fixme: running obj?
+    envelope *env = UsrToEnv(msg);
+    const LDOMHandle &om = CProxy_ArrayBase(msg->aid).ckLocMgr()->getOMHandle();
+    LBDatabaseObj()->MulticastSend(om,entry->allObjKeys.getVec(),entry->allObjKeys.size(),env->getTotalsize());
+#endif
+
+    // first time need to rebuild, we do simple send to refresh lastKnown
+    if (entry->needRebuild == 1) {
+      msg->_cookie = s;
+      SimpleSend(ep, msg, a, sid, opts);
+      entry->needRebuild = 2;
+      return;
+    }
+    else if (entry->needRebuild == 2) rebuild(s);
+  }
+  else {
+    // fixme - in this case, not recorded in LB
+    CmiPrintf("Warning: Multicast not optimized after multicast root migrated. \n");
   }
 
   // don't need packing here
@@ -439,10 +549,9 @@ void CkMulticastMgr::ArraySectionSend(CkDelegateData *pd,int ep,void *m, CkArray
   CkPackMessage(&env);
   m = EnvToUsr(env);
 */
-  multicastGrpMsg *msg = (multicastGrpMsg *)m;
-  msg->aid = a;
+
+  // update cookie
   msg->_cookie = s;
-  msg->ep = ep;
 
 #if SPLIT_MULTICAST
   // split multicast msg into SPLIT_NUM copies
@@ -555,7 +664,7 @@ void CkMulticastMgr::recvMsg(multicastGrpMsg *msg)
     else {
       // send through scheduler queue
       multicastGrpMsg *newm = (multicastGrpMsg *)CkCopyMsg((void **)&msg);
-      ap.ckSend((CkArrayMessage *)newm, msg->ep);
+      ap.ckSend((CkArrayMessage *)newm, msg->ep, CK_MSG_LB_NOTRACE);
     }
     // use CK_MSG_DONTFREE so that the message can be reused
     // the drawback of this scheme bypassing queue is that 
@@ -566,7 +675,7 @@ void CkMulticastMgr::recvMsg(multicastGrpMsg *msg)
   }
   if (nLocal) {
     CProxyElement_ArrayBase ap(msg->aid, entry->localElem[nLocal-1]);
-    ap.ckSend((CkArrayMessage *)msg, msg->ep);
+    ap.ckSend((CkArrayMessage *)msg, msg->ep, CK_MSG_LB_NOTRACE);
 //    CkSendMsgArrayInline(msg->ep, msg, msg->aid, entry->localElem[nLocal-1]);
   }
   else {
@@ -582,9 +691,12 @@ void CkGetSectionInfo(CkSectionInfo &id, void *msg)
   CkMcastBaseMsg *m = (CkMcastBaseMsg *)msg;
   if (CkMcastBaseMsg::checkMagic(m) == 0) 
     CmiAbort("Did you remember inherit multicast message from CkMcastBaseMsg?");
-  id.type = MulticastMsg;
-  id.get_pe() = m->gpe();
-  id.get_val() = m->cookie();
+  // ignore invalid cookie sent by SimpleSend
+  if (m->gpe() != -1) {
+    id.type = MulticastMsg;
+    id.get_pe() = m->gpe();
+    id.get_val() = m->cookie();
+  }
   // note: retain old redNo
 }
 
@@ -684,7 +796,7 @@ void CkMulticastMgr::contribute(int dataSize,void *data,CkReduction::reducerType
   }
 
   id.get_redNo()++;
-  DEBUGF(("[%d] val: %d %p\n", CkMyPe(), id.pe, id.val));
+  DEBUGF(("[%d] val: %d %p\n", CkMyPe(), id.get_pe(), id.get_val()));
 }
 
 CkReductionMsg* CkMulticastMgr::combineFrags (CkSectionInfo& id, 
@@ -789,7 +901,7 @@ void CkMulticastMgr::reduceFragment (int index, CkSectionInfo& id,
     newmsg->gcount     = redInfo.gcount [index];
     newmsg->rebuilt    = rebuilt;
     newmsg->callback   = msg_cb;
-    DEBUGF(("send to parent %p: %d\n", entry->parentGrp.val, entry->parentGrp.pe));
+    DEBUGF(("send to parent %p: %d\n", entry->parentGrp.get_val(), entry->parentGrp.get_pe()));
     mCastGrp[entry->parentGrp.get_pe()].recvRedMsg(newmsg);
   } else { // root
     newmsg->sid = id;
@@ -821,7 +933,7 @@ void CkMulticastMgr::reduceFragment (int index, CkSectionInfo& id,
         mCastGrp[CkMyPe()].freeup(CkSectionInfo(id.get_pe(), entry->oldc, 0));
         entry->oldc = NULL;
       }
-      if (rebuilt) entry->needRebuild = 1;
+      if (rebuilt && !entry->needRebuild) entry->needRebuild = 1;
     }
   }
 }
@@ -873,7 +985,7 @@ void CkMulticastMgr::recvRedMsg(CkReductionMsg *msg)
     return;
   }
 
-  DEBUGF(("[%d] recvRedMsg flag:%d red:%d\n", CkMyPe(), msg->flag, redInfo.redNo));
+  DEBUGF(("[%d] recvRedMsg rebuilt:%d red:%d\n", CkMyPe(), msg->rebuilt, redInfo.redNo));
 
   const int index = msg->fragNo;
 

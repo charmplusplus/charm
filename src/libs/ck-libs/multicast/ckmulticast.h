@@ -67,8 +67,12 @@ class CkMulticastMgr: public CkDelegateMgr {
     void setSection(CkSectionInfo &id, CkArrayID aid, CkArrayIndexMax *, int n);
     void setSection(CkSectionInfo &id);
     void setSection(CProxySection_ArrayElement &proxy);
+    void resetSection(CProxySection_ArrayElement &proxy);
     virtual void initDelegateMgr(CProxy *proxy);
-    void ArraySectionSend(CkDelegateData *pd,int ep,void *m, CkArrayID a, CkSectionID &s);
+    void retrieveCookie(CkSectionInfo s, CkSectionInfo srcInfo);
+    void recvCookieInfo(CkSectionInfo s, int red);
+    void ArraySectionSend(CkDelegateData *pd,int ep,void *m, CkArrayID a, CkSectionID &s, int opts);
+    void SimpleSend(int ep,void *m, CkArrayID a, CkSectionID &sid, int opts);
     // entry
     void teardown(CkSectionInfo s);  /**< entry: tear down the tree */
     void freeup(CkSectionInfo s);    /**< entry: free old tree */
@@ -91,6 +95,7 @@ class CkMulticastMgr: public CkDelegateMgr {
   public:
 //    typedef CkMcastReductionMsg *(*reducerFn)(int nMsg,CkMcastReductionMsg **msgs);
   private:
+    void prepareCookie(mCastEntry *entry, CkSectionID &sid, const CkArrayIndexMax *al, int count, CkArrayID aid);
     void initCookie(CkSectionInfo sid);
     void resetCookie(CkSectionInfo sid);
     enum {MAXREDUCERS=256};
