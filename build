@@ -12,7 +12,7 @@ syntax() {
   echo '<options>: help cc cc64 cxx kcc pgcc acc icc smp gm vmi scyld '
   echo ''
   echo '<charmc-options>: e.g. -g -save -verbose'
-  echo 'Note: This script is trivial.  It'
+  echo 'Note: This script:'
   echo ' 1. Creates directories <version> and <version>/tmp';
 #  echo ' 2. Copies src/Common/scripts/Makefile into <version>/tmp';
   echo ' 2. Does a "make <target> <version> OPTS=<charmc-options>" in <version>/tmp.'
@@ -97,6 +97,7 @@ fi
 [ -d $VERSION ] || mkdir $VERSION
 [ -d $VERSION/tmp ] || echo "Creating dir: $VERSION/tmp" 
 [ -d $VERSION/tmp ] || mkdir $VERSION/tmp
+
 echo "Copying src/Common/scripts/Makefile to $VERSION/tmp"
 rm -f $VERSION/tmp/Makefile
 
@@ -113,6 +114,11 @@ else
 #!/bin/sh
 ln -f -s \$@
 EOF
+	for dir in `echo bin lib include tmp`
+	do
+		[ -L $dir ] && rm -f $dir
+		ln -s $VERSION/$dir $dir
+	done
 fi
 
 chmod +x $VERSION/tmp/system_ln
@@ -151,7 +157,7 @@ then
 	echo "-------------------------------------------------"
 	echo "$PROGRAM built successfully."
 	echo "Next, try out a sample program like" \
-	     "$VERSION/pgms/charm++/simplearrayhello"
+	     "pgms/charm++/simplearrayhello"
 else
 	echo "-------------------------------------------------"
 	echo "Charm++ NOT BUILT. Either cd into $VERSION/tmp and try"
