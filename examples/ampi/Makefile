@@ -1,4 +1,6 @@
-DIRS=creduce Cjacobi3D
+DIRS=creduce 
+# Cjacobi3D taken off temporarily while chao plays with it. 
+# chao will put it back when done.
 
 all:
 	for d in $(DIRS); do \
