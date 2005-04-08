@@ -972,6 +972,7 @@ int chunk::lockLocalChunk(int lhc, int lhi, double prio)
       lockList = lockList->next;
       return 1;
     }
+    removeLock(lhc, lhi);
     DEBUGREF(CkPrintf("TMRC2D: [%d] LOCK chunk %d by %d on %d prio %.10f REFUSED (was %d[%don%d:%.10f])\n", CkMyPe(), cid, lhi, lhc, prio, lock, lockHolderIdx, lockHolderCid, lockPrio);)
     return 0;
   }
@@ -985,15 +986,17 @@ int chunk::lockLocalChunk(int lhc, int lhi, double prio)
       CkPrintf("ERROR: lockholder %d on %d trying to relock with different prio! prio=%f newprio=%f\n", lhi, lhc, lockPrio, prio);
       CmiAssert(!((lhi == lockHolderIdx) && (lhc == lockHolderCid)));
     }
+    /*
     removeLock(lhc, lhi);
     insertLock(lhc, lhi, prio);
     if ((lockList->prio == prio) && (lockList->holderIdx == lhi) && (lockList->holderCid == lhc)) {
       if ((prio < lockPrio) && (lhc != lockHolderCid)) { // lh might be next
 	CkPrintf("[%d]LOCK chunk %d by %d on %d prio %.10f SPIN (was %d[%don%d:%.10f])\n", CkMyPe(), cid, lhi, lhc, prio, lock, lockHolderIdx, lockHolderCid, lockPrio);
-	return -1; 
+	return 0; 
       }
     }
     removeLock(lhc, lhi);
+    */
     DEBUGREF(CkPrintf("TMRC2D: [%d] LOCK chunk %d by %d on %d prio %.10f REFUSED (was %d[%don%d:%.10f])\n", CkMyPe(), cid, lhi, lhc, prio, lock, lockHolderIdx, lockHolderCid, lockPrio);)
     return 0;
   }

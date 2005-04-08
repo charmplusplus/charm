@@ -295,12 +295,14 @@ void element::collapse(int shortEdge)
     FEM_Comm_Rec *dNodeRec=(FEM_Comm_Rec *)(theNodes->shared.getRec(nodes[delNode]));
     FEM_Comm_Rec *kNodeRec=(FEM_Comm_Rec *)(theNodes->shared.getRec(nodes[keepNode]));
     edge e;
-    kIdx = e.existsOn(kNodeRec, edges[shortEdge].cid);
-    dIdx = e.existsOn(dNodeRec, edges[shortEdge].cid);
+    kIdx = kNodeRec->getIdx(e.existsOn(kNodeRec, edges[shortEdge].cid));
+    dIdx = dNodeRec->getIdx(e.existsOn(dNodeRec, edges[shortEdge].cid));
     CkAssert(kIdx > -1);
     CkAssert(dIdx > -1);
+    CkAssert(dIdx != kIdx);
   }
   // collapse the edge; takes care of neighbor element
+  DEBUGREF(CkPrintf("TMRC2D: [%d] ...kIdx=%d dIdx=%d\n", myRef.cid, kIdx, dIdx);)
   result = edges[shortEdge].collapse(myRef, kIdx, dIdx, keepNbr, delNbr, 
 				     edges[keepEdge], edges[delEdge], 
 				     C->theNodes[nodes[opnode]], 

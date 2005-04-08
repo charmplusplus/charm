@@ -129,7 +129,7 @@ int edge::collapse(elemRef requester, int kIdx, int dIdx, elemRef kNbr,
       C->nodeReplaceDelete(kIdx, dIdx, newNode);
       for (i=0; i<dCount; i++) {
 	chunk = dNodeRec->getChk(i);
-	if ((j=existsOn(kNodeRec, chunk)) >= 0) {
+	if (kNodeRec && ((j=existsOn(kNodeRec, chunk)) >= 0)) {
 	  mesh[chunk].nodeReplaceDelete(kNodeRec->getIdx(j), 
 					dNodeRec->getIdx(i), newNode);
 	}
@@ -139,7 +139,7 @@ int edge::collapse(elemRef requester, int kIdx, int dIdx, elemRef kNbr,
       }
       for (i=0; i<kCount; i++) {
 	chunk = kNodeRec->getChk(i);
-	if (existsOn(dNodeRec, chunk) == -1) {
+	if (!dNodeRec || (existsOn(dNodeRec, chunk) == -1)) {
 	  mesh[chunk].nodeReplaceDelete(kNodeRec->getIdx(i), -1, newNode);
 	}
       }
@@ -169,7 +169,7 @@ int edge::collapse(elemRef requester, int kIdx, int dIdx, elemRef kNbr,
       C->nodeReplaceDelete(dIdx, kIdx, newNode);
       for (i=0; i<dCount; i++) {
 	chunk = dNodeRec->getChk(i);
-	if ((j=existsOn(kNodeRec, chunk)) >= 0) {
+	if (kNodeRec && ((j=existsOn(kNodeRec, chunk)) >= 0)) {
 	  mesh[chunk].nodeReplaceDelete(kNodeRec->getIdx(j), 
 					dNodeRec->getIdx(i), newNode);
 	}
@@ -179,7 +179,7 @@ int edge::collapse(elemRef requester, int kIdx, int dIdx, elemRef kNbr,
       }
       for (i=0; i<kCount; i++) {
 	chunk = kNodeRec->getChk(i);
-	if (existsOn(dNodeRec, chunk) == -1) {
+	if (!dNodeRec || (existsOn(dNodeRec, chunk) == -1)) {
 	  mesh[chunk].nodeReplaceDelete(kNodeRec->getIdx(i), -1, newNode);
 	}
       }
@@ -216,33 +216,36 @@ int edge::collapse(elemRef requester, int kIdx, int dIdx, elemRef kNbr,
     else dCount = 0;
     if (kNodeRec) kCount = kNodeRec->getShared();
     else kCount = 0;
-    while (lk != 1) {
-      if (lk == 0) return -1;
-      else if (lk == -1) CthYield();
-      lk = C->lockLocalChunk(myRef.cid, myRef.idx, length);
-    }
+    if (!(C->lockLocalChunk(myRef.cid, myRef.idx, length)))
+      return -1;
     for (i=0; i<dCount; i++) {
       chunk = dNodeRec->getChk(i);
       im = mesh[chunk].lockChunk(myRef.cid, myRef.idx, length);
-      while (im->anInt != 1) {
-	if (im->anInt == 0) { 
-	  CkFreeMsg(im); 
-	  return -1; 
+      if (im->anInt == 0) { 
+	CkFreeMsg(im); 
+	C->unlockLocalChunk(myRef.cid, myRef.idx);
+	for (j=0; j<i; j++) {
+	  chunk = dNodeRec->getChk(j);
+	  mesh[chunk].unlockChunk(myRef.cid, myRef.idx);
 	}
-	else if (im->anInt == -1) { CkFreeMsg(im); CthYield(); }
-	im = mesh[chunk].lockChunk(myRef.cid, myRef.idx, length);
+	return -1; 
       }
     }
     for (i=0; i<kCount; i++) {
       chunk = kNodeRec->getChk(i);
       im = mesh[chunk].lockChunk(myRef.cid, myRef.idx, length);
-      while (im->anInt != 1) {
-	if (im->anInt == 0) { 
-	  CkFreeMsg(im); 
-	  return -1; 
+      if (im->anInt == 0) { 
+	CkFreeMsg(im); 
+	C->unlockLocalChunk(myRef.cid, myRef.idx);
+	for (j=0; j<dCount; j++) {
+	  chunk = dNodeRec->getChk(j);
+	  mesh[chunk].unlockChunk(myRef.cid, myRef.idx);
 	}
-	else if (im->anInt == -1) { CkFreeMsg(im); CthYield(); }
-	im = mesh[chunk].lockChunk(myRef.cid, myRef.idx, length);
+	for (j=0; j<i; j++) {
+	  chunk = kNodeRec->getChk(j);
+	  mesh[chunk].unlockChunk(myRef.cid, myRef.idx);
+	}
+	return -1; 
       }
     }
     //DEBUGREF(CkPrintf("TMRC2D: [%d] ......edge::collapse: LOCKS obtained... On edge=%d on chunk=%d, requester==(%d,%d) with nbr=(%d,%d)\n", myRef.cid, myRef.idx, myRef.cid, requester.cid, requester.idx, nbr.cid, nbr.idx);)
@@ -275,7 +278,7 @@ int edge::collapse(elemRef requester, int kIdx, int dIdx, elemRef kNbr,
       C->nodeReplaceDelete(kIdx, dIdx, newNode);
       for (i=0; i<dCount; i++) {
 	chunk = dNodeRec->getChk(i);
-	if ((j=existsOn(kNodeRec, chunk)) >= 0) {
+	if (kNodeRec && ((j=existsOn(kNodeRec, chunk)) >= 0)) {
 	  mesh[chunk].nodeReplaceDelete(kNodeRec->getIdx(j), 
 					dNodeRec->getIdx(i), newNode);
 	}
@@ -285,7 +288,7 @@ int edge::collapse(elemRef requester, int kIdx, int dIdx, elemRef kNbr,
       }
       for (i=0; i<kCount; i++) {
 	chunk = kNodeRec->getChk(i);
-	if (existsOn(dNodeRec, chunk) == -1) {
+	if (!dNodeRec || (existsOn(dNodeRec, chunk) == -1)) {
 	  mesh[chunk].nodeReplaceDelete(kNodeRec->getIdx(i), -1, newNode);
 	}
       }
