@@ -11,11 +11,13 @@ class edge {
   int pending, newNodeIdx;
   double length;
   elemRef waitingFor, delNbr, keepNbr;
-  node newNode, incidentNode, fixNode, opnode;
+  node newNode, opnode;
+  int incidentNode, fixNode;
   edgeRef newEdgeRef; // half of this edge: from newNode to incidentNode
   chunk *C;
   edgeRef myRef, keepEdge, delEdge;
   elemRef elements[2];  // the elements on either side of the edge
+  int nodes[2];  // the nodes on either end of the edge on the edge's chunk
   int present;  // indicates this is an edge present in the mesh
   edge() { unsetPending(); present = 0; }
   edge(int idx, int cid, chunk *myChk) { 
@@ -51,6 +53,7 @@ class edge {
   }
   void set(elemRef e1, elemRef e2) { elements[0] = e1;  elements[1] = e2; }
   void set(elemRef *e) { elements[0] = e[0]; elements[1] = e[1]; }
+  void setNodes(int n1, int n2) { nodes[0] = n1; nodes[1] = n2; }
   void reset();
   edge& operator=(const edge& e) { 
     for (int i=0; i<2; i++)  elements[i] = e.elements[i];
@@ -93,9 +96,16 @@ class edge {
   void checkPending(elemRef e, elemRef ne);
   int split(int *m, edgeRef *e_prime, node iNode, node fNode,
 	    elemRef requester, int *local, int *first, int *nullNbr);
-  int collapse(elemRef requester, node kNode, node dNode, elemRef kNbr,
+  int collapse(elemRef requester, int kIdx, int dIdx, elemRef kNbr,
 	       elemRef dNbr, edgeRef kEdge, edgeRef dEdge, node oNode,
 	       int *local, int *first, node newN);
+  int existsOn(FEM_Comm_Rec *cl, int chunkID) {
+    int count = cl->getShared();
+    for (int i=0; i<count; i++) {
+      if (chunkID == cl->getChk(i)) return i;
+    }
+    return -1;
+  }
   void sanityCheck(chunk *c, edgeRef shouldRef);
 };
 

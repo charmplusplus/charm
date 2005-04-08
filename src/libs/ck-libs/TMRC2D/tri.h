@@ -194,18 +194,10 @@ class chunk : public TCharmClient1D {
   // See above for details of each
   intMsg *safeToMoveNode(int idx, double x, double y);
   splitOutMsg *split(int idx, elemRef e, node in, node fn);
-  splitOutMsg *collapse(int idx, elemRef e, node kn, node dn, elemRef kNbr, 
+  splitOutMsg *collapse(int idx, elemRef e, int kIdx, int dIdx, elemRef kNbr, 
 			elemRef dNbr, edgeRef kEdge, edgeRef dEdge, 
 			node opnode, node newN);
-  void collapseHelp(int idx, edgeRef er, node n1, node n2);
-  intMsg *nodeLockup(node n, double l, edgeRef start);
-  intMsg *opnodeLockup(int elemID, double l, edgeRef e);
-  void opnodeUnlock(int elemID, edgeRef e);
-  int getNode(node n);
-  void nodeUnlock(node n);
-  void nodeUpdate(node n, node newNode);
-  void nodeDelete(node n, node ndReplace);
-  void nodeReplaceDelete(node kn, node dn, node nn);
+  void nodeReplaceDelete(int kIdx, int dIdx, node nn);
   intMsg *isPending(int idx, objRef e);
   void checkPending(int idx, objRef aRef);
   void checkPending(int idx, objRef aRef1, objRef aRef2);

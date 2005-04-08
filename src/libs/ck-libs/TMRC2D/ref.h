@@ -41,7 +41,7 @@ class edgeRef : public objRef {
   void remove();
   int split(int *m, edgeRef *e_prime, node iNode, node fNode,
 	    elemRef requester, int *local, int *first, int *nullNbr);
-  int collapse(elemRef requester, node kNode, node dNode, elemRef kNbr, 
+  int collapse(elemRef requester, int kIdx, int dIdx, elemRef kNbr, 
 	       elemRef dNbr, edgeRef kEdge, edgeRef dEdge, node opnode,
 	       int *local, int *first, node newN);
   void resetEdge();

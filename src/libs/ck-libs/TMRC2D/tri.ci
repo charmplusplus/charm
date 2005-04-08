@@ -23,15 +23,9 @@ module refine {
     entry [threaded] void coarseningElements();	
     entry [sync] intMsg *safeToMoveNode(int, double, double);
     entry [sync, threaded] splitOutMsg *split(int, elemRef, node, node);
-    entry [sync, threaded] splitOutMsg *collapse(int, elemRef, node, node, 
+    entry [sync, threaded] splitOutMsg *collapse(int, elemRef, int, int, 
 	elemRef, elemRef, edgeRef, edgeRef, node, node);
-    entry [sync, threaded] intMsg *nodeLockup(node, double, edgeRef);
-    entry [sync, threaded] intMsg *opnodeLockup(int, double, edgeRef);
-    entry [sync, threaded] void opnodeUnlock(int, edgeRef);
-    entry [sync, threaded] void nodeUnlock(node);
-    entry [sync, threaded] void nodeUpdate(node, node);
-    entry [sync, threaded] void nodeDelete(node, node);
-    entry [sync, threaded] void nodeReplaceDelete(node, node, node);
+    entry [sync, threaded] void nodeReplaceDelete(int, int, node);
     entry [sync] intMsg *isPending(int, objRef);
     entry void checkPending(int, objRef);
     entry void checkPending(int, objRef, objRef);

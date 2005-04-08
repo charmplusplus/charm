@@ -115,7 +115,7 @@ void chunk::coarseningElements()
 	   (theElements[i].getArea() == 0.0))) {
 	// element i has higher target area or no area -- needs coarsening
 	cCount++;
-	//DEBUGREF(CkPrintf("TMRC2D: [%d] Coarsen element %d: area=%f target=%f\n", cid, i, theElements[i].getArea(), theElements[i].getTargetArea());)
+	DEBUGREF(CkPrintf("TMRC2D: [%d] Coarsen element %d: area=%f target=%f\n", cid, i, theElements[i].getArea(), theElements[i].getTargetArea());)
 	modified = 1; // something's bound to change
 	theElements[i].coarsen(); // coarsen the element
       }
@@ -151,192 +151,60 @@ splitOutMsg *chunk::split(int idx, elemRef e, node in, node fn)
   return som;
 }
 
-splitOutMsg *chunk::collapse(int idx, elemRef e, node kn, node dn, 
+splitOutMsg *chunk::collapse(int idx, elemRef e, int kIdx, int dIdx,
 			     elemRef kNbr, elemRef dNbr, edgeRef kEdge, 
 			     edgeRef dEdge, node opnode, node newN)
 {
   splitOutMsg *som = new splitOutMsg;
   accessLock();
-  som->result = theEdges[idx].collapse(e, kn, dn, kNbr, dNbr, kEdge, dEdge,
+  som->result = theEdges[idx].collapse(e, kIdx, dIdx, kNbr, dNbr, kEdge, dEdge,
 				       opnode, &(som->local), &(som->first), 
 				       newN);
   releaseLock();
   return som;
 }
 
-void chunk::collapseHelp(int idx, edgeRef er, node n1, node n2)
+void chunk::nodeReplaceDelete(int kIdx, int dIdx, node nn)
 {
-  DEBUGREF(CkPrintf("TMRC2D: [%d] WARNING! chunk::collapseHelp called but not implemented!\n", cid);)
-  //  theElements[idx].collapseHelp(er, n1, n2);
-}
-
-intMsg *chunk::nodeLockup(node n, double l, edgeRef start)
-{
-  intMsg *im = new intMsg;
-  im->anInt = 1;
+  DEBUGREF(CkPrintf("TMRC2D: [%d] nodeReplaceDelete: kIdx=%d dIdx=%d\n", cid, kIdx, dIdx);)
   accessLock();
-  for (int i=0; i<nodeSlots; i++) {
-    if (theNodes[i].isPresent() && (n == theNodes[i])) {
-      im->anInt = theNodes[i].lock(l, start);
-      break;
-    }
-  }
-  releaseLock();
-  return im;
-}
-
-intMsg *chunk::opnodeLockup(int elemID, double l, edgeRef e)
-{
-  intMsg *im = new intMsg;
-  accessLock();
-  im->anInt = theElements[elemID].lockOpNode(e, l);
-  releaseLock();
-  return im;
-}
-
-void chunk::opnodeUnlock(int elemID, edgeRef e)
-{
-  accessLock();
-  theElements[elemID].unlockOpNode(e);
-  releaseLock();
-}
-
-int chunk::getNode(node n)
-{
-  accessLock();
-  for (int i=0; i<nodeSlots; i++) {
-    if (theNodes[i].isPresent() && (n == theNodes[i])) {
-      return i;
-    }
-  }
-  CkPrintf("ERROR: chunk::getNode: Node [%2.8f,%2.8f] not found!\n", n.X(), n.Y());
-  CkAssert(0);
-  releaseLock();
-}
-
-void chunk::nodeUnlock(node n)
-{
-  accessLock();
-  for (int i=0; i<nodeSlots; i++) {
-    if (theNodes[i].isPresent() && (n == theNodes[i])) {
-      theNodes[i].unlock();
-      break;
-    }
-  }
-  releaseLock();
-}
-
-void chunk::nodeUpdate(node n, node newNode)
-{
-  accessLock();
-  for (int i=0; i<nodeSlots; i++) {
-    if (theNodes[i].isPresent() && (n == theNodes[i])) {
-      theNodes[i].set(newNode.X(), newNode.Y());
-      theNodes[i].boundary = newNode.boundary;
-      theNodes[i].unlock();
-      theClient->nodeUpdate(i, newNode.X(), newNode.Y());
-      DEBUGREF(CkPrintf("TMRC2D: [%d] theClient->nodeUpdate(%d, %2.10f, %2.10f\n", cid, i, newNode.X(), newNode.Y());)
-      break;
-    }
-  }
-  releaseLock();
-}
-
-void chunk::nodeDelete(node n, node ndReplace)
-{
-  int nIdx=-1, rIdx=-1, found=0;
-  accessLock();
-  // replace and delete n
-  for (int i=0; i<nodeSlots; i++) {
-    if (theNodes[i].isPresent()) {
-      if (n == theNodes[i]) { 
-	nIdx = i;
-	found++;
-      }
-      else if (ndReplace == theNodes[i]) {
-	rIdx = i;
-	found++;
-      }
-      if (found == 2) break;
-    }
-  }
-  if (nIdx == -1) { 
-    if (rIdx != -1) theNodes[rIdx].unlock();
-    return;
-  }
-  else if (rIdx == -1) {
-    theNodes[nIdx].set(ndReplace.X(), ndReplace.Y());
-    theNodes[nIdx].boundary = ndReplace.boundary;
-    theNodes[nIdx].unlock();
-    theClient->nodeUpdate(nIdx, ndReplace.X(), ndReplace.Y());
-    DEBUGREF(CkPrintf("TMRC2D: [%d] theClient->nodeUpdate(%d, %2.10f, %2.10f\n", cid, nIdx, ndReplace.X(), ndReplace.Y());)
-  }
-  else {
-    removeNode(nIdx);
-    theNodes[rIdx].unlock();
-    for (int j=0; j<elementSlots; j++) {
-      if (theElements[j].isPresent()) {
-	for (int k=0; k<3; k++) {
-	  if (theElements[j].nodes[k] == nIdx) {
-	    theElements[j].nodes[k] = rIdx;
-	    theClient->nodeReplaceDelete(j, k, nIdx, rIdx);
-	    DEBUGREF(CkPrintf("TMRC2D: [%d]theClient->nodeReplaceDelete(%d, %d, %d, %d\n", cid, j, k, nIdx, rIdx);)
-	  }
-	}
-      }
-    }
-  }
-  releaseLock();
-}
-
-void chunk::nodeReplaceDelete(node kn, node dn, node nn)
-{
-  int kIdx=-1, dIdx=-1, found=0;
-  accessLock();
-  for (int i=0; i<nodeSlots; i++) {
-    if (theNodes[i].isPresent()) {
-      if (kn == theNodes[i]) { 
-	kIdx = i;
-	found++;
-      }
-      else if (dn == theNodes[i]) {
-	dIdx = i;
-	found++;
-      }
-      if (found == 2) break;
-    }
-  }
   if (dIdx == -1) { 
     if (kIdx != -1) {
-      theNodes[kIdx].unlock();
       theNodes[kIdx].set(nn.X(), nn.Y());
       theNodes[kIdx].boundary = nn.boundary;
       theClient->nodeUpdate(kIdx, nn.X(), nn.Y());
-      DEBUGREF(CkPrintf("TMRC2D: [%d] (a)theClient->nodeUpdate(%d, %2.10f, %2.10f\n", cid, kIdx, nn.X(), nn.Y());)
+      DEBUGREF(CkPrintf("TMRC2D: [%d] (a)theClient->nodeUpdate(%d, %2.10f, %2.10f)\n", cid, kIdx, nn.X(), nn.Y());)
     }
     return;
   }
   else if (kIdx == -1) {
     theNodes[dIdx].set(nn.X(), nn.Y());
     theNodes[dIdx].boundary = nn.boundary;
-    theNodes[dIdx].unlock();
     theClient->nodeUpdate(dIdx, nn.X(), nn.Y());
-    DEBUGREF(CkPrintf("TMRC2D: [%d] (b)theClient->nodeUpdate(%d, %2.10f, %2.10f\n", cid, dIdx, nn.X(), nn.Y());)
+    DEBUGREF(CkPrintf("TMRC2D: [%d] (b)theClient->nodeUpdate(%d, %2.10f, %2.10f)\n", cid, dIdx, nn.X(), nn.Y());)
   }
   else {
     removeNode(dIdx);
-    theNodes[kIdx].unlock();
     theNodes[kIdx].set(nn.X(), nn.Y());
     theNodes[kIdx].boundary = nn.boundary;
     theClient->nodeUpdate(kIdx, nn.X(), nn.Y());
-    DEBUGREF(CkPrintf("TMRC2D: [%d] (c)theClient->nodeUpdate(%d, %2.10f, %2.10f\n", cid, kIdx, nn.X(), nn.Y());)
+    DEBUGREF(CkPrintf("TMRC2D: [%d] (c)theClient->nodeUpdate(%d, %2.10f, %2.10f)\n", cid, kIdx, nn.X(), nn.Y());)
     for (int j=0; j<elementSlots; j++) {
       if (theElements[j].isPresent()) {
 	for (int k=0; k<3; k++) {
 	  if (theElements[j].nodes[k] == dIdx) {
 	    theElements[j].nodes[k] = kIdx;
 	    theClient->nodeReplaceDelete(j, k, dIdx, kIdx);
-	    DEBUGREF(CkPrintf("TMRC2D: [%d]theClient->nodeReplaceDelete(%d, %d, %d, %d\n", cid, j, k, dIdx, kIdx);)
+	    DEBUGREF(CkPrintf("TMRC2D: [%d] theClient->nodeReplaceDelete(%d, %d, %d, %d)\n", cid, j, k, dIdx, kIdx);)
+	  }
+	}
+      }
+    }
+    for (int j=0; j<edgeSlots; j++) {
+      if (theEdges[j].isPresent()) {
+	for (int k=0; k<2; k++) {
+	  if (theEdges[j].nodes[k] == dIdx) {
+	    theEdges[j].nodes[k] = kIdx;
 	  }
 	}
       }
@@ -892,6 +760,8 @@ void chunk::deriveEdges(int *conn, int *gid)
 	  // point edge to the two neighboring elements
 	  theEdges[newEdge.idx].update(nullRef, myRef);
 	  theEdges[newEdge.idx].update(nullRef, nbrRef);
+	  theEdges[newEdge.idx].setNodes(theElements[i].nodes[n1localIdx],
+					 theElements[i].nodes[n2localIdx]);
 	  // point elem i's edge j at the edge
 	  theElements[i].set(j, newEdge);
 	  // point nbrRef at the edge
@@ -902,8 +772,7 @@ void chunk::deriveEdges(int *conn, int *gid)
 	    edgesSent++;
 	  }
 	}
-	// else edge will be made on a different chunk
-        else { 
+        else { // else edge will be made on a different chunk
 	  DEBUGREF(CkPrintf("TMRC2D: [%d] Edge between nodes %d,%d to be created elsewhere...\n", cid, theElements[i].nodes[n1localIdx], theElements[i].nodes[n2localIdx]);)
 	  // mark the edge as non-boundary; will be filled later
 	  theElements[i].edges[j].idx = theElements[i].edges[j].cid = -2;
@@ -1097,38 +966,35 @@ int chunk::lockLocalChunk(int lhc, int lhi, double prio)
     insertLock(lhc, lhi, prio);
     if ((lockList->prio == prio) && (lockList->holderIdx == lhi)
 	&& (lockList->holderCid == lhc)) {
-      CkPrintf("[%d]LOCK chunk %d by %d on %d prio %.10f LOCKED(was %d[%don%d:%.10f])\n", CkMyPe(), cid, lhi, lhc, prio, lock, lockHolderIdx, lockHolderCid, lockPrio);
+      DEBUGREF(CkPrintf("TMRC2D: [%d] LOCK chunk %d by %d on %d prio %.10f LOCKED(was %d[%don%d:%.10f])\n", CkMyPe(), cid, lhi, lhc, prio, lock, lockHolderIdx, lockHolderCid, lockPrio);)
       lock = 1; lockHolderCid = lhc; lockHolderIdx = lhi; lockPrio = prio; 
       //lockCount = 1;
       lockList = lockList->next;
       return 1;
     }
-    removeLock(lhc, lhi);
-    CkPrintf("[%d]LOCK chunk %d by %d on %d prio %.10f REFUSED (was %d[%don%d:%.10f])\n", CkMyPe(), cid, lhi, lhc, prio, lock, lockHolderIdx, lockHolderCid, lockPrio);
+    DEBUGREF(CkPrintf("TMRC2D: [%d] LOCK chunk %d by %d on %d prio %.10f REFUSED (was %d[%don%d:%.10f])\n", CkMyPe(), cid, lhi, lhc, prio, lock, lockHolderIdx, lockHolderCid, lockPrio);)
     return 0;
   }
   else { // this chunk is LOCKED
     if ((prio == lockPrio) && (lhi == lockHolderIdx) && (lhc == lockHolderCid)) {
       //lockCount++;
-      CkPrintf("[%d]LOCK chunk %d by %d on %d prio %.10f HELD (was %d[%don%d:%.10f])\n", CkMyPe(), cid, lhi, lhc, prio, lock, lockHolderIdx, lockHolderCid, lockPrio);
+      DEBUGREF(CkPrintf("TMRC2D: [%d] LOCK chunk %d by %d on %d prio %.10f HELD (was %d[%don%d:%.10f])\n", CkMyPe(), cid, lhi, lhc, prio, lock, lockHolderIdx, lockHolderCid, lockPrio);)
       return 1;
     }
     if ((lhi == lockHolderIdx) && (lhc == lockHolderCid)) {
       CkPrintf("ERROR: lockholder %d on %d trying to relock with different prio! prio=%f newprio=%f\n", lhi, lhc, lockPrio, prio);
       CmiAssert(!((lhi == lockHolderIdx) && (lhc == lockHolderCid)));
     }
-    /*
     removeLock(lhc, lhi);
     insertLock(lhc, lhi, prio);
     if ((lockList->prio == prio) && (lockList->holderIdx == lhi) && (lockList->holderCid == lhc)) {
-      if ((prio <= lockPrio) && (lhc < lockHolderCid)) { // lh might be next
+      if ((prio < lockPrio) && (lhc != lockHolderCid)) { // lh might be next
 	CkPrintf("[%d]LOCK chunk %d by %d on %d prio %.10f SPIN (was %d[%don%d:%.10f])\n", CkMyPe(), cid, lhi, lhc, prio, lock, lockHolderIdx, lockHolderCid, lockPrio);
-	return 0; 
+	return -1; 
       }
     }
     removeLock(lhc, lhi);
-    */
-    CkPrintf("[%d]LOCK chunk %d by %d on %d prio %.10f REFUSED (was %d[%don%d:%.10f])\n", CkMyPe(), cid, lhi, lhc, prio, lock, lockHolderIdx, lockHolderCid, lockPrio);
+    DEBUGREF(CkPrintf("TMRC2D: [%d] LOCK chunk %d by %d on %d prio %.10f REFUSED (was %d[%don%d:%.10f])\n", CkMyPe(), cid, lhi, lhc, prio, lock, lockHolderIdx, lockHolderCid, lockPrio);)
     return 0;
   }
 }
@@ -1202,8 +1068,12 @@ void chunk::unlockLocalChunk(int lhc, int lhi)
       lockHolderIdx = -1;
       lockHolderCid = -1;
       lockPrio = -1.0;
-      CkPrintf("[%d]UNLOCK chunk %d by holder %d on %d\n", CkMyPe(), cid, lhi, lhc);
+      DEBUGREF(CkPrintf("TMRC2D: [%d] UNLOCK chunk %d by holder %d on %d\n", CkMyPe(), cid, lhi, lhc);)
       //}
+  }
+  else { 
+    CkPrintf("TMRC2D: [%d] ERROR: UNLOCK chunk %d by holder %d on %d -- THIS WAS NOT THE HOLDER!!! %d on %d was!\n", CkMyPe(), cid, lhi, lhc, lockHolderIdx, lockHolderCid);
+    CkAbort(0);
   }
 }
 

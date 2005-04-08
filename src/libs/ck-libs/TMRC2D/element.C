@@ -205,7 +205,6 @@ void element::collapse(int shortEdge)
   int opnode, delNode, keepNode, delEdge, keepEdge, result;
   elemRef keepNbr, delNbr, nbr;
   int local, first, flag, kBound, dBound, kCorner, dCorner;
-  int orig_keep, orig_del;
 
   // check if a different edge from the shortEdge is pending for coarsening
   if (edges[shortEdge].isPending(myRef)) {
@@ -231,22 +230,10 @@ void element::collapse(int shortEdge)
   dBound = C->theNodes[nodes[delNode]].boundary;
   kCorner = C->theNodes[nodes[keepNode]].corner;
   dCorner = C->theNodes[nodes[delNode]].corner;
-  orig_keep = nodes[keepNode];
-  orig_del = nodes[delNode];
 
-  /*
-  DEBUGREF(CkPrintf("TMRC2D: [%d] ...LOCKing opnode=%d\n", myRef.cid, nodes[opnode]);)
-  for (int i=0; i<C->numChunks; i++) {
-    intMsg *im = mesh[i].nodeLockup(C->theNodes[nodes[opnode]], length, edges[shortEdge]);
-    if (im->anInt == 0) {
-      for (int j=i-1; j>=0; j--) {
-	mesh[j].nodeUnlock(C->theNodes[nodes[opnode]]);
-      }
-      return;
-    }
-  }
-  */
-
+  CkAssert(!(nbr == myRef));
+  CkAssert(!(keepNbr == myRef));
+  CkAssert(!(delNbr == myRef));
   // find coords of node to collapse to based on boundary conditions
   node newNode;
   if ((kBound == 0) && (dBound == 0)) { // both interior; collapse to midpoint
@@ -298,17 +285,31 @@ void element::collapse(int shortEdge)
     }
   }
 
+  int kIdx, dIdx;
+  if (edges[shortEdge].cid == myRef.cid) {
+    kIdx = nodes[keepNode];
+    dIdx = nodes[delNode];
+  }
+  else {
+    FEM_Node *theNodes = &(C->meshPtr->node);
+    FEM_Comm_Rec *dNodeRec=(FEM_Comm_Rec *)(theNodes->shared.getRec(nodes[delNode]));
+    FEM_Comm_Rec *kNodeRec=(FEM_Comm_Rec *)(theNodes->shared.getRec(nodes[keepNode]));
+    edge e;
+    kIdx = e.existsOn(kNodeRec, edges[shortEdge].cid);
+    dIdx = e.existsOn(dNodeRec, edges[shortEdge].cid);
+    CkAssert(kIdx > -1);
+    CkAssert(dIdx > -1);
+  }
   // collapse the edge; takes care of neighbor element
-  result = edges[shortEdge].collapse(myRef, C->theNodes[nodes[keepNode]],
-				     C->theNodes[nodes[delNode]], keepNbr,
-				     delNbr, edges[keepEdge], edges[delEdge], 
+  result = edges[shortEdge].collapse(myRef, kIdx, dIdx, keepNbr, delNbr, 
+				     edges[keepEdge], edges[delEdge], 
 				     C->theNodes[nodes[opnode]], 
 				     &local, &first, newNode);
 
   // clean up based on result of edge collapse
   if (result == 1) {
     // collapse successful; keepNode is node to keep
-    DEBUGREF(CkPrintf("TMRC2D: [%d] ...In collapse[%d](a) shortEdge=%d delEdge=%d keepEdge=%d opnode=%d delNode=%d keepNode=%d delNbr=%d keepNbr=%d\n", myRef.cid, myRef.idx, edges[shortEdge].idx, edges[delEdge].idx, edges[keepEdge].idx, nodes[opnode], orig_del, orig_keep, delNbr.idx, keepNbr.idx);)
+    DEBUGREF(CkPrintf("TMRC2D: [%d] ...In collapse[%d](a) shortEdge=%d delEdge=%d keepEdge=%d opnode=%d delNode=%d keepNode=%d delNbr=%d keepNbr=%d\n", myRef.cid, myRef.idx, edges[shortEdge].idx, edges[delEdge].idx, edges[keepEdge].idx, nodes[opnode], dIdx, kIdx, delNbr.idx, keepNbr.idx);)
     // tell delNbr to replace delEdge with keepEdge
     if (delNbr.cid != -1)
       mesh[delNbr.cid].updateElementEdge(delNbr.idx, edges[delEdge], 
@@ -324,17 +325,11 @@ void element::collapse(int shortEdge)
     if (local && !first) flag = LOCAL_SECOND;
     if (!local && first) flag = BOUND_FIRST;
     if (!local && !first) flag = BOUND_SECOND;
-    C->theClient->collapse(myRef.idx, orig_keep, orig_del, 
-			   newNode.X(), newNode.Y(), flag);
-    DEBUGREF(CkPrintf("TMRC2D: [%d] theClient->collapse(%d, %d, %d, %2.10f, %2.10f\n", myRef.cid, myRef.idx, orig_keep, orig_del, newNode.X(), newNode.Y());)
+    C->theClient->collapse(myRef.idx, kIdx, dIdx, newNode.X(), newNode.Y(), 
+			   flag);
+    DEBUGREF(CkPrintf("TMRC2D: [%d] theClient->collapse(%d, %d, %d, %2.10f, %2.10f\n", myRef.cid, myRef.idx, kIdx, dIdx, newNode.X(), newNode.Y());)
     // remove self
     C->removeElement(myRef.idx);
-    /*
-    // unlock opnode
-    for (int i=0; i<C->numChunks; i++) {
-      mesh[i].nodeUnlock(C->theNodes[nodes[opnode]]);
-    }
-    */
   }
   else if (result == 0) {
     // collapse successful, but first half of collapse decided to keep delNode
@@ -346,10 +341,10 @@ void element::collapse(int shortEdge)
     // tell delNbr to replace delEdge with keepEdge
     keepNbr = edges[keepEdge].getNbr(myRef);
     delNbr = edges[delEdge].getNbr(myRef);
-    int mytmp = orig_del;
-    orig_del = orig_keep;    
-    orig_keep = mytmp;
-    DEBUGREF(CkPrintf("TMRC2D: [%d] ...In collapse[%d](b) shortEdge=%d delEdge=%d keepEdge=%d opnode=%d delNode=%d keepNode=%d delNbr=%d keepNbr=%d\n", myRef.cid, myRef.idx, edges[shortEdge].idx, edges[delEdge].idx, edges[keepEdge].idx, nodes[opnode], orig_del, orig_keep, delNbr.idx, keepNbr.idx);)
+    int mytmp = dIdx;
+    dIdx = kIdx;    
+    kIdx = mytmp;
+    DEBUGREF(CkPrintf("TMRC2D: [%d] ...In collapse[%d](b) shortEdge=%d delEdge=%d keepEdge=%d opnode=%d delNode=%d keepNode=%d delNbr=%d keepNbr=%d\n", myRef.cid, myRef.idx, edges[shortEdge].idx, edges[delEdge].idx, edges[keepEdge].idx, nodes[opnode], dIdx, kIdx, delNbr.idx, keepNbr.idx);)
     if (delNbr.cid != -1)
       mesh[delNbr.cid].updateElementEdge(delNbr.idx, edges[delEdge], 
 					 edges[keepEdge]);
@@ -364,26 +359,13 @@ void element::collapse(int shortEdge)
     if (local && !first) flag = LOCAL_SECOND;
     if (!local && first) flag = BOUND_FIRST;
     if (!local && !first) flag = BOUND_SECOND;
-    DEBUGREF(CkPrintf("TMRC2D: [%d] theClient->collapse(%d, %d, %d, %2.10f, %2.10f\n", myRef.cid, myRef.idx, orig_keep, orig_del, newNode.X(), newNode.Y());)
-    C->theClient->collapse(myRef.idx, orig_keep, orig_del,
+    DEBUGREF(CkPrintf("TMRC2D: [%d] theClient->collapse(%d, %d, %d, %2.10f, %2.10f)\n", myRef.cid, myRef.idx, kIdx, dIdx, newNode.X(), newNode.Y());)
+    C->theClient->collapse(myRef.idx, kIdx, dIdx,
 			   newNode.X(), newNode.Y(), flag);
     // remove self
     C->removeElement(myRef.idx);
-    /*
-    // unlock opnode
-    for (int i=0; i<C->numChunks; i++) {
-      mesh[i].nodeUnlock(C->theNodes[nodes[opnode]]);
-    }
-    */
   }
-  else {
-    /*
-    // unlock opnode
-    for (int i=0; i<C->numChunks; i++) {
-      mesh[i].nodeUnlock(C->theNodes[nodes[opnode]]);
-    }
-    */
-  }
+  // else coarsen is pending
 }
 
 int element::findLongestEdge()
