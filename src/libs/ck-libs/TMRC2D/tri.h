@@ -266,6 +266,7 @@ class chunk : public TCharmClient1D {
   void unlockLocalChunk(int lhc, int lhi);
   void removeLock(int lhc, int lhi);
   void insertLock(int lhc, int lhi, double prio);
+  void fixNode(int nIdx);
 };
 
 #endif

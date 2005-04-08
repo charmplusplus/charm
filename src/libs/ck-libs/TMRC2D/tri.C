@@ -490,8 +490,8 @@ void chunk::removeEdge(int n)
 {
   DEBUGREF(CkPrintf("TMRC2D: [%d] Removing edge %d\n", cid, n);)
   if (theEdges[n].present) {
-    theEdges[n].present = 0;
     theEdges[n].reset();
+    theEdges[n].present = 0;
     if (n < firstFreeEdge) firstFreeEdge = n;
     else if ((n == firstFreeEdge) && (firstFreeEdge == edgeSlots)) {
       firstFreeEdge--; edgeSlots--;
@@ -753,7 +753,32 @@ void chunk::deriveEdges(int *conn, int *gid)
 	elemRef nbrRef;
 	int edgeIdx = getNbrRefOnEdge(theElements[i].nodes[n1localIdx], 
 				      theElements[i].nodes[n2localIdx], 
-				      conn, numGhosts, gid, i, &nbrRef); 
+				      conn, numGhosts, gid, i, &nbrRef);
+	FEM_Node *mNodes = &(meshPtr->node);
+	int nIdx1 = theElements[i].nodes[n1localIdx];
+	int nIdx2 = theElements[i].nodes[n2localIdx];
+	if ((theNodes[nIdx1].boundary < theNodes[nIdx2].boundary) && 
+	    (theNodes[nIdx1].boundary != 0))	{
+	  theNodes[nIdx2].fixed = 1;
+	  FEM_Comm_Rec *nRec = (FEM_Comm_Rec*)(mNodes->shared.getRec(nIdx2));
+	  if (nRec) {
+	    int count = nRec->getShared();
+	    for (i=0; i<count; i++) {
+	      mesh[nRec->getChk(i)].fixNode(nRec->getIdx(i));
+	    }
+	  }
+	}
+	if ((theNodes[nIdx2].boundary < theNodes[nIdx1].boundary) && 
+	    (theNodes[nIdx2].boundary != 0)) {
+	  theNodes[nIdx1].fixed = 1;
+	  FEM_Comm_Rec *nRec = (FEM_Comm_Rec*)(mNodes->shared.getRec(nIdx1));
+	  if (nRec) {
+	    int count = nRec->getShared();
+	    for (i=0; i<count; i++) {
+	      mesh[nRec->getChk(i)].fixNode(nRec->getIdx(i));
+	    }
+	  }
+	}
 	if (edgeLocal(myRef, nbrRef)) { // make edge here
 	  newEdge = addEdge();
 	  DEBUGREF(CkPrintf("TMRC2D: [%d] New edge (%d,%d) added between nodes %d and %d and elements %d and %d\n", cid, newEdge.cid, newEdge.idx, theElements[i].nodes[n1localIdx], theElements[i].nodes[n2localIdx], i, nbrRef.idx);)
@@ -1078,6 +1103,11 @@ void chunk::unlockLocalChunk(int lhc, int lhi)
     CkPrintf("TMRC2D: [%d] ERROR: UNLOCK chunk %d by holder %d on %d -- THIS WAS NOT THE HOLDER!!! %d on %d was!\n", CkMyPe(), cid, lhi, lhc, lockHolderIdx, lockHolderCid);
     CkAbort(0);
   }
+}
+
+void chunk::fixNode(int nIdx)
+{
+  theNodes[nIdx].fixed = 1;
 }
 
 #include "refine.def.h"

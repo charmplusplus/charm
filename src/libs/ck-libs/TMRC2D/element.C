@@ -204,7 +204,7 @@ void element::collapse(int shortEdge)
 
   int opnode, delNode, keepNode, delEdge, keepEdge, result;
   elemRef keepNbr, delNbr, nbr;
-  int local, first, flag, kBound, dBound, kCorner, dCorner;
+  int local, first, flag, kBound, dBound, kFixed, dFixed;
 
   // check if a different edge from the shortEdge is pending for coarsening
   if (edges[shortEdge].isPending(myRef)) {
@@ -228,8 +228,8 @@ void element::collapse(int shortEdge)
   // get the boundary flags for the nodes on the edge to collapse
   kBound = C->theNodes[nodes[keepNode]].boundary;
   dBound = C->theNodes[nodes[delNode]].boundary;
-  kCorner = C->theNodes[nodes[keepNode]].corner;
-  dCorner = C->theNodes[nodes[delNode]].corner;
+  kFixed = C->theNodes[nodes[keepNode]].fixed;
+  dFixed = C->theNodes[nodes[delNode]].fixed;
 
   CkAssert(!(nbr == myRef));
   CkAssert(!(keepNbr == myRef));
@@ -237,47 +237,55 @@ void element::collapse(int shortEdge)
   // find coords of node to collapse to based on boundary conditions
   node newNode;
   if ((kBound == 0) && (dBound == 0)) { // both interior; collapse to midpoint
-    newNode=C->theNodes[nodes[keepNode]].midpoint(C->theNodes[nodes[delNode]]);
-    newNode.boundary = 0;
-  }
-  else if ((kBound == 0) || (dBound == 0)) { // only one on boundary
-    // collapse edge to boundary node
-    if (kBound) {
-      newNode = C->theNodes[nodes[keepNode]];
+    if (!kFixed && !dFixed) {
+      newNode=C->theNodes[nodes[keepNode]].midpoint(C->theNodes[nodes[delNode]]);
+      newNode.boundary = 0;
+    }
+    else if (dFixed && kFixed) return;
+    else if (dFixed) {
+      newNode = C->theNodes[nodes[delNode]];
     }
     else {
       newNode = C->theNodes[nodes[delNode]];
     }
   }
+  else if ((kBound == 0) || (dBound == 0)) { // only one on boundary
+    // collapse edge to boundary node
+    if (kBound && !dFixed) {
+      newNode = C->theNodes[nodes[keepNode]];
+    }
+    else if (dBound && !kFixed) {
+      newNode = C->theNodes[nodes[delNode]];
+    }
+    else return;
+  }
   else if (kBound == dBound) { // both on same boundary
-    // check corner status of both nodes
-    if (kCorner && dCorner) return; // if both corners don't refine
-    else if (kCorner || dCorner) { // if one corner, collapse edge to corner
-      if (kCorner) {
+    // check fixed status of both nodes
+    if (kFixed && dFixed) return; // if both fixeds don't refine
+    else if (kFixed || dFixed) { // if one fixed, collapse edge to fixed
+      if (kFixed) {
 	newNode = C->theNodes[nodes[keepNode]];
       }
       else {
 	newNode = C->theNodes[nodes[delNode]];
       }
     }
-    else { // neither are corners, collapse edge to midpoint
+    else { // neither are fixeds, collapse edge to midpoint
       newNode=C->theNodes[nodes[keepNode]].midpoint(C->theNodes[nodes[delNode]]);
       newNode.boundary = kBound;
     }
   }
   else { // nodes on different boundary
     if (nbr.cid >= 0) return; // edge is internal; don't coarsen
-    else { // if it isn't check if lower boundary node is a corner
+    else { // if it isn't check if lower boundary node is a fixed
       if (dBound > kBound) { // dBound is numbered higher
-	CkAssert(dCorner);
-	if (kCorner) return; // if it is, don't coarsen
+	if (kFixed) return; // if it is, don't coarsen
 	else { // if it isn't, collapse edge to larger boundary node
 	  newNode = C->theNodes[nodes[delNode]];
 	}
       }
       else { // kBound is numbered higher
-	CkAssert(kCorner);
-	if (dCorner) return; // if it is, don't coarsen
+	if (dFixed) return; // if it is, don't coarsen
 	else { // if it isn't, collapse edge to larger boundary node
 	  newNode = C->theNodes[nodes[keepNode]];
 	}

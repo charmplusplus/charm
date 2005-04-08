@@ -23,39 +23,39 @@ class node {  // a 2D double coordinate
  public:
   int present;  // indicates this is an edge present in the mesh
   int boundary; // mesh boundary info: 0 for internal pos int for boundary
-  int corner;   // mesh corner info: 0 for non-corner, 1 for corner
+  int fixed;   // mesh fixed node info: 0 for non-fixed, 1 for fixed
   
   node() {
-    x=-1.0; y=-1.0; theLock = reports = boundary = corner = 0; 
+    x=-1.0; y=-1.0; theLock = reports = boundary = fixed = 0; 
     sumReports[0]=sumReports[1]=0.0; present = 0;
   }
   node(double a, double b) { 
-    x = a;  y = b;  reports = boundary = corner = theLock = 0; 
+    x = a;  y = b;  reports = boundary = fixed = theLock = 0; 
     sumReports[0] = sumReports[1] = 0.0; present = 1;
   }
   node(const node& n) { 
     x = n.x;  y = n.y;  reports = n.reports; boundary = n.boundary; 
-    theLock = n.theLock; present = n.present; corner = n.corner;
+    theLock = n.theLock; present = n.present; fixed = n.fixed;
     sumReports[0] = n.sumReports[0];  sumReports[1] = n.sumReports[1];
   }
   void set(double a, double b) { 
     x = a;  y = b; present = 1;
   }
   void reset() { 
-    theLock = reports = boundary = corner = 0;
+    theLock = reports = boundary = fixed = 0;
     sumReports[0] = sumReports[1] = 0.0; present = 0;
   }
   int operator==(const node& n) { return ((x == n.x) && (y == n.y)); }
   node& operator=(const node& n) { 
     x = n.x;  y = n.y;  reports = n.reports;  boundary = n.boundary;
-    theLock = n.theLock; corner = n.corner;
+    theLock = n.theLock; fixed = n.fixed;
     present = n.present;
     sumReports[0] = n.sumReports[0];  sumReports[1] = n.sumReports[1];
     return *this; 
   }
   void pup(PUP::er &p) {
     p(x); p(y); p(present); p(reports); p(theLock); p(boundary); 
-    p(sumReports, DIM); p(corner);
+    p(sumReports, DIM); p(fixed);
   }
   int isPresent() { return present; }
   double X() { return x; }
