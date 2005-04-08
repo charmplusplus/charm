@@ -122,7 +122,7 @@ typedef struct {
 
 /*store the data for 1 nodeUpdate operation*/
 typedef struct {
-	int nodeID;
+	int nodeID, boundaryFlag;
 	double newX,newY;
 } updateData;
 

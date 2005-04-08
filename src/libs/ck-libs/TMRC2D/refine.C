@@ -164,12 +164,13 @@ public:
 		res.push_back(d);
 	};
 
-	void addUpdate(int nodeID,double newX,double newY){
+	void addUpdate(int nodeID,double newX,double newY, int boundaryFlag){
 		coarsenData d;
 		d.type = UPDATE;
 		d.data.udata.nodeID = nodeID;
 		d.data.udata.newX = newX;
 		d.data.udata.newY = newY;
+		d.data.udata.boundaryFlag = boundaryFlag;
 		res.push_back(d);
 	};
 	
@@ -213,8 +214,8 @@ public:
   void collapse(int elementID,int nodeToKeep,int nodeToDelete,double nX,double nY,int flag){
 		res->addCollapse(elementID,nodeToKeep,nodeToDelete,nX,nY,flag);
   }
-	void nodeUpdate(int nodeID, double newX, double newY){
-		res->addUpdate(nodeID,newX,newY);
+	void nodeUpdate(int nodeID, double newX, double newY, int boundaryFlag){
+		res->addUpdate(nodeID,newX,newY,boundaryFlag);
 	}
 	void nodeReplaceDelete(int elementID, int relnodeID, int oldNodeID, int newNodeID){
 		res->addReplaceDelete(elementID,relnodeID,oldNodeID,newNodeID);

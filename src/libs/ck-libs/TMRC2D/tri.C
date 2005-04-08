@@ -172,7 +172,7 @@ void chunk::nodeReplaceDelete(int kIdx, int dIdx, node nn)
     if (kIdx != -1) {
       theNodes[kIdx].set(nn.X(), nn.Y());
       theNodes[kIdx].boundary = nn.boundary;
-      theClient->nodeUpdate(kIdx, nn.X(), nn.Y());
+      theClient->nodeUpdate(kIdx, nn.X(), nn.Y(), nn.boundary);
       DEBUGREF(CkPrintf("TMRC2D: [%d] (a)theClient->nodeUpdate(%d, %2.10f, %2.10f)\n", cid, kIdx, nn.X(), nn.Y());)
     }
     return;
@@ -180,14 +180,14 @@ void chunk::nodeReplaceDelete(int kIdx, int dIdx, node nn)
   else if (kIdx == -1) {
     theNodes[dIdx].set(nn.X(), nn.Y());
     theNodes[dIdx].boundary = nn.boundary;
-    theClient->nodeUpdate(dIdx, nn.X(), nn.Y());
+    theClient->nodeUpdate(dIdx, nn.X(), nn.Y(), nn.boundary);
     DEBUGREF(CkPrintf("TMRC2D: [%d] (b)theClient->nodeUpdate(%d, %2.10f, %2.10f)\n", cid, dIdx, nn.X(), nn.Y());)
   }
   else {
     removeNode(dIdx);
     theNodes[kIdx].set(nn.X(), nn.Y());
     theNodes[kIdx].boundary = nn.boundary;
-    theClient->nodeUpdate(kIdx, nn.X(), nn.Y());
+    theClient->nodeUpdate(kIdx, nn.X(), nn.Y(), nn.boundary);
     DEBUGREF(CkPrintf("TMRC2D: [%d] (c)theClient->nodeUpdate(%d, %2.10f, %2.10f)\n", cid, kIdx, nn.X(), nn.Y());)
     for (int j=0; j<elementSlots; j++) {
       if (theElements[j].isPresent()) {

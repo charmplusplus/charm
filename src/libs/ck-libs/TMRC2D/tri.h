@@ -78,7 +78,7 @@ public:
   // are replaced by references to nodeToKeep
   virtual void collapse(int elemId, int nodeToKeep, int nodeToDelete, double newX, double newY, int flag) {};
   // update nodeID with new coordinates newX and newY
-  virtual void nodeUpdate(int nodeID, double newX, double newY){};
+  virtual void nodeUpdate(int nodeID, double newX, double newY, int boundaryFlag){};
   // replace oldNodeID with newNodeID on element elementID and delete oldNodeID
   virtual void nodeReplaceDelete(int elementID, int relnodeID, int oldNodeID, int newNodeID){};
  
