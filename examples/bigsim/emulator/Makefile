@@ -36,6 +36,6 @@ test: all
 clean:
 	rm -f core *.cpm.h
 	rm -f TAGS *.o
-	rm -f jacobi3D maxReduce prime ping octo line
+	rm -f jacobi3D maxReduce prime ping octo line ring
 	rm -f conv-host charmrun
 	cd littleMD; $(MAKE) clean
