@@ -44,7 +44,7 @@ extern "C" {
 
   typedef void (*FEM_PupFn)(pup_er, void*);
 
-	typedef void (*FEM_Mesh_alloc_fn)(void *param,int *size,int *maxSize);
+  typedef void (*FEM_Mesh_alloc_fn)(void *param,int *size,int *maxSize);
   
   /* This should be MPI_Comm, but I want it for Fortran too */
   typedef int FEM_Comm_t; 
@@ -114,6 +114,7 @@ to mark the chunk to which a ghost node or element belongs datatype=FEM_INDEX*/
 #define FEM_BOUNDARY (FEM_ATTRIB_FIRST+9) /*provides the boundary flag for nodes, elements and sparse elements FEM_INT*/
 #define FEM_NODE_ELEM_ADJACENCY (FEM_ATTRIB_FIRST+10) /*node to element adjacency FEM_VAR_INDEX only */
 #define FEM_NODE_NODE_ADJACENCY (FEM_ATTRIB_FIRST+11) /*node to node adjacency FEM_VAR_INDEX only */
+#define FEM_ELEM_ELEM_ADJACENCY (FEM_ATTRIB_FIRST+12) /*element to element adjacency FEM_VAR_INDEX only */
 #define FEM_ATTRIB_LAST (FEM_ATTRIB_FIRST+14) /*This is the last valid attribute code*/
 
   /* Specialized routines: */
@@ -141,13 +142,13 @@ to mark the chunk to which a ghost node or element belongs datatype=FEM_INDEX*/
 	int type,int width, int offsetBytes,int distanceBytes,int skewBytes);
 	
   void FEM_Register_array(int fem_mesh,int entity,int attr,
-  	void *data, int datatype,int width);
+			  void *data, int datatype,int width);
 
-	 void FEM_Register_array_layout(int fem_mesh,int entity,int attr, 	
-  	void *data, IDXL_Layout_t layout);	
-	
-	//TODO:add the most important parameter.. the function pointer to the resize function
-	void FEM_Register_entity(int fem_mesh,int entity,void *data,int len,int max,FEM_Mesh_alloc_fn fn);	
+  void FEM_Register_array_layout(int fem_mesh,int entity,int attr, 	
+				 void *data, IDXL_Layout_t layout);	
+  
+  //TODO:add the most important parameter.. the function pointer to the resize function
+  void FEM_Register_entity(int fem_mesh,int entity,void *data,int len,int max,FEM_Mesh_alloc_fn fn);	
   
   void FEM_Mesh_set_length(int fem_mesh,int entity,int newLength);
   int FEM_Mesh_get_width(int fem_mesh,int entity,int attr);
@@ -180,6 +181,9 @@ to mark the chunk to which a ghost node or element belongs datatype=FEM_INDEX*/
 	const int *ends,const int *adj);
   void FEM_Add_ghost_stencil_type(int elType,int nElts,int addNodes,
 	const int *ends,const int *adj2);
+
+  void FEM_Add_elem_adj_layer(int fem_mesh,int nodesPerTuple);
+  void FEM_Add_elem2face_tuples(int fem_mesh, int tuplesPerElem,const int *elem2tuple);
 
   void FEM_Add_linear_periodicity(int nFaces,int nPer,
 	const int *facesA,const int *facesB,
@@ -217,14 +221,16 @@ to mark the chunk to which a ghost node or element belongs datatype=FEM_INDEX*/
   void init(void);
   void driver(void);
   
-	/*
-		Create additional mesh information
-	*/
-	void FEM_Mesh_create_node_elem_adjacency(int fem_mesh);
-	void FEM_Mesh_create_node_node_adjacency(int fem_mesh);
-	
-	
-/* Backward compatability routines: */
+  /*
+    Create additional mesh information
+  */
+  void FEM_Mesh_create_node_elem_adjacency(int fem_mesh);
+  void FEM_Mesh_create_node_node_adjacency(int fem_mesh);
+  void FEM_Mesh_create_elem_elem_adjacency(int fem_mesh);
+
+  void FEM_Mesh_print_elem_elem_adjacency(int fem_mesh); // do not use, will be removed after testing
+  
+  /* Backward compatability routines: */
   int FEM_Mesh_default_read(void);  /* return mesh used for get calls below */
   int FEM_Mesh_default_write(void); /* return mesh used for set calls below */
   void FEM_Mesh_set_default_read(int fem_mesh);

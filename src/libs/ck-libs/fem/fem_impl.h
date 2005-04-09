@@ -18,6 +18,7 @@ Orion Sky Lawlor, olawlor@acm.org, 9/28/00
 #define checkMPI pup_checkMPI
 #include "tcharm.h"
 #include "fem.h"
+#include "map.h"
 
 #include "fem_mesh.h"
 #include "idxl_layout.h"
@@ -34,6 +35,7 @@ Orion Sky Lawlor, olawlor@acm.org, 9/28/00
 // Verbose abort routine used by FEM framework:
 void FEM_Abort(const char *msg);
 void FEM_Abort(const char *caller,const char *sprintf_msg,int int0=0,int int1=0,int int2=0);
+
 
 /*This class describes a local-to-global index mapping, used in FEM_Print.
 The default is the identity mapping.*/
@@ -100,6 +102,8 @@ public:
 	const T& operator[](int i) const {return sto[i];}
 };
 typedef ArrayPtrT<int> intArrayPtr;
+
+
 
 /* Unmarshall into a heap-allocated copy */
 template<class T>
@@ -415,12 +419,15 @@ public:
 	const int *getCanon(void) const;
 	const FEM_Symmetries_t *getSymmetries(void) const;
 	const FEM_Sym_List &getSymList(void) const;
+
+
 };
 // Access the latest partition:
 FEM_Partition &FEM_curPartition(void);
 
 //Declare this at the start of every API routine:
 #define FEMAPI(routineName) TCHARM_API_TRACE(routineName,"fem")
+//#define FEMAPI(routineName) printf("%s\n", routineName);
 
 
 /*Partition this mesh's elements into n chunks,
@@ -448,6 +455,46 @@ void FEM_Mesh_split(FEM_Mesh *mesh,int nchunks,
 
 //Make a new[]'d copy of this (len-entry) array, changing the index as spec'd
 int *CkCopyArray(const int *src,int len,int indexBase);
+
+
+// Isaac's stuff:
+// Describes Element Faces. For use with finding element->element adjacencies
+// based on FEM_Ghost_Layer
+class FEM_ElemAdj_Layer : public CkNoncopyable {
+ public:
+  int nodesPerTuple; //Number of shared nodes needed to connect elements
+  class elemAdjInfo {
+  public:
+    int recentElType; // should not be here, but if it is it should be pup'ed
+    int tuplesPerElem; //# of tuples surrounding this element
+    intArrayPtr elem2tuple; //The tuples around this element [nodesPerTuple * tuplesPerElem]
+    elemAdjInfo(void) {/*add=false;*/tuplesPerElem=0;}
+    ~elemAdjInfo(void) {}
+    void pup(PUP::er &p) {//CkAbort("FEM> Shouldn't call elemGhostInfo::pup!\n");
+    }
+  };
+  elemAdjInfo elem[FEM_MAX_ELTYPE];
+
+  virtual void pup(PUP::er &p){
+    p | nodesPerTuple;
+    for(int i=0;i<FEM_MAX_ELTYPE;i++){
+      p | elem[i].tuplesPerElem;
+      if(elem[i].tuplesPerElem == 0){
+	continue;
+      }
+      int *arr;
+      if(p.isUnpacking()){
+	arr = new int[nodesPerTuple*elem[i].tuplesPerElem];
+      }else{
+	arr = elem[i].elem2tuple;
+      }
+      p(arr,nodesPerTuple*elem[i].tuplesPerElem);
+      if(p.isUnpacking()){
+	elem[i].elem2tuple = arr;
+      }
+    }
+  }
+};
 
 
 /*\@}*/

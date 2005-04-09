@@ -855,6 +855,9 @@ protected:
 	 * conn is never NULL.
 	 */
 	FEM_IndexAttribute *conn; //FEM_CONN attribute: element-to-node mapping 
+	FEM_IndexAttribute *elemAdjacency;
+	int tuplesPerElem;
+
 public:
 	FEM_Elem(const FEM_Mesh &mesh_, FEM_Elem *ghost_);
 	void pup(PUP::er &p);
@@ -868,7 +871,18 @@ public:
 	
 	void print(const char *type,const IDXL_Print_Map &map);
 
-// Backward compatability routines:
+	void create(int attr,const char *caller);
+
+	// Isaac's New Function:
+	void allocateElemAdjacency();
+	void setElemAdjacencySize(int width, int length){
+	  tuplesPerElem = width;
+	  elemAdjacency->setWidth(width);
+	  elemAdjacency->setLength(length);
+	}
+	FEM_IndexAttribute *getElemAdjacency(){return elemAdjacency;}
+
+	// Backward compatability routines:
 	int getConn(int elem,int nodeNo) const {return conn->get()(elem,nodeNo);}
 	int getNodesPer(void) const {return conn->get().width();}
 	int *connFor(int i) {return conn->get().getRow(i);}
@@ -1058,10 +1072,16 @@ inline int zeroToMinusOne(int i) {
 	if (i==0) return -1;
 	return i;
 }
+
+
+
+
 /**
  * This class describes all the nodes and elements in
  * a finite-element mesh or submesh.
  */
+class FEM_ElemAdj_Layer;
+
 class FEM_Mesh : public CkNoncopyable {
 	/// The symmetries in the mesh
 	FEM_Sym_List symList;
@@ -1069,6 +1089,8 @@ class FEM_Mesh : public CkNoncopyable {
 	
 	void checkElemType(int elType,const char *caller) const;
 	void checkSparseType(int uniqueID,const char *caller) const; 
+
+	FEM_ElemAdj_Layer* lastElemAdjLayer;
 public:
 	FEM_Mesh();
 	void pup(PUP::er &p); //For migration
@@ -1135,12 +1157,18 @@ public:
 
 	/********** New methods ***********/
 	/*
-		This method creates the mapping from a node to all the elements that are 
-		incident on it . It assumes the presence of one layer of ghost nodes that
-		share a node.
-		*/
+	  This method creates the mapping from a node to all the elements that are 
+	  incident on it . It assumes the presence of one layer of ghost nodes that
+	  share a node.
+	*/
 	void createElemNodeAdj();
 	void createNodeNodeAdj();
+	void createElemElemAdj();
+
+	/* Isaac's helpers for the createElemElemAdj() */
+	FEM_ElemAdj_Layer *addElemAdjLayer(void);
+	FEM_ElemAdj_Layer *curElemAdjLayer(void);
+
 }; 
 PUPmarshall(FEM_Mesh);
 FEM_Mesh *FEM_Mesh_lookup(int fem_mesh,const char *caller);
