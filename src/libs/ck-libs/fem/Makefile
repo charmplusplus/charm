@@ -1,7 +1,7 @@
 CDIR=../../../..
 CHARMC=$(CDIR)/bin/charmc $(OPTS)
 
-HEADERS=fem.h femf.h fem_mesh.h parallel_part.h
+HEADERS=fem.h femf.h fem_mesh.h parallel_part.h map.h
 HEADDEP=$(HEADERS) fem_impl.h 
 OBJS=fem.o fem_mesh.o symmetries.o \
 	partition.o map.o fem_compat.o call_init.o parallel_part.o
