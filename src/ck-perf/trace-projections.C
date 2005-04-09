@@ -61,11 +61,9 @@ On T3E, we need to have file number control by open/close files only when needed
 #endif
 
 #if CMK_HAS_COUNTER_PAPI
-// For now, we trace only two events - # Floating Point Instructions &
-// # of L2 Cache Misses.
-int numPAPIEvents = 3;
-int papiEvents[] = {PAPI_TOT_INS, PAPI_L3_DCM, PAPI_FP_OPS};
-char *papiEventNames[] = {"PAPI_TOT_INS", "PAPI_L3_DCM", "PAPI_FP_OPS"};
+int numPAPIEvents = 2;
+int papiEvents[] = { PAPI_L3_DCM, PAPI_FP_OPS };
+char *papiEventNames[] = {"PAPI_L3_DCM", "PAPI_FP_OPS"};
 #endif
  
 /* ****** CW TEMPORARY LOCATION ***** Support for thread listeners */
@@ -737,6 +735,8 @@ curevent(0), inEntry(0), computationStarted(0)
   if (papiRetValue != PAPI_VER_CURRENT) {
     CmiAbort("PAPI Library initialization failure!\n");
   }
+  // PAPI 3 mandates the initialization of the set to PAPI_NULL
+  papiEventSet = PAPI_NULL; 
   if (PAPI_create_eventset(&papiEventSet) != PAPI_OK) {
     CmiAbort("PAPI failed to create event set!\n");
   }
