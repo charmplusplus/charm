@@ -1388,3 +1388,32 @@ FEMchunk::print(int fem_mesh,int idxBase)
   lookup(fem_mesh,"FEM_Mesh_print")->print(idxBase);
   CkPrintf("\n\n");
 }  
+
+
+/* New Element to Element Adjacency interface */
+CDECL void FEM_Add_elem_adj_layer(int fem_mesh, int nodesPerTuple)
+{
+	FEMAPI("FEM_Add_elem_adj_layer");
+	FEM_Mesh *m = FEM_Mesh_lookup(fem_mesh,"FEM_Add_elem_adj_layer");
+	FEM_ElemAdj_Layer *cur=	m->addElemAdjLayer();
+	cur->nodesPerTuple=nodesPerTuple;
+}
+
+CDECL void FEM_Add_elem2face_tuples(int fem_mesh, int tuplesPerElem,const int *elem2tuple) 
+{
+	FEMAPI("FEM_Add_elem2face_tuples");
+	FEM_Mesh *m = FEM_Mesh_lookup(fem_mesh,"FEM_Add_elem_adj_layer");
+	FEM_ElemAdj_Layer *cur=m->curElemAdjLayer();
+
+#ifdef DEBUG
+	printf("HACK===> hardcoded elType=0,idxBase=0\n");
+#endif
+	int elType=0;
+	int idxBase=0;
+
+	// should somehow pass in the different data for different types of elements
+
+	cur->elem[elType].tuplesPerElem=tuplesPerElem;
+	cur->elem[elType].elem2tuple=CkCopyArray(elem2tuple,
+		          tuplesPerElem*cur->nodesPerTuple,idxBase);
+}
