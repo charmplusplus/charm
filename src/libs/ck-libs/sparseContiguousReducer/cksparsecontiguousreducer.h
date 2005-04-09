@@ -36,16 +36,14 @@ extern CkReduction::reducerType sparse_min_double;
 class CkTwoDoubles{
  public:
   double d1, d2;
-  CkTwoDoubles(){d1=0; d2=0;}
-  CkTwoDoubles(double _d1, double _d2){d1=_d1; d2=_d2;}
+  CkTwoDoubles(double _d1=0, double _d2=0) :d1(_d1), d2(_d2){}
   void operator+=(CkTwoDoubles d){d1+=d.d1; d2+=d.d2;}
 };
 
 class CkTwoFloats{
  public:
   float f1, f2;
-  CkTwoFloats(){f1=0; f2=0;}
-  CkTwoFloats(float _f1, float _f2){f1=_f1; f2=_f2;}
+  CkTwoFloats(float _f1=0, float _f2=0) :f1(_f1), f2(_f2){}
   void operator+=(CkTwoFloats f){f1+=f.f1; f2+=f.f2;}
 };
 
@@ -60,19 +58,10 @@ class CkDataSegHeader{
   CkDataSegHeader(){
   }
 
-  CkDataSegHeader(int _sx, int _sy, int _ex, int _ey){
-    sx = _sx;
-    sy = _sy;
-    ex = _ex;
-    ey = _ey;
-  }
+  CkDataSegHeader(int _sx, int _sy, int _ex, int _ey): sx(_sx), sy(_sy), ex(_ex), ey(_ey) {}
 
-  CkDataSegHeader(const CkDataSegHeader &r){
-    sx = r.sx;
-    sy = r.sy;
-    ex = r.ex;
-    ey = r.ey;
-  }
+  CkDataSegHeader(const CkDataSegHeader &r) : sx(r.sx), sy(r.sy), ex(r.ex), ey(r.ey) {}
+
 
   inline bool operator==(const CkDataSegHeader &r){
     if((r.sx == sx)&&(r.sy == sy)&&(r.ex == ex)&&(r.ey == ey))
