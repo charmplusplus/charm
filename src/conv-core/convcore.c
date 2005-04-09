@@ -1630,7 +1630,8 @@ void CmiSyncListSendFn(int npes, int *pes, int len, char *msg)
 
 CmiCommHandle CmiAsyncListSendFn(int npes, int *pes, int len, char *msg)
 {
-  CmiError("ListSend not implemented.");
+  /* A better asynchronous implementation may be wanted, but at least it works */
+  CmiSyncListSendFn(npes, pes, len, msg);
   return (CmiCommHandle) 0;
 }
 

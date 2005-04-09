@@ -406,6 +406,7 @@ Group IDs are useful for the multicast functions below.}
 
 \function{CmiGroup CmiEstablishGroup(int npes, int *pes);}
 \index{CmiGroup}
+\index{CmiEstablishGroup}
 \desc{Converts an array of processor numbers into a group ID.  Group
 IDs are useful for the multicast functions below.  Caution: this call
 uses up some resources.  In particular, establishing a group uses 
@@ -413,13 +414,13 @@ some network bandwidth (one broadcast's worth) and a small amount of
 memory on all processors.}
 
 \function{void CmiSyncMulticast(CmiGroup grp, unsigned int size, void *msg)}
-\index{CmiSyncBroadcast}
+\index{CmiSyncMulticast}
 \desc{Sends \uw{msg} of length \uw{size} bytes to all members
 of the specified group.  Group IDs are created using
 \kw{CmiEstablishGroup}.}
 
 \function{void CmiSyncMulticastAndFree(CmiGroup grp, unsigned int size, void *msg)}
-\index{CmiSyncBroadcastAndFree}
+\index{CmiSyncMulticastAndFree}
 \desc{Sends \uw{msg} of length \uw{size} bytes to all members
 of the specified group.  Uses \kw{CmiFree} to deallocate the
 message buffer for \uw{msg} when the broadcast completes. Therefore
@@ -427,7 +428,7 @@ message buffer for \uw{msg} when the broadcast completes. Therefore
 Group IDs are created using \kw{CmiEstablishGroup}.}
 
 \function{CmiCommHandle CmiAsyncMulticast(CmiGroup grp, unsigned int size, void *msg)}
-\index{CmiAsyncBroadcast}
+\index{CmiAsyncMulticast}
 \desc{\note{Not yet implemented.} Initiates asynchronous broadcast of
 message \uw{msg} of length \uw{size} bytes to all members of
 the specified group.  It returns a communication handle which could
@@ -439,30 +440,25 @@ freed before the communication is complete.
 Group IDs are created using \kw{CmiEstablishGroup}.}
 
 \function{void CmiSyncListSend(int npes, int *pes, unsigned int size, void *msg)}
-\index{CmiSyncBroadcast}
-\desc{\note{Not yet implemented.} Sends \uw{msg} of length \uw{size} bytes
-to all processors in the list.  Group IDs are created using
-\kw{CmiEstablishGroup}.}
+\index{CmiSyncListSend}
+\desc{Sends \uw{msg} of length \uw{size} bytes to \uw{npes} processors in the
+array \uw{pes}.
 
-\function{void CmiSyncMulticastAndFree(int npes, int *pes, unsigned int size, void *msg)}
-\index{CmiSyncBroadcastAndFree}
-\desc{\note{Not yet implemented.} Sends \uw{msg} of length \uw{size}
-bytes to all processors in the list.  Uses \kw{CmiFree} to deallocate the
-message buffer for \uw{msg} when the broadcast completes. Therefore
-\uw{msg} must point to a buffer allocated with \kw{CmiAlloc}.
-Group IDs are created using \kw{CmiEstablishGroup}.}
+\function{void CmiSyncListSendAndFree(int npes, int *pes, unsigned int size, void *msg)}
+\index{CmiSyncListSendAndFree}
+\desc{Sends \uw{msg} of length \uw{size} bytes to \uw{npes} processors in the
+array \uw{pes}. Uses \kw{CmiFree} to deallocate the message buffer for \uw{msg}
+when the multicast completes. Therefore, \uw{msg} must point to a buffer
+allocated with \kw{CmiAlloc}.
 
-\function{CmiCommHandle CmiAsyncMulticast(int npes, int *pes, unsigned int size, void *msg)}
-\index{CmiAsyncBroadcast}
-\desc{\note{Not yet implemented.} Initiates asynchronous broadcast of
-message \uw{msg} of length \uw{size} bytes to all processors
-in the list.  It returns a communication handle which could
-be used to check the status of this send using
-\kw{CmiAsyncMsgSent}. If the returned communication handle is 0,
-message buffer can be reused immediately, thus saving a call to 
-\kw{CmiAsyncMsgSent}. \uw{msg} should not be overwritten or
-freed before the communication is complete.
-Group IDs are created using \kw{CmiEstablishGroup}.}
+\function{CmiCommHandle CmiAsyncListSend(int npes, int *pes, unsigned int size, void *msg)}
+\index{CmiAsyncListSend}
+\desc{Initiates asynchronous multicast of message \uw{msg} of length \uw{size}
+bytes to \uw{npes} processors in the array \uw{pes}. It returns a communication
+handle which could be used to check the status of this send using
+\kw{CmiAsyncMsgSent}. If the returned communication handle is 0, message buffer
+can be reused immediately, thus saving a call to \kw{CmiAsyncMsgSent}. \uw{msg}
+should not be overwritten or freed before the communication is complete.
 
 \section{Scheduling Messages}
 \label{schedqueue}
