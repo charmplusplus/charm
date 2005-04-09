@@ -85,7 +85,7 @@ void FEM_REFINE2D_Newmesh(int meshID,int nodeID,int elemID,int nodeBoundary){
 	if(nodeBoundary){
 		FEM_Mesh_data(meshID,nodeID,FEM_BOUNDARY,tempBoundaries,0,nnodes,FEM_INT,1);
 	}
-	
+
   /*Set up refinement framework*/
   REFINE2D_NewMesh(meshID,nelems,total,nnodes,(int *)tempMesh,gid,tempBoundaries);
 	if(tempBoundaries){
@@ -393,6 +393,10 @@ void FEM_REFINE2D_Coarsen(int meshID,int nodeID,double *coord,int elemID,double 
 	FEM_Entity *node=FEM_Entity_lookup(meshID,nodeID,"REFINE2D_Mesh");
 	CkVec<FEM_Attribute *> *attrs = node->getAttrVec();
 	FEM_Attribute *validNodeAttr = node->lookup(FEM_VALID,"FEM_COARSEN");
+	FEM_Attribute *nodeBoundaryAttr = node->lookup(FEM_BOUNDARY,"FEM_COARSEN");
+	if(!nodeBoundaryAttr){
+		printf("Warning:- no boundary flags for nodes \n");
+	}
 	
 	FEM_Entity *elem = FEM_Entity_lookup(meshID,elemID,"REFIN2D_Mesh_elem");
 	CkVec<FEM_Attribute *> *elemattrs = elem->getAttrVec();
@@ -408,7 +412,12 @@ void FEM_REFINE2D_Coarsen(int meshID,int nodeID,double *coord,int elemID,double 
 	int *connData = connTable.getData();
 	unsigned char *validNodeData = validNodeTable.getData();
 	unsigned char *validElemData = validElemTable.getData();
-
+	/* Extract the data for node boundaries */
+	int *nodeBoundaryData=NULL;
+	if(nodeBoundaryAttr){
+		AllocTable2d<int> &nodeBoundaryTable = ((FEM_DataAttribute *)nodeBoundaryAttr)->getInt();
+		nodeBoundaryData = nodeBoundaryTable.getData();
+	}
 
 	for(int k=0;k<nnodes;k++){
 		if(validNodeData[k]){
@@ -436,13 +445,6 @@ void FEM_REFINE2D_Coarsen(int meshID,int nodeID,double *coord,int elemID,double 
 				tri = operation.data.cdata.elemID;
 				nodeToKeep = operation.data.cdata.nodeToKeep;
 				nodeToThrow = operation.data.cdata.nodeToDelete;
-	/*			n1 = operation.data.cdata.collapseEdge;
-				n2 = (n1 + 1)%3;
-				if(operation.data.cdata.nodeToKeep == n1){
-					nodeToThrow = connData[3*tri+n2];
-				}else{
-					nodeToThrow = connData[3*tri+n1];
-				}*/
 				if(operation.data.cdata.flag & 0x1 || operation.data.cdata.flag & 0x2){
 					coord[2*nodeToKeep] = operation.data.cdata.newX;
 					coord[2*nodeToKeep+1] = operation.data.cdata.newY;
@@ -456,6 +458,9 @@ void FEM_REFINE2D_Coarsen(int meshID,int nodeID,double *coord,int elemID,double 
 				if(validNodeData[operation.data.udata.nodeID]){
 					coord[2*(operation.data.udata.nodeID)] = operation.data.udata.newX;
 					coord[2*(operation.data.udata.nodeID)+1] = operation.data.udata.newY;
+					if(nodeBoundaryData){
+						nodeBoundaryData[operation.data.udata.nodeID]=operation.data.udata.boundaryFlag;
+					}
 				}else{
 					DEBUGINT(printf("[%d] WEIRD -- update operation for invalid node %d \n",CkMyPe(),operation.data.udata.nodeID));
 				}
@@ -479,20 +484,6 @@ void FEM_REFINE2D_Coarsen(int meshID,int nodeID,double *coord,int elemID,double 
 					DEBUGINT(printf("[%d] WEIRD -- COARSENDATA type == invalid \n",CkMyPe()));
 					CmiAbort("COARSENDATA type == invalid");
 		}
-	/*	int tri,nodeToThrow,nodeToKeep,flag,idxbase;
-		double nx,ny;
-		//temp sol
-		idxbase = 0;
-		REFINE2D_Get_Collapse(collapseNo,connData,&tri,&nodeToThrow,&nodeToKeep,&nx,&ny,&flag,idxbase);
-		if(flag & 0x1 || flag & 0x2){
-			coord[2*nodeToKeep]=nx;
-			coord[2*nodeToKeep+1] = ny;
-			validNodeData[nodeToThrow]=0;
-		}
-		validElemData[tri] = 0;
-		connData[3*tri] = -1;
-		connData[3*tri+1] = -1;
-		connData[3*tri+2] = -1;*/
 	}
 	
 }  

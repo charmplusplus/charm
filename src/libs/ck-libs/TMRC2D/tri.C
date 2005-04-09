@@ -682,6 +682,7 @@ void chunk::newMesh(int meshID_,int nEl, int nGhost, const int *conn_, const int
   int i, j;
   DEBUGREF(CkPrintf("TMRC2D: [%d] In newMesh...\n", cid);)
   meshID = meshID_;
+
   meshPtr = FEM_Mesh_lookup(meshID, "chunk::newMesh");
   numElements=nEl;
   numGhosts = nGhost;
