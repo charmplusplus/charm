@@ -181,7 +181,7 @@ std::string NetFEM_update_vtk::vtkFileFormat() {
 	int n=f.getItems();
 	resp << f.getName() << ",";
   }
-  resp << "cell_partition_num\">\n";
+  resp << "local_cell_num,cell_partition_num\">\n";
 	
   for (int fn=0;fn<nf;fn++) {
 	const NetFEM_doubleField &f=el.getField(fn);
@@ -207,7 +207,14 @@ std::string NetFEM_update_vtk::vtkFileFormat() {
   for(int i=0;i<total_cells;i++)
 	resp << partition_num << " ";
   resp << "</DataArray>\n";
-  
+
+
+  resp << "<DataArray type=\"Int32\" Name=\"local_cell_num\" format=\"ascii\" NumberOfComponents=\"1\">\n";
+  for(int i=0;i<total_cells;i++)
+	resp << i << " ";
+  resp << "</DataArray>\n";
+
+
   resp << "</CellData>\n";
     
   // Print Point Attribute Fields
@@ -293,7 +300,7 @@ std::string NetFEM_update_vtk::vtkIndexFormat(int timestep, int numChunks) {
   }
 	
   resp << "<PDataArray type=\"Int32\" Name=\"cell_partition_num\" format=\"ascii\" NumberOfComponents=\"1\"/>\n";
-	
+  resp << "<PDataArray type=\"Int32\" Name=\"local_cell_num\" format=\"ascii\" NumberOfComponents=\"1\"/>\n";	
   resp << "</PCellData>\n\n";
 	
 
