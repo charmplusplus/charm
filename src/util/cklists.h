@@ -37,8 +37,11 @@ class CkQ : private CkSTLHelper<T>, private CkNoncopyable {
     int blklen;
     int first;
     int len;
+    int mask;
     void _expand(void) {
-      int newlen=16+len*2;
+      // blklen is always kept as a power of 2
+      int newlen = blklen<<1;
+      mask |= blklen;
       T *newblk = new T[newlen];
       elementCopy(newblk,block+first,blklen-first);
       elementCopy(newblk+blklen-first,block,first);
@@ -46,11 +49,16 @@ class CkQ : private CkSTLHelper<T>, private CkNoncopyable {
       blklen = newlen; first = 0;
     }
   public:
-    CkQ() :first(0),len(0) {
-      block = NULL; blklen=0;
+    CkQ() :first(0),len(0),mask(3) {
+      blklen = 4;
+      block = new T[4];
     }
     CkQ(int sz) :first(0),len(0) {
-      block = new T[blklen=sz];
+      int size = 2;
+      mask = 0x03;
+      while (1<<size < sz) { size++; mask |= 1<<size; }
+      blklen = 1<<size;
+      block = new T[blklen];
     }
     ~CkQ() { delete[] block; }
     int length(void) { return len; }
@@ -58,20 +66,20 @@ class CkQ : private CkSTLHelper<T>, private CkNoncopyable {
     T deq(void) {
       if(len>0) {
         T &ret = block[first];
-        first = (first+1)%blklen;
+	first = (first+1)&mask;
         len--;
       	return ret;
       } else return T(); //For builtin types like int, void*, this is equivalent to T(0)
     }
     void enq(const T &elt) {
       if(len==blklen) _expand();
-      block[(first+len)%blklen] = elt;
+      block[(first+len)&mask] = elt;
       len++;
     }
     // stack semantics, needed to replace FIFO_QUEUE of converse
     void push(const T &elt) {
       if(len==blklen) _expand();
-      first = (first-1+blklen)%blklen;
+      first = (first-1+blklen)&mask;
       block[first] = elt;
       len++;
     }
@@ -79,17 +87,17 @@ class CkQ : private CkSTLHelper<T>, private CkNoncopyable {
     void insert(int pos, const T &elt) {
       while(len==blklen || pos>=blklen) _expand();
       for (int i=len; i>pos; i--)
-        block[(i+first)%blklen] = block[(i-1+first)%blklen];
-      block[(pos+first)%blklen] = elt;
+        block[(i+first)&mask] = block[(i-1+first)&mask];
+      block[(pos+first)&mask] = elt;
       if (pos > len) len = pos+1;
       else len++;
     }
     // delete an element at pos
     T remove(int pos) {
       if (pos >= len) return T(0);
-      T ret = block[(pos+first)%blklen];
+      T ret = block[(pos+first)&mask];
       for (int i=pos; i<len-1; i++)
-        block[(i+first)%blklen] = block[(i+1+first)%blklen];
+        block[(i+first)&mask] = block[(i+1+first)&mask];
       len--;
       return ret;
     }
@@ -101,7 +109,7 @@ class CkQ : private CkSTLHelper<T>, private CkNoncopyable {
     //Peek at the n'th item from the queue
     T& operator[](size_t n)
     {
-    	n=(n+first)%blklen;
+    	n=(n+first)&mask;
     	return block[n];
     }
     // needed to replace FIFO_Enumerate
@@ -110,7 +118,7 @@ class CkQ : private CkSTLHelper<T>, private CkNoncopyable {
       int i,j;
       for(i=0,j=first;i<len;i++){
         newblk[i] = block[j];
-        j = (j+1)%blklen;
+        j = (j+1)&mask;
       }
       return newblk;
     }
