@@ -220,6 +220,22 @@ typedef struct ImplicitDgramStruct
 
 struct PendingMsgStruct;
 
+#if CMK_USE_AMMASSO
+
+// State Machine for Queue Pair Connection State (machine layer state for QP)
+//    PRE_CONNECT  --->  CONNECTED  ---> CONNECTION_LOST
+//                        |    /|\              |
+//                       \|/    \---------------/
+//           CONNECTION_CLOSED
+
+typedef enum __qp_connection_state {
+  QP_CONN_STATE_PRE_CONNECT = 1,     // Connection is being attempted and no successful connection has been made yet
+  QP_CONN_STATE_CONNECTED,           // Connection has be established
+  QP_CONN_STATE_CONNECTION_LOST,     // Connection is being attempted and there has been an established connection in the past
+  QP_CONN_STATE_CONNECTION_CLOSED    // Connection closed
+} qp_connection_state_t;
+#endif
+  
 typedef struct OtherNodeStruct
 {
   int nodestart, nodesize;
@@ -244,6 +260,54 @@ typedef struct OtherNodeStruct
   struct PendingMsgStruct *sendhead, *sendtail;  /* gm send queue */
   int 			   disable;
   int 			   gm_pending;
+#endif
+
+#define AMMASSO_BUFSIZE  16384   // 16K
+#if CMK_USE_AMMASSO
+  // DMK : TODO : If any of these can be shared, then they can be moved to mycb_t in "machine-ammasso.c"
+
+  cc_uint32_t            recv_cq_depth;
+  cc_cq_handle_t         recv_cq;
+  cc_uint32_t            send_cq_depth;
+  cc_cq_handle_t         send_cq;
+  cc_qp_id_t             qp_id;      // Queue Pair ID
+  cc_qp_handle_t         qp;         // Queue Pair Handle
+
+  // DMK : TODO : Having all of these will be a scaling issue... Look into getting these shared among all
+  //              of the QPs to save on memory (larger but only one).
+  cc_rq_wr_t             rq_wr;      //
+  int                    myNode;     // This is a horrible hack! - When the receiving Completion Queue is polled for messages,
+                                     //   the address of the particular receive buffer is not known but the address of the
+                                     //   RecvQueue Work Request structure (the rq_wr above) is... so myNode will be set to
+                                     //   the index of this OtherNode structure in nodes and will be located at
+                                     //   (wc.wr_id + sizeof(cc_rq_wr_t) - See machine-ammasso.c PollForMessage()
+  cc_data_addr_t         recv_sgl;   //
+  char   recv_buf[AMMASSO_BUFSIZE] __attribute__ ((aligned(4096)));  // Receive Buffer
+  cc_stag_index_t  recv_stag_index;  //
+
+  cc_sq_wr_t             sq_wr;      //
+  cc_data_addr_t         send_sgl;   //
+  char   send_buf[AMMASSO_BUFSIZE] __attribute__ ((aligned(4096)));  // Send Buffer
+  cc_stag_index_t  send_stag_index;
+  CmiNodeLock              sendBufLock;
+
+  //cc_sq_wr_t             rdma_sq_wr; //
+  //cc_data_addr_t         rdma_sgl;   //
+  //char   rdma_buf[AMMASSO_BUFSIZE] __attribute__ ((aligned(4096)));  // RDMA Buffer
+  //cc_stag_index_t  rdma_stag_index;
+
+  cc_ep_handle_t         ep;         // Endpoint Handle
+  cc_ep_handle_t         cr;         // Endpoint Handle
+
+  cc_qp_query_attrs_t      qp_attrs;
+  cc_stag_index_t          qp_attrs_stag_index;
+
+  int                    posted;     // ??? "qp_rping.c" specific ???
+
+  cc_inet_addr_t         address;  // local if passive side of connection, remote if active side of connection
+  cc_inet_port_t         port;     // local if passive side of connection, remote if active side of connection
+  qp_connection_state_t  connectionState;  // State of the connection (connected, lost, etc)
+
 #endif
 
   int                      asm_rank;
@@ -294,6 +358,11 @@ static void OtherNode_init(OtherNode node)
     node->disable = 0;
     node->gm_pending = 0;
 #endif
+
+    // TODO: The initial values of the Ammasso related members will be set by the machine layer
+    //       as the QPs are being created (along with any initial values).  After all the details
+    //       of the layer are figured out, put some defaults here just so they are initialized to
+    //       known values.  (Though, it should not be a problem that they are not initialized here yet.)
 
     node->asm_rank=0;
     node->asm_total=0;
@@ -346,6 +415,7 @@ int CmiLongSendQueue(int forNode,int longerThan) {
 #endif
 
 extern void CmiGmConvertMachineID(unsigned int *mach_id);
+extern void CmiAmmassoNodeAddressesStoreHandler(int pe, struct sockaddr_in *addr, int port);
 
 /* initnode node table reply format:
  +------------------------------------------------------- 
@@ -394,6 +464,11 @@ static void node_addresses_store(ChMessage *msg)
     nodes[i].sock = INVALID_SOCKET;
 #endif
     nodestart+=nodes[i].nodesize;
+
+#if CMK_USE_AMMASSO
+    CmiAmmassoNodeAddressesStoreHandler(nodes[i].nodestart, &(nodes[i].addr), nodes[i].dataport);
+#endif
+
   }
   _Cmi_numpes=nodestart;
   n = _Cmi_numpes;
@@ -612,6 +687,10 @@ void SendHypercube(OutgoingMsg ogm, int root, int size, char *msg, unsigned int 
 #if CMK_USE_GM
 
 #include "machine-gm.c"
+
+#elif CMK_USE_AMMASSO
+
+#include "machine-ammasso.c"
 
 #elif CMK_USE_TCP
 

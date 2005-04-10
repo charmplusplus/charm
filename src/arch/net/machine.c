@@ -234,6 +234,10 @@ struct gm_port *gmport = NULL;
 int  portFinish = 0;
 #endif
 
+#if CMK_USE_AMMASSO
+  #include "clustercore/ccil_api.h"
+#endif
+
 #include "conv-ccs.h"
 #include "ccs-server.h"
 #include "sockRoutines.h"
@@ -2281,6 +2285,11 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usc, int everReturn)
   CmiGetArgInt(argv, "+networkProgressPeriod", &networkProgressPeriod);
 
   CmiStartThreads(argv);
+
+  #if CMK_USE_AMMASSO
+    CmiAmmassoOpenQueuePairs();
+  #endif
+
   ConverseRunPE(everReturn);
 }
 
