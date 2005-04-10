@@ -375,6 +375,15 @@ FEM_Mesh_create_node_node_adjacency(int fem_mesh){
 	m->createNodeNodeAdj();
 }
 
+CDECL void 
+FEM_Mesh_create_elem_elem_adjacency(int fem_mesh){
+	const char *caller="FEM_Mesh_create_elem_elem_adjacency"; FEMAPI(caller);
+	FEM_Mesh *m=FEM_Mesh_lookup(fem_mesh,caller);
+	printf("Mesh_lookup succeeded. now calling createElemeElemAdj()\n");
+	m->createElemElemAdj();
+}
+
+
 // Internal API:
 void FEM_Mesh_data_layout(int fem_mesh,int entity,int attr, 	
   	void *data, int firstItem,int length, const IDXL_Layout &layout) 
@@ -1243,7 +1252,8 @@ void FEM_Entity::copyOldGlobalno(const FEM_Entity &e) {
 
 /********************** Node *****************/
 FEM_Node::FEM_Node(FEM_Node *ghost_) 
-	:FEM_Entity(ghost_), primary(0), sharedIDXL(&shared,&shared),elemAdjacency(0),nodeAdjacency(0) 
+       :FEM_Entity(ghost_), primary(0), sharedIDXL(&shared,&shared),
+	elemAdjacency(0),nodeAdjacency(0)
 {}
 
 void FEM_Node::allocatePrimary(void) {
@@ -1280,6 +1290,7 @@ void FEM_Node::allocateNodeAdjacency(){
 	nodeAdjacency = new FEM_VarIndexAttribute(this,FEM_NODE_NODE_ADJACENCY);
 	add(nodeAdjacency);
 }
+
 const char *FEM_Node::getName(void) const {return "FEM_NODE";}
 
 void FEM_Node::create(int attr,const char *caller) {
@@ -1407,7 +1418,7 @@ public:
 };
 
 FEM_Elem::FEM_Elem(const FEM_Mesh &mesh, FEM_Elem *ghost_) 
-	:FEM_Entity(ghost_)
+  :FEM_Entity(ghost_), elemAdjacency(0)
 {
 	FEM_IndexAttribute::Checker *c;
 	if (isGhost()) // Ghost elements can point to both real as well as ghost nodes
@@ -1422,6 +1433,27 @@ void FEM_Elem::pup(PUP::er &p) {
 	FEM_Entity::pup(p);
 }
 FEM_Elem::~FEM_Elem() {
+}
+
+// Isaac's new functions
+void FEM_Elem::create(int attr,const char *caller) {
+  if(attr == FEM_ELEM_ELEM_ADJACENCY) {
+    allocateElemAdjacency();
+  }
+  else
+    super::create(attr,caller);
+}
+
+void FEM_Elem::allocateElemAdjacency(){
+  if(elemAdjacency){
+    delete elemAdjacency;
+  }
+  printf("trying new indexattribute\n");
+  elemAdjacency = new FEM_IndexAttribute(this,FEM_ELEM_ELEM_ADJACENCY);
+  printf("new indexattribute success\n");
+  elemAdjacency->setLength(size());
+  // elemAdjacency->setWidth(nodesPerTuple);
+  add(elemAdjacency);
 }
 
 const char *FEM_Elem::getName(void) const {
@@ -1660,14 +1692,116 @@ void FEM_Mesh::createElemNodeAdj(){
 	for(int i=0;i<elem.size();i++){
 		node.setElemAdjacency(i,elem[i]);
 	}
-};
+}
 
 void FEM_Mesh::createNodeNodeAdj(){
 	node.lookup(FEM_NODE_NODE_ADJACENCY,"FEM_Mesh::createNodeNodeAdj");
 	for(int i=0;i<elem.size();i++){
 		node.setNodeAdjacency(elem[i]);
 	}
-};
+}
+
+// Isaac's code: attempt #1
+// adapted from splitter::addLayer()
+// Also the ghosts are not yet being inserted. Should be easy to add them
+
+FEM_ElemAdj_Layer* FEM_Mesh::addElemAdjLayer(void) {
+  lastElemAdjLayer=new FEM_ElemAdj_Layer();
+  return lastElemAdjLayer;
+}
+FEM_ElemAdj_Layer* FEM_Mesh::curElemAdjLayer(void) {
+  if (lastElemAdjLayer==0) CkAbort("Must call FEM_Add_elem_adj_layer before FEM_Add_elem2face_tuples\n");
+  return lastElemAdjLayer;
+}
+
+void FEM_Mesh::createElemElemAdj()
+{
+
+  FEM_ElemAdj_Layer *g = curElemAdjLayer();
+  for (int t=0;t<elem.size();t++) // for each element type
+    if (elem.has(t)) {
+  
+      const int tuplesPerElem = g->elem[t].tuplesPerElem;
+      const int numElements = elem[t].size();
+      const int nodesPerTuple = g->nodesPerTuple;
+      printf("nodesPerTuple=%d tuplesPerElem=%d number of elements: %d\n", nodesPerTuple, tuplesPerElem, numElements);
+
+      tupleTable table(nodesPerTuple);
+
+      elem[t].lookup(FEM_ELEM_ELEM_ADJACENCY,"FEM_Mesh::createNodeNodeAdj");
+      elem[t].setElemAdjacencySize(nodesPerTuple,numElements);
+
+      //For every element of this type:
+      for (int elemNum=0;elemNum<numElements;elemNum++)
+	{
+	  // insert every element into the tuple table
+	  const int *conn=elem[t].connFor(elemNum);
+
+	  //   printf("tupleTable::MAX_TUPLE=%d\n", tupleTable::MAX_TUPLE);
+	  int tuple[tupleTable::MAX_TUPLE];
+	  FEM_Symmetries_t allSym;
+
+	  printf("\nAdding tuple for element %d\n", elemNum);
+	  for (int u=0;u<tuplesPerElem;u++) 
+	    {		
+	      // similar to the code in splitter::addTuple() 
+	      for (int i=0;i<nodesPerTuple;i++) {
+		if(i!=0) printf("-");
+		int eidx=g->elem[t].elem2tuple[i+u*g->nodesPerTuple];
+		if (eidx==-1) { //"not-there" node--
+		  tuple[i]=-1; //Don't map via connectivity
+		} else { //Ordinary node
+		  int n=conn[eidx];
+		  tuple[i]=n; 
+		  printf("%d", n);
+		}
+	      }
+	      printf("  ");
+	      table.addTuple(tuple,new elemList(0,elemNum,t,allSym)); 
+	    }
+	  printf("\n");
+	}
+  
+      //Loop over all the tuples, connecting adjacent elements
+      table.beginLookup();
+      elemList *l;
+
+      // We'll directly modify the element adjacency table
+      // We should use some abstraction, but this should be quick
+      AllocTable2d<int> &adjtable = elem[t].getElemAdjacency()->get();
+      adjtable.allocate(numElements,tuplesPerElem);
+      int *adjs = adjtable.getData();
+
+      for(int i=0;i<numElements*tuplesPerElem;i++) // can we legitimately initialize a Table2d like this?
+	adjs[i]=-1;
+      
+      while (NULL!=(l=table.lookupNext())) {
+	if (l->next==NULL) //One-entry list: must be a symmetry
+	  {
+	    // UNHANDLED CASE: not sure exactly what this means
+	  }
+	else { /* Several elements in list: normal case */
+	  //Consider adding ghosts for all element pairs on this tuple:	      
+      
+	  for (const elemList *a=l;a!=NULL;a=a->next){
+	    for (const elemList *b=l;b!=NULL;b=b->next){
+	      if(a!=b){
+		printf("Found adjacent elements: %d and %d\n", a->localNo, b->localNo);
+		int j; 
+		// walk through array until we find a spot to put this data
+		for(j=a->localNo*tuplesPerElem;adjs[j]!=-1;j++);
+		adjs[j] = b->localNo;
+		
+	      }
+	    }
+	  }
+	}
+      }
+    }
+}
+
+
+  
 
 
 FILE *FEM_openMeshFile(const char *prefix,int chunkNo,int nchunks,bool forRead)
