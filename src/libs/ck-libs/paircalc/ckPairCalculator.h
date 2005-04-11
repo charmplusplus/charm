@@ -118,13 +118,6 @@ class PairCalculator: public CBase_PairCalculator {
   inline double compute_entry(int n, complex *psi1, complex *psi2, int op) 
     {
 
-#ifdef  _PAIRCALC_USE_BLAS_
-      int incx=1;
-      int incy=1;
-      complex output=zdotu_(&n, &(psi1[0]), &incx,  &(psi2[0]), &incy);
-      return(output.re);
-#else
-        
         int i;
         register double sum = 0;
         for (i = 0; i < n; i++) {
@@ -132,7 +125,6 @@ class PairCalculator: public CBase_PairCalculator {
         }
         
         return sum;
-#endif
   }
  private:
   int numRecd, numExpected, grainSize, S, blkSize, N;
