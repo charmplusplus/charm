@@ -44,13 +44,8 @@ PairCalculator::PairCalculator(bool sym, int grainSize, int s, int blkSize,  int
   inDataLeft = NULL;
   inDataRight = NULL;
 
-#ifdef _SPARSECONT_ 
   outData = new double[grainSize * grainSize];
   memset(outData, 0 , sizeof(double)* grainSize * grainSize);
-#else
-  outData = new double[S * S];
-  memset(outData, 0 , sizeof(double)* S *S);
-#endif
 
   newData = NULL;
   sumPartialCount = 0;
@@ -100,12 +95,7 @@ PairCalculator::pup(PUP::er &p)
 #endif
     }
   if (p.isUnpacking()) {
-#ifdef _SPARSECONT_ 
     outData = new double[grainSize * grainSize];
-#else
-    outData = new double[S*S];
-#endif
-
     if(N>0)
       inDataLeft = new complex[numExpected*N];
     if(!symmetric || (symmetric&&thisIndex.x!=thisIndex.y))
@@ -250,283 +240,25 @@ PairCalculator::calculatePairs_gemm(int size, complex *points, int sender, bool 
 
     if (flag_dp) {
       if(thisIndex.w != 0) {   // Adjusting for double packing of incoming data
-#ifdef _SPARSECONT_
+
 	for (int i = 0; i < grainSize*grainSize; i++)
 	  outData[i] *= 2.0;
-#else
-	for (int i = 0; i < grainSize; i++)
-	  for (int j = 0; j < grainSize; j++)		  
-	    outData[(i+thisIndex.y)*S + j + thisIndex.x] *= 2.0; 
-#endif
       }
     }
-#ifdef _SPARSECONT_
+
     r.add((int)thisIndex.y, (int)thisIndex.x, (int)(thisIndex.y+grainSize-1), (int)(thisIndex.x+grainSize-1), outData);
     r.contribute(this, sparse_sum_double);
-#else
+#if CONVERSE_VERSION_ELAN
 
-#if !CONVERSE_VERSION_ELAN
-    contribute(S * S *sizeof(double), outData, CkReduction::sum_double);
-#else
     //CkPrintf("[%d] ELAN VERSION %d\n", CkMyPe(), symmetric);
     CProxy_PairCalcReducer pairCalcReducerProxy(reducer_id); 
     pairCalcReducerProxy.ckLocalBranch()->acceptContribute(S * S, outData, 
 							   cb, !symmetric, symmetric);
 #endif //!CONVERSE_VERSION_ELAN
 
-#endif //_SPARSECONT_
   }
-
 }
 
-
-/* note this is broken now, offset calculations need to be rejiggered to work with the one dimensional allocation scheme*/
-void
-PairCalculator::calculatePairs(int size, complex *points, int sender, bool fromRow, bool flag_dp)
-{
-#ifdef _PAIRCALC_DEBUG_
-  CkPrintf("     pairCalc[%d %d %d %d] got from [%d %d] with size {%d}, symm=%d, from=%d\n", thisIndex.w, thisIndex.x, thisIndex.y, thisIndex.z,  thisIndex.w, sender, size, symmetric, fromRow);
-#endif
-
-#ifdef NOGEMM
-  numRecd++;   // increment the number of received counts
-
-  int offset = -1;
-  complex **inData;
-  if (fromRow) {   // This could be the symmetric diagnoal case
-    offset = sender - thisIndex.x;
-    inData = inDataLeft;
-#ifdef _PAIRCALC_FIRSTPHASE_STREAM_
-    kLeftOffset[kLeftDoneCount + kLeftCount]=offset;
-    kLeftCount++;
-#endif
-  }
-  else {
-    offset = sender - thisIndex.y;
-    inData = inDataRight;
-#ifdef _PAIRCALC_FIRSTPHASE_STREAM_
-    kRightOffset[kRightDoneCount + kRightCount]=offset;
-    kRightCount++;
-#endif
-  }
-
-  N = size; // N is init here with the size of the data chunk. 
-            // Assuming that data chunk of the same plane across all states are of the same size
-
-  if (inData==NULL) 
-  { // now that we know N we can allocate contiguous space
-    inData = new complex[numExpected*N];
-  }
-  memcpy(inData[offset*N], points, size * sizeof(complex));
-
-
-  // once have K left and K right (or just K left if we're diagonal
-  // and symmetric) compute ZDOT for the inputs.
-
-  // Because the vectors are not guaranteed contiguous, record each
-  // offset so we can iterate through them
-
-
-#ifdef _PAIRCALC_FIRSTPHASE_STREAM_
-
-  if((kLeftCount >= kUnits 
-      && ((kRightCount >= kUnits) || (symmetric && thisIndex.x == thisIndex.y) )) 
-     || (numRecd == numExpected * 2) 
-     || ((symmetric && thisIndex.x==thisIndex.y && numRecd==numExpected)))
-      // if enough submatrix has arrived from both left and right matrixes; 
-      // or if enough submatrix has arrived from left and this is diagonal one;
-      // or if all submatrix has arrived
-    {
-      // count down kUnits from leftCount starting at kUnit'th element
-      //int i, j, idxOffset;
-      int leftoffset, rightoffset;
-
-      // Ready to do  kLeftReady in left matrix, and kRightReady in right matrix.
-      // Both in multiples of kUnits
-      int kLeftReady = kLeftCount - kLeftCount % kUnits;
-      int kRightReady;
-      if(! (symmetric && thisIndex.x == thisIndex.y))
-	  kRightReady = kRightCount - kRightCount % kUnits;
-
-      if (numRecd == numExpected * 2 
-	  || (symmetric && thisIndex.x==thisIndex.y && numRecd==numExpected))
-	{ // if all has arrived, then finish whatever is remained
-	  kLeftReady = kLeftCount;
-	  if(! (symmetric && thisIndex.x == thisIndex.y))
-	      kRightReady = kRightCount;
-	}
-
-      if(symmetric && thisIndex.x == thisIndex.y) {
-	  // if the symmetric but diagonal case
-
-          // NEW left compute with every entry in left (old+new)
-  	  int leftoffset1=0, leftoffset2=0;
-	  for(int kLeft1=kLeftDoneCount; kLeft1<kLeftDoneCount + kLeftReady; kLeft1++)
-	  {
-	    leftoffset1=kLeftOffset[kLeft1];
-	    for(int kLeft2=0; kLeft2<kLeftDoneCount + kLeftReady; kLeft2++)
-	      {
-		  leftoffset2 = kLeftOffset[kLeft2];
-		  // if(leftoffset1 <= leftoffset2) {
-#ifdef _SPARSECONT_
-		  outData[leftoffset1 * grainSize + leftoffset2] = 
-		    compute_entry(size, &(inDataLeft[leftoffset1*N]), &(inDataLeft[leftoffset2*N]),op1);   
-#else
-		  outData[(leftoffset1+thisIndex.y)*S + leftoffset2 + thisIndex.x] = 
-		    compute_entry(size, &(inDataLeft[leftoffset1*N]), &(inDataLeft[leftoffset2*N]),op1);   
-#endif	 
-		  //}
-	      }
-	  }
-      }
-      else {                                                        
-	// compute a square region of the matrix. The correct part of the
-	// region will be used by the reduction.
-
-        // NEW left compute with every entry in right
-	for(int kLeft=kLeftDoneCount; kLeft<kLeftDoneCount + kLeftReady; kLeft++)
-	  {
-	    leftoffset = kLeftOffset[kLeft];
-	    for(int kRight=0; kRight<kRightDoneCount + kRightReady; kRight++) 
-	      {
-	       rightoffset = kRightOffset[kRight];
-#ifdef _SPARSECONT_
-		outData[leftoffset * grainSize + rightoffset] = 
-		    compute_entry(size, &(inDataLeft[leftoffset*N]), &(inDataRight[rightoffset*N]),op1);     
-
-#else
-		outData[(leftoffset+thisIndex.y)*S + rightoffset + thisIndex.x] = 
-		    compute_entry(size, &(inDataLeft[leftoffset*N]), &(inDataRight[rightoffset*N]),op1);    
-#endif	    
-	      }
-	  }
-
-        // OLD left compute with every NEW entry in right
-	for(int kLeft=0; kLeft<kLeftDoneCount; kLeft++)
-	  {
-	    leftoffset = kLeftOffset[kLeft];
-	    for(int kRight=kRightDoneCount; kRight<kRightDoneCount + kRightReady; kRight++) 
-	      {
-	       rightoffset = kRightOffset[kRight];
-#ifdef _SPARSECONT_
-		outData[leftoffset * grainSize + rightoffset] = 
-		    compute_entry(size, &(inDataLeft[leftoffset*N]), &(inDataRight[rightoffset*N]),op1);       
-
-#else
-		outData[(leftoffset+thisIndex.y)*S + rightoffset + thisIndex.x] = 
-		    compute_entry(size, &(inDataLeft[leftoffset*N]), &(inDataRight[rightoffset*N]),op1);        
-#endif	    
-	      }
-	  }
-
-      }
-      // Decrement the undone session count
-      kLeftCount -= kLeftReady;
-      if(! (symmetric && thisIndex.x == thisIndex.y))
-	  kRightCount -= kRightReady;
-
-      // Increment the done session count
-      kLeftDoneCount +=kLeftReady;
-      if(! (symmetric && thisIndex.x == thisIndex.y))
-	  kRightDoneCount += kRightReady;
-    }
-
-  if (numRecd == numExpected * 2 || (symmetric && thisIndex.x==thisIndex.y && numRecd==numExpected)) {
-      numRecd = 0;
-      kLeftCount=0;
-      kRightCount=0;
-      kLeftDoneCount = 0;
-      kRightDoneCount = 0;
-
-      if (flag_dp) {
-	  if(thisIndex.w != 0) {   // Adjusting for double packing of incoming data
-#ifdef _SPARSECONT_
-	      for (int i = 0; i < grainSize*grainSize; i++)
-		  outData[i] *= 2.0;
-#else
-	      for (int i = 0; i < grainSize; i++)
-		  for (int j = 0; j < grainSize; j++)		  
-		      outData[(i+thisIndex.y)*S + j + thisIndex.x] *= 2.0; 
-#endif
-	  }
-      }
-#ifdef _SPARSECONT_
-      r.add((int)thisIndex.y, (int)thisIndex.x, (int)(thisIndex.y+grainSize-1), (int)(thisIndex.x+grainSize-1), outData);
-      r.contribute(this, sparse_sum_double);
-#else
-#if !CONVERSE_VERSION_ELAN
-      contribute(S * S *sizeof(double), outData, CkReduction::sum_double);
-#else
-      //CkPrintf("[%d] ELAN VERSION %d\n", CkMyPe(), symmetric);
-      CProxy_PairCalcReducer pairCalcReducerProxy(reducer_id); 
-      pairCalcReducerProxy.ckLocalBranch()->acceptContribute(S * S, outData, 
-                                                             cb, !symmetric, symmetric);
-#endif
-#endif
-  }
-
-#else 
-
-// Below is the old version, very dusty
-#ifdef _SPARSECONT_ 
-  if (numRecd == numExpected * 2 || (symmetric && thisIndex.x==thisIndex.y && numRecd==numExpected)) {
-    //    kLeftCount=kRightCount=0;  
-#ifdef _PAIRCALC_DEBUG_
-    CkPrintf("     pairCalc[%d %d %d %d] got expected %d\n", thisIndex.w, thisIndex.x, thisIndex.y, thisIndex.z,  numExpected);
-#endif
-    numRecd = 0;   // Reset the received count to zero for next iteration
-
-    int i, j, idxOffset;
-    if(symmetric && thisIndex.x == thisIndex.y) {
-        int size1 = size%PARTITION_SIZE;
-        if(size1 > 0) {
-	    int start_offset = size-size1;
-            for (i = 0; i < grainSize; i++)
-                for (j = 0; j < grainSize; j++) 
-                    outData[i * grainSize + j] = compute_entry(size1, &(inDataLeft[i*N])+start_offset,
-                                                               &(inDataLeft[j*N])+start_offset, op1);        
-        }
-        for(size1 = 0; size1 + PARTITION_SIZE < size; size1 += PARTITION_SIZE) {
-            for (i = 0; i < grainSize; i++)
-                for (j = 0; j < grainSize; j++) 
-                    outData[i * grainSize + j] += compute_entry(PARTITION_SIZE, &(inDataLeft[i*N])+size1,
-                                                                &(inDataLeft[j*N])+size1, op1);
-        }        
-    }     
-    else {                                                        
-      // compute a square region of the matrix. The correct part of the
-      // region will be used by the reduction.
-        int size1 = size%PARTITION_SIZE;
-        if(size1 > 0) {
-	    int start_offset = size-size1;
-            for (i = 0; i < grainSize; i++)
-                for (j = 0; j < grainSize; j++) 
-                    outData[i * grainSize + j] = compute_entry(size1, &(inDataLeft[i*N])+start_offset,
-                                                               &(inDataRight[j*N])+start_offset, op1);        
-        }
-        for(size1 = 0; size1 + PARTITION_SIZE < size; size1 += PARTITION_SIZE) {
-            for (i = 0; i < grainSize; i++)
-                for (j = 0; j < grainSize; j++) 
-                    outData[i * grainSize + j] += compute_entry(PARTITION_SIZE, &(inDataLeft[i*N])+size1,
-                                                               &(inDataRight[j*N])+size1, op1);      
-        }
-    }
-    if (flag_dp) {
-	if(thisIndex.w != 0) {   // Adjusting for double packing of incoming data
-	    for (i = 0; i < grainSize*grainSize; i++)
-		outData[i] *= 2.0;
-	}
-    }
-    // FIXME: should do 'op2' here!!!
-
-    r.add((int)thisIndex.y, (int)thisIndex.x, (int)(thisIndex.y+grainSize-1), (int)(thisIndex.x+grainSize-1), outData);
-    r.contribute(this, sparse_sum_double);
-  }
-#endif
-#endif
-
-#endif //NOGEMM
-}
 
 void
 PairCalculator::acceptResult(int size, double *matrix)
@@ -546,11 +278,13 @@ PairCalculator::acceptResult(int size, double *matrix1, double *matrix2)
 
   complex *mynewData = new complex[N*grainSize];
 
+  /* I don't think this has any purpose 
   complex *othernewData;
   if(symmetric && thisIndex.x != thisIndex.y){
       othernewData = new complex[N*grainSize];
+      memset(othernewData,0,N*grainSize* sizeof(complex));
   }
-
+  */
   int offset = 0, index = thisIndex.y*S + thisIndex.x;
 
   //ASSUMING TMATRIX IS REAL (LOSS OF GENERALITY)
@@ -559,50 +293,31 @@ PairCalculator::acceptResult(int size, double *matrix1, double *matrix2)
 
   int matrixSize=grainSize*grainSize;
 
-#ifdef ZG_BACK
-  /* old zgemm ztuff zlated for zeletion */
-     complex *amatrix=NULL;
-     int incx=1;
-     int incy=2;
-     complex alpha(1.0,0.0);//multiplicative identity 
-     complex beta(0.0,0.0);
-#else
-     double *amatrix=NULL;
-#endif
+  double *amatrix=NULL;
+
 
   index = thisIndex.x*S + thisIndex.y;
   double *localMatrix;
   double *outMatrix;
-#ifndef ZG_BACK
   if(S!=grainSize)  
     {
       // copy S stripe
       amatrix=new double[matrixSize];
-#else
-      amatrix=new complex[matrixSize];
-#endif
       for(int i=0;i<grainSize;i++){
 	localMatrix = (matrix1+index+i*S);
 	outMatrix   = reinterpret_cast <double *> (amatrix+i*grainSize);
-#ifndef ZG_BACK
 	memcpy(outMatrix,localMatrix,grainSize);
 	/* hopefully redundant zgemm stuff
  	 *   equivalent for loop below for this
 	 *  DCOPY(&grainSize,localMatrix,&incx, outMatrix,&incy);
 	 * copy in real leaving imaginary as zeros for zgemm only */
-#else
-	for(incx=0,incy=0;incx<grainSize;incx++,incy+=2)
-	  outMatrix[incy]=localMatrix[incx];
-#endif
 
       }
-#ifndef ZG_BACK
     }
   else // all at once no malloc
     {
       amatrix=matrix1+index;
     }
-#endif
 
 #ifdef _PAIRCALC_DEBUG_
   for (int i = 0; i < grainSize; i++) {
@@ -613,16 +328,6 @@ PairCalculator::acceptResult(int size, double *matrix1, double *matrix2)
   }
 #endif _PAIRCALC_DEBUG_
 
-
-
-#ifdef ZG_BACK
-  int m_in=grainSize;
-  int n_in=N;  
-  int k_in=grainSize;
-  char transform='N';
-  char transformT='T';
-  ZGEMM(&transform, &transformT, &n_in, &m_in, &k_in, &alpha, inDataLeft, &n_in,   &(amatrix[0]), &k_in, &beta, &(mynewData[0]), &n_in);
-#else
   int m_in=grainSize;
   int n_in=N*2;  
   int k_in=grainSize;
@@ -633,30 +338,17 @@ PairCalculator::acceptResult(int size, double *matrix1, double *matrix2)
   char transform='N';
   char transformT='T';
   DGEMM(&transform, &transformT, &n_in, &m_in, &k_in, &alphad, leftd, &n_in,  amatrix, &k_in, &betad, mynewDatad, &n_in);
-#endif
+
   if(!unitcoef){
-    /*zgemm thing zlated for zeletion
-     *  beta=complex(1.0,0.0);  // C = alpha*A*B + beta*C
-     */
-#ifndef ZG_BACK
+
     if(S!=grainSize)  
-#endif
       for(int i=0;i<grainSize;i++){
 	localMatrix = (matrix2+index+i*S);
 	outMatrix   = reinterpret_cast <double *> (amatrix+i*grainSize);
-#ifndef ZG_BACK
 	memcpy(outMatrix,localMatrix,grainSize);
-#else
-	/* zlated for zeletion
-	 * DCOPY(&grainSize,localMatrix,&incx, outMatrix,&incy); */
-	for(incx=0,incy=0;incx<grainSize;incx++,incy+=2)
-	  outMatrix[incy]=localMatrix[incx];
-#endif
       }
-#ifndef ZG_BACK
     else
       amatrix=matrix2+index;
-#endif
 
 #ifdef _PAIRCALC_DEBUG_
     for (int i = 0; i < grainSize; i++) {
@@ -668,19 +360,12 @@ PairCalculator::acceptResult(int size, double *matrix1, double *matrix2)
       }
     }
 #endif
-
-#ifdef ZG_BACK    
-       ZGEMM(&transform, &transformT, &n_in, &m_in, &k_in, &alpha, inDataRight, &n_in,  &(amatrix[0]), &k_in, &beta, &(mynewData[0]), &n_in);
-#else       
     double *rightd=reinterpret_cast <double *> (inDataRight);
     // C = alpha*A*B + beta*C
     DGEMM(&transform, &transformT, &n_in, &m_in, &k_in, &alphad, rightd, &n_in,  amatrix, &k_in, &betad, mynewDatad, &n_in);
-#endif
 
   }
-#ifndef ZG_BACK
   if(S!=grainSize)  
-#endif
     delete [] amatrix;
   // else we didn't allocate one
 
@@ -698,10 +383,12 @@ PairCalculator::acceptResult(int size, double *matrix1, double *matrix2)
   else {
     CkArrayIndex4D idx(thisIndex.w, 0, thisIndex.y, thisIndex.z);
     thisProxy(idx).sumPartialResult(N*grainSize, mynewData, thisIndex.z);
+    /* I think this matrix is unused
     if (thisIndex.y != thisIndex.x){   // FIXME: rowNum will alway == thisIndex.x
       CkArrayIndex4D idx(thisIndex.w, 0, thisIndex.x, thisIndex.z);
       thisProxy(idx).sumPartialResult(N*grainSize, othernewData, thisIndex.z);
     }
+    */
   }
 
 #else
@@ -727,17 +414,22 @@ PairCalculator::acceptResult(int size, double *matrix1, double *matrix2)
   else { // else part is NOT load balanced yet!!!
     CkArrayIndex4D idx(thisIndex.w, 0, thisIndex.y, thisIndex.z);
     thisProxy(idx).sumPartialResult(N*grainSize, mynewData, thisIndex.z);
-    if (thisIndex.y != thisIndex.x){   // FIXME: rowNum will alway == thisIndex.x
+    /* I think this is unused 
+       if (thisIndex.y != thisIndex.x){   // FIXME: rowNum will alway == thisIndex.x
       CkArrayIndex4D idx(thisIndex.w, 0, thisIndex.x, thisIndex.z);
       thisProxy(idx).sumPartialResult(N*grainSize, othernewData, thisIndex.z);
     }
+    */
   }
 #endif
 
   delete [] mynewData;
+  /* not used?*/
+  /*
   if(symmetric && thisIndex.x != thisIndex.y){
       delete [] othernewData;
   }
+  */
   if(conserveMemory)
   {
       // clear the right and left they'll get reallocated on the next pass
@@ -748,6 +440,7 @@ PairCalculator::acceptResult(int size, double *matrix1, double *matrix2)
 	inDataRight = NULL;
       }
     }
+
 }
 
 void 
@@ -923,4 +616,230 @@ PairCalcReducer:: doRegister(PairCalculator *elem, bool symmtype){
     numRegistered[symmtype]++;
 }
 
+
+/* note this is broken now, offset calculations need to be rejiggered to work with the one dimensional allocation scheme*/
+void
+PairCalculator::calculatePairs(int size, complex *points, int sender, bool fromRow, bool flag_dp)
+{
+#ifdef _PAIRCALC_DEBUG_
+  CkPrintf("     pairCalc[%d %d %d %d] got from [%d %d] with size {%d}, symm=%d, from=%d\n", thisIndex.w, thisIndex.x, thisIndex.y, thisIndex.z,  thisIndex.w, sender, size, symmetric, fromRow);
+#endif
+
+#ifdef NOGEMM
+  numRecd++;   // increment the number of received counts
+
+  int offset = -1;
+  complex **inData;
+  if (fromRow) {   // This could be the symmetric diagnoal case
+    offset = sender - thisIndex.x;
+    inData = inDataLeft;
+#ifdef _PAIRCALC_FIRSTPHASE_STREAM_
+    kLeftOffset[kLeftDoneCount + kLeftCount]=offset;
+    kLeftCount++;
+#endif
+  }
+  else {
+    offset = sender - thisIndex.y;
+    inData = inDataRight;
+#ifdef _PAIRCALC_FIRSTPHASE_STREAM_
+    kRightOffset[kRightDoneCount + kRightCount]=offset;
+    kRightCount++;
+#endif
+  }
+
+  N = size; // N is init here with the size of the data chunk. 
+            // Assuming that data chunk of the same plane across all states are of the same size
+
+  if (inData==NULL) 
+  { // now that we know N we can allocate contiguous space
+    inData = new complex[numExpected*N];
+  }
+  memcpy(inData[offset*N], points, size * sizeof(complex));
+
+
+  // once have K left and K right (or just K left if we're diagonal
+  // and symmetric) compute ZDOT for the inputs.
+
+  // Because the vectors are not guaranteed contiguous, record each
+  // offset so we can iterate through them
+
+
+#ifdef _PAIRCALC_FIRSTPHASE_STREAM_
+
+  if((kLeftCount >= kUnits 
+      && ((kRightCount >= kUnits) || (symmetric && thisIndex.x == thisIndex.y) )) 
+     || (numRecd == numExpected * 2) 
+     || ((symmetric && thisIndex.x==thisIndex.y && numRecd==numExpected)))
+      // if enough submatrix has arrived from both left and right matrixes; 
+      // or if enough submatrix has arrived from left and this is diagonal one;
+      // or if all submatrix has arrived
+    {
+      // count down kUnits from leftCount starting at kUnit'th element
+      //int i, j, idxOffset;
+      int leftoffset, rightoffset;
+
+      // Ready to do  kLeftReady in left matrix, and kRightReady in right matrix.
+      // Both in multiples of kUnits
+      int kLeftReady = kLeftCount - kLeftCount % kUnits;
+      int kRightReady;
+      if(! (symmetric && thisIndex.x == thisIndex.y))
+	  kRightReady = kRightCount - kRightCount % kUnits;
+
+      if (numRecd == numExpected * 2 
+	  || (symmetric && thisIndex.x==thisIndex.y && numRecd==numExpected))
+	{ // if all has arrived, then finish whatever is remained
+	  kLeftReady = kLeftCount;
+	  if(! (symmetric && thisIndex.x == thisIndex.y))
+	      kRightReady = kRightCount;
+	}
+
+      if(symmetric && thisIndex.x == thisIndex.y) {
+	  // if the symmetric but diagonal case
+
+          // NEW left compute with every entry in left (old+new)
+  	  int leftoffset1=0, leftoffset2=0;
+	  for(int kLeft1=kLeftDoneCount; kLeft1<kLeftDoneCount + kLeftReady; kLeft1++)
+	  {
+	    leftoffset1=kLeftOffset[kLeft1];
+	    for(int kLeft2=0; kLeft2<kLeftDoneCount + kLeftReady; kLeft2++)
+	      {
+		  leftoffset2 = kLeftOffset[kLeft2];
+		  // if(leftoffset1 <= leftoffset2) {
+		  outData[leftoffset1 * grainSize + leftoffset2] = 
+		    compute_entry(size, &(inDataLeft[leftoffset1*N]), &(inDataLeft[leftoffset2*N]),op1);   
+		  //}
+	      }
+	  }
+      }
+      else {                                                        
+	// compute a square region of the matrix. The correct part of the
+	// region will be used by the reduction.
+
+        // NEW left compute with every entry in right
+	for(int kLeft=kLeftDoneCount; kLeft<kLeftDoneCount + kLeftReady; kLeft++)
+	  {
+	    leftoffset = kLeftOffset[kLeft];
+	    for(int kRight=0; kRight<kRightDoneCount + kRightReady; kRight++) 
+	      {
+	       rightoffset = kRightOffset[kRight];
+		outData[leftoffset * grainSize + rightoffset] = 
+		    compute_entry(size, &(inDataLeft[leftoffset*N]), &(inDataRight[rightoffset*N]),op1);     
+	      }
+	  }
+
+        // OLD left compute with every NEW entry in right
+	for(int kLeft=0; kLeft<kLeftDoneCount; kLeft++)
+	  {
+	    leftoffset = kLeftOffset[kLeft];
+	    for(int kRight=kRightDoneCount; kRight<kRightDoneCount + kRightReady; kRight++) 
+	      {
+	       rightoffset = kRightOffset[kRight];
+		outData[leftoffset * grainSize + rightoffset] = 
+		    compute_entry(size, &(inDataLeft[leftoffset*N]), &(inDataRight[rightoffset*N]),op1);       
+	      }
+	  }
+
+      }
+      // Decrement the undone session count
+      kLeftCount -= kLeftReady;
+      if(! (symmetric && thisIndex.x == thisIndex.y))
+	  kRightCount -= kRightReady;
+
+      // Increment the done session count
+      kLeftDoneCount +=kLeftReady;
+      if(! (symmetric && thisIndex.x == thisIndex.y))
+	  kRightDoneCount += kRightReady;
+    }
+
+  if (numRecd == numExpected * 2 || (symmetric && thisIndex.x==thisIndex.y && numRecd==numExpected)) {
+      numRecd = 0;
+      kLeftCount=0;
+      kRightCount=0;
+      kLeftDoneCount = 0;
+      kRightDoneCount = 0;
+
+      if (flag_dp) {
+	  if(thisIndex.w != 0) {   // Adjusting for double packing of incoming data
+
+	      for (int i = 0; i < grainSize*grainSize; i++)
+		  outData[i] *= 2.0;
+	  }
+      }
+      r.add((int)thisIndex.y, (int)thisIndex.x, (int)(thisIndex.y+grainSize-1), (int)(thisIndex.x+grainSize-1), outData);
+      r.contribute(this, sparse_sum_double);
+
+#if CONVERSE_VERSION_ELAN
+      //CkPrintf("[%d] ELAN VERSION %d\n", CkMyPe(), symmetric);
+      CProxy_PairCalcReducer pairCalcReducerProxy(reducer_id); 
+      pairCalcReducerProxy.ckLocalBranch()->acceptContribute(S * S, outData, 
+                                                             cb, !symmetric, symmetric);
+#endif
+
+  }
+
+#else 
+
+// Below is the old version, very dusty
+  if (numRecd == numExpected * 2 || (symmetric && thisIndex.x==thisIndex.y && numRecd==numExpected)) {
+    //    kLeftCount=kRightCount=0;  
+#ifdef _PAIRCALC_DEBUG_
+    CkPrintf("     pairCalc[%d %d %d %d] got expected %d\n", thisIndex.w, thisIndex.x, thisIndex.y, thisIndex.z,  numExpected);
+#endif
+    numRecd = 0;   // Reset the received count to zero for next iteration
+
+    int i, j, idxOffset;
+    if(symmetric && thisIndex.x == thisIndex.y) {
+        int size1 = size%PARTITION_SIZE;
+        if(size1 > 0) {
+	    int start_offset = size-size1;
+            for (i = 0; i < grainSize; i++)
+                for (j = 0; j < grainSize; j++) 
+                    outData[i * grainSize + j] = compute_entry(size1, &(inDataLeft[i*N])+start_offset,
+                                                               &(inDataLeft[j*N])+start_offset, op1);        
+        }
+        for(size1 = 0; size1 + PARTITION_SIZE < size; size1 += PARTITION_SIZE) {
+            for (i = 0; i < grainSize; i++)
+                for (j = 0; j < grainSize; j++) 
+                    outData[i * grainSize + j] += compute_entry(PARTITION_SIZE, &(inDataLeft[i*N])+size1,
+                                                                &(inDataLeft[j*N])+size1, op1);
+        }        
+    }     
+    else {                                                        
+      // compute a square region of the matrix. The correct part of the
+      // region will be used by the reduction.
+        int size1 = size%PARTITION_SIZE;
+        if(size1 > 0) {
+	    int start_offset = size-size1;
+            for (i = 0; i < grainSize; i++)
+                for (j = 0; j < grainSize; j++) 
+                    outData[i * grainSize + j] = compute_entry(size1, &(inDataLeft[i*N])+start_offset,
+                                                               &(inDataRight[j*N])+start_offset, op1);        
+        }
+        for(size1 = 0; size1 + PARTITION_SIZE < size; size1 += PARTITION_SIZE) {
+            for (i = 0; i < grainSize; i++)
+                for (j = 0; j < grainSize; j++) 
+                    outData[i * grainSize + j] += compute_entry(PARTITION_SIZE, &(inDataLeft[i*N])+size1,
+                                                               &(inDataRight[j*N])+size1, op1);      
+        }
+    }
+    if (flag_dp) {
+	if(thisIndex.w != 0) {   // Adjusting for double packing of incoming data
+	    for (i = 0; i < grainSize*grainSize; i++)
+		outData[i] *= 2.0;
+	}
+    }
+    // FIXME: should do 'op2' here!!!
+
+    r.add((int)thisIndex.y, (int)thisIndex.x, (int)(thisIndex.y+grainSize-1), (int)(thisIndex.x+grainSize-1), outData);
+    r.contribute(this, sparse_sum_double);
+  }
+#endif
+
+#endif //NOGEMM
+}
+
+
+
 #include "ckPairCalculator.def.h"
+
+

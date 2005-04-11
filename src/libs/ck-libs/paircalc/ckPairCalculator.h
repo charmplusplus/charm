@@ -7,7 +7,6 @@
 #include "BroadcastStrategy.h"
 
 // Flag to use sparse reduction or regular reduction
-#define _SPARSECONT_ 
 
 // Debugging flag for Verbose output
 //#define _PAIRCALC_DEBUG_
