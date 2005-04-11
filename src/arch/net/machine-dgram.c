@@ -359,10 +359,12 @@ static void OtherNode_init(OtherNode node)
     node->gm_pending = 0;
 #endif
 
-    // TODO: The initial values of the Ammasso related members will be set by the machine layer
-    //       as the QPs are being created (along with any initial values).  After all the details
-    //       of the layer are figured out, put some defaults here just so they are initialized to
-    //       known values.  (Though, it should not be a problem that they are not initialized here yet.)
+    /*
+    TODO: The initial values of the Ammasso related members will be set by the machine layer
+          as the QPs are being created (along with any initial values).  After all the details
+          of the layer are figured out, put some defaults here just so they are initialized to
+          known values.  (Though, it should not be a problem that they are not initialized here yet.)
+    */
 
     node->asm_rank=0;
     node->asm_total=0;
