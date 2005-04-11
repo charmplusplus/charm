@@ -301,17 +301,12 @@ PairCalculator::acceptResult(int size, double *matrix1, double *matrix2)
   double *outMatrix;
   if(S!=grainSize)  
     {
-      // copy S stripe
+      // copy grainSize chunks at S offsets
       amatrix=new double[matrixSize];
       for(int i=0;i<grainSize;i++){
 	localMatrix = (matrix1+index+i*S);
-	outMatrix   = reinterpret_cast <double *> (amatrix+i*grainSize);
-	memcpy(outMatrix,localMatrix,grainSize);
-	/* hopefully redundant zgemm stuff
- 	 *   equivalent for loop below for this
-	 *  DCOPY(&grainSize,localMatrix,&incx, outMatrix,&incy);
-	 * copy in real leaving imaginary as zeros for zgemm only */
-
+	outMatrix   = amatrix+i*grainSize;
+	memcpy(outMatrix,localMatrix,grainSize*sizeof(double));
       }
     }
   else // all at once no malloc
@@ -344,8 +339,8 @@ PairCalculator::acceptResult(int size, double *matrix1, double *matrix2)
     if(S!=grainSize)  
       for(int i=0;i<grainSize;i++){
 	localMatrix = (matrix2+index+i*S);
-	outMatrix   = reinterpret_cast <double *> (amatrix+i*grainSize);
-	memcpy(outMatrix,localMatrix,grainSize);
+	outMatrix   = amatrix+i*grainSize;
+	memcpy(outMatrix,localMatrix,grainSize*sizeof(double));
       }
     else
       amatrix=matrix2+index;
