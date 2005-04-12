@@ -42,6 +42,10 @@ class CkQ : private CkSTLHelper<T>, private CkNoncopyable {
       // blklen is always kept as a power of 2
       int newlen = blklen<<1;
       mask |= blklen;
+      if (blklen==0) {
+	newlen = 16;
+	mask = 0x0f;
+      }
       T *newblk = new T[newlen];
       elementCopy(newblk,block+first,blklen-first);
       elementCopy(newblk+blklen-first,block,first);
@@ -49,14 +53,13 @@ class CkQ : private CkSTLHelper<T>, private CkNoncopyable {
       blklen = newlen; first = 0;
     }
   public:
-    CkQ() :first(0),len(0),mask(3) {
-      blklen = 4;
-      block = new T[4];
+    CkQ() :first(0),len(0),mask(0) {
+      blklen = 0; block = NULL;
     }
     CkQ(int sz) :first(0),len(0) {
       int size = 2;
       mask = 0x03;
-      while (1<<size < sz) { size++; mask |= 1<<size; }
+      while (1<<size < sz) { mask |= 1<<size; size++; }
       blklen = 1<<size;
       block = new T[blklen];
     }
