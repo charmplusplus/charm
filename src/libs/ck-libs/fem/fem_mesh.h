@@ -1169,6 +1169,64 @@ public:
 	FEM_ElemAdj_Layer *addElemAdjLayer(void);
 	FEM_ElemAdj_Layer *curElemAdjLayer(void);
 
+
+  // Terry's adjacency accessors & modifiers: NOTE - ALL VOID FOR NOW
+  //********* Element-to-element: preserve initial ordering relative to nodes
+  /// Place all of element e's adjacent elements in neighbors; assumes
+  /// neighbors allocated to correct size
+  void e2e_getAll(int e, int *neighbors) {}
+  /// Given id of element e, return the id of the idx-th adjacent element
+  int e2e_getNode(int e, short idx) {}
+  /// Given id of element e and id of another element nbr, return i such that
+  /// nbr is the i-th element adjacent to e
+  int e2e_getIndex(int e, int nbr) {}
+  /// Set the element adjacencies of element e to neighbors; assumes neighbors 
+  /// has the correct size
+  void e2e_setAll(int e, int *neighbors) {}
+  /// Set the idx-th element adjacent to e to be newElem
+  void e2e_setIndex(int e, short idx, int newElem) {}
+  /// Find element oldNbr in e's adjacent elements and replace with newNbr
+  void e2e_replace(int e, int oldNbr, int newNbr) {}
+
+  //********* Element-to-node: preserve initial ordering
+  /// Place all of element e's adjacent nodes in adjnodes; assumes
+  /// adjnodes allocated to correct size
+  void e2n_getAll(int e, int *adjnodes) {}
+  /// Given id of element e, return the id of the idx-th adjacent node
+  int e2n_getNode(int e, short idx) {}
+  /// Given id of element e and id of a node n, return i such that
+  /// n is the i-th node adjacent to e
+  short e2n_getIndex(int e, int n) {}
+  /// Set the node adjacencies of element e to adjnodes; assumes adjnodes 
+  /// has the correct size
+  void e2n_setAll(int e, int *adjnodes) {}
+  /// Set the idx-th node adjacent to e to be newNode
+  void e2n_setIndex(int e, short idx, int newNode) {}
+  /// Find node oldNode in e's adjacent ndoes and replace with newNode
+  void e2n_replace(int e, int oldNode, int newNode) {}
+
+  //********* Node-to-node
+  /// Place all of node n's adjacent nodes in adjnodes and the resulting 
+  /// length of adjnodes in sz; assumes adjnodes is not allocated, but sz is
+  int n2n_getAll(int n, int *adjnodes, int *sz) {}
+  /// Adds newNode to node n's node adjacency list
+  void n2n_add(int n, int newNode) {}
+  /// Removes oldNode from n's node adjacency list
+  void n2n_remove(int n, int oldNode) {}
+  /// Finds oldNode in n's node adjacency list, and replaces it with newNode
+  void n2n_replace(int n, int oldNode, int newNode) {}
+
+  //********* Node-to-element
+  /// Place all of node n's adjacent elements in adjelements and the resulting 
+  /// length of adjelements in sz; assumes adjelements is not allocated, 
+  /// but sz is
+  int n2e_getAll(int n, int *adjelements, int *sz) {}
+  /// Adds newElem to node n's element adjacency list
+  void n2e_add(int n, int newElem) {}
+  /// Removes oldElem from n's element adjacency list
+  void n2e_remove(int n, int oldElem) {}
+  /// Finds oldElem in n's element adjacency list, and replaces it with newElem
+  void n2e_replace(int n, int oldElem, int newElem) {}
 }; 
 PUPmarshall(FEM_Mesh);
 FEM_Mesh *FEM_Mesh_lookup(int fem_mesh,const char *caller);
