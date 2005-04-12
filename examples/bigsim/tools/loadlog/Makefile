@@ -1,10 +1,10 @@
 CHARMC=../../../../bin/charmc $(OPTS)
 
 loadlog: loadlog.o
-	$(CHARMC) -seq -o loadlog loadlog.o -lconv-bluegene-logs -language converse++
+	$(CHARMC) -o loadlog loadlog.o -lconv-bluegene-logs -language converse++
 
 loadlog.o: loadlog.C 
-	$(CHARMC) -seq -c loadlog.C
+	$(CHARMC) -c loadlog.C
 
 clean:
 	rm -f *.o loadlog *~ moduleinit.C charmrun conv-host
