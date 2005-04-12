@@ -584,7 +584,7 @@ driver(void)
 //    }
     
     if (1) { //Publish data to the net
-      NetFEM n=NetFEM_Begin(myChunk,t,2,NetFEM_POINTAT);
+      NetFEM n=NetFEM_Begin(myChunk,t,2,NetFEM_WRITE);
       NetFEM_Nodes(n,g.nnodes,(double *)g.coord,"Position (m)");
       NetFEM_Vector(n,(double *)g.d,"Displacement (m)");
       NetFEM_Vector(n,(double *)g.v,"Velocity (m/s)");
