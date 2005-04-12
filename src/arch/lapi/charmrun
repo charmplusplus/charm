@@ -4,9 +4,6 @@
 #  Translates +pN-style charmrun options into 
 # POE (Parallel Operating Environment) options.
 
-# COMMENT BY FILIPPO:
-# THIS FILE IS USELESS AT THE MOMENT, IT NEEDS TO USE LOAD LEVELER!
-
 args=""
 pes=1
 
@@ -239,15 +236,37 @@ grep -E -v "#@" $llfile | grep "export" >> $filename
 
 if [ $interactive -eq 0 ]
     then
-    # submit the job as poe
+    # submit the job as poe, iterating 
     echo "Running interactively> poe $PWD/$args -llfile $filename"
     poe $PWD/$args -llfile $filename
+    status=$?
+    if [ $status -eq 255 ];
+      then
+      llstatus=1
+    else
+      llstatus=0
+    fi
+    until (exit $llstatus);
+      do
+      echo "Retrying in two minutes..."
+      sleep 120
+      poe $PWD/$args -llfile $filename;
+      status=$?
+      if [ $status -eq 255 ];
+        then
+        llstatus=1
+      else
+        llstatus=0
+      fi
+    done
+    if [ $status -ne 0 ];then exit $status;fi
+    
 else
     # append the command at the end of the file and llsubmit it
-    echo "Running batch> poe $args"
+    echo "Submitting batch> poe $PWD/$args"
     cat >> $filename <<EOF
 
-poe $args
+poe $PWD/$args
 EOF
     llsubmit $filename
 fi
