@@ -381,6 +381,16 @@ FDECL void FTN_NAME(CMIMEMORYCHECK,cmimemorycheck)(){
 	CmiMemoryCheck();
 }
 
+class FEM_Operation_Data{
+	public:
+		double *coord;
+		int *connData,*nodeBoundaryData;
+		unsigned char *validNodeData,*validElemData;
+		FEM_Operation_Data(){
+		};
+};
+void FEM_Coarsen_Operation(FEM_Operation_Data *coarsen_data, coarsenData &operation);
+
 void FEM_REFINE2D_Coarsen(int meshID,int nodeID,double *coord,int elemID,double *desiredAreas){
 	int nnodes = FEM_Mesh_get_length(meshID,nodeID);
 	int nelems = FEM_Mesh_get_length(meshID,elemID);
@@ -409,14 +419,16 @@ void FEM_REFINE2D_Coarsen(int meshID,int nodeID,double *coord,int elemID,double 
 	AllocTable2d<int> &connTable = ((FEM_IndexAttribute *)connAttr)->get();
 	AllocTable2d<unsigned char>&validNodeTable = ((FEM_DataAttribute *)validNodeAttr)->getChar();
 	AllocTable2d<unsigned char>&validElemTable = ((FEM_DataAttribute *)validElemAttr)->getChar();
-	int *connData = connTable.getData();
-	unsigned char *validNodeData = validNodeTable.getData();
-	unsigned char *validElemData = validElemTable.getData();
+	FEM_Operation_Data *coarsen_data = new FEM_Operation_Data;
+	coarsen_data->coord = coord;
+	int *connData = coarsen_data->connData= connTable.getData();
+	unsigned char *validNodeData = coarsen_data->validNodeData = validNodeTable.getData();
+	unsigned char *validElemData = coarsen_data->validElemData = validElemTable.getData();
 	/* Extract the data for node boundaries */
-	int *nodeBoundaryData=NULL;
+	int *nodeBoundaryData= coarsen_data->nodeBoundaryData =NULL;
 	if(nodeBoundaryAttr){
 		AllocTable2d<int> &nodeBoundaryTable = ((FEM_DataAttribute *)nodeBoundaryAttr)->getInt();
-		nodeBoundaryData = nodeBoundaryTable.getData();
+		nodeBoundaryData = coarsen_data->nodeBoundaryData = nodeBoundaryTable.getData();
 	}
 
 	for(int k=0;k<nnodes;k++){
@@ -431,62 +443,74 @@ void FEM_REFINE2D_Coarsen(int meshID,int nodeID,double *coord,int elemID,double 
 	}
 
 	DEBUGINT(printf("coarsen %d %d \n",nodeCount,elemCount));	
-	REFINE2D_Coarsen(nodeCount,coord,elemCount,desiredAreas);
+	REFINE2D_Coarsen(nodeCount,coord,elemCount,desiredAreas,coarsen_data);
 	int nCollapses = REFINE2D_Get_Collapse_Length();
 
 
-	
+/*	
 	for(int collapseNo=0;collapseNo < nCollapses;collapseNo++){
-		int tri,nodeToThrow,nodeToKeep,n1,n2;
 		coarsenData operation;
 		REFINE2D_Get_Collapse(collapseNo,&operation);
-		switch(operation.type){
-			case COLLAPSE:
-				tri = operation.data.cdata.elemID;
-				nodeToKeep = operation.data.cdata.nodeToKeep;
-				nodeToThrow = operation.data.cdata.nodeToDelete;
-				if(operation.data.cdata.flag & 0x1 || operation.data.cdata.flag & 0x2){
-					coord[2*nodeToKeep] = operation.data.cdata.newX;
-					coord[2*nodeToKeep+1] = operation.data.cdata.newY;
-					validNodeData[nodeToThrow] = 0;
-					DEBUGINT(printf("---------Collapse <%d,%d> invalidating node %d and element %d \n",nodeToKeep,nodeToThrow,nodeToThrow,tri));
-				}
-				validElemData[tri] = 0;
-				connData[3*tri] = connData[3*tri+1] = connData[3*tri+2] = -1;
-				break;
-			case 	UPDATE:
-				if(validNodeData[operation.data.udata.nodeID]){
-					coord[2*(operation.data.udata.nodeID)] = operation.data.udata.newX;
-					coord[2*(operation.data.udata.nodeID)+1] = operation.data.udata.newY;
-					if(nodeBoundaryData){
-						nodeBoundaryData[operation.data.udata.nodeID]=operation.data.udata.boundaryFlag;
-					}
-				}else{
-					DEBUGINT(printf("[%d] WEIRD -- update operation for invalid node %d \n",CkMyPe(),operation.data.udata.nodeID));
-				}
-				break;
-			case REPLACE:
-				if(validElemData[operation.data.rddata.elemID]){
-					if(connData[3*operation.data.rddata.elemID+operation.data.rddata.relnodeID] == operation.data.rddata.oldNodeID){
-						connData[3*operation.data.rddata.elemID+operation.data.rddata.relnodeID] = operation.data.rddata.newNodeID;
-						if(validNodeData[operation.data.rddata.oldNodeID]){
-							validNodeData[operation.data.rddata.oldNodeID]=0;
-						}
-					}else{
-						DEBUGINT(printf("[%d] WEIRD -- REPLACE operation for element %d specifies different node number %d \n",CkMyPe(),operation.data.rddata.elemID,operation.data.rddata.oldNodeID));
-					}
-				}else{
-						DEBUGINT(printf("[%d] WEIRD -- REPLACE operation for invalid element %d \n",CkMyPe(),operation.data.rddata.elemID));
-				}
-				DEBUGINT(printf("---------Replace invalidating node %d with %d in element %d\n",operation.data.rddata.oldNodeID,operation.data.rddata.newNodeID,operation.data.rddata.elemID));
-				break;
-				default:
-					DEBUGINT(printf("[%d] WEIRD -- COARSENDATA type == invalid \n",CkMyPe()));
-					CmiAbort("COARSENDATA type == invalid");
-		}
+		FEM_Coarsen_Operation(coarsen_data,operation);
 	}
-	
+	*/
+	delete coarsen_data;
 }  
+
+void FEM_Coarsen_Operation(FEM_Operation_Data *coarsen_data, coarsenData &operation){
+	double *coord = coarsen_data->coord;
+	int tri,nodeToThrow,nodeToKeep,n1,n2;
+	int *connData = coarsen_data->connData;
+	unsigned char *validNodeData = coarsen_data->validNodeData;
+	unsigned char *validElemData = coarsen_data->validElemData;
+	int *nodeBoundaryData = coarsen_data->nodeBoundaryData;
+
+	switch(operation.type){
+		case COLLAPSE:
+			tri = operation.data.cdata.elemID;
+			nodeToKeep = operation.data.cdata.nodeToKeep;
+			nodeToThrow = operation.data.cdata.nodeToDelete;
+			if(operation.data.cdata.flag & 0x1 || operation.data.cdata.flag & 0x2){
+				coord[2*nodeToKeep] = operation.data.cdata.newX;
+				coord[2*nodeToKeep+1] = operation.data.cdata.newY;
+				validNodeData[nodeToThrow] = 0;
+				DEBUGINT(printf("---------Collapse <%d,%d> invalidating node %d and element %d \n",nodeToKeep,nodeToThrow,nodeToThrow,tri));
+			}
+			validElemData[tri] = 0;
+			connData[3*tri] = connData[3*tri+1] = connData[3*tri+2] = -1;
+			break;
+		case 	UPDATE:
+			if(validNodeData[operation.data.udata.nodeID]){
+				coord[2*(operation.data.udata.nodeID)] = operation.data.udata.newX;
+				coord[2*(operation.data.udata.nodeID)+1] = operation.data.udata.newY;
+				if(nodeBoundaryData){
+					nodeBoundaryData[operation.data.udata.nodeID]=operation.data.udata.boundaryFlag;
+				}
+			}else{
+				DEBUGINT(printf("[%d] WEIRD -- update operation for invalid node %d \n",CkMyPe(),operation.data.udata.nodeID));
+			}
+			break;
+		case REPLACE:
+			if(validElemData[operation.data.rddata.elemID]){
+				if(connData[3*operation.data.rddata.elemID+operation.data.rddata.relnodeID] == operation.data.rddata.oldNodeID){
+					connData[3*operation.data.rddata.elemID+operation.data.rddata.relnodeID] = operation.data.rddata.newNodeID;
+					if(validNodeData[operation.data.rddata.oldNodeID]){
+						validNodeData[operation.data.rddata.oldNodeID]=0;
+					}
+				}else{
+					DEBUGINT(printf("[%d] WEIRD -- REPLACE operation for element %d specifies different node number %d \n",CkMyPe(),operation.data.rddata.elemID,operation.data.rddata.oldNodeID));
+				}
+			}else{
+					DEBUGINT(printf("[%d] WEIRD -- REPLACE operation for invalid element %d \n",CkMyPe(),operation.data.rddata.elemID));
+			}
+			DEBUGINT(printf("---------Replace invalidating node %d with %d in element %d\n",operation.data.rddata.oldNodeID,operation.data.rddata.newNodeID,operation.data.rddata.elemID));
+			break;
+			default:
+				DEBUGINT(printf("[%d] WEIRD -- COARSENDATA type == invalid \n",CkMyPe()));
+			CmiAbort("COARSENDATA type == invalid");
+}			
+};
+
 
 FDECL void FTN_NAME(FEM_REFINE2D_COARSEN,fem_refine2d_coarsen)(int *meshID,int *nodeID,double *coord,int *elemID,double *desiredAreas){
 	FEM_REFINE2D_Coarsen(*meshID,*nodeID,coord,*elemID,desiredAreas);

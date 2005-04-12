@@ -152,7 +152,7 @@ class coarsenResults {
 	
 public:
 	coarsenResults(){}
-  void addCollapse(int elementID,int nodeToKeep,int nodeToDelete,double nX,double nY,int flag){
+  coarsenData addCollapse(int elementID,int nodeToKeep,int nodeToDelete,double nX,double nY,int flag){
 		coarsenData d;
 		d.type = COLLAPSE;
 		d.data.cdata.elemID = elementID;
@@ -161,27 +161,29 @@ public:
 		d.data.cdata.newX = nX;
 		d.data.cdata.newY = nY;
 		d.data.cdata.flag = flag;
-		res.push_back(d);
+		return d;
 	};
 
-	void addUpdate(int nodeID,double newX,double newY, int boundaryFlag){
+	coarsenData addUpdate(int nodeID,double newX,double newY, int boundaryFlag){
 		coarsenData d;
 		d.type = UPDATE;
 		d.data.udata.nodeID = nodeID;
 		d.data.udata.newX = newX;
 		d.data.udata.newY = newY;
 		d.data.udata.boundaryFlag = boundaryFlag;
-		res.push_back(d);
+//		res.push_back(d);
+		return d;
 	};
 	
-	void addReplaceDelete(int elemID,int relnodeID,int oldNodeID,int newNodeID){
+	coarsenData addReplaceDelete(int elemID,int relnodeID,int oldNodeID,int newNodeID){
 		coarsenData d;
 		d.type = REPLACE;
 		d.data.rddata.elemID = elemID;
 		d.data.rddata.relnodeID = relnodeID;
 		d.data.rddata.oldNodeID = oldNodeID;
 		d.data.rddata.newNodeID = newNodeID;
-		res.push_back(d);
+//		res.push_back(d);
+		return d;
 	};
 	
 	int countResults(){return res.size();}
@@ -206,19 +208,29 @@ public:
 	}
 };
 
+/*
+	Modifying the code so that instead of being stored the results are processed immediately
+	The coarsen client is used simply to create and return an appropriate coarsenData structure
+*/
+class FEM_Operation_Data;
+void FEM_Coarsen_Operation(FEM_Operation_Data *coarsen_data, coarsenData &operation);
 
 class resultsCoarsenClient : public refineClient {
   coarsenResults *res;
+	FEM_Operation_Data *data;
 public:
-  resultsCoarsenClient(coarsenResults *res_) : res(res_){};
+  resultsCoarsenClient(coarsenResults *res_,FEM_Operation_Data *data_=NULL) : res(res_),data(data_){};
   void collapse(int elementID,int nodeToKeep,int nodeToDelete,double nX,double nY,int flag){
-		res->addCollapse(elementID,nodeToKeep,nodeToDelete,nX,nY,flag);
+		coarsenData d = res->addCollapse(elementID,nodeToKeep,nodeToDelete,nX,nY,flag);
+		FEM_Coarsen_Operation(data,d);
   }
 	void nodeUpdate(int nodeID, double newX, double newY, int boundaryFlag){
-		res->addUpdate(nodeID,newX,newY,boundaryFlag);
+		coarsenData d = res->addUpdate(nodeID,newX,newY,boundaryFlag);
+		FEM_Coarsen_Operation(data,d);
 	}
 	void nodeReplaceDelete(int elementID, int relnodeID, int oldNodeID, int newNodeID){
-		res->addReplaceDelete(elementID,relnodeID,oldNodeID,newNodeID);
+		coarsenData d = res->addReplaceDelete(elementID,relnodeID,oldNodeID,newNodeID);
+		FEM_Coarsen_Operation(data,d);
 	}
 };
 
@@ -237,14 +249,14 @@ CDECL void REFINE2D_Split(int nNode,double *coord,int nEl,double *desiredArea)
   C->multipleRefine(desiredArea, &client);
 }
 
-CDECL void REFINE2D_Coarsen(int nNode,double *coord,int nEl,double *desiredArea)
+CDECL void REFINE2D_Coarsen(int nNode,double *coord,int nEl,double *desiredArea,FEM_Operation_Data *data)
 {
   TCHARM_API_TRACE("REFINE2D_Coarsen", "coarsen");
   chunk *C = CtvAccess(_refineChunk);
   if (!C)
     CkAbort("REFINE2D_Split failed> Did you forget to call REFINE2D_Attach?");
   C->coarsenResultsStorage=new coarsenResults;
-  resultsCoarsenClient client(C->coarsenResultsStorage);
+  resultsCoarsenClient client(C->coarsenResultsStorage,data);
 
   C->updateNodeCoords(nNode, coord, nEl);
   C->multipleCoarsen(desiredArea, &client);

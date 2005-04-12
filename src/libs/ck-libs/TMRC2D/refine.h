@@ -145,7 +145,8 @@ typedef struct {
 	} data;
 } coarsenData;
 
-void REFINE2D_Coarsen(int nNode,double *coord,int nEl,double *desiredArea);
+class FEM_Operation_Data;
+void REFINE2D_Coarsen(int nNode,double *coord,int nEl,double *desiredArea,FEM_Operation_Data *data);
 
 /*
 void REFINE2D_Get_Collapse(int i,int *conn,int *tri,int *nodeToThrow,int *nodeToKeep,double *nx,double *ny,int *flag,int idxbase);*/
