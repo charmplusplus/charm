@@ -15,8 +15,6 @@ Asks for refinements occasionally.
 #include "ckvector3d.h"
 #include "charm-api.h"
 #include "fem_mesh.h"
-
-
 #include "netfem.h"
 #include "refine.h"
 #include "femrefine.h"
@@ -473,50 +471,50 @@ driver(void)
   double startTime=CkWallTimer();
   double curArea=2.5e-5/1024;
   int t = 0;
-    if (1) { //Publish data to the net
-      NetFEM n=NetFEM_Begin(myChunk,t,2,NetFEM_WRITE);
-      int count=0;
-      double *vcoord = new double[2*g.nnodes];
-      double *vnodeid = new double[g.nnodes];
-      int *maptovalid = new int[g.nnodes];
-      for(int i=0;i<g.nnodes;i++){
-	if(g.validNode[i]){
-	  vcoord[2*count] = ((double *)g.coord)[2*i];
-	  vcoord[2*count+1] = ((double *)g.coord)[2*i+1];
-	  maptovalid[i] = count;
-	  printf("~~~~~~~ %d %d %.6lf %.6lf \n",count,i,vcoord[2*count],vcoord[2*count+1]);
-	  vnodeid[count] = i;
-	  count++;	
-	}
+  if (1) { //Publish data to the net
+    NetFEM n=NetFEM_Begin(myChunk,t,2,NetFEM_WRITE);
+    int count=0;
+    double *vcoord = new double[2*g.nnodes];
+    double *vnodeid = new double[g.nnodes];
+    int *maptovalid = new int[g.nnodes];
+    for(int i=0;i<g.nnodes;i++){
+      if(g.validNode[i]){
+	vcoord[2*count] = ((double *)g.coord)[2*i];
+	vcoord[2*count+1] = ((double *)g.coord)[2*i+1];
+	maptovalid[i] = count;
+	printf("~~~~~~~ %d %d %.6lf %.6lf \n",count,i,vcoord[2*count],vcoord[2*count+1]);
+	vnodeid[count] = i;
+	count++;	
       }
-      NetFEM_Nodes(n,count,(double *)vcoord,"Position (m)");
-      NetFEM_Scalar(n,vnodeid,1,"Node ID");
-      /*    NetFEM_Vector(n,(double *)g.d,"Displacement (m)");
-	    NetFEM_Vector(n,(double *)g.v,"Velocity (m/s)");*/
-      count=0;
-      int *vconn = new int[3*g.nelems];
-      double *vid = new double[3*g.nelems];
-      for(int i=0;i<g.nelems;i++){
-	if(g.validElem[i]){
-	  vconn[3*count] = maptovalid[g.conn[3*i]];
-	  vconn[3*count+1] = maptovalid[g.conn[3*i+1]];
-	  vconn[3*count+2] = maptovalid[g.conn[3*i+2]];
-	  printf("~~~~~~~ %d %d < %d,%d %d,%d %d,%d >\n",count,i,vconn[3*count],g.conn[3*i],vconn[3*count+1],g.conn[3*i+1],vconn[3*count+2],g.conn[3*i+2]);
-	  vid[count]=count;
-	  count++;	
-	}
-      }
-      NetFEM_Elements(n,count,3,(int *)vconn,"Triangles");
-      NetFEM_Scalar(n,vid,1,"Element ID");
-      /*	NetFEM_Scalar(n,g.S22,1,"Y Stress (pure)");
-		NetFEM_Scalar(n,g.S12,1,"Shear Stress (pure)");*/
-      NetFEM_End(n);
-      delete [] vcoord;
-      delete [] vconn;
-      delete [] maptovalid;
-      delete [] vid;
-      delete [] vnodeid;
     }
+    NetFEM_Nodes(n,count,(double *)vcoord,"Position (m)");
+    NetFEM_Scalar(n,vnodeid,1,"Node ID");
+    /*    NetFEM_Vector(n,(double *)g.d,"Displacement (m)");
+	  NetFEM_Vector(n,(double *)g.v,"Velocity (m/s)");*/
+    count=0;
+    int *vconn = new int[3*g.nelems];
+    double *vid = new double[3*g.nelems];
+    for(int i=0;i<g.nelems;i++){
+      if(g.validElem[i]){
+	vconn[3*count] = maptovalid[g.conn[3*i]];
+	vconn[3*count+1] = maptovalid[g.conn[3*i+1]];
+	vconn[3*count+2] = maptovalid[g.conn[3*i+2]];
+	printf("~~~~~~~ %d %d < %d,%d %d,%d %d,%d >\n",count,i,vconn[3*count],g.conn[3*i],vconn[3*count+1],g.conn[3*i+1],vconn[3*count+2],g.conn[3*i+2]);
+	vid[count]=count;
+	count++;	
+      }
+    }
+    NetFEM_Elements(n,count,3,(int *)vconn,"Triangles");
+    NetFEM_Scalar(n,vid,1,"Element ID");
+    /*	NetFEM_Scalar(n,g.S22,1,"Y Stress (pure)");
+	NetFEM_Scalar(n,g.S12,1,"Shear Stress (pure)");*/
+    NetFEM_End(n);
+    delete [] vcoord;
+    delete [] vconn;
+    delete [] maptovalid;
+    delete [] vid;
+    delete [] vnodeid;
+  }
   for (t=1;t<=tSteps;t++) {
     /*    if (1) { //Structural mechanics
     //Compute forces on nodes exerted by elements
@@ -541,9 +539,9 @@ driver(void)
 	 n,g.coord[n].x,g.coord[n].y,g.d[n].x,g.d[n].y);
 	 }
 	 }*/
-//    if (t%512==0)
-//      FEM_Migrate();
-
+    //    if (t%512==0)
+    //      FEM_Migrate();
+    
     vector2d *loc=new vector2d[2*g.nnodes];
     for (i=0;i<g.nnodes;i++) {
       loc[i]=g.coord[i];//+g.d[i];
@@ -570,7 +568,7 @@ driver(void)
       double *vnodeid = new double[g.nnodes];
       int *maptovalid = new int[g.nnodes];
       for(int i=0;i<g.nnodes;i++){
-				maptovalid[i] = -1;
+	maptovalid[i] = -1;
 	if(g.validNode[i]){
 	  vcoord[2*count] = ((double *)g.coord)[2*i];
 	  vcoord[2*count+1] = ((double *)g.coord)[2*i+1];

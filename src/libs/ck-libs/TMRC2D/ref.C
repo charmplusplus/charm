@@ -25,13 +25,13 @@ void edgeRef::remove()
   mesh[cid].removeEdge(idx);
 }
 
-int edgeRef::split(int *m, edgeRef *e_prime, node iNode, node fNode, 
+int edgeRef::split(int *m, edgeRef *e_prime, int oIdx, int fIdx,
 		   elemRef requester, int *local, int *first, 
 		   int *nullNbr)
 {
   splitOutMsg *som;
   int result;
-  som = mesh[cid].split(idx, requester, iNode, fNode);
+  som = mesh[cid].split(idx, requester, oIdx, fIdx);
   *m = som->n;
   *e_prime = som->e;
   *local = som->local;

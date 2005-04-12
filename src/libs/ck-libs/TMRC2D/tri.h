@@ -77,8 +77,9 @@ public:
   // and newY, while nodeToDelete is removed and all references to it
   // are replaced by references to nodeToKeep
   virtual void collapse(int elemId, int nodeToKeep, int nodeToDelete, double newX, double newY, int flag) {};
-  // update nodeID with new coordinates newX and newY
-  virtual void nodeUpdate(int nodeID, double newX, double newY, int boundaryFlag){};
+  // update nodeID with new coordinates newX and newY; set new node's boundary
+  // flag to boundaryFlag
+  virtual void nodeUpdate(int nodeID, double newX, double newY, int boundaryFlag, int shareCount, int *adjChunks, int *adjIndices){};
   // replace oldNodeID with newNodeID on element elementID and delete oldNodeID
   virtual void nodeReplaceDelete(int elementID, int relnodeID, int oldNodeID, int newNodeID){};
  
@@ -193,7 +194,7 @@ class chunk : public TCharmClient1D {
   // The following methods simply provide remote access to local data
   // See above for details of each
   intMsg *safeToMoveNode(int idx, double x, double y);
-  splitOutMsg *split(int idx, elemRef e, node in, node fn);
+  splitOutMsg *split(int idx, elemRef e, int oIdx, int fIdx);
   splitOutMsg *collapse(int idx, elemRef e, int kIdx, int dIdx, elemRef kNbr, 
 			elemRef dNbr, edgeRef kEdge, edgeRef dEdge, 
 			node opnode, node newN);

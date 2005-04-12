@@ -33,12 +33,12 @@ void edge::checkPending(elemRef e, elemRef ne)
   }
 }
 
-int edge::split(int *m, edgeRef *e_prime, node iNode, node fNode,
+int edge::split(int *m, edgeRef *e_prime, int oIdx, int fIdx,
 		elemRef requester, int *local, int *first, int *nullNbr)
 {
   // element requester has asked this edge to split and give back a new node
-  // and new edgeRef on iNode; return value is 1 if successful, 0 if
-  // e_prime is NOT incident on iNode, -1 if another split is pending
+  // and new edgeRef on oIdx; return value is 1 if successful, 0 if
+  // e_prime is NOT incident on oIdx, -1 if another split is pending
   // on this edge; local is set if this edge is not a boundary between chunks
   // and first is set if this was the first split request on this edge
   intMsg *im;
@@ -58,9 +58,8 @@ int edge::split(int *m, edgeRef *e_prime, node iNode, node fNode,
       CkFreeMsg(im);
       DEBUGREF(CkPrintf("TMRC2D: New node (%f,%f) added at index %d on chunk %d\n", newNode.X(), newNode.Y(), *m, myRef.cid);)
     }
-    // FIX THE LINE BELOW!!! incidentNode is not set right
-    if (iNode == C->theNodes[incidentNode]) return 1; // incidence as planned
-    else return 0; // incidence is on fNode
+    if (oIdx == incidentNode) return 1; // incidence as planned
+    else return 0; // incidence is on fIdx
   }
   else if (pending) { // can't split a second time yet; waiting for nbr elem
     DEBUGREF(CkPrintf("TMRC2D: edge::split: ** Pending on (%d,%d)! ** On edge=%d on chunk=%d, requester=%d on chunk=%d\n", waitingFor.cid, waitingFor.idx, myRef.idx, myRef.cid, requester.idx, requester.cid);)
@@ -69,16 +68,15 @@ int edge::split(int *m, edgeRef *e_prime, node iNode, node fNode,
   else { // Need to do the split
     DEBUGREF(CkPrintf("TMRC2D: edge::split: ** PART 1! ** On edge=%d on chunk=%d, requester==(%d,%d) with nbr=(%d,%d)\n", myRef.idx, myRef.cid, requester.cid, requester.idx, nbr.cid, nbr.idx);)
     setPending();
-    iNode.midpoint(fNode, newNode);
+    C->theNodes[oIdx].midpoint(C->theNodes[fIdx], newNode);
     im = mesh[requester.cid].addNode(newNode);
     newNodeIdx = im->anInt;
     CkFreeMsg(im);
     DEBUGREF(CkPrintf("TMRC2D: New node (%f,%f) added at index %d on chunk %d\n", newNode.X(), newNode.Y(), newNodeIdx, myRef.cid);)
     newEdgeRef = C->addEdge();
-    DEBUGREF(CkPrintf("TMRC2D: New edge (%d,%d) added between nodes (%f,%f) and newNode\n", newEdgeRef.cid, newEdgeRef.idx, iNode.X(), iNode.Y());)
-    // FIX THE TWO LINES BELOW
-    incidentNode = -1; //iNode;
-    fixNode = -1; //fNode;
+    DEBUGREF(CkPrintf("TMRC2D: New edge (%d,%d) added between nodes (%f,%f) and newNode\n", newEdgeRef.cid, newEdgeRef.idx, C->theNodes[oIdx].X(), C->theNodes[oIdx].Y());)
+    incidentNode = oIdx;
+    fixNode = fIdx;
     *m = newNodeIdx;
     *e_prime = newEdgeRef;
     *first = 1;

@@ -62,8 +62,24 @@ void element::split(int longEdge)
   otherEdge = (longEdge + 1) % 3;
   fixnode = otherEdge;
 
-  if ((result=edges[longEdge].split(&m, &e_prime,C->theNodes[nodes[othernode]],
-				    C->theNodes[nodes[fixnode]],
+  int fIdx, oIdx;
+  if (edges[longEdge].cid == myRef.cid) {
+    fIdx = nodes[fixnode];
+    oIdx = nodes[othernode];
+  }
+  else {
+    FEM_Node *theNodes = &(C->meshPtr->node);
+    FEM_Comm_Rec *oNodeRec=(FEM_Comm_Rec *)(theNodes->shared.getRec(nodes[othernode]));
+    FEM_Comm_Rec *fNodeRec=(FEM_Comm_Rec *)(theNodes->shared.getRec(nodes[fixnode]));
+    edge e;
+    fIdx = fNodeRec->getIdx(e.existsOn(fNodeRec, edges[longEdge].cid));
+    oIdx = oNodeRec->getIdx(e.existsOn(oNodeRec, edges[longEdge].cid));
+    CkAssert(fIdx > -1);
+    CkAssert(oIdx > -1);
+    CkAssert(oIdx != fIdx);
+  }
+
+  if ((result=edges[longEdge].split(&m, &e_prime,oIdx, fIdx,
 				    myRef, &local, &first, &nullNbr)) == 1) {
     // e_prime successfully created incident on othernode
     DEBUGREF(CkPrintf("TMRC2D: Refining element %d, opnode=%d ^othernode=%d fixnode=%d longEdge=%d modEdge=%d otherEdge=%d\n", myRef.idx, nodes[opnode], nodes[othernode], nodes[fixnode], edges[longEdge].idx, edges[modEdge].idx, edges[otherEdge].idx);)

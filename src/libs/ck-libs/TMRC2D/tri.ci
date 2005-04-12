@@ -22,7 +22,7 @@ module refine {
     entry void coarsenElement(int, double);
     entry [threaded] void coarseningElements();	
     entry [sync] intMsg *safeToMoveNode(int, double, double);
-    entry [sync, threaded] splitOutMsg *split(int, elemRef, node, node);
+    entry [sync, threaded] splitOutMsg *split(int, elemRef, int, int);
     entry [sync, threaded] splitOutMsg *collapse(int, elemRef, int, int, 
 	elemRef, elemRef, edgeRef, edgeRef, node, node);
     entry [sync, threaded] void nodeReplaceDelete(int, int, node);

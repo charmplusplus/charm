@@ -39,7 +39,7 @@ class edgeRef : public objRef {
   void update(elemRef& oldval, elemRef& newval);
   elemRef getNbr(elemRef m);
   void remove();
-  int split(int *m, edgeRef *e_prime, node iNode, node fNode,
+  int split(int *m, edgeRef *e_prime, int oIdx, int fIdx,
 	    elemRef requester, int *local, int *first, int *nullNbr);
   int collapse(elemRef requester, int kIdx, int dIdx, elemRef kNbr, 
 	       elemRef dNbr, edgeRef kEdge, edgeRef dEdge, node opnode,
