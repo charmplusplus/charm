@@ -551,9 +551,6 @@ CHARMLIBS: charm++
 $(L)/libck.a: $(LIBCK_CORE)
 	$(CHARMC) -o $@ $(LIBCK_CORE)
 
-$(L)/libckstandalone.a: ckstandalone.C
-	$(CHARMC) -o $@ ckstandalone.C
-
 CkFutures.def.h: CkFutures.decl.h
 
 CkFutures.decl.h: ckfutures.ci charmxi
@@ -755,7 +752,7 @@ $(L)/libmodulecomlib.a: $(COMLIB_OBJS)
 bluegene:  basics
 	$(MAKE) bluegene-target
 
-bluegene-target: charm++ $(L)/libconv-bluegene.a $(L)/libconv-bluegene-logs.a $(L)/libconv-bluegene-stub.a METIS
+bluegene-target: charm++ $(L)/libconv-bluegene.a $(L)/libconv-bluegene-logs.a $(L)/libconv-bluegene-stub.a $(L)/libblue-standalone.a METIS
 
 # old (Charm++) Blue Gene emulator
 BlueGene.decl.h BlueGene.def.h : BlueGene.ci charmxi
@@ -770,7 +767,7 @@ BLUE_HEADERS = blue_types.h blue_timing.h blue_defs.h blue_logs.h blue.h blue_im
 BLUE_OBJS = blue.o blue_node.o blue_proc.o blue_init.o blue_timing.o
 BLUE_IO_OBJS = blue_IO.o blue_logs.o blue_api.o
 
-LIBBLUE_OBJS = $(BLUE_OBJS) $(BLUE_IO_OBJS) blue_stub.o
+LIBBLUE_OBJS = $(BLUE_OBJS) $(BLUE_IO_OBJS) blue_stub.o blue_standalone.o
 
 $(L)/libconv-bluegene.a: $(BLUE_OBJS)
 	$(CHARMC) -o $@  $(BLUE_OBJS)
@@ -780,6 +777,9 @@ $(L)/libconv-bluegene-logs.a: $(BLUE_IO_OBJS)
 
 $(L)/libconv-bluegene-stub.a:  blue_stub.o
 	$(CHARMC) -o $@  blue_stub.o
+
+$(L)/libblue-standalone.a: blue_standalone.o
+	$(CHARMC) -o $@  blue_standalone.o
 
 ###############################################################################
 #
