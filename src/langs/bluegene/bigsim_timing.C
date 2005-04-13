@@ -1019,6 +1019,22 @@ void bgCorrectionFunc(char *msg)
 #endif
 }
 
+void BgDelaySend(BgMsgEntry *msgEntry)
+{
+#if DELAY_SEND
+  char *sendMsg = msgEntry->sendMsg;
+  if (!sendMsg) return;
+  CmiBgMsgRecvTime(sendMsg) = msgEntry->recvTime;
+  if (msgEntry->dstPe >= 0) {
+    CmiSyncSendAndFree(nodeInfo::Global2PE(msgEntry->dstPe),CmiBgMsgLength(sendMsg),sendMsg);
+  }
+  else {
+    CmiSyncBroadcastAllAndFree(CmiBgMsgLength(sendMsg),sendMsg);
+  }
+  msgEntry->sendMsg = NULL;
+#endif
+}
+
 /******************************************************************************
                implement heart beat
 TODO:

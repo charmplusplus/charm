@@ -59,7 +59,7 @@ public:
     fprintf(fp, "msgID:%d sent:%f recvtime:%f dstPe:%d size:%d group:%d\n", msgID, sendTime, recvTime, dstPe, msgsize, group);
   }
 #if DELAY_SEND
-  void send();
+//  void send();
 #endif
   void pup(PUP::er &p) {
     p|msgID; p|dstPe; p|sendTime; p|recvTime; p|tID; p|msgsize; 
@@ -92,6 +92,8 @@ public:
 };
 
 #define BG_STARTSIM     0x1
+
+extern void BgDelaySend(BgMsgEntry *msgEntry);
 
 class BgTimeLineRec;
 /**
@@ -186,7 +188,7 @@ public:
 #if DELAY_SEND
   void send() {
     for (int i=0; i<msgs.length(); i++)
-      msgs[i]->send();
+      BgDelaySend(msgs[i]);
   }
 #endif
 };

@@ -1324,7 +1324,7 @@ CmiStartFn bgMain(int argc, char **argv)
     if (correctTimeLog)
       CmiPrintf("BG info> Perform timestamp correction. \n");
     if (cva(bgMach).traceroot)
-      CmiPrintf("BG info> bgTrace root is %s. \n", cva(bgMach).traceroot);
+      CmiPrintf("BG info> bgTrace root is '%s'. \n", cva(bgMach).traceroot);
   }
 
   CtvInitialize(threadInfo *, threadinfo);

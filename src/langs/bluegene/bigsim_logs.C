@@ -37,6 +37,7 @@ BgMsgEntry::BgMsgEntry(char *msg, int dstNode, int tid, int local, int g)
 #endif
 }
 
+/*
 #if DELAY_SEND
 void BgMsgEntry::send() {
   if (!sendMsg) return;
@@ -50,6 +51,7 @@ void BgMsgEntry::send() {
   sendMsg = NULL;
 }
 #endif
+*/
 
 void bgEvents::print()
 {
