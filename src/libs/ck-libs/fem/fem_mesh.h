@@ -1173,12 +1173,22 @@ class FEM_Mesh : public CkNoncopyable {
   /// Get an element on edge (n1, n2) where n1, n2 are chunk-local
   /// node numberings; return -1 in case of failure
   int getElementOnEdge(int n1, int n2) { return -1; }
+
   /// Add a new node to the mesh, return the chunk-local numbering; -1 failure.
   int newNode() { return -1; }
   /// Add a new elem to the mesh, return the chunk-local numbering; -1 failure.
   int newElement() { return -1; }
+  /// Remove node from the mesh
+  void deleteNode(int n);
+  /// Remove element from the mesh
+  void deleteElement(int e);
 
-
+  /// Mark the idx-th node of element e
+  void markNode(int e, int idx);
+  /// Get element-local index of element e's marked node
+  int getMarkedNodeIdx(int e);
+  /// Get chunk-local numbering of element e's marked node
+  int getMarkedNode(int e);
 
   // Terry's adjacency accessors & modifiers: NOTE - ALL VOID FOR NOW
   //********* Element-to-element: preserve initial ordering relative to nodes
