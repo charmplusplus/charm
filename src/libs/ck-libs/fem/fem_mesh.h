@@ -1083,91 +1083,101 @@ inline int zeroToMinusOne(int i) {
 class FEM_ElemAdj_Layer;
 
 class FEM_Mesh : public CkNoncopyable {
-	/// The symmetries in the mesh
-	FEM_Sym_List symList;
-	bool m_isSetting;
-	
-	void checkElemType(int elType,const char *caller) const;
-	void checkSparseType(int uniqueID,const char *caller) const; 
+  /// The symmetries in the mesh
+  FEM_Sym_List symList;
+  bool m_isSetting;
+  
+  void checkElemType(int elType,const char *caller) const;
+  void checkSparseType(int uniqueID,const char *caller) const; 
+  
+  FEM_ElemAdj_Layer* lastElemAdjLayer;
+ public:
+  FEM_Mesh();
+  void pup(PUP::er &p); //For migration
+  ~FEM_Mesh();
+  
+  /// The nodes in this mesh:
+  FEM_Node node; 
+  
+  /// The different element types in this mesh:
+  FEM_Entity_Types<FEM_Elem> elem;
+  
+  /// The different sparse types in this mesh:
+  FEM_Entity_Types<FEM_Sparse> sparse;
+  
+  /// The unassociated user data for this mesh:
+  FEM_Userdata_list udata;
+  
+  /// The symmetries that apply to this mesh:
+  void setSymList(const FEM_Sym_List &src) {symList=src;}
+  const FEM_Sym_List &getSymList(void) const {return symList;}
+  
+  /// Set up the "shape" of our fields-- the number of element types,
+  /// the datatypes for user data, etc--based on this mesh.
+  void copyShape(const FEM_Mesh &src);
+  
+  //Return this type of element, given an element type
+  FEM_Entity &setCount(int elTypeOrMinusOne) {
+    if (elTypeOrMinusOne==-1) return node;
+    else return elem[chkET(elTypeOrMinusOne)];
+  }
+  const FEM_Entity &getCount(int elTypeOrMinusOne) const {
+    if (elTypeOrMinusOne==-1) return node;
+    else return elem[chkET(elTypeOrMinusOne)];
+  }
+  FEM_Elem &setElem(int elType) {return elem[chkET(elType)];}
+  const FEM_Elem &getElem(int elType) const {return elem[chkET(elType)];}
+  int chkET(int elType) const; //Check this element type-- abort if it's bad
+  
+  /// Look up this FEM_Entity type in this mesh, or abort if it's not valid.
+  FEM_Entity *lookup(int entity,const char *caller);
+  const FEM_Entity *lookup(int entity,const char *caller) const;
+  
+  /// Set/get direction control:
+  inline bool isSetting(void) const {return m_isSetting;}
+  void becomeSetting(void) {m_isSetting=true;}
+  void becomeGetting(void) {m_isSetting=false;}
+  
+  int nElems() const //Return total number of elements (of all types)
+    {return nElems(elem.size());}
+  /// Return the total number of elements before type t
+  int nElems(int t) const;
+  /// Return the "global" number of element elNo of type elType.
+  int getGlobalElem(int elType,int elNo) const;
+  /// Set our global numbers as 0...n-1 for nodes, elements, and sparse
+  void setAscendingGlobalno(void);
+  ///	The global numbers for elements runs across different types
+  void setAbsoluteGlobalno();
+  
+  void copyOldGlobalno(const FEM_Mesh &m);
+  void print(int idxBase);//Write a human-readable description to CkPrintf
+  /// Extract a list of our entities:
+  int getEntities(int *entites);
+  
+  
+  /********** New methods ***********/
+  /*
+    This method creates the mapping from a node to all the elements that are 
+    incident on it . It assumes the presence of one layer of ghost nodes that
+    share a node.
+  */
+  void createElemNodeAdj();
+  void createNodeNodeAdj();
+  void createElemElemAdj();
+  
+  /* Isaac's helpers for the createElemElemAdj() */
+  FEM_ElemAdj_Layer *addElemAdjLayer(void);
+  FEM_ElemAdj_Layer *curElemAdjLayer(void);
+  
+  // Terry'd mesh accessors & modifiers: NOTE - ALL VOID FOR NOW
+  /// Get an element on edge (n1, n2) where n1, n2 are chunk-local
+  /// node numberings; return -1 in case of failure
+  int getElementOnEdge(int n1, int n2) { return -1; }
+  /// Add a new node to the mesh, return the chunk-local numbering; -1 failure.
+  int newNode() { return -1; }
+  /// Add a new elem to the mesh, return the chunk-local numbering; -1 failure.
+  int newElement() { return -1; }
 
-	FEM_ElemAdj_Layer* lastElemAdjLayer;
-public:
-	FEM_Mesh();
-	void pup(PUP::er &p); //For migration
-	~FEM_Mesh();
-	
-	/// The nodes in this mesh:
-	FEM_Node node; 
-	
-	/// The different element types in this mesh:
-	FEM_Entity_Types<FEM_Elem> elem;
-	
-	/// The different sparse types in this mesh:
-	FEM_Entity_Types<FEM_Sparse> sparse;
-	
-	/// The unassociated user data for this mesh:
-	FEM_Userdata_list udata;
-	
-	/// The symmetries that apply to this mesh:
-	void setSymList(const FEM_Sym_List &src) {symList=src;}
-	const FEM_Sym_List &getSymList(void) const {return symList;}
-	
-	/// Set up the "shape" of our fields-- the number of element types,
-	/// the datatypes for user data, etc--based on this mesh.
-	void copyShape(const FEM_Mesh &src);
-	
-	//Return this type of element, given an element type
-	FEM_Entity &setCount(int elTypeOrMinusOne) {
-		if (elTypeOrMinusOne==-1) return node;
-		else return elem[chkET(elTypeOrMinusOne)];
-	}
-	const FEM_Entity &getCount(int elTypeOrMinusOne) const {
-		if (elTypeOrMinusOne==-1) return node;
-		else return elem[chkET(elTypeOrMinusOne)];
-	}
-	FEM_Elem &setElem(int elType) {return elem[chkET(elType)];}
-	const FEM_Elem &getElem(int elType) const {return elem[chkET(elType)];}
-	int chkET(int elType) const; //Check this element type-- abort if it's bad
-	
-	/// Look up this FEM_Entity type in this mesh, or abort if it's not valid.
-	FEM_Entity *lookup(int entity,const char *caller);
-	const FEM_Entity *lookup(int entity,const char *caller) const;
-	
-	/// Set/get direction control:
-	inline bool isSetting(void) const {return m_isSetting;}
-	void becomeSetting(void) {m_isSetting=true;}
-	void becomeGetting(void) {m_isSetting=false;}
-	
-	int nElems() const //Return total number of elements (of all types)
-	  {return nElems(elem.size());}
-	/// Return the total number of elements before type t
-	int nElems(int t) const;
-	/// Return the "global" number of element elNo of type elType.
-	int getGlobalElem(int elType,int elNo) const;
-	/// Set our global numbers as 0...n-1 for nodes, elements, and sparse
-	void setAscendingGlobalno(void);
-	///	The global numbers for elements runs across different types
-	void setAbsoluteGlobalno();
-	
-	void copyOldGlobalno(const FEM_Mesh &m);
-	void print(int idxBase);//Write a human-readable description to CkPrintf
-	/// Extract a list of our entities:
-	int getEntities(int *entites);
-
-
-	/********** New methods ***********/
-	/*
-	  This method creates the mapping from a node to all the elements that are 
-	  incident on it . It assumes the presence of one layer of ghost nodes that
-	  share a node.
-	*/
-	void createElemNodeAdj();
-	void createNodeNodeAdj();
-	void createElemElemAdj();
-
-	/* Isaac's helpers for the createElemElemAdj() */
-	FEM_ElemAdj_Layer *addElemAdjLayer(void);
-	FEM_ElemAdj_Layer *curElemAdjLayer(void);
 
 
   // Terry's adjacency accessors & modifiers: NOTE - ALL VOID FOR NOW
@@ -1176,7 +1186,7 @@ public:
   /// neighbors allocated to correct size
   void e2e_getAll(int e, int *neighbors) {}
   /// Given id of element e, return the id of the idx-th adjacent element
-  int e2e_getNode(int e, short idx) { return -1; }
+  int e2e_getNbr(int e, short idx) { return -1; }
   /// Given id of element e and id of another element nbr, return i such that
   /// nbr is the i-th element adjacent to e
   int e2e_getIndex(int e, int nbr) { return -1; }
