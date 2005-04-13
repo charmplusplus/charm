@@ -1176,10 +1176,10 @@ public:
   /// neighbors allocated to correct size
   void e2e_getAll(int e, int *neighbors) {}
   /// Given id of element e, return the id of the idx-th adjacent element
-  int e2e_getNode(int e, short idx) {}
+  int e2e_getNode(int e, short idx) { return -1; }
   /// Given id of element e and id of another element nbr, return i such that
   /// nbr is the i-th element adjacent to e
-  int e2e_getIndex(int e, int nbr) {}
+  int e2e_getIndex(int e, int nbr) { return -1; }
   /// Set the element adjacencies of element e to neighbors; assumes neighbors 
   /// has the correct size
   void e2e_setAll(int e, int *neighbors) {}
@@ -1193,10 +1193,10 @@ public:
   /// adjnodes allocated to correct size
   void e2n_getAll(int e, int *adjnodes) {}
   /// Given id of element e, return the id of the idx-th adjacent node
-  int e2n_getNode(int e, short idx) {}
+  int e2n_getNode(int e, short idx) { return -1; }
   /// Given id of element e and id of a node n, return i such that
   /// n is the i-th node adjacent to e
-  short e2n_getIndex(int e, int n) {}
+  short e2n_getIndex(int e, int n) { return -1; }
   /// Set the node adjacencies of element e to adjnodes; assumes adjnodes 
   /// has the correct size
   void e2n_setAll(int e, int *adjnodes) {}
@@ -1208,7 +1208,7 @@ public:
   //********* Node-to-node
   /// Place all of node n's adjacent nodes in adjnodes and the resulting 
   /// length of adjnodes in sz; assumes adjnodes is not allocated, but sz is
-  int n2n_getAll(int n, int *adjnodes, int *sz) {}
+  int n2n_getAll(int n, int *adjnodes, int *sz) { return -1; }
   /// Adds newNode to node n's node adjacency list
   void n2n_add(int n, int newNode) {}
   /// Removes oldNode from n's node adjacency list
@@ -1220,7 +1220,7 @@ public:
   /// Place all of node n's adjacent elements in adjelements and the resulting 
   /// length of adjelements in sz; assumes adjelements is not allocated, 
   /// but sz is
-  int n2e_getAll(int n, int *adjelements, int *sz) {}
+  int n2e_getAll(int n, int *adjelements, int *sz) { return -1; }
   /// Adds newElem to node n's element adjacency list
   void n2e_add(int n, int newElem) {}
   /// Removes oldElem from n's element adjacency list
