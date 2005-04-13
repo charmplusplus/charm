@@ -1,7 +1,7 @@
 CHARMC=../../../../bin/charmc $(OPTS)
 
 loadlog: loadlog.o
-	$(CHARMC) -o loadlog loadlog.o -lconv-bluegene-logs -language converse++
+	$(CHARMC) -seq -o loadlog loadlog.o -lconv-bluegene-logs -lconv-util -lckstandalone -language c++
 
 loadlog.o: loadlog.C 
 	$(CHARMC) -c loadlog.C
