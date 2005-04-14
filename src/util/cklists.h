@@ -273,6 +273,10 @@ class CkVec : private CkSTLHelper<T> {
 //STL-compatability:
     void push_back(const T &elt) {insert(length(),elt);}
     int size(void) const {return len;}
+
+//verbose position for easier removal
+    int push_back_v(const T &elt) {insert(length(),elt);return length()-1;}
+
  
 //PUP routine help:
     //Only pup the length of this vector, which is returned:
