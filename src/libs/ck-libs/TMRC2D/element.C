@@ -74,17 +74,17 @@ void element::split(int longEdge)
     edge e;
     fIdx = fNodeRec->getIdx(e.existsOn(fNodeRec, edges[longEdge].cid));
     oIdx = oNodeRec->getIdx(e.existsOn(oNodeRec, edges[longEdge].cid));
-    CkAssert(fIdx > -1);
-    CkAssert(oIdx > -1);
-    CkAssert(oIdx != fIdx);
   }
-
+  CkAssert(fIdx > -1);
+  CkAssert(oIdx > -1);
+  CkAssert(oIdx != fIdx);
+  
   if ((result=edges[longEdge].split(&m, &e_prime,oIdx, fIdx,
 				    myRef, &local, &first, &nullNbr)) == 1) {
     // e_prime successfully created incident on othernode
     DEBUGREF(CkPrintf("TMRC2D: Refining element %d, opnode=%d ^othernode=%d fixnode=%d longEdge=%d modEdge=%d otherEdge=%d\n", myRef.idx, nodes[opnode], nodes[othernode], nodes[fixnode], edges[longEdge].idx, edges[modEdge].idx, edges[otherEdge].idx);)
     DEBUGREF(CkPrintf("TMRC2D: to FEM: element=%d local=%d first=%d between nodes %d and %d\n", myRef.idx, local, first, nodes[othernode], nodes[fixnode]);)
-    newEdge = C->addEdge();
+    newEdge = C->addEdge(m, nodes[opnode]);
     DEBUGREF(CkPrintf("TMRC2D: New edge (%d,%d) added between nodes %d and %d\n", newEdge.cid, newEdge.idx, m, nodes[opnode]);)
     // add new element to preserve orientation
     if (opnode == 0) {
@@ -143,7 +143,7 @@ void element::split(int longEdge)
     // e_prime already incident on fixnode
   DEBUGREF(CkPrintf("TMRC2D: Refining element %d, opnode=%d othernode=%d ^fixnode=%d longEdge=%d modEdge=%d otherEdge=%d\n", myRef.idx, nodes[opnode], nodes[othernode], nodes[fixnode], edges[longEdge].idx, edges[modEdge].idx, edges[otherEdge].idx);)
       DEBUGREF(CkPrintf("TMRC2D: to FEM: element=%d local=%d first=%d between nodes %d and %d\n", myRef.idx, local, first, nodes[fixnode], nodes[othernode]);)
-    newEdge = C->addEdge();
+    newEdge = C->addEdge(m, nodes[opnode]);
     DEBUGREF(CkPrintf("TMRC2D: New edge (%d,%d) added between nodes %d and %d\n", newEdge.cid, newEdge.idx, m, nodes[opnode]);)
     // add new element to preserve orientation
     if (opnode == 0) {
@@ -407,6 +407,8 @@ int element::findLongestEdge()
       longEdge = i;
       maxlen = len[i];
     }
+  CkAssert(longEdge > -1);
+  CkAssert(longEdge < 3);
   return longEdge;
 }
 
@@ -497,4 +499,7 @@ void element::sanityCheck(chunk *c, elemRef shouldRef, int n)
     CkAssert(!(edges[i].isNull()));
     edges[i].sanityCheck();
   }
+  CkAssert(nodes[0] != nodes[1]);
+  CkAssert(nodes[0] != nodes[2]);
+  CkAssert(nodes[2] != nodes[1]);
 }

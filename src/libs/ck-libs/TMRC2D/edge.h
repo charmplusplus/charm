@@ -53,7 +53,7 @@ class edge {
   }
   void set(elemRef e1, elemRef e2) { elements[0] = e1;  elements[1] = e2; }
   void set(elemRef *e) { elements[0] = e[0]; elements[1] = e[1]; }
-  void setNodes(int n1, int n2) { nodes[0] = n1; nodes[1] = n2; }
+  void setNodes(int n1, int n2) { nodes[0] = n1; nodes[1] = n2; CkAssert(n1!=n2);}
   void reset();
   edge& operator=(const edge& e) { 
     for (int i=0; i<2; i++)  elements[i] = e.elements[i];

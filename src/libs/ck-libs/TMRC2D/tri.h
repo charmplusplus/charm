@@ -198,7 +198,8 @@ class chunk : public TCharmClient1D {
   splitOutMsg *collapse(int idx, elemRef e, int kIdx, int dIdx, elemRef kNbr, 
 			elemRef dNbr, edgeRef kEdge, edgeRef dEdge, 
 			node opnode, node newN);
-  void nodeReplaceDelete(int kIdx, int dIdx, node nn);
+  void nodeReplaceDelete(int kIdx, int dIdx, node nn, int shared, int *chk, 
+			 int *idx);
   intMsg *isPending(int idx, objRef e);
   void checkPending(int idx, objRef aRef);
   void checkPending(int idx, objRef aRef1, objRef aRef2);
@@ -249,7 +250,7 @@ class chunk : public TCharmClient1D {
   void adjustMesh();
   intMsg *addNode(node n);
   //int addNode(node n);
-  edgeRef addEdge();
+  edgeRef addEdge(int n1, int n2);
   elemRef addElement(int n1, int n2, int n3);
   elemRef addElement(int n1, int n2, int n3,
 		      edgeRef er1, edgeRef er2, edgeRef er3);

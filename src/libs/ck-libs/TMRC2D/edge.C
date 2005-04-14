@@ -73,7 +73,7 @@ int edge::split(int *m, edgeRef *e_prime, int oIdx, int fIdx,
     newNodeIdx = im->anInt;
     CkFreeMsg(im);
     DEBUGREF(CkPrintf("TMRC2D: New node (%f,%f) added at index %d on chunk %d\n", newNode.X(), newNode.Y(), newNodeIdx, myRef.cid);)
-    newEdgeRef = C->addEdge();
+    newEdgeRef = C->addEdge(newNodeIdx, fIdx);
     DEBUGREF(CkPrintf("TMRC2D: New edge (%d,%d) added between nodes (%f,%f) and newNode\n", newEdgeRef.cid, newEdgeRef.idx, C->theNodes[oIdx].X(), C->theNodes[oIdx].Y());)
     incidentNode = oIdx;
     fixNode = fIdx;
@@ -104,7 +104,8 @@ int edge::collapse(elemRef requester, int kIdx, int dIdx, elemRef kNbr,
   // element requester has asked this edge to collapse and give back new node
   // coordinates resulting node; return value is 1 if successful, 0 if
   // dNode is the node that is kept, -1 if fail
-  int i, j, lk, chunk, dCount, kCount;
+  int i, j, lk, chunk, dIdxlShared, kIdxlShared;
+  int *dIdxlChk, *dIdxlIdx, *kIdxlChk, *kIdxlIdx;
   elemRef nbr = getNot(requester), nullRef;
   nullRef.reset();
   *local = 0;
@@ -120,34 +121,54 @@ int edge::collapse(elemRef requester, int kIdx, int dIdx, elemRef kNbr,
       FEM_Comm_Rec *dNodeRec = (FEM_Comm_Rec *)(theNodes->shared.getRec(dIdx));
       FEM_Comm_Rec *kNodeRec = (FEM_Comm_Rec *)(theNodes->shared.getRec(kIdx));
       // Replace dNode with kNode and delete dNode everywhere in the mesh
-      if (dNodeRec) dCount = dNodeRec->getShared();
-      else dCount = 0;
-      if (kNodeRec) kCount = kNodeRec->getShared();
-      else kCount = 0;
-      C->nodeReplaceDelete(kIdx, dIdx, newNode);
-      for (i=0; i<dCount; i++) {
+      if (dNodeRec) dIdxlShared = dNodeRec->getShared();
+      else dIdxlShared = 0;
+      if (kNodeRec) kIdxlShared = kNodeRec->getShared();
+      else kIdxlShared = 0;
+      dIdxlChk = (int *)malloc((dIdxlShared+1)*sizeof(int));
+      kIdxlChk = (int *)malloc((kIdxlShared+1)*sizeof(int));
+      dIdxlIdx = (int *)malloc((dIdxlShared+1)*sizeof(int));
+      kIdxlIdx = (int *)malloc((kIdxlShared+1)*sizeof(int));
+      for (i=0; i<dIdxlShared; i++) {
+	dIdxlIdx[i] = dNodeRec->getIdx(i);
+	dIdxlChk[i] = dNodeRec->getChk(i);
+      }
+      dIdxlIdx[dIdxlShared] = dIdx;
+      dIdxlChk[dIdxlShared] = myRef.cid;
+      for (i=0; i<kIdxlShared; i++) {
+	kIdxlIdx[i] = kNodeRec->getIdx(i);
+	kIdxlChk[i] = kNodeRec->getChk(i);
+      }
+      kIdxlIdx[kIdxlShared] = kIdx;
+      kIdxlChk[kIdxlShared] = myRef.cid;
+      C->nodeReplaceDelete(kIdx, dIdx, newNode, dIdxlShared, dIdxlChk, 
+			   dIdxlIdx);
+      for (i=0; i<dIdxlShared; i++) {
 	chunk = dNodeRec->getChk(i);
 	if (kNodeRec && ((j=existsOn(kNodeRec, chunk)) >= 0)) {
 	  mesh[chunk].nodeReplaceDelete(kNodeRec->getIdx(j), 
-					dNodeRec->getIdx(i), newNode);
+					dNodeRec->getIdx(i), newNode, 
+					dIdxlShared, dIdxlChk, dIdxlIdx);
 	}
 	else {
-	  mesh[chunk].nodeReplaceDelete(-1, dNodeRec->getIdx(i), newNode);
+	  mesh[chunk].nodeReplaceDelete(-1, dNodeRec->getIdx(i), newNode,
+					kIdxlShared, kIdxlChk, kIdxlIdx);
 	}
       }
-      for (i=0; i<kCount; i++) {
+      for (i=0; i<kIdxlShared; i++) {
 	chunk = kNodeRec->getChk(i);
 	if (!dNodeRec || (existsOn(dNodeRec, chunk) == -1)) {
-	  mesh[chunk].nodeReplaceDelete(kNodeRec->getIdx(i), -1, newNode);
+	  mesh[chunk].nodeReplaceDelete(kNodeRec->getIdx(i), -1, newNode, 
+					dIdxlShared, dIdxlChk, dIdxlIdx);
 	}
       }
       // unlock the cloud
       C->unlockLocalChunk(myRef.cid, myRef.idx);
-      for (i=0; i<dCount; i++) {
+      for (i=0; i<dIdxlShared; i++) {
 	chunk = dNodeRec->getChk(i);
 	mesh[chunk].unlockChunk(myRef.cid, myRef.idx);
       }
-      for (i=0; i<kCount; i++) {
+      for (i=0; i<kIdxlShared; i++) {
 	chunk = kNodeRec->getChk(i);
 	mesh[chunk].unlockChunk(myRef.cid, myRef.idx);
       }
@@ -160,34 +181,54 @@ int edge::collapse(elemRef requester, int kIdx, int dIdx, elemRef kNbr,
       FEM_Comm_Rec *dNodeRec = (FEM_Comm_Rec *)(theNodes->shared.getRec(kIdx));
       FEM_Comm_Rec *kNodeRec = (FEM_Comm_Rec *)(theNodes->shared.getRec(dIdx));
       // Replace dNode with kNode and delete dNode everywhere in the mesh
-      if (dNodeRec) dCount = dNodeRec->getShared();
-      else dCount = 0;
-      if (kNodeRec) kCount = kNodeRec->getShared();
-      else kCount = 0;
-      C->nodeReplaceDelete(dIdx, kIdx, newNode);
-      for (i=0; i<dCount; i++) {
+      if (dNodeRec) dIdxlShared = dNodeRec->getShared();
+      else dIdxlShared = 0;
+      if (kNodeRec) kIdxlShared = kNodeRec->getShared();
+      else kIdxlShared = 0;
+      dIdxlChk = (int *)malloc((dIdxlShared+1)*sizeof(int));
+      kIdxlChk = (int *)malloc((kIdxlShared+1)*sizeof(int));
+      dIdxlIdx = (int *)malloc((dIdxlShared+1)*sizeof(int));
+      kIdxlIdx = (int *)malloc((kIdxlShared+1)*sizeof(int));
+      for (i=0; i<dIdxlShared; i++) {
+	dIdxlIdx[i] = dNodeRec->getIdx(i);
+	dIdxlChk[i] = dNodeRec->getChk(i);
+      }
+      dIdxlIdx[dIdxlShared] = kIdx;
+      dIdxlChk[dIdxlShared] = myRef.cid;
+      for (i=0; i<kIdxlShared; i++) {
+	kIdxlIdx[i] = kNodeRec->getIdx(i);
+	kIdxlChk[i] = kNodeRec->getChk(i);
+      }
+      kIdxlIdx[kIdxlShared] = dIdx;
+      kIdxlChk[kIdxlShared] = myRef.cid;
+      C->nodeReplaceDelete(dIdx, kIdx, newNode, dIdxlShared, dIdxlChk, 
+			   dIdxlIdx);
+      for (i=0; i<dIdxlShared; i++) {
 	chunk = dNodeRec->getChk(i);
 	if (kNodeRec && ((j=existsOn(kNodeRec, chunk)) >= 0)) {
 	  mesh[chunk].nodeReplaceDelete(kNodeRec->getIdx(j), 
-					dNodeRec->getIdx(i), newNode);
+					dNodeRec->getIdx(i), newNode,
+					dIdxlShared, dIdxlChk, dIdxlIdx);
 	}
 	else {
-	  mesh[chunk].nodeReplaceDelete(-1, dNodeRec->getIdx(i), newNode);
+	  mesh[chunk].nodeReplaceDelete(-1, dNodeRec->getIdx(i), newNode,
+					kIdxlShared, kIdxlChk, kIdxlIdx);
 	}
       }
-      for (i=0; i<kCount; i++) {
+      for (i=0; i<kIdxlShared; i++) {
 	chunk = kNodeRec->getChk(i);
 	if (!dNodeRec || (existsOn(dNodeRec, chunk) == -1)) {
-	  mesh[chunk].nodeReplaceDelete(kNodeRec->getIdx(i), -1, newNode);
+	  mesh[chunk].nodeReplaceDelete(kNodeRec->getIdx(i), -1, newNode,
+					dIdxlShared, dIdxlChk, dIdxlIdx);
 	}
       }
       // unlock the cloud
       C->unlockLocalChunk(myRef.cid, myRef.idx);
-      for (i=0; i<dCount; i++) {
+      for (i=0; i<dIdxlShared; i++) {
 	chunk = dNodeRec->getChk(i);
 	mesh[chunk].unlockChunk(myRef.cid, myRef.idx);
       }
-      for (i=0; i<kCount; i++) {
+      for (i=0; i<kIdxlShared; i++) {
 	chunk = kNodeRec->getChk(i);
 	mesh[chunk].unlockChunk(myRef.cid, myRef.idx);
       }
@@ -210,13 +251,13 @@ int edge::collapse(elemRef requester, int kIdx, int dIdx, elemRef kNbr,
     FEM_Comm_Rec *kNodeRec=(FEM_Comm_Rec *)(theNodes->shared.getRec(kIdx));
     intMsg *im;
     lk = C->lockLocalChunk(myRef.cid, myRef.idx, length);
-    if (dNodeRec) dCount = dNodeRec->getShared();
-    else dCount = 0;
-    if (kNodeRec) kCount = kNodeRec->getShared();
-    else kCount = 0;
+    if (dNodeRec) dIdxlShared = dNodeRec->getShared();
+    else dIdxlShared = 0;
+    if (kNodeRec) kIdxlShared = kNodeRec->getShared();
+    else kIdxlShared = 0;
     if (!(C->lockLocalChunk(myRef.cid, myRef.idx, length)))
       return -1;
-    for (i=0; i<dCount; i++) {
+    for (i=0; i<dIdxlShared; i++) {
       chunk = dNodeRec->getChk(i);
       im = mesh[chunk].lockChunk(myRef.cid, myRef.idx, length);
       if (im->anInt == 0) { 
@@ -229,13 +270,13 @@ int edge::collapse(elemRef requester, int kIdx, int dIdx, elemRef kNbr,
 	return -1; 
       }
     }
-    for (i=0; i<kCount; i++) {
+    for (i=0; i<kIdxlShared; i++) {
       chunk = kNodeRec->getChk(i);
       im = mesh[chunk].lockChunk(myRef.cid, myRef.idx, length);
       if (im->anInt == 0) { 
 	CkFreeMsg(im); 
 	C->unlockLocalChunk(myRef.cid, myRef.idx);
-	for (j=0; j<dCount; j++) {
+	for (j=0; j<dIdxlShared; j++) {
 	  chunk = dNodeRec->getChk(j);
 	  mesh[chunk].unlockChunk(myRef.cid, myRef.idx);
 	}
@@ -269,34 +310,54 @@ int edge::collapse(elemRef requester, int kIdx, int dIdx, elemRef kNbr,
       FEM_Comm_Rec *dNodeRec=(FEM_Comm_Rec *)(theNodes->shared.getRec(dIdx));
       FEM_Comm_Rec *kNodeRec=(FEM_Comm_Rec *)(theNodes->shared.getRec(kIdx));
       // Replace dNode with kNode and delete dNode everywhere in the mesh
-      if (dNodeRec) dCount = dNodeRec->getShared();
-      else dCount = 0;
-      if (kNodeRec) kCount = kNodeRec->getShared();
-      else kCount = 0;
-      C->nodeReplaceDelete(kIdx, dIdx, newNode);
-      for (i=0; i<dCount; i++) {
+      if (dNodeRec) dIdxlShared = dNodeRec->getShared();
+      else dIdxlShared = 0;
+      if (kNodeRec) kIdxlShared = kNodeRec->getShared();
+      else kIdxlShared = 0;
+      dIdxlChk = (int *)malloc((dIdxlShared+1)*sizeof(int));
+      kIdxlChk = (int *)malloc((kIdxlShared+1)*sizeof(int));
+      dIdxlIdx = (int *)malloc((dIdxlShared+1)*sizeof(int));
+      kIdxlIdx = (int *)malloc((kIdxlShared+1)*sizeof(int));
+      for (i=0; i<dIdxlShared; i++) {
+	dIdxlIdx[i] = dNodeRec->getIdx(i);
+	dIdxlChk[i] = dNodeRec->getChk(i);
+      }
+      dIdxlIdx[dIdxlShared] = dIdx;
+      dIdxlChk[dIdxlShared] = myRef.cid;
+      for (i=0; i<kIdxlShared; i++) {
+	kIdxlIdx[i] = kNodeRec->getIdx(i);
+	kIdxlChk[i] = kNodeRec->getChk(i);
+      }
+      kIdxlIdx[kIdxlShared] = kIdx;
+      kIdxlChk[kIdxlShared] = myRef.cid;
+      C->nodeReplaceDelete(kIdx, dIdx, newNode, dIdxlShared, dIdxlChk, 
+			   dIdxlIdx);
+      for (i=0; i<dIdxlShared; i++) {
 	chunk = dNodeRec->getChk(i);
 	if (kNodeRec && ((j=existsOn(kNodeRec, chunk)) >= 0)) {
 	  mesh[chunk].nodeReplaceDelete(kNodeRec->getIdx(j), 
-					dNodeRec->getIdx(i), newNode);
+					dNodeRec->getIdx(i), newNode, 
+					dIdxlShared, dIdxlChk, dIdxlIdx);
 	}
 	else {
-	  mesh[chunk].nodeReplaceDelete(-1, dNodeRec->getIdx(i), newNode);
+	  mesh[chunk].nodeReplaceDelete(-1, dNodeRec->getIdx(i), newNode, 
+					kIdxlShared, kIdxlChk, kIdxlIdx);
 	}
       }
-      for (i=0; i<kCount; i++) {
+      for (i=0; i<kIdxlShared; i++) {
 	chunk = kNodeRec->getChk(i);
 	if (!dNodeRec || (existsOn(dNodeRec, chunk) == -1)) {
-	  mesh[chunk].nodeReplaceDelete(kNodeRec->getIdx(i), -1, newNode);
+	  mesh[chunk].nodeReplaceDelete(kNodeRec->getIdx(i), -1, newNode, 
+					dIdxlShared, dIdxlChk, dIdxlIdx);
 	}
       }
       // unlock the cloud
       C->unlockLocalChunk(myRef.cid, myRef.idx);
-      for (i=0; i<dCount; i++) {
+      for (i=0; i<dIdxlShared; i++) {
 	chunk = dNodeRec->getChk(i);
 	mesh[chunk].unlockChunk(myRef.cid, myRef.idx);
       }
-      for (i=0; i<kCount; i++) {
+      for (i=0; i<kIdxlShared; i++) {
 	chunk = kNodeRec->getChk(i);
 	mesh[chunk].unlockChunk(myRef.cid, myRef.idx);
       }

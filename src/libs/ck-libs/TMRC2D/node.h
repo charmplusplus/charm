@@ -100,7 +100,9 @@ class node {  // a 2D double coordinate
   }
   double distance(const node& n) { // get distance to n
     double dx = n.x - x, dy = n.y - y;
-    return (sqrt ((dx * dx) + (dy * dy)));
+    double d = (sqrt ((dx * dx) + (dy * dy)));
+    CkAssert(d > 0.0);
+    return d;
   }
   void midpoint(const node& n, node& result) { // get midpoint between this & n
     result.x = (x + n.x) / 2.0;  result.y = (y + n.y) / 2.0;

@@ -164,7 +164,8 @@ splitOutMsg *chunk::collapse(int idx, elemRef e, int kIdx, int dIdx,
   return som;
 }
 
-void chunk::nodeReplaceDelete(int kIdx, int dIdx, node nn)
+void chunk::nodeReplaceDelete(int kIdx, int dIdx, node nn, int shared, 
+			      int *chk, int *idx)
 {
   int *foo;
   DEBUGREF(CkPrintf("TMRC2D: [%d] nodeReplaceDelete: kIdx=%d dIdx=%d\n", cid, kIdx, dIdx);)
@@ -422,12 +423,13 @@ intMsg *chunk::addNode(node n)
   return im;
 }
 
-edgeRef chunk::addEdge()
+edgeRef chunk::addEdge(int n1, int n2)
 {
   DEBUGREF(CkPrintf("TMRC2D: [%d] Adding edge %d\n", cid, numEdges);)
   edgeRef eRef(cid, firstFreeEdge);
   theEdges[firstFreeEdge].set(firstFreeEdge, cid, this);
   theEdges[firstFreeEdge].reset();
+  theEdges[firstFreeEdge].setNodes(n1, n2);
   numEdges++;
   firstFreeEdge++;
   if (firstFreeEdge-1 == edgeSlots)  edgeSlots++;
@@ -623,6 +625,7 @@ void chunk::updateNodeCoords(int nNode, double *coord, int nEl)
   // recalculate and cache new areas for each element
   for (i=0; i<elementSlots; i++) 
     if (theElements[i].isPresent())  theElements[i].calculateArea();
+  sanityCheck(); // quietly make sure mesh is in shape
   DEBUGREF(CkPrintf("TMRC2D: [%d] updateNodeCoords DONE.\n", cid);)
 }
 
@@ -630,6 +633,7 @@ void chunk::multipleRefine(double *desiredArea, refineClient *client)
 {
   int i;
   DEBUGREF(CkPrintf("TMRC2D: [%d] multipleRefine....\n", cid);)
+  sanityCheck(); // quietly make sure mesh is in shape
   theClient = client; // initialize refine client associated with this chunk
   //Uncomment this dump call to see TMRC2D's mesh config
   //dump();
@@ -653,17 +657,19 @@ void chunk::multipleCoarsen(double *desiredArea, refineClient *client)
   int i;
   double precThrshld, area;
   DEBUGREF(CkPrintf("TMRC2D: [%d] multipleCoarsen....\n", cid);)
+  sanityCheck(); // quietly make sure mesh is in shape
   theClient = client; // initialize refine client associated with this chunk
   //Uncomment this dump call to see TMRC2D's mesh config
   //dump();
   for (i=0; i<elementSlots; i++) { // set desired areas for elements
-    area = theElements[i].getArea();
-    precThrshld = area * 1e-8;
-    //CkPrintf("TMRC2D: desiredArea[%d]=%1.10e present? %d area=%1.10e\n", i, desiredArea[i], theElements[i].isPresent(), area);
-    if ((theElements[i].isPresent()) &&
-	(desiredArea[i] > area+precThrshld)) {
-      theElements[i].resetTargetArea(desiredArea[i]);
-      DEBUGREF(CkPrintf("TMRC2D: [%d] Setting target on element %d to %1.10e\n", cid, i, desiredArea[i]);)
+    if (theElements[i].isPresent()) {
+      area = theElements[i].getArea();
+      precThrshld = area * 1e-8;
+      //CkPrintf("TMRC2D: desiredArea[%d]=%1.10e present? %d area=%1.10e\n", i, desiredArea[i], theElements[i].isPresent(), area);
+      if (desiredArea[i] > area+precThrshld) {
+	theElements[i].resetTargetArea(desiredArea[i]);
+	DEBUGREF(CkPrintf("TMRC2D: [%d] Setting target on element %d to %1.10e\n", cid, i, desiredArea[i]);)
+      }
     }
   }
 
@@ -782,13 +788,12 @@ void chunk::deriveEdges(int *conn, int *gid)
 	  }
 	}
 	if (edgeLocal(myRef, nbrRef)) { // make edge here
-	  newEdge = addEdge();
+	  newEdge = addEdge(theElements[i].nodes[n1localIdx],
+			    theElements[i].nodes[n2localIdx]);
 	  DEBUGREF(CkPrintf("TMRC2D: [%d] New edge (%d,%d) added between nodes %d and %d and elements %d and %d\n", cid, newEdge.cid, newEdge.idx, theElements[i].nodes[n1localIdx], theElements[i].nodes[n2localIdx], i, nbrRef.idx);)
 	  // point edge to the two neighboring elements
 	  theEdges[newEdge.idx].update(nullRef, myRef);
 	  theEdges[newEdge.idx].update(nullRef, nbrRef);
-	  theEdges[newEdge.idx].setNodes(theElements[i].nodes[n1localIdx],
-					 theElements[i].nodes[n2localIdx]);
 	  // point elem i's edge j at the edge
 	  theElements[i].set(j, newEdge);
 	  // point nbrRef at the edge

@@ -25,7 +25,8 @@ module refine {
     entry [sync, threaded] splitOutMsg *split(int, elemRef, int, int);
     entry [sync, threaded] splitOutMsg *collapse(int, elemRef, int, int, 
 	elemRef, elemRef, edgeRef, edgeRef, node, node);
-    entry [sync, threaded] void nodeReplaceDelete(int, int, node);
+    entry [sync, threaded] void nodeReplaceDelete(int, int, node, int shared, 
+	int chk[shared], int idx[shared]);
     entry [sync] intMsg *isPending(int, objRef);
     entry void checkPending(int, objRef);
     entry void checkPending(int, objRef, objRef);
