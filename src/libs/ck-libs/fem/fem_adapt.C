@@ -409,4 +409,25 @@ int FEM_Adapt::vertex_split(int n, int n1, int n2, int e1, int e3)
 // element_bisect and helpers
 void FEM_Adapt::element_bisect(int e1) 
 {
+  int mn = theMesh->getMarkedNode(e1);
+  int mnIdx = theMesh->getMarkedNodeIdx(e1);
+  int n1Idx = (mnIdx+1)%3;
+  int n1 = theMesh->e2n_getNode(e1, n1Idx);
+  int n2Idx = (n1Idx+1)%3;
+  int n2 = theMesh->e2n_getNode(e1, n2Idx);
+  int e2 = theMesh->e2e_getNbr(e1, get_edge_index(n1Idx, n2Idx));
+  int mn2 = theMesh->getMarkedNode(e2);
+  while (!((mn2 != n1) && (mn2 != n2))) {
+    element_bisect(e2);
+    mn = theMesh->getMarkedNode(e1);
+    mnIdx = theMesh->getMarkedNodeIdx(e1);
+    n1Idx = (mnIdx+1)%3;
+    n1 = theMesh->e2n_getNode(e1, n1Idx);
+    n2Idx = (n1Idx+1)%3;
+    n2 = theMesh->e2n_getNode(e1, n2Idx);
+    e2 = theMesh->e2e_getNbr(e1, get_edge_index(n1Idx, n2Idx));
+    mn2 = theMesh->getMarkedNode(e2);
+  }
+  int foo = edge_bisect(e1, n1, n2);
+  return;
 }
