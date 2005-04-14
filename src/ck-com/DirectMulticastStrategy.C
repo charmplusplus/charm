@@ -240,7 +240,7 @@ void DirectMulticastStrategy::beginProcessing(int numElements){
     sinfo = ComlibSectionInfo(dest, myInstanceID);
 
     ComlibLearner *learner = new ComlibLearner();
-    setLearner(learner);
+    //setLearner(learner);
 }
 
 void DirectMulticastStrategy::handleMessage(void *msg){
