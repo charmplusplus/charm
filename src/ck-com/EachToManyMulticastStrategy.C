@@ -45,8 +45,11 @@ void *itrDoneHandler(void *msg){
         ComlibPrintf("[%d] Calling Dummy Done Inserting, %d, %d\n", CkMyPe(), instid, nexpected);
         nm_mgr = (EachToManyMulticastStrategy *)sentry->strategy;    
         nm_mgr->doneInserting();
-    }
+	
+	if (!nm_mgr->getOnFinish().isInvalid()) nm_mgr->getOnFinish().send(0);
     
+    }
+
     return NULL;
 }
 

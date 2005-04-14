@@ -192,6 +192,7 @@ class CharmStrategy : public Strategy {
     int forwardOnMigration;
     ComlibLearner *learner;
     CmiBool mflag;    //Does this strategy handle point-to-point or 
+    CkCallback onFinish;
 
  public:
     ComlibGroupInfo ginfo;
@@ -220,6 +221,14 @@ class CharmStrategy : public Strategy {
     //get the multicast flag
     CmiBool getMulticast () {
         return mflag;
+    }
+
+    inline void setOnFinish (CkCallback of) {
+      onFinish = of;
+    }
+
+    inline CkCallback getOnFinish () {
+      return onFinish;
     }
 
     //Called for each message

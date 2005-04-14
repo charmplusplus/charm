@@ -24,6 +24,7 @@ void CharmStrategy::pup(PUP::er &p) {
     p | ainfo;
     p | forwardOnMigration;
     p | mflag;
+    p | onFinish;
 }
 
 CharmMessageHolder::CharmMessageHolder(char * msg, int proc) 
