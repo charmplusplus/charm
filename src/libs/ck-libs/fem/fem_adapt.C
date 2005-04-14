@@ -234,8 +234,8 @@ int FEM_Adapt::edge_contraction(int n1, int n2)
 {
   int e1 = theMesh->getElementOnEdge(n1, n2);
   if (e1 < 0) {
-    CkPrintf("ERROR: edge_bisect: no element with edge [%d,%d]\n", n1, n2);
-    return -1;	     
+    CkPrintf("ERROR: edge_contraction: no element with edge [%d,%d]\n", n1,n2);
+    return 0;	     
   }
   return edge_contraction(e1, n1, n2);
 }
@@ -312,6 +312,7 @@ int FEM_Adapt::edge_contraction_help(int e1, int e2, int n1, int n2, int e1_n1,
   theMesh->deleteNode(n2);
   theMesh->deleteElement(e1);
   theMesh->deleteElement(e2);
+  return 1;
 }
 
 // vertex_split and helpers
@@ -428,6 +429,5 @@ void FEM_Adapt::element_bisect(int e1)
     e2 = theMesh->e2e_getNbr(e1, get_edge_index(n1Idx, n2Idx));
     mn2 = theMesh->getMarkedNode(e2);
   }
-  int foo = edge_bisect(e1, n1, n2);
-  return;
+  (void) edge_bisect(e1, n1, n2);
 }
