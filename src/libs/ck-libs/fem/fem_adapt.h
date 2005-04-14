@@ -1,15 +1,10 @@
 #ifndef __CHARM_FEM_ADAPT_H
 #define __CHARM_FEM_ADAPT_H
 
-#include "fem_mesh.h"
+#include "fem_impl.h"
 
 class FEM_Adapt {
   FEM_Mesh *theMesh;
-
-  /// Initialize FEM_Adapt with a chunk of the mesh
-  FEM_Adapt(FEM_Mesh *m) {
-    theMesh = m;
-  }
   // Helper methods
   /// Map a pair of element-local node numberings to an element-local edge 
   /// numbering
@@ -38,6 +33,11 @@ class FEM_Adapt {
 		    int stopElem, int *nn, int *ne, int *nodeList,
 		    int *elemList);
 
+ public:
+  /// Initialize FEM_Adapt with a chunk of the mesh
+  FEM_Adapt(FEM_Mesh *m) {
+    theMesh = m;
+  }
   /// Perform a Delaunay flip of edge (n1, n2)
   /** Perform a Delaunay flip of the edge (n1, n2) returning 1 if successful,
       0 if not.  The convexity of the quadrilateral formed by two faces
@@ -83,7 +83,7 @@ class FEM_Adapt {
   /** Given and element e1, determined n, e1's marked node, and bisect
       the edge opposite to n, propagating and bisecting the
       neighboring element in a similar fashion **/
-  virtual int element_bisect(int e1);
-}
+  virtual void element_bisect(int e1);
+};
 
 #endif

@@ -9,8 +9,9 @@ int FEM_Adapt::get_edge_index(int local_node1, int local_node2)
   else if (sum == 3) return 1;
   else if (sum == 2) return 2;
   else {
-    CkAbort("ERROR: local node pair is strange: [%d,%d]\n", local_node1,
+    CkPrintf("ERROR: local node pair is strange: [%d,%d]\n", local_node1,
 	    local_node2);
+    CkAbort("ERROR: local node pair is strange\n");
     return -1;
   }
 }
@@ -18,7 +19,8 @@ int FEM_Adapt::get_edge_index(int local_node1, int local_node2)
 int FEM_Adapt::find_local_node_index(int e, int n) {
   int result = theMesh->e2n_getIndex(e, n);
   if (result < 0) {
-    CkAbort("ERROR: node %d not found on element %d\n", n, e);
+    CkPrintf("ERROR: node %d not found on element %d\n", n, e);
+    CkAbort("ERROR: node not found\n");
   }
   return result;
 }
@@ -52,7 +54,8 @@ void FEM_Adapt::adj_traverse(int n, int startNode, int stopNode, int startElem,
     elemList[*ne] = elm; (*ne)++;
     nIdx = 3 - find_local_node_index(elm,n) - find_local_node_index(elm,nod);
     nod = theMesh->e2n_getNode(elm, nIdx);
-    elm = theMesh->getElementOnEdge(elm, n, nIdx);
+    elm = theMesh->e2e_getNbr(elm, get_edge_index(find_local_node_index(elm,n),
+						  nIdx));
   }
   if (elm == stopElem) {
     nodeList[*nn] = nod; (*nn)++;
@@ -67,7 +70,7 @@ void FEM_Adapt::adj_traverse(int n, int startNode, int stopNode, int startElem,
       elemList[*ne] = elm; (*ne)++;
       nIdx = 3 - find_local_node_index(elm,n) - find_local_node_index(elm,nod);
       nod = theMesh->e2n_getNode(elm, nIdx);
-      elm = theMesh->getElementOnEdge(elm, n, nIdx);
+      elm = theMesh->e2e_getNbr(elm, get_edge_index(find_local_node_index(elm,n), nIdx));
     }
     nodeList[*nn] = nod; (*nn)++;
   }
@@ -157,14 +160,21 @@ int FEM_Adapt::edge_bisect_help(int e1, int e2, int n1, int n2, int e1_n1,
   int n3 = theMesh->e2n_getNode(e1, e1_n3);
   int n5 = theMesh->newNode();
   int e3 = theMesh->newElement();
+  int e2_n1;
+  int e2_n2;
+  int e2_n3;
+  int mod_edge2;
+  int e2nbr;
+  int n4;
+  int e4;
   if (e2 >= 0) { // neighbor exists
-    int e2_n1 = find_local_node_index(e2, n1);
-    int e2_n2 = find_local_node_index(e2, n2);
-    int e2_n3 = 3 - e2_n1 - e2_n2;
-    int mod_edge2 = get_edge_index(e2_n1, e2_n3);
-    int e2nbr = theMesh->e2e_getNbr(e2, mod_edge2);
-    int n4 = theMesh->e2n_getNode(e2, e2_n3);
-    int e4 = theMesh->newElement();
+    e2_n1 = find_local_node_index(e2, n1);
+    e2_n2 = find_local_node_index(e2, n2);
+    e2_n3 = 3 - e2_n1 - e2_n2;
+    mod_edge2 = get_edge_index(e2_n1, e2_n3);
+    e2nbr = theMesh->e2e_getNbr(e2, mod_edge2);
+    n4 = theMesh->e2n_getNode(e2, e2_n3);
+    e4 = theMesh->newElement();
   }
   
   // Element-to-node updates
@@ -181,14 +191,18 @@ int FEM_Adapt::edge_bisect_help(int e1, int e2, int n1, int n2, int e1_n1,
   // Element-to-element updates
   theMesh->e2e_replace(e1, e1nbr, e3);
   theMesh->e2e_replace(e1nbr, e1, e3);
+  int nl[3];
   if (e2 >= 0) {
     theMesh->e2e_replace(e2, e2nbr, e4);
     theMesh->e2e_replace(e2nbr, e2, e4);
-    theMesh->e2e_setAll(e3, e1, e4, e1nbr);
-    theMesh->e2e_setAll(e4, e2, e3, e2nbr);
+    nl[0] = e1; nl[1] = e4; nl[2] = e1nbr;
+    theMesh->e2e_setAll(e3, nl);
+    nl[0] = e2; nl[1] = e3; nl[2] = e2nbr;
+    theMesh->e2e_setAll(e4, nl);
   }
   else {
-    theMesh->e2e_setAll(e3, e1, -1, e1nbr);
+    nl[0] = e1; nl[1] = -1; nl[2] = e1nbr;
+    theMesh->e2e_setAll(e3, nl);
   }
   // Node-to-node updates
   theMesh->n2n_replace(n1, n2, n5);
@@ -241,22 +255,30 @@ int FEM_Adapt::edge_contraction_help(int e1, int e2, int n1, int n2, int e1_n1,
   int e1nbr1 = theMesh->e2e_getNbr(e1, mod_edge1);
   int mod_edge2 = get_edge_index(e1_n2, e1_n3);
   int e1nbr2 = theMesh->e2e_getNbr(e1, mod_edge2);
-  int n3 = theMesh->e2e_getNode(e1, e1_n3);
+  int n3 = theMesh->e2n_getNode(e1, e1_n3);
+  int e2_n1;
+  int e2_n2;
+  int e2_n3;
+  int mod_edge3;
+  int e2nbr1;
+  int mod_edge4;
+  int e2nbr2;
+  int n4;
   if (e2 >= 0) {
-    int e2_n1 = find_local_node_index(e2, n1);
-    int e2_n2 = find_local_node_index(e2, n2);
-    int e2_n3 = 3 - e2_n1 - e2_n2;
-    int mod_edge3 = get_edge_index(e2_n1, e2_n3);
-    int e2nbr1 = theMesh->e2e_getNbr(e2, mod_edge3);
-    int mod_edge4 = get_edge_index(e2_n2, e2_n3);
-    int e2nbr2 = theMesh->e2e_getNbr(e2, mod_edge4);
-    int n4 = theMesh->e2e_getNode(e2, e2_n3);
+    e2_n1 = find_local_node_index(e2, n1);
+    e2_n2 = find_local_node_index(e2, n2);
+    e2_n3 = 3 - e2_n1 - e2_n2;
+    mod_edge3 = get_edge_index(e2_n1, e2_n3);
+    e2nbr1 = theMesh->e2e_getNbr(e2, mod_edge3);
+    mod_edge4 = get_edge_index(e2_n2, e2_n3);
+    e2nbr2 = theMesh->e2e_getNbr(e2, mod_edge4);
+    n4 = theMesh->e2n_getNode(e2, e2_n3);
   }
 
   int *n2_nbrNodes, *n2_nbrElems;
   int nnsize, nesize;
-  theMesh->n2n_getAll(n2, &n2_nbrNodes, &nnsize);
-  theMesh->n2e_getAll(n2, &n2_nbrElems, &nesize);
+  theMesh->n2n_getAll(n2, n2_nbrNodes, &nnsize);
+  theMesh->n2e_getAll(n2, n2_nbrElems, &nesize);
   
   // Element-to-node updates
   for (int i=0; i<nesize; i++) {
@@ -363,6 +385,7 @@ int FEM_Adapt::vertex_split(int n, int n1, int n2, int e1, int e3)
   theMesh->e2e_replace(e3, e4, e6);
   theMesh->e2e_replace(e4, e3, e6);
   // Node-to-node updates
+  int i;
   for (i=0; i<nnCount; i++) {
     theMesh->n2n_add(np, np_nodes[i]);
     theMesh->n2n_remove(n, np_nodes[i]);
