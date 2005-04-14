@@ -718,20 +718,6 @@ void CkGetSectionInfo(CkSectionInfo &id, void *msg)
 
 // Reduction
 
-#if 0
-CkReductionMsg* CkMcastReductionMsg::buildNew(int NdataSize,void *srcData,
-                  CkReduction::reducerType reducer)
-{
-  CkMcastReductionMsg *newmsg = new (NdataSize, 0) CkMcastReductionMsg;
-  newmsg->dataSize = NdataSize;
-  memcpy(newmsg->data, srcData, NdataSize);
-  newmsg->flag = 0;
-  newmsg->redNo = 0;
-  newmsg->gcounter = 0;
-  return newmsg;
-}
-#endif
-
 void CkMulticastMgr::setReductionClient(CProxySection_ArrayElement &proxy, CkCallback *cb)
 {
   CkSectionInfo &id = proxy.ckGetSectionInfo();
@@ -771,22 +757,27 @@ void CkMulticastMgr::contribute(int dataSize,void *data,CkReduction::reducerType
   if (id.get_val() == NULL || id.get_redNo() == -1) 
     CmiAbort("contribute: SectionID is not initialized\n");
 
-  int nFrags = 1;
-  if (-1 == fragSize) fragSize = dataSize;
-
-  CmiAssert (dataSize >= fragSize);
-  nFrags = dataSize/fragSize;
-  if (dataSize%fragSize) nFrags++;
+  int nFrags;
+  if (-1 == fragSize) {		// no frag
+    nFrags = 1;
+    fragSize = dataSize;
+  }
+  else {
+    CmiAssert (dataSize >= fragSize);
+    nFrags = dataSize/fragSize;
+    if (dataSize%fragSize) nFrags++;
+  }
 
   if (MAXFRAGS < nFrags) {
     CmiPrintf ("Recompile CkMulticast library for fragmenting msgs into more than %d fragments\n", MAXFRAGS);
     CmiAbort ("frag size too small\n");
   }
 
-  int fSize = fragSize;
+  int mpe = id.get_pe();
   CProxy_CkMulticastMgr  mCastGrp(thisgroup);
 
-  // break the message into kpiece fragments
+  // break the message into k-piece fragments
+  int fSize = fragSize;
   for (int i=0; i<nFrags; i++) {
     if ((0 != i) && ((nFrags-1) == i) && (0 != dataSize%fragSize)) {
       fSize = dataSize%fragSize;
@@ -802,13 +793,12 @@ void CkMulticastMgr::contribute(int dataSize,void *data,CkReduction::reducerType
     msg->sourceFlag         = 1;
     msg->redNo              = id.get_redNo();
     msg->gcount             = 1;
-    msg->rebuilt            = (id.get_pe() == CkMyPe())?0:1;
+    msg->rebuilt            = (mpe == CkMyPe())?0:1;
     msg->callback           = cb;
 
-    mCastGrp[id.get_pe()].recvRedMsg(msg);
+    mCastGrp[mpe].recvRedMsg(msg);
 
-    CmiAssert (1 == sizeof (byte));
-    data = (void*)(((byte*)data) + fSize);
+    data = (void*)(((char*)data) + fSize);
   }
 
   id.get_redNo()++;
