@@ -101,8 +101,8 @@ void CompletionEventHandler(cc_rnic_handle_t rnic, cc_cq_handle_t cq, void *cb);
 
 void CmiAmmassoOpenQueuePairs();
 
-void processAmmassoControlMessage(char* msg, int len, char *wasAck);
-void ProcessMessage(char* msg, int len, char *wasAck);
+void processAmmassoControlMessage(char* msg, int len, char *needAck);
+void ProcessMessage(char* msg, int len, char *needAck);
 //int PollForMessage(cc_cq_handle_t cq);
 
 OtherNode getNodeFromQPId(cc_qp_id_t qp_id);
@@ -297,6 +297,7 @@ int getQPSendBuffer(OtherNode node, char force) {
 
     rtnBufIndex = -1;
 
+    MACHSTATE(3, "getQPSendBuffer() - INFO: Pre-sendBufLock");
     #if CMK_SHARED_VARS_UNAVAILABLE
       while (node->sendBufLock != 0) { usleep(10000); } // Since CmiLock() is not really a lock, actually wait
     #endif
@@ -328,6 +329,7 @@ int getQPSendBuffer(OtherNode node, char force) {
     */
         
     CmiUnlock(node->sendBufLock);
+    MACHSTATE(3, "getQPSendBuffer() - INFO: Post-sendBufLock");
 
     if (rtnBufIndex >= 0) {
       break;
@@ -374,6 +376,7 @@ int sendDataOnQP(char* data, int len, OtherNode node, char force) {
     rtn = cc_qp_post_sq(contextBlock->rnic, node->qp, &(node->sq_wr[sendBufIndex]), 1, &(WRsPosted));
     if (rtn != CC_OK || WRsPosted != 1) {
 
+      MACHSTATE(3, "sendDataOnQP() - INFO: Pre-sendBufLock");
       #if CMK_SHARED_VARS_UNAVAILABLE
         while (node->sendBufLock != 0) { usleep(10000); } // Since CmiLock() is not really a lock, actually wait
       #endif
@@ -383,6 +386,9 @@ int sendDataOnQP(char* data, int len, OtherNode node, char force) {
       //node->send_bufFree = AMMASSO_BUF_NOT_IN_USE;
       
       // TODO : Find a way to recover from this (the counter being used, send_InUseCounter, is not good enough)... for now, abort...
+
+      CmiUnlock(node->sendBufLock);
+      MACHSTATE(3, "sendDataOnQP() - INFO: Post-sendBufLock");
 
       // Let the user know that an error occured
       MACHSTATE3(3, "sendDataOnQP() - Ammasso - ERROR: Unable to send data to node %d: %d, \"%s\"", node->myNode, rtn, cc_status_to_string(rtn));
@@ -616,7 +622,7 @@ static void ServiceCharmrun_nolock() {
   MACHSTATE(2, "} ServiceCharmrun_nolock end");
 }
 
-void processAmmassoControlMessage(char* msg, int len, char *wasAck) {
+void processAmmassoControlMessage(char* msg, int len, char *needAck) {
 
   int nodeIndex, ctrlType, i;
   OtherNode node;
@@ -664,8 +670,7 @@ void processAmmassoControlMessage(char* msg, int len, char *wasAck) {
       contextBlock->nodeReadyCount--;
       MACHSTATE1(3, "processAmmassoControlMessage() - Ammasso - INFO: Received READY packet... still waiting for %d more...", contextBlock->nodeReadyCount);
     
-      // NOTE: Since wasAck will remain 0, the CompletionEventHandler() will call sendAck()
-      //sendAck(node);
+      *needAck = 1;
 
       //#if CMK_SHARED_VARS_UNAVAILABLE
       //  while (node->sendBufLock != 0) { usleep(10000); } // Since CmiLock() is not really a lock, actually wait
@@ -691,9 +696,9 @@ void processAmmassoControlMessage(char* msg, int len, char *wasAck) {
 
       MACHSTATE1(3, "processAmmassoControlMessage() - Ammasso - INFO: Received ACK from node %d", nodeIndex);
 
-      // Indicate to the caller that the message was indeed an ACK
-      *wasAck = 1;
+      // NOTE: Don't send and ACK for an ACK
 
+      MACHSTATE(3, "processAmmassoControlMessage() - INFO: Pre-sendBufLock");
       #if CMK_SHARED_VARS_UNAVAILABLE
         while (node->sendBufLock != 0) { usleep(10000); } // Since CmiLock() is not really a lock, actually wait
       #endif
@@ -707,12 +712,13 @@ void processAmmassoControlMessage(char* msg, int len, char *wasAck) {
       //  node->sendAckIndex = 0;
 
       CmiUnlock(node->sendBufLock);
+      MACHSTATE(3, "processAmmassoControlMessage() - INFO: Post-sendBufLock");
 
       break;
   }
 }
 
-void ProcessMessage(char* msg, int len, char *wasAck) {
+void ProcessMessage(char* msg, int len, char *needAck) {
 
   int rank, srcPE, seqNum, magicCookie, size, i;
   unsigned int broot;
@@ -722,8 +728,8 @@ void ProcessMessage(char* msg, int len, char *wasAck) {
 
   MACHSTATE(3, "ProcessMessage() - INFO: Called...");
 
-  // Begin by indicating that the message is not an ACK, set wasAck if we find out it is indeed an ACK
-  *wasAck = 0;
+  // Begin by indicating that the message does not need an ACK, set needAck if we find out an ACK is needed
+  *needAck = 0;
 
   //{
   //  MACHSTATE1(3, "ProcessMessage() - INFO: msg = %p", msg);
@@ -756,7 +762,7 @@ void ProcessMessage(char* msg, int len, char *wasAck) {
       return;
     }
     */
-    processAmmassoControlMessage(msg, len, wasAck);
+    processAmmassoControlMessage(msg, len, needAck);
     return;
   }
 
@@ -852,6 +858,8 @@ void ProcessMessage(char* msg, int len, char *wasAck) {
   }
 
   MACHSTATE2(3, "ProcessMessage() - Ammasso - INFO: Message copied into asm_buf (asm_fill = %d, asm_total = %d)...", fromNode->asm_fill, fromNode->asm_total);
+
+  *needAck = 1;
 
   // Check to see if a full packet has been received
   if (fromNode->asm_fill == fromNode->asm_total) {
@@ -1175,6 +1183,7 @@ void AsynchronousEventHandler(cc_rnic_handle_t rnic, cc_event_record_t *er, void
         break;
       }
 
+      MACHSTATE(3, "AsynchronousEventHandler() - INFO: Pre-sendBufLock");
       #if CMK_SHARED_VARS_UNAVAILABLE
         while (node->sendBufLock != 0) { usleep(10000); } // Since CmiLock() is not really a lock, actually wait
       #endif
@@ -1184,6 +1193,7 @@ void AsynchronousEventHandler(cc_rnic_handle_t rnic, cc_event_record_t *er, void
       node->connectionState = QP_CONN_STATE_CONNECTION_CLOSED;
   
       CmiUnlock(node->sendBufLock);
+      MACHSTATE(3, "AsynchronousEventHandler() - INFO: Post-sendBufLock");
     
       break;
 
@@ -1222,6 +1232,7 @@ void AsynchronousEventHandler(cc_rnic_handle_t rnic, cc_event_record_t *er, void
   
           MACHSTATE1(3, "AsynchronousEventHandler() - Ammasso - INFO: Accepted Connection from node %d", nodeNumber);
 
+          MACHSTATE(3, "AsynchronousEventHandler() - INFO: Pre-sendBufLock");
           #if CMK_SHARED_VARS_UNAVAILABLE
             while (nodes[nodeNumber].sendBufLock != 0) { usleep(10000); } // Since CmiLock() is not really a lock, actually wait
           #endif
@@ -1233,6 +1244,7 @@ void AsynchronousEventHandler(cc_rnic_handle_t rnic, cc_event_record_t *er, void
           nodes[nodeNumber].connectionState = QP_CONN_STATE_CONNECTED;
 
           CmiUnlock(nodes[nodeNumber].sendBufLock);
+          MACHSTATE(3, "AsynchronousEventHandler() - INFO: Post-sendBufLock");
 
           MACHSTATE1(3, "AsynchronousEventHandler() - Connected to node %d", nodes[nodeNumber].myNode);
 	}
@@ -1270,6 +1282,7 @@ void AsynchronousEventHandler(cc_rnic_handle_t rnic, cc_event_record_t *er, void
         MACHSTATE2(3, "                                     r -> %s:%d", inet_ntoa(*(struct in_addr*) &(er->event_data.active_connect_results.raddr)), ntohs(er->event_data.active_connect_results.rport));
         MACHSTATE1(3, "                                     private_data -> \"%s\"", er->event_data.active_connect_results.private_data);
 
+        MACHSTATE(3, "AsynchronousEventHandler() - INFO: Pre-sendBufLock");
         #if CMK_SHARED_VARS_UNAVAILABLE
           while (node->sendBufLock != 0) { usleep(10000); } // Since CmiLock() is not really a lock, actually wait
         #endif
@@ -1281,6 +1294,7 @@ void AsynchronousEventHandler(cc_rnic_handle_t rnic, cc_event_record_t *er, void
         node->connectionState = QP_CONN_STATE_CONNECTED;
 
         CmiUnlock(node->sendBufLock);
+        MACHSTATE(3, "AsynchronousEventHandler() - INFO: Post-sendBufLock");
 
         MACHSTATE1(3, "AsynchronousEventHandler() - Connected to node %d", node->myNode);
       }
@@ -1322,7 +1336,7 @@ void AsynchronousEventHandler(cc_rnic_handle_t rnic, cc_event_record_t *er, void
     case CCAE_IRRQ_MSN_GAP:     // what to do... but I think
     case CCAE_IRRQ_MSN_RANGE:   // this is correct... DMK
       // Local Errors - ??? Not 100% sure about these (they are written differently in cc_ae.h than in the verbs spec... but I think they go here)
-    //case CCAE_CQ_SQ_COMPLETION_OVERFLOW:
+    case CCAE_CQ_SQ_COMPLETION_OVERFLOW:
     case CCAE_CQ_RQ_COMPLETION_ERROR:
     case CCAE_QP_SRQ_WQE_ERROR:
     
@@ -1343,6 +1357,7 @@ void AsynchronousEventHandler(cc_rnic_handle_t rnic, cc_event_record_t *er, void
         break;
       }
 
+      MACHSTATE(3, "AsynchronousEventHandler() - INFO: Pre-sendBufLock");
       #if CMK_SHARED_VARS_UNAVAILABLE
         while (node->sendBufLock != 0) { usleep(10000); } // Since CmiLock() is not really a lock, actually wait
       #endif
@@ -1352,6 +1367,7 @@ void AsynchronousEventHandler(cc_rnic_handle_t rnic, cc_event_record_t *er, void
       node->connectionState = QP_CONN_STATE_CONNECTION_LOST;
 
       CmiUnlock(node->sendBufLock);
+      MACHSTATE(3, "AsynchronousEventHandler() - INFO: Post-sendBufLock");
 
       MACHSTATE1(3, "AsynchronousEventHandler() -        Connection ERROR Occured - node %d", node->myNode);
       displayQueueQuery(node->qp, &(node->qp_attrs));
@@ -1378,7 +1394,7 @@ void CompletionEventHandler(cc_rnic_handle_t rnic, cc_cq_handle_t cq, void *cb) 
   int tmp;
   cc_rq_wr_t *rq_wr;
   char* recvBuf;
-  char wasAck;
+  char needAck;
 
   MACHSTATE(3, "CompletionEventHandler() - Called...");
 
@@ -1477,7 +1493,7 @@ void CompletionEventHandler(cc_rnic_handle_t rnic, cc_cq_handle_t cq, void *cb) 
         rq_wr = (cc_rq_wr_t*)wc.wr_id;
         
         // Process the Message
-        ProcessMessage((char*)(rq_wr->local_sgl.sge_list[0].to), wc.bytes_rcvd, &wasAck);
+        ProcessMessage((char*)(rq_wr->local_sgl.sge_list[0].to), wc.bytes_rcvd, &needAck);
         //ProcessMessage(node->recv_buf, wc.bytes_rcvd);
 
         // Re-Post the receive buffer
@@ -1491,7 +1507,7 @@ void CompletionEventHandler(cc_rnic_handle_t rnic, cc_cq_handle_t cq, void *cb) 
         }
 
         // Send and ACK to indicate this node is ready to receive another message
-        if (!wasAck)
+        if (needAck)
           sendAck(node);
 
         break;
@@ -1694,7 +1710,7 @@ void establishQPConnection(OtherNode node, int reuseQPFlag) {
     MACHSTATE(3, "establishQPConnection() - INFO: (PRE-SEND-CQ-CREATE)");
 
     // Create the Completion Queue
-    node->send_cq_depth = AMMASSO_NUMMSGBUFS_PER_QP;
+    node->send_cq_depth = AMMASSO_NUMMSGBUFS_PER_QP * 2;
     rtn = cc_cq_create(contextBlock->rnic, &(node->send_cq_depth), contextBlock->eh_id, node, &(node->send_cq));
     if (rtn != CC_OK) {
 
