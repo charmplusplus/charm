@@ -302,13 +302,13 @@ PairCalculator::acceptResult(int size, double *matrix1, double *matrix2)
 
   complex *mynewData = new complex[N*grainSize];
 
-  /* I don't think this has any purpose */
+  /* I don't think this has any purpose 
   complex *othernewData;
   if(symmetric && thisIndex.x != thisIndex.y){
       othernewData = new complex[N*grainSize];
       memset(othernewData,0,N*grainSize* sizeof(complex));
   }
-
+*/
   int offset = 0, index = thisIndex.y*S + thisIndex.x;
 
   //ASSUMING TMATRIX IS REAL (LOSS OF GENERALITY)
@@ -345,7 +345,7 @@ PairCalculator::acceptResult(int size, double *matrix1, double *matrix2)
       if(m!=amatrix[i*grainSize+j]){CkPrintf("Dcopy broken in back path: %2.5g != %2.5g \n", m, amatrix[i*grainSize+j]);}
     }
   }
-#endif _PAIRCALC_DEBUG_
+#endif //_PAIRCALC_DEBUG_
 
   int m_in=grainSize;
   int n_in=N*2;  
@@ -416,14 +416,13 @@ PairCalculator::acceptResult(int size, double *matrix1, double *matrix2)
   else {
     CkArrayIndex4D idx(thisIndex.w, 0, thisIndex.y, thisIndex.z);
     thisProxy(idx).sumPartialResult(N*grainSize, mynewData, thisIndex.z);
-    /* I think this matrix is unused*/
+    /* I think this matrix is unused
     if (thisIndex.y != thisIndex.x){   // FIXME: rowNum will alway == thisIndex.x
       CkArrayIndex4D idx(thisIndex.w, 0, thisIndex.x, thisIndex.z);
       thisProxy(idx).sumPartialResult(N*grainSize, othernewData, thisIndex.z);
     }
-
+*/
   }
-
 #else
   int segments=S/grainSize;
   if(S%grainSize!=0)
@@ -447,22 +446,23 @@ PairCalculator::acceptResult(int size, double *matrix1, double *matrix2)
   else { // else part is NOT load balanced yet!!!
     CkArrayIndex4D idx(thisIndex.w, 0, thisIndex.y, thisIndex.z);
     thisProxy(idx).sumPartialResult(N*grainSize, mynewData, thisIndex.z);
-    /* I think this is unused */
+    /* I think this is unused
        if (thisIndex.y != thisIndex.x){   // FIXME: rowNum will alway == thisIndex.x
-      CkArrayIndex4D idx(thisIndex.w, 0, thisIndex.x, thisIndex.z);
-      thisProxy(idx).sumPartialResult(N*grainSize, othernewData, thisIndex.z);
-    }
-
+	 CkArrayIndex4D idx(thisIndex.w, 0, thisIndex.x, thisIndex.z);
+	 thisProxy(idx).sumPartialResult(N*grainSize, othernewData, thisIndex.z);
+       }
+ */
   }
 #endif
 
   delete [] mynewData;
-  /* not used?*/
+
+  /* not used?
 
   if(symmetric && thisIndex.x != thisIndex.y){
       delete [] othernewData;
   }
-
+*/
   if(conserveMemory)
   {
       // clear the right and left they'll get reallocated on the next pass

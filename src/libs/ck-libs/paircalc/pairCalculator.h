@@ -51,6 +51,7 @@ class PairCalcID {
     p|isDoublePacked;
     p|conserveMemory;
   }
+
 };
 
 extern "C" void createPairCalculator(bool sym, int w, int grainSize, int numZ, int* z, int op1, FuncType f1, int op2, FuncType f2, CkCallback cb, PairCalcID* aid, int ep, CkArrayID cbid, int flag=0, CkGroupID *gid = 0, int flag_dp=0, bool conserveMemory=true);
@@ -66,5 +67,8 @@ extern "C" void finishPairCalc2(PairCalcID* pcid, int n, double *ptr1, double *p
 void startPairCalcLeftAndFinish(PairCalcID* pcid, int n, complex* ptr, int myS, int myZ);
 
 void startPairCalcRightAndFinish(PairCalcID* pcid, int n, complex* ptr, int myS, int myZ);
+
+void lbsyncPairCalc(PairCalcID* pcid);
+
 
 #endif

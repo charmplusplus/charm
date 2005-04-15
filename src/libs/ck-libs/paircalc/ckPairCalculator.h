@@ -107,6 +107,7 @@ class PairCalculator: public CBase_PairCalculator {
     
   PairCalculator(CkMigrateMessage *);
   ~PairCalculator();
+  void lbsync() {AtSync();};
   void calculatePairs(int, complex *, int, bool, bool); 
   void calculatePairs_gemm(int, complex *, int, bool, bool); 
   void acceptResult(int size, double *matrix);

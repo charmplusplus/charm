@@ -171,6 +171,15 @@ void startPairCalcLeft(PairCalcID* pcid, int n, complex* ptr, int myS, int myZ){
   }
 }
 
+void lbsyncPairCalc(PairCalcID* pcid){
+#ifdef _DEBUG_
+  CkPrintf("     lbsync symm=%d\n", pcid->Symmetric);
+#endif
+  CkArrayID pairCalculatorID = (CkArrayID)pcid->Aid; 
+  CProxy_PairCalculator pairCalculatorProxy(pairCalculatorID);
+  pairCalculatorProxy.lbsync();
+}
+
 void startPairCalcRight(PairCalcID* pcid, int n, complex* ptr, int myS, int myZ){
 #ifdef _DEBUG_
   CkPrintf("     Calc Right symm=%d\n", pcid->Symmetric);
