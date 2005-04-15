@@ -150,6 +150,7 @@ class PairCalculator: public CBase_PairCalculator {
   int cb_ep;
   CkGroupID reducer_id;
   CkSparseContiguousReducer<double> r;
+  int reduceElem;
 };
 
 class PairCalcReducer : public Group {
@@ -163,7 +164,8 @@ class PairCalcReducer : public Group {
   ~PairCalcReducer() {}
   void broadcastEntireResult(int size, double* matrix, bool symmtype);
   void broadcastEntireResult(int size, double* matrix1, double* matrix2, bool symmtype);
-  void doRegister(PairCalculator *, bool);
+  int doRegister(PairCalculator *, bool);
+  void unRegister(int pos);
 
   void acceptContribute(int size, double* matrix, CkCallback cb, bool isAllReduce, bool symmtype);
   

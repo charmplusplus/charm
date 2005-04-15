@@ -7,6 +7,11 @@ void createPairCalculator(bool sym, int s, int grainSize, int numZ, int* z, int 
                           PairCalcID* pcid, int cb_ep, CkArrayID cb_aid, 
                           int comlib_flag, CkGroupID *mapid, int flag_dp, bool conserveMemory) {
 
+  traceRegisterUserEvent("calcpairDGEMM", 210);
+  traceRegisterUserEvent("calcpairContrib", 220);
+  traceRegisterUserEvent("acceptResultDGEMM1", 230);
+  traceRegisterUserEvent("acceptResultDGEMM2", 240);
+
   //CkPrintf("create pair calculator %d, %d\n", s, grainSize);
 
   CProxy_PairCalcReducer pairCalcReducerProxy = CProxy_PairCalcReducer::ckNew();

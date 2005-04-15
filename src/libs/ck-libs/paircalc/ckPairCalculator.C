@@ -28,7 +28,7 @@ PairCalculator::PairCalculator(bool sym, int grainSize, int s, int blkSize,  int
   numRecd = 0;
   numExpected = grainSize;
 
-  kUnits=5;  //streaming unit only really used in NOGEMM, but could be used under other conditions
+  kUnits=grainSize;  //streaming unit only really used in NOGEMM, but could be used under other conditions
 
 #ifdef NOGEMM  
   kLeftOffset= new int[numExpected];
@@ -49,10 +49,11 @@ PairCalculator::PairCalculator(bool sym, int grainSize, int s, int blkSize,  int
 
   newData = NULL;
   sumPartialCount = 0;
-  setMigratable(false);
+  setMigratable(true);
+  usesAtSync=true;
 
   CProxy_PairCalcReducer pairCalcReducerProxy(reducer_id); 
-  pairCalcReducerProxy.ckLocalBranch()->doRegister(this, symmetric);
+  reduceElem=pairCalcReducerProxy.ckLocalBranch()->doRegister(this, symmetric);
 }
 
 void
@@ -82,6 +83,8 @@ PairCalculator::pup(PUP::er &p)
   p|symmetric;
   p|sumPartialCount;
   p|N;
+  p|reduceElem;
+  p|cb;
 #ifdef NOGEMM
   int rdiff,ldiff;
 #endif
@@ -95,6 +98,8 @@ PairCalculator::pup(PUP::er &p)
 #endif
     }
   if (p.isUnpacking()) {
+    CProxy_PairCalcReducer pairCalcReducerProxy(reducer_id); 
+    pairCalcReducerProxy.ckLocalBranch()->doRegister(this,symmetric);
     outData = new double[grainSize * grainSize];
     if(N>0)
       inDataLeft = new complex[numExpected*N];
@@ -122,21 +127,23 @@ PairCalculator::pup(PUP::er &p)
   p(kRightOffset, numExpected);
   p(kLeftOffset, numExpected);
 #endif
-  //p(cb);      // PUP the callback function: ???
               // How about sparseCont reducer???
 
 #ifdef _PAIRCALC_DEBUG_ 
   CkPrintf("ckPairCalculatorPUP\n");
 #endif
+
+  
 }
 
 PairCalculator::~PairCalculator()
 {
+  //we're going so take self out of group
+  CProxy_PairCalcReducer pairCalcReducerProxy(reducer_id); 
+  //  pairCalcReducerProxy.ckLocalBranch()->unRegister(reduceElem);  
   if(outData!=NULL)  
     delete [] outData;
 
-  // Since allocation is done in contiguous chunk, 
-  //   deletion is done in corresponding way.
   if(inDataLeft!=NULL)
     delete [] inDataLeft;
   if(!symmetric || (symmetric&&thisIndex.x!=thisIndex.y))
@@ -151,6 +158,7 @@ PairCalculator::~PairCalculator()
   if(kLeftOffset!=NULL)
     delete [] kLeftOffset;
 #endif
+
 }
 
 
@@ -226,16 +234,25 @@ PairCalculator::calculatePairs_gemm(int size, complex *points, int sender, bool 
     double beta=double(0.0); // C is unset
 
     double *ldata= reinterpret_cast <double *> (inDataLeft);
-
+#ifndef CMK_OPTIMIZE
+    double StartTime=CmiWallTimer();
+#endif
     if( numRecd == numExpected * 2) 
       {
 	double *rdata= reinterpret_cast <double *> (inDataRight); 
+
+
 	DGEMM(&transformT, &transform, &m_in, &n_in, &k_in, &alpha, ldata, &lda, rdata, &ldb, &beta, outData, &ldc);
       }
     else if (symmetric && thisIndex.x==thisIndex.y && numRecd==numExpected)
       {
 	DGEMM(&transformT, &transform, &m_in, &n_in, &k_in, &alpha, ldata, &lda, ldata, &ldb, &beta, outData, &ldc);
       }
+
+#ifndef CMK_OPTIMIZE
+    traceUserBracketEvent(210, StartTime, CmiWallTimer());
+#endif
+
     numRecd = 0;
 
     if (flag_dp) {
@@ -245,18 +262,25 @@ PairCalculator::calculatePairs_gemm(int size, complex *points, int sender, bool 
 	  outData[i] *= 2.0;
       }
     }
-
+#ifndef CMK_OPTIMIZE
+    StartTime=CmiWallTimer();
+#endif
+#if !CONVERSE_VERSION_ELAN
     r.add((int)thisIndex.y, (int)thisIndex.x, (int)(thisIndex.y+grainSize-1), (int)(thisIndex.x+grainSize-1), outData);
     r.contribute(this, sparse_sum_double);
-#if CONVERSE_VERSION_ELAN
-
+#else
     //CkPrintf("[%d] ELAN VERSION %d\n", CkMyPe(), symmetric);
     CProxy_PairCalcReducer pairCalcReducerProxy(reducer_id); 
     pairCalcReducerProxy.ckLocalBranch()->acceptContribute(S * S, outData, 
 							   cb, !symmetric, symmetric);
+
 #endif //!CONVERSE_VERSION_ELAN
 
+#ifndef CMK_OPTIMIZE
+    traceUserBracketEvent(220, StartTime, CmiWallTimer());
+#endif
   }
+
 }
 
 
@@ -278,13 +302,13 @@ PairCalculator::acceptResult(int size, double *matrix1, double *matrix2)
 
   complex *mynewData = new complex[N*grainSize];
 
-  /* I don't think this has any purpose 
+  /* I don't think this has any purpose */
   complex *othernewData;
   if(symmetric && thisIndex.x != thisIndex.y){
       othernewData = new complex[N*grainSize];
       memset(othernewData,0,N*grainSize* sizeof(complex));
   }
-  */
+
   int offset = 0, index = thisIndex.y*S + thisIndex.x;
 
   //ASSUMING TMATRIX IS REAL (LOSS OF GENERALITY)
@@ -332,7 +356,16 @@ PairCalculator::acceptResult(int size, double *matrix1, double *matrix2)
   double betad(0.0);
   char transform='N';
   char transformT='T';
+#ifndef CMK_OPTIMIZE
+  double StartTime=CmiWallTimer();
+#endif
+
   DGEMM(&transform, &transformT, &n_in, &m_in, &k_in, &alphad, leftd, &n_in,  amatrix, &k_in, &betad, mynewDatad, &n_in);
+
+#ifndef CMK_OPTIMIZE
+    traceUserBracketEvent(230, StartTime, CmiWallTimer());
+#endif
+
 
   if(!unitcoef){
 
@@ -357,8 +390,13 @@ PairCalculator::acceptResult(int size, double *matrix1, double *matrix2)
 #endif
     double *rightd=reinterpret_cast <double *> (inDataRight);
     // C = alpha*A*B + beta*C
+#ifndef CMK_OPTIMIZE
+    StartTime=CmiWallTimer();
+#endif
     DGEMM(&transform, &transformT, &n_in, &m_in, &k_in, &alphad, rightd, &n_in,  amatrix, &k_in, &betad, mynewDatad, &n_in);
-
+#ifndef CMK_OPTIMIZE
+    traceUserBracketEvent(240, StartTime, CmiWallTimer());
+#endif
   }
   if(S!=grainSize)  
     delete [] amatrix;
@@ -378,12 +416,12 @@ PairCalculator::acceptResult(int size, double *matrix1, double *matrix2)
   else {
     CkArrayIndex4D idx(thisIndex.w, 0, thisIndex.y, thisIndex.z);
     thisProxy(idx).sumPartialResult(N*grainSize, mynewData, thisIndex.z);
-    /* I think this matrix is unused
+    /* I think this matrix is unused*/
     if (thisIndex.y != thisIndex.x){   // FIXME: rowNum will alway == thisIndex.x
       CkArrayIndex4D idx(thisIndex.w, 0, thisIndex.x, thisIndex.z);
       thisProxy(idx).sumPartialResult(N*grainSize, othernewData, thisIndex.z);
     }
-    */
+
   }
 
 #else
@@ -409,22 +447,22 @@ PairCalculator::acceptResult(int size, double *matrix1, double *matrix2)
   else { // else part is NOT load balanced yet!!!
     CkArrayIndex4D idx(thisIndex.w, 0, thisIndex.y, thisIndex.z);
     thisProxy(idx).sumPartialResult(N*grainSize, mynewData, thisIndex.z);
-    /* I think this is unused 
+    /* I think this is unused */
        if (thisIndex.y != thisIndex.x){   // FIXME: rowNum will alway == thisIndex.x
       CkArrayIndex4D idx(thisIndex.w, 0, thisIndex.x, thisIndex.z);
       thisProxy(idx).sumPartialResult(N*grainSize, othernewData, thisIndex.z);
     }
-    */
+
   }
 #endif
 
   delete [] mynewData;
   /* not used?*/
-  /*
+
   if(symmetric && thisIndex.x != thisIndex.y){
       delete [] othernewData;
   }
-  */
+
   if(conserveMemory)
   {
       // clear the right and left they'll get reallocated on the next pass
@@ -605,14 +643,21 @@ PairCalcReducer::broadcastEntireResult(int size, double* matrix1, double* matrix
     (localElements[symmtype])[i]->acceptResult(size, matrix1, matrix2); 
 }
 
-void
+int
 PairCalcReducer:: doRegister(PairCalculator *elem, bool symmtype){
-    localElements[symmtype].push_back(elem);
-    numRegistered[symmtype]++;
+  numRegistered[symmtype]++;
+  return(localElements[symmtype].push_back_v(elem));
+}
+
+void
+PairCalcReducer:: unRegister(int elem){
+    localElements[symmtype].remove(elem);
+    numRegistered[symmtype]--;
 }
 
 
-/* note this is broken now, offset calculations need to be rejiggered to work with the one dimensional allocation scheme*/
+
+/* note this is probably broken now, offset calculations need to be rejiggered to work with the one dimensional allocation scheme*/
 void
 PairCalculator::calculatePairs(int size, complex *points, int sender, bool fromRow, bool flag_dp)
 {
