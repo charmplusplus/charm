@@ -101,6 +101,17 @@ class priorSumMsg : public CMessage_priorSumMsg {
   */
 };
 
+class calculatePairsMsg : public CkMcastBaseMsg, CMessage_calculatePairsMsg {
+ public:
+  complex *points;
+  int size;
+  int sender;
+  bool fromRow;
+  bool flag_dp;
+
+};
+
+
 class PairCalculator: public CBase_PairCalculator {
  public:
     PairCalculator(bool, int, int, int, int op1, FuncType fn1, int op2, FuncType fn2, CkCallback cb, CkGroupID gid, CkArrayID final_callbackid, int final_callback_ep, bool conserveMemory=true);
@@ -109,7 +120,8 @@ class PairCalculator: public CBase_PairCalculator {
   ~PairCalculator();
   void lbsync() {AtSync();};
   void calculatePairs(int, complex *, int, bool, bool); 
-  void calculatePairs_gemm(int, complex *, int, bool, bool); 
+  //  void calculatePairs_gemm(int, complex *, int, bool, bool); 
+  entry void calculatePairs_gemm(calculatePairsMsg *msg);
   void acceptResult(int size, double *matrix);
   void acceptResult(int size, double *matrix1, double *matrix2);
   void sumPartialResult(int size, complex *result, int offset);
@@ -130,14 +142,6 @@ class PairCalculator: public CBase_PairCalculator {
  private:
   int numRecd, numExpected, grainSize, S, blkSize, N;
   int kUnits;
-#ifdef NOGEMM
-  int kRightCount, kLeftCount;
-  int kRightDoneCount, kLeftDoneCount;
-  int *kLeftOffset;
-  int *kRightOffset;
-  int *kLeftMark;
-  int *kRightMark;
-#endif
   int op1, op2;
   FuncType fn1, fn2;
   complex *inDataLeft, *inDataRight;

@@ -140,33 +140,28 @@ void startPairCalcLeft(PairCalcID* pcid, int n, complex* ptr, int myS, int myZ){
   if(symmetric){
     for (c = 0; c < blkSize; c++)
       for(s2 = 0; s2 < S; s2 += grainSize){
-
-#ifdef NOGEMM
+	calculatePairsMsg *msg= new(n,0) calculatePairsMsg;
+	msg->size=n;
+	memcpy(msg->points,ptr,n*sizeof(complex));
+	msg->sender=myS;
+	msg->flag_dp=flag_dp;
 	if(s1 <= s2)
-	  pairCalculatorProxy(x, s1, s2, c).calculatePairs(n, ptr, myS, true, flag_dp);	 
-#else
-	if(s1 <= s2)
-	  pairCalculatorProxy(x, s1, s2, c).calculatePairs_gemm(n, ptr, myS, true, flag_dp);
-#endif
-
-
-#ifdef NOGEMM
+	  msg->fromRow=true;
 	else
-	  pairCalculatorProxy(x, s2, s1, c).calculatePairs(n, ptr, myS, false, flag_dp);	 
-#else
-	else
-	  pairCalculatorProxy(x, s2, s1, c).calculatePairs_gemm(n, ptr, myS, false, flag_dp);
-#endif
+	  msg->fromRow=false;
+	pairCalculatorProxy(x, s1, s2, c).calculatePairs_gemm(msg);
       }
   }
   else {
     for (c = 0; c < blkSize; c++)
       for(s2 = 0; s2 < S; s2 += grainSize){
-#ifdef NOGEMM
-	pairCalculatorProxy(x, s1, s2, c).calculatePairs(n, ptr, myS, true, flag_dp);
-#else
-	pairCalculatorProxy(x, s1, s2, c).calculatePairs_gemm(n, ptr, myS, true, flag_dp);
-#endif
+	calculatePairsMsg *msg= new(n,0) calculatePairsMsg;
+	msg->size=n;
+	memcpy(msg->points,ptr,n*sizeof(complex));
+	msg->sender=myS;
+	msg->flag_dp=flag_dp;
+	msg->fromRow=true;
+	pairCalculatorProxy(x, s1, s2, c).calculatePairs_gemm(msg);
       }
   }
 }
@@ -200,11 +195,13 @@ void startPairCalcRight(PairCalcID* pcid, int n, complex* ptr, int myS, int myZ)
   s2 = (myS/grainSize) * grainSize;
   for (c = 0; c < blkSize; c++)
     for(s1 = 0; s1 < S; s1 += grainSize){
-#ifdef NOGEMM
-      pairCalculatorProxy(x, s1, s2, c).calculatePairs(n, ptr, myS, false, flag_dp);
-#else
-      pairCalculatorProxy(x, s1, s2, c).calculatePairs_gemm(n, ptr, myS, false, flag_dp);
-#endif
+	calculatePairsMsg *msg= new(n,0) calculatePairsMsg;
+	msg->size=n;
+	memcpy(msg->points,ptr,n*sizeof(complex));
+	msg->sender=myS;
+	msg->flag_dp=flag_dp;
+	msg->fromRow=false;
+	pairCalculatorProxy_gemm(x, s1, s2, c).calculatePairsMsg(msg);
     }
 }
 

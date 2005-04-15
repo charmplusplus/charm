@@ -30,17 +30,6 @@ PairCalculator::PairCalculator(bool sym, int grainSize, int s, int blkSize,  int
 
   kUnits=grainSize;  //streaming unit only really used in NOGEMM, but could be used under other conditions
 
-#ifdef NOGEMM  
-  kLeftOffset= new int[numExpected];
-  kRightOffset= new int[numExpected];
-
-  kLeftCount=0;
-  kRightCount=0;
-
-  kLeftDoneCount = 0;
-  kRightDoneCount = 0;
-#endif
-
   inDataLeft = NULL;
   inDataRight = NULL;
 
@@ -70,12 +59,6 @@ PairCalculator::pup(PUP::er &p)
   p|fn1;
   p|fn2;
   p|conserveMemory;
-#ifdef NOGEMM
-  p|kRightCount;
-  p|kLeftCount;
-  p|kRightDoneCount;
-  p|kLeftDoneCount;
-#endif
   p|kUnits;
   p|cb_aid;
   p|cb_ep;
@@ -85,18 +68,6 @@ PairCalculator::pup(PUP::er &p)
   p|N;
   p|reduceElem;
   p|cb;
-#ifdef NOGEMM
-  int rdiff,ldiff;
-#endif
-  if(p.isPacking())
-    {//store offset calculation
-#ifdef NOGEMM      
-      rdiff=kRightMark-kRightOffset; 
-      ldiff=kLeftMark-kLeftOffset;
-      p|rdiff;
-      p|ldiff;
-#endif
-    }
   if (p.isUnpacking()) {
     CProxy_PairCalcReducer pairCalcReducerProxy(reducer_id); 
     pairCalcReducerProxy.ckLocalBranch()->doRegister(this,symmetric);
@@ -107,14 +78,6 @@ PairCalculator::pup(PUP::er &p)
       if(N>0)
 	inDataRight = new complex[numExpected*N];
 
-#ifdef NOGEMM
-    kRightOffset= new int[numExpected];
-    kLeftOffset= new int[numExpected];
-    p|rdiff;
-    p|ldiff;
-    kRightMark=kRightOffset+rdiff;
-    kLeftMark=kLeftOffset+ldiff;
-#endif
   }
   if(N>0)
     for (int i = 0; i < numExpected; i++)
@@ -123,10 +86,6 @@ PairCalculator::pup(PUP::er &p)
     if(N>0)  
       p(inDataRight, numExpected* N);
   }
-#ifdef NOGEMM  
-  p(kRightOffset, numExpected);
-  p(kLeftOffset, numExpected);
-#endif
               // How about sparseCont reducer???
 
 #ifdef _PAIRCALC_DEBUG_ 
@@ -152,54 +111,47 @@ PairCalculator::~PairCalculator()
 
   if(newData!=NULL)
     delete [] newData;
-#ifdef NOGEMM
-  if(kRightOffset!=NULL)
-    delete [] kRightOffset;
-  if(kLeftOffset!=NULL)
-    delete [] kLeftOffset;
-#endif
 
 }
 
-
 void
-PairCalculator::calculatePairs_gemm(int size, complex *points, int sender, bool fromRow, bool flag_dp)
+PairCalculator::calculatePairs_gemm(calculatePairsMsg *msg)
 {
 #ifdef _PAIRCALC_DEBUG_
-  CkPrintf("     pairCalc[%d %d %d %d] got from [%d %d] with size {%d}, symm=%d, from=%d\n", thisIndex.w, thisIndex.x, thisIndex.y, thisIndex.z,  thisIndex.w, sender, size, symmetric, fromRow);
+  CkPrintf("     pairCalc[%d %d %d %d] got from [%d %d] with size {%d}, symm=%d, from=%d\n", thisIndex.w, thisIndex.x, thisIndex.y, thisIndex.z,  thisIndex.w, msg->sender, msg->size, msg->symmetric, msg->fromRow);
 #endif
   
   numRecd++;   // increment the number of received counts
   complex *inData;
   int offset = -1;
   
-  if (fromRow) {   // This could be the symmetric diagonal case
-    offset = sender - thisIndex.x;
+  if (msg->fromRow) {   // This could be the symmetric diagonal case
+    offset = msg->sender - thisIndex.x;
     if (inDataLeft==NULL) 
       { // now that we know N we can allocate contiguous space
-	N = size; // N is init here with the size of the data chunk. 
+	N = msg->size; // N is init here with the size of the data chunk. 
 	inDataLeft = new complex[numExpected*N];
       }
     inData = inDataLeft;
   }
   else {
-    offset = sender - thisIndex.y;
+    offset = msg->sender - thisIndex.y;
     if (inDataRight==NULL) 
       { // now that we know N we can allocate contiguous space
-	N = size; // N is init here with the size of the data chunk. 
+	N = msg->size; // N is init here with the size of the data chunk. 
 	inDataRight = new complex[numExpected*N];
       }
     inData= inDataRight;
   }
 
-  CkAssert(N==size);
+  CkAssert(N==msg->size);
   /* 
    *  NOTE: For this to work the data chunks of the same plane across
    *  all states must be of the same size
    */
 
   // copy the input into our matrix
-  memcpy(&(inData[offset*N]), points, size * sizeof(complex));
+  memcpy(&(inData[offset*N]), points, msg->size * sizeof(complex));
 
   /*
    * Once we have accumulated all rows  we gemm it.
@@ -219,7 +171,7 @@ PairCalculator::calculatePairs_gemm(int size, complex *points, int sender, bool 
    * solution matrix we want in one step.
    */
 
-  if (numRecd == numExpected * 2 || (symmetric && thisIndex.x==thisIndex.y && numRecd==numExpected)) {
+  if (numRecd == numExpected * 2 || (msg->symmetric && thisIndex.x==thisIndex.y && numRecd==numExpected)) {
     char transform='N';
     int doubleN=2*N;
     char transformT='T';
@@ -244,7 +196,7 @@ PairCalculator::calculatePairs_gemm(int size, complex *points, int sender, bool 
 
 	DGEMM(&transformT, &transform, &m_in, &n_in, &k_in, &alpha, ldata, &lda, rdata, &ldb, &beta, outData, &ldc);
       }
-    else if (symmetric && thisIndex.x==thisIndex.y && numRecd==numExpected)
+    else if (msg->symmetric && thisIndex.x==thisIndex.y && numRecd==numExpected)
       {
 	DGEMM(&transformT, &transform, &m_in, &n_in, &k_in, &alpha, ldata, &lda, ldata, &ldb, &beta, outData, &ldc);
       }
@@ -269,10 +221,10 @@ PairCalculator::calculatePairs_gemm(int size, complex *points, int sender, bool 
     r.add((int)thisIndex.y, (int)thisIndex.x, (int)(thisIndex.y+grainSize-1), (int)(thisIndex.x+grainSize-1), outData);
     r.contribute(this, sparse_sum_double);
 #else
-    //CkPrintf("[%d] ELAN VERSION %d\n", CkMyPe(), symmetric);
+    //CkPrintf("[%d] ELAN VERSION %d\n", CkMyPe(), msg->symmetric);
     CProxy_PairCalcReducer pairCalcReducerProxy(reducer_id); 
     pairCalcReducerProxy.ckLocalBranch()->acceptContribute(S * S, outData, 
-							   cb, !symmetric, symmetric);
+							   cb, !msg->symmetric, msg->symmetric);
 
 #endif //!CONVERSE_VERSION_ELAN
 
@@ -280,7 +232,7 @@ PairCalculator::calculatePairs_gemm(int size, complex *points, int sender, bool 
     traceUserBracketEvent(220, StartTime, CmiWallTimer());
 #endif
   }
-
+  delete msg;
 }
 
 
