@@ -486,6 +486,11 @@ typedef struct {
   int ref;
 } CmiChunkHeader;
 
+/* Given a user chunk m, extract the enclosing chunk header fields: */
+#define SIZEFIELD(m) (((CmiChunkHeader *)(m))[-1].size)
+#define REFFIELD(m) (((CmiChunkHeader *)(m))[-1].ref)
+#define BLKSTART(m) (((CmiChunkHeader *)(m))-1)
+
 void    *CmiAlloc(int size);
 void     CmiReference(void *blk);
 int      CmiSize(void *blk);
@@ -759,9 +764,15 @@ void          CmiSyncMulticastFn(CmiGroup, int, char*);
 CmiCommHandle CmiAsyncMulticastFn(CmiGroup, int, char*);
 void          CmiFreeMulticastFn(CmiGroup, int, char*);
 
+/* This first version has the default system parameter to 0 */
 void          CmiSyncVectorSend(int, int, int *, char **);
 CmiCommHandle CmiAsyncVectorSend(int, int, int *, char **);
 void          CmiSyncVectorSendAndFree(int, int, int *, char **);
+
+void          CmiSyncVectorSendSystem(int, int, int *, char **, int);
+CmiCommHandle CmiAsyncVectorSendSystem(int, int, int *, char **, int);
+void          CmiSyncVectorSendAndFreeSystem(int, int, int *, char **, int);
+
 void	      CmiMultipleSend(unsigned int, int, int *, char **);
 void	      CmiMultipleIsend(unsigned int, int, int *, char **);
 

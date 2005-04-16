@@ -68,9 +68,9 @@ void          CmiFreeMulticastFn(CmiGroup, int, char*);
 #endif
 
 #if ! CMK_VECTOR_SEND_USES_COMMON_CODE
-void          CmiSyncVectorSend(int, int, int *, char **);
-CmiCommHandle CmiAsyncVectorSend(int, int, int *, char **);
-void          CmiSyncVectorSendAndFree(int, int, int *, char **);
+void          CmiSyncVectorSendSystem(int, int, int *, char **, int);
+CmiCommHandle CmiAsyncVectorSendSystem(int, int, int *, char **, int);
+void          CmiSyncVectorSendAndFreeSystem(int, int, int *, char **, int);
 #endif
 
 

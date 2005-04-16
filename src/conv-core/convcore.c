@@ -1482,50 +1482,86 @@ void CsdInit(argv)
  *
  * Vector Send
  *
+ * All the buffers are padded to 8 bytes. This helps in most systems where
+ * analigned memory either does not work, or works slowly.
+ *
+ * The last parameter "system" is by default at zero, in which case the normal
+ * messages are sent. If it is set to 1, the CmiChunkHeader prepended to every
+ * CmiAllocced message will also be sent (except for the first one). Useful for
+ * AllToAll communication, and other system features.
+ *
  ****************************************************************************/
+
+#define PAD8(x)    ((x+0x07)&(~0x07))
 
 #if CMK_VECTOR_SEND_USES_COMMON_CODE
 
-void CmiSyncVectorSend(destPE, n, sizes, msgs)
+void CmiSyncVectorSendSystem(destPE, n, sizes, msgs, system)
 int destPE, n;
 int *sizes;
 char **msgs;
+int system;
 {
   int i, total;
   char *mesg, *tmp;
   
-  for(i=0,total=0;i<n;i++) total += sizes[i];
+  for(i=0,total=0;i<n;i++) total += PAD8(sizes[i]);
+  if (system) total += (n-1)*sizeof(CmiChunkHeader);
   mesg = (char *) CmiAlloc(total);
-  for(i=0,tmp=mesg;i<n;i++) {
-    memcpy(tmp, msgs[i],sizes[i]);
-    tmp += sizes[i];
+  tmp=mesg;
+  if (system) {
+    memcpy(tmp, msgs[0], sizes[0]);
+    tmp += PAD8(sizes[i]);
+    for (i=1; i<n; ++i) {
+      memcpy(tmp, msgs[i]-sizeof(CmiChunkHeader), sizes[i]+sizeof(CmiChunkHeader));
+      tmp += PAD8(sizes[i])+sizeof(CmiChunkHeader);
+    }
+  } else {
+    for(i=0;i<n;i++) {
+      memcpy(tmp, msgs[i],sizes[i]);
+      tmp += PAD8(sizes[i]);
+    }
   }
   CmiSyncSendAndFree(destPE, total, mesg);
 }
 
-CmiCommHandle CmiAsyncVectorSend(destPE, n, sizes, msgs)
+CmiCommHandle CmiAsyncVectorSendSystem(destPE, n, sizes, msgs, system)
 int destPE, n;
 int *sizes;
 char **msgs;
+int system;
 {
-  CmiSyncVectorSend(destPE,n,sizes,msgs);
+  CmiSyncVectorSendSystem(destPE,n,sizes,msgs,system);
   return NULL;
 }
 
-void CmiSyncVectorSendAndFree(destPE, n, sizes, msgs)
+void CmiSyncVectorSendAndFreeSystem(destPE, n, sizes, msgs, system)
 int destPE, n;
 int *sizes;
 char **msgs;
+int system;
 {
   int i;
 
-  CmiSyncVectorSend(destPE,n,sizes,msgs);
+  CmiSyncVectorSendSystem(destPE,n,sizes,msgs,system);
   for(i=0;i<n;i++) CmiFree(msgs[i]);
   CmiFree(sizes);
   CmiFree(msgs);
 }
 
 #endif
+
+void CmiSyncVectorSend(int destPE, int n, int *sizes, char **msgs) {
+  CmiSyncVectorSendSystem(destPE, n, sizes, msgs, 0);
+}
+
+void CmiASyncVectorSend(int destPE, int n, int *sizes, char **msgs) {
+  CmiAsyncVectorSendSystem(destPE, n, sizes, msgs, 0);
+}
+
+void CmiSyncVectorSendAndFree(int destPE, int n, int *sizes, char **msgs) {
+  CmiSyncVectorSendAndFreeSystem(destPE, n, sizes, msgs, 0);
+}
 
 /*****************************************************************************
  *
@@ -1766,11 +1802,6 @@ void CmiMulticastInit()
  *
  ***************************************************************************/
 
-
-/* Given a user chunk m, extract the enclosing chunk header fields: */
-#define SIZEFIELD(m) (((CmiChunkHeader *)(m))[-1].size)
-#define REFFIELD(m) (((CmiChunkHeader *)(m))[-1].ref)
-#define BLKSTART(m) (((CmiChunkHeader *)(m))-1)
 
 void *CmiAlloc(int size)
 {
