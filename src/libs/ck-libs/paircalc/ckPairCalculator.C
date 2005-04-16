@@ -39,7 +39,7 @@ PairCalculator::PairCalculator(bool sym, int grainSize, int s, int blkSize,  int
 
   newData = NULL;
   sumPartialCount = 0;
-  setMigratable(true);
+  setMigratable(false);
   usesAtSync=true;
 
   CProxy_PairCalcReducer pairCalcReducerProxy(reducer_id); 
@@ -119,7 +119,7 @@ void
 PairCalculator::calculatePairs_gemm(calculatePairsMsg *msg)
 {
 #ifdef _PAIRCALC_DEBUG_
-  CkPrintf("     pairCalc[%d %d %d %d] got from [%d %d] with size {%d}, symm=%d, from=%d\n", thisIndex.w, thisIndex.x, thisIndex.y, thisIndex.z,  thisIndex.w, msg->sender, msg->size, symmetric, msg->fromRow);
+  CkPrintf(" symm=%d    pairCalc[%d %d %d %d] got from [%d %d] with size {%d}, from=%d, count+5d\n", symmetric, thisIndex.w, thisIndex.x, thisIndex.y, thisIndex.z,  thisIndex.w, msg->sender, msg->size, symmetric, msg->fromRow, numRecd);
 #endif
   
   numRecd++;   // increment the number of received counts
@@ -247,7 +247,7 @@ void
 PairCalculator::acceptResult(int size, double *matrix1, double *matrix2)
 {
 #ifdef _PAIRCALC_DEBUG_
-  CkPrintf("[%d %d %d %d]: Accept Result with size %d\n", thisIndex.w, thisIndex.x, thisIndex.y, thisIndex.z, size);
+  CkPrintf("[symm=%d %d %d %d %d]: Accept Result with size %d\n", symmetric, thisIndex.w, thisIndex.x, thisIndex.y, thisIndex.z, size);
 #endif
 
   bool unitcoef = false;
@@ -460,7 +460,7 @@ void
 PairCalculator::sumPartialResult(int size, complex *result, int offset)
 {
 #ifdef _PAIRCALC_DEBUG_
-  CkPrintf("[%d %d %d %d]: sum result from %d, count %d\n", thisIndex.w, thisIndex.x, thisIndex.y, thisIndex.z, offset, sumPartialCount);
+  CkPrintf("[symm=%d %d %d %d %d]: sum result from %d, count %d\n", symmetric, thisIndex.w, thisIndex.x, thisIndex.y, thisIndex.z, offset, sumPartialCount);
 #endif
 
   sumPartialCount++;
@@ -472,7 +472,10 @@ PairCalculator::sumPartialResult(int size, complex *result, int offset)
   for(int i=0; i<size; i++){
     newData[i] += result[i];
   }
-  if (sumPartialCount == (S/grainSize)*blkSize) {
+  int countExpect = (S/grainSize)*blkSize;
+  if(symmetric) countExpect = thisIndex.y/grainSize + 1;
+
+  if (sumPartialCount >= countExpect) {
 #ifndef _PAIRCALC_SECONDPHASE_LOADBAL_
     for(int j=0; j<grainSize; j++){
       CkCallback mycb(cb_ep, CkArrayIndex2D(thisIndex.y+j+offset, thisIndex.w), cb_aid);
@@ -482,13 +485,22 @@ PairCalculator::sumPartialResult(int size, complex *result, int offset)
       mycb.send(msg);
     }
 #else
-    for(int j=0; j<grainSize/(S/grainSize); j++){
-      CkCallback mycb(cb_ep, CkArrayIndex2D(thisIndex.y+j+offset, thisIndex.w), cb_aid);
-      mySendMsg *msg = new (N, 0)mySendMsg; // msg with newData (size N)
-      memcpy(msg->data, newData+j*N, N * sizeof(complex));
-      msg->N=N;
-      mycb.send(msg);
-    }
+    if(!symmetric)
+	for(int j=0; j<grainSize/(S/grainSize); j++){
+	    CkCallback mycb(cb_ep, CkArrayIndex2D(thisIndex.y+j+offset, thisIndex.w), cb_aid);
+	    mySendMsg *msg = new (N, 0)mySendMsg; // msg with newData (size N)
+	    memcpy(msg->data, newData+j*N, N * sizeof(complex));
+	    msg->N=N;
+	    mycb.send(msg);
+	}
+    else
+	for(int j=0; j<grainSize; j++){
+	    CkCallback mycb(cb_ep, CkArrayIndex2D(thisIndex.y+j+offset, thisIndex.w), cb_aid);
+	    mySendMsg *msg = new (N, 0)mySendMsg; // msg with newData (size N)
+	    memcpy(msg->data, newData+j*N, N * sizeof(complex));
+	    msg->N=N;
+	    mycb.send(msg);
+	}
 #endif
     sumPartialCount = 0;
     memset(newData,0,size*sizeof(complex));
