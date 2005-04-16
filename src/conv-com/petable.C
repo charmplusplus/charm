@@ -54,6 +54,7 @@ PeTable :: PeTable(int n)
   //CombBuffer=(char *)CmiAlloc(BIGBUFFERSIZE);
 
   PTFreeList=NULL;
+  PTFreeChunks=NULL;
 }
 
 PeTable :: ~PeTable()
@@ -66,9 +67,9 @@ PeTable :: ~PeTable()
   GarbageCollect();
   //CmiFree(ptrlist);
   PTinfo *tmp;
-  while (PTFreeList) {
-  	tmp=PTFreeList;
-	PTFreeList=tmp->next;
+  while (PTFreeChunks) {
+  	tmp=PTFreeChunks;
+	PTFreeChunks=PTNEXTCHUNK(tmp);
 	CmiFree(tmp);
   }
  // delete FreeList;
@@ -406,6 +407,8 @@ int PeTable :: UnpackAndInsert(void *in)
       *rc=(int)((char *)in-actualmsg);
       //ComlibPrintf("I am inserting %d\n", *rc);
   }
+
+  ptrvec.removeAll();
   
   return(ufield);
 }
@@ -441,8 +444,8 @@ int PeTable :: UnpackAndInsertAll(void *in, int npes, int *pelist){
   AllToAllHdr ahdr;
   UNPACK(AllToAllHdr, ahdr);
 
-  if(sizeof(AllToAllHdr) % 8 != 0)
-      t += 8 - sizeof(AllToAllHdr) % 8;
+  if(sizeof(AllToAllHdr) & 7 != 0)
+      t += 8 - sizeof(AllToAllHdr) & 7;
 
   refno = ahdr.refno;
   id = ahdr.id;
@@ -454,28 +457,49 @@ int PeTable :: UnpackAndInsertAll(void *in, int npes, int *pelist){
   //Inserting a memory foot print may, change later
   CmiChunkHeader *chdr= (CmiChunkHeader*)((char*)in - sizeof(CmiChunkHeader));
 
+  int *ref;
+  int size;
+  char *msg;
   for(int count = 0; count < nmsgs; count++){
-      int *ref = 0;
-      int size = 0;
-      char *msg = 0;
 
-      UNPACK(int, size);
-      ref = (int *)t;
-      t += sizeof(int);
+    t += sizeof(CmiChunkHeader);
 
-      *ref = (int)((char *)(&chdr->ref) - (char *)ref);
-      chdr->ref ++;
+    msg = t;
+    t += ALIGN8(size);
 
-      ComlibPrintf("ref = %d, global_ref = %d\n", *ref, chdr->ref);
+    // Get the size of the message, and set the ref field correctly for CmiFree
+    size = SIZEFIELD(msg);
+    REFFIELD(msg) = (int)((char *)&REFFIELD(in) - (char *)REFFIELD(msg));
 
-      msg = t;
-      t += ALIGN8(size);
-      
-      InsertMsgs(npes, pelist, size, msg);
+    // Do CmiReference(msg), this is done bypassing converse!
+    chdr->ref++;
+
+    /*
+    UNPACK(int, size);
+    ref = (int *)t;
+    t += sizeof(int);
+    
+    *ref = (int)((char *)(&chdr->ref) - (char *)ref);
+    chdr->ref ++;
+
+    ComlibPrintf("ref = %d, global_ref = %d\n", *ref, chdr->ref);
+    
+    msg = t;
+    t += ALIGN8(size);
+    */
+    InsertMsgs(npes, pelist, size, msg);
   }  
 
   CmiFree(in);
   return ufield;
+}
+
+PTvectorlist PeTable :: ExtractAndVectorize(comID id, int ufield, int npe, int *pelist) {
+
+}
+
+PTvectorlist PeTable :: ExtractAndVectorizeAll(comID id, int ufield) {
+
 }
 
 void PeTable :: GarbageCollect()

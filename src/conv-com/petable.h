@@ -18,12 +18,19 @@ typedef struct ptinfo {
   int refCount;
   int magic;
   int offset;
-  int freelistindex;
+  /*int freelistindex;*/
   int msgsize;
   void *msg;
   struct ptinfo * next;
 } PTinfo;
 
+typedef struct ptvectorlist {
+  int count;
+  int *sizes;
+  char *msgs;
+}* PTvectorlist;
+
+/*
 typedef struct {
   int refCount;
   int flag;
@@ -45,25 +52,36 @@ class GList {
 	void Add(void *);
 	void Delete();
 };
+*/
 
 #define ALIGN8(x)       (int)((~7)&((x)+7))
 
 /* Reduce the no. of mallocs by allocating from
- * a free list */
+ * a free list. By allocating 21 at a time, it allocates
+ * 512 contiguous bytes. */
 #define PTALLOC(ktmp) {\
   if (PTFreeList) {\
   	ktmp=PTFreeList;\
 	PTFreeList=ktmp->next;\
   }\
   else {\
-  	ktmp=(PTinfo *)CmiAlloc(sizeof(PTinfo));\
-	}\
+  	ktmp=(PTinfo *)CmiAlloc(21*sizeof(PTinfo)+sizeof(PTinfo *));\
+        for (int ii=1; ii<20; ++ii) {\
+          ktmp[ii].next = &(ktmp[ii+1]);\
+        }\
+        ktmp[20].next = NULL;\
+        PTFreeList=&(ktmp[1]);\
+        *((PTinfo**)(&ktmp[21]))=PTFreeChunks;\
+        PTFreeChunks=ktmp;\
+  }\
 }
 
 #define PTFREE(ktmp) {\
   ktmp->next=PTFreeList;\
   PTFreeList=ktmp;\
 }
+
+#define PTNEXTCHUNK(ktmp)  (*((PTinfo**)(&ktmp[21])));
 
 #define REALLOC(ktmp, ksize) {\
    PTinfo **junkptr=(PTinfo **)CmiAlloc(2*ksize*sizeof(void *));\
@@ -78,11 +96,12 @@ class PeTable {
     CkVec<PTinfo *> ptrvec;
 
     PTinfo *PTFreeList;
+    PTinfo *PTFreeChunks;
     //	char * CombBuffer;
     int *msgnum, *MaxSize;
     int NumPes;
     int magic;
-    GList *FreeList;
+    //GList *FreeList;
 
     inline int TotalMsgSize(int npe, int *pelist, int *nm, int *nd) {
         register int totsize=0;
@@ -122,7 +141,7 @@ class PeTable {
         tmp->refCount=0;
         tmp->magic=0;
         tmp->offset=0;
-        tmp->freelistindex=-1;
+        /*tmp->freelistindex=-1;*/
         tmp->msgsize=size;
         tmp->msg=msg;
         
@@ -155,6 +174,9 @@ class PeTable {
     
     char * ExtractAndPack(comID, int, int, int *pelist, int *length); 
     char * ExtractAndPackAll(comID id, int ufield, int *length);
+    
+    struct ptvectorlist * ExtractAndVectorize(comID, int, int, int *pelist); 
+    struct ptvectorlist * ExtractAndVectorizeAll(comID id, int ufield);
     
     void GarbageCollect();
     void Purge();
