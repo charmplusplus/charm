@@ -2,6 +2,7 @@
 
 #define PARTITION_SIZE 500
 
+
 PairCalculator::PairCalculator(CkMigrateMessage *m) { }
 	
 
@@ -118,7 +119,7 @@ void
 PairCalculator::calculatePairs_gemm(calculatePairsMsg *msg)
 {
 #ifdef _PAIRCALC_DEBUG_
-  CkPrintf("     pairCalc[%d %d %d %d] got from [%d %d] with size {%d}, symm=%d, from=%d\n", thisIndex.w, thisIndex.x, thisIndex.y, thisIndex.z,  thisIndex.w, msg->sender, msg->size, msg->symmetric, msg->fromRow);
+  CkPrintf("     pairCalc[%d %d %d %d] got from [%d %d] with size {%d}, symm=%d, from=%d\n", thisIndex.w, thisIndex.x, thisIndex.y, thisIndex.z,  thisIndex.w, msg->sender, msg->size, symmetric, msg->fromRow);
 #endif
   
   numRecd++;   // increment the number of received counts
@@ -151,7 +152,7 @@ PairCalculator::calculatePairs_gemm(calculatePairsMsg *msg)
    */
 
   // copy the input into our matrix
-  memcpy(&(inData[offset*N]), points, msg->size * sizeof(complex));
+  memcpy(&(inData[offset*N]), msg->points, msg->size * sizeof(complex));
 
   /*
    * Once we have accumulated all rows  we gemm it.
@@ -171,7 +172,7 @@ PairCalculator::calculatePairs_gemm(calculatePairsMsg *msg)
    * solution matrix we want in one step.
    */
 
-  if (numRecd == numExpected * 2 || (msg->symmetric && thisIndex.x==thisIndex.y && numRecd==numExpected)) {
+  if (numRecd == numExpected * 2 || (symmetric && thisIndex.x==thisIndex.y && numRecd==numExpected)) {
     char transform='N';
     int doubleN=2*N;
     char transformT='T';
@@ -196,7 +197,7 @@ PairCalculator::calculatePairs_gemm(calculatePairsMsg *msg)
 
 	DGEMM(&transformT, &transform, &m_in, &n_in, &k_in, &alpha, ldata, &lda, rdata, &ldb, &beta, outData, &ldc);
       }
-    else if (msg->symmetric && thisIndex.x==thisIndex.y && numRecd==numExpected)
+    else if (symmetric && thisIndex.x==thisIndex.y && numRecd==numExpected)
       {
 	DGEMM(&transformT, &transform, &m_in, &n_in, &k_in, &alpha, ldata, &lda, ldata, &ldb, &beta, outData, &ldc);
       }
@@ -207,7 +208,7 @@ PairCalculator::calculatePairs_gemm(calculatePairsMsg *msg)
 
     numRecd = 0;
 
-    if (flag_dp) {
+    if (msg->flag_dp) {
       if(thisIndex.w != 0) {   // Adjusting for double packing of incoming data
 
 	for (int i = 0; i < grainSize*grainSize; i++)
@@ -221,10 +222,10 @@ PairCalculator::calculatePairs_gemm(calculatePairsMsg *msg)
     r.add((int)thisIndex.y, (int)thisIndex.x, (int)(thisIndex.y+grainSize-1), (int)(thisIndex.x+grainSize-1), outData);
     r.contribute(this, sparse_sum_double);
 #else
-    //CkPrintf("[%d] ELAN VERSION %d\n", CkMyPe(), msg->symmetric);
+    //CkPrintf("[%d] ELAN VERSION %d\n", CkMyPe(), symmetric);
     CProxy_PairCalcReducer pairCalcReducerProxy(reducer_id); 
     pairCalcReducerProxy.ckLocalBranch()->acceptContribute(S * S, outData, 
-							   cb, !msg->symmetric, msg->symmetric);
+							   cb, !symmetric, symmetric);
 
 #endif //!CONVERSE_VERSION_ELAN
 

@@ -5,6 +5,7 @@
 #include "cksparsecontiguousreducer.h"
 #include "PipeBroadcastStrategy.h"
 #include "BroadcastStrategy.h"
+#include "DirectMulticastStrategy.h"
 
 // Flag to use sparse reduction or regular reduction
 
@@ -60,13 +61,6 @@ class mySendMsg : public CMessage_mySendMsg {
   int N;
   complex *data;
   friend class CMessage_mySendMsg;
-
-  /*
-  mySendMsg(int N, complex *data) {
-    this->N = N;
-    memcpy(this->data, data, N*sizeof(complex));
-  }
-  */
 };
 
 class partialResultMsg : public CMessage_partialResultMsg {
@@ -78,12 +72,6 @@ class partialResultMsg : public CMessage_partialResultMsg {
   CkCallback cb;
 
   friend class CMessage_partialResultMsg;
-  /*  
-  partialResultMsg(unsigned int iN,   complex *iresult, int ipriority, CkCallback icb) : N(iN),  priority(ipriority), cb(icb)
-    {
-      memcpy(this->result,iresult,N*sizeof(complex));
-    }
-  */
 };
 
 class priorSumMsg : public CMessage_priorSumMsg {
@@ -94,22 +82,25 @@ class priorSumMsg : public CMessage_priorSumMsg {
   CkCallback cb;
 
   friend class CMessage_priorSumMsg;
-  /*  priorSumMsg(unsigned int iN,  complex *iresult,int ipriority,CkCallback icb) :  N(iN), priority(ipriority), cb(icb)
-    {
-      memcpy(this->result,iresult,N*sizeof(complex));
-    }
-  */
+
 };
 
-class calculatePairsMsg : public CkMcastBaseMsg, CMessage_calculatePairsMsg {
+//class calculatePairsMsg : public CMessage_calculatePairsMsg, CkMcastBaseMsg {
+class calculatePairsMsg : public CMessage_calculatePairsMsg {
  public:
-  complex *points;
   int size;
   int sender;
   bool fromRow;
   bool flag_dp;
+  complex *points;
+  calculatePairsMsg(int _size, int _sender, bool _fromRow, bool _flag_dp, complex *_points) : size(_size), sender(_sender), fromRow(_fromRow), flag_dp(_flag_dp)
+    {
+      memcpy(points,_points,size*sizeof(complex));
+    }
+  friend class CMessage_calculatePairsMsg;
 
 };
+
 
 
 class PairCalculator: public CBase_PairCalculator {
@@ -121,7 +112,7 @@ class PairCalculator: public CBase_PairCalculator {
   void lbsync() {AtSync();};
   void calculatePairs(int, complex *, int, bool, bool); 
   //  void calculatePairs_gemm(int, complex *, int, bool, bool); 
-  entry void calculatePairs_gemm(calculatePairsMsg *msg);
+  void calculatePairs_gemm(calculatePairsMsg *msg);
   void acceptResult(int size, double *matrix);
   void acceptResult(int size, double *matrix1, double *matrix2);
   void sumPartialResult(int size, complex *result, int offset);

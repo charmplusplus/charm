@@ -46,8 +46,11 @@ void createPairCalculator(bool sym, int s, int grainSize, int numZ, int* z, int 
   bcastInstance.setStrategy(bstrat);
 
   pcid->Init(pairCalculatorProxy.ckGetArrayID(), pairCalcReducerProxy.ckGetGroupID(), grainSize, blkSize, s, sym, comlib_flag, bcastInstance, flag_dp, conserveMemory);
-  
-  
+
+  //  CharmStrategy *multistrat = new DirectMulticastStrategy(pairCalculatorProxy.ckGetArrayID(),1);
+
+  //  ComlibInstanceHandle mcastInstance = CkGetComlibInstance();
+  //  mcastInstance.setStrategy(multistrat);
   if(mapid) {
       if(sym){
           for(int numX = 0; numX < numZ; numX += blkSize){
@@ -140,27 +143,20 @@ void startPairCalcLeft(PairCalcID* pcid, int n, complex* ptr, int myS, int myZ){
   if(symmetric){
     for (c = 0; c < blkSize; c++)
       for(s2 = 0; s2 < S; s2 += grainSize){
-	calculatePairsMsg *msg= new(n,0) calculatePairsMsg;
-	msg->size=n;
-	memcpy(msg->points,ptr,n*sizeof(complex));
-	msg->sender=myS;
-	msg->flag_dp=flag_dp;
+	bool fromrow;
 	if(s1 <= s2)
-	  msg->fromRow=true;
+	  fromrow=true;
+
 	else
-	  msg->fromRow=false;
+	  fromrow=false;
+	calculatePairsMsg *msg= new ( n,0 ) calculatePairsMsg(n, myS, fromrow, flag_dp, ptr);
 	pairCalculatorProxy(x, s1, s2, c).calculatePairs_gemm(msg);
       }
   }
   else {
     for (c = 0; c < blkSize; c++)
       for(s2 = 0; s2 < S; s2 += grainSize){
-	calculatePairsMsg *msg= new(n,0) calculatePairsMsg;
-	msg->size=n;
-	memcpy(msg->points,ptr,n*sizeof(complex));
-	msg->sender=myS;
-	msg->flag_dp=flag_dp;
-	msg->fromRow=true;
+	calculatePairsMsg *msg= new  ( n,0 ) calculatePairsMsg(n, myS, true, flag_dp, ptr);
 	pairCalculatorProxy(x, s1, s2, c).calculatePairs_gemm(msg);
       }
   }
@@ -195,13 +191,8 @@ void startPairCalcRight(PairCalcID* pcid, int n, complex* ptr, int myS, int myZ)
   s2 = (myS/grainSize) * grainSize;
   for (c = 0; c < blkSize; c++)
     for(s1 = 0; s1 < S; s1 += grainSize){
-	calculatePairsMsg *msg= new(n,0) calculatePairsMsg;
-	msg->size=n;
-	memcpy(msg->points,ptr,n*sizeof(complex));
-	msg->sender=myS;
-	msg->flag_dp=flag_dp;
-	msg->fromRow=false;
-	pairCalculatorProxy_gemm(x, s1, s2, c).calculatePairsMsg(msg);
+      calculatePairsMsg *msg= new ( n,0 ) calculatePairsMsg(n,myS,false,flag_dp,ptr);
+      pairCalculatorProxy(x, s1, s2, c).calculatePairs_gemm(msg);
     }
 }
 
