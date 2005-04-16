@@ -14,6 +14,7 @@ module EveryLB {
    extern module OrbLB;
    extern module RecBisectBfLB;
    extern module MetisLB;
+   extern module PhasebyArrayLB;
    extern module RotateLB;
    extern module NeighborLB;
    extern module NeighborCommLB;

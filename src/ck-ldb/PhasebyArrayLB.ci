@@ -1,0 +1,9 @@
+module PhasebyArrayLB {
+
+extern module CentralLB;
+initnode void lbinit(void);
+group [migratable] PhasebyArrayLB : CentralLB {
+  entry void PhasebyArrayLB(const CkLBOptions &);  
+};
+
+};
