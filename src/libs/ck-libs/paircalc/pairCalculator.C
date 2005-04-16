@@ -145,12 +145,20 @@ void startPairCalcLeft(PairCalcID* pcid, int n, complex* ptr, int myS, int myZ){
       for(s2 = 0; s2 < S; s2 += grainSize){
 	bool fromrow;
 	if(s1 <= s2)
-	  fromrow=true;
+	  {
+	    fromrow=true;
+	    calculatePairsMsg *msg= new ( n,0 ) calculatePairsMsg(n, myS, fromrow, flag_dp, ptr);
+	    pairCalculatorProxy(x, s1, s2, c).calculatePairs_gemm(msg);
 
+	  }
 	else
-	  fromrow=false;
-	calculatePairsMsg *msg= new ( n,0 ) calculatePairsMsg(n, myS, fromrow, flag_dp, ptr);
-	pairCalculatorProxy(x, s1, s2, c).calculatePairs_gemm(msg);
+	  {
+	    fromrow=false;
+	    calculatePairsMsg *msg= new ( n,0 ) calculatePairsMsg(n, myS, fromrow, flag_dp, ptr);
+	    pairCalculatorProxy(x, s2, s1, c).calculatePairs_gemm(msg);
+	  }
+
+
       }
   }
   else {
