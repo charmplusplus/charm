@@ -463,13 +463,13 @@ int PeTable :: UnpackAndInsertAll(void *in, int npes, int *pelist){
   for(int count = 0; count < nmsgs; count++){
 
     t += sizeof(CmiChunkHeader);
-
     msg = t;
-    t += ALIGN8(size);
 
     // Get the size of the message, and set the ref field correctly for CmiFree
     size = SIZEFIELD(msg);
     REFFIELD(msg) = (int)((char *)&REFFIELD(in) - (char *)REFFIELD(msg));
+
+    t += ALIGN8(size);
 
     // Do CmiReference(msg), this is done bypassing converse!
     chdr->ref++;
