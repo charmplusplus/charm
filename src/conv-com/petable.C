@@ -495,11 +495,11 @@ int PeTable :: UnpackAndInsertAll(void *in, int npes, int *pelist){
 }
 
 PTvectorlist PeTable :: ExtractAndVectorize(comID id, int ufield, int npe, int *pelist) {
-
+  return NULL;
 }
 
 PTvectorlist PeTable :: ExtractAndVectorizeAll(comID id, int ufield) {
-
+  return NULL;
 }
 
 void PeTable :: GarbageCollect()
