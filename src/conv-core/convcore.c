@@ -1482,13 +1482,12 @@ void CsdInit(argv)
  *
  * Vector Send
  *
- * All the buffers are padded to 8 bytes. This helps in most systems where
- * analigned memory either does not work, or works slowly.
- *
  * The last parameter "system" is by default at zero, in which case the normal
  * messages are sent. If it is set to 1, the CmiChunkHeader prepended to every
  * CmiAllocced message will also be sent (except for the first one). Useful for
- * AllToAll communication, and other system features.
+ * AllToAll communication, and other system features. If system is 1, also all
+ * the messages will be padded to 8 bytes. Thus, the caller must be aware of
+ * that.
  *
  ****************************************************************************/
 
@@ -1505,8 +1504,12 @@ int system;
   int i, total;
   char *mesg, *tmp;
   
-  for(i=0,total=0;i<n;i++) total += PAD8(sizes[i]);
-  if (system) total += (n-1)*sizeof(CmiChunkHeader);
+  if (system) {
+    for(i=0,total=0;i<n;i++) total += PAD8(sizes[i]);
+    total += (n-1)*sizeof(CmiChunkHeader);
+  } else {
+    for(i=0,total=0;i<n;i++) total += sizes[i];
+  }
   mesg = (char *) CmiAlloc(total);
   tmp=mesg;
   if (system) {
@@ -1519,7 +1522,7 @@ int system;
   } else {
     for(i=0;i<n;i++) {
       memcpy(tmp, msgs[i],sizes[i]);
-      tmp += PAD8(sizes[i]);
+      tmp += sizes[i];
     }
   }
   CmiSyncSendAndFree(destPE, total, mesg);
