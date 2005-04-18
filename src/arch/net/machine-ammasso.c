@@ -299,7 +299,7 @@ int getQPSendBuffer(OtherNode node, char force) {
 
     MACHSTATE(3, "getQPSendBuffer() - INFO: Pre-sendBufLock");
     #if CMK_SHARED_VARS_UNAVAILABLE
-      while (node->sendBufLock != 0) { usleep(10000); } // Since CmiLock() is not really a lock, actually wait
+      while (node->sendBufLock != 0) { usleep(1); } // Since CmiLock() is not really a lock, actually wait
     #endif
     CmiLock(node->sendBufLock);
     
@@ -310,10 +310,16 @@ int getQPSendBuffer(OtherNode node, char force) {
     if (node->connectionState == QP_CONN_STATE_CONNECTED) {
       if (force) {
         rtnBufIndex = node->send_UseIndex;
+        node->send_UseIndex++;
+        if (node->send_UseIndex >= AMMASSO_NUMMSGBUFS_PER_QP * 2)
+          node->send_UseIndex = 0;
       } else {
         if (node->send_InUseCounter < AMMASSO_NUMMSGBUFS_PER_QP) {
           rtnBufIndex = node->send_UseIndex;
           node->send_InUseCounter++;
+          node->send_UseIndex++;
+          if (node->send_UseIndex >= AMMASSO_NUMMSGBUFS_PER_QP * 2)
+            node->send_UseIndex = 0;
         }
       }
     }
@@ -329,19 +335,19 @@ int getQPSendBuffer(OtherNode node, char force) {
     */
         
     CmiUnlock(node->sendBufLock);
-    MACHSTATE(3, "getQPSendBuffer() - INFO: Post-sendBufLock");
+    MACHSTATE3(3, "getQPSendBuffer() - INFO: Post-sendBufLock - rtnBufIndex = %d, node->connectionState = %d, node->send_UseIndex = %d", rtnBufIndex, node->connectionState, node->send_UseIndex);
 
     if (rtnBufIndex >= 0) {
       break;
     } else {
-      usleep(10000);  // 10ms
+      usleep(1);
     }
   }
 
-  // Increment the send_UseIndex counter so another buffer will be used next time
-  node->send_UseIndex++;
-  if (node->send_UseIndex >= AMMASSO_NUMMSGBUFS_PER_QP * 2)
-    node->send_UseIndex = 0;
+  //// Increment the send_UseIndex counter so another buffer will be used next time
+  //node->send_UseIndex++;
+  //if (node->send_UseIndex >= AMMASSO_NUMMSGBUFS_PER_QP * 2)
+  //  node->send_UseIndex = 0;
 
   MACHSTATE1(3, "getQPSendBuffer() - Ammasso - Finished (returning buffer index: %d)", rtnBufIndex);
 
@@ -373,12 +379,27 @@ int sendDataOnQP(char* data, int len, OtherNode node, char force) {
     // Set the data length in the SGL (Note: this is safe to reset like this because the buffer is of length
     //   AMMASSO_BUFSIZE and toSendLength has a maximum value of AMMASSO_BUFSIZE).
     (node->send_sgl[sendBufIndex]).length = toSendLength;
+
+    {
+      int j;
+      MACHSTATE1(3, "sendDataOnQP() - INFO: sendBufIndex = %d", sendBufIndex);
+      MACHSTATE1(3, "                       toSendLength = %d", toSendLength);
+      MACHSTATE1(3, "                       node->send_sgl = %p", node->send_sgl);
+      MACHSTATE1(3, "                       &(node->send_sgl[sendBufIndex]) = %p", &(node->send_sgl[sendBufIndex]));
+      MACHSTATE1(3, "                       sizeof(cc_data_addr_t) = %d", sizeof(cc_data_addr_t));
+      MACHSTATE1(3, "                       node->send_sgl + (sizeof(cc_data_addr_t) * sendBufIndex) = %p", node->send_sgl + (sizeof(cc_data_addr_t) * sendBufIndex));
+      MACHSTATE(3, "                       Raw Data:");
+      for (j = 0; j < toSendLength; j++) {
+        MACHSTATE2(3, "                          ((char*)((node->send_sgl[sendBufIndex]).to))[%d] = %02x", j, ((char*)((node->send_sgl[sendBufIndex]).to))[j]);
+      }
+    }
+
     rtn = cc_qp_post_sq(contextBlock->rnic, node->qp, &(node->sq_wr[sendBufIndex]), 1, &(WRsPosted));
     if (rtn != CC_OK || WRsPosted != 1) {
 
       MACHSTATE(3, "sendDataOnQP() - INFO: Pre-sendBufLock");
       #if CMK_SHARED_VARS_UNAVAILABLE
-        while (node->sendBufLock != 0) { usleep(10000); } // Since CmiLock() is not really a lock, actually wait
+        while (node->sendBufLock != 0) { usleep(1); } // Since CmiLock() is not really a lock, actually wait
       #endif
       CmiLock(node->sendBufLock);
 
@@ -449,8 +470,18 @@ void DeliverViaNetwork(OutgoingMsg msg, OtherNode otherNode, int rank, unsigned 
 
   // Create the header for the packet
   //DgramHeaderMake(otherNode->send_buf, rank, msg->src, Cmi_charmrun_pid, otherNode->send_next, broot);
+
+  //MACHSTATE(3, "DeliverViaNetwork() - INFO: Pre-send_next_lock");
+  //#if CMK_SHARED_VARS_UNAVAILABLE
+  //  while (otherNode->send_next_lock != 0) { usleep(1); } // Since CmiLock() is not really a lock, actually wait
+  //#endif
+  //CmiLock(otherNode->send_next_lock);
+
   DgramHeaderMake(msg->data, rank, msg->src, Cmi_charmrun_pid, otherNode->send_next, broot);  // Set DGram Header Fields In-Place
   otherNode->send_next = ((otherNode->send_next+1) & DGRAM_SEQNO_MASK);  // Increase the sequence number
+
+  //CmiUnlock(otherNode->send_next_lock);
+  //MACHSTATE(3, "DeliverViaNetwork() - INFO: Post-send_next_lock");
 
   //{
   //  int j;
@@ -700,7 +731,7 @@ void processAmmassoControlMessage(char* msg, int len, char *needAck) {
 
       MACHSTATE(3, "processAmmassoControlMessage() - INFO: Pre-sendBufLock");
       #if CMK_SHARED_VARS_UNAVAILABLE
-        while (node->sendBufLock != 0) { usleep(10000); } // Since CmiLock() is not really a lock, actually wait
+        while (node->sendBufLock != 0) { usleep(1); } // Since CmiLock() is not really a lock, actually wait
       #endif
       CmiLock(node->sendBufLock);
 
@@ -802,6 +833,12 @@ void ProcessMessage(char* msg, int len, char *needAck) {
 
   MACHSTATE1(3, "ProcessMessage() - INFO: Message from node %d...", fromNode->myNode);
 
+  //MACHSTATE(3, "ProcessMessage() - INFO: Pre-recv_expect_lock");
+  //#if CMK_SHARED_VARS_UNAVAILABLE
+  //  while (fromNode->recv_expect_lock != 0) { usleep(1); } // Since CmiLock() is not really a lock, actually wait
+  //#endif
+  //CmiLock(fromNode->recv_expect_lock);
+
   // Check the sequence number of the message
   if (seqNum == (fromNode->recv_expect)) {
     // The expected sequence number was received so setup the next one
@@ -811,6 +848,9 @@ void ProcessMessage(char* msg, int len, char *needAck) {
     CmiPrintf("[%d] ProcessMessage() - Ammasso - ERROR: Received a message witha bad sequence number... ignoring...", CmiMyPe());
     return;
   }
+
+  //CmiUnlock(fromNode->recv_expect_lock);
+  //MACHSTATE(3, "ProcessMessage() - INFO: Post-recv_expect_lock");
 
   newMsg = fromNode->asm_msg;
 
@@ -1093,6 +1133,11 @@ void CmiMachineExit(void) {
 
   MACHSTATE(3, "CmiMachineExit() - INFO: Called...");
 
+  // TODO: It would probably be a good idea to make a "closing connection" control message so all of the nodes
+  //       can agree to close the connections in a graceful way when they are all done.  Similar to the READY packet
+  //       but for closing so the closing is graceful (and the other node does not try to reconnect).  This barrier
+  //       would go here.
+
   // Check to see if in stand-alone mode
   if (Cmi_charmrun_pid != 0 && contextBlock->rnic != -1) {
 
@@ -1102,8 +1147,10 @@ void CmiMachineExit(void) {
       // Close all the connections and destroy all the QPs (and related data structures)
       closeQPConnection(nodes + i, 1);  // The program is closing so destroy the QPs
 
-      // Destroy the sendBufLock
+      // Destroy the locks
       CmiDestroyLock(nodes[i].sendBufLock);
+      CmiDestroyLock(nodes[i].send_next_lock);
+      CmiDestroyLock(nodes[i].recv_expect_lock);
     }
 
     // DMK : TODO : Clean up the buffer pool here (unregister the memory from the RNIC and free it)
@@ -1185,7 +1232,7 @@ void AsynchronousEventHandler(cc_rnic_handle_t rnic, cc_event_record_t *er, void
 
       MACHSTATE(3, "AsynchronousEventHandler() - INFO: Pre-sendBufLock");
       #if CMK_SHARED_VARS_UNAVAILABLE
-        while (node->sendBufLock != 0) { usleep(10000); } // Since CmiLock() is not really a lock, actually wait
+        while (node->sendBufLock != 0) { usleep(1); } // Since CmiLock() is not really a lock, actually wait
       #endif
       CmiLock(node->sendBufLock);
 
@@ -1234,7 +1281,7 @@ void AsynchronousEventHandler(cc_rnic_handle_t rnic, cc_event_record_t *er, void
 
           MACHSTATE(3, "AsynchronousEventHandler() - INFO: Pre-sendBufLock");
           #if CMK_SHARED_VARS_UNAVAILABLE
-            while (nodes[nodeNumber].sendBufLock != 0) { usleep(10000); } // Since CmiLock() is not really a lock, actually wait
+            while (nodes[nodeNumber].sendBufLock != 0) { usleep(1); } // Since CmiLock() is not really a lock, actually wait
           #endif
           CmiLock(nodes[nodeNumber].sendBufLock);
 
@@ -1284,7 +1331,7 @@ void AsynchronousEventHandler(cc_rnic_handle_t rnic, cc_event_record_t *er, void
 
         MACHSTATE(3, "AsynchronousEventHandler() - INFO: Pre-sendBufLock");
         #if CMK_SHARED_VARS_UNAVAILABLE
-          while (node->sendBufLock != 0) { usleep(10000); } // Since CmiLock() is not really a lock, actually wait
+          while (node->sendBufLock != 0) { usleep(1); } // Since CmiLock() is not really a lock, actually wait
         #endif
         CmiLock(node->sendBufLock);
 
@@ -1359,7 +1406,7 @@ void AsynchronousEventHandler(cc_rnic_handle_t rnic, cc_event_record_t *er, void
 
       MACHSTATE(3, "AsynchronousEventHandler() - INFO: Pre-sendBufLock");
       #if CMK_SHARED_VARS_UNAVAILABLE
-        while (node->sendBufLock != 0) { usleep(10000); } // Since CmiLock() is not really a lock, actually wait
+        while (node->sendBufLock != 0) { usleep(1); } // Since CmiLock() is not really a lock, actually wait
       #endif
       CmiLock(node->sendBufLock);
 
@@ -1412,7 +1459,8 @@ void CompletionEventHandler(cc_rnic_handle_t rnic, cc_cq_handle_t cq, void *cb) 
 
     // Poll the Completion Queue
     rtn = cc_cq_poll(contextBlock->rnic, cq, &wc);
-    if (rtn == CCERR_CQ_EMPTY) break;
+    //if (rtn == CCERR_CQ_EMPTY) break;
+    if (rtn != CC_OK) break;
 
     // Let the user know if there was an error
     if (wc.status != CC_OK) {
@@ -1569,6 +1617,8 @@ void CmiAmmassoOpenQueuePairs() {
     nodes[i].myNode = i;
     nodes[i].connectionState = QP_CONN_STATE_PRE_CONNECT;
     nodes[i].sendBufLock = CmiCreateLock();
+    nodes[i].send_next_lock = CmiCreateLock();
+    nodes[i].recv_expect_lock = CmiCreateLock();
     nodes[i].send_UseIndex = 0;
     nodes[i].send_InUseCounter = 0;
 
@@ -1583,7 +1633,7 @@ void CmiAmmassoOpenQueuePairs() {
 
   // Need to block here until all the connections for this node are made
   MACHSTATE(3, "CmiAmmassoOpenQueuePairs() - INFO: Waiting for all connections to be established...");
-  while (contextBlock->outstandingConnectionCount > 0) usleep(10000);  // Sleep 10ms
+  while (contextBlock->outstandingConnectionCount > 0) usleep(1000);
   MACHSTATE(3, "CmiAmmassoOpenQueuePairs() - INFO: All Connections have been established... Continuing");
 
   // Pause a little so both ends of the connection have time to receive and process the asynchronous events
@@ -1771,6 +1821,15 @@ void establishQPConnection(OtherNode node, int reuseQPFlag) {
       sprintf(buf, "establishQPConnection() - ERROR: Unable to create Queue Pair: %d, \"%s\"", rtn, cc_status_to_string(rtn));
       CmiAbort(buf);
     }
+
+    // Since the QP was just created (or re-created), reset the sequence number and any other variables that need reseting
+    node->send_InUseCounter = 0;
+    node->send_UseIndex = 0;
+    node->sendBufLock = 0;
+    node->send_next = 0;
+    node->send_next_lock = CmiCreateLock();
+    node->recv_expect = 0;
+    node->recv_expect_lock = CmiCreateLock();
 
   if (!reuseQPFlag) {
 
