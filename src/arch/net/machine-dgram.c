@@ -299,6 +299,9 @@ typedef struct OtherNodeStruct
   char                   send_InUseCounter;
   CmiNodeLock            sendBufLock;
 
+  CmiNodeLock            send_next_lock;
+  CmiNodeLock            recv_expect_lock;
+
   /*
   cc_sq_wr_t             rdma_sq_wr;
   cc_data_addr_t         rdma_sgl;
