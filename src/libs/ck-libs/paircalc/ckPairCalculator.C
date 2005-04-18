@@ -34,13 +34,12 @@ PairCalculator::PairCalculator(bool sym, int grainSize, int s, int blkSize,  int
   inDataLeft = NULL;
   inDataRight = NULL;
 
-  outData = new double[grainSize * grainSize];
-  memset(outData, 0 , sizeof(double)* grainSize * grainSize);
+  outData = NULL;
 
   newData = NULL;
   sumPartialCount = 0;
   setMigratable(false);
-  usesAtSync=true;
+  usesAtSync=false;
 
   CProxy_PairCalcReducer pairCalcReducerProxy(reducer_id); 
   reduceElem=pairCalcReducerProxy.ckLocalBranch()->doRegister(this, symmetric);
@@ -72,19 +71,19 @@ PairCalculator::pup(PUP::er &p)
   if (p.isUnpacking()) {
     CProxy_PairCalcReducer pairCalcReducerProxy(reducer_id); 
     pairCalcReducerProxy.ckLocalBranch()->doRegister(this,symmetric);
-    outData = new double[grainSize * grainSize];
-    if(N>0)
+//    if(N>0)
       inDataLeft = new complex[numExpected*N];
     if(!symmetric || (symmetric&&thisIndex.x!=thisIndex.y))
-      if(N>0)
+//      if(N>0)
 	inDataRight = new complex[numExpected*N];
-
+    newData = NULL;
+    outData = NULL;
   }
-  if(N>0)
+//  if(N>0)
     for (int i = 0; i < numExpected; i++)
       p(inDataLeft,numExpected*N);
   if(!symmetric || (symmetric&&thisIndex.x!=thisIndex.y)){
-    if(N>0)  
+//    if(N>0)  
       p(inDataRight, numExpected* N);
   }
               // How about sparseCont reducer???
@@ -173,6 +172,10 @@ PairCalculator::calculatePairs_gemm(calculatePairsMsg *msg)
    */
 
   if (numRecd == numExpected * 2 || (symmetric && thisIndex.x==thisIndex.y && numRecd==numExpected)) {
+    if(outData == NULL){
+      outData = new double[grainSize * grainSize];
+      memset(outData, 0 , sizeof(double)* grainSize * grainSize);
+    }
     char transform='N';
     int doubleN=2*N;
     char transformT='T';
@@ -424,6 +427,8 @@ PairCalculator::acceptResult(int size, double *matrix1, double *matrix2)
       if(!symmetric || (symmetric&&thisIndex.x!=thisIndex.y)) {
 	delete [] inDataRight;
 	inDataRight = NULL;
+	delete [] outData;
+	outData = NULL;
       }
     }
 
