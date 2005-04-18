@@ -20,7 +20,7 @@ class RingMulticastStrategy: public DirectMulticastStrategy {
  public:
     
     //Array constructor
-    RingMulticastStrategy(CkArrayID dest_id);    
+    RingMulticastStrategy(CkArrayID dest_id, int flag = 0);    
     RingMulticastStrategy(CkMigrateMessage *m) : DirectMulticastStrategy(m){}
 
     //Destructor

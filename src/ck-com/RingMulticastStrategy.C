@@ -2,8 +2,8 @@
 #include "RingMulticastStrategy.h"
 
 //Array Constructor
-RingMulticastStrategy::RingMulticastStrategy(CkArrayID dest_aid)
-    : DirectMulticastStrategy(dest_aid){
+RingMulticastStrategy::RingMulticastStrategy(CkArrayID dest_aid, int flag)
+  : DirectMulticastStrategy(dest_aid, flag){
 }
 
 
