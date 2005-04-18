@@ -362,8 +362,13 @@ int sendDataOnQP(char* data, int len, OtherNode node, char force) {
   int toSendLength;
   cc_status_t rtn;
   cc_uint32_t WRsPosted;
+  char isFirst = 1;
+  char *origMsgStart = data;
 
   MACHSTATE2(3, "sendDataOnQP() - Ammasso - INFO: Called (send to node %d, len = %d)...", node->myNode, len);
+
+  // DMK : For each message that is fragmented, attach another DGRAM header to it, (keeping in mind that the control
+  //       messages are no where near large enough for this to occur).
 
   while (len > 0) {
 
@@ -373,12 +378,32 @@ int sendDataOnQP(char* data, int len, OtherNode node, char force) {
     sendBufIndex = getQPSendBuffer(node, force);
 
     // Copy the contents (up to AMMASSO_BUFSIZE worth) of data into the send buffer
-    toSendLength = ((len > AMMASSO_BUFSIZE) ? (AMMASSO_BUFSIZE) : (len));  // MIN of len and AMMASSO_BUFSIZE
-    memcpy(node->send_buf + (sendBufIndex * AMMASSO_BUFSIZE), data, toSendLength);
+    if (isFirst) {
+
+      // In this case, the toSendLength includes the DGRAM header that was part of the original message
+      toSendLength = ((len > AMMASSO_BUFSIZE) ? (AMMASSO_BUFSIZE) : (len));  // MIN of len and AMMASSO_BUFSIZE
+      memcpy(node->send_buf + (sendBufIndex * AMMASSO_BUFSIZE), data, toSendLength);
+
+    } else {
+
+      // In this case, the toSendLength does not include the DGRAM header size since toSendLength represents the amount of
+      //   data in the message being sent and this time around the DGRAM header is being constructed
+      toSendLength = ((len > AMMASSO_BUFSIZE - DGRAM_HEADER_SIZE) ? (AMMASSO_BUFSIZE - DGRAM_HEADER_SIZE) : (len));  // MIN of len and AMMASSO_BUFSIZE
+      memcpy(node->send_buf + (sendBufIndex * AMMASSO_BUFSIZE) + DGRAM_HEADER_SIZE, data, toSendLength);
+      
+      // This dgram header is the same except for the sequence number, so copy the original and just modify the sequence number
+      // NOTE: If the message is large enough that fragmentation needs to happen, the send_next_lock is already owned by the
+      //       thread executing this code.
+      // TODO: This code is hacked up a bit to get this working in a hurry, come back later and find a more graceful way to handle this and
+      //       keep sendDataOnQP() generic (this should be in DeliverViaNetwork()).
+      memcpy(node->send_buf + (sendBufIndex * AMMASSO_BUFSIZE), origMsgStart, DGRAM_HEADER_SIZE);
+      ((DgramHeader*)(node->send_buf + (sendBufIndex * AMMASSO_BUFSIZE)))->seqno = node->send_next;
+      node->send_next = ((node->send_next+1) & DGRAM_SEQNO_MASK);  // Increase the sequence number
+    }
 
     // Set the data length in the SGL (Note: this is safe to reset like this because the buffer is of length
     //   AMMASSO_BUFSIZE and toSendLength has a maximum value of AMMASSO_BUFSIZE).
-    (node->send_sgl[sendBufIndex]).length = toSendLength;
+    (node->send_sgl[sendBufIndex]).length = toSendLength + ((isFirst) ? (0) : (DGRAM_HEADER_SIZE));
 
     {
       int j;
@@ -419,6 +444,7 @@ int sendDataOnQP(char* data, int len, OtherNode node, char force) {
     // Update the data and len variables for the next while (if fragmenting is needed
     data += toSendLength;
     len -= toSendLength;
+    isFirst = 0;
   }
 }
 
@@ -477,6 +503,12 @@ void DeliverViaNetwork(OutgoingMsg msg, OtherNode otherNode, int rank, unsigned 
   //#endif
   //CmiLock(otherNode->send_next_lock);
 
+  MACHSTATE(3, "DeliverViaNetwork() - INFO: Pre-send_next_lock");
+  #if CMK_SHARED_VARS_UNAVAILABLE
+    while (otherNode->send_next_lock != 0) { usleep(1); } // Since CmiLock() is not really a lock, actually wait
+  #endif
+  CmiLock(otherNode->send_next_lock);
+
   DgramHeaderMake(msg->data, rank, msg->src, Cmi_charmrun_pid, otherNode->send_next, broot);  // Set DGram Header Fields In-Place
   otherNode->send_next = ((otherNode->send_next+1) & DGRAM_SEQNO_MASK);  // Increase the sequence number
 
@@ -529,6 +561,9 @@ void DeliverViaNetwork(OutgoingMsg msg, OtherNode otherNode, int rank, unsigned 
   //  displayQueueQuery(otherNode->qp, &(otherNode->qp_attrs));
   //}
   sendDataOnQP(msg->data, msg->size, otherNode, 0);  // These are never forced (not control message of type ACKs)
+
+  CmiUnlock(otherNode->send_next_lock);
+  MACHSTATE(3, "DeliverViaNetwork() - INFO: Post-send_next_lock");
 
 
   // DMK : NOTE : I left this in as an example of how to retister the memory with the RNIC on the fly.  Since the ccil
@@ -762,13 +797,13 @@ void ProcessMessage(char* msg, int len, char *needAck) {
   // Begin by indicating that the message does not need an ACK, set needAck if we find out an ACK is needed
   *needAck = 0;
 
-  //{
-  //  MACHSTATE1(3, "ProcessMessage() - INFO: msg = %p", msg);
-  //  int j;
-  //  for (j = 0; j < DGRAM_HEADER_SIZE + 24; j++) {
-  //    MACHSTATE2(3, "ProcessMessage() - INFO: msg[%d] = %02x", j, msg[j]);
-  //  }
-  //}
+  {
+    MACHSTATE1(3, "ProcessMessage() - INFO: msg = %p", msg);
+    int j;
+    for (j = 0; j < DGRAM_HEADER_SIZE + 24; j++) {
+      MACHSTATE2(3, "ProcessMessage() - INFO: msg[%d] = %02x", j, msg[j]);
+    }
+  }
 
   // Check to see if the message length is too short
   if (len < DGRAM_HEADER_SIZE) {
@@ -813,7 +848,7 @@ void ProcessMessage(char* msg, int len, char *needAck) {
   checksum = computeCheckSum(msg, len);
   if (checksum != 0) {
     MACHSTATE1(3, "ProcessMessage() - Ammasso - ERROR: Received message with bad checksum (%d)... ignoring...", checksum);
-    CmiPrintf("[%d] ProcessMessage() - Ammasso - ERROR: Received message with bad checksum (%d)... ignoring...", CmiMyPe(), checksum);
+    CmiPrintf("[%d] ProcessMessage() - Ammasso - ERROR: Received message with bad checksum (%d)... ignoring...\n", CmiMyPe(), checksum);
     return;
   }
 
@@ -822,7 +857,7 @@ void ProcessMessage(char* msg, int len, char *needAck) {
   // Check the magic cookie for correctness
   if (magicCookie != (Cmi_charmrun_pid & DGRAM_MAGIC_MASK)) {
     MACHSTATE(3, "ProcessMessage() - Ammasso - ERROR: Received message with a bad magic cookie... ignoring...");
-    CmiPrintf("[%d] ProcessMessage() - Ammasso - ERROR: Received message with a bad magic cookie... ignoring...", CmiMyPe());
+    CmiPrintf("[%d] ProcessMessage() - Ammasso - ERROR: Received message with a bad magic cookie... ignoring...\n", CmiMyPe());
     return;
   }
 
@@ -845,7 +880,7 @@ void ProcessMessage(char* msg, int len, char *needAck) {
     fromNode->recv_expect = ((seqNum+1) & DGRAM_SEQNO_MASK);
   } else {
     MACHSTATE(3, "ProcessMessage() - Ammasso - ERROR: Received a message with a bad sequence number... ignoring...");
-    CmiPrintf("[%d] ProcessMessage() - Ammasso - ERROR: Received a message witha bad sequence number... ignoring...", CmiMyPe());
+    CmiPrintf("[%d] ProcessMessage() - Ammasso - ERROR: Received a message witha bad sequence number... ignoring...\n", CmiMyPe());
     return;
   }
 
