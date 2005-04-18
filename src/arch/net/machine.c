@@ -1609,9 +1609,15 @@ char *CmiGetNonLocalNodeQ(void)
 
 void *CmiGetNonLocal(void)
 {
+  void *msg;
   CmiState cs = CmiGetState();
   CmiIdleLock_checkMessage(&cs->idle);
-  return (void *) PCQueuePop(cs->recv);
+  msg = (void *) PCQueuePop(cs->recv);
+  if (Cmi_netpoll == 1 && msg == NULL) {  /* poll network in netpoll mode */
+    CommunicationPeriodic();
+    msg = (void *) PCQueuePop(cs->recv);
+  }
+  return msg;
 }
 
 
