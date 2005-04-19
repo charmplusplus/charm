@@ -126,6 +126,15 @@ void chunk::coarseningElements()
       theElements[i].coarsen(); // coarsen the element
     }
     CthYield(); // give other chunks on the same PE a chance
+    if (coarsenTop == 0) {
+      for (i=0; i<elementSlots; i++) { // set desired areas for elements
+	if (theElements[i].isPresent()) {
+	  if (theElements[i].getTargetArea() > theElements[i].getArea()) {
+	    addToStack(i, theElements[i].getShortestEdge());
+	  }
+	}
+      }
+    }
   }
   coarsenInProgress = 0;  // turn coarsen loop off
   //dump();
