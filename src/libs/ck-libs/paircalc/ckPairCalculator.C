@@ -39,9 +39,9 @@ PairCalculator::PairCalculator(bool sym, int grainSize, int s, int blkSize,  int
 
   newData = NULL;
   sumPartialCount = 0;
-  setMigratable(true);
-  usesAtSync=true;
-
+  //  setMigratable(true);
+  //  usesAtSync=true;
+  setMigratable(false);
   CProxy_PairCalcReducer pairCalcReducerProxy(reducer_id); 
   reduceElem=pairCalcReducerProxy.ckLocalBranch()->doRegister(this, symmetric);
 }
