@@ -442,14 +442,14 @@ Group IDs are created using \kw{CmiEstablishGroup}.}
 \function{void CmiSyncListSend(int npes, int *pes, unsigned int size, void *msg)}
 \index{CmiSyncListSend}
 \desc{Sends \uw{msg} of length \uw{size} bytes to \uw{npes} processors in the
-array \uw{pes}.
+array \uw{pes}.}
 
 \function{void CmiSyncListSendAndFree(int npes, int *pes, unsigned int size, void *msg)}
 \index{CmiSyncListSendAndFree}
 \desc{Sends \uw{msg} of length \uw{size} bytes to \uw{npes} processors in the
 array \uw{pes}. Uses \kw{CmiFree} to deallocate the message buffer for \uw{msg}
 when the multicast completes. Therefore, \uw{msg} must point to a buffer
-allocated with \kw{CmiAlloc}.
+allocated with \kw{CmiAlloc}.}
 
 \function{CmiCommHandle CmiAsyncListSend(int npes, int *pes, unsigned int size, void *msg)}
 \index{CmiAsyncListSend}
@@ -458,7 +458,7 @@ bytes to \uw{npes} processors in the array \uw{pes}. It returns a communication
 handle which could be used to check the status of this send using
 \kw{CmiAsyncMsgSent}. If the returned communication handle is 0, message buffer
 can be reused immediately, thus saving a call to \kw{CmiAsyncMsgSent}. \uw{msg}
-should not be overwritten or freed before the communication is complete.
+should not be overwritten or freed before the communication is complete.}
 
 \section{Scheduling Messages}
 \label{schedqueue}
