@@ -294,9 +294,9 @@ typedef struct OtherNodeStruct
   char                   *send_buf;
   cc_stag_index_t  send_stag_index;
 /*  char                   *send_bufFree;  */
-  char                   send_UseIndex;
+  int                   send_UseIndex;
 /*  char                   send_AckIndex;  */
-  char                   send_InUseCounter;
+  int                   send_InUseCounter;
   CmiNodeLock            sendBufLock;
 
   CmiNodeLock            send_next_lock;
