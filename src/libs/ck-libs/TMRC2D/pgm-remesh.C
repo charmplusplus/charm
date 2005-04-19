@@ -635,7 +635,7 @@ driver(void)
 	     myChunk,g.nnodes,g.nelems);
     // THIS IS THE REFINED MESH SENT TO NetFEM
     if (1) { //Publish data to the net
-      NetFEM n=NetFEM_Begin(myChunk,t,2,NetFEM_WRITE);
+      NetFEM n=NetFEM_Begin(myChunk,2*t-1,2,NetFEM_WRITE);
       int count=0;
       double *vcoord = new double[2*g.nnodes];
       double *vnodeid = new double[g.nnodes];
@@ -700,7 +700,7 @@ driver(void)
 	     myChunk,g.nnodes,g.nelems);
     // THIS IS THE COARSENED MESH SENT TO NetFEM
     if (1) { //Publish data to the net
-      NetFEM n=NetFEM_Begin(myChunk,t,2,NetFEM_WRITE);
+      NetFEM n=NetFEM_Begin(myChunk,2*t,2,NetFEM_WRITE);
       int count=0;
       double *vcoord = new double[2*g.nnodes];
       double *vnodeid = new double[g.nnodes];
