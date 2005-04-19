@@ -99,7 +99,7 @@ prioq pq;
   pq->heapsize = newsize;
   CmiFree(oheap);
 }
-
+#ifndef FASTQ
 void CqsPrioqRehash(pq)
      prioq pq;
 {
@@ -136,7 +136,7 @@ void CqsPrioqRehash(pq)
   pq->hash_key_size = newHsize;
   CmiFree(ohashtab);
 }
-
+#endif
 /*
  * This routine compares priorities. It returns:
  * 
@@ -277,9 +277,10 @@ unsigned int priobits, *priodata;
     pq->hashtab[hashval] = pe;
 #endif
   pq->hash_entry_size++;
+#ifndef FASTQ
   if(pq->hash_entry_size > 2*pq->hash_key_size)
     CqsPrioqRehash(pq);
-  
+#endif  
   /* Insert bucket into heap */
   heappos = pq->heapnext++;
   if (heappos == pq->heapsize) CqsPrioqExpand(pq);
