@@ -162,6 +162,7 @@ class element {  // triangular elements defined by three node references,
   void collapse(int shortEdge);
   int findLongestEdge();
   int findShortestEdge();
+  double getShortestEdge();
   int isLongestEdge(edgeRef& e);
 
   // Mesh improvement stuff

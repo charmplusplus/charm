@@ -535,6 +535,8 @@ driver(void)
   double startTime=CkWallTimer();
   double curArea=2.5e-5/1024;
   int t = 0;
+
+  // THIS IS THE INITIAL MESH SENT TO NetFEM
   if (1) { //Publish data to the net
     NetFEM n=NetFEM_Begin(myChunk,t,2,NetFEM_WRITE);
     int count=0;
@@ -631,6 +633,7 @@ driver(void)
     g.nnodes = FEM_Mesh_get_length(FEM_Mesh_default_read(),FEM_NODE);
     CkPrintf("[%d] Done with refinement step: %d nodes, %d elements\n",
 	     myChunk,g.nnodes,g.nelems);
+    // THIS IS THE REFINED MESH SENT TO NetFEM
     if (1) { //Publish data to the net
       NetFEM n=NetFEM_Begin(myChunk,t,2,NetFEM_WRITE);
       int count=0;
@@ -695,6 +698,7 @@ driver(void)
     g.nnodes = FEM_Mesh_get_length(FEM_Mesh_default_read(),FEM_NODE);
     CkPrintf("[%d] Done with coarsening step: %d nodes, %d elements\n",
 	     myChunk,g.nnodes,g.nelems);
+    // THIS IS THE COARSENED MESH SENT TO NetFEM
     if (1) { //Publish data to the net
       NetFEM n=NetFEM_Begin(myChunk,t,2,NetFEM_WRITE);
       int count=0;

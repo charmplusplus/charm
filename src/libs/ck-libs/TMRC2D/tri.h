@@ -107,6 +107,13 @@ class chunk : public TCharmClient1D {
   int firstFreeElement, firstFreeEdge, firstFreeNode;
 
   int edgesSent, edgesRecvd, first;
+  // These are for element sorting
+  typedef struct {
+    int elID;
+    double len;
+  } elemStack;
+  elemStack *coarsenElements;
+  int coarsenTop;
 
   void setupThreadPrivate(CthThread forThread) {
     CtvAccessOther(forThread, _refineChunk) = this;
@@ -271,6 +278,7 @@ class chunk : public TCharmClient1D {
   void fixNode(int nIdx);
   int joinCommLists(int nIdx, int shd, int *chk, int *idx, int *rChk, 
 		    int *rIdx);
+  void addToStack(int eIdx, double len);
 };
 
 #endif

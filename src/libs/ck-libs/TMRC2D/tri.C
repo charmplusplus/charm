@@ -19,6 +19,7 @@ chunk::chunk(chunkMsg *m)
   : TCharmClient1D(m->myThreads), sizeElements(0), sizeEdges(0), sizeNodes(0),
     firstFreeElement(0), firstFreeEdge(0), firstFreeNode(0),
     edgesSent(0), edgesRecvd(0), first(0),
+    coarsenElements(NULL), coarsenTop(0),
     additions(0), debug_counter(0), refineInProgress(0), coarsenInProgress(0),
     modified(0), meshLock(0), meshExpandFlag(0), 
     numElements(0), numEdges(0), numNodes(0), numGhosts(0), theClient(NULL),
@@ -92,6 +93,9 @@ void chunk::coarsenElement(int idx, double area)
   if (!theElements[idx].isPresent()) return;
   accessLock();
   theElements[idx].resetTargetArea(area);
+  coarsenElements[coarsenTop].elID = idx;
+  coarsenElements[coarsenTop].len = theElements[idx].getShortestEdge();
+  coarsenTop++;
   releaseLock();
   modified = 1;  // flag a change in one of the chunk's elements
   if (!coarsenInProgress) { // if coarsen loop not running
@@ -102,28 +106,20 @@ void chunk::coarsenElement(int idx, double area)
 
 void chunk::coarseningElements()
 {
-  int i, elCount, cCount;
-  while (modified) { // try to coarsen elements until no changes occur
-    i = 0;
-    modified = 0;
-    elCount = cCount = 0;
-    while (i < elementSlots) { // loop through the elements
-      if (theElements[i].isPresent()) elCount++;
-      if (theElements[i].isPresent() && 
-	  (((theElements[i].getTargetArea() > theElements[i].getArea()) && 
-	    (theElements[i].getTargetArea() >= 0.0)) ||
-	   (theElements[i].getArea() == 0.0))) {
-	// element i has higher target area or no area -- needs coarsening
-	cCount++;
-	//DEBUGREF(CkPrintf("TMRC2D: [%d] Coarsen element %d: area=%f target=%f\n", cid, i, theElements[i].getArea(), theElements[i].getTargetArea());)
-	modified = 1; // something's bound to change
-	theElements[i].coarsen(); // coarsen the element
-      }
-      i++;
-      CthYield(); // give other chunks on the same PE a chance
+  int i;
+  while (coarsenTop > 0) { // loop through the elements
+    coarsenTop--;
+    i = coarsenElements[coarsenTop].elID;
+    if (theElements[i].isPresent() && 
+	(((theElements[i].getTargetArea() > theElements[i].getArea()) && 
+	  (theElements[i].getTargetArea() >= 0.0)) ||
+	 (theElements[i].getArea() == 0.0))) {
+      // element i has higher target area or no area -- needs coarsening
+      //DEBUGREF(CkPrintf("TMRC2D: [%d] Coarsen element %d: area=%f target=%f\n", cid, i, theElements[i].getArea(), theElements[i].getTargetArea());)
+      theElements[i].coarsen(); // coarsen the element
     }
-    DEBUGREF(CkPrintf("TMRC2D: [%d] ||||| %d elems out of %d need coarsening ||||\n", cid, cCount, elCount);)
-    //CthYield(); // give other chunks on the same PE a chance
+    i++;
+    CthYield(); // give other chunks on the same PE a chance
   }
   coarsenInProgress = 0;  // turn coarsen loop off
   //dump();
@@ -673,6 +669,8 @@ void chunk::multipleCoarsen(double *desiredArea, refineClient *client)
   theClient = client; // initialize refine client associated with this chunk
   //Uncomment this dump call to see TMRC2D's mesh config
   //dump();
+  if (coarsenElements) delete [] coarsenElements;
+  coarsenElements = new elemStack[numElements];
   for (i=0; i<elementSlots; i++) { // set desired areas for elements
     if (theElements[i].isPresent()) {
       area = theElements[i].getArea();
@@ -680,11 +678,12 @@ void chunk::multipleCoarsen(double *desiredArea, refineClient *client)
       //CkPrintf("TMRC2D: desiredArea[%d]=%1.10e present? %d area=%1.10e\n", i, desiredArea[i], theElements[i].isPresent(), area);
       if (desiredArea[i] > area+precThrshld) {
 	theElements[i].resetTargetArea(desiredArea[i]);
+	addToStack(i, theElements[i].getShortestEdge());
 	//DEBUGREF(CkPrintf("TMRC2D: [%d] Setting target on element %d to %1.10e\n", cid, i, desiredArea[i]);)
       }
     }
   }
-
+  
   // start coarsening
   modified = 1;
   if (!coarsenInProgress) {
@@ -1163,6 +1162,29 @@ int chunk::joinCommLists(int nIdx, int shd, int *chk, int *idx, int *rChk,
     }
   }
   return count;
+}
+
+void chunk::addToStack(int eIdx, double len)
+{ // this amounts to a bubble-sorted stack where the longest shortest edges
+  // sink to the bottom
+  int pos = coarsenTop;
+  coarsenTop++;
+  while (pos > 0) {
+    if (len < coarsenElements[pos-1].len) {
+      coarsenElements[pos].elID = eIdx;
+      coarsenElements[pos].len = len;
+      break;
+    }
+    else {
+      coarsenElements[pos].elID = coarsenElements[pos-1].elID;
+      coarsenElements[pos].len = coarsenElements[pos-1].len;
+      pos--;
+    }
+  }
+  if (pos == 0) {
+    coarsenElements[pos].elID = eIdx;
+    coarsenElements[pos].len = len;
+  }
 }
 
 #include "refine.def.h"
