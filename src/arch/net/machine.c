@@ -1613,10 +1613,12 @@ void *CmiGetNonLocal(void)
   CmiState cs = CmiGetState();
   CmiIdleLock_checkMessage(&cs->idle);
   msg = (void *) PCQueuePop(cs->recv);
+#if CMK_SHARED_VARS_UNAVAILABLE
   if (Cmi_netpoll == 1 && msg == NULL) {  /* poll network in netpoll mode */
     CommunicationPeriodic();
     msg = (void *) PCQueuePop(cs->recv);
   }
+#endif
   return msg;
 }
 
