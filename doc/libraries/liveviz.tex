@@ -118,11 +118,7 @@ The liveVizConfig parameters are:
        \item ``true'' or liveVizConfig::pix\_color means a color image (3 RGB bytes per pixel).
        \item liveVizConfig::pix\_float means a floating-point color image (1 float per pixel, can only be used with sum\_float\_image\_data or max\_float\_image\_data).
      \end{itemize}
-   \item The second parameter is the flag ``serverPush'', which means:
-      \begin{itemize}
-     	\item serverPush==false: Client only sends request when client view changes or image is resized.
-     	\item serverPush==true: Client will repeatedly request new images from the server.
-      \end{itemize}
+   \item The second parameter is the flag ``serverPush'', which is currently unused. Set to true or false.     
    \item The third parameter is an optional 3D bounding box (type CkBbox3d).  If present, this puts the client into a 3D visualization mode.
 \end{itemize}
 
