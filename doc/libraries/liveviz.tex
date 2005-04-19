@@ -141,7 +141,9 @@ To compile the liveViz library:
 
 \section{Poll Mode}
 
-Because liveVizDeposit, above, performs its image reduction over your array, 
+In some cases you may want a server to deposit images only when it is ready to do so. For this case the server will not register a callback function, but rather will poll for the next request from the client when it is ready to send the client some image. For example a server may want to create a movie or series of images corresponding to timesteps in a simulation. The server will  have a timestep loop in which a chare computes some data for a timestep. At the end of each iteration the server will poll for a client request for the current timestep and will deposit the image with this client request.
+
+Because liveVizDeposit (described in an earlier section) performs its image reduction over your array, 
 you must ensure that your own reductions are not interleaved with the 
 liveVizDeposits.  This is trivial if your program performs no reductions,
 but if you do reductions you must somehow prevent this interleaving.
