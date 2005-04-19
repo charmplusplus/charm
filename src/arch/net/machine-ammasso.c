@@ -175,9 +175,9 @@ AmmassoStats __stats;
                                        CmiPrintf("[%d] " #event " average: %.3fns\n", CmiMyPe(), (((double)__stats.event ## _total)/(__stats.event ## _count)) * TO_NS); \
 				     }
 
-#elif
+#else
 
-#define AMMASSO_STATS_INIT(event)
+#define AMMASSO_STATS_INIT_AUX(event)
 #define AMMASSO_STATS_INIT
 #define AMMASSO_STATS_START(event)
 #define AMMASSO_STATS_END(event)
