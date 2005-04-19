@@ -94,8 +94,14 @@ void chunk::coarsenElement(int idx, double area)
   accessLock();
   theElements[idx].resetTargetArea(area);
   coarsenElements[coarsenTop].elID = idx;
-  coarsenElements[coarsenTop].len = theElements[idx].getShortestEdge();
+  coarsenElements[coarsenTop].len = -1.0;
   coarsenTop++;
+  int pos = coarsenTop-2;
+  while (pos >= 0) {
+    if (coarsenElements[pos].elID == idx)
+      coarsenElements[pos].elID = -1;
+    pos--;
+  }
   releaseLock();
   modified = 1;  // flag a change in one of the chunk's elements
   if (!coarsenInProgress) { // if coarsen loop not running
@@ -108,17 +114,17 @@ void chunk::coarseningElements()
 {
   int i;
   while (coarsenTop > 0) { // loop through the elements
+    rebubble();
     coarsenTop--;
     i = coarsenElements[coarsenTop].elID;
-    if (theElements[i].isPresent() && 
+    if ((i != -1) && theElements[i].isPresent() && 
 	(((theElements[i].getTargetArea() > theElements[i].getArea()) && 
 	  (theElements[i].getTargetArea() >= 0.0)) ||
 	 (theElements[i].getArea() == 0.0))) {
       // element i has higher target area or no area -- needs coarsening
-      //DEBUGREF(CkPrintf("TMRC2D: [%d] Coarsen element %d: area=%f target=%f\n", cid, i, theElements[i].getArea(), theElements[i].getTargetArea());)
+      CkPrintf("TMRC2D: [%d] Coarsen element %d: area=%f target=%f\n", cid, i, theElements[i].getArea(), theElements[i].getTargetArea());
       theElements[i].coarsen(); // coarsen the element
     }
-    i++;
     CthYield(); // give other chunks on the same PE a chance
   }
   coarsenInProgress = 0;  // turn coarsen loop off
@@ -503,6 +509,9 @@ void chunk::removeEdge(int n)
   if (theEdges[n].present) {
     theEdges[n].reset();
     theEdges[n].present = 0;
+    theEdges[n].elements[0].reset();
+    theEdges[n].elements[1].reset();
+    theEdges[n].nodes[0] = theEdges[n].nodes[1] = -1;
     if (n < firstFreeEdge) firstFreeEdge = n;
     else if ((n == firstFreeEdge) && (firstFreeEdge == edgeSlots)) {
       firstFreeEdge--; edgeSlots--;
@@ -679,7 +688,7 @@ void chunk::multipleCoarsen(double *desiredArea, refineClient *client)
       if (desiredArea[i] > area+precThrshld) {
 	theElements[i].resetTargetArea(desiredArea[i]);
 	addToStack(i, theElements[i].getShortestEdge());
-	//DEBUGREF(CkPrintf("TMRC2D: [%d] Setting target on element %d to %1.10e\n", cid, i, desiredArea[i]);)
+	CkPrintf("TMRC2D: [%d] Setting target on element %d to %1.10e with shortEdge %1.10e\n", cid, i, desiredArea[i], coarsenElements[coarsenTop-1].len);
       }
     }
   }
@@ -1170,7 +1179,7 @@ void chunk::addToStack(int eIdx, double len)
   int pos = coarsenTop;
   coarsenTop++;
   while (pos > 0) {
-    if (len < coarsenElements[pos-1].len) {
+    if (len <= coarsenElements[pos-1].len) {
       coarsenElements[pos].elID = eIdx;
       coarsenElements[pos].len = len;
       break;
@@ -1184,6 +1193,35 @@ void chunk::addToStack(int eIdx, double len)
   if (pos == 0) {
     coarsenElements[pos].elID = eIdx;
     coarsenElements[pos].len = len;
+  }
+}
+
+void chunk::rebubble()
+{
+  int pos = coarsenTop-1, loc, end;
+  int tmpID;
+  double tmpLen;
+
+  for (int i=0; i<coarsenTop; i++)
+    if ((coarsenElements[i].elID > -1) && (coarsenElements[i].len > -1.0))
+      coarsenElements[i].len = 
+	theElements[coarsenElements[i].elID].getShortestEdge();
+
+  while (coarsenElements[pos].len == -1.0) pos--;
+  end = pos;
+  while (pos > 0) {
+    loc = pos;
+    while ((coarsenElements[loc].len < coarsenElements[loc-1].len) &&
+	   (loc <= end)) {
+      tmpID = coarsenElements[loc].elID;
+      tmpLen = coarsenElements[loc].len;
+      coarsenElements[loc].elID = coarsenElements[loc-1].elID;
+      coarsenElements[loc].len = coarsenElements[loc-1].len;
+      coarsenElements[loc-1].elID = tmpID;
+      coarsenElements[loc-1].len = tmpLen;
+      loc++;
+    }
+    pos--;
   }
 }
 

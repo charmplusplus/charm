@@ -482,7 +482,7 @@ extern "C" void
 driver(void)
 {
   int ignored;
-  int i;  
+  int i, count;  
   int myChunk=FEM_My_partition();
   
   /*Add a refinement object to FEM array*/
@@ -529,7 +529,7 @@ driver(void)
     CkPrintf("Entering timeloop\n");
   }	
   //  int tSteps=0x70FF00FF;
-  int tSteps=1;
+  int tSteps=2;
   int z=13;
   calcMasses(g);
   double startTime=CkWallTimer();
@@ -539,7 +539,7 @@ driver(void)
   // THIS IS THE INITIAL MESH SENT TO NetFEM
   if (1) { //Publish data to the net
     NetFEM n=NetFEM_Begin(myChunk,t,2,NetFEM_WRITE);
-    int count=0;
+    count=0;
     double *vcoord = new double[2*g.nnodes];
     double *vnodeid = new double[g.nnodes];
     int *maptovalid = new int[g.nnodes];
@@ -612,14 +612,15 @@ driver(void)
     for (i=0;i<g.nnodes;i++) {
       loc[i]=g.coord[i];//+g.d[i];
     }
+
     double desiredArea = calcArea(g, 42);
-    double refineArea = desiredArea/2.0;
+    double refineArea = desiredArea/1.5;
     double *areas=new double[g.nelems];
     //prepare to refine
     for (i=0;i<g.nelems;i++) {
-      areas[i]=refineArea;
+      areas[i]=calcArea(g, i)/1.5;
     }
-    areas[42] = refineArea;
+
     CkPrintf("[%d] Starting refinement step: %d nodes, %d elements\n", myChunk,g.nnodes,g.nelems);
     FEM_REFINE2D_Split(FEM_Mesh_default_read(),FEM_NODE,(double *)loc,FEM_ELEM,areas,FEM_SPARSE);
     for (i=0; i<g.nnodes; i++) {
@@ -653,8 +654,8 @@ driver(void)
       }
       NetFEM_Nodes(n,count,(double *)vcoord,"Position (m)");
       NetFEM_Scalar(n,vnodeid,1,"Node ID");
-      /*    NetFEM_Vector(n,(double *)g.d,"Displacement (m)");
-	    NetFEM_Vector(n,(double *)g.v,"Velocity (m/s)");*/
+      //NetFEM_Vector(n,(double *)g.d,"Displacement (m)");
+      //NetFEM_Vector(n,(double *)g.v,"Velocity (m/s)");
       count=0;
       int *vconn = new int[3*g.nelems];
       double *vid = new double[3*g.nelems];
@@ -670,8 +671,8 @@ driver(void)
       }
       NetFEM_Elements(n,count,3,(int *)vconn,"Triangles");
       NetFEM_Scalar(n,vid,1,"Element ID");
-      /*	NetFEM_Scalar(n,g.S22,1,"Y Stress (pure)");
-		NetFEM_Scalar(n,g.S12,1,"Shear Stress (pure)");*/
+      //NetFEM_Scalar(n,g.S22,1,"Y Stress (pure)");
+      //NetFEM_Scalar(n,g.S12,1,"Shear Stress (pure)");
       NetFEM_End(n);
       delete [] vcoord;
       delete [] vconn;
@@ -689,7 +690,7 @@ driver(void)
     delete[] areas;
     areas=new double[g.nelems];
     for (i=0;i<g.nelems;i++) {
-      areas[i]=desiredArea;
+      areas[i]=calcArea(g, i) * 1.5;
     }
     CkPrintf("[%d] Starting coarsening step: %d nodes, %d elements\n", myChunk,g.nnodes,g.nelems);
     FEM_REFINE2D_Coarsen(FEM_Mesh_default_read(),FEM_NODE,(double *)g.coord,FEM_ELEM,areas);
@@ -718,8 +719,8 @@ driver(void)
       }
       NetFEM_Nodes(n,count,(double *)vcoord,"Position (m)");
       NetFEM_Scalar(n,vnodeid,1,"Node ID");
-      /*    NetFEM_Vector(n,(double *)g.d,"Displacement (m)");
-	    NetFEM_Vector(n,(double *)g.v,"Velocity (m/s)");*/
+      //    NetFEM_Vector(n,(double *)g.d,"Displacement (m)");
+      //    NetFEM_Vector(n,(double *)g.v,"Velocity (m/s)");
       count=0;
       int *vconn = new int[3*g.nelems];
       double *vid = new double[3*g.nelems];
@@ -735,8 +736,8 @@ driver(void)
       }
       NetFEM_Elements(n,count,3,(int *)vconn,"Triangles");
       NetFEM_Scalar(n,vid,1,"Element ID");
-      /*	NetFEM_Scalar(n,g.S22,1,"Y Stress (pure)");
-		NetFEM_Scalar(n,g.S12,1,"Shear Stress (pure)");*/
+      //NetFEM_Scalar(n,g.S22,1,"Y Stress (pure)");
+      //NetFEM_Scalar(n,g.S12,1,"Shear Stress (pure)");
       NetFEM_End(n);
       delete [] vcoord;
       delete [] vconn;

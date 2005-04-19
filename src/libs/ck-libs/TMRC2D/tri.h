@@ -15,8 +15,8 @@
 #include "messages.h"
 #include "mpi.h"
 
-#define DEBUGREF(x) x
-//#define DEBUGREF(x) 
+//#define DEBUGREF(x) x
+#define DEBUGREF(x) 
 
 // ------------------------ Global Read-only Data ---------------------------
 extern CProxy_chunk mesh;
@@ -279,6 +279,7 @@ class chunk : public TCharmClient1D {
   int joinCommLists(int nIdx, int shd, int *chk, int *idx, int *rChk, 
 		    int *rIdx);
   void addToStack(int eIdx, double len);
+  void rebubble();
 };
 
 #endif

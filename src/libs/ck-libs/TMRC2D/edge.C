@@ -43,12 +43,12 @@ int edge::split(int *m, edgeRef *e_prime, int oIdx, int fIdx,
   // and first is set if this was the first split request on this edge
   intMsg *im;
   elemRef nbr = getNot(requester), nullRef;
-  CkAssert((oIdx == nodes[0]) || (oIdx == nodes[1]));
-  CkAssert((fIdx == nodes[0]) || (fIdx == nodes[1]));
   nullRef.reset();
   if (pending && (waitingFor == requester)) { 
     // already split; waiting for requester
     DEBUGREF(CkPrintf("TMRC2D: edge::split: ** PART 2! ** On edge=%d on chunk=%d, requester=(%d,%d) with nbr=(%d,%d)\n", myRef.idx, myRef.cid, requester.cid, requester.idx, nbr.cid, nbr.idx);)
+  CkAssert((oIdx == nodes[0]) || (oIdx == nodes[1]));
+  CkAssert((fIdx == nodes[0]) || (fIdx == nodes[1]));
     *m = newNodeIdx;
     *e_prime = newEdgeRef;
     *first = 0;
