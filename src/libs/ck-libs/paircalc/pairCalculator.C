@@ -117,14 +117,14 @@ void createPairCalculator(bool sym, int s, int grainSize, int numZ, int* z, int 
 
   pairCalculatorProxy.doneInserting();
 
-#ifdef _DEBUG_
+#ifdef _PAIRCALC_DEBUG_
   CkPrintf("    Finished init {grain=%d, sym=%d, blk=%d, Z=%d, S=%d}\n", grainSize, sym, blkSize, numZ, s);
 #endif
 }
 
 // Deposit data and start calculation
 void startPairCalcLeft(PairCalcID* pcid, int n, complex* ptr, int myS, int myZ){
-#ifdef _DEBUG_
+#ifdef _PAIRCALC_DEBUG_
   CkPrintf("     Calc Left ptr %d\n", ptr);
 #endif
   CkArrayID pairCalculatorID = (CkArrayID)pcid->Aid; 
@@ -170,8 +170,9 @@ void startPairCalcLeft(PairCalcID* pcid, int n, complex* ptr, int myS, int myZ){
   }
 }
 
-void lbsyncPairCalc(PairCalcID* pcid){
-#ifdef _DEBUG_
+
+void isAtSyncPairCalc(PairCalcID* pcid){
+#ifdef _PAIRCALC_DEBUG_
   CkPrintf("     lbsync symm=%d\n", pcid->Symmetric);
 #endif
   CkArrayID pairCalculatorID = (CkArrayID)pcid->Aid; 
@@ -180,7 +181,7 @@ void lbsyncPairCalc(PairCalcID* pcid){
 }
 
 void startPairCalcRight(PairCalcID* pcid, int n, complex* ptr, int myS, int myZ){
-#ifdef _DEBUG_
+#ifdef _PAIRCALC_DEBUG_
   CkPrintf("     Calc Right symm=%d\n", pcid->Symmetric);
 #endif
   CkArrayID pairCalculatorID = (CkArrayID)pcid->Aid; 
@@ -209,7 +210,7 @@ void finishPairCalc(PairCalcID* pcid, int n, double *ptr) {
 }
 
 void finishPairCalc2(PairCalcID* pcid, int n, double *ptr1, double *ptr2) {
-#ifdef _DEBUG_
+#ifdef _PAIRCALC_DEBUG_
   CkPrintf("     Calc Finish\n");
 #endif
 

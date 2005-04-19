@@ -147,6 +147,8 @@ class PairCalculator: public CBase_PairCalculator {
   CkGroupID reducer_id;
   CkSparseContiguousReducer<double> r;
   int reduceElem;
+  bool existsLeft;
+  bool existsRight;
 };
 
 class PairCalcReducer : public Group {

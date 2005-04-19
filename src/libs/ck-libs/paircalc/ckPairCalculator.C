@@ -25,7 +25,8 @@ PairCalculator::PairCalculator(bool sym, int grainSize, int s, int blkSize,  int
   this->cb_aid = cb_aid;
   this->cb_ep = cb_ep;
   reducer_id = gid;
-
+  existsLeft=0;
+  existsRight=0;
   numRecd = 0;
   numExpected = grainSize;
 
@@ -38,8 +39,8 @@ PairCalculator::PairCalculator(bool sym, int grainSize, int s, int blkSize,  int
 
   newData = NULL;
   sumPartialCount = 0;
-  setMigratable(false);
-  usesAtSync=false;
+  setMigratable(true);
+  usesAtSync=true;
 
   CProxy_PairCalcReducer pairCalcReducerProxy(reducer_id); 
   reduceElem=pairCalcReducerProxy.ckLocalBranch()->doRegister(this, symmetric);
@@ -68,25 +69,27 @@ PairCalculator::pup(PUP::er &p)
   p|N;
   p|reduceElem;
   p|cb;
+  p|existsLeft;
+  p|existsRight;
   if (p.isUnpacking()) {
     CProxy_PairCalcReducer pairCalcReducerProxy(reducer_id); 
     pairCalcReducerProxy.ckLocalBranch()->doRegister(this,symmetric);
-//    if(N>0)
+    if(existsLeft)
       inDataLeft = new complex[numExpected*N];
-    if(!symmetric || (symmetric&&thisIndex.x!=thisIndex.y))
-//      if(N>0)
-	inDataRight = new complex[numExpected*N];
+    else
+      inDataLeft=NULL;
+    if(existsRight)
+      inDataRight = new complex[numExpected*N];
+    else 
+      inDataRight=NULL;
     newData = NULL;
     outData = NULL;
   }
-//  if(N>0)
-    for (int i = 0; i < numExpected; i++)
-      p(inDataLeft,numExpected*N);
-  if(!symmetric || (symmetric&&thisIndex.x!=thisIndex.y)){
-//    if(N>0)  
-      p(inDataRight, numExpected* N);
-  }
-              // How about sparseCont reducer???
+  if(existsLeft)
+    p((void*) inDataLeft,numExpected*N*sizeof(complex));
+  if(existsRight)
+    p((void*) inDataRight, numExpected* N*sizeof(complex));
+  // How about sparseCont reducer???
 
 #ifdef _PAIRCALC_DEBUG_ 
   CkPrintf("ckPairCalculatorPUP\n");
@@ -132,9 +135,11 @@ PairCalculator::calculatePairs_gemm(calculatePairsMsg *msg)
 	N = msg->size; // N is init here with the size of the data chunk. 
 	inDataLeft = new complex[numExpected*N];
       }
+    existsLeft=true;
     inData = inDataLeft;
   }
   else {
+    existsRight=true;
     offset = msg->sender - thisIndex.y;
     if (inDataRight==NULL) 
       { // now that we know N we can allocate contiguous space
@@ -430,6 +435,8 @@ PairCalculator::acceptResult(int size, double *matrix1, double *matrix2)
 	delete [] outData;
 	outData = NULL;
       }
+      existsLeft=false;
+      existsRight=false;
     }
 
 }

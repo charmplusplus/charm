@@ -68,7 +68,6 @@ void startPairCalcLeftAndFinish(PairCalcID* pcid, int n, complex* ptr, int myS, 
 
 void startPairCalcRightAndFinish(PairCalcID* pcid, int n, complex* ptr, int myS, int myZ);
 
-void lbsyncPairCalc(PairCalcID* pcid);
-
+void isAtSyncPairCalc(PairCalcID* pcid);
 
 #endif
