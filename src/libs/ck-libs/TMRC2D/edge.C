@@ -43,6 +43,8 @@ int edge::split(int *m, edgeRef *e_prime, int oIdx, int fIdx,
   // and first is set if this was the first split request on this edge
   intMsg *im;
   elemRef nbr = getNot(requester), nullRef;
+  CkAssert((oIdx == nodes[0]) || (oIdx == nodes[1]));
+  CkAssert((fIdx == nodes[0]) || (fIdx == nodes[1]));
   nullRef.reset();
   if (pending && (waitingFor == requester)) { 
     // already split; waiting for requester
@@ -53,13 +55,27 @@ int edge::split(int *m, edgeRef *e_prime, int oIdx, int fIdx,
     *local = 1;
     if (nbr.cid != requester.cid) { 
       *local = 0;
-      im = mesh[requester.cid].addNode(newNode);
+      im = mesh[requester.cid].addNode(newNode, C->theNodes[nodes[0]].boundary,
+				       C->theNodes[nodes[1]].boundary, 1);
       *m = im->anInt;
       CkFreeMsg(im);
       DEBUGREF(CkPrintf("TMRC2D: New node (%f,%f) added at index %d on chunk %d\n", newNode.X(), newNode.Y(), *m, myRef.cid);)
     }
-    if (oIdx == incidentNode) return 1; // incidence as planned
-    else return 0; // incidence is on fIdx
+    int nLoc = newNodeIdx;
+    if (requester.cid == myRef.cid) nLoc = *m;
+    if (oIdx == incidentNode) { // incidence as planned
+      if (nodes[0] == oIdx) nodes[0] = nLoc;
+      else if (nodes[1] == oIdx) nodes[1] = nLoc;
+      else CkAbort("ERROR: incident node not found on edge\n");
+      return 1; 
+    }
+    else { // incidence is on fIdx
+      if (nodes[0] == fIdx) nodes[0] = nLoc;
+      else if (nodes[1] == fIdx) nodes[1] = nLoc;
+      else CkAbort("ERROR: incident node not found on edge\n");
+      return 0;
+    }
+    
   }
   else if (pending) { // can't split a second time yet; waiting for nbr elem
     DEBUGREF(CkPrintf("TMRC2D: edge::split: ** Pending on (%d,%d)! ** On edge=%d on chunk=%d, requester=%d on chunk=%d\n", waitingFor.cid, waitingFor.idx, myRef.idx, myRef.cid, requester.idx, requester.cid);)
@@ -69,17 +85,20 @@ int edge::split(int *m, edgeRef *e_prime, int oIdx, int fIdx,
     DEBUGREF(CkPrintf("TMRC2D: edge::split: ** PART 1! ** On edge=%d on chunk=%d, requester==(%d,%d) with nbr=(%d,%d)\n", myRef.idx, myRef.cid, requester.cid, requester.idx, nbr.cid, nbr.idx);)
     setPending();
     C->theNodes[oIdx].midpoint(C->theNodes[fIdx], newNode);
-    im = mesh[requester.cid].addNode(newNode);
+    im = mesh[requester.cid].addNode(newNode, C->theNodes[nodes[0]].boundary, 
+				     C->theNodes[nodes[1]].boundary, (nbr.cid != -1));
     newNodeIdx = im->anInt;
     CkFreeMsg(im);
     DEBUGREF(CkPrintf("TMRC2D: New node (%f,%f) added at index %d on chunk %d\n", newNode.X(), newNode.Y(), newNodeIdx, myRef.cid);)
-    newEdgeRef = C->addEdge(newNodeIdx, fIdx);
+    newEdgeRef = C->addEdge(newNodeIdx, oIdx);
     DEBUGREF(CkPrintf("TMRC2D: New edge (%d,%d) added between nodes (%f,%f) and newNode\n", newEdgeRef.cid, newEdgeRef.idx, C->theNodes[oIdx].X(), C->theNodes[oIdx].Y());)
     incidentNode = oIdx;
     fixNode = fIdx;
     *m = newNodeIdx;
     *e_prime = newEdgeRef;
     *first = 1;
+  CkAssert((oIdx == nodes[0]) || (oIdx == nodes[1]));
+  CkAssert((fIdx == nodes[0]) || (fIdx == nodes[1]));
     if ((nbr.cid == requester.cid) || (nbr.cid == -1)) *local = 1;
     else *local = 0;
     C->theEdges[newEdgeRef.idx].setPending();
@@ -88,10 +107,17 @@ int edge::split(int *m, edgeRef *e_prime, int oIdx, int fIdx,
     if (*nullNbr) {
       DEBUGREF(CkPrintf("TMRC2D: on edge, nbr is null\n");)
     }
+  CkAssert((oIdx == nodes[0]) || (oIdx == nodes[1]));
+  CkAssert((fIdx == nodes[0]) || (fIdx == nodes[1]));
     if (nbr.cid != -1) {
       waitingFor = nbr;
       double nbrArea = nbr.getArea();
       mesh[nbr.cid].refineElement(nbr.idx, nbrArea);
+    }
+    else {
+      if (nodes[0] == oIdx) nodes[0] = newNodeIdx;
+      else if (nodes[1] == oIdx) nodes[1] = newNodeIdx;
+      else CkAbort("ERROR: incident node not found on edge\n");
     }
     return 1;
   }
@@ -109,12 +135,11 @@ int edge::collapse(elemRef requester, int kIdx, int dIdx, elemRef kNbr,
   elemRef nbr = getNot(requester), nullRef;
   nullRef.reset();
   *local = 0;
-  DEBUGREF(CkPrintf("TMRC2D: [%d] ......dIdx=%d kIdx=%d incidence=%d\n", myRef.cid, dIdx, kIdx, incidentNode);)
   if ((nbr.cid == -1) || (nbr.cid == requester.cid)) *local = 1;
   if (pending && (waitingFor == requester)) { // collapsed; awaiting requester
-    DEBUGREF(CkPrintf("TMRC2D: [%d] ......edge::collapse: ** PART 2! ** On edge=%d on chunk=%d, requester=(%d,%d) with nbr=(%d,%d)\n", myRef.cid, myRef.idx, myRef.cid, requester.cid, requester.idx, nbr.cid, nbr.idx);)
-    CkAssert((dIdx == nodes[0]) || (dIdx == nodes[1]));
-    CkAssert((kIdx == nodes[0]) || (kIdx == nodes[1]));
+    DEBUGREF(CkPrintf("TMRC2D: [%d] ......edge::collapse: ** PART 2! ** On edge=%d on chunk=%d, requester=(%d,%d) with nbr=(%d,%d) dIdx=%d kIdx=%d\n", myRef.cid, myRef.idx, myRef.cid, requester.cid, requester.idx, nbr.cid, nbr.idx, dIdx, kIdx);)
+  CkAssert((dIdx == nodes[0]) || (dIdx == nodes[1]));
+  CkAssert((kIdx == nodes[0]) || (kIdx == nodes[1]));
     *first = 0;
     if (dIdx == incidentNode) { // incidence as planned
       FEM_Node *theNodes = &(C->meshPtr->node);
@@ -177,9 +202,12 @@ int edge::collapse(elemRef requester, int kIdx, int dIdx, elemRef kNbr,
       return 1; 
     }
     else { // incidence is on kNode
+      int tmp = dIdx; 
+      dIdx = kIdx;
+      kIdx = tmp;
       FEM_Node *theNodes = &(C->meshPtr->node);
-      FEM_Comm_Rec *dNodeRec = (FEM_Comm_Rec *)(theNodes->shared.getRec(kIdx));
-      FEM_Comm_Rec *kNodeRec = (FEM_Comm_Rec *)(theNodes->shared.getRec(dIdx));
+      FEM_Comm_Rec *dNodeRec = (FEM_Comm_Rec *)(theNodes->shared.getRec(dIdx));
+      FEM_Comm_Rec *kNodeRec = (FEM_Comm_Rec *)(theNodes->shared.getRec(kIdx));
       // Replace dNode with kNode and delete dNode everywhere in the mesh
       if (dNodeRec) dIdxlShared = dNodeRec->getShared();
       else dIdxlShared = 0;
@@ -193,16 +221,35 @@ int edge::collapse(elemRef requester, int kIdx, int dIdx, elemRef kNbr,
 	dIdxlIdx[i] = dNodeRec->getIdx(i);
 	dIdxlChk[i] = dNodeRec->getChk(i);
       }
-      dIdxlIdx[dIdxlShared] = kIdx;
+      dIdxlIdx[dIdxlShared] = dIdx;
       dIdxlChk[dIdxlShared] = myRef.cid;
       for (i=0; i<kIdxlShared; i++) {
 	kIdxlIdx[i] = kNodeRec->getIdx(i);
 	kIdxlChk[i] = kNodeRec->getChk(i);
       }
-      kIdxlIdx[kIdxlShared] = dIdx;
+      kIdxlIdx[kIdxlShared] = kIdx;
       kIdxlChk[kIdxlShared] = myRef.cid;
-      C->nodeReplaceDelete(dIdx, kIdx, newNode, dIdxlShared, dIdxlChk, 
+      C->nodeReplaceDelete(kIdx, dIdx, newNode, dIdxlShared, dIdxlChk, 
 			   dIdxlIdx);
+      for (i=0; i<dIdxlShared; i++) {
+	chunk = dNodeRec->getChk(i);
+	if (kNodeRec && ((j=existsOn(kNodeRec, chunk)) >= 0)) {
+	  mesh[chunk].nodeReplaceDelete(kNodeRec->getIdx(j), 
+					dNodeRec->getIdx(i), newNode, 
+					dIdxlShared, dIdxlChk, dIdxlIdx);
+	}
+	else {
+	  mesh[chunk].nodeReplaceDelete(-1, dNodeRec->getIdx(i), newNode,
+					kIdxlShared, kIdxlChk, kIdxlIdx);
+	}
+      }
+      for (i=0; i<kIdxlShared; i++) {
+	chunk = kNodeRec->getChk(i);
+	if (!dNodeRec || (existsOn(dNodeRec, chunk) == -1)) {
+	  mesh[chunk].nodeReplaceDelete(kNodeRec->getIdx(i), -1, newNode, 
+					dIdxlShared, dIdxlChk, dIdxlIdx);
+	}
+      }
       for (i=0; i<dIdxlShared; i++) {
 	chunk = dNodeRec->getChk(i);
 	if (kNodeRec && ((j=existsOn(kNodeRec, chunk)) >= 0)) {
@@ -288,7 +335,7 @@ int edge::collapse(elemRef requester, int kIdx, int dIdx, elemRef kNbr,
       }
     }
     //DEBUGREF(CkPrintf("TMRC2D: [%d] ......edge::collapse: LOCKS obtained... On edge=%d on chunk=%d, requester==(%d,%d) with nbr=(%d,%d)\n", myRef.cid, myRef.idx, myRef.cid, requester.cid, requester.idx, nbr.cid, nbr.idx);)
-    DEBUGREF(CkPrintf("TMRC2D: [%d] ......edge::collapse: ** PART 1! ** On edge=%d on chunk=%d, requester==(%d,%d) with nbr=(%d,%d)\n", myRef.cid, myRef.idx, myRef.cid, requester.cid, requester.idx, nbr.cid, nbr.idx);)
+    DEBUGREF(CkPrintf("TMRC2D: [%d] ......edge::collapse: ** PART 1! ** On edge=%d on chunk=%d, requester==(%d,%d) with nbr=(%d,%d) dIdx=%d kIdx=%d\n", myRef.cid, myRef.idx, myRef.cid, requester.cid, requester.idx, nbr.cid, nbr.idx, dIdx, kIdx);)
     CkAssert((dIdx == nodes[0]) || (dIdx == nodes[1]));
     CkAssert((kIdx == nodes[0]) || (kIdx == nodes[1]));
     setPending();

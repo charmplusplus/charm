@@ -326,16 +326,17 @@ void element::collapse(int shortEdge)
     CkAssert(dIdx != kIdx);
   }
   // collapse the edge; takes care of neighbor element
-  DEBUGREF(CkPrintf("TMRC2D: [%d] ...kIdx=%d dIdx=%d\n", myRef.cid, kIdx, dIdx);)
+  present = 0;
   result = edges[shortEdge].collapse(myRef, kIdx, dIdx, keepNbr, delNbr, 
 				     edges[keepEdge], edges[delEdge], 
 				     C->theNodes[nodes[opnode]], 
 				     &local, &first, newNode);
-
+  present = 1;
   // clean up based on result of edge collapse
   if (result == 1) {
     // collapse successful; keepNode is node to keep
     DEBUGREF(CkPrintf("TMRC2D: [%d] ...In collapse[%d](a) shortEdge=%d delEdge=%d keepEdge=%d opnode=%d delNode=%d keepNode=%d delNbr=%d keepNbr=%d\n", myRef.cid, myRef.idx, edges[shortEdge].idx, edges[delEdge].idx, edges[keepEdge].idx, nodes[opnode], dIdx, kIdx, delNbr.idx, keepNbr.idx);)
+    CkAssert((delNbr.cid == -1) || !(delNbr == keepNbr));
     // tell delNbr to replace delEdge with keepEdge
     if (delNbr.cid != -1)
       mesh[delNbr.cid].updateElementEdge(delNbr.idx, edges[delEdge], 
@@ -353,7 +354,7 @@ void element::collapse(int shortEdge)
     if (!local && !first) flag = BOUND_SECOND;
     C->theClient->collapse(myRef.idx, kIdx, dIdx, newNode.X(), newNode.Y(), 
 			   flag);
-    DEBUGREF(CkPrintf("TMRC2D: [%d] theClient->collapse(%d, %d, %d, %2.10f, %2.10f\n", myRef.cid, myRef.idx, kIdx, dIdx, newNode.X(), newNode.Y());)
+    CkPrintf("TMRC2D: [%d] theClient->collapse(%d, %d, %d, %2.10f, %2.10f\n", myRef.cid, myRef.idx, kIdx, dIdx, newNode.X(), newNode.Y());
     // remove self
     C->removeElement(myRef.idx);
   }
@@ -367,6 +368,7 @@ void element::collapse(int shortEdge)
     // tell delNbr to replace delEdge with keepEdge
     keepNbr = edges[keepEdge].getNbr(myRef);
     delNbr = edges[delEdge].getNbr(myRef);
+    CkAssert((delNbr.cid == -1) || !(delNbr == keepNbr));
     int mytmp = dIdx;
     dIdx = kIdx;    
     kIdx = mytmp;
@@ -385,7 +387,7 @@ void element::collapse(int shortEdge)
     if (local && !first) flag = LOCAL_SECOND;
     if (!local && first) flag = BOUND_FIRST;
     if (!local && !first) flag = BOUND_SECOND;
-    DEBUGREF(CkPrintf("TMRC2D: [%d] theClient->collapse(%d, %d, %d, %2.10f, %2.10f)\n", myRef.cid, myRef.idx, kIdx, dIdx, newNode.X(), newNode.Y());)
+    CkPrintf("TMRC2D: [%d] theClient->collapse(%d, %d, %d, %2.10f, %2.10f)\n", myRef.cid, myRef.idx, kIdx, dIdx, newNode.X(), newNode.Y());
     C->theClient->collapse(myRef.idx, kIdx, dIdx,
 			   newNode.X(), newNode.Y(), flag);
     // remove self
@@ -498,6 +500,8 @@ void element::sanityCheck(chunk *c, elemRef shouldRef, int n)
     CkAssert((nodes[i] < n) && (nodes[i] > -1));
     CkAssert(!(edges[i].isNull()));
     edges[i].sanityCheck();
+    CkAssert((C->theEdges[edges[i].idx].nodes[0]==nodes[i]) || (C->theEdges[edges[i].idx].nodes[0]==nodes[(i+1)%3]));
+    CkAssert((C->theEdges[edges[i].idx].nodes[1]==nodes[i]) || (C->theEdges[edges[i].idx].nodes[1]==nodes[(i+1)%3]));
   }
   CkAssert(nodes[0] != nodes[1]);
   CkAssert(nodes[0] != nodes[2]);

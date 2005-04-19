@@ -610,28 +610,27 @@ driver(void)
     for (i=0;i<g.nnodes;i++) {
       loc[i]=g.coord[i];//+g.d[i];
     }
-    double desiredArea = calcArea(g, 0);
+    double desiredArea = calcArea(g, 42);
     double refineArea = desiredArea/2.0;
     double *areas=new double[g.nelems];
     //prepare to refine
     for (i=0;i<g.nelems;i++) {
-      areas[i]= calcArea(g, i);
-      //areas[i]=refineArea;
+      areas[i]=refineArea;
     }
     areas[42] = refineArea;
     CkPrintf("[%d] Starting refinement step: %d nodes, %d elements\n", myChunk,g.nnodes,g.nelems);
     FEM_REFINE2D_Split(FEM_Mesh_default_read(),FEM_NODE,(double *)loc,FEM_ELEM,areas,FEM_SPARSE);
-    repeat_after_split((void *)&g);
-    g.nelems = FEM_Mesh_get_length(FEM_Mesh_default_read(),FEM_ELEM);
-    g.nnodes = FEM_Mesh_get_length(FEM_Mesh_default_read(),FEM_NODE);
-    CkPrintf("[%d] Done with refinement step: %d nodes, %d elements\n",
-	     myChunk,g.nnodes,g.nelems);
     for (i=0; i<g.nnodes; i++) {
       g.validNode[i] = 1;
     }
     for (i=0; i<g.nelems; i++) {
       g.validElem[i] = 1;
     }
+    repeat_after_split((void *)&g);
+    g.nelems = FEM_Mesh_get_length(FEM_Mesh_default_read(),FEM_ELEM);
+    g.nnodes = FEM_Mesh_get_length(FEM_Mesh_default_read(),FEM_NODE);
+    CkPrintf("[%d] Done with refinement step: %d nodes, %d elements\n",
+	     myChunk,g.nnodes,g.nelems);
     if (1) { //Publish data to the net
       NetFEM n=NetFEM_Begin(myChunk,t,2,NetFEM_WRITE);
       int count=0;
@@ -684,12 +683,11 @@ driver(void)
     for (i=0;i<g.nnodes;i++) {
       loc[i]=g.coord[i];//+g.d[i];
     }
+    delete[] areas;
+    areas=new double[g.nelems];
     for (i=0;i<g.nelems;i++) {
       areas[i]=desiredArea;
     }
-    //coarsen all steps
-    //areas[z] *= 2.0;
-    //z += 3;
     CkPrintf("[%d] Starting coarsening step: %d nodes, %d elements\n", myChunk,g.nnodes,g.nelems);
     FEM_REFINE2D_Coarsen(FEM_Mesh_default_read(),FEM_NODE,(double *)g.coord,FEM_ELEM,areas);
     repeat_after_split((void *)&g);

@@ -15,8 +15,8 @@
 #include "messages.h"
 #include "mpi.h"
 
-//#define DEBUGREF(x) x
-#define DEBUGREF(x) 
+#define DEBUGREF(x) x
+//#define DEBUGREF(x) 
 
 // ------------------------ Global Read-only Data ---------------------------
 extern CProxy_chunk mesh;
@@ -248,7 +248,7 @@ class chunk : public TCharmClient1D {
   // these methods allow for run-time additions/modifications to the chunk
   void allocMesh(int nEl);
   void adjustMesh();
-  intMsg *addNode(node n);
+  intMsg *addNode(node n, int b1, int b2, int internal);
   //int addNode(node n);
   edgeRef addEdge(int n1, int n2);
   elemRef addElement(int n1, int n2, int n3);
@@ -269,6 +269,8 @@ class chunk : public TCharmClient1D {
   void removeLock(int lhc, int lhi);
   void insertLock(int lhc, int lhi, double prio);
   void fixNode(int nIdx);
+  int joinCommLists(int nIdx, int shd, int *chk, int *idx, int *rChk, 
+		    int *rIdx);
 };
 
 #endif

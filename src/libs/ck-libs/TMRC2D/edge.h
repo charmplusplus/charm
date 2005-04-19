@@ -22,6 +22,7 @@ class edge {
   edge() { unsetPending(); present = 0; }
   edge(int idx, int cid, chunk *myChk) { 
     unsetPending(); myRef.set(cid, idx); C = myChk; present = 1;
+    nodes[0] = nodes[1] = -1;
   }
   edge(elemRef e1, elemRef e2, int p) {
     elements[0] = e1;  elements[1] = e2;  pending = p; 
@@ -47,6 +48,8 @@ class edge {
     myRef = e.myRef;
     present = e.present;
     length = e.length;
+    nodes[0] = e.nodes[0];
+    nodes[1] = e.nodes[1];
   }
   void set(int idx, int cid, chunk *myChk)  { 
     unsetPending(); myRef.set(cid, idx); C = myChk; present = 1;
@@ -72,6 +75,8 @@ class edge {
     newEdgeRef = e.newEdgeRef;
     myRef = e.myRef;
     present = e.present;
+    nodes[0] = e.nodes[0];
+    nodes[1] = e.nodes[1];
     return *this; 
   }
   int isPresent() { return present; }

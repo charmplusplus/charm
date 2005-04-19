@@ -44,7 +44,7 @@ module refine {
     entry void tweakMesh();
     entry void improveChunk();
     entry [sync, threaded] void improve();
-    entry [sync] intMsg *addNode(node n);
+    entry [sync] intMsg *addNode(node, int, int, int);
     entry [sync] void removeNode(int);
     entry [sync] void removeEdge(int);
     entry [sync] void removeElement(int);
