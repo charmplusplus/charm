@@ -13,7 +13,7 @@
 DOCDIR=..
 
 # Destination directory for web-accessible copy of files (e.g., on PPL machines)
-WEBDIR=/expand8/www/ppl_manuals
+WEBDIR=/www/ppl_manuals
 
 # Call to Latex2html
 L2H=latex2html -white -antialias -local_icons \
