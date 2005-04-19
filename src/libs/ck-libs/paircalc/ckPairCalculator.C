@@ -4,7 +4,6 @@
 
 
 PairCalculator::PairCalculator(CkMigrateMessage *m) { }
-	
 
 PairCalculator::PairCalculator(bool sym, int grainSize, int s, int blkSize,  int op1,  FuncType fn1, int op2,  FuncType fn2, CkCallback cb, CkGroupID gid, CkArrayID cb_aid, int cb_ep, bool conserveMemory) 
 {
@@ -25,8 +24,8 @@ PairCalculator::PairCalculator(bool sym, int grainSize, int s, int blkSize,  int
   this->cb_aid = cb_aid;
   this->cb_ep = cb_ep;
   reducer_id = gid;
-  existsLeft=0;
-  existsRight=0;
+  existsLeft=false;
+  existsRight=false;
   numRecd = 0;
   numExpected = grainSize;
 
@@ -39,11 +38,11 @@ PairCalculator::PairCalculator(bool sym, int grainSize, int s, int blkSize,  int
 
   newData = NULL;
   sumPartialCount = 0;
-  //  setMigratable(true);
-  //  usesAtSync=true;
-  setMigratable(false);
+  setMigratable(true);
+  usesAtSync=true;
+  //setMigratable(false);
   CProxy_PairCalcReducer pairCalcReducerProxy(reducer_id); 
-  reduceElem=pairCalcReducerProxy.ckLocalBranch()->doRegister(this, symmetric);
+  pairCalcReducerProxy.ckLocalBranch()->doRegister(this, symmetric);
 }
 
 void
@@ -67,13 +66,10 @@ PairCalculator::pup(PUP::er &p)
   p|symmetric;
   p|sumPartialCount;
   p|N;
-  p|reduceElem;
   p|cb;
   p|existsLeft;
   p|existsRight;
   if (p.isUnpacking()) {
-    CProxy_PairCalcReducer pairCalcReducerProxy(reducer_id); 
-    pairCalcReducerProxy.ckLocalBranch()->doRegister(this,symmetric);
     if(existsLeft)
       inDataLeft = new complex[numExpected*N];
     else
@@ -86,9 +82,9 @@ PairCalculator::pup(PUP::er &p)
     outData = NULL;
   }
   if(existsLeft)
-    p((void*) inDataLeft,numExpected*N*sizeof(complex));
+    p((void*) inDataLeft, numExpected * N * sizeof(complex));
   if(existsRight)
-    p((void*) inDataRight, numExpected* N*sizeof(complex));
+    p((void*) inDataRight, numExpected* N * sizeof(complex));
   // How about sparseCont reducer???
 
 #ifdef _PAIRCALC_DEBUG_ 
@@ -100,9 +96,7 @@ PairCalculator::pup(PUP::er &p)
 
 PairCalculator::~PairCalculator()
 {
-  //we're going so take self out of group
-  CProxy_PairCalcReducer pairCalcReducerProxy(reducer_id); 
-  //  pairCalcReducerProxy.ckLocalBranch()->unRegister(reduceElem);  
+
   if(outData!=NULL)  
     delete [] outData;
 
@@ -116,7 +110,10 @@ PairCalculator::~PairCalculator()
     delete [] newData;
 
 }
-
+void PairCalculator::ResumeFromSync() {
+    CProxy_PairCalcReducer pairCalcReducerProxy(reducer_id); 
+    pairCalcReducerProxy.ckLocalBranch()->doRegister(this,symmetric);
+}
 void
 PairCalculator::calculatePairs_gemm(calculatePairsMsg *msg)
 {
@@ -432,11 +429,14 @@ PairCalculator::acceptResult(int size, double *matrix1, double *matrix2)
       if(!symmetric || (symmetric&&thisIndex.x!=thisIndex.y)) {
 	delete [] inDataRight;
 	inDataRight = NULL;
-	delete [] outData;
-	outData = NULL;
       }
       existsLeft=false;
       existsRight=false;
+      if(outData!=NULL)
+	{
+	  delete [] outData;
+	  outData = NULL;
+	}
     }
 
 }
@@ -620,17 +620,7 @@ PairCalcReducer::broadcastEntireResult(int size, double* matrix1, double* matrix
     (localElements[symmtype])[i]->acceptResult(size, matrix1, matrix2); 
 }
 
-int
-PairCalcReducer:: doRegister(PairCalculator *elem, bool symmtype){
-  numRegistered[symmtype]++;
-  return(localElements[symmtype].push_back_v(elem));
-}
 
-void
-PairCalcReducer:: unRegister(int elem){
-    localElements[symmtype].remove(elem);
-    numRegistered[symmtype]--;
-}
 
 
 

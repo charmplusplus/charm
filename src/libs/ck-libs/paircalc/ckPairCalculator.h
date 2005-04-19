@@ -110,8 +110,8 @@ class PairCalculator: public CBase_PairCalculator {
   PairCalculator(CkMigrateMessage *);
   ~PairCalculator();
   void lbsync() {AtSync();};
+  void ResumeFromSync();
   void calculatePairs(int, complex *, int, bool, bool); 
-  //  void calculatePairs_gemm(int, complex *, int, bool, bool); 
   void calculatePairs_gemm(calculatePairsMsg *msg);
   void acceptResult(int size, double *matrix);
   void acceptResult(int size, double *matrix1, double *matrix2);
@@ -130,6 +130,7 @@ class PairCalculator: public CBase_PairCalculator {
         
         return sum;
   }
+
  private:
   int numRecd, numExpected, grainSize, S, blkSize, N;
   int kUnits;
@@ -146,7 +147,6 @@ class PairCalculator: public CBase_PairCalculator {
   int cb_ep;
   CkGroupID reducer_id;
   CkSparseContiguousReducer<double> r;
-  int reduceElem;
   bool existsLeft;
   bool existsRight;
 };
@@ -160,10 +160,19 @@ class PairCalcReducer : public Group {
       tmp_matrix = NULL;
   }
   ~PairCalcReducer() {}
+  void clearRegister()
+    {  
+      localElements[0].resize(0);
+      localElements[1].resize(0);
+      numRegistered[0]=0;
+      numRegistered[1]=0;
+    }
   void broadcastEntireResult(int size, double* matrix, bool symmtype);
   void broadcastEntireResult(int size, double* matrix1, double* matrix2, bool symmtype);
-  int doRegister(PairCalculator *, bool);
-  void unRegister(int pos);
+  void doRegister(PairCalculator *elem, bool symmtype){
+    numRegistered[symmtype]++;
+    localElements[symmtype].push_back(elem);
+  }
 
   void acceptContribute(int size, double* matrix, CkCallback cb, bool isAllReduce, bool symmtype);
   

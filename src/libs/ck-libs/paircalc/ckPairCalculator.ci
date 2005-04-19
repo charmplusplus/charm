@@ -33,6 +33,7 @@ module ckPairCalculator {
 
 	group PairCalcReducer {
 		entry PairCalcReducer();
+		entry void clearRegister();
 		entry void broadcastEntireResult(int size, double matrix[size], bool symmtype);	
 		entry void broadcastEntireResult(int size, double matrix1[size], double matrix2[size], bool symmtype);			
 		entry void startMachineReduction(void);
