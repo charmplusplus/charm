@@ -76,6 +76,68 @@ typedef struct __context_block {
 mycb_t *contextBlock = NULL;
 
 
+#define AMMASSO_STATS   1
+#if AMMASSO_STATS
+
+#define AMMASSO_STATS_VARS(event)   double event ## _start;    \
+                                    double event ## _end;      \
+                                    double event ## _total;    \
+                                    long event ## _count;
+
+typedef struct __ammasso_stats {
+
+  AMMASSO_STATS_VARS(MachineInit)
+
+  AMMASSO_STATS_VARS(AmmassoDoIdle)
+
+  AMMASSO_STATS_VARS(DeliverViaNetwork)
+  AMMASSO_STATS_VARS(DeliverViaNetwork_pre_lock)
+  AMMASSO_STATS_VARS(DeliverViaNetwork_lock)
+  AMMASSO_STATS_VARS(DeliverViaNetwork_post_lock)
+  AMMASSO_STATS_VARS(DeliverViaNetwork_send)
+
+  AMMASSO_STATS_VARS(getQPSendBuffer)
+  AMMASSO_STATS_VARS(sendDataOnQP)
+
+  AMMASSO_STATS_VARS(AsynchronousEventHandler)
+  AMMASSO_STATS_VARS(CompletionEventHandler)
+  AMMASSO_STATS_VARS(ProcessMessage)
+  AMMASSO_STATS_VARS(processAmmassoControlMessage)
+
+} AmmassoStats;
+
+AmmassoStats __stats;
+
+#define TO_NS  ((double)1000000000.0)
+
+#define AMMASSO_STATS_START(event) { __stats.event ## _start = CmiWallTimer();     \
+                                   }
+
+#define AMMASSO_STATS_END(event)   { __stats.event ## _end = CmiWallTimer();         \
+                                     __stats.event ## _count++;                      \
+                                     __stats.event ## _total += (__stats.event ## _end - __stats.event ## _start);   \
+                                   }
+
+#define AMMASSO_STATS_DISPLAY_VERBOSE(event) { char buf[128];                        \
+                                               CmiPrintf("[%d] Ammasso Stats: event -> " #event "_count = %d\n", CmiMyPe(), __stats.event ## _count);   \
+                                               CmiPrintf("[%d]                event -> " #event "_total = %.3fns\n", CmiMyPe(), __stats.event ## _total * TO_NS);   \
+                                               CmiPrintf("[%d]                                                    " #event " average: %.3fns\n", CmiMyPe(), (((double)__stats.event ## _total)/(__stats.event ## _count)) * TO_NS); \
+                                             }
+
+#define AMMASSO_STATS_DISPLAY(event) {                                               \
+                                       CmiPrintf("[%d] " #event " average: %.3fns\n", CmiMyPe(), (((double)__stats.event ## _total)/(__stats.event ## _count)) * TO_NS); \
+				     }
+
+#elif
+
+#define AMMASSO_STATS_START(event)
+#define AMMASSO_STATS_END(event)
+#define AMMASSO_STATS_DISPLAY(event)
+
+#endif
+
+
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 // Function ProtoTypes /////////////////////////////////////////////////////////////////////////////
 
@@ -133,6 +195,8 @@ void CmiMachineInit(char **argv) {
 
   char buf[128];
   cc_status_t rtn;
+
+  AMMASSO_STATS_START(MachineInit)
 
   MACHSTATE(3, "CmiMachineInit() - INFO: (***** Ammasso Specific*****) - Called... Initializing RNIC...");
   MACHSTATE1(3, "CmiMachineInit() - INFO: Cmi_charmrun_pid = %d", Cmi_charmrun_pid);
@@ -226,6 +290,8 @@ void CmiMachineInit(char **argv) {
   }
 
   MACHSTATE(3, "CmiMachineInit() - INFO: Completed Successfully !!!");
+
+  AMMASSO_STATS_END(MachineInit)
 }
 
 
@@ -248,7 +314,9 @@ void AmmassoDoIdle() {
 
   int i;
 
-  //MACHSTATE(3, "AmmassoDoIdle() - INFO: Called...");
+  AMMASSO_STATS_START(AmmassoDoIdle)
+
+  MACHSTATE(3, "AmmassoDoIdle() - INFO: Called...");
   //
   //for (i = 0; i < contextBlock->numNodes; i++) {
   //
@@ -258,6 +326,14 @@ void AmmassoDoIdle() {
   //  MACHSTATE1(3, "AmmassoDoIdle() - INFO: Calling displayQueueQuery() on QP for node %d", i);
   //  displayQueueQuery(nodes[i].qp, &(nodes[i].qp_attrs));
   //}
+
+  for (i = 0; i < contextBlock->numNodes; i++) {
+    if (i == contextBlock->myNode) continue;
+    CompletionEventHandler(contextBlock->rnic, nodes[i].recv_cq, &(nodes[i]));
+    CompletionEventHandler(contextBlock->rnic, nodes[i].send_cq, &(nodes[i]));
+  }
+
+  AMMASSO_STATS_END(AmmassoDoIdle)
 }
 
 void CmiNotifyIdle(void) {
@@ -290,6 +366,8 @@ void sendAck(OtherNode node) {
 int getQPSendBuffer(OtherNode node, char force) {
 
   int rtnBufIndex, i;
+
+  AMMASSO_STATS_START(getQPSendBuffer)
 
   MACHSTATE1(3, "getQPSendBuffer() - Ammasso - Called (send to node %d)...", node->myNode);
 
@@ -340,7 +418,11 @@ int getQPSendBuffer(OtherNode node, char force) {
     if (rtnBufIndex >= 0) {
       break;
     } else {
-      usleep(1);
+
+      //usleep(1);
+
+      CompletionEventHandler(contextBlock->rnic, node->recv_cq, node);
+      CompletionEventHandler(contextBlock->rnic, node->send_cq, node);
     }
   }
 
@@ -351,6 +433,8 @@ int getQPSendBuffer(OtherNode node, char force) {
 
   MACHSTATE1(3, "getQPSendBuffer() - Ammasso - Finished (returning buffer index: %d)", rtnBufIndex);
 
+  AMMASSO_STATS_END(getQPSendBuffer)
+
   return rtnBufIndex;
 
 }
@@ -358,12 +442,18 @@ int getQPSendBuffer(OtherNode node, char force) {
 // NOTE: The force parameter can be thought of as an "is ACK" control message flag (see comments in getQPSendBuffer())
 int sendDataOnQP(char* data, int len, OtherNode node, char force) {
 
+  char buf[256];
   int sendBufIndex;
   int toSendLength;
   cc_status_t rtn;
   cc_uint32_t WRsPosted;
   char isFirst = 1;
   char *origMsgStart = data;
+
+  AMMASSO_STATS_START(sendDataOnQP)
+
+  //CompletionEventHandler(contextBlock->rnic, node->recv_cq, node);
+  CompletionEventHandler(contextBlock->rnic, node->send_cq, node);
 
   MACHSTATE2(3, "sendDataOnQP() - Ammasso - INFO: Called (send to node %d, len = %d)...", node->myNode, len);
 
@@ -438,7 +528,9 @@ int sendDataOnQP(char* data, int len, OtherNode node, char force) {
 
       // Let the user know that an error occured
       MACHSTATE3(3, "sendDataOnQP() - Ammasso - ERROR: Unable to send data to node %d: %d, \"%s\"", node->myNode, rtn, cc_status_to_string(rtn));
-      CmiAbort("Unable to send packet - See Machine Layer Debug File for more details.");
+      sprintf(buf, "sendDataOnQP() - Ammasso - ERROR: Unable to send data to node %d: %d, \"%s\"\n", node->myNode, rtn, cc_status_to_string(rtn));
+      //CmiAbort("Unable to send packet - See Machine Layer Debug File for more details.");
+      CmiAbort(buf);
     }
 
     // Update the data and len variables for the next while (if fragmenting is needed
@@ -446,6 +538,8 @@ int sendDataOnQP(char* data, int len, OtherNode node, char force) {
     len -= toSendLength;
     isFirst = 0;
   }
+
+  AMMASSO_STATS_END(sendDataOnQP)
 }
 
 
@@ -459,6 +553,9 @@ void DeliverViaNetwork(OutgoingMsg msg, OtherNode otherNode, int rank, unsigned 
   cc_data_addr_t sgl;
   cc_sq_wr_t wr;
   cc_uint32_t WRsPosted;
+
+  AMMASSO_STATS_START(DeliverViaNetwork)
+  AMMASSO_STATS_START(DeliverViaNetwork_pre_lock)
 
   MACHSTATE(3, "DeliverViaNetwork() - Ammasso - INFO: Called...");
 
@@ -503,11 +600,17 @@ void DeliverViaNetwork(OutgoingMsg msg, OtherNode otherNode, int rank, unsigned 
   //#endif
   //CmiLock(otherNode->send_next_lock);
 
+  AMMASSO_STATS_END(DeliverViaNetwork_pre_lock)
+  AMMASSO_STATS_START(DeliverViaNetwork_lock)
+
   MACHSTATE(3, "DeliverViaNetwork() - INFO: Pre-send_next_lock");
   #if CMK_SHARED_VARS_UNAVAILABLE
     while (otherNode->send_next_lock != 0) { usleep(1); } // Since CmiLock() is not really a lock, actually wait
   #endif
   CmiLock(otherNode->send_next_lock);
+
+  AMMASSO_STATS_END(DeliverViaNetwork_lock)
+  AMMASSO_STATS_START(DeliverViaNetwork_post_lock)
 
   DgramHeaderMake(msg->data, rank, msg->src, Cmi_charmrun_pid, otherNode->send_next, broot);  // Set DGram Header Fields In-Place
   otherNode->send_next = ((otherNode->send_next+1) & DGRAM_SEQNO_MASK);  // Increase the sequence number
@@ -560,7 +663,10 @@ void DeliverViaNetwork(OutgoingMsg msg, OtherNode otherNode, int rank, unsigned 
   //  MACHSTATE2(3, "DeliverViaNetwork() - Ammasso - ERROR - Unable post Work Request to Send Queue: %d, \"%s\"", rtn, cc_status_to_string(rtn));
   //  displayQueueQuery(otherNode->qp, &(otherNode->qp_attrs));
   //}
+
+  AMMASSO_STATS_START(DeliverViaNetwork_send)
   sendDataOnQP(msg->data, msg->size, otherNode, 0);  // These are never forced (not control message of type ACKs)
+  AMMASSO_STATS_END(DeliverViaNetwork_send)
 
   CmiUnlock(otherNode->send_next_lock);
   MACHSTATE(3, "DeliverViaNetwork() - INFO: Post-send_next_lock");
@@ -616,6 +722,9 @@ void DeliverViaNetwork(OutgoingMsg msg, OtherNode otherNode, int rank, unsigned 
   ***************************************************************/
 
   MACHSTATE(3, "DeliverViaNetwork() - Ammasso - INFO: Completed.");
+
+  AMMASSO_STATS_END(DeliverViaNetwork_post_lock)
+  AMMASSO_STATS_END(DeliverViaNetwork)
 }
 
 
@@ -692,6 +801,8 @@ void processAmmassoControlMessage(char* msg, int len, char *needAck) {
 
   int nodeIndex, ctrlType, i;
   OtherNode node;
+
+  AMMASSO_STATS_START(processAmmassoControlMessage)
 
   // Check the message
   if (len != AMMASSO_CTRLMSG_LEN || CtrlHeader_GetCharmrunPID(msg) != Cmi_charmrun_pid) {
@@ -782,6 +893,8 @@ void processAmmassoControlMessage(char* msg, int len, char *needAck) {
 
       break;
   }
+
+  AMMASSO_STATS_END(processAmmassoControlMessage)
 }
 
 void ProcessMessage(char* msg, int len, char *needAck) {
@@ -791,6 +904,8 @@ void ProcessMessage(char* msg, int len, char *needAck) {
   unsigned char checksum;
   OtherNode fromNode;
   char *newMsg;
+
+  AMMASSO_STATS_START(ProcessMessage)
 
   MACHSTATE(3, "ProcessMessage() - INFO: Called...");
 
@@ -994,6 +1109,7 @@ void ProcessMessage(char* msg, int len, char *needAck) {
            }
   #endif
 
+  AMMASSO_STATS_END(ProcessMessage)
 }
 
 // DMK : NOTE : I attempted to put this is a single function to be called by many places but it was getting
@@ -1168,6 +1284,26 @@ void CmiMachineExit(void) {
 
   MACHSTATE(3, "CmiMachineExit() - INFO: Called...");
 
+  // DMK - This is a sleep to help keep the output from the stat displays below separated in the program output
+  if (contextBlock->myNode)
+    sleep(contextBlock->myNode);
+
+  AMMASSO_STATS_DISPLAY(MachineInit)
+
+  AMMASSO_STATS_DISPLAY(DeliverViaNetwork)
+  AMMASSO_STATS_DISPLAY(DeliverViaNetwork_pre_lock)
+  AMMASSO_STATS_DISPLAY(DeliverViaNetwork_lock)
+  AMMASSO_STATS_DISPLAY(DeliverViaNetwork_post_lock)
+  AMMASSO_STATS_DISPLAY(DeliverViaNetwork_send)
+
+  AMMASSO_STATS_DISPLAY(getQPSendBuffer)
+  AMMASSO_STATS_DISPLAY(sendDataOnQP)
+
+  AMMASSO_STATS_DISPLAY(AsynchronousEventHandler)
+  AMMASSO_STATS_DISPLAY(CompletionEventHandler)
+  AMMASSO_STATS_DISPLAY(ProcessMessage)
+  AMMASSO_STATS_DISPLAY(processAmmassoControlMessage)
+
   // TODO: It would probably be a good idea to make a "closing connection" control message so all of the nodes
   //       can agree to close the connections in a graceful way when they are all done.  Similar to the READY packet
   //       but for closing so the closing is graceful (and the other node does not try to reconnect).  This barrier
@@ -1239,6 +1375,8 @@ void AsynchronousEventHandler(cc_rnic_handle_t rnic, cc_event_record_t *er, void
   cc_status_t rtn;
   char buf[16];
   cc_qp_modify_attrs_t modAttrs;
+
+  AMMASSO_STATS_START(AsynchronousEventHandler)
 
   MACHSTATE2(3, "AsynchronousEventHandler() - INFO: Called... event_id = %d, \"%s\"", er->event_id, cc_event_id_to_string(er->event_id));
 
@@ -1465,6 +1603,8 @@ void AsynchronousEventHandler(cc_rnic_handle_t rnic, cc_event_record_t *er, void
       break;
 
   } // end switch (er->event_id)
+
+  AMMASSO_STATS_END(AsynchronousEventHandler)
 }
 
 
@@ -1478,14 +1618,16 @@ void CompletionEventHandler(cc_rnic_handle_t rnic, cc_cq_handle_t cq, void *cb) 
   char* recvBuf;
   char needAck;
 
-  MACHSTATE(3, "CompletionEventHandler() - Called...");
+  AMMASSO_STATS_START(CompletionEventHandler)
 
-  // Reset the request notification type
-  rtn = cc_cq_request_notification(contextBlock->rnic, cq, CC_CQ_NOTIFICATION_TYPE_NEXT);
-  if (rtn != CC_OK) {
-    // Let the user know what happened
-    MACHSTATE2(3, "CompletionEventHandler() - Ammasso - WARNING - Unable to reset CQ request notification type: %d, \"%s\"", rtn, cc_status_to_string(rtn));
-  }
+  //MACHSTATE(3, "CompletionEventHandler() - Called...");
+
+  //// Reset the request notification type
+  //rtn = cc_cq_request_notification(contextBlock->rnic, cq, CC_CQ_NOTIFICATION_TYPE_NEXT);
+  //if (rtn != CC_OK) {
+  //  // Let the user know what happened
+  //  MACHSTATE2(3, "CompletionEventHandler() - Ammasso - WARNING - Unable to reset CQ request notification type: %d, \"%s\"", rtn, cc_status_to_string(rtn));
+  //}
 
   // Keep polling the Completion Queue until it is empty of Work Completions
   while (1) {
@@ -1603,6 +1745,7 @@ void CompletionEventHandler(cc_rnic_handle_t rnic, cc_cq_handle_t cq, void *cb) 
     } // end switch (wc.wr_type)
   } // end while (1)
 
+  AMMASSO_STATS_END(CompletionEventHandler)
 }
 
 
@@ -1668,7 +1811,16 @@ void CmiAmmassoOpenQueuePairs() {
 
   // Need to block here until all the connections for this node are made
   MACHSTATE(3, "CmiAmmassoOpenQueuePairs() - INFO: Waiting for all connections to be established...");
-  while (contextBlock->outstandingConnectionCount > 0) usleep(1000);
+  while (contextBlock->outstandingConnectionCount > 0) {
+
+    usleep(1000);
+
+    for (i = 0; i < contextBlock->numNodes; i++) {
+      if (i == contextBlock->myNode) continue;
+      CompletionEventHandler(contextBlock->rnic, nodes[i].recv_cq, &(nodes[i]));
+      CompletionEventHandler(contextBlock->rnic, nodes[i].send_cq, &(nodes[i]));
+    }
+  }
   MACHSTATE(3, "CmiAmmassoOpenQueuePairs() - INFO: All Connections have been established... Continuing");
 
   // Pause a little so both ends of the connection have time to receive and process the asynchronous events
@@ -1737,7 +1889,15 @@ void CmiAmmassoOpenQueuePairs() {
   //        all the threads execute... the thread executing this is one of those so it has to reach that node barrier
   //        before any of the other can start doing much of anything).
   MACHSTATE(3, "CmiAmmassoOpenQueuePairs() - INFO: Waiting for all neighboors to be ready...");
-  while (contextBlock->nodeReadyCount > 0) usleep(10000);  // Sleep 10ms
+  while (contextBlock->nodeReadyCount > 0) {
+    usleep(10000);  // Sleep 10ms
+    
+    for (i = 0; i < contextBlock->numNodes; i++) {
+      if (i == contextBlock->myNode) continue;
+      CompletionEventHandler(contextBlock->rnic, nodes[i].recv_cq, &(nodes[i]));
+      CompletionEventHandler(contextBlock->rnic, nodes[i].send_cq, &(nodes[i]));
+    }
+  }
   MACHSTATE(3, "CmiAmmassoOpenQueuePairs() - INFO: All neighboors ready...");
 
   MACHSTATE(3, "CmiAmmassoOpenQueuePairs() - INFO: Finished.");
@@ -1780,6 +1940,7 @@ void establishQPConnection(OtherNode node, int reuseQPFlag) {
     MACHSTATE(3, "establishQPConnection() - INFO: (PRE-RECV-CQ-REQUEST-NOTIFICATION)");
 
     // Setup the Request Notification Type
+    //rtn = cc_cq_request_notification(contextBlock->rnic, node->recv_cq, CC_CQ_NOTIFICATION_TYPE_NEXT);
     rtn = cc_cq_request_notification(contextBlock->rnic, node->recv_cq, CC_CQ_NOTIFICATION_TYPE_NEXT);
     if (rtn != CC_OK) {
 
@@ -1811,6 +1972,7 @@ void establishQPConnection(OtherNode node, int reuseQPFlag) {
     MACHSTATE(3, "establishQPConnection() - INFO: (PRE-SEND-CQ-REQUEST-NOTIFICATION)");
 
     // Setup the Request Notification Type
+    //rtn = cc_cq_request_notification(contextBlock->rnic, node->send_cq, CC_CQ_NOTIFICATION_TYPE_NEXT);
     rtn = cc_cq_request_notification(contextBlock->rnic, node->send_cq, CC_CQ_NOTIFICATION_TYPE_NEXT);
     if (rtn != CC_OK) {
 
@@ -2059,7 +2221,7 @@ void establishQPConnection(OtherNode node, int reuseQPFlag) {
       (node->sq_wr[i]).wr_id = (cc_uint64_t)(unsigned long)&(node->sq_wr[i]);
       (node->sq_wr[i]).wr_u.send.local_sgl.sge_count = 1;  // TODO : Make this more flexible
       (node->sq_wr[i]).wr_u.send.local_sgl.sge_list = &(node->send_sgl[i]);
-      (node->sq_wr[i]).signaled = 1;   // Tagged ???
+      (node->sq_wr[i]).signaled = 1; // ((i % AMMASSO_NUMMSGBUFS_PER_QP == 0) ? (1) : (0));   // Tagged ???
     }
 
     // DMK : NOTE : This was originally from one of the Ammasso Examples.  We don't need it here but I'm leaving it in as an
