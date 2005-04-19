@@ -25,8 +25,8 @@
 
 #define AMMASSO_PORT        2583
 
-#define AMMASSO_BUFSIZE            (1024 * 16)
-#define AMMASSO_NUMMSGBUFS_PER_QP  4
+#define AMMASSO_BUFSIZE            (1024 * 1)
+#define AMMASSO_NUMMSGBUFS_PER_QP  64
 #define AMMASSO_BUF_IN_USE         0
 #define AMMASSO_BUF_NOT_IN_USE     1
 
@@ -97,16 +97,63 @@ typedef struct __ammasso_stats {
   AMMASSO_STATS_VARS(DeliverViaNetwork_send)
 
   AMMASSO_STATS_VARS(getQPSendBuffer)
+  AMMASSO_STATS_VARS(getQPSendBuffer_lock)
+  AMMASSO_STATS_VARS(getQPSendBuffer_CEH)
+  AMMASSO_STATS_VARS(getQPSendBuffer_loop)
+
   AMMASSO_STATS_VARS(sendDataOnQP)
+  AMMASSO_STATS_VARS(sendDataOnQP_pre_send)
+  AMMASSO_STATS_VARS(sendDataOnQP_send)
+  AMMASSO_STATS_VARS(sendDataOnQP_post_send)
+
+  AMMASSO_STATS_VARS(sendDataOnQP_1024)
+  AMMASSO_STATS_VARS(sendDataOnQP_2048)
+  AMMASSO_STATS_VARS(sendDataOnQP_4096)
+  AMMASSO_STATS_VARS(sendDataOnQP_16384)
+  AMMASSO_STATS_VARS(sendDataOnQP_over)
 
   AMMASSO_STATS_VARS(AsynchronousEventHandler)
   AMMASSO_STATS_VARS(CompletionEventHandler)
   AMMASSO_STATS_VARS(ProcessMessage)
   AMMASSO_STATS_VARS(processAmmassoControlMessage)
 
+  AMMASSO_STATS_VARS(sendAck)
+
+  AMMASSO_STATS_VARS(CommunicationServer)
+
 } AmmassoStats;
 
 AmmassoStats __stats;
+
+#define AMMASSO_STATS_INIT_AUX(event)  { __stats.event ## _total = 0.0; __stats.event ## _count = 0; }
+#define AMMASSO_STATS_INIT   {                                                  \
+                               AMMASSO_STATS_INIT_AUX(MachineInit)                  \
+                               AMMASSO_STATS_INIT_AUX(AmmassoDoIdle)                \
+                               AMMASSO_STATS_INIT_AUX(DeliverViaNetwork)            \
+                               AMMASSO_STATS_INIT_AUX(DeliverViaNetwork_pre_lock)   \
+                               AMMASSO_STATS_INIT_AUX(DeliverViaNetwork_lock)       \
+                               AMMASSO_STATS_INIT_AUX(DeliverViaNetwork_post_lock)  \
+                               AMMASSO_STATS_INIT_AUX(DeliverViaNetwork_send)       \
+                               AMMASSO_STATS_INIT_AUX(getQPSendBuffer)              \
+                               AMMASSO_STATS_INIT_AUX(getQPSendBuffer_lock)         \
+                               AMMASSO_STATS_INIT_AUX(getQPSendBuffer_CEH)          \
+                               AMMASSO_STATS_INIT_AUX(getQPSendBuffer_loop)         \
+                               AMMASSO_STATS_INIT_AUX(sendDataOnQP)                 \
+                               AMMASSO_STATS_INIT_AUX(sendDataOnQP_pre_send)        \
+                               AMMASSO_STATS_INIT_AUX(sendDataOnQP_send)            \
+                               AMMASSO_STATS_INIT_AUX(sendDataOnQP_post_send)       \
+                               AMMASSO_STATS_INIT_AUX(sendDataOnQP_1024)            \
+                               AMMASSO_STATS_INIT_AUX(sendDataOnQP_2048)            \
+                               AMMASSO_STATS_INIT_AUX(sendDataOnQP_4096)            \
+                               AMMASSO_STATS_INIT_AUX(sendDataOnQP_16384)           \
+                               AMMASSO_STATS_INIT_AUX(sendDataOnQP_over)            \
+                               AMMASSO_STATS_INIT_AUX(AsynchronousEventHandler)     \
+                               AMMASSO_STATS_INIT_AUX(CompletionEventHandler)       \
+                               AMMASSO_STATS_INIT_AUX(ProcessMessage)               \
+                               AMMASSO_STATS_INIT_AUX(processAmmassoControlMessage) \
+                               AMMASSO_STATS_INIT_AUX(sendAck)                      \
+                               AMMASSO_STATS_INIT_AUX(CommunicationServer)          \
+			     }
 
 #define TO_NS  ((double)1000000000.0)
 
@@ -130,6 +177,8 @@ AmmassoStats __stats;
 
 #elif
 
+#define AMMASSO_STATS_INIT(event)
+#define AMMASSO_STATS_INIT
 #define AMMASSO_STATS_START(event)
 #define AMMASSO_STATS_END(event)
 #define AMMASSO_STATS_DISPLAY(event)
@@ -160,6 +209,7 @@ void CmiMachineExit();
 
 void AsynchronousEventHandler(cc_rnic_handle_t rnic, cc_event_record_t *eventRecord, void *cb);
 void CompletionEventHandler(cc_rnic_handle_t rnic, cc_cq_handle_t cq, void *cb);
+void CompletionEventHandlerWithAckFlag(cc_rnic_handle_t rnic, cc_cq_handle_t cq, void *cb, int breakOnAck);
 
 void CmiAmmassoOpenQueuePairs();
 
@@ -195,6 +245,8 @@ void CmiMachineInit(char **argv) {
 
   char buf[128];
   cc_status_t rtn;
+
+  AMMASSO_STATS_INIT
 
   AMMASSO_STATS_START(MachineInit)
 
@@ -356,11 +408,15 @@ void sendAck(OtherNode node) {
 
   char buf[AMMASSO_CTRLMSG_LEN];
 
+  AMMASSO_STATS_START(sendAck)
+
   MACHSTATE1(3, "sendAck() - Ammasso - INFO: Called... sending ACK to node %d", node->myNode);
 
   // Create and send an ACK message to the specified QP/Connection/Node
   CtrlHeader_Construct(buf, AMMASSO_CTRLTYPE_ACK);
   sendDataOnQP(buf, AMMASSO_CTRLMSG_LEN, node, 1);  // This is an ACK so set the force flag
+
+  AMMASSO_STATS_END(sendAck)
 }
 
 int getQPSendBuffer(OtherNode node, char force) {
@@ -373,13 +429,19 @@ int getQPSendBuffer(OtherNode node, char force) {
 
   while (1) {
 
+    AMMASSO_STATS_START(getQPSendBuffer_loop)
+
     rtnBufIndex = -1;
+
+    AMMASSO_STATS_START(getQPSendBuffer_lock)
 
     MACHSTATE(3, "getQPSendBuffer() - INFO: Pre-sendBufLock");
     #if CMK_SHARED_VARS_UNAVAILABLE
-      while (node->sendBufLock != 0) { usleep(1); } // Since CmiLock() is not really a lock, actually wait
+      while (node->sendBufLock != 0) { /* usleep(1) */ ; } // Since CmiLock() is not really a lock, actually wait
     #endif
     CmiLock(node->sendBufLock);
+
+    AMMASSO_STATS_END(getQPSendBuffer_lock)
     
     // If force is set, let the message use any of the available send buffers.  Otherwise, there can only
     // be AMMASSO_NUMMSGBUFS_PER_QP message outstanding (haven't gotten an ACK for) so wait for that.
@@ -416,13 +478,22 @@ int getQPSendBuffer(OtherNode node, char force) {
     MACHSTATE3(3, "getQPSendBuffer() - INFO: Post-sendBufLock - rtnBufIndex = %d, node->connectionState = %d, node->send_UseIndex = %d", rtnBufIndex, node->connectionState, node->send_UseIndex);
 
     if (rtnBufIndex >= 0) {
+
+      AMMASSO_STATS_END(getQPSendBuffer_loop)
       break;
+
     } else {
 
       //usleep(1);
 
-      CompletionEventHandler(contextBlock->rnic, node->recv_cq, node);
-      CompletionEventHandler(contextBlock->rnic, node->send_cq, node);
+      AMMASSO_STATS_START(getQPSendBuffer_CEH)
+
+      CompletionEventHandlerWithAckFlag(contextBlock->rnic, node->recv_cq, node, 1);
+      //CompletionEventHandler(contextBlock->rnic, node->send_cq, node);
+
+      AMMASSO_STATS_END(getQPSendBuffer_CEH)
+
+      AMMASSO_STATS_END(getQPSendBuffer_loop)
     }
   }
 
@@ -450,6 +521,20 @@ int sendDataOnQP(char* data, int len, OtherNode node, char force) {
   char isFirst = 1;
   char *origMsgStart = data;
 
+  int origSize = len;
+
+  if (origSize <= 1024) {
+    AMMASSO_STATS_START(sendDataOnQP_1024)
+  } else if (origSize <= 2048) { 
+    AMMASSO_STATS_START(sendDataOnQP_2048)
+  } else if (origSize <= 4096) { 
+    AMMASSO_STATS_START(sendDataOnQP_4096)
+  } else if (origSize <= 16384) { 
+    AMMASSO_STATS_START(sendDataOnQP_16384)
+  } else {
+    AMMASSO_STATS_START(sendDataOnQP_over)
+  }
+
   AMMASSO_STATS_START(sendDataOnQP)
 
   //CompletionEventHandler(contextBlock->rnic, node->recv_cq, node);
@@ -461,6 +546,8 @@ int sendDataOnQP(char* data, int len, OtherNode node, char force) {
   //       messages are no where near large enough for this to occur).
 
   while (len > 0) {
+
+    AMMASSO_STATS_START(sendDataOnQP_pre_send)  
 
     MACHSTATE(3, "sendDataOnQP() - Ammasso - INFO: Sending Fragment...");
 
@@ -495,36 +582,39 @@ int sendDataOnQP(char* data, int len, OtherNode node, char force) {
     //   AMMASSO_BUFSIZE and toSendLength has a maximum value of AMMASSO_BUFSIZE).
     (node->send_sgl[sendBufIndex]).length = toSendLength + ((isFirst) ? (0) : (DGRAM_HEADER_SIZE));
 
-    {
-      int j;
-      MACHSTATE1(3, "sendDataOnQP() - INFO: sendBufIndex = %d", sendBufIndex);
-      MACHSTATE1(3, "                       toSendLength = %d", toSendLength);
-      MACHSTATE1(3, "                       node->send_sgl = %p", node->send_sgl);
-      MACHSTATE1(3, "                       &(node->send_sgl[sendBufIndex]) = %p", &(node->send_sgl[sendBufIndex]));
-      MACHSTATE1(3, "                       sizeof(cc_data_addr_t) = %d", sizeof(cc_data_addr_t));
-      MACHSTATE1(3, "                       node->send_sgl + (sizeof(cc_data_addr_t) * sendBufIndex) = %p", node->send_sgl + (sizeof(cc_data_addr_t) * sendBufIndex));
-      MACHSTATE(3, "                       Raw Data:");
-      for (j = 0; j < toSendLength; j++) {
-        MACHSTATE2(3, "                          ((char*)((node->send_sgl[sendBufIndex]).to))[%d] = %02x", j, ((char*)((node->send_sgl[sendBufIndex]).to))[j]);
-      }
-    }
+    //{
+    //  int j;
+    //  MACHSTATE1(3, "sendDataOnQP() - INFO: sendBufIndex = %d", sendBufIndex);
+    //  MACHSTATE1(3, "                       toSendLength = %d", toSendLength);
+    //  MACHSTATE1(3, "                       node->send_sgl = %p", node->send_sgl);
+    //  MACHSTATE1(3, "                       &(node->send_sgl[sendBufIndex]) = %p", &(node->send_sgl[sendBufIndex]));
+    //  MACHSTATE1(3, "                       sizeof(cc_data_addr_t) = %d", sizeof(cc_data_addr_t));
+    //  MACHSTATE1(3, "                       node->send_sgl + (sizeof(cc_data_addr_t) * sendBufIndex) = %p", node->send_sgl + (sizeof(cc_data_addr_t) * sendBufIndex));
+    //  MACHSTATE(3, "                       Raw Data:");
+    //  for (j = 0; j < toSendLength; j++) {
+    //    MACHSTATE2(3, "                          ((char*)((node->send_sgl[sendBufIndex]).to))[%d] = %02x", j, ((char*)((node->send_sgl[sendBufIndex]).to))[j]);
+    //  }
+    //}
+ 
+    AMMASSO_STATS_END(sendDataOnQP_pre_send)  
+    AMMASSO_STATS_START(sendDataOnQP_send)
 
     rtn = cc_qp_post_sq(contextBlock->rnic, node->qp, &(node->sq_wr[sendBufIndex]), 1, &(WRsPosted));
     if (rtn != CC_OK || WRsPosted != 1) {
 
-      MACHSTATE(3, "sendDataOnQP() - INFO: Pre-sendBufLock");
-      #if CMK_SHARED_VARS_UNAVAILABLE
-        while (node->sendBufLock != 0) { usleep(1); } // Since CmiLock() is not really a lock, actually wait
-      #endif
-      CmiLock(node->sendBufLock);
+      //MACHSTATE(3, "sendDataOnQP() - INFO: Pre-sendBufLock");
+      //#if CMK_SHARED_VARS_UNAVAILABLE
+      //  while (node->sendBufLock != 0) { usleep(1); } // Since CmiLock() is not really a lock, actually wait
+      //#endif
+      //CmiLock(node->sendBufLock);
 
       //// Free the buffer lock to indicate that the buffer is no longer in use
       //node->send_bufFree = AMMASSO_BUF_NOT_IN_USE;
       
       // TODO : Find a way to recover from this (the counter being used, send_InUseCounter, is not good enough)... for now, abort...
 
-      CmiUnlock(node->sendBufLock);
-      MACHSTATE(3, "sendDataOnQP() - INFO: Post-sendBufLock");
+      //CmiUnlock(node->sendBufLock);
+      //MACHSTATE(3, "sendDataOnQP() - INFO: Post-sendBufLock");
 
       // Let the user know that an error occured
       MACHSTATE3(3, "sendDataOnQP() - Ammasso - ERROR: Unable to send data to node %d: %d, \"%s\"", node->myNode, rtn, cc_status_to_string(rtn));
@@ -533,13 +623,31 @@ int sendDataOnQP(char* data, int len, OtherNode node, char force) {
       CmiAbort(buf);
     }
 
+    AMMASSO_STATS_END(sendDataOnQP_send)
+    AMMASSO_STATS_START(sendDataOnQP_post_send)  
+
     // Update the data and len variables for the next while (if fragmenting is needed
     data += toSendLength;
     len -= toSendLength;
     isFirst = 0;
+
+    AMMASSO_STATS_END(sendDataOnQP_post_send)  
   }
 
   AMMASSO_STATS_END(sendDataOnQP)
+
+  if (origSize <= 1024) {
+    AMMASSO_STATS_END(sendDataOnQP_1024)
+  } else if (origSize <= 2048) { 
+    AMMASSO_STATS_END(sendDataOnQP_2048)
+  } else if (origSize <= 4096) { 
+    AMMASSO_STATS_END(sendDataOnQP_4096)
+  } else if (origSize <= 16384) { 
+    AMMASSO_STATS_END(sendDataOnQP_16384)
+  } else {
+    AMMASSO_STATS_END(sendDataOnQP_over)
+  }
+
 }
 
 
@@ -973,6 +1081,16 @@ void ProcessMessage(char* msg, int len, char *needAck) {
   if (magicCookie != (Cmi_charmrun_pid & DGRAM_MAGIC_MASK)) {
     MACHSTATE(3, "ProcessMessage() - Ammasso - ERROR: Received message with a bad magic cookie... ignoring...");
     CmiPrintf("[%d] ProcessMessage() - Ammasso - ERROR: Received message with a bad magic cookie... ignoring...\n", CmiMyPe());
+
+    {
+      CmiPrintf("ProcessMessage() - INFO: msg = %p", msg);
+      int j;
+      for (j = 0; j < DGRAM_HEADER_SIZE + 24; j++) {
+        CmiPrintf("ProcessMessage() - INFO: msg[%d] = %02x", j, msg[j]);
+      }
+    }
+
+
     return;
   }
 
@@ -1246,6 +1364,8 @@ static void CommunicationServer(int withDelayMs, int where) {
   //if (Cmi_charmrun_pid == 0)
   //  return;
 
+  AMMASSO_STATS_START(CommunicationServer)
+
   MACHSTATE2(2, "CommunicationServer(%d) from %d {",withDelayMs, where);
 
   // Check to see if this call is from an interrupt
@@ -1269,6 +1389,8 @@ static void CommunicationServer(int withDelayMs, int where) {
 #endif
 
   MACHSTATE(2,"} CommunicationServer");
+
+  AMMASSO_STATS_END(CommunicationServer)
 }
 
 
@@ -1297,12 +1419,27 @@ void CmiMachineExit(void) {
   AMMASSO_STATS_DISPLAY(DeliverViaNetwork_send)
 
   AMMASSO_STATS_DISPLAY(getQPSendBuffer)
+  AMMASSO_STATS_DISPLAY(getQPSendBuffer_lock)
+  AMMASSO_STATS_DISPLAY(getQPSendBuffer_CEH)
+  AMMASSO_STATS_DISPLAY(getQPSendBuffer_loop)
+
   AMMASSO_STATS_DISPLAY(sendDataOnQP)
+  AMMASSO_STATS_DISPLAY(sendDataOnQP_pre_send)
+  AMMASSO_STATS_DISPLAY(sendDataOnQP_send)
+  AMMASSO_STATS_DISPLAY(sendDataOnQP_post_send)
+
+  AMMASSO_STATS_DISPLAY(sendDataOnQP_1024)
+  AMMASSO_STATS_DISPLAY(sendDataOnQP_2048)
+  AMMASSO_STATS_DISPLAY(sendDataOnQP_4096)
+  AMMASSO_STATS_DISPLAY(sendDataOnQP_16384)
+  AMMASSO_STATS_DISPLAY(sendDataOnQP_over)
 
   AMMASSO_STATS_DISPLAY(AsynchronousEventHandler)
   AMMASSO_STATS_DISPLAY(CompletionEventHandler)
   AMMASSO_STATS_DISPLAY(ProcessMessage)
   AMMASSO_STATS_DISPLAY(processAmmassoControlMessage)
+
+  AMMASSO_STATS_DISPLAY(sendAck)
 
   // TODO: It would probably be a good idea to make a "closing connection" control message so all of the nodes
   //       can agree to close the connections in a graceful way when they are all done.  Similar to the READY packet
@@ -1569,6 +1706,7 @@ void AsynchronousEventHandler(cc_rnic_handle_t rnic, cc_event_record_t *er, void
       // Local Errors
     case CCAE_QP_LOCAL_CATASTROPHIC_ERROR:
       MACHSTATE3(3, "AsynchronousEventHandler() - WARNING: Connection Error \"%s\" - er->resource_indicator = %d (CC_RES_IND_QP: %d)", cc_event_id_to_string(er->event_id), er->resource_indicator, CC_RES_IND_QP);
+      CmiPrintf("AsynchronousEventHandler() - WARNING: Connection Error \"%s\" - er->resource_indicator = %d (CC_RES_IND_QP: %d)", cc_event_id_to_string(er->event_id), er->resource_indicator, CC_RES_IND_QP);
 
       // Figure out which QP went down
       node = getNodeFromQPId(er->resource_id.qp_id);
@@ -1607,8 +1745,11 @@ void AsynchronousEventHandler(cc_rnic_handle_t rnic, cc_event_record_t *er, void
   AMMASSO_STATS_END(AsynchronousEventHandler)
 }
 
-
 void CompletionEventHandler(cc_rnic_handle_t rnic, cc_cq_handle_t cq, void *cb) {
+  CompletionEventHandlerWithAckFlag(rnic, cq, cb, 0);
+}
+
+void CompletionEventHandlerWithAckFlag(cc_rnic_handle_t rnic, cc_cq_handle_t cq, void *cb, int breakOnAck) {
 
   OtherNode node = (OtherNode)cb;
   cc_status_t rtn;
@@ -1734,6 +1875,10 @@ void CompletionEventHandler(cc_rnic_handle_t rnic, cc_cq_handle_t cq, void *cb) 
         // Send and ACK to indicate this node is ready to receive another message
         if (needAck)
           sendAck(node);
+
+        // Check to see if the function should return (stop polling for messages)
+        if (breakOnAck && (!needAck))   // NOTE: Should only not need an ACK if ACK arrived or error
+          return;
 
         break;
 
@@ -1937,6 +2082,7 @@ void establishQPConnection(OtherNode node, int reuseQPFlag) {
       CmiAbort(buf);
     }
 
+    /*
     MACHSTATE(3, "establishQPConnection() - INFO: (PRE-RECV-CQ-REQUEST-NOTIFICATION)");
 
     // Setup the Request Notification Type
@@ -1952,6 +2098,7 @@ void establishQPConnection(OtherNode node, int reuseQPFlag) {
       sprintf(buf, "establishQPConnection() - ERROR: Unable to set RECV CQ Notification Type: %d, \"%s\"", rtn, cc_status_to_string(rtn));
       CmiAbort(buf);
     }
+    */
 
     MACHSTATE(3, "establishQPConnection() - INFO: (PRE-SEND-CQ-CREATE)");
 
@@ -1969,6 +2116,7 @@ void establishQPConnection(OtherNode node, int reuseQPFlag) {
       CmiAbort(buf);
     }
 
+    /*
     MACHSTATE(3, "establishQPConnection() - INFO: (PRE-SEND-CQ-REQUEST-NOTIFICATION)");
 
     // Setup the Request Notification Type
@@ -1984,6 +2132,7 @@ void establishQPConnection(OtherNode node, int reuseQPFlag) {
       sprintf(buf, "establishQPConnection() - ERROR: Unable to set SEND CQ Notification Type: %d, \"%s\"", rtn, cc_status_to_string(rtn));
       CmiAbort(buf);
     }
+    */
 
     MACHSTATE(3, "establishQPConnection() - INFO: (PRE-QP-CREATE)");
 
