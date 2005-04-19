@@ -10,8 +10,8 @@
 */
 /*@{*/
 
-#ifndef _CPAIMDLB_H_
-#define _CPAIMDLB_H_
+#ifndef _PHASEBYARRAYLB_H_
+#define _PHASEBYARRAYLB_H_
 
 #include "CentralLB.h"
 #include "PhasebyArrayLB.decl.h"
@@ -33,6 +33,6 @@ private:
 	void work(BaseLB::LDStats* stats, int count);
 };
 
-#endif /* _DUMMYLB_H_ */
+#endif /* _PHASEBYARRAYLB_H_ */
 
 /*@}*/

@@ -51,15 +51,17 @@ void PhasebyArrayLB::copyStats(BaseLB::LDStats *stats,BaseLB::LDStats *tempStats
 	tempStats->n_comm = stats->n_comm;
 	tempStats->n_migrateobjs = stats->n_migrateobjs;
 	tempStats->hashSize = stats->hashSize;
-	tempStats->objHash = new int[tempStats->hashSize];
-	for(int i=0;i<tempStats->hashSize;i++)
-		tempStats->objHash[i]=stats->objHash[i];
-	
+	if(tempStats->hashSize && stats->objHash!=NULL){
+		tempStats->objHash = new int[tempStats->hashSize];
+		for(int i=0;i<tempStats->hashSize;i++)
+			tempStats->objHash[i]=stats->objHash[i];
+	}
+	else
+		tempStats->objHash=NULL;
 	tempStats->objData.resize(tempStats->n_objs);
 	tempStats->from_proc.resize(tempStats->n_objs);
 	tempStats->to_proc.resize(tempStats->n_objs);
 	tempStats->commData.resize(tempStats->n_comm);
-
 	for(int i=0;i<tempStats->n_objs;i++){
 		tempStats->objData[i]=stats->objData[i];
 		tempStats->from_proc[i]=stats->from_proc[i];
@@ -75,24 +77,28 @@ void PhasebyArrayLB::copyStats(BaseLB::LDStats *stats,BaseLB::LDStats *tempStats
 
 void PhasebyArrayLB::updateStats(BaseLB::LDStats *stats,BaseLB::LDStats *tempStats){
 	tempStats->hashSize = stats->hashSize;
-	tempStats->objHash = new int[tempStats->hashSize];
-	for(int i=0;i<tempStats->hashSize;i++)
-		tempStats->objHash[i]=stats->objHash[i];
-	
+	if(tempStats->hashSize && stats->objHash!=NULL){
+		tempStats->objHash = new int[tempStats->hashSize];
+		for(int i=0;i<tempStats->hashSize;i++)
+			tempStats->objHash[i]=stats->objHash[i];
+	}
+	else
+		tempStats->objHash=NULL;
+
 	for(int i=0;i<tempStats->n_objs;i++)
 		tempStats->objData[i]=stats->objData[i];
 	
 }
 
 void PhasebyArrayLB::work(BaseLB::LDStats *stats, int count){
-
 	//It is assumed that statically placed arrays are set non-migratable in the application
 	tempStats = new BaseLB::LDStats;
+
 	copyStats(stats,tempStats);
 	int obj;
 	int flag=0;
-	
 	LDObjData *odata;
+	
 	
 	odata = &(tempStats->objData[0]);
 	omids.push_back(odata->omID());
@@ -105,7 +111,6 @@ void PhasebyArrayLB::work(BaseLB::LDStats *stats, int count){
 			}
 		if(flag==1){
 			flag=0;
-			//continue;
 		}
 		else
 			omids.push_back(odata->omID());
@@ -123,16 +128,15 @@ void PhasebyArrayLB::work(BaseLB::LDStats *stats, int count){
 				odata->migratable=CmiFalse;
  		}
 		lb->work(tempStats,count);
-
 		//Set other objects as background load
 		//Call a strategy here
 	}
 	//Copy to stats array
 	for(obj = 0; obj < tempStats->n_objs; obj++)
 		stats->to_proc[obj]=tempStats->to_proc[obj];
-	
 	tempStats->clear();
 	omids.free();
+
 }
 
 /*@}*/
