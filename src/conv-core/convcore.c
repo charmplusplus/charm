@@ -1496,7 +1496,7 @@ void CsdInit(argv)
 void CmiSyncVectorSend(int destPE, int n, int *sizes, char **msgs) {
   int total;
   char *mesg;
-  COMPACT_VECTOR(total, mesg, n, sizes, msgs);
+  VECTOR_COMPACT(total, mesg, n, sizes, msgs);
   CmiSyncSendAndFree(destPE, total, mesg);
 }
 

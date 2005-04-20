@@ -764,21 +764,21 @@ void     CmiLookupGroup(CmiGroup grp, int *npes, int **pes);
   int i;\
   char *tmp;\
   outsize=0;\
-  if (ndata>=0) for(i=0; i<ndata; ++i) outsize += insizes[i];\
+  if (inndata>=0) for(i=0; i<inndata; ++i) outsize += insizes[i];\
   else {\
-    for(i=0; i<-ndata; ++i) outsize += ALIGN8(insizes[i]);\
-    outsize -= (ndata+1) * sizeof(CmiChunkHeader);\
+    for(i=0; i<-inndata; ++i) outsize += ALIGN8(insizes[i]);\
+    outsize -= (inndata+1) * sizeof(CmiChunkHeader);\
   }\
   outdata = (char *)CmiAlloc(outsize);\
-  if (!outdata) fprintf(stderr, "%d: Out of mem\n", _Cmi_mynode);\
-  tmp = data;\
-  if (ndata>=0) for (i=0; i<ndata; ++i) {\
+  if (!outdata) fprintf(stderr, "%d: Out of mem\n", CmiMyNode());\
+  tmp = outdata;\
+  if (inndata>=0) for (i=0; i<inndata; ++i) {\
     memcpy(tmp, indatas[i]; insizes[i]);\
-    tmp += sizes[i];\
+    tmp += insizes[i];\
   } else {\
     memcpy(tmp, indatas[0]; insizes[0]);\
     tmp += ALIGN8(insizes[0]);\
-    for (i=0; i<-ndata; ++i) {\
+    for (i=0; i<-inndata; ++i) {\
       memcpy(tmp, indatas[i]-sizeof(CmiChunkHeader), insizes[i]+sizeof(CmiChunkHeader));\
       tmp += ALIGN8(insizes[i])+sizeof(CmiChunkHeader);\
     }\

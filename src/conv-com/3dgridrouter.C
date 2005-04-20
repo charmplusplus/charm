@@ -20,7 +20,7 @@
         newmsg=PeGrid->ExtractAndVectorize(kid, u1, knpe, kpelist);\
 	if (newmsg) {\
 	  CmiSetHandler(newmsg->msgs[0], khndl);\
-          CmiSyncVectorSendAndFreeSystem(knextpe, newmsg->count, newmsg->sizes, newmsg->msgs, 1);\
+          CmiSyncVectorSendAndFree(knextpe, -newmsg->count, newmsg->sizes, newmsg->msgs);\
         }\
 	else {\
 	  SendDummyMsg(kid, knextpe, u2);\
