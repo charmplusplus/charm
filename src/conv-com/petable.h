@@ -12,6 +12,8 @@
 #define NULL 0
 #endif
 
+#define CMK_COMMLIB_USE_VECTORIZE 1
+
 #define MSGQLEN 32
 
 typedef struct ptinfo {
@@ -24,10 +26,21 @@ typedef struct ptinfo {
   struct ptinfo * next;
 } PTinfo;
 
+/*
+ * This header is meant for usage with ExtractAndVectorize and
+ * ExtractAndVectorizeAll. It will contain a list of messages with its sizes.
+ * The parent class will later call a CmiFree to sizes and msgs. This will
+ * delete this two arrays, and also the containint ptvectorlist struct. This is
+ * done (in the two functions) by allocating a single message containing both
+ * the ptvectorlist struct, and the two arrays. Throught CmiReference
+ * (incremented only once), when both the arrays are deleted, the struct will
+ * also dirappear.
+ */
+
 typedef struct ptvectorlist {
   int count;
   int *sizes;
-  char *msgs;
+  char **msgs;
 }* PTvectorlist;
 
 /*

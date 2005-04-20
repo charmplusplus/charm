@@ -74,10 +74,15 @@ void GraphRouter::sendMessages(comID id, int cur_stage){
         ComlibPrintf("%d:sending to %d for %d pes in stage %d\n", MyPe, nextpe, npestosend, cur_stage);
 
         int len;
+#if CMK_COMMLIB_USE_VECTORIZE
+	PTvectorlist newmsg;
+        newmsg=PeGraph->ExtractAndVectorize(id, cur_stage + 1, npestosend, 
+                                       pesToSend);
+#else
 	char *newmsg;
         newmsg=PeGraph->ExtractAndPack(id, cur_stage + 1, npestosend, 
                                        pesToSend, &len);
-        
+#endif
 #if CMK_PERSISTENT_COMM
         if(len < PERSISTENT_BUFSIZE)
             if(currentIteration % 2)
@@ -91,8 +96,11 @@ void GraphRouter::sendMessages(comID id, int cur_stage){
                 CmiSetHandler(newmsg, CkpvAccess(RecvHandle));
             else
                 CmiSetHandler(newmsg, CkpvAccess(ProcHandle));
-
+#if CMK_COMMLIB_USE_VECTORIZE
+            CmiSyncVectorSendAndFree(nextpe, -newmsg->count, newmsg->sizes, newmsg->msgs);
+#else
             CmiSyncSendAndFree(nextpe, len, newmsg);
+#endif
         }
 	else {
             SendDummyMsg(id, nextpe, cur_stage + 1);

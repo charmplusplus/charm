@@ -19,6 +19,17 @@
 
 /**The only communication op used. Modify this to use
  ** vector send */
+#if CMK_COMMLIB_USE_VECTORIZE
+#define TREESENDFN(kid, u, knewmsg, khndl, knextpe)  \
+	{if (knewmsg) {\
+	  CmiSetHandler(knewmsg->msgs[0], khndl);\
+  	  CmiSyncVectorSendAndFree(knextpe, -knewmsg->count, knewmsg->sizes, knewmsg->msgs);\
+	}\
+	else {\
+	  SendDummyMsg(kid, knextpe, u);\
+	}\
+}
+#else
 #define TREESENDFN(kid, u, knewmsg, klen, khndl, knextpe)  \
 	{if (knewmsg) {\
 	  CmiSetHandler(knewmsg, khndl);\
@@ -28,6 +39,7 @@
 	  SendDummyMsg(kid, knextpe, u);\
 	}\
 }
+#endif
 
 /************************************************
  ************************************************/
@@ -97,9 +109,13 @@ void TreeRouter :: RecvManyMsg(comID id, char *msg)
 		int len;
 		int parent=(MyPe-1)/DEGREE;
 		parent=gmap(parent);
+#if CMK_COMMLIB_USE_VECTORIZE
+		PTvectorlist newmsg=SortBufferUp(id, 0);
+		TREESENDFN(id, 0, newmsg, CkpvAccess(RecvHandle), parent);
+#else
 		char *newmsg=SortBufferUp(id, 0, &len);
 		TREESENDFN(id, 0, newmsg, len, CkpvAccess(RecvHandle), parent);
-
+#endif
 	}
 	else {
 		DownStreamMsg(id);
@@ -108,7 +124,11 @@ void TreeRouter :: RecvManyMsg(comID id, char *msg)
   if (recvCount > recvExpected) DownStreamMsg(id);
 }
 
+#if CMK_COMMLIB_USE_VECTORIZE
+PTvectorlist TreeRouter :: SortBufferUp(comID id, int ufield)
+#else
 char * TreeRouter :: SortBufferUp(comID id, int ufield, int *len)
+#endif
 {
   int np=0, i;
   int * pelst=(int *)CmiAlloc(sizeof(int)*NumPes);
@@ -122,12 +142,20 @@ char * TreeRouter :: SortBufferUp(comID id, int ufield, int *len)
 
 	pelst[np++]=i;
   }
+#if CMK_COMMLIB_USE_VECTORIZE
+  PTvectorlist newmsg=PeTree->ExtractAndVectorize(id, ufield, np, pelst); 
+#else
   char *newmsg=PeTree->ExtractAndPack(id, ufield, np, pelst, len); 
+#endif
   CmiFree(pelst);
   return(newmsg);
 }
   
+#if CMK_COMMLIB_USE_VECTORIZE
+PTvectorlist TreeRouter :: SortBufferDown(comID id, int ufield, int s)
+#else
 char * TreeRouter :: SortBufferDown(comID id, int ufield, int *len, int s)
+#endif
 {
   int np=0, i;
   int * plist=(int *)CmiAlloc(sizeof(int)*NumPes);
@@ -140,7 +168,11 @@ char * TreeRouter :: SortBufferDown(comID id, int ufield, int *len, int s)
 	if (pe == rep) plist[np++]=i;
   }
 
+#if CMK_COMMLIB_USE_VECTORIZE
+  PTvectorlist newmsg=PeTree->ExtractAndVectorize(id, ufield, np, plist); 
+#else
   char * newmsg=PeTree->ExtractAndPack(id, ufield, np, plist, len); 
+#endif
   CmiFree(plist);
   return(newmsg);
 }
@@ -152,11 +184,19 @@ void TreeRouter :: DownStreamMsg(comID id)
 
   for (int i=0;i<deg;i++) {
     int len;
+#if CMK_COMMLIB_USE_VECTORIZE
+    PTvectorlist newmsg=SortBufferDown(id, 0, i+1);
+#else
     char *newmsg=SortBufferDown(id, 0, &len, i+1);
+#endif
     int child=MyPe*DEGREE+i+1;
     if (child >=NumPes || child==MyPe) break;
     child=gmap(child);
+#if CMK_COMMLIB_USE_VECTORIZE
+    TREESENDFN(id, 0, newmsg, CkpvAccess(RecvHandle), child);
+#else
     TREESENDFN(id, 0, newmsg, len, CkpvAccess(RecvHandle), child);
+#endif
   }
 
   LocalProcMsg(id);

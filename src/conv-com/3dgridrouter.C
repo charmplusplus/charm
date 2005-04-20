@@ -13,9 +13,23 @@
 
 /**The only communication op used. Modify this to use
  ** vector send */
+#if CMK_COMMLIB_USE_VECTORIZE
 #define GRIDSENDFN(kid, u1, u2, knpe, kpelist, khndl, knextpe)  \
   	{int len;\
-	char *newmsg;\
+	PTvectorlist newmsg;\
+        newmsg=PeGrid->ExtractAndVectorize(kid, u1, knpe, kpelist);\
+	if (newmsg) {\
+	  CmiSetHandler(newmsg->msgs[0], khndl);\
+          CmiSyncVectorSendAndFreeSystem(knextpe, newmsg->count, newmsg->sizes, newmsg->msgs, 1);\
+        }\
+	else {\
+	  SendDummyMsg(kid, knextpe, u2);\
+	}\
+}
+#else
+#define GRIDSENDFN(kid, u1, u2, knpe, kpelist, khndl, knextpe)  \
+  	{int len;\
+	char * newmsg;\
         newmsg=PeGrid->ExtractAndPack(kid, u1, knpe, kpelist, &len);\
 	if (newmsg) {\
 	  CmiSetHandler(newmsg, khndl);\
@@ -25,6 +39,7 @@
 	  SendDummyMsg(kid, knextpe, u2);\
 	}\
 }
+#endif
 
 #define ROWLEN COLLEN
 

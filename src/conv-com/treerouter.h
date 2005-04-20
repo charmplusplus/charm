@@ -21,8 +21,13 @@ class TreeRouter : public Router
 	void InitVars();
 	void DownStreamMsg(comID id);
 	void LocalProcMsg(comID);
+#if CMK_COMMLIB_USE_VECTORIZE
+	PTvectorlist SortBufferUp(comID, int);
+	PTvectorlist SortBufferDown(comID, int, int);
+#else
 	char * SortBufferUp(comID, int, int *);
 	char * SortBufferDown(comID, int, int *, int);
+#endif
   public:
 	TreeRouter(int, int);
 	~TreeRouter();

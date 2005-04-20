@@ -27,6 +27,20 @@
 /**The only communication op used. Modify this to use
  ** vector send */
 
+#if CMK_COMMLIB_USE_VECTORIZE
+#define HCUBESENDFN(kid, u1, u2, knpe, kpelist, khndl, knextpe, pehcube)  \
+  	{int len;\
+	PTvectorlist newmsg;\
+ 	newmsg=pehcube->ExtractAndVectorize(kid, u1, knpe, kpelist);\
+	if (newmsg) {\
+	  CmiSetHandler(newmsg->msgs[0], khndl);\
+  	  CmiSyncVectorSendAndFree(knextpe, -newmsg->count, newmsg->sizes, newmsg->msgs);\
+	}\
+	else {\
+	  SendDummyMsg(kid, knextpe, u2);\
+	}\
+}
+#else
 #define HCUBESENDFN(kid, u1, u2, knpe, kpelist, khndl, knextpe, pehcube)  \
   	{int len;\
 	char *newmsg;\
@@ -39,6 +53,7 @@
 	  SendDummyMsg(kid, knextpe, u2);\
 	}\
 }
+#endif
 
 inline int maxdim(int n)
 {
@@ -272,6 +287,22 @@ void DimexRouter::RecvManyMsg(comID id, char *msg)
             //Sending through prefix send to save on copying overhead   
             //of the hypercube algorithm            
             
+#if CMK_COMMLIB_USE_VECTORIZE
+            PTvectorlist newmsg;
+            newmsg=PeHcube->ExtractAndVectorizeAll(id, stage);
+            if (newmsg) {
+                CmiSetHandler(newmsg->msgs[0], CkpvAccess(ProcHandle));
+		for (int count=0; count<two_pow_ndirect; ++count) {
+		  int nextpe = count ^ MyPe;
+		  gmap(nextpe);
+		  ComlibPrintf("%d Sending to %d\n", MyPe, nextpe);
+		  CmiSyncVectorSend(nextpe, -newmsg->count, newmsg->sizes, newmsg->msgs);
+		}
+		for(int i=0;i<newmsg->count;i++) CmiFree(newmsg->msgs[i]);
+		CmiFree(newmsg->sizes);
+		CmiFree(newmsg->msgs);
+            }
+#else
             int *pelist = (int *)CmiAlloc(two_pow_ndirect * sizeof(int));
             for(int count = 0; count < two_pow_ndirect; count ++){
                 int nextpe = count ^ MyPe;
@@ -288,7 +319,9 @@ void DimexRouter::RecvManyMsg(comID id, char *msg)
                 CmiSetHandler(newmsg, CkpvAccess(ProcHandle));
                 CmiSyncListSendAndFree(two_pow_ndirect, pelist, len, newmsg);
             }
-            
+	    CmiFree(pelist);
+#endif
+
             stage -= numDirectSteps;
 
             //if(procMsgCount == two_pow_ndirect)

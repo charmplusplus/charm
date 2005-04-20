@@ -19,6 +19,22 @@
 
 /**The only communication op used. Modify this to use
  ** vector send */
+#if CMK_COMMLIB_USE_VECTORIZE
+#define GRIDSENDFN(kid, u1, u2, knpe, kpelist, khndl, knextpe)  \
+  	{int len;\
+	PTvectorlist newmsg;\
+        ComlibPrintf("Entering Gridsendfn\n");\
+        newmsg=PeMesh->ExtractAndVectorize(kid, u1, knpe, kpelist);\
+	if (newmsg) {\
+	  CmiSetHandler(newmsg->msgs[0], khndl);\
+          ComlibPrintf("Sending in Gridsendfn to %d\n",knextpe);\
+          CmiSyncVectorSendAndFree(knextpe, -newmsg->count, newmsg->sizes, newmsg->msgs);\
+        }\
+	else {\
+	  SendDummyMsg(kid, knextpe, u2);\
+	}\
+}
+#else
 #define GRIDSENDFN(kid, u1, u2, knpe, kpelist, khndl, knextpe)  \
   	{int len;\
 	char *newmsg;\
@@ -31,6 +47,7 @@
 	  SendDummyMsg(kid, knextpe, u2);\
 	}\
 }
+#endif
 
 /****************************************************
  * Preallocated memory=P ints + MAXNUMMSGS msgstructs
