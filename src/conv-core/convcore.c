@@ -1500,7 +1500,7 @@ void CmiSyncVectorSend(int destPE, int n, int *sizes, char **msgs) {
   CmiSyncSendAndFree(destPE, total, mesg);
 }
 
-void CmiASyncVectorSend(int destPE, int n, int *sizes, char **msgs) {
+CmiCommHandle CmiASyncVectorSend(int destPE, int n, int *sizes, char **msgs) {
   CmiSyncVectorSend(destPE, n, sizes, msgs);
   return NULL;
 }
