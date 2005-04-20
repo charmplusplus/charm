@@ -1,0 +1,9 @@
+module TopoLB
+{
+  extern module CentralLB;
+  initnode void lbinit (void);
+  group [migratable] TopoLB : CentralLB
+  {
+    entry void TopoLB (const CkLBOptions &);
+  };
+};
