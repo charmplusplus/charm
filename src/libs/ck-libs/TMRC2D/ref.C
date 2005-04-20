@@ -6,9 +6,9 @@
 extern CProxy_chunk mesh;
 
 // edgeRef methods
-void edgeRef::update(elemRef& oldval, elemRef& newval)
+void edgeRef::update(elemRef& oldval, elemRef& newval, int b)
 {
-  mesh[cid].updateElement(idx, oldval, newval);
+  mesh[cid].updateElement(idx, oldval, newval, b);
 }
 
 elemRef edgeRef::getNbr(elemRef m)
@@ -62,6 +62,16 @@ int edgeRef::isPending(elemRef e)
   intMsg *im;
   int result;
   im = mesh[cid].isPending(idx, e);
+  result = im->anInt;
+  CkFreeMsg(im);
+  return result;
+}
+
+int edgeRef::getBoundary()
+{
+  intMsg *im;
+  int result;
+  im = mesh[cid].getBoundary(idx);
   result = im->anInt;
   CkFreeMsg(im);
   return result;

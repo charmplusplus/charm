@@ -36,7 +36,7 @@ class edgeRef : public objRef {
  public:
   edgeRef() { }
   edgeRef(int chunkId, int objIdx) { cid = chunkId; idx = objIdx; }
-  void update(elemRef& oldval, elemRef& newval);
+  void update(elemRef& oldval, elemRef& newval, int b);
   elemRef getNbr(elemRef m);
   void remove();
   int split(int *m, edgeRef *e_prime, int oIdx, int fIdx,
@@ -46,6 +46,7 @@ class edgeRef : public objRef {
 	       int *local, int *first, node newN);
   void resetEdge();
   int isPending(elemRef e);
+  int getBoundary();
   void checkPending(elemRef e);
   void checkPending(elemRef e, elemRef ne);
 };

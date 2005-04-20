@@ -13,6 +13,7 @@ class edge {
   elemRef waitingFor, delNbr, keepNbr;
   node newNode, opnode;
   int incidentNode, fixNode;
+  int boundary;
   edgeRef newEdgeRef; // half of this edge: from newNode to incidentNode
   chunk *C;
   edgeRef myRef, keepEdge, delEdge;
@@ -48,6 +49,7 @@ class edge {
     myRef = e.myRef;
     present = e.present;
     length = e.length;
+    boundary = e.boundary;
     nodes[0] = e.nodes[0];
     nodes[1] = e.nodes[1];
   }
@@ -57,6 +59,8 @@ class edge {
   void set(elemRef e1, elemRef e2) { elements[0] = e1;  elements[1] = e2; }
   void set(elemRef *e) { elements[0] = e[0]; elements[1] = e[1]; }
   void setNodes(int n1, int n2) { nodes[0] = n1; nodes[1] = n2; CkAssert(n1!=n2);}
+  void setBoundary(int b) { boundary = b;}
+  int getBoundary() { return boundary;}
   void reset();
   edge& operator=(const edge& e) { 
     for (int i=0; i<2; i++)  elements[i] = e.elements[i];
@@ -75,6 +79,7 @@ class edge {
     newEdgeRef = e.newEdgeRef;
     myRef = e.myRef;
     present = e.present;
+    boundary = e.boundary;
     nodes[0] = e.nodes[0];
     nodes[1] = e.nodes[1];
     return *this; 

@@ -45,24 +45,27 @@ FDECL void FTN_NAME(REFINE2D_INIT,refine2d_init)(void)
 }
 
 /******************** NewMesh *******************/
-CDECL void REFINE2D_NewMesh(int meshID,int nEl,int nGhost,int nnodes,const int *conn,const int *gid,const int *boundaries)
+CDECL void REFINE2D_NewMesh(int meshID,int nEl,int nGhost,int nnodes,const int *conn,const int *gid,const int *boundaries, const int **edgeBoundaries)
 {
   TCHARM_API_TRACE("REFINE2D_NewMesh", "refine");
   if (!CtvAccess(_refineChunk))
     CkAbort("Forgot to call REFINE_Attach!!\n");
 	
-  CtvAccess(_refineChunk)->newMesh(meshID,nEl,nGhost,conn, gid, nnodes, boundaries,0);
+  CtvAccess(_refineChunk)->newMesh(meshID, nEl, nGhost, conn, gid, nnodes, 
+				   boundaries, edgeBoundaries, 0);
   MPI_Barrier(MPI_COMM_WORLD);
   CkWaitQD();
 }
-/*FDECL void FTN_NAME(REFINE2D_NEWMESH,refine2d_newmesh)
-(int *nEl,int *nGhost,int nnodes,const int *conn,const int *gid,const int *boundaries)
+/*
+FDECL void FTN_NAME(REFINE2D_NEWMESH,refine2d_newmesh)
+(int *nEl,int *nGhost,int nnodes,const int *conn,const int *gid,const int *boundaries, const int **edgeBoundaries)
 {
   TCHARM_API_TRACE("REFINE2D_NewMesh", "refine");
   if (!CtvAccess(_refineChunk))
     CkAbort("Forgot to call REFINE_Attach!!\n"); 
   
-  CtvAccess(_refineChunk)->newMesh(*nEl, *nGhost,conn, gid, nnodes, boundaries, 1);
+  CtvAccess(_refineChunk)->newMesh(*nEl, *nGhost,conn, gid, nnodes, 
+                                   boundaries, edgeBoundaries, 1);
   MPI_Barrier(MPI_COMM_WORLD);
   CkWaitQD();
 }*/
@@ -130,7 +133,7 @@ class resultsRefineClient : public refineClient {
   refineResults *res;
 public:
   resultsRefineClient(refineResults *res_) :res(res_) {}
-  void split(int tri, int side, int node, double frac) {
+  void split(int tri, int side, int node, double frac, int newNodeID, int newElemID, int origEdgeB, int newEdge1B, int newEdge2B) {
   #if 0
     //Convert from "tri.C edges" to sensible edges
     if (side==1) side=2;
@@ -220,7 +223,7 @@ class resultsCoarsenClient : public refineClient {
 	FEM_Operation_Data *data;
 public:
   resultsCoarsenClient(coarsenResults *res_,FEM_Operation_Data *data_=NULL) : res(res_),data(data_){};
-  void collapse(int elementID,int nodeToKeep,int nodeToDelete,double nX,double nY,int flag){
+  void collapse(int elementID,int nodeToKeep,int nodeToDelete,double nX,double nY,int flag, int b){
 		coarsenData d = res->addCollapse(elementID,nodeToKeep,nodeToDelete,nX,nY,flag);
 		FEM_Coarsen_Operation(data,d);
   }

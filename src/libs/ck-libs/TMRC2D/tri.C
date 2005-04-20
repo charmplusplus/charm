@@ -255,13 +255,17 @@ void chunk::checkPending(int idx, objRef aRef1, objRef aRef2)
   releaseLock();
 }
 
-void chunk::updateElement(int idx, objRef oldval, objRef newval)
+void chunk::updateElement(int idx, objRef oldval, objRef newval, int b)
 {
   elemRef ov, nv;
   ov.idx = oldval.idx;   ov.cid = oldval.cid; 
   nv.idx = newval.idx;   nv.cid = newval.cid; 
   accessLock();
   theEdges[idx].update(ov, nv);
+  if (theEdges[idx].getBoundary() < b)
+    theEdges[idx].setBoundary(b);
+  if ((theEdges[idx].getBoundary() > 0) && (b > 0))
+    CkPrintf("TMRC2D: [%d] WARNING! chunk::updateElementEdge collapsed two different boundaries together on one edge.\n", cid);
   releaseLock();
 }
 
@@ -437,13 +441,14 @@ intMsg *chunk::addNode(node n, int b1, int b2, int internal)
   return im;
 }
 
-edgeRef chunk::addEdge(int n1, int n2)
+edgeRef chunk::addEdge(int n1, int n2, int b)
 {
   DEBUGREF(CkPrintf("TMRC2D: [%d] Adding edge %d\n", cid, numEdges);)
   edgeRef eRef(cid, firstFreeEdge);
   theEdges[firstFreeEdge].set(firstFreeEdge, cid, this);
   theEdges[firstFreeEdge].reset();
   theEdges[firstFreeEdge].setNodes(n1, n2);
+  theEdges[firstFreeEdge].setBoundary(b);
   numEdges++;
   firstFreeEdge++;
   if (firstFreeEdge-1 == edgeSlots)  edgeSlots++;
@@ -712,8 +717,9 @@ void chunk::multipleCoarsen(double *desiredArea, refineClient *client)
   }
 }
 
-void chunk::newMesh(int meshID_,int nEl, int nGhost, const int *conn_, const int *gid_, 
-		    int nnodes, const int *boundaries, int idxOffset)
+void chunk::newMesh(int meshID_,int nEl, int nGhost, const int *conn_, 
+		    const int *gid_, int nnodes, const int *boundaries, 
+		    const int **edgeBoundaries, int idxOffset)
 {
   int i, j;
   DEBUGREF(CkPrintf("TMRC2D: [%d] In newMesh...\n", cid);)
@@ -752,7 +758,7 @@ void chunk::newMesh(int meshID_,int nEl, int nGhost, const int *conn_, const int
 
   MPI_Barrier(MPI_COMM_WORLD);
   // derive edges from elements on this chunk
-  deriveEdges(conn, gid);
+  deriveEdges(conn, gid, edgeBoundaries);
   CkAssert(nnodes == numNodes);
   if (boundaries) {
     for (i=0; i<numNodes; i++) {
@@ -767,7 +773,7 @@ void chunk::newMesh(int meshID_,int nEl, int nGhost, const int *conn_, const int
   DEBUGREF(CkPrintf("TMRC2D: [%d] newMesh DONE; chunk created with %d elements.\n", cid, numElements);)
 }
 
-void chunk::deriveEdges(int *conn, int *gid)
+void chunk::deriveEdges(int *conn, int *gid, const int **edgeBoundaries)
 {
   // need to add edges to the chunk, and update all edgeRefs on all elements
   // also need to add nodes to the chunk
@@ -817,7 +823,7 @@ void chunk::deriveEdges(int *conn, int *gid)
 	  }
 	}
 	if (edgeLocal(myRef, nbrRef)) { // make edge here
-	  newEdge = addEdge(nIdx1, nIdx2);
+	  newEdge = addEdge(nIdx1, nIdx2, edgeBoundaries[nIdx1][nIdx2]);
 	  //DEBUGREF(CkPrintf("TMRC2D: [%d] New edge (%d,%d) added between nodes %d and %d and elements %d and %d\n", cid, newEdge.cid, newEdge.idx, nIdx1, nIdx2, i, nbrRef.idx);)
 	  // point edge to the two neighboring elements
 	  theEdges[newEdge.idx].update(nullRef, myRef);
@@ -1232,6 +1238,13 @@ void chunk::rebubble()
     }
     pos--;
   }
+}
+
+intMsg *chunk::getBoundary(int edgeIdx)
+{
+  intMsg *im = new intMsg;
+  im->anInt = theEdges[edgeIdx].getBoundary();
+  return im;
 }
 
 #include "refine.def.h"

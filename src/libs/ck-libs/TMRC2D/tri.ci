@@ -30,7 +30,7 @@ module refine {
     entry [sync] intMsg *isPending(int, objRef);
     entry void checkPending(int, objRef);
     entry void checkPending(int, objRef, objRef);
-    entry [sync] void updateElement(int, objRef, objRef);
+    entry [sync] void updateElement(int, objRef, objRef, int);
     entry [sync] void updateElementEdge(int, objRef, objRef);
     entry void updateReferences(int, objRef, objRef);
     entry [sync, threaded] doubleMsg *getArea(int);
@@ -51,5 +51,6 @@ module refine {
     entry [sync] intMsg *lockChunk(int lhc, int lhi, double prio);
     entry [sync] void unlockChunk(int lhc, int lhi);
     entry [sync] void fixNode(int nIdx);
+    entry [sync] intMsg *getBoundary(int edgeIdx);
   };
 };

@@ -90,7 +90,7 @@ int edge::split(int *m, edgeRef *e_prime, int oIdx, int fIdx,
     newNodeIdx = im->anInt;
     CkFreeMsg(im);
     DEBUGREF(CkPrintf("TMRC2D: New node (%f,%f) added at index %d on chunk %d\n", newNode.X(), newNode.Y(), newNodeIdx, myRef.cid);)
-    newEdgeRef = C->addEdge(newNodeIdx, oIdx);
+    newEdgeRef = C->addEdge(newNodeIdx, oIdx, boundary);
     DEBUGREF(CkPrintf("TMRC2D: New edge (%d,%d) added between nodes (%f,%f) and newNode\n", newEdgeRef.cid, newEdgeRef.idx, C->theNodes[oIdx].X(), C->theNodes[oIdx].Y());)
     incidentNode = oIdx;
     fixNode = fIdx;

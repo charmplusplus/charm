@@ -71,12 +71,12 @@ public:
   // which side new element is added to (it moves to the new location
   // on edgeOfTri; frac indicates if this split is on the boundary and
   // if it is the first or second half of the split operation
-  virtual void split(int triNo,int edgeOfTri,int movingNode,double frac,int flag) {};
+  virtual void split(int triNo,int edgeOfTri,int movingNode,double frac,int flag, int newNodeID, int newElemID, int origEdgeB, int newEdge1B, int newEdge2B) {};
   // Collapse the edge between of elemId1 between endpoints nodeToKeep
   // and nodeToDelete.  nodeToKeep's coordinates are updated to newX
   // and newY, while nodeToDelete is removed and all references to it
   // are replaced by references to nodeToKeep
-  virtual void collapse(int elemId, int nodeToKeep, int nodeToDelete, double newX, double newY, int flag) {};
+  virtual void collapse(int elemId, int nodeToKeep, int nodeToDelete, double newX, double newY, int flag, int updatedEdgeBoundary) {};
   // update nodeID with new coordinates newX and newY; set new node's boundary
   // flag to boundaryFlag
   virtual void nodeUpdate(int nodeID, double newX, double newY, int boundaryFlag, int shareCount, int *adjChunks, int *adjIndices){};
@@ -186,7 +186,7 @@ class chunk : public TCharmClient1D {
   
   // deriveEdges creates nodes from the element & ghost info, then creates
   // unique edges for each adjacent pair of nodes
-  void deriveEdges(int *conn, int *gid);
+  void deriveEdges(int *conn, int *gid, const int **edgeBoundaries);
 
   // This initiates a refinement for a single element
   void refineElement(int idx, double area);
@@ -210,7 +210,7 @@ class chunk : public TCharmClient1D {
   intMsg *isPending(int idx, objRef e);
   void checkPending(int idx, objRef aRef);
   void checkPending(int idx, objRef aRef1, objRef aRef2);
-  void updateElement(int idx, objRef oldval, objRef newval);
+  void updateElement(int idx, objRef oldval, objRef newval, int b);
   void updateElementEdge(int idx, objRef oldval, objRef newval);
   void updateReferences(int idx, objRef oldval, objRef newval);
   doubleMsg *getArea(int n);
@@ -233,7 +233,8 @@ class chunk : public TCharmClient1D {
   // *** These methods are part of the interface with the FEM framework ***
   // create a chunk's mesh data
   void newMesh(int meshID_,int nEl, int nGhost,const int *conn_,const 
-	       int *gid_, int nnodes, const int *boundaries, int idxOffset);
+	       int *gid_, int nnodes, const int *boundaries, 
+	       const int **edgeBoundaries, int idxOffset);
   // Sets target areas specified by desiredArea, starts refining
   void multipleRefine(double *desiredArea, refineClient *client);
   // Sets target areas specified by desiredArea, starts coarsening
@@ -257,7 +258,7 @@ class chunk : public TCharmClient1D {
   void adjustMesh();
   intMsg *addNode(node n, int b1, int b2, int internal);
   //int addNode(node n);
-  edgeRef addEdge(int n1, int n2);
+  edgeRef addEdge(int n1, int n2, int b);
   elemRef addElement(int n1, int n2, int n3);
   elemRef addElement(int n1, int n2, int n3,
 		      edgeRef er1, edgeRef er2, edgeRef er3);
@@ -280,6 +281,7 @@ class chunk : public TCharmClient1D {
 		    int *rIdx);
   void addToStack(int eIdx, double len);
   void rebubble();
+  intMsg *getBoundary(int edgeIdx);
 };
 
 #endif

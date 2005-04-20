@@ -87,7 +87,9 @@ void FEM_REFINE2D_Newmesh(int meshID,int nodeID,int elemID,int nodeBoundary){
 	}
 
   /*Set up refinement framework*/
-  REFINE2D_NewMesh(meshID,nelems,total,nnodes,(int *)tempMesh,gid,tempBoundaries);
+	/*FIX ME!  PASS IN EDGE BOUNDARIES! */	
+	const int **edgeBoundaries = NULL;
+  REFINE2D_NewMesh(meshID,nelems,total,nnodes,(int *)tempMesh,gid,tempBoundaries,edgeBoundaries);
 	if(tempBoundaries){
 		delete [] tempBoundaries;
 	}
