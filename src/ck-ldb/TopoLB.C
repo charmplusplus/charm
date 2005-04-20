@@ -1,9 +1,9 @@
 /**************************************************************************
 TopoLB: 
 This is a topology-aware load balancer.
- * First groups the objects ino $p$ groups.
+ * First groups the objects into $p$ groups.
  * places object-groups onto processors one-by-one
- * Next object group to be placed is the one that gains maximum of placed now. It is placed at the processor that minimizes hop-bytes for it.
+ * Next object group to be placed is the one that gains maximum if placed now. It is placed at the processor that minimizes hop-bytes for it.
  
 Author: Tarun Agarwal (tarun)
 Date: 04/19/2005
