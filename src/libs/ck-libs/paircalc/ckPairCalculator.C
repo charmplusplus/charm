@@ -40,7 +40,8 @@ PairCalculator::PairCalculator(bool sym, int grainSize, int s, int blkSize,  int
   sumPartialCount = 0;
   setMigratable(true);
   usesAtSync=true;
-  //setMigratable(false);
+  //  setMigratable(false);
+  //  usesAtSync=false;
   CProxy_PairCalcReducer pairCalcReducerProxy(reducer_id); 
   pairCalcReducerProxy.ckLocalBranch()->doRegister(this, symmetric);
 }
@@ -111,8 +112,11 @@ PairCalculator::~PairCalculator()
 
 }
 void PairCalculator::ResumeFromSync() {
-    CProxy_PairCalcReducer pairCalcReducerProxy(reducer_id); 
-    pairCalcReducerProxy.ckLocalBranch()->doRegister(this,symmetric);
+  if(usesAtSync)
+    {
+      CProxy_PairCalcReducer pairCalcReducerProxy(reducer_id); 
+      pairCalcReducerProxy.ckLocalBranch()->doRegister(this,symmetric);
+    }
 }
 void
 PairCalculator::calculatePairs_gemm(calculatePairsMsg *msg)

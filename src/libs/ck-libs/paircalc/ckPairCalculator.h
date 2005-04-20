@@ -162,6 +162,8 @@ class PairCalcReducer : public Group {
   ~PairCalcReducer() {}
   void clearRegister()
     {  
+      acceptCount=0;
+      reduction_elementCount=0;
       localElements[0].resize(0);
       localElements[1].resize(0);
       numRegistered[0]=0;
