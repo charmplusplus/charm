@@ -126,15 +126,6 @@ void chunk::coarseningElements()
       theElements[i].coarsen(); // coarsen the element
     }
     CthYield(); // give other chunks on the same PE a chance
-    if (coarsenTop == 0) {
-      for (i=0; i<elementSlots; i++) { // set desired areas for elements
-	if (theElements[i].isPresent()) {
-	  if (theElements[i].getTargetArea() > theElements[i].getArea()) {
-	    addToStack(i, theElements[i].getShortestEdge());
-	  }
-	}
-      }
-    }
   }
   coarsenInProgress = 0;  // turn coarsen loop off
   //dump();
@@ -710,6 +701,15 @@ void chunk::multipleCoarsen(double *desiredArea, refineClient *client)
   }
   DEBUGREF(CkPrintf("TMRC2D: [%d] multipleCoarsen DONE.\n", cid);)
   CkWaitQD();
+  for (i=0; i<elementSlots; i++) { // set desired areas for elements
+    if (theElements[i].isPresent()) {
+      area = theElements[i].getArea();
+      precThrshld = area * 1e-8;
+      if (desiredArea[i] > area+precThrshld) {
+	CkPrintf("TMRC2D: [%d] WARNING: element %d area is %1.10e but target was %1.10e\n", cid, i, area, desiredArea[i]);
+      }
+    }
+  }
 }
 
 void chunk::newMesh(int meshID_,int nEl, int nGhost, const int *conn_, const int *gid_, 
