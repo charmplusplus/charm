@@ -760,6 +760,7 @@ void     CmiLookupGroup(CmiGroup grp, int *npes, int **pes);
  * bytes. The first message never has its memory header attached (it uses the
  * one of the new message).
  */
+
 #define VECTOR_COMPACT(outsize,outdata,inndata,insizes,indatas) {\
   int i;\
   char *tmp;\
@@ -772,11 +773,13 @@ void     CmiLookupGroup(CmiGroup grp, int *npes, int **pes);
   outdata = (char *)CmiAlloc(outsize);\
   if (!outdata) fprintf(stderr, "%d: Out of mem\n", CmiMyNode());\
   tmp = outdata;\
-  if (inndata>=0) for (i=0; i<inndata; ++i) {\
-    memcpy(tmp, indatas[i]; insizes[i]);\
-    tmp += insizes[i];\
+  if (inndata>=0) {\
+    for (i=0; i<inndata; ++i) {\
+      memcpy(tmp, indatas[i], insizes[i]);\
+      tmp += insizes[i];\
+    }\
   } else {\
-    memcpy(tmp, indatas[0]; insizes[0]);\
+    memcpy(tmp, indatas[0], insizes[0]);\
     tmp += ALIGN8(insizes[0]);\
     for (i=0; i<-inndata; ++i) {\
       memcpy(tmp, indatas[i]-sizeof(CmiChunkHeader), insizes[i]+sizeof(CmiChunkHeader));\
