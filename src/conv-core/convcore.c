@@ -1491,80 +1491,29 @@ void CsdInit(argv)
  *
  ****************************************************************************/
 
-#define PAD8(x)    ((x+0x07)&(~0x07))
-
 #if CMK_VECTOR_SEND_USES_COMMON_CODE
 
-void CmiSyncVectorSendSystem(destPE, n, sizes, msgs, system)
-int destPE, n;
-int *sizes;
-char **msgs;
-int system;
-{
-  int i, total;
-  char *mesg, *tmp;
-  
-  if (system) {
-    for(i=0,total=0;i<n;i++) total += PAD8(sizes[i]);
-    total += (n-1)*sizeof(CmiChunkHeader);
-  } else {
-    for(i=0,total=0;i<n;i++) total += sizes[i];
-  }
-  mesg = (char *) CmiAlloc(total);
-  tmp=mesg;
-  if (system) {
-    memcpy(tmp, msgs[0], sizes[0]);
-    tmp += PAD8(sizes[i]);
-    for (i=1; i<n; ++i) {
-      memcpy(tmp, msgs[i]-sizeof(CmiChunkHeader), sizes[i]+sizeof(CmiChunkHeader));
-      tmp += PAD8(sizes[i])+sizeof(CmiChunkHeader);
-    }
-  } else {
-    for(i=0;i<n;i++) {
-      memcpy(tmp, msgs[i],sizes[i]);
-      tmp += sizes[i];
-    }
-  }
+void CmiSyncVectorSend(int destPE, int n, int *sizes, char **msgs) {
+  int total;
+  char *mesg;
+  COMPACT_VECTOR(total, mesg, n, sizes, msgs);
   CmiSyncSendAndFree(destPE, total, mesg);
 }
 
-CmiCommHandle CmiAsyncVectorSendSystem(destPE, n, sizes, msgs, system)
-int destPE, n;
-int *sizes;
-char **msgs;
-int system;
-{
-  CmiSyncVectorSendSystem(destPE,n,sizes,msgs,system);
+void CmiASyncVectorSend(int destPE, int n, int *sizes, char **msgs) {
+  CmiSyncVectorSend(destPE, n, sizes, msgs);
   return NULL;
 }
 
-void CmiSyncVectorSendAndFreeSystem(destPE, n, sizes, msgs, system)
-int destPE, n;
-int *sizes;
-char **msgs;
-int system;
-{
+void CmiSyncVectorSendAndFree(int destPE, int n, int *sizes, char **msgs) {
   int i;
-
-  CmiSyncVectorSendSystem(destPE,n,sizes,msgs,system);
+  CmiSyncVectorSendAndFree(destPE, n, sizes, msgs);
   for(i=0;i<n;i++) CmiFree(msgs[i]);
   CmiFree(sizes);
   CmiFree(msgs);
 }
 
 #endif
-
-void CmiSyncVectorSend(int destPE, int n, int *sizes, char **msgs) {
-  CmiSyncVectorSendSystem(destPE, n, sizes, msgs, 0);
-}
-
-void CmiASyncVectorSend(int destPE, int n, int *sizes, char **msgs) {
-  CmiAsyncVectorSendSystem(destPE, n, sizes, msgs, 0);
-}
-
-void CmiSyncVectorSendAndFree(int destPE, int n, int *sizes, char **msgs) {
-  CmiSyncVectorSendAndFreeSystem(destPE, n, sizes, msgs, 0);
-}
 
 /*****************************************************************************
  *

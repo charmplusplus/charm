@@ -57,8 +57,6 @@ A more readable summary is at:
 #endif
 
 
-#define ALIGN8(x)       (int)((~7)&((x)+7))
-
 #define DEBUG_GOT_MANAGER 0
 
 typedef Elf32_Addr ELF_TYPE_Addr;

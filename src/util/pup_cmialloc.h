@@ -18,7 +18,6 @@
 #define BLKSTART(m) (((CmiChunkHeader *)(m))-1)
 
 //Align data sizes to 8 bytes
-#define ALIGN8(x)            (int)((~7)&((x)+7))
 #define ALIGN8_LONG(x)       (long)((~7)&((x)+7))
 
 //Assuming Size of CmiChunkHeader is a multiple of 8 bytes!!

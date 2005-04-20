@@ -105,8 +105,6 @@ public:
 		nInts=sizeof(obj)/sizeof(int);}
 };
 
-#define ALIGN8(x)       (int)((~7)&((x)+7))
-
 /********************* CkArrayListener ****************/
 ///An arrayListener is an object that gets informed whenever
 /// an array element is created, migrated, or destroyed.
