@@ -1507,7 +1507,7 @@ CmiCommHandle CmiASyncVectorSend(int destPE, int n, int *sizes, char **msgs) {
 
 void CmiSyncVectorSendAndFree(int destPE, int n, int *sizes, char **msgs) {
   int i;
-  CmiSyncVectorSendAndFree(destPE, n, sizes, msgs);
+  CmiSyncVectorSend(destPE, n, sizes, msgs);
   for(i=0;i<n;i++) CmiFree(msgs[i]);
   CmiFree(sizes);
   CmiFree(msgs);
