@@ -41,6 +41,7 @@ module comlib {
   PUPable MeshStreamingStrategy;
   PUPable PrioStreaming;
   PUPable BroadcastStrategy;
+  PUPable MultiRingMulticast;
 
   //Strategy pupable defined in the array manager code, along with the
   //array listener code

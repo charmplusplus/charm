@@ -41,7 +41,7 @@ inline int ComlibSectionHashKey::compare(const ComlibSectionHashKey &k2) const
 }
 
 /*For calls to qsort*/
-inline int intCompare(void *a, void *b){
+inline int intCompare(const void *a, const void *b){
     int a1 = *(int *) a;
     int b1 = *(int *) b;
 

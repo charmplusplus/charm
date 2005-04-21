@@ -8,6 +8,7 @@
 #include "NodeMulticast.h"
 #include "MsgPacker.h"
 #include "RingMulticastStrategy.h"
+#include "MultiRingMulticast.h"
 #include "PipeBroadcastStrategy.h"
 #include "BroadcastStrategy.h"
 #include "MeshStreamingStrategy.h"
