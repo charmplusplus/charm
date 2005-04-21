@@ -12,7 +12,7 @@
 #define NULL 0
 #endif
 
-#define CMK_COMMLIB_USE_VECTORIZE 1
+#define CMK_COMMLIB_USE_VECTORIZE 0
 
 #define MSGQLEN 32
 
