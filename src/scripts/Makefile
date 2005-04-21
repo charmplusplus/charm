@@ -203,6 +203,7 @@ CKHEADERS=ck.h ckstream.h envelope.h init.h qd.h charm.h charm++.h \
           charisma.decl.h TraceSummary.decl.h BlueGene.decl.h \
 	  comlib.decl.h ComlibManager.h DummyStrategy.h	\
 	  DirectMulticastStrategy.h RingMulticastStrategy.h	\
+	  MultiRingMulticast.h \
 	  EachToManyMulticastStrategy.h MsgPacker.h StreamingStrategy.h \
 	  NodeMulticast.h PipeBroadcastStrategy.h MeshStreamingStrategy.h \
           PrioStreaming.h MPIStrategy.h MsgPacker.h StreamingStrategy.h \
@@ -719,7 +720,7 @@ STRATEGY_OBJS = MPIStrategy.o StreamingStrategy.o \
 		EachToManyMulticastStrategy.o ComlibSectionInfo.o \
                 AAPLearner.o ComlibStats.o AAMLearner.o \
                 MsgPacker.o DirectMulticastStrategy.o \
-		RingMulticastStrategy.o \
+		RingMulticastStrategy.o MultiRingMulticast.o\
                 PipeBroadcastStrategy.o MeshStreamingStrategy.o \
                 PrioStreaming.o BroadcastStrategy.o
 
