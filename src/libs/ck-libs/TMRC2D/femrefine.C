@@ -13,30 +13,30 @@
 
 
 class intdual{
-	private:
-		int x,y;
-	public:
-		intdual(int _x,int _y){
-			if(_x <= _y){
- 				x = _x; y=_y;
- 			}else{
- 				x = _y; y= _x;
- 			}
-		}
-		inline int getx(){return x;};
-		inline int gety(){return y;};
-		inline CkHashCode hash() const {
-			return (CkHashCode)(x+y);
-		}
-		static CkHashCode staticHash(const void *k,size_t){
-			return ((intdual *)k)->hash();
-		}
-		inline int compare(intdual &t) const{
-			return (t.getx() == x && t.gety() == y);
-		}
-		static int staticCompare(const void *a,const void *b,size_t){
-			return ((intdual *)a)->compare((*(intdual *)b));
-		}
+private:
+  int x,y;
+public:
+  intdual(int _x,int _y){
+    if(_x <= _y){
+      x = _x; y=_y;
+    }else{
+      x = _y; y= _x;
+    }
+  }
+  inline int getx(){return x;};
+  inline int gety(){return y;};
+  inline CkHashCode hash() const {
+    return (CkHashCode)(x+y);
+  }
+  static CkHashCode staticHash(const void *k,size_t){
+    return ((intdual *)k)->hash();
+  }
+  inline int compare(intdual &t) const{
+    return (t.getx() == x && t.gety() == y);
+  }
+  static int staticCompare(const void *a,const void *b,size_t){
+    return ((intdual *)a)->compare((*(intdual *)b));
+  }
 };
 
 void FEM_REFINE2D_Init(){
@@ -49,31 +49,29 @@ FDECL void FTN_NAME(FEM_REFINE2D_INIT,fem_refine2d_init)(void)
 }
 
 
-
-
 void FEM_REFINE2D_Newmesh(int meshID,int nodeID,int elemID,int nodeBoundary){
-	int nelems = FEM_Mesh_get_length(meshID,elemID);
-	int	nghost = FEM_Mesh_get_length(meshID,elemID+FEM_GHOST);
-	int total = nghost + nelems;
-	int *tempMesh = new int[3*total];
-	int nnodes = FEM_Mesh_get_length(meshID,nodeID);
-	int *tempBoundaries=NULL;
-	if(nodeBoundary){
-		tempBoundaries = new int[nnodes];
-	}
-	FEM_Mesh_data(meshID,elemID,FEM_CONN,&tempMesh[0],0,nelems,FEM_INDEX_0,3);
-	FEM_Mesh_data(meshID,elemID+FEM_GHOST,FEM_CONN,&tempMesh[3*nelems],0,nghost,FEM_INDEX_0,3);
-
-	for(int t=nelems;t<total;t++){
-		for(int j=0;j<3;j++){
-			if(FEM_Is_ghost_index(tempMesh[3*t+j])){
-				tempMesh[3*t+j] += nelems;
-			}
-		}	
-	}
-	
+  int nelems = FEM_Mesh_get_length(meshID,elemID);
+  int nghost = FEM_Mesh_get_length(meshID,elemID+FEM_GHOST);
+  int total = nghost + nelems;
+  int *tempMesh = new int[3*total];
+  int nnodes = FEM_Mesh_get_length(meshID,nodeID);
+  int *tempBoundaries=NULL;
+  if(nodeBoundary){
+    tempBoundaries = new int[nnodes];
+  }
+  FEM_Mesh_data(meshID,elemID,FEM_CONN,&tempMesh[0],0,nelems,FEM_INDEX_0,3);
+  FEM_Mesh_data(meshID,elemID+FEM_GHOST,FEM_CONN,&tempMesh[3*nelems],0,nghost,FEM_INDEX_0,3);
+  
+  for(int t=nelems;t<total;t++){
+    for(int j=0;j<3;j++){
+      if(FEM_Is_ghost_index(tempMesh[3*t+j])){
+	tempMesh[3*t+j] += nelems;
+      }
+    }	
+  }
+  
   /*Set up the global ID's, for refinement*/
-	int myID = FEM_My_partition();
+  int myID = FEM_My_partition();
   int *gid=new int[2*total];
   for (int i=0;i<nelems;i++) {
     gid[2*i+0]=myID; //Local element-- my chunk
@@ -81,27 +79,26 @@ void FEM_REFINE2D_Newmesh(int meshID,int nodeID,int elemID,int nodeBoundary){
   }
   int gid_fid=FEM_Create_field(FEM_INT,2,0,2*sizeof(int));
   FEM_Update_ghost_field(gid_fid,0,gid);
-	
-	if(nodeBoundary){
-		FEM_Mesh_data(meshID,nodeID,FEM_BOUNDARY,tempBoundaries,0,nnodes,FEM_INT,1);
-	}
-
+  
+  if(nodeBoundary){
+    FEM_Mesh_data(meshID,nodeID,FEM_BOUNDARY,tempBoundaries,0,nnodes,FEM_INT,1);
+  }
+  
   /*Set up refinement framework*/
-	/*FIX ME!  PASS IN EDGE BOUNDARIES! */	
-	const int **edgeBoundaries = NULL;
+  /*FIX ME!  PASS IN EDGE BOUNDARIES! */	
+  const int **edgeBoundaries = NULL;
   REFINE2D_NewMesh(meshID,nelems,total,nnodes,(int *)tempMesh,gid,tempBoundaries,edgeBoundaries);
-	if(tempBoundaries){
-		delete [] tempBoundaries;
-	}
-	delete [] gid;
-	delete [] tempMesh;
+  if(tempBoundaries){
+    delete [] tempBoundaries;
+  }
+  delete [] gid;
+  delete [] tempMesh;
 }
 
-FDECL void FTN_NAME(FEM_REFINE2D_NEWMESH,fem_refine2d_newmesh)(int *meshID,int *nodeID,int *elemID, int *nodeBoundary){
-	FEM_REFINE2D_Newmesh(*meshID,*nodeID,*elemID,*nodeBoundary);
+FDECL void FTN_NAME(FEM_REFINE2D_NEWMESH,fem_refine2d_newmesh)(int *meshID,int *nodeID,int *elemID, int *nodeBoundary)
+{
+  FEM_REFINE2D_Newmesh(*meshID,*nodeID,*elemID,*nodeBoundary);
 }
-
-
 
 void FEM_REFINE2D_Split(int meshID,int nodeID,double *coord,int elemID,double *desiredAreas,int sparseID){
   int nnodes = FEM_Mesh_get_length(meshID,nodeID);
@@ -511,5 +508,5 @@ void FEM_Coarsen_Operation(FEM_Operation_Data *coarsen_data, coarsenData &operat
 
 
 FDECL void FTN_NAME(FEM_REFINE2D_COARSEN,fem_refine2d_coarsen)(int *meshID,int *nodeID,double *coord,int *elemID,double *desiredAreas){
-	FEM_REFINE2D_Coarsen(*meshID,*nodeID,coord,*elemID,desiredAreas);
+  FEM_REFINE2D_Coarsen(*meshID,*nodeID,coord,*elemID,desiredAreas);
 }
