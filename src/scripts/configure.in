@@ -150,6 +150,30 @@ then
 	test_finish 1
 fi
 
+cat > $t <<EOT
+#include <stdio.h>
+int main() {
+	printf("Hello, world!\n");
+	return 0;
+}
+EOT
+echo "set C++ linker as: $CMK_LDXX"
+test_link "whether linker works" "ok" "no" ""
+if test $fail -eq 1
+then
+	echo "Cannot link C++ programs with $CMK_LDXX"
+	echo " (check your charm++ version)"
+	test_finish 1
+fi
+
+if test "$base_version" = "net-linux" 
+then
+  test_link "whether linker accept --allow-multiple-definition" "ok" "no" "-Wl,--allow-multiple-definition"
+  if test $pass -eq 1
+  then
+	add_flag CMK_LDXX='"$CMK_LDXX -Wl,--allow-multiple-definition"' "net-linux linker"
+  fi
+fi
 
 # Perform the tests
 
