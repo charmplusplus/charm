@@ -25,8 +25,8 @@ inline int getMyId(int *pelist, int npes, int mype) {
         if(mype == pelist[count])
             myid = count;
 
-    if(myid == -1)
-        CkPrintf("Warning myid = -1\n");
+    //if(myid == -1)
+    //  CkPrintf("Warning myid = -1\n");
 
     return myid;
 }
@@ -64,8 +64,8 @@ inline int getMidPe(int *pelist, int npes, int src_pe) {
     else
         mid_pe = pelist[my_id % (npes/2)];
     
-    if(mid_pe == -1)
-        CkPrintf("Warning midpe = -1\n");
+    //if(mid_pe == -1)
+    //  CkPrintf("Warning midpe = -1\n");
 
     return mid_pe;
 }
@@ -107,14 +107,16 @@ ComlibSectionHashObject *MultiRingMulticast::createObjectOnSrcPe
     pelist[npes ++] = CkMyPe();
     qsort(pelist, npes, sizeof(int), intCompare);
 
-    char dump[2560];
-    sprintf(dump, "Section on %d : ", CkMyPe());
-    for(int count = 0; count < npes; count ++) {
-        sprintf(dump, "%s, %d", dump, pelist[count]);
-    }
+    /*
+      char dump[2560];
+      sprintf(dump, "Section on %d : ", CkMyPe());
+      for(int count = 0; count < npes; count ++) {
+      sprintf(dump, "%s, %d", dump, pelist[count]);
+      }
     
-    CkPrintf("%s\n\n", dump);
-
+      CkPrintf("%s\n\n", dump);
+    */
+    
     int myid = getMyId(pelist, npes, CkMyPe());    
 
     CkAssert(myid >= 0 && myid < npes);
@@ -146,7 +148,7 @@ ComlibSectionHashObject *MultiRingMulticast::createObjectOnSrcPe
         obj->pelist[0] = mid_pe;
     }
     
-    CkPrintf("%d Src = %d Next = %d Mid Pe =%d\n", CkMyPe(), CkMyPe(), nextpe, mid_pe);    
+    //CkPrintf("%d Src = %d Next = %d Mid Pe =%d\n", CkMyPe(), CkMyPe(), nextpe, mid_pe);    
     
     return obj;
 }
@@ -216,8 +218,8 @@ ComlibSectionHashObject *MultiRingMulticast::createObjectOnIntermediatePe
         obj->pelist[0] = nextpe;
     }
     
-    CkPrintf("%d: Src = %d Next = %d end = %d Midpe = %d\n", CkMyPe(), src_pe, 
-             nextpe, end_flag, mid_pe);    
+    //CkPrintf("%d: Src = %d Next = %d end = %d Midpe = %d\n", CkMyPe(), src_pe, 
+    //       nextpe, end_flag, mid_pe);    
     
     delete [] pelist;
     return obj;
