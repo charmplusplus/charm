@@ -4,8 +4,8 @@
 #include "CentralLB.h"
 #include "topology.h"
 
-#ifndef INF
-#define INF 999999
+#ifndef INFTY
+#define INFTY 999999999
 #endif
 
 void CreateTopoLB ();
