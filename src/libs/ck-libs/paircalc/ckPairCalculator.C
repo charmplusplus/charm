@@ -38,15 +38,12 @@ PairCalculator::PairCalculator(bool sym, int grainSize, int s, int blkSize,  int
 
   newData = NULL;
   sumPartialCount = 0;
+  usesAtSync=true;
+  
   if(lbpaircalc)
-    {
-      setMigratable(true);
-      usesAtSync=true;
-    }
-  else{
+    setMigratable(true);
+  else
     setMigratable(false);
-    usesAtSync=false;
-  }
   CProxy_PairCalcReducer pairCalcReducerProxy(reducer_id); 
   pairCalcReducerProxy.ckLocalBranch()->doRegister(this, symmetric);
 }
