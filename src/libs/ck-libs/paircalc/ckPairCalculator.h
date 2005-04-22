@@ -105,7 +105,7 @@ class calculatePairsMsg : public CMessage_calculatePairsMsg {
 
 class PairCalculator: public CBase_PairCalculator {
  public:
-    PairCalculator(bool, int, int, int, int op1, FuncType fn1, int op2, FuncType fn2, CkCallback cb, CkGroupID gid, CkArrayID final_callbackid, int final_callback_ep, bool conserveMemory=true);
+  PairCalculator(bool, int, int, int, int op1, FuncType fn1, int op2, FuncType fn2, CkCallback cb, CkGroupID gid, CkArrayID final_callbackid, int final_callback_ep, bool conserveMemory, bool lbpaircalc, CkCallback lbcb);
     
   PairCalculator(CkMigrateMessage *);
   ~PairCalculator();
@@ -142,6 +142,7 @@ class PairCalculator: public CBase_PairCalculator {
   int sumPartialCount;
   bool symmetric;
   bool conserveMemory;
+  bool lbpaircalc;
   CkCallback cb;
   CkArrayID cb_aid;
   int cb_ep;
@@ -149,6 +150,7 @@ class PairCalculator: public CBase_PairCalculator {
   CkSparseContiguousReducer<double> r;
   bool existsLeft;
   bool existsRight;
+  CkCallback cb_lb;
 };
 
 class PairCalcReducer : public Group {

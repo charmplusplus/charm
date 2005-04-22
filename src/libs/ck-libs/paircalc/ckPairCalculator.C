@@ -5,7 +5,7 @@
 
 PairCalculator::PairCalculator(CkMigrateMessage *m) { }
 
-PairCalculator::PairCalculator(bool sym, int grainSize, int s, int blkSize,  int op1,  FuncType fn1, int op2,  FuncType fn2, CkCallback cb, CkGroupID gid, CkArrayID cb_aid, int cb_ep, bool conserveMemory) 
+PairCalculator::PairCalculator(bool sym, int grainSize, int s, int blkSize,  int op1,  FuncType fn1, int op2,  FuncType fn2, CkCallback cb, CkGroupID gid, CkArrayID cb_aid, int cb_ep, bool conserveMemory, bool lbpaircalc, CkCallback lbcb) 
 {
 #ifdef _PAIRCALC_DEBUG_ 
   CkPrintf("[PAIRCALC] [%d %d %d %d] inited\n", thisIndex.w, thisIndex.x, thisIndex.y, thisIndex.z);
@@ -28,7 +28,7 @@ PairCalculator::PairCalculator(bool sym, int grainSize, int s, int blkSize,  int
   existsRight=false;
   numRecd = 0;
   numExpected = grainSize;
-
+  this->cb_lb=lbcb;
   kUnits=grainSize;  //streaming unit only really used in NOGEMM, but could be used under other conditions
 
   inDataLeft = NULL;
@@ -38,10 +38,15 @@ PairCalculator::PairCalculator(bool sym, int grainSize, int s, int blkSize,  int
 
   newData = NULL;
   sumPartialCount = 0;
-  setMigratable(true);
-  usesAtSync=true;
-  //  setMigratable(false);
-  //  usesAtSync=false;
+  if(lbpaircalc)
+    {
+      setMigratable(true);
+      usesAtSync=true;
+    }
+  else{
+    setMigratable(false);
+    usesAtSync=false;
+  }
   CProxy_PairCalcReducer pairCalcReducerProxy(reducer_id); 
   pairCalcReducerProxy.ckLocalBranch()->doRegister(this, symmetric);
 }
@@ -65,11 +70,13 @@ PairCalculator::pup(PUP::er &p)
   p|cb_ep;
   p|reducer_id;
   p|symmetric;
+  p|lbpaircalc;
   p|sumPartialCount;
   p|N;
   p|cb;
   p|existsLeft;
   p|existsRight;
+  p|cb_lb;
   if (p.isUnpacking()) {
     if(existsLeft)
       inDataLeft = new complex[numExpected*N];
@@ -116,6 +123,11 @@ void PairCalculator::ResumeFromSync() {
     {
       CProxy_PairCalcReducer pairCalcReducerProxy(reducer_id); 
       pairCalcReducerProxy.ckLocalBranch()->doRegister(this,symmetric);
+      //if gspace isn't syncing we'll have to do the resumption.
+      if(thisIndex.x==0 && thisIndex.y==0 && thisIndex.z==0 && thisIndex.w==0)
+	{
+	  cb_lb.send();
+	}
     }
 }
 void
