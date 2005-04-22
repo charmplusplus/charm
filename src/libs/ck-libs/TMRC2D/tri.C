@@ -179,7 +179,7 @@ void chunk::nodeReplaceDelete(int kIdx, int dIdx, node nn, int shared,
       jShared = joinCommLists(kIdx, shared, chk, idx, jChk, jIdx);
       theClient->nodeUpdate(kIdx, nn.X(), nn.Y(), nn.boundary, jShared, jChk, 
 			    jIdx);
-      CkPrintf("TMRC2D: [%d] (a)theClient->nodeUpdate(%d, %2.10f, %2.10f)\n", cid, kIdx, nn.X(), nn.Y());
+      CkPrintf("TMRC2D: [%d] (a)theClient->nodeUpdate(%d, %2.10f, %2.10f, %d)\n", cid, kIdx, nn.X(), nn.Y(), nn.boundary);
     }
     return;
   }
@@ -189,7 +189,7 @@ void chunk::nodeReplaceDelete(int kIdx, int dIdx, node nn, int shared,
     jShared = joinCommLists(dIdx, shared, chk, idx, jChk, jIdx);
     theClient->nodeUpdate(dIdx, nn.X(), nn.Y(), nn.boundary, jShared, jChk, 
 			  jIdx);
-    CkPrintf("TMRC2D: [%d] (b)theClient->nodeUpdate(%d, %2.10f, %2.10f)\n", cid, dIdx, nn.X(), nn.Y());
+    CkPrintf("TMRC2D: [%d] (b)theClient->nodeUpdate(%d, %2.10f, %2.10f, %d)\n", cid, dIdx, nn.X(), nn.Y(), nn.boundary);
   }
   else {
     removeNode(dIdx);
@@ -198,7 +198,7 @@ void chunk::nodeReplaceDelete(int kIdx, int dIdx, node nn, int shared,
     jShared = joinCommLists(kIdx, shared, chk, idx, jChk, jIdx);
     theClient->nodeUpdate(kIdx, nn.X(), nn.Y(), nn.boundary, jShared, jChk, 
 			  jIdx);
-    CkPrintf("TMRC2D: [%d] (c)theClient->nodeUpdate(%d, %2.10f, %2.10f)\n", cid, kIdx, nn.X(), nn.Y());
+    CkPrintf("TMRC2D: [%d] (c)theClient->nodeUpdate(%d, %2.10f, %2.10f, %d)\n", cid, kIdx, nn.X(), nn.Y(), nn.boundary);
     for (int j=0; j<elementSlots; j++) {
       if (theElements[j].isPresent()) {
 	CkAssert(theElements[j].nodes[0] != theElements[j].nodes[1]);
@@ -823,7 +823,10 @@ void chunk::deriveEdges(int *conn, int *gid, const int **edgeBoundaries)
 	  }
 	}
 	if (edgeLocal(myRef, nbrRef)) { // make edge here
-	  newEdge = addEdge(nIdx1, nIdx2, edgeBoundaries[nIdx1][nIdx2]);
+	  if (!edgeBoundaries)
+	    newEdge = addEdge(nIdx1, nIdx2, 0);
+	  else
+	    newEdge = addEdge(nIdx1, nIdx2, edgeBoundaries[nIdx1][nIdx2]);
 	  //DEBUGREF(CkPrintf("TMRC2D: [%d] New edge (%d,%d) added between nodes %d and %d and elements %d and %d\n", cid, newEdge.cid, newEdge.idx, nIdx1, nIdx2, i, nbrRef.idx);)
 	  // point edge to the two neighboring elements
 	  theEdges[newEdge.idx].update(nullRef, myRef);
