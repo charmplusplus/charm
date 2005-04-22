@@ -707,9 +707,14 @@ void *CmiGetNonLocal(void)
   CmiIdleLock_checkMessage(&cs->idle);
   /* although it seems that lock is not needed, I found it crashes very often
      on mpi-smp without lock */
+
+  CmiReleaseSentMessages();
+  PumpMsgs();
+  
   CmiLock(procState[cs->rank].recvLock);
   msg =  PCQueuePop(cs->recv); 
   CmiUnlock(procState[cs->rank].recvLock);
+
 /*
   if (msg) {
     MACHSTATE2(3,"CmiGetNonLocal done on pe %d for queue %p", CmiMyPe(), cs->recv); }
@@ -725,6 +730,7 @@ void *CmiGetNonLocal(void)
       PumpMsgs();
     }
   }
+  
   if(!msg) {
     CmiReleaseSentMessages();
     if (PumpMsgs())
