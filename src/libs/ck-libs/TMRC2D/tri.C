@@ -761,8 +761,11 @@ void chunk::newMesh(int meshID_,int nEl, int nGhost, const int *conn_,
   deriveEdges(conn, gid, edgeBoundaries);
   CkAssert(nnodes == numNodes);
   if (boundaries) {
+    CkPrintf("TMRC2D: [%d] Received non-NULL boundaries... adding...\n", cid);
     for (i=0; i<numNodes; i++) {
       theNodes[i].boundary = boundaries[i];
+      if (theNodes[i].boundary) 
+	CkPrintf("TMRC2D: [%d] Node %d has boundary %d.\n", cid, i, theNodes[i].boundary);
     }
   }
   else {
