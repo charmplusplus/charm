@@ -81,6 +81,60 @@ double LBTopology::per_hop_delay(int last_hop)
 		return HOP_LINK_DELAY;
 }
 
+void LBTopology::get_pairwise_hop_count(double  **distance)
+{
+  struct queueNode
+  {
+    int index;
+    int dist;
+    queueNode *next;
+    queueNode(int i,int d)
+    {
+      index=i;
+      dist=d;
+      next=NULL;
+    }
+  };
+  
+  bool *visited=new bool[npes];
+  int *neigh=new int[max_neighbors()];
+  int num_neighbors;
+
+  for(int i=0;i<npes;i++)
+  {
+    //Init data structures for BFS from i-th proc
+    for(int j=0;j<npes;j++)
+      visited[j]=false;
+
+    queueNode *q=new queueNode(i,0);
+    queueNode *last=q;
+    distance[i][i]=0;
+    visited[i]=true;
+
+    // Perform BFS until queue is empty
+    while(q)
+    { 
+      neighbors(q->index,neigh,num_neighbors);
+      for(int j=0;j<num_neighbors;j++)
+      {
+        if(!visited[neigh[j]])
+        {
+          visited[neigh[j]]=true;
+          distance[i][neigh[j]]=q->dist+1;
+          queueNode *qnew=new queueNode(neigh[j],q->dist+1);
+          last->next=qnew;
+          last=last->next;
+        }
+      }
+      queueNode *qtemp=q;
+      q=q->next;
+      delete qtemp;
+    }
+  }
+  delete[] visited;
+  delete[] neigh;
+}
+
 //smp - assume 1,2,3 or 4 processors per node
 
 template <int ppn>

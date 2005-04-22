@@ -36,6 +36,7 @@ public:
   virtual int get_hop_count(int src,int dest);
   virtual int rec_hop_count(int src,int dest,int max_neigh,int count,int *visited_srcs);
   virtual double per_hop_delay(int last_hop);
+  virtual void get_pairwise_hop_count(double **dist);
 };
 
 #define LBTOPO_MACRO(x) \
