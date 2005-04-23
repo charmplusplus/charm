@@ -758,8 +758,6 @@ void chunk::newMesh(int meshID_,int nEl, int nGhost, const int *conn_,
 
   MPI_Barrier(MPI_COMM_WORLD);
   // derive edges from elements on this chunk
-  deriveEdges(conn, gid, edgeBoundaries);
-  CkAssert(nnodes == numNodes);
   if (boundaries) {
     CkPrintf("TMRC2D: [%d] Received non-NULL boundaries... adding...\n", cid);
     for (i=0; i<numNodes; i++) {
@@ -767,8 +765,12 @@ void chunk::newMesh(int meshID_,int nEl, int nGhost, const int *conn_,
       if (theNodes[i].boundary) 
 	CkPrintf("TMRC2D: [%d] Node %d has boundary %d.\n", cid, i, theNodes[i].boundary);
     }
+    deriveEdges(conn, gid, edgeBoundaries);
+    CkAssert(nnodes == numNodes);
   }
   else {
+    deriveEdges(conn, gid, edgeBoundaries);
+    CkAssert(nnodes == numNodes);
     deriveBoundaries(conn, gid);
   }
   delete[] conn;
@@ -817,6 +819,7 @@ void chunk::deriveEdges(int *conn, int *gid, const int **edgeBoundaries)
 	if ((theNodes[nIdx2].boundary < theNodes[nIdx1].boundary) && 
 	    (theNodes[nIdx2].boundary != 0)) {
 	  theNodes[nIdx1].fixed = 1;
+	  CkPrintf("TMRC2D: [%d] Corner detected, fixing node %d\n", cid, nIdx1);
 	  FEM_Comm_Rec *nRec = (FEM_Comm_Rec*)(mNodes->shared.getRec(nIdx1));
 	  if (nRec) {
 	    int count = nRec->getShared();
@@ -1155,6 +1158,7 @@ void chunk::unlockLocalChunk(int lhc, int lhi)
 void chunk::fixNode(int nIdx)
 {
   theNodes[nIdx].fixed = 1;
+  CkPrintf("TMRC2D: [%d] Corner detected, fixing node %d\n", cid, nIdx);
 }
 
 int chunk::joinCommLists(int nIdx, int shd, int *chk, int *idx, int *rChk,
