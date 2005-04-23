@@ -1719,7 +1719,7 @@ ComlibManager.o: ComlibManager.C ComlibManager.h charm++.h charm.h \
   pup_cmialloc.h RingMulticastStrategy.h MultiRingMulticast.h \
   PipeBroadcastStrategy.h pipebroadcastconverse.h BroadcastStrategy.h \
   MeshStreamingStrategy.h PrioStreaming.h qd.h CentralLB.h BaseLB.h \
-  CentralLB.decl.h CentralLBMsg.h comlib.def.h
+  CentralLB.decl.h CentralLBMsg.h comlib.def.h pipelinestrategy.h
 	$(CHARMC) -c -I. ComlibManager.C
 
 MPIStrategy.o: MPIStrategy.C MPIStrategy.h ComlibManager.h charm++.h \
@@ -1996,7 +1996,7 @@ PipeBroadcastStrategy.o: PipeBroadcastStrategy.C PipeBroadcastStrategy.h \
   charisma.h charisma.decl.h tempo.h tempo.decl.h waitqd.h waitqd.decl.h \
   sdag.h ckcheckpoint.h CkCheckpoint.decl.h ckarrayreductionmgr.h trace.h \
   trace-bluegene.h comlib.h router.h convcomlibmanager.h ComlibStats.h \
-  comlib.decl.h pipebroadcastconverse.h
+  comlib.decl.h pipebroadcastconverse.h pipelinestrategy.h
 	$(CHARMC) -c -I. PipeBroadcastStrategy.C
 
 MeshStreamingStrategy.o: MeshStreamingStrategy.C MeshStreamingStrategy.h \
@@ -2243,4 +2243,23 @@ pipebroadcastconverse.o: pipebroadcastconverse.C pipebroadcastconverse.h \
   ckarrayreductionmgr.h trace.h trace-bluegene.h convcomlibmanager.h \
   comlib.h router.h
 	$(CHARMC) -c -I. pipebroadcastconverse.C
+
+pipelinestrategy.o: pipelinestrategy.C pipelinestrategy.h \
+  ckhashtable.h pup.h converse.h conv-config.h conv-common.h conv-mach.h \
+  conv-autoconfig.h conv-mach-opt.h pup_c.h conv-cpm.h conv-cpath.h \
+  conv-qd.h conv-random.h conv-lists.h conv-trace.h persistent.h \
+  debug-conv.h charm++.h charm.h middle.h middle-conv.h cklists.h \
+  ckbitvector.h ckstream.h init.h debug-charm.h CkMarshall.decl.h \
+  cksection.h ckcallback.h conv-ccs.h sockRoutines.h ccs-server.h \
+  ckobjQ.h ckreduction.h CkReduction.decl.h cknodegroupreduction.h \
+  CkArrayReductionMgr.decl.h ckmemcheckpoint.h CkMemCheckpoint.decl.h \
+  readonly.h ckarray.h cklocation.h LBDatabase.h lbdb.h LBDBManager.h \
+  LBObj.h LBOM.h LBComm.h LBMachineUtil.h LBDatabase.decl.h NullLB.decl.h \
+  BaseLB.decl.h CkLocation.decl.h CkArray.decl.h ComlibArrayListener.h \
+  ComlibStrategy.h convcomlibstrategy.h ComlibLearner.h envelope.h \
+  CkFutures.decl.h charisma.h charisma.decl.h tempo.h tempo.decl.h \
+  waitqd.h waitqd.decl.h sdag.h ckcheckpoint.h CkCheckpoint.decl.h \
+  ckarrayreductionmgr.h trace.h trace-bluegene.h convcomlibmanager.h \
+  comlib.h router.h
+	$(CHARMC) -c -I. pipelinestrategy.C
 
