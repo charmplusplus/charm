@@ -161,7 +161,7 @@ CVHEADERS=cpthreads.h converse.h conv-trace.h conv-random.h conv-qd.h \
 	convcomlibstrategy.h 3dgridrouter.h de.h hypercubetopology.h	\
 	routerstrategy.h comlib.h dummyconversestrategy.h  treerouter.h \
 	convcomlibmanager.h graphrouter.h petable.h gridrouter.h router.h \
-	pipebroadcastconverse.h cmipool.h
+	pipebroadcastconverse.h pipelinestrategy.h cmipool.h
 
 # The .c files are there to be #included by clients whole
 # This is a bit unusual, but makes client linking simpler.
@@ -726,7 +726,8 @@ STRATEGY_OBJS = MPIStrategy.o StreamingStrategy.o \
 
 CONVERSE_COM_OBJS = gridrouter.o de.o treerouter.o petable.o \
 	3dgridrouter.o graphrouter.o hypercubetopology.o \
-	routerstrategy.o convcomlibmanager.o pipebroadcastconverse.o
+	routerstrategy.o convcomlibmanager.o pipebroadcastconverse.o \
+	pipelinestrategy.o
 
 comlib.def.h: comlib.decl.h
 
