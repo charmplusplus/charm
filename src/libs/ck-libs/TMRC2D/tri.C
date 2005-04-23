@@ -176,6 +176,7 @@ void chunk::nodeReplaceDelete(int kIdx, int dIdx, node nn, int shared,
     if (kIdx != -1) {
       theNodes[kIdx].set(nn.X(), nn.Y());
       theNodes[kIdx].boundary = nn.boundary;
+      theNodes[kIdx].fixed = nn.fixed;
       jShared = joinCommLists(kIdx, shared, chk, idx, jChk, jIdx);
       theClient->nodeUpdate(kIdx, nn.X(), nn.Y(), nn.boundary, jShared, jChk, 
 			    jIdx);
@@ -186,6 +187,7 @@ void chunk::nodeReplaceDelete(int kIdx, int dIdx, node nn, int shared,
   else if (kIdx == -1) {
     theNodes[dIdx].set(nn.X(), nn.Y());
     theNodes[dIdx].boundary = nn.boundary;
+    theNodes[dIdx].fixed = nn.fixed;
     jShared = joinCommLists(dIdx, shared, chk, idx, jChk, jIdx);
     theClient->nodeUpdate(dIdx, nn.X(), nn.Y(), nn.boundary, jShared, jChk, 
 			  jIdx);
@@ -195,6 +197,7 @@ void chunk::nodeReplaceDelete(int kIdx, int dIdx, node nn, int shared,
     removeNode(dIdx);
     theNodes[kIdx].set(nn.X(), nn.Y());
     theNodes[kIdx].boundary = nn.boundary;
+    theNodes[kIdx].fixed = nn.fixed;
     jShared = joinCommLists(kIdx, shared, chk, idx, jChk, jIdx);
     theClient->nodeUpdate(kIdx, nn.X(), nn.Y(), nn.boundary, jShared, jChk, 
 			  jIdx);

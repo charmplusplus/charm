@@ -256,6 +256,8 @@ void element::collapse(int shortEdge)
   CkAssert(!(nbr == myRef));
   CkAssert(!(keepNbr == myRef));
   CkAssert(!(delNbr == myRef));
+  int tmpMap;
+  elemRef tmpRef;
   // find coords of node to collapse to based on boundary conditions
   node newNode;
   if ((kBound == 0) && (dBound == 0)) { // both interior; collapse to midpoint
@@ -266,9 +268,12 @@ void element::collapse(int shortEdge)
     else if (dFixed && kFixed) return;
     else if (dFixed) {
       newNode = C->theNodes[nodes[delNode]];
+      tmpMap = delNode; delNode = keepNode; keepNode = tmpMap;
+      tmpMap = delEdge; delEdge = keepEdge; keepEdge = tmpMap;
+      tmpRef = delNbr; delNbr = keepNbr; keepNbr = tmpRef;
     }
     else {
-      newNode = C->theNodes[nodes[delNode]];
+      newNode = C->theNodes[nodes[keepNode]];
     }
   }
   else if ((kBound == 0) || (dBound == 0)) { // only one on boundary
@@ -278,6 +283,9 @@ void element::collapse(int shortEdge)
     }
     else if (dBound && !kFixed) {
       newNode = C->theNodes[nodes[delNode]];
+      tmpMap = delNode; delNode = keepNode; keepNode = tmpMap;
+      tmpMap = delEdge; delEdge = keepEdge; keepEdge = tmpMap;
+      tmpRef = delNbr; delNbr = keepNbr; keepNbr = tmpRef;
     }
     else return;
   }
@@ -290,6 +298,9 @@ void element::collapse(int shortEdge)
       }
       else {
 	newNode = C->theNodes[nodes[delNode]];
+	tmpMap = delNode; delNode = keepNode; keepNode = tmpMap;
+	tmpMap = delEdge; delEdge = keepEdge; keepEdge = tmpMap;
+	tmpRef = delNbr; delNbr = keepNbr; keepNbr = tmpRef;
       }
     }
     else { // neither are fixeds, collapse edge to midpoint
@@ -304,6 +315,9 @@ void element::collapse(int shortEdge)
 	if (kFixed) return; // if it is, don't coarsen
 	else { // if it isn't, collapse edge to larger boundary node
 	  newNode = C->theNodes[nodes[delNode]];
+	  tmpMap = delNode; delNode = keepNode; keepNode = tmpMap;
+	  tmpMap = delEdge; delEdge = keepEdge; keepEdge = tmpMap;
+	  tmpRef = delNbr; delNbr = keepNbr; keepNbr = tmpRef;
 	}
       }
       else { // kBound is numbered higher
