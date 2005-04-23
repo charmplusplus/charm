@@ -808,6 +808,7 @@ void chunk::deriveEdges(int *conn, int *gid, const int **edgeBoundaries)
 	if ((theNodes[nIdx1].boundary < theNodes[nIdx2].boundary) && 
 	    (theNodes[nIdx1].boundary != 0))	{
 	  theNodes[nIdx2].fixed = 1;
+	  CkPrintf("TMRC2D: [%d] Corner detected, fixing node %d\n", cid, nIdx2);
 	  FEM_Comm_Rec *nRec = (FEM_Comm_Rec*)(mNodes->shared.getRec(nIdx2));
 	  if (nRec) {
 	    int count = nRec->getShared();
