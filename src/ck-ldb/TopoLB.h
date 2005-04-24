@@ -36,7 +36,7 @@ class TopoLB : public CentralLB
     void freeDataStructures(int num_procs);
     void initDataStructures(CentralLB::LDStats *stats,int count,int *newmap);
     void printDataStructures(int num_procs, int num_objs, int *newmap);
-    double getHopBytes(CentralLB::LDStats *stats,int count,CkVec<int>newmap);
+    double getHopBytes(CentralLB::LDStats *stats,int count,CkVec<int>obj_to_proc);
     
     CmiBool QueryBalanceNow (int step);
 }; 
