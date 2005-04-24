@@ -25,8 +25,8 @@
 
 #define AMMASSO_PORT        2583
 
-#define AMMASSO_BUFSIZE            (1024 * 1)
-#define AMMASSO_NUMMSGBUFS_PER_QP  64
+#define AMMASSO_BUFSIZE            8500
+#define AMMASSO_NUMMSGBUFS_PER_QP  4
 #define AMMASSO_BUF_IN_USE         0
 #define AMMASSO_BUF_NOT_IN_USE     1
 
@@ -47,6 +47,12 @@
 typedef struct __cmi_idle_state {
   char none;
 } CmiIdleState;
+
+typedef struct __private_data {
+  int node;
+  cc_stag_t stag;
+  cc_uint64_t to;
+} PrivateData;
 
 
 // DMK : This is copied from "qp_rping.c" in Ammasso's Example Code (modify as needed for our machine layer).
@@ -208,6 +214,7 @@ static void CommunicationServer(int withDelayMs, int where);
 void CmiMachineExit();
 
 void AsynchronousEventHandler(cc_rnic_handle_t rnic, cc_event_record_t *eventRecord, void *cb);
+void CheckRecvBufForMessage(OtherNode node);
 void CompletionEventHandler(cc_rnic_handle_t rnic, cc_cq_handle_t cq, void *cb);
 void CompletionEventHandlerWithAckFlag(cc_rnic_handle_t rnic, cc_cq_handle_t cq, void *cb, int breakOnAck);
 
@@ -234,8 +241,23 @@ char* cc_event_id_to_string(cc_event_id_t id);
 char* cc_connect_status_to_string(cc_connect_status_t status);
 
 
+//void periodicFunc(void *arg);
+
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 // Function Bodies /////////////////////////////////////////////////////////////////////////////////
+
+
+//int set = 0;
+//void periodicFunc(void *arg) {
+//
+//  if (set < 5) {
+//    CmiPrintf("periodicFunc() - Called...\n");
+//    set++;
+//  }
+//}
+
+
 
 
 /* CmiMachineInit()
@@ -252,6 +274,10 @@ void CmiMachineInit(char **argv) {
 
   MACHSTATE(3, "CmiMachineInit() - INFO: (***** Ammasso Specific*****) - Called... Initializing RNIC...");
   MACHSTATE1(3, "CmiMachineInit() - INFO: Cmi_charmrun_pid = %d", Cmi_charmrun_pid);
+
+
+  //CcdCallOnConditionKeep(CcdPERIODIC, (CcdVoidFn)periodicFunc, NULL);
+
 
   // Allocate a context block that will be used throughout this machine layer
   if (contextBlock != NULL) {
@@ -300,6 +326,7 @@ void CmiMachineInit(char **argv) {
       CmiAbort(buf);
     }
 
+    /*
     MACHSTATE(3, "CmiMachineInit() - INFO: (PRE-SET-CE-HANDLER)");
 
     // Set the Completion Event Handler
@@ -315,6 +342,7 @@ void CmiMachineInit(char **argv) {
       sprintf(buf, "CmiMachineInit() - ERROR: Unable to set Completion Event Handler: %d, \"%s\"", rtn, cc_status_to_string(rtn));
       CmiAbort(buf);
     }
+    */
 
     MACHSTATE(3, "CmiMachineInit() - INFO: (PRE-PD-ALLOC)");
 
@@ -365,10 +393,11 @@ void CmiAmmassoNodeAddressesStoreHandler(int pe, struct sockaddr_in *addr, int p
 void AmmassoDoIdle() {
 
   int i;
+  static int nextNode = 0;
 
   AMMASSO_STATS_START(AmmassoDoIdle)
 
-  MACHSTATE(3, "AmmassoDoIdle() - INFO: Called...");
+  //MACHSTATE(3, "AmmassoDoIdle() - INFO: Called...");
   //
   //for (i = 0; i < contextBlock->numNodes; i++) {
   //
@@ -379,11 +408,26 @@ void AmmassoDoIdle() {
   //  displayQueueQuery(nodes[i].qp, &(nodes[i].qp_attrs));
   //}
 
-  for (i = 0; i < contextBlock->numNodes; i++) {
-    if (i == contextBlock->myNode) continue;
-    CompletionEventHandler(contextBlock->rnic, nodes[i].recv_cq, &(nodes[i]));
-    CompletionEventHandler(contextBlock->rnic, nodes[i].send_cq, &(nodes[i]));
+  //for (i = 0; i < contextBlock->numNodes; i++) {
+  //  if (i == contextBlock->myNode) continue;
+  //  CompletionEventHandler(contextBlock->rnic, nodes[i].recv_cq, &(nodes[i]));
+  //  CompletionEventHandler(contextBlock->rnic, nodes[i].send_cq, &(nodes[i]));
+  //}
+
+  if (nextNode == contextBlock->myNode) {
+    nextNode++;
+    if (nextNode >= contextBlock->numNodes)
+      nextNode = 0;
   }
+
+  CheckRecvBufForMessage(&(nodes[nextNode]));
+
+  //CompletionEventHandler(contextBlock->rnic, nodes[nextNode].recv_cq, &(nodes[nextNode]));  
+  CompletionEventHandler(contextBlock->rnic, nodes[nextNode].send_cq, &(nodes[nextNode]));
+
+  nextNode++;
+  if (nextNode >= contextBlock->numNodes)
+    nextNode = 0;
 
   AMMASSO_STATS_END(AmmassoDoIdle)
 }
@@ -488,7 +532,9 @@ int getQPSendBuffer(OtherNode node, char force) {
 
       AMMASSO_STATS_START(getQPSendBuffer_CEH)
 
-      CompletionEventHandlerWithAckFlag(contextBlock->rnic, node->recv_cq, node, 1);
+      CheckRecvBufForMessage(node);
+      //CompletionEventHandlerWithAckFlag(contextBlock->rnic, node->recv_cq, node, 1);
+
       //CompletionEventHandler(contextBlock->rnic, node->send_cq, node);
 
       AMMASSO_STATS_END(getQPSendBuffer_CEH)
@@ -549,20 +595,35 @@ int sendDataOnQP(char* data, int len, OtherNode node, char force) {
 
     AMMASSO_STATS_START(sendDataOnQP_pre_send)  
 
-    MACHSTATE(3, "sendDataOnQP() - Ammasso - INFO: Sending Fragment...");
-
     // Get a free send buffer (NOTE: This call will block until a send buffer is free)
     sendBufIndex = getQPSendBuffer(node, force);
 
     // Copy the contents (up to AMMASSO_BUFSIZE worth) of data into the send buffer
     if (isFirst) {
 
+      /*
       // In this case, the toSendLength includes the DGRAM header that was part of the original message
-      toSendLength = ((len > AMMASSO_BUFSIZE) ? (AMMASSO_BUFSIZE) : (len));  // MIN of len and AMMASSO_BUFSIZE
-      memcpy(node->send_buf + (sendBufIndex * AMMASSO_BUFSIZE), data, toSendLength);
+      toSendLength = ((len > AMMASSO_BUFSIZE) ? (AMMASSO_BUFSIZE) : (len));
+      memcpy(node->send_buf + (sendBufIndex * AMMASSO_BUFSIZE, data, toSendLength);
+      */
+
+      /*
+      // DMK : TODO : The extra sizeof(unsigned int) is for the length portion of the buffer when doing an RDMA write (clean this up)
+      // In this case, the toSendLength includes the DGRAM header that was part of the original message
+      toSendLength = ((len > AMMASSO_BUFSIZE - sizeof(unsigned int)) ? (AMMASSO_BUFSIZE - sizeof(unsigned int)) : (len));
+      memcpy(node->send_buf + (sendBufIndex * AMMASSO_BUFSIZE) + sizeof(unsigned int), data, toSendLength);
+      */
+
+      // DMK : TODO : The extra sizeof(unsigned int) is for the length portion of the buffer when doing an RDMA write (clean this up)
+      // In this case, the toSendLength includes the DGRAM header that was part of the original message
+      toSendLength = ((len > AMMASSO_BUFSIZE - sizeof(unsigned int)) ? (AMMASSO_BUFSIZE - sizeof(unsigned int)) : (len));
+      memcpy(node->send_buf + ((sendBufIndex + 1) * AMMASSO_BUFSIZE) - sizeof(unsigned int) - toSendLength, data, toSendLength);
+
+      MACHSTATE1(3, "sendDataOnQP() - Ammasso - INFO: Sending 1st Fragment - toSendLength = %d...", toSendLength);
 
     } else {
 
+      /*
       // In this case, the toSendLength does not include the DGRAM header size since toSendLength represents the amount of
       //   data in the message being sent and this time around the DGRAM header is being constructed
       toSendLength = ((len > AMMASSO_BUFSIZE - DGRAM_HEADER_SIZE) ? (AMMASSO_BUFSIZE - DGRAM_HEADER_SIZE) : (len));  // MIN of len and AMMASSO_BUFSIZE
@@ -576,11 +637,60 @@ int sendDataOnQP(char* data, int len, OtherNode node, char force) {
       memcpy(node->send_buf + (sendBufIndex * AMMASSO_BUFSIZE), origMsgStart, DGRAM_HEADER_SIZE);
       ((DgramHeader*)(node->send_buf + (sendBufIndex * AMMASSO_BUFSIZE)))->seqno = node->send_next;
       node->send_next = ((node->send_next+1) & DGRAM_SEQNO_MASK);  // Increase the sequence number
+      */
+
+      /*
+      // DMK : TODO : The extra sizeof(unsigned int) is for the length portion of the buffer when doing an RDMA write (clean this up)
+      // In this case, the toSendLength does not include the DGRAM header size since toSendLength represents the amount of
+      //   data in the message being sent and this time around the DGRAM header is being constructed
+      toSendLength = ((len > AMMASSO_BUFSIZE - DGRAM_HEADER_SIZE - sizeof(unsigned int)) ? (AMMASSO_BUFSIZE - DGRAM_HEADER_SIZE - sizeof(unsigned int)) : (len));  // MIN of len and AMMASSO_BUFSIZE
+      memcpy(node->send_buf + (sendBufIndex * AMMASSO_BUFSIZE) + DGRAM_HEADER_SIZE + sizeof(unsigned int), data, toSendLength);
+      
+      // This dgram header is the same except for the sequence number, so copy the original and just modify the sequence number
+      // NOTE: If the message is large enough that fragmentation needs to happen, the send_next_lock is already owned by the
+      //       thread executing this code.
+      // TODO: This code is hacked up a bit to get this working in a hurry, come back later and find a more graceful way to handle this and
+      //       keep sendDataOnQP() generic (this should be in DeliverViaNetwork()).
+      memcpy(node->send_buf + (sendBufIndex * AMMASSO_BUFSIZE) + sizeof(unsigned int), origMsgStart, DGRAM_HEADER_SIZE);
+      ((DgramHeader*)(node->send_buf + (sendBufIndex * AMMASSO_BUFSIZE) + sizeof(unsigned int)))->seqno = node->send_next;
+      node->send_next = ((node->send_next+1) & DGRAM_SEQNO_MASK);  // Increase the sequence number
+      */
+
+      // DMK : TODO : The extra sizeof(unsigned int) is for the length portion of the buffer when doing an RDMA write (clean this up)
+      // In this case, the toSendLength does not include the DGRAM header size since toSendLength represents the amount of
+      //   data in the message being sent and this time around the DGRAM header is being constructed
+      toSendLength = ((len > AMMASSO_BUFSIZE - DGRAM_HEADER_SIZE - sizeof(unsigned int)) ? (AMMASSO_BUFSIZE - DGRAM_HEADER_SIZE - sizeof(unsigned int)) : (len));  // MIN of len and AMMASSO_BUFSIZE
+      memcpy(node->send_buf + ((sendBufIndex + 1) * AMMASSO_BUFSIZE) - sizeof(unsigned int) - toSendLength, data, toSendLength);
+      
+      // This dgram header is the same except for the sequence number, so copy the original and just modify the sequence number
+      // NOTE: If the message is large enough that fragmentation needs to happen, the send_next_lock is already owned by the
+      //       thread executing this code.
+      // TODO: This code is hacked up a bit to get this working in a hurry, come back later and find a more graceful way to handle this and
+      //       keep sendDataOnQP() generic (this should be in DeliverViaNetwork()).
+      memcpy(node->send_buf + ((sendBufIndex + 1) * AMMASSO_BUFSIZE) - sizeof(unsigned int) - toSendLength - DGRAM_HEADER_SIZE, origMsgStart, DGRAM_HEADER_SIZE);
+      ((DgramHeader*)(node->send_buf + ((sendBufIndex + 1) * AMMASSO_BUFSIZE) - sizeof(unsigned int) - toSendLength - DGRAM_HEADER_SIZE))->seqno = node->send_next;
+      node->send_next = ((node->send_next+1) & DGRAM_SEQNO_MASK);  // Increase the sequence number
+
+      MACHSTATE1(3, "sendDataOnQP() - Ammasso - INFO: Sending Continuation Fragment - toSendLength = %d...", toSendLength);
     }
+
+    // Set the length of data being sent as the first 'unsigned int's worth of data in the send buffer (to be RDMA written into
+    //   the other node's recv buffer and used to indicate a message is there)
+    //*((unsigned int*)(node->send_buf + (sendBufIndex * AMMASSO_BUFSIZE))) = toSendLength + ((isFirst) ? (0) : (DGRAM_HEADER_SIZE));;
 
     // Set the data length in the SGL (Note: this is safe to reset like this because the buffer is of length
     //   AMMASSO_BUFSIZE and toSendLength has a maximum value of AMMASSO_BUFSIZE).
-    (node->send_sgl[sendBufIndex]).length = toSendLength + ((isFirst) ? (0) : (DGRAM_HEADER_SIZE));
+    //(node->send_sgl[sendBufIndex]).length = toSendLength + ((isFirst) ? (0) : (DGRAM_HEADER_SIZE)) + sizeof(unsigned int);
+
+    // Write the size of the message at the end of the buffer
+    *((unsigned int*)(node->send_buf + ((sendBufIndex + 1) * AMMASSO_BUFSIZE) - sizeof(unsigned int))) = toSendLength + ((isFirst) ? (0) : (DGRAM_HEADER_SIZE));;
+
+    // Setup the local SGL
+    (node->send_sgl[sendBufIndex]).length = toSendLength + ((isFirst) ? (0) : (DGRAM_HEADER_SIZE)) + sizeof(unsigned int);
+    (node->send_sgl[sendBufIndex]).to = (cc_uint64_t)(unsigned long)(node->send_buf + ((sendBufIndex + 1) * AMMASSO_BUFSIZE) - ((node->send_sgl[sendBufIndex]).length));
+
+    // Setup the remote to
+    node->sq_wr[sendBufIndex].wr_u.rdma_write.remote_to = (node->remote_starting_to + ((sendBufIndex + 1) * AMMASSO_BUFSIZE) - ((node->send_sgl[sendBufIndex]).length));
 
     //{
     //  int j;
@@ -598,6 +708,11 @@ int sendDataOnQP(char* data, int len, OtherNode node, char force) {
  
     AMMASSO_STATS_END(sendDataOnQP_pre_send)  
     AMMASSO_STATS_START(sendDataOnQP_send)
+
+    MACHSTATE(3, "sendDataOnQP() - Ammasso - INFO: Enqueuing RDMA Write WR...");
+
+    MACHSTATE2(3, "sendDataOnQP() - Ammasso - INFO: (*(node->send_sgl[%d].wr_u.rdma_write.local_sgl.sge_list))->to = %p", sendBufIndex, node->sq_wr[sendBufIndex].wr_u.rdma_write.local_sgl.sge_list->to);
+    MACHSTATE2(3, "sendDataOnQP() - Ammasso - INFO: node->send_sgl[%d].wr_u.rdma_write.remote_to = %p", sendBufIndex, node->sq_wr[sendBufIndex].wr_u.rdma_write.remote_to);
 
     rtn = cc_qp_post_sq(contextBlock->rnic, node->qp, &(node->sq_wr[sendBufIndex]), 1, &(WRsPosted));
     if (rtn != CC_OK || WRsPosted != 1) {
@@ -622,6 +737,8 @@ int sendDataOnQP(char* data, int len, OtherNode node, char force) {
       //CmiAbort("Unable to send packet - See Machine Layer Debug File for more details.");
       CmiAbort(buf);
     }
+
+    MACHSTATE2(3, "sendDataOnQP() - Ammasso - INFO: RDMA Write WR Enqueue Completed: %d, \"%s\"", rtn, cc_status_to_string(rtn));
 
     AMMASSO_STATS_END(sendDataOnQP_send)
     AMMASSO_STATS_START(sendDataOnQP_post_send)  
@@ -1015,6 +1132,7 @@ void ProcessMessage(char* msg, int len, char *needAck) {
 
   AMMASSO_STATS_START(ProcessMessage)
 
+  //CmiPrintf("ProcessMessage() - INFO: Called...\n");
   MACHSTATE(3, "ProcessMessage() - INFO: Called...");
 
   // Begin by indicating that the message does not need an ACK, set needAck if we find out an ACK is needed
@@ -1083,10 +1201,12 @@ void ProcessMessage(char* msg, int len, char *needAck) {
     CmiPrintf("[%d] ProcessMessage() - Ammasso - ERROR: Received message with a bad magic cookie... ignoring...\n", CmiMyPe());
 
     {
-      CmiPrintf("ProcessMessage() - INFO: msg = %p", msg);
+      CmiPrintf("ProcessMessage() - INFO: Cmi_charmrun_pid = %d\n", Cmi_charmrun_pid);
+      CmiPrintf("ProcessMessage() - INFO: node->recv_UseIndex = %d\n", nodes_by_pe[srcPE]->recv_UseIndex);
+      CmiPrintf("ProcessMessage() - INFO: msg = %p\n", msg);
       int j;
       for (j = 0; j < DGRAM_HEADER_SIZE + 24; j++) {
-        CmiPrintf("ProcessMessage() - INFO: msg[%d] = %02x", j, msg[j]);
+        CmiPrintf("ProcessMessage() - INFO: msg[%d] = %02x\n", j, msg[j]);
       }
     }
 
@@ -1342,11 +1462,20 @@ int PollForMessage(cc_cq_handle_t cq) {
 
 static void CommunicationServer_nolock(int withDelayMs) {
 
+  int i;
+
   MACHSTATE(2, "CommunicationServer_nolock start {");
 
   // DMK : TODO : In spare time (here), check for messages and/or completions and/or errors
   //while(PollForMessage(contextBlock->send_cq));  // Clear all the completed sends
   //while(PollForMessage(contextBlock->recv_cq));  // Keep looping while there are still messages that have been received
+
+  for (i = 0; i < contextBlock->numNodes; i++) {
+    if (i == contextBlock->myNode) continue;
+    //CompletionEventHandlerWithAckFlag(contextBlock->rnic, nodes[i].recv_cq, &(nodes[i]), 1);
+    //CompletionEventHandler(contextBlock->rnic, nodes[i].send_cq, &(nodes[i]));
+    CheckRecvBufForMessage(&(nodes[i]));
+  }
 
   MACHSTATE(2, "}CommunicationServer_nolock end");
 }
@@ -1411,6 +1540,8 @@ void CmiMachineExit(void) {
     sleep(contextBlock->myNode);
 
   AMMASSO_STATS_DISPLAY(MachineInit)
+
+  AMMASSO_STATS_DISPLAY(AmmassoDoIdle)
 
   AMMASSO_STATS_DISPLAY(DeliverViaNetwork)
   AMMASSO_STATS_DISPLAY(DeliverViaNetwork_pre_lock)
@@ -1506,12 +1637,13 @@ OtherNode getNodeFromQPHandle(cc_qp_handle_t qp) {
 
 void AsynchronousEventHandler(cc_rnic_handle_t rnic, cc_event_record_t *er, void *cb) {
 
-  int nodeNumber;
+  int nodeNumber, i;
   OtherNode node;
   cc_ep_handle_t connReqEP;
   cc_status_t rtn;
-  char buf[16];
+  char buf[64];
   cc_qp_modify_attrs_t modAttrs;
+  PrivateData *priv;
 
   AMMASSO_STATS_START(AsynchronousEventHandler)
 
@@ -1556,17 +1688,32 @@ void AsynchronousEventHandler(cc_rnic_handle_t rnic, cc_event_record_t *er, void
 
     // er->event_id == CCAE_CONNECTION_REQUEST
     case CCAE_CONNECTION_REQUEST:
+      /*
       MACHSTATE3(3, "AsynchronousEventHandler() - INFO: Incomming Connection Request -> %s:%d, \"%s\"",
                     inet_ntoa(*(struct in_addr*) &(er->event_data.connection_request.laddr)),
                     ntohs(er->event_data.connection_request.lport),
                     er->event_data.connection_request.private_data
+                );
+      */
+
+      MACHSTATE2(3, "AsynchronousEventHandler() - INFO: Incomming Connection Request -> %s:%d",
+                    inet_ntoa(*(struct in_addr*) &(er->event_data.connection_request.laddr)),
+                    ntohs(er->event_data.connection_request.lport)
                 );
 
       connReqEP = er->event_data.connection_request.cr_handle;
 
       // NOTE : The "+ 5" comes from the private data string starting with "node "
       // Get the index of the node that is making the request
-      nodeNumber = atoi(er->event_data.connection_request.private_data + 5);
+      //nodeNumber = atoi(er->event_data.connection_request.private_data + 5);
+
+      priv = (PrivateData*)er->event_data.connection_request.private_data;
+
+      //nodeNumber = *((int*)(er->event_data.connection_request.private_data));
+      nodeNumber = priv->node;
+ 
+      MACHSTATE1(3, "AsynchronousEventHandler() - INFO: Connection Request from node %d", nodeNumber);
+
       if (nodeNumber < 0 || nodeNumber >= contextBlock->numNodes) {
 
         // Refuse the connection and log the rejection
@@ -1575,16 +1722,62 @@ void AsynchronousEventHandler(cc_rnic_handle_t rnic, cc_event_record_t *er, void
 
       } else {
 
+        { int j;
+          for (j = 0; j < 16; j++) {
+            MACHSTATE2(3, "                                      private_data[%d] = %02X", j, ((char*)er->event_data.connection_request.private_data)[j]);
+	  }
+	}
+
+        // Grab the remote stag and to
+        //memcpy(&(nodes[nodeNumber].remote_recv_stag), ((char*)(er->event_data.connection_request.private_data) + sizeof(int)), sizeof(cc_stag_t));
+        //memcpy(&(nodes[nodeNumber].remote_starting_to), ((char*)(er->event_data.connection_request.private_data) + sizeof(int) + sizeof(cc_stag_t)), sizeof(cc_uint64_t));
+        nodes[nodeNumber].remote_recv_stag = priv->stag;
+        nodes[nodeNumber].remote_starting_to = priv->to;
+        for (i = 0; i < AMMASSO_NUMMSGBUFS_PER_QP * 2; i++) {
+          //memcpy(&(nodes[nodeNumber].sq_wr[i].wr_u.rdma_write.remote_stag), &(nodes[nodeNumber].remote_recv_stag), sizeof(cc_stag_t));
+          //memcpy(&(nodes[nodeNumber].sq_wr[i].wr_u.rdma_write.remote_to), &(nodes[nodeNumber].remote_starting_to), sizeof(cc_uint64_t));
+          nodes[nodeNumber].sq_wr[i].wr_u.rdma_write.remote_stag = priv->stag;
+          nodes[nodeNumber].sq_wr[i].wr_u.rdma_write.remote_to = priv->to;
+          nodes[nodeNumber].sq_wr[i].wr_u.rdma_write.remote_to += (i * AMMASSO_BUFSIZE);
+	}
+
+        MACHSTATE1(3, "AsynchronousEventHandler() - INFO: remote_starting_to = %p", nodes[nodeNumber].remote_starting_to);
+
         // Keep a copy of the end point handle
         nodes[nodeNumber].cr = connReqEP;
 
         // Accept the connection
-        sprintf(buf, "node %d", contextBlock->myNode);
-        rtn = cc_cr_accept(contextBlock->rnic, connReqEP, nodes[nodeNumber].qp, strlen(buf) + 1, buf);
+        //sprintf(buf, "node %d", contextBlock->myNode);
+        //*((int*)buf) = contextBlock->myNode;
+        //memcpy(buf + sizeof(int), &(nodes[nodeNumber].recv_stag_index), sizeof(cc_stag_t));
+        //memcpy(buf + sizeof(int) + sizeof(cc_stag_t), &(nodes[nodeNumber].recv_buf), sizeof(cc_uint64_t));
+
+        priv = (PrivateData*)buf;
+        priv->node = contextBlock->myNode;
+        priv->stag = nodes[nodeNumber].recv_stag_index;
+        priv->to = (cc_uint64_t)nodes[nodeNumber].recv_buf;
+
+        MACHSTATE1(3, "                                          node = %d", priv->node);
+        MACHSTATE1(3, "                                          stag = %d", priv->stag);
+        MACHSTATE1(3, "                                          to = %p", priv->to);
+        
+        { int j;
+          MACHSTATE2(3, "                                      buf = %p, priv = %p", buf, priv);
+          for (j = 0; j < 16; j++) {
+            MACHSTATE2(3, "                                      ((char*)priv)[%d] = %02X", j, ((char*)priv)[j]);
+	  }
+	}
+
+        MACHSTATE(3, "AsynchronousEventHandler() - Ammasso - INFO: Accepting Connection...");
+
+        //rtn = cc_cr_accept(contextBlock->rnic, connReqEP, nodes[nodeNumber].qp, strlen(buf) + 1, buf);
+        //rtn = cc_cr_accept(contextBlock->rnic, connReqEP, nodes[nodeNumber].qp, sizeof(int) + sizeof(cc_stag_t) + sizeof(cc_uint64_t), buf);
+        rtn = cc_cr_accept(contextBlock->rnic, connReqEP, nodes[nodeNumber].qp, sizeof(PrivateData), (cc_uint8_t*)priv);
         if (rtn != CC_OK) {
 
           // Let the user know what happened
           MACHSTATE1(3, "AsynchronousEventHandler() - Ammasso - WARNING: Unable to accept connection from node %d", nodeNumber);
+
 	} else {
   
           MACHSTATE1(3, "AsynchronousEventHandler() - Ammasso - INFO: Accepted Connection from node %d", nodeNumber);
@@ -1637,7 +1830,42 @@ void AsynchronousEventHandler(cc_rnic_handle_t rnic, cc_event_record_t *er, void
         MACHSTATE(3, "                                     Connection Success...");
         MACHSTATE2(3, "                                     l -> %s:%d", inet_ntoa(*(struct in_addr*) &(er->event_data.active_connect_results.laddr)), ntohs(er->event_data.active_connect_results.lport));
         MACHSTATE2(3, "                                     r -> %s:%d", inet_ntoa(*(struct in_addr*) &(er->event_data.active_connect_results.raddr)), ntohs(er->event_data.active_connect_results.rport));
-        MACHSTATE1(3, "                                     private_data -> \"%s\"", er->event_data.active_connect_results.private_data);
+        MACHSTATE4(3, "                                     private_data_length = %d (%d, %d, %d)", er->event_data.active_connect_results.private_data_length, sizeof(int), sizeof(cc_stag_t), sizeof(cc_uint64_t));
+        //MACHSTATE1(3, "                                     private_data -> \"%s\"", er->event_data.active_connect_results.private_data);
+
+        /*
+        // Grab the fields from the private data
+        memcpy(&(node->remote_recv_stag), (((char*)(er->event_data.connection_request.private_data)) + sizeof(int)), sizeof(cc_stag_t));
+        memcpy(&(node->remote_starting_to), (((char*)(er->event_data.connection_request.private_data)) + sizeof(int) + sizeof(cc_stag_t)), sizeof(cc_uint64_t));
+        for (i = 0; i < AMMASSO_NUMMSGBUFS_PER_QP * 2; i++) {
+          memcpy(&(node->sq_wr[i].wr_u.rdma_write.remote_stag), &(node->remote_recv_stag), sizeof(cc_stag_t));
+          memcpy(&(node->sq_wr[i].wr_u.rdma_write.remote_to), &(node->remote_starting_to), sizeof(cc_uint64_t));
+          node->sq_wr[i].wr_u.rdma_write.remote_to += (i * AMMASSO_BUFSIZE);
+	}
+	*/
+
+        priv = (PrivateData*)((char*)er->event_data.connection_request.private_data - 4);
+
+        { int j;
+	  MACHSTATE2(3, "                                      private_data = %p, priv = %p", er->event_data.connection_request.private_data, priv);
+          for (j = 0; j < 16; j++) {
+            MACHSTATE3(3, "                                      private_data[%d] = %02X (priv:%02X)", j, ((char*)(er->event_data.connection_request.private_data))[j], ((char*)priv)[j]);
+	  }
+	}
+
+        node->remote_recv_stag = priv->stag;
+        node->remote_starting_to = priv->to;
+        for (i = 0; i < AMMASSO_NUMMSGBUFS_PER_QP * 2; i++) {
+          node->sq_wr[i].wr_u.rdma_write.remote_stag = priv->stag;
+          node->sq_wr[i].wr_u.rdma_write.remote_to = priv->to;
+          node->sq_wr[i].wr_u.rdma_write.remote_to += (i * AMMASSO_BUFSIZE);
+	}
+
+        MACHSTATE1(3, "                                          node = %d", priv->node);
+        MACHSTATE1(3, "                                          stag = %d", priv->stag);
+        MACHSTATE1(3, "                                          to = %p", priv->to);
+        
+        MACHSTATE1(3, "AsynchronousEventHandler() - INFO: remote_starting_to = %p", node->remote_starting_to);
 
         MACHSTATE(3, "AsynchronousEventHandler() - INFO: Pre-sendBufLock");
         #if CMK_SHARED_VARS_UNAVAILABLE
@@ -1743,6 +1971,50 @@ void AsynchronousEventHandler(cc_rnic_handle_t rnic, cc_event_record_t *er, void
   } // end switch (er->event_id)
 
   AMMASSO_STATS_END(AsynchronousEventHandler)
+}
+
+void CheckRecvBufForMessage(OtherNode node) {
+
+  char needAck;
+  unsigned int len;
+
+  MACHSTATE1(3, "CheckRecvBufForMessage() - INFO: Called... (node->recv_UseIndex = %d)...", node->recv_UseIndex);
+
+  // Get a pointer to the recv_buf indexed by recv_UseIndex and grab the length
+  char *recvBuf = node->recv_buf + (node->recv_UseIndex * AMMASSO_BUFSIZE);
+
+  //len = *((unsigned int*)recvBuf);
+  len = *((unsigned int*)(recvBuf + AMMASSO_BUFSIZE - sizeof(unsigned int)));
+
+  MACHSTATE1(3, "                                           (len = %d)...", len);
+
+  // Check if the length is set to zero (this indicates the buffer does not contain a message)
+  if (len != 0) {
+
+    // Start by zero-ing out the length of the message so it isn't picked up again
+    *((unsigned int*)(recvBuf + AMMASSO_BUFSIZE - sizeof(unsigned int))) = 0;
+
+    // Process the messsage
+    //ProcessMessage(recvBuf + sizeof(unsigned int), len, &needAck);
+    ProcessMessage(recvBuf + AMMASSO_BUFSIZE - sizeof(unsigned int) - len, len, &needAck);
+
+    // If an ACK is needed in response to this message, send one
+    if (needAck) sendAck(node);
+
+    // Finish by setting the length part of the message buffer to zero
+    //*((unsigned int*)recvBuf) = 0;
+ 
+    // Move onto the next recv_buf
+    node->recv_UseIndex++;
+    if (node->recv_UseIndex >= AMMASSO_NUMMSGBUFS_PER_QP * 2)
+      node->recv_UseIndex = 0;
+  }
+
+
+  len = *((unsigned int*)(recvBuf + AMMASSO_BUFSIZE - sizeof(unsigned int)));
+
+  MACHSTATE1(3, "                                           (len = %d)...", len);
+
 }
 
 void CompletionEventHandler(cc_rnic_handle_t rnic, cc_cq_handle_t cq, void *cb) {
@@ -1944,6 +2216,7 @@ void CmiAmmassoOpenQueuePairs() {
     nodes[i].recv_expect_lock = CmiCreateLock();
     nodes[i].send_UseIndex = 0;
     nodes[i].send_InUseCounter = 0;
+    nodes[i].recv_UseIndex = 0;
 
     // If you walk around talking to yourself people will look at you all funny-like.  Try not to do that.
     if (i == myNode) continue;
@@ -1962,8 +2235,9 @@ void CmiAmmassoOpenQueuePairs() {
 
     for (i = 0; i < contextBlock->numNodes; i++) {
       if (i == contextBlock->myNode) continue;
-      CompletionEventHandler(contextBlock->rnic, nodes[i].recv_cq, &(nodes[i]));
-      CompletionEventHandler(contextBlock->rnic, nodes[i].send_cq, &(nodes[i]));
+      //CompletionEventHandler(contextBlock->rnic, nodes[i].recv_cq, &(nodes[i]));
+      //CompletionEventHandler(contextBlock->rnic, nodes[i].send_cq, &(nodes[i]));
+      CheckRecvBufForMessage(&(nodes[i]));
     }
   }
   MACHSTATE(3, "CmiAmmassoOpenQueuePairs() - INFO: All Connections have been established... Continuing");
@@ -2039,8 +2313,9 @@ void CmiAmmassoOpenQueuePairs() {
     
     for (i = 0; i < contextBlock->numNodes; i++) {
       if (i == contextBlock->myNode) continue;
-      CompletionEventHandler(contextBlock->rnic, nodes[i].recv_cq, &(nodes[i]));
-      CompletionEventHandler(contextBlock->rnic, nodes[i].send_cq, &(nodes[i]));
+      //CompletionEventHandler(contextBlock->rnic, nodes[i].recv_cq, &(nodes[i]));
+      //CompletionEventHandler(contextBlock->rnic, nodes[i].send_cq, &(nodes[i]));
+      CheckRecvBufForMessage(&(nodes[i]));
     }
   }
   MACHSTATE(3, "CmiAmmassoOpenQueuePairs() - INFO: All neighboors ready...");
@@ -2069,7 +2344,7 @@ void establishQPConnection(OtherNode node, int reuseQPFlag) {
     MACHSTATE(3, "establishQPConnection() - INFO: (PRE-RECV-CQ-CREATE)");
 
     // Create the Completion Queue
-    node->recv_cq_depth = AMMASSO_NUMMSGBUFS_PER_QP * 2;
+    node->recv_cq_depth = AMMASSO_NUMMSGBUFS_PER_QP * 4;
     rtn = cc_cq_create(contextBlock->rnic, &(node->recv_cq_depth), contextBlock->eh_id, node, &(node->recv_cq));
     if (rtn != CC_OK) {
 
@@ -2103,7 +2378,7 @@ void establishQPConnection(OtherNode node, int reuseQPFlag) {
     MACHSTATE(3, "establishQPConnection() - INFO: (PRE-SEND-CQ-CREATE)");
 
     // Create the Completion Queue
-    node->send_cq_depth = AMMASSO_NUMMSGBUFS_PER_QP * 2;
+    node->send_cq_depth = AMMASSO_NUMMSGBUFS_PER_QP * 4;
     rtn = cc_cq_create(contextBlock->rnic, &(node->send_cq_depth), contextBlock->eh_id, node, &(node->send_cq));
     if (rtn != CC_OK) {
 
@@ -2140,8 +2415,8 @@ void establishQPConnection(OtherNode node, int reuseQPFlag) {
     // Set some initial Create Queue Pair Attributes that will be reused for all Queue Pairs Created
     qpCreateAttrs.sq_cq = node->send_cq;   // Set the Send Queue's Completion Queue
     qpCreateAttrs.rq_cq = node->recv_cq;   // Set the Request Queue's Completion Queue
-    qpCreateAttrs.sq_depth = AMMASSO_NUMMSGBUFS_PER_QP * 2;
-    qpCreateAttrs.rq_depth = AMMASSO_NUMMSGBUFS_PER_QP * 2;
+    qpCreateAttrs.sq_depth = AMMASSO_NUMMSGBUFS_PER_QP * 4;
+    qpCreateAttrs.rq_depth = AMMASSO_NUMMSGBUFS_PER_QP * 4;
     qpCreateAttrs.srq = 0;                         //
     qpCreateAttrs.rdma_read_enabled = 1;           //
     qpCreateAttrs.rdma_write_enabled = 1;          //
@@ -2176,6 +2451,7 @@ void establishQPConnection(OtherNode node, int reuseQPFlag) {
     node->send_next_lock = CmiCreateLock();
     node->recv_expect = 0;
     node->recv_expect_lock = CmiCreateLock();
+    node->recv_UseIndex = 0;
 
   if (!reuseQPFlag) {
 
@@ -2217,6 +2493,8 @@ void establishQPConnection(OtherNode node, int reuseQPFlag) {
       CmiAbort(buf);
     }
 
+    MACHSTATE1(3, "establishQPConnection() - INFO: node->recv_buf = %p", node->recv_buf);
+
     // Attempt to register a memory region for receiving (NOTE: memory will be pinned in memory as a result of this call)
     rtn = cc_nsmr_register_virt(contextBlock->rnic,                      // RNIC Handle
                                 CC_ADDR_TYPE_VA_BASED,                   // Next parameter is a virtual address
@@ -2225,7 +2503,7 @@ void establishQPConnection(OtherNode node, int reuseQPFlag) {
                                 contextBlock->pd_id,                     // The Protection Domain
                                 0,                                       // Flag: "If true, remote access is enabled with this STag"
                                 0,                                       // Remote Access Flag
-                                CC_ACF_LOCAL_READ | CC_ACF_LOCAL_WRITE,  // Access Control Flags
+                                CC_ACF_LOCAL_READ | CC_ACF_LOCAL_WRITE | CC_ACF_REMOTE_READ | CC_ACF_REMOTE_WRITE,  // Access Control Flags
                                 &(node->recv_stag_index)                 // Pointer to STag Index
                                );
     if (rtn != CC_OK) {
@@ -2275,6 +2553,9 @@ void establishQPConnection(OtherNode node, int reuseQPFlag) {
       (node->rq_wr[i]).wr_id = (cc_uint64_t)(unsigned long) &(node->rq_wr[i]);
       (node->rq_wr[i]).local_sgl.sge_count = 1;   // TODO : Make this more flexible
       (node->rq_wr[i]).local_sgl.sge_list = &(node->recv_sgl[i]);
+
+      // Clear the size portion of the buffer (the first unsigned int)
+      *((unsigned int*)(node->recv_buf + (i * AMMASSO_BUFSIZE))) = 0;
     }
     
     MACHSTATE(3, "establishQPConnection() - INFO: (PRE-NSMR-REGISTER-VIRT SEND-BUF)");
@@ -2300,7 +2581,7 @@ void establishQPConnection(OtherNode node, int reuseQPFlag) {
 
     // Attempt to get some memory for the buffers
     node->send_buf = (char*)CmiAlloc(AMMASSO_BUFSIZE * AMMASSO_NUMMSGBUFS_PER_QP * 2);
-    if (node->recv_buf == NULL) {
+    if (node->send_buf == NULL) {
 
       // Attempt to close the RNIC
       cc_rnic_close(contextBlock->rnic);
@@ -2311,6 +2592,8 @@ void establishQPConnection(OtherNode node, int reuseQPFlag) {
       CmiAbort(buf);
     }
 
+    MACHSTATE1(3, "establishQPConnection() - INFO: node->send_buf = %p", node->send_buf);
+
     // Attempt to register a memory region for sending (NOTE: memory will be pinned in memory as a result of this call)
     rtn = cc_nsmr_register_virt(contextBlock->rnic,
                                 CC_ADDR_TYPE_VA_BASED,
@@ -2319,7 +2602,7 @@ void establishQPConnection(OtherNode node, int reuseQPFlag) {
                                 contextBlock->pd_id,
                                 0,
                                 0,
-                                CC_ACF_LOCAL_READ | CC_ACF_LOCAL_WRITE,
+                                CC_ACF_LOCAL_READ | CC_ACF_LOCAL_WRITE | CC_ACF_REMOTE_READ | CC_ACF_REMOTE_WRITE,
                                 &(node->send_stag_index)
                                );
     if (rtn != CC_OK) {
@@ -2360,6 +2643,7 @@ void establishQPConnection(OtherNode node, int reuseQPFlag) {
 
     for (i = 0; i < AMMASSO_NUMMSGBUFS_PER_QP * 2; i++) {
 
+      /*
       // Setup single SGE for untagged sends
       (node->send_sgl[i]).length = AMMASSO_BUFSIZE;
       (node->send_sgl[i]).stag = node->send_stag_index;
@@ -2370,7 +2654,21 @@ void establishQPConnection(OtherNode node, int reuseQPFlag) {
       (node->sq_wr[i]).wr_id = (cc_uint64_t)(unsigned long)&(node->sq_wr[i]);
       (node->sq_wr[i]).wr_u.send.local_sgl.sge_count = 1;  // TODO : Make this more flexible
       (node->sq_wr[i]).wr_u.send.local_sgl.sge_list = &(node->send_sgl[i]);
-      (node->sq_wr[i]).signaled = 1; // ((i % AMMASSO_NUMMSGBUFS_PER_QP == 0) ? (1) : (0));   // Tagged ???
+      (node->sq_wr[i]).signaled = ((i % AMMASSO_NUMMSGBUFS_PER_QP == 0) ? (1) : (0));   // Tagged ???
+      */
+
+      // Setup single SGE for untagged sends
+      (node->send_sgl[i]).length = AMMASSO_BUFSIZE;
+      (node->send_sgl[i]).stag = node->send_stag_index;
+      (node->send_sgl[i]).to = (cc_uint64_t)(unsigned long)(node->send_buf + (AMMASSO_BUFSIZE * i));
+
+      // Setup single WR to reuse for untagged sends
+      (node->sq_wr[i]).wr_type = CC_WR_TYPE_RDMA_WRITE;
+      (node->sq_wr[i]).wr_id = (cc_uint64_t)(unsigned long)&(node->sq_wr[i]);
+      (node->sq_wr[i]).wr_u.rdma_write.local_sgl.sge_list = &(node->send_sgl[i]);
+      (node->sq_wr[i]).wr_u.rdma_write.local_sgl.sge_count = 1;
+      (node->sq_wr[i]).wr_u.rdma_write.read_fence = 0;
+      (node->sq_wr[i]).signaled = 1; //((i % AMMASSO_NUMMSGBUFS_PER_QP == 0) ? (1) : (0));   // Tagged ???
     }
 
     // DMK : NOTE : This was originally from one of the Ammasso Examples.  We don't need it here but I'm leaving it in as an
@@ -2484,6 +2782,8 @@ void establishQPConnection(OtherNode node, int reuseQPFlag) {
   ///// "Client" Specific /////
   if (node->myNode > contextBlock->myNode) {
 
+    PrivateData *priv = (PrivateData*)buf;
+
     // A one-time sleep that should give the passive side QPs time to post the listens before the active sides start trying to connect
     if (node->myNode == contextBlock->myNode + 1 || reuseQPFlag)  // Only do once if all the connections are being made for the first time, do this for all
       usleep(400000);  // Sleep 400ms                             // connections if reconnecting so the other RNIC has time to setup the listen
@@ -2506,8 +2806,18 @@ void establishQPConnection(OtherNode node, int reuseQPFlag) {
 
     // Attempt to make a connection to a "server" (NOTE: This call will return immediately; when the connection
     //   to the "server" is established, the asynchronous handler will be called.)
-    sprintf(buf, "node %d", contextBlock->myNode);
-    rtn = cc_qp_connect(contextBlock->rnic, node->qp, node->address, node->port, strlen(buf)+1, buf);
+    //sprintf(buf, "node %d", contextBlock->myNode);
+
+    //*((int*)buf) = contextBlock->myNode;
+    //memcpy(buf + sizeof(int), &(node->recv_stag_index), sizeof(cc_stag_t));
+    //memcpy(buf + sizeof(int) + sizeof(cc_stag_t), &(node->recv_buf), sizeof(cc_uint64_t));
+
+    priv->node = contextBlock->myNode;
+    priv->stag = node->recv_stag_index;
+    priv->to = (cc_uint64_t)node->recv_buf;
+
+    //rtn = cc_qp_connect(contextBlock->rnic, node->qp, node->address, node->port, /* strlen(buf) + 1 */ sizeof(int) + sizeof(cc_stag_t) + sizeof(cc_uint64_t), buf);
+    rtn = cc_qp_connect(contextBlock->rnic, node->qp, node->address, node->port, sizeof(PrivateData), buf);
     if (rtn != CC_OK) {
 
       // Attempt to clise the RNIC
