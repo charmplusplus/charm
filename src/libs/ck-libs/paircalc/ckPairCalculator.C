@@ -236,7 +236,7 @@ PairCalculator::calculatePairs_gemm(calculatePairsMsg *msg)
 #ifndef CMK_OPTIMIZE
     StartTime=CmiWallTimer();
 #endif
-#if !CONVERSE_VERSION_ELAN
+#if !CP_VERSION_ELAN
     r.add((int)thisIndex.y, (int)thisIndex.x, (int)(thisIndex.y+grainSize-1), (int)(thisIndex.x+grainSize-1), outData);
     r.contribute(this, sparse_sum_double);
 #else
@@ -245,7 +245,7 @@ PairCalculator::calculatePairs_gemm(calculatePairsMsg *msg)
     pairCalcReducerProxy.ckLocalBranch()->acceptContribute(S * S, outData, 
 							   cb, !symmetric, symmetric);
 
-#endif //!CONVERSE_VERSION_ELAN
+#endif //!CP_VERSION_ELAN
 
 #ifndef CMK_OPTIMIZE
     traceUserBracketEvent(220, StartTime, CmiWallTimer());
@@ -544,7 +544,7 @@ void add_double(void *in, void *inout, int *red_size, void *handle) {
 }
 
 
-#if CONVERSE_VERSION_ELAN
+#if CP_VERSION_ELAN
 
 typedef void (* ELAN_REDUCER)(void *in, void *inout, int *count, void *handle);
 
@@ -562,7 +562,7 @@ void PairCalcReducer::acceptContribute(int size, double* matrix, CkCallback cb,
     this->symmtype = symmtype;
     this->cb = cb;
 
-#if CONVERSE_VERSION_ELAN
+#if CP_VERSION_ELAN
     reduction_elementCount ++;
     
     int red_size = size *sizeof(double);
@@ -584,7 +584,7 @@ void PairCalcReducer::acceptContribute(int size, double* matrix, CkCallback cb,
 
 
 void PairCalcReducer::startMachineReduction() {
-#if CONVERSE_VERSION_ELAN
+#if CP_VERSION_ELAN
     double * dst_matrix =  NULL;
     
     if(isAllReduce) {
@@ -788,7 +788,7 @@ PairCalculator::calculatePairs(int size, complex *points, int sender, bool fromR
       r.add((int)thisIndex.y, (int)thisIndex.x, (int)(thisIndex.y+grainSize-1), (int)(thisIndex.x+grainSize-1), outData);
       r.contribute(this, sparse_sum_double);
 
-#if CONVERSE_VERSION_ELAN
+#if CP_VERSION_ELAN
       //CkPrintf("[%d] ELAN VERSION %d\n", CkMyPe(), symmetric);
       CProxy_PairCalcReducer pairCalcReducerProxy(reducer_id); 
       pairCalcReducerProxy.ckLocalBranch()->acceptContribute(S * S, outData, 
