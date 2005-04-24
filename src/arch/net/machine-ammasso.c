@@ -535,7 +535,7 @@ int getQPSendBuffer(OtherNode node, char force) {
       CheckRecvBufForMessage(node);
       //CompletionEventHandlerWithAckFlag(contextBlock->rnic, node->recv_cq, node, 1);
 
-      //CompletionEventHandler(contextBlock->rnic, node->send_cq, node);
+      CompletionEventHandler(contextBlock->rnic, node->send_cq, node);
 
       AMMASSO_STATS_END(getQPSendBuffer_CEH)
 
