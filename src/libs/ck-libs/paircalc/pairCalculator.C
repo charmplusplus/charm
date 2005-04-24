@@ -40,7 +40,7 @@ void createPairCalculator(bool sym, int s, int grainSize, int numZ, int* z, int 
   /*
     CharmStrategy * pstrat = new PipeBroadcastStrategy(USE_HYPERCUBE, pairCalculatorProxy.ckGetArrayID());
   */
-  CharmStrategy *bstrat = new BroadcastStrategy(USE_TREE);
+  CharmStrategy *bstrat = new BroadcastStrategy(USE_HYPERCUBE);
 
   ComlibInstanceHandle bcastInstance = CkGetComlibInstance();
   bcastInstance.setStrategy(bstrat);
