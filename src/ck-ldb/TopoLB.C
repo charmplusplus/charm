@@ -24,6 +24,7 @@ Date: 04/19/2005
 #define EPSILON  -0.001
 
 #define _lb_debug_on 0
+#define _lb_debug2_on 1
 
 CreateLBFunc_Def(TopoLB,"TopoLB: Balance objects based on the network topology");
 
@@ -287,7 +288,6 @@ void TopoLB::computePartitions(CentralLB::LDStats *stats,int count,int *newmap)
   delete[] origmap;
 }
 
-    
 void TopoLB::initDataStructures(CentralLB::LDStats *stats,int count,int *newmap)
 {
   //init dist
@@ -516,8 +516,11 @@ void TopoLB :: work(CentralLB::LDStats *stats,int count)
     assign[part_index]=proc_index;
 
     //CkPrintf("assign[%d]=%d\n",part_index,proc_index);
-    if(i%10 ==0)
-      CkPrintf("Assigned %d procs \n",i+1);
+    if(_lb_debug2_on)
+    {
+      if(i%100 ==0)
+        CkPrintf("Assigned %d procs \n",i+1);
+    }
     /*****Update Data Structures******************/
     cfree[part_index]=false;
     pfree[proc_index]=false;
@@ -623,6 +626,20 @@ void TopoLB :: work(CentralLB::LDStats *stats,int count)
   {
     stats->to_proc[i]= assign[newmap[i]];
   }
+
+  if(_lb_debug2_on)
+  {
+    CkPrintf(" Original   hopBytes : %lf\n", getHopBytes(stats,count,stats->from_proc));
+    CkPrintf(" Resulting  hopBytes : %lf\n", getHopBytes(stats,count,stats->to_proc));
+    /*
+    for(int trials=0;trials<10;trials++)
+    {
+      for(int i=0;i<stats->n_objs;i++)
+        stats->to_proc[i]=rand()%count;
+      CkPrintf(" Random     hopBytes : %lf\n", getHopBytes(stats,count,stats->to_proc));
+    }
+    */
+  }
   freeDataStructures(count);
   delete[] newmap;
 }
@@ -656,6 +673,90 @@ void TopoLB::printDataStructures(int count,int n_objs,int *newmap)
     }
     CkPrintf("\n");
   }
+}
+double TopoLB::getHopBytes(CentralLB::LDStats *stats,int count,CkVec<int>map)
+{
+  double **comm1=new double*[count];
+  for(int i=0;i<count;i++)
+    comm1[i]=new double[count];
+
+  for(int i=0;i<count;i++)
+  {
+    for(int j=0;j<count;j++)
+    {
+      comm1[i][j]=0;
+    }
+  }
+
+  bool *multicastAdded=new bool[count];
+  for(int i=0;i<stats->n_comm;i++)
+  {
+    LDCommData &cdata=stats->commData[i];
+    if(!cdata.from_proc() && cdata.receiver.get_type() ==LD_OBJ_MSG)
+    {
+      int sender=stats->getHash(cdata.sender);
+      int receiver=stats->getHash(cdata.receiver.get_destObj());
+
+      CmiAssert(sender<stats->n_objs);
+      CmiAssert(receiver<stats->n_objs);
+
+      if(map[sender]==map[receiver])
+        continue;
+
+      int send_part=map[sender];
+      int recv_part=map[receiver];
+      comm1[send_part][recv_part]+=cdata.bytes;
+      comm1[recv_part][send_part]+=cdata.bytes;
+    }
+    if(!cdata.from_proc() && cdata.receiver.get_type()==LD_OBJLIST_MSG)
+    {
+      int nobjs=0;
+      LDObjKey *receivers=cdata.receiver.get_destObjs(nobjs);
+      int sender=stats->getHash(cdata.sender);
+      int send_part=map[sender];
+      
+      CmiAssert(sender<stats->n_objs);
+
+      for(int i=0;i<count;i++)
+        multicastAdded[i]=false;
+      multicastAdded[send_part]=true;
+
+      for(int k=0;k<nobjs;k++)
+      {
+        int receiver=stats->getHash(receivers[k]);
+        //CmiAssert ( (int)(receivers[k])< stats->n_objs);
+        CmiAssert ( receiver < stats->n_objs);
+
+        int recv_part=map[receiver];
+        if(!multicastAdded[recv_part])
+        {
+          comm1[send_part][recv_part]+=cdata.bytes;
+          comm1[recv_part][send_part]+=cdata.bytes;
+      
+          multicastAdded[recv_part]=true;
+        }
+      }
+    }
+  }
+  delete[] multicastAdded;
+
+  double totalHB=0;
+  int proc1,proc2;
+
+  for(int i=0;i<count;i++)
+  {
+    proc1=map[i];
+    for(int j=0;j<count;j++)
+    {
+      proc2=map[j];
+      totalHB+=dist[proc1][proc2]*comm1[i][j];
+    }
+  }
+  for(int i=0;i<count;i++)
+    delete[] comm1[i];
+  delete[] comm1;
+
+  return totalHB;
 }
 
 
