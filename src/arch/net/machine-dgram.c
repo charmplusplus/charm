@@ -321,6 +321,10 @@ typedef struct OtherNodeStruct
   cc_inet_port_t         port;     /* local if passive side of connection, remote if active side of connection */
   qp_connection_state_t  connectionState;  /* State of the connection (connected, lost, etc) */
 
+  cc_stag_t              remote_recv_stag;
+  cc_uint64_t            remote_starting_to;
+  int                    recv_UseIndex;
+
 #endif
 
   int                      asm_rank;
