@@ -173,18 +173,18 @@ class IndexAndID {
  public:
   CkArrayIndex4D idx;
   CkArrayID id;
-  IndexAndID(CkArrayIndex4D *_idx, CkArrayID _id) 
+  IndexAndID(CkArrayIndex4D *_idx, CkArrayID *_id) 
     {
       idx=*_idx;
-      id=_id;
+      id=*_id;
     }
   void dump()
     {
-      CkPrintf(" w %d x %d y %d z %d\n",idx.index[0],idx.index[1],idx.index[2],idx.index[3]);
+      CkPrintf("w %d x %d y %d z %d\n",idx.index[0],idx.index[1],idx.index[2],idx.index[3]);
     }
   IndexAndID()
     {
-    };
+    }
 };
 
 class PairCalcReducer : public Group {
@@ -209,8 +209,6 @@ class PairCalcReducer : public Group {
   void broadcastEntireResult(int size, double* matrix1, double* matrix2, bool symmtype);
   void doRegister(IndexAndID *elem, bool symmtype){
     numRegistered[symmtype]++;
-    CkPrintf("registered :");
-    elem->dump();
     localElements[symmtype].push_back(*elem);
   }
 

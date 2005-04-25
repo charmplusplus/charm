@@ -8,7 +8,7 @@ PairCalculator::PairCalculator(CkMigrateMessage *m) { }
 PairCalculator::PairCalculator(bool sym, int grainSize, int s, int blkSize,  int op1,  FuncType fn1, int op2,  FuncType fn2, CkCallback cb, CkGroupID gid, CkArrayID cb_aid, int cb_ep, bool conserveMemory, bool lbpaircalc, CkCallback lbcb) 
 {
 #ifdef _PAIRCALC_DEBUG_ 
-  CkPrintf("[PAIRCALC] [%d %d %d %d] inited\n", thisIndex.w, thisIndex.x, thisIndex.y, thisIndex.z);
+  CkPrintf("[PAIRCALC] [%d %d %d %d] inited lb %d \n", thisIndex.w, thisIndex.x, thisIndex.y, thisIndex.z,lbpaircalc);
 #endif 
   this->conserveMemory=conserveMemory;
   this->symmetric = sym;
@@ -39,16 +39,15 @@ PairCalculator::PairCalculator(bool sym, int grainSize, int s, int blkSize,  int
   newData = NULL;
   sumPartialCount = 0;
   usesAtSync=true;
-  
   if(lbpaircalc)
     setMigratable(true);
   else
     setMigratable(false);
+
   CProxy_PairCalcReducer pairCalcReducerProxy(reducer_id); 
   CkArrayIndex4D indx4(thisIndex.w,thisIndex.x, thisIndex.y, thisIndex.z);
-  CkPrintf("registering %d %d %d %d as %d %d %d %d \n",thisIndex.w,thisIndex.x,thisIndex.y,thisIndex.z, indx4.index[0],indx4.index[1],indx4.index[2],indx4.index[3]);
-  IndexAndID *iandid= new IndexAndID(&indx4,thisProxy.ckGetArrayID());
-  iandid->dump();
+  CkArrayID myaid=thisProxy.ckGetArrayID();
+  IndexAndID *iandid= new IndexAndID(&indx4,&myaid);
   pairCalcReducerProxy.ckLocalBranch()->doRegister(iandid, symmetric);
   delete iandid;
 
@@ -124,21 +123,18 @@ PairCalculator::~PairCalculator()
 void PairCalculator::ResumeFromSync() {
   if(usesAtSync)
     {
-
       CProxy_PairCalcReducer pairCalcReducerProxy(reducer_id); 
-      CkAbort("fix my registration!\n");
-      /*      CkArrayIndex4D *indx4= new CkArrayIndex4D(thisIndex.w,thisIndex.x, thisIndex.y, thisIndex.z);
-      CkPrintf("registering %d %d %d %d as %d %d %d %d \n",thisIndex.w,thisIndex.x,thisIndex.y,thisIndex.z, indx4->index[0],indx4->index[1],indx4->index[2],indx4->index[3]);
-      IndexAndID *iandid= new IndexAndID(indx4,thisProxy.ckGetArrayID());
-      pairCalcReducerProxy.ckLocalBranch()->doRegister(iandid,symmetric);
+      CkArrayIndex4D indx4(thisIndex.w,thisIndex.x, thisIndex.y, thisIndex.z);
+      CkArrayID myaid=thisProxy.ckGetArrayID();
+      IndexAndID *iandid= new IndexAndID(&indx4,&myaid);
+      pairCalcReducerProxy.ckLocalBranch()->doRegister(iandid, symmetric);
       delete iandid;
-      */
-
       //if gspace isn't syncing we'll have to do the resumption.
-      if(thisIndex.x==0 && thisIndex.y==0 && thisIndex.z==0 && thisIndex.w==0)
+      /*      if(thisIndex.x==0 && thisIndex.y==0 && thisIndex.z==0 && thisIndex.w==0)
 	{
 	  cb_lb.send();
 	}
+      */
     }
 }
 void
@@ -440,15 +436,37 @@ PairCalculator::acceptResult(int size, double *matrix1, double *matrix2)
 	thisProxy(idx).sumPartialResult(msg);  
       }
   }
-  else { // else part is NOT load balanced yet!!!
+  else { 
+    // we just send these to gspace where acceptNewPsi will put them together
+    // this should be fairly load balanced as long as gspace is balanced
+    /*
     CkArrayIndex4D idx(thisIndex.w, 0, thisIndex.y, thisIndex.z);
     thisProxy(idx).sumPartialResult(N*grainSize, mynewData, thisIndex.z);
-    /* I think this is unused
-       if (thisIndex.y != thisIndex.x){   // FIXME: rowNum will alway == thisIndex.x
-	 CkArrayIndex4D idx(thisIndex.w, 0, thisIndex.x, thisIndex.z);
-	 thisProxy(idx).sumPartialResult(N*grainSize, othernewData, thisIndex.z);
-       }
- */
+    */
+
+    //we have an N*grainsize block
+    //we must communicate with all planes
+    int offset=thisIndex.z;  //zero for now but should be considered
+    int priority=0xFFFFFFFF;
+    for(int j=0;j<grainSize;j++)
+      {
+
+	//	CkCallback mycb(cb_ep, CkArrayIndex2D(thisIndex.y+j+offset, thisIndex.w), cb_aid);	
+
+	CkCallback mycb(cb_ep, CkArrayIndex2D(j+thisIndex.y ,thisIndex.w), cb_aid);	
+	partialResultMsg *msg = new (N, 8*sizeof(int) )partialResultMsg;
+	msg->N=N;
+	msg->myoffset = j; // someplace in the state
+	memcpy(msg->result,mynewData+j*N,msg->N*sizeof(complex));
+	*((int*)CkPriorityPtr(msg)) = priority;
+	CkSetQueueing(msg, CK_QUEUEING_IFIFO); 
+#ifdef _PAIRCALC_DEBUG_
+	CkPrintf("sending partial of size %d offset %d to [%d %d]\n",N,j,thisIndex.y+j,thisIndex.w);
+#endif
+ 	mycb.send(msg);
+
+      }
+
   }
 #endif
 
@@ -525,7 +543,9 @@ PairCalculator::sumPartialResult(int size, complex *result, int offset)
   }
   int countExpect = (S/grainSize)*blkSize;
   if(symmetric) countExpect = thisIndex.y/grainSize + 1;
-
+#ifdef _PAIRCALC_DEBUG_
+  CkPrintf("Have %d of Expected %d messages\n",sumPartialCount,countExpect);
+#endif
   if (sumPartialCount >= countExpect) {
 #ifndef _PAIRCALC_SECONDPHASE_LOADBAL_
     for(int j=0; j<grainSize; j++){
@@ -539,19 +559,21 @@ PairCalculator::sumPartialResult(int size, complex *result, int offset)
     if(!symmetric)
 	for(int j=0; j<grainSize/(S/grainSize); j++){
 	    CkCallback mycb(cb_ep, CkArrayIndex2D(thisIndex.y+j+offset, thisIndex.w), cb_aid);
-	    mySendMsg *msg = new (N, 0)mySendMsg; // msg with newData (size N)
+	    mySendMsg *msg = new (N, 0) mySendMsg; // msg with newData (size N)
 	    memcpy(msg->data, newData+j*N, N * sizeof(complex));
 	    msg->N=N;
 	    mycb.send(msg);
 	}
-    else
-	for(int j=0; j<grainSize; j++){
+    else //shouldn't be in here as we sent it directly to gspace
+      //      CkAbort("Whoah symmetric doesn't go through sumpartialresult anymore");
+      	for(int j=0; j<grainSize; j++){
 	    CkCallback mycb(cb_ep, CkArrayIndex2D(thisIndex.y+j+offset, thisIndex.w), cb_aid);
 	    mySendMsg *msg = new (N, 0)mySendMsg; // msg with newData (size N)
 	    memcpy(msg->data, newData+j*N, N * sizeof(complex));
 	    msg->N=N;
 	    mycb.send(msg);
 	}
+
 #endif
     sumPartialCount = 0;
     memset(newData,0,size*sizeof(complex));
@@ -652,43 +674,36 @@ PairCalcReducer::broadcastEntireResult(int size, double* matrix, bool symmtype)
 #ifdef _PAIRCALC_DEBUG_
   CkPrintf("bcasteres:On Pe %d -- %d objects\n", CkMyPe(), localElements[symmtype].length());
 #endif
-  /*  acceptResultMsg *msg= new (size,0) acceptResultMsg;
+  acceptResultMsg *msg= new (size,0) acceptResultMsg;
   msg->size=size;
   memcpy(msg->matrix,matrix,size* sizeof(double));
-  */
   for (int i = 0; i < localElements[symmtype].length(); i++)
     {
-      acceptResultMsg *msg= new (size) acceptResultMsg;
-      msg->size=size;
-      memcpy(msg->matrix,matrix,size* sizeof(double));
-      
 #ifdef _PAIRCALC_DEBUG_
       CkPrintf("call accept on :");
       (localElements[symmtype])[i].dump();
 #endif
-      CkSendMsgArrayInline(CkIndex_PairCalculator::__idx_acceptResult_acceptResultMsg, msg, (localElements[symmtype])[i].id, (localElements[symmtype])[i].idx);
-    }
+      CkSendMsgArrayInline(CkIndex_PairCalculator::__idx_acceptResult_acceptResultMsg, msg, (localElements[symmtype])[i].id, (localElements[symmtype])[i].idx, CK_MSG_KEEP);
 
-    //    (localElements[symmtype])[i]->acceptResult(size, matrix); 
+    }
+  delete msg;
+
 
 }
 
 void
 PairCalcReducer::broadcastEntireResult(int size, double* matrix1, double* matrix2, bool symmtype){
     CkPrintf("On Pe %d -- %d objects\n", CkMyPe(), localElements[symmtype].length());
-  acceptResultMsg2 *msg= new (size,size,0) acceptResultMsg2;
-  msg->size=size;
-  memcpy(msg->matrix1,matrix2,size* sizeof(double));
-  memcpy(msg->matrix2,matrix2,size* sizeof(double));
-  for (int i = 0; i < localElements[symmtype].length(); i++)
-    {
-      //      (localElements[symmtype])[i]->CkSendMsgArrayInline(msg);
-      CkSendMsgArrayInline(CkIndex_PairCalculator::__idx_acceptResult_acceptResultMsg2, msg, (localElements[symmtype])[0].id, (localElements[symmtype])[i].idx);
+    acceptResultMsg2 *msg= new (size,size,0) acceptResultMsg2;
+    msg->size=size;
+    memcpy(msg->matrix1,matrix1,size* sizeof(double));
+    memcpy(msg->matrix2,matrix2,size* sizeof(double));
+    for (int i = 0; i < localElements[symmtype].length(); i++)
+      {
+	CkSendMsgArrayInline(CkIndex_PairCalculator::__idx_acceptResult_acceptResultMsg2, msg, (localElements[symmtype])[0].id, (localElements[symmtype])[i].idx,CK_MSG_KEEP);
+      }
+    delete msg;
 
-    }
-  //
-  //  for (int i = 0; i < localElements[symmtype].length(); i++)
-  //    (localElements[symmtype])[i]->acceptResult(size, matrix1, matrix2); 
 }
 
 
