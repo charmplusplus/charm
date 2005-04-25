@@ -1026,6 +1026,7 @@ Written by Milind Bhandarkar around November 2000
 #elif CMK_THREADS_USE_PTHREADS
 
 #include <pthread.h>
+#include <errno.h> /* for perror */
 
 struct CthThreadStruct
 {
@@ -1117,6 +1118,9 @@ static void *CthOnly(void * arg)
 
 CthThread CthCreate(CthVoidFn fn, void *arg, int size)
 {
+  static int reported = 0;
+  pthread_attr_t attr;
+  int r;
   CthThread result;
   CthThread self = CthSelf();
   /* size is ignored in this version */
@@ -1126,7 +1130,20 @@ CthThread CthCreate(CthVoidFn fn, void *arg, int size)
   result->fn = fn;
   result->arg = arg;
   result->creator = &(self->cond);
-  if (0 != pthread_create(&(result->self), 0, CthOnly, (void*) result)) 
+
+  /* try set pthread stack, not necessarily supported on all platforms */
+  pthread_attr_init(&attr);
+  if (size<1024) size = CthCpvAccess(_defaultStackSize);
+  if (0!=(r=pthread_attr_setstacksize(&attr,size))) {
+      if (!reported) {
+        CmiPrintf("Warning: pthread_attr_setstacksize failed");
+	errno = r;
+	perror("pthread_attr_setstacksize");
+        reported = 1;
+      }
+  }
+
+  if (0 != pthread_create(&(result->self), &attr, CthOnly, (void*) result)) 
     CmiAbort("CthCreate failed to created a new pthread\n");
   do {
   pthread_cond_wait(&(self->cond), &CthCpvAccess(sched_mutex));
