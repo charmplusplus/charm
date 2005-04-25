@@ -180,7 +180,7 @@ class IndexAndID {
     }
   void dump()
     {
-      CkPrintf("id %d, w %d x %d y %d z %d\n",id,idx.index[0],idx.index[1],idx.index[2],idx.index[3]);
+      CkPrintf(" w %d x %d y %d z %d\n",idx.index[0],idx.index[1],idx.index[2],idx.index[3]);
     }
   IndexAndID()
     {
