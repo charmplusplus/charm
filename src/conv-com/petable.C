@@ -24,9 +24,9 @@
 
 struct AllToAllHdr {
   char dummy[CmiReservedHeaderSize];
-  int size;
   int refno;
   comID id;
+  int size;
   int ufield;
   int nmsgs;
 };
@@ -157,9 +157,9 @@ char * PeTable ::ExtractAndPack(comID id, int ufield, int npe,
 
   int refno = id.refno;    
 
-  PACK(int, *length);
   PACK(int, refno);
   PACK(comID, id);
+  PACK(int, *length);
   PACK(int, ufield);
   PACK(int, nummsgs);
   PACK(int, npe);
@@ -281,9 +281,9 @@ char * PeTable ::ExtractAndPackAll(comID id, int ufield, int *length) {
   int refno = 0;
 
   AllToAllHdr ahdr;
-  ahdr.size = *length;
   ahdr.refno = refno;
   ahdr.id = id;
+  ahdr.size = *length;
   ahdr.ufield = ufield;
   ahdr.nmsgs = nmsgs;
 
@@ -353,10 +353,10 @@ int PeTable :: UnpackAndInsert(void *in) {
 
   register int offset;
 
-  UNPACK(int, msgsize);
   UNPACK(int, refno);
   ComlibPrintf("%d UnPackAndInsert\n", CkMyPe());
   UNPACK(comID, id);
+  UNPACK(int, msgsize);
   UNPACK(int, ufield);
   UNPACK(int, nummsgs);
   UNPACK(int, npe);
