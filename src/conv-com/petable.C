@@ -24,6 +24,7 @@
 
 struct AllToAllHdr {
   char dummy[CmiReservedHeaderSize];
+  int size;
   int refno;
   comID id;
   int ufield;
@@ -156,6 +157,7 @@ char * PeTable ::ExtractAndPack(comID id, int ufield, int npe,
 
   int refno = id.refno;    
 
+  PACK(int, *length);
   PACK(int, refno);
   PACK(comID, id);
   PACK(int, ufield);
@@ -279,6 +281,7 @@ char * PeTable ::ExtractAndPackAll(comID id, int ufield, int *length) {
   int refno = 0;
 
   AllToAllHdr ahdr;
+  ahdr.size = *length;
   ahdr.refno = refno;
   ahdr.id = id;
   ahdr.ufield = ufield;
@@ -346,9 +349,11 @@ int PeTable :: UnpackAndInsert(void *in) {
   char *msgend, *msgcur;
   comID id;
   int refno = 0;
+  int msgsize;
 
   register int offset;
 
+  UNPACK(int, msgsize);
   UNPACK(int, refno);
   ComlibPrintf("%d UnPackAndInsert\n", CkMyPe());
   UNPACK(comID, id);
@@ -357,7 +362,7 @@ int PeTable :: UnpackAndInsert(void *in) {
   UNPACK(int, npe);
 
   // unpack all messages into an array
-  msgend = (char*)in + CmiSize(in);
+  msgend = (char*)in + msgsize;
   msgcur = (char*)in + ALIGN8(sizeof(struct AllToAllHdr) + (npe+nummsgs+1)*sizeof(int));
   while (msgcur < msgend) {
     CmiChunkHeader *ch = (CmiChunkHeader *)msgcur;
@@ -578,6 +583,7 @@ PTvectorlist PeTable :: ExtractAndVectorize(comID id, int ufield, int npe, int *
 
   int refno = id.refno;    
 
+  // SHOULD PACK THE SIZE, which is not available: fix elan and undo this cvs update
   PACK(int, refno);
   PACK(comID, id);
   PACK(int, ufield);
