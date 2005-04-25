@@ -29,14 +29,13 @@ NormalSlabArray::doFFT(int src_id, int dst_id)
     complex *temp;
     // i <> pe if destPlanesPerSlab is not 1
 
-    CkPrintf("useCommlib = %d\n", useCommlib);
-    if (useCommlib) {
+    if (fftuseCommlib) {
 	CProxy_NormalSlabArray destProxy_com;
 	if(fftinfo.isSrcSlab)
 	    destProxy_com = (CProxy_NormalSlabArray)fftinfo.destProxy;
 	else
 	    destProxy_com = (CProxy_NormalSlabArray)fftinfo.srcProxy;
-	commInstance.beginIteration();
+	fftcommInstance.beginIteration();
 	ComlibDelegateProxy(&destProxy_com);
     }
 
@@ -142,13 +141,13 @@ NormalSlabArray::doIFFT(int src_id, int dst_id)
     fclose(ifd);
 #endif    
     
-    if (useCommlib) {
+    if (fftuseCommlib) {
 	CProxy_NormalSlabArray destProxy_com;
 	if(fftinfo.isSrcSlab)
 	    destProxy_com = (CProxy_NormalSlabArray)fftinfo.destProxy;
 	else
 	    destProxy_com = (CProxy_NormalSlabArray)fftinfo.srcProxy;
-	commInstance.beginIteration();
+	fftcommInstance.beginIteration();
 	ComlibDelegateProxy(&destProxy_com);
     }
 
@@ -243,12 +242,12 @@ void NormalSlabArray::setup(NormalFFTinfo &info, bool _useCommlib)
     
     createPlans(info);
 
-    useCommlib = _useCommlib;
-    if (useCommlib) {        
+    fftuseCommlib = _useCommlib;
+    if (fftuseCommlib) {        
 	  int period_in_ms = 1, nmsgs = 1000;
 	  StreamingStrategy * strat = new StreamingStrategy(period_in_ms, nmsgs);
-        commInstance = CkGetComlibInstance();
-        commInstance.setStrategy(strat);
+        fftcommInstance = CkGetComlibInstance();
+        fftcommInstance.setStrategy(strat);
     }
 }
 

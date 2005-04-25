@@ -195,8 +195,8 @@ class NormalSlabArray: public SlabArray {
 	fftwnd_plan fwd2DPlan, bwd2DPlan;
 	fftw_plan fwd1DPlan, bwd1DPlan;
 	NormalFFTinfo *fftinfos[MAX_FFTS];
-	bool useCommlib;
-	ComlibInstanceHandle commInstance;
+	bool fftuseCommlib;
+	ComlibInstanceHandle fftcommInstance;
  private:
 	int counts[MAX_FFTS];
 };
