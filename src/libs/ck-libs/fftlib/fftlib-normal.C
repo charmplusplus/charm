@@ -28,6 +28,18 @@ NormalSlabArray::doFFT(int src_id, int dst_id)
     complex *sendData = new complex[fftinfo.srcPlanesPerSlab * fftinfo.destPlanesPerSlab * lineSize];
     complex *temp;
     // i <> pe if destPlanesPerSlab is not 1
+
+    CkPrintf("useCommlib = %d\n", useCommlib);
+    if (useCommlib) {
+	CProxy_NormalSlabArray destProxy_com;
+	if(fftinfo.isSrcSlab)
+	    destProxy_com = (CProxy_NormalSlabArray)fftinfo.destProxy;
+	else
+	    destProxy_com = (CProxy_NormalSlabArray)fftinfo.srcProxy;
+	commInstance.beginIteration();
+	ComlibDelegateProxy(&destProxy_com);
+    }
+
     int pe, i;
     for(i = 0, pe = 0; i < fftinfo.srcSize[0]; i += fftinfo.destPlanesPerSlab, pe++) {
 	int ti;
@@ -42,6 +54,8 @@ NormalSlabArray::doFFT(int src_id, int dst_id)
 	
 	((CProxy_NormalSlabArray)fftinfo.destProxy)(pe).acceptDataForFFT(lineSize * fftinfo.srcPlanesPerSlab * fftinfo.destPlanesPerSlab, sendData, thisIndex, dst_id);
     }
+
+
     delete [] sendData;
 }
 
@@ -128,6 +142,16 @@ NormalSlabArray::doIFFT(int src_id, int dst_id)
     fclose(ifd);
 #endif    
     
+    if (useCommlib) {
+	CProxy_NormalSlabArray destProxy_com;
+	if(fftinfo.isSrcSlab)
+	    destProxy_com = (CProxy_NormalSlabArray)fftinfo.destProxy;
+	else
+	    destProxy_com = (CProxy_NormalSlabArray)fftinfo.srcProxy;
+	commInstance.beginIteration();
+	ComlibDelegateProxy(&destProxy_com);
+    }
+
     complex *sendData = new complex[fftinfo.srcPlanesPerSlab * fftinfo.destPlanesPerSlab * lineSize];
     complex *temp;
     int i, pe;
@@ -210,7 +234,7 @@ void NormalSlabArray::createPlans(NormalFFTinfo &info)
     }
 }
 
-void NormalSlabArray::setup(NormalFFTinfo &info)
+void NormalSlabArray::setup(NormalFFTinfo &info, bool _useCommlib)
 {
     fftinfos[0] = new NormalFFTinfo(info);
     counts[0] = 0;
@@ -218,6 +242,14 @@ void NormalSlabArray::setup(NormalFFTinfo &info)
     fwd2DPlan = bwd2DPlan = NULL;
     
     createPlans(info);
+
+    useCommlib = _useCommlib;
+    if (useCommlib) {        
+	  int period_in_ms = 1, nmsgs = 1000;
+	  StreamingStrategy * strat = new StreamingStrategy(period_in_ms, nmsgs);
+        commInstance = CkGetComlibInstance();
+        commInstance.setStrategy(strat);
+    }
 }
 
 
