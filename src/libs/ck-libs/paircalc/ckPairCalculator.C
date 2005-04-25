@@ -45,7 +45,13 @@ PairCalculator::PairCalculator(bool sym, int grainSize, int s, int blkSize,  int
   else
     setMigratable(false);
   CProxy_PairCalcReducer pairCalcReducerProxy(reducer_id); 
-  pairCalcReducerProxy.ckLocalBranch()->doRegister(this, symmetric);
+  CkArrayIndex4D indx4(thisIndex.w,thisIndex.x, thisIndex.y, thisIndex.z);
+  CkPrintf("registering %d %d %d %d as %d %d %d %d \n",thisIndex.w,thisIndex.x,thisIndex.y,thisIndex.z, indx4.index[0],indx4.index[1],indx4.index[2],indx4.index[3]);
+  IndexAndID *iandid= new IndexAndID(&indx4,thisProxy.ckGetArrayID());
+  iandid->dump();
+  pairCalcReducerProxy.ckLocalBranch()->doRegister(iandid, symmetric);
+  delete iandid;
+
 }
 
 void
@@ -118,8 +124,16 @@ PairCalculator::~PairCalculator()
 void PairCalculator::ResumeFromSync() {
   if(usesAtSync)
     {
+
       CProxy_PairCalcReducer pairCalcReducerProxy(reducer_id); 
-      pairCalcReducerProxy.ckLocalBranch()->doRegister(this,symmetric);
+      CkAbort("fix my registration!\n");
+      /*      CkArrayIndex4D *indx4= new CkArrayIndex4D(thisIndex.w,thisIndex.x, thisIndex.y, thisIndex.z);
+      CkPrintf("registering %d %d %d %d as %d %d %d %d \n",thisIndex.w,thisIndex.x,thisIndex.y,thisIndex.z, indx4->index[0],indx4->index[1],indx4->index[2],indx4->index[3]);
+      IndexAndID *iandid= new IndexAndID(indx4,thisProxy.ckGetArrayID());
+      pairCalcReducerProxy.ckLocalBranch()->doRegister(iandid,symmetric);
+      delete iandid;
+      */
+
       //if gspace isn't syncing we'll have to do the resumption.
       if(thisIndex.x==0 && thisIndex.y==0 && thisIndex.z==0 && thisIndex.w==0)
 	{
@@ -252,6 +266,18 @@ PairCalculator::calculatePairs_gemm(calculatePairsMsg *msg)
 #endif
   }
   delete msg;
+}
+
+void
+PairCalculator::acceptResult(acceptResultMsg *msg)
+{
+  acceptResult(msg->size, msg->matrix, NULL);
+}
+
+void
+PairCalculator::acceptResult(acceptResultMsg2 *msg)
+{
+  acceptResult(msg->size, msg->matrix1,msg->matrix2);
 }
 
 
@@ -621,18 +647,49 @@ void PairCalcReducer::startMachineReduction() {
 }
 
 void
-PairCalcReducer::broadcastEntireResult(int size, double* matrix, bool symmtype){
+PairCalcReducer::broadcastEntireResult(int size, double* matrix, bool symmtype)
+{
+#ifdef _PAIRCALC_DEBUG_
+  CkPrintf("bcasteres:On Pe %d -- %d objects\n", CkMyPe(), localElements[symmtype].length());
+#endif
+  /*  acceptResultMsg *msg= new (size,0) acceptResultMsg;
+  msg->size=size;
+  memcpy(msg->matrix,matrix,size* sizeof(double));
+  */
   for (int i = 0; i < localElements[symmtype].length(); i++)
-    (localElements[symmtype])[i]->acceptResult(size, matrix); 
+    {
+      acceptResultMsg *msg= new (size) acceptResultMsg;
+      msg->size=size;
+      memcpy(msg->matrix,matrix,size* sizeof(double));
+      
+#ifdef _PAIRCALC_DEBUG_
+      CkPrintf("call accept on :");
+      (localElements[symmtype])[i].dump();
+#endif
+      CkSendMsgArrayInline(CkIndex_PairCalculator::__idx_acceptResult_acceptResultMsg, msg, (localElements[symmtype])[i].id, (localElements[symmtype])[i].idx);
+    }
+
+    //    (localElements[symmtype])[i]->acceptResult(size, matrix); 
+
 }
 
 void
 PairCalcReducer::broadcastEntireResult(int size, double* matrix1, double* matrix2, bool symmtype){
     CkPrintf("On Pe %d -- %d objects\n", CkMyPe(), localElements[symmtype].length());
+  acceptResultMsg2 *msg= new (size,size,0) acceptResultMsg2;
+  msg->size=size;
+  memcpy(msg->matrix1,matrix2,size* sizeof(double));
+  memcpy(msg->matrix2,matrix2,size* sizeof(double));
   for (int i = 0; i < localElements[symmtype].length(); i++)
-    (localElements[symmtype])[i]->acceptResult(size, matrix1, matrix2); 
-}
+    {
+      //      (localElements[symmtype])[i]->CkSendMsgArrayInline(msg);
+      CkSendMsgArrayInline(CkIndex_PairCalculator::__idx_acceptResult_acceptResultMsg2, msg, (localElements[symmtype])[0].id, (localElements[symmtype])[i].idx);
 
+    }
+  //
+  //  for (int i = 0; i < localElements[symmtype].length(); i++)
+  //    (localElements[symmtype])[i]->acceptResult(size, matrix1, matrix2); 
+}
 
 
 

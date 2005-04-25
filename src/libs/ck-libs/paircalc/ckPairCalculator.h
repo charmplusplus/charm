@@ -100,6 +100,20 @@ class calculatePairsMsg : public CMessage_calculatePairsMsg {
   friend class CMessage_calculatePairsMsg;
 
 };
+class acceptResultMsg : public CMessage_acceptResultMsg {
+ public:
+  int size;
+  double *matrix;
+  friend class CMessage_acceptResultMsg;
+};
+
+class acceptResultMsg2 : public CMessage_acceptResultMsg2 {
+ public:
+  int size;
+  double *matrix1;
+  double *matrix2;
+  friend class CMessage_acceptResultMsg2;
+};
 
 
 
@@ -115,6 +129,8 @@ class PairCalculator: public CBase_PairCalculator {
   void calculatePairs_gemm(calculatePairsMsg *msg);
   void acceptResult(int size, double *matrix);
   void acceptResult(int size, double *matrix1, double *matrix2);
+  void acceptResult(acceptResultMsg *msg);
+  void acceptResult(acceptResultMsg2 *msg);
   void sumPartialResult(int size, complex *result, int offset);
   void sumPartialResult(priorSumMsg *msg);
   void sumPartialResult(partialResultMsg *msg);
@@ -153,6 +169,24 @@ class PairCalculator: public CBase_PairCalculator {
   CkCallback cb_lb;
 };
 
+class IndexAndID {
+ public:
+  CkArrayIndex4D idx;
+  CkArrayID id;
+  IndexAndID(CkArrayIndex4D *_idx, CkArrayID _id) 
+    {
+      idx=*_idx;
+      id=_id;
+    }
+  void dump()
+    {
+      CkPrintf("id %d, w %d x %d y %d z %d\n",id,idx.index[0],idx.index[1],idx.index[2],idx.index[3]);
+    }
+  IndexAndID()
+    {
+    };
+};
+
 class PairCalcReducer : public Group {
  public:
   PairCalcReducer(CkMigrateMessage *m) { }
@@ -173,9 +207,11 @@ class PairCalcReducer : public Group {
     }
   void broadcastEntireResult(int size, double* matrix, bool symmtype);
   void broadcastEntireResult(int size, double* matrix1, double* matrix2, bool symmtype);
-  void doRegister(PairCalculator *elem, bool symmtype){
+  void doRegister(IndexAndID *elem, bool symmtype){
     numRegistered[symmtype]++;
-    localElements[symmtype].push_back(elem);
+    CkPrintf("registered :");
+    elem->dump();
+    localElements[symmtype].push_back(*elem);
   }
 
   void acceptContribute(int size, double* matrix, CkCallback cb, bool isAllReduce, bool symmtype);
@@ -183,7 +219,7 @@ class PairCalcReducer : public Group {
   void startMachineReduction();
 
  private:
-  CkVec<PairCalculator *> localElements[2];
+  CkVec<IndexAndID> localElements[2];
   int numRegistered[2];
   int acceptCount;
   int reduction_elementCount;

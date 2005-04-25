@@ -216,7 +216,7 @@ void finishPairCalc(PairCalcID* pcid, int n, double *ptr) {
 
 void finishPairCalc2(PairCalcID* pcid, int n, double *ptr1, double *ptr2) {
 #ifdef _PAIRCALC_DEBUG_
-  CkPrintf("     Calc Finish\n");
+  CkPrintf("     Calc Finish 2\n");
 #endif
 
   CkGroupID pairCalcReducerID = (CkArrayID)pcid->Gid; 
