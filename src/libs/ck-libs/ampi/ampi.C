@@ -374,6 +374,20 @@ static void ampiNodeInit(void)
   nodeinit_has_been_called=1;
 }
 
+#if PRINT_IDLE
+static double totalidle=0.0, startT=0.0;
+
+static void BeginIdle(void *dummy,double curWallTime)
+{
+  startT = curWallTime;
+}
+
+static void EndIdle(void *dummy,double curWallTime)
+{
+  totalidle += curWallTime - startT;
+}
+#endif
+
 static void ampiProcInit(void){
   CtvInitialize(ampiParent*, ampiPtr);
   CtvInitialize(int,ampiInitDone);
@@ -387,6 +401,10 @@ static void ampiProcInit(void){
   if(CkpvAccess(argvExtracted)==0){
     enableStreaming=CmiGetArgFlagDesc(argv,"+ampi_streaming","Enable streaming comlib for ampi send/recv.");
   }
+#endif
+#if PRINT_IDLE
+  CcdCallOnConditionKeep(CcdPROCESSOR_BEGIN_IDLE,(CcdVoidFn)BeginIdle,NULL);
+  CcdCallOnConditionKeep(CcdPROCESSOR_BEGIN_BUSY,(CcdVoidFn)EndIdle,NULL);
 #endif
 }
 
@@ -491,6 +509,7 @@ static ampi *ampiInit(char **argv)
 #if AMPI_COMLIB
         arr=CProxy_ampi::ckNew(parent,worldComm,ciStreaming,ciBcast,ciAllgather,ciAlltoall,opts);
 #else
+	//opts.setAnytimeMigration(0);
         arr=CProxy_ampi::ckNew(parent,worldComm,opts);
 #endif
 
@@ -1659,6 +1678,18 @@ CDECL void AMPI_Migrate(void)
 #endif
 }
 
+CDECL void AMPI_Migrateto(int destPE)
+{
+  AMPIAPI("AMPI_MigrateTo");
+#if CMK_BLUEGENE_CHARM
+  TRACE_BG_AMPI_SUSPEND();
+#endif
+  TCHARM_Migrate_to(destPE);
+#if CMK_BLUEGENE_CHARM
+  TRACE_BG_AMPI_START(getAmpiInstance(MPI_COMM_WORLD)->getThread(), "AMPI_MIGRATETO")
+#endif
+}
+
 CDECL void AMPI_Async_Migrate(void)
 {
   AMPIAPI("AMPI_Async_Migrate");
@@ -1778,6 +1809,9 @@ CDECL
 int AMPI_Finalize(void)
 {
   AMPIAPI("AMPI_Finalize");
+#if PRINT_IDLE
+  CkPrintf("[%d] Idle time %fs.\n", CkMyPe(), totalidle);
+#endif
 #if AMPI_COUNTER
     getAmpiParent()->counters.output(getAmpiInstance(MPI_COMM_WORLD)->getRank(MPI_COMM_WORLD));
 #endif
