@@ -25,6 +25,7 @@ Date: 04/19/2005
 
 #define _lb_debug_on 0
 #define _lb_debug2_on 1
+#define _make_new_grouping_ 1
 
 CreateLBFunc_Def(TopoLB,"TopoLB: Balance objects based on the network topology");
 
@@ -394,7 +395,7 @@ void TopoLB::initDataStructures(CentralLB::LDStats *stats,int count,int *newmap)
     hopBytes[i][count]=hbminIndex;
     hopBytes[i][count+1]=hbtotal/count;
   }
-
+  
   if(_lb_debug_on)
     CkPrintf("Before initing pfree cfree assign\n");
   //Init pfree, cfree, assign
@@ -452,8 +453,15 @@ void TopoLB :: work(CentralLB::LDStats *stats,int count)
     CkPrintf("before computing partitions...\n");
   
   int *newmap = new int[stats->n_objs];
-  computePartitions(stats,count,newmap);
-
+  if(_make_new_grouping_)
+    computePartitions(stats,count,newmap);
+  else
+  {
+    for(int i=0;i<stats->n_objs;i++)
+    {
+      newmap[i]=stats->from_proc[i];
+    }
+  }
   /***************** Fill Data Structures *************************/
   if(_lb_debug_on)
     CkPrintf("before allocating dataStructures...\n");
@@ -514,6 +522,22 @@ void TopoLB :: work(CentralLB::LDStats *stats,int count)
     CmiAssert(assign[part_index]==-1);
     CmiAssert(pfree[proc_index]);
     assign[part_index]=proc_index;
+
+    if(i==0)
+    {
+      double  maxComm=-1;
+      int maxCommIndex=-1;
+      for(int l=0;l<count;l++)
+      {
+        if(commUA[l]>maxComm)
+        {
+          maxComm=commUA[l];
+          maxCommIndex=l;
+        }
+      }
+      CkPrintf("Max communicating : %d\n",maxCommIndex);
+      CkPrintf("First selection   : %d\n",part_index);
+    }
 
     //CkPrintf("assign[%d]=%d\n",part_index,proc_index);
     if(_lb_debug2_on)
