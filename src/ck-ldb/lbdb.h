@@ -13,8 +13,9 @@
 #ifndef LBDBH_H
 #define LBDBH_H
 
-#include <converse.h>
-#include <charm.h>
+#include "converse.h"
+#include "charm.h"
+#include "middle.h"
 
 #ifdef __cplusplus
 extern "C" {
