@@ -30,6 +30,7 @@ class TopoLB : public CentralLB
     bool *pfree;
     bool *cfree;
     int *assign;
+    double total_comm;
     
     void computePartitions(CentralLB::LDStats *stats,int count,int *newmap);
     void allocateDataStructures(int num_procs);

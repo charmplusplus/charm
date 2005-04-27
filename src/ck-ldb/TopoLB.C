@@ -376,6 +376,30 @@ void TopoLB::initDataStructures(CentralLB::LDStats *stats,int count,int *newmap)
     }
   }
 
+  /******Avg degree test *******/
+  total_comm=0;
+  if(_lb_debug2_on)
+  {
+    int avg_degree=0;
+    for(int i=0;i<count;i++)
+    {
+      double comm_i_total=0;
+      for(int j=0;j<count;j++)
+      {
+        //Just a test
+        //comm[i][j]=(rand()%10 ==0);
+        //comm[i][j]=(dist[i][j]>count/4);
+        avg_degree+=(comm[i][j]>0);
+        total_comm+=comm[i][j];
+        comm_i_total+=comm[i][j];
+      }
+      //Just a test
+      //commUA[i]=comm_i_total;
+    }
+    CkPrintf("Avg degree (%d nodes) : %d\n",count,avg_degree/count);
+  }
+  /***************************/
+
   //Init hopBytes
   //hopBytes[i][j]=hopBytes if partition i is placed at proc j
   if(_lb_debug_on)
@@ -388,6 +412,8 @@ void TopoLB::initDataStructures(CentralLB::LDStats *stats,int count,int *newmap)
     {
       //Initialize by (total comm of i)*(avg dist from j);
       hopBytes[i][j]=commUA[i]*dist[j][count];
+      //Just a test
+      //hopBytes[i][j]=0;
       hbtotal+=hopBytes[i][j];
       if(hopBytes[i][hbminIndex]>hopBytes[i][j])
         hbminIndex=j;
@@ -599,6 +625,8 @@ void TopoLB :: work(CentralLB::LDStats *stats,int count)
         */
 
         hopBytes[cpart][proc]+=(c1-c2)*distnew[proc]+c2*dist[proc][proc_index]-c1*dist[proc][count];
+        //Just a test
+        //hopBytes[cpart][proc]+=c2*dist[proc][proc_index];
         h_updated=hopBytes[cpart][proc];
         
         //CkPrintf("Here2 hopBytes[%d][%d] = %lf  procs_left=%d\n",cpart,proc,hopBytes[cpart][proc],procs_left);
@@ -616,20 +644,6 @@ void TopoLB :: work(CentralLB::LDStats *stats,int count)
       hopBytes[cpart][count]=h_minindex;
       //CmiAssert(hbmin!=-1);
       hopBytes[cpart][count+1]=hbtotal/(procs_left);
-      /*
-      if(!pfree[(int)hopBytes[cpart][count]])
-      {
-        CkPrintf("Procs left : %d\n",procs_left);
-        CkPrintf("pfree[%d]=%d\n",(int)hopBytes[cpart][count],pfree[(int)hopBytes[cpart][count]]);
-        CkPrintf("assign[%d]=%d\n",part_index,proc_index);
-        CkPrintf("Failed because assigning %d to %d\n",cpart, (int)hopBytes[cpart][count]);
-        for(int k=0;k<count;k++,CkPrintf("%d ",pfree[k]));
-        CkPrintf("\n");
-        
-        //printDataStructures(count, stats->n_objs,newmap);
-        CmiAbort("Assigning already assigned proc!\n");
-      }
-      */
     }
 
     // d[j][count] is the average dist of proc j to unassigned procs
@@ -653,8 +667,10 @@ void TopoLB :: work(CentralLB::LDStats *stats,int count)
 
   if(_lb_debug2_on)
   {
-    CkPrintf(" Original   hopBytes : %lf\n", getHopBytes(stats,count,stats->from_proc));
-    CkPrintf(" Resulting  hopBytes : %lf\n", getHopBytes(stats,count,stats->to_proc));
+    double hbval=getHopBytes(stats,count,stats->from_proc);
+    CkPrintf(" Original   hopBytes : %lf  Avg comm hops: %lf\n", hbval,hbval/total_comm);
+    hbval=getHopBytes(stats,count,stats->to_proc);
+    CkPrintf(" Resulting  hopBytes : %lf  Avg comm hops: %lf\n", hbval,hbval/total_comm);
     /*
     for(int trials=0;trials<10;trials++)
     {
