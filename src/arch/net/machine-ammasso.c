@@ -1844,12 +1844,12 @@ void AsynchronousEventHandler(cc_rnic_handle_t rnic, cc_event_record_t *er, void
 	}
 	*/
 
-        priv = (PrivateData*)((char*)er->event_data.connection_request.private_data - 4);
+        priv = (PrivateData*)((char*)er->event_data.active_connect_results.private_data);
 
         { int j;
-	  MACHSTATE2(3, "                                      private_data = %p, priv = %p", er->event_data.connection_request.private_data, priv);
+	  MACHSTATE2(3, "                                      private_data = %p, priv = %p", er->event_data.active_connect_results.private_data, priv);
           for (j = 0; j < 16; j++) {
-            MACHSTATE3(3, "                                      private_data[%d] = %02X (priv:%02X)", j, ((char*)(er->event_data.connection_request.private_data))[j], ((char*)priv)[j]);
+            MACHSTATE3(3, "                                      private_data[%d] = %02X (priv:%02X)", j, ((char*)(er->event_data.active_connect_results.private_data))[j], ((char*)priv)[j]);
 	  }
 	}
 
