@@ -181,6 +181,8 @@ void _loadbalancerInit()
   // now called in cldb.c: CldModuleGeneralInit()
   // registerLBTopos();
   CmiGetArgStringDesc(argv, "+LBTopo", &_lbtopo, "define load balancing topology");
+  //Read the K parameter for RefineKLB
+  CmiGetArgIntDesc(argv, "+LBNumMoves", &_lb_args.percentMovesAllowed() , "Percentage of chares to be moved (used by RefineKLB) [0-100]");
 
   /**************** FUTURE PREDICTOR ****************/
   _lb_predict = CmiGetArgFlagDesc(argv, "+LBPredictor", "Turn on LB future predictor");

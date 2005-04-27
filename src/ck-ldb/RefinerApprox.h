@@ -17,7 +17,7 @@ public:
     overLoad = _overload; computes=0; processors=0; 
   };
   ~RefinerApprox() {};
-  void Refine(int count, CentralLB::LDStats* stats, int* cur_p, int* new_p);
+  void Refine(int count, CentralLB::LDStats* stats, int* cur_p, int* new_p, int percentMoves=100);
 
 protected:
   void create(int count, CentralLB::LDStats* stats, int* cur_p);

@@ -669,7 +669,7 @@ int RefinerApprox::numMoves()
 }
 
 void RefinerApprox::Refine(int count, CentralLB::LDStats* stats, 
-		     int* cur_p, int* new_p)
+		     int* cur_p, int* new_p, int percentMoves)
 {
     
   if(_lb_debug) CkPrintf("\n\n");
@@ -711,7 +711,20 @@ void RefinerApprox::Refine(int count, CentralLB::LDStats* stats,
   if(_lb_debug) CkPrintf("Avearge load : %lf\n",averageLoad);
   if(_lb_debug) printStats(0);
 
-  multirefine(numComputes);
+ 
+  int numAllowedMoves=(int)(percentMoves*numComputes/100.0);
+  if(numAllowedMoves<0)
+    numAllowedMoves=0;
+  if(numAllowedMoves>numComputes)
+    numAllowedMoves=numComputes;
+
+  if(_lb_args.debug())
+  {
+    CkPrintf("Percent of allowed moves = %d\n",percentMoves);
+    CkPrintf("Number of allowed moves = %d\n",numAllowedMoves);
+  }
+  //multirefine(numComputes);
+  multirefine(numAllowedMoves);
 
   int nmoves = 0;
 

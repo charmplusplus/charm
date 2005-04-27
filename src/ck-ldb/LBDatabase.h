@@ -36,6 +36,7 @@ private:
   int _lb_version;		// data file version
   double _lb_alpha;		// per message send overhead
   double _lb_beeta;		// per byte send overhead
+  int _lb_percentMovesAllowed; //Specifies restriction on num of chares to be moved(as a percentage of total number of chares). Used by RefineKLB
 public:
   CkLBArgs() {
     _autoLbPeriod = 0.5;	// 0.5 second default
@@ -43,6 +44,7 @@ public:
     _lb_printsumamry = _lb_migObjOnly = 0;
     _lb_statson = _lb_traceComm = 1;
     _lb_version = LB_FORMAT_VERSION;
+    _lb_percentMovesAllowed=100;
   }
   inline double & lbperiod() { return _autoLbPeriod; }
   inline int & debug() { return _lb_debug; }
@@ -57,6 +59,7 @@ public:
   inline int & traceComm() { return _lb_traceComm; }
   inline double & alpha() { return _lb_alpha; }
   inline double & beeta() { return _lb_beeta; }
+  inline int & percentMovesAllowed() { return _lb_percentMovesAllowed;}
 };
 
 extern CkLBArgs _lb_args;

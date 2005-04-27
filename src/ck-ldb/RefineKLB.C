@@ -33,7 +33,6 @@ void RefineKLB::work(BaseLB::LDStats* stats, int count)
   // RemoveNonMigratable(stats, count);
 
   // get original object mapping
-  //int* from_procs = Refiner::AllocProcs(count, stats);
   int* from_procs = RefinerApprox::AllocProcs(count, stats);
   for(obj=0;obj<stats->n_objs;obj++)  {
     int pe = stats->from_proc[obj];
@@ -41,13 +40,11 @@ void RefineKLB::work(BaseLB::LDStats* stats, int count)
   }
 
   // Get a new buffer to refine into
-  //int* to_procs = Refiner::AllocProcs(count,stats);
   int* to_procs = RefinerApprox::AllocProcs(count,stats);
 
-  //Refiner refiner(1.003);  // overload tolerance=1.05
   RefinerApprox refiner(1.003);  // overload tolerance=1.05
 
-  refiner.Refine(count,stats,from_procs,to_procs);
+  refiner.Refine(count,stats,from_procs,to_procs,_lb_args.percentMovesAllowed());
 
   // Save output
   for(obj=0;obj<stats->n_objs;obj++) {
@@ -60,8 +57,6 @@ void RefineKLB::work(BaseLB::LDStats* stats, int count)
   }
 
   // Free the refine buffers
-  //Refiner::FreeProcs(from_procs);
-  //Refiner::FreeProcs(to_procs);
   RefinerApprox::FreeProcs(from_procs);
   RefinerApprox::FreeProcs(to_procs);
 };
