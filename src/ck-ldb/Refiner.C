@@ -263,7 +263,7 @@ int Refiner::multirefine()
   double dMaxOverload = maxOverload * overloadStep + overloadStart;
   int curOverload;
   int refineDone = 0;
-  if (_lb_args.debug()>1)
+  if (_lb_args.debug()>=1)
     CmiPrintf("dMinOverload: %f dMaxOverload: %f\n", dMinOverload, dMaxOverload);
                                                                                 
   overLoad = dMinOverload;
@@ -285,7 +285,7 @@ int Refiner::multirefine()
       curOverload = (maxOverload + minOverload ) / 2;
                                                                                 
       overLoad = curOverload * overloadStep + overloadStart;
-      if (_lb_args.debug()>1)
+      if (_lb_args.debug()>=1)
       CmiPrintf("Testing curOverload %d = %f [min,max]= %d, %d\n", curOverload, overLoad, minOverload, maxOverload);
       if (refine())
         maxOverload = curOverload;
