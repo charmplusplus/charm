@@ -3739,7 +3739,7 @@ public_mALLOPt(int p, int v)
 }
 
 #ifndef CMK_OPTIMIZE
-extern int memory_allocated;
+extern unsigned int memory_allocated;
 #endif
 
 /*

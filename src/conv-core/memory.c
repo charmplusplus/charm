@@ -45,7 +45,7 @@
 #endif
 
 #ifndef CMK_OPTIMIZE
-int memory_allocated = 0;
+unsigned int memory_allocated = 0;
 #endif
 
 /*Rank of the processor that's currently holding the CmiMemLock,
