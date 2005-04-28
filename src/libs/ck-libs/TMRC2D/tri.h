@@ -15,8 +15,8 @@
 #include "messages.h"
 #include "mpi.h"
 
-//#define DEBUGREF(x) x
-#define DEBUGREF(x) 
+#define DEBUGREF(x) x
+//#define DEBUGREF(x) 
 
 // ------------------------ Global Read-only Data ---------------------------
 extern CProxy_chunk mesh;
