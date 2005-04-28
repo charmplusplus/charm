@@ -14,11 +14,10 @@ int main(int argc, char **argv)
   int my_id;		/* process id */
   int p;		/* number of processes */
   char* message_s, *message_r;	/* storage for the message */
-  int i, j, max_msgs, msg_size;
+  int i, max_msgs, msg_size;
   MPI_Status status;	/* return status for receive */
   double elapsed_time_sec;
   double bandwidth;
-  int plen = 128;
   double startTime = 0;
   
   MPI_Init( &argc, &argv );
@@ -45,8 +44,7 @@ int main(int argc, char **argv)
 #endif
     
     for(i=0; i<max_msgs; i++){
-      for(j=0;j<plen;j++)
-        MPI_Send(message_s, msg_size, MPI_CHAR, my_id+p/2, 0+j, MPI_COMM_WORLD);
+      MPI_Send(message_s, msg_size, MPI_CHAR, my_id+p/2, 0, MPI_COMM_WORLD);
       MPI_Recv(message_r, msg_size, MPI_CHAR, my_id+p/2, 0, MPI_COMM_WORLD, 
 	       &status); 
     }
@@ -58,7 +56,7 @@ int main(int argc, char **argv)
     AMPI_Uninstall_Idle_Timer();
 #endif
     fprintf(stdout, "Totaltime: %8.3f s\n",elapsed_time_sec);
-    elapsed_time_sec /= plen+1;  //We want the ping performance not round-trip.
+    elapsed_time_sec /= 2;  //We want the ping performance not round-trip.
     elapsed_time_sec /= max_msgs; //time for each message
     bandwidth = msg_size / elapsed_time_sec; //bandwidth
     
@@ -72,8 +70,7 @@ int main(int argc, char **argv)
     AMPI_Install_Idle_Timer();
 #endif
     for(i=0; i<max_msgs; i++){
-      for(j=0;j<plen;j++)
-        MPI_Recv(message_r, msg_size, MPI_CHAR, my_id-p/2, 0+j, MPI_COMM_WORLD, 
+      MPI_Recv(message_r, msg_size, MPI_CHAR, my_id-p/2, 0, MPI_COMM_WORLD, 
 	       &status); 
       MPI_Send(message_s, msg_size, MPI_CHAR, my_id-p/2, 0, MPI_COMM_WORLD);
     }
@@ -82,8 +79,7 @@ int main(int argc, char **argv)
 #ifdef AMPI
     AMPI_Uninstall_Idle_Timer();
 #endif
-  }
-	    
+  }	    
   
   free(message_s);
   free(message_r);

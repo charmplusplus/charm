@@ -18,21 +18,13 @@ int main(int argc, char **argv)
   MPI_Status status;	/* return status for receive */
   double elapsed_time_sec;
   double bandwidth;
-
   double startTime = 0;
-  
-  printf("Starting benchmark\n\n");
   
   MPI_Init( &argc, &argv );
   
   MPI_Comm_rank( MPI_COMM_WORLD, &my_id );
   MPI_Comm_size( MPI_COMM_WORLD, &p );
   
-  if (argc < 3) {
-    fprintf (stderr, "need iterations and msg size as params\n");
-    goto EXIT;
-  }
-
   if ((sscanf (argv[1], "%d", &max_msgs) < 1) ||
       (sscanf (argv[2], "%d", &msg_size) < 1)) {
     fprintf (stderr, "need msg count and msg size as params\n");
@@ -47,16 +39,24 @@ int main(int argc, char **argv)
   
   if( my_id < p/2 ) {
     startTime = MPI_Wtime();
+#ifdef AMPI
+    AMPI_Install_Idle_Timer();
+#endif
     
+    MPI_Send(message_s, msg_size, MPI_CHAR, my_id+p/2, 0, MPI_COMM_WORLD);
     for(i=0; i<max_msgs; i++){
-      MPI_Send(message_s, msg_size, MPI_CHAR, my_id+p/2, 0, MPI_COMM_WORLD);
       MPI_Recv(message_r, msg_size, MPI_CHAR, my_id+p/2, 0, MPI_COMM_WORLD, 
 	       &status); 
+      MPI_Send(message_s, msg_size, MPI_CHAR, my_id+p/2, 0, MPI_COMM_WORLD);
     }
     
     MPI_Barrier(MPI_COMM_WORLD); 
 
     elapsed_time_sec = MPI_Wtime() - startTime; 
+#ifdef AMPI
+    AMPI_Uninstall_Idle_Timer();
+#endif
+    fprintf(stdout, "Totaltime: %8.6f s\n",elapsed_time_sec);
     elapsed_time_sec /= 2;  //We want the ping performance not round-trip.
     elapsed_time_sec /= max_msgs; //time for each message
     bandwidth = msg_size / elapsed_time_sec; //bandwidth
@@ -67,6 +67,10 @@ int main(int argc, char **argv)
     
   }
   else {
+#ifdef AMPI
+    AMPI_Install_Idle_Timer();
+#endif
+    MPI_Send(message_s, msg_size, MPI_CHAR, my_id-p/2, 0, MPI_COMM_WORLD);
     for(i=0; i<max_msgs; i++){
       MPI_Recv(message_r, msg_size, MPI_CHAR, my_id-p/2, 0, MPI_COMM_WORLD, 
 	       &status); 
@@ -74,6 +78,9 @@ int main(int argc, char **argv)
     }
     
     MPI_Barrier(MPI_COMM_WORLD); 
+#ifdef AMPI
+    AMPI_Uninstall_Idle_Timer();
+#endif
   }	    
   
   free(message_s);
