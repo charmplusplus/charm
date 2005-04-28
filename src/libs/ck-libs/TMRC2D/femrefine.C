@@ -82,6 +82,11 @@ void FEM_REFINE2D_Newmesh(int meshID,int nodeID,int elemID,int nodeBoundary){
   
   if(nodeBoundary){
     FEM_Mesh_data(meshID,nodeID,FEM_BOUNDARY,tempBoundaries,0,nnodes,FEM_INT,1);
+		printf("NODE BOUNDARIES-------------\n");
+		for(int i=0;i<nnodes;i++){
+			printf("%d %d \n",i,tempBoundaries[i]);
+		}
+		printf("------------------------\n");
   }
   
   /*Set up refinement framework*/
