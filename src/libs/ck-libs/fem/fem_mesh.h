@@ -1267,19 +1267,69 @@ class FEM_Mesh : public CkNoncopyable {
   //********* Element-to-node: preserve initial ordering
   /// Place all of element e's adjacent nodes in adjnodes; assumes
   /// adjnodes allocated to correct size
-  void e2n_getAll(int e, int *adjnodes) {}
+  void e2n_getAll(int e, int *adjnodes) {
+    FEM_Elem &elems = setElem(1);
+    FEM_IndexAttribute *eConn = 
+      (FEM_IndexAttribute *)elems.lookup(FEM_CONN, "e2n_getAll");
+    AllocTable2d<int> &conn = eConn->get();
+    for (int i=0; i<conn.width(); i++) {
+      adjnodes[i] = conn[e][i];
+    }
+  }
   /// Given id of element e, return the id of the idx-th adjacent node
-  int e2n_getNode(int e, short idx) { return -1; }
+  int e2n_getNode(int e, short idx) { 
+    FEM_Elem &elems = setElem(1);
+    FEM_IndexAttribute *eConn = 
+      (FEM_IndexAttribute *)elems.lookup(FEM_CONN, "e2n_getAll");
+    AllocTable2d<int> &conn = eConn->get();
+    return conn[e][idx];
+  }
   /// Given id of element e and id of a node n, return i such that
   /// n is the i-th node adjacent to e
-  short e2n_getIndex(int e, int n) { return -1; }
+  short e2n_getIndex(int e, int n) { 
+    FEM_Elem &elems = setElem(1);
+    FEM_IndexAttribute *eConn = 
+      (FEM_IndexAttribute *)elems.lookup(FEM_CONN, "e2n_getAll");
+    AllocTable2d<int> &conn = eConn->get();
+    for (int i=0; i<conn.width(); i++) {
+      if (conn[e][i] == n) {
+	return i;
+      }
+    }
+    return -1;
+  }
   /// Set the node adjacencies of element e to adjnodes; assumes adjnodes 
   /// has the correct size
-  void e2n_setAll(int e, int *adjnodes) {}
+  void e2n_setAll(int e, int *adjnodes) {
+    FEM_Elem &elems = setElem(1);
+    FEM_IndexAttribute *eConn = 
+      (FEM_IndexAttribute *)elems.lookup(FEM_CONN, "e2n_getAll");
+    AllocTable2d<int> &conn = eConn->get();
+    for (int i=0; i<conn.width(); i++) {
+      conn[e][i] = adjnodes[i];
+    }
+  }
   /// Set the idx-th node adjacent to e to be newNode
-  void e2n_setIndex(int e, short idx, int newNode) {}
+  void e2n_setIndex(int e, short idx, int newNode) {
+    FEM_Elem &elems = setElem(1);
+    FEM_IndexAttribute *eConn = 
+      (FEM_IndexAttribute *)elems.lookup(FEM_CONN, "e2n_getAll");
+    AllocTable2d<int> &conn = eConn->get();
+    conn[e][idx] = newNode;
+  }
   /// Find node oldNode in e's adjacent ndoes and replace with newNode
-  void e2n_replace(int e, int oldNode, int newNode) {}
+  void e2n_replace(int e, int oldNode, int newNode) {
+    FEM_Elem &elems = setElem(1);
+    FEM_IndexAttribute *eConn = 
+      (FEM_IndexAttribute *)elems.lookup(FEM_CONN, "e2n_getAll");
+    AllocTable2d<int> &conn = eConn->get();
+    for (int i=0; i<conn.width(); i++) {
+      if (conn[e][i] == oldNode) {
+	conn[e][i] = newNode;
+	break;
+      }
+    }
+  }
 
   //********* Node-to-node
   /// Place all of node n's adjacent nodes in adjnodes and the resulting 
