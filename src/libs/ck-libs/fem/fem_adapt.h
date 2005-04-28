@@ -79,6 +79,9 @@ class FEM_Adapt {
   virtual int vertex_split(int n, int n1, int n2);
   virtual int vertex_split(int n, int n1, int n2, int e1, int e3);
   
+  // SINCE THIS USES THE MARKED VERTEX BISECTION ALGORITHM, IT IS A SPECIAL
+  // PURPOSE METHOD FOR CPSD.  THIS SHOULD MOVE UP INTO THE CPSD INTERFACE
+  // AS SHOULD THE MARKING OPERATIONS IN FEM_Mesh.
   /// Perform a propagating bisection of element e1 according to marked nodes
   /** Given and element e1, determined n, e1's marked node, and bisect
       the edge opposite to n, propagating and bisecting the

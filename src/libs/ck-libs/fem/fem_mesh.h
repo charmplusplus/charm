@@ -1169,10 +1169,7 @@ class FEM_Mesh : public CkNoncopyable {
   FEM_ElemAdj_Layer *addElemAdjLayer(void);
   FEM_ElemAdj_Layer *curElemAdjLayer(void);
   
-  // Terry'd mesh accessors & modifiers: NOTE - ALL VOID FOR NOW
-  /// Get an element on edge (n1, n2) where n1, n2 are chunk-local
-  /// node numberings; return -1 in case of failure
-  int getElementOnEdge(int n1, int n2) { return -1; }
+  // Terry's mesh accessors & modifiers
 
   /// Add a new node to the mesh, return the chunk-local numbering; -1 failure.
   int newNode() { return -1; }
@@ -1436,6 +1433,24 @@ class FEM_Mesh : public CkNoncopyable {
 	break;
       }
     }
+  }
+
+  /// Get an element on edge (n1, n2) where n1, n2 are chunk-local
+  /// node numberings; return -1 in case of failure
+  int getElementOnEdge(int n1, int n2) { 
+    int *n1AdjElems, *n2AdjElems;
+    int n1NumElems, n2NumElems;
+    n2e_getAll(n1, n1AdjElems, &n1NumElems);
+    n2e_getAll(n2, n2AdjElems, &n2NumElems);
+    for (int i=0; i<n1NumElems; i++) {
+      for (int j=0; j<n2NumElems; j++) {
+	if (n1AdjElems[i] == n2AdjElems[j]) {
+	  return n1AdjElems[i]; 
+	  break;
+	}
+      }
+    }
+    return -1; 
   }
 }; 
 PUPmarshall(FEM_Mesh);
