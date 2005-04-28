@@ -69,7 +69,7 @@ static int   maxQueueLength = 0;	/* maximum send queue length */
 
 
 /* max length of pending messages */
-#define MAXPENDINGSEND  300
+#define MAXPENDINGSEND  500
 
 typedef struct PendingMsgStruct
 {
