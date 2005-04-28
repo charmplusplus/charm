@@ -762,6 +762,7 @@ void chunk::newMesh(int meshID_,int nEl, int nGhost, const int *conn_,
   MPI_Barrier(MPI_COMM_WORLD);
   // derive edges from elements on this chunk
   if (boundaries) {
+    numNodes = nnodes;
     CkPrintf("TMRC2D: [%d] Received non-NULL boundaries... adding...\n", cid);
     for (i=0; i<numNodes; i++) {
       theNodes[i].boundary = boundaries[i];
