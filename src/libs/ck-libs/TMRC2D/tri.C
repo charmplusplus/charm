@@ -884,7 +884,6 @@ void chunk::deriveNodes()
       if ((aNode + 1) > numNodes)
 	numNodes = aNode + 1;
       theNodes[aNode].present = 1;
-      theNodes[aNode].boundary = 0;
     }
   }
   DEBUGREF(CkPrintf("TMRC2D: [%d] NumNodes = %d; max node idx = %d\n", cid, numNodes, numNodes-1);)
