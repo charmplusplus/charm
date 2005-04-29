@@ -143,24 +143,14 @@ void RefineTopoLB :: work(CentralLB::LDStats *stats,int count)
       if(j==cpart)
         continue;
 
-      //Just a test
-      /*
-      int temp=assign[cpart];
-      assign[cpart]=assign[j];
-      assign[j]=temp;
-      gain=orig_value-getInterMedHopBytes(stats,count,newmap);
-      assign[j]=assign[cpart];
-      assign[cpart]=temp;
-      */
-      
       gain=findSwapGain(j,cpart,count);
+
       //CkPrintf("%lf : %lf\n",gain,findSwapGain(j,cpart,count));
       if(gain>gainMax && gain>0)
       {
         gainMax=gain;
         swapcpart=j;
       }
-      //Just a test
     }
     if(swapcpart==-1)
     {
@@ -170,18 +160,15 @@ void RefineTopoLB :: work(CentralLB::LDStats *stats,int count)
     totalGain+=gainMax;
     CmiAssert(swapcpart!=-1);
     
-    //Just a test
-    //if(i==10)
-     // i=count;
-
     //Actually swap
     int temp=assign[cpart];
     assign[cpart]=assign[swapcpart];
     assign[swapcpart]=temp;
     swapdone[cpart]=true;
-  //  CkPrintf("Gain: %lf  Total_Gain: %lf HopBytes: %lf\n ",gainMax,totalGain,getInterMedHopBytes(stats,count,newmap));
- //   CkPrintf(" %lf  getInterMedHopBytes(stats,count,newmap);
-//    CkPrintf("Swap# %d:  %d and %d\n",i+1,cpart,swapcpart);
+  
+    //CkPrintf("Gain: %lf  Total_Gain: %lf HopBytes: %lf\n ",gainMax,totalGain,getInterMedHopBytes(stats,count,newmap));
+    //CkPrintf(" %lf  getInterMedHopBytes(stats,count,newmap);
+    //CkPrintf("Swap# %d:  %d and %d\n",i+1,cpart,swapcpart);
   }
   /******************* Assign mapping and print Stats*********/
   for(int i=0;i<stats->n_objs;i++)
@@ -205,31 +192,22 @@ void RefineTopoLB :: work(CentralLB::LDStats *stats,int count)
 double RefineTopoLB::findSwapGain(int cpart1, int cpart2,int count)
 {
   double oldvalue=0;
-  for(int i=0;i<count;i++)
-  {
-    oldvalue+=comm[cpart1][i]*dist[assign[cpart1]][assign[i]];
-    oldvalue+=comm[cpart2][i]*dist[assign[cpart2]][assign[i]];
-  }
-
-  int temp=assign[cpart1];
-  assign[cpart1]=assign[cpart2];
-  assign[cpart2]=temp;
+  int proc1=assign[cpart1];
+  int proc2=assign[cpart2];
+  int proci=-1;
 
   for(int i=0;i<count;i++)
   {
-    oldvalue-=comm[cpart1][i]*dist[assign[cpart1]][assign[i]];
-    oldvalue-=comm[cpart2][i]*dist[assign[cpart2]][assign[i]];
+    proci=assign[i];
+    if(i!=cpart1 && i!=cpart2)
+    {
+      //oldvalue+=comm[cpart1][i]*(dist[proc1][proci]-dist[proc2][proci]);
+      //oldvalue+=comm[cpart2][i]*(dist[proc2][proci]-dist[proc1][proci]);
+      oldvalue+=(comm[cpart1][i]-comm[cpart2][i])*(dist[proc1][proci]-dist[proc2][proci]);
+      
+    }
   }
-
-  assign[cpart2]=assign[cpart1];
-  assign[cpart1]=temp;
   return oldvalue;
-  
-  double old1=getCpartHopBytes(cpart1,assign[cpart1],count);
-  double old2=getCpartHopBytes(cpart2,assign[cpart2],count);
-  double new1=getCpartHopBytes(cpart1,assign[cpart2],count);
-  double new2=getCpartHopBytes(cpart2,assign[cpart1],count);
-  return(old1-new1+old2-new2);
 }
 
 double RefineTopoLB::getCpartHopBytes(int cpart, int proc, int count)

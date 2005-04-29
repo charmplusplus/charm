@@ -597,6 +597,13 @@ void TopoLB :: work(CentralLB::LDStats *stats,int count)
       if(!cfree[cpart]) //No need to update for assigned partitions
         continue;    
 
+      if(commUA[cpart]==0 && hopBytes[cpart][count]!=proc_index)
+      {
+        if(procs_left>1)
+          hopBytes[cpart][count+1]=(hopBytes[cpart][count+1]*(procs_left+1) - hopBytes[cpart][proc_index])/(procs_left);
+        continue;
+      }
+
       //double hbmin=INFTY;
       double hbmin=-1;
       double hbtotal=0;
@@ -661,10 +668,12 @@ void TopoLB :: work(CentralLB::LDStats *stats,int count)
   if(_lb_debug2_on)
   {
     double hbval1=getHopBytes(stats,count,stats->from_proc);
+    CkPrintf("\n");
     CkPrintf(" Original   hopBytes : %lf  Avg comm hops: %lf\n", hbval1,hbval1/total_comm);
     double hbval2=getHopBytes(stats,count,stats->to_proc);
     CkPrintf(" Resulting  hopBytes : %lf  Avg comm hops: %lf\n", hbval2,hbval2/total_comm);
     CkPrintf("Percentage gain %.2lf\n",(hbval1-hbval2)*100/hbval1);
+    CkPrintf("\n");
   }
 
   freeDataStructures(count);
