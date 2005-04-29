@@ -133,18 +133,19 @@ class resultsRefineClient : public refineClient {
   refineResults *res;
 public:
   resultsRefineClient(refineResults *res_) :res(res_) {}
-  void split(int tri, int side, int node, double frac, int newNodeID, int newElemID, int origEdgeB, int newEdge1B, int newEdge2B) {
-  #if 0
+  void split(int tri, int side, int node, double frac) {
+#if 0
     //Convert from "tri.C edges" to sensible edges
     if (side==1) side=2;
     else if (side==2) side=1;
-  #endif
+#endif
     res->add(tri, side, node, frac);
   }
-	void split(int tri, int side, int node, double frac,int flag) {
-    res->add(tri, side, node, frac,flag);
+  void split(int tri, int side, int node, double frac, int flag, 
+	     int newNodeID, int newElemID, int origEdgeB, int newEdge1B, 
+	     int newEdge2B) {
+    res->add(tri, side, node, frac, flag);
   }
-
 };
 
 class coarsenResults {

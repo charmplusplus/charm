@@ -71,7 +71,9 @@ public:
   // which side new element is added to (it moves to the new location
   // on edgeOfTri; frac indicates if this split is on the boundary and
   // if it is the first or second half of the split operation
-  virtual void split(int triNo,int edgeOfTri,int movingNode,double frac,int flag, int newNodeID, int newElemID, int origEdgeB, int newEdge1B, int newEdge2B) {};
+  virtual void split(int triNo, int edgeOfTri, int movingNode, double frac, 
+		     int flag, int newNodeID, int newElemID, int origEdgeB, 
+		     int newEdge1B, int newEdge2B) {};
   // Collapse the edge between of elemId1 between endpoints nodeToKeep
   // and nodeToDelete.  nodeToKeep's coordinates are updated to newX
   // and newY, while nodeToDelete is removed and all references to it
