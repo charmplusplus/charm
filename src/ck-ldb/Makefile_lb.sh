@@ -1,5 +1,5 @@
 #!/bin/sh
-LOADBALANCERS="DummyLB ComboCentLB RandCentLB RefineLB RefineKLB  RefineCommLB GreedyLB GreedyCommLB GreedyAgentLB GridCommLB Comm1LB OrbLB RecBisectBfLB MetisLB PhasebyArrayLB RotateLB NeighborLB NeighborCommLB WSLB HybridLB TopoLB"
+LOADBALANCERS="DummyLB ComboCentLB RandCentLB RefineLB RefineKLB  RefineCommLB GreedyLB GreedyCommLB GreedyAgentLB GridCommLB Comm1LB OrbLB RecBisectBfLB MetisLB PhasebyArrayLB RotateLB NeighborLB NeighborCommLB WSLB HybridLB TopoLB RefineTopoLB"
 
 out="Make.lb"
 

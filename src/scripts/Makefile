@@ -184,7 +184,7 @@ CKHEADERS=ck.h ckstream.h envelope.h init.h qd.h charm.h charm++.h \
 	  BaseLB.h CentralLB.h CentralLBMsg.h RandCentLB.h RecBisectBfLB.h \
 	  RefineLB.h RefineKLB.h RefineCommLB.h OrbLB.h \
 	  GreedyLB.h GreedyCommLB.h GreedyAgentLB.h Comm1LB.h MetisLB.h \
-      TopoLB.h    PhasebyArrayLB.h RotateLB.h GridCommLB.h DummyLB.h  \
+      TopoLB.h RefineTopoLB.h   PhasebyArrayLB.h RotateLB.h GridCommLB.h DummyLB.h  \
 	  NborBaseLB.h HybridBaseLB.h HybridLB.h HybridLBMsg.h \
 	  NeighborLB.h NeighborCommLB.h NeighborLBMsg.h WSLB.h \
 	  BlueGene.h middle.h middle-conv.h middle-blue.h \
@@ -197,7 +197,7 @@ CKHEADERS=ck.h ckstream.h envelope.h init.h qd.h charm.h charm++.h \
           DummyLB.decl.h RotateLB.decl.h RefineLB.decl.h RefineKLB.decl.h  \
           RefineCommLB.decl.h OrbLB.decl.h GreedyLB.decl.h GreedyCommLB.decl.h \
           Comm1LB.decl.h GreedyAgentLB.decl.h GridCommLB.decl.h \
-	  PhasebyArrayLB.decl.h TopoLB.decl.h\
+	  PhasebyArrayLB.decl.h TopoLB.decl.h RefineTopoLB.decl.h\
           NborBaseLB.decl.h NeighborLB.decl.h NeighborCommLB.decl.h \
           HybridBaseLB.decl.h HybridLB.decl.h WSLB.decl.h EveryLB.decl.h \
           charisma.decl.h TraceSummary.decl.h BlueGene.decl.h \

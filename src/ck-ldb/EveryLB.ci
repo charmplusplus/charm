@@ -21,5 +21,6 @@ module EveryLB {
    extern module WSLB;
    extern module HybridLB;
    extern module TopoLB;
+   extern module RefineTopoLB;
    initnode void initEveryLB(void);
 };
