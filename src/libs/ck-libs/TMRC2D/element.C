@@ -131,7 +131,7 @@ void element::split(int longEdge)
     int b = 0;
     if (nullNbr) b = edges[longEdge].getBoundary();
     if(C->theClient) {
-      C->theClient->split(myRef.idx,longEdge,othernode,0.5,flag,
+      C->theClient->split(myRef.idx, longEdge, othernode, 0.5, flag,
 			  m, newElem.idx, b, 0, b);
       CkPrintf("TMRC2D: [%d] theClient->split(elem=%d, edge=%d, newNode=%d, newElem=%d, bound=%d)\n", myRef.cid, myRef.idx, longEdge, m, newElem.idx, b);
     }
