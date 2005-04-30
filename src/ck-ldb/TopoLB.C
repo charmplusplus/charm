@@ -62,21 +62,22 @@ void TopoLB::freeDataStructures(int count)
 
 void TopoLB::allocateDataStructures(int count )
 {
+  int i;
   //Allocating in separate loop to have somewhat contiguous memory allocation
   hopBytes=new double*[count];
-  for(int i=0;i<count;i++)
+  for(i=0;i<count;i++)
   {
     hopBytes[i]=new double[count+2];
   }
 
   dist=new double*[count];
-  for(int i=0;i<count;i++)
+  for(i=0;i<count;i++)
   {
     dist[i]=new double[count+1];
   }
 
   comm=new double*[count];
-  for(int i=0;i<count;i++)
+  for(i=0;i<count;i++)
   {
     comm[i]=new double[count];
   }
@@ -291,12 +292,13 @@ void TopoLB::computePartitions(CentralLB::LDStats *stats,int count,int *newmap)
 
 void TopoLB::initDataStructures(CentralLB::LDStats *stats,int count,int *newmap)
 {
+  int i;
   //init dist
   if(_lb_debug_on)
     CkPrintf("Before initing dist\n");
  
   topo->get_pairwise_hop_count(dist);
-  for(int i=0;i<count;i++)
+  for(i=0;i<count;i++)
   {
     double totaldist=0;
     for(int j=0;j<count;j++)
@@ -310,7 +312,7 @@ void TopoLB::initDataStructures(CentralLB::LDStats *stats,int count,int *newmap)
   //Init comm,commUA from stats
   if(_lb_debug_on)
     CkPrintf("Before initing comm\n");
-  for(int i=0;i<count;i++)
+  for(i=0;i<count;i++)
   {
     for(int j=0;j<count;j++)
     {
@@ -319,7 +321,7 @@ void TopoLB::initDataStructures(CentralLB::LDStats *stats,int count,int *newmap)
     commUA[i]=0;
   }
   bool *multicastAdded=new bool[count];
-  for(int i=0;i<stats->n_comm;i++)
+  for(i=0;i<stats->n_comm;i++)
   {
     LDCommData &cdata=stats->commData[i];
     if(!cdata.from_proc() && cdata.receiver.get_type() ==LD_OBJ_MSG)
@@ -402,7 +404,7 @@ void TopoLB::initDataStructures(CentralLB::LDStats *stats,int count,int *newmap)
   //hopBytes[i][j]=hopBytes if partition i is placed at proc j
   if(_lb_debug_on)
     CkPrintf("Before initing hopBytes\n");
-  for(int i=0;i<count;i++)
+  for(i=0;i<count;i++)
   {
     int hbminIndex=0;
     double hbtotal=0;
@@ -423,7 +425,7 @@ void TopoLB::initDataStructures(CentralLB::LDStats *stats,int count,int *newmap)
   //Init pfree, cfree, assign
   if(_lb_debug_on)
     CkPrintf("Before initing pfree cfree assign\n");
-  for(int i=0;i<count;i++)
+  for(i=0;i<count;i++)
   {
     pfree[i]=true;
     cfree[i]=true;
@@ -433,6 +435,7 @@ void TopoLB::initDataStructures(CentralLB::LDStats *stats,int count,int *newmap)
 
 void TopoLB :: work(CentralLB::LDStats *stats,int count)
 {
+  int i, j;
   if (_lb_args.debug() >= 2) 
   {
     CkPrintf("In TopoLB Strategy...\n");
@@ -481,7 +484,7 @@ void TopoLB :: work(CentralLB::LDStats *stats,int count)
     computePartitions(stats,count,newmap);
   else
   {
-    for(int i=0;i<stats->n_objs;i++)
+    for(i=0;i<stats->n_objs;i++)
     {
       newmap[i]=stats->from_proc[i];
     }
@@ -503,7 +506,7 @@ void TopoLB :: work(CentralLB::LDStats *stats,int count)
     CkPrintf("before performing mapping...\n");
 
   double *distnew=new double[count];
-  for(int i=0;i<count;i++)
+  for(i=0;i<count;i++)
   {
     //Assume i-1 partitions placed, 
     //select and place the ith partition
@@ -585,7 +588,7 @@ void TopoLB :: work(CentralLB::LDStats *stats,int count)
 
     //Update hopBytes
     
-    for(int j=0;j<count;j++)
+    for(j=0;j<count;j++)
     {
       if(procs_left>1)
         distnew[j]=(dist[j][count]*procs_left -dist[j][proc_index]) / (procs_left-1);
@@ -648,7 +651,7 @@ void TopoLB :: work(CentralLB::LDStats *stats,int count)
 
     // d[j][count] is the average dist of proc j to unassigned procs
     // Also update commUA[j]
-    for(int j=0;j<count;j++)
+    for(j=0;j<count;j++)
     {
       if(procs_left>1)
         dist[j][count]=(dist[j][count]*procs_left -dist[j][proc_index]) / (procs_left-1);
@@ -660,7 +663,7 @@ void TopoLB :: work(CentralLB::LDStats *stats,int count)
 
   /******************  Fill out final composition Mapping **************************/
 
-  for(int i=0;i<stats->n_objs;i++)
+  for(i=0;i<stats->n_objs;i++)
   {
     stats->to_proc[i]= assign[newmap[i]];
   }
@@ -683,6 +686,7 @@ void TopoLB :: work(CentralLB::LDStats *stats,int count)
 
 void TopoLB::printDataStructures(int count,int n_objs,int *newmap)
 {
+  int i;
   /*
   CkPrintf("Partition Results : \n");
   for(int i=0;i<n_objs;i++)
@@ -692,7 +696,7 @@ void TopoLB::printDataStructures(int count,int n_objs,int *newmap)
   */
 
   CkPrintf("Dist : \n");
-  for(int i=0;i<count;i++)
+  for(i=0;i<count;i++)
   {
     for(int j=0;j<count+1;j++)
     {
@@ -701,7 +705,7 @@ void TopoLB::printDataStructures(int count,int n_objs,int *newmap)
     CkPrintf("\n");
   }
   CkPrintf("HopBytes: \n");
-  for(int i=0;i<count;i++)
+  for(i=0;i<count;i++)
   {
     for(int j=0;j<count+2;j++)
     {
@@ -712,11 +716,12 @@ void TopoLB::printDataStructures(int count,int n_objs,int *newmap)
 }
 double TopoLB::getHopBytes(CentralLB::LDStats *stats,int count,CkVec<int>map)
 {
+  int i;
   double **comm1=new double*[count];
-  for(int i=0;i<count;i++)
+  for(i=0;i<count;i++)
     comm1[i]=new double[count];
 
-  for(int i=0;i<count;i++)
+  for(i=0;i<count;i++)
   {
     for(int j=0;j<count;j++)
     {
@@ -725,7 +730,7 @@ double TopoLB::getHopBytes(CentralLB::LDStats *stats,int count,CkVec<int>map)
   }
 
   bool *multicastAdded=new bool[count];
-  for(int i=0;i<stats->n_comm;i++)
+  for(i=0;i<stats->n_comm;i++)
   {
     LDCommData &cdata=stats->commData[i];
     if(!cdata.from_proc() && cdata.receiver.get_type() ==LD_OBJ_MSG)
@@ -753,7 +758,7 @@ double TopoLB::getHopBytes(CentralLB::LDStats *stats,int count,CkVec<int>map)
       
       CmiAssert(sender<stats->n_objs);
 
-      for(int i=0;i<count;i++)
+      for(i=0;i<count;i++)
         multicastAdded[i]=false;
       multicastAdded[send_part]=true;
 
@@ -779,7 +784,7 @@ double TopoLB::getHopBytes(CentralLB::LDStats *stats,int count,CkVec<int>map)
   double totalHB=0;
   int proc1,proc2;
 
-  for(int i=0;i<count;i++)
+  for(i=0;i<count;i++)
   {
     proc1=map[i];
     for(int j=0;j<count;j++)
@@ -789,7 +794,7 @@ double TopoLB::getHopBytes(CentralLB::LDStats *stats,int count,CkVec<int>map)
       totalHB+=dist[i][j]*comm1[i][j];
     }
   }
-  for(int i=0;i<count;i++)
+  for(i=0;i<count;i++)
     delete[] comm1[i];
   delete[] comm1;
 

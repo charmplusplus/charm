@@ -41,6 +41,7 @@ CmiBool RefineTopoLB::QueryBalanceNow (int _step)
 
 void RefineTopoLB :: work(CentralLB::LDStats *stats,int count)
 {
+  int i, j;
   if (_lb_args.debug() >= 2) 
   {
     CkPrintf("In TopoLB Strategy...\n");
@@ -102,13 +103,13 @@ void RefineTopoLB :: work(CentralLB::LDStats *stats,int count)
   initDataStructures(stats,count,newmap);
   if(_lb_debug_on)
     CkPrintf("After initizlizing dataStructures...\n");
-  for(int i=0;i<count;i++)
+  for(i=0;i<count;i++)
     assign[i]=i;
   if(_lb_debug_on)
     printDataStructures(count, stats->n_objs,newmap);
   /***************** Perform RefineMent *************************/
   bool *swapdone=new bool[count];
-  for(int i=0;i<count;i++)
+  for(i=0;i<count;i++)
     swapdone[i]=false;
 
     
@@ -117,12 +118,12 @@ void RefineTopoLB :: work(CentralLB::LDStats *stats,int count)
  // CkPrintf(" Before Mapping Original   hopBytes : %lf  Avg comm hops: %lf\n", hbval,hbval/total_comm);
   //Perform ith swap
   double totalGain=0;
-  for(int i=0;i<count;i++)
+  for(i=0;i<count;i++)
   {
     //select the cpart which is most communicating and hasn't been moved yet
     int cpart=-1;
     double maxComm=-1;
-    for(int j=0;j<count;j++)
+    for(j=0;j<count;j++)
     {
       if(swapdone[j]) continue;
       if(commUA[j]>maxComm)
@@ -138,7 +139,7 @@ void RefineTopoLB :: work(CentralLB::LDStats *stats,int count)
     double gainMax=-1;
     double gain=-1;;
     double orig_value=getInterMedHopBytes(stats,count,newmap);
-    for(int j=0;j<count;j++)
+    for(j=0;j<count;j++)
     {
       if(j==cpart)
         continue;
@@ -171,7 +172,7 @@ void RefineTopoLB :: work(CentralLB::LDStats *stats,int count)
     //CkPrintf("Swap# %d:  %d and %d\n",i+1,cpart,swapcpart);
   }
   /******************* Assign mapping and print Stats*********/
-  for(int i=0;i<stats->n_objs;i++)
+  for(i=0;i<stats->n_objs;i++)
   {
     stats->to_proc[i]= assign[newmap[i]];
   }
