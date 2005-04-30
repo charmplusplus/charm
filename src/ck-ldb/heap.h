@@ -47,11 +47,15 @@ private:
 public:
   minHeap(int size);
   ~minHeap();
-  int numElements();
+  int numElements() { return count; }
   int insert(InfoRecord *);
   InfoRecord *deleteMin();
   InfoRecord *iterator(heapIterator *);
   InfoRecord *next(heapIterator *);
+  void update(InfoRecord *);
+private:
+  int least(int a, int b, int c);
+  void update(int index);
 };
 
 class maxHeap

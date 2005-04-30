@@ -16,7 +16,7 @@
 */
 /*@{*/
 
-class manheap;
+class minheap;
 class maxHeap;
 #include "heap.h"
 
@@ -32,11 +32,6 @@ minHeap::minHeap(int nsize)
 minHeap::~minHeap()
 {
   delete [] h;
-}
-
-int minHeap::numElements()
-{
-  return count;
 }
 
 int minHeap::insert(InfoRecord *x)
@@ -116,6 +111,55 @@ InfoRecord *minHeap::next(heapIterator *iter){
     return 0;
   iter->next += 1;
   return h[iter->next - 1].info;
+}
+
+int minHeap::least(int a, int b, int c){
+    int smaller;
+                                                                                
+    if(h[a].info->load < h[b].info->load)
+      smaller=a;
+    else
+      smaller=b;
+                                                                                
+    if(h[smaller].info->load < h[c].info->load)
+      return smaller;
+    else
+      return c;
+}
+
+void minHeap::update(InfoRecord *x) {
+    // find index
+    // TODO:  OPTIMIZE it!
+    int index;
+    for (index=0; index<numElements(); index++) 
+      if (x == h[index].info) break;
+    update(index);
+}
+
+void minHeap::update(int index) {
+    int parent = (index-1)/2;
+                                                                                
+    if((index != 0) && h[index].info->load < h[parent].info->load) {
+      swap(parent,index);
+      update(parent);
+    }
+                                                                                
+    int c1 = 2*index+1;
+    int c2 = 2*index+2;
+                                                                                
+    if(c2<numElements()){
+      int smaller = least(index,c1,c2);
+      if(smaller != index){
+        swap(smaller,index);
+        update(smaller);
+        return;
+      }
+    }
+    if(c1<numElements() && h[c1].info->load < h[index].info->load) {
+      swap(c1,index);
+      update(c1);
+      return;
+    }
 }
 
 //*****************
