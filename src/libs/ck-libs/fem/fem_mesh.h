@@ -276,7 +276,6 @@ public:
 			allocTable = NULL;
 		}	
 		this->table = user;
-		printf("table changed to %p \n",this->table);
 		this->rows = len;
 		max = max;
 	}
