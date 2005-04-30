@@ -1989,6 +1989,8 @@ void start_nodes_daemon(void)
   Fall back to the daemon.*/
 void start_nodes_rsh() {start_nodes_daemon();}
 void finish_nodes(void) {}
+void start_one_node_rsh(int rank0no) {}
+void finish_one_node(int rank0no) {}
 
 void envCat(char *dest,LPTSTR oldEnv)
 {
