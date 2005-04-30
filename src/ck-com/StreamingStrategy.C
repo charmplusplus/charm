@@ -149,7 +149,8 @@ void StreamingStrategy::flushPE(int pe) {
     sp | hdr;
 
     int nmsgs = streamingMsgCount[pe];
-    for(int count = 0; count < nmsgs; count++) {
+    int count;
+    for(count = 0; count < nmsgs; count++) {
         cmsg = streamingMsgBuf[pe][count];
         char *msg = cmsg->getCharmMessage();
         envelope *env = UsrToEnv(msg);
@@ -166,7 +167,7 @@ void StreamingStrategy::flushPE(int pe) {
     hdr.nmsgs = nmsgs;
     mp | hdr;
     
-    for(int count = 0; count < nmsgs; count++) {
+    for(count = 0; count < nmsgs; count++) {
         cmsg = streamingMsgBuf[pe][count];
         char *msg = cmsg->getCharmMessage();
         envelope *env = UsrToEnv(msg);
@@ -175,7 +176,7 @@ void StreamingStrategy::flushPE(int pe) {
         mp.pupCmiAllocBuf((void **)&env, size);
     }
 
-    for(int count = 0; count < nmsgs; count++) {
+    for(count = 0; count < nmsgs; count++) {
         cmsg = streamingMsgBuf[pe].deq();
         CkFreeMsg(cmsg->getCharmMessage());
         delete cmsg;
