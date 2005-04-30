@@ -58,7 +58,7 @@ void RefinerApprox::reinitAssignment()
     // now numComputes is all the computes: both migratable and nonmigratable.
     // afterwards, nonmigratable computes will be taken off
 
-    for(int i=0;i<P;i++)
+    for(i=0;i<P;i++)
     {
 	Iterator nextCompute;
 	nextCompute.id=0;
@@ -420,6 +420,7 @@ int RefinerApprox::computeB(processorInfo *p,double opt)
 
 int RefinerApprox::refine(double opt)
 {
+    int i;
     if(_lb_debug)CkPrintf("RefinerApprox::refine called with %lf\n",opt);
     if(opt<averageLoad)
 	return INFTY;
@@ -444,7 +445,7 @@ int RefinerApprox::refine(double opt)
     int nmoves=0;
 
     //Step 1: Remove all but one large computes on each node
-    for(int i=0;i<P;i++)
+    for(i=0;i<P;i++)
     {
 	computeInfo *smallestLargeCompute=NULL;
 	largeFree[i]=true;
@@ -499,7 +500,7 @@ int RefinerApprox::refine(double opt)
     //Step 3: Select L_t(=numLargeComputes) procs with minimum c[i] (=a[i]-b[i]) values.
     //Remove a[i] small jobs from each to get small job load at most opt/2
     minHeap *cHeap=new minHeap(P);
-    for(int i=0;i<P;i++)
+    for(i=0;i<P;i++)
     {
 	InfoRecord *ci=new InfoRecord();
 	ci->load=a[i]-b[i];
@@ -510,7 +511,7 @@ int RefinerApprox::refine(double opt)
     //Set of largeFree procs created with (small jobs < opt/2)
     minHeap *largeFreeLightProcs=new minHeap(P);
 
-    for(int i=0;i<numLargeComputes;i++)
+    for(i=0;i<numLargeComputes;i++)
     {
 	if(_lb_debug) CkPrintf("Removing a large compute %d\n",i);
 	//Remove biggest a_k computes from L_t procs
@@ -547,7 +548,7 @@ int RefinerApprox::refine(double opt)
     //Remove biggest b computes from P - L_t procs
     // Assign removed large computes to large free procs created in Step 3
     // Keep removed small computes unassigned for now.
-    for(int i=numLargeComputes;i<P;i++)
+    for(i=numLargeComputes;i<P;i++)
     {
 	//Remove biggest b computes from P - L_t procs
 	InfoRecord *cdata= cHeap->deleteMin();
@@ -630,7 +631,7 @@ int RefinerApprox::refine(double opt)
 
     //Step 6: Assign remaining small jobs one by one to least loaded proc
     minHeap *procsLoad=new minHeap(P);
-    for(int i=0;i<P;i++)
+    for(i=0;i<P;i++)
     {
 	procsLoad->insert((InfoRecord *) &(processors[i]) );
     }
