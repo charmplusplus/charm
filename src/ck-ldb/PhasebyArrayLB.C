@@ -46,6 +46,7 @@ CmiBool PhasebyArrayLB::QueryBalanceNow(int _step)
 }
 
 void PhasebyArrayLB::copyStats(BaseLB::LDStats *stats,BaseLB::LDStats *tempStats){
+	int i;
 	tempStats->count = stats->count;
 	tempStats->n_objs = stats->n_objs;
 	tempStats->n_comm = stats->n_comm;
@@ -62,16 +63,16 @@ void PhasebyArrayLB::copyStats(BaseLB::LDStats *stats,BaseLB::LDStats *tempStats
 	tempStats->from_proc.resize(tempStats->n_objs);
 	tempStats->to_proc.resize(tempStats->n_objs);
 	tempStats->commData.resize(tempStats->n_comm);
-	for(int i=0;i<tempStats->n_objs;i++){
+	for(i=0;i<tempStats->n_objs;i++){
 		tempStats->objData[i]=stats->objData[i];
 		tempStats->from_proc[i]=stats->from_proc[i];
 		tempStats->to_proc[i]=stats->to_proc[i];
 	}
-	for(int i=0;i<tempStats->n_comm;i++)
+	for(i=0;i<tempStats->n_comm;i++)
 		tempStats->commData[i]=stats->commData[i];
 	
 	tempStats->procs = new BaseLB::ProcStats[tempStats->count];
-	for(int i=0;i<tempStats->count;i++)
+	for(i=0;i<tempStats->count;i++)
 		tempStats->procs[i]=stats->procs[i];
 }
 
@@ -95,14 +96,14 @@ void PhasebyArrayLB::work(BaseLB::LDStats *stats, int count){
 	tempStats = new BaseLB::LDStats;
 
 	copyStats(stats,tempStats);
-	int obj;
+	int obj, i;
 	int flag=0;
 	LDObjData *odata;
 	
 	
 	odata = &(tempStats->objData[0]);
 	omids.push_back(odata->omID());
-	for(int i=0;i<tempStats->n_objs; i++){
+	for(i=0;i<tempStats->n_objs; i++){
 		odata = &(tempStats->objData[i]);
 		for(int j=0;j<omids.size();j++)
 			if(odata->omID()==omids[j]){
@@ -116,7 +117,7 @@ void PhasebyArrayLB::work(BaseLB::LDStats *stats, int count){
 			omids.push_back(odata->omID());
 	}
 	
-	for(int i=0;i<omids.size();i++){
+	for(i=0;i<omids.size();i++){
 		for(obj = 0; obj < tempStats->n_objs; obj++)
 			tempStats->from_proc[obj]=tempStats->to_proc[obj];
 		updateStats(stats,tempStats);

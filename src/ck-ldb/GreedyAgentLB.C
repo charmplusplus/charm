@@ -194,7 +194,7 @@ GreedyAgentLB::BuildCpuArray(CentralLB::LDStats* stats,
 
 void GreedyAgentLB::work(CentralLB::LDStats* stats, int count)
 {
-  int  obj, heapSize, objCount;
+  int  i, obj, heapSize, objCount;
   int *pemap = new int [count];
   HeapData *cpuData = BuildCpuArray(stats, count, &heapSize);
   HeapData *objData = BuildObjectArray(stats, count, &objCount);
@@ -222,7 +222,7 @@ void GreedyAgentLB::work(CentralLB::LDStats* stats, int count)
 	int *existing_map = new int[objCount];
 	Agent::Elem *preferList;
 	
-	for(int i=0;i<objCount;i++)
+	for(i=0;i<objCount;i++)
 		existing_map[i]=-1;
 
 	int extractIndex=0;
@@ -282,7 +282,7 @@ void GreedyAgentLB::work(CentralLB::LDStats* stats, int count)
 		else
 			trialLen = extractIndex;
 			
-		for(int i=0;i<trialLen;i++){
+		for(i=0;i<trialLen;i++){
 			trialpes[i]=minCpu[i].pe;
 			trialmap[minCpu[i].pe]=i;
 		}
