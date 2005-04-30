@@ -70,7 +70,7 @@ void LBInfo::getInfo(BaseLB::LDStats* stats, int count, int considerComm)
         minObjLoad = 1.0e20;  // I suppose no object load is beyond this
 	maxObjLoad = 0.0;
 
-	stats->makeCommHash();
+	if (considerComm) stats->makeCommHash();
 
         // get background load
 	if (bgLoads)
