@@ -18,7 +18,7 @@
       and the nonmigratable object is not taken in the objData array
 */
 
-#include <charm++.h>
+#include "charm++.h"
 
 
 #include "cklists.h"

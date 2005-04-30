@@ -517,7 +517,7 @@ void TopoLB :: work(CentralLB::LDStats *stats,int count)
 
 
     double gainMax=-1;
-    for(int j=0;j<count;j++)
+    for(j=0;j<count;j++)
     {
       if(!cfree[j])
         continue;

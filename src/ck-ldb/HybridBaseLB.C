@@ -747,6 +747,7 @@ void HybridBaseLB::StartCollectInfo()
     // assuming leaf must have a parent
   DEBUGF(("[%d] level 0 has %d unmatched (out)%d+(new)%d. \n", CkMyPe(), migs, lData->outObjs.size(), newObjs.size()));
   thisProxy[lData->parent].CollectInfo(locs, migs, 0);
+  delete [] locs;
 }
 
 void HybridBaseLB::CollectInfo(Location *loc, int n, int fromlevel)
@@ -1009,7 +1010,7 @@ LBMigrateMsg * HybridBaseLB::createMigrateMsg(LDStats* stats,int count)
       info.getInfo(stats, count, 0);	// no comm cost
       double totalLoad;
       info.getSummary(maxLoad, totalLoad);
-      CkPrintf("[%d] Load Summary: max: %f total: %f on %d processors at step %d.\n", CkMyPe(), maxLoad, totalLoad, count, step());
+      CkPrintf("[%d] Load Summary: max: %f total: %f on %d processors at step %d useMem: %fKB.\n", CkMyPe(), maxLoad, totalLoad, count, step(), (1.0*useMem())/1024);
   }
 
   // translate relative pe number to its real number
