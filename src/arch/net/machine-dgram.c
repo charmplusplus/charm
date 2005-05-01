@@ -16,7 +16,9 @@
  * @{
  */
 
+#if CMK_USE_AMMASSO
 #include "machine-ammasso.h"
+#endif
 
 #define DGRAM_HEADER_SIZE 8
 
