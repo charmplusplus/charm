@@ -1168,8 +1168,7 @@ class FEM_Mesh : public CkNoncopyable {
   FEM_ElemAdj_Layer *addElemAdjLayer(void);
   FEM_ElemAdj_Layer *curElemAdjLayer(void);
   
-  // Terry's mesh accessors & modifiers
-
+  /*** Terry's mesh accessors & modifiers ***/
   /// Add a new node to the mesh, return the chunk-local numbering; -1 failure.
   int newNode() { return -1; }
   /// Add a new elem to the mesh, return the chunk-local numbering; -1 failure.
@@ -1179,8 +1178,9 @@ class FEM_Mesh : public CkNoncopyable {
   /// Remove element from the mesh
   void deleteElement(int e) {}
 
-  // Terry's adjacency accessors & modifiers: NOTE - ALL VOID FOR NOW
-  //********* Element-to-element: preserve initial ordering relative to nodes
+  // Terry's adjacency accessors & modifiers
+
+  //  ------- Element-to-element: preserve initial ordering relative to nodes
   /// Place all of element e's adjacent elements in neighbors; assumes
   /// neighbors allocated to correct size
   void e2e_getAll(int e, int *neighbors);
@@ -1197,7 +1197,7 @@ class FEM_Mesh : public CkNoncopyable {
   /// Find element oldNbr in e's adjacent elements and replace with newNbr
   void e2e_replace(int e, int oldNbr, int newNbr);
 
-  //********* Element-to-node: preserve initial ordering
+  //  ------- Element-to-node: preserve initial ordering
   /// Place all of element e's adjacent nodes in adjnodes; assumes
   /// adjnodes allocated to correct size
   void e2n_getAll(int e, int *adjnodes);
@@ -1214,7 +1214,7 @@ class FEM_Mesh : public CkNoncopyable {
   /// Find node oldNode in e's adjacent ndoes and replace with newNode
   void e2n_replace(int e, int oldNode, int newNode);
 
-  //********* Node-to-node
+  //  ------- Node-to-node
   /// Place all of node n's adjacent nodes in adjnodes and the resulting 
   /// length of adjnodes in sz; assumes adjnodes is not allocated, but sz is
   void n2n_getAll(int n, int *adjnodes, int *sz);
@@ -1225,7 +1225,7 @@ class FEM_Mesh : public CkNoncopyable {
   /// Finds oldNode in n's node adjacency list, and replaces it with newNode
   void n2n_replace(int n, int oldNode, int newNode);
 
-  //********* Node-to-element
+  //  ------- Node-to-element
   /// Place all of node n's adjacent elements in adjelements and the resulting 
   /// length of adjelements in sz; assumes adjelements is not allocated, 
   /// but sz is
