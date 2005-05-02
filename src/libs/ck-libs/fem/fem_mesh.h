@@ -1179,13 +1179,6 @@ class FEM_Mesh : public CkNoncopyable {
   /// Remove element from the mesh
   void deleteElement(int e) {}
 
-  /// Mark the idx-th node of element e
-  void markNode(int e, int idx) {}
-  /// Get element-local index of element e's marked node
-  int getMarkedNodeIdx(int e) { return -1; }
-  /// Get chunk-local numbering of element e's marked node
-  int getMarkedNode(int e) { return -1; }
-
   // Terry's adjacency accessors & modifiers: NOTE - ALL VOID FOR NOW
   //********* Element-to-element: preserve initial ordering relative to nodes
   /// Place all of element e's adjacent elements in neighbors; assumes

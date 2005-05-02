@@ -1,7 +1,10 @@
 #ifndef __CHARM_FEM_ADAPT_H
 #define __CHARM_FEM_ADAPT_H
 
-#include "fem_impl.h"
+#include "charm-api.h"
+#include "ckvector3d.h"
+#include "fem.h"
+#include "fem_mesh.h"
 
 class FEM_Adapt {
   FEM_Mesh *theMesh;
