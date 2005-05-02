@@ -1,7 +1,12 @@
 /**
- ** Ammasso implementation of Converse NET version Contains Ammasso specific
- ** code for: CmiMachineInit() CmiNotifyIdle() DeliverViaNetwork()
- ** CommunicationServer() CmiMachineExit()
+ ** Ammasso implementation of Converse NET version
+ ** Contains Ammasso specific
+ ** code for:
+ ** CmiMachineInit()
+ ** CmiNotifyIdle()
+ ** DeliverViaNetwork()
+ ** CommunicationServer()
+ ** CmiMachineExit()
  **
  ** Written By:    Isaac Dooley      idooley2@uiuc.edu
  ** 03/12/05       Esteban Pauli     etpauli2@uiuc.edu
@@ -20,11 +25,16 @@
 #define ALIGN8(x)   (int)((~7)&((x)+7))
 #endif
 
+#define WASTE_TIME 600
 // In order to use CC_POST_CHECK, the last argument to cc_qp_post_sq must be "nWR"
 #define CC_POST_CHECK(routine,args,nodeTo) {\
-        int retry=100; \
-        while (ammasso_check_post_err(routine args, #routine, __LINE__, &nWR, nodeTo, retry) == 1) { retry--; usleep(100); } \
-        }
+        int retry=1000; \
+        while (ammasso_check_post_err(routine args, #routine, __LINE__, &nWR, nodeTo, retry) == 1) { \
+          int i; \
+          retry += WASTE_TIME; \
+          for (i=0; i<=WASTE_TIME; ++i) { retry --; } \
+        } \
+      }
 
 #define CC_CHECK(routine,args) \
         ammasso_check_err(routine args, #routine, __LINE__);
@@ -115,7 +125,10 @@ void establishQPConnection(OtherNode node, int reuseQPFlag);
 void reestablishQPConnection(OtherNode node);
 void closeQPConnection(OtherNode node, int destroyQPFlag);
 
-
+AmmassoBuffer *BufferAlloc(int n);
+void BufferFree(AmmassoBuffer *start, int n);
+AmmassoToken *TokenAlloc(int n);
+void TokenFree(AmmassoToken *start, int n);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 // Function Bodies /////////////////////////////////////////////////////////////////////////////////
@@ -289,7 +302,7 @@ void sendAck(OtherNode node) {
     token->wr.wr_u.rdma_write.local_sgl.sge_list->to = (unsigned long)&tokenBuf->tail;
     token->wr.wr_u.rdma_write.remote_to = (unsigned long)&token->remoteBuf->tail;
     CC_POST_CHECK(cc_qp_post_sq,(contextBlock->rnic, node->qp, &token->wr, 1, &nWR),node->myNode);
-    TOKEN_ENQUEUE(node->,usedTokens,token);
+    LIST_ENQUEUE(node->,usedTokens,token);
     *node->remoteAck = tmp_ack & ACK_MASK;
   }
 
@@ -315,8 +328,8 @@ AmmassoToken *getQPSendToken(OtherNode node) {
     if (*node->directAck > node->localAck) {
       newAck = *node->directAck;
       for (i=node->localAck; i<newAck; ++i) {
-	TOKEN_DEQUEUE(node->,usedTokens,token);
-	TOKEN_ENQUEUE(node->,sendTokens,token);
+	LIST_DEQUEUE(node->,usedTokens,token);
+	LIST_ENQUEUE(node->,sendTokens,token);
       }
       node->localAck = newAck;
     }
@@ -327,7 +340,7 @@ AmmassoToken *getQPSendToken(OtherNode node) {
       MACHSTATE1(3, "getQPSendBuffer() - INFO: Send completed with node %d... now waiting for acknowledge...", node->myNode);
     }
   }
-  TOKEN_DEQUEUE(node->,sendTokens,token);
+  LIST_DEQUEUE(node->,sendTokens,token);
   return token;
 }
 
@@ -475,7 +488,7 @@ int sendDataOnQP(char* data, int len, OtherNode node, char flags) {
     tokenBuf = sendBufToken->localBuf;
     // Enqueue the token to the used queue immediately, so it is safe to be
     // interrupted by other calls
-    TOKEN_ENQUEUE(node->,usedTokens,sendBufToken);
+    LIST_ENQUEUE(node->,usedTokens,sendBufToken);
 
     // Copy the contents (up to AMMASSO_BUFSIZE worth) of data into the send buffer
 
@@ -811,7 +824,7 @@ int ProcessMessage(char* msg, int len, Tailer *tail, OtherNode from) {
 
   // Decide whether a direct ACK will be needed or not, based on how many
   // messages the other side has sent us, and we haven't acknowledged yet
-  if (2*from->messagesNotYetAcknowledged > from->allocatedBuffers) {
+  if (2*from->messagesNotYetAcknowledged > from->num_recv_buf) {
     needAck = 1;
   } else {
     needAck = 0;
@@ -823,8 +836,8 @@ int ProcessMessage(char* msg, int len, Tailer *tail, OtherNode from) {
   if (tail->ack > from->localAck) {
     AmmassoToken *token;
     for (i=from->localAck; i<tail->ack; ++i) {
-      TOKEN_DEQUEUE(from->,usedTokens,token);
-      TOKEN_ENQUEUE(from->,sendTokens,token);
+      LIST_DEQUEUE(from->,usedTokens,token);
+      LIST_ENQUEUE(from->,sendTokens,token);
     }
     from->localAck = tail->ack;
   }
@@ -1390,11 +1403,11 @@ void AsynchronousEventHandler(cc_rnic_handle_t rnic, cc_event_record_t *er, void
         // Grab the remote stag and to, by the protocol, all the tokens are
         // consecutive in memory
 	for (i=0; i<(AMMASSO_INITIAL_BUFFERS/(contextBlock->numNodes-1)); ++i) {
-	  TOKEN_DEQUEUE(contextBlock->,freeTokens,token);
+	  LIST_DEQUEUE(contextBlock->,freeTokens,token);
 	  token->wr.wr_u.rdma_write.remote_stag = priv->stag;
 	  token->wr.wr_u.rdma_write.remote_to = priv->to + (i * sizeof(AmmassoBuffer));
 	  token->remoteBuf = (AmmassoBuffer*)(priv->to + (i * sizeof(AmmassoBuffer)));
-	  TOKEN_ENQUEUE(nodes[nodeNumber].,sendTokens,token);
+	  LIST_ENQUEUE(nodes[nodeNumber].,sendTokens,token);
 	}
 
 	nodes[nodeNumber].ack_sq_wr->wr_u.rdma_write.remote_to = priv->ack_to;
@@ -1497,11 +1510,11 @@ void AsynchronousEventHandler(cc_rnic_handle_t rnic, cc_event_record_t *er, void
         // Grab the remote stag and to, by the protocol, all the tokens are
         // consecutive in memory
 	for (i=0; i<(AMMASSO_INITIAL_BUFFERS/(contextBlock->numNodes-1)); ++i) {
-	  TOKEN_DEQUEUE(contextBlock->,freeTokens,token);
+	  LIST_DEQUEUE(contextBlock->,freeTokens,token);
 	  token->wr.wr_u.rdma_write.remote_stag = priv->stag;
 	  token->wr.wr_u.rdma_write.remote_to = priv->to + (i * sizeof(AmmassoBuffer));
 	  token->remoteBuf = (AmmassoBuffer*)(priv->to + (i * sizeof(AmmassoBuffer)));
-	  TOKEN_ENQUEUE(node->,sendTokens,token);
+	  LIST_ENQUEUE(node->,sendTokens,token);
 	}
 
 	node->ack_sq_wr->wr_u.rdma_write.remote_to = priv->ack_to;
@@ -1876,6 +1889,7 @@ void CmiAmmassoOpenQueuePairs() {
     contextBlock->freeRecvBuffers[i].stag = newStagIndex;
   }
   contextBlock->freeRecvBuffers[AMMASSO_INITIAL_BUFFERS-1].next = NULL;
+  contextBlock->last_freeRecvBuffers = &contextBlock->freeRecvBuffers[AMMASSO_INITIAL_BUFFERS-1];
 
   buffersPerNode = AMMASSO_INITIAL_BUFFERS / (contextBlock->numNodes-1);
 
@@ -1883,9 +1897,10 @@ void CmiAmmassoOpenQueuePairs() {
   // the the buffer where to receive the directly sent ACK
   bufferScanner = contextBlock->freeRecvBuffers;
   contextBlock->freeRecvBuffers = contextBlock->freeRecvBuffers[(contextBlock->numNodes-1)*buffersPerNode-1].next;
+  contextBlock->num_freeRecvBuffers = AMMASSO_INITIAL_BUFFERS - (contextBlock->numNodes-1)*buffersPerNode;
   for (i=0; i<contextBlock->numNodes; ++i) {
     if (i == contextBlock->myNode) continue;
-    nodes[i].allocatedBuffers = buffersPerNode;
+    nodes[i].num_recv_buf = buffersPerNode;
     nodes[i].recv_buf = bufferScanner;
     bufferScanner[buffersPerNode-1].next = NULL;
     nodes[i].last_recv_buf = &(bufferScanner[buffersPerNode-1]);
@@ -1965,7 +1980,7 @@ void CmiAmmassoOpenQueuePairs() {
     tokenScanner->wr.wr_u.rdma_write.local_sgl.sge_list = newSgls;
     tokenScanner->wr.signaled = 1;
     tokenScanner->localBuf = (AmmassoBuffer*)&(sendBuffer[i]);
-    TOKEN_ENQUEUE(contextBlock->,freeTokens,tokenScanner);
+    LIST_ENQUEUE(contextBlock->,freeTokens,tokenScanner);
     newSgls = (cc_data_addr_t*)(((char*)newSgls)+ALIGN8(sizeof(cc_data_addr_t)));
     tokenScanner = (AmmassoToken*)(((char*)tokenScanner)+ALIGN8(sizeof(AmmassoToken)));
   }

@@ -104,8 +104,14 @@ typedef struct __ammasso_token {
   cc_sq_wr_t wr;
 } AmmassoToken;
 
-// NOTE: in order to use TOKEN_*, no space has to be present in the parenthesis
-#define TOKEN_ENQUEUE(prefix, suffix, newtoken) \
+// if "name" is null, then "num_##name"==0 and "last_##name" is not defined
+#define LIST_DEFINE(type, name) \
+    type *name; \
+    type *last_ ##name; \
+    int    num_ ##name
+
+// NOTE: in order to use LIST_*, no space has to be present in the parenthesis
+#define LIST_ENQUEUE(prefix, suffix, newtoken) \
     prefix ##num_ ##suffix ++; \
     newtoken ##->next = NULL; \
     if (prefix ##suffix != NULL) { \
@@ -115,7 +121,7 @@ typedef struct __ammasso_token {
     } \
     prefix ##last_ ##suffix = newtoken
 
-#define TOKEN_DEQUEUE(prefix, suffix, thetoken) \
+#define LIST_DEQUEUE(prefix, suffix, thetoken) \
     CmiAssert(prefix ##num_ ##suffix > 0); \
     prefix ##num_ ##suffix --; \
     thetoken = prefix ##suffix; \
@@ -139,11 +145,9 @@ typedef struct __context_block {
   int                    nodeReadyCount;              // Synch. variable used to block until all other nodes are ready
 
   // Free Receive Buffer Pool, typically empty when allocated to processors
-  AmmassoBuffer *freeRecvBuffers;
+  LIST_DEFINE(AmmassoBuffer,freeRecvBuffers);
   //CmiNodeLock bufferPoolLock;
-  AmmassoToken  *freeTokens;
-  AmmassoToken  *last_freeTokens;
-  int           num_freeTokens;
+  LIST_DEFINE(AmmassoToken,freeTokens);
 
 } mycb_t;
 

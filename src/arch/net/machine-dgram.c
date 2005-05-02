@@ -268,7 +268,6 @@ typedef struct OtherNodeStruct
   int 			   gm_pending;
 #endif
 
-  /* #define AMMASSO_BUFSIZE  16384   // 16K  */
 #if CMK_USE_AMMASSO
   /* DMK : TODO : If any of these can be shared, then they can be moved to mycb_t in "machine-ammasso.c"  */
 
@@ -279,57 +278,39 @@ typedef struct OtherNodeStruct
   cc_qp_id_t             qp_id;      /* Queue Pair ID      */
   cc_qp_handle_t         qp;         /* Queue Pair Handle  */
 
-  /* DMK : TODO : Having all of these will be a scaling issue... Look into getting these shared among all
-                  of the QPs to save on memory (larger but only one).                                      */
-  //cc_rq_wr_t             *rq_wr;
-  int                    myNode;     /* This is a horrible hack! - When the receiving Completion Queue is polled for messages,
-                                      *   the address of the particular receive buffer is not known but the address of the
-                                      *   RecvQueue Work Request structure (the rq_wr above) is... so myNode will be set to
-                                      *   the index of this OtherNode structure in nodes and will be located at
-                                      *   (wc.wr_id + sizeof(cc_rq_wr_t) - See machine-ammasso.c PollForMessage()   */
-  //cc_data_addr_t         *recv_sgl;
-/* char   recv_buf[AMMASSO_BUFSIZE] __attribute__ ((aligned(4096)));  */
-  AmmassoBuffer          *recv_buf;
-  AmmassoBuffer          *last_recv_buf;
-  AmmassoBuffer          *pending; // when allocating new buffers, they remain here until the other node conferm their allocation
-  int                    allocatedBuffers;
-  ammasso_ack_t          *remoteAck;  // number of the next ACK to be sent to this node, it is piggybacked on every message
-  int                    messagesNotYetAcknowledged; // how many messages have been received since the last ACK was sent
-  //cc_stag_index_t  recv_stag_index;
+  int                    myNode;
+
+  // list of buffers currently allocated to this paricular node
+  LIST_DEFINE(AmmassoBuffer,recv_buf);
+
+  // when allocating new buffers, they remain here until the other node conferm
+  // their allocation
+  AmmassoBuffer          *pending;
+
+  // number of the next ACK to be sent to this node, it is piggybacked on every
+  // message
+  ammasso_ack_t          *remoteAck;
+
+  // how many messages have been received since the last ACK was sent
+  int                    messagesNotYetAcknowledged;
 
   // the following is used to send the ACK without a message
   cc_sq_wr_t             *ack_sq_wr;
+
   // the following is a pointer to where the ACK will arrive (if directly sent)
   ammasso_ack_t          *directAck;
 
-  AmmassoToken           *sendTokens; // linked list of available tokens
-  AmmassoToken           *last_sendTokens; // if sendTokens==NULL, this is undefined
-  int                    num_sendTokens;
-  AmmassoToken           *usedTokens; // they are waiting for an ACK
-  AmmassoToken           *last_usedTokens; // if usedTokens==NULL, this is undefined
-  int                    num_usedTokens;
+  LIST_DEFINE(AmmassoToken,sendTokens); // linked list of available tokens
+  LIST_DEFINE(AmmassoToken,usedTokens); // they are waiting for an ACK
 
-  ammasso_ack_t          localAck; // number of ACK received from this node, it is compared against the incoming ACK to release send buffers
-  //cc_sq_wr_t             *sq_wr;
-  //cc_data_addr_t         *send_sgl;
-/*  char   send_buf[AMMASSO_BUFSIZE] __attribute__ ((aligned(4096)));  */
-  //char                   *send_buf;
-  //cc_stag_index_t  send_stag_index;
-/*  char                   *send_bufFree;  */
-  //int                   send_UseIndex;
-/*  char                   send_AckIndex;  */
-  //int                   send_InUseCounter;
+  // number of ACK received from this node, it is compared against the incoming
+  // ACK to release send buffers
+  ammasso_ack_t          localAck;
+
+  // NOTE: this locks are probably not needed, try to see if they can be deleted
   CmiNodeLock            sendBufLock;
-
   CmiNodeLock            send_next_lock;
   CmiNodeLock            recv_expect_lock;
-
-  /*
-  cc_sq_wr_t             rdma_sq_wr;
-  cc_data_addr_t         rdma_sgl;
-  char   rdma_buf[AMMASSO_BUFSIZE] __attribute__ ((aligned(4096)));
-  cc_stag_index_t  rdma_stag_index;
-  */
 
   cc_ep_handle_t         ep;
   cc_ep_handle_t         cr;
