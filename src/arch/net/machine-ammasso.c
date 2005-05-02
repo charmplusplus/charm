@@ -28,7 +28,7 @@
 #define WASTE_TIME 600
 // In order to use CC_POST_CHECK, the last argument to cc_qp_post_sq must be "nWR"
 #define CC_POST_CHECK(routine,args,nodeTo) {\
-        int retry=1000; \
+        int retry=10000000; \
         while (ammasso_check_post_err(routine args, #routine, __LINE__, &nWR, nodeTo, retry) == 1) { \
           int i; \
           retry += WASTE_TIME; \
