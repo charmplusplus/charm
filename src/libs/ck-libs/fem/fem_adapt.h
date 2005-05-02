@@ -9,12 +9,6 @@
 class FEM_Adapt {
   FEM_Mesh *theMesh;
   // Helper methods
-  /// Map a pair of element-local node numberings to an element-local edge 
-  /// numbering
-  /** Given two element-local node numberings (i.e. 0, 1, 2 for triangular 
-      elements), calculate an element-local edge numbering (also 0, 1, or 2
-      for triangular elements) **/
-  int get_edge_index(int local_node1, int local_node2);
   /// Find an element-local node numbering for a chunk-local node
   /** Given a chunk-local element number e and a chunk-local node number n,
       determine the element-local node numbering for node n on element e **/
@@ -37,6 +31,13 @@ class FEM_Adapt {
 		    int *elemList);
 
  public:
+  /// Map a pair of element-local node numberings to an element-local edge 
+  /// numbering
+  /** Given two element-local node numberings (i.e. 0, 1, 2 for triangular 
+      elements), calculate an element-local edge numbering (also 0, 1, or 2
+      for triangular elements) **/
+  int get_edge_index(int local_node1, int local_node2);
+
   /// Initialize FEM_Adapt with a chunk of the mesh
   FEM_Adapt(FEM_Mesh *m) {
     theMesh = m;
@@ -88,8 +89,8 @@ class FEM_Adapt {
   /// Perform a propagating bisection of element e1 according to marked nodes
   /** Given and element e1, determined n, e1's marked node, and bisect
       the edge opposite to n, propagating and bisecting the
-      neighboring element in a similar fashion **/
-  virtual void element_bisect(int e1);
+      neighboring element in a similar fashion
+  virtual void element_bisect(int e1); **/
 };
 
 #endif

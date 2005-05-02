@@ -408,6 +408,7 @@ int FEM_Adapt::vertex_split(int n, int n1, int n2, int e1, int e3)
 }
 
 // element_bisect and helpers
+/*
 void FEM_Adapt::element_bisect(int e1) 
 {
   int mn = theMesh->getMarkedNode(e1);
@@ -431,3 +432,4 @@ void FEM_Adapt::element_bisect(int e1)
   }
   (void) edge_bisect(e1, n1, n2);
 }
+*/
