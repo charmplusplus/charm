@@ -132,6 +132,7 @@ void TokenAlloc(int n);
 
 void BufferAlloc(int n) {
   int i;
+  char buf[128];
   cc_stag_index_t newStagIndex;
   AmmassoBuffer *newBuffers;
 
@@ -178,6 +179,7 @@ void BufferAlloc(int n) {
 
 void TokenAlloc(int n) {
   int i;
+  char buf[128];
   cc_stag_index_t newStagIndex;
   AmmassoToken *sendToken, *tokenScanner;
   cc_data_addr_t *sendSgl;
