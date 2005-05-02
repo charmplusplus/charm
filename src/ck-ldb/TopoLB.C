@@ -26,6 +26,7 @@ Date: 04/19/2005
 #define _lb_debug_on 0
 #define _lb_debug2_on 1
 #define _make_new_grouping_ 0
+#define _FASTER_
 
 CreateLBFunc_Def(TopoLB,"TopoLB: Balance objects based on the network topology");
 
@@ -386,17 +387,12 @@ void TopoLB::initDataStructures(CentralLB::LDStats *stats,int count,int *newmap)
       double comm_i_total=0;
       for(int j=0;j<count;j++)
       {
-        //Just a test
-        //comm[i][j]=(rand()%10 ==0);
-        //comm[i][j]=(dist[i][j]>count/4);
         avg_degree+=(comm[i][j]>0);
         total_comm+=comm[i][j];
         comm_i_total+=comm[i][j];
       }
-      //Just a test
-      //commUA[i]=comm_i_total;
     }
-    CkPrintf("Avg degree (%d nodes) : %d\n",count,avg_degree/count);
+      //CkPrintf("Avg degree (%d nodes) : %d\n",count,avg_degree/count);
   }
   /***************************/
 
@@ -430,6 +426,19 @@ void TopoLB::initDataStructures(CentralLB::LDStats *stats,int count,int *newmap)
     pfree[i]=true;
     cfree[i]=true;
     assign[i]=-1;
+  }
+}
+
+void randomAssign(int count, int *perm)
+{
+  for(int i=0;i<count;i++)
+    perm[i]=i;
+  for(int i=0;i<count;i++)
+  {
+    int randpos=i+rand()%(count-i);
+    int temp=perm[i];
+    perm[i]=perm[randpos];
+    perm[randpos]=temp;
   }
 }
 
@@ -540,7 +549,7 @@ void TopoLB :: work(CentralLB::LDStats *stats,int count)
       }
     }
     if(_lb_debug_on)
-        CkPrintf("GainMax is : %lf\n",gainMax);
+        CkPrintf("GainMax [%d] is : %lf\n",i,gainMax);
 
     CmiAssert(part_index!=-1);
     CmiAssert(proc_index!=-1);
@@ -551,32 +560,18 @@ void TopoLB :: work(CentralLB::LDStats *stats,int count)
     assign[part_index]=proc_index;
     
     /*
-    if(i==0)
-    {
-      double  maxComm=-1;
-      int maxCommIndex=-1;
-      for(int l=0;l<count;l++)
-      {
-        if(commUA[l]>maxComm)
-        {
-          maxComm=commUA[l];
-          maxCommIndex=l;
-        }
-      }
-      CkPrintf("Max communicating : %d\n",maxCommIndex);
-      CkPrintf("First selection   : %d\n",part_index);
-    }
-    */
-
-    //CkPrintf("assign[%d]=%d\n",part_index,proc_index);
-    /*
     if(_lb_debug2_on)
     {
       if(i%100 ==0)
         CkPrintf("Assigned %d procs \n",i+1);
     }
     */
+    
+    
     /*****Update Data Structures******************/
+
+
+#ifndef _FASTER_
     cfree[part_index]=false;
     pfree[proc_index]=false;
 
@@ -602,51 +597,41 @@ void TopoLB :: work(CentralLB::LDStats *stats,int count)
 
       if(commUA[cpart]==0 && hopBytes[cpart][count]!=proc_index)
       {
-        if(procs_left>1)
+        if(procs_left>0)
           hopBytes[cpart][count+1]=(hopBytes[cpart][count+1]*(procs_left+1) - hopBytes[cpart][proc_index])/(procs_left);
         continue;
       }
 
       //double hbmin=INFTY;
-      double hbmin=-1;
-      double hbtotal=0;
+      int h_min_index=-1;
+      double h_min=-1;
+      double h_total=0;
 
       double c1=commUA[cpart];
       double c2=comm[cpart][part_index];
 
       double h_updated=0;
-      int h_minindex=(int)hopBytes[cpart][count];
 
       for(int proc=0;proc<count;proc++)
       {
         if(!pfree[proc]) // No need to update for assigned procs
           continue;
 
-        /*
-        hopBytes[cpart][proc]-=commUA[cpart]*dist[proc][count];
-        hopBytes[cpart][proc]+=comm[cpart][part_index]*dist[proc][proc_index];
-        hopBytes[cpart][proc]+=(commUA[cpart]-comm[cpart][part_index])*distnew[proc];
-        */
-
         hopBytes[cpart][proc]+=(c1-c2)*distnew[proc]+c2*dist[proc][proc_index]-c1*dist[proc][count];
-        //Just a test
-        //hopBytes[cpart][proc]+=c2*dist[proc][proc_index];
         h_updated=hopBytes[cpart][proc];
         
-        //CmiAssert((commUA[cpart]-comm[cpart][part_index]) >= EPSILON);
-        //CmiAssert(hopBytes[cpart][proc] >= EPSILON);
         //CmiAssert(hopBytes[cpart][proc] >= EPSILON);
 
-        hbtotal+=h_updated;
-        if(hbmin==-1 || h_updated<hbmin)
+        h_total+=h_updated;
+        if( h_updated<h_min || h_min_index==-1 )
         {
-          hbmin=h_updated;
-          h_minindex=proc;
+          h_min=h_updated;
+          h_min_index=proc;
         }
       }
-      hopBytes[cpart][count]=h_minindex;
-      //CmiAssert(hbmin!=-1);
-      hopBytes[cpart][count+1]=hbtotal/(procs_left);
+      //CmiAssert(h_min_index!=-1);
+      hopBytes[cpart][count]=h_min_index;
+      hopBytes[cpart][count+1]=h_total/(procs_left);
     }
 
     // d[j][count] is the average dist of proc j to unassigned procs
@@ -659,8 +644,90 @@ void TopoLB :: work(CentralLB::LDStats *stats,int count)
         dist[j][count]=0;
       commUA[j]-=comm[j][part_index];
     }
-  }
 
+#else
+    cfree[part_index]=false;
+    pfree[proc_index]=false;
+
+    //Dont need to update other data structures if this is last assignment
+    if(i == count-1)
+      continue;
+
+    int procs_left=count-i-1;
+
+    //Update hopBytes
+    for(int cpart=0;cpart<count;cpart++)
+    {
+      //No need to update for assigned partitions
+      if(!cfree[cpart]) 
+        continue;    
+
+      //If cpart doesn't communicate with part_index, just need to update minimum and average hopBytes attainable for cpart
+      if(comm[cpart][part_index]==0) 
+      {
+        //change average
+        if(procs_left>0)
+          hopBytes[cpart][count+1]=(hopBytes[cpart][count+1]*(procs_left+1) - hopBytes[cpart][proc_index])/(procs_left);
+
+        //change minimum if needed
+        if(hopBytes[cpart][count]==proc_index)
+        {
+          int c_min=-1;
+          double c_min_val=-1;
+          for(int l=0;l<count;l++)
+          {
+            if(!pfree[l])
+              continue;
+            
+            if(c_min==-1 || hopBytes[cpart][l]<c_min_val)
+            {
+              c_min_val=hopBytes[cpart][l];
+              c_min=l;
+            }
+          }
+          CmiAssert(c_min!=-1);
+          hopBytes[cpart][count]=c_min;
+        }
+        continue;
+      }
+
+      // If reached here cpart communicates with just assigned partition( part_index)
+      int h_min_index=-1;
+      double h_min=-1;
+      double h_total=0;
+
+      //double c1=commUA[cpart];
+      double c2=comm[cpart][part_index];
+
+      double h_updated=0;
+
+      for(int proc=0;proc<count;proc++)
+      {
+        if(!pfree[proc]) // No need to update for assigned procs
+          continue;
+
+        hopBytes[cpart][proc]+=c2*(dist[proc][proc_index]-dist[proc][count]);
+        h_updated=hopBytes[cpart][proc];
+        
+        //CmiAssert(h_updated >= EPSILON);
+
+        h_total+=h_updated;
+        if(h_updated<h_min || h_min_index==-1 )
+        {
+          h_min=h_updated;
+          h_min_index=proc;
+        }
+      }
+      CmiAssert(h_min_index!=-1);
+      CmiAssert(pfree[h_min_index]);
+      hopBytes[cpart][count]=h_min_index;
+      hopBytes[cpart][count+1]=h_total/(procs_left);
+    }
+
+#endif
+    
+  }
+  
   /******************  Fill out final composition Mapping **************************/
 
   for(i=0;i<stats->n_objs;i++)
@@ -670,17 +737,24 @@ void TopoLB :: work(CentralLB::LDStats *stats,int count)
 
   if(_lb_debug2_on)
   {
-    double hbval1=getHopBytes(stats,count,stats->from_proc);
+    double hbval1=getHopBytesNew(NULL,count);
     CkPrintf("\n");
-    CkPrintf(" Original   hopBytes : %lf  Avg comm hops: %lf\n", hbval1,hbval1/total_comm);
-    double hbval2=getHopBytes(stats,count,stats->to_proc);
-    CkPrintf(" Resulting  hopBytes : %lf  Avg comm hops: %lf\n", hbval2,hbval2/total_comm);
-    CkPrintf("Percentage gain %.2lf\n",(hbval1-hbval2)*100/hbval1);
+    CkPrintf(" Original   hopBytes : %.1lf  Avg comm hops: %lf\n", hbval1,hbval1/total_comm);
+    double hbval2=getHopBytesNew(assign,count);
+    CkPrintf(" Resulting  hopBytes : %.1lf  Avg comm hops: %lf\n", hbval2,hbval2/total_comm);
+    CkPrintf(" Percentage gain %.2lf\n",(hbval1-hbval2)*100/hbval1);
+  
+    /*
+    randomAssign(count, assign);
+    double hbval3=getHopBytesNew(assign,count);
+    CkPrintf(" Random  hopBytes : %lf  Avg comm hops: %lf\n", hbval3,hbval3/total_comm);
+    */
     CkPrintf("\n");
   }
 
   freeDataStructures(count);
   delete[] newmap;
+
 }
 
 
@@ -714,6 +788,26 @@ void TopoLB::printDataStructures(int count,int n_objs,int *newmap)
     CkPrintf("\n");
   }
 }
+
+double TopoLB::getHopBytesNew(int *assign_map, int count)
+{
+  double totalHB=0;
+  int i,j;
+  if(assign_map==NULL)
+  {
+    for(i=0;i<count;i++)
+      for(j=0;j<count;j++)
+        totalHB+=dist[i][j]*comm[i][j];
+  }
+  else
+  {
+    for(i=0;i<count;i++)
+      for(j=0;j<count;j++)
+        totalHB+=dist[assign_map[i]][assign_map[j]]*comm[i][j];
+  }
+  return totalHB;
+}
+
 double TopoLB::getHopBytes(CentralLB::LDStats *stats,int count,CkVec<int>map)
 {
   int i;
@@ -800,6 +894,5 @@ double TopoLB::getHopBytes(CentralLB::LDStats *stats,int count,CkVec<int>map)
 
   return totalHB;
 }
-
 
 #include "TopoLB.def.h"

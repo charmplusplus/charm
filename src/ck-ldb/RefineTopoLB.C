@@ -176,15 +176,19 @@ void RefineTopoLB :: work(CentralLB::LDStats *stats,int count)
   {
     stats->to_proc[i]= assign[newmap[i]];
   }
+  /*
   if(_lb_debug2_on)
   {
-    double hbval=getHopBytes(stats,count,stats->from_proc);
+    //double hbval=getHopBytes(stats,count,stats->from_proc);
+    double hbval=getHopBytesNew(NULL,count);
     CkPrintf(" Original   hopBytes : %lf  Avg comm hops: %lf\n", hbval,hbval/total_comm);
-  //  hbval=getHopBytes(stats,count,stats->to_proc);
+  
+    //  hbval=getHopBytes(stats,count,stats->to_proc);
     //CkPrintf(" Resulting  hopBytes : %lf  Avg comm hops: %lf\n", hbval,hbval/total_comm);
     hbval=getInterMedHopBytes(stats,count,newmap);
     CkPrintf("Other Resulting  hopBytes : %lf  Avg comm hops: %lf\n", hbval,hbval/total_comm);
   }
+  */
   freeDataStructures(count);
   delete[] newmap;
   delete[] swapdone;
