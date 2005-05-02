@@ -28,6 +28,7 @@ int FEM_Mesh_Parallel_broadcast(int fem_mesh,int masterRank,FEM_Comm_t comm_cont
 	if(myRank == masterRank){
 		//I am the master, i have the element connectivity data and need
 		//to send it to everybody
+		printf("[%d] Memory usage on vp 0 at the begining of partition %d \n",CkMyPe(),CmiMemoryUsage());
 		new_mesh=FEM_master_parallel_part(fem_mesh,masterRank,comm_context);
 		
 	}else{
@@ -107,6 +108,8 @@ int FEM_master_parallel_part(int fem_mesh,int masterRank,FEM_Comm_t comm_context
 	*/
 	struct partconndata *partdata = FEM_call_parmetis(data,comm_context);
 
+	printf("done with parmetis \n");
+	
 	/*
 		Set up a msa to store the partitions to which a node belongs.
 		A node can belong to multiple partitions.

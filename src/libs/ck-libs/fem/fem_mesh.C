@@ -1334,9 +1334,6 @@ void FEM_Node::setElemAdjacency(int type, const FEM_Elem &elem){
 		FEM_Elem *ghostElem = (FEM_Elem *)elem.getGhost();
 		fillElemAdjacencyTable(-(type+1),(*ghostElem));
 	}
-	printf("Node to elem adjacency after adding type %d --\n",type);
-	elemAdjacency->print();
-	printf("----------------------------------------------\n");
 };
 
 void FEM_Node::fillNodeAdjacencyForElement(int node,int nodesPerElem,const int *conn,FEM_VarIndexAttribute *adjacencyAttr){
@@ -1385,9 +1382,6 @@ void FEM_Node::setNodeAdjacency(const FEM_Elem &elem){
 		FEM_Elem *ghostElem = (FEM_Elem *)elem.getGhost();
 		fillNodeAdjacency(*ghostElem);
 	}
-	printf("Node to Node adjacency \n");
-	nodeAdjacency->print();
-	printf("----------------------------------------------\n");
 };
 
 /********************** Elem *****************/

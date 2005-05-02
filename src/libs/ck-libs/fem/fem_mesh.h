@@ -558,7 +558,6 @@ private:
 	CkVec<CkVec<ID> > idx;
 protected:
 	virtual void allocate(int length,int width,int datatype){
-		printf("allocating FEM_VarIndexAttribute for length %d \n",length);
 		idx.reserve(length);
 		for(int i=0;i<length;i++){
 			CkVec<ID> tempVec;
