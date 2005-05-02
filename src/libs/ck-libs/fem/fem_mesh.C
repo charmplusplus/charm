@@ -1868,3 +1868,305 @@ void FEM_writeMesh(FEM_Mesh *m,const char *prefix,int chunkNo,int nChunks)
 
 
 
+
+//********* Element-to-element: preserve initial ordering relative to nodes
+/// Place all of element e's adjacent elements in neighbors; assumes
+/// neighbors allocated to correct size
+inline void FEM_Mesh::e2e_getAll(int e, int *neighbors) 
+{
+  FEM_Elem &elems = setElem(1);
+  FEM_IndexAttribute *eAdj = 
+    (FEM_IndexAttribute *)elems.lookup(FEM_ELEM_ELEM_ADJACENCY, 
+				       "e2e_getAll");
+  AllocTable2d<int> &eAdjs = eAdj->get();
+  for (int i=0; i<eAdjs.width(); i++) {
+    neighbors[i] = eAdjs[e][i];
+  }
+}
+
+/// Given id of element e, return the id of the idx-th adjacent element
+inline int FEM_Mesh::e2e_getNbr(int e, short idx) 
+{     
+  FEM_Elem &elems = setElem(1);
+  FEM_IndexAttribute *eAdj = 
+    (FEM_IndexAttribute *)elems.lookup(FEM_ELEM_ELEM_ADJACENCY, 
+				       "e2e_getNbr");
+  AllocTable2d<int> &eAdjs = eAdj->get();
+  return eAdjs[e][idx];
+}
+
+/// Given id of element e and id of another element nbr, return i such that
+/// nbr is the i-th element adjacent to e
+inline int FEM_Mesh::e2e_getIndex(int e, int nbr) 
+{ 
+  FEM_Elem &elems = setElem(1);
+  FEM_IndexAttribute *eAdj = 
+    (FEM_IndexAttribute *)elems.lookup(FEM_ELEM_ELEM_ADJACENCY, 
+				       "e2e_getNbr");
+  AllocTable2d<int> &eAdjs = eAdj->get();
+  for (int i=0; i<eAdjs.width(); i++) {
+    if (eAdjs[e][i] == nbr) {
+      return i;
+    }
+  }
+  return -1;
+}
+
+/// Set the element adjacencies of element e to neighbors; assumes neighbors 
+/// has the correct size
+inline void FEM_Mesh::e2e_setAll(int e, int *neighbors) 
+{
+  FEM_Elem &elems = setElem(1);
+  FEM_IndexAttribute *eAdj = 
+    (FEM_IndexAttribute *)elems.lookup(FEM_ELEM_ELEM_ADJACENCY, 
+				       "e2e_getNbr");
+  AllocTable2d<int> &eAdjs = eAdj->get();
+  for (int i=0; i<eAdjs.width(); i++) {
+    eAdjs[e][i] = neighbors[i];
+  }
+}
+
+/// Set the idx-th element adjacent to e to be newElem
+inline void FEM_Mesh::e2e_setIndex(int e, short idx, int newElem) 
+{
+  FEM_Elem &elems = setElem(1);
+  FEM_IndexAttribute *eAdj = 
+    (FEM_IndexAttribute *)elems.lookup(FEM_ELEM_ELEM_ADJACENCY, 
+				       "e2e_getNbr");
+  AllocTable2d<int> &eAdjs = eAdj->get();
+  eAdjs[e][idx] = newElem;
+}
+ 
+/// Find element oldNbr in e's adjacent elements and replace with newNbr
+inline void FEM_Mesh::e2e_replace(int e, int oldNbr, int newNbr) 
+{
+  FEM_Elem &elems = setElem(1);
+  FEM_IndexAttribute *eAdj = 
+    (FEM_IndexAttribute *)elems.lookup(FEM_ELEM_ELEM_ADJACENCY, 
+				       "e2e_getNbr");
+  AllocTable2d<int> &eAdjs = eAdj->get();
+  for (int i=0; i<eAdjs.width(); i++) {
+    if (eAdjs[e][i] == oldNbr) {
+      eAdjs[e][i] = newNbr;
+      break;
+    }
+  }
+}
+
+//********* Element-to-node: preserve initial ordering
+/// Place all of element e's adjacent nodes in adjnodes; assumes
+/// adjnodes allocated to correct size
+inline void FEM_Mesh::e2n_getAll(int e, int *adjnodes) 
+{
+  FEM_Elem &elems = setElem(1);
+  FEM_IndexAttribute *eConn = 
+    (FEM_IndexAttribute *)elems.lookup(FEM_CONN, "e2n_getAll");
+  AllocTable2d<int> &conn = eConn->get();
+  for (int i=0; i<conn.width(); i++) {
+    adjnodes[i] = conn[e][i];
+  }
+}
+
+/// Given id of element e, return the id of the idx-th adjacent node
+inline int FEM_Mesh::e2n_getNode(int e, short idx) 
+{ 
+  FEM_Elem &elems = setElem(1);
+  FEM_IndexAttribute *eConn = 
+    (FEM_IndexAttribute *)elems.lookup(FEM_CONN, "e2n_getAll");
+  AllocTable2d<int> &conn = eConn->get();
+  return conn[e][idx];
+}
+
+/// Given id of element e and id of a node n, return i such that
+/// n is the i-th node adjacent to e
+inline short FEM_Mesh::e2n_getIndex(int e, int n) 
+{
+  FEM_Elem &elems = setElem(1);
+  FEM_IndexAttribute *eConn = 
+    (FEM_IndexAttribute *)elems.lookup(FEM_CONN, "e2n_getAll");
+  AllocTable2d<int> &conn = eConn->get();
+  for (int i=0; i<conn.width(); i++) {
+    if (conn[e][i] == n) {
+      return i;
+    }
+  }
+  return -1;
+}
+
+/// Set the node adjacencies of element e to adjnodes; assumes adjnodes 
+/// has the correct size
+inline void FEM_Mesh::e2n_setAll(int e, int *adjnodes) 
+{
+  FEM_Elem &elems = setElem(1);
+  FEM_IndexAttribute *eConn = 
+    (FEM_IndexAttribute *)elems.lookup(FEM_CONN, "e2n_getAll");
+  AllocTable2d<int> &conn = eConn->get();
+  for (int i=0; i<conn.width(); i++) {
+    conn[e][i] = adjnodes[i];
+  }
+}
+
+/// Set the idx-th node adjacent to e to be newNode
+inline void FEM_Mesh::e2n_setIndex(int e, short idx, int newNode) 
+{
+  FEM_Elem &elems = setElem(1);
+  FEM_IndexAttribute *eConn = 
+    (FEM_IndexAttribute *)elems.lookup(FEM_CONN, "e2n_getAll");
+  AllocTable2d<int> &conn = eConn->get();
+  conn[e][idx] = newNode;
+}
+
+/// Find node oldNode in e's adjacent ndoes and replace with newNode
+inline void FEM_Mesh::e2n_replace(int e, int oldNode, int newNode) 
+{
+  FEM_Elem &elems = setElem(1);
+  FEM_IndexAttribute *eConn = 
+    (FEM_IndexAttribute *)elems.lookup(FEM_CONN, "e2n_getAll");
+  AllocTable2d<int> &conn = eConn->get();
+  for (int i=0; i<conn.width(); i++) {
+    if (conn[e][i] == oldNode) {
+      conn[e][i] = newNode;
+	break;
+    }
+  }
+}
+
+//********* Node-to-node
+/// Place all of node n's adjacent nodes in adjnodes and the resulting 
+/// length of adjnodes in sz; assumes adjnodes is not allocated, but sz is
+inline void FEM_Mesh::n2n_getAll(int n, int *adjnodes, int *sz) 
+{
+  FEM_VarIndexAttribute *nAdj = 
+    (FEM_VarIndexAttribute *)node.lookup(FEM_NODE_NODE_ADJACENCY, 
+					 "n2n_getAll");
+  CkVec<CkVec<FEM_VarIndexAttribute::ID> > &nVec = nAdj->get();
+  CkVec<FEM_VarIndexAttribute::ID> &nsVec = nVec[n];
+  *sz = nsVec.length();
+  adjnodes = new int[*sz];
+  for (int i=0; i<(*sz); i++) {
+    adjnodes[i] = nsVec[i].id;
+  }
+}
+ 
+/// Adds newNode to node n's node adjacency list
+inline void FEM_Mesh::n2n_add(int n, int newNode) 
+{
+  FEM_VarIndexAttribute *nAdj = 
+    (FEM_VarIndexAttribute *)node.lookup(FEM_NODE_NODE_ADJACENCY, "n2n_add");
+  CkVec<CkVec<FEM_VarIndexAttribute::ID> > &nVec = nAdj->get();
+  CkVec<FEM_VarIndexAttribute::ID> &nsVec = nVec[n];
+  FEM_VarIndexAttribute::ID nn(0, newNode);
+  nsVec.push_back(nn);
+}
+
+/// Removes oldNode from n's node adjacency list
+inline void FEM_Mesh::n2n_remove(int n, int oldNode) 
+{
+  FEM_VarIndexAttribute *nAdj = 
+    (FEM_VarIndexAttribute *)node.lookup(FEM_NODE_NODE_ADJACENCY, 
+					 "n2n_remove");
+  CkVec<CkVec<FEM_VarIndexAttribute::ID> > &nVec = nAdj->get();
+  CkVec<FEM_VarIndexAttribute::ID> &nsVec = nVec[n];
+  for (int i=0; i<nsVec.length(); i++) {
+    if (nsVec[i].id == oldNode) {
+      nsVec.remove(i);
+      break;
+    }
+  }
+}
+
+/// Finds oldNode in n's node adjacency list, and replaces it with newNode
+inline void FEM_Mesh::n2n_replace(int n, int oldNode, int newNode) 
+{
+  FEM_VarIndexAttribute *nAdj = 
+    (FEM_VarIndexAttribute *)node.lookup(FEM_NODE_NODE_ADJACENCY, 
+					 "n2n_replace");
+  CkVec<CkVec<FEM_VarIndexAttribute::ID> > &nVec = nAdj->get();
+  CkVec<FEM_VarIndexAttribute::ID> &nsVec = nVec[n];
+  for (int i=0; i<nsVec.length(); i++) {
+    if (nsVec[i].id == oldNode) {
+      nsVec[i].id = newNode;
+      break;
+    }
+  }
+}
+
+//********* Node-to-element
+/// Place all of node n's adjacent elements in adjelements and the resulting 
+/// length of adjelements in sz; assumes adjelements is not allocated, 
+/// but sz is
+inline void FEM_Mesh::n2e_getAll(int n, int *adjelements, int *sz) 
+{
+  FEM_VarIndexAttribute *eAdj = 
+    (FEM_VarIndexAttribute *)node.lookup(FEM_NODE_ELEM_ADJACENCY, 
+					 "n2e_getAll");
+  CkVec<CkVec<FEM_VarIndexAttribute::ID> > &eVec = eAdj->get();
+  CkVec<FEM_VarIndexAttribute::ID> &nsVec = eVec[n];
+  *sz = nsVec.length();
+  adjelements = new int[*sz];
+  for (int i=0; i<(*sz); i++) {
+    adjelements[i] = nsVec[i].id;
+  }
+}
+ 
+/// Adds newElem to node n's element adjacency list
+inline void FEM_Mesh::n2e_add(int n, int newElem) 
+{
+  FEM_VarIndexAttribute *eAdj = 
+    (FEM_VarIndexAttribute *)node.lookup(FEM_NODE_ELEM_ADJACENCY, "n2e_add");
+  CkVec<CkVec<FEM_VarIndexAttribute::ID> > &eVec = eAdj->get();
+  CkVec<FEM_VarIndexAttribute::ID> &nsVec = eVec[n];
+  FEM_VarIndexAttribute::ID ne(1, newElem);
+  nsVec.push_back(ne);
+}
+
+/// Removes oldElem from n's element adjacency list
+inline void FEM_Mesh::n2e_remove(int n, int oldElem) 
+{
+  FEM_VarIndexAttribute *eAdj = 
+    (FEM_VarIndexAttribute *)node.lookup(FEM_NODE_ELEM_ADJACENCY, 
+					 "n2e_remove");
+  CkVec<CkVec<FEM_VarIndexAttribute::ID> > &eVec = eAdj->get();
+  CkVec<FEM_VarIndexAttribute::ID> &nsVec = eVec[n];
+  for (int i=0; i<nsVec.length(); i++) {
+    if (nsVec[i].id == oldElem) {
+      nsVec.remove(i);
+      break;
+    }
+  }
+}
+ 
+/// Finds oldElem in n's element adjacency list, and replaces it with newElem
+inline void FEM_Mesh::n2e_replace(int n, int oldElem, int newElem) 
+{
+  FEM_VarIndexAttribute *eAdj = 
+    (FEM_VarIndexAttribute *)node.lookup(FEM_NODE_ELEM_ADJACENCY, 
+					 "n2e_replace");
+  CkVec<CkVec<FEM_VarIndexAttribute::ID> > &eVec = eAdj->get();
+  CkVec<FEM_VarIndexAttribute::ID> &nsVec = eVec[n];
+  for (int i=0; i<nsVec.length(); i++) {
+    if (nsVec[i].id == oldElem) {
+      nsVec[i].id = newElem;
+      break;
+    }
+  }
+}
+
+/// Get an element on edge (n1, n2) where n1, n2 are chunk-local
+/// node numberings; return -1 in case of failure
+inline int FEM_Mesh::getElementOnEdge(int n1, int n2) 
+{
+  int *n1AdjElems, *n2AdjElems;
+  int n1NumElems, n2NumElems;
+  n2e_getAll(n1, n1AdjElems, &n1NumElems);
+  n2e_getAll(n2, n2AdjElems, &n2NumElems);
+  for (int i=0; i<n1NumElems; i++) {
+    for (int j=0; j<n2NumElems; j++) {
+      if (n1AdjElems[i] == n2AdjElems[j]) {
+	return n1AdjElems[i]; 
+	break;
+      }
+    }
+  }
+  return -1; 
+}
