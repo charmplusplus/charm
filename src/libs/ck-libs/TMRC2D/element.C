@@ -82,10 +82,10 @@ void element::split(int longEdge)
   if ((result=edges[longEdge].split(&m, &e_prime,oIdx, fIdx,
 				    myRef, &local, &first, &nullNbr)) == 1) {
     // e_prime successfully created incident on othernode
-    DEBUGREF(CkPrintf("TMRC2D: Refining element %d, opnode=%d ^othernode=%d fixnode=%d longEdge=%d modEdge=%d otherEdge=%d\n", myRef.idx, nodes[opnode], nodes[othernode], nodes[fixnode], edges[longEdge].idx, edges[modEdge].idx, edges[otherEdge].idx);)
-    DEBUGREF(CkPrintf("TMRC2D: to FEM: element=%d local=%d first=%d between nodes %d and %d\n", myRef.idx, local, first, nodes[othernode], nodes[fixnode]);)
+    DEBUGREF(CkPrintf("TMRC2D: [%d] Refining element %d, opnode=%d ^othernode=%d fixnode=%d longEdge=%d modEdge=%d otherEdge=%d\n", myRef.cid, myRef.idx, nodes[opnode], nodes[othernode], nodes[fixnode], edges[longEdge].idx, edges[modEdge].idx, edges[otherEdge].idx);)
+    DEBUGREF(CkPrintf("TMRC2D: [%d] to FEM: element=%d local=%d first=%d between nodes %d and %d\n", myRef.cid, myRef.idx, local, first, nodes[othernode], nodes[fixnode]);)
     newEdge = C->addEdge(m, nodes[opnode], 0);
-    DEBUGREF(CkPrintf("TMRC2D: New edge (%d,%d) added between nodes %d and %d\n", newEdge.cid, newEdge.idx, m, nodes[opnode]);)
+    DEBUGREF(CkPrintf("TMRC2D: [%d] New edge (%d,%d) added between nodes %d and %d\n", myRef.cid, newEdge.cid, newEdge.idx, m, nodes[opnode]);)
     // add new element to preserve orientation
     if (opnode == 0) {
       if (othernode == 1)
@@ -147,10 +147,10 @@ void element::split(int longEdge)
   }
   else if (result == 0) { 
     // e_prime already incident on fixnode
-  DEBUGREF(CkPrintf("TMRC2D: Refining element %d, opnode=%d othernode=%d ^fixnode=%d longEdge=%d modEdge=%d otherEdge=%d\n", myRef.idx, nodes[opnode], nodes[othernode], nodes[fixnode], edges[longEdge].idx, edges[modEdge].idx, edges[otherEdge].idx);)
-      DEBUGREF(CkPrintf("TMRC2D: to FEM: element=%d local=%d first=%d between nodes %d and %d\n", myRef.idx, local, first, nodes[fixnode], nodes[othernode]);)
+  DEBUGREF(CkPrintf("TMRC2D: [%d] Refining element %d, opnode=%d othernode=%d ^fixnode=%d longEdge=%d modEdge=%d otherEdge=%d\n", myRef.cid, myRef.idx, nodes[opnode], nodes[othernode], nodes[fixnode], edges[longEdge].idx, edges[modEdge].idx, edges[otherEdge].idx);)
+      DEBUGREF(CkPrintf("TMRC2D: [%d] to FEM: element=%d local=%d first=%d between nodes %d and %d\n", myRef.cid, myRef.idx, local, first, nodes[fixnode], nodes[othernode]);)
     newEdge = C->addEdge(m, nodes[opnode], 0);
-    DEBUGREF(CkPrintf("TMRC2D: New edge (%d,%d) added between nodes %d and %d\n", newEdge.cid, newEdge.idx, m, nodes[opnode]);)
+    DEBUGREF(CkPrintf("TMRC2D: [%d] New edge (%d,%d) added between nodes %d and %d\n", myRef.cid, newEdge.cid, newEdge.idx, m, nodes[opnode]);)
     // add new element to preserve orientation
     if (opnode == 0) {
       if (fixnode == 1)
@@ -546,8 +546,6 @@ void element::sanityCheck(chunk *c, elemRef shouldRef, int n)
     CkAssert((nodes[i] < n) && (nodes[i] > -1));
     CkAssert(!(edges[i].isNull()));
     edges[i].sanityCheck();
-    CkAssert((C->theEdges[edges[i].idx].nodes[0]==nodes[i]) || (C->theEdges[edges[i].idx].nodes[0]==nodes[(i+1)%3]));
-    CkAssert((C->theEdges[edges[i].idx].nodes[1]==nodes[i]) || (C->theEdges[edges[i].idx].nodes[1]==nodes[(i+1)%3]));
   }
   CkAssert(nodes[0] != nodes[1]);
   CkAssert(nodes[0] != nodes[2]);
