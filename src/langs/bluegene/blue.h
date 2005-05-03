@@ -226,6 +226,7 @@ void BgSetNodeData(char *data);
 typedef void (*bgEventCallBackFn)(void *data, double adjust, double recvT, void *usrPtr);
 
 void BgElapse(double t);
+void BgAdvance(double t);
 void BgStartCorrection();
 
 /* BG event types */
