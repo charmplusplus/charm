@@ -1711,50 +1711,45 @@ FEM_ElemAdj_Layer* FEM_Mesh::curElemAdjLayer(void) {
 void FEM_Mesh::createElemElemAdj()
 {
 
-  FEM_ElemAdj_Layer *g = curElemAdjLayer();
-  for (int t=0;t<elem.size();t++) // for each element type
-    if (elem.has(t)) {
-  
-      const int tuplesPerElem = g->elem[t].tuplesPerElem;
-      const int numElements = elem[t].size();
-      const int nodesPerTuple = g->nodesPerTuple;
-      printf("nodesPerTuple=%d tuplesPerElem=%d number of elements: %d\n", nodesPerTuple, tuplesPerElem, numElements);
+	FEM_ElemAdj_Layer *g = curElemAdjLayer();
+	for (int t=0;t<elem.size();t++) // for each element type
+	if (elem.has(t)) {
+		const int tuplesPerElem = g->elem[t].tuplesPerElem;
+		const int numElements = elem[t].size();
+		const int nodesPerTuple = g->nodesPerTuple;
+		printf("nodesPerTuple=%d tuplesPerElem=%d number of elements: %d\n", nodesPerTuple, tuplesPerElem, numElements);
+		tupleTable table(nodesPerTuple);
+		elem[t].lookup(FEM_ELEM_ELEM_ADJACENCY,"FEM_Mesh::createNodeNodeAdj");
+		elem[t].setElemAdjacencySize(nodesPerTuple,numElements);
 
-      tupleTable table(nodesPerTuple);
-
-      elem[t].lookup(FEM_ELEM_ELEM_ADJACENCY,"FEM_Mesh::createNodeNodeAdj");
-      elem[t].setElemAdjacencySize(nodesPerTuple,numElements);
-
-      //For every element of this type:
-      for (int elemNum=0;elemNum<numElements;elemNum++)
-	{
-	  // insert every element into the tuple table
-	  const int *conn=elem[t].connFor(elemNum);
-
-	  //   printf("tupleTable::MAX_TUPLE=%d\n", tupleTable::MAX_TUPLE);
-	  int tuple[tupleTable::MAX_TUPLE];
-	  FEM_Symmetries_t allSym;
-
-	  printf("\nAdding tuple for element %d\n", elemNum);
-	  for (int u=0;u<tuplesPerElem;u++) 
-	    {		
-	      // similar to the code in splitter::addTuple() 
-	      for (int i=0;i<nodesPerTuple;i++) {
-		if(i!=0) printf("-");
-		int eidx=g->elem[t].elem2tuple[i+u*g->nodesPerTuple];
-		if (eidx==-1) { //"not-there" node--
-		  tuple[i]=-1; //Don't map via connectivity
-		} else { //Ordinary node
-		  int n=conn[eidx];
-		  tuple[i]=n; 
-		  printf("%d", n);
+		//For every element of this type:
+		for (int elemNum=0;elemNum<numElements;elemNum++)
+		{
+			// insert every element into the tuple table
+			const int *conn=elem[t].connFor(elemNum);
+			//   printf("tupleTable::MAX_TUPLE=%d\n", tupleTable::MAX_TUPLE);
+			int tuple[tupleTable::MAX_TUPLE];
+			FEM_Symmetries_t allSym;
+			printf("\nAdding tuple for element %d\n", elemNum);
+			for (int u=0;u<tuplesPerElem;u++) 
+			{		
+				// similar to the code in splitter::addTuple() 
+				for (int i=0;i<nodesPerTuple;i++) {
+					if(i!=0) printf("-");
+					int eidx=g->elem[t].elem2tuple[i+u*g->nodesPerTuple];
+					if (eidx==-1) { //"not-there" node--
+						tuple[i]=-1; //Don't map via connectivity
+					} else { //Ordinary node
+						int n=conn[eidx];
+						tuple[i]=n; 
+						printf("%d", n);
+					}
+				}
+				printf("  ");
+				table.addTuple(tuple,new elemList(0,elemNum,t,allSym,u)); 
+			}
+			printf("\n");
 		}
-	      }
-	      printf("  ");
-	      table.addTuple(tuple,new elemList(0,elemNum,t,allSym)); 
-	    }
-	  printf("\n");
-	}
   
       //Loop over all the tuples, connecting adjacent elements
       table.beginLookup();
@@ -1783,7 +1778,8 @@ void FEM_Mesh::createElemElemAdj()
 		printf("Found adjacent elements: %d and %d\n", a->localNo, b->localNo);
 		int j; 
 		// walk through array until we find a spot to put this data
-		for(j=a->localNo*tuplesPerElem;adjs[j]!=-1;j++);
+//		for(j=a->localNo*tuplesPerElem;adjs[j]!=-1;j++);
+		j = a->localNo*tuplesPerElem + a->tupleNo;
 		adjs[j] = b->localNo;
 		
 	      }

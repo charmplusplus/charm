@@ -30,6 +30,7 @@ extern "C" int ck_fem_map_compare_int(const void *a, const void *b);
 class elemList {
 public:
 	int chunk;
+	int tupleNo;//tuple number on this element for the tuple that this list sorrounds 
 	int localNo;//Local number of this element on this chunk (negative for a ghost)
 	int type; //Kind of element
 	FEM_Symmetries_t sym; //Symmetries this element was reached via
@@ -38,6 +39,10 @@ public:
 	elemList(int chunk_,int localNo_,int type_,FEM_Symmetries_t sym_)
 		:chunk(chunk_),localNo(localNo_),type(type_), sym(sym_) 
 		{ next=NULL; }
+	elemList(int chunk_,int localNo_,int type_,FEM_Symmetries_t sym_,int tupleNo_)
+		:chunk(chunk_),localNo(localNo_),type(type_), sym(sym_) , tupleNo(tupleNo_)
+		{ next=NULL; }
+	
 	~elemList() {if (next) delete next;}
 	void setNext(elemList *n) {next=n;}
 };
