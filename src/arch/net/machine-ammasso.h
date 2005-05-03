@@ -74,6 +74,11 @@ typedef struct __ammasso_private_data {
   cc_uint64_t ack_to;
 } AmmassoPrivateData;
 
+typedef struct __ammasso_token_description {
+  cc_stag_t stag;
+  cc_uint64_t to;
+} AmmassoTokenDescription;
+
 typedef CmiUInt4 ammasso_ack_t;
 
 /* Structures to deal with the buffering */
@@ -149,6 +154,8 @@ typedef struct __context_block {
   //CmiNodeLock bufferPoolLock;
   LIST_DEFINE(AmmassoToken,freeTokens);
 
+  int pinnedMemory;
+  int conditionRegistered;
 } mycb_t;
 
 // Global instance of the mycb_t structure to be used throughout this machine layer

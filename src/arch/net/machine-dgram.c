@@ -282,10 +282,15 @@ typedef struct OtherNodeStruct
 
   // list of buffers currently allocated to this paricular node
   LIST_DEFINE(AmmassoBuffer,recv_buf);
+  // This is used when deallocating buffers: it is set to the buffer previous to
+  // the last in the list of recv_buf, so that the list can be broken, and the
+  // buffers released without the usage of either a double linked list or a
+  // linear search
+  AmmassoBuffer          *secondLastRecvBuf;
 
   // when allocating new buffers, they remain here until the other node conferm
   // their allocation
-  AmmassoBuffer          *pending;
+  LIST_DEFINE(AmmassoBuffer,pending);
 
   // number of the next ACK to be sent to this node, it is piggybacked on every
   // message
@@ -327,6 +332,9 @@ typedef struct OtherNodeStruct
   cc_stag_t              remote_recv_stag;
   cc_uint64_t            remote_starting_to;
   int                    recv_UseIndex;
+
+  /* Used by DYNAMIC ALLOCATOR */
+  int  max_used_tokens;
 
 #endif
 

@@ -25,6 +25,10 @@
 #define ALIGN8(x)   (int)((~7)&((x)+7))
 #endif
 
+/* DYNAMIC ALLOCATOR: Limit of the allowed pinned memory */
+#define MAX_PINNED_MEMORY   100000000
+/* DYNAMIC ALLOCATOR END */
+
 #define WASTE_TIME 600
 // In order to use CC_POST_CHECK, the last argument to cc_qp_post_sq must be "nWR"
 #define CC_POST_CHECK(routine,args,nodeTo) {\
@@ -126,9 +130,30 @@ void closeQPConnection(OtherNode node, int destroyQPFlag);
 
 void BufferAlloc(int n);
 void TokenAlloc(int n);
+void RequestTokens(OtherNode node, int n);
+void GrantTokens(OtherNode node, int n);
+void RequestReleaseTokens(OtherNode node, int n);
+void ReleaseTokens(OtherNode node, int n);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 // Function Bodies /////////////////////////////////////////////////////////////////////////////////
+
+/* Callbacks used by the DYNAMIC ALLOCATOR */
+void AllocatorCheck () {
+  int i, limit;
+  char buf[24];
+  for (i=0; i<contextBlock->numNodes; ++i) {
+    if (i==contextBlock->myNode) continue;
+    limit = nodes[i].num_sendTokens - nodes[i].max_used_tokens - 10;
+    CmiPrintf("[%d] AllocatorCheck called: node %d, limit %d\n",CmiMyPe(),i,limit);
+    if (limit > 0) {
+      ReleaseTokens(&nodes[i], limit);
+      CmiPrintf("[%d] Releasing %d tokens to %d\n", CmiMyPe(), limit, i);
+      nodes[i].max_used_tokens = 0;
+    }
+  }
+}
+/* DYNAMIC ALLOCATOR END */
 
 void BufferAlloc(int n) {
   int i;
@@ -152,6 +177,7 @@ void BufferAlloc(int n) {
     CmiAbort(buf);
   }
 
+  contextBlock->pinnedMemory += n*sizeof(AmmassoBuffer);
   CC_CHECK(cc_nsmr_register_virt,(contextBlock->rnic,
 				  CC_ADDR_TYPE_VA_BASED,
 				  (cc_byte_t*)newBuffers,
@@ -201,6 +227,7 @@ void TokenAlloc(int n) {
     CmiAbort(buf);
   }
 
+  contextBlock->pinnedMemory += n*sizeof(AmmassoBuffer);
   CC_CHECK(cc_nsmr_register_virt,(contextBlock->rnic,
 				  CC_ADDR_TYPE_VA_BASED,
 				  (cc_byte_t*)sendBuffer,
@@ -253,6 +280,88 @@ void TokenAlloc(int n) {
     sendSgl = (cc_data_addr_t*)(((char*)sendSgl)+ALIGN8(sizeof(cc_data_addr_t)));
     tokenScanner = (AmmassoToken*)(((char*)tokenScanner)+ALIGN8(sizeof(AmmassoToken)));
   }
+}
+
+void RequestTokens(OtherNode node, int n) {
+  char buf[24];
+  *((int*)buf) = n;
+  sendDataOnQP(buf, sizeof(int), node, AMMASSO_MOREBUFFERS);
+}
+
+void GrantTokens(OtherNode node, int n) {
+  int i;
+  char *buf;
+  AmmassoBuffer *buffer;
+  AmmassoBuffer *prebuffer;
+  AmmassoTokenDescription *tokenDesc;
+  if (node->pending != NULL) return;
+  if (n*sizeof(AmmassoTokenDescription) + sizeof(int) > AMMASSO_BUFSIZE) {
+    n = (AMMASSO_BUFSIZE-sizeof(int)) / sizeof(AmmassoTokenDescription);
+  }
+  if (contextBlock->num_freeRecvBuffers < n) {
+    int quantity = (n - contextBlock->num_freeRecvBuffers + 1023) & (~1023);
+    BufferAlloc(quantity);
+  }
+  buf = (char*) CmiAlloc(n*sizeof(AmmassoTokenDescription) + sizeof(int));
+  *((int*)buf) = n;
+  tokenDesc = (AmmassoTokenDescription*)(buf+sizeof(int));
+  buffer = contextBlock->freeRecvBuffers;
+  for (i=0; i<n; ++i) {
+    tokenDesc[i].stag = buffer->stag;
+    tokenDesc[i].to = (unsigned long)buffer;
+    prebuffer = buffer;
+    buffer = buffer->next;
+  }
+  node->pending = contextBlock->freeRecvBuffers;
+  node->last_pending = prebuffer;
+  node->num_pending = n;
+  prebuffer->next = NULL;
+  contextBlock->num_freeRecvBuffers -= n;
+  contextBlock->freeRecvBuffers = buffer;
+  sendDataOnQP(buf, n*sizeof(AmmassoTokenDescription) + sizeof(int), node, AMMASSO_ALLOCATE);
+  CmiFree(buf);
+}
+
+void RequestReleaseTokens(OtherNode node, int n) {
+  char buf[24];
+  *((int*)buf) = n;
+  sendDataOnQP(buf, sizeof(int), node, AMMASSO_RELEASE);
+}
+
+void ReleaseTokens(OtherNode node, int n) {
+  int i, nWR;
+  AmmassoToken *token;
+  AmmassoBuffer *tokenBuf;
+  cc_data_addr_t *tokenSgl;
+
+  if (node->num_sendTokens < n) n = node->num_sendTokens - 1;
+  if (n <= 0) return;
+  token = node->sendTokens;
+  tokenBuf = token->localBuf;
+
+  tokenBuf->tail.length = 1;
+  tokenBuf->tail.ack = 0;  // do not send any ACK with this message
+  tokenBuf->tail.flags = AMMASSO_RELEASED;
+
+  // Setup the local SGL
+  tokenSgl = token->wr.wr_u.rdma_write.local_sgl.sge_list;
+  tokenSgl->length = sizeof(Tailer);
+  tokenSgl->to = (unsigned long)&tokenBuf->tail;
+  token->wr.wr_u.rdma_write.remote_to = (unsigned long)&token->remoteBuf->tail;
+
+  CC_POST_CHECK(cc_qp_post_sq,(contextBlock->rnic, node->qp, &token->wr, 1, &nWR),node->myNode);
+
+  if (contextBlock->freeTokens == NULL) {
+    contextBlock->freeTokens = node->sendTokens;
+  } else {
+    contextBlock->last_freeTokens->next = node->sendTokens;
+  }
+  for (i=1; i<n; ++i) token = token->next;
+  contextBlock->last_freeTokens = token;
+  node->sendTokens = token->next;
+  token->next = NULL;
+  contextBlock->num_freeTokens += n;
+  node->num_sendTokens -= n;
 }
 
 /* CmiMachineInit()
@@ -360,6 +469,14 @@ void AmmassoDoIdle() {
 
   AMMASSO_STATS_START(AmmassoDoIdle)
 
+  /* DYNAMIC ALLOCATOR: Callbacks */
+  /*if (contextBlock->conditionRegistered == 0) {
+    CcdCallOnConditionKeep(CcdPERIODIC_1s, (CcdVoidFn) AllocatorCheck, NULL);
+    //CcdCallFnAfter((CcdVoidFn) AllocatorCheck, NULL, 100);
+    contextBlock->conditionRegistered = 1;
+    }*/
+  /* DYNAMIC ALLOCATOR END */
+
   for (i = 0; i < contextBlock->numNodes; i++) {
     if (i == contextBlock->myNode) continue;
     CheckRecvBufForMessage(&(nodes[i]));
@@ -424,6 +541,7 @@ void sendAck(OtherNode node) {
     token->wr.wr_u.rdma_write.remote_to = (unsigned long)&token->remoteBuf->tail;
     CC_POST_CHECK(cc_qp_post_sq,(contextBlock->rnic, node->qp, &token->wr, 1, &nWR),node->myNode);
     LIST_ENQUEUE(node->,usedTokens,token);
+    node->max_used_tokens = (node->num_usedTokens>node->max_used_tokens)?node->num_usedTokens:node->max_used_tokens;
     *node->remoteAck = tmp_ack & ACK_MASK;
   }
 
@@ -611,6 +729,7 @@ int sendDataOnQP(char* data, int len, OtherNode node, char flags) {
     // Enqueue the token to the used queue immediately, so it is safe to be
     // interrupted by other calls
     LIST_ENQUEUE(node->,usedTokens,sendBufToken);
+    node->max_used_tokens = (node->num_usedTokens>node->max_used_tokens)?node->num_usedTokens:node->max_used_tokens;
 
     // Copy the contents (up to AMMASSO_BUFSIZE worth) of data into the send buffer
 
@@ -888,8 +1007,12 @@ static void ServiceCharmrun_nolock() {
 
 void processAmmassoControlMessage(char* msg, int len, Tailer *tail, OtherNode from) {
 
-  int nodeIndex, ctrlType, i;
+  int nodeIndex, ctrlType, i, n, nWR;
+  AmmassoToken *token, *pretoken;
+  AmmassoBuffer *tokenBuf;
+  cc_data_addr_t *tokenSgl;
   OtherNode node;
+  AmmassoTokenDescription *tokenDesc;
 
   AMMASSO_STATS_START(processAmmassoControlMessage)
 
@@ -903,16 +1026,95 @@ void processAmmassoControlMessage(char* msg, int len, Tailer *tail, OtherNode fr
     // Decrement the node ready count by one
     contextBlock->nodeReadyCount--;
     MACHSTATE1(3, "processAmmassoControlMessage() - Ammasso - INFO: Received READY packet... still waiting for %d more...", contextBlock->nodeReadyCount);
-    
+
     break;
 
-  case AMMASSO_ALLOCATE:
-  case AMMASSO_ALLOCATED:
-  case AMMASSO_MOREBUFFERS:
-  case AMMASSO_RELEASE:
-  case AMMASSO_RELEASED:
+  case AMMASSO_ALLOCATE: // Sent by the receiver to allocate more tokens
 
-    // All of the preceeding have to be implemented
+    token = getQPSendToken(from);
+    tokenBuf = token->localBuf;
+
+    tokenBuf->tail.length = 1;
+    tokenBuf->tail.ack = 0;  // do not send any ACK with this message
+    tokenBuf->tail.flags = AMMASSO_ALLOCATED;
+
+    // Setup the local SGL
+    tokenSgl = token->wr.wr_u.rdma_write.local_sgl.sge_list;
+    tokenSgl->length = sizeof(Tailer);
+    tokenSgl->to = (unsigned long)&tokenBuf->tail;
+    token->wr.wr_u.rdma_write.remote_to = (unsigned long)&token->remoteBuf->tail;
+
+    CC_POST_CHECK(cc_qp_post_sq,(contextBlock->rnic, node->qp, &token->wr, 1, &nWR),node->myNode);
+
+    LIST_ENQUEUE(from->,usedTokens,token);
+    from->max_used_tokens = (from->num_usedTokens>from->max_used_tokens)?from->num_usedTokens:from->max_used_tokens;
+    // add the new tokens at the end of usedTokens (right after the one which
+    // which we are sending back the confirmation)
+    n = *((int*)msg);
+    if (contextBlock->num_freeTokens < n) {
+      int quantity = (n - contextBlock->num_freeTokens + 1023) & (~1023);
+      BufferAlloc(quantity);
+    }
+    token = contextBlock->freeTokens;
+    tokenDesc = (AmmassoTokenDescription*)(msg+sizeof(int));
+    for (i=0; i<n; ++i) {
+      token->remoteBuf = (AmmassoBuffer*)tokenDesc[i].to;
+      token->wr.wr_u.rdma_write.remote_stag = tokenDesc[i].stag;
+      pretoken = token;
+      token = token->next;
+    }
+    from->last_usedTokens->next = contextBlock->freeTokens;
+    from->last_usedTokens = pretoken;
+    pretoken->next = NULL;
+    contextBlock->freeTokens = token;
+    from->num_usedTokens += n;
+    contextBlock->num_freeTokens -= n;
+
+    break;
+
+  case AMMASSO_ALLOCATED: // Sent by the sender to conferm the token allocation
+
+    // link the pending buffers at the end of those allocated (right after the
+    // one with which this message came)
+    from->last_recv_buf->next = from->pending;
+    from->last_recv_buf = from->last_pending;
+    from->last_pending = NULL;
+    from->num_recv_buf += from->num_pending;
+    *from->remoteAck += from->num_pending;
+    from->num_pending = 0;
+
+    break;
+
+  case AMMASSO_MOREBUFFERS: // Sent by the sender to ask for more tokens
+
+    /* DYNAMIC ALLOCATOR: Grant what requested */
+    n = *((int*)msg);
+    GrantTokens(from, n);
+    /* DYNAMIC ALLOCATOR END */
+
+    break;
+
+  case AMMASSO_RELEASE: // Sent by the receiver to request back tokens
+
+    /* DYNAMIC ALLOCATOR: Ignore the request of the receiver to return buffers */
+    /* DYNAMIC ALLOCATOR END */
+
+    break;
+
+  case AMMASSO_RELEASED: // Sent by the sender to release tokens
+
+    // This secondLastRecvBuf is set in CheckRecvBufForMessage
+    from->secondLastRecvBuf->next = NULL;
+    tokenBuf = from->last_recv_buf;
+    from->last_recv_buf = from->secondLastRecvBuf;
+    from->num_recv_buf--;
+    LIST_ENQUEUE(contextBlock->,freeRecvBuffers,tokenBuf);
+    n = *((int*)msg);
+    for (i=1; i<n; ++i) {
+      LIST_DEQUEUE(from->,recv_buf,tokenBuf);
+      LIST_ENQUEUE(contextBlock->,freeRecvBuffers,tokenBuf);
+    }
+
     break;
 
   case ACK_WRAPPING:
@@ -1715,7 +1917,7 @@ void AsynchronousEventHandler(cc_rnic_handle_t rnic, cc_event_record_t *er, void
       // Local Errors
     case CCAE_QP_LOCAL_CATASTROPHIC_ERROR:
       MACHSTATE3(5, "AsynchronousEventHandler() - WARNING: Connection Error \"%s\" - er->resource_indicator = %d (CC_RES_IND_QP: %d)", cc_event_id_to_string(er->event_id), er->resource_indicator, CC_RES_IND_QP);
-      CmiPrintf("AsynchronousEventHandler() - WARNING: Connection Error \"%s\" - er->resource_indicator = %d (CC_RES_IND_QP: %d)", cc_event_id_to_string(er->event_id), er->resource_indicator, CC_RES_IND_QP);
+      CmiPrintf("AsynchronousEventHandler() - WARNING: Connection Error \"%s\" - er->resource_indicator = %d (CC_RES_IND_QP: %d)\n", cc_event_id_to_string(er->event_id), er->resource_indicator, CC_RES_IND_QP);
 
       // Figure out which QP went down
       node = getNodeFromQPId(er->resource_id.qp_id);
@@ -1758,6 +1960,7 @@ void CheckRecvBufForMessage(OtherNode node) {
 
   int needAck;
   unsigned int len;
+  AmmassoBuffer *current;
 
   MACHSTATE1(2, "CheckRecvBufForMessage() - INFO: Called... (node->recv_buf = %p)...", node->recv_buf);
 
@@ -1771,18 +1974,19 @@ void CheckRecvBufForMessage(OtherNode node) {
     (*node->remoteAck) ++;
     node->messagesNotYetAcknowledged ++;
 
-    // Process the messsage, NOTE that the message start is aligned to 8 bytes!
-    needAck = ProcessMessage(&(node->recv_buf->buf[AMMASSO_BUFSIZE - ALIGN8(len)]), len, &node->recv_buf->tail, node);
-
-    // If an ACK is needed in response to this message, send one
-    if (needAck) sendAck(node);
-
+    current = node->recv_buf;
     // Move the recv_buf back at the end of the receiving queue. This works also
     // if the queue if formed by a single element
     node->last_recv_buf->next = node->recv_buf;
     node->last_recv_buf = node->recv_buf;
     node->recv_buf = node->recv_buf->next;
     node->last_recv_buf->next = NULL;
+
+    // Process the messsage, NOTE that the message start is aligned to 8 bytes!
+    needAck = ProcessMessage(&(current->buf[AMMASSO_BUFSIZE - ALIGN8(len)]), len, &current->tail, node);
+
+    // If an ACK is needed in response to this message, send one
+    if (needAck) sendAck(node);
   }
 
 }
@@ -1975,6 +2179,7 @@ void CmiAmmassoOpenQueuePairs() {
   contextBlock->numNodes = numNodes = _Cmi_numnodes;
   contextBlock->outstandingConnectionCount = contextBlock->numNodes - 1;  // No connection with self
   contextBlock->nodeReadyCount = contextBlock->numNodes - 1;              // No ready packet from self
+  contextBlock->conditionRegistered = 0;
 
   MACHSTATE2(1, "CmiAmmassoOpenQueuePairs() - INFO: myNode = %d, numNodes = %d", myNode, numNodes);
 
@@ -1995,6 +2200,7 @@ void CmiAmmassoOpenQueuePairs() {
     CmiAbort(buf);
   }
 
+  contextBlock->pinnedMemory = AMMASSO_INITIAL_BUFFERS*sizeof(AmmassoBuffer) + (contextBlock->numNodes-1)*sizeof(ammasso_ack_t);
   CC_CHECK(cc_nsmr_register_virt,(contextBlock->rnic,
 				  CC_ADDR_TYPE_VA_BASED,
 				  (cc_byte_t*)contextBlock->freeRecvBuffers,
@@ -2048,6 +2254,7 @@ void CmiAmmassoOpenQueuePairs() {
     CmiAbort(buf);
   }
 
+  contextBlock->pinnedMemory += AMMASSO_INITIAL_BUFFERS*sizeof(AmmassoBuffer) + (contextBlock->numNodes-1)*sizeof(ammasso_ack_t);
   CC_CHECK(cc_nsmr_register_virt,(contextBlock->rnic,
 				  CC_ADDR_TYPE_VA_BASED,
 				  (cc_byte_t*)sendBuffer,
@@ -2147,6 +2354,7 @@ void CmiAmmassoOpenQueuePairs() {
     nodes[i].sendBufLock = CmiCreateLock();
     nodes[i].send_next_lock = CmiCreateLock();
     nodes[i].recv_expect_lock = CmiCreateLock();
+    nodes[i].max_used_tokens = 0;
     //nodes[i].send_UseIndex = 0;
     //nodes[i].send_InUseCounter = 0;
     //nodes[i].recv_UseIndex = 0;
@@ -2327,6 +2535,7 @@ void establishQPConnection(OtherNode node, int reuseQPFlag) {
     MACHSTATE(1, "establishQPConnection() - INFO: (PRE-NSMR-REGISTER-VIRT QP-QUERY-ATTRS)");
 
     // Attempt to register the qp_attrs member of the OtherNode structure with the RNIC so the Queue Pair's state can be queried
+    contextBlock->pinnedMemory += sizeof(cc_qp_query_attrs_t);
     CC_CHECK(cc_nsmr_register_virt,(contextBlock->rnic,
 				    CC_ADDR_TYPE_VA_BASED,
 				    (cc_byte_t*)(&(node->qp_attrs)),
