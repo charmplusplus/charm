@@ -479,6 +479,7 @@ void FEM_Coarsen_Operation(FEM_Operation_Data *coarsen_data, coarsenData &operat
 				coord[2*nodeToKeep] = operation.data.cdata.newX;
 				coord[2*nodeToKeep+1] = operation.data.cdata.newY;
 				validNodeData[nodeToThrow] = 0;
+				validNodeData[nodeToKeep] = 1;
 				DEBUGINT(printf("---------Collapse <%d,%d> invalidating node %d and element %d \n",nodeToKeep,nodeToThrow,nodeToThrow,tri));
 			}
 			validElemData[tri] = 0;
@@ -527,7 +528,9 @@ void interpolateNode(FEM_Node *node,int A,int B,int D,double frac){
 		FEM_Attribute *a = (FEM_Attribute *)(*attrs)[i];
 		if(a->getAttr()<FEM_ATTRIB_TAG_MAX){
 			FEM_DataAttribute *d = (FEM_DataAttribute *)a;
+			CmiMemoryCheck();
 			d->interpolate(A,B,D,frac);
+			CmiMemoryCheck();
 		}	
 	}	
 }

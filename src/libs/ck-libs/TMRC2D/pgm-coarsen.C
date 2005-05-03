@@ -465,7 +465,7 @@ driver(void)
     CkPrintf("Entering timeloop\n");
   }	
   //  int tSteps=0x70FF00FF;
-  int tSteps=10;
+  int tSteps=2;
   int z=13;
   calcMasses(g);
   double startTime=CkWallTimer();
@@ -549,11 +549,12 @@ driver(void)
     double *areas=new double[g.nelems];
     for (i=0;i<g.nelems;i++) {
       areas[i]=1.001*calcArea(g,i);
+//      areas[i]=calcArea(g,i);
     }
     
     //coarsen all steps
-    //areas[z] *= 2.0;
-    //z += 3;
+//    areas[z] *= 2.0;
+    z += 3;
     CkPrintf("[%d] Starting coarsening step: %d nodes, %d elements to %.3g\n", myChunk,g.nnodes,g.nelems,curArea);
     FEM_REFINE2D_Coarsen(FEM_Mesh_default_read(),FEM_NODE,(double *)g.coord,FEM_ELEM,areas);
     repeat_after_split((void *)&g);
@@ -573,7 +574,7 @@ driver(void)
 	  vcoord[2*count] = ((double *)g.coord)[2*i];
 	  vcoord[2*count+1] = ((double *)g.coord)[2*i+1];
 	  maptovalid[i] = count;
-	  printf("~~~~~~~ %d %d %.6lf %.6lf \n",count,i,vcoord[2*count],vcoord[2*count+1]);
+	  printf("node~~~~~~~ %d %d %.6lf %.6lf \n",count,i,vcoord[2*count],vcoord[2*count+1]);
 	  vnodeid[count] = i;
 	  count++;	
 	}
