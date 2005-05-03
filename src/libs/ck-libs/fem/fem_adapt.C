@@ -1,5 +1,19 @@
 #include "fem_adapt.h"  
 
+//init the validData method
+AllocTable2d<int> *FEM_Adapt::validDataFor(int entityNumber){
+	FEM_Entity *entity = theMesh->lookup(entityNumber,"validDataFor");
+	FEM_DataAttribute *validAttribute = (FEM_DataAttribute *)entity->lookup(FEM_VALID,"validDataFor");
+	if(validAttribute==NULL){
+		return NULL;
+	}else{
+		AllocTable2d<int> *validData = &validAttribute->getInt();
+		return validData;
+	}
+}
+
+
+
 // Helpers
 int FEM_Adapt::get_edge_index(int local_node1, int local_node2) 
 {
@@ -158,8 +172,8 @@ int FEM_Adapt::edge_bisect_help(int e1, int e2, int n1, int n2, int e1_n1,
   int mod_edge1 = get_edge_index(e1_n2, e1_n3);
   int e1nbr = theMesh->e2e_getNbr(e1, mod_edge1);
   int n3 = theMesh->e2n_getNode(e1, e1_n3);
-  int n5 = theMesh->newNode();
-  int e3 = theMesh->newElement();
+  int n5 = newNode();
+  int e3 = newElement();
   int e2_n1;
   int e2_n2;
   int e2_n3;
@@ -174,7 +188,7 @@ int FEM_Adapt::edge_bisect_help(int e1, int e2, int n1, int n2, int e1_n1,
     mod_edge2 = get_edge_index(e2_n1, e2_n3);
     e2nbr = theMesh->e2e_getNbr(e2, mod_edge2);
     n4 = theMesh->e2n_getNode(e2, e2_n3);
-    e4 = theMesh->newElement();
+    e4 = newElement();
   }
   
   // Element-to-node updates
@@ -309,9 +323,9 @@ int FEM_Adapt::edge_contraction_help(int e1, int e2, int n1, int n2, int e1_n1,
   theMesh->n2e_remove(n3, e1);
   theMesh->n2e_remove(n4, e2);
   
-  theMesh->deleteNode(n2);
-  theMesh->deleteElement(e1);
-  theMesh->deleteElement(e2);
+  deleteNode(n2);
+  deleteElement(e1);
+  deleteElement(e2);
   return 1;
 }
 
@@ -345,9 +359,9 @@ int FEM_Adapt::vertex_split(int n, int n1, int n2, int e1, int e3)
     n_e3 = find_local_node_index(e3, n);
     n2_e3 = find_local_node_index(e3, n2);
   }
-  int np = theMesh->newNode();
-  int e5 = theMesh->newElement();
-  int e6 = theMesh->newElement();
+  int np = newNode();
+  int e5 = newElement();
+  int e6 = newElement();
   int nnCount=0, neCount=0;
   int np_nodes[50], np_elems[50]; // I certainly hope the mesh is not this bad
   adj_traverse(n, n1, e2, n2, e4, &nnCount, &neCount, np_nodes, np_elems);
@@ -433,3 +447,44 @@ void FEM_Adapt::element_bisect(int e1)
   (void) edge_bisect(e1, n1, n2);
 }
 */
+
+
+int FEM_Adapt::newSlot(AllocTable2d<int> *validData){
+	int length = validData->size();
+	for(int i=0;i<length;i++){
+		if((*validData)[i][0] == 0){
+			(*validData)[i][0] = 1;
+			return i;
+		}
+	}
+	return length;
+};
+
+void FEM_Adapt::invalidateSlot(AllocTable2d<int> *validData,int slotNumber){
+	(*validData)[slotNumber][0] = 0;
+};
+
+int FEM_Adapt::newNode(){
+	if(nodeValid){
+		return  newSlot(nodeValid);
+	}else{
+		return theMesh->node.size();
+	}
+};
+
+int FEM_Adapt::newElement(){
+	if(elemValid){
+		return newSlot(elemValid);
+	}else{
+		FEM_Elem *elem = (FEM_Elem *)theMesh->lookup(FEM_ELEM,"newElement");
+		return elem->size();
+	}
+};
+
+void FEM_Adapt::deleteNode(int n){
+	invalidateSlot(nodeValid,n);
+};
+
+void FEM_Adapt::deleteElement(int e){
+	invalidateSlot(elemValid,e);
+};

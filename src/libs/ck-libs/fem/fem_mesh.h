@@ -1167,15 +1167,6 @@ class FEM_Mesh : public CkNoncopyable {
   FEM_ElemAdj_Layer *addElemAdjLayer(void);
   FEM_ElemAdj_Layer *curElemAdjLayer(void);
   
-  /*** Terry's mesh accessors & modifiers ***/
-  /// Add a new node to the mesh, return the chunk-local numbering; -1 failure.
-  int newNode() { return -1; }
-  /// Add a new elem to the mesh, return the chunk-local numbering; -1 failure.
-  int newElement() { return -1; }
-  /// Remove node from the mesh
-  void deleteNode(int n) {}
-  /// Remove element from the mesh
-  void deleteElement(int e) {}
 
   // Terry's adjacency accessors & modifiers
 

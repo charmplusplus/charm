@@ -10,6 +10,11 @@
 
 class FEM_Adapt {
   FEM_Mesh *theMesh;
+	/**
+	 * Cached pointers to the FEM_VALID arrays of the elements and nodes		
+	 */
+	AllocTable2d<int> *nodeValid, *elemValid;
+
   // Helper methods
   /// Find an element-local node numbering for a chunk-local node
   /** Given a chunk-local element number e and a chunk-local node number n,
@@ -31,7 +36,18 @@ class FEM_Adapt {
   void adj_traverse(int n, int startNode, int stopNode, int startElem, 
 		    int stopElem, int *nn, int *ne, int *nodeList,
 		    int *elemList);
-
+	
+	/**
+	 *return the valid data array for this particular type of entity
+	*/
+	AllocTable2d<int> *validDataFor(int entityNumber);
+	/**
+	 * Find out the first empty slot in a valid data array, mark it valid 
+	 * and return its index
+	 * If there is no such slot, add one and set it to valid and return it
+	 */
+	int newSlot(AllocTable2d<int> *validData);
+	void invalidateSlot(AllocTable2d<int> *validData,int slotNumber);
  public:
   /// Map a pair of element-local node numberings to an element-local edge 
   /// numbering
@@ -43,6 +59,8 @@ class FEM_Adapt {
   /// Initialize FEM_Adapt with a chunk of the mesh
   FEM_Adapt(FEM_Mesh *m) {
     theMesh = m;
+		nodeValid = validDataFor(FEM_NODE);
+		elemValid = validDataFor(FEM_ELEM);
   }
   /// Perform a Delaunay flip of edge (n1, n2)
   /** Perform a Delaunay flip of the edge (n1, n2) returning 1 if successful,
@@ -93,6 +111,20 @@ class FEM_Adapt {
       the edge opposite to n, propagating and bisecting the
       neighboring element in a similar fashion
   virtual void element_bisect(int e1); **/
+
+
+	/**Sayantan: Code to find out the ids of new elements and nodes and delete old ones
+	 * Moved it here from fem_mesh.h
+	 */
+	/*** Terry's mesh accessors & modifiers ***/
+  /// Add a new node to the mesh, return the chunk-local numbering; -1 failure.
+  int newNode();
+  /// Add a new elem to the mesh, return the chunk-local numbering; -1 failure.
+  int newElement();
+  /// Remove node from the mesh
+  void deleteNode(int n);
+  /// Remove element from the mesh
+  void deleteElement(int e); 
 };
 
 #endif
