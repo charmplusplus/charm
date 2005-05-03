@@ -155,6 +155,7 @@ int FEM_Adapt::edge_bisect(int n1, int n2)
     CkPrintf("ERROR: edge_bisect: no element with edge [%d,%d]\n", n1, n2);
     return -1;	     
   }
+  CkPrintf("FEM_Adapt: Bisecting edge (%d,%d)\n", n1, n2);
   return edge_bisect(e1, n1, n2);
 }
 int FEM_Adapt::edge_bisect(int e1, int n1, int n2)
@@ -163,6 +164,7 @@ int FEM_Adapt::edge_bisect(int e1, int n1, int n2)
   int e1_n2 = find_local_node_index(e1, n2);
   int shared_edge = get_edge_index(e1_n1, e1_n2);
   int e2 = theMesh->e2e_getNbr(e1, shared_edge); 
+  CkPrintf("FEM_Adapt: Edge (%d,%d) is between elements %d and %d\n", n1, n2, e1, e2);
   return edge_bisect_help(e1, e2, n1, n2, e1_n1, e1_n2);
 }
 int FEM_Adapt::edge_bisect_help(int e1, int e2, int n1, int n2, int e1_n1, 
@@ -173,7 +175,9 @@ int FEM_Adapt::edge_bisect_help(int e1, int e2, int n1, int n2, int e1_n1,
   int e1nbr = theMesh->e2e_getNbr(e1, mod_edge1);
   int n3 = theMesh->e2n_getNode(e1, e1_n3);
   int n5 = newNode();
+  CkPrintf("FEM_Adapt: Adding node %d on edge (%d,%d)\n", n5, n1, n2);
   int e3 = newElement();
+  CkPrintf("FEM_Adapt: Adding new element %d\n", e3);
   int e2_n1;
   int e2_n2;
   int e2_n3;
@@ -189,6 +193,7 @@ int FEM_Adapt::edge_bisect_help(int e1, int e2, int n1, int n2, int e1_n1,
     e2nbr = theMesh->e2e_getNbr(e2, mod_edge2);
     n4 = theMesh->e2n_getNode(e2, e2_n3);
     e4 = newElement();
+    CkPrintf("FEM_Adapt: Adding new element %d\n", e4);
   }
   
   // Element-to-node updates
@@ -292,7 +297,7 @@ int FEM_Adapt::edge_contraction_help(int e1, int e2, int n1, int n2, int e1_n1,
   int *n2_nbrNodes, *n2_nbrElems;
   int nnsize, nesize;
   theMesh->n2n_getAll(n2, n2_nbrNodes, &nnsize);
-  theMesh->n2e_getAll(n2, n2_nbrElems, &nesize);
+  theMesh->n2e_getAll(n2, &n2_nbrElems, &nesize);
   
   // Element-to-node updates
   for (int i=0; i<nesize; i++) {

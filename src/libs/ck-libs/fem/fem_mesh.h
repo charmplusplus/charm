@@ -1219,7 +1219,7 @@ class FEM_Mesh : public CkNoncopyable {
   /// Place all of node n's adjacent elements in adjelements and the resulting 
   /// length of adjelements in sz; assumes adjelements is not allocated, 
   /// but sz is
-  void n2e_getAll(int n, int *adjelements, int *sz);
+  void n2e_getAll(int n, int **adjelements, int *sz);
   /// Adds newElem to node n's element adjacency list
   void n2e_add(int n, int newElem);
   /// Removes oldElem from n's element adjacency list

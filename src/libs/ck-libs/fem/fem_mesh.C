@@ -1868,7 +1868,7 @@ void FEM_writeMesh(FEM_Mesh *m,const char *prefix,int chunkNo,int nChunks)
 /// neighbors allocated to correct size
 void FEM_Mesh::e2e_getAll(int e, int *neighbors) 
 {
-  FEM_Elem &elems = setElem(1);
+  FEM_Elem &elems = setElem(0);
   FEM_IndexAttribute *eAdj = 
     (FEM_IndexAttribute *)elems.lookup(FEM_ELEM_ELEM_ADJACENCY, 
 				       "e2e_getAll");
@@ -1881,11 +1881,13 @@ void FEM_Mesh::e2e_getAll(int e, int *neighbors)
 /// Given id of element e, return the id of the idx-th adjacent element
 int FEM_Mesh::e2e_getNbr(int e, short idx) 
 {     
-  FEM_Elem &elems = setElem(1);
+  FEM_Elem &elems = setElem(0);
   FEM_IndexAttribute *eAdj = 
     (FEM_IndexAttribute *)elems.lookup(FEM_ELEM_ELEM_ADJACENCY, 
 				       "e2e_getNbr");
   AllocTable2d<int> &eAdjs = eAdj->get();
+  CkPrintf("e2e_getNbr: nbrs are: %d %d %d requested %d-th\n", eAdjs[e][0],
+	   eAdjs[e][1], eAdjs[e][2], idx);
   return eAdjs[e][idx];
 }
 
@@ -1893,7 +1895,7 @@ int FEM_Mesh::e2e_getNbr(int e, short idx)
 /// nbr is the i-th element adjacent to e
 int FEM_Mesh::e2e_getIndex(int e, int nbr) 
 { 
-  FEM_Elem &elems = setElem(1);
+  FEM_Elem &elems = setElem(0);
   FEM_IndexAttribute *eAdj = 
     (FEM_IndexAttribute *)elems.lookup(FEM_ELEM_ELEM_ADJACENCY, 
 				       "e2e_getNbr");
@@ -1910,7 +1912,7 @@ int FEM_Mesh::e2e_getIndex(int e, int nbr)
 /// has the correct size
 void FEM_Mesh::e2e_setAll(int e, int *neighbors) 
 {
-  FEM_Elem &elems = setElem(1);
+  FEM_Elem &elems = setElem(0);
   FEM_IndexAttribute *eAdj = 
     (FEM_IndexAttribute *)elems.lookup(FEM_ELEM_ELEM_ADJACENCY, 
 				       "e2e_getNbr");
@@ -1923,7 +1925,7 @@ void FEM_Mesh::e2e_setAll(int e, int *neighbors)
 /// Set the idx-th element adjacent to e to be newElem
 void FEM_Mesh::e2e_setIndex(int e, short idx, int newElem) 
 {
-  FEM_Elem &elems = setElem(1);
+  FEM_Elem &elems = setElem(0);
   FEM_IndexAttribute *eAdj = 
     (FEM_IndexAttribute *)elems.lookup(FEM_ELEM_ELEM_ADJACENCY, 
 				       "e2e_getNbr");
@@ -1934,7 +1936,7 @@ void FEM_Mesh::e2e_setIndex(int e, short idx, int newElem)
 /// Find element oldNbr in e's adjacent elements and replace with newNbr
 void FEM_Mesh::e2e_replace(int e, int oldNbr, int newNbr) 
 {
-  FEM_Elem &elems = setElem(1);
+  FEM_Elem &elems = setElem(0);
   FEM_IndexAttribute *eAdj = 
     (FEM_IndexAttribute *)elems.lookup(FEM_ELEM_ELEM_ADJACENCY, 
 				       "e2e_getNbr");
@@ -1952,7 +1954,7 @@ void FEM_Mesh::e2e_replace(int e, int oldNbr, int newNbr)
 /// adjnodes allocated to correct size
 void FEM_Mesh::e2n_getAll(int e, int *adjnodes) 
 {
-  FEM_Elem &elems = setElem(1);
+  FEM_Elem &elems = setElem(0);
   FEM_IndexAttribute *eConn = 
     (FEM_IndexAttribute *)elems.lookup(FEM_CONN, "e2n_getAll");
   AllocTable2d<int> &conn = eConn->get();
@@ -1964,7 +1966,7 @@ void FEM_Mesh::e2n_getAll(int e, int *adjnodes)
 /// Given id of element e, return the id of the idx-th adjacent node
 int FEM_Mesh::e2n_getNode(int e, short idx) 
 { 
-  FEM_Elem &elems = setElem(1);
+  FEM_Elem &elems = setElem(0);
   FEM_IndexAttribute *eConn = 
     (FEM_IndexAttribute *)elems.lookup(FEM_CONN, "e2n_getAll");
   AllocTable2d<int> &conn = eConn->get();
@@ -1975,7 +1977,7 @@ int FEM_Mesh::e2n_getNode(int e, short idx)
 /// n is the i-th node adjacent to e
 short FEM_Mesh::e2n_getIndex(int e, int n) 
 {
-  FEM_Elem &elems = setElem(1);
+  FEM_Elem &elems = setElem(0);
   FEM_IndexAttribute *eConn = 
     (FEM_IndexAttribute *)elems.lookup(FEM_CONN, "e2n_getAll");
   AllocTable2d<int> &conn = eConn->get();
@@ -1991,7 +1993,7 @@ short FEM_Mesh::e2n_getIndex(int e, int n)
 /// has the correct size
 void FEM_Mesh::e2n_setAll(int e, int *adjnodes) 
 {
-  FEM_Elem &elems = setElem(1);
+  FEM_Elem &elems = setElem(0);
   FEM_IndexAttribute *eConn = 
     (FEM_IndexAttribute *)elems.lookup(FEM_CONN, "e2n_getAll");
   AllocTable2d<int> &conn = eConn->get();
@@ -2003,7 +2005,7 @@ void FEM_Mesh::e2n_setAll(int e, int *adjnodes)
 /// Set the idx-th node adjacent to e to be newNode
 void FEM_Mesh::e2n_setIndex(int e, short idx, int newNode) 
 {
-  FEM_Elem &elems = setElem(1);
+  FEM_Elem &elems = setElem(0);
   FEM_IndexAttribute *eConn = 
     (FEM_IndexAttribute *)elems.lookup(FEM_CONN, "e2n_getAll");
   AllocTable2d<int> &conn = eConn->get();
@@ -2013,7 +2015,7 @@ void FEM_Mesh::e2n_setIndex(int e, short idx, int newNode)
 /// Find node oldNode in e's adjacent ndoes and replace with newNode
 void FEM_Mesh::e2n_replace(int e, int oldNode, int newNode) 
 {
-  FEM_Elem &elems = setElem(1);
+  FEM_Elem &elems = setElem(0);
   FEM_IndexAttribute *eConn = 
     (FEM_IndexAttribute *)elems.lookup(FEM_CONN, "e2n_getAll");
   AllocTable2d<int> &conn = eConn->get();
@@ -2089,7 +2091,7 @@ void FEM_Mesh::n2n_replace(int n, int oldNode, int newNode)
 /// Place all of node n's adjacent elements in adjelements and the resulting 
 /// length of adjelements in sz; assumes adjelements is not allocated, 
 /// but sz is
-void FEM_Mesh::n2e_getAll(int n, int *adjelements, int *sz) 
+void FEM_Mesh::n2e_getAll(int n, int **adjelements, int *sz) 
 {
   FEM_VarIndexAttribute *eAdj = 
     (FEM_VarIndexAttribute *)node.lookup(FEM_NODE_ELEM_ADJACENCY, 
@@ -2097,9 +2099,9 @@ void FEM_Mesh::n2e_getAll(int n, int *adjelements, int *sz)
   CkVec<CkVec<FEM_VarIndexAttribute::ID> > &eVec = eAdj->get();
   CkVec<FEM_VarIndexAttribute::ID> &nsVec = eVec[n];
   *sz = nsVec.length();
-  adjelements = new int[*sz];
+  (*adjelements) = new int[*sz];
   for (int i=0; i<(*sz); i++) {
-    adjelements[i] = nsVec[i].id;
+    (*adjelements)[i] = nsVec[i].id;
   }
 }
  
@@ -2152,8 +2154,9 @@ int FEM_Mesh::getElementOnEdge(int n1, int n2)
 {
   int *n1AdjElems, *n2AdjElems;
   int n1NumElems, n2NumElems;
-  n2e_getAll(n1, n1AdjElems, &n1NumElems);
-  n2e_getAll(n2, n2AdjElems, &n2NumElems);
+  n2e_getAll(n1, &n1AdjElems, &n1NumElems);
+  n2e_getAll(n2, &n2AdjElems, &n2NumElems);
+  printf("%d has %d neighboring elements, %d has %d\n", n1, n1NumElems, n2, n2NumElems);
   for (int i=0; i<n1NumElems; i++) {
     for (int j=0; j<n2NumElems; j++) {
       if (n1AdjElems[i] == n2AdjElems[j]) {
