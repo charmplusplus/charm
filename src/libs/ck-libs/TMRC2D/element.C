@@ -233,6 +233,7 @@ void element::collapse(int shortEdge)
   int opnode, delNode, keepNode, delEdge, keepEdge, result;
   elemRef keepNbr, delNbr, nbr;
   int local, first, flag, kBound, dBound, kFixed, dFixed;
+  double frac;
 
   // check if a different edge from the shortEdge is pending for coarsening
   if (edges[shortEdge].isPending(myRef)) {
@@ -270,6 +271,7 @@ void element::collapse(int shortEdge)
     if (!kFixed && !dFixed) {
       newNode=C->theNodes[nodes[keepNode]].midpoint(C->theNodes[nodes[delNode]]);
       newNode.boundary = 0;
+      frac = 0.5;
     }
     else if (dFixed && kFixed) return;
     else if (dFixed) {
@@ -277,21 +279,25 @@ void element::collapse(int shortEdge)
       tmpMap = delNode; delNode = keepNode; keepNode = tmpMap;
       tmpMap = delEdge; delEdge = keepEdge; keepEdge = tmpMap;
       tmpRef = delNbr; delNbr = keepNbr; keepNbr = tmpRef;
+      frac = 1.0;
     }
     else {
       newNode = C->theNodes[nodes[keepNode]];
+      frac = 1.0;
     }
   }
   else if ((kBound == 0) || (dBound == 0)) { // only one on boundary
     // collapse edge to boundary node
     if (kBound && !dFixed) {
       newNode = C->theNodes[nodes[keepNode]];
+      frac = 1.0;
     }
     else if (dBound && !kFixed) {
       newNode = C->theNodes[nodes[delNode]];
       tmpMap = delNode; delNode = keepNode; keepNode = tmpMap;
       tmpMap = delEdge; delEdge = keepEdge; keepEdge = tmpMap;
       tmpRef = delNbr; delNbr = keepNbr; keepNbr = tmpRef;
+      frac = 1.0;
     }
     else return;
   }
@@ -301,17 +307,20 @@ void element::collapse(int shortEdge)
     else if (kFixed || dFixed) { // if one fixed, collapse edge to fixed
       if (kFixed) {
 	newNode = C->theNodes[nodes[keepNode]];
+	frac = 1.0;
       }
       else {
 	newNode = C->theNodes[nodes[delNode]];
 	tmpMap = delNode; delNode = keepNode; keepNode = tmpMap;
 	tmpMap = delEdge; delEdge = keepEdge; keepEdge = tmpMap;
 	tmpRef = delNbr; delNbr = keepNbr; keepNbr = tmpRef;
+	frac = 1.0;
       }
     }
     else { // neither are fixeds, collapse edge to midpoint
       newNode=C->theNodes[nodes[keepNode]].midpoint(C->theNodes[nodes[delNode]]);
       newNode.boundary = kBound;
+      frac = 0.5;
     }
   }
   else { // nodes on different boundary
@@ -324,12 +333,14 @@ void element::collapse(int shortEdge)
 	  tmpMap = delNode; delNode = keepNode; keepNode = tmpMap;
 	  tmpMap = delEdge; delEdge = keepEdge; keepEdge = tmpMap;
 	  tmpRef = delNbr; delNbr = keepNbr; keepNbr = tmpRef;
+	  frac = 1.0;
 	}
       }
       else { // kBound is numbered higher
 	if (dFixed) return; // if it is, don't coarsen
 	else { // if it isn't, collapse edge to larger boundary node
 	  newNode = C->theNodes[nodes[keepNode]];
+	  frac = 1.0;
 	}
       }
     }
