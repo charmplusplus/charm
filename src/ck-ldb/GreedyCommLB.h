@@ -16,6 +16,9 @@
 #include "CentralLB.h"
 #include "GreedyCommLB.decl.h"
 
+#include "elements.h"
+#include "heap.h"
+
 #include "CommLBHeap.h"
 #define CUT_OFF_FACTOR 1.200
 
@@ -32,7 +35,8 @@ struct graph{
 class GreedyCommLB : public CentralLB {
 public:
   int nobj,npe, nmigobj;
-  double ** alloc_array;
+  int * assigned_array;
+  processorInfo* processors;
   graph * object_graph;
   GreedyCommLB(const CkLBOptions &);
   GreedyCommLB(CkMigrateMessage *m);
