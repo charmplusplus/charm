@@ -386,6 +386,7 @@ class FEM_Operation_Data{
 		double *coord;
 		int *connData,*nodeBoundaryData;
 		unsigned char *validNodeData,*validElemData;
+		FEM_Node *node;
 		FEM_Operation_Data(){
 		};
 };
@@ -420,6 +421,7 @@ void FEM_REFINE2D_Coarsen(int meshID,int nodeID,double *coord,int elemID,double 
 	AllocTable2d<unsigned char>&validNodeTable = ((FEM_DataAttribute *)validNodeAttr)->getChar();
 	AllocTable2d<unsigned char>&validElemTable = ((FEM_DataAttribute *)validElemAttr)->getChar();
 	FEM_Operation_Data *coarsen_data = new FEM_Operation_Data;
+	coarsen_data->node = (FEM_Node *)node;
 	coarsen_data->coord = coord;
 	int *connData = coarsen_data->connData= connTable.getData();
 	unsigned char *validNodeData = coarsen_data->validNodeData = validNodeTable.getData();
@@ -457,6 +459,8 @@ void FEM_REFINE2D_Coarsen(int meshID,int nodeID,double *coord,int elemID,double 
 	delete coarsen_data;
 }  
 
+void interpolateNode(FEM_Node *node,int A,int B,int D,double frac);
+
 void FEM_Coarsen_Operation(FEM_Operation_Data *coarsen_data, coarsenData &operation){
 	double *coord = coarsen_data->coord;
 	int tri,nodeToThrow,nodeToKeep,n1,n2;
@@ -471,6 +475,7 @@ void FEM_Coarsen_Operation(FEM_Operation_Data *coarsen_data, coarsenData &operat
 			nodeToKeep = operation.data.cdata.nodeToKeep;
 			nodeToThrow = operation.data.cdata.nodeToDelete;
 			if(operation.data.cdata.flag & 0x1 || operation.data.cdata.flag & 0x2){
+				interpolateNode(coarsen_data->node,nodeToKeep,nodeToThrow,nodeToKeep,0.5);
 				coord[2*nodeToKeep] = operation.data.cdata.newX;
 				coord[2*nodeToKeep+1] = operation.data.cdata.newY;
 				validNodeData[nodeToThrow] = 0;
@@ -515,3 +520,15 @@ void FEM_Coarsen_Operation(FEM_Operation_Data *coarsen_data, coarsenData &operat
 FDECL void FTN_NAME(FEM_REFINE2D_COARSEN,fem_refine2d_coarsen)(int *meshID,int *nodeID,double *coord,int *elemID,double *desiredAreas){
   FEM_REFINE2D_Coarsen(*meshID,*nodeID,coord,*elemID,desiredAreas);
 }
+
+void interpolateNode(FEM_Node *node,int A,int B,int D,double frac){
+	CkVec<FEM_Attribute *>*attrs = node->getAttrVec();
+	for(int i=0;i<attrs->size();i++){
+		FEM_Attribute *a = (FEM_Attribute *)(*attrs)[i];
+		if(a->getAttr()<FEM_ATTRIB_TAG_MAX){
+			FEM_DataAttribute *d = (FEM_DataAttribute *)a;
+			d->interpolate(A,B,D,frac);
+		}	
+	}	
+}
+
