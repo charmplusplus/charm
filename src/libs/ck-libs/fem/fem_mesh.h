@@ -336,6 +336,8 @@ public:
 	
 	/// Return our attribute code
 	inline int getAttr(void) const {return attr;}
+
+	inline FEM_Entity *getEntity(void) {return e;}
 	
 	/// Return the number of rows in our table of data (0 if unknown).
 	/// This value is obtained directly from our owning Entity.
