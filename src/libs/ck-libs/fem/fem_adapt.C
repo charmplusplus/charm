@@ -1,15 +1,10 @@
 #include "fem_adapt.h"  
 
 //init the validData method
-AllocTable2d<int> *FEM_Adapt::validDataFor(int entityNumber){
+FEM_DataAttribute *FEM_Adapt::validDataFor(int entityNumber){
 	FEM_Entity *entity = theMesh->lookup(entityNumber,"validDataFor");
 	FEM_DataAttribute *validAttribute = (FEM_DataAttribute *)entity->lookup(FEM_VALID,"validDataFor");
-	if(validAttribute==NULL){
-		return NULL;
-	}else{
-		AllocTable2d<int> *validData = &validAttribute->getInt();
-		return validData;
-	}
+	return validAttribute;
 }
 
 
@@ -454,7 +449,8 @@ void FEM_Adapt::element_bisect(int e1)
 */
 
 
-int FEM_Adapt::newSlot(AllocTable2d<int> *validData){
+int FEM_Adapt::newSlot(FEM_DataAttribute *validAttr){
+	AllocTable2d<int> *validData = &validAttr->getInt();
 	int length = validData->size();
 	for(int i=0;i<length;i++){
 		if((*validData)[i][0] == 0){
@@ -462,10 +458,13 @@ int FEM_Adapt::newSlot(AllocTable2d<int> *validData){
 			return i;
 		}
 	}
+	FEM_Entity *entity = validAttr->getEntity();
+	entity->setLength(length+1);
 	return length;
 };
 
-void FEM_Adapt::invalidateSlot(AllocTable2d<int> *validData,int slotNumber){
+void FEM_Adapt::invalidateSlot(FEM_DataAttribute *validAttr,int slotNumber){
+	AllocTable2d<int> *validData = &validAttr->getInt();
 	(*validData)[slotNumber][0] = 0;
 };
 

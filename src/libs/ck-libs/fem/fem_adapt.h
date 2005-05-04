@@ -13,7 +13,7 @@ class FEM_Adapt {
 	/**
 	 * Cached pointers to the FEM_VALID arrays of the elements and nodes		
 	 */
-	AllocTable2d<int> *nodeValid, *elemValid;
+	FEM_DataAttribute *nodeValid, *elemValid;
 
   // Helper methods
   /// Find an element-local node numbering for a chunk-local node
@@ -40,14 +40,14 @@ class FEM_Adapt {
 	/**
 	 *return the valid data array for this particular type of entity
 	*/
-	AllocTable2d<int> *validDataFor(int entityNumber);
+	FEM_DataAttribute *validDataFor(int entityNumber);
 	/**
 	 * Find out the first empty slot in a valid data array, mark it valid 
 	 * and return its index
 	 * If there is no such slot, add one and set it to valid and return it
 	 */
-	int newSlot(AllocTable2d<int> *validData);
-	void invalidateSlot(AllocTable2d<int> *validData,int slotNumber);
+	int newSlot(FEM_DataAttribute *validData);
+	void invalidateSlot(FEM_DataAttribute *validData,int slotNumber);
  public:
   /// Map a pair of element-local node numberings to an element-local edge 
   /// numbering
