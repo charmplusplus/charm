@@ -560,9 +560,10 @@ private:
 	CkVec<CkVec<ID> > idx;
 protected:
 	virtual void allocate(int _length,int _width,int _datatype){
+		int oldlength = idx.size();
 		setWidth(1,"allocate"); //there is 1 vector per entity 
 		idx.reserve(_length);
-		for(int i=0;i<_length;i++){
+		for(int i=oldlength;i<_length;i++){
 			CkVec<ID> tempVec;
 			idx.insert(i,tempVec);
 		}
