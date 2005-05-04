@@ -559,9 +559,10 @@ private:
 	typedef FEM_Attribute super;
 	CkVec<CkVec<ID> > idx;
 protected:
-	virtual void allocate(int length,int width,int datatype){
-		idx.reserve(length);
-		for(int i=0;i<length;i++){
+	virtual void allocate(int _length,int _width,int _datatype){
+		setWidth(1,"allocate"); //there is 1 vector per entity 
+		idx.reserve(_length);
+		for(int i=0;i<_length;i++){
 			CkVec<ID> tempVec;
 			idx.insert(i,tempVec);
 		}
