@@ -171,6 +171,9 @@ void GreedyCommLB::work(BaseLB::LDStats* _stats, int count)
     processors = new processorInfo[count];
     for (int p=0; p<count; p++) {
       processors[p].Id = p;
+      processors[p].backgroundLoad = stats->procs[p].bg_cputime;
+      processors[p].computeLoad = 0;
+      processors[p].pe_speed = stats->procs[p].pe_speed;
       if (!stats->procs[p].available) {
         processors[p].load = MAXDOUBLE;
       }
@@ -179,9 +182,6 @@ void GreedyCommLB::work(BaseLB::LDStats* _stats, int count)
         if (!_lb_args.ignoreBgLoad())
           processors[p].load = processors[p].backgroundLoad;
       }
-      processors[p].backgroundLoad = stats->procs[p].bg_cputime;
-      processors[p].computeLoad = 0;
-      processors[p].pe_speed = stats->procs[p].pe_speed;
     }
 
 
