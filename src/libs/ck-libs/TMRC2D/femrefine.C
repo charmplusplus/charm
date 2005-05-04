@@ -385,7 +385,7 @@ class FEM_Operation_Data{
 	public:
 		double *coord;
 		int *connData,*nodeBoundaryData;
-		unsigned char *validNodeData,*validElemData;
+		int *validNodeData,*validElemData;
 		FEM_Node *node;
 		FEM_Operation_Data(){
 		};
@@ -418,22 +418,25 @@ void FEM_REFINE2D_Coarsen(int meshID,int nodeID,double *coord,int elemID,double 
 		CkAbort("Grrrr element without connectivity \n");
 	}
 	AllocTable2d<int> &connTable = ((FEM_IndexAttribute *)connAttr)->get();
-	AllocTable2d<unsigned char>&validNodeTable = ((FEM_DataAttribute *)validNodeAttr)->getChar();
-	AllocTable2d<unsigned char>&validElemTable = ((FEM_DataAttribute *)validElemAttr)->getChar();
+	AllocTable2d<int>&validNodeTable = ((FEM_DataAttribute *)validNodeAttr)->getInt();
+	AllocTable2d<int>&validElemTable = ((FEM_DataAttribute *)validElemAttr)->getInt();
 	FEM_Operation_Data *coarsen_data = new FEM_Operation_Data;
 	coarsen_data->node = (FEM_Node *)node;
 	coarsen_data->coord = coord;
 	int *connData = coarsen_data->connData= connTable.getData();
-	unsigned char *validNodeData = coarsen_data->validNodeData = validNodeTable.getData();
-	unsigned char *validElemData = coarsen_data->validElemData = validElemTable.getData();
+	int *validNodeData = coarsen_data->validNodeData = validNodeTable.getData();
+	int *validElemData = coarsen_data->validElemData = validElemTable.getData();
 	/* Extract the data for node boundaries */
 	int *nodeBoundaryData= coarsen_data->nodeBoundaryData =NULL;
 	if(nodeBoundaryAttr){
 		AllocTable2d<int> &nodeBoundaryTable = ((FEM_DataAttribute *)nodeBoundaryAttr)->getInt();
 		nodeBoundaryData = coarsen_data->nodeBoundaryData = nodeBoundaryTable.getData();
 	}
-
+	
+	printf("Nodes and their valid flags\n");
 	for(int k=0;k<nnodes;k++){
+		int valid = validNodeData[k];
+		printf("%d %d\n",k+1,valid);
 		if(validNodeData[k]){
 			nodeCount++;
 		}
@@ -456,6 +459,11 @@ void FEM_REFINE2D_Coarsen(int meshID,int nodeID,double *coord,int elemID,double 
 		FEM_Coarsen_Operation(coarsen_data,operation);
 	}
 	*/
+	printf("Nodes and their valid flags\n");
+	for(int i=0;i<nnodes;i++){
+		int valid = validNodeData[i];
+		printf("%d %d\n",i+1,valid);
+	}
 	delete coarsen_data;
 }  
 
@@ -465,8 +473,8 @@ void FEM_Coarsen_Operation(FEM_Operation_Data *coarsen_data, coarsenData &operat
 	double *coord = coarsen_data->coord;
 	int tri,nodeToThrow,nodeToKeep,n1,n2;
 	int *connData = coarsen_data->connData;
-	unsigned char *validNodeData = coarsen_data->validNodeData;
-	unsigned char *validElemData = coarsen_data->validElemData;
+	int *validNodeData = coarsen_data->validNodeData;
+	int *validElemData = coarsen_data->validElemData;
 	int *nodeBoundaryData = coarsen_data->nodeBoundaryData;
 
 	switch(operation.type){
