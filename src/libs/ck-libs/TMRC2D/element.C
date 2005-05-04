@@ -393,8 +393,8 @@ void element::collapse(int shortEdge)
     if (!local && first) flag = BOUND_FIRST;
     if (!local && !first) flag = BOUND_SECOND;
     C->theClient->collapse(myRef.idx, kIdx, dIdx, newNode.X(), newNode.Y(), 
-			   flag, b);
-    CkPrintf("TMRC2D: [%d] theClient->collapse(%d, %d, %d, %2.10f, %2.10f\n", myRef.cid, myRef.idx, kIdx, dIdx, newNode.X(), newNode.Y());
+			   flag, b, frac);
+    CkPrintf("TMRC2D: [%d] theClient->collapse(%d, %d, %d, %2.10f, %2.10f, (flag), %d, %1.1f\n", myRef.cid, myRef.idx, kIdx, dIdx, newNode.X(), newNode.Y(), b, frac);
     // remove self
     C->removeElement(myRef.idx);
   }
@@ -430,9 +430,9 @@ void element::collapse(int shortEdge)
     if (local && !first) flag = LOCAL_SECOND;
     if (!local && first) flag = BOUND_FIRST;
     if (!local && !first) flag = BOUND_SECOND;
-    CkPrintf("TMRC2D: [%d] theClient->collapse(%d, %d, %d, %2.10f, %2.10f)\n", myRef.cid, myRef.idx, kIdx, dIdx, newNode.X(), newNode.Y());
+    CkPrintf("TMRC2D: [%d] theClient->collapse(%d, %d, %d, %2.10f, %2.10f, (flag), %d, %1.1f)\n", myRef.cid, myRef.idx, kIdx, dIdx, newNode.X(), newNode.Y(), b, frac);
     C->theClient->collapse(myRef.idx, kIdx, dIdx,
-			   newNode.X(), newNode.Y(), flag, b);
+			   newNode.X(), newNode.Y(), flag, b, frac);
     // remove self
     C->removeElement(myRef.idx);
   }

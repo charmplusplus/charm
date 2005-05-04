@@ -1,8 +1,6 @@
-/*
-Simple sample implementation of refinement interface.
-Orion Sky Lawlor, olawlor@acm.org, 4/9/2002
-Modified by Terry Wilmarth, wilmarth@cse.uiuc.edu, 4/16/2002
- */
+// Simple sample implementation of refinement interface.
+// Orion Sky Lawlor, olawlor@acm.org, 4/9/2002
+// Modified by Terry Wilmarth, wilmarth@cse.uiuc.edu, 4/16/2002
 #include <stdlib.h>
 #include <unistd.h>
 #include <stdio.h>
@@ -72,62 +70,61 @@ FDECL void FTN_NAME(REFINE2D_NEWMESH,refine2d_newmesh)
 
 /********************** Splitting ******************/
 class refineResults {
-	int nResults;
-	class resRec {
-	public:
-		int t,s,n;
-		double f;
-		int flag;
-		resRec(int t_,int s_,int n_,double f_) 
-			:t(t_), s(s_), n(n_), f(f_) {flag =0;}
-		resRec(int t_,int s_,int n_,double f_,int flag_) 
-			:t(t_), s(s_), n(n_), f(f_),flag(flag_) {}
-	};
-	std::vector<resRec> res;
-	
+  int nResults;
+  class resRec {
+  public:
+    int t,s,n;
+    double f;
+    int flag;
+    resRec(int t_,int s_,int n_,double f_) 
+      :t(t_), s(s_), n(n_), f(f_) {flag =0;}
+    resRec(int t_,int s_,int n_,double f_,int flag_) 
+      :t(t_), s(s_), n(n_), f(f_),flag(flag_) {}
+  };
+  std::vector<resRec> res;
+  
   //Return anything on [0,2] than a or b
   int otherThan(int a,int b) {
     if (a==b) CkAbort("Opposite node is moving!");
     for (int i=0;i<3;i++)
-    	if (i!=a && i!=b) return i;
+      if (i!=a && i!=b) return i;
     CkAbort("Logic error in refine.C::otherThan");
     return -1;
   }
 public:
-	refineResults(void) {nResults=0;}
-	void add(int tri_,int side_,int n_,double frac_) {
-		nResults++;
-		res.push_back(resRec(tri_,side_,n_,frac_));
-	}
-	void add(int tri_,int side_,int n_,double frac_,int flag) {
-		nResults++;
-		res.push_back(resRec(tri_,side_,n_,frac_,flag));
-	}
-
-	int countResults(void) const {return nResults;}
-	void extract(int i,const int *conn,int *triDest,int *A,int *B,int *C,double *fracDest,int idxBase,int *flags) {
-		if ((i<0) || (i>=(int)res.size()))
-			CkAbort("Invalid index in REFINE2D_Get_Splits");
-		
-		int tri=res[i].t;
-		*triDest=tri+idxBase;
-		int edgeOfTri=res[i].s;
-		int movingNode=res[i].n;
-		
-		int c=(edgeOfTri+2)%3; //==opnode
-		*A=conn[3*tri+movingNode]; //==othernode
-		*B=conn[3*tri+otherThan(c,movingNode)];
-		*C=conn[3*tri+c];
-		*fracDest=res[i].f;
-		*flags = res[i].flag;
-		if (i==(int)res.size()-1) {
-		  delete this;
-		  chunk *C = CtvAccess(_refineChunk);
-		  C->refineResultsStorage=NULL;
-		}
-	}
+  refineResults(void) {nResults=0;}
+  void add(int tri_,int side_,int n_,double frac_) {
+    nResults++;
+    res.push_back(resRec(tri_,side_,n_,frac_));
+  }
+  void add(int tri_,int side_,int n_,double frac_,int flag) {
+    nResults++;
+    res.push_back(resRec(tri_,side_,n_,frac_,flag));
+  }
+  int countResults(void) const {return nResults;}
+  void extract(int i, const int *conn, int *triDest, int *A, int *B, int *C,
+	       double *fracDest, int idxBase, int *flags) {
+    if ((i<0) || (i>=(int)res.size()))
+      CkAbort("Invalid index in REFINE2D_Get_Splits");
+    
+    int tri=res[i].t;
+    *triDest=tri+idxBase;
+    int edgeOfTri=res[i].s;
+    int movingNode=res[i].n;
+    
+    int c=(edgeOfTri+2)%3; //==opnode
+    *A=conn[3*tri+movingNode]; //==othernode
+    *B=conn[3*tri+otherThan(c,movingNode)];
+    *C=conn[3*tri+c];
+    *fracDest=res[i].f;
+    *flags = res[i].flag;
+    if (i==(int)res.size()-1) {
+      delete this;
+      chunk *C = CtvAccess(_refineChunk);
+      C->refineResultsStorage=NULL;
+    }
+  }
 };
-
 
 class resultsRefineClient : public refineClient {
   refineResults *res;
@@ -149,93 +146,103 @@ public:
 };
 
 class coarsenResults {
-	/*
-		coarsenData is defined in refine.h
-	*/
-	std::vector<coarsenData> res;
-	
+  // coarsenData is defined in refine.h
+  std::vector<coarsenData> res;
 public:
-	coarsenResults(){}
-  coarsenData addCollapse(int elementID,int nodeToKeep,int nodeToDelete,double nX,double nY,int flag){
-		coarsenData d;
-		d.type = COLLAPSE;
-		d.data.cdata.elemID = elementID;
-		d.data.cdata.nodeToKeep = nodeToKeep;
-		d.data.cdata.nodeToDelete = nodeToDelete;
-		d.data.cdata.newX = nX;
-		d.data.cdata.newY = nY;
-		d.data.cdata.flag = flag;
-		return d;
-	};
-
-	coarsenData addUpdate(int nodeID,double newX,double newY, int boundaryFlag){
-		coarsenData d;
-		d.type = UPDATE;
-		d.data.udata.nodeID = nodeID;
-		d.data.udata.newX = newX;
-		d.data.udata.newY = newY;
-		d.data.udata.boundaryFlag = boundaryFlag;
-//		res.push_back(d);
-		return d;
-	};
-	
-	coarsenData addReplaceDelete(int elemID,int relnodeID,int oldNodeID,int newNodeID){
-		coarsenData d;
-		d.type = REPLACE;
-		d.data.rddata.elemID = elemID;
-		d.data.rddata.relnodeID = relnodeID;
-		d.data.rddata.oldNodeID = oldNodeID;
-		d.data.rddata.newNodeID = newNodeID;
-//		res.push_back(d);
-		return d;
-	};
-	
-	int countResults(){return res.size();}
-	/*void extract(int i,int *conn,int *tri,int *nodeToThrow,int *nodeToKeep,double *nx,double *ny,int *flag,int idxbase){
-		int t;
-		t = res[i].elemID;
-		*tri = t +idxbase;
-		*nodeToKeep = conn[3*t+res[i].nodeToKeep];
-		int n1 = res[i].collapseEdge;
-		int n2 = (res[i].collapseEdge+1)%3;
-		if(res[i].nodeToKeep == n1){
-			*nodeToThrow = conn[3*t+n2];
-		}else{
-			*nodeToThrow = conn[3*t+n1];
-		}
-		*nx = res[i].nx;
-		*ny = res[i].ny;
-		*flag = res[i].flag;
-	}*/
-	void extract(int i,coarsenData *output){
-		*output = res[i];
-	}
+  coarsenResults(){}
+  coarsenData addCollapse(int elementID, int nodeToKeep, int nodeToDelete,
+			  double nX, double nY, int flag, int boundFlag, 
+			  double frac)
+  {
+    coarsenData d;
+    d.type = COLLAPSE;
+    d.data.cdata.elemID = elementID;
+    d.data.cdata.nodeToKeep = nodeToKeep;
+    d.data.cdata.nodeToDelete = nodeToDelete;
+    d.data.cdata.newX = nX;
+    d.data.cdata.newY = nY;
+    d.data.cdata.flag = flag;
+    d.data.cdata.boundaryFlag = boundFlag;
+    d.data.cdata.frac = frac;
+    return d;
+  };
+  coarsenData addUpdate(int nodeID, double newX, double newY, int boundaryFlag)
+  {
+    coarsenData d;
+    d.type = UPDATE;
+    d.data.udata.nodeID = nodeID;
+    d.data.udata.newX = newX;
+    d.data.udata.newY = newY;
+    d.data.udata.boundaryFlag = boundaryFlag;
+    //		res.push_back(d);
+    return d;
+  };
+  coarsenData addReplaceDelete(int elemID, int relnodeID, int oldNodeID,
+			       int newNodeID)
+  {
+    coarsenData d;
+    d.type = REPLACE;
+    d.data.rddata.elemID = elemID;
+    d.data.rddata.relnodeID = relnodeID;
+    d.data.rddata.oldNodeID = oldNodeID;
+    d.data.rddata.newNodeID = newNodeID;
+    //		res.push_back(d);
+    return d;
+  };
+  int countResults(){return res.size();}
+  /*void extract(int i,int *conn,int *tri,int *nodeToThrow,int *nodeToKeep,double *nx,double *ny,int *flag,int idxbase){
+    int t;
+    t = res[i].elemID;
+    *tri = t +idxbase;
+    *nodeToKeep = conn[3*t+res[i].nodeToKeep];
+    int n1 = res[i].collapseEdge;
+    int n2 = (res[i].collapseEdge+1)%3;
+    if(res[i].nodeToKeep == n1){
+    *nodeToThrow = conn[3*t+n2];
+    }else{
+    *nodeToThrow = conn[3*t+n1];
+    }
+    *nx = res[i].nx;
+    *ny = res[i].ny;
+    *flag = res[i].flag;
+    }*/
+  void extract(int i, coarsenData *output){
+    *output = res[i];
+  }
 };
 
-/*
-	Modifying the code so that instead of being stored the results are processed immediately
-	The coarsen client is used simply to create and return an appropriate coarsenData structure
-*/
+// Modifying the code so that instead of being stored the results are
+// processed immediately. The coarsen client is used simply to create
+// and return an appropriate coarsenData structure.
 class FEM_Operation_Data;
-void FEM_Coarsen_Operation(FEM_Operation_Data *coarsen_data, coarsenData &operation);
+void FEM_Coarsen_Operation(FEM_Operation_Data *coarsen_data, 
+			   coarsenData &operation);
 
 class resultsCoarsenClient : public refineClient {
   coarsenResults *res;
-	FEM_Operation_Data *data;
+  FEM_Operation_Data *data;
 public:
-  resultsCoarsenClient(coarsenResults *res_,FEM_Operation_Data *data_=NULL) : res(res_),data(data_){};
-  void collapse(int elementID,int nodeToKeep,int nodeToDelete,double nX,double nY,int flag, int b){
-		coarsenData d = res->addCollapse(elementID,nodeToKeep,nodeToDelete,nX,nY,flag);
-		FEM_Coarsen_Operation(data,d);
+  resultsCoarsenClient(coarsenResults *res_, FEM_Operation_Data *data_=NULL) 
+    : res(res_),data(data_){};
+  void collapse(int elementID, int nodeToKeep, int nodeToDelete, double nX,
+		double nY, int flag, int b, double frac)
+  {
+    coarsenData d = res->addCollapse(elementID, nodeToKeep, nodeToDelete, nX,
+				     nY, flag, b, frac);
+    FEM_Coarsen_Operation(data,d);
   }
-	void nodeUpdate(int nodeID, double newX, double newY, int boundaryFlag){
-		coarsenData d = res->addUpdate(nodeID,newX,newY,boundaryFlag);
-		FEM_Coarsen_Operation(data,d);
-	}
-	void nodeReplaceDelete(int elementID, int relnodeID, int oldNodeID, int newNodeID){
-		coarsenData d = res->addReplaceDelete(elementID,relnodeID,oldNodeID,newNodeID);
-		FEM_Coarsen_Operation(data,d);
-	}
+  void nodeUpdate(int nodeID, double newX, double newY, int boundaryFlag)
+  {
+    coarsenData d = res->addUpdate(nodeID,newX,newY,boundaryFlag);
+    FEM_Coarsen_Operation(data,d);
+  }
+  void nodeReplaceDelete(int elementID, int relnodeID, int oldNodeID, 
+			 int newNodeID)
+  {
+    coarsenData d = res->addReplaceDelete(elementID, relnodeID, oldNodeID,
+					  newNodeID);
+    FEM_Coarsen_Operation(data,d);
+  }
 };
 
 
@@ -253,7 +260,8 @@ CDECL void REFINE2D_Split(int nNode,double *coord,int nEl,double *desiredArea)
   C->multipleRefine(desiredArea, &client);
 }
 
-CDECL void REFINE2D_Coarsen(int nNode,double *coord,int nEl,double *desiredArea,FEM_Operation_Data *data)
+CDECL void REFINE2D_Coarsen(int nNode, double *coord, int nEl,
+			    double *desiredArea, FEM_Operation_Data *data)
 {
   TCHARM_API_TRACE("REFINE2D_Coarsen", "coarsen");
   chunk *C = CtvAccess(_refineChunk);
@@ -320,7 +328,7 @@ static coarsenResults *getCoarsenResults(void) {
 
 
 CDECL int REFINE2D_Get_Collapse_Length(){
-	return getCoarsenResults()->countResults();
+  return getCoarsenResults()->countResults();
 }
 /*
 CDECL void REFINE2D_Get_Collapse(int i,int *conn,int *tri,int *nodeToThrow,int *nodeToKeep,double *nx,double *ny,int *flag,int idxbase){
@@ -363,20 +371,18 @@ static void checkConn(int nEl,const int *conn,int idxBase,int nNode)
   }
   int i;
   int nErrs=0;
-  for (i=0;i<nEl;i++) 
-  {
+  for (i=0;i<nEl;i++) {
     const element &e=C->theElements[i];
     const int *uc=&conn[3*i];
     int elErrs=checkElement(C,e,uc,idxBase);
     nErrs+=elErrs;
-    if (elErrs!=0) 
-    { //A bad element-- print out debugging info:
+    if (elErrs!=0) { //A bad element-- print out debugging info:
       /* This check is no longer valid...
-      CkError("REFINE2D Chunk %d>   Your triangle %d: %d %d %d\n"
-              "REFINE2D Chunk %d> but my triangle %d: %d %d %d\n",
-          C->cid+idxBase,i+idxBase, uc[0], uc[1], uc[2],
-          C->cid+idxBase,i+idxBase,
-          e.nodes[0].idx+idxBase,e.nodes[1].idx+idxBase,e.nodes[2].idx+idxBase);
+	 CkError("REFINE2D Chunk %d>   Your triangle %d: %d %d %d\n"
+	 "REFINE2D Chunk %d> but my triangle %d: %d %d %d\n",
+	 C->cid+idxBase,i+idxBase, uc[0], uc[1], uc[2],
+	 C->cid+idxBase,i+idxBase,
+	 e.nodes[0].idx+idxBase,e.nodes[1].idx+idxBase,e.nodes[2].idx+idxBase);
       */
     }
   }

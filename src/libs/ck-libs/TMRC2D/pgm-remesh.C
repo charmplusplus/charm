@@ -90,11 +90,11 @@ init(void)
   }
   double *td = new double[nPts];
   FEM_Register_array(FEM_Mesh_default_write(),FEM_NODE,FEM_DATA+5,td,FEM_DOUBLE,1);
-  unsigned char *validNodes = new unsigned char[nPts];
+  int *validNodes = new int[nPts];
   for(int ii=0;ii<nPts;ii++){
     validNodes[ii]=1;
   }
-  FEM_Register_array(FEM_Mesh_default_write(),FEM_NODE,FEM_VALID,validNodes,FEM_BYTE,1);
+  FEM_Register_array(FEM_Mesh_default_write(),FEM_NODE,FEM_VALID,validNodes,FEM_INT,1);
   
   int nEle=0;
   int *ele=NULL;
@@ -129,11 +129,11 @@ init(void)
     void *t = new double[nEle];
     FEM_Register_array(FEM_Mesh_default_write(),FEM_ELEM,FEM_DATA+k,t,FEM_DOUBLE,1);
   }
-  unsigned char *validElem = new unsigned char[nEle];
+  int *validElem = new int[nEle];
   for(int ii=0;ii<nEle;ii++){
     validElem[ii]=1;
   }
-  FEM_Register_array(FEM_Mesh_default_write(),FEM_ELEM,FEM_VALID,validElem,FEM_BYTE,1);
+  FEM_Register_array(FEM_Mesh_default_write(),FEM_ELEM,FEM_VALID,validElem,FEM_INT,1);
   
   /*Build the ghost layer for refinement border*/
   FEM_Add_ghost_layer(2,0); /*2 nodes/tuple, do not add ghost nodes*/
@@ -180,7 +180,7 @@ struct myGlobals {
   vector2d *R_net, *d, *v, *a; //Physical fields of each node
   double *m_i; //Inverse of mass at each node
   int m_i_fid; //Field ID for m_i
-  unsigned char *validNode,*validElem;
+  int *validNode,*validElem;
   int *nodeBoundary; //node boundary
   double *S11, *S22, *S12; //Stresses for each element
   int *edgeConn;//edge Connectivity table
@@ -209,8 +209,8 @@ void pup_myGlobals(pup_er p,myGlobals *g)
     g->S11=new double[g->maxelems];
     g->S22=new double[g->maxelems];
     g->S12=new double[g->maxelems];
-    g->validNode = new unsigned char[g->maxnodes];
-    g->validElem = new unsigned char[g->maxelems];
+    g->validNode = new int[g->maxnodes];
+    g->validElem = new int[g->maxelems];
     g->edgeConn = new int[2*g->maxedges];
     g->edgeBoundary = new int[g->maxedges];
   }
@@ -224,8 +224,8 @@ void pup_myGlobals(pup_er p,myGlobals *g)
   pup_doubles(p,(double *)g->S11,nelems);
   pup_doubles(p,(double *)g->S22,nelems);
   pup_doubles(p,(double *)g->S12,nelems);
-  pup_uchars(p,(unsigned char *)g->validNode,nnodes);
-  pup_uchars(p,(unsigned char *)g->validElem,nelems);
+  pup_ints(p,(int *)g->validNode,nnodes);
+  pup_ints(p,(int *)g->validElem,nelems);
   pup_ints(p,(int *)g->edgeConn,2*g->nedges);
   pup_ints(p,(int *)g->edgeBoundary,g->nedges);
 
@@ -373,7 +373,7 @@ void resize_nodes(void *data,int *len,int *max){
   myGlobals *g = (myGlobals *)data;
   vector2d *coord=g->coord,*R_net=g->R_net,*d=g->d,*v=g->v,*a=g->a;
   double *m_i=g->m_i;
-  unsigned char *validNode = g->validNode;
+  int *validNode = g->validNode;
   
   g->coord=new vector2d[*max];
   g->coord[0].x = 0.9;
@@ -384,7 +384,7 @@ void resize_nodes(void *data,int *len,int *max){
   g->v=new vector2d[g->maxnodes];//Node velocity
   g->a=new vector2d[g->maxnodes];//Node accelleration
   g->m_i=new double[g->maxnodes];//Node mass
-  g->validNode = new unsigned char[g->maxnodes]; //is the node valid
+  g->validNode = new int[g->maxnodes]; //is the node valid
   
   if(coord != NULL){
     for(int k=0;k<*len;k++){
@@ -398,7 +398,7 @@ void resize_nodes(void *data,int *len,int *max){
   FEM_Register_array(FEM_Mesh_default_read(),FEM_NODE,FEM_DATA+3,(void *)g->v,FEM_DOUBLE,2);
   FEM_Register_array(FEM_Mesh_default_read(),FEM_NODE,FEM_DATA+4,(void *)g->a,FEM_DOUBLE,2);
   FEM_Register_array_layout(FEM_Mesh_default_read(),FEM_NODE,FEM_DATA+5,(void *)g->m_i,g->m_i_fid);
-  FEM_Register_array(FEM_Mesh_default_read(),FEM_NODE,FEM_VALID,(void *)g->validNode,FEM_BYTE,1);
+  FEM_Register_array(FEM_Mesh_default_read(),FEM_NODE,FEM_VALID,(void *)g->validNode,FEM_INT,1);
   
   for(int k=0;k<*len;k++){
     printf("after resize node %d ( %.6f %.6f )\n",k,g->coord[k].x,g->coord[k].y);
@@ -421,21 +421,21 @@ void resize_elems(void *data,int *len,int *max){
   myGlobals *g = (myGlobals *)data;
   int *conn=g->conn;
   double *S11 = g->S11,*S22 = g->S22,*S12 = g->S12;
-  unsigned char *validElem = g->validElem;
+  int *validElem = g->validElem;
   
   g->conn = new int[3*(*max)];
   g->maxelems = *max;
   g->S11=new double[g->maxelems];
   g->S22=new double[g->maxelems];
   g->S12=new double[g->maxelems];
-  g->validElem = new unsigned char[g->maxelems];
+  g->validElem = new int[g->maxelems];
   
   FEM_Register_array(FEM_Mesh_default_read(),FEM_ELEM,FEM_CONN,(void *)g->conn,FEM_INDEX_0,3);	
   CkPrintf("Connectivity array starts at %p \n",g->conn);
   FEM_Register_array(FEM_Mesh_default_read(),FEM_ELEM,FEM_DATA,(void *)g->S11,FEM_DOUBLE,1);	
   FEM_Register_array(FEM_Mesh_default_read(),FEM_ELEM,FEM_DATA+1,(void *)g->S22,FEM_DOUBLE,1);	
   FEM_Register_array(FEM_Mesh_default_read(),FEM_ELEM,FEM_DATA+2,(void *)g->S12,FEM_DOUBLE,1);	
-  FEM_Register_array(FEM_Mesh_default_read(),FEM_ELEM,FEM_VALID,(void *)g->validElem,FEM_BYTE,1);	
+  FEM_Register_array(FEM_Mesh_default_read(),FEM_ELEM,FEM_VALID,(void *)g->validElem,FEM_INT,1);	
   
   if(conn != NULL){
     delete [] conn;

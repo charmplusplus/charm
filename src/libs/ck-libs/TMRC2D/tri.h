@@ -78,7 +78,7 @@ public:
   // and nodeToDelete.  nodeToKeep's coordinates are updated to newX
   // and newY, while nodeToDelete is removed and all references to it
   // are replaced by references to nodeToKeep
-  virtual void collapse(int elemId, int nodeToKeep, int nodeToDelete, double newX, double newY, int flag, int updatedEdgeBoundary) {};
+  virtual void collapse(int elemId, int nodeToKeep, int nodeToDelete, double newX, double newY, int flag, int updatedEdgeBoundary, double frac) {};
   // update nodeID with new coordinates newX and newY; set new node's boundary
   // flag to boundaryFlag
   virtual void nodeUpdate(int nodeID, double newX, double newY, int boundaryFlag, int shareCount, int *adjChunks, int *adjIndices){};
