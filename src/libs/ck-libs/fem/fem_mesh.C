@@ -2046,8 +2046,8 @@ void FEM_Mesh::n2n_add(int n, int newNode)
   FEM_VarIndexAttribute *nAdj = 
     (FEM_VarIndexAttribute *)node.lookup(FEM_NODE_NODE_ADJACENCY, "n2n_add");
   CkVec<CkVec<FEM_VarIndexAttribute::ID> > &nVec = nAdj->get();
-  CkVec<FEM_VarIndexAttribute::ID> &nsVec = nVec[n];
   FEM_VarIndexAttribute::ID nn(0, newNode);
+  CkVec<FEM_VarIndexAttribute::ID> &nsVec = nVec[n];
   nsVec.push_back(nn);
 }
 

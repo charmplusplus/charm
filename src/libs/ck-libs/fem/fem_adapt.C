@@ -454,12 +454,14 @@ int FEM_Adapt::newSlot(FEM_DataAttribute *validAttr){
 	int length = validData->size();
 	for(int i=0;i<length;i++){
 		if((*validData)[i][0] == 0){
-			(*validData)[i][0] = 1;
-			return i;
+		  (*validData)[i][0] = 1;
+		  return i;
 		}
 	}
 	FEM_Entity *entity = validAttr->getEntity();
 	entity->setLength(length+1);
+	validData = &validAttr->getInt();
+	(*validData)[length][0] = 1;
 	return length;
 };
 
