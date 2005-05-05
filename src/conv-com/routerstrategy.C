@@ -147,6 +147,10 @@ RouterStrategy::RouterStrategy(int stratid, int handle, int _npes,
     case USE_GRID:
         router = new D3GridRouter(npes, myPe);
         break;
+	
+    case USE_PREFIX:
+       	router = new PrefixRouter(npes, myPe);
+	break;
 
     case USE_DIRECT: router = NULL;
         break;

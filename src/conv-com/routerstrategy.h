@@ -15,6 +15,7 @@
 #include "de.h"
 #include "treerouter.h"
 #include "3dgridrouter.h"
+#include "prefixrouter.h"
 
 class RouterStrategy : public Strategy {
 

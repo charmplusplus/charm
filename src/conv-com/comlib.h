@@ -29,6 +29,7 @@ enum{BCAST=0,TREE, GRID, HCUBE};
                               //messages without any processing.
 #define USE_GRID 5            //Virtual topology is a 3d grid
 #define USE_LINEAR 6          //Virtual topology is a linear array
+#define USE_PREFIX 7	      //Prefix router to avoid contention
 
 #define IS_BROADCAST -1
 #define IS_SECTION_MULTICAST -2

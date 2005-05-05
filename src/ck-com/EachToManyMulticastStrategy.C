@@ -143,6 +143,8 @@ void EachToManyMulticastStrategy::commonInit() {
             routerID = USE_HYPERCUBE;
         else  if(strcmp(router, "USE_DIRECT") == 0)
             routerID = USE_DIRECT;        
+        else  if(strcmp(router, "USE_PREFIX") == 0)
+            routerID = USE_PREFIX;        
 
         //Just for the first step. After learning the learned
         //strategies will be chosen

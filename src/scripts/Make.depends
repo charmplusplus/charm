@@ -1734,7 +1734,7 @@ ComlibManager.o: ComlibManager.C ComlibManager.h charm++.h charm.h \
   charisma.h charisma.decl.h tempo.h tempo.decl.h waitqd.h waitqd.decl.h \
   sdag.h ckcheckpoint.h CkCheckpoint.decl.h ckarrayreductionmgr.h trace.h \
   trace-bluegene.h comlib.h router.h convcomlibmanager.h ComlibStats.h \
-  comlib.decl.h EachToManyMulticastStrategy.h routerstrategy.h \
+  comlib.decl.h EachToManyMulticastStrategy.h routerstrategy.h prefixrouter.h \
   gridrouter.h petable.h graphrouter.h de.h treerouter.h 3dgridrouter.h \
   DirectMulticastStrategy.h ComlibSectionInfo.h StreamingStrategy.h \
   DummyStrategy.h MPIStrategy.h NodeMulticast.h MsgPacker.h register.h \
@@ -1839,7 +1839,7 @@ EachToManyMulticastStrategy.o: EachToManyMulticastStrategy.C \
   sdag.h ckcheckpoint.h CkCheckpoint.decl.h ckarrayreductionmgr.h trace.h \
   trace-bluegene.h comlib.h router.h convcomlibmanager.h ComlibStats.h \
   comlib.decl.h routerstrategy.h gridrouter.h petable.h graphrouter.h \
-  de.h treerouter.h 3dgridrouter.h AAPLearner.h AAMLearner.h
+  de.h treerouter.h 3dgridrouter.h AAPLearner.h AAMLearner.h prefixrouter.h 
 	$(CHARMC) -c -I. EachToManyMulticastStrategy.C
 
 ComlibSectionInfo.o: ComlibSectionInfo.C ComlibManager.h charm++.h \
@@ -1879,7 +1879,7 @@ AAPLearner.o: AAPLearner.C AAPLearner.h comlib.h converse.h conv-config.h \
   trace-bluegene.h router.h ComlibManager.h convcomlibmanager.h \
   ComlibStats.h comlib.decl.h EachToManyMulticastStrategy.h \
   routerstrategy.h gridrouter.h petable.h graphrouter.h de.h treerouter.h \
-  3dgridrouter.h
+  3dgridrouter.h prefixrouter.h 
 	$(CHARMC) -c -I. AAPLearner.C
 
 ComlibStats.o: ComlibStats.C ComlibStats.h charm++.h charm.h converse.h \
@@ -1919,7 +1919,7 @@ AAMLearner.o: AAMLearner.C AAMLearner.h ComlibManager.h charm++.h charm.h \
   trace-bluegene.h comlib.h router.h convcomlibmanager.h ComlibStats.h \
   comlib.decl.h AAPLearner.h EachToManyMulticastStrategy.h \
   routerstrategy.h gridrouter.h petable.h graphrouter.h de.h treerouter.h \
-  3dgridrouter.h
+  3dgridrouter.h prefixrouter.h
 	$(CHARMC) -c -I. AAMLearner.C
 
 MsgPacker.o: MsgPacker.C MsgPacker.h charm++.h charm.h converse.h \
@@ -2189,6 +2189,24 @@ graphrouter.o: graphrouter.C graphrouter.h converse.h conv-config.h \
   trace-bluegene.h router.h petable.h hypercubetopology.h
 	$(CHARMC) -c -I. graphrouter.C
 
+prefixrouter.o: prefixrouter.C prefixrouter.h converse.h conv-config.h \
+  conv-common.h conv-mach.h conv-autoconfig.h conv-mach-opt.h pup_c.h \
+  conv-cpm.h conv-cpath.h conv-qd.h conv-random.h conv-lists.h \
+  conv-trace.h persistent.h debug-conv.h comlib.h charm++.h charm.h pup.h \
+  middle.h middle-conv.h cklists.h ckbitvector.h ckstream.h init.h \
+  ckhashtable.h debug-charm.h CkMarshall.decl.h cksection.h ckcallback.h \
+  conv-ccs.h sockRoutines.h ccs-server.h ckobjQ.h ckreduction.h \
+  CkReduction.decl.h cknodegroupreduction.h CkArrayReductionMgr.decl.h \
+  ckmemcheckpoint.h CkMemCheckpoint.decl.h readonly.h ckarray.h \
+  cklocation.h LBDatabase.h lbdb.h LBDBManager.h LBObj.h LBOM.h LBComm.h \
+  LBMachineUtil.h LBDatabase.decl.h NullLB.decl.h BaseLB.decl.h \
+  CkLocation.decl.h CkArray.decl.h ComlibArrayListener.h ComlibStrategy.h \
+  convcomlibstrategy.h ComlibLearner.h envelope.h CkFutures.decl.h \
+  charisma.h charisma.decl.h tempo.h tempo.decl.h waitqd.h waitqd.decl.h \
+  sdag.h ckcheckpoint.h CkCheckpoint.decl.h ckarrayreductionmgr.h trace.h \
+  trace-bluegene.h router.h 
+	$(CHARMC) -c -I. prefixrouter.C
+
 hypercubetopology.o: hypercubetopology.C hypercubetopology.h \
   graphrouter.h converse.h conv-config.h conv-common.h conv-mach.h \
   conv-autoconfig.h conv-mach-opt.h pup_c.h conv-cpm.h conv-cpath.h \
@@ -2224,7 +2242,7 @@ routerstrategy.o: routerstrategy.C routerstrategy.h convcomlibmanager.h \
   CkFutures.decl.h charisma.h charisma.decl.h tempo.h tempo.decl.h \
   waitqd.h waitqd.decl.h sdag.h ckcheckpoint.h CkCheckpoint.decl.h \
   ckarrayreductionmgr.h trace.h trace-bluegene.h router.h gridrouter.h \
-  petable.h graphrouter.h de.h treerouter.h 3dgridrouter.h
+  petable.h graphrouter.h de.h treerouter.h 3dgridrouter.h prefixrouter.h
 	$(CHARMC) -c -I. routerstrategy.C
 
 convcomlibmanager.o: convcomlibmanager.C convcomlibmanager.h converse.h \
@@ -2244,7 +2262,7 @@ convcomlibmanager.o: convcomlibmanager.C convcomlibmanager.h converse.h \
   waitqd.h waitqd.decl.h sdag.h ckcheckpoint.h CkCheckpoint.decl.h \
   ckarrayreductionmgr.h trace.h trace-bluegene.h router.h \
   routerstrategy.h gridrouter.h petable.h graphrouter.h de.h treerouter.h \
-  3dgridrouter.h
+  3dgridrouter.h prefixrouter.h
 	$(CHARMC) -c -I. convcomlibmanager.C
 
 pipebroadcastconverse.o: pipebroadcastconverse.C pipebroadcastconverse.h \

@@ -532,7 +532,7 @@ static ampi *ampiInit(char **argv)
 	EachToManyMulticastStrategy *sAllgather = new EachToManyMulticastStrategy(USE_HYPERCUBE,arr.ckGetArrayID(),arr.ckGetArrayID());
         ciAllgather.setStrategy(sAllgather);
 	
-	EachToManyMulticastStrategy *sAlltoall = new EachToManyMulticastStrategy(USE_MESH, arr.ckGetArrayID(),arr.ckGetArrayID());
+	EachToManyMulticastStrategy *sAlltoall = new EachToManyMulticastStrategy(USE_PREFIX, arr.ckGetArrayID(),arr.ckGetArrayID());
         ciAlltoall.setStrategy(sAlltoall);
 #endif        
   }
