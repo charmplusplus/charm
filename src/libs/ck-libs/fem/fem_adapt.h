@@ -48,6 +48,7 @@ class FEM_Adapt {
 	 */
 	int newSlot(FEM_DataAttribute *validData);
 	void invalidateSlot(FEM_DataAttribute *validData,int slotNumber);
+	void printValidArray(FEM_DataAttribute *validData);
  public:
   /// Map a pair of element-local node numberings to an element-local edge 
   /// numbering

@@ -278,6 +278,7 @@ public:
 		this->table = user;
 		this->rows = len;
 		max = max;
+	//	printf("register user data %p max %d rows %d\n",user,max,rows);
 	}
 };
 
