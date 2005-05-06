@@ -743,11 +743,22 @@ void TopoLB :: work(CentralLB::LDStats *stats,int count)
     double hbval2=getHopBytesNew(assign,count);
     CkPrintf(" Resulting  hopBytes : %.1lf  Avg comm hops: %lf\n", hbval2,hbval2/total_comm);
     CkPrintf(" Percentage gain %.2lf\n",(hbval1-hbval2)*100/hbval1);
-  
+    CkPrintf("\n");
+    
     /*
-    randomAssign(count, assign);
-    double hbval3=getHopBytesNew(assign,count);
-    CkPrintf(" Random  hopBytes : %lf  Avg comm hops: %lf\n", hbval3,hbval3/total_comm);
+    double total_hb_rand=0;
+    int nTrials=10;
+    for(int t=0;t<nTrials;t++)
+    {
+      randomAssign(count, assign);
+      double hbval3=getHopBytesNew(assign,count);
+      total_hb_rand+=hbval3;
+      //CkPrintf(" Random  hopBytes : %.1lf  Avg comm hops: %lf\n", hbval3,hbval3/total_comm);
+    }
+    CkPrintf("\n");
+    double hbval3=total_hb_rand/nTrials;
+    CkPrintf(" Average random hopBytes : %.1lf Avg comm hops : %lf\n",total_hb_rand/nTrials,total_hb_rand/(nTrials*total_comm)); 
+    CkPrintf(" Percentage gain(TopoLB vs random) %.2lf\n",(hbval3-hbval2)*100/hbval3);
     */
     CkPrintf("\n");
   }
