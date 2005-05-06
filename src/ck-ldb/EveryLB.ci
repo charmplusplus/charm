@@ -22,5 +22,6 @@ module EveryLB {
    extern module HybridLB;
    extern module TopoLB;
    extern module RefineTopoLB;
+   extern module TopoCentLB;
    initnode void initEveryLB(void);
 };

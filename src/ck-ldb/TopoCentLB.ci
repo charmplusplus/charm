@@ -1,0 +1,11 @@
+module TopoCentLB
+{
+  extern module CentralLB;
+
+  initnode void lbinit (void);
+
+  group [migratable] TopoCentLB : CentralLB
+  {
+    entry void TopoCentLB (const CkLBOptions &);
+  };
+};

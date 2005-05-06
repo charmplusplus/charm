@@ -899,9 +899,9 @@ HybridBaseLB.o: HybridBaseLB.C charm++.h charm.h converse.h conv-config.h \
   trace-bluegene.h BaseLB.h HybridBaseLB.h CentralLB.h CentralLB.decl.h \
   CentralLBMsg.h HybridBaseLB.decl.h NeighborLBMsg.h HybridLBMsg.h \
   topology.h GreedyLB.h GreedyLB.decl.h GreedyCommLB.h \
-  GreedyCommLB.decl.h CommLBHeap.h RefineCommLB.h RefinerComm.h \
-  elements.h Set.h heap.h Refiner.h RefineLB.h RefineLB.decl.h \
-  RefineCommLB.decl.h HybridBaseLB.def.h
+  GreedyCommLB.decl.h elements.h Set.h heap.h CommLBHeap.h RefineCommLB.h \
+  RefinerComm.h Refiner.h RefineLB.h RefineLB.decl.h RefineCommLB.decl.h \
+  HybridBaseLB.def.h
 	$(CHARMC) -c -I. HybridBaseLB.C
 
 NborBaseLB.o: NborBaseLB.C charm++.h charm.h converse.h conv-config.h \
@@ -1192,7 +1192,7 @@ EveryLB.o: EveryLB.C charm++.h charm.h converse.h conv-config.h \
   PhasebyArrayLB.decl.h RotateLB.decl.h NeighborLB.decl.h \
   NborBaseLB.decl.h NeighborLBMsg.h NeighborCommLB.decl.h WSLB.decl.h \
   HybridLB.decl.h HybridBaseLB.decl.h HybridLBMsg.h TopoLB.decl.h \
-  RefineTopoLB.decl.h EveryLB.def.h
+  RefineTopoLB.decl.h TopoCentLB.decl.h EveryLB.def.h
 	$(CHARMC) -c -I. EveryLB.C
 
 DummyLB.o: DummyLB.C charm++.h charm.h converse.h conv-config.h \
@@ -1347,8 +1347,8 @@ GreedyCommLB.o: GreedyCommLB.C charm++.h charm.h converse.h conv-config.h \
   charisma.h charisma.decl.h tempo.h tempo.decl.h waitqd.h waitqd.decl.h \
   sdag.h ckcheckpoint.h CkCheckpoint.decl.h ckarrayreductionmgr.h trace.h \
   trace-bluegene.h GreedyCommLB.h CentralLB.h BaseLB.h CentralLB.decl.h \
-  CentralLBMsg.h GreedyCommLB.decl.h CommLBHeap.h manager.h \
-  GreedyCommLB.def.h
+  CentralLBMsg.h GreedyCommLB.decl.h elements.h Set.h heap.h CommLBHeap.h \
+  manager.h GreedyCommLB.def.h
 	$(CHARMC) -c -I. GreedyCommLB.C
 
 GreedyAgentLB.o: GreedyAgentLB.C charm++.h charm.h converse.h \
@@ -1407,7 +1407,7 @@ Comm1LB.o: Comm1LB.C charm++.h charm.h converse.h conv-config.h \
   sdag.h ckcheckpoint.h CkCheckpoint.decl.h ckarrayreductionmgr.h trace.h \
   trace-bluegene.h Comm1LB.h CentralLB.h BaseLB.h CentralLB.decl.h \
   CentralLBMsg.h Comm1LB.decl.h CommLBHeap.h GreedyCommLB.h \
-  GreedyCommLB.decl.h Comm1LB.def.h
+  GreedyCommLB.decl.h elements.h Set.h heap.h Comm1LB.def.h
 	$(CHARMC) -c -I. Comm1LB.C
 
 OrbLB.o: OrbLB.C charm++.h charm.h converse.h conv-config.h conv-common.h \
@@ -1564,9 +1564,9 @@ HybridLB.o: HybridLB.C charm++.h charm.h converse.h conv-config.h \
   trace-bluegene.h HybridLB.h BaseLB.h CentralLB.h CentralLB.decl.h \
   CentralLBMsg.h HybridBaseLB.h HybridBaseLB.decl.h NeighborLBMsg.h \
   HybridLBMsg.h topology.h HybridLB.decl.h GreedyLB.h GreedyLB.decl.h \
-  GreedyCommLB.h GreedyCommLB.decl.h CommLBHeap.h RefineCommLB.h \
-  RefinerComm.h elements.h Set.h heap.h Refiner.h RefineLB.h \
-  RefineLB.decl.h RefineCommLB.decl.h HybridLB.def.h
+  GreedyCommLB.h GreedyCommLB.decl.h elements.h Set.h heap.h CommLBHeap.h \
+  RefineCommLB.h RefinerComm.h Refiner.h RefineLB.h RefineLB.decl.h \
+  RefineCommLB.decl.h HybridLB.def.h
 	$(CHARMC) -c -I. HybridLB.C
 
 TopoLB.o: TopoLB.C charm++.h charm.h converse.h conv-config.h \
@@ -1607,6 +1607,25 @@ RefineTopoLB.o: RefineTopoLB.C charm++.h charm.h converse.h conv-config.h \
   RefineTopoLB.decl.h RefineTopoLB.h TopoLB.h topology.h \
   RefineTopoLB.def.h
 	$(CHARMC) -c -I. RefineTopoLB.C
+
+TopoCentLB.o: TopoCentLB.C charm++.h charm.h converse.h conv-config.h \
+  conv-common.h conv-mach.h conv-autoconfig.h conv-mach-opt.h pup_c.h \
+  conv-cpm.h conv-cpath.h conv-qd.h conv-random.h conv-lists.h \
+  conv-trace.h persistent.h debug-conv.h pup.h middle.h middle-conv.h \
+  cklists.h ckbitvector.h ckstream.h init.h ckhashtable.h debug-charm.h \
+  CkMarshall.decl.h cksection.h ckcallback.h conv-ccs.h sockRoutines.h \
+  ccs-server.h ckobjQ.h ckreduction.h CkReduction.decl.h \
+  cknodegroupreduction.h CkArrayReductionMgr.decl.h ckmemcheckpoint.h \
+  CkMemCheckpoint.decl.h readonly.h ckarray.h cklocation.h LBDatabase.h \
+  lbdb.h LBDBManager.h LBObj.h LBOM.h LBComm.h LBMachineUtil.h \
+  LBDatabase.decl.h NullLB.decl.h BaseLB.decl.h CkLocation.decl.h \
+  CkArray.decl.h ComlibArrayListener.h ComlibStrategy.h \
+  convcomlibstrategy.h ComlibLearner.h envelope.h CkFutures.decl.h \
+  charisma.h charisma.decl.h tempo.h tempo.decl.h waitqd.h waitqd.decl.h \
+  sdag.h ckcheckpoint.h CkCheckpoint.decl.h ckarrayreductionmgr.h trace.h \
+  trace-bluegene.h CentralLB.h BaseLB.h CentralLB.decl.h CentralLBMsg.h \
+  TopoCentLB.decl.h TopoCentLB.h topology.h TopoCentLB.def.h
+	$(CHARMC) -c -I. TopoCentLB.C
 
 manager.o: manager.C manager.h CentralLB.h BaseLB.h LBDatabase.h lbdb.h \
   converse.h conv-config.h conv-common.h conv-mach.h conv-autoconfig.h \
@@ -1734,14 +1753,14 @@ ComlibManager.o: ComlibManager.C ComlibManager.h charm++.h charm.h \
   charisma.h charisma.decl.h tempo.h tempo.decl.h waitqd.h waitqd.decl.h \
   sdag.h ckcheckpoint.h CkCheckpoint.decl.h ckarrayreductionmgr.h trace.h \
   trace-bluegene.h comlib.h router.h convcomlibmanager.h ComlibStats.h \
-  comlib.decl.h EachToManyMulticastStrategy.h routerstrategy.h prefixrouter.h \
+  comlib.decl.h EachToManyMulticastStrategy.h routerstrategy.h \
   gridrouter.h petable.h graphrouter.h de.h treerouter.h 3dgridrouter.h \
-  DirectMulticastStrategy.h ComlibSectionInfo.h StreamingStrategy.h \
-  DummyStrategy.h MPIStrategy.h NodeMulticast.h MsgPacker.h register.h \
-  pup_cmialloc.h RingMulticastStrategy.h MultiRingMulticast.h \
-  PipeBroadcastStrategy.h pipebroadcastconverse.h BroadcastStrategy.h \
-  MeshStreamingStrategy.h PrioStreaming.h qd.h CentralLB.h BaseLB.h \
-  CentralLB.decl.h CentralLBMsg.h comlib.def.h
+  prefixrouter.h DirectMulticastStrategy.h ComlibSectionInfo.h \
+  StreamingStrategy.h DummyStrategy.h MPIStrategy.h NodeMulticast.h \
+  MsgPacker.h register.h pup_cmialloc.h RingMulticastStrategy.h \
+  MultiRingMulticast.h PipeBroadcastStrategy.h pipebroadcastconverse.h \
+  BroadcastStrategy.h MeshStreamingStrategy.h PrioStreaming.h qd.h \
+  CentralLB.h BaseLB.h CentralLB.decl.h CentralLBMsg.h comlib.def.h
 	$(CHARMC) -c -I. ComlibManager.C
 
 MPIStrategy.o: MPIStrategy.C MPIStrategy.h ComlibManager.h charm++.h \
@@ -1839,7 +1858,8 @@ EachToManyMulticastStrategy.o: EachToManyMulticastStrategy.C \
   sdag.h ckcheckpoint.h CkCheckpoint.decl.h ckarrayreductionmgr.h trace.h \
   trace-bluegene.h comlib.h router.h convcomlibmanager.h ComlibStats.h \
   comlib.decl.h routerstrategy.h gridrouter.h petable.h graphrouter.h \
-  de.h treerouter.h 3dgridrouter.h AAPLearner.h AAMLearner.h prefixrouter.h 
+  de.h treerouter.h 3dgridrouter.h prefixrouter.h AAPLearner.h \
+  AAMLearner.h
 	$(CHARMC) -c -I. EachToManyMulticastStrategy.C
 
 ComlibSectionInfo.o: ComlibSectionInfo.C ComlibManager.h charm++.h \
@@ -1879,7 +1899,7 @@ AAPLearner.o: AAPLearner.C AAPLearner.h comlib.h converse.h conv-config.h \
   trace-bluegene.h router.h ComlibManager.h convcomlibmanager.h \
   ComlibStats.h comlib.decl.h EachToManyMulticastStrategy.h \
   routerstrategy.h gridrouter.h petable.h graphrouter.h de.h treerouter.h \
-  3dgridrouter.h prefixrouter.h 
+  3dgridrouter.h prefixrouter.h
 	$(CHARMC) -c -I. AAPLearner.C
 
 ComlibStats.o: ComlibStats.C ComlibStats.h charm++.h charm.h converse.h \
@@ -2189,24 +2209,6 @@ graphrouter.o: graphrouter.C graphrouter.h converse.h conv-config.h \
   trace-bluegene.h router.h petable.h hypercubetopology.h
 	$(CHARMC) -c -I. graphrouter.C
 
-prefixrouter.o: prefixrouter.C prefixrouter.h converse.h conv-config.h \
-  conv-common.h conv-mach.h conv-autoconfig.h conv-mach-opt.h pup_c.h \
-  conv-cpm.h conv-cpath.h conv-qd.h conv-random.h conv-lists.h \
-  conv-trace.h persistent.h debug-conv.h comlib.h charm++.h charm.h pup.h \
-  middle.h middle-conv.h cklists.h ckbitvector.h ckstream.h init.h \
-  ckhashtable.h debug-charm.h CkMarshall.decl.h cksection.h ckcallback.h \
-  conv-ccs.h sockRoutines.h ccs-server.h ckobjQ.h ckreduction.h \
-  CkReduction.decl.h cknodegroupreduction.h CkArrayReductionMgr.decl.h \
-  ckmemcheckpoint.h CkMemCheckpoint.decl.h readonly.h ckarray.h \
-  cklocation.h LBDatabase.h lbdb.h LBDBManager.h LBObj.h LBOM.h LBComm.h \
-  LBMachineUtil.h LBDatabase.decl.h NullLB.decl.h BaseLB.decl.h \
-  CkLocation.decl.h CkArray.decl.h ComlibArrayListener.h ComlibStrategy.h \
-  convcomlibstrategy.h ComlibLearner.h envelope.h CkFutures.decl.h \
-  charisma.h charisma.decl.h tempo.h tempo.decl.h waitqd.h waitqd.decl.h \
-  sdag.h ckcheckpoint.h CkCheckpoint.decl.h ckarrayreductionmgr.h trace.h \
-  trace-bluegene.h router.h 
-	$(CHARMC) -c -I. prefixrouter.C
-
 hypercubetopology.o: hypercubetopology.C hypercubetopology.h \
   graphrouter.h converse.h conv-config.h conv-common.h conv-mach.h \
   conv-autoconfig.h conv-mach-opt.h pup_c.h conv-cpm.h conv-cpath.h \
@@ -2302,4 +2304,22 @@ pipelinestrategy.o: pipelinestrategy.C pipelinestrategy.h ckhashtable.h \
   ckarrayreductionmgr.h trace.h trace-bluegene.h convcomlibmanager.h \
   comlib.h router.h
 	$(CHARMC) -c -I. pipelinestrategy.C
+
+prefixrouter.o: prefixrouter.C prefixrouter.h converse.h conv-config.h \
+  conv-common.h conv-mach.h conv-autoconfig.h conv-mach-opt.h pup_c.h \
+  conv-cpm.h conv-cpath.h conv-qd.h conv-random.h conv-lists.h \
+  conv-trace.h persistent.h debug-conv.h comlib.h charm++.h charm.h pup.h \
+  middle.h middle-conv.h cklists.h ckbitvector.h ckstream.h init.h \
+  ckhashtable.h debug-charm.h CkMarshall.decl.h cksection.h ckcallback.h \
+  conv-ccs.h sockRoutines.h ccs-server.h ckobjQ.h ckreduction.h \
+  CkReduction.decl.h cknodegroupreduction.h CkArrayReductionMgr.decl.h \
+  ckmemcheckpoint.h CkMemCheckpoint.decl.h readonly.h ckarray.h \
+  cklocation.h LBDatabase.h lbdb.h LBDBManager.h LBObj.h LBOM.h LBComm.h \
+  LBMachineUtil.h LBDatabase.decl.h NullLB.decl.h BaseLB.decl.h \
+  CkLocation.decl.h CkArray.decl.h ComlibArrayListener.h ComlibStrategy.h \
+  convcomlibstrategy.h ComlibLearner.h envelope.h CkFutures.decl.h \
+  charisma.h charisma.decl.h tempo.h tempo.decl.h waitqd.h waitqd.decl.h \
+  sdag.h ckcheckpoint.h CkCheckpoint.decl.h ckarrayreductionmgr.h trace.h \
+  trace-bluegene.h router.h
+	$(CHARMC) -c -I. prefixrouter.C
 
