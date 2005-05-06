@@ -1446,7 +1446,8 @@ void FEM_Elem::allocateElemAdjacency(){
   elemAdjacency = new FEM_IndexAttribute(this,FEM_ELEM_ELEM_ADJACENCY);
   printf("new indexattribute success\n");
   elemAdjacency->setLength(size());
-  // elemAdjacency->setWidth(nodesPerTuple);
+  elemAdjacency->setWidth(conn->getWidth());
+	
   add(elemAdjacency);
 }
 
@@ -1718,8 +1719,6 @@ void FEM_Mesh::createElemElemAdj()
       const int nodesPerTuple = g->nodesPerTuple;
       printf("nodesPerTuple=%d tuplesPerElem=%d number of elements: %d\n", nodesPerTuple, tuplesPerElem, numElements);
       tupleTable table(nodesPerTuple);
-      elem[t].lookup(FEM_ELEM_ELEM_ADJACENCY,"FEM_Mesh::createElemElemAdj");
-      elem[t].setElemAdjacencySize(nodesPerTuple,numElements);
       
       //For every element of this type:
       for (int elemNum=0;elemNum<numElements;elemNum++)	{
@@ -1754,8 +1753,8 @@ void FEM_Mesh::createElemElemAdj()
       
       // We'll directly modify the element adjacency table
       // We should use some abstraction, but this should be quick
-      AllocTable2d<int> &adjtable = elem[t].getElemAdjacency()->get();
-      adjtable.allocate(numElements,tuplesPerElem);
+      FEM_IndexAttribute *elemAdjAttr = (FEM_IndexAttribute *)elem[t].lookup(FEM_ELEM_ELEM_ADJACENCY,"createElemElemAdj");
+			AllocTable2d<int> &adjtable = elemAdjAttr->get();
       int *adjs = adjtable.getData();
       
       // can we legitimately initialize a Table2d like this?

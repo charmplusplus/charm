@@ -878,11 +878,11 @@ public:
 
 	// Isaac's New Function:
 	void allocateElemAdjacency();
-	void setElemAdjacencySize(int width, int length){
+/*	void setElemAdjacencySize(int width, int length){
 	  tuplesPerElem = width;
 	  elemAdjacency->setWidth(width);
 	  elemAdjacency->setLength(length);
-	}
+	}*/
 	FEM_IndexAttribute *getElemAdjacency(){return elemAdjacency;}
 
 	// Backward compatability routines:

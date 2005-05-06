@@ -454,21 +454,21 @@ int FEM_Adapt::newSlot(FEM_DataAttribute *validAttr){
 	AllocTable2d<int> *validData = &validAttr->getInt();
 	int length = validAttr->getLength();
 	
-	printf("valid array before new element length %d\n",length);
-	printValidArray(validAttr);
+/*	printf("valid array before new element length %d\n",length);
+	printValidArray(validAttr);*/
 	for(int i=0;i<length;i++){
 		if((*validData)[i][0] == 0){
 		  (*validData)[i][0] = 1;
-			printf("valid array after new element at %d \n",i);
-			printValidArray(validAttr);
+/*			printf("valid array after new element at %d \n",i);
+			printValidArray(validAttr);*/
 		  return i;
 		}
 	}
 	entity->setLength(length+1);
 	validData = &validAttr->getInt();
 	(*validData)[length][0] = 1;
-	printf("valid array after new element current length %d\n",validAttr->getLength());
-	printValidArray(validAttr);
+/*	printf("valid array after new element current length %d\n",validAttr->getLength());
+	printValidArray(validAttr);*/
 	return length;
 };
 
@@ -507,10 +507,10 @@ void FEM_Adapt::printValidArray(FEM_DataAttribute *validAttr){
 	AllocTable2d<int> *validData = &validAttr->getInt();
 	int length = entity->getMax();
 
-	printf("Valid array---\n");
+/*	printf("Valid array---\n");
 	for(int i=0;i<length;i++){
 		printf("%d %d\n",i,(*validData)[i][0]);
-	}
+	}*/
 };
 
 
