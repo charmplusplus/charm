@@ -1710,78 +1710,75 @@ FEM_ElemAdj_Layer* FEM_Mesh::curElemAdjLayer(void) {
 
 void FEM_Mesh::createElemElemAdj()
 {
-
-	FEM_ElemAdj_Layer *g = curElemAdjLayer();
-	for (int t=0;t<elem.size();t++) // for each element type
-	if (elem.has(t)) {
-		const int tuplesPerElem = g->elem[t].tuplesPerElem;
-		const int numElements = elem[t].size();
-		const int nodesPerTuple = g->nodesPerTuple;
-		printf("nodesPerTuple=%d tuplesPerElem=%d number of elements: %d\n", nodesPerTuple, tuplesPerElem, numElements);
-		tupleTable table(nodesPerTuple);
-		elem[t].lookup(FEM_ELEM_ELEM_ADJACENCY,"FEM_Mesh::createNodeNodeAdj");
-		elem[t].setElemAdjacencySize(nodesPerTuple,numElements);
-
-		//For every element of this type:
-		for (int elemNum=0;elemNum<numElements;elemNum++)
-		{
-			// insert every element into the tuple table
-			const int *conn=elem[t].connFor(elemNum);
-			//   printf("tupleTable::MAX_TUPLE=%d\n", tupleTable::MAX_TUPLE);
-			int tuple[tupleTable::MAX_TUPLE];
-			FEM_Symmetries_t allSym;
-			printf("\nAdding tuple for element %d\n", elemNum);
-			for (int u=0;u<tuplesPerElem;u++) 
-			{		
-				// similar to the code in splitter::addTuple() 
-				for (int i=0;i<nodesPerTuple;i++) {
-					if(i!=0) printf("-");
-					int eidx=g->elem[t].elem2tuple[i+u*g->nodesPerTuple];
-					if (eidx==-1) { //"not-there" node--
-						tuple[i]=-1; //Don't map via connectivity
-					} else { //Ordinary node
-						int n=conn[eidx];
-						tuple[i]=n; 
-						printf("%d", n);
-					}
-				}
-				printf("  ");
-				table.addTuple(tuple,new elemList(0,elemNum,t,allSym,u)); 
-			}
-			printf("\n");
-		}
-  
+  FEM_ElemAdj_Layer *g = curElemAdjLayer();
+  for (int t=0;t<elem.size();t++) // for each element type
+    if (elem.has(t)) {
+      const int tuplesPerElem = g->elem[t].tuplesPerElem;
+      const int numElements = elem[t].size();
+      const int nodesPerTuple = g->nodesPerTuple;
+      printf("nodesPerTuple=%d tuplesPerElem=%d number of elements: %d\n", nodesPerTuple, tuplesPerElem, numElements);
+      tupleTable table(nodesPerTuple);
+      elem[t].lookup(FEM_ELEM_ELEM_ADJACENCY,"FEM_Mesh::createElemElemAdj");
+      elem[t].setElemAdjacencySize(nodesPerTuple,numElements);
+      
+      //For every element of this type:
+      for (int elemNum=0;elemNum<numElements;elemNum++)	{
+	// insert every element into the tuple table
+	const int *conn=elem[t].connFor(elemNum);
+	//   printf("tupleTable::MAX_TUPLE=%d\n", tupleTable::MAX_TUPLE);
+	int tuple[tupleTable::MAX_TUPLE];
+	FEM_Symmetries_t allSym;
+	printf("\nAdding tuple for element %d\n", elemNum);
+	for (int u=0;u<tuplesPerElem;u++) {		
+	  // similar to the code in splitter::addTuple() 
+	  for (int i=0;i<nodesPerTuple;i++) {
+	    if(i!=0) printf("-");
+	    int eidx=g->elem[t].elem2tuple[i+u*g->nodesPerTuple];
+	    if (eidx==-1) { //"not-there" node--
+	      tuple[i]=-1; //Don't map via connectivity
+	    } else { //Ordinary node
+	      int n=conn[eidx];
+	      tuple[i]=n; 
+	      printf("%d", n);
+	    }
+	  }
+	  printf("  ");
+	  table.addTuple(tuple,new elemList(0,elemNum,t,allSym,u)); 
+	}
+	printf("\n");
+      }
+      
       //Loop over all the tuples, connecting adjacent elements
       table.beginLookup();
       elemList *l;
-
+      
       // We'll directly modify the element adjacency table
       // We should use some abstraction, but this should be quick
       AllocTable2d<int> &adjtable = elem[t].getElemAdjacency()->get();
       adjtable.allocate(numElements,tuplesPerElem);
       int *adjs = adjtable.getData();
-
-      for(int i=0;i<numElements*tuplesPerElem;i++) // can we legitimately initialize a Table2d like this?
+      
+      // can we legitimately initialize a Table2d like this?
+      for(int i=0;i<numElements*tuplesPerElem;i++) 
 	adjs[i]=-1;
       
       while (NULL!=(l=table.lookupNext())) {
-	if (l->next==NULL) //One-entry list: must be a symmetry
-	  {
-	    // UNHANDLED CASE: not sure exactly what this means
-	  }
+	if (l->next==NULL) { // One-entry list: must be a symmetry
+	  // UNHANDLED CASE: not sure exactly what this means
+	}
 	else { /* Several elements in list: normal case */
 	  //Consider adding ghosts for all element pairs on this tuple:	      
-      
 	  for (const elemList *a=l;a!=NULL;a=a->next){
 	    for (const elemList *b=l;b!=NULL;b=b->next){
-	      if(a!=b){
-		printf("Found adjacent elements: %d and %d\n", a->localNo, b->localNo);
+	      if(a->localNo != b->localNo){
+		printf("Adjacent elements %d and %d\n", a->localNo,b->localNo);
 		int j; 
 		// walk through array until we find a spot to put this data
-//		for(j=a->localNo*tuplesPerElem;adjs[j]!=-1;j++);
+		// for(j=a->localNo*tuplesPerElem;adjs[j]!=-1;j++);
 		j = a->localNo*tuplesPerElem + a->tupleNo;
 		adjs[j] = b->localNo;
-		
+		printf("Adding element %d to element %d's adjacency in pos %d\n",
+		       b->localNo, a->localNo, a->tupleNo);
 	      }
 	    }
 	  }
