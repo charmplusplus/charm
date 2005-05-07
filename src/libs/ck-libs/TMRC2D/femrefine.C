@@ -483,7 +483,7 @@ void FEM_Coarsen_Operation(FEM_Operation_Data *coarsen_data, coarsenData &operat
 			nodeToKeep = operation.data.cdata.nodeToKeep;
 			nodeToThrow = operation.data.cdata.nodeToDelete;
 			if(operation.data.cdata.flag & 0x1 || operation.data.cdata.flag & 0x2){
-				interpolateNode(coarsen_data->node,nodeToKeep,nodeToThrow,nodeToKeep,0.5);
+				interpolateNode(coarsen_data->node,nodeToKeep,nodeToThrow,nodeToKeep,operation.data.cdata.frac);
 				coord[2*nodeToKeep] = operation.data.cdata.newX;
 				coord[2*nodeToKeep+1] = operation.data.cdata.newY;
 				validNodeData[nodeToThrow] = 0;
