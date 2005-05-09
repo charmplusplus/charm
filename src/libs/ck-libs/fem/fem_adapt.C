@@ -125,10 +125,12 @@ int FEM_Adapt::edge_flip_help(int e1, int e2, int n1, int n2, int e1_n1,
   theMesh->e2n_setIndex(e1, e1_n2, n4);
   theMesh->e2n_setIndex(e2, e2_n1, n3);
   // Element-to-element updates
-  theMesh->e2e_replace(e1, e1nbr, e2nbr);
-  theMesh->e2e_replace(e2, e2nbr, e1nbr);
   theMesh->e2e_replace(e1nbr, e1, e2);
   theMesh->e2e_replace(e2nbr, e2, e1);
+  theMesh->e2e_replace(e1, e2, e2nbr);
+  theMesh->e2e_replace(e2, e1, e1nbr);
+  theMesh->e2e_setIndex(e1, mod_edge1, e2);
+  theMesh->e2e_setIndex(e2, mod_edge2, e1);
   // Node-to-node updates
   theMesh->n2n_remove(n1, n2);
   theMesh->n2n_remove(n2, n1);
@@ -184,7 +186,7 @@ int FEM_Adapt::edge_bisect_help(int e1, int e2, int n1, int n2, int e1_n1,
     e2_n1 = find_local_node_index(e2, n1);
     e2_n2 = find_local_node_index(e2, n2);
     e2_n3 = 3 - e2_n1 - e2_n2;
-    mod_edge2 = get_edge_index(e2_n1, e2_n3);
+    mod_edge2 = get_edge_index(e2_n2, e2_n3);
     e2nbr = theMesh->e2e_getNbr(e2, mod_edge2);
     n4 = theMesh->e2n_getNode(e2, e2_n3);
     e4 = newElement();
@@ -203,19 +205,27 @@ int FEM_Adapt::edge_bisect_help(int e1, int e2, int n1, int n2, int e1_n1,
     theMesh->e2n_setIndex(e4, e2_n3, n4);
   }
   // Element-to-element updates
-  theMesh->e2e_replace(e1, e1nbr, e3);
-  theMesh->e2e_replace(e1nbr, e1, e3);
+  theMesh->e2e_setIndex(e1, mod_edge1, e3);
+  if (e1nbr != -1)
+    theMesh->e2e_replace(e1nbr, e1, e3);
   int nl[3];
   if (e2 >= 0) {
-    theMesh->e2e_replace(e2, e2nbr, e4);
-    theMesh->e2e_replace(e2nbr, e2, e4);
-    nl[0] = e1; nl[1] = e4; nl[2] = e1nbr;
+    theMesh->e2e_setIndex(e2, mod_edge2, e4);
+    if (e2nbr != -1)
+      theMesh->e2e_replace(e2nbr, e2, e4);
+    nl[get_edge_index(e1_n3, e1_n1)] = e1; 
+    nl[get_edge_index(e1_n2, e1_n1)] = e4; 
+    nl[get_edge_index(e1_n2, e1_n3)] = e1nbr;
     theMesh->e2e_setAll(e3, nl);
-    nl[0] = e2; nl[1] = e3; nl[2] = e2nbr;
+    nl[get_edge_index(e2_n3, e2_n1)] = e2; 
+    nl[get_edge_index(e2_n2, e2_n1)] = e3; 
+    nl[get_edge_index(e2_n3, e2_n2)] = e2nbr;
     theMesh->e2e_setAll(e4, nl);
   }
   else {
-    nl[0] = e1; nl[1] = -1; nl[2] = e1nbr;
+    nl[get_edge_index(e1_n3, e1_n1)] = e1; 
+    nl[get_edge_index(e1_n2, e1_n1)] = -1; 
+    nl[get_edge_index(e1_n2, e1_n3)] = e1nbr;
     theMesh->e2e_setAll(e3, nl);
   }
   // Node-to-node updates

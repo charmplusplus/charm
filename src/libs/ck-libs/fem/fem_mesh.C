@@ -1890,7 +1890,7 @@ int FEM_Mesh::e2e_getIndex(int e, int nbr)
   FEM_Elem &elems = setElem(0);
   FEM_IndexAttribute *eAdj = 
     (FEM_IndexAttribute *)elems.lookup(FEM_ELEM_ELEM_ADJACENCY, 
-				       "e2e_getNbr");
+				       "e2e_getIndex");
   AllocTable2d<int> &eAdjs = eAdj->get();
   for (int i=0; i<eAdjs.width(); i++) {
     if (eAdjs[e][i] == nbr) {
@@ -1907,8 +1907,10 @@ void FEM_Mesh::e2e_setAll(int e, int *neighbors)
   FEM_Elem &elems = setElem(0);
   FEM_IndexAttribute *eAdj = 
     (FEM_IndexAttribute *)elems.lookup(FEM_ELEM_ELEM_ADJACENCY, 
-				       "e2e_getNbr");
+				       "e2e_setAll");
   AllocTable2d<int> &eAdjs = eAdj->get();
+  CkPrintf("e2e_setAll: Setting element %d's neighbors to %d,%d,%d\n", e, 
+	   neighbors[0], neighbors[1], neighbors[2]);
   for (int i=0; i<eAdjs.width(); i++) {
     eAdjs[e][i] = neighbors[i];
   }
@@ -1920,8 +1922,10 @@ void FEM_Mesh::e2e_setIndex(int e, short idx, int newElem)
   FEM_Elem &elems = setElem(0);
   FEM_IndexAttribute *eAdj = 
     (FEM_IndexAttribute *)elems.lookup(FEM_ELEM_ELEM_ADJACENCY, 
-				       "e2e_getNbr");
+				       "e2e_setIndex");
   AllocTable2d<int> &eAdjs = eAdj->get();
+  CkPrintf("e2e_setIndex: Setting element %d's %d-th neighbor to %d\n", e, 
+	   idx, newElem);
   eAdjs[e][idx] = newElem;
 }
  
@@ -1931,11 +1935,12 @@ void FEM_Mesh::e2e_replace(int e, int oldNbr, int newNbr)
   FEM_Elem &elems = setElem(0);
   FEM_IndexAttribute *eAdj = 
     (FEM_IndexAttribute *)elems.lookup(FEM_ELEM_ELEM_ADJACENCY, 
-				       "e2e_getNbr");
+				       "e2e_replace");
   AllocTable2d<int> &eAdjs = eAdj->get();
   for (int i=0; i<eAdjs.width(); i++) {
     if (eAdjs[e][i] == oldNbr) {
       eAdjs[e][i] = newNbr;
+      CkPrintf("e2e_replace: Replacing %d in element %d's adjacency list with %d in position %d\n", oldNbr, e, newNbr, i);
       break;
     }
   }
