@@ -1191,6 +1191,9 @@ class FEM_Mesh : public CkNoncopyable {
   void e2e_setIndex(int e, short idx, int newElem);
   /// Find element oldNbr in e's adjacent elements and replace with newNbr
   void e2e_replace(int e, int oldNbr, int newNbr);
+  /// Remove all neighboring elements in adjacency
+  void e2e_removeAll(int e);
+
 
   //  ------- Element-to-node: preserve initial ordering
   /// Place all of element e's adjacent nodes in adjnodes; assumes
@@ -1212,13 +1215,15 @@ class FEM_Mesh : public CkNoncopyable {
   //  ------- Node-to-node
   /// Place all of node n's adjacent nodes in adjnodes and the resulting 
   /// length of adjnodes in sz; assumes adjnodes is not allocated, but sz is
-  void n2n_getAll(int n, int *adjnodes, int *sz);
+  void n2n_getAll(int n, int **adjnodes, int *sz);
   /// Adds newNode to node n's node adjacency list
   void n2n_add(int n, int newNode);
   /// Removes oldNode from n's node adjacency list
   void n2n_remove(int n, int oldNode);
   /// Finds oldNode in n's node adjacency list, and replaces it with newNode
   void n2n_replace(int n, int oldNode, int newNode);
+  /// Remove all nodes from n's node adjacency list
+  void n2n_removeAll(int n);
 
   //  ------- Node-to-element
   /// Place all of node n's adjacent elements in adjelements and the resulting 
@@ -1231,6 +1236,8 @@ class FEM_Mesh : public CkNoncopyable {
   void n2e_remove(int n, int oldElem);
   /// Finds oldElem in n's element adjacency list, and replaces it with newElem
   void n2e_replace(int n, int oldElem, int newElem);
+  /// Remove all elements from n's element adjacency list
+  void n2e_removeAll(int n);
 
   /// Get an element on edge (n1, n2) where n1, n2 are chunk-local
   /// node numberings; return -1 in case of failure

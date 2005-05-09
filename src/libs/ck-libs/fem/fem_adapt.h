@@ -36,19 +36,15 @@ class FEM_Adapt {
   void adj_traverse(int n, int startNode, int stopNode, int startElem, 
 		    int stopElem, int *nn, int *ne, int *nodeList,
 		    int *elemList);
-	
-	/**
-	 *return the valid data array for this particular type of entity
-	*/
-	FEM_DataAttribute *validDataFor(int entityNumber);
-	/**
-	 * Find out the first empty slot in a valid data array, mark it valid 
-	 * and return its index
-	 * If there is no such slot, add one and set it to valid and return it
-	 */
-	int newSlot(FEM_DataAttribute *validData);
-	void invalidateSlot(FEM_DataAttribute *validData,int slotNumber);
-	void printValidArray(FEM_DataAttribute *validData);
+  /// Return the valid data array for this particular type of entity
+  FEM_DataAttribute *validDataFor(int entityNumber);
+  /** Find out the first empty slot in a valid data array, mark it valid 
+   * and return its index
+   * If there is no such slot, add one and set it to valid and return it
+   */
+  int newSlot(FEM_DataAttribute *validData);
+  void invalidateSlot(FEM_DataAttribute *validData,int slotNumber);
+  void printValidArray(FEM_DataAttribute *validData);
  public:
   /// Map a pair of element-local node numberings to an element-local edge 
   /// numbering

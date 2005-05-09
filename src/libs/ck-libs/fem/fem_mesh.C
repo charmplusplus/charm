@@ -1946,6 +1946,19 @@ void FEM_Mesh::e2e_replace(int e, int oldNbr, int newNbr)
   }
 }
 
+/// Remove all neighboring elements in adjacency
+void FEM_Mesh::e2e_removeAll(int e)
+{
+  FEM_Elem &elems = setElem(0);
+  FEM_IndexAttribute *eAdj = 
+    (FEM_IndexAttribute *)elems.lookup(FEM_ELEM_ELEM_ADJACENCY, 
+				       "e2e_removeAll");
+  AllocTable2d<int> &eAdjs = eAdj->get();
+  for (int i=0; i<eAdjs.width(); i++) {
+    eAdjs[e][i] = -1;
+  }
+}
+
 //  ------- Element-to-node: preserve initial ordering
 /// Place all of element e's adjacent nodes in adjnodes; assumes
 /// adjnodes allocated to correct size
@@ -2027,7 +2040,7 @@ void FEM_Mesh::e2n_replace(int e, int oldNode, int newNode)
 //  ------- Node-to-node
 /// Place all of node n's adjacent nodes in adjnodes and the resulting 
 /// length of adjnodes in sz; assumes adjnodes is not allocated, but sz is
-void FEM_Mesh::n2n_getAll(int n, int *adjnodes, int *sz) 
+void FEM_Mesh::n2n_getAll(int n, int **adjnodes, int *sz) 
 {
   FEM_VarIndexAttribute *nAdj = 
     (FEM_VarIndexAttribute *)node.lookup(FEM_NODE_NODE_ADJACENCY, 
@@ -2035,9 +2048,9 @@ void FEM_Mesh::n2n_getAll(int n, int *adjnodes, int *sz)
   CkVec<CkVec<FEM_VarIndexAttribute::ID> > &nVec = nAdj->get();
   CkVec<FEM_VarIndexAttribute::ID> &nsVec = nVec[n];
   *sz = nsVec.length();
-  adjnodes = new int[*sz];
+  (*adjnodes) = new int[*sz];
   for (int i=0; i<(*sz); i++) {
-    adjnodes[i] = nsVec[i].id;
+    (*adjnodes)[i] = nsVec[i].id;
   }
 }
  
@@ -2082,6 +2095,17 @@ void FEM_Mesh::n2n_replace(int n, int oldNode, int newNode)
       break;
     }
   }
+}
+
+/// Remove all nodes from n's node adjacency list
+void FEM_Mesh::n2n_removeAll(int n)
+{
+  FEM_VarIndexAttribute *nAdj = 
+    (FEM_VarIndexAttribute *)node.lookup(FEM_NODE_NODE_ADJACENCY, 
+					 "n2n_removeAll");
+  CkVec<CkVec<FEM_VarIndexAttribute::ID> > &nVec = nAdj->get();
+  CkVec<FEM_VarIndexAttribute::ID> &nsVec = nVec[n];
+  nsVec.free();
 }
 
 //  ------- Node-to-element
@@ -2143,6 +2167,17 @@ void FEM_Mesh::n2e_replace(int n, int oldElem, int newElem)
       break;
     }
   }
+}
+
+/// Remove all elements from n's element adjacency list
+void FEM_Mesh::n2e_removeAll(int n)
+{
+  FEM_VarIndexAttribute *eAdj = 
+    (FEM_VarIndexAttribute *)node.lookup(FEM_NODE_ELEM_ADJACENCY, 
+					 "n2e_removeAll");
+  CkVec<CkVec<FEM_VarIndexAttribute::ID> > &eVec = eAdj->get();
+  CkVec<FEM_VarIndexAttribute::ID> &nsVec = eVec[n];
+  nsVec.free();
 }
 
 /// Get an element on edge (n1, n2) where n1, n2 are chunk-local

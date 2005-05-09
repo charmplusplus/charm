@@ -58,7 +58,7 @@ void FEM_Adapt::adj_traverse(int n, int startNode, int stopNode, int startElem,
   if (elm == -1) {
     nodeList[*nn] = nod; (*nn)++;
   }
-  while ((elm != stopElem) && (elm != -1)) {
+  while ((elm != stopElem) && (elm > -1)) {
     nodeList[*nn] = nod; (*nn)++;
     elemList[*ne] = elm; (*ne)++;
     nIdx = 3 - find_local_node_index(elm,n) - find_local_node_index(elm,nod);
@@ -72,9 +72,10 @@ void FEM_Adapt::adj_traverse(int n, int startNode, int stopNode, int startElem,
     nodeList[*nn] = stopNode; (*nn)++;
   }
   else {
+    nodeList[*nn] = nod; (*nn)++;
     int elm = stopElem;
     int nod = stopNode;
-    while (elm != -1) {
+    while (elm > -1) {
       nodeList[*nn] = nod; (*nn)++;
       elemList[*ne] = elm; (*ne)++;
       nIdx = 3 - find_local_node_index(elm,n) - find_local_node_index(elm,nod);
@@ -83,7 +84,6 @@ void FEM_Adapt::adj_traverse(int n, int startNode, int stopNode, int startElem,
     }
     nodeList[*nn] = nod; (*nn)++;
   }
-
 }
 
 // edge_flip and helpers
@@ -288,7 +288,7 @@ int FEM_Adapt::edge_contraction_help(int e1, int e2, int n1, int n2, int e1_n1,
   int mod_edge4;
   int e2nbr2;
   int n4;
-  if (e2 >= 0) {
+  if (e2 > -1) {
     e2_n1 = find_local_node_index(e2, n1);
     e2_n2 = find_local_node_index(e2, n2);
     e2_n3 = 3 - e2_n1 - e2_n2;
@@ -301,7 +301,7 @@ int FEM_Adapt::edge_contraction_help(int e1, int e2, int n1, int n2, int e1_n1,
 
   int *n2_nbrNodes, *n2_nbrElems;
   int nnsize, nesize;
-  theMesh->n2n_getAll(n2, n2_nbrNodes, &nnsize);
+  theMesh->n2n_getAll(n2, &n2_nbrNodes, &nnsize);
   theMesh->n2e_getAll(n2, &n2_nbrElems, &nesize);
   
   // Element-to-node updates
@@ -318,13 +318,14 @@ int FEM_Adapt::edge_contraction_help(int e1, int e2, int n1, int n2, int e1_n1,
   theMesh->e2e_replace(e2nbr2, e2, e2nbr1);
   // Node-to-node updates
   for (int i=0; i<nnsize; i++) {
-    theMesh->n2n_replace(n2_nbrNodes[i], n2, n1);
-    theMesh->n2n_add(n1, n2_nbrNodes[i]);
+    if (n2_nbrNodes[i] != n1) {
+      theMesh->n2n_remove(n2_nbrNodes[i], n1);
+      theMesh->n2n_replace(n2_nbrNodes[i], n2, n1);
+      theMesh->n2n_remove(n1, n2_nbrNodes[i]);
+      theMesh->n2n_add(n1, n2_nbrNodes[i]);
+    }
   }
   theMesh->n2n_remove(n1, n2);
-  theMesh->n2n_remove(n1, n1); // assume added by loop add above; not necessary
-  theMesh->n2n_remove(n1, n3); // assume duplicated by the loop add above
-  theMesh->n2n_remove(n1, n4); // assume duplicated by the loop add above
   theMesh->n2n_remove(n3, n2);
   theMesh->n2n_remove(n4, n2);
   // Node-to-element updates
@@ -374,7 +375,7 @@ int FEM_Adapt::vertex_split(int n, int n1, int n2, int e1, int e3)
   int e6 = newElement();
   int nnCount=0, neCount=0;
   int np_nodes[50], np_elems[50]; // I certainly hope the mesh is not this bad
-  adj_traverse(n, n1, e2, n2, e4, &nnCount, &neCount, np_nodes, np_elems);
+  adj_traverse(n, n1, n2, e2, e4, &nnCount, &neCount, np_nodes, np_elems);
 
   // Element-to-node updates
   int nl[3];
@@ -412,20 +413,28 @@ int FEM_Adapt::vertex_split(int n, int n1, int n2, int e1, int e3)
   // Node-to-node updates
   int i;
   for (i=0; i<nnCount; i++) {
-    theMesh->n2n_add(np, np_nodes[i]);
+    printf("np_nodes[%d] = %d\n", i, np_nodes[i]);
     theMesh->n2n_remove(n, np_nodes[i]);
+    theMesh->n2n_remove(np_nodes[i], n);
+    theMesh->n2n_add(np, np_nodes[i]);
+    theMesh->n2n_add(np_nodes[i], np);
   }
   theMesh->n2n_add(n, np);
-  theMesh->n2n_add(n, n1);
-  theMesh->n2n_add(n, n2);
   theMesh->n2n_add(np, n);
+  theMesh->n2n_add(n, n1);
+  theMesh->n2n_add(n1, n);
+  theMesh->n2n_add(n, n2);
+  theMesh->n2n_add(n2, n);
   // Node-to-element updates
   for (i=0; i<neCount; i++) { 
-    theMesh->n2e_add(np, np_elems[i]);
     theMesh->n2e_remove(n, np_elems[i]);
+    theMesh->e2n_replace(np_elems[i], n, np);
+    theMesh->n2e_add(np, np_elems[i]);
   }
   theMesh->n2e_add(n, e5);
   theMesh->n2e_add(n, e6);
+  theMesh->n2e_add(n1, e5);
+  theMesh->n2e_add(n2, e6);
   theMesh->n2e_add(np, e5);
   theMesh->n2e_add(np, e6);
   return np;
@@ -505,11 +514,14 @@ int FEM_Adapt::newElement(){
 };
 
 void FEM_Adapt::deleteNode(int n){
-	invalidateSlot(nodeValid,n);
+  theMesh->n2e_removeAll(n);
+  theMesh->n2n_removeAll(n);
+  invalidateSlot(nodeValid,n);
 };
 
 void FEM_Adapt::deleteElement(int e){
-	invalidateSlot(elemValid,e);
+  theMesh->e2e_removeAll(e);
+  invalidateSlot(elemValid,e);
 };
 
 void FEM_Adapt::printValidArray(FEM_DataAttribute *validAttr){
