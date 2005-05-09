@@ -64,7 +64,7 @@ ELAN_QUEUE    *elan_q;
 int enableGetBasedSend = 1;
 int enableBufferPooling = 0;
 
-int SMALL_MESSAGE_SIZE=4072;  /* Smallest message size queue 
+int SMALL_MESSAGE_SIZE=16384;  /* Smallest message size queue 
                                  used for receiving short messages */
                                      
 int MID_MESSAGE_SIZE=65536;     /* Queue for larger messages 
@@ -1353,7 +1353,8 @@ typedef void (* ELAN_REDUCER)(void *in, void *inout, int *count, void *handle);
 //data = data to be reduced
 //fn = function pointer of the function which will do the reduction
 //dest = destination buffer where data is finally stored on all processors
-void elan_machine_allreduce(int nelem, int size, void * data, void *dest, ELAN_REDUCER fn){
+void elan_machine_allreduce(int nelem, int size, void * data, void *dest, 
+                            ELAN_REDUCER fn){
     
     while(!CmiReleaseSentMessages() || cur_unsent) {
         PumpMsgs(0);
@@ -1361,7 +1362,7 @@ void elan_machine_allreduce(int nelem, int size, void * data, void *dest, ELAN_R
     }   
     
     //ELAN reduction call here
-    elan_reduce (elan_base->allGroup, data, dest, size, nelem, fn, NULL, 0, 0, ELAN_RESULT_ALL|elan_base->group_flags, 0);
+    elan_reduce (elan_base->allGroup, data, dest, size, nelem, fn, NULL, 0, 0, ELAN_REDUCE_COMMUTE | ELAN_RESULT_ALL | elan_base->group_flags, 0);
 }
 
 //nelem = number of elements
@@ -1381,7 +1382,7 @@ void elan_machine_reduce(int nelem, int size, void * data, void *dest, ELAN_REDU
     printf("Machine Called Reduce %d\n", sent_msgs);
 
     //ELAN reduction call here
-    elan_reduce (elan_base->allGroup, data, dest, size, nelem, fn, NULL, 0, 0, 0xfffffff8, root);
+    elan_reduce (elan_base->allGroup, data, dest, size, nelem, fn, NULL, 0, 0, ELAN_REDUCE_COMMUTE|elan_base->group_flags , root);
 }
 
 void *elan_CmiAlloc(int size){
@@ -1757,59 +1758,52 @@ void CmiFreeListSendFn(int npes, int *pes, int len, char *msg)
 
 #if USE_NIC_MULTICAST   
     //ULTIMATE HACK FOR PERFORMANCE, CLEAN UP LATER   
-    if(len > 2048) {
+    if(len > 2048 && len < MID_MESSAGE_SIZE && nremote > 4) {
         //Attempt to speedup Namd multicast, copy the message to local
         //elan memory and then send it several times from there. Should
         //improve performance as bandwidth is increased due to lower DMA
         //contention.
         
-        void *elan_addr = elan_allocElan(elan_base->state, 8, len+4*sizeof(int));
+        void *elan_addr = elan_allocElan(elan_base->state, 8, 
+                                         len+4*sizeof(int));
 
-        if(elan_addr == 0)
-            CmiPrintf("ELAN ALLOC FAILED\n");
-        
-        elan_buf = (char*)elan_elan2main(elan_base->state, 
-                                         elan_sdram2elan
-                                         (elan_base->state, 
-                                          elan_addr));            
-        
-        int old_size_field = SIZE_FIELD(msg_start);
-        int old_conv_size_field = CONV_SIZE_FIELD(msg_start);
-        int old_ref_field = REF_FIELD(msg_start);
-
-        TYPE_FIELD(msg_start) = ELAN_MESSAGE;
-        SIZE_FIELD(msg_start) = len + 4*sizeof(int);
-        CONV_SIZE_FIELD(msg_start) = len;
-        REF_FIELD(msg_start) = nremote; 
-        
-        elan_wait(elan_get(elan_base->state, msg_start, elan_buf,
-                           len + 4*sizeof(int), CmiMyPe()), ELAN_WAIT_EVENT);
-        //memcpy(elan_buf, msg_start, len+ 4*sizeof(int));
-        
-        REF_FIELD(msg_start) = old_ref_field; 
-        TYPE_FIELD(msg_start) = DYNAMIC_MESSAGE;
-        SIZE_FIELD(msg_start) = old_size_field ;
-        CONV_SIZE_FIELD(msg_start) = old_conv_size_field;
-                
-        //Actually free the message        
-        for(i=0;i<npes;i++)
-            if(pes[i] != CmiMyPe() && pes[i]/ppn != CmiMyPe()/ppn)
-                CmiFree(msg);                
-
-        msg = elan_buf + 4*sizeof(int);
+        if(elan_addr == 0) {
+            CmiPrintf("ELAN ALLOC FAILED, sending data from main memory instead\n");
+        }
+        else {
+            elan_buf = (char*)elan_elan2main(elan_base->state, 
+                                             elan_sdram2elan
+                                             (elan_base->state, 
+                                              elan_addr));            
+            
+            int old_size_field = SIZE_FIELD(msg_start);
+            int old_conv_size_field = CONV_SIZE_FIELD(msg_start);
+            int old_ref_field = REF_FIELD(msg_start);
+            
+            TYPE_FIELD(msg_start) = ELAN_MESSAGE;
+            SIZE_FIELD(msg_start) = len + 4*sizeof(int);
+            CONV_SIZE_FIELD(msg_start) = len;
+            REF_FIELD(msg_start) = nremote; 
+            
+            elan_wait(elan_get(elan_base->state, msg_start, elan_buf,
+                               len + 4*sizeof(int), CmiMyPe()), ELAN_WAIT_EVENT);
+            //memcpy(elan_buf, msg_start, len+ 4*sizeof(int));
+            
+            REF_FIELD(msg_start) = old_ref_field; 
+            TYPE_FIELD(msg_start) = DYNAMIC_MESSAGE;
+            SIZE_FIELD(msg_start) = old_size_field ;
+            CONV_SIZE_FIELD(msg_start) = old_conv_size_field;
+            
+            //Actually free the message        
+            for(i=0;i<npes;i++)
+                if(pes[i] != CmiMyPe() && pes[i]/ppn != CmiMyPe()/ppn)
+                    CmiFree(msg);                
+            
+            msg = elan_buf + 4*sizeof(int);
+        }
     }
 #endif  
-    /*
-#if CMK_PERSISTENT_COMM
-    if (phs) {
-        CmiAssert(phsSize == npes);
-        for(i=0;i<npes;i++) 
-            CmiSyncSendPersistent(pes[i], len, msg, phs[i]);
-        return;
-    }
-#endif
-    */
-
+    
     for(i=0;i<npes;i++) {
         if(pes[i] != CmiMyPe() && pes[i]/ppn != CmiMyPe()/ppn) {
             //dest not in my node
