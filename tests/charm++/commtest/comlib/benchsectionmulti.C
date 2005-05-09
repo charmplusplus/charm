@@ -1,4 +1,26 @@
 
+/*******************************************
+        This benchmark tests section multicast feature of the
+        Communication library with a many to many multicast benchmark.
+        Section multicasts are traditionally used for one-to-many
+        multicast operations, but this benchmark tests them in an
+        many-to-many fashion.
+
+         To Run
+             benchsectionmulti <message_size> <array_elements>
+
+         Defaults
+           message size = 128b
+           array elements = CkNumPes
+
+         Performance tips
+            - Use a maxpass of 1000
+            - Use +LBOff to remove loadbalancing statistics 
+              collection overheads
+
+Sameer Kumar 03/17/05      
+**************************************************/
+
 #include <stdio.h>
 #include <string.h>
 
@@ -74,6 +96,7 @@ public:
             elem_array[count] = CkArrayIndex1D(count);
         }
 
+        //Different section multicast strategies
         DirectMulticastStrategy *dstrat = new DirectMulticastStrategy
             (arr.ckGetArrayID());
 
@@ -107,6 +130,7 @@ public:
         }
     }
     
+    //Phase done, initiate next phase with larger message sizes
     void done()
     {
         static int count = 0;
@@ -146,7 +170,10 @@ class Bench : public CBase_Bench
     int mcount;
     double time, startTime;
     int firstEntryFlag, sendFinishedFlag;
-    CProxySection_Bench sproxy;
+
+    CProxySection_Bench sproxy;  //Section proxy, which decides who
+                                 //all this array element is sending
+                                 //to
     ComlibInstanceHandle myinst;
 
 public:
@@ -179,6 +206,8 @@ public:
         for(int count = 0; count < nElements; count ++) 
             elem_array[count] = CkArrayIndex1D(count);
         
+        //Create the section proxy on all array elements
+        //Later subset test should be added to this benchmark 
         sproxy = CProxySection_Bench::ckNew
             (thisProxy.ckGetArrayID(), elem_array, nElements); 
         ComlibResetSectionProxy(&sproxy);
@@ -192,7 +221,8 @@ public:
     Bench(CkMigrateMessage *m) {
         //CkPrintf(" Migrated to %d\n", CkMyPe());
     }
-    
+
+    //Send messages through the section proxy
     void sendMessage()
     {
         if(thisIndex >= nElements) {
@@ -210,7 +240,6 @@ public:
 #else
 	arr[count].receiveMessage(new (&size, 0) BenchMessage);
 #endif
-
         sendFinishedFlag = 1;	
     }
     
@@ -234,6 +263,7 @@ public:
         }
     }
 
+    //All messages received, loadbalance or start next phase
     void start(int messagesize){
         //CkPrintf("In Start\n");
 	MESSAGESIZE = messagesize;

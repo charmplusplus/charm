@@ -1,4 +1,22 @@
 
+/*******************************************
+        This benchmark tests all to all multicast in Charm++ using the
+        communication library.
+
+         To Run
+             benchmulti <message_size> <array_elements>
+
+         Defaults
+           message size = 128b
+           array elements = CkNumPes
+
+         Performance tips
+            - Use a maxpass of 1000
+            - Use +LBOff to remove loadbalancing overheads
+
+Sameer Kumar 10/28/04      
+**************************************************/
+
 #include <stdio.h>
 #include <string.h>
 
@@ -19,13 +37,7 @@ int MESSAGESIZE=128;
 /*readonly*/ CProxy_Bench arr;
 /*readonly*/ int nElements;
 
-void callbackhandler(void *message){
-    //CkPrintf("[%d]In callback function\n", CkMyPe());
-    
-    BenchMessage *bm = (BenchMessage *)EnvToUsr((envelope *)message);
-    arr[CkMyPe()].receiveMessage(bm);
-}
-
+//Old stupid way of creating messages
 class BenchMessage : public CMessage_BenchMessage {
 public:
     int size;
@@ -81,14 +93,18 @@ public:
             elem_array[count] = CkArrayIndex1D(count);
         }
 
+        //Create strategy
         EachToManyMulticastStrategy *strat = new 
             EachToManyMulticastStrategy(USE_MESH, arr.ckGetArrayID(), 
                                         arr.ckGetArrayID(),
                                         nElements, elem_array,
                                         nElements, elem_array);
 
+        //Use the multicast learner
         strat->setMulticast();
 
+        //Alltoall multicast is effectively an all-to-all broadcast.
+        //So we can try the broadcast strategy here too
         BroadcastStrategy *bstrat = new BroadcastStrategy
             (arr.ckGetArrayID(), USE_HYPERCUBE);
         
@@ -120,6 +136,7 @@ public:
         }
     }
     
+    //Finished a phase, increase message size and start next phase
     void done()
     {
         static int count = 0;
@@ -152,6 +169,8 @@ public:
     }
 };
 
+
+//Charm++ array to do all-to-all multicast
 /*array [1D]*/
 class Bench : public CBase_Bench 
 {
@@ -164,6 +183,7 @@ class Bench : public CBase_Bench
 
 public:
 
+    //A pup to migrate elements, because we always need one 
     void pup(PUP::er &p) {
         //if(p.isPacking())
         //  CkPrintf("Migrating from %d\n", CkMyPe());
@@ -179,6 +199,7 @@ public:
         p | arrd;
     }
   
+    //Constructor
     Bench(ComlibInstanceHandle cinst)
     {   
         pass = 0;
@@ -200,10 +221,12 @@ public:
         myinst = cinst;
     }
     
+    //Migrate constrctor
     Bench(CkMigrateMessage *m) {
         //        CkPrintf(" Migrated to %d\n", CkMyPe());
     }
     
+    //Send the multicast message, notice only one is sent.
     void sendMessage()
     {
         if(thisIndex >= nElements) {
@@ -230,7 +253,9 @@ public:
 
         sendFinishedFlag = 1;	
     }
-    
+
+    //Receive messages. Once all are received, initiate next step with
+    //larger message size
     void receiveMessage(BenchMessage *bmsg){
         
         ComlibPrintf("[%d][%d] In Receive Message \n", CkMyPe(), thisIndex);
@@ -261,6 +286,7 @@ public:
             sendMessage();
     }
 
+    //Resume from loadbalancing
     void ResumeFromSync() {
         myinst.setSourcePe();
         sendMessage();

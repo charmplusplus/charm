@@ -1,3 +1,22 @@
+
+/***********************
+        This benchmark tests all to all personalized communication
+   in Charm++ using the communication library.
+
+         To Run
+             bench <message_size> <array_elements>
+
+         Defaults
+           message size = 128b
+           array elements = CkNumPes
+
+         Performance tips
+            - Use a maxiter of 1000
+            - Use +LBOff to remove loadbalancing overheads
+
+Sameer Kumar 10/28/04      
+***********************/
+
 #include <stdio.h>
 #include <string.h>
 
@@ -12,14 +31,22 @@
 #include "DummyStrategy.h"
 #include "bench.decl.h"
 
-#define USELIB  1
-#define MAXITER 10
-#define NUMPASS 1
+#define USELIB  1           // Use comlib or default charm++
+#define MAXITER 10          // Number of iterations to run For
+                            // benchmark runs this should be atleast a
+                            // 1000
+
+#define NUMPASS 1           // Number of all-to-all phases with the
+                            // same message size. After NUMPASS phases
+                            // the message size will be
+                            // increased. Useful while using the
+                            // learning framework.
 
 /*readonly*/ CkChareID mid;
 /*readonly*/ CProxy_Bench arr;
 /*readonly*/ int nElements;
 
+//Old way of creating messages in Charm++
 class BenchMessage : public CMessage_BenchMessage {
 public:
     char *data;
@@ -83,6 +110,7 @@ public:
             elem_array[count] = CkArrayIndex1D(count);
         }
 
+        //Create strategy
         EachToManyMulticastStrategy *strat = new 
             EachToManyMulticastStrategy(USE_MESH, arr.ckGetArrayID(), 
                                         arr.ckGetArrayID(), 
@@ -152,10 +180,11 @@ public:
     }
 };
 
+/******** The all to all benchmar array *************/
 /*array [1D]*/
 class Bench : public ArrayElement1D
 {
-  int pass;
+    int pass;
     int mcount;
     int ite;
     int msize;
@@ -188,6 +217,9 @@ public:
         //myInst = cinst;
     }
     
+    //Send all to all messages
+    //proxy arr is the charm++ proxy
+    //proxy arrd is the comlib delegated proxy
     void sendMessage()
     {
 #ifdef USELIB
@@ -208,7 +240,9 @@ public:
         myInst.endIteration();
 #endif        
     }
-    
+
+    //receive the all to all messages Once I have everyones message I
+    //initiate the next iteration, or call loadbalancing.
     void receiveMessage(BenchMessage *bmsg){
         
         delete bmsg;
@@ -221,6 +255,9 @@ public:
             mcount = 0;            
             pass ++;            
             CProxy_Main mainProxy(mid);
+
+            //If I have finished all iterations for this message size,
+            //Go back to main and start with a larger message size.
             if(pass == MAXITER){
 		pass = 0;                
 		mainProxy.send();
@@ -233,6 +270,8 @@ public:
     void start(int messagesize){
         msize = messagesize;
 
+        //Initiate loadbalance at the phases 1 and NUMPASS/2
+        //So if NUMPASS = 1, loadbalancing will not be called 
 	if(ite % NUMPASS == NUMPASS/2 || ite % NUMPASS == 1) {
             //Call atsync in the middle and in the end
             ComlibPrintf("[%d] Calling Atsync\n", CkMyPe());
@@ -245,12 +284,14 @@ public:
         ite ++;
     }
 
+    //Finished loadbalancing
     void ResumeFromSync() {
         //        CkPrintf("%d: resuming\n", CkMyPe());
         myInst.setSourcePe();
 	sendMessage();
     }
 
+    //Pack the data for migration
     void pup(PUP::er &p) {
         //if(p.isPacking())
         //  CkPrintf("Migrating from %d\n", CkMyPe());
