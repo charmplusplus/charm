@@ -212,7 +212,7 @@ class PairCalcReducer : public Group {
     localElements[symmtype].push_back(*elem);
   }
 
-  void acceptContribute(int size, double* matrix, CkCallback cb, bool isAllReduce, bool symmtype);
+  void acceptContribute(int size, double* matrix, CkCallback cb, bool isAllReduce, bool symmtype, int offx, int offy, int inputsize);
   
   void startMachineReduction();
 

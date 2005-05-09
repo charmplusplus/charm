@@ -253,7 +253,11 @@ PairCalculator::calculatePairs_gemm(calculatePairsMsg *msg)
     //CkPrintf("[%d] ELAN VERSION %d\n", CkMyPe(), symmetric);
     CProxy_PairCalcReducer pairCalcReducerProxy(reducer_id); 
     pairCalcReducerProxy.ckLocalBranch()->acceptContribute(S * S, outData, 
-							   cb, !symmetric, symmetric);
+							   cb, !symmetric, symmetric, thisIndex.x, thisIndex.y, grainSize);
+
+#ifdef _ELAN_PAIRCALC_DEBUG_ 
+  CkPrintf("[PAIRCALC] [%d %d %d %d] called acceptContribute \n", thisIndex.w, thisIndex.x, thisIndex.y, thisIndex.z);
+#endif 
 
 #endif //!CP_VERSION_ELAN
 
@@ -581,7 +585,7 @@ PairCalculator::sumPartialResult(int size, complex *result, int offset)
 }
 
 // EJB: Shouldn't this be inlined?
-void add_double(void *in, void *inout, int *red_size, void *handle) {
+inline void add_double(void *in, void *inout, int *red_size, void *handle) {
     double * matrix1 = (double *)in;
     double * matrix2 = (double *)inout;
     int size = *red_size / sizeof(double);
@@ -589,6 +593,7 @@ void add_double(void *in, void *inout, int *red_size, void *handle) {
     for(int i = 0; i < size; i ++){
         matrix2[i] += matrix1[i];
     }
+    return;
 }
 
 
@@ -603,7 +608,7 @@ extern "C" void elan_machine_allreduce(int nelem, int size, void * data,
 #endif
 
 void PairCalcReducer::acceptContribute(int size, double* matrix, CkCallback cb, 
-                                       bool isAllReduce, bool symmtype)
+                                       bool isAllReduce, bool symmtype, int offx, int offy, int grainSize)
 {
     this->isAllReduce = isAllReduce;
     this->size = size;
@@ -612,18 +617,28 @@ void PairCalcReducer::acceptContribute(int size, double* matrix, CkCallback cb,
 
 #if CP_VERSION_ELAN
     reduction_elementCount ++;
-    
+#ifdef _ELAN_PAIRCALC_DEBUG_
+    CkPrintf("Accept contribute called on %d count is %d out of %d\n",CkMyPe(),reduction_elementCount, localElements[symmtype].length());
+#endif        
     int red_size = size *sizeof(double);
     if(tmp_matrix == NULL) {
-        tmp_matrix = matrix;
+        tmp_matrix = new double[size];
+	memset(tmp_matrix,0,red_size);
     }
-    else
-        add_double(matrix, tmp_matrix, &red_size, NULL);
+    int off=offx*grainSize+offy;
+    for(int i = 0; i < grainSize*grainSize ; i ++){
+        tmp_matrix[i+off] += matrix[i];
+    }
     
     if(reduction_elementCount == localElements[symmtype].length()) {
-        reduction_elementCount = 0;
         
+#ifdef _ELAN_PAIRCALC_DEBUG_
+    CkPrintf("[%d] Contributing %d \n",CkMyPe(),reduction_elementCount);
+
+#endif        
+        reduction_elementCount = 0;
         contribute(sizeof(int),&reduction_elementCount,CkReduction::sum_int);
+
     }
 #else
     CkAbort("Converse Version Is not ELAN, h/w reduction is not supported");
@@ -634,7 +649,9 @@ void PairCalcReducer::acceptContribute(int size, double* matrix, CkCallback cb,
 void PairCalcReducer::startMachineReduction() {
 #if CP_VERSION_ELAN
     double * dst_matrix =  NULL;
-    
+#ifdef _ELAN_PAIRCALC_DEBUG_
+    CkPrintf("Starting machine reduction %d\n",CkMyPe());
+#endif    
     if(isAllReduce) {
         dst_matrix = new double[size];
         memset(dst_matrix, 0, size * sizeof(double));
@@ -663,9 +680,14 @@ void PairCalcReducer::startMachineReduction() {
     }        
     
     tmp_matrix = NULL;
+#ifdef _ELAN_PAIRCALC_DEBUG_
+    CkPrintf("Leaving machine reduction %d\n",CkMyPe());
+#endif    
 #else
     CkAbort("Converse Version Is not ELAN, h/w reduction is not supported");
 #endif
+
+
 }
 
 void
