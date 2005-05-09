@@ -344,7 +344,6 @@ saves time selecting the desired dataset via the GUI's file dialog.
 \label{mainwindow}
 \end{figure}
 
-
 When \projections{} is started, it will display a main window as shown
 in figure \ref{mainwindow}. If summary (.sum) files are available in
 the set of data, a low-resolution utilization graph will be displayed
@@ -385,12 +384,17 @@ methods each processor spends its time on during a specified time range.
 It is particularly useful for identifying load imbalance and the probable
 offending entry method.
 \item
-The {\bf Communication Histogram} view COMMUNICATION HISTOGRAM DESCRIPTION
+The {\bf Communication} view is a general tool that presents
+communication properties contributed by each entry point across the
+processors.
 \item
 The {\bf Log File Viewer} provides a human-readable, verbose
 interpretation of a log file's entries.
 \item
-The {\bf Histograms} view HISTOGRAM SUMMARY DESCRIPTION.
+The {\bf Histograms} view presents entry point or communication
+histogram information (ie. the frequency of occurrence of events given
+an activity property like time bin size or message size on the
+x-axis).
 \item
 The {\bf Overview} view gives user an overview of the utilization of
 all processors during the execution. It is an extremely useful initial
@@ -401,10 +405,11 @@ light-weight at the same time.
 The {\bf Animation} view animates the processor usage over a specified
 range of time and a specified interval size.
 \item
-The {\bf Time Profile Graph} view TIME PROFILE SUMMARY DESCRIPTION
-\item
-The {\bf Multirun Analysis} view is still a work in progress. THE INTENDED
-YADA YADA YADA ...
+The {\bf Time Profile Graph} view is a more detailed presentation of
+the {\bf Graphs} utilization view in that it presents the time
+contribution by each entry point across the desired time
+interval. While the {/bf Graphs} view can show the same data, it is
+unable to stack the entry points, which proves useful in some cases.
 \end{itemize}
 
 \subsubsection{Graphs}
@@ -435,8 +440,6 @@ this step should not take more than a few minutes, though.
 \caption{Graph module}
 \label{graph}
 \end{figure}
-
-
 
 The Graph Window has 3 components in its display:
 \begin{enumerate}
@@ -727,9 +730,25 @@ closest to the bottom.  If you place the cursor over a portion of the
 bar, a pop-up window will appear telling you the name of the item,
 what percent of the usage it has, and the processor it is on.
 
-\subsubsection{Communication Histograms}
+\subsubsection{Communication}
 
-DESCRIPTION OF COMMUNICATION HISTOGRAM FUNCTIONALITY HERE PLEASE ...
+The dialog box of the tool allows the user to load communication
+characteristics information contributed to by entry methods across
+processors.
+
+The user may switch between the following communication characteristics:
+
+\begin{itemize}
+\item[-] Number of Messages Sent by entry methods (initial default view);
+\item[-] Number of Bytes Sent by entry methods;
+\item[-] Number of Messages Received by entry methods;
+\item[-] Number of Bytes Received by entry methods;
+\item[-] Number of Messages Sent externally (physically) by entry methods;
+\item[-] Number of Bytes Sent externally (physically) by entry methods;
+\item[-] and Number of hops messages travelled before being received
+by an entry methods (available only on trace logs generated on the
+Bluegene machine).
+\end{itemize}
 
 \begin{figure}[htb]
 \center
@@ -755,9 +774,16 @@ Each line has:
 
 \subsubsection{Histograms}
 
-This module allows you to examine the execution time distribution of all your
-entry points(EP). It gives a histogram of different number of EP's that have
-execution time falling in different time bins.
+This module allows you to examine the performance property
+distribution of all your entry points(EP). It gives a histogram of
+different number of EP's that have the following properties falling in
+different property bins:
+
+\begin{itemize}
+\item[-] Entry method execution time (How long did that entry method ran for?) 
+\item[-] Entry method creation message size (How large was the message
+that caused the entry method's execution?)
+\end{itemize}
 
 \begin{figure}[htb]
 \center
@@ -769,7 +795,17 @@ execution time falling in different time bins.
 
 A dialog allows you to specify the number of bins, the size of each
 bin and the minimum bin size you wish to start counting the entry
-method by.
+method by. This size is specified in ``units'' which can refer to
+microseconds for time-based histograms or bytes for histograms
+representing message sizes.
+
+The use of the tool is somewhat counterintuitive. The dialog box is
+created immediately and when the tool window is created, it is
+defaulted to a time-based histogram. You may change this histogram to
+a message-size-based histogram by selecting the ``Message Size'' radio
+button which would then update the graph using the same parameters
+provided in the dialog box. This issue will be fixed in upcoming
+editions of \projections{}.
 
 The following features are, as of this writing, not implemented. They
 will be ready very soon.
@@ -842,7 +878,26 @@ view.
 
 \subsubsection{Time Profile Graph}
 
-DESCRIPTION OF THE TIME PROFILE GRAPH TOOL.
+The Time Profile view is a visualization of the amount of time
+contributed by each entry method summed across all processors and
+displayed by user-adjustable time intervals.
+
+Under the tool options, one may:
+
+\begin{itemize}
+\item[-] Filter the set of entry methods to be displayed on the graph via
+the ``Select Entry Points'' button. One may also modify the color set used
+for the entry methods via this option.
+\item[-] use the ``Select New Range'' button to reload the dialog box
+for the tool and set new parameters for visualization (eg. different
+time range, different set of processors or different interval sizes).
+\item[-] store the current set of entry method colors to disk (to the
+same directory where the trace logs are stored). This is done via the
+``Save Entry Colors'' button.
+\item[-] load the stored set of entry method colors (if it exists)
+from disk (from the same directory where the trace logs are
+stored). This is done via the ``Load Entry Colors'' button.
+\end{itemize}
 
 \begin{figure}[htb]
 \center
@@ -851,18 +906,5 @@ DESCRIPTION OF THE TIME PROFILE GRAPH TOOL.
 \caption{Time Profile Graph View}
 \label{time profile}
 \end{figure}
-
-\subsubsection{Multirun Analysis}
-
-DESCRIPTION OF THE MULTIRUN ANALYSIS TOOL.
-
-\subsubsection{Miscellaneous Features}
-
-DESCRIBE AND SHOW THE USE OF VARIOUS PROJECTIONS DIALOG WINDOWS.
-
-\section{Tutorial: A Performance Analysis Exercise}
-
-DO A TYPICAL PERFORMANCE ANALYSIS EXERCISE, DESCRIBING COMMON THINGS TO
-WATCH OUT FOR WHEN USING PROJECTIONS.
 
 \end{document}
