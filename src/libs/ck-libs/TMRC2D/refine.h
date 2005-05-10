@@ -57,7 +57,11 @@ extern "C" {
    * of "split" calls received during earlier refinements.
    */
   void REFINE2D_Split(int nNode, double *coord, int nEl, double *desiredArea);
-  
+ 
+	typedef struct{
+	} refineData;
+
+ 
   // Get the number of split triangles.
   int REFINE2D_Get_Split_Length(void);
 
