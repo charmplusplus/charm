@@ -1,7 +1,30 @@
 #include "ckPairCalculator.h"
 
 #define PARTITION_SIZE 500
-
+/***************************************************************************
+ * This is a matrix multiply library with extra frills to communicate the  *
+ * results back to gspace or the calling ortho char as directed by the     *
+ * callback.                                                               *   
+ *                                                                         *
+ * The extra complications are for parallelization and the multiplication  *
+ * of the forces and energies.                                             *
+ *                                                                         *
+ * In normal use the calculator is created.  Then forces are sent to it    * 
+ * and multiplied in a big dgemm.  Then this result is reduced to the      *
+ * answer matrix and shipped back.  The received left and/or right data is *
+ * retained for the backward pass which is triggered by the finishPairCalc *
+ * call.  This carries in another set of matrices for multiplication.      *
+ * The results are again reduced and cast back.  Thus terminating the life *
+ * cycle of the data in the pair calculator.  As the calculator will be    *
+ * reused again throughout each iteration the calculators themselves are   *
+ * only created once.                                                      *
+ *                                                                         *
+ * The elan code is a specialized machine reduction/broadcast which runs   *
+ * much faster on lemieux, and theoretically on any other elan machine     *
+ * It operates by one dummy reduction which is used to indicated that all  *
+ * calculators on a PE machine have reported in.  Then the machine         *
+ * reduction is triggered.                                                 *
+ ***************************************************************************/
 
 PairCalculator::PairCalculator(CkMigrateMessage *m) { }
 
@@ -56,6 +79,9 @@ PairCalculator::PairCalculator(bool sym, int grainSize, int s, int blkSize,  int
 void
 PairCalculator::pup(PUP::er &p)
 {
+#ifdef _PAIRCALC_DEBUG_
+      CkPrintf("[%d,%d,%d,%d] pups on %d\n",thisIndex.w,thisIndex.x, thisIndex.y, thisIndex.z,CkMyPe());
+#endif
   ArrayElement4D::pup(p);
   p|numRecd;
   p|grainSize;
@@ -123,18 +149,21 @@ PairCalculator::~PairCalculator()
 void PairCalculator::ResumeFromSync() {
   if(usesAtSync)
     {
+#ifdef _PAIRCALC_DEBUG_
+      CkPrintf("[%d,%d,%d,%d] resumes from sync\n");
+#endif
       CProxy_PairCalcReducer pairCalcReducerProxy(reducer_id); 
       CkArrayIndex4D indx4(thisIndex.w,thisIndex.x, thisIndex.y, thisIndex.z);
       CkArrayID myaid=thisProxy.ckGetArrayID();
       IndexAndID *iandid= new IndexAndID(&indx4,&myaid);
       pairCalcReducerProxy.ckLocalBranch()->doRegister(iandid, symmetric);
       delete iandid;
-      //if gspace isn't syncing we'll have to do the resumption.
-      /*      if(thisIndex.x==0 && thisIndex.y==0 && thisIndex.z==0 && thisIndex.w==0)
+      if(thisIndex.x==0 && thisIndex.y==0 && thisIndex.z==0 && thisIndex.w==0)
 	{
-	  cb_lb.send();
+	
+	  cb_lb.send(NULL);
 	}
-      */
+
     }
 }
 void

@@ -123,7 +123,12 @@ class PairCalculator: public CBase_PairCalculator {
     
   PairCalculator(CkMigrateMessage *);
   ~PairCalculator();
-  void lbsync() {AtSync();};
+  void lbsync() {
+#ifdef _PAIRCALC_DEBUG_
+    CkPrintf("[%d,%d,%d,%d]atsyncs\n");
+#endif
+    AtSync();
+  };
   void ResumeFromSync();
   void calculatePairs(int, complex *, int, bool, bool); 
   void calculatePairs_gemm(calculatePairsMsg *msg);
