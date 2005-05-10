@@ -26,12 +26,18 @@ void createPairCalculator(bool sym, int s, int grainSize, int numZ, int* z, int 
   
   CkArrayOptions options;
   CProxy_PairCalculator pairCalculatorProxy;
+#ifdef CONVERSE_VERSION_ELAN
+  bool machreduce=(s/grainSize * numZ* blkSize>=CkNumPes()) ? true: false;
+#else
+  bool machreduce=false;
+#endif  
+
   if(!mapid) {
       pairCalculatorProxy = CProxy_PairCalculator::ckNew();
   }
   else {
       options.setMap(*mapid);
-      pairCalculatorProxy = CProxy_PairCalculator::ckNew(sym, grainSize, s, blkSize, op1, f1, op2, f2, cb, pairCalcReducerProxy.ckGetGroupID(), cb_aid, cb_ep, conserveMemory, lbpaircalc, lbcb, options);
+      pairCalculatorProxy = CProxy_PairCalculator::ckNew(sym, grainSize, s, blkSize, op1, f1, op2, f2, cb, pairCalcReducerProxy.ckGetGroupID(), cb_aid, cb_ep, conserveMemory, lbpaircalc, lbcb, machreduce, options);
   }
 
   pairCalculatorProxy.ckSetReductionClient(&cb);  
@@ -51,6 +57,8 @@ void createPairCalculator(bool sym, int s, int grainSize, int numZ, int* z, int 
 
   //  ComlibInstanceHandle mcastInstance = CkGetComlibInstance();
   //  mcastInstance.setStrategy(multistrat);
+
+
   if(mapid) {
       if(sym){
           for(int numX = 0; numX < numZ; numX += blkSize){
@@ -58,7 +66,7 @@ void createPairCalculator(bool sym, int s, int grainSize, int numZ, int* z, int 
                   for (int s2 = s1; s2 < s; s2 += grainSize) {
                       for (int c = 0; c < blkSize; c++) {
                           pairCalculatorProxy(z[numX],s1,s2,c).
-                              insert(sym, grainSize, s, blkSize, op1, f1, op2, f2, cb, pairCalcReducerProxy.ckGetGroupID(), cb_aid, cb_ep, conserveMemory, lbpaircalc, lbcb );
+                              insert(sym, grainSize, s, blkSize, op1, f1, op2, f2, cb, pairCalcReducerProxy.ckGetGroupID(), cb_aid, cb_ep, conserveMemory, lbpaircalc, lbcb,machreduce );
                           n_paircalc++;
                       }
                   }
@@ -71,7 +79,7 @@ void createPairCalculator(bool sym, int s, int grainSize, int numZ, int* z, int 
                   for (int s2 = 0; s2 < s; s2 += grainSize) {
                       for (int c = 0; c < blkSize; c++) {
                           pairCalculatorProxy(z[numX],s1,s2,c).
-                              insert(sym, grainSize, s, blkSize, op1, f1, op2, f2, cb, pairCalcReducerProxy.ckGetGroupID(), cb_aid, cb_ep, conserveMemory, lbpaircalc,lbcb );
+                              insert(sym, grainSize, s, blkSize, op1, f1, op2, f2, cb, pairCalcReducerProxy.ckGetGroupID(), cb_aid, cb_ep, conserveMemory, lbpaircalc,lbcb,machreduce );
                           n_paircalc++;
                           proc++;
                           if (proc >= CkNumPes()) proc = 0;
@@ -89,7 +97,7 @@ void createPairCalculator(bool sym, int s, int grainSize, int numZ, int* z, int 
                   for (int s2 = s1; s2 < s; s2 += grainSize) {
                       for (int c = 0; c < blkSize; c++) {
                           pairCalculatorProxy(z[numX],s1,s2,c).
-                              insert(sym, grainSize, s, blkSize, op1, f1, op2, f2, cb, pairCalcReducerProxy.ckGetGroupID(), cb_aid, cb_ep, conserveMemory, lbpaircalc, lbcb, proc);
+                              insert(sym, grainSize, s, blkSize, op1, f1, op2, f2, cb, pairCalcReducerProxy.ckGetGroupID(), cb_aid, cb_ep, conserveMemory, lbpaircalc, lbcb, machreduce, proc);
                           n_paircalc++;
                           proc++;
                           if (proc >= CkNumPes()) proc = 0;
@@ -104,7 +112,7 @@ void createPairCalculator(bool sym, int s, int grainSize, int numZ, int* z, int 
                   for (int s2 = 0; s2 < s; s2 += grainSize) {
                       for (int c = 0; c < blkSize; c++) {
                           pairCalculatorProxy(z[numX],s1,s2,c).
-                              insert(sym, grainSize, s, blkSize, op1, f1, op2, f2, cb, pairCalcReducerProxy.ckGetGroupID(), cb_aid, cb_ep, conserveMemory, lbpaircalc, lbcb, proc);
+                              insert(sym, grainSize, s, blkSize, op1, f1, op2, f2, cb, pairCalcReducerProxy.ckGetGroupID(), cb_aid, cb_ep, conserveMemory, lbpaircalc, lbcb,  machreduce, proc);
                           n_paircalc++;
                           proc++;
                           if (proc >= CkNumPes()) proc = 0;

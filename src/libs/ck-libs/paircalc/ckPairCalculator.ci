@@ -26,7 +26,7 @@ module ckPairCalculator {
 
 
 	array [4D] PairCalculator {
- 		entry PairCalculator(bool, int, int, int, int op1, FuncType fn1, int op2, FuncType fn2, CkCallback cb, CkGroupID gid, CkArrayID final_callbackid, int final_callback_ep, bool conserveMemory, bool lbpaircalc, CkCallback lbcb);
+ 		entry PairCalculator(bool, int, int, int, int op1, FuncType fn1, int op2, FuncType fn2, CkCallback cb, CkGroupID gid, CkArrayID final_callbackid, int final_callback_ep, bool conserveMemory, bool lbpaircalc, CkCallback lbcb, bool machreduce);
    		entry void lbsync();
 
    		entry void calculatePairs(int size, complex points[size], int, bool, bool);
