@@ -146,7 +146,7 @@ CDECL void IDXL_Sort_3d(IDXL_t l_t,double *coord3d){
 
 //Add a new entity at the given local index.  Copy the communication
 // list from the intersection of the communication lists of the given entities.
-static void splitEntity(IDXL_Side &c,
+void splitEntity(IDXL_Side &c,
 	int localIdx,int nBetween,int *between,int idxbase)
 {
 	//Find the commRecs for the surrounding nodes
