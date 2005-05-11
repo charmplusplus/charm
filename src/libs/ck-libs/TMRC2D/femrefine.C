@@ -108,6 +108,7 @@ FDECL void FTN_NAME(FEM_REFINE2D_NEWMESH,fem_refine2d_newmesh)(int *meshID,int *
 class FEM_Refine_Operation_Data{
 public:
 	int meshID,nodeID;
+	int cur_nodes;
 	CkVec<double> *coordVec;
 	double *coord;
 	FEM_Entity *node;
@@ -127,7 +128,7 @@ public:
 	};
 };
 
-void FEM_Refine_Operation(FEM_Refine_Operation_Data *data);
+void FEM_Refine_Operation(FEM_Refine_Operation_Data *data,refineData &d);
 
 void FEM_REFINE2D_Split(int meshID,int nodeID,double *coord,int elemID,double *desiredAreas,int sparseID){
   int nnodes = FEM_Mesh_get_length(meshID,nodeID);
@@ -138,6 +139,7 @@ void FEM_REFINE2D_Split(int meshID,int nodeID,double *coord,int elemID,double *d
 	refine_data.nodeID = nodeID;
 	refine_data.sparseID = sparseID;
 	refine_data.elemID = elemID;
+  refine_data.cur_nodes = FEM_Mesh_get_length(meshID,nodeID);
 
   /*Copy the cordinates of the nodes into a vector, 
     the cordinates of the new nodes will be inserted
@@ -208,7 +210,7 @@ void FEM_REFINE2D_Split(int meshID,int nodeID,double *coord,int elemID,double *d
 	printf(" node %d ( %.6f %.6f )\n",k,coord[2*k+0],coord[2*k+1]);
 	}*/
   DEBUGINT(printf("%d %d \n",nnodes,nelems));	
-  REFINE2D_Split(nnodes,coord,nelems,desiredAreas);
+  REFINE2D_Split(nnodes,coord,nelems,desiredAreas,&refine_data);
   
   int nSplits= refine_data.nSplits = REFINE2D_Get_Split_Length();
   DEBUGINT(printf("called REFINE2D_Split nSplits = %d \n",nSplits));
@@ -217,8 +219,13 @@ void FEM_REFINE2D_Split(int meshID,int nodeID,double *coord,int elemID,double *d
     return;
   }
 
-		FEM_Refine_Operation(&refine_data);
-		
+	for(int split = 0;split < nSplits;split++){
+		refineData op;
+		REFINE2D_Get_Split(split,&op);
+		FEM_Refine_Operation(&refine_data,op);
+	}
+
+
   DEBUGINT(printf("Cordinate list length %d \n",coordVec.size()/2));
   IDXL_Sort_2d(FEM_Comm_shared(meshID,nodeID),coordVec.getVec());
   int read = FEM_Mesh_is_get(meshID) ;
@@ -243,8 +250,20 @@ void FEM_REFINE2D_Split(int meshID,int nodeID,double *coord,int elemID,double *d
 	delete [] list;
   */
 }
+extern void splitEntity(IDXL_Side &c,
+	int localIdx,int nBetween,int *between,int idxbase);
 
-void FEM_Refine_Operation(FEM_Refine_Operation_Data *data){
+void FEM_Modify_IDXL(FEM_Refine_Operation_Data *data,refineData &op){
+	FEM_Node *node = (FEM_Node *)data->node;
+	int between[2];
+	between[0] = op.A;
+	between[1] = op.B;
+
+	splitEntity(node->shared,op.D,2,between,0);
+};
+
+
+void FEM_Refine_Operation(FEM_Refine_Operation_Data *data,refineData &op){
 	int meshID = data->meshID;
 	int nodeID = data->nodeID;
 	int sparseID = data->sparseID;
@@ -258,25 +277,24 @@ void FEM_Refine_Operation(FEM_Refine_Operation_Data *data){
 	AllocTable2d<int> *sparseConnTable, *sparseBoundaryTable;
 	CkVec<FEM_Attribute *> *sparseattrs = data->sparseattrs;
 
-	for (int splitNo=0;splitNo<data->nSplits;splitNo++){
-    int tri,A,B,C,D;
-    double frac;
-    // current number of nodes in the mesh
-    int cur_nodes = FEM_Mesh_get_length(meshID,nodeID);
-    int *connData = connTable->getData();
-    int flags;
+  int tri=op.tri,A=op.A,B=op.B,C=op.C,D=op.D;
+  double frac=op.frac;
+  // current number of nodes in the mesh
+  int *connData = connTable->getData();
+  int flags=op.flag;
     
-    REFINE2D_Get_Split(splitNo,(int *)(connData),&tri,&A,&B,&C,&frac,&flags);
-    if((flags & 0x1) || (flags & 0x2)){
-      //new node 
-      D = cur_nodes;
+  if((flags & 0x1) || (flags & 0x2)){
+			//new node 
       DEBUGINT(CkPrintf("---- Adding node %d\n",D));			
       /*	lastA=A;
-		lastB=B;
-		lastD=D;*/
-      if (A>=cur_nodes) CkAbort("Calculated A is invalid!");
-      if (B>=cur_nodes) CkAbort("Calculated B is invalid!");
-      data->node->setLength(cur_nodes+1);
+			lastB=B;
+			lastD=D;*/
+      if (A>=data->cur_nodes) CkAbort("Calculated A is invalid!");
+      if (B>=data->cur_nodes) CkAbort("Calculated B is invalid!");
+			if(D >= data->cur_nodes){
+	      data->node->setLength(D+1);
+				data->cur_nodes = D+1;
+			}	
       for(int i=0;i<attrs->size();i++){
 	FEM_Attribute *a = (FEM_Attribute *)(*attrs)[i];
 	if(a->getAttr()<FEM_ATTRIB_TAG_MAX){
@@ -358,7 +376,8 @@ void FEM_Refine_Operation(FEM_Refine_Operation_Data *data){
     }
     //add a new triangle
     /*TODO: replace  FEM_ELEM with parameter*/
-    int newTri =  FEM_Mesh_get_length(data->meshID,data->elemID);
+    int newTri =  op._new;
+		//FEM_Mesh_get_length(data->meshID,data->elemID);
     DEBUGINT(CkPrintf("---- Adding triangle %d after splitting %d \n",newTri,tri));
     data->elem->setLength(newTri+1);
     D = newnodes->get(intdual(A,B));
@@ -419,7 +438,6 @@ void FEM_Refine_Operation(FEM_Refine_Operation_Data *data){
       }
       nodes2sparse->put(intdual(C,D)) = cdidx+1;
     }
-  }
 }
 
 

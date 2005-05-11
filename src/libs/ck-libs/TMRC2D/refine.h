@@ -56,9 +56,13 @@ extern "C" {
    * equal to the "nEl" value passed in via REFINE_NewMesh plus the number
    * of "split" calls received during earlier refinements.
    */
-  void REFINE2D_Split(int nNode, double *coord, int nEl, double *desiredArea);
+	 class FEM_Refine_Operation_Data;
+  void REFINE2D_Split(int nNode, double *coord, int nEl, double *desiredArea,FEM_Refine_Operation_Data *refine_data);
  
 	typedef struct{
+    int tri,A,B,C,D, _new,origEdgeB, newEdge1B, newEdge2B; 
+    double frac;
+    int flag;
 	} refineData;
 
  
@@ -108,8 +112,7 @@ extern "C" {
    *   -Update connectivity for source triangle
    *   -Add new triangle. 
    */
-  void REFINE2D_Get_Split(int splitNo, const int *conn,	int *tri, int *A, 
-			  int *B, int *C, double *frac, int *flags);
+  void REFINE2D_Get_Split(int splitNo, refineData *d);
 
 
   // Data structures to store the changes caused by coarsening.  

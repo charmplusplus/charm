@@ -70,18 +70,8 @@ FDECL void FTN_NAME(REFINE2D_NEWMESH,refine2d_newmesh)
 
 /********************** Splitting ******************/
 class refineResults {
+  std::vector<refineData> res;
   int nResults;
-  class resRec {
-  public:
-    int t,s,n;
-    double f;
-    int flag;
-    resRec(int t_,int s_,int n_,double f_) 
-      :t(t_), s(s_), n(n_), f(f_) {flag =0;}
-    resRec(int t_,int s_,int n_,double f_,int flag_) 
-      :t(t_), s(s_), n(n_), f(f_),flag(flag_) {}
-  };
-  std::vector<resRec> res;
   
   //Return anything on [0,2] than a or b
   int otherThan(int a,int b) {
@@ -93,55 +83,59 @@ class refineResults {
   }
 public:
   refineResults(void) {nResults=0;}
-  void add(int tri_,int side_,int n_,double frac_) {
-    nResults++;
-    res.push_back(resRec(tri_,side_,n_,frac_));
-  }
-  void add(int tri_,int side_,int n_,double frac_,int flag) {
-    nResults++;
-    res.push_back(resRec(tri_,side_,n_,frac_,flag));
-  }
+	refineData createRefineData(int tri, int A, int B, int C,  
+		int D, int _new, double frac,int flag, int origEdgeB, int newEdge1B, 
+		int newEdge2B){
+		refineData d;
+		d.tri = tri;
+		d.A = A;
+		d.B = B;
+		d.C = C;
+		d.D = D;
+		d._new = _new;
+		d.frac = frac;
+		d.flag = flag;
+		d.origEdgeB = origEdgeB;
+		d.newEdge1B = newEdge1B;
+		d.newEdge2B = newEdge2B;
+		return d;
+	}
+	void add(refineData &d){
+		nResults++;
+		res.push_back(d);
+	};
+	
   int countResults(void) const {return nResults;}
-  void extract(int i, const int *conn, int *triDest, int *A, int *B, int *C,
-	       double *fracDest, int idxBase, int *flags) {
-    if ((i<0) || (i>=(int)res.size()))
-      CkAbort("Invalid index in REFINE2D_Get_Splits");
-    
-    int tri=res[i].t;
-    *triDest=tri+idxBase;
-    int edgeOfTri=res[i].s;
-    int movingNode=res[i].n;
-    
-    int c=(edgeOfTri+2)%3; //==opnode
-    *A=conn[3*tri+movingNode]; //==othernode
-    *B=conn[3*tri+otherThan(c,movingNode)];
-    *C=conn[3*tri+c];
-    *fracDest=res[i].f;
-    *flags = res[i].flag;
-    if (i==(int)res.size()-1) {
-      delete this;
-      chunk *C = CtvAccess(_refineChunk);
-      C->refineResultsStorage=NULL;
-    }
+	
+  void extract(int i, refineData *d) {
+		*d =  res[i];	
   }
 };
+void FEM_Modify_IDXL(FEM_Refine_Operation_Data *data,refineData &d);
 
 class resultsRefineClient : public refineClient {
   refineResults *res;
+	FEM_Refine_Operation_Data *data;
 public:
-  resultsRefineClient(refineResults *res_) :res(res_) {}
-  void split(int tri, int side, int node, double frac) {
+  resultsRefineClient(refineResults *res_,FEM_Refine_Operation_Data *data_) :res(res_),data(data_) {}
+ /* void split(int tri, int side, int node, double frac) {
 #if 0
     //Convert from "tri.C edges" to sensible edges
     if (side==1) side=2;
     else if (side==2) side=1;
 #endif
     res->add(tri, side, node, frac);
-  }
-  void split(int tri, int side, int node, double frac, int flag, 
-	     int newNodeID, int newElemID, int origEdgeB, int newEdge1B, 
+  }*/
+	//for the explanation of A,B,C,D look at diagram in refine.h
+  void split(int tri, int A, int B, int C,  
+	     int D, int _new, double frac,int flag, int origEdgeB, int newEdge1B, 
 	     int newEdge2B) {
-    res->add(tri, side, node, frac, flag);
+   	refineData d = res->createRefineData(tri,A,B,C,D, _new,frac,flag,origEdgeB,
+		newEdge1B,newEdge2B);
+		
+		FEM_Modify_IDXL(data,d);
+
+		res->add(d);
   }
 };
 
@@ -247,14 +241,14 @@ public:
 
 
 // this function should be called from a thread
-CDECL void REFINE2D_Split(int nNode,double *coord,int nEl,double *desiredArea)
+CDECL void REFINE2D_Split(int nNode,double *coord,int nEl,double *desiredArea,FEM_Refine_Operation_Data *refine_data)
 {
   TCHARM_API_TRACE("REFINE2D_Split", "refine");
   chunk *C = CtvAccess(_refineChunk);
   if (!C)
     CkAbort("REFINE2D_Split failed> Did you forget to call REFINE2D_Attach?");
   C->refineResultsStorage=new refineResults;
-  resultsRefineClient client(C->refineResultsStorage);
+  resultsRefineClient client(C->refineResultsStorage,refine_data);
 
   C->updateNodeCoords(nNode, coord, nEl);
   C->multipleRefine(desiredArea, &client);
@@ -276,9 +270,9 @@ CDECL void REFINE2D_Coarsen(int nNode, double *coord, int nEl,
 
 
 FDECL void FTN_NAME(REFINE2D_SPLIT,refine2d_split)
-   (int *nNode,double *coord,int *nEl,double *desiredArea)
+   (int *nNode,double *coord,int *nEl,double *desiredArea,FEM_Refine_Operation_Data *data)
 {
-  REFINE2D_Split(*nNode,coord,*nEl,desiredArea);
+  REFINE2D_Split(*nNode,coord,*nEl,desiredArea,data);
 }
 
 static refineResults *getResults(void) {
@@ -302,18 +296,18 @@ FDECL int FTN_NAME(REFINE2D_GET_SPLIT_LENGTH,refine2d_get_split_length)(void)
 }
 
 CDECL void REFINE2D_Get_Split
-    (int splitNo,const int *conn,int *triDest,int *A,int *B,int *C,double *fracDest,int *flags)
+    (int splitNo,refineData *d)
 {
   TCHARM_API_TRACE("REFINE2D_Get_Split", "refine");
   refineResults *r=getResults();
-  r->extract(splitNo,conn,triDest,A,B,C,fracDest,0,flags);
+  r->extract(splitNo,d);
 }
 FDECL void FTN_NAME(REFINE2D_GET_SPLIT,refine2d_get_split)
-    (int *splitNo,const int *conn,int *triDest,int *A,int *B,int *C,double *fracDest, int *flags)
+    (int *splitNo,refineData *d)
 {
   TCHARM_API_TRACE("REFINE2D_Get_Split", "refine");
   refineResults *r=getResults();
-  r->extract(*splitNo-1,conn,triDest,A,B,C,fracDest,1,flags);
+  r->extract(*splitNo-1,d);
 }
 
 static coarsenResults *getCoarsenResults(void) {

@@ -52,6 +52,7 @@ void element::split(int longEdge)
                       longEdge                         */
   int opnode, othernode, fixnode, modEdge, otherEdge, result, local, first;
   edgeRef e_prime, newEdge;
+	int oldothernode;
   int m = -2, nullNbr=0;
   elemRef newElem, nullRef;
 
@@ -115,6 +116,7 @@ void element::split(int longEdge)
     C->theEdges[newEdge.idx].update(nullRef, myRef);
     C->theEdges[newEdge.idx].update(nullRef, newElem);
     e_prime.update(nullRef, newElem, 0);
+		oldothernode = nodes[othernode];
     nodes[othernode] = m;
     edges[modEdge].checkPending(myRef, newElem);
     edges[modEdge] = newEdge;
@@ -131,8 +133,7 @@ void element::split(int longEdge)
     int b = 0;
     if (nullNbr) b = edges[longEdge].getBoundary();
     if(C->theClient) {
-      C->theClient->split(myRef.idx, longEdge, othernode, 0.5, flag,
-			  m, newElem.idx, b, 0, b);
+      C->theClient->split(myRef.idx, oldothernode,nodes[fixnode],nodes[opnode], m, newElem.idx, 0.5, flag,b, 0, b);
       CkPrintf("TMRC2D: [%d] theClient->split(elem=%d, edge=%d, newNode=%d, newElem=%d, bound=%d)\n", myRef.cid, myRef.idx, longEdge, m, newElem.idx, b);
     }
     if (nullNbr){ DEBUGREF(CkPrintf("TMRC2D: nbr is null\n");)}
@@ -180,6 +181,7 @@ void element::split(int longEdge)
     C->theEdges[newEdge.idx].update(nullRef, myRef);
     C->theEdges[newEdge.idx].update(nullRef, newElem);
     e_prime.update(nullRef, newElem, 0);
+		int oldfixnode = nodes[fixnode];
     nodes[fixnode] = m;
     edges[otherEdge].checkPending(myRef, newElem);
     edges[otherEdge] = newEdge;
@@ -195,8 +197,7 @@ void element::split(int longEdge)
     int b = 0;
     if (nullNbr) b = edges[longEdge].getBoundary();
     if (C->theClient) {
-      C->theClient->split(myRef.idx,longEdge,fixnode,0.5,flag,
-			  m, newElem.idx, b, 0, b);
+      C->theClient->split(myRef.idx,oldfixnode,nodes[othernode],nodes[opnode], m, newElem.idx, 0.5,flag,b, 0, b);
       CkPrintf("TMRC2D: [%d] theClient->split(elem=%d, edge=%d, newNode=%d, newElem=%d, bound=%d)\n", myRef.cid, myRef.idx, longEdge, m, newElem.idx, b);
     }
     DEBUGREF(CkPrintf("TMRC2D: Resetting pending edges, second split complete.\n");)
