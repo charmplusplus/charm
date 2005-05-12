@@ -64,7 +64,7 @@ ELAN_QUEUE    *elan_q;
 int enableGetBasedSend = 1;
 int enableBufferPooling = 0;
 
-int SMALL_MESSAGE_SIZE=16384;  /* Smallest message size queue 
+int SMALL_MESSAGE_SIZE=4072;  /* Smallest message size queue 
                                  used for receiving short messages */
                                      
 int MID_MESSAGE_SIZE=65536;     /* Queue for larger messages 
@@ -77,12 +77,12 @@ int MID_MESSAGE_SIZE=65536;     /* Queue for larger messages
 
 #define NON_BLOCKING_MSG  4     /* Message sizes greater 
                                     than this will be sent asynchronously*/
-#define RECV_MSG_Q_SIZE  8   //Maximim queue size for short messages
-#define MID_MSG_Q_SIZE   4   //Maximum queue size for mid-range messages
+#define RECV_MSG_Q_SIZE  32  //Maximim queue size for short messages
+#define MID_MSG_Q_SIZE   32   //Maximum queue size for mid-range messages
 
 //Actual sizes, can also be set from the command line
-int smallQSize = RECV_MSG_Q_SIZE;
-int midQSize = MID_MSG_Q_SIZE;
+int smallQSize = 8;
+int midQSize = 4;
 
 ELAN_EVENT *esmall[RECV_MSG_Q_SIZE], *emid[MID_MSG_Q_SIZE], *elarge;
 
@@ -842,6 +842,7 @@ void CmiSyncSendFn(int destPE, int size, char *msg)
         CmiSendSelf(dupmsg);
     else
         CmiAsyncSendFn(destPE, size, dupmsg);
+    return;
 }
 
 void ElanBasicSendFn(SMSG_LIST * ptr){
@@ -886,6 +887,7 @@ void ElanBasicSendFn(SMSG_LIST * ptr){
     MsgQueueBytes += ptr->size;
     
     outstandingMsgs[ptr->destpe] = 1;
+    return;
 }
 
 CmiCommHandle ElanSendFn(int destPE, int size, char *msg, int flag)
@@ -919,12 +921,12 @@ CmiCommHandle ElanSendFn(int destPE, int size, char *msg, int flag)
     msg_tmp->destpe = destPE;
     msg_tmp->is_broadcast = flag;
 
-    if ((MsgQueueLen > request_max || MsgQueueBytes > request_bytes) 
+    if ((MsgQueueLen > 16 /*request_max*/ || MsgQueueBytes > request_bytes) 
         && (!flag)) {
         CmiReleaseSentMessages();
         PumpMsgs(1); //PumpMsgs(0) 
     }
-
+    
     ElanSendQueuedMessages();
 
     if(MsgQueueLen > request_max || MsgQueueBytes > request_bytes 
@@ -971,6 +973,8 @@ void ElanSendQueuedMessages() {
         cur_unsent = new_unsent;
     else
         cur_unsent = ptr;
+
+    return;
 }
 
 void ElanGetBasedSend(SMSG_LIST *msg_tmp){
@@ -996,6 +1000,8 @@ void ElanGetBasedSend(SMSG_LIST *msg_tmp){
     MsgQueueBytes += msg_tmp->size;
     
     outstandingMsgs[msg_tmp->destpe] = 1;
+
+    return;
 }
 
 void handleGetHeader(char *msg, int src){
