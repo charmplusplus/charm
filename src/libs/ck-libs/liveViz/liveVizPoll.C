@@ -1,7 +1,7 @@
 /*
   liveVizPoll: application-polling image-assembly interface.
 
-Jonathan A. Booth, jbooth@uiuc.edu
+  Original Author: Jonathan A. Booth, jbooth@uiuc.edu
 */
 #include "liveViz.h"
 #include "liveViz_impl.h"
@@ -41,6 +41,12 @@ public:
       return requests.deq();
     }
   }
+
+  /// Redefined poll(), since it doesn't even use the timestep parameter
+  liveVizRequestMsg * poll(void) {
+  	return poll(0.0);
+  }
+
 };
 
 
@@ -103,6 +109,12 @@ liveVizRequestMsg *liveVizPoll(ArrayElement *from, double timestep) {
   }
 }
 
+// Same, but without the unused timestep parameter
+liveVizRequestMsg *liveVizPoll(ArrayElement *from) {
+  return liveVizPoll(from,0.0);
+}
+
+
 //Called by clients to deposit a piece of the final image
 void liveVizPollDeposit(ArrayElement *client,
                     double timestep,
@@ -117,6 +129,17 @@ void liveVizPollDeposit(ArrayElement *client,
   }
   liveVizDeposit(req,startx,starty,sizex,sizey,src,p);
 }
+
+
+// same but without the unused timestep parameter
+void liveVizPollDeposit(ArrayElement *client,
+		    const liveVizRequest &req,
+		    int startx, int starty, 
+		    int sizex, int sizey, const byte * src)
+{
+  liveVizPollDeposit(client, 0.0, req, startx, starty, sizex, sizey, src);
+}
+
 
 #include "liveVizPoll.def.h"
 
