@@ -3,8 +3,8 @@ About liveViz
 
 There are various types of reducers available in charm++, these reducers (mostly) work on numeric data. If array elements compute a small piece of a large 2D-image, then these chucks can be combined to form one large image using liveViz. In other words, liveViz is a reducer for 2D-image data, which combines small chunks of images deposited by chares into one large image.
 
-This visualization library follows client server model, i.e. image assembly is done on server side and final image can be viewed using liveViz client avaliable at:
-           .../charm/pgms/charm++/ccs/liveViz/client
+This visualization library follows client server model, i.e. image assembly is done on server side and final image can be viewed using a java based liveViz client avaliable at:
+           .../charm/bin/liveViz localhost 1234 
 
 A sample liveViz server example is available at:
            .../charm/pgms/charm++/ccs/liveViz/server
