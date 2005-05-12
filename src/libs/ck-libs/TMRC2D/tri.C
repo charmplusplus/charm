@@ -695,7 +695,9 @@ void chunk::multipleCoarsen(double *desiredArea, refineClient *client)
       //CkPrintf("TMRC2D: desiredArea[%d]=%1.10e present? %d area=%1.10e\n", i, desiredArea[i], theElements[i].isPresent(), area);
       if (desiredArea[i] > area+precThrshld) {
 	theElements[i].resetTargetArea(desiredArea[i]);
-	addToStack(i, theElements[i].getShortestEdge());
+	double angle;
+	theElements[i].getShortestEdge(&angle);
+	addToStack(i, angle);
 	CkPrintf("TMRC2D: [%d] Setting target on element %d to %1.10e with shortEdge %1.10e\n", cid, i, desiredArea[i], coarsenElements[coarsenTop-1].len);
       }
     }
@@ -1234,8 +1236,9 @@ void chunk::rebubble()
   for (int i=0; i<coarsenTop; i++)
     if ((coarsenElements[i].elID > -1) && (coarsenElements[i].len > -1.0)) {
       if (theElements[coarsenElements[i].elID].present) {
-	coarsenElements[i].len = 
-	  theElements[coarsenElements[i].elID].getShortestEdge();
+	double angle;
+	theElements[coarsenElements[i].elID].getShortestEdge(&angle);
+	coarsenElements[i].len = angle;
       }
       else {
 	coarsenElements[i].elID = -1;

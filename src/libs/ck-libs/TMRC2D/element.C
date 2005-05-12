@@ -480,17 +480,24 @@ int element::findShortestEdge()
   return shortEdge;
 }
 
-double element::getShortestEdge()
+double element::getShortestEdge(double *angle)
 {
   double minlen, len[3];
+  int shortest=0;
   // fine lengths of sides
   minlen = len[0] = C->theNodes[nodes[0]].distance(C->theNodes[nodes[1]]);
   len[1] = C->theNodes[nodes[1]].distance(C->theNodes[nodes[2]]);
   len[2] = C->theNodes[nodes[2]].distance(C->theNodes[nodes[0]]);
   for (int i=1; i<3; i++) // find min length of a side
     if (len[i] < minlen) {
+      shortest = i;
       minlen = len[i];
     }
+  double A, B, C;
+  C = len[shortest];
+  A = len[(shortest+1)%3];
+  B = len[(shortest+2)%3];
+  (*angle) = acos((C*C - A*A - B*B)/(2*A*B));
   return minlen;
 }
 

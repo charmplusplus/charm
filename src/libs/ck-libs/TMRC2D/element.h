@@ -1,6 +1,7 @@
 #ifndef ELEMENT_H
 #define ELEMENT_H
 
+#include <math.h>
 #include "ref.h"
 #include "refine.decl.h"
 
@@ -162,7 +163,7 @@ class element {  // triangular elements defined by three node references,
   void collapse(int shortEdge);
   int findLongestEdge();
   int findShortestEdge();
-  double getShortestEdge();
+  double getShortestEdge(double *angle);
   int isLongestEdge(edgeRef& e);
 
   // Mesh improvement stuff

@@ -414,5 +414,6 @@ void edge::sanityCheck(chunk *c, edgeRef shouldRef)
       nonNullElements++;
     }
   }
-  CkAssert(nonNullElements > 0);
+  if (nonNullElements == 0)
+    CkPrintf("TMRC2D: WARNING: Dangling edge found!\n");
 }
