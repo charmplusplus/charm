@@ -9,6 +9,12 @@ This visualization library follows client server model, i.e. image assembly is d
 A sample liveViz server example is available at:
            .../charm/pgms/charm++/ccs/liveViz/server
 
+The Sample liveViz Client:
+-------------------------
+
+The source for the sample client is available in .../charm/java/charm/liveViz
+
+
 How to use liveViz with Charm++ program:
 ---------------------------------------
 
