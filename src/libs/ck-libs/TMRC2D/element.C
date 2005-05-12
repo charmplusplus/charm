@@ -65,16 +65,22 @@ void element::split(int longEdge)
 
   int fIdx, oIdx;
   if (edges[longEdge].cid == myRef.cid) {
-    fIdx = nodes[fixnode];
     oIdx = nodes[othernode];
+    fIdx = nodes[fixnode];
   }
   else {
     FEM_Node *theNodes = &(C->meshPtr->node);
     FEM_Comm_Rec *oNodeRec=(FEM_Comm_Rec *)(theNodes->shared.getRec(nodes[othernode]));
     FEM_Comm_Rec *fNodeRec=(FEM_Comm_Rec *)(theNodes->shared.getRec(nodes[fixnode]));
     edge e;
-    fIdx = fNodeRec->getIdx(e.existsOn(fNodeRec, edges[longEdge].cid));
     oIdx = oNodeRec->getIdx(e.existsOn(oNodeRec, edges[longEdge].cid));
+    fIdx = fNodeRec->getIdx(e.existsOn(fNodeRec, edges[longEdge].cid));
+    CkPrintf("TMRC2D: [%d] oIdx=%d locally, %d on longEdge's chunk\n", 
+	     myRef.cid, nodes[othernode], oIdx);
+    CkPrintf("TMRC2D: [%d] fIdx=%d locally, %d on longEdge's chunk\n", 
+	     myRef.cid, nodes[fixnode], fIdx);
+    CkPrintf("oNodeRec: chk=%d idx=%d\n", oNodeRec->getChk(0), oNodeRec->getIdx(0));
+    CkPrintf("fNodeRec: chk=%d idx=%d\n", fNodeRec->getChk(0), fNodeRec->getIdx(0));
   }
   CkAssert(fIdx > -1);
   CkAssert(oIdx > -1);
@@ -136,13 +142,13 @@ void element::split(int longEdge)
       C->theClient->split(myRef.idx, oldothernode,nodes[fixnode],nodes[opnode], m, newElem.idx, 0.5, flag,b, 0, b);
       CkPrintf("TMRC2D: [%d] theClient->split(elem=%d, edge=%d, newNode=%d, newElem=%d, bound=%d)\n", myRef.cid, myRef.idx, longEdge, m, newElem.idx, b);
     }
-    if (nullNbr){ DEBUGREF(CkPrintf("TMRC2D: nbr is null\n");)}
+    if (nullNbr){ DEBUGREF(CkPrintf("TMRC2D: [%d] nbr is null\n");)}
     if (!first || nullNbr) {
       if (!first) {
-	DEBUGREF(CkPrintf("TMRC2D: Resetting pending edges, second split complete.\n");)
+	DEBUGREF(CkPrintf("TMRC2D: [%d] Resetting pending edges, second split complete.\n", myRef.cid);)
       }
       else if (nullNbr) {
-	DEBUGREF(CkPrintf("TMRC2D: Resetting pending edges, neighbor NULL.\n");)      }
+	DEBUGREF(CkPrintf("TMRC2D: [%d] Resetting pending edges, neighbor NULL.\n", myRef.cid);)      }
       edges[longEdge].resetEdge();
     }
   }
@@ -200,12 +206,12 @@ void element::split(int longEdge)
       C->theClient->split(myRef.idx,oldfixnode,nodes[othernode],nodes[opnode], m, newElem.idx, 0.5,flag,b, 0, b);
       CkPrintf("TMRC2D: [%d] theClient->split(elem=%d, edge=%d, newNode=%d, newElem=%d, bound=%d)\n", myRef.cid, myRef.idx, longEdge, m, newElem.idx, b);
     }
-    DEBUGREF(CkPrintf("TMRC2D: Resetting pending edges, second split complete.\n");)
+    DEBUGREF(CkPrintf("TMRC2D: [%d] Resetting pending edges, second split complete.\n", myRef.cid);)
     edges[longEdge].resetEdge();
   }
   else { // longEdge still trying to complete previous split; try later
     // do nothing for now
-    DEBUGREF(CkPrintf("TMRC2D: Can't bisect element %d, longEdge %d pending\n", myRef.idx, edges[longEdge].idx);)
+    DEBUGREF(CkPrintf("TMRC2D: [%d] Can't bisect element %d, longEdge %d pending\n", myRef.cid, myRef.idx, edges[longEdge].idx);)
   }
 }
 

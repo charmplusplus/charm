@@ -46,7 +46,7 @@ int edge::split(int *m, edgeRef *e_prime, int oIdx, int fIdx,
   nullRef.reset();
   if (pending && (waitingFor == requester)) { 
     // already split; waiting for requester
-    DEBUGREF(CkPrintf("TMRC2D: edge::split: ** PART 2! ** On edge=%d on chunk=%d, requester=(%d,%d) with nbr=(%d,%d)\n", myRef.idx, myRef.cid, requester.cid, requester.idx, nbr.cid, nbr.idx);)
+    DEBUGREF(CkPrintf("TMRC2D: [%d] edge::split: ** PART 2! ** On edge=%d on chunk=%d, requester=(%d,%d) with nbr=(%d,%d)\n", myRef.cid, myRef.idx, myRef.cid, requester.cid, requester.idx, nbr.cid, nbr.idx);)
     *m = newNodeIdx;
     *e_prime = newEdgeRef;
     *first = 0;
@@ -57,7 +57,7 @@ int edge::split(int *m, edgeRef *e_prime, int oIdx, int fIdx,
 				       C->theNodes[nodes[1]].boundary, 1);
       *m = im->anInt;
       CkFreeMsg(im);
-      DEBUGREF(CkPrintf("TMRC2D: New node (%f,%f) added at index %d on chunk %d\n", newNode.X(), newNode.Y(), *m, myRef.cid);)
+      DEBUGREF(CkPrintf("TMRC2D: [%d] New node (%f,%f) added at index %d on chunk %d\n", myRef.cid, newNode.X(), newNode.Y(), *m, myRef.cid);)
     }
     int nLoc = newNodeIdx;
     if (requester.cid == myRef.cid) nLoc = *m;
@@ -87,9 +87,9 @@ int edge::split(int *m, edgeRef *e_prime, int oIdx, int fIdx,
 				     C->theNodes[nodes[1]].boundary, (nbr.cid != -1));
     newNodeIdx = im->anInt;
     CkFreeMsg(im);
-    DEBUGREF(CkPrintf("TMRC2D: New node (%f,%f) added at index %d on chunk %d\n", newNode.X(), newNode.Y(), newNodeIdx, myRef.cid);)
+    DEBUGREF(CkPrintf("TMRC2D: [%d] New node (%f,%f) added at index %d\n", myRef.cid, newNode.X(), newNode.Y(), newNodeIdx);)
     newEdgeRef = C->addEdge(newNodeIdx, oIdx, boundary);
-    DEBUGREF(CkPrintf("TMRC2D: New edge (%d,%d) added between nodes (%f,%f) and newNode\n", newEdgeRef.cid, newEdgeRef.idx, C->theNodes[oIdx].X(), C->theNodes[oIdx].Y());)
+    DEBUGREF(CkPrintf("TMRC2D: [%d] New edge (%d,%d) added between nodes (%f,%f) and newNode\n", myRef.cid, newEdgeRef.cid, newEdgeRef.idx, C->theNodes[oIdx].X(), C->theNodes[oIdx].Y());)
     incidentNode = oIdx;
     fixNode = fIdx;
     *m = newNodeIdx;
@@ -101,7 +101,7 @@ int edge::split(int *m, edgeRef *e_prime, int oIdx, int fIdx,
     *nullNbr = 0;
     if (nbr == nullRef) *nullNbr = 1;
     if (*nullNbr) {
-      DEBUGREF(CkPrintf("TMRC2D: on edge, nbr is null\n");)
+      DEBUGREF(CkPrintf("TMRC2D: [%d] on edge, nbr is null\n", myRef.cid);)
     }
     if (nbr.cid != -1) {
       waitingFor = nbr;

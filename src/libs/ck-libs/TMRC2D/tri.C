@@ -838,7 +838,7 @@ void chunk::deriveEdges(int *conn, int *gid, const int **edgeBoundaries)
 	    newEdge = addEdge(nIdx1, nIdx2, 0);
 	  else
 	    newEdge = addEdge(nIdx1, nIdx2, edgeBoundaries[nIdx1][nIdx2]);
-	  //DEBUGREF(CkPrintf("TMRC2D: [%d] New edge (%d,%d) added between nodes %d and %d and elements %d and %d\n", cid, newEdge.cid, newEdge.idx, nIdx1, nIdx2, i, nbrRef.idx);)
+	  DEBUGREF(CkPrintf("TMRC2D: [%d] New edge (%d,%d) added between nodes %d and %d and elements %d and %d on chunk %d\n", cid, newEdge.cid, newEdge.idx, nIdx1, nIdx2, i, nbrRef.idx, nbrRef.cid);)
 	  // point edge to the two neighboring elements
 	  theEdges[newEdge.idx].update(nullRef, myRef);
 	  theEdges[newEdge.idx].update(nullRef, nbrRef);
@@ -1232,9 +1232,16 @@ void chunk::rebubble()
   double tmpLen;
 
   for (int i=0; i<coarsenTop; i++)
-    if ((coarsenElements[i].elID > -1) && (coarsenElements[i].len > -1.0))
-      coarsenElements[i].len = 
-	theElements[coarsenElements[i].elID].getShortestEdge();
+    if ((coarsenElements[i].elID > -1) && (coarsenElements[i].len > -1.0)) {
+      if (theElements[coarsenElements[i].elID].present) {
+	coarsenElements[i].len = 
+	  theElements[coarsenElements[i].elID].getShortestEdge();
+      }
+      else {
+	coarsenElements[i].elID = -1;
+	coarsenElements[i].len = -1.0;
+      }
+    }
 
   while (coarsenElements[pos].len == -1.0) pos--;
   end = pos;

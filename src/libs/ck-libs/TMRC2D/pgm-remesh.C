@@ -581,6 +581,7 @@ driver(void)
     delete [] vid;
     delete [] vnodeid;
   }
+  double desiredArea;
   for (t=1;t<=tSteps;t++) {
     /*    if (1) { //Structural mechanics
     //Compute forces on nodes exerted by elements
@@ -613,12 +614,19 @@ driver(void)
       loc[i]=g.coord[i];//+g.d[i];
     }
 
-    double desiredArea = calcArea(g, 42);
     double refineArea = desiredArea/1.5;
     double *areas=new double[g.nelems];
     //prepare to refine
-    for (i=0;i<g.nelems;i++) {
-      areas[i]=calcArea(g, i)/1.5;
+    if (t=1) {
+      desiredArea = calcArea(g, 42);
+      for (i=0;i<g.nelems;i++) {
+	areas[i]=calcArea(g, i)/1.5;
+      }
+    }
+    if (t=2) {
+      for (i=0;i<g.nelems;i++) {
+	areas[i]=desiredArea;
+      }
     }
 
     CkPrintf("[%d] Starting refinement step: %d nodes, %d elements\n", myChunk,g.nnodes,g.nelems);
@@ -690,7 +698,7 @@ driver(void)
     delete[] areas;
     areas=new double[g.nelems];
     for (i=0;i<g.nelems;i++) {
-      areas[i]=calcArea(g, i) * 1.5;
+      areas[i]=calcArea(g, i) * 2.5;
     }
     CkPrintf("[%d] Starting coarsening step: %d nodes, %d elements\n", myChunk,g.nnodes,g.nelems);
     FEM_REFINE2D_Coarsen(FEM_Mesh_default_read(),FEM_NODE,(double *)g.coord,FEM_ELEM,areas);
