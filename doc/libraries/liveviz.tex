@@ -141,7 +141,13 @@ To compile the liveViz library:
 
 \section{Poll Mode}
 
-In some cases you may want a server to deposit images only when it is ready to do so. For this case the server will not register a callback function, but rather will poll for the next request from the client when it is ready to send the client some image. For example a server may want to create a movie or series of images corresponding to timesteps in a simulation. The server will  have a timestep loop in which a chare computes some data for a timestep. At the end of each iteration the server will poll for a client request for the current timestep and will deposit the image with this client request.
+In some cases you may want a server to deposit images only when it is ready to do so. 
+For this case the server will not register a callback function, but rather will poll 
+for the next request from the client when it is ready to send the client some image. 
+For example a server may want to create a movie or series of images corresponding to 
+timesteps in a simulation. The server will  have a timestep loop in which a chare computes 
+some data for a timestep. At the end of each iteration the server will poll for a client 
+request for the current timestep and will deposit the image with this client request.
 
 Because liveVizDeposit (described in an earlier section) performs its image reduction over your array, 
 you must ensure that your own reductions are not interleaved with the 
@@ -172,9 +178,9 @@ An idiomatic use of these routines is:
 	... in some user compute routine ...
         timestep++;
         liveVizPollRequestMsg *req;
-        while (NULL!=(req=liveVizPoll(this,timestep))) {
+        while (NULL!=(req=liveVizPoll(this))) {
                 //...prepare image for request...
-                liveVizPollDeposit(this,timestep,req,
+                liveVizPollDeposit(this,req,
                         startx,starty,sizex,sizey,img);
         }
 \end{alltt}
@@ -183,3 +189,7 @@ A sample liveVizPoll server example is available at:
 \begin{alltt}
            .../charm/pgms/charm++/ccs/liveViz/pollserver
 \end{alltt}
+
+There is an optional and currently unused parameter ``timestep'' which may appear in older 
+applications using Poll Mode. LiveViz is backward compatible with those older applications.
+
