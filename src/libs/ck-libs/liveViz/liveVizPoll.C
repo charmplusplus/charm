@@ -131,15 +131,5 @@ void liveVizPollDeposit(ArrayElement *client,
 }
 
 
-// same but without the unused timestep parameter
-void liveVizPollDeposit(ArrayElement *client,
-		    const liveVizRequest &req,
-		    int startx, int starty, 
-		    int sizex, int sizey, const byte * src)
-{
-  liveVizPollDeposit(client, 0.0, req, startx, starty, sizex, sizey, src);
-}
-
-
 #include "liveVizPoll.def.h"
 

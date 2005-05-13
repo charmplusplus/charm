@@ -165,6 +165,8 @@ algorithm performs more than 2^32 steps (if each step takes
 */
 liveVizRequestMsg *liveVizPoll(ArrayElement *from,double timestep);
 
+liveVizRequestMsg *liveVizPoll(ArrayElement *from);
+
 
 /**
 Responds to a previously poll'd request.  The latter parameters
@@ -203,6 +205,17 @@ inline void liveVizPollDeposit(ArrayElement *from,
   liveVizPollDeposit(from, timestep, reqMsg->req, startx, starty, sizex, sizey, imageData);
   delete reqMsg;
 }
+
+
+// same but without the unused timestep parameter
+inline void liveVizPollDeposit(ArrayElement *client,
+		    const liveVizRequest &req,
+		    int startx, int starty, 
+		    int sizex, int sizey, const byte * src)
+{
+  liveVizPollDeposit(client, 0.0, req, startx, starty, sizex, sizey, src);
+}
+
 
 
 #endif /* def(thisHeader) */
