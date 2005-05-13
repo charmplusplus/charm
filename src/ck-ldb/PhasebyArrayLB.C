@@ -103,6 +103,11 @@ void PhasebyArrayLB::work(BaseLB::LDStats *stats, int count){
 	
 	odata = &(tempStats->objData[0]);
 	omids.push_back(odata->omID());
+	if(odata->migratable)
+		migratableOMs.push_back(CmiTrue);
+	else
+		migratableOMs.push_back(CmiFalse);
+
 	for(i=0;i<tempStats->n_objs; i++){
 		odata = &(tempStats->objData[i]);
 		for(int j=0;j<omids.size();j++)
@@ -110,34 +115,44 @@ void PhasebyArrayLB::work(BaseLB::LDStats *stats, int count){
 				flag=1;
 				break;
 			}
+		
 		if(flag==1){
 			flag=0;
 		}
-		else
+		else{
 			omids.push_back(odata->omID());
+			if(odata->migratable)
+				migratableOMs.push_back(CmiTrue);
+			else
+				migratableOMs.push_back(CmiFalse);
+		}
 	}
 	
 	for(i=0;i<omids.size();i++){
-		for(obj = 0; obj < tempStats->n_objs; obj++)
-			tempStats->from_proc[obj]=tempStats->to_proc[obj];
-		updateStats(stats,tempStats);
 		//copy to_proc from previous iteration to from_proc for this iteration
 		LDOMid  omid = omids[i];
-		for (obj = 0; obj < tempStats->n_objs; obj++) {
-		  odata = &(tempStats->objData[obj]);
-		  if (odata->omID() != omid)
-				odata->migratable=CmiFalse;
- 		}
-		lb->work(tempStats,count);
 		//Set other objects as background load
-		//Call a strategy here
+		if(migratableOMs[i]){
+			for (obj = 0; obj < tempStats->n_objs; obj++) {
+		  	odata = &(tempStats->objData[obj]);
+		  	if (odata->omID() != omid)
+					odata->migratable=CmiFalse;
+ 			}
+			//Call a strategy here
+			lb->work(tempStats,count);
+			if(i!=omids.size()-1){
+				for(obj = 0; obj < tempStats->n_objs; obj++)
+					tempStats->from_proc[obj]=tempStats->to_proc[obj];
+				updateStats(stats,tempStats);
+			}
+		}
 	}
 	//Copy to stats array
 	for(obj = 0; obj < tempStats->n_objs; obj++)
 		stats->to_proc[obj]=tempStats->to_proc[obj];
 	tempStats->clear();
 	omids.free();
-
+	migratableOMs.free();
 }
 
 /*@}*/
