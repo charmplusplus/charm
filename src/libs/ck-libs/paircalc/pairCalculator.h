@@ -13,15 +13,22 @@ class PairCalcID {
   bool Symmetric;
 
   ComlibInstanceHandle cinst;
+  ComlibInstanceHandle minst;
 
   bool useComlib;
   bool isDoublePacked;
   bool conserveMemory;
   bool lbpaircalc;
+  bool existsLproxy;
+  bool existsRproxy;
+  CProxySection_PairCalculator proxyLFrom;
+  CProxySection_PairCalculator proxyLNotFrom;
+  CProxySection_PairCalculator proxyRNotFrom;
+  CkGroupID mCastGrpId;
   PairCalcID() {}
   ~PairCalcID() {}
 
-  void Init(CkArrayID aid, CkGroupID gid, int grain, int blk, int s, bool sym, bool _useComlib,  ComlibInstanceHandle h, bool _dp, bool _conserveMemory, bool _lbpaircalc) {
+  void Init(CkArrayID aid, CkGroupID gid, int grain, int blk, int s, bool sym, bool _useComlib,  ComlibInstanceHandle h, bool _dp, bool _conserveMemory, bool _lbpaircalc, ComlibInstanceHandle m , CkGroupID _mCastGrpId) {
       
     Aid = aid;
     Gid = gid;
@@ -32,13 +39,12 @@ class PairCalcID {
     useComlib = _useComlib;
     conserveMemory = _conserveMemory;
     cinst = h;
-    
+    minst = m;
+    existsRproxy=false;
+    existsLproxy=false;
     isDoublePacked = _dp;
     lbpaircalc=_lbpaircalc;
-  }
-
-  void set(PairCalcID pid) {
-    Init(pid.Aid, pid.Gid, pid.GrainSize, pid.BlkSize, pid.S, pid.Symmetric, pid.useComlib, pid.cinst, pid.isDoublePacked, pid.conserveMemory, pid.lbpaircalc);
+    mCastGrpId=_mCastGrpId;
   }
 
   void pup(PUP::er &p) {
@@ -49,15 +55,22 @@ class PairCalcID {
     p|S;
     p|Symmetric;
     p|cinst;
+    p|minst;
     p|useComlib;
     p|isDoublePacked;
     p|conserveMemory;
     p|lbpaircalc;
+    p|existsLproxy;
+    p|existsRproxy;
+    p|mCastGrpId;
+    p|proxyLFrom;
+    p|proxyLNotFrom;
+    p|proxyRNotFrom;
   }
 
 };
 
-void createPairCalculator(bool sym, int w, int grainSize, int numZ, int* z, int op1, FuncType f1, int op2, FuncType f2, CkCallback cb, PairCalcID* aid, int ep, CkArrayID cbid, int flag, CkGroupID *gid, int flag_dp, bool conserveMemory, bool lbpaircalc, CkCallback lbcb);
+void createPairCalculator(bool sym, int w, int grainSize, int numZ, int* z, int op1, FuncType f1, int op2, FuncType f2, CkCallback cb, PairCalcID* aid, int ep, CkArrayID cbid, int flag, CkGroupID *gid, int flag_dp, bool conserveMemory, bool lbpaircalc, CkCallback lbcb, CkGroupID mCastGrpId);
 
 void startPairCalcLeft(PairCalcID* aid, int n, complex* ptr, int myS, int myZ);
 

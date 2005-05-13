@@ -25,6 +25,7 @@
  * calculators on a PE machine have reported in.  Then the machine         *
  * reduction is triggered.                                                 *
  ***************************************************************************/
+ComlibInstanceHandle mcastInstanceCP;
 
 PairCalculator::PairCalculator(CkMigrateMessage *m) { }
 
@@ -174,7 +175,7 @@ void
 PairCalculator::calculatePairs_gemm(calculatePairsMsg *msg)
 {
 #ifdef _PAIRCALC_DEBUG_
-  CkPrintf(" symm=%d    pairCalc[%d %d %d %d] got from [%d %d] with size {%d}, from=%d, count+5d\n", symmetric, thisIndex.w, thisIndex.x, thisIndex.y, thisIndex.z,  thisIndex.w, msg->sender, msg->size, symmetric, msg->fromRow, numRecd);
+  CkPrintf(" symm=%d    pairCalc[%d %d %d %d] got from [%d %d] with size {%d}, from=%d, count+%d\n", symmetric, thisIndex.w, thisIndex.x, thisIndex.y, thisIndex.z,  thisIndex.w, msg->sender, msg->size, symmetric, msg->fromRow, numRecd);
 #endif
   
   numRecd++;   // increment the number of received counts
@@ -203,13 +204,14 @@ PairCalculator::calculatePairs_gemm(calculatePairsMsg *msg)
   }
 
   CkAssert(N==msg->size);
+  CkAssert(offset<numExpected);
   /* 
    *  NOTE: For this to work the data chunks of the same plane across
    *  all states must be of the same size
    */
 
   // copy the input into our matrix
-  memcpy(&(inData[offset*N]), msg->points, msg->size * sizeof(complex));
+  memcpy(&(inData[offset*N]), msg->points, N * sizeof(complex));
 
   /*
    * Once we have accumulated all rows  we gemm it.
@@ -300,7 +302,7 @@ PairCalculator::calculatePairs_gemm(calculatePairsMsg *msg)
     traceUserBracketEvent(220, StartTime, CmiWallTimer());
 #endif
   }
-  delete msg;
+  //  delete msg;
 }
 
 void

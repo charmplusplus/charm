@@ -1,4 +1,5 @@
 module ckPairCalculator {
+	readonly ComlibInstanceHandle mcastInstanceCP;
 
 	message partialResultMsg  {
 	  complex result[];
@@ -30,7 +31,7 @@ module ckPairCalculator {
    		entry void lbsync();
 
    		entry void calculatePairs(int size, complex points[size], int, bool, bool);
-   		entry void calculatePairs_gemm(calculatePairsMsg *msg);
+   		entry [nokeep] void calculatePairs_gemm(calculatePairsMsg *msg);
 		entry void acceptResult(int size, double matrix[size]);
 
 		entry  void acceptResult(int size, double matrix1[size], double matrix2[size]);

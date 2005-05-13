@@ -1,11 +1,15 @@
 #ifndef _ckPairCalculator_h_
 #define _ckPairCalculator_h_
-
+#define _PC_COMMLIB_MULTI_ 0
 #include "pairutil.h"
+#include "ckmulticast.h"
 #include "cksparsecontiguousreducer.h"
 #include "PipeBroadcastStrategy.h"
 #include "BroadcastStrategy.h"
 #include "DirectMulticastStrategy.h"
+#include "RingMulticastStrategy.h"
+#include "MultiRingMulticast.h"
+#include "NodeMulticast.h"
 
 // Flag to use sparse reduction or regular reduction
 
@@ -31,6 +35,7 @@
 #define DCOPY dcopy
 #define ZTODO ztodo
 #endif
+extern ComlibInstanceHandle mcastInstanceCP;
 
 
 #ifdef _PAIRCALC_USE_BLAS_
@@ -85,16 +90,29 @@ class priorSumMsg : public CMessage_priorSumMsg {
 
 };
 
-//class calculatePairsMsg : public CMessage_calculatePairsMsg, CkMcastBaseMsg {
-class calculatePairsMsg : public CMessage_calculatePairsMsg {
+class calculatePairsMsg : public CkMcastBaseMsg, public CMessage_calculatePairsMsg {
  public:
   int size;
   int sender;
   bool fromRow;
   bool flag_dp;
   complex *points;
-  calculatePairsMsg(int _size, int _sender, bool _fromRow, bool _flag_dp, complex *_points) : size(_size), sender(_sender), fromRow(_fromRow), flag_dp(_flag_dp)
+
+  calculatePairsMsg() {}
+  void init(int _size, int _sender, bool _fromRow, bool _flag_dp, complex *_points)
     {
+      size=_size;
+      sender=_sender;
+      fromRow=_fromRow;
+      flag_dp=_flag_dp;
+      memcpy(points,_points,size*sizeof(complex));
+    }
+  calculatePairsMsg(int _size, int _sender, bool _fromRow, bool _flag_dp, complex *_points)
+    {
+      size=_size;
+      sender=_sender;
+      fromRow=_fromRow;
+      flag_dp=_flag_dp;
       memcpy(points,_points,size*sizeof(complex));
     }
   friend class CMessage_calculatePairsMsg;
