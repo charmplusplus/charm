@@ -197,6 +197,21 @@ void liveVizPollDeposit(ArrayElement *from,
 			liveVizCombine_t combine=sum_image_data
 			);
 
+
+inline void liveVizPollDeposit(ArrayElement *from,
+			const liveVizRequest &req,
+			int startx, int starty,
+			int sizex, int sizey, const byte * imageData,
+			liveVizCombine_t combine=sum_image_data
+			)
+{
+  liveVizPollDeposit(from,0.0,req,startx,starty,sizex,sizey,imageData,combine);
+}
+
+
+
+
+
 inline void liveVizPollDeposit(ArrayElement *from,
                         double timestep,
 			liveVizRequestMsg *reqMsg,
@@ -210,16 +225,17 @@ inline void liveVizPollDeposit(ArrayElement *from,
   delete reqMsg;
 }
 
-
-// same but without the unused timestep parameter
-inline void liveVizPollDeposit(ArrayElement *client,
-		    const liveVizRequest &req,
+// no timestep paramter
+inline void liveVizPollDeposit(ArrayElement *from,
+		    liveVizRequestMsg *reqMsg,
 		    int startx, int starty, 
-		    int sizex, int sizey, const byte * src,
+		    int sizex, int sizey, const byte * imageData,
 		    liveVizCombine_t combine=sum_image_data
 		    )
 {
-  liveVizPollDeposit(client, 0.0, req, startx, starty, sizex, sizey, src, combine);
+  if ( ! reqMsg ) CkError("liveVizPollDeposit: User passed a null message!");
+  liveVizPollDeposit(from, 0.0, reqMsg->req, startx, starty, sizex, sizey, imageData, combine);
+  delete reqMsg;
 }
 
 
