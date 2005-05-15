@@ -93,6 +93,16 @@ run the client program as:
 In offline mode, the ``update'' button fetches the next
 extant timestep directory.
 
+\section{NetFEM with other Visualization Tools}
+
+You can use a provided converter program to convert the offline NetFEM files into an XML format compatible with the powerful offline visualization tool ParaView(\url{http://paraview.org}). The converter is located in .../charm/src/libs/ck-libs/netfem/ParaviewConverter/. Build the converter by simply issuing a ``make'' command in that directory(assuming NetFEM already has been built).
+
+
+
+Run the converter from the parent directory of the "NetFEM" directory to be converted. The converter will generate a directory called ``ParaViewData'', which contains subdirectories for each timestep, along with a ``timestep''directory for index files for each timestep. All files in the ParaViewData directory can be opened by ParaView. To open all chunks for a given timestep, open the desired timestep file in ``ParaViewData/timesteps''. Also, individual partition files can also be opened from ``ParaViewData / $<$timestep$>$ / $<$partition\_num$>$''.
+
+
+
 \section{Interface Basics}
 
 You publish your data via NetFEM by making a series of
