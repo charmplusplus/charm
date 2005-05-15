@@ -120,14 +120,16 @@ void liveVizPollDeposit(ArrayElement *client,
                     double timestep,
 		    const liveVizRequest &req,
 		    int startx, int starty, 
-		    int sizex, int sizey, const byte * src)
+		    int sizex, int sizey, const byte * src,
+		    liveVizCombine_t combine
+		    )
 {
   liveVizPollArray *p = proxy(client->thisIndexMax).ckLocal();
   if ( !p ) {
     CkError("LiveViz error: somehow an element has been created who has"
             " no corresponding proxy member!");
   }
-  liveVizDeposit(req,startx,starty,sizex,sizey,src,p);
+  liveVizDeposit(req,startx,starty,sizex,sizey,src,p,combine);
 }
 
 
