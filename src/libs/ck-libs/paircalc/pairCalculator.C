@@ -149,15 +149,12 @@ void startPairCalcLeft(PairCalcID* pcid, int n, complex* ptr, int myS, int myZ){
   s1 = (myS/grainSize) * grainSize;
 
   int numElems;
-  calculatePairsMsg *msgfromrow=NULL;
-  calculatePairsMsg *msg=NULL;
   //create multicast proxy array section list 
-  if(!pcid->existsLproxy){
+  if(!(pcid->existsLproxy||pcid->existsLNotFromproxy)){
     if(symmetric){
-      CkArrayIndexMax *elems=new CkArrayIndexMax[blkSize*S/grainSize-s1];
-      CkArrayIndexMax *elemsfromrow=new CkArrayIndexMax[blkSize*S/grainSize+1-s1];
+      CkArrayIndexMax *elems=new CkArrayIndexMax[blkSize*S/grainSize];
+      CkArrayIndexMax *elemsfromrow=new CkArrayIndexMax[blkSize*S/grainSize];
       // 1 proxy for left and 1 for right
-
       int erowcount=0;
       int ecount=0;
       CkArrayIndex4D idx(x,0,0,0);
@@ -178,25 +175,37 @@ void startPairCalcLeft(PairCalcID* pcid, int n, complex* ptr, int myS, int myZ){
 	      elems[ecount++]=idx;
 	    }
 	}
+      if(ecount)
+	{
 
-      CProxySection_PairCalculator proxyfromrow = CProxySection_PairCalculator::ckNew(pairCalculatorID, elemsfromrow, erowcount); 
-      CProxySection_PairCalculator proxynotfrom = CProxySection_PairCalculator::ckNew(pairCalculatorID, elems, ecount); 
-      pcid->proxyLFrom=proxyfromrow;
-      pcid->proxyLNotFrom=proxynotfrom;
-      pcid->existsLproxy=true;
-      if(pcid->useComlib && _PC_COMMLIB_MULTI_)
-	{
-	  ComlibDelegateProxy(&(pcid->proxyLFrom));
-	  ComlibInitSectionID(pcid->proxyLFrom.ckGetSectionID());
-	  ComlibDelegateProxy(&(pcid->proxyLNotFrom));
-	  ComlibInitSectionID(pcid->proxyLNotFrom.ckGetSectionID());
+	  pcid->proxyLNotFrom = CProxySection_PairCalculator::ckNew(pairCalculatorID, elems, ecount); 
+	  pcid->existsLNotFromproxy=true;	  
+	  if(pcid->useComlib && _PC_COMMLIB_MULTI_)
+	    {
+	      ComlibDelegateProxy(&(pcid->proxyLNotFrom));
+	      ComlibInitSectionID(pcid->proxyLNotFrom.ckGetSectionID());
+	    }
+	  else
+	    {
+	      CkMulticastMgr *mcastGrp = CProxy_CkMulticastMgr(pcid->mCastGrpId).ckLocalBranch();       
+	      pcid->proxyLNotFrom.ckSectionDelegate(mcastGrp);
+	    }
 	}
-      else
+      if(erowcount)
 	{
-	  CkMulticastMgr *mcastGrp = CProxy_CkMulticastMgr(pcid->mCastGrpId).ckLocalBranch(); 
-      
-	  pcid->proxyLFrom.ckSectionDelegate(mcastGrp);
-	  pcid->proxyLNotFrom.ckSectionDelegate(mcastGrp);
+	  pcid->proxyLFrom  = CProxySection_PairCalculator::ckNew(pairCalculatorID, elemsfromrow, erowcount); 
+	  pcid->existsLproxy=true;	  
+	  if(pcid->useComlib && _PC_COMMLIB_MULTI_)
+	    {
+	      ComlibDelegateProxy(&(pcid->proxyLFrom));
+	      ComlibInitSectionID(pcid->proxyLFrom.ckGetSectionID());
+	    }
+	  else
+	    {
+	      CkMulticastMgr *mcastGrp = CProxy_CkMulticastMgr(pcid->mCastGrpId).ckLocalBranch(); 
+	      pcid->proxyLFrom.ckSectionDelegate(mcastGrp);
+
+	    }
 	}
       delete [] elemsfromrow;
       delete [] elems;
@@ -207,10 +216,9 @@ void startPairCalcLeft(PairCalcID* pcid, int n, complex* ptr, int myS, int myZ){
 #endif
       int erowcount=0;
       CkArrayIndexMax *elemsfromrow=new CkArrayIndexMax[blkSize*S/grainSize];
-
+      CkArrayIndex4D idx(x,s1,0,0);
       for (c = 0; c < blkSize; c++)
 	for(s2 = 0; s2 < S; s2 += grainSize){
-	  CkArrayIndex4D idx(x,s1,0,0);
 	  idx.index[2]=s2;
 	  idx.index[3]=c;
 	  elemsfromrow[erowcount++]=idx;
@@ -218,7 +226,7 @@ void startPairCalcLeft(PairCalcID* pcid, int n, complex* ptr, int myS, int myZ){
 	  CkPrintf("Add Section ID %d: %d,%d,%d,%d \n",erowcount, idx.index[0],idx.index[1],idx.index[2],idx.index[3]);
 #endif
 	}
-
+      CkAssert(erowcount>0);
 #ifdef _PAIRCALC_DEBUG_
       for(int count = 0; count < erowcount; count ++) {
 	CkArrayIndex4D idx4d;
@@ -230,8 +238,7 @@ void startPairCalcLeft(PairCalcID* pcid, int n, complex* ptr, int myS, int myZ){
 	CkPrintf("DEBUG ID %d: %d,%d,%d,%d \n",count, idx4d.index[0], idx4d.index[1], idx4d.index[2], idx4d.index[3]);          
       }
 #endif      
-      CProxySection_PairCalculator proxyrow = CProxySection_PairCalculator::ckNew(pairCalculatorID, elemsfromrow, erowcount); 
-      pcid->proxyLFrom=proxyrow;
+      pcid->proxyLFrom = CProxySection_PairCalculator::ckNew(pairCalculatorID, elemsfromrow, erowcount); 
       pcid->existsLproxy=true;      
       if(pcid->useComlib &&_PC_COMMLIB_MULTI_)
 	{
@@ -255,22 +262,19 @@ void startPairCalcLeft(PairCalcID* pcid, int n, complex* ptr, int myS, int myZ){
 #endif
     pcid->minst.beginIteration();
   }
-
-  //mcastInstanceCP.beginIteration();
-  if(symmetric)
+  if(pcid->existsLproxy)
     {
-      msgfromrow= new ( n,0 ) calculatePairsMsg(n, myS, true, flag_dp, ptr);
-      msg= new ( n,0 ) calculatePairsMsg(n, myS, false, flag_dp, ptr);	    
-      pcid->proxyLFrom.calculatePairs_gemm(msgfromrow);
-      pcid->proxyLNotFrom.calculatePairs_gemm(msg);
-    }
-  else
-    {
-      //msgfromrow= new ( n,0 ) calculatePairsMsg(n, myS, true, flag_dp, ptr);
-      msgfromrow= new ( n,0 ) calculatePairsMsg();
+      calculatePairsMsg *msgfromrow=new ( n,0 ) calculatePairsMsg;
       msgfromrow->init(n, myS, true, flag_dp, ptr);
       pcid->proxyLFrom.calculatePairs_gemm(msgfromrow);
     }
+  if(pcid->existsLNotFromproxy)
+    { //symmetric
+      calculatePairsMsg *msg= new ( n,0 ) calculatePairsMsg;
+      msg->init(n, myS, false, flag_dp, ptr);   
+      pcid->proxyLNotFrom.calculatePairs_gemm(msg);
+    }
+
 #ifdef _PAIRCALC_DEBUG_
   CkPrintf("Send from [%d %d]\n",x,s1);
 #endif
@@ -324,9 +328,10 @@ void startPairCalcRight(PairCalcID* pcid, int n, complex* ptr, int myS, int myZ)
 #endif
       int ecount=0;
       CkArrayIndexMax *elems=new CkArrayIndexMax[blkSize*S/grainSize];
+      CkArrayIndex4D idx(x,0,s2,0);
       for (c = 0; c < blkSize; c++)
 	for(s1 = 0; s1 < S; s1 += grainSize){
-	  CkArrayIndex4D idx(x,0,s2,0);
+
 	  idx.index[1]=s1;
 	  idx.index[3]=c;
 	  elems[ecount++] = idx;
@@ -334,6 +339,7 @@ void startPairCalcRight(PairCalcID* pcid, int n, complex* ptr, int myS, int myZ)
 	  CkPrintf("Add Section ID %d: %d,%d,%d,%d \n",ecount, idx.index[0],idx.index[1],idx.index[2],idx.index[3]);
 #endif
 	}
+
 #ifdef _PAIRCALC_DEBUG_      
       for(int count = 0; count < ecount; count ++) {
 	CkArrayIndex4D idx4d;
@@ -344,46 +350,48 @@ void startPairCalcRight(PairCalcID* pcid, int n, complex* ptr, int myS, int myZ)
 	CkPrintf("DEBUG ID %d: %d,%d,%d,%d \n",count, idx4d.index[0], idx4d.index[1], idx4d.index[2], idx4d.index[3]);          
       }
 #endif
-      CProxySection_PairCalculator proxy = CProxySection_PairCalculator::ckNew(pairCalculatorID, elems, ecount); 
-      pcid->proxyRNotFrom=proxy;
-      pcid->existsRproxy=true;      
-      if(pcid->useComlib && _PC_COMMLIB_MULTI_)
+      if(ecount)
 	{
-	  ComlibDelegateProxy(&(pcid->proxyRNotFrom));
-	  ComlibInitSectionID(pcid->proxyRNotFrom.ckGetSectionID());
+	  pcid->proxyRNotFrom = CProxySection_PairCalculator::ckNew(pairCalculatorID, elems, ecount); 
+	  pcid->existsRproxy=true;      
+	  if(pcid->useComlib && _PC_COMMLIB_MULTI_)
+	    {
+	      ComlibDelegateProxy(&(pcid->proxyRNotFrom));
+	      ComlibInitSectionID(pcid->proxyRNotFrom.ckGetSectionID());
+	    }
+	  else
+	    {
+	      CkMulticastMgr *mcastGrp = CProxy_CkMulticastMgr(pcid->mCastGrpId).ckLocalBranch(); 
+	      pcid->proxyRNotFrom.ckSectionDelegate(mcastGrp);
+	    }
 	}
-      else
-	{
-	  CkMulticastMgr *mcastGrp = CProxy_CkMulticastMgr(pcid->mCastGrpId).ckLocalBranch(); 
-	  pcid->proxyRNotFrom.ckSectionDelegate(mcastGrp);
-	}
-
       delete [] elems;
     }
   //  calculatePairsMsg *msg= new ( n,0 ) calculatePairsMsg(n,myS,false,flag_dp,ptr);
-  calculatePairsMsg *msg= new ( n,0 ) calculatePairsMsg();
-  msg->init(n,myS,false,flag_dp,ptr);
-  if(pcid->useComlib & _PC_COMMLIB_MULTI_) {
+  if(pcid->existsRproxy)
+    {
+      calculatePairsMsg *msg= new ( n,0 ) calculatePairsMsg;
+      msg->init(n,myS,false,flag_dp,ptr);
+      if(pcid->useComlib & _PC_COMMLIB_MULTI_) {
 #ifdef _PAIRCALC_DEBUG_
-    CkPrintf("%d Calling Begin Iteration\n", CkMyPe());
+	CkPrintf("%d Calling Begin Iteration\n", CkMyPe());
 #endif
-    pcid->minst.beginIteration();
-  }
+	pcid->minst.beginIteration();
+      }
+      //mcastInstanceCP.beginIteration();
+      pcid->proxyRNotFrom.calculatePairs_gemm(msg);
 
-  //mcastInstanceCP.beginIteration();
-  pcid->proxyRNotFrom.calculatePairs_gemm(msg);
-
-  if(pcid->useComlib && _PC_COMMLIB_MULTI_) {
+      if(pcid->useComlib && _PC_COMMLIB_MULTI_) {
 #ifdef _PAIRCALC_DEBUG_
-    CkPrintf("%d Calling End Iteration\n", CkMyPe());
+	CkPrintf("%d Calling End Iteration\n", CkMyPe());
 #endif
-    pcid->minst.endIteration();
-  }
-
+	pcid->minst.endIteration();
+      }
+      
 #ifdef _PAIRCALC_DEBUG_
-  CkPrintf("Send from [%d 0 %d]\n",x,s2);
+      CkPrintf("Send from [%d 0 %d]\n",x,s2);
 #endif
-
+    }
 }
 
 void finishPairCalc(PairCalcID* pcid, int n, double *ptr) {

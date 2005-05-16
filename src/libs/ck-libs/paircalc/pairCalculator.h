@@ -20,6 +20,7 @@ class PairCalcID {
   bool conserveMemory;
   bool lbpaircalc;
   bool existsLproxy;
+  bool existsLNotFromproxy;
   bool existsRproxy;
   CProxySection_PairCalculator proxyLFrom;
   CProxySection_PairCalculator proxyLNotFrom;
@@ -42,6 +43,7 @@ class PairCalcID {
     minst = m;
     existsRproxy=false;
     existsLproxy=false;
+    existsLNotFromproxy=false;
     isDoublePacked = _dp;
     lbpaircalc=_lbpaircalc;
     mCastGrpId=_mCastGrpId;
@@ -61,6 +63,7 @@ class PairCalcID {
     p|conserveMemory;
     p|lbpaircalc;
     p|existsLproxy;
+    p|existsLNotFromproxy;
     p|existsRproxy;
     p|mCastGrpId;
     p|proxyLFrom;
