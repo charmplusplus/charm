@@ -20,8 +20,9 @@ Date: 04/27/2005
 #define EPSILON  -0.001
 
 #define _lb_debug_on 0
-#define _lb_debug2_on 1
-#define _make_new_grouping_ 1
+#define _lb_debug2_on 0
+#define _make_new_grouping_ 0
+#define _USE_MAX_HOPBYTES_ 1
 
 CreateLBFunc_Def(RefineTopoLB,"TopoLB: Balance objects based on the network topology");
 
@@ -103,8 +104,12 @@ void RefineTopoLB :: work(CentralLB::LDStats *stats,int count)
   initDataStructures(stats,count,newmap);
   if(_lb_debug_on)
     CkPrintf("After initizlizing dataStructures...\n");
+
   for(i=0;i<count;i++)
     assign[i]=i;
+  
+
+
   if(_lb_debug_on)
     printDataStructures(count, stats->n_objs,newmap);
   /***************** Perform RefineMent *************************/
@@ -114,13 +119,17 @@ void RefineTopoLB :: work(CentralLB::LDStats *stats,int count)
 
     
   //double hbval=getHopBytes(stats,count,stats->from_proc);
-  double hbval=getInterMedHopBytes(stats,count,newmap);
+  //double hbval=getHopBytesNew(NULL,count);
  // CkPrintf(" Before Mapping Original   hopBytes : %lf  Avg comm hops: %lf\n", hbval,hbval/total_comm);
   //Perform ith swap
   double totalGain=0;
   for(i=0;i<count;i++)
   {
     //select the cpart which is most communicating and hasn't been moved yet
+    if(_USE_MAX_HOPBYTES_)
+    {
+      updateCommUA(count);
+    }
     int cpart=-1;
     double maxComm=-1;
     for(j=0;j<count;j++)
@@ -138,7 +147,7 @@ void RefineTopoLB :: work(CentralLB::LDStats *stats,int count)
     int swapcpart=-1;
     double gainMax=-1;
     double gain=-1;;
-    double orig_value=getInterMedHopBytes(stats,count,newmap);
+    //double orig_value=getHopBytesNew(assign,count);
     for(j=0;j<count;j++)
     {
       if(j==cpart)
@@ -167,8 +176,8 @@ void RefineTopoLB :: work(CentralLB::LDStats *stats,int count)
     assign[swapcpart]=temp;
     swapdone[cpart]=true;
   
-    //CkPrintf("Gain: %lf  Total_Gain: %lf HopBytes: %lf\n ",gainMax,totalGain,getInterMedHopBytes(stats,count,newmap));
-    //CkPrintf(" %lf  getInterMedHopBytes(stats,count,newmap);
+    //CkPrintf("Gain: %lf  Total_Gain: %lf HopBytes: %lf\n ",gainMax,totalGain,getHopBytesNew(stats,count,newmap));
+    //CkPrintf(" %lf  getHopBytesNew(stats,count,newmap);
     //CkPrintf("Swap# %d:  %d and %d\n",i+1,cpart,swapcpart);
   }
   /******************* Assign mapping and print Stats*********/
@@ -176,19 +185,16 @@ void RefineTopoLB :: work(CentralLB::LDStats *stats,int count)
   {
     stats->to_proc[i]= assign[newmap[i]];
   }
-  /*
   if(_lb_debug2_on)
   {
     //double hbval=getHopBytes(stats,count,stats->from_proc);
-    double hbval=getHopBytesNew(NULL,count);
-    CkPrintf(" Original   hopBytes : %lf  Avg comm hops: %lf\n", hbval,hbval/total_comm);
-  
-    //  hbval=getHopBytes(stats,count,stats->to_proc);
-    //CkPrintf(" Resulting  hopBytes : %lf  Avg comm hops: %lf\n", hbval,hbval/total_comm);
-    hbval=getInterMedHopBytes(stats,count,newmap);
-    CkPrintf("Other Resulting  hopBytes : %lf  Avg comm hops: %lf\n", hbval,hbval/total_comm);
+    double hbval1=getHopBytesNew(NULL,count);
+    CkPrintf(" Original   hopBytes : %lf  Avg comm hops: %lf\n", hbval1,hbval1/total_comm);
+    double hbval2=getHopBytesNew(assign,count);
+    CkPrintf(" Resulting  hopBytes : %lf  Avg comm hops: %lf\n", hbval2,hbval2/total_comm);
+    CkPrintf(" Percentage gain %.2lf\n",(hbval1-hbval2)*100/hbval1);
+    CkPrintf("\n");
   }
-  */
   freeDataStructures(count);
   delete[] newmap;
   delete[] swapdone;
@@ -232,26 +238,37 @@ double RefineTopoLB::getCpartHopBytes(int cpart, int proc, int count)
   return totalHB;
 }
 
-double RefineTopoLB::getInterMedHopBytes(CentralLB::LDStats *stats,int count, int *newmap)
+/*
+double RefineTopoLB::getInterMedHopBytes(int *assign_map,int count)
 {
   double totalHB=0;
+  int i,j;
 
-  for(int i=0;i<count;i++)
+  if(assign_map)
   {
-    for(int j=0;j<count;j++)
-    {
-      totalHB+=comm[i][j]*dist[assign[i]][assign[j]];
-    }
+    for(i=0;i<count;i++)
+      for(j=0;j<count;j++)
+        totalHB+=comm[i][j]*dist[assign_map[i]][assign_map[j]];
+  }
+  else
+  {
+    for(i=0;i<count;i++)
+      for(j=0;j<count;j++)
+        totalHB+=comm[i][j]*dist[i][j];
   }
   return totalHB;
-  /*
-  CkVec<int> obj_to_proc;
-  for(int i=0;i<stats->n_objs;i++)
+}
+*/
+
+void RefineTopoLB::updateCommUA(int count)
+{
+  int i,j;
+  for(i=0;i<count;i++)
   {
-    obj_to_proc.push_back(assign[newmap[i]]);
+    commUA[i]=0;
+    for(j=0;j<count;j++)
+      commUA[i]+=comm[i][j]*dist[assign[i]][assign[j]];
   }
-  return getHopBytes(stats,count,obj_to_proc);
-  */
 }
 
 #include "RefineTopoLB.def.h"

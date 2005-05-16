@@ -27,6 +27,9 @@ Date: 04/19/2005
 #define _lb_debug2_on 1
 #define _make_new_grouping_ 0
 #define _FASTER_
+#define _DIJKSTRA_LIKE_ 0
+#define _INIT_FROM_FILE  
+
 
 CreateLBFunc_Def(TopoLB,"TopoLB: Balance objects based on the network topology");
 
@@ -377,6 +380,22 @@ void TopoLB::initDataStructures(CentralLB::LDStats *stats,int count,int *newmap)
     }
   }
 
+  /***************************/
+  //Just a test
+  /*
+  for(int i=0;i<count;i++)
+    commUA[0];
+  for(int i=0;i<count;i++)
+  {
+    for(int j=0;j<i;j++)
+    {
+      comm[j][i]=comm[i][j]= rand()%100;
+      commUA[i]+=comm[i][j];
+      commUA[j]+=comm[i][j];
+    }
+  }
+  */
+
   /******Avg degree test *******/
   total_comm=0;
   if(_lb_debug2_on)
@@ -392,7 +411,7 @@ void TopoLB::initDataStructures(CentralLB::LDStats *stats,int count,int *newmap)
         comm_i_total+=comm[i][j];
       }
     }
-      //CkPrintf("Avg degree (%d nodes) : %d\n",count,avg_degree/count);
+     // CkPrintf("Avg degree (%d nodes) : %d\n",count,avg_degree/count);
   }
   /***************************/
 
@@ -407,9 +426,11 @@ void TopoLB::initDataStructures(CentralLB::LDStats *stats,int count,int *newmap)
     for(int j=0;j<count;j++)
     {
       //Initialize by (total comm of i)*(avg dist from j);
-      hopBytes[i][j]=commUA[i]*dist[j][count];
-      //Just a test
-      //hopBytes[i][j]=0;
+      if(_DIJKSTRA_LIKE_)
+        hopBytes[i][j]=0;
+      else
+        hopBytes[i][j]=commUA[i]*dist[j][count];
+
       hbtotal+=hopBytes[i][j];
       if(hopBytes[i][hbminIndex]>hopBytes[i][j])
         hbminIndex=j;
@@ -427,6 +448,7 @@ void TopoLB::initDataStructures(CentralLB::LDStats *stats,int count,int *newmap)
     cfree[i]=true;
     assign[i]=-1;
   }
+
 }
 
 void randomAssign(int count, int *perm)
@@ -442,75 +464,9 @@ void randomAssign(int count, int *perm)
   }
 }
 
-void TopoLB :: work(CentralLB::LDStats *stats,int count)
+void TopoLB::performMapping(int *newmap, int count)
 {
-  int i, j;
-  if (_lb_args.debug() >= 2) 
-  {
-    CkPrintf("In TopoLB Strategy...\n");
-  }
-  
-  /****Make sure that there is at least one available processor.***/
-  int proc;
-  for (proc = 0; proc < count; proc++) 
-  {
-    if (stats->procs[proc].available)  
-      break;
-  }
-	
-  if (proc == count) 
-  {
-    CmiAbort ("TopoLB: no available processors!");
-  }
- 
-  removeNonMigratable(stats,count);
-
-  if(_lb_debug_on)
-  {
-    CkPrintf("Num of procs: %d\n",count);
-    CkPrintf("Num of objs:  %d\n",stats->n_objs);
-  }
-
-  /**************Initialize Topology ****************************/
-  LBtopoFn topofn;
-  topofn = LBTopoLookup(_lbtopo);
-  if (topofn == NULL) 
-  {
-  	char str[1024];
-    CmiPrintf("TopoLB> Fatal error: Unknown topology: %s. Choose from:\n", _lbtopo);
-    printoutTopo();
-    sprintf(str, "TopoLB> Fatal error: Unknown topology: %s", _lbtopo);
-    CmiAbort(str);
-  }
-  topo = topofn(count);
-
-  /*********** Compute Partitions *********************************/
-  if(_lb_debug_on)
-    CkPrintf("before computing partitions...\n");
-  
-  int *newmap = new int[stats->n_objs];
-  if(_make_new_grouping_)
-    computePartitions(stats,count,newmap);
-  else
-  {
-    for(i=0;i<stats->n_objs;i++)
-    {
-      newmap[i]=stats->from_proc[i];
-    }
-  }
-  /***************** Fill Data Structures *************************/
-  if(_lb_debug_on)
-    CkPrintf("before allocating dataStructures...\n");
-  allocateDataStructures(count);
-  if(_lb_debug_on)
-    CkPrintf("before initizlizing dataStructures...\n");
-  initDataStructures(stats,count,newmap);
-
-  if(_lb_debug_on)
-    printDataStructures(count, stats->n_objs,newmap);
-  
-  /****************** Perform Mapping *****************************/
-
+  int i,j;
   if(_lb_debug_on)
     CkPrintf("before performing mapping...\n");
 
@@ -691,7 +647,7 @@ void TopoLB :: work(CentralLB::LDStats *stats,int count)
         continue;
       }
 
-      // If reached here cpart communicates with just assigned partition( part_index)
+      // If reached here cpart communicates with the partition assigned in this step( part_index)
       int h_min_index=-1;
       double h_min=-1;
       double h_total=0;
@@ -706,7 +662,10 @@ void TopoLB :: work(CentralLB::LDStats *stats,int count)
         if(!pfree[proc]) // No need to update for assigned procs
           continue;
 
-        hopBytes[cpart][proc]+=c2*(dist[proc][proc_index]-dist[proc][count]);
+        if(_DIJKSTRA_LIKE_)
+          hopBytes[cpart][proc]+=c2*(dist[proc][proc_index]);
+        else
+          hopBytes[cpart][proc]+=c2*(dist[proc][proc_index]-dist[proc][count]);
         h_updated=hopBytes[cpart][proc];
         
         //CmiAssert(h_updated >= EPSILON);
@@ -730,6 +689,85 @@ void TopoLB :: work(CentralLB::LDStats *stats,int count)
   
   /******************  Fill out final composition Mapping **************************/
 
+}
+
+void TopoLB :: work(CentralLB::LDStats *stats,int count)
+{
+  int i, j;
+  if (_lb_args.debug() >= 2) 
+  {
+    CkPrintf("In TopoLB Strategy...\n");
+  }
+  
+  /****Make sure that there is at least one available processor.***/
+  int proc;
+  for (proc = 0; proc < count; proc++) 
+  {
+    if (stats->procs[proc].available)  
+      break;
+  }
+	
+  if (proc == count) 
+  {
+    CmiAbort ("TopoLB: no available processors!");
+  }
+ 
+  removeNonMigratable(stats,count);
+
+  if(_lb_debug_on)
+  {
+    CkPrintf("Num of procs: %d\n",count);
+    CkPrintf("Num of objs:  %d\n",stats->n_objs);
+  }
+
+  /**************Initialize Topology ****************************/
+  LBtopoFn topofn;
+  topofn = LBTopoLookup(_lbtopo);
+  if (topofn == NULL) 
+  {
+  	char str[1024];
+    CmiPrintf("TopoLB> Fatal error: Unknown topology: %s. Choose from:\n", _lbtopo);
+    printoutTopo();
+    sprintf(str, "TopoLB> Fatal error: Unknown topology: %s", _lbtopo);
+    CmiAbort(str);
+  }
+  topo = topofn(count);
+
+  /*********** Compute Partitions *********************************/
+  if(_lb_debug_on)
+    CkPrintf("before computing partitions...\n");
+  
+  int *newmap = new int[stats->n_objs];
+  if(_make_new_grouping_)
+    computePartitions(stats,count,newmap);
+  else
+  {
+    for(i=0;i<stats->n_objs;i++)
+    {
+      newmap[i]=stats->from_proc[i];
+    }
+  }
+  /***************** Fill Data Structures *************************/
+  if(_lb_debug_on)
+    CkPrintf("before allocating dataStructures...\n");
+
+  allocateDataStructures(count);
+
+  if(_lb_debug_on)
+    CkPrintf("before initizlizing dataStructures...\n");
+
+  initDataStructures(stats,count,newmap);
+
+  if(_lb_debug_on)
+    printDataStructures(count, stats->n_objs,newmap);
+  
+  /****************** Perform Mapping *****************************/
+
+  if(_lb_debug_on)
+    CkPrintf("before performing mapping...\n");
+  
+  performMapping(newmap,count);
+
   for(i=0;i<stats->n_objs;i++)
   {
     stats->to_proc[i]= assign[newmap[i]];
@@ -739,13 +777,14 @@ void TopoLB :: work(CentralLB::LDStats *stats,int count)
   {
     double hbval1=getHopBytesNew(NULL,count);
     CkPrintf("\n");
-    CkPrintf(" Original   hopBytes : %.1lf  Avg comm hops: %lf\n", hbval1,hbval1/total_comm);
+    CkPrintf(" Original hopBytes : %.1lf \n", hbval1);
+    CkPrintf(" Original Avg hops : %.1lf \n", hbval1/total_comm);
     double hbval2=getHopBytesNew(assign,count);
-    CkPrintf(" Resulting  hopBytes : %.1lf  Avg comm hops: %lf\n", hbval2,hbval2/total_comm);
-    CkPrintf(" Percentage gain %.2lf\n",(hbval1-hbval2)*100/hbval1);
-    CkPrintf("\n");
+    //CkPrintf(" Resulting hopBytes : %.1lf \n", hbval2);
+    //CkPrintf(" Resulting Avg hops : %.1lf \n", hbval2/total_comm);
+    //CkPrintf(" Percentage gain %.2lf\n",(hbval1-hbval2)*100/hbval1);
+    //CkPrintf("\n");
     
-    /*
     double total_hb_rand=0;
     int nTrials=10;
     for(int t=0;t<nTrials;t++)
@@ -753,19 +792,21 @@ void TopoLB :: work(CentralLB::LDStats *stats,int count)
       randomAssign(count, assign);
       double hbval3=getHopBytesNew(assign,count);
       total_hb_rand+=hbval3;
-      //CkPrintf(" Random  hopBytes : %.1lf  Avg comm hops: %lf\n", hbval3,hbval3/total_comm);
+     //CkPrintf(" Random hopBytes : %.1lf \n", hbval3);
+     //CkPrintf(" Random Avg hops : %.1lf \n", hbval3/total_comm);
     }
-    CkPrintf("\n");
-    double hbval3=total_hb_rand/nTrials;
-    CkPrintf(" Average random hopBytes : %.1lf Avg comm hops : %lf\n",total_hb_rand/nTrials,total_hb_rand/(nTrials*total_comm)); 
-    CkPrintf(" Percentage gain(TopoLB vs random) %.2lf\n",(hbval3-hbval2)*100/hbval3);
-    */
+    //CkPrintf("\n");
+    double hbval4=total_hb_rand/nTrials;
+    CkPrintf(" Average Random hopBytes : %.1lf \n", hbval4);
+    CkPrintf(" Average Random Avg hops : %.1lf \n", hbval4/total_comm);
+    CkPrintf(" Resulting hopBytes : %.1lf \n", hbval2);
+    CkPrintf(" Resulting Avg hops : %.1lf \n", hbval2/total_comm);
+    CkPrintf(" Percentage gain(TopoLB vs random) %.2lf\n",(hbval4-hbval2)*100/hbval4);
     CkPrintf("\n");
   }
-
   freeDataStructures(count);
   delete[] newmap;
-
+  return;
 }
 
 

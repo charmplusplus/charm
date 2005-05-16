@@ -20,13 +20,14 @@ class RefineTopoLB : public TopoLB
     void work (CentralLB::LDStats *stats, int count);
     void pup (PUP::er &p) { TopoLB::pup(p); }
     	
-    //LBTopology			*topo;
+    //LBTopolog *topo;
   
   protected:
     double getCpartHopBytes(int cpart,int proc, int count);
     double findSwapGain(int cpart1, int cpart2,int count);
-    double getInterMedHopBytes(CentralLB::LDStats *stats,int count, int *newmap);
+    //double getInterMedHopBytes(CentralLB::LDStats *stats,int count, int *newmap);
     CmiBool QueryBalanceNow (int step);
+    void updateCommUA(int count);
 }; 
 
 

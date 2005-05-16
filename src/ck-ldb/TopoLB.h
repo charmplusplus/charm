@@ -17,6 +17,7 @@ class TopoLB : public CentralLB
     TopoLB (CkMigrateMessage *m) : CentralLB (m) { };
   
     void work (CentralLB::LDStats *stats, int count);
+   // void work_fromFile (char *filename);
     void pup (PUP::er &p) { CentralLB::pup(p); }
     	
     LBTopology			*topo;
@@ -39,6 +40,7 @@ class TopoLB : public CentralLB
     virtual void printDataStructures(int num_procs, int num_objs, int *newmap);
     virtual double getHopBytes(CentralLB::LDStats *stats,int count,CkVec<int>obj_to_proc);
     virtual double getHopBytesNew(int *assign_map, int count);
+    void performMapping(int *newmap, int count);
     
     CmiBool QueryBalanceNow (int step);
 }; 
