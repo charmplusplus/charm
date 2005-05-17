@@ -20,7 +20,9 @@
 #define beta PER_BYTE_SEND_OVERHEAD_DEFAULT     /*Long-message time per byte, seconds*/
 #define DEG_THRES 0.50
 
-//#define MAX_EDGE
+#define MAX_EDGE 0
+#define RAND_COMM 0
+#define make_mapping 0
 
 CreateLBFunc_Def(TopoCentLB,"Balance objects based on the network topology");
 
@@ -354,24 +356,27 @@ void TopoCentLB :: calculateMST(PartGraph *partgraph,LBTopology *topo,int *proc_
 	inHeap = new int[partgraph->n_nodes];
 	keys = new double[partgraph->n_nodes];
 
-	int **hopCount;
-	int **topoGraph;
+	//int **hopCount;
+	//int **topoGraph;
 	//int *topoDegree;
 	int *assigned_procs = new int[count];
 
-	hopCount = new int*[count];
+	hopCount = new double*[count];
 	for(i=0;i<count;i++){
 		proc_mapping[i]=-1;
 		assigned_procs[i]=0;
-		hopCount[i] = new int[count];
-		for(j=0;j<count;j++)
-			hopCount[i][j] = 0;
+		hopCount[i] = new double[count];
+		//for(j=0;j<count;j++)
+			//hopCount[i][j] = 0;
 	}
+
+	topo->get_pairwise_hop_count(hopCount);
 
 	int max_neighbors = topo->max_neighbors();
 	
 	//topoDegree = new int[count];
-	topoGraph = new int*[count];
+	/*int **topoGraph;
+topoGraph = new int*[count];
 	for(i=0;i<count;i++){
 		//topoDegree[i] = 0;
 		topoGraph[i] = new int[max_neighbors+1];
@@ -393,16 +398,7 @@ void TopoCentLB :: calculateMST(PartGraph *partgraph,LBTopology *topo,int *proc_
 	}
 	//Topology graph constructed
 	delete [] neigh;
-
-	//markedEdges = new Edge*[partmst->n_nodes];
-	/*for(int i=0;i<partmst->n_nodes;i++){
-		parent[i] = -1;
-		inHeap[i] = 1;
-  	markedEdges[i] = new Edge[partmst->n_nodes];
-    for(int j=0;j<partmst->n_nodes;j++)
-    	markedEdges[i][j] = 0;
-  }*/
-	
+*/
 	HeapNode *heap = new HeapNode[partgraph->n_nodes];
 	int heapSize = 0;
 
@@ -429,7 +425,7 @@ void TopoCentLB :: calculateMST(PartGraph *partgraph,LBTopology *topo,int *proc_
 	int k=0,comm_cnt=0,m=0,n=0;
 	int *commParts = new int[partgraph->n_nodes];
 	
-	srand(count);
+	//srand(count);
 
 	while(heapSize > 0){
 		HeapNode max = extractMax(heap,&heapSize);
@@ -471,87 +467,37 @@ void TopoCentLB :: calculateMST(PartGraph *partgraph,LBTopology *topo,int *proc_
 		m=0;
 		n=0;
 		comm_cnt=0;
+
+		int pot_proc=-1;
+		double min_cost=-1;
+		int min_cost_index=-1;
+		double cost=0;
+		int p=0;
+		//int q=0;
+
 		for(k=0;k<partgraph->n_nodes;k++){
 			if(!inHeap[k] && partgraph->edges[k][max.node]){
 				commParts[comm_cnt]=k;
 				comm_cnt++;
 			}
 		}
-		int pot_proc=-1;
-		double min_cost=-1;
-		int min_cost_index=-1;
-		double cost=0;
-		int p=0;
-		int q=0;
-		int sec_pot_proc=-1;
-		
-		for(m=0;m<comm_cnt;m++){
-			int pe=proc_mapping[commParts[m]];
-			n=0;	
-			//cost=0;
-			//CkPrintf("\nnhs of %d ie. part %d are ",pe,commParts[m]);
-			while(topoGraph[pe][n]!=-1){
-				pot_proc=topoGraph[pe][n];
-				//CkPrintf(" %d ",pot_proc);
-				if(assigned_procs[pot_proc]){
-					n++;
-					continue;
-				}
+
+		for(m=0;m<count;m++){
+			if(!assigned_procs[m]){
 				cost=0;
-				cost+=partgraph->edges[commParts[m]][max.node];
 				for(p=0;p<comm_cnt;p++){
-					if(p!=m){
-						if(!hopCount[proc_mapping[commParts[p]]][pot_proc])
-							hopCount[proc_mapping[commParts[p]]][pot_proc]=topo->get_hop_count(proc_mapping[commParts[p]],pot_proc);
-						cost += hopCount[proc_mapping[commParts[p]]][pot_proc]*partgraph->edges[commParts[p]][max.node];
-						//CkPrintf("hop count:%d\n",hopCount[proc_mapping[commParts[p]]][pot_proc]);
-					}
+					//if(!hopCount[proc_mapping[commParts[p]]][m])
+						//hopCount[proc_mapping[commParts[p]]][m]=topo->get_hop_count(proc_mapping[commParts[p]],m);
+					cost += hopCount[proc_mapping[commParts[p]]][m]*partgraph->edges[commParts[p]][max.node];
+					//CkPrintf("hop count:%d\n",hopCount[proc_mapping[commParts[p]]][pot_proc]);
 				}
-				//CkPrintf("-cost=%.1f- ",cost);
 				if(min_cost==-1 || cost<min_cost){
 					min_cost=cost;
-					min_cost_index=pot_proc;
+					min_cost_index=m;
 				}
+			}
+		}
 
-				// look at 2-away neighbors too...
-				q=0;
-				while(topoGraph[pot_proc][q]!=-1){
-					sec_pot_proc=topoGraph[pot_proc][q];
-					//CkPrintf(" %d ",pot_proc);
-					if(assigned_procs[sec_pot_proc]){
-						q++;
-						continue;
-					}
-					cost=0;
-					cost+=2*partgraph->edges[commParts[m]][max.node];
-					for(p=0;p<comm_cnt;p++){
-						if(p!=m){
-							if(!hopCount[proc_mapping[commParts[p]]][sec_pot_proc])
-								hopCount[proc_mapping[commParts[p]]][sec_pot_proc]=topo->get_hop_count(proc_mapping[commParts[p]],sec_pot_proc);
-							cost += hopCount[proc_mapping[commParts[p]]][sec_pot_proc]*partgraph->edges[commParts[p]][max.node];
-							//CkPrintf("hop count:%d\n",hopCount[proc_mapping[commParts[p]]][pot_proc]);
-						}
-					}
-					//CkPrintf("-cost=%.1f- ",cost);
-					if(min_cost==-1 || cost<min_cost){
-						min_cost=cost;
-						min_cost_index=sec_pot_proc;
-					}
-					q++;
-				}
-				n++;
-			}
-		}
-		if(min_cost==-1){
-			min_cost_index=-1;
-			while(min_cost_index==-1){
-				min_cost_index = rand()%count;
-				if(assigned_procs[min_cost_index])
-					min_cost_index=-1;
-			}
-			//CmiAbort("No potential processor found\n");
-			//CkPrintf("random proc:%d\n",min_cost_index);
-		}
 		//CkPrintf("\npart %d assigned to proc %d\n",max.node,min_cost_index);
 		proc_mapping[max.node]=min_cost_index;
 		assigned_procs[min_cost_index]=1;
@@ -559,38 +505,7 @@ void TopoCentLB :: calculateMST(PartGraph *partgraph,LBTopology *topo,int *proc_
 
 }
 
-	//CkPrintf("just before end..\n");
-	//Retain only those edges which are in the MST
-	/*PartGraph::Edge **newEdges;
-	
-	newEdges = new PartGraph::Edge*[partmst->n_nodes];
-	for(int i=0;i<partmst->n_nodes;i++){
-		newEdges[i] = new PartGraph::Edge[partmst->n_nodes];
-		for(int j=0;j<partmst->n_nodes;j++)
-			newEdges[i][j]=0;
-	}
-	
-	for(int i=0;i<partmst->n_nodes;i++){
-		if(parent[i] != -1){
-			newEdges[parent[i]][i] = partmst->edges[parent[i]][i];
-			newEdges[i][parent[i]] = partmst->edges[i][parent[i]];
-		}
-	}
 
-	//Convert the minimum spanning tree back to maximum spanning tree	
-	for(int i=0;i<partmst->n_nodes;i++)
-		for(int j=0;j<partmst->n_nodes;j++)
-			if(newEdges[i][j] != 0)
-				partmst->edges[i][j] = max_weight - newEdges[i][j];
-			else
-				partmst->edges[i][j] = 0;
-	*/
-
-
-/*int TopoCentLB :: compare(const void *p,const void *q){
-	return (((PotList*)p)->size - ((PotList*)q)->size);
-}
-*/
 void TopoCentLB :: work(CentralLB::LDStats *stats,int count)
 {
   int proc;
@@ -599,9 +514,9 @@ void TopoCentLB :: work(CentralLB::LDStats *stats,int count)
   int i,j;
 	LDObjData *odata;
 	
-	if (_lb_args.debug() >= 2) {
+	//if (_lb_args.debug() >= 2) {
     CkPrintf("In TopoCentLB Strategy...\n");
-  }
+  //}
 	
   // Make sure that there is at least one available processor.
   for (proc = 0; proc < count; proc++) {
@@ -618,9 +533,16 @@ void TopoCentLB :: work(CentralLB::LDStats *stats,int count)
 	int *newmap = new int[stats->n_objs];
 
 	//CkPrintf("before computing partitions...\n");
-	
-	computePartitions(stats,count,newmap);
-	
+
+	if(make_mapping)
+		computePartitions(stats,count,newmap);
+	else{
+		//mapping taken from previous algo
+		for(i=0;i<stats->n_objs;i++){
+      newmap[i]=stats->from_proc[i];
+    }
+	}
+		
 	/*CkPrintf("obj-proc mapping\n");
 	for(i=0;i<stats->n_objs;i++)
 		CkPrintf(" %d,%d ",i,newmap[i]);
@@ -655,8 +577,35 @@ void TopoCentLB :: work(CentralLB::LDStats *stats,int count)
 	int *addedComm=new int[count];
 
 	int max_comm_part=-1;
+	
 	double max_comm=0;
 	
+	#ifdef RAND_COMM
+	for(i=0;i<count;i++){
+		for(j=i+1;j<count;j++){
+			int val;
+			if(rand()%5==0)
+				val=0;
+			else
+				val= rand()%1000;
+				
+			partgraph->edges[i][j] = val;
+			partgraph->edges[j][i] = val;
+			
+			partgraph->nodes[i].comm += val;
+			partgraph->nodes[j].comm += val;
+			
+			if(partgraph->nodes[i].comm > max_comm){
+				max_comm = partgraph->nodes[i].comm;
+				max_comm_part = i;
+			}
+			if(partgraph->nodes[j].comm > max_comm){
+				max_comm = partgraph->nodes[j].comm;
+				max_comm_part = j;
+			}
+		}
+	}
+	#else
 	for(i=0;i<stats->n_comm;i++)
 	{
 		//DO I consider other comm too....i.e. to or from a processor
@@ -750,6 +699,7 @@ void TopoCentLB :: work(CentralLB::LDStats *stats,int count)
 		}
 
 	}
+	#endif
 	
 	int *proc_mapping = new int[count];
 	
@@ -795,15 +745,12 @@ void TopoCentLB :: work(CentralLB::LDStats *stats,int count)
 	delete [] neigh;
 */
 
+	//CkPrintf("max comm partition:%d\n",max_comm_part);
+	CkPrintf("before calling assignment function...\n");
 	calculateMST(partgraph,topo,proc_mapping,max_comm_part);
-	CkPrintf("after calculating MST...\n");
+	CkPrintf("after calling assignment function...\n");
 	//Returned partition graph is a Maximum Spanning Tree -- converted in above function itself
 
-	/*for(i=0;i<count;i++)
-		for(j=0;j<count;j++)
-			if(partmst->edges[i][j]==0)
-				bytesComm[i][j]=0;*/
-	
 	//Construct the Topology Graph
 	
 	/*int max_part_degree = 0;
@@ -820,16 +767,14 @@ void TopoCentLB :: work(CentralLB::LDStats *stats,int count)
 	PartGraph::Node* n;
 	for(i=0;i<count;i++){
 		pe = proc_mapping[i];
-		//pe=i;
 		n = &partgraph->nodes[i];
 		//CkPrintf("here..%d,first object:%d\n",n->num_objs,n->obj_list[0]);
 		for(j=0;j<n->num_objs;j++){
 			stats->to_proc[n->obj_list[j]] = pe;
-			//if(pe==507)
-				//CkPrintf(" %d,%d ",n->obj_list[j],pe);
 			if (_lb_args.debug()>1) 
         CkPrintf("[%d] Obj %d migrating from %d to %d\n", CkMyPe(),n->obj_list[j],stats->from_proc[n->obj_list[j]],pe);
 		}
 	}
 }
+
 #include "TopoCentLB.def.h"
