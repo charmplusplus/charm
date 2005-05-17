@@ -20,8 +20,8 @@
 #define beta PER_BYTE_SEND_OVERHEAD_DEFAULT     /*Long-message time per byte, seconds*/
 #define DEG_THRES 0.50
 
-#define MAX_EDGE 0
-#define RAND_COMM 0
+//#define MAX_EDGE
+//#define RAND_COMM
 #define make_mapping 0
 
 CreateLBFunc_Def(TopoCentLB,"Balance objects based on the network topology");
@@ -563,14 +563,6 @@ void TopoCentLB :: work(CentralLB::LDStats *stats,int count)
 		//CkPrintf("num:%d\n",n->num_objs);
 		n->obj_list[n->num_objs]=i;
 		n->num_objs++;
-	}
-
-	int **bytesComm;
-	bytesComm = new int*[count];
-	for(i=0;i<count;i++){
-		bytesComm[i] = new int[count];
-		for(j=0;j<count;j++)
-			bytesComm[i][j]=0;
 	}
 
 	//CkPrintf("num comm:%d\n",stats->n_comm);
