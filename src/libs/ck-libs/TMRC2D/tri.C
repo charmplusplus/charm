@@ -446,7 +446,7 @@ intMsg *chunk::addNode(node n, int b1, int b2, int internal)
 
 edgeRef chunk::addEdge(int n1, int n2, int b)
 {
-  DEBUGREF(CkPrintf("TMRC2D: [%d] Adding edge %d\n", cid, numEdges);)
+  DEBUGREF(CkPrintf("TMRC2D: [%d] Adding edge %d between nodes %d and %d\n", cid, numEdges, n1, n2);)
   edgeRef eRef(cid, firstFreeEdge);
   theEdges[firstFreeEdge].set(firstFreeEdge, cid, this);
   theEdges[firstFreeEdge].reset();

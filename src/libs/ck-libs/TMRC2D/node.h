@@ -194,6 +194,9 @@ class node {  // a 2D double coordinate
     if (theLock)
       CkAbort("TMRC2D: node::sanityCheck: WARNING: node is locked.\n");
   }
+  void dump() {
+    CkPrintf("[%5.9f,%5.9f]", x, y);
+  }
 };
 
 #endif

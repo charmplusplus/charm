@@ -90,6 +90,11 @@ class edge {
     if (elements[0] == oldval)  elements[0] = newval;
     else /* (elements[1] == oldval) */ elements[1] = newval;
   }
+  void updateNode(int oldval, int newval) {
+    CkAssert((nodes[0] == oldval) || (nodes[1] == oldval));
+    if (nodes[0] == oldval)  nodes[0] = newval;
+    else /* (nodes[1] == oldval) */ nodes[1] = newval;
+  }
   elemRef& getElement(int idx) {
     CkAssert((idx==0) || (idx==1));
     return elements[idx];

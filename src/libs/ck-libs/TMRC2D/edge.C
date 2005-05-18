@@ -51,7 +51,17 @@ int edge::split(int *m, edgeRef *e_prime, int oIdx, int fIdx,
     oIdx = (*sharedList)[oIdx];
     fIdx = (*sharedList)[fIdx];
   }
-  CkPrintf("TMRC2D: [%d] oIdx=%d fIdx=%d\n", myRef.cid, oIdx, fIdx);
+  CkPrintf("TMRC2D: [%d] oIdx=%d fIdx=%d ", myRef.cid, oIdx, fIdx);
+  CkPrintf("node[oIdx]="); C->theNodes[oIdx].dump();
+  CkPrintf("node[fIdx]="); C->theNodes[fIdx].dump();
+  CkPrintf("\n");
+  
+  CkPrintf("TMRC2D: [%d] node[0]=%d node[1]=%d ", myRef.cid, nodes[0], nodes[1]);
+  CkPrintf("coords of node[0]="); C->theNodes[nodes[0]].dump();
+  CkPrintf("coords of node[1]="); C->theNodes[nodes[1]].dump();
+  CkPrintf("\n");
+  CkAssert((oIdx == nodes[0]) || (oIdx == nodes[1]));
+  CkAssert((fIdx == nodes[0]) || (fIdx == nodes[1]));
 
   if (pending && (waitingFor == requester)) { 
     // already split; waiting for requester
@@ -69,20 +79,39 @@ int edge::split(int *m, edgeRef *e_prime, int oIdx, int fIdx,
       DEBUGREF(CkPrintf("TMRC2D: [%d] New node (%f,%f) added at index %d on chunk %d\n", myRef.cid, newNode.X(), newNode.Y(), *m, myRef.cid);)
     }
     int nLoc = newNodeIdx;
-    if (requester.cid == myRef.cid) nLoc = *m;
+    if (requester.cid == myRef.cid) { 
+      nLoc = *m;
+      C->theEdges[newEdgeRef.idx].updateNode(newNodeIdx, nLoc);
+    }
     if (oIdx == incidentNode) { // incidence as planned
-      if (nodes[0] == oIdx) nodes[0] = nLoc;
-      else if (nodes[1] == oIdx) nodes[1] = nLoc;
+      if (nodes[0] == oIdx) {
+	nodes[0] = nLoc;
+	CkPrintf("TMRC2D: [%d] Edge %d node[0] updated to %d\n", myRef.cid, 
+		 myRef.idx, nLoc);
+      }
+      else if (nodes[1] == oIdx) {
+	nodes[1] = nLoc;
+	CkPrintf("TMRC2D: [%d] Edge %d node[1] updated to %d\n", myRef.cid, 
+		 myRef.idx, nLoc);
+      }
       else CkAbort("ERROR: incident node not found on edge\n");
       return 1; 
     }
     else { // incidence is on fIdx
-      if (nodes[0] == fIdx) nodes[0] = nLoc;
-      else if (nodes[1] == fIdx) nodes[1] = nLoc;
+      CkAssert(fIdx == incidentNode);
+      if (nodes[0] == fIdx) {
+	nodes[0] = nLoc;
+	CkPrintf("TMRC2D: [%d] Edge %d node[0] updated to %d\n", myRef.cid, 
+		 myRef.idx, nLoc);
+      }
+      else if (nodes[1] == fIdx) {
+	nodes[1] = nLoc;
+	CkPrintf("TMRC2D: [%d] Edge %d node[1] updated to %d\n", myRef.cid, 
+		 myRef.idx, nLoc);
+      }
       else CkAbort("ERROR: incident node not found on edge\n");
       return 0;
     }
-    
   }
   else if (pending) { // can't split a second time yet; waiting for nbr elem
     DEBUGREF(CkPrintf("TMRC2D: [%d] edge::split: ** Pending on (%d,%d)! ** On edge=%d on chunk=%d, requester=%d on chunk=%d\n", myRef.cid, waitingFor.cid, waitingFor.idx, myRef.idx, myRef.cid, requester.idx, requester.cid);)
@@ -96,7 +125,7 @@ int edge::split(int *m, edgeRef *e_prime, int oIdx, int fIdx,
 				     C->theNodes[nodes[1]].boundary, (nbr.cid != -1));
     newNodeIdx = im->anInt;
     CkFreeMsg(im);
-    DEBUGREF(CkPrintf("TMRC2D: [%d] New node (%f,%f) added at index %d\n", myRef.cid, newNode.X(), newNode.Y(), newNodeIdx);)
+    DEBUGREF(CkPrintf("TMRC2D: [%d] New node (%f,%f) added at index %d on chunk %d\n", myRef.cid, newNode.X(), newNode.Y(), newNodeIdx, requester.cid);)
     newEdgeRef = C->addEdge(newNodeIdx, oIdx, boundary);
     DEBUGREF(CkPrintf("TMRC2D: [%d] New edge (%d,%d) added between nodes (%f,%f) and newNode\n", myRef.cid, newEdgeRef.cid, newEdgeRef.idx, C->theNodes[oIdx].X(), C->theNodes[oIdx].Y());)
     incidentNode = oIdx;
@@ -118,8 +147,16 @@ int edge::split(int *m, edgeRef *e_prime, int oIdx, int fIdx,
       mesh[nbr.cid].refineElement(nbr.idx, nbrArea);
     }
     else {
-      if (nodes[0] == oIdx) nodes[0] = newNodeIdx;
-      else if (nodes[1] == oIdx) nodes[1] = newNodeIdx;
+      if (nodes[0] == oIdx) {
+	nodes[0] = newNodeIdx;
+	CkPrintf("TMRC2D: [%d] Edge %d node[0] updated to %d\n", myRef.cid, 
+		 myRef.idx, newNodeIdx);
+      }
+      else if (nodes[1] == oIdx) {
+	nodes[1] = newNodeIdx;
+	CkPrintf("TMRC2D: [%d] Edge %d node[1] updated to %d\n", myRef.cid, 
+		 myRef.idx, newNodeIdx);
+      }
       else CkAbort("ERROR: incident node not found on edge\n");
     }
     return 1;
@@ -137,6 +174,15 @@ int edge::collapse(elemRef requester, int kIdx, int dIdx, elemRef kNbr,
   int *dIdxlChk, *dIdxlIdx, *kIdxlChk, *kIdxlIdx;
   elemRef nbr = getNot(requester), nullRef;
   nullRef.reset();
+
+  if (requester.cid != myRef.cid) {
+    FEM_Node *theNodes = &(C->meshPtr->node);
+    const FEM_Comm_List *sharedList = &(theNodes->shared.getList(requester.cid));
+    kIdx = (*sharedList)[kIdx];
+    dIdx = (*sharedList)[dIdx];
+  }
+  CkPrintf("TMRC2D: [%d] kIdx=%d dIdx=%d\n", myRef.cid, kIdx, dIdx);
+
   *local = 0;
   if ((nbr.cid == -1) || (nbr.cid == requester.cid)) *local = 1;
   if (pending && (waitingFor == requester)) { // collapsed; awaiting requester

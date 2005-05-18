@@ -64,6 +64,12 @@ void element::split(int longEdge)
   fixnode = otherEdge;
 
   int fIdx, oIdx;
+  CkPrintf("TMRC2D: [%d] oIdx=%d fIdx=%d ", myRef.cid, nodes[othernode], 
+	   nodes[fixnode]);
+  CkPrintf("node[oIdx]="); C->theNodes[nodes[othernode]].dump();
+  CkPrintf(" node[fIdx]="); C->theNodes[nodes[fixnode]].dump();
+  CkPrintf("\n");
+
   if (edges[longEdge].cid == myRef.cid) {
     oIdx = nodes[othernode];
     fIdx = nodes[fixnode];
@@ -122,7 +128,7 @@ void element::split(int longEdge)
     C->theEdges[newEdge.idx].update(nullRef, myRef);
     C->theEdges[newEdge.idx].update(nullRef, newElem);
     e_prime.update(nullRef, newElem, 0);
-		oldothernode = nodes[othernode];
+    oldothernode = nodes[othernode];
     nodes[othernode] = m;
     edges[modEdge].checkPending(myRef, newElem);
     edges[modEdge] = newEdge;
