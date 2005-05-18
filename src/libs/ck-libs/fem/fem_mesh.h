@@ -450,6 +450,9 @@ public:
 	AllocTable2d<int> &getInt(void) {return *int_data;}
 	const AllocTable2d<int> &getInt(void) const {return *int_data;}
 	
+	AllocTable2d<double> &getDouble(void) {return *double_data;}
+
+	
 	virtual void set(const void *src, int firstItem,int length, 
 		const IDXL_Layout &layout, const char *caller);
 	
