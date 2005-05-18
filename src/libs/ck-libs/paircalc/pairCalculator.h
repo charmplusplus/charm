@@ -48,7 +48,35 @@ class PairCalcID {
     lbpaircalc=_lbpaircalc;
     mCastGrpId=_mCastGrpId;
   }
+  void resetProxy()
+    {
+      if(useComlib && _PC_COMMLIB_MULTI_)
+	{
+	  if(existsLNotFromproxy)
+	    ComlibResetSectionProxy(&proxyLNotFrom);
+	  if(existsRproxy)
+	    ComlibResetSectionProxy(&proxyRNotFrom);
+	  if(existsLproxy)
+	    ComlibResetSectionProxy(&proxyLFrom);
+	}
+      else
+	{
+	  CkMulticastMgr *mcastGrp = CProxy_CkMulticastMgr(mCastGrpId).ckLocalBranch();       
+	  if(existsRproxy)
+	    {
+	      mcastGrp->resetSection(proxyRNotFrom);
+	    }
+	  if(existsLproxy)
+	    {
+	      mcastGrp->resetSection(proxyLFrom);
+	    }
+	  if(existsLNotFromproxy)
+	    {
+	      mcastGrp->resetSection(proxyLNotFrom);
+	    }
+	}
 
+    }
   void pup(PUP::er &p) {
     p|Aid;
     p|Gid;
