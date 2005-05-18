@@ -143,7 +143,7 @@ class PairCalculator: public CBase_PairCalculator {
   ~PairCalculator();
   void lbsync() {
 #ifdef _PAIRCALC_DEBUG_
-    CkPrintf("[%d,%d,%d,%d]atsyncs\n");
+    CkPrintf("[%d,%d,%d,%d] atsyncs\n", thisIndex.w, thisIndex.x, thisIndex.y, thisIndex.z);
 #endif
     AtSync();
   };
@@ -175,9 +175,6 @@ class PairCalculator: public CBase_PairCalculator {
   int kUnits;
   int op1, op2;
   FuncType fn1, fn2;
-  complex *inDataLeft, *inDataRight;
-  double *outData;
-  complex *newData;
   int sumPartialCount;
   bool symmetric;
   bool conserveMemory;
@@ -191,6 +188,10 @@ class PairCalculator: public CBase_PairCalculator {
   bool existsLeft;
   bool existsRight;
   CkCallback cb_lb;
+  complex *inDataLeft, *inDataRight;
+  double *outData;
+  complex *newData;
+
 };
 
 class IndexAndID {
@@ -211,6 +212,8 @@ class IndexAndID {
     }
 };
 
+PUPbytes(IndexAndID);
+
 class PairCalcReducer : public Group {
  public:
   PairCalcReducer(CkMigrateMessage *m) { }
@@ -219,9 +222,12 @@ class PairCalcReducer : public Group {
       reduction_elementCount = 0;
       tmp_matrix = NULL;
   }
-  ~PairCalcReducer() {}
+  ~PairCalcReducer() {if (tmp_matrix !=NULL) delete [] tmp_matrix;}
   void clearRegister()
     {  
+#ifdef _PAIRCALC_DEBUG_
+      CkPrintf("[%d] clearing register\n",CkMyPe());
+#endif
       acceptCount=0;
       reduction_elementCount=0;
       localElements[0].resize(0);
@@ -250,6 +256,24 @@ class PairCalcReducer : public Group {
   int size;
   bool symmtype;
   CkCallback cb;
+
+void pup(PUP::er &p){
+    p(localElements,2);
+    p(numRegistered,2);
+    p|acceptCount;
+    p|reduction_elementCount;
+    p|isAllReduce;
+    p|size;
+    p|symmtype;
+    p|cb;
+    if(p.isUnpacking())
+      {
+	tmp_matrix=NULL;
+      }
+  }
+
 }; 
+
+
 
 #endif

@@ -296,7 +296,6 @@ void isAtSyncPairCalc(PairCalcID* pcid){
   CkGroupID pairCalcReducerID = (CkArrayID)pcid->Gid; 
   CProxy_PairCalcReducer pairCalcReducerProxy(pairCalcReducerID);
   pairCalcReducerProxy.clearRegister();
-
   CkArrayID pairCalculatorID = (CkArrayID)pcid->Aid; 
   CProxy_PairCalculator pairCalculatorProxy(pairCalculatorID);
   pairCalculatorProxy.lbsync();

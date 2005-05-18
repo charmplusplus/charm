@@ -83,32 +83,32 @@ PairCalculator::PairCalculator(bool sym, int grainSize, int s, int blkSize,  int
 void
 PairCalculator::pup(PUP::er &p)
 {
+  ArrayElement4D::pup(p);
 #ifdef _PAIRCALC_DEBUG_
       CkPrintf("[%d,%d,%d,%d] pups on %d\n",thisIndex.w,thisIndex.x, thisIndex.y, thisIndex.z,CkMyPe());
 #endif
-  ArrayElement4D::pup(p);
   p|numRecd;
   p|grainSize;
   p|numExpected;
   p|S;
   p|blkSize;
+  p|N;
+  p|kUnits;
   p|op1;
   p|op2;
   p|fn1;
   p|fn2;
+  p|sumPartialCount;
+  p|symmetric;
   p|conserveMemory;
-  p|kUnits;
+  p|lbpaircalc;
+  p|machreduce;
+  p|cb;
   p|cb_aid;
   p|cb_ep;
   p|reducer_id;
-  p|symmetric;
-  p|lbpaircalc;
-  p|sumPartialCount;
-  p|N;
-  p|cb;
   p|existsLeft;
   p|existsRight;
-  p|machreduce;
   p|cb_lb;
   if (p.isUnpacking()) {
     if(existsLeft)
@@ -126,7 +126,6 @@ PairCalculator::pup(PUP::er &p)
     p((void*) inDataLeft, numExpected * N * sizeof(complex));
   if(existsRight)
     p((void*) inDataRight, numExpected* N * sizeof(complex));
-  // How about sparseCont reducer???
 
 #ifdef _PAIRCALC_DEBUG_ 
   CkPrintf("ckPairCalculatorPUP\n");
@@ -155,7 +154,7 @@ void PairCalculator::ResumeFromSync() {
   if(usesAtSync)
     {
 #ifdef _PAIRCALC_DEBUG_
-      CkPrintf("[%d,%d,%d,%d] resumes from sync\n");
+      CkPrintf("[%d,%d,%d,%d] resumes from sync\n",thisIndex.w,thisIndex.x,thisIndex.y, thisIndex.z);
 #endif
       CProxy_PairCalcReducer pairCalcReducerProxy(reducer_id); 
       CkArrayIndex4D indx4(thisIndex.w,thisIndex.x, thisIndex.y, thisIndex.z);
@@ -165,17 +164,15 @@ void PairCalculator::ResumeFromSync() {
       delete iandid;
       if(thisIndex.x==0 && thisIndex.y==0 && thisIndex.z==0 && thisIndex.w==0)
 	{
-	
-	  cb_lb.send(NULL);
+	  //	  cb_lb.send(NULL);
 	}
-
     }
 }
 void
 PairCalculator::calculatePairs_gemm(calculatePairsMsg *msg)
 {
 #ifdef _PAIRCALC_DEBUG_
-  CkPrintf(" symm=%d    pairCalc[%d %d %d %d] got from [%d %d] with size {%d}, from=%d, count+%d\n", symmetric, thisIndex.w, thisIndex.x, thisIndex.y, thisIndex.z,  thisIndex.w, msg->sender, msg->size, symmetric, msg->fromRow, numRecd);
+  CkPrintf(" symm=%d    pairCalc[%d %d %d %d] got from [%d %d] with size {%d}, from=%d, count=%d\n", symmetric, thisIndex.w, thisIndex.x, thisIndex.y, thisIndex.z,  thisIndex.w, msg->sender, msg->size, symmetric, msg->fromRow, numRecd);
 #endif
   
   numRecd++;   // increment the number of received counts

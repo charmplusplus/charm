@@ -65,10 +65,10 @@ class PairCalcID {
     p|existsLproxy;
     p|existsLNotFromproxy;
     p|existsRproxy;
-    p|mCastGrpId;
     p|proxyLFrom;
     p|proxyLNotFrom;
     p|proxyRNotFrom;
+    p|mCastGrpId;
   }
 
 };
