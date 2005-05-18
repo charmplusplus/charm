@@ -16,10 +16,6 @@ class FEM_Adapt {
 	FEM_DataAttribute *nodeValid, *elemValid;
 
   // Helper methods
-  /// Find an element-local node numbering for a chunk-local node
-  /** Given a chunk-local element number e and a chunk-local node number n,
-      determine the element-local node numbering for node n on element e **/
-  int find_local_node_index(int e, int n);
   /// Check if e1 and e3 are on the same side of edge path (n1, n, n2)
   /** Makes use of ordering of nodes in e1 to check is e3 is on the same side
       of the path of edges (n1, n) and (n, n2) **/
@@ -52,6 +48,10 @@ class FEM_Adapt {
       elements), calculate an element-local edge numbering (also 0, 1, or 2
       for triangular elements) **/
   int get_edge_index(int local_node1, int local_node2);
+  /// Find an element-local node numbering for a chunk-local node
+  /** Given a chunk-local element number e and a chunk-local node number n,
+      determine the element-local node numbering for node n on element e **/
+  int find_local_node_index(int e, int n);
 
   /// Initialize FEM_Adapt with a chunk of the mesh
   FEM_Adapt(FEM_Mesh *m) {
