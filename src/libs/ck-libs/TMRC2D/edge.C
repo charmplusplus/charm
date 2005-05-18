@@ -44,6 +44,15 @@ int edge::split(int *m, edgeRef *e_prime, int oIdx, int fIdx,
   intMsg *im;
   elemRef nbr = getNot(requester), nullRef;
   nullRef.reset();
+
+  if (requester.cid != myRef.cid) {
+    FEM_Node *theNodes = &(C->meshPtr->node);
+    const FEM_Comm_List *sharedList = &(theNodes->shared.getList(requester.cid));
+    oIdx = (*sharedList)[oIdx];
+    fIdx = (*sharedList)[fIdx];
+  }
+  CkPrintf("TMRC2D: [%d] oIdx=%d fIdx=%d\n", myRef.cid, oIdx, fIdx);
+
   if (pending && (waitingFor == requester)) { 
     // already split; waiting for requester
     DEBUGREF(CkPrintf("TMRC2D: [%d] edge::split: ** PART 2! ** On edge=%d on chunk=%d, requester=(%d,%d) with nbr=(%d,%d)\n", myRef.cid, myRef.idx, myRef.cid, requester.cid, requester.idx, nbr.cid, nbr.idx);)
