@@ -85,33 +85,6 @@ void RefinerApprox::reinitAssignment()
     }
 }
 
-/*
-void RefinerApprox::multirefine(int num_moves)
-{
-    computeAverage();
-    double avg=averageLoad;
-    double max=computeMax();
-
-    //Compute the thresholds for OPT that can effect moves
-    int numThresholds=numComputes+P;
-    double *threshold=new double[numThresholds];
-    
-    int i;
-    int nMoves;
-    for(i=0;i<numThresholds && nMoves>num_moves ;i++)
-    {
-	reinitAssignment();
-	nMoves=refine(threshold[i]);
-    }
-    if(nMoves>num_moves)
-    {
-	if(_lb_debug) CkPrintf("Mutirefine failed ");
-    }
-
-    delete [] threshold;
-}
-
-*/
 void RefinerApprox::multirefine(int num_moves)
 {
   computeAverage();
@@ -150,58 +123,6 @@ void RefinerApprox::multirefine(int num_moves)
   if(_lb_debug) CkPrintf("Refined within %d moves\n",numMoves);
   return;
 }
-/*
-int Refiner::multirefine()
-{
-  computeAverage();
-  double avg = averageLoad;
-  double max = computeMax();
-
-  const double overloadStep = 0.01;
-  const double overloadStart = 1.001;
-  double dCurOverload = max / avg;
-                                                                                
-  int minOverload = 0;
-  int maxOverload = (int)((dCurOverload - overloadStart)/overloadStep + 1);
-  double dMinOverload = minOverload * overloadStep + overloadStart;
-  double dMaxOverload = maxOverload * overloadStep + overloadStart;
-  int curOverload;
-  int refineDone = 0;
-  if (_lb_debug)
-    CmiPrintf("dMinOverload: %f dMaxOverload: %f\n", dMinOverload, dMaxOverload);
-                                                                                
-  overLoad = dMinOverload;
-  if (refine())
-    refineDone = 1;
-  else {
-    overLoad = dMaxOverload;
-    if (!refine()) {
-      CmiPrintf("ERROR: Could not refine at max overload\n");
-      refineDone = 1;
-    }
-  }
-                                                                                
-  // Scan up, until we find a refine that works
-  while (!refineDone) {
-    if (maxOverload - minOverload <= 1)
-      refineDone = 1;
-    else {
-      curOverload = (maxOverload + minOverload ) / 2;
-                                                                                
-      overLoad = curOverload * overloadStep + overloadStart;
-      if (_lb_debug)
-      CmiPrintf("Testing curOverload %d = %f [min,max]= %d, %d\n", curOverload, overLoad, minOverload, maxOverload);
-      if (refine())
-        maxOverload = curOverload;
-      else
-        minOverload = curOverload;
-    }
-  }
-  return 1;
-}
-*/
-
-/****************************************/
 
 Set * RefinerApprox::removeBiggestSmallComputes(int num,processorInfo * p,double opt)
 {

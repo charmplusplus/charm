@@ -15,10 +15,10 @@
 
 #include "CentralLB.h"
 #include "RefinerApprox.h"
-#include "RefineKLB.decl.h"
 
 class minheap;
 class maxheap;
+#include "RefineKLB.decl.h"
 
 #include "elements.h"
 #include "heap.h"
@@ -37,6 +37,7 @@ protected:
   double averageLoad;
 
   double overLoad;
+  void performGreedyMoves(int count, BaseLB::LDStats* stats,int *from_procs, int *to_procs, int numMoves);
 
 public:
   RefineKLB(const CkLBOptions &);
