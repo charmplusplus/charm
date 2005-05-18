@@ -698,6 +698,9 @@ int AMPI_Info_free(MPI_Info *info);
 #define MPI_Win_c2f(win)   (MPI_Fint)(win)
 #define MPI_Win_f2c(win)   (MPI_Win)(win)
 
+void AMPI_Install_Idle_Timer();
+void AMPI_Uninstall_Idle_Timer();
+
 extern int traceRegisterFunction(const char *name);
 extern void traceBeginFuncProj(char *,char *,int);
 extern void traceEndFuncProj(char *);

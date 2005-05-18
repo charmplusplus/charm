@@ -12,6 +12,7 @@
 #include "ampiProjections.h"
 
 #define CART_TOPOL 1
+#define AMPI_PRINT_IDLE 0
 
 /* change this define to "x" to trace all send/recv's */
 #define MSG_ORDER_DEBUG(x) /* empty */
@@ -376,12 +377,11 @@ static void ampiNodeInit(void)
 
 #if PRINT_IDLE
 static double totalidle=0.0, startT=0.0;
-
+static int beginHandle, endHandle;
 static void BeginIdle(void *dummy,double curWallTime)
 {
   startT = curWallTime;
 }
-
 static void EndIdle(void *dummy,double curWallTime)
 {
   totalidle += curWallTime - startT;
@@ -402,9 +402,19 @@ static void ampiProcInit(void){
     enableStreaming=CmiGetArgFlagDesc(argv,"+ampi_streaming","Enable streaming comlib for ampi send/recv.");
   }
 #endif
-#if PRINT_IDLE
-  CcdCallOnConditionKeep(CcdPROCESSOR_BEGIN_IDLE,(CcdVoidFn)BeginIdle,NULL);
-  CcdCallOnConditionKeep(CcdPROCESSOR_BEGIN_BUSY,(CcdVoidFn)EndIdle,NULL);
+}
+
+void AMPI_Install_Idle_Timer(){
+#if AMPI_PRINT_IDLE
+  beginHandle = CcdCallOnConditionKeep(CcdPROCESSOR_BEGIN_IDLE,(CcdVoidFn)BeginIdle,NULL);
+  endHandle = CcdCallOnConditionKeep(CcdPROCESSOR_END_IDLE,(CcdVoidFn)EndIdle,NULL);
+#endif
+}
+
+void AMPI_Uninstall_Idle_Timer(){
+#if AMPI_PRINT_IDLE
+  CcdCancelCallOnConditionKeep(CcdPROCESSOR_BEGIN_IDLE,beginHandle);
+  CcdCancelCallOnConditionKeep(CcdPROCESSOR_BEGIN_BUSY,endHandle);
 #endif
 }
 
