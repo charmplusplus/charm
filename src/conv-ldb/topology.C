@@ -18,6 +18,8 @@
 #include "cklists.h"
 #include "topology.h"
 
+extern char *_lbtopo;			/* topology name string */
+
 int LBTopology::get_hop_count(int src,int dest)
 {
 	int npe;
@@ -576,6 +578,115 @@ LBTOPO_MACRO(LBTopo_torus_nd_6);
 LBTOPO_MACRO(LBTopo_torus_nd_7);
 
 
+
+//Torus ND with unequal number of processors in each dimension
+/***************************************************************/
+template <int dimension>
+class LBTopo_itorus_nd: public LBTopology {
+private:
+	int *dim;
+	int *tempCoor;
+	
+public:
+	LBTopo_itorus_nd(int p): LBTopology(p) {
+  	CkPrintf("Irregular torus created\n");
+  	dim = new int[dimension];
+		tempCoor = new int[dimension];
+
+		int i=0;
+  	char *lbcopy = strdup(_lbtopo);
+  	char *ptr = strchr(lbcopy, ':');
+  	if (ptr==NULL) return;
+  	ptr = strtok(ptr+1, ",");
+  	while (ptr) {
+			dim[i]=atoi(ptr);
+			i++;
+			ptr = strtok(NULL, ",");
+  	}
+		CmiAssert(dimension==i);
+		
+		int procs=1;
+		for(i=0;i<dimension;i++)
+			procs*=dim[i];
+    CmiAssert(dimension>=1 && dimension<=16);
+    CmiAssert(p>=1);
+		CmiAssert(procs==p);
+  }
+	
+  ~LBTopo_itorus_nd() {
+  	delete[] dim;
+		delete[] tempCoor;
+	}
+	
+  virtual int max_neighbors() {
+    return dimension*2;
+  }
+	
+	virtual void neighbors(int mype, int* _n, int &nb) {
+    nb = 0;
+    for(int i=0;i<dimension*2;i++) {
+      _n[nb] = GetNeighborID(mype, i);
+      if (_n[nb]!=mype && (nb==0 || _n[nb-1]!=_n[nb]) ) nb++;
+    }
+  }
+
+	int GetNeighborID(int ProcessorID, int number) {
+    CmiAssert(number>=0 && number<max_neighbors());
+    CmiAssert(ProcessorID>=0 && ProcessorID<npes);
+    get_processor_coordinates(ProcessorID, tempCoor);
+
+    int index = number/2;
+    int displacement = (number%2)? -1: 1;
+   // do{
+		tempCoor[index] = (tempCoor[index] + displacement + dim[index]) % dim[index];
+		get_processor_id(tempCoor, &ProcessorID);
+    //} while (ProcessorID >= npes);
+    return ProcessorID;
+  }
+
+	virtual bool get_processor_coordinates(int processor_id, int* processor_coordinates) {
+    CmiAssert(processor_id>=0 && processor_id<npes);
+    CmiAssert(processor_coordinates != NULL );
+    for(int i=0;i<dimension;i++) {
+      processor_coordinates[i] = processor_id % dim[i];
+      processor_id = processor_id / dim[i];
+    }
+    return true;
+  }
+
+	virtual bool get_processor_id(const int* processor_coordinates, int* processor_id) {
+    int i;
+    CmiAssert( processor_coordinates != NULL );
+    CmiAssert( processor_id != NULL );
+    for(i=dimension-1;i>=0;i--) 
+      CmiAssert( 0<=processor_coordinates[i] && processor_coordinates[i]<dim[i]);
+    (*processor_id) = 0;
+    for(i=dimension-1;i>=0;i--) {
+      (*processor_id) = (*processor_id)* dim[i] + processor_coordinates[i];
+    }
+    return true;
+  }
+};
+
+
+typedef LBTopo_itorus_nd<1> LBTopo_itorus_nd_1;
+typedef LBTopo_itorus_nd<2> LBTopo_itorus_nd_2;
+typedef LBTopo_itorus_nd<3> LBTopo_itorus_nd_3;
+typedef LBTopo_itorus_nd<4> LBTopo_itorus_nd_4;
+typedef LBTopo_itorus_nd<5> LBTopo_itorus_nd_5;
+typedef LBTopo_itorus_nd<6> LBTopo_itorus_nd_6;
+typedef LBTopo_itorus_nd<7> LBTopo_itorus_nd_7;
+
+LBTOPO_MACRO(LBTopo_itorus_nd_1);
+LBTOPO_MACRO(LBTopo_itorus_nd_2);
+LBTOPO_MACRO(LBTopo_itorus_nd_3);
+LBTOPO_MACRO(LBTopo_itorus_nd_4);
+LBTOPO_MACRO(LBTopo_itorus_nd_5);
+LBTOPO_MACRO(LBTopo_itorus_nd_6);
+LBTOPO_MACRO(LBTopo_itorus_nd_7);
+
+
+/******************************************************************/
 // dense graph
 
 LBTOPO_MACRO(LBTopo_graph);
@@ -658,6 +769,13 @@ public:
     lbTopos.push_back(new LBTopoMap("torus_nd_5", createLBTopo_torus_nd_5));
     lbTopos.push_back(new LBTopoMap("torus_nd_6", createLBTopo_torus_nd_6));
     lbTopos.push_back(new LBTopoMap("torus_nd_7", createLBTopo_torus_nd_7));
+		lbTopos.push_back(new LBTopoMap("itorus_nd_1", createLBTopo_itorus_nd_1));
+    lbTopos.push_back(new LBTopoMap("itorus_nd_2", createLBTopo_itorus_nd_2));
+    lbTopos.push_back(new LBTopoMap("itorus_nd_3", createLBTopo_itorus_nd_3));
+    lbTopos.push_back(new LBTopoMap("itorus_nd_4", createLBTopo_itorus_nd_4));
+    lbTopos.push_back(new LBTopoMap("itorus_nd_5", createLBTopo_itorus_nd_5));
+    lbTopos.push_back(new LBTopoMap("itorus_nd_6", createLBTopo_itorus_nd_6));
+    lbTopos.push_back(new LBTopoMap("itorus_nd_7", createLBTopo_itorus_nd_7));
     lbTopos.push_back(new LBTopoMap("graph", createLBTopo_graph));
     lbTopos.push_back(new LBTopoMap("complete", createLBTopo_complete));
     lbTopos.push_back(new LBTopoMap("2_arytree", createLBTopo_2_arytree));
