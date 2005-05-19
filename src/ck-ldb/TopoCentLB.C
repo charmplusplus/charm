@@ -50,6 +50,11 @@ CmiBool TopoCentLB::QueryBalanceNow (int _step)
   return CmiTrue;
 }
 
+TopoCentLB::~TopoCentLB(){
+	if(partgraph)	delete partgraph;
+	if(topo) delete topo;
+}
+
 
 void TopoCentLB::computePartitions(CentralLB::LDStats *stats,int count,int *newmap)
 {
@@ -220,6 +225,7 @@ void TopoCentLB::computePartitions(CentralLB::LDStats *stats,int count,int *newm
   delete[] adjncy;
   delete[] objwt;
   delete[] edgewt;
+	delete[] handles;
 
 	//CkPrintf("chking wts on each partition...\n");
 
@@ -374,31 +380,6 @@ void TopoCentLB :: calculateMST(PartGraph *partgraph,LBTopology *topo,int *proc_
 
 	int max_neighbors = topo->max_neighbors();
 	
-	//topoDegree = new int[count];
-	/*int **topoGraph;
-topoGraph = new int*[count];
-	for(i=0;i<count;i++){
-		//topoDegree[i] = 0;
-		topoGraph[i] = new int[max_neighbors+1];
-		for(j=0;j<=max_neighbors;j++)
-			topoGraph[i][j]=0;
-	}
-	
-	int *neigh = new int[max_neighbors];
-	int max_degree=0;
-	int num_neigh=0;
-	for(i=0;i<count;i++){
-		topo->neighbors(i,neigh,num_neigh);
-		//topoDegree[i] = num_neigh;
-		if(num_neigh > max_degree)
-			max_degree = num_neigh;
-		for(j=0;j<num_neigh;j++)
-			topoGraph[i][j]=neigh[j];
-		topoGraph[i][j]=-1;
-	}
-	//Topology graph constructed
-	delete [] neigh;
-*/
 	HeapNode *heap = new HeapNode[partgraph->n_nodes];
 	int heapSize = 0;
 
@@ -503,6 +484,12 @@ topoGraph = new int*[count];
 		assigned_procs[min_cost_index]=1;
 	}
 
+	//clear up memory
+	delete[] inHeap;
+	delete[] keys;
+	delete[] assigned_procs;
+	delete[] heap;
+	delete[] commParts;
 }
 
 
@@ -701,55 +688,31 @@ void TopoCentLB :: work(CentralLB::LDStats *stats,int count)
  	int max_neighbors=0;
 	int *neigh;
 	int num_neigh=0;
-	
-	topofn = LBTopoLookup(_lbtopo);
+
+	char *lbcopy = strdup(_lbtopo);
+ 	char *ptr = strchr(lbcopy, ':');
+  if (ptr!=NULL){
+  	ptr = strtok(lbcopy, ":");
+		//CkPrintf("token:%s\n",ptr);
+	}
+	else
+		ptr=lbcopy;
+
+	topofn = LBTopoLookup(ptr);
   if (topofn == NULL) {
   	char str[1024];
-    CmiPrintf("TopoCentLB> Fatal error: Unknown topology: %s. Choose from:\n", _lbtopo);
+    CmiPrintf("TopoCentLB> Fatal error: Unknown topology: %s. Choose from:\n", ptr);
     printoutTopo();
-    sprintf(str, "TopoCentLB> Fatal error: Unknown topology: %s", _lbtopo);
+    sprintf(str, "TopoCentLB> Fatal error: Unknown topology: %s", ptr);
     CmiAbort(str);
   }
   
 	topo = topofn(count);
 	
-	/*max_neighbors = topo->max_neighbors();
-	
-	topoDegree = new int[count];
-	for(i=0;i<count;i++){
-		topoDegree[i] = 0;
-		topoGraph[i] = new int[count];
-		for(j=0;j<count;j++)
-			topoGraph[i][j]=0;
-	}
-	
-	neigh = new int[max_neighbors];
-	int max_degree=0;
-	for(i=0;i<count;i++){
-		topo->neighbors(i,neigh,num_neigh);
-		topoDegree[i] = num_neigh;
-		if(num_neigh > max_degree)
-			max_degree = num_neigh;
-		for(j=0;j<num_neigh;j++)
-			topoGraph[i][neigh[j]]=1;
-	}
-	//Topology graph constructed
-	delete [] neigh;
-*/
-
-	//CkPrintf("max comm partition:%d\n",max_comm_part);
-	CkPrintf("before calling assignment function...\n");
 	calculateMST(partgraph,topo,proc_mapping,max_comm_part);
-	CkPrintf("after calling assignment function...\n");
 	//Returned partition graph is a Maximum Spanning Tree -- converted in above function itself
 
 	//Construct the Topology Graph
-	
-	/*int max_part_degree = 0;
-	for(i=0;i<count;i++)
-		if(partmst->nodes[i].degree > max_part_degree)
-			max_part_degree = partmst->nodes[i].degree;
-	*/
 	
 	/*CkPrintf("part,proc mapping..\n");
 	for(i=0;i<count;i++)
@@ -767,6 +730,14 @@ void TopoCentLB :: work(CentralLB::LDStats *stats,int count)
         CkPrintf("[%d] Obj %d migrating from %d to %d\n", CkMyPe(),n->obj_list[j],stats->from_proc[n->obj_list[j]],pe);
 		}
 	}
+
+	delete[] newmap;
+	delete[] proc_mapping;
+	//Delete hopCount
+	for(i=0;i<count;i++)
+		delete[] hopCount[i];
+
+	delete[] hopCount;
 }
 
 #include "TopoCentLB.def.h"
