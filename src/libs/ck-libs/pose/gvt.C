@@ -19,7 +19,7 @@ PVT::PVT()
   localStats->TimerStart(GVT_TIMER);
 #endif
   optPVT = conPVT = estGVT = POSE_UnsetTS;
-  gvtTurn = simdone = 0;
+  startPhaseActive = gvtTurn = simdone = 0;
   SendsAndRecvs = new SRtable();
   SendsAndRecvs->Initialize();
   specEventCount = eventCount = waitForFirst = 0;
@@ -58,7 +58,7 @@ PVT::PVT()
 }
 
 /// ENTRY: runs the PVT calculation and reports to GVT
-void PVT::startPhase() 
+void PVT::startPhase(prioBcMsg *m) 
 {
 #ifdef POSE_STATS_ON
   localStats->TimerStart(GVT_TIMER);
@@ -66,6 +66,16 @@ void PVT::startPhase()
   CProxy_GVT g(TheGVT);
   CProxy_PVT p(ThePVT);
   register int i;
+
+  if (startPhaseActive) return;
+  startPhaseActive = 1;
+  if (m->bc) {
+    prioBcMsg *startMsg = new (8*sizeof(int)) prioBcMsg;
+    startMsg->bc = 0;
+    *((int *)CkPriorityPtr(startMsg)) = 1-INT_MAX;
+    CkSetQueueing(startMsg, CK_QUEUEING_IFIFO); 
+    p.startPhase(startMsg);
+  }
 
   objs.Wake(); // wake objects to make sure all have reported
   // compute PVT
@@ -162,7 +172,12 @@ void PVT::setGVT(GVTMsg *m)
   CkFreeMsg(m);
   waitForFirst = 1;
   objs.Commit();
-  p[CkMyPe()].startPhase();
+  startPhaseActive = 0;
+  prioBcMsg *startMsg = new (8*sizeof(int)) prioBcMsg;
+  startMsg->bc = 1;
+  *((int *)CkPriorityPtr(startMsg)) = 0;
+  CkSetQueueing(startMsg, CK_QUEUEING_IFIFO); 
+  p[CkMyPe()].startPhase(startMsg);
 #ifdef POSE_STATS_ON
   localStats->TimerStop();
 #endif
@@ -318,7 +333,11 @@ GVT::GVT()
   //  CkPrintf("GVT expects %d reports!\n", reportsExpected);
   if (CkMyPe() == 0) { // start the PVT phase of the GVT algorithm
     CProxy_PVT p(ThePVT);
-    p.startPhase(); // broadcast PVT calculation to all PVT branches
+    prioBcMsg *startMsg = new (8*sizeof(int)) prioBcMsg;
+    startMsg->bc = 1;
+    *((int *)CkPriorityPtr(startMsg)) = 0;
+    CkSetQueueing(startMsg, CK_QUEUEING_IFIFO); 
+    p.startPhase(startMsg); // broadcast PVT calculation to all PVT branches
   }
 }
 

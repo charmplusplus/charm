@@ -9,11 +9,12 @@ module gvt {
   };
   /// Message to send GVT estimate back to PVT
   message GVTMsg;
+  message prioBcMsg;
 
   /// PVT chare group for computing local processor virtual time 
   group PVT {
     entry PVT(void);
-    entry void startPhase(void);
+    entry void startPhase(prioBcMsg *);
     entry [expedited] void setGVT(GVTMsg *);
     entry [expedited] void reportReduce(UpdateMsg *);
   };

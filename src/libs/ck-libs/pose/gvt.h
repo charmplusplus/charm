@@ -52,6 +52,12 @@ public:
   int done;
 };
 
+/// Prioritized int msg; used to force GVT calculations
+class prioBcMsg : public CMessage_prioBcMsg {
+public:
+  int bc;
+};
+
 /// PVT chare group for computing local processor virtual time 
 /** Keeps track of local sends/recvs and computes processor virtual time.
     Interacts with GVT to obtain new estimate and invokes fossil 
@@ -85,12 +91,14 @@ class PVT : public Group {
   /// where the centralized GVT goes
   int gvtTurn;
   int specEventCount, eventCount;
+  /// startPhase active flag
+  int startPhaseActive;
  public:
   /// Basic Constructor
   PVT(void);
   PVT(CkMigrateMessage *) { };
   /// ENTRY: runs the PVT calculation and reports to GVT
-  void startPhase(void);             
+  void startPhase(prioBcMsg *m);             
   /// ENTRY: receive GVT estimate; wake up objects
   /** Receives the new GVT estimate and termination flag; wakes up objects
       for fossil collection and forward execution with new GVT estimate. */
