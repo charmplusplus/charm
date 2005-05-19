@@ -529,7 +529,7 @@ driver(void)
     CkPrintf("Entering timeloop\n");
   }	
   //  int tSteps=0x70FF00FF;
-  int tSteps=2;
+  int tSteps=4;
   int z=13;
   calcMasses(g);
   double startTime=CkWallTimer();
@@ -614,19 +614,10 @@ driver(void)
       loc[i]=g.coord[i];//+g.d[i];
     }
 
-    double refineArea = desiredArea/1.5;
     double *areas=new double[g.nelems];
     //prepare to refine
-    if (t=1) {
-      desiredArea = calcArea(g, 42);
-      for (i=0;i<g.nelems;i++) {
-	areas[i]=calcArea(g, i)/1.5;
-      }
-    }
-    if (t=2) {
-      for (i=0;i<g.nelems;i++) {
-	areas[i]=desiredArea;
-      }
+    for (i=0;i<g.nelems;i++) {
+      areas[i]=calcArea(g, i)/1.5;
     }
 
     CkPrintf("[%d] Starting refinement step: %d nodes, %d elements\n", myChunk,g.nnodes,g.nelems);

@@ -691,9 +691,9 @@ void chunk::multipleCoarsen(double *desiredArea, refineClient *client)
   for (i=0; i<elementSlots; i++) { // set desired areas for elements
     if (theElements[i].isPresent()) {
       area = theElements[i].getArea();
-      precThrshld = area * 1e-8;
+      //precThrshld = area * 1e-8;
       //CkPrintf("TMRC2D: desiredArea[%d]=%1.10e present? %d area=%1.10e\n", i, desiredArea[i], theElements[i].isPresent(), area);
-      if (desiredArea[i] > area+precThrshld) {
+      if (desiredArea[i] > area) {
 	theElements[i].resetTargetArea(desiredArea[i]);
 	double angle;
 	theElements[i].getShortestEdge(&angle);
@@ -711,11 +711,11 @@ void chunk::multipleCoarsen(double *desiredArea, refineClient *client)
   }
   DEBUGREF(CkPrintf("TMRC2D: [%d] multipleCoarsen DONE.\n", cid);)
   CkWaitQD();
-  for (i=0; i<elementSlots; i++) { // set desired areas for elements
+  for (i=0; i<elementSlots; i++) { // check desired areas for elements
     if (theElements[i].isPresent()) {
       area = theElements[i].getArea();
-      precThrshld = area * 1e-8;
-      if (desiredArea[i] > area+precThrshld) {
+      //precThrshld = area * 1e-8;
+      if (desiredArea[i] > area) {
 	CkPrintf("TMRC2D: [%d] WARNING: element %d area is %1.10e but target was %1.10e\n", cid, i, area, desiredArea[i]);
       }
     }
@@ -819,7 +819,7 @@ void chunk::deriveEdges(int *conn, int *gid, const int **edgeBoundaries)
 	  if (nRec) {
 	    int count = nRec->getShared();
 	    for (i=0; i<count; i++) {
-	      mesh[nRec->getChk(i)].fixNode(nRec->getIdx(i));
+	      mesh[nRec->getChk(i)].fixNode(nRec->getIdx(i), cid);
 	    }
 	  }
 	}
@@ -831,7 +831,7 @@ void chunk::deriveEdges(int *conn, int *gid, const int **edgeBoundaries)
 	  if (nRec) {
 	    int count = nRec->getShared();
 	    for (i=0; i<count; i++) {
-	      mesh[nRec->getChk(i)].fixNode(nRec->getIdx(i));
+	      mesh[nRec->getChk(i)].fixNode(nRec->getIdx(i), cid);
 	    }
 	  }
 	}
@@ -1054,7 +1054,7 @@ int chunk::lockLocalChunk(int lhc, int lhi, double prio)
       return 1;
     }
     removeLock(lhc, lhi);
-    //DEBUGREF(CkPrintf("TMRC2D: [%d] LOCK chunk %d by %d on %d prio %.10f REFUSED (was %d[%don%d:%.10f])\n", CkMyPe(), cid, lhi, lhc, prio, lock, lockHolderIdx, lockHolderCid, lockPrio);)
+    DEBUGREF(CkPrintf("TMRC2D: [%d] LOCK chunk %d by %d on %d prio %.10f REFUSED (was %d[%don%d:%.10f])\n", CkMyPe(), cid, lhi, lhc, prio, lock, lockHolderIdx, lockHolderCid, lockPrio);)
     return 0;
   }
   else { // this chunk is LOCKED
@@ -1078,7 +1078,7 @@ int chunk::lockLocalChunk(int lhc, int lhi, double prio)
     }
     removeLock(lhc, lhi);
     */
-    //DEBUGREF(CkPrintf("TMRC2D: [%d] LOCK chunk %d by %d on %d prio %.10f REFUSED (was %d[%don%d:%.10f])\n", CkMyPe(), cid, lhi, lhc, prio, lock, lockHolderIdx, lockHolderCid, lockPrio);)
+    DEBUGREF(CkPrintf("TMRC2D: [%d] LOCK chunk %d by %d on %d prio %.10f REFUSED (was %d[%don%d:%.10f])\n", CkMyPe(), cid, lhi, lhc, prio, lock, lockHolderIdx, lockHolderCid, lockPrio);)
     return 0;
   }
 }
@@ -1146,23 +1146,27 @@ void chunk::unlockChunk(int lhc, int lhi)
 void chunk::unlockLocalChunk(int lhc, int lhi)
 {
   if ((lockHolderIdx == lhi) && (lockHolderCid == lhc)) {
-    //lockCount--;
-    //if (lockCount == 0) {
+    //    lockCount--;
+    //    if (lockCount == 0) {
       lock = 0; 
       lockHolderIdx = -1;
       lockHolderCid = -1;
       lockPrio = -1.0;
-      //DEBUGREF(CkPrintf("TMRC2D: [%d] UNLOCK chunk %d by holder %d on %d\n", CkMyPe(), cid, lhi, lhc);)
-      //}
+      DEBUGREF(CkPrintf("TMRC2D: [%d] UNLOCK chunk %d by holder %d on %d\n", CkMyPe(), cid, lhi, lhc);)
+	//    }
   }
-  else { 
+  /*  else { 
     CkPrintf("TMRC2D: [%d] ERROR: UNLOCK chunk %d by holder %d on %d -- THIS WAS NOT THE HOLDER!!! %d on %d was!\n", CkMyPe(), cid, lhi, lhc, lockHolderIdx, lockHolderCid);
     CkAbort(0);
-  }
+    }*/
 }
 
-void chunk::fixNode(int nIdx)
+void chunk::fixNode(int nIdx, int chkid)
 {
+  FEM_Node *nodesPtr = &(meshPtr->node);
+  const FEM_Comm_List *sharedList = &(nodesPtr->shared.getList(chkid));
+  nIdx = (*sharedList)[nIdx];
+
   theNodes[nIdx].fixed = 1;
   CkPrintf("TMRC2D: [%d] Corner detected, fixing node %d\n", cid, nIdx);
 }
