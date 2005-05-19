@@ -217,15 +217,16 @@ void CkMulticastMgr::setSection(CProxySection_ArrayElement &proxy)
 // when root migrate
 void CkMulticastMgr::resetSection(CProxySection_ArrayElement &proxy)
 {
-  CkArrayID aid = proxy.ckGetArrayID();
-  CkSectionID &sid = proxy.ckGetSectionID();
   CkSectionInfo &info = proxy.ckGetSectionInfo();
 
+  int oldpe = info.get_pe();
+  if (oldpe == CkMyPe()) return;	// we don't have to recreate one
+
+  CkArrayID aid = proxy.ckGetArrayID();
+  CkSectionID &sid = proxy.ckGetSectionID();
   mCastEntry *entry = new mCastEntry(aid);
 
-  int oldpe = info.get_pe();
   void *oldentry = info.get_val();
-  CmiAssert(oldpe != CkMyPe());
 
   const CkArrayIndexMax *al = sid._elems;
   CmiAssert(info.aid == aid);
