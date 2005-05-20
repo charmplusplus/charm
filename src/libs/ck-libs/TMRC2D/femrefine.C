@@ -151,6 +151,7 @@ void FEM_REFINE2D_Split(int meshID,int nodeID,double *coord,int elemID,double *d
     coordVec.push_back(coord[i]);
   }
 	refine_data.coordVec = &coordVec;
+	refine_data.coord = coord;
   
   /*find out the attributes of the node 
    */
@@ -609,9 +610,17 @@ void interpolateNode(FEM_Node *node,int A,int B,int D,double frac){
 		FEM_Attribute *a = (FEM_Attribute *)(*attrs)[i];
 		if(a->getAttr()<FEM_ATTRIB_TAG_MAX){
 			FEM_DataAttribute *d = (FEM_DataAttribute *)a;
+			AllocTable2d<double> *doubleData;
+			if(a->getAttr() == FEM_DATA+6){
+				doubleData = &d->getDouble();
+				printf("A %d %.6lf %.6lf B %d %.6lf %.6lf frac %.6lf ",A,(*doubleData)[A][0],(*doubleData)[A][1],B,(*doubleData)[B][0],(*doubleData)[B][1],frac);
+			}
 			CmiMemoryCheck();
 			d->interpolate(A,B,D,frac);
 			CmiMemoryCheck();
+			if(a->getAttr() == FEM_DATA+6){
+				printf("D %d %.6lf %.6lf \n",D,(*doubleData)[D][0],(*doubleData)[D][1]);
+			}
 		}	
 	}	
 }
