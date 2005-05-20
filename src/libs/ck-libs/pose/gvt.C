@@ -60,14 +60,14 @@ PVT::PVT()
 /// ENTRY: runs the PVT calculation and reports to GVT
 void PVT::startPhase(prioBcMsg *m) 
 {
-#ifdef POSE_STATS_ON
-  localStats->TimerStart(GVT_TIMER);
-#endif
   CProxy_GVT g(TheGVT);
   CProxy_PVT p(ThePVT);
   register int i;
 
   if (startPhaseActive) return;
+#ifdef POSE_STATS_ON
+  localStats->TimerStart(GVT_TIMER);
+#endif
   startPhaseActive = 1;
   if (m->bc) {
     prioBcMsg *startMsg = new (8*sizeof(int)) prioBcMsg;
