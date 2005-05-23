@@ -271,14 +271,16 @@ void PVT::reportReduce(UpdateMsg *m)
     int entryCount = 0;
     // pack data into um
     SRentry *tmp = SRs;
-    while (tmp && ((tmp->timestamp <= optGVT) || (optGVT == POSE_UnsetTS))) {
+    while (tmp && ((tmp->timestamp <= optGVT) || (optGVT == POSE_UnsetTS))
+	   && (tmp->sends != tmp->recvs)) {
       entryCount++;
       tmp = tmp->next;
     }
     um = new (entryCount * sizeof(SRentry), 0) UpdateMsg;
     tmp = SRs;
     int i=0;
-    while (tmp && ((tmp->timestamp <= optGVT) || (optGVT == POSE_UnsetTS))) {
+    while (tmp && ((tmp->timestamp <= optGVT) || (optGVT == POSE_UnsetTS))
+	   && (tmp->sends != tmp->recvs)) {
       um->SRs[i] = *tmp;
       tmp = tmp->next;
       i++;

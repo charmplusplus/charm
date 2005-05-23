@@ -290,26 +290,41 @@ UpdateMsg *SRtable::PackTable(POSE_TimeType pvt)
   SortTable();
   nBkts = destBkt;
   if (destBkt >= b) { 
-    nEntries += numOverflow;
+    tmp = overflow;
+    while (tmp && (tmp->timestamp < pvt)) {
+      nEntries++;
+      tmp = tmp->next;
+    }
     nBkts = b-1;
   }
-  for (i=0; i<=nBkts; i++) nEntries += numEntries[i];
+  for (i=0; i<=nBkts; i++) {
+    tmp = buckets[i];
+    while (tmp) {
+      if (tmp->sends != tmp->recvs)
+	nEntries++;
+      tmp = tmp->next;
+    }
+  }
 
   packSize = nEntries * sizeof(SRentry);
   UpdateMsg *um = new (packSize, 0) UpdateMsg;
   for (i=0; i<=nBkts; i++) {
     tmp = buckets[i];
     while (tmp) {
-      um->SRs[entryIdx] = *tmp;
-      entryIdx++;
+      if (tmp->sends != tmp->recvs) {
+	um->SRs[entryIdx] = *tmp;
+	entryIdx++;
+      }
       tmp = tmp->next;
     }
   }
   if (destBkt >= b) {
     tmp = overflow;
     while (tmp && (tmp->timestamp < pvt)) {
-      um->SRs[entryIdx] = *tmp;
-      entryIdx++;
+      if (tmp->sends != tmp->recvs) {
+	um->SRs[entryIdx] = *tmp;
+	entryIdx++;
+      }
       tmp = tmp->next;
     }
   }
