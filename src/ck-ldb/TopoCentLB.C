@@ -303,6 +303,8 @@ void TopoCentLB::Heapify(HeapNode *heap, int node, int heapSize)
     tmp = heap[node];
     heap[node] = heap[xchange];
     heap[xchange] = tmp;
+		heapMapping[heap[node].node]=node;
+		heapMapping[heap[xchange].node]=xchange;
     Heapify(heap,xchange,heapSize);
   }    
 }
@@ -326,7 +328,7 @@ void TopoCentLB::BuildHeap(HeapNode *heap,int heapSize){
 }
 
 void TopoCentLB :: increaseKey(HeapNode *heap,int i,double wt){
-	
+	int val;
 	if(wt != -1.00){
 		#ifdef MAX_EDGE
 			//CkPrintf("me here...\n");
@@ -344,9 +346,10 @@ void TopoCentLB :: increaseKey(HeapNode *heap,int i,double wt){
 		HeapNode tmp = heap[parent];
 		heap[parent] = heap[i];
 		heap[i] = tmp;
+		heapMapping[heap[parent].node]=parent;
+		heapMapping[heap[i].node]=i;
 		increaseKey(heap,parent,-1.00);
 	}
-	
 }
 
 void TopoCentLB :: calculateMST(PartGraph *partgraph,LBTopology *topo,int *proc_mapping,int max_comm_part){
@@ -372,15 +375,19 @@ void TopoCentLB :: calculateMST(PartGraph *partgraph,LBTopology *topo,int *proc_
 		proc_mapping[i]=-1;
 		assigned_procs[i]=0;
 		hopCount[i] = new double[count];
-		//for(j=0;j<count;j++)
-			//hopCount[i][j] = 0;
+		for(j=0;j<count;j++)
+			hopCount[i][j] = 0;
 	}
 
+	//CkPrintf("getting hopcount\n");
+	//double start=CmiWallTimer();
 	topo->get_pairwise_hop_count(hopCount);
-
+	//CkPrintf("after getting hopcount:%lf\n",(CmiWallTimer()-start));
 	int max_neighbors = topo->max_neighbors();
 	
 	HeapNode *heap = new HeapNode[partgraph->n_nodes];
+	heapMapping = new int[partgraph->n_nodes];
+	
 	int heapSize = 0;
 
 	for(i=0;i<partgraph->n_nodes;i++){
@@ -389,7 +396,7 @@ void TopoCentLB :: calculateMST(PartGraph *partgraph,LBTopology *topo,int *proc_
 		keys[i] = 0.00;
 		//parent[i] = -1;
 		inHeap[i] = 1;
-		
+		heapMapping[i]=i;
 		/*if(i==0){ //Take 0 as root
 			heap[0].key = 1.00;
 			keys[0] = 0;
@@ -414,7 +421,9 @@ void TopoCentLB :: calculateMST(PartGraph *partgraph,LBTopology *topo,int *proc_
 		inHeap[max.node] = 0;
 
 		//CkPrintf("extracted part..%d with weight :%.1f\n",max.node,max.key);
-		
+		//for(j=0;j<heapSize;j++)
+			//heapMapping[heap[j].node]=j;
+
 		for(i=0;i<partgraph->n_nodes;i++){
 			commParts[i]=-1;
 			PartGraph::Edge wt = partgraph->edges[max.node][i];
@@ -430,12 +439,12 @@ void TopoCentLB :: calculateMST(PartGraph *partgraph,LBTopology *topo,int *proc_
 			#endif
 				//Update in the heap too
 				//First, find where this node is..in the heap
-				for(j=0;j<heapSize;j++)
+				/*for(j=0;j<heapSize;j++)
 					if(heap[j].node == i)
 						break;
 				if(j==heapSize)
-					CmiAbort("Some error in heap...\n");
-				increaseKey(heap,j,wt);
+					CmiAbort("Some error in heap...\n");*/
+				increaseKey(heap,heapMapping[i],wt);
 			}
 		}
 		
@@ -504,7 +513,7 @@ void TopoCentLB :: work(CentralLB::LDStats *stats,int count)
 	//if (_lb_args.debug() >= 2) {
     CkPrintf("In TopoCentLB Strategy...\n");
   //}
-	
+	//double start = CmiWallTimer();
   // Make sure that there is at least one available processor.
   for (proc = 0; proc < count; proc++) {
     if (stats->procs[proc].available) {
@@ -514,7 +523,7 @@ void TopoCentLB :: work(CentralLB::LDStats *stats,int count)
 	if (proc == count) {
     CmiAbort ("TopoCentLB: no available processors!");
   }
- 
+
   removeNonMigratable(stats,count);
 
 	int *newmap = new int[stats->n_objs];
@@ -529,7 +538,9 @@ void TopoCentLB :: work(CentralLB::LDStats *stats,int count)
       newmap[i]=stats->from_proc[i];
     }
 	}
-		
+	
+	//double sec = CmiWallTimer();
+	//CkPrintf("first here..:%lf\n",(sec-start));
 	/*CkPrintf("obj-proc mapping\n");
 	for(i=0;i<stats->n_objs;i++)
 		CkPrintf(" %d,%d ",i,newmap[i]);
@@ -541,7 +552,6 @@ void TopoCentLB :: work(CentralLB::LDStats *stats,int count)
 	partgraph = new PartGraph(count,max_objs);
 
 	//Fill up the partition graph - first fill the nodes and then, the edges
-	//CkPrintf("after computing partitions...\n");
 
 
 	for(i=0;i<stats->n_objs;i++)
@@ -551,7 +561,9 @@ void TopoCentLB :: work(CentralLB::LDStats *stats,int count)
 		n->obj_list[n->num_objs]=i;
 		n->num_objs++;
 	}
+	//double th = CmiWallTimer();
 
+	//CkPrintf("second here:%lf\n",(th-sec));
 	//CkPrintf("num comm:%d\n",stats->n_comm);
 	int *addedComm=new int[count];
 
@@ -708,8 +720,11 @@ void TopoCentLB :: work(CentralLB::LDStats *stats,int count)
   }
   
 	topo = topofn(count);
-	
+
+	//double fourth = CmiWallTimer();
+	//CkPrintf("before calling algo...:%lf\n",(fourth-th));
 	calculateMST(partgraph,topo,proc_mapping,max_comm_part);
+	//CkPrintf("after calling algo...:%lf\n",(CmiWallTimer()-fourth));
 	//Returned partition graph is a Maximum Spanning Tree -- converted in above function itself
 
 	//Construct the Topology Graph
@@ -738,6 +753,7 @@ void TopoCentLB :: work(CentralLB::LDStats *stats,int count)
 		delete[] hopCount[i];
 
 	delete[] hopCount;
+	delete[] heapMapping;
 }
 
 #include "TopoCentLB.def.h"

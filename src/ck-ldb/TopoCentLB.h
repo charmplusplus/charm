@@ -93,7 +93,7 @@ class TopoCentLB : public CentralLB
 		PartGraph *partgraph;
 		LBTopology			*topo;
 		double **hopCount;
-
+		int *heapMapping;
 		//int **topoGraph;
 		//int *topoDegree;
 		
