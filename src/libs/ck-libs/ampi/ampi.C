@@ -761,7 +761,7 @@ int ampiParent::getAttr(MPI_Comm comm, int keyval, void *attribute_val, int *fla
 	*flag = false;
 	if (kv_is_builtin(keyval)) { /* Allow access to special builtin flags */
 	  *flag=true;
-	  *(void **)attribute_val = (void *)&kv_builtin_storage;
+	  *(int *)attribute_val = kv_builtin_storage;
 	  return 0;
 	}
 	if(keyval<0 || keyval >= kvlist.size() || (kvlist[keyval]==NULL))
