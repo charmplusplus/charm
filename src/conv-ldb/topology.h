@@ -34,7 +34,7 @@ public:
   virtual bool coordinate_difference(const int* my_coordinates, const int* target_coordinates, int* difference) { return false;}
   virtual bool coordinate_difference(int my_processor_id, int target_processor_id, int* difference) { return false; }
   virtual int get_hop_count(int src,int dest);
-  virtual int rec_hop_count(int src,int dest,int max_neigh,int count,int *visited_srcs);
+  virtual int rec_hop_count(int src,int dest,int max_neigh,int count,int *visited_srcs,int min_hop_cnt);
   virtual double per_hop_delay(int last_hop);
   virtual void get_pairwise_hop_count(double **dist);
 };

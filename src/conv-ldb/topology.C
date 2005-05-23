@@ -31,30 +31,31 @@ int LBTopology::get_hop_count(int src,int dest)
 	npe = max_neighbors();
 	visited_srcs = new int[npes];
 	
- 	int count = rec_hop_count(src,dest,npe,1,visited_srcs);	
+ 	int count = rec_hop_count(src,dest,npe,1,visited_srcs,999999);
 	delete [] visited_srcs;
 
 	return count;
 }
 
-int LBTopology::rec_hop_count(int src,int dest,int max_neigh,int count,int *visited_srcs)
+int LBTopology::rec_hop_count(int src,int dest,int max_neigh,int count,int *visited_srcs,int min_hop_cnt)
 {
 	int *pes = new int[max_neigh];
-	int min_hop_cnt=999999;
+	//int min_hop_cnt=999999;
 	int ret_val=0;
 	int skip_neigh=0;
+	int neigh_cnt=0;
 	int i;
 	
-	neighbors(src,pes,max_neigh);
+	neighbors(src,pes,neigh_cnt);
 	
 	visited_srcs[count-1]=src;
 	
-	for(i=0;i<max_neigh;i++)
+	for(i=0;i<neigh_cnt;i++)
 	{
 		if(pes[i]==dest)
 			return count;
 	}
-	for(i=0;i<max_neigh;i++)
+	for(i=0;i<neigh_cnt;i++)
 	{
 		for(int j=0;j<count;j++)
 			if(visited_srcs[j]==pes[i])
@@ -64,9 +65,11 @@ int LBTopology::rec_hop_count(int src,int dest,int max_neigh,int count,int *visi
 			}
 		if(!skip_neigh)
 		{
-			ret_val=rec_hop_count(pes[i],dest,max_neigh,count+1,visited_srcs);
-			if(ret_val < min_hop_cnt)
-				min_hop_cnt = ret_val;
+			if(min_hop_cnt > count+1){
+				ret_val=rec_hop_count(pes[i],dest,max_neigh,count+1,visited_srcs,min_hop_cnt);
+				if(ret_val < min_hop_cnt)
+					min_hop_cnt = ret_val;
+			}
 		}
 		else
 			skip_neigh=0;
@@ -411,6 +414,7 @@ int LBTopo_torus3d::goodcoor(int x, int y, int z)
 
 void LBTopo_torus3d::neighbors(int mype, int* _n, int &nb)
 {
+
   int x = mype/(width*width);
   int k = mype%(width*width);
   int y = k/width;
@@ -449,6 +453,43 @@ void LBTopo_torus3d::neighbors(int mype, int* _n, int &nb)
     if (next != mype && checkuniq(_n, nb, next)) _n[nb++] = next;
   }
 }
+
+/*
+// Works only for perfect cube number of processor topologies
+int LBTopo_torus3d::get_hop_count(int src,int dest){
+	
+	int x_src = src/(width*width);
+  int k_src = src%(width*width);
+  int y_src = k_src/width;
+  int z_src = k_src%width;
+
+	int x_dest = dest/(width*width);
+  int k_dest = dest%(width*width);
+  int y_dest = k_dest/width;
+  int z_dest = k_dest%width;
+
+	int xdist=0,ydist=0,zdist=0;
+	
+	//CkPrintf("just a chk........\n");
+	xdist = x_dest-x_src;
+	if(xdist<0) xdist=-xdist;
+	if((width-xdist) < xdist)
+		xdist = width-xdist;
+
+	ydist = y_dest-y_src;
+	if(ydist<0) ydist=-ydist;
+	if((width-ydist) < ydist)
+		ydist = width-ydist;
+
+	zdist = z_dest-z_src;
+	if(zdist<0) zdist=-zdist;
+	if((width-zdist) < zdist)
+		zdist = width-zdist;
+
+	return (xdist+ydist+zdist);
+
+}
+*/
 
 //  TORUS ND 
 //  added by zshao1
