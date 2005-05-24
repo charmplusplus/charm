@@ -129,7 +129,7 @@ void CollideOctant::add(const CollideObjRec *p) {
  pathological pivots may give O(n^2)
 */
 template <class T> 
-inline void swap(T &a,T &b) {T tmp(a);a=b;b=tmp;}
+inline void myswap(T &a,T &b) {T tmp(a);a=b;b=tmp;}
 
 int CollideOctant::splitAt(int alongAxis)
 {
@@ -155,7 +155,7 @@ int CollideOctant::splitAt(int alongAxis)
 			while ((lval=val(l+1))<pval) l++;
 			while ((rval=val(r-1))>pval) r--;
 			if (!(lval==pval && rval==pval))
-				swap(us[l+1],us[r-1]);
+				myswap(us[l+1],us[r-1]);
 			else 
 			{//Both elements are equal to the pivot-- check if done
 				bool finished=true;
@@ -163,7 +163,7 @@ int CollideOctant::splitAt(int alongAxis)
 				for (i=l+2;i<=r-2;i++)
 					if (val(i)!=pval) {finished=false;break;}
 				if (finished) break;
-				else swap(us[l+1],us[i]);
+				else myswap(us[l+1],us[i]);
 			}
 		}
 #if DEBUG_CHECKS //Check this step of the partitioning
