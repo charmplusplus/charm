@@ -1,5 +1,11 @@
-PG_DIR="/usr/local/pgi4/linux86"
 COMMENT="Use pgf90 fortran compiler in $PG_DIR"
+PG_DIR=`which pgf90`
+if test x$PG_DIR = x 
+then
+  echo charmc> Fatal error: pgf90 not found!
+  exit 1
+fi
+PG_DIR="`dirname $PG_DIR`/.."
 CMK_CF77="$PG_DIR/bin/pgf77 "
 CMK_CF90="$PG_DIR/bin/pgf90 "
 CMK_CF90_FIXED="$CMK_CF90 -Mfixed "
