@@ -1,8 +1,8 @@
 XLC_PRE=/opt/ibmcmp
 XLC_POST=bin/blrts_
-XLC_F=$XLC_PRE/xlf/8.1
-CMK_CC="$XLC_PRE/vac/6.0/${XLC_POST}xlc -qcpluscmt "
-CMK_CXX="$XLC_PRE/vacpp/6.0/${XLC_POST}xlC "
+XLC_F=$XLC_PRE/xlf/9.1
+CMK_CC="$XLC_PRE/vac/7.0/${XLC_POST}xlc -qcpluscmt "
+CMK_CXX="$XLC_PRE/vacpp/7.0/${XLC_POST}xlC "
 CMK_LD="$CMK_CC  "
 CMK_LDXX="$CMK_CXX  "
 CMK_CF77="$XLC_F/${XLC_POST}xlf "

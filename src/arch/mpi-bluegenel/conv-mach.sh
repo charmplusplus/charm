@@ -1,4 +1,4 @@
-BL_INSTALL=/bgl/BlueLight/floor/
+BL_INSTALL=/bgl/BlueLight/ppcfloor/
 
 [ -z "$BL_INSTALL" ] && echo "ERROR: BL_INSTALL not defined!" && exit 1
 
@@ -22,7 +22,7 @@ CMK_RANLIB="$BGL_BIN/powerpc-bgl-blrts-gnu-ranlib "
 CMK_AR="$BGL_BIN/powerpc-bgl-blrts-gnu-ar q "
 CMK_LD="$CMK_CC "
 CMK_LDXX="$CMK_CXX "
-CMK_LIBS='-lckqt -lmpich.rts -lvdevices.rts -lcoprocessor.rts -lspad.rts -lrts.rts -ldevices.rts'
+CMK_LIBS='-lckqt -lmpich.rts -lmsglayer.rts -lrts.rts -ldevices.rts -lrts.rts'
 CMK_LD_LIBRARY_PATH="-Wl,-rpath,$CHARMLIBSO/"
 #CMK_SEQ_LIBS=''
 #CMK_SEQ_CC="$BGL_BIN/powerpc-bgl-blrts-gnu-gcc -Wno-deprecated "
