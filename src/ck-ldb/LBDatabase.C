@@ -499,7 +499,7 @@ void LBChangePredictor(LBPredictorFunction *model) {
 #endif
 }
 
-void LBSetPeriod(int second) {
+void LBSetPeriod(double second) {
 #if CMK_LBDB_ON
   if (CkpvAccess(lbdatabaseInited))
     LBDatabase::Object()->SetLBPeriod(second); 

@@ -349,7 +349,7 @@ void LBTurnPredictorOn(LBPredictorFunction *model, int wind);
 void LBTurnPredictorOff();
 void LBChangePredictor(LBPredictorFunction *model);
 
-void LBSetPeriod(int second);
+void LBSetPeriod(double second);
 
 void LBTurnInstrumentOn();
 void LBTurnInstrumentOff();
