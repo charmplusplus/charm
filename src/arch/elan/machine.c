@@ -64,7 +64,7 @@ ELAN_QUEUE    *elan_q;
 int enableGetBasedSend = 1;
 int enableBufferPooling = 0;
 
-int SMALL_MESSAGE_SIZE=4072;  /* Smallest message size queue 
+int SMALL_MESSAGE_SIZE=16384;  /* Smallest message size queue 
                                  used for receiving short messages */
                                      
 int MID_MESSAGE_SIZE=65536;     /* Queue for larger messages 
@@ -77,12 +77,12 @@ int MID_MESSAGE_SIZE=65536;     /* Queue for larger messages
 
 #define NON_BLOCKING_MSG  4     /* Message sizes greater 
                                     than this will be sent asynchronously*/
-#define RECV_MSG_Q_SIZE  32  //Maximim queue size for short messages
-#define MID_MSG_Q_SIZE   32   //Maximum queue size for mid-range messages
+#define RECV_MSG_Q_SIZE  8   //Maximim queue size for short messages
+#define MID_MSG_Q_SIZE   4   //Maximum queue size for mid-range messages
 
 //Actual sizes, can also be set from the command line
-int smallQSize = 8;
-int midQSize = 4;
+int smallQSize = RECV_MSG_Q_SIZE;
+int midQSize = MID_MSG_Q_SIZE;
 
 ELAN_EVENT *esmall[RECV_MSG_Q_SIZE], *emid[MID_MSG_Q_SIZE], *elarge;
 
@@ -173,17 +173,29 @@ static void PerrorExit(const char *msg);
 
 void SendSpanningChildren(int size, char *msg);
 
-#define TYPE_FIELD(buf) ((int *)(buf))[0]
-#define SIZE_FIELD(buf) ((int *)(buf))[1]
-//Encoded in the chunk header
-#define CONV_SIZE_FIELD(buf) ((int *)(buf))[2]
-#define REF_FIELD(buf)  ((int *)buf)[3]
+typedef struct __elanChunkHeader {
+  int type;
+  int size;
+} ElanChunkHeader;
 
-#define CONV_BUF_START(res) ((char *)(res) + 2*sizeof(int))
-//bufstart from converse buffer
-#define MACHINE_BUF_START(res) ((char *)(res) - 2*sizeof(int))
-//bufstart from user message
-#define USER_BUF_START(res) ((char *)(res) - 4*sizeof(int))
+typedef struct __chunkHeader {
+  ElanChunkHeader elan;
+  CmiChunkHeader conv;
+} ChunkHeader;
+
+#define TYPE_FIELD(buf)       (((ChunkHeader*)(buf))->elan.type)
+#define SIZE_FIELD(buf)       (((ChunkHeader*)(buf))->elan.size)
+#define CONV_SIZE_FIELD(buf)  (((ChunkHeader*)(buf))->conv.size)
+#define REF_FIELD(buf)        (((ChunkHeader*)(buf))->conv.ref)
+
+// CONV_BUF_START moves the res from pointing to the start of the elan chunk to the start of the converse chunk
+#define CONV_BUF_START(res)     ((char*)(res) + sizeof(ElanChunkHeader))
+
+// MACHINE_BUF_START moves the res from pointing to the start of the converse chunk to the start of the elan chunk
+#define MACHINE_BUF_START(res)  ((char*)(res) - sizeof(ElanChunkHeader))
+
+// USER_BUF_START moves the res from pointing to the start of the payload to the start of the elan chunk
+#define USER_BUF_START(res)     ((char*)(res) - sizeof(ChunkHeader))
 
 #define DYNAMIC_MESSAGE 0
 #define STATIC_MESSAGE 1
@@ -381,7 +393,7 @@ static int CmiReleaseSentMessages(void)
   while(msg_tmp != NULL){
       if(msg_tmp->sent) {
           done =0;
-          
+
           if(msg_tmp->status == BASIC_SEND) {
               if(elan_tportTxDone(msg_tmp->e)) {
                   elan_tportTxWait(msg_tmp->e);
@@ -397,7 +409,7 @@ static int CmiReleaseSentMessages(void)
           else {
               processGetEnv(msg_tmp);
               done = msg_tmp->done;
-          }              
+          }
           
           if(done) {
               MsgQueueLen--;
@@ -842,7 +854,6 @@ void CmiSyncSendFn(int destPE, int size, char *msg)
         CmiSendSelf(dupmsg);
     else
         CmiAsyncSendFn(destPE, size, dupmsg);
-    return;
 }
 
 void ElanBasicSendFn(SMSG_LIST * ptr){
@@ -887,7 +898,6 @@ void ElanBasicSendFn(SMSG_LIST * ptr){
     MsgQueueBytes += ptr->size;
     
     outstandingMsgs[ptr->destpe] = 1;
-    return;
 }
 
 CmiCommHandle ElanSendFn(int destPE, int size, char *msg, int flag)
@@ -921,12 +931,12 @@ CmiCommHandle ElanSendFn(int destPE, int size, char *msg, int flag)
     msg_tmp->destpe = destPE;
     msg_tmp->is_broadcast = flag;
 
-    if ((MsgQueueLen > 16 /*request_max*/ || MsgQueueBytes > request_bytes) 
+    if ((MsgQueueLen > request_max || MsgQueueBytes > request_bytes) 
         && (!flag)) {
         CmiReleaseSentMessages();
         PumpMsgs(1); //PumpMsgs(0) 
     }
-    
+
     ElanSendQueuedMessages();
 
     if(MsgQueueLen > request_max || MsgQueueBytes > request_bytes 
@@ -973,8 +983,6 @@ void ElanSendQueuedMessages() {
         cur_unsent = new_unsent;
     else
         cur_unsent = ptr;
-
-    return;
 }
 
 void ElanGetBasedSend(SMSG_LIST *msg_tmp){
@@ -1000,8 +1008,6 @@ void ElanGetBasedSend(SMSG_LIST *msg_tmp){
     MsgQueueBytes += msg_tmp->size;
     
     outstandingMsgs[msg_tmp->destpe] = 1;
-
-    return;
 }
 
 void handleGetHeader(char *msg, int src){
@@ -1391,15 +1397,17 @@ void elan_machine_reduce(int nelem, int size, void * data, void *dest, ELAN_REDU
     elan_reduce (elan_base->allGroup, data, dest, size, nelem, fn, NULL, 0, 0, ELAN_REDUCE_COMMUTE|elan_base->group_flags , root);
 }
 
+// NOTE: The "size" parameter already includes the size of the CmiChunkHeader data structure.
 void *elan_CmiAlloc(int size){
     char *res = NULL;
     char *buf;
     
     int alloc_size = size;
     if(enableBufferPooling) {
-        if(size <= SMALL_MESSAGE_SIZE + 2 * sizeof(int)) {
-            alloc_size = SMALL_MESSAGE_SIZE + 4 * sizeof(int); //2 more ints for machine header
-            size = SMALL_MESSAGE_SIZE + 2 * sizeof(int); //size of converse/user space
+
+        if (size <= SMALL_MESSAGE_SIZE + sizeof(ElanChunkHeader)) {
+	   alloc_size = SMALL_MESSAGE_SIZE + sizeof(ChunkHeader);
+           size = SMALL_MESSAGE_SIZE + sizeof(CmiChunkHeader);
 
 #if CMK_PERSISTENT_COMM
             //Put a footer at the end the message of it. This footer only will be sent with the pers. message
@@ -1412,9 +1420,9 @@ void *elan_CmiAlloc(int size){
                 buf = (char *)malloc_nomigrate(alloc_size);
         }
         /*
-        else if(size < MID_MESSAGE_SIZE + 2 * sizeof(int)) {
-            alloc_size = MID_MESSAGE_SIZE + 4 * sizeof(int); //2 more ints for machine header
-            size = MID_MESSAGE_SIZE + 2 * sizeof(int); //size of converse/user space
+        else if (size < MID_MESSAGE_SIZE + sizeof(ElanChunkHeader)) {
+            alloc_size = MID_MESSAGE_SIZE + sizeof(ChunkHeader);
+            size = MID_MESSAGE_SIZE + sizeof(CmiChunkHeader);
 
 #if CMK_PERSISTENT_COMM
             //Put a footer at the end the message of it. This footer will only be sent with the pers. message
@@ -1428,7 +1436,8 @@ void *elan_CmiAlloc(int size){
         }
         */
         else {
-            alloc_size = size + 2 * sizeof(int);  //2 more ints for machine header
+
+	    alloc_size = size + sizeof(ElanChunkHeader);
             
 #if CMK_PERSISTENT_COMM
             //Put a footer at the end the message of it. This footer will be sent with the pers. message
@@ -1438,8 +1447,9 @@ void *elan_CmiAlloc(int size){
             buf =(char *)malloc_nomigrate(alloc_size);
         }
     }
-    else { 
-        alloc_size = size + 2 * sizeof(int);    //2 more ints for machine header
+    else {
+
+        alloc_size = size + sizeof(ElanChunkHeader);
 #if CMK_PERSISTENT_COMM
         //Put a footer at the end the message of it. This footer will be sent with the pers. message
         alloc_size += sizeof(int)*2;
@@ -1467,12 +1477,14 @@ void elan_CmiFree(void *res){
             //Called from Cmifree so we know the size and 
             //we dont hve to store it again
             int size = SIZE_FIELD(buf);
-            if(size == SMALL_MESSAGE_SIZE + 2 * sizeof(int))
+
+            if (size == SMALL_MESSAGE_SIZE + sizeof(ElanChunkHeader))
+
                 //I knew I allocated the SMALL_MESSSAGE_SIZE of user data, 
                 //so I can put it back to the pool
                 PCQueuePush(localSmallBufferQueue, buf);
             /*
-              else if (size == MID_MESSAGE_SIZE + 2 * sizeof(int))
+              else if (size == MID_MESSAGE_SIZE + sizeof(ElanChunkHeader))
               PCQueuePush(localMidBufferQueue, buf);
             */
             else 
@@ -1493,14 +1505,15 @@ void elan_CmiFree(void *res){
 //should not be freed by the system.
 void *elan_CmiStaticAlloc(int size){
     char *res = NULL;
-    char *buf =(char *)malloc_nomigrate(size + 4 *sizeof(int));
+
+    char *buf = (char*)malloc_nomigrate(size + sizeof(ChunkHeader));
 
     TYPE_FIELD(buf) = STATIC_MESSAGE;
-    SIZE_FIELD(buf) = size + 4 * sizeof(int);
+    SIZE_FIELD(buf) = size + sizeof(ChunkHeader);
     CONV_SIZE_FIELD(buf) = size;
     REF_FIELD(buf) = 0;    
 
-    res = buf + 4 *sizeof(int);
+    res = buf + sizeof(ChunkHeader);
     return res;
 }
 
@@ -1518,7 +1531,8 @@ void *elan_CmiAllocElan(int size){
     char *res = NULL;
     char *buf = NULL;
 
-    void *elan_addr = elan_allocElan(elan_base->state, 8, len+ 4*sizeof(int));
+    void *elan_addr = elan_allocElan(elan_base->state, 8, len + sizeof(ChunkHeader));
+
     if(elan_addr == 0)
         CmiPrintf("ELAN ALLOC FAILED\n");
     
@@ -1526,11 +1540,11 @@ void *elan_CmiAllocElan(int size){
                                      (elan_base->state, elan_addr));            
 
     TYPE_FIELD(buf) = ELAN_MESSAGE;
-    SIZE_FIELD(buf) = size + 4 * sizeof(int);
+    SIZE_FIELD(buf) = size + sizeof(ChunkHeader);
     CONV_SIZE_FIELD(buf) = size;
     REF_FIELD(buf) = 0;    
 
-    res = buf + 4 *sizeof(int);
+    res = buf + sizeof(ChunkHeader);
     return res;
 }
 */
@@ -1770,9 +1784,7 @@ void CmiFreeListSendFn(int npes, int *pes, int len, char *msg)
         //improve performance as bandwidth is increased due to lower DMA
         //contention.
         
-        void *elan_addr = elan_allocElan(elan_base->state, 8, 
-                                         len+4*sizeof(int));
-
+        void *elan_addr = elan_allocElan(elan_base->state, 8, len + sizeof(ChunkHeader));
         if(elan_addr == 0) {
             CmiPrintf("ELAN ALLOC FAILED, sending data from main memory instead\n");
         }
@@ -1787,13 +1799,19 @@ void CmiFreeListSendFn(int npes, int *pes, int len, char *msg)
             int old_ref_field = REF_FIELD(msg_start);
             
             TYPE_FIELD(msg_start) = ELAN_MESSAGE;
-            SIZE_FIELD(msg_start) = len + 4*sizeof(int);
+            SIZE_FIELD(msg_start) = len + sizeof(ChunkHeader);
             CONV_SIZE_FIELD(msg_start) = len;
             REF_FIELD(msg_start) = nremote; 
             
-            elan_wait(elan_get(elan_base->state, msg_start, elan_buf,
-                               len + 4*sizeof(int), CmiMyPe()), ELAN_WAIT_EVENT);
-            //memcpy(elan_buf, msg_start, len+ 4*sizeof(int));
+            elan_wait(elan_get(elan_base->state,
+                               msg_Start,
+                               elan_buf,
+                               len + sizeof(ChunkHeader),
+                               CmiMyPe()
+                              ),
+                      ELAN_WAIT_EVENT
+                     );
+	    //memcpy(elan_buf, msg_start, len + sizeof(ChunkHeader));
             
             REF_FIELD(msg_start) = old_ref_field; 
             TYPE_FIELD(msg_start) = DYNAMIC_MESSAGE;
@@ -1805,7 +1823,7 @@ void CmiFreeListSendFn(int npes, int *pes, int len, char *msg)
                 if(pes[i] != CmiMyPe() && pes[i]/ppn != CmiMyPe()/ppn)
                     CmiFree(msg);                
             
-            msg = elan_buf + 4*sizeof(int);
+            msg = elan_buf + sizeof(ChunkHeader);
         }
     }
 #endif  
