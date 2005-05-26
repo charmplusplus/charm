@@ -105,6 +105,7 @@ typedef struct {
   CcsDelayedReply finish; /* Where to send the ack of termination */
 
   std::string printed; /* Union of all printed string and not yet shipped to the client */
+  int pipes[2]; /* File descriptors used to forward prints */
 } PythonStruct;
 typedef std::map<CmiUInt4,PythonStruct> PythonTable;
 

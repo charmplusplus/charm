@@ -14,29 +14,33 @@ static PyObject *CkPy_printstr(PyObject *self, PyObject *args) {
   Py_INCREF(Py_None);return Py_None; //Return-nothing idiom
 }
 
-static PyObject *CkPy_print(PyObject *self, PyObject *args) {
-  char *stringToPrint;
-  if (!PyArg_ParseTuple(args, "s:print", &stringToPrint)) return NULL;
-  CmiUInt4 pyReference = PyInt_AsLong(PyDict_GetItemString(PyModule_GetDict(PyImport_AddModule("__main__")),"charmNumber"));
-  CmiLock(CsvAccess(pyLock));
+static inline void Ck_printclient(CmiUInt4 ref, char* str) {
+    CmiLock(CsvAccess(pyLock));
   //PythonObject *pyWorker = ((*CsvAccess(pyWorkers))[pyReference]).object;
-  if (((*CsvAccess(pyWorkers))[pyReference]).clientReady > 0) {
+  if (((*CsvAccess(pyWorkers))[ref]).clientReady > 0) {
     // return the string to the client
     // since there is a client waiting, it means there must not be
     // pending strings to be returned ("printed" is empty)
     //CkPrintf("printing data to the client\n");
-    CcsDelayedReply client = ((*CsvAccess(pyWorkers))[pyReference]).client;
-    CcsSendDelayedReply(client, strlen(stringToPrint), stringToPrint);
-    ((*CsvAccess(pyWorkers))[pyReference]).printed.erase();
-    ((*CsvAccess(pyWorkers))[pyReference]).clientReady = 0;
+    CcsDelayedReply client = ((*CsvAccess(pyWorkers))[ref]).client;
+    CcsSendDelayedReply(client, strlen(str), str);
+    ((*CsvAccess(pyWorkers))[ref]).printed.erase();
+    ((*CsvAccess(pyWorkers))[ref]).clientReady = 0;
   } else {
     // add the string to those in list to be returned if it is keepPrint
-    if (((*CsvAccess(pyWorkers))[pyReference]).isKeepPrint) {
-      ((*CsvAccess(pyWorkers))[pyReference]).printed += std::string(stringToPrint);
+    if (((*CsvAccess(pyWorkers))[ref]).isKeepPrint) {
+      ((*CsvAccess(pyWorkers))[ref]).printed += std::string(str);
     }
     // else just drop the line
   }
   CmiUnlock(CsvAccess(pyLock));
+}
+
+static PyObject *CkPy_print(PyObject *self, PyObject *args) {
+  char *stringToPrint;
+  if (!PyArg_ParseTuple(args, "s:printclient", &stringToPrint)) return NULL;
+  CmiUInt4 pyReference = PyInt_AsLong(PyDict_GetItemString(PyModule_GetDict(PyImport_AddModule("__main__")),"__charmNumber__"));
+  Ck_printclient(pyReference, stringToPrint);
   Py_INCREF(Py_None);return Py_None; //Return-nothing idiom
 }
 
@@ -52,7 +56,7 @@ static PyObject *CkPy_numpes(PyObject *self, PyObject *args) {
 
 static PyObject *CkPy_myindex(PyObject *self, PyObject *args) {
   if (!PyArg_ParseTuple(args, ":myindex")) return NULL;
-  CmiUInt4 pyReference = PyInt_AsLong(PyDict_GetItemString(PyModule_GetDict(PyImport_AddModule("__main__")),"charmNumber"));
+  CmiUInt4 pyReference = PyInt_AsLong(PyDict_GetItemString(PyModule_GetDict(PyImport_AddModule("__main__")),"__charmNumber__"));
   CmiLock(CsvAccess(pyLock));
   ArrayElement1D *pyArray1 = dynamic_cast<ArrayElement1D*>(((*CsvAccess(pyWorkers))[pyReference]).object);
   ArrayElement2D *pyArray2 = dynamic_cast<ArrayElement2D*>(((*CsvAccess(pyWorkers))[pyReference]).object);
@@ -74,7 +78,7 @@ static PyObject *CkPy_myindex(PyObject *self, PyObject *args) {
 // method to read a variable and convert it to a python object
 static PyObject *CkPy_read(PyObject *self, PyObject *args) {
   if (!PyArg_ParseTuple(args, "O:read")) return NULL;
-  CmiUInt4 pyReference = PyInt_AsLong(PyDict_GetItemString(PyModule_GetDict(PyImport_AddModule("__main__")),"charmNumber"));
+  CmiUInt4 pyReference = PyInt_AsLong(PyDict_GetItemString(PyModule_GetDict(PyImport_AddModule("__main__")),"__charmNumber__"));
   CmiLock(CsvAccess(pyLock));
   PythonObject *pyWorker = ((*CsvAccess(pyWorkers))[pyReference]).object;
   CmiUnlock(CsvAccess(pyLock));
@@ -105,7 +109,7 @@ static PyObject *CkPy_write(PyObject *self, PyObject *args) {
     whatT = PyTuple_New(1);
     PyTuple_SET_ITEM(whatT, 0, what);
   }
-  CmiUInt4 pyReference = PyInt_AsLong(PyDict_GetItemString(PyModule_GetDict(PyImport_AddModule("__main__")),"charmNumber"));
+  CmiUInt4 pyReference = PyInt_AsLong(PyDict_GetItemString(PyModule_GetDict(PyImport_AddModule("__main__")),"__charmNumber__"));
   CmiLock(CsvAccess(pyLock));
   PythonObject *pyWorker = ((*CsvAccess(pyWorkers))[pyReference]).object;
   CmiUnlock(CsvAccess(pyLock));
@@ -296,9 +300,24 @@ void PythonObject::execute (CkCcsRequestMsg *msg, CcsDelayedReply *reply) {
     PyObject *mod = PyImport_AddModule("__main__");
     PyObject *dict = PyModule_GetDict(mod);
 
-    PyDict_SetItemString(dict,"charmNumber",PyInt_FromLong(pyReference));
-    PyRun_String("import ck",Py_file_input,dict,dict);
+    PyDict_SetItemString(dict,"__charmNumber__",PyInt_FromLong(pyReference));
+    PyRun_String("import ck\nimport sys\n"
+		 "ck.__doc__ = \"Ck module: basic charm routines\\n"
+		 "printstr(str) -- print a string on the server\\n"
+		 "printclient(str) -- print a string on the client\\n"
+		 "mype() -- return an integer for MyPe()\\n"
+		 "numpes() -- return an integer for NumPes()\\n"
+		 "myindex() -- return a tuple containing the array index (valid only for arrays)\\n"
+		 "read(where) -- read a value on the chare (uses the \\\"read\\\" method of the chare)\\n"
+		 "write(where, what) -- write a value back on the chare (uses the \\\"write\\\" method of the chare)\\n\"",
+		 Py_file_input,dict,dict);
     if (pyMsg->isHighLevel()) PyRun_String("import charm",Py_file_input,dict,dict);
+
+    pipe(((*CsvAccess(pyWorkers))[pyReference]).pipes);
+    FILE *pipeW = fdopen(((*CsvAccess(pyWorkers))[pyReference]).pipes[1], "w");
+    PyObject *file = PyFile_FromFile(pipeW, "__charm_stdout__", "w", fclose);
+    PyDict_SetItemString(dict,"__charmFile__",file);
+    PyRun_String("sys.stdout = __charmFile__",Py_file_input,dict,dict);
   }
 
   ((*CsvAccess(pyWorkers))[pyReference]).inUse = true;
@@ -351,7 +370,8 @@ void PythonObject::executeThread(PythonExecute *pyMsg) {
   // get the information about the running python thread and my reference number
   //ckout << "options  "<<pyMsg->isPersistent()<<endl;
   PyThreadState *mine = PyThreadState_Get();
-  CmiUInt4 pyReference = PyInt_AsLong(PyDict_GetItemString(PyModule_GetDict(PyImport_AddModule("__main__")),"charmNumber"));
+  PyObject *dict = PyModule_GetDict(PyImport_AddModule("__main__"));
+  CmiUInt4 pyReference = PyInt_AsLong(PyDict_GetItemString(dict,"__charmNumber__"));
 
   // store the self thread for future suspention if high level execution
   if (pyMsg->isHighLevel()) {
@@ -362,7 +382,36 @@ void PythonObject::executeThread(PythonExecute *pyMsg) {
 
   // decide whether it is iterative or not
   if (!pyMsg->isIterate()) {
-    PyRun_SimpleString(pyMsg->code.code);
+    PyObject* python_output = PyRun_String(pyMsg->code.code, Py_file_input, dict, dict);
+    //PyRun_SimpleString(pyMsg->code.code);
+    //CkPrintf("python_output = %d\n",python_output);
+    if (python_output == NULL) {
+      // return the string error to the client
+      PyObject *ptype, *pvalue, *ptraceback;
+      PyErr_Fetch(&ptype, &pvalue, &ptraceback);
+      PyObject *strP = PyObject_Str(ptype);
+      char *str = PyString_AsString(strP);
+      Ck_printclient(pyReference, str);
+      //CkPrintf("%s\n",str);
+      Py_DECREF(strP);
+      Ck_printclient(pyReference, ": ");
+      strP = PyObject_Str(pvalue);
+      str = PyString_AsString(strP);
+      Ck_printclient(pyReference, str);
+      //CkPrintf("%s\n",str);
+      Py_DECREF(strP);
+      //PyObject_Print(ptype, stdout, 0);
+      //CkPrintf("   %d %d %d %d\n",PyType_Check(ptype),PyString_Check(ptype),PyList_Check(ptype),PyTuple_Check(ptype));
+      //PyObject_Print(pvalue, stdout, 0);
+      //CkPrintf("   %d %d %d %d\n",PyType_Check(pvalue),PyString_Check(pvalue),PyList_Check(pvalue),PyTuple_Check(pvalue));
+      //PyObject_Print(ptraceback, stdout, 0);
+      //if (ptraceback) CkPrintf("   %d %d %d %d\n",PyType_Check(ptraceback),PyString_Check(ptraceback),PyList_Check(ptraceback),PyTuple_Check(ptraceback));
+    }
+    char buf[256];
+    buf[255] = 0;
+    int i;
+    int pippe = ((*CsvAccess(pyWorkers))[pyReference]).pipes[0];
+    while ((i = ::read(pippe,&buf[0],255))>0) CkPrintf(buf); //Ck_printclient(pyReference,buf);
   } else {
     // compile the program
     char *userCode = pyMsg->code.code;
@@ -493,7 +542,7 @@ void PythonObject::iterate (CkCcsRequestMsg *msg) {
   PyObject *mod = PyImport_AddModule("__main__");
   PyObject *dict = PyModule_GetDict(mod);
 
-  PyDict_SetItemString(dict,"charmNumber",PyInt_FromLong(pyReference));
+  PyDict_SetItemString(dict,"__charmNumber__",PyInt_FromLong(pyReference));
 
   // compile the program
   char *userCode = (char *)msg->data;
