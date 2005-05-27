@@ -26,8 +26,9 @@ This code will execute the routines \uw{fooNodeInit} and static
 and \uw{bar::barProcInit} on every processor before the main computation starts.
 Initnode calls are always executed before initproc calls.
 
-Note that these routines should only do registration, not computation--
-use a mainchare instead, which gets executed on only one processor,
+Note that these routines should only do registration, not computation since
+Charm run-time initialization does not start yet ---
+use a mainchare instead, which gets executed on only processor 0,
 to begin the computation.  Initcall routines are typically
 used to do special registrations and global variable setup
 before the computation actually begins.

@@ -290,23 +290,20 @@ configure the load balancer, etc. These functions are:
       in an array element constructor to tell load balancer whether this object
       is migratable or not\footnote{Currently not all load balancers 
       recognize this setting though.}.
-\item {\bf lbdb$->$SetLBPeriod(double s)}: this function can be called
-      anywhere\footnote{except that it must be called after LBDatabase
-      has been initialized in Charm++ init phase, so for example global 
-      variable constructor is not a good place to call it.} to regulate 
-      the load balancing period. It tells load balancer not to start next 
-      load balancing in less than s seconds. This can be used to prevent 
+\item {\bf LBSetPeriod(double s)}: this function can be called
+      anywhere (even in Charm++ initcalls) to specify 
+      the load balancing period time in seconds. 
+      It tells load balancer not to start next 
+      load balancing in less than $s$ seconds. This can be used to prevent 
       load balancing from occurring too often in 
       {\em automatic without sync mode}. Here is how to use it:
       \begin{alltt}
 // if used in an array element
 LBDatabase *lbdb = getLBDB();
-lbdb->SetLBPeriod(5);
+lbdb->SetLBPeriod(5.0);
 
 // if used outside of an array element
-// must be called after load balancer is initialized.
-LBDatabase *lbdb = LBDatabase::Object();
-lbdb->SetLBPeriod(5);
+LBSetPeriod(5.0);
 \end{alltt}
       Alternatively, one can specify +LBPeriod \{seconds\} at command line.
 \end{itemize}
