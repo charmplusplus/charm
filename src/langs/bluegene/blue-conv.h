@@ -107,7 +107,7 @@ static inline void BgSyncBroadcastAll(int nb, char *m)
 
 static inline void BgSyncNodeSendAndFree(int node, int nb, char *m)
 {
-  int x,y,z,t;
+  int x,y,z;
   BgGetXYZ(node, &x, &y, &z);
   BgSendPacket(x,y,z, ANYTHREAD, CmiGetHandler(m), LARGE_WORK, nb, m);
 }
