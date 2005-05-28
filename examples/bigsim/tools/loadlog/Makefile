@@ -4,7 +4,7 @@ loadlog: loadlog.o
 	$(CHARMC) -seq -o loadlog loadlog.o -lconv-bluegene-logs -lconv-util -lblue-standalone -language c++
 
 loadlog.o: loadlog.C 
-	$(CHARMC) -c loadlog.C
+	$(CHARMC) -seq -c loadlog.C
 
 clean:
 	rm -f *.o loadlog *~ moduleinit.C charmrun conv-host
