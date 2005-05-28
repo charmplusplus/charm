@@ -10,8 +10,8 @@ CMK_LDXX="$CMK_CXX "
 # pgcc can not handle QT right for generic64, so always use gcc
 CMK_SEQ_CC="gcc "
 CMK_SEQ_LD="gcc "
-CMK_SEQ_CXX="g++ "
-CMK_SEQ_LDXX="g++ "
+CMK_SEQ_CXX="pgCC "
+CMK_SEQ_LDXX="$CMK_SEQ_CXX"
 CMK_SEQ_LIBS=""
 
 # compiler for native programs
