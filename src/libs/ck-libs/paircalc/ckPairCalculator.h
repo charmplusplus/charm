@@ -45,7 +45,11 @@ extern "C" complex ZTODO( const int *N,  complex *X, const int *incX, complex *Y
 
 #ifdef _PAIRCALC_USE_DGEMM_
 
-extern "C" void DGEMM(char *,char *, int *,int *, int *,double *,double *,int *, double *,int *,double *,double *,int *);
+//extern "C" void DGEMM(char *,char *, int *,int *, int *,double *,double *,int *, double *,int *,double *,double *,int *);
+extern "C" {void DGEMM (char *, char *, int *, int *, int *,double *,double *,
+                        int *, double *, int *, double *, double *, int * );}
+
+
 #endif
 
 #ifdef _PAIRCALC_USE_ZGEMM_
@@ -137,7 +141,7 @@ class acceptResultMsg2 : public CMessage_acceptResultMsg2 {
 
 class PairCalculator: public CBase_PairCalculator {
  public:
-  PairCalculator(bool, int, int, int, int op1, FuncType fn1, int op2, FuncType fn2, CkCallback cb, CkGroupID gid, CkArrayID final_callbackid, int final_callback_ep, bool conserveMemory, bool lbpaircalc, CkCallback lbcb, bool machreduce);
+  PairCalculator(bool, int, int, int, int op1, FuncType fn1, int op2, FuncType fn2, CkCallback cb, CkGroupID gid, CkArrayID final_callbackid, int final_callback_ep, bool conserveMemory, bool lbpaircalc, CkCallback lbcb, bool machreduce, bool gspacesum);
     
   PairCalculator(CkMigrateMessage *);
   ~PairCalculator();
@@ -188,10 +192,10 @@ class PairCalculator: public CBase_PairCalculator {
   bool existsLeft;
   bool existsRight;
   CkCallback cb_lb;
-  complex *inDataLeft, *inDataRight;
+  double *inDataLeft, *inDataRight;
   double *outData;
   complex *newData;
-
+  bool gspacesum;
 };
 
 class IndexAndID {

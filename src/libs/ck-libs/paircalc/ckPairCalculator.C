@@ -29,7 +29,7 @@ ComlibInstanceHandle mcastInstanceCP;
 
 PairCalculator::PairCalculator(CkMigrateMessage *m) { }
 
-PairCalculator::PairCalculator(bool sym, int grainSize, int s, int blkSize,  int op1,  FuncType fn1, int op2,  FuncType fn2, CkCallback cb, CkGroupID gid, CkArrayID cb_aid, int cb_ep, bool conserveMemory, bool lbpaircalc, CkCallback lbcb,bool _machreduce) 
+PairCalculator::PairCalculator(bool sym, int grainSize, int s, int blkSize,  int op1,  FuncType fn1, int op2,  FuncType fn2, CkCallback cb, CkGroupID gid, CkArrayID cb_aid, int cb_ep, bool conserveMemory, bool lbpaircalc, CkCallback lbcb,bool _machreduce, bool gspacesum) 
 {
 #ifdef _PAIRCALC_DEBUG_ 
   CkPrintf("[PAIRCALC] [%d %d %d %d] inited lb %d \n", thisIndex.w, thisIndex.x, thisIndex.y, thisIndex.z,lbpaircalc);
@@ -53,7 +53,7 @@ PairCalculator::PairCalculator(bool sym, int grainSize, int s, int blkSize,  int
   numRecd = 0;
   numExpected = grainSize;
   this->cb_lb=lbcb;
-
+  this->gspacesum=gspacesum;
   machreduce=_machreduce;
 
   kUnits=grainSize;  //streaming unit only really used in NOGEMM, but could be used under other conditions
@@ -110,22 +110,24 @@ PairCalculator::pup(PUP::er &p)
   p|existsLeft;
   p|existsRight;
   p|cb_lb;
+  p|gspacesum;
   if (p.isUnpacking()) {
     if(existsLeft)
-      inDataLeft = new complex[numExpected*N];
+      inDataLeft = new double[2*numExpected*N];
     else
       inDataLeft=NULL;
     if(existsRight)
-      inDataRight = new complex[numExpected*N];
+      inDataRight = new double[2*numExpected*N];
     else 
       inDataRight=NULL;
     newData = NULL;
     outData = NULL;
   }
   if(existsLeft)
-    p((void*) inDataLeft, numExpected * N * sizeof(complex));
+    p((void*) inDataLeft, numExpected * N * 2* sizeof(double));
   if(existsRight)
-    p((void*) inDataRight, numExpected* N * sizeof(complex));
+
+    p((void*) inDataRight, numExpected* N * 2* sizeof(double));
 
 #ifdef _PAIRCALC_DEBUG_ 
   CkPrintf("ckPairCalculatorPUP\n");
@@ -176,39 +178,66 @@ PairCalculator::calculatePairs_gemm(calculatePairsMsg *msg)
 #endif
   
   numRecd++;   // increment the number of received counts
-  complex *inData;
   int offset = -1;
-  
   if (msg->fromRow) {   // This could be the symmetric diagonal case
     offset = msg->sender - thisIndex.x;
     if (inDataLeft==NULL) 
       { // now that we know N we can allocate contiguous space
 	N = msg->size; // N is init here with the size of the data chunk. 
-	inDataLeft = new complex[numExpected*N];
+	inDataLeft = new double[numExpected*N*2];
+	memset(inDataLeft,0,numExpected*N*2*sizeof(double));
+#ifdef _PAIRCALC_DEBUG_
+	CkPrintf("[%d,%d,%d,%d] Allocated Left %d * %d *2 \n",thisIndex.w,thisIndex.x,thisIndex.y,thisIndex.z,numExpected,N);
+
+#endif
       }
+    CkAssert(N==msg->size);
+    CkAssert(offset<numExpected);
     existsLeft=true;
-    inData = inDataLeft;
+    memcpy(&(inDataLeft[offset*N]), msg->points, N * 2 *sizeof(double));
+#ifdef _PAIRCALC_DEBUG_
+    CkPrintf("[%d,%d,%d,%d] Copying into offset*N %d * %d N *2 %d points start %g end %g\n",thisIndex.w,thisIndex.x,thisIndex.y,thisIndex.z, offset, N, N*2,msg->points[0].re, msg->points[N].im);
+#endif
+#ifdef _PAIRCALC_DEBUG_PARANOID_
+    CkPrintf("copying in \n");
+    for(int i=0;i<N*2;i++)
+      CkPrintf("%d %g %g\n",i,msg->points[i].re, msg->points[i].im);
+#endif
   }
   else {
-    existsRight=true;
     offset = msg->sender - thisIndex.y;
     if (inDataRight==NULL) 
       { // now that we know N we can allocate contiguous space
 	N = msg->size; // N is init here with the size of the data chunk. 
-	inDataRight = new complex[numExpected*N];
+	inDataRight = new double[numExpected*N*2];
+	memset(inDataRight,0,numExpected*N*2*sizeof(double));
+#ifdef _PAIRCALC_DEBUG_
+	CkPrintf("[%d,%d,%d,%d] Allocated right %d * %d *2 \n",thisIndex.w,thisIndex.x,thisIndex.y,thisIndex.z,numExpected,N);
+#endif
       }
-    inData= inDataRight;
+    CkAssert(N==msg->size);
+    CkAssert(offset<numExpected);
+    existsRight=true;
+    memcpy(&(inDataRight[offset*N]), msg->points, N * 2 *sizeof(double));
+
+#ifdef _PAIRCALC_DEBUG_
+    CkPrintf("[%d,%d,%d,%d] Copying into offset*N %d * %d N *2 %d points start %g end %g\n",thisIndex.w,thisIndex.x,thisIndex.y,thisIndex.z,offset,N, N*2,msg->points[0].re, msg->points[N].im);
+#endif
+#ifdef _PAIRCALC_DEBUG_PARANOID_
+    CkPrintf("copying in \n");
+    for(int i=0;i<N*2;i++)
+      CkPrintf("%d %g %g\n",i,msg->points[i].re, msg->points[i].im);
+#endif
   }
 
-  CkAssert(N==msg->size);
-  CkAssert(offset<numExpected);
+
   /* 
    *  NOTE: For this to work the data chunks of the same plane across
    *  all states must be of the same size
    */
 
   // copy the input into our matrix
-  memcpy(&(inData[offset*N]), msg->points, N * sizeof(complex));
+
 
   /*
    * Once we have accumulated all rows  we gemm it.
@@ -232,7 +261,18 @@ PairCalculator::calculatePairs_gemm(calculatePairsMsg *msg)
     if(outData == NULL){
       outData = new double[grainSize * grainSize];
       memset(outData, 0 , sizeof(double)* grainSize * grainSize);
+#ifdef _PAIRCALC_DEBUG_
+	CkPrintf("[%d,%d,%d,%d] Allocated outData %d * %d\n",thisIndex.w,thisIndex.x,thisIndex.y,thisIndex.z,grainSize, grainSize);
+#endif
     }
+
+#ifdef _PAIRCALC_DEBUG_PARANOID_
+    CkPrintf("[%d,%d,%d,%d] outData=C\n",thisIndex.w,thisIndex.x,thisIndex.y,thisIndex.z);
+    for(int i=0;i<grainSize*grainSize;i++)
+      CkPrintf(" %f");
+    CkPrintf("\n");
+#endif
+
     char transform='N';
     int doubleN=2*N;
     char transformT='T';
@@ -245,21 +285,35 @@ PairCalculator::calculatePairs_gemm(calculatePairsMsg *msg)
 
     double alpha=double(1.0);//multiplicative identity 
     double beta=double(0.0); // C is unset
-
-    double *ldata= reinterpret_cast <double *> (inDataLeft);
 #ifndef CMK_OPTIMIZE
     double StartTime=CmiWallTimer();
 #endif
+#ifdef _PAIRCALC_DEBUG_
+    CkPrintf("[%d,%d,%d,%d] gemming %c %c %d %d %d %f A %d B %d %f C %d\n",thisIndex.w,thisIndex.x,thisIndex.y,thisIndex.z,transformT,transform, m_in, n_in, k_in, alpha, lda, ldb, beta, ldc);
+#endif
     if( numRecd == numExpected * 2) 
       {
-	double *rdata= reinterpret_cast <double *> (inDataRight); 
-
-
-	DGEMM(&transformT, &transform, &m_in, &n_in, &k_in, &alpha, ldata, &lda, rdata, &ldb, &beta, outData, &ldc);
+#ifdef _PAIRCALC_DEBUG_PARANOID_
+	CkPrintf("[%d,%d,%d,%d] L=A\n",thisIndex.w,thisIndex.x,thisIndex.y,thisIndex.z);
+	for(int i=0;i<N*2;i++)
+	  for(int j=0;j<numExpected;j++)
+	    CkPrintf("%d %d %g\n",i,j,inDataLeft[i*N*2+j]);
+	CkPrintf("\n[%d,%d,%d,%d] R=B\n",thisIndex.w,thisIndex.x,thisIndex.y,thisIndex.z);
+	for(int i=0;i<N*2;i++)
+	  for(int j=0;j<numExpected;j++)
+	    CkPrintf("%d %d %g\n",i,j,inDataRight[i*N*2+j]);
+#endif
+	DGEMM(&transformT, &transform, &m_in, &n_in, &k_in, &alpha, inDataLeft, &lda, inDataRight, &ldb, &beta, outData, &ldc);
       }
     else if (symmetric && thisIndex.x==thisIndex.y && numRecd==numExpected)
       {
-	DGEMM(&transformT, &transform, &m_in, &n_in, &k_in, &alpha, ldata, &lda, ldata, &ldb, &beta, outData, &ldc);
+#ifdef _PAIRCALC_DEBUG_PARANOID_
+	CkPrintf("[%d,%d,%d,%d] L=R=A\n",thisIndex.w,thisIndex.x,thisIndex.y,thisIndex.z);
+	for(int i=0;i<numExpected*N*2;i++)
+	  CkPrintf("%f ",inDataLeft[i]);
+	CkPrintf("\n");
+#endif
+	DGEMM(&transformT, &transform, &m_in, &n_in, &k_in, &alpha, inDataLeft, &lda, inDataLeft, &ldb, &beta, outData, &ldc);
       }
 
 #ifndef CMK_OPTIMIZE
@@ -474,7 +528,7 @@ PairCalculator::acceptResult(int size, double *matrix1, double *matrix2)
 	thisProxy(idx).sumPartialResult(msg);  
       }
   }
-  else { 
+  else if (gspacesum){ 
     // we just send these to gspace where acceptNewPsi will put them together
     // this should be fairly load balanced as long as gspace is balanced
     /*
@@ -506,6 +560,18 @@ PairCalculator::acceptResult(int size, double *matrix1, double *matrix2)
       }
 
   }
+  else //sum in paircalc 
+    { 
+      CkArrayIndex4D idx(thisIndex.w, 0, thisIndex.y, thisIndex.z);
+      partialResultMsg *msg = new (N*grainSize, 8*sizeof(int) )partialResultMsg;
+      msg->N=N*grainSize;
+      msg->myoffset = thisIndex.z;
+      memcpy(msg->result,mynewData,msg->N*sizeof(complex));
+      msg->cb= cb;
+      *((int*)CkPriorityPtr(msg)) = priority;
+      CkSetQueueing(msg, CK_QUEUEING_IFIFO); 
+      thisProxy(idx).sumPartialResult(msg);  
+    }
 #endif
 
   delete [] mynewData;
@@ -603,7 +669,6 @@ PairCalculator::sumPartialResult(int size, complex *result, int offset)
 	    mycb.send(msg);
 	}
     else //shouldn't be in here as we sent it directly to gspace
-      //      CkAbort("Whoah symmetric doesn't go through sumpartialresult anymore");
       	for(int j=0; j<grainSize; j++){
 	    CkCallback mycb(cb_ep, CkArrayIndex2D(thisIndex.y+j+offset, thisIndex.w), cb_aid);
 	    mySendMsg *msg = new (N, 0)mySendMsg; // msg with newData (size N)
