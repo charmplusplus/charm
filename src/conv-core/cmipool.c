@@ -66,7 +66,7 @@ void CmiPoolAllocInit(int numBins)
 }
 
 #ifdef CMK_OPTIMIZE
-inline
+/*inline*/
 #endif
 void * CmiPoolAlloc(unsigned int numBytes)
 {
@@ -135,7 +135,7 @@ void * CmiPoolAlloc(unsigned int numBytes)
 }
 
 #ifdef CMK_OPTIMIZE
-inline
+/*inline*/
 #endif
 void CmiPoolFree(void * p) 
 {
