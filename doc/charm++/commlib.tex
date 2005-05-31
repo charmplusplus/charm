@@ -1,21 +1,135 @@
 \subsection{Communication Optimizations Framework}
 
-The communications framework in Charm++/converse is aimed at
+The communications framework in Charm++/Converse is aimed at
 optimizing certain communication patterns. Currently the programmer
 has to specify the communication pattern. The communications library
-uses the delegation framework. This is done to make access to the
-communication library transparent to the programmer.
+uses the delegation framework. This is done to enable easy and transparent 
+access to the for the programmer.
 
-To access the communication framework you first need to create an
-instance of the Communication Framework which will work with your
-messages and optimize that pattern. Each communication framework
+
+Each access to the communication framework is made through a communication 
+{\em call}, which is basically an invocation of a remote entry method through 
+a special proxy. The communication framework has two mechanisms for 
+programmers to access it. In the first mechanism, the programmer first 
+needs to create an instance of the Communication Framework which will optimize the 
+messages a communication pattern in the application. Each communication framework
 instance needs to know how to manage the messages. Hence a Strategy
 needs to be initialized and passed to the instance of the
-Communication Library framework.
+Communication Library framework. The instance identifier should be stored as a 
+private variable in each array element. During migration or loadbalancing the 
+instance id should PUP'ed.
 
-Each strategy inherits from the class {\em Strategy} and implements
-its entry methods.  Each strategy has its own set of options passed to
-its constructor. There are two types of strategies in our framework.
+While sending messages the user needs to create a 
+comlib delegated proxy to send messages to the communication framework. This proxy 
+ensures that all application messages are sent to the communication framework.
+So the programmer has to save and reuse the communication library instance and the 
+delegated proxy to make calls to the communication framework.
+
+In the newer interface the programmer only carries a comlib {\em associated} proxy. 
+An associated proxy is a delegated proxy which also carries the instance information. 
+This should simplify access to comlib, but each array element now should have a seperate 
+copy of this proxy. Like the Instance id the programmer should also PUP the array private 
+{\em associated} proxy for migration support.
+
+\subsubsection{Communication Optimization Strategy}
+
+Optimization algorithms are implemented as Strategies in the
+communication library. Strategies can be implemented at the Object
+(Charm++) level or the processor (Converse) level. Code reuse is
+possible by having a few object managers perform object level
+optimizations and then call several other processor level optimization
+schemes. For example, to optimize all-to-all communication the
+processor level strategies could use the different virtual topologies.
+
+All processor (Converse) level strategies inherit from the {\em
+class~Strategy} defined below and override its virtual methods.
+
+\begin{verbatim}
+//Converse or Processor level strategy
+class Strategy : public PUP::able{
+public:
+    //Called for each message
+    virtual void insertMessage(MessageHolder *msg);
+    //Called after all chares and groups have finished depositing their
+    //messages on that processor.
+    virtual void doneInserting();
+    virtual void beginProcessing(int nelements);
+};
+\end{verbatim}
+
+The class method {\em insertMessage} is called to deposit messages
+with the strategy. MessageHolder is a wrapper for converse
+messages. When a processor has sent all its messages, {\em
+doneInserting} is invoked on the strategy.
+
+\begin{verbatim}
+//Charm++ or Object level strategy
+class CharmStrategy : public Strategy{
+ protected:
+    int isArray;
+    int isGroup;
+    int isStrategyBracketed;
+    ............   
+    ............   
+public:
+    //Called for each message
+    virtual void insertMessage(CharmMessageHolder *msg);
+    //Called after all chares and groups have finished depositing their
+    //messages on that processor.
+    virtual void doneInserting();
+    virtual void beginProcessing(int nelements);
+};
+\end{verbatim}
+
+Charm++ level strategies also have to implement the insertMessage and
+doneInserting methods. Here insertMessage takes a CharmMessageHolder
+which is a Charm++ message wrapper. The call to beginProcessing
+initializes the strategies on each processor. This additional call is
+needed because the constructor of the strategy is called by user code
+in main::main on processor 0. Along with initializing its data,
+beginProcessing can also register message handlers, as the
+communication library strategies use Converse to communicate between
+processors. The flags {\em isArray} and {\em isGroup} store the type
+of objects that call the strategy and the flag {\em
+isStrategyBracketed} flag specifies if the CharmStrategy is bracketed
+or not. Bracketed strategies require that the application deposits
+messages in brackets demarcated by the calls ComlibBeginIteration and
+ComlibEndIteration. Bracketed strategies are discussed in detail in
+Section~\ref{sec:bracket}.
+
+\subsubsection{Supported Operations and Strategies}
+
+The communication framework now supports four different
+communication operations namely, (i) many-to-many communication, (ii)
+array and group broadcast, (iii) section multicast, (iv)
+streaming. Table~\ref{tbl:com_operation} shows the different
+strategies that optimize these communication operations. Some of these
+are converse strategies while others are object strategies. We now
+present in detail the strategies optimizing the above mentioned
+operations.
+
+
+\begin{table}[h]
+\begin{center}
+\begin{small}
+\begin{tabular}{|c|c|c|}
+\hline
+{\bf Operation} & {\bf Object Strategy} & {\bf Processor Strategy} \\
+\hline
+Many-to-many  personalized & EachToManyStrategy & Mesh, Grid, Hypercube, Direct \\
+Many-to-many  multicast    & EachToManyMulticastStrategy & Mesh, Grid, Hypercube, Direct \\
+Broadcast  & BroadcastStrategy & Binomial tree, Binary tree\\
+Section Multicast & DirectSection, RingSection, TreeSection & \\
+Streaming  & Streaming, MeshStreaming, PrioStreaming & \\
+\hline
+\end{tabular}
+\end{small}
+\end{center}
+\caption{Communication Operations supported in the Framework}
+\label{tbl:com_operation}
+\end{table}
+
+There are two types of strategies in the communication framework :
 
 \begin{itemize}
 
@@ -26,34 +140,72 @@ the EachToManyMulticastStrategy is a bracketed strategy. For bracketed
 strategies a beginIteration and an endIteration must be called before
 and after making the deposits respectively. 
 
-\item Streaming Strategies. Streaming strategies perform communication
-optimizations in the background and do not need beginIteration and
-endIteration to start processing. They usually combine and process
-the messages after every few ms (a parameter to the strategy) or after
-certain number of messages have been deposited.
+\item Non-Bracketed Strategies. Non-bracketed strategies perform communication
+optimizations without needing calls to beginIteration and
+endIteration to start processing. Non-bracketed strategies either immediately process messages 
+or after a timeout, and in both these cases its not triggered from the application.
 
 \end{itemize}
 
 The communications library currently has the following strategies
 implemented.
 
-\begin{itemize} 
+\subsubsection{EachToManyStrategy}
 
-\item EachToManyMulticastStrategy. EachToManyMulticastStrategy optimizes 
-collective personalized communication and collective multicast or a
-combination of both. In collective personalized communication
-operation each array element sends a distinct message to many other
-array elements. The sending and receiving elements need not belong to
-the same array.  Collective multicast is a special case of collective
-personalized communication where each array element sends the same
-message to the destination array elements.
+The class {\em EachToManyStrategy} optimizes all-to-all personalized
+communication using virtual topologies described in~\cite{CommlibIPDPS03}. The virtual topologies 
+2-D Mesh, 3-D Mesh and Hypercube have been implemented. EachToManyStrategy manages the object
+level communication by fist combining all object messages being sent
+to the same processor into one message and then calling the routers to
+optimize processor-to-processor communication. Different virtual
+topologies have been implemented as Converse {\em
+routers}. EachToManyStrategy can be initialized to chose one such
+topology. For example, with the mesh router, the strategy on each
+processor first sends messages to its row neighbors.  After having
+received its row messages each processor sends the column
+messages. After having received the column messages an iteration of
+the strategy finishes. All local messages are delivered as soon they
+are received. EachToManyMulticastStrategy is a variant of the
+EachToManyStrategy that can multicast messages to arrays using virtual
+topologies. It uses multicast routers for processor communication.
+
+\label{sec:bracket}
+
+EachToManyStrategy requires that all local messages have been
+deposited before they can be packed into row and column
+messages. Hence it needs to be a {\em bracketed} strategy. Bracketed
+strategies require each of the participating objects to deposit their
+intended messages within brackets. Calls to {\em ComlibBeginIteration}
+and {\em ComlibEndIteration} create a bracket. The call
+ComlibBeginIteration sets up the delegation framework to forward user
+messages to the correct strategy instance. User messages then get
+passed to the insertMessage entry function of the strategy.  When all
+local objects have called ComlibEndIteration, doneInserting is invoked
+on the strategy. 
+
+Bracketed strategies are typically needed when the communication
+optimization requires local source objects to reach a barrier. At this
+local barrier the communication framework invokes doneInserting on
+that strategy, which the calls the converse level strategy.
+
+Non-bracketed strategies have no such restriction. They process
+messages as soon as they arrive. so, non-bracketed strategies should
+not expect a doneInserting to be invoked on them. They must all
+process messages in the insertMessage call itself.
+
+The EachToManyStrategy also optimizes the all-to-all multicast operation. In all-to-all 
+multicast, a special case of all-to-all personalized communication, each array 
+element sends the same message to the destination array elements.
+
+The sending and receiving elements need not belong to
+the same array.  
 
 Strategy * strategy = new EachToManyMulticastStrategy(topology,
 src\_array, dest\_array);
 
-if the entire arrays are participating in the strategies. If only
-sections of the source and destination arrays are participating in the
-collective operation the following constructor could also be used.
+If the entire arrays are participating in the strategies. If only
+sections of the source and destination arrays are participating (many-to-many variants of the 
+all-to-all operations) in the collective operation the following constructor could also be used.
 
 EachToManyMulticastStrategy(int topology, CkArrayID srcarray, CkArrayID destarray,
 int nsrc, 
@@ -80,26 +232,47 @@ better performance for slightly higher message sizes and then Mesh
 starts performing best. The programmer is encouraged to try out all
 the topologies.
 
-To send a multicast message, the multicast message should inherit from
-CkMcastBaseMsg as mentioned in section \ref{array_section_multicast}
-about Array Section Multicast. To send the multicast message create
-the appropriate array section proxy. On the array section proxy call
-the appropriate entry method with this message. This will be explained
-in detail later.
 
-\item StreamingStrategy. In this communication optimization strategy 
-each array element sends many small messages to other array elements
-but these sends are not synchronized and the library periodically
-collects messages (or collects when a certain number of messages have
-been deposited) and sends them to their destinations. The period is a
-parameter to the StreamingStrategy. It needs to be specified in Milli
-seconds. 10ms is the default
+\subsubsection{Streaming Strategy}
+
+\label{sec:streaming_strategy}
+
+This strategy optimizes the scenario where objects sends several small
+messages to other objects. The StreamingStrategy collects messages
+destined to the same processor after a timeout or when certain number
+of messages have been deposited. These messages are combined and sent
+as one message to that destination, thus sending fewer messages of
+larger sizes. The timeout is a floating-point parameter to the
+StreamingStrategy. It needs to be specified in milliseconds, with a
+default of 1ms. Micro-second timeouts can also be specified by passing
+values less than 1. For example, $0.1$ represents $100\mu s$.
+
+The Streaming Strategy by default is a non-bracketed strategy. {\em
+Non-bracketed} strategies do not require the objects to call
+beginIteration and endIteration. Such strategies do not have to wait
+for all local messages, before processing those messages. As messages
+may wait for timeout potentially leading to loss of throughput, the
+streaming strategy also has a bracketed variant which flushes buckets
+on the endIteration call.
 
 Strategy * strategy = new StreamingStrategy(period\_in\_ms, int nmsgs);
 
 The header file is StreamingStrategy.h.
 
-\end{itemize}
+\subsubsection{Section Multicast and Broadcast Strategies}
+
+The DirectMulticastStrategy and its subclasses can multicast a message to the entire
+array or a section of array elements. The direct multicast strategies
+are non-bracketed, and the message is processed when the application
+deposits is. These strategies do not combine messages, but they may
+sequence the destinations of the multicast to minimize contention on a
+network. For example, the RingMulticastStrategy sends the messages
+along ring resulting in good throughput as the ring permutation is
+contention free on many communication topologies.
+
+For section multicast, the user must create a section proxy and
+delegate it to the communication library. Invocations on section
+proxies are passed on to the section multicast strategy.
 
 The following are the steps to use the communication library 
 in a user program.
@@ -110,8 +283,71 @@ All user programs that use the communcation library should use the
 linker option -module comlib.For Example \\ 
 charmc -o pgm pgm.o -module comlib
 
-\subsubsection {Calling the Library from User Code}
-Calls to the communication library have to be made at two places in
+\subsubsection{Accessing the Communication Library}
+
+Users of Charm++ and Adaptive MPI can access the communication library
+to improve the performance of their applications. With Adaptive MPI
+(AMPI) the communication framework is accessed transparently. AMPI
+automatically initializes several strategies to optimize several MPI
+calls like MPI\_Alltoall, MPI\_Allgather etc. We have shown that the CPU
+overhead of an all-to-all operation is much smaller than its
+completion time. We have hence provided asynchronous collective
+communication extensions in AMPI through the MPI\_Ialltoall call,
+which lets the application compute while the all-to-all is in
+progress. The EachToManyStrategy is called by AMPI for MPI\_Alltoall
+and the MPI\_Ialltoall calls.
+
+In Charm++, however, the user must create the strategies in the
+program explicitly.  Charm++ programs are normally based on
+communicating arrays of chares~\cite{ArraysJournal03}, that compute
+and then invoke entry methods on local or remote chares by sending
+them messages. These array elements send messages to each other
+through proxies. The messages are passed to the Charm++ runtime which
+calls lower level network APIs to communicate. To optimize
+communication in Charm++, the user can redirect a communication {\em
+call} to go through an instance of a strategy.
+
+To access the communication framework, the user first creates and
+initializes a communication library strategy. He then needs to make a
+copy of the array proxy and associate it with that strategy.  The user
+can create several instances of the same strategy, to optimize
+different communication calls in his application. Each communication
+operation is now associated with a proxy. The exact sequence of calls
+is shown below.
+
+\begin{verbatim}
+//In main::main()
+
+
+//Create the array
+aproxy = CProxy_Hello::ckNew();
+
+Strategy *strategy = new EachToManyStrategy(USE_MESH, srcarray, destarray);
+//Register the strategy
+ComlibAssociateProxy(aproxy, strategy);
+
+
+//Within the array object
+//First proxy should be delegated
+ComlibBeginIteration(aproxy);  
+aproxy[index].entry(message); //Sending a message
+.....     //sending more messages
+.....
+ComlibEndIteration(aproxy);    
+\end{verbatim}
+
+The above example shows the EachToManyStrategy. Notice the
+ComlibBeginIteration and the ComlibEndIteration calls, which demarcate
+the bracket. After main::main, the Communication Framework broadcasts
+the strategies along with the data passed to them from the user.  On
+each processor a {\em beginProcessing} is called to initialize the
+strategies, after which messages are passed to the strategy.
+
+There exists two mechanisms to invoke the communication library. The above 
+mentioned is new and recommended interface. The old interface is only 
+presented to maintain older programs. Users should switch to the new interface at the earliest. 
+
+Here calls to the communication library have to be made at two places in
 the user program. They are :
 
 \begin{enumerate}
@@ -119,6 +355,7 @@ the user program. They are :
 \begin{verbatim}
 //Include the appropriate header file
 #include <EachToManyMulticastStrategy.h>
+#include <StreamingStrategy.h>
 
 //In main::main() 
 //Create a Communication Library Instance
@@ -170,3 +407,47 @@ NOTE: Any number of communication framework instances can be
 created. Each of them should have a strategy registered. For bracketed
 strategies the instance handles should be remembered and
 beginIteration and endIteration should be called.
+
+
+\subsubsection{Loadbalancing and Migration support}
+
+The Communication optimization framework supports both loadbalancing and array migration. 
+It enables migration through message forwarding. The communication library forwards
+messages of a migrated source object back to the processor where the
+object resided at the last fence, which is typically a load-balancing step.  
+We call this processor the {\em designated processor P}. For each array element {\bf e} , its
+designated processor will be a processor where {\bf e} was some time
+in the past. Under normal circumstances, {\bf P} will be the processor
+on which {\bf e} resides. The designated-processor for an array
+element only changes at the fence step.
+
+When an array element leaves a processor its messages are still sent 
+by the strategies to its designates processor. A migrating array element should pup all {\em associated proxies} 
+and {\em instances} at the source and destination.  
+
+\begin{verbatim}
+
+  void arrayelement::pup(PUP::er &p){
+      ..........
+      ..........
+      p | aproxy;
+      p | cinst;
+ }
+\end{verbatim}
+
+At {\em load-balancing} time the user should make comlib remap the array element. This can be done by 
+calling ComlibResetProxy for array proxies and ComlibResetSectionProxy for section proxies. In resumeFromSync these 
+calls need to be made.
+
+\begin{verbatim}
+
+  void arrayelement::resumeFromSync() {
+      .......
+      .......
+      ComlibResetProxy(aproxy);  //New interface
+      cinst.setSourcePe();      //Old interface
+
+      ComlibResetSectionProxy(sproxy);  //Both interfaces
+  }
+
+\end{verbatim}
