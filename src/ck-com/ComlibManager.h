@@ -242,7 +242,14 @@ void ComlibEnd(CProxy &proxy);
 ComlibInstanceHandle CkCreateComlibInstance();
 ComlibInstanceHandle CkGetComlibInstance();
 ComlibInstanceHandle CkGetComlibInstance(int id);
+
 void ComlibResetSectionProxy(CProxySection_ArrayBase *sproxy);
+
+inline void ComlibResetProxy(CProxy *aproxy) {
+  ComlibInstanceHandle *handle = 
+    (ComlibInstanceHandle *) aproxy->ckDelegatedPtr();
+  handle->setSourcePe();
+}
 
 //Only Called when the strategies are not being created in main::main
 void ComlibDoneCreating(); 
