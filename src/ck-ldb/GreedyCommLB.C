@@ -237,7 +237,7 @@ void GreedyCommLB::work(BaseLB::LDStats* _stats, int count)
     }
 
     minHeap *lightProcessors = new minHeap(count);
-    for (int i=0; i<count; i++)
+    for (i=0; i<count; i++)
       if (stats->procs[i].available)
         lightProcessors->insert((InfoRecord *) &(processors[i]));
 
@@ -276,6 +276,8 @@ void GreedyCommLB::work(BaseLB::LDStats* _stats, int count)
 	    continue;
 	  int destPe = stats->to_proc[destObj];
 	  if(stats->procs[destPe].available == 0) continue;
+	  for (int pp=0; pp<commPes.size(); pp++)
+            if (destPe == commPes[pp]) continue;    // duplicated
 	  commPes.push_back(destPe);
         }
 
