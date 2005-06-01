@@ -453,9 +453,10 @@ void TopoLB::initDataStructures(CentralLB::LDStats *stats,int count,int *newmap)
 
 void randomAssign(int count, int *perm)
 {
-  for(int i=0;i<count;i++)
+  int i;
+  for(i=0;i<count;i++)
     perm[i]=i;
-  for(int i=0;i<count;i++)
+  for(i=0;i<count;i++)
   {
     int randpos=i+rand()%(count-i);
     int temp=perm[i];

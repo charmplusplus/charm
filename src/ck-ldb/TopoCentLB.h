@@ -34,10 +34,10 @@ class TopoCentLB : public CentralLB
 			typedef double Edge;
 
 			PartGraph(int num_parts,int init_num_objs){
-				
+				int i;
 				n_nodes = num_parts;
 				nodes = new Node[num_parts];
-				for(int i=0;i<num_parts;i++)
+				for(i=0;i<num_parts;i++)
 				{
 					nodes[i].obj_list = new int[init_num_objs];
 					nodes[i].num_objs=0;
@@ -47,7 +47,7 @@ class TopoCentLB : public CentralLB
 				
 				n_edges = num_parts*num_parts;
 				edges = new Edge*[num_parts];
-				for(int i=0;i<num_parts;i++)
+				for(i=0;i<num_parts;i++)
 				{
 					edges[i] = new Edge[num_parts];
 					for(int j=0;j<num_parts;j++)
@@ -56,11 +56,11 @@ class TopoCentLB : public CentralLB
 			}
 
 			PartGraph(PartGraph *pg,int init_num_objs){
-
+				int i;
 				n_nodes = pg->n_nodes;
 				n_edges = pg->n_edges;
 				nodes = new Node[n_nodes];
-				for(int i=0;i<n_nodes;i++){
+				for(i=0;i<n_nodes;i++){
 					nodes[i].obj_list=new int[init_num_objs];
 					nodes[i].num_objs = pg->nodes[i].num_objs;
 					nodes[i].degree = pg->nodes[i].degree;
@@ -70,7 +70,7 @@ class TopoCentLB : public CentralLB
 				}
 				
 				edges = new Edge*[n_nodes];
-				for(int i=0;i<n_nodes;i++){
+				for(i=0;i<n_nodes;i++){
 					edges[i] = new Edge[n_nodes];
 					for(int j=0;j<n_nodes;j++)
 						edges[i][j] = pg->edges[i][j];
