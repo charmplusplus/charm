@@ -118,7 +118,7 @@ public:
   static void staticMigrated(void* me, LDObjHandle h, int waitBarrier);
   void Migrated(LDObjHandle h, int waitBarrier);
 
-  void ObjMigrated(LDObjData data, int level);
+  void ObjMigrated(LDObjData data, LDCommData *cdata, int n, int level);
   void VectorDone(int atlevel);
   void MigrationDone(int balancing);  // Call when migration is complete
   void StatsDone(int level);  // Call when LDStats migration is complete
@@ -230,6 +230,7 @@ private:
   void buildStats(int level);
   CLBStatsMsg * buildCombinedLBStatsMessage(int atlevel);
   void depositLBStatsMessage(CLBStatsMsg *msg, int atlevel);
+  void collectCommData(int objIdx, CkVec<LDCommData> &comm, int atlevel);
 
   int future_migrates_expected;
   LBMigrateMsg** mig_msgs;

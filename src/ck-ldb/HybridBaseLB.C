@@ -445,11 +445,14 @@ void HybridBaseLB::Loadbalancing(int atlevel)
   // inform new objects that are from outside group
   if (atlevel < tree->numLevels()-1) 
     for (i=0; i<statsData->n_objs; i++) {
+      CmiAssert(statsData->from_proc[i] != -1);   // ???
       if (statsData->from_proc[i] == nclients)  {
         CmiAssert(statsData->to_proc[i] < nclients);
         int tope = lData->children[statsData->to_proc[i]];
-        // TODO: comm data
-        thisProxy[tope].ObjMigrated(statsData->objData[i], atlevel-1);
+        // comm data
+        CkVec<LDCommData> comms;
+        collectCommData(i, comms, atlevel);
+        thisProxy[tope].ObjMigrated(statsData->objData[i], comms.getVec(), comms.size(), atlevel-1);
       }
     }
 }
@@ -510,7 +513,9 @@ void HybridBaseLB::ReceiveMigration(LBMigrateMsg *msg)
             DEBUGF(("[%d] level: %d sending objData %d to %d. \n", CkMyPe(), atlevel, obj, move.to_pe));
 	    found = 1;
             // TODO send comm data
-            thisProxy[move.to_pe].ObjMigrated(statsData->objData[obj], atlevel);
+            CkVec<LDCommData> comms;
+            collectCommData(obj, comms, atlevel);
+            thisProxy[move.to_pe].ObjMigrated(statsData->objData[obj], comms.getVec(), comms.size(), atlevel);
             lData->outObjs.push_back(MigrationRecord(move.obj, lData->children[statsData->from_proc[obj]], -1));
             statsData->removeObject(obj);
             break;
@@ -579,7 +584,10 @@ void HybridBaseLB::ReceiveVectorMigration(LBVectorMigrateMsg *msg)
         if (objData.wallTime <= load) {
           if (_lb_args.debug()>2)
             CkPrintf("[%d] send obj: %d to %d.\n", CkMyPe(), obj, toPe);
-          thisProxy[toPe].ObjMigrated(objData, atlevel);
+	  // send comm data
+          CkVec<LDCommData> comms;
+          collectCommData(obj, comms, atlevel);
+          thisProxy[toPe].ObjMigrated(objData, comms.getVec(), comms.size(), atlevel);
           lData->outObjs.push_back(MigrationRecord(objData.handle, lData->children[statsData->from_proc[obj]], -1));
           statsData->removeObject(obj);
           load -= objData.wallTime; 
@@ -651,8 +659,24 @@ void HybridBaseLB::Migrated(LDObjHandle h, int waitBarrier)
   }
 }
 
+// find sender comms
+void HybridBaseLB::collectCommData(int objIdx, CkVec<LDCommData> &comms, int atlevel)
+{
+  LevelData *lData = levelData[atlevel];
+  LDStats *statsData = lData->statsData;
+
+  LDObjData &objData = statsData->objData[objIdx];
+
+  for (int com=0; com<statsData->n_comm; com++) {
+    LDCommData &cdata = statsData->commData[com];
+    if (cdata.from_proc()) continue;
+    if (cdata.sender.objID() == objData.objID() && cdata.sender.omID() == objData.omID())
+      comms.push_back(cdata);
+  }
+}
+
 // an object arrives with only objdata
-void HybridBaseLB::ObjMigrated(LDObjData data, int atlevel)
+void HybridBaseLB::ObjMigrated(LDObjData data, LDCommData *cdata, int n, int atlevel)
 {
   LevelData *lData = levelData[atlevel];
   LDStats *statsData = lData->statsData;
@@ -668,6 +692,15 @@ void HybridBaseLB::ObjMigrated(LDObjData data, int atlevel)
     // pretend this object belongs to it
     statsData->from_proc.push_back(lData->nChildren);
     statsData->to_proc.push_back(lData->nChildren);
+
+    // copy into comm data
+    if (n) {
+      CkVec<LDCommData> &cData = statsData->commData;
+      for (int i=0; i<n; i++) 
+        cData.push_back(cdata[i]);
+      statsData->n_comm += n;
+      statsData->deleteCommHash();
+    }
   }
   else { 	// leaf node, from which proc is unknown at this time
     LDObjKey key;
