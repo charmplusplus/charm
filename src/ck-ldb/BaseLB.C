@@ -179,6 +179,9 @@ void BaseLB::LDStats::makeCommHash() {
 void BaseLB::LDStats::deleteCommHash() {
   if (objHash) delete [] objHash;
   objHash = NULL;
+  for(int i=0; i < n_comm; i++) {
+      commData[i].clearHash();
+  }
 }
 
 int BaseLB::LDStats::getHash(const LDObjid &oid, const LDOMid &mid)
