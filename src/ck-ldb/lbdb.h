@@ -191,6 +191,7 @@ typedef struct {
   inline int from_proc() const { return (src_proc != -1); }
   inline int recv_type() const { return receiver.get_type(); }
   inline void pup(PUP::er &p);
+  inline void clearHash() { sendHash = recvHash = -1; }
 #endif
 } LDCommData;
 
