@@ -17,6 +17,7 @@
 #include "MetisLB.decl.h"
 
 void CreateMetisLB();
+BaseLB * AllocateMetisLB();
 
 class MetisLB : public CentralLB {
 public:
