@@ -297,7 +297,8 @@ void BaseLB::LDStats::removeObject(int obj)
 {
   CmiAssert(obj < objData.size());
   LDObjData odata = objData[obj];
-  LDObjKey okey;
+
+  LDObjKey okey;		// build a key
   okey.omID() = odata.omID();
   okey.objID() = odata.objID();
 
@@ -307,14 +308,16 @@ void BaseLB::LDStats::removeObject(int obj)
   n_objs --;
   if (odata.migratable) n_migrateobjs --;
 
-  // search for sender
+  // search for sender, can be multiple sender
+  int removed = 0;
   for (int com=0; com<n_comm; com++) {
-    LDCommData &cdata = commData[com];
+    LDCommData &cdata = commData[com-removed];
     if(!cdata.from_proc() && cdata.sender == okey) {
-      commData.remove(com);
-      break;
+      commData.remove(com-removed);
+      removed++;
     }
   }
+  n_comm -= removed;
 }
 
 void BaseLB::LDStats::pup(PUP::er &p)
