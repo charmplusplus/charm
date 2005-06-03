@@ -104,6 +104,7 @@
 
        integer, external :: FEM_Register
        external FEM_Migrate 
+       external FEM_Async_Migrate
 
        external FEM_Update_mesh
 

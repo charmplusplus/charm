@@ -589,6 +589,12 @@ FEM_Migrate(void)
   TCHARM_Migrate();
 }
 
+CDECL void
+FEM_Async_Migrate(void)
+{
+  TCHARM_Async_Migrate();
+}
+
 CDECL void 
 FEM_Done(void)
 {
