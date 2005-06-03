@@ -248,6 +248,9 @@ void GreedyCommLB::work(BaseLB::LDStats* _stats, int count)
 	CkPrintf("avail for %d = %d\n",pe,stats[pe].available);
     */
 
+    double *pe_comm = new double[count];
+    for (int i=0; i<count; i++) pe_comm[i] = 0.0;
+
     for(id = 0;id<nmigobj;id++){
 	x  = maxh.deleteMax();
 
@@ -270,15 +273,23 @@ void GreedyCommLB::work(BaseLB::LDStats* _stats, int count)
         CkVec<int> commPes;
         graph * ptr = object_graph[maxid].next;
     
+ 	// find out all processors that this obj communicates
+	double commload = 0.0;			// total comm load
         for(int com=0;(com<2*nobj)&&(ptr != NULL);com++,ptr=ptr->next){
 	  int destObj = ptr->id;
 	  if(assigned_array[destObj] == 0)  // this obj has not been assigned
 	    continue;
 	  int destPe = stats->to_proc[destObj];
 	  if(stats->procs[destPe].available == 0) continue;
+	  
+	  double cload = alpha*ptr->nmsg + beeta*ptr->data;
+	  pe_comm[destPe] += cload;
+	  commload += cload;
+
+          int exist = 0;
 	  for (int pp=0; pp<commPes.size(); pp++)
-            if (destPe == commPes[pp]) continue;    // duplicated
-	  commPes.push_back(destPe);
+            if (destPe == commPes[pp]) { exist=1; break; }    // duplicated
+	  if (!exist) commPes.push_back(destPe);
         }
 
 	int k;
@@ -286,9 +297,9 @@ void GreedyCommLB::work(BaseLB::LDStats* _stats, int count)
 	    pe = commPes[k];
             processorInfo *commpe = (processorInfo *) &processors[pe];
 	    
-	    temp = compute_com(maxid,pe);
+	    temp = commload - pe_comm[pe];
 	    
-	    /*  CkPrintf("check id = %d, processor = %d,com = %lf, pro = %lf, comp=%lf\n", maxid,pe,temp,alloc_array[pe][nobj],total_time); */
+	    //CkPrintf("check id = %d, processor = %d,com = %lf, pro = %lf, comp=%lf\n", maxid,pe,temp,alloc_array[pe][nobj],total_time);
 	    if(total_time > (temp + commpe->load)){
 		minpe = pe;
 		total_time = temp + commpe->load;
@@ -311,12 +322,15 @@ void GreedyCommLB::work(BaseLB::LDStats* _stats, int count)
 	    pe = commPes[k];
             processorInfo *commpe = (processorInfo *) &processors[pe];
             lightProcessors->update(commpe);
+	    pe_comm[pe] = 0.0;			// clear
         }
 
 	delete x;
     }
     
     // free up memory
+    delete [] pe_comm;
+
     delete [] processors;
     delete [] assigned_array;
 
