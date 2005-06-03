@@ -123,6 +123,8 @@ PyMethodDef PythonObject::CkPy_MethodsCustom[] = {
   {NULL,      NULL}        /* Sentinel */
 };
 
+char* PythonObject::CkPy_MethodsCustomDoc = "";
+
 PyMethodDef CkPy_MethodsDefault[] = {
   {"printstr", CkPy_printstr, METH_VARARGS},
   {"printclient", CkPy_print, METH_VARARGS},
@@ -311,13 +313,19 @@ void PythonObject::execute (CkCcsRequestMsg *msg, CcsDelayedReply *reply) {
 		 "read(where) -- read a value on the chare (uses the \\\"read\\\" method of the chare)\\n"
 		 "write(where, what) -- write a value back on the chare (uses the \\\"write\\\" method of the chare)\\n\"",
 		 Py_file_input,dict,dict);
-    if (pyMsg->isHighLevel()) PyRun_String("import charm",Py_file_input,dict,dict);
+    if (pyMsg->isHighLevel()) {
+      PyRun_String("import charm",Py_file_input,dict,dict);
+      PyRun_String(getMethodsDoc(),Py_file_input,dict,dict);
+    }
 
-    pipe(((*CsvAccess(pyWorkers))[pyReference]).pipes);
-    FILE *pipeW = fdopen(((*CsvAccess(pyWorkers))[pyReference]).pipes[1], "w");
-    PyObject *file = PyFile_FromFile(pipeW, "__charm_stdout__", "w", fclose);
-    PyDict_SetItemString(dict,"__charmFile__",file);
-    PyRun_String("sys.stdout = __charmFile__",Py_file_input,dict,dict);
+    PyRun_String("class __charmOutput__:\n"
+		 "    def __init__(self, stdout):\n"
+		 "        self.stdout = stdout\n"
+		 "    def write(self, s):\n"
+		 "        ck.printclient(s)\n"
+		 "sys.stdout = __charmOutput__(sys.stdout)"
+		 ,Py_file_input,dict,dict);
+
   }
 
   ((*CsvAccess(pyWorkers))[pyReference]).inUse = true;
@@ -407,11 +415,6 @@ void PythonObject::executeThread(PythonExecute *pyMsg) {
       //PyObject_Print(ptraceback, stdout, 0);
       //if (ptraceback) CkPrintf("   %d %d %d %d\n",PyType_Check(ptraceback),PyString_Check(ptraceback),PyList_Check(ptraceback),PyTuple_Check(ptraceback));
     }
-    char buf[256];
-    buf[255] = 0;
-    int i;
-    int pippe = ((*CsvAccess(pyWorkers))[pyReference]).pipes[0];
-    while ((i = ::read(pippe,&buf[0],255))>0) CkPrintf(buf); //Ck_printclient(pyReference,buf);
   } else {
     // compile the program
     char *userCode = pyMsg->code.code;

@@ -23,6 +23,7 @@ extern PyMethodDef CkPy_MethodsDefault[];
 
 class PythonObject {
   static PyMethodDef CkPy_MethodsCustom[];
+  static char* CkPy_MethodsCustomDoc;
  public:
   void pyRequest(CkCcsRequestMsg *msg);
   void execute(CkCcsRequestMsg *msg, CcsDelayedReply *reply);
@@ -34,6 +35,7 @@ class PythonObject {
   static void _callthr_executeThread(CkThrCallArg *impl_arg);
   void executeThread(PythonExecute *pyMsg);
   virtual PyMethodDef *getMethods() {return CkPy_MethodsCustom;}
+  virtual char *getMethodsDoc() {return CkPy_MethodsCustomDoc;}
 
   // utility functions to manipulate python objects
   // in order to use Dictionaries, Lists, Tuples, refer to
@@ -105,7 +107,6 @@ typedef struct {
   CcsDelayedReply finish; /* Where to send the ack of termination */
 
   std::string printed; /* Union of all printed string and not yet shipped to the client */
-  int pipes[2]; /* File descriptors used to forward prints */
 } PythonStruct;
 typedef std::map<CmiUInt4,PythonStruct> PythonTable;
 
