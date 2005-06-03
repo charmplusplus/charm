@@ -35,9 +35,15 @@ public:
   double *comLoads; 	// total comm load
   double *bgLoads; 	// background load
   int    numPes;
+  int    msgCount;	// total non-local communication
+  CmiUInt8  msgBytes;	// total non-local communication
   double minObjLoad, maxObjLoad;
-  LBInfo(): peLoads(NULL), objLoads(NULL), comLoads(NULL), bgLoads(NULL), numPes(0), minObjLoad(0.0), maxObjLoad(0.0) {}
-  LBInfo(double *pl, int count): peLoads(pl), objLoads(NULL), comLoads(NULL), bgLoads(NULL), numPes(count), minObjLoad(0.0), maxObjLoad(0.0) {}
+  LBInfo(): peLoads(NULL), objLoads(NULL), comLoads(NULL), 
+            bgLoads(NULL), msgCount(0), msgBytes(0),
+            numPes(0), minObjLoad(0.0), maxObjLoad(0.0) {}
+  LBInfo(double *pl, int count): peLoads(pl), objLoads(NULL), 
+            comLoads(NULL), bgLoads(NULL), msgCount(0), msgBytes(0),
+            numPes(count), minObjLoad(0.0), maxObjLoad(0.0) {}
   LBInfo(int count);
   ~LBInfo();
   void getInfo(BaseLB::LDStats* stats, int count, int considerComm);

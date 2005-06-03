@@ -19,6 +19,8 @@
 
 #define LB_FORMAT_VERSION     2
 
+extern int _lb_version;
+
 // command line options
 class CkLBArgs
 {
@@ -33,7 +35,6 @@ private:
   int _lb_useCpuTime;           // use cpu instead of wallclock time
   int _lb_statson;		// stats collection
   int _lb_traceComm;		// stats collection for comm
-  int _lb_version;		// data file version
   double _lb_alpha;		// per message send overhead
   double _lb_beeta;		// per byte send overhead
   int _lb_percentMovesAllowed; //Specifies restriction on num of chares to be moved(as a percentage of total number of chares). Used by RefineKLB
@@ -43,7 +44,6 @@ public:
     _lb_debug = _lb_ignoreBgLoad = _lb_syncResume = _lb_useCpuTime = 0;
     _lb_printsumamry = _lb_migObjOnly = 0;
     _lb_statson = _lb_traceComm = 1;
-    _lb_version = LB_FORMAT_VERSION;
     _lb_percentMovesAllowed=100;
   }
   inline double & lbperiod() { return _autoLbPeriod; }

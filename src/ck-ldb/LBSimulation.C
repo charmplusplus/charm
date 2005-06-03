@@ -19,6 +19,8 @@ int LBSimulation::simStepSize = 1;           /// number of steps to simulate
 int LBSimulation::simProcs = 0; 	     /// simulation target procs
 int LBSimulation::procsChanged = 0;          /// flag if the number of procs has been changed
 
+int _lb_version = LB_FORMAT_VERSION;	     /// data file version
+
 /*****************************************************************************
 		LBInfo: evaluation information for LBStats  
 *****************************************************************************/
@@ -53,6 +55,7 @@ void LBInfo::clear()
   }
   minObjLoad = 0.0;
   maxObjLoad = 0.0;
+  msgCount = msgBytes = 0;
 }
 
 void LBInfo::getInfo(BaseLB::LDStats* stats, int count, int considerComm)
@@ -69,6 +72,9 @@ void LBInfo::getInfo(BaseLB::LDStats* stats, int count, int considerComm)
 
         minObjLoad = 1.0e20;  // I suppose no object load is beyond this
 	maxObjLoad = 0.0;
+
+    	msgCount = 0;
+	msgBytes = 0;
 
 	if (considerComm) stats->makeCommHash();
 
@@ -138,12 +144,18 @@ void LBInfo::getInfo(BaseLB::LDStats* stats, int count, int considerComm)
               int nobjs;
               LDObjKey *objs = cdata.receiver.get_destObjs(nobjs);
 	      mcast_count ++;
+	      CkVec<int> pes;
 	      for (i=0; i<nobjs; i++) {
 	        int idx = stats->getHash(objs[i]);
 		CmiAssert(idx != -1);
 	        if (idx == -1) continue;    // receiver has just been removed?
 	        receiverPE = stats->to_proc[idx];
 		CmiAssert(receiverPE < count && receiverPE >= 0);
+		int exist = 0;
+	        for (int p=0; p<pes.size(); p++) 
+		  if (receiverPE == pes[p]) { exist=1; break; }
+		if (exist) continue;
+		pes.push_back(receiverPE);
 	        if(senderPE != receiverPE)
 	        {
 	  	msgSentCount[senderPE] += cdata.messages;
@@ -166,6 +178,8 @@ void LBInfo::getInfo(BaseLB::LDStats* stats, int count, int considerComm)
 			      byteSentCount[i] * beeta;
 		peLoads[i] += comload;
 		if (comLoads) comLoads[i] += comload;
+		msgCount += msgRecvCount[i] + msgSentCount[i];
+		msgBytes += byteRecvCount[i] + byteSentCount[i];
 	  }
 	  delete [] msgRecvCount;
 	  delete [] msgSentCount;
@@ -194,13 +208,14 @@ void LBInfo::print()
   average = sum/numPes;
   CmiPrintf("The processor loads are: \n");
   CmiPrintf("PE   (Total Load) (Obj Load) (Comm Load) (BG Load)\n");
-  for(i = 0; i < numPes; i++) {
-    CmiPrintf("%-4d %10f %10f %10f %10f\n", i, peLoads[i], objLoads[i], comLoads[i], bgLoads[i]);
-  }
+  if (_lb_args.debug() > 3)
+    for(i = 0; i < numPes; i++)
+      CmiPrintf("%-4d %10f %10f %10f %10f\n", i, peLoads[i], objLoads[i], comLoads[i], bgLoads[i]);
   CmiPrintf("max: %10f %10f %10f\n", maxLoad, maxProcObjLoad, maxComLoad);
   CmiPrintf("Min : %f	Max : %f	Average: %f\n", minLoad, maxLoad, average);
     // the min and max object (calculated in getLoadInfo)
   CmiPrintf("MinObj : %f	MaxObj : %f\n", minObjLoad, maxObjLoad, average);
+  CmiPrintf("Non-local comm: %d msgs %lld bytes\n", msgCount, msgBytes);
 }
 
 void LBInfo::getSummary(double &maxLoad, double &totalLoad)

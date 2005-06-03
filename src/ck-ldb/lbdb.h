@@ -17,6 +17,8 @@
 #include "charm.h"
 #include "middle.h"
 
+extern int _lb_version;
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -393,7 +395,7 @@ inline void LDObjData::pup(PUP::er &p) {
   p|cpuTime;
   p|wallTime;
   p|migratable;
-  p|asyncArrival;
+  if (_lb_version > -1) p|asyncArrival;
 }
 PUPmarshall(LDObjData);
 
@@ -427,7 +429,12 @@ inline void LDCommDesc::pup(PUP::er &p) {
   p|type;
   switch (type) {
   case LD_PROC_MSG:  p|dest.destProc; break;
-  case LD_OBJ_MSG:  p|dest.destObj.destObj; p|dest.destObj.destObjProc; break;
+  case LD_OBJ_MSG:   p|dest.destObj.destObj; 
+                     if (_lb_version == -1 && p.isUnpacking()) 
+		       dest.destObj.destObjProc = -1;
+		     else
+		       p|dest.destObj.destObjProc; 
+		     break;
   case LD_OBJLIST_MSG:  {  p|dest.destObjs.len; 
                            if (p.isUnpacking()) 
                                dest.destObjs.objs = new LDObjKey[dest.destObjs.len];
