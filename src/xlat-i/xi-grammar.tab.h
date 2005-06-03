@@ -156,7 +156,7 @@
 
 
 #if ! defined (YYSTYPE) && ! defined (YYSTYPE_IS_DECLARED)
-#line 16 "xi-grammar.y"
+#line 17 "xi-grammar.y"
 typedef union YYSTYPE {
   ModuleList *modlist;
   Module *module;

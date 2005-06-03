@@ -490,6 +490,7 @@ class Member : public Construct {
     virtual void genIndexDecls(XStr& str)=0;
     virtual void genPythonDefs(XStr& str) {}
     virtual void genPythonStaticDefs(XStr& str) {}
+    virtual void genPythonStaticDocs(XStr& str) {}
     virtual void lookforCEntry(CEntry *centry)  {}
 };
 
@@ -525,6 +526,7 @@ class MemberList : public Printable {
     void genReg(XStr& str);
     void genPythonDefs(XStr& str);
     void genPythonStaticDefs(XStr& str);
+    void genPythonStaticDocs(XStr& str);
     void collectSdagCode(CParsedFile *pf, int& sdagPresent);
     virtual void lookforCEntry(CEntry *centry);
 };
@@ -716,6 +718,7 @@ class Entry : public Member {
     int attribs;    
     Type *retType;
     Value *stacksize;
+    char *pythonDoc;
     
     XStr proxyName(void) {return container->proxyName();}
     XStr indexName(void) {return container->indexName();}
@@ -748,6 +751,7 @@ class Entry : public Member {
     void genPythonDecls(XStr& str);
     void genPythonDefs(XStr& str);
     void genPythonStaticDefs(XStr& str);
+    void genPythonStaticDocs(XStr& str);
     
     XStr paramType(int withDefaultVals,int withEO=0);
     XStr paramComma(int withDefaultVals,int withEO=0);

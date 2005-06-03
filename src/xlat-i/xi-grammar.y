@@ -10,6 +10,7 @@ extern int in_bracket,in_braces,in_int_expr;
 extern TList<Entry *> *connectEntries;
 ModuleList *modlist;
 extern int macroDefined(char *str, int istrue);
+extern char *python_doc;
 
 %}
 
@@ -125,7 +126,7 @@ extern int macroDefined(char *str, int istrue);
 %type <mvlist>		VarList
 %type <intval>		ParamBraceStart ParamBraceEnd SParamBracketStart SParamBracketEnd StartIntExpr EndIntExpr
 %type <sc>		Slist SingleConstruct Olist OptSdagCode HasElse ForwardList PublishesList OptPubList
-
+%type <intval>		PythonOptions
 
 %%
 
@@ -380,6 +381,12 @@ CAttribList	: CAttrib
 		{ $$ = $1; }
 		| CAttrib ',' CAttribList
 		{ $$ = $1 | $3; }
+		;
+
+PythonOptions	: /* Empty */
+		{ python_doc = NULL; $$ = 0; }
+		| LITERAL
+		{ python_doc = $1; $$ = 0; }
 		;
 
 ArrayAttrib	: PYTHON
@@ -668,7 +675,7 @@ EAttrib		: THREADED
                 { $$ = SSKIPSCHED; }
 		| INLINE
                 { $$ = SINLINE; }
-		| PYTHON
+		| PYTHON PythonOptions
                 { $$ = SPYTHON; }
 		;
 

@@ -19,6 +19,7 @@
 int fortranMode;
 int internalMode;
 const char *cur_file;
+char *python_doc;
 
 const char *Prefix::Proxy="CProxy_";
 const char *Prefix::ProxyElement="CProxyElement_";
@@ -795,9 +796,11 @@ void Chare::genPythonDecls(XStr& str) {
   b->genProxyNames(str,"      ",NULL,"::pup(p);","\n",forPython);
   str << "\n    }\n";
 
-  // define the python custom methods
+  // define the python custom methods and their documentation
   str << "    static PyMethodDef CkPy_MethodsCustom[];\n";
   str << "    PyMethodDef *getMethods(void) {return CkPy_MethodsCustom;}\n";
+  str << "    static char *CkPy_MethodsCustomDoc;\n";
+  str << "    char *getMethodsDoc(void) {return CkPy_MethodsCustomDoc;}\n";
 
   str << CIClassEnd;
 
@@ -814,10 +817,16 @@ void Chare::genPythonDefs(XStr& str) {
   XStr ptype;
   ptype<<Prefix::Python<<type;
 
+  // generate the python methods array
   str << "PyMethodDef "<<ptype<<"::CkPy_MethodsCustom[] = {\n";
   if (list)
     list->genPythonStaticDefs(str);
   str << "  {NULL, NULL}\n};\n\n";
+  // generate documentaion for the methods
+  str << "char * "<<ptype<<"::CkPy_MethodsCustomDoc = \"charm.__doc__ = \\\"Available methods for object "<<type<<":\\\\n\"";
+  if (list)
+    list->genPythonStaticDocs(str);
+  str << "\n  \"\\\"\";\n\n";
 
   if (list)
     list->genPythonDefs(str);
@@ -1781,6 +1790,14 @@ void MemberList::genPythonStaticDefs(XStr& str) {
   }
 }
 
+void MemberList::genPythonStaticDocs(XStr& str) {
+  if(member)
+    member->genPythonStaticDocs(str);
+  if(next) {
+    next->genPythonStaticDocs(str);
+  }
+}
+
 void Entry::lookforCEntry(CEntry *centry)
 {
    // compare name
@@ -2019,6 +2036,7 @@ Entry::Entry(int l, int a, Type *r, char *n, ParamList *p, Value *sz, SdagConstr
   if(!isThreaded() && stacksize) die("Non-Threaded methods cannot have stacksize",line);
   if(retType && !isSync() && !retType->isVoid()) 
     die("A remote method normally returns void.  To return non-void, you need to declare the method as [sync], which means it has blocking semantics.",line);
+  if (isPython()) pythonDoc = python_doc;
 }
 void Entry::setChare(Chare *c) {
 	Member::setChare(c);
@@ -2449,6 +2467,14 @@ void Entry::genPythonDefs(XStr& str) {
 void Entry::genPythonStaticDefs(XStr& str) {
   if (isPython()) {
     str << "  {\""<<name<<"\",_Python_"<<container->baseName()<<"_"<<name<<",METH_VARARGS},\n";
+  }
+}
+
+void Entry::genPythonStaticDocs(XStr& str) {
+  if (isPython()) {
+    str << "\n  \""<<name<<" -- \"";
+    if (pythonDoc) str <<(char*)pythonDoc;
+    str <<"\"\\\\n\"";
   }
 }
 
