@@ -723,6 +723,12 @@ FDECL void FTN_NAME(FEM_MIGRATE,fem_migrate)
   FEM_Migrate();
 }
 
+FDECL void FTN_NAME(FEM_ASYNC_MIGRATE,fem_async_migrate)
+  (void)
+{
+  FEM_Async_Migrate();
+}
+
 FDECL int FTN_NAME(FEM_CREATE_SIMPLE_FIELD,fem_create_simple_field)
   (int *bt, int *vl)
 {
