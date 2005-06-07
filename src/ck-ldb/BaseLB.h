@@ -81,7 +81,10 @@ public:
     int *objHash; 
     int  hashSize;
 
-    LDStats(int c=0);
+    int complete_flag;		// if this ocg is complete, eg in HybridLB,
+				// this LDStats may not be complete
+
+    LDStats(int c=0, int complete_flag=1);
     void assign(int oid, int pe) { CmiAssert(procs[pe].available); to_proc[oid] = pe; }
       // build hash table
     void makeCommHash();
@@ -101,8 +104,9 @@ public:
     void clearBgLoad() {
       for (int i=0; i<count; i++) procs[i].clearBgLoad();
     }
-    void print();
+    void computeNonlocalComm(int &nmsgs, int &nbytes);
     double computeAverageLoad();
+    void print();
     // edit functions
     void removeObject(int obj);
     void pup(PUP::er &p);

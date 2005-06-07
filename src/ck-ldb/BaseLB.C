@@ -75,9 +75,9 @@ inline static int ObjKey(const LDObjid &oid, const int hashSize) {
 	 |i_abs(oid.id[0])) % hashSize;
 }
 
-BaseLB::LDStats::LDStats(int c)
+BaseLB::LDStats::LDStats(int c, int complete)
 	: n_objs(0), n_migrateobjs(0), n_comm(0), 
-          objHash(NULL) 
+          objHash(NULL), complete_flag(complete)
 {
   count = c;
   if (count == 0) count = CkNumPes();
@@ -223,6 +223,78 @@ int BaseLB::LDStats::getRecvHash(LDCommData &cData)
     cData.recvHash =  getHash(cData.receiver.get_destObj());
   }
   return cData.recvHash;
+}
+
+void BaseLB::LDStats::computeNonlocalComm(int &nmsgs, int &nbytes)
+{
+#if CMK_LBDB_ON
+    	nmsgs = 0;
+	nbytes = 0;
+
+	makeCommHash();
+
+	int mcast_count = 0;
+        for (int cidx=0; cidx < n_comm; cidx++) {
+	    LDCommData& cdata = commData[cidx];
+	    int senderPE, receiverPE;
+	    if (cdata.from_proc())
+	      senderPE = cdata.src_proc;
+  	    else {
+	      int idx = getHash(cdata.sender);
+	      if (idx == -1) continue;    // sender has just migrated?
+	      senderPE = to_proc[idx];
+	      CmiAssert(senderPE != -1);
+	    }
+	    CmiAssert(senderPE < count && senderPE >= 0);
+
+            // find receiver: point-to-point and multicast two cases
+	    int receiver_type = cdata.receiver.get_type();
+	    if (receiver_type == LD_PROC_MSG || receiver_type == LD_OBJ_MSG) {
+              if (receiver_type == LD_PROC_MSG)
+	        receiverPE = cdata.receiver.proc();
+              else  {  // LD_OBJ_MSG
+	        int idx = getHash(cdata.receiver.get_destObj());
+		if (idx == -1) {		// receiver outside this domain
+		  if (complete_flag) continue;
+		  else receiverPE = -1;
+		}
+		else {
+	          receiverPE = to_proc[idx];
+	          CmiAssert(receiverPE != -1);
+		}
+              }
+              CmiAssert(receiverPE < count && receiverPE >= 0);
+	      if(senderPE != receiverPE)
+	      {
+	  	nmsgs += cdata.messages;
+		nbytes += cdata.bytes;
+	      }
+	    }
+            else if (receiver_type == LD_OBJLIST_MSG) {
+              int nobjs;
+              LDObjKey *objs = cdata.receiver.get_destObjs(nobjs);
+	      mcast_count ++;
+	      CkVec<int> pes;
+	      for (int i=0; i<nobjs; i++) {
+	        int idx = getHash(objs[i]);
+		CmiAssert(idx != -1);
+	        if (idx == -1) continue;    // receiver has just been removed?
+	        receiverPE = to_proc[idx];
+		CmiAssert(receiverPE < count && receiverPE >= 0);
+		int exist = 0;
+	        for (int p=0; p<pes.size(); p++) 
+		  if (receiverPE == pes[p]) { exist=1; break; }
+		if (exist) continue;
+		pes.push_back(receiverPE);
+	        if(senderPE != receiverPE)
+	        {
+	  	  nmsgs += cdata.messages;
+		  nbytes += cdata.bytes;
+	        }
+              }
+	    }
+	}   // end of for
+#endif
 }
 
 void BaseLB::LDStats::print()
