@@ -20,6 +20,10 @@
 
 /*@{*/
 
+/*==========================================================*/
+/*==========================================================*/
+/*==========================================================*/
+
 /** FUNCTIONS ALWAYS TO BE IMPLEMENTED
 
  * This first section of the file reports which methods must always be
@@ -32,25 +36,59 @@ void ConverseExit(void);
 void CmiAbort(const char *);
 
 void          CmiSyncSendFn(int, int, char *);
-CmiCommHandle CmiAsyncSendFn(int, int, char *);
 void          CmiFreeSendFn(int, int, char *);
 
 void          CmiSyncBroadcastFn(int, char *);
-CmiCommHandle CmiAsyncBroadcastFn(int, char *);
 void          CmiFreeBroadcastFn(int, char *);
 
 void          CmiSyncBroadcastAllFn(int, char *);
-CmiCommHandle CmiAsyncBroadcastAllFn(int, char *);
 void          CmiFreeBroadcastAllFn(int, char *);
+
+/* Poll the network for messages */
+//Different machine layers have different names for this function  
+
+/* Poll the network and when a message arrives and insert this arrived
+   message into the local queue. For SMP this message would have to be
+   inserted into the thread's queue with the correct rank **/
+//Pump messages is called when the processor goes idle
+void PumpMessages();  
+
+/* Free network resources when the messages have been sent out. Also
+called when machine goes idle and at other places depending on the
+implementation *********/
+void CmiReleaseSentMessages(); 
+
+//Called when the processor goes idle. Typically calls pump messages
+//and releaseSentMessages. The idle handler has to be explicitly
+//registered in ConverseInit through a call to CcdCallOnConditionKeep
+void CmiNotifyIdle();
+
+
+/*==========================================================*/
+/*==========================================================*/
+/*==========================================================*/
+
+/************ Recommended routines ***********************/
+/************ You dont have to implement these but they are supported
+ in the converse syntax and some rare programs may crash. But most
+ programs dont need them. *************/
+
+CmiCommHandle CmiAsyncSendFn(int, int, char *);
+CmiCommHandle CmiAsyncBroadcastFn(int, char *);
+CmiCommHandle CmiAsyncBroadcastAllFn(int, char *);
 
 int           CmiAsyncMsgSent(CmiCommHandle handle);
 void          CmiReleaseCommHandle(CmiCommHandle handle);
 
-void	      CmiMultipleSend(unsigned int, int, int *, char **);
-void	      CmiMultipleIsend(unsigned int, int, int *, char **);
 
+/*==========================================================*/
+/*==========================================================*/
+/*==========================================================*/
 
-/** MULTICAST/VECTOR SENDING FUNCTIONS
+//Optional routines which could use common code which is shared with
+//other machine layer implementations.
+
+/* MULTICAST/VECTOR SENDING FUNCTIONS
 
  * In relations to some flags, some other delivery functions may be needed.
  */
@@ -326,15 +364,6 @@ void     CmiNodeSpanTreeChildren(int node, int *children) ;
 
 #endif
 
-
-/** CCS
-
- * If CCS is available the following function is needed, used in debug-conv.c
- */
-
-#if CMK_CCS_AVAILABLE
-void CmiNotifyIdle();
-#endif
 
 
 /** IMMEDIATE MESSAGES
