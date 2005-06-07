@@ -237,7 +237,7 @@ void GreedyAgentLB::work(CentralLB::LDStats* stats, int count)
     //int extractIndex=0;
 		
 			CkPrintf("obj count:%d\n",obj);
-		for(int i=0;i<=count;i++)
+		for(i=0;i<=count;i++)
 			trialpes[i]=-1;
 
 		if(extractIndex==0)
