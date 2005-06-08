@@ -127,10 +127,12 @@ void PVT::startPhase(prioBcMsg *m)
   }
   
   // (2) Pack the SRtable data into the message
-  UpdateMsg *um = SendsAndRecvs->PackTable(pvt);
+  POSE_TimeType maxSR;
+  UpdateMsg *um = SendsAndRecvs->PackTable(pvt, &maxSR);
   // (3) Add the PVT info to the message
   um->optPVT = pvt;
   um->conPVT = conPVT;
+  um->maxSR = maxSR;
   um->runGVTflag = 0;
 
   if (um->numEntries > 0) {
@@ -252,7 +254,7 @@ void PVT::reportReduce(UpdateMsg *m)
 #endif
   CProxy_PVT p(ThePVT);
   CProxy_GVT g(TheGVT);
-  POSE_TimeType lastGVT = 0;
+  POSE_TimeType lastGVT = 0, maxSR=0;
   static POSE_TimeType optGVT = POSE_UnsetTS, conGVT = POSE_UnsetTS;
   static int done=0;
   static SRentry *SRs = NULL;
@@ -260,8 +262,8 @@ void PVT::reportReduce(UpdateMsg *m)
   // see if message provides new min optGVT or conGVT
   if ((optGVT < 0) || ((m->optPVT > POSE_UnsetTS) && (m->optPVT < optGVT)))
     optGVT = m->optPVT;
-  if ((conGVT < 0) || ((m->conPVT > POSE_UnsetTS) && (m->conPVT < conGVT)))
-    conGVT = m->conPVT;
+  if (m->maxSR > maxSR)
+    maxSR = m->maxSR;
   addSR(&SRs, m->SRs, optGVT, m->numEntries);
   done++;
   CkFreeMsg(m);
@@ -288,6 +290,7 @@ void PVT::reportReduce(UpdateMsg *m)
     um->numEntries = entryCount;
     um->optPVT = optGVT;
     um->conPVT = conGVT;
+    um->maxSR = maxSR;
     um->runGVTflag = 0;
 
     if (reportEnd) { //send to computeGVT
@@ -377,7 +380,8 @@ void GVT::computeGVT(UpdateMsg *m)
   CProxy_PVT p(ThePVT);
   CProxy_GVT g(TheGVT);
   GVTMsg *gmsg = new GVTMsg;
-  POSE_TimeType lastGVT = 0, earliestMsg = POSE_UnsetTS;
+  POSE_TimeType lastGVT = 0, earliestMsg = POSE_UnsetTS, 
+    earlyAny = POSE_UnsetTS;
   static POSE_TimeType optGVT = POSE_UnsetTS, conGVT = POSE_UnsetTS;
   static int done=0;
   static SRentry *SRs = NULL;
@@ -391,6 +395,8 @@ void GVT::computeGVT(UpdateMsg *m)
       optGVT = m->optPVT;
     if ((conGVT < 0) || ((m->conPVT > POSE_UnsetTS) && (m->conPVT < conGVT)))
       conGVT = m->conPVT;
+    if (m->maxSR > earlyAny) 
+      earlyAny = m->maxSR;
     // add send/recv info to SRs
     /*    if (m->numEntries > 0)
       CkPrintf("GVT recv'd %d SRs from a PE, earliest=%d\n", m->numEntries, 
@@ -418,11 +424,9 @@ void GVT::computeGVT(UpdateMsg *m)
     /*    if (SRs) SRs->dump();
 	  else CkPrintf("No SRs reported to GVT!\n");*/
     SRentry *tmp = SRs;
-    POSE_TimeType lastSR = POSE_UnsetTS, earlyAny = POSE_UnsetTS;
+    POSE_TimeType lastSR = POSE_UnsetTS;
     while (tmp && ((tmp->timestamp <= estGVT) || (estGVT == POSE_UnsetTS))) {
       lastSR = tmp->timestamp;
-      if (tmp->sends || tmp->recvs)
-	earlyAny = tmp->timestamp;
       if (tmp->sends != tmp->recvs) {
 	earliestMsg = tmp->timestamp;
 	break;

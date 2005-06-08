@@ -273,7 +273,7 @@ void SRtable::MapToBuckets(SRentry *bkt, SRentry *endBkt, int *s,
 }
 
 /// Compress and pack table into an UpdateMsg and return it
-UpdateMsg *SRtable::PackTable(POSE_TimeType pvt)
+UpdateMsg *SRtable::PackTable(POSE_TimeType pvt, POSE_TimeType *maxSR)
 { //check me
 #ifdef SR_SANITIZE
   sanitize();
@@ -300,6 +300,7 @@ UpdateMsg *SRtable::PackTable(POSE_TimeType pvt)
   for (i=0; i<=nBkts; i++) {
     tmp = buckets[i];
     while (tmp) {
+      (*maxSR) = tmp->timestamp;
       if (tmp->sends != tmp->recvs)
 	nEntries++;
       tmp = tmp->next;

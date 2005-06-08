@@ -202,7 +202,7 @@ class SRtable {
   /// Move contents of bkt to new bucket structure
   void MapToBuckets(SRentry *bkt, SRentry *endBkt, int *s, int *r);
   /// Compress and pack table into an UpdateMsg and return it
-  UpdateMsg *PackTable(POSE_TimeType pvt);
+  UpdateMsg *PackTable(POSE_TimeType pvt, POSE_TimeType *maxSRb);
   /// CompressAndSort all buckets
   void SortTable();
   /// Compress a bucket so all SRentries have unique timestamps and are sorted

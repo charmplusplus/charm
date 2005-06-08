@@ -29,6 +29,8 @@ public:
   POSE_TimeType optPVT;
   /// PVT of local conservative objects
   POSE_TimeType conPVT;
+  /// Max timestamp in SR table
+  POSE_TimeType maxSR;
   /// # sends/recvs at particular timestamps <= PVT
   SRentry *SRs;
   /// Count of entries in SRs
