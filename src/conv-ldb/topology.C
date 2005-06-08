@@ -18,7 +18,7 @@
 #include "cklists.h"
 #include "topology.h"
 
-extern char *_lbtopo;			/* topology name string */
+extern "C" char *_lbtopo;			/* topology name string */
 
 int LBTopology::get_hop_count(int src,int dest)
 {
