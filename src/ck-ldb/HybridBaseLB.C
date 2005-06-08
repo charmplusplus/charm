@@ -104,7 +104,7 @@ void HybridBaseLB::FindNeighbors()
         data->statsMsgsList = new CLBStatsMsg*[data->nChildren];
         for(int i=0; i < data->nChildren; i++)
            data->statsMsgsList[i] = NULL;
-        data->statsData = new LDStats(data->nChildren+1);
+        data->statsData = new LDStats(data->nChildren+1, 0);  // incomplete
         //  a fake processor
         ProcStats &procStat = data->statsData->procs[data->nChildren];
         procStat.available = CmiFalse;
@@ -1043,7 +1043,9 @@ LBMigrateMsg * HybridBaseLB::createMigrateMsg(LDStats* stats,int count)
       info.getInfo(stats, count, 0);	// no comm cost
       double totalLoad;
       info.getSummary(maxLoad, totalLoad);
-      CkPrintf("[%d] Load Summary: max: %f total: %f on %d processors at step %d useMem: %fKB.\n", CkMyPe(), maxLoad, totalLoad, count, step(), (1.0*useMem())/1024);
+      int nmsgs, nbytes;
+      stats->computeNonlocalComm(nmsgs, nbytes);
+      CkPrintf("[%d] Load Summary: max: %f total: %f on %d processors at step %d useMem: %fKB nonlocal: %d %dKB.\n", CkMyPe(), maxLoad, totalLoad, count, step(), (1.0*useMem())/1024, nmsgs, nbytes/1024);
   }
 
   // translate relative pe number to its real number
