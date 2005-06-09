@@ -187,21 +187,31 @@ PairCalculator::calculatePairs_gemm(calculatePairsMsg *msg)
 	inDataLeft = new double[numExpected*N*2];
 	memset(inDataLeft,0,numExpected*N*2*sizeof(double));
 #ifdef _PAIRCALC_DEBUG_
-	CkPrintf("[%d,%d,%d,%d] Allocated Left %d * %d *2 \n",thisIndex.w,thisIndex.x,thisIndex.y,thisIndex.z,numExpected,N);
+	CkPrintf("[%d,%d,%d,%d,%d] Allocated Left %d * %d *2 \n",thisIndex.w,thisIndex.x,thisIndex.y,thisIndex.z,symmetric, numExpected,N);
 
 #endif
       }
     CkAssert(N==msg->size);
     CkAssert(offset<numExpected);
     existsLeft=true;
-    memcpy(&(inDataLeft[offset*N]), msg->points, N * 2 *sizeof(double));
+    memcpy(&(inDataLeft[offset*N*2]), msg->points, N * 2 *sizeof(double));
 #ifdef _PAIRCALC_DEBUG_
-    CkPrintf("[%d,%d,%d,%d] Copying into offset*N %d * %d N *2 %d points start %g end %g\n",thisIndex.w,thisIndex.x,thisIndex.y,thisIndex.z, offset, N, N*2,msg->points[0].re, msg->points[N].im);
+    CkPrintf("[%d,%d,%d,%d,%d] Copying into offset*N %d * %d N *2 %d points start %g end %g\n",thisIndex.w,thisIndex.x,thisIndex.y,thisIndex.z, symmetric, offset, N, N*2,msg->points[0].re, msg->points[N-1].im);
 #endif
 #ifdef _PAIRCALC_DEBUG_PARANOID_
     CkPrintf("copying in \n");
-    for(int i=0;i<N*2;i++)
-      CkPrintf("%d %g %g\n",i,msg->points[i].re, msg->points[i].im);
+    double re;
+    double im;
+    for(int i=0;i<N;i++)
+      {	
+	re=msg->points[i].re;
+	im=msg->points[i].im;
+	CkPrintf("CL %d %g %g\n",i,re,im);
+	if(fabs(re)>0.0)
+	  CkAssert(fabs(re)>1.0e-300);
+	if(fabs(im)>0.0)
+	  CkAssert(fabs(im)>1.0e-300);
+      }
 #endif
   }
   else {
@@ -212,21 +222,31 @@ PairCalculator::calculatePairs_gemm(calculatePairsMsg *msg)
 	inDataRight = new double[numExpected*N*2];
 	memset(inDataRight,0,numExpected*N*2*sizeof(double));
 #ifdef _PAIRCALC_DEBUG_
-	CkPrintf("[%d,%d,%d,%d] Allocated right %d * %d *2 \n",thisIndex.w,thisIndex.x,thisIndex.y,thisIndex.z,numExpected,N);
+	CkPrintf("[%d,%d,%d,%d,%d] Allocated right %d * %d *2 \n",thisIndex.w,thisIndex.x,thisIndex.y,thisIndex.z,symmetric,numExpected,N);
 #endif
       }
     CkAssert(N==msg->size);
     CkAssert(offset<numExpected);
     existsRight=true;
-    memcpy(&(inDataRight[offset*N]), msg->points, N * 2 *sizeof(double));
+    memcpy(&(inDataRight[offset*N*2]), msg->points, N * 2 *sizeof(double));
 
 #ifdef _PAIRCALC_DEBUG_
-    CkPrintf("[%d,%d,%d,%d] Copying into offset*N %d * %d N *2 %d points start %g end %g\n",thisIndex.w,thisIndex.x,thisIndex.y,thisIndex.z,offset,N, N*2,msg->points[0].re, msg->points[N].im);
+    CkPrintf("[%d,%d,%d,%d,%d] Copying into offset*N %d * %d N *2 %d points start %g end %g\n",thisIndex.w,thisIndex.x,thisIndex.y,thisIndex.z,symmetric,offset,N, N*2,msg->points[0].re, msg->points[N-1].im);
 #endif
 #ifdef _PAIRCALC_DEBUG_PARANOID_
     CkPrintf("copying in \n");
-    for(int i=0;i<N*2;i++)
-      CkPrintf("%d %g %g\n",i,msg->points[i].re, msg->points[i].im);
+    double re;
+    double im;
+    for(int i=0;i<N;i++)
+      {
+	re=msg->points[i].re;
+	im=msg->points[i].im;
+	CkPrintf("CR %d %g %g\n",i,re,im);
+	if(fabs(re)>0.0)
+	  CkAssert(fabs(re)>1.0e-300);
+	if(fabs(im)>0.0)
+	  CkAssert(fabs(im)>1.0e-300);
+      }
 #endif
   }
 
@@ -245,31 +265,31 @@ PairCalculator::calculatePairs_gemm(calculatePairsMsg *msg)
    */
   /* To make this work, we transpose the first matrix (A). 
      In C++ it appears to be: 
-   * (ydima X ydimb) = (ydima X xdima) X (xdimb X ydimb)
+     * (ydima X ydimb) = (ydima X xdima) X (xdimb X ydimb)
 
-   * Which would be wrong, this works because we're using fortran
-   * BLAS, which has a transposed perspective (column major), so the
-   * actual multiplication is:
-   *
-   * (xdima X xdimb) = (xdima X ydima) X (ydimb X xdimb)
-   *
-   * Since xdima==xdimb==numExpected==grainSize this gives us the
-   * solution matrix we want in one step.
-   */
+     * Which would be wrong, this works because we're using fortran
+     * BLAS, which has a transposed perspective (column major), so the
+     * actual multiplication is:
+     *
+     * (xdima X xdimb) = (xdima X ydima) X (ydimb X xdimb)
+     *
+     * Since xdima==xdimb==numExpected==grainSize this gives us the
+     * solution matrix we want in one step.
+     */
 
   if (numRecd == numExpected * 2 || (symmetric && thisIndex.x==thisIndex.y && numRecd==numExpected)) {
     if(outData == NULL){
       outData = new double[grainSize * grainSize];
       memset(outData, 0 , sizeof(double)* grainSize * grainSize);
 #ifdef _PAIRCALC_DEBUG_
-	CkPrintf("[%d,%d,%d,%d] Allocated outData %d * %d\n",thisIndex.w,thisIndex.x,thisIndex.y,thisIndex.z,grainSize, grainSize);
+      CkPrintf("[%d,%d,%d,%d,%d] Allocated outData %d * %d\n",thisIndex.w,thisIndex.x,thisIndex.y,thisIndex.z,symmetric,grainSize, grainSize);
 #endif
     }
 
 #ifdef _PAIRCALC_DEBUG_PARANOID_
-    CkPrintf("[%d,%d,%d,%d] outData=C\n",thisIndex.w,thisIndex.x,thisIndex.y,thisIndex.z);
+    CkPrintf("[%d,%d,%d,%d,%d] outData=C\n",thisIndex.w,thisIndex.x,thisIndex.y,thisIndex.z,symmetric);
     for(int i=0;i<grainSize*grainSize;i++)
-      CkPrintf(" %f");
+      CkPrintf("o %g",outData[i]);
     CkPrintf("\n");
 #endif
 
@@ -289,29 +309,29 @@ PairCalculator::calculatePairs_gemm(calculatePairsMsg *msg)
     double StartTime=CmiWallTimer();
 #endif
 #ifdef _PAIRCALC_DEBUG_
-    CkPrintf("[%d,%d,%d,%d] gemming %c %c %d %d %d %f A %d B %d %f C %d\n",thisIndex.w,thisIndex.x,thisIndex.y,thisIndex.z,transformT,transform, m_in, n_in, k_in, alpha, lda, ldb, beta, ldc);
+    CkPrintf("[%d,%d,%d,%d,%d] gemming %c %c %d %d %d %f A %d B %d %f C %d\n",thisIndex.w,thisIndex.x,thisIndex.y,thisIndex.z,symmetric,transformT,transform, m_in, n_in, k_in, alpha, lda, ldb, beta, ldc);
 #endif
     if( numRecd == numExpected * 2) 
       {
 #ifdef _PAIRCALC_DEBUG_PARANOID_
-	CkPrintf("[%d,%d,%d,%d] L=A\n",thisIndex.w,thisIndex.x,thisIndex.y,thisIndex.z);
+	CkPrintf("[%d,%d,%d,%d,%d] L=A\n",thisIndex.w,thisIndex.x,thisIndex.y,thisIndex.z,symmetric);
 	for(int i=0;i<N*2;i++)
 	  for(int j=0;j<numExpected;j++)
-	    CkPrintf("%d %d %g\n",i,j,inDataLeft[i*N*2+j]);
-	CkPrintf("\n[%d,%d,%d,%d] R=B\n",thisIndex.w,thisIndex.x,thisIndex.y,thisIndex.z);
+	    CkPrintf("L %d %d %g\n",i,j,inDataLeft[i*numExpected+j]);
+	CkPrintf("\n[%d,%d,%d,%d,%d] R=B\n",thisIndex.w,thisIndex.x,thisIndex.y,thisIndex.z,symmetric);
 	for(int i=0;i<N*2;i++)
 	  for(int j=0;j<numExpected;j++)
-	    CkPrintf("%d %d %g\n",i,j,inDataRight[i*N*2+j]);
+	    CkPrintf("R %d %d %g\n",i,j,inDataRight[i*numExpected+j]);
 #endif
 	DGEMM(&transformT, &transform, &m_in, &n_in, &k_in, &alpha, inDataLeft, &lda, inDataRight, &ldb, &beta, outData, &ldc);
       }
     else if (symmetric && thisIndex.x==thisIndex.y && numRecd==numExpected)
       {
 #ifdef _PAIRCALC_DEBUG_PARANOID_
-	CkPrintf("[%d,%d,%d,%d] L=R=A\n",thisIndex.w,thisIndex.x,thisIndex.y,thisIndex.z);
-	for(int i=0;i<numExpected*N*2;i++)
-	  CkPrintf("%f ",inDataLeft[i]);
-	CkPrintf("\n");
+	CkPrintf("[%d,%d,%d,%d,%d] L=R=A\n",thisIndex.w,thisIndex.x,thisIndex.y,thisIndex.z,symmetric);
+	for(int i=0;i<N*2;i++)
+	  for(int j=0;j<numExpected;j++)
+	  CkPrintf("LS %d %d %g \n",i,j,inDataLeft[i*numExpected+j]);
 #endif
 	DGEMM(&transformT, &transform, &m_in, &n_in, &k_in, &alpha, inDataLeft, &lda, inDataLeft, &ldb, &beta, outData, &ldc);
       }
@@ -342,9 +362,9 @@ PairCalculator::calculatePairs_gemm(calculatePairsMsg *msg)
 	//CkPrintf("[%d] ELAN VERSION %d\n", CkMyPe(), symmetric);
 	CProxy_PairCalcReducer pairCalcReducerProxy(reducer_id); 
 	pairCalcReducerProxy.ckLocalBranch()->acceptContribute(S * S, outData, 
-				   cb, !symmetric, symmetric, thisIndex.x, thisIndex.y, grainSize);
+							       cb, !symmetric, symmetric, thisIndex.x, thisIndex.y, grainSize);
 #ifdef _ELAN_PAIRCALC_DEBUG_ 
-	CkPrintf("[PAIRCALC] [%d %d %d %d] called acceptContribute \n", thisIndex.w, thisIndex.x, thisIndex.y, thisIndex.z);
+	CkPrintf("[PAIRCALC] [%d %d %d %d %d] called acceptContribute \n", thisIndex.w, thisIndex.x, thisIndex.y, thisIndex.z,symmetric);
 #endif 
 
       }

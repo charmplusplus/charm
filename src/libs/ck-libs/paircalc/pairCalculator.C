@@ -260,6 +260,19 @@ void startPairCalcLeft(PairCalcID* pcid, int n, complex* ptr, int myS, int myZ){
 #endif
     pcid->minst.beginIteration();
   }
+#ifdef _PAIRCALC_DEBUG_PARANOID_
+  double re;
+  double im;
+  for(int i=0;i<n;i++)
+    {
+      re=ptr[i].re;
+      im=ptr[i].im;
+      if(fabs(re)>0.0)
+	CkAssert(fabs(re)>1.0e-300);
+      if(fabs(im)>0.0)
+	CkAssert(fabs(im)>1.0e-300);
+    }
+#endif
   if(pcid->existsLproxy)
     {
       calculatePairsMsg *msgfromrow=new ( n,0 ) calculatePairsMsg;
@@ -367,6 +380,19 @@ void startPairCalcRight(PairCalcID* pcid, int n, complex* ptr, int myS, int myZ)
   //  calculatePairsMsg *msg= new ( n,0 ) calculatePairsMsg(n,myS,false,flag_dp,ptr);
   if(pcid->existsRproxy)
     {
+#ifdef _DEBUG_PAIRCALC_PARANOID_
+  double re;
+  double im;
+  for(int i=0;i<n;i++)
+    {
+      re=ptr[i].re;
+      im=ptr[i].im;
+      if(fabs(re)>0.0)
+	CkAssert(fabs(re)>1.0e-300);
+      if(fabs(im)>0.0)
+	CkAssert(fabs(im)>1.0e-300);
+    }
+#endif
       calculatePairsMsg *msg= new ( n,0 ) calculatePairsMsg;
       msg->init(n,myS,false,flag_dp,ptr);
       if(pcid->useComlib & _PC_COMMLIB_MULTI_) {
