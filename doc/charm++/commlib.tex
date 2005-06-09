@@ -212,8 +212,9 @@ strategies optimizing the above mentioned operations.
 \hline
 {\bf Operation} & {\bf Object Strategy} & {\bf Processor Strategy} \\
 \hline
-Many-to-many  personalized & EachToManyStrategy & Mesh, Grid, Hypercube, Direct \\
-Many-to-many  multicast    & EachToManyMulticastStrategy & Mesh, Grid, Hypercube, Direct \\
+All-to-All/Many-to-many && \\
+personalized and multicast & EachToManyMulticastStrategy & Mesh, Grid, Hypercube, Direct \\
+%Many-to-many  multicast    & EachToManyMulticastStrategy & Mesh, Grid, Hypercube, Direct \\
 Broadcast  & BroadcastStrategy, PipeBroadcastStrategy & Binomial tree, Binary tree\\
 Section Multicast & DirectSection, RingSection, TreeSection & \\
 Streaming  & Streaming, MeshStreaming, PrioStreaming & \\
@@ -225,7 +226,7 @@ Streaming  & Streaming, MeshStreaming, PrioStreaming & \\
 \label{tbl:com_operation}
 \end{table}
 
-There are two types of strategies in the communication framework :
+There are two types of strategies in the communication framework:
 
 \begin{itemize}
 
@@ -245,13 +246,17 @@ after a timeout, and, in both cases, it's not triggered from the application.
 
 \subsubsection{Many-to-many Strategies}
 
-The class {\em EachToManyStrategy} optimizes all-to-all personalized
-communication using several virtual topologies like 2-D Mesh, 3-D Mesh and
-Hypercube. This communications happen when a processor sends a different message
-to each other processor. EachToManyStrategy manages the charm level
-communication by first combining all messages being sent to the same processor
-into one message, and then calling the {\em routers} to optimize the lower level
-processor-to-processor communication. The {\em routers} implement the different
+The class {\em EachToManyMulticastStrategy} optimizes both all-to-all
+personalized and all-to-all multicast communication using several virtual
+topologies like 2-D Mesh, 3-D Mesh and Hypercube. Personalized communication
+happens when a chare sends different messages to the other chares, multicast
+communication happens when a chare sends the same message to all other chares.
+EachToManyMulticastStrategy also optimized the special cases many-to-many where
+not all the chares in an array are involved in the collective operation.
+
+The charm level strategy collects all the messages from the chares and delivers
+on the destination, while the low level (processor-to-processor) communication
+is performed through converse lever {\em routers}, which implement the various
 virtual topologies.
 
 %For example, with the mesh router, the strategy on each processor
@@ -260,14 +265,16 @@ virtual topologies.
 %column messages an iteration of the strategy finishes. All local messages are
 %delivered as soon they are received.
 
-{\em EachToManyMulticastStrategy} is a variant of the EachToManyStrategy, and is
-used to optimize all-to-all multicast communication, where a processor sends the
-same message to all others. This strategy also uses the same virtual topologies
-at the lower level.
+%{\em EachToManyMulticastStrategy} is also used to optimize all-to-all multicast
+%communication, where a processor sends the same message to all others, using the
+%same virtual topologies at the lower level.
 
-EachToManyStrategy requires that all local messages have been deposited before
-they can be packed into single messages. Hence it needs to be a {\em bracketed}
-strategy (see before).
+EachToManyMulticastStrategy requires that all local messages have been deposited
+before they can be packed into single messages. Hence, it needs to be a {\em
+bracketed} strategy (see before).
+
+This strategy can also be used to optimize all-to-all collectives between charm
+groups.
 
 %Bracketed strategies require each of the participating objects to deposit their
 %intended messages within brackets. Calls to {\em ComlibBeginIteration} and {\em
@@ -287,23 +294,19 @@ strategy (see before).
 %not expect a doneInserting to be invoked on them. They must all
 %process messages in the insertMessage call itself.
 
-Both strategies also optimize the many-to-many operation, where the source and
-destination is not a whole array, but only a subset. Moreover, the sending and
-receiving elements need noot belong to the same array.
-
-As for the constructors to be used in the main, the two prototypes follow. They
-are for EachToManyMulticastStrategy, but are the same for EachToManyStrategy.
-The first one is for the all-to-all communication, the second one is for the
-many-to-many communication, as it allows to specify a list of chares for both
-source and destination. (Setting nsrc to 0 or ndest to 0 would make the strategy
-use the entire source or destination array respectively)
-
+As for the constructors to be used in the main chare, the two prototypes follow.
+The first one is for groups, the second for arrays. The optional parameters
+allow to specify the many-to-many behaviour, passing the lists of source and
+destination elements partecipating to the operation. If they are left to the
+default value, the collective is an all-to-all.
 
 \begin{verbatim}
-EachToManyMulticastStrategy(int topology, CkArrayID src\_array, CkArrayID dest\_array);
+EachToManyMulticastStrategy(int substrategy, int nsrcpes=0, int *srcpelist=0,
+                            int ndestpes=0, int *destpelist=0);
 
-EachToManyMulticastStrategy(int topology, CkArrayID src\_array, CkArrayID dest\_array,
-              int nsrc, CkArrayIndexMax *indices, int ndest, CkArrayIndexMax  *destelements);
+EachToManyMulticastStrategy(int substrategy, CkArrayID src, CkArrayID dest,
+                            int nsrc=0, CkArrayIndexMax *srcelements=0,
+                            int ndest=0, CkArrayIndexMax *destelements=0);
 \end{verbatim}
 
 Both have as first parameter the virtual topology that the strategy will use for
@@ -323,13 +326,66 @@ topologies.
 
 The header file to include is {\textrm{EachToManyMulticastStrategy.h}}.
 
+\subsubsection{Broadcast Strategies}
 
+There are two strategies of this type: {\em BroadcastStrategy} and {\em
+PipeBroadcastStrategy}. The first works only for group broadcast, while the
+second works for both groups and arrays.
 
+BroadcastStrategy performs a broadcast through a hypercube (default) or a tree,
+and the constructor is:
 
+\begin{verbatim}
+BroadcastStrategy(int topology=USE_HYPERCUBE);
+\end{verbatim}
 
+PipeBroadcastStrategy performs a broadcast through a ring or a hypercube
+(default). The characteristic of this strategy is that it fragments the message
+into small chunks that fit a predetermined size (passed as argument to the
+constructor), and it reassemble it before delivery. The constructor prototypes
+for groups and arrays respectively are:
 
+\begin{verbatim}
+  PipeBroadcastStrategy(int topology, CkArrayID aid, int pipeSize=DEFAULT_PIPE);
 
+  PipeBroadcastStrategy(CkGroupID gid, int topology=USE_HYPERCUBE, int pipeSize=DEFAULT_PIPE);
+\end{verbatim}
 
+The header file to include is {\textrm{BroadcastStrategy.h}} or
+{\textrm{PipeBroadcastStrategy.h}}, depending on which strategy is used.
+
+\subsubsection{Section Multicast Strategies}
+
+The DirectMulticastStrategy and its subclasses can multicast a message to the entire
+array or a section of array elements. The direct multicast strategies
+are non-bracketed, and the message is processed when the application
+deposits is. These strategies do not combine messages, but they may
+sequence the destinations of the multicast to minimize contention on a
+network.
+
+These are the available subclass strategies:
+
+\begin{description}
+\item[KDirectMulticastStrategy] sends the messages along a spanning tree of factor {\em k};
+\item[RingMulticastStrategy] sends the messages along ring resulting in good throughput as the ring permutation is contention free on many communication topologies;
+\item[MultiRingMulticast] sends the messages along a ring with multiple start points on the ring.
+\end{description}
+
+For all of them, the constructor are of the form:
+
+\begin{verbatim}
+KDirectMulticastStrategy(int kfactor, CkArrayID aid);
+
+RingMulticastStrategy(CkArrayID dest_id, int flag=0);
+
+MultiRingMulticast(CkArrayID dest_id, int flag=0);
+\end{verbatim}
+
+For section multicast, the user must create a section proxy and delegate it to
+the communication library. Invocations on section proxies are passed on to the
+section multicast strategy.
+
+The header file to include is the corrispective of the strategy name.
 
 \subsubsection{Streaming Strategies}
 
@@ -353,65 +409,51 @@ The prototype of the constructor is:
 Strategy * strategy = new StreamingStrategy(float period\_in\_ms, int nmsgs);
 \end{verbatim}
 
-The header file to include is {\textrm{StreamingStrategy.h}}.
+Of this strategy there are two variants:
 
-\subsubsection{Section Multicast and Broadcast Strategies}
+\begin{description}
+\item[MeshStreamingStrategy] which sends the messages along with a mesh instead of a linear array as the basic one;
+\item[PrioStreaming] which looks at the priority of the messages, and send those with a priority above a certain threshold directly, without delay. This strategy accept a third parameter in the constructor for the threshold priority.
+\end{description}
 
-The DirectMulticastStrategy and its subclasses can multicast a message to the entire
-array or a section of array elements. The direct multicast strategies
-are non-bracketed, and the message is processed when the application
-deposits is. These strategies do not combine messages, but they may
-sequence the destinations of the multicast to minimize contention on a
-network. For example, the RingMulticastStrategy sends the messages
-along ring resulting in good throughput as the ring permutation is
-contention free on many communication topologies.
+The header file to include is the corrispective of the strategy name.
 
-For section multicast, the user must create a section proxy and
-delegate it to the communication library. Invocations on section
-proxies are passed on to the section multicast strategy.
+\subsubsection{Communication Optimization Development}
 
-The following are the steps to use the communication library 
-in a user program.
+Optimization algorithms are implemented as Strategies in the communication
+library. Strategies can be implemented at the Object (\charmpp) level or the
+processor (\converse) level. Code reuse is possible by having a few object
+managers perform object level optimizations and then call several other
+processor level optimization schemes. For example, to optimize all-to-all
+communication the processor level strategies could use the different virtual
+topologies.
 
-
-
-
-
-
-
-\subsubsection{Communication Optimization Strategy}
-
-Optimization algorithms are implemented as Strategies in the
-communication library. Strategies can be implemented at the Object
-(Charm++) level or the processor (Converse) level. Code reuse is
-possible by having a few object managers perform object level
-optimizations and then call several other processor level optimization
-schemes. For example, to optimize all-to-all communication the
-processor level strategies could use the different virtual topologies.
-
-All processor (Converse) level strategies inherit from the {\em
-class~Strategy} defined below and override its virtual methods.
+All processor (\converse) level strategies inherit from the {\em class~Strategy}
+defined below and override its virtual methods.
 
 \begin{verbatim}
-//Converse or Processor level strategy
+// Converse or Processor level strategy
 class Strategy : public PUP::able{
 public:
-    //Called for each message
+    // Called for each message
     virtual void insertMessage(MessageHolder *msg);
-    //Called after all chares and groups have finished depositing their
-    //messages on that processor.
+    // Called after all chares and groups have finished depositing their
+    // messages on that processor.
+
     virtual void doneInserting();
     virtual void beginProcessing(int nelements);
 };
 \end{verbatim}
 
-The class method {\em insertMessage} is called to deposit messages
-with the strategy. MessageHolder is a wrapper for converse
-messages. When a processor has sent all its messages, {\em
-doneInserting} is invoked on the strategy.
+The class method {\em insertMessage} is called to deposit messages with the
+strategy. MessageHolder is a wrapper for converse messages. When a processor has
+sent all its messages {\em doneInserting} is invoked on the strategy.
+
+At the \charmpp{} level, all strategies inherit from the {\em
+class~CharmStrategy} reported here.
 
 \begin{verbatim}
-//Charm++ or Object level strategy
+// Charm++ or Object level strategy
 class CharmStrategy : public Strategy{
  protected:
     int isArray;
@@ -420,27 +462,25 @@ class CharmStrategy : public Strategy{
     ............   
     ............   
 public:
-    //Called for each message
+    // Called for each message
     virtual void insertMessage(CharmMessageHolder *msg);
-    //Called after all chares and groups have finished depositing their
-    //messages on that processor.
+    // Called after all chares and groups have finished depositing their
+    // messages on that processor.
     virtual void doneInserting();
     virtual void beginProcessing(int nelements);
 };
 \end{verbatim}
 
-Charm++ level strategies also have to implement the insertMessage and
-doneInserting methods. Here insertMessage takes a CharmMessageHolder
-which is a Charm++ message wrapper. The call to beginProcessing
-initializes the strategies on each processor. This additional call is
-needed because the constructor of the strategy is called by user code
-in main::main on processor 0. Along with initializing its data,
-beginProcessing can also register message handlers, as the
-communication library strategies use Converse to communicate between
-processors. The flags {\em isArray} and {\em isGroup} store the type
-of objects that call the strategy and the flag {\em
-isStrategyBracketed} flag specifies if the CharmStrategy is bracketed
-or not. Bracketed strategies require that the application deposits
+\charmpp{} level strategies also have to implement the insertMessage and
+doneInserting methods. Here insertMessage takes a CharmMessageHolder which is a
+\charmpp{} message wrapper. The call to beginProcessing initializes the strategies
+on each processor. This additional call is needed because the constructor of the
+strategy is called by user code in main::main on processor 0, while the strategy
+needs to be constructed everywhere. Along with initializing its data,
+beginProcessing can also register message handlers, as the communication library
+strategies use Converse handlers to communicate between processors. The flags
+{\em isArray} and {\em isGroup} store the type of objects that call the strategy
+and the flag {\em isStrategyBracketed} specifies if the CharmStrategy is
+bracketed or not. Bracketed strategies require that the application deposits
 messages in brackets demarcated by the calls ComlibBeginIteration and
-ComlibEndIteration. Bracketed strategies are discussed in detail in
-Section~\ref{sec:bracket}.
+ComlibEndIteration.
