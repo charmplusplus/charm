@@ -133,9 +133,9 @@ are described in section \ref{lbOption}.
 \label{lbarray}
 
 Load balancing framework is well integrated with Chare array implementation - 
-when a chare array is created, it  automatically registers its elements 
-to load balancing framework, instrument of compute time (wall/cpu time) 
-and communication pattern is done automatically and APIs are provided 
+when a chare array is created, it automatically registers its elements 
+with the load balancing framework. The instrumentation of compute time (wall/cpu time) 
+and communication pattern are done automatically and APIs are provided 
 for users to trigger the load balancing. 
 
 To use the load balancer, you must make your array elements migratable
@@ -226,9 +226,9 @@ call \kw{AtSync()}~\footnote{AtSync() is a member function of class ArrayElement
 When all local elements call \kw{AtSync}, the load balancer is triggered.  
 Once all migrations are completed, the load balancer calls the 
 virtual function \kw{ArrayElement::ResumeFromSync()} on each of the
-array element.  
+array elements.  
 
-Note that {\em AtSync()} is not a blocking call, it just give a hint to load
+Note that {\em AtSync()} is not a blocking call, it just gives a hint to load
 balancing that it is time for load balancing. During the time between 
 {\em AtSync} and {\em ResumeFromSync}, the object may be migrated. 
 One can choose to let objects continue working with incoming messages,
@@ -313,14 +313,14 @@ LBSetPeriod(5.0);
 
 Load balancing strategies are implemented as libraries in \charmpp{}. This
 allows programmers to easily experiment with different existing strategies 
-by simply linking a pool of strategy modules and choose 
-one to use at run-time via command line options.
+by simply linking a pool of strategy modules and choosing
+one to use at run-time via a command line option.
 
 Please note that linking a load balancing module is different from activating it:
 \begin{itemize}
 \item link a LB module: is to link a Load Balancer module(library) at 
    compile time; You can link against multiple LB libraries as candidates.
-\item activate a LB: is to actually ask tun-time to create a LB strategy and 
+\item activate a LB: is to actually ask at run-time to create a LB strategy and 
    start it. You can only activate load balancers that have been linked at
    compile time.
 \end{itemize}
@@ -339,7 +339,7 @@ other runtime options.
 \item {\em -module EveryLB} \\
   links special module EveryLB which includes all the charmpp{} built-in load balancers.
 \item {\em -balancer GreedyCommLB} \\
-  links load balancer GreedyCommLB and invoke this load balancer at runtime. One can specify multiple load balancers for example: \\
+  links load balancer GreedyCommLB and invokes this load balancer at runtime. One can specify multiple load balancers for example: \\
    {\em -balancer GreedyCommLB -balancer RefineLB}   \\
    This will start first load balancing step with GreedyCommLB, and second load balancing step with RefineLB, and same RefineLB in the subsequent load balancing steps.
 \item {\em -balancer ComboCentLB:GreedyLB,RefineLB}  \\
@@ -352,7 +352,7 @@ linked into a program, but they are not activated automatically at runtime.
 Using -balancer at compile time in order to activate load balancers automatically at run time. 
 Having -balancer A implies -module A, so you don't have to write -module A again, although it does not hurt.
 Using EveryLB is a convenient way to link against all existing load balancers. 
-One of the load balancer called MetisLB requires METIS library 
+One of the load balancers called MetisLB requires the METIS library 
 which is located at: charm/src/libs/ck-libs/parmetis/METISLib/. 
 You need to compile METIS library by "make METIS" under charm/tmp after you
 compile Charm++.
@@ -371,7 +371,7 @@ Run-time options are doing the same thing as compile time options, but they can 
 \end{itemize}
 
 Note: +balancer option works only if you have already linked the load balancers module at compile time. 
-Given +balancer with a wrong LB name will results in runtime error.
+Giving +balancer with a wrong LB name will result in a runtime error.
 When you have used -balancer A as compile time option, you don't need to use 
 +balancer A again to activate it at runtime. However, you can 
 use +balancer B to override the compile time option and choose to
@@ -379,15 +379,15 @@ activate B instead of A.
 
 \item {\bf When there is no load balancer activated}
 
-When you don't activate any of load balancer at compile time or run time, 
+When you don't activate any of load balancers at compile time or run time, 
 and your program counts on a load balancer because you use {\em AtSync()}
 and expect {\em ResumeFromSync()} to be called to continue,
 be assured that your program still can run. 
 What happens is that a special load balancer called {\em NullLB} is 
-automatically created in this case which basically does nothing 
-but calling {\em ResumeFromSync()} after {\em AtSync()}. 
-This is to make sure program does not hang because of {\em AtSync()}.
-The {\em NullLB} is smart enough to keep silent if there is any other 
+automatically created in this case which does nothing 
+but call {\em ResumeFromSync()} after {\em AtSync()}. 
+This is to keep a program from hanging after calling {\em AtSync()}.
+The {\em NullLB} is smart enough to keep silent if another 
 load balancer is created.
 
 \item {\bf Other useful run-time options}
@@ -440,12 +440,12 @@ accepts the following command line options:
 	is given by the {\em +LBDumpFile} option. The first step in the program is number 0. Negative
 	numbers will be converted to 0.
 \item {\em +LBDumpSteps StepsNo}\\
-        This option specify for how many steps to dump the data to the disk. If omitted, default value is 1.
+        This option specifies the number of steps for which data will be dumped to disk. If omitted, default value is 1.
 	The program will exit after StepsNo files are dumped.
 \item {\em +LBDumpFile FileName}\\
-	This option specified the base name of the file into which to dump the load balancing data. If this
-	option is not specified, the framework uses the default file {\tt lbdata.dat}. Since multistep is allowed,
-	to this base name it is added the step number in the form {\tt Filename.\#}; this apply to both dump and
+	This option specifies the base name of the file into which the load balancing data is dumped. If this
+	option is not specified, the framework uses the default file {\tt lbdata.dat}. Since multiple steps are allowed,
+	a number is appended to the filename in the form {\tt Filename.\#}; this applies to both dump and
 	simulation.
 \item {\em +LBSim StepStart}\\
 	This option instructs the framework to do the simulation during the first load balancing step.
@@ -454,13 +454,13 @@ accepts the following command line options:
 	will be used for the load balancing. The program will print the results
 	of the balancing for a number of steps given by the {\em +LBSimSteps} option, and then will exit.
 \item {\em +LBSimSteps StepsNo}\\
-        This options has the same meaning of {\em +LBDumpSteps}, except that apply for the simulation mode.
+        This option has the same meaning of {\em +LBDumpSteps}, except that apply for the simulation mode.
 	Default value is 1.
 \item {\em +LBSimProcs}\\
         This option may change the number of processors target of the load balancer strategy. It may be used to test
 	the load balancer in conditions where some processor crashes or someone becomes available. If this number is not
 	changed since the original run, starting from the second step file the program will print other additional
-	information about how the simulated load differ from the real load during the run (considering all
+	information about how the simulated load differs from the real load during the run (considering all
 	strategies that were applied while running). This may be used to test the validity of a load balancer
 	prediction over the reality. If the strategies used during run and simulation differ, the additional data
 	printed may not be useful.
@@ -481,9 +481,9 @@ When objects do not follow the assumption that the future workload will be the
 same as the past, the load balancer might not have the correct information to do
 a correct rebalancing job. To prevent this the user can provide a transition
 function to the load balancer to predict what will be the future workload, given
-the past, instrumented one. As said, the user might provide a specific function
-which inherit from {\tt LBPredictorFunction} and implement its
-functions. Here is the abstract class:
+the past, instrumented one. As said, the user might provide a specific class
+which inherits from {\tt LBPredictorFunction} and implement the appropriate functions. 
+Here is the abstract class:
 \begin{verbatim}
 class LBPredictorFunction {
 public:
@@ -531,9 +531,9 @@ the execution of the program. For this, two parameters can be setup at command
 line to specify the learning behaviour:
 \begin{enumerate}
 \item {\em +LBPredictorWindow size}\\
-This parameter will specify how many statistics the load balancer will keep for
-keeping updated the function parameters. The greater this number is, the best
-approximation of the workload will be, but more memory will be required to store
+This parameter will specify how many statistics the load balancer will keep. 
+The greater this number is, the better the
+approximation of the workload will be, but more memory is required to store
 the intermediate information. The default is 20.
 \item {\em +LBPredictorDelay steps}\\
 This will tell how many load balancer steps to wait before considering the
@@ -574,7 +574,7 @@ load balancer.
 \item {\em neighbor}\\  
  a strategy which imposes a virtual topology on the processors,
  load exchange happens to neighbors only. The overloaded processors
- initiate the load balancing, where a processor send work to its neighbors
+ initiate the load balancing, where a processor sends work to its neighbors
  when it becomes overloaded. The default topology is mesh2D, one can use
  command line option to choose other topology such as ring, mesh3D and 
  dense graph.
@@ -593,10 +593,9 @@ seed load balancer.
 {\bf Seed load balancers for Chares:}
 
 Seed load balancers can be directly used for load balancing Chares.
-The default seed load balancer that is always linked without overridden 
-is the random seed load balancer.
-User can picks one of the other strategies listed above and link as a plugin
-module into binary as described below to override the default strategy.
+The default seed load balancer which is always linked is the random seed load balancer.
+Users can choose another strategy listed above and link as a plugin
+module into binary as described below.
 
 {\bf Seed load balancers for Array Elements:}
 
