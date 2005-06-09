@@ -478,6 +478,7 @@ void repeat_after_split(void *data){
 };
 
 
+void publishMeshToNetFEM(myGlobals &g,int myChunk,int t);
 extern "C" void
 driver(void)
 {
@@ -538,48 +539,7 @@ driver(void)
 
   // THIS IS THE INITIAL MESH SENT TO NetFEM
   if (1) { //Publish data to the net
-    NetFEM n=NetFEM_Begin(myChunk,t,2,NetFEM_WRITE);
-    count=0;
-    double *vcoord = new double[2*g.nnodes];
-    double *vnodeid = new double[g.nnodes];
-    int *maptovalid = new int[g.nnodes];
-    for(int i=0;i<g.nnodes;i++){
-      if(g.validNode[i]){
-	vcoord[2*count] = ((double *)g.coord)[2*i];
-	vcoord[2*count+1] = ((double *)g.coord)[2*i+1];
-	maptovalid[i] = count;
-	printf("~~~~~~~ %d %d %.6lf %.6lf \n",count,i,vcoord[2*count],vcoord[2*count+1]);
-	vnodeid[count] = i;
-	count++;	
-      }
-    }
-    NetFEM_Nodes(n,count,(double *)vcoord,"Position (m)");
-    NetFEM_Scalar(n,vnodeid,1,"Node ID");
-    /*    NetFEM_Vector(n,(double *)g.d,"Displacement (m)");
-	  NetFEM_Vector(n,(double *)g.v,"Velocity (m/s)");*/
-    count=0;
-    int *vconn = new int[3*g.nelems];
-    double *vid = new double[3*g.nelems];
-    for(int i=0;i<g.nelems;i++){
-      if(g.validElem[i]){
-	vconn[3*count] = maptovalid[g.conn[3*i]];
-	vconn[3*count+1] = maptovalid[g.conn[3*i+1]];
-	vconn[3*count+2] = maptovalid[g.conn[3*i+2]];
-	printf("~~~~~~~ %d %d < %d,%d %d,%d %d,%d >\n",count,i,vconn[3*count],g.conn[3*i],vconn[3*count+1],g.conn[3*i+1],vconn[3*count+2],g.conn[3*i+2]);
-	vid[count]=count;
-	count++;	
-      }
-    }
-    NetFEM_Elements(n,count,3,(int *)vconn,"Triangles");
-    NetFEM_Scalar(n,vid,1,"Element ID");
-    /*	NetFEM_Scalar(n,g.S22,1,"Y Stress (pure)");
-	NetFEM_Scalar(n,g.S12,1,"Shear Stress (pure)");*/
-    NetFEM_End(n);
-    delete [] vcoord;
-    delete [] vconn;
-    delete [] maptovalid;
-    delete [] vid;
-    delete [] vnodeid;
+		publishMeshToNetFEM(g,myChunk,t);
   }
   double desiredArea;
   for (t=1;t<=tSteps;t++) {
@@ -635,49 +595,7 @@ driver(void)
 	     myChunk,g.nnodes,g.nelems);
     // THIS IS THE REFINED MESH SENT TO NetFEM
     if (1) { //Publish data to the net
-      NetFEM n=NetFEM_Begin(myChunk,2*t-1,2,NetFEM_WRITE);
-      int count=0;
-      double *vcoord = new double[2*g.nnodes];
-      double *vnodeid = new double[g.nnodes];
-      int *maptovalid = new int[g.nnodes];
-      for(int i=0;i<g.nnodes;i++){
-	maptovalid[i] = -1;
-	if(g.validNode[i]){
-	  vcoord[2*count] = ((double *)g.coord)[2*i];
-	  vcoord[2*count+1] = ((double *)g.coord)[2*i+1];
-	  maptovalid[i] = count;
-	  printf("~~~~~~~ %d %d %.6lf %.6lf \n",count,i,vcoord[2*count],vcoord[2*count+1]);
-	  vnodeid[count] = i;
-	  count++;	
-	}
-      }
-      NetFEM_Nodes(n,count,(double *)vcoord,"Position (m)");
-      NetFEM_Scalar(n,vnodeid,1,"Node ID");
-      //NetFEM_Vector(n,(double *)g.d,"Displacement (m)");
-      //NetFEM_Vector(n,(double *)g.v,"Velocity (m/s)");
-      count=0;
-      int *vconn = new int[3*g.nelems];
-      double *vid = new double[3*g.nelems];
-      for(int i=0;i<g.nelems;i++){
-	if(g.validElem[i]){
-	  vconn[3*count] = maptovalid[g.conn[3*i]];
-	  vconn[3*count+1] = maptovalid[g.conn[3*i+1]];
-	  vconn[3*count+2] = maptovalid[g.conn[3*i+2]];
-	  printf("~~~~~~~ %d %d < %d,%d %d,%d %d,%d >\n",count,i,vconn[3*count],g.conn[3*i],vconn[3*count+1],g.conn[3*i+1],vconn[3*count+2],g.conn[3*i+2]);
-	  vid[count]=count;
-	  count++;	
-	}
-      }
-      NetFEM_Elements(n,count,3,(int *)vconn,"Triangles");
-      NetFEM_Scalar(n,vid,1,"Element ID");
-      //NetFEM_Scalar(n,g.S22,1,"Y Stress (pure)");
-      //NetFEM_Scalar(n,g.S12,1,"Shear Stress (pure)");
-      NetFEM_End(n);
-      delete [] vcoord;
-      delete [] vconn;
-      delete [] maptovalid;
-      delete [] vid;
-      delete [] vnodeid;
+			publishMeshToNetFEM(g,myChunk,2*t-1);
     }
 
     // prepare to coarsen
@@ -700,53 +618,56 @@ driver(void)
 	     myChunk,g.nnodes,g.nelems);
     // THIS IS THE COARSENED MESH SENT TO NetFEM
     if (1) { //Publish data to the net
-      NetFEM n=NetFEM_Begin(myChunk,2*t,2,NetFEM_WRITE);
-      int count=0;
-      double *vcoord = new double[2*g.nnodes];
-      double *vnodeid = new double[g.nnodes];
-      int *maptovalid = new int[g.nnodes];
-      for(int i=0;i<g.nnodes;i++){
-	maptovalid[i] = -1;
-	if(g.validNode[i]){
-	  vcoord[2*count] = ((double *)g.coord)[2*i];
-	  vcoord[2*count+1] = ((double *)g.coord)[2*i+1];
-	  maptovalid[i] = count;
-	  printf("~~~~~~~ %d %d %.6lf %.6lf \n",count,i,vcoord[2*count],vcoord[2*count+1]);
-	  vnodeid[count] = i;
-	  count++;	
-	}
-      }
-      NetFEM_Nodes(n,count,(double *)vcoord,"Position (m)");
-      NetFEM_Scalar(n,vnodeid,1,"Node ID");
-      //    NetFEM_Vector(n,(double *)g.d,"Displacement (m)");
-      //    NetFEM_Vector(n,(double *)g.v,"Velocity (m/s)");
-      count=0;
-      int *vconn = new int[3*g.nelems];
-      double *vid = new double[3*g.nelems];
-      for(int i=0;i<g.nelems;i++){
-	if(g.validElem[i]){
-	  vconn[3*count] = maptovalid[g.conn[3*i]];
-	  vconn[3*count+1] = maptovalid[g.conn[3*i+1]];
-	  vconn[3*count+2] = maptovalid[g.conn[3*i+2]];
-	  printf("~~~~~~~ %d %d < %d,%d %d,%d %d,%d >\n",count,i,vconn[3*count],g.conn[3*i],vconn[3*count+1],g.conn[3*i+1],vconn[3*count+2],g.conn[3*i+2]);
-	  vid[count]=count;
-	  count++;	
-	}
-      }
-      NetFEM_Elements(n,count,3,(int *)vconn,"Triangles");
-      NetFEM_Scalar(n,vid,1,"Element ID");
-      //NetFEM_Scalar(n,g.S22,1,"Y Stress (pure)");
-      //NetFEM_Scalar(n,g.S12,1,"Shear Stress (pure)");
-      NetFEM_End(n);
-      delete [] vcoord;
-      delete [] vconn;
-      delete [] maptovalid;
-      delete [] vid;
-      delete [] vnodeid;
+			publishMeshToNetFEM(g,myChunk,2*t);
     }
-  }
+	}	
   if (CkMyPe()==0)
     CkPrintf("Driver finished\n");
 }
 
 
+
+void publishMeshToNetFEM(myGlobals &g,int myChunk,int t){
+    NetFEM n=NetFEM_Begin(myChunk,t,2,NetFEM_WRITE);
+    int count=0;
+    double *vcoord = new double[2*g.nnodes];
+    double *vnodeid = new double[g.nnodes];
+    int *maptovalid = new int[g.nnodes];
+    for(int i=0;i<g.nnodes;i++){
+      if(g.validNode[i]){
+	vcoord[2*count] = ((double *)g.coord)[2*i];
+	vcoord[2*count+1] = ((double *)g.coord)[2*i+1];
+	maptovalid[i] = count;
+	printf("~~~~~~~ %d %d %.6lf %.6lf \n",count,i,vcoord[2*count],vcoord[2*count+1]);
+	vnodeid[count] = i;
+	count++;	
+      }
+    }
+    NetFEM_Nodes(n,count,(double *)vcoord,"Position (m)");
+    NetFEM_Scalar(n,vnodeid,1,"Node ID");
+    /*    NetFEM_Vector(n,(double *)g.d,"Displacement (m)");
+	  NetFEM_Vector(n,(double *)g.v,"Velocity (m/s)");*/
+    count=0;
+    int *vconn = new int[3*g.nelems];
+    double *vid = new double[3*g.nelems];
+    for(int i=0;i<g.nelems;i++){
+      if(g.validElem[i]){
+	vconn[3*count] = maptovalid[g.conn[3*i]];
+	vconn[3*count+1] = maptovalid[g.conn[3*i+1]];
+	vconn[3*count+2] = maptovalid[g.conn[3*i+2]];
+	printf("~~~~~~~ %d %d < %d,%d %d,%d %d,%d >\n",count,i,vconn[3*count],g.conn[3*i],vconn[3*count+1],g.conn[3*i+1],vconn[3*count+2],g.conn[3*i+2]);
+	vid[count]=count;
+	count++;	
+      }
+    }
+    NetFEM_Elements(n,count,3,(int *)vconn,"Triangles");
+    NetFEM_Scalar(n,vid,1,"Element ID");
+    /*	NetFEM_Scalar(n,g.S22,1,"Y Stress (pure)");
+	NetFEM_Scalar(n,g.S12,1,"Shear Stress (pure)");*/
+    NetFEM_End(n);
+    delete [] vcoord;
+    delete [] vconn;
+    delete [] maptovalid;
+    delete [] vid;
+    delete [] vnodeid;
+}		
