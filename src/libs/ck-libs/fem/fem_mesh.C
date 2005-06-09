@@ -1084,7 +1084,7 @@ void FEM_Entity::setLength(int newlen) {
 			
 			for (int a=0;a<attributes.size();a++){
 				int code = attributes[a]->getAttr();
-				if(!(code <= FEM_ATTRIB_TAG_MAX || code == FEM_CONN)){
+				if(!(code <= FEM_ATTRIB_TAG_MAX || code == FEM_CONN || code == FEM_BOUNDARY)){
 					attributes[a]->reallocate();
 				}
 			}	
