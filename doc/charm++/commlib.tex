@@ -212,8 +212,11 @@ strategies optimizing the above mentioned operations.
 \hline
 {\bf Operation} & {\bf Object Strategy} & {\bf Processor Strategy} \\
 \hline
-All-to-All/Many-to-many && \\
-personalized and multicast & EachToManyMulticastStrategy & Mesh, Grid, Hypercube, Direct \\
+\begin{tabular}{c}
+All-to-All/Many-to-many \\
+personalized and multicast
+\end{tabular}
+ & EachToManyMulticastStrategy & Mesh, Grid, Hypercube, Direct \\
 %Many-to-many  multicast    & EachToManyMulticastStrategy & Mesh, Grid, Hypercube, Direct \\
 Broadcast  & BroadcastStrategy, PipeBroadcastStrategy & Binomial tree, Binary tree\\
 Section Multicast & DirectSection, RingSection, TreeSection & \\
