@@ -379,14 +379,14 @@ activate B instead of A.
 
 \item {\bf When there is no load balancer activated}
 
-When you don't activate any of load balancers at compile time or run time, 
+When you don't activate any of the load balancers at compile time or run time, 
 and your program counts on a load balancer because you use {\em AtSync()}
 and expect {\em ResumeFromSync()} to be called to continue,
-be assured that your program still can run. 
-What happens is that a special load balancer called {\em NullLB} is 
-automatically created in this case which does nothing 
-but call {\em ResumeFromSync()} after {\em AtSync()}. 
-This is to keep a program from hanging after calling {\em AtSync()}.
+be assured that your program can still run. 
+A special load balancer called {\em NullLB} is 
+automatically created in this case which just
+calls {\em ResumeFromSync()} after {\em AtSync()}. 
+This default load balancer keeps a program from hanging after calling {\em AtSync()}.
 The {\em NullLB} is smart enough to keep silent if another 
 load balancer is created.
 
