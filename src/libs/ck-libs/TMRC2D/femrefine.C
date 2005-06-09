@@ -157,7 +157,16 @@ void FEM_REFINE2D_Split(int meshID,int nodeID,double *coord,int elemID,double *d
    */
   FEM_Entity *e=refine_data.node = FEM_Entity_lookup(meshID,nodeID,"REFINE2D_Mesh");
   CkVec<FEM_Attribute *> *attrs = refine_data.attrs = e->getAttrVec();
-  
+  /* 
+  FEM_DataAttribute *boundaryAttr = (FEM_DataAttribute *)e->lookup(FEM_BOUNDARY,"split");
+  if(boundaryAttr != NULL){
+	AllocTable2d<int> &boundaryTable = boundaryAttr->getInt();
+	printf(" Node Boundary flags \n");
+	for(int i=0;i<nnodes;i++){
+		printf("Node %d flag %d \n",i,boundaryTable[i][0]);
+	}
+  }
+  */
   FEM_Entity *elem = refine_data.elem = FEM_Entity_lookup(meshID,elemID,"REFIN2D_Mesh_elem");
   CkVec<FEM_Attribute *> *elemattrs = refine_data.elemattrs = elem->getAttrVec();
   
@@ -205,7 +214,10 @@ void FEM_REFINE2D_Split(int meshID,int nodeID,double *coord,int elemID,double *d
       //		printf("%d < %d,%d > \n",j,cdata[0],cdata[1]);
       nodes2sparse.put(intdual(cdata[0],cdata[1])) = j+1;
     }
-  }	
+  }else{
+	printf("Edge boundary conditions not passed into FEM_REFINE2D_Split \n");
+  }
+	
   
   /*	for(int k=0;k<nnodes;k++){
 	printf(" node %d ( %.6f %.6f )\n",k,coord[2*k+0],coord[2*k+1]);
@@ -232,24 +244,6 @@ void FEM_REFINE2D_Split(int meshID,int nodeID,double *coord,int elemID,double *d
   int read = FEM_Mesh_is_get(meshID) ;
   assert(read);
   
-  /*	IDXL_t sharedid = FEM_Comm_shared(meshID,nodeID);
-	IDXL_Side_t sharedsendid = IDXL_Get_send(sharedid);
-	if(
-	int numshared = IDXL_Get_count(sharedsendid,0);
-	int *list = new int[numshared];
-	
-	char str[100];
-	sprintf(str,"shared_%d",FEM_My_partition());
-	FILE *fp = fopen(str,"a");
-	IDXL_Get_list(sharedsendid,0,list);
-	fprintf(fp,"*********************************\n");
-	for(int i=0;i<numshared;i++){
-	fprintf(fp,"id %d (%.6lf %.6lf) \n",list[i],coordVec[2*list[i]],coordVec[2*list[i]+1]);
-	}
-	fprintf(fp,"*********************************\n");	
-	fclose(fp);
-	delete [] list;
-  */
 }
 extern void splitEntity(IDXL_Side &c,
 	int localIdx,int nBetween,int *between,int idxbase);
@@ -265,19 +259,30 @@ void FEM_Modify_IDXL(FEM_Refine_Operation_Data *data,refineData &op){
 
 
 void FEM_Refine_Operation(FEM_Refine_Operation_Data *data,refineData &op){
-	int meshID = data->meshID;
-	int nodeID = data->nodeID;
-	int sparseID = data->sparseID;
-	CkVec<FEM_Attribute *> *attrs = data->attrs;
-	CkVec<FEM_Attribute *> *elemattrs = data->elemattrs;
-	CkHashtableT<intdual,int> *newnodes=data->newnodes;
-	CkHashtableT<intdual,int> *nodes2sparse = data->nodes2sparse;
+  int meshID = data->meshID;
+  int nodeID = data->nodeID;
+  int sparseID = data->sparseID;
+  CkVec<FEM_Attribute *> *attrs = data->attrs;
+  CkVec<FEM_Attribute *> *elemattrs = data->elemattrs;
+  CkHashtableT<intdual,int> *newnodes=data->newnodes;
+  CkHashtableT<intdual,int> *nodes2sparse = data->nodes2sparse;
   FEM_Attribute *sparseConnAttr = data->sparseConnAttr, *sparseBoundaryAttr = data->sparseBoundaryAttr;
-	AllocTable2d<int> *connTable = data->connTable;
-	double *coord = data->coord;
-	AllocTable2d<int> *sparseConnTable, *sparseBoundaryTable;
-	CkVec<FEM_Attribute *> *sparseattrs = data->sparseattrs;
-
+  AllocTable2d<int> *connTable = data->connTable;
+  double *coord = data->coord;
+  AllocTable2d<int> *sparseConnTable, *sparseBoundaryTable;
+  CkVec<FEM_Attribute *> *sparseattrs = data->sparseattrs;
+  
+  /*
+  FEM_DataAttribute *boundaryAttr = (FEM_DataAttribute *)data->node->lookup(FEM_BOUNDARY,"split");
+  if(boundaryAttr != NULL){
+        AllocTable2d<int> &boundaryTable = boundaryAttr->getInt();
+        printf(" Node Boundary flags \n");
+        for(int i=0;i<data->node->size();i++){
+                printf("Node %d flag %d \n",i,boundaryTable[i][0]);
+        }
+  }
+  */
+  
   int tri=op.tri,A=op.A,B=op.B,C=op.C,D=op.D;
   double frac=op.frac;
   // current number of nodes in the mesh
