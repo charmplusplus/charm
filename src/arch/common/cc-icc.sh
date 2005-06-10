@@ -1,9 +1,9 @@
 CMK_CPP_C='icc -E '
-CMK_CC="icc -fpic "
-CMK_CXX="icpc -fpic "
-CMK_CXXPP='icpc -E '
-CMK_LD='icc -i_dynamic '
-CMK_LDXX='icpc -i_dynamic '
+CMK_CC="icc -fpic -cxxlib-icc "
+CMK_CXX="icpc -fpic -cxxlib-icc "
+CMK_CXXPP='icpc -E -cxxlib-icc '
+CMK_LD='icc -i_dynamic -cxxlib-icc '
+CMK_LDXX='icpc -i_dynamic -cxxlib-icc '
 CMK_LD_LIBRARY_PATH="-Wl,-rpath,$CHARMLIBSO/"
 CMK_CF90='ifc -auto '
 CMK_CF90_FIXED="$CMK_CF90 -132 -FI "
