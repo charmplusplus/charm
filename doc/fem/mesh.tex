@@ -224,7 +224,8 @@ on the mesh.
   is one of the standard FEM data types \kw{FEM\_BYTE}, \kw{FEM\_INT}, 
   \kw{FEM\_FLOAT}, or \kw{FEM\_DOUBLE}; or else the C-style 0-based
   index type \kw{FEM\_INDEX\_0} or the Fortran-style 1-based index type
-  \kw{FEM\_INDEX\_1}.
+  \kw{FEM\_INDEX\_1}. Alternatively, the equivalent types \kw{IDXL\_BYTE}, \kw{IDXL\_INT},
+\kw{IDXL\_FLOAT}, \kw{IDXL\_DOUBLE}, \kw{IDXL\_INDEX\_0}, or \kw{IDXL\_INDEX\_1} may be used.
 
 \item \uw{width} The number of data items per entity. 
 
@@ -1222,8 +1223,8 @@ sparse data record, and \kw{nodes} gives the actual node numbers.
 \kw{dataPerRec} gives the number of data items associated with each sparse 
 data record, and \kw{dataType}, one of \kw{FEM\_BYTE}, \kw{FEM\_INT},
 \kw{FEM\_REAL}, or \kw{FEM\_DOUBLE}, gives the type of each data item.
-As usual, you may change or delete the \kw{nodes} and \kw{data} arrays after this
-call returns.
+As usual, you may change or delete the \kw{nodes} and \kw{data} arrays after 
+this call returns.
 
 For example, if the first set of sparse data is 17 sparse data records, each 
 containing 2 nodes stored in \kw{bNodes} and 3 integers stored in \kw{bDesc}, 
