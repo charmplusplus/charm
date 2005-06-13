@@ -96,6 +96,72 @@ public:
   }
 };
 
+// a simple 4 layer tree, fat at level 1
+//        1
+//     ---+---
+//     0  4  8
+//  ---+--
+//  0 
+// -+-
+// 0 1 2 3
+class FourLevelTree: public MyHierarchyTree {
+private:
+  int span[3];
+  int toproot;
+  int nLevels;
+public:
+  FourLevelTree() {
+    nLevels = 4;
+    CmiAssert(CkNumPes() == 65536);
+    span[0] = 64;
+    span[1] = 32;
+    span[2] = 32;
+    toproot = 2;
+  }
+  virtual ~FourLevelTree() {}
+  virtual int numLevels() { return nLevels; }
+  virtual int parent(int mype, int level) {
+    if (level == 0) return mype/span[0]*span[0];
+    if (level == 1) return mype/span[0]/span[1]*span[0]*span[1]+1;
+    if (level == 2) return toproot;
+    if (level == 3) return -1;
+    CmiAssert(0);
+    return -1;
+  }
+  virtual int isroot(int mype, int level) {
+    if (level == 0) return 0;
+    if (level == 1 && mype % span[0] == 0) return 1;
+    if (level == 2 && (mype-1)%(span[0]*span[1]) == 0) return 1;
+    if (level == 3 && mype == toproot) return 1;
+    return 0;
+  }
+  virtual int numChildren(int mype, int level) {
+    if (level == 0) return 0;
+    if (level == 1) return span[0];
+    if (level == 2) return span[1];
+    if (level == 3) return span[2];
+    CmiAssert(0);
+    return 0;
+  }
+  virtual void getChildren(int mype, int level, int *children, int &count) {
+    CmiAssert(isroot(mype, level));
+    count = numChildren(mype, level);
+    if (count == 0) { return; }
+    if (level == 1) {
+      for (int i=0; i<count; i++) 
+        children[i] = mype + i;
+    }
+    if (level == 2) {
+      for (int i=0; i<count; i++) 
+        children[i] = mype-1+i*span[0];
+    }
+    if (level == 3) {
+      for (int i=0; i<count; i++) 
+        children[i] = i*span[0]*span[1]+1;
+    }
+  }
+};
+
 class HybridBaseLB : public BaseLB
 {
 public:
