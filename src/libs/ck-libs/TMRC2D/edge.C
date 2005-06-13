@@ -52,13 +52,13 @@ int edge::split(int *m, edgeRef *e_prime, int oIdx, int fIdx,
     fIdx = (*sharedList)[fIdx];
   }
   CkPrintf("TMRC2D: [%d] oIdx=%d fIdx=%d ", myRef.cid, oIdx, fIdx);
-  CkPrintf("node[oIdx]="); C->theNodes[oIdx].dump();
-  CkPrintf("node[fIdx]="); C->theNodes[fIdx].dump();
+  CkPrintf("\ntheNodes[oIdx]="); C->theNodes[oIdx].dump();
+  CkPrintf("\ntheNodes[fIdx]="); C->theNodes[fIdx].dump();
   CkPrintf("\n");
   
   CkPrintf("TMRC2D: [%d] node[0]=%d node[1]=%d ", myRef.cid, nodes[0], nodes[1]);
-  CkPrintf("coords of node[0]="); C->theNodes[nodes[0]].dump();
-  CkPrintf("coords of node[1]="); C->theNodes[nodes[1]].dump();
+  CkPrintf("\ncoords of node[0]="); C->theNodes[nodes[0]].dump();
+  CkPrintf("\ncoords of node[1]="); C->theNodes[nodes[1]].dump();
   CkPrintf("\n");
   CkAssert((oIdx == nodes[0]) || (oIdx == nodes[1]));
   CkAssert((fIdx == nodes[0]) || (fIdx == nodes[1]));
@@ -471,4 +471,10 @@ void edge::sanityCheck(chunk *c, edgeRef shouldRef)
   }
   if (nonNullElements == 0)
     CkPrintf("TMRC2D: WARNING: Dangling edge found!\n");
+}
+
+void edge::sanityCheck(int node1, int node2)
+{
+  CkAssert((node1 == nodes[0]) || (node1 == nodes[1]));
+  CkAssert((node2 == nodes[0]) || (node2 == nodes[1]));
 }

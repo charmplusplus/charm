@@ -507,6 +507,27 @@ double element::getShortestEdge(double *angle)
   return minlen;
 }
 
+double element::getLargestEdge(double *angle)
+{
+  double maxlen, len[3];
+  int largest=0;
+  // fine lengths of sides
+  maxlen = len[0] = C->theNodes[nodes[0]].distance(C->theNodes[nodes[1]]);
+  len[1] = C->theNodes[nodes[1]].distance(C->theNodes[nodes[2]]);
+  len[2] = C->theNodes[nodes[2]].distance(C->theNodes[nodes[0]]);
+  for (int i=1; i<3; i++) // find max length of a side
+    if (len[i] > maxlen) {
+      largest = i;
+      maxlen = len[i];
+    }
+  double A, B, C;
+  C = len[largest];
+  A = len[(largest+1)%3];
+  B = len[(largest+2)%3];
+  (*angle) = acos((C*C - A*A - B*B)/(2*A*B));
+  return maxlen;
+}
+
 int element::isLongestEdge(edgeRef& e)
 {
   int longEdge = findLongestEdge();
@@ -577,6 +598,8 @@ void element::sanityCheck(chunk *c, elemRef shouldRef, int n)
     CkAssert((nodes[i] < n) && (nodes[i] > -1));
     CkAssert(!(edges[i].isNull()));
     edges[i].sanityCheck();
+    if (edges[i].cid == myRef.cid)
+      C->theEdges[edges[i].idx].sanityCheck(nodes[i], nodes[(i+1)%3]);
   }
   CkAssert(nodes[0] != nodes[1]);
   CkAssert(nodes[0] != nodes[2]);

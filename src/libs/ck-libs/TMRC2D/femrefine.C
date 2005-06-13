@@ -611,7 +611,7 @@ void FEM_Coarsen_Operation(FEM_Operation_Data *coarsen_data, coarsenData &operat
 					coarsen_data->nodes2sparse->remove(intdual(nodeToKeep,nodeToThrow));
 					(*(coarsen_data->validEdge))[sidx][0] = 0;
 					DEBUGINT(printf("---- Deleting edge %d between nodes %d and %d \n",sidx,nodeToKeep,nodeToThrow));
-					CmiMemoryCheck();
+					//					CmiMemoryCheck();
 				}	
 			}
 			validElemData[tri] = 0;
@@ -652,7 +652,7 @@ void FEM_Coarsen_Operation(FEM_Operation_Data *coarsen_data, coarsenData &operat
 									(*(coarsen_data->sparseConnTable))[edgeIdx][0] = otherNode;
 									(*(coarsen_data->sparseConnTable))[edgeIdx][1] = operation.data.rddata.newNodeID;
 								}	
-								CmiMemoryCheck();
+								//								CmiMemoryCheck();
 							}
 						}
 					}
@@ -668,7 +668,7 @@ void FEM_Coarsen_Operation(FEM_Operation_Data *coarsen_data, coarsenData &operat
 				DEBUGINT(printf("[%d] WEIRD -- COARSENDATA type == invalid \n",CkMyPe()));
 			CmiAbort("COARSENDATA type == invalid");
 	}			
-	CmiMemoryCheck();
+	//CmiMemoryCheck();
 };
 
 

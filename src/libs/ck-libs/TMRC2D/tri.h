@@ -121,7 +121,8 @@ class chunk : public TCharmClient1D {
     double len;
   } elemStack;
   elemStack *coarsenElements;
-  int coarsenTop;
+  elemStack *refineElements;
+  int coarsenTop, refineTop;
 
   void setupThreadPrivate(CthThread forThread) {
     CtvAccessOther(forThread, _refineChunk) = this;
@@ -185,6 +186,7 @@ class chunk : public TCharmClient1D {
   chunk(CkMigrateMessage *m) : TCharmClient1D(m) { };
   
   void sanityCheck(void);
+  void validCheck(void);
  
   // entry methods
   void deriveBoundaries(int *conn, int *gid);
@@ -287,8 +289,8 @@ class chunk : public TCharmClient1D {
   void fixNode(int nIdx, int chkid);
   int joinCommLists(int nIdx, int shd, int *chk, int *idx, int *rChk, 
 		    int *rIdx);
-  void addToStack(int eIdx, double len);
-  void rebubble();
+  void addToStack(int eIdx, double len, int cFlag);
+  void rebubble(int cFlag);
   intMsg *getBoundary(int edgeIdx);
 };
 

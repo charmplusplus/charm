@@ -554,16 +554,16 @@ driver(void)
 
   // THIS IS THE INITIAL MESH SENT TO NetFEM
   if (1) { //Publish data to the net
-		publishMeshToNetFEM(g,myChunk,t);
+    publishMeshToNetFEM(g,myChunk,t);
   }
   double desiredArea;
- /* 
- //should not be necessary as it would have been set in the init
- for (i=0; i<g.nnodes; i++) {
-      g.validNode[i] = 1;
+  /* 
+  //should not be necessary as it would have been set in the init
+  for (i=0; i<g.nnodes; i++) {
+    g.validNode[i] = 1;
   }
   for (i=0; i<g.nelems; i++) {
-      g.validElem[i] = 1;
+    g.validElem[i] = 1;
   }*/
   for (t=1;t<=tSteps;t++) {
     /*    if (1) { //Structural mechanics
@@ -579,39 +579,38 @@ driver(void)
     double curTime=CkWallTimer();
     double total=curTime-startTime;
     startTime=curTime;
-  	vector2d *loc;
-		double *areas;
+    vector2d *loc;
+    double *areas;
 	
     loc=new vector2d[2*g.nnodes];
     for (i=0;i<g.nnodes;i++) {
       loc[i]=g.coord[i];//+g.d[i];
     }
-
+    
     areas=new double[g.nelems];
     //prepare to refine
-   		for (i=0;i<g.nelems;i++) {
-	      areas[i]=calcArea(g, i);
-  	  }
-			//refine one element at a time
-			int refIdx = (13  + 3*t)%g.nnodes;
-			areas[refIdx] = calcArea(g,refIdx)/1.5;
-
+    for (i=0;i<g.nelems;i++) {
+      areas[i]=calcArea(g, i)*1.001;
+    }
+    //refine one element at a time
+    int refIdx = (13  + 3*t)%g.nnodes;
+    areas[refIdx] = calcArea(g,refIdx)/1.5;
+    
     CkPrintf("[%d] Starting refinement step: %d nodes, %d elements\n", myChunk,g.nnodes,g.nelems);
     FEM_REFINE2D_Split(FEM_Mesh_default_read(),FEM_NODE,(double *)loc,FEM_ELEM,areas,FEM_SPARSE);
     repeat_after_split((void *)&g);
 
-		
     g.nelems = FEM_Mesh_get_length(FEM_Mesh_default_read(),FEM_ELEM);
     g.nnodes = FEM_Mesh_get_length(FEM_Mesh_default_read(),FEM_NODE);
     CkPrintf("[%d] Done with refinement step: %d nodes, %d elements\n",
-	     myChunk,g.nnodes,g.nelems);
+	     myChunk,countValidEntities(g.validNode,g.nnodes),countValidEntities(g.validElem,g.nelems));
     // THIS IS THE REFINED MESH SENT TO NetFEM
     if (1) { //Publish data to the net
-			publishMeshToNetFEM(g,myChunk,2*t-1);
+      publishMeshToNetFEM(g,myChunk,2*t-1);
     }
     delete [] loc;
     delete[] areas;
-
+    
     // prepare to coarsen
     loc=new vector2d[2*g.nnodes];
     for (i=0;i<g.nnodes;i++) {
@@ -619,12 +618,12 @@ driver(void)
     }
     areas=new double[g.nelems];
     for (i=0;i<g.nelems;i++) {
-      areas[i]=calcArea(g, i);
+      areas[i]=calcArea(g, i)*0.999;
     }
-		//coarsen one element at a time
-		int coarseIdx = (23  + 4*t)%g.nnodes;
-		areas[coarseIdx] = calcArea(g,coarseIdx)*2.5;
-		
+    //coarsen one element at a time
+    int coarseIdx = (23  + 4*t)%g.nnodes;
+    areas[coarseIdx] = calcArea(g,coarseIdx)*2.5;
+    
     CkPrintf("[%d] Starting coarsening step: %d nodes, %d elements\n", myChunk,g.nnodes,g.nelems);
     FEM_REFINE2D_Coarsen(FEM_Mesh_default_read(),FEM_NODE,(double *)g.coord,FEM_ELEM,areas,FEM_SPARSE);
     repeat_after_split((void *)&g);
@@ -634,9 +633,9 @@ driver(void)
 	     myChunk,countValidEntities(g.validNode,g.nnodes),countValidEntities(g.validElem,g.nelems));
     // THIS IS THE COARSENED MESH SENT TO NetFEM
     if (1) { //Publish data to the net
-			publishMeshToNetFEM(g,myChunk,2*t);
+      publishMeshToNetFEM(g,myChunk,2*t);
     }
-	}	
+  }	
   if (CkMyPe()==0)
     CkPrintf("Driver finished\n");
 }

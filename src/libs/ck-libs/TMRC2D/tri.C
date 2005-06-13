@@ -19,7 +19,7 @@ chunk::chunk(chunkMsg *m)
   : TCharmClient1D(m->myThreads), sizeElements(0), sizeEdges(0), sizeNodes(0),
     firstFreeElement(0), firstFreeEdge(0), firstFreeNode(0),
     edgesSent(0), edgesRecvd(0), first(0),
-    coarsenElements(NULL), coarsenTop(0),
+    coarsenElements(NULL), refineElements(NULL), coarsenTop(0), refineTop(0),
     additions(0), debug_counter(0), refineInProgress(0), coarsenInProgress(0),
     modified(0), meshLock(0), meshExpandFlag(0), 
     numElements(0), numEdges(0), numNodes(0), numGhosts(0), theClient(NULL),
@@ -55,7 +55,16 @@ void chunk::refineElement(int idx, double area)
 { // Reduce element's targetArea to indicate need for refinement
   if (!theElements[idx].isPresent()) return;
   accessLock();
-  theElements[idx].setTargetArea(area);
+  theElements[idx].resetTargetArea(area);
+  refineElements[refineTop].elID = idx;
+  refineElements[refineTop].len = -1.0;
+  refineTop++;
+  int pos = refineTop-2;
+  while (pos >= 0) {
+    if (refineElements[pos].elID == idx)
+      refineElements[pos].elID = -1;
+    pos--;
+  }
   releaseLock();
   modified = 1;  // flag a change in one of the chunk's elements
   if (!refineInProgress) { // if refine loop not running
@@ -67,19 +76,17 @@ void chunk::refineElement(int idx, double area)
 void chunk::refiningElements()
 {
   int i;
-  while (modified) { // Refine elements until no changes occur
-    i = 0;
-    modified = 0;
-    while (i < elementSlots) { // loop through the elements
-      if (theElements[i].isPresent() && 
-	  (theElements[i].getTargetArea() <= theElements[i].getArea()) && 
-	  (theElements[i].getTargetArea() >= 0.0)) {
-	// element i has a lower target area -- needs to refine
-	modified = 1; // something's bound to change
-	theElements[i].refine(); // refine the element
-	adjustMesh();
-      }
-      i++;
+  while (refineTop > 0) { // loop through the elements
+    rebubble(0);
+    refineTop--;
+    i = refineElements[refineTop].elID;
+    if ((i != -1) && theElements[i].isPresent() && 
+	(theElements[i].getTargetArea() <= theElements[i].getArea()) && 
+	(theElements[i].getTargetArea() >= 0.0)) {
+      // element i has a lower target area -- needs to refine
+      modified = 1; // something's bound to change
+      theElements[i].refine(); // refine the element
+      adjustMesh();
     }
     CthYield(); // give other chunks on the same PE a chance
   }
@@ -114,7 +121,7 @@ void chunk::coarseningElements()
 {
   int i;
   while (coarsenTop > 0) { // loop through the elements
-    rebubble();
+    rebubble(1);
     coarsenTop--;
     i = coarsenElements[coarsenTop].elID;
     if ((i != -1) && theElements[i].isPresent() && 
@@ -630,15 +637,16 @@ void chunk::updateNodeCoords(int nNode, double *coord, int nEl)
   }
   DEBUGREF(CkPrintf("TMRC2D: [%d] In updateNodeCoords after CkWaitQD: edges sent=%d edge recvd=%d\n", cid, edgesSent, edgesRecvd);)
   sanityCheck(); // quietly make sure mesh is in shape
+  validCheck();
   // do some error checking
   //CkAssert(nEl == numElements);
   if (nEl != numElements) {
     DEBUGREF(CkPrintf("TMRC2D: [%d] WARNING: nEl=%d passed in updateNodeCoords does not match TMRC2D numElements=%d!\n", cid, nEl, numElements);)
-	}
+      }
   //CkAssert(nNode == numNodes);
   if (nNode != numNodes){
     DEBUGREF(CkPrintf("TMRC2D: [%d] WARNING: nNode=%d passed in updateNodeCoords does not match TMRC2D numNodes=%d!\n", cid, nNode, numNodes);)
-	}	
+      }	
   // update node coordinates from coord
   for (i=0; i<nodeSlots; i++)
     if (theNodes[i].isPresent()) {
@@ -657,16 +665,28 @@ void chunk::updateNodeCoords(int nNode, double *coord, int nEl)
 void chunk::multipleRefine(double *desiredArea, refineClient *client)
 {
   int i;
+  double area;
   DEBUGREF(CkPrintf("TMRC2D: [%d] multipleRefine....\n", cid);)
   sanityCheck(); // quietly make sure mesh is in shape
   theClient = client; // initialize refine client associated with this chunk
   //Uncomment this dump call to see TMRC2D's mesh config
   //dump();
-  for (i=0; i<elementSlots; i++)  // set desired areas for elements
-    if ((theElements[i].isPresent()) && 
-	(desiredArea[i] < theElements[i].getArea())){
-      theElements[i].setTargetArea(desiredArea[i]);
-	}
+  if (refineElements) delete [] refineElements;
+  refineElements = new elemStack[numElements];
+  for (i=0; i<elementSlots; i++) { // set desired areas for elements
+    if (theElements[i].isPresent()) {
+      area = theElements[i].getArea();
+      //precThrshld = area * 1e-8;
+      //CkPrintf("TMRC2D: desiredArea[%d]=%1.10e present? %d area=%1.10e\n", i, desiredArea[i], theElements[i].isPresent(), area);
+      if (desiredArea[i] < area) {
+	theElements[i].resetTargetArea(desiredArea[i]);
+	double angle;
+	theElements[i].getLargestEdge(&angle);
+	addToStack(i, angle, 0);
+	CkPrintf("TMRC2D: [%d] Setting target on element %d to %1.10e with largeEdge %1.10e\n", cid, i, desiredArea[i], refineElements[refineTop-1].len);
+      }
+    }
+  }
   // start refinement
   modified = 1;
   if (!refineInProgress) {
@@ -697,7 +717,7 @@ void chunk::multipleCoarsen(double *desiredArea, refineClient *client)
 	theElements[i].resetTargetArea(desiredArea[i]);
 	double angle;
 	theElements[i].getShortestEdge(&angle);
-	addToStack(i, angle);
+	addToStack(i, angle, 1);
 	CkPrintf("TMRC2D: [%d] Setting target on element %d to %1.10e with shortEdge %1.10e\n", cid, i, desiredArea[i], coarsenElements[coarsenTop-1].len);
       }
     }
@@ -1208,63 +1228,120 @@ int chunk::joinCommLists(int nIdx, int shd, int *chk, int *idx, int *rChk,
   return count;
 }
 
-void chunk::addToStack(int eIdx, double len)
+void chunk::addToStack(int eIdx, double len, int cFlag)
 { // this amounts to a bubble-sorted stack where the longest shortest edges
-  // sink to the bottom
-  int pos = coarsenTop;
-  coarsenTop++;
-  while (pos > 0) {
-    if (len <= coarsenElements[pos-1].len) {
+  // sink to the bottom in coarsening, vice versa for refinement
+  int pos;
+  if (cFlag) {
+    pos = coarsenTop;
+    coarsenTop++;
+    while (pos > 0) {
+      if (len <= coarsenElements[pos-1].len) {
+	coarsenElements[pos].elID = eIdx;
+	coarsenElements[pos].len = len;
+	break;
+      }
+      else {
+	coarsenElements[pos].elID = coarsenElements[pos-1].elID;
+	coarsenElements[pos].len = coarsenElements[pos-1].len;
+	pos--;
+      }
+    }
+    if (pos == 0) {
       coarsenElements[pos].elID = eIdx;
       coarsenElements[pos].len = len;
-      break;
-    }
-    else {
-      coarsenElements[pos].elID = coarsenElements[pos-1].elID;
-      coarsenElements[pos].len = coarsenElements[pos-1].len;
-      pos--;
     }
   }
-  if (pos == 0) {
-    coarsenElements[pos].elID = eIdx;
-    coarsenElements[pos].len = len;
+  else {
+    pos = refineTop;
+    refineTop++;
+    while (pos > 0) {
+      if (len >= refineElements[pos-1].len) {
+	refineElements[pos].elID = eIdx;
+	refineElements[pos].len = len;
+	break;
+      }
+      else {
+	refineElements[pos].elID = refineElements[pos-1].elID;
+	refineElements[pos].len = refineElements[pos-1].len;
+	pos--;
+      }
+    }
+    if (pos == 0) {
+      refineElements[pos].elID = eIdx;
+      refineElements[pos].len = len;
+    }
   }
 }
 
-void chunk::rebubble()
+void chunk::rebubble(int cFlag)
 {
-  int pos = coarsenTop-1, loc, end;
+  int pos, loc, end;
   int tmpID;
   double tmpLen;
-
-  for (int i=0; i<coarsenTop; i++)
-    if ((coarsenElements[i].elID > -1) && (coarsenElements[i].len > -1.0)) {
-      if (theElements[coarsenElements[i].elID].present) {
-	double angle;
-	theElements[coarsenElements[i].elID].getShortestEdge(&angle);
-	coarsenElements[i].len = angle;
+  if (cFlag) {
+    pos = coarsenTop-1;
+    for (int i=0; i<coarsenTop; i++)
+      if ((coarsenElements[i].elID > -1) && (coarsenElements[i].len > -1.0)) {
+	if (theElements[coarsenElements[i].elID].present) {
+	  double angle;
+	  theElements[coarsenElements[i].elID].getShortestEdge(&angle);
+	  coarsenElements[i].len = angle;
+	}
+	else {
+	  coarsenElements[i].elID = -1;
+	  coarsenElements[i].len = -1.0;
+	}
       }
-      else {
-	coarsenElements[i].elID = -1;
-	coarsenElements[i].len = -1.0;
+    
+    while (coarsenElements[pos].len == -1.0) pos--;
+    end = pos;
+    while (pos > 0) {
+      loc = pos;
+      while ((coarsenElements[loc].len < coarsenElements[loc-1].len) &&
+	     (loc <= end)) {
+	tmpID = coarsenElements[loc].elID;
+	tmpLen = coarsenElements[loc].len;
+	coarsenElements[loc].elID = coarsenElements[loc-1].elID;
+	coarsenElements[loc].len = coarsenElements[loc-1].len;
+	coarsenElements[loc-1].elID = tmpID;
+	coarsenElements[loc-1].len = tmpLen;
+	loc++;
       }
+      pos--;
     }
-
-  while (coarsenElements[pos].len == -1.0) pos--;
-  end = pos;
-  while (pos > 0) {
-    loc = pos;
-    while ((coarsenElements[loc].len < coarsenElements[loc-1].len) &&
-	   (loc <= end)) {
-      tmpID = coarsenElements[loc].elID;
-      tmpLen = coarsenElements[loc].len;
-      coarsenElements[loc].elID = coarsenElements[loc-1].elID;
-      coarsenElements[loc].len = coarsenElements[loc-1].len;
-      coarsenElements[loc-1].elID = tmpID;
-      coarsenElements[loc-1].len = tmpLen;
-      loc++;
+  }
+  else {
+    pos = refineTop-1;
+    for (int i=0; i<refineTop; i++)
+      if ((refineElements[i].elID > -1) && (refineElements[i].len > -1.0)) {
+	if (theElements[refineElements[i].elID].present) {
+	  double angle;
+	  theElements[refineElements[i].elID].getLargestEdge(&angle);
+	  refineElements[i].len = angle;
+	}
+	else {
+	  refineElements[i].elID = -1;
+	  refineElements[i].len = -1.0;
+	}
+      }
+    
+    while (refineElements[pos].len == -1.0) pos--;
+    end = pos;
+    while (pos > 0) {
+      loc = pos;
+      while ((refineElements[loc].len > refineElements[loc-1].len) &&
+	     (loc <= end)) {
+	tmpID = refineElements[loc].elID;
+	tmpLen = refineElements[loc].len;
+	refineElements[loc].elID = refineElements[loc-1].elID;
+	refineElements[loc].len = refineElements[loc-1].len;
+	refineElements[loc-1].elID = tmpID;
+	refineElements[loc-1].len = tmpLen;
+	loc++;
+      }
+      pos--;
     }
-    pos--;
   }
 }
 
@@ -1275,4 +1352,20 @@ intMsg *chunk::getBoundary(int edgeIdx)
   return im;
 }
 
+
+void chunk::validCheck()
+{
+  int i;
+  FEM_Entity *fem_node = meshPtr->lookup(FEM_NODE,"validCheck");
+  FEM_DataAttribute *validNode = (FEM_DataAttribute *)fem_node->lookup(FEM_ATTRIB_TAG_MAX-1,"validCheck");
+  AllocTable2d<int> &validNodeTable = validNode->getInt();
+  for (i=0; i<elementSlots; i++) {
+    //    CkAssert(theElements[i].isPresent()==);
+  }
+  for (i=0; i<nodeSlots; i++) {
+    CkAssert(theNodes[i].isPresent()==validNodeTable[i][0]);
+  }
+}
+
 #include "refine.def.h"
+
