@@ -77,10 +77,7 @@ init(void)
     }
     fclose(f);
   }
-  CkPrintf("Passing node coords to framework\n");
-  FEM_Set_node(nPts,2);
-  FEM_Set_node_data((double *)pts);
-
+ 
   int nEle=0;
   connRec *ele=NULL;
   CkPrintf("Reading elements from %s\n",eleName);
@@ -104,11 +101,47 @@ init(void)
     }
     fclose(f);
   }
-  
+ 
+
+
+  int fem_mesh=FEM_Mesh_default_write(); // Tell framework we are writing to the mesh
+
+  CkPrintf("Passing node coords to framework\n");
+
+  /*   Old versions used FEM_Set_node() and FEM_Set_node_data()
+   *   New versions use the more flexible FEM_Set_Data()
+   */
+
+  FEM_Mesh_data(fem_mesh,        // Add nodes to the current mesh
+                FEM_NODE,        // We are registering nodes
+                FEM_DATA+0,      // Register the point locations which are normally 
+                                 // the first data elements for an FEM_NODE
+                (double *)pts,   // The array of point locations
+                0,               // 0 based indexing
+                nPts,            // The number of points
+                FEM_DOUBLE,      // Coordinates are doubles
+                2);              // Points have dimension 2 (x,y)
+ 
+
   CkPrintf("Passing elements to framework\n");
 
-  FEM_Set_elem(0,nEle,0,3);
-  FEM_Set_elem_conn(0,(int *)ele);
+  /*   Old versions used FEM_Set_elem() and FEM_Set_elem_conn() 
+   *   New versions use the more flexible FEM_Set_Data()
+   */
+
+  FEM_Mesh_data(fem_mesh,      // Add nodes to the current mesh
+                FEM_ELEM+0,      // We are registering elements with type 0
+                                 // The next type of element could be registered with FEM_ELEM+1
+                FEM_CONN,        // Register the connectivity table for this
+                                 // data elements for this type of FEM entity
+                (int *)ele,      // The array of point locations
+                0,               // 0 based indexing
+                nEle,            // The number of elements
+                FEM_INDEX_0,     // We use zero based node numbering
+                3);              // Elements have degree 3, since triangles are defined 
+                                 // by three nodes
+ 
+   
   delete[] ele;
 
   delete[] pts;
