@@ -24,6 +24,7 @@
 #include "GreedyCommLB.h"
 #include "RefineCommLB.h"
 #include "RefineLB.h"
+#include "MetisLB.h"
 
 #define  DEBUGF(x)      // CmiPrintf x;
 
@@ -41,7 +42,7 @@ HybridLB::HybridLB(const CkLBOptions &opt): HybridBaseLB(opt)
   // IMPORTANT: currently, the greedy LB must allow objects that
   // are not from existing processors.
   refine = (CentralLB *)AllocateRefineLB();
-  greedy = (CentralLB *)AllocateGreedyLB();
+  greedy = (CentralLB *)AllocateMetisLB();
 #endif
 }
 
