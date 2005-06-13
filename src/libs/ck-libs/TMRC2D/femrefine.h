@@ -49,7 +49,7 @@ void FEM_REFINE2D_Newmesh(int meshID,int nodeID,int elemID,int nodeBoundary=0);
 
 void FEM_REFINE2D_Split(int meshID,int nodeID,double *coord,int elemID,double *desiredAreas,int sparseID=-1);
 
-void FEM_REFINE2D_Coarsen(int meshID,int nodeID,double *coord,int elemID,double *desiredAreas);
+void FEM_REFINE2D_Coarsen(int meshID,int nodeID,double *coord,int elemID,double *desiredAreas,int sparseID=-1);
 
 
 #ifdef __cplusplus

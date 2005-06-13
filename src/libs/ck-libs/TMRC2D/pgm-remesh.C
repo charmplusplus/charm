@@ -145,6 +145,7 @@ init(void)
   int nEdge;
   int *edgeConn;
   int *edgeBoundary;
+	int *validEdge;
   {
     char line[1024];
     FILE *f=fopen(edgeName,"r");
@@ -153,6 +154,7 @@ init(void)
     if (1!=sscanf(line,"%d",&nEdge)) die("Can't read number of elements!");
     edgeConn = new int[2*nEdge];
     edgeBoundary = new int[nEdge];
+		validEdge = new int[nEdge];
     for(int i=0;i<nEdge;i++){
       int edgeNo;
       if (NULL==fgets(line,1024,f)) die("Can't read edge input line!");
@@ -161,6 +163,7 @@ init(void)
       }
       edgeConn[i*2+0]--;
       edgeConn[i*2+1]--;		
+			validEdge[i] = 1;
     }
     fclose(f);
   }
@@ -168,6 +171,7 @@ init(void)
   FEM_Register_entity(FEM_Mesh_default_write(),FEM_SPARSE,NULL,nEdge,nEdge,resize_edges);
   FEM_Register_array(FEM_Mesh_default_write(),FEM_SPARSE,FEM_CONN,edgeConn,FEM_INDEX_0,2);
   FEM_Register_array(FEM_Mesh_default_write(),FEM_SPARSE,FEM_BOUNDARY,edgeBoundary,FEM_INT,1);
+	FEM_Register_array(FEM_Mesh_default_write(),FEM_SPARSE,FEM_VALID,validEdge,FEM_INT,1);
   CkPrintf("Finished with init\n");
 }
 
@@ -185,6 +189,7 @@ struct myGlobals {
   double *S11, *S22, *S12; //Stresses for each element
   int *edgeConn;//edge Connectivity table
   int *edgeBoundary;//edge boundary value
+	int *validEdge;
 };
 
 void pup_myGlobals(pup_er p,myGlobals *g) 
@@ -213,6 +218,7 @@ void pup_myGlobals(pup_er p,myGlobals *g)
     g->validElem = new int[g->maxelems];
     g->edgeConn = new int[2*g->maxedges];
     g->edgeBoundary = new int[g->maxedges];
+		g->validEdge = new int[g->maxedges];
   }
   pup_doubles(p,(double *)g->coord,2*nnodes);
   pup_ints(p,(int *)g->conn,3*nelems);
@@ -228,6 +234,7 @@ void pup_myGlobals(pup_er p,myGlobals *g)
   pup_ints(p,(int *)g->validElem,nelems);
   pup_ints(p,(int *)g->edgeConn,2*g->nedges);
   pup_ints(p,(int *)g->edgeBoundary,g->nedges);
+	pup_ints(p,(int *)g->validEdge,g->nedges);
 
   if (pup_isDeleting(p)) {
     delete[] g->coord;
@@ -244,6 +251,7 @@ void pup_myGlobals(pup_er p,myGlobals *g)
     delete[] g->validElem;
     delete[] g->edgeConn;
     delete[] g->edgeBoundary;
+		delete[] g->validEdge;
   }
 }
 
@@ -453,15 +461,19 @@ void resize_edges(void *data,int *len,int *max){
   
   int *conn = g->edgeConn;
   int *bound = g->edgeBoundary;
+	int *validEdge = g->validEdge;
   g->maxedges = *max;	
   g->edgeConn = new int[2*(*max)];
   g->edgeBoundary = new int[(*max)];
+	g->validEdge = new int[(*max)];
   
   FEM_Register_array(FEM_Mesh_default_read(),FEM_SPARSE,FEM_CONN,(void *)g->edgeConn,FEM_INDEX_0,2);	
   FEM_Register_array(FEM_Mesh_default_read(),FEM_SPARSE,FEM_BOUNDARY,(void *)g->edgeBoundary,FEM_INT,1);
+  FEM_Register_array(FEM_Mesh_default_read(),FEM_SPARSE,FEM_VALID,(void *)g->validEdge,FEM_INT,1);
   if(conn != NULL){
     delete [] conn;
     delete [] bound;	
+		delete [] validEdge;
   }
 }
 
@@ -479,6 +491,9 @@ void repeat_after_split(void *data){
 
 
 void publishMeshToNetFEM(myGlobals &g,int myChunk,int t);
+int countValidEntities(int *validData,int total);
+
+
 extern "C" void
 driver(void)
 {
@@ -542,6 +557,14 @@ driver(void)
 		publishMeshToNetFEM(g,myChunk,t);
   }
   double desiredArea;
+ /* 
+ //should not be necessary as it would have been set in the init
+ for (i=0; i<g.nnodes; i++) {
+      g.validNode[i] = 1;
+  }
+  for (i=0; i<g.nelems; i++) {
+      g.validElem[i] = 1;
+  }*/
   for (t=1;t<=tSteps;t++) {
     /*    if (1) { //Structural mechanics
     //Compute forces on nodes exerted by elements
@@ -556,39 +579,28 @@ driver(void)
     double curTime=CkWallTimer();
     double total=curTime-startTime;
     startTime=curTime;
-    /*    if (CkMyPe()==0 && (t%64==0))
-	  CkPrintf("%d %.6f sec for loop %d \n",CkNumPes(),total,t);*/
-    /*   if (0 && t%16==0) {
-	 CkPrintf("    Triangle 0:\n");
-	 for (int j=0;j<3;j++) {
-	 int n=g.conn[0][j];
-	 CkPrintf("    Node %d: coord=(%.4f,%.4f)  d=(%.4g,%.4g)\n",
-	 n,g.coord[n].x,g.coord[n].y,g.d[n].x,g.d[n].y);
-	 }
-	 }*/
-    //    if (t%512==0)
-    //      FEM_Migrate();
-    
-    vector2d *loc=new vector2d[2*g.nnodes];
+  	vector2d *loc;
+		double *areas;
+	
+    loc=new vector2d[2*g.nnodes];
     for (i=0;i<g.nnodes;i++) {
       loc[i]=g.coord[i];//+g.d[i];
     }
 
-    double *areas=new double[g.nelems];
+    areas=new double[g.nelems];
     //prepare to refine
-    for (i=0;i<g.nelems;i++) {
-      areas[i]=calcArea(g, i)/1.5;
-    }
+   		for (i=0;i<g.nelems;i++) {
+	      areas[i]=calcArea(g, i);
+  	  }
+			//refine one element at a time
+			int refIdx = (13  + 3*t)%g.nnodes;
+			areas[refIdx] = calcArea(g,refIdx)/1.5;
 
     CkPrintf("[%d] Starting refinement step: %d nodes, %d elements\n", myChunk,g.nnodes,g.nelems);
     FEM_REFINE2D_Split(FEM_Mesh_default_read(),FEM_NODE,(double *)loc,FEM_ELEM,areas,FEM_SPARSE);
-    for (i=0; i<g.nnodes; i++) {
-      g.validNode[i] = 1;
-    }
-    for (i=0; i<g.nelems; i++) {
-      g.validElem[i] = 1;
-    }
     repeat_after_split((void *)&g);
+
+		
     g.nelems = FEM_Mesh_get_length(FEM_Mesh_default_read(),FEM_ELEM);
     g.nnodes = FEM_Mesh_get_length(FEM_Mesh_default_read(),FEM_NODE);
     CkPrintf("[%d] Done with refinement step: %d nodes, %d elements\n",
@@ -597,25 +609,29 @@ driver(void)
     if (1) { //Publish data to the net
 			publishMeshToNetFEM(g,myChunk,2*t-1);
     }
+    delete [] loc;
+    delete[] areas;
 
     // prepare to coarsen
-    delete [] loc;
     loc=new vector2d[2*g.nnodes];
     for (i=0;i<g.nnodes;i++) {
       loc[i]=g.coord[i];//+g.d[i];
     }
-    delete[] areas;
     areas=new double[g.nelems];
     for (i=0;i<g.nelems;i++) {
-      areas[i]=calcArea(g, i) * 2.5;
+      areas[i]=calcArea(g, i);
     }
+		//coarsen one element at a time
+		int coarseIdx = (23  + 4*t)%g.nnodes;
+		areas[coarseIdx] = calcArea(g,coarseIdx)*2.5;
+		
     CkPrintf("[%d] Starting coarsening step: %d nodes, %d elements\n", myChunk,g.nnodes,g.nelems);
-    FEM_REFINE2D_Coarsen(FEM_Mesh_default_read(),FEM_NODE,(double *)g.coord,FEM_ELEM,areas);
+    FEM_REFINE2D_Coarsen(FEM_Mesh_default_read(),FEM_NODE,(double *)g.coord,FEM_ELEM,areas,FEM_SPARSE);
     repeat_after_split((void *)&g);
     g.nelems = FEM_Mesh_get_length(FEM_Mesh_default_read(),FEM_ELEM);
     g.nnodes = FEM_Mesh_get_length(FEM_Mesh_default_read(),FEM_NODE);
     CkPrintf("[%d] Done with coarsening step: %d nodes, %d elements\n",
-	     myChunk,g.nnodes,g.nelems);
+	     myChunk,countValidEntities(g.validNode,g.nnodes),countValidEntities(g.validElem,g.nelems));
     // THIS IS THE COARSENED MESH SENT TO NetFEM
     if (1) { //Publish data to the net
 			publishMeshToNetFEM(g,myChunk,2*t);
@@ -625,6 +641,13 @@ driver(void)
     CkPrintf("Driver finished\n");
 }
 
+int countValidEntities(int *validData,int total){
+	int sum =0 ;
+	for(int i=0;i<total;i++){
+		sum += validData[i];
+	}
+	return sum;
+}
 
 
 void publishMeshToNetFEM(myGlobals &g,int myChunk,int t){
