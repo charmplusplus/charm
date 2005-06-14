@@ -20,7 +20,7 @@ coarse: $(DEST) $(OBJS1)
 	$(CHARMC) -L. -o coarse $(OBJS1) -language fem -module netfem -module refine -memory paranoid
 
 remesh: $(DEST) $(OBJS2)
-	$(CHARMC) -L. -o remesh $(OBJS2) -language fem -module netfem -module refine #-memory paranoid
+	$(CHARMC) -L. -o remesh $(OBJS2) -language fem -module netfem -module refine -memory paranoid
 
 pgm.o: pgm.C pgm.h
 	$(CHARMC) -c pgm.C

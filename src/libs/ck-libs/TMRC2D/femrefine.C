@@ -248,7 +248,7 @@ void FEM_REFINE2D_Split(int meshID,int nodeID,double *coord,int elemID,double *d
 	}
 
 
-  DEBUGINT(printf("Cordinate list length %d \n",coordVec.size()/2));
+  DEBUGINT(printf("Cordinate list length %d according to FEM %d\n",coordVec.size()/2,FEM_Mesh_get_length(meshID,nodeID)));
   IDXL_Sort_2d(FEM_Comm_shared(meshID,nodeID),coordVec.getVec());
   int read = FEM_Mesh_is_get(meshID) ;
   assert(read);
@@ -392,9 +392,11 @@ void FEM_Refine_Operation(FEM_Refine_Operation_Data *data,refineData &op){
 		//add a new triangle
 		/*TODO: replace  FEM_ELEM with parameter*/
 		int newTri =  op._new;
-		//FEM_Mesh_get_length(data->meshID,data->elemID);
+		int cur_elements  = FEM_Mesh_get_length(data->meshID,data->elemID);
 		DEBUGINT(CkPrintf("---- Adding triangle %d after splitting %d \n",newTri,tri));
-		data->elem->setLength(newTri+1);
+		if(newTri >= cur_elements){
+			data->elem->setLength(newTri+1);
+		}	
 		D = newnodes->get(intdual(A,B));
 		for(int j=0;j<elemattrs->size();j++){
 			if((*elemattrs)[j]->getAttr() == FEM_CONN){

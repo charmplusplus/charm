@@ -596,7 +596,7 @@ driver(void)
     int refIdx = (13  + 3*t)%g.nnodes;
     areas[refIdx] = calcArea(g,refIdx)/1.5;
     
-    CkPrintf("[%d] Starting refinement step: %d nodes, %d elements\n", myChunk,g.nnodes,g.nelems);
+    CkPrintf("[%d] Starting refinement step: %d nodes, %d elements\n", myChunk,countValidEntities(g.validNode,g.nnodes),countValidEntities(g.validElem,g.nelems));
     FEM_REFINE2D_Split(FEM_Mesh_default_read(),FEM_NODE,(double *)loc,FEM_ELEM,areas,FEM_SPARSE);
     repeat_after_split((void *)&g);
 
@@ -624,7 +624,7 @@ driver(void)
     int coarseIdx = (23  + 4*t)%g.nnodes;
     areas[coarseIdx] = calcArea(g,coarseIdx)*2.5;
     
-    CkPrintf("[%d] Starting coarsening step: %d nodes, %d elements\n", myChunk,g.nnodes,g.nelems);
+    CkPrintf("[%d] Starting coarsening step: %d nodes, %d elements\n", myChunk,countValidEntities(g.validNode,g.nnodes),countValidEntities(g.validElem,g.nelems));
     FEM_REFINE2D_Coarsen(FEM_Mesh_default_read(),FEM_NODE,(double *)g.coord,FEM_ELEM,areas,FEM_SPARSE);
     repeat_after_split((void *)&g);
     g.nelems = FEM_Mesh_get_length(FEM_Mesh_default_read(),FEM_ELEM);
