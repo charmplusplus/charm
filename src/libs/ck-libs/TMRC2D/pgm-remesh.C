@@ -565,6 +565,11 @@ driver(void)
   for (i=0; i<g.nelems; i++) {
     g.validElem[i] = 1;
   }*/
+  double avgArea = 0.0;
+  for (i=0;i<g.nelems;i++) {
+    avgArea += calcArea(g, i);
+  }
+  avgArea /= g.nelems;
   for (t=1;t<=tSteps;t++) {
     /*    if (1) { //Structural mechanics
     //Compute forces on nodes exerted by elements
@@ -589,7 +594,7 @@ driver(void)
     }
     areas=new double[g.nelems];
     for (i=0;i<g.nelems;i++) {
-      areas[i]=calcArea(g, i)*2.1;
+      areas[i] = calcArea(g, i) + avgArea;
     }
     //coarsen one element at a time
     //int coarseIdx = (23  + 4*t)%g.nnodes;
@@ -615,7 +620,7 @@ driver(void)
     
     areas=new double[g.nelems];
     for (i=0;i<g.nelems;i++) {
-      areas[i]=calcArea(g, i)*0.9;
+      areas[i] = (calcArea(g, i)/2.0 + avgArea)/2.0;
     }
     //refine one element at a time
     //int refIdx = (13  + 3*t)%g.nnodes;
