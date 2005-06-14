@@ -140,17 +140,26 @@ driver(void)
   myGlobals g;
   FEM_Register(&g,(FEM_PupFn)pup_myGlobals);
   
-  FEM_Get_node(&nnodes,&ignored);
+  
+  int mesh=FEM_Mesh_default_read(); // Tell framework we are reading data from the mesh
+  
+  // Get node data
+  nnodes=FEM_Mesh_get_length(mesh,FEM_NODE); // Get number of nodes
   g.coord=new vector2d[nnodes];
-  FEM_Get_node_data((double *)g.coord);  
+  // Get node positions
+  FEM_Mesh_data(mesh, FEM_NODE, FEM_DATA+0, (double*)g.coord, 0, nnodes, FEM_DOUBLE, 2);  
 
-  FEM_Get_elem(0,&nelems,&ignored,&ignored);
+
+  // Get element data
+  nelems=FEM_Mesh_get_length(mesh,FEM_ELEM+0); // Get number of elements
   g.nnodes=nnodes; g.nelems=nelems;
   g.conn=new connRec[nelems];
   g.S11=new double[nelems];
   g.S22=new double[nelems];
   g.S12=new double[nelems];
-  FEM_Get_elem_conn(0,(int *)g.conn);
+  // Get connectivity for elements
+  FEM_Mesh_data(mesh, FEM_ELEM+0, FEM_CONN, (int *)g.conn, 0, nelems, FEM_INDEX_0, 3);  
+
 
   //Initialize associated data
   g.R_net=new vector2d[nnodes]; //Net force
@@ -204,10 +213,10 @@ driver(void)
     	    }
     }
     /* perform migration-based load balancing */
-    if (0)
+    if (t%1024==0)
       FEM_Migrate();
     
-    if (t==4608) { //Publish data to the net
+    if (t%1024==0) { //Publish data to the net
 	    NetFEM n=NetFEM_Begin(FEM_My_partition(),t,2,NetFEM_POINTAT);
 	    
 	    NetFEM_Nodes(n,nnodes,(double *)g.coord,"Position (m)");
