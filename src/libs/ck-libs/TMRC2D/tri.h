@@ -15,8 +15,10 @@
 #include "messages.h"
 #include "mpi.h"
 
-#define DEBUGREF(x) x
-//#define DEBUGREF(x) 
+// Debug level for TMRC2D: 1 = min, 2 = mod, 3 = max; off by default
+//#define TDEBUG1
+//#define TDEBUG2
+//#define TDEBUG3
 
 // ------------------------ Global Read-only Data ---------------------------
 extern CProxy_chunk mesh;

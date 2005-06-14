@@ -64,11 +64,13 @@ void element::split(int longEdge)
   fixnode = otherEdge;
 
   int fIdx, oIdx;
+#ifdef TDEBUG3
   CkPrintf("TMRC2D: [%d] oIdx=%d fIdx=%d ", myRef.cid, nodes[othernode], 
 	   nodes[fixnode]);
   CkPrintf("node[oIdx]="); C->theNodes[nodes[othernode]].dump();
   CkPrintf(" node[fIdx]="); C->theNodes[nodes[fixnode]].dump();
   CkPrintf("\n");
+#endif
 
   if (edges[longEdge].cid == myRef.cid) {
     oIdx = nodes[othernode];
@@ -81,12 +83,14 @@ void element::split(int longEdge)
     edge e;
     oIdx = oNodeRec->getIdx(e.existsOn(oNodeRec, edges[longEdge].cid));
     fIdx = fNodeRec->getIdx(e.existsOn(fNodeRec, edges[longEdge].cid));
+#ifdef TDEBUG3
     CkPrintf("TMRC2D: [%d] oIdx=%d locally, %d on longEdge's chunk\n", 
 	     myRef.cid, nodes[othernode], oIdx);
     CkPrintf("TMRC2D: [%d] fIdx=%d locally, %d on longEdge's chunk\n", 
 	     myRef.cid, nodes[fixnode], fIdx);
     CkPrintf("oNodeRec: chk=%d idx=%d\n", oNodeRec->getChk(0), oNodeRec->getIdx(0));
     CkPrintf("fNodeRec: chk=%d idx=%d\n", fNodeRec->getChk(0), fNodeRec->getIdx(0));
+#endif
   }
   CkAssert(fIdx > -1);
   CkAssert(oIdx > -1);
@@ -95,10 +99,13 @@ void element::split(int longEdge)
   if ((result=edges[longEdge].split(&m, &e_prime,oIdx, fIdx,
 				    myRef, &local, &first, &nullNbr)) == 1) {
     // e_prime successfully created incident on othernode
-    DEBUGREF(CkPrintf("TMRC2D: [%d] Refining element %d, opnode=%d ^othernode=%d fixnode=%d longEdge=%d modEdge=%d otherEdge=%d\n", myRef.cid, myRef.idx, nodes[opnode], nodes[othernode], nodes[fixnode], edges[longEdge].idx, edges[modEdge].idx, edges[otherEdge].idx);)
-    DEBUGREF(CkPrintf("TMRC2D: [%d] to FEM: element=%d local=%d first=%d between nodes %d and %d\n", myRef.cid, myRef.idx, local, first, nodes[othernode], nodes[fixnode]);)
+#ifdef TDEBUG2
+    CkPrintf("TMRC2D: [%d] Refining element %d, opnode=%d ^othernode=%d fixnode=%d longEdge=%d modEdge=%d otherEdge=%d\n", myRef.cid, myRef.idx, nodes[opnode], nodes[othernode], nodes[fixnode], edges[longEdge].idx, edges[modEdge].idx, edges[otherEdge].idx);
+#endif
     newEdge = C->addEdge(m, nodes[opnode], 0);
-    DEBUGREF(CkPrintf("TMRC2D: [%d] New edge (%d,%d) added between nodes %d and %d\n", myRef.cid, newEdge.cid, newEdge.idx, m, nodes[opnode]);)
+#ifdef TDEBUG2
+    CkPrintf("TMRC2D: [%d] New edge (%d,%d) added between nodes %d and %d\n", myRef.cid, newEdge.cid, newEdge.idx, m, nodes[opnode]);
+#endif
     // add new element to preserve orientation
     if (opnode == 0) {
       if (othernode == 1)
@@ -146,24 +153,31 @@ void element::split(int longEdge)
     if (nullNbr) b = edges[longEdge].getBoundary();
     if(C->theClient) {
       C->theClient->split(myRef.idx, oldothernode,nodes[fixnode],nodes[opnode], m, newElem.idx, 0.5, flag,b, 0, b);
+#ifdef TDEBUG1
       CkPrintf("TMRC2D: [%d] theClient->split(elem=%d, edge=%d, newNode=%d, newElem=%d, bound=%d)\n", myRef.cid, myRef.idx, longEdge, m, newElem.idx, b);
+#endif
     }
-    if (nullNbr){ DEBUGREF(CkPrintf("TMRC2D: [%d] nbr is null\n");)}
+
     if (!first || nullNbr) {
-      if (!first) {
-	DEBUGREF(CkPrintf("TMRC2D: [%d] Resetting pending edges, second split complete.\n", myRef.cid);)
-      }
-      else if (nullNbr) {
-	DEBUGREF(CkPrintf("TMRC2D: [%d] Resetting pending edges, neighbor NULL.\n", myRef.cid);)      }
+#ifdef TDEBUG3
+      if (!first)
+	CkPrintf("TMRC2D: [%d] Resetting pending edges, second split complete.\n", myRef.cid);
+      else if (nullNbr)
+	CkPrintf("TMRC2D: [%d] Resetting pending edges, neighbor NULL.\n", 
+		 myRef.cid);
+#endif
       edges[longEdge].resetEdge();
     }
   }
   else if (result == 0) { 
     // e_prime already incident on fixnode
-  DEBUGREF(CkPrintf("TMRC2D: [%d] Refining element %d, opnode=%d othernode=%d ^fixnode=%d longEdge=%d modEdge=%d otherEdge=%d\n", myRef.cid, myRef.idx, nodes[opnode], nodes[othernode], nodes[fixnode], edges[longEdge].idx, edges[modEdge].idx, edges[otherEdge].idx);)
-      DEBUGREF(CkPrintf("TMRC2D: [%d] to FEM: element=%d local=%d first=%d between nodes %d and %d\n", myRef.cid, myRef.idx, local, first, nodes[fixnode], nodes[othernode]);)
+#ifdef TDEBUG2
+    CkPrintf("TMRC2D: [%d] Refining element %d, opnode=%d othernode=%d ^fixnode=%d longEdge=%d modEdge=%d otherEdge=%d\n", myRef.cid, myRef.idx, nodes[opnode], nodes[othernode], nodes[fixnode], edges[longEdge].idx, edges[modEdge].idx, edges[otherEdge].idx);
+#endif
     newEdge = C->addEdge(m, nodes[opnode], 0);
-    DEBUGREF(CkPrintf("TMRC2D: [%d] New edge (%d,%d) added between nodes %d and %d\n", myRef.cid, newEdge.cid, newEdge.idx, m, nodes[opnode]);)
+#ifdef TDEBUG2
+    CkPrintf("TMRC2D: [%d] New edge (%d,%d) added between nodes %d and %d\n", myRef.cid, newEdge.cid, newEdge.idx, m, nodes[opnode]);
+#endif
     // add new element to preserve orientation
     if (opnode == 0) {
       if (fixnode == 1)
@@ -210,21 +224,28 @@ void element::split(int longEdge)
     if (nullNbr) b = edges[longEdge].getBoundary();
     if (C->theClient) {
       C->theClient->split(myRef.idx,oldfixnode,nodes[othernode],nodes[opnode], m, newElem.idx, 0.5,flag,b, 0, b);
+#ifdef TDEBUG1
       CkPrintf("TMRC2D: [%d] theClient->split(elem=%d, edge=%d, newNode=%d, newElem=%d, bound=%d)\n", myRef.cid, myRef.idx, longEdge, m, newElem.idx, b);
+#endif
     }
-    DEBUGREF(CkPrintf("TMRC2D: [%d] Resetting pending edges, second split complete.\n", myRef.cid);)
+#ifdef TDEBUG3
+    CkPrintf("TMRC2D: [%d] Resetting pending edges, second split complete.\n", 
+	     myRef.cid);
+#endif
     edges[longEdge].resetEdge();
   }
+#ifdef TDEBUG2
   else { // longEdge still trying to complete previous split; try later
     // do nothing for now
-    DEBUGREF(CkPrintf("TMRC2D: [%d] Can't bisect element %d, longEdge %d pending\n", myRef.cid, myRef.idx, edges[longEdge].idx);)
+    CkPrintf("TMRC2D: [%d] Can't bisect element %d, longEdge %d pending\n", 
+	     myRef.cid, myRef.idx, edges[longEdge].idx);
   }
+#endif
 }
 
 void element::coarsen()
 {
   int shortEdge = findShortestEdge();
-  DEBUGREF(CkPrintf("TMRC2D: [%d] ...Coarsen element %d on edge %d\n", myRef.cid, myRef.idx, shortEdge);)
   collapse(shortEdge);
 }
 
@@ -385,7 +406,9 @@ void element::collapse(int shortEdge)
   // clean up based on result of edge collapse
   if (result == 1) {
     // collapse successful; keepNode is node to keep
-    DEBUGREF(CkPrintf("TMRC2D: [%d] ...In collapse[%d](a) shortEdge=%d delEdge=%d keepEdge=%d opnode=%d delNode=%d keepNode=%d delNbr=%d keepNbr=%d\n", myRef.cid, myRef.idx, edges[shortEdge].idx, edges[delEdge].idx, edges[keepEdge].idx, nodes[opnode], dIdx, kIdx, delNbr.idx, keepNbr.idx);)
+#ifdef TDEBUG2
+    CkPrintf("TMRC2D: [%d] ...In collapse[%d](a) shortEdge=%d delEdge=%d keepEdge=%d opnode=%d delNode=%d keepNode=%d delNbr=%d keepNbr=%d\n", myRef.cid, myRef.idx, edges[shortEdge].idx, edges[delEdge].idx, edges[keepEdge].idx, nodes[opnode], dIdx, kIdx, delNbr.idx, keepNbr.idx);
+#endif
     CkAssert((delNbr.cid == -1) || !(delNbr == keepNbr));
     // tell delNbr to replace delEdge with keepEdge
     int b = 0;
@@ -407,7 +430,9 @@ void element::collapse(int shortEdge)
     if (!local && !first) flag = BOUND_SECOND;
     C->theClient->collapse(myRef.idx, kIdx, dIdx, newNode.X(), newNode.Y(), 
 			   flag, b, frac);
+#ifdef TDEBUG1
     CkPrintf("TMRC2D: [%d] theClient->collapse(%d, %d, %d, %2.10f, %2.10f, (flag), %d, %1.1f\n", myRef.cid, myRef.idx, kIdx, dIdx, newNode.X(), newNode.Y(), b, frac);
+#endif
     // remove self
     C->removeElement(myRef.idx);
   }
@@ -425,7 +450,9 @@ void element::collapse(int shortEdge)
     int mytmp = dIdx;
     dIdx = kIdx;    
     kIdx = mytmp;
-    DEBUGREF(CkPrintf("TMRC2D: [%d] ...In collapse[%d](b) shortEdge=%d delEdge=%d keepEdge=%d opnode=%d delNode=%d keepNode=%d delNbr=%d keepNbr=%d\n", myRef.cid, myRef.idx, edges[shortEdge].idx, edges[delEdge].idx, edges[keepEdge].idx, nodes[opnode], dIdx, kIdx, delNbr.idx, keepNbr.idx);)
+#ifdef TDEBUG2
+    CkPrintf("TMRC2D: [%d] ...In collapse[%d](b) shortEdge=%d delEdge=%d keepEdge=%d opnode=%d delNode=%d keepNode=%d delNbr=%d keepNbr=%d\n", myRef.cid, myRef.idx, edges[shortEdge].idx, edges[delEdge].idx, edges[keepEdge].idx, nodes[opnode], dIdx, kIdx, delNbr.idx, keepNbr.idx);
+#endif
     int b = 0;
     if (delNbr.cid != -1) {
       mesh[delNbr.cid].updateElementEdge(delNbr.idx, edges[delEdge], 
@@ -443,7 +470,9 @@ void element::collapse(int shortEdge)
     if (local && !first) flag = LOCAL_SECOND;
     if (!local && first) flag = BOUND_FIRST;
     if (!local && !first) flag = BOUND_SECOND;
+#ifdef TDEBUG1
     CkPrintf("TMRC2D: [%d] theClient->collapse(%d, %d, %d, %2.10f, %2.10f, (flag), %d, %1.1f)\n", myRef.cid, myRef.idx, kIdx, dIdx, newNode.X(), newNode.Y(), b, frac);
+#endif
     C->theClient->collapse(myRef.idx, kIdx, dIdx,
 			   newNode.X(), newNode.Y(), flag, b, frac);
     // remove self
