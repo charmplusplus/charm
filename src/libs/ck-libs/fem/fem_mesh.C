@@ -775,46 +775,46 @@ void FEM_DataAttribute::copyEntity(int dstEntity,const FEM_Attribute &src,int sr
 
 template<class T>
 inline void interpolateAttrs(AllocTable2d<T> *data,int A,int B,int D,double frac,int width){
-	T *rowA = data->getRow(A);
-	T *rowB = data->getRow(B);
-	T *rowD = data->getRow(D);
-	for(int i=0;i<width;i++){
-		double val = (double )rowA[i];
-		val *= (1.0-frac);
-		val += frac *((double )rowB[i]);
-		rowD[i] = (T )val;
-	}
+  T *rowA = data->getRow(A);
+  T *rowB = data->getRow(B);
+  T *rowD = data->getRow(D);
+  for(int i=0;i<width;i++){
+    double val = (double )rowA[i];
+    val *= (1.0-frac);
+    val += frac *((double )rowB[i]);
+    rowD[i] = (T )val;
+  }
 }
 
 template<class T>
 inline void minAttrs(AllocTable2d<T> *data,int A,int B,int D,double frac,int width){
-	T *rowA = data->getRow(A);
-	T *rowB = data->getRow(B);
-	T *rowD = data->getRow(D);
-	for(int i=0;i<width;i++){
-		if(rowA[i] == rowB[i]){
-			rowD[i] = rowA[i];
-		}else{
-			rowD[i] = 0;
-		}
-	}
+  T *rowA = data->getRow(A);
+  T *rowB = data->getRow(B);
+  T *rowD = data->getRow(D);
+  for(int i=0;i<width;i++){
+    if(rowA[i] == rowB[i]){
+      rowD[i] = rowA[i];
+    }else{
+      rowD[i] = 0;
+    }
+  }
 }
 
 void FEM_DataAttribute::interpolate(int A,int B,int D,double frac){
-	switch(getDatatype()){
-		case FEM_BYTE:
-			minAttrs(char_data,A,B,D,frac,getWidth());		
-			break;
-		case FEM_INT:
-			minAttrs(int_data,A,B,D,frac,getWidth());		
-			break;
-		case FEM_FLOAT:
-			interpolateAttrs(float_data,A,B,D,frac,getWidth());		
-			break;
-		case FEM_DOUBLE:
-			interpolateAttrs(double_data,A,B,D,frac,getWidth());		
-			break;
-	}
+  switch(getDatatype()){
+  case FEM_BYTE:
+    minAttrs(char_data,A,B,D,frac,getWidth());		
+    break;
+  case FEM_INT:
+    minAttrs(int_data,A,B,D,frac,getWidth());		
+    break;
+  case FEM_FLOAT:
+    interpolateAttrs(float_data,A,B,D,frac,getWidth());		
+    break;
+  case FEM_DOUBLE:
+    interpolateAttrs(double_data,A,B,D,frac,getWidth());		
+    break;
+  }
 }
 
 
