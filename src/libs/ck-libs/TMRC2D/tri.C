@@ -673,10 +673,12 @@ void chunk::updateNodeCoords(int nNode, double *coord, int nEl)
 #endif
   // do some error checking
   if (nEl != numElements) {
-    CkPrintf("TMRC2D: [%d] WARNING: nEl=%d passed in updateNodeCoords does not match TMRC2D numElements=%d!\n", cid, nEl, numElements);
+    CkPrintf("TMRC2D: [%d] ERROR: nEl=%d passed in updateNodeCoords does not match TMRC2D numElements=%d!\n", cid, nEl, numElements);
+    CkAssert(nEl == numElements);
   }
   if (nNode != numNodes) {
-    CkPrintf("TMRC2D: [%d] WARNING: nNode=%d passed in updateNodeCoords does not match TMRC2D numNodes=%d!\n", cid, nNode, numNodes);
+    CkPrintf("TMRC2D: [%d] ERROR: nNode=%d passed in updateNodeCoords does not match TMRC2D numNodes=%d!\n", cid, nNode, numNodes);
+    CkAssert(nNode == numNodes);
   }	
   // update node coordinates from coord
   for (i=0; i<nodeSlots; i++)
