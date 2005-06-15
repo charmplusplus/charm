@@ -133,7 +133,6 @@ void chunk::coarseningElements()
 	  (theElements[i].getTargetArea() >= 0.0)) ||
 	 (theElements[i].getArea() == 0.0))) {
       // element i has higher target area or no area -- needs coarsening
-      CkPrintf("TMRC2D: [%d] Coarsen element %d: area=%f target=%f\n", cid, i, theElements[i].getArea(), theElements[i].getTargetArea());
       theElements[i].coarsen(); // coarsen the element
     }
     CthYield(); // give other chunks on the same PE a chance
@@ -191,7 +190,9 @@ void chunk::nodeReplaceDelete(int kIdx, int dIdx, node nn, int shared,
       jShared = joinCommLists(kIdx, shared, chk, idx, jChk, jIdx);
       theClient->nodeUpdate(kIdx, nn.X(), nn.Y(), nn.boundary, jShared, jChk, 
 			    jIdx);
+#ifdef TDEBUG1
       CkPrintf("TMRC2D: [%d] (a)theClient->nodeUpdate(%d, %2.10f, %2.10f, %d)\n", cid, kIdx, nn.X(), nn.Y(), nn.boundary);
+#endif
     }
     return;
   }
@@ -202,7 +203,9 @@ void chunk::nodeReplaceDelete(int kIdx, int dIdx, node nn, int shared,
     jShared = joinCommLists(dIdx, shared, chk, idx, jChk, jIdx);
     theClient->nodeUpdate(dIdx, nn.X(), nn.Y(), nn.boundary, jShared, jChk, 
 			  jIdx);
+#ifdef TDEBUG1
     CkPrintf("TMRC2D: [%d] (b)theClient->nodeUpdate(%d, %2.10f, %2.10f, %d)\n", cid, dIdx, nn.X(), nn.Y(), nn.boundary);
+#endif
   }
   else {
     removeNode(dIdx);
@@ -212,7 +215,9 @@ void chunk::nodeReplaceDelete(int kIdx, int dIdx, node nn, int shared,
     jShared = joinCommLists(kIdx, shared, chk, idx, jChk, jIdx);
     theClient->nodeUpdate(kIdx, nn.X(), nn.Y(), nn.boundary, jShared, jChk, 
 			  jIdx);
+#ifdef TDEBUG1
     CkPrintf("TMRC2D: [%d] (c)theClient->nodeUpdate(%d, %2.10f, %2.10f, %d)\n", cid, kIdx, nn.X(), nn.Y(), nn.boundary);
+#endif
     for (int j=0; j<elementSlots; j++) {
       if (theElements[j].isPresent()) {
 	CkAssert(theElements[j].nodes[0] != theElements[j].nodes[1]);
@@ -222,7 +227,9 @@ void chunk::nodeReplaceDelete(int kIdx, int dIdx, node nn, int shared,
 	  if (theElements[j].nodes[k] == dIdx) {
 	    theElements[j].nodes[k] = kIdx;
 	    theClient->nodeReplaceDelete(j, k, dIdx, kIdx);
+#ifdef TDEBUG1
 	    CkPrintf("TMRC2D: [%d] theClient->nodeReplaceDelete(%d, %d, %d, %d)\n", cid, j, k, dIdx, kIdx);
+#endif
 	  }
 	}
       }
