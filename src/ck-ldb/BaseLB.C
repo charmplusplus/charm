@@ -260,10 +260,9 @@ void BaseLB::LDStats::computeNonlocalComm(int &nmsgs, int &nbytes)
 		}
 		else {
 	          receiverPE = to_proc[idx];
-	          CmiAssert(receiverPE != -1);
+                  CmiAssert(receiverPE < count && receiverPE >= 0);
 		}
               }
-              CmiAssert(receiverPE < count && receiverPE >= 0);
 	      if(senderPE != receiverPE)
 	      {
 	  	nmsgs += cdata.messages;
