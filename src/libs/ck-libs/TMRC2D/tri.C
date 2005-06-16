@@ -1406,7 +1406,7 @@ void chunk::rebubble(int cFlag)
     end = pos;
     while (pos > 0) {
       loc = pos;
-      while ((coarsenElements[loc].len < coarsenElements[loc-1].len) &&
+      while ((coarsenElements[loc].len > coarsenElements[loc-1].len) &&
 	     (loc <= end)) {
 	tmpID = coarsenElements[loc].elID;
 	tmpLen = coarsenElements[loc].len;
@@ -1438,7 +1438,7 @@ void chunk::rebubble(int cFlag)
     end = pos;
     while (pos > 0) {
       loc = pos;
-      while ((refineElements[loc].len > refineElements[loc-1].len) &&
+      while ((refineElements[loc].len < refineElements[loc-1].len) &&
 	     (loc <= end)) {
 	tmpID = refineElements[loc].elID;
 	tmpLen = refineElements[loc].len;
