@@ -130,10 +130,12 @@ public:
 };
 
 void FEM_Refine_Operation(FEM_Refine_Operation_Data *data,refineData &d);
+static int countValidEntities(int *validData,int total);
 
 void FEM_REFINE2D_Split(int meshID,int nodeID,double *coord,int elemID,double *desiredAreas,int sparseID){
   int nnodes = FEM_Mesh_get_length(meshID,nodeID);
   int nelems = FEM_Mesh_get_length(meshID,elemID);
+	int actual_nodes = nnodes, actual_elems = nelems;
   
 	FEM_Refine_Operation_Data refine_data;
 	refine_data.meshID = meshID;
@@ -228,11 +230,19 @@ void FEM_REFINE2D_Split(int meshID,int nodeID,double *coord,int elemID,double *d
   }
 	
   
-  /*	for(int k=0;k<nnodes;k++){
-	printf(" node %d ( %.6f %.6f )\n",k,coord[2*k+0],coord[2*k+1]);
-	}*/
+	//count the actual number of nodes and elements
+	if(refine_data.node->lookup(FEM_VALID,"refine2D_splilt") != NULL){
+		AllocTable2d<int> &validNodeTable = ((FEM_DataAttribute *)(refine_data.node->lookup(FEM_VALID,"refine2D_splilt")))->getInt();
+		actual_nodes = countValidEntities(validNodeTable.getData(),nnodes);
+	}
+	if(refine_data.elem->lookup(FEM_VALID,"refine2D_splilt") != NULL){
+		AllocTable2d<int> &validElemTable = ((FEM_DataAttribute *)(refine_data.elem->lookup(FEM_VALID,"refine2D_splilt")))->getInt();
+		actual_elems = countValidEntities(validElemTable.getData(),nelems);
+	}
+	
+	
   DEBUGINT(printf("%d %d \n",nnodes,nelems));	
-  REFINE2D_Split(nnodes,coord,nelems,desiredAreas,&refine_data);
+  REFINE2D_Split(actual_nodes,coord,actual_elems,desiredAreas,&refine_data);
   
   int nSplits= refine_data.nSplits = REFINE2D_Get_Split_Length();
   DEBUGINT(printf("called REFINE2D_Split nSplits = %d \n",nSplits));
@@ -697,5 +707,14 @@ void interpolateNode(FEM_Node *node,int A,int B,int D,double frac){
 			}
 		}	
 	}	
+}
+
+
+static int countValidEntities(int *validData,int total){
+	int sum =0 ;
+	for(int i=0;i<total;i++){
+		sum += validData[i];
+	}
+	return sum;
 }
 
