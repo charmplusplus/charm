@@ -374,6 +374,8 @@ void CmiReleaseCommHandle(CmiCommHandle c)
 
 void release_pmsg_list();
 
+#define MAX_RELEASE_POLL 8
+
 static int CmiReleaseSentMessages(void)
 {
     SMSG_LIST *msg_tmp=sent_msgs;
@@ -390,20 +392,23 @@ static int CmiReleaseSentMessages(void)
   release_pmsg_list();
 #endif
 
-  while(msg_tmp != NULL){
+  int ncheck = MAX_RELEASE_POLL;
+
+  while(msg_tmp != NULL && ncheck > 0){
       if(msg_tmp->sent) {
           done =0;
 
           if(msg_tmp->status == BASIC_SEND) {
+              ncheck --;
               if(elan_tportTxDone(msg_tmp->e)) {
                   elan_tportTxWait(msg_tmp->e);
                   done = 1;
               }          
               else 
 #if USE_SHM 
-           elan_deviceCheck(elan_base->state);
+                  elan_deviceCheck(elan_base->state);
 #else 
-       ;
+              ;
 #endif
           }
           else {
