@@ -149,8 +149,9 @@ void MetisLB::work(BaseLB::LDStats* stats, int count)
       {
         int senderID = stats->getHash(cdata.sender);
         int recverID = stats->getHash(cdata.receiver.get_destObj());
+        if (stats->complete_flag == 0 && recverID == -1) continue;
         CmiAssert(senderID < numobjs);
-        CmiAssert(recverID < numobjs);
+        CmiAssert(recverID < numobjs && recverID >= 0);
         comm[senderID][recverID] += cdata.messages;
         comm[recverID][senderID] += cdata.messages;
       }
