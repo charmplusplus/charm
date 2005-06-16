@@ -780,16 +780,14 @@ void chunk::multipleCoarsen(double *desiredArea, refineClient *client)
   CkPrintf("TMRC2D: [%d] multipleCoarsen DONE.\n", cid);
 #endif
   CkWaitQD();
-#ifdef TDEBUG3
   for (i=0; i<elementSlots; i++) { // check desired areas for elements
     if (theElements[i].isPresent()) {
       area = theElements[i].getArea();
-      if (desiredArea[i] > area) {
+      if (desiredArea[i] <= area) {
 	CkPrintf("TMRC2D: [%d] WARNING: element %d area is %1.10e but target was %1.10e\n", cid, i, area, desiredArea[i]);
       }
     }
   }
-#endif
 }
 
 void chunk::newMesh(int meshID_,int nEl, int nGhost, const int *conn_, 
