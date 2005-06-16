@@ -556,6 +556,8 @@ LBVectorMigrateMsg* HybridBaseLB::VectorStrategy(LDStats* stats,int count)
     move->to_pe = lData->children[move->to_pe];
   }
   return msg;
+#else
+  return NULL;
 #endif
 }
 

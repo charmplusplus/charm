@@ -221,8 +221,8 @@ bool Marquardt_solver(CentralLB::FutureModel *mod, int object) {
   delete[] y;
   delete[] temp;
 
-  return true;
 #endif
+  return true;
 }
 
 // routine that update LDStats given a predictor model
