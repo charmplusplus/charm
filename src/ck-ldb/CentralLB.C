@@ -451,7 +451,9 @@ void CentralLB::removeNonMigratable(LDStats* stats, int count)
       break;
     case LD_OBJ_MSG:  {
       int idx = stats->getRecvHash(cdata);
-      CmiAssert(idx != -1);
+      if (stats->complete_flag)
+        CmiAssert(idx != -1);
+      else if (idx == -1) continue;          // receiver not in this group
       if (!stats->objData[idx].migratable) continue;
       break;
       }
