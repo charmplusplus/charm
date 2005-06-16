@@ -783,7 +783,7 @@ void chunk::multipleCoarsen(double *desiredArea, refineClient *client)
   for (i=0; i<elementSlots; i++) { // check desired areas for elements
     if (theElements[i].isPresent()) {
       area = theElements[i].getArea();
-      if (desiredArea[i] <= area) {
+      if (desiredArea[i] > area) {
 	CkPrintf("TMRC2D: [%d] WARNING: element %d area is %1.10e but target was %1.10e\n", cid, i, area, desiredArea[i]);
       }
     }
