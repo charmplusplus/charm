@@ -317,6 +317,7 @@ TopoCentLB::HeapNode TopoCentLB::extractMax(HeapNode *heap,int *heapSize){
 
 	HeapNode max = heap[0];
 	heap[0] = heap[*heapSize-1];
+	heapMapping[heap[0].node]=0;
 	*heapSize = *heapSize - 1;
 	Heapify(heap,0,*heapSize);
 	return max;
@@ -406,7 +407,6 @@ void TopoCentLB :: calculateMST(PartGraph *partgraph,LBTopology *topo,int *proc_
 	//Assign the max comm partition first
 	heap[max_comm_part].key = 1.00;
 	
-	//CkPrintf("in calculate MST..\n");
 	heapSize = partgraph->n_nodes;
 	BuildHeap(heap,heapSize);
 
@@ -417,10 +417,8 @@ void TopoCentLB :: calculateMST(PartGraph *partgraph,LBTopology *topo,int *proc_
 
 	while(heapSize > 0){
 		HeapNode max = extractMax(heap,&heapSize);
-		//CkPrintf("in the extracting loop..\n");
 		inHeap[max.node] = 0;
 
-		//CkPrintf("extracted part..%d with weight :%.1f\n",max.node,max.key);
 		//for(j=0;j<heapSize;j++)
 			//heapMapping[heap[j].node]=j;
 
@@ -448,7 +446,7 @@ void TopoCentLB :: calculateMST(PartGraph *partgraph,LBTopology *topo,int *proc_
 			}
 		}
 		
-		if(max.node==0){ //For now, assign max comm partition to 0th proc in the topology
+		if(heapSize == partgraph->n_nodes-1){ //For now, assign max comm partition to 0th proc in the topology
 			proc_mapping[max.node]=0;
 			assigned_procs[0]=1;
 			continue;
@@ -488,7 +486,6 @@ void TopoCentLB :: calculateMST(PartGraph *partgraph,LBTopology *topo,int *proc_
 			}
 		}
 
-		//CkPrintf("\npart %d assigned to proc %d\n",max.node,min_cost_index);
 		proc_mapping[max.node]=min_cost_index;
 		assigned_procs[min_cost_index]=1;
 	}
@@ -539,8 +536,6 @@ void TopoCentLB :: work(CentralLB::LDStats *stats,int count)
     }
 	}
 	
-	//double sec = CmiWallTimer();
-	//CkPrintf("first here..:%lf\n",(sec-start));
 	/*CkPrintf("obj-proc mapping\n");
 	for(i=0;i<stats->n_objs;i++)
 		CkPrintf(" %d,%d ",i,newmap[i]);
@@ -557,14 +552,10 @@ void TopoCentLB :: work(CentralLB::LDStats *stats,int count)
 	for(i=0;i<stats->n_objs;i++)
 	{
 		PartGraph::Node* n = &partgraph->nodes[newmap[i]];
-		//CkPrintf("num:%d\n",n->num_objs);
 		n->obj_list[n->num_objs]=i;
 		n->num_objs++;
 	}
-	//double th = CmiWallTimer();
 
-	//CkPrintf("second here:%lf\n",(th-sec));
-	//CkPrintf("num comm:%d\n",stats->n_comm);
 	int *addedComm=new int[count];
 
 	int max_comm_part=-1;
@@ -613,7 +604,6 @@ void TopoCentLB :: work(CentralLB::LDStats *stats,int count)
 			if(newmap[senderID]==newmap[recverID])
 				continue;
 	
-			//CkPrintf("from %d to %d\n",newmap[senderID],newmap[recverID]);
 			if(partgraph->edges[newmap[senderID]][newmap[recverID]] == 0){
 				partgraph->nodes[newmap[senderID]].degree++;
 				partgraph->nodes[newmap[recverID]].degree++;
@@ -737,6 +727,7 @@ void TopoCentLB :: work(CentralLB::LDStats *stats,int count)
 	PartGraph::Node* n;
 	for(i=0;i<count;i++){
 		pe = proc_mapping[i];
+		//CkPrintf("%d %d\n",i,pe);
 		n = &partgraph->nodes[i];
 		//CkPrintf("here..%d,first object:%d\n",n->num_objs,n->obj_list[0]);
 		for(j=0;j<n->num_objs;j++){
