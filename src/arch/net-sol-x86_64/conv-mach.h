@@ -44,9 +44,9 @@
 #define CMK_THREADS_COPY_STACK                             0
 
 #define CMK_TIMER_USE_RDTSC                                0
-#define CMK_TIMER_USE_GETRUSAGE                            1
+#define CMK_TIMER_USE_GETRUSAGE                            0
 #define CMK_TIMER_USE_SPECIAL                              0
-#define CMK_TIMER_USE_TIMES                                0
+#define CMK_TIMER_USE_TIMES                                1
 
 #define CMK_TYPEDEF_INT2 short
 #define CMK_TYPEDEF_INT4 int
