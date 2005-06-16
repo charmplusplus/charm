@@ -410,6 +410,17 @@ void CentralLB::removeNonMigratable(LDStats* stats, int count)
 {
   int i;
 
+  // check if we have non-migratable objects
+  int have = 0;
+  for (i=0; i<stats->n_objs; i++) 
+  {
+    LDObjData &odata = stats->objData[i];
+    if (!odata.migratable) {
+      have = 1; break;
+    }
+  }
+  if (have == 0) return;
+
   CkVec<LDObjData> nonmig;
   CkVec<int> new_from_proc, new_to_proc;
   nonmig.resize(stats->n_migrateobjs);
