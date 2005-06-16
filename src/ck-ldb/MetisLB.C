@@ -92,6 +92,8 @@ void MetisLB::work(BaseLB::LDStats* stats, int count)
   int i, j, m;
   int option = 0;
 
+  stats->makeCommHash();
+
   removeNonMigratable(stats, count);
 
   int numobjs = stats->n_objs;
