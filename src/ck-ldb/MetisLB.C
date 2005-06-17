@@ -87,7 +87,7 @@ extern "C" void METIS_mCPartGraphKway(int*, int*, int*, int*, int*, int*,
 void MetisLB::work(BaseLB::LDStats* stats, int count)
 {
   if (_lb_args.debug() >= 2) {
-    CkPrintf("In MetisLB Strategy...\n");
+    CkPrintf("[%d] In MetisLB Strategy...\n", CkMyPe());
   }
   int i, j, m;
   int option = 0;
@@ -150,7 +150,7 @@ void MetisLB::work(BaseLB::LDStats* stats, int count)
         int senderID = stats->getHash(cdata.sender);
         int recverID = stats->getHash(cdata.receiver.get_destObj());
         if (stats->complete_flag == 0 && recverID == -1) continue;
-        CmiAssert(senderID < numobjs);
+        CmiAssert(senderID < numobjs && senderID >= 0);
         CmiAssert(recverID < numobjs && recverID >= 0);
         comm[senderID][recverID] += cdata.messages;
         comm[recverID][senderID] += cdata.messages;
@@ -245,14 +245,17 @@ void MetisLB::work(BaseLB::LDStats* stats, int count)
 				 &wgtflag, &numflag, &count, options, 
 				 &edgecut, newmap);
 */
+      if (_lb_args.debug() >= 1)
+        CkPrintf("[%d] calling METIS_PartGraphRecursive.\n", CkMyPe());
       METIS_PartGraphRecursive(&numobjs, xadj, adjncy, objwt, edgewt,
                                  &wgtflag, &numflag, &count, options,
                                  &edgecut, newmap);
-      CkPrintf("after calling Metis functions.\n");
+      if (_lb_args.debug() >= 1)
+        CkPrintf("[%d] after calling Metis functions.\n", CkMyPe());
     }
     else if (WEIGHTED == option) {
       CkPrintf("unepected\n");
-			float maxtotal_walltime = stats->procs[0].total_walltime;
+      float maxtotal_walltime = stats->procs[0].total_walltime;
       for (m=1; m<count; m++) {
 	if (maxtotal_walltime < stats->procs[m].total_walltime)
 	  maxtotal_walltime = stats->procs[m].total_walltime;
@@ -297,7 +300,7 @@ void MetisLB::work(BaseLB::LDStats* stats, int count)
   if(objwt) delete[] objwt;
   if(edgewt) delete[] edgewt;
 	
-	/*CkPrintf("obj-proc mapping\n");
+  /*CkPrintf("obj-proc mapping\n");
 	for(i=0;i<numobjs;i++)
 		CkPrintf(" %d,%d ",i,newmap[i]);
   */
@@ -314,7 +317,8 @@ void MetisLB::work(BaseLB::LDStats* stats, int count)
 	
 	//CkPrintf("chking wts on each partition...\n");
 
-	/*int avg=0;
+/*
+	int avg=0;
 	int *chkwt = new int[count];
 	for(i=0;i<count;i++)
 		chkwt[i]=0;
@@ -332,6 +336,9 @@ void MetisLB::work(BaseLB::LDStats* stats, int count)
   delete[] origmap;
   if(newmap != origmap)
     delete[] newmap;
+  if (_lb_args.debug() >= 1) {
+   CkPrintf("[%d] MetisLB done! \n", CkMyPe());
+  }
 }
 
 #include "MetisLB.def.h"
