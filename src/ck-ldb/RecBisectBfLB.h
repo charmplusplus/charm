@@ -24,6 +24,7 @@
 typedef CkQ<int> IntQueue;
 
 void CreateRecBisectBfLB();
+BaseLB * AllocateRecBisectBfLB();
 
 typedef struct {
   int size;
