@@ -65,6 +65,106 @@ PUPmarshallBytes(FuncType);
 
 #include "ckPairCalculator.decl.h"
 
+class IndexAndID {
+ public:
+  CkArrayIndex4D idx;
+  CkArrayID id;
+  IndexAndID(CkArrayIndex4D *_idx, CkArrayID *_id) 
+    {
+      idx=*_idx;
+      id=*_id;
+    }
+  void dump()
+    {
+      CkPrintf("w %d x %d y %d z %d\n",idx.index[0],idx.index[1],idx.index[2],idx.index[3]);
+    }
+  void sdump(char *string, int size)
+    {
+      snprintf(string,size,"w %d x %d y %d z %d\n",idx.index[0],idx.index[1],idx.index[2],idx.index[3]);
+    }
+  IndexAndID()
+    {
+    }
+};
+
+PUPbytes(IndexAndID);
+
+class PairCalcReducer : public Group {
+ public:
+  PairCalcReducer(CkMigrateMessage *m) { }
+  PairCalcReducer(){ 
+      acceptCount = 0; numRegistered[0] = 0; numRegistered[1] = 0;
+      reduction_elementCount = 0;
+      tmp_matrix = NULL;
+  }
+  ~PairCalcReducer() {if (tmp_matrix !=NULL) delete [] tmp_matrix;}
+  void clearRegister()
+    {  
+#ifdef _PAIRCALC_DEBUG_
+      CkPrintf("[%d] clearing register\n",CkMyPe());
+#endif
+      acceptCount=0;
+      reduction_elementCount=0;
+      localElements[0].removeAll();
+      localElements[1].removeAll();
+      numRegistered[0]=0;
+      numRegistered[1]=0;
+      if(tmp_matrix!=NULL)
+	{
+	  delete [] tmp_matrix;
+	  tmp_matrix=NULL;
+	}
+    }
+  void broadcastEntireResult(int size, double* matrix, bool symmtype);
+  void broadcastEntireResult(int size, double* matrix1, double* matrix2, bool symmtype);
+  void doRegister(IndexAndID *elem, bool symmtype){
+
+    numRegistered[symmtype]++;
+    localElements[symmtype].push_back(*elem);
+#ifdef _PAIRCALC_DEBUG_
+    char string[80];
+    localElements[symmtype][localElements[symmtype].length()-1].sdump(string,80);
+    CkPrintf("[%d] registered %d %s",CkMyPe(),symmtype,string);
+#endif
+  }
+
+  void acceptContribute(int size, double* matrix, CkCallback cb, bool isAllReduce, bool symmtype, int offx, int offy, int inputsize);
+  
+  void startMachineReduction();
+
+ private:
+  CkVec<IndexAndID> localElements[2];
+  int numRegistered[2];
+  int acceptCount;
+  int reduction_elementCount;
+  double *tmp_matrix;
+  bool isAllReduce;
+  int size;
+  bool symmtype;
+  CkCallback cb;
+
+void pup(PUP::er &p){
+#ifdef _PAIRCALC_DEBUG_
+  CkPrintf("PairCalcReducer on %d pupping\n",CkMyPe());
+#endif
+    p(localElements,2);
+    p(numRegistered,2);
+    p|acceptCount;
+    p|reduction_elementCount;
+    p|isAllReduce;
+    p|size;
+    p|symmtype;
+    p|cb;
+    if(p.isUnpacking())
+      {
+	tmp_matrix=NULL;
+      }
+  }
+
+}; 
+
+
+
 class mySendMsg : public CMessage_mySendMsg {
  public:
   int N;
@@ -149,6 +249,31 @@ class PairCalculator: public CBase_PairCalculator {
 #ifdef _PAIRCALC_DEBUG_
     CkPrintf("[%d,%d,%d,%d] atsyncs\n", thisIndex.w, thisIndex.x, thisIndex.y, thisIndex.z);
 #endif
+    CProxy_PairCalcReducer pairCalcReducerProxy(reducer_id);
+    pairCalcReducerProxy.ckLocalBranch()->clearRegister();
+    resumed=false;
+    /* lower our memory footprint */
+    if(existsLeft){
+      delete [] inDataLeft;
+      inDataLeft=NULL;
+    }
+    if(existsRight)
+      {
+	delete [] inDataRight;
+	inDataRight = NULL;
+      }
+    existsLeft=false;
+    existsRight=false;
+    if(outData!=NULL)
+      {
+	delete [] outData;
+	outData = NULL;
+      }
+    if(newData!=NULL)
+      {
+	delete [] newData;
+	newData = NULL;
+      }
     AtSync();
   };
   void ResumeFromSync();
@@ -188,7 +313,7 @@ class PairCalculator: public CBase_PairCalculator {
   CkArrayID cb_aid;
   int cb_ep;
   CkGroupID reducer_id;
-  CkSparseContiguousReducer<double> r;
+  CkSparseContiguousReducer<double> sparseRed;
   bool existsLeft;
   bool existsRight;
   CkCallback cb_lb;
@@ -196,87 +321,8 @@ class PairCalculator: public CBase_PairCalculator {
   double *outData;
   complex *newData;
   bool gspacesum;
+  bool resumed;
 };
-
-class IndexAndID {
- public:
-  CkArrayIndex4D idx;
-  CkArrayID id;
-  IndexAndID(CkArrayIndex4D *_idx, CkArrayID *_id) 
-    {
-      idx=*_idx;
-      id=*_id;
-    }
-  void dump()
-    {
-      CkPrintf("w %d x %d y %d z %d\n",idx.index[0],idx.index[1],idx.index[2],idx.index[3]);
-    }
-  IndexAndID()
-    {
-    }
-};
-
-PUPbytes(IndexAndID);
-
-class PairCalcReducer : public Group {
- public:
-  PairCalcReducer(CkMigrateMessage *m) { }
-  PairCalcReducer(){ 
-      acceptCount = 0; numRegistered[0] = 0; numRegistered[1] = 0;
-      reduction_elementCount = 0;
-      tmp_matrix = NULL;
-  }
-  ~PairCalcReducer() {if (tmp_matrix !=NULL) delete [] tmp_matrix;}
-  void clearRegister()
-    {  
-#ifdef _PAIRCALC_DEBUG_
-      CkPrintf("[%d] clearing register\n",CkMyPe());
-#endif
-      acceptCount=0;
-      reduction_elementCount=0;
-      localElements[0].resize(0);
-      localElements[1].resize(0);
-      numRegistered[0]=0;
-      numRegistered[1]=0;
-    }
-  void broadcastEntireResult(int size, double* matrix, bool symmtype);
-  void broadcastEntireResult(int size, double* matrix1, double* matrix2, bool symmtype);
-  void doRegister(IndexAndID *elem, bool symmtype){
-    numRegistered[symmtype]++;
-    localElements[symmtype].push_back(*elem);
-  }
-
-  void acceptContribute(int size, double* matrix, CkCallback cb, bool isAllReduce, bool symmtype, int offx, int offy, int inputsize);
-  
-  void startMachineReduction();
-
- private:
-  CkVec<IndexAndID> localElements[2];
-  int numRegistered[2];
-  int acceptCount;
-  int reduction_elementCount;
-  double *tmp_matrix;
-  bool isAllReduce;
-  int size;
-  bool symmtype;
-  CkCallback cb;
-
-void pup(PUP::er &p){
-    p(localElements,2);
-    p(numRegistered,2);
-    p|acceptCount;
-    p|reduction_elementCount;
-    p|isAllReduce;
-    p|size;
-    p|symmtype;
-    p|cb;
-    if(p.isUnpacking())
-      {
-	tmp_matrix=NULL;
-      }
-  }
-
-}; 
 
 
 

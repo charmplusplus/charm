@@ -304,9 +304,6 @@ void isAtSyncPairCalc(PairCalcID* pcid){
   CkPrintf("     lbsync symm=%d\n", pcid->Symmetric);
 #endif
   //nuke the register will rebuild in ResumeFromSync
-  CkGroupID pairCalcReducerID = (CkArrayID)pcid->Gid; 
-  CProxy_PairCalcReducer pairCalcReducerProxy(pairCalcReducerID);
-  pairCalcReducerProxy.clearRegister();
   CkArrayID pairCalculatorID = (CkArrayID)pcid->Aid; 
   CProxy_PairCalculator pairCalculatorProxy(pairCalculatorID);
   pairCalculatorProxy.lbsync();

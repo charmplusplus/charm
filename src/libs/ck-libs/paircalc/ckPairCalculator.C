@@ -55,7 +55,7 @@ PairCalculator::PairCalculator(bool sym, int grainSize, int s, int blkSize,  int
   this->cb_lb=lbcb;
   this->gspacesum=gspacesum;
   machreduce=_machreduce;
-
+  resumed=true;
   kUnits=grainSize;  //streaming unit only really used in NOGEMM, but could be used under other conditions
 
   inDataLeft = NULL;
@@ -84,9 +84,8 @@ void
 PairCalculator::pup(PUP::er &p)
 {
   ArrayElement4D::pup(p);
-#ifdef _PAIRCALC_DEBUG_
-      CkPrintf("[%d,%d,%d,%d] pups on %d\n",thisIndex.w,thisIndex.x, thisIndex.y, thisIndex.z,CkMyPe());
-#endif
+  p|symmetric;
+  p|resumed;
   p|numRecd;
   p|grainSize;
   p|numExpected;
@@ -99,7 +98,6 @@ PairCalculator::pup(PUP::er &p)
   p|fn1;
   p|fn2;
   p|sumPartialCount;
-  p|symmetric;
   p|conserveMemory;
   p|lbpaircalc;
   p|machreduce;
@@ -125,12 +123,29 @@ PairCalculator::pup(PUP::er &p)
   }
   if(existsLeft)
     p((void*) inDataLeft, numExpected * N * 2* sizeof(double));
+  //    p(inDataLeft, numExpected * N * 2 );
   if(existsRight)
-
     p((void*) inDataRight, numExpected* N * 2* sizeof(double));
+  //p(inDataRight, numExpected * N * 2);
+  /*  if (p.isUnpacking()) 
+    {
+      CProxy_PairCalcReducer pairCalcReducerProxy(reducer_id); 
+      CkArrayIndex4D indx4(thisIndex.w,thisIndex.x, thisIndex.y, thisIndex.z);
+      CkArrayID myaid=thisProxy.ckGetArrayID();
+      IndexAndID *iandid= new IndexAndID(&indx4,&myaid);
+      pairCalcReducerProxy.ckLocalBranch()->doRegister(iandid, symmetric);
+      delete iandid;
+    }
+  */
+#ifdef _PAIRCALC_DEBUG_
+  if (p.isUnpacking()) 
+    {
+      CkPrintf("[%d,%d,%d,%d,%d] pup unpacking on %d resumed=%d memory %d\n",thisIndex.w,thisIndex.x, thisIndex.y, thisIndex.z,symmetric,CkMyPe(),resumed, CmiMemoryUsage());
+      CkPrintf("[%d,%d,%d,%d,%d] pupped : %d %d %d %d %d %d %d %d %d fn1 fn2 %d %d %d %d %d cb cb_aid %d reducer_id sparsRed %d %d cb_lb inDataLeft inDataRight outData newData %d %d\n",thisIndex.w,thisIndex.x, thisIndex.y, thisIndex.z,symmetric, numRecd, numExpected, grainSize, S, blkSize, N, kUnits, op1, op2, sumPartialCount,symmetric, conserveMemory, lbpaircalc, machreduce, cb_ep, existsLeft, existsRight, gspacesum, resumed);
 
-#ifdef _PAIRCALC_DEBUG_ 
-  CkPrintf("ckPairCalculatorPUP\n");
+    }
+  else
+    CkPrintf("[%d,%d,%d,%d,%d] pup called on %d\n",thisIndex.w,thisIndex.x, thisIndex.y, thisIndex.z,symmetric,CkMyPe());
 #endif
 
   
@@ -139,24 +154,26 @@ PairCalculator::pup(PUP::er &p)
 PairCalculator::~PairCalculator()
 {
 
+#ifdef _PAIRCALC_DEBUG_
+      CkPrintf("[%d,%d,%d,%d,%d] destructs on [%d]\n",thisIndex.w,thisIndex.x,thisIndex.y, thisIndex.z, symmetric, CkMyPe());
+#endif
   if(outData!=NULL)  
     delete [] outData;
 
-  if(inDataLeft!=NULL)
+  if(existsLeft)
     delete [] inDataLeft;
-  if(!symmetric || (symmetric&&thisIndex.x!=thisIndex.y))
-    if(inDataRight!=NULL)
-      delete [] inDataRight;
+  if(existsRight)
+    delete [] inDataRight;
 
   if(newData!=NULL)
     delete [] newData;
 
 }
 void PairCalculator::ResumeFromSync() {
-  if(usesAtSync)
-    {
+  if(!resumed){
+  resumed=true;
 #ifdef _PAIRCALC_DEBUG_
-      CkPrintf("[%d,%d,%d,%d] resumes from sync\n",thisIndex.w,thisIndex.x,thisIndex.y, thisIndex.z);
+      CkPrintf("[%d,%d,%d,%d,%d] resumes from sync\n",thisIndex.w,thisIndex.x,thisIndex.y, thisIndex.z, symmetric);
 #endif
       CProxy_PairCalcReducer pairCalcReducerProxy(reducer_id); 
       CkArrayIndex4D indx4(thisIndex.w,thisIndex.x, thisIndex.y, thisIndex.z);
@@ -164,25 +181,25 @@ void PairCalculator::ResumeFromSync() {
       IndexAndID *iandid= new IndexAndID(&indx4,&myaid);
       pairCalcReducerProxy.ckLocalBranch()->doRegister(iandid, symmetric);
       delete iandid;
-      if(thisIndex.x==0 && thisIndex.y==0 && thisIndex.z==0 && thisIndex.w==0)
-	{
-	  //	  cb_lb.send(NULL);
-	}
-    }
+  }
 }
 void
 PairCalculator::calculatePairs_gemm(calculatePairsMsg *msg)
 {
 #ifdef _PAIRCALC_DEBUG_
-  CkPrintf(" symm=%d    pairCalc[%d %d %d %d] got from [%d %d] with size {%d}, from=%d, count=%d\n", symmetric, thisIndex.w, thisIndex.x, thisIndex.y, thisIndex.z,  thisIndex.w, msg->sender, msg->size, symmetric, msg->fromRow, numRecd);
+  CkPrintf(" symm=%d    pairCalc[%d %d %d %d] got from [%d %d] with size {%d}, from=%d, count=%d, resumed=%d\n", symmetric, thisIndex.w, thisIndex.x, thisIndex.y, thisIndex.z,  thisIndex.w, msg->sender, msg->size, msg->fromRow, numRecd,resumed);
 #endif
-  
+  if(!resumed)
+    {
+      ResumeFromSync();
+    }
   numRecd++;   // increment the number of received counts
   int offset = -1;
   if (msg->fromRow) {   // This could be the symmetric diagonal case
     offset = msg->sender - thisIndex.x;
     if (inDataLeft==NULL) 
       { // now that we know N we can allocate contiguous space
+	existsLeft=true;
 	N = msg->size; // N is init here with the size of the data chunk. 
 	inDataLeft = new double[numExpected*N*2];
 	memset(inDataLeft,0,numExpected*N*2*sizeof(double));
@@ -193,7 +210,6 @@ PairCalculator::calculatePairs_gemm(calculatePairsMsg *msg)
       }
     CkAssert(N==msg->size);
     CkAssert(offset<numExpected);
-    existsLeft=true;
     memcpy(&(inDataLeft[offset*N*2]), msg->points, N * 2 *sizeof(double));
 #ifdef _PAIRCALC_DEBUG_
     CkPrintf("[%d,%d,%d,%d,%d] Copying into offset*N %d * %d N *2 %d points start %g end %g\n",thisIndex.w,thisIndex.x,thisIndex.y,thisIndex.z, symmetric, offset, N, N*2,msg->points[0].re, msg->points[N-1].im);
@@ -218,6 +234,7 @@ PairCalculator::calculatePairs_gemm(calculatePairsMsg *msg)
     offset = msg->sender - thisIndex.y;
     if (inDataRight==NULL) 
       { // now that we know N we can allocate contiguous space
+	existsRight=true;
 	N = msg->size; // N is init here with the size of the data chunk. 
 	inDataRight = new double[numExpected*N*2];
 	memset(inDataRight,0,numExpected*N*2*sizeof(double));
@@ -227,9 +244,7 @@ PairCalculator::calculatePairs_gemm(calculatePairsMsg *msg)
       }
     CkAssert(N==msg->size);
     CkAssert(offset<numExpected);
-    existsRight=true;
     memcpy(&(inDataRight[offset*N*2]), msg->points, N * 2 *sizeof(double));
-
 #ifdef _PAIRCALC_DEBUG_
     CkPrintf("[%d,%d,%d,%d,%d] Copying into offset*N %d * %d N *2 %d points start %g end %g\n",thisIndex.w,thisIndex.x,thisIndex.y,thisIndex.z,symmetric,offset,N, N*2,msg->points[0].re, msg->points[N-1].im);
 #endif
@@ -354,8 +369,8 @@ PairCalculator::calculatePairs_gemm(calculatePairsMsg *msg)
 #endif
     if(!machreduce)
       {
-	r.add((int)thisIndex.y, (int)thisIndex.x, (int)(thisIndex.y+grainSize-1), (int)(thisIndex.x+grainSize-1), outData);
-	r.contribute(this, sparse_sum_double);
+	sparseRed.add((int)thisIndex.y, (int)thisIndex.x, (int)(thisIndex.y+grainSize-1), (int)(thisIndex.x+grainSize-1), outData);
+	sparseRed.contribute(this, sparse_sum_double);
       }
     else
       {
@@ -373,7 +388,7 @@ PairCalculator::calculatePairs_gemm(calculatePairsMsg *msg)
     traceUserBracketEvent(220, StartTime, CmiWallTimer());
 #endif
   }
-  //  delete msg;
+  //delete msg;
 }
 
 void
@@ -455,7 +470,6 @@ PairCalculator::acceptResult(int size, double *matrix1, double *matrix2)
   int m_in=grainSize;
   int n_in=N*2;  
   int k_in=grainSize;
-  double *leftd= reinterpret_cast <double *> (inDataLeft);
   double *mynewDatad= reinterpret_cast <double *> (mynewData);
   double alphad(1.0);
   double betad(0.0);
@@ -465,7 +479,7 @@ PairCalculator::acceptResult(int size, double *matrix1, double *matrix2)
   double StartTime=CmiWallTimer();
 #endif
 
-  DGEMM(&transform, &transformT, &n_in, &m_in, &k_in, &alphad, leftd, &n_in,  amatrix, &k_in, &betad, mynewDatad, &n_in);
+  DGEMM(&transform, &transformT, &n_in, &m_in, &k_in, &alphad, inDataLeft, &n_in,  amatrix, &k_in, &betad, mynewDatad, &n_in);
 
 #ifndef CMK_OPTIMIZE
     traceUserBracketEvent(230, StartTime, CmiWallTimer());
@@ -658,7 +672,7 @@ PairCalculator::sumPartialResult(int size, complex *result, int offset)
 
   sumPartialCount++;
 
-  if(!newData){
+  if(newData==NULL){
     newData = new complex[size];
     memset(newData,0,size*sizeof(complex));
   }  
@@ -998,8 +1012,8 @@ PairCalculator::calculatePairs(int size, complex *points, int sender, bool fromR
 		  outData[i] *= 2.0;
 	  }
       }
-      r.add((int)thisIndex.y, (int)thisIndex.x, (int)(thisIndex.y+grainSize-1), (int)(thisIndex.x+grainSize-1), outData);
-      r.contribute(this, sparse_sum_double);
+      sparseRed.add((int)thisIndex.y, (int)thisIndex.x, (int)(thisIndex.y+grainSize-1), (int)(thisIndex.x+grainSize-1), outData);
+      sparseRed.contribute(this, sparse_sum_double);
 
 #if CONVERSE_VERSION_ELAN
       //CkPrintf("[%d] ELAN VERSION %d\n", CkMyPe(), symmetric);
@@ -1063,8 +1077,8 @@ PairCalculator::calculatePairs(int size, complex *points, int sender, bool fromR
     }
     // FIXME: should do 'op2' here!!!
 
-    r.add((int)thisIndex.y, (int)thisIndex.x, (int)(thisIndex.y+grainSize-1), (int)(thisIndex.x+grainSize-1), outData);
-    r.contribute(this, sparse_sum_double);
+    sparseRed.add((int)thisIndex.y, (int)thisIndex.x, (int)(thisIndex.y+grainSize-1), (int)(thisIndex.x+grainSize-1), outData);
+    sparseRed.contribute(this, sparse_sum_double);
   }
 #endif
 
