@@ -138,6 +138,30 @@ void chunk::coarseningElements()
     CthYield(); // give other chunks on the same PE a chance
   }
   coarsenInProgress = 0;  // turn coarsen loop off
+  
+  double area;
+  if (coarsenElements) delete [] coarsenElements;
+  coarsenElements = new elemStack[numElements];
+  for (i=0; i<elementSlots; i++) { // set desired areas for elements
+    if (theElements[i].isPresent()) {
+      area = theElements[i].getArea();
+      //precThrshld = area * 1e-8;
+      if (theElements[i].getTargetArea() > area) {
+	double qFactor=	theElements[i].getAreaQuality();
+	addToStack(i, qFactor, 1);
+      }
+    }
+  }
+  
+  if (coarsenTop>0)
+  {
+    // start coarsening
+    modified = 1;
+    if (!coarsenInProgress) {
+    coarsenInProgress = 1;
+    mesh[cid].coarseningElements();
+    }
+  }
   //dump();
 }
 
@@ -720,9 +744,8 @@ void chunk::multipleRefine(double *desiredArea, refineClient *client)
       //precThrshld = area * 1e-8;
       if (desiredArea[i] < area) {
 	theElements[i].resetTargetArea(desiredArea[i]);
-	double angle;
-	theElements[i].getLargestEdge(&angle);
-	addToStack(i, angle, 0);
+	double qFactor=theElements[i].getAreaQuality();
+	addToStack(i, qFactor, 0);
 #ifdef TDEBUG2
 	CkPrintf("TMRC2D: [%d] Setting target on element %d to %1.10e with largeEdge %1.10e\n", cid, i, desiredArea[i], refineElements[refineTop-1].len);
 #endif
@@ -760,9 +783,8 @@ void chunk::multipleCoarsen(double *desiredArea, refineClient *client)
       //precThrshld = area * 1e-8;
       if (desiredArea[i] > area) {
 	theElements[i].resetTargetArea(desiredArea[i]);
-	double angle;
-	theElements[i].getShortestEdge(&angle);
-	addToStack(i, angle, 1);
+	double qFactor=	theElements[i].getAreaQuality();
+	addToStack(i, qFactor, 1);
 #ifdef TDEBUG2
 	CkPrintf("TMRC2D: [%d] Setting target on element %d to %1.10e with shortEdge %1.10e\n", cid, i, desiredArea[i], coarsenElements[coarsenTop-1].len);
 #endif
@@ -1362,7 +1384,7 @@ void chunk::addToStack(int eIdx, double len, int cFlag)
     pos = refineTop;
     refineTop++;
     while (pos > 0) {
-      if (len >= refineElements[pos-1].len) {
+      if (len <= refineElements[pos-1].len) {
 	refineElements[pos].elID = eIdx;
 	refineElements[pos].len = len;
 	break;
@@ -1390,9 +1412,7 @@ void chunk::rebubble(int cFlag)
     for (int i=0; i<coarsenTop; i++)
       if ((coarsenElements[i].elID > -1) && (coarsenElements[i].len > -1.0)) {
 	if (theElements[coarsenElements[i].elID].present) {
-	  double angle;
-	  theElements[coarsenElements[i].elID].getShortestEdge(&angle);
-	  coarsenElements[i].len = angle;
+	  coarsenElements[i].len = theElements[coarsenElements[i].elID].getAreaQuality();
 	}
 	else {
 	  coarsenElements[i].elID = -1;
@@ -1422,9 +1442,7 @@ void chunk::rebubble(int cFlag)
     for (int i=0; i<refineTop; i++)
       if ((refineElements[i].elID > -1) && (refineElements[i].len > -1.0)) {
 	if (theElements[refineElements[i].elID].present) {
-	  double angle;
-	  theElements[refineElements[i].elID].getLargestEdge(&angle);
-	  refineElements[i].len = angle;
+	  refineElements[i].len=theElements[refineElements[i].elID].getAreaQuality();
 	}
 	else {
 	  refineElements[i].elID = -1;
@@ -1436,7 +1454,7 @@ void chunk::rebubble(int cFlag)
     end = pos;
     while (pos > 0) {
       loc = pos;
-      while ((refineElements[loc].len < refineElements[loc-1].len) &&
+      while ((refineElements[loc].len > refineElements[loc-1].len) &&
 	     (loc <= end)) {
 	tmpID = refineElements[loc].elID;
 	tmpLen = refineElements[loc].len;
