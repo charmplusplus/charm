@@ -794,9 +794,9 @@ void mpi_migrate(void)
   AMPI_Migrate();
 }
 
-void mpi_migrateto(int destPE)
+void mpi_migrateto(int *destPE)
 {
-  AMPI_Migrateto(destPE);
+  AMPI_Migrateto(*destPE);
 }
 
 void mpi_register(void *d, MPI_PupFn f)
