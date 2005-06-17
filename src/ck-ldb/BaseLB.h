@@ -93,6 +93,7 @@ public:
     int getHash(const LDObjid &oid, const LDOMid &mid);
     int getSendHash(LDCommData &cData);
     int getRecvHash(LDCommData &cData);
+    void clearCommHash();
     void clear() {
       n_objs = n_comm = 0;
       objData.free();

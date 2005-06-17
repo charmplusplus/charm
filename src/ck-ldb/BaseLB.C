@@ -225,6 +225,12 @@ int BaseLB::LDStats::getRecvHash(LDCommData &cData)
   return cData.recvHash;
 }
 
+void BaseLB::LDStats::clearCommHash() {
+  for(int i=0; i < n_comm; i++) {
+      commData[i].clearHash();
+  }
+}
+
 void BaseLB::LDStats::computeNonlocalComm(int &nmsgs, int &nbytes)
 {
 #if CMK_LBDB_ON
