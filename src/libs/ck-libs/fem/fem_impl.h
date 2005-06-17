@@ -462,24 +462,30 @@ int *CkCopyArray(const int *src,int len,int indexBase);
 // based on FEM_Ghost_Layer
 class FEM_ElemAdj_Layer : public CkNoncopyable {
  public:
-  int nodesPerTuple; //Number of shared nodes needed to connect elements
-  class elemAdjInfo {
+  int initialized;
+  int nodesPerTuple; //Number of shared nodes for a pair of elements
+ 
+ class elemAdjInfo {
   public:
-    int recentElType; // should not be here, but if it is it should be pup'ed
-    int tuplesPerElem; //# of tuples surrounding this element
+    //  int recentElType; // should not be here, but if it is it should be pup'ed
+    int tuplesPerElem; //# of tuples surrounding this element, i.e. number of faces on an element
     intArrayPtr elem2tuple; //The tuples around this element [nodesPerTuple * tuplesPerElem]
     elemAdjInfo(void) {/*add=false;*/tuplesPerElem=0;}
     ~elemAdjInfo(void) {}
     void pup(PUP::er &p) {//CkAbort("FEM> Shouldn't call elemGhostInfo::pup!\n");
     }
   };
-  elemAdjInfo elem[FEM_MAX_ELTYPE];
+ 
+ elemAdjInfo elem[FEM_MAX_ELTYPE];
+
+ FEM_ElemAdj_Layer() {CkPrintf("FEM_ElemAdj_Layer initialized to zero\n");initialized=0;}
 
   virtual void pup(PUP::er &p){
     p | nodesPerTuple;
+	p | initialized;
     for(int i=0;i<FEM_MAX_ELTYPE;i++){
       p | elem[i].tuplesPerElem;
-      if(elem[i].tuplesPerElem == 0){
+	  if(elem[i].tuplesPerElem == 0){
 	continue;
       }
       int *arr;

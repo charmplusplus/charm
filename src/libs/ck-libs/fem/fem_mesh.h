@@ -862,6 +862,8 @@ protected:
 	 */
 	FEM_IndexAttribute *conn; //FEM_CONN attribute: element-to-node mapping 
 	FEM_IndexAttribute *elemAdjacency;
+	FEM_IndexAttribute *elemAdjacencyTypes; //  Doesn't store indices to elements, but rather just integer element types 
+
 	int tuplesPerElem;
 
 public:
@@ -1172,8 +1174,7 @@ class FEM_Mesh : public CkNoncopyable {
   void createElemElemAdj();
   
   /* Isaac's helpers for the createElemElemAdj() */
-  FEM_ElemAdj_Layer *addElemAdjLayer(void);
-  FEM_ElemAdj_Layer *curElemAdjLayer(void);
+  FEM_ElemAdj_Layer *getElemAdjLayer(void);
   
 
   // Terry's adjacency accessors & modifiers

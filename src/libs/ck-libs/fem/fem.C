@@ -1402,30 +1402,37 @@ FEMchunk::print(int fem_mesh,int idxBase)
 }  
 
 
-/* New Element to Element Adjacency interface */
-CDECL void FEM_Add_elem_adj_layer(int fem_mesh, int nodesPerTuple)
-{
-	FEMAPI("FEM_Add_elem_adj_layer");
-	FEM_Mesh *m = FEM_Mesh_lookup(fem_mesh,"FEM_Add_elem_adj_layer");
-	FEM_ElemAdj_Layer *cur=	m->addElemAdjLayer();
-	cur->nodesPerTuple=nodesPerTuple;
-}
+/*  Isaac's new element to element adjacency interface
+ *  Registers a set of tuples for a single element type
+ *  Must be called for each element type for which we  
+ *  want adjacencies to be computed.
+ * 
+ *  After a sequence of calls to this function, a call 
+ *  should be made to
+ *   FEM_Mesh_create_elem_elem_adjacency(int fem_mesh)
+ *
+ */
 
-CDECL void FEM_Add_elem2face_tuples(int fem_mesh, int tuplesPerElem,const int *elem2tuple) 
+CDECL void FEM_Add_elem2face_tuples(int fem_mesh, int elem_type, int nodesPerTuple, int tuplesPerElem,const int *elem2tuple) 
 {
 	FEMAPI("FEM_Add_elem2face_tuples");
 	FEM_Mesh *m = FEM_Mesh_lookup(fem_mesh,"FEM_Add_elem_adj_layer");
-	FEM_ElemAdj_Layer *cur=m->curElemAdjLayer();
+	FEM_ElemAdj_Layer *cur=m->getElemAdjLayer();
+	cur->initialized = 1;
+
+	if(cur->elem[elem_type].tuplesPerElem != 0)
+	  CkPrintf("FEM> WARNING: Don't call FEM_Add_elem2face_tuples() repeatedly with the same element type\n");
 
 #ifdef DEBUG
 	printf("HACK===> hardcoded elType=0,idxBase=0\n");
 #endif
-	int elType=0;
+	
 	int idxBase=0;
-
-	// should somehow pass in the different data for different types of elements
-
-	cur->elem[elType].tuplesPerElem=tuplesPerElem;
-	cur->elem[elType].elem2tuple=CkCopyArray(elem2tuple,
+	cur->nodesPerTuple=nodesPerTuple;
+	cur->elem[elem_type].tuplesPerElem=tuplesPerElem;
+	cur->elem[elem_type].elem2tuple=CkCopyArray(elem2tuple,
 		          tuplesPerElem*cur->nodesPerTuple,idxBase);
+
+	CkPrintf("Element type %d has %d tupesPerElem\n", elem_type, tuplesPerElem);
+
 }
