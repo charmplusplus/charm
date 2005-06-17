@@ -564,7 +564,7 @@ double element::getLargestEdge(double *angle)
   C = len[largest];
   A = len[(largest+1)%3];
   B = len[(largest+2)%3];
-  (*angle) = acos((C*C - A*A - B*B)/(2*A*B));
+  (*angle) = acos((C*C - A*A - B*B)/(-2*A*B));
   return maxlen;
 }
 
