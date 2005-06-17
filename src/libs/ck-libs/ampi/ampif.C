@@ -793,6 +793,11 @@ void mpi_migrate(void)
   AMPI_Migrate();
 }
 
+void mpi_migrateto(int pe)
+{
+  AMPI_MigrateTo(pe);
+}
+
 void mpi_register(void *d, MPI_PupFn f)
 {
   AMPI_Register(d,f);
