@@ -164,6 +164,7 @@ class element {  // triangular elements defined by three node references,
   int findLongestEdge();
   int findShortestEdge();
   double getShortestEdge(double *angle);
+  double getAreaQuality();
   double getLargestEdge(double *angle);
   int isLongestEdge(edgeRef& e);
 
