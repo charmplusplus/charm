@@ -532,8 +532,19 @@ double element::getShortestEdge(double *angle)
   C = len[shortest];
   A = len[(shortest+1)%3];
   B = len[(shortest+2)%3];
-  (*angle) = acos((C*C - A*A - B*B)/(2*A*B));
+  (*angle) = acos((C*C - A*A - B*B)/(-2*A*B));
   return minlen;
+}
+
+double element::getAreaQuality()
+{
+  double f, q, len[3];
+  len[0] = C->theNodes[nodes[0]].distance(C->theNodes[nodes[1]]);
+  len[1] = C->theNodes[nodes[1]].distance(C->theNodes[nodes[2]]);
+  len[2] = C->theNodes[nodes[2]].distance(C->theNodes[nodes[0]]);
+  f = 4.0*sqrt(3.0); //proportionality constant
+  q = (f*currentArea)/(len[0]*len[0]+len[1]*len[1]+len[2]*len[2]);  
+  return q;
 }
 
 double element::getLargestEdge(double *angle)
