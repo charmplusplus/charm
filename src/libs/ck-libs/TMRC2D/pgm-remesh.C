@@ -607,6 +607,8 @@ driver(void)
     g.nnodes = FEM_Mesh_get_length(FEM_Mesh_default_read(),FEM_NODE);
     CkPrintf("[%d] Done with coarsening step: %d nodes, %d elements\n",
 	     myChunk,countValidEntities(g.validNode,g.nnodes),countValidEntities(g.validElem,g.nelems));
+    delete [] loc;
+    delete[] areas;
     // THIS IS THE COARSENED MESH SENT TO NetFEM
     if (1) { //Publish data to the net
       publishMeshToNetFEM(g,myChunk,2*t-1);
@@ -634,12 +636,12 @@ driver(void)
     g.nnodes = FEM_Mesh_get_length(FEM_Mesh_default_read(),FEM_NODE);
     CkPrintf("[%d] Done with refinement step: %d nodes, %d elements\n",
 	     myChunk,countValidEntities(g.validNode,g.nnodes),countValidEntities(g.validElem,g.nelems));
+    delete [] loc;
+    delete[] areas;
     // THIS IS THE REFINED MESH SENT TO NetFEM
     if (1) { //Publish data to the net
       publishMeshToNetFEM(g,myChunk,2*t);
     }
-    delete [] loc;
-    delete[] areas;
   }
   if (CkMyPe()==0)
     CkPrintf("Driver finished\n");

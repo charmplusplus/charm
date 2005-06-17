@@ -122,7 +122,7 @@ class edge {
     return -1;
   }
   void sanityCheck(chunk *c, edgeRef shouldRef);
-  void sanityCheck(int node1, int node2);
+  void sanityCheck(int node1, int node2, int eIdx);
 };
 
 #endif

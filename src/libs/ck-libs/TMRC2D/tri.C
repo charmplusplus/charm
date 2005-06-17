@@ -41,12 +41,10 @@ void chunk::addRemoteEdge(int elem, int localEdge, edgeRef er)
   CkAssert(localEdge < 3);
   CkAssert(er.cid > -1);
   CkAssert(er.idx > -1);
-#ifdef TDEBUG1    
   if ((theElements[elem].edges[localEdge].cid > -1) &&
       (theElements[elem].edges[localEdge].idx > -1)){
     CkPrintf("TMRC2D: [%d] WARNING: addRemoteEdge replacing non-null edgeRef!\n", cid);
   }	
-#endif
   theElements[elem].set(localEdge, er);
 #ifdef TDEBUG3
   CkPrintf("TMRC2D: [%d] addRemoteEdge on element %d", cid, elem);
@@ -263,6 +261,10 @@ void chunk::nodeReplaceDelete(int kIdx, int dIdx, node nn, int shared,
 	for (int k=0; k<2; k++) {
 	  if (theEdges[j].nodes[k] == dIdx) {
 	    theEdges[j].nodes[k] = kIdx;
+#ifdef TDEBUG1
+	    CkPrintf("TMRC2D: [%d] Edge %d node %d replaced with %d\n", cid, j,
+		     dIdx, kIdx);
+#endif
 	  }
 	}
       }
@@ -307,10 +309,14 @@ void chunk::updateElement(int idx, objRef oldval, objRef newval, int b)
   nv.idx = newval.idx;   nv.cid = newval.cid; 
   accessLock();
   theEdges[idx].update(ov, nv);
+#ifdef TDEBUG1
+    CkPrintf("TMRC2D: [%d] Update edge %d replaced element %d with %d\n", cid,
+	     idx, ov.idx, nv.idx);
+#endif
   if (theEdges[idx].getBoundary() < b)
     theEdges[idx].setBoundary(b);
   if ((theEdges[idx].getBoundary() > 0) && (b > 0))
-    CkPrintf("TMRC2D: [%d] WARNING! chunk::updateElementEdge collapsed two different boundaries together on one edge.\n", cid);
+    CkPrintf("TMRC2D: [%d] WARNING! chunk::updateElement collapsed two different boundaries together on one edge.\n", cid);
   releaseLock();
 }
 
@@ -719,6 +725,7 @@ void chunk::updateNodeCoords(int nNode, double *coord, int nEl)
     if (theElements[i].isPresent())  theElements[i].calculateArea();
 #ifdef TDEBUG1
   sanityCheck(); // quietly make sure mesh is in shape
+  dump();
 #endif
 #ifdef TDEBUG2
   CkPrintf("TMRC2D: [%d] updateNodeCoords DONE.\n", cid);
@@ -1158,8 +1165,8 @@ void chunk::dump()
     }		 
   for (i=0; i<edgeSlots; i++)
     if (theEdges[i].isPresent()) {
-      CkPrintf("TMRC2D: [%d] Edge %d has elements [%d,%d] and [%d,%d]\n", cid, 
-	       i, theEdges[i].elements[0].cid, theEdges[i].elements[0].idx, 
+      CkPrintf("TMRC2D: [%d] Edge %d has nodes %d %d elements [%d,%d] [%d,%d]\n", cid, 
+	       i, theEdges[i].nodes[0], theEdges[i].nodes[1], theEdges[i].elements[0].cid, theEdges[i].elements[0].idx, 
 	       theEdges[i].elements[1].cid, theEdges[i].elements[1].idx);
     }		 
 }

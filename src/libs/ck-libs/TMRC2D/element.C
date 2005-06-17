@@ -639,7 +639,7 @@ void element::sanityCheck(chunk *c, elemRef shouldRef, int n)
     CkAssert(!(edges[i].isNull()));
     edges[i].sanityCheck();
     if (edges[i].cid == myRef.cid)
-      C->theEdges[edges[i].idx].sanityCheck(nodes[i], nodes[(i+1)%3]);
+      C->theEdges[edges[i].idx].sanityCheck(nodes[i],nodes[(i+1)%3],myRef.idx);
   }
   CkAssert(nodes[0] != nodes[1]);
   CkAssert(nodes[0] != nodes[2]);

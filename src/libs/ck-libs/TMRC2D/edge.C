@@ -511,8 +511,9 @@ void edge::sanityCheck(chunk *c, edgeRef shouldRef)
     CkPrintf("TMRC2D: WARNING: Dangling edge found!\n");
 }
 
-void edge::sanityCheck(int node1, int node2)
+void edge::sanityCheck(int node1, int node2, int eIdx)
 {
   CkAssert((node1 == nodes[0]) || (node1 == nodes[1]));
   CkAssert((node2 == nodes[0]) || (node2 == nodes[1]));
+  CkAssert((elements[0].idx == eIdx) || (elements[1].idx == eIdx));
 }
