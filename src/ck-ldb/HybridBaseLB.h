@@ -112,10 +112,16 @@ private:
 public:
   FourLevelTree() {
     nLevels = 4;
-    CmiAssert(CkNumPes() == 65536);
+#if 1
     span[0] = 64;
     span[1] = 32;
     span[2] = 32;
+#else
+    span[0] = 4;
+    span[1] = 2;
+    span[2] = 2;
+#endif
+    CmiAssert(CkNumPes() == span[0]*span[1]*span[2]);
     toproot = 2;
   }
   virtual ~FourLevelTree() {}
@@ -130,8 +136,8 @@ public:
   }
   virtual int isroot(int mype, int level) {
     if (level == 0) return 0;
-    if (level == 1 && mype % span[0] == 0) return 1;
-    if (level == 2 && (mype-1)%(span[0]*span[1]) == 0) return 1;
+    if (level == 1 && (mype % span[0]) == 0) return 1;
+    if (level == 2 && ((mype-1)%(span[0]*span[1])) == 0) return 1;
     if (level == 3 && mype == toproot) return 1;
     return 0;
   }

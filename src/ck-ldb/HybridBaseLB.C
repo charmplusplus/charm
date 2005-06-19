@@ -19,7 +19,7 @@
 #include "RefineCommLB.h"
 #include "RefineLB.h"
 
-#define  DEBUGF(x)      // CmiPrintf x;
+#define  DEBUGF(x)     //  CmiPrintf x;
 
 CreateLBFunc_Def(HybridBaseLB, "HybridBase load balancer");
 
@@ -50,6 +50,7 @@ HybridBaseLB::HybridBaseLB(const CkLBOptions &opt): BaseLB(opt)
 
   // defines topology
   tree = new ThreeLevelTree;
+  //tree = new FourLevelTree;
 
   // decide which load balancer to call
 //  greedy = (CentralLB *)AllocateGreedyLB();
@@ -402,6 +403,7 @@ void HybridBaseLB::Loadbalancing(int atlevel)
   int i;
 
   CmiAssert(atlevel >= 1);
+  CmiAssert(tree->isroot(CkMyPe(), atlevel));
 
   LevelData *lData = levelData[atlevel];
   LDStats *statsData = lData->statsData;
@@ -433,6 +435,7 @@ void HybridBaseLB::Loadbalancing(int atlevel)
     strat_end_time = CkWallTimer();
 
     // send to children 
+    CmiPrintf("[%d] level: %d nclients:%d children: %d %d\n", CkMyPe(), atlevel, nclients, lData->children[0], lData->children[1]);
     thisProxy.ReceiveMigration(migrateMsg, nclients, lData->children);
   }
 
@@ -515,7 +518,10 @@ void HybridBaseLB::ReceiveMigration(LBMigrateMsg *msg)
             // TODO send comm data
             CkVec<LDCommData> comms;
             collectCommData(obj, comms, atlevel);
-            thisProxy[move.to_pe].ObjMigrated(statsData->objData[obj], comms.getVec(), comms.size(), atlevel);
+	    if (move.to_pe != -1) {
+              // this object migrates to another PE of the parent domain
+              thisProxy[move.to_pe].ObjMigrated(statsData->objData[obj], comms.getVec(), comms.size(), atlevel);
+            }
             lData->outObjs.push_back(MigrationRecord(move.obj, lData->children[statsData->from_proc[obj]], -1));
             statsData->removeObject(obj);
             break;

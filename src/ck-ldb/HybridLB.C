@@ -59,10 +59,11 @@ void HybridLB::work(LDStats* stats,int count)
 
   // TODO: let's generate LBMigrateMsg ourself
   //  take into account the outObjs
-  if (currentLevel == tree->numLevels()-1) 
-    refine->work(stats, count);
-  else
+  //if (currentLevel == tree->numLevels()-1) 
+  if (currentLevel == 1) 
     greedy->work(stats, count);
+  else
+    refine->work(stats, count);
 #endif
 }
   
