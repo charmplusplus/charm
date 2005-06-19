@@ -435,7 +435,7 @@ void HybridBaseLB::Loadbalancing(int atlevel)
     strat_end_time = CkWallTimer();
 
     // send to children 
-    CmiPrintf("[%d] level: %d nclients:%d children: %d %d\n", CkMyPe(), atlevel, nclients, lData->children[0], lData->children[1]);
+    //CmiPrintf("[%d] level: %d nclients:%d children: %d %d\n", CkMyPe(), atlevel, nclients, lData->children[0], lData->children[1]);
     thisProxy.ReceiveMigration(migrateMsg, nclients, lData->children);
   }
 
