@@ -144,7 +144,7 @@ The Communication optimization framework supports both loadbalancing and array
 migration. It enables migration through message forwarding. Messages sent by a
 migrated array are forwarded to the processor where it is mapped to, and from
 here they get accounted. Messages sent to migrated arrays are forwarded from the
-processor where they are mapped to to their current destination.
+processor where they are mapped to their current destination.
 
 This mapping of array elements to processors can be updated by the user by
 calling {\textrm{ComlibResetProxy}} for array proxies, and
@@ -258,8 +258,8 @@ EachToManyMulticastStrategy also optimized the special cases many-to-many where
 not all the chares in an array are involved in the collective operation.
 
 The charm level strategy collects all the messages from the chares and delivers
-on the destination, while the low level (processor-to-processor) communication
-is performed through converse lever {\em routers}, which implement the various
+them tos the destination, while the low level (processor-to-processor) communication
+is performed through converse level {\em routers}, which implements the various
 virtual topologies.
 
 %For example, with the mesh router, the strategy on each processor
@@ -272,9 +272,9 @@ virtual topologies.
 %communication, where a processor sends the same message to all others, using the
 %same virtual topologies at the lower level.
 
-EachToManyMulticastStrategy requires that all local messages have been deposited
+EachToManyMulticastStrategy requires that all local messages be deposited
 before they can be packed into single messages. Hence, it needs to be a {\em
-bracketed} strategy (see before).
+bracketed} strategy.
 
 This strategy can also be used to optimize all-to-all collectives between charm
 groups.
@@ -300,7 +300,7 @@ groups.
 As for the constructors to be used in the main chare, the two prototypes follow.
 The first one is for groups, the second for arrays. The optional parameters
 allow to specify the many-to-many behaviour, passing the lists of source and
-destination elements partecipating to the operation. If they are left to the
+destination elements participating in the operation. If they are left to the
 default value, the collective is an all-to-all.
 
 \begin{verbatim}
@@ -345,7 +345,7 @@ BroadcastStrategy(int topology=USE_HYPERCUBE);
 PipeBroadcastStrategy performs a broadcast through a ring or a hypercube
 (default). The characteristic of this strategy is that it fragments the message
 into small chunks that fit a predetermined size (passed as argument to the
-constructor), and it reassemble it before delivery. The constructor prototypes
+constructor), and it reassembles it before delivery. The constructor prototypes
 for groups and arrays respectively are:
 
 \begin{verbatim}
@@ -366,7 +366,7 @@ deposits is. These strategies do not combine messages, but they may
 sequence the destinations of the multicast to minimize contention on a
 network.
 
-These are the available subclass strategies:
+These are the subclass strategies that are available:
 
 \begin{description}
 \item[KDirectMulticastStrategy] sends the messages along a spanning tree of factor {\em k};
@@ -374,7 +374,7 @@ These are the available subclass strategies:
 \item[MultiRingMulticast] sends the messages along a ring with multiple start points on the ring.
 \end{description}
 
-For all of them, the constructor are of the form:
+For these, the constructors are of the form:
 
 \begin{verbatim}
 KDirectMulticastStrategy(int kfactor, CkArrayID aid);
@@ -388,21 +388,21 @@ For section multicast, the user must create a section proxy and delegate it to
 the communication library. Invocations on section proxies are passed on to the
 section multicast strategy.
 
-The header file to include is the corrispective of the strategy name.
+The header file to include is respective to the strategy name.
 
 \subsubsection{Streaming Strategies}
 
 This strategy optimizes the scenario where chares send several small messages to
 other chares. The StreamingStrategy collects messages destined to the same
 processor and, after a timeout or when a certain number of messages have been
-collected, it sends them as a single message. This result in sending fewer
+collected, it sends them as a single message. This results in sending fewer
 messages of larger size. The timeout is a floating-point parameter to the
 StreamingStrategy. It needs to be specified in milliseconds, with a default
 value of 1ms. Micro-second timeouts can also be specified by passing values less
 than 1. For example, $0.1$ represents $100\mu s$.
 
 The Streaming Strategy is a non-bracketed strategy, so there is no need to call
-for {\textrm{beginIteration}} and {\textrm{endIteration}}. Since messages and be
+{\textrm{beginIteration}} and {\textrm{endIteration}}. Since messages can be
 delayed due to the timeout present, it is possible to call
 {\textrm{endIteration}} to flush all the messages to be sent immediately.
 
@@ -412,14 +412,14 @@ The prototype of the constructor is:
 Strategy * strategy = new StreamingStrategy(float period\_in\_ms, int nmsgs);
 \end{verbatim}
 
-Of this strategy there are two variants:
+There are two variants of this strategy:
 
 \begin{description}
-\item[MeshStreamingStrategy] which sends the messages along with a mesh instead of a linear array as the basic one;
-\item[PrioStreaming] which looks at the priority of the messages, and send those with a priority above a certain threshold directly, without delay. This strategy accept a third parameter in the constructor for the threshold priority.
+\item[MeshStreamingStrategy] which sends the messages along a mesh instead of a linear array as the basic one;
+\item[PrioStreaming] which looks at the priority of the messages, and sends those with a priority above a certain threshold directly, without delay. This strategy accepts a third parameter in the constructor for the threshold priority.
 \end{description}
 
-The header file to include is the corrispective of the strategy name.
+The header file to include is respective to the strategy name.
 
 \subsubsection{Communication Optimization Development}
 
