@@ -10,10 +10,9 @@
 
 class FEM_Adapt {
   FEM_Mesh *theMesh;
-	/**
-	 * Cached pointers to the FEM_VALID arrays of the elements and nodes		
-	 */
-	FEM_DataAttribute *nodeValid, *elemValid;
+  int chunkId;  // which chunk of the mesh is this? currently UNINITIALIZED
+  /// Cached pointers to the FEM_VALID arrays of the elements and nodes
+  FEM_DataAttribute *nodeValid, *elemValid;
 
   // Helper methods
   /// Check if e1 and e3 are on the same side of edge path (n1, n, n2)
@@ -56,13 +55,15 @@ class FEM_Adapt {
   /// Initialize FEM_Adapt with a chunk of the mesh
   FEM_Adapt(FEM_Mesh *m) {
     theMesh = m;
-		nodeValid = validDataFor(FEM_NODE);
-		elemValid = validDataFor(FEM_ELEM);
+    nodeValid = validDataFor(FEM_NODE);
+    elemValid = validDataFor(FEM_ELEM);
   }
   /// Perform a Delaunay flip of edge (n1, n2)
   /** Perform a Delaunay flip of the edge (n1, n2) returning 1 if successful,
       0 if not.  The convexity of the quadrilateral formed by two faces
-      incident to edge (n1, n2) is assumed. **/
+      incident to edge (n1, n2) is assumed. n1 and n2 are assumed to be local
+      to this chunk. An adjacency test is performed on n1 and n2 by 
+      searching for an element with edge [n1,n2]. **/
   virtual int edge_flip(int n1, int n2);
   /// Helper method to int edge_flip(int n1, int n2)
   virtual int edge_flip(int e1, int n1, int n2);
@@ -110,10 +111,7 @@ class FEM_Adapt {
   virtual void element_bisect(int e1); **/
 
 
-	/**Sayantan: Code to find out the ids of new elements and nodes and delete old ones
-	 * Moved it here from fem_mesh.h
-	 */
-	/*** Terry's mesh accessors & modifiers ***/
+  /** Mesh entity modification operations */
   /// Add a new node to the mesh, return the chunk-local numbering; -1 failure.
   int newNode();
   /// Add a new elem to the mesh, return the chunk-local numbering; -1 failure.
@@ -122,6 +120,36 @@ class FEM_Adapt {
   void deleteNode(int n);
   /// Remove element from the mesh
   void deleteElement(int e); 
+
+
+  /////////////////////   UNIMPLEMENTED!!!!!!!!!!   ////////////////////////
+  /** Modify information about another remote instance of a shared node to the
+      local instance of the node. */
+  /// Add information about a shared node instance
+  /** I'm not sure what the parameters should be just yet; n is the index of a
+      node on the local chunk, and the rest is some data about a remote
+      instance of that node somewhere else. */
+  void addSharedNodeInstance(int n, int someIdx, int someChunk) {}
+  void removeSharedNodeInstance(int n, int someIdx, int someChunk) {}
+
+  /** Mesh ghost entity modification operations */
+  /// Add a ghost node if none exists already
+  int newGhostNode() {return -1;}
+  int newGhostNode(int remoteChunk, int remoteIdx) {return -1;}
+  void updateGhostNode(int n, int remoteChunk, int remoteIdx) {}
+  void deleteGhostNode(int n) {}
+  /// Add a ghost element if none exists already
+  int newGhostElement() {return -1;}
+  int newGhostElement(int remoteChunk, int remoteIdx) {return -1;}
+  void updateGhostElement(int e, int remoteChunk, int remoteIdx) {}
+  void deleteGhostElement(int e) {}
+
+  /** Mesh entity tests */
+  int isSharedNode(int n) {return 0;}
+  int isGhostNode(int n) {return 0;}
+  int isGhostElement(int e) {return 0;}
+  int getGhostNode(int remoteChunk, int remoteIdx) {return -1;}
+  int getGhostElement(int remoteChunk, int remoteIdx) {return -1;}
 };
 
 #endif

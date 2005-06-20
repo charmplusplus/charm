@@ -89,6 +89,8 @@ void FEM_Adapt::adj_traverse(int n, int startNode, int stopNode, int startElem,
 // edge_flip and helpers
 int FEM_Adapt::edge_flip(int n1, int n2) 
 {
+  // the following assumes getElementOnEdge returns an element local to this 
+  // chunk, not a ghost element
   int e1 = theMesh->getElementOnEdge(n1, n2);
   if (e1 < 0) {
     CkPrintf("ERROR: edge_flip: no element with edge [%d,%d]\n", n1, n2);
@@ -101,12 +103,14 @@ int FEM_Adapt::edge_flip(int e1, int n1, int n2)
   int e1_n1 = find_local_node_index(e1, n1);
   int e1_n2 = find_local_node_index(e1, n2);
   int shared_edge = get_edge_index(e1_n1, e1_n2);
+  // e2 may be local or a ghost element
   int e2 = theMesh->e2e_getNbr(e1, shared_edge); 
   if (e2 == -1) { // there is no neighbor; can't flip; 
     return 1;  // this is a no-op; could return 0 if we want to flag as error
   }
   return edge_flip_help(e1, e2, n1, n2, e1_n1, e1_n2);
 }
+
 int FEM_Adapt::edge_flip_help(int e1, int e2, int n1, int n2, int e1_n1, 
 			      int e1_n2) 
 {
@@ -147,6 +151,8 @@ int FEM_Adapt::edge_flip_help(int e1, int e2, int n1, int n2, int e1_n1,
 // edge_bisect and helpers  
 int FEM_Adapt::edge_bisect(int n1, int n2) 
 {
+  // the following assumes getElementOnEdge returns an element local to this 
+  // chunk, not a ghost element
   int e1 = theMesh->getElementOnEdge(n1, n2);
   if (e1 < 0) {
     CkPrintf("ERROR: edge_bisect: no element with edge [%d,%d]\n", n1, n2);
