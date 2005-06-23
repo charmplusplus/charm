@@ -168,7 +168,7 @@ void _qdHandler(envelope *env)
   register QdMsg *msg = (QdMsg*) EnvToUsr(env);
   DEBUGP(("[%d] _qdHandler msg:%p\n", CmiMyPe(), msg));
 #if CMK_DUMMY_QD
-  CcdCallFnAfter((CcdVoidFn)_invokeQD,(void *)msg, CMK_DUMMY_QD*1000); // in s
+  CcdCallFnAfter((CcdVoidFn)_invokeQD,(void *)msg, CMK_DUMMY_QD*1000); // in ms
 #else
   CcdCallOnCondition(CcdPROCESSOR_STILL_IDLE, (CcdVoidFn)_callWhenIdle, (void*) msg);
 #endif
