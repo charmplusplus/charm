@@ -9,6 +9,8 @@
 
 #define  DEBUGP(x)   // CmiPrintf x;
 
+#define CMK_DUMMY_QD             0	/* seconds to wait for */
+
 #if CMK_BLUEGENE_CHARM
 // this is a hack for bgcharm++, I need to figure out a better
 // way to do this
@@ -152,11 +154,24 @@ static void _callWhenIdle(QdMsg *msg)
   }
 }
 
+#if CMK_DUMMY_QD
+static void _invokeQD(QdMsg *msg)
+{
+  QdCallback *cb = new QdCallback(msg->getCb());
+  cb->send();
+  delete cb;
+}
+#endif
+
 void _qdHandler(envelope *env)
 {
   register QdMsg *msg = (QdMsg*) EnvToUsr(env);
   DEBUGP(("[%d] _qdHandler msg:%p\n", CmiMyPe(), msg));
+#if CMK_DUMMY_QD
+  CcdCallFnAfter((CcdVoidFn)_invokeQD,(void *)msg, CMK_DUMMY_QD*1000); // in s
+#else
   CcdCallOnCondition(CcdPROCESSOR_STILL_IDLE, (CcdVoidFn)_callWhenIdle, (void*) msg);
+#endif
 }
 
 
