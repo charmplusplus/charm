@@ -1270,3 +1270,10 @@ void CmiMachineProgressImpl()
 }
 
 #endif
+
+
+/* Dummy implementation */
+extern "C" void CmiBarrier()
+{
+}
+

@@ -43,7 +43,6 @@
 #define CMK_TIMER_USE_SPECIAL                              0
 #define CMK_TIMER_USE_TIMES                                0
 #define CMK_TIMER_USE_BLUEGENEL				   1
-#define CMK_TIMER_USE_BLUEGENEL_NOBARRIER		   1
 
 #define CMK_VERSION_BLUEGENE                               1
 
