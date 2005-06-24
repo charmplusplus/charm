@@ -872,12 +872,10 @@ void CmiTimerInit()
   rts_get_personality(&dst, size);
   CpvAccess(clocktick) = 1.0 / dst.clockHz;
 
-#if CMI_TIMER_USE_BLUEGENEL_NOBARRIER
   /* try to synchronize calling barrier */
   CmiBarrier();
   CmiBarrier();
   CmiBarrier();
-#endif
 
   inittime_wallclock = rts_get_timebase();
 }
@@ -1984,7 +1982,7 @@ typedef struct {
   double pad; /* To align the first message, which follows this header */
 } CmiMultipleSendHeader;
 
-void _CmiMultipleSend(unsigned int destPE, int len, int sizes[], char *msgComps[], int immed)
+static void _CmiMultipleSend(unsigned int destPE, int len, int sizes[], char *msgComps[], int immed)
 {
   CmiMultipleSendHeader header;
   int m; /* Outgoing message */
