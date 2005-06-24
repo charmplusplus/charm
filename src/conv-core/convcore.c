@@ -856,7 +856,7 @@ static inline unsigned long long BGLTimebase(void)
 }
 #endif
 
-static unsigned long long inittime_wallclock;
+static unsigned long long inittime_wallclock = 0;
 CpvStaticDeclare(double, clocktick);
 
 int CmiTimerIsSynchronized()
@@ -872,10 +872,12 @@ void CmiTimerInit()
   rts_get_personality(&dst, size);
   CpvAccess(clocktick) = 1.0 / dst.clockHz;
 
+#if CMI_TIMER_USE_BLUEGENEL_NOBARRIER
   /* try to synchronize calling barrier */
   CmiBarrier();
   CmiBarrier();
   CmiBarrier();
+#endif
 
   inittime_wallclock = rts_get_timebase();
 }

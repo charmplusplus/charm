@@ -376,8 +376,10 @@ $(L)/libconv-cplus-y.a: $(L)/libconv-cplus-n.a
 
 $(L)/libconv-cplus-n.a: machine.c $(CVHEADERS)
 	@-test -f $(INC)/mpi.h && mv -f $(INC)/mpi.h $(INC)/mpi.BAK || true
-	$(CHARMC) -o $(L)/libconv-cplus-y.a -DFOR_CPLUS=1 machine.c
-	$(CHARMC) -o $(L)/libconv-cplus-n.a -DFOR_CPLUS=0 machine.c
+	$(CHARMC) -o machine.o machine.c
+	@-test -f ./bglmachine.C && $(CHARMC) -o machine.o bglmachine.C || true
+	$(CHARMC) -o $(L)/libconv-cplus-y.a -DFOR_CPLUS=1 machine.o
+	$(CHARMC) -o $(L)/libconv-cplus-n.a -DFOR_CPLUS=0 machine.o
 	@-test -f $(INC)/mpi.BAK && mv -f $(INC)/mpi.BAK $(INC)/mpi.h || true
 
 $(L)/libconv-util.a: $(LIBCONV_UTIL)
