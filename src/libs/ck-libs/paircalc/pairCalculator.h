@@ -110,6 +110,9 @@ void createPairCalculator(bool sym, int w, int grainSize, int numZ, int* z, int 
 void startPairCalcLeft(PairCalcID* aid, int n, complex* ptr, int myS, int myZ);
 
 void startPairCalcRight(PairCalcID* aid, int n, complex* ptr, int myS, int myZ);
+void makeLeftTree(PairCalcID* aid, int n, complex* ptr, int myS, int myZ);
+
+void makeRightTree(PairCalcID* aid, int n, complex* ptr, int myS, int myZ);
 
 extern "C" void finishPairCalc(PairCalcID* aid, int n, double *ptr);
 

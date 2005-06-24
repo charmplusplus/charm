@@ -128,10 +128,62 @@ void createPairCalculator(bool sym, int s, int grainSize, int numZ, int* z, int 
 #endif
 }
 
-// Deposit data and start calculation
 void startPairCalcLeft(PairCalcID* pcid, int n, complex* ptr, int myS, int myZ){
+  int symmetric = pcid->Symmetric;
+  bool flag_dp = pcid->isDoublePacked;
+  if(!(pcid->existsLproxy||pcid->existsLNotFromproxy)){
+    makeLeftTree(pcid,n,ptr,myS,myZ);
+  }
+  //use proxy to send
+  if(pcid->useComlib && _PC_COMMLIB_MULTI_) {
 #ifdef _PAIRCALC_DEBUG_
-  CkPrintf("     Calc Left ptr %d\n", ptr);
+    CkPrintf("%d Calling Begin Iteration\n", CkMyPe());
+#endif
+    pcid->minst.beginIteration();
+  }
+#ifdef _PAIRCALC_DEBUG_PARANOID_
+  double re;
+  double im;
+  for(int i=0;i<n;i++)
+    {
+      re=ptr[i].re;
+      im=ptr[i].im;
+      if(fabs(re)>0.0)
+	CkAssert(fabs(re)>1.0e-300);
+      if(fabs(im)>0.0)
+	CkAssert(fabs(im)>1.0e-300);
+    }
+#endif
+  if(pcid->existsLproxy)
+    {
+      calculatePairsMsg *msgfromrow=new ( n,0 ) calculatePairsMsg;
+      msgfromrow->init(n, myS, true, flag_dp, ptr);
+      pcid->proxyLFrom.calculatePairs_gemm(msgfromrow);
+    }
+  if(pcid->existsLNotFromproxy)
+    { //symmetric
+      calculatePairsMsg *msg= new ( n,0 ) calculatePairsMsg;
+      msg->init(n, myS, false, flag_dp, ptr);   
+      pcid->proxyLNotFrom.calculatePairs_gemm(msg);
+    }
+
+#ifdef _PAIRCALC_DEBUG_
+  CkPrintf("Send from [%d %d]\n",x,s1);
+#endif
+
+  if(pcid->useComlib && _PC_COMMLIB_MULTI_) {
+#ifdef _PAIRCALC_DEBUG_
+    CkPrintf("%d Calling End Iteration\n", CkMyPe());
+#endif
+    pcid->minst.endIteration();
+  }  
+}
+
+
+// Deposit data and start calculation
+void makeLeftTree(PairCalcID* pcid, int n, complex* ptr, int myS, int myZ){
+#ifdef _PAIRCALC_DEBUG_
+  CkPrintf("     Make Left ptr %d\n", ptr);
 #endif
   CkArrayID pairCalculatorID = (CkArrayID)pcid->Aid; 
   CProxy_PairCalculator pairCalculatorProxy(pairCalculatorID);
@@ -145,10 +197,9 @@ void startPairCalcLeft(PairCalcID* pcid, int n, complex* ptr, int myS, int myZ){
   bool conserveMemory = pcid->conserveMemory;
   x = myZ;
   s1 = (myS/grainSize) * grainSize;
-
+  if(!(pcid->existsLproxy||pcid->existsLNotFromproxy)){
   int numElems;
   //create multicast proxy array section list 
-  if(!(pcid->existsLproxy||pcid->existsLNotFromproxy)){
     if(symmetric){
       CkArrayIndexMax *elems=new CkArrayIndexMax[blkSize*S/grainSize];
       CkArrayIndexMax *elemsfromrow=new CkArrayIndexMax[blkSize*S/grainSize];
@@ -253,49 +304,6 @@ void startPairCalcLeft(PairCalcID* pcid, int n, complex* ptr, int myS, int myZ){
 
   }
 
-  //use proxy to send
-  if(pcid->useComlib && _PC_COMMLIB_MULTI_) {
-#ifdef _PAIRCALC_DEBUG_
-    CkPrintf("%d Calling Begin Iteration\n", CkMyPe());
-#endif
-    pcid->minst.beginIteration();
-  }
-#ifdef _PAIRCALC_DEBUG_PARANOID_
-  double re;
-  double im;
-  for(int i=0;i<n;i++)
-    {
-      re=ptr[i].re;
-      im=ptr[i].im;
-      if(fabs(re)>0.0)
-	CkAssert(fabs(re)>1.0e-300);
-      if(fabs(im)>0.0)
-	CkAssert(fabs(im)>1.0e-300);
-    }
-#endif
-  if(pcid->existsLproxy)
-    {
-      calculatePairsMsg *msgfromrow=new ( n,0 ) calculatePairsMsg;
-      msgfromrow->init(n, myS, true, flag_dp, ptr);
-      pcid->proxyLFrom.calculatePairs_gemm(msgfromrow);
-    }
-  if(pcid->existsLNotFromproxy)
-    { //symmetric
-      calculatePairsMsg *msg= new ( n,0 ) calculatePairsMsg;
-      msg->init(n, myS, false, flag_dp, ptr);   
-      pcid->proxyLNotFrom.calculatePairs_gemm(msg);
-    }
-
-#ifdef _PAIRCALC_DEBUG_
-  CkPrintf("Send from [%d %d]\n",x,s1);
-#endif
-
-  if(pcid->useComlib && _PC_COMMLIB_MULTI_) {
-#ifdef _PAIRCALC_DEBUG_
-    CkPrintf("%d Calling End Iteration\n", CkMyPe());
-#endif
-    pcid->minst.endIteration();
-  }
 }
 
 
@@ -310,6 +318,57 @@ void isAtSyncPairCalc(PairCalcID* pcid){
 }
 
 void startPairCalcRight(PairCalcID* pcid, int n, complex* ptr, int myS, int myZ){
+  bool flag_dp = pcid->isDoublePacked;
+  if(!pcid->existsRproxy)
+    {
+      makeRightTree(pcid,n,ptr,myS,myZ);
+    }
+  if(pcid->existsRproxy)
+    {
+#ifdef _DEBUG_PAIRCALC_PARANOID_
+  double re;
+  double im;
+  for(int i=0;i<n;i++)
+    {
+      re=ptr[i].re;
+      im=ptr[i].im;
+      if(fabs(re)>0.0)
+	CkAssert(fabs(re)>1.0e-300);
+      if(fabs(im)>0.0)
+	CkAssert(fabs(im)>1.0e-300);
+    }
+#endif
+      calculatePairsMsg *msg= new ( n,0 ) calculatePairsMsg;
+      msg->init(n,myS,false,flag_dp,ptr);
+      if(pcid->useComlib & _PC_COMMLIB_MULTI_) {
+#ifdef _PAIRCALC_DEBUG_
+	CkPrintf("%d Calling Begin Iteration\n", CkMyPe());
+#endif
+	pcid->minst.beginIteration();
+      }
+      //mcastInstanceCP.beginIteration();
+      pcid->proxyRNotFrom.calculatePairs_gemm(msg);
+
+      if(pcid->useComlib && _PC_COMMLIB_MULTI_) {
+#ifdef _PAIRCALC_DEBUG_
+	CkPrintf("%d Calling End Iteration\n", CkMyPe());
+#endif
+	pcid->minst.endIteration();
+      }
+      
+#ifdef _PAIRCALC_DEBUG_
+      CkPrintf("Send from [%d 0 %d]\n",x,s2);
+#endif
+    }
+  else
+    {
+#ifdef _PAIRCALC_DEBUG_
+      CkPrintf("Warning! No Right proxy for [%d 0 %d]\n",x,s2);
+#endif
+    }
+}
+
+void makeRightTree(PairCalcID* pcid, int n, complex* ptr, int myS, int myZ){
 #ifdef _PAIRCALC_DEBUG_
   CkPrintf("     Calc Right symm=%d\n", pcid->Symmetric);
 #endif
@@ -375,43 +434,6 @@ void startPairCalcRight(PairCalcID* pcid, int n, complex* ptr, int myS, int myZ)
       delete [] elems;
     }
   //  calculatePairsMsg *msg= new ( n,0 ) calculatePairsMsg(n,myS,false,flag_dp,ptr);
-  if(pcid->existsRproxy)
-    {
-#ifdef _DEBUG_PAIRCALC_PARANOID_
-  double re;
-  double im;
-  for(int i=0;i<n;i++)
-    {
-      re=ptr[i].re;
-      im=ptr[i].im;
-      if(fabs(re)>0.0)
-	CkAssert(fabs(re)>1.0e-300);
-      if(fabs(im)>0.0)
-	CkAssert(fabs(im)>1.0e-300);
-    }
-#endif
-      calculatePairsMsg *msg= new ( n,0 ) calculatePairsMsg;
-      msg->init(n,myS,false,flag_dp,ptr);
-      if(pcid->useComlib & _PC_COMMLIB_MULTI_) {
-#ifdef _PAIRCALC_DEBUG_
-	CkPrintf("%d Calling Begin Iteration\n", CkMyPe());
-#endif
-	pcid->minst.beginIteration();
-      }
-      //mcastInstanceCP.beginIteration();
-      pcid->proxyRNotFrom.calculatePairs_gemm(msg);
-
-      if(pcid->useComlib && _PC_COMMLIB_MULTI_) {
-#ifdef _PAIRCALC_DEBUG_
-	CkPrintf("%d Calling End Iteration\n", CkMyPe());
-#endif
-	pcid->minst.endIteration();
-      }
-      
-#ifdef _PAIRCALC_DEBUG_
-      CkPrintf("Send from [%d 0 %d]\n",x,s2);
-#endif
-    }
 }
 
 void finishPairCalc(PairCalcID* pcid, int n, double *ptr) {

@@ -21,7 +21,7 @@
  *                                                                         *
  * The elan code is a specialized machine reduction/broadcast which runs   *
  * much faster on lemieux, and theoretically on any other elan machine     *
- * It operates by one dummy reduction which is used to indicated that all  *
+ * It operates by one dummy reduction which is used to indicate that all   *
  * calculators on a PE machine have reported in.  Then the machine         *
  * reduction is triggered.                                                 *
  ***************************************************************************/
