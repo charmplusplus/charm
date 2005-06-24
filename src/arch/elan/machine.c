@@ -35,7 +35,7 @@ Developed by Sameer Kumar
 #define MAX_QLEN 1000
 #define MAX_BYTES 1000000
 
-#define USE_SHM 0
+#define USE_SHM 1
 
 /*
   To reduce the buffer used in broadcast and distribute the load from 
@@ -62,7 +62,7 @@ ELAN_TPORT    *elan_port;
 ELAN_QUEUE    *elan_q;
 
 int enableGetBasedSend = 1;
-int enableBufferPooling = 0;
+int enableBufferPooling = 1;
 
 int SMALL_MESSAGE_SIZE=16384;  /* Smallest message size queue 
                                  used for receiving short messages */
@@ -1726,7 +1726,7 @@ CmiCommHandle CmiAsyncListSendFn(int npes, int *pes, int len, char *msg)
 extern void CmiReference(void *blk);
 #if 1
 #define ELAN_BUF_SIZE MID_MESSAGE_SIZE
-#define USE_NIC_MULTICAST 0
+#define USE_NIC_MULTICAST 1
 
 void CmiFreeListSendFn(int npes, int *pes, int len, char *msg)
 {  
@@ -1809,7 +1809,7 @@ void CmiFreeListSendFn(int npes, int *pes, int len, char *msg)
             REF_FIELD(msg_start) = nremote; 
             
             elan_wait(elan_get(elan_base->state,
-                               msg_Start,
+                               msg_start,
                                elan_buf,
                                len + sizeof(ChunkHeader),
                                CmiMyPe()
