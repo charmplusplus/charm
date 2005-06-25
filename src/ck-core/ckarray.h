@@ -32,6 +32,7 @@ Orion Sky Lawlor, olawlor@acm.org
 	Utility defines, includes, etc.
 */
 extern void _registerCkArray(void);
+CpvExtern (int ,serializer);
 
 /**
 \addtogroup CkArray

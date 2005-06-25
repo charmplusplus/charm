@@ -151,10 +151,10 @@ GreedyLB::BuildCpuArray(BaseLB::LDStats* stats,
   for (pe=0; pe < count; pe++) {
     CentralLB::ProcStats &peData = stats->procs[pe];
  
-    data[*peCount].load = 0.0;
     map[pe] = -1;
     if (peData.available) 
     {
+    	data[*peCount].load = 0.0;
       data[*peCount].load += peData.bg_walltime;
       data[*peCount].pe = data[*peCount].id = pe;
       map[pe] = *peCount;
@@ -188,14 +188,15 @@ void GreedyLB::work(BaseLB::LDStats* stats, int count)
 {
   int  obj, heapSize, objCount;
   int *pemap = new int [count];
+	CmiMemoryCheck();
   HeapData *cpuData = BuildCpuArray(stats, count, &heapSize);
+	CmiMemoryCheck();
   HeapData *objData = BuildObjectArray(stats, count, &objCount);
-
   if (_lb_args.debug()>1) 
     CkPrintf("[%d] In GreedyLB strategy\n",CkMyPe());
-
   heapSize--;
   for (obj=0; obj < objCount; obj++) {
+		CmiMemoryCheck();
     HeapData minCpu;  
     // Operation of extracting the least loaded processor
     // from the heap
@@ -203,6 +204,7 @@ void GreedyLB::work(BaseLB::LDStats* stats, int count)
     cpuData[0] = cpuData[heapSize];
     heapSize--;
     Heapify(cpuData, 0, heapSize, LT);    
+		CmiMemoryCheck();
 
     // Increment the time of the least loaded processor by the cpuTime of
     // the `heaviest' object
@@ -226,6 +228,7 @@ void GreedyLB::work(BaseLB::LDStats* stats, int count)
       location = (location-1)/2;
     }
     cpuData[location] = minCpu;
+		CmiMemoryCheck();
   }
 
   delete [] cpuData;

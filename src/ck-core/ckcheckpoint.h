@@ -27,7 +27,15 @@ restarting of Charm++ programs. ...
 #define _CKCHECKPOINT_H
 
 #include "CkCheckpoint.decl.h"
-
+// loop over all CkLocMgr and do "code"
+#define  CKLOCMGR_LOOP(code)	\
+  for(i=0;i<numGroups;i++) {	\
+    IrrGroup *obj = CkpvAccess(_groupTable)->find((*CkpvAccess(_groupIDTable))[i]).getObj();	\
+    if(obj->isLocMgr())  {	\
+      CkLocMgr *mgr = (CkLocMgr*)obj;	\
+      code	\
+    }	\
+  }
 /***
   * Location iterator that save each location
  ***/
@@ -58,5 +66,6 @@ void CkPupProcessorData(PUP::er &p);
 
 void CkStartCheckpoint(char* dirname,const CkCallback& cb);
 void CkRestartMain(const char* dirname);
+
 
 #endif //_CKCHECKPOINT_H

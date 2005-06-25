@@ -378,7 +378,7 @@ LDRemoveLocalBarrierReceiver(LDHandle _db,LDBarrierReceiver h)
 extern "C" void LDAtLocalBarrier(LDHandle _db, LDBarrierClient h)
 {
   LBDB *const db = (LBDB*)(_db.handle);
-
+	
   db->AtLocalBarrier(h);
 }
 

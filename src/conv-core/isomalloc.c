@@ -18,7 +18,7 @@ generalized by Orion Lawlor November 2001.
 #include "converse.h"
 #include "memory-isomalloc.h"
 
-/* #define CMK_THREADS_DEBUG 1 */
+#define CMK_THREADS_DEBUG 0 
 
 #include <stdio.h>
 #include <stdlib.h>

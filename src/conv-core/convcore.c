@@ -1109,6 +1109,9 @@ void CsdEndIdle(void)
 #define MESSAGE_PHASE_CHECK
 #endif
 
+CpvExtern(char *,_validProcessors);
+extern int _exitHandlerIdx;
+
 void CmiHandleMessage(void *msg)
 {
 /* this is wrong because it counts the Charm++ messages in sched queue
@@ -1120,6 +1123,13 @@ void CmiHandleMessage(void *msg)
 	_LOG_E_HANDLER_BEGIN(handler); /* projector */
 #endif
 
+/*
+	FAULT_EVAC
+*/
+/*	if((!CpvAccess(_validProcessors)[CmiMyPe()]) && handler != _exitHandlerIdx){
+		return;
+	}*/
+	
         MESSAGE_PHASE_CHECK
 
 	h=&CmiGetHandlerInfo(msg);
@@ -1235,6 +1245,19 @@ int CsdScheduler(int maxmsgs)
 	CsdEndIdle();\
 	break;\
       }\
+/*
+	EVAC
+*/
+extern void CkClearAllArrayElements();
+CmiUInt2 handler1;
+void *__dbgMsg;
+void __dbgcheckMessageHandler(){
+	CmiUInt2 handler2;
+	if(__dbgMsg){
+			handler2=CmiGetHandler(__dbgMsg); 
+	//		CmiAssert(handler2 != 0);
+	}
+}
 
 void CsdScheduleForever(void)
 {
@@ -1242,6 +1265,12 @@ void CsdScheduleForever(void)
   SCHEDULE_TOP
   while (1) {
     msg = CsdNextMessage(&state);
+		__dbgMsg = msg;
+		if(msg){
+			handler1=CmiGetHandler(msg); 
+		}	
+//		CkClearAllArrayElements();
+		__dbgcheckMessageHandler();
     if (msg) { /*A message is available-- process it*/
       if (isIdle) {isIdle=0;CsdEndIdle();}
       SCHEDULE_MESSAGE
@@ -1350,7 +1379,7 @@ CthThread CthSuspendNormalThread()
   return CpvAccess(CthSchedulingThread);
 }
 
-void CthEnqueueSchedulingThread(CthThread t, int, int, unsigned int*);
+void CthEnqueueSchedulingThread(CthThreadToken *token, int, int, unsigned int*);
 CthThread CthSuspendSchedulingThread();
 
 CthThread CthSuspendSchedulingThread()
@@ -1370,8 +1399,13 @@ CthThread CthSuspendSchedulingThread()
   return succ;
 }
 
-void CthResumeNormalThread(CthThread t)
+void CthResumeNormalThread(CthThreadToken* token)
 {
+	CthThread t = token->thread;
+	if(t == NULL){
+	 free(token);
+	 return;
+	}
 #ifndef CMK_OPTIMIZE
 #if ! CMK_TRACE_IN_CHARM
   if(CpvAccess(traceOn))
@@ -1384,11 +1418,12 @@ void CthResumeNormalThread(CthThread t)
   CthResume(t);
 }
 
-void CthResumeSchedulingThread(CthThread t)
+void CthResumeSchedulingThread(CthThreadToken  *token)
 {
+	CthThread t = token->thread;
   CthThread me = CthSelf();
   if (me == CpvAccess(CthMainThread)) {
-    CthEnqueueSchedulingThread(me,CQS_QUEUEING_FIFO, 0, 0);
+    CthEnqueueSchedulingThread(CthGetToken(me),CQS_QUEUEING_FIFO, 0, 0);
   } else {
     CthSetNext(me, CpvAccess(CthSleepingStandins));
     CpvAccess(CthSleepingStandins) = me;
@@ -1405,18 +1440,18 @@ void CthResumeSchedulingThread(CthThread t)
   CthResume(t);
 }
 
-void CthEnqueueNormalThread(CthThread t, int s, 
+void CthEnqueueNormalThread(CthThreadToken* token, int s, 
 				   int pb,unsigned int *prio)
 {
-  CmiSetHandler(t, CpvAccess(CthResumeNormalThreadIdx));
-  CsdEnqueueGeneral(t, s, pb, prio);
+  CmiSetHandler(token, CpvAccess(CthResumeNormalThreadIdx));
+  CsdEnqueueGeneral(token, s, pb, prio);
 }
 
-void CthEnqueueSchedulingThread(CthThread t, int s, 
+void CthEnqueueSchedulingThread(CthThreadToken* token, int s, 
 				       int pb,unsigned int *prio)
 {
-  CmiSetHandler(t, CpvAccess(CthResumeSchedulingThreadIdx));
-  CsdEnqueueGeneral(t, s, pb, prio);
+  CmiSetHandler(token, CpvAccess(CthResumeSchedulingThreadIdx));
+  CsdEnqueueGeneral(token, s, pb, prio);
 }
 
 void CthSetStrategyDefault(CthThread t)

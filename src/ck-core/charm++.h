@@ -393,6 +393,11 @@ class IrrGroup : public Chare {
     virtual CmiBool isReductionMgr(void){ return CmiFalse; }
     static int isIrreducible(){ return 1;}
     virtual void flushStates() {}
+		/*
+			FAULT_EVAC
+		*/
+		virtual void evacuate(){};
+		virtual void doneEvacuate(){};
     virtual void CkAddThreadListeners(CthThread tid, void *msg);
 };
 
@@ -899,6 +904,7 @@ extern void CkStartQD(const CkCallback& cb);
 #include "waitqd.h"
 #include "sdag.h"
 #include "ckcheckpoint.h"
+#include "ckevacuation.h"
 #include "ckarrayreductionmgr.h"
 #include "trace.h"
 

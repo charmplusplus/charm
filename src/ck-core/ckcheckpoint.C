@@ -12,9 +12,12 @@ More documentation goes here...
 #include <string.h>
 #include "charm++.h"
 #include "ck.h"
-//#include "ckcheckpoint.h"
+#include "ckcheckpoint.h"
 
 #define DEBCHK  // CkPrintf
+
+#define DEBUGC(x) x
+//#define DEBUGC(x) 
 
 CkGroupID _sysChkptMgr;
 
@@ -296,15 +299,6 @@ void CkPupNodeGroupData(PUP::er &p)
 	delete [] tmpInfo;
 }
 
-// loop over all CkLocMgr and do "code"
-#define  CKLOCMGR_LOOP(code)	\
-  for(i=0;i<numGroups;i++) {	\
-    IrrGroup *obj = CkpvAccess(_groupTable)->find((*CkpvAccess(_groupIDTable))[i]).getObj();	\
-    if(obj->isLocMgr())  {	\
-      CkLocMgr *mgr = (CkLocMgr*)obj;	\
-      code	\
-    }	\
-  }
 
 // handle chare array elements for this processor
 void CkPupArrayElementsData(PUP::er &p)

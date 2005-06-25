@@ -136,13 +136,21 @@
 #endif
 
 /**************************** Shared Base Thread Class ***********************/
+/*
+	FAULT_EVAC
+	Moved the cmicore converse header from CthThreadBase to CthThreadToken.
+	The CthThreadToken gets enqueued in the converse queue instead of the
+	CthThread. This allows the thread to be moved out of a processor even
+	if there is an awaken call for it enqueued in the scheduler
+
+*/
+
 typedef struct CthThreadBase
 {
-  /*Start with a message header so threads can be enqueued 
-    as messages (e.g., by CthEnqueueNormalThread in convcore.c)
-  */
-  char cmicore[CmiMsgHeaderSizeBytes];
-  
+ 	CthThreadToken *token; /* token that shall be enqueued into the ready queue*/
+	int scheduled;				 /* has this thread been added to the ready queue ?
+													*/
+ 
   CmiObjId   tid;        /* globally unique tid */
   CthAwkFn   awakenfn;   /* Insert this thread into the ready queue */
   CthThFn    choosefn;   /* Return the next ready thread */
@@ -164,6 +172,10 @@ typedef struct CthThreadBase
 #define B(t) ((CthThreadBase *)(t))
 #define S(t) ((CthThread)(t))
 
+
+CthThreadToken *CthGetToken(CthThread t){
+	return B(t)->token;
+}
 
 /*********************** Stack Aliasing *********************
   Stack aliasing: instead of consuming virtual address space
@@ -340,6 +352,9 @@ static void CthThreadBaseInit(CthThreadBase *th)
   __pthread_find_self_with_pid=1;
   __pthread_nonstandard_stacks=1;
 #endif
+	th->token = (CthThreadToken *)malloc(sizeof(CthThreadToken));
+	th->token->thread = S(th);
+	th->scheduled = 0;
 
   th->awakenfn = 0;
   th->choosefn = 0;
@@ -387,6 +402,14 @@ static void *CthAllocateStack(CthThreadBase *th,int *stackSize,int useMigratable
 }
 static void CthThreadBaseFree(CthThreadBase *th)
 {
+	/*
+	 * remove the token if it is not queued in the converse scheduler		
+	 */
+	if(th->scheduled == 0){
+		free(th->token);
+	}else{
+		th->token->thread = NULL;
+	}
 	/* Call the free function pointer on all the listeners on
 			this thread and also delete the thread listener objects
 	*/
@@ -443,6 +466,13 @@ void CthPupBase(pup_er p,CthThreadBase *t,int useMigratable)
 	if ((CthThread)t==CthCpvAccess(CthCurrent))
 		CmiAbort("CthPupBase: Cannot pack running thread!");
 #endif
+	/*recreate the token when unpacking and set the thread
+	  pointer in it to NULL if the thread is being deleted*/
+	if(pup_isUnpacking(p)){
+		t->token = (CthThreadToken *)malloc(sizeof(CthThreadToken));
+		t->token->thread = S(t);
+		t->scheduled = 0;
+	}
 	/*Really need a pup_functionPtr here:*/
 	pup_bytes(p,&t->awakenfn,sizeof(t->awakenfn));
 	pup_bytes(p,&t->choosefn,sizeof(t->choosefn));
@@ -505,6 +535,7 @@ void CthSetStrategy(CthThread t, CthAwkFn awkfn, CthThFn chsfn)
 
 static void CthBaseResume(CthThread t)
 {
+	
 	struct CthThreadListener *l;
 	for(l=B(t)->listener;l!=NULL;l=l->next){
 			l->resume(l);
@@ -542,9 +573,9 @@ void CthSuspend(void)
 	for(l=cur->listener;l!=NULL;l=l->next){
 			l->suspend(l);
 	}
-	
   if (cur->choosefn == 0) CthNoStrategy();
   next = cur->choosefn();
+	cur->scheduled=0;
 #ifndef CMK_OPTIMIZE
 #if !CMK_TRACE_IN_CHARM
   if(CpvAccess(traceOn))
@@ -563,7 +594,8 @@ void CthAwaken(CthThread th)
     traceAwaken(th);
 #endif
 #endif
-  B(th)->awakenfn(th, CQS_QUEUEING_FIFO, 0, 0);
+  B(th)->awakenfn(B(th)->token, CQS_QUEUEING_FIFO, 0, 0);
+	B(th)->scheduled = 1;
 }
 
 void CthYield()
@@ -581,7 +613,8 @@ void CthAwakenPrio(CthThread th, int s, int pb, unsigned int *prio)
     traceAwaken(th);
 #endif
 #endif
-  B(th)->awakenfn(th, s, pb, prio);
+  B(th)->awakenfn(B(th)->token, s, pb, prio);
+	B(th)->scheduled = 1;
 }
 
 void CthYieldPrio(int s, int pb, unsigned int *prio)

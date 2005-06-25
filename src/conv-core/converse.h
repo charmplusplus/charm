@@ -940,9 +940,18 @@ void CmiIsomallocBlockListFree(void *doomedMallocedBlock);
 /****** CTH: THE LOW-LEVEL THREADS PACKAGE ******/
 
 typedef struct CthThreadStruct *CthThread;
+typedef struct {
+	/*Start with a message header so threads can be enqueued 
+    as messages (e.g., by CthEnqueueNormalThread in convcore.c)
+  */
+  char cmicore[CmiMsgHeaderSizeBytes];
+	CthThread thread;
+} CthThreadToken;
+
+CthThreadToken *CthGetToken(CthThread);
 
 typedef void        (*CthVoidFn)();
-typedef void        (*CthAwkFn)(CthThread,int,
+typedef void        (*CthAwkFn)(CthThreadToken *,int,
 				int prioBits,unsigned int *prioptr);
 typedef CthThread   (*CthThFn)();
 

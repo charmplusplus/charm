@@ -15,10 +15,12 @@
 #define AMPI_PRINT_IDLE 0
 
 /* change this define to "x" to trace all send/recv's */
-#define MSG_ORDER_DEBUG(x) /* empty */
+#define MSG_ORDER_DEBUG(x) // x /* empty */
 /* change this define to "x" to trace user calls */
-#define USER_CALL_DEBUG(x) /* ckout<<"vp "<<TCHARM_Element()<<": "<<x<<endl; */
-#define STARTUP_DEBUG(x)  /* ckout<<"ampi[pe "<<CkMyPe()<<"] "<< x <<endl; */
+#define USER_CALL_DEBUG(x) // ckout<<"vp "<<TCHARM_Element()<<": "<<x<<endl; 
+#define STARTUP_DEBUG(x)  // ckout<<"ampi[pe "<<CkMyPe()<<"] "<< x <<endl; 
+
+
 
 //------------- startup -------------
 static mpi_comm_worlds mpi_worlds;
@@ -588,16 +590,20 @@ ampiParent::ampiParent(MPI_Comm worldNo_,CProxy_TCharm threads_)
   prepareCtv();
 
   thread->semaPut(AMPI_BARRIER_SEMAID,&barrier);
+	AsyncEvacuate(CmiFalse);
 }
 
 ampiParent::ampiParent(CkMigrateMessage *msg):CBase_ampiParent(msg) {
   thread=NULL;
   worldPtr=NULL;
   myDDT=&myDDTsto;
+	AsyncEvacuate(CmiFalse);
 }
 
 void ampiParent::pup(PUP::er &p) {
+
   ArrayElement1D::pup(p);
+//	printf("[%d] Ampiparent being pupped \n",thisIndex);
   p|threads;
 
   p|worldStruct;
@@ -624,6 +630,7 @@ void ampiParent::ckJustMigrated(void) {
 }
 
 ampiParent::~ampiParent() {
+	STARTUP_DEBUG("ampiParent> destructor called");
 }
 
 //Children call this when they are first created or just migrated
@@ -788,6 +795,7 @@ void ampi::init(void) {
   thread=NULL;
   msgs=NULL;
   resumeOnRecv=false;
+	AsyncEvacuate(CmiFalse);
 }
 
 ampi::ampi()
@@ -850,8 +858,8 @@ ampi::ampi(CkMigrateMessage *msg):CBase_ampi(msg)
 
 void ampi::ckJustMigrated(void)
 {
-	ArrayElement1D::ckJustMigrated();
 	findParent(true);
+	ArrayElement1D::ckJustMigrated();
 }
 
 void ampi::findParent(bool forMigration) {
@@ -860,11 +868,13 @@ void ampi::findParent(bool forMigration) {
 	if (parent==NULL) CkAbort("AMPI can't find its parent!");
 	thread=parent->registerAmpi(this,myComm,forMigration);
 	if (thread==NULL) CkAbort("AMPI can't find its thread!");
+//	printf("[%d] ampi index %d TCharm thread pointer %p \n",CkMyPe(),thisIndex,thread);
 }
 
 static void cmm_pup_ampi_message(pup_er p,void **msg) {
 	CkPupMessage(*(PUP::er *)p,msg,1);
 	if (pup_isDeleting(p)) delete (AmpiMsg *)*msg;
+//	printf("[%d] pupping ampi message %p \n",CkMyPe(),*msg);
 }
 
 void ampi::pup(PUP::er &p)
@@ -877,6 +887,7 @@ void ampi::pup(PUP::er &p)
   p|nbcasts;
   p|tmpVec;
   p|remoteProxy;
+	p|resumeOnRecv;
   p|comlibProxy;
   p|ciStreaming;
   p|ciBcast;
@@ -891,10 +902,12 @@ void ampi::pup(PUP::er &p)
   }
 
   msgs=CmmPup((pup_er)&p,msgs,cmm_pup_ampi_message);
+//	printf("[%d] ampi index %d msgs table pointer %p\n",CkMyPe(),thisIndex,msgs);
 
   p|seqEntries;
   p|oorder;
 }
+extern "C" void __dbgcheckMessageHandler();
 
 ampi::~ampi()
 {
@@ -907,7 +920,9 @@ ampi::~ampi()
     msg = (AmpiMsg *) CmmGet(msgs, 3, tags, sts);
   }
 */
+	__dbgcheckMessageHandler();
   CmmFree(msgs);
+	__dbgcheckMessageHandler();
 }
 
 //------------------------ Communicator Splitting ---------------------
@@ -1287,8 +1302,8 @@ void
 ampi::generic(AmpiMsg* msg)
 {
 MSG_ORDER_DEBUG(
-  CkPrintf("AMPI vp %d arrival: tag=%d, src=%d, comm=%d  (from %d, seq %d)\n",
-  	thisIndex,msg->tag,msg->srcRank,msg->comm, msg->srcIdx, msg->seq);
+  CkPrintf("AMPI vp %d arrival: tag=%d, src=%d, comm=%d  (from %d, seq %d) resumeOnRecv %d\n",
+  	thisIndex,msg->tag,msg->srcRank,msg->comm, msg->srcIdx, msg->seq,resumeOnRecv);
 )
 
 //	AmpiMsg *msgcopy = msg;
@@ -1388,6 +1403,8 @@ ampi::delesend(int t, int sRank, const void* buf, int count, int type,  int rank
 int
 ampi::recv(int t, int s, void* buf, int count, int type, int comm, int *sts)
 {
+	ampi *dis;
+	MPI_Comm disComm = myComm.getComm();
   if(s==MPI_PROC_NULL) {
     ((MPI_Status *)sts)->MPI_SOURCE = MPI_PROC_NULL;
     ((MPI_Status *)sts)->MPI_TAG = MPI_ANY_TAG;
@@ -1408,24 +1425,25 @@ ampi::recv(int t, int s, void* buf, int count, int type, int comm, int *sts)
 
   int tags[3];
   AmpiMsg *msg = 0;
-  CkDDT_DataType *ddt = getDDT()->getType(type);
-  int len = ddt->getSize(count);
   
  MSG_ORDER_DEBUG(
   CkPrintf("AMPI vp %d blocking recv: tag=%d, src=%d, comm=%d\n",thisIndex,t,s,comm);
  )
 
   resumeOnRecv=true;
-//  int counter=0;
   while(1) {
+		//This is done to take into account the case in which an ampi thread has migrated
+		//while waiting for a message
+		dis = getAmpiInstance(disComm);
     tags[0] = t; tags[1] = s; tags[2] = comm;
-    msg = (AmpiMsg *) CmmGet(msgs, 3, tags, sts);
- //   if(msg) counters.push_back(counter);
+    msg = (AmpiMsg *) CmmGet(dis->msgs, 3, tags, sts);
     if (msg) break;
-    thread->suspend();
-//    counter++;
+    dis->thread->suspend();
+		dis = getAmpiInstance(disComm);
   }
-  resumeOnRecv=false;
+  dis->resumeOnRecv=false;
+  CkDDT_DataType *ddt = dis->getDDT()->getType(type);
+  int len = ddt->getSize(count);
   
   if(sts)
     ((MPI_Status*)sts)->MPI_LENGTH = msg->length;
@@ -1688,6 +1706,14 @@ CDECL void AMPI_Migrate(void)
 #endif
 }
 
+
+CDECL void AMPI_Evacuate(void)
+{
+  TCHARM_Evacuate();
+}
+
+
+
 CDECL void AMPI_Migrateto(int destPE)
 {
   AMPIAPI("AMPI_MigrateTo");
@@ -1698,6 +1724,11 @@ CDECL void AMPI_Migrateto(int destPE)
 #if CMK_BLUEGENE_CHARM
   TRACE_BG_AMPI_START(getAmpiInstance(MPI_COMM_WORLD)->getThread(), "AMPI_MIGRATETO")
 #endif
+}
+
+CDECL void AMPI_MigrateTo(int destPE)
+{
+	AMPI_Migrateto(destPE);
 }
 
 CDECL void AMPI_Async_Migrate(void)
@@ -1949,6 +1980,7 @@ const int MPI_REDUCE_SOURCE=0;
 const int MPI_REDUCE_COMM=MPI_COMM_WORLD;
 void ampi::reduceResult(CkReductionMsg *msg)
 {
+	MSG_ORDER_DEBUG(printf("[%d] reduceResult called \n",thisIndex));
   ampi::sendraw(MPI_REDUCE_TAG, MPI_REDUCE_SOURCE, msg->getData(), msg->getSize(),
              thisArrayID,thisIndex);
   delete msg;
@@ -1994,6 +2026,7 @@ int AMPI_Reduce(void *inbuf, void *outbuf, int count, int type, MPI_Op op,
   int rootIdx=ptr->comm2CommStruct(comm).getIndexForRank(root);
   CkCallback reduceCB(CkIndex_ampi::reduceResult(0),CkArrayIndex1D(rootIdx),ptr->getProxy(),true);
   msg->setCallback(reduceCB);
+	MSG_ORDER_DEBUG(CkPrintf("[%d] AMPI_Reduce called on comm %d root %d \n",ptr->thisIndex,comm,rootIdx));
   ptr->contribute(msg);
   if (ptr->thisIndex == rootIdx){
     /*HACK: Use recv() to block until reduction data comes back*/
@@ -2255,27 +2288,27 @@ inline void sortedIndex(int n, int* arr, int* idx){
       if (arr[idx[j+1]] < arr[idx[j]]) 
 	swapInt(idx[j+1],idx[j]);
 }
-CkVec<CkVec<int> > vecIndex(int count, int* arr){
+CkVec<CkVec<int> > *vecIndex(int count, int* arr){
   CkAssert(count!=0);
   int *newidx = new int [count];
   int flag;
   sortedIndex(count,arr,newidx);
-  CkVec<CkVec<int> > vec;
+  CkVec<CkVec<int> > *vec = new CkVec<CkVec<int> >;
   CkVec<int> slot;
-  slot.push_back(newidx[0]);
-  vec.push_back(slot);
+  vec->push_back(slot);
+  (*vec)[0].push_back(newidx[0]);
   for(int i=1;i<count;i++){
     flag=0;
-    for(int j=0;j<vec.size();j++){
-      if(matchReq(arr[newidx[i]],arr[(vec[j])[0]])){
-        (vec[j]).push_back(newidx[i]);
+    for(int j=0;j<vec->size();j++){
+      if(matchReq(arr[newidx[i]],arr[((*vec)[j])[0]])){
+        ((*vec)[j]).push_back(newidx[i]);
 	flag++;
       }
     }
     if(!flag){
       CkVec<int> newslot;
       newslot.push_back(newidx[i]);
-      vec.push_back(newslot);
+      vec->push_back(newslot);
     }else{
       CkAssert(flag==1);
     }
@@ -2355,16 +2388,24 @@ int AMPI_Waitall(int count, MPI_Request request[], MPI_Status sts[])
   AMPIAPI("AMPI_Waitall");
   if(count==0) return MPI_SUCCESS;
   checkRequests(count,request);
-  int i,j;
+  int i,j,oldPe;
   AmpiRequestList* reqs = getReqs();
-  CkVec<CkVec<int> > reqvec = vecIndex(count,request);
-  for(i=0;i<reqvec.size();i++){
-    for(j=0;j<(reqvec[i]).size();j++){
-      if(request[(reqvec[i])[j]] == MPI_REQUEST_NULL){
-        stsempty(sts[(reqvec[i])[j]]);
+  CkVec<CkVec<int> > *reqvec = vecIndex(count,request);
+  for(i=0;i<reqvec->size();i++){
+    for(j=0;j<((*reqvec)[i]).size();j++){
+      if(request[((*reqvec)[i])[j]] == MPI_REQUEST_NULL){
+        stsempty(sts[((*reqvec)[i])[j]]);
         continue;
       }
-      (*reqs)[request[(reqvec[i])[j]]]->wait(&sts[(reqvec[i])[j]]);
+			oldPe = CkMyPe();
+			AmpiRequest *waitReq = ((*reqs)[request[((*reqvec)[i])[j]]]);
+      waitReq->wait(&sts[((*reqvec)[i])[j]]);
+			if(oldPe != CkMyPe()){
+#if 1
+			reqs = getReqs();
+			reqvec  = vecIndex(count,request);
+#endif
+			}
     }
   }
 #if CMK_BLUEGENE_CHARM
@@ -2379,6 +2420,7 @@ int AMPI_Waitall(int count, MPI_Request request[], MPI_Status sts[])
       request[i] = MPI_REQUEST_NULL;
     }
   }
+	delete reqvec;
   return 0;
 }
 
@@ -2395,12 +2437,12 @@ int AMPI_Waitany(int count, MPI_Request *request, int *idx, MPI_Status *sts)
     return MPI_SUCCESS;
   }
   int flag=0;
-  CkVec<CkVec<int> > reqvec = vecIndex(count,request);
+  CkVec<CkVec<int> > *reqvec = vecIndex(count,request);
   while(count>0){ /* keep looping until some request finishes: */
-    for(int i=0;i<reqvec.size();i++){
-      AMPI_Test(&request[(reqvec[i])[0]], &flag, sts);
+    for(int i=0;i<reqvec->size();i++){
+      AMPI_Test(&request[((*reqvec)[i])[0]], &flag, sts);
       if(flag == 1 && sts->MPI_COMM != 0){ // to skip MPI_REQUEST_NULL
-        *idx = (reqvec[i])[0];
+        *idx = ((*reqvec)[i])[0];
   	USER_CALL_DEBUG("AMPI_Waitany returning "<<*idx);
         return 0;
       }
@@ -2410,6 +2452,7 @@ int AMPI_Waitany(int count, MPI_Request *request, int *idx, MPI_Status *sts)
   }
   *idx = MPI_UNDEFINED;
   USER_CALL_DEBUG("AMPI_Waitany returning UNDEFINED");
+	delete reqvec;
   return 0;
 }
 
@@ -2426,13 +2469,13 @@ int AMPI_Waitsome(int incount, MPI_Request *array_of_requests, int *outcount,
   MPI_Status sts;
   int i;
   int flag=0, realflag=0;
-  CkVec<CkVec<int> > reqvec = vecIndex(incount,array_of_requests);
+  CkVec<CkVec<int> > *reqvec = vecIndex(incount,array_of_requests);
   *outcount = 0;
   while(1){
-    for(i=0;i<reqvec.size();i++){
-      AMPI_Test(&array_of_requests[(reqvec[i])[0]], &flag, &sts);
+    for(i=0;i<reqvec->size();i++){
+      AMPI_Test(&array_of_requests[((*reqvec)[i])[0]], &flag, &sts);
       if(flag == 1){ 
-        array_of_indices[(*outcount)]=(reqvec[i])[0];
+        array_of_indices[(*outcount)]=((*reqvec)[i])[0];
 	array_of_statuses[(*outcount)++]=sts;
         if(sts.MPI_COMM != 0)
 	  realflag=1; // there is real(non null) request
@@ -2440,6 +2483,7 @@ int AMPI_Waitsome(int incount, MPI_Request *array_of_requests, int *outcount,
     }
     if(realflag && outcount>0) break;
   }
+	delete reqvec;
   return 0;
 }
 
@@ -2511,16 +2555,17 @@ int AMPI_Testany(int count, MPI_Request *request, int *index, int *flag, MPI_Sta
     stsempty(*sts);
     return MPI_SUCCESS;
   }
-  CkVec<CkVec<int> > reqvec = vecIndex(count,request);
+  CkVec<CkVec<int> > *reqvec = vecIndex(count,request);
   *flag=0;
-  for(int i=0;i<reqvec.size();i++){
-    AMPI_Test(&request[(reqvec[i])[0]], flag, sts);
+  for(int i=0;i<reqvec->size();i++){
+    AMPI_Test(&request[((*reqvec)[i])[0]], flag, sts);
     if(*flag==1 && sts->MPI_COMM!=0){ // skip MPI_REQUEST_NULL
-      *index = (reqvec[i])[0];
+      *index = ((*reqvec)[i])[0];
       return 0;
     }
   }
   *index = MPI_UNDEFINED;
+	delete reqvec;
   return 0;
 }
 
@@ -2533,18 +2578,19 @@ int AMPI_Testall(int count, MPI_Request *request, int *flag, MPI_Status *sts)
   int tmpflag;
   int i,j;
   AmpiRequestList* reqs = getReqs();
-  CkVec<CkVec<int> > reqvec = vecIndex(count,request);
+  CkVec<CkVec<int> > *reqvec = vecIndex(count,request);
   *flag = 1;  
-  for(i=0;i<reqvec.size();i++){
-    for(j=0;j<(reqvec[i]).size();j++){
-      if(request[(reqvec[i])[j]] == MPI_REQUEST_NULL)
+  for(i=0;i<reqvec->size();i++){
+    for(j=0;j<((*reqvec)[i]).size();j++){
+      if(request[((*reqvec)[i])[j]] == MPI_REQUEST_NULL)
         continue;
-      tmpflag = (*reqs)[request[(reqvec[i])[j]]]->test(&sts[(reqvec[i])[j]]);
+      tmpflag = (*reqs)[request[((*reqvec)[i])[j]]]->test(&sts[((*reqvec)[i])[j]]);
       *flag *= tmpflag;
     }
   }
   if(flag) 
     MPI_Waitall(count,request,sts);
+	delete reqvec;	
   return 0;
 }
 
@@ -2561,15 +2607,16 @@ int AMPI_Testsome(int incount, MPI_Request *array_of_requests, int *outcount,
   MPI_Status sts;
   int flag;
   int i;
-  CkVec<CkVec<int> > reqvec = vecIndex(incount,array_of_requests);
+  CkVec<CkVec<int> > *reqvec = vecIndex(incount,array_of_requests);
   *outcount = 0;
-  for(i=0;i<reqvec.size();i++){
-    AMPI_Test(&array_of_requests[(reqvec[i])[0]], &flag, &sts);
+  for(i=0;i<reqvec->size();i++){
+    AMPI_Test(&array_of_requests[((*reqvec)[i])[0]], &flag, &sts);
     if(flag == 1){
-      array_of_indices[(*outcount)]=(reqvec[i])[0];
+      array_of_indices[(*outcount)]=((*reqvec)[i])[0];
       array_of_statuses[(*outcount)++]=sts;
     }
   }
+	delete reqvec;
   return 0;
 }
 

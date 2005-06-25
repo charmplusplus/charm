@@ -73,8 +73,7 @@ void RotateLB::work (BaseLB::LDStats *stats, int count)
       }
       if (dest != stats->from_proc[obj]) {
 	stats->to_proc[obj] = dest;
-        //CkPrintf ("[%d] Object %d is migrating from PE %d to PE %d\n",
-	//          CkMyPe (), obj, stats->from_proc[obj], dest);
+   //     CkPrintf ("[%d] Object %d is migrating from PE %d to PE %d\n",CkMyPe (), obj, stats->from_proc[obj], dest);
       }
     }
   }

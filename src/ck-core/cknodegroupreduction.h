@@ -147,7 +147,10 @@ public:
 	void RecvMsg(CkReductionMsg *m);
 	void doRecvMsg(CkReductionMsg *m);
 
-        virtual void flushStates();	// flush state varaibles
+  virtual void flushStates();	// flush state varaibles
+	virtual void startLocalGroupReductions(int number){}; // can be used to start reductions on all the 
+	//CkReductionMgrs on a particular node. It is overwritten by CkArrayReductionMgr to make the actual calls
+	// since it knows the CkReductionMgrs on a node.
 
 private:
 //Data members
@@ -175,6 +178,9 @@ private:
 
 	int interrupt; /* flag for use in non-smp 0 means interrupt can occur 1 means not (also acts as a lock)*/
 
+	/*vector storing the children of this node*/
+	CkVec<int> kids;
+	
 //State:
 	void startReduction(int number,int srcPE);
 	void doAddContribution(CkReductionMsg *m);
@@ -188,10 +194,12 @@ private:
 	unsigned label;
 	int parent;
 	int numKids;
-	int *kids;
+//	int *kids;
 	void init_BinomialTree();
 
-	enum {TREE_WID=4};
+	
+	void init_BinaryTree();
+	enum {TREE_WID=2};
 	int treeRoot(void);//Root PE
 	CmiBool hasParent(void);
 	int treeParent(void);//My parent PE
@@ -206,10 +214,35 @@ private:
 	CmiBool isPresent(int num) const {return (CmiBool)(num==redNo);}
 	CmiBool isFuture(int num) const {return (CmiBool)(num>redNo);}
 
+	/*FAULT_EVAC*/
+	bool oldleaf;
+	bool blocked;
+	int newParent;
+	CkVec<int> newKids;
+	CkMsgQ<CkReductionMsg> bufferedMsgs;
+	CkMsgQ<CkReductionMsg> bufferedRemoteMsgs;
+	enum {OLDPARENT,OLDCHILDREN,NEWPARENT,LEAFPARENT};
+	int numModificationReplies;
+	int maxModificationRedNo;
+	int tempModificationRedNo;
+	bool readyDeletion;
+	int killed;	
+	
 //Checkpointing utilities
  public:
 	virtual void pup(PUP::er &p);
-
+	/*FAULT_EVAC*/
+	virtual void evacuate();
+	virtual void doneEvacuate();
+	void DeleteChild(int deletedChild);
+	void DeleteNewChild(int deletedChild);
+	void collectMaxRedNo(int maxRedNo);
+	void unblockNode(int maxRedNo);
+	void modifyTree(int code,int size,int *data);
+private:	
+	int findMaxRedNo();
+	void updateTree();
+	void clearBlockedMsgs();
 };
 
 

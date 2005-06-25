@@ -9,7 +9,7 @@ Orion Sky Lawlor, olawlor@acm.org, 11/19/2001
 
 #if 0
     /*Many debugging statements:*/
-#    define DBG(x) ckout<<"["<<thisIndex<<"] TCHARM> "<<x<<endl;
+#    define DBG(x) ckout<<"["<<thisIndex<<","<<CkMyPe()<<"] TCHARM> "<<x<<endl;
 #    define DBGX(x) ckout<<"PE("<<CkMyPe()<<") TCHARM> "<<x<<endl;
 #else
     /*No debugging statements*/
@@ -144,6 +144,8 @@ TCharm::TCharm(TCharmInitMsg *initMsg_)
   CtvAccessOther(tid,_curTCharm)=this;
   isStopped=true;
   resumeAfterMigration=false;
+	/* FAULT_EVAC*/
+	AsyncEvacuate(CmiTrue);
   skipResume=false;
   exitWhenDone=initMsg->opts.exitWhenDone;
   threadInfo.tProxy=CProxy_TCharm(thisArrayID);
@@ -165,6 +167,7 @@ TCharm::TCharm(CkMigrateMessage *msg)
   tid=NULL;
   threadGlobals=NULL;
   threadInfo.tProxy=CProxy_TCharm(thisArrayID);
+	AsyncEvacuate(CmiTrue);
   heapBlocks=0;
 }
 
@@ -192,8 +195,9 @@ void TCharm::pup(PUP::er &p) {
 
 #ifndef CMK_OPTIMIZE
   DBG("Packing thread");
-  if (!isStopped)
+  if (!isStopped && !CmiMemoryIs(CMI_MEMORY_IS_ISOMALLOC)){
     CkAbort("Cannot pup a running thread.  You must suspend before migrating.\n");
+	}	
   if (tcharm_nomig) CkAbort("Cannot migrate with the +tcharm_nomig option!\n");
 #endif
 
@@ -293,7 +297,7 @@ void TCharm::migrateTo(int destPE) {
 	if (destPE==CkMyPe()) return;
 	// Make sure migrateMe gets called *after* we suspend:
 	thisProxy[thisIndex].migrateDelayed(destPE);
-	resumeAfterMigration=true;
+//	resumeAfterMigration=true;
 	suspend();
 }
 void TCharm::migrateDelayed(int destPE) {
@@ -302,9 +306,21 @@ void TCharm::migrateDelayed(int destPE) {
 void TCharm::ckJustMigrated(void) {
 	ArrayElement::ckJustMigrated();
 	if (resumeAfterMigration) {
-		resumeAfterMigration=false;
+	 	resumeAfterMigration=false;
 		resume(); //Start the thread running
 	}
+}
+
+/*
+	FAULT_EVAC
+
+	If a Tcharm object is about to migrate it should be suspended first
+*/
+void TCharm::ckAboutToMigrate(void){
+	ArrayElement::ckAboutToMigrate();
+	resumeAfterMigration = true;
+	isStopped = true;
+//	suspend();
 }
 
 // clear the data before restarting from disk
@@ -354,7 +370,7 @@ void TCharm::stop(void)
   isStopped=true;
   DBG("thread suspended");
   CthSuspend();
-  DBG("thread resumed");
+// 	DBG("thread resumed");
   /*SUBTLE: We have to do the get() because "this" may have changed
     during a migration-suspend.  If you access *any* members
     from this point onward, you'll cause heap corruption if
@@ -363,6 +379,7 @@ void TCharm::stop(void)
   TCharm *dis=TCharm::get();
   dis->isStopped=false;
   dis->startTiming();
+//	printf("[%d] Thread resumed  for tid %p\n",dis->thisIndex,dis->tid);
 }
 
 //Resume the waiting thread
@@ -391,6 +408,23 @@ void TCharm::migrate(void)
 #else
   DBG("skipping sync, because there is no load balancer");
 #endif
+}
+
+
+void TCharm::evacuate(){
+	/*
+		FAULT_EVAC
+	*/
+	//CkClearAllArrayElementsCPP();
+	if(CpvAccess(startedEvac)){
+		int nextPE = getNextPE(CkArrayIndex1D(thisIndex));
+//		resumeAfterMigration=true;
+		CcdCallFnAfter((CcdVoidFn)CkEmmigrateElement, (void *)myRec, 1);
+		suspend();
+		return;
+	}
+	return;
+
 }
 
 //calls atsync with async mode
@@ -721,6 +755,13 @@ CDECL void TCHARM_Migrate_to(int destPE)
 	TCHARMAPI("TCHARM_Migrate_to");
 	TCharm::get()->migrateTo(destPE);
 }
+
+CDECL void TCHARM_Evacuate()
+{
+	TCHARMAPI("TCHARM_Migrate_to");
+	TCharm::get()->evacuate();
+}
+
 FORTRAN_AS_C(TCHARM_MIGRATE_TO,TCHARM_Migrate_to,tcharm_migrate_to,
 	(int *destPE),(*destPE))
 

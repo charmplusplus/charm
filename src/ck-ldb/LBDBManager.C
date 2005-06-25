@@ -483,7 +483,7 @@ void LocalBarrier::CheckBarrier()
     for(int i=0; i < max_client; i++)
       if (clients[i] != 0 && ((client*)clients[i])->refcount >= cur_refcount)
 	at_barrier = CmiTrue;
-
+		
     if (at_barrier) {
       at_count -= client_count;
       cur_refcount++;

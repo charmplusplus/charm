@@ -45,7 +45,7 @@ static const char *idx2str(const CkArrayMessage *m)
 #   define DEBS(x) CkPrintf x  //Send/recv/broadcast debug messages
 #   define DEBM(x) CkPrintf x  //Migration debug messages
 #   define DEBL(x) CkPrintf x  //Load balancing debug messages
-#   define DEBK(x) CkPrintf x  //Spring Cleaning debug messages
+#   define DEBK(x) //CkPrintf x  //Spring Cleaning debug messages
 #   define DEBB(x) CkPrintf x  //Broadcast debug messages
 #   define AA "LocMgr on %d: "
 #   define AB ,CkMyPe()
@@ -60,6 +60,9 @@ static const char *idx2str(const CkArrayMessage *m)
 #   define DEBB(x) /*CkPrintf x*/
 #   define str(x) /**/
 #endif
+
+
+extern "C" void __dbgcheckMessageHandler();
 
 
 #if CMK_LBDB_ON
@@ -188,14 +191,23 @@ public:
 #if 1
     if (i.nInts==1) {
       //Map 1D integer indices in simple round-robin fashion
-      return (i.data()[0])%CkNumPes();
+      int ans= (i.data()[0])%CkNumPes();
+			while(!CkpvAccess(_validProcessors)[ans] || (ans == CkMyPe() && CpvAccess(startedEvac))){
+				ans = (ans +1 )%CkNumPes();
+			}
+			return ans;
     }
     else 
 #endif
       {
 	//Map other indices based on their hash code, mod a big prime.
-	unsigned int hash=(i.hash()+739)%1280107;
-	return (hash % CkNumPes());
+			unsigned int hash=(i.hash()+739)%1280107;
+			int ans = (hash % CkNumPes());
+			while(!CkpvAccess(_validProcessors)[ans]){
+				ans = (ans +1 )%CkNumPes();
+			}
+			return ans;
+
       }
   }
 };
@@ -554,6 +566,10 @@ void CkMigratable::commonInit(void) {
 	thisChareType=i.chareType;
 	usesAtSync=CmiFalse;
 	barrierRegistered=CmiFalse;
+	/*
+	FAULT_EVAC
+	*/
+	AsyncEvacuate(CmiTrue);
 }
 
 CkMigratable::CkMigratable(void) {
@@ -576,6 +592,12 @@ void CkMigratable::pup(PUP::er &p) {
 	if (p.isUnpacking()) myRec->ReadyMigrate(readyMigrate);
 #endif
 	if(p.isUnpacking()) barrierRegistered=CmiFalse;
+	/*
+		FAULT_EVAC
+	*/
+	p | asyncEvacuate;
+	if(p.isUnpacking()){myRec->AsyncEvacuate(asyncEvacuate);}
+	
 	ckFinishConstruction();
 }
 
@@ -588,6 +610,7 @@ void CkMigratable::ckAboutToMigrate(void) { }
 void CkMigratable::ckJustMigrated(void) { }
 
 CkMigratable::~CkMigratable() {
+	__dbgcheckMessageHandler();
 	DEBC((AA"In CkMigratable::~CkMigratable %s\n"AB,idx2str(thisIndexMax)));
 #if CMK_OUT_OF_CORE
 	isInCore=CmiFalse;
@@ -613,6 +636,7 @@ CkMigratable::~CkMigratable() {
 #endif
 	//To detect use-after-delete
 	thisIndexMax.nInts=-123456;
+	__dbgcheckMessageHandler();
 }
 
 void CkMigratable::CkAbort(const char *why) const {
@@ -756,32 +780,41 @@ CkLocRec_local::CkLocRec_local(CkLocMgr *mgr,CmiBool fromMigration,
 	nextPe = -1;
 	asyncMigrate = CmiFalse;
 	readyMigrate = CmiTrue;
+	bounced  = CmiFalse;
 	the_lbdb=mgr->getLBDB();
 	ldHandle=the_lbdb->RegisterObj(mgr->getOMHandle(),
 		idx2LDObjid(idx),(void *)this,1);
 	if (fromMigration) {
 		DEBL((AA"Element %s migrated in\n"AB,idx2str(idx)));
-		the_lbdb->Migrated(ldHandle, !ignoreArrival);
-		if (ignoreArrival)  {
+		if (!ignoreArrival)  {
+			the_lbdb->Migrated(ldHandle, CmiTrue);
 		  // load balancer should ignore this objects movement
-		  AsyncMigrate(CmiTrue);
+		//  AsyncMigrate(CmiTrue);
 		}
 	}
 #endif
+	/*
+		FAULT_EVAC
+	*/
+	asyncEvacuate = CmiTrue;
 }
 CkLocRec_local::~CkLocRec_local()
 {
 	if (deletedMarker!=NULL) *deletedMarker=CmiTrue;
+	__dbgcheckMessageHandler();
 	myLocMgr->reclaim(idx,localIdx);
+	__dbgcheckMessageHandler();
 #if CMK_LBDB_ON
 	stopTiming();
 	DEBL((AA"Unregistering element %s from load balancer\n"AB,idx2str(idx)));
 	the_lbdb->UnregisterObj(ldHandle);
 #endif
+	__dbgcheckMessageHandler();
 }
 void CkLocRec_local::migrateMe(int toPe) //Leaving this processor
 {
 	//This will pack us up, send us off, and delete us
+//	printf("[%d] migrating migrateMe to %d \n",CkMyPe(),toPe);
 	myLocMgr->emigrate(this,toPe);
 }
 
@@ -1049,13 +1082,23 @@ public:
   
 	//Send a message for this element.
 	virtual CmiBool deliver(CkArrayMessage *msg,CkDeliver_t type,int opts=0) {
+		/*FAULT_EVAC*/
+		int destPE = onPe;
+		if((!CpvAccess(_validProcessors)[onPe] && onPe != allowMessagesOnly)){
+//			printf("Delivery failed because process %d is invalid\n",onPe);
+			/*
+				Send it to its home processor instead
+			*/
+			const CkArrayIndex &idx=msg->array_index();
+			destPE = getNextPE(idx);
+		}
 		access();//Update our modification date
 		msg->array_hops()++;
 		DEBS((AA"   Forwarding message for element %s to %d (REMOTE)\n"AB,
-		      idx2str(msg->array_index()),onPe));
+		      idx2str(msg->array_index()),destPE));
 		if (opts & CK_MSG_KEEP)
 			msg = (CkArrayMessage *)CkCopyMsg((void **)&msg);
-		CkArrayManagerDeliver(onPe,msg,opts);
+		CkArrayManagerDeliver(destPE,msg,opts);
 		return CmiTrue;
 	}
 	//Return if this element is now obsolete
@@ -1332,6 +1375,10 @@ void CkLocMgr::inform(const CkArrayIndex &idx,int nowOnPe)
 	CkLocRec *rec=elementNrec(idx);
 	if (rec!=NULL && rec->type()==CkLocRec::local)
 		return; //Never replace a local element's record!
+		/*
+			FAULT_EVAC
+		*/
+	//	CmiAssert(CpvAccess(_validProcessors)[nowOnPe]);
 	insertRemote(idx,nowOnPe);
 }
 
@@ -1412,7 +1459,9 @@ void CkLocMgr::reclaim(const CkArrayIndex &idx,int localIdx) {
 	DEBC((AA"Destroying element %s (local %d)\n"AB,idx2str(idx),localIdx));
 	//Delete, and mark as empty, each array element
 	for (ManagerRec *m=firstManager;m!=NULL;m=m->next) {
+		__dbgcheckMessageHandler();
 		delete m->elts.get(localIdx);
+		__dbgcheckMessageHandler();
 		m->elts.empty(localIdx);
 	}
 	
@@ -1458,6 +1507,7 @@ void CkLocMgr::removeFromTable(const CkArrayIndex &idx) {
 /************************** LocMgr: MESSAGING *************************/
 /// Deliver message to this element, going via the scheduler if local
 void CkLocMgr::deliver(CkMessage *m,CkDeliver_t type,int opts) {
+	DEBS((AA"deliver \n"AB));
 	CK_MAGICNUMBER_CHECK
 	CkArrayMessage *msg=(CkArrayMessage *)m;
 	const CkArrayIndex &idx=msg->array_index();
@@ -1465,6 +1515,11 @@ void CkLocMgr::deliver(CkMessage *m,CkDeliver_t type,int opts) {
 	if (type==CkDeliver_queue)
 		_TRACE_CREATION_DETAILED(UsrToEnv(m),msg->array_ep());
 	CkLocRec *rec=elementNrec(idx);
+	if(rec != NULL){
+		DEBS((AA"deliver %s of type %d \n"AB,idx2str(idx),rec->type()));
+	}else{
+		DEBS((AA"deliver %s rec is null\n"AB,idx2str(idx)));
+	}
 #if CMK_LBDB_ON
 	if (type==CkDeliver_queue) {
 		if (!(opts & CK_MSG_LB_NOTRACE)) {
@@ -1473,8 +1528,19 @@ void CkLocMgr::deliver(CkMessage *m,CkDeliver_t type,int opts) {
 		}
 	}
 #endif
-	if (rec!=NULL) rec->deliver(msg,type,opts);
-	else /* rec==NULL*/ {
+	/**FAULT_EVAC*/
+	if (rec!=NULL){
+		CmiBool result = rec->deliver(msg,type,opts);
+		if(!result){
+		/*	//DEBS((AA"deliver %s failed type %d \n"AB,idx2str(idx),rec->type()));
+			DEBS((AA"deliver %s failed \n"AB,idx2str(idx)));
+			if(rec->type() == CkLocRec::remote){
+				if (opts & CK_MSG_KEEP)
+					msg = (CkArrayMessage *)CkCopyMsg((void **)&msg);
+				deliverUnknown(msg,type);
+			}*/
+		}
+	}else /* rec==NULL*/ {
 		if (opts & CK_MSG_KEEP)
 			msg = (CkArrayMessage *)CkCopyMsg((void **)&msg);
 		deliverUnknown(msg,type);
@@ -1489,7 +1555,7 @@ CmiBool CkLocMgr::deliverUnknown(CkArrayMessage *msg,CkDeliver_t type)
 	int onPe=homePe(idx);
 	if (onPe!=CkMyPe()) 
 	{// Forward the message to its home processor
-		DEBM((AA"Forwarding message for unknown %s\n"AB,idx2str(idx)));
+		DEBM((AA"Forwarding message for unknown %s to home %d \n"AB,idx2str(idx),onPe));
 		msg->array_hops()++;
 		CkArrayManagerDeliver(onPe,msg);
 		return CmiTrue;
@@ -1658,6 +1724,14 @@ void CkLocMgr::emigrate(CkLocRec_local *rec,int toPe)
 {
 	CK_MAGICNUMBER_CHECK
 	if (toPe==CkMyPe()) return; //You're already there!
+	/*
+		FAULT_EVAC
+		if the toProcessor is already marked as invalid, dont emigrate
+		Shouldn't happen but might
+	*/
+	if(!(CkpvAccess(_validProcessors)[toPe])){
+		return;
+	}
 
 	int localIdx=rec->getLocalIndex();
 	CkArrayIndexMax idx=rec->getIndex();
@@ -1672,6 +1746,8 @@ void CkLocMgr::emigrate(CkLocRec_local *rec,int toPe)
 
 	//Let all the elements know we're leaving
 	callMethod(rec,&CkMigratable::ckAboutToMigrate);
+	/*EVAC*/
+	__dbgcheckMessageHandler();
 
 //First pass: find size of migration message
 	int bufSize;
@@ -1681,7 +1757,9 @@ void CkLocMgr::emigrate(CkLocRec_local *rec,int toPe)
 		pupElementsFor(p,rec,CkElementCreation_migrate);
 		bufSize=p.size(); 
 	}
-	
+		/*EVAC*/
+	__dbgcheckMessageHandler();
+
 //Allocate and pack into message
 	int doubleSize=bufSize/sizeof(double)+1;
 	CkArrayElementMigrateMessage *msg = 
@@ -1691,6 +1769,10 @@ void CkLocMgr::emigrate(CkLocRec_local *rec,int toPe)
 #if CMK_LBDB_ON
 	msg->ignoreArrival = rec->isAsyncMigrate()?1:0;
 #endif
+	/*
+		FAULT_EVAC
+	*/
+	msg->bounced = rec->isBounced();
 	{
 		PUP::toMem p(msg->packData); 
 		p.becomeDeleting(); 
@@ -1703,16 +1785,26 @@ void CkLocMgr::emigrate(CkLocRec_local *rec,int toPe)
 			CkAbort("Array element's pup routine has a direction mismatch.\n");
 		}
 	}
-	DEBM((AA"Migrated index size %s\n"AB,idx2str(idx)));	
+		/*EVAC*/
+	__dbgcheckMessageHandler();
+
+	DEBM((AA"Migrated index size %s to %d \n"AB,idx2str(idx),toPe));	
 
 //Send off message and delete old copy
+	__dbgcheckMessageHandler();
 	thisProxy[toPe].immigrate(msg);
+	__dbgcheckMessageHandler();
 	duringMigration=CmiTrue;
+	__dbgcheckMessageHandler();
 	delete rec; //Removes elements, hashtable entries, local index
+	
+	__dbgcheckMessageHandler();
+	
 	duringMigration=CmiFalse;
 	//The element now lives on another processor-- tell ourselves and its home
 	inform(idx,toPe);
 	informHome(idx,toPe);
+	CK_MAGICNUMBER_CHECK
 }
 
 /**
@@ -1722,6 +1814,7 @@ void CkLocMgr::immigrate(CkArrayElementMigrateMessage *msg)
 {
 	CkArrayMessage *amsg=(CkArrayMessage *)msg;
 	const CkArrayIndex &idx=msg->idx;
+		
 	PUP::fromMem p(msg->packData); 
 	
 	int nMsgMan;
@@ -1749,9 +1842,38 @@ void CkLocMgr::immigrate(CkArrayElementMigrateMessage *msg)
 		
 		CkAbort("Array element's pup routine has a direction mismatch.\n");
 	}
+	/*
+		FAULT_EVAC
+			if this element came in as a result of being bounced off some other process,
+			then it needs to be resumed. It is assumed that it was bounced because load 
+			balancing caused it to move into a processor which later crashed
+	*/
+	if(msg->bounced){
+		callMethod(rec,&CkMigratable::ResumeFromSync);
+	}
 	
 	//Let all the elements know we've arrived
 	callMethod(rec,&CkMigratable::ckJustMigrated);
+	/*FAULT_EVAC
+		If this processor has started evacuating array elements on it 
+		dont let new immigrants in. If they arrive send them to what
+		would be their correct homePE.
+		Leave a record here mentioning the processor where it got sent
+	*/
+	
+	if(CpvAccess(startedEvac)){
+		int newhomePE = getNextPE(idx);
+		DEBM((AA"Migrated into failed processor index size %s resent to %d \n"AB,idx2str(idx),newhomePE));	
+		CkLocMgr *mgr = rec->getLocMgr();
+		int targetPE=getNextPE(idx);
+		//set this flag so that load balancer is not informed when
+		//this element migrates
+		rec->AsyncMigrate(CmiTrue);
+		rec->Bounced(CmiTrue);
+		mgr->emigrate(rec,targetPE);
+		
+	}
+
 	delete msg;
 }
 
@@ -1786,13 +1908,23 @@ CkMigratable *CkLocMgr::lookup(const CkArrayIndex &idx,CkArrayID aid) {
 	else return rec->lookupElement(aid);
 }
 //"Last-known" location (returns a processor number)
-int CkLocMgr::lastKnown(const CkArrayIndex &idx) const {
+int CkLocMgr::lastKnown(const CkArrayIndex &idx) {
 	CkLocMgr *vthis=(CkLocMgr *)this;//Cast away "const"
 	CkLocRec *rec=vthis->elementNrec(idx);
 	int pe=-1;
 	if (rec!=NULL) pe=rec->lookupProcessor();
 	if (pe==-1) return homePe(idx);
-	else return pe;
+	else{
+		/*
+			FAULT_EVAC
+			if the lastKnownPE is invalid return homePE and delete this record
+		*/
+		if(!(CkpvAccess(_validProcessors)[pe])){
+			removeFromTable(idx);
+			return homePe(idx);
+		}
+		return pe;
+	}	
 }
 /// Return true if this array element lives on another processor
 bool CkLocMgr::isRemote(const CkArrayIndex &idx,int *onPe) const

@@ -57,6 +57,8 @@ Orion Sky Lawlor, olawlor@acm.org
 #include "LBDatabase.h"
 #endif // CMK_LBDB_ON
 
+CpvDeclare(int ,serializer);
+
 /************************** Debugging Utilities **************/
 
 //For debugging: convert given index to a string (NOT threadsafe)
@@ -370,6 +372,7 @@ CkArrayID CProxy_ArrayBase::ckCreateArray(CkArrayMessage *m,int ctor,
   CkMarshalledMessage marsh(m);
   CProxy_CkArrayReductionMgr nodereductionProxy = CProxy_CkArrayReductionMgr::ckNew();
   CkGroupID ag=CProxy_CkArray::ckNew(opts,marsh,nodereductionProxy);
+	nodereductionProxy.setAttachedGroup(ag);
   return (CkArrayID)ag;
 }
 CkArrayID CProxy_ArrayBase::ckCreateEmptyArray(void)
@@ -841,9 +844,9 @@ void CProxy_ArrayBase::ckBroadcast(CkArrayMessage *msg, int ep, int opts) const
 	else 
 	{ //Broadcast message via serializer node
 	  _TRACE_CREATION_DETAILED(UsrToEnv(msg), ep);
- 	  int skipsched = opts & CK_MSG_EXPEDITED;
-	  int serializer=0;//1623802937%CkNumPes();
-	  if (CkMyPe()==serializer)
+ 	  int skipsched = opts & CK_MSG_EXPEDITED; 
+	  //int serializer=0;//1623802937%CkNumPes();
+	  if (CkMyPe()==CpvAccess(serializer))
 	  {
 		DEBB((AA"Sending array broadcast\n"AB));
 		if (skipsched)
@@ -851,12 +854,12 @@ void CProxy_ArrayBase::ckBroadcast(CkArrayMessage *msg, int ep, int opts) const
 		else
 			CProxy_CkArray(_aid).recvBroadcast(msg);
 	  } else {
-		DEBB((AA"Forwarding array broadcast to serializer node %d\n"AB,serializer));
+		DEBB((AA"Forwarding array broadcast to serializer node %d\n"AB,CpvAccess(serializer)));
 		CProxy_CkArray ap(_aid);
 		if (skipsched)
-			ap[serializer].sendExpeditedBroadcast(msg);
+			ap[CpvAccess(serializer)].sendExpeditedBroadcast(msg);
 		else
-			ap[serializer].sendBroadcast(msg);
+			ap[CpvAccess(serializer)].sendBroadcast(msg);
 	  }
 	}
 }
@@ -865,8 +868,12 @@ void CProxy_ArrayBase::ckBroadcast(CkArrayMessage *msg, int ep, int opts) const
 void CkArray::sendBroadcast(CkMessage *msg)
 {
 	CK_MAGICNUMBER_CHECK
-	//Broadcast the message to all processors
-	thisProxy.recvBroadcast(msg);
+	if(CkMyPe() == CpvAccess(serializer)){
+		//Broadcast the message to all processors
+		thisProxy.recvBroadcast(msg);
+	}else{
+		thisProxy[CpvAccess(serializer)].sendBroadcast(msg);
+	}
 }
 void CkArray::sendExpeditedBroadcast(CkMessage *msg)
 {

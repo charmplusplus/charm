@@ -496,7 +496,9 @@ void _createGroup(CkGroupID groupID, envelope *env)
   int gIdx = _entryTable[epIdx]->chareIdx;  
   CkNodeGroupID rednMgr;
   if(_chareTable[gIdx]->isIrr == 0){
-	rednMgr = CProxy_CkArrayReductionMgr::ckNew();
+		CProxy_CkArrayReductionMgr rednMgrProxy = CProxy_CkArrayReductionMgr::ckNew();
+		rednMgr = rednMgrProxy;
+		rednMgrProxy.setAttachedGroup(groupID);
   }else{
 	rednMgr.setZero();
   }
@@ -916,8 +918,16 @@ static void _skipCldHandler(void *converseMsg)
   	(unsigned int *)env->getPrioPtr());
 }
 
+extern "C" void __dbgcheckMessageHandler();
+
 static void _skipCldEnqueue(int pe,envelope *env, int infoFn)
 {
+	if(pe == CkMyPe() ){
+		if(!CkpvAccess(_validProcessors)[CkMyPe()]){
+			printf("[%d] Invalid processor sending itself a message \n",CkMyPe());
+			return;
+		}
+	}
   if (pe == CkMyPe() && !CmiImmIsRunning()) {
 #if CMK_OBJECT_QUEUE_AVAILABLE
     Chare *obj = CkFindObjectPtr(env);
@@ -941,7 +951,9 @@ static void _skipCldEnqueue(int pe,envelope *env, int infoFn)
     CmiSetInfo(env,infoFn);
     if (pe==CLD_BROADCAST) { CmiSyncBroadcastAndFree(len, (char *)env); }
     else if (pe==CLD_BROADCAST_ALL) { CmiSyncBroadcastAllAndFree(len, (char *)env); }
-    else CmiSyncSendAndFree(pe, len, (char *)env);
+    else{
+			CmiSyncSendAndFree(pe, len, (char *)env);
+		}	
   }
 }
 
@@ -1056,7 +1068,11 @@ extern "C"
 void CkSendMsgInline(int entryIndex, void *msg, const CkChareID *pCid, int opts)
 {
   if (pCid->onPE==CkMyPe())
-  { //Just directly call the chare (skip QD handling & scheduler)
+  { 
+		if(!CkpvAccess(_validProcessors)[CkMyPe()]){
+			return;
+		}
+		//Just directly call the chare (skip QD handling & scheduler)
     register envelope *env = UsrToEnv(msg);
     if (env->isPacked()) CkUnpackMessage(&env);
     _STATS_RECORD_PROCESS_MSG_1();
@@ -1141,6 +1157,9 @@ void CkSendMsgBranchInline(int eIdx, void *msg, int destPE, CkGroupID gID, int o
 {
   if (destPE==CkMyPe())
   {
+		if(!CkpvAccess(_validProcessors)[CkMyPe()]){
+			return;
+		}
     IrrGroup *obj=(IrrGroup *)_localBranch(gID);
     if (obj!=NULL)
     { //Just directly call the group:

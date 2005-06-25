@@ -60,6 +60,7 @@ public:
 	CkArrayIndexMax idx; // Array index that is migrating
 	int ignoreArrival;   // if to inform LB of arrival
 	int length;//Size in bytes of the packed data
+	CmiBool bounced;
 	double* packData;
 };
 
@@ -222,6 +223,18 @@ private:
   CmiBool  readyMigrate;    /// status whether it is ready to migrate
   int  nextPe;              /// next migration dest processor
 #endif
+/**FAULT_EVAC*/
+private:
+	CmiBool asyncEvacuate; //can the element be evacuated anytime, false for tcharm 
+	CmiBool bounced; //did this element try to immigrate into a processor which was evacuating
+											// and was bounced away to some other processor. This is assumed to happen
+											//only if this object was migrated by a load balancer, but the processor
+											// started crashing soon after
+public:	
+	CmiBool isAsyncEvacuate(){return asyncEvacuate;}
+	void AsyncEvacuate(CmiBool set){asyncEvacuate = set;}
+	CmiBool isBounced(){return bounced;}
+	void Bounced(CmiBool set){bounced = set;}
 };
 class CkLocRec_remote;
 
@@ -243,6 +256,7 @@ protected:
 private:
   int thisChareType;//My chare type
   void commonInit(void);
+	bool asyncEvacuate;
 public:
   CkArrayIndexMax thisIndexMax;
 
@@ -285,12 +299,14 @@ protected:
   virtual void CkAbort(const char *str) const;
 
   CmiBool usesAtSync;//You must set this in the constructor to use AtSync().
-  virtual void ResumeFromSync(void);
   CmiBool barrierRegistered;//True iff barrier handle below is set
 
 #if CMK_LBDB_ON  //For load balancing:
   void AtSync(int waitForMigration=1);
   int MigrateToPe()  { return myRec->MigrateToPe(); }
+
+public:
+  virtual void ResumeFromSync(void);
 private: //Load balancer state:
   LDBarrierClient ldBarrierHandle;//Transient (not migrated)  
   LDBarrierReceiver ldBarrierRecvHandle;//Transient (not migrated)  
@@ -314,6 +330,12 @@ private:
   int prefetchObjID; //From CooRegisterObject
   CmiBool isInCore; //If true, the object is present in memory
 #endif
+	/*
+		FAULT_EVAC
+	*/
+	void AsyncEvacuate(CmiBool set){myRec->AsyncEvacuate(set);asyncEvacuate = set;};
+	public:
+	bool isAsyncEvacuate(){return asyncEvacuate;};
 };
 
 /** 
@@ -404,6 +426,9 @@ public:
 	
 	/// Find our location manager
 	inline CkLocMgr *getManager(void) const {return mgr;}
+	
+	/// Find the local record that refers to this element
+	inline CkLocRec_local *getLocalRecord(void) const {return rec;}
 	
 	/// Look up and return the array index of this location.
 	const CkArrayIndex &getIndex(void) const;
@@ -539,7 +564,7 @@ public:
 	CkMigratable *lookup(const CkArrayIndex &idx,CkArrayID aid);
 
 	/// Return the "last-known" location (returns a processor number)
-	int lastKnown(const CkArrayIndex &idx) const;
+	int lastKnown(const CkArrayIndex &idx);
 
 	/// Return true if this array element lives on another processor
 	bool isRemote(const CkArrayIndex &idx,int *onPe) const;

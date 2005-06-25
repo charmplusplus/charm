@@ -104,7 +104,13 @@ CkpvStaticDeclare(int,  _numInitsRecd); /* UInt changed to int */
 CkpvStaticDeclare(PtrQ*, _buffQ);
 CkpvStaticDeclare(PtrVec*, _bocInitVec);
 
-static int    _exitHandlerIdx;
+/*
+	FAULT_EVAC
+*/
+CkpvDeclare	(char *, _validProcessors);
+CpvDeclare(char ,startedEvac);
+
+int    _exitHandlerIdx;
 
 static Stats** _allStats = 0;
 
@@ -127,6 +133,13 @@ static char* _restartDir;
 
 int _defaultObjectQ = 0;            // for obejct queue
 int _ringexit = 0;		    // for charm exit
+
+/*
+	FAULT_EVAC
+
+	flag which marks whether or not to trigger the processor shutdowns
+*/
+int _raiseEvac=0;
 
 static inline void _parseCommandLineOpts(char **argv)
 {
@@ -173,6 +186,14 @@ static inline void _parseCommandLineOpts(char **argv)
     if (CkMyPe()==0)
       CkPrintf("Charm++> Program shutdown in ring.\n");
   }
+	/*
+		FAULT_EVAC
+
+		if the argument +raiseevac is present then cause faults
+	*/
+	if(CmiGetArgFlagDesc(argv,"+raiseevac","Generates processor evacuation on random processors")){
+		_raiseEvac = 1;
+	}
 }
 
 static void _bufferHandler(void *msg)
@@ -265,17 +286,26 @@ static void _exitHandler(envelope *env)
       env->setMsgtype(ReqStatMsg);
       env->setSrcPe(CkMyPe());
       // if exit in ring, instead of broadcasting, send in ring
-      if (_ringexit)
+      if (_ringexit){
+				DEBUGF(("[%d] Ring Exit \n",CkMyPe()));
         CmiSyncSendAndFree(0, env->getTotalsize(), (char *)env);
-      else
-        CmiSyncBroadcastAllAndFree(env->getTotalsize(), (char *)env);
+      }else{
+	      //  CmiSyncBroadcastAllAndFree(env->getTotalsize(), (char *)env);
+				/*FAULT_EVAC*/
+				for(int i=0;i<CkNumPes();i++){
+        	CmiSyncSend(i, env->getTotalsize(), (char *)env);
+				}	
+			}	
       break;
     case ReqStatMsg:
       DEBUGF(("ReqStatMsg on %d\n", CkMyPe()));
       CkNumberHandler(_charmHandlerIdx,(CmiHandler)_discardHandler);
       CkNumberHandler(_bocHandlerIdx, (CmiHandler)_discardHandler);
       CkNumberHandler(_nodeBocHandlerIdx, (CmiHandler)_discardHandler);
-      _sendStats();
+			/*FAULT_EVAC*/
+			if(CpvAccess(_validProcessors)[CkMyPe()]){
+	      _sendStats();
+			}	
       _mainDone = 1; // This is needed because the destructors for
                      // readonly variables will be called when the program
 		     // exits. If the destructor is called while _mainDone
@@ -289,8 +319,10 @@ static void _exitHandler(envelope *env)
         CmiSyncSendAndFree(CkMyPe()+1, env->getTotalsize(), (char *)env);
       else
         CmiFree(env);
-      if(CkMyPe())
+      if(CkMyPe()){
+				DEBUGF(("[%d] Calling converse exit \n",CkMyPe()));
         ConverseExit();
+			}	
       break;
     case StatMsg:
       CkAssert(CkMyPe()==0);
@@ -299,8 +331,10 @@ static void _exitHandler(envelope *env)
 #endif
       _numStatsRecd++;
       DEBUGF(("StatMsg on %d with %d\n", CkMyPe(), _numStatsRecd));
-      if(_numStatsRecd==CkNumPes()) {
+			/*FAULT_EVAC*/
+      if(_numStatsRecd==CkNumValidPes()) {
         _printStats();
+				DEBUGF(("[%d] Calling converse exit \n",CkMyPe()));
         ConverseExit();
       }
       break;
@@ -495,7 +529,12 @@ void _CkExit(void)
     envelope *env = _allocEnv(ReqStatMsg);
     env->setSrcPe(CkMyPe());
     CmiSetHandler(env, _exitHandlerIdx);
-    CmiSyncBroadcastAllAndFree(env->getTotalsize(), (char *)env);
+		/*FAULT_EVAC*/
+ //   CmiSyncBroadcastAllAndFree(env->getTotalsize(), (char *)env);
+    for(int i=0;i<CmiNumPes();i++){
+				CmiSyncSend(i,env->getTotalsize(),(char *)env);
+		}
+    	
   } else {
     envelope *env = _allocEnv(ExitMsg);
     env->setSrcPe(CkMyPe());
@@ -518,6 +557,8 @@ CkQ<CkExitFn> _CkExitFnVec;
 extern "C"
 void CkExit(void)
 {
+	/*FAULT_EVAC*/
+	DEBUGF(("[%d] CkExit called \n",CkMyPe()));
   if (!_CkExitFnVec.isEmpty()) {
     CkExitFn fn = _CkExitFnVec.deq();
     fn();
@@ -592,6 +633,13 @@ void _initCharm(int unused_argc, char **argv)
 	CkpvInitialize(char**, Ck_argv); CkpvAccess(Ck_argv)=argv;
 	CkpvInitialize(MsgPool*, _msgPool);
 	CkpvInitialize(CkCoreState *, _coreState);
+	/*
+		Added for evacuation-sayantan
+	*/
+	CkpvInitialize(char *,_validProcessors);
+	CkpvInitialize(char ,startedEvac);
+	CkpvInitialize(int,serializer);
+	
 
 	CksvInitialize(UInt, _numNodeGroups);
 	CksvInitialize(GroupTable*, _nodeGroupTable);
@@ -757,7 +805,25 @@ void _initCharm(int unused_argc, char **argv)
  	if (!inCommThread) {
 	  _TRACE_BEGIN_COMPUTATION();
 	}
+	/*
+		FAULT_EVAC
+	*/
+	CkpvAccess(_validProcessors) = new char[CkNumPes()];
+	CpvAccess(startedEvac) = 0;
+	_ckEvacBcastIdx = CkRegisterHandler((CmiHandler)_ckEvacBcast);
+	_ckAckEvacIdx = CkRegisterHandler((CmiHandler)_ckAckEvac);
+	CkpvAccess(serializer) = 0;
 
+	for(int vProc=0;vProc<CkNumPes();vProc++){
+		CkpvAccess(_validProcessors)[vProc]=1;
+	}
+	evacuate = 0;
+	CcdCallOnCondition(CcdSIGUSR1,(CcdVoidFn)CkDecideEvacPe,0);
+	if(CkMyPe() == 1 && _raiseEvac){
+	//	CcdCallOnConditionKeep(CcdPERIODIC_10s,(CcdVoidFn)CkDecideEvacPe,0);
+		CcdCallOnCondition(CcdPERIODIC_10s,(CcdVoidFn)CkDecideEvacPe,0);
+	}	
+	
 	if (faultFunc) {
 		if (CkMyPe()==0) _allStats = new Stats*[CkNumPes()];
 		if (!inCommThread) faultFunc(_restartDir);

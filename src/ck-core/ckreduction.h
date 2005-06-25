@@ -65,7 +65,12 @@ protected:
 class CkReductionMsg;
 
 
-class CkReductionNumberMsg;
+class CkReductionNumberMsg:public CMessage_CkReductionNumberMsg {
+public:
+  int num;
+  CkReductionNumberMsg(int n) {num=n;}
+};
+
 
 /**
  * One CkReductionMgr runs a non-overlapping set of reductions.
@@ -168,13 +173,13 @@ private:
 	void addContribution(CkReductionMsg *m);
 	void finishReduction(void);
 
-//Reduction tree utilities
+/*//Reduction tree utilities
 	enum {TREE_WID=2};
 	int treeRoot(void);//Root PE
 	CmiBool hasParent(void);
 	int treeParent(void);//My parent PE
 	int firstKid(void);//My first child PE
-	int treeKids(void);//Number of children in tree
+	int treeKids(void);//Number of children in tree*/
 
 	//Combine (& free) the current message vector.
 	CkReductionMsg *reduceMessages(void);

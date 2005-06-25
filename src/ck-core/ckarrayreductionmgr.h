@@ -1,17 +1,18 @@
 #ifndef _CKARRAYREDNMGR_H
 #define _CKARRAYREDNMGR_H
 class CkArrayReductionMgr : public NodeGroup{
-	/** Group Reduction Managers use this class
-	to carry out their reductions. This class receives
-	contributions from group/array redn mgrs when all
-	data from elements on a processor has been collected
-	This is then contributed to this group.*/
+	/** This class receives	contributions from all the CkReductionMgr s in a node, after each of them has 
+	collected all the contributions on one processor. The data from the different processors in a node
+	is collected and sent to the CkNodeReductionMgr for this node
+	*/
 	private:
 		int size;
 		int redNo;
 		int count;
+		CkGroupID attachedGroup;
 		CkMsgQ<CkReductionMsg> my_msgs;
 		CkMsgQ<CkReductionMsg> my_futureMsgs;
+		CkReductionMgr **my_rednMgrs;
 		CmiNodeLock lockCount;
 		void collectAllMessages();
 	public:
@@ -22,6 +23,10 @@ class CkArrayReductionMgr : public NodeGroup{
 		CkReductionMsg *reduceMessages(void);
                 void flushStates();
 		virtual void pup(PUP::er &p);
+		void setAttachedGroup(CkGroupID groupID);
+		void addRednMgr(CkReductionMgr *rednMgr,int rank);
+		void startNodeGroupReduction(int number,CkGroupID groupID);
+		virtual void startLocalGroupReductions(int number);
 };
 #endif
 

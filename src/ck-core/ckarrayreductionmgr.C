@@ -4,7 +4,7 @@
 #define ARRREDDEBUG 0
 
 #if ARRREDDEBUG
-#define ARPRINT ARPRINT
+#define ARPRINT CkPrintf
 #else
 #define ARPRINT //ARPRINT
 #endif
@@ -16,6 +16,8 @@ CkArrayReductionMgr::CkArrayReductionMgr(){
 	count = 0;
 	lockCount = CmiCreateLock();
 	ctorDoneFlag = 1;
+	my_rednMgrs = new (CkReductionMgr *)[size];
+	attachedGroup.setZero();
 };
 
 void CkArrayReductionMgr::flushStates(){
@@ -32,7 +34,7 @@ void CkArrayReductionMgr::flushStates(){
 
 void CkArrayReductionMgr::collectAllMessages(){
 	if(count == size){
-		ARPRINT("[%d] CollectAll messages  for %d with %d\n",CkMyNode(),redNo,count);
+		ARPRINT("[%d] CollectAll messages  for %d with %d on %p\n",CkMyNode(),redNo,count,this);
 		CkReductionMsg *result = reduceMessages();
 		result->redNo = redNo;
 		/**keep a count of elements that contributed to the original reduction***/
@@ -54,7 +56,7 @@ void CkArrayReductionMgr::collectAllMessages(){
 }
 
 void CkArrayReductionMgr::contributeArrayReduction(CkReductionMsg *m){
-	ARPRINT("[%d]Contribute Array Reduction called for RedNo %d\n",CkMyNode(),m->getRedNo());
+	ARPRINT("[%d]Contribute Array Reduction called for RedNo %d group %d \n",CkMyNode(),m->getRedNo(),thisgroup.idx);
 	/** store the contribution untill all procs have contributed. At that point reduce and
 	carry out a reduction among nodegroups*/
 	CmiLock(lockCount);
@@ -135,10 +137,57 @@ void CkArrayReductionMgr::pup(PUP::er &p){
 	p(redNo);p(count);
 	p|my_msgs;
 	p|my_futureMsgs;
+	p|attachedGroup;
 	if(p.isUnpacking()) {
 	  size = CkMyNodeSize();
 	  lockCount = CmiCreateLock();
+		my_rednMgrs = new (CkReductionMgr *)[size];
+		setAttachedGroup(attachedGroup);
 	}
 }
+
+void CkArrayReductionMgr::setAttachedGroup(CkGroupID groupID){
+	attachedGroup = groupID;
+	CProxy_CkReductionMgr reductionMgrProxy(attachedGroup);
+	int firstPE = CkNodeFirst(CkMyNode());
+	for(int i=0;i<size;i++){
+		my_rednMgrs[i] = reductionMgrProxy[firstPE+i].ckLocalBranch();
+	}
+	ARPRINT("[%d] setAttachedGroup called with attachedGroup %d \n",CkMyNode(),attachedGroup);
+}
+
+void CkArrayReductionMgr::addRednMgr(CkReductionMgr *rednMgr,int rank){
+	ARPRINT("[%d] addRednMgr called with %p on %p \n",CkMyNode(),rednMgr,this);
+	my_rednMgrs[rank] = rednMgr;
+}
+
+
+void CkArrayReductionMgr::startNodeGroupReduction(int number,CkGroupID groupID){
+	ARPRINT("[%d] startNodeGroupReductions for red No %d my group %d attached group %d on %p \n",CkMyNode(),number,thisgroup.idx, attachedGroup.idx,this);
+	if(attachedGroup.isZero()){
+		setAttachedGroup(groupID);
+	}
+	startLocalGroupReductions(number);
+	CkReductionNumberMsg *msg = new CkReductionNumberMsg(number);
+	envelope::setSrcPe((char *)UsrToEnv(msg),CkMyNode());
+	((CkNodeReductionMgr *)this)->ReductionStarting(msg);
+}
+void CkArrayReductionMgr::startLocalGroupReductions(int number){	
+	ARPRINT("[%d] startLocalGroupReductions for red No %d my group %d attached group %d number of rednMgrs %d on %p \n",CkMyNode(),number,thisgroup.idx, attachedGroup.idx,size,this);
+	if(attachedGroup.isZero()){
+		return;
+	}
+	int firstPE = CkNodeFirst(CkMyNode());
+	for(int i=0;i<size;i++){
+		CProxy_CkReductionMgr reductionMgrProxy(attachedGroup);
+		reductionMgrProxy[firstPE+i].ReductionStarting(new CkReductionNumberMsg(number));
+/*		if(my_rednMgrs[i]){
+			my_rednMgrs[i]->ReductionStarting(new CkReductionNumberMsg(number));
+		}else{
+			ARPRINT("[%d] my_rednMgr is null for %d for red No %d on %p \n",CkMyNode(),i,number,this);
+		}*/
+	}
+};
+
 
 #include "CkArrayReductionMgr.def.h"

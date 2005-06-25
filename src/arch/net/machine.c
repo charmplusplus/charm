@@ -867,12 +867,24 @@ int CmiMyRank(void)
 }
 #endif
 
+CpvExtern(char *,_validProcessors);
+CpvExtern(int,_charmEpoch);
+
 /*Add a message to this processor's receive queue 
   Must be called while holding comm. lock
 */
+
+extern double evacTime;
+
 static void CmiPushPE(int pe,void *msg)
 {
   CmiState cs=CmiGetStateN(pe);
+	/*
+		FAULT_EVAC
+	
+	if(CpvAccess(_charmEpoch)&&!(CpvAccess(_validProcessors)[CmiMyPe()])){
+		printf("[%d] Message after stop at %.6lf in %.6lf \n",CmiMyPe(),CmiWallTimer(),CmiWallTimer()-evacTime);
+	}*/
   MACHSTATE1(2,"Pushing message into %d's queue",pe);  
   MACHLOCK_ASSERT(comm_flag,"CmiPushPE")
 
@@ -893,7 +905,8 @@ static void CmiPushPE(int pe,void *msg)
 static void CmiPushNode(void *msg)
 {
   CmiState cs=CmiGetStateN(0);
-  MACHSTATE(2,"Pushing message into node queue");
+  
+	MACHSTATE(2,"Pushing message into node queue");
   MACHLOCK_ASSERT(comm_flag,"CmiPushNode")
   
 #if CMK_IMMEDIATE_MSG
@@ -1537,8 +1550,12 @@ void DeliverOutgoingMessage(OutgoingMsg ogm)
     SendHypercube(ogm, 1, 0, NULL, 0, DGRAM_BROADCAST);
 #else
     for (i=0; i<_Cmi_numnodes; i++)
-      if (i!=_Cmi_mynode)
-	DeliverViaNetwork(ogm, nodes + i, DGRAM_BROADCAST, DGRAM_ROOTPE_MASK);
+      if (i!=_Cmi_mynode){
+				/*FAULT_EVAC : is the target processor valid*/
+				if(CpvAccess(_validProcessors)[i]){
+					DeliverViaNetwork(ogm, nodes + i, DGRAM_BROADCAST, DGRAM_ROOTPE_MASK);
+				}
+			}	
 #endif
     GarbageCollectMsg(ogm);
     break;
@@ -1553,8 +1570,12 @@ void DeliverOutgoingMessage(OutgoingMsg ogm)
     SendHypercube(ogm, 1, 0, NULL, 0, DGRAM_BROADCAST);
 #else
     for (i = 0; i<_Cmi_numnodes; i++)
-      if (i!=_Cmi_mynode)
-	DeliverViaNetwork(ogm, nodes + i, DGRAM_BROADCAST, DGRAM_ROOTPE_MASK);
+      if (i!=_Cmi_mynode){
+				/*FAULT_EVAC : is the target processor valid*/
+				if(CpvAccess(_validProcessors)[i]){
+					DeliverViaNetwork(ogm, nodes + i, DGRAM_BROADCAST, DGRAM_ROOTPE_MASK);
+				}
+			}	
 #endif
     GarbageCollectMsg(ogm);
     break;

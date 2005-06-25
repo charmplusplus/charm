@@ -155,6 +155,8 @@ class TCharm: public CBase_TCharm
 	~TCharm();
 	
 	virtual void ckJustMigrated(void);
+	virtual void ckAboutToMigrate(void);
+	
 	void migrateDelayed(int destPE);
 	void atBarrier(CkReductionMsg *);
 	void atExit(CkReductionMsg *);
@@ -174,6 +176,8 @@ class TCharm: public CBase_TCharm
 	
 	//Block, migrate to destPE, and resume
 	void migrateTo(int destPE);
+
+	void evacuate();
 
 	//Thread finished running
 	void done(void);
@@ -207,7 +211,10 @@ class TCharm: public CBase_TCharm
 	void start(void);
 	//Aliases:
 	inline void suspend(void) {stop();}
-	inline void resume(void) { if (isStopped) start();}
+	inline void resume(void) { if (isStopped) start(); else {
+	//	printf("[%d] TCharm resume called on already running thread pe %d \n",thisIndex,CkMyPe());
+		}
+	}
 
 	//Go to sync, block, possibly migrate, and then resume
 	void migrate(void);

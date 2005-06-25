@@ -576,8 +576,13 @@ void AMPI_Print(char *str);
 int AMPI_Register(void *, MPI_PupFn);
 #define MPI_Migrate AMPI_Migrate
 void AMPI_Migrate(void);
+
+#define MPI_Evacuate AMPI_Evacuate
+void AMPI_Evacuate(void);
+
 #define MPI_Migrateto AMPI_Migrateto
 void AMPI_Migrateto(int destPE);
+
 #define MPI_Async_Migrate AMPI_Async_Migrate
 void AMPI_Async_Migrate(void);
 #define MPI_Allow_Migrate AMPI_Allow_Migrate
