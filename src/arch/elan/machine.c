@@ -62,9 +62,9 @@ ELAN_TPORT    *elan_port;
 ELAN_QUEUE    *elan_q;
 
 int enableGetBasedSend = 1;
-int enableBufferPooling = 1;
+int enableBufferPooling = 0;
 
-int SMALL_MESSAGE_SIZE=16384;  /* Smallest message size queue 
+int SMALL_MESSAGE_SIZE=4080;  /* Smallest message size queue 
                                  used for receiving short messages */
                                      
 int MID_MESSAGE_SIZE=65536;     /* Queue for larger messages 
