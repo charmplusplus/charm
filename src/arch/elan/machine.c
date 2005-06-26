@@ -35,7 +35,7 @@ Developed by Sameer Kumar
 #define MAX_QLEN 1000
 #define MAX_BYTES 1000000
 
-#define USE_SHM 1
+#define USE_SHM 0
 
 /*
   To reduce the buffer used in broadcast and distribute the load from 
@@ -1726,7 +1726,7 @@ CmiCommHandle CmiAsyncListSendFn(int npes, int *pes, int len, char *msg)
 extern void CmiReference(void *blk);
 #if 1
 #define ELAN_BUF_SIZE MID_MESSAGE_SIZE
-#define USE_NIC_MULTICAST 1
+#define USE_NIC_MULTICAST 0
 
 void CmiFreeListSendFn(int npes, int *pes, int len, char *msg)
 {  
