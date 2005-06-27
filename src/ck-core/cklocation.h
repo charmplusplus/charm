@@ -204,13 +204,13 @@ public:
   virtual CkMigratable *lookupElement(CkArrayID aid);
   virtual int lookupProcessor(void);
 
+  void AsyncMigrate(CmiBool use);
 #if CMK_LBDB_ON
 public:
   inline LBDatabase *getLBDB(void) const {return the_lbdb;}
   static void staticMigrate(LDObjHandle h, int dest);
   void recvMigrate(int dest);
   void setMigratable(int migratable);	/// set migratable
-  void AsyncMigrate(CmiBool use);
   CmiBool isAsyncMigrate()   { return asyncMigrate; }
   void ReadyMigrate(CmiBool ready) { readyMigrate = ready; } ///called from user
   int  isReadyMigrate()	{ return readyMigrate; }
@@ -301,12 +301,13 @@ protected:
   CmiBool usesAtSync;//You must set this in the constructor to use AtSync().
   CmiBool barrierRegistered;//True iff barrier handle below is set
 
+public:
+  virtual void ResumeFromSync(void);
+
 #if CMK_LBDB_ON  //For load balancing:
   void AtSync(int waitForMigration=1);
   int MigrateToPe()  { return myRec->MigrateToPe(); }
 
-public:
-  virtual void ResumeFromSync(void);
 private: //Load balancer state:
   LDBarrierClient ldBarrierHandle;//Transient (not migrated)  
   LDBarrierReceiver ldBarrierRecvHandle;//Transient (not migrated)  
