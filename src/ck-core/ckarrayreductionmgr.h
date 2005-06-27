@@ -12,7 +12,6 @@ class CkArrayReductionMgr : public NodeGroup{
 		CkGroupID attachedGroup;
 		CkMsgQ<CkReductionMsg> my_msgs;
 		CkMsgQ<CkReductionMsg> my_futureMsgs;
-		CkReductionMgr **my_rednMgrs;
 		CmiNodeLock lockCount;
 		void collectAllMessages();
 	public:
@@ -24,7 +23,6 @@ class CkArrayReductionMgr : public NodeGroup{
                 void flushStates();
 		virtual void pup(PUP::er &p);
 		void setAttachedGroup(CkGroupID groupID);
-		void addRednMgr(CkReductionMgr *rednMgr,int rank);
 		void startNodeGroupReduction(int number,CkGroupID groupID);
 		virtual void startLocalGroupReductions(int number);
 };

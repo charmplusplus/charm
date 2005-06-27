@@ -16,7 +16,6 @@ CkArrayReductionMgr::CkArrayReductionMgr(){
 	count = 0;
 	lockCount = CmiCreateLock();
 	ctorDoneFlag = 1;
-	my_rednMgrs = new (CkReductionMgr *)[size];
 	attachedGroup.setZero();
 };
 
@@ -141,24 +140,12 @@ void CkArrayReductionMgr::pup(PUP::er &p){
 	if(p.isUnpacking()) {
 	  size = CkMyNodeSize();
 	  lockCount = CmiCreateLock();
-		my_rednMgrs = new (CkReductionMgr *)[size];
-		setAttachedGroup(attachedGroup);
 	}
 }
 
 void CkArrayReductionMgr::setAttachedGroup(CkGroupID groupID){
 	attachedGroup = groupID;
-	CProxy_CkReductionMgr reductionMgrProxy(attachedGroup);
-	int firstPE = CkNodeFirst(CkMyNode());
-	for(int i=0;i<size;i++){
-		my_rednMgrs[i] = reductionMgrProxy[firstPE+i].ckLocalBranch();
-	}
 	ARPRINT("[%d] setAttachedGroup called with attachedGroup %d \n",CkMyNode(),attachedGroup);
-}
-
-void CkArrayReductionMgr::addRednMgr(CkReductionMgr *rednMgr,int rank){
-	ARPRINT("[%d] addRednMgr called with %p on %p \n",CkMyNode(),rednMgr,this);
-	my_rednMgrs[rank] = rednMgr;
 }
 
 
@@ -181,11 +168,6 @@ void CkArrayReductionMgr::startLocalGroupReductions(int number){
 	for(int i=0;i<size;i++){
 		CProxy_CkReductionMgr reductionMgrProxy(attachedGroup);
 		reductionMgrProxy[firstPE+i].ReductionStarting(new CkReductionNumberMsg(number));
-/*		if(my_rednMgrs[i]){
-			my_rednMgrs[i]->ReductionStarting(new CkReductionNumberMsg(number));
-		}else{
-			ARPRINT("[%d] my_rednMgr is null for %d for red No %d on %p \n",CkMyNode(),i,number,this);
-		}*/
 	}
 };
 
