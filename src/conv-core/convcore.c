@@ -1255,7 +1255,6 @@ void __dbgcheckMessageHandler(){
 	CmiUInt2 handler2;
 	if(__dbgMsg){
 			handler2=CmiGetHandler(__dbgMsg); 
-	//		CmiAssert(handler2 != 0);
 	}
 }
 
@@ -1265,12 +1264,11 @@ void CsdScheduleForever(void)
   SCHEDULE_TOP
   while (1) {
     msg = CsdNextMessage(&state);
-		__dbgMsg = msg;
+/*		__dbgMsg = msg;*/
 		if(msg){
 			handler1=CmiGetHandler(msg); 
 		}	
-//		CkClearAllArrayElements();
-		__dbgcheckMessageHandler();
+/*		__dbgcheckMessageHandler();*/
     if (msg) { /*A message is available-- process it*/
       if (isIdle) {isIdle=0;CsdEndIdle();}
       SCHEDULE_MESSAGE
