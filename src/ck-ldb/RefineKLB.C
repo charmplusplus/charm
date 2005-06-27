@@ -15,6 +15,8 @@
 #include "cklists.h"
 
 #include "RefineKLB.h"
+#define _USE_APPROX_ALGO_ 1
+#define _USE_RESIDUAL_MOVES_ 1
 //#include "heap.h"
 
 CreateLBFunc_Def(RefineKLB, "Move objects away from overloaded processor to reach average");
@@ -45,7 +47,17 @@ void RefineKLB::work(BaseLB::LDStats* stats, int count)
 
   RefinerApprox refiner(1.003);  // overload tolerance=1.003
 
-  refiner.Refine(count,stats,from_procs,to_procs,_lb_args.percentMovesAllowed());
+  if(_lb_args.percentMovesAllowed()>0 && _USE_APPROX_ALGO_)
+  {
+    refiner.Refine(count,stats,from_procs,to_procs,_lb_args.percentMovesAllowed());
+  }
+  else
+  {
+    for(obj=0;obj<stats->n_objs;obj++)  
+    {
+      to_procs[obj] = stats->from_proc[obj];
+    }
+  }
 
   // Save output
   int numMoves=0;
@@ -60,11 +72,11 @@ void RefineKLB::work(BaseLB::LDStats* stats, int count)
       numMoves++;
     }
   }
-  int maxMoves=(stats->n_objs)*(_lb_args.percentMovesAllowed());
+  int maxMoves=0.01*(stats->n_objs)*(_lb_args.percentMovesAllowed());
   int availableMoves=maxMoves-numMoves;
 
   //Perform Additional Moves in Greedy Fashion
-  if(availableMoves>0)
+  if(availableMoves>0 && _USE_RESIDUAL_MOVES_)
   {
     int *to_procs2=new int[stats->n_objs];
     performGreedyMoves(count,stats,to_procs,to_procs2,availableMoves);
@@ -138,6 +150,11 @@ void RefineKLB::performGreedyMoves(int count, BaseLB::LDStats* stats,int *from_p
     InfoRecord *maxProc=procLoad->deleteMax();
     
     InfoRecord *maxObj=procObjs[maxProc->Id]->deleteMax();
+    if(!maxObj)
+    {
+      procLoad->insert(maxProc);
+      break;
+    }
     unassignedComputes->insert(maxObj);
 
     maxProc->load-=maxObj->load;
@@ -156,6 +173,8 @@ void RefineKLB::performGreedyMoves(int count, BaseLB::LDStats* stats,int *from_p
   for(i=0;i<numMoves;i++)
   {
     InfoRecord *c=unassignedComputes->deleteMax();
+    if(!c)
+      break;
 
     InfoRecord *proc=leastLoadedP->deleteMin();
     proc->load+=c->load;
