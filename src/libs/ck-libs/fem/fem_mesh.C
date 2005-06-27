@@ -1900,6 +1900,7 @@ void FEM_writeMesh(FEM_Mesh *m,const char *prefix,int chunkNo,int nChunks)
 /// neighbors allocated to correct size
 void FEM_Mesh::e2e_getAll(int e, int *neighbors) 
 {
+  if (e == -1) return;
   FEM_Elem &elems = setElem(0);
   FEM_IndexAttribute *eAdj = 
     (FEM_IndexAttribute *)elems.lookup(FEM_ELEM_ELEM_ADJACENCY, 
@@ -1913,6 +1914,7 @@ void FEM_Mesh::e2e_getAll(int e, int *neighbors)
 /// Given id of element e, return the id of the idx-th adjacent element
 int FEM_Mesh::e2e_getNbr(int e, short idx) 
 {     
+  if (e == -1) return -1;
   FEM_Elem &elems = setElem(0);
   FEM_IndexAttribute *eAdj = 
     (FEM_IndexAttribute *)elems.lookup(FEM_ELEM_ELEM_ADJACENCY, 
@@ -1927,6 +1929,7 @@ int FEM_Mesh::e2e_getNbr(int e, short idx)
 /// nbr is the i-th element adjacent to e
 int FEM_Mesh::e2e_getIndex(int e, int nbr) 
 { 
+  if (e == -1) return -1;
   FEM_Elem &elems = setElem(0);
   FEM_IndexAttribute *eAdj = 
     (FEM_IndexAttribute *)elems.lookup(FEM_ELEM_ELEM_ADJACENCY, 
@@ -1944,6 +1947,7 @@ int FEM_Mesh::e2e_getIndex(int e, int nbr)
 /// has the correct size
 void FEM_Mesh::e2e_setAll(int e, int *neighbors) 
 {
+  if (e == -1) return;
   FEM_Elem &elems = setElem(0);
   FEM_IndexAttribute *eAdj = 
     (FEM_IndexAttribute *)elems.lookup(FEM_ELEM_ELEM_ADJACENCY, 
@@ -1959,6 +1963,7 @@ void FEM_Mesh::e2e_setAll(int e, int *neighbors)
 /// Set the idx-th element adjacent to e to be newElem
 void FEM_Mesh::e2e_setIndex(int e, short idx, int newElem) 
 {
+  if (e == -1) return;
   FEM_Elem &elems = setElem(0);
   FEM_IndexAttribute *eAdj = 
     (FEM_IndexAttribute *)elems.lookup(FEM_ELEM_ELEM_ADJACENCY, 
@@ -1972,6 +1977,7 @@ void FEM_Mesh::e2e_setIndex(int e, short idx, int newElem)
 /// Find element oldNbr in e's adjacent elements and replace with newNbr
 void FEM_Mesh::e2e_replace(int e, int oldNbr, int newNbr) 
 {
+  if (e == -1) return;
   FEM_Elem &elems = setElem(0);
   FEM_IndexAttribute *eAdj = 
     (FEM_IndexAttribute *)elems.lookup(FEM_ELEM_ELEM_ADJACENCY, 
@@ -1989,6 +1995,7 @@ void FEM_Mesh::e2e_replace(int e, int oldNbr, int newNbr)
 /// Remove all neighboring elements in adjacency
 void FEM_Mesh::e2e_removeAll(int e)
 {
+  if (e == -1) return;
   FEM_Elem &elems = setElem(0);
   FEM_IndexAttribute *eAdj = 
     (FEM_IndexAttribute *)elems.lookup(FEM_ELEM_ELEM_ADJACENCY, 
@@ -2004,6 +2011,7 @@ void FEM_Mesh::e2e_removeAll(int e)
 /// adjnodes allocated to correct size
 void FEM_Mesh::e2n_getAll(int e, int *adjnodes) 
 {
+  if (e == -1) return;
   FEM_Elem &elems = setElem(0);
   FEM_IndexAttribute *eConn = 
     (FEM_IndexAttribute *)elems.lookup(FEM_CONN, "e2n_getAll");
@@ -2016,6 +2024,7 @@ void FEM_Mesh::e2n_getAll(int e, int *adjnodes)
 /// Given id of element e, return the id of the idx-th adjacent node
 int FEM_Mesh::e2n_getNode(int e, short idx) 
 { 
+  if (e == -1) return -1;
   FEM_Elem &elems = setElem(0);
   FEM_IndexAttribute *eConn = 
     (FEM_IndexAttribute *)elems.lookup(FEM_CONN, "e2n_getAll");
@@ -2027,6 +2036,7 @@ int FEM_Mesh::e2n_getNode(int e, short idx)
 /// n is the i-th node adjacent to e
 short FEM_Mesh::e2n_getIndex(int e, int n) 
 {
+  if (e == -1) return -1;
   FEM_Elem &elems = setElem(0);
   FEM_IndexAttribute *eConn = 
     (FEM_IndexAttribute *)elems.lookup(FEM_CONN, "e2n_getAll");
@@ -2043,6 +2053,7 @@ short FEM_Mesh::e2n_getIndex(int e, int n)
 /// has the correct size
 void FEM_Mesh::e2n_setAll(int e, int *adjnodes) 
 {
+  if (e == -1) return;
   FEM_Elem &elems = setElem(0);
   FEM_IndexAttribute *eConn = 
     (FEM_IndexAttribute *)elems.lookup(FEM_CONN, "e2n_getAll");
@@ -2055,6 +2066,7 @@ void FEM_Mesh::e2n_setAll(int e, int *adjnodes)
 /// Set the idx-th node adjacent to e to be newNode
 void FEM_Mesh::e2n_setIndex(int e, short idx, int newNode) 
 {
+  if (e == -1) return;
   FEM_Elem &elems = setElem(0);
   FEM_IndexAttribute *eConn = 
     (FEM_IndexAttribute *)elems.lookup(FEM_CONN, "e2n_getAll");
@@ -2065,6 +2077,7 @@ void FEM_Mesh::e2n_setIndex(int e, short idx, int newNode)
 /// Find node oldNode in e's adjacent ndoes and replace with newNode
 void FEM_Mesh::e2n_replace(int e, int oldNode, int newNode) 
 {
+  if (e == -1) return;
   FEM_Elem &elems = setElem(0);
   FEM_IndexAttribute *eConn = 
     (FEM_IndexAttribute *)elems.lookup(FEM_CONN, "e2n_getAll");
@@ -2082,6 +2095,7 @@ void FEM_Mesh::e2n_replace(int e, int oldNode, int newNode)
 /// length of adjnodes in sz; assumes adjnodes is not allocated, but sz is
 void FEM_Mesh::n2n_getAll(int n, int **adjnodes, int *sz) 
 {
+  if (n == -1) return;
   FEM_VarIndexAttribute *nAdj = 
     (FEM_VarIndexAttribute *)node.lookup(FEM_NODE_NODE_ADJACENCY, 
 					 "n2n_getAll");
@@ -2097,6 +2111,7 @@ void FEM_Mesh::n2n_getAll(int n, int **adjnodes, int *sz)
 /// Adds newNode to node n's node adjacency list
 void FEM_Mesh::n2n_add(int n, int newNode) 
 {
+  if (n == -1) return;
   FEM_VarIndexAttribute *nAdj = 
     (FEM_VarIndexAttribute *)node.lookup(FEM_NODE_NODE_ADJACENCY, "n2n_add");
   CkVec<CkVec<FEM_VarIndexAttribute::ID> > &nVec = nAdj->get();
@@ -2108,6 +2123,7 @@ void FEM_Mesh::n2n_add(int n, int newNode)
 /// Removes oldNode from n's node adjacency list
 void FEM_Mesh::n2n_remove(int n, int oldNode) 
 {
+  if (n == -1) return;
   FEM_VarIndexAttribute *nAdj = 
     (FEM_VarIndexAttribute *)node.lookup(FEM_NODE_NODE_ADJACENCY, 
 					 "n2n_remove");
@@ -2124,6 +2140,7 @@ void FEM_Mesh::n2n_remove(int n, int oldNode)
 /// Finds oldNode in n's node adjacency list, and replaces it with newNode
 void FEM_Mesh::n2n_replace(int n, int oldNode, int newNode) 
 {
+  if (n == -1) return;
   FEM_VarIndexAttribute *nAdj = 
     (FEM_VarIndexAttribute *)node.lookup(FEM_NODE_NODE_ADJACENCY, 
 					 "n2n_replace");
@@ -2140,6 +2157,7 @@ void FEM_Mesh::n2n_replace(int n, int oldNode, int newNode)
 /// Remove all nodes from n's node adjacency list
 void FEM_Mesh::n2n_removeAll(int n)
 {
+  if (n == -1) return;
   FEM_VarIndexAttribute *nAdj = 
     (FEM_VarIndexAttribute *)node.lookup(FEM_NODE_NODE_ADJACENCY, 
 					 "n2n_removeAll");
@@ -2154,6 +2172,7 @@ void FEM_Mesh::n2n_removeAll(int n)
 /// but sz is
 void FEM_Mesh::n2e_getAll(int n, int **adjelements, int *sz) 
 {
+  if (n == -1) return;
   FEM_VarIndexAttribute *eAdj = 
     (FEM_VarIndexAttribute *)node.lookup(FEM_NODE_ELEM_ADJACENCY, 
 					 "n2e_getAll");
@@ -2169,6 +2188,7 @@ void FEM_Mesh::n2e_getAll(int n, int **adjelements, int *sz)
 /// Adds newElem to node n's element adjacency list
 void FEM_Mesh::n2e_add(int n, int newElem) 
 {
+  if (n == -1) return;
   FEM_VarIndexAttribute *eAdj = 
     (FEM_VarIndexAttribute *)node.lookup(FEM_NODE_ELEM_ADJACENCY, "n2e_add");
   CkVec<CkVec<FEM_VarIndexAttribute::ID> > &eVec = eAdj->get();
@@ -2180,6 +2200,7 @@ void FEM_Mesh::n2e_add(int n, int newElem)
 /// Removes oldElem from n's element adjacency list
 void FEM_Mesh::n2e_remove(int n, int oldElem) 
 {
+  if (n == -1) return;
   FEM_VarIndexAttribute *eAdj = 
     (FEM_VarIndexAttribute *)node.lookup(FEM_NODE_ELEM_ADJACENCY, 
 					 "n2e_remove");
@@ -2196,6 +2217,7 @@ void FEM_Mesh::n2e_remove(int n, int oldElem)
 /// Finds oldElem in n's element adjacency list, and replaces it with newElem
 void FEM_Mesh::n2e_replace(int n, int oldElem, int newElem) 
 {
+  if (n == -1) return;
   FEM_VarIndexAttribute *eAdj = 
     (FEM_VarIndexAttribute *)node.lookup(FEM_NODE_ELEM_ADJACENCY, 
 					 "n2e_replace");
@@ -2212,6 +2234,7 @@ void FEM_Mesh::n2e_replace(int n, int oldElem, int newElem)
 /// Remove all elements from n's element adjacency list
 void FEM_Mesh::n2e_removeAll(int n)
 {
+  if (n == -1) return;
   FEM_VarIndexAttribute *eAdj = 
     (FEM_VarIndexAttribute *)node.lookup(FEM_NODE_ELEM_ADJACENCY, 
 					 "n2e_removeAll");
