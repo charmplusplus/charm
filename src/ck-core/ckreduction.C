@@ -73,6 +73,11 @@ waits for the migrant contributions to straggle in.
 #define RED_DEB(x) //CkPrintf x
 #endif
 
+#ifndef INT_MAX
+#define INT_MAX 2147483647
+#endif
+
+
 Group::Group()
 {
 	creatingContributors();
