@@ -1,6 +1,8 @@
 #include "element.h"
 #include "tri.h"
 
+#define ZEROAREA 0.000000000005
+
 int element::lockOpNode(edgeRef e, double l) 
 {
   int edgeIdx = getEdgeIdx(e);
@@ -644,4 +646,40 @@ void element::sanityCheck(chunk *c, elemRef shouldRef, int n)
   CkAssert(nodes[0] != nodes[1]);
   CkAssert(nodes[0] != nodes[2]);
   CkAssert(nodes[2] != nodes[1]);
+}
+
+bool element::flipTest(node* oldnode, node* newnode) {
+  //oldnode is C->thenodes[nodes[delnode]]  
+}
+
+bool element::flipInverseTest(node* oldnode, node* newnode) {
+  double x0,x1,x2,x3,y0,y1,y2,y3;
+  int i=0;
+
+  for(i=0; i<3; i++) {
+    if( oldnode->X() == C->theNodes[nodes[i]].X() && oldnode->Y() == C->theNodes[nodes[i]].Y() ) {
+      break;
+    }
+  }
+  x0 = C->theNodes[nodes[(i+1)%3]].X();
+  x1 = oldnode->X();
+  x2 = C->theNodes[nodes[(i+2)%3]].X();
+  x3 = newnode->X();
+  y0 = C->theNodes[nodes[(i+1)%3]].Y();
+  y1 = oldnode->Y();
+  y2 = C->theNodes[nodes[(i+2)%3]].Y();
+  y3 = newnode->Y();
+
+  //vector-product (axby - aybx)
+  double res1 = (x0-x1)*(y2-y1) - (y0-y1)*(x2-x1);
+  double res2 = (x0-x3)*(y2-y3) - (y0-y3)*(x2-x3);
+
+  //zero area is sometimes giving bad results because zero can be represented as a 
+  //negative small number or a positive small number
+  if((res1>0 && res2>0)||(res1<=0 && res2<=0)) return false;
+  else if(fabs(res1)< ZEROAREA || fabs(res2)< ZEROAREA) return false;
+  else {
+    CkPrintf("Flip: (%lf,%lf);(%lf,%lf)--(%lf,%lf)--(%lf,%lf)\n",x0,y0,x2,y2,x1,y1,x3,y3);
+    return true; //the two vector products are opposite in sign, so there is a flip
+  }
 }

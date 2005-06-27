@@ -247,6 +247,11 @@ void chunk::nodeReplaceDelete(int kIdx, int dIdx, node nn, int shared,
 	CkAssert(theElements[j].nodes[2] != theElements[j].nodes[1]);
 	for (int k=0; k<3; k++) {
 	  if (theElements[j].nodes[k] == dIdx) {
+#ifdef FLIPTEST
+	    if(theElements[j].flipInverseTest(&(theNodes[dIdx]),&nn)) {
+	      CkPrintf("Chunk %d, Elem %d is flipping!!\n",cid,j);
+	    }
+#endif
 	    theElements[j].nodes[k] = kIdx;
 	    theClient->nodeReplaceDelete(j, k, dIdx, kIdx);
 #ifdef TDEBUG1

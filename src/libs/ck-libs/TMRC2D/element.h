@@ -167,6 +167,8 @@ class element {  // triangular elements defined by three node references,
   double getAreaQuality();
   double getLargestEdge(double *angle);
   int isLongestEdge(edgeRef& e);
+  bool flipTest(node*, node*);
+  bool flipInverseTest(node*, node*);
 
   // Mesh improvement stuff
   //void tweakNodes();

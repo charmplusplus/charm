@@ -19,6 +19,7 @@
 //#define TDEBUG1
 //#define TDEBUG2
 //#define TDEBUG3
+#define FLIPTEST
 
 // ------------------------ Global Read-only Data ---------------------------
 extern CProxy_chunk mesh;
