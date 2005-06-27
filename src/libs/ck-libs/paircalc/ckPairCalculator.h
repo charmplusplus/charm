@@ -252,7 +252,7 @@ class PairCalculator: public CBase_PairCalculator {
     CProxy_PairCalcReducer pairCalcReducerProxy(reducer_id);
     pairCalcReducerProxy.ckLocalBranch()->clearRegister();
     resumed=false;
-    /* lower our memory footprint */
+    /* lower our memory footprint 
     if(existsLeft){
       delete [] inDataLeft;
       inDataLeft=NULL;
@@ -274,6 +274,7 @@ class PairCalculator: public CBase_PairCalculator {
 	delete [] newData;
 	newData = NULL;
       }
+*/
     AtSync();
   };
   void ResumeFromSync();
@@ -316,6 +317,8 @@ class PairCalculator: public CBase_PairCalculator {
   CkSparseContiguousReducer<double> sparseRed;
   bool existsLeft;
   bool existsRight;
+  bool existsOut;
+  bool existsNew;
   CkCallback cb_lb;
   double *inDataLeft, *inDataRight;
   double *outData;

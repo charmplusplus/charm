@@ -50,6 +50,8 @@ PairCalculator::PairCalculator(bool sym, int grainSize, int s, int blkSize,  int
   reducer_id = gid;
   existsLeft=false;
   existsRight=false;
+  existsOut=false;
+  existsNew=false;
   numRecd = 0;
   numExpected = grainSize;
   this->cb_lb=lbcb;
@@ -107,9 +109,19 @@ PairCalculator::pup(PUP::er &p)
   p|reducer_id;
   p|existsLeft;
   p|existsRight;
+  p|existsOut;
+  p|existsNew;
   p|cb_lb;
   p|gspacesum;
   if (p.isUnpacking()) {
+    if(existsNew)
+      newData= new complex[N*grainSize];
+    else
+      newData=NULL;
+    if(existsOut)
+      outData= new double[grainSize*grainSize];
+    else
+      outData=NULL;
     if(existsLeft)
       inDataLeft = new double[2*numExpected*N];
     else
@@ -118,8 +130,7 @@ PairCalculator::pup(PUP::er &p)
       inDataRight = new double[2*numExpected*N];
     else 
       inDataRight=NULL;
-    newData = NULL;
-    outData = NULL;
+
   }
   if(existsLeft)
     p((void*) inDataLeft, numExpected * N * 2* sizeof(double));
@@ -160,9 +171,10 @@ PairCalculator::~PairCalculator()
   if(outData!=NULL)  
     delete [] outData;
 
-  if(existsLeft)
+  if(inDataLeft!=NULL)
     delete [] inDataLeft;
-  if(existsRight)
+
+  if(inDataRight!=NULL)
     delete [] inDataRight;
 
   if(newData!=NULL)
@@ -293,7 +305,8 @@ PairCalculator::calculatePairs_gemm(calculatePairsMsg *msg)
      */
 
   if (numRecd == numExpected * 2 || (symmetric && thisIndex.x==thisIndex.y && numRecd==numExpected)) {
-    if(outData == NULL){
+    if(!existsOut){
+      existsOut=true;
       outData = new double[grainSize * grainSize];
       memset(outData, 0 , sizeof(double)* grainSize * grainSize);
 #ifdef _PAIRCALC_DEBUG_
@@ -631,6 +644,7 @@ PairCalculator::acceptResult(int size, double *matrix1, double *matrix2)
 	{
 	  delete [] outData;
 	  outData = NULL;
+	  existsOut=false;
 	}
     }
 
@@ -672,9 +686,10 @@ PairCalculator::sumPartialResult(int size, complex *result, int offset)
 
   sumPartialCount++;
 
-  if(newData==NULL){
+  if(!existsNew){
     newData = new complex[size];
     memset(newData,0,size*sizeof(complex));
+    existsNew=true;
   }  
   for(int i=0; i<size; i++){
     newData[i] += result[i];
