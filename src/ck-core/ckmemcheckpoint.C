@@ -495,6 +495,10 @@ inline int CkMemCheckPT::isMaster(int buddype)
   return 0;
 }
 
+#ifdef CKLOCMGR_LOOP
+#undef CKLOCMGR_LOOP
+#endif
+
 // loop over all CkLocMgr and do "code"
 #define  CKLOCMGR_LOOP(code)	{	\
   int numGroups = CkpvAccess(_groupIDTable)->size(); 	\
