@@ -594,7 +594,7 @@ driver(void)
     }
     areas=new double[g.nelems];
     for (i=0;i<g.nelems;i++) {
-      areas[i] = calcArea(g, i) + avgArea;
+      areas[i] = avgArea;
     }
     //coarsen one element at a time
     //int coarseIdx = (23  + 4*t)%g.nnodes;
@@ -622,7 +622,7 @@ driver(void)
     
     areas=new double[g.nelems];
     for (i=0;i<g.nelems;i++) {
-      areas[i] = (calcArea(g, i)/2.0 + avgArea)/2.0;
+      areas[i] = avgArea;
     }
     //refine one element at a time
     //int refIdx = (13  + 3*t)%g.nnodes;
