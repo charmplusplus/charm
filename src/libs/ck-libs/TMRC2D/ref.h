@@ -8,6 +8,9 @@
 #include "fem.h"
 #include "fem_mesh.h"
 
+//#define FLIPTEST
+//#define FLIPPREVENT
+
 class objRef { // a reference to a piece of data that may be remotely located
  public:
   int cid, idx;
@@ -41,6 +44,8 @@ class edgeRef : public objRef {
   int collapse(elemRef requester, int kIdx, int dIdx, elemRef kNbr, 
 	       elemRef dNbr, edgeRef kEdge, edgeRef dEdge, node opnode,
 	       int *local, int *first, node newN);
+  int flipPrevent(elemRef requester, int kIdx, int dIdx, elemRef kNbr, 
+	       elemRef dNbr, edgeRef kEdge, edgeRef dEdge, node opnode, node newN);
   void resetEdge();
   int isPending(elemRef e);
   int getBoundary();

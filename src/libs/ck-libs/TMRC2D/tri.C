@@ -141,7 +141,7 @@ void chunk::coarseningElements()
   if (coarsenElements) delete [] coarsenElements;
   coarsenElements = new elemStack[numElements];
   for (i=0; i<elementSlots; i++) { // set desired areas for elements
-    if (theElements[i].isPresent()) {
+    if (theElements[i].isPresent() && theElements[i].nonCoarsenCount<1) {
       area = theElements[i].getArea();
       //precThrshld = area * 1e-8;
       if (theElements[i].getTargetArea() > area) {
@@ -156,8 +156,8 @@ void chunk::coarseningElements()
     // start coarsening
     modified = 1;
     if (!coarsenInProgress) {
-    coarsenInProgress = 1;
-    mesh[cid].coarseningElements();
+      coarsenInProgress = 1;
+      mesh[cid].coarseningElements();
     }
   }
   //dump();
@@ -194,6 +194,18 @@ splitOutMsg *chunk::collapse(int idx, elemRef e, int kIdx, int dIdx,
   som->result = theEdges[idx].collapse(e, kIdx, dIdx, kNbr, dNbr, kEdge, dEdge,
 				       opnode, &(som->local), &(som->first), 
 				       newN);
+  releaseLock();
+  return som;
+}
+
+splitOutMsg *chunk::flipPreventE(int idx, elemRef e, int kIdx, int dIdx,
+			     elemRef kNbr, elemRef dNbr, edgeRef kEdge, 
+			     edgeRef dEdge, node opnode, node newN)
+{
+  splitOutMsg *som = new splitOutMsg;
+  accessLock();
+  som->result = theEdges[idx].flipPrevent(e, kIdx, dIdx, kNbr, dNbr, kEdge, dEdge,
+				       opnode, newN);
   releaseLock();
   return som;
 }
@@ -248,8 +260,9 @@ void chunk::nodeReplaceDelete(int kIdx, int dIdx, node nn, int shared,
 	for (int k=0; k<3; k++) {
 	  if (theElements[j].nodes[k] == dIdx) {
 #ifdef FLIPTEST
+	    if(theElements[j].nodes[(k+1)%3] == kIdx || theElements[j].nodes[(k+2)%3] == kIdx) break; //don't worry abt this element, it will be deleted
 	    if(theElements[j].flipInverseTest(&(theNodes[dIdx]),&nn)) {
-	      CkPrintf("Chunk %d, Elem %d is flipping!!\n",cid,j);
+	      //CkPrintf("Chunk %d, Elem %d is flipping!!\n",cid,j);
 	    }
 #endif
 	    theElements[j].nodes[k] = kIdx;
@@ -276,6 +289,47 @@ void chunk::nodeReplaceDelete(int kIdx, int dIdx, node nn, int shared,
     }
   }
   releaseLock();
+}
+
+boolMsg *chunk::flipPrevent(int kIdx, int dIdx, node nn, int shared, int *chk, int *idx)
+{
+  boolMsg *bm = new boolMsg;
+  bm->aBool = false;
+  for (int j=0; j<elementSlots; j++) {
+    if (theElements[j].isPresent()) {
+      CkAssert(theElements[j].nodes[0] != theElements[j].nodes[1]);
+      CkAssert(theElements[j].nodes[1] != theElements[j].nodes[2]);
+      CkAssert(theElements[j].nodes[2] != theElements[j].nodes[0]);
+      for (int k=0; k<3; k++) {
+	if (theElements[j].nodes[k] == dIdx) {
+	  if(theElements[j].nodes[(k+1)%3] == kIdx || theElements[j].nodes[(k+2)%3] == kIdx) break; //don't worry abt this element, it will be deleted
+	  if(theElements[j].flipInverseTest(&(theNodes[dIdx]),&nn)) {
+	    //CkPrintf("Chunk %d, Elem %d is flipping!!\n",cid,j);
+	    bm->aBool = true;
+	    //mesh[*chk].incnonCoarsen(*idx);
+	    return bm;
+	  }
+	}
+	if (theElements[j].nodes[k] == kIdx) {
+	  if(theElements[j].nodes[(k+1)%3] == dIdx || theElements[j].nodes[(k+2)%3] == dIdx) break; //don't worry abt this element, it will be deleted
+	  if(theElements[j].flipInverseTest(&(theNodes[kIdx]),&nn)) {
+	    //CkPrintf("Chunk %d, Elem %d is flipping!!\n",cid,j);
+	    bm->aBool = true;
+	    //mesh[*chk].incnonCoarsen(*idx);
+	    return bm;
+	  }
+	}
+      }
+    }
+  }
+  return bm;
+}
+
+void chunk::incnonCoarsen(int idx) {
+  accessLock();
+  theElements[idx].incnonCoarsen();
+  releaseLock();
+  return;
 }
 
 intMsg *chunk::isPending(int idx, objRef e)

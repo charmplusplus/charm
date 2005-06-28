@@ -114,6 +114,8 @@ class edge {
   int collapse(elemRef requester, int kIdx, int dIdx, elemRef kNbr,
 	       elemRef dNbr, edgeRef kEdge, edgeRef dEdge, node oNode,
 	       int *local, int *first, node newN);
+  int flipPrevent(elemRef requester, int kIdx, int dIdx, elemRef kNbr,
+	       elemRef dNbr, edgeRef kEdge, edgeRef dEdge, node oNode, node newN);
   int existsOn(FEM_Comm_Rec *cl, int chunkID) {
     int count = cl->getShared();
     for (int i=0; i<count; i++) {

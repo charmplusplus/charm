@@ -57,6 +57,17 @@ int edgeRef::collapse(elemRef requester, int kIdx, int dIdx, elemRef kNbr,
   return result;
 }
 
+int edgeRef::flipPrevent(elemRef requester, int kIdx, int dIdx, elemRef kNbr, 
+		      elemRef dNbr, edgeRef kEdge, edgeRef dEdge, node opnode, node newN)
+{
+  splitOutMsg *som;
+  int result;
+  som = mesh[cid].flipPreventE(idx, requester, kIdx, dIdx, kNbr, dNbr, kEdge, dEdge, opnode, newN);
+  result = som->result;
+  CkFreeMsg(som);
+  return result;
+}
+
 int edgeRef::isPending(elemRef e)
 {
   intMsg *im;

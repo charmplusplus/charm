@@ -38,3 +38,9 @@ public:
   int idx;
   double aDouble;
 };
+
+// boolMsg: used to send a bool
+class boolMsg : public CMessage_boolMsg {
+public:
+  int aBool;
+};

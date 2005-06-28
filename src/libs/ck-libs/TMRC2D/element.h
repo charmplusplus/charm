@@ -39,9 +39,10 @@ class element {  // triangular elements defined by three node references,
   elemRef myRef;
   chunk *C;
   int present;  // indicates this is an element present in the mesh
+  short nonCoarsenCount;
 
   /// Basic element constructor
-  element() {   targetArea = currentArea = -1.0; }
+  element() {   targetArea = currentArea = -1.0; nonCoarsenCount = 0; }
   element(int cid, int idx, chunk *C) { set(); set(cid, idx, C); }
   element(int *n) { set();  set(n); }
   element(int *n, edgeRef *e) { set();  set(n, e); }
@@ -54,7 +55,8 @@ class element {  // triangular elements defined by three node references,
   }
   /// Copy constructor
   element(const element& e) {
-    targetArea = e.targetArea;  currentArea = e.currentArea;
+    targetArea = e.targetArea;  currentArea = e.currentArea; 
+    nonCoarsenCount = e.nonCoarsenCount;
     present = e.present;
     for (int i=0; i<3; i++) {
       nodes[i] = e.nodes[i];  edges[i] = e.edges[i];
@@ -64,6 +66,7 @@ class element {  // triangular elements defined by three node references,
   /// Assignment
   element& operator=(const element& e) { 
     targetArea = e.targetArea;  currentArea = e.currentArea; 
+    nonCoarsenCount = e.nonCoarsenCount;
     present = e.present;
     for (int i=0; i<3; i++) { 
       nodes[i] = e.nodes[i];  edges[i] = e.edges[i];
@@ -73,9 +76,9 @@ class element {  // triangular elements defined by three node references,
   }
 
   /// Basic set operation
-  void set() { targetArea = currentArea = -1.0;  present = 0; } 
+  void set() { targetArea = currentArea = -1.0;  present = 0; nonCoarsenCount = 0; } 
   void set(int c, int i, chunk *ck) { 
-    set(); myRef.set(c, i); C = ck; present = 1; 
+    set(); myRef.set(c, i); C = ck; present = 1;
   }
   void set(int *n) { present = 1; for (int i=0; i<3; i++)  nodes[i] = n[i]; }
   void set(int *n, edgeRef *e) {
@@ -169,6 +172,7 @@ class element {  // triangular elements defined by three node references,
   int isLongestEdge(edgeRef& e);
   bool flipTest(node*, node*);
   bool flipInverseTest(node*, node*);
+  void incnonCoarsen(void);
 
   // Mesh improvement stuff
   //void tweakNodes();

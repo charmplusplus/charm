@@ -19,7 +19,6 @@
 //#define TDEBUG1
 //#define TDEBUG2
 //#define TDEBUG3
-#define FLIPTEST
 
 // ------------------------ Global Read-only Data ---------------------------
 extern CProxy_chunk mesh;
@@ -218,7 +217,12 @@ class chunk : public TCharmClient1D {
   splitOutMsg *collapse(int idx, elemRef e, int kIdx, int dIdx, elemRef kNbr, 
 			elemRef dNbr, edgeRef kEdge, edgeRef dEdge, 
 			node opnode, node newN);
+  splitOutMsg *flipPreventE(int idx, elemRef e, int kIdx, int dIdx, elemRef kNbr, 
+			elemRef dNbr, edgeRef kEdge, edgeRef dEdge, 
+			node opnode, node newN);
   void nodeReplaceDelete(int kIdx, int dIdx, node nn, int shared, int *chk, 
+			 int *idx);
+  boolMsg *flipPrevent(int kIdx, int dIdx, node nn, int shared, int *chk, 
 			 int *idx);
   intMsg *isPending(int idx, objRef e);
   void checkPending(int idx, objRef aRef);
@@ -295,6 +299,9 @@ class chunk : public TCharmClient1D {
   void addToStack(int eIdx, double len, int cFlag);
   void rebubble(int cFlag);
   intMsg *getBoundary(int edgeIdx);
+
+  void incnonCoarsen(int idx);
+
 };
 
 #endif

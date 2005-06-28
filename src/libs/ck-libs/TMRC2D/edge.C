@@ -498,6 +498,126 @@ int edge::collapse(elemRef requester, int kIdx, int dIdx, elemRef kNbr,
   }
 }
 
+int edge::flipPrevent(elemRef requester, int kIdx, int dIdx, elemRef kNbr,
+		   elemRef dNbr, edgeRef kEdge, edgeRef dEdge, node oNode, node newN)
+{
+  int i,j, lk, chunk, dIdxlShared, kIdxlShared;
+  int *dIdxlChk, *dIdxlIdx, *kIdxlChk, *kIdxlIdx;
+  boolMsg *ret;
+
+  length = (C->theNodes[kIdx]).distance(C->theNodes[dIdx]);
+#ifdef TDEBUG2
+  CkPrintf("TMRC2D: [%d] ......Building lock cloud... edge=%d requester=%d nbr=%d\n", myRef.cid, myRef.idx, requester.idx, nbr.idx);
+#endif
+  FEM_Node *theNodes = &(C->meshPtr->node);
+  FEM_Comm_Rec *dNodeRec=(FEM_Comm_Rec *)(theNodes->shared.getRec(dIdx));
+  FEM_Comm_Rec *kNodeRec=(FEM_Comm_Rec *)(theNodes->shared.getRec(kIdx));
+  intMsg *im;
+  lk = C->lockLocalChunk(myRef.cid, myRef.idx, length);
+  if (dNodeRec) dIdxlShared = dNodeRec->getShared();
+  else dIdxlShared = 0;
+  if (kNodeRec) kIdxlShared = kNodeRec->getShared();
+  else kIdxlShared = 0;
+  if (!(C->lockLocalChunk(myRef.cid, myRef.idx, length)))
+    return -1;
+  for (i=0; i<dIdxlShared; i++) {
+    chunk = dNodeRec->getChk(i);
+    im = mesh[chunk].lockChunk(myRef.cid, myRef.idx, length);
+    if (im->anInt == 0) { 
+      CkFreeMsg(im); 
+      C->unlockLocalChunk(myRef.cid, myRef.idx);
+      for (j=0; j<i; j++) {
+	chunk = dNodeRec->getChk(j);
+	mesh[chunk].unlockChunk(myRef.cid, myRef.idx);
+      }
+      return -1; 
+    }
+  }
+  for (i=0; i<kIdxlShared; i++) {
+    chunk = kNodeRec->getChk(i);
+    im = mesh[chunk].lockChunk(myRef.cid, myRef.idx, length);
+    if (im->anInt == 0) { 
+      CkFreeMsg(im); 
+      C->unlockLocalChunk(myRef.cid, myRef.idx);
+      for (j=0; j<dIdxlShared; j++) {
+	chunk = dNodeRec->getChk(j);
+	mesh[chunk].unlockChunk(myRef.cid, myRef.idx);
+      }
+      for (j=0; j<i; j++) {
+	chunk = kNodeRec->getChk(j);
+	mesh[chunk].unlockChunk(myRef.cid, myRef.idx);
+      }
+      return -1; 
+    }
+  }
+#ifdef TDEBUG2
+  CkPrintf("TMRC2D: [%d] ......edge::collapse: LOCKS obtained... On edge=%d on chunk=%d, requester==(%d,%d) with nbr=(%d,%d)\n", myRef.cid, myRef.idx, myRef.cid, requester.cid, requester.idx, nbr.cid, nbr.idx);
+#endif
+#ifdef TDEBUG1
+  CkPrintf("TMRC2D: [%d] ......edge::collapse: ** PART 1! ** On edge=%d on chunk=%d, requester==(%d,%d) with nbr=(%d,%d) dIdx=%d kIdx=%d\n", myRef.cid, myRef.idx, myRef.cid, requester.cid, requester.idx, nbr.cid, nbr.idx, dIdx, kIdx);
+#endif
+  fixNode = kIdx;
+  opnode = oNode;
+  newNode = newN;
+  keepNbr = kNbr;
+  delNbr = dNbr;
+  keepEdge = kEdge;
+  delEdge = dEdge;
+
+  theNodes = &(C->meshPtr->node);
+  dNodeRec=(FEM_Comm_Rec *)(theNodes->shared.getRec(dIdx));
+  kNodeRec=(FEM_Comm_Rec *)(theNodes->shared.getRec(kIdx));
+  // Replace dNode with kNode and delete dNode everywhere in the mesh
+  if (dNodeRec) dIdxlShared = dNodeRec->getShared();
+  else dIdxlShared = 0;
+  if (kNodeRec) kIdxlShared = kNodeRec->getShared();
+  else kIdxlShared = 0;
+  dIdxlChk = (int *)malloc((dIdxlShared+1)*sizeof(int));
+  kIdxlChk = (int *)malloc((kIdxlShared+1)*sizeof(int));
+  dIdxlIdx = (int *)malloc((dIdxlShared+1)*sizeof(int));
+  kIdxlIdx = (int *)malloc((kIdxlShared+1)*sizeof(int));
+  for (i=0; i<dIdxlShared; i++) {
+    dIdxlIdx[i] = dNodeRec->getIdx(i);
+    dIdxlChk[i] = dNodeRec->getChk(i);
+  }
+  dIdxlIdx[dIdxlShared] = dIdx;
+  dIdxlChk[dIdxlShared] = myRef.cid;
+  for (i=0; i<kIdxlShared; i++) {
+    kIdxlIdx[i] = kNodeRec->getIdx(i);
+    kIdxlChk[i] = kNodeRec->getChk(i);
+  }
+  kIdxlIdx[kIdxlShared] = kIdx;
+  kIdxlChk[kIdxlShared] = myRef.cid;
+  ret = C->flipPrevent(kIdx, dIdx, newNode, dIdxlShared, dIdxlChk, dIdxlIdx);
+  for (i=0; i<dIdxlShared; i++) {
+    chunk = dNodeRec->getChk(i);
+    if (kNodeRec && ((j=existsOn(kNodeRec, chunk)) >= 0)) {
+      ret = mesh[chunk].flipPrevent(kNodeRec->getIdx(j), dNodeRec->getIdx(i), newNode, dIdxlShared, dIdxlChk, dIdxlIdx);
+    }
+    else {
+      ret = mesh[chunk].flipPrevent(-1, dNodeRec->getIdx(i), newNode, kIdxlShared, kIdxlChk, kIdxlIdx);
+    }
+  }
+  for (i=0; i<kIdxlShared; i++) {
+    chunk = kNodeRec->getChk(i);
+    if (!dNodeRec || (existsOn(dNodeRec, chunk) == -1)) {
+      ret = mesh[chunk].flipPrevent(kNodeRec->getIdx(i), -1, newNode, dIdxlShared, dIdxlChk, dIdxlIdx);
+    }
+  }
+  // unlock the cloud
+  C->unlockLocalChunk(myRef.cid, myRef.idx);
+  for (i=0; i<dIdxlShared; i++) {
+    chunk = dNodeRec->getChk(i);
+    mesh[chunk].unlockChunk(myRef.cid, myRef.idx);
+  }
+  for (i=0; i<kIdxlShared; i++) {
+    chunk = kNodeRec->getChk(i);
+    mesh[chunk].unlockChunk(myRef.cid, myRef.idx);
+  }
+  if(ret->aBool) return -1;
+  return 1;  
+}
+
 void edge::sanityCheck(chunk *c, edgeRef shouldRef) 
 {
   int nonNullElements=0;

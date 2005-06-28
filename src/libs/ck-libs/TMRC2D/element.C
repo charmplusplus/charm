@@ -1,7 +1,7 @@
 #include "element.h"
 #include "tri.h"
 
-#define ZEROAREA 0.000000000005
+#define ZEROAREA 1.0e-15
 
 int element::lockOpNode(edgeRef e, double l) 
 {
@@ -398,6 +398,17 @@ void element::collapse(int shortEdge)
     CkAssert(dIdx > -1);
     CkAssert(dIdx != kIdx);
   }
+
+#ifdef FLIPPREVENT
+  result = edges[shortEdge].flipPrevent(myRef, kIdx, dIdx, keepNbr, delNbr, 
+				     edges[keepEdge], edges[delEdge], 
+				     C->theNodes[nodes[opnode]], newNode);
+  if(result == -1) {
+    mesh[myRef.cid].incnonCoarsen(myRef.idx);
+    return;
+  }
+#endif
+
   // collapse the edge; takes care of neighbor element
   present = 0;
   result = edges[shortEdge].collapse(myRef, kIdx, dIdx, keepNbr, delNbr, 
@@ -648,6 +659,11 @@ void element::sanityCheck(chunk *c, elemRef shouldRef, int n)
   CkAssert(nodes[2] != nodes[1]);
 }
 
+void element::incnonCoarsen() {
+  nonCoarsenCount++;
+  return;
+}
+
 bool element::flipTest(node* oldnode, node* newnode) {
   //oldnode is C->thenodes[nodes[delnode]]  
 }
@@ -677,9 +693,12 @@ bool element::flipInverseTest(node* oldnode, node* newnode) {
   //zero area is sometimes giving bad results because zero can be represented as a 
   //negative small number or a positive small number
   if((res1>0 && res2>0)||(res1<=0 && res2<=0)) return false;
-  else if(fabs(res1)< ZEROAREA || fabs(res2)< ZEROAREA) return false;
+  else if(/*fabs(res1) < ZEROAREA || */fabs(res2) < ZEROAREA) {
+    CkPrintf("Zero area: Chunk %d Elem %d (%lf,%lf);(%lf,%lf)--(%lf,%lf)--(%lf,%lf)\n",myRef.cid,myRef.idx,x0,y0,x2,y2,x1,y1,x3,y3);
+    return true;
+  }
   else {
-    CkPrintf("Flip: (%lf,%lf);(%lf,%lf)--(%lf,%lf)--(%lf,%lf)\n",x0,y0,x2,y2,x1,y1,x3,y3);
+    CkPrintf("Flip: Chunk %d Elem %d -- (%lf,%lf);(%lf,%lf)--(%lf,%lf)--(%lf,%lf)\n",myRef.cid,myRef.idx,x0,y0,x2,y2,x1,y1,x3,y3);
     return true; //the two vector products are opposite in sign, so there is a flip
   }
 }
