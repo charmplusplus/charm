@@ -204,13 +204,13 @@ public:
   virtual CkMigratable *lookupElement(CkArrayID aid);
   virtual int lookupProcessor(void);
 
-  void AsyncMigrate(CmiBool use);
 #if CMK_LBDB_ON
 public:
   inline LBDatabase *getLBDB(void) const {return the_lbdb;}
   static void staticMigrate(LDObjHandle h, int dest);
   void recvMigrate(int dest);
   void setMigratable(int migratable);	/// set migratable
+  void AsyncMigrate(CmiBool use);
   CmiBool isAsyncMigrate()   { return asyncMigrate; }
   void ReadyMigrate(CmiBool ready) { readyMigrate = ready; } ///called from user
   int  isReadyMigrate()	{ return readyMigrate; }
@@ -222,6 +222,8 @@ private:
   CmiBool  asyncMigrate;  /// if readyMove is inited
   CmiBool  readyMigrate;    /// status whether it is ready to migrate
   int  nextPe;              /// next migration dest processor
+#else
+	void AsyncMigrate(CmiBool use){};
 #endif
 /**FAULT_EVAC*/
 private:
