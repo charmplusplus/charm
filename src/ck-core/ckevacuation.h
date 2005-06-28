@@ -15,7 +15,7 @@ struct evacMsg{
 	int remainingElements; // number of array elements that still exist on that processor
 };
 
-CkpvExtern(char *,_validProcessors);
+CpvExtern(char *,_validProcessors);
 extern int _ckEvacBcastIdx;
 extern int _ckAckEvacIdx;
 CpvExtern(char ,startedEvac);

@@ -37,7 +37,7 @@ void _ckEvacBcast(struct evacMsg *msg){
 	}
 	printf("[%d]<%.6f> Processor %d is being evacuated \n",CkMyPe(),CmiWallTimer(),msg->pe);
 	fprintf(stderr,"[%d] <%.6f> Processor %d is being evacuated \n",CkMyPe(),CmiWallTimer(),msg->pe);
-	CkpvAccess(_validProcessors)[msg->pe] = 0;
+	CpvAccess(_validProcessors)[msg->pe] = 0;
 	set_avail_vector(CpvAccess(_validProcessors));
 	if(msg->pe == CpvAccess(serializer)){
 		CpvAccess(serializer) = getNextSerializer();
@@ -108,7 +108,7 @@ void CkStopScheduler(){
 	}
 	printf("[%d] Stopping Scheduler \n");
 	/*stops putting messages into the scheduler queue*/
-	CkpvAccess(_validProcessors)[CkMyPe()]=0;
+	CpvAccess(_validProcessors)[CkMyPe()]=0;
 }
 
 void CkEmmigrateElement(void *arg){
@@ -125,7 +125,7 @@ void CkEmmigrateElement(void *arg){
 }
 
 void CkEvacuatedElement(){
-	if(!CkpvAccess(_validProcessors)[CkMyPe()]){
+	if(!CpvAccess(_validProcessors)[CkMyPe()]){
 		return;
 	}
 	if(!CpvAccess(startedEvac)){
@@ -144,7 +144,7 @@ void CkEvacuatedElement(){
 	DEBUGC(printf("[%d] remaining elements %d \n",CkMyPe(),remainingElements););
 	if(remainingElements == 0){
 		printf("[%d] Processor empty in %.6lfs \n",CkMyPe(),CmiWallTimer()-evacTime);
-		CkpvAccess(_validProcessors)[CkMyPe()] = 0;
+		CpvAccess(_validProcessors)[CkMyPe()] = 0;
 		CkAnnounceEvac(0);
 		int numNodeGroups = CksvAccess(_nodeGroupIDTable).size();
 		for(int i=0;i<numNodeGroups;i++){
@@ -213,7 +213,7 @@ void CkClearAllArrayElements(){
 			removed
 		*/
 		printf("[%d] Processor empty in %.6lfs \n",CkMyPe(),CmiWallTimer()-evacTime);
-		CkpvAccess(_validProcessors)[CkMyPe()] = 0;
+		CpvAccess(_validProcessors)[CkMyPe()] = 0;
 		int numNodeGroups = CksvAccess(_nodeGroupIDTable).size();
 		for(int i=0;i<numNodeGroups;i++){
   	  IrrGroup *obj = CksvAccess(_nodeGroupTable)->find((CksvAccess(_nodeGroupIDTable))[i]).getObj();	
@@ -277,7 +277,7 @@ int getNextPE(const CkArrayIndex &i){
 	if (i.nInts==1) {
       //Map 1D integer indices in simple round-robin fashion
       int ans= (i.data()[0])%CkNumPes();
-			while(!CkpvAccess(_validProcessors)[ans] || ans == CkMyPe()){
+			while(!CpvAccess(_validProcessors)[ans] || ans == CkMyPe()){
 				ans = (ans +1 )%CkNumPes();
 			}
 			return ans;
@@ -285,7 +285,7 @@ int getNextPE(const CkArrayIndex &i){
 		//Map other indices based on their hash code, mod a big prime.
 			unsigned int hash=(i.hash()+739)%1280107;
 			int ans = (hash % CkNumPes());
-			while(!CkpvAccess(_validProcessors)[ans] || ans == CkMyPe()){
+			while(!CpvAccess(_validProcessors)[ans] || ans == CkMyPe()){
 				ans = (ans +1 )%CkNumPes();
 			}
 			return ans;

@@ -107,7 +107,7 @@ CkpvStaticDeclare(PtrVec*, _bocInitVec);
 /*
 	FAULT_EVAC
 */
-CkpvDeclare	(char *, _validProcessors);
+CpvDeclare	(char *, _validProcessors);
 CpvDeclare(char ,startedEvac);
 
 int    _exitHandlerIdx;
@@ -636,9 +636,9 @@ void _initCharm(int unused_argc, char **argv)
 	/*
 		Added for evacuation-sayantan
 	*/
-	CkpvInitialize(char *,_validProcessors);
-	CkpvInitialize(char ,startedEvac);
-	CkpvInitialize(int,serializer);
+	CpvInitialize(char *,_validProcessors);
+	CpvInitialize(char ,startedEvac);
+	CpvInitialize(int,serializer);
 	
 
 	CksvInitialize(UInt, _numNodeGroups);
@@ -808,14 +808,14 @@ void _initCharm(int unused_argc, char **argv)
 	/*
 		FAULT_EVAC
 	*/
-	CkpvAccess(_validProcessors) = new char[CkNumPes()];
+	CpvAccess(_validProcessors) = new char[CkNumPes()];
 	CpvAccess(startedEvac) = 0;
 	_ckEvacBcastIdx = CkRegisterHandler((CmiHandler)_ckEvacBcast);
 	_ckAckEvacIdx = CkRegisterHandler((CmiHandler)_ckAckEvac);
-	CkpvAccess(serializer) = 0;
+	CpvAccess(serializer) = 0;
 
 	for(int vProc=0;vProc<CkNumPes();vProc++){
-		CkpvAccess(_validProcessors)[vProc]=1;
+		CpvAccess(_validProcessors)[vProc]=1;
 	}
 	evacuate = 0;
 	CcdCallOnCondition(CcdSIGUSR1,(CcdVoidFn)CkDecideEvacPe,0);

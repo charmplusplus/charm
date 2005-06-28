@@ -192,7 +192,7 @@ public:
     if (i.nInts==1) {
       //Map 1D integer indices in simple round-robin fashion
       int ans= (i.data()[0])%CkNumPes();
-			while(!CkpvAccess(_validProcessors)[ans] || (ans == CkMyPe() && CpvAccess(startedEvac))){
+			while(!CpvAccess(_validProcessors)[ans] || (ans == CkMyPe() && CpvAccess(startedEvac))){
 				ans = (ans +1 )%CkNumPes();
 			}
 			return ans;
@@ -203,7 +203,7 @@ public:
 	//Map other indices based on their hash code, mod a big prime.
 			unsigned int hash=(i.hash()+739)%1280107;
 			int ans = (hash % CkNumPes());
-			while(!CkpvAccess(_validProcessors)[ans]){
+			while(!CpvAccess(_validProcessors)[ans]){
 				ans = (ans +1 )%CkNumPes();
 			}
 			return ans;
@@ -1729,7 +1729,7 @@ void CkLocMgr::emigrate(CkLocRec_local *rec,int toPe)
 		if the toProcessor is already marked as invalid, dont emigrate
 		Shouldn't happen but might
 	*/
-	if(!(CkpvAccess(_validProcessors)[toPe])){
+	if(!(CpvAccess(_validProcessors)[toPe])){
 		return;
 	}
 
@@ -1919,7 +1919,7 @@ int CkLocMgr::lastKnown(const CkArrayIndex &idx) {
 			FAULT_EVAC
 			if the lastKnownPE is invalid return homePE and delete this record
 		*/
-		if(!(CkpvAccess(_validProcessors)[pe])){
+		if(!(CpvAccess(_validProcessors)[pe])){
 			removeFromTable(idx);
 			return homePe(idx);
 		}

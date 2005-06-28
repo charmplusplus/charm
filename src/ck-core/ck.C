@@ -923,7 +923,7 @@ extern "C" void __dbgcheckMessageHandler();
 static void _skipCldEnqueue(int pe,envelope *env, int infoFn)
 {
 	if(pe == CkMyPe() ){
-		if(!CkpvAccess(_validProcessors)[CkMyPe()]){
+		if(!CpvAccess(_validProcessors)[CkMyPe()]){
 			printf("[%d] Invalid processor sending itself a message \n",CkMyPe());
 			return;
 		}
@@ -1069,7 +1069,7 @@ void CkSendMsgInline(int entryIndex, void *msg, const CkChareID *pCid, int opts)
 {
   if (pCid->onPE==CkMyPe())
   { 
-		if(!CkpvAccess(_validProcessors)[CkMyPe()]){
+		if(!CpvAccess(_validProcessors)[CkMyPe()]){
 			return;
 		}
 		//Just directly call the chare (skip QD handling & scheduler)
@@ -1157,7 +1157,7 @@ void CkSendMsgBranchInline(int eIdx, void *msg, int destPE, CkGroupID gID, int o
 {
   if (destPE==CkMyPe())
   {
-		if(!CkpvAccess(_validProcessors)[CkMyPe()]){
+		if(!CpvAccess(_validProcessors)[CkMyPe()]){
 			return;
 		}
     IrrGroup *obj=(IrrGroup *)_localBranch(gID);

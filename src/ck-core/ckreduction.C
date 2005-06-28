@@ -416,7 +416,7 @@ void CkReductionMgr::startReduction(int number,int srcPE)
 	/*
 		FAULT_EVAC
 	*/
-	if(!(CkpvAccess(_validProcessors)[CkMyPe()])){
+	if(!(CpvAccess(_validProcessors)[CkMyPe()])){
 		return;
 	}
 	
@@ -429,7 +429,7 @@ void CkReductionMgr::startReduction(int number,int srcPE)
 		for(int i=temp;i<=number;i++){
 			for(int j=0;j<CkNumPes();j++){
 				if(j != CkMyPe() && j != srcPE){
-					if((CkpvAccess(_validProcessors)[j])||allowMessagesOnly !=-1){
+					if((CpvAccess(_validProcessors)[j])||allowMessagesOnly !=-1){
 						thisProxy[j].ReductionStarting(new CkReductionNumberMsg(i));
 					}
 				}
@@ -448,7 +448,7 @@ void CkReductionMgr::startReduction(int number,int srcPE)
 		if(hasParent()){
 	  // kick-start your parent too ...
 			if(treeParent() != srcPE){
-				if((CkpvAccess(_validProcessors)[treeParent()])||allowMessagesOnly !=-1){
+				if((CpvAccess(_validProcessors)[treeParent()])||allowMessagesOnly !=-1){
 		  		thisProxy[treeParent()].ReductionStarting(new CkReductionNumberMsg(i));
 				}	
 			}	
@@ -456,7 +456,7 @@ void CkReductionMgr::startReduction(int number,int srcPE)
 	  for (int k=0;k<treeKids();k++)
 	  {
 			if(firstKid()+k != srcPE){
-				if((CkpvAccess(_validProcessors)[kids[k]])||allowMessagesOnly !=-1){
+				if((CpvAccess(_validProcessors)[kids[k]])||allowMessagesOnly !=-1){
 			    DEBR((AA"Asking child PE %d to start #%d\n"AB,kids[k],redNo));
 			    thisProxy[kids[k]].ReductionStarting(new CkReductionNumberMsg(i));
 				}	
@@ -1461,7 +1461,7 @@ void CkNodeReductionMgr::finishReduction(void)
 
   if (hasParent())
   {//Pass data up tree to parent
-		if(CkpvAccess(_validProcessors)[CkMyNode()] || killed == 0){
+		if(CpvAccess(_validProcessors)[CkMyNode()] || killed == 0){
     	DEBR((AA"Passing reduced data up to parent node %d. \n"AB,treeParent()));
 #if DEBUGRED
     	CkPrintf("[%d,%d] Passing data up to parentNode %d at %.6f for redNo %d with ncontrib %d\n",CkMyNode(),CkMyPe(),treeParent(),CkWallTimer(),redNo,nContrib);
