@@ -194,7 +194,7 @@ void GreedyCommLB::work(BaseLB::LDStats* _stats, int count)
 		xcoord = stats->getHash(commData.sender);
 		ycoord = stats->getHash(commData.receiver.get_destObj());
 		if((xcoord == -1)||(ycoord == -1))
-		    if (_lb_args.ignoreBgLoad()) continue;
+		    if (_lb_args.ignoreBgLoad() || stats->complete_flag==0) continue;
 		    else CkAbort("Error in search\n");
 		add_graph(xcoord,ycoord,commData.bytes, commData.messages);
 	 }
