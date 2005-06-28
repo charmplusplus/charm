@@ -56,8 +56,14 @@ void Refiner::create(int count, BaseLB::LDStats* stats, int* procs)
         computes[i].processor = -1;
         computes[i].oldProcessor = procs[i];
         computes[i].migratable = odata.migratable;
-        if (computes[i].oldProcessor >= P) 
-          CmiAbort("LB Panic: the old processor in RefineLB cannot be found, is this in a simulation mode?");
+        if (computes[i].oldProcessor >= P)  {
+ 	  if (stats->complete_flag)
+            CmiAbort("LB Panic: the old processor in RefineLB cannot be found, is this in a simulation mode?");
+          else {
+              // an object from outside domain, randomize its location
+            computes[i].oldProcessor = CrnRand()%P;
+	  }
+	}
   }
 //  for (i=0; i < numComputes; i++)
 //      processors[computes[i].oldProcessor].computeLoad += computes[i].load;
