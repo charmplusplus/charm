@@ -402,6 +402,7 @@ static void *CthAllocateStack(CthThreadBase *th,int *stackSize,int useMigratable
 }
 static void CthThreadBaseFree(CthThreadBase *th)
 {
+	struct CthThreadListener *l,*lnext;
 	/*
 	 * remove the token if it is not queued in the converse scheduler		
 	 */
@@ -413,7 +414,6 @@ static void CthThreadBaseFree(CthThreadBase *th)
 	/* Call the free function pointer on all the listeners on
 			this thread and also delete the thread listener objects
 	*/
-	struct CthThreadListener *l,*lnext;
 	for(l=th->listener;l!=NULL;l=lnext){
 			lnext=l->next;
 			l->next=0;
