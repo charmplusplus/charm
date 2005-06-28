@@ -49,7 +49,7 @@ public:
   void getInfo(BaseLB::LDStats* stats, int count, int considerComm);
   void clear();
   void print();
-  void getSummary(double &maxLoad, double &totalLoad);
+  void getSummary(double &maxLoad, double &maxCpuLoad, double &totalLoad);
 };
 
 class CentralLB : public BaseLB

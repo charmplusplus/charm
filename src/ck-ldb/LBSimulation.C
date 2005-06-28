@@ -218,12 +218,15 @@ void LBInfo::print()
   CmiPrintf("Non-local comm: %d msgs %lld bytes\n", msgCount, msgBytes);
 }
 
-void LBInfo::getSummary(double &maxLoad, double &totalLoad)
+void LBInfo::getSummary(double &maxLoad, double &maxCpuLoad, double &totalLoad)
 {
   totalLoad = maxLoad = peLoads[0];
+  maxCpuLoad = objLoads[0];
   for (int i = 1; i < numPes; i++) {
     double load = peLoads[i];
     if (load>maxLoad) maxLoad=load;
+    double cpuload = objLoads[i];
+    if (cpuload>maxCpuLoad) maxCpuLoad=cpuload;
     totalLoad += load;
   }
 }

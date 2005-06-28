@@ -16,8 +16,7 @@
 #include "LBDBManager.h"
 #include "LBSimulation.h"
 
-//#define  DEBUGF(x)       CmiPrintf x;
-#define DEBUGF(x) 
+#define  DEBUGF(x)       // CmiPrintf x;
 
 CkGroupID loadbalancer;
 int * lb_ptr;
@@ -158,7 +157,7 @@ void CentralLB::AtSync()
 void CentralLB::ProcessAtSync()
 {
 #if CMK_LBDB_ON
-	CmiAssert(CkpvAccess(_validProcessors)[CkMyPe()]);
+  CmiAssert(CkpvAccess(_validProcessors)[CkMyPe()]);
   if (CkMyPe() == cur_ld_balancer) {
     start_lb_time = CkWallTimer();
   }
@@ -380,9 +379,16 @@ void CentralLB::LoadBalance()
 //  calculate predicted load
 //  very time consuming though, so only happen when debugging is on
   if (_lb_args.printSummary()) {
-      LBInfo info(migrateMsg->expectedLoad, clients);
+      LBInfo info(clients);
         // not take comm data
-      getPredictedLoadWithMsg(statsData, clients, migrateMsg, info, 0);
+      getPredictedLoadWithMsg(statsData, clients, migrateMsg, info, 1);
+      double mLoad, mCpuLoad, totalLoad;
+      info.getSummary(mLoad, mCpuLoad, totalLoad);
+      int nmsgs, nbytes;
+      statsData->computeNonlocalComm(nmsgs, nbytes);
+      CkPrintf("[%d] Load Summary: max (with comm): %f max (obj only): %f total: %f at step %d useMem: %.2fKB nonlocal: %d msgs %.2fKB.\n", CkMyPe(), mLoad, mCpuLoad, totalLoad, step(), (1.0*useMem())/1024, nmsgs, 1.0*nbytes/1024);
+      for (int i=0; i<clients; i++)
+        migrateMsg->expectedLoad[i] = info.peLoads[i];
   }
 
   DEBUGF(("[%d]calling recv migration\n",CkMyPe()));
