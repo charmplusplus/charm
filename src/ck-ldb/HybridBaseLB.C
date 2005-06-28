@@ -64,8 +64,14 @@ HybridBaseLB::HybridBaseLB(const CkLBOptions &opt): BaseLB(opt)
   if (CkNumPes() > 8192) statsStrategy = SHRINK;
   //statsStrategy = SHRINK;
 
-  maxLoad = 0.0;
   vector_n_moves = 0;
+
+  maxLoad = 0.0;
+  maxCpuLoad = 0.0;
+  totalLoad = 0.0;
+  maxCommCount = 0;
+  maxCommBytes = 0.0;
+  maxMem = 0.0;
 
   if (_lb_args.statsOn()) theLbdb->CollectStatsOn();
 #endif
@@ -944,10 +950,12 @@ void HybridBaseLB::MigrationDone(int balancing)
 
 void HybridBaseLB::ResumeClients(CkReductionMsg *msg)
 {
+/*
   if (CkMyPe() == 0 && _lb_args.printSummary()) {
     double mload = *(double *)msg->getData();
     CkPrintf("[%d] MAX Load: %f at step %d.\n", CkMyPe(), mload, step()-1);
   }
+*/
   ResumeClients(1);
   delete msg;
 }
@@ -1046,14 +1054,21 @@ LBMigrateMsg * HybridBaseLB::createMigrateMsg(LDStats* stats,int count)
     DEBUGF(("[%d] obj (%d %d %d %d) migrate from %d to %d\n", CkMyPe(), item->obj.objID().id[0], item->obj.objID().id[1], item->obj.objID().id[2], item->obj.objID().id[3], item->from_pe, item->to_pe));
   }
 
-  if (_lb_args.printSummary() && currentLevel == 1) {
-      LBInfo info(msg->expectedLoad, count);
-      info.getInfo(stats, count, 0);	// no comm cost
-      double totalLoad;
-      info.getSummary(maxLoad, totalLoad);
+  if (_lb_args.printSummary()) {
+    if (currentLevel == 1) {
+      LBInfo info(count);
+      info.getInfo(stats, count, 1);	// no comm cost
+      double mLoad, mCpuLoad, totalLoad;
+      info.getSummary(mLoad, mCpuLoad, totalLoad);
       int nmsgs, nbytes;
       stats->computeNonlocalComm(nmsgs, nbytes);
-      CkPrintf("[%d] Load Summary: max: %f total: %f on %d processors at step %d useMem: %fKB nonlocal: %d %dKB.\n", CkMyPe(), maxLoad, totalLoad, count, step(), (1.0*useMem())/1024, nmsgs, nbytes/1024);
+      //CkPrintf("[%d] Load Summary: max (with comm): %f max (obj only): %f total: %f on %d processors at step %d useMem: %fKB nonlocal: %d %dKB.\n", CkMyPe(), maxLoad, mCpuLoad, totalLoad, count, step(), (1.0*useMem())/1024, nmsgs, nbytes/1024);
+      thisProxy[0].reportLBQulity(mLoad, mCpuLoad, totalLoad, nmsgs, nbytes/1024);
+    }
+    if (currentLevel == tree->numLevels()-2) {
+      double mem = (1.0*useMem())/1024;
+      thisProxy[0].reportLBMem(mem);
+    }
   }
 
   // translate relative pe number to its real number
@@ -1088,6 +1103,42 @@ int HybridBaseLB::NeighborIndex(int pe, int atlevel)
       }
     }
     return peslot;
+}
+
+// only called on PE 0
+void HybridBaseLB::reportLBQulity(double mload, double mCpuLoad, double totalload, int nmsgs, double bytes)
+{
+  static int pecount=0;
+  CmiAssert(CkMyPe() == 0);
+  if (mload > maxLoad) maxLoad = mload;
+  if (mCpuLoad > maxCpuLoad) maxCpuLoad = mCpuLoad;
+  totalLoad += totalload;
+  maxCommCount += nmsgs;
+  maxCommBytes += bytes;   // KB
+  pecount++;
+  if (pecount == tree->numNodes(1)) {
+    CkPrintf("[%d] Load Summary: max (with comm): %f max (obj only): %f total: %f at step %d nonlocal: %d msgs, %.2fKB reported from %d PEs.\n", CkMyPe(), maxLoad, maxCpuLoad, totalLoad, step(), maxCommCount, maxCommBytes, pecount);
+    maxLoad = 0.0;
+    maxCpuLoad = 0.0;
+    totalLoad = 0.0;
+    maxCommCount = 0;
+    maxCommBytes = 0.0;
+    pecount = 0;
+  }
+}
+
+// only called on PE 0
+void HybridBaseLB::reportLBMem(double mem)
+{
+  static int pecount=0;
+  CmiAssert(CkMyPe() == 0);
+  if (mem > maxMem) maxMem = mem;
+  pecount++;
+  if (pecount == tree->numNodes(tree->numLevels()-2)) {
+    CkPrintf("[%d] Load Summary: maxMem: %fKB reported at step %d from %d PEs.\n", CkMyPe(), maxMem, step(), pecount);
+    maxMem = 0.0;
+    pecount = 0;
+  }
 }
 
 int HybridBaseLB::useMem()

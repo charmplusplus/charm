@@ -37,6 +37,7 @@ public:
   virtual int isroot(int mype, int level) = 0;
   virtual int numChildren(int mype, int level) = 0;
   virtual void getChildren(int mype, int level, int *children, int &count) = 0;
+  virtual int numNodes(int level) = 0;
 };
 
 // a simple 3 layer tree, fat at level 1
@@ -93,6 +94,13 @@ public:
       for (int i=0; i<count; i++) 
         children[i] = i*span[0];
     }
+  }
+  virtual int numNodes(int level) {
+    CmiAssert(level>=0 && level<nLevels);
+    if (level == nLevels-1) return 1;
+    int count=1;
+    for (int i=0; i<level; i++) count *= span[i];
+    return CkNumPes()/count;
   }
 };
 
@@ -166,6 +174,12 @@ public:
         children[i] = i*span[0]*span[1]+1;
     }
   }
+  virtual int numNodes(int level) {
+    CmiAssert(level>=0 && level<nLevels);
+    if (level == nLevels-1) return 1;
+    if (level == 0) return CkNumPes();
+    return span[level-1];
+  }
 };
 
 class HybridBaseLB : public BaseLB
@@ -199,6 +213,9 @@ public:
   void StartCollectInfo();
   void CollectInfo(Location *loc, int n, int fromlevel);
   void PropagateInfo(Location *loc, int n, int fromlevel);
+
+  void reportLBQulity(double mload, double mCpuLoad, double totalload, int nmsgs, double bytesentry );
+  void reportLBMem(double);
 
   struct MigrationRecord {
     LDObjHandle handle;
@@ -310,38 +327,18 @@ private:
   int cur_ld_balancer;
   double start_lb_time;
 
-  double maxLoad;
+  double maxLoad;		    // on level = 1
+  double maxCpuLoad;		    // on level = 1
+  double maxCommBytes;      // on level = 1
+  int    maxCommCount;      // on level = 1
+  double totalLoad;
+  double maxMem;                    // on level = max - 1
 
   CkVec<Location> newObjs;
 
   int vector_n_moves;
 };
 
-/*
-class NLBStatsMsg {
-public:
-  int from_pe;
-  int serial;
-  int pe_speed;
-  double total_walltime;
-  double total_cputime;
-  double idletime;
-  double bg_walltime;
-  double bg_cputime;
-  double obj_walltime;   // may not needed
-  double obj_cputime;   // may not needed
-  int n_objs;
-  LDObjData *objData;
-  int n_comm;
-  LDCommData *commData;
-public:
-  NLBStatsMsg(int osz, int csz);
-  NLBStatsMsg(NLBStatsMsg *s);
-  NLBStatsMsg()  {}
-  ~NLBStatsMsg();
-  void pup(PUP::er &p);
-}; 
-*/
 
 #endif /* NBORBASELB_H */
 

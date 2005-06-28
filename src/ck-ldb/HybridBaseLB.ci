@@ -24,6 +24,8 @@ group [migratable] HybridBaseLB: BaseLB {
   entry void StartCollectInfo();
   entry void CollectInfo(Location loc[n], int n, int fromlevel);	
   entry void PropagateInfo(Location loc[n], int n, int fromlevel);
+  entry void reportLBQulity(double, double, double, int, double);
+  entry void reportLBMem(double);
 };
 
 };
