@@ -1745,85 +1745,125 @@ void FEM_Mesh::createElemElemAdj()
   tupleTable table(nodesPerTuple);
 
   // Put tuples into table
-  for (int t=0;t<elem.size();t++) // for each element type
-    if (elem.has(t)) {
-      const int tuplesPerElem = g->elem[t].tuplesPerElem;
-      const int numElements = elem[t].size();
-	  // for every element of  type t:
-      for (int elemNum=0;elemNum<numElements;elemNum++)	{
-		// insert element into the tuple table
-		const int *conn=elem[t].connFor(elemNum);
-		int tuple[tupleTable::MAX_TUPLE];
-		FEM_Symmetries_t allSym;
-		// copy node numbers into tuple
-		for (int u=0;u<tuplesPerElem;u++) {
-		  for (int i=0;i<nodesPerTuple;i++) {
-			if(i!=0) CkPrintf("-");
-			int eidx=g->elem[t].elem2tuple[i+u*g->nodesPerTuple];
-			if (eidx==-1) { //"not-there" node--
-			  tuple[i]=-1; //Don't map via connectivity
-			} else { //Ordinary node
-			  int n=conn[eidx];
-			  tuple[i]=n; 
-			}
-		  }
-		  // add tuple to table
-		  table.addTuple(tuple,new elemList(0,elemNum,t,allSym,u)); 
-		}
-      }
-	}
+  for (int t=0;t<elem.size();t++){ // for each element type
+      if(elem.has(t)) {
+          const int tuplesPerElem = g->elem[t].tuplesPerElem;
+          const int numElements = elem[t].size();
+          // for every element of  type t:
+          for (int elemNum=0;elemNum<numElements;elemNum++)	{
+              // insert element into the tuple table
+              const int *conn=elem[t].connFor(elemNum);
+              int tuple[tupleTable::MAX_TUPLE];
+              FEM_Symmetries_t allSym;
+              // copy node numbers into tuple
+              for (int u=0;u<tuplesPerElem;u++) {
+                  for (int i=0;i<nodesPerTuple;i++) {
+                      if(i!=0){
+                          //   CkPrintf("-");
+                      }
+                      int eidx=g->elem[t].elem2tuple[i+u*g->nodesPerTuple];
+                      if (eidx==-1) { //"not-there" node--
+                          tuple[i]=-1; //Don't map via connectivity
+                      } else { //Ordinary node
+                          int n=conn[eidx];
+                          tuple[i]=n; 
+                      }
+                  }
+                  // add tuple to table
+                  table.addTuple(tuple,new elemList(0,elemNum,t,allSym,u)); 
+              }
+          }
+      
+          // Put corresponding ghost elements into tuple table
+          if(elem[t].getGhost() != NULL){
+              FEM_Elem *ghostElem = (FEM_Elem *)elem[t].getGhost();
+              printf("found some ghost layer, I think its type is %d\n", -(t+1));
+              
+              const int numElements = ghostElem->size();
+              printf("this ghost layer has %d elements in it\n", numElements);
 
+              // for every element of  type t:
+              for (int elemNum=0;elemNum<numElements;elemNum++)	{
+                  // insert element into the tuple table
+                  const int *conn=ghostElem->connFor(elemNum);
+                  int tuple[tupleTable::MAX_TUPLE];
+                  FEM_Symmetries_t allSym;
+                  // copy node numbers into tuple
+                  for (int u=0;u<tuplesPerElem;u++) {
+                      for (int i=0;i<nodesPerTuple;i++) {
+                          if(i!=0){
+                              //   CkPrintf("-");
+                          }
+                          int eidx=g->elem[t].elem2tuple[i+u*g->nodesPerTuple];
+                          if (eidx==-1) { //"not-there" node--
+                              tuple[i]=-1; //Don't map via connectivity
+                          } else { //Ordinary node
+                              int n=conn[eidx];
+                              tuple[i]=n; 
+                          }
+                      }
+                      // add tuple to table
+                      table.addTuple(tuple,new elemList(0,elemNum,t+FEM_GHOST,allSym,u)); 
+                  }
+              }
+          }
+          
+      }
+  }
+  
 
   /* Extract adjacencies from table and store into 
    * FEM_ELEM_ELEM_ADJACENCY and FEM_ELEM_ELEM_ADJ_TYPES 
    * attribute fields
    */
   for (int t=0;t<elem.size();t++) // for each element type t
-    if (elem.has(t)) {
-	  elemList *l;
-	  const int tuplesPerElem = g->elem[t].tuplesPerElem;
-      const int numElements = elem[t].size();
-	  table.beginLookup();
-      
-      // directly modify the element adjacency table for element type t
-      FEM_IndexAttribute *elemAdjAttr = (FEM_IndexAttribute *)elem[t].lookup(FEM_ELEM_ELEM_ADJACENCY,"createElemElemAdj");
-	  AllocTable2d<int> &adjTable = elemAdjAttr->get();
-      int *adjs = adjTable.getData();
-	  FEM_IndexAttribute *elemAdjTypesAttr = (FEM_IndexAttribute *)elem[t].lookup(FEM_ELEM_ELEM_ADJ_TYPES,"createElemElemAdj");
-	  AllocTable2d<int> &adjTypesTable = elemAdjTypesAttr->get();
-	  int *adjTypes = adjTypesTable.getData();
-
-      // initialize tables
-      for(int i=0;i<numElements*tuplesPerElem;i++){
-		adjs[i]=-1;
-		adjTypes[i]=0;
-	  }
-	  
-	  // look through each elemList that is returned by the tuple table
-      while (NULL!=(l=table.lookupNext())) {
-		if (l->next==NULL) { 
-		  // One-entry list: must be a symmetry
-		  // UNHANDLED CASE: not sure exactly what this means
-		}
-		else { /* Several elements in list: normal case */
-		  // for each a,b from the list
-		  for (const elemList *a=l;a!=NULL;a=a->next){
-			for (const elemList *b=l;b!=NULL;b=b->next){
-			  // if a and b are different elements
-			  if((a->localNo != b->localNo) || (a->type != b->type)){
-				int j = a->localNo*tuplesPerElem + a->tupleNo;
-				if(a->type == t){ // only update the entries for element type t
-				  CkAssert(j<numElements*tuplesPerElem);
-				  // CkPrintf("Found adjacent elements %d:%d and %d:%d\n", a->type, a->localNo,b->type,b->localNo);
-				  adjs[j] = b->localNo;
-				  adjTypes[j] = b->type;
-				}
-			  }
-			}
-		  }
-		}
+      if (elem.has(t)) {
+          elemList *l;
+          const int tuplesPerElem = g->elem[t].tuplesPerElem;
+          const int numElements = elem[t].size();
+          table.beginLookup();
+          
+          // directly modify the element adjacency table for element type t
+          FEM_IndexAttribute *elemAdjAttr = (FEM_IndexAttribute *)elem[t].lookup(FEM_ELEM_ELEM_ADJACENCY,"createElemElemAdj");
+          AllocTable2d<int> &adjTable = elemAdjAttr->get();
+          int *adjs = adjTable.getData();
+          FEM_IndexAttribute *elemAdjTypesAttr = (FEM_IndexAttribute *)elem[t].lookup(FEM_ELEM_ELEM_ADJ_TYPES,"createElemElemAdj");
+          AllocTable2d<int> &adjTypesTable = elemAdjTypesAttr->get();
+          int *adjTypes = adjTypesTable.getData();
+          
+          // initialize tables
+          for(int i=0;i<numElements*tuplesPerElem;i++){
+              adjs[i]=-1;
+              adjTypes[i]=0;
+          }
+          
+          // look through each elemList that is returned by the tuple table
+          while (NULL!=(l=table.lookupNext())) {
+              if (l->next==NULL) { 
+                  // One-entry list: must be a symmetry
+                  // UNHANDLED CASE: not sure exactly what this means
+              }
+              else { /* Several elements in list: normal case */
+                  // for each a,b from the list
+                  for (const elemList *a=l;a!=NULL;a=a->next){
+                      for (const elemList *b=l;b!=NULL;b=b->next){
+                          // if a and b are different elements
+                          if(t==0)CkPrintf("Found adjacent elements %d:%d and %d:%d\n", a->type, a->localNo,b->type,b->localNo);
+                          
+                          if((a->localNo != b->localNo) || (a->type != b->type)){
+                              int j = a->localNo*tuplesPerElem + a->tupleNo;
+                              if(a->type == t){ // only update the entries for element type t
+                                  CkAssert(j<numElements*tuplesPerElem);
+                                  // CkPrintf("Found adjacent elements %d:%d and %d:%d\n", a->type, a->localNo,b->type,b->localNo);
+                                  adjs[j] = b->localNo;
+                                  adjTypes[j] = b->type;
+                              }
+                          }
+                      }
+                  }
+              }
+          }
       }
-    }
 }
 
 
