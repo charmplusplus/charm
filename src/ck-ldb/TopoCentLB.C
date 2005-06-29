@@ -521,11 +521,11 @@ void TopoCentLB :: work(CentralLB::LDStats *stats,int count)
     CmiAbort ("TopoCentLB: no available processors!");
   }
 
+  
   removeNonMigratable(stats,count);
 
 	int *newmap = new int[stats->n_objs];
 
-	//CkPrintf("before computing partitions...\n");
 
 	if(make_mapping)
 		computePartitions(stats,count,newmap);
@@ -536,8 +536,7 @@ void TopoCentLB :: work(CentralLB::LDStats *stats,int count)
     }
 	}
 	
-	/*CkPrintf("obj-proc mapping\n");
-	for(i=0;i<stats->n_objs;i++)
+	/*for(i=0;i<stats->n_objs;i++)
 		CkPrintf(" %d,%d ",i,newmap[i]);
 	*/
 	int max_objs = findMaxObjs(newmap,stats->n_objs,count);
@@ -557,7 +556,9 @@ void TopoCentLB :: work(CentralLB::LDStats *stats,int count)
 	}
 
 	int *addedComm=new int[count];
-
+  
+  stats->makeCommHash();
+  
 	int max_comm_part=-1;
 	
 	double max_comm=0;
@@ -712,9 +713,7 @@ void TopoCentLB :: work(CentralLB::LDStats *stats,int count)
 	topo = topofn(count);
 
 	//double fourth = CmiWallTimer();
-	//CkPrintf("before calling algo...:%lf\n",(fourth-th));
 	calculateMST(partgraph,topo,proc_mapping,max_comm_part);
-	//CkPrintf("after calling algo...:%lf\n",(CmiWallTimer()-fourth));
 	//Returned partition graph is a Maximum Spanning Tree -- converted in above function itself
 
 	//Construct the Topology Graph
