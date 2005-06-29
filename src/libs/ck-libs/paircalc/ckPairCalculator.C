@@ -4,12 +4,12 @@
 /***************************************************************************
  * This is a matrix multiply library with extra frills to communicate the  *
  * results back to gspace or the calling ortho char as directed by the     *
- * callback.                                                               *   
+ * callback.                                                               *
  *                                                                         *
  * The extra complications are for parallelization and the multiplication  *
  * of the forces and energies.                                             *
  *                                                                         *
- * In normal use the calculator is created.  Then forces are sent to it    * 
+ * In normal use the calculator is created.  Then forces are sent to it    *
  * and multiplied in a big dgemm.  Then this result is reduced to the      *
  * answer matrix and shipped back.  The received left and/or right data is *
  * retained for the backward pass which is triggered by the finishPairCalc *
@@ -24,25 +24,54 @@
  * It operates by one dummy reduction which is used to indicate that all   *
  * calculators on a PE machine have reported in.  Then the machine         *
  * reduction is triggered.                                                 *
+ *                                                                         *
+ * The paircalculator is a 4 dimensional array.  Those dimensions are:     *
+ *            w: gspace state plane (the second index of the 2D gspace)    *
+ *            x: coordinate offset within plane (a factor of grainsize)    *
+ *            y: coordinate offset within plane (a factor of grainsize)    *
+ *            z: blocksize, unused always 0                                *
+ *       So, for grainsize 64 for a size 128x128 problem:                  *
+ *        1st quadrant ranges from [0,0]   to [63,63]    index [w,0,0,0]   *
+ *        2nd quadrant ranges from [0,64]  to [63,127]   index [w,0,64,0]  *
+ *        3rd quadrant ranges from [64,0]  to [127,63]   index [w,64,0,0]  *
+ *        4th quadrant ranges from [64,64] to [127,127]  index [w,64,64,0] *
+ *                                                                         *
+ *       0   64   127                                                      *
+ *     0 _________                                                         *
+ *       |   |   |                                                         *
+ *       | 1 | 2 |                                                         *
+ *    64 ---------                                                         *
+ *       |   |   |                                                         *
+ *       | 3 | 4 |                                                         *
+ *   127 ---------                                                         *
+ *                                                                         *
+ *                                                                         *
+ *                                                                         *
+ * Further complication arises from the fact that each plane is a          *
+ * cross-section of a sphere.  So the actual data is sparse and is         *
+ * represented by a contiguous set of the nonzero elements.  This is       * 
+ * commonly referred to as N or size within the calculator.                *
+ *                                                                         *
  ***************************************************************************/
+
 ComlibInstanceHandle mcastInstanceCP;
 
 PairCalculator::PairCalculator(CkMigrateMessage *m) { }
 
-PairCalculator::PairCalculator(bool sym, int grainSize, int s, int blkSize,  int op1,  FuncType fn1, int op2,  FuncType fn2, CkCallback cb, CkGroupID gid, CkArrayID cb_aid, int cb_ep, bool conserveMemory, bool lbpaircalc, CkCallback lbcb,bool _machreduce, bool gspacesum) 
+PairCalculator::PairCalculator(bool sym, int grainSize, int s, int blkSize,  int op1,  FuncType fn1, int op2,  FuncType fn2, CkCallback cb, CkGroupID gid, CkArrayID cb_aid, int cb_ep, bool conserveMemory, bool lbpaircalc, CkCallback lbcb,bool _machreduce, bool gspacesum)
 {
-#ifdef _PAIRCALC_DEBUG_ 
+#ifdef _PAIRCALC_DEBUG_
   CkPrintf("[PAIRCALC] [%d %d %d %d] inited lb %d \n", thisIndex.w, thisIndex.x, thisIndex.y, thisIndex.z,lbpaircalc);
-#endif 
+#endif
   this->conserveMemory=conserveMemory;
   this->symmetric = sym;
   this->grainSize = grainSize;
   this->S = s;
   this->blkSize = blkSize;
-  this->op1 = op1; 
-  this->fn1 = fn1; 
-  this->op2 = op2; 
-  this->fn2 = fn2; 
+  this->op1 = op1;
+  this->fn1 = fn1;
+  this->op2 = op2;
+  this->fn2 = fn2;
   this->cb = cb;
   this->N = -1;
   this->cb_aid = cb_aid;
@@ -73,7 +102,7 @@ PairCalculator::PairCalculator(bool sym, int grainSize, int s, int blkSize,  int
   else
     setMigratable(false);
 
-  CProxy_PairCalcReducer pairCalcReducerProxy(reducer_id); 
+  CProxy_PairCalcReducer pairCalcReducerProxy(reducer_id);
   CkArrayIndex4D indx4(thisIndex.w,thisIndex.x, thisIndex.y, thisIndex.z);
   CkArrayID myaid=thisProxy.ckGetArrayID();
   IndexAndID *iandid= new IndexAndID(&indx4,&myaid);
@@ -128,7 +157,7 @@ PairCalculator::pup(PUP::er &p)
       inDataLeft=NULL;
     if(existsRight)
       inDataRight = new double[2*numExpected*N];
-    else 
+    else
       inDataRight=NULL;
 
   }
@@ -138,9 +167,9 @@ PairCalculator::pup(PUP::er &p)
   if(existsRight)
     p((void*) inDataRight, numExpected* N * 2* sizeof(double));
   //p(inDataRight, numExpected * N * 2);
-  /*  if (p.isUnpacking()) 
+  /*  if (p.isUnpacking())
     {
-      CProxy_PairCalcReducer pairCalcReducerProxy(reducer_id); 
+      CProxy_PairCalcReducer pairCalcReducerProxy(reducer_id);
       CkArrayIndex4D indx4(thisIndex.w,thisIndex.x, thisIndex.y, thisIndex.z);
       CkArrayID myaid=thisProxy.ckGetArrayID();
       IndexAndID *iandid= new IndexAndID(&indx4,&myaid);
@@ -149,7 +178,7 @@ PairCalculator::pup(PUP::er &p)
     }
   */
 #ifdef _PAIRCALC_DEBUG_
-  if (p.isUnpacking()) 
+  if (p.isUnpacking())
     {
       CkPrintf("[%d,%d,%d,%d,%d] pup unpacking on %d resumed=%d memory %d\n",thisIndex.w,thisIndex.x, thisIndex.y, thisIndex.z,symmetric,CkMyPe(),resumed, CmiMemoryUsage());
       CkPrintf("[%d,%d,%d,%d,%d] pupped : %d %d %d %d %d %d %d %d %d fn1 fn2 %d %d %d %d %d cb cb_aid %d reducer_id sparsRed %d %d cb_lb inDataLeft inDataRight outData newData %d %d\n",thisIndex.w,thisIndex.x, thisIndex.y, thisIndex.z,symmetric, numRecd, numExpected, grainSize, S, blkSize, N, kUnits, op1, op2, sumPartialCount,symmetric, conserveMemory, lbpaircalc, machreduce, cb_ep, existsLeft, existsRight, gspacesum, resumed);
@@ -159,7 +188,7 @@ PairCalculator::pup(PUP::er &p)
     CkPrintf("[%d,%d,%d,%d,%d] pup called on %d\n",thisIndex.w,thisIndex.x, thisIndex.y, thisIndex.z,symmetric,CkMyPe());
 #endif
 
-  
+
 }
 
 PairCalculator::~PairCalculator()
@@ -168,7 +197,7 @@ PairCalculator::~PairCalculator()
 #ifdef _PAIRCALC_DEBUG_
       CkPrintf("[%d,%d,%d,%d,%d] destructs on [%d]\n",thisIndex.w,thisIndex.x,thisIndex.y, thisIndex.z, symmetric, CkMyPe());
 #endif
-  if(outData!=NULL)  
+  if(outData!=NULL)
     delete [] outData;
 
   if(inDataLeft!=NULL)
@@ -187,7 +216,7 @@ void PairCalculator::ResumeFromSync() {
 #ifdef _PAIRCALC_DEBUG_
       CkPrintf("[%d,%d,%d,%d,%d] resumes from sync\n",thisIndex.w,thisIndex.x,thisIndex.y, thisIndex.z, symmetric);
 #endif
-      CProxy_PairCalcReducer pairCalcReducerProxy(reducer_id); 
+      CProxy_PairCalcReducer pairCalcReducerProxy(reducer_id);
       CkArrayIndex4D indx4(thisIndex.w,thisIndex.x, thisIndex.y, thisIndex.z);
       CkArrayID myaid=thisProxy.ckGetArrayID();
       IndexAndID *iandid= new IndexAndID(&indx4,&myaid);
@@ -209,10 +238,10 @@ PairCalculator::calculatePairs_gemm(calculatePairsMsg *msg)
   int offset = -1;
   if (msg->fromRow) {   // This could be the symmetric diagonal case
     offset = msg->sender - thisIndex.x;
-    if (inDataLeft==NULL) 
+    if (inDataLeft==NULL)
       { // now that we know N we can allocate contiguous space
 	existsLeft=true;
-	N = msg->size; // N is init here with the size of the data chunk. 
+	N = msg->size; // N is init here with the size of the data chunk.
 	inDataLeft = new double[numExpected*N*2];
 	memset(inDataLeft,0,numExpected*N*2*sizeof(double));
 #ifdef _PAIRCALC_DEBUG_
@@ -231,7 +260,7 @@ PairCalculator::calculatePairs_gemm(calculatePairsMsg *msg)
     double re;
     double im;
     for(int i=0;i<N;i++)
-      {	
+      {
 	re=msg->points[i].re;
 	im=msg->points[i].im;
 	CkPrintf("CL %d %g %g\n",i,re,im);
@@ -244,10 +273,10 @@ PairCalculator::calculatePairs_gemm(calculatePairsMsg *msg)
   }
   else {
     offset = msg->sender - thisIndex.y;
-    if (inDataRight==NULL) 
+    if (inDataRight==NULL)
       { // now that we know N we can allocate contiguous space
 	existsRight=true;
-	N = msg->size; // N is init here with the size of the data chunk. 
+	N = msg->size; // N is init here with the size of the data chunk.
 	inDataRight = new double[numExpected*N*2];
 	memset(inDataRight,0,numExpected*N*2*sizeof(double));
 #ifdef _PAIRCALC_DEBUG_
@@ -278,7 +307,7 @@ PairCalculator::calculatePairs_gemm(calculatePairsMsg *msg)
   }
 
 
-  /* 
+  /*
    *  NOTE: For this to work the data chunks of the same plane across
    *  all states must be of the same size
    */
@@ -288,10 +317,10 @@ PairCalculator::calculatePairs_gemm(calculatePairsMsg *msg)
 
   /*
    * Once we have accumulated all rows  we gemm it.
-   * (numExpected X N) X (N X numExpected) = (numExpected X numExpected) 
+   * (numExpected X N) X (N X numExpected) = (numExpected X numExpected)
    */
-  /* To make this work, we transpose the first matrix (A). 
-     In C++ it appears to be: 
+  /* To make this work, we transpose the first matrix (A).
+     In C++ it appears to be:
      * (ydima X ydimb) = (ydima X xdima) X (xdimb X ydimb)
 
      * Which would be wrong, this works because we're using fortran
@@ -331,7 +360,7 @@ PairCalculator::calculatePairs_gemm(calculatePairsMsg *msg)
     int ldb=doubleN;   //leading dimension B
     int ldc=numExpected;   //leading dimension C
 
-    double alpha=double(1.0);//multiplicative identity 
+    double alpha=double(1.0);//multiplicative identity
     double beta=double(0.0); // C is unset
 #ifndef CMK_OPTIMIZE
     double StartTime=CmiWallTimer();
@@ -339,7 +368,7 @@ PairCalculator::calculatePairs_gemm(calculatePairsMsg *msg)
 #ifdef _PAIRCALC_DEBUG_
     CkPrintf("[%d,%d,%d,%d,%d] gemming %c %c %d %d %d %f A %d B %d %f C %d\n",thisIndex.w,thisIndex.x,thisIndex.y,thisIndex.z,symmetric,transformT,transform, m_in, n_in, k_in, alpha, lda, ldb, beta, ldc);
 #endif
-    if( numRecd == numExpected * 2) 
+    if( numRecd == numExpected * 2)
       {
 #ifdef _PAIRCALC_DEBUG_PARANOID_
 	CkPrintf("[%d,%d,%d,%d,%d] L=A\n",thisIndex.w,thisIndex.x,thisIndex.y,thisIndex.z,symmetric);
@@ -388,12 +417,12 @@ PairCalculator::calculatePairs_gemm(calculatePairsMsg *msg)
     else
       {
 	//CkPrintf("[%d] ELAN VERSION %d\n", CkMyPe(), symmetric);
-	CProxy_PairCalcReducer pairCalcReducerProxy(reducer_id); 
-	pairCalcReducerProxy.ckLocalBranch()->acceptContribute(S * S, outData, 
+	CProxy_PairCalcReducer pairCalcReducerProxy(reducer_id);
+	pairCalcReducerProxy.ckLocalBranch()->acceptContribute(S * S, outData,
 							       cb, !symmetric, symmetric, thisIndex.x, thisIndex.y, grainSize);
-#ifdef _ELAN_PAIRCALC_DEBUG_ 
+#ifdef _ELAN_PAIRCALC_DEBUG_
 	CkPrintf("[PAIRCALC] [%d %d %d %d %d] called acceptContribute \n", thisIndex.w, thisIndex.x, thisIndex.y, thisIndex.z,symmetric);
-#endif 
+#endif
 
       }
 
@@ -435,7 +464,7 @@ PairCalculator::acceptResult(int size, double *matrix1, double *matrix2)
 
   complex *mynewData = new complex[N*grainSize];
 
-  /* I don't think this has any purpose 
+  /* I don't think this has any purpose
   complex *othernewData;
   if(symmetric && thisIndex.x != thisIndex.y){
       othernewData = new complex[N*grainSize];
@@ -445,7 +474,7 @@ PairCalculator::acceptResult(int size, double *matrix1, double *matrix2)
   int offset = 0, index = thisIndex.y*S + thisIndex.x;
 
   //ASSUMING TMATRIX IS REAL (LOSS OF GENERALITY)
-  register double m=0;  
+  register double m=0;
 
 
   int matrixSize=grainSize*grainSize;
@@ -456,7 +485,7 @@ PairCalculator::acceptResult(int size, double *matrix1, double *matrix2)
   index = thisIndex.x*S + thisIndex.y;
   double *localMatrix;
   double *outMatrix;
-  if(S!=grainSize)  
+  if(S!=grainSize)
     {
       // copy grainSize chunks at S offsets
       amatrix=new double[matrixSize];
@@ -473,7 +502,7 @@ PairCalculator::acceptResult(int size, double *matrix1, double *matrix2)
 
 #ifdef _PAIRCALC_DEBUG_
   for (int i = 0; i < grainSize; i++) {
-    for (int j = 0; j < grainSize; j++){ 
+    for (int j = 0; j < grainSize; j++){
       m = matrix1[index + j + i*S];
       if(m!=amatrix[i*grainSize+j]){CkPrintf("Dcopy broken in back path: %2.5g != %2.5g \n", m, amatrix[i*grainSize+j]);}
     }
@@ -481,7 +510,7 @@ PairCalculator::acceptResult(int size, double *matrix1, double *matrix2)
 #endif //_PAIRCALC_DEBUG_
 
   int m_in=grainSize;
-  int n_in=N*2;  
+  int n_in=N*2;
   int k_in=grainSize;
   double *mynewDatad= reinterpret_cast <double *> (mynewData);
   double alphad(1.0);
@@ -501,7 +530,7 @@ PairCalculator::acceptResult(int size, double *matrix1, double *matrix2)
 
   if(!unitcoef){
 
-    if(S!=grainSize)  
+    if(S!=grainSize)
       for(int i=0;i<grainSize;i++){
 	localMatrix = (matrix2+index+i*S);
 	outMatrix   = amatrix+i*grainSize;
@@ -512,7 +541,7 @@ PairCalculator::acceptResult(int size, double *matrix1, double *matrix2)
 
 #ifdef _PAIRCALC_DEBUG_
     for (int i = 0; i < grainSize; i++) {
-      for (int j = 0; j < grainSize; j++){ 
+      for (int j = 0; j < grainSize; j++){
 	m = matrix2[index + j + i*S];
 
 	if(m!=amatrix[i*grainSize+j]){CkPrintf("Dcopy broken in back path: %2.5g != %2.5g \n",
@@ -530,14 +559,14 @@ PairCalculator::acceptResult(int size, double *matrix1, double *matrix2)
     traceUserBracketEvent(240, StartTime, CmiWallTimer());
 #endif
   }
-  if(S!=grainSize)  
+  if(S!=grainSize)
     delete [] amatrix;
   // else we didn't allocate one
 
-  /* revise this to partition the data into S/M objects 
+  /* revise this to partition the data into S/M objects
    * add new message and entry method for sumPartial result
    * to avoid message copying.
-   */ 
+   */
 
   //original version
 #ifndef _PAIRCALC_SECONDPHASE_LOADBAL_
@@ -561,9 +590,9 @@ PairCalculator::acceptResult(int size, double *matrix1, double *matrix2)
       segments+=1;
   int blocksize=grainSize/segments;
   int priority=0xFFFFFFFF;
-  if(!symmetric){    
+  if(!symmetric){
     for(int segment=0;segment < segments;segment++)
-      {  
+      {
 	CkArrayIndex4D idx(thisIndex.w, segment*grainSize, thisIndex.y, thisIndex.z);
 	partialResultMsg *msg = new (N*blocksize, 8*sizeof(int) )partialResultMsg;
 	msg->N=N*blocksize;
@@ -571,11 +600,11 @@ PairCalculator::acceptResult(int size, double *matrix1, double *matrix2)
 	memcpy(msg->result,mynewData+segment*N*blocksize,msg->N*sizeof(complex));
 	msg->cb= cb;
 	*((int*)CkPriorityPtr(msg)) = priority;
-	CkSetQueueing(msg, CK_QUEUEING_IFIFO); 
-	thisProxy(idx).sumPartialResult(msg);  
+	CkSetQueueing(msg, CK_QUEUEING_IFIFO);
+	thisProxy(idx).sumPartialResult(msg);
       }
   }
-  else if (gspacesum){ 
+  else if (gspacesum){
     // we just send these to gspace where acceptNewPsi will put them together
     // this should be fairly load balanced as long as gspace is balanced
     /*
@@ -590,15 +619,15 @@ PairCalculator::acceptResult(int size, double *matrix1, double *matrix2)
     for(int j=0;j<grainSize;j++)
       {
 
-	//	CkCallback mycb(cb_ep, CkArrayIndex2D(thisIndex.y+j+offset, thisIndex.w), cb_aid);	
+	//	CkCallback mycb(cb_ep, CkArrayIndex2D(thisIndex.y+j+offset, thisIndex.w), cb_aid);
 
-	CkCallback mycb(cb_ep, CkArrayIndex2D(j+thisIndex.y ,thisIndex.w), cb_aid);	
+	CkCallback mycb(cb_ep, CkArrayIndex2D(j+thisIndex.y ,thisIndex.w), cb_aid);
 	partialResultMsg *msg = new (N, 8*sizeof(int) )partialResultMsg;
 	msg->N=N;
 	msg->myoffset = j; // someplace in the state
 	memcpy(msg->result,mynewData+j*N,msg->N*sizeof(complex));
 	*((int*)CkPriorityPtr(msg)) = priority;
-	CkSetQueueing(msg, CK_QUEUEING_IFIFO); 
+	CkSetQueueing(msg, CK_QUEUEING_IFIFO);
 #ifdef _PAIRCALC_DEBUG_
 	CkPrintf("sending partial of size %d offset %d to [%d %d]\n",N,j,thisIndex.y+j,thisIndex.w);
 #endif
@@ -607,8 +636,8 @@ PairCalculator::acceptResult(int size, double *matrix1, double *matrix2)
       }
 
   }
-  else //sum in paircalc 
-    { 
+  else //sum in paircalc
+    {
       CkArrayIndex4D idx(thisIndex.w, 0, thisIndex.y, thisIndex.z);
       partialResultMsg *msg = new (N*grainSize, 8*sizeof(int) )partialResultMsg;
       msg->N=N*grainSize;
@@ -616,8 +645,8 @@ PairCalculator::acceptResult(int size, double *matrix1, double *matrix2)
       memcpy(msg->result,mynewData,msg->N*sizeof(complex));
       msg->cb= cb;
       *((int*)CkPriorityPtr(msg)) = priority;
-      CkSetQueueing(msg, CK_QUEUEING_IFIFO); 
-      thisProxy(idx).sumPartialResult(msg);  
+      CkSetQueueing(msg, CK_QUEUEING_IFIFO);
+      thisProxy(idx).sumPartialResult(msg);
     }
 #endif
 
@@ -650,7 +679,7 @@ PairCalculator::acceptResult(int size, double *matrix1, double *matrix2)
 
 }
 
-void 
+void
 PairCalculator::sumPartialResult(partialResultMsg *msg)
 {
 #ifdef _PAIRCALC_DEBUG_
@@ -664,7 +693,7 @@ PairCalculator::sumPartialResult(partialResultMsg *msg)
 
 
 
-void 
+void
 PairCalculator::sumPartialResult(priorSumMsg *msg)
 {
 #ifdef _PAIRCALC_DEBUG_
@@ -677,7 +706,7 @@ PairCalculator::sumPartialResult(priorSumMsg *msg)
 }
 
 
-void 
+void
 PairCalculator::sumPartialResult(int size, complex *result, int offset)
 {
 #ifdef _PAIRCALC_DEBUG_
@@ -690,7 +719,7 @@ PairCalculator::sumPartialResult(int size, complex *result, int offset)
     newData = new complex[size];
     memset(newData,0,size*sizeof(complex));
     existsNew=true;
-  }  
+  }
   for(int i=0; i<size; i++){
     newData[i] += result[i];
   }
@@ -737,7 +766,7 @@ inline void add_double(void *in, void *inout, int *red_size, void *handle) {
     double * matrix1 = (double *)in;
     double * matrix2 = (double *)inout;
     int size = *red_size / sizeof(double);
-    
+
     for(int i = 0; i < size; i ++){
         matrix2[i] += matrix1[i];
     }
@@ -749,13 +778,13 @@ inline void add_double(void *in, void *inout, int *red_size, void *handle) {
 
 typedef void (* ELAN_REDUCER)(void *in, void *inout, int *count, void *handle);
 
-extern "C" void elan_machine_reduce(int nelem, int size, void * data, 
+extern "C" void elan_machine_reduce(int nelem, int size, void * data,
                                     void *dest, ELAN_REDUCER fn, int root);
-extern "C" void elan_machine_allreduce(int nelem, int size, void * data, 
+extern "C" void elan_machine_allreduce(int nelem, int size, void * data,
                                        void *dest, ELAN_REDUCER fn);
 #endif
 
-void PairCalcReducer::acceptContribute(int size, double* matrix, CkCallback cb, 
+void PairCalcReducer::acceptContribute(int size, double* matrix, CkCallback cb,
                                        bool isAllReduce, bool symmtype, int offx, int offy, int grainSize)
 {
     this->isAllReduce = isAllReduce;
@@ -767,7 +796,7 @@ void PairCalcReducer::acceptContribute(int size, double* matrix, CkCallback cb,
     reduction_elementCount ++;
 #ifdef _ELAN_PAIRCALC_DEBUG_
     CkPrintf("Accept contribute called on %d count is %d out of %d\n",CkMyPe(),reduction_elementCount, localElements[symmtype].length());
-#endif        
+#endif
     int red_size = size *sizeof(double);
     if(tmp_matrix == NULL) {
         tmp_matrix = new double[size];
@@ -777,13 +806,13 @@ void PairCalcReducer::acceptContribute(int size, double* matrix, CkCallback cb,
     for(int i = 0; i < grainSize*grainSize ; i ++){
         tmp_matrix[i+off] += matrix[i];
     }
-    
+
     if(reduction_elementCount == localElements[symmtype].length()) {
-        
+
 #ifdef _ELAN_PAIRCALC_DEBUG_
     CkPrintf("[%d] Contributing %d \n",CkMyPe(),reduction_elementCount);
 
-#endif        
+#endif
         reduction_elementCount = 0;
         contribute(sizeof(int),&reduction_elementCount,CkReduction::sum_int);
 
@@ -799,23 +828,23 @@ void PairCalcReducer::startMachineReduction() {
     double * dst_matrix =  NULL;
 #ifdef _ELAN_PAIRCALC_DEBUG_
     CkPrintf("Starting machine reduction %d\n",CkMyPe());
-#endif    
+#endif
     if(isAllReduce) {
         dst_matrix = new double[size];
         memset(dst_matrix, 0, size * sizeof(double));
         elan_machine_allreduce(size, sizeof(double), tmp_matrix, dst_matrix, add_double);
     }
-    else {     
+    else {
         int pe = CkNumPes()/2; //HACK FOO BAR, GET IT FROM CALLBACK cb
-        
+
         if(pe == CkMyPe()) {
             dst_matrix = new double[size];
             memset(dst_matrix, 0, size * sizeof(double));
         }
-        
+
         elan_machine_reduce(size, sizeof(double), tmp_matrix, dst_matrix, add_double, pe);
     }
-    
+
     if(isAllReduce) {
          broadcastEntireResult(size, dst_matrix,  symmtype);
         delete [] dst_matrix;
@@ -825,12 +854,12 @@ void PairCalcReducer::startMachineReduction() {
             cb.send(size *sizeof(double), dst_matrix);
             delete [] dst_matrix;
         }
-    }        
+    }
     delete [] tmp_matrix;
     tmp_matrix = NULL;
 #ifdef _ELAN_PAIRCALC_DEBUG_
     CkPrintf("Leaving machine reduction %d\n",CkMyPe());
-#endif    
+#endif
 #else
     CkAbort("Converse Version Is not ELAN, h/w reduction is not supported");
 #endif
@@ -909,10 +938,10 @@ PairCalculator::calculatePairs(int size, complex *points, int sender, bool fromR
 #endif
   }
 
-  N = size; // N is init here with the size of the data chunk. 
+  N = size; // N is init here with the size of the data chunk.
             // Assuming that data chunk of the same plane across all states are of the same size
 
-  if (inData==NULL) 
+  if (inData==NULL)
   { // now that we know N we can allocate contiguous space
     inData = new complex[numExpected*N];
   }
@@ -928,11 +957,11 @@ PairCalculator::calculatePairs(int size, complex *points, int sender, bool fromR
 
 #ifdef _PAIRCALC_FIRSTPHASE_STREAM_
 
-  if((kLeftCount >= kUnits 
-      && ((kRightCount >= kUnits) || (symmetric && thisIndex.x == thisIndex.y) )) 
-     || (numRecd == numExpected * 2) 
+  if((kLeftCount >= kUnits
+      && ((kRightCount >= kUnits) || (symmetric && thisIndex.x == thisIndex.y) ))
+     || (numRecd == numExpected * 2)
      || ((symmetric && thisIndex.x==thisIndex.y && numRecd==numExpected)))
-      // if enough submatrix has arrived from both left and right matrixes; 
+      // if enough submatrix has arrived from both left and right matrixes;
       // or if enough submatrix has arrived from left and this is diagonal one;
       // or if all submatrix has arrived
     {
@@ -947,7 +976,7 @@ PairCalculator::calculatePairs(int size, complex *points, int sender, bool fromR
       if(! (symmetric && thisIndex.x == thisIndex.y))
 	  kRightReady = kRightCount - kRightCount % kUnits;
 
-      if (numRecd == numExpected * 2 
+      if (numRecd == numExpected * 2
 	  || (symmetric && thisIndex.x==thisIndex.y && numRecd==numExpected))
 	{ // if all has arrived, then finish whatever is remained
 	  kLeftReady = kLeftCount;
@@ -967,13 +996,13 @@ PairCalculator::calculatePairs(int size, complex *points, int sender, bool fromR
 	      {
 		  leftoffset2 = kLeftOffset[kLeft2];
 		  // if(leftoffset1 <= leftoffset2) {
-		  outData[leftoffset1 * grainSize + leftoffset2] = 
-		    compute_entry(size, &(inDataLeft[leftoffset1*N]), &(inDataLeft[leftoffset2*N]),op1);   
+		  outData[leftoffset1 * grainSize + leftoffset2] =
+		    compute_entry(size, &(inDataLeft[leftoffset1*N]), &(inDataLeft[leftoffset2*N]),op1);
 		  //}
 	      }
 	  }
       }
-      else {                                                        
+      else {
 	// compute a square region of the matrix. The correct part of the
 	// region will be used by the reduction.
 
@@ -981,11 +1010,11 @@ PairCalculator::calculatePairs(int size, complex *points, int sender, bool fromR
 	for(int kLeft=kLeftDoneCount; kLeft<kLeftDoneCount + kLeftReady; kLeft++)
 	  {
 	    leftoffset = kLeftOffset[kLeft];
-	    for(int kRight=0; kRight<kRightDoneCount + kRightReady; kRight++) 
+	    for(int kRight=0; kRight<kRightDoneCount + kRightReady; kRight++)
 	      {
 	       rightoffset = kRightOffset[kRight];
-		outData[leftoffset * grainSize + rightoffset] = 
-		    compute_entry(size, &(inDataLeft[leftoffset*N]), &(inDataRight[rightoffset*N]),op1);     
+		outData[leftoffset * grainSize + rightoffset] =
+		    compute_entry(size, &(inDataLeft[leftoffset*N]), &(inDataRight[rightoffset*N]),op1);
 	      }
 	  }
 
@@ -993,11 +1022,11 @@ PairCalculator::calculatePairs(int size, complex *points, int sender, bool fromR
 	for(int kLeft=0; kLeft<kLeftDoneCount; kLeft++)
 	  {
 	    leftoffset = kLeftOffset[kLeft];
-	    for(int kRight=kRightDoneCount; kRight<kRightDoneCount + kRightReady; kRight++) 
+	    for(int kRight=kRightDoneCount; kRight<kRightDoneCount + kRightReady; kRight++)
 	      {
 	       rightoffset = kRightOffset[kRight];
-		outData[leftoffset * grainSize + rightoffset] = 
-		    compute_entry(size, &(inDataLeft[leftoffset*N]), &(inDataRight[rightoffset*N]),op1);       
+		outData[leftoffset * grainSize + rightoffset] =
+		    compute_entry(size, &(inDataLeft[leftoffset*N]), &(inDataRight[rightoffset*N]),op1);
 	      }
 	  }
 
@@ -1032,18 +1061,18 @@ PairCalculator::calculatePairs(int size, complex *points, int sender, bool fromR
 
 #if CONVERSE_VERSION_ELAN
       //CkPrintf("[%d] ELAN VERSION %d\n", CkMyPe(), symmetric);
-      CProxy_PairCalcReducer pairCalcReducerProxy(reducer_id); 
-      pairCalcReducerProxy.ckLocalBranch()->acceptContribute(S * S, outData, 
+      CProxy_PairCalcReducer pairCalcReducerProxy(reducer_id);
+      pairCalcReducerProxy.ckLocalBranch()->acceptContribute(S * S, outData,
                                                              cb, !symmetric, symmetric);
 #endif
 
   }
 
-#else 
+#else
 
 // Below is the old version, very dusty
   if (numRecd == numExpected * 2 || (symmetric && thisIndex.x==thisIndex.y && numRecd==numExpected)) {
-    //    kLeftCount=kRightCount=0;  
+    //    kLeftCount=kRightCount=0;
 #ifdef _PAIRCALC_DEBUG_
     CkPrintf("     pairCalc[%d %d %d %d] got expected %d\n", thisIndex.w, thisIndex.x, thisIndex.y, thisIndex.z,  numExpected);
 #endif
@@ -1055,33 +1084,33 @@ PairCalculator::calculatePairs(int size, complex *points, int sender, bool fromR
         if(size1 > 0) {
 	    int start_offset = size-size1;
             for (i = 0; i < grainSize; i++)
-                for (j = 0; j < grainSize; j++) 
+                for (j = 0; j < grainSize; j++)
                     outData[i * grainSize + j] = compute_entry(size1, &(inDataLeft[i*N])+start_offset,
-                                                               &(inDataLeft[j*N])+start_offset, op1);        
+                                                               &(inDataLeft[j*N])+start_offset, op1);
         }
         for(size1 = 0; size1 + PARTITION_SIZE < size; size1 += PARTITION_SIZE) {
             for (i = 0; i < grainSize; i++)
-                for (j = 0; j < grainSize; j++) 
+                for (j = 0; j < grainSize; j++)
                     outData[i * grainSize + j] += compute_entry(PARTITION_SIZE, &(inDataLeft[i*N])+size1,
                                                                 &(inDataLeft[j*N])+size1, op1);
-        }        
-    }     
-    else {                                                        
+        }
+    }
+    else {
       // compute a square region of the matrix. The correct part of the
       // region will be used by the reduction.
         int size1 = size%PARTITION_SIZE;
         if(size1 > 0) {
 	    int start_offset = size-size1;
             for (i = 0; i < grainSize; i++)
-                for (j = 0; j < grainSize; j++) 
+                for (j = 0; j < grainSize; j++)
                     outData[i * grainSize + j] = compute_entry(size1, &(inDataLeft[i*N])+start_offset,
-                                                               &(inDataRight[j*N])+start_offset, op1);        
+                                                               &(inDataRight[j*N])+start_offset, op1);
         }
         for(size1 = 0; size1 + PARTITION_SIZE < size; size1 += PARTITION_SIZE) {
             for (i = 0; i < grainSize; i++)
-                for (j = 0; j < grainSize; j++) 
+                for (j = 0; j < grainSize; j++)
                     outData[i * grainSize + j] += compute_entry(PARTITION_SIZE, &(inDataLeft[i*N])+size1,
-                                                               &(inDataRight[j*N])+size1, op1);      
+                                                               &(inDataRight[j*N])+size1, op1);
         }
     }
     if (flag_dp) {
