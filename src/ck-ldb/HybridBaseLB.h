@@ -37,7 +37,7 @@ public:
   virtual int isroot(int mype, int level) = 0;
   virtual int numChildren(int mype, int level) = 0;
   virtual void getChildren(int mype, int level, int *children, int &count) = 0;
-  virtual int numNodes(int level) = 0;
+  virtual int numNodes(int level);
 };
 
 // a simple 3 layer tree, fat at level 1
@@ -97,9 +97,9 @@ public:
   }
   virtual int numNodes(int level) {
     CmiAssert(level>=0 && level<nLevels);
-    if (level == nLevels-1) return 1;
     int count=1;
     for (int i=0; i<level; i++) count *= span[i];
+    CmiAssert(CkNumPes()%count ==0);
     return CkNumPes()/count;
   }
 };
@@ -176,9 +176,10 @@ public:
   }
   virtual int numNodes(int level) {
     CmiAssert(level>=0 && level<nLevels);
-    if (level == nLevels-1) return 1;
-    if (level == 0) return CkNumPes();
-    return span[level-1];
+    int count=1;
+    for (int i=0; i<level; i++) count *= span[i];
+    CmiAssert(CkNumPes()%count ==0);
+    return CkNumPes()/count;
   }
 };
 
