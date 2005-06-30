@@ -1745,6 +1745,9 @@ FEM_ElemAdj_Layer* FEM_Mesh::getElemAdjLayer(void) {
  * them in the conn array, especially since the ghosts
  * will have some type of negative id.
  *
+ * TODO: Create and add the attributes for the ghost
+ * elements, so we have their connectivity also.
+ *
  */
 void FEM_Mesh::createElemElemAdj()
 {
