@@ -37,7 +37,7 @@ public:
   virtual int isroot(int mype, int level) = 0;
   virtual int numChildren(int mype, int level) = 0;
   virtual void getChildren(int mype, int level, int *children, int &count) = 0;
-  virtual int numNodes(int level);
+  virtual int numNodes(int level) = 0;
 };
 
 // a simple 3 layer tree, fat at level 1
