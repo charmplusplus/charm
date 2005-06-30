@@ -2077,12 +2077,21 @@ void FEM_Mesh::e2e_removeAll(int e)
 void FEM_Mesh::e2n_getAll(int e, int *adjnodes) 
 {
   if (e == -1) return;
-  FEM_Elem &elems = setElem(0);
-  FEM_IndexAttribute *eConn = 
-    (FEM_IndexAttribute *)elems.lookup(FEM_CONN, "e2n_getAll");
-  AllocTable2d<int> &conn = eConn->get();
-  for (int i=0; i<conn.width(); i++) {
-    adjnodes[i] = conn[e][i];
+  if(FEM_Is_ghost_index(e)){
+    FEM_Elem &elems = setElem(0+FEM_GHOST);
+    FEM_IndexAttribute *eConn = 
+      (FEM_IndexAttribute *)elems.lookup(FEM_CONN, "e2n_getAll");
+    AllocTable2d<int> &conn = eConn->get();
+    for (int i=0; i<conn.width(); i++)
+      adjnodes[i] = conn[FEM_To_ghost_index(e)][i];
+  }
+  else{
+    FEM_Elem &elems = setElem(0);
+    FEM_IndexAttribute *eConn = 
+      (FEM_IndexAttribute *)elems.lookup(FEM_CONN, "e2n_getAll");
+    AllocTable2d<int> &conn = eConn->get();
+    for (int i=0; i<conn.width(); i++)
+      adjnodes[i] = conn[e][i];
   }
 }
 
@@ -2090,11 +2099,20 @@ void FEM_Mesh::e2n_getAll(int e, int *adjnodes)
 int FEM_Mesh::e2n_getNode(int e, short idx) 
 { 
   if (e == -1) return -1;
-  FEM_Elem &elems = setElem(0);
-  FEM_IndexAttribute *eConn = 
-    (FEM_IndexAttribute *)elems.lookup(FEM_CONN, "e2n_getAll");
-  AllocTable2d<int> &conn = eConn->get();
-  return conn[e][idx];
+  if(FEM_Is_ghost_index(e)){
+    FEM_Elem &elems = setElem(0+FEM_GHOST);
+    FEM_IndexAttribute *eConn = 
+      (FEM_IndexAttribute *)elems.lookup(FEM_CONN, "e2n_getAll");
+    AllocTable2d<int> &conn = eConn->get();
+    return conn[FEM_To_ghost_index(e)][idx];
+  }
+  else{
+    FEM_Elem &elems = setElem(0);
+    FEM_IndexAttribute *eConn = 
+      (FEM_IndexAttribute *)elems.lookup(FEM_CONN, "e2n_getAll");
+    AllocTable2d<int> &conn = eConn->get();
+    return conn[e][idx];
+  }
 }
 
 /// Given id of element e and id of a node n, return i such that
@@ -2102,14 +2120,23 @@ int FEM_Mesh::e2n_getNode(int e, short idx)
 short FEM_Mesh::e2n_getIndex(int e, int n) 
 {
   if (e == -1) return -1;
-  FEM_Elem &elems = setElem(0);
-  FEM_IndexAttribute *eConn = 
-    (FEM_IndexAttribute *)elems.lookup(FEM_CONN, "e2n_getAll");
-  AllocTable2d<int> &conn = eConn->get();
-  for (int i=0; i<conn.width(); i++) {
-    if (conn[e][i] == n) {
-      return i;
-    }
+  if(FEM_Is_ghost_index(e)){
+    FEM_Elem &elems = setElem(0+FEM_GHOST);
+    FEM_IndexAttribute *eConn = 
+      (FEM_IndexAttribute *)elems.lookup(FEM_CONN, "e2n_getAll");
+    AllocTable2d<int> &conn = eConn->get();
+    for (int i=0; i<conn.width(); i++)
+      if (conn[FEM_To_ghost_index(e)][i] == n) 
+        return i;
+  }
+  else{
+    FEM_Elem &elems = setElem(0);
+    FEM_IndexAttribute *eConn = 
+      (FEM_IndexAttribute *)elems.lookup(FEM_CONN, "e2n_getAll");
+    AllocTable2d<int> &conn = eConn->get();
+    for (int i=0; i<conn.width(); i++)
+      if (conn[e][i] == n)
+        return i;
   }
   return -1;
 }
@@ -2119,40 +2146,74 @@ short FEM_Mesh::e2n_getIndex(int e, int n)
 void FEM_Mesh::e2n_setAll(int e, int *adjnodes) 
 {
   if (e == -1) return;
-  FEM_Elem &elems = setElem(0);
-  FEM_IndexAttribute *eConn = 
-    (FEM_IndexAttribute *)elems.lookup(FEM_CONN, "e2n_getAll");
-  AllocTable2d<int> &conn = eConn->get();
-  for (int i=0; i<conn.width(); i++) {
-    conn[e][i] = adjnodes[i];
+  if(FEM_Is_ghost_index(e)){
+    FEM_Elem &elems = setElem(0+FEM_GHOST);
+    FEM_IndexAttribute *eConn = 
+      (FEM_IndexAttribute *)elems.lookup(FEM_CONN, "e2n_getAll");
+    AllocTable2d<int> &conn = eConn->get();
+    for (int i=0; i<conn.width(); i++) {
+      conn[FEM_To_ghost_index(e)][i] = adjnodes[i];
+    }
   }
+  else{
+    FEM_Elem &elems = setElem(0);
+    FEM_IndexAttribute *eConn = 
+      (FEM_IndexAttribute *)elems.lookup(FEM_CONN, "e2n_getAll");
+    AllocTable2d<int> &conn = eConn->get();
+    for (int i=0; i<conn.width(); i++) {
+      conn[e][i] = adjnodes[i];
+    }
+  }  
 }
 
 /// Set the idx-th node adjacent to e to be newNode
 void FEM_Mesh::e2n_setIndex(int e, short idx, int newNode) 
 {
   if (e == -1) return;
-  FEM_Elem &elems = setElem(0);
-  FEM_IndexAttribute *eConn = 
-    (FEM_IndexAttribute *)elems.lookup(FEM_CONN, "e2n_getAll");
-  AllocTable2d<int> &conn = eConn->get();
-  conn[e][idx] = newNode;
+  if(FEM_Is_ghost_index(e)){
+    FEM_Elem &elems = setElem(0+FEM_GHOST); 
+    FEM_IndexAttribute *eConn = 
+      (FEM_IndexAttribute *)elems.lookup(FEM_CONN, "e2n_getAll");
+    AllocTable2d<int> &conn = eConn->get();
+    conn[FEM_To_ghost_index(e)][idx] = newNode;
+  }
+  else{
+    FEM_Elem &elems = setElem(0); 
+    FEM_IndexAttribute *eConn = 
+      (FEM_IndexAttribute *)elems.lookup(FEM_CONN, "e2n_getAll");
+    AllocTable2d<int> &conn = eConn->get();
+    conn[e][idx] = newNode;
+  }
 }
 
 /// Find node oldNode in e's adjacent ndoes and replace with newNode
 void FEM_Mesh::e2n_replace(int e, int oldNode, int newNode) 
 {
   if (e == -1) return;
-  FEM_Elem &elems = setElem(0);
-  FEM_IndexAttribute *eConn = 
-    (FEM_IndexAttribute *)elems.lookup(FEM_CONN, "e2n_getAll");
-  AllocTable2d<int> &conn = eConn->get();
-  for (int i=0; i<conn.width(); i++) {
-    if (conn[e][i] == oldNode) {
-      conn[e][i] = newNode;
-	break;
+  if(FEM_Is_ghost_index(e)){
+    FEM_Elem &elems = setElem(0+FEM_GHOST);
+    FEM_IndexAttribute *eConn = 
+      (FEM_IndexAttribute *)elems.lookup(FEM_CONN, "e2n_getAll");
+    AllocTable2d<int> &conn = eConn->get();
+    for (int i=0; i<conn.width(); i++) {
+      if (conn[FEM_To_ghost_index(e)][i] == oldNode) {
+        conn[FEM_To_ghost_index(e)][i] = newNode;
+        break;
+      }
     }
   }
+  else{
+    FEM_Elem &elems = setElem(0);
+    FEM_IndexAttribute *eConn = 
+      (FEM_IndexAttribute *)elems.lookup(FEM_CONN, "e2n_getAll");
+    AllocTable2d<int> &conn = eConn->get();
+    for (int i=0; i<conn.width(); i++) {
+      if (conn[e][i] == oldNode) {
+        conn[e][i] = newNode;
+        break;
+      }
+    }
+  }  
 }
 
 //  ------- Node-to-node
