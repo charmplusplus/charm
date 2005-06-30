@@ -1810,8 +1810,13 @@ FEM_ElemAdj_Layer* FEM_Mesh::getElemAdjLayer(void) {
  * them in the conn array, especially since the ghosts
  * will have some type of negative id.
  *
- * TODO: Create and add the attributes for the ghost
- * elements, so we have their connectivity also.
+ * TODO:
+ *  
+ *   Create and add the attributes for the ghost
+ *   elements, so we have their connectivity also.
+ * 
+ *   Use some variable length data structure for
+ *   the adjacency tables?
  *
  */
 void FEM_Mesh::createElemElemAdj()
@@ -1951,9 +1956,11 @@ void FEM_Mesh::createElemElemAdj()
 //  ------- Element-to-element: preserve initial ordering relative to nodes
 /// Place all of element e's adjacent elements in neighbors; assumes
 /// neighbors allocated to correct size
+/// Currently just works as expected only with a single element type.
 void FEM_Mesh::e2e_getAll(int e, int *neighbors) 
 {
-  if (e == -1) return;
+  if (e == -1) return; // non existent element
+  CkAssert(! FEM_Is_ghost_index(e)); // we don't yet generate ghost element adjacencies 
   FEM_Elem &elems = setElem(0);
   FEM_IndexAttribute *eAdj = 
     (FEM_IndexAttribute *)elems.lookup(FEM_ELEM_ELEM_ADJACENCY, 
@@ -1983,6 +1990,7 @@ int FEM_Mesh::e2e_getNbr(int e, short idx)
 int FEM_Mesh::e2e_getIndex(int e, int nbr) 
 { 
   if (e == -1) return -1;
+  CkAssert(! FEM_Is_ghost_index(e)); // we don't yet generate ghost element adjacencies 
   FEM_Elem &elems = setElem(0);
   FEM_IndexAttribute *eAdj = 
     (FEM_IndexAttribute *)elems.lookup(FEM_ELEM_ELEM_ADJACENCY, 
@@ -2001,6 +2009,7 @@ int FEM_Mesh::e2e_getIndex(int e, int nbr)
 void FEM_Mesh::e2e_setAll(int e, int *neighbors) 
 {
   if (e == -1) return;
+  CkAssert(! FEM_Is_ghost_index(e)); // we don't yet generate ghost element adjacencies 
   FEM_Elem &elems = setElem(0);
   FEM_IndexAttribute *eAdj = 
     (FEM_IndexAttribute *)elems.lookup(FEM_ELEM_ELEM_ADJACENCY, 
@@ -2017,6 +2026,7 @@ void FEM_Mesh::e2e_setAll(int e, int *neighbors)
 void FEM_Mesh::e2e_setIndex(int e, short idx, int newElem) 
 {
   if (e == -1) return;
+  CkAssert(! FEM_Is_ghost_index(e)); // we don't yet generate ghost element adjacencies 
   FEM_Elem &elems = setElem(0);
   FEM_IndexAttribute *eAdj = 
     (FEM_IndexAttribute *)elems.lookup(FEM_ELEM_ELEM_ADJACENCY, 
@@ -2031,6 +2041,7 @@ void FEM_Mesh::e2e_setIndex(int e, short idx, int newElem)
 void FEM_Mesh::e2e_replace(int e, int oldNbr, int newNbr) 
 {
   if (e == -1) return;
+  CkAssert(! FEM_Is_ghost_index(e)); // we don't yet generate ghost element adjacencies 
   FEM_Elem &elems = setElem(0);
   FEM_IndexAttribute *eAdj = 
     (FEM_IndexAttribute *)elems.lookup(FEM_ELEM_ELEM_ADJACENCY, 
@@ -2049,6 +2060,7 @@ void FEM_Mesh::e2e_replace(int e, int oldNbr, int newNbr)
 void FEM_Mesh::e2e_removeAll(int e)
 {
   if (e == -1) return;
+  CkAssert(! FEM_Is_ghost_index(e)); // we don't yet generate ghost element adjacencies 
   FEM_Elem &elems = setElem(0);
   FEM_IndexAttribute *eAdj = 
     (FEM_IndexAttribute *)elems.lookup(FEM_ELEM_ELEM_ADJACENCY, 
