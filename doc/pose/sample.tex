@@ -1,0 +1,77 @@
+\section{Compiling, Running and Debugging a Sample \pose{} program}
+
+Sample code is available in the Charm++ source distribution.  Assuming a
+net-linux build of Charm++, look in {\tt charm/net-linux/examples/pose}.
+The SimBenchmark directory contains a synthetic benchmark simulation and is
+fairly straightforward to understand.
+
+\subsection{Compiling}
+
+To build a \pose{} simulation, run {\tt etrans.pl} on each \pose{}
+module to get the new source files.  {etrans.pl} is a source to source
+translator.  Given a module name it will translate the {\tt module.h},
+{\tt module.ci}, and {\tt module.C} files into {\tt module\_sim.h},
+{\tt module\_sim.ci}, and {\tt module\_sim.C} files.  The translation
+operation adds wrapper classes for \pose{} objects and handles the
+interface with strategies and other poser options.
+
+To facilitate code organization, the {\tt module.C} file can be broken
+up into multiple files and those files can appended to the {etrans.pl}
+command line after the module name.  These additional .C files will be
+translated and their output appended to the {\tt module\_sim.C} file.
+
+The {\tt -s} switch can be passed to use the sequential simulator feature
+of \pose{} on your simulation, but you must also build a sequential
+version when you compile (see below).
+
+Once the code has been translated, it is a \charmpp{} program that can
+be compiled with {\tt charmc}.  Please refer to the CHARM++/CONVERSE
+Installation and Usage Manual for details on the charmc command.  You
+should build the new source files produced by etrans.pl along with the
+main program and any other source needed with {\tt charmc}, linking
+with {\tt -module pose} (or {\tt -module seqpose} for a sequential
+version) and {\tt -language charm++}.  The SimBenchmark example has a
+Makefile that shows this process.
+
+\subsection{Running} 
+
+To run the program in parallel, a {\tt charmrun} executable was
+created by {\tt charmc}.  The flag {\tt +p} is used to specify a
+number of processors to run the program on.  For example:
+
+\begin{verbatim}
+> ./charmrun pgm +p4
+\end{verbatim}
+
+This runs the executable {\tt pgm} on 4 processors.  For more
+information on how to use {\tt charmrun} and set up your environment
+for parallel runs, see the CHARM++/CONVERSE Installation and Usage
+Manual. 
+
+\subsection{Debugging}
+
+Because \pose{} is translated to \charmpp{}, debugging is a little
+more challenging than normal.  Multi-processor debugging can be
+achieved with the {\tt charmrun ++debug} option, and debugging is
+performed on the {\tt module\_sim.C} source files.  The user thus has
+to track down problems in the original \pose{} source code.  A
+long-term goal of the \pose{} developers is to eliminate the
+translation phase and rely on the interface translator of \charmpp{}
+to provide similar functionality.
+
+\subsection{Sequential Mode}
+
+As mentioned above, the same source code can be used to generate a
+purely sequential \pose{} executable by using the {\tt -s} flag to
+{\tt etrans.pl} and linking with {\tt -module seqpose}.  This turns
+off all aspects of synchronization, checkpointing and GVT calculation
+that are needed for optimistic parallel execution.  Thus you should
+experience better one-processor times for executables built for
+sequential execution than those built for parallel execution.  This is
+convenient for examining how a program scales in comparison to
+sequential time.  It is also helpful for simulations that are small
+and fast, or in situations where multiple processors are not
+available.
+
+
+

@@ -1,0 +1,79 @@
+\section{Introduction}
+
+\pose{} (Parallel Object-oriented Simulation Environment) is a tool for
+parallel discrete event simulation (PDES) based on Charm++.  You should have
+a background in object-oriented programming (preferably C++) and know the
+basic principles behind discrete event simulation. Familiarity
+with simple parallel programming in Charm++ is also a plus.  
+
+\pose{} uses the approach of message-driven execution of Charm++, but
+adds the element of discrete timestamps to control when, in simulated
+time, a message is executed.
+
+Users may choose synchronization strategies (conservative or several
+optimistic variants) on a per class basis, depending on the desired
+behavior of the object.  However, \pose{} is intended to perform best
+with a special type of {\it adaptive} synchronization strategy which
+changes it's behavior on a per object basis.  Thus, other
+synchronization strategies may not be properly maintained.  There are
+two significant versions of the adaptive strategy, {\sl adapt4}, a
+simple, stable version, and {\sl adept}, the development version.
+
+\subsection{Developing a model in \pose{}}
+
+Modelling a system in \pose{} is similar to how you would model in C++ or
+any OOP language.  Objects are entities that hold data, and have a
+fixed set of operations that can be performed on them (methods).
+
+Charm++ provides the parallelism we desire, but the model does not
+differ dramatically from C++.  The primary difference is that objects
+may exist on a set of processors, and so invoking methods on them
+requires communication via messages.  These parallel objects are
+called {\it chares}.
+
+\pose{} adds to Charm++ by putting timestamps on method invocations
+(events), and executing events in timestamp order to preserve the
+validity of the global state.
+
+Developing a model in \pose{} involves identifying the entities we
+wish to model, determining their interactions with other entities and
+determining how they change over time.
+
+\subsection{PDES in \pose{}}
+
+A simulation in \pose{} consists of a set of \charmpp{} chares performing
+timestamped events in parallel.  In \pose{}, these chares are called {\sl
+posers}.  \pose{} is designed to work with many such entities per
+processor. The more a system can be broken down into its parallel
+components when designing the simulation model, the more potential
+parallelism in the final application.
+
+A poser class is defined with a synchronization strategy associated
+with it.  We encourage the use of the adaptive strategies, as
+mentioned earlier.  Adaptive strategies are optimistic, and will
+potentially execute events out of order, but have rollback and
+cancellation messages as well as checkpointing abilities to deal with
+this behind the scenes.
+
+Execution is driven by events.  An event arrives for a poser and is
+sorted into a queue by timestamp.  The poser has a local time called
+object virtual time (OVT) which represents its progress through the
+simulation.  When an event arrives with a timestamp $t>$OVT, the OVT is
+advanced to $t$.  If the event has timestamp $t<$OVT, it may be that
+other events with greater timestamps were executed.  If this is the
+case, a rollback will occur.  If not, the event is simply executed
+along with the others in the queue.
+
+Time can also pass on a poser within the course of executing an
+event.  An {\sl elapse} function is used to advance the OVT.  
+
+\pose{} maintains a global clock, the global virtual time (GVT), that
+represents the progress of the entire simulation.  
+
+Currently, \pose{} has no way to directly specify event dependencies, so if
+they exist, the programmer must handle errors in ordering carefully.
+\pose{} provides a delayed error message print and abort function that
+is only performed if there is no chance of rolling back the dependency
+error.  Another mechanism provided by \pose{} is a method of tagging
+events with {\it sequence numbers}.  This allows the user to determine the
+execution order of events which have the same timestamp.

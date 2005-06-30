@@ -1,0 +1,114 @@
+\section{Glossary of \pose{}-specific Terms}
+
+\begin{itemize}
+\item {\tt void {\bf POSE\_init}()}\\
+	$\circ$ Initializes various items in \pose{}; creates the load balancer
+	if load balancing is turned on; initializes the statistics
+	gathering facility if statistics are turned on.\\
+	$\circ$ Must be called in user's main program prior to creation of any
+	simulation objects or reference to any other \pose{} construct.
+\item {\tt void {\bf POSE\_start}()}\\
+	$\circ$ Sets busy wait to default if none specified; starts
+	quiescence detection; starts simulation timer.\\
+	$\circ$ Must be called in user's main program when simulation
+	should start.
+\item {\tt void {\bf POSE\_registerCallBack}(CkCallback cb)}\\
+	$\circ$ Registers callback function with \pose{} -- when program
+	ends or quiesces, function is called.\\
+	$\circ$ CkCallback is created with the index of the callback
+	function and a proxy to the object that function is to be
+	called on.  For example, to register the function {\tt wrapUp}
+	in the main module as a callback:
+
+\begin{verbatim}
+  CProxy_main M(mainhandle);
+  POSE_registerCallBack(CkCallback(CkIndex_main::wrapUp(), M));
+\end{verbatim}
+
+\item {\tt void {\bf POSE\_stop}()}\\
+	$\circ$ Commits remaining events; prints final time and
+	statistics (if on); calls callback function.\\
+	$\circ$ Called internally when quiescence is detected or
+	program reaches {\tt POSE\_endtime}.
+\item {\tt void {\bf POSE\_exit}()}\\
+	$\circ$ Similar to {\tt CkExit()}.
+\item {\tt void {\bf POSE\_set\_busy\_wait}(int n)}\\
+	$\circ$ Used to control granularity of events; when calling
+	{\tt POSE\_busy\_wait}, program busywaits for time to compute $fib(n)$.
+\item {\tt void {\bf POSE\_busy\_wait}()}\\
+	$\circ$ Busywait for time to compute $fib(n)$ where n is either
+	1 or set by {\tt POSE\_set\_busy\_wait}.
+\item {\tt {\bf POSE\_useET(t)}}\\
+	$\circ$ Set program to terminate when global
+	virtual time (GVT) reaches $t$.
+\item {\tt {\bf POSE\_useID()}}\\
+	$\circ$ Set program to terminate when no events are available
+	in the simulation.
+\item {\tt void {\bf POSE\_create}({\it constructorName}(eventMsg *m), int
+handle, int atTime)}\\
+	$\circ$ Creates a poser object given its constructor, an event
+	message $m$ of the appropriate type, any integer as the handle
+	(by which the object will be referred from then on), and a
+	time (in simulation timesteps) at which it should be created.\\ 
+	$\circ$ The handle can be thought of as a chare array element
+	index in Charm++.
+\item {\tt void {\bf POSE\_invoke\_at}({\it methodName}(eventMsg *m),
+{\it className}, int handle, int atTime)}\\
+	$\circ$ Send a {\it methodName} event with message $m$ to an
+	object of type {\it className} designated by handle $handle$
+	at time specified by $atTime$.\\
+	$\circ$ This can be used by non-poser objects in the \pose{}
+	module to inject events into the system being simulated.  It
+	should not be used by a poser object to generate an event.
+\item {\tt void {\bf POSE\_invoke}({\it methodName}(eventMsg *m),
+{\it className}, int handle, int timeOffset)}\\
+	$\circ$ Send a {\it methodName} event with message $m$ to an
+	object of type {\it className} designated by handle $handle$
+	at current OVT + $timeOffset$.\\
+	$\circ$ This is used by poser objects to send events from one
+	poser to another.
+\item {\tt void {\bf POSE\_local\_invoke}({\it methodName}(eventMsg
+	*m), int timeOffset)}\\
+	$\circ$ Send a {\it methodName} event with message $m$ to this
+	object at current OVT + $timeOffset$.\\
+	$\circ$ This is used by poser objects to send events to themselves.
+\item {\tt void {\bf CommitPrintf}(char *s, args...)}\\
+	$\circ$ Buffered print statement; prints when event is
+	committed (i.e. will not be rolled back).\\
+	$\circ$ Currently, must be called on the wrapper class
+	(parent) to work properly, but a fix for this is in the works.
+\item {\tt void {\bf CommitError}(char *s, args...)}\\
+	$\circ$ Buffered error statement; prints and aborts program
+	when event is committed.\\
+	$\circ$ Currently, must be called on the wrapper class
+	(parent) to work properly, but a fix for this is in the works.
+\item {\tt void {\bf elapse}(int n)}\\
+	$\circ$ Elapse $n$ simulation time units.
+\item {\tt {\bf poser}}\\
+	$\circ$ Keyword (used in place of chare) to denote a poser
+	object in the {\tt .ci} file of a \pose{} module.
+\item {\tt {\bf event}}\\
+	$\circ$ Keyword used in square brackets in the {\tt .ci} file
+	of a \pose{} module to denote that the entry method is an event method.
+\item {\tt {\bf eventMsg}}\\
+	$\circ$ Base class for all event messages; provides timestamp,
+	priority and many other properties.
+\item {\tt {\bf sim}}\\
+	$\circ$ Base class of all wrapper classes.
+\item {\tt {\bf strat}}\\
+	$\circ$ Base class of all strategy classes.
+\item {\tt {\bf con}}\\
+	$\circ$ Simple conservative strategy class.
+\item {\tt {\bf opt, opt2, opt3, spec, adapt, adapt2}}\\
+	$\circ$ Optimistic strategy classes.
+\item {\tt {\bf rep}}\\
+	$\circ$ Base class for all representation classes.
+\item {\tt {\bf chpt}}\\
+	$\circ$ Simple checkpointing representation class.
+\item {\tt {\bf OVT()}}\\
+	$\circ$ Returns the object virtual time (OVT) of the poser in
+	which it is called
+\item {\tt void $MySim$::{\bf terminus}()}\\
+	$\circ$ When simulation has terminated and program is about to exit, this method is called on all posers.  Implemented as an empty method in the base {\tt rep} class, the programmer may choose to override this with whatever actions may need to be performed per object at the end of the simulation.
+\end{itemize}
+
