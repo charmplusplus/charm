@@ -1693,6 +1693,71 @@ int FEM_Mesh::getEntities(int *entities) {
 	return len;
 }
 
+
+FILE *FEM_openMeshFile(const char *prefix,int chunkNo,int nchunks,bool forRead)
+{
+    char fname[256];
+    static const char *meshFileNames="%s_vp%d_%d.dat";
+    sprintf(fname, meshFileNames, prefix, nchunks, chunkNo);
+    FILE *fp = fopen(fname, forRead?"r":"w");
+    CkPrintf("FEM> %s %s...\n",forRead?"Reading":"Writing",fname);  
+    if(fp==0) {
+      FEM_Abort(forRead?"FEM: unable to open input file"
+      	:"FEM: unable to create output file.\n");
+    }
+    return fp;
+}
+
+static inline void read_version()
+{
+    FILE *f = fopen("FEMVERSION", "r");
+    if (f!=NULL)  {
+	fscanf(f, "%d", &femVersion);
+	if (CkMyPe()==0) CkPrintf("FEM> femVersion detected: %d\n", femVersion);
+	fclose(f);
+    }
+}
+
+static inline void write_version()
+{
+    FILE *f = fopen("FEMVERSION", "w");
+    if (f!=NULL)  {
+		fprintf(f, "%d", femVersion);
+		fclose(f);
+    }
+}
+
+FEM_Mesh *FEM_readMesh(const char *prefix,int chunkNo,int nChunks)
+{
+	// find FEM file version number
+	static int version_checked = 0;
+	if (!version_checked) {
+	    version_checked=1;
+	    read_version();
+	}
+
+	FEM_Mesh *ret=new FEM_Mesh;
+	ret->becomeGetting();
+        FILE *fp = FEM_openMeshFile(prefix,chunkNo,nChunks,true);
+	PUP::fromTextFile p(fp);
+	ret->pup(p);
+  	fclose(fp);
+	return ret;
+}
+
+void FEM_writeMesh(FEM_Mesh *m,const char *prefix,int chunkNo,int nChunks)
+{
+	if (chunkNo == 0) {
+	   write_version();
+	}
+        FILE *fp = FEM_openMeshFile(prefix,chunkNo,nChunks,false);
+	PUP::toTextFile p(fp);
+	m->pup(p);
+	fclose(fp);
+}
+
+
+
 void FEM_Mesh::createElemNodeAdj(){
 	node.lookup(FEM_NODE_ELEM_ADJACENCY,"FEM_Mesh::createElemNodeAdj");
 	for(int i=0;i<elem.size();i++){
@@ -1878,72 +1943,6 @@ void FEM_Mesh::createElemElemAdj()
               }
           }
       }
-}
-
-
-  
-
-
-FILE *FEM_openMeshFile(const char *prefix,int chunkNo,int nchunks,bool forRead)
-{
-    char fname[256];
-    static const char *meshFileNames="%s_vp%d_%d.dat";
-    sprintf(fname, meshFileNames, prefix, nchunks, chunkNo);
-    FILE *fp = fopen(fname, forRead?"r":"w");
-    CkPrintf("FEM> %s %s...\n",forRead?"Reading":"Writing",fname);  
-    if(fp==0) {
-      FEM_Abort(forRead?"FEM: unable to open input file"
-      	:"FEM: unable to create output file.\n");
-    }
-    return fp;
-}
-
-static inline void read_version()
-{
-    FILE *f = fopen("FEMVERSION", "r");
-    if (f!=NULL)  {
-	fscanf(f, "%d", &femVersion);
-	if (CkMyPe()==0) CkPrintf("FEM> femVersion detected: %d\n", femVersion);
-	fclose(f);
-    }
-}
-
-static inline void write_version()
-{
-    FILE *f = fopen("FEMVERSION", "w");
-    if (f!=NULL)  {
-		fprintf(f, "%d", femVersion);
-		fclose(f);
-    }
-}
-
-FEM_Mesh *FEM_readMesh(const char *prefix,int chunkNo,int nChunks)
-{
-	// find FEM file version number
-	static int version_checked = 0;
-	if (!version_checked) {
-	    version_checked=1;
-	    read_version();
-	}
-
-	FEM_Mesh *ret=new FEM_Mesh;
-	ret->becomeGetting();
-        FILE *fp = FEM_openMeshFile(prefix,chunkNo,nChunks,true);
-	PUP::fromTextFile p(fp);
-	ret->pup(p);
-  	fclose(fp);
-	return ret;
-}
-
-void FEM_writeMesh(FEM_Mesh *m,const char *prefix,int chunkNo,int nChunks)
-{
-	if (chunkNo == 0) {
-	   write_version();
-	}
-        FILE *fp = FEM_openMeshFile(prefix,chunkNo,nChunks,false);
-	PUP::toTextFile p(fp);
-	m->pup(p);
-	fclose(fp);
 }
 
 
