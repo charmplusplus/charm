@@ -907,7 +907,6 @@ void ampi::pup(PUP::er &p)
   p|seqEntries;
   p|oorder;
 }
-extern "C" void __dbgcheckMessageHandler();
 
 ampi::~ampi()
 {
@@ -920,9 +919,7 @@ ampi::~ampi()
     msg = (AmpiMsg *) CmmGet(msgs, 3, tags, sts);
   }
 */
-	__dbgcheckMessageHandler();
   CmmFree(msgs);
-	__dbgcheckMessageHandler();
 }
 
 //------------------------ Communicator Splitting ---------------------
