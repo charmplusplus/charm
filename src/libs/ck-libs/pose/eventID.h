@@ -18,7 +18,7 @@ class eventID
   /// Basic Constructor
   eventID() { id = 0; pe = CkMyPe(); control = 0; }          
   /// Init to default unused values
-  void init() { id = -1; pe = -1; control = INT_MIN; }
+  void init() { id = 0; pe = -1; control = INT_MIN; }
   /// Get next value for eventID
   /** increments id field for this eventID */
   void incEventID() {
@@ -48,7 +48,7 @@ class eventID
   /// Less than comparison operator
   /** Provides a way to sort events by event ID */
   int operator<(const eventID& o) {
-    return (control < o.control));
+    return (control < o.control);
   }
   /// Dump all data fields
   void dump() { 

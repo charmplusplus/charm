@@ -34,7 +34,7 @@ void rep::registerTimestamp(int idx, eventMsg *m, POSE_TimeType offset)
 #endif
   m->Timestamp(ovt+offset);
   m->setPriority(ovt+offset-INT_MAX);
-  m->evID.setObj(myHandle);
+  //m->evID.setObj(myHandle);
 #ifndef SEQUENTIAL_POSE
   parent->registerSent(ovt+offset);
 #endif
