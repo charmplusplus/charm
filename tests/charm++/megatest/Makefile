@@ -24,9 +24,9 @@ OBJS=megatest.o \
      templates.o \
      inherit.o \
      reduction.o \
-     callback.o	\
+     bitvector.o \
      immediatering.o \
-     bitvector.o
+     callback.o
 
 #     priolongtest.o \
 
