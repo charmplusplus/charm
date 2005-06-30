@@ -1249,14 +1249,6 @@ int CsdScheduler(int maxmsgs)
 	EVAC
 */
 extern void CkClearAllArrayElements();
-CmiUInt2 handler1;
-void *__dbgMsg;
-void __dbgcheckMessageHandler(){
-	CmiUInt2 handler2;
-	if(__dbgMsg){
-			handler2=CmiGetHandler(__dbgMsg); 
-	}
-}
 
 void CsdScheduleForever(void)
 {
@@ -1264,11 +1256,6 @@ void CsdScheduleForever(void)
   SCHEDULE_TOP
   while (1) {
     msg = CsdNextMessage(&state);
-/*		__dbgMsg = msg;*/
-		if(msg){
-			handler1=CmiGetHandler(msg); 
-		}	
-/*		__dbgcheckMessageHandler();*/
     if (msg) { /*A message is available-- process it*/
       if (isIdle) {isIdle=0;CsdEndIdle();}
       SCHEDULE_MESSAGE
