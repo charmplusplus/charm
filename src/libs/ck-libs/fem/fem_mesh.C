@@ -1728,12 +1728,23 @@ FEM_ElemAdj_Layer* FEM_Mesh::getElemAdjLayer(void) {
  * are then extracted from the table and the resulting
  * adjacencies are marked in the FEM_ELEM_ELEM_ADJACENCY
  * and FEM_ELEM_ELEM_ADJ_TYPES attribute fields. The attributes
- * store the adjacent element's  local id and type respectively.
+ * store the adjacent element's local id and type respectively.
  * The ordering in the attribute tables is by local element id,
  * as usual, and is then ordered by the tuple ordering specified
  * in the last parameter to FEM_Add_elem2face_tuples, which 
  * gets stored in the FEM_ElemAdj_Layer data structure
  * created/returned by getElemAdjLayer().
+ *
+ * The element id's are NOT indices into the conn array in 
+ * the case of ghost elements. Ghost elements will have the
+ * same element type as their corresponding real elements.
+ * Their id, which gets stored in FEM_ELEM_ELEM_ADJACENCY
+ * will be a negative number which can be converted to an index
+ * with FEM_From_ghost_index(). Thus the user MUST use 
+ * FEM_Is_ghost_index(i) on the values, before accessing 
+ * them in the conn array, especially since the ghosts
+ * will have some type of negative id.
+ *
  */
 void FEM_Mesh::createElemElemAdj()
 {
@@ -1750,9 +1761,9 @@ void FEM_Mesh::createElemElemAdj()
           const int tuplesPerElem = g->elem[t].tuplesPerElem;
           const int numElements = elem[t].size();
           // for every element of  type t:
-          for (int elemNum=0;elemNum<numElements;elemNum++)	{
+          for (int elemIndex=0;elemIndex<numElements;elemIndex++)	{
               // insert element into the tuple table
-              const int *conn=elem[t].connFor(elemNum);
+              const int *conn=elem[t].connFor(elemIndex);
               int tuple[tupleTable::MAX_TUPLE];
               FEM_Symmetries_t allSym;
               // copy node numbers into tuple
@@ -1770,7 +1781,7 @@ void FEM_Mesh::createElemElemAdj()
                       }
                   }
                   // add tuple to table
-                  table.addTuple(tuple,new elemList(0,elemNum,t,allSym,u)); 
+                  table.addTuple(tuple,new elemList(0,elemIndex,t,allSym,u)); 
               }
           }
       
@@ -1783,9 +1794,9 @@ void FEM_Mesh::createElemElemAdj()
               printf("this ghost layer has %d elements in it\n", numElements);
 
               // for every element of  type t:
-              for (int elemNum=0;elemNum<numElements;elemNum++)	{
+              for (int elemIndex=0;elemIndex<numElements;elemIndex++)	{
                   // insert element into the tuple table
-                  const int *conn=ghostElem->connFor(elemNum);
+                  const int *conn=ghostElem->connFor(elemIndex);
                   int tuple[tupleTable::MAX_TUPLE];
                   FEM_Symmetries_t allSym;
                   // copy node numbers into tuple
@@ -1803,7 +1814,7 @@ void FEM_Mesh::createElemElemAdj()
                           }
                       }
                       // add tuple to table
-                      table.addTuple(tuple,new elemList(0,elemNum,t+FEM_GHOST,allSym,u)); 
+                      table.addTuple(tuple,new elemList(0,FEM_From_ghost_index(elemIndex),t,allSym,u)); 
                   }
               }
           }
