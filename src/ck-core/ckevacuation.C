@@ -13,7 +13,6 @@
 	FAULT_EVAC
 */
 
-extern "C" void __dbgcheckMessageHandler();
 
 
 int _ckEvacBcastIdx;
@@ -155,12 +154,15 @@ void CkEvacuatedElement(){
 }
 
 int evacuate;
+extern "C" void CkClearAllArrayElements();
+
 void CkDecideEvacPe(){
 	if(evacuate > 0){
 		return;
 	}
 	evacuate = 1;
 	evacTime = CmiWallTimer();
+	CkClearAllArrayElements();
 }
 
 
@@ -251,7 +253,6 @@ void CkElementEvacuate::addLocation(CkLocation &loc){
 //				list[i]->ckMigrate(targetPE);
 				rec->AsyncMigrate(CmiTrue);
 				locMgr->emigrate(rec,targetPE);
-				__dbgcheckMessageHandler();
 				numEvacuated++;
 			}
 		}

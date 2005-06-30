@@ -918,7 +918,6 @@ static void _skipCldHandler(void *converseMsg)
   	(unsigned int *)env->getPrioPtr());
 }
 
-extern "C" void __dbgcheckMessageHandler();
 
 static void _skipCldEnqueue(int pe,envelope *env, int infoFn)
 {

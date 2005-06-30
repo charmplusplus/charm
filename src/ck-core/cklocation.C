@@ -62,8 +62,6 @@ static const char *idx2str(const CkArrayMessage *m)
 #endif
 
 
-extern "C" void __dbgcheckMessageHandler();
-
 
 #if CMK_LBDB_ON
 /*LBDB object handles are fixed-sized, and not necc.
@@ -610,7 +608,6 @@ void CkMigratable::ckAboutToMigrate(void) { }
 void CkMigratable::ckJustMigrated(void) { }
 
 CkMigratable::~CkMigratable() {
-	__dbgcheckMessageHandler();
 	DEBC((AA"In CkMigratable::~CkMigratable %s\n"AB,idx2str(thisIndexMax)));
 #if CMK_OUT_OF_CORE
 	isInCore=CmiFalse;
@@ -636,7 +633,6 @@ CkMigratable::~CkMigratable() {
 #endif
 	//To detect use-after-delete
 	thisIndexMax.nInts=-123456;
-	__dbgcheckMessageHandler();
 }
 
 void CkMigratable::CkAbort(const char *why) const {
@@ -801,15 +797,12 @@ CkLocRec_local::CkLocRec_local(CkLocMgr *mgr,CmiBool fromMigration,
 CkLocRec_local::~CkLocRec_local()
 {
 	if (deletedMarker!=NULL) *deletedMarker=CmiTrue;
-	__dbgcheckMessageHandler();
 	myLocMgr->reclaim(idx,localIdx);
-	__dbgcheckMessageHandler();
 #if CMK_LBDB_ON
 	stopTiming();
 	DEBL((AA"Unregistering element %s from load balancer\n"AB,idx2str(idx)));
 	the_lbdb->UnregisterObj(ldHandle);
 #endif
-	__dbgcheckMessageHandler();
 }
 void CkLocRec_local::migrateMe(int toPe) //Leaving this processor
 {
@@ -1459,9 +1452,7 @@ void CkLocMgr::reclaim(const CkArrayIndex &idx,int localIdx) {
 	DEBC((AA"Destroying element %s (local %d)\n"AB,idx2str(idx),localIdx));
 	//Delete, and mark as empty, each array element
 	for (ManagerRec *m=firstManager;m!=NULL;m=m->next) {
-		__dbgcheckMessageHandler();
 		delete m->elts.get(localIdx);
-		__dbgcheckMessageHandler();
 		m->elts.empty(localIdx);
 	}
 	
@@ -1747,7 +1738,6 @@ void CkLocMgr::emigrate(CkLocRec_local *rec,int toPe)
 	//Let all the elements know we're leaving
 	callMethod(rec,&CkMigratable::ckAboutToMigrate);
 	/*EVAC*/
-	__dbgcheckMessageHandler();
 
 //First pass: find size of migration message
 	int bufSize;
@@ -1757,8 +1747,6 @@ void CkLocMgr::emigrate(CkLocRec_local *rec,int toPe)
 		pupElementsFor(p,rec,CkElementCreation_migrate);
 		bufSize=p.size(); 
 	}
-		/*EVAC*/
-	__dbgcheckMessageHandler();
 
 //Allocate and pack into message
 	int doubleSize=bufSize/sizeof(double)+1;
@@ -1785,20 +1773,14 @@ void CkLocMgr::emigrate(CkLocRec_local *rec,int toPe)
 			CkAbort("Array element's pup routine has a direction mismatch.\n");
 		}
 	}
-		/*EVAC*/
-	__dbgcheckMessageHandler();
 
 	DEBM((AA"Migrated index size %s to %d \n"AB,idx2str(idx),toPe));	
 
 //Send off message and delete old copy
-	__dbgcheckMessageHandler();
 	thisProxy[toPe].immigrate(msg);
-	__dbgcheckMessageHandler();
 	duringMigration=CmiTrue;
-	__dbgcheckMessageHandler();
 	delete rec; //Removes elements, hashtable entries, local index
 	
-	__dbgcheckMessageHandler();
 	
 	duringMigration=CmiFalse;
 	//The element now lives on another processor-- tell ourselves and its home
