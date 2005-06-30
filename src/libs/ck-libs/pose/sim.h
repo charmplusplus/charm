@@ -38,7 +38,7 @@ public:
   /// Relative start time: for computing degree of parallelization
   double rst;
   /// Basic Constructor
-  eventMsg() { rst = 0.0; parent = NULL; str = NULL; }
+  eventMsg() { rst = 0.0; parent = NULL; str = NULL; evID.init();}
   /// Destructor
   virtual ~eventMsg() { }
   void sanitize() {
@@ -54,10 +54,16 @@ public:
       to be invoked on the receiving side.  Sets the priority of this
       message to timestamp - POSE_TimeMax. */
   void Timestamp(POSE_TimeType t) { 
-    timestamp = t;  evID = GetEventID();  
+    timestamp = t;  
+    if (evID.getPE() == -1)
+      evID = GetEventID();  
     setPriority(t-POSE_TimeMax); 
     rst = 0.0;
     parent = NULL; str = NULL;
+  }
+  void SetSequenceNumber(int ctrl) { 
+    evID = GetEventID();  
+    evID.setControl(ctrl);  
   }
   /// Assignment operator: copies priority too
   eventMsg& operator=(const eventMsg& obj) {

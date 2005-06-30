@@ -10,13 +10,15 @@ class eventID
 {
   /// PE identifier field ensures uniqueness across PEs
   int pe;
-  /// Object identifier field for ordering
-  int obj;
+  /// Control field for ordering events with same tiemstamp
+  int control;
  public:
   /// Large number for identifier unique on creation PE
   unsigned int id; 
   /// Basic Constructor
-  eventID() { id = 0; pe = CkMyPe(); obj = 0; }          
+  eventID() { id = 0; pe = CkMyPe(); control = 0; }          
+  /// Init to default unused values
+  void init() { id = -1; pe = -1; control = INT_MIN; }
   /// Get next value for eventID
   /** increments id field for this eventID */
   void incEventID() {
@@ -26,27 +28,27 @@ class eventID
   /// Assignment operator
   eventID& operator=(const eventID& e) { 
     CmiAssert((e.pe >= 0) || (e.pe < CkNumPes()));
-    id = e.id;  pe = e.pe;  obj = e.obj; return *this;
+    id = e.id;  pe = e.pe;  control = e.control; return *this;
   }
   /// get source PE
   int getPE() { return pe; }
-  /// get source obj
-  int getObj() { return obj; }
-  /// set source obj
-  void setObj(int objIdx) { obj = objIdx; }
+  /// get source control
+  int getControl() { return control; }
+  /// set source control
+  void setControl(int ctrl) { control = ctrl; }
   /// Equality comparison operator
   int operator==(const eventID& o) {
-    return ((id == o.id) && (pe == o.pe) && (obj == o.obj));
+    return ((id == o.id) && (pe == o.pe) && (control == o.control));
   }
   /// Less than/equality comparison operator
   /** Provides a way to sort events by event ID */
   int operator<=(const eventID& o) {
-    return ((obj < o.obj) || ((obj == o.obj) && (id <= o.id)));
+    return (control <= o.control);
   }
   /// Less than comparison operator
   /** Provides a way to sort events by event ID */
   int operator<(const eventID& o) {
-    return ((obj < o.obj) || ((obj == o.obj) && (id < o.id)));
+    return (control < o.control));
   }
   /// Dump all data fields
   void dump() { 
