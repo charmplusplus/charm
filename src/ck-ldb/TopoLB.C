@@ -314,6 +314,7 @@ void TopoLB::initDataStructures(CentralLB::LDStats *stats,int count,int *newmap)
   }
 
   //Init comm,commUA from stats
+  stats->makeCommHash();
   if(_lb_debug_on)
     CkPrintf("Before initing comm\n");
   for(i=0;i<count;i++)
