@@ -1304,6 +1304,7 @@ void FEM_Node::create(int attr,const char *caller) {
 		super::create(attr,caller);
 }
 
+//  Fill the node to element adjacency table for this specific type of element
 void FEM_Node::fillElemAdjacencyTable(int type,const FEM_Elem &elem){
 	int nodesPerElem = elem.getNodesPer();
 	CkVec<CkVec<var_id> > &adjacencyTable = elemAdjacency->get();
@@ -1312,19 +1313,16 @@ void FEM_Node::fillElemAdjacencyTable(int type,const FEM_Elem &elem){
 		const int *conn = elem.connFor(i);
 		for(int j=0;j<nodesPerElem;j++){
 				int node = conn[j];
-				if(! FEM_Is_ghost_index(node)){
-					adjacencyTable[node].push_back(var_id(type,i));
-				}else{
-					if(node == -1){
-						//invalid node.. shouldnt happen
-					}else{
-						ghostAdjacencyTable[FEM_To_ghost_index(node)].push_back(var_id(type,i));
-					}
-				}
+				if(FEM_Is_ghost_index(node))	
+				  ghostAdjacencyTable[FEM_To_ghost_index(node)].push_back(var_id(type,i));
+				else if (node!=-1)
+				  adjacencyTable[node].push_back(var_id(type,i));
+				else{}//invalid node.. shouldnt happen
 		}
 	}
 };
 
+//  Fill the node to element adjacency table for both this element and its corresponding ghosts
 void FEM_Node::setElemAdjacency(int type, const FEM_Elem &elem){
 	fillElemAdjacencyTable(type,elem);
 	if(elem.getGhost() != NULL){
@@ -1333,41 +1331,50 @@ void FEM_Node::setElemAdjacency(int type, const FEM_Elem &elem){
 	}
 };
 
-void FEM_Node::fillNodeAdjacencyForElement(int node,int nodesPerElem,const int *conn,FEM_VarIndexAttribute *adjacencyAttr){
-	for(int k=0;k<nodesPerElem;k++){
-		if(conn[k] != node){
-			var_id nodeIDAdded = var_id::createNodeID(1,conn[k]);
-			int idx = adjacencyAttr->findInRow(node,nodeIDAdded);
-			if(idx == -1){
-				(adjacencyAttr->get())[node].push_back(nodeIDAdded);
-			}	
-		}	
-	}
-};
 
+//  Populate the entire node to node adjacency table
+//  Two nodes are considered adjacent if they both are in the connectivity table for a common element.
+//  This choice for definition of adjacent nodes does not take into account what are edges 
+//  of the element, but it does simplify the computation. It will work fine for 
+//  triangles and tetrahedra, but may not make as much sense for more complicated
+//  element types where all nodes are not directly connected by edges.
 void FEM_Node::fillNodeAdjacency(const FEM_Elem &elem){
 	int nodesPerElem = elem.getNodesPer();
 	CkVec<CkVec<var_id> > &adjacencyTable = nodeAdjacency->get();
 	FEM_VarIndexAttribute *ghostAdjacencyAttr = ((FEM_Node *)getGhost())->nodeAdjacency;
 	CkVec<CkVec<var_id> > &ghostAdjacencyTable = ghostAdjacencyAttr->get();
 	
-	for(int i=0;i<elem.size();i++){
+	for(int i=0;i<elem.size();i++){        // for each element of the given type
 		const int *conn = elem.connFor(i);
 		printf("Elem %d ",i);
-		for(int j=0;j<nodesPerElem;j++){
+		for(int j=0;j<nodesPerElem;j++){   // for each node adjacent to the element
 			int node = conn[j];
 			printf("%d ",node);
-			if(node >= 0){
-				fillNodeAdjacencyForElement(node,nodesPerElem,conn,nodeAdjacency);
-			}else{
-				if(node == -1){
-					//invalid node...
-				}else{
-					//ghost 
-					node = -(node+2);
-					fillNodeAdjacencyForElement(node,nodesPerElem,conn,ghostAdjacencyAttr);
+
+			if(FEM_Is_ghost_index(node)) { // A ghost node
+			  for(int k=0;k<nodesPerElem;k++){
+				if(conn[k] != node){ // Here we need the node id which is negative not the corresponding positive index
+				  var_id nodeIDAdded = var_id::createNodeID(1,conn[k]);
+				  int idx = ghostAdjacencyAttr->findInRow(node,nodeIDAdded); // find position of k'th node in adjacency list
+				  if(idx == -1){ // If k'th node is not currently in the adjacency list, push it onto list
+					(ghostAdjacencyAttr->get())[FEM_To_ghost_index(node)].push_back(nodeIDAdded); // Here we need the node index which is positive
+				  }
 				}
-			}	
+			  }
+			}
+			else if (node!=-1) { // A non-ghost node, almost same as for ghost nodes
+			  for(int k=0;k<nodesPerElem;k++){
+				if(conn[k] != node){
+				  var_id nodeIDAdded = var_id::createNodeID(1,conn[k]);
+				  int idx = nodeAdjacency->findInRow(node,nodeIDAdded);
+				  if(idx == -1){
+					(nodeAdjacency->get())[node].push_back(nodeIDAdded);
+				  }
+				}
+			  }
+			}
+			else{}//invalid node.. shouldnt happen
+			
 		}
 		printf("\n");
 	}
