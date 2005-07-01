@@ -1312,15 +1312,13 @@ void FEM_Node::fillElemAdjacencyTable(int type,const FEM_Elem &elem){
 		const int *conn = elem.connFor(i);
 		for(int j=0;j<nodesPerElem;j++){
 				int node = conn[j];
-				if(node >= 0){
+				if(! FEM_Is_ghost_index(node)){
 					adjacencyTable[node].push_back(var_id(type,i));
 				}else{
-					//its a ghost node
 					if(node == -1){
 						//invalid node.. shouldnt happen
 					}else{
-						node = -(node+2);
-						ghostAdjacencyTable[node].push_back(var_id(type,i));
+						ghostAdjacencyTable[FEM_To_ghost_index(node)].push_back(var_id(type,i));
 					}
 				}
 		}
