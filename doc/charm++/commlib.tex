@@ -18,12 +18,13 @@ communication {\em call} to go through an instance of a strategy.
 
 To access the communication framework, the user first creates and initializes a
 communication library strategy. He then needs to make a copy of the array proxy
-and associate it with that strategy. The user can create several instances of
-the same strategy, to optimize different communication calls in his application.
-Each communication operation is now associated with a proxy. There exist two
-interfaces, which need to keep different information in every chare. The first
-one is suggested to be used, as it is newer and simpler. The second one is
-mainly for reference on older codes.
+and associate it with that strategy. In order to use the framework, the
+receiving entry methods need to receive messages, and not marshalled parameters.
+The user can create several instances of the same strategy, to optimize
+different communication calls in his application. Each communication operation
+is now associated with a proxy. There exist two interfaces, which need to keep
+different information in every chare. The first one is suggested to be used, as
+it is newer and simpler. The second one is mainly for reference on older codes.
 
 The information to be kept can be either stored as a readonly variable, or
 internally as a private variable of each chare using it.
@@ -359,12 +360,14 @@ The header file to include is {\textrm{BroadcastStrategy.h}} or
 
 \subsubsection{Section Multicast Strategies}
 
-The DirectMulticastStrategy and its subclasses can multicast a message to the entire
-array or a section of array elements. The direct multicast strategies
-are non-bracketed, and the message is processed when the application
-deposits is. These strategies do not combine messages, but they may
-sequence the destinations of the multicast to minimize contention on a
-network.
+The DirectMulticastStrategy and its subclasses can multicast a message to the
+entire array or a section of array elements. The direct multicast strategies are
+non-bracketed, and the message is processed when the application deposits is.
+These strategies do not combine messages, but they may sequence the destinations
+of the multicast to minimize contention on a network.
+
+In order to use these strategies, the message sent must inherit from class
+{\textrm{CkMcastBaseMsg}}.
 
 These are the subclass strategies that are available:
 
