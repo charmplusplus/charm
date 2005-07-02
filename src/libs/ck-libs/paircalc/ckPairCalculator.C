@@ -30,7 +30,8 @@
  *            x: coordinate offset within plane (a factor of grainsize)    *
  *            y: coordinate offset within plane (a factor of grainsize)    *
  *            z: blocksize, unused always 0                                *
- *       So, for grainsize 64 for a size 128x128 problem:                  *
+ *       So, for an example grainsize of 64 for a 128x128 problem:         *
+ *        S/grainsize gives us a 2x2 decomposition.                        *
  *        1st quadrant ranges from [0,0]   to [63,63]    index [w,0,0,0]   *
  *        2nd quadrant ranges from [0,64]  to [63,127]   index [w,0,64,0]  *
  *        3rd quadrant ranges from [64,0]  to [127,63]   index [w,64,0,0]  *
@@ -82,6 +83,7 @@ PairCalculator::PairCalculator(bool sym, int grainSize, int s, int blkSize,  int
   existsOut=false;
   existsNew=false;
   numRecd = 0;
+  newelems=0;
   numExpected = grainSize;
   this->cb_lb=lbcb;
   this->gspacesum=gspacesum;
@@ -105,9 +107,8 @@ PairCalculator::PairCalculator(bool sym, int grainSize, int s, int blkSize,  int
   CProxy_PairCalcReducer pairCalcReducerProxy(reducer_id);
   CkArrayIndex4D indx4(thisIndex.w,thisIndex.x, thisIndex.y, thisIndex.z);
   CkArrayID myaid=thisProxy.ckGetArrayID();
-  IndexAndID *iandid= new IndexAndID(&indx4,&myaid);
+  IndexAndID iandid(indx4,myaid);
   pairCalcReducerProxy.ckLocalBranch()->doRegister(iandid, symmetric);
-  delete iandid;
 
 }
 
@@ -142,9 +143,11 @@ PairCalculator::pup(PUP::er &p)
   p|existsNew;
   p|cb_lb;
   p|gspacesum;
+  p|newelems;
+  p|cookie;
   if (p.isUnpacking()) {
     if(existsNew)
-      newData= new complex[N*grainSize];
+      newData= new complex[newelems];
     else
       newData=NULL;
     if(existsOut)
@@ -166,6 +169,10 @@ PairCalculator::pup(PUP::er &p)
   //    p(inDataLeft, numExpected * N * 2 );
   if(existsRight)
     p((void*) inDataRight, numExpected* N * 2* sizeof(double));
+  if(existsNew)
+    p((void*) newData, newelems* sizeof(complex));
+  if(existsOut)
+    p((void*) outData, grainSize*grainSize* sizeof(double));
   //p(inDataRight, numExpected * N * 2);
   /*  if (p.isUnpacking())
     {
@@ -208,7 +215,15 @@ PairCalculator::~PairCalculator()
 
   if(newData!=NULL)
     delete [] newData;
-
+  // redundant paranoia
+  outData=NULL;
+  inDataRight=NULL;
+  inDataLeft=NULL;
+  newData=NULL;
+  existsLeft=false;
+  existsRight=false;
+  existsNew=false;
+  existsOut=false;
 }
 void PairCalculator::ResumeFromSync() {
   if(!resumed){
@@ -216,12 +231,13 @@ void PairCalculator::ResumeFromSync() {
 #ifdef _PAIRCALC_DEBUG_
       CkPrintf("[%d,%d,%d,%d,%d] resumes from sync\n",thisIndex.w,thisIndex.x,thisIndex.y, thisIndex.z, symmetric);
 #endif
+#ifndef _PAIRCALC_SLOW_FAT_SIMPLE_CAST_
       CProxy_PairCalcReducer pairCalcReducerProxy(reducer_id);
       CkArrayIndex4D indx4(thisIndex.w,thisIndex.x, thisIndex.y, thisIndex.z);
       CkArrayID myaid=thisProxy.ckGetArrayID();
-      IndexAndID *iandid= new IndexAndID(&indx4,&myaid);
+      IndexAndID iandid(indx4,myaid);
       pairCalcReducerProxy.ckLocalBranch()->doRegister(iandid, symmetric);
-      delete iandid;
+#endif
   }
 }
 void
@@ -238,8 +254,9 @@ PairCalculator::calculatePairs_gemm(calculatePairsMsg *msg)
   int offset = -1;
   if (msg->fromRow) {   // This could be the symmetric diagonal case
     offset = msg->sender - thisIndex.x;
-    if (inDataLeft==NULL)
+    if (!existsLeft)
       { // now that we know N we can allocate contiguous space
+	CkAssert(inDataLeft==NULL);
 	existsLeft=true;
 	N = msg->size; // N is init here with the size of the data chunk.
 	inDataLeft = new double[numExpected*N*2];
@@ -273,8 +290,9 @@ PairCalculator::calculatePairs_gemm(calculatePairsMsg *msg)
   }
   else {
     offset = msg->sender - thisIndex.y;
-    if (inDataRight==NULL)
+    if (!existsRight)
       { // now that we know N we can allocate contiguous space
+	CkAssert(inDataRight==NULL);
 	existsRight=true;
 	N = msg->size; // N is init here with the size of the data chunk.
 	inDataRight = new double[numExpected*N*2];
@@ -335,6 +353,7 @@ PairCalculator::calculatePairs_gemm(calculatePairsMsg *msg)
 
   if (numRecd == numExpected * 2 || (symmetric && thisIndex.x==thisIndex.y && numRecd==numExpected)) {
     if(!existsOut){
+      CkAssert(outData==NULL);
       existsOut=true;
       outData = new double[grainSize * grainSize];
       memset(outData, 0 , sizeof(double)* grainSize * grainSize);
@@ -431,6 +450,12 @@ PairCalculator::calculatePairs_gemm(calculatePairsMsg *msg)
 #endif
   }
   //delete msg;
+}
+
+void
+PairCalculator::acceptResultSlow(acceptResultMsg *msg)
+{
+  acceptResult(msg->size, msg->matrix, NULL);
 }
 
 void
@@ -716,7 +741,9 @@ PairCalculator::sumPartialResult(int size, complex *result, int offset)
   sumPartialCount++;
 
   if(!existsNew){
+    CkAssert(newData==NULL);
     newData = new complex[size];
+    newelems=size;
     memset(newData,0,size*sizeof(complex));
     existsNew=true;
   }
@@ -868,6 +895,28 @@ void PairCalcReducer::startMachineReduction() {
 }
 
 void
+PairCalcReducer::broadcastEntireResult(entireResultMsg *imsg)
+{
+#ifdef _PAIRCALC_DEBUG_
+  CkPrintf("bcasteres:On Pe %d -- %d objects\n", CkMyPe(), localElements[imsg->symmetric].length());
+#endif
+  acceptResultMsg *msg= new (size,0) acceptResultMsg;
+  msg->size=imsg->size;
+  memcpy(msg->matrix,imsg->matrix,imsg->size* sizeof(double));
+  for (int i = 0; i < localElements[imsg->symmetric].length(); i++)
+    {
+#ifdef _PAIRCALC_DEBUG_
+      CkPrintf("call accept on :");
+      (localElements[imsg->symmetric])[i].dump();
+#endif
+      CkSendMsgArrayInline(CkIndex_PairCalculator::__idx_acceptResult_acceptResultMsg, msg, (localElements[imsg->symmetric])[i].id, (localElements[imsg->symmetric])[i].idx, CK_MSG_KEEP);
+
+    }
+  delete imsg;
+}
+
+
+void
 PairCalcReducer::broadcastEntireResult(int size, double* matrix, bool symmtype)
 {
 #ifdef _PAIRCALC_DEBUG_
@@ -885,7 +934,8 @@ PairCalcReducer::broadcastEntireResult(int size, double* matrix, bool symmtype)
       CkSendMsgArrayInline(CkIndex_PairCalculator::__idx_acceptResult_acceptResultMsg, msg, (localElements[symmtype])[i].id, (localElements[symmtype])[i].idx, CK_MSG_KEEP);
 
     }
-  delete msg;
+  
+  //  delete msg;
 
 
 }
@@ -901,7 +951,23 @@ PairCalcReducer::broadcastEntireResult(int size, double* matrix1, double* matrix
       {
 	CkSendMsgArrayInline(CkIndex_PairCalculator::__idx_acceptResult_acceptResultMsg2, msg, (localElements[symmtype])[0].id, (localElements[symmtype])[i].idx,CK_MSG_KEEP);
       }
-    delete msg;
+    //    delete msg;
+
+}
+
+void
+PairCalcReducer::broadcastEntireResult(entireResultMsg2 *imsg)
+{
+    CkPrintf("On Pe %d -- %d objects\n", CkMyPe(), localElements[imsg->symmetric].length());
+    acceptResultMsg2 *msg= new (imsg->size,imsg->size,0) acceptResultMsg2;
+    msg->size=imsg->size;
+    memcpy(msg->matrix1,imsg->matrix1,imsg->size* sizeof(double));
+    memcpy(msg->matrix2,imsg->matrix2,imsg->size* sizeof(double));
+    for (int i = 0; i < localElements[imsg->symmetric].length(); i++)
+      {
+	CkSendMsgArrayInline(CkIndex_PairCalculator::__idx_acceptResult_acceptResultMsg2, msg, (localElements[imsg->symmetric])[0].id, (localElements[imsg->symmetric])[i].idx,CK_MSG_KEEP);
+      }
+    delete imsg;
 
 }
 

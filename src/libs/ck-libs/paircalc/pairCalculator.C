@@ -57,6 +57,21 @@ void createPairCalculator(bool sym, int s, int grainSize, int numZ, int* z, int 
   mcastInstanceCP = CkGetComlibInstance();
   mcastInstanceCP.setStrategy(multistrat);
   pcid->Init(pairCalculatorProxy.ckGetArrayID(), pairCalcReducerProxy.ckGetGroupID(), grainSize, blkSize, s, sym, comlib_flag, bcastInstance, flag_dp, conserveMemory, lbpaircalc, mcastInstanceCP, mCastGrpId, gspacesum);
+
+  // we need to create one array section for each (s1, s2, c) tuple
+  // then send each section a null multicast to setup the delegation
+  // group each receiving paircalculator will use the received null
+  // multicast to capture the section cookie for use in the section
+  // reduction.
+
+  // The curious thing here is that we really have no further use for the
+  // proxy once we've setup the section and sent the multicast.
+  
+  // We should however keep it around anyway so we can reset it after
+  // migration.  Which means we need a structure of proxies indexed by
+  // a tuple.  Might as well use a CkHash with CkArray3D indices.
+  
+
   if(mapid) {
     if(sym){ 
           for(int numX = 0; numX < numZ; numX += blkSize){
@@ -127,6 +142,10 @@ void createPairCalculator(bool sym, int s, int grainSize, int numZ, int* z, int 
   CkPrintf("    Finished init {grain=%d, sym=%d, blk=%d, Z=%d, S=%d}\n", grainSize, sym, blkSize, numZ, s);
 #endif
 }
+
+
+
+
 
 void startPairCalcLeft(PairCalcID* pcid, int n, complex* ptr, int myS, int myZ){
   int symmetric = pcid->Symmetric;
@@ -445,22 +464,57 @@ void finishPairCalc2(PairCalcID* pcid, int n, double *ptr1, double *ptr2) {
   CkPrintf("     Calc Finish 2\n");
 #endif
 
+#ifdef _PAIRCALC_SLOW_FAT_SIMPLE_CAST_
+  CkArrayID pairCalcID = (CkArrayID)pcid->Aid; 
+  CProxy_PairCalculator pairCalculatorProxy(pairCalcID);
+#endif
+
   CkGroupID pairCalcReducerID = (CkArrayID)pcid->Gid; 
   CProxy_PairCalcReducer pairCalcReducerProxy(pairCalcReducerID);
 
   ComlibInstanceHandle bcastInstance = pcid->cinst;
 
   if(pcid->useComlib && _PC_COMMLIB_MULTI_) {
+#ifdef _PAIRCALC_SLOW_FAT_SIMPLE_CAST_
+      ComlibDelegateProxy(&pairCalculatorProxy);
+#else
       ComlibDelegateProxy(&pairCalcReducerProxy);
+#endif
       bcastInstance.beginIteration();
   }
 
+#ifdef _PAIRCALC_SLOW_FAT_SIMPLE_CAST_
+  /* 
+     Just broadcast directly to the paircalculators. We expect this to
+     perform badly, this is mostly a debugging comparison block.
+   */ 
   if(ptr2==NULL){
-      pairCalcReducerProxy.broadcastEntireResult(n, ptr1, pcid->Symmetric);
+      acceptResultMsg *omsg=new ( n,0 ) acceptResultMsg;
+      omsg->init(n, ptr1);
+      pairCalculatorProxy.acceptResultSlow(omsg);
   }
   else {
-      pairCalcReducerProxy.broadcastEntireResult(n, ptr1, ptr2, pcid->Symmetric);
+      acceptResultMsg2 *omsg=new ( n,n,0 ) acceptResultMsg2;
+      omsg->init(n, ptr1, ptr2);
+      pairCalculatorProxy.acceptResult(omsg);
   }
+#else
+  if(ptr2==NULL){
+
+      entireResultMsg *omsg=new ( n, 0 ) entireResultMsg;
+      omsg->init(n, ptr1, pcid->Symmetric);
+      pairCalcReducerProxy.broadcastEntireResult(omsg);
+      //  pairCalcReducerProxy.broadcastEntireResult(n, ptr1, pcid->Symmetric);
+  }
+  else {
+
+      entireResultMsg2 *omsg=new ( n, n, 0 ) entireResultMsg2;
+      omsg->init(n, ptr1, ptr2, pcid->Symmetric);
+
+      pairCalcReducerProxy.broadcastEntireResult(omsg);
+      //   pairCalcReducerProxy.broadcastEntireResult(n, ptr1, ptr2, pcid->Symmetric);
+  }
+#endif
   if(pcid->useComlib && _PC_COMMLIB_MULTI_) {
       bcastInstance.endIteration();
   }
@@ -472,4 +526,78 @@ void startPairCalcLeftAndFinish(PairCalcID* pcid, int n, complex* ptr, int myS, 
 
 void startPairCalcRightAndFinish(PairCalcID* pcid, int n, complex* ptr, int myS, int myZ){
 
+}
+
+
+
+/* These are the classic no multicast version for comparison and debugging */
+
+void startPairCalcLeftSlow(PairCalcID* pcid, int n, complex* ptr, int myS, int myZ){
+#ifdef _DEBUG_
+  CkPrintf("     Calc Left ptr %d\n", ptr);
+
+#endif
+  CkArrayID pairCalculatorID = (CkArrayID)pcid->Aid; 
+  CProxy_PairCalculator pairCalculatorProxy(pairCalculatorID);
+
+  int s1, s2, x, c;
+  int grainSize = pcid->GrainSize;
+  int blkSize =  pcid->BlkSize;
+  int S = pcid->S;
+  int symmetric = pcid->Symmetric;
+  bool flag_dp = pcid->isDoublePacked;
+
+  x = myZ;
+  s1 = (myS/grainSize) * grainSize;
+  if(symmetric){
+    for (c = 0; c < blkSize; c++)
+      for(s2 = 0; s2 < S; s2 += grainSize){
+	if(s1 <= s2)
+	  {
+	    calculatePairsMsg *msg=new ( n,0 ) calculatePairsMsg;
+	    msg->init(n, myS, true, flag_dp, ptr);
+	    pairCalculatorProxy(x, s1, s2, c).calculatePairs_gemm(msg);
+	  }
+	else
+	  {
+	    calculatePairsMsg *msg=new ( n,0 ) calculatePairsMsg;
+	    msg->init(n, myS, false, flag_dp, ptr);
+	    pairCalculatorProxy(x, s2, s1, c).calculatePairs_gemm(msg);
+	  }
+      }
+  }
+  else {
+    for (c = 0; c < blkSize; c++)
+      for(s2 = 0; s2 < S; s2 += grainSize){
+	calculatePairsMsg *msg=new ( n,0 ) calculatePairsMsg;
+	msg->init(n, myS, true, flag_dp, ptr);
+	pairCalculatorProxy(x, s1, s2, c).calculatePairs_gemm(msg);
+      }
+  }
+}
+
+void startPairCalcRightSlow(PairCalcID* pcid, int n, complex* ptr, int myS, int myZ){
+#ifdef _DEBUG_
+  CkPrintf("     Calc Right symm=%d\n", pcid->Symmetric);
+#endif
+  CkArrayID pairCalculatorID = (CkArrayID)pcid->Aid; 
+  CProxy_PairCalculator pairCalculatorProxy(pairCalculatorID);
+
+  int s1, s2, x, c;
+  int grainSize = pcid->GrainSize;
+  int blkSize =  pcid->BlkSize;
+  int S = pcid->S;
+  bool symmetric = pcid->Symmetric;
+  bool flag_dp = pcid->isDoublePacked;
+
+  CkAssert(symmetric == false);
+  
+  x = myZ;
+  s2 = (myS/grainSize) * grainSize;
+  for (c = 0; c < blkSize; c++)
+    for(s1 = 0; s1 < S; s1 += grainSize){
+      calculatePairsMsg *msg=new ( n,0 ) calculatePairsMsg;
+      msg->init(n, myS, false, flag_dp, ptr);
+      pairCalculatorProxy(x, s1, s2, c).calculatePairs_gemm(msg);
+    }
 }

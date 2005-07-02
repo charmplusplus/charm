@@ -3,6 +3,19 @@
 #define _pairCalculator_h
 #include "ckPairCalculator.h"
 
+
+/* a place to keep the section proxies for the reduction */
+class SProxP 
+{
+ public:
+  CkArrayIndex3D idx;
+  CProxySection_PairCalculator sectProxy;
+  SProxP (CkArrayIndex3D _idx, CProxySection_PairCalculator _proxy) : idx(_idx), sectProxy(_proxy)
+    {}
+  SProxP () : idx(0,0,0)
+    {}
+};
+PUPbytes(SProxP);
 class PairCalcID {
  public:
   CkArrayID Aid;
@@ -27,6 +40,7 @@ class PairCalcID {
   CProxySection_PairCalculator proxyLNotFrom;
   CProxySection_PairCalculator proxyRNotFrom;
   CkGroupID mCastGrpId;
+  CkVec < SProxP > sections;
   PairCalcID() {}
   ~PairCalcID() {}
 
@@ -100,7 +114,7 @@ class PairCalcID {
     p|proxyLNotFrom;
     p|proxyRNotFrom;
     p|mCastGrpId;
-
+    p|sections;
   }
 
 };
@@ -123,5 +137,10 @@ void startPairCalcLeftAndFinish(PairCalcID* pcid, int n, complex* ptr, int myS, 
 void startPairCalcRightAndFinish(PairCalcID* pcid, int n, complex* ptr, int myS, int myZ);
 
 void isAtSyncPairCalc(PairCalcID* pcid);
+
+/* These are the classic no multicast version for comparison and debugging */
+void startPairCalcLeftSlow(PairCalcID* aid, int n, complex* ptr, int myS, int myZ);
+
+void startPairCalcRightSlow(PairCalcID* aid, int n, complex* ptr, int myS, int myZ);
 
 #endif

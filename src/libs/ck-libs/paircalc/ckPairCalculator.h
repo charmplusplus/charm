@@ -3,6 +3,7 @@
 #define _PC_COMMLIB_MULTI_ 0
 #include "pairutil.h"
 #include "ckmulticast.h"
+#include "ckhashtable.h"
 #include "cksparsecontiguousreducer.h"
 #include "PipeBroadcastStrategy.h"
 #include "BroadcastStrategy.h"
@@ -74,6 +75,9 @@ class IndexAndID {
       idx=*_idx;
       id=*_id;
     }
+  IndexAndID(CkArrayIndex4D _idx, CkArrayID _id): idx(_idx),id(_id)
+    {
+    }
   void dump()
     {
       CkPrintf("w %d x %d y %d z %d\n",idx.index[0],idx.index[1],idx.index[2],idx.index[3]);
@@ -109,18 +113,21 @@ class PairCalcReducer : public Group {
       localElements[1].removeAll();
       numRegistered[0]=0;
       numRegistered[1]=0;
-      if(tmp_matrix!=NULL)
+      /*      if(tmp_matrix!=NULL)
 	{
 	  delete [] tmp_matrix;
 	  tmp_matrix=NULL;
 	}
+      */
     }
+  void broadcastEntireResult(entireResultMsg *msg);
+  void broadcastEntireResult(entireResultMsg2 *msg);
   void broadcastEntireResult(int size, double* matrix, bool symmtype);
   void broadcastEntireResult(int size, double* matrix1, double* matrix2, bool symmtype);
-  void doRegister(IndexAndID *elem, bool symmtype){
+  void doRegister(IndexAndID elem, bool symmtype){
 
     numRegistered[symmtype]++;
-    localElements[symmtype].push_back(*elem);
+    localElements[symmtype].push_back(elem);
 #ifdef _PAIRCALC_DEBUG_
     char string[80];
     localElements[symmtype][localElements[symmtype].length()-1].sdump(string,80);
@@ -201,17 +208,7 @@ class calculatePairsMsg : public CkMcastBaseMsg, public CMessage_calculatePairsM
   bool fromRow;
   bool flag_dp;
   complex *points;
-
-  calculatePairsMsg() {}
   void init(int _size, int _sender, bool _fromRow, bool _flag_dp, complex *_points)
-    {
-      size=_size;
-      sender=_sender;
-      fromRow=_fromRow;
-      flag_dp=_flag_dp;
-      memcpy(points,_points,size*sizeof(complex));
-    }
-  calculatePairsMsg(int _size, int _sender, bool _fromRow, bool _flag_dp, complex *_points)
     {
       size=_size;
       sender=_sender;
@@ -226,6 +223,11 @@ class acceptResultMsg : public CMessage_acceptResultMsg {
  public:
   int size;
   double *matrix;
+  void init(int _size, double *_points)
+    {
+      size=_size;
+      memcpy(matrix,_points,size*sizeof(double));
+    }
   friend class CMessage_acceptResultMsg;
 };
 
@@ -234,8 +236,45 @@ class acceptResultMsg2 : public CMessage_acceptResultMsg2 {
   int size;
   double *matrix1;
   double *matrix2;
+  void init(int _size, double *_points1, double *_points2)
+    {
+      size=_size;
+      memcpy(matrix1,_points1,size*sizeof(double));
+      memcpy(matrix2,_points2,size*sizeof(double));
+    }
   friend class CMessage_acceptResultMsg2;
 };
+
+class entireResultMsg : public CMessage_entireResultMsg {
+ public:
+  int size;
+  double *matrix;
+  bool symmetric;
+  void init(int _size, double *_points, bool _symmetric)
+    {
+      size=_size;
+      symmetric=_symmetric;
+      memcpy(matrix,_points,size*sizeof(double));
+    }
+  friend class CMessage_entireResultMsg;
+};
+
+class entireResultMsg2 : public CMessage_entireResultMsg2 {
+ public:
+  int size;
+  double *matrix1;
+  double *matrix2;
+  bool symmetric;
+  void init(int _size, double *_points1, double *_points2, bool _symmetric)
+    {
+      size=_size;
+      symmetric=_symmetric;
+      memcpy(matrix1,_points1,size*sizeof(double));
+      memcpy(matrix2,_points2,size*sizeof(double));
+    }
+  friend class CMessage_entireResultMsg2;
+};
+
 
 
 
@@ -249,8 +288,10 @@ class PairCalculator: public CBase_PairCalculator {
 #ifdef _PAIRCALC_DEBUG_
     CkPrintf("[%d,%d,%d,%d] atsyncs\n", thisIndex.w, thisIndex.x, thisIndex.y, thisIndex.z);
 #endif
+#ifndef _PAIRCALC_SLOW_FAT_SIMPLE_CAST_
     CProxy_PairCalcReducer pairCalcReducerProxy(reducer_id);
     pairCalcReducerProxy.ckLocalBranch()->clearRegister();
+#endif
     resumed=false;
     /* lower our memory footprint 
     if(existsLeft){
@@ -282,6 +323,7 @@ class PairCalculator: public CBase_PairCalculator {
   void calculatePairs_gemm(calculatePairsMsg *msg);
   void acceptResult(int size, double *matrix);
   void acceptResult(int size, double *matrix1, double *matrix2);
+  void acceptResultSlow(acceptResultMsg *msg);
   void acceptResult(acceptResultMsg *msg);
   void acceptResult(acceptResultMsg2 *msg);
   void sumPartialResult(int size, complex *result, int offset);
@@ -325,6 +367,10 @@ class PairCalculator: public CBase_PairCalculator {
   complex *newData;
   bool gspacesum;
   bool resumed;
+  /* to support the simpler section reduction*/
+  CkSectionInfo cookie; 
+  int newelems;
+  
 };
 
 
