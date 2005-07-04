@@ -374,7 +374,7 @@ void CmiReleaseCommHandle(CmiCommHandle c)
 
 void release_pmsg_list();
 
-#define MAX_RELEASE_POLL 8
+#define MAX_RELEASE_POLL 4
 
 static int CmiReleaseSentMessages(void)
 {
@@ -399,7 +399,6 @@ static int CmiReleaseSentMessages(void)
           done =0;
 
           if(msg_tmp->status == BASIC_SEND) {
-              ncheck --;
               if(elan_tportTxDone(msg_tmp->e)) {
                   elan_tportTxWait(msg_tmp->e);
                   done = 1;
@@ -435,6 +434,7 @@ static int CmiReleaseSentMessages(void)
           } else {
               prev = msg_tmp;
               msg_tmp = msg_tmp->next;
+              ncheck --;
           }
       }
       else {
