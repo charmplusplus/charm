@@ -493,6 +493,8 @@ typedef struct {
 #define REFFIELD(m) (((CmiChunkHeader *)(m))[-1].ref)
 #define BLKSTART(m) (((CmiChunkHeader *)(m))-1)
 
+extern void* malloc_nomigrate(size_t size);
+
 void    *CmiAlloc(int size);
 void     CmiReference(void *blk);
 int      CmiSize(void *blk);
