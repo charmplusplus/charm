@@ -860,9 +860,10 @@ protected:
 	 * conn, from FEM_CONN, lists the nodes surrounding each element.
 	 * conn is never NULL.
 	 */
-	FEM_IndexAttribute *conn; //FEM_CONN attribute: element-to-node mapping 
-	FEM_IndexAttribute *elemAdjacency;
-	FEM_IndexAttribute *elemAdjacencyTypes; //  Doesn't store indices to elements, but rather just integer element types 
+	FEM_IndexAttribute *conn;                // FEM_CONN attribute: element-to-node mapping 
+
+	FEM_IndexAttribute *elemAdjacency;       // FEM_ELEM_ELEM_ADJACENCY attribute
+	FEM_IndexAttribute *elemAdjacencyTypes;  // FEM_ELEM_ELEM_ADJ_TYPES attribute
 
 	int tuplesPerElem;
 
