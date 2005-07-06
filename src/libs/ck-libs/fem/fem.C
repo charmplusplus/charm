@@ -1416,16 +1416,12 @@ FEMchunk::print(int fem_mesh,int idxBase)
 CDECL void FEM_Add_elem2face_tuples(int fem_mesh, int elem_type, int nodesPerTuple, int tuplesPerElem,const int *elem2tuple) 
 {
 	FEMAPI("FEM_Add_elem2face_tuples");
-	FEM_Mesh *m = FEM_Mesh_lookup(fem_mesh,"FEM_Add_elem_adj_layer");
-	FEM_ElemAdj_Layer *cur=m->getElemAdjLayer();
+	FEM_Mesh *m = FEM_Mesh_lookup(fem_mesh,"FEM_Add_elem2face_tuples");
+	FEM_ElemAdj_Layer *cur=m->getElemAdjLayer(); // creates the structure on first access
 	cur->initialized = 1;
 
 	if(cur->elem[elem_type].tuplesPerElem != 0)
 	  CkPrintf("FEM> WARNING: Don't call FEM_Add_elem2face_tuples() repeatedly with the same element type\n");
-
-#ifdef DEBUG
-	printf("HACK===> hardcoded elType=0,idxBase=0\n");
-#endif
 	
 	int idxBase=0;
 	cur->nodesPerTuple=nodesPerTuple;

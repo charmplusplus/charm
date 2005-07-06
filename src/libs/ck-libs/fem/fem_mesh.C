@@ -1435,7 +1435,13 @@ FEM_Elem::~FEM_Elem() {
 
 
 void FEM_Elem::create(int attr,const char *caller) {
-  if(attr == FEM_ELEM_ELEM_ADJACENCY) {
+  if(attr == FEM_ELEM_ELEM_ADJACENCY || attr == FEM_ELEM_ELEM_ADJ_TYPES) {
+	// We need to catch both possible occurences, since if either one falls through to 
+	// the super::create(), it will not know what to do, and will fail
+	//
+	// Note: allocateElemAdjacency() will create both attribute fields since they
+	//       should always be used together.
+	CkPrintf("Allocating e2e adjacency table: attr=%d caller=%s\n", attr, caller);
     allocateElemAdjacency();
   }
   else
@@ -1529,7 +1535,8 @@ void FEM_Sparse::create(int attr,const char *caller) {
 FEM_Mesh::FEM_Mesh() 
 	:node(new FEM_Node(NULL)),
 	 elem(*this,"FEM_ELEM"),
-	 sparse(*this,"FEM_SPARSE")
+	 sparse(*this,"FEM_SPARSE"),
+	 lastElemAdjLayer(NULL)
 {
 	m_isSetting=true; //Meshes start out setting
 	lastElemAdjLayer=NULL; // Will be created on demand
@@ -1810,10 +1817,13 @@ FEM_ElemAdj_Layer* FEM_Mesh::getElemAdjLayer(void) {
  * same element type as their corresponding real elements.
  * Their id, which gets stored in FEM_ELEM_ELEM_ADJACENCY
  * will be a negative number which can be converted to an index
- * with FEM_From_ghost_index(). Thus the user MUST use 
+ * with FEM_To_ghost_index(). Thus the user MUST use 
  * FEM_Is_ghost_index(i) on the values, before accessing 
  * them in the conn array, especially since the ghosts
- * will have some type of negative id.
+ * will have a negative id.
+ *
+ * The function assumes that the FEM_ELEM_ELEM_ADJACENCY
+ * and FEM_ELEM_ELEM_ADJ_TYPES attribute fields already exist.
  *
  * TODO:
  *  
@@ -1823,6 +1833,8 @@ FEM_ElemAdj_Layer* FEM_Mesh::getElemAdjLayer(void) {
  *   Use some variable length data structure for
  *   the adjacency tables?
  *
+ *   Verify the tuple table does not need to be 
+ *   explicitly deleted.
  */
 void FEM_Mesh::createElemElemAdj()
 {
@@ -1832,6 +1844,7 @@ void FEM_Mesh::createElemElemAdj()
 
   const int nodesPerTuple = g->nodesPerTuple;
   tupleTable table(nodesPerTuple);
+
 
   // Put tuples into table
   for (int t=0;t<elem.size();t++){ // for each element type
@@ -1913,10 +1926,12 @@ void FEM_Mesh::createElemElemAdj()
           table.beginLookup();
           
           // directly modify the element adjacency table for element type t
-          FEM_IndexAttribute *elemAdjAttr = (FEM_IndexAttribute *)elem[t].lookup(FEM_ELEM_ELEM_ADJACENCY,"createElemElemAdj");
+		  FEM_IndexAttribute *elemAdjTypesAttr = (FEM_IndexAttribute *)elem[t].lookup(FEM_ELEM_ELEM_ADJ_TYPES,"createElemElemAdj");
+		  FEM_IndexAttribute *elemAdjAttr = (FEM_IndexAttribute *)elem[t].lookup(FEM_ELEM_ELEM_ADJACENCY,"createElemElemAdj");
+		  CkAssert(elemAdjTypesAttr && elemAdjAttr);
+
           AllocTable2d<int> &adjTable = elemAdjAttr->get();
           int *adjs = adjTable.getData();
-          FEM_IndexAttribute *elemAdjTypesAttr = (FEM_IndexAttribute *)elem[t].lookup(FEM_ELEM_ELEM_ADJ_TYPES,"createElemElemAdj");
           AllocTable2d<int> &adjTypesTable = elemAdjTypesAttr->get();
           int *adjTypes = adjTypesTable.getData();
           
