@@ -368,7 +368,7 @@ aspects of the same computation, and thus will run most efficiently
 if they lie on the same processor.  Bound array elements are guaranteed
 to always be able to interact using \kw{ckLocal} (see 
 section~\ref{ckLocal for arrays}), although the local pointer must
-be refreshed after any migration. This should be done during the pup
+be refreshed after any migration. This should be done during the \kw{pup}
 routine. When migrated, all elements that are bound together will be created
 at the new processor before \kw{pup} is called on any of them, ensuring that
 a valid local pointer to any of the bound objects can be obtained during the
