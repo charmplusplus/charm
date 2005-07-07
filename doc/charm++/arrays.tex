@@ -365,10 +365,14 @@ bound together-- A[i] and B[i] will always be on the same processor.
 
 Bound arrays are often useful if A[i] and B[i] perform different 
 aspects of the same computation, and thus will run most efficiently 
-if they lie on the same processor.  Bound array elements are guarenteed
+if they lie on the same processor.  Bound array elements are guaranteed
 to always be able to interact using \kw{ckLocal} (see 
 section~\ref{ckLocal for arrays}), although the local pointer must
-be refreshed after any migration.
+be refreshed after any migration. This should be done during the pup
+routine. When migrated, all elements that are bound together will be created
+at the new processor before \kw{pup} is called on any of them, ensuring that
+a valid local pointer to any of the bound objects can be obtained during the
+\kw{pup} routine of any of the others.
 
 An arbitrary number of arrays can be bound together--
 in the example above, we could create yet another array
