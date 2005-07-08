@@ -3,7 +3,7 @@
 The communications framework in Charm++/Converse is aimed at optimizing certain
 communication patterns. Currently the programmer has to specify the
 communication pattern it intends to optimize, together with the strategy to be
-used. The communications library uses the delegation framework in order too
+used. The communications library uses the delegation framework (\ref{delegation}) in order too
 enable easy and transparent access to the framework by the programmer.
 
 For \ampi{} programs, the communication optimization is done by the \ampi{}
@@ -51,26 +51,26 @@ CProxy_MyArray dproxy;
 // Create the array
 aproxy = CProxy_Hello::ckNew();
 
-// Create the strategy
-Strategy *strategy = new EachToManyStrategy(USE_MESH, srcarray, destarray);
+// Create the strategy (description of constructors later)
+CharmStrategy *strategy = new EachToManyMulticastStrategy(USE_MESH, srcarray, destarray);
 //or
-Strategy *strategy = new StreamingStrategy(10,10);
+CharmStrategy *strategy = new StreamingStrategy(10,10);
 
 // Register the strategy to a new proxy, so that aproxy is without commlib,
 // while dproxy uses it
 dproxy = aproxy;
-ComlibAssociateProxy(dproxy, strategy);
+ComlibAssociateProxy(strategy, dproxy);
 \end{verbatim}
 
 \item In the array element
 \begin{verbatim}
 // First proxy should be delegated
-ComlibBeginIteration(aproxy);   // Only for bracketed strategies
+ComlibBeginIteration(dproxy);   // Only for bracketed strategies
 dproxy[index].entry(message);   // Sending a message
 .....     //sending more messages
 .....
 aproxy[index].entry2{message2); // Send a message without commlib
-ComlibEndIteration(aproxy);     // Only for bracketed strategies
+ComlibEndIteration(dproxy);     // Only for bracketed strategies
 \end{verbatim}
 \end{enumerate}
 
@@ -133,7 +133,7 @@ cinst.endIteration();         // Only for bracketed strategies
 \subsubsection{Sections}
 
 In order to multicast only to a part of the array instead of the entire array,
-it is necessary to create a {\textrm{CProxySection\_class}} of the desired
+it is necessary to create a {\textrm{CProxySection\_class}} (\ref{array_section_multicast}) of the desired
 portion of the destination array, delegate it with either
 {\textrm{ComlibAssociateProxy()}} or {\textrm{ComlibDelegateProxy}}, and send a
 broadcast to it. This broadcast on the section will result in the desired
