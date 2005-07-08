@@ -23,7 +23,8 @@
 #define _PAIRCALC_USE_DGEMM_
 // Flags not yet correct
 #define _PAIRCALC_SECONDPHASE_LOADBAL_
-
+enum redtypes {section=0, machine=1, sparsecontiguous=2};
+PUPbytes(redtypes);
 
 #ifdef FORTRANUNDERSCORE
 #define ZGEMM zgemm_ 
@@ -171,6 +172,12 @@ void pup(PUP::er &p){
 }; 
 
 
+class initGRedMsg : public CkMcastBaseMsg, public CMessage_initGRedMsg {
+ public:
+  CkCallback cb;
+  CkGroupID mCastGrpId;
+  friend class CMessage_initGRedMsg;
+};
 
 class mySendMsg : public CMessage_mySendMsg {
  public:
@@ -280,7 +287,7 @@ class entireResultMsg2 : public CMessage_entireResultMsg2 {
 
 class PairCalculator: public CBase_PairCalculator {
  public:
-  PairCalculator(bool, int, int, int, int op1, FuncType fn1, int op2, FuncType fn2, CkCallback cb, CkGroupID gid, CkArrayID final_callbackid, int final_callback_ep, bool conserveMemory, bool lbpaircalc, CkCallback lbcb, bool machreduce, bool gspacesum);
+  PairCalculator(bool, int, int, int, int op1, FuncType fn1, int op2, FuncType fn2, CkCallback cb, CkGroupID gid, CkArrayID final_callbackid, int final_callback_ep, bool conserveMemory, bool lbpaircalc, CkCallback lbcb, redtypes reduce, bool gspacesum);
     
   PairCalculator(CkMigrateMessage *);
   ~PairCalculator();
@@ -293,32 +300,10 @@ class PairCalculator: public CBase_PairCalculator {
     pairCalcReducerProxy.ckLocalBranch()->clearRegister();
 #endif
     resumed=false;
-    /* lower our memory footprint 
-    if(existsLeft){
-      delete [] inDataLeft;
-      inDataLeft=NULL;
-    }
-    if(existsRight)
-      {
-	delete [] inDataRight;
-	inDataRight = NULL;
-      }
-    existsLeft=false;
-    existsRight=false;
-    if(outData!=NULL)
-      {
-	delete [] outData;
-	outData = NULL;
-      }
-    if(newData!=NULL)
-      {
-	delete [] newData;
-	newData = NULL;
-      }
-*/
     AtSync();
   };
   void ResumeFromSync();
+  void initGRed(initGRedMsg *msg);
   void calculatePairs(int, complex *, int, bool, bool); 
   void calculatePairs_gemm(calculatePairsMsg *msg);
   void acceptResult(int size, double *matrix);
@@ -351,7 +336,7 @@ class PairCalculator: public CBase_PairCalculator {
   bool symmetric;
   bool conserveMemory;
   bool lbpaircalc;
-  bool machreduce;
+  redtypes cpreduce;
   CkCallback cb;
   CkArrayID cb_aid;
   int cb_ep;
@@ -368,11 +353,13 @@ class PairCalculator: public CBase_PairCalculator {
   bool gspacesum;
   bool resumed;
   /* to support the simpler section reduction*/
+  CkGroupID mCastGrpId;
   CkSectionInfo cookie; 
   int newelems;
   
 };
 
-
+//forward declaration
+CkReductionMsg *sumMatrixDouble(int nMsg, CkReductionMsg **msgs);
 
 #endif

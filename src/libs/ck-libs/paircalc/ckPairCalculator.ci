@@ -1,6 +1,10 @@
 module ckPairCalculator {
 	readonly ComlibInstanceHandle mcastInstanceCP;
 
+	initcall registersumMatrixDouble(void);	
+
+	message initGRedMsg;
+
 	message partialResultMsg  {
 	  complex result[];
 	};
@@ -37,9 +41,9 @@ module ckPairCalculator {
 
 
 	array [4D] PairCalculator {
- 		entry PairCalculator(bool, int, int, int, int op1, FuncType fn1, int op2, FuncType fn2, CkCallback cb, CkGroupID gid, CkArrayID final_callbackid, int final_callback_ep, bool conserveMemory, bool lbpaircalc, CkCallback lbcb, bool machreduce, bool gspacesum );
+ 		entry PairCalculator(bool, int, int, int, int op1, FuncType fn1, int op2, FuncType fn2, CkCallback cb, CkGroupID gid, CkArrayID final_callbackid, int final_callback_ep, bool conserveMemory, bool lbpaircalc, CkCallback lbcb, redtypes cpreduce, bool gspacesum );
    		entry void lbsync();
-
+		entry void initGRed(initGRedMsg *msg);
    		entry void calculatePairs(int size, complex points[size], int, bool, bool);
    		entry [nokeep] void calculatePairs_gemm(calculatePairsMsg *msg);
 		entry void acceptResult(int size, double matrix[size]);

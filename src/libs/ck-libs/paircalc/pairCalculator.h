@@ -90,6 +90,7 @@ class PairCalcID {
 	    {
 	      mcastGrp->resetSection(proxyLNotFrom);
 	    }
+	  
 	}
 
     }
@@ -124,13 +125,18 @@ void createPairCalculator(bool sym, int w, int grainSize, int numZ, int* z, int 
 void startPairCalcLeft(PairCalcID* aid, int n, complex* ptr, int myS, int myZ);
 
 void startPairCalcRight(PairCalcID* aid, int n, complex* ptr, int myS, int myZ);
-void makeLeftTree(PairCalcID* aid, int n, complex* ptr, int myS, int myZ);
+void makeLeftTree(PairCalcID* pid, int myS, int myZ);
 
-void makeRightTree(PairCalcID* aid, int n, complex* ptr, int myS, int myZ);
+void makeRightTree(PairCalcID* pid, int myS, int myZ);
 
 extern "C" void finishPairCalc(PairCalcID* aid, int n, double *ptr);
 
 extern "C" void finishPairCalc2(PairCalcID* pcid, int n, double *ptr1, double *ptr2);
+
+void initSectRed ( bool sym, int s, int grainSize, int numZ, int* z, 
+		   int blkSize,  PairCalcID* pcid);
+
+CProxySection_PairCalculator initOneRedSect( bool sym, int numZ, int* z, int blkSize,  PairCalcID* pcid, CkCallback cb, int s1, int s2, int c);
 
 void startPairCalcLeftAndFinish(PairCalcID* pcid, int n, complex* ptr, int myS, int myZ);
 
@@ -142,5 +148,7 @@ void isAtSyncPairCalc(PairCalcID* pcid);
 void startPairCalcLeftSlow(PairCalcID* aid, int n, complex* ptr, int myS, int myZ);
 
 void startPairCalcRightSlow(PairCalcID* aid, int n, complex* ptr, int myS, int myZ);
+
+
 
 #endif

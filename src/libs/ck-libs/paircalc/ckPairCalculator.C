@@ -57,9 +57,36 @@
 
 ComlibInstanceHandle mcastInstanceCP;
 
+CkReduction::reducerType sumMatrixDoubleType;
+
+void registersumMatrixDouble(void)
+{ 
+  sumMatrixDoubleType=CkReduction::addReducer(sumMatrixDouble);
+}
+
+
+// sum up the contribution for each plane of the grain
+CkReductionMsg *sumMatrixDouble(int nMsg, CkReductionMsg **msgs)
+{
+  double *ret=(double *)msgs[0]->getData();
+  // all pieces are grainSize* grainSize
+  double *inmatrix;
+  int offset;
+  int size=msgs[0]->getSize()/sizeof(double);
+
+  for(int i=1; i<nMsg;i++)
+    {
+      inmatrix=(double *) msgs[i]->getData();
+      for(int d=0;d<size;d++)
+	ret[d]+=inmatrix[d];
+    }
+  return CkReductionMsg::buildNew(size*sizeof(double),ret);
+}
+
+
 PairCalculator::PairCalculator(CkMigrateMessage *m) { }
 
-PairCalculator::PairCalculator(bool sym, int grainSize, int s, int blkSize,  int op1,  FuncType fn1, int op2,  FuncType fn2, CkCallback cb, CkGroupID gid, CkArrayID cb_aid, int cb_ep, bool conserveMemory, bool lbpaircalc, CkCallback lbcb,bool _machreduce, bool gspacesum)
+PairCalculator::PairCalculator(bool sym, int grainSize, int s, int blkSize,  int op1,  FuncType fn1, int op2,  FuncType fn2, CkCallback cb, CkGroupID gid, CkArrayID cb_aid, int cb_ep, bool conserveMemory, bool lbpaircalc, CkCallback lbcb, redtypes _cpreduce, bool gspacesum)
 {
 #ifdef _PAIRCALC_DEBUG_
   CkPrintf("[PAIRCALC] [%d %d %d %d] inited lb %d \n", thisIndex.w, thisIndex.x, thisIndex.y, thisIndex.z,lbpaircalc);
@@ -87,7 +114,7 @@ PairCalculator::PairCalculator(bool sym, int grainSize, int s, int blkSize,  int
   numExpected = grainSize;
   this->cb_lb=lbcb;
   this->gspacesum=gspacesum;
-  machreduce=_machreduce;
+  cpreduce=_cpreduce;
   resumed=true;
   kUnits=grainSize;  //streaming unit only really used in NOGEMM, but could be used under other conditions
 
@@ -132,8 +159,8 @@ PairCalculator::pup(PUP::er &p)
   p|sumPartialCount;
   p|conserveMemory;
   p|lbpaircalc;
-  p|machreduce;
   p|cb;
+  p|cpreduce;
   p|cb_aid;
   p|cb_ep;
   p|reducer_id;
@@ -142,8 +169,9 @@ PairCalculator::pup(PUP::er &p)
   p|existsOut;
   p|existsNew;
   p|cb_lb;
-  p|gspacesum;
   p|newelems;
+  p|gspacesum;
+  p|mCastGrpId;
   p|cookie;
   if (p.isUnpacking()) {
     if(existsNew)
@@ -151,7 +179,16 @@ PairCalculator::pup(PUP::er &p)
     else
       newData=NULL;
     if(existsOut)
-      outData= new double[grainSize*grainSize];
+      {
+	outData= new double[grainSize*grainSize];
+	// just in case we migrated with a reduction in progress
+	// this is the only way to restore the sparseContiguous reducer state
+	// if we didn't, no harm done.
+	if(cpreduce==sparsecontiguous)
+	  {
+	    sparseRed.add((int)thisIndex.y, (int)thisIndex.x, (int)(thisIndex.y+grainSize-1), (int)(thisIndex.x+grainSize-1), outData);
+	  }
+      }
     else
       outData=NULL;
     if(existsLeft)
@@ -166,24 +203,13 @@ PairCalculator::pup(PUP::er &p)
   }
   if(existsLeft)
     p((void*) inDataLeft, numExpected * N * 2* sizeof(double));
-  //    p(inDataLeft, numExpected * N * 2 );
   if(existsRight)
     p((void*) inDataRight, numExpected* N * 2* sizeof(double));
   if(existsNew)
     p((void*) newData, newelems* sizeof(complex));
   if(existsOut)
     p((void*) outData, grainSize*grainSize* sizeof(double));
-  //p(inDataRight, numExpected * N * 2);
-  /*  if (p.isUnpacking())
-    {
-      CProxy_PairCalcReducer pairCalcReducerProxy(reducer_id);
-      CkArrayIndex4D indx4(thisIndex.w,thisIndex.x, thisIndex.y, thisIndex.z);
-      CkArrayID myaid=thisProxy.ckGetArrayID();
-      IndexAndID *iandid= new IndexAndID(&indx4,&myaid);
-      pairCalcReducerProxy.ckLocalBranch()->doRegister(iandid, symmetric);
-      delete iandid;
-    }
-  */
+
 #ifdef _PAIRCALC_DEBUG_
   if (p.isUnpacking())
     {
@@ -225,6 +251,23 @@ PairCalculator::~PairCalculator()
   existsNew=false;
   existsOut=false;
 }
+
+
+
+
+
+
+// initialize the section cookie and the reduction client
+void PairCalculator::initGRed(initGRedMsg *msg)
+{
+  CkGetSectionInfo(cookie,msg);
+  cb=msg->cb;
+  mCastGrpId=msg->mCastGrpId;
+  cpreduce=section;
+  thisProxy.ckSetReductionClient(&cb);  //probably redundant
+  delete msg;
+}
+
 void PairCalculator::ResumeFromSync() {
   if(!resumed){
   resumed=true;
@@ -428,13 +471,7 @@ PairCalculator::calculatePairs_gemm(calculatePairsMsg *msg)
 #ifndef CMK_OPTIMIZE
     StartTime=CmiWallTimer();
 #endif
-    if(!machreduce)
-      {
-	sparseRed.add((int)thisIndex.y, (int)thisIndex.x, (int)(thisIndex.y+grainSize-1), (int)(thisIndex.x+grainSize-1), outData);
-	sparseRed.contribute(this, sparse_sum_double);
-      }
-    else
-      {
+    if(cpreduce==machine){
 	//CkPrintf("[%d] ELAN VERSION %d\n", CkMyPe(), symmetric);
 	CProxy_PairCalcReducer pairCalcReducerProxy(reducer_id);
 	pairCalcReducerProxy.ckLocalBranch()->acceptContribute(S * S, outData,
@@ -443,6 +480,16 @@ PairCalculator::calculatePairs_gemm(calculatePairsMsg *msg)
 	CkPrintf("[PAIRCALC] [%d %d %d %d %d] called acceptContribute \n", thisIndex.w, thisIndex.x, thisIndex.y, thisIndex.z,symmetric);
 #endif
 
+    }
+    else if(cpreduce==sparsecontiguous)
+      {
+	sparseRed.add((int)thisIndex.y, (int)thisIndex.x, (int)(thisIndex.y+grainSize-1), (int)(thisIndex.x+grainSize-1), outData);
+	sparseRed.contribute(this, sparse_sum_double);
+      }
+    else //section reduction
+      {
+	CkMulticastMgr *mcastGrp=CProxy_CkMulticastMgr(mCastGrpId).ckLocalBranch();
+	mcastGrp->contribute(grainSize*grainSize*sizeof(double), outData, sumMatrixDoubleType, cookie, cb);
       }
 
 #ifndef CMK_OPTIMIZE
