@@ -153,6 +153,11 @@ void *CMI_VMI_CmiAlloc (int size);
 void CMI_VMI_CmiFree (void *ptr);
 #endif
 
+#if CONVERSE_VERSION_ELAN
+void* elan_CmiAlloc(int size);
+#endif
+
+
 /*****************************************************************************
  *
  * Command-Line Argument (CLA) parsing routines.
