@@ -22,13 +22,11 @@ void element::calculateArea()
   // Let a, b, c be the lengths of the three sides.
   // Area=SQRT(s(s-a)(s-b)(s-c)), where s=(a+b+c)/2 or perimeter/2.
   int i;
-  node n[3];
   double s, perimeter, len[3];
-  for (i=0; i<3; i++) n[i] = C->theNodes[nodes[i]];
   // fine lengths of sides
-  len[0] = n[0].distance(n[1]);
-  len[1] = n[1].distance(n[2]);
-  len[2] = n[2].distance(n[0]);
+  len[0] = (C->theNodes[nodes[0]]).distance(C->theNodes[nodes[1]]);
+  len[1] = (C->theNodes[nodes[1]]).distance(C->theNodes[nodes[2]]);
+  len[2] = (C->theNodes[nodes[2]]).distance(C->theNodes[nodes[0]]);
   // apply Heron's formula
   perimeter = len[0] + len[1] + len[2];
   s = perimeter / 2.0;
@@ -287,9 +285,14 @@ void element::collapse(int shortEdge)
   delEdge = opnode;
   keepEdge = (shortEdge + 1) % 3;
   keepNode = keepEdge;
+  nbr = edges[shortEdge].getNbr(myRef);
   keepNbr = edges[keepEdge].getNbr(myRef);
   delNbr = edges[delEdge].getNbr(myRef);
-  nbr = edges[shortEdge].getNbr(myRef);
+  if (delNbr == keepNbr) { // don't coarsen around node with degree 3
+    nonCoarsenCount++;
+    return;
+  }
+
   // get the boundary flags for the nodes on the edge to collapse
   kBound = C->theNodes[nodes[keepNode]].boundary;
   dBound = C->theNodes[nodes[delNode]].boundary;
@@ -309,7 +312,10 @@ void element::collapse(int shortEdge)
       newNode.boundary = 0;
       frac = 0.5;
     }
-    else if (dFixed && kFixed) return;
+    else if (dFixed && kFixed) {
+      nonCoarsenCount++;
+      return;
+    }
     else if (dFixed) {
       newNode = C->theNodes[nodes[delNode]];
       tmpMap = delNode; delNode = keepNode; keepNode = tmpMap;
@@ -335,11 +341,17 @@ void element::collapse(int shortEdge)
       tmpRef = delNbr; delNbr = keepNbr; keepNbr = tmpRef;
       frac = 1.0;
     }
-    else return;
+    else { 
+      nonCoarsenCount++;
+      return;
+    }
   }
   else if (kBound == dBound) { // both on same boundary
     // check fixed status of both nodes
-    if (kFixed && dFixed) return; // if both fixeds don't refine
+    if (kFixed && dFixed) { // if both fixeds don't coarsen
+      nonCoarsenCount++;
+      return; 
+    }
     else if (kFixed || dFixed) { // if one fixed, collapse edge to fixed
       if (kFixed) {
 	newNode = C->theNodes[nodes[keepNode]];
@@ -360,10 +372,16 @@ void element::collapse(int shortEdge)
     }
   }
   else { // nodes on different boundary
-    if (nbr.cid >= 0) return; // edge is internal; don't coarsen
+    if (nbr.cid >= 0) { // edge is internal; don't coarsen
+      nonCoarsenCount++;
+      return;
+    }
     else { // if it isn't check if lower boundary node is a fixed
       if (dBound > kBound) { // dBound is numbered higher
-	if (kFixed) return; // if it is, don't coarsen
+	if (kFixed) { // if it is, don't coarsen
+	  nonCoarsenCount++;
+	  return;
+	}
 	else { // if it isn't, collapse edge to larger boundary node
 	  newNode = C->theNodes[nodes[delNode]];
 	  tmpMap = delNode; delNode = keepNode; keepNode = tmpMap;
@@ -373,7 +391,10 @@ void element::collapse(int shortEdge)
 	}
       }
       else { // kBound is numbered higher
-	if (dFixed) return; // if it is, don't coarsen
+	if (dFixed) { // if it is, don't coarsen
+	  nonCoarsenCount++;
+	  return;
+	}
 	else { // if it isn't, collapse edge to larger boundary node
 	  newNode = C->theNodes[nodes[keepNode]];
 	  frac = 1.0;
@@ -404,7 +425,7 @@ void element::collapse(int shortEdge)
 				     edges[keepEdge], edges[delEdge], 
 				     C->theNodes[nodes[opnode]], newNode);
   if(result == -1) {
-    mesh[myRef.cid].incnonCoarsen(myRef.idx);
+    nonCoarsenCount++;
     return;
   }
 #endif

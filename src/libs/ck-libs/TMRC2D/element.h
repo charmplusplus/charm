@@ -76,13 +76,22 @@ class element {  // triangular elements defined by three node references,
   }
 
   /// Basic set operation
-  void set() { targetArea = currentArea = -1.0;  present = 0; nonCoarsenCount = 0; } 
+  void set() { 
+    targetArea = currentArea = -1.0;  
+    present = 0; 
+    nonCoarsenCount = 0; 
+  } 
   void set(int c, int i, chunk *ck) { 
-    set(); myRef.set(c, i); C = ck; present = 1;
+    set(); myRef.set(c, i); C = ck; present = 1; nonCoarsenCount = 0; 
   }
-  void set(int *n) { present = 1; for (int i=0; i<3; i++)  nodes[i] = n[i]; }
+  void set(int *n) { 
+    present = 1; 
+    nonCoarsenCount = 0;
+    for (int i=0; i<3; i++)  nodes[i] = n[i]; 
+  }
   void set(int *n, edgeRef *e) {
     present = 1;
+    nonCoarsenCount = 0;
     for (int i=0; i<3; i++) {
       nodes[i] = n[i];
       edges[i] = e[i];
@@ -90,17 +99,21 @@ class element {  // triangular elements defined by three node references,
   }
   void set(int n1, int n2, int n3) {
     present = 1;
+    nonCoarsenCount = 0;
     nodes[0] = n1;  nodes[1] = n2;  nodes[2] = n3;
   }
   void set(int n1, int n2, int n3, edgeRef e1, edgeRef e2, edgeRef e3) {
     present = 1;
+    nonCoarsenCount = 0;
     nodes[0] = n1;  nodes[1] = n2;  nodes[2] = n3;
     edges[0] = e1;  edges[1] = e2;  edges[2] = e3;
   }
   void set(edgeRef& e1, edgeRef& e2, edgeRef& e3) {
-    present = 1;  edges[0] = e1;  edges[1] = e2;  edges[2] = e3;
+    present = 1;      
+    nonCoarsenCount = 0;
+    edges[0] = e1;  edges[1] = e2;  edges[2] = e3;
   }
-  void set(int idx, edgeRef e) { edges[idx] = e; }
+  void set(int idx, edgeRef e) { nonCoarsenCount = 0; edges[idx] = e; }
 
   /// Update an old edgeRef with a new one
   void update(edgeRef& oldval, edgeRef& newval) {

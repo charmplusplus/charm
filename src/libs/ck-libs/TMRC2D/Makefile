@@ -5,13 +5,14 @@ CHARMC=$(CHARMDIR)/bin/charmc $(OPTS)
 OBJS=cst_nl.o pgm.o 
 OBJS1=cst_nl.o pgm-coarsen.o
 OBJS2=cst_nl.o pgm-remesh.o
+OBJS3=cst_nl.o pgm-test.o
 
 LIB=libmodulerefine
 DEST=$(CHARMDIR)/lib/$(LIB).a
 LOBJS=ref.o edge.o element.o tri.o refine.o femrefine.o
 HEADERS=refine.h refinef.h femrefine.h femrefinef.h
 
-all: $(DEST) pgm coarse remesh
+all: $(DEST) pgm coarse remesh test
 
 pgm: $(DEST) $(OBJS)
 	$(CHARMC) -L. -o pgm $(OBJS) -language fem -module netfem -module refine -memory paranoid
@@ -22,6 +23,9 @@ coarse: $(DEST) $(OBJS1)
 remesh: $(DEST) $(OBJS2)
 	$(CHARMC) -L. -o remesh $(OBJS2) -language fem -module netfem -module refine -memory paranoid
 
+test: $(DEST) $(OBJS3)
+	$(CHARMC) -L. -o test $(OBJS3) -language fem -module netfem -module refine -memory paranoid
+
 pgm.o: pgm.C pgm.h
 	$(CHARMC) -c pgm.C
 
@@ -30,6 +34,9 @@ pgm-coarsen.o: pgm-coarsen.C pgm.h
 
 pgm-remesh.o: pgm-remesh.C pgm.h
 	$(CHARMC) -c pgm-remesh.C
+
+pgm-test.o: pgm-test.C pgm.h
+	$(CHARMC) -c pgm-test.C
 
 cst_nl.o: cst_nl.C pgm.h
 	$(CHARMC) -c cst_nl.C

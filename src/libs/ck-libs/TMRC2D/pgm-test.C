@@ -4,6 +4,7 @@ Triangle Mesh Refinement & Coarsening (TMRC2D) demo code.
 Reads in a Triangle mesh.
 Passes it to the REFINE2D subsystem.
 Remeshes via a sequence of refinements and coarsenings.
+This version constantly changes.
 */
 #include <stdlib.h>
 #include <unistd.h>
@@ -497,8 +498,7 @@ int countValidEntities(int *validData,int total);
 extern "C" void
 driver(void)
 {
-  int ignored;
-  int i, count;  
+  int i;  
   int myChunk=FEM_My_partition();
   
   /*Add a refinement object to FEM array*/
@@ -528,59 +528,33 @@ driver(void)
   }
   
   //Apply a small initial perturbation to positions
+  /*
   for (i=0;i<g.nnodes;i++) {
     const double max=1.0e-15/15.0; //Tiny perturbation
     g.d[i].x+=max*(i&15);
     g.d[i].y+=max*((i+5)&15);
   }
-  
+  */
+
   int fid=FEM_Create_field(FEM_DOUBLE,2,0,sizeof(vector2d));
-  
   for (i=0;i<g.nelems;i++){
     checkTriangle(g,i);
   }	
-  sleep(5);
-  //Timeloop
-  if (CkMyPe()==0){
-    CkPrintf("Entering timeloop\n");
-  }	
-  //  int tSteps=0x70FF00FF;
-  int tSteps=4;
-  int z=13;
+  //sleep(5);
+
   calcMasses(g);
   double startTime=CkWallTimer();
-  double curArea=2.5e-5/1024;
-  int t = 0;
 
   // THIS IS THE INITIAL MESH SENT TO NetFEM
-  if (1) { //Publish data to the net
-    publishMeshToNetFEM(g,myChunk,t);
-  }
-  double desiredArea;
-  /* 
-  //should not be necessary as it would have been set in the init
-  for (i=0; i<g.nnodes; i++) {
-    g.validNode[i] = 1;
-  }
-  for (i=0; i<g.nelems; i++) {
-    g.validElem[i] = 1;
-  }*/
+  publishMeshToNetFEM(g,myChunk,0);
+
   double avgArea = 0.0;
-  for (i=0;i<g.nelems;i++) {
-    avgArea += calcArea(g, i);
-  }
+  for (i=0;i<g.nelems;i++) avgArea += calcArea(g, i);
   avgArea /= g.nelems;
-  for (t=1;t<=tSteps;t++) {
-    /*    if (1) { //Structural mechanics
-    //Compute forces on nodes exerted by elements
-    CST_NL(g.coord,g.conn,g.R_net,g.d,matConst,g.nnodes,g.nelems,g.S11,g.S22,g.S12);
-    //Communicate net force on shared nodes
-    FEM_Update_field(fid,g.R_net);
-    //Advance node positions
-    advanceNodes(dt,g.nnodes,g.coord,g.R_net,g.a,g.v,g.d,g.m_i,(t%4)==0);
-    }*/
-    
-    //Debugging/perf. output
+
+  if (CkMyPe()==0) CkPrintf("Entering timeloop\n");
+  int tSteps=1;
+  for (int t=1;t<=tSteps;t++) {
     double curTime=CkWallTimer();
     double total=curTime-startTime;
     startTime=curTime;
@@ -594,11 +568,8 @@ driver(void)
     }
     areas=new double[g.nelems];
     for (i=0;i<g.nelems;i++) {
-      areas[i] = avgArea;
+      areas[i] = avgArea * 4.0;
     }
-    //coarsen one element at a time
-    //int coarseIdx = (23  + 4*t)%g.nnodes;
-    //areas[coarseIdx] = calcArea(g,coarseIdx)*2.5;
     
     CkPrintf("[%d] Starting coarsening step: %d nodes, %d elements\n", myChunk,countValidEntities(g.validNode,g.nnodes),countValidEntities(g.validElem,g.nelems));
     FEM_REFINE2D_Coarsen(FEM_Mesh_default_read(),FEM_NODE,(double *)g.coord,FEM_ELEM,areas,FEM_SPARSE);
@@ -607,27 +578,22 @@ driver(void)
     g.nnodes = FEM_Mesh_get_length(FEM_Mesh_default_read(),FEM_NODE);
     CkPrintf("[%d] Done with coarsening step: %d nodes, %d elements\n",
 	     myChunk,countValidEntities(g.validNode,g.nnodes),countValidEntities(g.validElem,g.nelems));
-    delete [] loc;
+    delete[] loc;
     delete[] areas;
     // THIS IS THE COARSENED MESH SENT TO NetFEM
-    if (1) { //Publish data to the net
-      publishMeshToNetFEM(g,myChunk,2*t-1);
-    }
+    publishMeshToNetFEM(g,myChunk,2*t-1);
 
     //prepare to refine
     loc=new vector2d[2*g.nnodes];
     for (i=0;i<g.nnodes;i++) {
       loc[i]=g.coord[i];//+g.d[i];
     }
-    
     areas=new double[g.nelems];
     for (i=0;i<g.nelems;i++) {
-      areas[i] = avgArea;
+      //areas[i] = avgArea;
+      areas[i] = calcArea(g,i)/1.5;
     }
-    //refine one element at a time
-    //int refIdx = (13  + 3*t)%g.nnodes;
-    //areas[refIdx] = calcArea(g,refIdx)/1.5;
-    
+
     CkPrintf("[%d] Starting refinement step: %d nodes, %d elements\n", myChunk,countValidEntities(g.validNode,g.nnodes),countValidEntities(g.validElem,g.nelems));
     FEM_REFINE2D_Split(FEM_Mesh_default_read(),FEM_NODE,(double *)loc,FEM_ELEM,areas,FEM_SPARSE);
     repeat_after_split((void *)&g);
@@ -636,67 +602,66 @@ driver(void)
     g.nnodes = FEM_Mesh_get_length(FEM_Mesh_default_read(),FEM_NODE);
     CkPrintf("[%d] Done with refinement step: %d nodes, %d elements\n",
 	     myChunk,countValidEntities(g.validNode,g.nnodes),countValidEntities(g.validElem,g.nelems));
-    delete [] loc;
+    delete[] loc;
     delete[] areas;
     // THIS IS THE REFINED MESH SENT TO NetFEM
-    if (1) { //Publish data to the net
-      publishMeshToNetFEM(g,myChunk,2*t);
+    publishMeshToNetFEM(g,myChunk,2*t);
+  }
+  if (CkMyPe()==0) CkPrintf("Driver finished\n");
+}
+
+int countValidEntities(int *validData,int total)
+{
+  int sum =0 ;
+  for(int i=0;i<total;i++){
+    sum += validData[i];
+  }
+  return sum;
+}
+
+
+void publishMeshToNetFEM(myGlobals &g,int myChunk,int t)
+{
+  NetFEM n=NetFEM_Begin(myChunk,t,2,NetFEM_WRITE);
+  int count=0;
+  double *vcoord = new double[2*g.nnodes];
+  double *vnodeid = new double[g.nnodes];
+  int *maptovalid = new int[g.nnodes];
+  for(int i=0;i<g.nnodes;i++){
+    if(g.validNode[i]){
+      vcoord[2*count] = ((double *)g.coord)[2*i];
+      vcoord[2*count+1] = ((double *)g.coord)[2*i+1];
+      maptovalid[i] = count;
+      printf("~~~~~~~ %d %d %.6lf %.6lf \n",count,i,vcoord[2*count],vcoord[2*count+1]);
+      vnodeid[count] = i;
+      count++;	
     }
   }
-  if (CkMyPe()==0)
-    CkPrintf("Driver finished\n");
-}
-
-int countValidEntities(int *validData,int total){
-	int sum =0 ;
-	for(int i=0;i<total;i++){
-		sum += validData[i];
-	}
-	return sum;
-}
-
-
-void publishMeshToNetFEM(myGlobals &g,int myChunk,int t){
-    NetFEM n=NetFEM_Begin(myChunk,t,2,NetFEM_WRITE);
-    int count=0;
-    double *vcoord = new double[2*g.nnodes];
-    double *vnodeid = new double[g.nnodes];
-    int *maptovalid = new int[g.nnodes];
-    for(int i=0;i<g.nnodes;i++){
-      if(g.validNode[i]){
-	vcoord[2*count] = ((double *)g.coord)[2*i];
-	vcoord[2*count+1] = ((double *)g.coord)[2*i+1];
-	maptovalid[i] = count;
-	printf("~~~~~~~ %d %d %.6lf %.6lf \n",count,i,vcoord[2*count],vcoord[2*count+1]);
-	vnodeid[count] = i;
-	count++;	
-      }
+  NetFEM_Nodes(n,count,(double *)vcoord,"Position (m)");
+  NetFEM_Scalar(n,vnodeid,1,"Node ID");
+  /*    NetFEM_Vector(n,(double *)g.d,"Displacement (m)");
+	NetFEM_Vector(n,(double *)g.v,"Velocity (m/s)");*/
+  count=0;
+  int *vconn = new int[3*g.nelems];
+  double *vid = new double[3*g.nelems];
+  for(int i=0;i<g.nelems;i++){
+    if(g.validElem[i]){
+      vconn[3*count] = maptovalid[g.conn[3*i]];
+      vconn[3*count+1] = maptovalid[g.conn[3*i+1]];
+      vconn[3*count+2] = maptovalid[g.conn[3*i+2]];
+      printf("~~~~~~~ %d %d < %d,%d %d,%d %d,%d >\n",count,i,vconn[3*count],g.conn[3*i],vconn[3*count+1],g.conn[3*i+1],vconn[3*count+2],g.conn[3*i+2]);
+      vid[count]=count;
+      count++;	
     }
-    NetFEM_Nodes(n,count,(double *)vcoord,"Position (m)");
-    NetFEM_Scalar(n,vnodeid,1,"Node ID");
-    /*    NetFEM_Vector(n,(double *)g.d,"Displacement (m)");
-	  NetFEM_Vector(n,(double *)g.v,"Velocity (m/s)");*/
-    count=0;
-    int *vconn = new int[3*g.nelems];
-    double *vid = new double[3*g.nelems];
-    for(int i=0;i<g.nelems;i++){
-      if(g.validElem[i]){
-	vconn[3*count] = maptovalid[g.conn[3*i]];
-	vconn[3*count+1] = maptovalid[g.conn[3*i+1]];
-	vconn[3*count+2] = maptovalid[g.conn[3*i+2]];
-	printf("~~~~~~~ %d %d < %d,%d %d,%d %d,%d >\n",count,i,vconn[3*count],g.conn[3*i],vconn[3*count+1],g.conn[3*i+1],vconn[3*count+2],g.conn[3*i+2]);
-	vid[count]=count;
-	count++;	
-      }
-    }
-    NetFEM_Elements(n,count,3,(int *)vconn,"Triangles");
-    NetFEM_Scalar(n,vid,1,"Element ID");
-    /*	NetFEM_Scalar(n,g.S22,1,"Y Stress (pure)");
+  }
+  NetFEM_Elements(n,count,3,(int *)vconn,"Triangles");
+  NetFEM_Scalar(n,vid,1,"Element ID");
+  /*	NetFEM_Scalar(n,g.S22,1,"Y Stress (pure)");
 	NetFEM_Scalar(n,g.S12,1,"Shear Stress (pure)");*/
-    NetFEM_End(n);
-    delete [] vcoord;
-    delete [] vconn;
-    delete [] maptovalid;
-    delete [] vid;
-    delete [] vnodeid;
+  NetFEM_End(n);
+  delete [] vcoord;
+  delete [] vconn;
+  delete [] maptovalid;
+  delete [] vid;
+  delete [] vnodeid;
 }		

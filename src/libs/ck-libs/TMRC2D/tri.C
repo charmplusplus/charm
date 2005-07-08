@@ -20,7 +20,7 @@ chunk::chunk(chunkMsg *m)
     firstFreeElement(0), firstFreeEdge(0), firstFreeNode(0),
     edgesSent(0), edgesRecvd(0), first(0),
     coarsenElements(NULL), refineElements(NULL), refineStack(NULL),
-    refineHeapSize(0), coarsenHeapSize(0),
+    refineHeapSize(0), coarsenHeapSize(0), refineTop(0),
     additions(0), debug_counter(0), refineInProgress(0), coarsenInProgress(0),
     modified(0), meshLock(0), meshExpandFlag(0), 
     numElements(0), numEdges(0), numNodes(0), numGhosts(0), theClient(NULL),
@@ -147,7 +147,6 @@ void chunk::coarseningElements()
     if (theElements[i].isPresent() && theElements[i].nonCoarsenCount<1) {
       area = theElements[i].getArea();
       qFactor=theElements[i].getAreaQuality();
-
       //precThrshld = area * 1e-8;
       if (theElements[i].getTargetArea() > area || qFactor < 0.40)  {
       CkPrintf("Element[%d] has area %1.10e, target is %1.10e \n",i,area, theElements[i].getTargetArea());
@@ -158,9 +157,7 @@ void chunk::coarseningElements()
     }
   }
   
-  if (coarsenHeapSize>0)
-  {
-    // start coarsening
+  if (coarsenHeapSize>0) {
     modified = 1;
     if (!coarsenInProgress) {
       coarsenInProgress = 1;
