@@ -43,7 +43,8 @@ extern "C" {
    */
   void REFINE2D_NewMesh(int meshID, int nEl, int nGhost, int nnodes,
 			const int *conn, const int *gid,
-			const int *boundaries, const int **edgeBoundaries);
+			const int *boundaries, const int *edgeBounds, 
+			const int *edgeConn, int nEdges);
   
   /**
    * Refine the mesh so each element has, at most, the given desired area.
