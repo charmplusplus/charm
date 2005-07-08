@@ -19,7 +19,8 @@ chunk::chunk(chunkMsg *m)
   : TCharmClient1D(m->myThreads), sizeElements(0), sizeEdges(0), sizeNodes(0),
     firstFreeElement(0), firstFreeEdge(0), firstFreeNode(0),
     edgesSent(0), edgesRecvd(0), first(0),
-    coarsenElements(NULL), refineElements(NULL), coarsenTop(0), refineTop(0),
+    coarsenElements(NULL), refineElements(NULL), refineStack(NULL),
+    refineHeapSize(0), coarsenHeapSize(0),
     additions(0), debug_counter(0), refineInProgress(0), coarsenInProgress(0),
     modified(0), meshLock(0), meshExpandFlag(0), 
     numElements(0), numEdges(0), numNodes(0), numGhosts(0), theClient(NULL),
@@ -58,11 +59,11 @@ void chunk::refineElement(int idx, double area)
   if (!theElements[idx].isPresent()) return;
   accessLock();
   theElements[idx].resetTargetArea(area);
-  refineElements[refineTop].elID = idx;
-  refineElements[refineTop].len = -1.0;
+  refineStack[refineTop].elID = idx;
+  refineStack[refineTop].len = -1.0;
   refineTop++;
-  int pos = refineTop-2;
-  while (pos >= 0) {
+  int pos = refineHeapSize;
+  while (pos >= 1) {
     if (refineElements[pos].elID == idx)
       refineElements[pos].elID = -1;
     pos--;
@@ -78,10 +79,13 @@ void chunk::refineElement(int idx, double area)
 void chunk::refiningElements()
 {
   int i;
-  while (refineTop > 0) { // loop through the elements
-    rebubble(0);
-    refineTop--;
-    i = refineElements[refineTop].elID;
+  while (refineHeapSize>0 || refineTop > 0) { // loop through the elements
+    if (refineTop>0) {
+      refineTop--;
+      i=refineStack[refineTop].elID;
+    }
+    else
+      i=Delete_Min(0);
     if ((i != -1) && theElements[i].isPresent() && 
 	(theElements[i].getTargetArea() <= theElements[i].getArea()) && 
 	(theElements[i].getTargetArea() >= 0.0)) {
@@ -102,15 +106,14 @@ void chunk::coarsenElement(int idx, double area)
   if (!theElements[idx].isPresent()) return;
   accessLock();
   theElements[idx].resetTargetArea(area);
-  coarsenElements[coarsenTop].elID = idx;
-  coarsenElements[coarsenTop].len = -1.0;
-  coarsenTop++;
-  int pos = coarsenTop-2;
-  while (pos >= 0) {
+  Insert(idx, -1.0, 1);
+  int pos = coarsenHeapSize;
+  while (pos > 1) {
     if (coarsenElements[pos].elID == idx)
       coarsenElements[pos].elID = -1;
     pos--;
   }
+
   releaseLock();
   modified = 1;  // flag a change in one of the chunk's elements
   if (!coarsenInProgress) { // if coarsen loop not running
@@ -122,10 +125,9 @@ void chunk::coarsenElement(int idx, double area)
 void chunk::coarseningElements()
 {
   int i;
-  while (coarsenTop > 0) { // loop through the elements
-    rebubble(1);
-    coarsenTop--;
-    i = coarsenElements[coarsenTop].elID;
+  while (coarsenHeapSize > 0) { // loop through the elements
+
+    i=Delete_Min(1);
     if ((i != -1) && theElements[i].isPresent() && 
 	(((theElements[i].getTargetArea() > theElements[i].getArea()) && 
 	  (theElements[i].getTargetArea() >= 0.0)) ||
@@ -136,22 +138,27 @@ void chunk::coarseningElements()
     CthYield(); // give other chunks on the same PE a chance
   }
   coarsenInProgress = 0;  // turn coarsen loop off
-  
-  double area;
+  double area, qFactor;
   if (coarsenElements) delete [] coarsenElements;
-  coarsenElements = new elemStack[numElements];
+  coarsenElements = new elemHeap[numElements+1];
+  coarsenElements[0].elID=-1;
+  coarsenElements[0].len=-2.0;
   for (i=0; i<elementSlots; i++) { // set desired areas for elements
     if (theElements[i].isPresent() && theElements[i].nonCoarsenCount<1) {
       area = theElements[i].getArea();
+      qFactor=theElements[i].getAreaQuality();
+
       //precThrshld = area * 1e-8;
-      if (theElements[i].getTargetArea() > area) {
-	double qFactor=	theElements[i].getAreaQuality();
-	addToStack(i, qFactor, 1);
+      if (theElements[i].getTargetArea() > area || qFactor < 0.40)  {
+      CkPrintf("Element[%d] has area %1.10e, target is %1.10e \n",i,area, theElements[i].getTargetArea());
+	if (theElements[i].getTargetArea() <= area)
+	  theElements[i].resetTargetArea(area*1.1);
+	Insert(i, qFactor, 1);
       }
     }
   }
   
-  if (coarsenTop>0)
+  if (coarsenHeapSize>0)
   {
     // start coarsening
     modified = 1;
@@ -573,6 +580,26 @@ edgeRef chunk::addEdge(int n1, int n2, int b)
   return eRef;
 }
 
+edgeRef chunk::addEdge(int n1, int n2, const int *edgeBounds, const int *edgeConn, int nEdges)
+{
+  int i=0;
+#ifdef TDEBUG1  
+  CkPrintf("TMRC2D: [%d] Adding edge %d between nodes %d and %d\n", 
+	   cid, nEdges, n1, n2);
+#endif
+  while (i<nEdges && !(n1==edgeConn[2*i] && n2==edgeConn[2*i+1]) || (n2==edgeConn[2*i] && n1==edgeConn[2*i+1]))
+    i++;
+  theEdges[i].set(i, cid, this);
+  theEdges[i].reset();
+  theEdges[i].setNodes(n1, n2);
+  theEdges[i].setBoundary(edgeBounds[i]);
+  edgeRef eRef(cid, i);
+  numEdges++;
+  while (theEdges[firstFreeEdge].isPresent()) firstFreeEdge++;
+  return eRef;
+}
+
+
 elemRef chunk::addElement(int n1, int n2, int n3)
 {
   elemRef eRef(cid, firstFreeElement);
@@ -802,16 +829,19 @@ void chunk::multipleRefine(double *desiredArea, refineClient *client)
   sanityCheck(); // quietly make sure mesh is in shape
 #endif
   theClient = client; // initialize refine client associated with this chunk
+  
+  if (refineStack) delete [] refineStack;
+  refineStack=new elemHeap[numElements];
   if (refineElements) delete [] refineElements;
-  refineElements = new elemStack[numElements];
+  refineElements = new elemHeap[numElements+1];
   for (i=0; i<elementSlots; i++) { // set desired areas for elements
     if (theElements[i].isPresent()) {
       area = theElements[i].getArea();
       //precThrshld = area * 1e-8;
-      if (desiredArea[i] < area) {
+      if (desiredArea[i] < 0.80*area) {
 	theElements[i].resetTargetArea(desiredArea[i]);
 	double qFactor=theElements[i].getAreaQuality();
-	addToStack(i, qFactor, 0);
+	Insert(i, qFactor, 0);
 #ifdef TDEBUG2
 	CkPrintf("TMRC2D: [%d] Setting target on element %d to %1.10e with largeEdge %1.10e\n", cid, i, desiredArea[i], refineElements[refineTop-1].len);
 #endif
@@ -833,7 +863,7 @@ void chunk::multipleRefine(double *desiredArea, refineClient *client)
 void chunk::multipleCoarsen(double *desiredArea, refineClient *client)
 {
   int i;
-  double precThrshld, area;
+  double precThrshld, area, qFactor;
 #ifdef TDEBUG2
   CkPrintf("TMRC2D: [%d] multipleCoarsen....\n", cid);
 #endif
@@ -842,18 +872,27 @@ void chunk::multipleCoarsen(double *desiredArea, refineClient *client)
 #endif
   theClient = client; // initialize refine client associated with this chunk
   if (coarsenElements) delete [] coarsenElements;
-  coarsenElements = new elemStack[numElements];
+  coarsenElements = new elemHeap[numElements+1];
+  coarsenElements[0].len=-2.0;
+  coarsenElements[0].elID=-1;
   for (i=0; i<elementSlots; i++) { // set desired areas for elements
     if (theElements[i].isPresent()) {
       area = theElements[i].getArea();
+      qFactor = theElements[i].getAreaQuality();
+
       //precThrshld = area * 1e-8;
-      if (desiredArea[i] > area) {
+      if (desiredArea[i] > area && (area < (0.95*desiredArea[i]) || qFactor < 0.85))
+      {
 	theElements[i].resetTargetArea(desiredArea[i]);
-	double qFactor=	theElements[i].getAreaQuality();
-	addToStack(i, qFactor, 1);
+	Insert(i, qFactor, 1);
 #ifdef TDEBUG2
-	CkPrintf("TMRC2D: [%d] Setting target on element %d to %1.10e with shortEdge %1.10e\n", cid, i, desiredArea[i], coarsenElements[coarsenTop-1].len);
+	CkPrintf("TMRC2D: [%d] Setting target on element %d to %1.10e with shortEdge %1.10e\n", cid, i, desiredArea[i], qFactor);
 #endif
+      }
+      else if (qFactor<0.55)
+      {
+	theElements[i].resetTargetArea(area*1.1);
+	Insert(i, qFactor, 1);
       }
     }
   }
@@ -879,8 +918,8 @@ void chunk::multipleCoarsen(double *desiredArea, refineClient *client)
 }
 
 void chunk::newMesh(int meshID_,int nEl, int nGhost, const int *conn_, 
-		    const int *gid_, int nnodes, const int *boundaries, 
-		    const int **edgeBoundaries, int idxOffset)
+		    const int *gid_, int nnodes, const int *boundaries, int nEdges, 
+		    const int *edgeConn, const int *edgeBounds, int idxOffset)
 {
   int i, j;
 #ifdef TDEBUG2
@@ -933,11 +972,11 @@ void chunk::newMesh(int meshID_,int nEl, int nGhost, const int *conn_,
 	CkPrintf("TMRC2D: [%d] Node %d has boundary %d.\n", cid, i, theNodes[i].boundary);
 #endif
     }
-    deriveEdges(conn, gid, edgeBoundaries);
+    deriveEdges(conn, gid, edgeBounds, edgeConn, nEdges);
     CkAssert(nnodes == numNodes);
   }
   else {
-    deriveEdges(conn, gid, edgeBoundaries);
+    deriveEdges(conn, gid, edgeBounds, edgeConn, nEdges);
     CkAssert(nnodes == numNodes);
     deriveBoundaries(conn, gid);
   }
@@ -949,7 +988,7 @@ void chunk::newMesh(int meshID_,int nEl, int nGhost, const int *conn_,
 #endif
 }
 
-void chunk::deriveEdges(int *conn, int *gid, const int **edgeBoundaries)
+void chunk::deriveEdges(int *conn, int *gid, const int *edgeBounds, const int *edgeConn, int nEdges)
 {
   // need to add edges to the chunk, and update all edgeRefs on all elements
   // also need to add nodes to the chunk
@@ -1015,10 +1054,10 @@ void chunk::deriveEdges(int *conn, int *gid, const int **edgeBoundaries)
 	  }
 	}
 	if (edgeLocal(myRef, nbrRef)) { // make edge here
-	  if (!edgeBoundaries)
+	  if (!edgeBounds)
 	    newEdge = addEdge(nIdx1, nIdx2, 0);
 	  else
-	    newEdge = addEdge(nIdx1, nIdx2, edgeBoundaries[nIdx1][nIdx2]);
+	    newEdge = addEdge(nIdx1, nIdx2, edgeBounds, edgeConn, nEdges);
 #ifdef TDEBUG3
 	  CkPrintf("TMRC2D: [%d] New edge (%d,%d) added between nodes %d and %d and elements %d and %d on chunk %d\n", cid, newEdge.cid, newEdge.idx, nIdx1, nIdx2, i, nbrRef.idx, nbrRef.cid);
 #endif
@@ -1422,118 +1461,88 @@ int chunk::joinCommLists(int nIdx, int shd, int *chk, int *idx, int *rChk,
   return count;
 }
 
-void chunk::addToStack(int eIdx, double len, int cFlag)
-{ // this amounts to a bubble-sorted stack where the longest shortest edges
-  // sink to the bottom in coarsening, vice versa for refinement
-  int pos;
+void chunk::Insert(int eIdx, double len, int cFlag)
+{
+
+  int i;
   if (cFlag) {
-    pos = coarsenTop;
-    coarsenTop++;
-    while (pos > 0) {
-      if (len <= coarsenElements[pos-1].len) {
-	coarsenElements[pos].elID = eIdx;
-	coarsenElements[pos].len = len;
-	break;
-      }
-      else {
-	coarsenElements[pos].elID = coarsenElements[pos-1].elID;
-	coarsenElements[pos].len = coarsenElements[pos-1].len;
-	pos--;
-      }
+    i = ++coarsenHeapSize; 
+    while ((coarsenElements[i/2].len>=len) && (i != 1))
+    {
+      coarsenElements[i].len=coarsenElements[i/2].len;
+      coarsenElements[i].elID=coarsenElements[i/2].elID;  // swap bubble with number above  
+      i/=2;                     
     }
-    if (pos == 0) {
-      coarsenElements[pos].elID = eIdx;
-      coarsenElements[pos].len = len;
-    }
+    coarsenElements[i].elID=eIdx;
+    coarsenElements[i].len=len; 
   }
   else {
-    pos = refineTop;
-    refineTop++;
-    while (pos > 0) {
-      if (len <= refineElements[pos-1].len) {
-	refineElements[pos].elID = eIdx;
-	refineElements[pos].len = len;
-	break;
-      }
-      else {
-	refineElements[pos].elID = refineElements[pos-1].elID;
-	refineElements[pos].len = refineElements[pos-1].len;
-	pos--;
-      }
+    i = ++refineHeapSize; 
+    while ((refineElements[i/2].len>=len) && (i != 1))
+    {
+      refineElements[i].len=refineElements[i/2].len;
+      refineElements[i].elID=refineElements[i/2].elID;  // swap bubble with number above  
+      i/=2;                     
     }
-    if (pos == 0) {
-      refineElements[pos].elID = eIdx;
-      refineElements[pos].len = len;
-    }
+    refineElements[i].elID=eIdx;
+    refineElements[i].len=len; 
   }
 }
 
-void chunk::rebubble(int cFlag)
+// removes and returns the minimum element of the heap 
+int chunk::Delete_Min(int cflag)
 {
-  int pos, loc, end;
-  int tmpID;
-  double tmpLen;
-  if (cFlag) {
-    pos = coarsenTop-1;
-    for (int i=0; i<coarsenTop; i++)
-      if ((coarsenElements[i].elID > -1) && (coarsenElements[i].len > -1.0)) {
-	if (theElements[coarsenElements[i].elID].present) {
-	  coarsenElements[i].len = theElements[coarsenElements[i].elID].getAreaQuality();
-	}
-	else {
-	  coarsenElements[i].elID = -1;
-	  coarsenElements[i].len = -1.0;
-	}
+  int Child, i, Min_ID; 
+
+  if (cflag) {
+    Min_ID=coarsenElements[1].elID;
+    for (i=1; i*2 <= coarsenHeapSize-1; i=Child)
+    {
+      // Find smaller child
+      Child = i*2;       // child is left child  
+      if (Child !=coarsenHeapSize)  // If this is not == Size, then right child exists
+	if (coarsenElements[Child+1].len < coarsenElements[Child].len)
+	  Child++; 
+
+      // Percolate one level
+      if (coarsenElements[coarsenHeapSize].len >= coarsenElements[Child].len){  
+	coarsenElements[i].elID = coarsenElements[Child].elID;   
+	coarsenElements[i].len = coarsenElements[Child].len;
       }
-    
-    while (coarsenElements[pos].len == -1.0) pos--;
-    end = pos;
-    while (pos > 0) {
-      loc = pos;
-      while ((coarsenElements[loc].len > coarsenElements[loc-1].len) &&
-	     (loc <= end)) {
-	tmpID = coarsenElements[loc].elID;
-	tmpLen = coarsenElements[loc].len;
-	coarsenElements[loc].elID = coarsenElements[loc-1].elID;
-	coarsenElements[loc].len = coarsenElements[loc-1].len;
-	coarsenElements[loc-1].elID = tmpID;
-	coarsenElements[loc-1].len = tmpLen;
-	loc++;
-      }
-      pos--;
+      else
+         break; 
     }
+    coarsenElements[i].elID = coarsenElements[coarsenHeapSize].elID;   // Place holding value into the bubble
+    coarsenElements[i].len = coarsenElements[coarsenHeapSize].len; 
+    coarsenHeapSize--;
+    return Min_ID; 
   }
   else {
-    pos = refineTop-1;
-    for (int i=0; i<refineTop; i++)
-      if ((refineElements[i].elID > -1) && (refineElements[i].len > -1.0)) {
-	if (theElements[refineElements[i].elID].present) {
-	  refineElements[i].len=theElements[refineElements[i].elID].getAreaQuality();
-	}
-	else {
-	  refineElements[i].elID = -1;
-	  refineElements[i].len = -1.0;
-	}
+    Min_ID=refineElements[1].elID;
+    for (i=1; i*2 <= refineHeapSize-1; i=Child)
+    {
+      // Find smaller child
+      Child = i*2;       // child is left child  
+      if (Child !=refineHeapSize)  // If this is not == Size, then right child exists
+	if (refineElements[Child+1].len < refineElements[Child].len)
+	  Child++; 
+
+      // Percolate one level
+      if (refineElements[refineHeapSize].len >= refineElements[Child].len){  
+	refineElements[i].elID = refineElements[Child].elID;   
+	refineElements[i].len = refineElements[Child].len;
       }
-    
-    while (refineElements[pos].len == -1.0) pos--;
-    end = pos;
-    while (pos > 0) {
-      loc = pos;
-      while ((refineElements[loc].len > refineElements[loc-1].len) &&
-	     (loc <= end)) {
-	tmpID = refineElements[loc].elID;
-	tmpLen = refineElements[loc].len;
-	refineElements[loc].elID = refineElements[loc-1].elID;
-	refineElements[loc].len = refineElements[loc-1].len;
-	refineElements[loc-1].elID = tmpID;
-	refineElements[loc-1].len = tmpLen;
-	loc++;
-      }
-      pos--;
+      else
+         break; 
     }
+    refineElements[i].elID = refineElements[refineHeapSize].elID;   // Place holding value into the bubble
+    refineElements[i].len = refineElements[refineHeapSize].len; 
+    refineHeapSize--;
+    return Min_ID; 
   }
 }
+
+
 
 intMsg *chunk::getBoundary(int edgeIdx)
 {

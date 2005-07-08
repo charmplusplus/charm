@@ -118,13 +118,14 @@ class chunk : public TCharmClient1D {
 
   int edgesSent, edgesRecvd, first;
   // These are for element sorting
-  typedef struct {
+ typedef struct {
     int elID;
     double len;
-  } elemStack;
-  elemStack *coarsenElements;
-  elemStack *refineElements;
-  int coarsenTop, refineTop;
+  } elemHeap; //CHANGED
+  elemHeap *coarsenElements;
+  elemHeap *refineElements;
+  elemHeap *refineStack; //CHANGED
+  int refineTop, refineHeapSize, coarsenHeapSize; //CHANGED
 
   void setupThreadPrivate(CthThread forThread) {
     CtvAccessOther(forThread, _refineChunk) = this;
@@ -198,7 +199,8 @@ class chunk : public TCharmClient1D {
   
   // deriveEdges creates nodes from the element & ghost info, then creates
   // unique edges for each adjacent pair of nodes
-  void deriveEdges(int *conn, int *gid, const int **edgeBoundaries);
+  void deriveEdges(int *conn, int *gid, const int *edgeBounds, const int *edgeConn,
+		   int nEdges);
 
   // This initiates a refinement for a single element
   void refineElement(int idx, double area);
@@ -250,8 +252,8 @@ class chunk : public TCharmClient1D {
   // *** These methods are part of the interface with the FEM framework ***
   // create a chunk's mesh data
   void newMesh(int meshID_,int nEl, int nGhost,const int *conn_,const 
-	       int *gid_, int nnodes, const int *boundaries, 
-	       const int **edgeBoundaries, int idxOffset);
+	       int *gid_, int nnodes, const int *boundaries, int nEdges,
+	       const int *edgeConn, const int *edgeBounds, int idxOffset);
   // Sets target areas specified by desiredArea, starts refining
   void multipleRefine(double *desiredArea, refineClient *client);
   // Sets target areas specified by desiredArea, starts coarsening
@@ -276,6 +278,7 @@ class chunk : public TCharmClient1D {
   intMsg *addNode(node n, int b1, int b2, int internal);
   //int addNode(node n);
   edgeRef addEdge(int n1, int n2, int b);
+  edgeRef addEdge(int n1, int n2, const int *edgeBounds,const int *edgeConn, int nEdges); 
   elemRef addElement(int n1, int n2, int n3);
   elemRef addElement(int n1, int n2, int n3,
 		      edgeRef er1, edgeRef er2, edgeRef er3);
@@ -298,6 +301,9 @@ class chunk : public TCharmClient1D {
 		    int *rIdx);
   void addToStack(int eIdx, double len, int cFlag);
   void rebubble(int cFlag);
+  void Insert(int elID, double len, int cFlag);
+  int Delete_Min(int cFlag);
+
   intMsg *getBoundary(int edgeIdx);
 
   void incnonCoarsen(int idx);
