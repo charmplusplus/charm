@@ -779,8 +779,8 @@ inline void interpolateAttrs(AllocTable2d<T> *data,int A,int B,int D,double frac
   T *rowD = data->getRow(D);
   for(int i=0;i<width;i++){
     double val = (double )rowA[i];
-    val *= (1.0-frac);
-    val += frac *((double )rowB[i]);
+    val *= (frac);
+    val += (1-frac) *((double )rowB[i]);
     rowD[i] = (T )val;
   }
 }
