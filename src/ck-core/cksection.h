@@ -102,6 +102,16 @@ class CkSectionInfo {
 PUPbytes(CkSectionInfo) //FIXME: write a real pup routine
 PUPmarshall(CkSectionInfo)
 
+class CkArrayIndex1D;
+class CkArrayIndex2D;
+class CkArrayIndex3D;
+class CkArrayIndex4D;
+class CkArrayIndex5D;
+class CkArrayIndex6D;
+
+#define CKSECTIONID_CONSTRUCTOR(index) \
+  CkSectionID(const CkArrayID &aid, const CkArrayIndex##index *elems, const int nElems);
+
 class CkSectionID {
 public:
   CkSectionInfo   _cookie;		// used by array section multicast
@@ -117,7 +127,13 @@ public:
 public:
   CkSectionID(): _elems(NULL), _nElems(0), pelist(0), npes(0) {}
   CkSectionID(const CkSectionID &sid);
-  CkSectionID(const CkArrayID &aid, const CkArrayIndexMax *elems, const int nElems);
+  CKSECTIONID_CONSTRUCTOR(1D)
+  CKSECTIONID_CONSTRUCTOR(2D)
+  CKSECTIONID_CONSTRUCTOR(3D)
+  CKSECTIONID_CONSTRUCTOR(4D)
+  CKSECTIONID_CONSTRUCTOR(5D)
+  CKSECTIONID_CONSTRUCTOR(6D)
+  CKSECTIONID_CONSTRUCTOR(Max)
   void operator=(const CkSectionID &);
   ~CkSectionID();
   void pup(PUP::er &p);

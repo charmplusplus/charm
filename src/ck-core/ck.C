@@ -232,14 +232,23 @@ void CProxy::pup(PUP::er &p) {
 }
 
 /**** Array sections */
-CkSectionID::CkSectionID(const CkArrayID &aid, const CkArrayIndexMax *elems, const int nElems): _nElems(nElems) {
-  _cookie.aid = aid;
-  _cookie.get_pe() = CkMyPe();
-  _elems = new CkArrayIndexMax[nElems];
-  for (int i=0; i<nElems; i++) _elems[i] = elems[i];
-  pelist = NULL;
-  npes  = 0;
+#define CKSECTIONID_CONSTRUCTOR_DEF(index) \
+CkSectionID::CkSectionID(const CkArrayID &aid, const CkArrayIndex##index *elems, const int nElems): _nElems(nElems) { \
+  _cookie.aid = aid;	\
+  _cookie.get_pe() = CkMyPe();	\
+  _elems = new CkArrayIndexMax[nElems];	\
+  for (int i=0; i<nElems; i++) _elems[i] = elems[i];	\
+  pelist = NULL;	\
+  npes  = 0;	\
 }
+
+CKSECTIONID_CONSTRUCTOR_DEF(1D)
+CKSECTIONID_CONSTRUCTOR_DEF(2D)
+CKSECTIONID_CONSTRUCTOR_DEF(3D)
+CKSECTIONID_CONSTRUCTOR_DEF(4D)
+CKSECTIONID_CONSTRUCTOR_DEF(5D)
+CKSECTIONID_CONSTRUCTOR_DEF(6D)
+CKSECTIONID_CONSTRUCTOR_DEF(Max)
 
 CkSectionID::CkSectionID(const CkSectionID &sid) {
   _cookie = sid._cookie;
