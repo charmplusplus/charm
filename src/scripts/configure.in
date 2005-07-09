@@ -175,6 +175,9 @@ then
   fi
 fi
 
+echo "set F90 compiler as: $CMK_CF90"
+echo "set F77 compiler as: $CMK_CF77"
+
 # Perform the tests
 
 #### Check bool ####
@@ -678,8 +681,22 @@ cat > conftest.f90 <<EOF
       END
 EOF
 
-AC_MSG_CHECKING(subroutine name used by Fortran compiler)
+AC_MSG_CHECKING(subroutine name used by Fortran 90 compiler)
 $CMK_CF90 -c conftest.f90 > /dev/null 2> /dev/null
+
+# if f90 not working, try f77
+if test ! -r conftest.o
+then
+  AC_MSG_RESULT("Fortran 90 compiler not working")
+  AC_MSG_CHECKING(subroutine name used by Fortran 77 compiler)
+### test fortran 77 subroutine name ###
+  cat > conftest.f <<EOF
+      SUBROUTINE FOO_foo
+      END
+EOF
+
+  $CMK_CF77 -c conftest.f > /dev/null 2> /dev/null
+fi
 
 if test -r conftest.o
 then
