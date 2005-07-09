@@ -36,8 +36,16 @@ void RefinerApprox::create(int count, CentralLB::LDStats* stats, int* procs)
         computes[index].processor = -1;
         computes[index].oldProcessor = procs[i];
         computes[index].migratable = odata.migratable;
-        if (computes[i].oldProcessor >= P) 
-          CmiAbort("LB Panic: the old processor in RefineLB cannot be found, is this in a simulation mode?");
+        if (computes[index].oldProcessor >= P)  {
+ 	  if (stats->complete_flag) {
+            CmiPrintf("LB Panic: the old processor %d of obj %d in RefineKLB cannot be found, is this in a simulation mode?\n", computes[index].oldProcessor, i);
+	    CmiAbort("Abort!");
+    	  }
+          else {
+              // an object from outside domain, randomize its location
+            computes[i].oldProcessor = CrnRand()%P;
+	  }
+	}
         index ++;
       }
       else
@@ -595,7 +603,7 @@ void RefinerApprox::Refine(int count, CentralLB::LDStats* stats,
 {
     
   if(_lb_debug) CkPrintf("\n\n");
-  if(_lb_debug) CkPrintf("[%d] Refiner strategy\n",CkMyPe());
+  if(_lb_debug) CkPrintf("[%d] RefinerApprox strategy\n",CkMyPe());
   P = count;
   numComputes = stats->n_objs;
   computes = new computeInfo[numComputes];
