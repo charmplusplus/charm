@@ -4,7 +4,7 @@
 
 #include "ckmulticast.h"
 
-#define DEBUGF(x)  //  CkPrintf x;
+#define DEBUGF(x)  // CkPrintf x;
 
 #define MAXMCASTCHILDREN 2
 
@@ -282,6 +282,7 @@ void CkMulticastMgr::recvCookieInfo(CkSectionInfo s, int red)
   entry->red.redNo = red;
 
   initCookie(s);
+  // TODO delete old tree
 }
 
 void CkMulticastMgr::initCookie(CkSectionInfo s)
@@ -1020,7 +1021,7 @@ void CkMulticastMgr::recvRedMsg(CkReductionMsg *msg)
   const int numFragsRcvd = redInfo.msgs [index].length();
 
   if (CkMyPe() == 0) {
-    DEBUGF(("[%d] lcount:%d-%d, ccount:%d-%d, gcount:%d-%d root:%d\n", CkMyPe(),entry->red.lcount,entry->localElem.length(), entry->red.ccount, entry->children.length(), entry->red.gcount, entry->allElem.length(), !entry->hasParent()));
+    DEBUGF(("[%d] index:%d lcount:%d-%d, ccount:%d-%d, gcount:%d-%d root:%d\n", CkMyPe(),index, entry->red.lcount[index],entry->localElem.length(), entry->red.ccount[index], entry->children.length(), entry->red.gcount[index], entry->allElem.length(), !entry->hasParent()));
   }
 
   int currentTreeUp = 0;
@@ -1082,7 +1083,7 @@ void CkMulticastMgr::releaseBufferedReduceMsgs(mCastEntryPtr entry)
 
   for (int j=0; j<MAXFRAGS; j++) {
     for (i=0; i<entry->red.msgs[j].length(); i++) {
-      DEBUGF(("releaseBufferedReduceMsgs: %p\n", entry->red.msgs[i]));
+      DEBUGF(("releaseBufferedReduceMsgs: %p\n", entry->red.msgs[j][i]));
       entry->red.msgs[j][i]->sid = entry->rootSid;
       entry->red.msgs[j][i]->sourceFlag = 0;
       mCastGrp[entry->rootSid.get_pe()].recvRedMsg(entry->red.msgs[j][i]);
