@@ -5,9 +5,9 @@
 Some registration routines need be executed exactly once
 before the computation begins. You may choose to 
 declare a regular  \CC\ subroutine \kw{initnode} in the .ci file
-to ask \charmpp to execute the routine exactly once on every node before the
-computation begins, or to declare a regular  \CC\ subroutine \kw{initproc}
-to be executed exactly once on every processor.
+to ask \charmpp to execute the routine exactly once on {\em every node} 
+before the computation begins, or to declare a regular  \CC\ subroutine 
+\kw{initproc} to be executed exactly once on {\em every processor}.
 
 \begin{alltt}
 module foo \{
@@ -23,8 +23,11 @@ module foo \{
 
 This code will execute the routines \uw{fooNodeInit} and static 
 \uw{bar::barNodeInit} once on every node and \uw{fooProcInit}
-and \uw{bar::barProcInit} on every processor before the main computation starts.
+and \uw{bar::barProcInit} on every processor before the main computation 
+starts.
 Initnode calls are always executed before initproc calls.
+Both init calls (declared as static member function) can be used in chare, 
+group or chare arrays.
 
 Note that these routines should only do registration, not computation since
 Charm run-time initialization does not start yet ---

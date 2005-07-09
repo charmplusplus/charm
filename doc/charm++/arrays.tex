@@ -670,17 +670,44 @@ of each entry method.
 \subsubsection{Array Section}
 \experimental{}
 
-\charmpp{} now supports array section. Array section is a subset of array 
-elements in a chare array. You can create a special proxy for an array section 
-and do multicast using the proxy. Section reduction is not directly supported 
-by the section proxy. However, an optimized section multicast/reduction 
+\charmpp{} supports array section which is a subset of array 
+elements in a chare array.
+A special proxy for an array section can be created given a list of array
+indexes of elements.
+Multicast operations are directly supported in array section proxy with
+an unoptimized direct-sending implementation.
+Section reduction is not directly supported by the section proxy. 
+However, an optimized section multicast/reduction 
 library called ''CkMulticast'' is provided as a separate library module,
-it can be plugged in as a delegation module. 
+which can be plugged in as a delegation of a section proxy for performing
+section-based multicasts and reductions. 
 
-For each chare array "A" declared in a ci file, the definition of section proxy 
+For each chare array "A" declared in a ci file, a section proxy 
 of type "CProxySection\_A" is automatically generated in the decl and def 
-header files. You can create an array section proxy in your application by 
-invoking ckNew() to CProxySection:
+header files. 
+In order to create an array section, a user needs to provide array indexes 
+of all the array section members.
+You can create an array section proxy in your application by 
+invoking ckNew() function of the CProxySection.
+For example, for a 3D array:
+
+\begin{alltt}
+  CkVec<CkArrayIndex3D> elems;    // add array indices
+  for (int i=0; i<10; i++)
+    for (int j=0; j<20; j+=2)
+      for (int k=0; k<30; k+=2)
+         elems.push_back(CkArrayIndex3D(i, j, k));
+  CProxySection_Hello proxy = CProxySection_Hello::ckNew(helloArrayID, elems.getVec(), elems.size());
+\end{alltt}
+
+Alternatively:
+
+\begin{alltt}
+  CProxySection_Hello proxy = CProxySection_Hello::ckNew(helloArrayID, 1, 10, 1, 1, 20, 2, 1, 30, 2);
+\end{alltt}
+
+For user-defined array index other than CkArrayIndex1D to CkArrayIndex6D,
+one needs to use the generic array index type: CkArrayIndexMax.
 
 \begin{alltt}
   CkArrayIndexMax *elems;    // add array indices
