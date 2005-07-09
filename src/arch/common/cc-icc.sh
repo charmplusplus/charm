@@ -5,9 +5,6 @@ CMK_CXXPP='icpc -E -cxxlib-icc '
 CMK_LD='icc -i_dynamic -cxxlib-icc '
 CMK_LDXX='icpc -i_dynamic -cxxlib-icc '
 CMK_LD_LIBRARY_PATH="-Wl,-rpath,$CHARMLIBSO/"
-CMK_CF90='ifc -auto '
-CMK_CF90_FIXED="$CMK_CF90 -132 -FI "
-CMK_NATIVE_F90="$CMK_CF90"
 CMK_NATIVE_CC="$CMK_CC"
 CMK_NATIVE_CXX="$CMK_CXX"
 CMK_NATIVE_LD="$CMK_LD"
@@ -19,4 +16,20 @@ CMK_NATIVE_LDXX="$CMK_LDXX"
 #CMK_MOD_EXT="mod"
 #CMK_F90_USE_MODDIR=""
 
-. $CHARMINC/conv-mach-ifort.sh
+# for Intel Fortran compiler ifc
+CMK_CF77="ifc -auto "
+CMK_CF90="ifc -auto "
+CMK_CF90_FIXED="$CMK_CF90 -132 -FI "
+F90DIR=`which ifc 2> /dev/null`
+if test -x "$F90DIR" 
+then
+  F90LIBDIR="`dirname $F90DIR`/../lib"
+  F90MAIN="$F90LIBDIR/for_main.o"
+fi
+# for_main.o is important for main() in f90 code
+CMK_F90MAINLIBS="$F90MAIN "
+CMK_F90LIBS="-L$F90LIBDIR -lifcore -lifport "
+CMK_F77LIBS="$CMK_F90LIBS"
+CMK_MOD_NAME_ALLCAPS=
+CMK_MOD_EXT="mod"
+CMK_F90_USE_MODDIR=""
