@@ -92,20 +92,21 @@ public:
 CmiPrintf("start %d elements\n", nElements);
     CkMulticastMgr *mg = CProxy_CkMulticastMgr(mCastGrpId).ckLocalBranch();
 
-    CkArrayIndexMax *al = new CkArrayIndexMax[sectionSize];
-    for (int i=0; i<sectionSize; i++) {
-      al[i] = CkArrayIndex1D(i);
-    }
+    // create section proxy
+//    CkVec<CkArrayIndex1D> al;
+//    for (int i=0; i<sectionSize; i++)
+//      al.push_back(CkArrayIndex1D(i));
+//    mcp = CProxySection_Hello::ckNew(thisArrayID, al.getVec(), al.size());
 #if 0
     mcast = new CProxySection_Hello(thisArrayID, al, SECTIONSIZE, mCastGrpId);
 #endif
-    mcp = CProxySection_Hello::ckNew(thisArrayID, al, sectionSize);
+    mcp = CProxySection_Hello::ckNew(thisArrayID, 0, SECTIONSIZE-1, 1);
     mcp.ckSectionDelegate(mg);
-    delete [] al;
-/*
+
+#if 0
     mcp.ckDelegate(mg);
     mg->setSection(mcp);
-*/
+#endif
 
 #if 0
     mg->setSection(sid, thisArrayID, al, SECTIONSIZE);
@@ -180,7 +181,7 @@ CmiPrintf("start %d elements\n", nElements);
 
   void SayHi(HiMsg *m)
   {
-    //CkPrintf("[%d] Hi[%d] from element %d\n",CmiMyPe(), m->data[0],thisIndex);
+    // CkPrintf("[%d] Hi[%d] from element %d\n",CmiMyPe(), m->data[0],thisIndex);
     CmiAssert(m->data[0] == 22 && m->data[1] == 28);
 
     CkGetSectionInfo(sid, m);
