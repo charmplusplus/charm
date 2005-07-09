@@ -700,11 +700,15 @@ For example, for a 3D array:
   CProxySection_Hello proxy = CProxySection_Hello::ckNew(helloArrayID, elems.getVec(), elems.size());
 \end{alltt}
 
-Alternatively:
+Alternatively, one can do the same thing by providing (lbound:ubound:stride) 
+for each dimension:
 
 \begin{alltt}
-  CProxySection_Hello proxy = CProxySection_Hello::ckNew(helloArrayID, 1, 10, 1, 1, 20, 2, 1, 30, 2);
+  CProxySection_Hello proxy = CProxySection_Hello::ckNew(helloArrayID, 0, 9, 1, 0, 19, 2, 0, 29, 2);
 \end{alltt}
+
+The above codes create a section proxy that contains array elements of 
+[0:9, 0:19:2, 0:29:2).
 
 For user-defined array index other than CkArrayIndex1D to CkArrayIndex6D,
 one needs to use the generic array index type: CkArrayIndexMax.
