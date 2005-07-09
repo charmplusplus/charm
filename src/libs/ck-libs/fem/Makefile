@@ -1,10 +1,11 @@
 CDIR=../../../..
 CHARMC=$(CDIR)/bin/charmc $(OPTS)
 
-HEADERS=fem.h femf.h fem_mesh.h fem_adapt.h fem_impl.h parallel_part.h map.h
+HEADERS=fem.h femf.h fem_mesh.h fem_adapt.h fem_impl.h parallel_part.h map.h  fem_mesh_modify.h
 HEADDEP=$(HEADERS) fem_impl.h 
 OBJS=fem.o fem_mesh.o fem_adapt.o symmetries.o \
-	partition.o map.o fem_compat.o call_init.o parallel_part.o
+	partition.o map.o fem_compat.o call_init.o \
+	parallel_part.o fem_mesh_modify.o
 COMPAT=compat_init.o compat_finit.o compat_driver.o compat_fdriver.o 
 LIB=libmodulefem
 
@@ -16,7 +17,7 @@ FEMMAIN=$(LIBDIR)/libfemmain.o
 
 .SUFFIXES:
 .SUFFIXES: .c .o
-                                                                                
+
 .c.o:
 	$(CHARMC) -c $<
 
@@ -79,6 +80,9 @@ $(FEMMAIN): femmain.C $(HEADDEP)
 
 call_init.o: call_init.c
 	$(CHARMC) -c call_init.c
+
+fem_mesh_modify.o: fem_mesh_modify.C fem_mesh_modify.h $(HEADDEP)
+	$(CHARMC) -c fem_mesh_modify.C
 
 clean:
 	rm -rf *.a *.def.h *.decl.h *.o SunWS_cache $(DEST) $(COMPATLIB) headers
