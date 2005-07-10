@@ -417,6 +417,22 @@ void AssembleDatagram(OtherNode node, ExplicitDgram dg)
       KillEveryoneCode(4559313);
   }
   if (node->asm_fill == node->asm_total) {
+    /* spanning tree broadcast - send first to avoid invalid msg ptr */
+#if CMK_BROADCAST_SPANNING_TREE
+    if (node->asm_rank == DGRAM_BROADCAST
+#if CMK_NODE_QUEUE_AVAILABLE 
+          || node->asm_rank == DGRAM_NODEBROADCAST
+#endif
+      )
+        SendSpanningChildren(NULL, 0, node->asm_total, msg, dg->broot, dg->rank);
+#elif CMK_BROADCAST_HYPERCUBE
+    if (node->asm_rank == DGRAM_BROADCAST
+#if CMK_NODE_QUEUE_AVAILABLE
+          || node->asm_rank == DGRAM_NODEBROADCAST
+#endif
+      )
+        SendHypercube(NULL, 0, node->asm_total, msg, dg->broot, dg->rank);
+#endif
     if (node->asm_rank == DGRAM_BROADCAST) {
       int len = node->asm_total;
       for (i=1; i<_Cmi_mynodesize; i++)
@@ -433,22 +449,6 @@ void AssembleDatagram(OtherNode node, ExplicitDgram dg)
 #endif
 	   CmiPushPE(node->asm_rank, msg);
     }
-    /* spanning tree broadcast */
-#if CMK_BROADCAST_SPANNING_TREE
-      if (node->asm_rank == DGRAM_BROADCAST
-#if CMK_NODE_QUEUE_AVAILABLE 
-          || node->asm_rank == DGRAM_NODEBROADCAST
-#endif
-      )
-        SendSpanningChildren(NULL, 0, node->asm_total, (char*)node->asm_msg, dg->broot, dg->rank);
-#elif CMK_BROADCAST_HYPERCUBE
-      if (node->asm_rank == DGRAM_BROADCAST
-#if CMK_NODE_QUEUE_AVAILABLE
-          || node->asm_rank == DGRAM_NODEBROADCAST
-#endif
-      )
-        SendHypercube(NULL, 0, node->asm_total, (char*)node->asm_msg, dg->broot, dg->rank);
-#endif
     node->asm_msg = 0;
     myNode->recd_msgs++;
     myNode->recd_bytes += node->asm_total;

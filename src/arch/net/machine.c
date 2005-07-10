@@ -1955,6 +1955,7 @@ void CmiFreeListSendFn(int npes, int *pes, int len, char *msg)
 /*
   if root is 1, it is called from the broadcast root, only ogm is needed;
   if root is 0, it is called in the tree, ogm must be NULL and msg, size and startpe are needed
+  note: function leaves msg buffer untouched
 */
 void SendSpanningChildren(OutgoingMsg ogm, int root, int size, char *msg, unsigned int startpe, int noderank)
 {
@@ -1989,7 +1990,9 @@ int log_of_2 (int i) {
   return m;
 }
 
-/* called from root - send msg along the hypercube in broadcast. */
+/* called from root - send msg along the hypercube in broadcast.
+  note: function leaves msg buffer untouched
+*/
 void SendHypercube(OutgoingMsg ogm, int root, int size, char *msg, unsigned int srcpe, int noderank)
 {
   CmiState cs = CmiGetState();
