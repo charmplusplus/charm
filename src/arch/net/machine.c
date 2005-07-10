@@ -1551,11 +1551,11 @@ void DeliverOutgoingMessage(OutgoingMsg ogm)
 #else
     for (i=0; i<_Cmi_numnodes; i++)
       if (i!=_Cmi_mynode){
-				/*FAULT_EVAC : is the target processor valid*/
-				if(CpvAccess(_validProcessors)[i]){
-					DeliverViaNetwork(ogm, nodes + i, DGRAM_BROADCAST, DGRAM_ROOTPE_MASK);
-				}
-			}	
+	/*FAULT_EVAC : is the target processor valid*/
+	if(CpvAccess(_validProcessors)[i]){
+	  DeliverViaNetwork(ogm, nodes + i, DGRAM_BROADCAST, DGRAM_ROOTPE_MASK);
+	}
+      }	
 #endif
     GarbageCollectMsg(ogm);
     break;
@@ -1571,11 +1571,11 @@ void DeliverOutgoingMessage(OutgoingMsg ogm)
 #else
     for (i = 0; i<_Cmi_numnodes; i++)
       if (i!=_Cmi_mynode){
-				/*FAULT_EVAC : is the target processor valid*/
-				if(CpvAccess(_validProcessors)[i]){
-					DeliverViaNetwork(ogm, nodes + i, DGRAM_BROADCAST, DGRAM_ROOTPE_MASK);
-				}
-			}	
+	/*FAULT_EVAC : is the target processor valid*/
+	if(CpvAccess(_validProcessors)[i]){
+	  DeliverViaNetwork(ogm, nodes + i, DGRAM_BROADCAST, DGRAM_ROOTPE_MASK);
+	}
+      }	
 #endif
     GarbageCollectMsg(ogm);
     break;

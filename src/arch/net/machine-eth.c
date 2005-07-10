@@ -412,8 +412,9 @@ void AssembleDatagram(OtherNode node, ExplicitDgram dg)
   	node->asm_fill, node->asm_total, node->nodestart)
   if (node->asm_fill > node->asm_total) {
       fprintf(stderr, "\n\n\t\tLength mismatch!!\n\n");
-      MACHSTATE4(5,"Length mismatch seq %d, from 'pe' %d, fill %d, total %d",
-      	dg->seqno,node->nodestart,node->asm_fill,node->asm_total)
+      fflush(stderr);
+      MACHSTATE4(5,"Length mismatch seq %d, from 'pe' %d, fill %d, total %d\n", dg->seqno,node->nodestart,node->asm_fill,node->asm_total)
+      KillEveryoneCode(4559313);
   }
   if (node->asm_fill == node->asm_total) {
     if (node->asm_rank == DGRAM_BROADCAST) {
@@ -432,6 +433,22 @@ void AssembleDatagram(OtherNode node, ExplicitDgram dg)
 #endif
 	   CmiPushPE(node->asm_rank, msg);
     }
+    /* spanning tree broadcast */
+#if CMK_BROADCAST_SPANNING_TREE
+      if (node->asm_rank == DGRAM_BROADCAST
+#if CMK_NODE_QUEUE_AVAILABLE 
+          || node->asm_rank == DGRAM_NODEBROADCAST
+#endif
+      )
+        SendSpanningChildren(NULL, 0, node->asm_total, (char*)node->asm_msg, dg->broot, dg->rank);
+#elif CMK_BROADCAST_HYPERCUBE
+      if (node->asm_rank == DGRAM_BROADCAST
+#if CMK_NODE_QUEUE_AVAILABLE
+          || node->asm_rank == DGRAM_NODEBROADCAST
+#endif
+      )
+        SendHypercube(NULL, 0, node->asm_total, (char*)node->asm_msg, dg->broot, dg->rank);
+#endif
     node->asm_msg = 0;
     myNode->recd_msgs++;
     myNode->recd_bytes += node->asm_total;
@@ -505,21 +522,6 @@ void IntegrateMessageDatagram(ExplicitDgram dg)
       if (seqno >= node->recv_expect)
 	node->recv_expect = ((seqno+1)&DGRAM_SEQNO_MASK);
       LOG(Cmi_clock, Cmi_nodestart, 'Y', node->recv_next, dg->seqno);
-#if CMK_BROADCAST_SPANNING_TREE
-      if (dg->rank == DGRAM_BROADCAST
-#if CMK_NODE_QUEUE_AVAILABLE 
-          || dg->rank == DGRAM_NODEBROADCAST
-#endif
-      )
-        SendSpanningChildren(NULL, 0, dg->len, (char*)dg->data, dg->broot, dg->rank);
-#elif CMK_BROADCAST_HYPERCUBE
-      if (dg->rank == DGRAM_BROADCAST
-#if CMK_NODE_QUEUE_AVAILABLE
-          || dg->rank == DGRAM_NODEBROADCAST
-#endif
-      )
-        SendHypercube(NULL, 0, dg->len, (char*)dg->data, dg->broot, dg->rank);
-#endif
       return;
     }
   }
