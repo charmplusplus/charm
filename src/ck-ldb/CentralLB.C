@@ -367,7 +367,7 @@ void CentralLB::LoadBalance()
       info.getSummary(mLoad, mCpuLoad, totalLoad);
       int nmsgs, nbytes;
       statsData->computeNonlocalComm(nmsgs, nbytes);
-      CkPrintf("[%d] Load Summary (before LB): max (with comm): %f max (obj only): %f average: %f at step %d nonlocal: %d msgs %.2fKB.\n", CkMyPe(), mLoad, mCpuLoad, totalLoad/clients, step(), nmsgs, 1.0*nbytes/1024);
+      CkPrintf("[%d] Load Summary (before LB): max (obj only): %f average: %f at step %d nonlocal: %d msgs %.2fKB.\n", CkMyPe(), mCpuLoad, totalLoad/clients, step(), nmsgs, 1.0*nbytes/1024);
   }
 
   double strat_start_time = CkWallTimer();
@@ -397,7 +397,7 @@ void CentralLB::LoadBalance()
       info.getSummary(mLoad, mCpuLoad, totalLoad);
       int nmsgs, nbytes;
       statsData->computeNonlocalComm(nmsgs, nbytes);
-      CkPrintf("[%d] Load Summary (after LB): max (with comm): %f max (obj only): %f average: %f at step %d nonlocal: %d msgs %.2fKB useMem: %.2fKB.\n", CkMyPe(), mLoad, mCpuLoad, totalLoad/clients, step(), nmsgs, 1.0*nbytes/1024, (1.0*useMem())/1024);
+      CkPrintf("[%d] Load Summary (after LB): max (obj only): %f average: %f at step %d nonlocal: %d msgs %.2fKB useMem: %.2fKB.\n", CkMyPe(), mCpuLoad, totalLoad/clients, step(), nmsgs, 1.0*nbytes/1024, (1.0*useMem())/1024);
       for (int i=0; i<clients; i++)
         migrateMsg->expectedLoad[i] = info.peLoads[i];
   }
