@@ -213,6 +213,8 @@ static int msgQueueLen = 0;
 static int request_max;
 static int no_outstanding_sends=0; /*FLAG: consume outstanding Isends in scheduler loop*/
 
+static int outstanding_recvs = 0;
+
 static int Cmi_dim;	/* hypercube dim of network */
 
 static char     **Cmi_argv;
@@ -293,6 +295,7 @@ static void recv_done(void *clientdata){
 #endif
 
   CmiFree(clientdata);
+  outstanding_recvs--;
 }
 
 /* first packet recv callback, gets recv_done for the whole msg */
@@ -307,6 +310,7 @@ BLMPI_Rzv_Recv_t * first_pkt_recv_done   (const BGLQuad    * msginfo,
 					  char            ** buffer,
 					  void           (** cb_done)(void *),
 					  void            ** clientdata){
+  outstanding_recvs++;
   /* printf ("Receiving %d bytes\n", sndlen); */
   *rcvlen = sndlen>0?sndlen:1;	/* to avoid malloc(0) which might return NULL */
   *buffer = (char *)CmiAlloc(sndlen);
@@ -773,6 +777,10 @@ static int PumpMsgs(void){
   return flag; 
 }
 static void AdvanceCommunications(void){
+  while(BLMPI_Messager_advance(_msgr)) ;
+  while(outstanding_recvs){
+    BLMPI_Messager_advance(_msgr);
+  }
   while(BLMPI_Messager_advance(_msgr)) ;
 }
 
