@@ -179,7 +179,7 @@ void main::finish(void)
 
 main::main(CkArgMsg *msg)
 {
-  CmiPrintf("Megatest is running on %d processors. \n", CkNumPes());
+  CmiPrintf("Megatest is running on %d nodes %d processors. \n", CkNumNodes(), CkNumPes());
   int argc = msg->argc;
   char **argv = msg->argv;
   int numtests, i;
