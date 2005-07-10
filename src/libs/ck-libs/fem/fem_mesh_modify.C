@@ -14,7 +14,7 @@ int FEM_add_node(){
   
   // lengthen node array, and any attributes if needed
   // return a new index
-  
+  return 0;
 }
 
 
@@ -34,6 +34,8 @@ int FEM_add_shared_node(int* adjacent_nodes, int num_adjacent_nodes, int upcall)
 
   }
 
+
+  return 0;
 }
 
 
@@ -112,6 +114,8 @@ int FEM_add_element(int* conn, int conn_size, int elem_type){
   //   update remote adjacencies
   //   update local adjacencies
 
+
+  return 0;
 }
 
 
@@ -123,4 +127,5 @@ int FEM_add_element_remote(){
 
   // update my adjacencies
 
+  return 0;
 }
