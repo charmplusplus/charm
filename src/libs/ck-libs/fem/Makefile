@@ -5,7 +5,7 @@ HEADERS=fem.h femf.h fem_mesh.h fem_adapt.h fem_impl.h parallel_part.h map.h  fe
 HEADDEP=$(HEADERS) fem_impl.h 
 OBJS=fem.o fem_mesh.o fem_adapt.o symmetries.o \
 	partition.o map.o fem_compat.o call_init.o \
-	parallel_part.o fem_mesh_modify.o
+	parallel_part.o fem_mesh_modify.o fem_mesh_adjacency.o
 COMPAT=compat_init.o compat_finit.o compat_driver.o compat_fdriver.o 
 LIB=libmodulefem
 
@@ -83,6 +83,9 @@ call_init.o: call_init.c
 
 fem_mesh_modify.o: fem_mesh_modify.C fem_mesh_modify.h $(HEADDEP)
 	$(CHARMC) -c fem_mesh_modify.C
+
+fem_mesh_adjacency.o: fem_mesh_adjacency.C $(HEADDEP)
+	$(CHARMC) -c fem_mesh_adjacency.C
 
 clean:
 	rm -rf *.a *.def.h *.decl.h *.o SunWS_cache $(DEST) $(COMPATLIB) headers
