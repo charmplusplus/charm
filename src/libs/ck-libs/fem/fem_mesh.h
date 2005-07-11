@@ -1240,7 +1240,8 @@ class FEM_Mesh : public CkNoncopyable {
   void n2e_removeAll(int n);
 
   /// Get an element on edge (n1, n2) where n1, n2 are chunk-local
-  /// node numberings; return -1 in case of failure
+  /// node numberings and result is chunk-local element; return -1 in case 
+  /// of failure
   int getElementOnEdge(int n1, int n2);
 }; 
 PUPmarshall(FEM_Mesh);

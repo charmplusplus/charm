@@ -1,0 +1,336 @@
+#include "fem_adapt_new.h"  
+
+// ======================  BEGIN edge_flip  =================================
+/* Perform a Delaunay flip of the edge (n1, n2) returning 1 if successful, 0 if
+   not (likely due to the edge being on a boundary). The convexity of the 
+   quadrilateral formed by two faces incident to edge (n1, n2) is assumed. n1 
+   and n2 are assumed to be local to this chunk.  An adjacency test is 
+   performed on n1 and n2 by searching for an element with edge [n1,n2].
+
+       n3                 n3
+        o                  o
+       / \                /|\
+      /   \              / | \
+     /     \            /  |  \
+    /       \          /   |   \
+n1 o---------o n2  n1 o    |    o n2
+    \       /          \   |   / 
+     \     /            \  |  /
+      \   /              \ | /
+       \ /                \|/
+        o                  o
+       n4                 n4
+*/
+int FEM_Adapt::edge_flip(int n1, int n2) 
+{
+  int e1, e1_n1, e1_n2, e1_n3, n3;
+  int e2, e2_n1, e2_n2, e2_n3, n4;
+  findAdjData(n1, n2, &e1, &e2, &e1_n1, &e1_n2, &e1_n3, &e2_n1, &e2_n2, &e2_n3,
+	      &n3, &n4);
+  if ((e1 == -1) || (e2 == -1)) return 0; // edge on boundary are not there
+  return edge_flip_help(e1, e2, n1, n2, e1_n1, e1_n2, e1_n3, n3, n4);
+}
+int FEM_Adapt::edge_flip_help(int e1, int e2, int n1, int n2, int e1_n1, 
+			      int e1_n2, int e1_n3, int n3, int n4) 
+{
+  int conn[3];
+
+  FEM_remove_element(e1, 0);
+  FEM_remove_element(e2, 0);
+  // add n1, n3, n4
+  conn[e1_n1] = n1;  conn[e1_n2] = n4;  conn[e1_n3] = n3;
+  (void) FEM_add_element(conn, 3, 0);
+  // add n2, n3, n4
+  conn[e1_n1] = n4;  conn[e1_n2] = n2;  conn[e1_n3] = n3;
+  (void) FEM_add_element(conn, 3, 0);
+  return 1;
+}
+// ======================  END edge_flip  ===================================
+
+
+// ======================  BEGIN edge_bisect  ===============================
+/* Given edge e:(n1, n2), remove the two elements (n1,n2,n3) and 
+   (n2,n1,n4) adjacent to e, and bisect e by adding node 
+   n5. Add elements (n1,n5,n3), (n5,n2,n3), (n5,n1,n4) and (n2,n5,n4); 
+   returns new node n5.
+
+       n3                 n3
+        o                  o
+       / \                /|\
+      /   \              / | \
+     /     \            /  |  \
+    /       \          /   |n5 \
+n1 o---------o n2  n1 o----o----o n2
+    \       /          \   |   / 
+     \     /            \  |  /
+      \   /              \ | /
+       \ /                \|/
+        o                  o
+       n4                 n4
+*/
+int FEM_Adapt::edge_bisect(int n1, int n2) 
+{
+  int e1, e1_n1, e1_n2, e1_n3, n3;
+  int e2, e2_n1, e2_n2, e2_n3, n4;
+  findAdjData(n1, n2, &e1, &e2, &e1_n1, &e1_n2, &e1_n3, &e2_n1, &e2_n2, &e2_n3,
+	      &n3, &n4);
+  return edge_bisect_help(e1, e2, n1, n2, e1_n1, e1_n2, e1_n3, e2_n1, e2_n2, 
+			  e2_n3, n3, n4);
+}
+int FEM_Adapt::edge_bisect_help(int e1, int e2, int n1, int n2, int e1_n1, 
+				int e1_n2, int e1_n3, int e2_n1, int e2_n2, 
+				int e2_n3, int n3, int n4)
+{
+  int n5, conn[3];
+
+  FEM_remove_element(e1, 0);
+  FEM_remove_element(e2, 0);  // assumes intelligent behavior when no e2 exists
+  // hmm... if e2 is a ghost and we remove it and create all the new elements
+  // locally, then we don't really need to add a *shared* node
+  n5 = FEM_add_node();
+  // add n1, n5, n3
+  conn[e1_n1] = n1;  conn[e1_n2] = n5;  conn[e1_n3] = n3;
+  (void) FEM_add_element(conn, 3, 0);
+  // add n2, n5, n3
+  conn[e1_n1] = n5;  conn[e1_n2] = n2;  conn[e1_n3] = n3;
+  (void) FEM_add_element(conn, 3, 0);
+  if (e2 != -1) { // e2 exists
+    // add n1, n5, n4
+    conn[e2_n1] = n1;  conn[e2_n2] = n5;  conn[e2_n3] = n4;
+    (void) FEM_add_element(conn, 3, 0);
+    // add n2, n5, n4
+    conn[e2_n1] = n5;  conn[e2_n2] = n2;  conn[e2_n3] = n4;
+    (void) FEM_add_element(conn, 3, 0);
+  }
+  return n5;
+}
+// ======================  END edge_bisect  ================================
+
+
+// ======================  BEGIN vertex_remove  ============================
+/* Inverse of edge bisect, this removes a degree 4 vertex n1 and 2 of its
+   adjacent elements.  n2 indicates that the two elements removed are
+   adjacent to edge [n1,n2]. This could be performed with edge_contraction,
+   but this is a simpler operation. 
+
+         n3	             n3        
+          o	              o        
+         /|\	             / \       
+        / | \	            /   \      
+       /  |  \	           /     \     
+      /   |n1 \           /       \    
+  n5 o----o----o n2   n5 o---------o n2
+      \   |   /           \       /    
+       \  |  /	           \     /     
+        \ | /	            \   /      
+         \|/	             \ /       
+          o	              o        
+         n4                  n4        
+*/
+int FEM_Adapt::vertex_remove(int n1, int n2)
+{
+  int e1, e1_n1, e1_n2, e1_n3, n3;
+  int e2, e2_n1, e2_n2, e2_n3, n4;
+  findAdjData(n1, n2, &e1, &e2, &e1_n1, &e1_n2, &e1_n3, &e2_n1, &e2_n2, &e2_n3,
+	      &n3, &n4);
+  if (e1 == -1) return 0;
+  // find n5
+  int *nbrNodes, nnsize, n5;
+  theMesh->n2n_getAll(n1, &nbrNodes, &nnsize);
+  for (int i=0; i<nnsize; i++) {
+    if ((nbrNodes[i] != n2) && (nbrNodes[i] != n3) && (nbrNodes[i] != n4)) {
+      n5 = nbrNodes[i];
+      break;
+    }
+  }
+  return vertex_remove_help(e1, e2, n1, n2, e1_n1, e1_n2, e1_n3, e2_n1, e2_n2, 
+			    e2_n3, n3, n4, n5);
+}
+int FEM_Adapt::vertex_remove_help(int e1, int e2, int n1, int n2, int e1_n1, 
+				  int e1_n2, int e1_n3, int e2_n1, int e2_n2, 
+				  int e2_n3, int n3, int n4, int n5)
+{
+  int e3 = theMesh->e2e_getNbr(e1, get_edge_index(e1_n1, e1_n3));
+  if (e3 == -1) return 0;
+  FEM_remove_element(e1, 0);
+  FEM_remove_element(e3, 0);
+  if (e2 != -1) {
+    int e4 = theMesh->e2e_getNbr(e2, get_edge_index(e2_n1, e2_n3));
+    if (e4 == -1) return 0;
+    FEM_remove_element(e2, 0);
+    FEM_remove_element(e4, 0);
+  }
+  FEM_remove_node(n1);
+
+  int conn[3];
+  // add n2, n5, n3
+  conn[e1_n1] = n4;  conn[e1_n2] = n2;  conn[e1_n3] = n3;
+  (void) FEM_add_element(conn, 3, 0);
+  if (e2 != -1) {
+    // add n2, n5, n4
+    conn[e2_n1] = n5;  conn[e2_n2] = n2;  conn[e2_n3] = n4;
+    (void) FEM_add_element(conn, 3, 0);
+  }
+  return 1;
+}
+// ======================  END vertex_remove  ==============================
+  
+// ======================  BEGIN edge_contraction  ============================
+/* Given and edge e:(n1, n2), determine the two adjacent elements (n1,n2,n3) 
+   and (n1,n2,n4). Contract edge e by creating node n5, removing all elements 
+   incident on n1 xor n2 and reinserting with incidence on n5, removing the two
+   elements (n1,n2,n3) and (n1,n2,n4) adjacent to e, and finally removing nodes
+   n1 and n2; return 1 if successful, 0 if not 
+
+       n3                 n3
+        o                  o
+       / \                 |
+      /   \                |  
+ \   /     \   /         \ | / 
+  \ /       \ /           \|/   
+n1 o---------o n2          o n5     
+  / \       / \           /|\    
+ /   \     /   \         / | \ 
+      \   /                |  
+       \ /                 | 
+        o                  o
+       n4                 n4
+*/
+int FEM_Adapt::edge_contraction(int n1, int n2) 
+{
+  int e1, e1_n1, e1_n2, e1_n3, n3;
+  int e2, e2_n1, e2_n2, e2_n3, n4;
+  findAdjData(n1, n2, &e1, &e2, &e1_n1, &e1_n2, &e1_n3, &e2_n1, &e2_n2, &e2_n3,
+	      &n3, &n4);
+  if (e1 == -1) return 0;
+  return edge_contraction_help(e1, e2, n1, n2, e1_n1, e1_n2, e1_n3, e2_n1, 
+			       e2_n2, e2_n3, n3, n4);
+}
+int FEM_Adapt::edge_contraction_help(int e1, int e2, int n1, int n2, int e1_n1,
+				     int e1_n2, int e1_n3, int e2_n1, 
+				     int e2_n2, int e2_n3, int n3, int n4)
+{
+  int conn[3], n5 = FEM_add_node();
+
+  // delete/add surrounding elements
+  int *nbrElems, nesize;
+  theMesh->n2e_getAll(n1, &nbrElems, &nesize);
+  for (int i=0; i<nesize; i++) {
+    if ((nbrElems[i] != e1) && (nbrElems[i] != e2)) {
+      theMesh->e2n_getAll(nbrElems[i], conn);
+      for (int j=0; j<3; j++) 
+	if (conn[j] == n1) conn[j] = n5;
+      FEM_remove_element(nbrElems[i], 0);
+      (void) FEM_add_element(conn, 3, 0);
+    }
+  }
+  theMesh->n2e_getAll(n2, &nbrElems, &nesize);
+  for (int i=0; i<nesize; i++) {
+    if ((nbrElems[i] != e1) && (nbrElems[i] != e2)) {
+      theMesh->e2n_getAll(nbrElems[i], conn);
+      for (int j=0; j<3; j++) 
+	if (conn[j] == n2) conn[j] = n5;
+      FEM_remove_element(nbrElems[i], 0);
+      (void) FEM_add_element(conn, 3, 0);
+    }
+  }
+
+  FEM_remove_element(e1, 0);
+  FEM_remove_element(e2, 0);
+  FEM_remove_node(n1);
+  FEM_remove_node(n2);
+  return 1;
+}
+// ======================  END edge_contraction  ==============================
+
+// ======================  BEGIN vertex_split =================================
+/* Given a node n and two adjacent nodes n1 and n2, split n into two nodes n 
+   and np such that the edges to the neighbors n1 and n2 expand into two new 
+   elements (n, np, n1) and (np, n, n2); return the id of the newly created 
+   node np
+
+    n1	            n1             
+     o	             o             
+     |	            / \            
+     |  	   /   \           
+   \ | /      \   /     \   /      
+    \|/        \ /       \ /       
+     o n      n o---------o np
+    /|\        / \       / \       
+   / | \      /   \     /   \      
+     |  	   \   /           
+     | 	            \ /            
+     o	             o             
+    n2              n2             
+*/
+int FEM_Adapt::vertex_split(int n, int n1, int n2) 
+{
+  int e1 = theMesh->getElementOnEdge(n, n1);
+  if (e1 == -1) return -1;	     
+  int e3 = theMesh->getElementOnEdge(n, n2);
+  if (e3 == -1) return -1;	     
+  return vertex_split(n, n1, n2, e1, e3);
+}
+int FEM_Adapt::vertex_split(int n, int n1, int n2, int e1, int e3)
+{
+  int e1_n = find_local_node_index(e1, n);
+  int e1_n1 = find_local_node_index(e1, n1);
+  int e2 = theMesh->e2e_getNbr(e1, get_edge_index(e1_n, e1_n1));
+  int e3_n = find_local_node_index(e3, n);
+  int e3_n2 = find_local_node_index(e3, n2);
+  int e4 = theMesh->e2e_getNbr(e3, get_edge_index(e3_n, e3_n2));
+  if (!check_orientation(e1, e3, n, n1, n2)) {
+    int tmp = e3;
+    e3 = e4;
+    e4 = tmp;
+    e3_n = find_local_node_index(e3, n);
+    e3_n2 = find_local_node_index(e3, n2);
+  }
+
+  int np = FEM_add_node();
+  int conn[3];
+
+  int current, next, nt, nl, eknp, eknt, eknl;
+  // traverse elements on one side of n starting with e2
+  current = e2;
+  nt = n1;
+  while ((current != e3) && (current != -1)) { 
+    eknp = find_local_node_index(current, n);
+    eknt = find_local_node_index(current, nt);
+    eknl = 3 - eknp - eknt;
+    next = theMesh->e2e_getNbr(current, get_edge_index(eknp, eknl));
+    nl = theMesh->e2n_getNode(current, eknl);
+    FEM_remove_element(current, 0);
+    // add nl, nt, np
+    conn[eknp] = np; conn[eknt] = nt; conn[eknl] = nl;
+    (void) FEM_add_element(conn, 3, 0);
+    nt = nl;
+    current = next;
+  }
+  if (current == -1) { // didn't make it all the way around
+    // traverse elements on one side of n starting with e4
+    current = e4;
+    nt = n2;
+    while ((current != e1) && (current != -1)) {
+      eknp = find_local_node_index(current, n);
+      eknt = find_local_node_index(current, nt);
+      eknl = 3 - eknp - eknt;
+      next = theMesh->e2e_getNbr(current, get_edge_index(eknp, eknl));
+      nl = theMesh->e2n_getNode(current, eknl);
+      FEM_remove_element(current, 0);
+      // add nl, nt, np
+      conn[eknp] = np; conn[eknt] = nt; conn[eknl] = nl;
+      (void) FEM_add_element(conn, 3, 0);
+      nt = nl;
+      current = next;
+    }
+  }
+  // add n, n1, np
+  conn[e1_n] = n; conn[e1_n1] = n1; conn[3 - e1_n - e1_n1] = np;
+  (void) FEM_add_element(conn, 3, 0);
+  // add n, n2, np
+  conn[e3_n] = n; conn[e3_n2] = n2; conn[3 - e3_n - e3_n2] = np;
+  (void) FEM_add_element(conn, 3, 0);
+  return np;
+}
+// ======================  END vertex_split ===================
