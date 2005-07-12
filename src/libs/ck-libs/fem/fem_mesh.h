@@ -3,8 +3,7 @@ Charm++ Finite Element Framework:
 C++ implementation file: Mesh representation and manipulation
 
 This file lists the classes used to represent and manipulate 
-Finite Element Meshes inside the FEM framework.  It's largely
-self-contained, and has no direct references to parallelism.
+Finite Element Meshes inside the FEM framework.
 
 Orion Sky Lawlor, olawlor@acm.org, 1/3/2003
 */
@@ -1169,30 +1168,28 @@ class FEM_Mesh : public CkNoncopyable {
   void createNodeNodeAdj();
   void createElemElemAdj();
   
-  /* Isaac's helpers for the createElemElemAdj() */
   FEM_ElemAdj_Layer *getElemAdjLayer(void);
   
-
   // Terry's adjacency accessors & modifiers
 
   //  ------- Element-to-element: preserve initial ordering relative to nodes
   /// Place all of element e's adjacent elements in neighbors; assumes
   /// neighbors allocated to correct size
-  void e2e_getAll(int e, int *neighbors);
+  void e2e_getAll(int e, int *neighborss, int etype=0);
   /// Given id of element e, return the id of the idx-th adjacent element
-  int e2e_getNbr(int e, short idx);
+  int e2e_getNbr(int e, short idx, int etype=0);
   /// Given id of element e and id of another element nbr, return i such that
   /// nbr is the i-th element adjacent to e
-  int e2e_getIndex(int e, int nbr);
+  int e2e_getIndex(int e, int nbr, int etype=0);
   /// Set the element adjacencies of element e to neighbors; assumes neighbors 
   /// has the correct size
-  void e2e_setAll(int e, int *neighbors);
+  void e2e_setAll(int e, int *neighbors, int etype=0);
   /// Set the idx-th element adjacent to e to be newElem
-  void e2e_setIndex(int e, short idx, int newElem);
+  void e2e_setIndex(int e, short idx, int newElem, int etype=0);
   /// Find element oldNbr in e's adjacent elements and replace with newNbr
-  void e2e_replace(int e, int oldNbr, int newNbr);
+  void e2e_replace(int e, int oldNbr, int newNbr, int etype=0);
   /// Remove all neighboring elements in adjacency
-  void e2e_removeAll(int e);
+  void e2e_removeAll(int e, int etype=0);
 
 
   //  ------- Element-to-node: preserve initial ordering

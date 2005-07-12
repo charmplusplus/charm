@@ -40,6 +40,7 @@ FEM_Mesh_create_elem_node_adjacency(int fem_mesh){
 }
 
 
+
 void FEM_Node::allocateElemAdjacency(){
 	if(elemAdjacency){
 		delete elemAdjacency;
@@ -165,6 +166,10 @@ void FEM_Elem::allocateElemAdjacency(){
 	
   add(elemAdjacency);
   add(elemAdjacencyTypes);
+
+  // Verify that the corresponding ghost adjacency tables are created
+  CkAssert( ((FEM_Elem*)getGhost())->elemAdjacency );
+  CkAssert( ((FEM_Elem*)getGhost())->elemAdjacencyTypes );
 }
 
 
@@ -291,9 +296,7 @@ void FEM_Mesh::createElemElemAdj()
                   // copy node numbers into tuple
                   for (int u=0;u<tuplesPerElem;u++) {
                       for (int i=0;i<nodesPerTuple;i++) {
-                          if(i!=0){
-                              //   CkPrintf("-");
-                          }
+                       
                           int eidx=g->elem[t].elem2tuple[i+u*g->nodesPerTuple];
                           if (eidx==-1) { //"not-there" node--
                               tuple[i]=-1; //Don't map via connectivity
@@ -321,17 +324,25 @@ void FEM_Mesh::createElemElemAdj()
           elemList *l;
           const int tuplesPerElem = g->elem[t].tuplesPerElem;
           const int numElements = elem[t].size();
-          table.beginLookup();
+		  const int numGhostElements = ((FEM_Elem*)(elem[t].getGhost()))->size();
+		  table.beginLookup();
           
           // directly modify the element adjacency table for element type t
 		  FEM_IndexAttribute *elemAdjTypesAttr = (FEM_IndexAttribute *)elem[t].lookup(FEM_ELEM_ELEM_ADJ_TYPES,"createElemElemAdj");
 		  FEM_IndexAttribute *elemAdjAttr = (FEM_IndexAttribute *)elem[t].lookup(FEM_ELEM_ELEM_ADJACENCY,"createElemElemAdj");
+		  FEM_IndexAttribute *elemAdjTypesAttrGhost = (FEM_IndexAttribute *)elem[t].getGhost()->lookup(FEM_ELEM_ELEM_ADJ_TYPES,"createElemElemAdj");
+		  FEM_IndexAttribute *elemAdjAttrGhost = (FEM_IndexAttribute *)elem[t].getGhost()->lookup(FEM_ELEM_ELEM_ADJACENCY,"createElemElemAdj");
 		  CkAssert(elemAdjTypesAttr && elemAdjAttr);
 
           AllocTable2d<int> &adjTable = elemAdjAttr->get();
           int *adjs = adjTable.getData();
           AllocTable2d<int> &adjTypesTable = elemAdjTypesAttr->get();
           int *adjTypes = adjTypesTable.getData();
+
+		  AllocTable2d<int> &adjTableGhost = elemAdjAttrGhost->get();
+          int *adjsGhost = adjTableGhost.getData();
+          AllocTable2d<int> &adjTypesTableGhost = elemAdjTypesAttrGhost->get();
+          int *adjTypesGhost = adjTypesTableGhost.getData();
           
           // initialize tables
           for(int i=0;i<numElements*tuplesPerElem;i++){
@@ -349,18 +360,22 @@ void FEM_Mesh::createElemElemAdj()
                   // for each a,b from the list
                   for (const elemList *a=l;a!=NULL;a=a->next){
                       for (const elemList *b=l;b!=NULL;b=b->next){
-                          // if a and b are different elements
-                          if(t==0)CkPrintf("Found adjacent elements %d:%d and %d:%d\n", a->type, a->localNo,b->type,b->localNo);
-                          
-                          if((a->localNo != b->localNo) || (a->type != b->type)){
-                              int j = a->localNo*tuplesPerElem + a->tupleNo;
-                              if(a->type == t){ // only update the entries for element type t
-                                  CkAssert(j<numElements*tuplesPerElem);
-                                  // CkPrintf("Found adjacent elements %d:%d and %d:%d\n", a->type, a->localNo,b->type,b->localNo);
-                                  adjs[j] = b->localNo;
-                                  adjTypes[j] = b->type;
-                              }
-                          }
+						// if a and b are different elements
+						if((a->localNo != b->localNo) || (a->type != b->type)){
+						  int j;
+						  if(FEM_Is_ghost_index(a->localNo))
+							j = FEM_To_ghost_index(a->localNo)*tuplesPerElem + a->tupleNo;
+						  else
+							j = a->localNo*tuplesPerElem + a->tupleNo;
+						  
+						  if(a->type == t){ // only update the entries for element type t
+							CkAssert(j<numElements*tuplesPerElem);
+							// CkPrintf("Found adjacent elements %d:%d and %d:%d\n", a->type, a->localNo,b->type,b->localNo);
+							adjs[j] = b->localNo;
+							adjTypes[j] = b->type;
+						  
+						  }
+						}
                       }
                   }
               }
@@ -370,49 +385,46 @@ void FEM_Mesh::createElemElemAdj()
 
 
 
-
 //  ------- Element-to-element: preserve initial ordering relative to nodes
 /// Place all of element e's adjacent elements in neighbors; assumes
 /// neighbors allocated to correct size
-/// Currently just works as expected only with a single element type.
-void FEM_Mesh::e2e_getAll(int e, int *neighbors) 
+void FEM_Mesh::e2e_getAll(int e, int *neighbors, int etype) 
 {
   if (e == -1) return; // non existent element
-  CkAssert(! FEM_Is_ghost_index(e)); // we don't yet generate ghost element adjacencies 
-  FEM_Elem &elems = setElem(0);
-  FEM_IndexAttribute *eAdj = 
-    (FEM_IndexAttribute *)elems.lookup(FEM_ELEM_ELEM_ADJACENCY, 
-				       "e2e_getAll");
+  FEM_IndexAttribute *eAdj;
+  if(FEM_Is_ghost_index(e))
+	eAdj = (FEM_IndexAttribute *)elem[etype].getGhost()->lookup(FEM_ELEM_ELEM_ADJACENCY,"e2e_getAll");
+  else
+	eAdj = (FEM_IndexAttribute *)elem[etype].lookup(FEM_ELEM_ELEM_ADJACENCY,"e2e_getAll");
   AllocTable2d<int> &eAdjs = eAdj->get();
   for (int i=0; i<eAdjs.width(); i++) {
     neighbors[i] = eAdjs[e][i];
   }
 }
 
-/// Given id of element e, return the id of the idx-th adjacent element
-int FEM_Mesh::e2e_getNbr(int e, short idx) 
+/// Given id of element e of type etype, return the id of the idx-th adjacent element
+int FEM_Mesh::e2e_getNbr(int e, short idx, int etype) 
 {     
   if (e == -1) return -1;
-  FEM_Elem &elems = setElem(0);
-  FEM_IndexAttribute *eAdj = 
-    (FEM_IndexAttribute *)elems.lookup(FEM_ELEM_ELEM_ADJACENCY, 
-				       "e2e_getNbr");
+  FEM_IndexAttribute *eAdj;
+  if(FEM_Is_ghost_index(e))
+	eAdj = (FEM_IndexAttribute *)elem[etype].getGhost()->lookup(FEM_ELEM_ELEM_ADJACENCY,"e2e_getNbr");
+  else
+	eAdj = (FEM_IndexAttribute *)elem[etype].lookup(FEM_ELEM_ELEM_ADJACENCY,"e2e_getNbr");
   AllocTable2d<int> &eAdjs = eAdj->get();
-  //CkPrintf("e2e_getNbr: nbrs are: %d %d %d requested %d-th\n", eAdjs[e][0],
-  //eAdjs[e][1], eAdjs[e][2], idx);
   return eAdjs[e][idx];
 }
 
 /// Given id of element e and id of another element nbr, return i such that
 /// nbr is the i-th element adjacent to e
-int FEM_Mesh::e2e_getIndex(int e, int nbr) 
+int FEM_Mesh::e2e_getIndex(int e, int nbr, int etype) 
 { 
   if (e == -1) return -1;
-  CkAssert(! FEM_Is_ghost_index(e)); // we don't yet generate ghost element adjacencies 
-  FEM_Elem &elems = setElem(0);
-  FEM_IndexAttribute *eAdj = 
-    (FEM_IndexAttribute *)elems.lookup(FEM_ELEM_ELEM_ADJACENCY, 
-				       "e2e_getIndex");
+  FEM_IndexAttribute *eAdj;
+  if(FEM_Is_ghost_index(e))
+	eAdj = (FEM_IndexAttribute *)elem[etype].getGhost()->lookup(FEM_ELEM_ELEM_ADJACENCY,"e2e_getIndex");
+  else
+	eAdj = (FEM_IndexAttribute *)elem[etype].lookup(FEM_ELEM_ELEM_ADJACENCY,"e2e_getIndex");
   AllocTable2d<int> &eAdjs = eAdj->get();
   for (int i=0; i<eAdjs.width(); i++) {
     if (eAdjs[e][i] == nbr) {
@@ -424,14 +436,14 @@ int FEM_Mesh::e2e_getIndex(int e, int nbr)
 
 /// Set the element adjacencies of element e to neighbors; assumes neighbors 
 /// has the correct size
-void FEM_Mesh::e2e_setAll(int e, int *neighbors) 
+void FEM_Mesh::e2e_setAll(int e, int *neighbors, int etype) 
 {
   if (e == -1) return;
-  CkAssert(! FEM_Is_ghost_index(e)); // we don't yet generate ghost element adjacencies 
-  FEM_Elem &elems = setElem(0);
-  FEM_IndexAttribute *eAdj = 
-    (FEM_IndexAttribute *)elems.lookup(FEM_ELEM_ELEM_ADJACENCY, 
-				       "e2e_setAll");
+  FEM_IndexAttribute *eAdj;
+  if(FEM_Is_ghost_index(e))
+	eAdj = (FEM_IndexAttribute *)elem[etype].getGhost()->lookup(FEM_ELEM_ELEM_ADJACENCY,"e2e_setAll");
+  else
+	eAdj = (FEM_IndexAttribute *)elem[etype].lookup(FEM_ELEM_ELEM_ADJACENCY,"e2e_setAll");
   AllocTable2d<int> &eAdjs = eAdj->get();
   //CkPrintf("e2e_setAll: Setting element %d's neighbors to %d,%d,%d\n", e, 
   //neighbors[0], neighbors[1], neighbors[2]);
@@ -441,29 +453,27 @@ void FEM_Mesh::e2e_setAll(int e, int *neighbors)
 }
 
 /// Set the idx-th element adjacent to e to be newElem
-void FEM_Mesh::e2e_setIndex(int e, short idx, int newElem) 
+void FEM_Mesh::e2e_setIndex(int e, short idx, int newElem, int etype) 
 {
   if (e == -1) return;
-  CkAssert(! FEM_Is_ghost_index(e)); // we don't yet generate ghost element adjacencies 
-  FEM_Elem &elems = setElem(0);
-  FEM_IndexAttribute *eAdj = 
-    (FEM_IndexAttribute *)elems.lookup(FEM_ELEM_ELEM_ADJACENCY, 
-				       "e2e_setIndex");
+  FEM_IndexAttribute *eAdj;
+  if(FEM_Is_ghost_index(e))
+	eAdj = (FEM_IndexAttribute *)elem[etype].getGhost()->lookup(FEM_ELEM_ELEM_ADJACENCY,"e2e_setIndex");
+  else
+	eAdj = (FEM_IndexAttribute *)elem[etype].lookup(FEM_ELEM_ELEM_ADJACENCY,"e2e_setIndex");    
   AllocTable2d<int> &eAdjs = eAdj->get();
-  //CkPrintf("e2e_setIndex: Setting element %d's %d-th neighbor to %d\n", e, 
-  //idx, newElem);
   eAdjs[e][idx] = newElem;
 }
- 
+
 /// Find element oldNbr in e's adjacent elements and replace with newNbr
-void FEM_Mesh::e2e_replace(int e, int oldNbr, int newNbr) 
+void FEM_Mesh::e2e_replace(int e, int oldNbr, int newNbr, int etype) 
 {
   if (e == -1) return;
-  CkAssert(! FEM_Is_ghost_index(e)); // we don't yet generate ghost element adjacencies 
-  FEM_Elem &elems = setElem(0);
-  FEM_IndexAttribute *eAdj = 
-    (FEM_IndexAttribute *)elems.lookup(FEM_ELEM_ELEM_ADJACENCY, 
-				       "e2e_replace");
+  FEM_IndexAttribute *eAdj;
+  if(FEM_Is_ghost_index(e))
+	eAdj = (FEM_IndexAttribute *)elem[etype].getGhost()->lookup(FEM_ELEM_ELEM_ADJACENCY,"e2e_replace");
+  else
+	eAdj = (FEM_IndexAttribute *)elem[etype].lookup(FEM_ELEM_ELEM_ADJACENCY,"e2e_replace");
   AllocTable2d<int> &eAdjs = eAdj->get();
   for (int i=0; i<eAdjs.width(); i++) {
     if (eAdjs[e][i] == oldNbr) {
@@ -475,14 +485,14 @@ void FEM_Mesh::e2e_replace(int e, int oldNbr, int newNbr)
 }
 
 /// Remove all neighboring elements in adjacency
-void FEM_Mesh::e2e_removeAll(int e)
+void FEM_Mesh::e2e_removeAll(int e, int etype)
 {
   if (e == -1) return;
-  CkAssert(! FEM_Is_ghost_index(e)); // we don't yet generate ghost element adjacencies 
-  FEM_Elem &elems = setElem(0);
-  FEM_IndexAttribute *eAdj = 
-    (FEM_IndexAttribute *)elems.lookup(FEM_ELEM_ELEM_ADJACENCY, 
-				       "e2e_removeAll");
+  FEM_IndexAttribute *eAdj;
+  if(FEM_Is_ghost_index(e))
+	eAdj = (FEM_IndexAttribute *)elem[etype].getGhost()->lookup(FEM_ELEM_ELEM_ADJACENCY,"e2e_removeAll");
+  else
+	eAdj = (FEM_IndexAttribute *)elem[etype].lookup(FEM_ELEM_ELEM_ADJACENCY,"e2e_removeAll");
   AllocTable2d<int> &eAdjs = eAdj->get();
   for (int i=0; i<eAdjs.width(); i++) {
     eAdjs[e][i] = -1;
