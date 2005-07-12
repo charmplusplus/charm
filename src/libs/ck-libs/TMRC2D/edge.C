@@ -506,9 +506,6 @@ int edge::flipPrevent(elemRef requester, int kIdx, int dIdx, elemRef kNbr,
   boolMsg *ret;
 
   length = (C->theNodes[kIdx]).distance(C->theNodes[dIdx]);
-#ifdef TDEBUG2
-  CkPrintf("TMRC2D: [%d] ......Building lock cloud... edge=%d requester=%d nbr=%d\n", myRef.cid, myRef.idx, requester.idx, nbr.idx);
-#endif
   FEM_Node *theNodes = &(C->meshPtr->node);
   FEM_Comm_Rec *dNodeRec=(FEM_Comm_Rec *)(theNodes->shared.getRec(dIdx));
   FEM_Comm_Rec *kNodeRec=(FEM_Comm_Rec *)(theNodes->shared.getRec(kIdx));
@@ -550,12 +547,6 @@ int edge::flipPrevent(elemRef requester, int kIdx, int dIdx, elemRef kNbr,
       return -1; 
     }
   }
-#ifdef TDEBUG2
-  CkPrintf("TMRC2D: [%d] ......edge::collapse: LOCKS obtained... On edge=%d on chunk=%d, requester==(%d,%d) with nbr=(%d,%d)\n", myRef.cid, myRef.idx, myRef.cid, requester.cid, requester.idx, nbr.cid, nbr.idx);
-#endif
-#ifdef TDEBUG1
-  CkPrintf("TMRC2D: [%d] ......edge::collapse: ** PART 1! ** On edge=%d on chunk=%d, requester==(%d,%d) with nbr=(%d,%d) dIdx=%d kIdx=%d\n", myRef.cid, myRef.idx, myRef.cid, requester.cid, requester.idx, nbr.cid, nbr.idx, dIdx, kIdx);
-#endif
   fixNode = kIdx;
   opnode = oNode;
   newNode = newN;

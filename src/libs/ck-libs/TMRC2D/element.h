@@ -186,6 +186,7 @@ class element {  // triangular elements defined by three node references,
   bool flipTest(node*, node*);
   bool flipInverseTest(node*, node*);
   void incnonCoarsen(void);
+  void resetnonCoarsen(void) { nonCoarsenCount = 0; }
 
   // Mesh improvement stuff
   //void tweakNodes();

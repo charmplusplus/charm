@@ -58,5 +58,6 @@ module refine {
     entry [sync] void fixNode(int nIdx, int chkid);
     entry [sync] intMsg *getBoundary(int edgeIdx);
     entry [sync] void incnonCoarsen(int idx);
+    entry [sync] void resetnonCoarsen(int idx);
   };
 };

@@ -540,7 +540,6 @@ driver(void)
   for (i=0;i<g.nelems;i++){
     checkTriangle(g,i);
   }	
-  //sleep(5);
 
   calcMasses(g);
   double startTime=CkWallTimer();
@@ -553,7 +552,7 @@ driver(void)
   avgArea /= g.nelems;
 
   if (CkMyPe()==0) CkPrintf("Entering timeloop\n");
-  int tSteps=1;
+  int tSteps=5;
   for (int t=1;t<=tSteps;t++) {
     double curTime=CkWallTimer();
     double total=curTime-startTime;
@@ -568,7 +567,7 @@ driver(void)
     }
     areas=new double[g.nelems];
     for (i=0;i<g.nelems;i++) {
-      areas[i] = avgArea * 4.0;
+      areas[i] = avgArea * 2.0;
     }
     
     CkPrintf("[%d] Starting coarsening step: %d nodes, %d elements\n", myChunk,countValidEntities(g.validNode,g.nnodes),countValidEntities(g.validElem,g.nelems));
@@ -590,8 +589,8 @@ driver(void)
     }
     areas=new double[g.nelems];
     for (i=0;i<g.nelems;i++) {
-      //areas[i] = avgArea;
-      areas[i] = calcArea(g,i)/1.5;
+      areas[i] = avgArea * 2.0;
+      //areas[i] = calcArea(g,i)/1.5;
     }
 
     CkPrintf("[%d] Starting refinement step: %d nodes, %d elements\n", myChunk,countValidEntities(g.validNode,g.nnodes),countValidEntities(g.validElem,g.nelems));

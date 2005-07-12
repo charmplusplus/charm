@@ -135,9 +135,8 @@ class chunk : public TCharmClient1D {
   
   // debug_counter is used to print successive snapshots of the chunk
   // and match them up to other chunk snapshots; refineInProgress
-  // flags that the refinement loop is active; modified flags that a
-  // target area for some element on this chunk has been modified
-  int debug_counter, refineInProgress, coarsenInProgress, modified;
+  // flags that the refinement loop is active
+  int debug_counter, refineInProgress, coarsenInProgress;
 
   // meshLock is used to lock the mesh for expansion; if meshlock is
   // zero, the mesh can be either accessed or locked; accesses to the
@@ -267,8 +266,6 @@ class chunk : public TCharmClient1D {
 
   // local methods
   // These access and set local flags
-  void setModified() { modified = 1; }
-  int isModified() { return modified; }
   void setRefining() { refineInProgress = 1; }
   int isRefining() { return refineInProgress; }
 
@@ -307,7 +304,7 @@ class chunk : public TCharmClient1D {
   intMsg *getBoundary(int edgeIdx);
 
   void incnonCoarsen(int idx);
-
+  void resetnonCoarsen(int idx);
 };
 
 #endif

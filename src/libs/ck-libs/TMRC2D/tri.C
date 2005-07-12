@@ -5,6 +5,11 @@
 #include <stdio.h>
 #include "tri.h"
 
+#define REFINE_PRECISION 0.6
+#define COARSEN_PRECISION 0.9
+#define QUALITY_MAX 0.9
+#define QUALITY_MIN 0.6
+
 // I will keep this code until I die!
 //#define accessLock() {printf("%s : %d calling accessLock \n",__FILE__,__LINE__); accessLock1();}
 //readonlys
@@ -22,7 +27,7 @@ chunk::chunk(chunkMsg *m)
     coarsenElements(NULL), refineElements(NULL), refineStack(NULL),
     refineHeapSize(0), coarsenHeapSize(0), refineTop(0),
     additions(0), debug_counter(0), refineInProgress(0), coarsenInProgress(0),
-    modified(0), meshLock(0), meshExpandFlag(0), 
+    meshLock(0), meshExpandFlag(0), 
     numElements(0), numEdges(0), numNodes(0), numGhosts(0), theClient(NULL),
     elementSlots(0), edgeSlots(0), nodeSlots(0), lock(0), lockCount(0),
     lockHolderIdx(-1), lockHolderCid(-1), lockPrio(-1.0), lockList(NULL)
@@ -69,7 +74,6 @@ void chunk::refineElement(int idx, double area)
     pos--;
   }
   releaseLock();
-  modified = 1;  // flag a change in one of the chunk's elements
   if (!refineInProgress) { // if refine loop not running
     refineInProgress = 1;
     mesh[cid].refiningElements(); // start it up
@@ -86,11 +90,8 @@ void chunk::refiningElements()
     }
     else
       i=Delete_Min(0);
-    if ((i != -1) && theElements[i].isPresent() && 
-	(theElements[i].getTargetArea() <= theElements[i].getArea()) && 
-	(theElements[i].getTargetArea() >= 0.0)) {
+    if ((i != -1) && theElements[i].isPresent()) {
       // element i has a lower target area -- needs to refine
-      modified = 1; // something's bound to change
       theElements[i].refine(); // refine the element
       adjustMesh();
     }
@@ -102,7 +103,7 @@ void chunk::refiningElements()
 
 
 void chunk::coarsenElement(int idx, double area)
-{ // Increase element's targetArea to indicate need for coarsening
+{ 
   if (!theElements[idx].isPresent()) return;
   accessLock();
   theElements[idx].resetTargetArea(area);
@@ -115,7 +116,6 @@ void chunk::coarsenElement(int idx, double area)
   }
 
   releaseLock();
-  modified = 1;  // flag a change in one of the chunk's elements
   if (!coarsenInProgress) { // if coarsen loop not running
     coarsenInProgress = 1;
     mesh[cid].coarseningElements(); // start it up
@@ -126,10 +126,9 @@ void chunk::coarseningElements()
 {
   int i;
   while (coarsenHeapSize > 0) { // loop through the elements
-
     i=Delete_Min(1);
-    if ((i != -1) && theElements[i].isPresent() && 
-	(((theElements[i].getTargetArea() > theElements[i].getArea()) && 
+    if ((i != -1) && theElements[i].isPresent() &&
+	(((theElements[i].getTargetArea() > theElements[i].getArea()) &&
 	  (theElements[i].getTargetArea() >= 0.0)) ||
 	 (theElements[i].getArea() == 0.0))) {
       // element i has higher target area or no area -- needs coarsening
@@ -143,28 +142,26 @@ void chunk::coarseningElements()
   coarsenElements = new elemHeap[numElements+1];
   coarsenElements[0].elID=-1;
   coarsenElements[0].len=-2.0;
-  for (i=0; i<elementSlots; i++) { // set desired areas for elements
-    if (theElements[i].isPresent() && theElements[i].nonCoarsenCount<1) {
+  for (i=0; i<elementSlots; i++) {
+    if (theElements[i].isPresent() && (theElements[i].nonCoarsenCount<1)) {
       area = theElements[i].getArea();
       qFactor=theElements[i].getAreaQuality();
-      //precThrshld = area * 1e-8;
-      if (theElements[i].getTargetArea() > area || qFactor < 0.40)  {
-      CkPrintf("Element[%d] has area %1.10e, target is %1.10e \n",i,area, theElements[i].getTargetArea());
+      //if ((theElements[i].getTargetArea() > area) || (qFactor < QUALITY_MIN)) {
+      if ((theElements[i].getTargetArea()*COARSEN_PRECISION > area) 
+	  || (qFactor < QUALITY_MIN)) {
+	CkPrintf("Element[%d] has area %1.10e, target is %1.10e \n", i, area, 
+		 theElements[i].getTargetArea());
 	if (theElements[i].getTargetArea() <= area)
 	  theElements[i].resetTargetArea(area*1.1);
+
 	Insert(i, qFactor, 1);
       }
     }
   }
-  
-  if (coarsenHeapSize>0) {
-    modified = 1;
-    if (!coarsenInProgress) {
-      coarsenInProgress = 1;
-      mesh[cid].coarseningElements();
-    }
+  if ((coarsenHeapSize>0) && !coarsenInProgress) {
+    coarsenInProgress = 1;
+    mesh[cid].coarseningElements();
   }
-  //dump();
 }
 
 // many remote access methods follow
@@ -269,11 +266,15 @@ void chunk::nodeReplaceDelete(int kIdx, int dIdx, node nn, int shared,
 	      //CkPrintf("Chunk %d, Elem %d is flipping!!\n",cid,j);
 	    }
 #endif
+	    theElements[j].nonCoarsenCount = 0;
 	    theElements[j].nodes[k] = kIdx;
 	    theClient->nodeReplaceDelete(j, k, dIdx, kIdx);
 #ifdef TDEBUG1
 	    CkPrintf("TMRC2D: [%d] theClient->nodeReplaceDelete(%d, %d, %d, %d)\n", cid, j, k, dIdx, kIdx);
 #endif
+	  }
+	  if (theElements[j].nodes[k] == kIdx) {
+	    theElements[j].nonCoarsenCount = 0;
 	  }
 	}
       }
@@ -332,6 +333,13 @@ boolMsg *chunk::flipPrevent(int kIdx, int dIdx, node nn, int shared, int *chk, i
 void chunk::incnonCoarsen(int idx) {
   accessLock();
   theElements[idx].incnonCoarsen();
+  releaseLock();
+  return;
+}
+
+void chunk::resetnonCoarsen(int idx) {
+  accessLock();
+  theElements[idx].resetnonCoarsen();
   releaseLock();
   return;
 }
@@ -441,7 +449,6 @@ void chunk::setTargetArea(int idx, double aDouble)
   accessLock();
   theElements[idx].setTargetArea(aDouble);
   releaseLock();
-  modified = 1;
   if (!refineInProgress) {
     refineInProgress = 1;
     mesh[cid].refiningElements();
@@ -453,7 +460,6 @@ void chunk::resetTargetArea(int idx, double aDouble)
   accessLock();
   theElements[idx].resetTargetArea(aDouble);
   releaseLock();
-  modified = 1;
 }
 
 void chunk::reportPos(int idx, double x, double y)
@@ -607,7 +613,6 @@ elemRef chunk::addElement(int n1, int n2, int n3)
   firstFreeElement++;
   if (firstFreeElement-1 == elementSlots)  elementSlots++;
   else  while (theElements[firstFreeElement].isPresent()) firstFreeElement++;
-  modified = 1;
   if (!refineInProgress) {
     refineInProgress = 1;
     mesh[cid].refiningElements();
@@ -630,7 +635,6 @@ elemRef chunk::addElement(int n1, int n2, int n3,
   firstFreeElement++;
   if (firstFreeElement-1 == elementSlots)  elementSlots++;
   else  while (theElements[firstFreeElement].isPresent()) firstFreeElement++;
-  modified = 1;
   if (!refineInProgress) {
     refineInProgress = 1;
     mesh[cid].refiningElements();
@@ -835,7 +839,7 @@ void chunk::multipleRefine(double *desiredArea, refineClient *client)
     if (theElements[i].isPresent()) {
       area = theElements[i].getArea();
       //precThrshld = area * 1e-8;
-      if (desiredArea[i] < 0.80*area) {
+      if (desiredArea[i] < REFINE_PRECISION*area) {
 	theElements[i].resetTargetArea(desiredArea[i]);
 	double qFactor=theElements[i].getAreaQuality();
 	Insert(i, qFactor, 0);
@@ -846,7 +850,6 @@ void chunk::multipleRefine(double *desiredArea, refineClient *client)
     }
   }
   // start refinement
-  modified = 1;
   if (!refineInProgress) {
    refineInProgress = 1;
    mesh[cid].refiningElements();
@@ -876,26 +879,22 @@ void chunk::multipleCoarsen(double *desiredArea, refineClient *client)
     if (theElements[i].isPresent()) {
       area = theElements[i].getArea();
       qFactor = theElements[i].getAreaQuality();
-
+      theElements[i].nonCoarsenCount = 0;
       //precThrshld = area * 1e-8;
-      if (desiredArea[i] > area && (area < (0.95*desiredArea[i]) || qFactor < 0.85))
-      {
-	theElements[i].resetTargetArea(desiredArea[i]);
+      theElements[i].resetTargetArea(desiredArea[i]);
+      if ((desiredArea[i]*COARSEN_PRECISION > area) || (qFactor<QUALITY_MAX)) {
 	Insert(i, qFactor, 1);
 #ifdef TDEBUG2
 	CkPrintf("TMRC2D: [%d] Setting target on element %d to %1.10e with shortEdge %1.10e\n", cid, i, desiredArea[i], qFactor);
 #endif
       }
-      else if (qFactor<0.55)
-      {
-	theElements[i].resetTargetArea(area*1.1);
+      else if (qFactor<QUALITY_MIN) {
 	Insert(i, qFactor, 1);
       }
     }
   }
   
   // start coarsening
-  modified = 1;
   if (!coarsenInProgress) {
    coarsenInProgress = 1;
    mesh[cid].coarseningElements();
