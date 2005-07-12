@@ -19,7 +19,16 @@ A ghost element is one that is adjacent to at least one shared node. A ghost nod
 
  */
 
+#ifndef _FEM_REF_
+#define _FEM_REF_
 
+#include "charm++.h"
+#include "charm-api.h"
+#include "cklists.h"
+#include "mpi.h"
+#include "femMeshModify.decl.h"
+
+extern CProxy_femMeshModify meshMod;
 
 int FEM_add_node();
 int FEM_add_shared_node(int* adjacent_nodes, int num_adjacent_nodes, int upcall);
@@ -27,3 +36,86 @@ void FEM_remove_node(int node);
 
 void FEM_remove_element(int element, int elem_type);
 int FEM_add_element(int* conn, int conn_size, int elem_type);
+
+
+void FEM_REF_INIT(void);
+
+//there is one fem_lock associated with every FEM_Mesh.
+class FEM_lock {
+  int idx;
+  int owner;
+  bool isOwner;
+  bool isLocked;
+  bool hasLocks;
+  CkVec<int> lockedChunks;
+ public:
+  FEM_lock() {};
+  FEM_lock(int i);
+  ~FEM_lock();
+
+  //locks all chunks which contain all the nodes and elements that are passed 
+  //in this function
+  //locking of the chunks is blocking and is strictly in ascending order.
+  int lock(int numNodes, int *nodes, int numElems, int* elems);
+  //unlock all the concerned chunks.
+  //since at one point of time one chunk can only lock one set of chunks for
+  //one operation, one does not need to pass arguments to unlock.
+  int unlock();
+  int lock(int chunkNo, int own);
+  int unlock(int chunkNo, int own);
+};
+
+
+class femMeshModMsg : public CMessage_femMeshModMsg {
+ public:
+  int numChunks;
+  int myChunk;
+
+  femMeshModMsg(int num, int idx) {
+    numChunks = num;
+    myChunk = idx;
+  }
+
+  ~femMeshModMsg() {
+  }
+};
+
+class intMsg : public CMessage_intMsg {
+ public:
+  int i;
+
+  intMsg(int n) {
+    i = n;
+  }
+
+  ~intMsg(){}
+};
+
+class int2Msg : public CMessage_int2Msg {
+ public:
+  int i, j;
+
+  int2Msg(int m, int n) {
+    i = m;
+    j = n;
+  }
+
+  ~int2Msg(){}
+};
+
+class femMeshModify {
+  int numChunks;
+  int idx;
+  FEM_lock *fmLock;
+ public:
+  femMeshModify(femMeshModMsg *fm);
+  femMeshModify(CkMigrateMessage *m) {};
+  ~femMeshModify();
+
+  intMsg *femMeshModify::lockRemoteChunk(int2Msg *i2msg);
+  intMsg *femMeshModify::unlockRemoteChunk(int2Msg *i2msg);
+};
+
+
+#endif
+

@@ -1,0 +1,14 @@
+module femMeshModify {
+
+  readonly CProxy_femMeshModify meshMod;
+
+  message femMeshModMsg;
+  message intMsg;
+  message int2Msg;
+
+  array [1D] femMeshModify {
+    entry femMeshModify(femMeshModMsg *);
+    entry [sync,threaded] intMsg *lockRemoteChunk(int2Msg *);
+    entry [sync,threaded] intMsg *unlockRemoteChunk(int2Msg *);
+  };
+};
