@@ -5,9 +5,11 @@ module femMeshModify {
   message femMeshModMsg;
   message intMsg;
   message int2Msg;
+  message FEMMeshMsg;
 
   array [1D] femMeshModify {
     entry femMeshModify(femMeshModMsg *);
+    entry [sync] void setFemMesh(FEMMeshMsg *);
     entry [sync,threaded] intMsg *lockRemoteChunk(int2Msg *);
     entry [sync,threaded] intMsg *unlockRemoteChunk(int2Msg *);
   };

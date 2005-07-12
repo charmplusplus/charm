@@ -27,6 +27,7 @@ A ghost element is one that is adjacent to at least one shared node. A ghost nod
 #include "cklists.h"
 #include "mpi.h"
 #include "femMeshModify.decl.h"
+#include "fem_mesh.h"
 
 extern CProxy_femMeshModify meshMod;
 
@@ -48,9 +49,14 @@ class FEM_lock {
   bool isLocked;
   bool hasLocks;
   CkVec<int> lockedChunks;
+  femMeshModify *mmod;
+
+ private:
+  bool existsChunk(int index);
+
  public:
   FEM_lock() {};
-  FEM_lock(int i);
+  FEM_lock(int i, femMeshModify *m);
   ~FEM_lock();
 
   //locks all chunks which contain all the nodes and elements that are passed 
@@ -65,6 +71,21 @@ class FEM_lock {
   int unlock(int chunkNo, int own);
 };
 
+class FEM_MUtil {
+  int idx;
+  femMeshModify *mmod;
+ public:
+  FEM_MUtil() {}
+  FEM_MUtil(int i, femMeshModify *m);
+  ~FEM_MUtil();
+
+  //the entType signifies what type of entity to lock. node=0, elem=1;
+  //entNo signifies the local index of the entity
+  //numChunks is the number of chunks that need to be locked to lock that entity
+  //chunks identifies the chunks that need to be locked
+  void getChunkNos(int entType, int entNo, int *numChunks, int *chunks);
+  bool isShared(int index);
+};
 
 class femMeshModMsg : public CMessage_femMeshModMsg {
  public:
@@ -103,17 +124,35 @@ class int2Msg : public CMessage_int2Msg {
   ~int2Msg(){}
 };
 
+class FEMMeshMsg : public CMessage_FEMMeshMsg {
+ public:
+  FEM_Mesh *m;
+
+  FEMMeshMsg(FEM_Mesh *mh) {
+    m = mh;
+  }
+
+  ~FEMMeshMsg() {}
+};
+
 class femMeshModify {
+  friend class FEM_lock;
+  friend class FEM_MUtil;
+ protected:
   int numChunks;
   int idx;
+  FEM_Mesh *fmMesh;
   FEM_lock *fmLock;
+  FEM_MUtil *fmUtil;
+
  public:
   femMeshModify(femMeshModMsg *fm);
   femMeshModify(CkMigrateMessage *m) {};
   ~femMeshModify();
 
-  intMsg *femMeshModify::lockRemoteChunk(int2Msg *i2msg);
-  intMsg *femMeshModify::unlockRemoteChunk(int2Msg *i2msg);
+  void setFemMesh(FEMMeshMsg *fm);
+  intMsg *lockRemoteChunk(int2Msg *i2msg);
+  intMsg *unlockRemoteChunk(int2Msg *i2msg);
 };
 
 

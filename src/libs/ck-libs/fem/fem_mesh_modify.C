@@ -156,15 +156,17 @@ void FEM_REF_INIT(void) {
 
   femMeshModMsg *fm = new femMeshModMsg(size, cid);
   meshMod[cid].insert(fm);
+  return;
 }
 
 
-FEM_lock::FEM_lock(int i) {
+FEM_lock::FEM_lock(int i, femMeshModify *m) {
   idx = i;
   owner = -1;
   isOwner = false;
   isLocked = false;
   hasLocks = false;
+  mmod = m;
 }
 
 FEM_lock::~FEM_lock() {
@@ -175,7 +177,16 @@ FEM_lock::~FEM_lock() {
   delete &lockedChunks;
 }
 
+bool FEM_lock::existsChunk(int index) {
+  for(int i=0; i<lockedChunks.size(); i++) {
+    if(lockedChunks[i] == index) return true;
+  }
+  return false;
+}
+
 //will only return if it gets the locks
+//the set of nodes or elems that a chunk can ask to be locked can either be 
+//shared, ghosts or local nodes/elements.
 int FEM_lock::lock(int numNodes, int *nodes, int numElems, int* elems) {
   bool done = false;
   int ret = 0;
@@ -183,9 +194,29 @@ int FEM_lock::lock(int numNodes, int *nodes, int numElems, int* elems) {
     if(!isLocked || (isLocked && isOwner)) {
       for(int i=0; i<numNodes; i++) {
 	//which chunk does this belong to
-	//add that chunk to the lock list, if not already in it.
-	
+	//add that chunk to the lock list, if it does not exist already.
+	int numchunks;
+	int *chunks;
+	mmod->fmUtil->getChunkNos(0,nodes[i],&numchunks,chunks);
+	for(int j=0; j<numchunks; j++) {
+	  if(!existsChunk(chunks[j])) {
+	    lockedChunks.push_back(chunks[j]);
+	  }
+	}
       }
+      for(int i=0; i<numElems; i++) {
+	//which chunk does this belong to
+	//add that chunk to the lock list, if not already in it.
+	int numchunks;
+	int *chunks;
+	mmod->fmUtil->getChunkNos(1,elems[i],&numchunks,chunks);
+	for(int j=0; j<numchunks; j++) {
+	  if(!existsChunk(chunks[j])) {
+	    lockedChunks.push_back(chunks[j]);
+	  }
+	}
+      }
+
       //sort the elements in ascending order
       int tmp;
       int numLocks = lockedChunks.size();
@@ -198,6 +229,7 @@ int FEM_lock::lock(int numNodes, int *nodes, int numElems, int* elems) {
 	  }
 	}
       }
+
       //lock them
       for(int i=0; i<numLocks; i++) {
 	ret = lock(lockedChunks[i],idx);
@@ -292,16 +324,53 @@ int FEM_lock::unlock(int chunkNo, int own) {
 }
 
 
+FEM_MUtil::FEM_MUtil(int i, femMeshModify *m) {
+  idx = i;
+  mmod = m;
+}
+
+FEM_MUtil::~FEM_MUtil() {
+}
+
+void FEM_MUtil::getChunkNos(int entType, int entNo, int *numChunks, int *chunks) {
+  int type = 0; //0 - local, 1 - shared, 2 - ghost.
+  
+  if(entType == 0) { //nodes
+    if(FEM_Is_ghost_index(entNo)) type = 2;
+    else if(isShared(entNo)) type = 1;
+    else type = 0;
+    //mmod->fmMesh->node;
+  }
+  else if(entType == 1) { //elems
+  }
+  return;
+}
+
+bool FEM_MUtil::isShared(int index) {
+  return false;
+}
+
+
 femMeshModify::femMeshModify(femMeshModMsg *fm) {
   numChunks = fm->numChunks;
   idx = fm->myChunk;
-  fmLock = new FEM_lock(idx);
+  fmLock = new FEM_lock(idx, this);
+  fmUtil = new FEM_MUtil(idx, this);
+  fmMesh = NULL;
 }
 
 femMeshModify::~femMeshModify() {
   if(fmLock != NULL) {
     delete fmLock;
   }
+  if(fmUtil != NULL) {
+    delete fmUtil;
+  }
+}
+
+void femMeshModify::setFemMesh(FEMMeshMsg *fm) {
+  fmMesh = fm->m;
+  return;
 }
 
 intMsg *femMeshModify::lockRemoteChunk(int2Msg *msg) {
