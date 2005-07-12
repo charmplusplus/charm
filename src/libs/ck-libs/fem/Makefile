@@ -81,7 +81,10 @@ $(FEMMAIN): femmain.C $(HEADDEP)
 call_init.o: call_init.c
 	$(CHARMC) -c call_init.c
 
-fem_mesh_modify.o: fem_mesh_modify.C fem_mesh_modify.h $(HEADDEP)
+femMeshModify.decl.h: fem_mesh_modify.ci
+	$(CHARMC) fem_mesh_modify.ci
+
+fem_mesh_modify.o: femMeshModify.decl.h fem_mesh_modify.C fem_mesh_modify.h $(HEADDEP)
 	$(CHARMC) -c fem_mesh_modify.C
 
 fem_mesh_adjacency.o: fem_mesh_adjacency.C $(HEADDEP)
