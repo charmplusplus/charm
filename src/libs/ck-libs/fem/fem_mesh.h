@@ -809,11 +809,9 @@ class FEM_Node : public FEM_Entity {
 	
 	void allocateElemAdjacency();
 	void allocateNodeAdjacency();
-	/*
-		stores the node to element adjacency vector 
-	*/
-	FEM_VarIndexAttribute *elemAdjacency;
-	FEM_VarIndexAttribute *nodeAdjacency;
+
+	FEM_VarIndexAttribute *elemAdjacency; // stores the node to element adjacency vector 
+	FEM_VarIndexAttribute *nodeAdjacency; // stores the node to node adjacency vector 
 	typedef FEM_VarIndexAttribute::ID var_id;
 protected:
 	virtual void create(int attr,const char *caller);
