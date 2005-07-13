@@ -137,6 +137,7 @@ init(void)
   int nEdge;
   int *edgeConn;
   int *edgeBoundary;
+  int *validEdge;
   {
     char line[1024];
     FILE *f=fopen(edgeName,"r");
@@ -145,6 +146,7 @@ init(void)
     if (1!=sscanf(line,"%d",&nEdge)) die("Can't read number of elements!");
     edgeConn = new int[2*nEdge];
     edgeBoundary = new int[nEdge];
+    validEdge = new int[nEdge];
     for(int i=0;i<nEdge;i++){
       int edgeNo;
       if (NULL==fgets(line,1024,f)) die("Can't read edge input line!");
@@ -152,7 +154,8 @@ init(void)
 	die("Can't parse edge input line!");
       }
       edgeConn[i*2+0]--;
-      edgeConn[i*2+1]--;		
+      edgeConn[i*2+1]--;	
+      validEdge[i] = 1;	
     }
     fclose(f);
   }
@@ -160,6 +163,7 @@ init(void)
   FEM_Register_entity(FEM_Mesh_default_write(),FEM_SPARSE,NULL,nEdge,nEdge,resize_edges);
   FEM_Register_array(FEM_Mesh_default_write(),FEM_SPARSE,FEM_CONN,edgeConn,FEM_INDEX_0,2);
   FEM_Register_array(FEM_Mesh_default_write(),FEM_SPARSE,FEM_BOUNDARY,edgeBoundary,FEM_INT,1);
+  FEM_Register_array(FEM_Mesh_default_write(),FEM_SPARSE,FEM_VALID,validEdge,FEM_INT,1);
   CkPrintf("Finished with init\n");
 }
 
@@ -176,6 +180,7 @@ struct myGlobals {
   double *S11, *S22, *S12; //Stresses for each element
   int *edgeConn;//edge Connectivity table
   int *edgeBoundary;//edge boundary value
+  int *validEdge;
 };
 
 void pup_myGlobals(pup_er p,myGlobals *g) 
@@ -203,6 +208,7 @@ void pup_myGlobals(pup_er p,myGlobals *g)
     g->S12=new double[g->maxelems];
     g->edgeConn = new int[2*g->maxedges];
     g->edgeBoundary = new int[g->maxedges];
+    g->validEdge = new int[g->maxedges];
   }
   pup_doubles(p,(double *)g->coord,2*nnodes);
   pup_ints(p,(int *)g->conn,3*nelems);
@@ -217,6 +223,7 @@ void pup_myGlobals(pup_er p,myGlobals *g)
   pup_doubles(p,(double *)g->S12,nelems);
   pup_ints(p,(int *)g->edgeConn,2*g->nedges);
   pup_ints(p,(int *)g->edgeBoundary,g->nedges);
+  pup_ints(p,(int *)g->validEdge,g->nedges);
 	
   if (pup_isDeleting(p)) {
     delete[] g->coord;
@@ -232,6 +239,7 @@ void pup_myGlobals(pup_er p,myGlobals *g)
     delete[] g->S12;
     delete[] g->edgeConn;
     delete[] g->edgeBoundary;
+    delete[] g->validEdge;
   }
 }
 
@@ -439,15 +447,19 @@ void resize_edges(void *data,int *len,int *max){
   
   int *conn = g->edgeConn;
   int *bound = g->edgeBoundary;
+  int *validEdge = g->validEdge;  
   g->maxedges = *max;	
   g->edgeConn = new int[2*(*max)];
   g->edgeBoundary = new int[(*max)];
-  
+  g->validEdge = new int[(*max)];
+
   FEM_Register_array(FEM_Mesh_default_read(),FEM_SPARSE,FEM_CONN,(void *)g->edgeConn,FEM_INDEX_0,2);	
   FEM_Register_array(FEM_Mesh_default_read(),FEM_SPARSE,FEM_BOUNDARY,(void *)g->edgeBoundary,FEM_INT,1);
+  FEM_Register_array(FEM_Mesh_default_read(),FEM_SPARSE,FEM_VALID,(void *)g->validEdge,FEM_INT,1);
   if(conn != NULL){
     delete [] conn;
     delete [] bound;	
+    delete [] validEdge;
   }
 }
 

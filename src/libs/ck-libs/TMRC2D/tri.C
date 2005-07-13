@@ -5,11 +5,6 @@
 #include <stdio.h>
 #include "tri.h"
 
-#define REFINE_PRECISION 0.6
-#define COARSEN_PRECISION 0.9
-#define QUALITY_MAX 0.9
-#define QUALITY_MIN 0.6
-
 // I will keep this code until I die!
 //#define accessLock() {printf("%s : %d calling accessLock \n",__FILE__,__LINE__); accessLock1();}
 //readonlys
@@ -105,8 +100,11 @@ void chunk::refiningElements()
 void chunk::coarsenElement(int idx, double area)
 { 
   if (!theElements[idx].isPresent()) return;
+  double theArea;
   accessLock();
-  theElements[idx].resetTargetArea(area);
+  theArea = theElements[idx].getArea();
+  if (area > theElements[idx].getTargetArea())
+    theElements[idx].resetTargetArea(area);
   Insert(idx, -1.0, 1);
   int pos = coarsenHeapSize;
   while (pos > 1) {
@@ -114,7 +112,6 @@ void chunk::coarsenElement(int idx, double area)
       coarsenElements[pos].elID = -1;
     pos--;
   }
-
   releaseLock();
   if (!coarsenInProgress) { // if coarsen loop not running
     coarsenInProgress = 1;
@@ -125,19 +122,24 @@ void chunk::coarsenElement(int idx, double area)
 void chunk::coarseningElements()
 {
   int i;
+  double area, qFactor, targetArea;
   while (coarsenHeapSize > 0) { // loop through the elements
     i=Delete_Min(1);
-    if ((i != -1) && theElements[i].isPresent() &&
-	(((theElements[i].getTargetArea() > theElements[i].getArea()) &&
-	  (theElements[i].getTargetArea() >= 0.0)) ||
-	 (theElements[i].getArea() == 0.0))) {
-      // element i has higher target area or no area -- needs coarsening
-      theElements[i].coarsen(); // coarsen the element
+    CkPrintf("Loop at element %d\n", i);
+    if ((i != -1) && theElements[i].isPresent()) {
+      CkPrintf("Checking element %d\n", i);
+      area = theElements[i].getArea();
+      targetArea = theElements[i].getTargetArea();
+      qFactor = theElements[i].getAreaQuality();
+      if ((theElements[i].getTargetArea()*COARSEN_PRECISION > area) || 
+	  (qFactor < QUALITY_MIN)) { 
+	CkPrintf("Coarsening element %d\n", i);
+	theElements[i].coarsen(); // coarsen the element
+      }
     }
     CthYield(); // give other chunks on the same PE a chance
   }
   coarsenInProgress = 0;  // turn coarsen loop off
-  double area, qFactor;
   if (coarsenElements) delete [] coarsenElements;
   coarsenElements = new elemHeap[numElements+1];
   coarsenElements[0].elID=-1;
@@ -145,15 +147,10 @@ void chunk::coarseningElements()
   for (i=0; i<elementSlots; i++) {
     if (theElements[i].isPresent() && (theElements[i].nonCoarsenCount<1)) {
       area = theElements[i].getArea();
+      targetArea = theElements[i].getTargetArea();
       qFactor=theElements[i].getAreaQuality();
-      //if ((theElements[i].getTargetArea() > area) || (qFactor < QUALITY_MIN)) {
-      if ((theElements[i].getTargetArea()*COARSEN_PRECISION > area) 
-	  || (qFactor < QUALITY_MIN)) {
-	CkPrintf("Element[%d] has area %1.10e, target is %1.10e \n", i, area, 
-		 theElements[i].getTargetArea());
-	if (theElements[i].getTargetArea() <= area)
-	  theElements[i].resetTargetArea(area*1.1);
-
+      if ((targetArea*COARSEN_PRECISION > area) || (qFactor < QUALITY_MIN)) {
+	CkPrintf("Element[%d] has area %1.10e target %1.10e qFactor %1.10e\n", i, area, targetArea, qFactor);
 	Insert(i, qFactor, 1);
       }
     }
@@ -882,14 +879,12 @@ void chunk::multipleCoarsen(double *desiredArea, refineClient *client)
       theElements[i].nonCoarsenCount = 0;
       //precThrshld = area * 1e-8;
       theElements[i].resetTargetArea(desiredArea[i]);
-      if ((desiredArea[i]*COARSEN_PRECISION > area) || (qFactor<QUALITY_MAX)) {
+      if ((desiredArea[i]*COARSEN_PRECISION > area) || (qFactor<QUALITY_MIN)) {
 	Insert(i, qFactor, 1);
+	CkPrintf("Element[%d] has area %1.10e target %1.10e qFactor %1.10e\n", i, area, desiredArea[i], qFactor);
 #ifdef TDEBUG2
 	CkPrintf("TMRC2D: [%d] Setting target on element %d to %1.10e with shortEdge %1.10e\n", cid, i, desiredArea[i], qFactor);
 #endif
-      }
-      else if (qFactor<QUALITY_MIN) {
-	Insert(i, qFactor, 1);
       }
     }
   }
@@ -903,6 +898,7 @@ void chunk::multipleCoarsen(double *desiredArea, refineClient *client)
   CkPrintf("TMRC2D: [%d] multipleCoarsen DONE.\n", cid);
 #endif
   CkWaitQD();
+/*
   for (i=0; i<elementSlots; i++) { // check desired areas for elements
     if (theElements[i].isPresent()) {
       area = theElements[i].getArea();
@@ -911,6 +907,7 @@ void chunk::multipleCoarsen(double *desiredArea, refineClient *client)
       }
     }
   }
+*/
 }
 
 void chunk::newMesh(int meshID_,int nEl, int nGhost, const int *conn_, 
@@ -1459,7 +1456,6 @@ int chunk::joinCommLists(int nIdx, int shd, int *chk, int *idx, int *rChk,
 
 void chunk::Insert(int eIdx, double len, int cFlag)
 {
-
   int i;
   if (cFlag) {
     i = ++coarsenHeapSize; 

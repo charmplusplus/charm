@@ -27,11 +27,15 @@ void element::calculateArea()
   len[0] = (C->theNodes[nodes[0]]).distance(C->theNodes[nodes[1]]);
   len[1] = (C->theNodes[nodes[1]]).distance(C->theNodes[nodes[2]]);
   len[2] = (C->theNodes[nodes[2]]).distance(C->theNodes[nodes[0]]);
+  CkAssert(len[0] > 0.0);
+  CkAssert(len[1] > 0.0);
+  CkAssert(len[2] > 0.0);
   // apply Heron's formula
   perimeter = len[0] + len[1] + len[2];
   s = perimeter / 2.0;
   // cache the result in currentArea
   currentArea = sqrt(s * (s - len[0]) * (s - len[1]) * (s - len[2]));
+  if (isnan(currentArea)) currentArea = 0.0;
 }
 
 void element::refine()
@@ -288,11 +292,11 @@ void element::collapse(int shortEdge)
   nbr = edges[shortEdge].getNbr(myRef);
   keepNbr = edges[keepEdge].getNbr(myRef);
   delNbr = edges[delEdge].getNbr(myRef);
-  if (delNbr == keepNbr) { // don't coarsen around node with degree 3
+  if (!edges[shortEdge].isPending(myRef) && (delNbr == keepNbr)) { 
+    // don't coarsen around node with degree 3 unless pending on this element
     nonCoarsenCount++;
     return;
   }
-
   // get the boundary flags for the nodes on the edge to collapse
   kBound = C->theNodes[nodes[keepNode]].boundary;
   dBound = C->theNodes[nodes[delNode]].boundary;
@@ -419,7 +423,6 @@ void element::collapse(int shortEdge)
     CkAssert(dIdx > -1);
     CkAssert(dIdx != kIdx);
   }
-
 #ifdef FLIPPREVENT
   result = edges[shortEdge].flipPrevent(myRef, kIdx, dIdx, keepNbr, delNbr, 
 				     edges[keepEdge], edges[delEdge], 
@@ -429,7 +432,6 @@ void element::collapse(int shortEdge)
     return;
   }
 #endif
-
   // collapse the edge; takes care of neighbor element
   present = 0;
   result = edges[shortEdge].collapse(myRef, kIdx, dIdx, keepNbr, delNbr, 
@@ -512,14 +514,14 @@ void element::collapse(int shortEdge)
     // remove self
     C->removeElement(myRef.idx);
   }
-  // else coarsen is pending
+  //else coarsen is pending
 }
 
 int element::findLongestEdge()
 {
   int i, longEdge;
   double maxlen = 0.0, len[3];
-  // fine lengths of sides
+  // find lengths of sides
   len[0] = C->theNodes[nodes[0]].distance(C->theNodes[nodes[1]]);
   len[1] = C->theNodes[nodes[1]].distance(C->theNodes[nodes[2]]);
   len[2] = C->theNodes[nodes[2]].distance(C->theNodes[nodes[0]]);

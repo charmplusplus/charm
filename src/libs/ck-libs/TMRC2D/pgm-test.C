@@ -146,7 +146,7 @@ init(void)
   int nEdge;
   int *edgeConn;
   int *edgeBoundary;
-	int *validEdge;
+  int *validEdge;
   {
     char line[1024];
     FILE *f=fopen(edgeName,"r");
@@ -155,7 +155,7 @@ init(void)
     if (1!=sscanf(line,"%d",&nEdge)) die("Can't read number of elements!");
     edgeConn = new int[2*nEdge];
     edgeBoundary = new int[nEdge];
-		validEdge = new int[nEdge];
+    validEdge = new int[nEdge];
     for(int i=0;i<nEdge;i++){
       int edgeNo;
       if (NULL==fgets(line,1024,f)) die("Can't read edge input line!");
@@ -164,7 +164,7 @@ init(void)
       }
       edgeConn[i*2+0]--;
       edgeConn[i*2+1]--;		
-			validEdge[i] = 1;
+      validEdge[i] = 1;
     }
     fclose(f);
   }
@@ -172,7 +172,7 @@ init(void)
   FEM_Register_entity(FEM_Mesh_default_write(),FEM_SPARSE,NULL,nEdge,nEdge,resize_edges);
   FEM_Register_array(FEM_Mesh_default_write(),FEM_SPARSE,FEM_CONN,edgeConn,FEM_INDEX_0,2);
   FEM_Register_array(FEM_Mesh_default_write(),FEM_SPARSE,FEM_BOUNDARY,edgeBoundary,FEM_INT,1);
-	FEM_Register_array(FEM_Mesh_default_write(),FEM_SPARSE,FEM_VALID,validEdge,FEM_INT,1);
+  FEM_Register_array(FEM_Mesh_default_write(),FEM_SPARSE,FEM_VALID,validEdge,FEM_INT,1);
   CkPrintf("Finished with init\n");
 }
 
@@ -219,7 +219,7 @@ void pup_myGlobals(pup_er p,myGlobals *g)
     g->validElem = new int[g->maxelems];
     g->edgeConn = new int[2*g->maxedges];
     g->edgeBoundary = new int[g->maxedges];
-		g->validEdge = new int[g->maxedges];
+    g->validEdge = new int[g->maxedges];
   }
   pup_doubles(p,(double *)g->coord,2*nnodes);
   pup_ints(p,(int *)g->conn,3*nelems);
@@ -235,7 +235,7 @@ void pup_myGlobals(pup_er p,myGlobals *g)
   pup_ints(p,(int *)g->validElem,nelems);
   pup_ints(p,(int *)g->edgeConn,2*g->nedges);
   pup_ints(p,(int *)g->edgeBoundary,g->nedges);
-	pup_ints(p,(int *)g->validEdge,g->nedges);
+  pup_ints(p,(int *)g->validEdge,g->nedges);
 
   if (pup_isDeleting(p)) {
     delete[] g->coord;
@@ -252,7 +252,7 @@ void pup_myGlobals(pup_er p,myGlobals *g)
     delete[] g->validElem;
     delete[] g->edgeConn;
     delete[] g->edgeBoundary;
-		delete[] g->validEdge;
+    delete[] g->validEdge;
   }
 }
 
@@ -462,11 +462,11 @@ void resize_edges(void *data,int *len,int *max){
   
   int *conn = g->edgeConn;
   int *bound = g->edgeBoundary;
-	int *validEdge = g->validEdge;
+  int *validEdge = g->validEdge;
   g->maxedges = *max;	
   g->edgeConn = new int[2*(*max)];
   g->edgeBoundary = new int[(*max)];
-	g->validEdge = new int[(*max)];
+  g->validEdge = new int[(*max)];
   
   FEM_Register_array(FEM_Mesh_default_read(),FEM_SPARSE,FEM_CONN,(void *)g->edgeConn,FEM_INDEX_0,2);	
   FEM_Register_array(FEM_Mesh_default_read(),FEM_SPARSE,FEM_BOUNDARY,(void *)g->edgeBoundary,FEM_INT,1);
@@ -474,7 +474,7 @@ void resize_edges(void *data,int *len,int *max){
   if(conn != NULL){
     delete [] conn;
     delete [] bound;	
-		delete [] validEdge;
+    delete [] validEdge;
   }
 }
 
@@ -552,7 +552,7 @@ driver(void)
   avgArea /= g.nelems;
 
   if (CkMyPe()==0) CkPrintf("Entering timeloop\n");
-  int tSteps=5;
+  int tSteps=10;
   for (int t=1;t<=tSteps;t++) {
     double curTime=CkWallTimer();
     double total=curTime-startTime;
@@ -567,7 +567,7 @@ driver(void)
     }
     areas=new double[g.nelems];
     for (i=0;i<g.nelems;i++) {
-      areas[i] = avgArea * 2.0;
+      areas[i] = avgArea;
     }
     
     CkPrintf("[%d] Starting coarsening step: %d nodes, %d elements\n", myChunk,countValidEntities(g.validNode,g.nnodes),countValidEntities(g.validElem,g.nelems));
@@ -589,7 +589,7 @@ driver(void)
     }
     areas=new double[g.nelems];
     for (i=0;i<g.nelems;i++) {
-      areas[i] = avgArea * 2.0;
+      areas[i] = avgArea;
       //areas[i] = calcArea(g,i)/1.5;
     }
 

@@ -431,7 +431,9 @@ int edge::collapse(elemRef requester, int kIdx, int dIdx, elemRef kNbr,
     if (nbr.cid > -1) {
       waitingFor = nbr;
       double nbrArea = nbr.getArea();
-      mesh[nbr.cid].coarsenElement(nbr.idx, nbrArea*1.01+0.000000000000000001);
+      CkPrintf("Calling coarsen on neighbor element[%d] with area=%1.10e\n", 
+	       nbr.idx, 2.0*nbrArea);
+      mesh[nbr.cid].coarsenElement(nbr.idx, 2.0*nbrArea);
     }
     else {
       FEM_Node *theNodes = &(C->meshPtr->node);

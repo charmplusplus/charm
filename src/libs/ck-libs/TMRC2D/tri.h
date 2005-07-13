@@ -15,6 +15,10 @@
 #include "messages.h"
 #include "mpi.h"
 
+#define REFINE_PRECISION 0.6
+#define COARSEN_PRECISION 0.9
+#define QUALITY_MIN 0.5
+
 // Debug level for TMRC2D: 1 = min, 2 = mod, 3 = max; off by default
 //#define TDEBUG1
 //#define TDEBUG2
