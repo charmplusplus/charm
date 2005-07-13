@@ -1221,6 +1221,8 @@ class FEM_Mesh : public CkNoncopyable {
   void n2n_replace(int n, int oldNode, int newNode);
   /// Remove all nodes from n's node adjacency list
   void n2n_removeAll(int n);
+  /// Is queryNode in node n's adjacency vector?
+  int n2n_exists(int n, int queryNode);
 
   //  ------- Node-to-element
   /// Place all of node n's adjacent elements in adjelements and the resulting 

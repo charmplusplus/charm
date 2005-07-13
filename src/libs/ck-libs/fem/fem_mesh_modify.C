@@ -26,24 +26,22 @@ void FEM_remove_element(int mesh, int element, int elem_type){
 }
 
 int FEM_add_element(int mesh, int* conn, int conn_size, int elem_type){
-  return FEM_add_element(FEM_Mesh_lookup(mesh,"FEM_remove_element"), conn, conn_size, elem_type);
+  return FEM_add_element(FEM_Mesh_lookup(mesh,"FEM_add_element"), conn, conn_size, elem_type);
 }
 
 void FEM_Modify_Lock(int mesh, int* affectedNodes, int numAffectedNodes, int* affectedElts, int numAffectedElts){
-  FEM_Modify_Lock(FEM_Mesh_lookup(mesh,"FEM_remove_element"), affectedNodes, numAffectedNodes, affectedElts, numAffectedElts);
+  FEM_Modify_Lock(FEM_Mesh_lookup(mesh,"FEM_Modify_Lock"), affectedNodes, numAffectedNodes, affectedElts, numAffectedElts);
 }
 
 void FEM_Modify_Unlock(int mesh){
-  FEM_Modify_Unlock(FEM_Mesh_lookup(mesh,"FEM_remove_element"));
+  FEM_Modify_Unlock(FEM_Mesh_lookup(mesh,"FEM_Modify_Unlock"));
 }
 
 
 // The internal functions
 
-// A temporary function, should probably be implemented and renamed.
-int is_shared(FEM_Mesh *m, int node){
-  m->getfmMM()->getfmUtil()->isShared(node);
-  return 0;
+inline int is_shared(FEM_Mesh *m, int node){
+  return m->getfmMM()->getfmUtil()->isShared(node);
 }
 
 int FEM_add_node_local(FEM_Mesh *m){
@@ -96,12 +94,22 @@ void FEM_remove_node(FEM_Mesh *m, int node){
   
   // if node is shared:
   if(is_shared(m, node)){
-    //   verify it is not adjacent to any elements locally
+    // verify it is not adjacent to any elements locally
+    int numAdjNodes, numAdjElts;
+    int **adjNodes, **adjElts;
+    m->n2n_getAll(node, adjNodes, &numAdjNodes);
+    m->n2e_getAll(node, adjElts, &numAdjElts);
+    CkAssert((numAdjNodes==0) && (numAdjElts==0)); // we shouldn't be removing a node away that is connected to anything
+  
     
     
+    // verify it is not adjacent to any elements on any of the associated chunks
     
-    //   verify it is not adjacent to any elements on any of the associated chunks
-    //   delete it locally and delete it on remote chunks, update IDXL tables
+    // delete it locally and 
+    
+    // delete it on remote chunks, update IDXL tables
+    
+
   }
   else {
     // if node is local:
@@ -110,7 +118,7 @@ void FEM_remove_node(FEM_Mesh *m, int node){
     int **adjNodes, **adjElts;
     m->n2n_getAll(node, adjNodes, &numAdjNodes);
     m->n2e_getAll(node, adjElts, &numAdjElts);
-    CkAssert((numAdjNodes==0) && (numAdjElts==0)); // we shouldn't be removing a node away that is connected to things
+    CkAssert((numAdjNodes==0) && (numAdjElts==0)); // we shouldn't be removing a node away that is connected to anything
     
     // delete node
 
@@ -135,7 +143,7 @@ void FEM_remove_element_local(FEM_Mesh *m, int element, int etype){
   }
 
   // find adjacent elements
-  width = m->elem[etype].getConn().size(); // WHAT SHOULD THIS BE????
+  width = m->elem[etype].getConn().size();
   int *adjelts = new int[width];
   m->e2e_getAll(element, adjelts, etype);
   
@@ -144,7 +152,7 @@ void FEM_remove_element_local(FEM_Mesh *m, int element, int etype){
     m->e2e_replace(adjelts[i],element,-1);
   }
 
-  // SHOULD THEN MARK AS -1 IN APPROPRIATE ELEMENT TABLE
+  // delete element by marking invalid
 
   delete[] adjnodes;
 }
@@ -181,10 +189,13 @@ int FEM_add_element_local(FEM_Mesh*m, const int *conn, int connSize, int elemTyp
   // add to e2n table, i.e. the element's conn
   m->elem[elemType].connIs(newEl,conn);
   
-  // add to corresponding inverse, the n2e table
+  // add to corresponding inverse, the n2e and n2n table
   for(int i=0;i<connSize;i++){
     m->n2e_add(conn[i],newEl);
+    
+    //    m->n2n_add();
   }
+
   
   // update e2e table
   
