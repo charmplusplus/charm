@@ -196,11 +196,11 @@ int FEM_lock::lock(int numNodes, int *nodes, int numElems, int* elems) {
 	//which chunk does this belong to
 	//add that chunk to the lock list, if it does not exist already.
 	int numchunks;
-	int *chunks;
+	IDXL_Share **chunks;
 	mmod->fmUtil->getChunkNos(0,nodes[i],&numchunks,chunks);
 	for(int j=0; j<numchunks; j++) {
-	  if(!existsChunk(chunks[j])) {
-	    lockedChunks.push_back(chunks[j]);
+	  if(!existsChunk(chunks[j]->chk)) {
+	    lockedChunks.push_back(chunks[j]->chk);
 	  }
 	}
       }
@@ -208,11 +208,11 @@ int FEM_lock::lock(int numNodes, int *nodes, int numElems, int* elems) {
 	//which chunk does this belong to
 	//add that chunk to the lock list, if not already in it.
 	int numchunks;
-	int *chunks;
+	IDXL_Share **chunks;
 	mmod->fmUtil->getChunkNos(1,elems[i],&numchunks,chunks);
 	for(int j=0; j<numchunks; j++) {
-	  if(!existsChunk(chunks[j])) {
-	    lockedChunks.push_back(chunks[j]);
+	  if(!existsChunk(chunks[j]->chk)) {
+	    lockedChunks.push_back(chunks[j]->chk);
 	  }
 	}
       }
@@ -332,21 +332,81 @@ FEM_MUtil::FEM_MUtil(int i, femMeshModify *m) {
 FEM_MUtil::~FEM_MUtil() {
 }
 
-void FEM_MUtil::getChunkNos(int entType, int entNo, int *numChunks, int *chunks) {
+void FEM_MUtil::getChunkNos(int entType, int entNo, int *numChunks, IDXL_Share **chunks) {
   int type = 0; //0 - local, 1 - shared, 2 - ghost.
-  
+
   if(entType == 0) { //nodes
+    //only nodes can be shared
     if(FEM_Is_ghost_index(entNo)) type = 2;
     else if(isShared(entNo)) type = 1;
     else type = 0;
-    //mmod->fmMesh->node;
+
+    if(type == 2) {
+      int ghostid = FEM_To_ghost_index(entNo);
+      const IDXL_Rec *irec = mmod->fmMesh->node.getGhostRecv().getRec(ghostid);
+      *numChunks = irec->getShared(); //check this value!!
+      chunks = (IDXL_Share**)malloc((*numChunks)*sizeof(IDXL_Share*));
+      for(int i=0; i<*numChunks; i++) {
+	int chk = irec->getChk(i);
+	int index = irec->getIdx(i);
+	chunks[i] = new IDXL_Share(chk, index);
+      }
+    }
+    else if(type == 1) {
+      const IDXL_Rec *irec = mmod->fmMesh->node.shared.getRec(entNo);
+      *numChunks = irec->getShared();
+      chunks = (IDXL_Share**)malloc((*numChunks)*sizeof(IDXL_Share*));
+      for(int i=0; i<*numChunks; i++) {
+	int chk = irec->getChk(i);
+	int index = irec->getIdx(i);
+	chunks[i] = new IDXL_Share(chk, index);
+      }
+    }
+    else if(type == 0) {
+      *numChunks = 1;
+      chunks = (IDXL_Share**)malloc((*numChunks)*sizeof(IDXL_Share*));
+      for(int i=0; i<*numChunks; i++) {
+	int chk = idx; //index of this chunk
+	int index = entNo;
+	chunks[i] = new IDXL_Share(chk, index);
+      }
+    }
   }
   else if(entType == 1) { //elems
+    //elements cannot be shared
+    if(FEM_Is_ghost_index(entNo)) type = 2;
+    else type = 0;
+
+    if(type == 2) {
+      int ghostid = FEM_To_ghost_index(entNo);
+      const IDXL_Rec *irec = mmod->fmMesh->node.getGhostRecv().getRec(ghostid);
+      *numChunks = irec->getShared(); //should be 1
+      chunks = (IDXL_Share**)malloc((*numChunks)*sizeof(IDXL_Share*));
+      for(int i=0; i<*numChunks; i++) {
+	int chk = irec->getChk(i);
+	int index = irec->getIdx(i);
+	chunks[i] = new IDXL_Share(chk, index);
+      }
+    }
+    else if(type == 0) {
+      *numChunks = 1;
+      chunks = (IDXL_Share**)malloc((*numChunks)*sizeof(IDXL_Share*));
+      for(int i=0; i<*numChunks; i++) {
+	int chk = idx; //index of this chunk
+	int index = entNo;
+	chunks[i] = new IDXL_Share(chk, index);
+      }
+    }
   }
   return;
 }
 
 bool FEM_MUtil::isShared(int index) {
+  //this function will be only called for a shared list
+  //have to figure out if node.shared is kept up to date
+  const IDXL_Rec *irec = mmod->fmMesh->node.shared.getRec(index);
+  //if an entry exists in the shared idxl lists, then it is a shared node
+  if(irec != NULL) return true;
   return false;
 }
 

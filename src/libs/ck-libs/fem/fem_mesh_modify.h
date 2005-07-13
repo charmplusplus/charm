@@ -28,6 +28,7 @@ A ghost element is one that is adjacent to at least one shared node. A ghost nod
 #include "mpi.h"
 #include "femMeshModify.decl.h"
 #include "fem_mesh.h"
+#include "idxl.h"
 
 extern CProxy_femMeshModify meshMod;
 
@@ -74,6 +75,7 @@ class FEM_lock {
 class FEM_MUtil {
   int idx;
   femMeshModify *mmod;
+
  public:
   FEM_MUtil() {}
   FEM_MUtil(int i, femMeshModify *m);
@@ -83,7 +85,7 @@ class FEM_MUtil {
   //entNo signifies the local index of the entity
   //numChunks is the number of chunks that need to be locked to lock that entity
   //chunks identifies the chunks that need to be locked
-  void getChunkNos(int entType, int entNo, int *numChunks, int *chunks);
+  void getChunkNos(int entType, int entNo, int *numChunks, IDXL_Share **chunks);
   bool isShared(int index);
 };
 
