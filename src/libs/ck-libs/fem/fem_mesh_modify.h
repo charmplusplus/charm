@@ -32,12 +32,12 @@ A ghost element is one that is adjacent to at least one shared node. A ghost nod
 
 extern CProxy_femMeshModify meshMod;
 
-int FEM_add_node();
-int FEM_add_shared_node(int* adjacent_nodes, int num_adjacent_nodes, int upcall);
-void FEM_remove_node(int node);
+int FEM_add_node(int mesh);
+int FEM_add_shared_node(int mesh, int* adjacent_nodes, int num_adjacent_nodes, int upcall);
+void FEM_remove_node(int mesh,int node);
 
-void FEM_remove_element(int element, int elem_type);
-int FEM_add_element(int* conn, int conn_size, int elem_type);
+void FEM_remove_element(int mesh, int element, int elem_type);
+int FEM_add_element(int mesh, int* conn, int conn_size, int elem_type);
 
 
 void FEM_REF_INIT(void);
@@ -140,6 +140,7 @@ class FEMMeshMsg : public CMessage_FEMMeshMsg {
 class femMeshModify {
   friend class FEM_lock;
   friend class FEM_MUtil;
+  friend class FEM_Mesh;
  protected:
   int numChunks;
   int idx;
@@ -155,6 +156,9 @@ class femMeshModify {
   void setFemMesh(FEMMeshMsg *fm);
   intMsg *lockRemoteChunk(int2Msg *i2msg);
   intMsg *unlockRemoteChunk(int2Msg *i2msg);
+
+  FEM_MUtil *getfmUtil(){return fmUtil;}
+
 };
 
 

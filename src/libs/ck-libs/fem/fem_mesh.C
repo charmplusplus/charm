@@ -1439,6 +1439,14 @@ const FEM_Entity *FEM_Mesh::lookup(int entity,const char *caller) const {
 	return ((FEM_Mesh *)this)->lookup(entity,caller);
 }
 
+void FEM_Mesh::setFemMeshModify(femMeshModify *m){
+  fmMM = m;
+}
+
+
+femMeshModify *FEM_Mesh::getfmMM(){
+  return fmMM;
+}
 
 void FEM_Mesh::pup(PUP::er &p)  //For migration
 {

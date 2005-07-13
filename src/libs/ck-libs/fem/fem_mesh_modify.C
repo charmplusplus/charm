@@ -11,27 +11,37 @@
 #include "fem_impl.h"
 #include "fem_mesh_modify.h"
 
-int FEM_add_node(){
-  
-  // lengthen node array, and any attributes if needed
-  // return a new index
+// A temporary function, should probably be implemented and renamed.
+int is_shared(int mesh, int node){
+  FEM_Mesh *m=FEM_Mesh_lookup(mesh,"FEM_add_node");
+  m->getfmMM()->getfmUtil()->isShared(node);
   return 0;
 }
 
+int FEM_add_node(int mesh){
+  FEM_Mesh *m=FEM_Mesh_lookup(mesh,"FEM_add_node");
 
-int FEM_add_shared_node(int* adjacentNodes, int numAdjacentNodes, int upcall){
+  // lengthen node attributes
+  int oldLength = m->node.size();
+  m->node.setLength(oldLength+1);
+
+  // return a new index
+  return oldLength;
+}
+
+
+int FEM_add_shared_node(int mesh, int* adjacentNodes, int numAdjacentNodes, int upcall){
   // add local node
-  int newNode = FEM_add_node();
+  int newNode = FEM_add_node(mesh);
 
   // for each adjacent node, if the node is shared
   for(int i=0;i<numAdjacentNodes;i++){
-    
-    // if node adjacent_nodes[i] is shared,
-    {
-      // call_shared_node_remote() on all chunks for which the shared node exists
-    }
-
-
+    if(is_shared(mesh, adjacentNodes[i]))
+      {
+        // lookup adjacent_nodes[i] in IDXL, to find all remote chunks which share this node
+        // call_shared_node_remote() on all chunks for which the shared node exists
+        // we must make sure that we only call the remote entry method once for each remote chunk
+      }
 
   }
 
@@ -41,9 +51,9 @@ int FEM_add_shared_node(int* adjacentNodes, int numAdjacentNodes, int upcall){
 
 
 // The function called by the entry method on the remote chunk
-void FEM_add_shared_node_remote(){
+void FEM_add_shared_node_remote(int mesh){
   // create local node
-  int newnode = FEM_add_node();
+  int newnode = FEM_add_node(mesh);
   
   // must negotiate the common IDXL number for the new node, 
   // and store it in appropriate IDXL tables
@@ -54,37 +64,83 @@ void FEM_add_shared_node_remote(){
 
 
 // remove a local or shared node, but NOT a ghost node
-void FEM_remove_node(int node){
-  
+void FEM_remove_node(int mesh, int node){
+  FEM_Mesh *m=FEM_Mesh_lookup(mesh,"FEM_add_node");
+
   if(FEM_Is_ghost_index(node))
     CkAbort("Cannot call FEM_remove_node on a ghost node\n");
   
   // if node is shared:
-  //   verify it is not adjacent to any elements locally
-  //   verify it is not adjacent to any elements on any of the associated chunks
-  //   delete it locally and delete it on remote chunks, update IDXL tables
+  if(is_shared(mesh, node)){
+    //   verify it is not adjacent to any elements locally
+    
+    
+    
+    //   verify it is not adjacent to any elements on any of the associated chunks
+    //   delete it locally and delete it on remote chunks, update IDXL tables
+  }
+  else {
+    // if node is local:
 
-  // if node is local:
-  //   verify it is not adjacent to any elements locally
-  //   delete it locally
-     
+    int numAdjNodes, numAdjElts;
+    int **adjNodes, **adjElts;
+    m->n2n_getAll(node, adjNodes, &numAdjNodes);
+    m->n2e_getAll(node, adjElts, &numAdjElts);
+    CkAssert((numAdjNodes==0) && (numAdjElts==0)); // we shouldn't be removing a node away that is connected to things
+    
+    // delete node
+
+    // FIXME: Currently we just pretend the node is deleted, really it should be added to 
+    //        a list of free nodes which will be recycled
+    //        Or we should have a scheme for marking deleted nodes
+  }
 }
 
 
+// remove a local element from the adjacency tables as well as the element list
+void FEM_remove_element_local(FEM_Mesh*m, int element, int etype){
 
+  // find adjacent nodes
+  int width = m->elem[etype].getConn().size(); // should be the number of nodes that can be adjacent to this element
+  int *adjnodes = new int[width];
+  m->e2n_getAll(element, adjnodes, etype);
+  
+  // replace me in their adjacencies with -1
+  for(int i=0;i<width;i++){
+    m->n2e_replace(adjnodes[i],element,-1);
+  }
+
+  // find adjacent elements
+  width = m->elem[etype].getConn().size(); // WHAT SHOULD THIS BE????
+  int *adjelts = new int[width];
+  m->e2e_getAll(element, adjelts, etype);
+  
+  // replace me in their adjacencies with -1
+  for(int i=0;i<width;i++){
+    m->e2e_replace(adjelts[i],element,-1);
+  }
+
+  // SHOULD THEN MARK AS -1 IN APPROPRIATE ELEMENT TABLE
+
+  delete[] adjnodes;
+}
 
 // Can be called on local or ghost elements
-void FEM_remove_element(int element, int elemType){
- 
+void FEM_remove_element(int mesh, int element, int elemType){
+  FEM_Mesh *m=FEM_Mesh_lookup(mesh,"FEM_remove_element");
+
   if(FEM_Is_ghost_index(element)){
-    // remove local copy from elem[elemType]->ghost() table
-    // call FEM_remove_element_remote on other chunk which owns the element
+    // remove local ghost element
+    FEM_remove_element_local(m, element, elemType);
+    
+    // call FEM_remove_element_remote on other chunk which owns the element   
   }
   else {
-    // delete the element from local elem[elem_type] table
-  }
+    // remove local element
+    FEM_remove_element_local(m, element, elemType);
 
-  
+    // call FEM_remove_element_remote on any other chunk for which this is a ghost
+  }
 }
 
 void FEM_remove_element_remote(int element, int elemType){
@@ -92,29 +148,61 @@ void FEM_remove_element_remote(int element, int elemType){
 }
 
 
-
-
-int FEM_add_element(int* conn, int connSize, int elemType){
-  // if no shared or ghost nodes in conn
-  //   grow local element and attribute tables if needed
-  //   add to the elem[elemType] table
-  //   return new element id
+// A helper function that adds the local element, and updates adjacencies
+int FEM_add_element_local(FEM_Mesh*m, const int *conn, int connSize, int elemType){
+  // lengthen node attributes
+  int oldLength = m->elem[elemType].size();
+  m->elem[elemType].setLength(oldLength+1);
+  const int newEl = oldLength;
   
-  // else if any shared nodes but no ghosts in conn
-  //   make this element ghost on all others, updating all IDXL's
-  //   also in same remote entry method, update adjacencies on all others
-  //   grow local element and attribute tables if needed
-  //   add to local elem[elemType] table, and update IDXL if needed
-  //   update local adjacencies
-  //   return the new element id
+  // add to e2n table, i.e. the element's conn
+  m->elem[elemType].connIs(newEl,conn);
+  
+  // add to corresponding inverse, the n2e table
+  for(int i=0;i<connSize;i++){
+    m->n2e_add(conn[i],newEl);
+  }
+  
+  // update e2e table
+  
+  // We really need to throw the potentially adjacent elements and this new one into a 
+  // tuple table to see who will be really be adjacent to this new one in the e2e
+  //   AAAAAAAAHHHHHHH
+  
+  return newEl;
+}
 
-  // else if any ghosts in conn
-  //   promote ghosts to shared on others, requesting new ghosts
-  //   grow local element and attribute tables if needed
-  //   add to local elem[elemType] table, and update IDXL if needed
-  //   update remote adjacencies
-  //   update local adjacencies
 
+int FEM_add_element(int mesh, int* conn, int connSize, int elemType){
+  FEM_Mesh *m=FEM_Mesh_lookup(mesh,"FEM_add_node");
+  
+  int sharedcount=0;
+  int ghostcount=0;
+  for(int i=0;i<connSize;i++){
+    if(is_shared(mesh,conn[i])) sharedcount++;
+    if(FEM_Is_ghost_index(conn[i])) ghostcount++;
+  }
+
+  if(sharedcount==0 && ghostcount==0){
+    return FEM_add_element_local(m,conn,connSize,elemType);
+  }
+  else if(ghostcount==0){
+    // else if any shared nodes but no ghosts in conn
+    //   make this element ghost on all others, updating all IDXL's
+    //   also in same remote entry method, update adjacencies on all others
+    //   grow local element and attribute tables if needed
+    //   add to local elem[elemType] table, and update IDXL if needed
+    //   update local adjacencies
+    //   return the new element id
+  }
+  else if(ghostcount !=0){
+    // else if any ghosts in conn
+    //   promote ghosts to shared on others, requesting new ghosts
+    //   grow local element and attribute tables if needed
+    //   add to local elem[elemType] table, and update IDXL if needed
+    //   update remote adjacencies
+    //   update local adjacencies
+  }
 
   return 0;
 }
@@ -137,7 +225,7 @@ int FEM_add_element_remote(){
 
 CProxy_femMeshModify meshMod;
 
-void FEM_REF_INIT(void) {
+void FEM_REF_INIT(int mesh) {
   CkArrayID femRefId;
   int cid;
   int size;
@@ -156,6 +244,12 @@ void FEM_REF_INIT(void) {
 
   femMeshModMsg *fm = new femMeshModMsg(size, cid);
   meshMod[cid].insert(fm);
+
+
+  FEM_Mesh *m=FEM_Mesh_lookup(mesh,"FEM_REF_INIT");
+  FEMMeshMsg *msg = new FEMMeshMsg(m); 
+  meshMod[cid].setFemMesh(msg);
+
   return;
 }
 
@@ -430,6 +524,7 @@ femMeshModify::~femMeshModify() {
 
 void femMeshModify::setFemMesh(FEMMeshMsg *fm) {
   fmMesh = fm->m;
+  fmMesh->setFemMeshModify(this);
   return;
 }
 

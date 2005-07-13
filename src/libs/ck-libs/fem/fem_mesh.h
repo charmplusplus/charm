@@ -1077,17 +1077,21 @@ inline int zeroToMinusOne(int i) {
  * a finite-element mesh or submesh.
  */
 class FEM_ElemAdj_Layer;
-
+class femMeshModify;
 class FEM_Mesh : public CkNoncopyable {
   /// The symmetries in the mesh
   FEM_Sym_List symList;
   bool m_isSetting;
+  femMeshModify *fmMM;
   
   void checkElemType(int elType,const char *caller) const;
   void checkSparseType(int uniqueID,const char *caller) const; 
   
   FEM_ElemAdj_Layer* lastElemAdjLayer;
+
  public:
+  void setFemMeshModify(femMeshModify *m);
+  
   FEM_Mesh();
   void pup(PUP::er &p); //For migration
   ~FEM_Mesh();
@@ -1111,7 +1115,10 @@ class FEM_Mesh : public CkNoncopyable {
   /// Set up the "shape" of our fields-- the number of element types,
   /// the datatypes for user data, etc--based on this mesh.
   void copyShape(const FEM_Mesh &src);
-  
+
+  // Get the fem mesh modification object associated with this mesh or partition  
+  femMeshModify *getfmMM();
+
   //Return this type of element, given an element type
   FEM_Entity &setCount(int elTypeOrMinusOne) {
     if (elTypeOrMinusOne==-1) return node;
