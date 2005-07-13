@@ -218,14 +218,11 @@ public:
 		}
 		if (max_==0) { //They gave no suggested size-- pick one:
 			if (rows_==this->rows+1) //Growing slowly: grab a little extra
-				max_=10+rows_+(rows_>>2); 
+				max_=10+rows_+(rows_>>2); //  125% plus 10
 			else // for a big change, just go with the minimum needed: 
 				max_=rows_;
 		}
-/*
-		if(max_ == 0){
-			max_ = rows_;
-		} */
+
 		int oldRows=this->rows;
 		this->cols=cols_;
 		this->rows=rows_;
@@ -243,7 +240,6 @@ public:
 				setRow(r,fill);
 		}
 		allocTable = this->table;
-		//Zero out new table entries:
 	}
 	
 	/// Pup routine and operator|:
@@ -277,7 +273,6 @@ public:
 		this->table = user;
 		this->rows = len;
 		max = max;
-	//	printf("register user data %p max %d rows %d\n",user,max,rows);
 	}
 };
 
@@ -1193,19 +1188,19 @@ class FEM_Mesh : public CkNoncopyable {
   //  ------- Element-to-node: preserve initial ordering
   /// Place all of element e's adjacent nodes in adjnodes; assumes
   /// adjnodes allocated to correct size
-  void e2n_getAll(int e, int *adjnodes);
+  void e2n_getAll(int e, int *adjnodes, int etype=0);
   /// Given id of element e, return the id of the idx-th adjacent node
-  int e2n_getNode(int e, short idx);
+  int e2n_getNode(int e, short idx, int etype=0);
   /// Given id of element e and id of a node n, return i such that
   /// n is the i-th node adjacent to e
-  short e2n_getIndex(int e, int n);
+  short e2n_getIndex(int e, int n, int etype=0);
   /// Set the node adjacencies of element e to adjnodes; assumes adjnodes 
   /// has the correct size
-  void e2n_setAll(int e, int *adjnodes);
+  void e2n_setAll(int e, int *adjnodes, int etype=0);
   /// Set the idx-th node adjacent to e to be newNode
-  void e2n_setIndex(int e, short idx, int newNode);
+  void e2n_setIndex(int e, short idx, int newNode, int etype=0);
   /// Find node oldNode in e's adjacent ndoes and replace with newNode
-  void e2n_replace(int e, int oldNode, int newNode);
+  void e2n_replace(int e, int oldNode, int newNode, int etype=0);
 
   //  ------- Node-to-node
   /// Place all of node n's adjacent nodes in adjnodes and the resulting 
