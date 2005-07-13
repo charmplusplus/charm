@@ -602,8 +602,8 @@ PairCalculator::acceptResult(int size, double *matrix1, double *matrix2)
 #endif
 
       // copy grainSize chunks at S offsets
-      amatrix=new double[matrixSize*2];
-      memset(amatrix,0,matrixSize *sizeof(double)*2);
+      amatrix=new double[matrixSize];
+      memset(amatrix,0,matrixSize *sizeof(double));
       CkAssert(size>=matrixSize);
       for(int i=0;i<grainSize;i++){
 	localMatrix = (matrix1+index+i*S);
