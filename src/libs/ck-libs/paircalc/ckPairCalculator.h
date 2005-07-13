@@ -21,8 +21,8 @@
 #define _PAIRCALC_FIRSTPHASE_STREAM_
 #define _PAIRCALC_USE_ZGEMM_
 #define _PAIRCALC_USE_DGEMM_
-// Flags not yet correct
-#define _PAIRCALC_SECONDPHASE_LOADBAL_
+
+//#define _PAIRCALC_SECONDPHASE_LOADBAL_
 enum redtypes {section=0, machine=1, sparsecontiguous=2};
 PUPbytes(redtypes);
 

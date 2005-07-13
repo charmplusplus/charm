@@ -230,6 +230,9 @@ CProxySection_PairCalculator initOneRedSect( bool sym, int numZ, int* z, int blk
 
 // Deposit data and start calculation
 void startPairCalcLeft(PairCalcID* pcid, int n, complex* ptr, int myS, int myZ){
+#ifdef _PAIRCALC_NO_MULTI_
+  startPairCalcLeftSlow(pcid, n, ptr, myS, myZ);
+#else
   int symmetric = pcid->Symmetric;
   bool flag_dp = pcid->isDoublePacked;
   if(!(pcid->existsLproxy||pcid->existsLNotFromproxy)){
@@ -278,6 +281,7 @@ void startPairCalcLeft(PairCalcID* pcid, int n, complex* ptr, int myS, int myZ){
 #endif
     pcid->minst.endIteration();
   }  
+#endif
 }
 
 
@@ -314,7 +318,7 @@ void makeLeftTree(PairCalcID* pcid, int myS, int myZ){
 	      idx.index[3]=c;
 	      elemsfromrow[erowcount++]=idx;
 	    }
-	  else // swap s1 : s2
+	  else // swap s1 : s2 and toggle fromRow
 	    {
 	      idx.index[1]=s2;
 	      idx.index[2]=s1;
@@ -416,6 +420,9 @@ void isAtSyncPairCalc(PairCalcID* pcid){
 }
 
 void startPairCalcRight(PairCalcID* pcid, int n, complex* ptr, int myS, int myZ){
+#ifdef _PAIRCALC_NO_MULTI_
+  startPairCalcRightSlow(pcid, n, ptr, myS, myZ);
+#else
   bool flag_dp = pcid->isDoublePacked;
   if(!pcid->existsRproxy)
     {
@@ -464,6 +471,7 @@ void startPairCalcRight(PairCalcID* pcid, int n, complex* ptr, int myS, int myZ)
       CkPrintf("Warning! No Right proxy for [%d 0 %d]\n",x,s2);
 #endif
     }
+#endif //_NO_MULTI
 }
 
 void makeRightTree(PairCalcID* pcid, int myS, int myZ){
@@ -633,7 +641,7 @@ void startPairCalcLeftSlow(PairCalcID* pcid, int n, complex* ptr, int myS, int m
     for (c = 0; c < blkSize; c++)
       for(s2 = 0; s2 < S; s2 += grainSize){
 	if(s1 <= s2)
-	  {
+ 	  {
 	    calculatePairsMsg *msg=new ( n,0 ) calculatePairsMsg;
 	    msg->init(n, myS, true, flag_dp, ptr);
 	    pairCalculatorProxy(x, s1, s2, c).calculatePairs_gemm(msg);

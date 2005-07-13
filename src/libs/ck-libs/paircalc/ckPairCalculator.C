@@ -264,7 +264,7 @@ void PairCalculator::initGRed(initGRedMsg *msg)
   cb=msg->cb;
   mCastGrpId=msg->mCastGrpId;
   cpreduce=section;
-  thisProxy.ckSetReductionClient(&cb);  //probably redundant
+  //  thisProxy.ckSetReductionClient(&cb);  //probably redundant
   delete msg;
 }
 
@@ -401,16 +401,10 @@ PairCalculator::calculatePairs_gemm(calculatePairsMsg *msg)
       outData = new double[grainSize * grainSize];
       memset(outData, 0 , sizeof(double)* grainSize * grainSize);
 #ifdef _PAIRCALC_DEBUG_
-      CkPrintf("[%d,%d,%d,%d,%d] Allocated outData %d * %d\n",thisIndex.w,thisIndex.x,thisIndex.y,thisIndex.z,symmetric,grainSize, grainSize);
+       CkPrintf("[%d,%d,%d,%d,%d] Allocated outData %d * %d\n",thisIndex.w,thisIndex.x,thisIndex.y,thisIndex.z,symmetric,grainSize, grainSize);
 #endif
     }
 
-#ifdef _PAIRCALC_DEBUG_PARANOID_
-    CkPrintf("[%d,%d,%d,%d,%d] outData=C\n",thisIndex.w,thisIndex.x,thisIndex.y,thisIndex.z,symmetric);
-    for(int i=0;i<grainSize*grainSize;i++)
-      CkPrintf("o %g",outData[i]);
-    CkPrintf("\n");
-#endif
 
     char transform='N';
     int doubleN=2*N;
@@ -433,33 +427,47 @@ PairCalculator::calculatePairs_gemm(calculatePairsMsg *msg)
     if( numRecd == numExpected * 2)
       {
 #ifdef _PAIRCALC_DEBUG_PARANOID_
-	CkPrintf("[%d,%d,%d,%d,%d] L=A\n",thisIndex.w,thisIndex.x,thisIndex.y,thisIndex.z,symmetric);
+	char filename[80];
+	sprintf(filename, "fwlmdata.%d_%d_%d_%d_%d", thisIndex.w,thisIndex.x, thisIndex.y,thisIndex.z, symmetric);
+	FILE *loutfile = fopen(filename, "w");
+	fprintf(loutfile,"[%d,%d,%d,%d,%d] inDataLeft\n",thisIndex.w,thisIndex.x,thisIndex.y,thisIndex.z,symmetric);
 	for(int i=0;i<N*2;i++)
 	  for(int j=0;j<numExpected;j++)
-	    CkPrintf("L %d %d %g\n",i,j,inDataLeft[i*numExpected+j]);
-	CkPrintf("\n[%d,%d,%d,%d,%d] R=B\n",thisIndex.w,thisIndex.x,thisIndex.y,thisIndex.z,symmetric);
+	    fprintf(loutfile,"%d %d %g \n",i,j,inDataLeft[i*numExpected+j]);
+	fclose(loutfile);
+	sprintf(filename, "fwrmdata.%d_%d_%d_%d_%d", thisIndex.w,thisIndex.x, thisIndex.y,thisIndex.z, symmetric);
+	FILE *routfile = fopen(filename, "w");
+	fprintf(routfile,"[%d,%d,%d,%d,%d] inDataRight\n",thisIndex.w,thisIndex.x,thisIndex.y,thisIndex.z,symmetric);
 	for(int i=0;i<N*2;i++)
 	  for(int j=0;j<numExpected;j++)
-	    CkPrintf("R %d %d %g\n",i,j,inDataRight[i*numExpected+j]);
+	    fprintf(routfile,"%d %d %g\n",i,j,inDataRight[i*numExpected+j]);
+	fclose(routfile);
 #endif
-	DGEMM(&transformT, &transform, &m_in, &n_in, &k_in, &alpha, inDataLeft, &lda, inDataRight, &ldb, &beta, outData, &ldc);
+
+	DGEMM(&transformT, &transform, &m_in, &n_in, &k_in, &alpha, inDataRight, &lda, inDataLeft, &ldb, &beta, outData, &ldc);
+	// switching solves a transposition problem
+	//	  DGEMM(&transformT, &transform, &m_in, &n_in, &k_in, &alpha, inDataLeft, &lda, inDataRight, &ldb, &beta, outData, &ldc);
       }
     else if (symmetric && thisIndex.x==thisIndex.y && numRecd==numExpected)
       {
 #ifdef _PAIRCALC_DEBUG_PARANOID_
-	CkPrintf("[%d,%d,%d,%d,%d] L=R=A\n",thisIndex.w,thisIndex.x,thisIndex.y,thisIndex.z,symmetric);
+	char filename[80];
+	sprintf(filename, "fwlmdata.%d_%d_%d_%d_%d", thisIndex.w,thisIndex.x, thisIndex.y,thisIndex.z, symmetric);
+	FILE *loutfile = fopen(filename, "w");
+	fprintf(loutfile,"[%d,%d,%d,%d,%d] inDataLeft\n",thisIndex.w,thisIndex.x,thisIndex.y,thisIndex.z,symmetric);
 	for(int i=0;i<N*2;i++)
 	  for(int j=0;j<numExpected;j++)
-	  CkPrintf("LS %d %d %g \n",i,j,inDataLeft[i*numExpected+j]);
+	    fprintf(loutfile,"%d %d %g \n",i,j,inDataLeft[i*numExpected+j]);
+	fclose(loutfile);
 #endif
 	DGEMM(&transformT, &transform, &m_in, &n_in, &k_in, &alpha, inDataLeft, &lda, inDataLeft, &ldb, &beta, outData, &ldc);
-      }
+      } 
 
 #ifndef CMK_OPTIMIZE
     traceUserBracketEvent(210, StartTime, CmiWallTimer());
 #endif
 
-    numRecd = 0;
+    numRecd = 0; 
 
     if (msg->flag_dp) {
       if(thisIndex.w != 0) {   // Adjusting for double packing of incoming data
@@ -468,9 +476,30 @@ PairCalculator::calculatePairs_gemm(calculatePairsMsg *msg)
 	  outData[i] *= 2.0;
       }
     }
+#ifdef _PAIRCALC_DEBUG_PARANOID_
+    char filename[80];
+    sprintf(filename, "fwgmodata.%d_%d_%d_%d_%d", thisIndex.w,thisIndex.x, thisIndex.y,thisIndex.z, symmetric);
+    FILE *outfile = fopen(filename, "w");
+
+
+    fprintf(outfile,"[%d,%d,%d,%d,%d] outData=C\n",thisIndex.w,thisIndex.x,thisIndex.y,thisIndex.z,symmetric);
+    for(int i=0;i<grainSize;i++)
+      {
+	for(int j=0;j<grainSize;j++)
+	  fprintf(outfile," %g",outData[i*grainSize+j]);
+	  fprintf(outfile,"\n");
+      }
+    fclose(outfile);
+#endif
+
+#ifdef _PAIRCALC_VALID_OUT_
+    CkPrintf("[PAIRCALC] [%d %d %d %d %d] forward gemm out %.10g %.10g %.10g %.10g \n", thisIndex.w, thisIndex.x, thisIndex.y, thisIndex.z,symmetric, outData[0],outData[1],outData[grainSize*grainSize-2],outData[grainSize*grainSize-1]);
+#endif
 #ifndef CMK_OPTIMIZE
     StartTime=CmiWallTimer();
 #endif
+
+
     if(cpreduce==machine){
 	//CkPrintf("[%d] ELAN VERSION %d\n", CkMyPe(), symmetric);
 	CProxy_PairCalcReducer pairCalcReducerProxy(reducer_id);
@@ -496,7 +525,7 @@ PairCalculator::calculatePairs_gemm(calculatePairsMsg *msg)
     traceUserBracketEvent(220, StartTime, CmiWallTimer());
 #endif
   }
-  //delete msg;
+
 }
 
 void
@@ -542,8 +571,9 @@ PairCalculator::acceptResult(int size, double *matrix1, double *matrix2)
       othernewData = new complex[N*grainSize];
       memset(othernewData,0,N*grainSize* sizeof(complex));
   }
-*/
+  */
   int offset = 0, index = thisIndex.y*S + thisIndex.x;
+  //  index = thisIndex.y*S + thisIndex.x;
 
   //ASSUMING TMATRIX IS REAL (LOSS OF GENERALITY)
   register double m=0;
@@ -552,18 +582,32 @@ PairCalculator::acceptResult(int size, double *matrix1, double *matrix2)
   int matrixSize=grainSize*grainSize;
 
   double *amatrix=NULL;
-
-
+  //  index = thisIndex.x*S + thisIndex.y;
+  //  if(!symmetric)
   index = thisIndex.x*S + thisIndex.y;
   double *localMatrix;
   double *outMatrix;
   if(S!=grainSize)
     {
+#ifdef _PAIRCALC_DEBUG_PARANOID_
+    char ifilename[80];
+    sprintf(ifilename, "bwim1data.%d_%d_%d_%d_%d", thisIndex.w,thisIndex.x, thisIndex.y,thisIndex.z, symmetric);
+    FILE *ofile = fopen(ifilename, "w");
+    fprintf(ofile,"[%d,%d,%d,%d,%d] IM1\n",thisIndex.w,thisIndex.x,thisIndex.y,thisIndex.z,symmetric);
+    for(int i=0;i<S*S;i++)
+      {
+	  fprintf(ofile,"%.10g\n",matrix1[i]);
+      }
+    fclose(ofile);
+#endif
+
       // copy grainSize chunks at S offsets
-      amatrix=new double[matrixSize];
+      amatrix=new double[matrixSize*2];
+      memset(amatrix,0,matrixSize *sizeof(double)*2);
+      CkAssert(size>=matrixSize);
       for(int i=0;i<grainSize;i++){
 	localMatrix = (matrix1+index+i*S);
-	outMatrix   = amatrix+i*grainSize;
+	outMatrix   = (double *) (amatrix+i*grainSize);
 	memcpy(outMatrix,localMatrix,grainSize*sizeof(double));
       }
     }
@@ -576,7 +620,7 @@ PairCalculator::acceptResult(int size, double *matrix1, double *matrix2)
   for (int i = 0; i < grainSize; i++) {
     for (int j = 0; j < grainSize; j++){
       m = matrix1[index + j + i*S];
-      if(m!=amatrix[i*grainSize+j]){CkPrintf("Dcopy broken in back path: %2.5g != %2.5g \n", m, amatrix[i*grainSize+j]);}
+      if(m!=amatrix[i*grainSize+j]){CkPrintf("copy broken in back path: %2.5g != %2.5g \n", m, amatrix[i*grainSize+j]);}
     }
   }
 #endif //_PAIRCALC_DEBUG_
@@ -592,8 +636,44 @@ PairCalculator::acceptResult(int size, double *matrix1, double *matrix2)
 #ifndef CMK_OPTIMIZE
   double StartTime=CmiWallTimer();
 #endif
+#ifdef _PAIRCALC_DEBUG_PARANOID_
+    char filename[80];
+    sprintf(filename, "bwgmodata.%d_%d_%d_%d_%d", thisIndex.w,thisIndex.x, thisIndex.y,thisIndex.z, symmetric);
+    FILE *outfile = fopen(filename, "w");
+
+
+    fprintf(outfile,"[%d,%d,%d,%d,%d] LM\n",thisIndex.w,thisIndex.x,thisIndex.y,thisIndex.z,symmetric);
+    for(int i=0;i<N*grainSize;i++)
+      {
+	  fprintf(outfile," %g %g",inDataLeft[i]);
+	  fprintf(outfile,"\n");
+      }
+    fclose(outfile);
+	sprintf(filename, "bwmdata.%d_%d_%d_%d_%d", thisIndex.w,thisIndex.x, thisIndex.y,thisIndex.z, symmetric);
+	FILE *moutfile = fopen(filename, "w");
+	fprintf(moutfile,"[%d,%d,%d,%d,%d] amatrix\n",thisIndex.w,thisIndex.x,thisIndex.y,thisIndex.z,symmetric);
+	for (int i = 0; i < grainSize; i++) {
+	  for (int j = 0; j < grainSize; j++){ 
+	    fprintf(moutfile,"%.10g\n",amatrix[i*grainSize+j]);
+	  }
+	}
+	fclose(moutfile);
+#endif
 
   DGEMM(&transform, &transformT, &n_in, &m_in, &k_in, &alphad, inDataLeft, &n_in,  amatrix, &k_in, &betad, mynewDatad, &n_in);
+#ifdef _PAIRCALC_DEBUG_PARANOID_
+    sprintf(filename, "bwgmodata.%d_%d_%d_%d_%d", thisIndex.w,thisIndex.x, thisIndex.y,thisIndex.z, symmetric);
+    FILE *ooutfile = fopen(filename, "w");
+
+
+    fprintf(ooutfile,"[%d,%d,%d,%d,%d] outData=C\n",thisIndex.w,thisIndex.x,thisIndex.y,thisIndex.z,symmetric);
+    for(int i=0;i<N*grainSize;i++)
+      {
+	  fprintf(ooutfile," %g %g",mynewData[i].re,mynewData[i].im);
+	  fprintf(ooutfile,"\n");
+      }
+    fclose(ooutfile);
+#endif
 
 #ifndef CMK_OPTIMIZE
     traceUserBracketEvent(230, StartTime, CmiWallTimer());
@@ -639,6 +719,9 @@ PairCalculator::acceptResult(int size, double *matrix1, double *matrix2)
    * add new message and entry method for sumPartial result
    * to avoid message copying.
    */
+#ifdef _PAIRCALC_VALID_OUT_
+  CkPrintf("[PAIRCALC] [%d %d %d %d %d] backward gemm out %.10g %.10g %.10g %.10g \n", thisIndex.w, thisIndex.x, thisIndex.y, thisIndex.z,symmetric, mynewDatad[0],mynewDatad[1],mynewData[N*grainSize-1].re,mynewData[N*grainSize-1].im);
+#endif
 
   //original version
 #ifndef _PAIRCALC_SECONDPHASE_LOADBAL_
@@ -649,12 +732,12 @@ PairCalculator::acceptResult(int size, double *matrix1, double *matrix2)
   else {
     CkArrayIndex4D idx(thisIndex.w, 0, thisIndex.y, thisIndex.z);
     thisProxy(idx).sumPartialResult(N*grainSize, mynewData, thisIndex.z);
-    /* I think this matrix is unused
+    /* I think this matrix is unused 
     if (thisIndex.y != thisIndex.x){   // FIXME: rowNum will alway == thisIndex.x
       CkArrayIndex4D idx(thisIndex.w, 0, thisIndex.x, thisIndex.z);
       thisProxy(idx).sumPartialResult(N*grainSize, othernewData, thisIndex.z);
     }
-*/
+    */
   }
 #else
   int segments=S/grainSize;
@@ -778,6 +861,8 @@ PairCalculator::sumPartialResult(priorSumMsg *msg)
 }
 
 
+
+/* stupid backward path still broken for asymm when grainsize!=S*/
 void
 PairCalculator::sumPartialResult(int size, complex *result, int offset)
 {
@@ -789,26 +874,29 @@ PairCalculator::sumPartialResult(int size, complex *result, int offset)
 
   if(!existsNew){
     CkAssert(newData==NULL);
-    newData = new complex[size];
-    newelems=size;
-    memset(newData,0,size*sizeof(complex));
+    newData = new complex[N*grainSize];
+    newelems=N*grainSize;
+    memset(newData,0,N*grainSize*sizeof(complex));
     existsNew=true;
   }
   for(int i=0; i<size; i++){
     newData[i] += result[i];
   }
   int countExpect = (S/grainSize)*blkSize;
-  if(symmetric) countExpect = thisIndex.y/grainSize + 1;
+  //  if(symmetric) countExpect = thisIndex.y/grainSize + 1;
 #ifdef _PAIRCALC_DEBUG_
   CkPrintf("Have %d of Expected %d messages\n",sumPartialCount,countExpect);
 #endif
-  if (sumPartialCount >= countExpect) {
+  if (sumPartialCount == countExpect) {
 #ifndef _PAIRCALC_SECONDPHASE_LOADBAL_
     for(int j=0; j<grainSize; j++){
-      CkCallback mycb(cb_ep, CkArrayIndex2D(thisIndex.y+j+offset, thisIndex.w), cb_aid);
+      CkCallback mycb(cb_ep, CkArrayIndex2D(thisIndex.y+j, thisIndex.w), cb_aid);
       mySendMsg *msg = new (N, 0)mySendMsg; // msg with newData (size N)
       memcpy(msg->data, newData+j*N, N * sizeof(complex));
       msg->N=N;
+#ifdef _PAIRCALC_VALID_OUT_
+      CkPrintf("[PAIRCALC] [%d %d %d %d %d] bw ps to %d %d %.10g %.10g %.10g %.10g \n", thisIndex.w, thisIndex.x, thisIndex.y, thisIndex.z,symmetric, thisIndex.y+j+offset, thisIndex.x,msg->data[0].re,msg->data[0].im,msg->data[N-1].re,msg->data[N-1].im);
+#endif
       mycb.send(msg);
     }
 #else
@@ -818,20 +906,27 @@ PairCalculator::sumPartialResult(int size, complex *result, int offset)
 	    mySendMsg *msg = new (N, 0) mySendMsg; // msg with newData (size N)
 	    memcpy(msg->data, newData+j*N, N * sizeof(complex));
 	    msg->N=N;
+#ifdef _PAIRCALC_VALID_OUT_
+	    CkPrintf("[PAIRCALC] [%d %d %d %d %d] bw ps to %d %d %.10g %.10g %.10g %.10g \n", thisIndex.w, thisIndex.x, thisIndex.y, thisIndex.z,symmetric, thisIndex.y+j+offset, thisIndex.x,msg->data[0].re,msg->data[0].im,msg->data[N-1].re,msg->data[N-1].im);
+#endif
 	    mycb.send(msg);
 	}
     else //shouldn't be in here as we sent it directly to gspace
       	for(int j=0; j<grainSize; j++){
-	    CkCallback mycb(cb_ep, CkArrayIndex2D(thisIndex.y+j+offset, thisIndex.w), cb_aid);
+	    CkCallback mycb(cb_ep, CkArrayIndex2D(thisIndex.y+j+offset, thisIndex.w), cb_aid); 
 	    mySendMsg *msg = new (N, 0)mySendMsg; // msg with newData (size N)
 	    memcpy(msg->data, newData+j*N, N * sizeof(complex));
 	    msg->N=N;
+
+#ifdef _PAIRCALC_VALID_OUT_
+	    CkPrintf("[PAIRCALC] [%d %d %d %d %d] bw ps to %d %d %.10g %.10g %.10g %.10g \n", thisIndex.w, thisIndex.x, thisIndex.y, thisIndex.z,symmetric, thisIndex.y+j+offset, thisIndex.x,msg->data[0].re,msg->data[0].im,msg->data[N-1].re,msg->data[N-1].im);
+#endif
 	    mycb.send(msg);
 	}
 
 #endif
     sumPartialCount = 0;
-    memset(newData,0,size*sizeof(complex));
+    memset(newData,0,N*grainSize*sizeof(complex));
   }
 }
 
