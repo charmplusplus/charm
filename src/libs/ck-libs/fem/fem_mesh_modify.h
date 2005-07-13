@@ -32,12 +32,21 @@ A ghost element is one that is adjacent to at least one shared node. A ghost nod
 
 extern CProxy_femMeshModify meshMod;
 
-int FEM_add_node(int mesh);
-int FEM_add_shared_node(int mesh, int* adjacent_nodes, int num_adjacent_nodes, int upcall);
+// The external interfaces which translate directly to the FEM_Mesh* ones below
+int FEM_add_node(int mesh, int* adjacent_nodes, int num_adjacent_nodes, int upcall);
 void FEM_remove_node(int mesh,int node);
-
 void FEM_remove_element(int mesh, int element, int elem_type);
 int FEM_add_element(int mesh, int* conn, int conn_size, int elem_type);
+void FEM_Modify_Lock(int mesh, int* affectedNodes, int numAffectedNodes, int* affectedElts, int numAffectedElts);
+void FEM_Modify_Unlock(int mesh);
+
+// The internal functions which take in a FEM_Mesh*
+int FEM_add_node(FEM_Mesh *m, int* adjacent_nodes, int num_adjacent_nodes, int upcall);
+void FEM_remove_node(FEM_Mesh *m, int node);
+void FEM_remove_element(FEM_Mesh *m, int element, int elem_type);
+int FEM_add_element(FEM_Mesh *m, int* conn, int conn_size, int elem_type);
+void FEM_Modify_Lock(FEM_Mesh *m, int* affectedNodes, int numAffectedNodes, int* affectedElts, int numAffectedElts);
+void FEM_Modify_Unlock(FEM_Mesh *m);
 
 
 void FEM_REF_INIT(void);

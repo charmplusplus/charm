@@ -11,16 +11,42 @@
 #include "fem_impl.h"
 #include "fem_mesh_modify.h"
 
+
+// These should be accessible to the user
+int FEM_add_node(int mesh, int* adjacent_nodes, int num_adjacent_nodes, int upcall){
+  return FEM_add_node(FEM_Mesh_lookup(mesh,"FEM_add_node"), adjacent_nodes, num_adjacent_nodes, upcall);
+}
+
+void FEM_remove_node(int mesh,int node){
+  FEM_remove_node(FEM_Mesh_lookup(mesh,"FEM_remove_node"), node);
+}
+
+void FEM_remove_element(int mesh, int element, int elem_type){
+  FEM_remove_element(FEM_Mesh_lookup(mesh,"FEM_remove_element"), element, elem_type);
+}
+
+int FEM_add_element(int mesh, int* conn, int conn_size, int elem_type){
+  return FEM_add_element(FEM_Mesh_lookup(mesh,"FEM_remove_element"), conn, conn_size, elem_type);
+}
+
+void FEM_Modify_Lock(int mesh, int* affectedNodes, int numAffectedNodes, int* affectedElts, int numAffectedElts){
+  FEM_Modify_Lock(FEM_Mesh_lookup(mesh,"FEM_remove_element"), affectedNodes, numAffectedNodes, affectedElts, numAffectedElts);
+}
+
+void FEM_Modify_Unlock(int mesh){
+  FEM_Modify_Unlock(FEM_Mesh_lookup(mesh,"FEM_remove_element"));
+}
+
+
+// The internal functions
+
 // A temporary function, should probably be implemented and renamed.
-int is_shared(int mesh, int node){
-  FEM_Mesh *m=FEM_Mesh_lookup(mesh,"FEM_add_node");
+int is_shared(FEM_Mesh *m, int node){
   m->getfmMM()->getfmUtil()->isShared(node);
   return 0;
 }
 
-int FEM_add_node(int mesh){
-  FEM_Mesh *m=FEM_Mesh_lookup(mesh,"FEM_add_node");
-
+int FEM_add_node_local(FEM_Mesh *m){
   // lengthen node attributes
   int oldLength = m->node.size();
   m->node.setLength(oldLength+1);
@@ -30,13 +56,13 @@ int FEM_add_node(int mesh){
 }
 
 
-int FEM_add_shared_node(int mesh, int* adjacentNodes, int numAdjacentNodes, int upcall){
+int FEM_add_node(FEM_Mesh *m, int* adjacentNodes, int numAdjacentNodes, int upcall){
   // add local node
-  int newNode = FEM_add_node(mesh);
+  int newNode = FEM_add_node_local(m);
 
   // for each adjacent node, if the node is shared
   for(int i=0;i<numAdjacentNodes;i++){
-    if(is_shared(mesh, adjacentNodes[i]))
+    if(is_shared(m, adjacentNodes[i]))
       {
         // lookup adjacent_nodes[i] in IDXL, to find all remote chunks which share this node
         // call_shared_node_remote() on all chunks for which the shared node exists
@@ -45,15 +71,14 @@ int FEM_add_shared_node(int mesh, int* adjacentNodes, int numAdjacentNodes, int 
 
   }
 
-
   return 0;
 }
 
 
 // The function called by the entry method on the remote chunk
-void FEM_add_shared_node_remote(int mesh){
+void FEM_add_shared_node_remote(FEM_Mesh *m){
   // create local node
-  int newnode = FEM_add_node(mesh);
+  int newnode = FEM_add_node_local(m);
   
   // must negotiate the common IDXL number for the new node, 
   // and store it in appropriate IDXL tables
@@ -64,14 +89,13 @@ void FEM_add_shared_node_remote(int mesh){
 
 
 // remove a local or shared node, but NOT a ghost node
-void FEM_remove_node(int mesh, int node){
-  FEM_Mesh *m=FEM_Mesh_lookup(mesh,"FEM_add_node");
+void FEM_remove_node(FEM_Mesh *m, int node){
 
   if(FEM_Is_ghost_index(node))
     CkAbort("Cannot call FEM_remove_node on a ghost node\n");
   
   // if node is shared:
-  if(is_shared(mesh, node)){
+  if(is_shared(m, node)){
     //   verify it is not adjacent to any elements locally
     
     
@@ -98,7 +122,7 @@ void FEM_remove_node(int mesh, int node){
 
 
 // remove a local element from the adjacency tables as well as the element list
-void FEM_remove_element_local(FEM_Mesh*m, int element, int etype){
+void FEM_remove_element_local(FEM_Mesh *m, int element, int etype){
 
   // find adjacent nodes
   int width = m->elem[etype].getConn().size(); // should be the number of nodes that can be adjacent to this element
@@ -126,8 +150,7 @@ void FEM_remove_element_local(FEM_Mesh*m, int element, int etype){
 }
 
 // Can be called on local or ghost elements
-void FEM_remove_element(int mesh, int element, int elemType){
-  FEM_Mesh *m=FEM_Mesh_lookup(mesh,"FEM_remove_element");
+void FEM_remove_element(FEM_Mesh *m, int element, int elemType){
 
   if(FEM_Is_ghost_index(element)){
     // remove local ghost element
@@ -143,7 +166,7 @@ void FEM_remove_element(int mesh, int element, int elemType){
   }
 }
 
-void FEM_remove_element_remote(int element, int elemType){
+void FEM_remove_element_remote(FEM_Mesh *m, int element, int elemType){
   // remove local element from elem[elemType] table
 }
 
@@ -173,13 +196,12 @@ int FEM_add_element_local(FEM_Mesh*m, const int *conn, int connSize, int elemTyp
 }
 
 
-int FEM_add_element(int mesh, int* conn, int connSize, int elemType){
-  FEM_Mesh *m=FEM_Mesh_lookup(mesh,"FEM_add_node");
+int FEM_add_element(FEM_Mesh *m, int* conn, int connSize, int elemType){
   
   int sharedcount=0;
   int ghostcount=0;
   for(int i=0;i<connSize;i++){
-    if(is_shared(mesh,conn[i])) sharedcount++;
+    if(is_shared(m,conn[i])) sharedcount++;
     if(FEM_Is_ghost_index(conn[i])) ghostcount++;
   }
 
