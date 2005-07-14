@@ -281,6 +281,31 @@ to mark the chunk to which a ghost node or element belongs datatype=FEM_INDEX*/
   
   void FEM_Set_partition(int *elem2chunk);
 
+
+  /* Public functions that modify the mesh */
+  int FEM_add_node(int mesh, int* adjacent_nodes, int num_adjacent_nodes, int upcall);
+  void FEM_remove_node(int mesh,int node);
+  void FEM_remove_element(int mesh, int element, int elem_type);
+  int FEM_add_element(int mesh, int* conn, int conn_size, int elem_type);
+  void FEM_Modify_Lock(int mesh, int* affectedNodes, int numAffectedNodes, int* affectedElts, int numAffectedElts);
+  void FEM_Modify_Unlock(int mesh);
+  
+  
+  // To help debugging:
+  void FEM_Print_Mesh_Summary(int mesh);
+
+
+
+
+
+
+
+
+
+
+
+
+
 /* Routines we wish didn't exist: */
   void FEM_Serial_split(int nchunks);
   void FEM_Serial_begin(int chunkNo);
@@ -292,7 +317,7 @@ to mark the chunk to which a ghost node or element belongs datatype=FEM_INDEX*/
   int FEM_Get_comm_partner(int partnerNo);
   int FEM_Get_comm_count(int partnerNo);
   void FEM_Get_comm_nodes(int partnerNo,int *nodeNos);
-  
+
 
 /* Routines that no longer exist:
   void FEM_Composite_elem(int newElType);

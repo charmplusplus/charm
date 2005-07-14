@@ -17,37 +17,48 @@ extern void splitEntity(IDXL_Side &c, int localIdx, int nBetween, int *between, 
 CProxy_femMeshModify meshMod;
 
 
-// These should be accessible to the user
-int FEM_add_node(int mesh, int* adjacent_nodes, int num_adjacent_nodes, int upcall){
-  return FEM_add_node(FEM_Mesh_lookup(mesh,"FEM_add_node"), adjacent_nodes, num_adjacent_nodes, upcall);
-}
 
-void FEM_remove_node(int mesh,int node){
-  FEM_remove_node(FEM_Mesh_lookup(mesh,"FEM_remove_node"), node);
-}
-
-void FEM_remove_element(int mesh, int element, int elem_type){
-  FEM_remove_element(FEM_Mesh_lookup(mesh,"FEM_remove_element"), element, elem_type);
-}
-
-int FEM_add_element(int mesh, int* conn, int conn_size, int elem_type){
-  return FEM_add_element(FEM_Mesh_lookup(mesh,"FEM_add_element"), conn, conn_size, elem_type);
-}
-
-void FEM_Modify_Lock(int mesh, int* affectedNodes, int numAffectedNodes, int* affectedElts, int numAffectedElts){
-  FEM_Modify_Lock(FEM_Mesh_lookup(mesh,"FEM_Modify_Lock"), affectedNodes, numAffectedNodes, affectedElts, numAffectedElts);
-}
-
-void FEM_Modify_Unlock(int mesh){
-  FEM_Modify_Unlock(FEM_Mesh_lookup(mesh,"FEM_Modify_Unlock"));
-}
-
-
-// The internal functions
-
+// A wrapper to simplify the lookup to whether a node is shared
 inline int is_shared(FEM_Mesh *m, int node){
   return m->getfmMM()->getfmUtil()->isShared(node);
 }
+
+
+CDECL void FEM_Print_Mesh_Summary(int mesh){
+  FEM_Mesh *m=FEM_Mesh_lookup(mesh,"FEM_Print_Mesh_Summary");
+  
+  // Print Element info
+  
+  CkPrintf("Element Types: %d\n", m->elem.size());
+  for (int t=0;t<m->elem.size();t++) // for each element type t
+	if (m->elem.has(t)) {
+	  const int numElements = m->elem[t].size();
+	  const int numGhostElements = ((FEM_Elem*)(m->elem[t].getGhost()))->size();
+	  unsigned long numValidEl=0;
+	  unsigned long numValidElGhosts=0;
+	  unsigned char *validData;
+	  FEM_DataAttribute *validAttr;
+	  
+	  validAttr = (FEM_DataAttribute *)m->elem[t].lookup(FEM_VALID,"FEM_Print_Mesh_Summary");
+	  validData = validAttr->getChar().getData();	
+	  CkAssert(validData);
+	  for(int i=0;i<numElements;i++){
+		if (validData[i])
+		  numValidEl++;
+	  }
+	  
+	  validAttr = (FEM_DataAttribute *)m->elem[t].getGhost()->lookup(FEM_VALID,"FEM_Print_Mesh_Summary");
+	  validData = validAttr->getChar().getData();
+	  CkAssert(validData);
+	  for(int i=0;i<numElements;i++){
+		if (validData[i])
+		  numValidElGhosts++;
+	  }
+	  
+	  CkPrintf("Element type %d contains %d/%d elements and %d/%d ghosts\n", t, numValidEl, numElements, numValidElGhosts, numGhostElements);
+	}
+}
+
 
 
 int FEM_add_node_local(FEM_Mesh *m){
@@ -76,7 +87,7 @@ int FEM_add_node(FEM_Mesh *m, int* adjacentNodes, int numAdjacentNodes, int upca
     //nodes between which it is added are shared
     if(is_shared(m, adjacentNodes[i]))
       {
-	sharedCount++;
+		sharedCount++;
         // lookup adjacent_nodes[i] in IDXL, to find all remote chunks which share this node
         // call_shared_node_remote() on all chunks for which the shared node exists
         // we must make sure that we only call the remote entry method once for each remote chunk
@@ -139,7 +150,7 @@ void FEM_remove_node(FEM_Mesh *m, int node){
 	unsigned char *validData = validAttr->getChar().getData();
 	validData[node]=0;
 
-    // delete it on remote chunks, update IDXL tables
+    // delete it on remote chunks(shared and ghost), update IDXL tables
     
 
   }
@@ -248,7 +259,8 @@ void update_new_element_e2e(FEM_Mesh *m, int newEl, int elemType){
     }
 
   // insert all elements adjacent to the nodes adjacent to the new element
-  int adjnodes[tuplesPerElem];
+  int *adjnodes = new int[tuplesPerElem];
+
   m->e2n_getAll(newEl, adjnodes, elemType);
   
   for(int i=0;i<tuplesPerElem;i++){
@@ -274,6 +286,8 @@ void update_new_element_e2e(FEM_Mesh *m, int newEl, int elemType){
       
     }
   }
+  delete[] adjnodes;
+
   
   // extract adjacencies from table and update all e2e tables for both newEl and the others
   

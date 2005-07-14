@@ -478,7 +478,7 @@ class FEM_ElemAdj_Layer : public CkNoncopyable {
  
  elemAdjInfo elem[FEM_MAX_ELTYPE];
 
- FEM_ElemAdj_Layer() {CkPrintf("FEM_ElemAdj_Layer initialized to zero\n");initialized=0;}
+ FEM_ElemAdj_Layer() {initialized=0;}
 
   virtual void pup(PUP::er &p){
     p | nodesPerTuple;

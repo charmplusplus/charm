@@ -1429,6 +1429,4 @@ CDECL void FEM_Add_elem2face_tuples(int fem_mesh, int elem_type, int nodesPerTup
 	cur->elem[elem_type].elem2tuple=CkCopyArray(elem2tuple,
 		          tuplesPerElem*cur->nodesPerTuple,idxBase);
 
-	CkPrintf("Element type %d has %d tupesPerElem\n", elem_type, tuplesPerElem);
-
 }

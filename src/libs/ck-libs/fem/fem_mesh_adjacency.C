@@ -167,9 +167,6 @@ void FEM_Elem::allocateElemAdjacency(){
   add(elemAdjacency);
   add(elemAdjacencyTypes);
 
-  // Verify that the corresponding ghost adjacency tables are created
-  CkAssert( ((FEM_Elem*)getGhost())->elemAdjacency );
-  CkAssert( ((FEM_Elem*)getGhost())->elemAdjacencyTypes );
 }
 
 
@@ -271,11 +268,7 @@ void FEM_Mesh::createElemElemAdj()
           // Put corresponding ghost elements into tuple table
           if(elem[t].getGhost() != NULL){
               FEM_Elem *ghostElem = (FEM_Elem *)elem[t].getGhost();
-              printf("found some ghost layer, I think its type is %d\n", -(t+1));
-              
               const int numElements = ghostElem->size();
-              printf("this ghost layer has %d elements in it\n", numElements);
-
               // for every element of  type t:
               for (int elemIndex=0;elemIndex<numElements;elemIndex++)	{
                   // insert element into the tuple table
