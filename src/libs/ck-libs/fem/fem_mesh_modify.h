@@ -175,7 +175,7 @@ class sharedNodeMsg : public CMessage_sharedNodeMsg {
   }
 };
 
-class femMeshModify/* : public TCharmClient1D */{
+class femMeshModify : public CBase_femMeshModify {
   friend class FEM_lock;
   friend class FEM_MUtil;
   friend class FEM_Mesh;

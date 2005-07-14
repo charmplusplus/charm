@@ -449,7 +449,6 @@ CDECL void FEM_REF_INIT(int mesh) {
   femMeshModMsg *fm = new femMeshModMsg(size,cid);
   meshMod[cid].insert(fm);
 
-
   FEM_Mesh *m=FEM_Mesh_lookup(mesh,"FEM_REF_INIT");
   FEMMeshMsg *msg = new FEMMeshMsg(m); 
   meshMod[cid].setFemMesh(msg);
