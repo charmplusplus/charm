@@ -331,6 +331,7 @@ void makeLeftTree(PairCalcID* pcid, int myS, int myZ){
 
 	  pcid->proxyLNotFrom = CProxySection_PairCalculator::ckNew(pairCalculatorID, elems, ecount); 
 	  pcid->existsLNotFromproxy=true;	  
+#ifndef _PAIRCALC_DO_NOT_DELEGATE_
 	  if(pcid->useComlib && _PC_COMMLIB_MULTI_)
 	    {
 	      ComlibDelegateProxy(&(pcid->proxyLNotFrom));
@@ -338,14 +339,17 @@ void makeLeftTree(PairCalcID* pcid, int myS, int myZ){
 	    }
 	  else
 	    {
+
 	      CkMulticastMgr *mcastGrp = CProxy_CkMulticastMgr(pcid->mCastGrpId).ckLocalBranch();       
 	      pcid->proxyLNotFrom.ckSectionDelegate(mcastGrp);
 	    }
+#endif
 	}
       if(erowcount)
 	{
 	  pcid->proxyLFrom  = CProxySection_PairCalculator::ckNew(pairCalculatorID, elemsfromrow, erowcount); 
 	  pcid->existsLproxy=true;	  
+#ifndef _PAIRCALC_DO_NOT_DELEGATE_
 	  if(pcid->useComlib && _PC_COMMLIB_MULTI_)
 	    {
 	      ComlibDelegateProxy(&(pcid->proxyLFrom));
@@ -357,6 +361,7 @@ void makeLeftTree(PairCalcID* pcid, int myS, int myZ){
 	      pcid->proxyLFrom.ckSectionDelegate(mcastGrp);
 
 	    }
+#endif
 	}
       delete [] elemsfromrow;
       delete [] elems;
@@ -391,6 +396,7 @@ void makeLeftTree(PairCalcID* pcid, int myS, int myZ){
 #endif      
       pcid->proxyLFrom = CProxySection_PairCalculator::ckNew(pairCalculatorID, elemsfromrow, erowcount); 
       pcid->existsLproxy=true;      
+#ifndef _PAIRCALC_DO_NOT_DELEGATE_
       if(pcid->useComlib &&_PC_COMMLIB_MULTI_)
 	{
 	  ComlibDelegateProxy(&(pcid->proxyLFrom));
@@ -401,6 +407,7 @@ void makeLeftTree(PairCalcID* pcid, int myS, int myZ){
 	  CkMulticastMgr *mcastGrp = CProxy_CkMulticastMgr(pcid->mCastGrpId).ckLocalBranch(); 
 	  pcid->proxyLFrom.ckSectionDelegate(mcastGrp);
 	}
+#endif
       delete [] elemsfromrow;
     }
 
@@ -526,6 +533,7 @@ void makeRightTree(PairCalcID* pcid, int myS, int myZ){
 	{
 	  pcid->proxyRNotFrom = CProxySection_PairCalculator::ckNew(pairCalculatorID, elems, ecount); 
 	  pcid->existsRproxy=true;      
+#ifndef _PAIRCALC_DO_NOT_DELEGATE_
 	  if(pcid->useComlib && _PC_COMMLIB_MULTI_)
 	    {
 	      ComlibDelegateProxy(&(pcid->proxyRNotFrom));
@@ -536,6 +544,7 @@ void makeRightTree(PairCalcID* pcid, int myS, int myZ){
 	      CkMulticastMgr *mcastGrp = CProxy_CkMulticastMgr(pcid->mCastGrpId).ckLocalBranch(); 
 	      pcid->proxyRNotFrom.ckSectionDelegate(mcastGrp);
 	    }
+#endif
 	}
       delete [] elems;
     }

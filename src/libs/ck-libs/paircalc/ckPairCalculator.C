@@ -583,8 +583,8 @@ PairCalculator::acceptResult(int size, double *matrix1, double *matrix2)
 
   double *amatrix=NULL;
   //  index = thisIndex.x*S + thisIndex.y;
-  //  if(!symmetric)
-  index = thisIndex.x*S + thisIndex.y;
+  if(!symmetric)
+    index = thisIndex.x*S + thisIndex.y;
   double *localMatrix;
   double *outMatrix;
   if(S!=grainSize)
@@ -883,7 +883,7 @@ PairCalculator::sumPartialResult(int size, complex *result, int offset)
     newData[i] += result[i];
   }
   int countExpect = (S/grainSize)*blkSize;
-  //  if(symmetric) countExpect = thisIndex.y/grainSize + 1;
+  if(symmetric) countExpect = thisIndex.y/grainSize + 1;
 #ifdef _PAIRCALC_DEBUG_
   CkPrintf("Have %d of Expected %d messages\n",sumPartialCount,countExpect);
 #endif
