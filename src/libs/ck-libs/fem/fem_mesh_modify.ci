@@ -1,4 +1,4 @@
-module femMeshModify {
+mainmodule FEMMeshModify {
 
   readonly CProxy_femMeshModify meshMod;
 

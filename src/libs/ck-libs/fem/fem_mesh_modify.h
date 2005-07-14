@@ -22,13 +22,14 @@ A ghost element is one that is adjacent to at least one shared node. A ghost nod
 #ifndef _FEM_REF_
 #define _FEM_REF_
 
+#include "tcharm.h"
 #include "charm++.h"
 #include "charm-api.h"
 #include "cklists.h"
 #include "mpi.h"
-#include "femMeshModify.decl.h"
 #include "fem_mesh.h"
 #include "idxl.h"
+#include "FEMMeshModify.decl.h"
 
 extern CProxy_femMeshModify meshMod;
 
@@ -54,10 +55,6 @@ CDECL void FEM_Modify_Unlock(int mesh){
   FEM_Modify_Unlock(FEM_Mesh_lookup(mesh,"FEM_Modify_Unlock"));}
 
   
-
-void FEM_REF_INIT(void);
-
-
 //there is one fem_lock associated with every FEM_Mesh.
 class FEM_lock {
   int idx;
@@ -112,13 +109,14 @@ class femMeshModMsg : public CMessage_femMeshModMsg {
   int numChunks;
   int myChunk;
 
+  femMeshModMsg() {}
+  
   femMeshModMsg(int num, int idx) {
     numChunks = num;
     myChunk = idx;
   }
-
-  ~femMeshModMsg() {
-  }
+  
+  ~femMeshModMsg() {}
 };
 
 class intMsg : public CMessage_intMsg {
@@ -177,7 +175,7 @@ class sharedNodeMsg : public CMessage_sharedNodeMsg {
   }
 };
 
-class femMeshModify {
+class femMeshModify/* : public TCharmClient1D */{
   friend class FEM_lock;
   friend class FEM_MUtil;
   friend class FEM_Mesh;
@@ -191,7 +189,7 @@ class femMeshModify {
 
  public:
   femMeshModify(femMeshModMsg *fm);
-  femMeshModify(CkMigrateMessage *m) {};
+  femMeshModify(CkMigrateMessage *m)/* : TCharmClient1D(m) */{};
   ~femMeshModify();
 
   intMsg *lockRemoteChunk(int2Msg *i2msg);

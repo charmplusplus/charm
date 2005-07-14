@@ -428,7 +428,7 @@ void FEM_Modify_Unlock(FEM_Mesh *m) {
 }
 
 
-void FEM_REF_INIT(int mesh) {
+CDECL void FEM_REF_INIT(int mesh) {
   CkArrayID femRefId;
   int cid;
   int size;
@@ -438,14 +438,15 @@ void FEM_REF_INIT(int mesh) {
   MPI_Comm_rank(comm,&cid);
   MPI_Comm_size(comm,&size);
   if(cid==0) {
-    CkArrayOptions opts(size);
+    CkArrayOptions opts;
     opts.bindTo(tc->getProxy()); //bind to the current proxy
-    femRefId = CProxy_femMeshModify::ckNew(new femMeshModMsg(size,cid), opts);
+    femMeshModMsg *fm = new femMeshModMsg;
+    femRefId = CProxy_femMeshModify::ckNew(fm, opts);
   }
   MPI_Bcast(&femRefId, sizeof(CkArrayID), MPI_BYTE, 0, comm);
   meshMod = femRefId;
 
-  femMeshModMsg *fm = new femMeshModMsg(size, cid);
+  femMeshModMsg *fm = new femMeshModMsg(size,cid);
   meshMod[cid].insert(fm);
 
 
@@ -812,4 +813,4 @@ void femMeshModify::addSharedNodeRemote(sharedNodeMsg *fm) {
 }
 
 
-#include "femMeshModify.def.h"
+#include "FEMMeshModify.def.h"
