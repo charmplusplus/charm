@@ -1,4 +1,3 @@
-BGL_INSTALL=/bgd-public/chuang10/bglsw-install
 BGL_FLOOR=/auto/BGX/floor
 [ -z "$BGL_INSTALL" ] && echo "ERROR: BL_INSTALL not defined!" && exit 1
 
