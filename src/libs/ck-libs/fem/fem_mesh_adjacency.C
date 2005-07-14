@@ -230,12 +230,6 @@ FEM_ElemAdj_Layer* FEM_Mesh::getElemAdjLayer(void) {
  *
  * TODO:
  *  
- *   Create and add the attributes for the ghost
- *   elements, so we have their connectivity also.
- * 
- *   Use some variable length data structure for
- *   the adjacency tables?
- *
  *   Verify the tuple table does not need to be 
  *   explicitly deleted.
  */
@@ -263,16 +257,11 @@ void FEM_Mesh::createElemElemAdj()
               // copy node numbers into tuple
               for (int u=0;u<tuplesPerElem;u++) {
                   for (int i=0;i<nodesPerTuple;i++) {
-                      if(i!=0){
-                          //   CkPrintf("-");
-                      }
-                      int eidx=g->elem[t].elem2tuple[i+u*g->nodesPerTuple];
-                      if (eidx==-1) { //"not-there" node--
-                          tuple[i]=-1; //Don't map via connectivity
-                      } else { //Ordinary node
-                          int n=conn[eidx];
-                          tuple[i]=n; 
-                      }
+                    int eidx=g->elem[t].elem2tuple[i+u*g->nodesPerTuple];
+                    if (eidx==-1)    // "not-there" node
+                      tuple[i]=-1;   // Don't map via connectivity
+                    else             // Ordinary node
+                      tuple[i]=conn[eidx]; 
                   }
                   // add tuple to table
                   table.addTuple(tuple,new elemList(0,elemIndex,t,allSym,u)); 
@@ -321,65 +310,69 @@ void FEM_Mesh::createElemElemAdj()
    */
   for (int t=0;t<elem.size();t++) // for each element type t
       if (elem.has(t)) {
-          elemList *l;
-          const int tuplesPerElem = g->elem[t].tuplesPerElem;
-          const int numElements = elem[t].size();
-		  const int numGhostElements = ((FEM_Elem*)(elem[t].getGhost()))->size();
-		  table.beginLookup();
-          
-          // directly modify the element adjacency table for element type t
-		  FEM_IndexAttribute *elemAdjTypesAttr = (FEM_IndexAttribute *)elem[t].lookup(FEM_ELEM_ELEM_ADJ_TYPES,"createElemElemAdj");
-		  FEM_IndexAttribute *elemAdjAttr = (FEM_IndexAttribute *)elem[t].lookup(FEM_ELEM_ELEM_ADJACENCY,"createElemElemAdj");
-		  FEM_IndexAttribute *elemAdjTypesAttrGhost = (FEM_IndexAttribute *)elem[t].getGhost()->lookup(FEM_ELEM_ELEM_ADJ_TYPES,"createElemElemAdj");
-		  FEM_IndexAttribute *elemAdjAttrGhost = (FEM_IndexAttribute *)elem[t].getGhost()->lookup(FEM_ELEM_ELEM_ADJACENCY,"createElemElemAdj");
-		  CkAssert(elemAdjTypesAttr && elemAdjAttr);
-
-          AllocTable2d<int> &adjTable = elemAdjAttr->get();
-          int *adjs = adjTable.getData();
-          AllocTable2d<int> &adjTypesTable = elemAdjTypesAttr->get();
-          int *adjTypes = adjTypesTable.getData();
-
-		  AllocTable2d<int> &adjTableGhost = elemAdjAttrGhost->get();
-          int *adjsGhost = adjTableGhost.getData();
-          AllocTable2d<int> &adjTypesTableGhost = elemAdjTypesAttrGhost->get();
-          int *adjTypesGhost = adjTypesTableGhost.getData();
-          
-          // initialize tables
-          for(int i=0;i<numElements*tuplesPerElem;i++){
-              adjs[i]=-1;
-              adjTypes[i]=0;
+        elemList *l;
+        const int tuplesPerElem = g->elem[t].tuplesPerElem;
+        const int numElements = elem[t].size();
+        const int numGhostElements = ((FEM_Elem*)(elem[t].getGhost()))->size();
+        table.beginLookup();
+        
+        // directly modify the element adjacency table for element type t
+        FEM_IndexAttribute *elemAdjTypesAttr = (FEM_IndexAttribute *)elem[t].lookup(FEM_ELEM_ELEM_ADJ_TYPES,"createElemElemAdj");
+        FEM_IndexAttribute *elemAdjAttr = (FEM_IndexAttribute *)elem[t].lookup(FEM_ELEM_ELEM_ADJACENCY,"createElemElemAdj");
+        FEM_IndexAttribute *elemAdjTypesAttrGhost = (FEM_IndexAttribute *)elem[t].getGhost()->lookup(FEM_ELEM_ELEM_ADJ_TYPES,"createElemElemAdj");
+        FEM_IndexAttribute *elemAdjAttrGhost = (FEM_IndexAttribute *)elem[t].getGhost()->lookup(FEM_ELEM_ELEM_ADJACENCY,"createElemElemAdj");
+        CkAssert(elemAdjTypesAttr && elemAdjAttr);
+        
+        AllocTable2d<int> &adjTable = elemAdjAttr->get();
+        int *adjs = adjTable.getData();
+        AllocTable2d<int> &adjTypesTable = elemAdjTypesAttr->get();
+        int *adjTypes = adjTypesTable.getData();
+        
+        AllocTable2d<int> &adjTableGhost = elemAdjAttrGhost->get();
+        int *adjsGhost = adjTableGhost.getData();
+        AllocTable2d<int> &adjTypesTableGhost = elemAdjTypesAttrGhost->get();
+        int *adjTypesGhost = adjTypesTableGhost.getData();
+        
+        // initialize tables
+        for(int i=0;i<numElements*tuplesPerElem;i++){
+          adjs[i]=-1;
+          adjTypes[i]=0;
+        }
+        
+        // look through each elemList that is returned by the tuple table
+        while (NULL!=(l=table.lookupNext())) {
+          if (l->next==NULL) { 
+            // One-entry list: must be a symmetry
+            // UNHANDLED CASE: not sure exactly what this means
           }
-          
-          // look through each elemList that is returned by the tuple table
-          while (NULL!=(l=table.lookupNext())) {
-              if (l->next==NULL) { 
-                  // One-entry list: must be a symmetry
-                  // UNHANDLED CASE: not sure exactly what this means
-              }
-              else { /* Several elements in list: normal case */
+          else { /* Several elements in list: normal case */
                   // for each a,b from the list
-                  for (const elemList *a=l;a!=NULL;a=a->next){
-                      for (const elemList *b=l;b!=NULL;b=b->next){
-						// if a and b are different elements
-						if((a->localNo != b->localNo) || (a->type != b->type)){
-						  int j;
-						  if(FEM_Is_ghost_index(a->localNo))
-							j = FEM_To_ghost_index(a->localNo)*tuplesPerElem + a->tupleNo;
-						  else
-							j = a->localNo*tuplesPerElem + a->tupleNo;
-						  
-						  if(a->type == t){ // only update the entries for element type t
-							CkAssert(j<numElements*tuplesPerElem);
-							// CkPrintf("Found adjacent elements %d:%d and %d:%d\n", a->type, a->localNo,b->type,b->localNo);
-							adjs[j] = b->localNo;
-							adjTypes[j] = b->type;
-						  
-						  }
-						}
-                      }
+            for (const elemList *a=l;a!=NULL;a=a->next){
+              for (const elemList *b=l;b!=NULL;b=b->next){
+                // if a and b are different elements
+                if((a->localNo != b->localNo) || (a->type != b->type)){
+                  int j;
+                  if(a->type == t){ // only update the entries for element type t
+                    
+                    if(FEM_Is_ghost_index(a->localNo)){
+                      j = FEM_To_ghost_index(a->localNo)*tuplesPerElem + a->tupleNo;
+                      CkAssert(j<numElements*tuplesPerElem);
+                      adjsGhost[j] = b->localNo;
+                      adjTypesGhost[j] = b->type;
+                    }
+                    else {
+                      j = a->localNo*tuplesPerElem + a->tupleNo;
+                      CkAssert(j<numElements*tuplesPerElem);
+                      adjs[j] = b->localNo;
+                      adjTypes[j] = b->type;
+                    }
                   }
+                  
+                }
               }
+            }
           }
+        }
       }
 }
 
