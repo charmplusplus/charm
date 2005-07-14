@@ -242,6 +242,7 @@ void update_new_element_e2e(FEM_Mesh *m, int newEl, int elemType){
   FEM_IndexAttribute *elemAdjAttr = (FEM_IndexAttribute *)m->elem[elemType].lookup(FEM_ELEM_ELEM_ADJACENCY,"update_new_element_e2e");
   FEM_IndexAttribute *elemAdjTypesAttrGhost = (FEM_IndexAttribute *)m->elem[elemType].getGhost()->lookup(FEM_ELEM_ELEM_ADJ_TYPES,"update_new_element_e2e");
   FEM_IndexAttribute *elemAdjAttrGhost = (FEM_IndexAttribute *)m->elem[elemType].getGhost()->lookup(FEM_ELEM_ELEM_ADJACENCY,"update_new_element_e2e");
+
   AllocTable2d<int> &adjTable = elemAdjAttr->get();
   int *adjs = adjTable.getData();
   AllocTable2d<int> &adjTypesTable = elemAdjTypesAttr->get();
@@ -322,11 +323,12 @@ int FEM_add_element(FEM_Mesh *m, int* conn, int connSize, int elemType){
     if(FEM_Is_ghost_index(conn[i])) ghostcount++;
   }
 
-  if(sharedcount==0 && ghostcount==0){
+  if(sharedcount==0 && ghostcount==0){// no ghost or shared nodes in conn
     return FEM_add_element_local(m,conn,connSize,elemType);
   }
-  else if(ghostcount==0){
-    // else if any shared nodes but no ghosts in conn
+  else if(ghostcount==0){// else if any shared nodes but no ghosts in conn
+    int newEl = FEM_add_element_local(m,conn,connSize,elemType);
+    
     //   make this element ghost on all others, updating all IDXL's
     //   also in same remote entry method, update adjacencies on all others
     //   grow local element and attribute tables if needed
@@ -334,8 +336,8 @@ int FEM_add_element(FEM_Mesh *m, int* conn, int connSize, int elemType){
     //   update local adjacencies
     //   return the new element id
   }
-  else if(ghostcount !=0){
-    // else if any ghosts in conn
+  else if(ghostcount !=0){// else if any ghosts in conn
+   
     //   promote ghosts to shared on others, requesting new ghosts
     //   grow local element and attribute tables if needed
     //   add to local elem[elemType] table, and update IDXL if needed
