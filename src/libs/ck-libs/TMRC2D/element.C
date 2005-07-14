@@ -3,6 +3,8 @@
 
 #define ZEROAREA 1.0e-15
 
+int isnan(double x) { return (x!=x); }
+
 int element::lockOpNode(edgeRef e, double l) 
 {
   int edgeIdx = getEdgeIdx(e);
@@ -35,7 +37,7 @@ void element::calculateArea()
   s = perimeter / 2.0;
   // cache the result in currentArea
   currentArea = sqrt(s * (s - len[0]) * (s - len[1]) * (s - len[2]));
-  if (isnan(currentArea)) currentArea = 0.0;
+  //if (isnan(currentArea)) currentArea = 0.0;
 }
 
 void element::refine()
