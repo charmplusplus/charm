@@ -11,6 +11,11 @@
 #include "fem_impl.h"
 #include "fem_mesh_modify.h"
 
+extern void splitEntity(IDXL_Side &c, int localIdx, int nBetween, int *between, int idxbase);
+
+
+CProxy_femMeshModify meshMod;
+
 
 // These should be accessible to the user
 int FEM_add_node(int mesh, int* adjacent_nodes, int num_adjacent_nodes, int upcall){
@@ -44,6 +49,7 @@ inline int is_shared(FEM_Mesh *m, int node){
   return m->getfmMM()->getfmUtil()->isShared(node);
 }
 
+
 int FEM_add_node_local(FEM_Mesh *m){
   // lengthen node attributes
   int oldLength = m->node.size();
@@ -63,11 +69,14 @@ int FEM_add_node_local(FEM_Mesh *m){
 int FEM_add_node(FEM_Mesh *m, int* adjacentNodes, int numAdjacentNodes, int upcall){
   // add local node
   int newNode = FEM_add_node_local(m);
+  int sharedCount = 0;
 
   // for each adjacent node, if the node is shared
-  for(int i=0;i<numAdjacentNodes;i++){
+  for(int i=0;i<numAdjacentNodes;i++){ //a newly added node is shared only if all the 
+    //nodes between which it is added are shared
     if(is_shared(m, adjacentNodes[i]))
       {
+	sharedCount++;
         // lookup adjacent_nodes[i] in IDXL, to find all remote chunks which share this node
         // call_shared_node_remote() on all chunks for which the shared node exists
         // we must make sure that we only call the remote entry method once for each remote chunk
@@ -75,18 +84,30 @@ int FEM_add_node(FEM_Mesh *m, int* adjacentNodes, int numAdjacentNodes, int upca
 
   }
 
+  //this is the entry in the IDXL.
+  //since we are locking all chunks that are participating in an operation,
+  //so, two different operations cannot happen on the same chunk, hence, the
+  //entry in the IDXL will be correct
+  //besides, do we have a basic operation, where two add_nodes are done within the same lock?
+  //if so, we will have to ensure lock steps, to ensure correct idxl entries
+  if(sharedCount == numAdjacentNodes) {
+    m->getfmMM()->getfmUtil()->splitEntityAll(m, newNode, numAdjacentNodes, adjacentNodes, 0);
+  }
+
   return newNode;
 }
 
 
 // The function called by the entry method on the remote chunk
-void FEM_add_shared_node_remote(FEM_Mesh *m){
+void FEM_add_shared_node_remote(FEM_Mesh *m, int chk, int nBetween, int *between){
   // create local node
   int newnode = FEM_add_node_local(m);
   
   // must negotiate the common IDXL number for the new node, 
   // and store it in appropriate IDXL tables
 
+  //note that these are the shared indices, local indices need to be calculated
+  m->getfmMM()->getfmUtil()->splitEntityRemote(m, chk, newnode, nBetween, between, 0);
 }
 
 
@@ -382,10 +403,16 @@ int FEM_add_element_remote(){
 }
 
 
+void FEM_Modify_Lock(FEM_Mesh *m, int* affectedNodes, int numAffectedNodes, int* affectedElts, int numAffectedElts) {
+  m->getfmMM()->getfmLock()->lock(numAffectedNodes, affectedNodes, numAffectedElts, affectedElts);
+  return;
+}
 
+void FEM_Modify_Unlock(FEM_Mesh *m) {
+  m->getfmMM()->getfmLock()->unlock();
+  return;
+}
 
-
-CProxy_femMeshModify meshMod;
 
 void FEM_REF_INIT(int mesh) {
   CkArrayID femRefId;
@@ -666,6 +693,66 @@ bool FEM_MUtil::isShared(int index) {
   return false;
 }
 
+//An IDXL helper function which is same as splitEntity, but instead of just adding to this chunk's
+//idxl list, it will add to the idxl lists of all chunks.
+void FEM_MUtil::splitEntityAll(FEM_Mesh *m, int localIdx, int nBetween, int *between, int idxbase)
+{
+  //Find the commRecs for the surrounding nodes
+  IDXL_Side *c = &(m->node.shared);
+  const IDXL_Rec **tween = (const IDXL_Rec **)malloc(nBetween*sizeof(IDXL_Rec *));
+  
+  //Make a new commRec as the interesection of the surrounding entities--
+  // we loop over the first entity's comm. list
+  tween[0] = c->getRec(between[0] - idxbase);
+  for (int zs=tween[0]->getShared()-1; zs>=0; zs--) {
+    for (int w1=0; w1<nBetween; w1++) {
+      tween[w1] = c->getRec(between[w1]-idxbase);
+    }
+    int chk = tween[0]->getChk(zs);
+
+    //Make sure this processor shares all our entities
+    int w = 0;
+    for (w=0; w<nBetween; w++) {
+      if (!tween[w]->hasChk(chk)) {
+	break;
+      }
+    }
+
+    if (w == nBetween) {//The new node is shared with chk
+      c->addNode(localIdx,chk); //add in the shared entry of this chunk
+
+      //generate the shared node numbers with chk from the local indices
+      int *sharedIndices = (int *)malloc(nBetween*sizeof(int));
+      const IDXL_List ll = m->node.shared.getList(chk);
+      for(int w1=0; w1<nBetween; w1++) {
+	for(int w2=0; w2<ll.size(); w2++) {
+	  if(ll[w2] == between[w1]) {
+	    sharedIndices[w1] = w2;
+	    break;
+	  }
+	}
+      }
+      delete &ll; //clean up
+      sharedNodeMsg *fm = new sharedNodeMsg(mmod->idx,nBetween,sharedIndices);
+      meshMod[chk].addSharedNodeRemote(fm);
+      //break;
+    }
+  }
+  return;
+}
+
+void FEM_MUtil::splitEntityRemote(FEM_Mesh *m, int chk, int localIdx, int nBetween, int *between, int idxbase)
+{
+  //convert the shared indices to local indices
+  int *localIndices = (int *)malloc(nBetween*sizeof(int));
+  const IDXL_List ll = m->node.shared.getList(chk);
+  for(int i=0; i<nBetween; i++) {
+    localIndices[i] = ll[between[i]];
+  }
+  splitEntity(m->node.shared, localIdx, nBetween, localIndices, idxbase);
+  return;
+}
+
 
 femMeshModify::femMeshModify(femMeshModMsg *fm) {
   numChunks = fm->numChunks;
@@ -702,6 +789,12 @@ intMsg *femMeshModify::unlockRemoteChunk(int2Msg *msg) {
   int ret = fmLock->unlock(msg->i, msg->j);
   imsg->i = ret;
   return imsg;
+}
+
+void femMeshModify::addSharedNodeRemote(sharedNodeMsg *fm) {
+
+  FEM_add_shared_node_remote(fmMesh, fm->chk, fm->nBetween, fm->between);
+  return;
 }
 
 

@@ -6,11 +6,13 @@ module femMeshModify {
   message intMsg;
   message int2Msg;
   message FEMMeshMsg;
+  message sharedNodeMsg;
 
   array [1D] femMeshModify {
     entry femMeshModify(femMeshModMsg *);
     entry [sync] void setFemMesh(FEMMeshMsg *);
     entry [sync,threaded] intMsg *lockRemoteChunk(int2Msg *);
     entry [sync,threaded] intMsg *unlockRemoteChunk(int2Msg *);
+    entry [sync,threaded] void addSharedNodeRemote(sharedNodeMsg *);
   };
 };

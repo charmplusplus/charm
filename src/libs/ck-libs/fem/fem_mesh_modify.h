@@ -96,6 +96,8 @@ class FEM_MUtil {
   //chunks identifies the chunks that need to be locked
   void getChunkNos(int entType, int entNo, int *numChunks, IDXL_Share **chunks);
   bool isShared(int index);
+  void splitEntityAll(FEM_Mesh *m, int localIdx, int nBetween, int *between, int idxbase);
+  void splitEntityRemote(FEM_Mesh *m, int chk, int localIdx, int nBetween, int *between, int idxbase);
 };
 
 class femMeshModMsg : public CMessage_femMeshModMsg {
@@ -146,10 +148,33 @@ class FEMMeshMsg : public CMessage_FEMMeshMsg {
   ~FEMMeshMsg() {}
 };
 
+class sharedNodeMsg : public CMessage_sharedNodeMsg {
+ public:
+  int chk;
+  int nBetween;
+  int *between;
+
+  sharedNodeMsg(int c, int nB, int *B) {
+    chk = c;
+    nBetween = nB;
+    between = (int *)malloc(nBetween*sizeof(int));
+    for(int i=0; i<nBetween; i++) {
+      between[i] = B[i];
+    }
+  }
+
+  ~sharedNodeMsg() {
+    if(between) {
+      delete between;
+    }
+  }
+};
+
 class femMeshModify {
   friend class FEM_lock;
   friend class FEM_MUtil;
   friend class FEM_Mesh;
+
  protected:
   int numChunks;
   int idx;
@@ -162,11 +187,14 @@ class femMeshModify {
   femMeshModify(CkMigrateMessage *m) {};
   ~femMeshModify();
 
-  void setFemMesh(FEMMeshMsg *fm);
   intMsg *lockRemoteChunk(int2Msg *i2msg);
   intMsg *unlockRemoteChunk(int2Msg *i2msg);
 
+  void setFemMesh(FEMMeshMsg *fm);
+  FEM_lock *getfmLock(){return fmLock;}
   FEM_MUtil *getfmUtil(){return fmUtil;}
+
+  void addSharedNodeRemote(sharedNodeMsg *fm);
 
 };
 
