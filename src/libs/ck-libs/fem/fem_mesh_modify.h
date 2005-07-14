@@ -40,17 +40,17 @@ int FEM_add_element(FEM_Mesh *m, int* conn, int conn_size, int elem_type);
 void FEM_Modify_Lock(FEM_Mesh *m, int* affectedNodes, int numAffectedNodes, int* affectedElts, int numAffectedElts);
 void FEM_Modify_Unlock(FEM_Mesh *m);
 
-int FEM_add_node(int mesh, int* adjacent_nodes, int num_adjacent_nodes, int upcall){
+CDECL int FEM_add_node(int mesh, int* adjacent_nodes, int num_adjacent_nodes, int upcall){
   return FEM_add_node(FEM_Mesh_lookup(mesh,"FEM_add_node"), adjacent_nodes, num_adjacent_nodes, upcall);}
-void FEM_remove_node(int mesh,int node){
+CDECL void FEM_remove_node(int mesh,int node){
   FEM_remove_node(FEM_Mesh_lookup(mesh,"FEM_remove_node"), node);}
-void FEM_remove_element(int mesh, int element, int elem_type){
+CDECL void FEM_remove_element(int mesh, int element, int elem_type){
   FEM_remove_element(FEM_Mesh_lookup(mesh,"FEM_remove_element"), element, elem_type);}
-int FEM_add_element(int mesh, int* conn, int conn_size, int elem_type){
+CDECL int FEM_add_element(int mesh, int* conn, int conn_size, int elem_type){
   return FEM_add_element(FEM_Mesh_lookup(mesh,"FEM_add_element"), conn, conn_size, elem_type);}
-void FEM_Modify_Lock(int mesh, int* affectedNodes, int numAffectedNodes, int* affectedElts, int numAffectedElts){
+CDECL void FEM_Modify_Lock(int mesh, int* affectedNodes, int numAffectedNodes, int* affectedElts, int numAffectedElts){
   FEM_Modify_Lock(FEM_Mesh_lookup(mesh,"FEM_Modify_Lock"), affectedNodes, numAffectedNodes, affectedElts, numAffectedElts);}
-void FEM_Modify_Unlock(int mesh){
+CDECL void FEM_Modify_Unlock(int mesh){
   FEM_Modify_Unlock(FEM_Mesh_lookup(mesh,"FEM_Modify_Unlock"));}
 
   
