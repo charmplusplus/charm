@@ -75,7 +75,7 @@ int FEM_add_node(FEM_Mesh *m, int* adjacentNodes, int numAdjacentNodes, int upca
 
   }
 
-  return 0;
+  return newNode;
 }
 
 
