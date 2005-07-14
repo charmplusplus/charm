@@ -133,7 +133,7 @@ void ComlibSectionInfo::getRemotePelist(int nindices,
     if(length > nindices)
         length = nindices;
     
-    pelist = new int[length];
+    pelist = new int[length+1];
     npes = 0;
 
     for(acount = 0; acount < nindices; acount++){
