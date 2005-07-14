@@ -6,8 +6,6 @@
 #include "fem.h"
 #include "fem_mesh.h"
 
-#define FEM_VALID FEM_ATTRIB_TAG_MAX-1
-
 class FEM_Adapt {
   FEM_Mesh *theMesh;
   /// The chunk id of the mesh chunk

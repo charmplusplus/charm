@@ -48,9 +48,15 @@ int FEM_add_node_local(FEM_Mesh *m){
   // lengthen node attributes
   int oldLength = m->node.size();
   m->node.setLength(oldLength+1);
+  const int newNode = oldLength;
 
+  // set new node as valid
+  FEM_DataAttribute *validAttr = (FEM_DataAttribute*)m->node.lookup(FEM_VALID,"FEM_add_node_local");
+  unsigned char *validData = validAttr->getChar().getData();
+  validData[newNode]=1;
+  
   // return a new index
-  return oldLength;
+  return newNode;
 }
 
 
@@ -87,6 +93,8 @@ void FEM_add_shared_node_remote(FEM_Mesh *m){
 
 
 // remove a local or shared node, but NOT a ghost node
+// Should probably be able to handle ghosts somday, but I cannot 
+// remember the reasoning for not allowing them
 void FEM_remove_node(FEM_Mesh *m, int node){
 
   if(FEM_Is_ghost_index(node))
@@ -105,26 +113,28 @@ void FEM_remove_node(FEM_Mesh *m, int node){
     
     // verify it is not adjacent to any elements on any of the associated chunks
     
-    // delete it locally and 
-    
+	// mark node as deleted/invalid locally
+	FEM_DataAttribute *validAttr = (FEM_DataAttribute*)m->node.lookup(FEM_VALID,"FEM_remove_node");
+	unsigned char *validData = validAttr->getChar().getData();
+	validData[node]=0;
+
     // delete it on remote chunks, update IDXL tables
     
 
   }
   else {
     // if node is local:
-
     int numAdjNodes, numAdjElts;
     int **adjNodes, **adjElts;
     m->n2n_getAll(node, adjNodes, &numAdjNodes);
     m->n2e_getAll(node, adjElts, &numAdjElts);
     CkAssert((numAdjNodes==0) && (numAdjElts==0)); // we shouldn't be removing a node away that is connected to anything
     
-    // delete node
+    // mark node as deleted/invalid
+	FEM_DataAttribute *validAttr = (FEM_DataAttribute*)m->node.lookup(FEM_VALID,"FEM_remove_node");
+	unsigned char *validData = validAttr->getChar().getData();
+	validData[node]=0;
 
-    // FIXME: Currently we just pretend the node is deleted, really it should be added to 
-    //        a list of free nodes which will be recycled
-    //        Or we should have a scheme for marking deleted nodes
   }
 }
 
@@ -153,6 +163,17 @@ void FEM_remove_element_local(FEM_Mesh *m, int element, int etype){
   }
 
   // delete element by marking invalid
+  // mark node as deleted/invalid
+  if(FEM_Is_ghost_index(element)){
+	FEM_DataAttribute *validAttr = (FEM_DataAttribute*)m->elem[etype].getGhost()->lookup(FEM_VALID,"FEM_remove_element_local");
+	unsigned char *validData = validAttr->getChar().getData();
+	validData[FEM_To_ghost_index(element)]=0;
+  }
+  else {
+	FEM_DataAttribute *validAttr = (FEM_DataAttribute*)m->elem[etype].lookup(FEM_VALID,"FEM_remove_element_local");
+	unsigned char *validData = validAttr->getChar().getData();
+	validData[element]=0;
+  }
 
   delete[] adjnodes;
 }
@@ -277,19 +298,21 @@ void update_new_element_e2e(FEM_Mesh *m, int newEl, int elemType){
         }
       }
     }
-    
   } 
-  
-  
 }
 
 
 // A helper function that adds the local element, and updates adjacencies
 int FEM_add_element_local(FEM_Mesh *m, const int *conn, int connSize, int elemType){
-  // lengthen node attributes
+  // lengthen element attributes
   int oldLength = m->elem[elemType].size();
   m->elem[elemType].setLength(oldLength+1);
   const int newEl = oldLength;
+
+  // Mark new element as valid
+  FEM_DataAttribute *validAttr = (FEM_DataAttribute*)m->elem[elemType].lookup(FEM_VALID,"FEM_add_element_local");
+  unsigned char *validData = validAttr->getChar().getData();
+  validData[newEl]=1;
   
   // update element's conn, i.e. e2n table
   m->elem[elemType].connIs(newEl,conn);
@@ -305,10 +328,8 @@ int FEM_add_element_local(FEM_Mesh *m, const int *conn, int connSize, int elemTy
     }
   }
 
-  
   // update e2e table -- too complicated, so it gets is own function
   update_new_element_e2e(m,newEl,elemType);
-
   
   return newEl;
 }

@@ -790,10 +790,10 @@ inline int FEM_Attribute::getMax(){ return e->getMax();}
  * special shared-nodes communications and a "primary" flag.
  */
 
-class FEM_Elem; 
+class FEM_Elem;
 class FEM_Node : public FEM_Entity {
 	typedef FEM_Entity super;
-	
+
 	/**
 	 * primary flag, from FEM_NODE_PRIMARY, indicates this chunk "owns" this node.
 	 * Datatype is always FEM_BYTE (we need an FEM_BIT!), width is always 1,
@@ -801,6 +801,9 @@ class FEM_Node : public FEM_Entity {
 	 */
 	FEM_DataAttribute *primary; 
 	void allocatePrimary(void);
+
+	FEM_DataAttribute *valid;
+	void allocateValid(void);
 	
 	void allocateElemAdjacency();
 	void allocateNodeAdjacency();
@@ -847,17 +850,16 @@ class FEM_Elem:public FEM_Entity {
 	typedef FEM_Entity super;
 protected:
 	typedef AllocTable2d<int> conn_t;
-	
-	/**
-	 * conn, from FEM_CONN, lists the nodes surrounding each element.
-	 * conn is never NULL.
-	 */
-	FEM_IndexAttribute *conn;                // FEM_CONN attribute: element-to-node mapping 
 
+	int tuplesPerElem;
+
+	// The following are attributes that will commonly be used:
+	FEM_IndexAttribute *conn;                // FEM_CONN attribute: element-to-node mapping 
 	FEM_IndexAttribute *elemAdjacency;       // FEM_ELEM_ELEM_ADJACENCY attribute
 	FEM_IndexAttribute *elemAdjacencyTypes;  // FEM_ELEM_ELEM_ADJ_TYPES attribute
 
-	int tuplesPerElem;
+	FEM_DataAttribute *valid;
+	void allocateValid(void);
 
 public:
 	FEM_Elem(const FEM_Mesh &mesh_, FEM_Elem *ghost_);

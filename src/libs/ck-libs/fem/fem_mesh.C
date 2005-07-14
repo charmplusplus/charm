@@ -467,6 +467,12 @@ CDECL const char *FEM_Get_attr_name(int attr,char *storage)
 	case FEM_PARTITION: return "FEM_PARTITION";
 	case FEM_SYMMETRIES: return "FEM_SYMMETRIES";
 	case FEM_NODE_PRIMARY: return "FEM_NODE_PRIMARY";
+	case FEM_NODE_ELEM_ADJACENCY: return "FEM_NODE_ELEM_ADJACENCY";
+	case FEM_NODE_NODE_ADJACENCY: return "FEM_NODE_NODE_ADJACENCY";
+	case FEM_ELEM_ELEM_ADJACENCY: return "FEM_ELEM_ELEM_ADJACENCY";
+	case FEM_ELEM_ELEM_ADJ_TYPES: return "FEM_ELEM_ELEM_ADJ_TYPES";
+	case FEM_VALID: return "FEM_VALID";
+
 	default: break;
 	};
 	sprintf(storage,"unknown attribute code (%d)",attr);
@@ -1230,17 +1236,27 @@ void FEM_Entity::copyOldGlobalno(const FEM_Entity &e) {
 
 /********************** Node *****************/
 FEM_Node::FEM_Node(FEM_Node *ghost_) 
-       :FEM_Entity(ghost_), primary(0), sharedIDXL(&shared,&shared),
-	elemAdjacency(0),nodeAdjacency(0)
+  :FEM_Entity(ghost_), primary(0), valid(0), sharedIDXL(&shared,&shared),
+   elemAdjacency(0),nodeAdjacency(0)
 {}
 
 void FEM_Node::allocatePrimary(void) {
-	if (primary) CkAbort("FEM_Node::allocatePrimary called, but already allocated");
-	primary=new FEM_DataAttribute(this,FEM_NODE_PRIMARY);
-	add(primary); // primary will be deleted by FEM_Entity now
-	primary->setWidth(1); //Only 1 flag per node
-	primary->setDatatype(FEM_BYTE);
+  if (primary) CkAbort("FEM_Node::allocatePrimary called, but already allocated");
+  primary=new FEM_DataAttribute(this,FEM_NODE_PRIMARY);
+  add(primary); // primary will be deleted by FEM_Entity now
+  primary->setWidth(1); //Only 1 flag per node
+  primary->setDatatype(FEM_BYTE);
 }
+
+void FEM_Node::allocateValid(void) {
+  if (valid) CkAbort("FEM_Node::allocateValid called, but already allocated");
+  valid=new FEM_DataAttribute(this,FEM_VALID);
+  add(valid);
+  valid->setWidth(1); //Only 1 flag per node
+  valid->setDatatype(FEM_BYTE);
+}
+
+
 
 void FEM_Node::pup(PUP::er &p) {
 	p.comment(" ---------------- Nodes ------------------ ");	
@@ -1257,15 +1273,16 @@ FEM_Node::~FEM_Node() {
 const char *FEM_Node::getName(void) const {return "FEM_NODE";}
 
 void FEM_Node::create(int attr,const char *caller) {
-	if (attr==FEM_NODE_PRIMARY) {
-		allocatePrimary();
-	} 
-	else if(attr == FEM_NODE_ELEM_ADJACENCY) {
-		allocateElemAdjacency();
-	}else if(attr == FEM_NODE_NODE_ADJACENCY){
-		allocateNodeAdjacency();
-	}else
-		super::create(attr,caller);
+  if (attr==FEM_NODE_PRIMARY)
+	allocatePrimary();
+  else if(attr == FEM_VALID)
+	allocateValid();
+  else if(attr == FEM_NODE_ELEM_ADJACENCY)
+	allocateElemAdjacency();
+  else if(attr == FEM_NODE_NODE_ADJACENCY)
+	allocateNodeAdjacency();
+  else
+	super::create(attr,caller);
 }
 
 
@@ -1298,7 +1315,7 @@ public:
 };
 
 FEM_Elem::FEM_Elem(const FEM_Mesh &mesh, FEM_Elem *ghost_) 
-  :FEM_Entity(ghost_), elemAdjacency(0), elemAdjacencyTypes(0)
+  :FEM_Entity(ghost_), elemAdjacency(0), elemAdjacencyTypes(0), valid(0)
 {
 	FEM_IndexAttribute::Checker *c;
 	if (isGhost()) // Ghost elements can point to both real as well as ghost nodes
@@ -1317,17 +1334,30 @@ FEM_Elem::~FEM_Elem() {
 
 
 void FEM_Elem::create(int attr,const char *caller) {
-  if(attr == FEM_ELEM_ELEM_ADJACENCY || attr == FEM_ELEM_ELEM_ADJ_TYPES) {
-	// We need to catch both possible occurences, since if either one falls through to 
-	// the super::create(), it will not know what to do, and will fail
-	//
-	// Note: allocateElemAdjacency() will create both attribute fields since they
-	//       should always be used together.
-	CkPrintf("Allocating e2e adjacency table: attr=%d caller=%s\n", attr, caller);
+  // We need to catch both FEM_ELEM_ELEM_ADJACENCY and FEM_ELEM_ELEM_ADJ_TYPES, 
+  // since if either one falls through to 
+  // the super::create(), it will not know what to do, and will fail
+  //
+  // Note: allocateElemAdjacency() will create both attribute fields since they
+  //       should always be used together.
+  
+  if(attr == FEM_ELEM_ELEM_ADJACENCY)
     allocateElemAdjacency();
-  }
+  else if(attr == FEM_ELEM_ELEM_ADJ_TYPES)
+    allocateElemAdjacency();
+  else if(attr == FEM_VALID)
+	allocateValid();
   else
     super::create(attr,caller);
+}
+
+
+void FEM_Elem::allocateValid(void) {
+  if (valid) CkAbort("FEM_Elem::allocateValid called, but already allocated");
+  valid=new FEM_DataAttribute(this,FEM_VALID);
+  add(valid);
+  valid->setWidth(1); //Only 1 flag per node
+  valid->setDatatype(FEM_BYTE);
 }
 
 

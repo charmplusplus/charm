@@ -118,8 +118,11 @@ to mark the chunk to which a ghost node or element belongs datatype=FEM_INDEX*/
 #define FEM_ELEM_ELEM_ADJ_TYPES (FEM_ATTRIB_FIRST+13) /*stores element types for those element id's listed in 
 														FEM_ELEM_ELEM_ADJACENCY, needed when using 
 														multiple element types*/
+#define FEM_VALID (FEM_ATTRIB_FIRST+14) /* Stores a flag(an IDXL_BYTE) for each element or node specifying whether the entity 
+										   exists or is valid. It may be 0 whenever a mesh modification occurs that deletes the 
+										   corresponding node or element */
 
-#define FEM_ATTRIB_LAST (FEM_ATTRIB_FIRST+14) /*This is the last valid attribute code*/
+#define FEM_ATTRIB_LAST (FEM_ATTRIB_FIRST+15) /*This is the last valid attribute code*/
 
   /* Specialized routines: */
   void FEM_Mesh_set_conn(int fem_mesh,int entity,
