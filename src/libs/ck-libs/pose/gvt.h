@@ -101,6 +101,8 @@ class PVT : public Group {
   PVT(CkMigrateMessage *) { };
   /// ENTRY: runs the PVT calculation and reports to GVT
   void startPhase(prioBcMsg *m);             
+  /// ENTRY: runs the expedited PVT calculation and reports to GVT
+  void startPhaseExp(prioBcMsg *m);             
   /// ENTRY: receive GVT estimate; wake up objects
   /** Receives the new GVT estimate and termination flag; wakes up objects
       for fossil collection and forward execution with new GVT estimate. */

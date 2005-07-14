@@ -57,6 +57,10 @@ PVT::PVT()
 #endif
 }
 
+void PVT::startPhaseExp(prioBcMsg *m) {
+  startPhase(m);
+}
+
 /// ENTRY: runs the PVT calculation and reports to GVT
 void PVT::startPhase(prioBcMsg *m) 
 {
@@ -74,7 +78,7 @@ void PVT::startPhase(prioBcMsg *m)
     startMsg->bc = 0;
     *((int *)CkPriorityPtr(startMsg)) = 1-INT_MAX;
     CkSetQueueing(startMsg, CK_QUEUEING_IFIFO); 
-    p.startPhase(startMsg);
+    p.startPhaseExp(startMsg);
   }
 
   objs.Wake(); // wake objects to make sure all have reported

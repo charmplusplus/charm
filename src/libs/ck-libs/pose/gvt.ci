@@ -15,6 +15,7 @@ module gvt {
   group PVT {
     entry PVT(void);
     entry void startPhase(prioBcMsg *);
+    entry [expedited] void startPhaseExp(prioBcMsg *);
     entry [expedited] void setGVT(GVTMsg *);
     entry [expedited] void reportReduce(UpdateMsg *);
   };
@@ -22,7 +23,7 @@ module gvt {
   /// GVT chare group for estimating GVT
   group GVT {
     entry GVT(void);
-    entry void runGVT(UpdateMsg *);
+    entry [expedited] void runGVT(UpdateMsg *);
     entry [expedited] void computeGVT(UpdateMsg *);
   };
 };
