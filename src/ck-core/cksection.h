@@ -109,6 +109,27 @@ class CkArrayIndex4D;
 class CkArrayIndex5D;
 class CkArrayIndex6D;
 
+#define _SECTION_MAGIC     88       /* multicast magic number for error checking */
+
+/**
+ * CkMcastBaseMsg is the base class for all multicast message.
+ */
+class CkMcastBaseMsg {
+ public:
+  CkSectionInfo _cookie;
+  char magic;
+  unsigned short ep;
+//  CkArrayID aid; 
+
+ public:
+  CkMcastBaseMsg(): magic(_SECTION_MAGIC) {}
+  static inline int checkMagic(CkMcastBaseMsg *m) 
+      { return m->magic == _SECTION_MAGIC; }
+  inline int &gpe(void) { return _cookie.get_pe(); }
+  inline int &redno(void) { return _cookie.get_redNo(); }
+  inline void *&cookie(void) { return _cookie.get_val(); }
+};
+
 #define CKSECTIONID_CONSTRUCTOR(index) \
   CkSectionID(const CkArrayID &aid, const CkArrayIndex##index *elems, const int nElems);
 
@@ -139,25 +160,5 @@ public:
   void pup(PUP::er &p);
 };
 PUPmarshall(CkSectionID)
-
-#define _SECTION_MAGIC     88       /**< multicast magic number for error checking */
-/**
- CkMcastBaseMsg is the base class for all multicast message.
-*/
-class CkMcastBaseMsg {
- public:
-  CkSectionInfo _cookie;
-  char magic;
-  unsigned short ep;
-//  CkArrayID aid; 
-
- public:
-  CkMcastBaseMsg(): magic(_SECTION_MAGIC) {}
-  static inline int checkMagic(CkMcastBaseMsg *m) 
-      { return m->magic == _SECTION_MAGIC; }
-  inline int &gpe(void) { return _cookie.get_pe(); }
-  inline int &redno(void) { return _cookie.get_redNo(); }
-  inline void *&cookie(void) { return _cookie.get_val(); }
-};
 
 #endif
