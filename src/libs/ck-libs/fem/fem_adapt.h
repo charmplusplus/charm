@@ -10,7 +10,7 @@ class FEM_Adapt {
   FEM_Mesh *theMesh;
   /// The chunk id of the mesh chunk
   int cid;  
-  /// Cached pointers to the FEM_VALID arrays of the elements and nodes
+  /// Cached pointers to the FEM_IS_VALID arrays of the elements and nodes
   FEM_DataAttribute *nodeValid, *elemValid;
 
   // Helper methods: see bottom of this file
@@ -184,7 +184,7 @@ class FEM_Adapt {
 //init the validData method
 FEM_DataAttribute *FEM_Adapt::validDataFor(int entityNumber){
 	FEM_Entity *entity = theMesh->lookup(entityNumber,"validDataFor");
-	FEM_DataAttribute *validAttribute = (FEM_DataAttribute *)entity->lookup(FEM_VALID,"validDataFor");
+	FEM_DataAttribute *validAttribute = (FEM_DataAttribute *)entity->lookup(FEM_IS_VALID,"validDataFor");
 	return validAttribute;
 }
 

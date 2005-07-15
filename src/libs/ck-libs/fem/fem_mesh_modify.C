@@ -33,8 +33,8 @@ CDECL void FEM_Print_Mesh_Summary(int mesh){
   int numNodes = m->node.size();
   unsigned long numValidNode=0;
 
-  CkPrintf("Attempting to lookup FEM_VALID in the print_summary routine\n");
-  validAttr = (FEM_DataAttribute *)m->node.lookup(FEM_VALID,"FEM_Print_Mesh_Summary");
+  CkPrintf("Attempting to lookup FEM_IS_VALID in the print_summary routine\n");
+  validAttr = (FEM_DataAttribute *)m->node.lookup(FEM_IS_VALID,"FEM_Print_Mesh_Summary");
   for(int i=0;i<numNodes;i++)
 	if(validAttr->getChar()(i,0)) numValidNode++;
   CkPrintf("Nodes: %d/%d\n", numValidNode,numNodes);
@@ -50,14 +50,14 @@ CDECL void FEM_Print_Mesh_Summary(int mesh){
 	  unsigned char *validData;
 	  
 	  
-	  CkPrintf("Attempting to lookup FEM_VALID in the print_summary routine\n");
-	  validAttr = (FEM_DataAttribute *)m->elem[t].lookup(FEM_VALID,"FEM_Print_Mesh_Summary");
+	  CkPrintf("Attempting to lookup FEM_IS_VALID in the print_summary routine\n");
+	  validAttr = (FEM_DataAttribute *)m->elem[t].lookup(FEM_IS_VALID,"FEM_Print_Mesh_Summary");
 	  for(int i=0;i<numElements;i++)
 		if(validAttr->getChar()(i,0)) numValidEl++;
 	  
 
-	  CkPrintf("Attempting to lookup FEM_VALID in the print_summary routine\n");
-	  validAttr = (FEM_DataAttribute *)m->elem[t].getGhost()->lookup(FEM_VALID,"FEM_Print_Mesh_Summary");
+	  CkPrintf("Attempting to lookup FEM_IS_VALID in the print_summary routine\n");
+	  validAttr = (FEM_DataAttribute *)m->elem[t].getGhost()->lookup(FEM_IS_VALID,"FEM_Print_Mesh_Summary");
 	  for(int i=0;i<numGhostElements;i++)
 		if(validAttr->getChar()(i,0)) numValidElGhosts++;
 	 
@@ -73,7 +73,7 @@ int FEM_add_node_local(FEM_Mesh *m){
   const int newNode = oldLength;
 
   // set new node as valid
-  FEM_DataAttribute *validAttr = (FEM_DataAttribute*)m->node.lookup(FEM_VALID,"FEM_add_node_local");
+  FEM_DataAttribute *validAttr = (FEM_DataAttribute*)m->node.lookup(FEM_IS_VALID,"FEM_add_node_local");
   validAttr->getChar()(newNode,0)=1;
   
   // return a new index
@@ -150,7 +150,7 @@ void FEM_remove_node(FEM_Mesh *m, int node){
     // verify it is not adjacent to any elements on any of the associated chunks
     
 	// mark node as deleted/invalid locally
-	FEM_DataAttribute *validAttr = (FEM_DataAttribute*)m->node.lookup(FEM_VALID,"FEM_remove_node");
+	FEM_DataAttribute *validAttr = (FEM_DataAttribute*)m->node.lookup(FEM_IS_VALID,"FEM_remove_node");
 	unsigned char *validData = validAttr->getChar().getData();
 	validData[node]=0;
 
@@ -167,7 +167,7 @@ void FEM_remove_node(FEM_Mesh *m, int node){
     CkAssert((numAdjNodes==0) && (numAdjElts==0)); // we shouldn't be removing a node away that is connected to anything
     
     // mark node as deleted/invalid
-	FEM_DataAttribute *validAttr = (FEM_DataAttribute*)m->node.lookup(FEM_VALID,"FEM_remove_node");
+	FEM_DataAttribute *validAttr = (FEM_DataAttribute*)m->node.lookup(FEM_IS_VALID,"FEM_remove_node");
 	unsigned char *validData = validAttr->getChar().getData();
 	validData[node]=0;
 
@@ -201,12 +201,12 @@ void FEM_remove_element_local(FEM_Mesh *m, int element, int etype){
   // delete element by marking invalid
   // mark node as deleted/invalid
   if(FEM_Is_ghost_index(element)){
-	FEM_DataAttribute *validAttr = (FEM_DataAttribute*)m->elem[etype].getGhost()->lookup(FEM_VALID,"FEM_remove_element_local");
+	FEM_DataAttribute *validAttr = (FEM_DataAttribute*)m->elem[etype].getGhost()->lookup(FEM_IS_VALID,"FEM_remove_element_local");
 	unsigned char *validData = validAttr->getChar().getData();
 	validData[FEM_To_ghost_index(element)]=0;
   }
   else {
-	FEM_DataAttribute *validAttr = (FEM_DataAttribute*)m->elem[etype].lookup(FEM_VALID,"FEM_remove_element_local");
+	FEM_DataAttribute *validAttr = (FEM_DataAttribute*)m->elem[etype].lookup(FEM_IS_VALID,"FEM_remove_element_local");
 	unsigned char *validData = validAttr->getChar().getData();
 	validData[element]=0;
   }
@@ -349,7 +349,7 @@ int FEM_add_element_local(FEM_Mesh *m, const int *conn, int connSize, int elemTy
   const int newEl = oldLength;
 
   // Mark new element as valid
-  FEM_DataAttribute *validAttr = (FEM_DataAttribute*)m->elem[elemType].lookup(FEM_VALID,"FEM_add_element_local");
+  FEM_DataAttribute *validAttr = (FEM_DataAttribute*)m->elem[elemType].lookup(FEM_IS_VALID,"FEM_add_element_local");
   unsigned char *validData = validAttr->getChar().getData();
   validData[newEl]=1;
   

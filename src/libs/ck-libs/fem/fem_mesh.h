@@ -739,7 +739,7 @@ public:
 	}
 	
 	/**
-	 * Allocate the FEM_VALID attribute's data
+	 * Allocate the FEM_IS_VALID attribute's data
 	 */
 	void allocateValid();
 
