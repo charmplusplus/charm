@@ -1082,20 +1082,36 @@ void FEM_Entity::setLength(int newlen) {
 
 void FEM_Entity::allocateValid(void) {
   if (valid) CkAbort("FEM_Entity::allocateValid called, but already allocated");
-  CkPrintf("ALLOCATING VALID ARRAY!!!\n");
   valid=new FEM_DataAttribute(this,FEM_IS_VALID);
   add(valid);
   valid->setWidth(1); //Only 1 flag per node
   valid->setLength(size());
   valid->setDatatype(FEM_BYTE);
   valid->reallocate();
-  
+
   // Set all to valid initially
   for(int i=0;i<size();i++)
 	valid->getChar()(i,0)=1;
-  
 }
 
+inline void FEM_Entity::set_valid(int idx){
+  valid->getChar()(idx,0)=1;
+}
+
+inline void FEM_Entity::set_invalid(int idx){
+  valid->getChar()(idx,0)=0;
+}
+
+inline int FEM_Entity::is_valid(int idx){
+  return valid->getChar()(idx,0);
+}
+
+unsigned int FEM_Entity::count_valid(){
+  unsigned int count=0;
+  for(int i=0;i<size();i++)
+	if(is_valid(i)) count++;
+  return count;
+}
 
 void FEM_Entity::setMaxLength(int newLen,int newMaxLen,void *pargs,FEM_Mesh_alloc_fn fn){
         CkPrintf("resize fn %p \n",fn);
@@ -1668,4 +1684,32 @@ void FEM_Mesh_allocate_valid_attr(int fem_mesh, int entity_type){
   FEM_Mesh *m=FEM_Mesh_lookup(fem_mesh,"FEM_Mesh_create_valid_elem");
   FEM_Entity *entity = m->lookup(entity_type,"FEM_Mesh_allocate_valid_attr");
   entity->allocateValid();
+}
+
+// mark an entity as valid
+void FEM_set_entity_valid(int mesh, int entityType, int entityIdx){
+  FEM_Mesh *m=FEM_Mesh_lookup(mesh,"FEM_");
+  FEM_Entity *entity = m->lookup(entityType,"FEM_");
+  entity->set_valid(entityIdx);
+}
+
+// mark an entity as invalid
+void FEM_set_entity_invalid(int mesh, int entityType, int entityIdx){
+  FEM_Mesh *m=FEM_Mesh_lookup(mesh,"FEM_Mesh_create_valid_elem");
+  FEM_Entity *entity = m->lookup(entityType,"FEM_Mesh_allocate_valid_attr");
+  return entity->set_invalid(entityIdx);
+}
+
+// Determine if an entity is valid
+int FEM_is_valid(int mesh, int entityType, int entityIdx){
+  FEM_Mesh *m=FEM_Mesh_lookup(mesh,"FEM_Mesh_create_valid_elem");
+  FEM_Entity *entity = m->lookup(entityType,"FEM_Mesh_allocate_valid_attr");
+  return (entity->is_valid(entityIdx) != 0);
+}
+
+// Count number of valid items for this entity type
+unsigned int FEM_count_valid(int mesh, int entityType){
+  FEM_Mesh *m=FEM_Mesh_lookup(mesh,"FEM_Mesh_create_valid_elem");
+  FEM_Entity *entity = m->lookup(entityType,"FEM_Mesh_allocate_valid_attr");
+  return entity->count_valid();
 }

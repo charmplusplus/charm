@@ -26,58 +26,32 @@ inline int is_shared(FEM_Mesh *m, int node){
 
 
 CDECL void FEM_Print_Mesh_Summary(int mesh){
+  CkPrintf("---------------FEM_Print_Mesh_Summary-------------\n");
   FEM_Mesh *m=FEM_Mesh_lookup(mesh,"FEM_Print_Mesh_Summary");
-  FEM_DataAttribute *validAttr;
 
-  // Print Element info
-  int numNodes = m->node.size();
-  unsigned long numValidNode=0;
+  // Print Node information
+  CkPrintf("     Nodes: %d/%d\n", m->node.count_valid(), m->node.size());
 
-  CkPrintf("Attempting to lookup FEM_IS_VALID in the print_summary routine\n");
-  validAttr = (FEM_DataAttribute *)m->node.lookup(FEM_IS_VALID,"FEM_Print_Mesh_Summary");
-  for(int i=0;i<numNodes;i++)
-	if(validAttr->getChar()(i,0)) numValidNode++;
-  CkPrintf("Nodes: %d/%d\n", numValidNode,numNodes);
-
-
-  CkPrintf("Element Types: %d\n", m->elem.size());
+  // Print Element information
+  CkPrintf("     Element Types: %d\n", m->elem.size());
   for (int t=0;t<m->elem.size();t++) // for each element type t
 	if (m->elem.has(t)) {
-	  const int numElements = m->elem[t].size();
-	  const int numGhostElements = ((FEM_Elem*)(m->elem[t].getGhost()))->size();
-	  unsigned long numValidEl=0;
-	  unsigned long numValidElGhosts=0;
-	  unsigned char *validData;
-	  
-	  
-	  CkPrintf("Attempting to lookup FEM_IS_VALID in the print_summary routine\n");
-	  validAttr = (FEM_DataAttribute *)m->elem[t].lookup(FEM_IS_VALID,"FEM_Print_Mesh_Summary");
-	  for(int i=0;i<numElements;i++)
-		if(validAttr->getChar()(i,0)) numValidEl++;
-	  
-
-	  CkPrintf("Attempting to lookup FEM_IS_VALID in the print_summary routine\n");
-	  validAttr = (FEM_DataAttribute *)m->elem[t].getGhost()->lookup(FEM_IS_VALID,"FEM_Print_Mesh_Summary");
-	  for(int i=0;i<numGhostElements;i++)
-		if(validAttr->getChar()(i,0)) numValidElGhosts++;
-	 
-	  CkPrintf("Element type %d contains %d/%d elements and %d/%d ghosts\n", t, numValidEl, numElements, numValidElGhosts, numGhostElements);
+	  unsigned int numEl = m->elem[t].size();
+	  unsigned int numElG = m->elem[t].getGhost()->size();
+	  unsigned int numValidEl = m->elem[t].count_valid();
+	  unsigned int numValidElG = m->elem[t].getGhost()->count_valid();
+	  CkPrintf("     Element type %d contains %d/%d elements and %d/%d ghosts\n", t, numValidEl, numEl, numValidElG, numElG);
 	}
+
+  CkPrintf("\n");
 }
 
 
 int FEM_add_node_local(FEM_Mesh *m){
-  // lengthen node attributes
-  int oldLength = m->node.size();
-  m->node.setLength(oldLength+1);
-  const int newNode = oldLength;
-
-  // set new node as valid
-  FEM_DataAttribute *validAttr = (FEM_DataAttribute*)m->node.lookup(FEM_IS_VALID,"FEM_add_node_local");
-  validAttr->getChar()(newNode,0)=1;
-  
-  // return a new index
-  return newNode;
+  const int newNode = m->node.size();
+  m->node.setLength(newNode+1); // lengthen node attributes
+  m->node.set_valid(newNode);   // set new node as valid
+  return newNode;  // return a new index
 }
 
 
@@ -129,12 +103,14 @@ void FEM_add_shared_node_remote(FEM_Mesh *m, int chk, int nBetween, int *between
 
 
 // remove a local or shared node, but NOT a ghost node
-// Should probably be able to handle ghosts somday, but I cannot 
+// Should probably be able to handle ghosts someday, but I cannot 
 // remember the reasoning for not allowing them
 void FEM_remove_node(FEM_Mesh *m, int node){
 
   if(FEM_Is_ghost_index(node))
     CkAbort("Cannot call FEM_remove_node on a ghost node\n");
+  
+  CkAssert(m->node.is_valid(node)); // make sure the node is still there
   
   // if node is shared:
   if(is_shared(m, node)){
@@ -150,9 +126,7 @@ void FEM_remove_node(FEM_Mesh *m, int node){
     // verify it is not adjacent to any elements on any of the associated chunks
     
 	// mark node as deleted/invalid locally
-	FEM_DataAttribute *validAttr = (FEM_DataAttribute*)m->node.lookup(FEM_IS_VALID,"FEM_remove_node");
-	unsigned char *validData = validAttr->getChar().getData();
-	validData[node]=0;
+	m->node.set_invalid(node);
 
     // delete it on remote chunks(shared and ghost), update IDXL tables
     
@@ -167,9 +141,7 @@ void FEM_remove_node(FEM_Mesh *m, int node){
     CkAssert((numAdjNodes==0) && (numAdjElts==0)); // we shouldn't be removing a node away that is connected to anything
     
     // mark node as deleted/invalid
-	FEM_DataAttribute *validAttr = (FEM_DataAttribute*)m->node.lookup(FEM_IS_VALID,"FEM_remove_node");
-	unsigned char *validData = validAttr->getChar().getData();
-	validData[node]=0;
+	m->node.set_invalid(node);
 
   }
 }
@@ -201,14 +173,10 @@ void FEM_remove_element_local(FEM_Mesh *m, int element, int etype){
   // delete element by marking invalid
   // mark node as deleted/invalid
   if(FEM_Is_ghost_index(element)){
-	FEM_DataAttribute *validAttr = (FEM_DataAttribute*)m->elem[etype].getGhost()->lookup(FEM_IS_VALID,"FEM_remove_element_local");
-	unsigned char *validData = validAttr->getChar().getData();
-	validData[FEM_To_ghost_index(element)]=0;
+	m->elem[etype].getGhost()->set_invalid(FEM_To_ghost_index(element));
   }
   else {
-	FEM_DataAttribute *validAttr = (FEM_DataAttribute*)m->elem[etype].lookup(FEM_IS_VALID,"FEM_remove_element_local");
-	unsigned char *validData = validAttr->getChar().getData();
-	validData[element]=0;
+	m->elem[etype].set_invalid(element);
   }
 
   delete[] adjnodes;
@@ -349,9 +317,7 @@ int FEM_add_element_local(FEM_Mesh *m, const int *conn, int connSize, int elemTy
   const int newEl = oldLength;
 
   // Mark new element as valid
-  FEM_DataAttribute *validAttr = (FEM_DataAttribute*)m->elem[elemType].lookup(FEM_IS_VALID,"FEM_add_element_local");
-  unsigned char *validData = validAttr->getChar().getData();
-  validData[newEl]=1;
+  m->elem[elemType].set_valid(newEl);
   
   // update element's conn, i.e. e2n table
   m->elem[elemType].connIs(newEl,conn);

@@ -8,14 +8,14 @@ Assumptions:
 The mesh must be in a consistant state before and after these operations:
     - Any shared node must be in the IDXL table for both the local and 
       other chunks.
-    - Exactly one ghost layer exists around all chunks. See definition below
-    - All adjacency tables must be correct before any of these calls. 
-      The calls will maintain the adjacency tables, both remotely
-      and locally.
     - FEM_add_element can only be called with a set of existing local or shared nodes
-
-
-A ghost element is one that is adjacent to at least one shared node. A ghost node is any node adjacent to a ghost element, but is itself not a shared node. Thus we have exactly one layer of ghosts.
+    - The mesh must be nice. Each element may be adjacent to at most one other element per face/edge/tuple
+	- The mesh must have e2e, n2n, and n2e adjacencies computed before any of these functions are called.
+	  The calls will maintain the adjacency tables, both remotely and locally.
+	- Exactly one ghost layer exists around all chunks before these modification functions are called. 
+	  A ghost element is one that is adjacent to at least one shared node. A ghost node is any non-shared 
+	  node adjacent to a ghost element. The e2e adjacencies need not have the same definition for 
+	  adjacent elements.
 
  */
 

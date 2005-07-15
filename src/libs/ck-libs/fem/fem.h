@@ -227,17 +227,18 @@ to mark the chunk to which a ghost node or element belongs datatype=FEM_INDEX*/
   void init(void);
   void driver(void);
   
-  /*
-    Create additional mesh information
-  */
+  /* Create additional mesh adjacency information */
   void FEM_Mesh_create_node_elem_adjacency(int fem_mesh);
   void FEM_Mesh_create_node_node_adjacency(int fem_mesh);
   void FEM_Mesh_create_elem_elem_adjacency(int fem_mesh);
 
-  /* Create the Valid Attribute */
+  /* Create and modify the FEM_IS_VALID Attribute */
   void FEM_Mesh_allocate_valid_attr(int fem_mesh, int entity_type);
+  void FEM_set_entity_valid(int mesh, int entityType, int entityIdx);
+  void FEM_set_entity_invalid(int mesh, int entityType, int entityIdx);
+  int FEM_is_valid(int mesh, int entityType, int entityIdx);
+  unsigned int FEM_count_valid(int mesh, int entityType);
 
-  
   /* Backward compatability routines: */
   int FEM_Mesh_default_read(void);  /* return mesh used for get calls below */
   int FEM_Mesh_default_write(void); /* return mesh used for set calls below */

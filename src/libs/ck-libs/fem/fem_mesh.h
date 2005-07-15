@@ -739,9 +739,14 @@ public:
 	}
 	
 	/**
-	 * Allocate the FEM_IS_VALID attribute's data
+	 * Allocate or Modify the FEM_IS_VALID attribute data
 	 */
 	void allocateValid();
+	void set_valid(int idx);
+	void set_invalid(int idx);
+	int is_valid(int idx);
+	unsigned int count_valid();
+
 
 	/**expose the attribute vector for refining 
 		. breaks modularity but more efficient
