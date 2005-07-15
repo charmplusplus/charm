@@ -698,8 +698,8 @@ void FEM_Coarsen_Operation(FEM_Operation_Data *coarsen_data, coarsenData &operat
 };
 
 
-FDECL void FTN_NAME(FEM_REFINE2D_COARSEN,fem_refine2d_coarsen)(int *meshID,int *nodeID,double *coord,int *elemID,double *desiredAreas){
-  FEM_REFINE2D_Coarsen(*meshID,*nodeID,coord,*elemID,desiredAreas);
+FDECL void FTN_NAME(FEM_REFINE2D_COARSEN,fem_refine2d_coarsen)(int *meshID,int *nodeID,double *coord,int *elemID,double *desiredAreas,int *sparseID){
+  FEM_REFINE2D_Coarsen(*meshID,*nodeID,coord,*elemID,desiredAreas,*sparseID);
 }
 
 void interpolateNode(FEM_Node *node,int A,int B,int D,double frac){
