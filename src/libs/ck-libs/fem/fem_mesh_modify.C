@@ -7,6 +7,7 @@
  *
  */
 
+#include "charm.h"
 #include "fem.h"
 #include "fem_impl.h"
 #include "fem_mesh_modify.h"
@@ -26,9 +27,19 @@ inline int is_shared(FEM_Mesh *m, int node){
 
 CDECL void FEM_Print_Mesh_Summary(int mesh){
   FEM_Mesh *m=FEM_Mesh_lookup(mesh,"FEM_Print_Mesh_Summary");
-  
+  FEM_DataAttribute *validAttr;
+
   // Print Element info
-  
+  int numNodes = m->node.size();
+  unsigned long numValidNode=0;
+
+  CkPrintf("Attempting to lookup FEM_VALID in the print_summary routine\n");
+  validAttr = (FEM_DataAttribute *)m->node.lookup(FEM_VALID,"FEM_Print_Mesh_Summary");
+  for(int i=0;i<numNodes;i++)
+	if(validAttr->getChar()(i,0)) numValidNode++;
+  CkPrintf("Nodes: %d/%d\n", numValidNode,numNodes);
+
+
   CkPrintf("Element Types: %d\n", m->elem.size());
   for (int t=0;t<m->elem.size();t++) // for each element type t
 	if (m->elem.has(t)) {
@@ -37,28 +48,22 @@ CDECL void FEM_Print_Mesh_Summary(int mesh){
 	  unsigned long numValidEl=0;
 	  unsigned long numValidElGhosts=0;
 	  unsigned char *validData;
-	  FEM_DataAttribute *validAttr;
 	  
+	  
+	  CkPrintf("Attempting to lookup FEM_VALID in the print_summary routine\n");
 	  validAttr = (FEM_DataAttribute *)m->elem[t].lookup(FEM_VALID,"FEM_Print_Mesh_Summary");
-	  validData = validAttr->getChar().getData();	
-	  CkAssert(validData);
-	  for(int i=0;i<numElements;i++){
-		if (validData[i])
-		  numValidEl++;
-	  }
+	  for(int i=0;i<numElements;i++)
+		if(validAttr->getChar()(i,0)) numValidEl++;
 	  
+
+	  CkPrintf("Attempting to lookup FEM_VALID in the print_summary routine\n");
 	  validAttr = (FEM_DataAttribute *)m->elem[t].getGhost()->lookup(FEM_VALID,"FEM_Print_Mesh_Summary");
-	  validData = validAttr->getChar().getData();
-	  CkAssert(validData);
-	  for(int i=0;i<numElements;i++){
-		if (validData[i])
-		  numValidElGhosts++;
-	  }
-	  
+	  for(int i=0;i<numGhostElements;i++)
+		if(validAttr->getChar()(i,0)) numValidElGhosts++;
+	 
 	  CkPrintf("Element type %d contains %d/%d elements and %d/%d ghosts\n", t, numValidEl, numElements, numValidElGhosts, numGhostElements);
 	}
 }
-
 
 
 int FEM_add_node_local(FEM_Mesh *m){
@@ -69,8 +74,7 @@ int FEM_add_node_local(FEM_Mesh *m){
 
   // set new node as valid
   FEM_DataAttribute *validAttr = (FEM_DataAttribute*)m->node.lookup(FEM_VALID,"FEM_add_node_local");
-  unsigned char *validData = validAttr->getChar().getData();
-  validData[newNode]=1;
+  validAttr->getChar()(newNode,0)=1;
   
   // return a new index
   return newNode;

@@ -643,6 +643,12 @@ class FEM_Entity {
 		values associated with an entity. 
 	*/
 	void allocateBoundary();
+
+	/*
+	    used to allocate the char array for storing whether each entity is valid
+		When a node/element is deleted the flag in the valid table is set to 0.
+	*/
+	FEM_DataAttribute *valid;
 	
 	FEM_Comm ghostSend; //Non-ghosts we send out (only set for real entities)
 	FEM_Comm ghostRecv; //Ghosts we recv into (only set for ghost entities)
@@ -732,6 +738,11 @@ public:
 		return len;
 	}
 	
+	/**
+	 * Allocate the FEM_VALID attribute's data
+	 */
+	void allocateValid();
+
 	/**expose the attribute vector for refining 
 		. breaks modularity but more efficient
 	*/
@@ -801,9 +812,6 @@ class FEM_Node : public FEM_Entity {
 	 */
 	FEM_DataAttribute *primary; 
 	void allocatePrimary(void);
-
-	FEM_DataAttribute *valid;
-	void allocateValid(void);
 	
 	void allocateElemAdjacency();
 	void allocateNodeAdjacency();
@@ -858,10 +866,8 @@ protected:
 	FEM_IndexAttribute *elemAdjacency;       // FEM_ELEM_ELEM_ADJACENCY attribute
 	FEM_IndexAttribute *elemAdjacencyTypes;  // FEM_ELEM_ELEM_ADJ_TYPES attribute
 
-	FEM_DataAttribute *valid;
-	void allocateValid(void);
-
 public:
+
 	FEM_Elem(const FEM_Mesh &mesh_, FEM_Elem *ghost_);
 	void pup(PUP::er &p);
 	~FEM_Elem();
@@ -1013,6 +1019,7 @@ class FEM_Entity_Types {
 	CkVec<T *> types; // Our main storage for different entity types
 	const FEM_Mesh &mesh;
 	const char *name; //FEM_SPARSE or FEM_ELEM, or some such.
+
 public:
 	FEM_Entity_Types(const FEM_Mesh &mesh_,const char *name_) 
 		:mesh(mesh_), name(name_) {}
@@ -1063,6 +1070,7 @@ public:
 	/// Read-only and write-only operator[]'s:
 	inline T &operator[] (int type) { return set(type); }
 	inline const T &operator[] (int type) const { return get(type); }
+
 };
 
 // Map fortran element (>=1) or node (0) marker to C version (>=1, -1)
@@ -1166,7 +1174,7 @@ class FEM_Mesh : public CkNoncopyable {
     incident on it . It assumes the presence of one layer of ghost nodes that
     share a node.
   */
-  void createElemNodeAdj();
+  void createNodeElemAdj();
   void createNodeNodeAdj();
   void createElemElemAdj();
   

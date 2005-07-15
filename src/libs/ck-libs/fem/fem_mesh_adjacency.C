@@ -17,7 +17,7 @@ CDECL void
 FEM_Mesh_create_node_elem_adjacency(int fem_mesh){
 	const char *caller="FEM_Mesh_create_node_elem_adjacency"; FEMAPI(caller);
 	FEM_Mesh *m=FEM_Mesh_lookup(fem_mesh,caller);
-	m->createElemNodeAdj();
+	m->createNodeElemAdj();
 }
 
 CDECL void 
@@ -170,7 +170,7 @@ void FEM_Elem::allocateElemAdjacency(){
 }
 
 
-void FEM_Mesh::createElemNodeAdj(){
+void FEM_Mesh::createNodeElemAdj(){
 	node.lookup(FEM_NODE_ELEM_ADJACENCY,"FEM_Mesh::createElemNodeAdj");
 	for(int i=0;i<elem.size();i++){
 		node.setElemAdjacency(i,elem[i]);

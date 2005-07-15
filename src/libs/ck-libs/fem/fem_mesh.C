@@ -977,7 +977,7 @@ CDECL const char *FEM_Get_entity_name(int entity,char *storage)
 }
 
 FEM_Entity::FEM_Entity(FEM_Entity *ghost_) //Default constructor
-	:length(0), max(0),ghost(ghost_), coord(0), sym(0), globalno(0), 
+	:length(0), max(0),ghost(ghost_), coord(0), sym(0), globalno(0), valid(0),
 	 ghostIDXL(ghost?&ghostSend:NULL, ghost?&ghost->ghostRecv:NULL),resize(NULL)
 {
 	//No attributes initially
@@ -1079,6 +1079,24 @@ void FEM_Entity::setLength(int newlen) {
 	}
 }
 
+
+void FEM_Entity::allocateValid(void) {
+  if (valid) CkAbort("FEM_Entity::allocateValid called, but already allocated");
+  CkPrintf("ALLOCATING VALID ARRAY!!!\n");
+  valid=new FEM_DataAttribute(this,FEM_VALID);
+  add(valid);
+  valid->setWidth(1); //Only 1 flag per node
+  valid->setLength(size());
+  valid->setDatatype(FEM_BYTE);
+  valid->reallocate();
+  
+  // Set all to valid initially
+  for(int i=0;i<size();i++)
+	valid->getChar()(i,0)=1;
+  
+}
+
+
 void FEM_Entity::setMaxLength(int newLen,int newMaxLen,void *pargs,FEM_Mesh_alloc_fn fn){
         CkPrintf("resize fn %p \n",fn);
 	max = newMaxLen;
@@ -1145,29 +1163,30 @@ FEM_Attribute *FEM_Entity::lookup(int attr,const char *caller) {
  * by subclasses.
  */
 void FEM_Entity::create(int attr,const char *caller) {
-	if (attr<=FEM_ATTRIB_TAG_MAX) 
-	{ //It's a valid user data tag
-		add(new FEM_DataAttribute(this,attr));
-	} else if (attr==FEM_COORD) {
-		allocateCoord();
-	} else if (attr==FEM_SYMMETRIES) {
-		allocateSym();
-	} else if (attr==FEM_GLOBALNO) {
-		allocateGlobalno();
-	} else if(attr == FEM_CHUNK){
-		FEM_IndexAttribute *chunkNo= new FEM_IndexAttribute(this,FEM_CHUNK,NULL);
-		add(chunkNo);
-		chunkNo->setWidth(1);
-	} else if(attr == FEM_BOUNDARY){
-		//the boundary attribute for this entity
-		allocateBoundary();
-	} else {
+  if (attr<=FEM_ATTRIB_TAG_MAX) //It's a valid user data tag
+	add(new FEM_DataAttribute(this,attr));
+  else if (attr==FEM_COORD) 
+	allocateCoord();
+  else if (attr==FEM_SYMMETRIES) 
+	allocateSym();
+  else if (attr==FEM_GLOBALNO) 
+	allocateGlobalno();
+  else if (attr==FEM_VALID)
+	allocateValid();
+  else if(attr == FEM_CHUNK){
+	FEM_IndexAttribute *chunkNo= new FEM_IndexAttribute(this,FEM_CHUNK,NULL);
+	add(chunkNo);
+	chunkNo->setWidth(1);
+  } else if(attr == FEM_BOUNDARY){
+	//the boundary attribute for this entity
+	allocateBoundary();
+  } else {
 	//It's an unrecognized tag: abort
-		char attrNameStorage[256], msg[1024];
-		sprintf(msg,"Could not locate the attribute %s for entity %s",
+	char attrNameStorage[256], msg[1024];
+	sprintf(msg,"Could not locate the attribute %s for entity %s",
 			FEM_Get_attr_name(attr,attrNameStorage), getName());
-		FEM_Abort(caller,msg);
-	}
+	FEM_Abort(caller,msg);
+  }
 }
 
 void FEM_Entity::allocateCoord(void) {
@@ -1236,7 +1255,7 @@ void FEM_Entity::copyOldGlobalno(const FEM_Entity &e) {
 
 /********************** Node *****************/
 FEM_Node::FEM_Node(FEM_Node *ghost_) 
-  :FEM_Entity(ghost_), primary(0), valid(0), sharedIDXL(&shared,&shared),
+  :FEM_Entity(ghost_), primary(0), sharedIDXL(&shared,&shared),
    elemAdjacency(0),nodeAdjacency(0)
 {}
 
@@ -1246,14 +1265,6 @@ void FEM_Node::allocatePrimary(void) {
   add(primary); // primary will be deleted by FEM_Entity now
   primary->setWidth(1); //Only 1 flag per node
   primary->setDatatype(FEM_BYTE);
-}
-
-void FEM_Node::allocateValid(void) {
-  if (valid) CkAbort("FEM_Node::allocateValid called, but already allocated");
-  valid=new FEM_DataAttribute(this,FEM_VALID);
-  add(valid);
-  valid->setWidth(1); //Only 1 flag per node
-  valid->setDatatype(FEM_BYTE);
 }
 
 
@@ -1275,8 +1286,6 @@ const char *FEM_Node::getName(void) const {return "FEM_NODE";}
 void FEM_Node::create(int attr,const char *caller) {
   if (attr==FEM_NODE_PRIMARY)
 	allocatePrimary();
-  else if(attr == FEM_VALID)
-	allocateValid();
   else if(attr == FEM_NODE_ELEM_ADJACENCY)
 	allocateElemAdjacency();
   else if(attr == FEM_NODE_NODE_ADJACENCY)
@@ -1315,7 +1324,7 @@ public:
 };
 
 FEM_Elem::FEM_Elem(const FEM_Mesh &mesh, FEM_Elem *ghost_) 
-  :FEM_Entity(ghost_), elemAdjacency(0), elemAdjacencyTypes(0), valid(0)
+  :FEM_Entity(ghost_), elemAdjacency(0), elemAdjacencyTypes(0)
 {
 	FEM_IndexAttribute::Checker *c;
 	if (isGhost()) // Ghost elements can point to both real as well as ghost nodes
@@ -1345,19 +1354,8 @@ void FEM_Elem::create(int attr,const char *caller) {
     allocateElemAdjacency();
   else if(attr == FEM_ELEM_ELEM_ADJ_TYPES)
     allocateElemAdjacency();
-  else if(attr == FEM_VALID)
-	allocateValid();
   else
     super::create(attr,caller);
-}
-
-
-void FEM_Elem::allocateValid(void) {
-  if (valid) CkAbort("FEM_Elem::allocateValid called, but already allocated");
-  valid=new FEM_DataAttribute(this,FEM_VALID);
-  add(valid);
-  valid->setWidth(1); //Only 1 flag per node
-  valid->setDatatype(FEM_BYTE);
 }
 
 
@@ -1413,9 +1411,8 @@ FEM_Sparse::~FEM_Sparse() {
 const char *FEM_Sparse::getName(void) const { return "FEM_SPARSE"; }
 
 void FEM_Sparse::create(int attr,const char *caller) {
-	if (attr==FEM_SPARSE_ELEM) {
+	if (attr==FEM_SPARSE_ELEM)
 		allocateElem();
-	}
 	else /*super*/ FEM_Entity::create(attr,caller);
 }
 
@@ -1442,7 +1439,7 @@ FEM_Entity *FEM_Mesh::lookup(int entity,const char *caller) {
 			entity-=FEM_GHOST;
 			isGhost=true;
 		}
-		if (entity==FEM_NODE) 
+		if (entity==FEM_NODE)
 			e=&node;
 		else if (entity>=FEM_ELEM && entity<FEM_ELEM+100) 
 		{ //It's a kind of element:
@@ -1663,4 +1660,12 @@ void FEM_writeMesh(FEM_Mesh *m,const char *prefix,int chunkNo,int nChunks)
 	PUP::toTextFile p(fp);
 	m->pup(p);
 	fclose(fp);
+}
+
+
+// Setup the entity FEM_VALID tables
+void FEM_Mesh_allocate_valid_attr(int fem_mesh, int entity_type){  
+  FEM_Mesh *m=FEM_Mesh_lookup(fem_mesh,"FEM_Mesh_create_valid_elem");
+  FEM_Entity *entity = m->lookup(entity_type,"FEM_Mesh_allocate_valid_attr");
+  entity->allocateValid();
 }
