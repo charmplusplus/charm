@@ -1,7 +1,7 @@
 CDIR=../../../..
 CHARMC=$(CDIR)/bin/charmc $(OPTS)
 
-HEADERS=fem.h femf.h fem_mesh.h fem_adapt.h fem_impl.h parallel_part.h map.h  fem_mesh_modify.h femMeshModify.decl.h
+HEADERS=fem.h femf.h fem_mesh.h fem_adapt.h fem_impl.h parallel_part.h map.h  fem_mesh_modify.h FEMMeshModify.decl.h
 HEADDEP=$(HEADERS) fem_impl.h 
 OBJS=fem.o fem_mesh.o fem_adapt.o symmetries.o \
 	partition.o map.o fem_compat.o call_init.o \
@@ -81,10 +81,10 @@ $(FEMMAIN): femmain.C $(HEADDEP)
 call_init.o: call_init.c
 	$(CHARMC) -c call_init.c
 
-femMeshModify.decl.h: fem_mesh_modify.ci
+FEMMeshModify.decl.h: fem_mesh_modify.ci
 	$(CHARMC) fem_mesh_modify.ci
 
-fem_mesh_modify.o: femMeshModify.decl.h fem_mesh_modify.C fem_mesh_modify.h $(HEADDEP)
+fem_mesh_modify.o: FEMMeshModify.decl.h fem_mesh_modify.C fem_mesh_modify.h $(HEADDEP)
 	$(CHARMC) -c fem_mesh_modify.C
 
 fem_mesh_adjacency.o: fem_mesh_adjacency.C $(HEADDEP)
