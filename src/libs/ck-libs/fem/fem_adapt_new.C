@@ -334,3 +334,66 @@ int FEM_Adapt::vertex_split(int n, int n1, int n2, int e1, int e3)
   return np;
 }
 // ======================  END vertex_split ===================
+
+// Helpers
+int FEM_Adapt::get_edge_index(int local_node1, int local_node2) 
+{
+  int sum = local_node1 + local_node2;
+  CkAssert(local_node1 != local_node2);
+  if (sum == 1) return 0;
+  else if (sum == 3) return 1;
+  else if (sum == 2) return 2;
+  else {
+    CkPrintf("ERROR: local node pair is strange: [%d,%d]\n", local_node1,
+	    local_node2);
+    CkAbort("ERROR: local node pair is strange\n");
+    return -1;
+  }
+}
+
+int FEM_Adapt::find_local_node_index(int e, int n) {
+  int result = theMesh->e2n_getIndex(e, n);
+  if (result < 0) {
+    CkPrintf("ERROR: node %d not found on element %d\n", n, e);
+    CkAbort("ERROR: node not found\n");
+  }
+  return result;
+}
+
+int FEM_Adapt::check_orientation(int e1, int e3, int n, int n1, int n2)
+{
+  int e1_n = find_local_node_index(e1, n);
+  int e1_n1 = find_local_node_index(e1, n1);
+  int e3_n = find_local_node_index(e3, n);
+  int e3_n2 = find_local_node_index(e3, n2);
+  
+  if (((e1_n1 == (e1_n+1)%3) && (e3_n == (e3_n2+1)%3)) ||
+      ((e1_n == (e1_n1+1)%3) && (e3_n2 == (e3_n+1)%3)))
+    return 1;
+  else return 0;
+}
+
+void FEM_Adapt::findAdjData(int n1, int n2, int *e1, int *e2, int *e1n1, 
+			    int *e1n2, int *e1n3, int *e2n1, int *e2n2, 
+			    int *e2n3, int *n3, int *n4)
+{
+  // Set some default values in case e1 is not there
+  (*e1n1) = (*e1n2) = (*e1n3) = (*n3) = -1;
+  (*e1) = theMesh->getElementOnEdge(n1, n2); // assumed to return local element
+  if ((*e1) == -1) return;
+  (*e1n1) = find_local_node_index((*e1), n1);
+  (*e1n2) = find_local_node_index((*e1), n2);
+  (*e1n3) = 3 - (*e1n1) - (*e1n2);
+  (*n3) = theMesh->e2n_getNode((*e1), (*e1n3));
+  (*e2) = theMesh->e2e_getNbr((*e1), get_edge_index((*e1n1), (*e1n2)));
+  // Set some default values in case e2 is not there
+  (*e2n1) = (*e2n2) = (*e2n3) = (*n4) = -1;
+  if ((*e2) != -1) { // e2 exists
+    (*e2n1) = find_local_node_index((*e2), n1);
+    (*e2n2) = find_local_node_index((*e2), n2);
+    (*e2n3) = 3 - (*e2n1) - (*e2n2);
+    if ((*e2) > -1) { // if e2 is a ghost, there is no e2n data
+      (*n4) = theMesh->e2n_getNode((*e2), (*e2n3));
+    }
+  }
+}
