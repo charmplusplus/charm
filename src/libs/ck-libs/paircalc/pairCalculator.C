@@ -37,6 +37,7 @@ void createPairCalculator(bool sym, int s, int grainSize, int numZ, int* z, int 
   traceRegisterUserEvent("calcpairContrib", 220);
   traceRegisterUserEvent("acceptResultDGEMM1", 230);
   traceRegisterUserEvent("acceptResultDGEMM2", 240);
+  traceRegisterUserEvent("acceptResultDGEMM1R", 250);
 
   //CkPrintf("create pair calculator %d, %d\n", s, grainSize);
 
@@ -271,9 +272,6 @@ void startPairCalcLeft(PairCalcID* pcid, int n, complex* ptr, int myS, int myZ){
       pcid->proxyLNotFrom.calculatePairs_gemm(msg);
     }
 
-#ifdef _PAIRCALC_DEBUG_
-  CkPrintf("Send from [%d %d]\n",x,s1);
-#endif
 
   if(pcid->useComlib && _PC_COMMLIB_MULTI_) {
 #ifdef _PAIRCALC_DEBUG_
@@ -468,14 +466,11 @@ void startPairCalcRight(PairCalcID* pcid, int n, complex* ptr, int myS, int myZ)
 	pcid->minst.endIteration();
       }
       
-#ifdef _PAIRCALC_DEBUG_
-      CkPrintf("Send from [%d 0 %d]\n",x,s2);
-#endif
     }
   else
     {
 #ifdef _PAIRCALC_DEBUG_
-      CkPrintf("Warning! No Right proxy for [%d 0 %d]\n",x,s2);
+      CkPrintf("Warning! No Right proxy ! \n");
 #endif
     }
 #endif //_NO_MULTI
