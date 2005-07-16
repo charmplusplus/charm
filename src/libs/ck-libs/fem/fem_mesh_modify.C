@@ -465,14 +465,19 @@ int FEM_lock::lock(int numNodes, int *nodes, int numElems, int* elems) {
   while(!done) {
     if(!isLocked || (isLocked && isOwner)) {
       for(int i=0; i<numNodes; i++) {
+	if(i==0) { //lock myself
+	  if(!existsChunk(idx)) {
+	    lockedChunks.push_back(idx);
+	  }
+	}
 	//which chunk does this belong to
 	//add that chunk to the lock list, if it does not exist already.
 	int numchunks;
-	IDXL_Share **chunks;
-	mmod->fmUtil->getChunkNos(0,nodes[i],&numchunks,chunks);
+	IDXL_Share **chunks1;
+	mmod->fmUtil->getChunkNos(0,nodes[i],&numchunks,&chunks1);
 	for(int j=0; j<numchunks; j++) {
-	  if(!existsChunk(chunks[j]->chk)) {
-	    lockedChunks.push_back(chunks[j]->chk);
+	  if(!existsChunk(chunks1[j]->chk)) {
+	    lockedChunks.push_back(chunks1[j]->chk);
 	  }
 	}
       }
@@ -480,11 +485,11 @@ int FEM_lock::lock(int numNodes, int *nodes, int numElems, int* elems) {
 	//which chunk does this belong to
 	//add that chunk to the lock list, if not already in it.
 	int numchunks;
-	IDXL_Share **chunks;
-	mmod->fmUtil->getChunkNos(1,elems[i],&numchunks,chunks);
+	IDXL_Share **chunks1;
+	mmod->fmUtil->getChunkNos(1,elems[i],&numchunks,&chunks1);
 	for(int j=0; j<numchunks; j++) {
-	  if(!existsChunk(chunks[j]->chk)) {
-	    lockedChunks.push_back(chunks[j]->chk);
+	  if(!existsChunk(chunks1[j]->chk)) {
+	    lockedChunks.push_back(chunks1[j]->chk);
 	  }
 	}
       }
@@ -507,6 +512,7 @@ int FEM_lock::lock(int numNodes, int *nodes, int numElems, int* elems) {
 	ret = lock(lockedChunks[i],idx);
 	if(ret != 1) return -1;
       }
+      hasLocks = true;
       done = true;
     }
     else {
@@ -530,6 +536,7 @@ int FEM_lock::unlock() {
 	}
       }
       hasLocks = false;
+      done = true;
     }
     else {
       CthYield();
@@ -546,13 +553,22 @@ int FEM_lock::lock(int chunkNo, int own) {
       if(chunkNo == idx) {
 	isLocked = true;
 	owner = own;
-	if(owner == idx) isOwner = true;
-	else isOwner = false;
+	if(owner == idx) {
+	  isOwner = true;
+	  hasLocks = true;
+	}
+	else {
+	  isOwner = false;
+	}
+	CkPrintf("Chunk %d locked by chunk %d\n",chunkNo, own);
       }
       else {
 	int2Msg *imsg = new int2Msg(chunkNo,own);
 	ret = meshMod[chunkNo].lockRemoteChunk(imsg);
 	if(ret->i != 1) return -1;
+	else {
+	  hasLocks = true;
+	}
       }
       break;
     }
@@ -580,10 +596,11 @@ int FEM_lock::unlock(int chunkNo, int own) {
 	isLocked = false;
 	owner = -1;
 	isOwner = false;
+	CkPrintf("Chunk %d unlocked by chunk %d\n",chunkNo, own);
       }
       else {
 	int2Msg *imsg = new int2Msg(chunkNo,own);
-	ret = meshMod[chunkNo].lockRemoteChunk(imsg);
+	ret = meshMod[chunkNo].unlockRemoteChunk(imsg);
 	if(ret->i != 1) return -1;
       }
       break;
@@ -604,7 +621,7 @@ FEM_MUtil::FEM_MUtil(int i, femMeshModify *m) {
 FEM_MUtil::~FEM_MUtil() {
 }
 
-void FEM_MUtil::getChunkNos(int entType, int entNo, int *numChunks, IDXL_Share **chunks) {
+void FEM_MUtil::getChunkNos(int entType, int entNo, int *numChunks, IDXL_Share ***chunks) {
   int type = 0; //0 - local, 1 - shared, 2 - ghost.
 
   if(entType == 0) { //nodes
@@ -617,30 +634,30 @@ void FEM_MUtil::getChunkNos(int entType, int entNo, int *numChunks, IDXL_Share *
       int ghostid = FEM_To_ghost_index(entNo);
       const IDXL_Rec *irec = mmod->fmMesh->node.getGhostRecv().getRec(ghostid);
       *numChunks = irec->getShared(); //check this value!!
-      chunks = (IDXL_Share**)malloc((*numChunks)*sizeof(IDXL_Share*));
+      *chunks = (IDXL_Share**)malloc((*numChunks)*sizeof(IDXL_Share*));
       for(int i=0; i<*numChunks; i++) {
 	int chk = irec->getChk(i);
 	int index = irec->getIdx(i);
-	chunks[i] = new IDXL_Share(chk, index);
+	(*chunks)[i] = new IDXL_Share(chk, index);
       }
     }
     else if(type == 1) {
       const IDXL_Rec *irec = mmod->fmMesh->node.shared.getRec(entNo);
       *numChunks = irec->getShared();
-      chunks = (IDXL_Share**)malloc((*numChunks)*sizeof(IDXL_Share*));
+      *chunks = (IDXL_Share**)malloc((*numChunks)*sizeof(IDXL_Share*));
       for(int i=0; i<*numChunks; i++) {
 	int chk = irec->getChk(i);
 	int index = irec->getIdx(i);
-	chunks[i] = new IDXL_Share(chk, index);
+	(*chunks)[i] = new IDXL_Share(chk, index);
       }
     }
     else if(type == 0) {
       *numChunks = 1;
-      chunks = (IDXL_Share**)malloc((*numChunks)*sizeof(IDXL_Share*));
+      (*chunks) = (IDXL_Share**)malloc((*numChunks)*sizeof(IDXL_Share*));
       for(int i=0; i<*numChunks; i++) {
 	int chk = idx; //index of this chunk
 	int index = entNo;
-	chunks[i] = new IDXL_Share(chk, index);
+	(*chunks)[i] = new IDXL_Share(chk, index);
       }
     }
   }
@@ -653,20 +670,20 @@ void FEM_MUtil::getChunkNos(int entType, int entNo, int *numChunks, IDXL_Share *
       int ghostid = FEM_To_ghost_index(entNo);
       const IDXL_Rec *irec = mmod->fmMesh->node.getGhostRecv().getRec(ghostid);
       *numChunks = irec->getShared(); //should be 1
-      chunks = (IDXL_Share**)malloc((*numChunks)*sizeof(IDXL_Share*));
+      *chunks = (IDXL_Share**)malloc((*numChunks)*sizeof(IDXL_Share*));
       for(int i=0; i<*numChunks; i++) {
 	int chk = irec->getChk(i);
 	int index = irec->getIdx(i);
-	chunks[i] = new IDXL_Share(chk, index);
+	(*chunks)[i] = new IDXL_Share(chk, index);
       }
     }
     else if(type == 0) {
       *numChunks = 1;
-      chunks = (IDXL_Share**)malloc((*numChunks)*sizeof(IDXL_Share*));
+      *chunks = (IDXL_Share**)malloc((*numChunks)*sizeof(IDXL_Share*));
       for(int i=0; i<*numChunks; i++) {
 	int chk = idx; //index of this chunk
 	int index = entNo;
-	chunks[i] = new IDXL_Share(chk, index);
+	(*chunks)[i] = new IDXL_Share(chk, index);
       }
     }
   }
