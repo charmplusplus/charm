@@ -51,6 +51,8 @@ int FEM_add_node_local(FEM_Mesh *m){
   const int newNode = m->node.size();
   m->node.setLength(newNode+1); // lengthen node attributes
   m->node.set_valid(newNode);   // set new node as valid
+  m->n2e_removeAll(newNode);    // initialize element adjacencies
+  m->n2n_removeAll(newNode);    // initialize node adjacencies
   return newNode;  // return a new index
 }
 
@@ -79,7 +81,7 @@ int FEM_add_node(FEM_Mesh *m, int* adjacentNodes, int numAdjacentNodes, int upca
   //entry in the IDXL will be correct
   //besides, do we have a basic operation, where two add_nodes are done within the same lock?
   //if so, we will have to ensure lock steps, to ensure correct idxl entries
-  if(sharedCount == numAdjacentNodes) {
+  if(sharedCount==numAdjacentNodes && numAdjacentNodes!=0) {
     m->getfmMM()->getfmUtil()->splitEntityAll(m, newNode, numAdjacentNodes, adjacentNodes, 0);
   }
 
@@ -212,6 +214,9 @@ void update_new_element_e2e(FEM_Mesh *m, int newEl, int elemType){
   FEM_ElemAdj_Layer *g = m->getElemAdjLayer();
   CkAssert(g->initialized);
   const int nodesPerTuple = g->nodesPerTuple;
+  CkPrintf("nodesPerTuple=%d\n", nodesPerTuple);
+  CkAssert(nodesPerTuple==2);
+  CkAssert(g->elem[0].tuplesPerElem == 3);
   tupleTable table(nodesPerTuple);
   FEM_Symmetries_t allSym;
 
@@ -237,11 +242,11 @@ void update_new_element_e2e(FEM_Mesh *m, int newEl, int elemType){
   
   for(int i=0;i<tuplesPerElem;i++){
     int sz;
-    int **adjelements;
-    m->n2e_getAll(adjnodes[i], adjelements, &sz);
+    int *adjelements;
+    m->n2e_getAll(adjnodes[i], &adjelements, &sz);
     
     for(int j=0;j<sz;j++){
-      int elementToAdd = *adjelements[j];
+      int elementToAdd = adjelements[j];
       const int tuplesPerElem = g->elem[elemType].tuplesPerElem;
       int tuple[tupleTable::MAX_TUPLE];
       const int *conn=m->elem[elemType].connFor(elementToAdd);
@@ -253,7 +258,7 @@ void update_new_element_e2e(FEM_Mesh *m, int newEl, int elemType){
           else           //Ordinary node
             tuple[i]=conn[eidx]; 
           
-          table.addTuple(tuple,new elemList(0,elementToAdd,elemType,allSym,u)); 
+		  table.addTuple(tuple,new elemList(0,elementToAdd,elemType,allSym,u)); 
         }
       
     }
@@ -262,7 +267,7 @@ void update_new_element_e2e(FEM_Mesh *m, int newEl, int elemType){
 
   
   // extract adjacencies from table and update all e2e tables for both newEl and the others
-  
+  table.beginLookup();
     
   // look through each elemList that is returned by the tuple table
   elemList *l;
@@ -315,6 +320,9 @@ int FEM_add_element_local(FEM_Mesh *m, const int *conn, int connSize, int elemTy
   int oldLength = m->elem[elemType].size();
   m->elem[elemType].setLength(oldLength+1);
   const int newEl = oldLength;
+
+  m->e2n_removeAll(newEl);
+  m->e2e_removeAll(newEl);
 
   // Mark new element as valid
   m->elem[elemType].set_valid(newEl);

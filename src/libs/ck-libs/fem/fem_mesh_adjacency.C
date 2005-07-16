@@ -97,14 +97,10 @@ void FEM_Node::fillNodeAdjacency(const FEM_Elem &elem){
 	CkVec<CkVec<var_id> > &adjacencyTable = nodeAdjacency->get();
 	FEM_VarIndexAttribute *ghostAdjacencyAttr = ((FEM_Node *)getGhost())->nodeAdjacency;
 	CkVec<CkVec<var_id> > &ghostAdjacencyTable = ghostAdjacencyAttr->get();
-	
 	for(int i=0;i<elem.size();i++){        // for each element of the given type
 		const int *conn = elem.connFor(i);
-		printf("Elem %d ",i);
 		for(int j=0;j<nodesPerElem;j++){   // for each node adjacent to the element
 			int node = conn[j];
-			printf("%d ",node);
-
 			if(FEM_Is_ghost_index(node)) { // A ghost node
 			  for(int k=0;k<nodesPerElem;k++){
 				if(conn[k] != node){ // Here we need the node id which is negative not the corresponding positive index
@@ -130,7 +126,6 @@ void FEM_Node::fillNodeAdjacency(const FEM_Elem &elem){
 			else{}//invalid node.. shouldnt happen
 			
 		}
-		printf("\n");
 	}
 };
 
@@ -650,6 +645,26 @@ void FEM_Mesh::e2n_replace(int e, int oldNode, int newNode, int etype)
     }
   }  
 }
+
+void FEM_Mesh::e2n_removeAll(int e, int etype)
+{
+  if (e == -1) return;
+  if(FEM_Is_ghost_index(e)){
+    FEM_IndexAttribute *eConn = (FEM_IndexAttribute *)elem[etype].getGhost()->lookup(FEM_CONN,"e2n_getAll");
+    AllocTable2d<int> &conn = eConn->get();
+    for (int i=0; i<conn.width(); i++)
+	  conn[FEM_To_ghost_index(e)][i] = -1;
+  }
+  else{
+    FEM_IndexAttribute *eConn = (FEM_IndexAttribute *)elem[etype].lookup(FEM_CONN,"e2n_getAll");
+    AllocTable2d<int> &conn = eConn->get();
+    for (int i=0; i<conn.width(); i++)
+	  conn[e][i] = -1;
+  }  
+}
+
+
+
 
 //  ------- Node-to-node
 /// Place all of node n's adjacent nodes in adjnodes and the resulting 

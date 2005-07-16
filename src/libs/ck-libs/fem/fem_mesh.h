@@ -1223,6 +1223,9 @@ class FEM_Mesh : public CkNoncopyable {
   void e2n_setIndex(int e, short idx, int newNode, int etype=0);
   /// Find node oldNode in e's adjacent ndoes and replace with newNode
   void e2n_replace(int e, int oldNode, int newNode, int etype=0);
+  /// Replace all entries with -1
+  void e2n_removeAll(int e, int etype=0);
+
 
   //  ------- Node-to-node
   /// Place all of node n's adjacent nodes in adjnodes and the resulting 
