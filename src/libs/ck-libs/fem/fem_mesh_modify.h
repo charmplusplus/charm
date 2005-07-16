@@ -98,7 +98,7 @@ class FEM_MUtil {
   //entNo signifies the local index of the entity
   //numChunks is the number of chunks that need to be locked to lock that entity
   //chunks identifies the chunks that need to be locked
-  void getChunkNos(int entType, int entNo, int *numChunks, IDXL_Share **chunks);
+  void getChunkNos(int entType, int entNo, int *numChunks, IDXL_Share ***chunks);
   bool isShared(int index);
   void splitEntityAll(FEM_Mesh *m, int localIdx, int nBetween, int *between, int idxbase);
   void splitEntityRemote(FEM_Mesh *m, int chk, int localIdx, int nBetween, int *between, int idxbase);
