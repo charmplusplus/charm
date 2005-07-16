@@ -6,7 +6,9 @@ module FEMMeshModify {
   message intMsg;
   message int2Msg;
   message FEMMeshMsg;
-  message sharedNodeMsg;
+  message sharedNodeMsg {
+    int between[];
+  };
 
   array [1D] femMeshModify {
     entry femMeshModify(femMeshModMsg *);

@@ -724,8 +724,13 @@ void FEM_MUtil::splitEntityAll(FEM_Mesh *m, int localIdx, int nBetween, int *bet
 	  }
 	}
       }
-      delete &ll; //clean up
-      sharedNodeMsg *fm = new sharedNodeMsg(mmod->idx,nBetween,sharedIndices);
+      //delete &ll; //clean up
+      sharedNodeMsg *fm = new (2, 0) sharedNodeMsg;
+      fm->chk = mmod->idx;
+      fm->nBetween = nBetween;
+      for(int j=0; j<nBetween; j++) {
+	fm->between[j] = sharedIndices[j];
+      }
       meshMod[chk].addSharedNodeRemote(fm);
       //break;
     }

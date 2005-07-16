@@ -159,14 +159,14 @@ class sharedNodeMsg : public CMessage_sharedNodeMsg {
   int nBetween;
   int *between;
 
-  sharedNodeMsg(int c, int nB, int *B) {
+  /*sharedNodeMsg(int c, int nB, int *B) {
     chk = c;
     nBetween = nB;
     between = (int *)malloc(nBetween*sizeof(int));
     for(int i=0; i<nBetween; i++) {
       between[i] = B[i];
     }
-  }
+    }*/
 
   ~sharedNodeMsg() {
     if(between) {
