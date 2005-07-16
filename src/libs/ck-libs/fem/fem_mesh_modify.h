@@ -102,6 +102,8 @@ class FEM_MUtil {
   bool isShared(int index);
   void splitEntityAll(FEM_Mesh *m, int localIdx, int nBetween, int *between, int idxbase);
   void splitEntityRemote(FEM_Mesh *m, int chk, int localIdx, int nBetween, int *between, int idxbase);
+  void removeNodeAll(FEM_Mesh *m, int localIdx);
+  void removeNodeRemote(FEM_Mesh *m, int chk, int sharedIdx);
 };
 
 class femMeshModMsg : public CMessage_femMeshModMsg {
@@ -175,6 +177,12 @@ class sharedNodeMsg : public CMessage_sharedNodeMsg {
   }
 };
 
+class removeSharedNodeMsg : public CMessage_removeSharedNodeMsg {
+ public:
+  int chk;
+  int index;
+};
+
 class femMeshModify : public CBase_femMeshModify {
   friend class FEM_lock;
   friend class FEM_MUtil;
@@ -200,6 +208,7 @@ class femMeshModify : public CBase_femMeshModify {
   FEM_MUtil *getfmUtil(){return fmUtil;}
 
   void addSharedNodeRemote(sharedNodeMsg *fm);
+  void removeSharedNodeRemote(removeSharedNodeMsg *fm);
 
 };
 

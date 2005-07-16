@@ -102,6 +102,17 @@ void FEM_add_shared_node_remote(FEM_Mesh *m, int chk, int nBetween, int *between
 }
 
 
+void FEM_remove_node_local(FEM_Mesh *m, int node) {
+    // if node is local:
+    int numAdjNodes, numAdjElts;
+    int **adjNodes, **adjElts;
+    m->n2n_getAll(node, adjNodes, &numAdjNodes);
+    m->n2e_getAll(node, adjElts, &numAdjElts);
+    CkAssert((numAdjNodes==0) && (numAdjElts==0)); // we shouldn't be removing a node away that is connected to anything
+    
+    // mark node as deleted/invalid
+	m->node.set_invalid(node);  
+}
 
 
 // remove a local or shared node, but NOT a ghost node
@@ -131,20 +142,11 @@ void FEM_remove_node(FEM_Mesh *m, int node){
 	m->node.set_invalid(node);
 
     // delete it on remote chunks(shared and ghost), update IDXL tables
-    
+	m->getfmMM()->getfmUtil()->removeNodeAll(m, node);
 
   }
   else {
-    // if node is local:
-    int numAdjNodes, numAdjElts;
-    int **adjNodes, **adjElts;
-    m->n2n_getAll(node, adjNodes, &numAdjNodes);
-    m->n2e_getAll(node, adjElts, &numAdjElts);
-    CkAssert((numAdjNodes==0) && (numAdjElts==0)); // we shouldn't be removing a node away that is connected to anything
-    
-    // mark node as deleted/invalid
-	m->node.set_invalid(node);
-
+    FEM_remove_node_local(m,node);
   }
 }
 
@@ -631,6 +633,8 @@ void FEM_MUtil::getChunkNos(int entType, int entNo, int *numChunks, IDXL_Share *
     else type = 0;
 
     if(type == 2) {
+      //not very sure if it is any use ever to lock ghost nodes..
+      //cannot think of a situation
       int ghostid = FEM_To_ghost_index(entNo);
       const IDXL_Rec *irec = mmod->fmMesh->node.getGhostRecv().getRec(ghostid);
       *numChunks = irec->getShared(); //check this value!!
@@ -668,7 +672,7 @@ void FEM_MUtil::getChunkNos(int entType, int entNo, int *numChunks, IDXL_Share *
 
     if(type == 2) {
       int ghostid = FEM_To_ghost_index(entNo);
-      const IDXL_Rec *irec = mmod->fmMesh->node.getGhostRecv().getRec(ghostid);
+      const IDXL_Rec *irec = mmod->fmMesh->elem[0].getGhostRecv().getRec(ghostid);
       *numChunks = irec->getShared(); //should be 1
       *chunks = (IDXL_Share**)malloc((*numChunks)*sizeof(IDXL_Share*));
       for(int i=0; i<*numChunks; i++) {
@@ -764,6 +768,26 @@ void FEM_MUtil::splitEntityRemote(FEM_Mesh *m, int chk, int localIdx, int nBetwe
   return;
 }
 
+void FEM_MUtil::removeNodeAll(FEM_Mesh *m, int localIdx)
+{
+  IDXL_Side *c = &(m->node.shared);
+  const IDXL_Rec *tween = c->getRec(localIdx);
+  for(int i=0; i<tween->getShared(); i++) {
+    removeSharedNodeMsg *fm = new removeSharedNodeMsg;
+    fm->chk = mmod->idx;
+    fm->index = tween->getIdx(i);
+    meshMod[tween->getChk(i)].removeSharedNodeRemote(fm);
+  }  
+  return;
+}
+
+void FEM_MUtil::removeNodeRemote(FEM_Mesh *m, int chk, int sharedIdx) {
+  int localIdx;
+  const IDXL_List ll = m->node.shared.getList(chk);
+  localIdx = ll[sharedIdx];
+  FEM_remove_node_local(m,localIdx);
+  return;
+}
 
 femMeshModify::femMeshModify(femMeshModMsg *fm) {
   numChunks = fm->numChunks;
@@ -808,5 +832,8 @@ void femMeshModify::addSharedNodeRemote(sharedNodeMsg *fm) {
   return;
 }
 
+void femMeshModify::removeSharedNodeRemote(removeSharedNodeMsg *fm) {
+  fmUtil->removeNodeRemote(fmMesh, fm->chk, fm->index);
+}
 
 #include "FEMMeshModify.def.h"

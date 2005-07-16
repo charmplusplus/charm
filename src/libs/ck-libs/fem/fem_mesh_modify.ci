@@ -9,6 +9,7 @@ module FEMMeshModify {
   message sharedNodeMsg {
     int between[];
   };
+  message removeSharedNodeMsg;
 
   array [1D] femMeshModify {
     entry femMeshModify(femMeshModMsg *);
@@ -16,5 +17,6 @@ module FEMMeshModify {
     entry [sync,threaded] intMsg *lockRemoteChunk(int2Msg *);
     entry [sync,threaded] intMsg *unlockRemoteChunk(int2Msg *);
     entry [sync,threaded] void addSharedNodeRemote(sharedNodeMsg *);
+    entry [sync,threaded] void removeSharedNodeRemote(removeSharedNodeMsg *);
   };
 };

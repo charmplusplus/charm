@@ -679,7 +679,7 @@ void FEM_Mesh::n2n_getAll(int n, int **adjnodes, int *sz)
   CkVec<CkVec<FEM_VarIndexAttribute::ID> > &nVec = nAdj->get();
   CkVec<FEM_VarIndexAttribute::ID> &nsVec = nVec[n];
   *sz = nsVec.length();
-  (*adjnodes) = new int[*sz];
+  if(*sz != 0) (*adjnodes) = new int[*sz];
   for (int i=0; i<(*sz); i++) {
     (*adjnodes)[i] = nsVec[i].id;
   }
@@ -777,7 +777,7 @@ void FEM_Mesh::n2e_getAll(int n, int **adjelements, int *sz)
   CkVec<CkVec<FEM_VarIndexAttribute::ID> > &eVec = eAdj->get();
   CkVec<FEM_VarIndexAttribute::ID> &nsVec = eVec[n];
   *sz = nsVec.length();
-  (*adjelements) = new int[*sz];
+  if(*sz !=0) (*adjelements) = new int[*sz];
   for (int i=0; i<(*sz); i++) {
     (*adjelements)[i] = nsVec[i].id;
   }
