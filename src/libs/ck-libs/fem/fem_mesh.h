@@ -746,7 +746,12 @@ public:
 	void set_invalid(int idx);
 	int is_valid(int idx);
 	unsigned int count_valid();
-
+	
+	/**
+	 * Set the coordinates for a single item
+	 */
+	void set_coord(int idx, double x, double y);
+	void set_coord(int idx, double x, double y, double z);
 
 	/**expose the attribute vector for refining 
 		. breaks modularity but more efficient
@@ -849,7 +854,7 @@ public:
 	void fillNodeAdjacency(const FEM_Elem &elem);
 	void setNodeAdjacency(const FEM_Elem &elem);
 	void fillNodeAdjacencyForElement(int node,int nodesPerElem,const int *conn,FEM_VarIndexAttribute *adjacencyAttr);
-	
+
 	void print(const char *type,const IDXL_Print_Map &map);
 };
 PUPmarshall(FEM_Node);

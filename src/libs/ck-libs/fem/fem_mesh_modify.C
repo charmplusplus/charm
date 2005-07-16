@@ -214,9 +214,6 @@ void update_new_element_e2e(FEM_Mesh *m, int newEl, int elemType){
   FEM_ElemAdj_Layer *g = m->getElemAdjLayer();
   CkAssert(g->initialized);
   const int nodesPerTuple = g->nodesPerTuple;
-  CkPrintf("nodesPerTuple=%d\n", nodesPerTuple);
-  CkAssert(nodesPerTuple==2);
-  CkAssert(g->elem[0].tuplesPerElem == 3);
   tupleTable table(nodesPerTuple);
   FEM_Symmetries_t allSym;
 
@@ -235,7 +232,7 @@ void update_new_element_e2e(FEM_Mesh *m, int newEl, int elemType){
       table.addTuple(tuple,new elemList(0,newEl,elemType,allSym,u)); 
     }
 
-  // insert all elements adjacent to the nodes adjacent to the new element
+  // insert all elements adjacent to the nodes adjacent to the new element, including ghosts
   int *adjnodes = new int[tuplesPerElem];
 
   m->e2n_getAll(newEl, adjnodes, elemType);

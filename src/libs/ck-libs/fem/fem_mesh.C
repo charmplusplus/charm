@@ -1231,6 +1231,42 @@ void FEM_Entity::setSymmetries(int r,FEM_Symmetries_t s)
 }
 
 
+/*
+ * Set the coordinates for a node or other entity.
+ * Use the appropriate 2d or 3d version.
+ * 
+ * Note that first the function attempts to find coordinates in
+ * the FEM_COORD attribute's array "*coord". If this fails, then
+ * it will use the user's FEM_DATA field. Little error checking is
+ * done, so the functions may crash if used inappropriately.
+ */
+inline void FEM_Entity::set_coord(int idx, double x, double y){
+  if(coord){
+	coord->getDouble()(idx,0)=x;
+	coord->getDouble()(idx,1)=y;
+  }
+  else {
+	FEM_DataAttribute* attr = 	(FEM_DataAttribute*)lookup(FEM_DATA,"set_coord");
+	attr->getDouble()(idx,0)=x;
+	attr->getDouble()(idx,1)=y;
+  }
+}
+
+inline void FEM_Entity::set_coord(int idx, double x, double y, double z){
+  if(coord){
+	coord->getDouble()(idx,0)=x;
+	coord->getDouble()(idx,1)=y;
+	coord->getDouble()(idx,2)=z;
+  }
+  else {
+	FEM_DataAttribute* attr = 	(FEM_DataAttribute*)lookup(FEM_DATA,"set_coord");
+	attr->getDouble()(idx,0)=x;
+	attr->getDouble()(idx,1)=y;
+	attr->getDouble()(idx,2)=z;
+  }
+}
+
+
 void FEM_Entity::allocateGlobalno(void) {
 	if (globalno) CkAbort("FEM_Entity::allocateGlobalno called, but already allocated");
 	globalno=new FEM_IndexAttribute(this,FEM_GLOBALNO,NULL);
@@ -1713,4 +1749,16 @@ unsigned int FEM_count_valid(int mesh, int entityType){
   FEM_Mesh *m=FEM_Mesh_lookup(mesh,"FEM_Mesh_create_valid_elem");
   FEM_Entity *entity = m->lookup(entityType,"FEM_Mesh_allocate_valid_attr");
   return entity->count_valid();
+}
+
+// Set coordinates for some entity's item number idx 
+void FEM_set_entity_coord2(int mesh, int entityType, int idx, double x, double y){
+  FEM_Mesh *m=FEM_Mesh_lookup(mesh,"FEM_Mesh_create_valid_elem");
+  FEM_Entity *entity = m->lookup(entityType,"FEM_Mesh_allocate_valid_attr");
+  entity->set_coord(idx,x,y);
+}
+void FEM_set_entity_coord3(int mesh, int entityType, int idx, double x, double y, double z){
+  FEM_Mesh *m=FEM_Mesh_lookup(mesh,"FEM_Mesh_create_valid_elem");
+  FEM_Entity *entity = m->lookup(entityType,"FEM_Mesh_allocate_valid_attr");
+  entity->set_coord(idx,x,y,z);
 }

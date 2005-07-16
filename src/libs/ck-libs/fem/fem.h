@@ -239,6 +239,11 @@ to mark the chunk to which a ghost node or element belongs datatype=FEM_INDEX*/
   int FEM_is_valid(int mesh, int entityType, int entityIdx);
   unsigned int FEM_count_valid(int mesh, int entityType);
 
+  /* Easy set method for coordinates, that may be helpful when creating a mesh */
+  void FEM_set_entity_coord2(int mesh, int entityType, int entityIdx, double x, double y);
+  void FEM_set_entity_coord3(int mesh, int entityType, int entityIdx, double x, double y, double z);
+  
+
   /* Backward compatability routines: */
   int FEM_Mesh_default_read(void);  /* return mesh used for get calls below */
   int FEM_Mesh_default_write(void); /* return mesh used for set calls below */
