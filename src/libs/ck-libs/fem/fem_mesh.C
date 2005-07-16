@@ -1081,17 +1081,18 @@ void FEM_Entity::setLength(int newlen) {
 
 
 void FEM_Entity::allocateValid(void) {
-  if (valid) CkAbort("FEM_Entity::allocateValid called, but already allocated");
-  valid=new FEM_DataAttribute(this,FEM_IS_VALID);
-  add(valid);
-  valid->setWidth(1); //Only 1 flag per node
-  valid->setLength(size());
-  valid->setDatatype(FEM_BYTE);
-  valid->reallocate();
-
-  // Set all to valid initially
-  for(int i=0;i<size();i++)
-	valid->getChar()(i,0)=1;
+  if (!valid){
+	valid=new FEM_DataAttribute(this,FEM_IS_VALID);
+	add(valid);
+	valid->setWidth(1); //Only 1 flag per node
+	valid->setLength(size());
+	valid->setDatatype(FEM_BYTE);
+	valid->reallocate();
+	
+	// Set all to valid initially
+	for(int i=0;i<size();i++)
+	  valid->getChar()(i,0)=1;
+  }
 }
 
 inline void FEM_Entity::set_valid(int idx){
