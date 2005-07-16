@@ -750,7 +750,7 @@ PairCalculator::acceptResult(int size, double *matrix1, double *matrix2)
     CkArrayIndex4D idx(thisIndex.w, 0, thisIndex.y, thisIndex.z);
     thisProxy(idx).sumPartialResult(N*grainSize, mynewData, thisIndex.z);
 
-    if (thisIndex.y != thisIndex.x){   // FIXME: rowNum will alway == thisIndex.x
+    if (thisIndex.y != thisIndex.x){ 
       CkArrayIndex4D idxo(thisIndex.w, 0, thisIndex.x, thisIndex.z);
       thisProxy(idxo).sumPartialResult(N*grainSize, othernewData, thisIndex.z);
     }
@@ -790,6 +790,27 @@ PairCalculator::acceptResult(int size, double *matrix1, double *matrix2)
     //we must communicate with all planes
     int offset=thisIndex.z;  //zero for now but should be considered
     int priority=0xFFFFFFFF;
+    if (thisIndex.y != thisIndex.x)
+      { 
+	for(int j=0;j<grainSize;j++)
+	  {
+
+	    //	CkCallback mycb(cb_ep, CkArrayIndex2D(thisIndex.y+j+offset, thisIndex.w), cb_aid);
+
+	    CkCallback mycb(cb_ep, CkArrayIndex2D(j+thisIndex.x ,thisIndex.w), cb_aid);
+	    partialResultMsg *msg = new (N, 8*sizeof(int) )partialResultMsg;
+	    msg->N=N;
+	    msg->myoffset = j; // someplace in the state
+	    memcpy(msg->result,othernewData+j*N,msg->N*sizeof(complex));
+	    *((int*)CkPriorityPtr(msg)) = priority;
+	    CkSetQueueing(msg, CK_QUEUEING_IFIFO);
+#ifdef _PAIRCALC_DEBUG_
+	    CkPrintf("sending partial of size %d offset %d to [%d %d]\n",N,j,thisIndex.y+j,thisIndex.w);
+#endif
+	    mycb.send(msg);
+
+	  }
+      }
     for(int j=0;j<grainSize;j++)
       {
 
@@ -805,7 +826,7 @@ PairCalculator::acceptResult(int size, double *matrix1, double *matrix2)
 #ifdef _PAIRCALC_DEBUG_
 	CkPrintf("sending partial of size %d offset %d to [%d %d]\n",N,j,thisIndex.y+j,thisIndex.w);
 #endif
- 	mycb.send(msg);
+	mycb.send(msg);
 
       }
 
@@ -922,6 +943,7 @@ PairCalculator::sumPartialResult(int size, complex *result, int offset)
 
 #endif
   if (sumPartialCount == countExpect) {
+
 #ifndef _PAIRCALC_SECONDPHASE_LOADBAL_
     for(int j=0; j<grainSize; j++){
       CkCallback mycb(cb_ep, CkArrayIndex2D(thisIndex.y+j, thisIndex.w), cb_aid);
