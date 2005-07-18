@@ -8,6 +8,18 @@
  *
  */
 
+/* 
+   Which types of entities are currently supported:
+   
+   e2n: Just the element conn table
+   e2e: all
+   n2e: all
+   n2n: 
+   
+
+*/
+
+
 #include "fem.h"
 #include "fem_impl.h"
 #include "charm-api.h" /*for CDECL, FTN_NAME*/
@@ -84,14 +96,13 @@ void FEM_Node::fillElemAdjacencyTable(int type,const FEM_Elem &elem){
 		for(int j=0;j<nodesPerElem;j++){
 		  int node = conn[j];
 		  if(FEM_Is_ghost_index(node))	
-			ghostAdjacencyTable[FEM_To_ghost_index(node)].push_back(var_id(type,i));
+			ghostAdjacencyTable[FEM_To_ghost_index(node)].push_back(var_id(type,FEM_From_ghost_index(i)));
 		  else if (node!=-1)
-			adjacencyTable[node].push_back(var_id(type,i));
+			adjacencyTable[node].push_back(var_id(type,FEM_From_ghost_index(i)));
 		  else{}//invalid node.. shouldnt happen
 		}
 	  }
 	}
-	
 
 };
 
@@ -116,6 +127,8 @@ void FEM_Node::fillNodeAdjacency(const FEM_Elem &elem){
 	CkVec<CkVec<var_id> > &adjacencyTable = nodeAdjacency->get();
 	FEM_VarIndexAttribute *ghostAdjacencyAttr = ((FEM_Node *)getGhost())->nodeAdjacency;
 	CkVec<CkVec<var_id> > &ghostAdjacencyTable = ghostAdjacencyAttr->get();
+
+	// Add the adjacencies defined by the non-ghost elements
 	for(int i=0;i<elem.size();i++){        // for each element of the given type
 		const int *conn = elem.connFor(i);
 		for(int j=0;j<nodesPerElem;j++){   // for each node adjacent to the element
@@ -142,10 +155,51 @@ void FEM_Node::fillNodeAdjacency(const FEM_Elem &elem){
 				}
 			  }
 			}
-			else{}//invalid node.. shouldnt happen
+			else{}//invalid node.. shouldn't happen
 			
 		}
 	}
+
+	// Add adjacencies defined by the ghost elements
+	if(elem.getGhost()){
+	  for(int i=0;i<((FEM_Elem*)elem.getGhost())->size();i++){        // for each element of the given type
+		const int *conn = ((FEM_Elem*)elem.getGhost())->connFor(i);
+		for(int j=0;j<nodesPerElem;j++){   // for each node adjacent to the element
+		  int node = conn[j];
+		  if(FEM_Is_ghost_index(node)) { // A ghost node
+			for(int k=0;k<nodesPerElem;k++){
+			  if(conn[k] != node){ // Here we need the node id which is negative not the corresponding positive index
+				  var_id nodeIDAdded = var_id::createNodeID(1,conn[k]);
+				  int idx = ghostAdjacencyAttr->findInRow(node,nodeIDAdded); // find position of k'th node in adjacency list
+				  if(idx == -1){ // If k'th node is not currently in the adjacency list, push it onto list
+					(ghostAdjacencyAttr->get())[FEM_To_ghost_index(node)].push_back(nodeIDAdded); // Here we need the node index which is positive
+				  }
+			  }
+			}
+		  }
+		  else if (node!=-1) { // A non-ghost node, almost same as for ghost nodes
+			for(int k=0;k<nodesPerElem;k++){
+			  if(conn[k] != node){
+				var_id nodeIDAdded = var_id::createNodeID(1,conn[k]);
+				int idx = nodeAdjacency->findInRow(node,nodeIDAdded);
+				if(idx == -1){
+				  (nodeAdjacency->get())[node].push_back(nodeIDAdded);
+				}
+			  }
+			}
+		  }
+		  else{}//invalid node.. shouldn't happen
+		  
+		}
+	  }
+	}
+
+
+
+
+
+
+
 };
 
 void FEM_Node::setNodeAdjacency(const FEM_Elem &elem){
