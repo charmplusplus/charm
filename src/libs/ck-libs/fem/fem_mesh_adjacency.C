@@ -63,17 +63,36 @@ void FEM_Node::fillElemAdjacencyTable(int type,const FEM_Elem &elem){
 	int nodesPerElem = elem.getNodesPer();
 	CkVec<CkVec<var_id> > &adjacencyTable = elemAdjacency->get();
 	CkVec<CkVec<var_id> > &ghostAdjacencyTable = ((FEM_Node *)getGhost())->elemAdjacency->get();
+
+	// Scan through elements
 	for(int i=0;i<elem.size();i++){
-		const int *conn = elem.connFor(i);
-		for(int j=0;j<nodesPerElem;j++){
-				int node = conn[j];
-				if(FEM_Is_ghost_index(node))	
-				  ghostAdjacencyTable[FEM_To_ghost_index(node)].push_back(var_id(type,i));
-				else if (node!=-1)
-				  adjacencyTable[node].push_back(var_id(type,i));
-				else{}//invalid node.. shouldnt happen
-		}
+	  const int *conn = elem.connFor(i);
+	  for(int j=0;j<nodesPerElem;j++){
+		int node = conn[j];
+		if(FEM_Is_ghost_index(node))	
+		  ghostAdjacencyTable[FEM_To_ghost_index(node)].push_back(var_id(type,i));
+		else if (node!=-1)
+		  adjacencyTable[node].push_back(var_id(type,i));
+		else{}//invalid node.. shouldnt happen
+	  }
 	}
+	
+	// Scan through ghost elements
+	if(elem.getGhost()){
+	  for(int i=0;i<((FEM_Elem*)elem.getGhost())->size();i++){
+		const int *conn = ((FEM_Elem*)elem.getGhost())->connFor(i);
+		for(int j=0;j<nodesPerElem;j++){
+		  int node = conn[j];
+		  if(FEM_Is_ghost_index(node))	
+			ghostAdjacencyTable[FEM_To_ghost_index(node)].push_back(var_id(type,i));
+		  else if (node!=-1)
+			adjacencyTable[node].push_back(var_id(type,i));
+		  else{}//invalid node.. shouldnt happen
+		}
+	  }
+	}
+	
+
 };
 
 //  Fill the node to element adjacency table for both this element and its corresponding ghosts
