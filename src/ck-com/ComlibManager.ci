@@ -4,6 +4,7 @@ module comlib {
   message ComlibDummyMsg;
   //  message PrioMsg;
   message ComlibMulticastMsg {
+	ComlibMulticastIndexCount indicesCount[];
 	CkArrayIndexMax indices[];
 	char usrMsg[];
   };

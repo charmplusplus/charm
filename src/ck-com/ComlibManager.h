@@ -45,13 +45,22 @@ class PrioMsg: public CMessage_PrioMsg {
 };
 */
 
+/**
+ * Structure used to hold a count of the indeces associated to each pe in a multicast message.
+ */
+struct ComlibMulticastIndexCount {
+  int pe;
+  int count;
+};
+
 class ComlibMulticastMsg : public CkMcastBaseMsg, 
                public CMessage_ComlibMulticastMsg {
     
   public:
-    int nIndices;
-    char *usrMsg;        
+    int nPes;
+    ComlibMulticastIndexCount *indicesCount;
     CkArrayIndexMax *indices;
+    char *usrMsg;        
 };
 
 class ComlibManager;

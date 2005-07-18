@@ -72,21 +72,44 @@ ComlibSectionHashObject *RingMulticastStrategy::createObjectOnSrcPe
 }
 
 
-ComlibSectionHashObject *RingMulticastStrategy::createObjectOnIntermediatePe
-(int nelements, CkArrayIndexMax *elements, int src_pe){
+ComlibSectionHashObject *
+RingMulticastStrategy::createObjectOnIntermediatePe(int nindices,
+						    CkArrayIndexMax *idxlist,
+						    int npes,
+						    ComlibMulticastIndexCount *counts,
+						    int src_pe){
 
-    ComlibSectionHashObject *obj;
+  ComlibSectionHashObject *obj = new ComlibSectionHashObject;
 
-    obj = createObjectOnSrcPe(nelements, elements);
-    
-    //here we check if have reached the end of the ring
-    if(obj->npes > 0 && isEndOfRing(*obj->pelist, src_pe)) {
-        delete obj->pelist;
-        obj->pelist = NULL;
-        obj->npes =0;
+  obj->indices.resize(0);
+  for (int i=0; i<nindices; ++i) obj->indices.insertAtEnd(idxlist[i]);
+  //obj = createObjectOnSrcPe(nelements, elements);
+
+  obj->pelist = new int[1];
+  obj->npes = 1;
+  obj->pelist[0] = CkMyPe(); // this is neutral for the if inside next loop
+
+  // find the next processor in the ring
+  for (int i=0; i<npes; ++i) {
+    if (obj->pelist[0] > CkMyPe()) { // we have already found a processor greater
+                                     // than us, find the smallest among them
+      if (counts[i].pe > CkMyPe() && counts[i].pe < obj->pelist[0])
+	obj->pelist[0] = counts[i].pe;
+    } else {  // we have not yet found a processor greater than us, stick with
+	      // the smallest, or one greater than us
+      if (counts[i].pe < obj->pelist[0] || counts[i].pe > CkMyPe())
+	obj->pelist[0] = counts[i].pe;
     }
+  }
+    
+  //here we check if have reached the end of the ring
+  if(obj->npes > 0 && isEndOfRing(*obj->pelist, src_pe)) {
+    delete obj->pelist;
+    obj->pelist = NULL;
+    obj->npes = 0;
+  }
 
-    return obj;
+  return obj;
 }
 
 //We need to end the ring, 

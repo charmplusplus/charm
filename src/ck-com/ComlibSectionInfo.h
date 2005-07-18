@@ -132,12 +132,42 @@ class ComlibSectionInfo {
     
     void processOldSectionMessage(CharmMessageHolder *cmsg);
 
+    /**
+     * Starting from a message to be sent, it generates a new message containing
+     * the information about the multicast, together with the message itself.
+     * The info about the multicast is contained in the field sec_id of cmsg.
+     */
     ComlibMulticastMsg *getNewMulticastMessage(CharmMessageHolder *cmsg);
 
-    void unpack(envelope *cb_env, CkVec<CkArrayIndexMax> &destIndices, 
+    /**
+     * Given a ComlibMulticastMsg arrived through the network as input (cb_env),
+     * separate it into its basic components.
+
+     * destIndeces is the pointer to the first element in this processor (as by
+     * the knowledge of the sender); nLocalElems is the count of how many
+     * elements are local. env is a new allocated memory containing the user
+     * message.
+     */
+    void unpack(envelope *cb_env, int &nLocalElems, CkArrayIndexMax *&destIndices, 
                 envelope *&env);
 
     void localMulticast(envelope *env);
+
+    /**
+     * Returns the number of remote procs involved in the array index list, the
+     * number of elements each proc has, and the mapping between indices and
+     * procs.
+     
+     * @param nindices size of the array idxlist (input)
+     * @param idxlist array of indeces of the section (input)
+     * @param npes number of processors involved (output)
+     * @param nidx number of indices that are remote (output)
+     * @param counts array of associations pe-count: number of elements in proc pe (output, new'ed(CkNumPes()))
+     * @param belongs array of integers expressing association of elements with pes: belongs[i] = index in counts of the processor having index i (output, new'ed(nidx))
+    */
+    void getRemotePeCount(int nindices, CkArrayIndexMax *idxlist, 
+			  int &npes, int &nidx,
+			  ComlibMulticastIndexCount *&counts, int *&belongs);
 
     void getRemotePelist(int nindices, CkArrayIndexMax *idxlist, 
                          int &npes, int *&pelist);

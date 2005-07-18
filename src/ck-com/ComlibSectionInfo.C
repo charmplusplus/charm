@@ -17,25 +17,44 @@ ComlibMulticastMsg * ComlibSectionInfo::getNewMulticastMessage
     initSectionID(cmsg->sec_id);   
 
     CkPackMessage(&env);
-    int sizes[2];
-    sizes[0] = cmsg->sec_id->_nElems;
-    sizes[1] = env->getTotalsize();                
+    int nRemotePes, nRemoteIndices;
+    ComlibMulticastIndexCount *indicesCount;
+    int *belongingList;
+    getRemotePeCount(cmsg->sec_id->_nElems, cmsg->sec_id->_elems, nRemotePes, nRemoteIndices, indicesCount, belongingList);
+    if (nRemotePes == 0) return NULL;
+
+    int sizes[3];
+    sizes[0] = nRemotePes;
+    sizes[1] = nRemoteIndices; // only those remote ///cmsg->sec_id->_nElems;
+    sizes[2] = env->getTotalsize();
     
-    ComlibPrintf("Creating new comlib multicast message %d, %d\n", sizes[0], sizes[1]);
+    ComlibPrintf("Creating new comlib multicast message %d, %d %d\n", sizes[0], sizes[1], sizes[2]);
     
     ComlibMulticastMsg *msg = new(sizes, 0) ComlibMulticastMsg;
-    msg->nIndices = cmsg->sec_id->_nElems;
+    msg->nPes = nRemotePes;
     msg->_cookie.sInfo.cInfo.instId = instanceID;
     msg->_cookie.sInfo.cInfo.id = MaxSectionID - 1;
     msg->_cookie.sInfo.cInfo.status = COMLIB_MULTICAST_NEW_SECTION;
     msg->_cookie.type = COMLIB_MULTICAST_MESSAGE;
     msg->_cookie.pe = CkMyPe();
     
-    memcpy(msg->indices, cmsg->sec_id->_elems, 
-           sizes[0] * sizeof(CkArrayIndexMax));
-    memcpy(msg->usrMsg, env, sizes[1] * sizeof(char));         
+    // fill in the three pointers of the ComlibMulticastMsg
+    memcpy(msg->indicesCount, indicesCount, sizes[0] * sizeof(ComlibMulticastIndexCount));
+    //memcpy(msg->indices, cmsg->sec_id->_elems, sizes[1] * sizeof(CkArrayIndexMax));
+    CkArrayIndexMax *indicesPe[nRemotePes];
+    indicesPe[0] = msg->indices;
+    for (int i=1; i<nRemotePes; ++i) indicesPe[i] = indicesPe[i-1] + indicesCount[i-1].count;
+    for (int i=0; i<cmsg->sec_id->_nElems; ++i) {
+      if (belongingList[i] >= 0) {
+	*indicesPe[belongingList[i]] = cmsg->sec_id->_elems[i];
+	indicesPe[belongingList[i]]++;
+      }
+    }
+    memcpy(msg->usrMsg, env, sizes[2] * sizeof(char));
     envelope *newenv = UsrToEnv(msg);
-    
+    delete [] indicesCount;
+    delete [] belongingList;
+
     newenv->getsetArrayMgr() = env->getsetArrayMgr();
     newenv->getsetArraySrcPe() = env->getsetArraySrcPe();
     newenv->getsetArrayEp() = env->getsetArrayEp();
@@ -50,12 +69,24 @@ ComlibMulticastMsg * ComlibSectionInfo::getNewMulticastMessage
     return (ComlibMulticastMsg *)EnvToUsr(newenv);
 }
 
-void ComlibSectionInfo::unpack(envelope *cb_env, 
-                               CkVec<CkArrayIndexMax> &dest_indices, 
+void ComlibSectionInfo::unpack(envelope *cb_env,
+			       int &nLocalElems,
+                               CkArrayIndexMax *&dest_indices, 
                                envelope *&env) {
         
     ComlibMulticastMsg *ccmsg = (ComlibMulticastMsg *)EnvToUsr(cb_env);
-    
+    int i;
+
+    dest_indices = ccmsg->indices;
+    for (i=0; i<ccmsg->nPes; ++i) {
+      if (ccmsg->indicesCount[i].pe == CkMyPe()) break;
+      dest_indices += ccmsg->indicesCount[i].count;
+    }
+
+    CkAssert(i < ccmsg->nPes);
+    nLocalElems = ccmsg->indicesCount[i].count;
+
+    /*
     for(int count = 0; count < ccmsg->nIndices; count++){
         CkArrayIndexMax idx = ccmsg->indices[count];
         
@@ -66,8 +97,9 @@ void ComlibSectionInfo::unpack(envelope *cb_env,
         
         //        if(dest_proc == CkMyPe())
         dest_indices.insertAtEnd(idx);                        
-    }            
-    
+    }
+    */
+
     envelope *usrenv = (envelope *) ccmsg->usrMsg;
     env = (envelope *)CmiAlloc(usrenv->getTotalsize());
     memcpy(env, ccmsg->usrMsg, usrenv->getTotalsize());
@@ -123,6 +155,55 @@ void ComlibSectionInfo::getPeList(int _nElems,
 }
 
 
+void ComlibSectionInfo::getRemotePeCount(int nindices, CkArrayIndexMax *idxlist, 
+		      int &npes, int &nidx,
+		      ComlibMulticastIndexCount *&counts, int *&belongs) {
+  int count = 0;
+  int i;
+    
+  int length = CkNumPes();
+
+  if(length > nindices) length = nindices;
+    
+  counts = new ComlibMulticastIndexCount[length];
+  belongs = new int[nindices];
+  npes = 0;
+  nidx = 0;
+
+  for(i=0; i<nindices; ++i){
+    int p = ComlibGetLastKnown(destArrayID, idxlist[i]);
+    if(p == CkMyPe()) {
+      belongs[i] = -1;
+      continue;
+    }
+    
+    if(p == -1) CkAbort("Invalid Section\n");        
+
+    ++nidx;
+    //Collect remote processors
+    for(count = 0; count < npes; count ++)
+      if(counts[count].pe == p)
+	break;
+    
+    if(count == npes) {
+      counts[npes].pe = p;
+      counts[npes].count = 0;
+      ++npes;
+    }
+
+    counts[count].count++;
+    belongs[i] = count;
+  }
+  
+  if(npes == 0) {
+    delete [] counts;
+    delete [] belongs;
+    counts = NULL;
+    belongs = NULL;
+  }
+}
+
+
 void ComlibSectionInfo::getRemotePelist(int nindices, 
                                         CkArrayIndexMax *idxlist, 
                                         int &npes, int *&pelist) {
@@ -130,6 +211,18 @@ void ComlibSectionInfo::getRemotePelist(int nindices,
     int count = 0, acount = 0;
     
     int length = CkNumPes();
+
+    // HACK FOR DEBUGGING
+    /*pelist = new int[length-1];
+    npes = length-1;
+    for (acount=0; acount<length; acount++) {
+      if (acount == CkMyPe()) continue;
+      pelist[count]=acount;
+      count++;
+    }
+    return;*/
+    // END HACK
+
     if(length > nindices)
         length = nindices;
     

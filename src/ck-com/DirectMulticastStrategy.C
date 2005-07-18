@@ -105,7 +105,7 @@ void DirectMulticastStrategy::insertMessage(CharmMessageHolder *cmsg){
             localMulticast(UsrToEnv(msg), obj);
             CkFreeMsg(msg);
             
-            remoteMulticast(UsrToEnv(newmsg), obj);
+            if (newmsg != NULL) remoteMulticast(UsrToEnv(newmsg), obj);
         }        
     }
     else 
@@ -130,8 +130,8 @@ void DirectMulticastStrategy::insertSectionID(CkSectionID *sid) {
 }
 
 
-ComlibSectionHashObject *DirectMulticastStrategy::createObjectOnSrcPe
-(int nindices, CkArrayIndexMax *idxlist) {
+ComlibSectionHashObject *
+DirectMulticastStrategy::createObjectOnSrcPe(int nindices, CkArrayIndexMax *idxlist) {
 
     ComlibSectionHashObject *obj = new ComlibSectionHashObject();
     
@@ -142,16 +142,21 @@ ComlibSectionHashObject *DirectMulticastStrategy::createObjectOnSrcPe
 }
 
 
-ComlibSectionHashObject *DirectMulticastStrategy::
-createObjectOnIntermediatePe(int nindices, CkArrayIndexMax *idxlist, 
-                             int srcpe){
+ComlibSectionHashObject *
+DirectMulticastStrategy::createObjectOnIntermediatePe(int nindices,
+						      CkArrayIndexMax *idxlist,
+						      int npes,
+						      ComlibMulticastIndexCount *counts,
+						      int srcpe) {
 
     ComlibSectionHashObject *obj = new ComlibSectionHashObject();
         
     obj->pelist = 0;
     obj->npes = 0;
-    
-    sinfo.getLocalIndices(nindices, idxlist, obj->indices);
+
+    obj->indices.resize(0);
+    for (int i=0; i<nindices; ++i) obj->indices.insertAtEnd(idxlist[i]);
+    //sinfo.getLocalIndices(nindices, idxlist, obj->indices);
 
     return obj;
 }
@@ -220,6 +225,7 @@ void DirectMulticastStrategy::remoteMulticast(envelope *env,
     CkPackMessage(&env);
     //Sending a remote multicast
     CmiSyncListSendAndFree(npes, pelist, env->getTotalsize(), (char*)env);
+    //CmiSyncBroadcastAndFree(env->getTotalsize(), (char*)env);
 }
 
 void DirectMulticastStrategy::pup(PUP::er &p){
@@ -271,17 +277,19 @@ void DirectMulticastStrategy::handleMessage(void *msg){
     }
 }
 
+#include <string>
 
 void DirectMulticastStrategy::handleNewMulticastMessage(envelope *env) {
     
     ComlibPrintf("%d : In handleNewMulticastMessage\n", CkMyPe());
 
     CkUnpackMessage(&env);    
-    
+
+    int localElems;
     envelope *newenv;
-    CkVec<CkArrayIndexMax> idx_list;    
+    CkArrayIndexMax *local_idx_list;    
     
-    sinfo.unpack(env, idx_list, newenv);
+    sinfo.unpack(env, localElems, local_idx_list, newenv);
 
     ComlibMulticastMsg *cbmsg = (ComlibMulticastMsg *)EnvToUsr(env);
     ComlibSectionHashKey key(cbmsg->_cookie.pe, 
@@ -290,18 +298,34 @@ void DirectMulticastStrategy::handleNewMulticastMessage(envelope *env) {
     ComlibSectionHashObject *old_obj = NULL;
     
     old_obj = sec_ht.get(key);
-    if(old_obj != NULL)
+    if(old_obj != NULL) {
         delete old_obj;
+    }
 
-    
+    /*
     CkArrayIndexMax *idx_list_array = new CkArrayIndexMax[idx_list.size()];
     for(int count = 0; count < idx_list.size(); count++)
         idx_list_array[count] = idx_list[count];
+    */
 
-    ComlibSectionHashObject *new_obj = createObjectOnIntermediatePe
-        (idx_list.size(), idx_list_array, cbmsg->_cookie.pe);
+    ComlibSectionHashObject *new_obj = createObjectOnIntermediatePe(localElems, local_idx_list, cbmsg->nPes, cbmsg->indicesCount, cbmsg->_cookie.pe);
 
-    delete [] idx_list_array;
+    /*
+    char buf[100];
+    std::string tmp = "";
+    for (int i=0; i<idx_list.size(); i++) {
+      sprintf(buf, " (%d-%d-%d-%d)",((short*)&idx_list_array[i])[2],((short*)&idx_list_array[i])[3],((short*)&idx_list_array[i])[4],((short*)&idx_list_array[i])[5]);
+      tmp+=buf;
+    }
+    ComlibPrintf("[%d] LOCAL MULTICAST: %s\n",key.hash(),tmp.data());
+    tmp=""+new_obj->npes;
+    for (int i=0; i<new_obj->npes; i++) {
+      sprintf(buf, " %d",new_obj->pelist[i]);
+      tmp+=buf;
+    }
+    ComlibPrintf("[%d] REMOTE MULTICAST: %s\n",key.hash(),tmp.data());
+    */
+    //delete [] idx_list_array;
     
     sec_ht.put(key) = new_obj;
 

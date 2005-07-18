@@ -3,7 +3,12 @@
 
 #include "DirectMulticastStrategy.h"
 
-
+/**
+ * Multicast Strategy that sends a multicast in a ring: the source processor
+ * send a message only to its following neighbour, which propagates it forward
+ * to its neighbour, and so on. Only the processors involved in the multicast
+ * are part of the ring.
+ */
 class RingMulticastStrategy: public DirectMulticastStrategy {
     
  protected:
@@ -14,8 +19,11 @@ class RingMulticastStrategy: public DirectMulticastStrategy {
     virtual ComlibSectionHashObject *createObjectOnSrcPe(int nelements, 
                                                          CkArrayIndexMax *elements);
 
-    virtual ComlibSectionHashObject *createObjectOnIntermediatePe
-        (int nelements, CkArrayIndexMax *elements, int src_pe);
+    virtual ComlibSectionHashObject *createObjectOnIntermediatePe(int nelements,
+								  CkArrayIndexMax *elements,
+								  int npes,
+								  ComlibMulticastIndexCount *counts,
+								  int src_pe);
     
  public:
     
