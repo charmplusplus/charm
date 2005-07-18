@@ -133,10 +133,14 @@ extern "C" void finishPairCalc(PairCalcID* aid, int n, double *ptr);
 
 extern "C" void finishPairCalc2(PairCalcID* pcid, int n, double *ptr1, double *ptr2);
 
+extern "C" void finishPairCalcSection(int n, double *ptr,CProxySection_PairCalculator sectionProxy);
+
+extern "C" void finishPairCalcSection2( int n, double *ptr1, double *ptr2,CProxySection_PairCalculator sectionProxy);
+
 void initSectRed ( bool sym, int s, int grainSize, int numZ, int* z, 
 		   int blkSize,  PairCalcID* pcid);
 
-CProxySection_PairCalculator initOneRedSect( bool sym, int numZ, int* z, int blkSize,  PairCalcID* pcid, CkCallback cb, int s1, int s2, int c);
+CProxySection_PairCalculator initOneRedSect( int numZ, int* z, int blkSize,  PairCalcID* pcid, CkCallback cb, int s1, int s2, int c);
 
 void startPairCalcLeftAndFinish(PairCalcID* pcid, int n, complex* ptr, int myS, int myZ);
 

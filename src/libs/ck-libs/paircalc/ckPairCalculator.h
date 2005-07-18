@@ -309,6 +309,7 @@ class PairCalculator: public CBase_PairCalculator {
   void acceptResult(int size, double *matrix);
   void acceptResult(int size, double *matrix1, double *matrix2);
   void acceptResultSlow(acceptResultMsg *msg);
+  void acceptResultSlow(acceptResultMsg2 *msg);
   void acceptResult(acceptResultMsg *msg);
   void acceptResult(acceptResultMsg2 *msg);
   void sumPartialResult(int size, complex *result, int offset);

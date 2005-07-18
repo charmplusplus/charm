@@ -535,6 +535,12 @@ PairCalculator::acceptResultSlow(acceptResultMsg *msg)
 }
 
 void
+PairCalculator::acceptResultSlow(acceptResultMsg2 *msg)
+{
+  acceptResult(msg->size, msg->matrix1, msg->matrix2);
+}
+
+void
 PairCalculator::acceptResult(acceptResultMsg *msg)
 {
   acceptResult(msg->size, msg->matrix, NULL);
@@ -579,16 +585,26 @@ PairCalculator::acceptResult(int size, double *matrix1, double *matrix2)
 
   //ASSUMING TMATRIX IS REAL (LOSS OF GENERALITY)
   register double m=0;
-
-
-  int matrixSize=grainSize*grainSize;
-
+  bool makeLocalCopy=false;
   double *amatrix=NULL;
 
+  if(S!=grainSize && size!=S)
+    makeLocalCopy=true;
+  
+  if(S==grainSize)// all at once no malloc
+    {
+      amatrix=matrix1+index;
+    }
+  else
+    { // you were sent the correct section only
+      amatrix=matrix1;
+    }
 
+  int matrixSize=grainSize*grainSize;
   double *localMatrix;
   double *outMatrix;
-  if(S!=grainSize)
+
+  if(makeLocalCopy)
     {
 #ifdef _PAIRCALC_DEBUG_PARANOID_
       char ifilename[80];
@@ -601,7 +617,6 @@ PairCalculator::acceptResult(int size, double *matrix1, double *matrix2)
 	}
       fclose(ofile);
 #endif
-
       // copy grainSize chunks at S offsets
       amatrix=new double[matrixSize];
       memset(amatrix,0,matrixSize *sizeof(double));
@@ -612,10 +627,7 @@ PairCalculator::acceptResult(int size, double *matrix1, double *matrix2)
 	memcpy(outMatrix,localMatrix,grainSize*sizeof(double));
       }
     }
-  else // all at once no malloc
-    {
-      amatrix=matrix1+index;
-    }
+
 
 #ifdef _PAIRCALC_DEBUG_
   for (int i = 0; i < grainSize; i++) {
@@ -700,7 +712,7 @@ PairCalculator::acceptResult(int size, double *matrix1, double *matrix2)
 
 
   if(!unitcoef){ // CG non minimization case
-
+    // FIXME: we need to figure out section arrangement for this
     if(S!=grainSize)
       for(int i=0;i<grainSize;i++){
 	localMatrix = (matrix2+index+i*S);
@@ -732,7 +744,7 @@ PairCalculator::acceptResult(int size, double *matrix1, double *matrix2)
 #endif
   } // end  CG case
 
-  if(S!=grainSize)
+  if(makeLocalCopy)
     delete [] amatrix;
   // else we didn't allocate one
 

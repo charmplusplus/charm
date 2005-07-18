@@ -50,6 +50,7 @@ module ckPairCalculator {
 
 		entry  void acceptResult(int size, double matrix1[size], double matrix2[size]);
 		entry [nokeep] void acceptResultSlow(acceptResultMsg *msg);
+		entry [nokeep] void acceptResultSlow(acceptResultMsg2 *msg);
 		entry [nokeep,inline] void acceptResult(acceptResultMsg *msg);
 		entry [nokeep,inline] void acceptResult(acceptResultMsg2 *msg);
 	  	entry void sumPartialResult(int size, complex result[size], int offset);

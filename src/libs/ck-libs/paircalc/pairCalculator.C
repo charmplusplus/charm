@@ -193,7 +193,7 @@ void initSectRed ( bool sym, int s, int grainSize, int numZ, int* z,
   */
 }
 
-CProxySection_PairCalculator initOneRedSect( bool sym, int numZ, int* z, int blkSize,  PairCalcID* pcid, CkCallback cb, int s1, int s2, int c)
+CProxySection_PairCalculator initOneRedSect(int numZ, int* z, int blkSize,  PairCalcID* pcid, CkCallback cb, int s1, int s2, int c)
 {
   int ecount=0;
   CkArrayIndexMax *elems =new CkArrayIndexMax[numZ/blkSize];  
@@ -549,6 +549,10 @@ void finishPairCalc(PairCalcID* pcid, int n, double *ptr) {
     finishPairCalc2(pcid, n, ptr, NULL);
 }
 
+void finishPairCalcSection(int n, double *ptr, CProxySection_PairCalculator sectionProxy) {
+    finishPairCalcSection2(n, ptr, NULL, sectionProxy);
+}
+
 void finishPairCalc2(PairCalcID* pcid, int n, double *ptr1, double *ptr2) {
 #ifdef _PAIRCALC_DEBUG_
   CkPrintf("     Calc Finish 2\n");
@@ -611,6 +615,25 @@ void finishPairCalc2(PairCalcID* pcid, int n, double *ptr1, double *ptr2) {
       bcastInstance.endIteration();
   }
 }
+
+/* This version uses a section multicast to only send the part of the matrix needed by each section */
+void finishPairCalcSection2(int n, double *ptr1, double *ptr2, CProxySection_PairCalculator sectionProxy) {
+#ifdef _PAIRCALC_DEBUG_
+  CkPrintf("     Calc Finish Mcast 2\n");
+#endif
+
+  if(ptr2==NULL){
+      acceptResultMsg *omsg=new ( n,0 ) acceptResultMsg;
+      omsg->init(n, ptr1);
+      sectionProxy.acceptResultSlow(omsg);
+  }
+  else {
+      acceptResultMsg2 *omsg=new ( n,n,0 ) acceptResultMsg2;
+      omsg->init(n, ptr1, ptr2);
+      sectionProxy.acceptResultSlow(omsg);
+  }
+}
+
 
 void startPairCalcLeftAndFinish(PairCalcID* pcid, int n, complex* ptr, int myS, int myZ){
     
