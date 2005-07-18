@@ -18,7 +18,7 @@ typedef BGLML::TorusDirectMessage<BGLML::DetermRoutePacket> DetermMsg;
 /* #include "BGLML/templates/TorusDynamicMessage.h" 
 typedef BGLML::TorusDynamicMessage<BGLML::DynamicRoutePacket> DynamicMsg; */
 
-#define EAGER 1
+#define EAGER 0
 
 #include "bglml/BLMPI_EagerProtocol.h"
 #include "bglml/BLMPI_RzvProtocol.h"
@@ -35,7 +35,7 @@ inline char *ALIGN_16(char *p){
 
 static char *_msgr_buf = NULL;
 static BLMPI_Messager_t* _msgr = NULL;
-
+static void ** _recvArray;
 /*
     To reduce the buffer used in broadcast and distribute the load from 
   broadcasting node, define CMK_BROADCAST_SPANNING_TREE enforce the use of 
@@ -46,7 +46,7 @@ static BLMPI_Messager_t* _msgr = NULL;
 #if CMK_SMP
 #define CMK_BROADCAST_SPANNING_TREE    0
 #else
-#define CMK_BROADCAST_SPANNING_TREE    1
+#define CMK_BROADCAST_SPANNING_TREE    0
 #define CMK_BROADCAST_HYPERCUBE        0
 #endif /* CMK_SMP */
 
@@ -204,11 +204,12 @@ void SendSpanningChildren(int size, char *msg);
 void SendHypercube(int size, char *msg);
 
 typedef struct msg_list {
+  BGLQuad info;
   char *msg;
   char *send_buf;
 } SMSG_LIST;
 
-#define MAX_QLEN 200
+#define MAX_QLEN 32
 static int msgQueueLen = 0;
 static int request_max;
 static int no_outstanding_sends=0; /*FLAG: consume outstanding Isends in scheduler loop*/
@@ -252,16 +253,18 @@ struct CmiMsgInfo{
 #endif
   char* msgptr;
   int sndlen;
-  int padding;
 };
 
 /* send done callback: sets the smsg entry to done */
 static void send_done(void *data){
-  SMSG_LIST *msg_tmp = (SMSG_LIST *)data;
-  msgQueueLen--;
+  SMSG_LIST *msg_tmp = (SMSG_LIST *)ALIGN_16((char *)data);
   CmiFree(msg_tmp->msg);
+  msg_tmp->msg=NULL;
   CmiFree(msg_tmp->send_buf);
+  msg_tmp->send_buf=NULL;
   CmiFree(data);
+  data=NULL;
+  msgQueueLen--;
 }
 
 /* recv done callback: push the recved msg to recv queue */
@@ -274,8 +277,8 @@ static void recv_done(void *clientdata){
    * push msg to recv queue */
   CMI_CHECK_CHECKSUM(msg, sndlen);
   if (CMI_MAGIC(msg) != CHARM_MAGIC_NUMBER) { /* received a non-charm msg */
-    CmiPrintf("Charm++ Warning: Non Charm++ Message Received. \n");
-    CmiFree(msg);
+    CmiFree(clientdata);
+    CmiAbort("Charm++ Warning: Non Charm++ Message Received. \n");
     return;
   }
 #if CMK_NODE_QUEUE_AVAILABLE
@@ -300,16 +303,19 @@ static void recv_done(void *clientdata){
 
 /* first packet recv callback, gets recv_done for the whole msg */
 #if EAGER
-BLMPI_Eager_Recv_t * first_pkt_recv_done (const BGLQuad    * msginfo,
+BLMPI_Eager_Recv_t * first_pkt_recv_done (
 #else
-BLMPI_Rzv_Recv_t * first_pkt_recv_done   (const BGLQuad    * msginfo,
+BLMPI_Rzv_Recv_t * first_pkt_recv_done   (
 #endif
+					  const BGLQuad    * msginfo,
 					  unsigned 	     senderrank,
 					  const unsigned     sndlen,
 					  unsigned         * rcvlen,
 					  char            ** buffer,
 					  void           (** cb_done)(void *),
-					  void            ** clientdata){
+					  void            ** clientdata
+					 )
+{
   outstanding_recvs++;
   /* printf ("Receiving %d bytes\n", sndlen); */
   *rcvlen = sndlen>0?sndlen:1;	/* to avoid malloc(0) which might return NULL */
@@ -338,9 +344,9 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
   _Cmi_mynode = BLMPI_Messager_rank(_msgr);
 
   /* Eager protocol init */
-  void ** recvArray = (void **) malloc (sizeof(void *) * _Cmi_numnodes);
+  _recvArray = (void **) CmiAlloc (sizeof(void *) * _Cmi_numnodes);
 #if EAGER
-  BLMPI_Eager_Init(_msgr, first_pkt_recv_done, recvArray, 11, 12);
+  BLMPI_Eager_Init(_msgr, first_pkt_recv_done, _recvArray, 11, 12);
 #else
   BLMPI_Rzv_Init(_msgr, first_pkt_recv_done, 11, 12, 3, 13);
 #endif
@@ -543,8 +549,9 @@ void ConverseExit(void){
 
   ConverseCommonExit();
 
+  CmiFree(procState);
   CmiFree(_msgr_buf);
-  
+  CmiFree(_recvArray); 
 #if (CMK_DEBUG_MODE || CMK_WEB_MODE || NODE_0_IS_CONVHOST)
   if (CmiMyPe() == 0){
     CmiPrintf("End of program\n");
@@ -557,7 +564,7 @@ void ConverseExit(void){
 /* exit() called on any node would abort the whole program */
 void CmiAbort(const char * message){
   CmiError("------------- Processor %d Exiting: Called CmiAbort ------------\n"
-        "Reason: %s\n",CmiMyPe(),message);
+        "{snd:%d,rcv:%d} Reason: %s\n",CmiMyPe(),msgQueueLen,outstanding_recvs,message);
   CmiPrintStackTrace(0);
   exit(-1);
 }
@@ -592,10 +599,14 @@ void *CmiGetNonLocal(){
   }
   
   if(!msg) {
+    AdvanceCommunications();
+    return PCQueuePop(cs->recv);
+/*
     if (PumpMsgs())
       return  PCQueuePop(cs->recv);
     else
       return 0;
+*/
   }
 #endif /* !CMK_SMP */
   return msg;
@@ -623,8 +634,9 @@ void  CmiGeneralFreeSend(int destPE, int size, char* msg){
     CmiSendSelf(msg);
     return;
   }
-  
-  SMSG_LIST *msg_tmp = (SMSG_LIST *)CmiAlloc(sizeof(SMSG_LIST));
+ 
+  void *msg_tmp_buf = CmiAlloc(sizeof(SMSG_LIST)+16); 
+  SMSG_LIST *msg_tmp = (SMSG_LIST *)ALIGN_16((char *)msg_tmp_buf);
   msg_tmp->msg = msg;
 
 #if EAGER
@@ -635,20 +647,18 @@ void  CmiGeneralFreeSend(int destPE, int size, char* msg){
   BLMPI_Rzv_Send_t *send = (BLMPI_Rzv_Send_t *)ALIGN_16(msg_tmp->send_buf);
 #endif
 
-  while (msgQueueLen > request_max) {
-	/*printf("Waiting for %d messages to be sent\n", msgQueueLen);*/
-        AdvanceCommunications();
-  }
   CMI_MAGIC(msg) = CHARM_MAGIC_NUMBER;
   CMI_SET_CHECKSUM(msg, size);
 
-  BGLQuad info;
+  CQdCreate(CpvAccess(cQdState), 1);
 #if EAGER
-  BLMPI_Eager_Send(send, _msgr, &info, msg, size, destPE, send_done,(void *)msg_tmp);
+  BLMPI_Eager_Send(send, _msgr, &(msg_tmp->info), msg, size, destPE, send_done,(void *)msg_tmp_buf);
 #else
-  BLMPI_Rzv_Send(send, _msgr, &info, msg, size, destPE, send_done,(void *)msg_tmp);
+  BLMPI_Rzv_Send(send, _msgr, &(msg_tmp->info), msg, size, destPE, send_done,(void *)msg_tmp_buf);
 #endif
   msgQueueLen++;
+
+  AdvanceCommunications();
 }
 
 void CmiSyncSendFn(int destPE, int size, char *msg){
@@ -677,13 +687,11 @@ void SendSpanningChildren(int size, char *msg)
   CmiState cs = CmiGetState();
   int startpe = CMI_BROADCAST_ROOT(msg)-1;
   int i;
-
   CmiAssert(startpe>=0 && startpe<_Cmi_numpes);
-
+  int dist = cs->pe-startpe;
+  if(dist<0) dist+=_Cmi_numpes;
   for (i=1; i<=BROADCAST_SPANNING_FACTOR; i++) {
-    int p = cs->pe-startpe;
-    if (p<0) p+=_Cmi_numpes;
-    p = BROADCAST_SPANNING_FACTOR*p + i;
+    int p = BROADCAST_SPANNING_FACTOR*dist + i;
     if (p > _Cmi_numpes - 1) break;
     p += startpe;
     p = p%_Cmi_numpes;
@@ -735,9 +743,10 @@ void CmiFreeBroadcastFn(int size, char *msg){
 #else
   int i;
   for ( i=cs->pe+1; i<_Cmi_numpes; i++ ) 
-    CmiGeneralFreeSend(i,size,msg);
+    CmiSyncSendFn(i,size,msg);
   for ( i=0; i<cs->pe; i++ ) 
-    CmiGeneralFreeSend(i,size,msg);
+    CmiSyncSendFn(i,size,msg);
+  CmiFree(msg);
 #endif
 }
 
@@ -751,18 +760,19 @@ void CmiFreeBroadcastAllFn(int size, char *msg){
   CmiState cs = CmiGetState();
 #if CMK_BROADCAST_SPANNING_TREE
   CMI_SET_BROADCAST_ROOT(msg, cs->pe+1);
-  CmiSyncSendFn(cs->pe, size,msg) ;
   SendSpanningChildren(size, msg);
+  CmiSyncSendFn(cs->pe,size,msg);
   CmiFree(msg);
 #elif CMK_BROADCAST_HYPERCUBE
-  CmiSyncSendFn(cs->pe, size,msg) ;
+  CmiSyncSendFn(cs->pe,size,msg);
   CMI_SET_CYCLE(msg, 0);
   SendHypercube(size, msg);
   CmiFree(msg);
 #else
   int i ;
   for ( i=0; i<_Cmi_numpes; i++ ) 
-    CmiGeneralFreeSend(i,size,msg);
+    CmiSyncSendFn(i,size,msg);
+  CmiFree(msg);
 #endif
 }
 
@@ -777,16 +787,18 @@ static int PumpMsgs(void){
   return flag; 
 }
 static void AdvanceCommunications(void){
-  while(BLMPI_Messager_advance(_msgr)) ;
   while(outstanding_recvs){
+    BLMPI_Messager_advance(_msgr);
+  }
+  while(msgQueueLen>request_max){
     BLMPI_Messager_advance(_msgr);
   }
   while(BLMPI_Messager_advance(_msgr)) ;
 }
 
 void CmiNotifyIdle(){
-/* FIXME: idle blocking is not enforced here */
-  if (!PumpMsgs() && idleblock) AdvanceCommunications();
+//  if (!PumpMsgs() && idleblock) AdvanceCommunications();
+  AdvanceCommunications();
 }
 
 static void CmiNotifyBeginIdle(CmiIdleState *s)
@@ -880,11 +892,15 @@ void          CmiFreeListSendFn(int npes, int *pes, int size, char *msg){
     if(pes[i] == CmiMyPe()){
       CmiSendSelf(msg);
     }else{
+#if 0
       CmiReference(msg);
       CmiGeneralFreeSend(pes[i],size,msg);
+#else
+      CmiSyncSendFn(pes[i],size,msg);
+#endif
     }
   }
-//  CmiFree(msg);
+  CmiFree(msg);
 }
 
 CmiCommHandle CmiAsyncListSendFn(int npes, int *pes, int size, char *msg){
@@ -1189,7 +1205,7 @@ int  networkProgressPeriod;
 void CmiMachineProgressImpl()
 {
 #if !CMK_SMP
-    PumpMsgs();
+    AdvanceCommunications();
 #if CMK_IMMEDIATE_MSG
     CmiHandleImmediate();
 #endif
