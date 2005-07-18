@@ -73,19 +73,29 @@ void FEM_Node::allocateNodeAdjacency(){
 //  Fill the node to element adjacency table for this specific type of element
 void FEM_Node::fillElemAdjacencyTable(int type,const FEM_Elem &elem){
 	int nodesPerElem = elem.getNodesPer();
+	FEM_VarIndexAttribute *adjacencyAttr = elemAdjacency;
 	CkVec<CkVec<var_id> > &adjacencyTable = elemAdjacency->get();
-	CkVec<CkVec<var_id> > &ghostAdjacencyTable = ((FEM_Node *)getGhost())->elemAdjacency->get();
+	FEM_VarIndexAttribute *ghostAdjacencyAttr = ((FEM_Node *)getGhost())->elemAdjacency;
+	CkVec<CkVec<var_id> > &ghostAdjacencyTable = ghostAdjacencyAttr->get();
 
 	// Scan through elements
 	for(int i=0;i<elem.size();i++){
 	  const int *conn = elem.connFor(i);
 	  for(int j=0;j<nodesPerElem;j++){
 		int node = conn[j];
-		if(FEM_Is_ghost_index(node))	
-		  ghostAdjacencyTable[FEM_To_ghost_index(node)].push_back(var_id(type,i));
-		else if (node!=-1)
-		  adjacencyTable[node].push_back(var_id(type,i));
-		else{}//invalid node.. shouldnt happen
+		if (node!=-1){
+		  if(FEM_Is_ghost_index(node)){
+			
+			int idx = ghostAdjacencyAttr->findInRow(FEM_To_ghost_index(node),var_id(type,i));
+			if(idx == -1) // If not currently in the adjacency list, push onto list
+			  ghostAdjacencyTable[FEM_To_ghost_index(node)].push_back(var_id(type,i));
+		  }
+		  else{
+			int idx = adjacencyAttr->findInRow(node,var_id(type,i));
+			if(idx == -1) // If not currently in the adjacency list, push onto list
+			  adjacencyTable[node].push_back(var_id(type,i));
+		  }
+		}
 	  }
 	}
 	
@@ -95,15 +105,22 @@ void FEM_Node::fillElemAdjacencyTable(int type,const FEM_Elem &elem){
 		const int *conn = ((FEM_Elem*)elem.getGhost())->connFor(i);
 		for(int j=0;j<nodesPerElem;j++){
 		  int node = conn[j];
-		  if(FEM_Is_ghost_index(node))	
-			ghostAdjacencyTable[FEM_To_ghost_index(node)].push_back(var_id(type,FEM_From_ghost_index(i)));
-		  else if (node!=-1)
-			adjacencyTable[node].push_back(var_id(type,FEM_From_ghost_index(i)));
-		  else{}//invalid node.. shouldnt happen
+		  if (node!=-1){
+			if(FEM_Is_ghost_index(node)){
+			  int idx = ghostAdjacencyAttr->findInRow(FEM_To_ghost_index(node),var_id(type,FEM_From_ghost_index(i)));
+			  if(idx == -1) // If not currently in the adjacency list, push onto list
+				ghostAdjacencyTable[FEM_To_ghost_index(node)].push_back(var_id(type,FEM_From_ghost_index(i)));
+			}
+			else{
+			  int idx = adjacencyAttr->findInRow(node,var_id(type,FEM_From_ghost_index(i)));
+			  if(idx == -1) // If not currently in the adjacency list, push onto list
+				adjacencyTable[node].push_back(var_id(type,FEM_From_ghost_index(i)));
+			}
+		  }
 		}
 	  }
 	}
-
+	
 };
 
 //  Fill the node to element adjacency table for both this element and its corresponding ghosts
