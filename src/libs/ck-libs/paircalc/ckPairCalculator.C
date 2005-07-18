@@ -264,7 +264,7 @@ void PairCalculator::initGRed(initGRedMsg *msg)
   cb=msg->cb;
   mCastGrpId=msg->mCastGrpId;
   cpreduce=section;
-  //  thisProxy.ckSetReductionClient(&cb);  //probably redundant
+  thisProxy.ckSetReductionClient(&cb);  //probably redundant
   delete msg;
 }
 
