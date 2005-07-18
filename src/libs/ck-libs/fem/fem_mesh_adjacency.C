@@ -8,18 +8,6 @@
  *
  */
 
-/* 
-   Which types of entities are currently supported:
-   
-   e2n: Just the element conn table
-   e2e: all
-   n2e: all
-   n2n: 
-   
-
-*/
-
-
 #include "fem.h"
 #include "fem_impl.h"
 #include "charm-api.h" /*for CDECL, FTN_NAME*/
@@ -210,13 +198,6 @@ void FEM_Node::fillNodeAdjacency(const FEM_Elem &elem){
 		}
 	  }
 	}
-
-
-
-
-
-
-
 };
 
 void FEM_Node::setNodeAdjacency(const FEM_Elem &elem){
