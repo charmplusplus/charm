@@ -41,7 +41,7 @@ ComlibMulticastMsg * ComlibSectionInfo::getNewMulticastMessage
     // fill in the three pointers of the ComlibMulticastMsg
     memcpy(msg->indicesCount, indicesCount, sizes[0] * sizeof(ComlibMulticastIndexCount));
     //memcpy(msg->indices, cmsg->sec_id->_elems, sizes[1] * sizeof(CkArrayIndexMax));
-    CkArrayIndexMax *indicesPe[nRemotePes];
+    CkArrayIndexMax **indicesPe = (CkArrayIndexMax**)alloca(nRemotePes * sizeof(CkArrayIndexMax*));
     indicesPe[0] = msg->indices;
     for (int i=1; i<nRemotePes; ++i) indicesPe[i] = indicesPe[i-1] + indicesCount[i-1].count;
     for (int i=0; i<cmsg->sec_id->_nElems; ++i) {
