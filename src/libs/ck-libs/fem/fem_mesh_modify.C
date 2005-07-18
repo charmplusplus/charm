@@ -14,10 +14,7 @@
 
 extern void splitEntity(IDXL_Side &c, int localIdx, int nBetween, int *between, int idxbase);
 
-
 CProxy_femMeshModify meshMod;
-
-
 
 // A wrapper to simplify the lookup to whether a node is shared
 inline int is_shared(FEM_Mesh *m, int node){
@@ -41,6 +38,7 @@ CDECL void FEM_Print_Mesh_Summary(int mesh){
 	  unsigned int numValidEl = m->elem[t].count_valid();
 	  unsigned int numValidElG = m->elem[t].getGhost()->count_valid();
 	  CkPrintf("     Element type %d contains %d/%d elements and %d/%d ghosts\n", t, numValidEl, numEl, numValidElG, numElG);
+	  
 	}
 
   CkPrintf("\n");
@@ -105,9 +103,9 @@ void FEM_add_shared_node_remote(FEM_Mesh *m, int chk, int nBetween, int *between
 void FEM_remove_node_local(FEM_Mesh *m, int node) {
     // if node is local:
     int numAdjNodes, numAdjElts;
-    int **adjNodes, **adjElts;
-    m->n2n_getAll(node, adjNodes, &numAdjNodes);
-    m->n2e_getAll(node, adjElts, &numAdjElts);
+    int *adjNodes, *adjElts;
+    m->n2n_getAll(node, &adjNodes, &numAdjNodes);
+    m->n2e_getAll(node, &adjElts, &numAdjElts);
     CkAssert((numAdjNodes==0) && (numAdjElts==0)); // we shouldn't be removing a node away that is connected to anything
     
     // mark node as deleted/invalid
@@ -129,9 +127,9 @@ void FEM_remove_node(FEM_Mesh *m, int node){
   if(is_shared(m, node)){
     // verify it is not adjacent to any elements locally
     int numAdjNodes, numAdjElts;
-    int **adjNodes, **adjElts;
-    m->n2n_getAll(node, adjNodes, &numAdjNodes);
-    m->n2e_getAll(node, adjElts, &numAdjElts);
+    int *adjNodes, *adjElts;
+    m->n2n_getAll(node, &adjNodes, &numAdjNodes);
+    m->n2e_getAll(node, &adjElts, &numAdjElts);
     CkAssert((numAdjNodes==0) && (numAdjElts==0)); // we shouldn't be removing a node away that is connected to anything
   
     
@@ -154,35 +152,59 @@ void FEM_remove_node(FEM_Mesh *m, int node){
 // remove a local element from the adjacency tables as well as the element list
 void FEM_remove_element_local(FEM_Mesh *m, int element, int etype){
 
-  // find adjacent nodes
-  int width = m->elem[etype].getConn().size(); // should be the number of nodes that can be adjacent to this element
-  int *adjnodes = new int[width];
+  // replace this element with -1 in adjacent nodes' adjacencies
+  const int nodesPerEl = m->elem[etype].getConn().width(); // should be the number of nodes that can be adjacent to this element
+  int *adjnodes = new int[nodesPerEl];
   m->e2n_getAll(element, adjnodes, etype);
+  for(int i=0;i<nodesPerEl;i++)
+	if(adjnodes[i] != -1)
+	  m->n2e_remove(adjnodes[i],element);
   
-  // replace me in their adjacencies with -1
-  for(int i=0;i<width;i++){
-    m->n2e_replace(adjnodes[i],element,-1);
-  }
-
-  // find adjacent elements
-  width = m->elem[etype].getConn().size();
-  int *adjelts = new int[width];
+  // replace this element with -1 in adjacent elements' adjacencies
+  const int numAdjElts = nodesPerEl;    // FIXME: hopefully there will be at most as many faces on an element as vertices
+  int *adjelts = new int[numAdjElts]; 
   m->e2e_getAll(element, adjelts, etype);
-  
-  // replace me in their adjacencies with -1
-  for(int i=0;i<width;i++){
+  for(int i=0;i<numAdjElts;i++){
     m->e2e_replace(adjelts[i],element,-1);
   }
-
+  
   // delete element by marking invalid
-  // mark node as deleted/invalid
   if(FEM_Is_ghost_index(element)){
 	m->elem[etype].getGhost()->set_invalid(FEM_To_ghost_index(element));
   }
   else {
 	m->elem[etype].set_invalid(element);
   }
+  
+  // We must now remove any n2n adjacencies which existed because of the 
+  // element that is now being removed. This is done by removing all 
+  // n2n adjacencies for the nodes of this element, and recreating those
+  // that still exist by using the neighboring elements.
+  for(int i=0;i<nodesPerEl;i++)
+	for(int j=i+1;j<nodesPerEl;j++){
+	  m->n2n_remove(adjnodes[i],adjnodes[j]);
+	  m->n2n_remove(adjnodes[j],adjnodes[i]);
+	}
 
+  for(int i=0;i<numAdjElts;i++){ // for each neighboring element
+	if(adjelts[i] != -1){
+	  int *adjnodes2 = new int[nodesPerEl];
+	  m->e2n_getAll(adjelts[i], adjnodes2, etype);
+	
+	  for(int j=0;j<nodesPerEl;j++){     // for each j,k pair of nodes adjacent to the neighboring element
+		for(int k=j+1;k<nodesPerEl;k++){   
+		  if(!m->n2n_exists(adjnodes2[j],adjnodes2[k]))
+			m->n2n_add(adjnodes2[j],adjnodes2[k]);
+		  if(!m->n2n_exists(adjnodes2[k],adjnodes2[j]))
+			m->n2n_add(adjnodes2[k],adjnodes2[j]);
+		}
+	  }
+	 
+	  delete[] adjnodes2;
+	}
+  }
+ 
+  delete[] adjelts;
   delete[] adjnodes;
 }
 
@@ -216,53 +238,57 @@ void update_new_element_e2e(FEM_Mesh *m, int newEl, int elemType){
   FEM_ElemAdj_Layer *g = m->getElemAdjLayer();
   CkAssert(g->initialized);
   const int nodesPerTuple = g->nodesPerTuple;
+  //  CkPrintf("nodesPerTuple=%d\n", nodesPerTuple);
   tupleTable table(nodesPerTuple);
   FEM_Symmetries_t allSym;
 
-  // insert the new element
+
+  // insert all elements adjacent to the nodes adjacent to the new 
+  // element, including ghosts, and the new element itself
+
   const int tuplesPerElem = g->elem[elemType].tuplesPerElem;
-  int tuple[tupleTable::MAX_TUPLE];
-  const int *conn=m->elem[elemType].connFor(newEl);
-  for (int u=0;u<tuplesPerElem;u++)
-    for (int i=0;i<nodesPerTuple;i++) {
-      int eidx=g->elem[elemType].elem2tuple[i+u*g->nodesPerTuple];
-      if (eidx==-1)  //"not-there" node--
-        tuple[i]=-1; //Don't map via connectivity
-      else           //Ordinary node
-        tuple[i]=conn[eidx]; 
-    
-      table.addTuple(tuple,new elemList(0,newEl,elemType,allSym,u)); 
-    }
-
-  // insert all elements adjacent to the nodes adjacent to the new element, including ghosts
   int *adjnodes = new int[tuplesPerElem];
-
+  CkVec<int> elist;
   m->e2n_getAll(newEl, adjnodes, elemType);
-  
   for(int i=0;i<tuplesPerElem;i++){
     int sz;
     int *adjelements;
     m->n2e_getAll(adjnodes[i], &adjelements, &sz);
-    
     for(int j=0;j<sz;j++){
-      int elementToAdd = adjelements[j];
-      const int tuplesPerElem = g->elem[elemType].tuplesPerElem;
-      int tuple[tupleTable::MAX_TUPLE];
-      const int *conn=m->elem[elemType].connFor(elementToAdd);
-      for (int u=0;u<tuplesPerElem;u++)
-        for (int i=0;i<nodesPerTuple;i++) {
-          int eidx=g->elem[elemType].elem2tuple[i+u*g->nodesPerTuple];
-          if (eidx==-1)  //"not-there" node--
-            tuple[i]=-1; //Don't map via connectivity
-          else           //Ordinary node
-            tuple[i]=conn[eidx]; 
-          
-		  table.addTuple(tuple,new elemList(0,elementToAdd,elemType,allSym,u)); 
-        }
-      
-    }
+	  int found=0;
+	  // only insert if it is not already in the list
+	  for(int i=0;i<elist.length();i++)// we use a slow linear scan of the vector
+		if(elist[i] == adjelements[j])
+		  found=1;
+	  if(!found){
+		elist.push_back(adjelements[j]);
+		//	CkPrintf("Adding element %d to list\n", adjelements[j]);
+	  }
+	}
+	delete[] adjelements;
   }
   delete[] adjnodes;
+  
+  
+  for(int i=0;i<elist.length();i++){
+	int nextElem = elist[i];
+	//CkPrintf("Adding elem %d to tuple table\n", nextElem);
+	int tuple[tupleTable::MAX_TUPLE];
+	const int *conn=m->elem[elemType].connFor(nextElem);
+	//CkPrintf("tuplesPerElem=%d\n", tuplesPerElem);
+	for (int u=0;u<tuplesPerElem;u++) {
+	  for (int i=0;i<nodesPerTuple;i++) {
+		int eidx=g->elem[elemType].elem2tuple[i+u*g->nodesPerTuple];
+		if (eidx==-1)  //"not-there" node--
+		  tuple[i]=-1; //Don't map via connectivity
+		else           //Ordinary node
+		  tuple[i]=conn[eidx]; 
+	  }
+	  
+	  // CkPrintf("tuple=%d,%d\n", tuple[0], tuple[1]);
+	  table.addTuple(tuple,new elemList(0,nextElem,elemType,allSym,u)); 
+	}
+  }
 
   
   // extract adjacencies from table and update all e2e tables for both newEl and the others
@@ -285,26 +311,39 @@ void update_new_element_e2e(FEM_Mesh *m, int newEl, int elemType){
   int *adjTypesGhost = adjTypesTableGhost.getData();
   
   while (NULL!=(l=table.lookupNext())) {
-    if (l->next==NULL) { 
-      // One-entry list: must be a symmetry
-      // UNHANDLED CASE: not sure exactly what this means
-    }
+    if (l->next==NULL) {} // One-entry list: must be a symmetry
     else { /* Several elements in list: normal case */
-      // for each a,b from the list
+      // for each a,b pair of adjacent edges
       for (const elemList *a=l;a!=NULL;a=a->next){
         for (const elemList *b=l;b!=NULL;b=b->next){
           // if a and b are different elements
           if((a->localNo != b->localNo) || (a->type != b->type)){
             int j;
-            if(FEM_Is_ghost_index(a->localNo))
-              j = FEM_To_ghost_index(a->localNo)*tuplesPerElem + a->tupleNo;
-            else
-              j = a->localNo*tuplesPerElem + a->tupleNo;
+			//	CkPrintf("%d:%d:%d adj to %d:%d:%d\n", a->type, a->localNo, a->tupleNo, b->type, b->localNo, b->tupleNo);
+			// Put b in a's adjacency list
+			if(FEM_Is_ghost_index(a->localNo)){
+			  j = FEM_To_ghost_index(a->localNo)*tuplesPerElem + a->tupleNo;
+			  adjsGhost[j] = b->localNo;
+			  adjTypesGhost[j] = b->type;
+			}
+			else{
+			  j= a->localNo*tuplesPerElem + a->tupleNo;
+			  adjs[j] = b->localNo;
+			  adjTypes[j] = b->type;
+			}
+
+			// Put a in b's adjacency list
+			if(FEM_Is_ghost_index(b->localNo)){
+			  j = FEM_To_ghost_index(b->localNo)*tuplesPerElem + b->tupleNo;
+			  adjsGhost[j] = a->localNo;
+			  adjTypesGhost[j] = a->type;
+			}
+			else{
+			  j= b->localNo*tuplesPerElem + b->tupleNo;
+			  adjs[j] = a->localNo;
+			  adjTypes[j] = a->type;
+			}
             
-            if(a->type == elemType){ // only update the entries for element type t
-              adjs[j] = b->localNo;
-              adjTypes[j] = b->type;              
-            }
           }
         }
       }
@@ -342,7 +381,7 @@ int FEM_add_element_local(FEM_Mesh *m, const int *conn, int connSize, int elemTy
 
   // update e2e table -- too complicated, so it gets is own function
   update_new_element_e2e(m,newEl,elemType);
-  
+
   return newEl;
 }
 
