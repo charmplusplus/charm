@@ -188,10 +188,9 @@ class NormalSlabArray: public SlabArray {
 
 	void pup(PUP::er &p);
 
- private:
 	void createPlans(NormalFFTinfo &info);
-
- protected:
+ 
+protected:
 	fftwnd_plan fwd2DPlan, bwd2DPlan;
 	fftw_plan fwd1DPlan, bwd1DPlan;
 	NormalFFTinfo *fftinfos[MAX_FFTS];
@@ -210,6 +209,7 @@ class NormalRealSlabArray: public SlabArray {
 			fftinfos[i] = NULL;
 			counts[i] = 0;
 		}
+		tempdataPtr = NULL;
 		rfwd1DXPlan = rbwd1DXPlan = (rfftw_plan) NULL;
 		fwd1DYPlan = bwd1DYPlan = (fftw_plan) NULL;
 		fwd1DZPlan = bwd1DZPlan = (fftw_plan) NULL;
@@ -228,7 +228,6 @@ class NormalRealSlabArray: public SlabArray {
 
 	void pup(PUP::er &p);
 
- private:
 	void createPlans(NormalFFTinfo &info);
 
  protected:
@@ -236,7 +235,11 @@ class NormalRealSlabArray: public SlabArray {
 	fftw_plan fwd1DYPlan, bwd1DYPlan; 
 	fftw_plan fwd1DZPlan, bwd1DZPlan;
 	NormalFFTinfo *fftinfos[MAX_FFTS];
+        bool fftuseCommlib;
+        ComlibInstanceHandle fftcommInstance;
+
  private:
+	complex *tempdataPtr;
 	int counts[MAX_FFTS];
 };
 
@@ -320,6 +323,7 @@ class NormalLineArray : public CBase_NormalLineArray {
     void doFirstFFT(int id, int direction);
     void doSecondFFT(int ypos, complex *val, int size, int id, int direction);
     void doThirdFFT(int zpos, int ypos, complex *val, int size, int id, int direction);
+    void doFFT(int id, int direction) {doFirstFFT(id, direction);}
     virtual void doneFFT(int id, int direction);
     void setInstance(int id_) { id = id_; 
     //mgrProxy.ckLocalBranch()->registerElement(id); 
@@ -332,6 +336,8 @@ class NormalLineArray : public CBase_NormalLineArray {
     int id;
     LineFFTinfo *fftinfos[MAX_FFTS];
     int count[MAX_FFTS];
+    bool fftuseCommlib;
+    ComlibInstanceHandle fftcommInstance;
 };
 
 
