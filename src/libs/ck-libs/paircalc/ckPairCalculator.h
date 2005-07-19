@@ -226,30 +226,28 @@ class calculatePairsMsg : public CkMcastBaseMsg, public CMessage_calculatePairsM
   friend class CMessage_calculatePairsMsg;
 
 };
-class acceptResultMsg : public CMessage_acceptResultMsg {
- public:
-  int size;
-  double *matrix;
-  void init(int _size, double *_points)
-    {
-      size=_size;
-      memcpy(matrix,_points,size*sizeof(double));
-    }
-  friend class CMessage_acceptResultMsg;
-};
 
-class acceptResultMsg2 : public CMessage_acceptResultMsg2 {
+class acceptResultMsg : public CkMcastBaseMsg, public CMessage_acceptResultMsg {
  public:
   int size;
+  int size2;
   double *matrix1;
   double *matrix2;
-  void init(int _size, double *_points1, double *_points2)
+  void init(int _size, int _size2, double *_points1, double *_points2)
     {
       size=_size;
+      size2=_size2;
       memcpy(matrix1,_points1,size*sizeof(double));
-      memcpy(matrix2,_points2,size*sizeof(double));
+      memcpy(matrix2,_points2,size2*sizeof(double));
     }
-  friend class CMessage_acceptResultMsg2;
+  void init1(int _size, double *_points1)
+    {
+      size=_size;
+      size2=0;
+      memcpy(matrix1,_points1,size*sizeof(double));
+      matrix2=NULL;
+    }
+  friend class CMessage_acceptResultMsg;
 };
 
 class entireResultMsg : public CMessage_entireResultMsg {
@@ -306,12 +304,8 @@ class PairCalculator: public CBase_PairCalculator {
   void initGRed(initGRedMsg *msg);
   void calculatePairs(int, complex *, int, bool, bool); 
   void calculatePairs_gemm(calculatePairsMsg *msg);
-  void acceptResult(int size, double *matrix);
-  void acceptResult(int size, double *matrix1, double *matrix2);
-  void acceptResultSlow(acceptResultMsg *msg);
-  void acceptResultSlow(acceptResultMsg2 *msg);
   void acceptResult(acceptResultMsg *msg);
-  void acceptResult(acceptResultMsg2 *msg);
+  void acceptResultI(acceptResultMsg *msg);
   void sumPartialResult(int size, complex *result, int offset);
   void sumPartialResult(priorSumMsg *msg);
   void sumPartialResult(partialResultMsg *msg);

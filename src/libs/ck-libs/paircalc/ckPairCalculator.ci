@@ -22,10 +22,6 @@ module ckPairCalculator {
 	};
 
 	message acceptResultMsg  {
-	  double matrix[];
-	};
-
-	message acceptResultMsg2  {
 	  double matrix1[];
 	  double matrix2[];
 	};
@@ -46,13 +42,8 @@ module ckPairCalculator {
 		entry void initGRed(initGRedMsg *msg);
    		entry void calculatePairs(int size, complex points[size], int, bool, bool);
    		entry [nokeep] void calculatePairs_gemm(calculatePairsMsg *msg);
-		entry void acceptResult(int size, double matrix[size]);
-
-		entry  void acceptResult(int size, double matrix1[size], double matrix2[size]);
-		entry [nokeep] void acceptResultSlow(acceptResultMsg *msg);
-		entry [nokeep] void acceptResultSlow(acceptResultMsg2 *msg);
-		entry [nokeep,inline] void acceptResult(acceptResultMsg *msg);
-		entry [nokeep,inline] void acceptResult(acceptResultMsg2 *msg);
+		entry [nokeep] void acceptResult(acceptResultMsg *msg);
+		entry [nokeep,inline] void acceptResultI(acceptResultMsg *msg);
 	  	entry void sumPartialResult(int size, complex result[size], int offset);
 	  	entry void sumPartialResult(partialResultMsg *msg);
 	  	entry void sumPartialResult(priorSumMsg *msg);

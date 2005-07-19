@@ -549,9 +549,6 @@ void finishPairCalc(PairCalcID* pcid, int n, double *ptr) {
     finishPairCalc2(pcid, n, ptr, NULL);
 }
 
-void finishPairCalcSection(int n, double *ptr, CProxySection_PairCalculator sectionProxy) {
-    finishPairCalcSection2(n, ptr, NULL, sectionProxy);
-}
 
 void finishPairCalc2(PairCalcID* pcid, int n, double *ptr1, double *ptr2) {
 #ifdef _PAIRCALC_DEBUG_
@@ -584,12 +581,12 @@ void finishPairCalc2(PairCalcID* pcid, int n, double *ptr1, double *ptr2) {
    */ 
   if(ptr2==NULL){
       acceptResultMsg *omsg=new ( n,0 ) acceptResultMsg;
-      omsg->init(n, ptr1);
-      pairCalculatorProxy.acceptResultSlow(omsg);
+      omsg->init1(n, ptr1);
+      pairCalculatorProxy.acceptResult(omsg);
   }
   else {
       acceptResultMsg2 *omsg=new ( n,n,0 ) acceptResultMsg2;
-      omsg->init(n, ptr1, ptr2);
+      omsg->init(n,n, ptr1, ptr2);
       pairCalculatorProxy.acceptResult(omsg);
   }
 #else
@@ -616,6 +613,11 @@ void finishPairCalc2(PairCalcID* pcid, int n, double *ptr1, double *ptr2) {
   }
 }
 
+void finishPairCalcSection(int n, double *ptr, CProxySection_PairCalculator sectionProxy) {
+    finishPairCalcSection2(n, ptr, NULL, sectionProxy);
+}
+
+
 /* This version uses a section multicast to only send the part of the matrix needed by each section */
 void finishPairCalcSection2(int n, double *ptr1, double *ptr2, CProxySection_PairCalculator sectionProxy) {
 #ifdef _PAIRCALC_DEBUG_
@@ -623,14 +625,14 @@ void finishPairCalcSection2(int n, double *ptr1, double *ptr2, CProxySection_Pai
 #endif
 
   if(ptr2==NULL){
-      acceptResultMsg *omsg=new ( n,0 ) acceptResultMsg;
-      omsg->init(n, ptr1);
-      sectionProxy.acceptResultSlow(omsg);
+      acceptResultMsg *omsg=new ( n,0,0 ) acceptResultMsg;
+      omsg->init1(n, ptr1);
+      sectionProxy.acceptResult(omsg);
   }
   else {
-      acceptResultMsg2 *omsg=new ( n,n,0 ) acceptResultMsg2;
-      omsg->init(n, ptr1, ptr2);
-      sectionProxy.acceptResultSlow(omsg);
+      acceptResultMsg *omsg=new ( n,n,0 ) acceptResultMsg;
+      omsg->init(n, n, ptr1, ptr2);
+      sectionProxy.acceptResult(omsg);
   }
 }
 

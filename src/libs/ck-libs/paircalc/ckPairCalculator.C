@@ -264,7 +264,7 @@ void PairCalculator::initGRed(initGRedMsg *msg)
   cb=msg->cb;
   mCastGrpId=msg->mCastGrpId;
   cpreduce=section;
-  thisProxy.ckSetReductionClient(&cb);  //probably redundant
+  //  thisProxy.ckSetReductionClient(&cb);  //probably redundant
   delete msg;
 }
 
@@ -527,15 +527,15 @@ PairCalculator::calculatePairs_gemm(calculatePairsMsg *msg)
   }
 
 }
-
+/*
 void
-PairCalculator::acceptResultSlow(acceptResultMsg *msg)
+PairCalculator::acceptResultSection(acceptResultMsg *msg)
 {
   acceptResult(msg->size, msg->matrix, NULL);
 }
 
 void
-PairCalculator::acceptResultSlow(acceptResultMsg2 *msg)
+PairCalculator::acceptResultSection(acceptResultMsg2 *msg)
 {
   acceptResult(msg->size, msg->matrix1, msg->matrix2);
 }
@@ -559,15 +559,34 @@ PairCalculator::acceptResult(int size, double *matrix)
     acceptResult(size, matrix, NULL);
 }
 
+*/
+//PairCalculator::acceptResult(int size, double *matrix1, double *matrix2)
 void
-PairCalculator::acceptResult(int size, double *matrix1, double *matrix2)
+PairCalculator::acceptResultI(acceptResultMsg *msg)
+{
+  
+    acceptResult(msg);
+  }
+
+void
+PairCalculator::acceptResult(acceptResultMsg *msg)
 {
 #ifdef _PAIRCALC_DEBUG_
   CkPrintf("[%d %d %d %d %d]: Accept Result with size %d\n", thisIndex.w, thisIndex.x, thisIndex.y, thisIndex.z, symmetric, size);
 #endif
-
+  int size=msg->size;
+  int size2=msg->size2;
+  double *matrix1=msg->matrix1;
+  double *matrix2=msg->matrix2;
   bool unitcoef = false;
-  if(matrix2==NULL) unitcoef = true;
+  if(cpreduce==section) //update cookie from multicast
+    CkGetSectionInfo(cookie,msg);
+  if(matrix2==NULL||size2<1) 
+    {
+      unitcoef = true;
+    }
+  else
+    CkPrintf("Hey! matrix2 isn't null!\n");
 
   complex *mynewData = new complex[N*grainSize];
   
@@ -582,13 +601,13 @@ PairCalculator::acceptResult(int size, double *matrix1, double *matrix2)
 
   if(!symmetric)
     index = thisIndex.x*S + thisIndex.y;
-
+  int matrixSize=grainSize*grainSize;
   //ASSUMING TMATRIX IS REAL (LOSS OF GENERALITY)
   register double m=0;
   bool makeLocalCopy=false;
   double *amatrix=NULL;
 
-  if(S!=grainSize && size!=S)
+  if(S!=grainSize && size!=matrixSize)
     makeLocalCopy=true;
   
   if(S==grainSize)// all at once no malloc
@@ -600,12 +619,13 @@ PairCalculator::acceptResult(int size, double *matrix1, double *matrix2)
       amatrix=matrix1;
     }
 
-  int matrixSize=grainSize*grainSize;
+
   double *localMatrix;
   double *outMatrix;
 
   if(makeLocalCopy)
     {
+      //      CkPrintf("Hey! makeLocalCopy is true!\n");
 #ifdef _PAIRCALC_DEBUG_PARANOID_
       char ifilename[80];
       sprintf(ifilename, "bwim1data.%d_%d_%d_%d_%d", thisIndex.w,thisIndex.x, thisIndex.y,thisIndex.z, symmetric);
@@ -1111,16 +1131,15 @@ PairCalcReducer::broadcastEntireResult(entireResultMsg *imsg)
 #ifdef _PAIRCALC_DEBUG_
   CkPrintf("bcasteres:On Pe %d -- %d objects\n", CkMyPe(), localElements[imsg->symmetric].length());
 #endif
-  acceptResultMsg *msg= new (size,0) acceptResultMsg;
-  msg->size=imsg->size;
-  memcpy(msg->matrix,imsg->matrix,imsg->size* sizeof(double));
+  acceptResultMsg *msg= new (size,0,0) acceptResultMsg;
+  msg->init1(imsg->size,imsg->matrix);
   for (int i = 0; i < localElements[imsg->symmetric].length(); i++)
     {
 #ifdef _PAIRCALC_DEBUG_
       CkPrintf("call accept on :");
       (localElements[imsg->symmetric])[i].dump();
 #endif
-      CkSendMsgArrayInline(CkIndex_PairCalculator::__idx_acceptResult_acceptResultMsg, msg, (localElements[imsg->symmetric])[i].id, (localElements[imsg->symmetric])[i].idx, CK_MSG_KEEP);
+      CkSendMsgArrayInline(CkIndex_PairCalculator::__idx_acceptResultI_acceptResultMsg, msg, (localElements[imsg->symmetric])[i].id, (localElements[imsg->symmetric])[i].idx, CK_MSG_KEEP);
 
     }
   delete imsg;
@@ -1133,16 +1152,15 @@ PairCalcReducer::broadcastEntireResult(int size, double* matrix, bool symmtype)
 #ifdef _PAIRCALC_DEBUG_
   CkPrintf("bcasteres:On Pe %d -- %d objects\n", CkMyPe(), localElements[symmtype].length());
 #endif
-  acceptResultMsg *msg= new (size,0) acceptResultMsg;
-  msg->size=size;
-  memcpy(msg->matrix,matrix,size* sizeof(double));
+  acceptResultMsg *msg= new (size,0,0) acceptResultMsg;
+  msg->init1(size,matrix);
   for (int i = 0; i < localElements[symmtype].length(); i++)
     {
 #ifdef _PAIRCALC_DEBUG_
       CkPrintf("call accept on :");
       (localElements[symmtype])[i].dump();
 #endif
-      CkSendMsgArrayInline(CkIndex_PairCalculator::__idx_acceptResult_acceptResultMsg, msg, (localElements[symmtype])[i].id, (localElements[symmtype])[i].idx, CK_MSG_KEEP);
+      CkSendMsgArrayInline(CkIndex_PairCalculator::__idx_acceptResultI_acceptResultMsg, msg, (localElements[symmtype])[i].id, (localElements[symmtype])[i].idx, CK_MSG_KEEP);
 
     }
   
@@ -1154,13 +1172,11 @@ PairCalcReducer::broadcastEntireResult(int size, double* matrix, bool symmtype)
 void
 PairCalcReducer::broadcastEntireResult(int size, double* matrix1, double* matrix2, bool symmtype){
     CkPrintf("On Pe %d -- %d objects\n", CkMyPe(), localElements[symmtype].length());
-    acceptResultMsg2 *msg= new (size,size,0) acceptResultMsg2;
-    msg->size=size;
-    memcpy(msg->matrix1,matrix1,size* sizeof(double));
-    memcpy(msg->matrix2,matrix2,size* sizeof(double));
+    acceptResultMsg *msg= new (size,size,0) acceptResultMsg;
+    msg->init(size,size,matrix1,matrix2);
     for (int i = 0; i < localElements[symmtype].length(); i++)
       {
-	CkSendMsgArrayInline(CkIndex_PairCalculator::__idx_acceptResult_acceptResultMsg2, msg, (localElements[symmtype])[0].id, (localElements[symmtype])[i].idx,CK_MSG_KEEP);
+	CkSendMsgArrayInline(CkIndex_PairCalculator::__idx_acceptResultI_acceptResultMsg, msg, (localElements[symmtype])[0].id, (localElements[symmtype])[i].idx,CK_MSG_KEEP);
       }
     //    delete msg;
 
@@ -1170,13 +1186,14 @@ void
 PairCalcReducer::broadcastEntireResult(entireResultMsg2 *imsg)
 {
     CkPrintf("On Pe %d -- %d objects\n", CkMyPe(), localElements[imsg->symmetric].length());
-    acceptResultMsg2 *msg= new (imsg->size,imsg->size,0) acceptResultMsg2;
+    acceptResultMsg *msg= new (imsg->size,imsg->size,0) acceptResultMsg;
     msg->size=imsg->size;
+    msg->size2=imsg->size;
     memcpy(msg->matrix1,imsg->matrix1,imsg->size* sizeof(double));
-    memcpy(msg->matrix2,imsg->matrix2,imsg->size* sizeof(double));
+    memcpy(msg->matrix2,imsg->matrix2,msg->size2* sizeof(double));
     for (int i = 0; i < localElements[imsg->symmetric].length(); i++)
       {
-	CkSendMsgArrayInline(CkIndex_PairCalculator::__idx_acceptResult_acceptResultMsg2, msg, (localElements[imsg->symmetric])[0].id, (localElements[imsg->symmetric])[i].idx,CK_MSG_KEEP);
+	CkSendMsgArrayInline(CkIndex_PairCalculator::__idx_acceptResultI_acceptResultMsg, msg, (localElements[imsg->symmetric])[0].id, (localElements[imsg->symmetric])[i].idx,CK_MSG_KEEP);
       }
     delete imsg;
 
