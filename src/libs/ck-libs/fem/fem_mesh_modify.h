@@ -94,6 +94,7 @@ class FEM_MUtil {
   FEM_MUtil(int i, femMeshModify *m);
   ~FEM_MUtil();
 
+  int getIdx() { return idx; }
   //the entType signifies what type of entity to lock. node=0, elem=1;
   //entNo signifies the local index of the entity
   //numChunks is the number of chunks that need to be locked to lock that entity
@@ -104,6 +105,7 @@ class FEM_MUtil {
   void splitEntityRemote(FEM_Mesh *m, int chk, int localIdx, int nBetween, int *between, int idxbase);
   void removeNodeAll(FEM_Mesh *m, int localIdx);
   void removeNodeRemote(FEM_Mesh *m, int chk, int sharedIdx);
+  int exists_in_IDXL(FEM_Mesh *m, int localIdx, int chk);
 };
 
 class femMeshModMsg : public CMessage_femMeshModMsg {
@@ -183,6 +185,20 @@ class removeSharedNodeMsg : public CMessage_removeSharedNodeMsg {
   int index;
 };
 
+class addGhostNodeMsg : public CMessage_addGhostNodeMsg {
+ public:
+  int chk;
+  int index;
+};
+
+class addGhostElemMsg : public CMessage_addGhostNodeMsg {
+ public:
+  int chk;
+  int index;
+  int elemType;
+};
+
+
 class femMeshModify : public CBase_femMeshModify {
   friend class FEM_lock;
   friend class FEM_MUtil;
@@ -209,6 +225,9 @@ class femMeshModify : public CBase_femMeshModify {
 
   void addSharedNodeRemote(sharedNodeMsg *fm);
   void removeSharedNodeRemote(removeSharedNodeMsg *fm);
+
+  void addGhostNode(addGhostNodeMsg *fm);
+  void addGhostElem(addGhostElemMsg *fm);
 
 };
 
