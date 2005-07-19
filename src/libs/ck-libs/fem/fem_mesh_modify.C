@@ -16,6 +16,22 @@ extern void splitEntity(IDXL_Side &c, int localIdx, int nBetween, int *between, 
 
 CProxy_femMeshModify meshMod;
 
+
+CDECL int FEM_add_node(int mesh, int* adjacent_nodes, int num_adjacent_nodes, int upcall){
+  return FEM_add_node(FEM_Mesh_lookup(mesh,"FEM_add_node"), adjacent_nodes, num_adjacent_nodes, upcall);}
+CDECL void FEM_remove_node(int mesh,int node){
+  FEM_remove_node(FEM_Mesh_lookup(mesh,"FEM_remove_node"), node);}
+CDECL void FEM_remove_element(int mesh, int element, int elem_type){
+  FEM_remove_element(FEM_Mesh_lookup(mesh,"FEM_remove_element"), element, elem_type);}
+CDECL int FEM_add_element(int mesh, int* conn, int conn_size, int elem_type){
+  return FEM_add_element(FEM_Mesh_lookup(mesh,"FEM_add_element"), conn, conn_size, elem_type);}
+CDECL void FEM_Modify_Lock(int mesh, int* affectedNodes, int numAffectedNodes, int* affectedElts, int numAffectedElts){
+  FEM_Modify_Lock(FEM_Mesh_lookup(mesh,"FEM_Modify_Lock"), affectedNodes, numAffectedNodes, affectedElts, numAffectedElts);}
+CDECL void FEM_Modify_Unlock(int mesh){
+  FEM_Modify_Unlock(FEM_Mesh_lookup(mesh,"FEM_Modify_Unlock"));}
+
+
+
 // A wrapper to simplify the lookup to whether a node is shared
 inline int is_shared(FEM_Mesh *m, int node){
   return m->getfmMM()->getfmUtil()->isShared(node);
@@ -44,35 +60,26 @@ CDECL void FEM_Print_Mesh_Summary(int mesh){
   CkPrintf("\n");
 }
 
+// prototype with optional parameter
+int FEM_add_node_local(FEM_Mesh *m, int addGhost=0);
 
-int FEM_add_node_local(FEM_Mesh *m){
-  const int newNode = m->node.size();
-  m->node.setLength(newNode+1); // lengthen node attributes
-  m->node.set_valid(newNode);   // set new node as valid
+int FEM_add_node_local(FEM_Mesh *m, int addGhost){
+  int newNode;
+  if(addGhost){
+	newNode = m->node.getGhost()->size();
+	m->node.getGhost()->setLength(newNode+1); // lengthen node attributes
+	m->node.getGhost()->set_valid(newNode);   // set new node as valid
+  }
+  else{
+	newNode = m->node.size();
+	m->node.setLength(newNode+1); // lengthen node attributes
+	m->node.set_valid(newNode);   // set new node as valid
+  }
   m->n2e_removeAll(newNode);    // initialize element adjacencies
   m->n2n_removeAll(newNode);    // initialize node adjacencies
   return newNode;  // return a new index
 }
 
-int FEM_add_ghost_node_local(FEM_Mesh *m) {
-  const int newNode = m->node.getGhost()->size();
-  m->node.getGhost()->setLength(newNode+1); // lengthen node attributes
-  m->node.getGhost()->set_valid(newNode);   // set new node as valid
-  //I guess ghosts do not have adjacency information
-  //m->n2e_removeAll(newNode);    // initialize element adjacencies
-  //m->n2n_removeAll(newNode);    // initialize node adjacencies
-  return newNode;  // return a new index
-}
-
-int FEM_add_ghost_elem_local(FEM_Mesh *m, int elemType) {
-  const int newNode = m->elem[elemType].getGhost()->size();
-  m->elem[elemType].getGhost()->setLength(newNode+1); // lengthen node attributes
-  m->elem[elemType].getGhost()->set_valid(newNode);   // set new node as valid
-  //I guess ghosts do not have adjacency information
-  //m->n2e_removeAll(newNode);    // initialize element adjacencies
-  //m->n2n_removeAll(newNode);    // initialize node adjacencies
-  return newNode;  // return a new index
-}
 
 int FEM_add_node(FEM_Mesh *m, int* adjacentNodes, int numAdjacentNodes, int upcall){
   // add local node
@@ -255,7 +262,7 @@ void FEM_remove_element_remote(FEM_Mesh *m, int element, int elemType){
 // A helper function for FEM_add_element_local below
 // Will only work with the same element type as the one given, may crash otherwise
 void update_new_element_e2e(FEM_Mesh *m, int newEl, int elemType){
-  CkAssert(!FEM_Is_ghost_index(newEl)); // TODO: fix this function to handle ghosts
+
   // Create tuple table
   FEM_ElemAdj_Layer *g = m->getElemAdjLayer();
   CkAssert(g->initialized);
@@ -296,7 +303,11 @@ void update_new_element_e2e(FEM_Mesh *m, int newEl, int elemType){
 	int nextElem = elist[i];
 	//CkPrintf("Adding elem %d to tuple table\n", nextElem);
 	int tuple[tupleTable::MAX_TUPLE];
-	const int *conn=m->elem[elemType].connFor(nextElem);
+	int *conn;
+	if(FEM_Is_ghost_index(nextElem))
+	  ((FEM_Elem*)conn=m->elem[elemType].getGhost())->connFor(FEM_To_ghost_index(nextElem));
+	else
+	  conn=m->elem[elemType].connFor(nextElem);
 	//CkPrintf("tuplesPerElem=%d\n", tuplesPerElem);
 	for (int u=0;u<tuplesPerElem;u++) {
 	  for (int i=0;i<nodesPerTuple;i++) {
@@ -372,22 +383,30 @@ void update_new_element_e2e(FEM_Mesh *m, int newEl, int elemType){
   } 
 }
 
-
 // A helper function that adds the local element, and updates adjacencies
-int FEM_add_element_local(FEM_Mesh *m, const int *conn, int connSize, int elemType){
+int FEM_add_element_local(FEM_Mesh *m, const int *conn, int connSize, int elemType=0, int addGhost=0);//prototype
+int FEM_add_element_local(FEM_Mesh *m, const int *conn, int connSize, int elemType, int addGhost){
   // lengthen element attributes
-  int oldLength = m->elem[elemType].size();
-  m->elem[elemType].setLength(oldLength+1);
-  const int newEl = oldLength;
+  int newEl;
+  if(addGhost){
+	int oldLength = m->elem[elemType].getGhost()->size();
+	m->elem[elemType].getGhost()->setLength(oldLength+1);
+	newEl = FEM_From_ghost_index(oldLength);
+	m->elem[elemType].getGhost()->set_valid(newEl);// Mark new element as valid
+	((FEM_Elem*)m->elem[elemType].getGhost())->connIs(newEl,conn);// update element's conn, i.e. e2n table
+}
+  else{
+	int oldLength = m->elem[elemType].size();
+	m->elem[elemType].setLength(oldLength+1);
+	newEl = oldLength;
+	m->elem[elemType].set_valid(newEl);  // Mark new element as valid
+	m->elem[elemType].connIs(newEl,conn);  // update element's conn, i.e. e2n table
+  }
 
+  // clear e2n and e2e connectivities for this new element
   m->e2n_removeAll(newEl);
   m->e2e_removeAll(newEl);
 
-  // Mark new element as valid
-  m->elem[elemType].set_valid(newEl);
-  
-  // update element's conn, i.e. e2n table
-  m->elem[elemType].connIs(newEl,conn);
   
   // add to corresponding inverse, the n2e and n2n table
   for(int i=0;i<connSize;i++){

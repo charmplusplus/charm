@@ -254,8 +254,6 @@ to mark the chunk to which a ghost node or element belongs datatype=FEM_INDEX*/
   int FEM_Get_ghost_list_length(void);
   void FEM_Get_ghost_list(int *dest);
 
-  void FEM_Add_node(int localIdx,int nBetween,int *betweenNodes);  
-  
   void FEM_Update_field(int fid, void *nodes);
   void FEM_Update_ghost_field(int fid, int elTypeOrMinusOne, void *nodes);
   void FEM_Reduce_field(int fid, const void *nodes, void *outbuf, int op);
@@ -298,23 +296,13 @@ to mark the chunk to which a ghost node or element belongs datatype=FEM_INDEX*/
   void FEM_remove_element(int mesh, int element, int elem_type=0);
   void FEM_Modify_Lock(int mesh, int* affectedNodes, int numAffectedNodes, int* affectedElts=0, int numAffectedElts=0);
   void FEM_Modify_Unlock(int mesh);
+  void FEM_REF_INIT(int mesh);
   
+ 
+
   
   // To help debugging:
   void FEM_Print_Mesh_Summary(int mesh);
-
-
-  //fem_modify functions
-  void FEM_REF_INIT(int mesh);
-  int FEM_add_node(int mesh, int* adjacent_nodes, int num_adjacent_nodes, int upcall);
-  void FEM_remove_node(int mesh,int node);
-  void FEM_remove_element(int mesh, int element, int elem_type);
-  int FEM_add_element(int mesh, int* conn, int conn_size, int elem_type);
-  void FEM_Modify_Lock(int mesh, int* affectedNodes, int numAffectedNodes, int* affectedElts, int numAffectedElts);
-  void FEM_Modify_Unlock(int mesh);
-
-
-
 
 /* Routines we wish didn't exist: */
   void FEM_Serial_split(int nchunks);
