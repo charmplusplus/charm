@@ -462,16 +462,17 @@ FDECL void FTN_NAME(CMIMEMORYCHECK,cmimemorycheck)(){
 }
 
 class FEM_Operation_Data{
-	public:
-		double *coord;
-		int *connData,*nodeBoundaryData;
-		int *validNodeData,*validElemData;
-		FEM_Node *node;
-		CkHashtableT<intdual,int> *nodes2sparse;
-		AllocTable2d<int> *validEdge;
-		AllocTable2d<int> *sparseConnTable;
-		FEM_Operation_Data(){
-		};
+public:
+  double *coord;
+  int *connData,*nodeBoundaryData;
+  int *validNodeData,*validElemData;
+  FEM_Node *node;
+  CkHashtableT<intdual,int> *nodes2sparse;
+  AllocTable2d<int> *validEdge;
+  AllocTable2d<int> *sparseConnTable;
+  FEM_Attribute *sparseBoundaryAttr;
+  FEM_Operation_Data(){
+  };
 };
 void FEM_Coarsen_Operation(FEM_Operation_Data *coarsen_data, coarsenData &operation);
 
@@ -528,11 +529,17 @@ void FEM_REFINE2D_Coarsen(int meshID,int nodeID,double *coord,int elemID,double 
   /* populate the hashtable from nodes2edges with the valid edges */
   CkHashtableT<intdual,int> nodes2sparse(nelems);
   coarsen_data->nodes2sparse = &nodes2sparse;
+  FEM_Attribute *sparseBoundaryAttr;
   if(sparseID != -1){
     FEM_Entity *sparse = FEM_Entity_lookup(meshID,sparseID,"Coarsen_sparse");
     FEM_DataAttribute *validEdgeAttribute = (FEM_DataAttribute *)sparse->lookup(FEM_VALID,"Coarsen_sparse");
     FEM_IndexAttribute *sparseConnAttribute = (FEM_IndexAttribute *)sparse->lookup(FEM_CONN,"Coarsen_sparse");
     AllocTable2d<int> *sparseConnTable = coarsen_data->sparseConnTable = &(sparseConnAttribute->get());
+    coarsen_data->sparseBoundaryAttr = sparseBoundaryAttr = sparse->lookup(FEM_BOUNDARY,"REFINE2D_Mesh_sparse");
+    if(sparseBoundaryAttr == NULL){
+      CkAbort("Specified sparse elements without boundary conditions");
+    }
+
     
     if(validEdgeAttribute){
       coarsen_data->validEdge = &(validEdgeAttribute->getInt());
@@ -574,28 +581,49 @@ void FEM_Coarsen_Operation(FEM_Operation_Data *coarsen_data, coarsenData &operat
   int *validNodeData = coarsen_data->validNodeData;
   int *validElemData = coarsen_data->validElemData;
   int *nodeBoundaryData = coarsen_data->nodeBoundaryData;
-  
+  FEM_Attribute *sparseBoundaryAttr = coarsen_data->sparseBoundaryAttr;
+  AllocTable2d<int> *sparseBoundaryTable;
+
   switch(operation.type){
-  case COLLAPSE:
-    tri = operation.data.cdata.elemID;
-    nodeToKeep = operation.data.cdata.nodeToKeep;
-    nodeToThrow = operation.data.cdata.nodeToDelete;
-    if(operation.data.cdata.flag & 0x1 || operation.data.cdata.flag & 0x2){
-      interpolateNode(coarsen_data->node,nodeToKeep,nodeToThrow,nodeToKeep,operation.data.cdata.frac);
-      coord[2*nodeToKeep] = operation.data.cdata.newX;
-      coord[2*nodeToKeep+1] = operation.data.cdata.newY;
-      validNodeData[nodeToThrow] = 0;
-      validNodeData[nodeToKeep] = 1;
-      DEBUGINT(printf("---------Collapse <%d,%d> invalidating node %d and element %d \n",nodeToKeep,nodeToThrow,nodeToThrow,tri));
-      if(coarsen_data->validEdge){	
-	int sidx = coarsen_data->nodes2sparse->get(intdual(nodeToKeep,nodeToThrow))-1;
-	coarsen_data->nodes2sparse->remove(intdual(nodeToKeep,nodeToThrow));
-	(*(coarsen_data->validEdge))[sidx][0] = 0;
-	DEBUGINT(printf("---- Deleting edge %d between nodes %d and %d \n",sidx,nodeToKeep,nodeToThrow));
-      }	
+  case COLLAPSE: 
+    {
+      tri = operation.data.cdata.elemID;
+      nodeToKeep = operation.data.cdata.nodeToKeep;
+      nodeToThrow = operation.data.cdata.nodeToDelete;
+      int opNode = 0;
+      for (int i=0; i<3; i++) {
+	if ((connData[3*tri+i] != nodeToThrow) &&
+	    (connData[3*tri+i] != nodeToKeep)) {
+	  opNode = connData[3*tri+i];
+	  break;
+	}
+      }
+      sparseBoundaryTable = &(((FEM_DataAttribute *)sparseBoundaryAttr)->getInt());
+      int delEdgeIdx = coarsen_data->nodes2sparse->get(intdual(nodeToThrow,opNode))-1;
+      int keepEdgeIdx = coarsen_data->nodes2sparse->get(intdual(nodeToKeep,opNode))-1;
+      int delBC = ((*sparseBoundaryTable)[delEdgeIdx])[0];
+      int keepBC = ((*sparseBoundaryTable)[keepEdgeIdx])[0];
+      if (delBC > keepBC) {
+	((*sparseBoundaryTable)[keepEdgeIdx])[0] = delBC;
+      }
+      
+      if(operation.data.cdata.flag & 0x1 || operation.data.cdata.flag & 0x2){
+	interpolateNode(coarsen_data->node,nodeToKeep,nodeToThrow,nodeToKeep,operation.data.cdata.frac);
+	coord[2*nodeToKeep] = operation.data.cdata.newX;
+	coord[2*nodeToKeep+1] = operation.data.cdata.newY;
+	validNodeData[nodeToThrow] = 0;
+	validNodeData[nodeToKeep] = 1;
+	DEBUGINT(printf("---------Collapse <%d,%d> invalidating node %d and element %d \n",nodeToKeep,nodeToThrow,nodeToThrow,tri));
+	if(coarsen_data->validEdge){	
+	  int sidx = coarsen_data->nodes2sparse->get(intdual(nodeToKeep,nodeToThrow))-1;
+	  coarsen_data->nodes2sparse->remove(intdual(nodeToKeep,nodeToThrow));
+	  (*(coarsen_data->validEdge))[sidx][0] = 0;
+	  DEBUGINT(printf("---- Deleting edge %d between nodes %d and %d \n",sidx,nodeToKeep,nodeToThrow));
+	}	
+      }
+      validElemData[tri] = 0;
+      connData[3*tri] = connData[3*tri+1] = connData[3*tri+2] = -1;
     }
-    validElemData[tri] = 0;
-    connData[3*tri] = connData[3*tri+1] = connData[3*tri+2] = -1;
     break;
   case	UPDATE:
     if(validNodeData[operation.data.udata.nodeID]){
