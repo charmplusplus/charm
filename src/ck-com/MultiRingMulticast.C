@@ -17,7 +17,7 @@ void MultiRingMulticast::beginProcessing(int  nelements){
     DirectMulticastStrategy::beginProcessing(nelements);
 }
 
-
+/*
 inline int getMyId(int *pelist, int npes, int mype) {
     int myid = -1;
 
@@ -69,6 +69,7 @@ inline int getMidPe(int *pelist, int npes, int src_pe) {
 
     return mid_pe;
 }
+*/
 
 //Unlike ring the source here sends two or more messages while all
 //elements along the ring only send one.
