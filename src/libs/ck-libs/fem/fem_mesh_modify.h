@@ -39,7 +39,7 @@ int FEM_add_node(FEM_Mesh *m, int* adjacent_nodes, int num_adjacent_nodes, int u
 void FEM_remove_node(FEM_Mesh *m, int node);
 void FEM_remove_element(FEM_Mesh *m, int element, int elem_type);
 int FEM_add_element(FEM_Mesh *m, int* conn, int conn_size, int elem_type);
-void FEM_Modify_Lock(FEM_Mesh *m, int* affectedNodes, int numAffectedNodes, int* affectedElts, int numAffectedElts);
+void FEM_Modify_Lock(FEM_Mesh *m, int* affectedNodes, int numAffectedNodes, int* affectedElts, int numAffectedElts, int elemtype=0);
 void FEM_Modify_Unlock(FEM_Mesh *m);
 
   
@@ -64,13 +64,14 @@ class FEM_lock {
   //locks all chunks which contain all the nodes and elements that are passed 
   //in this function
   //locking of the chunks is blocking and is strictly in ascending order.
-  int lock(int numNodes, int *nodes, int numElems, int* elems);
+  int lock(int numNodes, int *nodes, int numElems, int* elems, int elemType=0);
   //unlock all the concerned chunks.
   //since at one point of time one chunk can only lock one set of chunks for
   //one operation, one does not need to pass arguments to unlock.
   int unlock();
   int lock(int chunkNo, int own);
   int unlock(int chunkNo, int own);
+  int getIdx() { return idx; }
 };
 
 class FEM_MUtil {
@@ -87,13 +88,17 @@ class FEM_MUtil {
   //entNo signifies the local index of the entity
   //numChunks is the number of chunks that need to be locked to lock that entity
   //chunks identifies the chunks that need to be locked
-  void getChunkNos(int entType, int entNo, int *numChunks, IDXL_Share ***chunks);
+  void getChunkNos(int entType, int entNo, int *numChunks, IDXL_Share ***chunks, int elemType=0);
   bool isShared(int index);
   void splitEntityAll(FEM_Mesh *m, int localIdx, int nBetween, int *between, int idxbase);
   void splitEntityRemote(FEM_Mesh *m, int chk, int localIdx, int nBetween, int *between, int idxbase);
   void removeNodeAll(FEM_Mesh *m, int localIdx);
   void removeNodeRemote(FEM_Mesh *m, int chk, int sharedIdx);
-  int exists_in_IDXL(FEM_Mesh *m, int localIdx, int chk);
+  int exists_in_IDXL(FEM_Mesh *m, int localIdx, int chk, int type, int elemType=0);
+
+  void addGhostElementRemote(FEM_Mesh *m, int chk, int elemType, int numGhostIndices, int *ghostIndices, int numSharedIndices, int *sharedIndices, int connSize);
+  chunkListMsg *getChunksSharingGhostNodeRemote(FEM_Mesh *m, int chk, int sharedIdx);
+  void buildChunkToNodeTable(int *nodetype, int sharedcount, int ghostcount, int localcount, int *conn, int connSize, CkVec<int> **allShared, int *numSharedChunks, CkVec<int> *allChunks, int **sharedConn);
 };
 
 class femMeshModMsg : public CMessage_femMeshModMsg {
@@ -173,19 +178,37 @@ class removeSharedNodeMsg : public CMessage_removeSharedNodeMsg {
   int index;
 };
 
-class addGhostNodeMsg : public CMessage_addGhostNodeMsg {
+class addGhostElemMsg : public CMessage_addGhostElemMsg {
  public:
   int chk;
-  int index;
-};
-
-class addGhostElemMsg : public CMessage_addGhostNodeMsg {
- public:
-  int chk;
-  int index;
   int elemType;
+  int numGhostIndex;
+  int *ghostIndices;
+  int numSharedIndex;
+  int *sharedIndices;
+  int connSize;
+
+  ~addGhostElemMsg() {
+    if(ghostIndices) {
+      delete ghostIndices;
+    }
+    if(sharedIndices) {
+      delete sharedIndices;
+    }
+  }
 };
 
+class chunkListMsg : public CMessage_chunkListMsg {
+ public:
+  int numChunkList;
+  int *chunkList;
+
+  ~chunkListMsg() {
+    if(chunkList) {
+      delete chunkList;
+    }
+  }
+};
 
 class femMeshModify : public CBase_femMeshModify {
   friend class FEM_lock;
@@ -214,9 +237,8 @@ class femMeshModify : public CBase_femMeshModify {
   void addSharedNodeRemote(sharedNodeMsg *fm);
   void removeSharedNodeRemote(removeSharedNodeMsg *fm);
 
-  void addGhostNode(addGhostNodeMsg *fm);
   void addGhostElem(addGhostElemMsg *fm);
-
+  chunkListMsg *getChunksSharingGhostNode(int2Msg *);
 };
 
 

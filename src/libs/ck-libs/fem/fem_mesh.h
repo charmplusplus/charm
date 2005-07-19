@@ -600,8 +600,6 @@ class FEM_Entity {
 	FEM_Mesh_alloc_fn resize; // should be a function pointer to the actual resize function later
 	void *args; // arguments to the resize function
 	
-	FEM_Entity *ghost; // Our ghost entity type, or NULL if we're the ghost
-	
 	/**
 	 * This is our main list of attributes-- everything about each of 
 	 * our entities is in this list of attributes.  This list is searched
@@ -650,8 +648,6 @@ class FEM_Entity {
 	*/
 	FEM_DataAttribute *valid;
 	
-	FEM_Comm ghostSend; //Non-ghosts we send out (only set for real entities)
-	FEM_Comm ghostRecv; //Ghosts we recv into (only set for ghost entities)
 protected:
 	/**
 	 * lookup of this attribute code has failed: check if it needs
@@ -673,8 +669,13 @@ protected:
 	/// This class also attaches the ghost attribute, so be sure to 
 	///   call add before manipulating the attribute.
 	void add(FEM_Attribute *attribute);
-public:
-	
+ public:
+
+	FEM_Entity *ghost; // Our ghost entity type, or NULL if we're the ghost
+		
+	FEM_Comm ghostSend; //Non-ghosts we send out (only set for real entities)
+	FEM_Comm ghostRecv; //Ghosts we recv into (only set for ghost entities)
+
 	FEM_Entity(FEM_Entity *ghost_); //Default constructor
 	void pup(PUP::er &p);
 	virtual ~FEM_Entity();
