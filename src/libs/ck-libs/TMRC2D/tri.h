@@ -15,7 +15,7 @@
 #include "messages.h"
 #include "mpi.h"
 
-#define REFINE_PRECISION 0.6
+#define REFINE_PRECISION 0.9
 #define COARSEN_PRECISION 0.9
 #define QUALITY_MIN 0.5
 
