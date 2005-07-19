@@ -93,12 +93,12 @@ ComlibSectionHashObject *MultiRingMulticast::createObjectOnSrcPe
     if(npes < 4) {
         obj->npes = npes;
         obj->pelist = pelist;
-	CkPrintf("MultiRingMulticast::createObjectOnSrcPe, less than 4 procs\n");
+	//CkPrintf("MultiRingMulticast::createObjectOnSrcPe, less than 4 procs\n");
 
         return obj;
     }
     
-    CkPrintf("MultiRingMulticast::createObjectOnSrcPe, more than 3 procs\n");
+    //CkPrintf("MultiRingMulticast::createObjectOnSrcPe, more than 3 procs\n");
     //pelist[npes ++] = CkMyPe();
     qsort(pelist, npes, sizeof(int), intCompare);
 
@@ -170,7 +170,7 @@ ComlibSectionHashObject *MultiRingMulticast::createObjectOnIntermediatePe(int ni
 
     ComlibSectionHashObject *obj = new ComlibSectionHashObject();
 
-    CkPrintf("MultiRingMulticast: creating object on intermediate Pe %d-%d (%d-%d)\n", CkMyPe(),srcpe, npes,nindices);
+    //CkPrintf("MultiRingMulticast: creating object on intermediate Pe %d-%d (%d-%d)\n", CkMyPe(),srcpe, npes,nindices);
     //int *pelist;
     //int npes;
     //sinfo.getRemotePelist(nelements, elements, npes, pelist);
