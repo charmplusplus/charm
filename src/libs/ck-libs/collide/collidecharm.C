@@ -232,47 +232,48 @@ voxelAggregator *CollisionAggregator::addAccum(const CollideLoc3d &dest)
 }
 
 //Add this chunk's triangles
-void CollisionAggregator::aggregate(int pe,int chunk,
-	int n,const bbox3d *boxes,const int *prio)
+void CollisionAggregator::aggregate(int pe, int chunk, int n, 
+				    const bbox3d *boxes, const int *prio)
 {
-	hashCache1<CollideLoc3d,voxelAggregator *>
-		cache(CollideLoc3d(-1000000000,-1000000000,-1000000000));
-	
-	//Add each object to its corresponding voxelAggregators
-	for (int i=0;i<n;i++) {
-	//Compute bbox. and location
-		const bbox3d &bbox=boxes[i];
-		int oPrio=chunk;
-		if (prio!=NULL) oPrio=prio[i];
-		CollideObjRec obj(CollideObjID(chunk,i,oPrio,pe),bbox);
-		iSeg1d sx(gridMap.world2grid(0,bbox.axis(0))),
-		       sy(gridMap.world2grid(1,bbox.axis(1))),
-		       sz(gridMap.world2grid(2,bbox.axis(2)));
-		
-		STATS(objects++)
-		STATS(gridSizes[0]+=sx.getMax()-sx.getMin())
-		STATS(gridSizes[1]+=sy.getMax()-sy.getMin())
-		STATS(gridSizes[2]+=sz.getMax()-sz.getMin())
-		
-		//Loop over all grid voxels touched by this object
-		CollideLoc3d g;
-		g.z=sz.getMin();
-		do { 
-		  g.y=sy.getMin();
-		  do { 
-		    g.x=sx.getMin();
-		    do {
-			voxelAggregator *c=cache.lookup(g);
-			if (c==NULL) { /* First object for this voxel: add record */
-				c=voxels.get(g);
-				if (c==NULL) c=addAccum(g);
-				cache.add(g,c);
-			}
-			c->add(obj);
-		    } while (++g.x<sx.getMax());
-		  } while (++g.y<sy.getMax());
-		} while (++g.z<sz.getMax());
-	}
+  hashCache1<CollideLoc3d,voxelAggregator *>
+    cache(CollideLoc3d(-1000000000,-1000000000,-1000000000));
+  
+  //Add each object to its corresponding voxelAggregators
+  for (int i=0;i<n;i++) {
+    CkPrintf("aggregate: chunk %d: box %d of %d\n", chunk, i, n);
+    //Compute bbox. and location
+    const bbox3d &bbox=boxes[i];
+    int oPrio=chunk;
+    if (prio!=NULL) oPrio=prio[i];
+    CollideObjRec obj(CollideObjID(chunk,i,oPrio,pe),bbox);
+
+    iSeg1d sx(gridMap.world2grid(0,bbox.axis(0))),
+      sy(gridMap.world2grid(1,bbox.axis(1))),
+      sz(gridMap.world2grid(2,bbox.axis(2)));
+    STATS(objects++)
+      STATS(gridSizes[0]+=sx.getMax()-sx.getMin())
+      STATS(gridSizes[1]+=sy.getMax()-sy.getMin())
+      STATS(gridSizes[2]+=sz.getMax()-sz.getMin())
+      
+      //Loop over all grid voxels touched by this object
+      CollideLoc3d g;
+    g.z=sz.getMin();
+    do { 
+      g.y=sy.getMin();
+      do { 
+	g.x=sx.getMin();
+	do {
+	  voxelAggregator *c=cache.lookup(g);
+	  if (c==NULL) { /* First object for this voxel: add record */
+	    c=voxels.get(g);
+	    if (c==NULL) c=addAccum(g);
+	    cache.add(g,c);
+	  }
+	  c->add(obj);
+	} while (++g.x<sx.getMax());
+      } while (++g.y<sy.getMax());
+    } while (++g.z<sz.getMax());
+  }
 }
 
 //Send off all accumulated messages

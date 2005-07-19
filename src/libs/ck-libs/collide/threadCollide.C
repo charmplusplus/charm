@@ -283,17 +283,16 @@ CDECL collide_t COLLIDE_Init(int mpi_comm,
 	if (tc==NULL) CkAbort("Must call COLLIDE_Init from driver");
 	int rank=TCHARMLIB_Get_rank(tc,mpi_comm);
 	if (rank==0) { // I am the master: I must create the array
-		CkArrayOptions opts(TCHARMLIB_Bound_array(tc,mpi_comm));
-		CProxy_threadCollideMgr client=
-			CProxy_threadCollideMgr::ckNew();
-		CollideGrid3d gridMap(*(vector3d *)gridStart, *(vector3d *)gridSize);
-		CollideHandle collide=
-			CollideCreate(gridMap,client);
-		CProxy_threadCollide::ckNew(tc->getProxy(),client,collide,opts);
-		// As array elements are created, they will
-		//  do tc->semaPut(COLLIDE_TCHARM_SEMAID,this);
+	  CkArrayOptions opts(TCHARMLIB_Bound_array(tc,mpi_comm));
+	  CProxy_threadCollideMgr client=
+	    CProxy_threadCollideMgr::ckNew();
+	  CollideGrid3d gridMap(*(vector3d *)gridStart, *(vector3d *)gridSize);
+	  CollideHandle collide=
+	    CollideCreate(gridMap,client);
+	  CProxy_threadCollide::ckNew(tc->getProxy(),client,collide,opts);
+	  // As array elements are created, they will
+	  //  do tc->semaPut(COLLIDE_TCHARM_SEMAID,this);
 	}
-	
 	// Block until the collision objects are all created:
 	threadCollide *coll=(threadCollide *)tc->semaGet(COLLIDE_TCHARM_SEMAID);
 	// hideous: extract the groupID's "idx" to use as a "collide_t"

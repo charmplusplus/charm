@@ -144,7 +144,8 @@ int CollideOctant::splitAt(int alongAxis)
 	while (lo<hi) {
 		attempts++;  STATS(pivots++)
 		//Choose a pivot element and value
-		int pivot=lo+(rand()&0x7fff)*(hi-lo+1)/0x8000;
+		//int pivot=lo+(rand()&0x7fff)*(hi-lo+1)/0x8000;
+	       int pivot = (lo/2)+(hi/2);	       
 #define val(x) us[x]->getBbox().axis(alongAxis).getMin()
 		real pval=val(pivot);
 		

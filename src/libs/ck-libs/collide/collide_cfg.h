@@ -13,7 +13,7 @@ Orion Sky Lawlor, olawlor@acm.org, 2003/3/19
 
 /// Use bitwise trick for fast floating-point to integer conversion.
 #ifndef COLLIDE_USE_FLOAT_HACK
-#define COLLIDE_USE_FLOAT_HACK 1
+#define COLLIDE_USE_FLOAT_HACK 0
 #endif
 
 /// Use recursive coordinate bisection within a voxel.
