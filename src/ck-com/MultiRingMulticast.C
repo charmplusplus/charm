@@ -90,21 +90,16 @@ ComlibSectionHashObject *MultiRingMulticast::createObjectOnSrcPe
     if(npes == 0)
         return obj;
 
-    if(npes == 1) {        
-        obj->npes = 1;        
+    if(npes < 4) {
+        obj->npes = npes;
         obj->pelist = pelist;
+	CkPrintf("MultiRingMulticast::createObjectOnSrcPe, less than 4 procs\n");
 
-        return obj;
-    }
-
-    if(npes == 2) {        
-        obj->npes = 2;        
-        obj->pelist = pelist;
-        
         return obj;
     }
     
-    pelist[npes ++] = CkMyPe();
+    CkPrintf("MultiRingMulticast::createObjectOnSrcPe, more than 3 procs\n");
+    //pelist[npes ++] = CkMyPe();
     qsort(pelist, npes, sizeof(int), intCompare);
 
     /*
@@ -117,126 +112,128 @@ ComlibSectionHashObject *MultiRingMulticast::createObjectOnSrcPe
       CkPrintf("%s\n\n", dump);
     */
     
-    int myid = getMyId(pelist, npes, CkMyPe());    
+    int myid = -1; // getMyId(pelist, npes, CkMyPe());    
+    for (int i=0; i<npes; ++i) {
+      if (pelist[i] == CkMyPe()) {
+	myid = i;
+	break;
+      }
+    }
 
-    CkAssert(myid >= 0 && myid < npes);
+    //CkAssert(myid >= 0 && myid < npes);
 
-    int nextpe = -1;
-    
-    if(myid < npes / 2) 
-        getNextPe(pelist, npes/2, CkMyPe(), nextpe);
-    else 
-        getNextPe(pelist+npes/2, npes - npes/2, CkMyPe(), nextpe);
-    
-    int mid_pe = -1;
-    mid_pe = getMidPe(pelist, npes, CkMyPe());
-    
-    delete [] pelist;
+    int breaking = npes/2; /* 0 : breaking-1    is the first ring
+			      breaking : npes-1 is the second ring
+			   */
 
+    int nextpe = myid + 1;
+    // wrap nextpe around the ring
+    if(myid < breaking) {
+      if (nextpe >= breaking) nextpe = 0;
+    } else {
+      if (nextpe >= npes) nextpe = breaking;
+    }
+    
+    int midpe;
+    if (myid < breaking) {
+      midpe = myid + breaking;
+      if (midpe >= npes || midpe < breaking) midpe = breaking;
+    } else {
+      midpe = myid - breaking;
+    }
+    //mid_pe = getMidPe(pelist, npes, CkMyPe());
+    
     if(nextpe != CkMyPe()) {
         obj->pelist = new int[2];
         obj->npes = 2;
         
-        obj->pelist[0] = nextpe;
-        obj->pelist[1] = mid_pe;
+        obj->pelist[0] = pelist[nextpe];
+        obj->pelist[1] = pelist[midpe];
     }
     else {
-        CkPrintf("Warning Should not be here !!!!!!!!!\n");
-        obj->pelist = new int[1];
-        obj->npes = 1;
+        CkAbort("Warning Should not be here !!!!!!!!!\n");
+        //obj->pelist = new int[1];
+        //obj->npes = 1;
         
-        obj->pelist[0] = mid_pe;
+        //obj->pelist[0] = midpe;
     }
     
+    delete [] pelist;
+
     //CkPrintf("%d Src = %d Next = %d Mid Pe =%d\n", CkMyPe(), CkMyPe(), nextpe, mid_pe);    
     
     return obj;
 }
 
 
-ComlibSectionHashObject *MultiRingMulticast::createObjectOnIntermediatePe
-(int nelements, CkArrayIndexMax *elements, int src_pe){
+ComlibSectionHashObject *MultiRingMulticast::createObjectOnIntermediatePe(int nindices, CkArrayIndexMax *idxlist, int npes, ComlibMulticastIndexCount *counts, int srcpe) {
 
     ComlibSectionHashObject *obj = new ComlibSectionHashObject();
 
-    int *pelist;
-    int npes;
-    sinfo.getRemotePelist(nelements, elements, npes, pelist);
+    CkPrintf("MultiRingMulticast: creating object on intermediate Pe %d-%d (%d-%d)\n", CkMyPe(),srcpe, npes,nindices);
+    //int *pelist;
+    //int npes;
+    //sinfo.getRemotePelist(nelements, elements, npes, pelist);
     
     obj->pelist = 0;
-    obj->npes = 0;   
-    sinfo.getLocalIndices(nelements, elements, obj->indices);
+    obj->npes = 0;
+    for (int i=0; i<nindices; ++i) obj->indices.insertAtEnd(idxlist[i]);
+    //sinfo.getLocalIndices(nelements, elements, obj->indices);
 
-    pelist[npes ++] = CkMyPe();
+    //pelist[npes ++] = CkMyPe();
 
-    if(npes <= 3)
+    if(npes <= 4)
         return obj;
     
-    qsort(pelist, npes, sizeof(int), intCompare);
+    qsort(counts, npes, sizeof(ComlibMulticastIndexCount), indexCountCompare);
     
-    int myid = getMyId(pelist, npes, CkMyPe());
+    int myid = -1;
+    for (int i=0; i<npes; ++i) {
+      if (counts[i].pe == CkMyPe()) {
+	myid = i;
+	break;
+      }
+    }
+    //getMyId(pelist, npes, CkMyPe());
     
     CkAssert(myid >= 0 && myid < npes);
 
-    int src_id = getMyId(pelist, npes, src_pe);
-    
-    if(src_id == -1) { //Src isnt the receipient of the multicast
-        pelist[npes ++] = src_pe;
-        qsort(pelist, npes, sizeof(int), intCompare);
-        src_id = getMyId(pelist, npes, src_pe);
-        myid = getMyId(pelist, npes, CkMyPe());
-        
-        CkAssert(src_id >= 0 && src_id < npes);
+    int breaking = npes/2;
+    int srcid = 0; // = getMyId(pelist, npes, src_pe);
+    for (int i=0; i<npes; ++i) {
+      if (counts[i].pe == srcpe) {
+	srcid = i;
+	break;
+      }
     }
 
-    int nextpe = -1;
-    int new_src_pe = src_pe;
-    int mid_pe = getMidPe(pelist, npes, src_pe);
-    
-    if(myid < npes / 2) {
-        getNextPe(pelist, npes/2, CkMyPe(), nextpe);
+    if (srcid < breaking ^ myid < breaking) {
+      // if we are in the two different halves, correct srcid
+      if (srcid < breaking) {
+	srcid += breaking;
+	if (srcid >= npes || srcid < breaking) srcid = breaking;
+      } else {
+	srcid -= breaking;
+      }
+    }
+    // now srcid is the starting point of this half ring, which could be the
+    // original sender itself (0 if the sender is not part of the recipients),
+    // or the counterpart in the other ring
 
-        //If source is in the other half I have to change to the
-        //middle guy
-        if(src_id >= npes/2)
-            new_src_pe = mid_pe;
+    int nextid = myid + 1;
+    // wrap nextpe around the ring
+    if(myid < breaking) {
+      if (nextid >= breaking) nextid = 0;
     }
     else {
-        getNextPe(pelist + (npes/2), npes - npes/2, CkMyPe(), nextpe);
-
-        //If source is in the other half I have to change to the
-        //middle guy
-        if(src_id < npes/2)
-            new_src_pe = mid_pe;
+      if (nextid >= npes) nextid = breaking;
     }
 
-    bool end_flag = isEndOfRing(nextpe, new_src_pe);
-
-    if(!end_flag) {
-        obj->pelist = new int[1];
-        obj->npes = 1;
-        obj->pelist[0] = nextpe;
+    if (nextid != srcid) {
+      obj->pelist = new int[1];
+      obj->npes = 1;
+      obj->pelist[0] = counts[nextid].pe;
     }
-    
-    //CkPrintf("%d: Src = %d Next = %d end = %d Midpe = %d\n", CkMyPe(), src_pe, 
-    //       nextpe, end_flag, mid_pe);    
-    
-    delete [] pelist;
+
     return obj;
 }
-
-//We need to end the ring,
-//    if next_pe is the same as the source_pe, or
-//    if next_pe is the first processor in the ring, greater than srouce_pe.
-//Both these comparisons are done in a 'cyclic' way with wraparounds.
-
-int MultiRingMulticast::isEndOfRing(int next_pe, int src_pe){
-    
-    ComlibPrintf("[%d] isEndofring %d, %d\n", CkMyPe(), next_pe, src_pe);
-    
-    if((next_pe != CkMyPe()) && (next_pe != src_pe)) 
-        return 0;
-    
-    return 1;
-}
-

@@ -27,8 +27,7 @@ class MultiRingMulticast: public DirectMulticastStrategy {
                                                          CkArrayIndexMax *elements);
 
     ///Creates the propagation across the half ring
-    virtual ComlibSectionHashObject *createObjectOnIntermediatePe
-        (int nelements, CkArrayIndexMax *elements, int src_pe);
+    virtual ComlibSectionHashObject *createObjectOnIntermediatePe(int nindices, CkArrayIndexMax *idxlist, int npes, ComlibMulticastIndexCount *counts, int srcpe);
     
  public:
     

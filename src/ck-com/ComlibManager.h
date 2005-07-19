@@ -53,6 +53,23 @@ struct ComlibMulticastIndexCount {
   int count;
 };
 
+///for use of qsort
+inline int indexCountCompare(const void *a, const void *b) {
+  ComlibMulticastIndexCount a1 = *(ComlibMulticastIndexCount*) a;
+  ComlibMulticastIndexCount b1 = *(ComlibMulticastIndexCount*) b;
+
+  if(a1.pe < b1.pe)
+    return -1;
+  
+  if(a1.pe == b1.pe)
+    return 0;
+  
+  if(a1.pe > b1.pe)
+    return 1;
+  
+  return 0;
+}
+
 class ComlibMulticastMsg : public CkMcastBaseMsg, 
                public CMessage_ComlibMulticastMsg {
     
