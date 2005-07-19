@@ -1,3 +1,4 @@
+#include <alloca.h>
 
 #include "ComlibManager.h"
 #include "ComlibSectionInfo.h"
