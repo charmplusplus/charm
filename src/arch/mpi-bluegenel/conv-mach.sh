@@ -1,10 +1,9 @@
-BGL_FLOOR=/auto/BGX/floor
-[ -z "$BGL_INSTALL" ] && echo "ERROR: BL_INSTALL not defined!" && exit 1
+BGL_FLOOR=/bgl/BlueLight/ppcfloor
+[ -z "$BGL_FLOOR" ] && echo "ERROR: BGL_FLOOR not defined!" && exit 1
 
-BGL_BASE=$BGL_INSTALL
 BGL_BIN=$BGL_FLOOR/blrts-gnu/bin
-BGL_INC=$BGL_INSTALL/bglsys/include
-BGL_LIB=$BGL_INSTALL/bglsys/lib
+BGL_INC=$BGL_FLOOR/bglsys/include
+BGL_LIB=$BGL_FLOOR/bglsys/lib
 
 OPTS_CPP="$OPTS_CPP -I$BGL_INC "
 GCC_OPTS="-gdwarf-2 -Wno-deprecated"
@@ -21,7 +20,7 @@ CMK_RANLIB="$BGL_BIN/powerpc-bgl-blrts-gnu-ranlib "
 CMK_AR="$BGL_BIN/powerpc-bgl-blrts-gnu-ar q "
 CMK_LD="$CMK_CC "
 CMK_LDXX="$CMK_CXX "
-CMK_LIBS='-lckqt -lmpich.rts -lbglml.rts -lrts.rts -ldevices.rts -lcxxmpich.rts'
+CMK_LIBS='-lckqt -lmpich.rts -lmsglayer.rts -lrts.rts -ldevices.rts -lrts.rts'
 CMK_LD_LIBRARY_PATH="-Wl,-rpath,$CHARMLIBSO/"
 #CMK_SEQ_LIBS=''
 #CMK_SEQ_CC="$BGL_BIN/powerpc-bgl-blrts-gnu-gcc -Wno-deprecated "

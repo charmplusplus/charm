@@ -1,6 +1,6 @@
-BGL_SRC=/bgd-public/chuang10/bglsw
-BGL_INSTALL=/bgd-public/chuang10/bglsw-install
-BGL_FLOOR=/auto/BGX/floor
+BGL_SRC=/bgdhome/chuang10/bglsw
+BGL_INSTALL=/bgdhome/chuang10/bglsw-install
+BGL_FLOOR=/auto/export-bglsim/BlueLight/ppcfloor
 [ -z "$BGL_INSTALL" ] && echo "ERROR: BL_INSTALL not defined!" && exit 1
 
 BGL_BASE=$BGL_INSTALL
