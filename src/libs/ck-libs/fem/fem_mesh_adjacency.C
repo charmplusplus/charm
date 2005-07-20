@@ -416,7 +416,7 @@ void FEM_Mesh::createElemElemAdj()
                     
                     if(FEM_Is_ghost_index(a->localNo)){
                       j = FEM_To_ghost_index(a->localNo)*tuplesPerElem + a->tupleNo;
-                      CkAssert(j<numElements*tuplesPerElem);
+                      CkAssert(j<numGhostElements*tuplesPerElem);
                       adjsGhost[j] = b->localNo;
                       adjTypesGhost[j] = b->type;
                     }
