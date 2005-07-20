@@ -28,6 +28,19 @@ test: pgm
 	./charmrun ./pgm +vp3 -write
 	./charmrun ./pgm +vp3 -read
 	rm -f fem_mesh_vp3_*
+	-make testf
+
+testf: fpgm
+	./charmrun ./fpgm +p1 +vp1
+	./charmrun ./fpgm +p1 +vp2
+	./charmrun ./fpgm +p2 +vp1
+	./charmrun ./fpgm +p2 +vp2
+	./charmrun ./fpgm +p2 +vp3
+	./charmrun ./fpgm +p2 +vp4
+	-@rm -f fem_mesh_vp3_*
+	./charmrun ./fpgm +vp3 -write
+	./charmrun ./fpgm +vp3 -read
+	rm -f fem_mesh_vp3_*
 
 bgtest: pgm
 	./charmrun ./pgm +p1 +vp1 +x1 +y1 +z1
