@@ -35,14 +35,14 @@ int FEM_Adapt::edge_flip_help(int e1, int e2, int n1, int n2, int e1_n1,
 {
   int conn[3];
 
-  FEM_remove_element(e1, 0);
-  FEM_remove_element(e2, 0);
+  FEM_remove_element(theMesh, e1, 0);
+  FEM_remove_element(theMesh, e2, 0);
   // add n1, n3, n4
   conn[e1_n1] = n1;  conn[e1_n2] = n4;  conn[e1_n3] = n3;
-  (void) FEM_add_element(conn, 3, 0);
+  (void) FEM_add_element(theMesh, conn, 3, 0);
   // add n2, n3, n4
   conn[e1_n1] = n4;  conn[e1_n2] = n2;  conn[e1_n3] = n3;
-  (void) FEM_add_element(conn, 3, 0);
+  (void) FEM_add_element(theMesh, conn, 3, 0);
   return 1;
 }
 // ======================  END edge_flip  ===================================
@@ -83,24 +83,24 @@ int FEM_Adapt::edge_bisect_help(int e1, int e2, int n1, int n2, int e1_n1,
 {
   int n5, conn[3];
 
-  FEM_remove_element(e1, 0);
-  FEM_remove_element(e2, 0);  // assumes intelligent behavior when no e2 exists
+  FEM_remove_element(theMesh, e1, 0); 
+  FEM_remove_element(theMesh, e2, 0);  // assumes intelligent behavior when no e2 exists
   // hmm... if e2 is a ghost and we remove it and create all the new elements
   // locally, then we don't really need to add a *shared* node
-  n5 = FEM_add_node();
+  n5 = FEM_add_node(theMesh);
   // add n1, n5, n3
   conn[e1_n1] = n1;  conn[e1_n2] = n5;  conn[e1_n3] = n3;
-  (void) FEM_add_element(conn, 3, 0);
+  (void) FEM_add_element(theMesh, conn, 3, 0);
   // add n2, n5, n3
   conn[e1_n1] = n5;  conn[e1_n2] = n2;  conn[e1_n3] = n3;
-  (void) FEM_add_element(conn, 3, 0);
+  (void) FEM_add_element(theMesh, conn, 3, 0);
   if (e2 != -1) { // e2 exists
     // add n1, n5, n4
     conn[e2_n1] = n1;  conn[e2_n2] = n5;  conn[e2_n3] = n4;
-    (void) FEM_add_element(conn, 3, 0);
+    (void) FEM_add_element(theMesh, conn, 3, 0);
     // add n2, n5, n4
     conn[e2_n1] = n5;  conn[e2_n2] = n2;  conn[e2_n3] = n4;
-    (void) FEM_add_element(conn, 3, 0);
+    (void) FEM_add_element(theMesh, conn, 3, 0);
   }
   return n5;
 }
@@ -152,24 +152,24 @@ int FEM_Adapt::vertex_remove_help(int e1, int e2, int n1, int n2, int e1_n1,
 {
   int e3 = theMesh->e2e_getNbr(e1, get_edge_index(e1_n1, e1_n3));
   if (e3 == -1) return 0;
-  FEM_remove_element(e1, 0);
-  FEM_remove_element(e3, 0);
+  FEM_remove_element(theMesh, e1, 0);
+  FEM_remove_element(theMesh, e3, 0);
   if (e2 != -1) {
     int e4 = theMesh->e2e_getNbr(e2, get_edge_index(e2_n1, e2_n3));
     if (e4 == -1) return 0;
-    FEM_remove_element(e2, 0);
-    FEM_remove_element(e4, 0);
+    FEM_remove_element(theMesh, e2, 0);
+    FEM_remove_element(theMesh, e4, 0);
   }
-  FEM_remove_node(n1);
+  FEM_remove_node(theMesh, n1);
 
   int conn[3];
   // add n2, n5, n3
   conn[e1_n1] = n4;  conn[e1_n2] = n2;  conn[e1_n3] = n3;
-  (void) FEM_add_element(conn, 3, 0);
+  (void) FEM_add_element(theMesh, conn, 3, 0);
   if (e2 != -1) {
     // add n2, n5, n4
     conn[e2_n1] = n5;  conn[e2_n2] = n2;  conn[e2_n3] = n4;
-    (void) FEM_add_element(conn, 3, 0);
+    (void) FEM_add_element(theMesh, conn, 3, 0);
   }
   return 1;
 }
@@ -210,7 +210,7 @@ int FEM_Adapt::edge_contraction_help(int e1, int e2, int n1, int n2, int e1_n1,
 				     int e1_n2, int e1_n3, int e2_n1, 
 				     int e2_n2, int e2_n3, int n3, int n4)
 {
-  int conn[3], n5 = FEM_add_node();
+  int conn[3], n5 = FEM_add_node(theMesh);
 
   // delete/add surrounding elements
   int *nbrElems, nesize;
@@ -220,8 +220,8 @@ int FEM_Adapt::edge_contraction_help(int e1, int e2, int n1, int n2, int e1_n1,
       theMesh->e2n_getAll(nbrElems[i], conn);
       for (int j=0; j<3; j++) 
 	if (conn[j] == n1) conn[j] = n5;
-      FEM_remove_element(nbrElems[i], 0);
-      (void) FEM_add_element(conn, 3, 0);
+      FEM_remove_element(theMesh, nbrElems[i], 0);
+      (void) FEM_add_element(theMesh, conn, 3, 0);
     }
   }
   theMesh->n2e_getAll(n2, &nbrElems, &nesize);
@@ -230,15 +230,15 @@ int FEM_Adapt::edge_contraction_help(int e1, int e2, int n1, int n2, int e1_n1,
       theMesh->e2n_getAll(nbrElems[i], conn);
       for (int j=0; j<3; j++) 
 	if (conn[j] == n2) conn[j] = n5;
-      FEM_remove_element(nbrElems[i], 0);
-      (void) FEM_add_element(conn, 3, 0);
+      FEM_remove_element(theMesh, nbrElems[i], 0);
+      (void) FEM_add_element(theMesh, conn, 3, 0);
     }
   }
 
-  FEM_remove_element(e1, 0);
-  FEM_remove_element(e2, 0);
-  FEM_remove_node(n1);
-  FEM_remove_node(n2);
+  FEM_remove_element(theMesh, e1, 0);
+  FEM_remove_element(theMesh, e2, 0);
+  FEM_remove_node(theMesh, n1);
+  FEM_remove_node(theMesh, n2);
   return 1;
 }
 // ======================  END edge_contraction  ==============================
@@ -252,13 +252,13 @@ int FEM_Adapt::edge_contraction_help(int e1, int e2, int n1, int n2, int e1_n1,
     n1	            n1             
      o	             o             
      |	            / \            
-     |  	   /   \           
+     |             /   \           
    \ | /      \   /     \   /      
     \|/        \ /       \ /       
      o n      n o---------o np
     /|\        / \       / \       
    / | \      /   \     /   \      
-     |  	   \   /           
+     |             \   /           
      | 	            \ /            
      o	             o             
     n2              n2             
@@ -287,7 +287,7 @@ int FEM_Adapt::vertex_split(int n, int n1, int n2, int e1, int e3)
     e3_n2 = find_local_node_index(e3, n2);
   }
 
-  int np = FEM_add_node();
+  int np = FEM_add_node(theMesh);
   int conn[3];
 
   int current, next, nt, nl, eknp, eknt, eknl;
@@ -300,10 +300,10 @@ int FEM_Adapt::vertex_split(int n, int n1, int n2, int e1, int e3)
     eknl = 3 - eknp - eknt;
     next = theMesh->e2e_getNbr(current, get_edge_index(eknp, eknl));
     nl = theMesh->e2n_getNode(current, eknl);
-    FEM_remove_element(current, 0);
+    FEM_remove_element(theMesh, current, 0);
     // add nl, nt, np
     conn[eknp] = np; conn[eknt] = nt; conn[eknl] = nl;
-    (void) FEM_add_element(conn, 3, 0);
+    (void) FEM_add_element(theMesh, conn, 3, 0);
     nt = nl;
     current = next;
   }
@@ -317,34 +317,23 @@ int FEM_Adapt::vertex_split(int n, int n1, int n2, int e1, int e3)
       eknl = 3 - eknp - eknt;
       next = theMesh->e2e_getNbr(current, get_edge_index(eknp, eknl));
       nl = theMesh->e2n_getNode(current, eknl);
-      FEM_remove_element(current, 0);
+      FEM_remove_element(theMesh, current, 0);
       // add nl, nt, np
       conn[eknp] = np; conn[eknt] = nt; conn[eknl] = nl;
-      (void) FEM_add_element(conn, 3, 0);
+      (void) FEM_add_element(theMesh, conn, 3, 0);
       nt = nl;
       current = next;
     }
   }
   // add n, n1, np
   conn[e1_n] = n; conn[e1_n1] = n1; conn[3 - e1_n - e1_n1] = np;
-  (void) FEM_add_element(conn, 3, 0);
+  (void) FEM_add_element(theMesh, conn, 3, 0);
   // add n, n2, np
   conn[e3_n] = n; conn[e3_n2] = n2; conn[3 - e3_n - e3_n2] = np;
-  (void) FEM_add_element(conn, 3, 0);
+  (void) FEM_add_element(theMesh, conn, 3, 0);
   return np;
 }
 // ======================  END vertex_split ===================
-
-// =====================  BEGIN refine_element_leb =========================
-/* Given an element e, if e's longest edge f is also the longest edge
-   of e's neighbor across f, g, split f by adding a new node in the
-   center of f, and splitting both e and g into two elements.  If g
-   does not have f as it's longest edge, recursively call
-   refine_element_leb on g, and start over. */
-int refine_element_leb(int e)
-{
-}
-// ========================  END refine_element_leb ========================
 
 // Helpers
 int FEM_Adapt::get_edge_index(int local_node1, int local_node2) 
