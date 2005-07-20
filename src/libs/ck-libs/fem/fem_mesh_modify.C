@@ -280,7 +280,7 @@ void update_new_element_e2e(FEM_Mesh *m, int newEl, int elemType){
   m->e2n_getAll(newEl, adjnodes, elemType);
   for(int i=0;i<tuplesPerElem;i++){
     int sz;
-    int *adjelements;
+    int *adjelements=0;
     m->n2e_getAll(adjnodes[i], &adjelements, &sz);
     for(int j=0;j<sz;j++){
 	  int found=0;
@@ -293,7 +293,7 @@ void update_new_element_e2e(FEM_Mesh *m, int newEl, int elemType){
 		//	CkPrintf("Adding element %d to list\n", adjelements[j]);
 	  }
 	}
-	delete[] adjelements;
+	if(sz!=0) delete[] adjelements;
   }
   delete[] adjnodes;
   
