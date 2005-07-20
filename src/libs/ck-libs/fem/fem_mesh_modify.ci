@@ -21,6 +21,11 @@ module FEMMeshModify {
     int conn[];
     int ghostIndices[];
   };
+  message removeGhostElemMsg {
+    int ghostIndices[];
+  };
+  message removeElemMsg;
+
 
   array [1D] femMeshModify {
     entry femMeshModify(femMeshModMsg *);
@@ -32,5 +37,7 @@ module FEMMeshModify {
     entry [sync,threaded] void addGhostElem(addGhostElemMsg *);
     entry [sync,threaded] chunkListMsg *getChunksSharingGhostNode(int2Msg *);
     entry [sync,threaded] void addElementRemote(addElemMsg *fm);
+    entry [sync,threaded] void removeGhostElem(removeGhostElemMsg *);
+    entry [sync,threaded] void removeElementRemote(removeElemMsg *);
   };
 };
