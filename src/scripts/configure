@@ -2108,20 +2108,22 @@ fi
 echo "set F90 compiler as: $CMK_CF90"
 echo "$as_me:$LINENO: checking \"whether Fortran 90 compiler works\"" >&5
 echo $ECHO_N "checking \"whether Fortran 90 compiler works\"... $ECHO_C" >&6
-cat > conftest.f90 <<EOF
+cat > conftest2.f90 <<EOF
       SUBROUTINE FOO_foo
       END
 EOF
-$CMK_CF90 -c conftest.f90 > /dev/null 2> /dev/null
-if test ! -r conftest.o
+$CMK_CF90 -c conftest2.f90 > /dev/null 2> /dev/null
+if test ! -r conftest2.o
 then
   echo "$as_me:$LINENO: result: \"no\"" >&5
 echo "${ECHO_T}\"no\"" >&6
 else
   echo "$as_me:$LINENO: result: \"yes\"" >&5
 echo "${ECHO_T}\"yes\"" >&6
+  mv -f conftest2.o conftest.o
 fi
 
+### check fortran name mangling
 echo "$as_me:$LINENO: checking subroutine name used by Fortran 90 compiler" >&5
 echo $ECHO_N "checking subroutine name used by Fortran 90 compiler... $ECHO_C" >&6
 

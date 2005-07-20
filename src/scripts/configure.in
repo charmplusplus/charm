@@ -690,16 +690,17 @@ fi
 ### test fortran 90 compiler ###
 echo "set F90 compiler as: $CMK_CF90"
 AC_MSG_CHECKING("whether Fortran 90 compiler works")
-cat > conftest.f90 <<EOF
+cat > conftest2.f90 <<EOF
       SUBROUTINE FOO_foo
       END
 EOF
-$CMK_CF90 -c conftest.f90 > /dev/null 2> /dev/null
-if test ! -r conftest.o
+$CMK_CF90 -c conftest2.f90 > /dev/null 2> /dev/null
+if test ! -r conftest2.o
 then
   AC_MSG_RESULT("no")
 else
   AC_MSG_RESULT("yes")
+  mv -f conftest2.o conftest.o
 fi
 
 ### check fortran name mangling
