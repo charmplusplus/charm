@@ -240,7 +240,6 @@ void CollisionAggregator::aggregate(int pe, int chunk, int n,
   
   //Add each object to its corresponding voxelAggregators
   for (int i=0;i<n;i++) {
-    CkPrintf("aggregate: chunk %d: box %d of %d\n", chunk, i, n);
     //Compute bbox. and location
     const bbox3d &bbox=boxes[i];
     int oPrio=chunk;
