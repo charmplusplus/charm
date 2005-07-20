@@ -906,7 +906,7 @@ static void CmiPushNode(void *msg)
 {
   CmiState cs=CmiGetStateN(0);
   
-	MACHSTATE(2,"Pushing message into node queue");
+  MACHSTATE(2,"Pushing message into node queue");
   MACHLOCK_ASSERT(comm_flag,"CmiPushNode")
   
 #if CMK_IMMEDIATE_MSG
@@ -1630,17 +1630,9 @@ char *CmiGetNonLocalNodeQ(void)
 
 void *CmiGetNonLocal(void)
 {
-  void *msg;
   CmiState cs = CmiGetState();
   CmiIdleLock_checkMessage(&cs->idle);
-  msg = (void *) PCQueuePop(cs->recv);
-#if CMK_SHARED_VARS_UNAVAILABLE
-  if (Cmi_netpoll == 1 && msg == NULL) {  /* poll network in netpoll mode */
-    CommunicationPeriodic();
-    msg = (void *) PCQueuePop(cs->recv);
-  }
-#endif
-  return msg;
+  return (void *) PCQueuePop(cs->recv);
 }
 
 
