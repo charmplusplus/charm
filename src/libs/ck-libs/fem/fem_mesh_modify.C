@@ -304,7 +304,7 @@ void update_new_element_e2e(FEM_Mesh *m, int newEl, int elemType){
 	int tuple[tupleTable::MAX_TUPLE];
 	int *conn;
 	if(FEM_Is_ghost_index(nextElem))
-	  ((FEM_Elem*)conn=m->elem[elemType].getGhost())->connFor(FEM_To_ghost_index(nextElem));
+	  conn=((FEM_Elem*)m->elem[elemType].getGhost())->connFor(FEM_To_ghost_index(nextElem));
 	else
 	  conn=m->elem[elemType].connFor(nextElem);
 	//CkPrintf("tuplesPerElem=%d\n", tuplesPerElem);
