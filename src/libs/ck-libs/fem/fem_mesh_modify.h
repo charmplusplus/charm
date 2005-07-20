@@ -98,7 +98,8 @@ class FEM_MUtil {
 
   void addGhostElementRemote(FEM_Mesh *m, int chk, int elemType, int numGhostIndices, int *ghostIndices, int numSharedIndices, int *sharedIndices, int connSize);
   chunkListMsg *getChunksSharingGhostNodeRemote(FEM_Mesh *m, int chk, int sharedIdx);
-  void buildChunkToNodeTable(int *nodetype, int sharedcount, int ghostcount, int localcount, int *conn, int connSize, CkVec<int> **allShared, int *numSharedChunks, CkVec<int> *allChunks, int **sharedConn);
+  void buildChunkToNodeTable(int *nodetype, int sharedcount, int ghostcount, int localcount, int *conn, int connSize, CkVec<int> ***allShared, int *numSharedChunks, CkVec<int> **allChunks, int ***sharedConn);
+  void addElemRemote(FEM_Mesh *m, int chk, int elemtype, int connSize, int *conn, int numGhostIndex, int *ghostIndices);
 };
 
 class femMeshModMsg : public CMessage_femMeshModMsg {
@@ -210,6 +211,25 @@ class chunkListMsg : public CMessage_chunkListMsg {
   }
 };
 
+class addElemMsg : public CMessage_addElemMsg {
+ public:
+  int chk;
+  int elemtype;
+  int connSize;
+  int *conn;
+  int numGhostIndex;
+  int *ghostIndices;
+
+  ~addElemMsg() {
+    if(conn) {
+      delete conn;
+    }
+    if(ghostIndices) {
+      delete ghostIndices;
+    }
+  }
+};
+
 class femMeshModify : public CBase_femMeshModify {
   friend class FEM_lock;
   friend class FEM_MUtil;
@@ -239,6 +259,8 @@ class femMeshModify : public CBase_femMeshModify {
 
   void addGhostElem(addGhostElemMsg *fm);
   chunkListMsg *getChunksSharingGhostNode(int2Msg *);
+
+  void addElementRemote(addElemMsg *fm);
 };
 
 
