@@ -1096,14 +1096,17 @@ void FEM_Entity::allocateValid(void) {
 }
 
 inline void FEM_Entity::set_valid(int idx){
+  CkAssert(idx < size() && idx >=0);
   valid->getChar()(idx,0)=1;
 }
 
 inline void FEM_Entity::set_invalid(int idx){
+  CkAssert(idx < size() && idx >=0);
   valid->getChar()(idx,0)=0;
 }
 
 inline int FEM_Entity::is_valid(int idx){
+  CkAssert(idx < size() && idx >=0);
   return valid->getChar()(idx,0);
 }
 
