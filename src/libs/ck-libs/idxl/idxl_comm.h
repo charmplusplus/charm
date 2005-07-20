@@ -178,6 +178,16 @@ public:
 		addList(sharedWithChk).push_back(localNo);
 		flushMap();
 	}
+
+	void removeNode(int localNo, int sharedWithChk) {
+	  int local = findLocalList(sharedWithChk);
+	  for(int i=0; i<comm[local]->size(); i++) {
+	    if((*comm[local])[i] == localNo) {
+	      (*comm[local])[i] = -1; //amounts to removing this element from this list for this chunk
+	    }
+	  }
+	  flushMap();
+	}
 	
 	/// The communication lists just changed-- flush any cached information.
 	void flushMap(void);
