@@ -887,16 +887,12 @@ void          CmiSyncListSendFn(int npes, int *pes, int size, char *msg){
 void          CmiFreeListSendFn(int npes, int *pes, int size, char *msg){
   CMI_SET_BROADCAST_ROOT(msg,0);
   for(int i=0;i<npes;i++){
-    if(pes[i] == CmiMyPe()){
-      CmiSendSelf(msg);
-    }else{
 #if 0
-      CmiReference(msg);
-      CmiGeneralFreeSend(pes[i],size,msg);
+    CmiReference(msg);
+    CmiGeneralFreeSend(pes[i],size,msg);
 #else
-      CmiSyncSendFn(pes[i],size,msg);
+    CmiSyncSendFn(pes[i],size,msg);
 #endif
-    }
   }
   CmiFree(msg);
 }
