@@ -1,3 +1,11 @@
+#ifndef __CHARM_FEM_INTERPOLATE_H
+#define __CHARM_FEM_INTERPOLATE_H
+
+#include "charm-api.h"
+#include "ckvector3d.h"
+#include "fem.h"
+#include "fem_mesh.h"
+
 // This is an interface for specifying solution transfer operations
 // for small mesh modification operations. It provides overridable
 // defaults for node and element interpolations.  These functions are passed to
@@ -11,6 +19,7 @@ class FEM_Interpolate {
     int n;
     int nodes[8];
     int dim;    
+    int nNbrs;
     double coord[3];
     double frac;
   } NodalArgs;
@@ -33,7 +42,8 @@ class FEM_Interpolate {
   }
 
   FEM_Interpolate(FEM_Mesh *m) {
-    nodeFnPtr = elemFnPtr = NULL;
+    nodeEdgeFnPtr = nodeFaceFnPtr = nodeElementFnPtr = NULL;
+    elemCopyFnPtr = elemNodeFnPtr = NULL;
     theMesh = m;
   }
 
@@ -97,3 +107,5 @@ class FEM_Interpolate {
       later to derive an element's data **/
   virtual void FEM_InterpolateElementToNodes(int e);
 };
+
+#endif
