@@ -165,40 +165,6 @@ void FEM_Node::fillNodeAdjacency(const FEM_Elem &elem){
 		}
 	  }
 	}
-	// Add the adjacencies defined by the ghost elements
-	if(elem.getGhost()){
-	  for(int i=0;i<elem.getGhost()->size();i++){        // for each element of the given type
-		const int *conn = ((FEM_Elem*)elem.getGhost())->connFor(i);
-		for(int j=0;j<nodesPerElem;j++){   // for each node adjacent to the element
-		  int node = conn[j];
-		  if (node!=-1){
-			if(FEM_Is_ghost_index(node)) { // A ghost node
-			  for(int k=0;k<nodesPerElem;k++){
-				if(conn[k] != node){ // Here we need the node id which is negative not the corresponding positive index
-				  var_id nodeIDAdded = var_id::createNodeID(1,conn[k]);
-				  int idx = ghostAdjacencyAttr->findInRow(FEM_To_ghost_index(node),nodeIDAdded); // find position of k'th node in adjacency list
-				  if(idx == -1){ // If k'th node is not currently in the adjacency list, push it onto list
-					ghostAdjacencyTable[FEM_To_ghost_index(node)].push_back(nodeIDAdded); // Here we need the node index which is positive
-				  }
-				}
-			  }
-			}
-			else { // A non-ghost node, almost same as for ghost nodes
-			  for(int k=0;k<nodesPerElem;k++){
-				if(conn[k] != node){
-				  var_id nodeIDAdded = var_id::createNodeID(1,conn[k]);
-				  int idx = nodeAdjacency->findInRow(node,nodeIDAdded);
-				  if(idx == -1){
-					adjacencyTable[node].push_back(nodeIDAdded);
-				  }
-				}
-			  }
-			}
-		  }
-		}
-	  }
-	}
-
 };
 
 void FEM_Node::setNodeAdjacency(const FEM_Elem &elem){

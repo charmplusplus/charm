@@ -60,6 +60,53 @@ CDECL void FEM_Print_Mesh_Summary(int mesh){
   CkPrintf("\n");
 }
 
+
+CDECL void FEM_Print_n2n(int mesh, int nodeid){
+  FEM_Mesh *m=FEM_Mesh_lookup(mesh,"FEM_Print_Mesh_Summary");
+  CkPrintf("node %d is adjacent to nodes:", nodeid);
+  int *adjnodes;
+  int sz;
+  m->n2n_getAll(nodeid, &adjnodes, &sz); 
+  for(int i=0;i<sz;i++)
+	CkPrintf(" %d", adjnodes[i]);
+  if(sz!=0) delete[] adjnodes;  
+  CkPrintf("\n");
+}
+CDECL void FEM_Print_n2e(int mesh, int eid){
+  FEM_Mesh *m=FEM_Mesh_lookup(mesh,"FEM_Print_Mesh_Summary");
+  CkPrintf("node %d is adjacent to elements:", eid);
+  int *adjes;
+  int sz;
+  m->n2e_getAll(eid, &adjes, &sz);
+  for(int i=0;i<sz;i++)
+	CkPrintf(" %d", adjes[i]);
+  if(sz!=0) delete[] adjes;
+  CkPrintf("\n");
+}
+
+// WARNING THESE TWO FUNCTIONS ONLY WORK ON TRIANGULAR ELEMENTS...
+CDECL void FEM_Print_e2n(int mesh, int eid){
+  FEM_Mesh *m=FEM_Mesh_lookup(mesh,"FEM_Print_Mesh_Summary");
+  CkPrintf("element %d is adjacent to nodes:", eid);
+  int adjns[3];
+  m->e2n_getAll(eid, adjns, 0); 
+  for(int i=0;i<3;i++)
+	CkPrintf(" %d", adjns[i]);
+  CkPrintf("\n");
+}
+CDECL void FEM_Print_e2e(int mesh, int eid){
+  FEM_Mesh *m=FEM_Mesh_lookup(mesh,"FEM_Print_Mesh_Summary");
+  CkPrintf("element %d is adjacent to elements:", eid);
+  int adjes[3];
+  m->e2e_getAll(eid, adjes, 0); 
+  for(int i=0;i<3;i++)
+	CkPrintf(" %d", adjes[i]);
+  CkPrintf("\n");
+}
+
+
+
+
 // prototype with optional parameter
 int FEM_add_node_local(FEM_Mesh *m, int addGhost=0);
 
@@ -273,64 +320,66 @@ void FEM_remove_element(FEM_Mesh *m, int elementid, int elemtype){
     
     //get a list of chunks for which this element is a ghost
     const IDXL_Rec *irec = m->elem[elemtype].ghostSend.getRec(elementid);
-    int numSharedChunks = irec->getShared();
-    for(int i=0; i<numSharedChunks; i++) {
-      int chk = irec->getChk(i);
-      int sharedIdx = irec->getIdx(i);
-      //get the list of n2e for all nodes of this element. If any node has only this element in its list.
-      //it no longer should be a ghost on chk
-      m->elem[elemtype].ghostSend.removeNode(elementid, chk);
-      const IDXL_List ll = m->elem[elemtype].ghostSend.getList(chk);
-      int size = ll.size();
-      int connSize = m->elem[elemtype].getConn().width();
-      int *nodes = (int*)malloc(connSize*sizeof(int));
-      int numGhostNodes = 0;
-      int *ghostIndices = (int*)malloc(connSize*sizeof(int));
-      m->e2n_getAll(elementid,nodes,elemtype);
-
-      const IDXL_List ln = m->node.ghostSend.getList(chk);
-      int sizeN = ln.size();
-
-      for(int j=0; j<connSize; j++) {
-	int *elems;
-	int numElems;
-	m->n2e_getAll(nodes[j], &elems, &numElems);
-	
-	//if any of these elems is a ghost on chk then do not delete this ghost node
-	int shouldBeDeleted = 1;
-	for(int k=0; k<numElems; k++) {
-	  for(int l=0; l<size; l++) {
-	    if(elems[k] == ll[l]) {
-	      shouldBeDeleted = 0; 
-	      break;
-	    }
+    if(irec){
+	  int numSharedChunks = irec->getShared();
+	  for(int i=0; i<numSharedChunks; i++) {
+		int chk = irec->getChk(i);
+		int sharedIdx = irec->getIdx(i);
+		//get the list of n2e for all nodes of this element. If any node has only this element in its list.
+		//it no longer should be a ghost on chk
+		m->elem[elemtype].ghostSend.removeNode(elementid, chk);
+		const IDXL_List ll = m->elem[elemtype].ghostSend.getList(chk);
+		int size = ll.size();
+		int connSize = m->elem[elemtype].getConn().width();
+		int *nodes = (int*)malloc(connSize*sizeof(int));
+		int numGhostNodes = 0;
+		int *ghostIndices = (int*)malloc(connSize*sizeof(int));
+		m->e2n_getAll(elementid,nodes,elemtype);
+		
+		const IDXL_List ln = m->node.ghostSend.getList(chk);
+		int sizeN = ln.size();
+		
+		for(int j=0; j<connSize; j++) {
+		  int *elems;
+		  int numElems;
+		  m->n2e_getAll(nodes[j], &elems, &numElems);
+		  
+		  //if any of these elems is a ghost on chk then do not delete this ghost node
+		  int shouldBeDeleted = 1;
+		  for(int k=0; k<numElems; k++) {
+			for(int l=0; l<size; l++) {
+			  if(elems[k] == ll[l]) {
+				shouldBeDeleted = 0; 
+				break;
+			  }
+			}
+			if(shouldBeDeleted == 0) break;
+		  }
+		  
+		  //add this to the list of ghost nodes to be deleted on the remote chunk
+		  if(shouldBeDeleted == 1) {
+			//convert this local index to a shared index
+			for(int k=0; k<sizeN; k++) {
+			  if(nodes[j] == ln[k]) {
+				m->node.ghostSend.removeNode(nodes[j], chk);
+				ghostIndices[numGhostNodes] = k;
+				numGhostNodes++;
+			  }
+			}
+		  }
+		}
+		//now that all ghost nodes to be removed have been decided, we add the elem & call the entry method
+		removeGhostElemMsg *rm = new (numGhostNodes, 0) removeGhostElemMsg;
+		rm->chk = m->getfmMM()->getfmUtil()->getIdx();
+		rm->elemtype = elemtype;
+		rm->elementid = sharedIdx;
+		rm->numGhostIndex = numGhostNodes;
+		for(int j=0; j<numGhostNodes; j++) {
+		  rm->ghostIndices[j] = ghostIndices[j];
+		}
+		meshMod[chk].removeGhostElem(rm);  //update the ghosts on all shared chunks
 	  }
-	  if(shouldBeDeleted == 0) break;
 	}
-	
-	//add this to the list of ghost nodes to be deleted on the remote chunk
-	if(shouldBeDeleted == 1) {
-	  //convert this local index to a shared index
-	  for(int k=0; k<sizeN; k++) {
-	    if(nodes[j] == ln[k]) {
-	      m->node.ghostSend.removeNode(nodes[j], chk);
-	      ghostIndices[numGhostNodes] = k;
-	      numGhostNodes++;
-	    }
-	  }
-	}
-      }
-      //now that all ghost nodes to be removed have been decided, we add the elem & call the entry method
-      removeGhostElemMsg *rm = new (numGhostNodes, 0) removeGhostElemMsg;
-      rm->chk = m->getfmMM()->getfmUtil()->getIdx();
-      rm->elemtype = elemtype;
-      rm->elementid = sharedIdx;
-      rm->numGhostIndex = numGhostNodes;
-      for(int j=0; j<numGhostNodes; j++) {
-	rm->ghostIndices[j] = ghostIndices[j];
-      }
-      meshMod[chk].removeGhostElem(rm);  //update the ghosts on all shared chunks
-    }
   }
   return;
 }
@@ -465,7 +514,6 @@ void update_new_element_e2e(FEM_Mesh *m, int newEl, int elemType){
 }
 
 // A helper function that adds the local element, and updates adjacencies
-int FEM_add_element_local(FEM_Mesh *m, const int *conn, int connSize, int elemType=0, int addGhost=0);//prototype
 int FEM_add_element_local(FEM_Mesh *m, const int *conn, int connSize, int elemType, int addGhost){
   // lengthen element attributes
   int newEl;
@@ -483,24 +531,20 @@ int FEM_add_element_local(FEM_Mesh *m, const int *conn, int connSize, int elemTy
 	m->elem[elemType].set_valid(newEl);  // Mark new element as valid
 	m->elem[elemType].connIs(newEl,conn);  // update element's conn, i.e. e2n table
   }
-
-  // clear e2n and e2e connectivities for this new element
-  m->e2n_removeAll(newEl);
-  m->e2e_removeAll(newEl);
-
   
   // add to corresponding inverse, the n2e and n2n table
   for(int i=0;i<connSize;i++){
     m->n2e_add(conn[i],newEl);
     for(int j=i+1;j<connSize;j++){
-      if(! m->n2n_exists(i,j))
-        m->n2n_add(i,j);
-      if(! m->n2n_exists(j,i))
-        m->n2n_add(j,i);
+      if(! m->n2n_exists(conn[i],conn[j]))
+        m->n2n_add(conn[i],conn[j]);
+      if(! m->n2n_exists(conn[j],conn[i]))
+        m->n2n_add(conn[j],conn[i]);
     }
   }
 
   // update e2e table -- too complicated, so it gets is own function
+  m->e2e_removeAll(newEl);
   update_new_element_e2e(m,newEl,elemType);
 
   return newEl;

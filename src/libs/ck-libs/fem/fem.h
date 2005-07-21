@@ -232,6 +232,11 @@ to mark the chunk to which a ghost node or element belongs datatype=FEM_INDEX*/
   void FEM_Mesh_create_node_node_adjacency(int fem_mesh);
   void FEM_Mesh_create_elem_elem_adjacency(int fem_mesh);
 
+  void FEM_Print_n2n(int mesh, int nodeid);
+  void FEM_Print_n2e(int mesh, int nodeid);
+  void FEM_Print_e2e(int mesh, int eid);
+  void FEM_Print_e2n(int mesh, int eid);
+
   /* Create and modify the FEM_IS_VALID Attribute */
   void FEM_Mesh_allocate_valid_attr(int fem_mesh, int entity_type);
   void FEM_set_entity_valid(int mesh, int entityType, int entityIdx);
