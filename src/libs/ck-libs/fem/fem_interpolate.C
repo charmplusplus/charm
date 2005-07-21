@@ -1,3 +1,4 @@
+// FEM_Interpolate default implementation - TLW
 #include "fem_interpolate.h"
 
 /* A node is added on an edge; interpolate from neighboring nodes; this uses n,
@@ -68,7 +69,7 @@ void FEM_Interpolate::FEM_InterpolateNodeInElement(NodalArgs args)
     FEM_Attribute *a = (FEM_Attribute *)(*attrs)[i];
     if (a->getAttr() < FEM_ATTRIB_TAG_MAX) {
       FEM_DataAttribute *d = (FEM_DataAttribute *)a;
-      if (args.nNbrs <= 8) {
+      if ((args.nNbrs >= 4) && (args.nNbrs <= 8)) {
 	d->interpolate(args.nodes, args.n, args.nNbrs);
       }
       else {
@@ -90,6 +91,14 @@ void FEM_Interpolate::FEM_InterpolateElementCopy(ElementArgs args)
   }
   // do default interpolation
   // DEFAULT BEHAVIOR: COPY ALL ELEMENT DATA
+  FEM_Entity *elem = theMesh->lookup(args.elType,"FEM_InterpolateElementCopy");
+  CkVec<FEM_Attribute *>*elemattrs = elem->getAttrVec();
+  for(int j=0;j<elemattrs->size();j++){
+    FEM_Attribute *elattr = (FEM_Attribute *)(*elemattrs)[j];
+    if(elattr->getAttr() < FEM_ATTRIB_FIRST){ 
+      elattr->copyEntity(args.e,*elattr,args.oldElement);
+    }
+  }
 }
 
 /* An element is added and derives data from its nodes; assumes relevant data 

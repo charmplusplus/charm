@@ -1,3 +1,9 @@
+// This is an interface for specifying solution transfer operations
+// for small mesh modification operations. It provides overridable
+// defaults for node and element interpolations.  These functions are passed to
+// FEM_add_element and FEM_add_node operations, along with a simple argument
+// struct - TLW
+
 #ifndef __CHARM_FEM_INTERPOLATE_H
 #define __CHARM_FEM_INTERPOLATE_H
 
@@ -5,12 +11,6 @@
 #include "ckvector3d.h"
 #include "fem.h"
 #include "fem_mesh.h"
-
-// This is an interface for specifying solution transfer operations
-// for small mesh modification operations. It provides overridable
-// defaults for node and element interpolations.  These functions are passed to
-// FEM_add_element and FEM_add_node operations, along with a simple argument
-// struct.
 
 class FEM_Interpolate {
   FEM_Mesh *theMesh;
@@ -27,6 +27,7 @@ class FEM_Interpolate {
   typedef struct {
     int e;
     int oldElement;
+    int elType;
   } ElementArgs;
 
   typedef void (* FEM_InterpolateNodeFn)(NodalArgs);
