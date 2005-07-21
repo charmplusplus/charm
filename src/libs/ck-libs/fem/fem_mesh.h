@@ -462,6 +462,7 @@ public:
 
 	/*used during refining to extrapolate the values of a node */
 	void interpolate(int A,int B,int D,double frac);
+	void interpolate(int *iNodes,int rNode,int k);
 };
 PUPmarshall(FEM_DataAttribute);
 

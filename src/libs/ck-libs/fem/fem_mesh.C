@@ -771,15 +771,49 @@ inline void interpolateAttrs(AllocTable2d<T> *data,int A,int B,int D,double frac
 }
 
 template<class T>
+inline void interpolateAttrs(AllocTable2d<T> *data,int *iNodes,int rNode,int k,int width){
+  T *row[8];
+  for (int i=0; i<k; i++) {
+    row[i] = data->getRow(iNodes[i]);
+  }
+  T *rowR = data->getRow(rNode);
+  for(int i=0;i<width;i++){
+    double val = 0.0;
+    for (int j=0; j<k; j++) {
+      val += (double)row[j][i];
+    }
+    val = val/k;
+    rowR[i] = (T )val;
+  }
+}
+
+template<class T>
 inline void minAttrs(AllocTable2d<T> *data,int A,int B,int D,double frac,int width){
   T *rowA = data->getRow(A);
   T *rowB = data->getRow(B);
   T *rowD = data->getRow(D);
   for(int i=0;i<width;i++){
-    if(rowA[i] == rowB[i]){
+    if(rowA[i] < rowB[i]){
       rowD[i] = rowA[i];
     }else{
-      rowD[i] = 0;
+      rowD[i] = rowB[i];
+    }
+  }
+}
+
+template<class T>
+inline void minAttrs(AllocTable2d<T> *data,int *iNodes,int rNode,int k,int width){
+  T *row[8];
+  for (int i=0; i<k; i++) {
+    row[i] = data->getRow(iNodes[i]);
+  }
+  T *rowR = data->getRow(rNode);
+  for(int i=0;i<width;i++){
+    rowR[i] = row[0][i]; 
+    for (int j=1; j<k; j++) {
+      if (row[j][i] < rowR[i]) {
+	rowR[i] = row[j][i];
+      }
     }
   }
 }
@@ -801,7 +835,22 @@ void FEM_DataAttribute::interpolate(int A,int B,int D,double frac){
   }
 }
 
-
+void FEM_DataAttribute::interpolate(int *iNodes,int rNode,int k){
+  switch(getDatatype()){
+  case FEM_BYTE:
+    minAttrs(char_data,iNodes,rNode,k,getWidth());		
+    break;
+  case FEM_INT:
+    minAttrs(int_data,iNodes,rNode,k,getWidth());		
+    break;
+  case FEM_FLOAT:
+    interpolateAttrs(float_data,iNodes,rNode,k,getWidth());		
+    break;
+  case FEM_DOUBLE:
+    interpolateAttrs(double_data,iNodes,rNode,k,getWidth());		
+    break;
+  }
+}
 
 /*********************** FEM_IndexAttribute *******************/
 FEM_IndexAttribute::Checker::~Checker() {}
