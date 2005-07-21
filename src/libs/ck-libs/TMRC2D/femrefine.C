@@ -404,49 +404,43 @@ void FEM_Refine_Operation(FEM_Refine_Operation_Data *data,refineData &op){
 	if (oldRow[i] == B){
 	  newRow[i] = D;
 	}	
-					else if (oldRow[i] == C){
-						newRow[i] = C;
-					}	
-					else if (oldRow[i] == D){
-						newRow[i] = A;
-					}	
-				}
-				DEBUGINT(CkPrintf("New Triangle %d  (%d %d %d) conn %p\n",newTri,newRow[0],newRow[1],newRow[2],newRow));
-			}else{
-				FEM_Attribute *elattr = (FEM_Attribute *)(*elemattrs)[j];
-				if(elattr->getAttr() < FEM_ATTRIB_FIRST){ 
-					elattr->copyEntity(newTri,*elattr,tri);
-				}
-			}
-		}
-		if(sparseID != -1){
-			/*
-			add the sparse element (edge between C and D)
-			*/
-			int cdidx = data->sparse->size();
-			data->sparse->setLength(cdidx+1);
-			for(int satt = 0; satt < sparseattrs->size();satt++){
-				if((*sparseattrs)[satt]->getAttr() == FEM_CONN){
-					sparseConnTable = &(((FEM_IndexAttribute *)sparseConnAttr)->get());
-					int *cdconn = (*sparseConnTable)[cdidx];
-					cdconn[0]=C;
-					cdconn[1]=D;
-				}
-				if((*sparseattrs)[satt]->getAttr() == FEM_BOUNDARY){
-					/*
-					An edge connecting C and D has to be an internal edge
-					*/
-					sparseBoundaryTable = &(((FEM_DataAttribute *)sparseBoundaryAttr)->getInt());
-					((*sparseBoundaryTable)[cdidx])[0] = 0;
-				}
-			}
-			if(data->validEdge){
-				(*(data->validEdge))[cdidx][0] = 1;
-			}
-			nodes2sparse->put(intdual(C,D)) = cdidx+1;
-		}
+	else if (oldRow[i] == C){
+	  newRow[i] = C;
+	}	
+	else if (oldRow[i] == D){
+	  newRow[i] = A;
+	}	
+      }
+      DEBUGINT(CkPrintf("New Triangle %d  (%d %d %d) conn %p\n",newTri,newRow[0],newRow[1],newRow[2],newRow));
+    }else{
+      FEM_Attribute *elattr = (FEM_Attribute *)(*elemattrs)[j];
+      if(elattr->getAttr() < FEM_ATTRIB_FIRST){ 
+	elattr->copyEntity(newTri,*elattr,tri);
+      }
+    }
+  }
+  if(sparseID != -1){ /* add sparse element (edge between C and D) */
+    int cdidx = data->sparse->size();
+    data->sparse->setLength(cdidx+1);
+    for(int satt = 0; satt < sparseattrs->size();satt++){
+      if((*sparseattrs)[satt]->getAttr() == FEM_CONN){
+	sparseConnTable = &(((FEM_IndexAttribute *)sparseConnAttr)->get());
+	int *cdconn = (*sparseConnTable)[cdidx];
+	cdconn[0]=C;
+	cdconn[1]=D;
+      }
+      if((*sparseattrs)[satt]->getAttr() == FEM_BOUNDARY){
+	/* An edge connecting C and D has to be an internal edge */
+	sparseBoundaryTable = &(((FEM_DataAttribute *)sparseBoundaryAttr)->getInt());
+	((*sparseBoundaryTable)[cdidx])[0] = 0;
+      }
+    }
+    if(data->validEdge){
+      (*(data->validEdge))[cdidx][0] = 1;
+    }
+    nodes2sparse->put(intdual(C,D)) = cdidx+1;
+  }
 }
-
 
 
 FDECL void FTN_NAME(FEM_REFINE2D_SPLIT,fem_refine2d_split)(int *meshID,int *nodeID,double *coord,int *elemID,double *desiredAreas){
