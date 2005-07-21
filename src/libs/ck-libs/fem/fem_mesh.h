@@ -543,12 +543,12 @@ public:
 
 		static ID createNodeID(int type,int node){
 			ID temp;
-			if(node < -1){
-				temp.id = -(node+2);
-				temp.type = -type;
+			if(FEM_Is_ghost_index(node)){
+			  temp.id = FEM_To_ghost_index(node);
+			  temp.type = -type; // FIXME: this type mapping cannot distinguish between -0 and 0
 			}else{
-				temp.id = node;
-				temp.type = type;
+			  temp.id = node;
+			  temp.type = type;
 			}
 			return temp;
 		}
