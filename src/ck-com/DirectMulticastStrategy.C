@@ -88,9 +88,9 @@ void DirectMulticastStrategy::insertMessage(CharmMessageHolder *cmsg){
             localMulticast(env, obj);
             remoteMulticast(env, obj);
         }
-        else {            
+        else {
             //New sec id, so send it along with the message
-            void *newmsg = sinfo.getNewMulticastMessage(cmsg);
+            void *newmsg = sinfo.getNewMulticastMessage(cmsg, needSorting());
             insertSectionID(sid);
 
             ComlibSectionHashKey 
@@ -98,9 +98,30 @@ void DirectMulticastStrategy::insertMessage(CharmMessageHolder *cmsg){
             
             ComlibSectionHashObject *obj = sec_ht.get(key);
 
-            if(obj == NULL)
+	    if(obj == NULL)
                 CkAbort("Cannot Find Section\n");
-            
+
+            /*
+	    CkPrintf("%u: Src = %d dest:", key.hash(), CkMyPe());
+	    for (int i=0; i<obj->npes; ++i)
+	      CkPrintf(" %d",obj->pelist[i]);
+	    CkPrintf(", map:");
+	    ComlibMulticastMsg *lll = (ComlibMulticastMsg*)newmsg;
+	    envelope *ppp = UsrToEnv(newmsg);
+	    CkUnpackMessage(&ppp);
+	    int ttt=0;
+	    for (int i=0; i<lll->nPes; ++i) {
+	      CkPrintf(" %d (",lll->indicesCount[i].pe);
+	      for (int j=0; j<lll->indicesCount[i].count; ++j) {
+		CkPrintf(" %d",((int*)&(lll->indices[ttt]))[1]);
+		ttt++;
+	      }
+	      CkPrintf(" )");
+	    }
+	    CkPackMessage(&ppp);
+	    CkPrintf("\n");
+	    */
+
             char *msg = cmsg->getCharmMessage();
             localMulticast(UsrToEnv(msg), obj);
             CkFreeMsg(msg);
@@ -127,6 +148,7 @@ void DirectMulticastStrategy::insertSectionID(CkSectionID *sid) {
     
     obj = createObjectOnSrcPe(sid->_nElems, sid->_elems);
     sec_ht.put(key) = obj;
+
 }
 
 
@@ -328,6 +350,14 @@ void DirectMulticastStrategy::handleNewMulticastMessage(envelope *env) {
     //delete [] idx_list_array;
     
     sec_ht.put(key) = new_obj;
+
+    /*
+    CkPrintf("%u: Proc = %d (%d) forward:", key.hash(), CkMyPe(),cbmsg->nPes);
+    for (int i=0; i<new_obj->npes; ++i) CkPrintf(" %d",new_obj->pelist[i]);
+    CkPrintf(", deliver:");
+    for (int i=0; i<new_obj->indices.size(); ++i) CkPrintf(" %d",((int*)&new_obj->indices[i])[1]);
+    CkPrintf("\n");
+    */
 
     remoteMulticast(env, new_obj);
     localMulticast(newenv, new_obj); //local multicast always copies

@@ -136,8 +136,9 @@ class ComlibSectionInfo {
      * Starting from a message to be sent, it generates a new message containing
      * the information about the multicast, together with the message itself.
      * The info about the multicast is contained in the field sec_id of cmsg.
+     * The processors will be order by MyPe() if requested.
      */
-    ComlibMulticastMsg *getNewMulticastMessage(CharmMessageHolder *cmsg);
+    ComlibMulticastMsg *getNewMulticastMessage(CharmMessageHolder *cmsg, int needSort);
 
     /**
      * Given a ComlibMulticastMsg arrived through the network as input (cb_env),
@@ -165,9 +166,9 @@ class ComlibSectionInfo {
      * @param counts array of associations pe-count: number of elements in proc pe (output, new'ed(CkNumPes()))
      * @param belongs array of integers expressing association of elements with pes: belongs[i] = index in counts of the processor having index i (output, new'ed(nidx))
     */
-    void getRemotePeCount(int nindices, CkArrayIndexMax *idxlist, 
-			  int &npes, int &nidx,
-			  ComlibMulticastIndexCount *&counts, int *&belongs);
+    void getPeCount(int nindices, CkArrayIndexMax *idxlist, 
+		    int &npes, int &nidx,
+		    ComlibMulticastIndexCount *&counts, int *&belongs);
 
     void getRemotePelist(int nindices, CkArrayIndexMax *idxlist, 
                          int &npes, int *&pelist);

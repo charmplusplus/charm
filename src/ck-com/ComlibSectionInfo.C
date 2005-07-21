@@ -3,8 +3,7 @@
 #include "ComlibManager.h"
 #include "ComlibSectionInfo.h"
 
-ComlibMulticastMsg * ComlibSectionInfo::getNewMulticastMessage
-(CharmMessageHolder *cmsg){
+ComlibMulticastMsg * ComlibSectionInfo::getNewMulticastMessage(CharmMessageHolder *cmsg, int needSort){
     
     if(cmsg->sec_id == NULL || cmsg->sec_id->_nElems == 0)
         return NULL;
@@ -21,7 +20,7 @@ ComlibMulticastMsg * ComlibSectionInfo::getNewMulticastMessage
     int nRemotePes, nRemoteIndices;
     ComlibMulticastIndexCount *indicesCount;
     int *belongingList;
-    getRemotePeCount(cmsg->sec_id->_nElems, cmsg->sec_id->_elems, nRemotePes, nRemoteIndices, indicesCount, belongingList);
+    getPeCount(cmsg->sec_id->_nElems, cmsg->sec_id->_elems, nRemotePes, nRemoteIndices, indicesCount, belongingList);
     if (nRemotePes == 0) return NULL;
 
     int sizes[3];
@@ -38,13 +37,33 @@ ComlibMulticastMsg * ComlibSectionInfo::getNewMulticastMessage
     msg->_cookie.sInfo.cInfo.status = COMLIB_MULTICAST_NEW_SECTION;
     msg->_cookie.type = COMLIB_MULTICAST_MESSAGE;
     msg->_cookie.pe = CkMyPe();
-    
+
     // fill in the three pointers of the ComlibMulticastMsg
     memcpy(msg->indicesCount, indicesCount, sizes[0] * sizeof(ComlibMulticastIndexCount));
     //memcpy(msg->indices, cmsg->sec_id->_elems, sizes[1] * sizeof(CkArrayIndexMax));
+
     CkArrayIndexMax **indicesPe = (CkArrayIndexMax**)alloca(nRemotePes * sizeof(CkArrayIndexMax*));
-    indicesPe[0] = msg->indices;
-    for (int i=1; i<nRemotePes; ++i) indicesPe[i] = indicesPe[i-1] + indicesCount[i-1].count;
+
+    if (needSort) {
+      // if we are sorting the array, then we need to fix the problem that belongingList
+      // refers to the original ordering! This is done by mapping indicesPe in a way coherent
+      // with the original ordering.
+      int previous, i, j;
+      qsort(msg->indicesCount, sizes[0], sizeof(ComlibMulticastIndexCount), indexCountCompare);
+
+      for (j=0; j<nRemotePes; ++j) if (indicesCount[j].pe == msg->indicesCount[0].pe) break;
+      indicesPe[j] = msg->indices;
+      previous = j;
+      for (i=1; i<nRemotePes; ++i) {
+	for (j=0; j<nRemotePes; ++j) if (indicesCount[j].pe == msg->indicesCount[i].pe) break;
+	indicesPe[j] = indicesPe[previous] + indicesCount[previous].count;
+        previous = j;
+      }
+    } else {
+      indicesPe[0] = msg->indices;
+      for (int i=1; i<nRemotePes; ++i) indicesPe[i] = indicesPe[i-1] + indicesCount[i-1].count;
+    }
+
     for (int i=0; i<cmsg->sec_id->_nElems; ++i) {
       if (belongingList[i] >= 0) {
 	*indicesPe[belongingList[i]] = cmsg->sec_id->_elems[i];
@@ -87,6 +106,11 @@ void ComlibSectionInfo::unpack(envelope *cb_env,
     CkAssert(i < ccmsg->nPes);
     nLocalElems = ccmsg->indicesCount[i].count;
 
+    /*
+    CkPrintf("Unpacking: %d local elements:",nLocalElems);
+    for (int j=0; j<nLocalElems; ++j) CkPrintf(" %d",((int*)&dest_indices[j])[1]);
+    CkPrintf("\n");
+    */
     /*
     for(int count = 0; count < ccmsg->nIndices; count++){
         CkArrayIndexMax idx = ccmsg->indices[count];
@@ -156,7 +180,7 @@ void ComlibSectionInfo::getPeList(int _nElems,
 }
 
 
-void ComlibSectionInfo::getRemotePeCount(int nindices, CkArrayIndexMax *idxlist, 
+void ComlibSectionInfo::getPeCount(int nindices, CkArrayIndexMax *idxlist, 
 		      int &npes, int &nidx,
 		      ComlibMulticastIndexCount *&counts, int *&belongs) {
   int count = 0;
@@ -173,15 +197,10 @@ void ComlibSectionInfo::getRemotePeCount(int nindices, CkArrayIndexMax *idxlist,
 
   for(i=0; i<nindices; ++i){
     int p = ComlibGetLastKnown(destArrayID, idxlist[i]);
-    if(p == CkMyPe()) {
-      belongs[i] = -1;
-      continue;
-    }
     
     if(p == -1) CkAbort("Invalid Section\n");        
 
-    ++nidx;
-    //Collect remote processors
+    //Collect processors
     for(count = 0; count < npes; count ++)
       if(counts[count].pe == p)
 	break;
@@ -192,10 +211,17 @@ void ComlibSectionInfo::getRemotePeCount(int nindices, CkArrayIndexMax *idxlist,
       ++npes;
     }
 
+    if(p == CkMyPe()) {
+      belongs[i] = -1;
+      continue;
+    }
+
+    ++nidx;
     counts[count].count++;
     belongs[i] = count;
   }
-  
+  //CkPrintf("section has %d procs\n",npes);
+
   if(npes == 0) {
     delete [] counts;
     delete [] belongs;

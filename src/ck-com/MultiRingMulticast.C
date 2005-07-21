@@ -84,7 +84,7 @@ ComlibSectionHashObject *MultiRingMulticast::createObjectOnSrcPe
 
     int *pelist;
     int npes;
-    sinfo.getRemotePelist(nelements, elements, npes, pelist);
+    sinfo.getPeList(nelements, elements, npes, pelist);
     
     sinfo.getLocalIndices(nelements, elements, obj->indices);
 
@@ -92,6 +92,13 @@ ComlibSectionHashObject *MultiRingMulticast::createObjectOnSrcPe
         return obj;
 
     if(npes < 4) {
+        // direct sending, take out ourself from the list!
+	for (int i=0; i<npes; ++i) {
+	  if (pelist[i] == CkMyPe()) {
+	    pelist[i] = pelist[--npes];
+	    break;
+	  }
+	}
         obj->npes = npes;
         obj->pelist = pelist;
 	//CkPrintf("MultiRingMulticast::createObjectOnSrcPe, less than 4 procs\n");
@@ -127,29 +134,30 @@ ComlibSectionHashObject *MultiRingMulticast::createObjectOnSrcPe
 			      breaking : npes-1 is the second ring
 			   */
 
-    int nextpe = myid + 1;
+    int next_id = myid + 1;
     // wrap nextpe around the ring
     if(myid < breaking) {
-      if (nextpe >= breaking) nextpe = 0;
+      if (next_id >= breaking) next_id = 0;
     } else {
-      if (nextpe >= npes) nextpe = breaking;
+      if (next_id >= npes) next_id = breaking;
     }
     
-    int midpe;
+    int mid_id;
     if (myid < breaking) {
-      midpe = myid + breaking;
-      if (midpe >= npes || midpe < breaking) midpe = breaking;
+      mid_id = myid + breaking;
+      if (mid_id < breaking) mid_id = breaking;
     } else {
-      midpe = myid - breaking;
+      mid_id = myid - breaking;
+      if (mid_id >= breaking) mid_id = 0;
     }
     //mid_pe = getMidPe(pelist, npes, CkMyPe());
     
-    if(nextpe != CkMyPe()) {
+    if(pelist[next_id] != CkMyPe()) {
         obj->pelist = new int[2];
         obj->npes = 2;
         
-        obj->pelist[0] = pelist[nextpe];
-        obj->pelist[1] = pelist[midpe];
+        obj->pelist[0] = pelist[next_id];
+        obj->pelist[1] = pelist[mid_id];
     }
     else {
         CkAbort("Warning Should not be here !!!!!!!!!\n");
@@ -161,7 +169,7 @@ ComlibSectionHashObject *MultiRingMulticast::createObjectOnSrcPe
     
     delete [] pelist;
 
-    //CkPrintf("%d Src = %d Next = %d Mid Pe =%d\n", CkMyPe(), CkMyPe(), nextpe, mid_pe);    
+    //CkPrintf("%d Src = %d Next = %d Mid Pe =%d\n", CkMyPe(), CkMyPe(), pelist[next_id], pelist[mid_id]);
     
     return obj;
 }
@@ -183,10 +191,10 @@ ComlibSectionHashObject *MultiRingMulticast::createObjectOnIntermediatePe(int ni
 
     //pelist[npes ++] = CkMyPe();
 
-    if(npes <= 4)
+    if(npes < 4)
         return obj;
     
-    qsort(counts, npes, sizeof(ComlibMulticastIndexCount), indexCountCompare);
+    //qsort(counts, npes, sizeof(ComlibMulticastIndexCount), indexCountCompare);
     
     int myid = -1;
     for (int i=0; i<npes; ++i) {
@@ -212,9 +220,10 @@ ComlibSectionHashObject *MultiRingMulticast::createObjectOnIntermediatePe(int ni
       // if we are in the two different halves, correct srcid
       if (srcid < breaking) {
 	srcid += breaking;
-	if (srcid >= npes || srcid < breaking) srcid = breaking;
+	if (srcid < breaking) srcid = breaking;
       } else {
 	srcid -= breaking;
+	if (srcid >= breaking) srcid = 0;
       }
     }
     // now srcid is the starting point of this half ring, which could be the

@@ -46,6 +46,9 @@ class DirectMulticastStrategy: public CharmStrategy {
      */
     virtual ComlibSectionHashObject *createObjectOnIntermediatePe(int nindices, CkArrayIndexMax *idxlist, int npes, ComlibMulticastIndexCount *counts, int srcpe);
         
+    ///Needed for getNewMulticastMessage, to specify if the list of processors need to be ordered
+    virtual int needSorting() { return 0; }
+
     ///Called to multicast the message to local array elements.
     void localMulticast(envelope *env, ComlibSectionHashObject *obj);
     

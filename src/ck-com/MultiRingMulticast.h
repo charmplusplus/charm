@@ -28,6 +28,9 @@ class MultiRingMulticast: public DirectMulticastStrategy {
 
     ///Creates the propagation across the half ring
     virtual ComlibSectionHashObject *createObjectOnIntermediatePe(int nindices, CkArrayIndexMax *idxlist, int npes, ComlibMulticastIndexCount *counts, int srcpe);
+
+    ///Specifies that the multicast messages need the processor list to be ordered
+    virtual int needSorting() { return 1; }
     
  public:
     
