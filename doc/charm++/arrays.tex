@@ -363,17 +363,6 @@ bound together-- A[i] and B[i] will always be on the same processor.
   bProxy=CProxy_B::ckNew(\uw{parameters},opts);
 \end{alltt}
 
-Bound arrays are often useful if A[i] and B[i] perform different 
-aspects of the same computation, and thus will run most efficiently 
-if they lie on the same processor.  Bound array elements are guaranteed
-to always be able to interact using \kw{ckLocal} (see 
-section~\ref{ckLocal for arrays}), although the local pointer must
-be refreshed after any migration. This should be done during the \kw{pup}
-routine. When migrated, all elements that are bound together will be created
-at the new processor before \kw{pup} is called on any of them, ensuring that
-a valid local pointer to any of the bound objects can be obtained during the
-\kw{pup} routine of any of the others.
-
 An arbitrary number of arrays can be bound together--
 in the example above, we could create yet another array
 C and bind it to A or B.  The result would be the same
@@ -387,6 +376,55 @@ of elements in the arrays, although elements of A which have
 no corresponding element in B obey no special semantics.
 Any method may be used to create the elements of any bound
 array.
+
+Bound arrays are often useful if A[i] and B[i] perform different 
+aspects of the same computation, and thus will run most efficiently 
+if they lie on the same processor.  Bound array elements are guaranteed
+to always be able to interact using \kw{ckLocal} (see 
+section~\ref{ckLocal for arrays}), although the local pointer must
+be refreshed after any migration. This should be done during the \kw{pup}
+routine. When migrated, all elements that are bound together will be created
+at the new processor before \kw{pup} is called on any of them, ensuring that
+a valid local pointer to any of the bound objects can be obtained during the
+\kw{pup} routine of any of the others.
+
+For example, an array {\it Alibrary} is implemented as a library module.
+It implements a certain functionality by operating on a data array {\it dest}
+which is just a pointer to some user provided data.
+A user defined array {\it UserArray} is created and bound to 
+the array {\it Alibrary} to take advanatage of the functionality provided 
+by the library.
+When bound array element migrated, the {\it data} pointer in {\it UserArray}
+is re-allocated in {\it pup()}, thus {\it UserArray} is responsible to refresh
+the pointer {\it dest} stored in {\it Alibrary}.
+
+\begin{alltt}
+class Alibrary: public CProxy_Alibrary \{
+public:
+  ...
+  void set_ptr(double *ptr) \{ dest = ptr; \}
+  virtual void pup(PUP::er &p);
+private:
+  double *dest;           // point to user data in user defined bound array
+\};
+
+class UserArray: public CProxy_UserArray \{
+public:
+  virtual void pup(PUP::er &p) \{
+                p|len;
+                if(p.isUnpacking()) \{ 
+                  data = new double[len];
+                  Alibrary *myfellow = AlibraryProxy(thisIndex).ckLocal();
+                  myfellow->set_ptr(data);    // refresh data in bound array
+                \}
+                p(data, len);
+  \}
+private:
+  CProxy_Alibrary  AlibraryProxy;   // proxy to my bound array
+  double *data;          // user allocated data pointer
+  int len;
+\};
+\end{alltt}
 
 
 \subsubsection{Advanced Array Creation: Dynamic Insertion}
