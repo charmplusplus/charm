@@ -261,7 +261,9 @@ class ComlibManager: public CkDelegateMgr {
 };
 
 void ComlibDelegateProxy(CProxy *proxy);
+void ComlibAssociateProxy(ComlibInstanceHandle *cinst, CProxy &proxy);
 void ComlibAssociateProxy(CharmStrategy *strat, CProxy &proxy); 
+ComlibInstanceHandle ComlibRegister(CharmStrategy *strat);
 void ComlibBegin(CProxy &proxy);    
 void ComlibEnd(CProxy &proxy);    
 

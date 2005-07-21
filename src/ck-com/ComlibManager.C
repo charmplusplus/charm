@@ -965,10 +965,14 @@ CkDelegateData * ComlibManager::DelegatePointerPup(PUP::er &p,
     return inst;
 }    
 
-
 void ComlibDelegateProxy(CProxy *proxy){
     CProxy_ComlibManager cgproxy(CkpvAccess(cmgrID));
     proxy->ckDelegate(cgproxy.ckLocalBranch(), NULL);
+}
+
+void ComlibAssociateProxy(ComlibInstanceHandle *cinst, CProxy &proxy) {
+    CProxy_ComlibManager cgproxy(CkpvAccess(cmgrID));
+    proxy.ckDelegate(cgproxy.ckLocalBranch(), cinst);
 }
 
 void ComlibAssociateProxy(CharmStrategy *strat, CProxy &proxy) {
@@ -980,6 +984,12 @@ void ComlibAssociateProxy(CharmStrategy *strat, CProxy &proxy) {
     CProxy_ComlibManager cgproxy(CkpvAccess(cmgrID));
     proxy.ckDelegate(cgproxy.ckLocalBranch(), cinst);
 } 
+
+ComlibInstanceHandle ComlibRegister(CharmStrategy *strat) {
+    ComlibInstanceHandle cinst(CkGetComlibInstance());
+    cinst.setStrategy(strat);
+    return cinst;
+}
 
 void ComlibBegin(CProxy &proxy) {
     ComlibInstanceHandle *cinst = (ComlibInstanceHandle *)proxy.ckDelegatedPtr();

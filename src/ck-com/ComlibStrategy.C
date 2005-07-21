@@ -551,6 +551,7 @@ int ComlibGetLastKnown(CkArrayID aid, CkArrayIndexMax idx) {
         CkArray *array = CkArrayID::CkLocalBranch(aid);
         pe = array->lastKnown(idx) + CkNumPes();
         CkpvAccess(locationTable)->put(cidx) = pe;
+	//CkPrintf("LAST KNOWN %d: (%d %d %d %d) -> %d\n",CkMyPe(),((short*)&idx)[2],((short*)&idx)[3],((short*)&idx)[4],((short*)&idx)[5],pe);
     }
     //CkPrintf("last pe = %d \n", pe - CkNumPes());
     
