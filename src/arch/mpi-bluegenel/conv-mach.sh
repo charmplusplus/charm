@@ -1,9 +1,27 @@
-BGL_FLOOR=/bgl/BlueLight/ppcfloor
-[ -z "$BGL_FLOOR" ] && echo "ERROR: BGL_FLOOR not defined!" && exit 1
+BGL_TYPICAL_FLOOR=/bgl/BlueLight/ppcfloor
+
+# if no floor set, use typical floor path
+if test -z "$BGL_FLOOR"
+then
+  BGL_FLOOR=$BGL_TYPICAL_FLOOR
+fi
+
+# if no install path (for experimental) set, use floor
+if test -z "$BGL_INSTALL"
+then
+  BGL_INSTALL=$BGL_FLOOR
+fi
 
 BGL_BIN=$BGL_FLOOR/blrts-gnu/bin
-BGL_INC=$BGL_FLOOR/bglsys/include
-BGL_LIB=$BGL_FLOOR/bglsys/lib
+BGL_INC=$BGL_INSTALL/bglsys/include
+BGL_LIB=$BGL_INSTALL/bglsys/lib
+
+# test if compiler binary present
+if test ! -x $BGL_BIN/powerpc-bgl-blrts-gnu-g++
+then
+ echo "ERROR: Invalid BGL_INSTALL or BGL_FLOOR, C/C++ compiler missing"
+ exit 1
+fi
 
 OPTS_CPP="$OPTS_CPP -I$BGL_INC "
 GCC_OPTS="-gdwarf-2 -Wno-deprecated"
