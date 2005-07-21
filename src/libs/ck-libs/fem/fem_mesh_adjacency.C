@@ -59,8 +59,8 @@ void FEM_Node::allocateNodeAdjacency(){
 }
 
 
-//  Fill the node to element adjacency table for this specific type of element
-void FEM_Node::fillElemAdjacencyTable(int type,const FEM_Elem &elem){
+//  Fill the node to element adjacency table for both this element and its corresponding ghosts
+void FEM_Node::setElemAdjacency(int type, const FEM_Elem &elem){
 	int nodesPerElem = elem.getNodesPer();
 	FEM_VarIndexAttribute *adjacencyAttr = elemAdjacency;
 	CkVec<CkVec<var_id> > &adjacencyTable = elemAdjacency->get();
@@ -74,15 +74,16 @@ void FEM_Node::fillElemAdjacencyTable(int type,const FEM_Elem &elem){
 		int node = conn[j];
 		if (node!=-1){
 		  if(FEM_Is_ghost_index(node)){
-			
 			int idx = ghostAdjacencyAttr->findInRow(FEM_To_ghost_index(node),var_id(type,i));
-			if(idx == -1) // If not currently in the adjacency list, push onto list
+			if(idx == -1) {// If not currently in the adjacency list, push onto list
 			  ghostAdjacencyTable[FEM_To_ghost_index(node)].push_back(var_id(type,i));
+			}
 		  }
 		  else{
 			int idx = adjacencyAttr->findInRow(node,var_id(type,i));
-			if(idx == -1) // If not currently in the adjacency list, push onto list
+			if(idx == -1) {// If not currently in the adjacency list, push onto list
 			  adjacencyTable[node].push_back(var_id(type,i));
+			}
 		  }
 		}
 	  }
@@ -97,27 +98,20 @@ void FEM_Node::fillElemAdjacencyTable(int type,const FEM_Elem &elem){
 		  if (node!=-1){
 			if(FEM_Is_ghost_index(node)){
 			  int idx = ghostAdjacencyAttr->findInRow(FEM_To_ghost_index(node),var_id(type,FEM_From_ghost_index(i)));
-			  if(idx == -1) // If not currently in the adjacency list, push onto list
+			  if(idx == -1){ // If not currently in the adjacency list, push onto list
 				ghostAdjacencyTable[FEM_To_ghost_index(node)].push_back(var_id(type,FEM_From_ghost_index(i)));
+			  }
 			}
+			
 			else{
 			  int idx = adjacencyAttr->findInRow(node,var_id(type,FEM_From_ghost_index(i)));
-			  if(idx == -1) // If not currently in the adjacency list, push onto list
+			  if(idx == -1){// If not currently in the adjacency list, push onto list
 				adjacencyTable[node].push_back(var_id(type,FEM_From_ghost_index(i)));
+			  }
 			}
 		  }
 		}
 	  }
-	}
-	
-};
-
-//  Fill the node to element adjacency table for both this element and its corresponding ghosts
-void FEM_Node::setElemAdjacency(int type, const FEM_Elem &elem){
-	fillElemAdjacencyTable(type,elem);
-	if(elem.getGhost() != NULL){
-		FEM_Elem *ghostElem = (FEM_Elem *)elem.getGhost();
-		fillElemAdjacencyTable(-(type+1),(*ghostElem));
 	}
 };
 
@@ -128,51 +122,103 @@ void FEM_Node::setElemAdjacency(int type, const FEM_Elem &elem){
 //  of the element, but it does simplify the computation. It will work fine for 
 //  triangles and tetrahedra, but may not make as much sense for more complicated
 //  element types where all nodes are not directly connected by edges.
-void FEM_Node::fillNodeAdjacency(const FEM_Elem &elem){
-	int nodesPerElem = elem.getNodesPer();
-	CkVec<CkVec<var_id> > &adjacencyTable = nodeAdjacency->get();
-	FEM_VarIndexAttribute *ghostAdjacencyAttr = ((FEM_Node *)getGhost())->nodeAdjacency;
-	CkVec<CkVec<var_id> > &ghostAdjacencyTable = ghostAdjacencyAttr->get();
-
-	// Add the adjacencies defined by the non-ghost elements
-	for(int i=0;i<elem.size();i++){        // for each element of the given type
-	  const int *conn = elem.connFor(i);
-	  for(int j=0;j<nodesPerElem;j++){   // for each node adjacent to the element
-		int node = conn[j];
-		if (node!=-1){
-		  if(FEM_Is_ghost_index(node)) { // A ghost node
-			for(int k=0;k<nodesPerElem;k++){
-			  if(conn[k] != node){ // Here we need the node id which is negative not the corresponding positive index
-				var_id nodeIDAdded = var_id::createNodeID(1,conn[k]);
-				int idx = ghostAdjacencyAttr->findInRow(FEM_To_ghost_index(node),nodeIDAdded); // find position of k'th node in adjacency list
-				if(idx == -1){ // If k'th node is not currently in the adjacency list, push it onto list
-				  ghostAdjacencyTable[FEM_To_ghost_index(node)].push_back(nodeIDAdded); // Here we need the node index which is positive
-				}
+void FEM_Node::setNodeAdjacency(const FEM_Elem &elem){
+  CkPrintf("In FEM_Node::setNodeAdjacency()\n");
+  int nodesPerElem = elem.getNodesPer();
+  CkVec<CkVec<var_id> > &adjacencyTable = nodeAdjacency->get();
+  FEM_VarIndexAttribute *ghostAdjacencyAttr = ((FEM_Node *)getGhost())->nodeAdjacency;
+  CkVec<CkVec<var_id> > &ghostAdjacencyTable = ghostAdjacencyAttr->get();
+  
+  // Add the adjacencies defined by the non-ghost elements
+  for(int i=0;i<elem.size();i++) {        // for each element of the given type
+	const int *conn = elem.connFor(i);
+	for(int j=0;j<nodesPerElem;j++){   // for each node adjacent to the element
+	  const int nodej = conn[j];
+	  if (nodej!=-1){
+		if(FEM_Is_ghost_index(nodej)) { // A ghost node
+		  for(int k=0;k<nodesPerElem;k++){
+			const int nodek=conn[k];
+			if(nodek != nodej){
+			  var_id nodeID = var_id::createNodeID(1,nodek);
+			  int idx = ghostAdjacencyAttr->findInRow(FEM_To_ghost_index(nodej),nodeID);
+			  if(idx == -1){
+				  if(nodej==-5|| nodek==-5) CkPrintf("G %d->%d not found adding\n", nodej, nodek);
+				ghostAdjacencyTable[FEM_To_ghost_index(nodej)].push_back(nodeID);
+			  }
+			  {
+				  if(nodej==-5|| nodek==-5) CkPrintf("G %d->%d found already\n", nodej, nodek);
 			  }
 			}
 		  }
-		  else { // A non-ghost node, almost same as for ghost nodes
-			for(int k=0;k<nodesPerElem;k++){
-			  if(conn[k] != node){
-				var_id nodeIDAdded = var_id::createNodeID(1,conn[k]);
-				int idx = nodeAdjacency->findInRow(node,nodeIDAdded);
-				if(idx == -1){
-				  adjacencyTable[node].push_back(nodeIDAdded);
-				}
+		}
+		else { // A non-ghost node, almost same as for ghost nodes
+		  for(int k=0;k<nodesPerElem;k++){
+			const int nodek=conn[k];
+			if(nodek != nodej){
+			  var_id nodeID = var_id::createNodeID(1,nodek);
+			  int idx = nodeAdjacency->findInRow(nodej,nodeID);
+			  if(idx == -1){
+				  if(nodej==-5|| nodek==-5) CkPrintf("NG %d->%d not found--adding\n", nodej, nodek);
+				adjacencyTable[nodej].push_back(nodeID);
+			  }
+			  {
+				 if(nodej==-5 || nodek==-5) CkPrintf("NG %d->%d found already\n", nodej, nodek);
 			  }
 			}
 		  }
 		}
 	  }
 	}
-};
+  }
 
-void FEM_Node::setNodeAdjacency(const FEM_Elem &elem){
-	fillNodeAdjacency(elem);
-	if(elem.getGhost() != NULL){
-		FEM_Elem *ghostElem = (FEM_Elem *)elem.getGhost();
-		fillNodeAdjacency(*ghostElem);
+
+  for(int i=0;i<((FEM_Elem*)elem.getGhost())->size();i++) {        // for each element of the given type
+	const int *conn = ((FEM_Elem*)elem.getGhost())->connFor(i);
+	for(int j=0;j<nodesPerElem;j++){   // for each node adjacent to the element
+	  const int nodej = conn[j];
+	  if (nodej!=-1){
+		if(FEM_Is_ghost_index(nodej)) { // A ghost node
+		  for(int k=0;k<nodesPerElem;k++){
+			const int nodek=conn[k];
+			if(nodek != nodej){
+			  var_id nodeID = var_id::createNodeID(1,nodek);
+			  int idx = ghostAdjacencyAttr->findInRow(FEM_To_ghost_index(nodej),nodeID);
+			  if(idx == -1){
+				if(nodej==-5|| nodek==-5) CkPrintf("G-G %d->%d not found adding\n", nodej, nodek);
+				ghostAdjacencyTable[FEM_To_ghost_index(nodej)].push_back(nodeID);
+			  }
+			  {
+				if(nodej==-5|| nodek==-5) CkPrintf("G-G %d->%d found already\n", nodej, nodek);
+			  }
+			}
+		  }
+		}
+		else { // A non-ghost node, almost same as for ghost nodes
+		  for(int k=0;k<nodesPerElem;k++){
+			const int nodek=conn[k];
+			if(nodek != nodej){
+			  var_id nodeID = var_id::createNodeID(1,nodek);
+			  int idx = nodeAdjacency->findInRow(nodej,nodeID);
+			  if(idx == -1){
+				if(nodej==-5|| nodek==-5) CkPrintf("G-NG %d->%d not found--adding\n", nodej, nodek);
+				adjacencyTable[nodej].push_back(nodeID);
+			  }
+			  {
+				if (nodej==-5 || nodek==-5) CkPrintf("G-NG %d->%d found already\n", nodej, nodek);
+			  }
+			}
+		  }
+		}
+	  }
 	}
+  }
+
+
+
+
+
+
+
 };
 
 
@@ -717,7 +763,10 @@ void FEM_Mesh::n2n_getAll(int n, int **adjnodes, int *sz)
 	*sz = nsVec.length();
 	if(*sz != 0) (*adjnodes) = new int[*sz];
 	for (int i=0; i<(*sz); i++) {
-	  (*adjnodes)[i] = nsVec[i].id;
+	  if(nsVec[i].type >= 0)
+		(*adjnodes)[i] = nsVec[i].id;
+	  else
+		(*adjnodes)[i] = FEM_From_ghost_index(nsVec[i].id);
 	}
   }
   else{
@@ -727,7 +776,10 @@ void FEM_Mesh::n2n_getAll(int n, int **adjnodes, int *sz)
 	*sz = nsVec.length();
 	if(*sz != 0) (*adjnodes) = new int[*sz];
 	for (int i=0; i<(*sz); i++) {
-	  (*adjnodes)[i] = nsVec[i].id;
+	  if(nsVec[i].type >= 0)
+		(*adjnodes)[i] = nsVec[i].id;
+	  else
+		(*adjnodes)[i] = FEM_From_ghost_index(nsVec[i].id);
 	}
   }
   
@@ -789,6 +841,7 @@ int FEM_Mesh::n2n_exists(int n, int queryNode)
 {
   if (n == -1) return 0;
   if(FEM_Is_ghost_index(n)){
+	CkAssert(node.getGhost());
 	FEM_VarIndexAttribute *nAdj = (FEM_VarIndexAttribute *)node.getGhost()->lookup(FEM_NODE_NODE_ADJACENCY,"n2n_exists");
 	CkVec<CkVec<FEM_VarIndexAttribute::ID> > &nVec = nAdj->get();
 	CkVec<FEM_VarIndexAttribute::ID> &nsVec = nVec[FEM_To_ghost_index(n)];
@@ -868,7 +921,7 @@ void FEM_Mesh::n2e_getAll(int n, int **adjelements, int *sz)
 	*sz = nsVec.length();
 	if(*sz !=0) (*adjelements) = new int[*sz];
 	for (int i=0; i<(*sz); i++) {
-	  (*adjelements)[i] = nsVec[i].id;
+		(*adjelements)[i] = nsVec[i].id;
 	}
   }
   else {

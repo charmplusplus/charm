@@ -105,11 +105,6 @@ CDECL void FEM_Print_e2e(int mesh, int eid){
 }
 
 
-
-
-// prototype with optional parameter
-int FEM_add_node_local(FEM_Mesh *m, int addGhost=0);
-
 int FEM_add_node_local(FEM_Mesh *m, int addGhost){
   int newNode;
   if(addGhost){
@@ -392,53 +387,51 @@ void FEM_remove_element_remote(FEM_Mesh *m, int element, int elemtype){
 // A helper function for FEM_add_element_local below
 // Will only work with the same element type as the one given, may crash otherwise
 void update_new_element_e2e(FEM_Mesh *m, int newEl, int elemType){
+  CkAssert(elemType==0); // this function most definitely will not yet work with mixed element types.
 
   // Create tuple table
   FEM_ElemAdj_Layer *g = m->getElemAdjLayer();
   CkAssert(g->initialized);
   const int nodesPerTuple = g->nodesPerTuple;
-  //  CkPrintf("nodesPerTuple=%d\n", nodesPerTuple);
+  const int tuplesPerElem = g->elem[elemType].tuplesPerElem;
   tupleTable table(nodesPerTuple);
   FEM_Symmetries_t allSym;
 
 
-  // insert all elements adjacent to the nodes adjacent to the new 
+  // locate all elements adjacent to the nodes adjacent to the new 
   // element, including ghosts, and the new element itself
-
-  const int tuplesPerElem = g->elem[elemType].tuplesPerElem;
-  int *adjnodes = new int[tuplesPerElem];
+  const int nodesPerElem = m->elem[elemType].getNodesPer();
+  int *adjnodes = new int[nodesPerElem];
   CkVec<int> elist;
   m->e2n_getAll(newEl, adjnodes, elemType);
-  for(int i=0;i<tuplesPerElem;i++){
+  for(int i=0;i<nodesPerElem;i++){
     int sz;
     int *adjelements=0;
     m->n2e_getAll(adjnodes[i], &adjelements, &sz);
     for(int j=0;j<sz;j++){
 	  int found=0;
 	  // only insert if it is not already in the list
-	  for(int i=0;i<elist.length();i++)// we use a slow linear scan of the vector
+	  for(int i=0;i<elist.length();i++)// we use a slow linear scan of the CkVec
 		if(elist[i] == adjelements[j])
 		  found=1;
 	  if(!found){
 		elist.push_back(adjelements[j]);
-		//	CkPrintf("Adding element %d to list\n", adjelements[j]);
 	  }
 	}
 	if(sz!=0) delete[] adjelements;
   }
   delete[] adjnodes;
   
-  
+
+  // Add all the potentially adjacent elements to the tuple table
   for(int i=0;i<elist.length();i++){
 	int nextElem = elist[i];
-	//CkPrintf("Adding elem %d to tuple table\n", nextElem);
 	int tuple[tupleTable::MAX_TUPLE];
 	int *conn;
 	if(FEM_Is_ghost_index(nextElem))
 	  conn=((FEM_Elem*)m->elem[elemType].getGhost())->connFor(FEM_To_ghost_index(nextElem));
 	else
 	  conn=m->elem[elemType].connFor(nextElem);
-	//CkPrintf("tuplesPerElem=%d\n", tuplesPerElem);
 	for (int u=0;u<tuplesPerElem;u++) {
 	  for (int i=0;i<nodesPerTuple;i++) {
 		int eidx=g->elem[elemType].elem2tuple[i+u*g->nodesPerTuple];
@@ -447,14 +440,13 @@ void update_new_element_e2e(FEM_Mesh *m, int newEl, int elemType){
 		else           //Ordinary node
 		  tuple[i]=conn[eidx]; 
 	  }
-	  
-	  // CkPrintf("tuple=%d,%d\n", tuple[0], tuple[1]);
 	  table.addTuple(tuple,new elemList(0,nextElem,elemType,allSym,u)); 
 	}
   }
 
+
   
-  // extract adjacencies from table and update all e2e tables for both newEl and the others
+  // extract true adjacencies from table and update all e2e tables for both newEl and the others
   table.beginLookup();
     
   // look through each elemList that is returned by the tuple table
@@ -478,34 +470,32 @@ void update_new_element_e2e(FEM_Mesh *m, int newEl, int elemType){
     else { /* Several elements in list: normal case */
       // for each a,b pair of adjacent edges
       for (const elemList *a=l;a!=NULL;a=a->next){
-        for (const elemList *b=l;b!=NULL;b=b->next){
-          // if a and b are different elements
-          if((a->localNo != b->localNo) || (a->type != b->type)){
-            int j;
-	    //	CkPrintf("%d:%d:%d adj to %d:%d:%d\n", a->type, a->localNo, a->tupleNo, b->type, b->localNo, b->tupleNo);
-	    // Put b in a's adjacency list
-	    if(FEM_Is_ghost_index(a->localNo)){
-	      j = FEM_To_ghost_index(a->localNo)*tuplesPerElem + a->tupleNo;
-	      adjsGhost[j] = b->localNo;
-	      adjTypesGhost[j] = b->type;
-	    }
-	    else{
-	      j= a->localNo*tuplesPerElem + a->tupleNo;
-	      adjs[j] = b->localNo;
-	      adjTypes[j] = b->type;
-	    }
-
-	    // Put a in b's adjacency list
-	    if(FEM_Is_ghost_index(b->localNo)){
-	      j = FEM_To_ghost_index(b->localNo)*tuplesPerElem + b->tupleNo;
-	      adjsGhost[j] = a->localNo;
-	      adjTypesGhost[j] = a->type;
-	    }
-	    else{
-	      j= b->localNo*tuplesPerElem + b->tupleNo;
-	      adjs[j] = a->localNo;
-	      adjTypes[j] = a->type;
-	    }
+        for (const elemList *b=a->next;b!=NULL;b=b->next){
+          if((a->localNo != b->localNo) || (a->type != b->type)){ // if a and b are different elements
+			//	CkPrintf("%d:%d:%d adj to %d:%d:%d\n", a->type, a->localNo, a->tupleNo, b->type, b->localNo, b->tupleNo);
+			// Put b in a's adjacency list
+			if(FEM_Is_ghost_index(a->localNo)){
+			  const int j = FEM_To_ghost_index(a->localNo)*tuplesPerElem + a->tupleNo;
+			  adjsGhost[j] = b->localNo;
+			  adjTypesGhost[j] = b->type;
+			}
+			else{
+			  const int j= a->localNo*tuplesPerElem + a->tupleNo;
+			  adjs[j] = b->localNo;
+			  adjTypes[j] = b->type;
+			}
+			
+			// Put a in b's adjacency list
+			if(FEM_Is_ghost_index(b->localNo)){
+			  const int j = FEM_To_ghost_index(b->localNo)*tuplesPerElem + b->tupleNo;
+			  adjsGhost[j] = a->localNo;
+			  adjTypesGhost[j] = a->type;
+			}
+			else{
+			  const int j= b->localNo*tuplesPerElem + b->tupleNo;
+			  adjs[j] = a->localNo;
+			  adjTypes[j] = a->type;
+			}
           }
         }
       }
