@@ -1,12 +1,31 @@
-BGL_SRC=/bgdhome/chuang10/bglsw
-BGL_INSTALL=/bgdhome/chuang10/bglsw-install
-BGL_FLOOR=/auto/export-bglsim/BlueLight/ppcfloor
-[ -z "$BGL_INSTALL" ] && echo "ERROR: BL_INSTALL not defined!" && exit 1
+BGL_TYPICAL_FLOOR=/bgl/BlueLight/ppcfloor
 
-BGL_BASE=$BGL_INSTALL
+BGL_SRC=/bgd-public/chuang10/bglsw
+BGL_INSTALL=/bgd-public/chuang10/bglsw-install
+BGL_FLOOR=/auto/BGX/floor
+
+# if no floor set, use typical floor path
+if test -z "$BGL_FLOOR"
+then
+  BGL_FLOOR=$BGL_TYPICAL_FLOOR
+fi
+
+# if no install path (for experimental) set, use floor
+if test -z "$BGL_INSTALL"
+then
+  BGL_INSTALL=$BGL_FLOOR
+fi
+
 BGL_BIN=$BGL_FLOOR/blrts-gnu/bin
 BGL_INC="-I$BGL_SRC/commlib/BGLML -I$BGL_INSTALL/bglsys/include -I$BGL_INSTALL/bglsys/include/bglml"
 BGL_LIB="-L$BGL_INSTALL/bglsys/lib"
+
+# test if compiler binary present
+if test ! -x $BGL_BIN/powerpc-bgl-blrts-gnu-g++
+then
+ echo "ERROR: Invalid BGL_INSTALL or BGL_FLOOR, C/C++ compiler missing"
+ exit 1
+fi
 
 OPTS_CPP="$OPTS_CPP $BGL_INC "
 GCC_OPTS="-gdwarf-2 -Wno-deprecated"

@@ -8,20 +8,18 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <math.h>
+#include <string.h>
 #include "machine.h"
 #include "converse.h"
 #include "pcqueue.h"
 
-/* For Gheorghe's msg templates */
-#include "templates/TorusDirectMessage.h"
-typedef BGLML::TorusDirectMessage<BGLML::DetermRoutePacket> DetermMsg;
-/* #include "BGLML/templates/TorusDynamicMessage.h" 
-typedef BGLML::TorusDynamicMessage<BGLML::DynamicRoutePacket> DynamicMsg; */
-
 #define EAGER 1
 
+#if EAGER
 #include "bglml/BLMPI_EagerProtocol.h"
+#else
 #include "bglml/BLMPI_RzvProtocol.h"
+#endif
 
 #if 0
 #define BGL_DEBUG CmiPrintf
@@ -46,7 +44,7 @@ static void ** _recvArray;
 #if CMK_SMP
 #define CMK_BROADCAST_SPANNING_TREE    0
 #else
-#define CMK_BROADCAST_SPANNING_TREE    1
+#define CMK_BROADCAST_SPANNING_TREE    0
 #define CMK_BROADCAST_HYPERCUBE        0
 #endif /* CMK_SMP */
 
