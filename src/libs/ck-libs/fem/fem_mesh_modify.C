@@ -510,9 +510,9 @@ int FEM_add_element_local(FEM_Mesh *m, const int *conn, int connSize, int elemTy
   if(addGhost){
 	int oldLength = m->elem[elemType].getGhost()->size();
 	m->elem[elemType].getGhost()->setLength(oldLength+1);
-	newEl = FEM_From_ghost_index(oldLength);
 	m->elem[elemType].getGhost()->set_valid(oldLength);// Mark new element as valid
-	((FEM_Elem*)m->elem[elemType].getGhost())->connIs(newEl,conn);// update element's conn, i.e. e2n table
+	((FEM_Elem*)m->elem[elemType].getGhost())->connIs(oldLength,conn);// update element's conn, i.e. e2n table
+	newEl = FEM_From_ghost_index(oldLength);
 }
   else{
 	int oldLength = m->elem[elemType].size();

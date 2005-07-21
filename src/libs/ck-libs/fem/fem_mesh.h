@@ -531,8 +531,14 @@ public:
 			id = -1;
 		};
 		ID(int _type,int _id){
+		  if(_id < 0) {
+			type = -(_type+1);
+			id = FEM_To_ghost_index(_id);
+		  }
+		  else {
 			type = _type;
 			id = _id;
+		  }
 		};
 		bool operator ==(const ID &rhs)const {
 			return (type == rhs.type) && (id == rhs.id);
@@ -543,15 +549,14 @@ public:
 		};
 
 		static ID createNodeID(int type,int node){
-			ID temp;
-			if(FEM_Is_ghost_index(node)){
-			  temp.id = FEM_To_ghost_index(node);
-			  temp.type = -type; // FIXME: this type mapping cannot distinguish between -0 and 0
-			}else{
-			  temp.id = node;
-			  temp.type = type;
-			}
-			return temp;
+		  ID temp(type, node);
+		  return temp;
+		}
+		int getSignedId() {
+		  if(type<0){
+			return FEM_From_ghost_index(id);
+		  }
+		  else return id;
 		}
  };
 private:

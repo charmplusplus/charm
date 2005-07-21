@@ -142,11 +142,11 @@ void FEM_Node::setNodeAdjacency(const FEM_Elem &elem){
 			  var_id nodeID = var_id::createNodeID(1,nodek);
 			  int idx = ghostAdjacencyAttr->findInRow(FEM_To_ghost_index(nodej),nodeID);
 			  if(idx == -1){
-				  if(nodej==-5|| nodek==-5) CkPrintf("G %d->%d not found adding\n", nodej, nodek);
+				//if(nodej==-5|| nodek==-5) CkPrintf("G %d->%d not found adding\n", nodej, nodek);
 				ghostAdjacencyTable[FEM_To_ghost_index(nodej)].push_back(nodeID);
 			  }
 			  {
-				  if(nodej==-5|| nodek==-5) CkPrintf("G %d->%d found already\n", nodej, nodek);
+				//if(nodej==-5|| nodek==-5) CkPrintf("G %d->%d found already\n", nodej, nodek);
 			  }
 			}
 		  }
@@ -158,11 +158,11 @@ void FEM_Node::setNodeAdjacency(const FEM_Elem &elem){
 			  var_id nodeID = var_id::createNodeID(1,nodek);
 			  int idx = nodeAdjacency->findInRow(nodej,nodeID);
 			  if(idx == -1){
-				  if(nodej==-5|| nodek==-5) CkPrintf("NG %d->%d not found--adding\n", nodej, nodek);
+				//if(nodej==-5|| nodek==-5) CkPrintf("NG %d->%d not found--adding\n", nodej, nodek);
 				adjacencyTable[nodej].push_back(nodeID);
 			  }
 			  {
-				 if(nodej==-5 || nodek==-5) CkPrintf("NG %d->%d found already\n", nodej, nodek);
+				//if(nodej==-5 || nodek==-5) CkPrintf("NG %d->%d found already\n", nodej, nodek);
 			  }
 			}
 		  }
@@ -184,11 +184,11 @@ void FEM_Node::setNodeAdjacency(const FEM_Elem &elem){
 			  var_id nodeID = var_id::createNodeID(1,nodek);
 			  int idx = ghostAdjacencyAttr->findInRow(FEM_To_ghost_index(nodej),nodeID);
 			  if(idx == -1){
-				if(nodej==-5|| nodek==-5) CkPrintf("G-G %d->%d not found adding\n", nodej, nodek);
+				//if(nodej==-5|| nodek==-5) CkPrintf("G-G %d->%d not found adding\n", nodej, nodek);
 				ghostAdjacencyTable[FEM_To_ghost_index(nodej)].push_back(nodeID);
 			  }
 			  {
-				if(nodej==-5|| nodek==-5) CkPrintf("G-G %d->%d found already\n", nodej, nodek);
+				//if(nodej==-5|| nodek==-5) CkPrintf("G-G %d->%d found already\n", nodej, nodek);
 			  }
 			}
 		  }
@@ -200,11 +200,11 @@ void FEM_Node::setNodeAdjacency(const FEM_Elem &elem){
 			  var_id nodeID = var_id::createNodeID(1,nodek);
 			  int idx = nodeAdjacency->findInRow(nodej,nodeID);
 			  if(idx == -1){
-				if(nodej==-5|| nodek==-5) CkPrintf("G-NG %d->%d not found--adding\n", nodej, nodek);
+				//if(nodej==-5|| nodek==-5) CkPrintf("G-NG %d->%d not found--adding\n", nodej, nodek);
 				adjacencyTable[nodej].push_back(nodeID);
 			  }
 			  {
-				if (nodej==-5 || nodek==-5) CkPrintf("G-NG %d->%d found already\n", nodej, nodek);
+				//if (nodej==-5 || nodek==-5) CkPrintf("G-NG %d->%d found already\n", nodej, nodek);
 			  }
 			}
 		  }
@@ -763,10 +763,7 @@ void FEM_Mesh::n2n_getAll(int n, int **adjnodes, int *sz)
 	*sz = nsVec.length();
 	if(*sz != 0) (*adjnodes) = new int[*sz];
 	for (int i=0; i<(*sz); i++) {
-	  if(nsVec[i].type >= 0)
-		(*adjnodes)[i] = nsVec[i].id;
-	  else
-		(*adjnodes)[i] = FEM_From_ghost_index(nsVec[i].id);
+	  (*adjnodes)[i] = nsVec[i].getSignedId();
 	}
   }
   else{
@@ -776,10 +773,7 @@ void FEM_Mesh::n2n_getAll(int n, int **adjnodes, int *sz)
 	*sz = nsVec.length();
 	if(*sz != 0) (*adjnodes) = new int[*sz];
 	for (int i=0; i<(*sz); i++) {
-	  if(nsVec[i].type >= 0)
-		(*adjnodes)[i] = nsVec[i].id;
-	  else
-		(*adjnodes)[i] = FEM_From_ghost_index(nsVec[i].id);
+	  (*adjnodes)[i] = nsVec[i].getSignedId();
 	}
   }
   
@@ -795,6 +789,9 @@ void FEM_Mesh::n2n_add(int n, int newNode)
 	FEM_VarIndexAttribute::ID nn(0, newNode);
 	CkVec<FEM_VarIndexAttribute::ID> &nsVec = nVec[FEM_To_ghost_index(n)];
 	nsVec.push_back(nn);
+	/*if((n==20 || n==21 || n== -5) && (newNode==20 || newNode==21 || newNode== -5)) {
+	  CkPrintf("Added edge %d->%d\n", n, newNode);
+	  }*/
   }
   else{
 	FEM_VarIndexAttribute *nAdj = (FEM_VarIndexAttribute *)node.lookup(FEM_NODE_NODE_ADJACENCY,"n2n_add");
@@ -817,7 +814,7 @@ void FEM_Mesh::n2n_remove(int n, int oldNode)
 	CkVec<CkVec<FEM_VarIndexAttribute::ID> > &nVec = nAdj->get();
 	CkVec<FEM_VarIndexAttribute::ID> &nsVec = nVec[FEM_To_ghost_index(n)];
 	for (int i=0; i<nsVec.length(); i++) {
-	  if (nsVec[i].id == oldNode) {
+	  if (nsVec[i].getSignedId() == oldNode) {
 		nsVec.remove(i);
 		break;
 	  }
@@ -828,7 +825,7 @@ void FEM_Mesh::n2n_remove(int n, int oldNode)
 	CkVec<CkVec<FEM_VarIndexAttribute::ID> > &nVec = nAdj->get();
 	CkVec<FEM_VarIndexAttribute::ID> &nsVec = nVec[n];
 	for (int i=0; i<nsVec.length(); i++) {
-	  if (nsVec[i].id == oldNode) {
+	  if (nsVec[i].getSignedId() == oldNode) {
 		nsVec.remove(i);
 		break;
 	  }
@@ -846,7 +843,7 @@ int FEM_Mesh::n2n_exists(int n, int queryNode)
 	CkVec<CkVec<FEM_VarIndexAttribute::ID> > &nVec = nAdj->get();
 	CkVec<FEM_VarIndexAttribute::ID> &nsVec = nVec[FEM_To_ghost_index(n)];
 	for (int i=0; i<nsVec.length(); i++)
-	  if (nsVec[i].id == queryNode) 
+	  if (nsVec[i].getSignedId() == queryNode) 
 		return 1;
   }
   else {
@@ -854,7 +851,7 @@ int FEM_Mesh::n2n_exists(int n, int queryNode)
 	CkVec<CkVec<FEM_VarIndexAttribute::ID> > &nVec = nAdj->get();
 	CkVec<FEM_VarIndexAttribute::ID> &nsVec = nVec[n];
 	for (int i=0; i<nsVec.length(); i++)
-	  if (nsVec[i].id == queryNode) 
+	  if (nsVec[i].getSignedId() == queryNode) 
 		return 1;
   }
   return 0;
@@ -869,8 +866,8 @@ void FEM_Mesh::n2n_replace(int n, int oldNode, int newNode)
 	CkVec<CkVec<FEM_VarIndexAttribute::ID> > &nVec = nAdj->get();
 	CkVec<FEM_VarIndexAttribute::ID> &nsVec = nVec[FEM_To_ghost_index(n)];
 	for (int i=0; i<nsVec.length(); i++) {
-	  if (nsVec[i].id == oldNode) {
-		nsVec[i].id = newNode;
+	  if (nsVec[i].getSignedId() == oldNode) {
+		nsVec[i] = FEM_VarIndexAttribute::ID(0,newNode);
 		break;
 	  }
 	}
@@ -880,8 +877,8 @@ void FEM_Mesh::n2n_replace(int n, int oldNode, int newNode)
 	CkVec<CkVec<FEM_VarIndexAttribute::ID> > &nVec = nAdj->get();
 	CkVec<FEM_VarIndexAttribute::ID> &nsVec = nVec[n];
 	for (int i=0; i<nsVec.length(); i++) {
-	  if (nsVec[i].id == oldNode) {
-		nsVec[i].id = newNode;
+	  if (nsVec[i].getSignedId() == oldNode) {
+		nsVec[i] = FEM_VarIndexAttribute::ID(0,newNode);
 		break;
 	  }
 	}
@@ -921,7 +918,7 @@ void FEM_Mesh::n2e_getAll(int n, int **adjelements, int *sz)
 	*sz = nsVec.length();
 	if(*sz !=0) (*adjelements) = new int[*sz];
 	for (int i=0; i<(*sz); i++) {
-		(*adjelements)[i] = nsVec[i].id;
+	  (*adjelements)[i] = nsVec[i].getSignedId();
 	}
   }
   else {
@@ -931,7 +928,7 @@ void FEM_Mesh::n2e_getAll(int n, int **adjelements, int *sz)
 	*sz = nsVec.length();
 	if(*sz !=0) (*adjelements) = new int[*sz];
 	for (int i=0; i<(*sz); i++) {
-	  (*adjelements)[i] = nsVec[i].id;
+	  (*adjelements)[i] = nsVec[i].getSignedId();
 	}
   }
 }
@@ -965,7 +962,7 @@ void FEM_Mesh::n2e_remove(int n, int oldElem)
 	CkVec<CkVec<FEM_VarIndexAttribute::ID> > &eVec = eAdj->get();
 	CkVec<FEM_VarIndexAttribute::ID> &nsVec = eVec[FEM_To_ghost_index(n)];
 	for (int i=0; i<nsVec.length(); i++) {
-	  if (nsVec[i].id == oldElem) {
+	  if (nsVec[i].getSignedId() == oldElem) {
 		nsVec.remove(i);
 		break;
 	  }
@@ -976,7 +973,7 @@ void FEM_Mesh::n2e_remove(int n, int oldElem)
 	CkVec<CkVec<FEM_VarIndexAttribute::ID> > &eVec = eAdj->get();
 	CkVec<FEM_VarIndexAttribute::ID> &nsVec = eVec[n];
 	for (int i=0; i<nsVec.length(); i++) {
-	  if (nsVec[i].id == oldElem) {
+	  if (nsVec[i].getSignedId() == oldElem) {
 		nsVec.remove(i);
 		break;
 	  }
@@ -994,8 +991,8 @@ void FEM_Mesh::n2e_replace(int n, int oldElem, int newElem)
 	CkVec<CkVec<FEM_VarIndexAttribute::ID> > &eVec = eAdj->get();
 	CkVec<FEM_VarIndexAttribute::ID> &nsVec = eVec[FEM_To_ghost_index(n)];
 	for (int i=0; i<nsVec.length(); i++) {
-	  if (nsVec[i].id == oldElem) {
-		nsVec[i].id = newElem;
+	  if (nsVec[i].getSignedId() == oldElem) {
+		nsVec[i] = FEM_VarIndexAttribute::ID(0,newElem);
 		break;
 	  }
 	}
@@ -1005,8 +1002,8 @@ void FEM_Mesh::n2e_replace(int n, int oldElem, int newElem)
 	CkVec<CkVec<FEM_VarIndexAttribute::ID> > &eVec = eAdj->get();
 	CkVec<FEM_VarIndexAttribute::ID> &nsVec = eVec[n];
 	for (int i=0; i<nsVec.length(); i++) {
-	  if (nsVec[i].id == oldElem) {
-		nsVec[i].id = newElem;
+	  if (nsVec[i].getSignedId() == oldElem) {
+		nsVec[i] = FEM_VarIndexAttribute::ID(0,newElem);
 		break;
 	  }
 	}
