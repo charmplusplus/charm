@@ -1,0 +1,28 @@
+mainmodule pgm {
+  readonly CProxy_Main mainProxy;
+  readonly CProxy_Source src;
+  readonly CProxy_Destination dest;
+
+  readonly ComlibInstanceHandle strat_direct;
+  readonly ComlibInstanceHandle strat_ring;
+  readonly ComlibInstanceHandle strat_multiring;
+
+  message MyMulticastMessage {
+    char data[];
+  };
+
+  mainchare Main {
+    entry Main(CkArgMsg *m);
+    entry void done(void);
+  };
+
+  array [1D] Source {
+    entry Source(int n, int list[n]);
+    entry void start(int i);
+  };        	
+
+  array [1D] Destination {
+    entry Destination(int senders);
+    entry void receive(MyMulticastMessage *m);
+  };        	
+};
