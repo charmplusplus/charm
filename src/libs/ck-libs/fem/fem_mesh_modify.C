@@ -521,7 +521,7 @@ int FEM_add_element_local(FEM_Mesh *m, const int *conn, int connSize, int elemTy
 	int oldLength = m->elem[elemType].getGhost()->size();
 	m->elem[elemType].getGhost()->setLength(oldLength+1);
 	newEl = FEM_From_ghost_index(oldLength);
-	m->elem[elemType].getGhost()->set_valid(newEl);// Mark new element as valid
+	m->elem[elemType].getGhost()->set_valid(oldLength);// Mark new element as valid
 	((FEM_Elem*)m->elem[elemType].getGhost())->connIs(newEl,conn);// update element's conn, i.e. e2n table
 }
   else{
@@ -610,7 +610,7 @@ int FEM_add_element(FEM_Mesh *m, int* conn, int connSize, int elemType){
 	int sharedNode = m->getfmMM()->getfmUtil()->exists_in_IDXL(m,conn[j],chk,0);
 	if(sharedNode == -1) {
 	  //node 'j' is a ghost on chunk 'i'
-	  int sharedGhost = m->getfmMM()->getfmUtil()->exists_in_IDXL(m,FEM_To_ghost_index(conn[j]),chk,1);
+	  int sharedGhost = m->getfmMM()->getfmUtil()->exists_in_IDXL(m,conn[j],chk,1);
 	  if( sharedGhost == -1) {
 	    //it is a new ghost
 	    m->node.ghostSend.addNode(FEM_To_ghost_index(conn[j]),chk);
@@ -696,7 +696,7 @@ int FEM_add_element(FEM_Mesh *m, int* conn, int connSize, int elemType){
 	am->conn[i] = m->getfmMM()->getfmUtil()->exists_in_IDXL(m,conn[i],remoteChunk,0);
       }
       else if(nodetype[i] == 2) {
-	am->conn[i] = m->getfmMM()->getfmUtil()->exists_in_IDXL(m,FEM_To_ghost_index(conn[i]),remoteChunk,1);
+	am->conn[i] = m->getfmMM()->getfmUtil()->exists_in_IDXL(m,conn[i],remoteChunk,1);
 	am->ghostIndices[j] = i;
 	j++;
       }
@@ -1005,7 +1005,7 @@ void FEM_MUtil::getChunkNos(int entType, int entNo, int *numChunks, IDXL_Share *
       *numChunks = irec->getShared() + 1; //add myself to the list
       *chunks = (IDXL_Share**)malloc((*numChunks)*sizeof(IDXL_Share*));
       int i=0;
-      for(i=0; i<*numChunks; i++) {
+      for(i=0; i<*numChunks-1; i++) {
 	int chk = irec->getChk(i);
 	int index = irec->getIdx(i);
 	(*chunks)[i] = new IDXL_Share(chk, index);
@@ -1254,20 +1254,35 @@ void FEM_MUtil::buildChunkToNodeTable(int *nodetype, int sharedcount, int ghostc
 	}
       }
     }
-    *sharedConn = (int **)malloc(connSize*sizeof(int *));
+    *sharedConn = (int **)malloc((*numSharedChunks)*sizeof(int *));
+    for(int j=0; j<*numSharedChunks; j++) {
+      (*sharedConn)[j] = (int *)malloc(connSize*sizeof(int));
+    }
     int index = getIdx();
     for(int i=0; i<connSize; i++) {
-      (*sharedConn)[i] = (int*)malloc((*numSharedChunks)*sizeof(int));
+      //(*sharedConn)[i] = (int*)malloc((*numSharedChunks)*sizeof(int));
+      int chkindex = -1;
       if((nodetype[i] == 1) || (nodetype[i] == 2)) {
 	for(int j=0; j<(*numSharedChunks); j++) {//initialize
 	  (*sharedConn)[j][i] = -1;
 	}
 	for(int j=0; j<(*allShared)[i]->size(); j++) {
-	  (*sharedConn)[(*(*allShared)[i])[j]][i] = 1; 
+	  for(int k=0; k<*numSharedChunks; k++) {
+	    if((*(*allShared)[i])[j] == (*(*allChunks))[k]) chkindex = k;
+	  }
+	  (*sharedConn)[chkindex][i] = 1; 
 	}
 	if(nodetype[i] == 2) {
-	  (*sharedConn)[index][i] = 2;
-	  if((*allShared)[i]->size()==1) (*sharedConn)[(*(*allShared)[i])[0]][i] = 0;
+ 	  for(int k=0; k<*numSharedChunks; k++) {
+	    if(index == (*(*allChunks))[k]) chkindex = k;
+	  }
+	  (*sharedConn)[chkindex][i] = 2;
+	  if((*allShared)[i]->size()==1) {
+	    for(int k=0; k<*numSharedChunks; k++) {
+	      if((*(*allShared)[i])[0] == (*(*allChunks))[k]) chkindex = k;
+	    }
+	    (*sharedConn)[chkindex][i] = 0;
+	  }
 	}
       }
       else {
@@ -1275,7 +1290,10 @@ void FEM_MUtil::buildChunkToNodeTable(int *nodetype, int sharedcount, int ghostc
 	for(int j=0; j<(*numSharedChunks); j++) {
 	  (*sharedConn)[j][i] = -1; 
 	}
-	(*sharedConn)[index][i] = 0;
+	for(int k=0; k<*numSharedChunks; k++) {
+	  if(index == (*(*allChunks))[k]) chkindex = k;
+	}
+	(*sharedConn)[chkindex][i] = 0;
       }
     }
   }
