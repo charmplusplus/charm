@@ -440,6 +440,66 @@ int FEM_Adapt::vertex_split(int n, int n1, int n2, int e1, int e3)
    on g, and start over. */ 
 int FEM_Adapt::refine_element_leb(int e)
 {
+  int eConn[3], fixNode, otherNode, opNode, longEdge, nbr; 
+  double eLens[3], longEdgeLen = 0.0;
+  theMesh->e2n_getAll(e, eConn);
+  eLens[0] = len(eConn[0], eConn[1]);
+  eLens[1] = len(eConn[1], eConn[2]);
+  eLens[2] = len(eConn[2], eConn[0]);
+  for (int i=0; i<3; i++)
+    if (eLens[i] > longEdgeLen) {
+      longEdgeLen = eLens[i];
+      longEdge = i;
+      fixNode = eConn[i];
+      otherNode = eConn[(i+1)%3];
+      opNode = eConn[(i+2)%3];
+    }
+  nbr = theMesh->e2e_getNbr(e, longEdge);
+  if (nbr == -1) // e's longEdge is on physical boundary
+    return edge_bisect(fixNode, otherNode);
+  int nbrOpNode = e2n_getNot(nbr, fixNode, otherNode);
+  double fixEdgeLen = len(fixNode, nbrOpNode);
+  double otherEdgeLen = len(otherNode, nbrOpNode);
+  if ((fixEdgeLen > longEdgeLen) || (otherEdgeLen > longEdgeLen)) { 
+    // longEdge is not nbr's longest edge
+    int newNode = edge_bisect(fixNode, otherNode);
+    int propElem, propNode; // get the element to propagate on
+    if (fixEdgeLen > otherEdgeLen) {
+      propElem = findElementWithNodes(newNode, fixNode, nbrOpNode);
+      propNode = fixNode;
+    }
+    else {
+      propElem = findElementWithNodes(newNode, otherNode, nbrOpNode);
+      propNode = otherNode;
+    }
+    int localChk, nbrChk;
+    localChk = theMod->getfmUtil()->getIdx();
+    //nbrChk = theMod->getfmUtil()->getRemoteIdx(nbr);
+    if (nbr >= 0) // e's neighbor on longEdge is local
+      meshMod[localChk].refine_flip_element_leb(localChk, propElem, propNode, 
+					     newNode, nbrOpNode, longEdgeLen);
+    else { // nbr < -1 so nbr is a ghost of a non-local element
+      int propNodeT = getSharedNodeIdxl(propNode, nbrChk);
+      int newNodeT = getSharedNodeIdxl(newNode, nbrChk);
+      int nbrOpNodeT = (nbrOpNode>=0)?(getSharedNodeIdxl(nbrOpNode, nbrChk)):(getGhostNodeIdxl(nbrOpNode, nbrChk));
+      int propElemT = getGhostElementIdxl(propElem, nbrChk);
+      meshMod[nbrChk].refine_flip_element_leb(localChk, propElemT, propNodeT, 
+					      newNodeT,nbrOpNodeT,longEdgeLen);
+    }
+    return newNode;
+  }
+  else return edge_bisect(fixNode, otherNode); // longEdge is nbr's long edge
+}
+void FEM_Adapt::refine_flip_element_leb(int e, int p, int n1, int n2, double le) 
+{
+  int newNode = refine_element_leb(e);
+  (void) edge_flip(n1, n2);
+  if (len(p, newNode) > le) {
+    int localChk = theMod->getfmUtil()->getIdx();
+    int newElem = findElementWithNodes(newNode, n1, p);
+    meshMod[localChk].refine_flip_element_leb(localChk, newElem, p, n1, 
+					      newNode, le);
+  }
 }
 // ========================  END refine_element_leb ========================
 
@@ -504,6 +564,16 @@ void FEM_Adapt::findAdjData(int n1, int n2, int *e1, int *e2, int *e1n1,
       (*n4) = theMesh->e2n_getNode((*e2), (*e2n3));
     }
   }
+}
+
+int FEM_Adapt::getSharedNodeIdxl(int n, int chk) {
+  return theMod->getfmUtil()->exists_in_IDXL(theMesh, n, chk, 0, -1);
+}
+int FEM_Adapt::getGhostNodeIdxl(int n, int chk) { 
+  return theMod->getfmUtil()->exists_in_IDXL(theMesh, n, chk, 2, -1);
+}
+int FEM_Adapt::getGhostElementIdxl(int e, int chk) { 
+  return theMod->getfmUtil()->exists_in_IDXL(theMesh, e, chk, 4, 0);
 }
 
 void FEM_Adapt::printAdjacencies(int *nodes, int numNodes, int *elems, int numElems) {

@@ -28,6 +28,7 @@ The mesh must be in a consistant state before and after these operations:
 #include "cklists.h"
 #include "mpi.h"
 #include "fem_mesh.h"
+#include "fem_adapt_new.h"
 #include "idxl.h"
 #include "FEMMeshModify.decl.h"
 
@@ -99,6 +100,8 @@ class FEM_MUtil {
   void removeNodeAll(FEM_Mesh *m, int localIdx);
   void removeNodeRemote(FEM_Mesh *m, int chk, int sharedIdx);
   int exists_in_IDXL(FEM_Mesh *m, int localIdx, int chk, int type, int elemType=0);
+  // IMPLEMENT ME!!!!
+  int lookup_in_IDXL(FEM_Mesh *m, int sharedIdx, int fromChk, int type, int elemType=0) { printf("IMPLEMENT ME: FEM_MUtil::lookup_in_IDXL !!!!\n"); return -1; }
 
   void addGhostElementRemote(FEM_Mesh *m, int chk, int elemType, int numGhostIndices, int *ghostIndices, int numSharedIndices, int *sharedIndices, int connSize);
   chunkListMsg *getChunksSharingGhostNodeRemote(FEM_Mesh *m, int chk, int sharedIdx);
@@ -267,11 +270,13 @@ class femMeshModify : public CBase_femMeshModify {
   friend class FEM_lock;
   friend class FEM_MUtil;
   friend class FEM_Mesh;
+  friend class FEM_Adapt;
 
  protected:
   int numChunks;
   int idx;
   FEM_Mesh *fmMesh;
+  FEM_Adapt *fmAdapt;
   FEM_lock *fmLock;
   FEM_MUtil *fmUtil;
 
@@ -296,6 +301,10 @@ class femMeshModify : public CBase_femMeshModify {
 
   void removeGhostElem(removeGhostElemMsg *fm);
   void removeElementRemote(removeElemMsg *fm);
+
+  void refine_flip_element_leb(int fromChk, int propElemT, int propNodeT,
+			       int newNodeT, int nbrOpNodeT, 
+			       double longEdgeLen);
 };
 
 

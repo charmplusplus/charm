@@ -39,5 +39,6 @@ module FEMMeshModify {
     entry [sync,threaded] void addElementRemote(addElemMsg *fm);
     entry [sync,threaded] void removeGhostElem(removeGhostElemMsg *);
     entry [sync,threaded] void removeElementRemote(removeElemMsg *);
+    entry void refine_flip_element_leb(int, int, int, int, int, double);
   };
 };

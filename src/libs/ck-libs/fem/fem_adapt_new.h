@@ -12,13 +12,15 @@
 
 class FEM_Adapt {
   FEM_Mesh *theMesh;
-
+  femMeshModify *theMod;
   // Helper methods: see bottom of this file
   /// Check if e1 and e3 are on the same side of edge path (n1, n, n2)
   /** Makes use of ordering of nodes in e1 to check is e3 is on the same side
       of the path of edges (n1, n) and (n, n2) **/
   int check_orientation(int e1, int e3, int n, int n1, int n2);
  public:
+  typedef double (*edgeLengthFn)(int, int);
+  edgeLengthFn len;
   /// Map a pair of element-local node numberings to an element-local edge 
   /// numbering
   /** Given two element-local node numberings (i.e. 0, 1, 2 for triangular 
@@ -35,9 +37,36 @@ class FEM_Adapt {
   void findAdjData(int n1, int n2, int *e1, int *e2, int *e1n1, int *e1n2, 
 		   int *e1n3, int *e2n1, int *e2n2, int *e2n3, int *n3, 
 		   int *n4);
+  int e2n_getNot(int e, int n1, int n2) {
+    int eConn[3];
+    theMesh->e2n_getAll(e, eConn);
+    for (int i=0; i<3; i++) 
+      if ((eConn[i] != n2) && (eConn[i] != n2)) return eConn[i];
+  }
+  int n2e_exists(int n, int e) {
+    int *nConn, nSz;
+    theMesh->n2e_getAll(n, &nConn, &nSz);
+    for (int i=0; i<nSz; i++) 
+      if (nConn[i] == e) return 1;
+    return 0;
+  }
+  int findElementWithNodes(int n1, int n2, int n3) {
+    int *nConn, nSz;
+    theMesh->n2e_getAll(n1, &nConn, &nSz);
+    for (int i=0; i<nSz; i++) {
+      if ((n2e_exists(n2, nConn[i])) && (n2e_exists(n3, nConn[i]))) {
+	return nConn[i];
+      }
+    }
+  }
+  int getSharedNodeIdxl(int n, int chk);
+  int getGhostNodeIdxl(int n, int chk);
+  int getGhostElementIdxl(int e, int chk);
 
   /// Initialize FEM_Adapt with a chunk of the mesh
-  FEM_Adapt(FEM_Mesh *m) { theMesh = m; }
+  FEM_Adapt(FEM_Mesh *m, femMeshModify *fm) { theMesh = m; theMod = fm; }
+  /// Set the default edgeLengthFn len
+  void FEM_Adapt_SetEdgeLengthFn(edgeLengthFn f) { len = f; }
   /// Perform a Delaunay flip of edge (n1, n2)
   /** Perform a Delaunay flip of edge (n1, n2) returning 1 if successful, 0 if 
       not (likely due to the edge being on a boundary).  The convexity of the 
@@ -91,7 +120,8 @@ class FEM_Adapt {
       throughout the mesh to maintain the requirement that only longest edges
       are bisected; returns 1 if successful, 0 if not **/
   virtual int refine_element_leb(int e);
-
+  virtual void refine_flip_element_leb(int e, int p, int n1, int n2, 
+				       double le);
   virtual void printAdjacencies(int *nodes, int numNodes, int *elems, int numElems);
 };
 
