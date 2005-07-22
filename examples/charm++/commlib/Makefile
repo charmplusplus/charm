@@ -1,6 +1,4 @@
-DIRS=hello integrate integrate2 integrateArray \
-	piArray queens RedExample \
-	ring rings speeds commlib
+DIRS=multicast
 
 all: 
 	for d in $(DIRS); do \
