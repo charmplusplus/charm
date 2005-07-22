@@ -72,6 +72,18 @@ CDECL void FEM_Print_n2n(int mesh, int nodeid){
   if(sz!=0) delete[] adjnodes;  
   CkPrintf("\n");
 }
+
+void FEM_MUtil::FEM_Print_n2n(FEM_Mesh *m, int nodeid){
+  CkPrintf("node %d is adjacent to nodes:", nodeid);
+  int *adjnodes;
+  int sz;
+  m->n2n_getAll(nodeid, &adjnodes, &sz); 
+  for(int i=0;i<sz;i++)
+	CkPrintf(" %d", adjnodes[i]);
+  if(sz!=0) delete[] adjnodes;  
+  CkPrintf("\n");
+}
+
 CDECL void FEM_Print_n2e(int mesh, int eid){
   FEM_Mesh *m=FEM_Mesh_lookup(mesh,"FEM_Print_Mesh_Summary");
   CkPrintf("node %d is adjacent to elements:", eid);
@@ -84,6 +96,18 @@ CDECL void FEM_Print_n2e(int mesh, int eid){
   CkPrintf("\n");
 }
 
+void FEM_MUtil::FEM_Print_n2e(FEM_Mesh *m, int eid){
+  CkPrintf("node %d is adjacent to elements:", eid);
+  int *adjes;
+  int sz;
+  m->n2e_getAll(eid, &adjes, &sz);
+  for(int i=0;i<sz;i++)
+	CkPrintf(" %d", adjes[i]);
+  if(sz!=0) delete[] adjes;
+  CkPrintf("\n");
+}
+
+
 // WARNING THESE TWO FUNCTIONS ONLY WORK ON TRIANGULAR ELEMENTS...
 CDECL void FEM_Print_e2n(int mesh, int eid){
   FEM_Mesh *m=FEM_Mesh_lookup(mesh,"FEM_Print_Mesh_Summary");
@@ -94,8 +118,27 @@ CDECL void FEM_Print_e2n(int mesh, int eid){
 	CkPrintf(" %d", adjns[i]);
   CkPrintf("\n");
 }
+
+void FEM_MUtil::FEM_Print_e2n(FEM_Mesh *m, int eid){
+  CkPrintf("element %d is adjacent to nodes:", eid);
+  int adjns[3];
+  m->e2n_getAll(eid, adjns, 0); 
+  for(int i=0;i<3;i++)
+	CkPrintf(" %d", adjns[i]);
+  CkPrintf("\n");
+}
+
 CDECL void FEM_Print_e2e(int mesh, int eid){
   FEM_Mesh *m=FEM_Mesh_lookup(mesh,"FEM_Print_Mesh_Summary");
+  CkPrintf("element %d is adjacent to elements:", eid);
+  int adjes[3];
+  m->e2e_getAll(eid, adjes, 0); 
+  for(int i=0;i<3;i++)
+	CkPrintf(" %d", adjes[i]);
+  CkPrintf("\n");
+}
+
+void FEM_MUtil::FEM_Print_e2e(FEM_Mesh *m, int eid){
   CkPrintf("element %d is adjacent to elements:", eid);
   int adjes[3];
   m->e2e_getAll(eid, adjes, 0); 
@@ -184,6 +227,8 @@ void FEM_remove_node_local(FEM_Mesh *m, int node) {
 // Should probably be able to handle ghosts someday, but I cannot 
 // remember the reasoning for not allowing them
 void FEM_remove_node(FEM_Mesh *m, int node){
+
+  if(node == -1) return; // -1 is not even a valid ghost number
 
   if(FEM_Is_ghost_index(node))
     CkAbort("Cannot call FEM_remove_node on a ghost node\n");
@@ -280,6 +325,8 @@ void FEM_remove_element_local(FEM_Mesh *m, int element, int etype){
 
 // Can be called on local or ghost elements
 void FEM_remove_element(FEM_Mesh *m, int elementid, int elemtype){
+
+  if(elementid == -1) return; // -1 is not even a valid ghost number
 
   if(FEM_Is_ghost_index(elementid)){
     // remove local ghost element
@@ -811,31 +858,35 @@ int FEM_lock::lock(int numNodes, int *nodes, int numElems, int* elems, int elemT
   while(!done) {
     if(!isLocked || (isLocked && isOwner)) {
       for(int i=0; i<numNodes; i++) {
-	if(i==0) { //lock myself
+	if(i==0) { //lock myself, just once
 	  if(!existsChunk(idx)) {
 	    lockedChunks.push_back(idx);
 	  }
 	}
 	//which chunk does this belong to
 	//add that chunk to the lock list, if it does not exist already.
-	int numchunks;
-	IDXL_Share **chunks1;
-	mmod->fmUtil->getChunkNos(0,nodes[i],&numchunks,&chunks1);
-	for(int j=0; j<numchunks; j++) {
-	  if(!existsChunk(chunks1[j]->chk)) {
-	    lockedChunks.push_back(chunks1[j]->chk);
+	if(nodes[i] != -1) {
+	  int numchunks;
+	  IDXL_Share **chunks1;
+	  mmod->fmUtil->getChunkNos(0,nodes[i],&numchunks,&chunks1);
+	  for(int j=0; j<numchunks; j++) {
+	    if(!existsChunk(chunks1[j]->chk)) {
+	      lockedChunks.push_back(chunks1[j]->chk);
+	    }
 	  }
 	}
       }
       for(int i=0; i<numElems; i++) {
 	//which chunk does this belong to
 	//add that chunk to the lock list, if not already in it.
-	int numchunks;
-	IDXL_Share **chunks1;
-	mmod->fmUtil->getChunkNos(1,elems[i],&numchunks,&chunks1,elemType);
-	for(int j=0; j<numchunks; j++) {
-	  if(!existsChunk(chunks1[j]->chk)) {
-	    lockedChunks.push_back(chunks1[j]->chk);
+	if(elems[i] != -1) {
+	  int numchunks;
+	  IDXL_Share **chunks1;
+	  mmod->fmUtil->getChunkNos(1,elems[i],&numchunks,&chunks1,elemType);
+	  for(int j=0; j<numchunks; j++) {
+	    if(!existsChunk(chunks1[j]->chk)) {
+	      lockedChunks.push_back(chunks1[j]->chk);
+	    }
 	  }
 	}
       }

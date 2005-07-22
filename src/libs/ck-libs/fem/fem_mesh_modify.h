@@ -106,6 +106,10 @@ class FEM_MUtil {
   void addElemRemote(FEM_Mesh *m, int chk, int elemtype, int connSize, int *conn, int numGhostIndex, int *ghostIndices);
   void removeGhostElementRemote(FEM_Mesh *m, int chk, int elementid, int elemtype, int numGhostIndex, int *ghostIndices);
   void removeElemRemote(FEM_Mesh *m, int chk, int elementid, int elemtype);
+  void FEM_Print_n2n(FEM_Mesh *m, int nodeid);
+  void FEM_Print_n2e(FEM_Mesh *m, int nodeid);
+  void FEM_Print_e2n(FEM_Mesh *m, int eid);
+  void FEM_Print_e2e(FEM_Mesh *m, int eid);
 };
 
 class femMeshModMsg : public CMessage_femMeshModMsg {

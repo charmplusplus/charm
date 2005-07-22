@@ -9,6 +9,7 @@
 #include "fem_mesh.h"
 #include "fem_mesh_modify.h"
 
+
 class FEM_Adapt {
   FEM_Mesh *theMesh;
 
@@ -90,6 +91,8 @@ class FEM_Adapt {
       throughout the mesh to maintain the requirement that only longest edges
       are bisected; returns 1 if successful, 0 if not **/
   virtual int refine_element_leb(int e);
+
+  virtual void printAdjacencies(int *nodes, int numNodes, int *elems, int numElems);
 };
 
 
