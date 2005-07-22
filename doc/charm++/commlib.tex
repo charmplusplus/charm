@@ -54,7 +54,7 @@ The creation of all the strategies needed, and their registration must be done
 in the constructor of the mainchare (for more on array creation see
 \ref{advanced array create}):
 
-\begin{verbatim}
+\begin{alltt}
   // Create the array
   aproxy = CProxy\_MyArray::ckNew();
 
@@ -69,7 +69,7 @@ in the constructor of the mainchare (for more on array creation see
   ComlibAssociateProxy(strategy, comlibproxy);
 
   cinst = ComlibRegister(strategy);
-\end{verbatim}
+\end{alltt}
 
 In this example, after dproxy has been associated with commlib it can only be
 used with commlib, and cannot send anymore regular messages. For this, if
@@ -114,7 +114,7 @@ ComlibAssociateProxy (ComlibInstanceHandle *cinst, CProxy &proxy);
 
 %% \begin{enumerate}
 %% \item main.C global
-%% \begin{verbatim}
+%% \begin{alltt}
 %% // Include the appropriate header file
 %% #include <EachToManyMulticastStrategy.h>
 %% #include <StreamingStrategy.h>
@@ -122,10 +122,10 @@ ComlibAssociateProxy (ComlibInstanceHandle *cinst, CProxy &proxy);
 %% // Declare the global variable
 %% CProxy_MyArray aproxy;
 %% CProxy_MyArray dproxy;
-%% \end{verbatim}
+%% \end{alltt}
 
 %% \item main.C:main()
-%% \begin{verbatim}
+%% \begin{alltt}
 %% // Create the array
 %% aproxy = CProxy_Hello::ckNew();
 
@@ -138,7 +138,7 @@ ComlibAssociateProxy (ComlibInstanceHandle *cinst, CProxy &proxy);
 %% // while dproxy uses it
 %% dproxy = aproxy;
 %% ComlibAssociateProxy(strategy, dproxy);
-%% \end{verbatim}
+%% \end{alltt}
 
 %% \item In the array element
 %% \begin{alltt}
@@ -164,7 +164,7 @@ ComlibAssociateProxy (ComlibInstanceHandle *cinst, CProxy &proxy);
 
 %% \begin{enumerate}
 %% \item main.C global
-%% \begin{verbatim}
+%% \begin{alltt}
 %% // Include the appropriate header file
 %% #include <EachToManyMulticastStrategy.h>
 %% #include <StreamingStrategy.h>
@@ -172,10 +172,10 @@ ComlibAssociateProxy (ComlibInstanceHandle *cinst, CProxy &proxy);
 %% // Declare the global variable
 %% CProxy_MyArray aproxy;
 %% ComlibInstanceHandle cinst;
-%% \end{verbatim}
+%% \end{alltt}
 
 %% \item main.C:main()
-%% \begin{verbatim}
+%% \begin{alltt}
 %% // Create the array
 %% aproxy = CProxy_Hello::ckNew();
 
@@ -189,10 +189,10 @@ ComlibAssociateProxy (ComlibInstanceHandle *cinst, CProxy &proxy);
 
 %% // Register the strategy
 %% cinst.setStrategy(strategy);
-%% \end{verbatim}
+%% \end{alltt}
 
 %% \item In the array element 
-%% \begin{verbatim}
+%% \begin{alltt}
 %% // Before calling an entry method whose message should go thorough the
 %% // library the proxy has to be delegated. Create a new copy of the
 %% // proxy and delegate it before using it.
@@ -205,7 +205,7 @@ ComlibAssociateProxy (ComlibInstanceHandle *cinst, CProxy &proxy);
 %% .....
 %% aproxy[index].entry2();       // Send a message without commlib
 %% cinst.endIteration();         // Only for bracketed strategies
-%% \end{verbatim}
+%% \end{alltt}
 %% \end{enumerate}
 
 %% \subsubsection{Sections}
@@ -238,35 +238,35 @@ element. This can be done by calling ComlibResetProxy for array proxies and
 ComlibResetSectionProxy for section proxies. This calls need to be made in
 resumeFromSync.
 
-\begin{verbatim}
+\begin{alltt}
   void arrayelement::resumeFromSync() {
       .......
       .......
       ComlibResetProxy(comlibproxy);
       ComlibResetSectionProxy(mysection);
   }
-\end{verbatim}
+\end{alltt}
 
 A migrating array element containing {\em associated proxies} or {\em
 instances} should pup them all at the source and destination.
 
-\begin{verbatim}
+\begin{alltt}
   void arrayelement::pup(PUP::er &p){
       ..........
       ..........
       p | mysection;
       p | cinst;
   }
-\end{verbatim}
+\end{alltt}
 
 
 \subsubsection{Compiling User Code}
 
 All user programs that use the communcation library should use the
 linker option {\textrm{-module comlib}. For example,
-\begin{verbatim}
+\begin{alltt}
 charmc -o pgm pgm.o -module comlib
-\end{verbatim}
+\end{alltt}
 
 
 \subsubsection{Supported Operations and Strategies}
@@ -399,14 +399,14 @@ allow to specify the many-to-many behaviour, passing the lists of source and
 destination elements participating in the operation. If they are left to the
 default value, the collective is an all-to-all.
 
-\begin{verbatim}
+\begin{alltt}
 EachToManyMulticastStrategy(int substrategy, int nsrcpes=0, int *srcpelist=0,
                             int ndestpes=0, int *destpelist=0);
 
 EachToManyMulticastStrategy(int substrategy, CkArrayID src, CkArrayID dest,
                             int nsrc=0, CkArrayIndexMax *srcelements=0,
                             int ndest=0, CkArrayIndexMax *destelements=0);
-\end{verbatim}
+\end{alltt}
 
 Both have as first parameter the virtual topology that the strategy will use for
 the low level optimization. The possible values are:
@@ -433,9 +433,9 @@ second works for both groups and arrays.
 BroadcastStrategy performs a broadcast through a hypercube (default) or a tree,
 and the constructor is:
 
-\begin{verbatim}
+\begin{alltt}
 BroadcastStrategy(int topology=USE_HYPERCUBE);
-\end{verbatim}
+\end{alltt}
 
 PipeBroadcastStrategy performs a broadcast through a ring or a hypercube
 (default). The characteristic of this strategy is that it fragments the message
@@ -443,10 +443,10 @@ into small chunks that fit a predetermined size (passed as argument to the
 constructor), and it reassembles them before delivery. The constructor
 prototypes for groups and arrays respectively are:
 
-\begin{verbatim}
+\begin{alltt}
 PipeBroadcastStrategy(int topology, CkArrayID aid, int pipeSize=DEFAULT_PIPE);
 PipeBroadcastStrategy(CkGroupID gid, int topology=USE_HYPERCUBE, int pipeSize=DEFAULT_PIPE);
-\end{verbatim}
+\end{alltt}
 
 
 \subsubsection{Section Multicast Strategies}
@@ -471,11 +471,11 @@ These are the subclass strategies that are available:
 
 For these, the constructors are of the form:
 
-\begin{verbatim}
+\begin{alltt}
 DirectMulticastStrategy(CkArrayID aid, int flag=0);
 RingMulticastStrategy(CkArrayID dest_id, int flag=0);
 MultiRingMulticast(CkArrayID dest_id, int flag=0);
-\end{verbatim}
+\end{alltt}
 
 For section multicast, the user must create a section proxy and delegate it to
 the communication library. Invocations on section proxies are passed on to the
@@ -499,9 +499,9 @@ delayed due to the timeout present, it is possible to call
 
 The prototype of the constructor is:
 
-\begin{verbatim}
+\begin{alltt}
 StreamingStrategy(float period\_in\_ms, int nmsgs);
-\end{verbatim}
+\end{alltt}
 
 There are two variants of this strategy:
 
@@ -524,7 +524,7 @@ topologies.
 All processor (\converse) level strategies inherit from the {\em class~Strategy}
 defined below and override its virtual methods.
 
-\begin{verbatim}
+\begin{alltt}
 // Converse or Processor level strategy
 class Strategy : public PUP::able{
 public:
@@ -536,7 +536,7 @@ public:
     virtual void doneInserting();
     virtual void beginProcessing(int nelements);
 };
-\end{verbatim}
+\end{alltt}
 
 The class method {\em insertMessage} is called to deposit messages with the
 strategy. MessageHolder is a wrapper for converse messages. When a processor has
@@ -545,7 +545,7 @@ sent all its messages {\em doneInserting} is invoked on the strategy.
 At the \charmpp{} level, all strategies inherit from the {\em
 class~CharmStrategy} reported here.
 
-\begin{verbatim}
+\begin{alltt}
 // Charm++ or Object level strategy
 class CharmStrategy : public Strategy{
  protected:
@@ -562,7 +562,7 @@ public:
     virtual void doneInserting();
     virtual void beginProcessing(int nelements);
 };
-\end{verbatim}
+\end{alltt}
 
 \charmpp{} level strategies also have to implement the insertMessage and
 doneInserting methods. Here insertMessage takes a CharmMessageHolder which is a
