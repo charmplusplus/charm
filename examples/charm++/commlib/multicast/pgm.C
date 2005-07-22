@@ -1,6 +1,7 @@
 #include <stdlib.h>
 #include <alloca.h>
 #include <time.h>
+#include <string.h>
 
 #include "pgm.h"
 
@@ -32,7 +33,7 @@ Main::Main(CkArgMsg *m) {
   // create the random mapping of sender-receiver
   char **matrix = (char **) alloca(nsrc * sizeof(char*));
   matrix[0] = (char *) alloca(nsrc * ndest * sizeof(char));
-  bzero(matrix[0], nsrc * ndest * sizeof(char));
+  memset(matrix[0], 0, nsrc * ndest * sizeof(char));
   for (int i=1; i<nsrc; ++i) matrix[i] = matrix[i-1] + ndest;
 
   srandom(time(NULL));
