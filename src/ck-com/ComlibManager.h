@@ -10,15 +10,6 @@
 #include "charm++.h"
 #include "convcomlibmanager.h"
 
-#define USE_TREE 1            //Organizes the all to all as a tree
-#define USE_MESH 2            //Virtual topology is a mesh here
-#define USE_HYPERCUBE 3       //Virtual topology is a hypercube
-#define USE_DIRECT 4          //A dummy strategy that directly forwards 
-                              //messages without any processing.
-#define USE_GRID 5            //Virtual topology is a 3d grid
-#define USE_LINEAR 6          //Virtual topology is a linear array
-#define USE_PREFIX 7          //Prefix router to avoid contention
-
 #define CHARM_MPI 0 
 #define MAX_NSTRAT 1024
 #define LEARNING_PERIOD 1000 //Number of iterations after which the
