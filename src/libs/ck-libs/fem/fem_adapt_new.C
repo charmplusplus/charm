@@ -335,6 +335,17 @@ int FEM_Adapt::vertex_split(int n, int n1, int n2, int e1, int e3)
 }
 // ======================  END vertex_split ===================
 
+// =====================  BEGIN refine_element_leb ========================= 
+/* Given an element e, if e's longest edge f is also the longest edge
+   of e's neighbor across f, g, split f by adding a new node in the 
+   center of f, and splitting both e and g into two elements.  If g
+   does not have f as it's longest edge, recursively call refine_element_leb 
+   on g, and start over. */ 
+int refine_element_leb(int e)
+{
+}
+// ========================  END refine_element_leb ========================
+
 // Helpers
 int FEM_Adapt::get_edge_index(int local_node1, int local_node2) 
 {

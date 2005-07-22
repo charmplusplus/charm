@@ -84,6 +84,12 @@ class FEM_Adapt {
       return the id of the newly created node np **/
   virtual int vertex_split(int n, int n1, int n2);
   virtual int vertex_split(int n, int n1, int n2, int e1, int e3);
+
+  /// Initiate instance of Longest Edge Bisection on an element
+  /** Initiate instance of Longest Edge Bisection on element e.  Propagates
+      throughout the mesh to maintain the requirement that only longest edges
+      are bisected; returns 1 if successful, 0 if not **/
+  virtual int refine_element_leb(int e);
 };
 
 
