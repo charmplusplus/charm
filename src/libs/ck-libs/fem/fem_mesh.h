@@ -803,6 +803,11 @@ protected:
 	const FEM_Comm &getGhostRecv(void) const { return ghost->ghostRecv; }
 	FEM_Comm_Holder ghostIDXL; //IDXL interface
 	
+	void addVarIndexAttribute(int code){
+		FEM_VarIndexAttribute *varAttribute = new FEM_VarIndexAttribute(this,code);
+		add(varAttribute);
+	}
+	
 	void print(const char *type,const IDXL_Print_Map &map);
 };
 PUPmarshall(FEM_Entity);

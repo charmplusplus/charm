@@ -1400,7 +1400,6 @@ void FEM_Node::create(int attr,const char *caller) {
 }
 
 
-
 /********************** Elem *****************/
 /// This checker verifies that FEM_Elem::conn's entries are valid node indices.
 class FEM_Elem_Conn_Checker : public FEM_IndexAttribute::Checker {
