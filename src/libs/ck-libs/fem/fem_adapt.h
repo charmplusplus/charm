@@ -12,6 +12,8 @@ class FEM_Adapt {
   int cid;  
   /// Cached pointers to the FEM_IS_VALID arrays of the elements and nodes
   FEM_DataAttribute *nodeValid, *elemValid;
+  /// Return the valid data array for this particular type of entity
+  FEM_DataAttribute *validDataFor(int entityNumber);
 
   // Helper methods: see bottom of this file
   /// Check if e1 and e3 are on the same side of edge path (n1, n, n2)
@@ -30,8 +32,6 @@ class FEM_Adapt {
   void adj_traverse(int n, int startNode, int stopNode, int startElem, 
 		    int stopElem, int *nn, int *ne, int *nodeList,
 		    int *elemList);
-  /// Return the valid data array for this particular type of entity
-  FEM_DataAttribute *validDataFor(int entityNumber);
   /** Find out the first empty slot in a valid data array, mark it valid 
    * and return its index
    * If there is no such slot, add one and set it to valid and return it

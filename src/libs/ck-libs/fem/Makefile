@@ -7,7 +7,7 @@ HEADDEP=$(HEADERS) fem_impl.h
 OBJS=fem.o fem_mesh.o symmetries.o \
 	partition.o map.o fem_compat.o call_init.o \
 	parallel_part.o fem_mesh_modify.o fem_mesh_adjacency.o \
-	fem_adapt_new.o fem_interpolate.o 
+	fem_adapt_new.o fem_interpolate.o
 COMPAT=compat_init.o compat_finit.o compat_driver.o compat_fdriver.o 
 LIB=libmodulefem
 
@@ -70,6 +70,9 @@ fem_compat.o: fem_compat.C $(HEADDEP)
 
 fem_mesh.o: fem_mesh.C $(HEADDEP)
 	$(CHARMC) -c fem_mesh.C
+
+#fem_adapt.o: fem_adapt.C $(HEADDEP)
+#	$(CHARMC) -c fem_adapt.C
 
 fem_adapt_new.o: fem_adapt_new.C $(HEADDEP)
 	$(CHARMC) -c fem_adapt_new.C
