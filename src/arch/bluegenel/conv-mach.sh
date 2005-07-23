@@ -2,7 +2,7 @@ BGL_TYPICAL_FLOOR=/bgl/BlueLight/ppcfloor
 
 BGL_SRC=/bgd-public/chuang10/bglsw
 BGL_INSTALL=/bgd-public/chuang10/bglsw-install
-BGL_FLOOR=/auto/BGX/floor
+BGL_FLOOR=/auto/BGX/ppcfloor
 
 # if no floor set, use typical floor path
 if test -z "$BGL_FLOOR"
@@ -34,6 +34,7 @@ OPTS_LD="$OPTS_LD $BGL_LIB "
 CMK_CPP_CHARM="$BGL_BIN/powerpc-bgl-blrts-gnu-cpp -P"
 CMK_CPP_C="$BGL_BIN/powerpc-bgl-blrts-gnu-cpp -E "
 CMK_CXX="$BGL_BIN/powerpc-bgl-blrts-gnu-g++ $GCC_OPTS "
+CMK_GCXX="$BGL_BIN/powerpc-bgl-blrts-gnu-g++ $GCC_OPTS "
 CMK_CC="$BGL_BIN/powerpc-bgl-blrts-gnu-gcc $GCC_OPTS "
 CMK_CXXPP="$BGL_BIN/powerpc-bgl-blrts-gnu-g++ -E "
 CMK_CF77="$BGL_BIN/powerpc-bgl-blrts-gnu-g77 "

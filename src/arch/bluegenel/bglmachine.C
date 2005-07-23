@@ -341,10 +341,9 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
   _Cmi_numnodes = BLMPI_Messager_size(_msgr);
   _Cmi_mynode = BLMPI_Messager_rank(_msgr);
 
-  /* Eager protocol init */
   _recvArray = (void **) CmiAlloc (sizeof(void *) * _Cmi_numnodes);
 #if EAGER
-  BLMPI_Eager_Init(_msgr, first_pkt_recv_done, _recvArray, 11, 12);
+  BLMPI_Eager_Init(_msgr, first_pkt_recv_done, _recvArray, 14, 15);
 #else
   BLMPI_Rzv_Init(_msgr, first_pkt_recv_done, 11, 12, 3, 13);
 #endif
@@ -464,7 +463,7 @@ static void ConverseRunPE(int everReturn)
     if (!everReturn) {
       Cmi_startfn(CmiGetArgc(CmiMyArgv), CmiMyArgv);
       if (Cmi_usrsched==0) CsdScheduler(-1);
-        ConverseExit();
+      ConverseExit();
     }
   }
 }
@@ -785,10 +784,10 @@ static int PumpMsgs(void){
   return flag; 
 }
 static void AdvanceCommunications(void){
-  while(outstanding_recvs){
+  while(msgQueueLen>request_max){
     BLMPI_Messager_advance(_msgr);
   }
-  while(msgQueueLen>request_max){
+  while(outstanding_recvs){
     BLMPI_Messager_advance(_msgr);
   }
   while(BLMPI_Messager_advance(_msgr)) ;
@@ -887,12 +886,8 @@ void          CmiSyncListSendFn(int npes, int *pes, int size, char *msg){
 void          CmiFreeListSendFn(int npes, int *pes, int size, char *msg){
   CMI_SET_BROADCAST_ROOT(msg,0);
   for(int i=0;i<npes;i++){
-#if 0
     CmiReference(msg);
     CmiGeneralFreeSend(pes[i],size,msg);
-#else
-    CmiSyncSendFn(pes[i],size,msg);
-#endif
   }
   CmiFree(msg);
 }
