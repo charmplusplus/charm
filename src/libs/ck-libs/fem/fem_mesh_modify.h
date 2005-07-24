@@ -291,6 +291,7 @@ class femMeshModify : public CBase_femMeshModify {
   void setFemMesh(FEMMeshMsg *fm);
   FEM_lock *getfmLock(){return fmLock;}
   FEM_MUtil *getfmUtil(){return fmUtil;}
+  FEM_Adapt *getfmAdapt(){return fmAdapt;}
 
   void addSharedNodeRemote(sharedNodeMsg *fm);
   void removeSharedNodeRemote(removeSharedNodeMsg *fm);

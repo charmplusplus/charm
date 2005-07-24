@@ -330,7 +330,7 @@ void FEM_remove_element(FEM_Mesh *m, int elementid, int elemtype){
 
   if(FEM_Is_ghost_index(elementid)){
     // remove local ghost element
-    FEM_remove_element_local(m, elementid, elemtype);
+    //FEM_remove_element_local(m, elementid, elemtype);
     
     //an element can come as a ghost from only one chunk, so just convert args and call it on that chunk
     int ghostid = FEM_To_ghost_index(elementid);
@@ -365,8 +365,9 @@ void FEM_remove_element(FEM_Mesh *m, int elementid, int elemtype){
     if(irec){
 	  int numSharedChunks = irec->getShared();
 	  for(int i=0; i<numSharedChunks; i++) {
-		int chk = irec->getChk(i);
-		int sharedIdx = irec->getIdx(i);
+	    irec = m->elem[elemtype].ghostSend.getRec(elementid);
+	    int chk = irec->getChk(0);
+		int sharedIdx = irec->getIdx(0);
 		//get the list of n2e for all nodes of this element. If any node has only this element in its list.
 		//it no longer should be a ghost on chk
 		m->elem[elemtype].ghostSend.removeNode(elementid, chk);
@@ -747,6 +748,7 @@ int FEM_add_element(FEM_Mesh *m, int* conn, int connSize, int elemType){
     const IDXL_List ilist = m->elem[elemType].ghost->ghostRecv.getList(remoteChunk);
     int size = ilist.size();
     newEl = ilist[size-1];
+    newEl = FEM_To_ghost_index(newEl);
   }
   else if(ghostcount > 0 && localcount == 0 && sharedcount == 0) { // it is a remote elem with no shared nodes
     //I guess such a situation will never occur
@@ -1060,8 +1062,8 @@ void FEM_MUtil::getChunkNos(int entType, int entNo, int *numChunks, IDXL_Share *
       (*chunks)[i] = new IDXL_Share(idx, -1);
     }
     else if(type == 0) {
-      *numChunks = 1;
-      (*chunks) = (IDXL_Share**)malloc((*numChunks)*sizeof(IDXL_Share*));
+      *numChunks = 0;
+      *chunks = (IDXL_Share**)malloc((*numChunks)*sizeof(IDXL_Share*));
       for(int i=0; i<*numChunks; i++) {
 	int chk = idx; //index of this chunk
 	int index = entNo;
@@ -1086,7 +1088,7 @@ void FEM_MUtil::getChunkNos(int entType, int entNo, int *numChunks, IDXL_Share *
       }
     }
     else if(type == 0) {
-      *numChunks = 1;
+      *numChunks = 0;
       *chunks = (IDXL_Share**)malloc((*numChunks)*sizeof(IDXL_Share*));
       for(int i=0; i<*numChunks; i++) {
 	int chk = idx; //index of this chunk
@@ -1246,6 +1248,7 @@ void FEM_MUtil::addGhostElementRemote(FEM_Mesh *m, int chk, int elemType, int nu
   }
 
   int newGhostElement = FEM_add_element_local(m, conn, connSize, elemType, 1);
+  m->elem[elemType].ghost->ghostRecv.addNode(FEM_To_ghost_index(newGhostElement),chk);
   return;
 }
 
