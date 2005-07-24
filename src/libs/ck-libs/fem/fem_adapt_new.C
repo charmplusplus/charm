@@ -1,6 +1,7 @@
 #include "fem_adapt_new.h"  
 
 #define DEBUG_1
+#define DEBUG_2
 
 // ======================  BEGIN edge_flip  =================================
 /* Perform a Delaunay flip of the edge (n1, n2) returning 1 if successful, 0 if
@@ -57,13 +58,31 @@ int FEM_Adapt::edge_flip_help(int e1, int e2, int n1, int n2, int e1_n1,
 #endif
 
   FEM_remove_element(theMesh, e1, 0);
+#ifdef DEBUG_2
+  CkPrintf("Adjacencies after remove element %d: conn(%d,%d,%d)\n",e1,n1,n2,n3);
+  lockelems[0] = -1;
+  printAdjacencies(locknodes, numNodes, lockelems, numElems);
+#endif
   FEM_remove_element(theMesh, e2, 0);
+#ifdef DEBUG_2
+  CkPrintf("Adjacencies after remove element %d: conn(%d,%d,%d)\n",e2,n1,n2,n4);
+  lockelems[1] = -1;
+  printAdjacencies(locknodes, numNodes, lockelems, numElems);
+#endif
   // add n1, n3, n4
   conn[e1_n1] = n1;  conn[e1_n2] = n4;  conn[e1_n3] = n3;
   lockelems[0] = FEM_add_element(theMesh, conn, 3, 0);
+#ifdef DEBUG_2
+  CkPrintf("Adjacencies after add element %d: conn(%d,%d,%d)\n",lockelems[0],conn[0],conn[1],conn[2]);
+  printAdjacencies(locknodes, numNodes, lockelems, numElems);
+#endif
   // add n2, n3, n4
   conn[e1_n1] = n4;  conn[e1_n2] = n2;  conn[e1_n3] = n3;
   lockelems[1] = FEM_add_element(theMesh, conn, 3, 0);
+#ifdef DEBUG_2
+  CkPrintf("Adjacencies after add element %d: conn(%d,%d,%d)\n",lockelems[1],conn[0],conn[1],conn[2]);
+  printAdjacencies(locknodes, numNodes, lockelems, numElems);
+#endif
 
 #ifdef DEBUG_1
   CkPrintf("Adjacencies after flip\n");
@@ -138,13 +157,13 @@ int FEM_Adapt::edge_bisect_help(int e1, int e2, int n1, int n2, int e1_n1,
 #endif
 
   FEM_remove_element(theMesh, e1, 0); 
-#ifdef DEBUG_1
+#ifdef DEBUG_2
   CkPrintf("Adjacencies after remove element %d\n",e1);
   lockelems[0] = -1;
   printAdjacencies(locknodes, numNodes, lockelems, numElems);
 #endif
   FEM_remove_element(theMesh, e2, 0);  // assumes intelligent behavior when no e2 exists
-#ifdef DEBUG_1
+#ifdef DEBUG_2
   lockelems[1] = -1;
   CkPrintf("Adjacencies after remove element %d\n",e2);
   printAdjacencies(locknodes, numNodes, lockelems, numElems);
@@ -156,21 +175,21 @@ int FEM_Adapt::edge_bisect_help(int e1, int e2, int n1, int n2, int e1_n1,
   adjnodes[1] = n2;
 
   n5 = FEM_add_node(theMesh,adjnodes,2,0);
-#ifdef DEBUG_1
+#ifdef DEBUG_2
   CkPrintf("Adjacencies after add node %d\n",n5);
   printAdjacencies(locknodes, numNodesNew, lockelems, numElemsNew);
 #endif
   // add n1, n5, n3
   conn[e1_n1] = n1;  conn[e1_n2] = n5;  conn[e1_n3] = n3;
   lockelems[0] = FEM_add_element(theMesh, conn, 3, 0);
-#ifdef DEBUG_1
+#ifdef DEBUG_2
   CkPrintf("Adjacencies after add element %d: conn(%d,%d,%d)\n",lockelems[0],conn[0],conn[1],conn[2]);
   printAdjacencies(locknodes, numNodesNew, lockelems, numElemsNew);
 #endif
   // add n2, n5, n3
   conn[e1_n1] = n5;  conn[e1_n2] = n2;  conn[e1_n3] = n3;
   lockelems[1] = FEM_add_element(theMesh, conn, 3, 0);
-#ifdef DEBUG_1
+#ifdef DEBUG_2
   CkPrintf("Adjacencies after add element %d: conn(%d,%d,%d)\n",lockelems[1],conn[0],conn[1],conn[2]);
   printAdjacencies(locknodes, numNodesNew, lockelems, numElemsNew);
 #endif
@@ -178,20 +197,20 @@ int FEM_Adapt::edge_bisect_help(int e1, int e2, int n1, int n2, int e1_n1,
     // add n1, n5, n4
     conn[e2_n1] = n1;  conn[e2_n2] = n5;  conn[e2_n3] = n4;
     lockelems[2] = FEM_add_element(theMesh, conn, 3, 0);
-#ifdef DEBUG_1
+#ifdef DEBUG_2
   CkPrintf("Adjacencies after add element %d: conn(%d,%d,%d)\n",lockelems[2],conn[0],conn[1],conn[2]);
   printAdjacencies(locknodes, numNodes, lockelems, numElemsNew);
 #endif
     // add n2, n5, n4
     conn[e2_n1] = n5;  conn[e2_n2] = n2;  conn[e2_n3] = n4;
     lockelems[3] = FEM_add_element(theMesh, conn, 3, 0);
-#ifdef DEBUG_1
+#ifdef DEBUG_2
   CkPrintf("Adjacencies after add element %d: conn(%d,%d,%d)\n",lockelems[3],conn[0],conn[1],conn[2]);
   printAdjacencies(locknodes, numNodesNew, lockelems, numElemsNew);
 #endif
   }
 
-#ifdef DEBUG_1
+#ifdef DEBUG_2
   CkPrintf("Adjacencies after bisect\n");
   locknodes[4] = n5;
   printAdjacencies(locknodes, numNodesNew, lockelems, numElemsNew);
@@ -281,21 +300,54 @@ int FEM_Adapt::vertex_remove_help(int e1, int e2, int n1, int n2, int e1_n1,
 #endif
     
     FEM_remove_element(theMesh, e1, 0);
+#ifdef DEBUG_2
+  CkPrintf("Adjacencies after remove element %d\n",e1);
+  lockelems[0] = -1;
+  printAdjacencies(locknodes, numNodes, lockelems, numElems);
+#endif
     FEM_remove_element(theMesh, e3, 0);
+#ifdef DEBUG_2
+  CkPrintf("Adjacencies after remove element %d\n",e3);
+  lockelems[2] = -1;
+  printAdjacencies(locknodes, numNodes, lockelems, numElems);
+#endif
     if (e2 != -1) {
       FEM_remove_element(theMesh, e2, 0);
+#ifdef DEBUG_2
+  CkPrintf("Adjacencies after remove element %d\n",e2);
+  lockelems[1] = -1;
+  printAdjacencies(locknodes, numNodes, lockelems, numElems);
+#endif
       FEM_remove_element(theMesh, e4, 0);
+#ifdef DEBUG_2
+  CkPrintf("Adjacencies after remove element %d\n",e4);
+  lockelems[3] = -1;
+  printAdjacencies(locknodes, numNodes, lockelems, numElems);
+#endif
     }
     FEM_remove_node(theMesh, n1);
+#ifdef DEBUG_2
+  CkPrintf("Adjacencies after remove node %d\n",n1);
+  locknodes[4] = -1;
+  printAdjacencies(locknodes, numNodes, lockelems, numElems);
+#endif
     
     int *conn = (int*)malloc(3*sizeof(int));
     // add n2, n5, n3
     conn[e1_n1] = n2;  conn[e1_n2] = n3;  conn[e1_n3] = n5;
     lockelems[0] = FEM_add_element(theMesh, conn, 3, 0);
+#ifdef DEBUG_2
+  CkPrintf("Adjacencies after add element %d: conn(%d,%d,%d)\n",lockelems[0],conn[0],conn[1],conn[2]);
+  printAdjacencies(locknodes, numNodes, lockelems, numElems);
+#endif
     if (e2 != -1) {
       // add n2, n5, n4
       conn[e2_n1] = n5;  conn[e2_n2] = n4;  conn[e2_n3] = n2;
       lockelems[1] = FEM_add_element(theMesh, conn, 3, 0);
+#ifdef DEBUG_2
+  CkPrintf("Adjacencies after add element %d: conn(%d,%d,%d)\n",lockelems[1],conn[0],conn[1],conn[2]);
+  printAdjacencies(locknodes, numNodes, lockelems, numElems);
+#endif
     }
 
 #ifdef DEBUG_1
