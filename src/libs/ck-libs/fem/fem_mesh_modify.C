@@ -1406,6 +1406,40 @@ void FEM_MUtil::removeElemRemote(FEM_Mesh *m, int chk, int elementid, int elemty
   return;
 }
 
+int FEM_MUtil::lookup_in_IDXL(FEM_Mesh *m, int sharedIdx, int chk, int type, int elemType) {
+  int localIdx  = -1;
+  IDXL_List ll;
+  if(type == 0) { //shared node
+    ll = m->node.shared.getList(chk);
+  }
+  else if(type == 1) { //ghost node send 
+    ll = m->node.ghostSend.getList(chk);
+  }
+  else if(type == 2) { //ghost node recv 
+    ll = m->node.ghost->ghostRecv.getList(chk);
+    sharedIdx = FEM_To_ghost_index(sharedIdx);
+  }
+  else if(type == 3) { //ghost node recv 
+    ll = m->elem[elemType].ghostSend.getList(chk);
+  }
+  else if(type == 4) { //ghost node recv 
+    ll = m->elem[elemType].ghost->ghostRecv.getList(chk);
+    sharedIdx = FEM_To_ghost_index(sharedIdx);
+  }
+  localIdx = ll[sharedIdx];
+  return localIdx;
+}
+
+int FEM_MUtil::getRemoteIdx(FEM_Mesh *m, int elementid, int elemtype) {
+  CkAssert(elementid < -1);
+  int ghostid = FEM_To_ghost_index(elementid);
+  const IDXL_Rec *irec = m->elem[elemtype].ghost->ghostRecv.getRec(ghostid);
+  int size = irec->getShared();
+  CkAssert(size == 1);
+  int remoteChunk = irec->getChk(0);
+  int sharedIdx = irec->getIdx(0);
+  return remoteChunk;
+}
 
 femMeshModify::femMeshModify(femMeshModMsg *fm) {
   numChunks = fm->numChunks;

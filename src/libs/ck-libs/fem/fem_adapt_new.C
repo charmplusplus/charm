@@ -571,7 +571,7 @@ int FEM_Adapt::refine_element_leb(int e)
     }
     int localChk, nbrChk;
     localChk = theMod->getfmUtil()->getIdx();
-    //nbrChk = theMod->getfmUtil()->getRemoteIdx(nbr);
+    nbrChk = theMod->getfmUtil()->getRemoteIdx(theMesh,nbr,0);
     if (nbr >= 0) // e's neighbor on longEdge is local
       meshMod[localChk].refine_flip_element_leb(localChk, propElem, propNode, 
 					     newNode, nbrOpNode, longEdgeLen);

@@ -100,8 +100,9 @@ class FEM_MUtil {
   void removeNodeAll(FEM_Mesh *m, int localIdx);
   void removeNodeRemote(FEM_Mesh *m, int chk, int sharedIdx);
   int exists_in_IDXL(FEM_Mesh *m, int localIdx, int chk, int type, int elemType=0);
-  // IMPLEMENT ME!!!!
-  int lookup_in_IDXL(FEM_Mesh *m, int sharedIdx, int fromChk, int type, int elemType=0) { printf("IMPLEMENT ME: FEM_MUtil::lookup_in_IDXL !!!!\n"); return -1; }
+
+  int lookup_in_IDXL(FEM_Mesh *m, int sharedIdx, int fromChk, int type, int elemType=0);
+  int getRemoteIdx(FEM_Mesh *m, int elementid, int elemtype);
 
   void addGhostElementRemote(FEM_Mesh *m, int chk, int elemType, int numGhostIndices, int *ghostIndices, int numSharedIndices, int *sharedIndices, int connSize);
   chunkListMsg *getChunksSharingGhostNodeRemote(FEM_Mesh *m, int chk, int sharedIdx);
