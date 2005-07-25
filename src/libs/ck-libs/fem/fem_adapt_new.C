@@ -49,6 +49,9 @@ int FEM_Adapt::edge_flip_help(int e1, int e2, int n1, int n2, int e1_n1,
   lockelems[0] = e1;
   lockelems[1] = e2;
 
+  //currently we do not move chunk boundaries, so we do not flip edges in which one of the 4 nodes of the quadrilateral is a ghost node.
+  if(n1 < 0 || n2 < 0 || n3 < 0 || n4 < 0) return -1;
+
   FEM_Modify_Lock(theMesh, locknodes, numNodes, lockelems, numElems);
 
 #ifdef DEBUG_1
@@ -401,35 +404,99 @@ int FEM_Adapt::edge_contraction_help(int e1, int e2, int n1, int n2, int e1_n1,
   int *adjnodes = (int*)malloc(2*sizeof(int));
   adjnodes[0] = n1;
   adjnodes[1] = n2;
-  int n5 = FEM_add_node(theMesh,adjnodes,2,0);
+  int *adjelems = (int*)malloc(2*sizeof(int));
+  adjelems[0] = e1;
+  adjelems[1] = e2;
 
+  FEM_Modify_Lock(theMesh, adjnodes, 2, adjelems, 2);
+#ifdef DEBUG_1
+  CkPrintf("Edge Contraction, edge %d->%d on chunk %d\n", n1, n2, theMod->getfmUtil()->getIdx());
+  CkPrintf("Adjacencies before edge contract\n");
+  printAdjacencies(adjnodes, 2, adjelems, 2);
+#endif
+  FEM_remove_element(theMesh, e1, 0);
+#ifdef DEBUG_2
+  CkPrintf("Adjacencies after remove element %d\n",e1);
+  printAdjacencies(adjnodes, 2, adjelems, 2);
+#endif
+  FEM_remove_element(theMesh, e2, 0);
+#ifdef DEBUG_2
+  CkPrintf("Adjacencies after remove element %d\n",e2);
+  printAdjacencies(adjnodes, 2, adjelems, 2);
+#endif
+  int n5 = FEM_add_node(theMesh,adjnodes,2,0);
+#ifdef DEBUG_2
+  CkPrintf("Adjacencies after add node %d\n",n5);
+  printAdjacencies(adjnodes, 2, adjelems, 2);
+#endif
+  //FEM_Modify_Unlock(theMesh);
+
+  int *nbrElems1, nesize1, *nbrElems2, nesize2;
+  theMesh->n2e_getAll(n1, &nbrElems1, &nesize1);
+  theMesh->n2e_getAll(n2, &nbrElems2, &nesize2);
+
+  //FEM_Modify_Lock(theMesh, nbrElems1, 0, nbrElems1, nesize1);
   // delete/add surrounding elements
-  int *nbrElems, nesize;
-  theMesh->n2e_getAll(n1, &nbrElems, &nesize);
-  for (int i=0; i<nesize; i++) {
-    if ((nbrElems[i] != e1) && (nbrElems[i] != e2)) {
-      theMesh->e2n_getAll(nbrElems[i], conn);
+  for (int i=0; i<nesize1; i++) {
+    if ((nbrElems1[i] != e1) && (nbrElems1[i] != e2)) {
+      theMesh->e2n_getAll(nbrElems1[i], conn);
       for (int j=0; j<3; j++) 
 	if (conn[j] == n1) conn[j] = n5;
-      FEM_remove_element(theMesh, nbrElems[i], 0);
-      (void) FEM_add_element(theMesh, conn, 3, 0);
+      FEM_remove_element(theMesh, nbrElems1[i], 0);
+#ifdef DEBUG_2
+      CkPrintf("Adjacencies after remove element %d\n",nbrElems1[i]);
+      printAdjacencies(nbrElems1, 0, nbrElems1, nesize1);
+#endif
+      nbrElems1[i] = FEM_add_element(theMesh, conn, 3, 0);
+#ifdef DEBUG_2
+      CkPrintf("Adjacencies after add element %d: conn(%d,%d,%d)\n",nbrElems1[i],conn[0],conn[1],conn[2]);
+      printAdjacencies(nbrElems1, 0, nbrElems1, nesize1);
+#endif
     }
   }
-  theMesh->n2e_getAll(n2, &nbrElems, &nesize);
-  for (int i=0; i<nesize; i++) {
-    if ((nbrElems[i] != e1) && (nbrElems[i] != e2)) {
-      theMesh->e2n_getAll(nbrElems[i], conn);
+  //FEM_Modify_Unlock(theMesh);
+
+  //FEM_Modify_Lock(theMesh, nbrElems2, 0, nbrElems2, nesize2);
+  for (int i=0; i<nesize2; i++) {
+    if ((nbrElems2[i] != e1) && (nbrElems2[i] != e2)) {
+      theMesh->e2n_getAll(nbrElems2[i], conn);
       for (int j=0; j<3; j++) 
 	if (conn[j] == n2) conn[j] = n5;
-      FEM_remove_element(theMesh, nbrElems[i], 0);
-      (void) FEM_add_element(theMesh, conn, 3, 0);
+      FEM_remove_element(theMesh, nbrElems2[i], 0);
+#ifdef DEBUG_2
+      CkPrintf("Adjacencies after remove element %d\n",nbrElems2[i]);
+      printAdjacencies(nbrElems2, 0, nbrElems2, nesize2);
+#endif
+      nbrElems2[i] = FEM_add_element(theMesh, conn, 3, 0);
+#ifdef DEBUG_2
+      CkPrintf("Adjacencies after add element %d: conn(%d,%d,%d)\n",nbrElems2[i],conn[0],conn[1],conn[2]);
+      printAdjacencies(nbrElems2, 0, nbrElems2, nesize2);
+#endif
     }
   }
+  //FEM_Modify_Unlock(theMesh);
 
-  FEM_remove_element(theMesh, e1, 0);
-  FEM_remove_element(theMesh, e2, 0);
+  //FEM_Modify_Lock(theMesh, adjnodes, 2, adjelems, 0);
   FEM_remove_node(theMesh, n1);
+#ifdef DEBUG_2
+  CkPrintf("Adjacencies after remove node %d\n",n1);
+  printAdjacencies(adjnodes, 2, adjelems, 0);
+#endif
   FEM_remove_node(theMesh, n2);
+#ifdef DEBUG_2
+  CkPrintf("Adjacencies after remove node %d\n",n2);
+  printAdjacencies(adjnodes, 2, adjelems, 0);
+#endif
+#ifdef DEBUG_1
+  CkPrintf("Adjacencies after edge contract\n");
+  adjnodes[0] = n5;
+  adjnodes[1] = -1;
+  adjelems[0] = -1;
+  adjelems[1] = -1;
+  printAdjacencies(adjnodes, 2, adjelems, 0);
+#endif
+  FEM_Modify_Unlock(theMesh);
+
   return 1;
 }
 // ======================  END edge_contraction  ==============================
@@ -478,12 +545,35 @@ int FEM_Adapt::vertex_split(int n, int n1, int n2, int e1, int e3)
     e3_n2 = find_local_node_index(e3, n2);
   }
 
-  int *adjnodes = (int*)malloc(2*sizeof(int));
-  adjnodes[0] = n1; //not correct at all... correct this
-  adjnodes[1] = n2;
-  int np = FEM_add_node(theMesh,adjnodes,2,0);
-  int *conn = (int*)malloc(3*sizeof(int));
+  int *locknodes = (int*)malloc(4*sizeof(int));
+  locknodes[0] = n1;
+  locknodes[1] = n;
+  locknodes[2] = n2;
+  locknodes[3] = -1;
+  int *lockelems = (int*)malloc(6*sizeof(int));
+  lockelems[0] = e1;
+  lockelems[1] = e2;
+  lockelems[2] = e3;
+  lockelems[3] = e4;
+  lockelems[4] = -1;
+  lockelems[5] = -1;
 
+  FEM_Modify_Lock(theMesh, locknodes, 4, lockelems, 6);
+#ifdef DEBUG_1
+  CkPrintf("VErtex Split, %d-%d-%d on chunk %d\n", n1, n, n2, theMod->getfmUtil()->getIdx());
+  CkPrintf("Adjacencies before vertex split\n");
+  printAdjacencies(locknodes, 4, lockelems, 4);
+#endif
+  int *adjnodes = (int*)malloc(2*sizeof(int));
+  adjnodes[0] = n; //looks like it will never be shared, since according to later code, all n1, n & n2 should be local.. appears to be not correct
+  int np = FEM_add_node(theMesh,adjnodes,1,0);
+  locknodes[3] = np;
+#ifdef DEBUG_2
+  CkPrintf("Adjacencies after add node %d\n",np);
+  printAdjacencies(locknodes, 4, lockelems, 6);
+#endif
+
+  int *conn = (int*)malloc(3*sizeof(int));
   int current, next, nt, nl, eknp, eknt, eknl;
   // traverse elements on one side of n starting with e2
   current = e2;
@@ -495,9 +585,17 @@ int FEM_Adapt::vertex_split(int n, int n1, int n2, int e1, int e3)
     next = theMesh->e2e_getNbr(current, get_edge_index(eknp, eknl));
     nl = theMesh->e2n_getNode(current, eknl);
     FEM_remove_element(theMesh, current, 0);
+#ifdef DEBUG_2
+    CkPrintf("Adjacencies after remove element %d\n",current);
+    printAdjacencies(locknodes, 4, lockelems, 6);
+#endif
     // add nl, nt, np
     conn[eknp] = np; conn[eknt] = nt; conn[eknl] = nl;
-    (void) FEM_add_element(theMesh, conn, 3, 0);
+    int newelem = FEM_add_element(theMesh, conn, 3, 0);
+#ifdef DEBUG_2
+    CkPrintf("Adjacencies after add element %d: conn(%d,%d,%d)\n",newelem,conn[0],conn[1],conn[2]);
+    printAdjacencies(locknodes, 4, lockelems, 6);
+#endif
     nt = nl;
     current = next;
   }
@@ -512,19 +610,42 @@ int FEM_Adapt::vertex_split(int n, int n1, int n2, int e1, int e3)
       next = theMesh->e2e_getNbr(current, get_edge_index(eknp, eknl));
       nl = theMesh->e2n_getNode(current, eknl);
       FEM_remove_element(theMesh, current, 0);
+#ifdef DEBUG_2
+      CkPrintf("Adjacencies after remove element %d\n",current);
+      printAdjacencies(locknodes, 4, lockelems, 6);
+#endif
       // add nl, nt, np
       conn[eknp] = np; conn[eknt] = nt; conn[eknl] = nl;
-      (void) FEM_add_element(theMesh, conn, 3, 0);
+      int newelem = FEM_add_element(theMesh, conn, 3, 0);
+#ifdef DEBUG_2
+    CkPrintf("Adjacencies after add element %d: conn(%d,%d,%d)\n",newelem,conn[0],conn[1],conn[2]);
+    printAdjacencies(locknodes, 4, lockelems, 6);
+#endif
       nt = nl;
       current = next;
     }
   }
+
   // add n, n1, np
   conn[e1_n] = n; conn[e1_n1] = n1; conn[3 - e1_n - e1_n1] = np;
-  (void) FEM_add_element(theMesh, conn, 3, 0);
+  lockelems[4] = FEM_add_element(theMesh, conn, 3, 0);
+#ifdef DEBUG_2
+  CkPrintf("Adjacencies after add element %d: conn(%d,%d,%d)\n",lockelems[4],conn[0],conn[1],conn[2]);
+  printAdjacencies(locknodes, 4, lockelems, 6);
+#endif
   // add n, n2, np
   conn[e3_n] = n; conn[e3_n2] = n2; conn[3 - e3_n - e3_n2] = np;
-  (void) FEM_add_element(theMesh, conn, 3, 0);
+  lockelems[5] = FEM_add_element(theMesh, conn, 3, 0);
+#ifdef DEBUG_2
+  CkPrintf("Adjacencies after add element %d: conn(%d,%d,%d)\n",lockelems[5],conn[0],conn[1],conn[2]);
+  printAdjacencies(locknodes, 4, lockelems, 6);
+#endif
+#ifdef DEBUG_1
+  CkPrintf("Adjacencies after vertex split\n");
+  printAdjacencies(locknodes, 4, lockelems, 4);
+#endif
+  FEM_Modify_Unlock(theMesh);
+
   return np;
 }
 // ======================  END vertex_split ===================
