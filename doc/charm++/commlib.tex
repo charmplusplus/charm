@@ -23,7 +23,8 @@ and associate it with that strategy. In order to use the framework, the
 receiving entry methods need to receive messages (see \ref{messages}), and not
 marshalled parameters. The user can create several instances of the same or
 different strategies, to optimize different communication calls in the
-application.
+application. In order to access the class signatures, the file ``comlib.h''
+should be included.
 
 Each communication operation is associate with a proxy, through which the
 message was sent. These proxies can be associated in the mainchare constructor
