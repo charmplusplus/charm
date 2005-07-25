@@ -1,7 +1,4 @@
-#include "ComlibManager.h"
-#include "DirectMulticastStrategy.h"
-#include "RingMulticastStrategy.h"
-#include "MultiRingMulticast.h"
+#include "comlib.h"
 
 #include "pgm.decl.h"
 
