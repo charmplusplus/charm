@@ -8,7 +8,7 @@
 #ifndef _DE_H
 #define _DE_H
 #include <converse.h>
-#include "comlib.h"
+#include "convcomlib.h"
 #include "petable.h"
 
 //Dimensional Exchange (Hypercube) based router

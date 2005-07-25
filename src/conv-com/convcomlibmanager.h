@@ -12,7 +12,7 @@
 #define CONVCOMLIBMANAGER
 
 #include <converse.h>
-#include "comlib.h"
+#include "convcomlib.h"
 #include <convcomlibstrategy.h>
 
 #define MAX_NUM_STRATS 32

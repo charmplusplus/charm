@@ -8,7 +8,7 @@
 #ifndef TREEROUTER_H
 #define TREEROUTER_H
 #include <converse.h>
-#include "comlib.h"
+#include "convcomlib.h"
 #include "petable.h"
 
 class TreeRouter : public Router

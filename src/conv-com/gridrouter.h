@@ -10,7 +10,7 @@
 
 #include <math.h>
 #include <converse.h>
-#include "comlib.h"
+#include "convcomlib.h"
 #include "petable.h"
 
 #define ROWLEN COLLEN

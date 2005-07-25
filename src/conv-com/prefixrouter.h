@@ -3,7 +3,7 @@
 
 #include <math.h>
 #include <converse.h>
-#include "comlib.h"
+#include "convcomlib.h"
 
 //Prefix router to avoid contention on m,n-tree networks
 

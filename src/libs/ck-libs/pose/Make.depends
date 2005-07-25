@@ -84,7 +84,7 @@ stats.o: stats.C ../../../../include/charm++.h \
   ../../../../include/trace-bluegene.h stats.h stats.decl.h pose_config.h \
   ../../../../include/StreamingStrategy.h \
   ../../../../include/ComlibManager.h ../../../../include/envelope.h \
-  ../../../../include/comlib.h ../../../../include/router.h \
+  ../../../../include/convcomlib.h ../../../../include/router.h \
   ../../../../include/convcomlibmanager.h \
   ../../../../include/ComlibStats.h ../../../../include/comlib.decl.h \
   ../../../../include/MeshStreamingStrategy.h \
@@ -133,7 +133,7 @@ srtable.o: srtable.C ../../../../include/charm++.h \
   ../../../../include/trace-bluegene.h srtable.h pose.h pose.decl.h \
   pose_config.h ../../../../include/StreamingStrategy.h \
   ../../../../include/ComlibManager.h ../../../../include/envelope.h \
-  ../../../../include/comlib.h ../../../../include/router.h \
+  ../../../../include/convcomlib.h ../../../../include/router.h \
   ../../../../include/convcomlibmanager.h \
   ../../../../include/ComlibStats.h ../../../../include/comlib.decl.h \
   ../../../../include/MeshStreamingStrategy.h \
@@ -186,7 +186,7 @@ cancel.o: cancel.C eventID.h ../../../../include/charm++.h \
   ../../../../include/trace-bluegene.h pose.h pose.decl.h pose_config.h \
   ../../../../include/StreamingStrategy.h \
   ../../../../include/ComlibManager.h ../../../../include/envelope.h \
-  ../../../../include/comlib.h ../../../../include/router.h \
+  ../../../../include/convcomlib.h ../../../../include/router.h \
   ../../../../include/convcomlibmanager.h \
   ../../../../include/ComlibStats.h ../../../../include/comlib.decl.h \
   ../../../../include/MeshStreamingStrategy.h \
@@ -239,7 +239,7 @@ mempool.o: mempool.C ../../../../include/charm++.h \
   ../../../../include/trace-bluegene.h pose.h pose.decl.h pose_config.h \
   ../../../../include/StreamingStrategy.h \
   ../../../../include/ComlibManager.h ../../../../include/envelope.h \
-  ../../../../include/comlib.h ../../../../include/router.h \
+  ../../../../include/convcomlib.h ../../../../include/router.h \
   ../../../../include/convcomlibmanager.h \
   ../../../../include/ComlibStats.h ../../../../include/comlib.decl.h \
   ../../../../include/MeshStreamingStrategy.h \
@@ -292,7 +292,7 @@ pvtobj.o: pvtobj.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/trace-bluegene.h pose_config.h \
   ../../../../include/StreamingStrategy.h \
   ../../../../include/ComlibManager.h ../../../../include/envelope.h \
-  ../../../../include/comlib.h ../../../../include/router.h \
+  ../../../../include/convcomlib.h ../../../../include/router.h \
   ../../../../include/convcomlibmanager.h \
   ../../../../include/ComlibStats.h ../../../../include/comlib.decl.h \
   ../../../../include/MeshStreamingStrategy.h \
@@ -345,7 +345,7 @@ lbObject.o: lbObject.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/trace-bluegene.h pose_config.h \
   ../../../../include/StreamingStrategy.h \
   ../../../../include/ComlibManager.h ../../../../include/envelope.h \
-  ../../../../include/comlib.h ../../../../include/router.h \
+  ../../../../include/convcomlib.h ../../../../include/router.h \
   ../../../../include/convcomlibmanager.h \
   ../../../../include/ComlibStats.h ../../../../include/comlib.decl.h \
   ../../../../include/MeshStreamingStrategy.h \
@@ -398,7 +398,7 @@ ldbal.o: ldbal.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/trace-bluegene.h pose_config.h \
   ../../../../include/StreamingStrategy.h \
   ../../../../include/ComlibManager.h ../../../../include/envelope.h \
-  ../../../../include/comlib.h ../../../../include/router.h \
+  ../../../../include/convcomlib.h ../../../../include/router.h \
   ../../../../include/convcomlibmanager.h \
   ../../../../include/ComlibStats.h ../../../../include/comlib.decl.h \
   ../../../../include/MeshStreamingStrategy.h \
@@ -451,7 +451,7 @@ gvt.o: gvt.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/trace-bluegene.h pose_config.h \
   ../../../../include/StreamingStrategy.h \
   ../../../../include/ComlibManager.h ../../../../include/envelope.h \
-  ../../../../include/comlib.h ../../../../include/router.h \
+  ../../../../include/convcomlib.h ../../../../include/router.h \
   ../../../../include/convcomlibmanager.h \
   ../../../../include/ComlibStats.h ../../../../include/comlib.decl.h \
   ../../../../include/MeshStreamingStrategy.h \
@@ -504,7 +504,7 @@ event.o: event.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/trace-bluegene.h pose_config.h \
   ../../../../include/StreamingStrategy.h \
   ../../../../include/ComlibManager.h ../../../../include/envelope.h \
-  ../../../../include/comlib.h ../../../../include/router.h \
+  ../../../../include/convcomlib.h ../../../../include/router.h \
   ../../../../include/convcomlibmanager.h \
   ../../../../include/ComlibStats.h ../../../../include/comlib.decl.h \
   ../../../../include/MeshStreamingStrategy.h \
@@ -557,7 +557,7 @@ eqheap.o: eqheap.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/trace-bluegene.h pose_config.h \
   ../../../../include/StreamingStrategy.h \
   ../../../../include/ComlibManager.h ../../../../include/envelope.h \
-  ../../../../include/comlib.h ../../../../include/router.h \
+  ../../../../include/convcomlib.h ../../../../include/router.h \
   ../../../../include/convcomlibmanager.h \
   ../../../../include/ComlibStats.h ../../../../include/comlib.decl.h \
   ../../../../include/MeshStreamingStrategy.h \
@@ -610,7 +610,7 @@ evq.o: evq.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/trace-bluegene.h pose_config.h \
   ../../../../include/StreamingStrategy.h \
   ../../../../include/ComlibManager.h ../../../../include/envelope.h \
-  ../../../../include/comlib.h ../../../../include/router.h \
+  ../../../../include/convcomlib.h ../../../../include/router.h \
   ../../../../include/convcomlibmanager.h \
   ../../../../include/ComlibStats.h ../../../../include/comlib.decl.h \
   ../../../../include/MeshStreamingStrategy.h \
@@ -663,7 +663,7 @@ sim.o: sim.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/trace-bluegene.h pose_config.h \
   ../../../../include/StreamingStrategy.h \
   ../../../../include/ComlibManager.h ../../../../include/envelope.h \
-  ../../../../include/comlib.h ../../../../include/router.h \
+  ../../../../include/convcomlib.h ../../../../include/router.h \
   ../../../../include/convcomlibmanager.h \
   ../../../../include/ComlibStats.h ../../../../include/comlib.decl.h \
   ../../../../include/MeshStreamingStrategy.h \
@@ -716,7 +716,7 @@ rep.o: rep.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/trace-bluegene.h pose_config.h \
   ../../../../include/StreamingStrategy.h \
   ../../../../include/ComlibManager.h ../../../../include/envelope.h \
-  ../../../../include/comlib.h ../../../../include/router.h \
+  ../../../../include/convcomlib.h ../../../../include/router.h \
   ../../../../include/convcomlibmanager.h \
   ../../../../include/ComlibStats.h ../../../../include/comlib.decl.h \
   ../../../../include/MeshStreamingStrategy.h \
@@ -769,7 +769,7 @@ strat.o: strat.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/trace-bluegene.h pose_config.h \
   ../../../../include/StreamingStrategy.h \
   ../../../../include/ComlibManager.h ../../../../include/envelope.h \
-  ../../../../include/comlib.h ../../../../include/router.h \
+  ../../../../include/convcomlib.h ../../../../include/router.h \
   ../../../../include/convcomlibmanager.h \
   ../../../../include/ComlibStats.h ../../../../include/comlib.decl.h \
   ../../../../include/MeshStreamingStrategy.h \
@@ -822,7 +822,7 @@ seq.o: seq.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/trace-bluegene.h pose_config.h \
   ../../../../include/StreamingStrategy.h \
   ../../../../include/ComlibManager.h ../../../../include/envelope.h \
-  ../../../../include/comlib.h ../../../../include/router.h \
+  ../../../../include/convcomlib.h ../../../../include/router.h \
   ../../../../include/convcomlibmanager.h \
   ../../../../include/ComlibStats.h ../../../../include/comlib.decl.h \
   ../../../../include/MeshStreamingStrategy.h \
@@ -875,7 +875,7 @@ cons.o: cons.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/trace-bluegene.h pose_config.h \
   ../../../../include/StreamingStrategy.h \
   ../../../../include/ComlibManager.h ../../../../include/envelope.h \
-  ../../../../include/comlib.h ../../../../include/router.h \
+  ../../../../include/convcomlib.h ../../../../include/router.h \
   ../../../../include/convcomlibmanager.h \
   ../../../../include/ComlibStats.h ../../../../include/comlib.decl.h \
   ../../../../include/MeshStreamingStrategy.h \
@@ -928,7 +928,7 @@ opt.o: opt.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/trace-bluegene.h pose_config.h \
   ../../../../include/StreamingStrategy.h \
   ../../../../include/ComlibManager.h ../../../../include/envelope.h \
-  ../../../../include/comlib.h ../../../../include/router.h \
+  ../../../../include/convcomlib.h ../../../../include/router.h \
   ../../../../include/convcomlibmanager.h \
   ../../../../include/ComlibStats.h ../../../../include/comlib.decl.h \
   ../../../../include/MeshStreamingStrategy.h \
@@ -981,7 +981,7 @@ opt2.o: opt2.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/trace-bluegene.h pose_config.h \
   ../../../../include/StreamingStrategy.h \
   ../../../../include/ComlibManager.h ../../../../include/envelope.h \
-  ../../../../include/comlib.h ../../../../include/router.h \
+  ../../../../include/convcomlib.h ../../../../include/router.h \
   ../../../../include/convcomlibmanager.h \
   ../../../../include/ComlibStats.h ../../../../include/comlib.decl.h \
   ../../../../include/MeshStreamingStrategy.h \
@@ -1034,7 +1034,7 @@ opt3.o: opt3.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/trace-bluegene.h pose_config.h \
   ../../../../include/StreamingStrategy.h \
   ../../../../include/ComlibManager.h ../../../../include/envelope.h \
-  ../../../../include/comlib.h ../../../../include/router.h \
+  ../../../../include/convcomlib.h ../../../../include/router.h \
   ../../../../include/convcomlibmanager.h \
   ../../../../include/ComlibStats.h ../../../../include/comlib.decl.h \
   ../../../../include/MeshStreamingStrategy.h \
@@ -1087,7 +1087,7 @@ spec.o: spec.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/trace-bluegene.h pose_config.h \
   ../../../../include/StreamingStrategy.h \
   ../../../../include/ComlibManager.h ../../../../include/envelope.h \
-  ../../../../include/comlib.h ../../../../include/router.h \
+  ../../../../include/convcomlib.h ../../../../include/router.h \
   ../../../../include/convcomlibmanager.h \
   ../../../../include/ComlibStats.h ../../../../include/comlib.decl.h \
   ../../../../include/MeshStreamingStrategy.h \
@@ -1140,7 +1140,7 @@ adapt.o: adapt.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/trace-bluegene.h pose_config.h \
   ../../../../include/StreamingStrategy.h \
   ../../../../include/ComlibManager.h ../../../../include/envelope.h \
-  ../../../../include/comlib.h ../../../../include/router.h \
+  ../../../../include/convcomlib.h ../../../../include/router.h \
   ../../../../include/convcomlibmanager.h \
   ../../../../include/ComlibStats.h ../../../../include/comlib.decl.h \
   ../../../../include/MeshStreamingStrategy.h \
@@ -1193,7 +1193,7 @@ adapt2.o: adapt2.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/trace-bluegene.h pose_config.h \
   ../../../../include/StreamingStrategy.h \
   ../../../../include/ComlibManager.h ../../../../include/envelope.h \
-  ../../../../include/comlib.h ../../../../include/router.h \
+  ../../../../include/convcomlib.h ../../../../include/router.h \
   ../../../../include/convcomlibmanager.h \
   ../../../../include/ComlibStats.h ../../../../include/comlib.decl.h \
   ../../../../include/MeshStreamingStrategy.h \
@@ -1246,7 +1246,7 @@ adapt3.o: adapt3.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/trace-bluegene.h pose_config.h \
   ../../../../include/StreamingStrategy.h \
   ../../../../include/ComlibManager.h ../../../../include/envelope.h \
-  ../../../../include/comlib.h ../../../../include/router.h \
+  ../../../../include/convcomlib.h ../../../../include/router.h \
   ../../../../include/convcomlibmanager.h \
   ../../../../include/ComlibStats.h ../../../../include/comlib.decl.h \
   ../../../../include/MeshStreamingStrategy.h \
@@ -1299,7 +1299,7 @@ adapt4.o: adapt4.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/trace-bluegene.h pose_config.h \
   ../../../../include/StreamingStrategy.h \
   ../../../../include/ComlibManager.h ../../../../include/envelope.h \
-  ../../../../include/comlib.h ../../../../include/router.h \
+  ../../../../include/convcomlib.h ../../../../include/router.h \
   ../../../../include/convcomlibmanager.h \
   ../../../../include/ComlibStats.h ../../../../include/comlib.decl.h \
   ../../../../include/MeshStreamingStrategy.h \
@@ -1352,7 +1352,7 @@ pose.o: pose.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/trace-bluegene.h pose_config.h \
   ../../../../include/StreamingStrategy.h \
   ../../../../include/ComlibManager.h ../../../../include/envelope.h \
-  ../../../../include/comlib.h ../../../../include/router.h \
+  ../../../../include/convcomlib.h ../../../../include/router.h \
   ../../../../include/convcomlibmanager.h \
   ../../../../include/ComlibStats.h ../../../../include/comlib.decl.h \
   ../../../../include/MeshStreamingStrategy.h \
@@ -1447,7 +1447,7 @@ stats.seq.o: stats.C ../../../../include/charm++.h \
   ../../../../include/trace-bluegene.h stats.h stats.decl.h pose_config.h \
   ../../../../include/StreamingStrategy.h \
   ../../../../include/ComlibManager.h ../../../../include/envelope.h \
-  ../../../../include/comlib.h ../../../../include/router.h \
+  ../../../../include/convcomlib.h ../../../../include/router.h \
   ../../../../include/convcomlibmanager.h \
   ../../../../include/ComlibStats.h ../../../../include/comlib.decl.h \
   ../../../../include/MeshStreamingStrategy.h \
@@ -1496,7 +1496,7 @@ srtable.seq.o: srtable.C ../../../../include/charm++.h \
   ../../../../include/trace-bluegene.h srtable.h pose.h pose.decl.h \
   pose_config.h ../../../../include/StreamingStrategy.h \
   ../../../../include/ComlibManager.h ../../../../include/envelope.h \
-  ../../../../include/comlib.h ../../../../include/router.h \
+  ../../../../include/convcomlib.h ../../../../include/router.h \
   ../../../../include/convcomlibmanager.h \
   ../../../../include/ComlibStats.h ../../../../include/comlib.decl.h \
   ../../../../include/MeshStreamingStrategy.h \
@@ -1549,7 +1549,7 @@ cancel.seq.o: cancel.C eventID.h ../../../../include/charm++.h \
   ../../../../include/trace-bluegene.h pose.h pose.decl.h pose_config.h \
   ../../../../include/StreamingStrategy.h \
   ../../../../include/ComlibManager.h ../../../../include/envelope.h \
-  ../../../../include/comlib.h ../../../../include/router.h \
+  ../../../../include/convcomlib.h ../../../../include/router.h \
   ../../../../include/convcomlibmanager.h \
   ../../../../include/ComlibStats.h ../../../../include/comlib.decl.h \
   ../../../../include/MeshStreamingStrategy.h \
@@ -1602,7 +1602,7 @@ mempool.seq.o: mempool.C ../../../../include/charm++.h \
   ../../../../include/trace-bluegene.h pose.h pose.decl.h pose_config.h \
   ../../../../include/StreamingStrategy.h \
   ../../../../include/ComlibManager.h ../../../../include/envelope.h \
-  ../../../../include/comlib.h ../../../../include/router.h \
+  ../../../../include/convcomlib.h ../../../../include/router.h \
   ../../../../include/convcomlibmanager.h \
   ../../../../include/ComlibStats.h ../../../../include/comlib.decl.h \
   ../../../../include/MeshStreamingStrategy.h \
@@ -1655,7 +1655,7 @@ pvtobj.seq.o: pvtobj.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/trace-bluegene.h pose_config.h \
   ../../../../include/StreamingStrategy.h \
   ../../../../include/ComlibManager.h ../../../../include/envelope.h \
-  ../../../../include/comlib.h ../../../../include/router.h \
+  ../../../../include/convcomlib.h ../../../../include/router.h \
   ../../../../include/convcomlibmanager.h \
   ../../../../include/ComlibStats.h ../../../../include/comlib.decl.h \
   ../../../../include/MeshStreamingStrategy.h \
@@ -1709,7 +1709,7 @@ lbObject.seq.o: lbObject.C pose.h pose.decl.h \
   ../../../../include/trace-bluegene.h pose_config.h \
   ../../../../include/StreamingStrategy.h \
   ../../../../include/ComlibManager.h ../../../../include/envelope.h \
-  ../../../../include/comlib.h ../../../../include/router.h \
+  ../../../../include/convcomlib.h ../../../../include/router.h \
   ../../../../include/convcomlibmanager.h \
   ../../../../include/ComlibStats.h ../../../../include/comlib.decl.h \
   ../../../../include/MeshStreamingStrategy.h \
@@ -1762,7 +1762,7 @@ ldbal.seq.o: ldbal.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/trace-bluegene.h pose_config.h \
   ../../../../include/StreamingStrategy.h \
   ../../../../include/ComlibManager.h ../../../../include/envelope.h \
-  ../../../../include/comlib.h ../../../../include/router.h \
+  ../../../../include/convcomlib.h ../../../../include/router.h \
   ../../../../include/convcomlibmanager.h \
   ../../../../include/ComlibStats.h ../../../../include/comlib.decl.h \
   ../../../../include/MeshStreamingStrategy.h \
@@ -1815,7 +1815,7 @@ gvt.seq.o: gvt.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/trace-bluegene.h pose_config.h \
   ../../../../include/StreamingStrategy.h \
   ../../../../include/ComlibManager.h ../../../../include/envelope.h \
-  ../../../../include/comlib.h ../../../../include/router.h \
+  ../../../../include/convcomlib.h ../../../../include/router.h \
   ../../../../include/convcomlibmanager.h \
   ../../../../include/ComlibStats.h ../../../../include/comlib.decl.h \
   ../../../../include/MeshStreamingStrategy.h \
@@ -1868,7 +1868,7 @@ event.seq.o: event.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/trace-bluegene.h pose_config.h \
   ../../../../include/StreamingStrategy.h \
   ../../../../include/ComlibManager.h ../../../../include/envelope.h \
-  ../../../../include/comlib.h ../../../../include/router.h \
+  ../../../../include/convcomlib.h ../../../../include/router.h \
   ../../../../include/convcomlibmanager.h \
   ../../../../include/ComlibStats.h ../../../../include/comlib.decl.h \
   ../../../../include/MeshStreamingStrategy.h \
@@ -1921,7 +1921,7 @@ eqheap.seq.o: eqheap.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/trace-bluegene.h pose_config.h \
   ../../../../include/StreamingStrategy.h \
   ../../../../include/ComlibManager.h ../../../../include/envelope.h \
-  ../../../../include/comlib.h ../../../../include/router.h \
+  ../../../../include/convcomlib.h ../../../../include/router.h \
   ../../../../include/convcomlibmanager.h \
   ../../../../include/ComlibStats.h ../../../../include/comlib.decl.h \
   ../../../../include/MeshStreamingStrategy.h \
@@ -1974,7 +1974,7 @@ evq.seq.o: evq.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/trace-bluegene.h pose_config.h \
   ../../../../include/StreamingStrategy.h \
   ../../../../include/ComlibManager.h ../../../../include/envelope.h \
-  ../../../../include/comlib.h ../../../../include/router.h \
+  ../../../../include/convcomlib.h ../../../../include/router.h \
   ../../../../include/convcomlibmanager.h \
   ../../../../include/ComlibStats.h ../../../../include/comlib.decl.h \
   ../../../../include/MeshStreamingStrategy.h \
@@ -2027,7 +2027,7 @@ sim.seq.o: sim.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/trace-bluegene.h pose_config.h \
   ../../../../include/StreamingStrategy.h \
   ../../../../include/ComlibManager.h ../../../../include/envelope.h \
-  ../../../../include/comlib.h ../../../../include/router.h \
+  ../../../../include/convcomlib.h ../../../../include/router.h \
   ../../../../include/convcomlibmanager.h \
   ../../../../include/ComlibStats.h ../../../../include/comlib.decl.h \
   ../../../../include/MeshStreamingStrategy.h \
@@ -2080,7 +2080,7 @@ rep.seq.o: rep.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/trace-bluegene.h pose_config.h \
   ../../../../include/StreamingStrategy.h \
   ../../../../include/ComlibManager.h ../../../../include/envelope.h \
-  ../../../../include/comlib.h ../../../../include/router.h \
+  ../../../../include/convcomlib.h ../../../../include/router.h \
   ../../../../include/convcomlibmanager.h \
   ../../../../include/ComlibStats.h ../../../../include/comlib.decl.h \
   ../../../../include/MeshStreamingStrategy.h \
@@ -2133,7 +2133,7 @@ strat.seq.o: strat.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/trace-bluegene.h pose_config.h \
   ../../../../include/StreamingStrategy.h \
   ../../../../include/ComlibManager.h ../../../../include/envelope.h \
-  ../../../../include/comlib.h ../../../../include/router.h \
+  ../../../../include/convcomlib.h ../../../../include/router.h \
   ../../../../include/convcomlibmanager.h \
   ../../../../include/ComlibStats.h ../../../../include/comlib.decl.h \
   ../../../../include/MeshStreamingStrategy.h \
@@ -2186,7 +2186,7 @@ seq.seq.o: seq.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/trace-bluegene.h pose_config.h \
   ../../../../include/StreamingStrategy.h \
   ../../../../include/ComlibManager.h ../../../../include/envelope.h \
-  ../../../../include/comlib.h ../../../../include/router.h \
+  ../../../../include/convcomlib.h ../../../../include/router.h \
   ../../../../include/convcomlibmanager.h \
   ../../../../include/ComlibStats.h ../../../../include/comlib.decl.h \
   ../../../../include/MeshStreamingStrategy.h \
@@ -2239,7 +2239,7 @@ cons.seq.o: cons.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/trace-bluegene.h pose_config.h \
   ../../../../include/StreamingStrategy.h \
   ../../../../include/ComlibManager.h ../../../../include/envelope.h \
-  ../../../../include/comlib.h ../../../../include/router.h \
+  ../../../../include/convcomlib.h ../../../../include/router.h \
   ../../../../include/convcomlibmanager.h \
   ../../../../include/ComlibStats.h ../../../../include/comlib.decl.h \
   ../../../../include/MeshStreamingStrategy.h \
@@ -2292,7 +2292,7 @@ opt.seq.o: opt.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/trace-bluegene.h pose_config.h \
   ../../../../include/StreamingStrategy.h \
   ../../../../include/ComlibManager.h ../../../../include/envelope.h \
-  ../../../../include/comlib.h ../../../../include/router.h \
+  ../../../../include/convcomlib.h ../../../../include/router.h \
   ../../../../include/convcomlibmanager.h \
   ../../../../include/ComlibStats.h ../../../../include/comlib.decl.h \
   ../../../../include/MeshStreamingStrategy.h \
@@ -2345,7 +2345,7 @@ opt2.seq.o: opt2.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/trace-bluegene.h pose_config.h \
   ../../../../include/StreamingStrategy.h \
   ../../../../include/ComlibManager.h ../../../../include/envelope.h \
-  ../../../../include/comlib.h ../../../../include/router.h \
+  ../../../../include/convcomlib.h ../../../../include/router.h \
   ../../../../include/convcomlibmanager.h \
   ../../../../include/ComlibStats.h ../../../../include/comlib.decl.h \
   ../../../../include/MeshStreamingStrategy.h \
@@ -2398,7 +2398,7 @@ opt3.seq.o: opt3.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/trace-bluegene.h pose_config.h \
   ../../../../include/StreamingStrategy.h \
   ../../../../include/ComlibManager.h ../../../../include/envelope.h \
-  ../../../../include/comlib.h ../../../../include/router.h \
+  ../../../../include/convcomlib.h ../../../../include/router.h \
   ../../../../include/convcomlibmanager.h \
   ../../../../include/ComlibStats.h ../../../../include/comlib.decl.h \
   ../../../../include/MeshStreamingStrategy.h \
@@ -2451,7 +2451,7 @@ spec.seq.o: spec.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/trace-bluegene.h pose_config.h \
   ../../../../include/StreamingStrategy.h \
   ../../../../include/ComlibManager.h ../../../../include/envelope.h \
-  ../../../../include/comlib.h ../../../../include/router.h \
+  ../../../../include/convcomlib.h ../../../../include/router.h \
   ../../../../include/convcomlibmanager.h \
   ../../../../include/ComlibStats.h ../../../../include/comlib.decl.h \
   ../../../../include/MeshStreamingStrategy.h \
@@ -2504,7 +2504,7 @@ adapt.seq.o: adapt.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/trace-bluegene.h pose_config.h \
   ../../../../include/StreamingStrategy.h \
   ../../../../include/ComlibManager.h ../../../../include/envelope.h \
-  ../../../../include/comlib.h ../../../../include/router.h \
+  ../../../../include/convcomlib.h ../../../../include/router.h \
   ../../../../include/convcomlibmanager.h \
   ../../../../include/ComlibStats.h ../../../../include/comlib.decl.h \
   ../../../../include/MeshStreamingStrategy.h \
@@ -2557,7 +2557,7 @@ adapt2.seq.o: adapt2.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/trace-bluegene.h pose_config.h \
   ../../../../include/StreamingStrategy.h \
   ../../../../include/ComlibManager.h ../../../../include/envelope.h \
-  ../../../../include/comlib.h ../../../../include/router.h \
+  ../../../../include/convcomlib.h ../../../../include/router.h \
   ../../../../include/convcomlibmanager.h \
   ../../../../include/ComlibStats.h ../../../../include/comlib.decl.h \
   ../../../../include/MeshStreamingStrategy.h \
@@ -2610,7 +2610,7 @@ adapt3.seq.o: adapt3.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/trace-bluegene.h pose_config.h \
   ../../../../include/StreamingStrategy.h \
   ../../../../include/ComlibManager.h ../../../../include/envelope.h \
-  ../../../../include/comlib.h ../../../../include/router.h \
+  ../../../../include/convcomlib.h ../../../../include/router.h \
   ../../../../include/convcomlibmanager.h \
   ../../../../include/ComlibStats.h ../../../../include/comlib.decl.h \
   ../../../../include/MeshStreamingStrategy.h \
@@ -2663,7 +2663,7 @@ adapt4.seq.o: adapt4.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/trace-bluegene.h pose_config.h \
   ../../../../include/StreamingStrategy.h \
   ../../../../include/ComlibManager.h ../../../../include/envelope.h \
-  ../../../../include/comlib.h ../../../../include/router.h \
+  ../../../../include/convcomlib.h ../../../../include/router.h \
   ../../../../include/convcomlibmanager.h \
   ../../../../include/ComlibStats.h ../../../../include/comlib.decl.h \
   ../../../../include/MeshStreamingStrategy.h \
@@ -2716,7 +2716,7 @@ pose.seq.o: pose.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/trace-bluegene.h pose_config.h \
   ../../../../include/StreamingStrategy.h \
   ../../../../include/ComlibManager.h ../../../../include/envelope.h \
-  ../../../../include/comlib.h ../../../../include/router.h \
+  ../../../../include/convcomlib.h ../../../../include/router.h \
   ../../../../include/convcomlibmanager.h \
   ../../../../include/ComlibStats.h ../../../../include/comlib.decl.h \
   ../../../../include/MeshStreamingStrategy.h \

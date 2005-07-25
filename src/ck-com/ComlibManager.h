@@ -4,7 +4,7 @@
 #include "charm++.h"
 #include "cksection.h"
 #include "envelope.h"
-#include "comlib.h"
+#include "convcomlib.h"
 #include <math.h>
 
 #include "charm++.h"

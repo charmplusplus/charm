@@ -159,9 +159,10 @@ CVHEADERS=cpthreads.h converse.h conv-trace.h conv-random.h conv-qd.h \
       conv-common.h conv-config.sh conv-config.h conv-mach.h conv-mach.sh \
       blue.h blue-conv.h bgconverse.h \
 	convcomlibstrategy.h 3dgridrouter.h de.h hypercubetopology.h	\
-	routerstrategy.h comlib.h dummyconversestrategy.h  treerouter.h \
+	routerstrategy.h convcomlib.h dummyconversestrategy.h  treerouter.h \
 	convcomlibmanager.h graphrouter.h petable.h gridrouter.h router.h \
-	prefixrouter.h pipebroadcastconverse.h pipelinestrategy.h cmipool.h
+	prefixrouter.h pipebroadcastconverse.h pipelinestrategy.h cmipool.h \
+	comlib.h
 
 # The .c files are there to be #included by clients whole
 # This is a bit unusual, but makes client linking simpler.

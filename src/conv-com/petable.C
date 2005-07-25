@@ -15,7 +15,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include <converse.h>
-#include "comlib.h"
+#include "convcomlib.h"
 #include "petable.h"
 #include "converse.h"
 

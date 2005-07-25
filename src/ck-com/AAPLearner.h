@@ -2,7 +2,7 @@
 #ifndef AAPLEARNER_H
 #define AAPLEARNER_H
 
-#include "comlib.h"
+#include "convcomlib.h"
 #include "ComlibManager.h"
 #include "ComlibLearner.h"
 
