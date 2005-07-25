@@ -11,9 +11,11 @@
 #include "ckvector3d.h"
 #include "fem.h"
 #include "fem_mesh.h"
+#include "fem_mesh_modify.h"
 
 class FEM_Interpolate {
   FEM_Mesh *theMesh;
+  femMeshModify *theMod;
  public:
   typedef struct {
     int n;
@@ -46,6 +48,13 @@ class FEM_Interpolate {
     nodeEdgeFnPtr = nodeFaceFnPtr = nodeElementFnPtr = NULL;
     elemCopyFnPtr = elemNodeFnPtr = NULL;
     theMesh = m;
+  }
+
+  FEM_Interpolate(FEM_Mesh *m, femMeshModify *fm) {
+    nodeEdgeFnPtr = nodeFaceFnPtr = nodeElementFnPtr = NULL;
+    elemCopyFnPtr = elemNodeFnPtr = NULL;
+    theMesh = m;
+    theMod = fm;
   }
 
   void FEM_InterpolateSetMesh(FEM_Mesh *m) { theMesh = m; }
