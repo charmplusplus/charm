@@ -177,6 +177,7 @@ int FEM_add_node(FEM_Mesh *m, int* adjacentNodes, int numAdjacentNodes, int upca
     nm.nodes[i] = adjacentNodes[i];
   }
   nm.frac = 0.5;
+  inp->FEM_InterpolateNodeOnEdge(nm);
 
   // for each adjacent node, if the node is shared
   for(int i=0;i<numAdjacentNodes;i++){ //a newly added node is shared only if all the 
@@ -217,6 +218,7 @@ void FEM_add_shared_node_remote(FEM_Mesh *m, int chk, int nBetween, int *between
     nm.nodes[i] = between[i];
   }
   nm.frac = 0.5;
+  inp->FEM_InterpolateNodeOnEdge(nm);
   
   // must negotiate the common IDXL number for the new node, 
   // and store it in appropriate IDXL tables
