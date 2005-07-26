@@ -210,15 +210,6 @@ int FEM_add_node(FEM_Mesh *m, int* adjacentNodes, int numAdjacentNodes, int upca
 void FEM_add_shared_node_remote(FEM_Mesh *m, int chk, int nBetween, int *between){
   // create local node
   int newnode = FEM_add_node_local(m, 0);
-
-  FEM_Interpolate *inp = m->getfmMM()->getfmInp();
-  FEM_Interpolate::NodalArgs nm;
-  nm.n = newnode;
-  for(int i=0; i<nBetween; i++) {
-    nm.nodes[i] = between[i];
-  }
-  nm.frac = 0.5;
-  inp->FEM_InterpolateNodeOnEdge(nm);
   
   // must negotiate the common IDXL number for the new node, 
   // and store it in appropriate IDXL tables
@@ -1195,6 +1186,16 @@ void FEM_MUtil::splitEntityRemote(FEM_Mesh *m, int chk, int localIdx, int nBetwe
   for(int i=0; i<nBetween; i++) {
     localIndices[i] = ll[between[i]];
   }
+
+  FEM_Interpolate *inp = m->getfmMM()->getfmInp();
+  FEM_Interpolate::NodalArgs nm;
+  nm.n = localIdx;
+  for(int i=0; i<nBetween; i++) {
+    nm.nodes[i] = localIndices[i];
+  }
+  nm.frac = 0.5;
+  inp->FEM_InterpolateNodeOnEdge(nm);
+
   splitEntity(m->node.shared, localIdx, nBetween, localIndices, idxbase);
   return;
 }
