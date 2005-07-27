@@ -1,5 +1,4 @@
 #include <stdlib.h>
-#include <alloca.h>
 #include <time.h>
 #include <string.h>
 
@@ -36,10 +35,10 @@ Main::Main(CkArgMsg *m) {
   memset(matrix[0], 0, nsrc * ndest * sizeof(char));
   for (int i=1; i<nsrc; ++i) matrix[i] = matrix[i-1] + ndest;
 
-  srandom(time(NULL));
+  srand48(time(NULL));
   for (int i=0; i<nsrc; ++i) {
     for (int j=0; j<mcastFactor; ++j) {
-      int k = int((double(random()) * ndest) / RAND_MAX);
+      int k = int(drand48() * ndest);
       matrix[i][k] = 1;
     }
   }
