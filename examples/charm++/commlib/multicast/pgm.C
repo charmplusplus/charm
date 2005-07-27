@@ -1,4 +1,5 @@
 #include <stdlib.h>
+#include <alloca.h>
 #include <time.h>
 #include <string.h>
 
