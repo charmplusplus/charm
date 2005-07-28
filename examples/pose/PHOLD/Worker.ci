@@ -1,0 +1,12 @@
+message WorkerData;
+message WorkMsg;
+
+poser worker : sim adapt4 chpt {
+  entry worker(WorkerData *);
+  // Event methods
+  entry [event] void work(WorkMsg *);
+};
+
+
+
+

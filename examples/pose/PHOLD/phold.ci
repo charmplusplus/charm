@@ -1,0 +1,8 @@
+mainmodule PHOLD {
+  extern module Worker;
+  readonly CkChareID mainhandle;
+  
+  mainchare main {
+    entry main();
+  };
+};
