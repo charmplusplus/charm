@@ -25,10 +25,10 @@ CDECL void FEM_remove_element(int mesh, int element, int elem_type){
   FEM_remove_element(FEM_Mesh_lookup(mesh,"FEM_remove_element"), element, elem_type);}
 CDECL int FEM_add_element(int mesh, int* conn, int conn_size, int elem_type){
   return FEM_add_element(FEM_Mesh_lookup(mesh,"FEM_add_element"), conn, conn_size, elem_type);}
-CDECL void FEM_Modify_Lock(int mesh, int* affectedNodes, int numAffectedNodes, int* affectedElts, int numAffectedElts, int elemtype){
-  FEM_Modify_Lock(FEM_Mesh_lookup(mesh,"FEM_Modify_Lock"), affectedNodes, numAffectedNodes, affectedElts, numAffectedElts, elemtype);}
-CDECL void FEM_Modify_Unlock(int mesh){
-  FEM_Modify_Unlock(FEM_Mesh_lookup(mesh,"FEM_Modify_Unlock"));}
+CDECL int FEM_Modify_Lock(int mesh, int* affectedNodes, int numAffectedNodes, int* affectedElts, int numAffectedElts, int elemtype){
+  return FEM_Modify_Lock(FEM_Mesh_lookup(mesh,"FEM_Modify_Lock"), affectedNodes, numAffectedNodes, affectedElts, numAffectedElts, elemtype);}
+CDECL int FEM_Modify_Unlock(int mesh){
+  return FEM_Modify_Unlock(FEM_Mesh_lookup(mesh,"FEM_Modify_Unlock"));}
 
 
 
@@ -631,7 +631,76 @@ int FEM_add_element(FEM_Mesh *m, int* conn, int connSize, int elemType){
     newEl = FEM_add_element_local(m,conn,connSize,elemType,0);
     //no modifications required for ghostsend or ghostrecv of nodes or elements
   }
-  else if(ghostcount==0 && sharedcount > 0){// a local elem with some or ALL shared nodes
+  else if(ghostcount==0 && sharedcount > 0 && localcount > 0){// a local elem with not ALL shared nodes
+    newEl = FEM_add_element_local(m,conn,connSize,elemType,0);
+    
+    //   make this element ghost on all others, updating all IDXL's
+    //   also in same remote entry method, update adjacencies on all others
+    //   grow local element and attribute tables if needed
+    //   add to local elem[elemType] table, and update IDXL if needed
+    //   update local adjacencies
+    //   return the new element id
+
+    //build a mapping of all shared chunks to all nodes in this element    
+    CkVec<int> **allShared;
+    int numSharedChunks = 0;
+    CkVec<int> *allChunks;
+    int **sharedConn; 
+    m->getfmMM()->getfmUtil()->buildChunkToNodeTable(nodetype, sharedcount, ghostcount, localcount, conn, connSize, &allShared, &numSharedChunks, &allChunks, &sharedConn);   
+
+    //add all the local nodes in this element to the ghost list, if they did not exist already
+    for(int i=0; i<numSharedChunks; i++) {
+      int chk = (*allChunks)[i];
+      if(chk == m->getfmMM()->getfmUtil()->getIdx()) continue; //it is this chunk
+      //it is a new element so it could not have existed as a ghost on that chunk. Just add it.
+      m->elem[elemType].ghostSend.addNode(newEl,chk);
+      //ghost nodes should be added only if they were not already present as ghosts on that chunk.
+      int numNodesToAdd = 0;
+      int numSharedGhosts = 0;
+      int numSharedNodes = 0;
+      int *sharedGhosts = (int *)malloc((connSize-1)*sizeof(int));
+      int *sharedNodes = (int *)malloc((connSize)*sizeof(int));
+      for(int j=0; j<connSize; j++) {
+	int sharedNode = m->getfmMM()->getfmUtil()->exists_in_IDXL(m,conn[j],chk,0);
+	if(sharedNode == -1) {
+	  //node 'j' is a ghost on chunk 'i'
+	  int sharedGhost = m->getfmMM()->getfmUtil()->exists_in_IDXL(m,conn[j],chk,1);
+	  if( sharedGhost == -1) {
+	    //it is a new ghost
+	    m->node.ghostSend.addNode(FEM_To_ghost_index(conn[j]),chk);
+	    numNodesToAdd++;
+	  }
+	  else {
+	    //it is a shared ghost
+	    sharedGhosts[numSharedGhosts] = sharedGhost;
+	    numSharedGhosts++;
+	  }
+	}
+	else {
+	  //it is a shared node
+	  sharedNodes[numSharedNodes] = sharedNode;
+	  numSharedNodes++;
+	}
+      }
+      addGhostElemMsg *fm = new (numSharedGhosts, numSharedNodes, 0)addGhostElemMsg;
+      fm->chk = m->getfmMM()->getfmUtil()->getIdx();
+      fm->elemType = elemType;
+      fm->numGhostIndex = numSharedGhosts;
+      for(int j=0; j<numSharedGhosts; j++) {
+	fm->ghostIndices[j] = sharedGhosts[j];
+      }
+      fm->numSharedIndex = numSharedNodes;
+      for(int j=0; j<numSharedNodes; j++) {
+	fm->sharedIndices[j] = sharedNodes[j];
+      }
+      fm->connSize = connSize;
+      meshMod[chk].addGhostElem(fm); //newEl, m->fmMM->idx, elemType;
+    }
+  }
+  else if(ghostcount==0 && sharedcount > 0 && localcount == 0){// a local elem with ALL shared nodes
+    //it is interesting to note that such a situation can only occur between only two chunks
+    //in any number of dimensions.
+    //So, the solution is to figure out, where it belongs to...
     newEl = FEM_add_element_local(m,conn,connSize,elemType,0);
     
     //   make this element ghost on all others, updating all IDXL's
@@ -803,14 +872,12 @@ int FEM_add_element_remote(){
 }
 
 
-void FEM_Modify_Lock(FEM_Mesh *m, int* affectedNodes, int numAffectedNodes, int* affectedElts, int numAffectedElts, int elemtype) {
-  m->getfmMM()->getfmLock()->lock(numAffectedNodes, affectedNodes, numAffectedElts, affectedElts, elemtype);
-  return;
+int FEM_Modify_Lock(FEM_Mesh *m, int* affectedNodes, int numAffectedNodes, int* affectedElts, int numAffectedElts, int elemtype) {
+  return m->getfmMM()->getfmLock()->lock(numAffectedNodes, affectedNodes, numAffectedElts, affectedElts, elemtype);
 }
 
-void FEM_Modify_Unlock(FEM_Mesh *m) {
-  m->getfmMM()->getfmLock()->unlock();
-  return;
+int FEM_Modify_Unlock(FEM_Mesh *m) {
+  return m->getfmMM()->getfmLock()->unlock();
 }
 
 
@@ -884,6 +951,10 @@ int FEM_lock::lock(int numNodes, int *nodes, int numElems, int* elems, int elemT
 	//which chunk does this belong to
 	//add that chunk to the lock list, if it does not exist already.
 	if(nodes[i] != -1) {
+	  if(nodes[i] < -1) {
+	    if(!mmod->fmMesh->node.ghost->is_valid(FEM_To_ghost_index(nodes[i]))) return -1;
+	  } 
+	  else if(!mmod->fmMesh->node.is_valid(nodes[i])) return -1;
 	  int numchunks;
 	  IDXL_Share **chunks1;
 	  mmod->fmUtil->getChunkNos(0,nodes[i],&numchunks,&chunks1);
@@ -898,6 +969,10 @@ int FEM_lock::lock(int numNodes, int *nodes, int numElems, int* elems, int elemT
 	//which chunk does this belong to
 	//add that chunk to the lock list, if not already in it.
 	if(elems[i] != -1) {
+	  if(elems[i] < -1) {
+	    if(!mmod->fmMesh->elem[elemType].ghost->is_valid(FEM_To_ghost_index(elems[i]))) return -1;
+	  } 
+	  else if(!mmod->fmMesh->elem[elemType].is_valid(elems[i])) return -1;
 	  int numchunks;
 	  IDXL_Share **chunks1;
 	  mmod->fmUtil->getChunkNos(1,elems[i],&numchunks,&chunks1,elemType);
@@ -925,7 +1000,9 @@ int FEM_lock::lock(int numNodes, int *nodes, int numElems, int* elems, int elemT
       //lock them
       for(int i=0; i<numLocks; i++) {
 	ret = lock(lockedChunks[i],idx);
-	if(ret != 1) return -1;
+	if(ret != 1) {
+	  return -1;
+	}
       }
       hasLocks = true;
       done = true;
@@ -958,6 +1035,7 @@ int FEM_lock::unlock() {
       //block
     }
   }
+  lockedChunks.removeAll(); //free up the list.. the next lock will build it again
   return 1;
 }
 

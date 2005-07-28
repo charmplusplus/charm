@@ -28,9 +28,37 @@ int FEM_Adapt::edge_flip(int n1, int n2)
 {
   int e1, e1_n1, e1_n2, e1_n3, n3;
   int e2, e2_n1, e2_n2, e2_n3, n4;
-  findAdjData(n1, n2, &e1, &e2, &e1_n1, &e1_n2, &e1_n3, &e2_n1, &e2_n2, &e2_n3,
-	      &n3, &n4);
-  if ((e1 == -1) || (e2 == -1)) return 0; // edge on boundary are not there
+  int numNodes = 4;
+  int numElems = 2;
+  int *locknodes = (int*)malloc(numNodes*sizeof(int));
+  int *lockelems = (int*)malloc(numElems*sizeof(int));
+  bool done = false;
+
+  findAdjData(n1, n2, &e1, &e2, &e1_n1, &e1_n2, &e1_n3, &e2_n1, &e2_n2, &e2_n3,&n3, &n4);
+  locknodes[0] = n1;
+  locknodes[1] = n2;
+  locknodes[2] = n3;
+  locknodes[3] = n4;
+  lockelems[0] = e1;
+  lockelems[1] = e2;
+  while(!done) {
+    int gotlock = FEM_Modify_Lock(theMesh, locknodes, numNodes, lockelems, numElems);
+    findAdjData(n1, n2, &e1, &e2, &e1_n1, &e1_n2, &e1_n3, &e2_n1, &e2_n2, &e2_n3,&n3, &n4);
+    if(gotlock==1 && lockelems[0]==e1 && lockelems[1]==e2 && locknodes[2]==n3 && locknodes[3]==n4) {
+      done = true;
+    }
+    else {
+      FEM_Modify_Unlock(theMesh);
+      locknodes[2] = n3;
+      locknodes[3] = n4;
+      lockelems[0] = e1;
+      lockelems[1] = e2;
+    }
+  }
+  if ((e1 == -1) || (e2 == -1)) {
+    FEM_Modify_Unlock(theMesh);
+    return 0; // edge on boundary are not there
+  }
   return edge_flip_help(e1, e2, n1, n2, e1_n1, e1_n2, e1_n3, n3, n4);
 }
 int FEM_Adapt::edge_flip_help(int e1, int e2, int n1, int n2, int e1_n1, 
@@ -52,7 +80,7 @@ int FEM_Adapt::edge_flip_help(int e1, int e2, int n1, int n2, int e1_n1,
   //currently we do not move chunk boundaries, so we do not flip edges in which one of the 4 nodes of the quadrilateral is a ghost node.
   if(n1 < 0 || n2 < 0 || n3 < 0 || n4 < 0) return -1;
 
-  FEM_Modify_Lock(theMesh, locknodes, numNodes, lockelems, numElems);
+  //FEM_Modify_Lock(theMesh, locknodes, numNodes, lockelems, numElems);
 
 #ifdef DEBUG_1
   CkPrintf("Flipping edge %d->%d on chunk %d\n", n1, n2, theMod->getfmUtil()->getIdx());
@@ -92,6 +120,7 @@ int FEM_Adapt::edge_flip_help(int e1, int e2, int n1, int n2, int e1_n1,
   printAdjacencies(locknodes, numNodes, lockelems, numElems);
 #endif
 
+  //make sure that it always comes here, don't return with unlocking
   FEM_Modify_Unlock(theMesh);
 
   return 1;
@@ -123,8 +152,33 @@ int FEM_Adapt::edge_bisect(int n1, int n2)
 {
   int e1, e1_n1, e1_n2, e1_n3, n3;
   int e2, e2_n1, e2_n2, e2_n3, n4;
-  findAdjData(n1, n2, &e1, &e2, &e1_n1, &e1_n2, &e1_n3, &e2_n1, &e2_n2, &e2_n3,
-	      &n3, &n4);
+  int numNodes = 4;
+  int numElems = 2;
+  int *locknodes = (int*)malloc(numNodes*sizeof(int));
+  int *lockelems = (int*)malloc(numElems*sizeof(int));
+  bool done = false;
+
+  findAdjData(n1, n2, &e1, &e2, &e1_n1, &e1_n2, &e1_n3, &e2_n1, &e2_n2, &e2_n3,&n3, &n4);
+  locknodes[0] = n1;
+  locknodes[1] = n2;
+  locknodes[2] = n3;
+  locknodes[3] = n4;
+  lockelems[0] = e1;
+  lockelems[1] = e2;
+  while(!done) {
+    int gotlock = FEM_Modify_Lock(theMesh, locknodes, numNodes, lockelems, numElems);
+    findAdjData(n1, n2, &e1, &e2, &e1_n1, &e1_n2, &e1_n3, &e2_n1, &e2_n2, &e2_n3,&n3, &n4);
+    if(gotlock==1 && lockelems[0]==e1 && lockelems[1]==e2 && locknodes[2]==n3 && locknodes[3]==n4) {
+      done = true;
+    }
+    else {
+      FEM_Modify_Unlock(theMesh);
+      locknodes[2] = n3;
+      locknodes[3] = n4;
+      lockelems[0] = e1;
+      lockelems[1] = e2;
+    }
+  }
   return edge_bisect_help(e1, e2, n1, n2, e1_n1, e1_n2, e1_n3, e2_n1, e2_n2, 
 			  e2_n3, n3, n4);
 }
@@ -151,7 +205,7 @@ int FEM_Adapt::edge_bisect_help(int e1, int e2, int n1, int n2, int e1_n1,
   lockelems[2] = -1;
   lockelems[3] = -1;
 
-  FEM_Modify_Lock(theMesh, locknodes, numNodes, lockelems, numElems);
+  //FEM_Modify_Lock(theMesh, locknodes, numNodes, lockelems, numElems);
 
 #ifdef DEBUG_1
   CkPrintf("Bisect edge %d->%d on chunk %d\n", n1, n2, theMod->getfmUtil()->getIdx());
@@ -249,8 +303,13 @@ int FEM_Adapt::vertex_remove(int n1, int n2)
 {
   int e1, e1_n1, e1_n2, e1_n3, n3;
   int e2, e2_n1, e2_n2, e2_n3, n4;
-  findAdjData(n1, n2, &e1, &e2, &e1_n1, &e1_n2, &e1_n3, &e2_n1, &e2_n2, &e2_n3,
-	      &n3, &n4);
+  int numNodes = 5;
+  int numElems = 2;
+  int *locknodes = (int*)malloc(numNodes*sizeof(int));
+  int *lockelems = (int*)malloc(numElems*sizeof(int));
+  bool done = false;
+
+  findAdjData(n1, n2, &e1, &e2, &e1_n1, &e1_n2, &e1_n3, &e2_n1, &e2_n2, &e2_n3,&n3, &n4);
   if (e1 == -1) return 0;
   // find n5
   int *nbrNodes, nnsize, n5;
@@ -259,6 +318,41 @@ int FEM_Adapt::vertex_remove(int n1, int n2)
     if ((nbrNodes[i] != n2) && (nbrNodes[i] != n3) && (nbrNodes[i] != n4)) {
       n5 = nbrNodes[i];
       break;
+    }
+  }
+  locknodes[0] = n1;
+  locknodes[1] = n2;
+  locknodes[2] = n3;
+  locknodes[3] = n4;
+  locknodes[4] = n5;
+  lockelems[0] = e1;
+  lockelems[1] = e2;
+  while(!done) {
+    int gotlock = FEM_Modify_Lock(theMesh, locknodes, numNodes, lockelems, numElems);
+    findAdjData(n1, n2, &e1, &e2, &e1_n1, &e1_n2, &e1_n3, &e2_n1, &e2_n2, &e2_n3,&n3, &n4);
+    if (e1 == -1) {
+      FEM_Modify_Unlock(theMesh);
+      return 0;
+    }
+    // find n5
+    int *nbrNodes, nnsize, n5;
+    theMesh->n2n_getAll(n1, &nbrNodes, &nnsize);
+    for (int i=0; i<nnsize; i++) {
+      if ((nbrNodes[i] != n2) && (nbrNodes[i] != n3) && (nbrNodes[i] != n4)) {
+	n5 = nbrNodes[i];
+	break;
+      }
+    }
+    if(gotlock==1 && lockelems[0]==e1 && lockelems[1]==e2 && locknodes[2]==n3 && locknodes[3]==n4 && locknodes[4]==n5) {
+      done = true;
+    }
+    else {
+      FEM_Modify_Unlock(theMesh);
+      locknodes[2] = n3;
+      locknodes[3] = n4;
+      locknodes[4] = n5;
+      lockelems[0] = e1;
+      lockelems[1] = e2;
     }
   }
   return vertex_remove_help(e1, e2, n1, n2, e1_n1, e1_n2, e1_n3, e2_n1, e2_n2, 
@@ -294,7 +388,7 @@ int FEM_Adapt::vertex_remove_help(int e1, int e2, int n1, int n2, int e1_n1,
       lockelems[3] = e4;
       if(e4 == -1 ) return 0;
     }
-    FEM_Modify_Lock(theMesh, locknodes, numNodes, lockelems, numElems);
+    //FEM_Modify_Lock(theMesh, locknodes, numNodes, lockelems, numElems);
 
 #ifdef DEBUG_1
   CkPrintf("Vertex Remove edge %d->%d on chunk %d\n", n1, n2, theMod->getfmUtil()->getIdx());
@@ -390,9 +484,38 @@ int FEM_Adapt::edge_contraction(int n1, int n2)
 {
   int e1, e1_n1, e1_n2, e1_n3, n3;
   int e2, e2_n1, e2_n2, e2_n3, n4;
-  findAdjData(n1, n2, &e1, &e2, &e1_n1, &e1_n2, &e1_n3, &e2_n1, &e2_n2, &e2_n3,
-	      &n3, &n4);
+  int numNodes = 4;
+  int numElems = 2;
+  int *locknodes = (int*)malloc(numNodes*sizeof(int));
+  int *lockelems = (int*)malloc(numElems*sizeof(int));
+  bool done = false;
+
+  findAdjData(n1, n2, &e1, &e2, &e1_n1, &e1_n2, &e1_n3, &e2_n1, &e2_n2, &e2_n3,&n3, &n4);
+  locknodes[0] = n1;
+  locknodes[1] = n2;
+  locknodes[2] = n3;
+  locknodes[3] = n4;
+  lockelems[0] = e1;
+  lockelems[1] = e2;
   if (e1 == -1) return 0;
+  while(!done) {
+    int gotlock = FEM_Modify_Lock(theMesh, locknodes, numNodes, lockelems, numElems);
+    findAdjData(n1, n2, &e1, &e2, &e1_n1, &e1_n2, &e1_n3, &e2_n1, &e2_n2, &e2_n3,&n3, &n4);
+    if (e1 == -1) {
+      FEM_Modify_Unlock(theMesh);
+      return 0;
+    }
+    if(gotlock==1 && lockelems[0]==e1 && lockelems[1]==e2 && locknodes[2]==n3 && locknodes[3]==n4) {
+      done = true;
+    }
+    else {
+      FEM_Modify_Unlock(theMesh);
+      locknodes[2] = n3;
+      locknodes[3] = n4;
+      lockelems[0] = e1;
+      lockelems[1] = e2;
+    }
+  }
   return edge_contraction_help(e1, e2, n1, n2, e1_n1, e1_n2, e1_n3, e2_n1, 
 			       e2_n2, e2_n3, n3, n4);
 }
@@ -408,7 +531,7 @@ int FEM_Adapt::edge_contraction_help(int e1, int e2, int n1, int n2, int e1_n1,
   adjelems[0] = e1;
   adjelems[1] = e2;
 
-  FEM_Modify_Lock(theMesh, adjnodes, 2, adjelems, 2);
+  //FEM_Modify_Lock(theMesh, adjnodes, 2, adjelems, 2);
 #ifdef DEBUG_1
   CkPrintf("Edge Contraction, edge %d->%d on chunk %d\n", n1, n2, theMod->getfmUtil()->getIdx());
   CkPrintf("Adjacencies before edge contract\n");
@@ -523,10 +646,19 @@ int FEM_Adapt::edge_contraction_help(int e1, int e2, int n1, int n2, int e1_n1,
 */
 int FEM_Adapt::vertex_split(int n, int n1, int n2) 
 {
+  int *locknodes = (int*)malloc(2*sizeof(int));
+  locknodes[0] = n1; locknodes[1] = n2;
+  FEM_Modify_Lock(theMesh, locknodes, 2, locknodes, 0);
   int e1 = theMesh->getElementOnEdge(n, n1);
-  if (e1 == -1) return -1;	     
+  if (e1 == -1) {
+    FEM_Modify_Unlock(theMesh);
+    return -1;	     
+  }
   int e3 = theMesh->getElementOnEdge(n, n2);
-  if (e3 == -1) return -1;	     
+  if (e3 == -1) {
+    FEM_Modify_Unlock(theMesh);
+    return -1;	     
+  }
   return vertex_split(n, n1, n2, e1, e3);
 }
 int FEM_Adapt::vertex_split(int n, int n1, int n2, int e1, int e3)
@@ -558,7 +690,7 @@ int FEM_Adapt::vertex_split(int n, int n1, int n2, int e1, int e3)
   lockelems[4] = -1;
   lockelems[5] = -1;
 
-  FEM_Modify_Lock(theMesh, locknodes, 4, lockelems, 6);
+  //FEM_Modify_Lock(theMesh, locknodes, 4, lockelems, 6);
 #ifdef DEBUG_1
   CkPrintf("VErtex Split, %d-%d-%d on chunk %d\n", n1, n, n2, theMod->getfmUtil()->getIdx());
   CkPrintf("Adjacencies before vertex split\n");
