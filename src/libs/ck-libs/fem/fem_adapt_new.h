@@ -7,8 +7,8 @@
 #include "ckvector3d.h"
 #include "fem.h"
 #include "fem_mesh.h"
-#include "fem_mesh_modify.h"
 
+class femMeshModify;
 
 class FEM_Adapt {
   FEM_Mesh *theMesh;
@@ -42,6 +42,7 @@ class FEM_Adapt {
     theMesh->e2n_getAll(e, eConn);
     for (int i=0; i<3; i++) 
       if ((eConn[i] != n2) && (eConn[i] != n2)) return eConn[i];
+    return -1; //should never come here
   }
   int n2e_exists(int n, int e) {
     int *nConn, nSz;
@@ -58,10 +59,15 @@ class FEM_Adapt {
 	return nConn[i];
       }
     }
+    return -1; //should never come here
   }
   int getSharedNodeIdxl(int n, int chk);
   int getGhostNodeIdxl(int n, int chk);
   int getGhostElementIdxl(int e, int chk);
+
+  FEM_Adapt() {
+    theMesh = NULL; theMod = NULL;
+  }
 
   /// Initialize FEM_Adapt with a chunk of the mesh
   FEM_Adapt(FEM_Mesh *m, femMeshModify *fm) { theMesh = m; theMod = fm; }

@@ -11,7 +11,8 @@
 #include "ckvector3d.h"
 #include "fem.h"
 #include "fem_mesh.h"
-#include "fem_mesh_modify.h"
+
+class femMeshModify;
 
 class FEM_Interpolate {
   FEM_Mesh *theMesh;

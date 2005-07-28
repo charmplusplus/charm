@@ -1,4 +1,5 @@
 #include "fem_adapt_new.h"  
+#include "fem_mesh_modify.h"
 
 #define DEBUG_1
 #define DEBUG_2

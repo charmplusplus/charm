@@ -287,17 +287,17 @@ class femMeshModify : public CBase_femMeshModify {
   friend class FEM_lock;
   friend class FEM_MUtil;
   friend class FEM_Mesh;
-  friend class FEM_Adapt;
   friend class FEM_Interpolate;
+  friend class FEM_Adapt;
 
- protected:
+ public:
   int numChunks;
   int idx;
   FEM_Mesh *fmMesh;
-  FEM_Adapt *fmAdapt;
   FEM_lock *fmLock;
   FEM_MUtil *fmUtil;
   FEM_Interpolate *fmInp;
+  FEM_Adapt *fmAdapt;
 
  public:
   femMeshModify(femMeshModMsg *fm);
