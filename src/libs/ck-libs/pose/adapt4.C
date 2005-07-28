@@ -17,14 +17,12 @@ void adapt4::Step()
   parent->Status();
 
   if (rbFlag) { // adjust leash according to rollback
-    if (timeLeash > avgRBoffset)
-      timeLeash = avgRBoffset;
-    else timeLeash = avgRBoffset/2;
+    timeLeash = avgRBoffset;
   }
   else if (timeLeash < theMaxLeash) { // adjust according to state
     if (eq->currentPtr->timestamp > POSE_UnsetTS) { // adjust to next event
-      if (eq->currentPtr->timestamp - lastGVT >= timeLeash)
-	timeLeash++;
+      if (eq->currentPtr->timestamp - lastGVT > timeLeash)
+	timeLeash == eq->currentPtr->timestamp - lastGVT;
       // else leave it alone
     }
     // no next event; leave it alone
