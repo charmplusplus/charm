@@ -713,6 +713,8 @@ int FEM_Adapt::edge_contraction_help(int e1, int e2, int n1, int n2, int e1_n1,
 */
 int FEM_Adapt::vertex_split(int n, int n1, int n2) 
 {
+  if ((n < 0) || ((n1 <= -1) && (n2 <= -1)))
+    CkAbort("FEM_Adapt::vertex_split: n and at least one of its neighbor must be local to this chunk; n1 and n2 must both exist\n");
   int *locknodes = (int*)malloc(2*sizeof(int));
   locknodes[0] = n1; locknodes[1] = n2;
   FEM_Modify_Lock(theMesh, locknodes, 2, locknodes, 0);
@@ -759,7 +761,7 @@ int FEM_Adapt::vertex_split(int n, int n1, int n2, int e1, int e3)
 
   //FEM_Modify_Lock(theMesh, locknodes, 4, lockelems, 6);
 #ifdef DEBUG_1
-  CkPrintf("VErtex Split, %d-%d-%d on chunk %d\n", n1, n, n2, theMod->getfmUtil()->getIdx());
+  CkPrintf("Vertex Split, %d-%d-%d on chunk %d\n", n1, n, n2, theMod->getfmUtil()->getIdx());
   CkPrintf("Adjacencies before vertex split\n");
   printAdjacencies(locknodes, 4, lockelems, 4);
 #endif
