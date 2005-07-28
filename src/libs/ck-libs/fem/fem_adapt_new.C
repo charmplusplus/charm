@@ -78,9 +78,14 @@ int FEM_Adapt::edge_flip_help(int e1, int e2, int n1, int n2, int e1_n1,
   lockelems[1] = e2;
 
   //currently we do not move chunk boundaries, so we do not flip edges in which one of the 4 nodes of the quadrilateral is a ghost node.
-  if(n1 < 0 || n2 < 0 || n3 < 0 || n4 < 0) return -1;
+  if(n1 < 0 || n2 < 0 || n3 < 0 || n4 < 0) {
+    return -1;
+  }
 
   //FEM_Modify_Lock(theMesh, locknodes, numNodes, lockelems, numElems);
+
+  int e1chunk=-1, e2chunk=-1;
+  int index = theMod->getIdx();
 
 #ifdef DEBUG_1
   CkPrintf("Flipping edge %d->%d on chunk %d\n", n1, n2, theMod->getfmUtil()->getIdx());
@@ -88,28 +93,57 @@ int FEM_Adapt::edge_flip_help(int e1, int e2, int n1, int n2, int e1_n1,
   printAdjacencies(locknodes, numNodes, lockelems, numElems);
 #endif
 
-  FEM_remove_element(theMesh, e1, 0);
+  e1chunk = FEM_remove_element(theMesh, e1, 0);
 #ifdef DEBUG_2
   CkPrintf("Adjacencies after remove element %d: conn(%d,%d,%d)\n",e1,n1,n2,n3);
   lockelems[0] = -1;
   printAdjacencies(locknodes, numNodes, lockelems, numElems);
 #endif
-  FEM_remove_element(theMesh, e2, 0);
+  e2chunk = FEM_remove_element(theMesh, e2, 0);
 #ifdef DEBUG_2
   CkPrintf("Adjacencies after remove element %d: conn(%d,%d,%d)\n",e2,n1,n2,n4);
   lockelems[1] = -1;
   printAdjacencies(locknodes, numNodes, lockelems, numElems);
 #endif
+
+  if(e1chunk==e2chunk && e1chunk!=index) {
+    //both of them are on some other chunk
+    //will happen when all three nodes are shared between e1chunk & index
+    //do nothing, just call them on those chunks
+  }
+  else if(e1chunk==e2chunk && e1chunk==index) {
+    //common case, when both of them are local
+  }
+  else if(e1chunk!=e2chunk && (e1chunk==index || e2chunk==index)) {
+    //one is local & one is remote
+    if(e1chunk==index) {
+      //if n1 or n2 or n4 had only e2 as local n2e on e2chunk then, downgrade it from shared to ghost
+      //n4 is remote, upgrade it from ghost to shared node on e1chunk
+      e2chunk=e1chunk; //e1chunk eats e2
+    }
+    else {
+      //if n1 or n2 or n3 had only e1 as local n2e on e1chunk then, downgrade it from shared to ghost
+      //n3 is remote, upgrade it from ghost to shared node on e2chunk
+      e1chunk=e2chunk; //e2chunk eats e1
+    }
+    //effectively index eats the other element
+  }
+  else {
+    //the chunk trying to flip both elements, doesn't own even one of them
+    //extremely rare case.. not handling this now
+    CkAbort("Flip with two external elements on two different chunks\n");
+  }
+
   // add n1, n3, n4
   conn[e1_n1] = n1;  conn[e1_n2] = n4;  conn[e1_n3] = n3;
-  lockelems[0] = FEM_add_element(theMesh, conn, 3, 0);
+  lockelems[0] = FEM_add_element(theMesh, conn, 3, 0, e1chunk);
 #ifdef DEBUG_2
   CkPrintf("Adjacencies after add element %d: conn(%d,%d,%d)\n",lockelems[0],conn[0],conn[1],conn[2]);
   printAdjacencies(locknodes, numNodes, lockelems, numElems);
 #endif
   // add n2, n3, n4
   conn[e1_n1] = n4;  conn[e1_n2] = n2;  conn[e1_n3] = n3;
-  lockelems[1] = FEM_add_element(theMesh, conn, 3, 0);
+  lockelems[1] = FEM_add_element(theMesh, conn, 3, 0, e2chunk);
 #ifdef DEBUG_2
   CkPrintf("Adjacencies after add element %d: conn(%d,%d,%d)\n",lockelems[1],conn[0],conn[1],conn[2]);
   printAdjacencies(locknodes, numNodes, lockelems, numElems);
@@ -207,19 +241,22 @@ int FEM_Adapt::edge_bisect_help(int e1, int e2, int n1, int n2, int e1_n1,
 
   //FEM_Modify_Lock(theMesh, locknodes, numNodes, lockelems, numElems);
 
+  int e1chunk=-1, e2chunk=-1, e3chunk=-1, e4chunk=-1, n5chunk=-1;
+  int index = theMod->getIdx();
+
 #ifdef DEBUG_1
   CkPrintf("Bisect edge %d->%d on chunk %d\n", n1, n2, theMod->getfmUtil()->getIdx());
   CkPrintf("Adjacencies before bisect\n");
   printAdjacencies(locknodes, numNodes, lockelems, numElems);
 #endif
 
-  FEM_remove_element(theMesh, e1, 0); 
+  e1chunk = FEM_remove_element(theMesh, e1, 0); 
 #ifdef DEBUG_2
   CkPrintf("Adjacencies after remove element %d\n",e1);
   lockelems[0] = -1;
   printAdjacencies(locknodes, numNodes, lockelems, numElems);
 #endif
-  FEM_remove_element(theMesh, e2, 0);  // assumes intelligent behavior when no e2 exists
+  e2chunk = FEM_remove_element(theMesh, e2, 0);  // assumes intelligent behavior when no e2 exists
 #ifdef DEBUG_2
   lockelems[1] = -1;
   CkPrintf("Adjacencies after remove element %d\n",e2);
@@ -227,25 +264,46 @@ int FEM_Adapt::edge_bisect_help(int e1, int e2, int n1, int n2, int e1_n1,
 #endif
   // hmm... if e2 is a ghost and we remove it and create all the new elements
   // locally, then we don't really need to add a *shared* node
+  //but we are not moving chunk boundaries
   int *adjnodes = (int*)malloc(2*sizeof(int));
   adjnodes[0] = n1;
   adjnodes[1] = n2;
 
-  n5 = FEM_add_node(theMesh,adjnodes,2,0);
+  if(e1chunk=-1 || e2chunk==-1) {
+    //it is fine, let it continue
+    e4chunk = e2chunk;
+    e3chunk = e2chunk;
+    e2chunk = e1chunk;
+  }
+  else if(e1chunk==e2chunk && e1chunk!=index) {
+    n5chunk = e1chunk;
+    e4chunk = e2chunk;
+    e3chunk = e2chunk;
+    e2chunk = e1chunk;
+  }
+  else {
+    //there can be a lot of conditions, but for nothing, do we have to do aything special now
+    n5chunk = -1;
+    e4chunk = e2chunk;
+    e3chunk = e2chunk;
+    e2chunk = e1chunk;
+  }
+
+  n5 = FEM_add_node(theMesh,adjnodes,2,n5chunk,0);
 #ifdef DEBUG_2
   CkPrintf("Adjacencies after add node %d\n",n5);
   printAdjacencies(locknodes, numNodesNew, lockelems, numElemsNew);
 #endif
   // add n1, n5, n3
   conn[e1_n1] = n1;  conn[e1_n2] = n5;  conn[e1_n3] = n3;
-  lockelems[0] = FEM_add_element(theMesh, conn, 3, 0);
+  lockelems[0] = FEM_add_element(theMesh, conn, 3, 0, e1chunk);
 #ifdef DEBUG_2
   CkPrintf("Adjacencies after add element %d: conn(%d,%d,%d)\n",lockelems[0],conn[0],conn[1],conn[2]);
   printAdjacencies(locknodes, numNodesNew, lockelems, numElemsNew);
 #endif
   // add n2, n5, n3
   conn[e1_n1] = n5;  conn[e1_n2] = n2;  conn[e1_n3] = n3;
-  lockelems[1] = FEM_add_element(theMesh, conn, 3, 0);
+  lockelems[1] = FEM_add_element(theMesh, conn, 3, 0, e1chunk);
 #ifdef DEBUG_2
   CkPrintf("Adjacencies after add element %d: conn(%d,%d,%d)\n",lockelems[1],conn[0],conn[1],conn[2]);
   printAdjacencies(locknodes, numNodesNew, lockelems, numElemsNew);
@@ -253,14 +311,14 @@ int FEM_Adapt::edge_bisect_help(int e1, int e2, int n1, int n2, int e1_n1,
   if (e2 != -1) { // e2 exists
     // add n1, n5, n4
     conn[e2_n1] = n1;  conn[e2_n2] = n5;  conn[e2_n3] = n4;
-    lockelems[2] = FEM_add_element(theMesh, conn, 3, 0);
+    lockelems[2] = FEM_add_element(theMesh, conn, 3, 0, e2chunk);
 #ifdef DEBUG_2
   CkPrintf("Adjacencies after add element %d: conn(%d,%d,%d)\n",lockelems[2],conn[0],conn[1],conn[2]);
   printAdjacencies(locknodes, numNodes, lockelems, numElemsNew);
 #endif
     // add n2, n5, n4
     conn[e2_n1] = n5;  conn[e2_n2] = n2;  conn[e2_n3] = n4;
-    lockelems[3] = FEM_add_element(theMesh, conn, 3, 0);
+    lockelems[3] = FEM_add_element(theMesh, conn, 3, 0, e2chunk);
 #ifdef DEBUG_2
   CkPrintf("Adjacencies after add element %d: conn(%d,%d,%d)\n",lockelems[3],conn[0],conn[1],conn[2]);
   printAdjacencies(locknodes, numNodesNew, lockelems, numElemsNew);
@@ -390,66 +448,69 @@ int FEM_Adapt::vertex_remove_help(int e1, int e2, int n1, int n2, int e1_n1,
     }
     //FEM_Modify_Lock(theMesh, locknodes, numNodes, lockelems, numElems);
 
+    int e1chunk=-1, e2chunk=-1, e3chunk=-1, e4chunk=-1;
+    int index = theMod->getIdx();
+
 #ifdef DEBUG_1
-  CkPrintf("Vertex Remove edge %d->%d on chunk %d\n", n1, n2, theMod->getfmUtil()->getIdx());
-  CkPrintf("Adjacencies before vertex remove\n");
-  printAdjacencies(locknodes, numNodes, lockelems, numElems);
+    CkPrintf("Vertex Remove edge %d->%d on chunk %d\n", n1, n2, theMod->getfmUtil()->getIdx());
+    CkPrintf("Adjacencies before vertex remove\n");
+    printAdjacencies(locknodes, numNodes, lockelems, numElems);
 #endif
     
-    FEM_remove_element(theMesh, e1, 0);
+    e1chunk = FEM_remove_element(theMesh, e1, 0);
 #ifdef DEBUG_2
-  CkPrintf("Adjacencies after remove element %d\n",e1);
-  lockelems[0] = -1;
-  printAdjacencies(locknodes, numNodes, lockelems, numElems);
+    CkPrintf("Adjacencies after remove element %d\n",e1);
+    lockelems[0] = -1;
+    printAdjacencies(locknodes, numNodes, lockelems, numElems);
 #endif
-    FEM_remove_element(theMesh, e3, 0);
+    e3chunk = FEM_remove_element(theMesh, e3, 0);
 #ifdef DEBUG_2
-  CkPrintf("Adjacencies after remove element %d\n",e3);
-  lockelems[2] = -1;
-  printAdjacencies(locknodes, numNodes, lockelems, numElems);
+    CkPrintf("Adjacencies after remove element %d\n",e3);
+    lockelems[2] = -1;
+    printAdjacencies(locknodes, numNodes, lockelems, numElems);
 #endif
     if (e2 != -1) {
-      FEM_remove_element(theMesh, e2, 0);
+      e2chunk = FEM_remove_element(theMesh, e2, 0);
 #ifdef DEBUG_2
-  CkPrintf("Adjacencies after remove element %d\n",e2);
-  lockelems[1] = -1;
-  printAdjacencies(locknodes, numNodes, lockelems, numElems);
+      CkPrintf("Adjacencies after remove element %d\n",e2);
+      lockelems[1] = -1;
+      printAdjacencies(locknodes, numNodes, lockelems, numElems);
 #endif
-      FEM_remove_element(theMesh, e4, 0);
+      e4chunk = FEM_remove_element(theMesh, e4, 0);
 #ifdef DEBUG_2
-  CkPrintf("Adjacencies after remove element %d\n",e4);
-  lockelems[3] = -1;
-  printAdjacencies(locknodes, numNodes, lockelems, numElems);
+      CkPrintf("Adjacencies after remove element %d\n",e4);
+      lockelems[3] = -1;
+      printAdjacencies(locknodes, numNodes, lockelems, numElems);
 #endif
     }
     FEM_remove_node(theMesh, n1);
 #ifdef DEBUG_2
-  CkPrintf("Adjacencies after remove node %d\n",n1);
-  locknodes[4] = -1;
-  printAdjacencies(locknodes, numNodes, lockelems, numElems);
+    CkPrintf("Adjacencies after remove node %d\n",n1);
+    locknodes[4] = -1;
+    printAdjacencies(locknodes, numNodes, lockelems, numElems);
 #endif
     
     int *conn = (int*)malloc(3*sizeof(int));
     // add n2, n5, n3
     conn[e1_n1] = n2;  conn[e1_n2] = n3;  conn[e1_n3] = n5;
-    lockelems[0] = FEM_add_element(theMesh, conn, 3, 0);
+    lockelems[0] = FEM_add_element(theMesh, conn, 3, 0, e1chunk);
 #ifdef DEBUG_2
-  CkPrintf("Adjacencies after add element %d: conn(%d,%d,%d)\n",lockelems[0],conn[0],conn[1],conn[2]);
-  printAdjacencies(locknodes, numNodes, lockelems, numElems);
+    CkPrintf("Adjacencies after add element %d: conn(%d,%d,%d)\n",lockelems[0],conn[0],conn[1],conn[2]);
+    printAdjacencies(locknodes, numNodes, lockelems, numElems);
 #endif
     if (e2 != -1) {
       // add n2, n5, n4
       conn[e2_n1] = n5;  conn[e2_n2] = n4;  conn[e2_n3] = n2;
-      lockelems[1] = FEM_add_element(theMesh, conn, 3, 0);
+      lockelems[1] = FEM_add_element(theMesh, conn, 3, 0, e2chunk);
 #ifdef DEBUG_2
-  CkPrintf("Adjacencies after add element %d: conn(%d,%d,%d)\n",lockelems[1],conn[0],conn[1],conn[2]);
-  printAdjacencies(locknodes, numNodes, lockelems, numElems);
+      CkPrintf("Adjacencies after add element %d: conn(%d,%d,%d)\n",lockelems[1],conn[0],conn[1],conn[2]);
+      printAdjacencies(locknodes, numNodes, lockelems, numElems);
 #endif
     }
 
 #ifdef DEBUG_1
-  CkPrintf("Adjacencies after vertex remove\n");
-  printAdjacencies(locknodes, numNodesNew, lockelems, numElemsNew);
+    CkPrintf("Adjacencies after vertex remove\n");
+    printAdjacencies(locknodes, numNodesNew, lockelems, numElemsNew);
 #endif
 
     FEM_Modify_Unlock(theMesh);
@@ -532,22 +593,27 @@ int FEM_Adapt::edge_contraction_help(int e1, int e2, int n1, int n2, int e1_n1,
   adjelems[1] = e2;
 
   //FEM_Modify_Lock(theMesh, adjnodes, 2, adjelems, 2);
+  
+  int e1chunk=-1, e2chunk=-1;
+  int index = theMod->getIdx();
+
 #ifdef DEBUG_1
   CkPrintf("Edge Contraction, edge %d->%d on chunk %d\n", n1, n2, theMod->getfmUtil()->getIdx());
   CkPrintf("Adjacencies before edge contract\n");
   printAdjacencies(adjnodes, 2, adjelems, 2);
 #endif
-  FEM_remove_element(theMesh, e1, 0);
+  e1chunk = FEM_remove_element(theMesh, e1, 0);
 #ifdef DEBUG_2
   CkPrintf("Adjacencies after remove element %d\n",e1);
   printAdjacencies(adjnodes, 2, adjelems, 2);
 #endif
-  FEM_remove_element(theMesh, e2, 0);
+  e2chunk = FEM_remove_element(theMesh, e2, 0);
 #ifdef DEBUG_2
   CkPrintf("Adjacencies after remove element %d\n",e2);
   printAdjacencies(adjnodes, 2, adjelems, 2);
 #endif
-  int n5 = FEM_add_node(theMesh,adjnodes,2,0);
+  //if n1 & n2 are shared, n5 should be shared, then only it can have the same connections
+  int n5 = FEM_add_node(theMesh,adjnodes,2,-1,0);
 #ifdef DEBUG_2
   CkPrintf("Adjacencies after add node %d\n",n5);
   printAdjacencies(adjnodes, 2, adjelems, 2);
@@ -565,12 +631,12 @@ int FEM_Adapt::edge_contraction_help(int e1, int e2, int n1, int n2, int e1_n1,
       theMesh->e2n_getAll(nbrElems1[i], conn);
       for (int j=0; j<3; j++) 
 	if (conn[j] == n1) conn[j] = n5;
-      FEM_remove_element(theMesh, nbrElems1[i], 0);
+      e1chunk = FEM_remove_element(theMesh, nbrElems1[i], 0);
 #ifdef DEBUG_2
       CkPrintf("Adjacencies after remove element %d\n",nbrElems1[i]);
       printAdjacencies(nbrElems1, 0, nbrElems1, nesize1);
 #endif
-      nbrElems1[i] = FEM_add_element(theMesh, conn, 3, 0);
+      nbrElems1[i] = FEM_add_element(theMesh, conn, 3, 0, e1chunk); //add it to the same chunk from where it was removed
 #ifdef DEBUG_2
       CkPrintf("Adjacencies after add element %d: conn(%d,%d,%d)\n",nbrElems1[i],conn[0],conn[1],conn[2]);
       printAdjacencies(nbrElems1, 0, nbrElems1, nesize1);
@@ -585,12 +651,12 @@ int FEM_Adapt::edge_contraction_help(int e1, int e2, int n1, int n2, int e1_n1,
       theMesh->e2n_getAll(nbrElems2[i], conn);
       for (int j=0; j<3; j++) 
 	if (conn[j] == n2) conn[j] = n5;
-      FEM_remove_element(theMesh, nbrElems2[i], 0);
+      e1chunk = FEM_remove_element(theMesh, nbrElems2[i], 0);
 #ifdef DEBUG_2
       CkPrintf("Adjacencies after remove element %d\n",nbrElems2[i]);
       printAdjacencies(nbrElems2, 0, nbrElems2, nesize2);
 #endif
-      nbrElems2[i] = FEM_add_element(theMesh, conn, 3, 0);
+      nbrElems2[i] = FEM_add_element(theMesh, conn, 3, 0, e1chunk);
 #ifdef DEBUG_2
       CkPrintf("Adjacencies after add element %d: conn(%d,%d,%d)\n",nbrElems2[i],conn[0],conn[1],conn[2]);
       printAdjacencies(nbrElems2, 0, nbrElems2, nesize2);
@@ -698,7 +764,7 @@ int FEM_Adapt::vertex_split(int n, int n1, int n2, int e1, int e3)
 #endif
   int *adjnodes = (int*)malloc(2*sizeof(int));
   adjnodes[0] = n; //looks like it will never be shared, since according to later code, all n1, n & n2 should be local.. appears to be not correct
-  int np = FEM_add_node(theMesh,adjnodes,1,0);
+  int np = FEM_add_node(theMesh,adjnodes,1,-1,0);
   locknodes[3] = np;
 #ifdef DEBUG_2
   CkPrintf("Adjacencies after add node %d\n",np);

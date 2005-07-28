@@ -10,6 +10,9 @@ module FEMMeshModify {
     int between[];
   };
   message removeSharedNodeMsg;
+  message addNodeMsg {
+    int between[];
+  };
   message addGhostElemMsg {
     int ghostIndices[];
     int sharedIndices[];
@@ -32,6 +35,7 @@ module FEMMeshModify {
     entry [sync] void setFemMesh(FEMMeshMsg *);
     entry [sync,threaded] intMsg *lockRemoteChunk(int2Msg *);
     entry [sync,threaded] intMsg *unlockRemoteChunk(int2Msg *);
+    entry [sync,threaded] intMsg *addNodeRemote(addNodeMsg *);
     entry [sync,threaded] void addSharedNodeRemote(sharedNodeMsg *);
     entry [sync,threaded] void removeSharedNodeRemote(removeSharedNodeMsg *);
     entry [sync,threaded] void addGhostElem(addGhostElemMsg *);

@@ -37,10 +37,10 @@ extern CProxy_femMeshModify meshMod;
 
 
 // The internal functions which take in a FEM_Mesh*, but could feasibly be used by others
-int FEM_add_node(FEM_Mesh *m, int* adjacent_nodes=0, int num_adjacent_nodes=0, int upcall=0);
+int FEM_add_node(FEM_Mesh *m, int* adjacent_nodes=0, int num_adjacent_nodes=0, int chunkNo=-1, int upcall=0);
 void FEM_remove_node(FEM_Mesh *m, int node);
-void FEM_remove_element(FEM_Mesh *m, int element, int elem_type=0);
-int FEM_add_element(FEM_Mesh *m, int* conn, int conn_size, int elem_type=0);
+int FEM_remove_element(FEM_Mesh *m, int element, int elem_type=0);
+int FEM_add_element(FEM_Mesh *m, int* conn, int conn_size, int elem_type=0, int chunkNo=-1);
 int FEM_Modify_Lock(FEM_Mesh *m, int* affectedNodes=0, int numAffectedNodes=0, int* affectedElts=0, int numAffectedElts=0, int elemtype=0);
 int FEM_Modify_Unlock(FEM_Mesh *m);
 
@@ -164,6 +164,21 @@ class FEMMeshMsg : public CMessage_FEMMeshMsg {
   }
 
   ~FEMMeshMsg() {}
+};
+
+class addNodeMsg : public CMessage_addNodeMsg {
+ public:
+  int chk;
+  int nBetween;
+  int *between;
+  int chunkNo;
+  int upcall;
+
+  ~addNodeMsg() {
+    if(between) {
+      delete between;
+    }
+  }
 };
 
 class sharedNodeMsg : public CMessage_sharedNodeMsg {
@@ -293,11 +308,15 @@ class femMeshModify : public CBase_femMeshModify {
   intMsg *unlockRemoteChunk(int2Msg *i2msg);
 
   void setFemMesh(FEMMeshMsg *fm);
+  int getNumChunks(){return numChunks;}
+  int getIdx(){return idx;}
+  FEM_Mesh *getfmMesh(){return fmMesh;}
   FEM_lock *getfmLock(){return fmLock;}
   FEM_MUtil *getfmUtil(){return fmUtil;}
   FEM_Adapt *getfmAdapt(){return fmAdapt;}
   FEM_Interpolate *getfmInp(){return fmInp;}
 
+  intMsg *addNodeRemote(addNodeMsg *fm);
   void addSharedNodeRemote(sharedNodeMsg *fm);
   void removeSharedNodeRemote(removeSharedNodeMsg *fm);
 
