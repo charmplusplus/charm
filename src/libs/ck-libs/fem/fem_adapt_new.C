@@ -1004,5 +1004,9 @@ void FEM_Adapt::printAdjacencies(int *nodes, int numNodes, int *elems, int numEl
     theMod->getfmUtil()->FEM_Print_e2n(theMesh, elems[i]);
     theMod->getfmUtil()->FEM_Print_e2e(theMesh, elems[i]);
   }
+
+  theMod->getfmUtil()->FEM_Print_n2e(theMesh, 8);
+  theMod->getfmUtil()->FEM_Print_n2n(theMesh, 8);
+
   return;
 }

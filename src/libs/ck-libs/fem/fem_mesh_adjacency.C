@@ -12,6 +12,7 @@
 #include "fem.h"
 #include "fem_impl.h"
 #include "charm-api.h" /*for CDECL, FTN_NAME*/
+#include "fem_mesh_modify.h"
 
 
 CDECL void 
@@ -979,7 +980,6 @@ void FEM_Mesh::n2e_remove(int n, int oldElem)
 	  }
 	}
   }
-
 }
  
 /// Finds oldElem in n's element adjacency list, and replaces it with newElem
@@ -1026,7 +1026,6 @@ void FEM_Mesh::n2e_removeAll(int n)
 	CkVec<FEM_VarIndexAttribute::ID> &nsVec = eVec[n];
 	nsVec.free();
   }
-  
 }
 
 /// Get an element on edge (n1, n2) where n1, n2 are chunk-local
@@ -1037,14 +1036,20 @@ int FEM_Mesh::getElementOnEdge(int n1, int n2)
   int n1NumElems, n2NumElems;
   n2e_getAll(n1, &n1AdjElems, &n1NumElems);
   n2e_getAll(n2, &n2AdjElems, &n2NumElems);
-  printf("%d has %d neighboring elements, %d has %d\n", n1, n1NumElems, n2, n2NumElems);
+  int ret = -1;
+  //CkPrintf("%d has %d neighboring elements, %d has %d\n", n1, n1NumElems, n2, n2NumElems);
   for (int i=0; i<n1NumElems; i++) {
     for (int j=0; j<n2NumElems; j++) {
       if (n1AdjElems[i] == n2AdjElems[j]) {
-	return n1AdjElems[i]; 
-	break;
+	if(n1AdjElems[i] >= 0) {
+	  return n1AdjElems[i];
+	  break;
+	}
+	else {
+	  ret = n1AdjElems[i];
+	}
       }
     }
   }
-  return -1; 
+  return ret; //preferably return a local element, otherwise return a ghost 
 }
