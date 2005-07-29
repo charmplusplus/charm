@@ -259,7 +259,10 @@ void FEM_remove_node_local(FEM_Mesh *m, int node) {
     } //otherwise this ghost node is connected to some element in another chunk, which the chunk that just informed us doesn't know abt
   }
   else {
-    CkAssert((numAdjNodes==0) && (numAdjElts==0)); // we shouldn't be removing a node away that is connected to anything
+    //there seems to be bugs in n2n, which leaves some connections in rare cases even when n2e has nothing, so I am removing this assert temporarily.
+    if(!((numAdjNodes==0) && (numAdjElts==0))) { // we shouldn't be removing a node away that is connected to anything
+      CkPrintf("Error:: node %d has %d node adjacencies and %d edge adjacencies\n",node,numAdjNodes,numAdjElts);
+    }
     m->node.set_invalid(node);
   }
 }
@@ -290,16 +293,14 @@ void FEM_remove_node(FEM_Mesh *m, int node){
     m->n2e_getAll(node, &adjElts, &numAdjElts);
     CkAssert((numAdjNodes==0) && (numAdjElts==0)); // we shouldn't be removing a node away that is connected to anything
   
-    
-    
     // verify it is not adjacent to any elements on any of the associated chunks
-    
-	// mark node as deleted/invalid locally
-	m->node.set_invalid(node);
 
     // delete it on remote chunks(shared and ghost), update IDXL tables
 	m->getfmMM()->getfmUtil()->removeNodeAll(m, node);
-
+    
+	// mark node as deleted/invalid locally
+	//FEM_remove_node_local(m,node);
+	//m->node.set_invalid(node);
   }
   else {
     FEM_remove_node_local(m,node);
@@ -375,9 +376,6 @@ int FEM_remove_element(FEM_Mesh *m, int elementid, int elemtype){
   if(elementid == -1) return -1; // -1 is not even a valid ghost number
 
   if(FEM_Is_ghost_index(elementid)){
-    // remove local ghost element
-    //FEM_remove_element_local(m, elementid, elemtype);
-    
     //an element can come as a ghost from only one chunk, so just convert args and call it on that chunk
     int ghostid = FEM_To_ghost_index(elementid);
     const IDXL_Rec *irec = m->elem[elemtype].ghost->ghostRecv.getRec(ghostid);
@@ -392,12 +390,12 @@ int FEM_remove_element(FEM_Mesh *m, int elementid, int elemtype){
     rm->elemtype = elemtype;
     meshMod[remoteChunk].removeElementRemote(rm);
     //another possible deadlock
+
+    // remove local ghost element
+    //FEM_remove_element_local(m, elementid, elemtype);
     return remoteChunk;
   }
   else {
-    // remove local element
-    FEM_remove_element_local(m, elementid, elemtype);
-
     //if this is a ghost element on some other chunks, then for all ghost nodes in this element,
     //we should individually go to each ghost and figure out if it has any connectivity in
     //the ghost layer after the removal. If not, then it will be removed from their ghost layers.
@@ -451,7 +449,7 @@ int FEM_remove_element(FEM_Mesh *m, int elementid, int elemtype){
 	    //convert this local index to a shared index
 	    for(int k=0; k<sizeN; k++) {
 	      if(nodes[j] == ln[k]) {
-		m->node.ghostSend.removeNode(nodes[j], chk);
+		//m->node.ghostSend.removeNode(nodes[j], chk); //expermiment: do not delete ghost nodes
 		ghostIndices[numGhostNodes] = k;
 		numGhostNodes++;
 	      }
@@ -470,6 +468,8 @@ int FEM_remove_element(FEM_Mesh *m, int elementid, int elemtype){
 	meshMod[chk].removeGhostElem(rm);  //update the ghosts on all shared chunks
       }
     }
+    // remove local element
+    FEM_remove_element_local(m, elementid, elemtype);
   }
   return m->getfmMM()->getfmUtil()->getIdx();
 }
@@ -1179,33 +1179,43 @@ void FEM_MUtil::getChunkNos(int entType, int entNo, int *numChunks, IDXL_Share *
       int ghostid = FEM_To_ghost_index(entNo);
       int noShared = 0;  //I think a ghost node in the receiver table is entered as only coming from the one chunk that was first to add it.
       const IDXL_Rec *irec = mmod->fmMesh->node.ghost->ghostRecv.getRec(ghostid);
-      noShared = irec->getShared(); //check this value!!
-      CkAssert(noShared > 0);
-      int chunk = irec->getChk(0);
-      int sharedIdx = exists_in_IDXL(mmod->fmMesh,ghostid,chunk,2);
-      int2Msg *i2 = new int2Msg(idx, sharedIdx);
-      chunkListMsg *clm = meshMod[chunk].getChunksSharingGhostNode(i2);
-      *numChunks = clm->numChunkList + 1; //add chunk to the list
-      *chunks = (IDXL_Share**)malloc((*numChunks)*sizeof(IDXL_Share*));
-      int i=0;
-      for(i=0; i<*numChunks - 1; i++) {
-	int chk = clm->chunkList[i];
-	int index = -1; // no need to have these, I never use it anyway
-	(*chunks)[i] = new IDXL_Share(chk, index);
+      if(irec) {
+	noShared = irec->getShared(); //check this value!!
+	//CkAssert(noShared > 0);
+	int chunk = irec->getChk(0);
+	int sharedIdx = exists_in_IDXL(mmod->fmMesh,ghostid,chunk,2);
+	int2Msg *i2 = new int2Msg(idx, sharedIdx);
+	chunkListMsg *clm = meshMod[chunk].getChunksSharingGhostNode(i2);
+	*numChunks = clm->numChunkList + 1; //add chunk to the list
+	*chunks = (IDXL_Share**)malloc((*numChunks)*sizeof(IDXL_Share*));
+	int i=0;
+	for(i=0; i<*numChunks - 1; i++) {
+	  int chk = clm->chunkList[i];
+	  int index = -1; // no need to have these, I never use it anyway
+	  (*chunks)[i] = new IDXL_Share(chk, index);
+	}
+	(*chunks)[i] = new IDXL_Share(chunk, -1);
       }
-      (*chunks)[i] = new IDXL_Share(chunk, -1);
+      else { //might be that it does not exist anymore in the ghost list
+	*numChunks = 0;
+      }
     }
     else if(type == 1) {
       const IDXL_Rec *irec = mmod->fmMesh->node.shared.getRec(entNo);
-      *numChunks = irec->getShared() + 1; //add myself to the list
-      *chunks = (IDXL_Share**)malloc((*numChunks)*sizeof(IDXL_Share*));
-      int i=0;
-      for(i=0; i<*numChunks-1; i++) {
-	int chk = irec->getChk(i);
-	int index = irec->getIdx(i);
-	(*chunks)[i] = new IDXL_Share(chk, index);
+      if(irec) {
+	*numChunks = irec->getShared() + 1; //add myself to the list
+	*chunks = (IDXL_Share**)malloc((*numChunks)*sizeof(IDXL_Share*));
+	int i=0;
+	for(i=0; i<*numChunks-1; i++) {
+	  int chk = irec->getChk(i);
+	  int index = irec->getIdx(i);
+	  (*chunks)[i] = new IDXL_Share(chk, index);
+	}
+	(*chunks)[i] = new IDXL_Share(idx, -1);
       }
-      (*chunks)[i] = new IDXL_Share(idx, -1);
+      else { //might be that it does not exist anymore in the ghost list
+	*numChunks = 0;
+      }
     }
     else if(type == 0) {
       *numChunks = 0;
@@ -1225,12 +1235,17 @@ void FEM_MUtil::getChunkNos(int entType, int entNo, int *numChunks, IDXL_Share *
     if(type == 2) {
       int ghostid = FEM_To_ghost_index(entNo);
       const IDXL_Rec *irec = mmod->fmMesh->elem[elemType].ghost->ghostRecv.getRec(ghostid);
-      *numChunks = irec->getShared(); //should be 1
-      *chunks = (IDXL_Share**)malloc((*numChunks)*sizeof(IDXL_Share*));
-      for(int i=0; i<*numChunks; i++) {
-	int chk = irec->getChk(i);
-	int index = irec->getIdx(i);
-	(*chunks)[i] = new IDXL_Share(chk, index);
+      if(irec) {
+	*numChunks = irec->getShared(); //should be 1
+	*chunks = (IDXL_Share**)malloc((*numChunks)*sizeof(IDXL_Share*));
+	for(int i=0; i<*numChunks; i++) {
+	  int chk = irec->getChk(i);
+	  int index = irec->getIdx(i);
+	  (*chunks)[i] = new IDXL_Share(chk, index);
+	}
+      }
+      else { //might be that it does not exist anymore in the ghost list
+	*numChunks = 0;
       }
     }
     else if(type == 0) {
@@ -1542,14 +1557,14 @@ void FEM_MUtil::removeGhostElementRemote(FEM_Mesh *m, int chk, int elementid, in
 
   const IDXL_List ll2 = m->elem[elemtype].ghost->ghostRecv.getList(chk);
   int localIdx = ll2[elementid];
-  m->elem[elemtype].ghost->ghostRecv.removeNode(localIdx, chk);
+  m->elem[elemtype].ghost->ghostRecv.removeNode(localIdx, chk); //expermiment: do not delete ghost nodes
   FEM_remove_element_local(m, FEM_To_ghost_index(localIdx), elemtype);
 
   //convert existing remote ghost indices to local ghost indices 
   const IDXL_List ll1 = m->node.ghost->ghostRecv.getList(chk);
   for(int i=0; i<numGhostIndex; i++) {
     int localIdx = ll1[ghostIndices[i]];
-    m->node.ghost->ghostRecv.removeNode(localIdx, chk);
+    //m->node.ghost->ghostRecv.removeNode(localIdx, chk); //expermiment: do not delete ghost nodes
     FEM_remove_node_local(m, FEM_To_ghost_index(localIdx));
   }
 

@@ -270,24 +270,21 @@ int FEM_Adapt::edge_bisect_help(int e1, int e2, int n1, int n2, int e1_n1,
   adjnodes[0] = n1;
   adjnodes[1] = n2;
 
-  if(e1chunk=-1 || e2chunk==-1) {
+  if(e1chunk==-1 || e2chunk==-1) {
     //it is fine, let it continue
     e4chunk = e2chunk;
-    e3chunk = e2chunk;
-    e2chunk = e1chunk;
+    e3chunk = e1chunk;
   }
   else if(e1chunk==e2chunk && e1chunk!=index) {
     n5chunk = e1chunk;
     e4chunk = e2chunk;
-    e3chunk = e2chunk;
-    e2chunk = e1chunk;
+    e3chunk = e1chunk;
   }
   else {
     //there can be a lot of conditions, but for nothing, do we have to do aything special now
     n5chunk = -1;
     e4chunk = e2chunk;
-    e3chunk = e2chunk;
-    e2chunk = e1chunk;
+    e3chunk = e1chunk;
   }
 
   n5 = FEM_add_node(theMesh,adjnodes,2,n5chunk,0);
@@ -304,7 +301,7 @@ int FEM_Adapt::edge_bisect_help(int e1, int e2, int n1, int n2, int e1_n1,
 #endif
   // add n2, n5, n3
   conn[e1_n1] = n5;  conn[e1_n2] = n2;  conn[e1_n3] = n3;
-  lockelems[1] = FEM_add_element(theMesh, conn, 3, 0, e1chunk);
+  lockelems[1] = FEM_add_element(theMesh, conn, 3, 0, e3chunk);
 #ifdef DEBUG_2
   CkPrintf("Adjacencies after add element %d: conn(%d,%d,%d)\n",lockelems[1],conn[0],conn[1],conn[2]);
   printAdjacencies(locknodes, numNodesNew, lockelems, numElemsNew);
@@ -319,7 +316,7 @@ int FEM_Adapt::edge_bisect_help(int e1, int e2, int n1, int n2, int e1_n1,
 #endif
     // add n2, n5, n4
     conn[e2_n1] = n5;  conn[e2_n2] = n2;  conn[e2_n3] = n4;
-    lockelems[3] = FEM_add_element(theMesh, conn, 3, 0, e2chunk);
+    lockelems[3] = FEM_add_element(theMesh, conn, 3, 0, e4chunk);
 #ifdef DEBUG_2
   CkPrintf("Adjacencies after add element %d: conn(%d,%d,%d)\n",lockelems[3],conn[0],conn[1],conn[2]);
   printAdjacencies(locknodes, numNodesNew, lockelems, numElemsNew);
