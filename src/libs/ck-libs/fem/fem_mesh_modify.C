@@ -449,7 +449,7 @@ int FEM_remove_element(FEM_Mesh *m, int elementid, int elemtype){
 	    //convert this local index to a shared index
 	    for(int k=0; k<sizeN; k++) {
 	      if(nodes[j] == ln[k]) {
-		//m->node.ghostSend.removeNode(nodes[j], chk); //expermiment: do not delete ghost nodes
+		//m->node.ghostSend.removeNode(nodes[j], chk); //do not delete ghost nodes
 		ghostIndices[numGhostNodes] = k;
 		numGhostNodes++;
 	      }
@@ -699,7 +699,7 @@ int FEM_add_element(FEM_Mesh *m, int* conn, int connSize, int elemType, int chun
 	  int sharedGhost = m->getfmMM()->getfmUtil()->exists_in_IDXL(m,conn[j],chk,1);
 	  if( sharedGhost == -1) {
 	    //it is a new ghost
-	    m->node.ghostSend.addNode(FEM_To_ghost_index(conn[j]),chk);
+	    m->node.ghostSend.addNode(conn[j],chk);
 	    numNodesToAdd++;
 	  }
 	  else {
@@ -789,7 +789,7 @@ int FEM_add_element(FEM_Mesh *m, int* conn, int connSize, int elemType, int chun
 	  int sharedGhost = m->getfmMM()->getfmUtil()->exists_in_IDXL(m,conn[j],chk,1);
 	  if( sharedGhost == -1) {
 	    //it is a new ghost
-	    m->node.ghostSend.addNode(FEM_To_ghost_index(conn[j]),chk);
+	    m->node.ghostSend.addNode(conn[j],chk);
 	    numNodesToAdd++;
 	  }
 	  else {
@@ -1557,14 +1557,14 @@ void FEM_MUtil::removeGhostElementRemote(FEM_Mesh *m, int chk, int elementid, in
 
   const IDXL_List ll2 = m->elem[elemtype].ghost->ghostRecv.getList(chk);
   int localIdx = ll2[elementid];
-  m->elem[elemtype].ghost->ghostRecv.removeNode(localIdx, chk); //expermiment: do not delete ghost nodes
+  m->elem[elemtype].ghost->ghostRecv.removeNode(localIdx, chk); 
   FEM_remove_element_local(m, FEM_To_ghost_index(localIdx), elemtype);
 
   //convert existing remote ghost indices to local ghost indices 
   const IDXL_List ll1 = m->node.ghost->ghostRecv.getList(chk);
   for(int i=0; i<numGhostIndex; i++) {
     int localIdx = ll1[ghostIndices[i]];
-    //m->node.ghost->ghostRecv.removeNode(localIdx, chk); //expermiment: do not delete ghost nodes
+    //m->node.ghost->ghostRecv.removeNode(localIdx, chk); //do not delete ghost nodes
     FEM_remove_node_local(m, FEM_To_ghost_index(localIdx));
   }
 
