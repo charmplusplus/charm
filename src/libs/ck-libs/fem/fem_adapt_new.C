@@ -1,8 +1,8 @@
 #include "fem_adapt_new.h"  
 #include "fem_mesh_modify.h"
 
-#define DEBUG_1
-#define DEBUG_2
+//#define DEBUG_1
+//#define DEBUG_2
 
 // ======================  BEGIN edge_flip  =================================
 /* Perform a Delaunay flip of the edge (n1, n2) returning 1 if successful, 0 if
@@ -34,8 +34,13 @@ int FEM_Adapt::edge_flip(int n1, int n2)
   int *locknodes = (int*)malloc(numNodes*sizeof(int));
   int *lockelems = (int*)malloc(numElems*sizeof(int));
   bool done = false;
+  int isEdge = 0;
 
-  findAdjData(n1, n2, &e1, &e2, &e1_n1, &e1_n2, &e1_n3, &e2_n1, &e2_n2, &e2_n3,&n3, &n4);
+  isEdge = findAdjData(n1, n2, &e1, &e2, &e1_n1, &e1_n2, &e1_n3, &e2_n1, &e2_n2, &e2_n3,&n3, &n4);
+  if(isEdge == -1) {
+    CkPrintf("Error: Flip %d->%d not done as it is no longer a valid edge\n",n1,n2);
+    return -1;
+  }
   locknodes[0] = n1;
   locknodes[1] = n2;
   locknodes[2] = n3;
@@ -44,7 +49,12 @@ int FEM_Adapt::edge_flip(int n1, int n2)
   lockelems[1] = e2;
   while(!done) {
     int gotlock = FEM_Modify_Lock(theMesh, locknodes, numNodes, lockelems, numElems);
-    findAdjData(n1, n2, &e1, &e2, &e1_n1, &e1_n2, &e1_n3, &e2_n1, &e2_n2, &e2_n3,&n3, &n4);
+    isEdge = findAdjData(n1, n2, &e1, &e2, &e1_n1, &e1_n2, &e1_n3, &e2_n1, &e2_n2, &e2_n3,&n3, &n4);
+    if(isEdge == -1) {
+      FEM_Modify_Unlock(theMesh);
+      CkPrintf("Error: Flip %d->%d not done as it is no longer a valid edge\n",n1,n2);
+      return -1;
+    }
     if(gotlock==1 && lockelems[0]==e1 && lockelems[1]==e2 && locknodes[2]==n3 && locknodes[3]==n4) {
       done = true;
     }
@@ -192,8 +202,13 @@ int FEM_Adapt::edge_bisect(int n1, int n2)
   int *locknodes = (int*)malloc(numNodes*sizeof(int));
   int *lockelems = (int*)malloc(numElems*sizeof(int));
   bool done = false;
+  int isEdge = 0;
 
-  findAdjData(n1, n2, &e1, &e2, &e1_n1, &e1_n2, &e1_n3, &e2_n1, &e2_n2, &e2_n3,&n3, &n4);
+  isEdge = findAdjData(n1, n2, &e1, &e2, &e1_n1, &e1_n2, &e1_n3, &e2_n1, &e2_n2, &e2_n3,&n3, &n4);
+  if(isEdge == -1) {
+    CkPrintf("Error: Bisect %d->%d not done as it is no longer a valid edge\n",n1,n2);
+    return -1;
+  }
   locknodes[0] = n1;
   locknodes[1] = n2;
   locknodes[2] = n3;
@@ -202,7 +217,12 @@ int FEM_Adapt::edge_bisect(int n1, int n2)
   lockelems[1] = e2;
   while(!done) {
     int gotlock = FEM_Modify_Lock(theMesh, locknodes, numNodes, lockelems, numElems);
-    findAdjData(n1, n2, &e1, &e2, &e1_n1, &e1_n2, &e1_n3, &e2_n1, &e2_n2, &e2_n3,&n3, &n4);
+    isEdge = findAdjData(n1, n2, &e1, &e2, &e1_n1, &e1_n2, &e1_n3, &e2_n1, &e2_n2, &e2_n3,&n3, &n4);
+    if(isEdge == -1) {
+      FEM_Modify_Unlock(theMesh);
+      CkPrintf("Error: Bisect %d->%d not done as it is no longer a valid edge\n",n1,n2);
+      return -1;
+    }
     if(gotlock==1 && lockelems[0]==e1 && lockelems[1]==e2 && locknodes[2]==n3 && locknodes[3]==n4) {
       done = true;
     }
@@ -364,12 +384,21 @@ int FEM_Adapt::vertex_remove(int n1, int n2)
   int *locknodes = (int*)malloc(numNodes*sizeof(int));
   int *lockelems = (int*)malloc(numElems*sizeof(int));
   bool done = false;
+  int isEdge = 0;
 
-  findAdjData(n1, n2, &e1, &e2, &e1_n1, &e1_n2, &e1_n3, &e2_n1, &e2_n2, &e2_n3,&n3, &n4);
+  isEdge = findAdjData(n1, n2, &e1, &e2, &e1_n1, &e1_n2, &e1_n3, &e2_n1, &e2_n2, &e2_n3,&n3, &n4);
+  if(isEdge == -1) {
+    CkPrintf("Error: Vertex Remove %d->%d not done as it is no longer a valid edge\n",n1,n2);
+    return -1;
+  }
   if (e1 == -1) return 0;
   // find n5
   int *nbrNodes, nnsize, n5;
   theMesh->n2n_getAll(n1, &nbrNodes, &nnsize);
+  if(nnsize != 4) {
+    CkPrintf("Error: Vertex Remove %d->%d on node %d with %d connections (!= 4)\n",n1,n2,n1,nnsize);
+    return -1;    
+  }
   for (int i=0; i<nnsize; i++) {
     if ((nbrNodes[i] != n2) && (nbrNodes[i] != n3) && (nbrNodes[i] != n4)) {
       n5 = nbrNodes[i];
@@ -385,7 +414,12 @@ int FEM_Adapt::vertex_remove(int n1, int n2)
   lockelems[1] = e2;
   while(!done) {
     int gotlock = FEM_Modify_Lock(theMesh, locknodes, numNodes, lockelems, numElems);
-    findAdjData(n1, n2, &e1, &e2, &e1_n1, &e1_n2, &e1_n3, &e2_n1, &e2_n2, &e2_n3,&n3, &n4);
+    isEdge = findAdjData(n1, n2, &e1, &e2, &e1_n1, &e1_n2, &e1_n3, &e2_n1, &e2_n2, &e2_n3,&n3, &n4);
+    if(isEdge == -1) {
+      FEM_Modify_Unlock(theMesh);
+      CkPrintf("Error: Vertex Remove %d->%d not done as it is no longer a valid edge\n",n1,n2);
+      return -1;
+    }
     if (e1 == -1) {
       FEM_Modify_Unlock(theMesh);
       return 0;
@@ -398,6 +432,11 @@ int FEM_Adapt::vertex_remove(int n1, int n2)
 	n5 = nbrNodes[i];
 	break;
       }
+    }
+    if(nnsize != 4) {
+      FEM_Modify_Unlock(theMesh);
+      CkPrintf("Error: Vertex Remove %d->%d on node %d with %d connections (!= 4)\n",n1,n2,n1,nnsize);
+      return -1;    
     }
     if(gotlock==1 && lockelems[0]==e1 && lockelems[1]==e2 && locknodes[2]==n3 && locknodes[3]==n4 && locknodes[4]==n5) {
       done = true;
@@ -548,8 +587,13 @@ int FEM_Adapt::edge_contraction(int n1, int n2)
   int *locknodes = (int*)malloc(numNodes*sizeof(int));
   int *lockelems = (int*)malloc(numElems*sizeof(int));
   bool done = false;
+  int isEdge = 0;
 
-  findAdjData(n1, n2, &e1, &e2, &e1_n1, &e1_n2, &e1_n3, &e2_n1, &e2_n2, &e2_n3,&n3, &n4);
+  isEdge = findAdjData(n1, n2, &e1, &e2, &e1_n1, &e1_n2, &e1_n3, &e2_n1, &e2_n2, &e2_n3,&n3, &n4);
+  if(isEdge == -1) {
+    CkPrintf("Edge Contract %d->%d not done as it is no longer a valid edge\n",n1,n2);
+    return -1;
+  }
   locknodes[0] = n1;
   locknodes[1] = n2;
   locknodes[2] = n3;
@@ -559,7 +603,12 @@ int FEM_Adapt::edge_contraction(int n1, int n2)
   if (e1 == -1) return 0;
   while(!done) {
     int gotlock = FEM_Modify_Lock(theMesh, locknodes, numNodes, lockelems, numElems);
-    findAdjData(n1, n2, &e1, &e2, &e1_n1, &e1_n2, &e1_n3, &e2_n1, &e2_n2, &e2_n3,&n3, &n4);
+    isEdge = findAdjData(n1, n2, &e1, &e2, &e1_n1, &e1_n2, &e1_n3, &e2_n1, &e2_n2, &e2_n3,&n3, &n4);
+    if(isEdge == -1) {
+      FEM_Modify_Unlock(theMesh);
+      CkPrintf("Edge contract %d->%d not done as it is no longer a valid edge\n",n1,n2);
+      return -1;
+    }
     if (e1 == -1) {
       FEM_Modify_Unlock(theMesh);
       return 0;
@@ -957,14 +1006,21 @@ int FEM_Adapt::check_orientation(int e1, int e3, int n, int n1, int n2)
   else return 0;
 }
 
-void FEM_Adapt::findAdjData(int n1, int n2, int *e1, int *e2, int *e1n1, 
+int FEM_Adapt::findAdjData(int n1, int n2, int *e1, int *e2, int *e1n1, 
 			    int *e1n2, int *e1n3, int *e2n1, int *e2n2, 
 			    int *e2n3, int *n3, int *n4)
 {
   // Set some default values in case e1 is not there
   (*e1n1) = (*e1n2) = (*e1n3) = (*n3) = -1;
+
+  //if n1,n2 is not an edge return 
+  if(theMesh->n2n_exists(n1,n2)!=1 || theMesh->n2n_exists(n2,n1)!=1) return -1; 
+
   (*e1) = theMesh->getElementOnEdge(n1, n2); // assumed to return local element
-  if ((*e1) == -1) return;
+  if ((*e1) == -1) {
+    CkPrintf("Error: No Element on edge %d->%d\n",n1,n2);
+    return -1;
+  }
   (*e1n1) = find_local_node_index((*e1), n1);
   (*e1n2) = find_local_node_index((*e1), n2);
   (*e1n3) = 3 - (*e1n1) - (*e1n2);
@@ -980,6 +1036,7 @@ void FEM_Adapt::findAdjData(int n1, int n2, int *e1, int *e2, int *e1n1,
     (*n4) = theMesh->e2n_getNode((*e2), (*e2n3));
     //}
   }
+  return 1;
 }
 
 int FEM_Adapt::getSharedNodeIdxl(int n, int chk) {
@@ -1004,9 +1061,6 @@ void FEM_Adapt::printAdjacencies(int *nodes, int numNodes, int *elems, int numEl
     theMod->getfmUtil()->FEM_Print_e2n(theMesh, elems[i]);
     theMod->getfmUtil()->FEM_Print_e2e(theMesh, elems[i]);
   }
-
-  theMod->getfmUtil()->FEM_Print_n2e(theMesh, 8);
-  theMod->getfmUtil()->FEM_Print_n2n(theMesh, 8);
 
   return;
 }

@@ -1374,10 +1374,10 @@ int FEM_MUtil::exists_in_IDXL(FEM_Mesh *m, int localIdx, int chk, int type, int 
     ll = m->node.ghost->ghostRecv.getList(chk);
     localIdx = FEM_To_ghost_index(localIdx);
   }
-  else if(type == 3) { //ghost node recv 
+  else if(type == 3) { //ghost elem send 
     ll = m->elem[elemType].ghostSend.getList(chk);
   }
-  else if(type == 4) { //ghost node recv 
+  else if(type == 4) { //ghost elem recv 
     ll = m->elem[elemType].ghost->ghostRecv.getList(chk);
     localIdx = FEM_To_ghost_index(localIdx);
   }
@@ -1536,10 +1536,17 @@ void FEM_MUtil::addElemRemote(FEM_Mesh *m, int chk, int elemtype, int connSize, 
 
   int *localIndices = (int *)malloc(connSize*sizeof(int));
   int j=0;
+  int ghostsRemaining = numGhostIndex;
   for(int i=0; i<connSize; i++) {
-    if(ghostIndices[j] == i) {
-      localIndices[i] = ll1[conn[i]];
-      j++;
+    if(ghostsRemaining > 0) {
+      if(ghostIndices[j] == i) {
+	localIndices[i] = ll1[conn[i]];
+	ghostsRemaining--;
+	j++;
+      }
+      else {
+	localIndices[i] = ll2[conn[i]];
+      }
     }
     else {
       localIndices[i] = ll2[conn[i]];

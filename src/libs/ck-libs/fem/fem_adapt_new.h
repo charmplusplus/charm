@@ -34,7 +34,7 @@ class FEM_Adapt {
   /// Extract adjacency data relative to edge [n1,n2]
   /** Extract elements adjacent to edge [n1,n2] along with element-local node
       numberings and nodes opposite input edge **/
-  void findAdjData(int n1, int n2, int *e1, int *e2, int *e1n1, int *e1n2, 
+  int findAdjData(int n1, int n2, int *e1, int *e2, int *e1n1, int *e1n2, 
 		   int *e1n3, int *e2n1, int *e2n2, int *e2n3, int *n3, 
 		   int *n4);
   int e2n_getNot(int e, int n1, int n2) {
