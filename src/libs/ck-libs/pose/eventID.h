@@ -4,6 +4,7 @@
 #ifndef EVENTID_H
 #define EVENTID_H
 #include "charm++.h"
+#include "limits.h"
 
 /// Unique identifier for a POSE event
 class eventID 
