@@ -409,6 +409,10 @@ void FEM_Mesh::createElemElemAdj()
           adjs[i]=-1;
           adjTypes[i]=0;
         }
+        for(int i=0;i<numGhostElements*tuplesPerElem;i++){
+          adjsGhost[i]=-1;
+          adjTypesGhost[i]=0;
+        }
         
         // look through each elemList that is returned by the tuple table
         while (NULL!=(l=table.lookupNext())) {
@@ -596,7 +600,7 @@ void FEM_Mesh::e2e_removeAll(int e, int etype)
     eAdj = (FEM_IndexAttribute *)elem[etype].getGhost()->lookup(FEM_ELEM_ELEM_ADJACENCY,"e2e_removeAll");
     AllocTable2d<int> &eAdjs = eAdj->get();
     for (int i=0; i<eAdjs.width(); i++) {
-      eAdjs[FEM_Is_ghost_index(e)][i] = -1;
+      eAdjs[FEM_To_ghost_index(e)][i] = -1;
     }
   }
   else {
@@ -617,14 +621,16 @@ void FEM_Mesh::e2n_getAll(int e, int *adjnodes, int etype)
   if(FEM_Is_ghost_index(e)){
     FEM_IndexAttribute *eConn = (FEM_IndexAttribute *)elem[etype].getGhost()->lookup(FEM_CONN,"e2n_getAll");
     AllocTable2d<int> &conn = eConn->get();
-    for (int i=0; i<conn.width(); i++)
+    for (int i=0; i<conn.width(); i++) {
       adjnodes[i] = conn[FEM_To_ghost_index(e)][i];
+    }
   }
   else{
     FEM_IndexAttribute *eConn = (FEM_IndexAttribute *)elem[etype].lookup(FEM_CONN,"e2n_getAll");
     AllocTable2d<int> &conn = eConn->get();
-    for (int i=0; i<conn.width(); i++)
+    for (int i=0; i<conn.width(); i++) {
       adjnodes[i] = conn[e][i];
+    }
   }
 }
 

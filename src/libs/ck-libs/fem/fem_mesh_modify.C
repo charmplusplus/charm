@@ -567,30 +567,30 @@ void update_new_element_e2e(FEM_Mesh *m, int newEl, int elemType){
       for (const elemList *a=l;a!=NULL;a=a->next){
         for (const elemList *b=a->next;b!=NULL;b=b->next){
           if((a->localNo != b->localNo) || (a->type != b->type)){ // if a and b are different elements
-			//	CkPrintf("%d:%d:%d adj to %d:%d:%d\n", a->type, a->localNo, a->tupleNo, b->type, b->localNo, b->tupleNo);
-			// Put b in a's adjacency list
-			if(FEM_Is_ghost_index(a->localNo)){
-			  const int j = FEM_To_ghost_index(a->localNo)*tuplesPerElem + a->tupleNo;
-			  adjsGhost[j] = b->localNo;
-			  adjTypesGhost[j] = b->type;
-			}
-			else{
-			  const int j= a->localNo*tuplesPerElem + a->tupleNo;
-			  adjs[j] = b->localNo;
-			  adjTypes[j] = b->type;
-			}
+	    //	CkPrintf("%d:%d:%d adj to %d:%d:%d\n", a->type, a->localNo, a->tupleNo, b->type, b->localNo, b->tupleNo);
+	    // Put b in a's adjacency list
+	    if(FEM_Is_ghost_index(a->localNo)){
+	      const int j = FEM_To_ghost_index(a->localNo)*tuplesPerElem + a->tupleNo;
+	      adjsGhost[j] = b->localNo;
+	      adjTypesGhost[j] = b->type;
+	    }
+	    else{
+	      const int j= a->localNo*tuplesPerElem + a->tupleNo;
+	      adjs[j] = b->localNo;
+	      adjTypes[j] = b->type;
+	    }
 			
-			// Put a in b's adjacency list
-			if(FEM_Is_ghost_index(b->localNo)){
-			  const int j = FEM_To_ghost_index(b->localNo)*tuplesPerElem + b->tupleNo;
-			  adjsGhost[j] = a->localNo;
-			  adjTypesGhost[j] = a->type;
-			}
-			else{
-			  const int j= b->localNo*tuplesPerElem + b->tupleNo;
-			  adjs[j] = a->localNo;
-			  adjTypes[j] = a->type;
-			}
+	    // Put a in b's adjacency list
+	    if(FEM_Is_ghost_index(b->localNo)){
+	      const int j = FEM_To_ghost_index(b->localNo)*tuplesPerElem + b->tupleNo;
+	      adjsGhost[j] = a->localNo;
+	      adjTypesGhost[j] = a->type;
+	    }
+	    else{
+	      const int j= b->localNo*tuplesPerElem + b->tupleNo;
+	      adjs[j] = a->localNo;
+	      adjTypes[j] = a->type;
+	    }
           }
         }
       }

@@ -395,7 +395,7 @@ int FEM_Adapt::vertex_remove(int n1, int n2)
   // find n5
   int *nbrNodes, nnsize, n5;
   theMesh->n2n_getAll(n1, &nbrNodes, &nnsize);
-  if(nnsize != 4) {
+  if(!(nnsize == 4 || (nnsize==3 && e2==-1))) {
     CkPrintf("Error: Vertex Remove %d->%d on node %d with %d connections (!= 4)\n",n1,n2,n1,nnsize);
     return -1;    
   }
@@ -433,7 +433,7 @@ int FEM_Adapt::vertex_remove(int n1, int n2)
 	break;
       }
     }
-    if(nnsize != 4) {
+    if(!(nnsize == 4 || (nnsize==3 && e2==-1))) {
       FEM_Modify_Unlock(theMesh);
       CkPrintf("Error: Vertex Remove %d->%d on node %d with %d connections (!= 4)\n",n1,n2,n1,nnsize);
       return -1;    
@@ -733,7 +733,7 @@ int FEM_Adapt::edge_contraction_help(int e1, int e2, int n1, int n2, int e1_n1,
 #endif
   FEM_Modify_Unlock(theMesh);
 
-  return 1;
+  return n5;
 }
 // ======================  END edge_contraction  ==============================
 
