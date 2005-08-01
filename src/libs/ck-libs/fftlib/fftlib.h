@@ -213,6 +213,7 @@ class NormalRealSlabArray: public SlabArray {
 		rfwd1DXPlan = rbwd1DXPlan = (rfftw_plan) NULL;
 		fwd1DYPlan = bwd1DYPlan = (fftw_plan) NULL;
 		fwd1DZPlan = bwd1DZPlan = (fftw_plan) NULL;
+		rfwd2DXYPlan = rfwd2DXYPlan = (rfftwnd_plan)NULL;
 	}
 	void setup(NormalFFTinfo &info);
 
@@ -231,6 +232,8 @@ class NormalRealSlabArray: public SlabArray {
 	void createPlans(NormalFFTinfo &info);
 
  protected:
+	rfftwnd_plan rfwd2DXYPlan, rbwd2DXYPlan;
+
 	rfftw_plan rfwd1DXPlan, rbwd1DXPlan;
 	fftw_plan fwd1DYPlan, bwd1DYPlan; 
 	fftw_plan fwd1DZPlan, bwd1DZPlan;

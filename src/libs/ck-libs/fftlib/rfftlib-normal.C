@@ -28,14 +28,26 @@ NormalRealSlabArray::doFFT(int src_id, int dst_id)
 
     for(p = 0; p < fftinfo.srcPlanesPerSlab; p++){
         // real_to_complex on Y dimension
-	rfftw(rfwd1DXPlan, fftinfo.srcSize[1], 
-	      (fftw_real*)dataPtr, 1, fftinfo.srcSize[1], 
-	      (fftw_real*)outDataPtr, 1, fftinfo.srcSize[1]+2);  
+	rfftwnd_one_real_to_complex(rfwd2DXYPlan, (fftw_real*)dataPtr,
+				    (fftw_complex*)outDataPtr2);
+
+/*
+
+	if(thisIndex==0 && src_id==0){
+	    for(int i=0;i<fftinfo.srcSize[1]*fftinfo.srcSize[0]; i++)
+		CkPrintf("%d %g\n", i, dataPtr[i]);
+	}
 
 	fftw(fwd1DYPlan, fftinfo.srcSize[0]/2+1,
 	     (fftw_complex*)outDataPtr, fftinfo.srcSize[1]/2+1, 1, 
 	     (fftw_complex*)outDataPtr2, fftinfo.srcSize[1]/2+1, 1);
 
+
+	if(thisIndex==0 && src_id==0){
+	    for(int i=0;i<(fftinfo.srcSize[1]/2+1)*fftinfo.srcSize[0]; i++)
+		CkPrintf("%d %g %g\n", i, outDataPtr2[i].re, outDataPtr2[i].im);
+	}
+*/
 	dataPtr += rplaneSize;
 	outDataPtr += cplaneSize;
 	outDataPtr2 += cplaneSize;
@@ -134,6 +146,12 @@ NormalRealSlabArray::doIFFT(int src_id, int dst_id)
 	fftw(bwd1DZPlan, lineSize, 
 	     (fftw_complex*)dataPtr+p*planeSize, lineSize, 1, 
 	     NULL, 0, 0);
+
+/*	if(thisIndex==0 && src_id==0){
+	    for(int i=0;i<(fftinfo.srcSize[1]/2+1)*fftinfo.srcSize[0]; i++)
+		CkPrintf("%d %g %g\n", i, dataPtr[i+p*planeSize].re, dataPtr[i+p*planeSize].im);
+	}
+*/
     }
   
     complex *sendData = new complex[fftinfo.srcPlanesPerSlab * fftinfo.destPlanesPerSlab * lineSize];
@@ -189,6 +207,15 @@ NormalRealSlabArray::acceptDataForIFFT(int numPoints, complex *points, int posn,
 	CmiAssert(rbwd1DXPlan!=NULL);
 	double *dataPtr = (double*)fftinfo.dataPtr;
 	for(p = 0; p < fftinfo.srcPlanesPerSlab; p++) {
+	    rfftwnd_one_complex_to_real(rbwd2DXYPlan, 
+					(fftw_complex*)(tempdataPtr+p*cplaneSize), 
+					(fftw_real*)(dataPtr+p*rplaneSize));
+/*
+	    if(thisIndex==0 && info_id==0){
+		for(int i=0;i<fftinfo.srcSize[1]*fftinfo.srcSize[0]; i++)
+		    CkPrintf("%d %g\n", i, dataPtr[i]);
+	    }
+	    
 
 	    // Doing X direction first
 		fftw(bwd1DYPlan, lineSize, 
@@ -202,6 +229,7 @@ NormalRealSlabArray::acceptDataForIFFT(int numPoints, complex *points, int posn,
 		      1, lineSize*2, //stride, nextFFT
 		      (fftw_real*)dataPtr + p * rplaneSize, 
 		      1, fftinfo.srcSize[1]);
+*/
 	}
 	doneIFFT(info_id);
     }
@@ -209,16 +237,21 @@ NormalRealSlabArray::acceptDataForIFFT(int numPoints, complex *points, int posn,
 void NormalRealSlabArray::createPlans(NormalFFTinfo &info)
 {
     if (info.isSrcSlab) {
-	rfwd1DXPlan = rfftw_create_plan(info.srcSize[0], FFTW_REAL_TO_COMPLEX, FFTW_MEASURE|FFTW_OUT_OF_PLACE);
+	int size[]={info.srcSize[0], info.srcSize[1]};
+	rfwd2DXYPlan = rfftw2d_create_plan(info.srcSize[0], info.srcSize[1], FFTW_REAL_TO_COMPLEX, FFTW_OUT_OF_PLACE);
+	rbwd2DXYPlan = rfftw2d_create_plan(info.srcSize[0], info.srcSize[1], FFTW_COMPLEX_TO_REAL, FFTW_OUT_OF_PLACE);
+
+	rfwd1DXPlan = rfftw_create_plan(info.srcSize[0], FFTW_REAL_TO_COMPLEX, FFTW_OUT_OF_PLACE);
 	//fwd1DYPlan = fftw_create_plan(info.srcSize[1], FFTW_BACKWARD, FFTW_MEASURE|FFTW_IN_PLACE); 
-	fwd1DYPlan = fftw_create_plan(info.srcSize[1], FFTW_BACKWARD, FFTW_MEASURE|FFTW_OUT_OF_PLACE); 
-	rbwd1DXPlan = rfftw_create_plan(info.srcSize[0], FFTW_COMPLEX_TO_REAL, FFTW_MEASURE|FFTW_OUT_OF_PLACE);
-	bwd1DYPlan = fftw_create_plan(info.destSize[1], FFTW_BACKWARD, FFTW_MEASURE|FFTW_IN_PLACE);
+	fwd1DYPlan = fftw_create_plan(info.srcSize[1], FFTW_BACKWARD, FFTW_OUT_OF_PLACE); 
+	rbwd1DXPlan = rfftw_create_plan(info.srcSize[0], FFTW_COMPLEX_TO_REAL, FFTW_OUT_OF_PLACE);
+	bwd1DYPlan = fftw_create_plan(info.destSize[1], FFTW_BACKWARD, FFTW_IN_PLACE);
     }
     else {
-	bwd1DZPlan = fftw_create_plan(info.destSize[0], FFTW_BACKWARD, FFTW_MEASURE|FFTW_IN_PLACE);
-	bwd1DYPlan = fftw_create_plan(info.destSize[1], FFTW_BACKWARD, FFTW_MEASURE|FFTW_IN_PLACE);
-	fwd1DZPlan = fftw_create_plan(info.destSize[0], FFTW_FORWARD, FFTW_MEASURE|FFTW_IN_PLACE);
+
+	bwd1DZPlan = fftw_create_plan(info.destSize[0], FFTW_BACKWARD, FFTW_IN_PLACE);
+	bwd1DYPlan = fftw_create_plan(info.destSize[1], FFTW_BACKWARD, FFTW_IN_PLACE);
+	fwd1DZPlan = fftw_create_plan(info.destSize[0], FFTW_FORWARD, FFTW_IN_PLACE);
     }
 }
 
@@ -248,6 +281,12 @@ NormalRealSlabArray::~NormalRealSlabArray()
 	fftw_destroy_plan(fwd1DZPlan);
     if (bwd1DZPlan)
 	fftw_destroy_plan(bwd1DZPlan);
+
+    if(rfwd2DXYPlan)
+	fftwnd_destroy_plan(rfwd2DXYPlan);
+    if(rbwd2DXYPlan)
+	fftwnd_destroy_plan(rbwd2DXYPlan);
+
     int i;
     for (i = 0; i < MAX_FFTS; i++)
 	delete fftinfos[i];
