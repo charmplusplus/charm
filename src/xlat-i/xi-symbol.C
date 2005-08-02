@@ -2481,7 +2481,7 @@ void Entry::genPythonDefs(XStr& str) {
   if (isPython()) {
 
     str << "PyObject *_Python_"<<container->baseName()<<"_"<<name<<"(PyObject *self, PyObject *arg) {\n";
-    str << "  int pyNumber = PyInt_AsLong(PyDict_GetItemString(PyModule_GetDict(PyImport_AddModule(\"__main__\")),\"charmNumber\"));\n";
+    str << "  int pyNumber = PyInt_AsLong(PyDict_GetItemString(PyModule_GetDict(PyImport_AddModule(\"__main__\")),\"__charmNumber__\"));\n";
     str << "  CmiLock(CsvAccess(pyLock));\n";
     str << "  "<<container->baseName()<<" *pyWorker = ("<<container->baseName()<<" *)((*CsvAccess(pyWorkers))[pyNumber]).object;\n";
     str << "  ((*CsvAccess(pyWorkers))[pyNumber]).arg=arg;\n";
