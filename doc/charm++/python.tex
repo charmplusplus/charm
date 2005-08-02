@@ -518,7 +518,7 @@ is returned to Python. The function \texttt{Py\_BuildValue} can be used to creat
 this value.
 
 A characteristic of Python is that in a multithreaded environment (like the one
-provided in \charmpp{}), the runinng thread needs to keep a lock to prevent
+provided in \charmpp{}), the running thread needs to keep a lock to prevent
 other threads to access any variable. When using high level scripting, and the
 Python script is suspended for long times waiting for the \charmpp{} application
 to perform the required task, it may be useful to release the lock to allow
