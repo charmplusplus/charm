@@ -826,6 +826,7 @@ void chunk::multipleRefine(double *desiredArea, refineClient *client)
 #ifdef TDEBUG1
   sanityCheck(); // quietly make sure mesh is in shape
 #endif
+  CmiMemoryCheck();
   theClient = client; // initialize refine client associated with this chunk
   
   if (refineStack) delete [] refineStack;
@@ -855,12 +856,14 @@ void chunk::multipleRefine(double *desiredArea, refineClient *client)
   CkPrintf("TMRC2D: [%d] multipleRefine DONE.\n", cid);
 #endif
   CkWaitQD();
+  CmiMemoryCheck();
 }
 
 void chunk::multipleCoarsen(double *desiredArea, refineClient *client)
 {
   int i;
   double precThrshld, area, qFactor;
+  CmiMemoryCheck();
 #ifdef TDEBUG2
   CkPrintf("TMRC2D: [%d] multipleCoarsen....\n", cid);
 #endif
@@ -908,6 +911,7 @@ void chunk::multipleCoarsen(double *desiredArea, refineClient *client)
     }
   }
 */
+  CmiMemoryCheck();
 }
 
 void chunk::newMesh(int meshID_,int nEl, int nGhost, const int *conn_, 

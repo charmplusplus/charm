@@ -267,6 +267,7 @@ void FEM_Modify_IDXL(FEM_Refine_Operation_Data *data,refineData &op){
 };
 
 void FEM_Refine_Operation(FEM_Refine_Operation_Data *data,refineData &op){
+  CmiMemoryCheck();
   int meshID = data->meshID;
   int nodeID = data->nodeID;
   int sparseID = data->sparseID;
@@ -279,7 +280,7 @@ void FEM_Refine_Operation(FEM_Refine_Operation_Data *data,refineData &op){
   double *coord = data->coord;
   AllocTable2d<int> *sparseConnTable, *sparseBoundaryTable;
   CkVec<FEM_Attribute *> *sparseattrs = data->sparseattrs;
-  
+  CmiMemoryCheck();  
   /*
   FEM_DataAttribute *boundaryAttr = (FEM_DataAttribute *)data->node->lookup(FEM_BOUNDARY,"split");
   if(boundaryAttr != NULL){
@@ -296,6 +297,7 @@ void FEM_Refine_Operation(FEM_Refine_Operation_Data *data,refineData &op){
   // current number of nodes in the mesh
   int *connData = connTable->getData();
   int flags=op.flag;
+  CmiMemoryCheck();
     
   if((flags & 0x1) || (flags & 0x2)){
     //new node 
@@ -309,6 +311,7 @@ void FEM_Refine_Operation(FEM_Refine_Operation_Data *data,refineData &op){
       data->node->setLength(D+1);
       data->cur_nodes = D+1;
     }	
+  CmiMemoryCheck();
     for(int i=0;i<attrs->size();i++){
       FEM_Attribute *a = (FEM_Attribute *)(*attrs)[i];
       if(a->getAttr()<FEM_ATTRIB_TAG_MAX){
@@ -334,8 +337,9 @@ void FEM_Refine_Operation(FEM_Refine_Operation_Data *data,refineData &op){
 	  }
 	}
       }	
+      CmiMemoryCheck();
     }
-
+    CmiMemoryCheck();
     int AandB[2];
     AandB[0]=A;
     AandB[1]=B;
@@ -349,6 +353,7 @@ void FEM_Refine_Operation(FEM_Refine_Operation_Data *data,refineData &op){
     /* add the new sparse element <D,B> and modify the connectivity of the old
        one from <A,B> to <A,D> and change the hashtable to reflect that change
     */
+  CmiMemoryCheck();
     if(sparseID != -1){
       int oldsidx = nodes2sparse->get(intdual(A,B))-1;
       int newsidx = data->sparse->size();
@@ -376,6 +381,7 @@ void FEM_Refine_Operation(FEM_Refine_Operation_Data *data,refineData &op){
       nodes2sparse->put(intdual(D,B)) = newsidx+1;
     }
   }
+  CmiMemoryCheck();
   //add a new triangle
   /*TODO: replace  FEM_ELEM with parameter*/
   int newTri =	op._new;
@@ -385,6 +391,7 @@ void FEM_Refine_Operation(FEM_Refine_Operation_Data *data,refineData &op){
     data->elem->setLength(newTri+1);
   }	
   D = newnodes->get(intdual(A,B));
+  CmiMemoryCheck();
   for(int j=0;j<elemattrs->size();j++){
     if((*elemattrs)[j]->getAttr() == FEM_CONN){
       DEBUGINT(CkPrintf("elem attr conn code %d \n",(*elemattrs)[j]->getAttr()));
@@ -419,6 +426,7 @@ void FEM_Refine_Operation(FEM_Refine_Operation_Data *data,refineData &op){
       }
     }
   }
+  CmiMemoryCheck();
   if(sparseID != -1){ /* add sparse element (edge between C and D) */
     int cdidx = data->sparse->size();
     data->sparse->setLength(cdidx+1);
@@ -440,6 +448,7 @@ void FEM_Refine_Operation(FEM_Refine_Operation_Data *data,refineData &op){
     }
     nodes2sparse->put(intdual(C,D)) = cdidx+1;
   }
+  CmiMemoryCheck();
 }
 
 
