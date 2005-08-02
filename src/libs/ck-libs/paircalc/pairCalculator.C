@@ -63,11 +63,11 @@ void createPairCalculator(bool sym, int s, int grainSize, int numZ, int* z, int 
   if(machreduce)
     cpreduce=machine;
   if(!mapid) {
-      pairCalculatorProxy = CProxy_PairCalculator::ckNew();
+    pairCalculatorProxy = CProxy_PairCalculator::ckNew();
   }
   else {
-      options.setMap(*mapid);
-      pairCalculatorProxy = CProxy_PairCalculator::ckNew(sym, grainSize, s, blkSize, op1, f1, op2, f2, cb, pairCalcReducerProxy.ckGetGroupID(), cb_aid, cb_ep, conserveMemory, lbpaircalc, lbcb, cpreduce, gspacesum, options);
+    options.setMap(*mapid);
+    pairCalculatorProxy = CProxy_PairCalculator::ckNew(sym, grainSize, s, blkSize, op1, f1, op2, f2, cb, pairCalcReducerProxy.ckGetGroupID(), cb_aid, cb_ep, conserveMemory, lbpaircalc, lbcb, cpreduce, gspacesum, options);
   }
 
   pairCalculatorProxy.ckSetReductionClient(&cb);  
@@ -80,31 +80,40 @@ void createPairCalculator(bool sym, int s, int grainSize, int numZ, int* z, int 
 
   ComlibInstanceHandle bcastInstance = CkGetComlibInstance();
   bcastInstance.setStrategy(bstrat);
+  CharmStrategy *ringstrat = new RingMulticastStrategy(pairCalculatorProxy.ckGetArrayID());
+  pcid->Init(pairCalculatorProxy.ckGetArrayID(), pairCalcReducerProxy.ckGetGroupID(), grainSize, blkSize, s, sym, comlib_flag, bcastInstance, flag_dp, conserveMemory, lbpaircalc, mCastGrpId, gspacesum);
   CharmStrategy *multistrat = new DirectMulticastStrategy(pairCalculatorProxy.ckGetArrayID());
+  if(sym)// cheap hack to only do this once 
+    mcastInstanceCP=ComlibRegister(multistrat);
 
-  mcastInstanceCP = CkGetComlibInstance();
-  mcastInstanceCP.setStrategy(multistrat);
-  pcid->Init(pairCalculatorProxy.ckGetArrayID(), pairCalcReducerProxy.ckGetGroupID(), grainSize, blkSize, s, sym, comlib_flag, bcastInstance, flag_dp, conserveMemory, lbpaircalc, mcastInstanceCP, mCastGrpId, gspacesum);
+  pcid->rinst=ComlibRegister(ringstrat);
+
   if(sym)
     for(int numX = 0; numX < numZ; numX += blkSize){
       for (int s1 = 0; s1 < s; s1 += grainSize) {
 	for (int s2 = s1; s2 < s; s2 += grainSize) {
 	  for (int c = 0; c < blkSize; c++) {
 	    if(mapid) {
+#ifdef _PAIRCALC_CREATE_DEBUG_
+	      CkPrintf("inserting [%d %d %d %d %d]\n",z[numX],s1,s2,c,sym); 
+#endif
 	      pairCalculatorProxy(z[numX],s1,s2,c).
 		insert(sym, grainSize, s, blkSize, op1, f1, op2, f2, cb, pairCalcReducerProxy.ckGetGroupID(), cb_aid, cb_ep, conserveMemory, lbpaircalc, lbcb, cpreduce, gspacesum );
 	    }
 	    else
 	      {
+#ifdef _PAIRCALC_CREATE_DEBUG_
+	      CkPrintf("inserting [%d %d %d %d %d]\n",z[numX],s1,s2,c,sym); 
+#endif
 		pairCalculatorProxy(z[numX],s1,s2,c).
 		  insert(sym, grainSize, s, blkSize, op1, f1, op2, f2, cb, pairCalcReducerProxy.ckGetGroupID(), cb_aid, cb_ep, conserveMemory, lbpaircalc, lbcb, cpreduce, gspacesum, proc);
 		proc++;
 		if (proc >= CkNumPes()) proc = 0;
 	      }
+	  }
 	}
       }
     }
-  }
   else
     {
       for(int numX = 0; numX < numZ; numX += blkSize){
@@ -112,10 +121,16 @@ void createPairCalculator(bool sym, int s, int grainSize, int numZ, int* z, int 
 	  for (int s2 = 0; s2 < s; s2 += grainSize) {
 	    for (int c = 0; c < blkSize; c++) {
 	      if(mapid) {
+#ifdef _PAIRCALC_CREATE_DEBUG_
+	      CkPrintf("inserting [%d %d %d %d %d]\n",z[numX],s1,s2,c,sym); 
+#endif
 		pairCalculatorProxy(z[numX],s1,s2,c).
 		  insert(sym, grainSize, s, blkSize, op1, f1, op2, f2, cb, pairCalcReducerProxy.ckGetGroupID(), cb_aid, cb_ep, conserveMemory, lbpaircalc, lbcb, cpreduce, gspacesum );
 	      }
 	      else{
+#ifdef _PAIRCALC_CREATE_DEBUG_
+	      CkPrintf("inserting [%d %d %d %d %d]\n",z[numX],s1,s2,c,sym); 
+#endif
 		pairCalculatorProxy(z[numX],s1,s2,c).
 		  insert(sym, grainSize, s, blkSize, op1, f1, op2, f2, cb, pairCalcReducerProxy.ckGetGroupID(), cb_aid, cb_ep, conserveMemory, lbpaircalc, lbcb,  cpreduce, gspacesum, proc);
 		proc++;
@@ -177,18 +192,18 @@ void initSectRed ( bool sym, int s, int grainSize, int numZ, int* z,
   // better semantic
   
   /*  CkArrayIndexMax *elems=new CkArrayIndexMax[blkSize*grainSize*grainSize*(numZ/blkSize)];  
-    for (int s1 = 0; s1 < s; s1 += grainSize) {
+      for (int s1 = 0; s1 < s; s1 += grainSize) {
       for (int s2 = s1; s2 < s; s2 += grainSize) {
-	for (int c = 0; c < blkSize; c++) 
-	  {
-	    // figure out the callback
-	    CProxySection_PairCalculator sectProxy=initOneRedSect(sym, numZ, z, blkSize, pcid, cb, s1, s2, c);
-	    // now we put the proxy in our structure
-	    CkArrayIndex3D idx3d(s1,s2,c);
-	    pcid->sections.push_back(SProxP(idx3d,sectProxy));
-	  }
+      for (int c = 0; c < blkSize; c++) 
+      {
+      // figure out the callback
+      CProxySection_PairCalculator sectProxy=initOneRedSect(sym, numZ, z, blkSize, pcid, cb, s1, s2, c);
+      // now we put the proxy in our structure
+      CkArrayIndex3D idx3d(s1,s2,c);
+      pcid->sections.push_back(SProxP(idx3d,sectProxy));
       }
-    }
+      }
+      }
 
   */
 }
@@ -196,7 +211,7 @@ void initSectRed ( bool sym, int s, int grainSize, int numZ, int* z,
 CProxySection_PairCalculator initOneRedSect(int numZ, int* z, int blkSize,  PairCalcID* pcid, CkCallback cb, int s1, int s2, int c)
 {
   int ecount=0;
-  CkArrayIndexMax *elems =new CkArrayIndexMax[numZ/blkSize];  
+  CkArrayIndexMax *elems=(CkArrayIndexMax*) alloca(numZ/blkSize * sizeof(CkArrayIndexMax));
   for(int numX = 0; numX < numZ; numX += blkSize){
     CkArrayIndex4D idx4d(z[numX],s1,s2,c);
     elems[ecount++]=idx4d;
@@ -204,27 +219,27 @@ CProxySection_PairCalculator initOneRedSect(int numZ, int* z, int blkSize,  Pair
   // now that we have the section, make the proxy and do delegation
   CProxySection_PairCalculator sectProxy = CProxySection_PairCalculator::ckNew(pcid->Aid, elems, ecount); 
 
-  /*  if(pcid->useComlib && _PC_COMMLIB_MULTI_)
+  /* Don't use Commlib with a section reduction proxy.
 
-      // until there is a commlib reduction there is no point in
-      // delegating this multicast
-      {
-      ComlibDelegateProxy(&sectProxy);
-      ComlibInitSectionID(sectProxy.ckGetSectionID());
-    }
+  if(pcid->useComlib && _PC_COMMLIB_MULTI_)
+  {
+
+  ComlibAssociateProxy(&(pcid->rinst),sectProxy);
+  }
   else
-    {
+  {
+  CkMulticastMgr *mcastGrp = CProxy_CkMulticastMgr(pcid->mCastGrpId).ckLocalBranch();       
+  sectProxy.ckSectionDelegate(mcastGrp);
+  }
   */
 
   CkMulticastMgr *mcastGrp = CProxy_CkMulticastMgr(pcid->mCastGrpId).ckLocalBranch();       
   sectProxy.ckSectionDelegate(mcastGrp);
-      //    }
   // send the message to initialize it with the callback and groupid
   initGRedMsg *gredMsg=new initGRedMsg;
   gredMsg->cb=cb;
   gredMsg->mCastGrpId=pcid->mCastGrpId;
   sectProxy.initGRed(gredMsg);
-  delete [] elems;
   return sectProxy;
 }
 
@@ -240,12 +255,6 @@ void startPairCalcLeft(PairCalcID* pcid, int n, complex* ptr, int myS, int myZ){
     makeLeftTree(pcid,myS,myZ);
   }
   //use proxy to send
-  if(pcid->useComlib && _PC_COMMLIB_MULTI_) {
-#ifdef _PAIRCALC_DEBUG_
-    CkPrintf("%d Calling Begin Iteration\n", CkMyPe());
-#endif
-    pcid->minst.beginIteration();
-  }
 #ifdef _PAIRCALC_DEBUG_PARANOID_
   double re;
   double im;
@@ -274,10 +283,6 @@ void startPairCalcLeft(PairCalcID* pcid, int n, complex* ptr, int myS, int myZ){
 
 
   if(pcid->useComlib && _PC_COMMLIB_MULTI_) {
-#ifdef _PAIRCALC_DEBUG_
-    CkPrintf("%d Calling End Iteration\n", CkMyPe());
-#endif
-    pcid->minst.endIteration();
   }  
 #endif
 }
@@ -298,11 +303,11 @@ void makeLeftTree(PairCalcID* pcid, int myS, int myZ){
   x = myZ;
   s1 = (myS/grainSize) * grainSize;
   if(!(pcid->existsLproxy||pcid->existsLNotFromproxy)){
-  int numElems;
-  //create multicast proxy array section list 
+    int numElems;
+    //create multicast proxy array section list 
     if(symmetric){
-      CkArrayIndexMax *elems=new CkArrayIndexMax[blkSize*S/grainSize];
-      CkArrayIndexMax *elemsfromrow=new CkArrayIndexMax[blkSize*S/grainSize];
+      CkArrayIndexMax *elems=(CkArrayIndexMax*) alloca(blkSize*S/grainSize * sizeof(CkArrayIndexMax));
+      CkArrayIndexMax *elemsfromrow=(CkArrayIndexMax*) alloca(blkSize*S/grainSize * sizeof(CkArrayIndexMax));
       // 1 proxy for left and 1 for right
       int erowcount=0;
       int ecount=0;
@@ -332,8 +337,7 @@ void makeLeftTree(PairCalcID* pcid, int myS, int myZ){
 #ifndef _PAIRCALC_DO_NOT_DELEGATE_
 	  if(pcid->useComlib && _PC_COMMLIB_MULTI_)
 	    {
-	      ComlibDelegateProxy(&(pcid->proxyLNotFrom));
-	      ComlibInitSectionID(pcid->proxyLNotFrom.ckGetSectionID());
+	      ComlibAssociateProxy(&mcastInstanceCP,pcid->proxyLNotFrom);
 	    }
 	  else
 	    {
@@ -350,26 +354,26 @@ void makeLeftTree(PairCalcID* pcid, int myS, int myZ){
 #ifndef _PAIRCALC_DO_NOT_DELEGATE_
 	  if(pcid->useComlib && _PC_COMMLIB_MULTI_)
 	    {
-	      ComlibDelegateProxy(&(pcid->proxyLFrom));
-	      ComlibInitSectionID(pcid->proxyLFrom.ckGetSectionID());
+	      ComlibAssociateProxy(&mcastInstanceCP, pcid->proxyLFrom);
 	    }
 	  else
 	    {
 	      CkMulticastMgr *mcastGrp = CProxy_CkMulticastMgr(pcid->mCastGrpId).ckLocalBranch(); 
 	      pcid->proxyLFrom.ckSectionDelegate(mcastGrp);
+	      // MultiCastMgr makes its own copy
+	      delete [] elemsfromrow;
+	      delete [] elems;
 
 	    }
 #endif
 	}
-      delete [] elemsfromrow;
-      delete [] elems;
     }
     else { //just make left here, right will be taken care of in startRight
 #ifdef _PAIRCALC_DEBUG_
       CkPrintf("initializing multicast proxy in %d %d \n",x,s1);
 #endif
       int erowcount=0;
-      CkArrayIndexMax *elemsfromrow=new CkArrayIndexMax[blkSize*S/grainSize];
+      CkArrayIndexMax *elemsfromrow=(CkArrayIndexMax*) alloca(blkSize*S/grainSize * sizeof(CkArrayIndexMax));
       CkArrayIndex4D idx(x,s1,0,0);
       for (c = 0; c < blkSize; c++)
 	for(s2 = 0; s2 < S; s2 += grainSize){
@@ -395,18 +399,19 @@ void makeLeftTree(PairCalcID* pcid, int myS, int myZ){
       pcid->proxyLFrom = CProxySection_PairCalculator::ckNew(pairCalculatorID, elemsfromrow, erowcount); 
       pcid->existsLproxy=true;      
 #ifndef _PAIRCALC_DO_NOT_DELEGATE_
-      if(pcid->useComlib &&_PC_COMMLIB_MULTI_)
+      if(pcid->useComlib && _PC_COMMLIB_MULTI_ )
 	{
-	  ComlibDelegateProxy(&(pcid->proxyLFrom));
-	  ComlibInitSectionID(pcid->proxyLFrom.ckGetSectionID());
+	  ComlibAssociateProxy(&mcastInstanceCP,pcid->proxyLFrom);
 	}
       else
 	{
 	  CkMulticastMgr *mcastGrp = CProxy_CkMulticastMgr(pcid->mCastGrpId).ckLocalBranch(); 
 	  pcid->proxyLFrom.ckSectionDelegate(mcastGrp);
+	  // MultiCastMgr makes its own copy
+	  delete [] elemsfromrow;
 	}
 #endif
-      delete [] elemsfromrow;
+
     }
 
   }
@@ -436,36 +441,21 @@ void startPairCalcRight(PairCalcID* pcid, int n, complex* ptr, int myS, int myZ)
   if(pcid->existsRproxy)
     {
 #ifdef _DEBUG_PAIRCALC_PARANOID_
-  double re;
-  double im;
-  for(int i=0;i<n;i++)
-    {
-      re=ptr[i].re;
-      im=ptr[i].im;
-      if(fabs(re)>0.0)
-	CkAssert(fabs(re)>1.0e-300);
-      if(fabs(im)>0.0)
-	CkAssert(fabs(im)>1.0e-300);
-    }
+      double re;
+      double im;
+      for(int i=0;i<n;i++)
+	{
+	  re=ptr[i].re;
+	  im=ptr[i].im;
+	  if(fabs(re)>0.0)
+	    CkAssert(fabs(re)>1.0e-300);
+	  if(fabs(im)>0.0)
+	    CkAssert(fabs(im)>1.0e-300);
+	}
 #endif
       calculatePairsMsg *msg= new ( n,0 ) calculatePairsMsg;
       msg->init(n,myS,false,flag_dp,ptr);
-      if(pcid->useComlib & _PC_COMMLIB_MULTI_) {
-#ifdef _PAIRCALC_DEBUG_
-	CkPrintf("%d Calling Begin Iteration\n", CkMyPe());
-#endif
-	pcid->minst.beginIteration();
-      }
-      //mcastInstanceCP.beginIteration();
       pcid->proxyRNotFrom.calculatePairs_gemm(msg);
-
-      if(pcid->useComlib && _PC_COMMLIB_MULTI_) {
-#ifdef _PAIRCALC_DEBUG_
-	CkPrintf("%d Calling End Iteration\n", CkMyPe());
-#endif
-	pcid->minst.endIteration();
-      }
-      
     }
   else
     {
@@ -501,7 +491,7 @@ void makeRightTree(PairCalcID* pcid, int myS, int myZ){
       CkPrintf("initializing multicast proxy in %d %d \n",x,s2);
 #endif
       int ecount=0;
-      CkArrayIndexMax *elems=new CkArrayIndexMax[blkSize*S/grainSize];
+      CkArrayIndexMax *elems=(CkArrayIndexMax*) alloca(blkSize*S/grainSize * sizeof(CkArrayIndexMax));
       CkArrayIndex4D idx(x,0,s2,0);
       for (c = 0; c < blkSize; c++)
 	for(s1 = 0; s1 < S; s1 += grainSize){
@@ -531,22 +521,23 @@ void makeRightTree(PairCalcID* pcid, int myS, int myZ){
 #ifndef _PAIRCALC_DO_NOT_DELEGATE_
 	  if(pcid->useComlib && _PC_COMMLIB_MULTI_)
 	    {
-	      ComlibDelegateProxy(&(pcid->proxyRNotFrom));
-	      ComlibInitSectionID(pcid->proxyRNotFrom.ckGetSectionID());
+	      ComlibAssociateProxy(&mcastInstanceCP,pcid->proxyRNotFrom);
 	    }
 	  else
 	    {
 	      CkMulticastMgr *mcastGrp = CProxy_CkMulticastMgr(pcid->mCastGrpId).ckLocalBranch(); 
 	      pcid->proxyRNotFrom.ckSectionDelegate(mcastGrp);
+	      // MultiCastMgr makes its own copy
+	      delete [] elems;
 	    }
 #endif
 	}
-      delete [] elems;
+
     }
 }
 
 void finishPairCalc(PairCalcID* pcid, int n, double *ptr) {
-    finishPairCalc2(pcid, n, ptr, NULL);
+  finishPairCalc2(pcid, n, ptr, NULL);
 }
 
 
@@ -564,30 +555,28 @@ void finishPairCalc2(PairCalcID* pcid, int n, double *ptr1, double *ptr2) {
   CProxy_PairCalcReducer pairCalcReducerProxy(pairCalcReducerID);
 
   ComlibInstanceHandle bcastInstance = pcid->cinst;
-
-  if(pcid->useComlib && _PC_COMMLIB_MULTI_) {
-#ifdef _PAIRCALC_SLOW_FAT_SIMPLE_CAST_
-      ComlibDelegateProxy(&pairCalculatorProxy);
-#else
-      ComlibDelegateProxy(&pairCalcReducerProxy);
-#endif
-      bcastInstance.beginIteration();
-  }
-
+  /* if{
+     #ifdef _PAIRCALC_SLOW_FAT_SIMPLE_CAST_
+     ComlibDelegateProxy(&pairCalculatorProxy);
+     #else
+     ComlibDelegateProxy(&pairCalcReducerProxy);
+     #endif
+     }
+  */
 #ifdef _PAIRCALC_SLOW_FAT_SIMPLE_CAST_
   /* 
      Just broadcast directly to the paircalculators. We expect this to
      perform badly, this is mostly a debugging comparison block.
-   */ 
+  */ 
   if(ptr2==NULL){
-      acceptResultMsg *omsg=new ( n,0 ) acceptResultMsg;
-      omsg->init1(n, ptr1);
-      pairCalculatorProxy.acceptResult(omsg);
+    acceptResultMsg *omsg=new ( n,0 ) acceptResultMsg;
+    omsg->init1(n, ptr1);
+    pairCalculatorProxy.acceptResult(omsg);
   }
   else {
-      acceptResultMsg2 *omsg=new ( n,n,0 ) acceptResultMsg2;
-      omsg->init(n,n, ptr1, ptr2);
-      pairCalculatorProxy.acceptResult(omsg);
+    acceptResultMsg2 *omsg=new ( n,n,0 ) acceptResultMsg2;
+    omsg->init(n,n, ptr1, ptr2);
+    pairCalculatorProxy.acceptResult(omsg);
   }
 #else
   if(ptr2==NULL){
@@ -601,20 +590,19 @@ void finishPairCalc2(PairCalcID* pcid, int n, double *ptr1, double *ptr2) {
   else {
 
     /*entireResultMsg2 *omsg=new ( n, n, 0 ) entireResultMsg2;
-    omsg->init(n, ptr1, ptr2, pcid->Symmetric);
+      omsg->init(n, ptr1, ptr2, pcid->Symmetric);
 
-    pairCalcReducerProxy.broadcastEntireResult(omsg);
+      pairCalcReducerProxy.broadcastEntireResult(omsg);
     */
     pairCalcReducerProxy.broadcastEntireResult(n, ptr1, ptr2, pcid->Symmetric);
   }
 #endif
-  if(pcid->useComlib && _PC_COMMLIB_MULTI_) {
-      bcastInstance.endIteration();
-  }
+
 }
 
+
 void finishPairCalcSection(int n, double *ptr, CProxySection_PairCalculator sectionProxy) {
-    finishPairCalcSection2(n, ptr, NULL, sectionProxy);
+  finishPairCalcSection2(n, ptr, NULL, sectionProxy);
 }
 
 
@@ -625,14 +613,14 @@ void finishPairCalcSection2(int n, double *ptr1, double *ptr2, CProxySection_Pai
 #endif
 
   if(ptr2==NULL){
-      acceptResultMsg *omsg=new ( n,0,0 ) acceptResultMsg;
-      omsg->init1(n, ptr1);
-      sectionProxy.acceptResult(omsg);
+    acceptResultMsg *omsg=new ( n,0,0 ) acceptResultMsg;
+    omsg->init1(n, ptr1);
+    sectionProxy.acceptResult(omsg);
   }
   else {
-      acceptResultMsg *omsg=new ( n,n,0 ) acceptResultMsg;
-      omsg->init(n, n, ptr1, ptr2);
-      sectionProxy.acceptResult(omsg);
+    acceptResultMsg *omsg=new ( n,n,0 ) acceptResultMsg;
+    omsg->init(n, n, ptr1, ptr2);
+    sectionProxy.acceptResult(omsg);
   }
 }
 

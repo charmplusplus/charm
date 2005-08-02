@@ -1,6 +1,6 @@
 #ifndef _ckPairCalculator_h_
 #define _ckPairCalculator_h_
-#define _PC_COMMLIB_MULTI_ 0
+#define _PC_COMMLIB_MULTI_ 1
 #include "pairutil.h"
 #include "ckmulticast.h"
 #include "ckhashtable.h"

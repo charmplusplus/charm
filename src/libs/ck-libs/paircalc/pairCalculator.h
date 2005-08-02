@@ -5,17 +5,7 @@
 
 
 /* a place to keep the section proxies for the reduction */
-class SProxP 
-{
- public:
-  CkArrayIndex3D idx;
-  CProxySection_PairCalculator sectProxy;
-  SProxP (CkArrayIndex3D _idx, CProxySection_PairCalculator _proxy) : idx(_idx), sectProxy(_proxy)
-    {}
-  SProxP () : idx(0,0,0)
-    {}
-};
-PUPbytes(SProxP);
+
 class PairCalcID {
  public:
   CkArrayID Aid;
@@ -27,6 +17,7 @@ class PairCalcID {
 
   ComlibInstanceHandle cinst;
   ComlibInstanceHandle minst;
+  ComlibInstanceHandle rinst;
 
   bool useComlib;
   bool isDoublePacked;
@@ -40,11 +31,10 @@ class PairCalcID {
   CProxySection_PairCalculator proxyLNotFrom;
   CProxySection_PairCalculator proxyRNotFrom;
   CkGroupID mCastGrpId;
-  CkVec < SProxP > sections;
   PairCalcID() {}
   ~PairCalcID() {}
 
-  void Init(CkArrayID aid, CkGroupID gid, int grain, int blk, int s, bool sym, bool _useComlib,  ComlibInstanceHandle h, bool _dp, bool _conserveMemory, bool _lbpaircalc, ComlibInstanceHandle m , CkGroupID _mCastGrpId, bool _gspacesum ) {
+  void Init(CkArrayID aid, CkGroupID gid, int grain, int blk, int s, bool sym, bool _useComlib,  ComlibInstanceHandle h, bool _dp, bool _conserveMemory, bool _lbpaircalc, CkGroupID _mCastGrpId, bool _gspacesum ) {
       
     Aid = aid;
     Gid = gid;
@@ -55,7 +45,6 @@ class PairCalcID {
     useComlib = _useComlib;
     conserveMemory = _conserveMemory;
     cinst = h;
-    minst = m;
     existsRproxy=false;
     existsLproxy=false;
     existsLNotFromproxy=false;
@@ -103,6 +92,7 @@ class PairCalcID {
     p|Symmetric;
     p|cinst;
     p|minst;
+    p|rinst;
     p|useComlib;
     p|isDoublePacked;
     p|conserveMemory;
@@ -115,7 +105,6 @@ class PairCalcID {
     p|proxyLNotFrom;
     p|proxyRNotFrom;
     p|mCastGrpId;
-    p|sections;
   }
 
 };
