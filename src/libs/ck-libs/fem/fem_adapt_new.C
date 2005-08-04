@@ -1,8 +1,8 @@
 #include "fem_adapt_new.h"  
 #include "fem_mesh_modify.h"
 
-//#define DEBUG_1
-//#define DEBUG_2
+#define DEBUG_1
+#define DEBUG_2
 
 // ======================  BEGIN edge_flip  =================================
 /* Perform a Delaunay flip of the edge (n1, n2) returning 1 if successful, 0 if
@@ -72,12 +72,14 @@ int FEM_Adapt::edge_flip(int n1, int n2)
   }
   return edge_flip_help(e1, e2, n1, n2, e1_n1, e1_n2, e1_n3, n3, n4);
 }
+
 int FEM_Adapt::edge_flip_help(int e1, int e2, int n1, int n2, int e1_n1, 
 			      int e1_n2, int e1_n3, int n3, int n4) 
 {
   int *conn = (int*)malloc(3*sizeof(int));
   int numNodes = 4;
   int numElems = 2;
+  int newNode = 0;
   int *locknodes = (int*)malloc(numNodes*sizeof(int));
   int *lockelems = (int*)malloc(numElems*sizeof(int));
 
@@ -89,9 +91,9 @@ int FEM_Adapt::edge_flip_help(int e1, int e2, int n1, int n2, int e1_n1,
   lockelems[1] = e2;
 
   //currently we do not move chunk boundaries, so we do not flip edges in which one of the 4 nodes of the quadrilateral is a ghost node.
-  if(n1 < 0 || n2 < 0 || n3 < 0 || n4 < 0) {
+  /*if(n1 < 0 || n2 < 0 || n3 < 0 || n4 < 0) {
     return -1;
-  }
+    }*/
 
   //FEM_Modify_Lock(theMesh, locknodes, numNodes, lockelems, numElems);
 
@@ -131,11 +133,56 @@ int FEM_Adapt::edge_flip_help(int e1, int e2, int n1, int n2, int e1_n1,
       //if n1 or n2 or n4 had only e2 as local n2e on e2chunk then, downgrade it from shared to ghost
       //n4 is remote, upgrade it from ghost to shared node on e1chunk
       e2chunk=e1chunk; //e1chunk eats e2
+      conn[0] = n1; conn[1] = n2; conn[2] = n4;
+      int newel = FEM_add_element(theMesh, conn, 3, 0, e2chunk);
+      //find the new node index & replace n4 with that
+      for(int j=0; j<3; j++) {
+	if((conn[j]!=n1)&&(conn[j]!=n2)) {
+	  int oldn4 = n4;
+	  n4 = conn[j];
+	  newNode = n4;
+	  CkPrintf("Changing node %d to node %d\n",oldn4,n4);
+	}
+      }
+#ifdef DEBUG_2
+      locknodes[3] = n4;
+      lockelems[1] = newel;
+      CkPrintf("Adjacencies after add element %d: conn(%d,%d,%d)\n",e2,n1,n2,n4);
+      printAdjacencies(locknodes, numNodes, lockelems, numElems);
+#endif
+      FEM_remove_element(theMesh, newel);
+#ifdef DEBUG_2
+      CkPrintf("Adjacencies after remove element %d: conn(%d,%d,%d)\n",newel,n1,n2,n4);
+      lockelems[1] = -1;
+      printAdjacencies(locknodes, numNodes, lockelems, numElems);
+#endif
     }
     else {
       //if n1 or n2 or n3 had only e1 as local n2e on e1chunk then, downgrade it from shared to ghost
       //n3 is remote, upgrade it from ghost to shared node on e2chunk
       e1chunk=e2chunk; //e2chunk eats e1
+      conn[0] = n1; conn[1] = n2; conn[2] = n3;
+      int newel = FEM_add_element(theMesh, conn, 3, 0, e1chunk);
+      for(int j=0; j<3; j++) {
+	if((conn[j]!=n1)&&(conn[j]!=n2)) {
+	  int oldn3 = n3;
+	  n3 = conn[j]; 
+	  newNode = n3;
+	  CkPrintf("Changing node %d to node %d\n",oldn3,n3);
+	}
+      }
+#ifdef DEBUG_2
+      locknodes[3] = n3;
+      lockelems[1] = newel;
+      CkPrintf("Adjacencies after add element %d: conn(%d,%d,%d)\n",e2,n1,n2,n3);
+      printAdjacencies(locknodes, numNodes, lockelems, numElems);
+#endif
+      FEM_remove_element(theMesh, newel);
+#ifdef DEBUG_2
+      CkPrintf("Adjacencies after remove element %d: conn(%d,%d,%d)\n",newel,n1,n2,n3);
+      lockelems[1] = -1;
+      printAdjacencies(locknodes, numNodes, lockelems, numElems);
+#endif
     }
     //effectively index eats the other element
   }
@@ -168,7 +215,7 @@ int FEM_Adapt::edge_flip_help(int e1, int e2, int n1, int n2, int e1_n1,
   //make sure that it always comes here, don't return with unlocking
   FEM_Modify_Unlock(theMesh);
 
-  return 1;
+  return newNode;
 }
 // ======================  END edge_flip  ===================================
 
@@ -237,6 +284,7 @@ int FEM_Adapt::edge_bisect(int n1, int n2)
   return edge_bisect_help(e1, e2, n1, n2, e1_n1, e1_n2, e1_n3, e2_n1, e2_n2, 
 			  e2_n3, n3, n4);
 }
+
 int FEM_Adapt::edge_bisect_help(int e1, int e2, int n1, int n2, int e1_n1, 
 				int e1_n2, int e1_n3, int e2_n1, int e2_n2, 
 				int e2_n3, int n3, int n4)
@@ -453,6 +501,7 @@ int FEM_Adapt::vertex_remove(int n1, int n2)
   return vertex_remove_help(e1, e2, n1, n2, e1_n1, e1_n2, e1_n3, e2_n1, e2_n2, 
 			    e2_n3, n3, n4, n5);
 }
+
 int FEM_Adapt::vertex_remove_help(int e1, int e2, int n1, int n2, int e1_n1, 
 				  int e1_n2, int e1_n3, int e2_n1, int e2_n2, 
 				  int e2_n3, int n3, int n4, int n5)
@@ -627,6 +676,7 @@ int FEM_Adapt::edge_contraction(int n1, int n2)
   return edge_contraction_help(e1, e2, n1, n2, e1_n1, e1_n2, e1_n3, e2_n1, 
 			       e2_n2, e2_n3, n3, n4);
 }
+
 int FEM_Adapt::edge_contraction_help(int e1, int e2, int n1, int n2, int e1_n1,
 				     int e1_n2, int e1_n3, int e2_n1, 
 				     int e2_n2, int e2_n3, int n3, int n4)
@@ -757,6 +807,7 @@ int FEM_Adapt::edge_contraction_help(int e1, int e2, int n1, int n2, int e1_n1,
      o	             o             
     n2              n2             
 */
+/* This function has some undefined characteristics.. please do not use it as of now*/
 int FEM_Adapt::vertex_split(int n, int n1, int n2) 
 {
   if ((n < 0) || ((n1 <= -1) && (n2 <= -1)))
@@ -776,6 +827,7 @@ int FEM_Adapt::vertex_split(int n, int n1, int n2)
   }
   return vertex_split(n, n1, n2, e1, e3);
 }
+
 int FEM_Adapt::vertex_split(int n, int n1, int n2, int e1, int e3)
 {
   int e1_n = find_local_node_index(e1, n);

@@ -794,9 +794,6 @@ void FEM_Mesh::n2n_add(int n, int newNode)
 	FEM_VarIndexAttribute::ID nn(0, newNode);
 	CkVec<FEM_VarIndexAttribute::ID> &nsVec = nVec[FEM_To_ghost_index(n)];
 	nsVec.push_back(nn);
-	/*if((n==20 || n==21 || n== -5) && (newNode==20 || newNode==21 || newNode== -5)) {
-	  CkPrintf("Added edge %d->%d\n", n, newNode);
-	  }*/
   }
   else{
 	FEM_VarIndexAttribute *nAdj = (FEM_VarIndexAttribute *)node.lookup(FEM_NODE_NODE_ADJACENCY,"n2n_add");

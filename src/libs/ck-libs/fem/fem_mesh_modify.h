@@ -111,6 +111,9 @@ class FEM_MUtil {
   void addElemRemote(FEM_Mesh *m, int chk, int elemtype, int connSize, int *conn, int numGhostIndex, int *ghostIndices);
   void removeGhostElementRemote(FEM_Mesh *m, int chk, int elementid, int elemtype, int numGhostIndex, int *ghostIndices);
   void removeElemRemote(FEM_Mesh *m, int chk, int elementid, int elemtype);
+  int Replace_node_local(FEM_Mesh *m, int oldIdx, int newIdx);
+  void addToSharedList(FEM_Mesh *m, int fromChk, int sharedIdx);
+
   void FEM_Print_n2n(FEM_Mesh *m, int nodeid);
   void FEM_Print_n2e(FEM_Mesh *m, int nodeid);
   void FEM_Print_e2n(FEM_Mesh *m, int eid);
@@ -330,6 +333,8 @@ class femMeshModify : public CBase_femMeshModify {
   void refine_flip_element_leb(int fromChk, int propElemT, int propNodeT,
 			       int newNodeT, int nbrOpNodeT, 
 			       double longEdgeLen);
+
+  void addToSharedList(int fromChk, int sharedIdx);
 };
 
 

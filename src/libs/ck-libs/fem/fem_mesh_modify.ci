@@ -28,7 +28,10 @@ module FEMMeshModify {
     int ghostIndices[];
   };
   message removeElemMsg;
-
+  /*message ghostNdsEltsMsg {
+    int ghostElts[];
+    int ghostNds[];
+  };*/
 
   array [1D] femMeshModify {
     entry femMeshModify(femMeshModMsg *);
@@ -44,5 +47,6 @@ module FEMMeshModify {
     entry [sync,threaded] void removeGhostElem(removeGhostElemMsg *);
     entry [sync,threaded] void removeElementRemote(removeElemMsg *);
     entry void refine_flip_element_leb(int, int, int, int, int, double);
+    entry [sync,threaded] void addToSharedList(int, int);
   };
 };

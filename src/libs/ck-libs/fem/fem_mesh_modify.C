@@ -63,14 +63,7 @@ CDECL void FEM_Print_Mesh_Summary(int mesh){
 
 CDECL void FEM_Print_n2n(int mesh, int nodeid){
   FEM_Mesh *m=FEM_Mesh_lookup(mesh,"FEM_Print_Mesh_Summary");
-  CkPrintf("node %d is adjacent to nodes:", nodeid);
-  int *adjnodes;
-  int sz;
-  m->n2n_getAll(nodeid, &adjnodes, &sz); 
-  for(int i=0;i<sz;i++)
-	CkPrintf(" %d", adjnodes[i]);
-  if(sz!=0) delete[] adjnodes;  
-  CkPrintf("\n");
+  m->getfmMM()->getfmUtil()->FEM_Print_n2n(m, nodeid);
 }
 
 void FEM_MUtil::FEM_Print_n2n(FEM_Mesh *m, int nodeid){
@@ -86,14 +79,7 @@ void FEM_MUtil::FEM_Print_n2n(FEM_Mesh *m, int nodeid){
 
 CDECL void FEM_Print_n2e(int mesh, int eid){
   FEM_Mesh *m=FEM_Mesh_lookup(mesh,"FEM_Print_Mesh_Summary");
-  CkPrintf("node %d is adjacent to elements:", eid);
-  int *adjes;
-  int sz;
-  m->n2e_getAll(eid, &adjes, &sz);
-  for(int i=0;i<sz;i++)
-	CkPrintf(" %d", adjes[i]);
-  if(sz!=0) delete[] adjes;
-  CkPrintf("\n");
+  m->getfmMM()->getfmUtil()->FEM_Print_n2e(m, eid);
 }
 
 void FEM_MUtil::FEM_Print_n2e(FEM_Mesh *m, int eid){
@@ -111,12 +97,7 @@ void FEM_MUtil::FEM_Print_n2e(FEM_Mesh *m, int eid){
 // WARNING THESE TWO FUNCTIONS ONLY WORK ON TRIANGULAR ELEMENTS...
 CDECL void FEM_Print_e2n(int mesh, int eid){
   FEM_Mesh *m=FEM_Mesh_lookup(mesh,"FEM_Print_Mesh_Summary");
-  CkPrintf("element %d is adjacent to nodes:", eid);
-  int adjns[3];
-  m->e2n_getAll(eid, adjns, 0); 
-  for(int i=0;i<3;i++)
-	CkPrintf(" %d", adjns[i]);
-  CkPrintf("\n");
+  m->getfmMM()->getfmUtil()->FEM_Print_e2n(m, eid);
 }
 
 void FEM_MUtil::FEM_Print_e2n(FEM_Mesh *m, int eid){
@@ -130,12 +111,7 @@ void FEM_MUtil::FEM_Print_e2n(FEM_Mesh *m, int eid){
 
 CDECL void FEM_Print_e2e(int mesh, int eid){
   FEM_Mesh *m=FEM_Mesh_lookup(mesh,"FEM_Print_Mesh_Summary");
-  CkPrintf("element %d is adjacent to elements:", eid);
-  int adjes[3];
-  m->e2e_getAll(eid, adjes, 0); 
-  for(int i=0;i<3;i++)
-	CkPrintf(" %d", adjes[i]);
-  CkPrintf("\n");
+  m->getfmMM()->getfmUtil()->FEM_Print_e2e(m, eid);
 }
 
 void FEM_MUtil::FEM_Print_e2e(FEM_Mesh *m, int eid){
@@ -151,17 +127,19 @@ void FEM_MUtil::FEM_Print_e2e(FEM_Mesh *m, int eid){
 int FEM_add_node_local(FEM_Mesh *m, int addGhost){
   int newNode;
   if(addGhost){
-	newNode = m->node.getGhost()->size();
-	m->node.getGhost()->setLength(newNode+1); // lengthen node attributes
-	m->node.getGhost()->set_valid(newNode);   // set new node as valid
+    newNode = m->node.getGhost()->size();
+    m->node.getGhost()->setLength(newNode+1); // lengthen node attributes
+    m->node.getGhost()->set_valid(newNode);   // set new node as valid
+    m->n2e_removeAll(FEM_To_ghost_index(newNode));    // initialize element adjacencies
+    m->n2n_removeAll(FEM_To_ghost_index(newNode));    // initialize node adjacencies
   }
   else{
-	newNode = m->node.size();
-	m->node.setLength(newNode+1); // lengthen node attributes
-	m->node.set_valid(newNode);   // set new node as valid
+    newNode = m->node.size();
+    m->node.setLength(newNode+1); // lengthen node attributes
+    m->node.set_valid(newNode);   // set new node as valid
+    m->n2e_removeAll(newNode);    // initialize element adjacencies
+    m->n2n_removeAll(newNode);    // initialize node adjacencies
   }
-  m->n2e_removeAll(newNode);    // initialize element adjacencies
-  m->n2n_removeAll(newNode);    // initialize node adjacencies
   return newNode;  // return a new index
 }
 
@@ -640,6 +618,7 @@ int FEM_add_element(FEM_Mesh *m, int* conn, int connSize, int elemType, int chun
   
   int newEl = -1;
   int index = m->getfmMM()->getIdx();
+  int buildGhosts = 0;
   int sharedcount=0;
   int ghostcount=0;
   int localcount=0;
@@ -665,69 +644,7 @@ int FEM_add_element(FEM_Mesh *m, int* conn, int connSize, int elemType, int chun
   }
   else if(ghostcount==0 && sharedcount > 0 && localcount > 0){// a local elem with not ALL shared nodes
     newEl = FEM_add_element_local(m,conn,connSize,elemType,0);
-    
-    //   make this element ghost on all others, updating all IDXL's
-    //   also in same remote entry method, update adjacencies on all others
-    //   grow local element and attribute tables if needed
-    //   add to local elem[elemType] table, and update IDXL if needed
-    //   update local adjacencies
-    //   return the new element id
-
-    //build a mapping of all shared chunks to all nodes in this element    
-    CkVec<int> **allShared;
-    int numSharedChunks = 0;
-    CkVec<int> *allChunks;
-    int **sharedConn; 
-    m->getfmMM()->getfmUtil()->buildChunkToNodeTable(nodetype, sharedcount, ghostcount, localcount, conn, connSize, &allShared, &numSharedChunks, &allChunks, &sharedConn);   
-
-    //add all the local nodes in this element to the ghost list, if they did not exist already
-    for(int i=0; i<numSharedChunks; i++) {
-      int chk = (*allChunks)[i];
-      if(chk == index) continue; //it is this chunk
-      //it is a new element so it could not have existed as a ghost on that chunk. Just add it.
-      m->elem[elemType].ghostSend.addNode(newEl,chk);
-      //ghost nodes should be added only if they were not already present as ghosts on that chunk.
-      int numNodesToAdd = 0;
-      int numSharedGhosts = 0;
-      int numSharedNodes = 0;
-      int *sharedGhosts = (int *)malloc((connSize-1)*sizeof(int));
-      int *sharedNodes = (int *)malloc((connSize)*sizeof(int));
-      for(int j=0; j<connSize; j++) {
-	int sharedNode = m->getfmMM()->getfmUtil()->exists_in_IDXL(m,conn[j],chk,0);
-	if(sharedNode == -1) {
-	  //node 'j' is a ghost on chunk 'i'
-	  int sharedGhost = m->getfmMM()->getfmUtil()->exists_in_IDXL(m,conn[j],chk,1);
-	  if( sharedGhost == -1) {
-	    //it is a new ghost
-	    m->node.ghostSend.addNode(conn[j],chk);
-	    numNodesToAdd++;
-	  }
-	  else {
-	    //it is a shared ghost
-	    sharedGhosts[numSharedGhosts] = sharedGhost;
-	    numSharedGhosts++;
-	  }
-	}
-	else {
-	  //it is a shared node
-	  sharedNodes[numSharedNodes] = sharedNode;
-	  numSharedNodes++;
-	}
-      }
-      addGhostElemMsg *fm = new (numSharedGhosts, numSharedNodes, 0)addGhostElemMsg;
-      fm->chk = index;
-      fm->elemType = elemType;
-      fm->numGhostIndex = numSharedGhosts;
-      for(int j=0; j<numSharedGhosts; j++) {
-	fm->ghostIndices[j] = sharedGhosts[j];
-      }
-      fm->numSharedIndex = numSharedNodes;
-      for(int j=0; j<numSharedNodes; j++) {
-	fm->sharedIndices[j] = sharedNodes[j];
-      }
-      fm->connSize = connSize;
-      meshMod[chk].addGhostElem(fm); //newEl, m->fmMM->idx, elemType;
-    }
+    buildGhosts = 1;
   }
   else if(ghostcount==0 && sharedcount > 0 && localcount == 0){// a local elem with ALL shared nodes
     //it is interesting to note that such a situation can only occur between only two chunks
@@ -755,7 +672,137 @@ int FEM_add_element(FEM_Mesh *m, int* conn, int connSize, int elemType, int chun
       return newEl;
     }
     newEl = FEM_add_element_local(m,conn,connSize,elemType,0);
-    
+    buildGhosts = 1;
+  }
+  else if(ghostcount > 0 && localcount == 0 && sharedcount > 0) { // it is remote elem with some shared nodes
+    //this is the part when it eats a ghost element
+    if((chunkNo!=-1) && (chunkNo==index)) { //this is because the chunk doing this operation is supposed to eat into anyone else.
+      //change all ghost nodes to shared nodes
+      //this also involves going to allchunks that it was local/shared on and make it shared and add this chunk to the list of chunks it is shared to.
+      for(int i=0; i<connSize; i++) {
+	if(nodetype[i]==2) {
+	  //build up the list of chunks it is shared/local to
+	  int numchunks;
+	  IDXL_Share **chunks1;
+	  m->getfmMM()->getfmUtil()->getChunkNos(0,conn[i],&numchunks,&chunks1);
+
+	  //add a new node with the same attributes as this ghost node, do not remove the ghost node yet
+	  int newN = m->getfmMM()->getfmUtil()->Replace_node_local(m, conn[i], -1);
+
+	  //add index to the shared list of this node on all the chunks
+	  for(int j=0; j<numchunks; j++) {
+	    int chk = chunks1[j]->chk;
+	    if(chk==index) continue;
+	    m->node.shared.addNode(newN,chk);
+	    //find out what chk calls this node (from the ghostrecv idxl list)
+	    int idx = m->getfmMM()->getfmUtil()->exists_in_IDXL(m, conn[i],  chk, 2);
+	    m->node.ghost->ghostRecv.removeNode(FEM_To_ghost_index(conn[i]), chk);
+	    meshMod[chk].addToSharedList(index, idx); //when doing this add, make all idxl lists consistent, and return me the list of n2e connections for this node, which are local to this chunk, and also a list of the connectivity
+	  }
+	  //remove the ghost node
+	  FEM_remove_node_local(m,conn[i]);
+	  conn[i] = newN;
+	}
+      }
+      newEl = FEM_add_element_local(m,conn,connSize,elemType,0);
+      buildGhosts = 1;
+    }
+    else {
+      //figure out which chunk it is local to
+      //among all chunks who share some of the nodes or from whom this chunk receives ghost nodes
+      //if there is any chunk which owns a ghost node which is not shared, then that is a local node 
+      //to that chunk and that chunk owns that element. However, only that chunk knows abt it.
+      //So, just go to the owner of every ghost node and figure out who all share that node.
+      //Build up this table of nodes owned by which all chunks.
+      //The chunk that is in the table corresponding to all nodes wins the element.
+      
+      CkVec<int> **allShared;
+      int numSharedChunks = 0;
+      CkVec<int> *allChunks;
+      int **sharedConn; 
+      m->getfmMM()->getfmUtil()->buildChunkToNodeTable(nodetype, sharedcount, ghostcount, localcount, conn, connSize, &allShared, &numSharedChunks, &allChunks, &sharedConn);   
+      
+      //we are looking for any chunk which does not have a ghost node
+      int remoteChunk = -1;
+      for(int i=0; i<numSharedChunks; i++) {
+	remoteChunk = i;
+	for(int j=0; j<connSize; j++) {
+	  if(sharedConn[i][j] == -1) {
+	    remoteChunk = -1;
+	    break; //this chunk has a ghost node
+	  }
+	  if(sharedConn[i][j] == 0) {
+	    break; //this is a local node, hence it is the remotechunk
+	  }
+	}
+	if(remoteChunk == i) break;
+	else remoteChunk = -1;
+      }
+      CkAssert(remoteChunk != -1);
+      
+      remoteChunk = (*allChunks)[remoteChunk];
+      //convert all connections to the shared IDXL indices. We should also tell which are ghost indices
+      int numGhostNodes = 0;
+      for(int i=0; i<connSize; i++) {
+	if(nodetype[i] == 2) { //a ghost node
+	  numGhostNodes++;
+	}
+      }
+      CkAssert(numGhostNodes > 0);
+      if(chunkNo!=-1) {
+	if(chunkNo != remoteChunk)
+	  CkPrintf("Error: I derived it should go to chunk %d, which is not %d\n",remoteChunk,chunkNo);
+      }
+      addElemMsg *am = new (connSize, numGhostNodes, 0) addElemMsg;
+      int chk = index;
+      am->chk = chk;
+      am->elemtype = elemType;
+      am->connSize = connSize;
+      am->numGhostIndex = numGhostNodes;
+      int j = 0;
+      for(int i=0; i<connSize; i++) {
+	if(nodetype[i] == 1) {
+	  am->conn[i] = m->getfmMM()->getfmUtil()->exists_in_IDXL(m,conn[i],remoteChunk,0);
+	}
+	else if(nodetype[i] == 2) {
+	  am->conn[i] = m->getfmMM()->getfmUtil()->exists_in_IDXL(m,conn[i],remoteChunk,2);
+	  am->ghostIndices[j] = i;
+	  j++;
+	}
+      }
+      meshMod[remoteChunk].addElementRemote(am);
+      //this might be a source of a deadlock, because I am sure the remote chunk will call a sync entry method on this chunk for updating my ghosts....
+      
+      //pick up the last entry from the element ghostrecv IDXL with remoteChunk, that is the index of the last element added.
+      const IDXL_List ilist = m->elem[elemType].ghost->ghostRecv.getList(remoteChunk);
+      int size = ilist.size();
+      newEl = ilist[size-1];
+      newEl = FEM_To_ghost_index(newEl);
+    }
+  }
+  else if(ghostcount > 0 && localcount == 0 && sharedcount == 0) { // it is a remote elem with no shared nodes
+    //I guess such a situation will never occur
+    //figure out which chunk it is local to -- this would be really difficult to do in such a case.
+    //so, for now, we do not allow a chunk to add an element for which it does not share even a single node.
+
+    // almost the code in the preceeding else cacse will work for this, but its better not to allow this
+  }
+  else if(ghostcount > 0 && localcount > 0 && sharedcount > 0){// it is a flip operation
+    //actually this can be generalized as an operation which moves the boundary, to make the ghost node shared
+    //if one uses FEM_elem_acquire, then this condition gets distributed across other conditions already done.
+   
+    //   promote ghosts to shared on others, requesting new ghosts
+    //   grow local element and attribute tables if needed
+    //   add to local elem[elemType] table, and update IDXL if needed
+    //   update remote adjacencies
+    //   update local adjacencies
+  }
+  else if(ghostcount > 0 && localcount > 0 && sharedcount == 0) { //this is an impossible case
+    //bogus case
+  }
+
+
+  if(buildGhosts==1) {
     //   make this element ghost on all others, updating all IDXL's
     //   also in same remote entry method, update adjacencies on all others
     //   grow local element and attribute tables if needed
@@ -818,94 +865,6 @@ int FEM_add_element(FEM_Mesh *m, int* conn, int connSize, int elemType, int chun
       fm->connSize = connSize;
       meshMod[chk].addGhostElem(fm); //newEl, m->fmMM->idx, elemType;
     }
-  }
-  else if(ghostcount > 0 && localcount == 0 && sharedcount > 0) { // it is remote elem with some shared nodes
-    //figure out which chunk it is local to
-    //among all chunks who share some of the nodes or from whom this chunk receives ghost nodes
-    //if there is any chunk which owns a ghost node which is not shared, then that is a local node 
-    //to that chunk and that chunk owns that element. However, only that chunk knows abt it.
-    //So, just go to the owner of every ghost node and figure out who all share that node.
-    //Build up this table of nodes owned by which all chunks.
-    //The chunk that is in the table corresponding to all nodes wins the element.
-
-    CkVec<int> **allShared;
-    int numSharedChunks = 0;
-    CkVec<int> *allChunks;
-    int **sharedConn; 
-    m->getfmMM()->getfmUtil()->buildChunkToNodeTable(nodetype, sharedcount, ghostcount, localcount, conn, connSize, &allShared, &numSharedChunks, &allChunks, &sharedConn);   
-    
-    //we are looking for any chunk which does not have a ghost node
-    int remoteChunk = -1;
-    for(int i=0; i<numSharedChunks; i++) {
-      remoteChunk = i;
-      for(int j=0; j<connSize; j++) {
-	if(sharedConn[i][j] == -1) {
-	  remoteChunk = -1;
-	  break; //this chunk has a ghost node
-	}
-	if(sharedConn[i][j] == 0) {
-	  break; //this is a local node, hence it is the remotechunk
-	}
-      }
-      if(remoteChunk == i) break;
-      else remoteChunk = -1;
-    }
-    CkAssert(remoteChunk != -1);
-
-    remoteChunk = (*allChunks)[remoteChunk];
-    //convert all connections to the shared IDXL indices. We should also tell which are ghost indices
-    int numGhostNodes = 0;
-    for(int i=0; i<connSize; i++) {
-      if(nodetype[i] == 2) { //a ghost node
-	numGhostNodes++;
-      }
-    }
-    CkAssert(numGhostNodes > 0);
-    addElemMsg *am = new (connSize, numGhostNodes, 0) addElemMsg;
-    int chk = index;
-    am->chk = chk;
-    am->elemtype = elemType;
-    am->connSize = connSize;
-    am->numGhostIndex = numGhostNodes;
-    int j = 0;
-    for(int i=0; i<connSize; i++) {
-      if(nodetype[i] == 1) {
-	am->conn[i] = m->getfmMM()->getfmUtil()->exists_in_IDXL(m,conn[i],remoteChunk,0);
-      }
-      else if(nodetype[i] == 2) {
-	am->conn[i] = m->getfmMM()->getfmUtil()->exists_in_IDXL(m,conn[i],remoteChunk,2);
-	am->ghostIndices[j] = i;
-	j++;
-      }
-    }
-    meshMod[remoteChunk].addElementRemote(am);
-    //this might be a source of a deadlock, because I am sure the remote chunk will call a sync entry method on this chunk for updating my ghosts....
-
-    //pick up the last entry from the element ghostrecv IDXL with remoteChunk, that is the index of the last element added.
-    const IDXL_List ilist = m->elem[elemType].ghost->ghostRecv.getList(remoteChunk);
-    int size = ilist.size();
-    newEl = ilist[size-1];
-    newEl = FEM_To_ghost_index(newEl);
-  }
-  else if(ghostcount > 0 && localcount == 0 && sharedcount == 0) { // it is a remote elem with no shared nodes
-    //I guess such a situation will never occur
-    //figure out which chunk it is local to -- this would be really difficult to do in such a case.
-    //so, for now, we do not allow a chunk to add an element for which it does not share even a single node.
-
-    // almost the code in the preceeding else cacse will work for this, but its better not to allow this
-  }
-  else if(ghostcount > 0 && localcount > 0 && sharedcount > 0){// it is a flip operation
-    //actually this can be generalized as an operation which moves the boundary, to make the ghost node shared
-    //if one uses FEM_elem_acquire, then this condition gets distributed across other conditions already done.
-   
-    //   promote ghosts to shared on others, requesting new ghosts
-    //   grow local element and attribute tables if needed
-    //   add to local elem[elemType] table, and update IDXL if needed
-    //   update remote adjacencies
-    //   update local adjacencies
-  }
-  else if(ghostcount > 0 && localcount > 0 && sharedcount == 0) { //this is an impossible case
-    //bogus case
   }
 
   return newEl;
@@ -1309,7 +1268,6 @@ void FEM_MUtil::splitEntityAll(FEM_Mesh *m, int localIdx, int nBetween, int *bet
 	  }
 	}
       }
-      //delete &ll; //clean up
       sharedNodeMsg *fm = new (2, 0) sharedNodeMsg;
       fm->chk = mmod->idx;
       fm->nBetween = nBetween;
@@ -1619,6 +1577,133 @@ int FEM_MUtil::getRemoteIdx(FEM_Mesh *m, int elementid, int elemtype) {
   return remoteChunk;
 }
 
+int FEM_MUtil::Replace_node_local(FEM_Mesh *m, int oldIdx, int newIdx) {
+  //removes oldIdx and copies all its attributes to newIdx
+  if(newIdx==-1) {
+    newIdx = m->node.size();
+    m->node.setLength(newIdx+1); // lengthen node attributes
+    m->node.set_valid(newIdx);   // set new node as valid
+    m->n2e_removeAll(newIdx);    // initialize element adjacencies
+    m->n2n_removeAll(newIdx);    // initialize node adjacencies
+  }
+
+  CkVec<FEM_Attribute *>*attrs;
+  CkVec<FEM_Attribute *>*nattrs;
+  if(FEM_Is_ghost_index(oldIdx)){
+    attrs =  m->node.ghost->getAttrVec();
+    //oldIdx = FEM_To_ghost_index(oldIdx);
+  }
+  else{
+    attrs =  m->node.getAttrVec();
+  }
+  nattrs = m->node.getAttrVec();
+
+  for(int j=0; j<attrs->size(); j++){
+    FEM_Attribute *att = (FEM_Attribute *)(*attrs)[j];
+    FEM_Attribute *natt = (FEM_Attribute *)(*nattrs)[j];
+    if(att->getAttr() < FEM_ATTRIB_TAG_MAX){ 
+      FEM_DataAttribute *d = (FEM_DataAttribute *)natt;
+      if(FEM_Is_ghost_index(oldIdx)){
+	d->copyEntity(newIdx, *att, FEM_To_ghost_index(oldIdx));
+      }
+      else {
+	d->copyEntity(newIdx, *att, oldIdx);
+      }
+    }
+  }
+
+  //update the conectivity of neighboring nodes and elements
+  int *nnbrs;
+  int nsize;
+  m->n2n_getAll(oldIdx, &nnbrs, &nsize);
+  m->n2n_removeAll(newIdx);
+  for(int i=0; i<nsize; i++) {
+    m->n2n_add(newIdx, nnbrs[i]);
+    m->n2n_replace(nnbrs[i], oldIdx, newIdx);
+  }
+  int *enbrs;
+  int esize;
+  m->n2e_getAll(oldIdx, &enbrs, &esize);
+  m->n2e_removeAll(newIdx);
+  for(int i=0; i<esize; i++) {
+    m->n2e_add(newIdx, enbrs[i]);
+    m->e2n_replace(enbrs[i], oldIdx, newIdx, 0);
+  }
+
+  //get rid of all connections of the older node
+  m->n2n_removeAll(oldIdx);
+  m->n2e_removeAll(oldIdx);
+  return newIdx;  // return a new index
+}
+
+void FEM_MUtil::addToSharedList(FEM_Mesh *m, int fromChk, int sharedIdx) {
+  int elemType = 0;
+  int connSize = m->elem[elemType].getConn().width();
+  int localIdx = mmod->fmUtil->lookup_in_IDXL(m,sharedIdx,fromChk,1); //look in the ghostsend list
+
+  //fix the idxl lists
+  m->node.shared.addNode(localIdx, fromChk);
+  m->node.ghostSend.removeNode(localIdx, fromChk);
+
+  int *enbrs;
+  int esize;
+  m->n2e_getAll(localIdx, &enbrs, &esize);
+  for(int i=0; i<esize; i++) {
+    if(enbrs[i] >= 0) { //if it is a local element
+      //if it exists in the ghostsend list already
+      int exists = mmod->fmUtil->exists_in_IDXL(m, enbrs[i], fromChk, 3);
+      if(exists == -1) {
+	m->elem[elemType].ghostSend.addNode(enbrs[i], fromChk);
+	//ghost nodes should be added only if they were not already present as ghosts on that chunk.
+	int numNodesToAdd = 0;
+	int numSharedGhosts = 0;
+	int numSharedNodes = 0;
+	int *sharedGhosts = (int *)malloc(connSize*sizeof(int));
+	int *sharedNodes = (int *)malloc(connSize*sizeof(int));
+	int *nnbrs = (int*)malloc(connSize*sizeof(int));
+	m->e2n_getAll(enbrs[i], nnbrs, elemType);
+	for(int j=0; j<connSize; j++) {
+	  int sharedNode = mmod->fmUtil->exists_in_IDXL(m,nnbrs[j],fromChk,0);
+	  if(sharedNode == -1) {
+	    //node 'j' is a ghost on chunk 'i'
+	    int sharedGhost = mmod->fmUtil->exists_in_IDXL(m,nnbrs[j],fromChk,1);
+	    if( sharedGhost == -1) {
+	      //it is a new ghost
+	      m->node.ghostSend.addNode(nnbrs[j],fromChk);
+	      numNodesToAdd++;
+	    }
+	    else {
+	      //it is a shared ghost
+	      sharedGhosts[numSharedGhosts] = sharedGhost;
+	      numSharedGhosts++;
+	    }
+	  }
+	  else {
+	    //it is a shared node
+	    sharedNodes[numSharedNodes] = sharedNode;
+	    numSharedNodes++;
+	  }
+	}
+	//add this element as a ghost on fromChk
+	addGhostElemMsg *fm = new (numSharedGhosts, numSharedNodes, 0)addGhostElemMsg;
+	fm->chk = getIdx();
+	fm->elemType = elemType;
+	fm->numGhostIndex = numSharedGhosts;
+	for(int j=0; j<numSharedGhosts; j++) {
+	  fm->ghostIndices[j] = sharedGhosts[j];
+	}
+	fm->numSharedIndex = numSharedNodes;
+	for(int j=0; j<numSharedNodes; j++) {
+	  fm->sharedIndices[j] = sharedNodes[j];
+	}
+	fm->connSize = connSize;
+	meshMod[fromChk].addGhostElem(fm); 
+      }
+    }
+  }
+}
+
+
 femMeshModify::femMeshModify(femMeshModMsg *fm) {
   numChunks = fm->numChunks;
   idx = fm->myChunk;
@@ -1729,6 +1814,10 @@ void femMeshModify::refine_flip_element_leb(int fromChk, int propElemT,
     fmAdapt->refine_flip_element_leb(propElem, propNode, newNode, nbrOpNode, 
 				     longEdgeLen);
   }
+}
+
+void femMeshModify::addToSharedList(int fromChk, int sharedIdx) {
+  fmUtil->addToSharedList(fmMesh, fromChk, sharedIdx);
 }
 
 #include "FEMMeshModify.def.h"
