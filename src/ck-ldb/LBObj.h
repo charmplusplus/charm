@@ -74,13 +74,14 @@ public:
   }
   inline void StopTimer(double* walltime, double* cputime) {
 	if (startWTime >= 0.0) {	// in case startOn in middle of entry
-          double endWTime = CkWallTimer();
+          const double endWTime = CkWallTimer();
 	  *walltime = endWTime - startWTime;
 #if CMK_LBDB_CPUTIMER
-	  *cputime = CkCpuTimer() - startCTime;
+          const double endCTime = CkCpuTimer();
 #else
-	  *cputime = endWTime - startCTime;
+          const double endCTime = endWTime;
 #endif
+	  *cputime = endCTime - startCTime;
 	}
   }
 

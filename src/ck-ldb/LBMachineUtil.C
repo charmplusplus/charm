@@ -49,7 +49,11 @@ LBMachineUtil::LBMachineUtil()
 void LBMachineUtil::StatsOn()
 {
   const double cur_wall = CkWallTimer();
+#if CMK_LBDB_CPUTIMER
   const double cur_cpu = CkCpuTimer();
+#else
+  const double cur_cpu = cur_wall;
+#endif
 
   if (state == off) {
 #if ! CMK_BLUEGENE_CHARM
@@ -81,7 +85,11 @@ void LBMachineUtil::StatsOff()
 
   if (start_totalwall != -1.) {
     const double cur_wall = CkWallTimer();
+#if CMK_LBDB_CPUTIMER
     const double cur_cpu = CkCpuTimer();
+#else
+    const double cur_cpu = cur_wall;
+#endif
     total_walltime += (cur_wall - start_totalwall);
     total_cputime += (cur_cpu - start_totalcpu);
   }
