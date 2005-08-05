@@ -30,3 +30,5 @@
 
 #define CMK_IMMEDIATE_MSG				   1
 #define CMK_MACHINE_PROGRESS_DEFINED                       1
+
+#define CMK_LBDB_CPUTIMER				   0
