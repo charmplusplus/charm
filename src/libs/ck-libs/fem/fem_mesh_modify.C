@@ -1710,6 +1710,7 @@ femMeshModify::femMeshModify(femMeshModMsg *fm) {
   fmLock = new FEM_lock(idx, this);
   fmUtil = new FEM_MUtil(idx, this);
   fmAdapt = NULL;
+  fmAdaptAlgs = NULL;
   fmInp = NULL;
   fmMesh = NULL;
 }
@@ -1727,6 +1728,8 @@ void femMeshModify::setFemMesh(FEMMeshMsg *fm) {
   fmMesh = fm->m;
   fmMesh->setFemMeshModify(this);
   fmAdapt = new FEM_Adapt(fmMesh, this);
+  int dim = 2; // FIX ME!  Look this up somewhere!
+  fmAdaptAlgs = new FEM_Adapt_Algs(fmMesh, this, dim);
   fmInp = new FEM_Interpolate(fmMesh, this);
   return;
 }
@@ -1802,7 +1805,7 @@ void femMeshModify::refine_flip_element_leb(int fromChk, int propElemT,
 					    int nbrOpNodeT, double longEdgeLen)
 {
   if (fromChk == getfmUtil()->getIdx()) { // no translation necessary
-    fmAdapt->refine_flip_element_leb(propElemT, propNodeT, newNodeT, 
+    fmAdaptAlgs->refine_flip_element_leb(propElemT, propNodeT, newNodeT, 
 				     nbrOpNodeT, longEdgeLen);
   }
   else {
@@ -1811,8 +1814,8 @@ void femMeshModify::refine_flip_element_leb(int fromChk, int propElemT,
     propNode = getfmUtil()->lookup_in_IDXL(fmMesh, propElemT, fromChk, 0, -1);
     newNode = getfmUtil()->lookup_in_IDXL(fmMesh, newNodeT, fromChk, 0, -1);
     nbrOpNode = getfmUtil()->lookup_in_IDXL(fmMesh, nbrOpNodeT, fromChk, 1,-1);
-    fmAdapt->refine_flip_element_leb(propElem, propNode, newNode, nbrOpNode, 
-				     longEdgeLen);
+    fmAdaptAlgs->refine_flip_element_leb(propElem, propNode, newNode, 
+					 nbrOpNode, longEdgeLen);
   }
 }
 

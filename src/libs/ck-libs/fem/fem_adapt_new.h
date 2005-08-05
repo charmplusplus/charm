@@ -19,8 +19,6 @@ class FEM_Adapt {
       of the path of edges (n1, n) and (n, n2) **/
   int check_orientation(int e1, int e3, int n, int n1, int n2);
  public:
-  typedef double (*edgeLengthFn)(int, int);
-  edgeLengthFn len;
   /// Map a pair of element-local node numberings to an element-local edge 
   /// numbering
   /** Given two element-local node numberings (i.e. 0, 1, 2 for triangular 
@@ -71,8 +69,6 @@ class FEM_Adapt {
 
   /// Initialize FEM_Adapt with a chunk of the mesh
   FEM_Adapt(FEM_Mesh *m, femMeshModify *fm) { theMesh = m; theMod = fm; }
-  /// Set the default edgeLengthFn len
-  void FEM_Adapt_SetEdgeLengthFn(edgeLengthFn f) { len = f; }
   /// Perform a Delaunay flip of edge (n1, n2)
   /** Perform a Delaunay flip of edge (n1, n2) returning 1 if successful, 0 if 
       not (likely due to the edge being on a boundary).  The convexity of the 
@@ -121,13 +117,6 @@ class FEM_Adapt {
   virtual int vertex_split(int n, int n1, int n2);
   virtual int vertex_split(int n, int n1, int n2, int e1, int e3);
 
-  /// Initiate instance of Longest Edge Bisection on an element
-  /** Initiate instance of Longest Edge Bisection on element e.  Propagates
-      throughout the mesh to maintain the requirement that only longest edges
-      are bisected; returns 1 if successful, 0 if not **/
-  virtual int refine_element_leb(int e);
-  virtual void refine_flip_element_leb(int e, int p, int n1, int n2, 
-				       double le);
   virtual void printAdjacencies(int *nodes, int numNodes, int *elems, int numElems);
 };
 

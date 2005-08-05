@@ -29,6 +29,7 @@ The mesh must be in a consistant state before and after these operations:
 #include "mpi.h"
 #include "fem_mesh.h"
 #include "fem_adapt_new.h"
+#include "fem_adapt_algs.h"
 #include "fem_interpolate.h"
 #include "idxl.h"
 #include "FEMMeshModify.decl.h"
@@ -292,6 +293,7 @@ class femMeshModify : public CBase_femMeshModify {
   friend class FEM_Mesh;
   friend class FEM_Interpolate;
   friend class FEM_Adapt;
+  friend class FEM_Adapt_Algs;
 
  public:
   int numChunks;
@@ -301,6 +303,7 @@ class femMeshModify : public CBase_femMeshModify {
   FEM_MUtil *fmUtil;
   FEM_Interpolate *fmInp;
   FEM_Adapt *fmAdapt;
+  FEM_Adapt_Algs *fmAdaptAlgs;
 
  public:
   femMeshModify(femMeshModMsg *fm);
@@ -317,6 +320,7 @@ class femMeshModify : public CBase_femMeshModify {
   FEM_lock *getfmLock(){return fmLock;}
   FEM_MUtil *getfmUtil(){return fmUtil;}
   FEM_Adapt *getfmAdapt(){return fmAdapt;}
+  FEM_Adapt_Algs *getfmAdaptAlgs(){return fmAdaptAlgs;}
   FEM_Interpolate *getfmInp(){return fmInp;}
 
   intMsg *addNodeRemote(addNodeMsg *fm);
