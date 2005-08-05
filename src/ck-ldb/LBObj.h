@@ -66,12 +66,21 @@ public:
   void IncrementTime(double walltime, double cputime);
   inline void StartTimer(void) {
 	startWTime = CkWallTimer();
+#if CMK_LBDB_CPUTIMER
 	startCTime = CkCpuTimer();
+#else
+	startCTime = startWTime;
+#endif
   }
   inline void StopTimer(double* walltime, double* cputime) {
 	if (startWTime >= 0.0) {	// in case startOn in middle of entry
-	  *walltime = CkWallTimer() - startWTime;
+          double endWTime = CkWallTimer();
+	  *walltime = endWTime - startWTime;
+#if CMK_LBDB_CPUTIMER
 	  *cputime = CkCpuTimer() - startCTime;
+#else
+	  *cputime = endWTime - startCTime;
+#endif
 	}
   }
 
