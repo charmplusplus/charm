@@ -26,6 +26,9 @@ module FEMMeshModify {
   };
   message removeGhostElemMsg {
     int ghostIndices[];
+    int ghostRNIndices[];
+    int ghostREIndices[];
+    int sharedIndices[];
   };
   message removeElemMsg;
   /*message ghostNdsEltsMsg {

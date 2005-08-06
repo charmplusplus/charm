@@ -40,7 +40,7 @@ extern CProxy_femMeshModify meshMod;
 // The internal functions which take in a FEM_Mesh*, but could feasibly be used by others
 int FEM_add_node(FEM_Mesh *m, int* adjacent_nodes=0, int num_adjacent_nodes=0, int chunkNo=-1, int upcall=0);
 void FEM_remove_node(FEM_Mesh *m, int node);
-int FEM_remove_element(FEM_Mesh *m, int element, int elem_type=0);
+int FEM_remove_element(FEM_Mesh *m, int element, int elem_type=0, int permanent=0);
 int FEM_add_element(FEM_Mesh *m, int* conn, int conn_size, int elem_type=0, int chunkNo=-1);
 int FEM_Modify_Lock(FEM_Mesh *m, int* affectedNodes=0, int numAffectedNodes=0, int* affectedElts=0, int numAffectedElts=0, int elemtype=0);
 int FEM_Modify_Unlock(FEM_Mesh *m);
@@ -110,8 +110,8 @@ class FEM_MUtil {
   chunkListMsg *getChunksSharingGhostNodeRemote(FEM_Mesh *m, int chk, int sharedIdx);
   void buildChunkToNodeTable(int *nodetype, int sharedcount, int ghostcount, int localcount, int *conn, int connSize, CkVec<int> ***allShared, int *numSharedChunks, CkVec<int> **allChunks, int ***sharedConn);
   void addElemRemote(FEM_Mesh *m, int chk, int elemtype, int connSize, int *conn, int numGhostIndex, int *ghostIndices);
-  void removeGhostElementRemote(FEM_Mesh *m, int chk, int elementid, int elemtype, int numGhostIndex, int *ghostIndices);
-  void removeElemRemote(FEM_Mesh *m, int chk, int elementid, int elemtype);
+  void removeGhostElementRemote(FEM_Mesh *m, int chk, int elementid, int elemtype, int numGhostIndex, int *ghostIndices, int numGhostRNIndex, int *ghostRNIndices, int numGhostREIndex, int *ghostREIndices, int numSharedIndex, int *sharedIndices);
+  void removeElemRemote(FEM_Mesh *m, int chk, int elementid, int elemtype, int permanent);
   int Replace_node_local(FEM_Mesh *m, int oldIdx, int newIdx);
   void addToSharedList(FEM_Mesh *m, int fromChk, int sharedIdx);
 
@@ -270,11 +270,20 @@ class removeGhostElemMsg : public CMessage_removeGhostElemMsg {
   int elemtype;
   int elementid;
   int numGhostIndex;
+  int numGhostRNIndex;
+  int numGhostREIndex;
+  int numSharedIndex;
   int *ghostIndices;
+  int *ghostRNIndices;
+  int *ghostREIndices;
+  int *sharedIndices;
 
   ~removeGhostElemMsg() {
     if(ghostIndices) {
       delete ghostIndices;
+      delete ghostRNIndices;
+      delete ghostREIndices;
+      delete sharedIndices;
     }
   }
 };
@@ -284,6 +293,7 @@ class removeElemMsg : public CMessage_removeElemMsg {
   int chk;
   int elementid;
   int elemtype;
+  int permanent;
 };
 
 

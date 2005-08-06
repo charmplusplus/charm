@@ -298,7 +298,7 @@ to mark the chunk to which a ghost node or element belongs datatype=FEM_INDEX*/
   int FEM_add_node(int mesh, int* adjacent_nodes=0, int num_adjacent_nodes=0, int chunkNo=-1, int upcall=0);
   int FEM_add_element(int mesh, int* conn, int conn_size, int elem_type=0, int chunkNo=-1);
   void FEM_remove_node(int mesh,int node);
-  int FEM_remove_element(int mesh, int element, int elem_type=0);
+  int FEM_remove_element(int mesh, int element, int elem_type=0, int permanent=0);
   int FEM_Modify_Lock(int mesh, int* affectedNodes, int numAffectedNodes, int* affectedElts=0, int numAffectedElts=0, int elemtype=0);
   int FEM_Modify_Unlock(int mesh);
   void FEM_REF_INIT(int mesh);
