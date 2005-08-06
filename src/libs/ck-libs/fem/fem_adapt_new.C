@@ -106,13 +106,24 @@ int FEM_Adapt::edge_flip_help(int e1, int e2, int n1, int n2, int e1_n1,
   printAdjacencies(locknodes, numNodes, lockelems, numElems);
 #endif
 
-  e1chunk = FEM_remove_element(theMesh, e1, 0);
+  if(n1 < 0 || n2 < 0 || n3 < 0) {
+    e1chunk = FEM_remove_element(theMesh, e1, 0, 1);
+  }
+  else {
+    e1chunk = FEM_remove_element(theMesh, e1, 0);
+  }
 #ifdef DEBUG_2
   CkPrintf("Adjacencies after remove element %d: conn(%d,%d,%d)\n",e1,n1,n2,n3);
   lockelems[0] = -1;
   printAdjacencies(locknodes, numNodes, lockelems, numElems);
 #endif
-  e2chunk = FEM_remove_element(theMesh, e2, 0);
+  //if this is a ghost, then eat into it
+  if(n1 < 0 || n2 < 0 || n4 < 0) {
+    e2chunk = FEM_remove_element(theMesh, e2, 0, 1);
+  }
+  else {
+    e2chunk = FEM_remove_element(theMesh, e2, 0);
+  }
 #ifdef DEBUG_2
   CkPrintf("Adjacencies after remove element %d: conn(%d,%d,%d)\n",e2,n1,n2,n4);
   lockelems[1] = -1;
