@@ -39,7 +39,7 @@ class FEM_Adapt {
     int eConn[3];
     theMesh->e2n_getAll(e, eConn);
     for (int i=0; i<3; i++) 
-      if ((eConn[i] != n2) && (eConn[i] != n2)) return eConn[i];
+      if ((eConn[i] != n2) && (eConn[i] != n1)) return eConn[i];
     return -1; //should never come here
   }
   int n2e_exists(int n, int e) {

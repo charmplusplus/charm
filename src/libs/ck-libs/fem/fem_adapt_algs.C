@@ -81,6 +81,15 @@ void FEM_Adapt_Algs::Adapt_Init(double *coord)
   numElements = theMesh->elem[0].size();
 }
 
+/* Initialize numNodes, numElements and coords */
+void FEM_Adapt_Algs::Adapt_Init(int m, int a)
+{
+  mesh = m;
+  coord_attr = a;
+  numNodes = theMesh->node.size();
+  numElements = theMesh->elem[0].size();
+}
+
 /* Set sizes on elements throughout the mesh; note: size is edge length */
 void FEM_Adapt_Algs::SetMeshSize(int method, double factor, double *sizes)
 {
@@ -126,7 +135,8 @@ void FEM_Adapt_Algs::SetMeshSize(int method, double factor, double *sizes)
    on g, and start over. */ 
 int FEM_Adapt_Algs::refine_element_leb(int e)
 {
-  int eConn[3], fixNode, otherNode, opNode, longEdge, nbr; 
+  int *eConn = (int*)malloc(3*sizeof(int));
+  int fixNode, otherNode, opNode, longEdge, nbr; 
   double eLens[3], longEdgeLen = 0.0;
   theMesh->e2n_getAll(e, eConn);
   eLens[0] = length(eConn[0], eConn[1]);
@@ -158,19 +168,20 @@ int FEM_Adapt_Algs::refine_element_leb(int e)
       propElem = theAdaptor->findElementWithNodes(newNode, otherNode, nbrOpNode);
       propNode = otherNode;
     }
-    int localChk, nbrChk;
-    localChk = theMod->getfmUtil()->getIdx();
-    nbrChk = theMod->getfmUtil()->getRemoteIdx(theMesh,nbr,0);
-    if (nbr >= 0) // e's neighbor on longEdge is local
-      meshMod[localChk].refine_flip_element_leb(localChk, propElem, propNode, 
-					     newNode, nbrOpNode, longEdgeLen);
-    else { // nbr < -1 so nbr is a ghost of a non-local element
+
+    //if propElem is a ghost, then it is propagating in a neighboring chunk, otherwise not
+    if(!FEM_Is_ghost_index(propElem)) {
+      refine_flip_element_leb(propElem, propNode, newNode, nbrOpNode, longEdgeLen);
+    }
+    else {
+      int localChk, nbrChk;
+      localChk = theMod->getfmUtil()->getIdx();
+      nbrChk = theMod->getfmUtil()->getRemoteIdx(theMesh,propElem,0);
       int propNodeT = theAdaptor->getSharedNodeIdxl(propNode, nbrChk);
       int newNodeT = theAdaptor->getSharedNodeIdxl(newNode, nbrChk);
       int nbrOpNodeT = (nbrOpNode>=0)?(theAdaptor->getSharedNodeIdxl(nbrOpNode, nbrChk)):(theAdaptor->getGhostNodeIdxl(nbrOpNode, nbrChk));
       int propElemT = theAdaptor->getGhostElementIdxl(propElem, nbrChk);
-      meshMod[nbrChk].refine_flip_element_leb(localChk, propElemT, propNodeT, 
-					      newNodeT,nbrOpNodeT,longEdgeLen);
+      meshMod[nbrChk].refine_flip_element_leb(localChk, propElemT, propNodeT, newNodeT,nbrOpNodeT,longEdgeLen);
     }
     return newNode;
   }
@@ -183,15 +194,33 @@ void FEM_Adapt_Algs::refine_flip_element_leb(int e, int p, int n1, int n2, doubl
   if (length(p, newNode) > le) {
     int localChk = theMod->getfmUtil()->getIdx();
     int newElem = theAdaptor->findElementWithNodes(newNode, n1, p);
-    meshMod[localChk].refine_flip_element_leb(localChk, newElem, p, n1, 
-					      newNode, le);
+    refine_flip_element_leb(newElem, p, n1, newNode, le);
   }
 }
 // ========================  END refine_element_leb ========================
 
 double FEM_Adapt_Algs::length(int n1, int n2)
 {
-  double *n1_coord = &(nodeCoords[n1*dim]), *n2_coord = &(nodeCoords[n2*dim]);
+  //not the correct way to grab coordinates... what abt new nodes???
+  //double *n1_coord = &(nodeCoords[n1*dim]), *n2_coord = &(nodeCoords[n2*dim]);
+  double *n1_coord = (double*)malloc(2*sizeof(double));
+  double *n2_coord = (double*)malloc(2*sizeof(double));
+
+  if(!FEM_Is_ghost_index(n1)) {
+    FEM_Mesh_get_data(mesh, FEM_NODE, coord_attr, (void *)n1_coord, n1, 1, FEM_DOUBLE, 2);
+  }
+  else {
+    int ghostidx = FEM_To_ghost_index(n1);
+    FEM_Mesh_get_data(mesh, FEM_NODE + FEM_GHOST, coord_attr, (void *)n1_coord, ghostidx, 1, FEM_DOUBLE, 2);
+  }
+  if(!FEM_Is_ghost_index(n2)) {
+    FEM_Mesh_get_data(mesh, FEM_NODE, coord_attr, (void *)n2_coord, n2, 1, FEM_DOUBLE, 2);
+  }
+  else {
+    int ghostidx = FEM_To_ghost_index(n2);
+    FEM_Mesh_get_data(mesh, FEM_NODE + FEM_GHOST, coord_attr, (void *)n2_coord, ghostidx, 1, FEM_DOUBLE, 2);
+  }
+  
   double d, ds_sum=0.0;
   for (int i=0; i<dim; i++) {
     d = n1_coord[i] - n2_coord[i];

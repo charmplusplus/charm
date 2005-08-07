@@ -19,6 +19,9 @@ class FEM_Adapt_Algs {
   int numElements, numNodes, dim;
   double *regional_sizes;
   double *nodeCoords;
+  int mesh;
+  int coord_attr;
+
  public:
   FEM_Adapt_Algs() {
     theMesh = NULL; theMod = NULL; theAdaptor = NULL;
@@ -67,6 +70,7 @@ class FEM_Adapt_Algs {
  public:
   /// Initialize numNodes, numElements and coords
   void Adapt_Init(double *coord);
+  void Adapt_Init(int m, int a); //this should be the correct interface
   virtual int refine_element_leb(int e);
   virtual void refine_flip_element_leb(int e, int p, int n1, int n2, 
 				       double le);
