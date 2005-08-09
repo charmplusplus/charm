@@ -1,0 +1,27 @@
+module HbmLB {
+
+extern module LBDatabase;
+extern module BaseLB;
+
+include "NeighborLBMsg.h";
+include "CentralLBMsg.h";
+include "HybridLBMsg.h";
+
+initnode void lbinit(void);
+
+group [migratable] HbmLB: BaseLB {
+  entry void HbmLB(const CkLBOptions &);  
+  entry void ProcessAtSync();
+  entry void ReceiveStats(double t, int frompe, int level);
+  entry void ResumeClients(CkReductionMsg *msg);
+  entry void ResumeClients(int balancing);
+  entry void ReceiveMigrationCount(int, int);	
+  entry void ReceiveMigrationDelta(double delta, int lblevel, int level);	
+  entry void Loadbalancing(int level);	
+  entry void NotifyObjectMigrationDone(int, int);	
+  entry void ReceiveResumeClients(int fromlevel, int balancing);
+  entry void ObjMigrated(LDObjData data, LDCommData cdata[n], int n);
+  entry void reportLBQulity(double, double, double, int, double);
+};
+
+};
