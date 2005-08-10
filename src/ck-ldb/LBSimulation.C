@@ -90,7 +90,8 @@ void LBInfo::getInfo(BaseLB::LDStats* stats, int count, int considerComm)
     	{
 		int pe = stats->to_proc[obj];
 		if (pe == -1) continue;     // this object is out
-		double &oload = stats->objData[obj].wallTime;
+		CmiAssert(pe >=0 && pe < count);
+		double oload = stats->objData[obj].wallTime;
 		if (oload < minObjLoad) minObjLoad = oload;
 		if (oload > maxObjLoad) maxObjLoad = oload;
 		peLoads[pe] += oload;
