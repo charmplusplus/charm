@@ -33,7 +33,7 @@ class FEM_Interpolate {
     int elType;
   } ElementArgs;
 
-  typedef void (* FEM_InterpolateNodeFn)(NodalArgs);
+  typedef void (* FEM_InterpolateNodeFn)(NodalArgs, FEM_Mesh *);
   typedef void (* FEM_InterpolateElementFn)(ElementArgs);
 
   FEM_InterpolateNodeFn nodeEdgeFnPtr, nodeFaceFnPtr, nodeElementFnPtr;

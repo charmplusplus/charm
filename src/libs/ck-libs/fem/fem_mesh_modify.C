@@ -32,6 +32,30 @@ CDECL int FEM_Modify_Unlock(int mesh){
 
 
 
+void FEM_Mesh_dataP(FEM_Mesh *fem_mesh,int entity,int attr,void *data, int firstItem,int length, int datatype,int width) {
+  IDXL_Layout lo(datatype,width);
+  FEM_Mesh_data_layoutP(fem_mesh,entity,attr,data,firstItem,length,lo);
+}
+
+void FEM_Mesh_data_layoutP(FEM_Mesh *fem_mesh,int entity,int attr,void *data, int firstItem,int length, IDXL_Layout_t layout) {
+  const char *caller="FEM_Mesh_data_layout";
+  FEM_Mesh_data_layoutP(fem_mesh,entity,attr,data,firstItem,length,
+			IDXL_Layout_List::get().get(layout,caller));
+}
+
+void FEM_Mesh_data_layoutP(FEM_Mesh *m,int entity,int attr,void *data, int firstItem,int length, const IDXL_Layout &layout) {
+  const char *caller="FEM_Mesh_data";
+  //FEMAPI(caller);
+  //FEM_Mesh *m=FEM_Mesh_lookup(fem_mesh,caller);
+  FEM_Attribute *a=m->lookup(entity,caller)->lookup(attr,caller);
+  
+  if (m->isSetting()) 
+    a->set(data,firstItem,length,layout,caller);
+  else /* m->isGetting()*/
+    a->get(data,firstItem,length,layout,caller);
+}
+
+
 // A wrapper to simplify the lookup to whether a node is shared
 inline int is_shared(FEM_Mesh *m, int node){
   return m->getfmMM()->getfmUtil()->isShared(node);
@@ -1029,6 +1053,9 @@ FEM_lock::FEM_lock(int i, femMeshModify *m) {
   isOwner = false;
   isLocked = false;
   hasLocks = false;
+  isLocking = false;
+  isUnlocking = false;
+  lockedChunks.removeAll();
   mmod = m;
 }
 
@@ -1053,8 +1080,10 @@ bool FEM_lock::existsChunk(int index) {
 int FEM_lock::lock(int numNodes, int *nodes, int numElems, int* elems, int elemType) {
   bool done = false;
   int ret = 0;
+  CkAssert(!hasLocks && (lockedChunks.size()==0) && !isLocking && !isUnlocking); //should not try to lock while it has locks
   while(!done) {
-    if(!isLocked || (isLocked && isOwner)) {
+    if((!isLocked || (isLocked && isOwner)) && !isUnlocking && !isLocking) {
+      isLocking = true; //I've started modifying locked chunks, so I should be sure
       for(int i=0; i<numNodes; i++) {
 	if(i==0) { //lock myself, just once
 	  if(!existsChunk(idx)) {
@@ -1065,9 +1094,19 @@ int FEM_lock::lock(int numNodes, int *nodes, int numElems, int* elems, int elemT
 	//add that chunk to the lock list, if it does not exist already.
 	if(nodes[i] != -1) {
 	  if(nodes[i] < -1) {
-	    if(!mmod->fmMesh->node.ghost->is_valid(FEM_To_ghost_index(nodes[i]))) return -1;
+	    if(!mmod->fmMesh->node.ghost->is_valid(FEM_To_ghost_index(nodes[i]))) {
+	      //clean up whatever has been done
+	      lockedChunks.removeAll();
+	      isLocking = false;
+	      return 0;
+	    }
 	  } 
-	  else if(!mmod->fmMesh->node.is_valid(nodes[i])) return -1;
+	  else if(!mmod->fmMesh->node.is_valid(nodes[i])) {
+	    //clean up whatever has been done
+	    lockedChunks.removeAll();
+	    isLocking = false;
+	    return 0;
+	  }
 	  int numchunks;
 	  IDXL_Share **chunks1;
 	  mmod->fmUtil->getChunkNos(0,nodes[i],&numchunks,&chunks1);
@@ -1083,9 +1122,19 @@ int FEM_lock::lock(int numNodes, int *nodes, int numElems, int* elems, int elemT
 	//add that chunk to the lock list, if not already in it.
 	if(elems[i] != -1) {
 	  if(elems[i] < -1) {
-	    if(!mmod->fmMesh->elem[elemType].ghost->is_valid(FEM_To_ghost_index(elems[i]))) return -1;
+	    if(!mmod->fmMesh->elem[elemType].ghost->is_valid(FEM_To_ghost_index(elems[i]))) {
+	      //clean up whatever has been done
+	      lockedChunks.removeAll();
+	      isLocking = false;
+	      return 0;
+	    }
 	  } 
-	  else if(!mmod->fmMesh->elem[elemType].is_valid(elems[i])) return -1;
+	  else if(!mmod->fmMesh->elem[elemType].is_valid(elems[i])) {
+	    //clean up whatever has been done
+	    lockedChunks.removeAll();
+	    isLocking = false;
+	    return 0;
+	  }
 	  int numchunks;
 	  IDXL_Share **chunks1;
 	  mmod->fmUtil->getChunkNos(1,elems[i],&numchunks,&chunks1,elemType);
@@ -1113,49 +1162,62 @@ int FEM_lock::lock(int numNodes, int *nodes, int numElems, int* elems, int elemT
       //lock them
       for(int i=0; i<numLocks; i++) {
 	ret = lock(lockedChunks[i],idx);
+	CkAssert(ret == 1);
 	if(ret != 1) {
 	  return -1;
+	} else {
+	  hasLocks = true;
 	}
       }
-      hasLocks = true;
       done = true;
+      isLocking = false;
     }
     else {
       CthYield();
       //block
     }
   }
+  CkAssert(!isLocking && !isUnlocking && hasLocks && lockedChunks.size()>0);
   return 1;
 }
 
 int FEM_lock::unlock() {
   bool done = false;
   int ret = 0;
+  if(!hasLocks && lockedChunks.size()==0) {
+    return 0;
+  }
+  CkAssert(hasLocks && (lockedChunks.size()>0) && !isUnlocking && !isLocking); //should not try to unlock if it does not have locks
   while(!done) {
-    if(!isLocked || (isLocked && isOwner)) {
+    if((!isLocked || (isLocked && isOwner)) && !isLocking && !isUnlocking) {
       //get rid of the locks
+      isUnlocking = true;
       if(hasLocks) {
 	for(int i=0; i<lockedChunks.size(); i++) {
 	  ret = unlock(lockedChunks[i],idx);
+	  CkAssert(ret == 1);
 	  if(ret != 1) return -1;
 	}
       }
       hasLocks = false;
+      lockedChunks.removeAll(); //free up the list.. the next lock will build it again
       done = true;
+      isUnlocking = false;
     }
     else {
       CthYield();
       //block
     }
   }
-  lockedChunks.removeAll(); //free up the list.. the next lock will build it again
+  CkAssert(!isUnlocking && !isLocking && !hasLocks && (lockedChunks.size()==0));
   return 1;
 }
 
 int FEM_lock::lock(int chunkNo, int own) {
   intMsg *ret = new intMsg(0);
+  CkAssert(!(isLocked && (own==owner) && (chunkNo==idx))); //should not try to lock me, if it has already locked me
   while(true) {
-    if(!isLocked || (chunkNo != idx)) {
+    if((!isLocked || (chunkNo != idx)) && !isUnlocking) {
       if(chunkNo == idx) {
 	isLocked = true;
 	owner = own;
@@ -1171,6 +1233,7 @@ int FEM_lock::lock(int chunkNo, int own) {
       else {
 	int2Msg *imsg = new int2Msg(chunkNo,own);
 	ret = meshMod[chunkNo].lockRemoteChunk(imsg);
+	CkAssert(ret->i == 1);
 	if(ret->i != 1) return -1;
 	else {
 	  hasLocks = true;
@@ -1188,16 +1251,10 @@ int FEM_lock::lock(int chunkNo, int own) {
 //for sanity, only the owner should unlock it
 int FEM_lock::unlock(int chunkNo, int own) {
   intMsg *ret = new intMsg(0);
+  CkAssert(!(!isLocked && (chunkNo==idx))); //noone should try to unlock me, if I am not locked
+  CkAssert(!(isLocked && (chunkNo==idx) && (owner!=own))); //if I am locked by someone else, only he should try to unlock me
   while(true) {
-    if(!isLocked && (chunkNo == idx)) {
-      CkError("%d trying to unlock %d which is not locked!!\n",own,chunkNo);
-      return -1;
-    }
-    else if(isLocked && (chunkNo == idx) && (owner != own)) {
-      CkError("%d trying to unlock %d which is locked by %d!!\n",own,chunkNo,owner);
-      return -1;
-    }
-    else if(isLocked || (chunkNo != idx)) {
+    if(isLocked || (chunkNo != idx) && !isLocking) {
       if(chunkNo == idx) {
 	isLocked = false;
 	owner = -1;
@@ -1207,6 +1264,7 @@ int FEM_lock::unlock(int chunkNo, int own) {
       else {
 	int2Msg *imsg = new int2Msg(chunkNo,own);
 	ret = meshMod[chunkNo].unlockRemoteChunk(imsg);
+	CkAssert(ret->i == 1);
 	if(ret->i != 1) return -1;
       }
       break;
@@ -1932,21 +1990,20 @@ void femMeshModify::removeElementRemote(removeElemMsg *fm) {
 
 void femMeshModify::refine_flip_element_leb(int fromChk, int propElemT, 
 					    int propNodeT, int newNodeT, 
-					    int nbrOpNodeT, double longEdgeLen)
+					    int nbrOpNodeT, int nbrghost, double longEdgeLen)
 {
-  if (fromChk == getfmUtil()->getIdx()) { // no translation necessary
-    fmAdaptAlgs->refine_flip_element_leb(propElemT, propNodeT, newNodeT, 
-				     nbrOpNodeT, longEdgeLen);
+  int propElem, propNode, newNode, nbrOpNode;
+  propElem = getfmUtil()->lookup_in_IDXL(fmMesh, propElemT, fromChk, 3, 0);
+  propNode = getfmUtil()->lookup_in_IDXL(fmMesh, propNodeT, fromChk, 0, -1);
+  newNode = getfmUtil()->lookup_in_IDXL(fmMesh, newNodeT, fromChk, 0, -1);
+  if(nbrghost) {
+    nbrOpNode = getfmUtil()->lookup_in_IDXL(fmMesh, nbrOpNodeT, fromChk, 1,-1); 
   }
   else {
-    int propElem, propNode, newNode, nbrOpNode;
-    propElem = getfmUtil()->lookup_in_IDXL(fmMesh, propElemT, fromChk, 3, 0);
-    propNode = getfmUtil()->lookup_in_IDXL(fmMesh, propElemT, fromChk, 0, -1);
-    newNode = getfmUtil()->lookup_in_IDXL(fmMesh, newNodeT, fromChk, 0, -1);
-    nbrOpNode = getfmUtil()->lookup_in_IDXL(fmMesh, nbrOpNodeT, fromChk, 1,-1);
-    fmAdaptAlgs->refine_flip_element_leb(propElem, propNode, newNode, 
-					 nbrOpNode, longEdgeLen);
+    nbrOpNode = getfmUtil()->lookup_in_IDXL(fmMesh, nbrOpNodeT, fromChk, 0,-1); 
   }
+  fmAdaptAlgs->refine_flip_element_leb(propElem, propNode, newNode, nbrOpNode, longEdgeLen);
+  return;
 }
 
 void femMeshModify::addToSharedList(int fromChk, int sharedIdx) {

@@ -109,6 +109,7 @@ FEM_Mesh_data(int fem_mesh,int entity,int attr,
 	IDXL_Layout lo(datatype,width);
 	FEM_Mesh_data_layout(fem_mesh,entity,attr,data,firstItem,length,lo);
 }
+
 FORTRAN_AS_C(FEM_MESH_DATA,FEM_Mesh_data,fem_mesh_data,
 	(int *fem_mesh,int *entity,int *attr,void *data,int *firstItem,int *length,int *datatype,int *width),
 	(*fem_mesh,*entity,*attr,data,*firstItem-1,*length,*datatype,*width)
@@ -147,6 +148,7 @@ FEM_Mesh_data_layout(int fem_mesh,int entity,int attr,
 	FEM_Mesh_data_layout(fem_mesh,entity,attr,data,firstItem,length,
 		IDXL_Layout_List::get().get(layout,caller));
 }
+
 FORTRAN_AS_C(FEM_MESH_DATA_LAYOUT,FEM_Mesh_data_layout,fem_mesh_data_layout,
 	(int *fem_mesh,int *entity,int *attr,void *data,int *firstItem,int *length,int *layout),
 	(*fem_mesh,*entity,*attr,data,*firstItem-1,*length,*layout)

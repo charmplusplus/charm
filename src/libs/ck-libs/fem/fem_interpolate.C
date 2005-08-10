@@ -8,7 +8,7 @@
 void FEM_Interpolate::FEM_InterpolateNodeOnEdge(NodalArgs args)
 {
   if (nodeEdgeFnPtr) { // default is overridden
-    nodeEdgeFnPtr(args);
+    nodeEdgeFnPtr(args,theMesh);
     return;
   }
   // do default interpolation
@@ -30,7 +30,7 @@ void FEM_Interpolate::FEM_InterpolateNodeOnEdge(NodalArgs args)
 void FEM_Interpolate::FEM_InterpolateNodeOnFace(NodalArgs args)
 {
   if (nodeFaceFnPtr) { // default is overridden
-    nodeFaceFnPtr(args);
+    nodeFaceFnPtr(args, theMesh);
     return;
   }
   // do default interpolation
@@ -58,7 +58,7 @@ void FEM_Interpolate::FEM_InterpolateNodeOnFace(NodalArgs args)
 void FEM_Interpolate::FEM_InterpolateNodeInElement(NodalArgs args)
 {
   if (nodeElementFnPtr) { // default is overridden
-    nodeElementFnPtr(args);
+    nodeElementFnPtr(args, theMesh);
     return;
   }
   // do default interpolation

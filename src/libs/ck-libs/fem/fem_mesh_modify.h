@@ -48,6 +48,9 @@ int FEM_Modify_Unlock(FEM_Mesh *m);
 // Internal functions which shouldn't be used by anyone else
 int FEM_add_node_local(FEM_Mesh *m, int addGhost=0);
 
+void FEM_Mesh_dataP(FEM_Mesh *fem_mesh,int entity,int attr,void *data, int firstItem, int length, int datatype,int width);
+void FEM_Mesh_data_layoutP(FEM_Mesh *fem_mesh,int entity,int attr,void *data, int firstItem, int length, IDXL_Layout_t layout);
+void FEM_Mesh_data_layoutP(FEM_Mesh *fem_mesh,int entity,int attr,void *data, int firstItem,int length, const IDXL_Layout &layout);
 
 
 //there is one fem_lock associated with every FEM_Mesh.
@@ -57,6 +60,8 @@ class FEM_lock {
   bool isOwner;
   bool isLocked;
   bool hasLocks;
+  bool isLocking;
+  bool isUnlocking;
   CkVec<int> lockedChunks;
   femMeshModify *mmod;
 
@@ -345,7 +350,7 @@ class femMeshModify : public CBase_femMeshModify {
   void removeElementRemote(removeElemMsg *fm);
 
   void refine_flip_element_leb(int fromChk, int propElemT, int propNodeT,
-			       int newNodeT, int nbrOpNodeT, 
+			       int newNodeT, int nbrOpNodeT, int nbrghost,
 			       double longEdgeLen);
 
   void addToSharedList(int fromChk, int sharedIdx);

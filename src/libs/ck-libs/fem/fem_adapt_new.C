@@ -1,8 +1,8 @@
 #include "fem_adapt_new.h"  
 #include "fem_mesh_modify.h"
 
-#define DEBUG_1
-#define DEBUG_2
+//#define DEBUG_1
+//#define DEBUG_2
 
 // ======================  BEGIN edge_flip  =================================
 /* Perform a Delaunay flip of the edge (n1, n2) returning 1 if successful, 0 if

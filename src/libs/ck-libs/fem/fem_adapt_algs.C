@@ -82,9 +82,8 @@ void FEM_Adapt_Algs::Adapt_Init(double *coord)
 }
 
 /* Initialize numNodes, numElements and coords */
-void FEM_Adapt_Algs::Adapt_Init(int m, int a)
+void FEM_Adapt_Algs::Adapt_Init(int a)
 {
-  mesh = m;
   coord_attr = a;
   numNodes = theMesh->node.size();
   numElements = theMesh->elem[0].size();
@@ -138,6 +137,9 @@ int FEM_Adapt_Algs::refine_element_leb(int e)
   int *eConn = (int*)malloc(3*sizeof(int));
   int fixNode, otherNode, opNode, longEdge, nbr; 
   double eLens[3], longEdgeLen = 0.0;
+
+  if(e==-1) return -1;
+
   theMesh->e2n_getAll(e, eConn);
   eLens[0] = length(eConn[0], eConn[1]);
   eLens[1] = length(eConn[1], eConn[2]);
@@ -179,9 +181,10 @@ int FEM_Adapt_Algs::refine_element_leb(int e)
       nbrChk = theMod->getfmUtil()->getRemoteIdx(theMesh,propElem,0);
       int propNodeT = theAdaptor->getSharedNodeIdxl(propNode, nbrChk);
       int newNodeT = theAdaptor->getSharedNodeIdxl(newNode, nbrChk);
+      int nbrghost = (nbrOpNode>=0)?0:1;
       int nbrOpNodeT = (nbrOpNode>=0)?(theAdaptor->getSharedNodeIdxl(nbrOpNode, nbrChk)):(theAdaptor->getGhostNodeIdxl(nbrOpNode, nbrChk));
       int propElemT = theAdaptor->getGhostElementIdxl(propElem, nbrChk);
-      meshMod[nbrChk].refine_flip_element_leb(localChk, propElemT, propNodeT, newNodeT,nbrOpNodeT,longEdgeLen);
+      meshMod[nbrChk].refine_flip_element_leb(localChk, propElemT, propNodeT, newNodeT,nbrOpNodeT,nbrghost,longEdgeLen);
     }
     return newNode;
   }
@@ -190,6 +193,7 @@ int FEM_Adapt_Algs::refine_element_leb(int e)
 void FEM_Adapt_Algs::refine_flip_element_leb(int e, int p, int n1, int n2, double le) 
 {
   int newNode = refine_element_leb(e);
+  if(newNode == -1) return;
   (void) theAdaptor->edge_flip(n1, n2);
   if (length(p, newNode) > le) {
     int localChk = theMod->getfmUtil()->getIdx();
@@ -207,18 +211,18 @@ double FEM_Adapt_Algs::length(int n1, int n2)
   double *n2_coord = (double*)malloc(2*sizeof(double));
 
   if(!FEM_Is_ghost_index(n1)) {
-    FEM_Mesh_get_data(mesh, FEM_NODE, coord_attr, (void *)n1_coord, n1, 1, FEM_DOUBLE, 2);
+    FEM_Mesh_dataP(theMesh, FEM_NODE, coord_attr, (void *)n1_coord, n1, 1, FEM_DOUBLE, 2);
   }
   else {
     int ghostidx = FEM_To_ghost_index(n1);
-    FEM_Mesh_get_data(mesh, FEM_NODE + FEM_GHOST, coord_attr, (void *)n1_coord, ghostidx, 1, FEM_DOUBLE, 2);
+    FEM_Mesh_dataP(theMesh, FEM_NODE + FEM_GHOST, coord_attr, (void *)n1_coord, ghostidx, 1, FEM_DOUBLE, 2);
   }
   if(!FEM_Is_ghost_index(n2)) {
-    FEM_Mesh_get_data(mesh, FEM_NODE, coord_attr, (void *)n2_coord, n2, 1, FEM_DOUBLE, 2);
+    FEM_Mesh_dataP(theMesh, FEM_NODE, coord_attr, (void *)n2_coord, n2, 1, FEM_DOUBLE, 2);
   }
   else {
     int ghostidx = FEM_To_ghost_index(n2);
-    FEM_Mesh_get_data(mesh, FEM_NODE + FEM_GHOST, coord_attr, (void *)n2_coord, ghostidx, 1, FEM_DOUBLE, 2);
+    FEM_Mesh_dataP(theMesh, FEM_NODE + FEM_GHOST, coord_attr, (void *)n2_coord, ghostidx, 1, FEM_DOUBLE, 2);
   }
   
   double d, ds_sum=0.0;

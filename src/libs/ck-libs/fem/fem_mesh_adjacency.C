@@ -1038,7 +1038,7 @@ int FEM_Mesh::getElementOnEdge(int n1, int n2)
   n2e_getAll(n1, &n1AdjElems, &n1NumElems);
   n2e_getAll(n2, &n2AdjElems, &n2NumElems);
   int ret = -1;
-  CkPrintf("%d has %d neighboring elements, %d has %d\n", n1, n1NumElems, n2, n2NumElems);
+  //CkPrintf("%d has %d neighboring elements, %d has %d\n", n1, n1NumElems, n2, n2NumElems);
   for (int i=0; i<n1NumElems; i++) {
     for (int j=0; j<n2NumElems; j++) {
       if (n1AdjElems[i] == n2AdjElems[j]) {
