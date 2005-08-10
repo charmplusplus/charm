@@ -5,7 +5,7 @@
 #include "fem.h"
 #include "netfem.h"
 #include "vector2d.h"
-
+#include "fem_interpolate.h"
 
 //One element's connectivity information
 typedef int connRec[3];
@@ -34,12 +34,9 @@ void doNetFEM(int& t, int mesh, myGlobals &g);
 
 void rebuildArrays (int mesh, myGlobals &g);
 
-void FEM_mesh_smooth(int mesh, myGlobals &g);
+void FEM_mesh_smooth(int mesh, int *nodes, int nNodes, int attrNo);
 
-void getData(int mesh, int idx, double *areas, vector2d*& centroids, int& nEle, myGlobals &g);
-
-int isNodeInternal(int idx);
-
+void interpolate(FEM_Interpolate::NodalArgs args,FEM_Mesh *meshP);
 //Compute forces on constant-strain triangles:
 void CST_NL(const vector2d *coor,const connRec *lm,vector2d *R_net,
 	    const vector2d *d,const double *c,
