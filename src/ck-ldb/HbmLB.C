@@ -236,7 +236,7 @@ void HbmLB::Loadbalancing(int atlevel)
 CkPrintf("[%d] lload: %f rload: %f atlevel: %d\n", CkMyPe(), lload, rload, atlevel);
   if (diff/avg > 0.02) {
     // we need to perform load balancing
-    int numpes = (int)pow(2, atlevel);
+    int numpes = (int)pow(2.0, atlevel);
     double delta = myabs(lload-rload) / numpes;
 
     int overloaded = lData->children[0];
