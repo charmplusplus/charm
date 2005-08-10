@@ -31,6 +31,8 @@ The mesh must be in a consistant state before and after these operations:
 #include "fem_adapt_new.h"
 #include "fem_adapt_algs.h"
 #include "fem_interpolate.h"
+#include "fem_lock.h"
+#include "fem_util.h"
 #include "idxl.h"
 #include "FEMMeshModify.decl.h"
 
@@ -47,84 +49,14 @@ int FEM_Modify_Unlock(FEM_Mesh *m);
 
 // Internal functions which shouldn't be used by anyone else
 int FEM_add_node_local(FEM_Mesh *m, int addGhost=0);
+void FEM_remove_node_local(FEM_Mesh *m, int node);
+int FEM_add_element_local(FEM_Mesh *m, const int *conn, int connSize, int elemType, int addGhost);void FEM_remove_element_local(FEM_Mesh *m, int element, int etype);
+
 
 void FEM_Mesh_dataP(FEM_Mesh *fem_mesh,int entity,int attr,void *data, int firstItem, int length, int datatype,int width);
 void FEM_Mesh_data_layoutP(FEM_Mesh *fem_mesh,int entity,int attr,void *data, int firstItem, int length, IDXL_Layout_t layout);
 void FEM_Mesh_data_layoutP(FEM_Mesh *fem_mesh,int entity,int attr,void *data, int firstItem,int length, const IDXL_Layout &layout);
 
-
-//there is one fem_lock associated with every FEM_Mesh.
-class FEM_lock {
-  int idx;
-  int owner;
-  bool isOwner;
-  bool isLocked;
-  bool hasLocks;
-  bool isLocking;
-  bool isUnlocking;
-  CkVec<int> lockedChunks;
-  femMeshModify *mmod;
-
- private:
-  bool existsChunk(int index);
-
- public:
-  FEM_lock() {};
-  FEM_lock(int i, femMeshModify *m);
-  ~FEM_lock();
-
-  //locks all chunks which contain all the nodes and elements that are passed 
-  //in this function
-  //locking of the chunks is blocking and is strictly in ascending order.
-  int lock(int numNodes, int *nodes, int numElems, int* elems, int elemType=0);
-  //unlock all the concerned chunks.
-  //since at one point of time one chunk can only lock one set of chunks for
-  //one operation, one does not need to pass arguments to unlock.
-  int unlock();
-  int lock(int chunkNo, int own);
-  int unlock(int chunkNo, int own);
-  int getIdx() { return idx; }
-};
-
-class FEM_MUtil {
-  int idx;
-  femMeshModify *mmod;
-
- public:
-  FEM_MUtil() {}
-  FEM_MUtil(int i, femMeshModify *m);
-  ~FEM_MUtil();
-
-  int getIdx() { return idx; }
-  //the entType signifies what type of entity to lock. node=0, elem=1;
-  //entNo signifies the local index of the entity
-  //numChunks is the number of chunks that need to be locked to lock that entity
-  //chunks identifies the chunks that need to be locked
-  void getChunkNos(int entType, int entNo, int *numChunks, IDXL_Share ***chunks, int elemType=0);
-  bool isShared(int index);
-  void splitEntityAll(FEM_Mesh *m, int localIdx, int nBetween, int *between, int idxbase);
-  void splitEntityRemote(FEM_Mesh *m, int chk, int localIdx, int nBetween, int *between, int idxbase);
-  void removeNodeAll(FEM_Mesh *m, int localIdx);
-  void removeNodeRemote(FEM_Mesh *m, int chk, int sharedIdx);
-  int exists_in_IDXL(FEM_Mesh *m, int localIdx, int chk, int type, int elemType=0);
-
-  int lookup_in_IDXL(FEM_Mesh *m, int sharedIdx, int fromChk, int type, int elemType=0);
-  int getRemoteIdx(FEM_Mesh *m, int elementid, int elemtype);
-
-  void addGhostElementRemote(FEM_Mesh *m, int chk, int elemType, int numGhostIndices, int *ghostIndices, int numSharedIndices, int *sharedIndices, int connSize);
-  chunkListMsg *getChunksSharingGhostNodeRemote(FEM_Mesh *m, int chk, int sharedIdx);
-  void buildChunkToNodeTable(int *nodetype, int sharedcount, int ghostcount, int localcount, int *conn, int connSize, CkVec<int> ***allShared, int *numSharedChunks, CkVec<int> **allChunks, int ***sharedConn);
-  void addElemRemote(FEM_Mesh *m, int chk, int elemtype, int connSize, int *conn, int numGhostIndex, int *ghostIndices);
-  void removeGhostElementRemote(FEM_Mesh *m, int chk, int elementid, int elemtype, int numGhostIndex, int *ghostIndices, int numGhostRNIndex, int *ghostRNIndices, int numGhostREIndex, int *ghostREIndices, int numSharedIndex, int *sharedIndices);
-  void removeElemRemote(FEM_Mesh *m, int chk, int elementid, int elemtype, int permanent);
-  int Replace_node_local(FEM_Mesh *m, int oldIdx, int newIdx);
-  void addToSharedList(FEM_Mesh *m, int fromChk, int sharedIdx);
-
-  void FEM_Print_n2n(FEM_Mesh *m, int nodeid);
-  void FEM_Print_n2e(FEM_Mesh *m, int nodeid);
-  void FEM_Print_e2n(FEM_Mesh *m, int eid);
-  void FEM_Print_e2e(FEM_Mesh *m, int eid);
-};
 
 class femMeshModMsg : public CMessage_femMeshModMsg {
  public:
