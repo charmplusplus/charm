@@ -56,6 +56,11 @@ HbmLB::HbmLB(const CkLBOptions &opt): BaseLB(opt)
 
   maxLoad = 0.0;
   vector_n_moves = 0;
+  maxLoad = 0.0;
+  maxCpuLoad = 0.0;
+  totalLoad = 0.0;
+  maxCommCount = 0;
+  maxCommBytes = 0.0;
 
   if (_lb_args.statsOn()) theLbdb->CollectStatsOn();
 #endif
@@ -125,6 +130,7 @@ void HbmLB::AtSync()
 void HbmLB::ProcessAtSync()
 {
 #if CMK_LBDB_ON
+  int i;
   start_lb_time = 0;
 
   if (CkMyPe() == 0) {
@@ -145,7 +151,7 @@ void HbmLB::ProcessAtSync()
   myStats.from_proc.resize(myStats.n_objs);
   myStats.to_proc.resize(myStats.n_objs);
   theLbdb->GetObjData(myStats.objData.getVec());
-  for (int i=0; i<myStats.n_objs; i++)
+  for (i=0; i<myStats.n_objs; i++)
     myStats.from_proc[i] = myStats.to_proc[i] = 0;    // only one PE
 
   myStats.n_comm = theLbdb->GetCommDataSz();
@@ -156,36 +162,9 @@ void HbmLB::ProcessAtSync()
 
   // send to parent
   DEBUGF(("[%d] Send stats to parent %d\n", CkMyPe(), levelData[0]->parent));
-  thisProxy[levelData[0]->parent].ReceiveStats(total_walltime, CkMyPe(), 0);
-#endif
-}
-
-// only called on leaves
-CLBStatsMsg* HbmLB::AssembleStats()
-{
-#if CMK_LBDB_ON
-  // build and send stats
-  const int osz = theLbdb->GetObjDataSz();
-  const int csz = theLbdb->GetCommDataSz();
-
-  CLBStatsMsg* msg = new CLBStatsMsg(osz, csz);
-  msg->from_pe = CkMyPe();
-
-  // Get stats
-  theLbdb->GetTime(&msg->total_walltime,&msg->total_cputime,
-                   &msg->idletime, &msg->bg_walltime,&msg->bg_cputime);
-//  msg->pe_speed = myspeed;
-  // number of pes
-  msg->pe_speed = 1;
-
-  msg->n_objs = osz;
-  theLbdb->GetObjData(msg->objData);
-  msg->n_comm = csz;
-  theLbdb->GetCommData(msg->commData);
-
-  return msg;
-#else
-  return NULL;
+  double tload = 0.0;
+  for (i=0; i<myStats.n_objs; i++) tload += myStats.objData[i].wallTime;
+  thisProxy[levelData[0]->parent].ReceiveStats(tload, CkMyPe(), 0);
 #endif
 }
 
@@ -252,6 +231,7 @@ void HbmLB::Loadbalancing(int atlevel)
 
   double diff = myabs(lload-rload);
   double maxl = mymax(lload, rload);
+CkPrintf("[%d] lload: %f rload: %f atlevel: %d\n", CkMyPe(), lload, rload, atlevel);
   if (diff > 0.0) {
     // we need to perform load balancing
     int numpes = pow(2, atlevel);
@@ -536,10 +516,10 @@ void HbmLB::ResumeClients(int balancing)
 	        lbName(), step()-1,end_lb_time,end_lb_time - start_lb_time);
   }
   if (balancing && _lb_args.printSummary()) {
-      int count = CkNumPes();
+      int count = 1;
       LBInfo info(count);
       LDStats *stats = &myStats;
-      info.getInfo(stats, count, 1);	// no comm cost
+      info.getInfo(stats, count, 0);	// no comm cost
       double mLoad, mCpuLoad, totalLoad;
       info.getSummary(mLoad, mCpuLoad, totalLoad);
       int nmsgs, nbytes;

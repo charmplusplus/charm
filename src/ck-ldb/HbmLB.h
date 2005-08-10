@@ -199,8 +199,6 @@ protected:
 
 private:
   void FindNeighbors();
-  CLBStatsMsg* AssembleStats();
-//  void buildStats(int level);
 
   int migrate_expected;
   LBMigrateMsg** mig_msgs;
