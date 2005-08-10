@@ -112,25 +112,25 @@ typedef struct __ammasso_token {
 // if "name" is null, then "num_##name"==0 and "last_##name" is not defined
 #define LIST_DEFINE(type, name) \
     type *name; \
-    type *last_ ##name; \
-    int    num_ ##name
+    type *last_ ## name; \
+    int    num_ ## name
 
 // NOTE: in order to use LIST_*, no space has to be present in the parenthesis
 #define LIST_ENQUEUE(prefix, suffix, newtoken) \
-    prefix ##num_ ##suffix ++; \
-    newtoken ##->next = NULL; \
-    if (prefix ##suffix != NULL) { \
-      prefix ##last_ ##suffix ##->next = newtoken; \
+    prefix num_ ## suffix ++; \
+    newtoken ->next = NULL; \
+    if (prefix suffix != NULL) { \
+      prefix last_ ## suffix ->next = newtoken; \
     } else { \
-      prefix ##suffix = newtoken; \
+      prefix suffix = newtoken; \
     } \
-    prefix ##last_ ##suffix = newtoken
+    prefix last_ ## suffix = newtoken
 
 #define LIST_DEQUEUE(prefix, suffix, thetoken) \
-    CmiAssert(prefix ##num_ ##suffix > 0); \
-    prefix ##num_ ##suffix --; \
-    thetoken = prefix ##suffix; \
-    prefix ##suffix = thetoken ##->next
+    CmiAssert(prefix num_ ## suffix > 0); \
+    prefix num_ ## suffix --; \
+    thetoken = prefix suffix; \
+    prefix suffix = thetoken ->next
 
 // DMK : This is copied from "qp_rping.c" in Ammasso's Example Code (modify as needed for our machine layer).
 // User Defined Context that will be sent to function handlers for asynchronous events.
