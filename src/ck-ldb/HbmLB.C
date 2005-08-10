@@ -10,6 +10,7 @@
 */
 /*@{*/
 
+#include <math.h>
 #include "charm++.h"
 #include "BaseLB.h"
 #include "HbmLB.h"
@@ -231,10 +232,11 @@ void HbmLB::Loadbalancing(int atlevel)
 
   double diff = myabs(lload-rload);
   double maxl = mymax(lload, rload);
+  double avg =  (lload+rload)/2.0;
 CkPrintf("[%d] lload: %f rload: %f atlevel: %d\n", CkMyPe(), lload, rload, atlevel);
-  if (diff > 0.0) {
+  if (diff/avg > 0.02) {
     // we need to perform load balancing
-    int numpes = pow(2, atlevel);
+    int numpes = (int)pow(2, atlevel);
     double delta = myabs(lload-rload) / numpes;
 
     int overloaded = lData->children[0];
