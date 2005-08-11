@@ -28,6 +28,7 @@ Load-balancing test program:
 #include "WSLB.h"
 #include "OrbLB.h"
 #include "HybridLB.h"
+#include "HbmLB.h"
 
 #include "lb_test.decl.h"
 
@@ -114,6 +115,9 @@ static const struct {
   {"hybrid",
    "hybrid - Hybrid strategy",
    CreateHybridLB},
+  {"hbm",
+   "HbmLB - HBM strategy",
+   CreateHbmLB},
 
   {NULL,NULL,NULL}
 };
