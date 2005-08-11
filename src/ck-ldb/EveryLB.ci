@@ -19,9 +19,10 @@ module EveryLB {
    extern module NeighborLB;
    extern module NeighborCommLB;
    extern module WSLB;
-   extern module HybridLB;
    extern module TopoLB;
    extern module RefineTopoLB;
    extern module TopoCentLB;
+   extern module HybridLB;
+   extern module HbmLB;
    initnode void initEveryLB(void);
 };
