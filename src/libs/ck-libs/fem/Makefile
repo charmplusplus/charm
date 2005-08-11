@@ -2,13 +2,13 @@ CDIR=../../../..
 CHARMC=$(CDIR)/bin/charmc $(OPTS)
 
 
-HEADERS=fem.h femf.h fem_mesh.h fem_impl.h parallel_part.h map.h  fem_mesh_modify.h FEMMeshModify.decl.h fem_adapt_new.h fem_adapt_algs.h fem_interpolate.h fem_lock.h fem_util.h
+HEADERS=fem.h femf.h fem_mesh.h fem_impl.h parallel_part.h map.h  fem_mesh_modify.h FEMMeshModify.decl.h fem_adapt_new.h fem_adapt_algs.h fem_interpolate.h fem_lock.h fem_util.h fem_lock_node.h fem_adapt_lock.h
 HEADDEP=$(HEADERS) fem_impl.h 
 OBJS=fem.o fem_mesh.o symmetries.o \
 	partition.o map.o fem_compat.o call_init.o \
 	parallel_part.o fem_mesh_modify.o fem_mesh_adjacency.o \
 	fem_adapt_new.o fem_adapt_algs.o fem_interpolate.o \
-	fem_lock.o fem_util.o
+	fem_lock.o fem_util.o fem_lock_node.o fem_adapt_lock.o
 COMPAT=compat_init.o compat_finit.o compat_driver.o compat_fdriver.o 
 LIB=libmodulefem
 
@@ -89,6 +89,12 @@ fem_lock.o: fem_lock.C $(HEADDEP)
 
 fem_util.o: fem_util.C $(HEADDEP)
 	$(CHARMC) -c fem_util.C
+
+fem_lock_node.o: fem_lock_node.C $(HEADDEP)
+	$(CHARMC) -c fem_lock_node.C
+
+fem_adapt_lock.o: fem_adapt_lock.C $(HEADDEP)
+	$(CHARMC) -c fem_adapt_lock.C
 
 fem_comm.o: fem_comm.C $(HEADDEP)
 	$(CHARMC) -c fem_comm.C

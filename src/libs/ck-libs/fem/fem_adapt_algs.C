@@ -6,7 +6,11 @@
 
 FEM_Adapt_Algs::FEM_Adapt_Algs(FEM_Mesh *m, femMeshModify *fm, int dimension) 
 { 
-  theMesh = m; theMod = fm; dim = dimension; theAdaptor = theMod->fmAdapt;
+  theMesh = m; 
+  theMod = fm; 
+  dim = dimension; 
+  //theAdaptor = theMod->fmAdapt;
+  theAdaptor = theMod->fmAdaptL;
 }
 
 /* Perform refinements on a mesh.  Tries to maintain/improve element quality as

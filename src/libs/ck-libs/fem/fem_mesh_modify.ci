@@ -41,6 +41,8 @@ module FEMMeshModify {
     entry [sync] void setFemMesh(FEMMeshMsg *);
     entry [sync,threaded] intMsg *lockRemoteChunk(int2Msg *);
     entry [sync,threaded] intMsg *unlockRemoteChunk(int2Msg *);
+    entry [sync,threaded] intMsg *lockRemoteNode(int, int, int, int);
+    entry [sync,threaded] intMsg *unlockRemoteNode(int, int, int, int);
     entry [sync,threaded] intMsg *addNodeRemote(addNodeMsg *);
     entry [sync,threaded] void addSharedNodeRemote(sharedNodeMsg *);
     entry [sync,threaded] void removeSharedNodeRemote(removeSharedNodeMsg *);

@@ -70,7 +70,9 @@ int FEM_Adapt::edge_flip(int n1, int n2)
     FEM_Modify_Unlock(theMesh);
     return 0; // edge on boundary are not there
   }
-  return edge_flip_help(e1, e2, n1, n2, e1_n1, e1_n2, e1_n3, n3, n4);
+  int ret = edge_flip_help(e1, e2, n1, n2, e1_n1, e1_n2, e1_n3, n3, n4);
+  FEM_Modify_Unlock(theMesh);
+  return ret;
 }
 
 int FEM_Adapt::edge_flip_help(int e1, int e2, int n1, int n2, int e1_n1, 
@@ -224,8 +226,6 @@ int FEM_Adapt::edge_flip_help(int e1, int e2, int n1, int n2, int e1_n1,
 #endif
 
   //make sure that it always comes here, don't return with unlocking
-  FEM_Modify_Unlock(theMesh);
-
   return newNode;
 }
 // ======================  END edge_flip  ===================================
@@ -292,8 +292,9 @@ int FEM_Adapt::edge_bisect(int n1, int n2)
       lockelems[1] = e2;
     }
   }
-  return edge_bisect_help(e1, e2, n1, n2, e1_n1, e1_n2, e1_n3, e2_n1, e2_n2, 
-			  e2_n3, n3, n4);
+  int ret = edge_bisect_help(e1, e2, n1, n2, e1_n1, e1_n2, e1_n3, e2_n1, e2_n2, e2_n3, n3, n4);
+  FEM_Modify_Unlock(theMesh);
+  return ret;
 }
 
 int FEM_Adapt::edge_bisect_help(int e1, int e2, int n1, int n2, int e1_n1, 
@@ -408,7 +409,6 @@ int FEM_Adapt::edge_bisect_help(int e1, int e2, int n1, int n2, int e1_n1,
   printAdjacencies(locknodes, numNodesNew, lockelems, numElemsNew);
 #endif
 
-  FEM_Modify_Unlock(theMesh);
   return n5;
 }
 // ======================  END edge_bisect  ================================
@@ -509,8 +509,10 @@ int FEM_Adapt::vertex_remove(int n1, int n2)
       lockelems[1] = e2;
     }
   }
-  return vertex_remove_help(e1, e2, n1, n2, e1_n1, e1_n2, e1_n3, e2_n1, e2_n2, 
+  int ret = vertex_remove_help(e1, e2, n1, n2, e1_n1, e1_n2, e1_n3, e2_n1, e2_n2, 
 			    e2_n3, n3, n4, n5);
+  FEM_Modify_Unlock(theMesh);
+  return ret;
 }
 
 int FEM_Adapt::vertex_remove_help(int e1, int e2, int n1, int n2, int e1_n1, 
@@ -610,7 +612,6 @@ int FEM_Adapt::vertex_remove_help(int e1, int e2, int n1, int n2, int e1_n1,
     printAdjacencies(locknodes, numNodesNew, lockelems, numElemsNew);
 #endif
 
-    FEM_Modify_Unlock(theMesh);
     return 1;
   }
   return 0;
@@ -684,8 +685,9 @@ int FEM_Adapt::edge_contraction(int n1, int n2)
       lockelems[1] = e2;
     }
   }
-  return edge_contraction_help(e1, e2, n1, n2, e1_n1, e1_n2, e1_n3, e2_n1, 
-			       e2_n2, e2_n3, n3, n4);
+  int ret = edge_contraction_help(e1, e2, n1, n2, e1_n1, e1_n2, e1_n3, e2_n1, e2_n2, e2_n3, n3, n4);
+  FEM_Modify_Unlock(theMesh);
+  return ret;
 }
 
 int FEM_Adapt::edge_contraction_help(int e1, int e2, int n1, int n2, int e1_n1,
@@ -792,7 +794,6 @@ int FEM_Adapt::edge_contraction_help(int e1, int e2, int n1, int n2, int e1_n1,
   adjelems[1] = -1;
   printAdjacencies(adjnodes, 2, adjelems, 0);
 #endif
-  FEM_Modify_Unlock(theMesh);
 
   return n5;
 }
@@ -836,7 +837,9 @@ int FEM_Adapt::vertex_split(int n, int n1, int n2)
     FEM_Modify_Unlock(theMesh);
     return -1;	     
   }
-  return vertex_split(n, n1, n2, e1, e3);
+  int ret = vertex_split(n, n1, n2, e1, e3);
+  FEM_Modify_Unlock(theMesh);
+  return ret;
 }
 
 int FEM_Adapt::vertex_split(int n, int n1, int n2, int e1, int e3)
@@ -954,7 +957,6 @@ int FEM_Adapt::vertex_split(int n, int n1, int n2, int e1, int e3)
   CkPrintf("Adjacencies after vertex split\n");
   printAdjacencies(locknodes, 4, lockelems, 4);
 #endif
-  FEM_Modify_Unlock(theMesh);
 
   return np;
 }

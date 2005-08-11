@@ -6,6 +6,8 @@
 #include "fem.h"
 #include "fem_mesh.h"
 
+#define _LOCKCHUNKS
+
 class femMeshModify;
 
 //there is one fem_lock associated with every FEM_Mesh.

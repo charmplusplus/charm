@@ -11,11 +11,13 @@
 
 class femMeshModify;
 class FEM_Adapt;
+class FEM_AdaptL;
 
 class FEM_Adapt_Algs {
   FEM_Mesh *theMesh;
   femMeshModify *theMod;
-  FEM_Adapt *theAdaptor;
+  //FEM_Adapt *theAdaptor;
+  FEM_AdaptL *theAdaptor;
   int numElements, numNodes, dim;
   double *regional_sizes;
   double *nodeCoords;

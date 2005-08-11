@@ -12,22 +12,35 @@
 #include "fem_impl.h"
 #include "fem_mesh_modify.h"
 
+#define MAX_CHUNK 1000000
+
 CProxy_femMeshModify meshMod;
 
 
 CDECL int FEM_add_node(int mesh, int* adjacent_nodes, int num_adjacent_nodes, int chunkNo, int upcall){
-  return FEM_add_node(FEM_Mesh_lookup(mesh,"FEM_add_node"), adjacent_nodes, num_adjacent_nodes, chunkNo, upcall);}
+  return FEM_add_node(FEM_Mesh_lookup(mesh,"FEM_add_node"), adjacent_nodes, num_adjacent_nodes, chunkNo, upcall);
+}
 CDECL void FEM_remove_node(int mesh,int node){
-  return FEM_remove_node(FEM_Mesh_lookup(mesh,"FEM_remove_node"), node);}
+  return FEM_remove_node(FEM_Mesh_lookup(mesh,"FEM_remove_node"), node);
+}
 CDECL int FEM_remove_element(int mesh, int element, int elem_type, int permanent){
-  return FEM_remove_element(FEM_Mesh_lookup(mesh,"FEM_remove_element"), element, elem_type, permanent);}
+  return FEM_remove_element(FEM_Mesh_lookup(mesh,"FEM_remove_element"), element, elem_type, permanent);
+}
 CDECL int FEM_add_element(int mesh, int* conn, int conn_size, int elem_type, int chunkNo){
-  return FEM_add_element(FEM_Mesh_lookup(mesh,"FEM_add_element"), conn, conn_size, elem_type, chunkNo);}
+  return FEM_add_element(FEM_Mesh_lookup(mesh,"FEM_add_element"), conn, conn_size, elem_type, chunkNo);
+}
 CDECL int FEM_Modify_Lock(int mesh, int* affectedNodes, int numAffectedNodes, int* affectedElts, int numAffectedElts, int elemtype){
-  return FEM_Modify_Lock(FEM_Mesh_lookup(mesh,"FEM_Modify_Lock"), affectedNodes, numAffectedNodes, affectedElts, numAffectedElts, elemtype);}
+  return FEM_Modify_Lock(FEM_Mesh_lookup(mesh,"FEM_Modify_Lock"), affectedNodes, numAffectedNodes, affectedElts, numAffectedElts, elemtype);
+}
 CDECL int FEM_Modify_Unlock(int mesh){
-  return FEM_Modify_Unlock(FEM_Mesh_lookup(mesh,"FEM_Modify_Unlock"));}
-
+  return FEM_Modify_Unlock(FEM_Mesh_lookup(mesh,"FEM_Modify_Unlock"));
+}
+CDECL int FEM_Modify_LockN(int mesh, int nodeId, int readLock) {
+  return FEM_Modify_LockN(FEM_Mesh_lookup(mesh,"FEM_Modify_LockN"),nodeId, readLock);
+}
+CDECL int FEM_Modify_UnlockN(int mesh, int nodeId, int readLock) {
+  return FEM_Modify_UnlockN(FEM_Mesh_lookup(mesh,"FEM_Modify_UnlockN"),nodeId, readLock);
+}
 
 
 void FEM_Mesh_dataP(FEM_Mesh *fem_mesh,int entity,int attr,void *data, int firstItem,int length, int datatype,int width) {
@@ -70,14 +83,14 @@ CDECL void FEM_Print_Mesh_Summary(int mesh){
   // Print Element information
   CkPrintf("     Element Types: %d\n", m->elem.size());
   for (int t=0;t<m->elem.size();t++) // for each element type t
-	if (m->elem.has(t)) {
-	  unsigned int numEl = m->elem[t].size();
-	  unsigned int numElG = m->elem[t].getGhost()->size();
-	  unsigned int numValidEl = m->elem[t].count_valid();
-	  unsigned int numValidElG = m->elem[t].getGhost()->count_valid();
-	  CkPrintf("     Element type %d contains %d/%d elements and %d/%d ghosts\n", t, numValidEl, numEl, numValidElG, numElG);
+    if (m->elem.has(t)) {
+      unsigned int numEl = m->elem[t].size();
+      unsigned int numElG = m->elem[t].getGhost()->size();
+      unsigned int numValidEl = m->elem[t].count_valid();
+      unsigned int numValidElG = m->elem[t].getGhost()->count_valid();
+      CkPrintf("     Element type %d contains %d/%d elements and %d/%d ghosts\n", t, numValidEl, numEl, numValidElG, numElG);
 	  
-	}
+    }
 
   CkPrintf("\n");
 }
@@ -94,7 +107,7 @@ void FEM_MUtil::FEM_Print_n2n(FEM_Mesh *m, int nodeid){
   int sz;
   m->n2n_getAll(nodeid, &adjnodes, &sz); 
   for(int i=0;i<sz;i++)
-	CkPrintf(" %d", adjnodes[i]);
+    CkPrintf(" %d", adjnodes[i]);
   if(sz!=0) delete[] adjnodes;  
   CkPrintf("\n");
 }
@@ -110,7 +123,7 @@ void FEM_MUtil::FEM_Print_n2e(FEM_Mesh *m, int eid){
   int sz;
   m->n2e_getAll(eid, &adjes, &sz);
   for(int i=0;i<sz;i++)
-	CkPrintf(" %d", adjes[i]);
+    CkPrintf(" %d", adjes[i]);
   if(sz!=0) delete[] adjes;
   CkPrintf("\n");
 }
@@ -127,7 +140,7 @@ void FEM_MUtil::FEM_Print_e2n(FEM_Mesh *m, int eid){
   int adjns[3];
   m->e2n_getAll(eid, adjns, 0); 
   for(int i=0;i<3;i++)
-	CkPrintf(" %d", adjns[i]);
+    CkPrintf(" %d", adjns[i]);
   CkPrintf("\n");
 }
 
@@ -141,7 +154,7 @@ void FEM_MUtil::FEM_Print_e2e(FEM_Mesh *m, int eid){
   int adjes[3];
   m->e2e_getAll(eid, adjes, 0); 
   for(int i=0;i<3;i++)
-	CkPrintf(" %d", adjes[i]);
+    CkPrintf(" %d", adjes[i]);
   CkPrintf("\n");
 }
 
@@ -154,6 +167,8 @@ int FEM_add_node_local(FEM_Mesh *m, int addGhost){
     m->node.getGhost()->set_valid(newNode);   // set new node as valid
     m->n2e_removeAll(FEM_To_ghost_index(newNode));    // initialize element adjacencies
     m->n2n_removeAll(FEM_To_ghost_index(newNode));    // initialize node adjacencies
+    //add a lock
+    //m->getfmMM()->fmgLockN.push_back(new FEM_lockN(FEM_To_ghost_index(newNode)));
   }
   else{
     newNode = m->node.size();
@@ -161,6 +176,8 @@ int FEM_add_node_local(FEM_Mesh *m, int addGhost){
     m->node.set_valid(newNode);   // set new node as valid
     m->n2e_removeAll(newNode);    // initialize element adjacencies
     m->n2n_removeAll(newNode);    // initialize node adjacencies
+    //add a lock
+    m->getfmMM()->fmLockN.push_back(new FEM_lockN(newNode));
   }
   return newNode;  // return a new index
 }
@@ -246,13 +263,13 @@ void FEM_add_shared_node_remote(FEM_Mesh *m, int chk, int nBetween, int *between
 
 
 void FEM_remove_node_local(FEM_Mesh *m, int node) {
-    // if node is local:
-    int numAdjNodes, numAdjElts;
-    int *adjNodes, *adjElts;
-    m->n2n_getAll(node, &adjNodes, &numAdjNodes);
-    m->n2e_getAll(node, &adjElts, &numAdjElts);
+  // if node is local:
+  int numAdjNodes, numAdjElts;
+  int *adjNodes, *adjElts;
+  m->n2n_getAll(node, &adjNodes, &numAdjNodes);
+  m->n2e_getAll(node, &adjElts, &numAdjElts);
     
-    // mark node as deleted/invalid
+  // mark node as deleted/invalid
   if(FEM_Is_ghost_index(node)){
     if((numAdjNodes==0) && (numAdjElts==0)) {
       m->node.ghost->set_invalid(FEM_To_ghost_index(node));
@@ -295,11 +312,11 @@ void FEM_remove_node(FEM_Mesh *m, int node){
     // verify it is not adjacent to any elements on any of the associated chunks
 
     // delete it on remote chunks(shared and ghost), update IDXL tables
-	m->getfmMM()->getfmUtil()->removeNodeAll(m, node);
+    m->getfmMM()->getfmUtil()->removeNodeAll(m, node);
     
-	// mark node as deleted/invalid locally
-	//FEM_remove_node_local(m,node);
-	//m->node.set_invalid(node);
+    // mark node as deleted/invalid locally
+    //FEM_remove_node_local(m,node);
+    //m->node.set_invalid(node);
   }
   else {
     FEM_remove_node_local(m,node);
@@ -316,7 +333,7 @@ void FEM_remove_element_local(FEM_Mesh *m, int element, int etype){
   m->e2n_getAll(element, adjnodes, etype);
   for(int i=0;i<nodesPerEl;i++)
     if(adjnodes[i] != -1) //if an element is local, then an adjacent node should not be -1
-	  m->n2e_remove(adjnodes[i],element);
+      m->n2e_remove(adjnodes[i],element);
   
   // replace this element with -1 in adjacent elements' adjacencies
   const int numAdjElts = nodesPerEl;    // FIXME: hopefully there will be at most as many faces on an element as vertices
@@ -328,10 +345,10 @@ void FEM_remove_element_local(FEM_Mesh *m, int element, int etype){
   
   // delete element by marking invalid
   if(FEM_Is_ghost_index(element)){
-	m->elem[etype].getGhost()->set_invalid(FEM_To_ghost_index(element));
+    m->elem[etype].getGhost()->set_invalid(FEM_To_ghost_index(element));
   }
   else {
-	m->elem[etype].set_invalid(element);
+    m->elem[etype].set_invalid(element);
   }
   
   // We must now remove any n2n adjacencies which existed because of the 
@@ -342,27 +359,27 @@ void FEM_remove_element_local(FEM_Mesh *m, int element, int etype){
   //we have valid neighboring elements, then none of the edges (n2n conn) on that
   //face should go off, this would be more efficient.
   for(int i=0;i<nodesPerEl;i++)
-	for(int j=i+1;j<nodesPerEl;j++){
-	  m->n2n_remove(adjnodes[i],adjnodes[j]);
-	  m->n2n_remove(adjnodes[j],adjnodes[i]);
-	}
+    for(int j=i+1;j<nodesPerEl;j++){
+      m->n2n_remove(adjnodes[i],adjnodes[j]);
+      m->n2n_remove(adjnodes[j],adjnodes[i]);
+    }
 
   for(int i=0;i<numAdjElts;i++){ // for each neighboring element
-	if(adjelts[i] != -1){
-	  int *adjnodes2 = new int[nodesPerEl];
-	  m->e2n_getAll(adjelts[i], adjnodes2, etype);
+    if(adjelts[i] != -1){
+      int *adjnodes2 = new int[nodesPerEl];
+      m->e2n_getAll(adjelts[i], adjnodes2, etype);
 	
-	  for(int j=0;j<nodesPerEl;j++){     // for each j,k pair of nodes adjacent to the neighboring element
-		for(int k=j+1;k<nodesPerEl;k++){   
-		  if(!m->n2n_exists(adjnodes2[j],adjnodes2[k]))
-			m->n2n_add(adjnodes2[j],adjnodes2[k]);
-		  if(!m->n2n_exists(adjnodes2[k],adjnodes2[j]))
-			m->n2n_add(adjnodes2[k],adjnodes2[j]);
-		}
-	  }
-	 
-	  delete[] adjnodes2;
+      for(int j=0;j<nodesPerEl;j++){     // for each j,k pair of nodes adjacent to the neighboring element
+	for(int k=j+1;k<nodesPerEl;k++){   
+	  if(!m->n2n_exists(adjnodes2[j],adjnodes2[k]))
+	    m->n2n_add(adjnodes2[j],adjnodes2[k]);
+	  if(!m->n2n_exists(adjnodes2[k],adjnodes2[j]))
+	    m->n2n_add(adjnodes2[k],adjnodes2[j]);
 	}
+      }
+	 
+      delete[] adjnodes2;
+    }
   }
  
   delete[] adjelts;
@@ -602,39 +619,39 @@ void update_new_element_e2e(FEM_Mesh *m, int newEl, int elemType){
     int *adjelements=0;
     m->n2e_getAll(adjnodes[i], &adjelements, &sz);
     for(int j=0;j<sz;j++){
-	  int found=0;
-	  // only insert if it is not already in the list
-	  for(int i=0;i<elist.length();i++)// we use a slow linear scan of the CkVec
-		if(elist[i] == adjelements[j])
-		  found=1;
-	  if(!found){
-		elist.push_back(adjelements[j]);
-	  }
-	}
-	if(sz!=0) delete[] adjelements;
+      int found=0;
+      // only insert if it is not already in the list
+      for(int i=0;i<elist.length();i++)// we use a slow linear scan of the CkVec
+	if(elist[i] == adjelements[j])
+	  found=1;
+      if(!found){
+	elist.push_back(adjelements[j]);
+      }
+    }
+    if(sz!=0) delete[] adjelements;
   }
   delete[] adjnodes;
   
 
   // Add all the potentially adjacent elements to the tuple table
   for(int i=0;i<elist.length();i++){
-	int nextElem = elist[i];
-	int tuple[tupleTable::MAX_TUPLE];
-	int *conn;
-	if(FEM_Is_ghost_index(nextElem))
-	  conn=((FEM_Elem*)m->elem[elemType].getGhost())->connFor(FEM_To_ghost_index(nextElem));
-	else
-	  conn=m->elem[elemType].connFor(nextElem);
-	for (int u=0;u<tuplesPerElem;u++) {
-	  for (int i=0;i<nodesPerTuple;i++) {
-		int eidx=g->elem[elemType].elem2tuple[i+u*g->nodesPerTuple];
-		if (eidx==-1)  //"not-there" node--
-		  tuple[i]=-1; //Don't map via connectivity
-		else           //Ordinary node
-		  tuple[i]=conn[eidx]; 
-	  }
-	  table.addTuple(tuple,new elemList(0,nextElem,elemType,allSym,u)); 
-	}
+    int nextElem = elist[i];
+    int tuple[tupleTable::MAX_TUPLE];
+    int *conn;
+    if(FEM_Is_ghost_index(nextElem))
+      conn=((FEM_Elem*)m->elem[elemType].getGhost())->connFor(FEM_To_ghost_index(nextElem));
+    else
+      conn=m->elem[elemType].connFor(nextElem);
+    for (int u=0;u<tuplesPerElem;u++) {
+      for (int i=0;i<nodesPerTuple;i++) {
+	int eidx=g->elem[elemType].elem2tuple[i+u*g->nodesPerTuple];
+	if (eidx==-1)  //"not-there" node--
+	  tuple[i]=-1; //Don't map via connectivity
+	else           //Ordinary node
+	  tuple[i]=conn[eidx]; 
+      }
+      table.addTuple(tuple,new elemList(0,nextElem,elemType,allSym,u)); 
+    }
   }
 
 
@@ -701,18 +718,18 @@ int FEM_add_element_local(FEM_Mesh *m, const int *conn, int connSize, int elemTy
   // lengthen element attributes
   int newEl;
   if(addGhost){
-	int oldLength = m->elem[elemType].getGhost()->size();
-	m->elem[elemType].getGhost()->setLength(oldLength+1);
-	m->elem[elemType].getGhost()->set_valid(oldLength);// Mark new element as valid
-	((FEM_Elem*)m->elem[elemType].getGhost())->connIs(oldLength,conn);// update element's conn, i.e. e2n table
-	newEl = FEM_From_ghost_index(oldLength);
-}
+    int oldLength = m->elem[elemType].getGhost()->size();
+    m->elem[elemType].getGhost()->setLength(oldLength+1);
+    m->elem[elemType].getGhost()->set_valid(oldLength);// Mark new element as valid
+    ((FEM_Elem*)m->elem[elemType].getGhost())->connIs(oldLength,conn);// update element's conn, i.e. e2n table
+    newEl = FEM_From_ghost_index(oldLength);
+  }
   else{
-	int oldLength = m->elem[elemType].size();
-	m->elem[elemType].setLength(oldLength+1);
-	newEl = oldLength;
-	m->elem[elemType].set_valid(newEl);  // Mark new element as valid
-	m->elem[elemType].connIs(newEl,conn);  // update element's conn, i.e. e2n table
+    int oldLength = m->elem[elemType].size();
+    m->elem[elemType].setLength(oldLength+1);
+    newEl = oldLength;
+    m->elem[elemType].set_valid(newEl);  // Mark new element as valid
+    m->elem[elemType].connIs(newEl,conn);  // update element's conn, i.e. e2n table
   }
   
   // add to corresponding inverse, the n2e and n2n table
@@ -1015,6 +1032,119 @@ int FEM_Modify_Unlock(FEM_Mesh *m) {
   return m->getfmMM()->getfmLock()->unlock();
 }
 
+int FEM_Modify_LockN(FEM_Mesh *m, int nodeId, int readlock) {
+  if(is_shared(m,nodeId)) {
+    //find the index of the least chunk it is shared on and try to lock it
+    int index = m->getfmMM()->getIdx();
+    int numchunks;
+    IDXL_Share **chunks1;
+    m->getfmMM()->getfmUtil()->getChunkNos(0,nodeId,&numchunks,&chunks1);
+    int minChunk = MAX_CHUNK;
+    for(int j=0; j<numchunks; j++) {
+      int pchk = chunks1[j]->chk;
+      if(pchk < minChunk) minChunk = pchk;
+    }
+    if(minChunk==index) {
+      if(readlock) {
+	return m->getfmMM()->getfmLockN(nodeId)->rlock();
+      } else {
+	return m->getfmMM()->getfmLockN(nodeId)->wlock();
+      }
+    }
+    else {
+      int sharedIdx = m->getfmMM()->getfmUtil()->exists_in_IDXL(m,nodeId,minChunk,0);
+      if(readlock) {
+	return meshMod[minChunk].lockRemoteNode(sharedIdx, index, 0, 1)->i;
+      } else {
+	return meshMod[minChunk].lockRemoteNode(sharedIdx, index, 0, 0)->i;
+      }
+    }
+  }
+  else if(FEM_Is_ghost_index(nodeId)) {
+    //find the index of the least chunk that owns it & try to lock it
+    int index = m->getfmMM()->getIdx();
+    int numchunks;
+    IDXL_Share **chunks1;
+    m->getfmMM()->getfmUtil()->getChunkNos(0,nodeId,&numchunks,&chunks1);
+    int minChunk = MAX_CHUNK;
+    for(int j=0; j<numchunks; j++) {
+      int pchk = chunks1[j]->chk;
+      if(pchk == index) continue;
+      if(pchk < minChunk) minChunk = pchk;
+    }
+    int sharedIdx = m->getfmMM()->getfmUtil()->exists_in_IDXL(m,nodeId,minChunk,2);
+    if(readlock) {
+      return meshMod[minChunk].lockRemoteNode(sharedIdx, index, 1, 1)->i;
+    } else {
+      return meshMod[minChunk].lockRemoteNode(sharedIdx, index, 1, 0)->i;
+    }
+  }
+  else {
+    if(readlock) {
+      return m->getfmMM()->getfmLockN(nodeId)->rlock();
+    } else {
+      return m->getfmMM()->getfmLockN(nodeId)->wlock();
+    }
+  }
+  return -1; //should not reach here
+}
+
+int FEM_Modify_UnlockN(FEM_Mesh *m, int nodeId, int readlock) {
+  if(is_shared(m,nodeId)) {
+    //find the index of the least chunk it is shared on and try to unlock it
+    int index = m->getfmMM()->getIdx();
+    int numchunks;
+    IDXL_Share **chunks1;
+    m->getfmMM()->getfmUtil()->getChunkNos(0,nodeId,&numchunks,&chunks1);
+    int minChunk = MAX_CHUNK;
+    for(int j=0; j<numchunks; j++) {
+      int pchk = chunks1[j]->chk;
+      if(pchk < minChunk) minChunk = pchk;
+    }
+    if(minChunk==index) {
+      if(readlock) {
+	return m->getfmMM()->getfmLockN(nodeId)->runlock();
+      } else {
+	return m->getfmMM()->getfmLockN(nodeId)->wunlock();
+      }
+    }
+    else {
+      int sharedIdx = m->getfmMM()->getfmUtil()->exists_in_IDXL(m,nodeId,minChunk,0);
+      if(readlock) {
+	return meshMod[minChunk].unlockRemoteNode(sharedIdx, index, 0, 1)->i;
+      } else {
+	return meshMod[minChunk].unlockRemoteNode(sharedIdx, index, 0, 0)->i;
+      }
+    }
+  }
+  else if(FEM_Is_ghost_index(nodeId)) {
+    //find the index of the least chunk that owns it & try to unlock it
+    int index = m->getfmMM()->getIdx();
+    int numchunks;
+    IDXL_Share **chunks1;
+    m->getfmMM()->getfmUtil()->getChunkNos(0,nodeId,&numchunks,&chunks1);
+    int minChunk = MAX_CHUNK;
+    for(int j=0; j<numchunks; j++) {
+      int pchk = chunks1[j]->chk;
+      if(pchk == index) continue;
+      if(pchk < minChunk) minChunk = pchk;
+    }
+    int sharedIdx = m->getfmMM()->getfmUtil()->exists_in_IDXL(m,nodeId,minChunk,2);
+    if(readlock) {
+      return meshMod[minChunk].unlockRemoteNode(sharedIdx, index, 1, 1)->i;
+    } else {
+      return meshMod[minChunk].unlockRemoteNode(sharedIdx, index, 1, 0)->i;
+    }
+  }
+  else {
+    if(readlock) {
+      return m->getfmMM()->getfmLockN(nodeId)->runlock();
+    } else {
+      return m->getfmMM()->getfmLockN(nodeId)->wunlock();
+    }
+  }
+  return -1; //should not reach here
+}
 
 CDECL void FEM_REF_INIT(int mesh) {
   CkArrayID femRefId;
@@ -1051,6 +1181,7 @@ femMeshModify::femMeshModify(femMeshModMsg *fm) {
   fmLock = new FEM_lock(idx, this);
   fmUtil = new FEM_MUtil(idx, this);
   fmAdapt = NULL;
+  fmAdaptL = NULL;
   fmAdaptAlgs = NULL;
   fmInp = NULL;
   fmMesh = NULL;
@@ -1069,9 +1200,19 @@ void femMeshModify::setFemMesh(FEMMeshMsg *fm) {
   fmMesh = fm->m;
   fmMesh->setFemMeshModify(this);
   fmAdapt = new FEM_Adapt(fmMesh, this);
+  fmAdaptL = new FEM_AdaptL(fmMesh, this);
   int dim = 2; // FIX ME!  Look this up somewhere!
   fmAdaptAlgs = new FEM_Adapt_Algs(fmMesh, this, dim);
   fmInp = new FEM_Interpolate(fmMesh, this);
+  //populate the node locks
+  int nsize = fmMesh->node.size();
+  for(int i=0; i<nsize; i++) {
+    fmLockN.push_back(new FEM_lockN(i));
+  }
+  /*int gsize = fmMesh->node.ghost->size();
+    for(int i=0; i<gsize; i++) {
+    fmgLockN.push_back(new FEM_lockN(FEM_To_ghost_index(i)));
+    }*/
   return;
 }
 
@@ -1085,6 +1226,42 @@ intMsg *femMeshModify::lockRemoteChunk(int2Msg *msg) {
 intMsg *femMeshModify::unlockRemoteChunk(int2Msg *msg) {
   intMsg *imsg = new intMsg(0);
   int ret = fmLock->unlock(msg->i, msg->j);
+  imsg->i = ret;
+  return imsg;
+}
+
+intMsg *femMeshModify::lockRemoteNode(int sharedIdx, int fromChk, int isGhost, int readLock) {
+  int localIdx;
+  if(isGhost) {
+    localIdx = fmUtil->lookup_in_IDXL(fmMesh, sharedIdx, fromChk, 1);
+  } else {
+    localIdx = fmUtil->lookup_in_IDXL(fmMesh, sharedIdx, fromChk, 0);
+  }
+  intMsg *imsg = new intMsg(0);
+  int ret;
+  if(readLock) {
+    ret = getfmLockN(localIdx)->rlock();
+  } else {
+    ret = getfmLockN(localIdx)->wlock();
+  }
+  imsg->i = ret;
+  return imsg;
+}
+
+intMsg *femMeshModify::unlockRemoteNode(int sharedIdx, int fromChk, int isGhost, int readLock) {
+  int localIdx;
+  if(isGhost) {
+    localIdx = fmUtil->lookup_in_IDXL(fmMesh, sharedIdx, fromChk, 1);
+  } else {
+    localIdx = fmUtil->lookup_in_IDXL(fmMesh, sharedIdx, fromChk, 0);
+  }
+  intMsg *imsg = new intMsg(0);
+  int ret;
+  if(readLock) {
+    ret = getfmLockN(localIdx)->runlock();
+  } else {
+    ret = getfmLockN(localIdx)->wunlock();
+  }
   imsg->i = ret;
   return imsg;
 }

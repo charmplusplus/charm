@@ -11,6 +11,7 @@
 class femMeshModify;
 
 class FEM_Adapt {
+ protected:
   FEM_Mesh *theMesh;
   femMeshModify *theMod;
   // Helper methods: see bottom of this file
