@@ -6,8 +6,7 @@
 #include "rfftw.h"
 #include "EachToManyMulticastStrategy.h"
 #include "StreamingStrategy.h"
-
-#include "fftlib.decl.h"
+#include "comlib.h"
 
 #define COMPLEX_TO_REAL -11
 #define REAL_TO_COMPLEX -12
@@ -18,111 +17,96 @@
 
 class NormalFFTinfo {
  public:
-    // Constructors
-        NormalFFTinfo(CProxy_SlabArray &sProxy,
-                      CProxy_SlabArray &dProxy,
-                      int sDim[2], int dDim[2], int isSrc,
-                      void *dptr, int transType,
-                      int sPlanesPerSlab=1, int dPlanesPerSlab=1) {
-	    init(sProxy, dProxy, sDim, dDim, isSrc, dptr, transType, sPlanesPerSlab, dPlanesPerSlab);
-	}
-	NormalFFTinfo(NormalFFTinfo &info) {
-                init(info.srcProxy, info.destProxy,
-                     info.srcSize, info.destSize, info.isSrcSlab,
-                     info.dataPtr, info.transformType,
-                     info.srcPlanesPerSlab, info.destPlanesPerSlab);
-        }
+    NormalFFTinfo(int sDim[2], int dDim[2], int isSrc,
+		  void *dptr, int transType,
+		  int sPlanesPerSlab=1, int dPlanesPerSlab=1) {
+	init(sDim, dDim, isSrc, dptr, transType, sPlanesPerSlab, dPlanesPerSlab);
+    }
+    NormalFFTinfo(NormalFFTinfo &info) {
+	init(info.srcSize, info.destSize, info.isSrcSlab,
+	     info.dataPtr, info.transformType,
+	     info.srcPlanesPerSlab, info.destPlanesPerSlab);
+    }
+    
+    NormalFFTinfo(void) {dataPtr=NULL;}
+    
+    int srcSize[2], destSize[2];
+    bool isSrcSlab;
+    int srcPlanesPerSlab, destPlanesPerSlab;
+    void *dataPtr;
+    int transformType;
+    
+    void pup(PUP::er &p) {
+	p(srcSize, 2);
+	p(destSize, 2);
+	p(isSrcSlab);
+	p(srcPlanesPerSlab);
+	p(destPlanesPerSlab);
+	p|transformType;
+	if (p.isUnpacking()) 
+	    dataPtr = NULL;
+    }
 
-	NormalFFTinfo(void) {}
-
-	// charm pup function
-	void pup(PUP::er &p) {
-		p|srcProxy;
-		p|destProxy;
-		p(srcSize, 2);
-		p(destSize, 2);
-		p(isSrcSlab);
-		p(srcPlanesPerSlab);
-		p(destPlanesPerSlab);
-		p|transformType;
-		if (p.isUnpacking()) 
-			dataPtr = NULL;
-	}
-
-	CProxy_SlabArray srcProxy, destProxy;
-	int srcSize[2], destSize[2];
-	bool isSrcSlab;
-	int srcPlanesPerSlab, destPlanesPerSlab;
-	void *dataPtr;
-	int transformType;
-	
-	void init(CProxy_SlabArray &sProxy,
-		 CProxy_SlabArray &dProxy,
-		 int sDim[2], int dDim[2], int isSrc,
-		 void *dptr, int transT,
-		 int sPlanesPerSlab, int dPlanesPerSlab) {
-                if (sDim[1] != dDim[1])
-                        ckerr << "WARNING"
-                                  << "This configuration of the source and destination "
-                                  << "is not consistent, check the dimensions. The program is "
-                                  << "likely to misbehave"
-                                  << endl;
-                srcProxy = sProxy;
-                destProxy = dProxy;
-                isSrcSlab = isSrc;
-                srcPlanesPerSlab = sPlanesPerSlab;
-                destPlanesPerSlab = dPlanesPerSlab;
-                dataPtr = dptr;
-                transformType=transT;
-                memcpy(srcSize, sDim, 2 * sizeof(int));
-                memcpy(destSize, dDim, 2 * sizeof(int));
-        }
+ private:  
+    void init( int sDim[2], int dDim[2], int isSrc,
+	       void *dptr, int transT,
+	       int sPlanesPerSlab, int dPlanesPerSlab) {
+	if (sDim[1] != dDim[1])
+	    ckerr << "WARNING"
+		  << "This configuration of the source and destination "
+		  << "is not consistent, check the dimensions. The program is "
+		  << "likely to misbehave"
+		  << endl;
+	isSrcSlab = isSrc;
+	srcPlanesPerSlab = sPlanesPerSlab;
+	destPlanesPerSlab = dPlanesPerSlab;
+	dataPtr = dptr;
+	transformType=transT;
+	memcpy(srcSize, sDim, 2 * sizeof(int));
+	memcpy(destSize, dDim, 2 * sizeof(int));
+    }
 };
+
 
 class LineFFTinfo {
  public:
 	// Constructors
-	LineFFTinfo(CProxy_NormalLineArray &xProxy, CProxy_NormalLineArray &yProxy, CProxy_NormalLineArray &zProxy, int size[3], int isSrc, complex *dptr, int sPencilsPerSlab=1, int dPencilsPerSlab=1) {
-		init(xProxy, yProxy, zProxy, size[0], size[1], size[2], isSrc, dptr, sPencilsPerSlab, dPencilsPerSlab);
+	LineFFTinfo(int size[3], int isSrc, complex *dptr, int xPencilsPerSlab=1, int yPencilsPerSlab=1, int zPencilsPerSlab=1) {
+	  init(size[0], size[1], size[2], isSrc, dptr, xPencilsPerSlab, yPencilsPerSlab, zPencilsPerSlab);
 	}
 	LineFFTinfo(LineFFTinfo &info) {
-		init(info.xlinesProxy, info.ylinesProxy, info.zlinesProxy, info.sizeX, info.sizeY, info.sizeZ, info.isSrcSlab, (complex *) NULL, info.sPencilsPerSlab, info.dPencilsPerSlab);
+	    init(info.sizeX, info.sizeY, info.sizeZ, info.isSrcSlab, (complex *) NULL, info.xPencilsPerSlab, info.yPencilsPerSlab, info.zPencilsPerSlab);
 	}
 	LineFFTinfo(void) {}
 
 	// charm pup function
 	void pup(PUP::er &p) {
-		p|xlinesProxy;
-		p|ylinesProxy;
-		p|zlinesProxy;
-		p|sizeX;
-		p|sizeY;
-		p|sizeZ;
-		p(isSrcSlab);
-		p(sPencilsPerSlab);
-		p(dPencilsPerSlab);
-		if (p.isUnpacking()) 
-			dataPtr = (complex *) NULL;
+	    p|sizeX;
+	    p|sizeY;
+	    p|sizeZ;
+	    p(isSrcSlab);
+	    p(xPencilsPerSlab);
+	    p(yPencilsPerSlab);
+	    p(zPencilsPerSlab);
+	    if (p.isUnpacking()) 
+		dataPtr = (complex *) NULL;
 	}
-	CProxy_NormalLineArray xlinesProxy, ylinesProxy, zlinesProxy;
 	int sizeX, sizeY, sizeZ;
 	bool isSrcSlab;
-	int sPencilsPerSlab, dPencilsPerSlab;
+	int xPencilsPerSlab, yPencilsPerSlab, zPencilsPerSlab;
 	complex *dataPtr;
  private:
-	void init(CProxy_NormalLineArray &xProxy, CProxy_NormalLineArray &yProxy, CProxy_NormalLineArray &zProxy, int sizex, int sizey, int sizez, int isSrc, complex *dptr, int _sPencilsPerSlab, int _dPencilsPerSlab) {
+	void init(int sizex, int sizey, int sizez, int isSrc, complex *dptr,  int _xPencilsPerSlab, int _yPencilsPerSlab, int _zPencilsPerSlab) {
 		if (sizex != sizey || sizey != sizez)
 			ckerr << "WARNING"
 				  << "This configuration of the source and destination "
 				  << "is not consistent, check the dimensions. The program is "
 				  << "likely to misbehave" 
 				  << endl;
-		xlinesProxy = xProxy; 
-		ylinesProxy = yProxy;
-		zlinesProxy = zProxy;
 		isSrcSlab = isSrc;
-		sPencilsPerSlab = _sPencilsPerSlab; 
-		dPencilsPerSlab = _dPencilsPerSlab;
+		xPencilsPerSlab = _xPencilsPerSlab; 
+		yPencilsPerSlab = _yPencilsPerSlab;
+		zPencilsPerSlab = _zPencilsPerSlab;
 		dataPtr = dptr;
 		sizeX = sizex;
 		sizeY = sizey;
@@ -130,8 +114,19 @@ class LineFFTinfo {
 	}
 };
 
+#include "fftlib.decl.h"
+
 PUPmarshall(NormalFFTinfo);
 PUPmarshall(LineFFTinfo);
+
+
+typedef struct _SlabArrayInfo{
+    int count;
+    NormalFFTinfo info;
+    ComlibInstanceHandle fftcommInstance;
+//    SlabArrayInfo() {count=0; info=NormalFFTinfo();}
+//    ~SlabArrayInfo() {}
+}SlabArrayInfo;
 
 /*
  * Abstract super class for the two dimensional array of slabs,
@@ -145,17 +140,22 @@ class SlabArray: public CBase_SlabArray {
 
 	// user SHOULD redefine these
 	virtual void doneFFT(int id) {
-		ckout << "NormalSlabArray finished FFT" << endl; 
-		CkExit();
+	    ckout << "NormalSlabArray finished FFT" << endl; 
+	    CkExit();
 	}
 	virtual void doneIFFT(int id) {
-		ckout << "NormalSlabArray finished IFFT" << endl;
-		CkExit();
+	    ckout << "NormalSlabArray finished IFFT" << endl;
+	    CkExit();
 	}
 
 	// Library subclasses MUST define these
 	virtual void doFFT(int, int) = 0; //ffts data from src to dest
 	virtual void doIFFT(int, int) = 0; //ffts data from dest to src
+ protected:
+	CProxy_SlabArray srcProxy, destProxy;
+	bool fftuseCommlib;
+//	ComlibInstanceHandle fftcommInstance;
+	CkVec<SlabArrayInfo*> infoVec;
 };
 
 /*
@@ -164,19 +164,18 @@ class SlabArray: public CBase_SlabArray {
 
 class NormalSlabArray: public SlabArray {
  public:
-	NormalSlabArray(CkMigrateMessage *m): SlabArray(m) {}
+	NormalSlabArray(CkMigrateMessage *m): SlabArray(m) {CkPrintf("migrate constructor called\n");}
 	NormalSlabArray() {
-		int i;
-		for (i = 0; i < MAX_FFTS; i++) {
-			fftinfos[i] = NULL;
-			counts[i] = 0;
-		}
-		fwd2DPlan = bwd2DPlan = (fftwnd_plan) NULL;
-		fwd1DPlan = bwd1DPlan = (fftw_plan) NULL;
+	    CkPrintf("Empty constructor called\n");
+	    fwd2DPlan = bwd2DPlan = (fftwnd_plan) NULL;
+	    fwd1DPlan = bwd1DPlan = (fftw_plan) NULL;
+	    fftuseCommlib = false;
+	    //fftcommInstance = ComlibInstanceHandle();
 	}
-	void setup(NormalFFTinfo &info, bool useCommlib=false);
 
-	NormalSlabArray(NormalFFTinfo &info) { setup(info); }
+	NormalSlabArray(NormalFFTinfo &info, 
+			CProxy_NormalSlabArray src, CProxy_NormalSlabArray dest, 
+			bool useCommlib, ComlibInstanceHandle inst);
 	~NormalSlabArray();
 
 
@@ -188,36 +187,34 @@ class NormalSlabArray: public SlabArray {
 
 	void pup(PUP::er &p);
 
-	void createPlans(NormalFFTinfo &info);
- 
+	void setup(NormalFFTinfo &info, 
+		   CProxy_NormalSlabArray src, CProxy_NormalSlabArray dest, 
+		   bool useCommlib=false, 
+		   ComlibInstanceHandle inst=ComlibInstanceHandle());
 protected:
 	fftwnd_plan fwd2DPlan, bwd2DPlan;
 	fftw_plan fwd1DPlan, bwd1DPlan;
-	NormalFFTinfo *fftinfos[MAX_FFTS];
-	bool fftuseCommlib;
-	ComlibInstanceHandle fftcommInstance;
- private:
-	int counts[MAX_FFTS];
+
+	void createPlans(NormalFFTinfo &info);
 };
 
 class NormalRealSlabArray: public SlabArray {
  public:
 	NormalRealSlabArray(CkMigrateMessage *m): SlabArray(m) {}
 	NormalRealSlabArray() {
-		int i;
-		for (i = 0; i < MAX_FFTS; i++) {
-			fftinfos[i] = NULL;
-			counts[i] = 0;
-		}
-		tempdataPtr = NULL;
-		rfwd1DXPlan = rbwd1DXPlan = (rfftw_plan) NULL;
-		fwd1DYPlan = bwd1DYPlan = (fftw_plan) NULL;
-		fwd1DZPlan = bwd1DZPlan = (fftw_plan) NULL;
-		rfwd2DXYPlan = rfwd2DXYPlan = (rfftwnd_plan)NULL;
+	    CkPrintf("Empty constructor called\n");
+	    tempdataPtr = NULL;
+	    rfwd1DXPlan = rbwd1DXPlan = (rfftw_plan) NULL;
+	    fwd1DYPlan = bwd1DYPlan = (fftw_plan) NULL;
+	    fwd1DZPlan = bwd1DZPlan = (fftw_plan) NULL;
+	    rfwd2DXYPlan = rfwd2DXYPlan = (rfftwnd_plan)NULL;
+	    fftuseCommlib = false;
+	    //fftcommInstance = ComlibInstanceHandle();	
 	}
-	void setup(NormalFFTinfo &info);
 
-	NormalRealSlabArray(NormalFFTinfo &info) { setup(info); }
+	NormalRealSlabArray(NormalFFTinfo &info,
+			    CProxy_NormalRealSlabArray, CProxy_NormalRealSlabArray, 
+			    bool useCommlib, ComlibInstanceHandle inst);
 	~NormalRealSlabArray();
 
 
@@ -233,17 +230,20 @@ class NormalRealSlabArray: public SlabArray {
 
  protected:
 	rfftwnd_plan rfwd2DXYPlan, rbwd2DXYPlan;
-
 	rfftw_plan rfwd1DXPlan, rbwd1DXPlan;
 	fftw_plan fwd1DYPlan, bwd1DYPlan; 
 	fftw_plan fwd1DZPlan, bwd1DZPlan;
+
 	NormalFFTinfo *fftinfos[MAX_FFTS];
-        bool fftuseCommlib;
-        ComlibInstanceHandle fftcommInstance;
+      bool fftuseCommlib;
+      ComlibInstanceHandle fftcommInstance;
+	
+      void setup(NormalFFTinfo &info, 
+		   CProxy_NormalRealSlabArray, CProxy_NormalRealSlabArray, 
+		   bool useCommlib, ComlibInstanceHandle inst);
 
  private:
 	complex *tempdataPtr;
-	int counts[MAX_FFTS];
 };
 
 #if 0
@@ -301,28 +301,24 @@ class SparseSlabArray: public SlabArray {
 };
 #endif
 
+typedef struct _PencilArrayInfo{
+    int count;
+    LineFFTinfo info;
+    ComlibInstanceHandle fftcommInstance;
+}PencilArrayInfo;
+
 class NormalLineArray : public CBase_NormalLineArray {
  public:
     NormalLineArray (CkMigrateMessage *m) {}
     NormalLineArray () {
+	fwdplan = bwdplan =NULL;
+	fftuseCommlib = false;
 	id = -1;
-	for(int i=0; i<MAX_FFTS; i++)
-	    count[i] = 0;
 	line = NULL;
     }
-    NormalLineArray (LineFFTinfo &info, int _flag) {
-	int sizeX = info.sizeX;
-	int sizeY = info.sizeY;
-	fftinfos[0] = new LineFFTinfo(info);
-	line = NULL;
-	fwdplan = fftw_create_plan(sizeX, FFTW_FORWARD, FFTW_USE_WISDOM|FFTW_IN_PLACE|FFTW_MEASURE);
-	bwdplan = fftw_create_plan(sizeY, FFTW_BACKWARD, FFTW_USE_WISDOM|FFTW_IN_PLACE|FFTW_MEASURE);
-	id = -1;
-	for(int i=0; i<MAX_FFTS; i++)
-	    count[i] = 0;
-	flag = _flag;
-    }
+    NormalLineArray (LineFFTinfo &info, CProxy_NormalLineArray _xProxy, CProxy_NormalLineArray _yProxy, CProxy_NormalLineArray _zProxy, bool useCommlib, ComlibInstanceHandle &inst);
     ~NormalLineArray () {}
+    void setup (LineFFTinfo &info, CProxy_NormalLineArray _xProxy, CProxy_NormalLineArray _yProxy, CProxy_NormalLineArray _zProxy, bool useCommlib, ComlibInstanceHandle &inst);
     void doFirstFFT(int id, int direction);
     void doSecondFFT(int ypos, complex *val, int size, int id, int direction);
     void doThirdFFT(int zpos, int ypos, complex *val, int size, int id, int direction);
@@ -333,14 +329,13 @@ class NormalLineArray : public CBase_NormalLineArray {
     contribute(sizeof(int), &id_, CkReduction::sum_int);
     }
  protected:
-    int flag;
     complex *line;
     fftw_plan fwdplan, bwdplan;
     int id;
-    LineFFTinfo *fftinfos[MAX_FFTS];
-    int count[MAX_FFTS];
+
+    CProxy_NormalLineArray xProxy, yProxy, zProxy;
     bool fftuseCommlib;
-    ComlibInstanceHandle fftcommInstance;
+    CkVec<PencilArrayInfo*> infoVec;
 };
 
 

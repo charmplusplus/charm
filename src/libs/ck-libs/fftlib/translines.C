@@ -5,19 +5,20 @@
 void
 NormalLineArray::doFirstFFT(int fftid, int direction)
 {
-    LineFFTinfo &fftinfo = *(fftinfos[fftid]);        
+    LineFFTinfo &fftinfo = (infoVec[fftid]->info);
     complex *line = fftinfo.dataPtr;
     int sizeX = fftinfo.sizeX;
     int sizeZ = fftinfo.sizeZ;
-    int sPencilsPerSlab = fftinfo.sPencilsPerSlab;
+    int xPencilsPerSlab = fftinfo.xPencilsPerSlab;
+    int yPencilsPerSlab = fftinfo.yPencilsPerSlab;
+    int zPencilsPerSlab = fftinfo.zPencilsPerSlab;
 
     if(direction)
-	fftw(fwdplan, sPencilsPerSlab, (fftw_complex*)line, 1, sizeX, NULL, 0, 0); // sPencilsPerSlab many 1-D fft's 
+	fftw(fwdplan, xPencilsPerSlab, (fftw_complex*)line, 1, sizeX, NULL, 0, 0); // xPencilsPerSlab many 1-D fft's 
     else
-	fftw_one(bwdplan, (fftw_complex*)line, NULL);
+	fftw(bwdplan, zPencilsPerSlab, (fftw_complex*)line, 1, sizeZ, NULL, 0, 0);
     
-    // thisIndex.x is y-coord
-    int x, y, z;
+    int x, y, z=0;
 #ifdef VERBOSE
     CkPrintf("First FFT done at [%d %d] [%d %d]\n", thisIndex.x, thisIndex.y,sizeX,sizeZ);
 #endif
@@ -26,30 +27,45 @@ NormalLineArray::doFirstFFT(int fftid, int direction)
     ckout << "xlines " << id << endl;
     mgrProxy.ckLocalBranch()->beginIteration(id);
 #endif
-    if(direction){
-	int  sendDataSize = sPencilsPerSlab;
+    int baseY;
+    if(direction)
+    {
+	int  sendDataSize = yPencilsPerSlab*xPencilsPerSlab;
 	complex *sendData = new complex[sendDataSize];
-	for (x = 0; x < sizeX; x++) {
-	    for(y = 0; y < sPencilsPerSlab; y++){
-		sendData[y] = line[x+sizeX*y];
+	int zpos = thisIndex.y;
+	for (x = 0, baseY = sizeX*z; x < sizeX; x+=yPencilsPerSlab, baseY++) {
+	    for(z = 0; z < xPencilsPerSlab; z++){
+		for(y = 0; y < yPencilsPerSlab; y++)
+		    sendData[y] = line[y+baseY];
+		//	memcpy(sendData, (line+x+sizeX*z), sizeof(complex)*yPencilsPerSlab);
 	    }
 	    
 #ifdef VERBOSE
 	    CkPrintf(" [%d %d] sending to YLINES [%d %d] \n",  thisIndex.x, thisIndex.y, thisIndex.y, x);
 #endif
-	    fftinfo.ylinesProxy(thisIndex.y, x).doSecondFFT(thisIndex.x, sendData, sendDataSize, fftid, direction);
+	    yProxy(zpos, x).doSecondFFT(thisIndex.x, sendData, sendDataSize, fftid, direction);
 	}
 	delete [] sendData;
     }
-    else {
-	for (z = 0; z < sizeZ; z++) {
+    else 
+    {
+	int  sendDataSize = yPencilsPerSlab;
+	complex *sendData = new complex[sendDataSize];
+	int ypos = thisIndex.y;
+	//for(z = 0; z < xPencilsPerSlab; z++){
+	    for (x = 0, baseY = sizeX*z; x < sizeX; x++, baseY++) {
+		for(y = 0; y < yPencilsPerSlab; y++)
+		    sendData[y] = line[y+baseY];
+	    
 #ifdef VERBOSE
-	    CkPrintf(" [%d %d] sending to YLINES [%d %d] \n",  thisIndex.x, thisIndex.y, z, thisIndex.x);
+		CkPrintf(" [%d %d] sending to YLINES [%d %d] \n",  thisIndex.x, thisIndex.y, thisIndex.y, x);
 #endif
-
-	    fftinfo.ylinesProxy(z, thisIndex.x).doSecondFFT(thisIndex.y, &line[z], 1, fftid, direction);
-	}
+		yProxy(thisIndex.y+z, x).doSecondFFT(thisIndex.x, sendData, sendDataSize, fftid, direction);
+	    }
+	    //}
+	delete [] sendData;
     }
+
 #ifdef COMLIB
     mgrProxy.ckLocalBranch()->endIteration();
 #endif
@@ -59,26 +75,27 @@ NormalLineArray::doFirstFFT(int fftid, int direction)
 void
 NormalLineArray::doSecondFFT(int ypos, complex *val, int datasize, int fftid, int direction)
 {
-    LineFFTinfo &fftinfo = *(fftinfos[fftid]);        
+    LineFFTinfo &fftinfo = (infoVec[fftid]->info);        
     complex *line = fftinfo.dataPtr;
     int sizeY = fftinfo.sizeY;
-    int sPencilsPerSlab = fftinfo.sPencilsPerSlab;
+    int xPencilsPerSlab = fftinfo.xPencilsPerSlab;
+    int yPencilsPerSlab = fftinfo.yPencilsPerSlab;
+    int zPencilsPerSlab = fftinfo.zPencilsPerSlab;
     int	expectSize = 0;
-     if(direction)
-	expectSize = sPencilsPerSlab;
-    else
-	expectSize = 1;
+    int x,z,baseZ;
+    expectSize = yPencilsPerSlab*xPencilsPerSlab;
     CkAssert(datasize == expectSize);
-    memcpy(line+ypos, val, datasize*sizeof(complex));
+    for(x=0; x<yPencilsPerSlab; x++)
+	line[x*sizeY+ypos] = val[x];
 
-    count[fftid] += datasize;
-    if (count[fftid] == sizeY) {
-	count[fftid] = 0;
+    infoVec[fftid]->count++;
+    if (infoVec[fftid]->count == sizeY/xPencilsPerSlab) {
+	infoVec[fftid]->count = 0;
 	int y;
 	if(direction)
-	    fftw_one(fwdplan, (fftw_complex*)line, NULL);
+	    fftw(fwdplan, yPencilsPerSlab, (fftw_complex*)line, 1, sizeY, NULL, 0, 0);
 	else
-	    fftw_one(bwdplan, (fftw_complex*)line, NULL);
+	    fftw(bwdplan, yPencilsPerSlab, (fftw_complex*)line, 1, sizeY, NULL, 0, 0);
 	
 #ifdef VERBOSE
 	CkPrintf("Second FFT done at [%d %d]\n", thisIndex.x, thisIndex.y);
@@ -89,56 +106,77 @@ NormalLineArray::doSecondFFT(int ypos, complex *val, int datasize, int fftid, in
 	ckout << "ylines " << id << " " << CkMyPe() << endl;
 	mgrProxy.ckLocalBranch()->beginIteration(id);
 #endif
-	if(direction)
-	    for (y = 0; y < sizeY; y++) {
+	if(direction){
+	    int  sendDataSize = zPencilsPerSlab;
+	    complex *sendData = new complex[sendDataSize];
+	    int xpos = thisIndex.y;
+	    for (y = 0, baseZ = x*sizeY; y < sizeY; y++, baseZ++) {
+		//for (x = 0; x < yPencilsPerSlab; x++){
+                    for(z = 0; z < zPencilsPerSlab; z++)
+                        sendData[z] = line[z+baseZ];
+		    //}
 #ifdef VERBOSE
 		CkPrintf(" [%d %d] sending to ZLINES [%d %d] \n",  thisIndex.x, thisIndex.y, thisIndex.y, y);
-#endif
-		(fftinfo.zlinesProxy)(thisIndex.y, y).doThirdFFT(thisIndex.x, 0, &line[y], 1, fftid, direction);
+#endif	
+		(zProxy)(xpos, y).doThirdFFT(thisIndex.x, 0, sendData, sendDataSize, fftid, direction);
+		
 	    }
+	    delete [] sendData;
+	}
 	else {
-	    for (y = 0; y < sizeY; y+=sPencilsPerSlab) {
+	    int  sendDataSize = xPencilsPerSlab;
+	    complex *sendData = new complex[sendDataSize];
+	    for (x = 0; x < yPencilsPerSlab; x++){
+		for (y = 0; y < sizeY; y+=xPencilsPerSlab) {
 #ifdef VERBOSE
-		CkPrintf(" [%d %d] sending to ZLINES [%d %d] \n",  thisIndex.x, thisIndex.y, y, thisIndex.y);
+		CkPrintf(" [%d %d] sending to XLINES [%d %d] \n",  thisIndex.x, thisIndex.y, y, thisIndex.y);
 #endif
-		(fftinfo.xlinesProxy)(y, thisIndex.x).doThirdFFT(thisIndex.y, y, &line[y], sPencilsPerSlab, fftid, direction);
+		(xProxy)(y, thisIndex.x).doThirdFFT(thisIndex.y, y, &line[y], sendDataSize, fftid, direction);
+		}
 	    }
+	    delete [] sendData;
 	}
 #ifdef COMLIB
 	mgrProxy.ckLocalBranch()->endIteration();
 #endif
-	}
+    }
 }
 
 void
 NormalLineArray::doThirdFFT(int zpos, int ypos, complex *val, int datasize, int fftid, int direction)
 {
-    LineFFTinfo &fftinfo = *(fftinfos[fftid]);        
+    LineFFTinfo &fftinfo = (infoVec[fftid]->info);        
     complex *line = fftinfo.dataPtr;
     int sizeX = fftinfo.sizeX;
     int sizeZ = fftinfo.sizeZ;
-    int sPencilsPerSlab = fftinfo.sPencilsPerSlab;
+    int xPencilsPerSlab = fftinfo.xPencilsPerSlab;
+    int zPencilsPerSlab = fftinfo.zPencilsPerSlab;
     int expectSize=0, offset=0, i; 
     if(direction){
-	expectSize = 1;
+	expectSize = zPencilsPerSlab;
+	for(int y=0; y<zPencilsPerSlab; y++)
+	    line[zpos+y*sizeZ] = val[y];
 	offset = zpos;
-	line[zpos] = val[0];
     }
     else{
-	expectSize = sPencilsPerSlab;
+	expectSize = xPencilsPerSlab;
 	for(i=0,offset=ypos; i<expectSize; i++,offset+=sizeX)
 	    line[offset] = val[i]; //
     }
     CkAssert(datasize == expectSize);
 
-    count[fftid] += expectSize;
 
-    if (count[fftid] == sizeX* expectSize) {
-	count[fftid] = 0;
+    infoVec[fftid]->count += expectSize;
+
+    if (infoVec[fftid]->count == sizeX* expectSize) {
+	infoVec[fftid]->count = 0;
+
+	memset(line, 1, sizeof(complex)*fftinfo.sizeX*fftinfo.zPencilsPerSlab);
+
 	if(direction)
-	    fftw_one(fwdplan, (fftw_complex*)line, NULL);
+	    fftw(fwdplan, zPencilsPerSlab, (fftw_complex*)line, 1, sizeX, NULL, 0, 0);
 	else
-	    fftw(bwdplan, sPencilsPerSlab, (fftw_complex*)line, 1, sizeX, NULL, 0, 0); // sPencilsPerSlab many 1-D fft's 
+	    fftw(bwdplan, xPencilsPerSlab, (fftw_complex*)line, 1, sizeX, NULL, 0, 0); // sPencilsPerSlab many 1-D fft's 
 #ifdef VERBOSE
 	CkPrintf("Third FFT done at [%d %d]\n", thisIndex.x, thisIndex.y);
 #endif
@@ -151,4 +189,27 @@ NormalLineArray::doThirdFFT(int zpos, int ypos, complex *val, int datasize, int 
 void 
 NormalLineArray::doneFFT(int id, int direction){
     CkPrintf("FFT finished \n");
+}
+
+NormalLineArray::NormalLineArray (LineFFTinfo &info, CProxy_NormalLineArray _xProxy, CProxy_NormalLineArray _yProxy, CProxy_NormalLineArray _zProxy, bool _useCommlib, ComlibInstanceHandle &inst) {
+    setup(info, _xProxy, _yProxy, _zProxy, _useCommlib, inst);
+}
+
+void
+NormalLineArray::setup (LineFFTinfo &info, CProxy_NormalLineArray _xProxy, CProxy_NormalLineArray _yProxy, CProxy_NormalLineArray _zProxy, bool _useCommlib, ComlibInstanceHandle &inst) {
+	xProxy = _xProxy;
+	yProxy = _yProxy;
+	zProxy = _zProxy;
+	
+	PencilArrayInfo *pencilinfo = new PencilArrayInfo();
+	pencilinfo->info = info;
+	pencilinfo->count = 0;
+	pencilinfo->fftcommInstance = inst;
+	infoVec.insert(infoVec.size(), pencilinfo);
+	
+	line = NULL;
+	fwdplan = fftw_create_plan(info.sizeX, FFTW_FORWARD, FFTW_IN_PLACE);
+	bwdplan = fftw_create_plan(info.sizeY, FFTW_BACKWARD, FFTW_IN_PLACE);
+	id = -1;
+	fftuseCommlib = _useCommlib;
 }

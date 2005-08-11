@@ -7,7 +7,7 @@
 void
 NormalRealSlabArray::doFFT(int src_id, int dst_id)
 {
-    NormalFFTinfo &fftinfo = *(fftinfos[src_id]);
+    NormalFFTinfo &fftinfo = (infoVec[src_id]->info);
     
     if(fftinfo.transformType != REAL_TO_COMPLEX) CkPrintf("Transform Type at doFFT is %d\n", fftinfo.transformType);
     CkAssert(fftinfo.transformType == REAL_TO_COMPLEX);
@@ -56,6 +56,20 @@ NormalRealSlabArray::doFFT(int src_id, int dst_id)
     dataPtr = (double*)fftinfo.dataPtr;
     outDataPtr2 = outData2;
 
+
+//    CProxy_NormalSlabArray destProxy = (CProxy_NormalSlabArray)(infoVec[src_id]->destProxy);
+//    CProxy_NormalSlabArray srcProxy = (CProxy_NormalSlabArray)(infoVec[src_id]->srcProxy);
+
+    if (fftuseCommlib) {
+	CProxy_NormalSlabArray destProxy_com;
+	if(fftinfo.isSrcSlab)
+	    destProxy_com = (CProxy_NormalSlabArray)destProxy;
+	else
+	    destProxy_com = (CProxy_NormalSlabArray)srcProxy;
+	fftcommInstance.beginIteration();
+	ComlibDelegateProxy(&destProxy_com);
+    }
+
     // allocating the data for sending to destination side
     lineSize = fftinfo.srcSize[1]/2+1;
     complex *sendData = new complex[fftinfo.srcPlanesPerSlab * fftinfo.destPlanesPerSlab * lineSize];
@@ -77,7 +91,7 @@ NormalRealSlabArray::doFFT(int src_id, int dst_id)
         CkPrintf("[%d] sendFFTData to %d, size %d \n", thisIndex, pe, 
 		 lineSize * fftinfo.srcPlanesPerSlab * fftinfo.destPlanesPerSlab);
 #endif
-        ((CProxy_NormalRealSlabArray)fftinfo.destProxy)(pe).acceptDataForFFT(lineSize * fftinfo.srcPlanesPerSlab * fftinfo.destPlanesPerSlab, sendData, thisIndex, dst_id);
+        ((CProxy_NormalSlabArray)destProxy)(pe).acceptDataForFFT(lineSize * fftinfo.srcPlanesPerSlab * fftinfo.destPlanesPerSlab, sendData, thisIndex, dst_id);
     }
     delete [] sendData;
     delete [] outData;
@@ -90,7 +104,7 @@ NormalRealSlabArray::doFFT(int src_id, int dst_id)
 void
 NormalRealSlabArray::acceptDataForFFT(int numPoints, complex *points, int posn, int info_id)
 {
-    NormalFFTinfo &fftinfo = *(fftinfos[info_id]);
+    NormalFFTinfo &fftinfo = (infoVec[info_id]->info);
     CkAssert(fftinfo.transformType == COMPLEX_TO_REAL);
 
     complex *dataPtr = (complex*)fftinfo.dataPtr;
@@ -100,7 +114,7 @@ NormalRealSlabArray::acceptDataForFFT(int numPoints, complex *points, int posn, 
     CkAssert(numPoints == fftinfo.srcPlanesPerSlab * fftinfo.destPlanesPerSlab * lineSize);
 #endif
 	
-    counts[info_id]++;
+    infoVec[info_id]->count++;
     int planeSize = fftinfo.destSize[0] * (fftinfo.destSize[1]/2+1);
     int p;
     for (p = 0; p < fftinfo.destPlanesPerSlab; p++) {
@@ -110,8 +124,8 @@ NormalRealSlabArray::acceptDataForFFT(int numPoints, complex *points, int posn, 
 	points += lineSize * fftinfo.srcPlanesPerSlab;
     }
 
-    if (counts[info_id] == fftinfo.destSize[0] / fftinfo.srcPlanesPerSlab) {
-	counts[info_id] = 0;
+    if (infoVec[info_id]->count == fftinfo.destSize[0] / fftinfo.srcPlanesPerSlab) {
+	infoVec[info_id]->count = 0;
 	CkAssert(fwd1DZPlan != NULL);
 	for(p = 0; p < fftinfo.destPlanesPerSlab; p++) {
 		fftw(fwd1DZPlan, 
@@ -131,7 +145,7 @@ NormalRealSlabArray::acceptDataForFFT(int numPoints, complex *points, int posn, 
 void
 NormalRealSlabArray::doIFFT(int src_id, int dst_id)
 {
-    NormalFFTinfo &fftinfo = *(fftinfos[src_id]);
+    NormalFFTinfo &fftinfo = (infoVec[src_id]->info);
     CkAssert(fftinfo.transformType == COMPLEX_TO_REAL);
 
     complex *dataPtr = (complex*)fftinfo.dataPtr;
@@ -153,7 +167,20 @@ NormalRealSlabArray::doIFFT(int src_id, int dst_id)
 	}
 */
     }
-  
+      
+//    CProxy_NormalSlabArray destProxy = (CProxy_NormalSlabArray)(infoVec[src_id]->destProxy);
+//    CProxy_NormalSlabArray srcProxy = (CProxy_NormalSlabArray)(infoVec[src_id]->srcProxy);
+
+    if (fftuseCommlib) {
+	CProxy_NormalSlabArray destProxy_com;
+	if(fftinfo.isSrcSlab)
+	    destProxy_com = (CProxy_NormalSlabArray)destProxy;
+	else
+	    destProxy_com = (CProxy_NormalSlabArray)srcProxy;
+	fftcommInstance.beginIteration();
+	ComlibDelegateProxy(&destProxy_com);
+    }
+
     complex *sendData = new complex[fftinfo.srcPlanesPerSlab * fftinfo.destPlanesPerSlab * lineSize];
     complex *temp;
     int i, pe;
@@ -169,7 +196,7 @@ NormalRealSlabArray::doIFFT(int src_id, int dst_id)
 		temp += lineSize;
 	    }
 
-	((CProxy_NormalRealSlabArray)fftinfo.srcProxy)(pe).acceptDataForIFFT(lineSize * fftinfo.destPlanesPerSlab * fftinfo.srcPlanesPerSlab, sendData, thisIndex, dst_id);
+	((CProxy_NormalSlabArray)srcProxy)(pe).acceptDataForIFFT(lineSize * fftinfo.destPlanesPerSlab * fftinfo.srcPlanesPerSlab, sendData, thisIndex, dst_id);
     }
     delete [] sendData;
 }
@@ -177,7 +204,7 @@ NormalRealSlabArray::doIFFT(int src_id, int dst_id)
 void
 NormalRealSlabArray::acceptDataForIFFT(int numPoints, complex *points, int posn, int info_id)
 {
-    NormalFFTinfo &fftinfo = *(fftinfos[info_id]);
+    NormalFFTinfo &fftinfo = (infoVec[info_id]->info);
     CkAssert(fftinfo.transformType == REAL_TO_COMPLEX);
 
     int rplaneSize = fftinfo.srcSize[0] * fftinfo.srcSize[1];
@@ -191,7 +218,7 @@ NormalRealSlabArray::acceptDataForIFFT(int numPoints, complex *points, int posn,
     CkAssert(numPoints == fftinfo.srcPlanesPerSlab * fftinfo.destPlanesPerSlab * lineSize);
 #endif
 
-    counts[info_id]++;
+    infoVec[info_id]->count++;
     int p;
     complex *pointPtr = points;
     inDataPtr = tempdataPtr + posn * lineSize * fftinfo.destPlanesPerSlab;
@@ -202,8 +229,8 @@ NormalRealSlabArray::acceptDataForIFFT(int numPoints, complex *points, int posn,
     }
     
     int expectedCount = fftinfo.srcSize[0]/fftinfo.destPlanesPerSlab;
-    if (counts[info_id] == expectedCount) {
-	counts[info_id] = 0;
+    if (infoVec[info_id]->count == expectedCount) {
+	infoVec[info_id]->count = 0;
 	CmiAssert(rbwd1DXPlan!=NULL);
 	double *dataPtr = (double*)fftinfo.dataPtr;
 	for(p = 0; p < fftinfo.srcPlanesPerSlab; p++) {
@@ -255,17 +282,38 @@ void NormalRealSlabArray::createPlans(NormalFFTinfo &info)
     }
 }
 
-void NormalRealSlabArray::setup(NormalFFTinfo &info)
+void NormalRealSlabArray::setup(NormalFFTinfo &info,
+				CProxy_NormalRealSlabArray src, 
+				CProxy_NormalRealSlabArray dest, 
+				bool useCommlib, ComlibInstanceHandle inst)
 {
-    fftinfos[0] = new NormalFFTinfo(info);
-    counts[0] = 0;
+    SlabArrayInfo *slabinfo;
+    slabinfo->info = info;
+    slabinfo->count = 0;
+    infoVec.insert(infoVec.size(), slabinfo);
+
+    srcProxy = src;
+    destProxy = dest;
     rfwd1DXPlan = rbwd1DXPlan = (rfftw_plan) NULL;
     fwd1DYPlan = bwd1DYPlan = (fftw_plan) NULL;
     fwd1DZPlan = bwd1DZPlan = (fftw_plan) NULL;
 
     createPlans(info);
+
+    fftuseCommlib = useCommlib;
+    fftcommInstance = ComlibInstanceHandle();
+    if (fftuseCommlib) {        
+	fftcommInstance = inst;
+   }
 }
 
+NormalRealSlabArray::NormalRealSlabArray(NormalFFTinfo &info,
+					 CProxy_NormalRealSlabArray src, 
+					 CProxy_NormalRealSlabArray dest, 
+					 bool useCommlib, ComlibInstanceHandle inst)
+{ 
+    setup(info, src, dest, useCommlib, inst); 
+}
 
 NormalRealSlabArray::~NormalRealSlabArray() 
 {
@@ -287,9 +335,7 @@ NormalRealSlabArray::~NormalRealSlabArray()
     if(rbwd2DXYPlan)
 	fftwnd_destroy_plan(rbwd2DXYPlan);
 
-    int i;
-    for (i = 0; i < MAX_FFTS; i++)
-	delete fftinfos[i];
+    infoVec.removeAll();
     if(tempdataPtr != NULL) 
 	delete [] tempdataPtr;
 }
@@ -300,7 +346,7 @@ void NormalRealSlabArray::pup(PUP::er &p)
     int i;
     ArrayElement1D::pup(p);
 
-    for (i = 0; i < MAX_FFTS; i++) {
+/*    for (i = 0; i < MAX_FFTS; i++) {
 	if (p.isUnpacking()) {
           fftinfos[i] = NULL;
 	}
@@ -317,8 +363,7 @@ void NormalRealSlabArray::pup(PUP::er &p)
 	    }	    
 	}
     }
-    
-    p(counts, MAX_FFTS);
+*/  
 }
 
 
