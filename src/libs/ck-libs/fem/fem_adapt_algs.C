@@ -130,14 +130,130 @@ void FEM_Adapt_Algs::SetMeshSize(int method, double factor, double *sizes)
   }
 }
 
+int FEM_Adapt_Algs::simple_refine(double targetA) {
+  int noEle = theMesh->elem[0].size();
+  int *con = (int*)malloc(3*sizeof(int));
+  double *areas = (double*)malloc(noEle*sizeof(double));
+  int *map1 = (int*)malloc(noEle*sizeof(int));
+  double *n1_coord = (double*)malloc(2*sizeof(double));
+  double *n2_coord = (double*)malloc(2*sizeof(double));
+  double *n3_coord = (double*)malloc(2*sizeof(double));
+
+  for(int i=0; i<noEle; i++) {
+    if(theMesh->elem[0].is_valid(i)) {
+      theMesh->e2n_getAll(i,con,0);
+      getCoord(con[0], n1_coord);
+      getCoord(con[1], n2_coord);
+      getCoord(con[2], n3_coord);
+      //do a refinement only if it has any node within x coords 0.087 to 0.063
+      if(!((n1_coord[0]<0.0087 && n1_coord[0]>0.0063) || (n2_coord[0]<0.0087 && n2_coord[0]>0.0063) || (n3_coord[0]<0.0087 && n3_coord[0]>0.0063))) {
+	areas[i] = 0.000000001; //make it believe that this triangle does not need refinement
+      } else {
+	areas[i] = getArea(n1_coord, n2_coord, n3_coord);
+      }
+    } else {
+      areas[i] = 0.000000001;
+    }
+    map1[i] = i;
+  }
+
+  for(int i=0; i<noEle; i++) {
+    for(int j=i+1; j<noEle; j++) {
+      if(areas[j] > areas[i]) {
+	double tmp = areas[j];
+	areas[j] = areas[i];
+	areas[i] = tmp;
+	int t = map1[j];
+	map1[j] = map1[i];
+	map1[i] = t;
+      }
+    }
+  }
+
+  for(int i=0; i<noEle; i++) {
+    if(theMesh->elem[0].is_valid(map1[i])) {
+      if(areas[i] > targetA) {
+	refine_element_leb(map1[i]);
+      }
+    }
+  }
+  free(con);
+  free(areas);
+  free(map1);
+  free(n1_coord);
+  free(n2_coord);
+  free(n3_coord);
+  return 1;
+}
+
+int FEM_Adapt_Algs::simple_coarsen(double targetA) {
+  int noEle = theMesh->elem[0].size();
+  int *con = (int*)malloc(3*sizeof(int));
+  double *areas = (double*)malloc(noEle*sizeof(double));
+  int *map1 = (int*)malloc(noEle*sizeof(int));
+  double *n1_coord = (double*)malloc(2*sizeof(double));
+  double *n2_coord = (double*)malloc(2*sizeof(double));
+  double *n3_coord = (double*)malloc(2*sizeof(double));
+  int *shortestEdge = (int *)malloc(2*sizeof(int));
+
+  for(int i=0; i<noEle; i++) {
+    if(theMesh->elem[0].is_valid(i)) {
+      theMesh->e2n_getAll(i,con,0);
+      getCoord(con[0], n1_coord);
+      getCoord(con[1], n2_coord);
+      getCoord(con[2], n3_coord);
+      //do a coarsening only if it has any node within y coords less than 0.04
+      if(!((n1_coord[1]<0.04) || (n2_coord[1]<0.04) || (n3_coord[1]<0.04))) {
+	areas[i] = 1.0; //make it believe that this triangle is big enough
+      } else {
+	areas[i] = getArea(n1_coord, n2_coord, n3_coord);
+      }
+    } else {
+      areas[i] = 1.0;
+    }
+    map1[i] = i;
+  }
+
+  for(int i=0; i<noEle; i++) {
+    for(int j=i+1; j<noEle; j++) {
+      if(areas[j] < areas[i]) {
+	double tmp = areas[j];
+	areas[j] = areas[i];
+	areas[i] = tmp;
+	int t = map1[j];
+	map1[j] = map1[i];
+	map1[i] = t;
+      }
+    }
+  }
+
+  for(int i=0; i<noEle; i++) {
+    if(theMesh->elem[0].is_valid(map1[i])) {
+      if(areas[i] < targetA) {
+	//find the nodes along the smallest edge & coarsen the edge
+	theMesh->e2n_getAll(map1[i],con,0);
+	getShortestEdge(con[0], con[1], con[2], shortestEdge);
+	theAdaptor->edge_contraction(shortestEdge[0], shortestEdge[1]);
+      }
+    }
+  }
+  free(con);
+  free(areas);
+  free(map1);
+  free(n1_coord);
+  free(n2_coord);
+  free(n3_coord);
+  free(shortestEdge);
+  return 1;
+}
+
 // =====================  BEGIN refine_element_leb ========================= 
 /* Given an element e, if e's longest edge f is also the longest edge
    of e's neighbor across f, g, split f by adding a new node in the 
    center of f, and splitting both e and g into two elements.  If g
    does not have f as it's longest edge, recursively call refine_element_leb 
    on g, and start over. */ 
-int FEM_Adapt_Algs::refine_element_leb(int e)
-{
+int FEM_Adapt_Algs::refine_element_leb(int e) {
   int *eConn = (int*)malloc(3*sizeof(int));
   int fixNode, otherNode, opNode, longEdge, nbr; 
   double eLens[3], longEdgeLen = 0.0;
@@ -194,8 +310,8 @@ int FEM_Adapt_Algs::refine_element_leb(int e)
   }
   else return theAdaptor->edge_bisect(fixNode, otherNode); // longEdge is nbr's long edge
 }
-void FEM_Adapt_Algs::refine_flip_element_leb(int e, int p, int n1, int n2, double le) 
-{
+
+void FEM_Adapt_Algs::refine_flip_element_leb(int e, int p, int n1, int n2, double le) {
   int newNode = refine_element_leb(e);
   if(newNode == -1) return;
   (void) theAdaptor->edge_flip(n1, n2);
@@ -207,32 +323,118 @@ void FEM_Adapt_Algs::refine_flip_element_leb(int e, int p, int n1, int n2, doubl
 }
 // ========================  END refine_element_leb ========================
 
+//HELPER functions
+
 double FEM_Adapt_Algs::length(int n1, int n2)
 {
-  //not the correct way to grab coordinates... what abt new nodes???
-  //double *n1_coord = &(nodeCoords[n1*dim]), *n2_coord = &(nodeCoords[n2*dim]);
   double *n1_coord = (double*)malloc(2*sizeof(double));
   double *n2_coord = (double*)malloc(2*sizeof(double));
 
-  if(!FEM_Is_ghost_index(n1)) {
-    FEM_Mesh_dataP(theMesh, FEM_NODE, coord_attr, (void *)n1_coord, n1, 1, FEM_DOUBLE, 2);
-  }
-  else {
-    int ghostidx = FEM_To_ghost_index(n1);
-    FEM_Mesh_dataP(theMesh, FEM_NODE + FEM_GHOST, coord_attr, (void *)n1_coord, ghostidx, 1, FEM_DOUBLE, 2);
-  }
-  if(!FEM_Is_ghost_index(n2)) {
-    FEM_Mesh_dataP(theMesh, FEM_NODE, coord_attr, (void *)n2_coord, n2, 1, FEM_DOUBLE, 2);
-  }
-  else {
-    int ghostidx = FEM_To_ghost_index(n2);
-    FEM_Mesh_dataP(theMesh, FEM_NODE + FEM_GHOST, coord_attr, (void *)n2_coord, ghostidx, 1, FEM_DOUBLE, 2);
-  }
-  
+  getCoord(n1, n1_coord);
+  getCoord(n2, n2_coord);
+
+  double ret = length(n1_coord, n2_coord);
+
+  free(n1_coord);
+  free(n2_coord);
+  return ret;
+}
+
+double FEM_Adapt_Algs::length(double *n1_coord, double *n2_coord) { 
   double d, ds_sum=0.0;
+
   for (int i=0; i<dim; i++) {
     d = n1_coord[i] - n2_coord[i];
     ds_sum += d*d;
   }
   return (sqrt(ds_sum));
+}
+
+
+double FEM_Adapt_Algs::getArea(int n1, int n2, int n3)
+{
+  double *n1_coord = (double*)malloc(2*sizeof(double));
+  double *n2_coord = (double*)malloc(2*sizeof(double));
+  double *n3_coord = (double*)malloc(2*sizeof(double));
+
+  getCoord(n1, n1_coord);
+  getCoord(n2, n2_coord);
+  getCoord(n3, n3_coord);
+
+  double ret = getArea(n1_coord, n2_coord, n3_coord);
+
+  free(n1_coord);
+  free(n2_coord);
+  free(n3_coord);
+  return ret;
+}
+
+double FEM_Adapt_Algs::getArea(double *n1_coord, double *n2_coord, double *n3_coord) {
+  double area=0.0;
+  double aLen, bLen, cLen, sLen, d, ds_sum;
+
+  for (int i=0; i<2; i++) {
+    d = n1_coord[i] - n2_coord[i];
+    ds_sum += d*d;
+  }
+  aLen = sqrt(ds_sum);
+  for (int i=0; i<2; i++) {
+    d = n2_coord[i] - n3_coord[i];
+    ds_sum += d*d;
+  }
+  bLen = sqrt(ds_sum);
+  for (int i=0; i<2; i++) {
+    d = n3_coord[i] - n1_coord[i];
+    ds_sum += d*d;
+  }
+  cLen = sqrt(ds_sum);
+  sLen = (aLen+bLen+cLen)/2;
+  return (sqrt(sLen*(sLen-aLen)*(sLen-bLen)*(sLen-cLen)));
+}
+
+int FEM_Adapt_Algs::getCoord(int n1, double *crds) {
+  if(!FEM_Is_ghost_index(n1)) {
+    FEM_Mesh_dataP(theMesh, FEM_NODE, coord_attr, (void *)crds, n1, 1, FEM_DOUBLE, 2);
+  }
+  else {
+    int ghostidx = FEM_To_ghost_index(n1);
+    FEM_Mesh_dataP(theMesh, FEM_NODE + FEM_GHOST, coord_attr, (void *)crds, ghostidx, 1, FEM_DOUBLE, 2);
+  }
+  return 1;
+}
+
+int FEM_Adapt_Algs::getShortestEdge(int n1, int n2, int n3, int* shortestEdge) {
+  double *n1_coord = (double*)malloc(2*sizeof(double));
+  double *n2_coord = (double*)malloc(2*sizeof(double));
+  double *n3_coord = (double*)malloc(2*sizeof(double));
+
+  getCoord(n1, n1_coord);
+  getCoord(n2, n2_coord);
+  getCoord(n3, n3_coord);
+
+  double aLen = length(n1_coord, n2_coord);
+  int shortest = 0;
+
+  double bLen = length(n2_coord, n3_coord);
+  if(bLen < aLen) shortest = 1;
+
+  double cLen = length(n3_coord, n1_coord);
+  if((cLen < aLen) && (cLen < bLen)) shortest = 2;
+
+  if(shortest==0) {
+    shortestEdge[0] = n1;
+    shortestEdge[1] = n2;
+  }
+  else if (shortest==1) {
+    shortestEdge[0] = n2;
+    shortestEdge[1] = n3;
+  }
+  else {
+    shortestEdge[0] = n3;
+    shortestEdge[1] = n1;
+  }
+  free(n1_coord);
+  free(n2_coord);
+  free(n3_coord);
+  return 1;
 }

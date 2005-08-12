@@ -75,7 +75,15 @@ class FEM_Adapt_Algs {
   virtual int refine_element_leb(int e);
   virtual void refine_flip_element_leb(int e, int p, int n1, int n2, 
 				       double le);
+
+  int simple_refine(double targetA);
+  int simple_coarsen(double targetA);
   double length(int n1, int n2);
+  double getArea(int n1, int n2, int n3);
+  double length(double *n1_coord, double *n2_coord);
+  double getArea(double *n1_coord, double *n2_coord, double *n3_coord);
+  int getCoord(int n1, double *crds);
+  int getShortestEdge(int n1, int n2, int n3, int* shortestEdge);
 };
 
 

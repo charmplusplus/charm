@@ -6,6 +6,7 @@ int FEM_AdaptL::lockNodes(int *gotlocks, int *lockrnodes, int numRNodes, int *lo
   bool donelocks = false;
   int numNodes = numRNodes + numWNodes;
   for(int i=0; i<numNodes; i++) gotlocks[i] = 0;
+  int tryCounts=0;
   while(!donelocks) {
     for(int i=0; i<numRNodes; i++) {
       if(lockrnodes[i]==-1) {
@@ -35,8 +36,14 @@ int FEM_AdaptL::lockNodes(int *gotlocks, int *lockrnodes, int numRNodes, int *lo
     for(int i=0; i<numNodes; i++) {
       tmplocks = tmplocks && (gotlocks[i]>0);
     }
-    if(tmplocks) donelocks = true;
-    else CthYield(); //block for a while
+    if(tmplocks) {
+      donelocks = true;
+    }
+    else {
+      tryCounts++;
+      if(tryCounts>=10) return -1;
+      CthYield(); //spin for a while
+    }
   }
   return 1;
 }
@@ -52,9 +59,15 @@ int FEM_AdaptL::unlockNodes(int *gotlocks, int *lockrnodes, int numRNodes, int *
 	continue;
       }
       if(FEM_Is_ghost_index(lockrnodes[i])) {
-	if(!theMesh->node.ghost->is_valid(FEM_To_ghost_index(lockrnodes[i]))) return -1;
+	if(!theMesh->node.ghost->is_valid(FEM_To_ghost_index(lockrnodes[i]))) {
+	  free(ungetlocks);
+	  return -1;
+	}
       } else {
-	if(!theMesh->node.is_valid(lockrnodes[i])) return -1;
+	if(!theMesh->node.is_valid(lockrnodes[i])) {
+	  free(ungetlocks);
+	  return -1;
+	}
       }
       if(gotlocks[i]>0) ungetlocks[i] = FEM_Modify_UnlockN(theMesh, lockrnodes[i], 1);
       else ungetlocks[i] = 1;
@@ -65,9 +78,15 @@ int FEM_AdaptL::unlockNodes(int *gotlocks, int *lockrnodes, int numRNodes, int *
 	continue;
       }
       if(FEM_Is_ghost_index(lockwnodes[i])) {
-	if(!theMesh->node.ghost->is_valid(FEM_To_ghost_index(lockwnodes[i]))) return -1;
+	if(!theMesh->node.ghost->is_valid(FEM_To_ghost_index(lockwnodes[i]))) {
+	  free(ungetlocks);
+	  return -1;
+	}
       } else {
-	if(!theMesh->node.is_valid(lockwnodes[i])) return -1;
+	if(!theMesh->node.is_valid(lockwnodes[i])) {
+	  free(ungetlocks);
+	  return -1;
+	}
       }
       if(gotlocks[numRNodes+i]>0) ungetlocks[numRNodes+i] = FEM_Modify_UnlockN(theMesh, lockwnodes[i], 0);
       else ungetlocks[numRNodes+i] = 1;
@@ -116,6 +135,7 @@ int FEM_AdaptL::edge_flip(int n1, int n2) {
       unlockNodes(gotlocks, locknodes, 0, locknodes, numNodes);
       locknodes[2] = n3;
       locknodes[3] = n4;
+      CthYield();
     }
   }
   if ((e1 == -1) || (e2 == -1)) {
@@ -124,6 +144,9 @@ int FEM_AdaptL::edge_flip(int n1, int n2) {
   }
   int ret = edge_flip_help(e1, e2, n1, n2, e1_n1, e1_n2, e1_n3, n3, n4);
   unlockNodes(gotlocks, locknodes, 0, locknodes, numNodes);
+
+  free(locknodes);
+  free(gotlocks);
   return ret;
 }
 
@@ -160,10 +183,14 @@ int FEM_AdaptL::edge_bisect(int n1, int n2) {
       unlockNodes(gotlocks, locknodes, 0, locknodes, numNodes);
       locknodes[2] = n3;
       locknodes[3] = n4;
+      CthYield();
     }
   }
   int ret = edge_bisect_help(e1, e2, n1, n2, e1_n1, e1_n2, e1_n3, e2_n1, e2_n2, e2_n3, n3, n4);
   unlockNodes(gotlocks, locknodes, 0, locknodes, numNodes);
+
+  free(locknodes);
+  free(gotlocks);
   return ret;
 }
 
@@ -235,12 +262,63 @@ int FEM_AdaptL::vertex_remove(int n1, int n2) {
       locknodes[2] = n3;
       locknodes[3] = n4;
       locknodes[4] = n5;
+      CthYield();
     }
   }
   int ret = vertex_remove_help(e1, e2, n1, n2, e1_n1, e1_n2, e1_n3, e2_n1, e2_n2, e2_n3, n3, n4, n5);
   unlockNodes(gotlocks, locknodes, 0, locknodes, numNodes);
+
+  free(locknodes);
+  free(gotlocks);
   return ret;
 }
 
 int FEM_AdaptL::edge_contraction(int n1, int n2) {
+  int e1, e1_n1, e1_n2, e1_n3, n3;
+  int e2, e2_n1, e2_n2, e2_n3, n4;
+  int numNodes = 4;
+  int numElems = 2;
+  int *locknodes = (int*)malloc(numNodes*sizeof(int));
+  int *gotlocks = (int*)malloc(numNodes*sizeof(int));
+  bool done = false;
+  int isEdge = 0;
+
+  isEdge = findAdjData(n1, n2, &e1, &e2, &e1_n1, &e1_n2, &e1_n3, &e2_n1, &e2_n2, &e2_n3,&n3, &n4);
+  if(isEdge == -1) {
+    CkPrintf("Edge Contract %d->%d not done as it is no longer a valid edge\n",n1,n2);
+    return -1;
+  }
+  locknodes[0] = n1;
+  locknodes[1] = n2;
+  locknodes[2] = n3;
+  locknodes[3] = n4;
+  if (e1 == -1) return 0;
+  while(!done) {
+    int gotlock = lockNodes(gotlocks, locknodes, 0, locknodes, numNodes);
+    isEdge = findAdjData(n1, n2, &e1, &e2, &e1_n1, &e1_n2, &e1_n3, &e2_n1, &e2_n2, &e2_n3,&n3, &n4);
+    if(isEdge == -1) {
+      unlockNodes(gotlocks, locknodes, 0, locknodes, numNodes);
+      CkPrintf("Edge contract %d->%d not done as it is no longer a valid edge\n",n1,n2);
+      return -1;
+    }
+    if (e1 == -1) {
+      unlockNodes(gotlocks, locknodes, 0, locknodes, numNodes);
+      return 0;
+    }
+    if(gotlock==1 && locknodes[2]==n3 && locknodes[3]==n4) {
+      done = true;
+    }
+    else {
+      unlockNodes(gotlocks, locknodes, 0, locknodes, numNodes);
+      locknodes[2] = n3;
+      locknodes[3] = n4;
+      CthYield();
+    }
+  }
+  int ret = edge_contraction_help(e1, e2, n1, n2, e1_n1, e1_n2, e1_n3, e2_n1, e2_n2, e2_n3, n3, n4);
+  unlockNodes(gotlocks, locknodes, 0, locknodes, numNodes);
+
+  free(locknodes);
+  free(gotlocks);
+  return ret;
 }
