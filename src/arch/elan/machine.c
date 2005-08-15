@@ -374,7 +374,7 @@ void CmiReleaseCommHandle(CmiCommHandle c)
 
 void release_pmsg_list();
 
-#define MAX_RELEASE_POLL 8
+#define MAX_RELEASE_POLL 4096
 
 static int CmiReleaseSentMessages(void)
 {
