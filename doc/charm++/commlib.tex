@@ -327,13 +327,13 @@ endIteration must be called before and after making the deposits respectively.
 The usage of the strategy becomes:
 
 \begin{alltt}
-ComlibBeginIteration(dproxy);
+ComlibBegin(dproxy);
 
 dproxy[index].entry(message);   // Sending a message
 .....     //sending more messages
 .....
 
-ComlibEndIteration(dproxy);
+ComlibEnd(dproxy);
 \end{alltt}
 
 \item Non-Bracketed Strategies. Non-bracketed strategies perform communication
@@ -576,5 +576,5 @@ strategies use Converse handlers to communicate between processors. The flags
 {\em isArray} and {\em isGroup} store the type of objects that call the strategy
 and the flag {\em isStrategyBracketed} specifies if the CharmStrategy is
 bracketed or not. Bracketed strategies require that the application deposits
-messages in brackets demarcated by the calls ComlibBeginIteration and
-ComlibEndIteration.
+messages in brackets demarcated by the calls ComlibBegin and
+ComlibEnd.
