@@ -2,7 +2,7 @@ BGL_TYPICAL_FLOOR=/bgl/BlueLight/ppcfloor
 
 BGL_SRC=/bgd-public/chuang10/bglsw
 BGL_INSTALL=/bgd-public/chuang10/bglsw-install
-BGL_FLOOR=/auto/BGX/ppcfloor
+#BGL_FLOOR=/auto/BGX/floor
 
 # if no floor set, use typical floor path
 if test -z "$BGL_FLOOR"
@@ -17,7 +17,7 @@ then
 fi
 
 BGL_BIN=$BGL_FLOOR/blrts-gnu/bin
-BGL_INC="-I$BGL_SRC/commlib/BGLML -I$BGL_INSTALL/bglsys/include -I$BGL_INSTALL/bglsys/include/bglml"
+BGL_INC="-I$BGL_INSTALL/bglsys/include -I$BGL_SRC/commlib/"
 BGL_LIB="-L$BGL_INSTALL/bglsys/lib"
 
 # test if compiler binary present

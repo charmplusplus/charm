@@ -12,13 +12,15 @@
 #include "machine.h"
 #include "converse.h"
 #include "pcqueue.h"
+#include <stack>
+#define RZV_SIZE 10000
 
 #define EAGER 1
 
 #if EAGER
-#include "bglml/BLMPI_EagerProtocol.h"
+#include "BLMPI_EagerProtocol.h"
 #else
-#include "bglml/BLMPI_RzvProtocol.h"
+#include "BLMPI_RzvProtocol.h"
 #endif
 
 #if 0
@@ -31,9 +33,12 @@ inline char *ALIGN_16(char *p){
   return((char *)((((unsigned long)p)+0xf)&0xfffffff0));
 }
 
+//#include "torusbarrier.C"
+
 static char *_msgr_buf = NULL;
-static BLMPI_Messager_t* _msgr = NULL;
+static BGLML_Messager_t* _msgr = NULL;
 static void ** _recvArray;
+
 /*
     To reduce the buffer used in broadcast and distribute the load from 
   broadcasting node, define CMK_BROADCAST_SPANNING_TREE enforce the use of 
@@ -193,7 +198,8 @@ extern "C" void ConverseCommonExit(void);
 extern "C" void CthInit(char **argv);
 
 static int PumpMsgs();
-static void AdvanceCommunications();
+static void SendMsgsUntil(int);
+static void AdvanceCommunications(int down = 16);
 static void ConverseRunPE(int everReturn);
 static void CommunicationServer(int sleepTime);
 static void CommunicationServerThread(int sleepTime);
@@ -245,9 +251,9 @@ static ProcState  *procState;
 
 struct CmiMsgInfo{
 #if EAGER
-  BLMPI_Eager_Recv_t recv;
+  BLMPI_Eager_Recv_t eager_recv;
 #else
-  BLMPI_Rzv_Recv_t recv;
+  BLMPI_Rzv_Recv_t rzv_recv;
 #endif
   char* msgptr;
   int sndlen;
@@ -257,9 +263,7 @@ struct CmiMsgInfo{
 static void send_done(void *data){
   SMSG_LIST *msg_tmp = (SMSG_LIST *)ALIGN_16((char *)data);
   CmiFree(msg_tmp->msg);
-  msg_tmp->msg=NULL;
   CmiFree(msg_tmp->send_buf);
-  msg_tmp->send_buf=NULL;
   CmiFree(data);
   data=NULL;
   msgQueueLen--;
@@ -299,12 +303,9 @@ static void recv_done(void *clientdata){
   outstanding_recvs--;
 }
 
-/* first packet recv callback, gets recv_done for the whole msg */
 #if EAGER
-BLMPI_Eager_Recv_t * first_pkt_recv_done (
-#else
-BLMPI_Rzv_Recv_t * first_pkt_recv_done   (
-#endif
+/* first packet recv callback, gets recv_done for the whole msg */
+BLMPI_Eager_Recv_t * first_pkt_eager_recv_done (
 					  const BGLQuad    * msginfo,
 					  unsigned 	     senderrank,
 					  const unsigned     sndlen,
@@ -324,29 +325,54 @@ BLMPI_Rzv_Recv_t * first_pkt_recv_done   (
   info->msgptr = *buffer;
   info->sndlen = sndlen;
 
-#if EAGER
-  return (BLMPI_Eager_Recv_t *)(&(info->recv));
-#else
-  return (BLMPI_Rzv_Recv_t *)(&(info->recv));
-#endif
+  return (&(info->eager_recv));
 }
+
+#else
+
+BLMPI_Rzv_Recv_t * first_pkt_rzv_recv_done   (
+					  const BGLQuad    * msginfo,
+					  unsigned 	     senderrank,
+					  const unsigned     sndlen,
+					  unsigned         * rcvlen,
+					  char            ** buffer,
+					  void           (** cb_done)(void *),
+					  void            ** clientdata
+					 )
+{
+  outstanding_recvs++;
+  /* printf ("Receiving %d bytes\n", sndlen); */
+  *rcvlen = sndlen>0?sndlen:1;	/* to avoid malloc(0) which might return NULL */
+  *buffer = (char *)CmiAlloc(sndlen);
+  *cb_done = recv_done;
+  *clientdata = CmiAlloc(sizeof(struct CmiMsgInfo)+16);
+  struct CmiMsgInfo *info = (struct CmiMsgInfo *)ALIGN_16((char *)(*clientdata));
+  info->msgptr = *buffer;
+  info->sndlen = sndlen;
+
+  return (&(info->rzv_recv));
+}
+
+#endif
 
 void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret){
   int n, i;
 
-  _msgr_buf = (char *)CmiAlloc(sizeof(BLMPI_Messager_t)+16);
-  _msgr = (BLMPI_Messager_t *)ALIGN_16(_msgr_buf);
-  BLMPI_Messager_Init(_msgr, BGL_AppMutexs, BGL_AppBarriers);
+  _msgr_buf = (char *)CmiAlloc(sizeof(BGLML_Messager_t)+16);
+  _msgr = (BGLML_Messager_t *)ALIGN_16(_msgr_buf);
+  BGLML_Messager_Init(_msgr, BGL_AppMutexs, BGL_AppBarriers);
 
-  _Cmi_numnodes = BLMPI_Messager_size(_msgr);
-  _Cmi_mynode = BLMPI_Messager_rank(_msgr);
+  _Cmi_numnodes = BGLML_Messager_size(_msgr);
+  _Cmi_mynode = BGLML_Messager_rank(_msgr);
 
   _recvArray = (void **) CmiAlloc (sizeof(void *) * _Cmi_numnodes);
 #if EAGER
-  BLMPI_Eager_Init(_msgr, first_pkt_recv_done, _recvArray, 14, 15);
+  BLMPI_Eager_Init(_msgr, first_pkt_eager_recv_done, _recvArray, 11, 12);
 #else
-  BLMPI_Rzv_Init(_msgr, first_pkt_recv_done, 11, 12, 3, 13);
+  BLMPI_Rzv_Init(_msgr, first_pkt_rzv_recv_done, 11, 12, 3, 13);
 #endif
+
+//  BGLBARRIER_TorusBarrier_Init(_msgr);
 
   /* processor per node */
   _Cmi_mynodesize = 1;
@@ -541,7 +567,7 @@ void ConverseExit(void){
   }
 */
   while(msgQueueLen) {
-    AdvanceCommunications();
+    AdvanceCommunications(outstanding_recvs);
   }
 
   ConverseCommonExit();
@@ -590,9 +616,7 @@ void *CmiGetNonLocal(){
 */
 #if !CMK_SMP
   if (no_outstanding_sends) {
-    while (msgQueueLen>0) {
-      AdvanceCommunications();
-    }
+    SendMsgsUntil(0);
   }
   
   if(!msg) {
@@ -631,31 +655,28 @@ void  CmiGeneralFreeSend(int destPE, int size, char* msg){
     CmiSendSelf(msg);
     return;
   }
+
+  SendMsgsUntil(request_max);
  
   void *msg_tmp_buf = CmiAlloc(sizeof(SMSG_LIST)+16); 
   SMSG_LIST *msg_tmp = (SMSG_LIST *)ALIGN_16((char *)msg_tmp_buf);
   msg_tmp->msg = msg;
 
-#if EAGER
-  msg_tmp->send_buf = (char *) CmiAlloc (sizeof(BLMPI_Eager_Send_t)+16);
-  BLMPI_Eager_Send_t *send = (BLMPI_Eager_Send_t *)ALIGN_16(msg_tmp->send_buf);
-#else
-  msg_tmp->send_buf = (char *) CmiAlloc (sizeof(BLMPI_Rzv_Send_t)+16);
-  BLMPI_Rzv_Send_t *send = (BLMPI_Rzv_Send_t *)ALIGN_16(msg_tmp->send_buf);
-#endif
-
   CMI_MAGIC(msg) = CHARM_MAGIC_NUMBER;
   CMI_SET_CHECKSUM(msg, size);
-
   CQdCreate(CpvAccess(cQdState), 1);
-#if EAGER
-  BLMPI_Eager_Send(send, _msgr, &(msg_tmp->info), msg, size, destPE, send_done,(void *)msg_tmp_buf);
-#else
-  BLMPI_Rzv_Send(send, _msgr, &(msg_tmp->info), msg, size, destPE, send_done,(void *)msg_tmp_buf);
-#endif
-  msgQueueLen++;
 
-  AdvanceCommunications();
+#if EAGER
+    msg_tmp->send_buf = (char *) CmiAlloc (sizeof(BLMPI_Eager_Send_t)+16);
+    BLMPI_Eager_Send_t *send = (BLMPI_Eager_Send_t *)ALIGN_16(msg_tmp->send_buf);
+    BLMPI_Eager_Send(send, _msgr, &(msg_tmp->info), msg, size, destPE, send_done,(void *)msg_tmp_buf);
+#else
+    msg_tmp->send_buf = (char *) CmiAlloc (sizeof(BLMPI_Rzv_Send_t)+16);
+    BLMPI_Rzv_Send_t *send = (BLMPI_Rzv_Send_t *)ALIGN_16(msg_tmp->send_buf);
+    BLMPI_Rzv_Send(send, _msgr, &(msg_tmp->info), msg, size, destPE, send_done,(void *)msg_tmp_buf);
+#endif
+
+  msgQueueLen++;
 }
 
 void CmiSyncSendFn(int destPE, int size, char *msg){
@@ -779,18 +800,26 @@ void CmiFreeBroadcastAllFn(int size, char *msg){
    inserted into the thread's queue with the correct rank **/
 /* Pump messages is called when the processor goes idle */
 static int PumpMsgs(void){
-  int flag = BLMPI_Messager_advance(_msgr);
-  while(BLMPI_Messager_advance(_msgr)) ;
+  int flag = BGLML_Messager_advance(_msgr);
+  while(BGLML_Messager_advance(_msgr)>0) ;
   return flag; 
 }
-static void AdvanceCommunications(void){
+static void AdvanceCommunications(int down){
   while(msgQueueLen>request_max){
-    BLMPI_Messager_advance(_msgr);
+    while(BGLML_Messager_advance(_msgr)>0) ;
   }
-  while(outstanding_recvs){
-    BLMPI_Messager_advance(_msgr);
+  int target = outstanding_recvs - down;
+  if(target<0) target=0;
+  while(outstanding_recvs>target){
+    while(BGLML_Messager_advance(_msgr)>0) ;
   }
-  while(BLMPI_Messager_advance(_msgr)) ;
+  while(BGLML_Messager_advance(_msgr)>0) ;
+}
+static void SendMsgsUntil(int target){
+  while(msgQueueLen>target){
+    while(BGLML_Messager_advance(_msgr)>0) ;
+  }
+  while(BGLML_Messager_advance(_msgr)>0) ;
 }
 
 void CmiNotifyIdle(){
@@ -876,6 +905,14 @@ void          CmiReleaseCommHandle(CmiCommHandle handle){
  */
 
 #if ! CMK_MULTICAST_LIST_USE_COMMON_CODE
+static int queues[6][64];
+static int qlens[6];
+inline int coordinatesForRank(int r,int xsz, int ysz, int zsz, int *x, int *y, int *z){
+  *x = r % xsz;
+  *y = (r % (xsz * ysz)) / xsz;
+  *z = r / (xsz * ysz);
+}
+
 void          CmiSyncListSendFn(int npes, int *pes, int size, char *msg){
   char *copymsg;
   copymsg = (char *)CmiAlloc(size);
@@ -885,10 +922,61 @@ void          CmiSyncListSendFn(int npes, int *pes, int size, char *msg){
 
 void          CmiFreeListSendFn(int npes, int *pes, int size, char *msg){
   CMI_SET_BROADCAST_ROOT(msg,0);
+
+#if 1
   for(int i=0;i<npes;i++){
     CmiReference(msg);
     CmiGeneralFreeSend(pes[i],size,msg);
   }
+#endif
+
+#if 0
+  for(int i=0;i<6;i++){
+//    queues[i] = (int *)CmiAlloc(sizeof(int)*npes);
+    qlens[i] = 0;
+  }
+  int order;
+  int mx,my,mz;
+  int x,y,z,t;
+  int xsz,ysz,zsz;
+  int unfinished = npes;
+  BGLPersonality pers;
+  pers = ((BGLML::Messager *)_msgr)->_pers;
+  xsz = pers.xSize;
+  ysz = pers.ySize;
+  zsz = pers.zSize;
+  coordinatesForRank(_Cmi_mynode,xsz,ysz,zsz,&mx,&my,&mz);
+
+#define abs(x) (((x)>0)?(x):(-(x)))
+  for(int i=0;i<npes;i++){
+    if(pes[i]==_Cmi_mynode){
+      CmiReference(msg);
+      CmiGeneralFreeSend(pes[i],size,msg);
+      unfinished--;
+      continue;
+    }
+    coordinatesForRank(pes[i],xsz,ysz,zsz,&x,&y,&z);
+    order = ((BGLML::Messager *)_msgr)->pinFifo(x,y,z,0);
+    int dist = abs(x-mx)+abs(y-my)+abs(z-mz);
+    queues[order][(qlens[order])++] = pes[i];
+CmiAssert(qlens[order]<64);
+  }
+#undef abs
+
+  while(unfinished){
+    for(order=0;order<6;order++){
+      if(qlens[order]==0) continue;
+      CmiReference(msg);
+      CmiGeneralFreeSend(queues[order][--(qlens[order])],size,msg);
+CmiAssert(qlens[order]>=0);
+      unfinished--;
+    }
+  }
+  for(int i=0;i<6;i++){
+//    CmiFree(queues[i]);
+  }
+#endif
+
   CmiFree(msg);
 }
 
@@ -1194,7 +1282,7 @@ int  networkProgressPeriod;
 void CmiMachineProgressImpl()
 {
 #if !CMK_SMP
-    AdvanceCommunications();
+    AdvanceCommunications(1);
 #if CMK_IMMEDIATE_MSG
     CmiHandleImmediate();
 #endif
@@ -1211,5 +1299,5 @@ void CmiMachineProgressImpl()
 /* Dummy implementation */
 extern "C" void CmiBarrier()
 {
+//  BGLBARRIER_TorusBarrier_Barrier();
 }
-
