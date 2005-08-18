@@ -1,0 +1,18 @@
+mainmodule lvServer {
+  readonly CProxy_Main mainProxy;
+  readonly int nChares;
+  readonly int gridWidth;
+  readonly int gridHeight;
+
+  mainchare [python] Main {
+    entry Main(CkArgMsg *m);
+	entry [python] void pycall(int handle);
+   };
+
+  array [1D] lvServer {
+    entry lvServer(void);
+	entry void genNextImage();
+ };
+
+
+};
