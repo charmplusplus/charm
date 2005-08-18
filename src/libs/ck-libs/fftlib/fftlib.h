@@ -166,7 +166,9 @@ class NormalSlabArray: public SlabArray {
  public:
 	NormalSlabArray(CkMigrateMessage *m): SlabArray(m) {CkPrintf("migrate constructor called\n");}
 	NormalSlabArray() {
+#if VERBOSE
 	    CkPrintf("Empty constructor called\n");
+#endif
 	    fwd2DPlan = bwd2DPlan = (fftwnd_plan) NULL;
 	    fwd1DPlan = bwd1DPlan = (fftw_plan) NULL;
 	    fftuseCommlib = false;
@@ -202,7 +204,9 @@ class NormalRealSlabArray: public SlabArray {
  public:
 	NormalRealSlabArray(CkMigrateMessage *m): SlabArray(m) {}
 	NormalRealSlabArray() {
+#if VERBOSE
 	    CkPrintf("Empty constructor called\n");
+#endif
 	    tempdataPtr = NULL;
 	    rfwd1DXPlan = rbwd1DXPlan = (rfftw_plan) NULL;
 	    fwd1DYPlan = bwd1DYPlan = (fftw_plan) NULL;
