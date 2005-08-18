@@ -34,7 +34,10 @@ void ImageData::WriteHeader(ImageDataCombine_t combine,
 {
 	ImageHeader *ihead=(ImageHeader *)dest;
 	ihead->m_combine=combine;
-	ihead->m_req=*req;
+	// since the poll mode does not yet have a req, 
+	// just set it to null.
+	if(req)
+	  ihead->m_req=*req;
 }
 
 void ImageData::ReadHeader(ImageDataCombine_t &combine,
@@ -65,7 +68,8 @@ int ImageData::GetBuffSize (const int& startx,
                             const int& starty,
                             const int& sizex,
                             const int& sizey,
-                            const liveVizRequest* req,
+                            const int req_wid,
+							const int req_ht,
                             const byte* src)
 {
     GetClippedImage (src,
@@ -73,9 +77,11 @@ int ImageData::GetBuffSize (const int& startx,
                      starty,
                      sizex,
                      sizey,
-                     req);
+                     req_wid,
+					 req_ht
+					 );
 
-    return AddImage (req);
+    return AddImage (req_wid);
 }
 
 
@@ -84,7 +90,9 @@ byte* ImageData::GetClippedImage (const byte* img,
                                   const int& starty,
                                   const int& sizex,
                                   const int& sizey,
-                                  const liveVizRequest* req)
+                                  const int req_wid,
+								  const int req_ht
+								  )
 {
     bool shift       = false;
     int  newpos      = 0;
@@ -107,8 +115,8 @@ byte* ImageData::GetClippedImage (const byte* img,
     // if image is completely outside display region, then ignore image
     if (((startx+sizex-1) < 0) ||
         ((starty+sizey-1) < 0) ||
-        (startx > (req->wid-1)) ||
-        (starty > (req->ht-1)))
+        (startx > (req_wid-1)) ||
+        (starty > (req_ht-1)))
     {
         m_clippedImage = NULL;
         goto EXITPOINT;
@@ -121,9 +129,9 @@ byte* ImageData::GetClippedImage (const byte* img,
         m_starty  = 0;
     }
 
-    if ((m_starty+m_sizey) > req->ht)
+    if ((m_starty+m_sizey) > req_ht)
     {
-        m_sizey = req->ht - m_starty;
+        m_sizey = req_ht - m_starty;
     }
 
     // need to shift data for other 2 cases
@@ -134,9 +142,9 @@ byte* ImageData::GetClippedImage (const byte* img,
         shift     = true;
     }
 
-    if ((m_startx + m_sizex) > req->wid)
+    if ((m_startx + m_sizex) > req_wid)
     {
-        m_sizex  = req->wid - m_startx;
+        m_sizex  = req_wid - m_startx;
         shift    = true;
     }
 
@@ -175,7 +183,7 @@ EXITPOINT:
 
 #ifdef COMPLETE_BLACK_PIXEL_ELIMINATION
 
-int ImageData::AddImage (const liveVizRequest* req,
+int ImageData::AddImage (const int req_wid,
                          byte* dest)
 {
     LineHeader head;                 // header of data line being copied
@@ -217,7 +225,7 @@ int ImageData::AddImage (const liveVizRequest* req,
                     // found a data line
                     if (NULL != dest)
                     {
-                        head.m_pos	= ((starty + y)*(req->wid)) + 
+                        head.m_pos	= ((starty + y)*(req_wid)) + 
                                      (startx + x);
                         head.m_size	= 0;
                     }
@@ -294,7 +302,7 @@ int ImageData::AddImage (const liveVizRequest* req,
 
 #ifdef NO_BLACK_PIXEL_ELIMINATION
 
-int ImageData::AddImage (const liveVizRequest* req,
+int ImageData::AddImage (const int req_wid
                          byte* dest)
 {
     LineHeader head;                 // header of data line being copied
@@ -331,7 +339,7 @@ int ImageData::AddImage (const liveVizRequest* req,
         {
             if (NULL != dest)
             {
-                head.m_pos	= ((starty + y)*(req->wid)) + 
+                head.m_pos	= ((starty + y)*(req_wid)) + 
                                (startx);
                 head.m_size	= sizex;
 
@@ -366,7 +374,7 @@ int ImageData::AddImage (const liveVizRequest* req,
    This strategy tries to eliminate black pixels from ends of
    data lines in deposited image chunck.
 */
-int ImageData::AddImage (const liveVizRequest* req,
+int ImageData::AddImage (const int req_wid,
                          byte* dest)
 {
     LineHeader head;                 // header of data line being copied
@@ -433,7 +441,7 @@ int ImageData::AddImage (const liveVizRequest* req,
 
                 if (NULL != dest)
                 {
-                    head.m_pos	= ((starty + y)*(req->wid)) + 
+                    head.m_pos	= ((starty + y)*(req_wid)) + 
                                   (startx + xoffset);
                     head.m_size	= (endPos - startPos)/m_bytesPerPixel + 1;
 

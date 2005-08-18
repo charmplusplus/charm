@@ -10,9 +10,11 @@ Orion Sky Lawlor, olawlor@acm.org, 6/2002
 #include "liveViz0.h"
 #include "pup_toNetwork.h"
 
+
 //Current liveViz application configuration.
 //  This is data that never changes during the course of a run.
 static liveVizConfig config; 
+
 
 void liveVizConfig::init(pixel_t pix,bool push)
 {
@@ -105,14 +107,14 @@ extern "C" void getImageHandler(char * msg)
 
 void liveViz0Deposit(const liveVizRequest &req,byte * imageData)
 {
-  // CkPrintf("LiveViz: sending ccs back %.6f s\n",CmiWallTimer()-startTime);
   int len=req.wid*req.ht*config.getNetworkBytesPerPixel();
   if (config.getVerbose(2))
     CmiPrintf("CCS getImage> Reply for (%d x %d) pixel or %d byte image.\n",
 	      req.wid,req.ht,len);
   CcsSendDelayedReply(req.replyToken, len, imageData);
-  // CkPrintf("LiveViz: request took %.6f s\n",CmiWallTimer()-startTime);
 }
+
+
 
 //Startup routine-- must be called on processor 0
 void liveViz0Init(const liveVizConfig &cfg) {
@@ -121,4 +123,10 @@ void liveViz0Init(const liveVizConfig &cfg) {
   CcsRegisterHandler("lvImage", (CmiHandler)getImageHandler);
   if (config.getVerbose(1))
     CmiPrintf("CCS getImage handlers registered.  Waiting for clients...\n");
+}
+
+void liveViz0PollInit() {
+  CcsRegisterHandler("lvImage", (CmiHandler)getImageHandler);
+  if (config.getVerbose(1))
+    CmiPrintf("CCS getImage handler registered.  Waiting for clients...\n");
 }

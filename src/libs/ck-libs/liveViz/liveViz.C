@@ -82,11 +82,12 @@ void liveVizDeposit(const liveVizRequest &req,
                                                                         starty,
                                                                         sizex,
                                                                         sizey,
-                                                                        &req,
+                                                                        req.wid,
+																		req.ht,
                                                                         src),
                                                  NULL, image_combine_reducer);
   imageData.WriteHeader(combine,&req,(byte*)(msg->getData()));
-  imageData.AddImage (&req, (byte*)(msg->getData()));
+  imageData.AddImage (req.wid, (byte*)(msg->getData()));
 
   //Contribute this image to the reduction
   msg->setCallback(CkCallback(vizReductionHandler));

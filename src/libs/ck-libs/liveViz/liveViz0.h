@@ -48,6 +48,7 @@ void liveViz0Get(const liveVizRequest &req,void *data,int dataLen);
 */
 void liveViz0Deposit(const liveVizRequest &req,byte * imageData);
 
+
 /**
   liveVizConfig describes the type of images available from
   this parallel server--images may be color or greyscale,
@@ -130,6 +131,31 @@ private:
   your program is ready to begin processing image requests.
 */
 void liveViz0Init(const liveVizConfig &cfg);
+void liveViz0PollInit();
+
+
+// A wrapper for the queue of images which is built for the Poll mode
+class imageUnit{
+public:
+  int bpp;
+  int wid;
+  int ht;
+  byte * imageData;
+  
+  int len(){return bpp*wid*ht;}
+
+  imageUnit(int _bpp, int _wid, int _ht, byte*_imageData){
+	bpp=_bpp;
+	wid=_wid;
+	ht=_ht;
+	imageData=_imageData;
+  }
+
+  imageUnit(){}
+};
+
+
+
 
 #endif /* def(thisHeader) */
 

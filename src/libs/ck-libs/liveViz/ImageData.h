@@ -25,7 +25,8 @@ class ImageData
                          const int& starty,
                          const int& sizex,
                          const int& sizey,
-                         const liveVizRequest* req,
+                         const int req_wid,
+						 const int req_ht,
                          const byte* src);
 
         /*
@@ -83,7 +84,7 @@ class ImageData
           |                    |  |  |   |  |          |          |   |Data   |
            -------------------------------------------------------------------
         */
-        int AddImage (const liveVizRequest* req,
+        int AddImage (const int req_wid,
                       byte* dest        = NULL);
 	
 	void WriteHeader(ImageDataCombine_t combine,
@@ -137,7 +138,9 @@ class ImageData
                                const int& starty,
                                const int& sizex,
                                const int& sizey,
-                               const liveVizRequest* req);
+                               const int req_wid,
+							   const int req_ht
+							   );
 
 
 

@@ -1,8 +1,9 @@
 module liveVizPoll {
-PUPable liveVizArrayListener;
+  readonly CProxy_liveVizPollArray myGroupProxy;
 
-array [Max] liveVizPollArray {
-	entry liveVizPollArray(void);
+group liveVizPollArray {
+	entry liveVizPollArray();
 	entry void request(liveVizRequestMsg *msg);
 };
+
 }
