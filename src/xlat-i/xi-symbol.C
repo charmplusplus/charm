@@ -1298,20 +1298,18 @@ static const char *CIMsgClassAnsi =
 "{\n"
 "  public:\n"
 "    static int __idx;\n"
-"    void* operator new(size_t,void*p) { return p; }\n"
-"    void* operator new(size_t,const int);\n"
+"    void* operator new(size_t, void*p) { return p; }\n"
 "    void* operator new(size_t);\n"
 "    void* operator new(size_t, int*, const int);\n"
 "    void* operator new(size_t, int*);\n"
 "#if CMK_MULTIPLE_DELETE\n"
-"    void operator delete(void*p,void*){CkFreeMsg(p);}\n"
-"    void operator delete(void*p,const int){CkFreeMsg(p);}\n"
+"    void operator delete(void*p, void*){CkFreeMsg(p);}\n"
 "    void operator delete(void*p){ CkFreeMsg(p);}\n"
-"    void operator delete(void*p,int*,const int){CkFreeMsg(p);}\n"
-"    void operator delete(void*p,int*){CkFreeMsg(p);}\n"
+"    void operator delete(void*p, int*, const int){CkFreeMsg(p);}\n"
+"    void operator delete(void*p, int*){CkFreeMsg(p);}\n"
 "#endif\n"
-"    void operator delete(void*p,size_t){CkFreeMsg(p);}\n"
-"    static void* alloc(int,size_t,int*,int);\n"
+"    void operator delete(void*p, size_t){CkFreeMsg(p);}\n"
+"    static void* alloc(int,size_t, int*, int);\n"
 ;
 
 void
@@ -1327,17 +1325,27 @@ Message::genAllocDecl(XStr &str)
   str << "    static " << mtype << "* unpack(void* p);\n";
   num = numVars();
   if(num>0) {
-    str << "    void *operator new(size_t,";
+    str << "    void *operator new(size_t";
     for(i=0;i<num;i++)
-      str << "int, ";
-    str << "const int);\n";
-    str << "#if CMK_MULTIPLE_DELETE\n";
-    str << "    void operator delete(void *p,";
-    for(i=0;i<num;i++)
-        str << "int, ";
-    str << "const int){CkFreeMsg(p);}\n";
-    str << "#endif\n";
+      str << ", int";
+    str << ");\n";
   }
+  str << "    void *operator new(size_t, ";
+  for(i=0;i<num;i++)
+    str << "int, ";
+  str << "const int);\n";
+  str << "#if CMK_MULTIPLE_DELETE\n";
+  if(num>0) {
+    str << "    void operator delete(void *p";
+    for(i=0;i<num;i++)
+        str << ", int";
+    str << "){CkFreeMsg(p);}\n";
+  }
+  str << "    void operator delete(void *p, ";
+  for(i=0;i<num;i++)
+    str << "int, ";
+  str << "const int){CkFreeMsg(p);}\n";
+  str << "#endif\n";
 }
 
 void
@@ -1397,10 +1405,6 @@ Message::genDefs(XStr& str)
     // new (size_t)
     str << tspec << "void *" << ptype << "::operator new(size_t s){\n";
     str << "  return " << mtype << "::alloc(__idx, s, 0, 0);\n}\n";
-    // new (size_t, priobits)
-    str << tspec << "void *" << ptype << "::operator new(size_t s,";
-    str << "const int pb){\n";
-    str << "  return " << mtype << "::alloc(__idx, s, 0, pb);\n}\n";
     // new (size_t, int*)
     str << tspec << "void *" << ptype << "::operator new(size_t s, int* sz){\n";
     str << "  return " << mtype << "::alloc(__idx, s, sz, 0);\n}\n";
@@ -1408,18 +1412,29 @@ Message::genDefs(XStr& str)
     str << tspec << "void *" << ptype << "::operator new(size_t s, int* sz,";
     str << "const int pb){\n";
     str << "  return " << mtype << "::alloc(__idx, s, sz, pb);\n}\n";
-    // new (size_t, int, int, ..., int, priobits)
+    // new (size_t, int, int, ..., int)
     if(num>0) {
-      str << tspec << "void *"<< ptype << "::operator new(size_t s, ";
+      str << tspec << "void *" << ptype << "::operator new(size_t s";
       for(i=0;i<num;i++)
-        str << "int sz" << i << ", ";
-      str << "const int p) {\n";
+        str << ", int sz" << i;
+      str << ") {\n";
       str << "  int sizes[" << num << "];\n";
       for(i=0;i<num;i++)
         str << "  sizes[" << i << "] = sz" << i << ";\n";
-      str << "  return " << mtype << "::alloc(__idx, s, sizes, p);\n";
+      str << "  return " << mtype << "::alloc(__idx, s, sizes, 0);\n";
       str << "}\n";
     }
+    // new (size_t, int, int, ..., int, priobits)
+    // degenerates to  new(size_t, priobits)  if no varsize
+    str << tspec << "void *"<< ptype << "::operator new(size_t s, ";
+    for(i=0;i<num;i++)
+      str << "int sz" << i << ", ";
+    str << "const int p) {\n";
+    if (num>0) str << "  int sizes[" << num << "];\n";
+    for(i=0;i<num;i++)
+      str << "  sizes[" << i << "] = sz" << i << ";\n";
+    str << "  return " << mtype << "::alloc(__idx, s, " << (num>0?"sizes":"0") << ", p);\n";
+    str << "}\n";
     // alloc(int, size_t, int*, priobits)
     str << tspec << "void* " << ptype;
     str << "::alloc(int msgnum, size_t sz, int *sizes, int pb) {\n";
