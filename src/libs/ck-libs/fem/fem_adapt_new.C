@@ -367,7 +367,7 @@ int FEM_Adapt::edge_bisect_help(int e1, int e2, int n1, int n2, int e1_n1,
     e3chunk = e1chunk;
   }
 
-  n5 = FEM_add_node(theMesh,adjnodes,2,n5chunk,0);
+  n5 = FEM_add_node(theMesh,adjnodes,2,n5chunk,0,0);
 #ifdef DEBUG_2
   CkPrintf("Adjacencies after add node %d\n",n5);
   printAdjacencies(locknodes, numNodesNew, lockelems, numElemsNew);
@@ -702,8 +702,68 @@ int FEM_Adapt::edge_contraction_help(int e1, int e2, int n1, int n2, int e1_n1,
   adjelems[0] = e1;
   adjelems[1] = e2;
 
-  //FEM_Modify_Lock(theMesh, adjnodes, 2, adjelems, 2);
-  
+  //FEM_Modify_Lock(theMesh, adjnodes, 2, adjelems, 2);  
+
+  //New code by updating a node rather than deleting both
+  int keepnode=0, deletenode=0, shared=0, n1_shared=0, n2_shared=0;
+  n1_shared = theMod->getfmUtil()->isShared(n1);
+  n2_shared = theMod->getfmUtil()->isShared(n2);
+  if(n1_shared && n2_shared) {
+    keepnode = n1;
+    deletenode = n2;
+    shared = 2;
+  }
+  else if(n1_shared) {
+    //update n1 & delete n2
+    keepnode = n1;
+    deletenode = n2;
+    shared = 1;
+  } else if(n2_shared) {
+    //update n2 & delete n1
+    keepnode = n2;
+    deletenode = n1;
+    shared = 1;
+  } else {
+    //keep either
+    keepnode = n1;
+    deletenode = n2;
+  }
+
+  //update keepnode's attributes
+  FEM_Interpolate *inp = theMod->getfmInp();
+  FEM_Interpolate::NodalArgs nm;
+  nm.n = keepnode;
+  nm.nodes[0] = keepnode;
+  nm.nodes[1] = deletenode;
+  //choose frac wisely, check if either node is on the boundary, update frac
+  int n1_bound, n2_bound;
+  FEM_Mesh_dataP(theMesh, FEM_NODE, FEM_BOUNDARY, &n1_bound, keepnode, 1 , FEM_INT, 1);
+  FEM_Mesh_dataP(theMesh, FEM_NODE, FEM_BOUNDARY, &n2_bound, deletenode, 1 , FEM_INT, 1);
+  if((n1_bound < 0) && (n2_bound < 0) && (n1_bound != n2_bound)) {
+    return -1; //they are on different boundaries
+  }
+  else if(n1_bound<0 && n2_bound<0) {
+    nm.frac = 0.5;
+  }
+  else if(n1_bound < 0) { //keep its attributes
+    nm.frac = 1.0;
+  }
+  else if(n2_bound < 0) {
+    nm.frac = 0.0;
+  }
+  else {
+    nm.frac = 0.5;
+  }
+  //temporary hack, if it is shared, do not change the attributes, since I amnot updating them now
+  if(n1_shared || n2_shared) {
+    nm.frac = 1.0;
+  }
+
+  inp->FEM_InterpolateNodeOnEdge(nm);
+  if(shared) { //update the attributes of keepnode
+  }
+
+
   int e1chunk=-1, e2chunk=-1;
   int index = theMod->getIdx();
 
@@ -722,8 +782,25 @@ int FEM_Adapt::edge_contraction_help(int e1, int e2, int n1, int n2, int e1_n1,
   CkPrintf("Adjacencies after remove element %d\n",e2);
   printAdjacencies(adjnodes, 2, adjelems, 2);
 #endif
-  //if n1 & n2 are shared, n5 should be shared, then only it can have the same connections
-  int n5 = FEM_add_node(theMesh,adjnodes,2,-1,0);
+
+
+  int *nbrElems, nesize, echunk;
+  theMesh->n2e_getAll(deletenode, &nbrElems, &nesize);
+  for (int i=0; i<nesize; i++) {
+    if ((nbrElems[i] != e1) && (nbrElems[i] != e2)) {
+      theMesh->e2n_getAll(nbrElems[i], conn);
+      for (int j=0; j<3; j++) 
+	if (conn[j] == deletenode) conn[j] = keepnode;
+      echunk = FEM_remove_element(theMesh, nbrElems[i], 0);
+      nbrElems[i] = FEM_add_element(theMesh, conn, 3, 0, echunk); //add it to the same chunk from where it was removed
+    }
+  }
+  FEM_remove_node(theMesh, deletenode);
+  return keepnode;
+
+  /*
+  //if n1 OR n2 are shared, n5 should be shared, then only it can have the same connections
+  int n5 = FEM_add_node(theMesh,adjnodes,2,-1,1,0);
 #ifdef DEBUG_2
   CkPrintf("Adjacencies after add node %d\n",n5);
   printAdjacencies(adjnodes, 2, adjelems, 2);
@@ -796,6 +873,7 @@ int FEM_Adapt::edge_contraction_help(int e1, int e2, int n1, int n2, int e1_n1,
 #endif
 
   return n5;
+*/
 }
 // ======================  END edge_contraction  ==============================
 
@@ -879,7 +957,7 @@ int FEM_Adapt::vertex_split(int n, int n1, int n2, int e1, int e3)
 #endif
   int *adjnodes = (int*)malloc(2*sizeof(int));
   adjnodes[0] = n; //looks like it will never be shared, since according to later code, all n1, n & n2 should be local.. appears to be not correct
-  int np = FEM_add_node(theMesh,adjnodes,1,-1,0);
+  int np = FEM_add_node(theMesh,adjnodes,1,-1,0,0);
   locknodes[3] = np;
 #ifdef DEBUG_2
   CkPrintf("Adjacencies after add node %d\n",np);

@@ -369,6 +369,7 @@ void FEM_MUtil::buildChunkToNodeTable(int *nodetype, int sharedcount, int ghostc
       }
     }
   }
+  CkAssert(*numSharedChunks>0);
   return;
 }
 

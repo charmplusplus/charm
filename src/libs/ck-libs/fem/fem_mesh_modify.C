@@ -17,8 +17,8 @@
 CProxy_femMeshModify meshMod;
 
 
-CDECL int FEM_add_node(int mesh, int* adjacent_nodes, int num_adjacent_nodes, int chunkNo, int upcall){
-  return FEM_add_node(FEM_Mesh_lookup(mesh,"FEM_add_node"), adjacent_nodes, num_adjacent_nodes, chunkNo, upcall);
+CDECL int FEM_add_node(int mesh, int* adjacent_nodes, int num_adjacent_nodes, int chunkNo, int forceShared, int upcall){
+  return FEM_add_node(FEM_Mesh_lookup(mesh,"FEM_add_node"), adjacent_nodes, num_adjacent_nodes, chunkNo, forceShared, upcall);
 }
 CDECL void FEM_remove_node(int mesh,int node){
   return FEM_remove_node(FEM_Mesh_lookup(mesh,"FEM_remove_node"), node);
@@ -182,7 +182,7 @@ int FEM_add_node_local(FEM_Mesh *m, int addGhost){
   return newNode;  // return a new index
 }
 
-int FEM_add_node(FEM_Mesh *m, int* adjacentNodes, int numAdjacentNodes, int chunkNo, int upcall){
+int FEM_add_node(FEM_Mesh *m, int* adjacentNodes, int numAdjacentNodes, int chunkNo, int forceShared, int upcall){
   // add local node
   //chunkNo is a parameter to override which chunk it belongs to.. 
   //should be used only when all the adjacentnodes are shared but you know that the new node should not
@@ -241,7 +241,7 @@ int FEM_add_node(FEM_Mesh *m, int* adjacentNodes, int numAdjacentNodes, int chun
     //entry in the IDXL will be correct
     //besides, do we have a basic operation, where two add_nodes are done within the same lock?
     //if so, we will have to ensure lock steps, to ensure correct idxl entries
-    if(sharedCount==numAdjacentNodes && numAdjacentNodes!=0) {
+    if((sharedCount==numAdjacentNodes && numAdjacentNodes!=0)) {
       m->getfmMM()->getfmUtil()->splitEntityAll(m, newNode, numAdjacentNodes, adjacentNodes, 0);
     }
   }
@@ -1273,7 +1273,7 @@ intMsg *femMeshModify::addNodeRemote(addNodeMsg *msg) {
   for(int i=0; i<msg->nBetween; i++) {
     localIndices[i] = fmUtil->lookup_in_IDXL(fmMesh, msg->between[i], msg->chk, 0);
   }
-  int ret = FEM_add_node(fmMesh, localIndices, msg->nBetween, msg->chunkNo, msg->upcall);
+  int ret = FEM_add_node(fmMesh, localIndices, msg->nBetween, msg->chunkNo, msg->forceShared, msg->upcall);
   //this is a ghost on that chunk,
   //add it to the idxl & update that guys idxl list
   fmMesh->node.ghostSend.addNode(ret,msg->chk);

@@ -60,13 +60,13 @@ int FEM_AdaptL::unlockNodes(int *gotlocks, int *lockrnodes, int numRNodes, int *
       }
       if(FEM_Is_ghost_index(lockrnodes[i])) {
 	if(!theMesh->node.ghost->is_valid(FEM_To_ghost_index(lockrnodes[i]))) {
-	  free(ungetlocks);
-	  return -1;
+	  //free(ungetlocks);
+	  //return -1;
 	}
       } else {
 	if(!theMesh->node.is_valid(lockrnodes[i])) {
-	  free(ungetlocks);
-	  return -1;
+	  //free(ungetlocks);
+	  //return -1;
 	}
       }
       if(gotlocks[i]>0) ungetlocks[i] = FEM_Modify_UnlockN(theMesh, lockrnodes[i], 1);
@@ -79,13 +79,13 @@ int FEM_AdaptL::unlockNodes(int *gotlocks, int *lockrnodes, int numRNodes, int *
       }
       if(FEM_Is_ghost_index(lockwnodes[i])) {
 	if(!theMesh->node.ghost->is_valid(FEM_To_ghost_index(lockwnodes[i]))) {
-	  free(ungetlocks);
-	  return -1;
+	  //free(ungetlocks);
+	  //return -1;
 	}
       } else {
 	if(!theMesh->node.is_valid(lockwnodes[i])) {
-	  free(ungetlocks);
-	  return -1;
+	  //free(ungetlocks);
+	  //return -1;
 	}
       }
       if(gotlocks[numRNodes+i]>0) ungetlocks[numRNodes+i] = FEM_Modify_UnlockN(theMesh, lockwnodes[i], 0);
@@ -283,6 +283,22 @@ int FEM_AdaptL::edge_contraction(int n1, int n2) {
   bool done = false;
   int isEdge = 0;
 
+  if(n1<0 || n2<0) return -1; //should not contract an edge which is not local
+  /*
+  //if either of the nodes is on the boundary, do not contract
+  int n1_bound, n2_bound;
+  FEM_Mesh_dataP(theMesh, FEM_NODE, FEM_BOUNDARY, &n1_bound, n1, 1 , FEM_INT, 1);   
+  FEM_Mesh_dataP(theMesh, FEM_NODE, FEM_BOUNDARY, &n2_bound, n2, 1 , FEM_INT, 1);   
+  CkVec<FEM_Attribute *>*attrs = (theMesh->node).getAttrVec();
+  for (int i=0; i<attrs->size(); i++) {
+    FEM_Attribute *a = (FEM_Attribute *)(*attrs)[i];
+    if (a->getAttr()==FEM_BOUNDARY) {
+      FEM_DataAttribute *d = (FEM_DataAttribute*)a;
+      if(d->getInt()[n1][0] < 0) return -1; //it is on the boundary
+      if(d->getInt()[n2][0] < 0) return -1; //it is on the boundary
+    }
+  }
+  */
   isEdge = findAdjData(n1, n2, &e1, &e2, &e1_n1, &e1_n2, &e1_n3, &e2_n1, &e2_n2, &e2_n3,&n3, &n4);
   if(isEdge == -1) {
     CkPrintf("Edge Contract %d->%d not done as it is no longer a valid edge\n",n1,n2);
