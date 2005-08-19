@@ -67,15 +67,20 @@ class NormalFFTinfo {
     }
 };
 
+typedef struct _PencilType{
+    const static int XLINE = 0;
+    const static int YLINE = 1;
+    const static int ZLINE = 2;
+}PencilType;
 
 class LineFFTinfo {
  public:
 	// Constructors
-	LineFFTinfo(int size[3], int isSrc, complex *dptr, int xPencilsPerSlab=1, int yPencilsPerSlab=1, int zPencilsPerSlab=1) {
-	  init(size[0], size[1], size[2], isSrc, dptr, xPencilsPerSlab, yPencilsPerSlab, zPencilsPerSlab);
+	LineFFTinfo(int size[3], int ptype, complex *dptr, int xPencilsPerSlab=1, int yPencilsPerSlab=1, int zPencilsPerSlab=1) {
+	  init(size[0], size[1], size[2], ptype, dptr, xPencilsPerSlab, yPencilsPerSlab, zPencilsPerSlab);
 	}
 	LineFFTinfo(LineFFTinfo &info) {
-	    init(info.sizeX, info.sizeY, info.sizeZ, info.isSrcSlab, (complex *) NULL, info.xPencilsPerSlab, info.yPencilsPerSlab, info.zPencilsPerSlab);
+	    init(info.sizeX, info.sizeY, info.sizeZ, info.ptype, (complex *) NULL, info.xPencilsPerSlab, info.yPencilsPerSlab, info.zPencilsPerSlab);
 	}
 	LineFFTinfo(void) {}
 
@@ -84,7 +89,7 @@ class LineFFTinfo {
 	    p|sizeX;
 	    p|sizeY;
 	    p|sizeZ;
-	    p(isSrcSlab);
+	    p(ptype);
 	    p(xPencilsPerSlab);
 	    p(yPencilsPerSlab);
 	    p(zPencilsPerSlab);
@@ -92,18 +97,18 @@ class LineFFTinfo {
 		dataPtr = (complex *) NULL;
 	}
 	int sizeX, sizeY, sizeZ;
-	bool isSrcSlab;
+	int ptype;
 	int xPencilsPerSlab, yPencilsPerSlab, zPencilsPerSlab;
 	complex *dataPtr;
  private:
-	void init(int sizex, int sizey, int sizez, int isSrc, complex *dptr,  int _xPencilsPerSlab, int _yPencilsPerSlab, int _zPencilsPerSlab) {
+	void init(int sizex, int sizey, int sizez, int _ptype, complex *dptr,  int _xPencilsPerSlab, int _yPencilsPerSlab, int _zPencilsPerSlab) {
 		if (sizex != sizey || sizey != sizez)
 			ckerr << "WARNING"
 				  << "This configuration of the source and destination "
 				  << "is not consistent, check the dimensions. The program is "
 				  << "likely to misbehave" 
 				  << endl;
-		isSrcSlab = isSrc;
+		ptype = _ptype;
 		xPencilsPerSlab = _xPencilsPerSlab; 
 		yPencilsPerSlab = _yPencilsPerSlab;
 		zPencilsPerSlab = _zPencilsPerSlab;
