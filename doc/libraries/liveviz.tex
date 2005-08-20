@@ -142,67 +142,47 @@ To compile the liveViz library:
 \section{Poll Mode}
 
 In some cases you may want a server to deposit images only when it is ready to do so. 
-For this case the server will not register a callback function, but rather will poll 
-for the next request from the client when it is ready to send the client some image. 
-For example a server may want to create a movie or series of images corresponding to 
-timesteps in a simulation. The server will  have a timestep loop in which a chare computes 
-some data for a timestep. At the end of each iteration the server will poll for a client 
-request for the current timestep and will deposit the image with this client request.
+For this case the server will not register a callback function that triggers image generation, but rather the server will deposit an image at its convenience.
+For example a server may want to create a movie or series of images corresponding to some
+timesteps in a simulation. The server will have a timestep loop in which an array computes 
+some data for a timestep. At the end of each iteration the server will deposit the image. The use of LiveViz's Poll Mode supports this type of server generation of images.
 
-Because liveVizDeposit (described in an earlier section) performs its image reduction over your array, 
-you must ensure that your own reductions are not interleaved with the 
-liveVizDeposits.  This is trivial if your program performs no reductions,
-but if you do reductions you must somehow prevent this interleaving.
-One method to do this is to buffer the liveViz request message until 
-you can handle it safely.  Another method is to use liveVizPoll,
-which creates a separate ``shadow'' array that liveViz uses to do
-its reductions.
-
-liveVizPoll must get control during the creation of your array,
-so you call liveVizPollInit with a liveVizConfig object (just like
-liveVizInit) and a CkArrayOptions object, like:
+Poll Mode contains a few significant differences to the standard mode. First we describe the use of Poll Mode, and then we will describe the differences. liveVizPoll must get control during the creation of your array,
+so you call liveVizPollInit with no parameters.
 
 \begin{alltt}
-        CkArrayOptions opts(nElements);
-        liveVizPollInit(cfg,opts);
-        CProxy_myArr arr=CProxy_myArr::ckNew(opts);
+	liveVizPollInit();
+	CkArrayOptions opts(nChares);
+	arr = CProxy_lvServer::ckNew(opts);
 \end{alltt}
 
-You get requests from liveVizPoll in a polling fashion.
-The routine ``liveVizPoll'' returns a liveVizPollRequestMsg
-if one is available.  If a non-NULL message is returned, you
-must then call liveVizPollDeposit and repeat the call.
-
-An idiomatic use of these routines is:
-\begin{alltt}
-	... in some user compute routine ...
-        timestep++;
-        liveVizPollRequestMsg *req;
-        while (NULL!=(req=liveVizPoll(this))) {
-                //...prepare image for request...
-                liveVizPollDeposit(this,req,
-                        startx,starty,sizex,sizey,img);
-        }
-\end{alltt}
-
-A sample liveVizPoll server example is available at:
-\begin{alltt}
-           .../charm/pgms/charm++/ccs/liveViz/pollserver
-\end{alltt}
-
-
-By default liveViz combines image chunks by doing a saturating sum of 
-overlapping pixel values. If you want liveViz to combine image chunks by using 
-max (i.e. for overlapping pixels in deposited image chunks, final image will 
-have the pixel with highest intensity or in other words largest value), you need
-to pass one more parameter (liveVizCombine\_t) to the ``liveVizDeposit'' function:
+To deposit an image, the server just calls liveVizPollDeposit. The server must take care not to generate too many images, before a client requests them. Each server generated image is buffered until the client can get the image. The buffered images will be stored in memory on processor 0.
 
 \begin{alltt}
- liveVizPollDeposit (this,req,startx,starty,sizex,sizey,img,max\_image\_data);
+  liveVizPollDeposit( this,
+                      startX,startY,            // Location of local piece
+                      localSizeX,localSizeY,    // Dimensions of the piece I'm depositing
+                      globalSizeX,globalSizeY,  // Dimensions of the entire image
+                      img,                      // Image byte array
+                      sum_image_data,           // Desired image combiner
+                      3                         // Bytes/pixel
+                    );
 \end{alltt}
+The last two parameters are optional. By default they are set to sum\_image\_data and 3 bytes per pixel.
 
-Valid combiners include: sum\_float\_image\_data, max\_float\_image\_data, sum\_image\_data, 
-or max\_image\_data.
-There is an optional and currently unused parameter ``timestep'' which may appear in older 
-applications that use Poll Mode. LiveViz is backward compatible with these older applications.
 
+
+A sample liveVizPoll server and client are available at:
+\begin{alltt}
+           .../charm/examples/charm++/lvServer
+           .../charm/java/bin/lvClient
+\end{alltt}
+This example server uses a PythonCCS command to cause an image to be generated by the server. The client also then gets the image.
+
+LiveViz provides multiple image combiner types. Any supported type can be used as a parameter to liveVizPollDeposit. Valid combiners include: sum\_float\_image\_data, max\_float\_image\_data, sum\_image\_data, and max\_image\_data. 
+
+The differences in Poll Mode may be apparent. There is no callback function which causes the server to generate and deposit an image. Furthermore, a server may generate an image before or after a client has sent a request. The deposit function, therefore is more complicated, as the server will specify information about the image that it is generating. The client will no longer specify the desired size or other configuration options, since the server may generate the image before the client request is available to the server. The liveVizPollInit call takes no parameters.
+
+The server should call Deposit with the same global size and combiner type on all of the array elements which correspond to the ``this'' parameter.
+
+The latest version of liveVizPoll is not backwards compatable with older versions. The old version had some fundamental problems which would occur if a server generated an image before a client requested it. Thus the new version buffers server generated images until requested by a client. Furthermore the client requests are also buffered if they arrive before the server generates the images. Problems could also occur during migration with the old version.
