@@ -41,11 +41,11 @@ class edgeRef : public objRef {
   void remove();
   int split(int *m, edgeRef *e_prime, int oIdx, int fIdx,
 	    elemRef requester, int *local, int *first, int *nullNbr);
-  int collapse(elemRef requester, int kIdx, int dIdx, elemRef kNbr, 
-	       elemRef dNbr, edgeRef kEdge, edgeRef dEdge, node opnode,
-	       int *local, int *first, node newN);
+  void collapse(elemRef requester, int kIdx, int dIdx, elemRef kNbr, 
+		elemRef dNbr, edgeRef kEdge, edgeRef dEdge, node newN, 
+		double frac);
   int flipPrevent(elemRef requester, int kIdx, int dIdx, elemRef kNbr, 
-	       elemRef dNbr, edgeRef kEdge, edgeRef dEdge, node opnode, node newN);
+	       elemRef dNbr, edgeRef kEdge, edgeRef dEdge, node newN);
   void resetEdge();
   int isPending(elemRef e);
   int getBoundary();

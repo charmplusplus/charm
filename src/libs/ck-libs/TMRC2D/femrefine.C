@@ -302,25 +302,21 @@ void FEM_Refine_Operation(FEM_Refine_Operation_Data *data,refineData &op){
   if((flags & 0x1) || (flags & 0x2)){
     //new node 
     DEBUGINT(CkPrintf("---- Adding node %d\n",D));			
-    /*	lastA=A;
-	lastB=B;
-	lastD=D;*/
+    /*	lastA=A; lastB=B; lastD=D;*/
     if (A>=data->cur_nodes) CkAbort("Calculated A is invalid!");
     if (B>=data->cur_nodes) CkAbort("Calculated B is invalid!");
     if(D >= data->cur_nodes){
       data->node->setLength(D+1);
       data->cur_nodes = D+1;
     }	
-  CmiMemoryCheck();
     for(int i=0;i<attrs->size();i++){
       FEM_Attribute *a = (FEM_Attribute *)(*attrs)[i];
       if(a->getAttr()<FEM_ATTRIB_TAG_MAX){
 	FEM_DataAttribute *d = (FEM_DataAttribute *)a;
 	d->interpolate(A,B,D,frac);
       }else{
-	/*The boundary value of a new node should be the 
-	  boundary value of the edge(sparse element) that contains
-	  the two nodes */
+	/* Boundary value of new node D should be boundary value of the edge
+	   (sparse element) that contains the two nodes A & B. */
 	if(a->getAttr() == FEM_BOUNDARY){
 	  if(sparseID != -1){
 	    int sidx = nodes2sparse->get(intdual(A,B))-1;
@@ -601,6 +597,8 @@ void FEM_Coarsen_Operation(FEM_Operation_Data *coarsen_data, coarsenData &operat
 	  break;
 	}
       }
+      CkPrintf("Collapse %d, nodeToKeep %d, nodeToThrow %d, opNode %d\n",
+	       tri, nodeToKeep, nodeToThrow, opNode);
       sparseBoundaryTable = &(((FEM_DataAttribute *)sparseBoundaryAttr)->getInt());
       int delEdgeIdx = coarsen_data->nodes2sparse->get(intdual(nodeToThrow,opNode))-1;
       int keepEdgeIdx = coarsen_data->nodes2sparse->get(intdual(nodeToKeep,opNode))-1;
@@ -622,6 +620,18 @@ void FEM_Coarsen_Operation(FEM_Operation_Data *coarsen_data, coarsenData &operat
 	  coarsen_data->nodes2sparse->remove(intdual(nodeToKeep,nodeToThrow));
 	  (*(coarsen_data->validEdge))[sidx][0] = 0;
 	  DEBUGINT(printf("---- Deleting edge %d between nodes %d and %d \n",sidx,nodeToKeep,nodeToThrow));
+	  if (delEdgeIdx >=0) {
+	    coarsen_data->nodes2sparse->remove(intdual(opNode,nodeToThrow));
+	    (*(coarsen_data->validEdge))[delEdgeIdx][0] = 0;
+	    DEBUGINT(printf("---- Deleting edge %d between nodes %d and %d \n",delEdgeIdx,opNode,nodeToThrow));
+	  }
+	}	
+      }
+      else {
+	if (delEdgeIdx >=0) {
+	  coarsen_data->nodes2sparse->remove(intdual(opNode,nodeToThrow));
+	  (*(coarsen_data->validEdge))[delEdgeIdx][0] = 0;
+	  DEBUGINT(printf("---- Deleting edge %d between nodes %d and %d \n",delEdgeIdx,opNode,nodeToThrow));
 	}	
       }
       validElemData[tri] = 0;

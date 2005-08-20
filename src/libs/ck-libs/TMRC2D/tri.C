@@ -92,6 +92,7 @@ void chunk::refiningElements()
     }
     CthYield(); // give other chunks on the same PE a chance
   }
+  sanityCheck(); // quietly make sure mesh is in shape
   refineInProgress = 0; // nothing needs refinement; turn refine loop off
   //    if (CkMyPe() == 0) for (int j=0; j<5; j++) mesh[j].print();
 }
@@ -132,7 +133,7 @@ void chunk::coarseningElements()
       targetArea = theElements[i].getTargetArea();
       qFactor = theElements[i].getAreaQuality();
       if ((theElements[i].getTargetArea()*COARSEN_PRECISION > area) || 
-	  (qFactor < QUALITY_MIN)) { 
+	  (area == 0.0) || (qFactor < QUALITY_MIN)) { 
 	CkPrintf("Coarsening element %d\n", i);
 	theElements[i].coarsen(); // coarsen the element
       }
@@ -147,6 +148,9 @@ void chunk::coarseningElements()
   for (i=0; i<elementSlots; i++) {
     if (theElements[i].isPresent() && (theElements[i].nonCoarsenCount<1)) {
       area = theElements[i].getArea();
+      if (area == 0.0) {
+	CkPrintf("Element[%d] has area %1.10e!\n", i, area);
+      }
       targetArea = theElements[i].getTargetArea();
       qFactor=theElements[i].getAreaQuality();
       if ((targetArea*COARSEN_PRECISION > area) || (qFactor < QUALITY_MIN)) {
@@ -155,6 +159,7 @@ void chunk::coarseningElements()
       }
     }
   }
+  sanityCheck(); // quietly make sure mesh is in shape
   if ((coarsenHeapSize>0) && !coarsenInProgress) {
     coarsenInProgress = 1;
     mesh[cid].coarseningElements();
@@ -183,27 +188,23 @@ splitOutMsg *chunk::split(int idx, elemRef e, int oIdx, int fIdx)
   return som;
 }
 
-splitOutMsg *chunk::collapse(int idx, elemRef e, int kIdx, int dIdx,
-			     elemRef kNbr, elemRef dNbr, edgeRef kEdge, 
-			     edgeRef dEdge, node opnode, node newN)
+void chunk::collapse(int idx, elemRef e, int kIdx, int dIdx, elemRef kNbr, 
+		     elemRef dNbr, edgeRef kEdge, edgeRef dEdge, node newN, 
+		     double frac)
 {
-  splitOutMsg *som = new splitOutMsg;
   accessLock();
-  som->result = theEdges[idx].collapse(e, kIdx, dIdx, kNbr, dNbr, kEdge, dEdge,
-				       opnode, &(som->local), &(som->first), 
-				       newN);
+  theEdges[idx].collapse(e, kIdx, dIdx, kNbr, dNbr, kEdge, dEdge, newN, frac);
   releaseLock();
-  return som;
 }
 
 splitOutMsg *chunk::flipPreventE(int idx, elemRef e, int kIdx, int dIdx,
 			     elemRef kNbr, elemRef dNbr, edgeRef kEdge, 
-			     edgeRef dEdge, node opnode, node newN)
+			     edgeRef dEdge, node newN)
 {
   splitOutMsg *som = new splitOutMsg;
   accessLock();
-  som->result = theEdges[idx].flipPrevent(e, kIdx, dIdx, kNbr, dNbr, kEdge, dEdge,
-				       opnode, newN);
+  som->result = theEdges[idx].flipPrevent(e, kIdx, dIdx, kNbr, dNbr, kEdge, 
+					  dEdge, newN);
   releaseLock();
   return som;
 }
@@ -274,6 +275,9 @@ void chunk::nodeReplaceDelete(int kIdx, int dIdx, node nn, int shared,
 	    theElements[j].nonCoarsenCount = 0;
 	  }
 	}
+	CkAssert(theElements[j].nodes[0] != theElements[j].nodes[1]);
+	CkAssert(theElements[j].nodes[0] != theElements[j].nodes[2]);
+	CkAssert(theElements[j].nodes[2] != theElements[j].nodes[1]);
       }
     }
     for (int j=0; j<edgeSlots; j++) {
@@ -836,13 +840,17 @@ void chunk::multipleRefine(double *desiredArea, refineClient *client)
   for (i=0; i<elementSlots; i++) { // set desired areas for elements
     if (theElements[i].isPresent()) {
       area = theElements[i].getArea();
+      if (area == 0.0) {
+	CkPrintf("Element[%d] has area %1.10e!\n", i, area);
+      }
       //precThrshld = area * 1e-8;
       if (desiredArea[i] < REFINE_PRECISION*area) {
 	theElements[i].resetTargetArea(desiredArea[i]);
 	double qFactor=theElements[i].getAreaQuality();
 	Insert(i, qFactor, 0);
+	CkPrintf("Element[%d] has area %1.10e target %1.10e qFactor %1.10e\n", i, area, desiredArea[i], qFactor);
 #ifdef TDEBUG2
-	CkPrintf("TMRC2D: [%d] Setting target on element %d to %1.10e with largeEdge %1.10e\n", cid, i, desiredArea[i], refineElements[refineTop-1].len);
+	CkPrintf("TMRC2D: [%d] Setting target on element %d to %1.10e with largeEdge %1.10e\n", cid, i, desiredArea[i], qFactor);
 #endif
       }
     }
@@ -878,11 +886,15 @@ void chunk::multipleCoarsen(double *desiredArea, refineClient *client)
   for (i=0; i<elementSlots; i++) { // set desired areas for elements
     if (theElements[i].isPresent()) {
       area = theElements[i].getArea();
+      if (area == 0.0) {
+	CkPrintf("Element[%d] has area %1.10e!\n", i, area);
+      }
       qFactor = theElements[i].getAreaQuality();
       theElements[i].nonCoarsenCount = 0;
       //precThrshld = area * 1e-8;
       theElements[i].resetTargetArea(desiredArea[i]);
-      if ((desiredArea[i]*COARSEN_PRECISION > area) || (qFactor<QUALITY_MIN)) {
+      if ((desiredArea[i]*COARSEN_PRECISION > area) || (area == 0.0) || 
+	  (qFactor<QUALITY_MIN)) {
 	Insert(i, qFactor, 1);
 	CkPrintf("Element[%d] has area %1.10e target %1.10e qFactor %1.10e\n", i, area, desiredArea[i], qFactor);
 #ifdef TDEBUG2
@@ -1562,6 +1574,20 @@ void chunk::validCheck()
   for (i=0; i<nodeSlots; i++) {
     CkAssert(theNodes[i].isPresent()==validNodeTable[i][0]);
   }
+}
+
+intMsg *chunk::neighboring(int idx, elemRef e)
+{
+  intMsg *m= new intMsg;
+  m->anInt = theElements[idx].neighboring(e);
+  return m;
+}
+
+intMsg *chunk::safeToCoarsen(int idx, edgeRef e)
+{
+  intMsg *m= new intMsg;
+  m->anInt = theElements[idx].safeToCoarsen(e);
+  return m;
 }
 
 #include "refine.def.h"

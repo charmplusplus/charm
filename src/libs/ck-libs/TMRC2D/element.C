@@ -252,6 +252,13 @@ void element::split(int longEdge)
 void element::coarsen()
 {
   int shortEdge = findShortestEdge();
+  // check if a different edge from the shortEdge is pending for coarsening
+  if (!(edges[shortEdge].isPending(myRef))) {
+    shortEdge = (shortEdge+1)%3;
+    if (!(edges[shortEdge].isPending(myRef))) {
+      shortEdge = (shortEdge+1)%3;
+    }
+  }
   collapse(shortEdge);
 }
 
@@ -269,254 +276,50 @@ void element::collapse(int shortEdge)
                      shortEdge            
              
                         nbr                      */  
-
-  int opnode, delNode, keepNode, delEdge, keepEdge, result;
-  elemRef keepNbr, delNbr, nbr;
-  int local, first, flag, kBound, dBound, kFixed, dFixed;
+  int opnode, delNode, keepNode, delEdge, keepEdge;
+  int kBound, dBound, kFixed, dFixed;
+  elemRef nbr, delNbr, keepNbr;
   double frac;
 
-  // check if a different edge from the shortEdge is pending for coarsening
-  if (edges[shortEdge].isPending(myRef)) {
-  }
-  else if (edges[(shortEdge+1)%3].isPending(myRef)) {
-    shortEdge = (shortEdge+1)%3;
-  }
-  else if (edges[(shortEdge+2)%3].isPending(myRef)) {
-    shortEdge = (shortEdge+2)%3;
-  }
-
-  // set up all the variables
-  opnode = (shortEdge + 2) % 3;
-  delNode = shortEdge;
-  delEdge = opnode;
-  keepEdge = (shortEdge + 1) % 3;
-  keepNode = keepEdge;
-  nbr = edges[shortEdge].getNbr(myRef);
-  keepNbr = edges[keepEdge].getNbr(myRef);
-  delNbr = edges[delEdge].getNbr(myRef);
-  if (!edges[shortEdge].isPending(myRef) && (delNbr == keepNbr)) { 
-    // don't coarsen around node with degree 3 unless pending on this element
-    nonCoarsenCount++;
-    return;
-  }
+  opnode = (shortEdge+2)%3;  delNode = shortEdge;  keepNode = (shortEdge+1)%3;
+  delEdge = opnode;  keepEdge = keepNode;
   // get the boundary flags for the nodes on the edge to collapse
   kBound = C->theNodes[nodes[keepNode]].boundary;
   dBound = C->theNodes[nodes[delNode]].boundary;
-  kFixed = C->theNodes[nodes[keepNode]].fixed;
+  kFixed = C->theNodes[nodes[keepNode]].fixed; 
   dFixed = C->theNodes[nodes[delNode]].fixed;
+  keepNbr = edges[keepEdge].getNbr(myRef);
+  delNbr = edges[delEdge].getNbr(myRef);
+  nbr = edges[shortEdge].getNbr(myRef);
 
-  CkAssert(!(nbr == myRef));
-  CkAssert(!(keepNbr == myRef));
-  CkAssert(!(delNbr == myRef));
-  int tmpMap;
-  elemRef tmpRef;
+  if (!safeToCoarsen(&nonCoarsenCount, shortEdge, delNbr, keepNbr,nbr)) return;
+
   // find coords of node to collapse to based on boundary conditions
   node newNode;
-  if ((kBound == 0) && (dBound == 0)) { // both interior; collapse to midpoint
-    if (!kFixed && !dFixed) {
-      newNode=C->theNodes[nodes[keepNode]].midpoint(C->theNodes[nodes[delNode]]);
-      newNode.boundary = 0;
-      frac = 0.5;
-    }
-    else if (dFixed && kFixed) {
-      nonCoarsenCount++;
-      return;
-    }
-    else if (dFixed) {
-      newNode = C->theNodes[nodes[delNode]];
-      tmpMap = delNode; delNode = keepNode; keepNode = tmpMap;
-      tmpMap = delEdge; delEdge = keepEdge; keepEdge = tmpMap;
-      tmpRef = delNbr; delNbr = keepNbr; keepNbr = tmpRef;
-      frac = 1.0;
-    }
-    else {
-      newNode = C->theNodes[nodes[keepNode]];
-      frac = 1.0;
-    }
-  }
-  else if ((kBound == 0) || (dBound == 0)) { // only one on boundary
-    // collapse edge to boundary node
-    if (kBound && !dFixed) {
-      newNode = C->theNodes[nodes[keepNode]];
-      frac = 1.0;
-    }
-    else if (dBound && !kFixed) {
-      newNode = C->theNodes[nodes[delNode]];
-      tmpMap = delNode; delNode = keepNode; keepNode = tmpMap;
-      tmpMap = delEdge; delEdge = keepEdge; keepEdge = tmpMap;
-      tmpRef = delNbr; delNbr = keepNbr; keepNbr = tmpRef;
-      frac = 1.0;
-    }
-    else { 
-      nonCoarsenCount++;
-      return;
-    }
-  }
-  else if (kBound == dBound) { // both on same boundary
-    // check fixed status of both nodes
-    if (kFixed && dFixed) { // if both fixeds don't coarsen
-      nonCoarsenCount++;
-      return; 
-    }
-    else if (kFixed || dFixed) { // if one fixed, collapse edge to fixed
-      if (kFixed) {
-	newNode = C->theNodes[nodes[keepNode]];
-	frac = 1.0;
-      }
-      else {
-	newNode = C->theNodes[nodes[delNode]];
-	tmpMap = delNode; delNode = keepNode; keepNode = tmpMap;
-	tmpMap = delEdge; delEdge = keepEdge; keepEdge = tmpMap;
-	tmpRef = delNbr; delNbr = keepNbr; keepNbr = tmpRef;
-	frac = 1.0;
-      }
-    }
-    else { // neither are fixeds, collapse edge to midpoint
-      newNode=C->theNodes[nodes[keepNode]].midpoint(C->theNodes[nodes[delNode]]);
-      newNode.boundary = kBound;
-      frac = 0.5;
-    }
-  }
-  else { // nodes on different boundary
-    if (nbr.cid >= 0) { // edge is internal; don't coarsen
-      nonCoarsenCount++;
-      return;
-    }
-    else { // if it isn't check if lower boundary node is a fixed
-      if (dBound > kBound) { // dBound is numbered higher
-	if (kFixed) { // if it is, don't coarsen
-	  nonCoarsenCount++;
-	  return;
-	}
-	else { // if it isn't, collapse edge to larger boundary node
-	  newNode = C->theNodes[nodes[delNode]];
-	  tmpMap = delNode; delNode = keepNode; keepNode = tmpMap;
-	  tmpMap = delEdge; delEdge = keepEdge; keepEdge = tmpMap;
-	  tmpRef = delNbr; delNbr = keepNbr; keepNbr = tmpRef;
-	  frac = 1.0;
-	}
-      }
-      else { // kBound is numbered higher
-	if (dFixed) { // if it is, don't coarsen
-	  nonCoarsenCount++;
-	  return;
-	}
-	else { // if it isn't, collapse edge to larger boundary node
-	  newNode = C->theNodes[nodes[keepNode]];
-	  frac = 1.0;
-	}
-      }
-    }
-  }
+  if (!findNewNodeDetails(&newNode, &frac, kBound, dBound, kFixed, dFixed, 
+			  &keepNode, &delNode, &nonCoarsenCount, &keepEdge,
+			  &delEdge, &keepNbr, &delNbr, &nbr))
+    return;
 
+  // translate node ids the shared ids
   int kIdx, dIdx;
-  if (edges[shortEdge].cid == myRef.cid) {
-    kIdx = nodes[keepNode];
-    dIdx = nodes[delNode];
-  }
-  else {
-    FEM_Node *theNodes = &(C->meshPtr->node);
-    FEM_Comm_Rec *dNodeRec=(FEM_Comm_Rec *)(theNodes->shared.getRec(nodes[delNode]));
-    FEM_Comm_Rec *kNodeRec=(FEM_Comm_Rec *)(theNodes->shared.getRec(nodes[keepNode]));
-    edge e;
-    kIdx = kNodeRec->getIdx(e.existsOn(kNodeRec, edges[shortEdge].cid));
-    dIdx = dNodeRec->getIdx(e.existsOn(dNodeRec, edges[shortEdge].cid));
-    CkAssert(kIdx > -1);
-    CkAssert(dIdx > -1);
-    CkAssert(dIdx != kIdx);
-  }
+  translateNodeIDs(&kIdx, &dIdx, shortEdge, keepNode, delNode);
+
 #ifdef FLIPPREVENT
-  result = edges[shortEdge].flipPrevent(myRef, kIdx, dIdx, keepNbr, delNbr, 
-				     edges[keepEdge], edges[delEdge], 
-				     C->theNodes[nodes[opnode]], newNode);
-  if(result == -1) {
+  if (edges[shortEdge].flipPrevent(myRef, kIdx, dIdx, keepNbr, delNbr, 
+				   edges[keepEdge], edges[delEdge], newNode)
+      == -1) {
     nonCoarsenCount++;
     return;
   }
 #endif
+
   // collapse the edge; takes care of neighbor element
   present = 0;
-  result = edges[shortEdge].collapse(myRef, kIdx, dIdx, keepNbr, delNbr, 
-				     edges[keepEdge], edges[delEdge], 
-				     C->theNodes[nodes[opnode]], 
-				     &local, &first, newNode);
+  edges[shortEdge].collapse(myRef, kIdx, dIdx, keepNbr, delNbr, 
+			    edges[keepEdge], edges[delEdge], newNode, frac);
   present = 1;
-  // clean up based on result of edge collapse
-  if (result == 1) {
-    // collapse successful; keepNode is node to keep
-#ifdef TDEBUG2
-    CkPrintf("TMRC2D: [%d] ...In collapse[%d](a) shortEdge=%d delEdge=%d keepEdge=%d opnode=%d delNode=%d keepNode=%d delNbr=%d keepNbr=%d\n", myRef.cid, myRef.idx, edges[shortEdge].idx, edges[delEdge].idx, edges[keepEdge].idx, nodes[opnode], dIdx, kIdx, delNbr.idx, keepNbr.idx);
-#endif
-    CkAssert((delNbr.cid == -1) || !(delNbr == keepNbr));
-    // tell delNbr to replace delEdge with keepEdge
-    int b = 0;
-    if (delNbr.cid != -1) {
-      mesh[delNbr.cid].updateElementEdge(delNbr.idx, edges[delEdge], 
-					 edges[keepEdge]);
-      b = edges[delEdge].getBoundary();
-    }
-    // tell keepEdge to replace myRef with delNbr
-    edges[keepEdge].update(myRef, delNbr, b);
-    // remove delEdge
-    edges[delEdge].remove();
-    // edge[shortEdge] handles removal of delNode and shortEdge, as well as
-    // update of keepNode; so nothing else to do here
-    // Notify FEM client of the collapse
-    if (local && first) flag = LOCAL_FIRST;
-    if (local && !first) flag = LOCAL_SECOND;
-    if (!local && first) flag = BOUND_FIRST;
-    if (!local && !first) flag = BOUND_SECOND;
-    C->theClient->collapse(myRef.idx, kIdx, dIdx, newNode.X(), newNode.Y(), 
-			   flag, b, frac);
-#ifdef TDEBUG1
-    CkPrintf("TMRC2D: [%d] theClient->collapse(%d, %d, %d, %2.10f, %2.10f, (flag), %d, %1.1f\n", myRef.cid, myRef.idx, kIdx, dIdx, newNode.X(), newNode.Y(), b, frac);
-#endif
-    // remove self
-    C->removeElement(myRef.idx);
-  }
-  else if (result == 0) {
-    // collapse successful, but first half of collapse decided to keep delNode
-    // remap for sanity
-    keepNode = shortEdge;
-    keepEdge = opnode;
-    delEdge = (shortEdge + 1) % 3;
-    delNode = delEdge;
-    // tell delNbr to replace delEdge with keepEdge
-    keepNbr = edges[keepEdge].getNbr(myRef);
-    delNbr = edges[delEdge].getNbr(myRef);
-    CkAssert((delNbr.cid == -1) || !(delNbr == keepNbr));
-    int mytmp = dIdx;
-    dIdx = kIdx;    
-    kIdx = mytmp;
-#ifdef TDEBUG2
-    CkPrintf("TMRC2D: [%d] ...In collapse[%d](b) shortEdge=%d delEdge=%d keepEdge=%d opnode=%d delNode=%d keepNode=%d delNbr=%d keepNbr=%d\n", myRef.cid, myRef.idx, edges[shortEdge].idx, edges[delEdge].idx, edges[keepEdge].idx, nodes[opnode], dIdx, kIdx, delNbr.idx, keepNbr.idx);
-#endif
-    int b = 0;
-    if (delNbr.cid != -1) {
-      mesh[delNbr.cid].updateElementEdge(delNbr.idx, edges[delEdge], 
-					 edges[keepEdge]);
-      b = edges[delEdge].getBoundary();
-    }
-    // tell keepEdge to replace myRef with delNbr
-    edges[keepEdge].update(myRef, delNbr, b);
-    // remove delEdge
-    edges[delEdge].remove();
-    // edge[shortEdge] handles removal of delNode and shortEdge, as well as
-    // update of keepNode; so nothing else to do here
-    // Notify FEM client of the collapse
-    if (local && first) flag = LOCAL_FIRST;
-    if (local && !first) flag = LOCAL_SECOND;
-    if (!local && first) flag = BOUND_FIRST;
-    if (!local && !first) flag = BOUND_SECOND;
-#ifdef TDEBUG1
-    CkPrintf("TMRC2D: [%d] theClient->collapse(%d, %d, %d, %2.10f, %2.10f, (flag), %d, %1.1f)\n", myRef.cid, myRef.idx, kIdx, dIdx, newNode.X(), newNode.Y(), b, frac);
-#endif
-    C->theClient->collapse(myRef.idx, kIdx, dIdx,
-			   newNode.X(), newNode.Y(), flag, b, frac);
-    // remove self
-    C->removeElement(myRef.idx);
-  }
-  //else coarsen is pending
+  C->removeElement(myRef.idx);     // remove self
 }
 
 int element::findLongestEdge()
@@ -726,4 +529,169 @@ bool element::flipInverseTest(node* oldnode, node* newnode) {
     CkPrintf("Flip: Chunk %d Elem %d -- (%lf,%lf);(%lf,%lf)--(%lf,%lf)--(%lf,%lf)\n",myRef.cid,myRef.idx,x0,y0,x2,y2,x1,y1,x3,y3);
     return true; //the two vector products are opposite in sign, so there is a flip
   }
+}
+
+
+int element::findNewNodeDetails(node *newNode, double *frac, int kBc, int dBc,
+				int kFx, int dFx, int *kNd, int *dNd, 
+				short *nonCC, int *kEg, int *dEg, 
+				elemRef *kNbr, elemRef *dNbr, elemRef *nbr)
+{
+  int tmpMap;
+  elemRef tmpRef;
+  if ((kBc == 0) && (dBc == 0)) { // both interior; collapse to midpoint
+    if (!kFx && !dFx) {
+      (*newNode)=C->theNodes[nodes[(*kNd)]].midpoint(C->theNodes[nodes[(*dNd)]]);
+      (*newNode).boundary = 0;
+      (*frac) = 0.5;
+      return 1;
+    }
+    else if (dFx && kFx)  (*nonCC)++;
+    else if (dFx) {
+      (*newNode) = C->theNodes[nodes[(*dNd)]];
+      tmpMap = (*dNd); (*dNd) = (*kNd); (*kNd) = tmpMap;
+      tmpMap = (*dEg); (*dEg) = (*kEg); (*kEg) = tmpMap;
+      tmpRef = (*dNbr); (*dNbr) = (*kNbr); (*kNbr) = tmpRef;
+      (*frac) = 1.0;
+      return 1;
+    }
+    else {
+      (*newNode) = C->theNodes[nodes[(*kNd)]];
+      (*frac) = 1.0;
+      return 1;
+    }
+  }
+  else if ((kBc == 0) || (dBc == 0)) { // only one on boundary
+    // collapse edge to boundary node
+    if (kBc && !dFx) {
+      (*newNode) = C->theNodes[nodes[(*kNd)]];
+      (*frac) = 1.0;
+      return 1;
+    }
+    else if (dBc && !kFx) {
+      (*newNode) = C->theNodes[nodes[(*dNd)]];
+      tmpMap = (*dNd); (*dNd) = (*kNd); (*kNd) = tmpMap;
+      tmpMap = (*dEg); (*dEg) = (*kEg); (*kEg) = tmpMap;
+      tmpRef = (*dNbr); (*dNbr) = (*kNbr); (*kNbr) = tmpRef;
+      (*frac) = 1.0;
+      return 1;
+    }
+    else (*nonCC)++;
+  }
+  else if (kBc == dBc) { // both on same boundary
+    if (nbr->cid >= 0) (*nonCC)++; // edge is internal; don't coarsen
+    // check fixed status of both nodes
+    else if (kFx && dFx) (*nonCC)++;  // if both fixeds don't coarsen
+    else if (kFx || dFx) { // if one fixed, collapse edge to fixed
+      if (kFx) {
+	(*newNode) = C->theNodes[nodes[(*kNd)]];
+	(*frac) = 1.0;
+	return 1;
+      }
+      else {
+	(*newNode) = C->theNodes[nodes[(*dNd)]];
+	tmpMap = (*dNd); (*dNd) = (*kNd); (*kNd) = tmpMap;
+	tmpMap = (*dEg); (*dEg) = (*kEg); (*kEg) = tmpMap;
+	tmpRef = (*dNbr); (*dNbr) = (*kNbr); (*kNbr) = tmpRef;
+	(*frac) = 1.0;
+	return 1;
+      }
+    }
+    else { // neither are fixeds, collapse edge to midpoint
+      (*newNode)=C->theNodes[nodes[(*kNd)]].midpoint(C->theNodes[nodes[(*dNd)]]);
+      (*newNode).boundary = kBc;
+      (*frac) = 0.5;
+      return 1;
+    }
+  }
+  else { // nodes on different boundary
+    if (nbr->cid >= 0) (*nonCC)++; // edge is internal; don't coarsen
+    else { // if it isn't check if lower boundary node is a fixed
+      if (dBc > kBc) { // dBc is numbered higher
+	if (kFx) (*nonCC)++;  // if it is, don't coarsen
+	else { // if it isn't, collapse edge to larger boundary node
+	  (*newNode) = C->theNodes[nodes[(*dNd)]];
+	  tmpMap = (*dNd); (*dNd) = (*kNd); (*kNd) = tmpMap;
+	  tmpMap = (*dEg); (*dEg) = (*kEg); (*kEg) = tmpMap;
+	  tmpRef = (*dNbr); (*dNbr) = (*kNbr); (*kNbr) = tmpRef;
+	  (*frac) = 1.0;
+	  return 1;
+	}
+      }
+      else { // kBc is numbered higher
+	if (dFx) (*nonCC)++;  // if it is, don't coarsen
+	else { // if it isn't, collapse edge to larger boundary node
+	  (*newNode) = C->theNodes[nodes[(*kNd)]];
+	  (*frac) = 1.0;
+	  return 1;
+	}
+      }
+    }
+  }
+  return 0;
+}
+
+void element::translateNodeIDs(int *kIdx, int *dIdx, int sEg, int kNd, int dNd)
+{
+  if (edges[sEg].cid == myRef.cid) {
+    (*kIdx) = nodes[kNd];
+    (*dIdx) = nodes[dNd];
+  }
+  else {
+    FEM_Node *theNodes = &(C->meshPtr->node);
+    FEM_Comm_Rec *dNodeRec=(FEM_Comm_Rec *)(theNodes->shared.getRec(nodes[dNd]));
+    FEM_Comm_Rec *kNodeRec=(FEM_Comm_Rec *)(theNodes->shared.getRec(nodes[kNd]));
+    edge e;
+    (*kIdx) = kNodeRec->getIdx(e.existsOn(kNodeRec, edges[sEg].cid));
+    (*dIdx) = dNodeRec->getIdx(e.existsOn(dNodeRec, edges[sEg].cid));
+  }
+}
+
+int element::safeToCoarsen(short *nonCC, int sEg, elemRef dNbr, elemRef kNbr,
+			   elemRef nbr)
+{
+  if (!edges[sEg].isPending(myRef)) {
+    if ((dNbr == kNbr) && (dNbr.cid != -1)) { // wackiness has ensued
+      (*nonCC)++;
+      return 0;
+    }
+    else if ((dNbr.cid != -1) && (kNbr.cid != -1) && 
+	     (neighboring(dNbr, kNbr))) {
+      (*nonCC)++;
+      return 0;
+    }
+    else if (nbr.cid != -1) {
+      intMsg *im;
+      im = mesh[nbr.cid].safeToCoarsen(nbr.idx, edges[sEg]);
+      if (im->anInt == 0) (*nonCC)++;
+      return im->anInt;
+    }
+  }
+  return 1;
+}
+
+int element::safeToCoarsen(edgeRef ser) {
+  elemRef nbr1, nbr2;
+  for (int i=0; i<3; i++) {
+    if (edges[i] == ser) {
+      nbr1 = edges[(i+1)%3].getNbr(myRef);
+      nbr2 = edges[(i+2)%3].getNbr(myRef);
+      break;
+    }
+  }
+  if (nbr1 == nbr2) return 0;
+  if ((nbr1.cid == -1) || (nbr2.cid == -1)) return 1;
+  return (!neighboring(nbr1, nbr2));
+}
+
+int element::neighboring(elemRef e1, elemRef e2) {
+  intMsg *im;
+  if ((e1.cid == -1) || (e2.cid == -1)) return 0;
+  im = mesh[e1.cid].neighboring(e1.idx, e2);
+  return im->anInt;
+}
+
+int element::neighboring(elemRef e) {
+  return ((edges[0].getNbr(myRef) == e) || (edges[1].getNbr(myRef) == e) || 
+	  (edges[2].getNbr(myRef) == e));
 }

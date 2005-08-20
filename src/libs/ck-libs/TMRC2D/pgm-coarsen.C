@@ -548,7 +548,7 @@ driver(void)
     }
     double *areas=new double[g.nelems];
     for (i=0;i<g.nelems;i++) {
-      areas[i]=1.1*calcArea(g,i);
+      areas[i]=1.5*calcArea(g,i);
 //      areas[i]=calcArea(g,i);
     }
     

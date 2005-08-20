@@ -10,13 +10,13 @@ class edge {
  public:
   int pending, newNodeIdx;
   double length;
-  elemRef waitingFor, delNbr, keepNbr;
-  node newNode, opnode;
+  elemRef waitingFor;
+  node newNode;
   int incidentNode, fixNode;
   int boundary;
   edgeRef newEdgeRef; // half of this edge: from newNode to incidentNode
   chunk *C;
-  edgeRef myRef, keepEdge, delEdge;
+  edgeRef myRef;
   elemRef elements[2];  // the elements on either side of the edge
   int nodes[2];  // the nodes on either end of the edge on the edge's chunk
   int present;  // indicates this is an edge present in the mesh
@@ -37,12 +37,7 @@ class edge {
     newNodeIdx = e.newNodeIdx;
     C = e.C;
     waitingFor = e.waitingFor;
-    keepNbr = e.keepNbr;
-    delNbr = e.delNbr;
-    keepEdge = e.keepEdge;
-    delEdge = e.delEdge;
     newNode = e.newNode;
-    opnode = e.opnode;
     incidentNode = e.incidentNode;
     fixNode = e.fixNode;
     newEdgeRef = e.newEdgeRef;
@@ -68,12 +63,7 @@ class edge {
     newNodeIdx = e.newNodeIdx;
     C = e.C;
     waitingFor = e.waitingFor;
-    keepNbr = e.keepNbr;
-    delNbr = e.delNbr;
-    keepEdge = e.keepEdge;
-    delEdge = e.delEdge;
     newNode = e.newNode;
-    opnode = e.opnode;
     incidentNode = e.incidentNode;
     fixNode = e.fixNode;
     newEdgeRef = e.newEdgeRef;
@@ -111,11 +101,11 @@ class edge {
   void checkPending(elemRef e, elemRef ne);
   int split(int *m, edgeRef *e_prime, int oIdx, int fIdx,
 	    elemRef requester, int *local, int *first, int *nullNbr);
-  int collapse(elemRef requester, int kIdx, int dIdx, elemRef kNbr,
-	       elemRef dNbr, edgeRef kEdge, edgeRef dEdge, node oNode,
-	       int *local, int *first, node newN);
+  void collapse(elemRef requester, int kIdx, int dIdx, elemRef kNbr,
+		elemRef dNbr, edgeRef kEdge, edgeRef dEdge, node newN, 
+		double frac);
   int flipPrevent(elemRef requester, int kIdx, int dIdx, elemRef kNbr,
-	       elemRef dNbr, edgeRef kEdge, edgeRef dEdge, node oNode, node newN);
+	       elemRef dNbr, edgeRef kEdge, edgeRef dEdge, node newN);
   int existsOn(FEM_Comm_Rec *cl, int chunkID) {
     int count = cl->getShared();
     for (int i=0; i<count; i++) {
@@ -123,6 +113,15 @@ class edge {
     }
     return -1;
   }
+  void translateSharedNodeIDs(int *kIdx, int *dIdx, elemRef req);
+  void unlockCloudRemoveEdge(int dIdxlShared, int kIdxlShared, 
+			     FEM_Comm_Rec *dNodeRec, FEM_Comm_Rec *kNodeRec);
+  void localCollapse(int kIdx, int dIdx, elemRef *req, node *newNode, 
+		     double frac, elemRef *keepNbr, elemRef *delNbr, 
+		     edgeRef *kEdge, edgeRef *dEdge, int local, int first);
+  void updateCloud(int kIdx, int dIdx, node newNode, int *dIdxl, int *kIdxl,
+		   FEM_Comm_Rec **dNodeRec, FEM_Comm_Rec **kNodeRec);
+  int buildLockingCloud(int kIdx, int dIdx, elemRef *req, elemRef *nbr);
   void sanityCheck(chunk *c, edgeRef shouldRef);
   void sanityCheck(int node1, int node2, int eIdx);
 };

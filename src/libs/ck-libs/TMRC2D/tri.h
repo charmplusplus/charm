@@ -219,12 +219,12 @@ class chunk : public TCharmClient1D {
   // See above for details of each
   intMsg *safeToMoveNode(int idx, double x, double y);
   splitOutMsg *split(int idx, elemRef e, int oIdx, int fIdx);
-  splitOutMsg *collapse(int idx, elemRef e, int kIdx, int dIdx, elemRef kNbr, 
-			elemRef dNbr, edgeRef kEdge, edgeRef dEdge, 
-			node opnode, node newN);
-  splitOutMsg *flipPreventE(int idx, elemRef e, int kIdx, int dIdx, elemRef kNbr, 
-			elemRef dNbr, edgeRef kEdge, edgeRef dEdge, 
-			node opnode, node newN);
+  void collapse(int idx, elemRef e, int kIdx, int dIdx, elemRef kNbr, 
+		elemRef dNbr, edgeRef kEdge, edgeRef dEdge, node newN,
+		double frac);
+  splitOutMsg *flipPreventE(int idx, elemRef e, int kIdx, int dIdx,
+			    elemRef kNbr, elemRef dNbr, edgeRef kEdge, 
+			    edgeRef dEdge, node newN);
   void nodeReplaceDelete(int kIdx, int dIdx, node nn, int shared, int *chk, 
 			 int *idx);
   boolMsg *flipPrevent(int kIdx, int dIdx, node nn, int shared, int *chk, 
@@ -309,6 +309,8 @@ class chunk : public TCharmClient1D {
 
   void incnonCoarsen(int idx);
   void resetnonCoarsen(int idx);
+  intMsg *neighboring(int idx, elemRef e);
+  intMsg *safeToCoarsen(int idx, edgeRef e);
 };
 
 #endif

@@ -177,6 +177,11 @@ class element {  // triangular elements defined by three node references,
   void split(int longEdge);
   void coarsen();
   void collapse(int shortEdge);
+  int findNewNodeDetails(node *newNode, double *frac, int kBc, int dBc, 
+			 int kFx, int dFx, int *kNd, int *dNd, short *nonCC,
+			 int *kEg, int *dEg, elemRef *kNbr, elemRef *dNbr,
+			 elemRef *nbr);
+  void translateNodeIDs(int *kIdx, int *dIdx, int sEg, int kNd, int dNd);
   int findLongestEdge();
   int findShortestEdge();
   double getShortestEdge(double *angle);
@@ -187,6 +192,12 @@ class element {  // triangular elements defined by three node references,
   bool flipInverseTest(node*, node*);
   void incnonCoarsen(void);
   void resetnonCoarsen(void) { nonCoarsenCount = 0; }
+  int safeToCoarsen(short *nonCC, int sEg, elemRef dNbr, elemRef kNbr, 
+		    elemRef nbr);
+  int safeToCoarsen(edgeRef e);
+  int neighboring(elemRef e1, elemRef e2);
+  int neighboring(elemRef e);
+  
 
   // Mesh improvement stuff
   //void tweakNodes();

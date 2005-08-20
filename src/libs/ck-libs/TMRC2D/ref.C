@@ -42,27 +42,21 @@ int edgeRef::split(int *m, edgeRef *e_prime, int oIdx, int fIdx,
   return result;
 }
 
-int edgeRef::collapse(elemRef requester, int kIdx, int dIdx, elemRef kNbr, 
-		      elemRef dNbr, edgeRef kEdge, edgeRef dEdge, node opnode, 
-		      int *local, int *first, node newN)
+void edgeRef::collapse(elemRef requester, int kIdx, int dIdx, elemRef kNbr, 
+		       elemRef dNbr, edgeRef kEdge, edgeRef dEdge, node newN, 
+		       double frac)
 {
-  splitOutMsg *som;
-  int result;
-  som = mesh[cid].collapse(idx, requester, kIdx, dIdx, kNbr, dNbr, kEdge, 
-			  dEdge, opnode, newN);
-  *local = som->local;
-  *first = som->first;
-  result = som->result;
-  CkFreeMsg(som);
-  return result;
+  mesh[cid].collapse(idx, requester, kIdx, dIdx, kNbr, dNbr, kEdge, 
+			   dEdge, newN, frac);
 }
 
 int edgeRef::flipPrevent(elemRef requester, int kIdx, int dIdx, elemRef kNbr, 
-		      elemRef dNbr, edgeRef kEdge, edgeRef dEdge, node opnode, node newN)
+		      elemRef dNbr, edgeRef kEdge, edgeRef dEdge, node newN)
 {
   splitOutMsg *som;
   int result;
-  som = mesh[cid].flipPreventE(idx, requester, kIdx, dIdx, kNbr, dNbr, kEdge, dEdge, opnode, newN);
+  som = mesh[cid].flipPreventE(idx, requester, kIdx, dIdx, kNbr, dNbr, kEdge, 
+			       dEdge, newN);
   result = som->result;
   CkFreeMsg(som);
   return result;
