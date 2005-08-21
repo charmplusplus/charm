@@ -704,7 +704,7 @@ int FEM_Adapt::edge_contraction_help(int e1, int e2, int n1, int n2, int e1_n1,
 
   //FEM_Modify_Lock(theMesh, adjnodes, 2, adjelems, 2);  
 
-  //New code by updating a node rather than deleting both
+  //New code for updating a node rather than deleting both
   int keepnode=0, deletenode=0, shared=0, n1_shared=0, n2_shared=0;
   n1_shared = theMod->getfmUtil()->isShared(n1);
   n2_shared = theMod->getfmUtil()->isShared(n2);
@@ -729,34 +729,47 @@ int FEM_Adapt::edge_contraction_help(int e1, int e2, int n1, int n2, int e1_n1,
     deletenode = n2;
   }
 
-  //update keepnode's attributes
-  FEM_Interpolate *inp = theMod->getfmInp();
-  FEM_Interpolate::NodalArgs nm;
-  nm.n = keepnode;
-  nm.nodes[0] = keepnode;
-  nm.nodes[1] = deletenode;
-  //choose frac wisely, check if either node is on the boundary, update frac
   int n1_bound, n2_bound;
   FEM_Mesh_dataP(theMesh, FEM_NODE, FEM_BOUNDARY, &n1_bound, keepnode, 1 , FEM_INT, 1);
   FEM_Mesh_dataP(theMesh, FEM_NODE, FEM_BOUNDARY, &n2_bound, deletenode, 1 , FEM_INT, 1);
+  //update keepnode's attributes; choose frac wisely, check if either node is on the boundary, update frac
+  FEM_Interpolate *inp = theMod->getfmInp();
+  FEM_Interpolate::NodalArgs nm;
   if((n1_bound < 0) && (n2_bound < 0) && (n1_bound != n2_bound)) {
     return -1; //they are on different boundaries
   }
   else if(n1_bound<0 && n2_bound<0) {
     nm.frac = 0.5;
+    //TODO: must ensure that any of the two nodes is not a corner
+    if(isCorner(keepnode)) {
+      nm.frac = 1.0;
+    } 
+    else if(isCorner(deletenode)) {
+      nm.frac = 0.0;
+    }
   }
   else if(n1_bound < 0) { //keep its attributes
     nm.frac = 1.0;
   }
   else if(n2_bound < 0) {
-    nm.frac = 0.0;
+    if(shared==2) {
+      keepnode = n2;
+      deletenode = n1;
+      nm.frac = 1.0;
+    } else {
+      nm.frac = 0.0;
+    }
   }
   else {
     nm.frac = 0.5;
   }
-  //temporary hack, if it is shared, do not change the attributes, since I amnot updating them now
+  nm.nodes[0] = keepnode;
+  nm.nodes[1] = deletenode;
+  nm.n = keepnode;
+
+  //hack, if it is shared, do not change the attributes, since I am not updating them now across all chunks
   if(n1_shared || n2_shared) {
-    nm.frac = 1.0;
+      nm.frac = 1.0;
   }
 
   inp->FEM_InterpolateNodeOnEdge(nm);
@@ -915,12 +928,12 @@ int FEM_Adapt::vertex_split(int n, int n1, int n2)
     FEM_Modify_Unlock(theMesh);
     return -1;	     
   }
-  int ret = vertex_split(n, n1, n2, e1, e3);
+  int ret = vertex_split_help(n, n1, n2, e1, e3);
   FEM_Modify_Unlock(theMesh);
   return ret;
 }
 
-int FEM_Adapt::vertex_split(int n, int n1, int n2, int e1, int e3)
+int FEM_Adapt::vertex_split_help(int n, int n1, int n2, int e1, int e3)
 {
   int e1_n = find_local_node_index(e1, n);
   int e1_n1 = find_local_node_index(e1, n1);
@@ -1136,4 +1149,36 @@ void FEM_Adapt::printAdjacencies(int *nodes, int numNodes, int *elems, int numEl
   }
 
   return;
+}
+
+bool FEM_Adapt::isCorner(int n1) {
+  //if it has two adjacent nodes on two different boundaries and the edges are boundaries
+  int *n1AdjNodes, *n1AdjElems, *n2AdjElems;
+  int n1NumNodes, n1NumElems, n2NumElems;
+  theMesh->n2n_getAll(n1, &n1AdjNodes, &n1NumNodes);
+  int n1_bound, n2_bound;
+  FEM_Mesh_dataP(theMesh, FEM_NODE, FEM_BOUNDARY, &n1_bound, n1, 1 , FEM_INT, 1);
+  for (int i=0; i<n1NumNodes; i++) {
+    int ret = 0;
+    int n2 = n1AdjNodes[i];
+    FEM_Mesh_dataP(theMesh, FEM_NODE, FEM_BOUNDARY, &n2_bound, n2, 1 , FEM_INT, 1);
+    if(n1_bound != n2_bound) {
+      //find the number of elements this edge belongs to
+      theMesh->n2e_getAll(n1, &n1AdjElems, &n1NumElems);
+      theMesh->n2e_getAll(n2, &n2AdjElems, &n2NumElems);
+      for(int k=0; k<n1NumElems; k++) {
+	for (int j=0; j<n2NumElems; j++) {
+	  if (n1AdjElems[k] == n2AdjElems[j]) {
+	    if(n1AdjElems[k] != -1) {
+	      ret++;
+	    }
+	  }
+	}
+      }
+      free(n1AdjElems);
+      free(n2AdjElems);
+      if(ret==1) return true;
+    }
+  }
+  return false;
 }

@@ -21,8 +21,29 @@ void FEM_Interpolate::FEM_InterpolateNodeOnEdge(NodalArgs args)
     if (a->getAttr() < FEM_ATTRIB_TAG_MAX) {
       FEM_DataAttribute *d = (FEM_DataAttribute *)a;
       d->interpolate(args.nodes[0], args.nodes[1], args.n, args.frac);
+    } else if(a->getAttr()==FEM_BOUNDARY) {
+      if(args.frac==1.0) {
+	a->copyEntity(args.n,*a,args.nodes[0]);
+      } else if(args.frac==0.0) {
+	a->copyEntity(args.n,*a,args.nodes[1]);
+      }
     }
   }
+  //if the node is shared, then update these values on the other chunks as well
+  if(theMod->fmUtil->isShared(args.n)) {
+    //build up the list of chunks it is shared/local to
+    int numchunks;
+    IDXL_Share **chunks1;
+    theMod->fmUtil->getChunkNos(0,args.n,&numchunks,&chunks1);
+
+    for(int j=0; j<numchunks; j++) {
+      int chk = chunks1[j]->chk;
+      if(chk==theMod->getIdx()) continue;
+      //meshMod[chk].updateNodeAttrs();
+    }
+  }
+
+  return;
 }
 
 /* A node is added on an face; interpolate from nodes of face; this uses n, 

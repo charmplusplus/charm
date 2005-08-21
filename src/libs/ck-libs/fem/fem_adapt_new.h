@@ -77,7 +77,7 @@ class FEM_Adapt {
       n1 and n2 are assumed to be local to this chunk. An adjacency test is
       performed on n1 and n2 by searching for an element with edge [n1,n2]. **/
   virtual int edge_flip(int n1, int n2);
-  virtual int edge_flip_help(int e1, int e2, int n1, int n2, int e1_n1, 
+  int edge_flip_help(int e1, int e2, int n1, int n2, int e1_n1, 
 			     int e1_n2, int e1_n3, int n3, int n4);
   
   /// Bisect edge (n1, n2) and the two adjacent elements
@@ -85,7 +85,7 @@ class FEM_Adapt {
       adjacent to e, and bisect e by adding node n5. Add elements (n1,n5,n3), 
       (n5,n2,n3), (n5,n1,n4) and (n2,n5,n4); returns new node n5. **/
   virtual int edge_bisect(int n1, int n2);
-  virtual int edge_bisect_help(int e1, int e2, int n1, int n2, int e1_n1, 
+  int edge_bisect_help(int e1, int e2, int n1, int n2, int e1_n1, 
 			       int e1_n2, int e1_n3, int e2_n1, int e2_n2, 
 			       int e2_n3, int n3, int n4);
 
@@ -95,7 +95,7 @@ class FEM_Adapt {
       adjacent to edge [n1,n2]. This could be performed with edge_contraction,
       but this is a simpler operation. **/
   virtual int vertex_remove(int n1, int n2);
-  virtual int vertex_remove_help(int e1, int e2, int n1, int n2, int e1_n1, 
+  int vertex_remove_help(int e1, int e2, int n1, int n2, int e1_n1, 
 				 int e1_n2, int e1_n3, int e2_n1, int e2_n2, 
 				 int e2_n3, int n3, int n4, int n5);
 
@@ -106,7 +106,7 @@ class FEM_Adapt {
       removing the two elements (n1,n2,n3) and (n1,n2,n4) adjacent to e, and 
       finally removing nodes n1 and n2; return 1 if successful, 0 if not **/
   virtual int edge_contraction(int n1, int n2);
-  virtual int edge_contraction_help(int e1, int e2, int n1, int n2, int e1_n1, 
+  int edge_contraction_help(int e1, int e2, int n1, int n2, int e1_n1, 
 				    int e1_n2, int e1_n3, int e2_n1, int e2_n2,
 				    int e2_n3, int n3, int n4);
 
@@ -116,9 +116,11 @@ class FEM_Adapt {
       expand into two new elements (n, np, n1) and (np, n, n2);
       return the id of the newly created node np **/
   virtual int vertex_split(int n, int n1, int n2);
-  virtual int vertex_split(int n, int n1, int n2, int e1, int e3);
+  int vertex_split_help(int n, int n1, int n2, int e1, int e3);
 
   virtual void printAdjacencies(int *nodes, int numNodes, int *elems, int numElems);
+
+  virtual bool isCorner(int n1);
 };
 
 

@@ -4,6 +4,9 @@
 #include "fem_adapt_algs.h"
 #include "fem_mesh_modify.h"
 
+#define MINAREA 1.0e-15
+#define MAXAREA 1.0e15
+
 FEM_Adapt_Algs::FEM_Adapt_Algs(FEM_Mesh *m, femMeshModify *fm, int dimension) 
 { 
   theMesh = m; 
@@ -146,13 +149,13 @@ int FEM_Adapt_Algs::simple_refine(double targetA) {
       getCoord(con[1], n2_coord);
       getCoord(con[2], n3_coord);
       //do a refinement only if it has any node within x coords 0.087 to 0.063
-      if(!((n1_coord[0]<0.0087 && n1_coord[0]>0.0063) || (n2_coord[0]<0.0087 && n2_coord[0]>0.0063) || (n3_coord[0]<0.0087 && n3_coord[0]>0.0063))) {
-	areas[i] = 0.000000001; //make it believe that this triangle does not need refinement
-      } else {
+      /*if(!((n1_coord[0]<0.0087 && n1_coord[0]>0.0063) || (n2_coord[0]<0.0087 && n2_coord[0]>0.0063) || (n3_coord[0]<0.0087 && n3_coord[0]>0.0063))) {
+	areas[i] = MINAREA; //make it believe that this triangle does not need refinement
+	} else */{
 	areas[i] = getArea(n1_coord, n2_coord, n3_coord);
       }
     } else {
-      areas[i] = 0.000000001;
+      areas[i] = MINAREA;
     }
     map1[i] = i;
   }
@@ -203,13 +206,13 @@ int FEM_Adapt_Algs::simple_coarsen(double targetA) {
       getCoord(con[1], n2_coord);
       getCoord(con[2], n3_coord);
       //do a coarsening only if it has any node within y coords less than 0.04
-      if(!((n1_coord[1]<0.04) || (n2_coord[1]<0.04) || (n3_coord[1]<0.04))) {
-	areas[i] = 1.0; //make it believe that this triangle is big enough
-      } else {
+      /*if(!((n1_coord[1]<0.04) || (n2_coord[1]<0.04) || (n3_coord[1]<0.04))) {
+	areas[i] = MAXAREA; //make it believe that this triangle is big enough
+	} else */{
 	areas[i] = getArea(n1_coord, n2_coord, n3_coord);
       }
     } else {
-      areas[i] = 1.0;
+      areas[i] = MAXAREA;
     }
     map1[i] = i;
   }
