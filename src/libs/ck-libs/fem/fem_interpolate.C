@@ -41,6 +41,10 @@ void FEM_Interpolate::FEM_InterpolateNodeOnEdge(NodalArgs args)
       if(chk==theMod->getIdx()) continue;
       //meshMod[chk].updateNodeAttrs();
     }
+    for(int j=0; j<numchunks; j++) {
+      delete chunks1[j];
+    }
+    free(chunks1);
   }
 
   return;

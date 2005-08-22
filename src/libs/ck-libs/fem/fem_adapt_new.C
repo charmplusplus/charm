@@ -39,6 +39,8 @@ int FEM_Adapt::edge_flip(int n1, int n2)
   isEdge = findAdjData(n1, n2, &e1, &e2, &e1_n1, &e1_n2, &e1_n3, &e2_n1, &e2_n2, &e2_n3,&n3, &n4);
   if(isEdge == -1) {
     CkPrintf("Error: Flip %d->%d not done as it is no longer a valid edge\n",n1,n2);
+    free(locknodes);
+    free(lockelems);
     return -1;
   }
   locknodes[0] = n1;
@@ -53,6 +55,8 @@ int FEM_Adapt::edge_flip(int n1, int n2)
     if(isEdge == -1) {
       FEM_Modify_Unlock(theMesh);
       CkPrintf("Error: Flip %d->%d not done as it is no longer a valid edge\n",n1,n2);
+      free(locknodes);
+      free(lockelems);
       return -1;
     }
     if(gotlock==1 && lockelems[0]==e1 && lockelems[1]==e2 && locknodes[2]==n3 && locknodes[3]==n4) {
@@ -68,10 +72,14 @@ int FEM_Adapt::edge_flip(int n1, int n2)
   }
   if ((e1 == -1) || (e2 == -1)) {
     FEM_Modify_Unlock(theMesh);
+    free(locknodes);
+    free(lockelems);
     return 0; // edge on boundary are not there
   }
   int ret = edge_flip_help(e1, e2, n1, n2, e1_n1, e1_n2, e1_n3, n3, n4);
   FEM_Modify_Unlock(theMesh);
+  free(locknodes);
+  free(lockelems);
   return ret;
 }
 
@@ -226,6 +234,9 @@ int FEM_Adapt::edge_flip_help(int e1, int e2, int n1, int n2, int e1_n1,
 #endif
 
   //make sure that it always comes here, don't return with unlocking
+  free(conn);
+  free(locknodes);
+  free(lockelems);
   return newNode;
 }
 // ======================  END edge_flip  ===================================
@@ -265,6 +276,8 @@ int FEM_Adapt::edge_bisect(int n1, int n2)
   isEdge = findAdjData(n1, n2, &e1, &e2, &e1_n1, &e1_n2, &e1_n3, &e2_n1, &e2_n2, &e2_n3,&n3, &n4);
   if(isEdge == -1) {
     CkPrintf("Error: Bisect %d->%d not done as it is no longer a valid edge\n",n1,n2);
+    free(locknodes);
+    free(lockelems);
     return -1;
   }
   locknodes[0] = n1;
@@ -279,6 +292,8 @@ int FEM_Adapt::edge_bisect(int n1, int n2)
     if(isEdge == -1) {
       FEM_Modify_Unlock(theMesh);
       CkPrintf("Error: Bisect %d->%d not done as it is no longer a valid edge\n",n1,n2);
+      free(locknodes);
+      free(lockelems);
       return -1;
     }
     if(gotlock==1 && lockelems[0]==e1 && lockelems[1]==e2 && locknodes[2]==n3 && locknodes[3]==n4) {
@@ -294,6 +309,8 @@ int FEM_Adapt::edge_bisect(int n1, int n2)
   }
   int ret = edge_bisect_help(e1, e2, n1, n2, e1_n1, e1_n2, e1_n3, e2_n1, e2_n2, e2_n3, n3, n4);
   FEM_Modify_Unlock(theMesh);
+  free(locknodes);
+  free(lockelems);
   return ret;
 }
 
@@ -409,6 +426,10 @@ int FEM_Adapt::edge_bisect_help(int e1, int e2, int n1, int n2, int e1_n1,
   printAdjacencies(locknodes, numNodesNew, lockelems, numElemsNew);
 #endif
 
+  free(conn);
+  free(locknodes);
+  free(lockelems);
+  free(adjnodes);
   return n5;
 }
 // ======================  END edge_bisect  ================================
@@ -448,14 +469,22 @@ int FEM_Adapt::vertex_remove(int n1, int n2)
   isEdge = findAdjData(n1, n2, &e1, &e2, &e1_n1, &e1_n2, &e1_n3, &e2_n1, &e2_n2, &e2_n3,&n3, &n4);
   if(isEdge == -1) {
     CkPrintf("Error: Vertex Remove %d->%d not done as it is no longer a valid edge\n",n1,n2);
+    free(locknodes);
+    free(lockelems);
     return -1;
   }
-  if (e1 == -1) return 0;
+  if (e1 == -1) {
+    free(locknodes);
+    free(lockelems);
+    return 0;
+  }
   // find n5
   int *nbrNodes, nnsize, n5;
   theMesh->n2n_getAll(n1, &nbrNodes, &nnsize);
   if(!(nnsize == 4 || (nnsize==3 && e2==-1))) {
     CkPrintf("Error: Vertex Remove %d->%d on node %d with %d connections (!= 4)\n",n1,n2,n1,nnsize);
+    free(locknodes);
+    free(lockelems);
     return -1;    
   }
   for (int i=0; i<nnsize; i++) {
@@ -477,10 +506,14 @@ int FEM_Adapt::vertex_remove(int n1, int n2)
     if(isEdge == -1) {
       FEM_Modify_Unlock(theMesh);
       CkPrintf("Error: Vertex Remove %d->%d not done as it is no longer a valid edge\n",n1,n2);
+      free(locknodes);
+      free(lockelems);
       return -1;
     }
     if (e1 == -1) {
       FEM_Modify_Unlock(theMesh);
+      free(locknodes);
+      free(lockelems);
       return 0;
     }
     // find n5
@@ -495,6 +528,8 @@ int FEM_Adapt::vertex_remove(int n1, int n2)
     if(!(nnsize == 4 || (nnsize==3 && e2==-1))) {
       FEM_Modify_Unlock(theMesh);
       CkPrintf("Error: Vertex Remove %d->%d on node %d with %d connections (!= 4)\n",n1,n2,n1,nnsize);
+      free(locknodes);
+      free(lockelems);
       return -1;    
     }
     if(gotlock==1 && lockelems[0]==e1 && lockelems[1]==e2 && locknodes[2]==n3 && locknodes[3]==n4 && locknodes[4]==n5) {
@@ -512,6 +547,8 @@ int FEM_Adapt::vertex_remove(int n1, int n2)
   int ret = vertex_remove_help(e1, e2, n1, n2, e1_n1, e1_n2, e1_n3, e2_n1, e2_n2, 
 			    e2_n3, n3, n4, n5);
   FEM_Modify_Unlock(theMesh);
+  free(locknodes);
+  free(lockelems);
   return ret;
 }
 
@@ -543,7 +580,11 @@ int FEM_Adapt::vertex_remove_help(int e1, int e2, int n1, int n2, int e1_n1,
     if (e2 != -1) {
       e4 = theMesh->e2e_getNbr(e2, get_edge_index(e2_n1, e2_n3));
       lockelems[3] = e4;
-      if(e4 == -1 ) return 0;
+      if(e4 == -1 ) {
+	free(locknodes);
+	free(lockelems);
+	return 0;
+      }
     }
     //FEM_Modify_Lock(theMesh, locknodes, numNodes, lockelems, numElems);
 
@@ -611,9 +652,14 @@ int FEM_Adapt::vertex_remove_help(int e1, int e2, int n1, int n2, int e1_n1,
     CkPrintf("Adjacencies after vertex remove\n");
     printAdjacencies(locknodes, numNodesNew, lockelems, numElemsNew);
 #endif
-
+    free(conn);
+    free(locknodes);
+    free(lockelems);
     return 1;
   }
+
+  free(locknodes);
+  free(lockelems);
   return 0;
 }
 // ======================  END vertex_remove  ==============================
@@ -653,6 +699,8 @@ int FEM_Adapt::edge_contraction(int n1, int n2)
   isEdge = findAdjData(n1, n2, &e1, &e2, &e1_n1, &e1_n2, &e1_n3, &e2_n1, &e2_n2, &e2_n3,&n3, &n4);
   if(isEdge == -1) {
     CkPrintf("Edge Contract %d->%d not done as it is no longer a valid edge\n",n1,n2);
+    free(locknodes);
+    free(lockelems);
     return -1;
   }
   locknodes[0] = n1;
@@ -661,17 +709,25 @@ int FEM_Adapt::edge_contraction(int n1, int n2)
   locknodes[3] = n4;
   lockelems[0] = e1;
   lockelems[1] = e2;
-  if (e1 == -1) return 0;
+  if (e1 == -1) {
+    free(locknodes);
+    free(lockelems);
+    return 0;
+  }
   while(!done) {
     int gotlock = FEM_Modify_Lock(theMesh, locknodes, numNodes, lockelems, numElems);
     isEdge = findAdjData(n1, n2, &e1, &e2, &e1_n1, &e1_n2, &e1_n3, &e2_n1, &e2_n2, &e2_n3,&n3, &n4);
     if(isEdge == -1) {
       FEM_Modify_Unlock(theMesh);
       CkPrintf("Edge contract %d->%d not done as it is no longer a valid edge\n",n1,n2);
+      free(locknodes);
+      free(lockelems);
       return -1;
     }
     if (e1 == -1) {
       FEM_Modify_Unlock(theMesh);
+      free(locknodes);
+      free(lockelems);
       return 0;
     }
     if(gotlock==1 && lockelems[0]==e1 && lockelems[1]==e2 && locknodes[2]==n3 && locknodes[3]==n4) {
@@ -687,6 +743,8 @@ int FEM_Adapt::edge_contraction(int n1, int n2)
   }
   int ret = edge_contraction_help(e1, e2, n1, n2, e1_n1, e1_n2, e1_n3, e2_n1, e2_n2, e2_n3, n3, n4);
   FEM_Modify_Unlock(theMesh);
+  free(locknodes);
+  free(lockelems);
   return ret;
 }
 
@@ -736,6 +794,9 @@ int FEM_Adapt::edge_contraction_help(int e1, int e2, int n1, int n2, int e1_n1,
   FEM_Interpolate *inp = theMod->getfmInp();
   FEM_Interpolate::NodalArgs nm;
   if((n1_bound < 0) && (n2_bound < 0) && (n1_bound != n2_bound)) {
+    free(conn);
+    free(adjnodes);
+    free(adjelems);
     return -1; //they are on different boundaries
   }
   else if(n1_bound<0 && n2_bound<0) {
@@ -809,6 +870,9 @@ int FEM_Adapt::edge_contraction_help(int e1, int e2, int n1, int n2, int e1_n1,
     }
   }
   FEM_remove_node(theMesh, deletenode);
+  free(conn);
+  free(adjnodes);
+  free(adjelems);
   return keepnode;
 
   /*
@@ -921,15 +985,18 @@ int FEM_Adapt::vertex_split(int n, int n1, int n2)
   int e1 = theMesh->getElementOnEdge(n, n1);
   if (e1 == -1) {
     FEM_Modify_Unlock(theMesh);
+    free(locknodes);
     return -1;	     
   }
   int e3 = theMesh->getElementOnEdge(n, n2);
   if (e3 == -1) {
     FEM_Modify_Unlock(theMesh);
+    free(locknodes);
     return -1;	     
   }
   int ret = vertex_split_help(n, n1, n2, e1, e3);
   FEM_Modify_Unlock(theMesh);
+  free(locknodes);
   return ret;
 }
 
@@ -1049,6 +1116,10 @@ int FEM_Adapt::vertex_split_help(int n, int n1, int n2, int e1, int e3)
   printAdjacencies(locknodes, 4, lockelems, 4);
 #endif
 
+  free(locknodes);
+  free(lockelems);
+  free(conn);
+  free(adjnodes);
   return np;
 }
 // ======================  END vertex_split ===================

@@ -559,6 +559,7 @@ int FEM_remove_element(FEM_Mesh *m, int elementid, int elemtype, int permanent){
 	    }
 	  }
 	  //now that all ghost nodes to be removed have been decided, we add the elem & call the entry method
+	  free(nodes);
 	}
 	removeGhostElemMsg *rm = new (numGhostNodes, numGhostRN, numGhostRE, numSharedNodes, 0) removeGhostElemMsg;
 	rm->chk = m->getfmMM()->getfmUtil()->getIdx();
@@ -581,6 +582,8 @@ int FEM_remove_element(FEM_Mesh *m, int elementid, int elemtype, int permanent){
 	  rm->sharedIndices[j] = sharedIndices[j];
 	}
 	meshMod[chk].removeGhostElem(rm);  //update the ghosts on all shared chunks
+	free(ghostIndices);
+	free(sharedIndices);
       }
     }
     // remove local element
@@ -806,6 +809,7 @@ int FEM_add_element(FEM_Mesh *m, int* conn, int connSize, int elemType, int chun
       int size = ilist.size();
       newEl = ilist[size-1];
       newEl = FEM_To_ghost_index(newEl);
+      free(nodetype);
       return newEl;
     }
     newEl = FEM_add_element_local(m,conn,connSize,elemType,0);
@@ -843,6 +847,10 @@ int FEM_add_element(FEM_Mesh *m, int* conn, int connSize, int elemType, int chun
 	  //remove the ghost node
 	  FEM_remove_node_local(m,conn[i]);
 	  conn[i] = newN;
+	  for(int j=0; j<numchunks; j++) {
+	    delete chunks1[j];
+	  }
+	  free(chunks1);
 	}
       }
       newEl = FEM_add_element_local(m,conn,connSize,elemType,0);
@@ -919,6 +927,14 @@ int FEM_add_element(FEM_Mesh *m, int* conn, int connSize, int elemType, int chun
       int size = ilist.size();
       newEl = ilist[size-1];
       newEl = FEM_To_ghost_index(newEl);
+      for(int k=0; k<numSharedChunks; k++) {
+	free(sharedConn[k]);
+      }
+      free(sharedConn);
+      for(int k=0; k<connSize; k++) {
+	delete allShared[k];
+      }
+      free(allShared);
     }
   }
   else if(ghostcount > 0 && localcount == 0 && sharedcount == 0) { // it is a remote elem with no shared nodes
@@ -1005,9 +1021,20 @@ int FEM_add_element(FEM_Mesh *m, int* conn, int connSize, int elemType, int chun
       }
       fm->connSize = connSize;
       meshMod[chk].addGhostElem(fm); //newEl, m->fmMM->idx, elemType;
+      free(sharedGhosts);
+      free(sharedNodes);
     }
+    for(int k=0; k<numSharedChunks; k++) {
+      free(sharedConn[k]);
+    }
+    free(sharedConn);
+    for(int k=0; k<connSize; k++) {
+      delete allShared[k];
+    }
+    free(allShared);
   }
 
+  free(nodetype);
   return newEl;
 }
 
@@ -1044,6 +1071,10 @@ int FEM_Modify_LockN(FEM_Mesh *m, int nodeId, int readlock) {
       int pchk = chunks1[j]->chk;
       if(pchk < minChunk) minChunk = pchk;
     }
+    for(int j=0; j<numchunks; j++) {
+      delete chunks1[j];
+    }
+    free(chunks1);
     if(minChunk==index) {
       if(readlock) {
 	return m->getfmMM()->getfmLockN(nodeId)->rlock();
@@ -1072,6 +1103,10 @@ int FEM_Modify_LockN(FEM_Mesh *m, int nodeId, int readlock) {
       if(pchk == index) continue;
       if(pchk < minChunk) minChunk = pchk;
     }
+    for(int j=0; j<numchunks; j++) {
+      delete chunks1[j];
+    }
+    free(chunks1);
     int sharedIdx = m->getfmMM()->getfmUtil()->exists_in_IDXL(m,nodeId,minChunk,2);
     if(readlock) {
       return meshMod[minChunk].lockRemoteNode(sharedIdx, index, 1, 1)->i;
@@ -1101,6 +1136,10 @@ int FEM_Modify_UnlockN(FEM_Mesh *m, int nodeId, int readlock) {
       int pchk = chunks1[j]->chk;
       if(pchk < minChunk) minChunk = pchk;
     }
+    for(int j=0; j<numchunks; j++) {
+      delete chunks1[j];
+    }
+    free(chunks1);
     if(minChunk==index) {
       if(readlock) {
 	return m->getfmMM()->getfmLockN(nodeId)->runlock();
@@ -1129,6 +1168,10 @@ int FEM_Modify_UnlockN(FEM_Mesh *m, int nodeId, int readlock) {
       if(pchk == index) continue;
       if(pchk < minChunk) minChunk = pchk;
     }
+    for(int j=0; j<numchunks; j++) {
+      delete chunks1[j];
+    }
+    free(chunks1);
     int sharedIdx = m->getfmMM()->getfmUtil()->exists_in_IDXL(m,nodeId,minChunk,2);
     if(readlock) {
       return meshMod[minChunk].unlockRemoteNode(sharedIdx, index, 1, 1)->i;
@@ -1278,6 +1321,7 @@ intMsg *femMeshModify::addNodeRemote(addNodeMsg *msg) {
   //add it to the idxl & update that guys idxl list
   fmMesh->node.ghostSend.addNode(ret,msg->chk);
   imsg->i = fmUtil->exists_in_IDXL(fmMesh,ret,msg->chk,1);
+  free(localIndices);
   return imsg;
 }
 

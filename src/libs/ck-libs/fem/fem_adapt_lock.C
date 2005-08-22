@@ -98,6 +98,7 @@ int FEM_AdaptL::unlockNodes(int *gotlocks, int *lockrnodes, int numRNodes, int *
     if(tmplocks) donelocks = true;
     else CthYield(); //block for a while
   }
+  free(ungetlocks);  
   return 1;
 }
 

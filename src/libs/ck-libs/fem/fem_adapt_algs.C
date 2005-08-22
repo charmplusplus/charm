@@ -267,7 +267,7 @@ int FEM_Adapt_Algs::refine_element_leb(int e) {
   eLens[0] = length(eConn[0], eConn[1]);
   eLens[1] = length(eConn[1], eConn[2]);
   eLens[2] = length(eConn[2], eConn[0]);
-  for (int i=0; i<3; i++)
+  for (int i=0; i<3; i++) {
     if (eLens[i] > longEdgeLen) {
       longEdgeLen = eLens[i];
       longEdge = i;
@@ -275,6 +275,8 @@ int FEM_Adapt_Algs::refine_element_leb(int e) {
       otherNode = eConn[(i+1)%3];
       opNode = eConn[(i+2)%3];
     }
+  }
+  free(eConn);
   nbr = theMesh->e2e_getNbr(e, longEdge);
   if (nbr == -1) // e's longEdge is on physical boundary
     return theAdaptor->edge_bisect(fixNode, otherNode);

@@ -162,9 +162,11 @@ void FEM_MUtil::splitEntityAll(FEM_Mesh *m, int localIdx, int nBetween, int *bet
 	fm->between[j] = sharedIndices[j];
       }
       meshMod[chk].addSharedNodeRemote(fm);
+      free(sharedIndices);
       //break;
     }
   }
+  free(tween);
   return;
 }
 
@@ -187,6 +189,7 @@ void FEM_MUtil::splitEntityRemote(FEM_Mesh *m, int chk, int localIdx, int nBetwe
   inp->FEM_InterpolateNodeOnEdge(nm);
 
   splitEntity(m->node.shared, localIdx, nBetween, localIndices, idxbase);
+  free(localIndices);
   return;
 }
 
@@ -267,6 +270,7 @@ void FEM_MUtil::addGhostElementRemote(FEM_Mesh *m, int chk, int elemType, int nu
 
   int newGhostElement = FEM_add_element_local(m, conn, connSize, elemType, 1);
   m->elem[elemType].ghost->ghostRecv.addNode(FEM_To_ghost_index(newGhostElement),chk);
+  free(conn);
   return;
 }
 
@@ -308,6 +312,10 @@ void FEM_MUtil::buildChunkToNodeTable(int *nodetype, int sharedcount, int ghostc
 	  (*allShared)[i]->push_back(chunks1[j]->chk);
 	}
       }
+      for(int j=0; j<numchunks; j++) {
+	delete chunks1[j];
+      }
+      free(chunks1);
     }
     //translate the information in a reverse data structure -- which chunk has which nodes as shared
     *allChunks = new CkVec<int>;
@@ -400,6 +408,7 @@ void FEM_MUtil::addElemRemote(FEM_Mesh *m, int chk, int elemtype, int connSize, 
   }
 
   FEM_add_element(m, localIndices, connSize, elemtype);
+  free(localIndices);
   return;
 }
 
@@ -614,6 +623,9 @@ void FEM_MUtil::addToSharedList(FEM_Mesh *m, int fromChk, int sharedIdx) {
 	}
 	fm->connSize = connSize;
 	meshMod[fromChk].addGhostElem(fm); 
+	free(sharedGhosts);
+	free(sharedNodes);
+	free(nnbrs);
       }
     }
   }
