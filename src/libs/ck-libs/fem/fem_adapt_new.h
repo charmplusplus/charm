@@ -46,8 +46,13 @@ class FEM_Adapt {
   int n2e_exists(int n, int e) {
     int *nConn, nSz;
     theMesh->n2e_getAll(n, &nConn, &nSz);
-    for (int i=0; i<nSz; i++) 
-      if (nConn[i] == e) return 1;
+    for (int i=0; i<nSz; i++) {
+      if (nConn[i] == e) {
+	free(nConn);
+	return 1;
+      }
+    }
+    free(nConn);
     return 0;
   }
   int findElementWithNodes(int n1, int n2, int n3) {
@@ -55,9 +60,11 @@ class FEM_Adapt {
     theMesh->n2e_getAll(n1, &nConn, &nSz);
     for (int i=0; i<nSz; i++) {
       if ((n2e_exists(n2, nConn[i])) && (n2e_exists(n3, nConn[i]))) {
+	free(nConn);
 	return nConn[i];
       }
     }
+    free(nConn);
     return -1; //should never come here
   }
   int getSharedNodeIdxl(int n, int chk);

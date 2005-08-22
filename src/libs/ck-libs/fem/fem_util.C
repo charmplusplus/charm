@@ -558,6 +558,9 @@ int FEM_MUtil::Replace_node_local(FEM_Mesh *m, int oldIdx, int newIdx) {
   //get rid of all connections of the older node
   m->n2n_removeAll(oldIdx);
   m->n2e_removeAll(oldIdx);
+
+  delete nnbrs;
+  delete enbrs;
   return newIdx;  // return a new index
 }
 
@@ -629,5 +632,7 @@ void FEM_MUtil::addToSharedList(FEM_Mesh *m, int fromChk, int sharedIdx) {
       }
     }
   }
+  delete enbrs;
+  return;
 }
 

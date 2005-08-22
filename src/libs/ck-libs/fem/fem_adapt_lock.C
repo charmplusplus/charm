@@ -115,6 +115,8 @@ int FEM_AdaptL::edge_flip(int n1, int n2) {
   isEdge = findAdjData(n1, n2, &e1, &e2, &e1_n1, &e1_n2, &e1_n3, &e2_n1, &e2_n2, &e2_n3,&n3, &n4);
   if(isEdge == -1) {
     CkPrintf("Error: Flip %d->%d not done as it is no longer a valid edge\n",n1,n2);
+    free(locknodes);
+    free(gotlocks);
     return -1;
   }
   locknodes[0] = n1;
@@ -127,6 +129,8 @@ int FEM_AdaptL::edge_flip(int n1, int n2) {
     if(isEdge == -1) {
       unlockNodes(gotlocks, locknodes, 0, locknodes, numNodes);
       CkPrintf("Error: Flip %d->%d not done as it is no longer a valid edge\n",n1,n2);
+      free(locknodes);
+      free(gotlocks);
       return -1;
     }
     if(gotlock==1 && locknodes[2]==n3 && locknodes[3]==n4) {
@@ -141,6 +145,8 @@ int FEM_AdaptL::edge_flip(int n1, int n2) {
   }
   if ((e1 == -1) || (e2 == -1)) {
     unlockNodes(gotlocks, locknodes, 0, locknodes, numNodes);
+    free(locknodes);
+    free(gotlocks);
     return 0;
   }
   int ret = edge_flip_help(e1, e2, n1, n2, e1_n1, e1_n2, e1_n3, n3, n4);
@@ -163,6 +169,8 @@ int FEM_AdaptL::edge_bisect(int n1, int n2) {
   isEdge = findAdjData(n1, n2, &e1, &e2, &e1_n1, &e1_n2, &e1_n3, &e2_n1, &e2_n2, &e2_n3,&n3, &n4);
   if(isEdge == -1) {
     CkPrintf("Error: Bisect %d->%d not done as it is no longer a valid edge\n",n1,n2);
+    free(locknodes);
+    free(gotlocks);
     return -1;
   }
   locknodes[0] = n1;
@@ -175,6 +183,8 @@ int FEM_AdaptL::edge_bisect(int n1, int n2) {
     if(isEdge == -1) {
       unlockNodes(gotlocks, locknodes, 0, locknodes, numNodes);
       CkPrintf("Error: Bisect %d->%d not done as it is no longer a valid edge\n",n1,n2);
+      free(locknodes);
+      free(gotlocks);
       return -1;
     }
     if(gotlock==1 && locknodes[2]==n3 && locknodes[3]==n4) {
@@ -208,14 +218,22 @@ int FEM_AdaptL::vertex_remove(int n1, int n2) {
   isEdge = findAdjData(n1, n2, &e1, &e2, &e1_n1, &e1_n2, &e1_n3, &e2_n1, &e2_n2, &e2_n3,&n3, &n4);
   if(isEdge == -1) {
     CkPrintf("Error: Vertex Remove %d->%d not done as it is no longer a valid edge\n",n1,n2);
+    free(locknodes);
+    free(gotlocks);
     return -1;
   }
-  if (e1 == -1) return 0;
+  if (e1 == -1) {
+    free(locknodes);
+    free(gotlocks);
+    return 0;
+  }
   // find n5
   int *nbrNodes, nnsize, n5;
   theMesh->n2n_getAll(n1, &nbrNodes, &nnsize);
   if(!(nnsize == 4 || (nnsize==3 && e2==-1))) {
     CkPrintf("Error: Vertex Remove %d->%d on node %d with %d connections (!= 4)\n",n1,n2,n1,nnsize);
+    free(locknodes);
+    free(gotlocks);
     return -1;    
   }
   for (int i=0; i<nnsize; i++) {
@@ -224,6 +242,7 @@ int FEM_AdaptL::vertex_remove(int n1, int n2) {
       break;
     }
   }
+  free(nbrNodes);
   locknodes[0] = n1;
   locknodes[1] = n2;
   locknodes[2] = n3;
@@ -235,10 +254,14 @@ int FEM_AdaptL::vertex_remove(int n1, int n2) {
     if(isEdge == -1) {
       unlockNodes(gotlocks, locknodes, 0, locknodes, numNodes);
       CkPrintf("Error: Vertex Remove %d->%d not done as it is no longer a valid edge\n",n1,n2);
+      free(locknodes);
+      free(gotlocks);
       return -1;
     }
     if (e1 == -1) {
       unlockNodes(gotlocks, locknodes, 0, locknodes, numNodes);
+      free(locknodes);
+      free(gotlocks);
       return 0;
     }
     // find n5
@@ -250,9 +273,12 @@ int FEM_AdaptL::vertex_remove(int n1, int n2) {
 	break;
       }
     }
+    free(nbrNodes);
     if(!(nnsize == 4 || (nnsize==3 && e2==-1))) {
       unlockNodes(gotlocks, locknodes, 0, locknodes, numNodes);
       CkPrintf("Error: Vertex Remove %d->%d on node %d with %d connections (!= 4)\n",n1,n2,n1,nnsize);
+      free(locknodes);
+      free(gotlocks);
       return -1;    
     }
     if(gotlock==1 && locknodes[2]==n3 && locknodes[3]==n4 && locknodes[4]==n5) {
@@ -284,7 +310,11 @@ int FEM_AdaptL::edge_contraction(int n1, int n2) {
   bool done = false;
   int isEdge = 0;
 
-  if(n1<0 || n2<0) return -1; //should not contract an edge which is not local
+  if(n1<0 || n2<0) {
+    free(locknodes);
+    free(gotlocks);
+    return -1; //should not contract an edge which is not local
+  }
   /*
   //if either of the nodes is on the boundary, do not contract
   int n1_bound, n2_bound;
@@ -303,23 +333,33 @@ int FEM_AdaptL::edge_contraction(int n1, int n2) {
   isEdge = findAdjData(n1, n2, &e1, &e2, &e1_n1, &e1_n2, &e1_n3, &e2_n1, &e2_n2, &e2_n3,&n3, &n4);
   if(isEdge == -1) {
     CkPrintf("Edge Contract %d->%d not done as it is no longer a valid edge\n",n1,n2);
+    free(locknodes);
+    free(gotlocks);
     return -1;
   }
   locknodes[0] = n1;
   locknodes[1] = n2;
   locknodes[2] = n3;
   locknodes[3] = n4;
-  if (e1 == -1) return 0;
+  if (e1 == -1) {
+    free(locknodes);
+    free(gotlocks);
+    return 0;
+  }
   while(!done) {
     int gotlock = lockNodes(gotlocks, locknodes, 0, locknodes, numNodes);
     isEdge = findAdjData(n1, n2, &e1, &e2, &e1_n1, &e1_n2, &e1_n3, &e2_n1, &e2_n2, &e2_n3,&n3, &n4);
     if(isEdge == -1) {
       unlockNodes(gotlocks, locknodes, 0, locknodes, numNodes);
       CkPrintf("Edge contract %d->%d not done as it is no longer a valid edge\n",n1,n2);
+      free(locknodes);
+      free(gotlocks);
       return -1;
     }
     if (e1 == -1) {
       unlockNodes(gotlocks, locknodes, 0, locknodes, numNodes);
+      free(locknodes);
+      free(gotlocks);
       return 0;
     }
     if(gotlock==1 && locknodes[2]==n3 && locknodes[3]==n4) {

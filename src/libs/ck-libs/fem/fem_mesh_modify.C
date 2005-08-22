@@ -282,6 +282,8 @@ void FEM_remove_node_local(FEM_Mesh *m, int node) {
     }
     m->node.set_invalid(node);
   }
+  delete adjNodes;
+  delete adjElts;
 }
 
 
@@ -317,6 +319,8 @@ void FEM_remove_node(FEM_Mesh *m, int node){
     // mark node as deleted/invalid locally
     //FEM_remove_node_local(m,node);
     //m->node.set_invalid(node);
+    delete adjNodes;
+    delete adjElts;
   }
   else {
     FEM_remove_node_local(m,node);
@@ -526,6 +530,7 @@ int FEM_remove_element(FEM_Mesh *m, int elementid, int elemtype, int permanent){
 			ghostRNIndices.push_back(sgn);
 			numGhostRN++;
 		      }
+		      delete elts;
 		    }
 		  }
 		}
@@ -556,7 +561,9 @@ int FEM_remove_element(FEM_Mesh *m, int elementid, int elemtype, int permanent){
 	      }
 	      sharedIndices[numSharedNodes] = ssn;
 	      numSharedNodes++;
+	      delete n2ns;
 	    }
+	    delete elems;
 	  }
 	  //now that all ghost nodes to be removed have been decided, we add the elem & call the entry method
 	  free(nodes);
