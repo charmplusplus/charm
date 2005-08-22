@@ -72,7 +72,7 @@ else
 #PBS -j oe
 
 # This specifies the file to write stdout information to:
-##PBS -o $output
+#PBS -o $output
 
 # Change to the directory where charmrun was run:
 cd $indir
