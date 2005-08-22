@@ -152,10 +152,12 @@ void chunk::coarseningElements()
 	CkPrintf("Element[%d] has area %1.10e!\n", i, area);
       }
       targetArea = theElements[i].getTargetArea();
-      qFactor=theElements[i].getAreaQuality();
+      double shortEdgeLen, angle;
+      shortEdgeLen=theElements[i].getShortestEdge(&angle);
+      qFactor = theElements[i].getAreaQuality();
       if ((targetArea*COARSEN_PRECISION > area) || (qFactor < QUALITY_MIN)) {
 	CkPrintf("Element[%d] has area %1.10e target %1.10e qFactor %1.10e\n", i, area, targetArea, qFactor);
-	Insert(i, qFactor, 1);
+	Insert(i, shortEdgeLen*qFactor, 1);
       }
     }
   }
@@ -889,13 +891,15 @@ void chunk::multipleCoarsen(double *desiredArea, refineClient *client)
       if (area == 0.0) {
 	CkPrintf("Element[%d] has area %1.10e!\n", i, area);
       }
+      double shortEdgeLen, angle;
+      shortEdgeLen = theElements[i].getShortestEdge(&angle);
       qFactor = theElements[i].getAreaQuality();
       theElements[i].nonCoarsenCount = 0;
       //precThrshld = area * 1e-8;
       theElements[i].resetTargetArea(desiredArea[i]);
       if ((desiredArea[i]*COARSEN_PRECISION > area) || (area == 0.0) || 
 	  (qFactor<QUALITY_MIN)) {
-	Insert(i, qFactor, 1);
+	Insert(i, shortEdgeLen*qFactor, 1);
 	CkPrintf("Element[%d] has area %1.10e target %1.10e qFactor %1.10e\n", i, area, desiredArea[i], qFactor);
 #ifdef TDEBUG2
 	CkPrintf("TMRC2D: [%d] Setting target on element %d to %1.10e with shortEdge %1.10e\n", cid, i, desiredArea[i], qFactor);

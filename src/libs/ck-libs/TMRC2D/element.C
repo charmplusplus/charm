@@ -3,7 +3,7 @@
 
 #define ZEROAREA 1.0e-15
 
-int isnan(double x) { return (x!=x); }
+int myisnan(double x) { return (x!=x); }
 
 int element::lockOpNode(edgeRef e, double l) 
 {
@@ -37,7 +37,7 @@ void element::calculateArea()
   s = perimeter / 2.0;
   // cache the result in currentArea
   currentArea = sqrt(s * (s - len[0]) * (s - len[1]) * (s - len[2]));
-  if (isnan(currentArea)) currentArea = 0.0;
+  if (myisnan(currentArea)) currentArea = 0.0;
 }
 
 void element::refine()
@@ -254,9 +254,11 @@ void element::coarsen()
   int shortEdge = findShortestEdge();
   // check if a different edge from the shortEdge is pending for coarsening
   if (!(edges[shortEdge].isPending(myRef))) {
-    shortEdge = (shortEdge+1)%3;
-    if (!(edges[shortEdge].isPending(myRef))) {
+    if (edges[(shortEdge+1)%3].isPending(myRef)) {
       shortEdge = (shortEdge+1)%3;
+    }
+    else if (edges[(shortEdge+2)%3].isPending(myRef)) {
+      shortEdge = (shortEdge+2)%3;
     }
   }
   collapse(shortEdge);

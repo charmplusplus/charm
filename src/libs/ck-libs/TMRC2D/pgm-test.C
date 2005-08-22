@@ -382,6 +382,7 @@ void resize_nodes(void *data,int *len,int *max){
   myGlobals *g = (myGlobals *)data;
   vector2d *coord=g->coord,*R_net=g->R_net,*d=g->d,*v=g->v,*a=g->a;
   double *m_i=g->m_i;
+  int *bound = g->nodeBoundary;
   int *validNode = g->validNode;
   
   g->coord=new vector2d[*max];
@@ -393,6 +394,7 @@ void resize_nodes(void *data,int *len,int *max){
   g->v=new vector2d[g->maxnodes];//Node velocity
   g->a=new vector2d[g->maxnodes];//Node accelleration
   g->m_i=new double[g->maxnodes];//Node mass
+  g->nodeBoundary = new int[(*max)];
   g->validNode = new int[g->maxnodes]; //is the node valid
   
   if(coord != NULL){
@@ -406,6 +408,7 @@ void resize_nodes(void *data,int *len,int *max){
   FEM_Register_array(FEM_Mesh_default_read(),FEM_NODE,FEM_DATA+2,(void *)g->d,FEM_DOUBLE,2);
   FEM_Register_array(FEM_Mesh_default_read(),FEM_NODE,FEM_DATA+3,(void *)g->v,FEM_DOUBLE,2);
   FEM_Register_array(FEM_Mesh_default_read(),FEM_NODE,FEM_DATA+4,(void *)g->a,FEM_DOUBLE,2);
+  FEM_Register_array(FEM_Mesh_default_read(),FEM_NODE,FEM_BOUNDARY,(void *)g->nodeBoundary,FEM_INT,1);
   FEM_Register_array_layout(FEM_Mesh_default_read(),FEM_NODE,FEM_DATA+5,(void *)g->m_i,g->m_i_fid);
   FEM_Register_array(FEM_Mesh_default_read(),FEM_NODE,FEM_VALID,(void *)g->validNode,FEM_INT,1);
   
@@ -420,6 +423,7 @@ void resize_nodes(void *data,int *len,int *max){
     delete [] v;
     delete [] a;
     delete [] m_i;
+    delete [] bound;
     delete [] validNode;
   }
 };
@@ -553,6 +557,7 @@ driver(void)
 
   if (CkMyPe()==0) CkPrintf("Entering timeloop\n");
   int tSteps=10;
+  int k=2;
   for (int t=1;t<=tSteps;t++) {
     double curTime=CkWallTimer();
     double total=curTime-startTime;
@@ -569,7 +574,6 @@ driver(void)
     for (i=0;i<g.nelems;i++) {
       areas[i] = avgArea;
     }
-    
     CkPrintf("[%d] Starting coarsening step: %d nodes, %d elements\n", myChunk,countValidEntities(g.validNode,g.nnodes),countValidEntities(g.validElem,g.nelems));
     FEM_REFINE2D_Coarsen(FEM_Mesh_default_read(),FEM_NODE,(double *)g.coord,FEM_ELEM,areas,FEM_SPARSE);
     repeat_after_split((void *)&g);
