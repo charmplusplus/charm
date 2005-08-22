@@ -22,18 +22,64 @@ FEM_Adapt_Algs::FEM_Adapt_Algs(FEM_Mesh *m, femMeshModify *fm, int dimension)
    sizes specified in sizes array; Negative entries in size array indicate no 
    refinement. */
 void FEM_Adapt_Algs::FEM_Refine(int qm, int method, double factor, 
-				double *sizes, double *coord)
+				double *sizes)
 {
   CkPrintf("WARNING: FEM_Refine: Under construction.\n");
-  Adapt_Init(coord);
+  numNodes = theMesh->node.size();
+  numElements = theMesh->elem[0].size();
   (void)Refine(qm, method, factor, sizes);
 }
 
 /* Performs refinement; returns number of modifications */
 int FEM_Adapt_Algs::Refine(int qm, int method, double factor, double *sizes)
 {
+  // loop through elemsToRefine
+  int elId, mods=0, iter_mods=1, orig_elems = -1;
   SetMeshSize(method, factor, sizes);
-  return 0;
+  while (iter_mods != 0) {
+    iter_mods=0;
+    numNodes = theMesh->node.size();
+    numElements = theMesh->elem[0].size();
+    if (orig_elems == -1) orig_elems = numElements;
+    // sort elements to be refined by quality into elemsToRefine
+    if (refineStack) delete [] refineStack;
+    refineStack = new elemHeap[numElements];
+    if (refineElements) delete [] refineElements;
+    refineElements = new elemHeap[numElements+1];
+    for (int i=0; i<orig_elems; i++) { 
+      if (theMesh->elem[0].is_valid(i)) {
+	// find maxEdgeLength of i
+	int *eConn = (int*)malloc(3*sizeof(int));
+	double tmpLen, maxEdgeLength;
+	theMesh->e2n_getAll(i, eConn);
+	maxEdgeLength = length(eConn[0], eConn[1]);
+	tmpLen = length(eConn[1], eConn[2]);
+	if (tmpLen > maxEdgeLength) maxEdgeLength = tmpLen;
+	tmpLen = length(eConn[2], eConn[0]);
+	if (tmpLen > maxEdgeLength) maxEdgeLength = tmpLen;
+	if (maxEdgeLength > (regional_sizes[i]*REFINE_TOL)) {
+	  double qFactor=1.0;//theElements[i].getAreaQuality();
+	  Insert(i, qFactor, 0);
+	}
+      }
+    }
+    while (refineHeapSize>0 || refineTop > 0) { // loop through the elements
+      if (refineTop>0) {
+	refineTop--;
+	elId=refineStack[refineTop].elID;
+      }
+      else  elId=Delete_Min(0);
+      if ((elId != -1) && (theMesh->elem[0].is_valid(elId))) {
+	(void)refine_element_leb(elId); // refine the element
+	iter_mods++;
+      }
+      CthYield(); // give other chunks on the same PE a chance
+    }
+    mods += iter_mods;
+    CkPrintf("Refine: %d modifications in last pass.\n", iter_mods);
+  }
+  CkPrintf("Refine: %d total modifications.\n", mods);
+  return mods;
 }
 
 /* Perform coarsening on a mesh.  Tries to maintain/improve element quality as 
@@ -42,64 +88,43 @@ int FEM_Adapt_Algs::Refine(int qm, int method, double factor, double *sizes)
    sizes specified in sizes array; Negative entries in size array indicate no 
    coarsening. */
 void FEM_Adapt_Algs::FEM_Coarsen(int qm, int method, double factor, 
-				 double *sizes, double *coord)
+				 double *sizes)
 {
   CkPrintf("WARNING: FEM_Coarsen: Under construction.\n");
-  Adapt_Init(coord);
-  (void)Coarsen(qm, method, factor, sizes);
+  SetMeshSize(method, factor, sizes);
+  (void)Coarsen(qm);
 }
 
 /* Performs coarsening; returns number of modifications */
-int FEM_Adapt_Algs::Coarsen(int qm, int method, double factor, double *sizes)
+int FEM_Adapt_Algs::Coarsen(int qm)
 {
-  SetMeshSize(method, factor, sizes);
   return 0;
 }
 
 /* Smooth the mesh using method according to some quality measure qm */
-void FEM_Adapt_Algs::FEM_Smooth(int qm, int method, double *coord)
+void FEM_Adapt_Algs::FEM_Smooth(int qm, int method)
 {
   CkPrintf("WARNING: FEM_Smooth: Not yet implemented.\n");
-  Adapt_Init(coord);
 }
 
 /* Repair the mesh according to some quality measure qm */
-void FEM_Adapt_Algs::FEM_Repair(int qm, double *coord)
+void FEM_Adapt_Algs::FEM_Repair(int qm)
 {
   CkPrintf("WARNING: FEM_Repair: Not yet implemented.\n");
-  Adapt_Init(coord);
 }
 
 /* Remesh entire mesh according to quality measure qm. If method = 0, set 
    entire mesh size to factor; if method = 1, use sizes array; if method = 2, 
    uses existing regional sizes and scale by factor*/
 void FEM_Adapt_Algs::FEM_Remesh(int qm, int method, double factor, 
-				double *sizes, double *coord)
+				double *sizes)
 {
   CkPrintf("WARNING: FEM_Remesh: Under construction.\n");
-  Adapt_Init(coord);
-}
-
-/* Initialize numNodes, numElements and coords */
-void FEM_Adapt_Algs::Adapt_Init(double *coord)
-{
-  nodeCoords = coord;
-  numNodes = theMesh->node.size();
-  numElements = theMesh->elem[0].size();
-}
-
-/* Initialize numNodes, numElements and coords */
-void FEM_Adapt_Algs::Adapt_Init(int a)
-{
-  coord_attr = a;
-  numNodes = theMesh->node.size();
-  numElements = theMesh->elem[0].size();
 }
 
 /* Set sizes on elements throughout the mesh; note: size is edge length */
 void FEM_Adapt_Algs::SetMeshSize(int method, double factor, double *sizes)
 {
-  // assumes Adapt_Init has been called for the current algorithm
   if (method == 0) {
     regional_sizes = (double *)malloc(numElements*sizeof(double));
     for (int i=0; i<numElements; i++) {
@@ -292,13 +317,13 @@ int FEM_Adapt_Algs::refine_element_leb(int e) {
       propNode = fixNode;
     }
     else {
-      propElem = theAdaptor->findElementWithNodes(newNode, otherNode, nbrOpNode);
+      propElem = theAdaptor->findElementWithNodes(newNode,otherNode,nbrOpNode);
       propNode = otherNode;
     }
 
-    //if propElem is a ghost, then it is propagating in a neighboring chunk, otherwise not
+    //if propElem is ghost, then it's propagating to neighbor, otherwise not
     if(!FEM_Is_ghost_index(propElem)) {
-      refine_flip_element_leb(propElem, propNode, newNode, nbrOpNode, longEdgeLen);
+      refine_flip_element_leb(propElem,propNode,newNode,nbrOpNode,longEdgeLen);
     }
     else {
       int localChk, nbrChk;
@@ -313,10 +338,11 @@ int FEM_Adapt_Algs::refine_element_leb(int e) {
     }
     return newNode;
   }
-  else return theAdaptor->edge_bisect(fixNode, otherNode); // longEdge is nbr's long edge
+  else return theAdaptor->edge_bisect(fixNode, otherNode); // longEdge on nbr
 }
-
-void FEM_Adapt_Algs::refine_flip_element_leb(int e, int p, int n1, int n2, double le) {
+void FEM_Adapt_Algs::refine_flip_element_leb(int e, int p, int n1, int n2, 
+					     double le) 
+{
   int newNode = refine_element_leb(e);
   if(newNode == -1) return;
   (void) theAdaptor->edge_flip(n1, n2);
@@ -332,8 +358,8 @@ void FEM_Adapt_Algs::refine_flip_element_leb(int e, int p, int n1, int n2, doubl
 
 double FEM_Adapt_Algs::length(int n1, int n2)
 {
-  double *n1_coord = (double*)malloc(2*sizeof(double));
-  double *n2_coord = (double*)malloc(2*sizeof(double));
+  double *n1_coord = (double*)malloc(dim*sizeof(double));
+  double *n2_coord = (double*)malloc(dim*sizeof(double));
 
   getCoord(n1, n1_coord);
   getCoord(n2, n2_coord);
@@ -399,11 +425,11 @@ double FEM_Adapt_Algs::getArea(double *n1_coord, double *n2_coord, double *n3_co
 
 int FEM_Adapt_Algs::getCoord(int n1, double *crds) {
   if(!FEM_Is_ghost_index(n1)) {
-    FEM_Mesh_dataP(theMesh, FEM_NODE, coord_attr, (void *)crds, n1, 1, FEM_DOUBLE, 2);
+    FEM_Mesh_dataP(theMesh, FEM_NODE, coord_attr, (void *)crds, n1, 1, FEM_DOUBLE, dim);
   }
   else {
     int ghostidx = FEM_To_ghost_index(n1);
-    FEM_Mesh_dataP(theMesh, FEM_NODE + FEM_GHOST, coord_attr, (void *)crds, ghostidx, 1, FEM_DOUBLE, 2);
+    FEM_Mesh_dataP(theMesh, FEM_NODE + FEM_GHOST, coord_attr, (void *)crds, ghostidx, 1, FEM_DOUBLE, dim);
   }
   return 1;
 }
@@ -442,4 +468,74 @@ int FEM_Adapt_Algs::getShortestEdge(int n1, int n2, int n3, int* shortestEdge) {
   free(n2_coord);
   free(n3_coord);
   return 1;
+}
+
+
+void FEM_Adapt_Algs::Insert(int eIdx, double len, int cFlag)
+{
+  int i;
+  if (cFlag) {
+    i = ++coarsenHeapSize; 
+    while ((coarsenElements[i/2].len>=len) && (i != 1)) {
+      coarsenElements[i].len=coarsenElements[i/2].len;
+      coarsenElements[i].elID=coarsenElements[i/2].elID;
+      i/=2;                     
+    }
+    coarsenElements[i].elID=eIdx;
+    coarsenElements[i].len=len; 
+  }
+  else {
+    i = ++refineHeapSize; 
+    while ((refineElements[i/2].len>=len) && (i != 1)) {
+      refineElements[i].len=refineElements[i/2].len;
+      refineElements[i].elID=refineElements[i/2].elID;
+      i/=2;                     
+    }
+    refineElements[i].elID=eIdx;
+    refineElements[i].len=len; 
+  }
+}
+
+// removes and returns the minimum element of the heap 
+int FEM_Adapt_Algs::Delete_Min(int cflag)
+{
+  int Child, i, Min_ID; 
+  if (cflag) {
+    Min_ID=coarsenElements[1].elID;
+    for (i=1; i*2 <= coarsenHeapSize-1; i=Child) { // Find smaller child
+      Child = i*2; // child is left child  
+      if (Child != coarsenHeapSize)  // right child exists
+	if (coarsenElements[Child+1].len < coarsenElements[Child].len)
+	  Child++; 
+      // Percolate one level
+      if (coarsenElements[coarsenHeapSize].len >= coarsenElements[Child].len) {
+	coarsenElements[i].elID = coarsenElements[Child].elID;
+	coarsenElements[i].len = coarsenElements[Child].len;
+      }
+      else break; 
+    }
+    coarsenElements[i].elID = coarsenElements[coarsenHeapSize].elID;
+    coarsenElements[i].len = coarsenElements[coarsenHeapSize].len; 
+    coarsenHeapSize--;
+    return Min_ID; 
+  }
+  else {
+    Min_ID=refineElements[1].elID;
+    for (i=1; i*2 <= refineHeapSize-1; i=Child) { // Find smaller child
+      Child = i*2;       // child is left child  
+      if (Child !=refineHeapSize)  // right child exists
+	if (refineElements[Child+1].len < refineElements[Child].len)
+	  Child++; 
+      // Percolate one level
+      if (refineElements[refineHeapSize].len >= refineElements[Child].len){  
+	refineElements[i].elID = refineElements[Child].elID;   
+	refineElements[i].len = refineElements[Child].len;
+      }
+      else break; 
+    }
+    refineElements[i].elID = refineElements[refineHeapSize].elID;
+    refineElements[i].len = refineElements[refineHeapSize].len; 
+    refineHeapSize--;
+    return Min_ID; 
+  }
 }
