@@ -58,7 +58,7 @@ int FEM_Adapt_Algs::Refine(int qm, int method, double factor, double *sizes)
 	tmpLen = length(eConn[2], eConn[0]);
 	if (tmpLen > maxEdgeLength) maxEdgeLength = tmpLen;
 	if (maxEdgeLength > (regional_sizes[i]*REFINE_TOL)) {
-	  double qFactor=1.0;//theElements[i].getAreaQuality();
+	  double qFactor=1.0;//getAreaQuality(i);
 	  Insert(i, qFactor, 0);
 	}
       }
@@ -384,9 +384,9 @@ double FEM_Adapt_Algs::length(double *n1_coord, double *n2_coord) {
 
 double FEM_Adapt_Algs::getArea(int n1, int n2, int n3)
 {
-  double *n1_coord = (double*)malloc(2*sizeof(double));
-  double *n2_coord = (double*)malloc(2*sizeof(double));
-  double *n3_coord = (double*)malloc(2*sizeof(double));
+  double *n1_coord = (double*)malloc(dim*sizeof(double));
+  double *n2_coord = (double*)malloc(dim*sizeof(double));
+  double *n3_coord = (double*)malloc(dim*sizeof(double));
 
   getCoord(n1, n1_coord);
   getCoord(n2, n2_coord);
@@ -435,9 +435,9 @@ int FEM_Adapt_Algs::getCoord(int n1, double *crds) {
 }
 
 int FEM_Adapt_Algs::getShortestEdge(int n1, int n2, int n3, int* shortestEdge) {
-  double *n1_coord = (double*)malloc(2*sizeof(double));
-  double *n2_coord = (double*)malloc(2*sizeof(double));
-  double *n3_coord = (double*)malloc(2*sizeof(double));
+  double *n1_coord = (double*)malloc(dim*sizeof(double));
+  double *n2_coord = (double*)malloc(dim*sizeof(double));
+  double *n3_coord = (double*)malloc(dim*sizeof(double));
 
   getCoord(n1, n1_coord);
   getCoord(n2, n2_coord);
@@ -538,4 +538,27 @@ int FEM_Adapt_Algs::Delete_Min(int cflag)
     refineHeapSize--;
     return Min_ID; 
   }
+}
+
+double FEM_Adapt_Algs::getAreaQuality(int elem)
+{
+  double f, q, len[3];
+  int n[3];
+  double currentArea;
+  double *n1_coord = (double*)malloc(dim*sizeof(double));
+  double *n2_coord = (double*)malloc(dim*sizeof(double));
+  double *n3_coord = (double*)malloc(dim*sizeof(double));
+  theMesh->e2n_getAll(elem, n);
+  getCoord(n[0], n1_coord);
+  getCoord(n[1], n2_coord);
+  getCoord(n[2], n3_coord);
+
+  currentArea = getArea(n1_coord, n2_coord, n3_coord);
+
+  len[0] = length(n1_coord, n2_coord);
+  len[1] = length(n2_coord, n3_coord);
+  len[2] = length(n3_coord, n1_coord);
+  f = 4.0*sqrt(3.0); //proportionality constant
+  q = (f*currentArea)/(len[0]*len[0]+len[1]*len[1]+len[2]*len[2]);
+  return q;
 }

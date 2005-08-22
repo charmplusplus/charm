@@ -98,6 +98,7 @@ class FEM_Adapt_Algs {
   double getArea(double *n1_coord, double *n2_coord, double *n3_coord);
   int getCoord(int n1, double *crds);
   int getShortestEdge(int n1, int n2, int n3, int* shortestEdge);
+  double getAreaQuality(int elem);
 };
 
 
