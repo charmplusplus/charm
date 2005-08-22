@@ -282,8 +282,8 @@ void FEM_remove_node_local(FEM_Mesh *m, int node) {
     }
     m->node.set_invalid(node);
   }
-  delete adjNodes;
-  delete adjElts;
+  if(numAdjNodes != 0) delete adjNodes;
+  if(numAdjElts != 0) delete adjElts;
 }
 
 
@@ -319,8 +319,8 @@ void FEM_remove_node(FEM_Mesh *m, int node){
     // mark node as deleted/invalid locally
     //FEM_remove_node_local(m,node);
     //m->node.set_invalid(node);
-    delete adjNodes;
-    delete adjElts;
+    if(numAdjNodes!=0) delete adjNodes;
+    if(numAdjElts!=0) delete adjElts;
   }
   else {
     FEM_remove_node_local(m,node);
@@ -530,7 +530,7 @@ int FEM_remove_element(FEM_Mesh *m, int elementid, int elemtype, int permanent){
 			ghostRNIndices.push_back(sgn);
 			numGhostRN++;
 		      }
-		      delete elts;
+		      if(numElts!=0) delete elts;
 		    }
 		  }
 		}
@@ -561,9 +561,9 @@ int FEM_remove_element(FEM_Mesh *m, int elementid, int elemtype, int permanent){
 	      }
 	      sharedIndices[numSharedNodes] = ssn;
 	      numSharedNodes++;
-	      delete n2ns;
+	      if(numn2ns!=0) delete n2ns;
 	    }
-	    delete elems;
+	    if(numElems!=0) delete elems;
 	  }
 	  //now that all ghost nodes to be removed have been decided, we add the elem & call the entry method
 	  free(nodes);
@@ -857,7 +857,7 @@ int FEM_add_element(FEM_Mesh *m, int* conn, int connSize, int elemType, int chun
 	  for(int j=0; j<numchunks; j++) {
 	    delete chunks1[j];
 	  }
-	  free(chunks1);
+	  if(numchunks != 0) free(chunks1);
 	}
       }
       newEl = FEM_add_element_local(m,conn,connSize,elemType,0);
@@ -937,7 +937,7 @@ int FEM_add_element(FEM_Mesh *m, int* conn, int connSize, int elemType, int chun
       for(int k=0; k<numSharedChunks; k++) {
 	free(sharedConn[k]);
       }
-      free(sharedConn);
+      if(numSharedChunks!=0) free(sharedConn);
       for(int k=0; k<connSize; k++) {
 	delete allShared[k];
       }
@@ -1034,7 +1034,7 @@ int FEM_add_element(FEM_Mesh *m, int* conn, int connSize, int elemType, int chun
     for(int k=0; k<numSharedChunks; k++) {
       free(sharedConn[k]);
     }
-    free(sharedConn);
+    if(numSharedChunks!=0) free(sharedConn);
     for(int k=0; k<connSize; k++) {
       delete allShared[k];
     }
@@ -1081,7 +1081,7 @@ int FEM_Modify_LockN(FEM_Mesh *m, int nodeId, int readlock) {
     for(int j=0; j<numchunks; j++) {
       delete chunks1[j];
     }
-    free(chunks1);
+    if(numchunks!=0) free(chunks1);
     if(minChunk==index) {
       if(readlock) {
 	return m->getfmMM()->getfmLockN(nodeId)->rlock();
@@ -1113,7 +1113,7 @@ int FEM_Modify_LockN(FEM_Mesh *m, int nodeId, int readlock) {
     for(int j=0; j<numchunks; j++) {
       delete chunks1[j];
     }
-    free(chunks1);
+    if(numchunks!=0) free(chunks1);
     int sharedIdx = m->getfmMM()->getfmUtil()->exists_in_IDXL(m,nodeId,minChunk,2);
     if(readlock) {
       return meshMod[minChunk].lockRemoteNode(sharedIdx, index, 1, 1)->i;
@@ -1146,7 +1146,7 @@ int FEM_Modify_UnlockN(FEM_Mesh *m, int nodeId, int readlock) {
     for(int j=0; j<numchunks; j++) {
       delete chunks1[j];
     }
-    free(chunks1);
+    if(numchunks!=0) free(chunks1);
     if(minChunk==index) {
       if(readlock) {
 	return m->getfmMM()->getfmLockN(nodeId)->runlock();
@@ -1178,7 +1178,7 @@ int FEM_Modify_UnlockN(FEM_Mesh *m, int nodeId, int readlock) {
     for(int j=0; j<numchunks; j++) {
       delete chunks1[j];
     }
-    free(chunks1);
+    if(numchunks!=0) free(chunks1);
     int sharedIdx = m->getfmMM()->getfmUtil()->exists_in_IDXL(m,nodeId,minChunk,2);
     if(readlock) {
       return meshMod[minChunk].unlockRemoteNode(sharedIdx, index, 1, 1)->i;

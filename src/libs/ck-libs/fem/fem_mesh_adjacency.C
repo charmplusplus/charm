@@ -1043,9 +1043,8 @@ int FEM_Mesh::getElementOnEdge(int n1, int n2)
     for (int j=0; j<n2NumElems; j++) {
       if (n1AdjElems[i] == n2AdjElems[j]) {
 	if(n1AdjElems[i] >= 0) {
-	  free(n1AdjElems);
-	  free(n2AdjElems);
-	  return n1AdjElems[i];
+	  ret = n1AdjElems[i];
+	  break;
 	}
 	else {
 	  ret = n1AdjElems[i];

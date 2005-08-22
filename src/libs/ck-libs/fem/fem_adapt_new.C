@@ -485,7 +485,7 @@ int FEM_Adapt::vertex_remove(int n1, int n2)
     CkPrintf("Error: Vertex Remove %d->%d on node %d with %d connections (!= 4)\n",n1,n2,n1,nnsize);
     free(locknodes);
     free(lockelems);
-    free(nbrNodes);
+    if(nnsize!=0) delete nbrNodes;
     return -1;    
   }
   for (int i=0; i<nnsize; i++) {
@@ -494,7 +494,7 @@ int FEM_Adapt::vertex_remove(int n1, int n2)
       break;
     }
   }
-  free(nbrNodes);
+  if(nnsize!=0) delete nbrNodes;
   locknodes[0] = n1;
   locknodes[1] = n2;
   locknodes[2] = n3;
@@ -527,7 +527,7 @@ int FEM_Adapt::vertex_remove(int n1, int n2)
 	break;
       }
     }
-    free(nbrNodes);
+    if(nnsize!=0) delete nbrNodes;
     if(!(nnsize == 4 || (nnsize==3 && e2==-1))) {
       FEM_Modify_Unlock(theMesh);
       CkPrintf("Error: Vertex Remove %d->%d on node %d with %d connections (!= 4)\n",n1,n2,n1,nnsize);
@@ -872,7 +872,7 @@ int FEM_Adapt::edge_contraction_help(int e1, int e2, int n1, int n2, int e1_n1,
       nbrElems[i] = FEM_add_element(theMesh, conn, 3, 0, echunk); //add it to the same chunk from where it was removed
     }
   }
-  free(nbrElems);
+  if(nesize!=0) delete nbrElems;
   FEM_remove_node(theMesh, deletenode);
   free(conn);
   free(adjnodes);
@@ -1250,14 +1250,14 @@ bool FEM_Adapt::isCorner(int n1) {
 	  }
 	}
       }
-      free(n1AdjElems);
-      free(n2AdjElems);
+      if(n1NumElems!=0) delete n1AdjElems;
+      if(n2NumElems!=0) delete n2AdjElems;
       if(ret==1) {
-	free(n1AdjNodes);
+	if(n1NumNodes!=0) delete n1AdjNodes;
 	return true;
       }
     }
   }
-  free(n1AdjNodes);
+  if(n1NumNodes!=0) delete n1AdjNodes;
   return false;
 }

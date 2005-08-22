@@ -72,7 +72,7 @@ int FEM_lock::lock(int numNodes, int *nodes, int numElems, int* elems, int elemT
 	  for(int j=0; j<numchunks; j++) {
 	    delete chunks1[j];
 	  }
-	  free(chunks1);
+	  if(numchunks!=0) free(chunks1);
 	}
       }
       for(int i=0; i<numElems; i++) {
@@ -104,7 +104,7 @@ int FEM_lock::lock(int numNodes, int *nodes, int numElems, int* elems, int elemT
 	  for(int j=0; j<numchunks; j++) {
 	    delete chunks1[j];
 	  }
-	  free(chunks1);
+	  if(numchunks!=0) free(chunks1);
 	}
       }
 

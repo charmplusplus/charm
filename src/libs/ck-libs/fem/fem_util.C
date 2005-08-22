@@ -166,7 +166,7 @@ void FEM_MUtil::splitEntityAll(FEM_Mesh *m, int localIdx, int nBetween, int *bet
       //break;
     }
   }
-  free(tween);
+  //free(tween);
   return;
 }
 
@@ -312,10 +312,12 @@ void FEM_MUtil::buildChunkToNodeTable(int *nodetype, int sharedcount, int ghostc
 	  (*allShared)[i]->push_back(chunks1[j]->chk);
 	}
       }
-      for(int j=0; j<numchunks; j++) {
-	delete chunks1[j];
+      if(nodetype[i]==1 || nodetype[i]==2) {
+	for(int j=0; j<numchunks; j++) {
+	  delete chunks1[j];
+	}
+	if(numchunks!=0) free(chunks1);
       }
-      free(chunks1);
     }
     //translate the information in a reverse data structure -- which chunk has which nodes as shared
     *allChunks = new CkVec<int>;
