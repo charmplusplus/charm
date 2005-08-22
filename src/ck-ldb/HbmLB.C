@@ -299,6 +299,7 @@ void HbmLB::ReceiveResumeClients(int balancing, int fromlevel){
 // pick objects to migrate "t" amount of work
 void HbmLB::ReceiveMigrationDelta(double t, int lblevel, int fromlevel)
 {
+#if CMK_LBDB_ON
   int i;
   int atlevel = fromlevel-1;
   LevelData *lData = levelData[atlevel];
@@ -339,11 +340,13 @@ void HbmLB::ReceiveMigrationDelta(double t, int lblevel, int fromlevel)
     DEBUGF(("myStats.removeObject: %d, %d, %d\n", migs[i], i, objData.size()));
     myStats.removeObject(idx);
   }
+#endif
 }
 
 // find sender comms
 void HbmLB::collectCommData(int objIdx, CkVec<LDCommData> &comms)
 {
+#if CMK_LBDB_ON
   LevelData *lData = levelData[0];
 
   LDObjData &objData = myStats.objData[objIdx];
@@ -354,6 +357,7 @@ void HbmLB::collectCommData(int objIdx, CkVec<LDCommData> &comms)
     if (cdata.sender.objID() == objData.objID() && cdata.sender.omID() == objData.omID())
       comms.push_back(cdata);
   }
+#endif
 }
 
 
