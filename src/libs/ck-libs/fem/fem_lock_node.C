@@ -16,7 +16,7 @@ int FEM_lockN::rlock() {
     return -1;
   }
   else {
-    CkPrintf("Got read lock on node %d\n", idx);
+    //CkPrintf("Got read lock on node %d\n", idx);
     noreadLocks++;
     return 1;
   }
@@ -26,7 +26,7 @@ int FEM_lockN::rlock() {
 int FEM_lockN::runlock() {
   CkAssert(noreadLocks>0 && nowriteLocks==0);
   if(noreadLocks > 0) {
-    CkPrintf("Unlocked read lock on node %d\n", idx);
+    //CkPrintf("Unlocked read lock on node %d\n", idx);
     noreadLocks--;
     return 1;
   }
@@ -39,7 +39,7 @@ int FEM_lockN::runlock() {
 int FEM_lockN::wlock() {
   if(nowriteLocks==0 && noreadLocks==0) {
     nowriteLocks++;
-    CkPrintf("Got write lock on node %d\n", idx);
+    //CkPrintf("Got write lock on node %d\n", idx);
     return 1;
   } else {
     return -1;
@@ -50,7 +50,7 @@ int FEM_lockN::wlock() {
 int FEM_lockN::wunlock() {
   CkAssert(noreadLocks==0 && nowriteLocks>0);
   if(nowriteLocks) {
-    CkPrintf("Unlocked write lock on node %d\n", idx);
+    //CkPrintf("Unlocked write lock on node %d\n", idx);
     nowriteLocks--;
     return 1;
   } else {

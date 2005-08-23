@@ -26,6 +26,8 @@ void FEM_Interpolate::FEM_InterpolateNodeOnEdge(NodalArgs args)
 	a->copyEntity(args.n,*a,args.nodes[0]);
       } else if(args.frac==0.0) {
 	a->copyEntity(args.n,*a,args.nodes[1]);
+      } else {
+	a->copyEntity(args.n,*a,args.nodes[0]); //doesn't matter, copy boundary flag of any one
       }
     }
   }

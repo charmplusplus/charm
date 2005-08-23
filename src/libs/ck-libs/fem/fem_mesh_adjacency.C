@@ -760,7 +760,10 @@ void FEM_Mesh::e2n_removeAll(int e, int etype)
 /// length of adjnodes in sz; assumes adjnodes is not allocated, but sz is
 void FEM_Mesh::n2n_getAll(int n, int **adjnodes, int *sz) 
 {
-  if (n == -1) return;
+  if (n == -1) {
+    *sz = 0;
+    return;
+  }
   if(FEM_Is_ghost_index(n)){
 	FEM_VarIndexAttribute *nAdj = (FEM_VarIndexAttribute *)node.getGhost()->lookup(FEM_NODE_NODE_ADJACENCY,"n2n_getAll");
 	CkVec<CkVec<FEM_VarIndexAttribute::ID> > &nVec = nAdj->get();
@@ -912,7 +915,10 @@ void FEM_Mesh::n2n_removeAll(int n)
 /// but sz is
 void FEM_Mesh::n2e_getAll(int n, int **adjelements, int *sz) 
 {
-  if (n == -1) return;
+  if (n == -1) {
+    *sz = 0;
+    return;
+  }
   if(FEM_Is_ghost_index(n)){
 	FEM_VarIndexAttribute *eAdj = (FEM_VarIndexAttribute *)node.getGhost()->lookup(FEM_NODE_ELEM_ADJACENCY,"n2e_getAll");  
 	CkVec<CkVec<FEM_VarIndexAttribute::ID> > &eVec = eAdj->get();

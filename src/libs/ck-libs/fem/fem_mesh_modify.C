@@ -276,14 +276,15 @@ void FEM_remove_node_local(FEM_Mesh *m, int node) {
     } //otherwise this ghost node is connected to some element in another chunk, which the chunk that just informed us doesn't know abt
   }
   else {
+    CkAssert((numAdjNodes==0) && (numAdjElts==0)); // we shouldn't be removing a node away that is connected to anything
     //there seems to be bugs in n2n, which leaves some connections in rare cases even when n2e has nothing, so I am removing this assert temporarily.
-    if(!((numAdjNodes==0) && (numAdjElts==0))) { // we shouldn't be removing a node away that is connected to anything
+    /*if(!((numAdjNodes==0) && (numAdjElts==0))) { // we shouldn't be removing a node away that is connected to anything
       CkPrintf("Error:: node %d has %d node adjacencies and %d edge adjacencies\n",node,numAdjNodes,numAdjElts);
-    }
+      }*/
     m->node.set_invalid(node);
   }
-  if(numAdjNodes != 0) delete adjNodes;
-  if(numAdjElts != 0) delete adjElts;
+  if(numAdjNodes != 0) delete[] adjNodes;
+  if(numAdjElts != 0) delete[] adjElts;
 }
 
 
@@ -292,7 +293,7 @@ void FEM_remove_node_local(FEM_Mesh *m, int node) {
 // remember the reasoning for not allowing them
 void FEM_remove_node(FEM_Mesh *m, int node){
 
-  if(node == -1) return; // -1 is not even a valid ghost number
+  CkAssert(node != -1);
 
   //someone might actually want to remove a ghost node... when there is a ghost edge with both end nodes shared
   //we will have to intercept such a situation and call it on the remotechunk
@@ -319,8 +320,8 @@ void FEM_remove_node(FEM_Mesh *m, int node){
     // mark node as deleted/invalid locally
     //FEM_remove_node_local(m,node);
     //m->node.set_invalid(node);
-    if(numAdjNodes!=0) delete adjNodes;
-    if(numAdjElts!=0) delete adjElts;
+    if(numAdjNodes!=0) delete[] adjNodes;
+    if(numAdjElts!=0) delete[] adjElts;
   }
   else {
     FEM_remove_node_local(m,node);
@@ -393,7 +394,8 @@ void FEM_remove_element_local(FEM_Mesh *m, int element, int etype){
 // Can be called on local or ghost elements
 int FEM_remove_element(FEM_Mesh *m, int elementid, int elemtype, int permanent){
 
-  if(elementid == -1) return -1; // -1 is not even a valid ghost number
+  //CkAssert(elementid != -1);
+  if(elementid == -1) return -1;
 
   if(FEM_Is_ghost_index(elementid)){
     //an element can come as a ghost from only one chunk, so just convert args and call it on that chunk
@@ -530,7 +532,7 @@ int FEM_remove_element(FEM_Mesh *m, int elementid, int elemtype, int permanent){
 			ghostRNIndices.push_back(sgn);
 			numGhostRN++;
 		      }
-		      if(numElts!=0) delete elts;
+		      if(numElts!=0) delete[] elts;
 		    }
 		  }
 		}
@@ -561,9 +563,9 @@ int FEM_remove_element(FEM_Mesh *m, int elementid, int elemtype, int permanent){
 	      }
 	      sharedIndices[numSharedNodes] = ssn;
 	      numSharedNodes++;
-	      if(numn2ns!=0) delete n2ns;
+	      if(numn2ns!=0) delete[] n2ns;
 	    }
-	    if(numElems!=0) delete elems;
+	    if(numElems!=0) delete[] elems;
 	  }
 	  //now that all ghost nodes to be removed have been decided, we add the elem & call the entry method
 	  free(nodes);
@@ -771,6 +773,7 @@ int FEM_add_element(FEM_Mesh *m, int* conn, int connSize, int elemType, int chun
   int localcount=0;
   int *nodetype = (int *)malloc(connSize *sizeof(int)); //0 -- local, 1 -- shared, 2--ghost
   for(int i=0;i<connSize;i++){
+    CkAssert(conn[i]!=-1);
     if(is_shared(m,conn[i])) {
       nodetype[i] = 1;
       sharedcount++;
@@ -1287,6 +1290,7 @@ intMsg *femMeshModify::lockRemoteNode(int sharedIdx, int fromChk, int isGhost, i
   } else {
     localIdx = fmUtil->lookup_in_IDXL(fmMesh, sharedIdx, fromChk, 0);
   }
+  CkAssert(localIdx != -1);
   intMsg *imsg = new intMsg(0);
   int ret;
   if(readLock) {
@@ -1305,6 +1309,7 @@ intMsg *femMeshModify::unlockRemoteNode(int sharedIdx, int fromChk, int isGhost,
   } else {
     localIdx = fmUtil->lookup_in_IDXL(fmMesh, sharedIdx, fromChk, 0);
   }
+  CkAssert(localIdx != -1);
   intMsg *imsg = new intMsg(0);
   int ret;
   if(readLock) {
@@ -1322,6 +1327,7 @@ intMsg *femMeshModify::addNodeRemote(addNodeMsg *msg) {
   int *localIndices = (int*)malloc(msg->nBetween *sizeof(int));
   for(int i=0; i<msg->nBetween; i++) {
     localIndices[i] = fmUtil->lookup_in_IDXL(fmMesh, msg->between[i], msg->chk, 0);
+    CkAssert(localIndices[i] != -1);
   }
   int ret = FEM_add_node(fmMesh, localIndices, msg->nBetween, msg->chunkNo, msg->forceShared, msg->upcall);
   //this is a ghost on that chunk,

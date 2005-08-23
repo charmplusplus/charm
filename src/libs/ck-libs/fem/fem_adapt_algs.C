@@ -286,7 +286,10 @@ int FEM_Adapt_Algs::refine_element_leb(int e) {
   int fixNode, otherNode, opNode, longEdge, nbr; 
   double eLens[3], longEdgeLen = 0.0;
 
-  if(e==-1) return -1;
+  if(e==-1) {
+    free(eConn);
+    return -1;
+  }
 
   theMesh->e2n_getAll(e, eConn);
   eLens[0] = length(eConn[0], eConn[1]);
@@ -311,6 +314,7 @@ int FEM_Adapt_Algs::refine_element_leb(int e) {
   if ((fixEdgeLen > longEdgeLen) || (otherEdgeLen > longEdgeLen)) { 
     // longEdge is not nbr's longest edge
     int newNode = theAdaptor->edge_bisect(fixNode, otherNode);
+    if(newNode==-1) return -1;
     int propElem, propNode; // get the element to propagate on
     if (fixEdgeLen > otherEdgeLen) {
       propElem = theAdaptor->findElementWithNodes(newNode, fixNode, nbrOpNode);

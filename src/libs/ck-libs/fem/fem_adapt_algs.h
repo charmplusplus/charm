@@ -21,7 +21,7 @@ class FEM_Adapt_Algs {
   femMeshModify *theMod;
   //FEM_Adapt *theAdaptor;
   FEM_AdaptL *theAdaptor;
-  int numElements, numNodes, dim;
+  int numNodes, numElements, dim;
   double *regional_sizes;
   int coord_attr;
   int bc_attr;

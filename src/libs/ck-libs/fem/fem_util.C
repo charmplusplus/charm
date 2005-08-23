@@ -166,7 +166,7 @@ void FEM_MUtil::splitEntityAll(FEM_Mesh *m, int localIdx, int nBetween, int *bet
       //break;
     }
   }
-  //free(tween);
+  free(tween);
   return;
 }
 
@@ -561,8 +561,8 @@ int FEM_MUtil::Replace_node_local(FEM_Mesh *m, int oldIdx, int newIdx) {
   m->n2n_removeAll(oldIdx);
   m->n2e_removeAll(oldIdx);
 
-  delete nnbrs;
-  delete enbrs;
+  delete[] nnbrs;
+  delete[] enbrs;
   return newIdx;  // return a new index
 }
 
@@ -634,7 +634,7 @@ void FEM_MUtil::addToSharedList(FEM_Mesh *m, int fromChk, int sharedIdx) {
       }
     }
   }
-  delete enbrs;
+  delete[] enbrs;
   return;
 }
 

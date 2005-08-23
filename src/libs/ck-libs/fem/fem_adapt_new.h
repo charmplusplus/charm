@@ -48,11 +48,11 @@ class FEM_Adapt {
     theMesh->n2e_getAll(n, &nConn, &nSz);
     for (int i=0; i<nSz; i++) {
       if (nConn[i] == e) {
-	free(nConn);
+	if(nSz!=0) free(nConn);
 	return 1;
       }
     }
-    free(nConn);
+    if(nSz!=0) free(nConn);
     return 0;
   }
   int findElementWithNodes(int n1, int n2, int n3) {
@@ -65,7 +65,7 @@ class FEM_Adapt {
 	break;
       }
     }
-    free(nConn);
+    if(nSz!=0) free(nConn);
     return ret; //should never come here
   }
   int getSharedNodeIdxl(int n, int chk);
@@ -114,7 +114,7 @@ class FEM_Adapt {
       removing the two elements (n1,n2,n3) and (n1,n2,n4) adjacent to e, and 
       finally removing nodes n1 and n2; return 1 if successful, 0 if not **/
   virtual int edge_contraction(int n1, int n2);
-  int edge_contraction_help(int e1, int e2, int n1, int n2, int e1_n1, 
+  virtual int edge_contraction_help(int e1, int e2, int n1, int n2, int e1_n1, 
 				    int e1_n2, int e1_n3, int e2_n1, int e2_n2,
 				    int e2_n3, int n3, int n4);
 
