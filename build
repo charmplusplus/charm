@@ -144,11 +144,11 @@ printOption() {
 }
 
 CheckDir() {
-  for dir in $*
+  for d in $*
   do
-    if test ! -d $dir
+    if test ! -d $d
     then
-      echo Error: cannot find $1!
+      echo Error: cannot find $d!
       exit 1
     fi
   done
@@ -200,33 +200,58 @@ while [ ! $# -eq 0 ]
 do
   case "$1" in
     	    "--basedir")
-          	shift; CheckDir $1/include $1/lib
-          	LIBDIR="$LIBDIR -L$1/lib";
-          	INCDIR="$INCDIR -I$1/include"; shift
+          	shift; 
+  		for dir in $1
+  		do
+		  CheckDir $dir/include $dir/lib
+          	  LIBDIR="$LIBDIR -L$dir/lib";
+          	  INCDIR="$INCDIR -I$dir/include"
+		done
+          	shift
  	  	;;
     	    --basedir=*)
                 basedir=`echo $1 | awk -F= '{print $2}'`
-		CheckDir $basedir/include $basedir/lib
-          	LIBDIR="$LIBDIR -L$basedir/lib";
-          	INCDIR="$INCDIR -I$basedir/include"; shift
+  		for dir in $basedir
+  		do
+		  CheckDir $dir/include $dir/lib
+          	  LIBDIR="$LIBDIR -L$dir/lib";
+          	  INCDIR="$INCDIR -I$dir/include"
+		done
+          	shift
  	  	;;
     	    "--libdir")
           	shift; CheckDir $1
-          	LIBDIR="$LIBDIR -L$1"; shift
+  		for dir in $1
+  		do
+          	  LIBDIR="$LIBDIR -L$dir"; 
+		done
+                shift
  	  	;;
     	    --libdir=*)
                 libdir=`echo $1 | awk -F= '{print $2}'`
 		CheckDir $libdir
-          	LIBDIR="$LIBDIR -L$libdir"; shift
+  		for dir in $libdir
+  		do
+          	  LIBDIR="$LIBDIR -L$dir"; 
+		done
+          	shift
  	  	;;
     	    "--incdir")
           	shift; CheckDir $1
-          	INCDIR="$INCDIR -I$1"; shift
+  		for dir in $1
+  		do
+          	  INCDIR="$INCDIR -I$dir"; 
+		done
+          	shift
  	  	;;
     	    --incdir=*)
                 incdir=`echo $1 | awk -F= '{print $2}'`
 		CheckDir $incdir
-          	INCDIR="$INCDIR -I$incdir"; shift
+  		for dir in $incdir
+  		do
+          	  INCDIR="$INCDIR -I$dir"; 
+		done
+          	shift
  	  	;;
 	    --no-build-shared|-nobs|--no-shared)
 		BUILD_SHARED="-nobs"; shift
