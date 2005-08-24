@@ -566,3 +566,66 @@ double FEM_Adapt_Algs::getAreaQuality(int elem)
   q = (f*currentArea)/(len[0]*len[0]+len[1]*len[1]+len[2]*len[2]);
   return q;
 }
+
+// FEM_Mesh_mooth
+//  Inputs  : meshP - a pointer to the FEM_Mesh object to smooth
+//	    : nodes - an array of local node numbers to be smoothed.  Send
+//		  NULL pointer to smooth all nodes.
+//	    : nNodes - the number of nodes to be smoothed.  This must 
+//		      be the total number of nodes on this chunk if the nodes
+//		      array is NULL
+//	    : attrNo - the attribute number where the coords are registered
+//  Shifts nodes around to improve mesh quality.  FEM_BOUNDARY attribute
+//  and interpolator function must be registered by user to maintain 
+//  boundary information.
+void  FEM_Adapt_Algs::FEM_mesh_smooth(FEM_Mesh *meshP, int *nodes, int nNodes, int attrNo) {
+  vector2d newPos, *coords, *ghostCoords;
+  int idx, nNod, nGn, gIdxN, *boundVals, nodesInChunk, mesh;
+  int *adjnodes;
+
+  mesh=FEM_Mesh_default_read();
+  nodesInChunk = FEM_Mesh_get_length(mesh,FEM_NODE);
+  nGn = FEM_Mesh_get_length(mesh, FEM_GHOST + FEM_NODE);
+  
+  boundVals = new int[nodesInChunk];
+  coords = new vector2d[nodesInChunk+nGn];
+
+  FEM_Mesh_data(mesh, FEM_NODE, FEM_BOUNDARY, (int*) boundVals, 0, nodesInChunk, FEM_INT, 1);    
+
+  FEM_Mesh_data(mesh, FEM_NODE, attrNo, (double*)coords, 0, nodesInChunk, FEM_DOUBLE, 2);
+
+  IDXL_Layout_t coord_layout = IDXL_Layout_create(IDXL_DOUBLE, 2);
+  FEM_Update_ghost_field(coord_layout,-1, coords); 
+  ghostCoords = &(coords[nodesInChunk]);
+  for (int i=0; i<nNodes; i++)
+  {
+    if (nodes==NULL) idx=i;
+    else idx=nodes[i];
+    newPos.x=0;
+    newPos.y=0;
+    CkAssert(idx<nodesInChunk);  
+    if (FEM_is_valid(mesh, FEM_NODE, idx) && boundVals[idx]>-1) //node must be internal
+    {
+      meshP->n2n_getAll(idx, &adjnodes, &nNod);
+      for (int j=0; j<nNod; j++) { //for all adjacent nodes, find coords
+	if (adjnodes[j]<-1) {
+	  gIdxN = FEM_From_ghost_index(adjnodes[j]);
+	  newPos.x += ghostCoords[gIdxN].x;
+	  newPos.y += ghostCoords[gIdxN].y;
+	}
+	else {
+	  newPos.x += coords[adjnodes[j]].x;
+	  newPos.y += coords[adjnodes[j]].y;
+	}     
+      }
+      newPos.x/=nNod;
+      newPos.y/=nNod;
+      FEM_set_entity_coord2(mesh, FEM_NODE, idx, newPos.x, newPos.y);
+      delete [] adjnodes;
+    }
+  }
+
+  delete [] coords;
+  delete [] boundVals;
+}
+

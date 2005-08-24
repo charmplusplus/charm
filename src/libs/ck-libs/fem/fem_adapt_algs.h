@@ -8,6 +8,8 @@
 #include "ckvector3d.h"
 #include "fem.h"
 #include "fem_mesh.h"
+#include "vector2d.h"
+
 
 #define REFINE_TOL 1.1
 #define COARSEN_TOL 0.9
@@ -62,6 +64,18 @@ class FEM_Adapt_Algs {
   /// Smooth the mesh using method according to some quality measure qm
   void FEM_Smooth(int qm, int method);
   /// Repair the mesh according to some quality measure qm
+
+  // FEM_Mesh_mooth
+  //	Inputs	: meshP - a pointer to the FEM_Mesh object to smooth
+  //		: nodes - an array of local node numbers to be smoothed.  Send
+  //			  NULL pointer to smooth all nodes.
+  //		: nNodes - the size of the nodes array
+  //		: attrNo - the attribute number where the coords are registered
+  //	Shifts nodes around to improve mesh quality.  FEM_BOUNDARY attribute
+  //	and interpolator function must be registered by user to maintain 
+  //	boundary information.
+  void FEM_mesh_smooth(FEM_Mesh *meshP, int *nodes, int nNodes, int attrNo);
+
   void FEM_Repair(int qm);
   /// Remesh entire mesh
   /** Remesh entire mesh according to quality measure qm
