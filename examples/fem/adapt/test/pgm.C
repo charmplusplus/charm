@@ -5,7 +5,7 @@
 #include "fem_mesh.h"
 #include "fem_adapt_new.h"
 #include "fem_mesh_modify.h"
-
+#include <math.h>
 
 extern void _registerFEMMeshModify(void);
 
@@ -177,335 +177,104 @@ driver(void)
   int nnodes,nelems,nelems2,ignored;
   int i,t=0, myId=FEM_My_partition();
   myGlobals g;
+  g.coord=NULL;
+  g.conn=NULL;
+  g.vCoord=NULL;
+  g.vConn=NULL;
+  
   FEM_Register(&g,(FEM_PupFn)pup_myGlobals);
+
   int mesh=FEM_Mesh_default_read(); // Tell framework we are reading data from the mesh
   FEM_Mesh *meshP = FEM_Mesh_lookup(mesh, "driver");
   _registerFEMMeshModify();
 
   printf("partition %d is in driver\n", myId);
-
-   
-  // Get node data
-  nnodes=FEM_Mesh_get_length(mesh,FEM_NODE); // Get number of nodes
-  g.nnodes=nnodes;
-  g.coord=new vector2d[nnodes];
-  // Get node positions
-  FEM_Mesh_data(mesh, FEM_NODE, FEM_DATA+0, (double*)g.coord, 0, nnodes, FEM_DOUBLE, 2);  
-
-
-  // Get element data
-  nelems=FEM_Mesh_get_length(mesh,FEM_ELEM+0); // Get number of elements
-  g.nelems=nelems;
-  g.conn=new connRec[nelems];
-  // Get connectivity for elements
-  FEM_Mesh_data(mesh, FEM_ELEM+0, FEM_CONN, (int *)g.conn, 0, nelems, FEM_INDEX_0, 3);  
-
-
   {
- 	int j, t=0;
-	const int triangleFaces[6] = {0,1,1,2,2,0};
- 	FEM_Add_elem2face_tuples(mesh, 0, 2, 3, triangleFaces);
- 	FEM_Mesh_create_elem_elem_adjacency(mesh);
-	FEM_Mesh_allocate_valid_attr(mesh, FEM_ELEM+0);
-	FEM_Mesh_allocate_valid_attr(mesh, FEM_NODE);
-	FEM_Mesh_create_node_elem_adjacency(mesh);
-	FEM_Mesh_create_node_node_adjacency(mesh);
-
+    int j, t=0;
+    const int triangleFaces[6] = {0,1,1,2,2,0};
+    FEM_Add_elem2face_tuples(mesh, 0, 2, 3, triangleFaces);
+    FEM_Mesh_create_elem_elem_adjacency(mesh);
+    FEM_Mesh_allocate_valid_attr(mesh, FEM_ELEM+0);
+    FEM_Mesh_allocate_valid_attr(mesh, FEM_NODE);
+    FEM_Mesh_create_node_elem_adjacency(mesh);
+    FEM_Mesh_create_node_node_adjacency(mesh);
 	
-	FEM_Print_Mesh_Summary(mesh);
+    FEM_Print_Mesh_Summary(mesh);
 	
-	int tuplesPerElem = 3;
-	int elementNum = 0;
-	
-
-	int *values, *nvalues;
-	double *valuesDouble, *nvaluesDouble;
-	values = new int[g.nelems];
-	nvalues = new int[g.nnodes];
-	valuesDouble = new double[g.nelems];
-	nvaluesDouble = new double[g.nnodes];
-
-	FEM_Mesh_data(mesh, FEM_ELEM+elementNum, FEM_DATA, values, 0, g.nelems, FEM_INT, 1);
-	FEM_Mesh_data(mesh, FEM_NODE, FEM_DATA+1, nvalues, 0, g.nnodes, FEM_INT, 1);
-
-	for (int i=0; i<g.nelems; i++) valuesDouble[i]=values[i];
-	for (int i=0; i<g.nnodes; i++) nvaluesDouble[i]=nvalues[i];
-
-	// ghost data
-	int ng=FEM_Mesh_get_length(mesh,FEM_GHOST+FEM_ELEM+elementNum); 
-	int *valuesg, *nvaluesg;
-	valuesg=new int[ng];
-	int ngn = FEM_Mesh_get_length(mesh,FEM_GHOST+FEM_NODE);
-	nvaluesg = new int[ngn];
-
-	FEM_Mesh_data(mesh, FEM_GHOST+FEM_ELEM+elementNum, FEM_DATA, valuesg, 0, ng, FEM_INT, 1);
-	FEM_Mesh_data(mesh, FEM_GHOST+FEM_NODE, FEM_DATA+1, nvaluesg, 0, ngn, FEM_INT, 1);
-
-	FEM_Print_Mesh_Summary(mesh);
-
-	int rank = 0;
-	MPI_Comm comm = MPI_COMM_WORLD;
-	MPI_Comm_rank(comm,&rank);
-	
-	MPI_Barrier(comm);
-
-	FEM_REF_INIT(mesh);
-  	MPI_Barrier(comm);
-
-
-
-/*// Remaps the nodes to correspond the original node numberings
-  vector2d *coords;
-  connRec *conns;
-  conns=new connRec[g.nelems];
-  coords=new vector2d[g.nnodes];
-  for (int i=0; i<g.nnodes; i++) {
-    CkPrintf("oldCoords[%d]: (%f, %f)\n", i, g.coord[i].x, g.coord[i].y);
-    coords[nvalues[i]]=g.coord[i];  
-    CkPrintf("node %d has val %d\n", i, nvalues[i]);
-  }
-  for (int i=0; i<g.nelems;i++) {
-    for (int j=0; j<3; j++) {
-      conns[i][j]=nvalues[g.conn[i][j]];
-    }    
-  }
-
-
-*/
-	// Test out adjacencies here
-	// Print them pretty like
-/*
-	CkPrintf("\n  *** TESTING E2E ADJACENCIES *** \n\n");
-	neighbors=new int[3];
-	for (int i=0; i<g.nelems; i++) {
-	  meshP->e2e_getAll(i, neighbors);
-	  CkPrintf(" %d:  e2e : ", myId);
-	  if (values[i]<10) CkPrintf(" ");
-	  CkPrintf("[%d] => { ", values[i]);
-	  for (j=0; j<3; j++) {
-	    if (neighbors[j]<-1) 
-	    {
-	      if (valuesg[FEM_From_ghost_index(neighbors[j])]<10) CkPrintf(" ");
-	      CkPrintf("(%d)*",valuesg[FEM_From_ghost_index(neighbors[j])]);
-	    }
-	    else if (neighbors[j]>-1) {
-	      if (values[neighbors[j]]<10) CkPrintf(" ");
-	      CkPrintf("(%d) ", values[neighbors[j]]);
-	    }
-	    else {
-	      CkPrintf("(%d) ", neighbors[j]);
-	    }
-	    if (j<2) CkPrintf(", ");
-	  }
-	  CkPrintf(" }\n");
-	}
-
-	delete [] neighbors;    
-
-	CkPrintf("\n  *** TESTING E2N ADJACENCIES *** \n\n");
-	neighbors=new int[3];
-	for (int i=0; i<g.nelems; i++) {
-	  meshP->e2n_getAll(i, neighbors);
-	  CkPrintf(" %d:  e2n : ", myId);
-	  if (values[i]<10) CkPrintf(" ");
-	  CkPrintf("[%d] => { ", values[i]);
-	  for (j=0; j<3; j++) {
-	    if (neighbors[j]<-1) 
-	    {
-	      if (nvaluesg[FEM_From_ghost_index(neighbors[j])]<10) CkPrintf(" ");
-	      CkPrintf("(%d)*",nvaluesg[FEM_From_ghost_index(neighbors[j])]);
-	    }
-	    else if (neighbors[j]>-1) {
-	      if (nvalues[neighbors[j]]<10) CkPrintf(" ");
-	      CkPrintf("(%d) ", nvalues[neighbors[j]]);//coords[i].x, g.coord[i].y
-	    }
-	    else {
-	      CkPrintf("(%d) ", neighbors[j]);
-	    }
-	    if (j<2) CkPrintf(", ");
-	  }
-	  CkPrintf(" }\n");
-	}
-
-      
-	CkPrintf("\n  *** TESTING N2N ADJACENCIES *** \n\n");
-	for (int i=0; i<g.nnodes; i++) {
-	  meshP->n2n_getAll(i, &adjnodes, &adjSz);
-	  CkPrintf(" %d:  n2n : ", myId);
-	  if (nvalues[i]<10) CkPrintf(" ");
-	  CkPrintf("[%d] => { ", nvalues[i]);
-	  for (int j=0; j<adjSz; j++){
-	    if (adjnodes[j]<-1) 
-	    {
-	      if (nvaluesg[FEM_From_ghost_index(adjnodes[j])]<10) CkPrintf(" ");
-	      CkPrintf("(%d)*",nvaluesg[FEM_From_ghost_index(adjnodes[j])]);
-	    }
-	    else if (adjnodes[j]>-1) {
-	      if (nvalues[adjnodes[j]]<10) CkPrintf(" ");
-	      CkPrintf("(%d) ", nvalues[adjnodes[j]]);
-	    }
-	    else {
-	      CkPrintf("(%d) ", adjnodes[j]);
-	    }
-	    if (j<adjSz-1) CkPrintf(", ");
-	  }
-	  CkPrintf(" }\n");
-	}	
-      
-	delete [] adjnodes;
-
-	CkPrintf("\n  *** TESTING N2E ADJACENCIES *** \n\n");
-	for (int i=0; i<g.nnodes; i++) {
-	  meshP->n2e_getAll(i, &adjelems, &adjSz);
-	  CkPrintf(" %d:  n2e : ", myId);
-	  if (nvalues[i]<10) CkPrintf(" ");
-	  CkPrintf("[%d] => { ", nvalues[i]);
-	  for (int j=0; j<adjSz; j++){
-	    if (adjelems[j]<-1) 
-	    {
-	      if (valuesg[FEM_From_ghost_index(adjelems[j])]<10) CkPrintf(" ");
-	      CkPrintf("(%d)*",valuesg[FEM_From_ghost_index(adjelems[j])]);
-	    }
-	    else if (adjnodes[j]>-1) {
-	      if (values[adjelems[j]]<10) CkPrintf(" ");
-	      CkPrintf("(%d) ", values[adjelems[j]]);
-	    }
-	    else {
-	      CkPrintf("(%d) ", adjelems[j]);
-	    }
-	    if (j<adjSz-1) CkPrintf(", ");
-	  }
-	  CkPrintf(" }\n");
-	}	
-*/
-//      doNetFEM(t, mesh, g);
-
+    int tuplesPerElem = 3;
+    int elementNum = 0;
+    int rank = 0;
+    MPI_Comm comm = MPI_COMM_WORLD;
+    MPI_Comm_rank(comm,&rank);
+    MPI_Barrier(comm);
+    FEM_REF_INIT(mesh);
+    MPI_Barrier(comm);
 
 //********************* Test mesh modification here **************************//
      
-      FEM_Adapt *adaptor= meshP->getfmMM()->getfmAdapt();
-      doNetFEM(t, mesh, g);
-      FEM_Adapt_Algs *adaptAlgs= meshP->getfmMM()->getfmAdaptAlgs();
-      adaptAlgs->Adapt_Init(mesh, FEM_DATA+0);
-      FEM_Interpolate *interp = meshP->getfmMM()->getfmInp();
-      interp->FEM_SetInterpolateNodeEdgeFnPtr(interpolate);
-/*
-      // EDGE FLIP TESTING
-      int flip[2];
-         
-      if (myId==0) 
-      {
-	flip[0]=2;
-	flip[1]=0;
-      }	
-      else if (myId==1) 
-      {
-	flip[0]=1;
-	flip[1]=16;
-      }	
-      else if (myId==2) 
-      {
-	flip[0]=14;
-	flip[1]=15;
-      }	
-      else //if (myId==3) 
-      {
-	flip[0]=14;
-	flip[1]=8;
-      }	
+    double meanArea=0.0;
+    FEM_Adapt *adaptor= meshP->getfmMM()->getfmAdaptL();
+    doNetFEM(t, mesh, g);
+    FEM_Adapt_Algs *adaptAlgs= meshP->getfmMM()->getfmAdaptAlgs();
+    adaptAlgs->FEM_Adapt_Algs_Init(FEM_DATA+0, FEM_BOUNDARY);
+    FEM_Interpolate *interp = meshP->getfmMM()->getfmInp();
+    interp->FEM_SetInterpolateNodeEdgeFnPtr(interpolate);
+/*    adaptor->edge_contraction(5,2);
+    adaptor->edge_contraction(1,4);
+    adaptor->edge_contraction(25,13);
+    adaptor->edge_contraction(43,47);
+    adaptor->edge_contraction(40,39);
+    adaptor->edge_contraction(21,22);
+    adaptor->edge_contraction(9,52);
+    adaptor->edge_contraction(19,29);
+    adaptor->edge_contraction(42,14);
+    adaptor->edge_contraction(12,50);
+    adaptor->edge_contraction(26,46);*/
+    doNetFEM(t, mesh, g);
+    CkPrintf("*************** CONTRACTION *************** \n");
+    printQualityInfo(g, meanArea);
 
- //     CkPrintf("%d:Running edge_flip (%d, %d)\n",myId, flip[0],flip[1]);
-      if (rank==1) adaptor->edge_flip(flip[0],flip[1]);*/
-    int *nodes;
+      
+    int *nodes=NULL, *adjnodes, nNod;
     for (int c=0; c<3; c++) {  
-      for (int i=0; i<g.nelems; i++)
+      for (int i=0; i<g.nelems; i++) {
 	if (FEM_is_valid(mesh, FEM_ELEM, i))
 	  adaptAlgs->refine_element_leb(i);
-
+      }
       doNetFEM(t, mesh, g);
-      if (!nodes) delete[] nodes;
-      nodes = new int[g.nnodes];
-      for (int i=0; i<g.nnodes; i++) nodes[i]=i;
-      for (int i=0; i<2; i++) { 
-        FEM_mesh_smooth(mesh, nodes, g.nnodes, FEM_DATA+0);
-        doNetFEM(t, mesh, g);
+      CkPrintf("*************** REFINEMENT *************** \n");
+      printQualityInfo(g, meanArea);
+/*      if (rank==0) {
+	meshP->n2n_getAll(3, &adjnodes, &nNod);
+for (int j=0; j<nNod; j++) CkPrintf("node[%d]: %d\n", 3,adjnodes[j]);
+
+      }
+      else if (rank==1) {
+	meshP->n2n_getAll(17, &adjnodes, &nNod);
+for (int j=0; j<nNod; j++) CkPrintf("node[%d]: %d\n", 17,adjnodes[j]);
+
+      }
+
+ //	  CkPrintf("%d: (%f, %f)\n", j, theCoord.x, theCoord.y);
+*/	
+
+
+      if (nodes!=NULL) delete[] nodes;
+      nodes = NULL;
+//      for (int i=0; i<g.nnodes; i++) nodes[i]=i;
+      for (int i=0; i<3; i++) { 
+	adaptAlgs->FEM_mesh_smooth(meshP, NULL, g.nnodes, FEM_DATA+0);
+	doNetFEM(t, mesh, g);
+	CkPrintf("*************** SMOOTHING **************** \n");
+       	printQualityInfo(g, meanArea);
       }
     }
     FEM_Print_Mesh_Summary(mesh);
-
-
-      
-
   
-
-
-/*
-      int bisect[2];
-
-      if (myId==0) 
-      {
-	bisect[0]=2;
-	bisect[1]=3;
-      }	
-      else if (myId==1) 
-      {
-	bisect[0]=1;
-	bisect[1]=4;
-      }	
-      else if (myId==2) 
-      {
-	bisect[0]=15;
-	bisect[1]=17;
-      }	
-      else //if (myId==3) 
-      {
-	bisect[0]=1;
-	bisect[1]=2;
-      }	
-      int newNode=0;
-      CkPrintf("%d:Running edge_bisect (%d, %d)\n",myId, bisect[0],bisect[1]);
-      newNode=adaptor->edge_bisect(bisect[0],bisect[1]);
-*/
-
-
-/*
-      int vRemove[2];
-  
-      CkPrintf("Begin vertex remove. \n");
-      if (myId==0) 
-      {
-	vRemove[0]=newNode;
-	vRemove[1]=13;
-      }	
-      else if (myId==1) 
-      {
-	vRemove[0]=newNode;
-	vRemove[1]=1;
-      }	
-      else if (myId==2) 
-      {
-	vRemove[0]=newNode;
-	vRemove[1]=15;
-      }	
-      else //if (myId==3) 
-      {
-	vRemove[0]=newNode;
-	vRemove[1]=2;
-      }	
-
-      CkPrintf("%d:Running vertex_remove (%d, %d)\n",myId, vRemove[0],vRemove[1]);
-      if (rank==0) adaptor->vertex_remove(vRemove[0],vRemove[1]);*/
-
-  
-      CkPrintf("Chunk %d Waiting for Synchronization\n",rank);
-      MPI_Barrier(comm);
-      CkPrintf("Synchronized\n");
-      doNetFEM(t, mesh, g);
-      doNetFEM(t, mesh, g);
-
-      doNetFEM(t, mesh, g);
-      FEM_Print_Mesh_Summary(mesh);
-      CkExit();
+    CkPrintf("Chunk %d Waiting for Synchronization\n",rank);
+    MPI_Barrier(comm);
+    CkPrintf("Synchronized\n");
+    CkExit();
   }
   CkPrintf("Driver finished.\n");
 }
@@ -558,8 +327,9 @@ void doNetFEM(int& t, int mesh, myGlobals &g) {
   CkPrintf("Sending to netFem step %d.\n",t);
   rebuildArrays(mesh, g);
 //  for (int i=0; i<g.nVnodes; i++)  CkPrintf("vNode[%d]: (%f, %f) \n", i, g.vCoord[i].x, g.vCoord[i].y);  
+//  for (int i=0; i<g.nVelems; i++)  CkPrintf("vElem[%d]: (%d, %d, %d) \n", i, g.vConn[i][0], g.vConn[i][1], g.vConn[i][2]);
   NetFEM n=NetFEM_Begin(FEM_My_partition(),t,2,NetFEM_WRITE);
-  NetFEM_Nodes(n,g.nVnodes,(double *)g.vCoord,"Position (m)");
+  NetFEM_Nodes(n,g.nnodes,(double *)g.coord,"Position (m)");
   NetFEM_Elements(n,g.nVelems,3,(int *)g.vConn,"Triangles");
   NetFEM_End(n);
   t++;
@@ -567,10 +337,10 @@ void doNetFEM(int& t, int mesh, myGlobals &g) {
 
 void rebuildArrays (int mesh, myGlobals &g) {
   CkPrintf("Rebuilding arrays. \n");
-  delete [] g.conn;
-  delete [] g.coord;
-  if (!g.vCoord) delete [] g.vCoord;
-  if (!g.vConn) delete [] g.vConn;
+  if (g.conn!=NULL) delete [] g.conn;
+  if (g.coord!=NULL) delete [] g.coord;
+  if (g.vCoord!=NULL) delete [] g.vCoord;
+  if (g.vConn!=NULL) delete [] g.vConn;
   g.nelems=FEM_Mesh_get_length(mesh, FEM_ELEM);
   g.nnodes=FEM_Mesh_get_length(mesh, FEM_NODE);
   g.nVnodes = FEM_count_valid(mesh, FEM_NODE);
@@ -581,24 +351,22 @@ void rebuildArrays (int mesh, myGlobals &g) {
   g.vCoord = new vector2d[g.nVnodes];
 
   FEM_Mesh_data(mesh, FEM_NODE, FEM_DATA, (double *)g.coord, 0, g.nnodes, FEM_DOUBLE, 2);
-  FEM_Mesh_data(mesh, FEM_ELEM, FEM_CONN, (int *)g.conn, 0, g.nelems, FEM_INDEX_0, 3);
 
   int j=0;
   for (int i=0; i<g.nnodes;i++) {
-//  CkPrintf("node[%d]: (%f, %f) \n", i, g.coord[i].x, g.coord[i].y);
     if (FEM_is_valid(mesh, FEM_NODE, i)) {
+//      CkPrintf("g.coord[%d]: (%f, %f) \n", i, g.coord[i].x, g.coord[i].y);
       g.vCoord[j]=g.coord[i];
-//      CkPrintf("vNode[%d]: (%f, %f) \n", j, g.vCoord[j].x, g.vCoord[j].y);
       j++;
     }
   }
   j=0;
   for (int i=0; i<g.nelems;i++) {
-//  CkPrintf("elem[%d]: (%d, %d, %d) \n", i, g.conn[i][0], g.conn[i][1], g.conn[i][2]);
+    FEM_Mesh_lookup(mesh, "driver")->e2n_getAll(i, (int *)g.conn[i]);
     if (FEM_is_valid(mesh, FEM_ELEM, i)) {
+//      CkPrintf("g.conn[%d]: (%d, %d, %d) \n", i, g.conn[i][0], g.conn[i][1], g.conn[i][2]);
       for (int k=0; k<3; k++)
 	g.vConn[j][k]=g.conn[i][k];
-//      CkPrintf("vElem[%d]: (%d, %d, %d) \n", j, g.vConn[j][0], g.vConn[j][1], g.vConn[j][2]);
       j++;  
     }
   }
@@ -606,7 +374,7 @@ void rebuildArrays (int mesh, myGlobals &g) {
 
 void FEM_mesh_smooth(int mesh, int *nodes, int nNodes, int attrNo)
 {
-  vector2d newPos, *coords, *ghostCoords;
+  vector2d newPos, *coords, *ghostCoords,theCoord;
   int nNod, nGn, *boundVals, nodesInChunk;
   int neighbors[3], *adjnodes;
   int gIdxN;
@@ -623,6 +391,7 @@ void FEM_mesh_smooth(int mesh, int *nodes, int nNodes, int attrNo)
   IDXL_Layout_t coord_layout = IDXL_Layout_create(IDXL_DOUBLE, 2);
   FEM_Update_ghost_field(coord_layout,-1, coords); 
   ghostCoords = &(coords[nodesInChunk]);
+ // FEM_Mesh_data(FEM_Mesh_default_write(), FEM_GHOST+FEM_NODE, attrNo, (double*)ghostCoords, 0, nGn, FEM_DOUBLE, 2);
   for (int i=0; i<nNodes; i++)
   {
     newPos.x=0;
@@ -631,17 +400,23 @@ void FEM_mesh_smooth(int mesh, int *nodes, int nNodes, int attrNo)
     if (FEM_is_valid(mesh, FEM_NODE, i) && boundVals[i]>-1) //node must be internal
     {
       meshP->n2n_getAll(i, &adjnodes, &nNod);
-      for (int j=0; j<nNod; j++) CkPrintf("node[%d]: %d\n", i,adjnodes[j]);
+     // for (int j=0; j<nNod; j++) CkPrintf("node[%d]: %d\n", i,adjnodes[j]);
+      
       for (int j=0; j<nNod; j++) { //for all adjacent nodes, find coords
 	if (adjnodes[j]<-1) {
 	  gIdxN = FEM_From_ghost_index(adjnodes[j]);
-	  newPos.x += ghostCoords[gIdxN].x;
-	  newPos.y += ghostCoords[gIdxN].y;
+	  newPos.x += theCoord.x=ghostCoords[gIdxN].x;
+	  newPos.y += theCoord.y=ghostCoords[gIdxN].y;
 	}
 	else {
-	  newPos.x += coords[adjnodes[j]].x;
-	  newPos.y += coords[adjnodes[j]].y;
+	  newPos.x += theCoord.x=coords[adjnodes[j]].x;
+	  newPos.y += theCoord.y=coords[adjnodes[j]].y;
 	}     
+	int rank=FEM_My_partition();
+	if (rank==0 && i==3 || rank==1 && i==17) {
+	  CkPrintf("node[%d]: %d\n", i,adjnodes[j]);
+	  CkPrintf("%d: (%f, %f)\n", j, theCoord.x, theCoord.y);
+	}
       }
       newPos.x/=nNod;
       newPos.y/=nNod;
@@ -649,13 +424,16 @@ void FEM_mesh_smooth(int mesh, int *nodes, int nNodes, int attrNo)
       delete [] adjnodes;
     }
   }
-  delete [] coords;
+ // FEM_Update_field(coord_layout, coords);
+ // FEM_Mesh_data(FEM_Mesh_default_write(), FEM_NODE, attrNo, (double*)coords, 0, nodesInChunk, FEM_DOUBLE, 2);
+
+  if (coords) delete [] coords;
   delete [] boundVals;
 }
 
 void interpolate(FEM_Interpolate::NodalArgs args, FEM_Mesh *meshP)
 {
-  CkPrintf("INTERPOLATOR!!!!!!!!!!!\n");
+//  CkPrintf("INTERPOLATOR!!!!!!!!!!!\n");
   int *boundVals= new int[meshP->node.realsize()];
   FEM_Mesh_dataP(meshP, FEM_NODE, FEM_BOUNDARY, (int*) boundVals, 0, meshP->node.realsize() , FEM_INT, 1);   
   CkVec<FEM_Attribute *>*attrs = (meshP->node).getAttrVec();
@@ -676,4 +454,96 @@ void interpolate(FEM_Interpolate::NodalArgs args, FEM_Mesh *meshP)
   }
 }
 
+void printQualityInfo (myGlobals &g, double &meanArea) {
+  double len[3], s, area[g.nVelems], angles[g.nVelems], qArr[g.nVelems], minlen=0.0, A, B, C;
+  double meanQ=0.0, meanA=0.0, f;
+  int smallest=0;
+  int idx=0;
+  meanArea=0.0;
+  for (int i=0; i<g.nelems; i++) {
+  if (FEM_is_valid(FEM_Mesh_default_read(), FEM_ELEM, i)) {
+    for (int j=0; j<3; j++) {
+      len[j] = getDistance(g.coord[g.conn[i][j]],g.coord[g.conn[i][(j+1)%3]]);
+    }  
+    s = (len[0] + len[1] + len[2])/2.0;
+    area[idx] = sqrt(s * (s - len[0]) * (s - len[1]) * (s - len[2]));
+    f = 4.0*sqrt(3.0); //proportionality constant
+    qArr[idx] = (f*area[idx])/(len[0]*len[0]+len[1]*len[1]+len[2]*len[2]);
+//    CkPrintf("area[%d]: %e || ", i, area[idx]);
+//    CkPrintf("g.conn: (%d, %d, %d) || ", i, g.conn[i][0], g.conn[i][1], g.conn[i][2]);
+   // CkPrintf("g.coord[%d]: {(%.3f, %.3f),(%.3f, %.3f), (%.3f, %.3f)}\n", i, g.coord[g.conn[i][0]].x,g.coord[g.conn[i][0]].y, g.coord[g.conn[i][1]].x,g.coord[g.conn[i][1]].y, g.coord[g.conn[i][2]].x, g.coord[g.conn[i][2]].y);
+    //CkPrintf("len: (%.4f, %.4f, %.4f) \n", len[0], len[1], len[2]);
 
+
+    minlen=999.0;  
+    for (int j=0; j<3; j++) { // find min length of a side
+      if (len[j] < minlen) {
+	smallest = j;
+	minlen = len[j];
+      }
+    }
+    C = len[smallest];
+    A = len[(smallest+1)%3];
+    B = len[(smallest+2)%3];
+    angles[idx] = acos((C*C - A*A - B*B)/(-2*A*B));
+    angles[idx] *= (180.0/pi);
+    meanQ+=qArr[idx];
+    meanA+=angles[idx];
+    meanArea+=area[idx];
+    idx++;
+  }
+  }
+ 
+  insertion_sort(qArr, g.nVelems);
+  insertion_sort(angles, g.nVelems);
+  insertion_sort(area, g.nVelems);
+
+  meanQ/=g.nVelems;
+  meanA/=g.nVelems;
+  meanArea/=g.nVelems;
+  CkPrintf("------------ Quality Summary ---------------\n");
+  CkPrintf(" Angle stats:\n");
+  //for (int i=0; i<g.nelems; i++) CkPrintf(" angles[%d]: %f \n", i, angles[i]);
+  CkPrintf("  min   :	%f\n", angles[0]);
+  CkPrintf("  median:	%f\n", angles[g.nVelems/2]);
+  CkPrintf("  mean  :	%f\n", meanA);
+  CkPrintf("  max   :	%f\n\n", angles[g.nVelems-1]);
+  
+  CkPrintf(" Quality stats:\n");
+  //for (int i=0; i<g.nelems; i++) CkPrintf(" qArr[%d]: %f \n", i, qArr[i]);
+  CkPrintf("  min   :	%f\n", qArr[0]);
+  CkPrintf("  median:	%f\n", qArr[g.nVelems/2]);
+  CkPrintf("  mean  :	%f\n", meanQ);
+  CkPrintf("  max   :	%f\n\n", qArr[g.nVelems-1]);
+
+  CkPrintf(" Area stats:\n");
+ // for (int i=0; i<g.nVelems; i++) CkPrintf(" Area[%d]: %f (%d)\n", i, area[i], FEM_is_valid(FEM_Mesh_default_read(), FEM_ELEM, i));
+  CkPrintf("  min   :	%.5e\n", area[0]);
+  CkPrintf("  median:	%.5e\n", area[g.nVelems/2]);
+  CkPrintf("  mean  :	%.5e\n", meanArea);
+  CkPrintf("  max   :	%.5e\n\n", area[g.nVelems-1]);
+
+  
+}
+
+double getDistance (vector2d n1, vector2d n2) {
+  return sqrt((n1.x-n2.x)*(n1.x-n2.x)+(n1.y-n2.y)*(n1.y-n2.y));
+}
+
+void insertion_sort(double *numbers, int array_size)
+{
+  int i, j;
+  double index;
+
+  for (i=1; i < array_size; i++)
+  {
+    index = numbers[i];
+    j = i;
+    while ((j > 0) && (numbers[j-1] > index))
+    {
+      numbers[j] = numbers[j-1];
+      j = j - 1;
+    }
+    numbers[j] = index;
+  }
+}

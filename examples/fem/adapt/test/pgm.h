@@ -29,7 +29,9 @@ struct myGlobals {
   
   double *S11, *S22, *S12;
 };
-
+void insertion_sort(double *numbers, int array_size);
+void printQualityInfo (myGlobals &g, double &meanArea);
+double getDistance (vector2d n1, vector2d n2);
 void doNetFEM(int& t, int mesh, myGlobals &g); 
 
 void rebuildArrays (int mesh, myGlobals &g);
@@ -55,6 +57,8 @@ const double matConst[4]={3.692e9,  1.292e9,  3.692e9,  1.200e9 };
 
 //The timestep, in seconds
 const double dt=1.0e-9;
+
+const double pi= 3.141592653589793;
 
 // A convenient error function
 static void die(const char *str) {
