@@ -470,7 +470,7 @@ static void CmiReleaseSentMessages(void)
   MPI_Status sts;
 
 #if CMK_VERSION_BLUEGENE
-  void MPID_Progress_test();
+  MPID_Progress_test();
 #endif
      
   MACHSTATE1(2,"CmiReleaseSentMessages begin on %d {", CmiMyPe());
@@ -507,7 +507,7 @@ static int PumpMsgs(void)
   int recd=0;
 
 #if CMK_VERSION_BLUEGENE
-  void MPID_Progress_test();
+  MPID_Progress_test();
 #endif
 
   MACHSTATE(2,"PumpMsgs begin {");
