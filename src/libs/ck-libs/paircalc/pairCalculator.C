@@ -211,7 +211,7 @@ void initSectRed ( bool sym, int s, int grainSize, int numZ, int* z,
 CProxySection_PairCalculator initOneRedSect(int numZ, int* z, int blkSize,  PairCalcID* pcid, CkCallback cb, int s1, int s2, int c)
 {
   int ecount=0;
-  CkArrayIndexMax *elems=(CkArrayIndexMax*) alloca(numZ/blkSize * sizeof(CkArrayIndexMax));
+  CkArrayIndexMax *elems= new CkArrayIndexMax[numZ/blkSize];
   for(int numX = 0; numX < numZ; numX += blkSize){
     CkArrayIndex4D idx4d(z[numX],s1,s2,c);
     elems[ecount++]=idx4d;
@@ -306,8 +306,8 @@ void makeLeftTree(PairCalcID* pcid, int myS, int myZ){
     int numElems;
     //create multicast proxy array section list 
     if(symmetric){
-      CkArrayIndexMax *elems=(CkArrayIndexMax*) alloca(blkSize*S/grainSize * sizeof(CkArrayIndexMax));
-      CkArrayIndexMax *elemsfromrow=(CkArrayIndexMax*) alloca(blkSize*S/grainSize * sizeof(CkArrayIndexMax));
+      CkArrayIndexMax *elems= new CkArrayIndexMax[blkSize*S/grainSize];
+      CkArrayIndexMax *elemsfromrow= new CkArrayIndexMax[blkSize*S/grainSize];
       // 1 proxy for left and 1 for right
       int erowcount=0;
       int ecount=0;
@@ -373,7 +373,7 @@ void makeLeftTree(PairCalcID* pcid, int myS, int myZ){
       CkPrintf("initializing multicast proxy in %d %d \n",x,s1);
 #endif
       int erowcount=0;
-      CkArrayIndexMax *elemsfromrow=(CkArrayIndexMax*) alloca(blkSize*S/grainSize * sizeof(CkArrayIndexMax));
+      CkArrayIndexMax *elemsfromrow= new CkArrayIndexMax[blkSize*S/grainSize];
       CkArrayIndex4D idx(x,s1,0,0);
       for (c = 0; c < blkSize; c++)
 	for(s2 = 0; s2 < S; s2 += grainSize){
@@ -491,7 +491,7 @@ void makeRightTree(PairCalcID* pcid, int myS, int myZ){
       CkPrintf("initializing multicast proxy in %d %d \n",x,s2);
 #endif
       int ecount=0;
-      CkArrayIndexMax *elems=(CkArrayIndexMax*) alloca(blkSize*S/grainSize * sizeof(CkArrayIndexMax));
+      CkArrayIndexMax *elems= new CkArrayIndexMax[blkSize*S/grainSize];
       CkArrayIndex4D idx(x,0,s2,0);
       for (c = 0; c < blkSize; c++)
 	for(s1 = 0; s1 < S; s1 += grainSize){
