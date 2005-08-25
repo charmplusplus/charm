@@ -1,6 +1,6 @@
-\subsection{Nodegroup Objects}
+\subsection{NodeGroup Objects}
 
-{\it Node groups} \index{node groups} \index{nodegroup} are very
+{\it Node groups} \index{node groups} \index{nodegroup} \index{Nodegroup} are very
 similar to the group objects already discussed in that node groups are
 collections of chares as well.  Node groups, however, have one chare per node
 rather than one chare per processor.  So, each node contains a branch of the
@@ -9,10 +9,10 @@ node group is executed, it runs on only one processor within each node.
 
 Node groups have a definition syntax that is very similar to groups.  Rather
 than inheriting from the system defined class, \kw{Group}, node groups inherit
-from \kw{Nodegroup}.  For example, in the interface file, we declare:
+from \kw{NodeGroup}.  For example, in the interface file, we declare:
 
 \begin{alltt}
- nodegroup NodegroupType \{
+ nodegroup NodeGroupType \{
   // Interface specifications as for normal chares
  \};
 \end{alltt}
@@ -20,7 +20,7 @@ from \kw{Nodegroup}.  For example, in the interface file, we declare:
 In the {\tt .h} file, we define \uw{NodeGroupType} as follows:
 
 \begin{alltt}
- class NodeGroupType : public Nodegroup [,other superclasses ] \{
+ class NodeGroupType : public NodeGroup [,other superclasses ] \{
   // Data and member functions as in \CC{}
   // Entry functions as for normal chares
  \};
@@ -56,7 +56,7 @@ group type, and each instance has a different group handle, and its own set of
 branches.
 
 
-\subsubsection{Method Invocation on Nodegroups}
+\subsubsection{Method Invocation on NodeGroups}
 
 Methods can be invoked either on a particular \index{branch}branch of a
 \index{nodegroup}nodegroup by specifying a {\em node number} as a method

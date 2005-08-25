@@ -52,7 +52,7 @@ wants to write PUP routines for the groups and declare them as
 to hold key control data like global object counts, and thus needs
 mainchares be checkpointed too. To do this, the programmer should write
 a PUP routine for the mainchare and declare them as {\tt [migratable]} 
-in the .ci file, just as in the case of Group and Nodegroup. In addition,
+in the .ci file, just as in the case of Group and NodeGroup. In addition,
 the programmer also needs to put the proxy to the mainchare (usually 
 noted as mainproxy) as a read-only data in the code, and make sure 
 processor 0, which holds the mainchare, initiates the checkpoint.
