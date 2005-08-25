@@ -9,26 +9,18 @@
  * - CkPoolQueue: additional queues that can be used with CkMultiPool.
 ********************************************************************/
 
-#ifndef ALIGN8
-#define ALIGN8(x)        (int)((~7)&((x)+7))
-#endif
-
-/// Base class for multiple queues, only for internal usage
-template <typename type>
-class CkPoolQueueBase {
-public:
-  virtual void enqueue(type *p) = 0;
-  virtual type *dequeue(size_t size) = 0;
-};
+#include "charm.h"
 
 /// A queue for CkMultiPool, templated with the type it handles, and the number
 /// of objects allocated in a single chunk
-template <typename type, unsigned int sz>
-class CkPoolQueue : public CkPoolQueueBase<type> {
+template <typename type>
+class CkPoolQueue {
   type *first;
+  int sz;
 
+  CkPoolQueue {} // private, not usable
 public:
-  CkPoolQueue() { first = NULL; }
+  CkPoolQueue(int _sz) : first(NULL), sz(_sz) { CkAssert(_sz > 0); }
   void enqueue(type *p) {
     //printf("buffer enqueue\n");
     *(type**)p = first;
@@ -67,7 +59,7 @@ template <typename type> class CkMultiPool;
 /// class MyClass : public CkPool<MyClass, 32>
 template <typename type, unsigned int sz = 16>
 class CkPool {
-  static CkPoolQueue<type, sz> buffer;
+  static CkPoolQueue<type> buffer;
 public:
 
   void *operator new(size_t size) {
@@ -83,7 +75,7 @@ public:
 };
 
 template <typename type, unsigned int sz>
-CkPoolQueue<type,sz> CkPool<type,sz>::buffer;
+CkPoolQueue<type> CkPool<type,sz>::buffer = CkPoolQueue<type>(sz);
 
 /// CkMultiPool allows the user to have both a default queue, and specific
 /// queues from which to allocate. This should be more useful when deletion of
@@ -93,21 +85,21 @@ template <typename type>
 class CkMultiPool {
 public:
   void *operator new(size_t sz) {
-    type *ret = CkPool<type>::buffer.dequeue(sz+sizeof(CkPoolQueueBase<type>*));
-    CkPoolQueueBase<type> **bufferP = (CkPoolQueueBase<type> **)(ALIGN8((int)((char*)ret)+sz+sizeof(CkPoolQueueBase<type>*)) - sizeof(CkPoolQueueBase<type>*));
+    type *ret = CkPool<type>::buffer.dequeue(sz+sizeof(CkPoolQueue<type>*));
+    CkPoolQueue<type> **bufferP = (CkPoolQueue<type> **)(ALIGN8((int)((char*)ret)+sz+sizeof(CkPoolQueue<type>*)) - sizeof(CkPoolQueue<type>*));
     *bufferP = &CkPool<type>::buffer;
     //printf(" - pool operator new default %p\n",bufferP);
     return ret;
   }
-  void *operator new(size_t sz, CkPoolQueueBase<type> *buf) {
-    type *ret = buf->dequeue(sz+sizeof(CkPoolQueueBase<type>*));
-    CkPoolQueueBase<type> **bufferP = (CkPoolQueueBase<type> **)(ALIGN8((int)((char*)ret)+sz+sizeof(CkPoolQueueBase<type>*)) - sizeof(CkPoolQueueBase<type>*));
+  void *operator new(size_t sz, CkPoolQueue<type> *buf) {
+    type *ret = buf->dequeue(sz+sizeof(CkPoolQueue<type>*));
+    CkPoolQueue<type> **bufferP = (CkPoolQueue<type> **)(ALIGN8((int)((char*)ret)+sz+sizeof(CkPoolQueue<type>*)) - sizeof(CkPoolQueue<type>*));
     *bufferP = buf;
     //printf(" - pool operator new with buffer %p\n",bufferP);
     return ret;
   }
   void operator delete(void *p, size_t sz) {
-    CkPoolQueueBase<type> **bufferP = (CkPoolQueueBase<type> **)(ALIGN8((int)((char*)p)+sz+sizeof(CkPoolQueueBase<type>*)) - sizeof(CkPoolQueueBase<type>*));
+    CkPoolQueue<type> **bufferP = (CkPoolQueue<type> **)(ALIGN8((int)((char*)p)+sz+sizeof(CkPoolQueue<type>*)) - sizeof(CkPoolQueue<type>*));
     //printf(" - pool operator delete %p\n",bufferP);
     (*bufferP)->enqueue((type*)p);
   }
