@@ -8,7 +8,7 @@
 #include "ckvector3d.h"
 #include "fem.h"
 #include "fem_mesh.h"
-#include "vector2d.h"
+#include "../../../vector2d.h"  // **CW** tentative
 
 
 #define REFINE_TOL 1.1
