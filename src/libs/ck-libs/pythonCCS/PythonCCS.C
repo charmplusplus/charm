@@ -255,6 +255,7 @@ void PythonObject::finished (PythonFinished *pyMsg, CcsDelayedReply *reply) {
 void PythonObject::execute (CkCcsRequestMsg *msg, CcsDelayedReply *reply) {
   // ATTN: be sure that in all possible paths pyLock is released!
   PythonExecute *pyMsg = (PythonExecute *)msg->data;
+  PyEval_AcquireLock();
   CmiLock(CsvAccess(pyLock));
   CmiUInt4 pyReference;
   CmiUInt4 returnValue;
@@ -269,7 +270,7 @@ void PythonObject::execute (CkCcsRequestMsg *msg, CcsDelayedReply *reply) {
       // the interpreter already exists and it is neither in use, nor dead
       //CkPrintf("interpreter present and not in use\n");
       pyReference = pyMsg->interpreter;
-      PyEval_AcquireLock();
+      //PyEval_AcquireLock();
     } else {
       // ops, either the iterator does not exist or is already in use, return an
       // error to the client, we don't want to create a new interpreter if the
@@ -279,6 +280,7 @@ void PythonObject::execute (CkCcsRequestMsg *msg, CcsDelayedReply *reply) {
       returnValue = htonl(0);
       CcsSendDelayedReply(*reply, sizeof(CmiUInt4), (void *)&returnValue);
       CmiUnlock(CsvAccess(pyLock));
+      PyEval_ReleaseLock();
       return;  // stop the execution
     }
   } else {
@@ -292,7 +294,7 @@ void PythonObject::execute (CkCcsRequestMsg *msg, CcsDelayedReply *reply) {
     ((*CsvAccess(pyWorkers))[pyReference]).clientReady = 0;
 
     // create the new interpreter
-    PyEval_AcquireLock();
+    //PyEval_AcquireLock();
     PyThreadState *pts = Py_NewInterpreter();
 
     Py_InitModule("ck", CkPy_MethodsDefault);
