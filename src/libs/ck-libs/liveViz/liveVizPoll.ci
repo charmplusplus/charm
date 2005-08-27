@@ -4,6 +4,7 @@ module liveVizPoll {
 group liveVizPollArray {
 	entry liveVizPollArray();
 	entry void request(liveVizRequestMsg *msg);
+	entry void liveVizPoll0Deposit(int wid, int ht, int bpp, int len, byte imageData[len]);
 };
 
 }
