@@ -18,7 +18,7 @@ class CkPoolQueue {
   type *first;
   int sz;
 
-  CkPoolQueue {} // private, not usable
+  CkPoolQueue() {} // private, not usable
 public:
   CkPoolQueue(int _sz) : first(NULL), sz(_sz) { CkAssert(_sz > 0); }
   void enqueue(type *p) {
@@ -32,7 +32,7 @@ public:
       first = (type*)malloc(sz * ALIGN8(size));
       type **src;
       type *dest;
-      for (unsigned int i=0; i<sz-1; ++i) {
+      for (int i=0; i<sz-1; ++i) {
 	src = (type**)(((char*)first)+i*ALIGN8(size));
 	dest = (type*)(((char*)first)+(i+1)*ALIGN8(size));
 	//printf("debug: %p %p %p\n",first,src,dest);
