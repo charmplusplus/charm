@@ -56,6 +56,8 @@ class _CkOStream {
     _OPSHIFTLEFT(unsigned short, "%hu");
     _OPSHIFTLEFT(long, "%ld");
     _OPSHIFTLEFT(unsigned long, "%lu");
+    _OPSHIFTLEFT(long long, "%lld");
+    _OPSHIFTLEFT(unsigned long long, "%llu");
     _OPSHIFTLEFT(char, "%c");
     _OPSHIFTLEFT(unsigned char, "%u");
     _OPSHIFTLEFT(float, "%f");
@@ -79,7 +81,29 @@ class _CkErrStream : public _CkOStream {
 CkpvExtern(_CkOutStream*, _ckout);
 CkpvExtern(_CkErrStream*, _ckerr);
 
-class CkOutStream {
+class CkOStream {
+ public:
+  virtual CkOStream& operator << (_CkOStream& (*f)(_CkOStream &)) = 0;
+#define SHIFTLEFT(type) \
+  virtual CkOStream& operator << (type x) = 0;
+
+  SHIFTLEFT(int);
+  SHIFTLEFT(unsigned int);
+  SHIFTLEFT(short);
+  SHIFTLEFT(unsigned short);
+  SHIFTLEFT(long);
+  SHIFTLEFT(unsigned long);
+  SHIFTLEFT(long long);
+  SHIFTLEFT(unsigned long long);
+  SHIFTLEFT(char);
+  SHIFTLEFT(unsigned char);
+  SHIFTLEFT(float);
+  SHIFTLEFT(double);
+  SHIFTLEFT(const char*);
+  SHIFTLEFT(void*);
+};
+
+class CkOutStream : public CkOStream {
   public:
   CkOutStream& operator << (_CkOStream& (*f)(_CkOStream &)) {
     f(*CkpvAccess(_ckout));
@@ -96,6 +120,8 @@ class CkOutStream {
     OUTSHIFTLEFT(unsigned short);
     OUTSHIFTLEFT(long);
     OUTSHIFTLEFT(unsigned long);
+    OUTSHIFTLEFT(long long);
+    OUTSHIFTLEFT(unsigned long long);
     OUTSHIFTLEFT(char);
     OUTSHIFTLEFT(unsigned char);
     OUTSHIFTLEFT(float);
@@ -104,7 +130,7 @@ class CkOutStream {
     OUTSHIFTLEFT(void*);
 };
 
-class CkErrStream {
+class CkErrStream : public CkOStream {
   public:
   CkErrStream& operator << (_CkOStream& (*f)(_CkOStream &)) {
     f(*CkpvAccess(_ckerr));
@@ -121,6 +147,8 @@ class CkErrStream {
     ERRSHIFTLEFT(unsigned short);
     ERRSHIFTLEFT(long);
     ERRSHIFTLEFT(unsigned long);
+    ERRSHIFTLEFT(long long);
+    ERRSHIFTLEFT(unsigned long long);
     ERRSHIFTLEFT(char);
     ERRSHIFTLEFT(unsigned char);
     ERRSHIFTLEFT(float);
@@ -146,6 +174,8 @@ class CkInStream {
     OPSHIFTRIGHT(unsigned short, "%hu");
     OPSHIFTRIGHT(long, "%ld");
     OPSHIFTRIGHT(unsigned long, "%lu");
+    OPSHIFTRIGHT(long long, "%lld");
+    OPSHIFTRIGHT(unsigned long long, "%llu");
     OPSHIFTRIGHT(char, "%c");
     OPSHIFTRIGHT(unsigned char, "%c");
     OPSHIFTRIGHT(float, "%f");
