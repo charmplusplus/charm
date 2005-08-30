@@ -22,12 +22,56 @@ void FEM_Interpolate::FEM_InterpolateNodeOnEdge(NodalArgs args)
       FEM_DataAttribute *d = (FEM_DataAttribute *)a;
       d->interpolate(args.nodes[0], args.nodes[1], args.n, args.frac);
     } else if(a->getAttr()==FEM_BOUNDARY) {
+      int n1_bound, n2_bound;
+      FEM_Mesh_dataP(theMesh, FEM_NODE, FEM_BOUNDARY, &n1_bound, args.nodes[0], 1 , FEM_INT, 1);
+      FEM_Mesh_dataP(theMesh, FEM_NODE, FEM_BOUNDARY, &n2_bound, args.nodes[1], 1 , FEM_INT, 1);
       if(args.frac==1.0) {
 	a->copyEntity(args.n,*a,args.nodes[0]);
       } else if(args.frac==0.0) {
 	a->copyEntity(args.n,*a,args.nodes[1]);
       } else {
-	a->copyEntity(args.n,*a,args.nodes[0]); //doesn't matter, copy boundary flag of any one
+	if(n1_bound<0 && n2_bound<0 && n1_bound!=n2_bound) {
+	  //figure out if one of them is a corner,
+	  bool n1corner = theMod->fmAdaptL->isCorner(args.nodes[0]);
+	  bool n2corner = theMod->fmAdaptL->isCorner(args.nodes[1]);
+	  if(n1corner && !n2corner) {
+	    a->copyEntity(args.n,*a,args.nodes[1]);
+	  }
+	  else if(n2corner && !n1corner) {
+	    a->copyEntity(args.n,*a,args.nodes[0]);
+	  }
+	  else if(n2corner && n1corner) { //assign it a new number other than the two
+	    //a->copyEntity(args.n,*a,args.nodes[0]); 
+	    int nbound = 0;
+	    if(abs(n1_bound - n2_bound) == 2) {
+	      nbound = (abs(n1_bound)<abs(n2_bound)) ? n1_bound-1 : n2_bound-1;
+	    } else {
+	      nbound = (abs(n1_bound)<abs(n2_bound)) ? n1_bound+1 : n2_bound+1;
+	    }
+	    FEM_DataAttribute *d = (FEM_DataAttribute *)a;
+	    d->getInt().setRow(args.n,nbound);
+	  }
+	  else {//boundary attribute should be 0
+	    //a->copyEntity(args.n,*a,args.nodes[0]); 
+	    int nbound = 0;
+	    FEM_DataAttribute *d = (FEM_DataAttribute *)a;
+	    d->getInt().setRow(args.n,nbound);
+	  }
+	}
+	else if(n1_bound<0 && n2_bound<0) {
+	  //both nodes on same boundary, copy from any one
+	  a->copyEntity(args.n,*a,args.nodes[0]);
+	}
+	else if(n1_bound<0) {
+	  a->copyEntity(args.n,*a,args.nodes[1]);
+	}
+	else if(n2_bound<0) {
+	  a->copyEntity(args.n,*a,args.nodes[0]);
+	}
+	else {
+	  //both nodes are internal, copy any one
+	  a->copyEntity(args.n,*a,args.nodes[0]);
+	}
       }
     }
   }

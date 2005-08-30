@@ -38,7 +38,7 @@ int FEM_Adapt::edge_flip(int n1, int n2)
 
   isEdge = findAdjData(n1, n2, &e1, &e2, &e1_n1, &e1_n2, &e1_n3, &e2_n1, &e2_n2, &e2_n3,&n3, &n4);
   if(isEdge == -1) {
-    CkPrintf("Warning: Flip %d->%d not done as it is no longer a valid edge\n",n1,n2);
+    CkPrintf("[%d]Warning: Flip %d->%d not done as it is no longer a valid edge\n",theMod->idx,n1,n2);
     free(locknodes);
     free(lockelems);
     return -1;
@@ -54,7 +54,7 @@ int FEM_Adapt::edge_flip(int n1, int n2)
     isEdge = findAdjData(n1, n2, &e1, &e2, &e1_n1, &e1_n2, &e1_n3, &e2_n1, &e2_n2, &e2_n3,&n3, &n4);
     if(isEdge == -1) {
       FEM_Modify_Unlock(theMesh);
-      CkPrintf("Warning: Flip %d->%d not done as it is no longer a valid edge\n",n1,n2);
+      CkPrintf("[%d]Warning: Flip %d->%d not done as it is no longer a valid edge\n",theMod->idx,n1,n2);
       free(locknodes);
       free(lockelems);
       return -1;
@@ -275,7 +275,7 @@ int FEM_Adapt::edge_bisect(int n1, int n2)
 
   isEdge = findAdjData(n1, n2, &e1, &e2, &e1_n1, &e1_n2, &e1_n3, &e2_n1, &e2_n2, &e2_n3,&n3, &n4);
   if(isEdge == -1) {
-    CkPrintf("Warning: Bisect %d->%d not done as it is no longer a valid edge\n",n1,n2);
+    CkPrintf("[%d]Warning: Bisect %d->%d not done as it is no longer a valid edge\n",theMod->idx,n1,n2);
     free(locknodes);
     free(lockelems);
     return -1;
@@ -291,7 +291,7 @@ int FEM_Adapt::edge_bisect(int n1, int n2)
     isEdge = findAdjData(n1, n2, &e1, &e2, &e1_n1, &e1_n2, &e1_n3, &e2_n1, &e2_n2, &e2_n3,&n3, &n4);
     if(isEdge == -1) {
       FEM_Modify_Unlock(theMesh);
-      CkPrintf("Warning: Bisect %d->%d not done as it is no longer a valid edge\n",n1,n2);
+      CkPrintf("[%d]Warning: Bisect %d->%d not done as it is no longer a valid edge\n",theMod->idx,n1,n2);
       free(locknodes);
       free(lockelems);
       return -1;
@@ -348,6 +348,17 @@ int FEM_Adapt::edge_bisect_help(int e1, int e2, int n1, int n2, int e1_n1,
   printAdjacencies(locknodes, numNodes, lockelems, numElems);
 #endif
 
+  //add node
+  int *adjnodes = (int*)malloc(2*sizeof(int));
+  adjnodes[0] = n1;
+  adjnodes[1] = n2;
+  n5 = FEM_add_node(theMesh,adjnodes,2,n5chunk,0,0);
+#ifdef DEBUG_2
+  CkPrintf("Adjacencies after add node %d\n",n5);
+  printAdjacencies(locknodes, numNodesNew, lockelems, numElemsNew);
+#endif
+
+  //remove elements
   e1chunk = FEM_remove_element(theMesh, e1, 0); 
 #ifdef DEBUG_2
   CkPrintf("Adjacencies after remove element %d\n",e1);
@@ -360,13 +371,10 @@ int FEM_Adapt::edge_bisect_help(int e1, int e2, int n1, int n2, int e1_n1,
   CkPrintf("Adjacencies after remove element %d\n",e2);
   printAdjacencies(locknodes, numNodes, lockelems, numElems);
 #endif
+
   // hmm... if e2 is a ghost and we remove it and create all the new elements
   // locally, then we don't really need to add a *shared* node
   //but we are not moving chunk boundaries
-  int *adjnodes = (int*)malloc(2*sizeof(int));
-  adjnodes[0] = n1;
-  adjnodes[1] = n2;
-
   if(e1chunk==-1 || e2chunk==-1) {
     //it is fine, let it continue
     e4chunk = e2chunk;
@@ -384,11 +392,6 @@ int FEM_Adapt::edge_bisect_help(int e1, int e2, int n1, int n2, int e1_n1,
     e3chunk = e1chunk;
   }
 
-  n5 = FEM_add_node(theMesh,adjnodes,2,n5chunk,0,0);
-#ifdef DEBUG_2
-  CkPrintf("Adjacencies after add node %d\n",n5);
-  printAdjacencies(locknodes, numNodesNew, lockelems, numElemsNew);
-#endif
   // add n1, n5, n3
   conn[e1_n1] = n1;  conn[e1_n2] = n5;  conn[e1_n3] = n3;
   lockelems[0] = FEM_add_element(theMesh, conn, 3, 0, e1chunk);
@@ -468,7 +471,7 @@ int FEM_Adapt::vertex_remove(int n1, int n2)
 
   isEdge = findAdjData(n1, n2, &e1, &e2, &e1_n1, &e1_n2, &e1_n3, &e2_n1, &e2_n2, &e2_n3,&n3, &n4);
   if(isEdge == -1) {
-    CkPrintf("Warning: Vertex Remove %d->%d not done as it is no longer a valid edge\n",n1,n2);
+    CkPrintf("[%d]Warning: Vertex Remove %d->%d not done as it is no longer a valid edge\n",theMod->idx,n1,n2);
     free(locknodes);
     free(lockelems);
     return -1;
@@ -482,7 +485,7 @@ int FEM_Adapt::vertex_remove(int n1, int n2)
   int *nbrNodes, nnsize, n5;
   theMesh->n2n_getAll(n1, &nbrNodes, &nnsize);
   if(!(nnsize == 4 || (nnsize==3 && e2==-1))) {
-    CkPrintf("Warning: Vertex Remove %d->%d on node %d with %d connections (!= 4)\n",n1,n2,n1,nnsize);
+    CkPrintf("[%d]Warning: Vertex Remove %d->%d on node %d with %d connections (!= 4)\n",theMod->idx,n1,n2,n1,nnsize);
     free(locknodes);
     free(lockelems);
     if(nnsize!=0) delete[] nbrNodes;
@@ -507,7 +510,7 @@ int FEM_Adapt::vertex_remove(int n1, int n2)
     isEdge = findAdjData(n1, n2, &e1, &e2, &e1_n1, &e1_n2, &e1_n3, &e2_n1, &e2_n2, &e2_n3,&n3, &n4);
     if(isEdge == -1) {
       FEM_Modify_Unlock(theMesh);
-      CkPrintf("Warning: Vertex Remove %d->%d not done as it is no longer a valid edge\n",n1,n2);
+      CkPrintf("[%d]Warning: Vertex Remove %d->%d not done as it is no longer a valid edge\n",theMod->idx,n1,n2);
       free(locknodes);
       free(lockelems);
       return -1;
@@ -530,7 +533,7 @@ int FEM_Adapt::vertex_remove(int n1, int n2)
     if(nnsize!=0) delete[] nbrNodes;
     if(!(nnsize == 4 || (nnsize==3 && e2==-1))) {
       FEM_Modify_Unlock(theMesh);
-      CkPrintf("Warning: Vertex Remove %d->%d on node %d with %d connections (!= 4)\n",n1,n2,n1,nnsize);
+      CkPrintf("[%d]Warning: Vertex Remove %d->%d on node %d with %d connections (!= 4)\n",theMod->idx,n1,n2,n1,nnsize);
       free(locknodes);
       free(lockelems);
       return -1;    
@@ -1179,7 +1182,7 @@ int FEM_Adapt::findAdjData(int n1, int n2, int *e1, int *e2, int *e1n1,
 
   (*e1) = theMesh->getElementOnEdge(n1, n2); // assumed to return local element
   if ((*e1) == -1) {
-    CkPrintf("Warning: No Element on edge %d->%d\n",n1,n2);
+    CkPrintf("[%d]Warning: No Element on edge %d->%d\n",theMod->idx,n1,n2);
     return -1;
   }
   (*e1n1) = find_local_node_index((*e1), n1);
@@ -1198,7 +1201,7 @@ int FEM_Adapt::findAdjData(int n1, int n2, int *e1, int *e2, int *e1n1,
     //}
   }
   if(*n3 == *n4) {
-    CkPrintf("Warning: Identical elements %d:(%d,%d,%d) & %d:(%d,%d,%d)\n",*e1,n1,n2,*n3,*e2,n1,n2,*n4);
+    CkPrintf("[%d]Warning: Identical elements %d:(%d,%d,%d) & %d:(%d,%d,%d)\n",theMod->idx,*e1,n1,n2,*n3,*e2,n1,n2,*n4);
     return -1;
   }
   return 1;
@@ -1237,10 +1240,21 @@ bool FEM_Adapt::isCorner(int n1) {
   theMesh->n2n_getAll(n1, &n1AdjNodes, &n1NumNodes);
   int n1_bound, n2_bound;
   FEM_Mesh_dataP(theMesh, FEM_NODE, FEM_BOUNDARY, &n1_bound, n1, 1 , FEM_INT, 1);
+  if(n1_bound==0) return false; //it is internal
+  int nbr1=-1, nbr2=-1;
+  for (int i=0; i<n1NumNodes; i++) {
+    int n2 = n1AdjNodes[i];
+    FEM_Mesh_dataP(theMesh, FEM_NODE, FEM_BOUNDARY, &n2_bound, n2, 1 , FEM_INT, 1);
+    if(n1_bound == n2_bound) {
+      nbr1 = n2;
+      break;
+    }
+  }
   for (int i=0; i<n1NumNodes; i++) {
     int ret = 0;
     int n2 = n1AdjNodes[i];
     FEM_Mesh_dataP(theMesh, FEM_NODE, FEM_BOUNDARY, &n2_bound, n2, 1 , FEM_INT, 1);
+    if(n2_bound == 0) continue;
     if(n1_bound != n2_bound) {
       //find the number of elements this edge belongs to
       theMesh->n2e_getAll(n1, &n1AdjElems, &n1NumElems);
@@ -1257,8 +1271,15 @@ bool FEM_Adapt::isCorner(int n1) {
       if(n1NumElems!=0) delete[] n1AdjElems;
       if(n2NumElems!=0) delete[] n2AdjElems;
       if(ret==1) {
-	if(n1NumNodes!=0) delete[] n1AdjNodes;
-	return true;
+	nbr2 = n2;
+	if(abs(n2_bound) < abs(n1_bound)) {
+	  if(n1NumNodes!=0) delete[] n1AdjNodes;
+	  return true;
+	}
+	else {
+	  if(n1NumNodes!=0) delete[] n1AdjNodes;
+	  return false;
+	}
       }
     }
   }

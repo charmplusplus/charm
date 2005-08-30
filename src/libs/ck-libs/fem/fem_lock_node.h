@@ -6,26 +6,28 @@
 #include "fem.h"
 #include "fem_mesh.h"
 
-#define _LOCKNODES
+//#define DEBUG_LOCKS
 
 class femMeshModify;
 
 //there is one fem_lock associated with every node (locks on elements are not required)
 //should lock all nodes, involved in any operation
 class FEM_lockN {
+  int owner, pending;
+  femMeshModify *theMod;
   int idx; //index of the node
   int noreadLocks;
   int nowriteLocks;
-    
+  
  public:
   FEM_lockN() {};
-  FEM_lockN(int i);
+  FEM_lockN(int i,femMeshModify *mod);
   ~FEM_lockN();
     
   int rlock();
   int runlock();
-  int wlock();
-  int wunlock();
+  int wlock(int own);
+  int wunlock(int own);
   int getIdx() { return idx; }
 };
 

@@ -1,7 +1,10 @@
 #include "fem_lock_node.h"
 #include "fem_mesh_modify.h"
 
-FEM_lockN::FEM_lockN(int i) {
+FEM_lockN::FEM_lockN(int i,femMeshModify *mod) {
+  owner = -1;
+  pending = -1;
+  theMod = mod;
   idx = i;
   noreadLocks = 0;
   nowriteLocks = 0;
@@ -36,10 +39,13 @@ int FEM_lockN::runlock() {
   return -1; //should not reach here
 }
 
-int FEM_lockN::wlock() {
+int FEM_lockN::wlock(int own) {
   if(nowriteLocks==0 && noreadLocks==0) {
     nowriteLocks++;
-    //CkPrintf("Got write lock on node %d\n", idx);
+    owner = own;
+#ifdef DEBUG_LOCKS
+    CkPrintf("[%d] Got write lock on node %d{%d} .\n",owner, idx, theMod->idx);
+#endif
     return 1;
   } else {
     return -1;
@@ -47,11 +53,14 @@ int FEM_lockN::wlock() {
   return -1;
 }
 
-int FEM_lockN::wunlock() {
+int FEM_lockN::wunlock(int own) {
   CkAssert(noreadLocks==0 && nowriteLocks>0);
   if(nowriteLocks) {
-    //CkPrintf("Unlocked write lock on node %d\n", idx);
     nowriteLocks--;
+#ifdef DEBUG_LOCKS
+    CkPrintf("[%d] Unlocked write lock on node %d{%d} .\n",owner, idx, theMod->idx);
+#endif
+    owner = -1;
     return 1;
   } else {
     return -1;

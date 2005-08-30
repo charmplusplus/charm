@@ -8,7 +8,7 @@
 #include "ckvector3d.h"
 #include "fem.h"
 #include "fem_mesh.h"
-#include "../../../vector2d.h"  // **CW** tentative
+#include "vector2d.h"  // **CW** tentative
 
 
 #define REFINE_TOL 1.1
@@ -19,6 +19,10 @@ class FEM_Adapt;
 class FEM_AdaptL;
 
 class FEM_Adapt_Algs {
+  friend class FEM_AdaptL;
+  friend class FEM_Adapt;
+
+ protected: 
   FEM_Mesh *theMesh;
   femMeshModify *theMod;
   //FEM_Adapt *theAdaptor;
@@ -113,6 +117,9 @@ class FEM_Adapt_Algs {
   int getCoord(int n1, double *crds);
   int getShortestEdge(int n1, int n2, int n3, int* shortestEdge);
   double getAreaQuality(int elem);
+  bool didItFlip(int n1, int n2, int n3, double *n4_coord);
+  bool didItFlip(double *n1_coord, double *n2_coord, double *n3_coord, double *n4_coord);
+  double getSignedArea(double *n1_coord, double *n2_coord, double *n3_coord);
 };
 
 

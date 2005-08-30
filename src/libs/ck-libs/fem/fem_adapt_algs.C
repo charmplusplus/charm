@@ -408,16 +408,19 @@ double FEM_Adapt_Algs::getArea(double *n1_coord, double *n2_coord, double *n3_co
   double area=0.0;
   double aLen, bLen, cLen, sLen, d, ds_sum;
 
+  ds_sum = 0.0;
   for (int i=0; i<2; i++) {
     d = n1_coord[i] - n2_coord[i];
     ds_sum += d*d;
   }
   aLen = sqrt(ds_sum);
+  ds_sum = 0.0;
   for (int i=0; i<2; i++) {
     d = n2_coord[i] - n3_coord[i];
     ds_sum += d*d;
   }
   bLen = sqrt(ds_sum);
+  ds_sum = 0.0;
   for (int i=0; i<2; i++) {
     d = n3_coord[i] - n1_coord[i];
     ds_sum += d*d;
@@ -425,6 +428,52 @@ double FEM_Adapt_Algs::getArea(double *n1_coord, double *n2_coord, double *n3_co
   cLen = sqrt(ds_sum);
   sLen = (aLen+bLen+cLen)/2;
   return (sqrt(sLen*(sLen-aLen)*(sLen-bLen)*(sLen-cLen)));
+}
+
+bool FEM_Adapt_Algs::didItFlip(int n1, int n2, int n3, double *n4_coord)
+{
+  //n3 is the node to be deleted, n4 is the new node to be added
+  double *n1_coord = (double*)malloc(dim*sizeof(double));
+  double *n2_coord = (double*)malloc(dim*sizeof(double));
+  double *n3_coord = (double*)malloc(dim*sizeof(double));
+
+  getCoord(n1, n1_coord);
+  getCoord(n2, n2_coord);
+  getCoord(n3, n3_coord);
+
+  double ret_old = getSignedArea(n1_coord, n2_coord, n3_coord);
+  double ret_new = getSignedArea(n1_coord, n2_coord, n4_coord);
+
+  free(n1_coord);
+  free(n2_coord);
+  free(n3_coord);
+
+  if(ret_old > MINAREA && ret_new < -MINAREA) return true;
+  else if(ret_old < -MINAREA && ret_new > MINAREA) return true;
+  else return false;
+}
+
+
+bool FEM_Adapt_Algs::didItFlip(double *n1_coord, double *n2_coord, double *n3_coord, double *n4_coord)
+{
+  double ret_old = getSignedArea(n1_coord, n2_coord, n3_coord);
+  double ret_new = getSignedArea(n1_coord, n2_coord, n4_coord);
+  if(ret_old > MINAREA && ret_new < -MINAREA) return true;
+  else if(ret_old < -MINAREA && ret_new > MINAREA) return true;
+  else return false;
+}
+
+double FEM_Adapt_Algs::getSignedArea(double *n1_coord, double *n2_coord, double *n3_coord) {
+  double area=0.0;
+  double vec1_x, vec1_y, vec2_x, vec2_y;
+
+  vec1_x = n1_coord[0] - n2_coord[0];
+  vec1_y = n1_coord[1] - n2_coord[1];
+  vec2_x = n3_coord[0] - n2_coord[0];
+  vec2_y = n3_coord[1] - n2_coord[1];
+
+  area = vec1_x*vec2_y - vec2_x*vec1_y;
+  return area;
 }
 
 int FEM_Adapt_Algs::getCoord(int n1, double *crds) {

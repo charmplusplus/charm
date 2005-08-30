@@ -168,7 +168,7 @@ int FEM_add_node_local(FEM_Mesh *m, int addGhost){
     m->n2e_removeAll(FEM_To_ghost_index(newNode));    // initialize element adjacencies
     m->n2n_removeAll(FEM_To_ghost_index(newNode));    // initialize node adjacencies
     //add a lock
-    //m->getfmMM()->fmgLockN.push_back(new FEM_lockN(FEM_To_ghost_index(newNode)));
+    //m->getfmMM()->fmgLockN.push_back(new FEM_lockN(FEM_To_ghost_index(newNode),m->getfmMM()));
   }
   else{
     newNode = m->node.size();
@@ -177,7 +177,7 @@ int FEM_add_node_local(FEM_Mesh *m, int addGhost){
     m->n2e_removeAll(newNode);    // initialize element adjacencies
     m->n2n_removeAll(newNode);    // initialize node adjacencies
     //add a lock
-    m->getfmMM()->fmLockN.push_back(new FEM_lockN(newNode));
+    m->getfmMM()->fmLockN.push_back(new FEM_lockN(newNode,m->getfmMM()));
   }
   return newNode;  // return a new index
 }
@@ -722,7 +722,7 @@ void update_new_element_e2e(FEM_Mesh *m, int newEl, int elemType){
         }
       }
     }
-  } 
+  }
 }
 
 // A helper function that adds the local element, and updates adjacencies
@@ -759,6 +759,10 @@ int FEM_add_element_local(FEM_Mesh *m, const int *conn, int connSize, int elemTy
   m->e2e_removeAll(newEl);
   update_new_element_e2e(m,newEl,elemType);
 
+  int *adjes = new int[3];
+  m->e2e_getAll(newEl, adjes, 0);
+  CkAssert(!((adjes[0]==adjes[1] && adjes[0]!=-1) || (adjes[1]==adjes[2] && adjes[1]!=-1) || (adjes[2]==adjes[0] && adjes[2]!=-1)));
+  delete[] adjes;
   return newEl;
 }
 
@@ -1089,7 +1093,7 @@ int FEM_Modify_LockN(FEM_Mesh *m, int nodeId, int readlock) {
       if(readlock) {
 	return m->getfmMM()->getfmLockN(nodeId)->rlock();
       } else {
-	return m->getfmMM()->getfmLockN(nodeId)->wlock();
+	return m->getfmMM()->getfmLockN(nodeId)->wlock(index);
       }
     }
     else {
@@ -1128,7 +1132,8 @@ int FEM_Modify_LockN(FEM_Mesh *m, int nodeId, int readlock) {
     if(readlock) {
       return m->getfmMM()->getfmLockN(nodeId)->rlock();
     } else {
-      return m->getfmMM()->getfmLockN(nodeId)->wlock();
+      int index = m->getfmMM()->getIdx();
+      return m->getfmMM()->getfmLockN(nodeId)->wlock(index);
     }
   }
   return -1; //should not reach here
@@ -1154,7 +1159,7 @@ int FEM_Modify_UnlockN(FEM_Mesh *m, int nodeId, int readlock) {
       if(readlock) {
 	return m->getfmMM()->getfmLockN(nodeId)->runlock();
       } else {
-	return m->getfmMM()->getfmLockN(nodeId)->wunlock();
+	return m->getfmMM()->getfmLockN(nodeId)->wunlock(index);
       }
     }
     else {
@@ -1193,7 +1198,8 @@ int FEM_Modify_UnlockN(FEM_Mesh *m, int nodeId, int readlock) {
     if(readlock) {
       return m->getfmMM()->getfmLockN(nodeId)->runlock();
     } else {
-      return m->getfmMM()->getfmLockN(nodeId)->wunlock();
+      int index = m->getfmMM()->getIdx();
+      return m->getfmMM()->getfmLockN(nodeId)->wunlock(index);
     }
   }
   return -1; //should not reach here
@@ -1225,6 +1231,34 @@ CDECL void FEM_REF_INIT(int mesh) {
   meshMod[cid].setFemMesh(msg);
 
   return;
+}
+
+//this would be only done for attributes of a node
+void FEM_Update_attributes(FEM_Mesh *m, int attr_id, int id) {
+  femMeshModify *theMod = m->getfmMM();
+  FEM_MUtil *util = theMod->getfmUtil();
+  if(util->isShared(id)) {
+    //build up the list of chunks it is shared/local to
+    int numchunks;
+    IDXL_Share **chunks1;
+    util->getChunkNos(0,id,&numchunks,&chunks1);
+
+    for(int j=0; j<numchunks; j++) {
+      int chk = chunks1[j]->chk;
+      if(chk==theMod->getIdx()) continue;
+      //meshMod[chk].updateNodeAttrs();
+    }
+    for(int j=0; j<numchunks; j++) {
+      delete chunks1[j];
+    }
+    free(chunks1);
+  }
+  //else if() {
+    //in ghost send list
+  //}
+  //else if() {
+    //in the ghost recv list, probably this won't be used, because noone is supposed to update attributes of a ghost node
+  //}
 }
 
 
@@ -1260,11 +1294,11 @@ void femMeshModify::setFemMesh(FEMMeshMsg *fm) {
   //populate the node locks
   int nsize = fmMesh->node.size();
   for(int i=0; i<nsize; i++) {
-    fmLockN.push_back(new FEM_lockN(i));
+    fmLockN.push_back(new FEM_lockN(i,this));
   }
   /*int gsize = fmMesh->node.ghost->size();
     for(int i=0; i<gsize; i++) {
-    fmgLockN.push_back(new FEM_lockN(FEM_To_ghost_index(i)));
+    fmgLockN.push_back(new FEM_lockN(FEM_To_ghost_index(i),this));
     }*/
   return;
 }
@@ -1296,7 +1330,7 @@ intMsg *femMeshModify::lockRemoteNode(int sharedIdx, int fromChk, int isGhost, i
   if(readLock) {
     ret = getfmLockN(localIdx)->rlock();
   } else {
-    ret = getfmLockN(localIdx)->wlock();
+    ret = getfmLockN(localIdx)->wlock(fromChk);
   }
   imsg->i = ret;
   return imsg;
@@ -1315,7 +1349,7 @@ intMsg *femMeshModify::unlockRemoteNode(int sharedIdx, int fromChk, int isGhost,
   if(readLock) {
     ret = getfmLockN(localIdx)->runlock();
   } else {
-    ret = getfmLockN(localIdx)->wunlock();
+    ret = getfmLockN(localIdx)->wunlock(fromChk);
   }
   imsg->i = ret;
   return imsg;
