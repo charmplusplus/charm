@@ -67,6 +67,9 @@ public:
     //printf(" - pool operator new %p (size=%d)\n",ret,size);
     return ret;
   }
+  void *operator new(size_t size, void *p) {
+    return p;
+  }
   void operator delete(void *p, size_t size) {
     //printf(" - pool operator delete %p\n",p);
     buffer.enqueue((type*)p);
@@ -97,6 +100,9 @@ public:
     *bufferP = buf;
     //printf(" - pool operator new with buffer %p\n",bufferP);
     return ret;
+  }
+  void *operator new(size_t size, void *p) {
+    return p;
   }
   void operator delete(void *p, size_t sz) {
     CkPoolQueue<type> **bufferP = (CkPoolQueue<type> **)(ALIGN8((int)((char*)p)+sz+sizeof(CkPoolQueue<type>*)) - sizeof(CkPoolQueue<type>*));
