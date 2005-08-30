@@ -14,22 +14,26 @@ NormalLineArray::doFirstFFT(int fftid, int direction)
     int yPencilsPerSlab = fftinfo.yPencilsPerSlab;
     int zPencilsPerSlab = fftinfo.zPencilsPerSlab;
 
-    if(direction && ptype==PencilType::XLINE)
-	fftw(fwdplan, xPencilsPerSlab, (fftw_complex*)line, 1, sizeX, NULL, 0, 0); // xPencilsPerSlab many 1-D fft's 
-    else if(!direction && ptype==PencilType::ZLINE)
-	fftw(bwdplan, zPencilsPerSlab, (fftw_complex*)line, 1, sizeZ, NULL, 0, 0);
-    else
-	CkAbort("Can't do this FFT\n");
-#if 0
+#ifdef VERBOSE 
     {
 	char fname[80];
-	snprintf(fname,80,"xline.y%d.z%d.out", thisIndex.x, thisIndex.y);
+	if(direction)
+	snprintf(fname,80,"xline_%d.y%d.z%d.out", fftid,thisIndex.x, thisIndex.y);
+	else
+	snprintf(fname,80,"zline_%d.x%d.y%d.out", fftid,thisIndex.x, thisIndex.y);
       FILE *fp=fopen(fname,"w");
 	for(int x = 0; x < sizeX*xPencilsPerSlab; x++)
 	    fprintf(fp, "%d  %g %g\n", x, line[x].re, line[x].im);
 	fclose(fp);
     }
 #endif
+
+    if(direction && ptype==PencilType::XLINE)
+	fftw(fwdplan, xPencilsPerSlab, (fftw_complex*)line, 1, sizeX, NULL, 0, 0); // xPencilsPerSlab many 1-D fft's 
+    else if(!direction && ptype==PencilType::ZLINE)
+	fftw(bwdplan, zPencilsPerSlab, (fftw_complex*)line, 1, sizeZ, NULL, 0, 0);
+    else
+	CkAbort("Can't do this FFT\n");
 
     int x, y, z=0;
 #ifdef VERBOSE
@@ -119,16 +123,6 @@ NormalLineArray::doSecondFFT(int ypos, complex *val, int datasize, int fftid, in
 	infoVec[fftid]->count = 0;
 	int y;
 
-#if 0
-    {
-	char fname[80];
-	snprintf(fname,80,"yline.x%d.z%d.out", thisIndex.y, thisIndex.x);
-      FILE *fp=fopen(fname,"w");
-	for(int x = 0; x < sizeY*yPencilsPerSlab; x++)
-	    fprintf(fp, "%d  %g %g\n", x, line[x].re, line[x].im);
-	fclose(fp);
-    }
-#endif
 
     if(direction && ptype==PencilType::YLINE)
 	    fftw(fwdplan, yPencilsPerSlab, (fftw_complex*)line, 1, sizeY, NULL, 0, 0);
@@ -136,6 +130,17 @@ NormalLineArray::doSecondFFT(int ypos, complex *val, int datasize, int fftid, in
 	    fftw(bwdplan, yPencilsPerSlab, (fftw_complex*)line, 1, sizeY, NULL, 0, 0);
     else
 	CkAbort("Can't do this FFT\n");
+
+#ifdef VERBOSE
+    {
+	char fname[80];
+	snprintf(fname,80,"yline_%d.x%d.z%d.out", fftid, thisIndex.y, thisIndex.x);
+      FILE *fp=fopen(fname,"w");
+	for(int x = 0; x < sizeY*yPencilsPerSlab; x++)
+	    fprintf(fp, "%d  %g %g\n", x, line[x].re, line[x].im);
+	fclose(fp);
+    }
+#endif
 
 #ifdef VERBOSE
 	CkPrintf("Second FFT done at [%d %d]\n", thisIndex.x, thisIndex.y);
@@ -223,17 +228,6 @@ NormalLineArray::doThirdFFT(int zpos, int xpos, complex *val, int datasize, int 
 
 //	memset(line, 1, sizeof(complex)*fftinfo.sizeX*fftinfo.zPencilsPerSlab);
 
-#if 0
-    {
-	char fname[80];
-	snprintf(fname,80,"zline.x%d.y%d.out", thisIndex.x, thisIndex.y);
-      FILE *fp=fopen(fname,"w");
-	for(int x = 0; x < sizeX*xPencilsPerSlab; x++)
-	    fprintf(fp, "%d  %g %g\n", x, line[x].re, line[x].im);
-	fclose(fp);
-    }
-#endif
-
 	if(direction && ptype==PencilType::ZLINE)
 	    fftw(fwdplan, zPencilsPerSlab, (fftw_complex*)line, 1, sizeX, NULL, 0, 0);
 	else if(!direction && ptype==PencilType::XLINE)
@@ -244,14 +238,30 @@ NormalLineArray::doThirdFFT(int zpos, int xpos, complex *val, int datasize, int 
 	CkPrintf("Third FFT done at [%d %d]\n", thisIndex.x, thisIndex.y);
 #endif
 
-	doneFFT(id, direction);
+#ifdef VERBOSE
+    {
+	char fname[80];
+	if(direction)
+	snprintf(fname,80,"zline_%d.x%d.y%d.out", fftid, thisIndex.x, thisIndex.y);
+	else
+	snprintf(fname,80,"xline_%d.y%d.z%d.out", fftid, thisIndex.x, thisIndex.y);
+      FILE *fp=fopen(fname,"w");
+	for(int x = 0; x < sizeX*xPencilsPerSlab; x++)
+	    fprintf(fp, "%d  %g %g\n", x, line[x].re, line[x].im);
+	fclose(fp);
+    }
+#endif
+
+	doneFFT(fftid, direction);
 //	contribute(sizeof(int), &count, CkReduction::sum_int);
     }
 }
 
 void 
 NormalLineArray::doneFFT(int id, int direction){
+#ifdef VERBOSE
     CkPrintf("FFT finished \n");
+#endif
 }
 
 NormalLineArray::NormalLineArray (LineFFTinfo &info, CProxy_NormalLineArray _xProxy, CProxy_NormalLineArray _yProxy, CProxy_NormalLineArray _zProxy, bool _useCommlib, ComlibInstanceHandle &inst) {
