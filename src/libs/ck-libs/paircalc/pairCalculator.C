@@ -31,7 +31,7 @@ extern ComlibInstanceHandle mcastInstanceCP;
 void createPairCalculator(bool sym, int s, int grainSize, int numZ, int* z, int op1, 
                           FuncType f1, int op2, FuncType f2, CkCallback cb, 
                           PairCalcID* pcid, int cb_ep, CkArrayID cb_aid, 
-                          int comlib_flag, CkGroupID *mapid, int flag_dp, bool conserveMemory, bool lbpaircalc, CkCallback lbcb, CkGroupID mCastGrpId, bool gspacesum) {
+                          int comlib_flag, CkGroupID *mapid, int flag_dp, bool conserveMemory, bool lbpaircalc, int priority, CkGroupID mCastGrpId, bool gspacesum) {
 
   traceRegisterUserEvent("calcpairDGEMM", 210);
   traceRegisterUserEvent("calcpairContrib", 220);
@@ -67,7 +67,7 @@ void createPairCalculator(bool sym, int s, int grainSize, int numZ, int* z, int 
   }
   else {
     options.setMap(*mapid);
-    pairCalculatorProxy = CProxy_PairCalculator::ckNew(sym, grainSize, s, blkSize, op1, f1, op2, f2, cb, pairCalcReducerProxy.ckGetGroupID(), cb_aid, cb_ep, conserveMemory, lbpaircalc, lbcb, cpreduce, gspacesum, options);
+    pairCalculatorProxy = CProxy_PairCalculator::ckNew(sym, grainSize, s, blkSize, op1, f1, op2, f2, cb, pairCalcReducerProxy.ckGetGroupID(), cb_aid, cb_ep, conserveMemory, lbpaircalc, cpreduce, gspacesum,options);
   }
 
   pairCalculatorProxy.ckSetReductionClient(&cb);  
@@ -81,7 +81,7 @@ void createPairCalculator(bool sym, int s, int grainSize, int numZ, int* z, int 
   ComlibInstanceHandle bcastInstance = CkGetComlibInstance();
   bcastInstance.setStrategy(bstrat);
   CharmStrategy *ringstrat = new RingMulticastStrategy(pairCalculatorProxy.ckGetArrayID());
-  pcid->Init(pairCalculatorProxy.ckGetArrayID(), pairCalcReducerProxy.ckGetGroupID(), grainSize, blkSize, s, sym, comlib_flag, bcastInstance, flag_dp, conserveMemory, lbpaircalc, mCastGrpId, gspacesum);
+  pcid->Init(pairCalculatorProxy.ckGetArrayID(), pairCalcReducerProxy.ckGetGroupID(), grainSize, blkSize, s, sym, comlib_flag, bcastInstance, flag_dp, conserveMemory, lbpaircalc, mCastGrpId, gspacesum, priority);
   CharmStrategy *multistrat = new DirectMulticastStrategy(pairCalculatorProxy.ckGetArrayID());
   if(sym)// cheap hack to only do this once 
     mcastInstanceCP=ComlibRegister(multistrat);
@@ -98,7 +98,7 @@ void createPairCalculator(bool sym, int s, int grainSize, int numZ, int* z, int 
 	      CkPrintf("inserting [%d %d %d %d %d]\n",z[numX],s1,s2,c,sym); 
 #endif
 	      pairCalculatorProxy(z[numX],s1,s2,c).
-		insert(sym, grainSize, s, blkSize, op1, f1, op2, f2, cb, pairCalcReducerProxy.ckGetGroupID(), cb_aid, cb_ep, conserveMemory, lbpaircalc, lbcb, cpreduce, gspacesum );
+		insert(sym, grainSize, s, blkSize, op1, f1, op2, f2, cb, pairCalcReducerProxy.ckGetGroupID(), cb_aid, cb_ep, conserveMemory, lbpaircalc, cpreduce, gspacesum );
 	    }
 	    else
 	      {
@@ -106,7 +106,7 @@ void createPairCalculator(bool sym, int s, int grainSize, int numZ, int* z, int 
 	      CkPrintf("inserting [%d %d %d %d %d]\n",z[numX],s1,s2,c,sym); 
 #endif
 		pairCalculatorProxy(z[numX],s1,s2,c).
-		  insert(sym, grainSize, s, blkSize, op1, f1, op2, f2, cb, pairCalcReducerProxy.ckGetGroupID(), cb_aid, cb_ep, conserveMemory, lbpaircalc, lbcb, cpreduce, gspacesum, proc);
+		  insert(sym, grainSize, s, blkSize, op1, f1, op2, f2, cb, pairCalcReducerProxy.ckGetGroupID(), cb_aid, cb_ep, conserveMemory, lbpaircalc, cpreduce, gspacesum, proc);
 		proc++;
 		if (proc >= CkNumPes()) proc = 0;
 	      }
@@ -125,14 +125,14 @@ void createPairCalculator(bool sym, int s, int grainSize, int numZ, int* z, int 
 	      CkPrintf("inserting [%d %d %d %d %d]\n",z[numX],s1,s2,c,sym); 
 #endif
 		pairCalculatorProxy(z[numX],s1,s2,c).
-		  insert(sym, grainSize, s, blkSize, op1, f1, op2, f2, cb, pairCalcReducerProxy.ckGetGroupID(), cb_aid, cb_ep, conserveMemory, lbpaircalc, lbcb, cpreduce, gspacesum );
+		  insert(sym, grainSize, s, blkSize, op1, f1, op2, f2, cb, pairCalcReducerProxy.ckGetGroupID(), cb_aid, cb_ep, conserveMemory, lbpaircalc,  cpreduce, gspacesum );
 	      }
 	      else{
 #ifdef _PAIRCALC_CREATE_DEBUG_
 	      CkPrintf("inserting [%d %d %d %d %d]\n",z[numX],s1,s2,c,sym); 
 #endif
 		pairCalculatorProxy(z[numX],s1,s2,c).
-		  insert(sym, grainSize, s, blkSize, op1, f1, op2, f2, cb, pairCalcReducerProxy.ckGetGroupID(), cb_aid, cb_ep, conserveMemory, lbpaircalc, lbcb,  cpreduce, gspacesum, proc);
+		  insert(sym, grainSize, s, blkSize, op1, f1, op2, f2, cb, pairCalcReducerProxy.ckGetGroupID(), cb_aid, cb_ep, conserveMemory, lbpaircalc,   cpreduce, gspacesum, proc);
 		proc++;
 		if (proc >= CkNumPes()) proc = 0;
 	      }
@@ -270,13 +270,17 @@ void startPairCalcLeft(PairCalcID* pcid, int n, complex* ptr, int myS, int myZ){
 #endif
   if(pcid->existsLproxy)
     {
-      calculatePairsMsg *msgfromrow=new ( n,0 ) calculatePairsMsg;
+      calculatePairsMsg *msgfromrow=new (n, 8* sizeof(int)) calculatePairsMsg;
+      CkSetQueueing(msgfromrow, CK_QUEUEING_IFIFO);
+      *(int*)CkPriorityPtr(msgfromrow) = pcid->priority;    
       msgfromrow->init(n, myS, true, flag_dp, ptr);
       pcid->proxyLFrom.calculatePairs_gemm(msgfromrow);
     }
   if(pcid->existsLNotFromproxy)
     { //symmetric
-      calculatePairsMsg *msg= new ( n,0 ) calculatePairsMsg;
+      calculatePairsMsg *msg= new ( n,8*sizeof(int) ) calculatePairsMsg;
+      CkSetQueueing(msg, CK_QUEUEING_IFIFO);
+      *(int*)CkPriorityPtr(msg) = pcid->priority;    
       msg->init(n, myS, false, flag_dp, ptr);   
       pcid->proxyLNotFrom.calculatePairs_gemm(msg);
     }
@@ -453,7 +457,9 @@ void startPairCalcRight(PairCalcID* pcid, int n, complex* ptr, int myS, int myZ)
 	    CkAssert(fabs(im)>1.0e-300);
 	}
 #endif
-      calculatePairsMsg *msg= new ( n,0 ) calculatePairsMsg;
+      calculatePairsMsg *msg= new ( n,8*sizeof(int) ) calculatePairsMsg;
+      CkSetQueueing(msg, CK_QUEUEING_IFIFO);
+      *(int*)CkPriorityPtr(msg) = pcid->priority;    
       msg->init(n,myS,false,flag_dp,ptr);
       pcid->proxyRNotFrom.calculatePairs_gemm(msg);
     }

@@ -86,7 +86,7 @@ CkReductionMsg *sumMatrixDouble(int nMsg, CkReductionMsg **msgs)
 
 PairCalculator::PairCalculator(CkMigrateMessage *m) { }
 
-PairCalculator::PairCalculator(bool sym, int grainSize, int s, int blkSize,  int op1,  FuncType fn1, int op2,  FuncType fn2, CkCallback cb, CkGroupID gid, CkArrayID cb_aid, int cb_ep, bool conserveMemory, bool lbpaircalc, CkCallback lbcb, redtypes _cpreduce, bool gspacesum)
+PairCalculator::PairCalculator(bool sym, int grainSize, int s, int blkSize,  int op1,  FuncType fn1, int op2,  FuncType fn2, CkCallback cb, CkGroupID gid, CkArrayID cb_aid, int cb_ep, bool conserveMemory, bool lbpaircalc,  redtypes _cpreduce, bool gspacesum)
 {
 #ifdef _PAIRCALC_DEBUG_
   CkPrintf("[PAIRCALC] [%d %d %d %d] inited lb %d \n", thisIndex.w, thisIndex.x, thisIndex.y, thisIndex.z,lbpaircalc);
@@ -112,7 +112,6 @@ PairCalculator::PairCalculator(bool sym, int grainSize, int s, int blkSize,  int
   numRecd = 0;
   newelems=0;
   numExpected = grainSize;
-  this->cb_lb=lbcb;
   this->gspacesum=gspacesum;
   cpreduce=_cpreduce;
   resumed=true;
@@ -168,7 +167,6 @@ PairCalculator::pup(PUP::er &p)
   p|existsRight;
   p|existsOut;
   p|existsNew;
-  p|cb_lb;
   p|newelems;
   p|gspacesum;
   p|mCastGrpId;
@@ -470,11 +468,14 @@ PairCalculator::calculatePairs_gemm(calculatePairsMsg *msg)
     numRecd = 0; 
 
     if (msg->flag_dp) {
+#ifndef NEW_DECOMP	
       if(thisIndex.w != 0) {   // Adjusting for double packing of incoming data
-
+#endif
 	for (int i = 0; i < grainSize*grainSize; i++)
 	  outData[i] *= 2.0;
+#ifndef NEW_DECOMP	
       }
+#endif
     }
 #ifdef _PAIRCALC_DEBUG_PARANOID_
     char filename[80];
@@ -701,9 +702,12 @@ PairCalculator::acceptResult(acceptResultMsg *msg)
 #ifndef CMK_OPTIMIZE
   traceUserBracketEvent(230, StartTime, CmiWallTimer());
 #endif
-
   if(symmetric && (thisIndex.x !=thisIndex.y) && existsRight)
     {
+//#ifdef CMK_VERSION_BLUEGENE
+  CmiNetworkProgressAfter(1);
+//#endif
+
 #ifndef CMK_OPTIMIZE
       StartTime=CmiWallTimer();
 #endif

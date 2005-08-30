@@ -229,10 +229,11 @@ class calculatePairsMsg : public CkMcastBaseMsg, public CMessage_calculatePairsM
 
 class acceptResultMsg : public CkMcastBaseMsg, public CMessage_acceptResultMsg {
  public:
-  int size;
-  int size2;
   double *matrix1;
   double *matrix2;
+  int size;
+  int size2;
+
   void init(int _size, int _size2, double *_points1, double *_points2)
     {
       size=_size;
@@ -252,8 +253,8 @@ class acceptResultMsg : public CkMcastBaseMsg, public CMessage_acceptResultMsg {
 
 class entireResultMsg : public CMessage_entireResultMsg {
  public:
-  int size;
   double *matrix;
+  int size;
   bool symmetric;
   void init(int _size, double *_points, bool _symmetric)
     {
@@ -266,9 +267,9 @@ class entireResultMsg : public CMessage_entireResultMsg {
 
 class entireResultMsg2 : public CMessage_entireResultMsg2 {
  public:
-  int size;
   double *matrix1;
   double *matrix2;
+  int size;
   bool symmetric;
   void init(int _size, double *_points1, double *_points2, bool _symmetric)
     {
@@ -285,7 +286,7 @@ class entireResultMsg2 : public CMessage_entireResultMsg2 {
 
 class PairCalculator: public CBase_PairCalculator {
  public:
-  PairCalculator(bool, int, int, int, int op1, FuncType fn1, int op2, FuncType fn2, CkCallback cb, CkGroupID gid, CkArrayID final_callbackid, int final_callback_ep, bool conserveMemory, bool lbpaircalc, CkCallback lbcb, redtypes reduce, bool gspacesum);
+  PairCalculator(bool, int, int, int, int op1, FuncType fn1, int op2, FuncType fn2, CkCallback cb, CkGroupID gid, CkArrayID final_callbackid, int final_callback_ep, bool conserveMemory, bool lbpaircalc, redtypes reduce, bool gspacesum);
     
   PairCalculator(CkMigrateMessage *);
   ~PairCalculator();
@@ -341,7 +342,6 @@ class PairCalculator: public CBase_PairCalculator {
   bool existsRight;
   bool existsOut;
   bool existsNew;
-  CkCallback cb_lb;
   double *inDataLeft, *inDataRight;
   double *outData;
   complex *newData;

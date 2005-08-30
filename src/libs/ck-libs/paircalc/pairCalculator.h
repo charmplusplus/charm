@@ -27,6 +27,7 @@ class PairCalcID {
   bool existsLNotFromproxy;
   bool existsRproxy;
   bool gspacesum;
+  int priority;
   CProxySection_PairCalculator proxyLFrom;
   CProxySection_PairCalculator proxyLNotFrom;
   CProxySection_PairCalculator proxyRNotFrom;
@@ -34,7 +35,7 @@ class PairCalcID {
   PairCalcID() {}
   ~PairCalcID() {}
 
-  void Init(CkArrayID aid, CkGroupID gid, int grain, int blk, int s, bool sym, bool _useComlib,  ComlibInstanceHandle h, bool _dp, bool _conserveMemory, bool _lbpaircalc, CkGroupID _mCastGrpId, bool _gspacesum ) {
+  void Init(CkArrayID aid, CkGroupID gid, int grain, int blk, int s, bool sym, bool _useComlib,  ComlibInstanceHandle h, bool _dp, bool _conserveMemory, bool _lbpaircalc, CkGroupID _mCastGrpId, bool _gspacesum ,int _priority) {
       
     Aid = aid;
     Gid = gid;
@@ -52,6 +53,7 @@ class PairCalcID {
     lbpaircalc=_lbpaircalc;
     mCastGrpId=_mCastGrpId;
     gspacesum=_gspacesum;
+    priority=_priority;
   }
   void resetProxy()
     {
@@ -105,11 +107,12 @@ class PairCalcID {
     p|proxyLNotFrom;
     p|proxyRNotFrom;
     p|mCastGrpId;
+    p|priority;
   }
 
 };
 
-void createPairCalculator(bool sym, int w, int grainSize, int numZ, int* z, int op1, FuncType f1, int op2, FuncType f2, CkCallback cb, PairCalcID* aid, int ep, CkArrayID cbid, int flag, CkGroupID *gid, int flag_dp, bool conserveMemory, bool lbpaircalc, CkCallback lbcb, CkGroupID mCastGrpId, bool gspacesum);
+void createPairCalculator(bool sym, int w, int grainSize, int numZ, int* z, int op1, FuncType f1, int op2, FuncType f2, CkCallback cb, PairCalcID* aid, int ep, CkArrayID cbid, int flag, CkGroupID *gid, int flag_dp, bool conserveMemory, bool lbpaircalc, int priority, CkGroupID mCastGrpId, bool gspacesum);
 
 void startPairCalcLeft(PairCalcID* aid, int n, complex* ptr, int myS, int myZ);
 
