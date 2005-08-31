@@ -35,7 +35,15 @@
 #include "pcqueue.h"
 
 #define FLIPBIT(node,bitnumber) (node ^ (1 << bitnumber))
+
+#if CMK_VERSION_BLUEGENE
+#define MAX_QLEN 8
+#define NETWORK_PROGRESS_PERIOD_DEFAULT 16
+#else
+#define NETWORK_PROGRESS_PERIOD_DEFAULT 0
 #define MAX_QLEN 200
+#endif
+
 
 /*
     To reduce the buffer used in broadcast and distribute the load from 
@@ -144,7 +152,7 @@ typedef struct msg_list {
      MPI_Request req;
 } SMSG_LIST;
 
-static int MsgQueueLen=0;
+int MsgQueueLen=0;
 static int request_max;
 
 static SMSG_LIST *sent_msgs=0;
@@ -461,7 +469,7 @@ void CmiReleaseCommHandle(CmiCommHandle c)
 extern void MPID_Progress_test();
 #endif
 
-static void CmiReleaseSentMessages(void)
+void CmiReleaseSentMessages(void)
 {
   SMSG_LIST *msg_tmp=sent_msgs;
   SMSG_LIST *prev=0;
@@ -469,10 +477,11 @@ static void CmiReleaseSentMessages(void)
   int done;
   MPI_Status sts;
 
+  
 #if CMK_VERSION_BLUEGENE
   MPID_Progress_test();
 #endif
-     
+ 
   MACHSTATE1(2,"CmiReleaseSentMessages begin on %d {", CmiMyPe());
   while(msg_tmp!=0) {
     done =0;
@@ -499,7 +508,7 @@ static void CmiReleaseSentMessages(void)
   MACHSTATE(2,"} CmiReleaseSentMessages end");
 }
 
-static int PumpMsgs(void)
+int PumpMsgs(void)
 {
   int nbytes, flg, res;
   char *msg;
@@ -1217,7 +1226,7 @@ void CmiFreeNodeBroadcastAllFn(int s, char *m)
 #endif
 
 /************************** MAIN ***********************************/
-#define MPI_REQUEST_MAX 1024*10 
+#define MPI_REQUEST_MAX 16      //1024*10 
 
 void ConverseExit(void)
 {
@@ -1325,7 +1334,7 @@ static void ConverseRunPE(int everReturn)
   /* Network progress function is used to poll the network when for
      messages. This flushes receive buffers on some  implementations*/
   CpvInitialize(int , networkProgressCount);
-  CpvAccess(networkProgressCount) = 0;
+  CpvAccess(networkProgressCount) = 0; 
 
 #if CMK_SMP
   CcdCallOnConditionKeep(CcdPROCESSOR_BEGIN_IDLE,(CcdVoidFn)CmiNotifyBeginIdle,(void *)s);
@@ -1442,9 +1451,14 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
   CsvInitialize(CmiNodeState, NodeState);
   CmiNodeStateInit(&CsvAccess(NodeState));
 
+  printf("Before Calling Malloc \n");
+
   procState = (ProcState *)malloc((_Cmi_mynodesize+1) * sizeof(ProcState));
+
+  printf("After Calling Malloc %d\n", procState);
+
   for (i=0; i<_Cmi_mynodesize+1; i++) {
-/*    procState[i].sendMsgBuf = PCQueueCreate();   */
+    /*    procState[i].sendMsgBuf = PCQueueCreate();   */
     procState[i].recvLock = CmiCreateLock();
   }
 #if CMK_SMP
@@ -1454,7 +1468,7 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
 
   /* Network progress function is used to poll the network when for
      messages. This flushes receive buffers on some  implementations*/
-  networkProgressPeriod = 0;
+  networkProgressPeriod = NETWORK_PROGRESS_PERIOD_DEFAULT;
   CmiGetArgInt(argv, "+networkProgressPeriod", &networkProgressPeriod);
 
   CmiStartThreads(argv);
