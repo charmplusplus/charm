@@ -79,17 +79,17 @@ void CmiOutOfMemoryInit(void) {
   void *ptrs[MEMORY_PREALLOCATE_MAX];
   int i,len=0;
   for (i=0;i<MEMORY_PREALLOCATE_MAX;i++) {
-    ptrs[i]=malloc(1024*1024);
+    ptrs[i] = meta_malloc(1024*1024);
     if (ptrs[i]==NULL) break;
     else len=i+1; /* this allocation worked */
   }
   /* we now own all the memory-- release all but the last meg. */
-  printf("CMK_MEMORY_PREALLOCATE_HACK claimed %d megs\n",len);
+  //printf("CMK_MEMORY_PREALLOCATE_HACK claimed %d megs\n",len);
   for (i=len-2;i>=0;i--) {
-    free(ptrs[i]);
+    meta_free(ptrs[i]);
   }
 #endif
-  memory_lifeRaft=(char *)malloc(65536/2);
+  memory_lifeRaft=(char *)meta_malloc(65536/2);
 }
 
 void CmiOutOfMemory(int nBytes) 

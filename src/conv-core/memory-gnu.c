@@ -403,7 +403,7 @@ extern "C" {
 
 
 #ifndef MALLOC_ALIGNMENT
-#define MALLOC_ALIGNMENT       (2 * SIZE_SZ)
+#define MALLOC_ALIGNMENT       (4 * SIZE_SZ)
 #endif
 
 /* The corresponding bit mask value */
