@@ -1372,7 +1372,7 @@ void foo(void) {
 	printf("Hello, world!\n");
 }
 EOT
-echo "set C++ compiler as: $CMK_CXX"
+echo "set C++ compiler as: $CMK_CXX $OPTS_CXX"
 test_cxx "whether C++ compiler works" "ok" "no" ""
 if test $fail -eq 1
 then
@@ -1388,7 +1388,7 @@ int main() {
 	return 0;
 }
 EOT
-echo "set C++ linker as: $CMK_LDXX"
+echo "set C++ linker as: $CMK_LDXX $OPTS_LD"
 test_link "whether linker works" "ok" "no" ""
 if test $fail -eq 1
 then
