@@ -21,7 +21,8 @@ void FEM_Interpolate::FEM_InterpolateNodeOnEdge(NodalArgs args)
     if (a->getAttr() < FEM_ATTRIB_TAG_MAX) {
       FEM_DataAttribute *d = (FEM_DataAttribute *)a;
       d->interpolate(args.nodes[0], args.nodes[1], args.n, args.frac);
-    } else if(a->getAttr()==FEM_BOUNDARY) {
+    } 
+    else if(a->getAttr()==FEM_BOUNDARY) {
       int n1_bound, n2_bound;
       FEM_Mesh_dataP(theMesh, FEM_NODE, FEM_BOUNDARY, &n1_bound, args.nodes[0], 1 , FEM_INT, 1);
       FEM_Mesh_dataP(theMesh, FEM_NODE, FEM_BOUNDARY, &n2_bound, args.nodes[1], 1 , FEM_INT, 1);
@@ -77,7 +78,7 @@ void FEM_Interpolate::FEM_InterpolateNodeOnEdge(NodalArgs args)
   }
   //if the node is shared, then update these values on the other chunks as well
   if(theMod->fmUtil->isShared(args.n)) {
-    //build up the list of chunks it is shared/local to
+    //build up the list of chunks it is shared/local to and update the coords & boundary falgs, others should be updated by the user
     int numchunks;
     IDXL_Share **chunks1;
     theMod->fmUtil->getChunkNos(0,args.n,&numchunks,&chunks1);
@@ -85,7 +86,12 @@ void FEM_Interpolate::FEM_InterpolateNodeOnEdge(NodalArgs args)
     for(int j=0; j<numchunks; j++) {
       int chk = chunks1[j]->chk;
       if(chk==theMod->getIdx()) continue;
-      //meshMod[chk].updateNodeAttrs();
+      double coord[2];
+      int bound = 0;
+      FEM_Mesh_dataP(theMesh, FEM_NODE, theMod->fmAdaptAlgs->coord_attr, coord, args.n, 1 , FEM_DOUBLE, 2);
+      FEM_Mesh_dataP(theMesh, FEM_NODE, FEM_BOUNDARY, &bound, args.n, 1 , FEM_INT, 1);
+      int sharedIdx = theMod->fmUtil->exists_in_IDXL(theMesh,args.n,chk,0);
+      meshMod[chk].updateNodeAttrs(theMod->idx, sharedIdx, coord[0], coord[1], bound);
     }
     for(int j=0; j<numchunks; j++) {
       delete chunks1[j];

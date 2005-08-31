@@ -53,5 +53,6 @@ module FEMMeshModify {
     entry [sync,threaded] void removeElementRemote(removeElemMsg *);
     entry /*[sync,threaded]*/ void refine_flip_element_leb(int, int, int, int, int, int, double);
     entry [sync,threaded] void addToSharedList(int, int);
+    entry [sync,threaded] void updateNodeAttrs(int, int, double, double, int);
   };
 };

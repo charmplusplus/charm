@@ -21,6 +21,8 @@ class FEM_AdaptL;
 class FEM_Adapt_Algs {
   friend class FEM_AdaptL;
   friend class FEM_Adapt;
+  friend class femMeshModify;
+  friend class FEM_Interpolate;
 
  protected: 
   FEM_Mesh *theMesh;

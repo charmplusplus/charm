@@ -427,6 +427,9 @@ double FEM_Adapt_Algs::getArea(double *n1_coord, double *n2_coord, double *n3_co
   }
   cLen = sqrt(ds_sum);
   sLen = (aLen+bLen+cLen)/2;
+  if(sLen-aLen < 0) return 0.0;
+  else if(sLen-bLen < 0) return 0.0;
+  else if(sLen-cLen < 0) return 0.0; //area too small to note
   return (sqrt(sLen*(sLen-aLen)*(sLen-bLen)*(sLen-cLen)));
 }
 

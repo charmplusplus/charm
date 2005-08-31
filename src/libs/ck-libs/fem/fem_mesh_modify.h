@@ -306,6 +306,7 @@ class femMeshModify : public CBase_femMeshModify {
 			       double longEdgeLen);
 
   void addToSharedList(int fromChk, int sharedIdx);
+  void updateNodeAttrs(int fromChk, int sharedIdx, double coordX, double coordY, int bound);
 };
 
 

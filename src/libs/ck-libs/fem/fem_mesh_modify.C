@@ -1431,4 +1431,24 @@ void femMeshModify::addToSharedList(int fromChk, int sharedIdx) {
   fmUtil->addToSharedList(fmMesh, fromChk, sharedIdx);
 }
 
+void femMeshModify::updateNodeAttrs(int fromChk, int sharedIdx, double coordX, double coordY, int bound) {
+  int localIdx = fmUtil->lookup_in_IDXL(fmMesh, sharedIdx, fromChk, 0);
+  double *coord = new double[2];
+  coord[0] = coordX; coord[1] = coordY;
+  CkVec<FEM_Attribute *>*attrs = (fmMesh->node).getAttrVec();
+  for (int i=0; i<attrs->size(); i++) {
+    FEM_Attribute *a = (FEM_Attribute *)(*attrs)[i];
+    if (a->getAttr() == fmAdaptAlgs->coord_attr) {
+      FEM_DataAttribute *d = (FEM_DataAttribute *)a;
+      d->getDouble().setRow(localIdx,coord,0);
+    }
+    else if(a->getAttr() == FEM_BOUNDARY) {
+      FEM_DataAttribute *d = (FEM_DataAttribute *)a;
+      d->getInt().setRow(localIdx,bound);
+    }
+  }
+  delete [] coord;
+  return;
+}
+
 #include "FEMMeshModify.def.h"

@@ -565,19 +565,18 @@ int FEM_AdaptL::edge_contraction_help(int e1, int e2, int n1, int n2, int e1_n1,
   nm.n = keepnode;
 
   //hack, if it is shared, do not change the attributes, since I am not updating them now across all chunks
-  if(n1_shared || n2_shared) {
+  /*if(n1_shared || n2_shared) {
     if((n1_shared && n2_bound) ||(n2_shared && n1_bound)) {
       nm.frac = 1.0;
-      /*free(conn);
-      free(adjnodes);
-      free(adjelems);
-      return -1; //one edge on a shared node & the other on a boundary
-      */
+      //free(conn);
+      //free(adjnodes);
+      //free(adjelems);
+      //return -1; //one edge on a shared node & the other on a boundary
     }
     else {
       nm.frac = 1.0;
     }
-  }
+  }*/
 
 
   CkVec<int> lockedNodes;
@@ -775,9 +774,7 @@ int FEM_AdaptL::edge_contraction_help(int e1, int e2, int n1, int n2, int e1_n1,
     return -1;
   }
 
-  inp->FEM_InterpolateNodeOnEdge(nm);
-  if(shared) { //update the attributes of keepnode
-  }
+  inp->FEM_InterpolateNodeOnEdge(nm); //update the attributes of keepnode across shared
 
   int e1chunk=-1, e2chunk=-1;
   int index = theMod->getIdx();
