@@ -157,7 +157,7 @@ int main() {
 	return 0;
 }
 EOT
-echo "set C++ linker as: $CMK_LDXX $OPTS_LD"
+echo "set C++ linker as: $CMK_LDXX $OPTS_LDXX"
 test_link "whether linker works" "ok" "no" ""
 if test $fail -eq 1
 then
