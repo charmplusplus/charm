@@ -733,6 +733,9 @@ int FEM_AdaptL::edge_contraction_help(int e1, int e2, int n1, int n2, int e1_n1,
   new_coord[0] = nm.frac*n1_coord[0] + (1-nm.frac)*n2_coord[0];
   new_coord[1] = nm.frac*n1_coord[1] + (1-nm.frac)*n2_coord[1];
   int flipSliver = false;
+  int *nbr1Elems, nesize1;
+  int *conn1 = new int[3];
+  theMesh->n2e_getAll(keepnode, &nbr1Elems, &nesize1);
   for (int i=0; i<nesize; i++) {
     if ((nbrElems[i] != e1) && (nbrElems[i] != e2)) {
       theMesh->e2n_getAll(nbrElems[i], conn);
@@ -742,6 +745,29 @@ int FEM_AdaptL::edge_contraction_help(int e1, int e2, int n1, int n2, int e1_n1,
 	  conn[2] = deletenode;
 	}
       }
+      /*bool pyramidcase = false;
+      for(int k=0; k<nesize1; k++) {
+	if ((nbr1Elems[k] != e1) && (nbr1Elems[k] != e2)) {
+	  theMesh->e2n_getAll(nbr1Elems[k], conn1);
+	  bool tmp1 = true;
+	  for(int l=0; l<3; l++) {
+	    if(!((conn1[l] == conn[0]) || (conn1[l] == conn[1]) || (conn1[l] == conn[2]))) {
+	      tmp1 = false;
+	      break;
+	    }
+	  }
+	  if(tmp1) {
+	    pyramidcase = true;
+	    break;
+	  }
+	}
+      }
+      if(pyramidcase) {
+	flipSliver = true;
+	CkPrintf("[%d]Warning: New Elem %d(%d,%d,%d) would be similar to Elem %d(%d,%d,%d)\n",theMod->idx,nbrElems[i],conn[0],conn[1],conn[2],nbr1Elems[i],conn1[0],conn1[1],conn1[2]);
+	break;
+      }
+      */
       if(theMod->fmAdaptAlgs->didItFlip(conn[0],conn[1],conn[2],new_coord)) {
 	flipSliver = true;
 	CkPrintf("[%d]Warning: Elem %d would become a sliver if %d->%d is contracted\n",theMod->idx,nbrElems[i],n1,n2);
@@ -749,6 +775,26 @@ int FEM_AdaptL::edge_contraction_help(int e1, int e2, int n1, int n2, int e1_n1,
       }
     }
   }
+  if(!flipSliver) {
+    for (int i=0; i<nesize1; i++) {
+      if ((nbr1Elems[i] != e1) && (nbr1Elems[i] != e2)) {
+	theMesh->e2n_getAll(nbr1Elems[i], conn1);
+	for(int j=0; j<2; j++) {
+	  if (conn1[j] == keepnode) {
+	    conn1[j] = conn1[2];
+	    conn1[2] = keepnode;
+	  }
+	}
+	if(theMod->fmAdaptAlgs->didItFlip(conn1[0],conn1[1],conn1[2],new_coord)) {
+	  flipSliver = true;
+	  CkPrintf("[%d]Warning: Elem %d would become a sliver if %d->%d is contracted\n",theMod->idx,nbr1Elems[i],n1,n2);
+	  break;
+	}
+      }
+    }
+  }
+  if(nesize1 != 0) delete [] nbr1Elems;
+  delete [] conn1;
   if(flipSliver) {
     int size = lockedNodes.size();
     int *gotlocks = (int*)malloc(size*sizeof(int));

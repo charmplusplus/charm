@@ -158,7 +158,7 @@ void FEM_Adapt_Algs::SetMeshSize(int method, double factor, double *sizes)
   }
 }
 
-int FEM_Adapt_Algs::simple_refine(double targetA) {
+int FEM_Adapt_Algs::simple_refine(double targetA, double xmin, double ymin, double xmax, double ymax) {
   int noEle = theMesh->elem[0].size();
   int *con = (int*)malloc(3*sizeof(int));
   double *areas = (double*)malloc(noEle*sizeof(double));
@@ -173,11 +173,12 @@ int FEM_Adapt_Algs::simple_refine(double targetA) {
       getCoord(con[0], n1_coord);
       getCoord(con[1], n2_coord);
       getCoord(con[2], n3_coord);
-      //do a refinement only if it has any node within x coords 0.087 to 0.063
-      /*if(!((n1_coord[0]<0.0087 && n1_coord[0]>0.0063) || (n2_coord[0]<0.0087 && n2_coord[0]>0.0063) || (n3_coord[0]<0.0087 && n3_coord[0]>0.0063))) {
-	areas[i] = MINAREA; //make it believe that this triangle does not need refinement
-	} else */{
+      //do a refinement only if it has any node within the refinement box
+      if((n1_coord[0]<xmax && n1_coord[0]>xmin && n1_coord[1]<ymax && n1_coord[1]>ymin) || (n2_coord[0]<xmax && n2_coord[0]>xmin && n2_coord[1]<ymax && n2_coord[1]>ymin) || (n3_coord[0]<xmax && n3_coord[0]>xmin && n3_coord[1]<ymax && n3_coord[1]>ymin)) {
 	areas[i] = getArea(n1_coord, n2_coord, n3_coord);
+	} 
+      else {
+	areas[i] = MINAREA; //make it believe that this triangle does not need refinement
       }
     } else {
       areas[i] = MINAREA;
@@ -214,7 +215,7 @@ int FEM_Adapt_Algs::simple_refine(double targetA) {
   return 1;
 }
 
-int FEM_Adapt_Algs::simple_coarsen(double targetA) {
+int FEM_Adapt_Algs::simple_coarsen(double targetA, double xmin, double ymin, double xmax, double ymax) {
   int noEle = theMesh->elem[0].size();
   int *con = (int*)malloc(3*sizeof(int));
   double *areas = (double*)malloc(noEle*sizeof(double));
@@ -223,48 +224,55 @@ int FEM_Adapt_Algs::simple_coarsen(double targetA) {
   double *n2_coord = (double*)malloc(2*sizeof(double));
   double *n3_coord = (double*)malloc(2*sizeof(double));
   int *shortestEdge = (int *)malloc(2*sizeof(int));
+  bool adapted = true;
 
-  for(int i=0; i<noEle; i++) {
-    if(theMesh->elem[0].is_valid(i)) {
-      theMesh->e2n_getAll(i,con,0);
-      getCoord(con[0], n1_coord);
-      getCoord(con[1], n2_coord);
-      getCoord(con[2], n3_coord);
-      //do a coarsening only if it has any node within y coords less than 0.04
-      /*if(!((n1_coord[1]<0.04) || (n2_coord[1]<0.04) || (n3_coord[1]<0.04))) {
-	areas[i] = MAXAREA; //make it believe that this triangle is big enough
-	} else */{
-	areas[i] = getArea(n1_coord, n2_coord, n3_coord);
+  while(adapted) {
+    adapted = false;
+    for(int i=0; i<noEle; i++) {
+      if(theMesh->elem[0].is_valid(i)) {
+	theMesh->e2n_getAll(i,con,0);
+	getCoord(con[0], n1_coord);
+	getCoord(con[1], n2_coord);
+	getCoord(con[2], n3_coord);
+	//do a coarsening only if it has any node within the coarsen box
+	if((n1_coord[0]<xmax && n1_coord[0]>xmin && n1_coord[1]<ymax && n1_coord[1]>ymin) || (n2_coord[0]<xmax && n2_coord[0]>xmin && n2_coord[1]<ymax && n2_coord[1]>ymin) || (n3_coord[0]<xmax && n3_coord[0]>xmin && n3_coord[1]<ymax && n3_coord[1]>ymin)) {
+	  areas[i] = getArea(n1_coord, n2_coord, n3_coord);
+	} 
+	else {
+	  areas[i] = MAXAREA; //make it believe that this triangle is big enough
+	}
+      } else {
+	areas[i] = MAXAREA;
       }
-    } else {
-      areas[i] = MAXAREA;
+      map1[i] = i;
     }
-    map1[i] = i;
-  }
-
-  for(int i=0; i<noEle; i++) {
-    for(int j=i+1; j<noEle; j++) {
-      if(areas[j] < areas[i]) {
-	double tmp = areas[j];
-	areas[j] = areas[i];
-	areas[i] = tmp;
-	int t = map1[j];
-	map1[j] = map1[i];
-	map1[i] = t;
-      }
-    }
-  }
-
-  for(int i=0; i<noEle; i++) {
-    if(theMesh->elem[0].is_valid(map1[i])) {
-      if(areas[i] < targetA) {
-	//find the nodes along the smallest edge & coarsen the edge
-	theMesh->e2n_getAll(map1[i],con,0);
-	getShortestEdge(con[0], con[1], con[2], shortestEdge);
-	theAdaptor->edge_contraction(shortestEdge[0], shortestEdge[1]);
+    
+    for(int i=0; i<noEle; i++) {
+      for(int j=i+1; j<noEle; j++) {
+	if(areas[j] < areas[i]) {
+	  double tmp = areas[j];
+	  areas[j] = areas[i];
+	  areas[i] = tmp;
+	  int t = map1[j];
+	  map1[j] = map1[i];
+	  map1[i] = t;
+	}
       }
     }
+    
+    for(int i=0; i<noEle; i++) {
+      if(theMesh->elem[0].is_valid(map1[i])) {
+	if(areas[i] < targetA) {
+	  //find the nodes along the smallest edge & coarsen the edge
+	  theMesh->e2n_getAll(map1[i],con,0);
+	  getShortestEdge(con[0], con[1], con[2], shortestEdge);
+	  int ret = theAdaptor->edge_contraction(shortestEdge[0], shortestEdge[1]);
+	  if(ret != -1) adapted = true;
+	}
+      }
+    }
   }
+
   free(con);
   free(areas);
   free(map1);

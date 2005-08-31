@@ -137,11 +137,12 @@ CDECL void FEM_Print_e2n(int mesh, int eid){
 
 void FEM_MUtil::FEM_Print_e2n(FEM_Mesh *m, int eid){
   CkPrintf("element %d is adjacent to nodes:", eid);
-  int adjns[3];
+  int *adjns = new int[3];
   m->e2n_getAll(eid, adjns, 0); 
   for(int i=0;i<3;i++)
     CkPrintf(" %d", adjns[i]);
   CkPrintf("\n");
+  delete [] adjns;
 }
 
 CDECL void FEM_Print_e2e(int mesh, int eid){
@@ -151,11 +152,12 @@ CDECL void FEM_Print_e2e(int mesh, int eid){
 
 void FEM_MUtil::FEM_Print_e2e(FEM_Mesh *m, int eid){
   CkPrintf("element %d is adjacent to elements:", eid);
-  int adjes[3];
+  int *adjes = new int[3];
   m->e2e_getAll(eid, adjes, 0); 
   for(int i=0;i<3;i++)
     CkPrintf(" %d", adjes[i]);
   CkPrintf("\n");
+  delete [] adjes;
 }
 
 
@@ -761,7 +763,10 @@ int FEM_add_element_local(FEM_Mesh *m, const int *conn, int connSize, int elemTy
 
   int *adjes = new int[3];
   m->e2e_getAll(newEl, adjes, 0);
-  CkAssert(!((adjes[0]==adjes[1] && adjes[0]!=-1) || (adjes[1]==adjes[2] && adjes[1]!=-1) || (adjes[2]==adjes[0] && adjes[2]!=-1)));
+  CkAssert(!((adjes[0]==adjes[1] && adjes[0]!=-1) || (adjes[1]==adjes[2] && adjes[1]!=-1) || (adjes[2]==adjes[0] && adjes[2]!=-1)));/* {
+    m->getfmMM()->getfmUtil()->FEM_Print_e2n(m,newEl);
+    m->getfmMM()->getfmUtil()->FEM_Print_e2e(m,newEl);
+    }*/
   delete[] adjes;
   return newEl;
 }

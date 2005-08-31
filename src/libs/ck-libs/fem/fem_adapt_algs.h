@@ -110,8 +110,8 @@ class FEM_Adapt_Algs {
   virtual void refine_flip_element_leb(int e, int p, int n1, int n2, 
 				       double le);
 
-  int simple_refine(double targetA);
-  int simple_coarsen(double targetA);
+  int simple_refine(double targetA, double xmin=0.0, double ymin=0.0, double xmax=1.0, double ymax=1.0);
+  int simple_coarsen(double targetA, double xmin=0.0, double ymin=0.0, double xmax=1.0, double ymax=1.0);
   double length(int n1, int n2);
   double getArea(int n1, int n2, int n3);
   double length(double *n1_coord, double *n2_coord);
