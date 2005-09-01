@@ -14,7 +14,6 @@ CMK_LD="$CMK_CC "
 OPTS_LDXX="$OPTS_LDXX -multiply_defined suppress -flat_namespace "
 CMK_LDXX="$CMK_CXX "
 CMK_LIBS="-Wl,-u,_gmpi_macosx_malloc_hack -lckqt -lmpich -lpmpich"
-CMK_RANLIB="ranlib"
 
 # Assumes IBM xlf90 compiler:
 CMK_CF77="f77 -qnocommon -qextname -qthreaded "
@@ -42,3 +41,4 @@ CMK_LD_SHARED=" -dynamic -dynamiclib -flat_namespace -undefined dynamic_lookup "
 CMK_LD_SHARED_LIBS="-lstdc++"
 CMK_LD_SHARED_ABSOLUTE_PATH=true
 
+CMK_RANLIB="ranlib -s"

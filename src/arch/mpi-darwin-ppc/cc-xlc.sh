@@ -7,8 +7,6 @@ CMK_C_OPTIMIZE="-O3 -qstrict -Q  "
 CMK_CXX_OPTIMIZE="-O3 -qstrict -Q "
 OPTS_CC=
 OPTS_CXX=
-OPTS_LD=
-OPTS_LDXX=
 
 CMK_NATIVE_CC="xlc_r "
 CMK_NATIVE_LD="xlc_r "
