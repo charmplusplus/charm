@@ -35,6 +35,10 @@
 # if CMK_MALLOC_USE_OS_BUILTIN
 /*Default to the system malloc-- perhaps the only possibility*/
 #  define CMK_MEMORY_BUILD_OS 1
+
+#define mm_malloc   malloc
+#define mm_free     free
+
 # elif CMK_MALLOC_USE_GNUOLD_MALLOC
 #  define CMK_MEMORY_BUILD_GNUOLD  1
 # else
@@ -79,17 +83,17 @@ void CmiOutOfMemoryInit(void) {
   void *ptrs[MEMORY_PREALLOCATE_MAX];
   int i,len=0;
   for (i=0;i<MEMORY_PREALLOCATE_MAX;i++) {
-    ptrs[i] = meta_malloc(1024*1024);
+    ptrs[i] = mm_malloc(1024*1024);
     if (ptrs[i]==NULL) break;
     else len=i+1; /* this allocation worked */
   }
   /* we now own all the memory-- release all but the last meg. */
   //printf("CMK_MEMORY_PREALLOCATE_HACK claimed %d megs\n",len);
   for (i=len-2;i>=0;i--) {
-    meta_free(ptrs[i]);
+    mm_free(ptrs[i]);
   }
 #endif
-  memory_lifeRaft=(char *)meta_malloc(65536/2);
+  memory_lifeRaft=(char *)mm_malloc(65536/2);
 }
 
 void CmiOutOfMemory(int nBytes) 
@@ -105,6 +109,9 @@ void CmiOutOfMemory(int nBytes)
 #if CMK_MEMORY_BUILD_OS
 /* Just use the OS's built-in malloc.  All we provide is CmiMemoryInit.
 */
+
+
+
 void CmiMemoryInit(argv)
   char **argv;
 {
