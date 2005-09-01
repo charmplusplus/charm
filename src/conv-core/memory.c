@@ -36,9 +36,6 @@
 /*Default to the system malloc-- perhaps the only possibility*/
 #  define CMK_MEMORY_BUILD_OS 1
 
-#define mm_malloc   malloc
-#define mm_free     free
-
 # elif CMK_MALLOC_USE_GNUOLD_MALLOC
 #  define CMK_MEMORY_BUILD_GNUOLD  1
 # else
@@ -47,6 +44,17 @@
 # endif
 
 #endif
+
+#if CMK_MEMORY_BUILD_OS 
+#define mm_malloc   malloc
+#define mm_free     free
+#else 
+
+void *mm_malloc(size_t size);
+void mm_free(void *ptr);
+
+#endif
+
 
 #ifndef CMK_OPTIMIZE
 unsigned int memory_allocated = 0;
