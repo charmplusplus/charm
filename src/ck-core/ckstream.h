@@ -85,7 +85,7 @@ class CkOStream {
  public:
   virtual CkOStream& operator << (_CkOStream& (*f)(_CkOStream &)) = 0;
 #define SHIFTLEFT(type) \
-  virtual CkOStream& operator << (type x) = 0;
+  virtual CkOStream& operator << (type x) = 0
 
   SHIFTLEFT(int);
   SHIFTLEFT(unsigned int);
