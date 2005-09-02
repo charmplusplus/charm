@@ -10,8 +10,10 @@
 
 #include "conv-mach.h"
 
+#ifndef CMK_VERSION_BLUEGENE
 #if CMK_MALLOC_USE_GNU_MALLOC 
 extern "C" void *memalign(size_t boundary, size_t size);
+#endif
 #endif
 
 struct complex {
