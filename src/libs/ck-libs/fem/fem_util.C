@@ -638,3 +638,76 @@ void FEM_MUtil::addToSharedList(FEM_Mesh *m, int fromChk, int sharedIdx) {
   return;
 }
 
+void FEM_MUtil::StructureTest(FEM_Mesh *m) {
+  int noNodes = m->node.size();
+  int noEle = m->elem[0].size();
+
+  int *n2e, n2esize=0;
+  int e2n[3];
+
+  for(int i=0; i<noNodes; i++) {
+    if(m->node.is_valid(i)) {
+      m->n2e_getAll(i,&n2e,&n2esize);
+    } 
+    else {
+      continue;
+    }
+    if(n2esize > 0) {
+      m->e2n_getAll(n2e[0],e2n,0);
+      int testnode = i;
+      int startnode = (e2n[0]==testnode) ? e2n[1] : e2n[0];
+      int othernode = (e2n[2]==testnode) ? e2n[1] : e2n[2];
+      int previousnode = startnode;
+      int nextnode = -1;
+      int numdeadends = 0;
+      int numunused = n2esize-1;
+      n2e[0] = -1;
+      for(int j=0; j<n2esize-1; j++) {
+	nextnode = -1;
+	for(int k=1; k<n2esize; k++) {
+	  if(n2e[k]==-1) continue;
+	  m->e2n_getAll(n2e[k],e2n,0);
+	  if(e2n[0]==previousnode || e2n[1]==previousnode || e2n[2]==previousnode) {
+	    nextnode = (e2n[0]==previousnode) ? ((e2n[1]==testnode)? e2n[2]:e2n[1]) : ((e2n[1]==previousnode)? ((e2n[0]==testnode)? e2n[2]:e2n[0]):((e2n[1]==testnode)? e2n[0]:e2n[1]));
+	    previousnode = nextnode;
+	    n2e[k] = -1;
+	    numunused--;
+	  }
+	}
+	if(nextnode==othernode && othernode!=-1) {
+	  //it has reached a full circle
+	  break;
+	}
+	else if(nextnode==-1) {
+	  //this is one edge, start travelling along the other end
+	  numdeadends++;
+	  previousnode = othernode;
+	  othernode = -1;
+	}
+	if(numdeadends>=2 && numunused!=0) {
+	  CkAssert(false);
+	}
+      }
+      delete [] n2e;
+    }
+  }
+}
+
+int FEM_MUtil::AreaTest(FEM_Mesh *m) {
+  int noEle = m->elem[0].size();
+  int *con = new int[3];
+
+  for(int i=0; i<noEle; i++) {
+    if(m->elem[0].is_valid(i)) {
+      m->e2n_getAll(i,con,0);
+      double area = mmod->fmAdaptAlgs->getArea(con[0],con[1],con[2]);
+      if(fabs(area) < SLIVERAREA) {
+	CkAssert(false);
+	delete [] con;
+	return -1;
+      }
+    }
+  }
+  delete [] con;
+  return 1;
+}

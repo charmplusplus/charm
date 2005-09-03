@@ -101,6 +101,18 @@ class int2Msg : public CMessage_int2Msg {
   ~int2Msg(){}
 };
 
+class double2Msg : public CMessage_double2Msg {
+ public:
+  double i,j;
+
+  double2Msg(double m, double n) {
+    i = m;
+    j = n;
+  }
+
+  ~double2Msg() {}
+};
+
 class FEMMeshMsg : public CMessage_FEMMeshMsg {
  public:
   FEM_Mesh *m;
@@ -307,6 +319,8 @@ class femMeshModify : public CBase_femMeshModify {
 
   void addToSharedList(int fromChk, int sharedIdx);
   void updateNodeAttrs(int fromChk, int sharedIdx, double coordX, double coordY, int bound);
+  double2Msg *getRemoteCoord(int fromChk, int ghostIdx);
+  intMsg *getRemoteBound(int fromChk, int ghostIdx);
 };
 
 

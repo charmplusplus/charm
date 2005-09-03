@@ -763,17 +763,13 @@ int FEM_add_element_local(FEM_Mesh *m, const int *conn, int connSize, int elemTy
 
   int *adjes = new int[3];
   m->e2e_getAll(newEl, adjes, 0);
-  CkAssert(!((adjes[0]==adjes[1] && adjes[0]!=-1) || (adjes[1]==adjes[2] && adjes[1]!=-1) || (adjes[2]==adjes[0] && adjes[2]!=-1)));/* {
-    m->getfmMM()->getfmUtil()->FEM_Print_e2n(m,newEl);
-    m->getfmMM()->getfmUtil()->FEM_Print_e2e(m,newEl);
-    }*/
+  CkAssert(!((adjes[0]==adjes[1] && adjes[0]!=-1) || (adjes[1]==adjes[2] && adjes[1]!=-1) || (adjes[2]==adjes[0] && adjes[2]!=-1)));
   delete[] adjes;
   return newEl;
 }
 
 
 int FEM_add_element(FEM_Mesh *m, int* conn, int connSize, int elemType, int chunkNo){
-  
   int newEl = -1;
   int index = m->getfmMM()->getIdx();
   int buildGhosts = 0;
@@ -1454,6 +1450,22 @@ void femMeshModify::updateNodeAttrs(int fromChk, int sharedIdx, double coordX, d
   }
   delete [] coord;
   return;
+}
+
+double2Msg *femMeshModify::getRemoteCoord(int fromChk, int ghostIdx) {
+  int localIdx = fmUtil->lookup_in_IDXL(fmMesh, ghostIdx, fromChk, 1);
+  double coord[2];
+  FEM_Mesh_dataP(fmMesh, FEM_NODE, fmAdaptAlgs->coord_attr, coord, localIdx, 1, FEM_DOUBLE, 2);
+  double2Msg *d = new double2Msg(coord[0], coord[1]);
+  return d;
+}
+
+intMsg *femMeshModify::getRemoteBound(int fromChk, int ghostIdx) {
+  int localIdx = fmUtil->lookup_in_IDXL(fmMesh, ghostIdx, fromChk, 1);
+  int bound;
+  FEM_Mesh_dataP(fmMesh, FEM_NODE, fmAdaptAlgs->coord_attr, &bound, localIdx, 1, FEM_INT, 1);
+  intMsg *d = new intMsg(bound);
+  return d;
 }
 
 #include "FEMMeshModify.def.h"

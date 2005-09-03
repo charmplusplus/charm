@@ -42,6 +42,8 @@ class FEM_MUtil {
   void removeElemRemote(FEM_Mesh *m, int chk, int elementid, int elemtype, int permanent);
   int Replace_node_local(FEM_Mesh *m, int oldIdx, int newIdx);
   void addToSharedList(FEM_Mesh *m, int fromChk, int sharedIdx);
+  void StructureTest(FEM_Mesh *m);
+  int AreaTest(FEM_Mesh *m);
 
   void FEM_Print_n2n(FEM_Mesh *m, int nodeid);
   void FEM_Print_n2e(FEM_Mesh *m, int nodeid);

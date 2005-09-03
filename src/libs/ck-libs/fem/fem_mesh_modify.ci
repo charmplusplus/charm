@@ -5,6 +5,7 @@ module FEMMeshModify {
   message femMeshModMsg;
   message intMsg;
   message int2Msg;
+  message double2Msg;
   message FEMMeshMsg;
   message sharedNodeMsg {
     int between[];
@@ -54,5 +55,7 @@ module FEMMeshModify {
     entry /*[sync,threaded]*/ void refine_flip_element_leb(int, int, int, int, int, int, double);
     entry [sync,threaded] void addToSharedList(int, int);
     entry [sync,threaded] void updateNodeAttrs(int, int, double, double, int);
+    entry [sync,threaded] double2Msg *getRemoteCoord(int, int);
+    entry [sync,threaded] intMsg *getRemoteBound(int, int);
   };
 };

@@ -745,32 +745,13 @@ int FEM_AdaptL::edge_contraction_help(int e1, int e2, int n1, int n2, int e1_n1,
 	  conn[2] = deletenode;
 	}
       }
-      /*bool pyramidcase = false;
-      for(int k=0; k<nesize1; k++) {
-	if ((nbr1Elems[k] != e1) && (nbr1Elems[k] != e2)) {
-	  theMesh->e2n_getAll(nbr1Elems[k], conn1);
-	  bool tmp1 = true;
-	  for(int l=0; l<3; l++) {
-	    if(!((conn1[l] == conn[0]) || (conn1[l] == conn[1]) || (conn1[l] == conn[2]))) {
-	      tmp1 = false;
-	      break;
-	    }
-	  }
-	  if(tmp1) {
-	    pyramidcase = true;
-	    break;
-	  }
-	}
-      }
-      if(pyramidcase) {
-	flipSliver = true;
-	CkPrintf("[%d]Warning: New Elem %d(%d,%d,%d) would be similar to Elem %d(%d,%d,%d)\n",theMod->idx,nbrElems[i],conn[0],conn[1],conn[2],nbr1Elems[i],conn1[0],conn1[1],conn1[2]);
-	break;
-      }
-      */
+
+      //if((conn[0]==-16 || conn[1]==-16 || conn[2]==-16) && (conn[0]==-19 || conn[1]==-19 || conn[2]==-19) && (conn[0]==20 || conn[1]==20 || conn[2]==20)) {
+      //CkPrintf("blah\n");
+      //}
       if(theMod->fmAdaptAlgs->didItFlip(conn[0],conn[1],conn[2],new_coord)) {
 	flipSliver = true;
-	CkPrintf("[%d]Warning: Elem %d would become a sliver if %d->%d is contracted\n",theMod->idx,nbrElems[i],n1,n2);
+	CkPrintf("[%d]Warning: Elem %d(%d,%d,%d) would become a sliver if %d->%d is contracted\n",theMod->idx,nbrElems[i],conn[0],conn[1],conn[2],n1,n2);
 	break;
       }
     }
@@ -785,9 +766,12 @@ int FEM_AdaptL::edge_contraction_help(int e1, int e2, int n1, int n2, int e1_n1,
 	    conn1[2] = keepnode;
 	  }
 	}
+	//if((conn1[0]==-16 || conn1[1]==-16 || conn1[2]==-16) && (conn1[0]==-19 || conn1[1]==-19 || conn1[2]==-19) && (conn1[0]==20 || conn1[1]==20 || conn1[2]==20)) {
+	//CkPrintf("blah\n");
+	//}
 	if(theMod->fmAdaptAlgs->didItFlip(conn1[0],conn1[1],conn1[2],new_coord)) {
 	  flipSliver = true;
-	  CkPrintf("[%d]Warning: Elem %d would become a sliver if %d->%d is contracted\n",theMod->idx,nbr1Elems[i],n1,n2);
+	  CkPrintf("[%d]Warning: Elem %d(%d,%d,%d) would become a sliver if %d->%d is contracted\n",theMod->idx,nbr1Elems[i],conn1[0],conn1[1],conn1[2],n1,n2);
 	  break;
 	}
       }
@@ -795,6 +779,9 @@ int FEM_AdaptL::edge_contraction_help(int e1, int e2, int n1, int n2, int e1_n1,
   }
   if(nesize1 != 0) delete [] nbr1Elems;
   delete [] conn1;
+  delete [] n1_coord;
+  delete [] n2_coord;
+  delete [] new_coord;
   if(flipSliver) {
     int size = lockedNodes.size();
     int *gotlocks = (int*)malloc(size*sizeof(int));
@@ -843,6 +830,9 @@ int FEM_AdaptL::edge_contraction_help(int e1, int e2, int n1, int n2, int e1_n1,
   printAdjacencies(adjnodes, 2, adjelems, 2);
 #endif
 
+  if(shared==2 && (n1_bound<0||n2_bound<0)) {
+    CkPrintf("blah\n");
+  }
   for (int i=0; i<nesize; i++) {
     if ((nbrElems[i] != e1) && (nbrElems[i] != e2)) {
       theMesh->e2n_getAll(nbrElems[i], conn);

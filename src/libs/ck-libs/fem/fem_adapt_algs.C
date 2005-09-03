@@ -4,8 +4,8 @@
 #include "fem_adapt_algs.h"
 #include "fem_mesh_modify.h"
 
-#define MINAREA 1.0e-15
-#define MAXAREA 1.0e15
+#define MINAREA 1.0e-12
+#define MAXAREA 1.0e12
 
 FEM_Adapt_Algs::FEM_Adapt_Algs(FEM_Mesh *m, femMeshModify *fm, int dimension) 
 { 
@@ -212,6 +212,9 @@ int FEM_Adapt_Algs::simple_refine(double targetA, double xmin, double ymin, doub
   free(n1_coord);
   free(n2_coord);
   free(n3_coord);
+
+  //test the mesh for slivered triangles
+  theMod->fmUtil->StructureTest(theMesh);
   return 1;
 }
 
@@ -280,6 +283,9 @@ int FEM_Adapt_Algs::simple_coarsen(double targetA, double xmin, double ymin, dou
   free(n2_coord);
   free(n3_coord);
   free(shortestEdge);
+
+  //test the mesh for slivered triangles
+  theMod->fmUtil->StructureTest(theMesh);
   return 1;
 }
 
@@ -459,8 +465,9 @@ bool FEM_Adapt_Algs::didItFlip(int n1, int n2, int n3, double *n4_coord)
   free(n2_coord);
   free(n3_coord);
 
-  if(ret_old > MINAREA && ret_new < -MINAREA) return true;
-  else if(ret_old < -MINAREA && ret_new > MINAREA) return true;
+  if(ret_old > SLIVERAREA && ret_new < -SLIVERAREA) return true; //it is a flip
+  else if(ret_old < -SLIVERAREA && ret_new > SLIVERAREA) return true; //it is a flip
+  else if(fabs(ret_new) < SLIVERAREA) return true; // it is a sliver
   else return false;
 }
 
@@ -492,8 +499,23 @@ int FEM_Adapt_Algs::getCoord(int n1, double *crds) {
     FEM_Mesh_dataP(theMesh, FEM_NODE, coord_attr, (void *)crds, n1, 1, FEM_DOUBLE, dim);
   }
   else {
-    int ghostidx = FEM_To_ghost_index(n1);
-    FEM_Mesh_dataP(theMesh, FEM_NODE + FEM_GHOST, coord_attr, (void *)crds, ghostidx, 1, FEM_DOUBLE, dim);
+    int numchunks;
+    IDXL_Share **chunks1;
+    theMod->fmUtil->getChunkNos(0,n1,&numchunks,&chunks1);
+    int index = theMod->idx;
+    for(int j=0; j<numchunks; j++) {
+      int chk = chunks1[j]->chk;
+      if(chk==index) continue;
+      int ghostidx = theMod->fmUtil->exists_in_IDXL(theMesh,n1,chk,2);
+      double2Msg *d = meshMod[chk].getRemoteCoord(index,ghostidx);
+      crds[0] = d->i;
+      crds[1] = d->j;
+      for(int j=0; j<numchunks; j++) {
+	delete chunks1[j];
+      }
+      if(numchunks != 0) free(chunks1);
+      break;
+    }
   }
   return 1;
 }
