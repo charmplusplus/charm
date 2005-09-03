@@ -654,6 +654,18 @@ void FEM_MUtil::StructureTest(FEM_Mesh *m) {
     }
     if(n2esize > 0) {
       m->e2n_getAll(n2e[0],e2n,0);
+
+      //any local/shared node should have at least one local element connected to it
+      bool done = false;
+      for(int j=0; j<n2esize; j++) {
+	if(n2e[j] >= 0) {
+	  done = true; 
+	  break;
+	}
+      }
+      CkAssert(done);
+
+      //ensure that there is a cloud of connectivity, no disconnected elements, other than boundaries
       int testnode = i;
       int startnode = (e2n[0]==testnode) ? e2n[1] : e2n[0];
       int othernode = (e2n[2]==testnode) ? e2n[1] : e2n[2];
@@ -685,6 +697,7 @@ void FEM_MUtil::StructureTest(FEM_Mesh *m) {
 	  othernode = -1;
 	}
 	if(numdeadends>=2 && numunused!=0) {
+	  FEM_Print_coords(m,i);
 	  CkAssert(false);
 	}
       }
@@ -711,3 +724,77 @@ int FEM_MUtil::AreaTest(FEM_Mesh *m) {
   delete [] con;
   return 1;
 }
+
+void FEM_MUtil::FEM_Print_n2n(FEM_Mesh *m, int nodeid){
+  CkPrintf("node %d is adjacent to nodes:", nodeid);
+  int *adjnodes;
+  int sz;
+  m->n2n_getAll(nodeid, &adjnodes, &sz); 
+  for(int i=0;i<sz;i++)
+    CkPrintf(" %d", adjnodes[i]);
+  if(sz!=0) delete[] adjnodes;  
+  CkPrintf("\n");
+}
+
+void FEM_MUtil::FEM_Print_n2e(FEM_Mesh *m, int eid){
+  CkPrintf("node %d is adjacent to elements:", eid);
+  int *adjes;
+  int sz;
+  m->n2e_getAll(eid, &adjes, &sz);
+  for(int i=0;i<sz;i++)
+    CkPrintf(" %d", adjes[i]);
+  if(sz!=0) delete[] adjes;
+  CkPrintf("\n");
+}
+
+void FEM_MUtil::FEM_Print_e2n(FEM_Mesh *m, int eid){
+  CkPrintf("element %d is adjacent to nodes:", eid);
+  int *adjns = new int[3];
+  m->e2n_getAll(eid, adjns, 0); 
+  for(int i=0;i<3;i++)
+    CkPrintf(" %d", adjns[i]);
+  CkPrintf("\n");
+  delete [] adjns;
+}
+
+void FEM_MUtil::FEM_Print_e2e(FEM_Mesh *m, int eid){
+  CkPrintf("element %d is adjacent to elements:", eid);
+  int *adjes = new int[3];
+  m->e2e_getAll(eid, adjes, 0); 
+  for(int i=0;i<3;i++)
+    CkPrintf(" %d", adjes[i]);
+  CkPrintf("\n");
+  delete [] adjes;
+}
+
+void FEM_MUtil::FEM_Print_coords(FEM_Mesh *m, int nodeid) {
+  double crds[2];
+  int bound;
+  if(!FEM_Is_ghost_index(nodeid)) {
+    FEM_Mesh_dataP(m, FEM_NODE, mmod->fmAdaptAlgs->coord_attr, (void *)crds, nodeid, 1, FEM_DOUBLE, 2);
+    FEM_Mesh_dataP(m, FEM_NODE, FEM_BOUNDARY, (void *)&bound, nodeid, 1, FEM_INT, 1);
+  }
+  else {
+    int numchunks;
+    IDXL_Share **chunks1;
+    getChunkNos(0,nodeid,&numchunks,&chunks1);
+    int index = mmod->idx;
+    for(int j=0; j<numchunks; j++) {
+      int chk = chunks1[j]->chk;
+      if(chk==index) continue;
+      int ghostidx = exists_in_IDXL(m,nodeid,chk,2);
+      double2Msg *d = meshMod[chk].getRemoteCoord(index,ghostidx);
+      intMsg *im = meshMod[chk].getRemoteBound(index,ghostidx);
+      crds[0] = d->i;
+      crds[1] = d->j;
+      bound = im->i;
+      for(int j=0; j<numchunks; j++) {
+	delete chunks1[j];
+      }
+      if(numchunks != 0) free(chunks1);
+      break;
+    }
+  }
+  CkPrintf("node %d (%f,%f) and boundary %d\n",nodeid,crds[0],crds[1],bound);
+}
+

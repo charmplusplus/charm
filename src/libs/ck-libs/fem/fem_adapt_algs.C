@@ -214,7 +214,7 @@ int FEM_Adapt_Algs::simple_refine(double targetA, double xmin, double ymin, doub
   free(n3_coord);
 
   //test the mesh for slivered triangles
-  theMod->fmUtil->StructureTest(theMesh);
+  //theMod->fmUtil->StructureTest(theMesh);
   return 1;
 }
 
@@ -285,7 +285,7 @@ int FEM_Adapt_Algs::simple_coarsen(double targetA, double xmin, double ymin, dou
   free(shortestEdge);
 
   //test the mesh for slivered triangles
-  theMod->fmUtil->StructureTest(theMesh);
+  //theMod->fmUtil->StructureTest(theMesh);
   return 1;
 }
 

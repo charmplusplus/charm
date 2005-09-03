@@ -44,11 +44,11 @@ class FEM_MUtil {
   void addToSharedList(FEM_Mesh *m, int fromChk, int sharedIdx);
   void StructureTest(FEM_Mesh *m);
   int AreaTest(FEM_Mesh *m);
-
   void FEM_Print_n2n(FEM_Mesh *m, int nodeid);
   void FEM_Print_n2e(FEM_Mesh *m, int nodeid);
   void FEM_Print_e2n(FEM_Mesh *m, int eid);
   void FEM_Print_e2e(FEM_Mesh *m, int eid);
+  void FEM_Print_coords(FEM_Mesh *m, int nodeid);
 };
 
 #endif

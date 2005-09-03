@@ -101,31 +101,9 @@ CDECL void FEM_Print_n2n(int mesh, int nodeid){
   m->getfmMM()->getfmUtil()->FEM_Print_n2n(m, nodeid);
 }
 
-void FEM_MUtil::FEM_Print_n2n(FEM_Mesh *m, int nodeid){
-  CkPrintf("node %d is adjacent to nodes:", nodeid);
-  int *adjnodes;
-  int sz;
-  m->n2n_getAll(nodeid, &adjnodes, &sz); 
-  for(int i=0;i<sz;i++)
-    CkPrintf(" %d", adjnodes[i]);
-  if(sz!=0) delete[] adjnodes;  
-  CkPrintf("\n");
-}
-
 CDECL void FEM_Print_n2e(int mesh, int eid){
   FEM_Mesh *m=FEM_Mesh_lookup(mesh,"FEM_Print_Mesh_Summary");
   m->getfmMM()->getfmUtil()->FEM_Print_n2e(m, eid);
-}
-
-void FEM_MUtil::FEM_Print_n2e(FEM_Mesh *m, int eid){
-  CkPrintf("node %d is adjacent to elements:", eid);
-  int *adjes;
-  int sz;
-  m->n2e_getAll(eid, &adjes, &sz);
-  for(int i=0;i<sz;i++)
-    CkPrintf(" %d", adjes[i]);
-  if(sz!=0) delete[] adjes;
-  CkPrintf("\n");
 }
 
 
@@ -135,29 +113,9 @@ CDECL void FEM_Print_e2n(int mesh, int eid){
   m->getfmMM()->getfmUtil()->FEM_Print_e2n(m, eid);
 }
 
-void FEM_MUtil::FEM_Print_e2n(FEM_Mesh *m, int eid){
-  CkPrintf("element %d is adjacent to nodes:", eid);
-  int *adjns = new int[3];
-  m->e2n_getAll(eid, adjns, 0); 
-  for(int i=0;i<3;i++)
-    CkPrintf(" %d", adjns[i]);
-  CkPrintf("\n");
-  delete [] adjns;
-}
-
 CDECL void FEM_Print_e2e(int mesh, int eid){
   FEM_Mesh *m=FEM_Mesh_lookup(mesh,"FEM_Print_Mesh_Summary");
   m->getfmMM()->getfmUtil()->FEM_Print_e2e(m, eid);
-}
-
-void FEM_MUtil::FEM_Print_e2e(FEM_Mesh *m, int eid){
-  CkPrintf("element %d is adjacent to elements:", eid);
-  int *adjes = new int[3];
-  m->e2e_getAll(eid, adjes, 0); 
-  for(int i=0;i<3;i++)
-    CkPrintf(" %d", adjes[i]);
-  CkPrintf("\n");
-  delete [] adjes;
 }
 
 
@@ -1463,7 +1421,7 @@ double2Msg *femMeshModify::getRemoteCoord(int fromChk, int ghostIdx) {
 intMsg *femMeshModify::getRemoteBound(int fromChk, int ghostIdx) {
   int localIdx = fmUtil->lookup_in_IDXL(fmMesh, ghostIdx, fromChk, 1);
   int bound;
-  FEM_Mesh_dataP(fmMesh, FEM_NODE, fmAdaptAlgs->coord_attr, &bound, localIdx, 1, FEM_INT, 1);
+  FEM_Mesh_dataP(fmMesh, FEM_NODE, FEM_BOUNDARY, &bound, localIdx, 1, FEM_INT, 1);
   intMsg *d = new intMsg(bound);
   return d;
 }
