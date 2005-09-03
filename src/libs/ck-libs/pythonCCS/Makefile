@@ -13,9 +13,8 @@ $(DEST): $(OBJS)
 	$(CHARMC) $(OBJS) -o $@
 
 headers: $(HEADERS)
-	ln -sf ../tmp/libs/ck-libs/pythonCCS/PythonCCS.h $(CDIR)/include/
-	ln -sf ../tmp/libs/ck-libs/pythonCCS/PythonCCS-client.h $(CDIR)/include/
-	ln -sf ../tmp/libs/ck-libs/pythonCCS/PythonCCS.decl.h $(CDIR)/include/
+	cp ($HEADERS) $(CDIR)/include/
+	touch headers
 
 PythonCCS.o: PythonCCS.C $(HEADDEP)
 	$(CHARMC) -c $(FLAGS) PythonCCS.C
