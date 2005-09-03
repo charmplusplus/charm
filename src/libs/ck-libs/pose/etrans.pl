@@ -449,7 +449,7 @@ foreach my $incfile ($inC,@otherfiles)
       $inbody=1;
       # regexp if block to extract the fields
       # expecting  class::method(parameters)
-      if ($thisline =~ /^\s*([^:\s\(]+)\s*\:\:\s*([^\s\(]+)\s*\(\s*([^\s]+)\s?[\*]*\s*([^\s\,\{\)]+)/) {
+      if ($thisline =~ /^\s*([^:\s\(]+)\s*\:\:\s*([^\s\(]+)\s*\(\s*([^\s\*]+)\s*[\*]*\s*([^\s\,\{\)]+)/) {
 	$returntype='';
 	$class=$1;
 	$method=$2;
@@ -457,7 +457,7 @@ foreach my $incfile ($inC,@otherfiles)
 	$messagename=$4;
       }
       # expecting retval *class::method(parameters)
-      elsif ($thisline =~ /^\s*([^:\s\(]+ \*)([^\s:\(]+)\s*\:\:\s*([^\s\(]+)\s*\(\s*([^\s]+)\s?\**\s*([^\s,\)\{]+)/) {
+      elsif ($thisline =~ /^\s*([^:\s\(]+ \*)([^\s:\(]+)\s*\:\:\s*([^\s\(]+)\s*\(\s*([^\s\*]+)\s*\**\s*([^\s,\)\{]+)/) {
 
 	$returntype=$1;
 	$class=$2;
@@ -466,7 +466,7 @@ foreach my $incfile ($inC,@otherfiles)
 	$messagename=$5;
       }
       # expecting retval class::method(parameters)
-      elsif ($thisline =~ /^\s*([^:\s\(]+)\s?([^\s:\(]+)\s*\:\:\s*([^\s\(]+)\s*\(\s*([^\s]+)\s?\**\s*([^\s,\)\{]+)/) {
+      elsif ($thisline =~ /^\s*([^:\s\(]+)\s?([^\s:\(]+)\s*\:\:\s*([^\s\(]+)\s*\(\s*([^\s\*]+)\s*\**\s*([^\s,\)\{]+)/) {
 	$returntype=$1;
 	$class=$2;
 	$method=$3;
