@@ -404,6 +404,7 @@ AC_DEFINE_UNQUOTED(CMK_SIGSAFE_SYSTEM, $pass, [whether to use signal-safe system
 skip_dl=0
 # for bproc, ignore -ldl
 test -n "$CMK_BPROC" && skip_dl=1
+test -n "$CMK_NO_DL" && skip_dl=1
 dl_opt='-ldl'
 #workaround for pgcc 4.0, -ldl crash linking, so use -Wl,-ldl to skip the prelinker.
 case "$CMK_CXX" in
