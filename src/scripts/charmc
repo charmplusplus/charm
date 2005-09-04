@@ -1432,15 +1432,18 @@ CORE_LIBS="-lconv-core -lconv-util $TRACE_OBJ "
 case "$LANGUAGE" in
 "charm"|"charm++"|"f90charm"|"ckbluegene"|"bgcharm++")
 	MAKE_LDXX="1"
-	MIDDLE_LIBS="-lck -lconv-cplus-y $CORE_LIBS -lm"
+	MIDDLE_LIBS="-lck -lconv-cplus-y $CORE_LIBS "
+        CMK_SYSLIBS="$CMK_SYSLIBS -lm"
 	;;
 "converse")
 	MAKE_LD="1"
-	MIDDLE_LIBS="-lconv-cplus-n $CORE_LIBS -ltrace-converse -lm"
+	MIDDLE_LIBS="-lconv-cplus-n $CORE_LIBS -ltrace-converse "
+        CMK_SYSLIBS="$CMK_SYSLIBS -lm"
 	;;
 "converse++"|"bluegene"|"bgconverse++")
 	MAKE_LDXX="1"
-	MIDDLE_LIBS="$MIDDLE_LIBS -lconv-cplus-y $CORE_LIBS -ltrace-converse -lm"
+	MIDDLE_LIBS="$MIDDLE_LIBS -lconv-cplus-y $CORE_LIBS -ltrace-converse "
+        CMK_SYSLIBS="$CMK_SYSLIBS -lm"
 	;;
 *)
 	Abort "Unrecognized choice of language $LANGUAGE"
