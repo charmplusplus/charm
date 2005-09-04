@@ -615,7 +615,7 @@ private:
 	typedef void (CkMigratable::* CkMigratable_voidfn_t)(void);
 	void callMethod(CkLocRec_local *rec,CkMigratable_voidfn_t fn);
 
-	CmiBool deliverUnknown(CkArrayMessage *msg,CkDeliver_t type);
+	CmiBool deliverUnknown(CkArrayMessage *msg,CkDeliver_t type,int opts);
 
 	/// Create a new local record at this array index.
 	CkLocRec_local *createLocal(const CkArrayIndex &idx, 

@@ -1534,12 +1534,12 @@ void CkLocMgr::deliver(CkMessage *m,CkDeliver_t type,int opts) {
 	}else /* rec==NULL*/ {
 		if (opts & CK_MSG_KEEP)
 			msg = (CkArrayMessage *)CkCopyMsg((void **)&msg);
-		deliverUnknown(msg,type);
+		deliverUnknown(msg,type,opts);
 	}
 }
 
 /// This index is not hashed-- somehow figure out what to do.
-CmiBool CkLocMgr::deliverUnknown(CkArrayMessage *msg,CkDeliver_t type)
+CmiBool CkLocMgr::deliverUnknown(CkArrayMessage *msg,CkDeliver_t type,int opts)
 {
 	CK_MAGICNUMBER_CHECK
 	const CkArrayIndex &idx=msg->array_index();
@@ -1548,7 +1548,7 @@ CmiBool CkLocMgr::deliverUnknown(CkArrayMessage *msg,CkDeliver_t type)
 	{// Forward the message to its home processor
 		DEBM((AA"Forwarding message for unknown %s to home %d \n"AB,idx2str(idx),onPe));
 		msg->array_hops()++;
-		CkArrayManagerDeliver(onPe,msg);
+		CkArrayManagerDeliver(onPe,msg,opts);
 		return CmiTrue;
 	}
 	else
