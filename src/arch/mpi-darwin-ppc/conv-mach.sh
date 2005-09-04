@@ -41,4 +41,5 @@ CMK_LD_SHARED=" -dynamic -dynamiclib -flat_namespace -undefined dynamic_lookup "
 CMK_LD_SHARED_LIBS="-lstdc++"
 CMK_LD_SHARED_ABSOLUTE_PATH=true
 
+CMK_NO_DL=true
 CMK_RANLIB="ranlib -s"
