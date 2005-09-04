@@ -1451,11 +1451,7 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
   CsvInitialize(CmiNodeState, NodeState);
   CmiNodeStateInit(&CsvAccess(NodeState));
 
-  printf("Before Calling Malloc \n");
-
   procState = (ProcState *)malloc((_Cmi_mynodesize+1) * sizeof(ProcState));
-
-  printf("After Calling Malloc %d\n", procState);
 
   for (i=0; i<_Cmi_mynodesize+1; i++) {
     /*    procState[i].sendMsgBuf = PCQueueCreate();   */
