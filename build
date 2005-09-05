@@ -28,7 +28,7 @@ syntax() {
   ( cd $src ; ls -1 | egrep -v '(^CVS)|(^shmem$)|(^mpi$)|(^sim$)|(^net$)|(^elan$)|(^util$)|(^common$)|(^uth$)|(^conv-mach-fix.sh$)|(^win32$)|(^paragon$)|(^vmi$)|(^lapi$)|(^template$)' | pr -3 -t )
   echo ''
   echo '<options>: compiler and platform specific options'
-  echo 'cc cc64 cxx kcc pgcc acc icc ecc gcc3 mpcc'
+  echo 'cc cc64 cxx kcc pgcc acc icc ecc gcc3 mpcc pathscale'
   echo 'help smp gm tcp vmi scyld clustermatic bluegene ooc syncft papi'
   echo '--incdir --libdir --basedir --no-build-shared -j'
   if test $more = 1
@@ -47,6 +47,7 @@ syntax() {
   echo '  ecc             Intel C/C++ compiler for Linux IA64'
   echo '  gcc3            use gcc3 - GNU GCC/G++ version 3'
   echo '  mpcc            SUN Solaris C++ compiler for MPI'
+  echo '  pathscale       use pathscale compiler suite'
   echo ''
   echo 'Platform specific options (choose multiple if apply):'
   echo '  smp             support for SMP, multithreaded charm on each node'
