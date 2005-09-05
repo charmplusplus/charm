@@ -119,7 +119,8 @@ static inline void CmiSyncBroadcastAllAndFree(int nb, char *m)
 }  /* end of namespace */
 
 
-#else
+#else   /* end if CMK_BLUEGENE_NODE */
+
 /**
   This version of Blue Gene Charm++ use a Blue Gene thread as 
   a Charm PE.

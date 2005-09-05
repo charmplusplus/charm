@@ -190,21 +190,21 @@ public:
     if (i.nInts==1) {
       //Map 1D integer indices in simple round-robin fashion
       int ans= (i.data()[0])%CkNumPes();
-			while(!CpvAccess(_validProcessors)[ans] || (ans == CkMyPe() && CpvAccess(startedEvac))){
-				ans = (ans +1 )%CkNumPes();
-			}
-			return ans;
+      while(!CmiNodeAlive(ans) || (ans == CkMyPe() && CpvAccess(startedEvac))){
+        ans = (ans +1 )%CkNumPes();
+      }
+      return ans;
     }
     else 
 #endif
       {
 	//Map other indices based on their hash code, mod a big prime.
-			unsigned int hash=(i.hash()+739)%1280107;
-			int ans = (hash % CkNumPes());
-			while(!CpvAccess(_validProcessors)[ans]){
-				ans = (ans +1 )%CkNumPes();
-			}
-			return ans;
+	unsigned int hash=(i.hash()+739)%1280107;
+	int ans = (hash % CkNumPes());
+	while(!CmiNodeAlive(ans)){
+		ans = (ans +1 )%CkNumPes();
+	}
+	return ans;
 
       }
   }
@@ -1077,7 +1077,7 @@ public:
 	virtual CmiBool deliver(CkArrayMessage *msg,CkDeliver_t type,int opts=0) {
 		/*FAULT_EVAC*/
 		int destPE = onPe;
-		if((!CpvAccess(_validProcessors)[onPe] && onPe != allowMessagesOnly)){
+		if((!CmiNodeAlive(onPe) && onPe != allowMessagesOnly)){
 //			printf("Delivery failed because process %d is invalid\n",onPe);
 			/*
 				Send it to its home processor instead
@@ -1368,10 +1368,6 @@ void CkLocMgr::inform(const CkArrayIndex &idx,int nowOnPe)
 	CkLocRec *rec=elementNrec(idx);
 	if (rec!=NULL && rec->type()==CkLocRec::local)
 		return; //Never replace a local element's record!
-		/*
-			FAULT_EVAC
-		*/
-	//	CmiAssert(CpvAccess(_validProcessors)[nowOnPe]);
 	insertRemote(idx,nowOnPe);
 }
 
@@ -1720,7 +1716,7 @@ void CkLocMgr::emigrate(CkLocRec_local *rec,int toPe)
 		if the toProcessor is already marked as invalid, dont emigrate
 		Shouldn't happen but might
 	*/
-	if(!(CpvAccess(_validProcessors)[toPe])){
+	if(!CmiNodeAlive(toPe)){
 		return;
 	}
 
@@ -1901,7 +1897,7 @@ int CkLocMgr::lastKnown(const CkArrayIndex &idx) {
 			FAULT_EVAC
 			if the lastKnownPE is invalid return homePE and delete this record
 		*/
-		if(!(CpvAccess(_validProcessors)[pe])){
+		if(!CmiNodeAlive(pe)){
 			removeFromTable(idx);
 			return homePe(idx);
 		}

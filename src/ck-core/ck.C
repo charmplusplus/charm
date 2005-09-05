@@ -930,12 +930,12 @@ static void _skipCldHandler(void *converseMsg)
 
 static void _skipCldEnqueue(int pe,envelope *env, int infoFn)
 {
-	if(pe == CkMyPe() ){
-		if(!CpvAccess(_validProcessors)[CkMyPe()]){
-			printf("[%d] Invalid processor sending itself a message \n",CkMyPe());
-			return;
-		}
-	}
+  if(pe == CkMyPe() ){
+    if(!CmiNodeAlive(CkMyPe())){
+	printf("[%d] Invalid processor sending itself a message \n",CkMyPe());
+	return;
+    }
+  }
   if (pe == CkMyPe() && !CmiImmIsRunning()) {
 #if CMK_OBJECT_QUEUE_AVAILABLE
     Chare *obj = CkFindObjectPtr(env);
@@ -1077,9 +1077,9 @@ void CkSendMsgInline(int entryIndex, void *msg, const CkChareID *pCid, int opts)
 {
   if (pCid->onPE==CkMyPe())
   { 
-		if(!CpvAccess(_validProcessors)[CkMyPe()]){
-			return;
-		}
+    if(!CmiNodeAlive(CkMyPe())){
+	return;
+    }
 		//Just directly call the chare (skip QD handling & scheduler)
     register envelope *env = UsrToEnv(msg);
     if (env->isPacked()) CkUnpackMessage(&env);
@@ -1165,9 +1165,9 @@ void CkSendMsgBranchInline(int eIdx, void *msg, int destPE, CkGroupID gID, int o
 {
   if (destPE==CkMyPe())
   {
-		if(!CpvAccess(_validProcessors)[CkMyPe()]){
-			return;
-		}
+    if(!CmiNodeAlive(CkMyPe())){
+	return;
+    }
     IrrGroup *obj=(IrrGroup *)_localBranch(gID);
     if (obj!=NULL)
     { //Just directly call the group:
