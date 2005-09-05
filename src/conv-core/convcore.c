@@ -1114,7 +1114,6 @@ void CsdEndIdle(void)
 #define MESSAGE_PHASE_CHECK
 #endif
 
-CpvExtern(char *,_validProcessors);
 extern int _exitHandlerIdx;
 
 void CmiHandleMessage(void *msg)

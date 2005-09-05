@@ -1384,6 +1384,15 @@ void CthSetThreadID(CthThread th, int a, int b, int c);
 
 void CthTraceResume(CthThread t);
 
+/*FAULT_EVAC */
+#if CMK_BLUEGENE_CHARM
+#define CmiNodeAlive(x) (1)
+#else
+CpvExtern(char *,_validProcessors);
+#define CmiNodeAlive(x)  (CpvAccess(_validProcessors)[x])
+#endif
+
+
 #include "conv-cpm.h"
 #include "conv-cpath.h"
 #include "conv-qd.h"
