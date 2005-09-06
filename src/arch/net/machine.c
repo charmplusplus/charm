@@ -867,7 +867,6 @@ int CmiMyRank(void)
 }
 #endif
 
-CpvExtern(char *,_validProcessors);
 CpvExtern(int,_charmEpoch);
 
 /*Add a message to this processor's receive queue 
@@ -882,7 +881,7 @@ static void CmiPushPE(int pe,void *msg)
 	/*
 		FAULT_EVAC
 	
-	if(CpvAccess(_charmEpoch)&&!(CpvAccess(_validProcessors)[CmiMyPe()])){
+	if(CpvAccess(_charmEpoch)&&!CmiNodeAlive(CmiMyPe())){
 		printf("[%d] Message after stop at %.6lf in %.6lf \n",CmiMyPe(),CmiWallTimer(),CmiWallTimer()-evacTime);
 	}*/
   MACHSTATE1(2,"Pushing message into %d's queue",pe);  
@@ -1552,7 +1551,7 @@ void DeliverOutgoingMessage(OutgoingMsg ogm)
     for (i=0; i<_Cmi_numnodes; i++)
       if (i!=_Cmi_mynode){
 	/*FAULT_EVAC : is the target processor valid*/
-	if(CpvAccess(_validProcessors)[i]){
+	if(CmiNodeAlive(i)){
 	  DeliverViaNetwork(ogm, nodes + i, DGRAM_BROADCAST, DGRAM_ROOTPE_MASK);
 	}
       }	
@@ -1572,7 +1571,7 @@ void DeliverOutgoingMessage(OutgoingMsg ogm)
     for (i = 0; i<_Cmi_numnodes; i++)
       if (i!=_Cmi_mynode){
 	/*FAULT_EVAC : is the target processor valid*/
-	if(CpvAccess(_validProcessors)[i]){
+	if(CmiNodeAlive(i)){
 	  DeliverViaNetwork(ogm, nodes + i, DGRAM_BROADCAST, DGRAM_ROOTPE_MASK);
 	}
       }	

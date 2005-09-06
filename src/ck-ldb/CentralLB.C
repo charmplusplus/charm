@@ -157,7 +157,7 @@ void CentralLB::AtSync()
 void CentralLB::ProcessAtSync()
 {
 #if CMK_LBDB_ON
-	CmiAssert(CpvAccess(_validProcessors)[CkMyPe()]);
+  CmiAssert(CmiNodeAlive(CkMyPe()));
   if (CkMyPe() == cur_ld_balancer) {
     start_lb_time = CkWallTimer();
   }
@@ -294,10 +294,10 @@ void CentralLB::ReceiveStats(CkMarshalledCLBStatsMessage &msg)
   DEBUGF(("Stats msg received, %d %d %d %d %p\n",
   	   pe,stats_msg_count,m->n_objs,m->serial,m));
 	
-	if(!CpvAccess(_validProcessors)[pe]){
-		DEBUGF(("[%d] ReceiveStats called from invalidProcessor %d\n",CkMyPe(),pe));
-		return;
-	}
+  if(!CmiNodeAlive(pe)){
+	DEBUGF(("[%d] ReceiveStats called from invalidProcessor %d\n",CkMyPe(),pe));
+	return;
+  }
 	
   if (m->avail_vector) {
       LBDatabaseObj()->set_avail_vector(m->avail_vector,  m->next_lb);
@@ -523,10 +523,10 @@ void CentralLB::ReceiveMigration(LBMigrateMsg *m)
   for (i=0; i<CkNumPes(); i++) theLbdb->lastLBInfo.expectedLoad[i] = m->expectedLoad[i];
   CmiAssert(migrates_expected <= 0 || migrates_completed == migrates_expected);
 /*FAULT_EVAC*/
-	if(!(CpvAccess(_validProcessors)[CkMyPe()])){
-		delete m;
-		return;
-	}
+  if(!CmiNodeAlive(CkMyPe())){
+	delete m;
+	return;
+  }
   migrates_expected = 0;
   future_migrates_expected = 0;
   for(i=0; i < m->n_moves; i++) {
