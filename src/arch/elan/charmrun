@@ -26,7 +26,11 @@ done
 # Try to guess the number of nodes
 nodes=$pes
 ppn=0
-[ ! "$RMS_NODES" = "" ] && ppn=`expr $RMS_PROCS / $RMS_NODES`
+if [ ! "$RMS_NODES" = "" ] 
+then
+  ppn=`expr $RMS_PROCS / $RMS_NODES`
+  test $pes -gt $RMS_NODES && nodes=$RMS_NODES
+fi
 for i in 4 2 3
 do
   [ $ppn -ne 0 -a $i -gt $ppn ] && continue
@@ -45,6 +49,10 @@ args=`pwd`/"$args"
 if [ ! "$RMS_NODES" = "" ]
 then
 # Running from a batch script: just use prun
+	if test $pes -gt $RMS_PROCS
+        then
+	  echo "Charmrun> too many processors requested!"
+        fi
 	echo "Charmrun running> prun $extra $args"
 	prun $extra $args	
 else
@@ -83,6 +91,15 @@ EOF
 	chmod 755 $script
 	jobid=`qsub $script`
 	echo "Job enqueued under job ID $jobid"
+
+End() {
+        echo "autobuild> qdel $jobid ..."
+        qdel $jobid
+        rm -f $script
+        exit $1
+}
+
+	trap 'End 1' 2 3
 	retry=0
 # Wait for the job to complete, by checking its status
 	while [ true ]
