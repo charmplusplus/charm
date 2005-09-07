@@ -172,10 +172,13 @@ extern void CmiDestroyLock(CmiNodeLock lock);
 
 extern CmiNodeLock CmiMemLock_lock;
 #define CmiMemLock() do{if (CmiMemLock_lock) CmiLock(CmiMemLock_lock);} while (0)
+
 #define CmiMemUnlock() do{if (CmiMemLock_lock) CmiUnlock(CmiMemLock_lock);} while (0)
+
 
 #endif
 
+#define CmiMemcpy(dest, src, size) memcpy((dest), (src), (size))
 
 #if CMK_SHARED_VARS_EXEMPLAR /* Used only by HP Exemplar version */
 
