@@ -6,7 +6,7 @@
 
 /* delegated paircalc proxies perform like fermented dung on BG/L */
 #ifdef CMK_VERSION_BLUEGENE
-#define _PAIRCALC_DO_NOT_DELEGATE_
+#define _PAIRCALC_DO_NOT_DELEGATE_ 1
 #endif
 
 /* a place to keep the section proxies for the reduction */

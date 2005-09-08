@@ -466,7 +466,7 @@ PairCalculator::calculatePairs_gemm(calculatePairsMsg *msg)
 #endif
 
     numRecd = 0; 
-
+#define NEW_DECOMP	
     if (msg->flag_dp) {
 #ifndef NEW_DECOMP	
       if(thisIndex.w != 0) {   // Adjusting for double packing of incoming data
@@ -778,9 +778,62 @@ PairCalculator::acceptResult(acceptResultMsg *msg)
 
   //original version
 #ifndef _PAIRCALC_SECONDPHASE_LOADBAL_
-  if(!symmetric){
+  if(!symmetric && !gspacesum){
     CkArrayIndex4D idx(thisIndex.w, 0, thisIndex.y, thisIndex.z);
     thisProxy(idx).sumPartialResult(N*grainSize, mynewData, thisIndex.z);
+  }
+  else if (gspacesum){
+    // we just send these to gspace where acceptNewPsi or acceptLambda will put them together
+    // this should be fairly load balanced as long as gspace is balanced
+    /*
+      CkArrayIndex4D idx(thisIndex.w, 0, thisIndex.y, thisIndex.z);
+      thisProxy(idx).sumPartialResult(N*grainSize, mynewData, thisIndex.z);
+    */
+
+    //we have an N*grainsize block
+    //we must communicate with all planes
+    int offset=thisIndex.z;  //zero for now but should be considered
+    int priority=0x1;
+    if(symmetric){  // we have this othernewdata issue for the symmetric case
+	if (thisIndex.y != thisIndex.x) //othernewdata
+      { 
+	for(int j=0;j<grainSize;j++)
+	  {
+	    //	CkCallback mycb(cb_ep, CkArrayIndex2D(thisIndex.y+j+offset, thisIndex.w), cb_aid);
+
+	    CkCallback mycb(cb_ep, CkArrayIndex2D(j+thisIndex.x ,thisIndex.w), cb_aid);
+	    partialResultMsg *msg = new (N, 8*sizeof(int) )partialResultMsg;
+	    msg->N=N;
+	    msg->myoffset = j; // someplace in the state
+	    memcpy(msg->result,othernewData+j*N,msg->N*sizeof(complex));
+	    *((int*)CkPriorityPtr(msg)) = priority;
+	    CkSetQueueing(msg, CK_QUEUEING_IFIFO);
+#ifdef _PAIRCALC_DEBUG_
+	    CkPrintf("sending partial of size %d offset %d to [%d %d]\n",N,j,thisIndex.y+j,thisIndex.w);
+#endif
+	    mycb.send(msg);
+
+	  }
+      }
+    }
+    for(int j=0;j<grainSize;j++) //mynewdata
+      {
+	//	CkCallback mycb(cb_ep, CkArrayIndex2D(thisIndex.y+j+offset, thisIndex.w), cb_aid);
+
+	CkCallback mycb(cb_ep, CkArrayIndex2D(j+thisIndex.y ,thisIndex.w), cb_aid);
+	partialResultMsg *msg = new (N, 8*sizeof(int) )partialResultMsg;
+	msg->N=N;
+	msg->myoffset = j; // someplace in the state
+	memcpy(msg->result,mynewData+j*N,msg->N*sizeof(complex));
+	*((int*)CkPriorityPtr(msg)) = priority;
+	CkSetQueueing(msg, CK_QUEUEING_IFIFO);
+#ifdef _PAIRCALC_DEBUG_
+	CkPrintf("sending partial of size %d offset %d to [%d %d]\n",N,j,thisIndex.y+j,thisIndex.w);
+#endif
+	mycb.send(msg);
+
+      }
+
   }
   else {
     CkArrayIndex4D idx(thisIndex.w, 0, thisIndex.y, thisIndex.z);
@@ -800,9 +853,12 @@ PairCalculator::acceptResult(acceptResultMsg *msg)
     segments+=1;
   int blocksize=grainSize/segments;
   int priority=0xFFFFFFFF;
-  if(!symmetric){
+  if(!symmetric&&!gspacesum){
     for(int segment=0;segment < segments;segment++)
       {
+#ifdef CMK_VERSION_BLUEGENE
+	      CmiNetworkProgress();
+#endif
 	CkArrayIndex4D idx(thisIndex.w, segment*grainSize, thisIndex.y, thisIndex.z);
 	partialResultMsg *msg = new (N*blocksize, 8*sizeof(int) )partialResultMsg;
 	msg->N=N*blocksize;
@@ -826,10 +882,14 @@ PairCalculator::acceptResult(acceptResultMsg *msg)
     //we must communicate with all planes
     int offset=thisIndex.z;  //zero for now but should be considered
     int priority=0xFFFFFFFF;
-    if (thisIndex.y != thisIndex.x)
+    if(symmetric) //symmetric case has this other matrix to worry about
+    if (thisIndex.y != thisIndex.x) //othernewdata
       { 
 	for(int j=0;j<grainSize;j++)
 	  {
+#ifdef CMK_VERSION_BLUEGENE
+	      CmiNetworkProgress();
+#endif
 
 	    //	CkCallback mycb(cb_ep, CkArrayIndex2D(thisIndex.y+j+offset, thisIndex.w), cb_aid);
 
@@ -847,9 +907,11 @@ PairCalculator::acceptResult(acceptResultMsg *msg)
 
 	  }
       }
-    for(int j=0;j<grainSize;j++)
+    for(int j=0;j<grainSize;j++) //mynewdata
       {
-
+#ifdef CMK_VERSION_BLUEGENE
+	      CmiNetworkProgress();
+#endif
 	//	CkCallback mycb(cb_ep, CkArrayIndex2D(thisIndex.y+j+offset, thisIndex.w), cb_aid);
 
 	CkCallback mycb(cb_ep, CkArrayIndex2D(j+thisIndex.y ,thisIndex.w), cb_aid);
@@ -867,8 +929,8 @@ PairCalculator::acceptResult(acceptResultMsg *msg)
       }
 
   }
-  else //sum in paircalc
-    {
+  else  //symmetric && !gspacesum 
+  {//sum in paircalc
       CkArrayIndex4D idx(thisIndex.w, 0, thisIndex.y, thisIndex.z);
       partialResultMsg *msg = new (N*grainSize, 8*sizeof(int) )partialResultMsg;
       msg->N=N*grainSize;
