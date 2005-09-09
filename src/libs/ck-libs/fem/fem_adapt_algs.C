@@ -58,7 +58,7 @@ int FEM_Adapt_Algs::Refine(int qm, int method, double factor, double *sizes)
 	tmpLen = length(eConn[2], eConn[0]);
 	if (tmpLen > maxEdgeLength) maxEdgeLength = tmpLen;
 	if (maxEdgeLength > (regional_sizes[i]*REFINE_TOL)) {
-	  double qFactor=1.0;//getAreaQuality(i);
+	  double qFactor=getAreaQuality(i);
 	  Insert(i, qFactor, 0);
 	}
       }

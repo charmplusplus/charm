@@ -1328,6 +1328,29 @@ void FEM_Entity::allocateGlobalno(void) {
 	globalno->setWidth(1);
 }
 
+void FEM_Entity::allocateMeshSizing(void) {
+  if (meshSizing) 
+    CkAbort("FEM_Entity::allocateMeshSizing called, but already allocated");
+  meshSizing=new FEM_DataAttribute(this,FEM_MESH_SIZING);
+  add(meshSizing); // globalno will be deleted via attributes list now
+  meshSizing->setWidth(1);
+  meshSizing->setDatatype(FEM_DOUBLE);
+}
+
+void FEM_Entity::setMeshSizing(int r,double s)
+{
+  if (!meshSizing) allocateMeshSizing();
+  meshSizing->getDouble()(r,0)=s;
+}
+
+void FEM_Entity::setMeshSizing(double *sf)
+{
+  if (!meshSizing) allocateMeshSizing();
+  int len = size();
+  for (int i=0; i<len; i++)
+    meshSizing->getDouble()(i,0)=sf[i];
+}
+
 void FEM_Entity::allocateBoundary(){
 	FEM_DataAttribute *bound = new FEM_DataAttribute(this,FEM_BOUNDARY);
 	add(bound);

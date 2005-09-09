@@ -648,6 +648,12 @@ class FEM_Entity {
 	*/
 	void allocateBoundary();
 
+	/// Mesh sizing attribute for elements
+	/** Specifies a double edge length target for the mesh at each 
+	    element; used in adaptivity algorithms */
+	FEM_DataAttribute *meshSizing;
+	void allocateMeshSizing(void);
+
 	/*
 	    used to allocate the char array for storing whether each entity is valid
 		When a node/element is deleted the flag in the valid table is set to 0.
@@ -792,6 +798,15 @@ protected:
 	void setAscendingGlobalno(void);
 	void setAscendingGlobalno(int base);
 	void copyOldGlobalno(const FEM_Entity &e);
+
+	// Mesh sizing array access
+	bool hasMeshSizing(void) const {return meshSizing!=0;}
+	double getMeshSizing(int r) const {
+	  if (meshSizing==0) return -1; // Unknown mesh sizing
+	  return meshSizing->getDouble()(r,0);
+	}
+	void setMeshSizing(int r,double s);
+	void setMeshSizing(double *sf);
 	
 	//Ghost comm. list access
 	FEM_Comm &setGhostSend(void) { return ghostSend; }
@@ -1188,6 +1203,7 @@ class FEM_Mesh : public CkNoncopyable {
   void print(int idxBase);//Write a human-readable description to CkPrintf
   /// Extract a list of our entities:
   int getEntities(int *entites);
+  
   
   
   /********** New methods ***********/

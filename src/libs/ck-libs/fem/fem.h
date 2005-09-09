@@ -122,7 +122,8 @@ to mark the chunk to which a ghost node or element belongs datatype=FEM_INDEX*/
 										   exists or is valid. It may be 0 whenever a mesh modification occurs that deletes the 
 										   corresponding node or element */
 
-#define FEM_ATTRIB_LAST (FEM_ATTRIB_FIRST+15) /*This is the last valid attribute code*/
+#define FEM_MESH_SIZING (FEM_ATTRIB_FIRST+15) /* Target edge length attr. */
+#define FEM_ATTRIB_LAST (FEM_ATTRIB_FIRST+16) /*This is the last valid attribute code*/
 
   /* Specialized routines: */
   void FEM_Mesh_set_conn(int fem_mesh,int entity,

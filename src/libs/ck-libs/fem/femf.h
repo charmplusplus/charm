@@ -44,6 +44,7 @@
        integer, parameter :: FEM_NODE_PRIMARY=(FEM_ATTRIB_FIRST+7)
        integer, parameter :: FEM_CHUNK=(FEM_ATTRIB_FIRST+8)
        integer, parameter :: FEM_BOUNDARY=(FEM_ATTRIB_FIRST+9)
+       integer, parameter :: FEM_MESH_SIZING=(FEM_ATTRIB_FIRST+15)
        integer, parameter :: FEM_INDEX_0=IDXL_INDEX_0
        integer, parameter :: FEM_INDEX_1=IDXL_INDEX_1
 
