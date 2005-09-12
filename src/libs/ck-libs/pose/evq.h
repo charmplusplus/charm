@@ -118,7 +118,9 @@ class eventQueue {
       RBevent = e;
     }
 #else
-    else if (RBevent->timestamp > e->timestamp) {
+    else if ((RBevent->timestamp > e->timestamp) ||
+             (RBevent->timestamp == e->timestamp && RBevent->evID > e->evID)
+            ) {
       CmiAssert(RBevent->prev->next == RBevent);
       CmiAssert(RBevent->next->prev == RBevent);
       RBevent = e;

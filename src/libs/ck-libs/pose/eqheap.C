@@ -13,7 +13,7 @@ void HeapNode::insert(Event *e)
   sanitize();
 #endif
   CmiAssert(this != NULL);
-  CmiAssert(e->timestamp >= this->e->timestamp);
+  CmiAssert(e->timestamp > this->e->timestamp || (e->timestamp == this->e->timestamp && e->evID >= this->e->evID));
   HeapNode *eh;
   if (left == NULL) {  // make it the left subheap
     eh = new HeapNode(e, 1, NULL, NULL);
@@ -25,12 +25,12 @@ void HeapNode::insert(Event *e)
     right = eh;
     subheapsize += 1;
   }
-  else if (e->timestamp <= left->e->timestamp) { // make root of left subtree
+  else if (e->timestamp < left->e->timestamp || (e->timestamp == left->e->timestamp && e->evID <= left->e->evID)) { // make root of left subtree
     eh = new HeapNode(e, left->subheapsize+1, left, NULL);
     left = eh;
     subheapsize += 1;
   }
-  else if (e->timestamp <= right->e->timestamp) { // make root of right subtree
+  else if (e->timestamp < right->e->timestamp || (e->timestamp == right->e->timestamp && e->evID <= right->e->evID)) { // make root of right subtree
     eh = new HeapNode(e, right->subheapsize+1, right, NULL);
     right = eh;
     subheapsize += 1;
@@ -56,7 +56,7 @@ void HeapNode::insertDeterministic(Event *e)
   sanitize();
 #endif
   CmiAssert(this != NULL);
-  CmiAssert(e->timestamp >= this->e->timestamp);
+  CmiAssert(e->timestamp > this->e->timestamp || (e->timestamp == this->e->timestamp && e->evID >= this->e->evID));
   HeapNode *eh;
   if (left == NULL) {  // make it the left subheap
     eh = new HeapNode(e, 1, NULL, NULL);
@@ -110,7 +110,7 @@ HeapNode *HeapNode::conjoin(HeapNode *h)
   else if ((e->timestamp < h->e->timestamp) ||
            ((e->timestamp == h->e->timestamp) && (e->evID <= h->e->evID))) {
 #else
-  else if (e->timestamp < h->e->timestamp) { // make this the root
+  else if (e->timestamp < h->e->timestamp || (e->timestamp == h->e->timestamp && e->evID <= h->e->evID)) { // make this the root
 #endif
     // conjoin this's kids into this's left and make this's right h
     if (!left) left = right;
@@ -238,7 +238,7 @@ void EqHeap::InsertEvent(Event *e)
   CmiAssert((top == NULL) || (top->subheapsize > 0));
   if (top == NULL) // make the top of the heap
     top = new HeapNode(e, 1, NULL, NULL);
-  else if (e->timestamp < top->e->timestamp) { // insert at top of heap
+  else if (e->timestamp < top->e->timestamp || (e->timestamp == top->e->timestamp && e->evID < top->e->evID)) { // insert at top of heap
     if (top->subheapsize == 1) // only one node in heap
       top = new HeapNode(e, 2, top, NULL); // make old top into left subheap
     else if (top->left && top->right) { // full(ish) heap
@@ -361,8 +361,8 @@ int EqHeap::DeleteEvent(eventID evID, POSE_TimeType timestamp)
     sanitize();
 #endif
   int result;
-  if (!top || (timestamp < top->e->timestamp))
-    return 0;
+  if (!top || (timestamp < top->e->timestamp))  // NOTE: Skipping evID comparison... if control not set in parameter evID then
+    return 0;                                   //   search will fail... not having the check shouldn't cause too much un-needed work
   else if ((top->e->timestamp == timestamp) && (top->e->evID == evID)) {
     HeapNode *tmp = top; // top is the match
     if (top->left)

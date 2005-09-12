@@ -75,12 +75,12 @@ void eventQueue::InsertEvent(Event *e)
   // greater than last timestamp in queue, 
   // or currentPtr is at back (presumably because heap is empty)
   //CkPrintf("Received event "); e->evID.dump(); CkPrintf(" at %d...\n", e->timestamp);
-  if ((tmp->timestamp <= e->timestamp) && (currentPtr != backPtr))
+  if ((tmp->timestamp < e->timestamp || (tmp->timestamp == e->timestamp && tmp->evID < e->evID)) && (currentPtr != backPtr))
     eqh->InsertEvent(e); // insert in heap
   else { // tmp->timestamp > e->timestamp; insert in linked list
     if ((currentPtr != backPtr) && (currentPtr->timestamp > e->timestamp))
       tmp = currentPtr; // may be closer to insertion point
-    while (tmp->timestamp > e->timestamp) // search for position
+    while (tmp->timestamp > e->timestamp || (tmp->timestamp == e->timestamp && tmp->evID > e->evID)) // search for position
       tmp = tmp->prev;
     // insert e
     e->prev = tmp;
@@ -90,7 +90,7 @@ void eventQueue::InsertEvent(Event *e)
     // if e is inserted before currPtr, move currPtr back to avoid rollback
     if ((currentPtr->prev == e) && (currentPtr->done < 1))
       currentPtr = currentPtr->prev;
-    else if ((currentPtr == backPtr) || (e->timestamp < currentPtr->timestamp))
+    else if ((currentPtr == backPtr) || (e->timestamp < currentPtr->timestamp || (e->timestamp == currentPtr->timestamp && e->evID < currentPtr->evID)))
       SetRBevent(e);
   }
 #ifdef EQ_SANITIZE
@@ -111,14 +111,14 @@ void eventQueue::InsertEventDeterministic(Event *e)
   // greater than last timestamp in queue, 
   // or currentPtr is at back (presumably because heap is empty)
   //CkPrintf("Received event "); e->evID.dump(); CkPrintf(" at %d...\n", e->timestamp);
-  if (((tmp->timestamp < e->timestamp) ||
-       (tmp->timestamp == e->timestamp) && (tmp->evID < e->evID))
+  if ((tmp->timestamp < e->timestamp) ||
+      ((tmp->timestamp == e->timestamp) && (tmp->evID < e->evID))
       && (currentPtr != backPtr))
     eqh->InsertEvent(e); // insert in heap
   else { // tmp->timestamp > e->timestamp; insert in linked list
     if ((currentPtr != backPtr) && (currentPtr->timestamp > e->timestamp))
       tmp = currentPtr; // may be closer to insertion point
-    while (tmp->timestamp > e->timestamp) // search for position
+    while (tmp->timestamp > e->timestamp || (tmp->timestamp == e->timestamp && tmp->evID > e->evID)) // search for position
       tmp = tmp->prev;
     // tmp now points to last event with timestamp <= e's
     if (tmp->timestamp == e->timestamp) // deterministic bit
