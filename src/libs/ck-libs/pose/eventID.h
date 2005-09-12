@@ -51,6 +51,17 @@ class eventID
   int operator<(const eventID& o) {
     return (control < o.control);
   }
+  /// Greater than/equality comparison operator
+  /** Provides a way to sort events by event ID */
+  int operator>=(const eventID& o) {
+    return (control >= o.control);
+  }
+  /// Greater than comparison operator
+  /** Provides a way to sort events by event ID */
+  int operator> (const eventID& o) {
+    return (control >  o.control);
+  }
+
   /// Dump all data fields
   void dump() { 
     CmiAssert((pe >= 0) && (pe < CkNumPes())); 
