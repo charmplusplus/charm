@@ -1,0 +1,4 @@
+Please note that DIMX, DIMY and DIMZ are for local vp dimensions. 
+Eg, a 240^3 problem can be configured as follows:
+compile w/ DIMX=30 DIMY=30 DIMZ=30 
+run w/ pgm 8 8 8 
