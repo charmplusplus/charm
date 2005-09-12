@@ -1,3 +1,8 @@
+/* File: fem_adapt.C
+ * Authors: Nilesh Choudhury, Terry Wilmarth
+ *
+ */
+
 #include "fem_adapt.h"  
 
 // ======================  BEGIN edge_flip  =================================

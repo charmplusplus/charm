@@ -1,3 +1,8 @@
+/* File: fem_interpolate.C
+ * Authors: Terry Wilmarth, Nilesh Choudhury
+ * 
+ */
+
 // FEM_Interpolate default implementation - TLW
 #include "fem_interpolate.h"
 #include "fem_mesh_modify.h"

@@ -1,3 +1,9 @@
+/* File: fem_adapt_new.h
+ * Authors: Terry Wilmarth, Nilesh Choudhury
+ *
+ */
+
+
 // This will eventually take the place of the previous version when Nilesh and 
 // Isaac's fem_mesh_modify module is complete.
 #ifndef __CHARM_FEM_ADAPT_H

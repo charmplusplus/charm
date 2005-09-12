@@ -1,3 +1,8 @@
+/* File: fem_adapt_lock.h
+ * Authors: Nilesh Choudhury, Terry Wilmarth
+ *
+ */
+
 #ifndef __CHARM_FEM_ADAPT_LOCK_H
 #define __CHARM_FEM_ADAPT_LOCK_H
 

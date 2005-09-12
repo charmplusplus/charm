@@ -1,4 +1,9 @@
-/*!
+/* File: fem_mesh_modify.h
+ * Authors: Nilesh Choudhury
+ * 
+ */
+
+/*
  
 This file contains a set of functions, which allow primitive operations upon meshes in parallel. The functions are defined in fem_mesh_modify.C.
 
@@ -312,6 +317,8 @@ class femMeshModify : public CBase_femMeshModify {
 
   void removeGhostElem(removeGhostElemMsg *fm);
   void removeElementRemote(removeElemMsg *fm);
+
+  void removeGhostNode(int fromChk, int sharedIdx);
 
   void refine_flip_element_leb(int fromChk, int propElemT, int propNodeT,
 			       int newNodeT, int nbrOpNodeT, int nbrghost,

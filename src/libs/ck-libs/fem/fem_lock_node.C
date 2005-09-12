@@ -1,3 +1,8 @@
+/* File: fem_lock_node.C
+ * Authors: Nilesh Choudhury
+ * 
+ */
+
 #include "fem_lock_node.h"
 #include "fem_mesh_modify.h"
 

@@ -1,3 +1,8 @@
+/* File: fem_adapt_lock.C
+ * Authors: Nilesh Choudhury, Terry Wilmarth
+ *
+ */
+
 #include "fem_adapt_lock.h"
 #include "fem_mesh_modify.h"
 
@@ -492,9 +497,33 @@ int FEM_AdaptL::edge_contraction_help(int e1, int e2, int n1, int n2, int e1_n1,
   n1_shared = theMod->getfmUtil()->isShared(n1);
   n2_shared = theMod->getfmUtil()->isShared(n2);
   if(n1_shared && n2_shared) {
-    keepnode = n1;
-    deletenode = n2;
-    shared = 2;
+    bool same = true;
+    const IDXL_Rec *irec1 = theMesh->node.shared.getRec(n1);
+    const IDXL_Rec *irec2 = theMesh->node.shared.getRec(n2);
+    if(irec1->getShared() == irec2->getShared()) {
+      for(int i=0; i<irec1->getShared(); i++) {
+	same = false;
+	for(int j=0; j<irec2->getShared(); j++) {
+	  if(irec1->getChk(i) == irec2->getChk(j)) {
+	    same = true; break;
+	  }
+	}
+	if(!same) break;
+      }
+    }
+    else {
+      same = false;
+    }
+    if(same) {
+      keepnode = n1;
+      deletenode = n2;
+      shared = 2;
+    } else {
+      free(conn);
+      free(adjnodes);
+      free(adjelems);
+      return -1; //they are on different boundaries
+    }
   }
   else if(n1_shared) {
     //update n1 & delete n2
@@ -746,9 +775,6 @@ int FEM_AdaptL::edge_contraction_help(int e1, int e2, int n1, int n2, int e1_n1,
 	}
       }
 
-      //if((conn[0]==-16 || conn[1]==-16 || conn[2]==-16) && (conn[0]==-19 || conn[1]==-19 || conn[2]==-19) && (conn[0]==20 || conn[1]==20 || conn[2]==20)) {
-      //CkPrintf("blah\n");
-      //}
       if(theMod->fmAdaptAlgs->didItFlip(conn[0],conn[1],conn[2],new_coord)) {
 	flipSliver = true;
 	CkPrintf("[%d]Warning: Elem %d(%d,%d,%d) would become a sliver if %d->%d is contracted\n",theMod->idx,nbrElems[i],conn[0],conn[1],conn[2],n1,n2);
@@ -766,9 +792,6 @@ int FEM_AdaptL::edge_contraction_help(int e1, int e2, int n1, int n2, int e1_n1,
 	    conn1[2] = keepnode;
 	  }
 	}
-	//if((conn1[0]==-16 || conn1[1]==-16 || conn1[2]==-16) && (conn1[0]==-19 || conn1[1]==-19 || conn1[2]==-19) && (conn1[0]==20 || conn1[1]==20 || conn1[2]==20)) {
-	//CkPrintf("blah\n");
-	//}
 	if(theMod->fmAdaptAlgs->didItFlip(conn1[0],conn1[1],conn1[2],new_coord)) {
 	  flipSliver = true;
 	  CkPrintf("[%d]Warning: Elem %d(%d,%d,%d) would become a sliver if %d->%d is contracted\n",theMod->idx,nbr1Elems[i],conn1[0],conn1[1],conn1[2],n1,n2);
@@ -830,9 +853,6 @@ int FEM_AdaptL::edge_contraction_help(int e1, int e2, int n1, int n2, int e1_n1,
   printAdjacencies(adjnodes, 2, adjelems, 2);
 #endif
 
-  if(shared==2 && (n1_bound<0||n2_bound<0)) {
-    CkPrintf("blah\n");
-  }
   for (int i=0; i<nesize; i++) {
     if ((nbrElems[i] != e1) && (nbrElems[i] != e2)) {
       theMesh->e2n_getAll(nbrElems[i], conn);

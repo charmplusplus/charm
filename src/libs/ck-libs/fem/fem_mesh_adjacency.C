@@ -6,7 +6,7 @@
  * of all needed tables. The second half provides 
  * easy accessor and modifier functions.
  *
- * Authors include: Isaac, Sayantan, Terry
+ * Authors include: Isaac, Sayantan, Terry, Nilesh
  */
 
 #include "fem.h"

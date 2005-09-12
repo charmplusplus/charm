@@ -1,3 +1,9 @@
+/* File: fem_util.h
+ * Authors: Nilesh Choudhury
+ * 
+ */
+
+
 #ifndef __CHARM_FEM_MUTIL_H
 #define __CHARM_FEM_MUTIL_H
 
@@ -40,6 +46,7 @@ class FEM_MUtil {
   void addElemRemote(FEM_Mesh *m, int chk, int elemtype, int connSize, int *conn, int numGhostIndex, int *ghostIndices);
   void removeGhostElementRemote(FEM_Mesh *m, int chk, int elementid, int elemtype, int numGhostIndex, int *ghostIndices, int numGhostRNIndex, int *ghostRNIndices, int numGhostREIndex, int *ghostREIndices, int numSharedIndex, int *sharedIndices);
   void removeElemRemote(FEM_Mesh *m, int chk, int elementid, int elemtype, int permanent);
+  void removeGhostNodeRemote(FEM_Mesh *m, int fromChk, int sharedIdx);
   int Replace_node_local(FEM_Mesh *m, int oldIdx, int newIdx);
   void addToSharedList(FEM_Mesh *m, int fromChk, int sharedIdx);
   void StructureTest(FEM_Mesh *m);

@@ -1,3 +1,9 @@
+/* File: fem_adapt_algs.C
+ * Authors: Terry Wilmarth, Nilesh Choudhury
+ * 
+ */
+
+
 // This module implements high level mesh adaptivity algorithms that make use 
 // of the primitive mesh adaptivity operations provided by fem_adapt(_new).
 // Ask: TLW
@@ -273,7 +279,9 @@ int FEM_Adapt_Algs::simple_coarsen(double targetA, double xmin, double ymin, dou
 	  if(ret != -1) adapted = true;
 	}
       }
+      //if(adapted) break;
     }
+    //if(adapted) break;
   }
 
   free(con);
@@ -285,7 +293,7 @@ int FEM_Adapt_Algs::simple_coarsen(double targetA, double xmin, double ymin, dou
   free(shortestEdge);
 
   //test the mesh for slivered triangles
-  //theMod->fmUtil->StructureTest(theMesh);
+  theMod->fmUtil->StructureTest(theMesh);
   return 1;
 }
 

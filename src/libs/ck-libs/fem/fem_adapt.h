@@ -1,3 +1,9 @@
+/* File: fem_adapt.h
+ * Authors: Terry Wilmarth, Nilesh Choudhury
+ *
+ */
+
+
 #ifndef __CHARM_FEM_ADAPT_H
 #define __CHARM_FEM_ADAPT_H
 

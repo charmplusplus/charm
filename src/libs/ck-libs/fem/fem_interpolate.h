@@ -1,3 +1,8 @@
+/* File: fem_interpolate.h
+ * Authors: Terry Wilmarth, Nilesh Choudhury
+ * 
+ */
+
 // This is an interface for specifying solution transfer operations
 // for small mesh modification operations. It provides overridable
 // defaults for node and element interpolations.  These functions are passed to

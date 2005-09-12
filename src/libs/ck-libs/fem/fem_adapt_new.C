@@ -1,3 +1,8 @@
+/* File: fem_adapt_new.C
+ * Authors: Nilesh Choudhury, Terry Wilmarth
+ *
+ */
+
 #include "fem_adapt_new.h"  
 #include "fem_mesh_modify.h"
 
@@ -1253,7 +1258,20 @@ bool FEM_Adapt::isCorner(int n1) {
   for (int i=0; i<n1NumNodes; i++) {
     int ret = 0;
     int n2 = n1AdjNodes[i];
-    FEM_Mesh_dataP(theMesh, FEM_NODE, FEM_BOUNDARY, &n2_bound, n2, 1 , FEM_INT, 1);
+    if(FEM_Is_ghost_index(n2)) {
+      int numchunks;
+      IDXL_Share **chunks1;
+      theMod->fmUtil->getChunkNos(0,n2,&numchunks,&chunks1);
+      int index = theMod->idx;
+      CkAssert(numchunks>0);
+      int chk = chunks1[0]->chk;
+      int ghostidx = theMod->fmUtil->exists_in_IDXL(theMesh,n2,chk,2);
+      intMsg *im = meshMod[chk].getRemoteBound(index,ghostidx);
+      n2_bound = im->i;
+    }
+    else {
+      FEM_Mesh_dataP(theMesh, FEM_NODE, FEM_BOUNDARY, &n2_bound, n2, 1 , FEM_INT, 1);
+    }
     if(n2_bound == 0) continue;
     if(n1_bound != n2_bound) {
       //find the number of elements this edge belongs to

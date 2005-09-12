@@ -1,3 +1,8 @@
+/* File: fem_adapt_algs.h
+ * Authors: Terry Wilmarth, Nilesh Choudhury
+ * 
+ */
+
 // This module implements high level mesh adaptivity algorithms that make use 
 // of the primitive mesh adaptivity operations provided by fem_adapt(_new).
 // Ask: TLW

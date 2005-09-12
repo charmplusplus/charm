@@ -1,3 +1,8 @@
+/* File: fem_mesh_modify.ci
+ * Authors: Nilesh Choudhury
+ * 
+ */
+
 module FEMMeshModify {
 
   readonly CProxy_femMeshModify meshMod;
@@ -52,6 +57,7 @@ module FEMMeshModify {
     entry [sync,threaded] void addElementRemote(addElemMsg *fm);
     entry [sync,threaded] void removeGhostElem(removeGhostElemMsg *);
     entry [sync,threaded] void removeElementRemote(removeElemMsg *);
+    entry [sync,threaded] void removeGhostNode(int fromChk, int sharedIdx);
     entry /*[sync,threaded]*/ void refine_flip_element_leb(int, int, int, int, int, int, double);
     entry [sync,threaded] void addToSharedList(int, int);
     entry [sync,threaded] void updateNodeAttrs(int, int, double, double, int);

@@ -1,3 +1,9 @@
+/* File: fem_util.C
+ * Authors: Nilesh Choudhury
+ * 
+ */
+
+
 #include "fem_util.h"
 #include "fem_mesh_modify.h"
 
@@ -28,19 +34,20 @@ void FEM_MUtil::getChunkNos(int entType, int entNo, int *numChunks, IDXL_Share *
       if(irec) {
 	noShared = irec->getShared(); //check this value!!
 	//CkAssert(noShared > 0);
-	int chunk = irec->getChk(0);
-	int sharedIdx = exists_in_IDXL(mmod->fmMesh,ghostid,chunk,2);
+	/*int chunk = irec->getChk(0);
+	int sharedIdx = exists_in_IDXL(mmod->fmMesh,FEM_To_ghost_index(ghostid),chunk,2);
 	int2Msg *i2 = new int2Msg(idx, sharedIdx);
 	chunkListMsg *clm = meshMod[chunk].getChunksSharingGhostNode(i2);
-	*numChunks = clm->numChunkList + 1; //add chunk to the list
+	*numChunks = clm->numChunkList + 1; //add chunk to the list */
+	*numChunks = noShared;
 	*chunks = (IDXL_Share**)malloc((*numChunks)*sizeof(IDXL_Share*));
 	int i=0;
-	for(i=0; i<*numChunks - 1; i++) {
-	  int chk = clm->chunkList[i];
+	for(i=0; i<*numChunks; i++) {
+	  int chk = irec->getChk(i); //clm->chunkList[i];
 	  int index = -1; // no need to have these, I never use it anyway
 	  (*chunks)[i] = new IDXL_Share(chk, index);
 	}
-	(*chunks)[i] = new IDXL_Share(chunk, -1);
+	//(*chunks)[i] = new IDXL_Share(chunk, -1);
       }
       else { //might be that it does not exist anymore in the ghost list
 	*numChunks = 0;
@@ -246,6 +253,21 @@ void FEM_MUtil::removeNodeRemote(FEM_Mesh *m, int chk, int sharedIdx) {
   return;
 }
 
+void FEM_MUtil::removeGhostNodeRemote(FEM_Mesh *m, int fromChk, int sharedIdx) {
+  int localIdx = lookup_in_IDXL(m,sharedIdx,fromChk,2); //look in the ghostrecv list
+  m->node.ghost->ghostRecv.removeNode(localIdx, fromChk);
+  int ghostid = FEM_To_ghost_index(localIdx);
+  int numAdjNodes, numAdjElts;
+  int *adjNodes, *adjElts;
+  m->n2n_getAll(ghostid, &adjNodes, &numAdjNodes);
+  m->n2e_getAll(ghostid, &adjElts, &numAdjElts);
+    
+  // mark node as deleted/invalid
+  CkAssert((numAdjNodes==0) && (numAdjElts==0));
+  m->node.ghost->set_invalid(localIdx);
+  return;
+}
+
 void FEM_MUtil::addGhostElementRemote(FEM_Mesh *m, int chk, int elemType, int numGhostIndices, int *ghostIndices, int numSharedIndices, int *sharedIndices, int connSize) {
 
   int numNewGhostIndices = connSize - (numGhostIndices + numSharedIndices);
@@ -431,6 +453,8 @@ void FEM_MUtil::removeGhostElementRemote(FEM_Mesh *m, int chk, int elementid, in
     for(int i=0; i<numGhostIndex; i++) {
       localIdx = lgrn[ghostIndices[i]];
       m->node.ghost->ghostRecv.removeNode(localIdx, chk); //do not delete ghost nodes
+      //FIXME: ensure that there are no other instances to this in the IDXL lists, before
+      //deleting this entry. Currently, remove node won't remove this, if this has connections
       FEM_remove_node_local(m, FEM_To_ghost_index(localIdx));
     }
   }
@@ -663,7 +687,9 @@ void FEM_MUtil::StructureTest(FEM_Mesh *m) {
 	  break;
 	}
       }
-      CkAssert(done);
+      if(!done) {
+	CkPrintf("WARNING: isolated local node %d, with no local element connectivity\n",i);
+      }
 
       //ensure that there is a cloud of connectivity, no disconnected elements, other than boundaries
       int testnode = i;
@@ -698,7 +724,8 @@ void FEM_MUtil::StructureTest(FEM_Mesh *m) {
 	}
 	if(numdeadends>=2 && numunused!=0) {
 	  FEM_Print_coords(m,i);
-	  CkAssert(false);
+	  CkPrintf("WARNING: local element connectivity of %d is discontinuous\n",i);
+	  //CkAssert(false);
 	}
       }
       delete [] n2e;
