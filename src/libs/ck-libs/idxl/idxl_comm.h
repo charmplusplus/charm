@@ -183,7 +183,7 @@ public:
 	  int local = findLocalList(sharedWithChk);
 	  for(int i=0; i<comm[local]->size(); i++) {
 	    if((*comm[local])[i] == localNo) {
-	      //(*comm[local])[i] = -1; //amounts to removing this element from this list for this chunk
+	      (*comm[local])[i] = -1; //amounts to removing this element from this list for this chunk
 	    }
 	  }
 	  flushMap();
