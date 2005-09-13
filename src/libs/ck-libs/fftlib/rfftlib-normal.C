@@ -287,10 +287,10 @@ void NormalRealSlabArray::setup(NormalFFTinfo &info,
 				CProxy_NormalRealSlabArray dest, 
 				bool useCommlib, ComlibInstanceHandle inst)
 {
-    SlabArrayInfo slabinfo;
-    slabinfo.info = info;
-    slabinfo.count = 0;
-    infoVec.insert(infoVec.size(), &slabinfo);
+    SlabArrayInfo *slabinfo=new SlabArrayInfo;
+    slabinfo->info = info;
+    slabinfo->count = 0;
+    infoVec.insert(infoVec.size(), slabinfo);
 
     srcProxy = src;
     destProxy = dest;
