@@ -96,7 +96,7 @@ void CmiOutOfMemoryInit(void) {
     else len=i+1; /* this allocation worked */
   }
   /* we now own all the memory-- release all but the last meg. */
-  //printf("CMK_MEMORY_PREALLOCATE_HACK claimed %d megs\n",len);
+  /* printf("CMK_MEMORY_PREALLOCATE_HACK claimed %d megs\n",len); */
   for (i=len-2;i>=0;i--) {
     mm_free(ptrs[i]);
   }
