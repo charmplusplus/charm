@@ -273,6 +273,7 @@ class femMeshModify : public CBase_femMeshModify {
   FEM_lock *fmLock;
   CkVec<FEM_lockN *> fmLockN;
   //CkVec<FEM_lockN *> *fmgLockN;
+  CkVec<bool> fmIdxlLock; //each chunk has (n-1)*5 idxl lists, but just (n-1) locks, only one other chunk will try to lock it. The default value is 0, which means that none of the idxl lists are locked by the nbr, otherwise depending on the value 1,2,3,4,5 various idxl lists are locked
   FEM_MUtil *fmUtil;
   FEM_Interpolate *fmInp;
   FEM_Adapt *fmAdapt;
@@ -328,6 +329,13 @@ class femMeshModify : public CBase_femMeshModify {
   void updateNodeAttrs(int fromChk, int sharedIdx, double coordX, double coordY, int bound);
   double2Msg *getRemoteCoord(int fromChk, int ghostIdx);
   intMsg *getRemoteBound(int fromChk, int ghostIdx);
+
+  intMsg *getIdxGhostSend(int fromChk, int idxshared, int toChk);
+  void updateIdxlList(int fromChk, int idxTrans, int transChk);
+  void verifyIdxlList(int fromChk, int size, int type);
+
+  void idxllockRemote(int fromChk, int type);
+  void idxlunlockRemote(int fromChk, int type);
 };
 
 

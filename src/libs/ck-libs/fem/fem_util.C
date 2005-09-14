@@ -149,6 +149,7 @@ void FEM_MUtil::splitEntityAll(FEM_Mesh *m, int localIdx, int nBetween, int *bet
     }
 
     if (w == nBetween) {//The new node is shared with chk
+      idxllock(m,chk,0);
       c->addNode(localIdx,chk); //add in the shared entry of this chunk
 
       //generate the shared node numbers with chk from the local indices
@@ -169,6 +170,7 @@ void FEM_MUtil::splitEntityAll(FEM_Mesh *m, int localIdx, int nBetween, int *bet
 	fm->between[j] = sharedIndices[j];
       }
       meshMod[chk].addSharedNodeRemote(fm);
+      idxlunlock(m,chk,0);
       free(sharedIndices);
       //break;
     }
@@ -204,12 +206,25 @@ void FEM_MUtil::removeNodeAll(FEM_Mesh *m, int localIdx)
 {
   IDXL_Side *c = &(m->node.shared);
   const IDXL_Rec *tween = c->getRec(localIdx);
-  for(int i=0; i<tween->getShared(); i++) {
-    removeSharedNodeMsg *fm = new removeSharedNodeMsg;
-    fm->chk = mmod->idx;
-    fm->index = tween->getIdx(i);
-    meshMod[tween->getChk(i)].removeSharedNodeRemote(fm);
-  }  
+  int size = 0;
+  if(tween) 
+    size = tween->getShared();
+  if(size>0) {
+    int *schunks = (int*)malloc(size*sizeof(int));
+    int *sidx = (int*)malloc(size*sizeof(int));
+    for(int i=0; i<size; i++) {
+      schunks[i] = tween->getChk(i);
+      sidx[i] = tween->getIdx(i);
+    }
+    for(int i=0; i<size; i++) {
+      removeSharedNodeMsg *fm = new removeSharedNodeMsg;
+      fm->chk = mmod->idx;
+      fm->index = sidx[i];
+      meshMod[schunks[i]].removeSharedNodeRemote(fm);
+    }
+    free(schunks);
+    free(sidx);
+  }
   //remove it from this chunk
   FEM_remove_node_local(m,localIdx);
   return;
@@ -444,6 +459,10 @@ void FEM_MUtil::removeGhostElementRemote(FEM_Mesh *m, int chk, int elementid, in
   
   const IDXL_List lgre = m->elem[elemtype].ghost->ghostRecv.getList(chk);
   localIdx = lgre[elementid];
+  if(localIdx == -1) {
+    CkPrintf("Ghost element at shared index %d, already removed\n",elementid);
+    return;
+  }
   m->elem[elemtype].ghost->ghostRecv.removeNode(localIdx, chk); 
   FEM_remove_element_local(m, FEM_To_ghost_index(localIdx), elemtype);
 
@@ -607,6 +626,8 @@ void FEM_MUtil::addToSharedList(FEM_Mesh *m, int fromChk, int sharedIdx) {
       //if it exists in the ghostsend list already
       int exists = mmod->fmUtil->exists_in_IDXL(m, enbrs[i], fromChk, 3);
       if(exists == -1) {
+	idxllock(m, fromChk, 1);
+	idxllock(m, fromChk, 3);
 	m->elem[elemType].ghostSend.addNode(enbrs[i], fromChk);
 	//ghost nodes should be added only if they were not already present as ghosts on that chunk.
 	int numNodesToAdd = 0;
@@ -652,6 +673,8 @@ void FEM_MUtil::addToSharedList(FEM_Mesh *m, int fromChk, int sharedIdx) {
 	}
 	fm->connSize = connSize;
 	meshMod[fromChk].addGhostElem(fm); 
+	idxlunlock(m, fromChk, 1);
+	idxlunlock(m, fromChk, 3);
 	free(sharedGhosts);
 	free(sharedNodes);
 	free(nnbrs);
@@ -688,6 +711,8 @@ void FEM_MUtil::StructureTest(FEM_Mesh *m) {
 	}
       }
       if(!done) {
+	FEM_Print_coords(m,i);
+	FEM_Print_n2e(m,i);
 	CkPrintf("WARNING: isolated local node %d, with no local element connectivity\n",i);
       }
 
@@ -750,6 +775,55 @@ int FEM_MUtil::AreaTest(FEM_Mesh *m) {
   }
   delete [] con;
   return 1;
+}
+
+int FEM_MUtil::IdxlListTest(FEM_Mesh *m) {
+  for(int type=0; type <5; type++) {
+    int listsize = 0;
+    if(type==0) listsize = m->node.shared.size();
+    else if(type==1) listsize = m->node.ghostSend.size();
+    else if(type==2) listsize = m->node.ghost->ghostRecv.size();
+    else if(type==3) listsize = m->elem[0].ghostSend.size();
+    else if(type==4) listsize = m->elem[0].ghost->ghostRecv.size();
+    
+    for(int i=0; i<listsize; i++) {
+      IDXL_List il;
+      if(type==0) il = m->node.shared.getLocalList(i);
+      else if(type==1) il = m->node.ghostSend.getLocalList(i);
+      else if(type==2) il = m->node.ghost->ghostRecv.getLocalList(i);
+      else if(type==3) il = m->elem[0].ghostSend.getLocalList(i);
+      else if(type==4) il = m->elem[0].ghost->ghostRecv.getLocalList(i);
+      int shck = il.getDest();
+      int size = il.size();
+      //verify that chunk 'shck' also has an idxl list with me of 'size'
+      meshMod[shck].verifyIdxlList(idx,size,type);
+      //verify that all entries are positive
+      for(int j=0; j<size; j++) {
+	CkAssert(il[j] >= -1);
+      }
+    }
+  }
+  
+  return 1;
+}
+
+void FEM_MUtil::verifyIdxlListRemote(FEM_Mesh *m, int fromChk, int fsize, int type) {
+  IDXL_Side is;
+
+  IDXL_List il;
+  if(type==0) il = m->node.shared.getList(fromChk);
+  else if(type==1) il = m->node.ghost->ghostRecv.getList(fromChk);
+  else if(type==2) il = m->node.ghostSend.getList(fromChk);
+  else if(type==3) il = m->elem[0].ghost->ghostRecv.getList(fromChk);
+  else if(type==4) il = m->elem[0].ghostSend.getList(fromChk);
+  int size = il.size();
+  CkAssert(fsize == size);
+  //verify that all entries are positive
+  for(int j=0; j<size; j++) {
+    CkAssert(il[j] >= -1);
+  }
+  
+  return;
 }
 
 void FEM_MUtil::FEM_Print_n2n(FEM_Mesh *m, int nodeid){
@@ -823,5 +897,42 @@ void FEM_MUtil::FEM_Print_coords(FEM_Mesh *m, int nodeid) {
     }
   }
   CkPrintf("node %d (%f,%f) and boundary %d\n",nodeid,crds[0],crds[1],bound);
+}
+
+void FEM_MUtil::idxllock(FEM_Mesh *m, int chk, int type) {
+  if(idx < chk) {
+    idxllockLocal(m,chk,type);
+    meshMod[chk].idxllockRemote(idx,type);
+  } else {
+    meshMod[chk].idxllockRemote(idx,type);
+    idxllockLocal(m,chk,type);
+  }
+  return;
+}
+
+void FEM_MUtil::idxlunlock(FEM_Mesh *m, int chk, int type) {
+  if(idx < chk) {
+    meshMod[chk].idxlunlockRemote(idx,type);
+    idxlunlockLocal(m,chk,type);
+  } else {
+    idxlunlockLocal(m,chk,type);
+    meshMod[chk].idxlunlockRemote(idx,type);
+  }
+  return;
+}
+
+void FEM_MUtil::idxllockLocal(FEM_Mesh *m, int toChk, int type) {
+  while(mmod->fmIdxlLock[toChk*5 + type] == true) {
+    //block by looping,
+    CthYield();
+  }
+  mmod->fmIdxlLock[toChk*5 + type] = true;
+  return;
+}
+
+void FEM_MUtil::idxlunlockLocal(FEM_Mesh *m, int toChk, int type) {
+  CkAssert(mmod->fmIdxlLock[toChk*5 + type] == true);
+  mmod->fmIdxlLock[toChk*5 + type] = false;
+  return;
 }
 

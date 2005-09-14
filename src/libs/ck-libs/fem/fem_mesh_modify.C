@@ -162,9 +162,11 @@ int FEM_add_node(FEM_Mesh *m, int* adjacentNodes, int numAdjacentNodes, int chun
     am->chunkNo = chunkNo;
     am->upcall = upcall;
     intMsg *imsg = new intMsg(-1);
+    m->getfmMM()->getfmUtil()->idxllock(m,chunkNo,2);
     imsg = meshMod[chunkNo].addNodeRemote(am);
     int newghost = FEM_add_node_local(m,1);
     m->node.ghost->ghostRecv.addNode(newghost,chunkNo);
+    m->getfmMM()->getfmUtil()->idxlunlock(m,chunkNo,2);
     //this is the ghostsend index on that chunk, translate it from ghostrecv idxl table
     //return FEM_To_ghost_index(m->getfmMM()->getfmUtil()->lookup_in_IDXL(m,imsg->i,chunkNo,2));
     //rather this is same as
@@ -201,7 +203,7 @@ int FEM_add_node(FEM_Mesh *m, int* adjacentNodes, int numAdjacentNodes, int chun
     //entry in the IDXL will be correct
     //besides, do we have a basic operation, where two add_nodes are done within the same lock?
     //if so, we will have to ensure lock steps, to ensure correct idxl entries
-    if((sharedCount==numAdjacentNodes && numAdjacentNodes!=0)) {
+    if((sharedCount==numAdjacentNodes && numAdjacentNodes!=0) && forceShared!=-1 ) {
       m->getfmMM()->getfmUtil()->splitEntityAll(m, newNode, numAdjacentNodes, adjacentNodes, 0);
     }
   }
@@ -840,11 +842,13 @@ int FEM_add_element(FEM_Mesh *m, int* conn, int connSize, int elemType, int chun
 	  for(int j=0; j<numchunks; j++) {
 	    int chk = chunks1[j]->chk;
 	    if(chk==index) continue;
+	    m->getfmMM()->getfmUtil()->idxllock(m, chk, 0);
 	    m->node.shared.addNode(newN,chk);
 	    //find out what chk calls this node (from the ghostrecv idxl list)
 	    int idx = m->getfmMM()->getfmUtil()->exists_in_IDXL(m, conn[i],  chk, 2);
 	    m->node.ghost->ghostRecv.removeNode(FEM_To_ghost_index(conn[i]), chk);
 	    meshMod[chk].addToSharedList(index, idx); //when doing this add, make all idxl lists consistent, and return me the list of n2e connections for this node, which are local to this chunk, and also a list of the connectivity
+	    m->getfmMM()->getfmUtil()->idxlunlock(m, chk, 0);
 	  }
 	  nodetype[i] = 1;
 	  sharedcount++;
@@ -1006,6 +1010,8 @@ int FEM_add_element(FEM_Mesh *m, int* conn, int connSize, int elemType, int chun
       int chk = (*allChunks)[i];
       if(chk == index) continue; //it is this chunk
       //it is a new element so it could not have existed as a ghost on that chunk. Just add it.
+      m->getfmMM()->getfmUtil()->idxllock(m, chk, 3);
+      m->getfmMM()->getfmUtil()->idxllock(m, chk, 1);
       m->elem[elemType].ghostSend.addNode(newEl,chk);
       //ghost nodes should be added only if they were not already present as ghosts on that chunk.
       int numNodesToAdd = 0;
@@ -1019,7 +1025,30 @@ int FEM_add_element(FEM_Mesh *m, int* conn, int connSize, int elemType, int chun
 	  //node 'j' is a ghost on chunk 'i'
 	  int sharedGhost = m->getfmMM()->getfmUtil()->exists_in_IDXL(m,conn[j],chk,1);
 	  if( sharedGhost == -1) {
-	    //it is a new ghost
+	    //this might be a new ghost, figure out if any of the chunks sharing
+	    //this node has created this as a ghost on 'chk'
+	    const IDXL_Rec *irec = m->node.shared.getRec(conn[j]);
+	    if(irec) {
+	      int noShared = irec->getShared();
+	      for(int sharedck=0; sharedck<noShared; sharedck++) {
+		int ckshared = irec->getChk(sharedck);
+		int idxshared = irec->getIdx(sharedck);
+		if(ckshared == chk) continue;
+		CkAssert(chk!=index && chk!=ckshared && ckshared!=index);
+		int idxghostsend = meshMod[ckshared].getIdxGhostSend(index,idxshared,chk)->i;
+		if(idxghostsend != -1) {
+		  m->node.ghostSend.addNode(conn[j],chk);
+		  meshMod[chk].updateIdxlList(index,idxghostsend,ckshared);
+		  sharedGhost = m->getfmMM()->getfmUtil()->exists_in_IDXL(m,conn[j],chk,1);
+		  CkAssert(sharedGhost != -1);
+		  break; //found a chunk that sends it out, update my tables
+		}
+		//Chunk 'ckshared' does not send this to Chunk 'chk' as ghost
+	      }
+	    }
+	    //else it is a new ghost
+	  }
+	  if(sharedGhost == -1) {
 	    m->node.ghostSend.addNode(conn[j],chk);
 	    numNodesToAdd++;
 	  }
@@ -1048,6 +1077,8 @@ int FEM_add_element(FEM_Mesh *m, int* conn, int connSize, int elemType, int chun
       }
       fm->connSize = connSize;
       meshMod[chk].addGhostElem(fm); //newEl, m->fmMM->idx, elemType;
+      m->getfmMM()->getfmUtil()->idxlunlock(m, chk, 3);
+      m->getfmMM()->getfmUtil()->idxlunlock(m, chk, 1);
       free(sharedGhosts);
       free(sharedNodes);
     }
@@ -1315,6 +1346,9 @@ void femMeshModify::setFemMesh(FEMMeshMsg *fm) {
     for(int i=0; i<gsize; i++) {
     fmgLockN.push_back(new FEM_lockN(FEM_To_ghost_index(i),this));
     }*/
+  for(int i=0; i<numChunks*5; i++) {
+    fmIdxlLock.push_back(false);
+  }
   return;
 }
 
@@ -1490,6 +1524,54 @@ intMsg *femMeshModify::getRemoteBound(int fromChk, int ghostIdx) {
   FEM_Mesh_dataP(fmMesh, FEM_NODE, FEM_BOUNDARY, &bound, localIdx, 1, FEM_INT, 1);
   intMsg *d = new intMsg(bound);
   return d;
+}
+
+intMsg *femMeshModify::getIdxGhostSend(int fromChk, int idxshared, int toChk) {
+  int localIdx = fmUtil->lookup_in_IDXL(fmMesh, idxshared, fromChk, 0);
+  int idxghostsend = -1;
+  if(localIdx != -1) { 
+    const IDXL_Rec *irec = fmMesh->node.ghostSend.getRec(localIdx);
+    if(irec) {
+      for(int i=0; i<irec->getShared(); i++) {
+	if(irec->getChk(i) == toChk) {
+	  idxghostsend = fmUtil->exists_in_IDXL(fmMesh, localIdx, toChk, 1);
+	  break;
+	}
+      }
+    }
+  }
+  intMsg *d = new intMsg(idxghostsend);
+  return d;
+}
+
+void femMeshModify::updateIdxlList(int fromChk, int idxTrans, int transChk) {
+  int idxghostrecv = fmUtil->lookup_in_IDXL(fmMesh, idxTrans, transChk, 2);
+  CkAssert(idxghostrecv != -1);
+  fmMesh->node.ghost->ghostRecv.addNode(idxghostrecv,fromChk);
+  return;
+}
+
+void femMeshModify::verifyIdxlList(int fromChk, int size, int type) {
+  fmUtil->verifyIdxlListRemote(fmMesh, fromChk, size, type);
+  return;
+}
+
+void femMeshModify::idxllockRemote(int fromChk, int type) {
+  if(type==1) type = 2;
+  else if(type ==2) type = 1;
+  else if(type ==3) type = 4;
+  else if(type ==4) type = 3;
+  fmUtil->idxllockLocal(fmMesh, fromChk, type);
+  return;
+}
+
+void femMeshModify::idxlunlockRemote(int fromChk, int type) {
+  if(type==1) type = 2;
+  else if(type ==2) type = 1;
+  else if(type ==3) type = 4;
+  else if(type ==4) type = 3;
+  fmUtil->idxlunlockLocal(fmMesh, fromChk, type);
+  return;
 }
 
 #include "FEMMeshModify.def.h"

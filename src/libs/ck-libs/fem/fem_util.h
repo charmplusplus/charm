@@ -51,11 +51,19 @@ class FEM_MUtil {
   void addToSharedList(FEM_Mesh *m, int fromChk, int sharedIdx);
   void StructureTest(FEM_Mesh *m);
   int AreaTest(FEM_Mesh *m);
+  int IdxlListTest(FEM_Mesh *m);
+  void verifyIdxlListRemote(FEM_Mesh *m, int fromChk, int fsize, int type);
+
   void FEM_Print_n2n(FEM_Mesh *m, int nodeid);
   void FEM_Print_n2e(FEM_Mesh *m, int nodeid);
   void FEM_Print_e2n(FEM_Mesh *m, int eid);
   void FEM_Print_e2e(FEM_Mesh *m, int eid);
   void FEM_Print_coords(FEM_Mesh *m, int nodeid);
+
+  void idxllock(FEM_Mesh *m, int chk, int type);
+  void idxlunlock(FEM_Mesh *m, int chk, int type);
+  void idxllockLocal(FEM_Mesh *m, int toChk, int type);
+  void idxlunlockLocal(FEM_Mesh *m, int toChk, int type);
 };
 
 #endif

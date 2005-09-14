@@ -63,5 +63,10 @@ module FEMMeshModify {
     entry [sync,threaded] void updateNodeAttrs(int, int, double, double, int);
     entry [sync,threaded] double2Msg *getRemoteCoord(int, int);
     entry [sync,threaded] intMsg *getRemoteBound(int, int);
+    entry [sync,threaded] intMsg *getIdxGhostSend(int, int, int);
+    entry [sync,threaded] void updateIdxlList(int, int, int);
+    entry [sync,threaded] void verifyIdxlList(int, int, int);
+    entry [sync,threaded] void idxllockRemote(int, int);
+    entry [sync,threaded] void idxlunlockRemote(int, int);
   };
 };

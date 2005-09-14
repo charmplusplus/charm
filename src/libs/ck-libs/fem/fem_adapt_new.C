@@ -357,7 +357,11 @@ int FEM_Adapt::edge_bisect_help(int e1, int e2, int n1, int n2, int e1_n1,
   int *adjnodes = (int*)malloc(2*sizeof(int));
   adjnodes[0] = n1;
   adjnodes[1] = n2;
-  n5 = FEM_add_node(theMesh,adjnodes,2,n5chunk,0,0);
+  int forceshared = 0;
+  if(e1>=0 && e2>=0) {
+    forceshared = -1;
+  }
+  n5 = FEM_add_node(theMesh,adjnodes,2,n5chunk,forceshared,0);
 #ifdef DEBUG_2
   CkPrintf("Adjacencies after add node %d\n",n5);
   printAdjacencies(locknodes, numNodesNew, lockelems, numElemsNew);

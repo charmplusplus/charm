@@ -128,6 +128,7 @@ class FEM_Adapt_Algs {
   bool didItFlip(int n1, int n2, int n3, double *n4_coord);
   bool didItFlip(double *n1_coord, double *n2_coord, double *n3_coord, double *n4_coord);
   double getSignedArea(double *n1_coord, double *n2_coord, double *n3_coord);
+  void tests(void);
 };
 
 
