@@ -852,7 +852,7 @@ PairCalculator::acceptResult(acceptResultMsg *msg)
   if(S%grainSize!=0)
     segments+=1;
   int blocksize=grainSize/segments;
-  int priority=0xFFFFFFFF;
+  int priority=0x1;
   if(!symmetric&&!gspacesum){
     for(int segment=0;segment < segments;segment++)
       {
@@ -881,7 +881,7 @@ PairCalculator::acceptResult(acceptResultMsg *msg)
     //we have an N*grainsize block
     //we must communicate with all planes
     int offset=thisIndex.z;  //zero for now but should be considered
-    int priority=0xFFFFFFFF;
+    int priority=0x1;
     if(symmetric) //symmetric case has this other matrix to worry about
     if (thisIndex.y != thisIndex.x) //othernewdata
       { 
