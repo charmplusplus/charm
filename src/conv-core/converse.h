@@ -623,6 +623,8 @@ int      CmiTimerIsSynchronized();
 void  CmiPrintf(const char *, ...);
 void  CmiError(const char *, ...);
 int   CmiScanf(const char *, ...);
+/* CmiFlush is disabled in this case */
+#define CmiFlush(stream) 
 
 #else /* standard definitions */
 
@@ -639,6 +641,8 @@ int   CmiScanf(const char *, ...);
 
 void  CmiPrintf(const char *format, ...);
 void  CmiError(const char *format, ...);
+/* CmiFlush works only when CMK_CMIPRINTF_IS_A_BUILTIN is false */
+#define CmiFlush(stream)  fflush(stream);
 #define CmiScanf  scanf
 
 #endif

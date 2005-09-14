@@ -129,6 +129,16 @@ CpvDeclare(int,BlocksAllocated);
 
 #define MAX_HANDLERS 512
 
+#if ! CMK_CMIPRINTF_IS_A_BUILTIN
+CpvDeclare(int,expIOFlushFlag);
+#if CMI_IO_BUFFER_EXPLICIT
+/* 250k not too large depending on how slow terminal IO is */
+#define DEFAULT_IO_BUFFER_SIZE 250000
+CpvDeclare(char*,explicitIOBuffer);
+CpvDeclare(int,expIOBufferSize);
+#endif
+#endif
+
 #if CMK_NODE_QUEUE_AVAILABLE
 void  *CmiGetNonLocalNodeQ();
 #endif
@@ -2225,6 +2235,7 @@ static void CIdleTimeoutInit(char **argv)
 
 extern void CrnInit(void);
 extern void CmiIsomallocInit(char **argv);
+void CmiIOInit(char **argv);
 
 static void CmiProcessPriority(char **argv)
 {
@@ -2329,6 +2340,9 @@ void ConverseCommonInit(char **argv)
 {
   CmiArgInit(argv);
   CmiMemoryInit(argv);
+#if ! CMK_CMIPRINTF_IS_A_BUILTIN
+  CmiIOInit(argv);
+#endif
 #if CONVERSE_POOL
   CmiPoolAllocInit(30);  
 #endif
@@ -2379,6 +2393,51 @@ void ConverseCommonExit(void)
 /*closeTraceCore();*/ /* projector */
 #endif
 
+#if CMI_IO_BUFFER_EXPLICIT
+  CmiFlush(stdout);  /* end of program, always flush */
+#endif
+}
+
+/****
+ * CW Lee - 9/14/2005
+ * Added a mechanism to allow some control over machines with extremely
+ * inefficient terminal IO mechanisms. Case in point: the XT3 has a
+ * 20ms flush overhead along with about 25MB/s bandwidth for IO. This,
+ * coupled with a default setup using unbuffered stdout introduced
+ * severe overheads (and hence limiting scaling) for applications like 
+ * NAMD.
+ */
+void CmiIOInit(char **argv) {
+  CpvInitialize(int, expIOFlushFlag);
+#if CMI_IO_BUFFER_EXPLICIT
+  /* 
+     Support for an explicit buffer only makes sense if the machine
+     layer does not wish to make its own implementation.
+
+     Placing this after CmiMemoryInit() means that CmiMemoryInit()
+     MUST NOT make use of stdout if an explicit buffer is requested.
+
+     The setvbuf function may only be used after opening a stream and
+     before any other operations have been performed on it
+  */
+  CpvInitialize(char*, explicitIOBuffer);
+  CpvInitialize(int, expIOBufferSize);
+  if (!CmiGetArgIntDesc(argv,"+io_buffer_size", &CpvAccess(expIOBufferSize),
+			"Explicit IO Buffer Size")) {
+    CpvAccess(expIOBufferSize) = DEFAULT_IO_BUFFER_SIZE;
+  }
+  if (CpvAccess(expIOBufferSize) <= 0) {
+    CpvAccess(expIOBufferSize) = DEFAULT_IO_BUFFER_SIZE;
+  }
+  CpvAccess(explicitIOBuffer) = (char*)CmiAlloc(CpvAccess(expIOBufferSize)*
+						sizeof(char*));
+  if (setvbuf(stdout, CpvAccess(explicitIOBuffer), _IOFBF, 
+	      CpvAccess(expIOBufferSize))) {
+    CmiAbort("Explicit IO Buffering failed\n");
+  }
+#endif
+  CpvAccess(expIOFlushFlag) = CmiGetArgFlagDesc(argv,"+io_flush_explicit",
+						"Explicit IO Flush Request");
 }
 
 #if ! CMK_CMIPRINTF_IS_A_BUILTIN
@@ -2387,8 +2446,13 @@ void CmiPrintf(const char *format, ...)
 {
   va_list args;
   va_start(args,format);
-  vprintf(format, args);
-  fflush(stdout);
+  vfprintf(stdout,format, args);
+#if ! CMI_IO_FLUSH_EXPLICIT
+  /* even if the system flushes implicitly, the user can override */
+  if (!CpvAccess(expIOFlushFlag)) {
+    CmiFlush(stdout);
+  }
+#endif
   va_end(args);
 }
 
@@ -2397,7 +2461,7 @@ void CmiError(const char *format, ...)
   va_list args;
   va_start(args,format);
   vfprintf(stderr,format, args);
-  fflush(stderr);
+  CmiFlush(stderr);  /* stderr is always flushed */
   va_end(args);
 }
 
