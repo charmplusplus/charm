@@ -8,6 +8,8 @@
 #ifndef _CONV_MACH_H
 #define _CONV_MACH_H
 
+#define XT3_ONLY_PCQUEUE_WORKAROUND                        1
+
 #define CMK_CONVERSE_MPI                                   1
 
 #define CMK_MEMORY_PREALLOCATE_HACK			   1

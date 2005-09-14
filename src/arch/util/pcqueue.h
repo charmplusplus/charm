@@ -116,7 +116,11 @@ char *PCQueuePop(PCQueue Q)
     circ = Q->head;
     pull = circ->pull;
     data = circ->data[pull];
+#ifdef XT3_ONLY_PCQUEUE_WORKAROUND
+    if (data && (Q->len > 0)) {
+#else
     if (data) {
+#endif
       circ->pull = (pull + 1);
       circ->data[pull] = 0;
       if (pull == PCQueueSize - 1) { /* just pulled the data from the last slot
