@@ -2235,7 +2235,9 @@ static void CIdleTimeoutInit(char **argv)
 
 extern void CrnInit(void);
 extern void CmiIsomallocInit(char **argv);
+#if ! CMK_CMIPRINTF_IS_A_BUILTIN
 void CmiIOInit(char **argv);
+#endif
 
 static void CmiProcessPriority(char **argv)
 {
@@ -2407,6 +2409,7 @@ void ConverseCommonExit(void)
  * severe overheads (and hence limiting scaling) for applications like 
  * NAMD.
  */
+#if ! CMK_CMIPRINTF_IS_A_BUILTIN
 void CmiIOInit(char **argv) {
   CpvInitialize(int, expIOFlushFlag);
 #if CMI_IO_BUFFER_EXPLICIT
@@ -2439,6 +2442,7 @@ void CmiIOInit(char **argv) {
   CpvAccess(expIOFlushFlag) = CmiGetArgFlagDesc(argv,"+io_flush_explicit",
 						"Explicit IO Flush Request");
 }
+#endif
 
 #if ! CMK_CMIPRINTF_IS_A_BUILTIN
 
