@@ -36,7 +36,6 @@ class FEM_Adapt_Algs {
   //FEM_Adapt *theAdaptor;
   FEM_AdaptL *theAdaptor;
   int numNodes, numElements, dim;
-  double *regional_sizes;
   int coord_attr;
   int bc_attr;
   // These are for element sorting

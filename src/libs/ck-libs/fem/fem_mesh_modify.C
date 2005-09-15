@@ -722,6 +722,7 @@ void update_new_element_e2e(FEM_Mesh *m, int newEl, int elemType){
 int FEM_add_element_local(FEM_Mesh *m, const int *conn, int connSize, int elemType, int addGhost){
   // lengthen element attributes
   int newEl;
+  CmiMemoryCheck();
   if(addGhost){
     int oldLength = m->elem[elemType].getGhost()->size();
     m->elem[elemType].getGhost()->setLength(oldLength+1);
@@ -737,6 +738,7 @@ int FEM_add_element_local(FEM_Mesh *m, const int *conn, int connSize, int elemTy
     m->elem[elemType].connIs(newEl,conn);  // update element's conn, i.e. e2n table
   }
   
+  CmiMemoryCheck();
   // add to corresponding inverse, the n2e and n2n table
   for(int i=0;i<connSize;i++){
     m->n2e_add(conn[i],newEl);
@@ -756,6 +758,7 @@ int FEM_add_element_local(FEM_Mesh *m, const int *conn, int connSize, int elemTy
   m->e2e_getAll(newEl, adjes, 0);
   CkAssert(!((adjes[0]==adjes[1] && adjes[0]!=-1) || (adjes[1]==adjes[2] && adjes[1]!=-1) || (adjes[2]==adjes[0] && adjes[2]!=-1)));
   delete[] adjes;
+  CmiMemoryCheck();
   return newEl;
 }
 

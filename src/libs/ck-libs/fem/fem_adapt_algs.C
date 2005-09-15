@@ -40,19 +40,21 @@ void FEM_Adapt_Algs::FEM_Refine(int qm, int method, double factor,
 int FEM_Adapt_Algs::Refine(int qm, int method, double factor, double *sizes)
 {
   // loop through elemsToRefine
-  int elId, mods=0, iter_mods=1, orig_elems = -1;
+  int elId, mods=0, iter_mods=1;
   SetMeshSize(method, factor, sizes);
+  refineElements = refineStack = NULL;
+  refineTop = refineHeapSize = 0;
+  CmiMemoryCheck();
   while (iter_mods != 0) {
     iter_mods=0;
     numNodes = theMesh->node.size();
     numElements = theMesh->elem[0].size();
-    if (orig_elems == -1) orig_elems = numElements;
     // sort elements to be refined by quality into elemsToRefine
     if (refineStack) delete [] refineStack;
     refineStack = new elemHeap[numElements];
     if (refineElements) delete [] refineElements;
     refineElements = new elemHeap[numElements+1];
-    for (int i=0; i<orig_elems; i++) { 
+    for (int i=0; i<numElements; i++) { 
       if (theMesh->elem[0].is_valid(i)) {
 	// find maxEdgeLength of i
 	int *eConn = (int*)malloc(3*sizeof(int));
@@ -63,7 +65,8 @@ int FEM_Adapt_Algs::Refine(int qm, int method, double factor, double *sizes)
 	if (tmpLen > maxEdgeLength) maxEdgeLength = tmpLen;
 	tmpLen = length(eConn[2], eConn[0]);
 	if (tmpLen > maxEdgeLength) maxEdgeLength = tmpLen;
-	if (maxEdgeLength > (regional_sizes[i]*REFINE_TOL)) {
+	if ((theMesh->elem[0].getMeshSizing(i) > 0.0) &&
+	    (maxEdgeLength > (theMesh->elem[0].getMeshSizing(i)*REFINE_TOL))) {
 	  double qFactor=getAreaQuality(i);
 	  Insert(i, qFactor, 0);
 	}
@@ -77,6 +80,7 @@ int FEM_Adapt_Algs::Refine(int qm, int method, double factor, double *sizes)
       else  elId=Delete_Min(0);
       if ((elId != -1) && (theMesh->elem[0].is_valid(elId))) {
 	(void)refine_element_leb(elId); // refine the element
+	CmiMemoryCheck();
 	iter_mods++;
       }
       CthYield(); // give other chunks on the same PE a chance
@@ -85,6 +89,7 @@ int FEM_Adapt_Algs::Refine(int qm, int method, double factor, double *sizes)
     CkPrintf("Refine: %d modifications in last pass.\n", iter_mods);
   }
   CkPrintf("Refine: %d total modifications.\n", mods);
+  CmiMemoryCheck();
   return mods;
 }
 
@@ -132,19 +137,14 @@ void FEM_Adapt_Algs::FEM_Remesh(int qm, int method, double factor,
 void FEM_Adapt_Algs::SetMeshSize(int method, double factor, double *sizes)
 {
   if (method == 0) {
-    regional_sizes = (double *)malloc(numElements*sizeof(double));
     for (int i=0; i<numElements; i++) {
-      regional_sizes[i] = factor;
+      theMesh->elem[0].setMeshSizing(i, factor);
     }
   }
   else if (method == 1) {
-    regional_sizes = (double *)malloc(numElements*sizeof(double));
-    for (int i=0; i<numElements; i++) {
-      regional_sizes[i] = sizes[i];
-    }
+    theMesh->elem[0].setMeshSizing(sizes);
   }
   else if (method == 2) {
-    regional_sizes = (double *)malloc(numElements*sizeof(double));
     double avgEdgeLength = 0.0;
     for (int i=0; i<numElements; i++) {
       int eConn[4];
@@ -159,7 +159,7 @@ void FEM_Adapt_Algs::SetMeshSize(int method, double factor, double *sizes)
       else {
 	avgEdgeLength /= 3.0;
       }
-      regional_sizes[i] = factor * avgEdgeLength;
+      theMesh->elem[0].setMeshSizing(i, factor*avgEdgeLength);
     }
   }
 }
@@ -317,6 +317,8 @@ int FEM_Adapt_Algs::refine_element_leb(int e) {
     return -1;
   }
 
+  CmiMemoryCheck();
+
   theMesh->e2n_getAll(e, eConn);
   eLens[0] = length(eConn[0], eConn[1]);
   eLens[1] = length(eConn[1], eConn[2]);
@@ -331,6 +333,9 @@ int FEM_Adapt_Algs::refine_element_leb(int e) {
     }
   }
   free(eConn);
+
+  CmiMemoryCheck();
+
   nbr = theMesh->e2e_getNbr(e, longEdge);
   if (nbr == -1) // e's longEdge is on physical boundary
     return theAdaptor->edge_bisect(fixNode, otherNode);
@@ -350,6 +355,7 @@ int FEM_Adapt_Algs::refine_element_leb(int e) {
       propElem = theAdaptor->findElementWithNodes(newNode,otherNode,nbrOpNode);
       propNode = otherNode;
     }
+    CmiMemoryCheck();
 
     //if propElem is ghost, then it's propagating to neighbor, otherwise not
     if(!FEM_Is_ghost_index(propElem)) {
@@ -366,6 +372,7 @@ int FEM_Adapt_Algs::refine_element_leb(int e) {
       int propElemT = theAdaptor->getGhostElementIdxl(propElem, nbrChk);
       meshMod[nbrChk].refine_flip_element_leb(localChk, propElemT, propNodeT, newNodeT,nbrOpNodeT,nbrghost,longEdgeLen);
     }
+    CmiMemoryCheck();
     return newNode;
   }
   else return theAdaptor->edge_bisect(fixNode, otherNode); // longEdge on nbr
@@ -381,6 +388,7 @@ void FEM_Adapt_Algs::refine_flip_element_leb(int e, int p, int n1, int n2,
     int newElem = theAdaptor->findElementWithNodes(newNode, n1, p);
     refine_flip_element_leb(newElem, p, n1, newNode, le);
   }
+  CmiMemoryCheck();
 }
 // ========================  END refine_element_leb ========================
 

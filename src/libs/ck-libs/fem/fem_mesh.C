@@ -474,6 +474,7 @@ CDECL const char *FEM_Get_attr_name(int attr,char *storage)
 	case FEM_ELEM_ELEM_ADJACENCY: return "FEM_ELEM_ELEM_ADJACENCY";
 	case FEM_ELEM_ELEM_ADJ_TYPES: return "FEM_ELEM_ELEM_ADJ_TYPES";
 	case FEM_IS_VALID: return "FEM_IS_VALID";
+	case FEM_MESH_SIZING: return "FEM_MESH_SIZING";
 
 	default: break;
 	};
@@ -1028,7 +1029,7 @@ CDECL const char *FEM_Get_entity_name(int entity,char *storage)
 }
 
 FEM_Entity::FEM_Entity(FEM_Entity *ghost_) //Default constructor
-	:length(0), max(0),ghost(ghost_), coord(0), sym(0), globalno(0), valid(0),
+  :length(0), max(0),ghost(ghost_), coord(0), sym(0), globalno(0), valid(0), meshSizing(0),
 	 ghostIDXL(ghost?&ghostSend:NULL, ghost?&ghost->ghostRecv:NULL),resize(NULL)
 {
 	//No attributes initially
@@ -1100,36 +1101,39 @@ void FEM_Entity::copyShape(const FEM_Entity &src) {
 	if (ghost) ghost->copyShape(*src.ghost);
 }
 
-void FEM_Entity::setLength(int newlen) {
-	if(!resize){
-		if (size()!=newlen) {
-			length=newlen;
-			// Each of our attributes need to be expanded for our new length:
-			for (int a=0;a<attributes.size();a++)
-				attributes[a]->reallocate();
-		}
-	}else{
-		length = newlen;
-		if(length > max){
-			if(max > 4){
-				max = max + (max >> 2);
-			}else{
-				max = max +10;
-			}
-			
-			for (int a=0;a<attributes.size();a++){
-				int code = attributes[a]->getAttr();
-				if(!(code <= FEM_ATTRIB_TAG_MAX || code == FEM_CONN || code == FEM_BOUNDARY)){
-					attributes[a]->reallocate();
-				}
-			}	
-			//		call resize with args max n;
-			CkPrintf("Resize called \n");
-			resize(args,&length,&max);
-		}
+void FEM_Entity::setLength(int newlen) 
+{
+  if (!resize) {
+    if (size() != newlen) {
+      length = newlen;
+      // Each of our attributes need to be expanded for our new length:
+      for (int a=0; a<attributes.size(); a++) {
+	CkAssert(attributes[a]->getWidth() < 1000);
+	attributes[a]->reallocate();
+      }
+    }
+  }
+  else {
+    length = newlen;
+    if (length > max) {
+      if (max > 4) {
+	max = max + (max >> 2);
+      }
+      else {
+	max = max + 10;
+      }
+      for (int a=0;a<attributes.size();a++){
+	int code = attributes[a]->getAttr();
+	if(!(code <= FEM_ATTRIB_TAG_MAX || code == FEM_CONN || code == FEM_BOUNDARY)){
+	  attributes[a]->reallocate();
 	}
+      }	
+      // call resize with args max n;
+      CkPrintf("Resize called \n");
+      resize(args,&length,&max);
+    }
+  }
 }
-
 
 void FEM_Entity::allocateValid(void) {
   if (!valid){
@@ -1244,6 +1248,8 @@ void FEM_Entity::create(int attr,const char *caller) {
 	allocateGlobalno();
   else if (attr==FEM_IS_VALID)
 	allocateValid();
+  else if (attr==FEM_MESH_SIZING) 
+	allocateMeshSizing();
   else if(attr == FEM_CHUNK){
 	FEM_IndexAttribute *chunkNo= new FEM_IndexAttribute(this,FEM_CHUNK,NULL);
 	add(chunkNo);
@@ -1332,9 +1338,17 @@ void FEM_Entity::allocateMeshSizing(void) {
   if (meshSizing) 
     CkAbort("FEM_Entity::allocateMeshSizing called, but already allocated");
   meshSizing=new FEM_DataAttribute(this,FEM_MESH_SIZING);
-  add(meshSizing); // globalno will be deleted via attributes list now
+  add(meshSizing); // meshSizing will be deleted via attributes list now
   meshSizing->setWidth(1);
   meshSizing->setDatatype(FEM_DOUBLE);
+}
+
+double FEM_Entity::getMeshSizing(int r) {
+  if (!meshSizing) {
+    allocateMeshSizing();
+    return -1.0;
+  }
+  return meshSizing->getDouble()(r,0);
 }
 
 void FEM_Entity::setMeshSizing(int r,double s)

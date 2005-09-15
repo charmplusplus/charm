@@ -801,10 +801,7 @@ protected:
 
 	// Mesh sizing array access
 	bool hasMeshSizing(void) const {return meshSizing!=0;}
-	double getMeshSizing(int r) const {
-	  if (meshSizing==0) return -1; // Unknown mesh sizing
-	  return meshSizing->getDouble()(r,0);
-	}
+	double getMeshSizing(int r); 
 	void setMeshSizing(int r,double s);
 	void setMeshSizing(double *sf);
 	

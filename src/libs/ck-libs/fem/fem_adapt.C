@@ -87,12 +87,14 @@ int FEM_Adapt::edge_bisect_help(int e1, int e2, int n1, int n2, int e1_n1,
 {
   int n5 = newNode();
   int e3 = newElement();
+  theMesh->setMeshSizing(e3, getMeshSizing(e1));
   localEdgeBisect(n1, n2, e1, e2, e3, e1_n1, e1_n2, e1_n3, e1nbr, n3, n5);
 
   if (e2 != -1) {
     int e2_n1, e2_n2, e2_n3, n4, edge2, e2nbr;
     findAdjData(n1, n2, e2, &e2_n1, &e2_n2, &e2_n3, &n4, &edge2, &e2nbr);
     int e4 = newElement();
+    theMesh->setMeshSizing(e4, getMeshSizing(e2));
     localEdgeBisect(n1, n2, e2, e1, e4, e2_n1, e2_n2, e2_n3, e2nbr, n4, n5);
     theMesh->n2n_remove(n5, n1);
     theMesh->n2n_remove(n5, n2);
