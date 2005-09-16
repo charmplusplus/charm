@@ -284,7 +284,6 @@ void FEM_MUtil::removeGhostNodeRemote(FEM_Mesh *m, int fromChk, int sharedIdx) {
 }
 
 void FEM_MUtil::addGhostElementRemote(FEM_Mesh *m, int chk, int elemType, int numGhostIndices, int *ghostIndices, int numSharedIndices, int *sharedIndices, int connSize) {
-
   int numNewGhostIndices = connSize - (numGhostIndices + numSharedIndices);
   int *conn = (int *)malloc(connSize*sizeof(int));
   for(int i=0; i<numNewGhostIndices; i++) {
@@ -292,19 +291,16 @@ void FEM_MUtil::addGhostElementRemote(FEM_Mesh *m, int chk, int elemType, int nu
     m->node.ghost->ghostRecv.addNode(newGhostNode,chk);
     conn[i] = FEM_To_ghost_index(newGhostNode);
   }
-
   //convert existing remote ghost indices to local ghost indices 
   const IDXL_List ll1 = m->node.ghost->ghostRecv.getList(chk);
   for(int i=0; i<numGhostIndices; i++) {
     conn[i+numNewGhostIndices] = FEM_To_ghost_index(ll1[ghostIndices[i]]);
   }
-
   //convert sharedIndices to localIndices
   const IDXL_List ll2 = m->node.shared.getList(chk);
   for(int i=0; i<numSharedIndices; i++) {
     conn[i+numNewGhostIndices+numGhostIndices] = ll2[sharedIndices[i]];
   }
-
   int newGhostElement = FEM_add_element_local(m, conn, connSize, elemType, 1);
   m->elem[elemType].ghost->ghostRecv.addNode(FEM_To_ghost_index(newGhostElement),chk);
   free(conn);

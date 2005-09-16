@@ -722,7 +722,6 @@ void update_new_element_e2e(FEM_Mesh *m, int newEl, int elemType){
 int FEM_add_element_local(FEM_Mesh *m, const int *conn, int connSize, int elemType, int addGhost){
   // lengthen element attributes
   int newEl;
-  CmiMemoryCheck();
   if(addGhost){
     int oldLength = m->elem[elemType].getGhost()->size();
     m->elem[elemType].getGhost()->setLength(oldLength+1);
@@ -738,7 +737,6 @@ int FEM_add_element_local(FEM_Mesh *m, const int *conn, int connSize, int elemTy
     m->elem[elemType].connIs(newEl,conn);  // update element's conn, i.e. e2n table
   }
   
-  CmiMemoryCheck();
   // add to corresponding inverse, the n2e and n2n table
   for(int i=0;i<connSize;i++){
     m->n2e_add(conn[i],newEl);
@@ -758,7 +756,6 @@ int FEM_add_element_local(FEM_Mesh *m, const int *conn, int connSize, int elemTy
   m->e2e_getAll(newEl, adjes, 0);
   CkAssert(!((adjes[0]==adjes[1] && adjes[0]!=-1) || (adjes[1]==adjes[2] && adjes[1]!=-1) || (adjes[2]==adjes[0] && adjes[2]!=-1)));
   delete[] adjes;
-  CmiMemoryCheck();
   return newEl;
 }
 
@@ -786,7 +783,6 @@ int FEM_add_element(FEM_Mesh *m, int* conn, int connSize, int elemType, int chun
     }
   }
   localcount = connSize - (sharedcount + ghostcount);
-
   if(sharedcount==0 && ghostcount==0){// add a local elem with all local nodes
     newEl = FEM_add_element_local(m,conn,connSize,elemType,0);
     //no modifications required for ghostsend or ghostrecv of nodes or elements
@@ -837,10 +833,8 @@ int FEM_add_element(FEM_Mesh *m, int* conn, int connSize, int elemType, int chun
 	  int numchunks;
 	  IDXL_Share **chunks1;
 	  m->getfmMM()->getfmUtil()->getChunkNos(0,conn[i],&numchunks,&chunks1);
-
 	  //add a new node with the same attributes as this ghost node, do not remove the ghost node yet
 	  int newN = m->getfmMM()->getfmUtil()->Replace_node_local(m, conn[i], -1);
-
 	  //add index to the shared list of this node on all the chunks
 	  for(int j=0; j<numchunks; j++) {
 	    int chk = chunks1[j]->chk;
@@ -882,7 +876,6 @@ int FEM_add_element(FEM_Mesh *m, int* conn, int connSize, int elemType, int chun
       CkVec<int> *allChunks;
       int **sharedConn; 
       m->getfmMM()->getfmUtil()->buildChunkToNodeTable(nodetype, sharedcount, ghostcount, localcount, conn, connSize, &allShared, &numSharedChunks, &allChunks, &sharedConn);   
-      
       //we are looking for a chunk which does not have a ghost node
       int remoteChunk = -1;
       for(int i=0; i<numSharedChunks; i++) {
@@ -919,7 +912,6 @@ int FEM_add_element(FEM_Mesh *m, int* conn, int connSize, int elemType, int chun
 	  CkAssert(false);
 	}
       }
-      
       remoteChunk = (*allChunks)[remoteChunk];
       //convert all connections to the shared IDXL indices. We should also tell which are ghost indices
       int numGhostNodes = 0;
@@ -992,7 +984,6 @@ int FEM_add_element(FEM_Mesh *m, int* conn, int connSize, int elemType, int chun
     //bogus case
   }
 
-
   if(buildGhosts==1) {
     //   make this element ghost on all others, updating all IDXL's
     //   also in same remote entry method, update adjacencies on all others
@@ -1007,7 +998,6 @@ int FEM_add_element(FEM_Mesh *m, int* conn, int connSize, int elemType, int chun
     CkVec<int> *allChunks;
     int **sharedConn; 
     m->getfmMM()->getfmUtil()->buildChunkToNodeTable(nodetype, sharedcount, ghostcount, localcount, conn, connSize, &allShared, &numSharedChunks, &allChunks, &sharedConn);   
-
     //add all the local nodes in this element to the ghost list, if they did not exist already
     for(int i=0; i<numSharedChunks; i++) {
       int chk = (*allChunks)[i];

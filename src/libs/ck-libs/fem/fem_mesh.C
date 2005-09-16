@@ -1348,13 +1348,15 @@ double FEM_Entity::getMeshSizing(int r) {
     allocateMeshSizing();
     return -1.0;
   }
-  return meshSizing->getDouble()(r,0);
+  if (r >= 0)  return meshSizing->getDouble()(r,0);
+  else  return ghost->meshSizing->getDouble()(FEM_To_ghost_index(r),0);
 }
 
 void FEM_Entity::setMeshSizing(int r,double s)
 {
   if (!meshSizing) allocateMeshSizing();
-  meshSizing->getDouble()(r,0)=s;
+  if (r >= 0)  meshSizing->getDouble()(r,0)=s;
+  else ghost->meshSizing->getDouble()(FEM_To_ghost_index(r),0)=s;
 }
 
 void FEM_Entity::setMeshSizing(double *sf)

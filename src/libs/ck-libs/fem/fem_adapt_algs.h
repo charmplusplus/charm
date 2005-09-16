@@ -99,7 +99,7 @@ class FEM_Adapt_Algs {
   /// Performs refinement; returns number of modifications
   int Refine(int qm, int method, double factor, double *sizes);
   /// Performs coarsening; returns number of modifications
-  int Coarsen(int qm);
+  int Coarsen(int qm, int method, double factor, double *sizes);
   /// Set sizes on elements throughout the mesh; note: size is edge length
   void SetMeshSize(int method, double factor, double *sizes);
   /// Insert element to be refined/coarsened

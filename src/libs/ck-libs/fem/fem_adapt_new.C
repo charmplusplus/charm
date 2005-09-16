@@ -382,6 +382,7 @@ int FEM_Adapt::edge_bisect_help(int e1, int e2, int n1, int n2, int e1_n1,
   double e2Sz = -1.0; 
   if (e2 != -1) e2Sz = theMesh->elem[0].getMeshSizing(e2);
   e2chunk = FEM_remove_element(theMesh, e2, 0);  // assumes intelligent behavior when no e2 exists
+
 #ifdef DEBUG_2
   lockelems[1] = -1;
   CkPrintf("Adjacencies after remove element %d\n",e2);

@@ -30,7 +30,6 @@ FEM_Adapt_Algs::FEM_Adapt_Algs(FEM_Mesh *m, femMeshModify *fm, int dimension)
 void FEM_Adapt_Algs::FEM_Refine(int qm, int method, double factor, 
 				double *sizes)
 {
-  CkPrintf("WARNING: FEM_Refine: Under construction.\n");
   numNodes = theMesh->node.size();
   numElements = theMesh->elem[0].size();
   (void)Refine(qm, method, factor, sizes);
@@ -44,7 +43,6 @@ int FEM_Adapt_Algs::Refine(int qm, int method, double factor, double *sizes)
   SetMeshSize(method, factor, sizes);
   refineElements = refineStack = NULL;
   refineTop = refineHeapSize = 0;
-  CmiMemoryCheck();
   while (iter_mods != 0) {
     iter_mods=0;
     numNodes = theMesh->node.size();
@@ -80,16 +78,14 @@ int FEM_Adapt_Algs::Refine(int qm, int method, double factor, double *sizes)
       else  elId=Delete_Min(0);
       if ((elId != -1) && (theMesh->elem[0].is_valid(elId))) {
 	(void)refine_element_leb(elId); // refine the element
-	CmiMemoryCheck();
 	iter_mods++;
       }
       CthYield(); // give other chunks on the same PE a chance
     }
     mods += iter_mods;
-    CkPrintf("Refine: %d modifications in last pass.\n", iter_mods);
+    CkPrintf("FEM_Refine: %d modifications in last pass.\n", iter_mods);
   }
-  CkPrintf("Refine: %d total modifications.\n", mods);
-  CmiMemoryCheck();
+  CkPrintf("FEM_Refine: %d total modifications.\n", mods);
   return mods;
 }
 
@@ -102,14 +98,80 @@ void FEM_Adapt_Algs::FEM_Coarsen(int qm, int method, double factor,
 				 double *sizes)
 {
   CkPrintf("WARNING: FEM_Coarsen: Under construction.\n");
-  SetMeshSize(method, factor, sizes);
-  (void)Coarsen(qm);
+  numNodes = theMesh->node.size();
+  numElements = theMesh->elem[0].size();
+  (void)Coarsen(qm, method, factor, sizes);
 }
 
 /* Performs coarsening; returns number of modifications */
-int FEM_Adapt_Algs::Coarsen(int qm)
+int FEM_Adapt_Algs::Coarsen(int qm, int method, double factor, double *sizes)
 {
-  return 0;
+  // loop through elemsToRefine
+  int elId, mods=0, iter_mods=1;
+  SetMeshSize(method, factor, sizes);
+  coarsenElements = NULL;
+  coarsenHeapSize = 0;
+  while (iter_mods != 0) {
+    CkPrintf("FEM_Coarsen: Setting Up Coarsening Pass...\n");
+    iter_mods=0;
+    numNodes = theMesh->node.size();
+    numElements = theMesh->elem[0].size();
+    // sort elements to be refined by quality into elemsToRefine
+    if (coarsenElements) delete [] coarsenElements;
+    coarsenElements = new elemHeap[numElements+1];
+    coarsenElements[0].len=-2.0;
+    coarsenElements[0].elID=-1;
+    for (int i=0; i<numElements; i++) { 
+      if (theMesh->elem[0].is_valid(i)) {
+	// find minEdgeLength of i
+	int *eConn = (int*)malloc(3*sizeof(int));
+	double tmpLen, minEdgeLength;
+	theMesh->e2n_getAll(i, eConn);
+	minEdgeLength = length(eConn[0], eConn[1]);
+	tmpLen = length(eConn[1], eConn[2]);
+	if (tmpLen < minEdgeLength) minEdgeLength = tmpLen;
+	tmpLen = length(eConn[2], eConn[0]);
+	if (tmpLen < minEdgeLength) minEdgeLength = tmpLen;
+	if ((theMesh->elem[0].getMeshSizing(i) > 0.0) &&
+	    (minEdgeLength < (theMesh->elem[0].getMeshSizing(i)*COARSEN_TOL))){
+	  double qFactor=getAreaQuality(i);
+	  Insert(i, qFactor*minEdgeLength, 1);
+	}
+      }
+    }
+    CkPrintf("FEM_Coarsen: Starting Coarsening Pass...\n");
+    while (coarsenHeapSize>0) { // loop through the elements
+      elId=Delete_Min(1);
+      if ((elId != -1) && (theMesh->elem[0].is_valid(elId))) {
+	int *eConn = (int*)malloc(3*sizeof(int));
+	double tmpLen, minEdgeLength;
+	int n1, n2;
+	theMesh->e2n_getAll(elId, eConn);
+	minEdgeLength = length(eConn[0], eConn[1]);
+	n1 = eConn[0]; n2 = eConn[1];
+	tmpLen = length(eConn[1], eConn[2]);
+	if (tmpLen < minEdgeLength) { 
+	  minEdgeLength = tmpLen;
+	  n1 = eConn[1]; n2 = eConn[2];
+	}
+	tmpLen = length(eConn[2], eConn[0]);
+	if (tmpLen < minEdgeLength) {
+	  minEdgeLength = tmpLen;
+	  n1 = eConn[2]; n2 = eConn[0];
+	}
+	// coarsen element's short edge
+	if (theAdaptor->edge_contraction(n1, n2) > 0) {
+	  iter_mods++;
+	  return 1;
+	}
+      }
+      CthYield(); // give other chunks on the same PE a chance
+    }
+    mods += iter_mods;
+    CkPrintf("FEM_Coarsen: %d modifications in last pass.\n", iter_mods);
+  }
+  CkPrintf("FEM_Coarsen: %d total modifications.\n", mods);
+  return mods;
 }
 
 /* Smooth the mesh using method according to some quality measure qm */
@@ -317,8 +379,6 @@ int FEM_Adapt_Algs::refine_element_leb(int e) {
     return -1;
   }
 
-  CmiMemoryCheck();
-
   theMesh->e2n_getAll(e, eConn);
   eLens[0] = length(eConn[0], eConn[1]);
   eLens[1] = length(eConn[1], eConn[2]);
@@ -333,8 +393,6 @@ int FEM_Adapt_Algs::refine_element_leb(int e) {
     }
   }
   free(eConn);
-
-  CmiMemoryCheck();
 
   nbr = theMesh->e2e_getNbr(e, longEdge);
   if (nbr == -1) // e's longEdge is on physical boundary
@@ -355,7 +413,6 @@ int FEM_Adapt_Algs::refine_element_leb(int e) {
       propElem = theAdaptor->findElementWithNodes(newNode,otherNode,nbrOpNode);
       propNode = otherNode;
     }
-    CmiMemoryCheck();
 
     //if propElem is ghost, then it's propagating to neighbor, otherwise not
     if(!FEM_Is_ghost_index(propElem)) {
@@ -372,7 +429,6 @@ int FEM_Adapt_Algs::refine_element_leb(int e) {
       int propElemT = theAdaptor->getGhostElementIdxl(propElem, nbrChk);
       meshMod[nbrChk].refine_flip_element_leb(localChk, propElemT, propNodeT, newNodeT,nbrOpNodeT,nbrghost,longEdgeLen);
     }
-    CmiMemoryCheck();
     return newNode;
   }
   else return theAdaptor->edge_bisect(fixNode, otherNode); // longEdge on nbr
@@ -388,7 +444,6 @@ void FEM_Adapt_Algs::refine_flip_element_leb(int e, int p, int n1, int n2,
     int newElem = theAdaptor->findElementWithNodes(newNode, n1, p);
     refine_flip_element_leb(newElem, p, n1, newNode, le);
   }
-  CmiMemoryCheck();
 }
 // ========================  END refine_element_leb ========================
 

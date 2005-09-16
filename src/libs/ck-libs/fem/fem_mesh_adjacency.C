@@ -852,12 +852,12 @@ int FEM_Mesh::n2n_exists(int n, int queryNode)
 		return 1;
   }
   else {
-	FEM_VarIndexAttribute *nAdj = (FEM_VarIndexAttribute *)node.lookup(FEM_NODE_NODE_ADJACENCY,"n2n_exists");
-	CkVec<CkVec<FEM_VarIndexAttribute::ID> > &nVec = nAdj->get();
-	CkVec<FEM_VarIndexAttribute::ID> &nsVec = nVec[n];
-	for (int i=0; i<nsVec.length(); i++)
-	  if (nsVec[i].getSignedId() == queryNode) 
-		return 1;
+    FEM_VarIndexAttribute *nAdj = (FEM_VarIndexAttribute *)node.lookup(FEM_NODE_NODE_ADJACENCY,"n2n_exists");
+    CkVec<CkVec<FEM_VarIndexAttribute::ID> > &nVec = nAdj->get();
+    CkVec<FEM_VarIndexAttribute::ID> &nsVec = nVec[n];
+    for (int i=0; i<nsVec.length(); i++)
+      if (nsVec[i].getSignedId() == queryNode) 
+	return 1;
   }
   return 0;
 }
