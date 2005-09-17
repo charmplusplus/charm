@@ -277,6 +277,11 @@ public:
   //Begin load balancer measurements again (e.g., after CthSuspend)
   inline void ckStartTiming(void) {myRec->startTiming();}
   inline LBDatabase *getLBDB(void) const {return myRec->getLBDB();}
+
+  /*******Added for cosmology*******/
+  LDObjHandle timingBeforeCall(int *objstopped);
+  void timingAfterCall(LDObjHandle objHandle,int *objstopped);
+  /*********************************/
 #else
   inline void ckStopTiming(void) { }
   inline void ckStartTiming(void) { }
