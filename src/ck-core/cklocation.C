@@ -859,6 +859,8 @@ CmiBool CkLocRec_local::isObsolete(int nSprings,const CkArrayIndex &idx_)
 		/* This is suspicious-- the halfCreated queue should be extremely
 		 transient.  It's possible we just looked at the wrong time, though;
 		 so this is only a warning. 
+         B
+         B
 		*/
 		CkPrintf("CkLoc WARNING> %d messages still around for uncreated element %s!\n",
 			 len,idx2str(idx));
@@ -866,6 +868,58 @@ CmiBool CkLocRec_local::isObsolete(int nSprings,const CkArrayIndex &idx_)
 	//A local element never expires
 	return CmiFalse;
 }
+
+/**********Added for cosmology (inline function handling without parameter marshalling)***********/
+
+LDObjHandle CkMigratable::timingBeforeCall(int* objstopped){
+
+	LDObjHandle objHandle;
+#if CMK_LBDB_ON
+	if (getLBDB()->RunningObject(&objHandle)) {
+		*objstopped = 1;
+		getLBDB()->ObjectStop(objHandle);
+  }
+#endif
+
+  //DEBS((AA"   Invoking entry %d on element %s\n"AB,epIdx,idx2str(idx)));
+	//CmiBool isDeleted=CmiFalse; //Enables us to detect deletion during processing
+	//deletedMarker=&isDeleted;
+	myRec->startTiming();
+/*#ifndef CMK_OPTIMIZE
+	if (msg) {  Tracing: 
+		envelope *env=UsrToEnv(msg);
+	//	CkPrintf("ckLocation.C beginExecuteDetailed %d %d \n",env->getEvent(),env->getsetArraySrcPe());
+		if (_entryTable[epIdx]->traceEnabled)
+			_TRACE_BEGIN_EXECUTE_DETAILED(env->getEvent(),
+		    		 ForChareMsg,epIdx,env->getsetArraySrcPe(), env->getTotalsize(), idx.getProjectionID());
+	}
+#endif*/
+
+  return objHandle;
+}
+
+void CkMigratable::timingAfterCall(LDObjHandle objHandle,int *objstopped){
+  
+/*#ifndef CMK_OPTIMIZE
+	if (msg) {  Tracing: 
+		if (_entryTable[epIdx]->traceEnabled)
+			_TRACE_END_EXECUTE();
+	}
+#endif*/
+//#if CMK_LBDB_ON
+//        if (!isDeleted) checkBufferedMigration();   // check if should migrate
+//#endif
+//	if (isDeleted) return CmiFalse;//We were deleted
+//	deletedMarker=NULL;
+	myRec->stopTiming();
+//	return CmiTrue;
+#if CMK_LBDB_ON
+		if (*objstopped) getLBDB()->ObjectStart(objHandle);
+#endif
+
+ return;
+}
+/****************************************************************************/
 
 CmiBool CkLocRec_local::invokeEntry(CkMigratable *obj,void *msg,
 	int epIdx,CmiBool doFree) 
