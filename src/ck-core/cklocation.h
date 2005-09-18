@@ -277,15 +277,15 @@ public:
   //Begin load balancer measurements again (e.g., after CthSuspend)
   inline void ckStartTiming(void) {myRec->startTiming();}
   inline LBDatabase *getLBDB(void) const {return myRec->getLBDB();}
-
-  /*******Added for cosmology*******/
-  LDObjHandle timingBeforeCall(int *objstopped);
-  void timingAfterCall(LDObjHandle objHandle,int *objstopped);
-  /*********************************/
 #else
   inline void ckStopTiming(void) { }
   inline void ckStartTiming(void) { }
 #endif
+
+  /// for inline call
+  LDObjHandle timingBeforeCall(int *objstopped);
+  void timingAfterCall(LDObjHandle objHandle,int *objstopped);
+
   //Initiate a migration to the given processor
   inline void ckMigrate(int toPe) {myRec->migrateMe(toPe);}
   
