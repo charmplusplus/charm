@@ -1138,7 +1138,7 @@ static inline void _sendMsgBranchMulti(int eIdx, void *msg, CkGroupID gID,
 extern "C"
 void CkSendMsgBranchImmediate(int eIdx, void *msg, int destPE, CkGroupID gID)
 {
-#if CMK_IMMEDIATE_MSG
+#if CMK_IMMEDIATE_MSG && ! CMK_SMP
   if (destPE==CkMyPe()) 
   { 
     CkSendMsgBranchInline(eIdx, msg, destPE, gID);
