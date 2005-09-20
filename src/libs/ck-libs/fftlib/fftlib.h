@@ -133,9 +133,9 @@ class LineFFTinfo {
 	    CkAssert((sizeX==sizeY) && (sizeX==sizeZ));
 	    
 	    if(pblock == PencilBlock::SQUAREBLOCK){
-		getSquaresize(xPencilsPerSlab, xsquare);
-		getSquaresize(yPencilsPerSlab, ysquare);
-		getSquaresize(zPencilsPerSlab, zsquare);
+		getSquaresize(xPencilsPerSlab, sizeX, xsquare);
+		getSquaresize(yPencilsPerSlab, sizeX, ysquare);
+		getSquaresize(zPencilsPerSlab, sizeX, zsquare);
 		
 		CkAssert((xsquare[1]%ysquare[1]==0) || (ysquare[1]%xsquare[1]==0));
 		CkAssert((zsquare[0]%ysquare[0]==0) || (ysquare[0]%zsquare[0]==0));
@@ -148,14 +148,15 @@ class LineFFTinfo {
 			 || (zPencilsPerSlab%yPencilsPerSlab==0));
 	    }
 	}
-	void getSquaresize(int size, int *square) {
-	    int squaresize = (int)sqrt(size);
+	void getSquaresize(int size, int planesize, int *square) {
+	    int squaresize = (int)sqrt((float)size);
 	    if(size==squaresize*squaresize){
 		square[0]=squaresize;
 		square[1]=squaresize;
 	    }
 	    else{
-		while(squaresize>1 && (size%squaresize!=0)){
+		while(squaresize>1 && ((size%squaresize!=0) || 
+		       ((size%squaresize==0)&&(planesize%squaresize!=0||planesize%(size/squaresize)!=0)))){
 		    squaresize--;
 		}
 		square[1]=squaresize;
