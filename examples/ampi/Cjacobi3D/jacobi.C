@@ -143,7 +143,7 @@ int main(int ac, char** av)
   MPI_Bcast(&niter, 1, MPI_INT, 0, MPI_COMM_WORLD);
 
   cp = new chunk;
-#ifdef AMPI
+#if defined(AMPI) && ! defined(NO_PUP)
   MPI_Register((void*)&cp, (MPI_PupFn) chunk_pup);
 #endif
 

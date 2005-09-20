@@ -1,6 +1,6 @@
 CHARMC=../../../bin/charmc $(OPTS)
 
-ampi: jacobi
+ampi: jacobi jacobi.iso
 
 mpi: jacobi.C
 	mpiCC -o jacobi jacobi.C  $(OPTS)
@@ -14,8 +14,8 @@ jacobi.iso: jacobi.C
 	-$(CHARMC) -o jacobi.iso jacobi.o -language ampi -module EveryLB -memory isomalloc
 
 test: ampi
-	./charmrun +p3 jacobi 2 2 2 +vp8 +balancer RotateLB
-	-./charmrun +p3 jacobi.iso 2 2 2 +vp8 +balancer RotateLB
+	./charmrun +p3 jacobi 2 2 2 +vp8 +balancer RotateLB +LBDebug
+	-./charmrun +p3 jacobi.iso 2 2 2 +vp8 +balancer RotateLB +LBDebug
 
 bgtest: jacobi
 	./charmrun +p2 jacobi 2 2 2 10 +vp8 +balancer RotateLB +x2 +y2 +z1
