@@ -73,14 +73,20 @@ typedef struct _PencilType{
     const static int ZLINE = 2;
 }PencilType;
 
+typedef struct _PencilBlock{
+    const static int FLATBLOCK = 0;
+    const static int SQUAREBLOCK = 1;
+}PencilBlock;
+
+
 class LineFFTinfo {
  public:
 	// Constructors
-	LineFFTinfo(int size[3], int ptype, complex *dptr, int xPencilsPerSlab=1, int yPencilsPerSlab=1, int zPencilsPerSlab=1) {
-	  init(size[0], size[1], size[2], ptype, dptr, xPencilsPerSlab, yPencilsPerSlab, zPencilsPerSlab);
+	LineFFTinfo(int size[3], int _ptype, int _pblock, complex *dptr, int _xPencilsPerSlab=1, int _yPencilsPerSlab=1, int _zPencilsPerSlab=1) {
+	  init(size[0], size[1], size[2], _ptype, _pblock, dptr, _xPencilsPerSlab, _yPencilsPerSlab, _zPencilsPerSlab);
 	}
 	LineFFTinfo(LineFFTinfo &info) {
-	    init(info.sizeX, info.sizeY, info.sizeZ, info.ptype, (complex *) NULL, info.xPencilsPerSlab, info.yPencilsPerSlab, info.zPencilsPerSlab);
+	    init(info.sizeX, info.sizeY, info.sizeZ, info.ptype, info.pblock, (complex *) NULL, info.xPencilsPerSlab, info.yPencilsPerSlab, info.zPencilsPerSlab);
 	}
 	LineFFTinfo(void) {}
 
@@ -90,32 +96,72 @@ class LineFFTinfo {
 	    p|sizeY;
 	    p|sizeZ;
 	    p(ptype);
+	    p(pblock);
 	    p(xPencilsPerSlab);
 	    p(yPencilsPerSlab);
 	    p(zPencilsPerSlab);
+	    p(xsquare, 2);
+	    p(ysquare, 2);
+	    p(zsquare, 2);
 	    if (p.isUnpacking()) 
 		dataPtr = (complex *) NULL;
 	}
 	int sizeX, sizeY, sizeZ;
 	int ptype;
+	int pblock;
 	int xPencilsPerSlab, yPencilsPerSlab, zPencilsPerSlab;
+	int xsquare[2], ysquare[2], zsquare[2];
 	complex *dataPtr;
  private:
-	void init(int sizex, int sizey, int sizez, int _ptype, complex *dptr,  int _xPencilsPerSlab, int _yPencilsPerSlab, int _zPencilsPerSlab) {
-		if (sizex != sizey || sizey != sizez)
+	void init(int sizex, int sizey, int sizez, int _ptype, int _pblock, complex *dptr,  int _xPencilsPerSlab, int _yPencilsPerSlab, int _zPencilsPerSlab) {
+	    if (sizex != sizey || sizey != sizez)
 			ckerr << "WARNING"
 				  << "This configuration of the source and destination "
 				  << "is not consistent, check the dimensions. The program is "
 				  << "likely to misbehave" 
 				  << endl;
-		ptype = _ptype;
-		xPencilsPerSlab = _xPencilsPerSlab; 
-		yPencilsPerSlab = _yPencilsPerSlab;
-		zPencilsPerSlab = _zPencilsPerSlab;
-		dataPtr = dptr;
-		sizeX = sizex;
-		sizeY = sizey;
-		sizeZ = sizez;
+	    ptype = _ptype;
+	    pblock = _pblock;
+	    xPencilsPerSlab = _xPencilsPerSlab; 
+	    yPencilsPerSlab = _yPencilsPerSlab;
+	    zPencilsPerSlab = _zPencilsPerSlab;
+	    dataPtr = dptr;
+	    sizeX = sizex;
+	    sizeY = sizey;
+	    sizeZ = sizez;
+	    
+	    CkAssert((sizeX==sizeY) && (sizeX==sizeZ));
+	    
+	    if(pblock == PencilBlock::SQUAREBLOCK){
+		getSquaresize(xPencilsPerSlab, xsquare);
+		getSquaresize(yPencilsPerSlab, ysquare);
+		getSquaresize(zPencilsPerSlab, zsquare);
+		
+		CkAssert((xsquare[1]%ysquare[1]==0) || (ysquare[1]%xsquare[1]==0));
+		CkAssert((zsquare[0]%ysquare[0]==0) || (ysquare[0]%zsquare[0]==0));
+	    }
+	    else {
+		xsquare[0]=xPencilsPerSlab;  xsquare[1]=1;
+		ysquare[0]=yPencilsPerSlab;  ysquare[1]=1;
+		zsquare[0]=zPencilsPerSlab;  zsquare[1]=1;
+		CkAssert((yPencilsPerSlab%zPencilsPerSlab==0) 
+			 || (zPencilsPerSlab%yPencilsPerSlab==0));
+	    }
+	}
+	void getSquaresize(int size, int *square) {
+	    int squaresize = (int)sqrt(size);
+	    if(size==squaresize*squaresize){
+		square[0]=squaresize;
+		square[1]=squaresize;
+	    }
+	    else{
+		while(squaresize>1 && (size%squaresize!=0)){
+		    squaresize--;
+		}
+		square[1]=squaresize;
+		square[0]=size/squaresize;
+	    }
+	    CkAssert(size==square[0]*square[1]);
 	}
 };
 
