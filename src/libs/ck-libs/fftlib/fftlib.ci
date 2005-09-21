@@ -1,5 +1,7 @@
 module fftlib {
 
+	message SendFFTMsg {complex data[];};
+
 	// The following arrays do not have entry methods corresponding to
 	// constructors. The user array that inherit from these should provide
 	// contructor entry methods
@@ -34,7 +36,7 @@ module fftlib {
 			CProxy_NormalLineArray _xProxy, CProxy_NormalLineArray _yProxy, CProxy_NormalLineArray _zProxy, 
 			bool useCommlib, ComlibInstanceHandle &inst);
 		entry void doFirstFFT(int id, int direction);
-		entry void doSecondFFT(int ypos,  complex val[size], int size, int id, int direction);
-		entry void doThirdFFT(int zpos, int ypos, complex val[size], int size, int id, int direction);
+		entry void doSecondFFT(SendFFTMsg *msg);
+		entry void doThirdFFT(SendFFTMsg *msg);
 	};
 };

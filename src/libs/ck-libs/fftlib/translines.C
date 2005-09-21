@@ -2,6 +2,7 @@
 
 //#define HEAVYVERBOSE 1
 //#define VERBOSE 1
+//#define _PRIOMSG_
 
 void
 NormalLineArray::doFirstFFT(int fftid, int direction)
@@ -52,11 +53,24 @@ NormalLineArray::doFirstFFT(int fftid, int direction)
 	{
 	    int sendSquarethick = ysquare[1] <= xsquare[1] ? ysquare[1]:xsquare[1];
 	    int sendDataSize = ysquare[0]*xsquare[0] * sendSquarethick;
-	    complex *sendData = (complex*)fftw_malloc(sizeof(complex)*sendDataSize);
 	    int zpos = thisIndex.y;
 	    int index=0;
+	    complex *sendData = NULL;
+
 	    for(z = 0; z < xsquare[1]; z+=sendSquarethick){
 		for(x = 0; x < sizeX; x+=ysquare[0]) {
+		    SendFFTMsg *msg = new(sendDataSize, sizeof(int)*8) SendFFTMsg;
+		    sendData = msg->data;
+		    msg->ypos = thisIndex.x; 
+		    msg->size = sendDataSize;
+		    msg->id = fftid;
+		    msg->direction = direction;
+		    msg->data = sendData;
+		    CkSetQueueing(msg, CK_QUEUEING_IFIFO);
+#ifdef _PRIOMSG_
+		    int prioNum =  (zpos+z) + x*sizeX;
+		    *(int*)CkPriorityPtr(msg) = prioNum; 
+#endif	
 		    index = 0;
 		    for(iz = z; iz < z+sendSquarethick; iz++)
 			for(ix = x; ix < x+ysquare[0]; ix++)
@@ -66,23 +80,34 @@ NormalLineArray::doFirstFFT(int fftid, int direction)
 #ifdef VERBOSE	
 		    CkPrintf(" [%d %d] sending to YLINES [	%d %d] \n",  thisIndex.x, thisIndex.y, thisIndex.y, x);
 #endif	
-		    yProxy(zpos+z, x).doSecondFFT(thisIndex.x, sendData, sendDataSize, fftid, direction);
+		    yProxy(zpos+z, x).doSecondFFT(msg);
 		}
 	    //memset(sendData, 0, sizeof(complex)*yPencilsPerSlab*xPencilsPerSlab);
 	    }
-	    fftw_free(sendData);
 	}
 	else
 	{
 	    int sendSquarewidth = ysquare[0]<=zsquare[0] ? ysquare[0]:zsquare[0];
 	    int sendDataSize = ysquare[1] * sendSquarewidth * zsquare[1];
-
-	    complex *sendData = (complex*)fftw_malloc(sizeof(complex)*sendDataSize);
 	    int xpos = thisIndex.x;
 	    int ypos = thisIndex.y;
 	    int index=0;
+	    complex *sendData = NULL;
+
 	    for(x = 0; x < zsquare[0]; x+=sendSquarewidth)
 		for(z = 0; z < sizeZ; z+=ysquare[1]){
+		    SendFFTMsg *msg = new(sendDataSize, sizeof(int)*8) SendFFTMsg;
+		    sendData = msg->data;
+		    msg->ypos = thisIndex.x; 
+		    msg->size = sendDataSize;
+		    msg->id = fftid;
+		    msg->direction = direction;
+		    msg->data = sendData;
+		    CkSetQueueing(msg, CK_QUEUEING_IFIFO);
+#ifdef _PRIOMSG_
+		    int prioNum =  (z) + (x+xpos)*sizeX;
+		    *(int*)CkPriorityPtr(msg) = prioNum; 
+#endif	
 		    index = 0;
 		    for(iz = z; iz < z+ysquare[1]; iz++)
 			for (ix = x; ix < x+sendSquarewidth; ix++) 
@@ -91,10 +116,9 @@ NormalLineArray::doFirstFFT(int fftid, int direction)
 		
 #ifdef VERBOSE	
 		    CkPrintf(" [%d %d] sending	 to YLINES [%d %d] \n",  thisIndex.x, thisIndex.y, z, thisIndex.x);
-#endif	
-		    yProxy(z, xpos+x).doSecondFFT(ypos, sendData, sendDataSize, fftid, direction);
+#endif
+		    yProxy(z, xpos+x).doSecondFFT(msg);
 		}
-	    fftw_free(sendData);
 	}
     }
 #ifdef COMLIB
@@ -171,15 +195,28 @@ NormalLineArray::doSecondFFT(int ypos, complex *val, int datasize, int fftid, in
 	ckout << "ylines " << id << " " << CkMyPe() << endl;
 	mgrProxy.ckLocalBranch()->beginIteration(id);
 #endif
-	if(true){//else if(pblock == PencilBlock::SQUAREBLOCK){
 	if(direction){
 	    int sendSquarewidth = ysquare[0]<=zsquare[0] ? ysquare[0]:zsquare[0];
 	    int sendDataSize = sendSquarewidth * ysquare[1] * zsquare[1];
-	    complex *sendData = (complex*)fftw_malloc(sizeof(complex)*sendDataSize);
 	    int xpos = thisIndex.y;
 	    int index=0;
+	    complex *sendData = NULL;
+
 	    for(x = 0; x < ysquare[0]; x+=sendSquarewidth)
 		for(y = 0; y < sizeY; y+=zsquare[1]) {
+		    SendFFTMsg *msg = new(sendDataSize, sizeof(int)*8) SendFFTMsg;
+		    sendData = msg->data;
+		    msg->zpos = thisIndex.x; 
+		    msg->ypos = 0;
+		    msg->size = sendDataSize;
+		    msg->id = fftid;
+		    msg->direction = direction;
+		    msg->data = sendData;
+		    CkSetQueueing(msg, CK_QUEUEING_IFIFO);
+#ifdef _PRIOMSG_
+		    int prioNum =  (xpos+x) + y*sizeY;
+		    *(int*)CkPriorityPtr(msg) = prioNum; 
+#endif	
 		    index = 0;
 		    for(iy = y; iy < y+zsquare[1]; iy++)
 			for(ix = x; ix < x+sendSquarewidth; ix++)
@@ -189,19 +226,31 @@ NormalLineArray::doSecondFFT(int ypos, complex *val, int datasize, int fftid, in
 #ifdef VERBOSE
 		    CkPrintf(" [%d %d] sending to ZLINES [	%d %d] \n",  thisIndex.x, thisIndex.y, thisIndex.y, y);
 #endif	
-		    (zProxy)(x+xpos, y).doThirdFFT(thisIndex.x, 0, sendData, sendDataSize, fftid, direction);
-		
+		    (zProxy)(x+xpos, y).doThirdFFT(msg);
 		}
-	    fftw_free(sendData);
 	}
 	else {
 	    int sendSquarethick = ysquare[1]<=xsquare[1] ? ysquare[1]:xsquare[1];
 	    int sendDataSize = ysquare[0]*xsquare[0] * sendSquarethick;
-	    complex *sendData = (complex*)fftw_malloc(sizeof(complex)*sendDataSize);
 	    int zpos = thisIndex.x;
 	    int index, ix, iy, iz;
+	    complex *sendData = NULL;
+
 	    for(z = 0; z < ysquare[1]; z+=sendSquarethick)
 		for (y = 0; y < sizeY; y+=xsquare[0]) {
+		    SendFFTMsg *msg = new(sendDataSize, sizeof(int)*8) SendFFTMsg;
+		    sendData = msg->data;
+		    msg->zpos = 0;
+		    msg->ypos = thisIndex.y;
+		    msg->size = sendDataSize;
+		    msg->id = fftid;
+		    msg->direction = direction;
+		    msg->data = sendData;
+		    CkSetQueueing(msg, CK_QUEUEING_IFIFO);
+#ifdef _PRIOMSG_		    
+		    int prioNum =  (y)*sizeY + (zpos+z);
+		    *(int*)CkPriorityPtr(msg) = prioNum; 
+#endif	
 		    index = 0;
 		    for(iz = z; iz < z+sendSquarethick; iz++)
 			for(iy = y; iy < y+xsquare[0]; iy++)
@@ -211,14 +260,11 @@ NormalLineArray::doSecondFFT(int ypos, complex *val, int datasize, int fftid, in
 #ifdef VERBOSE
 		    CkPrintf(" [%d %d] sending to XLINES [%d %d]	 \n",  thisIndex.x, thisIndex.y, y, zpos+z);
 #endif
-		    (xProxy)(y, zpos+z).doThirdFFT(0, thisIndex.y, sendData, sendDataSize, fftid, direction);
+		    (xProxy)(y, zpos+z).doThirdFFT(msg);
 		}
-	    
-	    fftw_free(sendData);
 	}	
-    }
 #ifdef COMLIB
-    mgrProxy.ckLocalBranch()->endIteration();
+	mgrProxy.ckLocalBranch()->endIteration();
 #endif
     }
 }
@@ -235,11 +281,6 @@ NormalLineArray::doThirdFFT(int zpos, int xpos, complex *val, int datasize, int 
     int *ysquare = fftinfo.ysquare;
     int *zsquare = fftinfo.zsquare;
     int expectSize=0, expectMsg=0, offset=0, i; 
-#define _CAREFUL_
-#ifdef _CAREFUL_
-    if(infoVec[fftid]->count==0)
-	memset(line, 0, sizeof(complex)*sizeX*zsquare[0]);
-#endif
 
     int x,y,z,idx;
     if(direction){
@@ -298,6 +339,18 @@ NormalLineArray::doThirdFFT(int zpos, int xpos, complex *val, int datasize, int 
 	doneFFT(fftid, direction);
 //	contribute(sizeof(int), &count, CkReduction::sum_int);
     }
+}
+
+void 
+NormalLineArray::doSecondFFT(SendFFTMsg *msg){
+    doSecondFFT(msg->ypos, msg->data, msg->size, msg->id, msg->direction);
+    delete msg;
+}
+
+void 
+NormalLineArray::doThirdFFT(SendFFTMsg *msg){
+    doThirdFFT(msg->zpos, msg->ypos, msg->data, msg->size, msg->id, msg->direction);
+    delete msg;
 }
 
 void 

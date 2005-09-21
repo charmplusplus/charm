@@ -363,6 +363,17 @@ typedef struct _PencilArrayInfo{
     ComlibInstanceHandle fftcommInstance;
 }PencilArrayInfo;
 
+class SendFFTMsg: public CMessage_SendFFTMsg {
+public:
+    int size;
+    int id;
+    int direction;
+    int ypos;
+    int zpos;
+    complex *data;
+};
+
+
 class NormalLineArray : public CBase_NormalLineArray {
  public:
     NormalLineArray (CkMigrateMessage *m) {}
@@ -378,6 +389,10 @@ class NormalLineArray : public CBase_NormalLineArray {
     void doFirstFFT(int id, int direction);
     void doSecondFFT(int ypos, complex *val, int size, int id, int direction);
     void doThirdFFT(int zpos, int ypos, complex *val, int size, int id, int direction);
+
+    void doSecondFFT(SendFFTMsg *msg);
+    void doThirdFFT(SendFFTMsg *msg);
+
     void doFFT(int id, int direction) {doFirstFFT(id, direction);}
     virtual void doneFFT(int id, int direction);
     void setInstance(int id_) { id = id_; 
