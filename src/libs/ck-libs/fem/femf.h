@@ -44,6 +44,11 @@
        integer, parameter :: FEM_NODE_PRIMARY=(FEM_ATTRIB_FIRST+7)
        integer, parameter :: FEM_CHUNK=(FEM_ATTRIB_FIRST+8)
        integer, parameter :: FEM_BOUNDARY=(FEM_ATTRIB_FIRST+9)
+	   integer, parameter :: FEM_NODE_ELEM_ADJACENCY=(FEM_ATTRIB_FIRST+10)
+	   integer, parameter :: FEM_NODE_NODE_ADJACENCY=(FEM_ATTRIB_FIRST+11)
+	   integer, parameter :: FEM_ELEM_ELEM_ADJACENCY=(FEM_ATTRIB_FIRST+12)
+	   integer, parameter :: FEM_ELEM_ELEM_ADJ_TYPES=(FEM_ATTRIB_FIRST+13)
+	   integer, parameter :: FEM_IS_VALID=(FEM_ATTRIB_FIRST+14)		 
        integer, parameter :: FEM_MESH_SIZING=(FEM_ATTRIB_FIRST+15)
        integer, parameter :: FEM_INDEX_0=IDXL_INDEX_0
        integer, parameter :: FEM_INDEX_1=IDXL_INDEX_1
@@ -108,6 +113,8 @@
        external FEM_Async_Migrate
 
        external FEM_Update_mesh
+
+	   external FEM_Add_elem2face_tuples
 
        interface
        
@@ -285,5 +292,19 @@
          integer, intent(out) :: total_len,ghost_len
        end subroutine
        
+
+	   subroutine FEM_Mesh_create_node_elem_adjacency(fem_mesh)
+		 integer, intent(in) :: fem_mesh
+	   end subroutine
+
+	   subroutine FEM_Mesh_create_node_node_adjacency(fem_mesh)
+		 integer, intent(in) :: fem_mesh
+	   end subroutine
+
+	   subroutine FEM_Mesh_create_elem_elem_adjacency(fem_mesh)
+		 integer, intent(in) :: fem_mesh
+	   end subroutine
+
+
        end interface
 

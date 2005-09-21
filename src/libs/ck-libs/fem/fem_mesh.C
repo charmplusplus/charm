@@ -641,7 +641,7 @@ void FEM_Attribute::tryAllocate(void) {
 	  widthNull = (getWidth()==0);
 	}
 	if ((!allocated) && !lenNull && !widthNull && getDatatype()!=-1) {
-		allocated=true;
+	  allocated=true;
 		allocate(getMax(),getWidth(),getDatatype());
 	}
 }
