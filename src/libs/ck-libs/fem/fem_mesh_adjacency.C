@@ -19,6 +19,11 @@ FEM_Mesh_create_node_elem_adjacency(int fem_mesh){
 	FEM_Mesh *m=FEM_Mesh_lookup(fem_mesh,caller);
 	m->createNodeElemAdj();
 }
+FORTRAN_AS_C(FEM_MESH_CREATE_NODE_ELEM_ADJACENCY,
+             FEM_Mesh_create_node_elem_adjacency,
+             fem_mesh_create_node_elem_adjacency, 
+             (int *fem_mesh),  (*fem_mesh) )
+
 
 CDECL void 
 FEM_Mesh_create_node_node_adjacency(int fem_mesh){
@@ -26,6 +31,11 @@ FEM_Mesh_create_node_node_adjacency(int fem_mesh){
 	FEM_Mesh *m=FEM_Mesh_lookup(fem_mesh,caller);
 	m->createNodeNodeAdj();
 }
+FORTRAN_AS_C(FEM_MESH_CREATE_NODE_NODE_ADJACENCY,
+             FEM_Mesh_create_node_node_adjacency,
+             fem_mesh_create_node_node_adjacency, 
+             (int *fem_mesh),  (*fem_mesh) )
+
 
 CDECL void 
 FEM_Mesh_create_elem_elem_adjacency(int fem_mesh){
@@ -33,11 +43,30 @@ FEM_Mesh_create_elem_elem_adjacency(int fem_mesh){
 	FEM_Mesh *m=FEM_Mesh_lookup(fem_mesh,caller);
 	m->createElemElemAdj();
 }
+FORTRAN_AS_C(FEM_MESH_CREATE_ELEM_ELEM_ADJACENCY,
+             FEM_Mesh_create_elem_elem_adjacency,
+             fem_mesh_create_elem_elem_adjacency, 
+             (int *fem_mesh),  (*fem_mesh) )
+
+
 
 CDECL void 
 FEM_Mesh_create_elem_node_adjacency(int fem_mesh){
-  CkPrintf("Do Not Call FEM_Mesh_create_elem_node_adjacency(), as the connectivity table already exists");
+  CkPrintf("WARNING: Do Not Call FEM_Mesh_create_elem_node_adjacency(), as the connectivity table should already exist\n");
 }
+
+
+CDECL void 
+FEM_Mesh_get2ElementsOnEdge(int fem_mesh, int n1, int n2, int *e1, int *e2){
+	const char *caller="FEM_Mesh_get2ElementsOnEdge"; FEMAPI(caller);
+	FEM_Mesh *m=FEM_Mesh_lookup(fem_mesh,caller);
+	m->get2ElementsOnEdge(n1, n2, e1, e2);
+}
+FORTRAN_AS_C(FEM_MESH_GET2ELEMENTSONEDGE,
+             FEM_Mesh_get2ElementsOnEdge,
+             fem_mesh_get2elementsonedge, 
+             (int *fem_mesh, int *n1, int *n2, int *e1, int *e2),  
+             (*fem_mesh,*n1,*n2,e1,e2) )
 
 
 
@@ -1037,6 +1066,12 @@ void FEM_Mesh::n2e_removeAll(int n)
 
 /// Get an element on edge (n1, n2) where n1, n2 are chunk-local
 /// node numberings; return -1 in case of failure
+
+// I think the break statement may cause some unexpected behaviour here
+// The break will break out of the inner for loop back to the outer for loop
+// I am not sure exactly what the symantics of this function should be
+//   -- Isaac
+
 int FEM_Mesh::getElementOnEdge(int n1, int n2) 
 {
   int *n1AdjElems, *n2AdjElems;
@@ -1048,17 +1083,51 @@ int FEM_Mesh::getElementOnEdge(int n1, int n2)
   for (int i=0; i<n1NumElems; i++) {
     for (int j=0; j<n2NumElems; j++) {
       if (n1AdjElems[i] == n2AdjElems[j]) {
-	if(n1AdjElems[i] >= 0) {
-	  ret = n1AdjElems[i];
-	  break;
-	}
-	else {
-	  ret = n1AdjElems[i];
-	}
+        if(n1AdjElems[i] >= 0) {
+          ret = n1AdjElems[i];
+          break;
+        }
+        else {
+          ret = n1AdjElems[i];
+        }
       }
     }
   }
   free(n1AdjElems);
   free(n2AdjElems);
   return ret; //preferably return a local element, otherwise return a ghost 
+}
+
+
+/// Get 2 elements on edge (n1, n2) where n1, n2 are chunk-local
+/// node numberings; return the edges in result_e1 and result_e2
+/// No preference is given to ghosts over local elements
+void FEM_Mesh::get2ElementsOnEdge(int n1, int n2, int *result_e1, int *result_e2) 
+{
+  int *n1AdjElems, *n2AdjElems;
+  int n1NumElems, n2NumElems;
+  n2e_getAll(n1, &n1AdjElems, &n1NumElems);
+  n2e_getAll(n2, &n2AdjElems, &n2NumElems);
+  int found=0;
+
+  *result_e1=-1;
+  *result_e2=-1;
+
+  for (int i=0; i<n1NumElems; i++) {
+    for (int j=0; j<n2NumElems; j++) {
+      if (n1AdjElems[i] == n2AdjElems[j]) {
+        if(found==0){
+          *result_e1 = n1AdjElems[i];
+          found++;
+        }
+        else if(found==1){
+          *result_e2 = n1AdjElems[i];
+          found++;
+        }
+      }
+    }
+  }
+
+  free(n1AdjElems);
+  free(n2AdjElems);
 }

@@ -291,19 +291,24 @@
          integer, intent(in) :: mesh
          integer, intent(out) :: total_len,ghost_len
        end subroutine
-       
 
-	   subroutine FEM_Mesh_create_node_elem_adjacency(fem_mesh)
-		 integer, intent(in) :: fem_mesh
-	   end subroutine
 
-	   subroutine FEM_Mesh_create_node_node_adjacency(fem_mesh)
-		 integer, intent(in) :: fem_mesh
-	   end subroutine
-
-	   subroutine FEM_Mesh_create_elem_elem_adjacency(fem_mesh)
-		 integer, intent(in) :: fem_mesh
-	   end subroutine
+       subroutine FEM_Mesh_create_node_elem_adjacency(fem_mesh)
+         integer, intent(in) :: fem_mesh
+       end subroutine
+         
+       subroutine FEM_Mesh_create_node_node_adjacency(fem_mesh)
+         integer, intent(in) :: fem_mesh
+       end subroutine
+         
+       subroutine FEM_Mesh_create_elem_elem_adjacency(fem_mesh)
+         integer, intent(in) :: fem_mesh
+       end subroutine
+         
+       subroutine   FEM_Mesh_get2ElementsOnEdge(fem_mesh,n1,n2,e1,e2)
+         integer, intent(in)  :: fem_mesh, n1, n2
+         integer, intent(out) :: e1, e2
+       end subroutine                                        
 
 
        end interface

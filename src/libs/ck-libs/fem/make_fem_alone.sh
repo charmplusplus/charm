@@ -4,6 +4,12 @@
 # to build "FEM_ALONE", a version of the FEM framework
 # built on regular MPI, not Charm++'s AMPI.
 #
+# WARNING: This script probably will not work with 
+#          the recent versions of FEM. To add the 
+#          adjacency and modification operations
+#	   it was required to use Charm++ instead
+#          of the pure MPI base that had existed.
+#
 # Build charm normally, then run this script from the 
 # main charm directory like:
 #    > src/libs/ck-libs/fem/make_fem_alone.sh
@@ -25,6 +31,11 @@
 # 
 # Orion Sky Lawlor, olawlor@acm.org, 2003/8/18
 #
+
+echo "WARNING: see warning description in make_fem_alone.sh"
+echo "         This script will probably not work!         "
+echo
+
 
 Do() {
 	echo "> $@"

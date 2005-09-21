@@ -1430,3 +1430,7 @@ CDECL void FEM_Add_elem2face_tuples(int fem_mesh, int elem_type, int nodesPerTup
 		          tuplesPerElem*cur->nodesPerTuple,idxBase);
 
 }
+FORTRAN_AS_C(FEM_ADD_ELEM2FACE_TUPLES,FEM_Add_elem2face_tuples,fem_add_elem2face_tuples,
+  (int *fem_mesh,int *elem_type,int *nodesPerTuple, int *tuplesPerElem, int *elem2tuple), 
+  (*fem_mesh, *elem_type, *nodesPerTuple, *tuplesPerElem, elem2tuple)
+)

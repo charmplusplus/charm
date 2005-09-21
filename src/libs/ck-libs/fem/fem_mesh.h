@@ -1290,6 +1290,14 @@ class FEM_Mesh : public CkNoncopyable {
   /// node numberings and result is chunk-local element; return -1 in case 
   /// of failure
   int getElementOnEdge(int n1, int n2);
+
+  /// Get two elements adjacent to both n1 and n2
+  void get2ElementsOnEdge(int n1, int n2, int *result_e1, int *result_e2) ;
+
+
+
+
+
 }; 
 PUPmarshall(FEM_Mesh);
 FEM_Mesh *FEM_Mesh_lookup(int fem_mesh,const char *caller);
