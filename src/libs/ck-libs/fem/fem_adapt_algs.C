@@ -83,9 +83,9 @@ int FEM_Adapt_Algs::Refine(int qm, int method, double factor, double *sizes)
       CthYield(); // give other chunks on the same PE a chance
     }
     mods += iter_mods;
-    CkPrintf("FEM_Refine: %d modifications in last pass.\n", iter_mods);
+    CkPrintf("ParFUM_Refine: %d modifications in last pass.\n", iter_mods);
   }
-  CkPrintf("FEM_Refine: %d total modifications.\n", mods);
+  CkPrintf("ParFUM_Refine: %d total modifications.\n", mods);
   return mods;
 }
 
@@ -97,7 +97,7 @@ int FEM_Adapt_Algs::Refine(int qm, int method, double factor, double *sizes)
 void FEM_Adapt_Algs::FEM_Coarsen(int qm, int method, double factor, 
 				 double *sizes)
 {
-  CkPrintf("WARNING: FEM_Coarsen: Under construction.\n");
+  CkPrintf("WARNING: ParFUM_Coarsen: Under construction.\n");
   numNodes = theMesh->node.size();
   numElements = theMesh->elem[0].size();
   (void)Coarsen(qm, method, factor, sizes);
@@ -108,11 +108,11 @@ int FEM_Adapt_Algs::Coarsen(int qm, int method, double factor, double *sizes)
 {
   // loop through elemsToRefine
   int elId, mods=0, iter_mods=1;
+  double qFactor;
   SetMeshSize(method, factor, sizes);
   coarsenElements = NULL;
   coarsenHeapSize = 0;
   while (iter_mods != 0) {
-    CkPrintf("FEM_Coarsen: Setting Up Coarsening Pass...\n");
     iter_mods=0;
     numNodes = theMesh->node.size();
     numElements = theMesh->elem[0].size();
@@ -125,65 +125,75 @@ int FEM_Adapt_Algs::Coarsen(int qm, int method, double factor, double *sizes)
       if (theMesh->elem[0].is_valid(i)) {
 	// find minEdgeLength of i
 	int *eConn = (int*)malloc(3*sizeof(int));
-	double tmpLen, minEdgeLength;
+	double tmpLen, minEdgeLength, avgEdgeLength;
 	theMesh->e2n_getAll(i, eConn);
-	minEdgeLength = length(eConn[0], eConn[1]);
+	avgEdgeLength = minEdgeLength = length(eConn[0], eConn[1]);
 	tmpLen = length(eConn[1], eConn[2]);
+	avgEdgeLength += tmpLen;
 	if (tmpLen < minEdgeLength) minEdgeLength = tmpLen;
 	tmpLen = length(eConn[2], eConn[0]);
+	avgEdgeLength += tmpLen;
 	if (tmpLen < minEdgeLength) minEdgeLength = tmpLen;
-	if ((theMesh->elem[0].getMeshSizing(i) > 0.0) &&
-	    (minEdgeLength < (theMesh->elem[0].getMeshSizing(i)*COARSEN_TOL))){
-	  double qFactor=getAreaQuality(i);
+	qFactor=getAreaQuality(i);
+	avgEdgeLength /= 3.0;
+	if (((theMesh->elem[0].getMeshSizing(i) > 0.0) &&
+	     ((avgEdgeLength < (theMesh->elem[0].getMeshSizing(i)*COARSEN_TOL))
+	      || (minEdgeLength < (0.5*avgEdgeLength))))
+	    || (qFactor < QUALITY_MIN)) {
 	  Insert(i, qFactor*minEdgeLength, 1);
 	}
       }
     }
-    CkPrintf("FEM_Coarsen: Starting Coarsening Pass...\n");
     while (coarsenHeapSize>0) { // loop through the elements
       elId=Delete_Min(1);
       if ((elId != -1) && (theMesh->elem[0].is_valid(elId))) {
 	int *eConn = (int*)malloc(3*sizeof(int));
-	double tmpLen, minEdgeLength;
+	double tmpLen, minEdgeLength, avgEdgeLength;
 	int n1, n2;
 	theMesh->e2n_getAll(elId, eConn);
-	minEdgeLength = length(eConn[0], eConn[1]);
+	avgEdgeLength = minEdgeLength = length(eConn[0], eConn[1]);
 	n1 = eConn[0]; n2 = eConn[1];
 	tmpLen = length(eConn[1], eConn[2]);
+	avgEdgeLength += tmpLen;
 	if (tmpLen < minEdgeLength) { 
 	  minEdgeLength = tmpLen;
 	  n1 = eConn[1]; n2 = eConn[2];
 	}
 	tmpLen = length(eConn[2], eConn[0]);
+	avgEdgeLength += tmpLen;
 	if (tmpLen < minEdgeLength) {
 	  minEdgeLength = tmpLen;
 	  n1 = eConn[2]; n2 = eConn[0];
 	}
+	avgEdgeLength /= 3.0;
+	qFactor=getAreaQuality(elId);
 	// coarsen element's short edge
-	if (theAdaptor->edge_contraction(n1, n2) > 0) {
-	  iter_mods++;
-	  return 1;
+	if (((theMesh->elem[0].getMeshSizing(elId) > 0.0) &&
+	     ((avgEdgeLength < (theMesh->elem[0].getMeshSizing(elId)*COARSEN_TOL))
+	      || (minEdgeLength < (0.5*avgEdgeLength))))
+	    || (qFactor < QUALITY_MIN)) {
+	  if (theAdaptor->edge_contraction(n1, n2) > 0)  iter_mods++;
 	}
       }
       CthYield(); // give other chunks on the same PE a chance
     }
     mods += iter_mods;
-    CkPrintf("FEM_Coarsen: %d modifications in last pass.\n", iter_mods);
+    CkPrintf("ParFUM_Coarsen: %d modifications in last pass.\n", iter_mods);
   }
-  CkPrintf("FEM_Coarsen: %d total modifications.\n", mods);
+  CkPrintf("ParFUM_Coarsen: %d total modifications.\n", mods);
   return mods;
 }
 
 /* Smooth the mesh using method according to some quality measure qm */
 void FEM_Adapt_Algs::FEM_Smooth(int qm, int method)
 {
-  CkPrintf("WARNING: FEM_Smooth: Not yet implemented.\n");
+  CkPrintf("WARNING: ParFUM_Smooth: Not yet implemented.\n");
 }
 
 /* Repair the mesh according to some quality measure qm */
 void FEM_Adapt_Algs::FEM_Repair(int qm)
 {
-  CkPrintf("WARNING: FEM_Repair: Not yet implemented.\n");
+  CkPrintf("WARNING: ParFUM_Repair: Not yet implemented.\n");
 }
 
 /* Remesh entire mesh according to quality measure qm. If method = 0, set 
@@ -192,7 +202,7 @@ void FEM_Adapt_Algs::FEM_Repair(int qm)
 void FEM_Adapt_Algs::FEM_Remesh(int qm, int method, double factor, 
 				double *sizes)
 {
-  CkPrintf("WARNING: FEM_Remesh: Under construction.\n");
+  CkPrintf("WARNING: ParFUM_Remesh: Under construction.\n");
 }
 
 /* Set sizes on elements throughout the mesh; note: size is edge length */

@@ -18,6 +18,7 @@
 #define SLIVERAREA 1.0e-12
 #define REFINE_TOL 1.1
 #define COARSEN_TOL 0.9
+#define QUALITY_MIN 0.5
 
 class femMeshModify;
 class FEM_Adapt;
