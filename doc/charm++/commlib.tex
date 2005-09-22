@@ -1,10 +1,10 @@
 \subsection{Communication Optimizations Framework}
 
-The communications framework in Charm++/Converse is aimed at optimizing certain
+The communication framework in Charm++/Converse is aimed at optimizing certain
 communication patterns. Currently the programmer has to specify the
 communication pattern it intends to optimize, together with the strategy to be
 used. The communications library uses the delegation framework
-(\ref{delegation}) in order too enable easy and transparent access to the
+(\ref{delegation}) in order to enable easy and transparent access to the
 framework by the programmer.
 
 For \ampi{} programs, the communication optimization is done by the \ampi{}
@@ -26,15 +26,15 @@ different strategies, to optimize different communication calls in the
 application. In order to access the class signatures, the file ``comlib.h''
 should be included.
 
-Each communication operation is associate with a proxy, through which the
-message was sent. These proxies can be associated in the mainchare constructor
-(for example useful for all-to-all strategies), or later in the single chare
-array elements (for example for section multicasts). In both cases, some
-information has to be kept, formerly the CProxy or the ComlibInstanceHandle, and
-this can be done in readoly variables, or as internal variables of the objects.
+Each communication operation is associated with a proxy, through which the
+message is sent. These proxies can be associated in the mainchare constructor
+(useful for all-to-all strategies), or later in the single chare
+array elements (useful for section multicasts). In both cases, some
+information has to be kept, either the CProxy or the ComlibInstanceHandle, and
+this can be done in readonly variables, or as internal variables of the objects.
 
 An example on how to use commlib can be found in the charm distribution, under
-``examples/charm++/commlib/multicast/'', where the proxies are associated in the
+``examples/charm++/commlib/multicast/ '', where the proxies are associated in the
 chare arrays.
 
 
@@ -72,7 +72,7 @@ in the constructor of the mainchare (for more on array creation see
   cinst = ComlibRegister(strategy);
 \end{alltt}
 
-In this example, after dproxy has been associated with commlib it can only be
+In this example, after aproxy has been associated with comlibproxy it can only be
 used with commlib, and cannot send anymore regular messages. For this, if
 regular messages without commlib are desired, a copy of the original proxy
 should be made (like here).
@@ -86,7 +86,7 @@ to send multicasts (see \ref{array section} for more on section proxies).
   ComlibAssociateProxy(cinst, mysection);  // mysection will always use commlib
 \end{alltt}
 
-After a proxy has been associate in some way to commlib, it can be used to send
+After a proxy has been associated in some way to commlib, it can be used to send
 messages with commlib:
 
 \begin{alltt}
@@ -96,11 +96,11 @@ messages with commlib:
   aproxy[0].single(msg);    // send to a single element {\textbf{without}} commlib
 \end{alltt}
 
-In the case a bracketed strategy is used, two additional function calls have to
-be added before starting to se the messages and after finished. These are
+In case a bracketed strategy is used, two additional function calls have to
+be added before starting to send the messages and after finishing. These are
 discussed later in \ref{bracketed strategies}.
 
-The signatures of the function used here is as following:
+The signatures of the functions used here are the following:
 
 \begin{alltt}
 ComlibRegister (CharmStrategy *strat);
@@ -234,11 +234,6 @@ especially during load-balancing, where most of the migrations happen. As shown
 in the following example, these calls should be made inside the
 {\textrm{resumeFromSync}} method.
 
-At {\em load-balancing} time the user should make comlib remap the array
-element. This can be done by calling ComlibResetProxy for array proxies and
-ComlibResetSectionProxy for section proxies. This calls need to be made in
-resumeFromSync.
-
 \begin{alltt}
   void arrayelement::resumeFromSync() {
       .......
@@ -260,10 +255,9 @@ instances} should pup them all at the source and destination.
   }
 \end{alltt}
 
-
 \subsubsection{Compiling User Code}
 
-All user programs that use the communcation library should use the
+All user programs that use the communication library should use the
 linker option {\textrm{-module comlib}. For example,
 \begin{alltt}
 charmc -o pgm pgm.o -module comlib
@@ -318,7 +312,7 @@ There are two types of strategies in the communication framework:
 \begin{itemize}
 
 \item \label{bracketed strategies}
-Bracketed Strategies. In bracketed strategies each source Chare (which could be
+Bracketed Strategies: In bracketed strategies each source chare (which could be
 an array element or a group) deposits its entries and then the strategy performs
 the communication optimization. For example the EachToManyMulticastStrategy is a
 bracketed strategy. For bracketed strategies a beginIteration and an
@@ -336,7 +330,7 @@ dproxy[index].entry(message);   // Sending a message
 ComlibEnd(dproxy);
 \end{alltt}
 
-\item Non-Bracketed Strategies. Non-bracketed strategies perform communication
+\item Non-Bracketed Strategies: Non-bracketed strategies perform communication
 optimizations without needing calls to beginIteration and endIteration to start
 processing. Non-bracketed strategies either immediately process messages or
 after a timeout, and, in both cases, it's not triggered from the application.
@@ -351,7 +345,7 @@ personalized and all-to-all multicast communication using several virtual
 topologies like 2-D Mesh, 3-D Mesh and Hypercube. Personalized communication
 happens when a chare sends different messages to the other chares, multicast
 communication happens when a chare sends the same message to all other chares.
-EachToManyMulticastStrategy also optimized the special cases many-to-many where
+EachToManyMulticastStrategy also optimizes the special cases of many-to-many multicast where
 not all the chares in an array are involved in the collective operation.
 
 The charm level strategy collects all the messages from the chares and delivers
@@ -371,9 +365,7 @@ implements the various virtual topologies.
 
 EachToManyMulticastStrategy requires that all local messages be deposited
 before they can be packed into single messages. Hence, it needs to be a {\em
-bracketed} strategy.
-
-This strategy can also be used to optimize all-to-all collectives between charm
+bracketed} strategy. This strategy can also be used to optimize all-to-all collectives between charm
 groups.
 
 %Bracketed strategies require each of the participating objects to deposit their
@@ -467,7 +459,7 @@ These are the subclass strategies that are available:
 \begin{description}
 \item[DirectMulticastStrategy] sends the messages directly to all recipients;
 \item[RingMulticastStrategy] sends the messages along ring resulting in good throughput as the ring permutation is contention free on many communication topologies;
-\item[MultiRingMulticast] sends the message along two rings (the ordered list of recipients is splitted in half).
+\item[MultiRingMulticast] sends the message along two rings (the ordered list of recipients is split in half).
 \end{description}
 
 For these, the constructors are of the form:
