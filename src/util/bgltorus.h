@@ -10,35 +10,51 @@
 #include <rts.h>
 #include <stdlib.h>
 
-class BGLTorousManager;
+class BGLTorusManager;
 
-class BGLTorousManager {
+class BGLTorusManager {
 
   BGLPersonality my_bg;
-  int xsize, ysize, zsize; 
+  int xsize, ysize, zsize;   //size in processors
+  int nxsize, nysize, nzsize;  //size in nodes
+  int isVN;
 
  public:
   
   //Assumes an TXYZ Mapping
-  BGLTorousManager() {
+  BGLTorusManager() {
     int size = sizeof(BGLPersonality);
     rts_get_personality(&my_bg, size);
+
+    isVN = 0;
 
     xsize = my_bg.xSize;
     ysize = my_bg.ySize;
     zsize = my_bg.zSize;  
 
-    if(my_bg.opFlags & BGLPERSONALITY_OPFLAGS_VIRTUALNM)
+    nxsize = xsize;
+    nysize = ysize;
+    nzsize = zsize;
+    
+    if(my_bg.opFlags & BGLPERSONALITY_OPFLAGS_VIRTUALNM) {
+      isVN = 1;
       xsize *= 2;
+    }
 
-    //CmiPrintf("BGL Torous Constructor %d,%d,%d\n", xsize, ysize, zsize);
+    //CmiPrintf("BGL Torus Constructor %d,%d,%d\n", xsize, ysize, zsize);
   }
 
   inline int getXSize() { return xsize;}
   inline int getYSize() { return ysize;}
   inline int getZSize() { return zsize;}
 
-  static inline BGLTorousManager *getObject();
+  inline int getXNodeSize() { return nxsize;}
+  inline int getYNodeSize() { return nysize;}
+  inline int getZNodeSize() { return nzsize;}
+
+  inline int isVnodeMode() { return isVN;}
+
+  static inline BGLTorusManager *getObject();
 
   inline void getMyCoordinates(int &X, int &Y, int &Z) {
     /*
@@ -107,9 +123,11 @@ class BGLTorousManager {
   }
 };
 
-CpvExtern(BGLTorousManager *, tmanager); 
+CpvExtern(BGLTorusManager *, tmanager); 
 
-BGLTorousManager *BGLTorousManager::getObject() {
+BGLTorusManager *BGLTorusManager::getObject() {
+  if(CpvAccess(tmanager) == NULL)
+    CpvAccess(tmanager) = new BGLTorusManager();
   return CpvAccess(tmanager);
 }  
 
