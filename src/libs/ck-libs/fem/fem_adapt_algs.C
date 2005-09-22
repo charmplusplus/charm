@@ -63,10 +63,10 @@ int FEM_Adapt_Algs::Refine(int qm, int method, double factor, double *sizes)
 	if (tmpLen > maxEdgeLength) maxEdgeLength = tmpLen;
 	tmpLen = length(eConn[2], eConn[0]);
 	if (tmpLen > maxEdgeLength) maxEdgeLength = tmpLen;
+	double qFactor=getAreaQuality(i);
 	if ((theMesh->elem[0].getMeshSizing(i) > 0.0) &&
 	    (maxEdgeLength > (theMesh->elem[0].getMeshSizing(i)*REFINE_TOL))) {
-	  double qFactor=getAreaQuality(i);
-	  Insert(i, qFactor, 0);
+	  Insert(i, qFactor*(1.0/maxEdgeLength), 0);
 	}
       }
     }
@@ -77,8 +77,19 @@ int FEM_Adapt_Algs::Refine(int qm, int method, double factor, double *sizes)
       }
       else  elId=Delete_Min(0);
       if ((elId != -1) && (theMesh->elem[0].is_valid(elId))) {
-	(void)refine_element_leb(elId); // refine the element
-	iter_mods++;
+	int *eConn = (int*)malloc(3*sizeof(int));
+	double tmpLen, maxEdgeLength;
+	theMesh->e2n_getAll(elId, eConn);
+	maxEdgeLength = length(eConn[0], eConn[1]);
+	tmpLen = length(eConn[1], eConn[2]);
+	if (tmpLen > maxEdgeLength) maxEdgeLength = tmpLen;
+	tmpLen = length(eConn[2], eConn[0]);
+	if (tmpLen > maxEdgeLength) maxEdgeLength = tmpLen;
+	if ((theMesh->elem[0].getMeshSizing(elId) > 0.0) &&
+	    (maxEdgeLength > (theMesh->elem[0].getMeshSizing(elId)*REFINE_TOL))) {
+	  (void)refine_element_leb(elId); // refine the element
+	  iter_mods++;
+	}
       }
       CthYield(); // give other chunks on the same PE a chance
     }
@@ -137,8 +148,7 @@ int FEM_Adapt_Algs::Coarsen(int qm, int method, double factor, double *sizes)
 	qFactor=getAreaQuality(i);
 	avgEdgeLength /= 3.0;
 	if (((theMesh->elem[0].getMeshSizing(i) > 0.0) &&
-	     ((avgEdgeLength < (theMesh->elem[0].getMeshSizing(i)*COARSEN_TOL))
-	      || (minEdgeLength < (0.5*avgEdgeLength))))
+	     (avgEdgeLength < (theMesh->elem[0].getMeshSizing(i)*COARSEN_TOL)))
 	    || (qFactor < QUALITY_MIN)) {
 	  Insert(i, qFactor*minEdgeLength, 1);
 	}
@@ -169,8 +179,7 @@ int FEM_Adapt_Algs::Coarsen(int qm, int method, double factor, double *sizes)
 	qFactor=getAreaQuality(elId);
 	// coarsen element's short edge
 	if (((theMesh->elem[0].getMeshSizing(elId) > 0.0) &&
-	     ((avgEdgeLength < (theMesh->elem[0].getMeshSizing(elId)*COARSEN_TOL))
-	      || (minEdgeLength < (0.5*avgEdgeLength))))
+	     (avgEdgeLength < (theMesh->elem[0].getMeshSizing(elId)*COARSEN_TOL)))
 	    || (qFactor < QUALITY_MIN)) {
 	  if (theAdaptor->edge_contraction(n1, n2) > 0)  iter_mods++;
 	}

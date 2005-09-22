@@ -16,9 +16,9 @@
 #include "vector2d.h"  // **CW** tentative
 
 #define SLIVERAREA 1.0e-12
-#define REFINE_TOL 1.1
-#define COARSEN_TOL 0.9
-#define QUALITY_MIN 0.5
+#define REFINE_TOL 1.5
+#define COARSEN_TOL 0.85
+#define QUALITY_MIN 0.6
 
 class femMeshModify;
 class FEM_Adapt;
