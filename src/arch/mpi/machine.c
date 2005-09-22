@@ -535,8 +535,9 @@ int PumpMsgs(void)
     MACHSTATE2(3,"PumpMsgs recv one from node:%d to rank:%d", sts.MPI_SOURCE, CMI_DEST_RANK(msg));
     CMI_CHECK_CHECKSUM(msg, nbytes);
     if (CMI_MAGIC(msg) != CHARM_MAGIC_NUMBER) { /* received a non-charm msg */
-      CmiPrintf("Charm++ Warning: Non Charm++ Message Received. \n");
+      CmiPrintf("Charm++ Abort: Non Charm++ Message Received of size %d. \n", nbytes);
       CmiFree(msg);
+      CmiAbort("Abort!\n");
       continue;
     }
 #if CMK_NODE_QUEUE_AVAILABLE
