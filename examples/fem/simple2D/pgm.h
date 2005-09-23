@@ -5,9 +5,12 @@
 #include "fem.h"
 #include "netfem.h"
 #include "vector2d.h"
+#include "fem_interpolate.h"
+
 
 //One element's connectivity information
 typedef int connRec[3];
+typedef int connRec2[4];
 
 // A structure for handling data that may need to be migrated
 struct myGlobals {
@@ -16,11 +19,17 @@ struct myGlobals {
   vector2d *coord;
   connRec *conn;
 
+  int nelems2;
+  connRec2 *conn2;
+
   vector2d *R_net, *d, *v, *a;
   
   double *S11, *S22, *S12;
 };
 
+void FEM_mesh_smooth(int mesh, int *nodes, int nNodes, int attrNo);
+
+void interpolate(FEM_Interpolate::NodalArgs args,FEM_Mesh *meshP);
 //Compute forces on constant-strain triangles:
 void CST_NL(const vector2d *coor,const connRec *lm,vector2d *R_net,
 	    const vector2d *d,const double *c,
