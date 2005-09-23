@@ -121,6 +121,17 @@ class BGLTorusManager {
   inline int coords2rank(int x, int y, int z) {
     return x + y * xsize + z * xsize * ysize;
   }
+
+  inline int getHopsToRank(int x1, int y1, int z1) {
+    int x,y,z;
+    getMyCoordinates(x,y,z);
+    return (abs(x1-x)+abs(y1-y)+abs(z1-z));
+  }
+  inline int getHopsToCoordinates(int pe){
+    int pe_x, pe_y, pe_z;
+    getCoordinatesByRank(pe, pe_x, pe_y, pe_z);
+    return getHopsToRank(pe_x,pe_y,pe_z);
+  }
 };
 
 CpvExtern(BGLTorusManager *, tmanager); 
