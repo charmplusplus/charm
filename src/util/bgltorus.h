@@ -122,15 +122,40 @@ class BGLTorusManager {
     return x + y * xsize + z * xsize * ysize;
   }
 
-  inline int getHopsToRank(int x1, int y1, int z1) {
+  inline int getHopsToCoordinates(int x1, int y1, int z1) {
     int x,y,z;
     getMyCoordinates(x,y,z);
     return (abs(x1-x)+abs(y1-y)+abs(z1-z));
   }
-  inline int getHopsToCoordinates(int pe){
+  inline int getHopsToRank(int pe){
     int pe_x, pe_y, pe_z;
     getCoordinatesByRank(pe, pe_x, pe_y, pe_z);
-    return getHopsToRank(pe_x,pe_y,pe_z);
+    return getHopsToCoordinates(pe_x,pe_y,pe_z);
+  }
+
+  /* return my cone number 0-5, self=-1 */
+  inline int getConeNumberForRank(int x1, int y1, int z1){
+    int x,y,z;
+    int dx,dy,dz;
+    getMyCoordinates(x,y,z);
+    dx=x1-x;
+    dy=y1-y;
+    dz=z1-z;
+    if(dx==0 && dy==0 && dz==0) return -1;
+    if(abs(dx)>=abs(dy) && abs(dx)>=abs(dz)) return (dx>0)?0:1;
+    if(abs(dy)> abs(dx) && abs(dy)>=abs(dz)) return (dy>0)?2:3;
+    if(abs(dz)> abs(dx) && abs(dz)> abs(dy)) return (dz>0)?4:5;
+    CkAssert(-1);
+  }
+
+  /* sort pes by ascending order of hops to me */
+  inline void sortRanksByHops(int *pes, int n){
+    int i,j,tmp;
+    for (i=0; i<n-1; i++)
+      for (j=0; j<n-1-i; j++)
+        if (getHopsToRank(pes[j+1]) < getHopsToRank(pes[j])){
+          tmp=pes[j+1]; pes[j+1]=pes[j]; pes[j]=tmp;
+        }
   }
 };
 
