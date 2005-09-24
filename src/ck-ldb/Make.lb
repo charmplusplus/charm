@@ -27,6 +27,7 @@ LOADBALANCERS=\
    $(L)/libmoduleTopoCentLB.a \
    $(L)/libmoduleHybridLB.a \
    $(L)/libmoduleHbmLB.a \
+   $(L)/libmoduleBlockLB.a \
    manager.o
 
 DummyLB.def.h: DummyLB.decl.h
@@ -172,6 +173,13 @@ RotateLB.decl.h: RotateLB.ci charmxi
 $(L)/libmoduleRotateLB.a: RotateLB.o 
 	$(CHARMC) -o $(L)/libmoduleRotateLB.a RotateLB.o 
 	
+BlockLB.def.h: BlockLB.decl.h
+
+BlockLB.decl.h: BlockLB.ci charmxi
+	$(CHARMXI) BlockLB.ci
+
+$(L)/libmoduleBlockLB.a: BlockLB.o 
+	$(CHARMC) -o $(L)/libmoduleBlockLB.a BlockLB.o 
 
 NeighborLB.def.h: NeighborLB.decl.h
 
@@ -271,6 +279,7 @@ LB_OBJ=EveryLB.o \
     TopoCentLB.o \
     HybridLB.o \
     HbmLB.o \
+		BlockLB.o \
     manager.o
 
 EveryLB.def.h: EveryLB.decl.h

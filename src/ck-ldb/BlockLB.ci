@@ -1,0 +1,11 @@
+module BlockLB
+{
+  extern module CentralLB;
+
+  initnode void lbinit (void);
+
+  group [migratable] BlockLB : CentralLB
+  {
+    entry void BlockLB (const CkLBOptions &);
+  };
+};
