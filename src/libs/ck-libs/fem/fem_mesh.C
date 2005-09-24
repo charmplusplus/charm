@@ -1153,27 +1153,34 @@ void FEM_Entity::allocateValid(void) {
 }
 
 void FEM_Entity::set_valid(unsigned int idx){
-  CkAssert(idx < size() && idx >=0);
+  CkAssert(idx < size() && idx >=0 && first_invalid<=last_invalid);
   valid->getChar()(idx,0)=1;
 
   if(idx == first_invalid)
   	// Move first_invalid to the next invalid entry	
-	while((first_invalid<=last_invalid) && is_valid(first_invalid))
+	while((first_invalid<last_invalid) && is_valid(first_invalid)){
 	  first_invalid++;
+	}
   else if(idx == last_invalid)
 	// Move last_invalid to the previous invalid entry	
-	while((first_invalid<=last_invalid) && is_valid(last_invalid))
+	while((first_invalid<last_invalid) && is_valid(last_invalid))
 	  last_invalid--;
 
   // If we have no invalid elements left, then put both pointers to 0
-  if(first_invalid == last_invalid)
+  if( first_invalid == last_invalid && is_valid(first_invalid) )
 	first_invalid = last_invalid = 0;
   
 }
 
 void FEM_Entity::set_invalid(unsigned int idx){
-  CkAssert(idx < size() && idx >=0);
+  CkAssert(idx < size() && idx >=0 && first_invalid<=last_invalid);
   valid->getChar()(idx,0)=0;
+
+  // If there are currently no invalid entities
+  if(first_invalid==0 && last_invalid==0 && is_valid(0)){
+	first_invalid = last_invalid = idx;
+	return;
+  }
 
   if(idx < first_invalid){
 	first_invalid = idx;
@@ -1195,11 +1202,12 @@ void FEM_Entity::set_invalid(unsigned int idx){
 }
 
 int FEM_Entity::is_valid(unsigned int idx){
-  CkAssert(idx < size() && idx >=0);
+  CkAssert(idx < size() && idx >=0 && first_invalid<=last_invalid);
   return valid->getChar()(idx,0);
 }
 
 unsigned int FEM_Entity::count_valid(){
+  CkAssert(first_invalid<=last_invalid);
   unsigned int count=0;
   for(int i=0;i<size();i++)
 	if(is_valid(i)) count++;
@@ -1212,21 +1220,18 @@ unsigned int FEM_Entity::count_valid(){
 /// If someone has a better name for this function, please change it.
 unsigned int FEM_Entity::get_next_invalid(){
   unsigned int retval;
-  if(! is_valid(first_invalid)){
-	retval = first_invalid;
-	set_valid(retval);
-	// Move first_invalid to the next invalid entry	
-	while((first_invalid<=last_invalid) && is_valid(first_invalid))
-	  first_invalid++;
-	
-	// If we have no invalid elements left, then put both pointers to 0
-	if(first_invalid == last_invalid)
-	  first_invalid = last_invalid = 0;
 
+  CkAssert(!is_valid(first_invalid) || first_invalid==0);
+
+  // if we have an invalid entity to return
+  if(! is_valid(first_invalid)){
+ 	retval = first_invalid;
+ 	set_valid(retval);
   }
   else{
-  	retval = size();
-    setLength(retval+1);
+	// resize array and return new entity
+	retval = size();
+	setLength(retval+1);
 	set_valid(retval);
   }
   return retval;
