@@ -122,18 +122,14 @@ CDECL void FEM_Print_e2e(int mesh, int eid){
 int FEM_add_node_local(FEM_Mesh *m, int addGhost){
   int newNode;
   if(addGhost){
-    newNode = m->node.getGhost()->size();
-    m->node.getGhost()->setLength(newNode+1); // lengthen node attributes
-    m->node.getGhost()->set_valid(newNode);   // set new node as valid
+	newNode = m->node.getGhost()->get_next_invalid(); // find a place for new node in tables, reusing old invalid nodes if possible
     m->n2e_removeAll(FEM_To_ghost_index(newNode));    // initialize element adjacencies
     m->n2n_removeAll(FEM_To_ghost_index(newNode));    // initialize node adjacencies
     //add a lock
     //m->getfmMM()->fmgLockN.push_back(new FEM_lockN(FEM_To_ghost_index(newNode),m->getfmMM()));
   }
   else{
-    newNode = m->node.size();
-    m->node.setLength(newNode+1); // lengthen node attributes
-    m->node.set_valid(newNode);   // set new node as valid
+    newNode = m->node.get_next_invalid();
     m->n2e_removeAll(newNode);    // initialize element adjacencies
     m->n2n_removeAll(newNode);    // initialize node adjacencies
     //add a lock
@@ -723,17 +719,12 @@ int FEM_add_element_local(FEM_Mesh *m, const int *conn, int connSize, int elemTy
   // lengthen element attributes
   int newEl;
   if(addGhost){
-    int oldLength = m->elem[elemType].getGhost()->size();
-    m->elem[elemType].getGhost()->setLength(oldLength+1);
-    m->elem[elemType].getGhost()->set_valid(oldLength);// Mark new element as valid
-    ((FEM_Elem*)m->elem[elemType].getGhost())->connIs(oldLength,conn);// update element's conn, i.e. e2n table
-    newEl = FEM_From_ghost_index(oldLength);
+    newEl = m->elem[elemType].getGhost()->get_next_invalid(); // find a place in the array for the new el
+    ((FEM_Elem*)m->elem[elemType].getGhost())->connIs(newEl,conn);// update element's conn, i.e. e2n table
+    newEl = FEM_From_ghost_index(newEl); // return the signed ghost value
   }
   else{
-    int oldLength = m->elem[elemType].size();
-    m->elem[elemType].setLength(oldLength+1);
-    newEl = oldLength;
-    m->elem[elemType].set_valid(newEl);  // Mark new element as valid
+    newEl = m->elem[elemType].get_next_invalid();
     m->elem[elemType].connIs(newEl,conn);  // update element's conn, i.e. e2n table
   }
   

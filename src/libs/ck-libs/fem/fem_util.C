@@ -456,7 +456,7 @@ void FEM_MUtil::removeGhostElementRemote(FEM_Mesh *m, int chk, int elementid, in
   const IDXL_List lgre = m->elem[elemtype].ghost->ghostRecv.getList(chk);
   localIdx = lgre[elementid];
   if(localIdx == -1) {
-    CkPrintf("Ghost element at shared index %d, already removed\n",elementid);
+	//    CkPrintf("Ghost element at shared index %d, already removed\n",elementid);
     return;
   }
   m->elem[elemtype].ghost->ghostRecv.removeNode(localIdx, chk); 

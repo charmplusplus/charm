@@ -1147,20 +1147,54 @@ void FEM_Entity::allocateValid(void) {
 	// Set all to valid initially
 	for(int i=0;i<size();i++)
 	  valid->getChar()(i,0)=1;
+  first_invalid = last_invalid = 0;
   }
+
 }
 
-void FEM_Entity::set_valid(int idx){
+void FEM_Entity::set_valid(unsigned int idx){
   CkAssert(idx < size() && idx >=0);
   valid->getChar()(idx,0)=1;
+
+  if(idx == first_invalid)
+  	// Move first_invalid to the next invalid entry	
+	while((first_invalid<=last_invalid) && is_valid(first_invalid))
+	  first_invalid++;
+  else if(idx == last_invalid)
+	// Move last_invalid to the previous invalid entry	
+	while((first_invalid<=last_invalid) && is_valid(last_invalid))
+	  last_invalid--;
+
+  // If we have no invalid elements left, then put both pointers to 0
+  if(first_invalid == last_invalid)
+	first_invalid = last_invalid = 0;
+  
 }
 
-void FEM_Entity::set_invalid(int idx){
+void FEM_Entity::set_invalid(unsigned int idx){
   CkAssert(idx < size() && idx >=0);
   valid->getChar()(idx,0)=0;
+
+  if(idx < first_invalid){
+	first_invalid = idx;
+  }
+  
+  if(idx > last_invalid){
+	last_invalid = idx;
+  }
+
+  // TODO:
+  // We should probably have an algorithm for shrinking the entire attribute 
+  // array if we invalidate the final element. In this case we should scan backwards
+  // to find the largest indexed valid entity and resize down to it.
+  // 
+  // It may be necessary to modify the idxl lists if we do this type of shrinking.
+  // Someone needs to confirm whether that is necessary. If not, then it should be 
+  // simple to allow shrinking of the number of nodes or elements.
+
 }
 
-int FEM_Entity::is_valid(int idx){
+int FEM_Entity::is_valid(unsigned int idx){
   CkAssert(idx < size() && idx >=0);
   return valid->getChar()(idx,0);
 }
@@ -1171,6 +1205,35 @@ unsigned int FEM_Entity::count_valid(){
 	if(is_valid(i)) count++;
   return count;
 }
+
+/// Get an entry(entity index) that corresponds to an invalid entity
+/// The invalid slot in the tables can then be reused when "creating" a new element or node
+/// We either return an empty slot, or resize the array and return a value at the end
+/// If someone has a better name for this function, please change it.
+unsigned int FEM_Entity::get_next_invalid(){
+  unsigned int retval;
+  if(! is_valid(first_invalid)){
+	retval = first_invalid;
+	set_valid(retval);
+	// Move first_invalid to the next invalid entry	
+	while((first_invalid<=last_invalid) && is_valid(first_invalid))
+	  first_invalid++;
+	
+	// If we have no invalid elements left, then put both pointers to 0
+	if(first_invalid == last_invalid)
+	  first_invalid = last_invalid = 0;
+
+  }
+  else{
+  	retval = size();
+    setLength(retval+1);
+	set_valid(retval);
+  }
+  return retval;
+}
+
+
+
 
 void FEM_Entity::setMaxLength(int newLen,int newMaxLen,void *pargs,FEM_Mesh_alloc_fn fn){
         CkPrintf("resize fn %p \n",fn);

@@ -657,8 +657,11 @@ class FEM_Entity {
 	/*
 	    used to allocate the char array for storing whether each entity is valid
 		When a node/element is deleted the flag in the valid table is set to 0.
+		Additionally, we keep track of the first and last occurence in the array of
+		invalid indices. This should make searching for slots to reuse quicker.
 	*/
 	FEM_DataAttribute *valid;
+	unsigned int first_invalid, last_invalid;
 	
 protected:
 	/**
@@ -755,10 +758,11 @@ protected:
 	 * Allocate or Modify the FEM_IS_VALID attribute data
 	 */
 	void allocateValid();
-	void set_valid(int idx);
-	void set_invalid(int idx);
-	int is_valid(int idx);
+	void set_valid(unsigned int idx);
+	void set_invalid(unsigned int idx);
+	int is_valid(unsigned int idx);
 	unsigned int count_valid();
+	unsigned int get_next_invalid();
 	
 	/**
 	 * Set the coordinates for a single item
