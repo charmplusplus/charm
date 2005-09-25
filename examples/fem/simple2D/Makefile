@@ -2,11 +2,15 @@ CHARMC=../../../bin/charmc $(OPTS)
 
 all: pgm
 
-pgm: pgm.o
-	$(CHARMC) -o pgm pgm.o -language fem -module netfem #-memory paranoid 
+pgm: pgm.o cst_nl.o
+	$(CHARMC) -o pgm pgm.o cst_nl.o -language fem -module netfem 
 
 pgm.o: pgm.C
-	$(CHARMC) -I../../../src/libs/ck-libs/fem -c pgm.C
+	$(CHARMC) -c pgm.C
+
+cst_nl.o: cst_nl.C
+	$(CHARMC) -c cst_nl.C
+
 
 test: pgm
 	./charmrun ./pgm +vp4 +p2
@@ -15,4 +19,4 @@ bgtest: pgm
 	./charmrun ./pgm +vp4 +p2 +x2 +y2 +z1
 
 clean:
-	rm -rf pgm fpgm *.o conv-host charmrun NetFEM Paraview* ParaView* *~ pvClient.out README
+	rm -f pgm fpgm *.o conv-host charmrun
