@@ -577,11 +577,12 @@ void LogEntry::addPapi(int numPapiEvts, int *papi_ids, LONG_LONG_PAPI *papiVals)
 
 void LogEntry::pup(PUP::er &p)
 {
-  int itime, irecvtime, icputime, i;
+  int i;
+  CMK_TYPEDEF_UINT8 itime, irecvtime, icputime;
   char ret = '\n';
 
   p|type;
-  if (p.isPacking()) itime = (int)(1.0e6*time);
+  if (p.isPacking()) itime = (CMK_TYPEDEF_UINT8)(1.0e6*time);
   switch (type) {
     case USER_EVENT:
     case USER_EVENT_PAIR:
@@ -597,8 +598,8 @@ void LogEntry::pup(PUP::er &p)
       break;
     case BEGIN_PROCESSING:
       if (p.isPacking()) {
-        irecvtime = (int)(recvTime==-1?-1:1.0e6*recvTime);
-        icputime = (int)(1.0e6*cputime);
+        irecvtime = (CMK_TYPEDEF_UINT8)(recvTime==-1?-1:1.0e6*recvTime);
+        icputime = (CMK_TYPEDEF_UINT8)(1.0e6*cputime);
       }
       p|mIdx; p|eIdx; p|itime; p|event; p|pe; 
       p|msglen; p|irecvtime; p|id.id[0]; p|id.id[1]; p|id.id[2];
@@ -619,7 +620,7 @@ void LogEntry::pup(PUP::er &p)
       }
       break;
     case END_PROCESSING:
-      if (p.isPacking()) icputime = (int)(1.0e6*cputime);
+      if (p.isPacking()) icputime = (CMK_TYPEDEF_UINT8)(1.0e6*cputime);
       p|mIdx; p|eIdx; p|itime; p|event; p|pe; p|msglen; p|icputime;
 #if CMK_HAS_COUNTER_PAPI
       p|numPapiEvents;
@@ -634,13 +635,13 @@ void LogEntry::pup(PUP::er &p)
       if (p.isUnpacking()) cputime = icputime/1.0e6;
       break;
     case CREATION:
-      if (p.isPacking()) irecvtime = (int)(1.0e6*recvTime);
+      if (p.isPacking()) irecvtime = (CMK_TYPEDEF_UINT8)(1.0e6*recvTime);
       p|mIdx; p|eIdx; p|itime;
       p|event; p|pe; p|msglen; p|irecvtime;
       if (p.isUnpacking()) recvTime = irecvtime/1.0e6;
       break;
     case CREATION_MULTICAST:
-      if (p.isPacking()) irecvtime = (int)(1.0e6*recvTime);
+      if (p.isPacking()) irecvtime = (CMK_TYPEDEF_UINT8)(1.0e6*recvTime);
       p|mIdx; p|eIdx; p|itime;
       p|event; p|pe; p|msglen; p|irecvtime; p|numpes;
       if (pes == NULL) {
@@ -1105,7 +1106,10 @@ void toProjectionsFile::bytes(void *p,int n,size_t itemSize,dataType t)
     case Tulong: CheckAndFPrintF(f," %lu",((unsigned long *)p)[i]); break;
     case Tfloat: CheckAndFPrintF(f," %.7g",((float *)p)[i]); break;
     case Tdouble: CheckAndFPrintF(f," %.15g",((double *)p)[i]); break;
+#ifdef CMK_PUP_LONG_LONG
     case Tlonglong: CheckAndFPrintF(f," %lld",((CMK_TYPEDEF_INT8 *)p)[i]); break;
+    case Tulonglong: CheckAndFPrintF(f," %llu",((CMK_TYPEDEF_UINT8 *)p)[i]); break;
+#endif
     default: CmiAbort("Unrecognized pup type code!");
     };
 }
@@ -1132,7 +1136,10 @@ void fromProjectionsFile::bytes(void *p,int n,size_t itemSize,dataType t)
     case Tulong:((unsigned long *)p)[i]=readUint(); break;
     case Tfloat: ((float *)p)[i]=(float)readDouble(); break;
     case Tdouble:((double *)p)[i]=readDouble(); break;
+#ifdef CMK_PUP_LONG_LONG
     case Tlonglong: ((CMK_TYPEDEF_INT8 *)p)[i]=readLongInt(); break;
+    case Tulonglong: ((CMK_TYPEDEF_UINT8 *)p)[i]=readLongInt(); break;
+#endif
     default: CmiAbort("Unrecognized pup type code!");
     };
 }
@@ -1153,7 +1160,10 @@ void toProjectionsGZFile::bytes(void *p,int n,size_t itemSize,dataType t)
     case Tulong: gzprintf(f," %lu",((unsigned long *)p)[i]); break;
     case Tfloat: gzprintf(f," %.7g",((float *)p)[i]); break;
     case Tdouble: gzprintf(f," %.15g",((double *)p)[i]); break;
+#ifdef CMK_PUP_LONG_LONG
     case Tlonglong: gzprintf(f," %lld",((CMK_TYPEDEF_INT8 *)p)[i]); break;
+    case Tulonglong: gzprintf(f," %llu",((CMK_TYPEDEF_UINT8 *)p)[i]); break;
+#endif
     default: CmiAbort("Unrecognized pup type code!");
     };
 }
