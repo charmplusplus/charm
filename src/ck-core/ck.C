@@ -970,6 +970,13 @@ static void _skipCldEnqueue(int pe,envelope *env, int infoFn)
 #endif
 
 // by pass Charm++ priority queue, send as Converse message
+static void _noCldEnqueueMulti(int npes, int *pes, envelope *env)
+{
+  CkPackMessage(&env);
+  int len=env->getTotalsize();
+  CmiSyncListSendAndFree(npes, pes, len, env);
+}
+
 static void _noCldEnqueue(int pe, envelope *env)
 {
 /*
