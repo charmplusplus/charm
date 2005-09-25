@@ -134,10 +134,11 @@ class BGLTorusManager {
   }
 
   /* return my cone number 0-5, self=-1 */
-  inline int getConeNumberForRank(int x1, int y1, int z1){
-    int x,y,z;
+  inline int getConeNumberForRank(int pe){
+    int x,y,z,x1,y1,z1;
     int dx,dy,dz;
     getMyCoordinates(x,y,z);
+    getCoordinatesByRank(pe, x1, y1, z1);
     dx=x1-x;
     dy=y1-y;
     dz=z1-z;
