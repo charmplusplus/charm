@@ -441,6 +441,8 @@ public:
 	/// Look up and return the array index of this location.
 	const CkArrayIndex &getIndex(void) const;
 	
+        void destroyAll();
+
 	/// Pup all the array elements at this location.
 	void pup(PUP::er &p);
 };

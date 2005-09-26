@@ -1674,6 +1674,10 @@ const CkArrayIndex &CkLocation::getIndex(void) const {
 	return rec->getIndex();
 }
 
+void CkLocation::destroyAll() {
+	mgr->callMethod(rec, &CkMigratable::ckDestroy);
+}
+
 void CkLocation::pup(PUP::er &p) {
 	mgr->pupElementsFor(p,rec,CkElementCreation_migrate);
 }
