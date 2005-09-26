@@ -1204,29 +1204,28 @@ void CkSendMsgBranch(int eIdx, void *msg, int pe, CkGroupID gID, int opts)
 }
 
 extern "C"
-void CkSendMsgBranchImmediateMulti(int eIdx,void *msg,int npes,int *pes,CkGroupID gID)
+void CkSendMsgBranchMultiImmediate(int eIdx,void *msg,int npes,int *pes,CkGroupID gID)
 {
 #if CMK_IMMEDIATE_MSG && ! CMK_SMP
-  register envelope *env = _prepareMsgBranch(eIdx,msg,gID,ForBocMsg);
+  register envelope *env = _prepareImmediateMsgBranch(eIdx,msg,gID,ForBocMsg);
   _TRACE_CREATION_MULTICAST(env, npes, pes);
   _noCldEnqueueMulti(npes, pes, env);
   _TRACE_CREATION_DONE(1);      // since it only creates one creation event.
-  _STATS_RECORD_SEND_BRANCH_N(npes);
-  CpvAccess(_qd)->create(npes);
 #else
   _sendMsgBranchMulti(eIdx, msg, gID, npes, pes);
+#endif
   _STATS_RECORD_SEND_BRANCH_N(npes);
   CpvAccess(_qd)->create(npes);
-#endif
 }
 
 extern "C"
 void CkSendMsgBranchMulti(int eIdx,void *msg,int npes,int *pes,CkGroupID gID, int opts)
 {
   if (opts & CK_MSG_IMMEDIATE) {
-    CkSendMsgBranchImmediateMulti(eIdx,msg,npes,pes,gID);
-    return; 
+    CkSendMsgBranchMultiImmediate(eIdx,msg,npes,pes,gID);
+    return;
   }
+    // normal mesg
   _sendMsgBranchMulti(eIdx, msg, gID, npes, pes);
   _STATS_RECORD_SEND_BRANCH_N(npes);
   CpvAccess(_qd)->create(npes);
