@@ -974,7 +974,7 @@ static void _noCldEnqueueMulti(int npes, int *pes, envelope *env)
 {
   CkPackMessage(&env);
   int len=env->getTotalsize();
-  CmiSyncListSendAndFree(npes, pes, len, env);
+  CmiSyncListSendAndFree(npes, pes, len, (char *)env);
 }
 
 static void _noCldEnqueue(int pe, envelope *env)
@@ -1376,12 +1376,32 @@ void CkArrayManagerDeliver(int pe,void *msg, int opts) {
     _skipCldEnqueue(pe, env, _infoIdx);
 }
 
+class ElementDestroyer : public CkLocIterator {
+private:
+        CkLocMgr *locMgr;
+public:
+        ElementDestroyer(CkLocMgr* mgr_):locMgr(mgr_){};
+        void addLocation(CkLocation &loc) {
+	  loc.destroyAll();
+        }
+};
+
 void CkDeleteChares() {
   int i;
-  // TODO: delete all array elements
+  int numGroups = CkpvAccess(_groupIDTable)->size();
+
+  // delete all array elements
+  for(i=0;i<numGroups;i++) {
+    IrrGroup *obj = CkpvAccess(_groupTable)->find((*CkpvAccess(_groupIDTable))[i]).getObj();
+    if(obj && obj->isLocMgr())  {
+      CkLocMgr *mgr = (CkLocMgr*)obj;
+      ElementDestroyer destroyer(mgr);
+      mgr->iterate(destroyer);
+printf("[%d] DELETE!\n", CkMyPe());
+    }
+  }
 
   // delete all groups
-  int numGroups = CkpvAccess(_groupIDTable)->size();
   CmiImmediateLock(CkpvAccess(_groupTableImmLock));
   for(i=0;i<numGroups;i++) {
     CkGroupID gID = (*CkpvAccess(_groupIDTable))[i];
@@ -1389,6 +1409,7 @@ void CkDeleteChares() {
     if (obj) delete obj;
   }
   CmiImmediateUnlock(CkpvAccess(_groupTableImmLock));
+
   // delete all node groups
   if (CkMyRank() == 0) {
     int numNodeGroups = CksvAccess(_nodeGroupIDTable).size();
