@@ -2435,7 +2435,7 @@ void Entry::genGroupDecl(XStr& str)
     if(!forElement && !isSync() && !container->isNodeGroup()) {
       str << "    "<<retType<<" "<<name<<"("<<paramComma(1,0)<<"int npes, int *pes"<<eo(1)<<")\n";
       str << "    {\n"<<marshallMsg();
-      str << "      CkSendMsg"<<node<<"BranchMulti("<<params<<", npes, pes, ckGetGroupID());\n";
+      str << "      CkSendMsg"<<node<<"BranchMulti("<<params<<", npes, pes, ckGetGroupID()"<<opts<<");\n";
       str << "    }\n";
     }
   }

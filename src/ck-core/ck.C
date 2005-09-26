@@ -1194,21 +1194,39 @@ void CkSendMsgBranch(int eIdx, void *msg, int pe, CkGroupID gID, int opts)
     CkSendMsgBranchInline(eIdx, msg, pe, gID, opts);
     return;
   }
-#ifndef CMK_OPTIMIZE
   if (opts & CK_MSG_IMMEDIATE) {
     CkSendMsgBranchImmediate(eIdx,msg,pe,gID);
     return;
-//     CmiAbort("Immediate message is not allowed in Group!");
   }
-#endif
   _sendMsgBranch(eIdx, msg, gID, pe, opts);
   _STATS_RECORD_SEND_BRANCH_1();
   CkpvAccess(_coreState)->create();
 }
 
 extern "C"
-void CkSendMsgBranchMulti(int eIdx,void *msg,int npes,int *pes,CkGroupID gID)
+void CkSendMsgBranchImmediateMulti(int eIdx,void *msg,int npes,int *pes,CkGroupID gID)
 {
+#if CMK_IMMEDIATE_MSG && ! CMK_SMP
+  register envelope *env = _prepareMsgBranch(eIdx,msg,gID,ForBocMsg);
+  _TRACE_CREATION_MULTICAST(env, npes, pes);
+  _noCldEnqueueMulti(npes, pes, env);
+  _TRACE_CREATION_DONE(1);      // since it only creates one creation event.
+  _STATS_RECORD_SEND_BRANCH_N(npes);
+  CpvAccess(_qd)->create(npes);
+#else
+  _sendMsgBranchMulti(eIdx, msg, gID, npes, pes);
+  _STATS_RECORD_SEND_BRANCH_N(npes);
+  CpvAccess(_qd)->create(npes);
+#endif
+}
+
+extern "C"
+void CkSendMsgBranchMulti(int eIdx,void *msg,int npes,int *pes,CkGroupID gID, int opts)
+{
+  if (opts & CK_MSG_IMMEDIATE) {
+    CkSendMsgBranchImmediateMulti(eIdx,msg,npes,pes,gID);
+    return; 
+  }
   _sendMsgBranchMulti(eIdx, msg, gID, npes, pes);
   _STATS_RECORD_SEND_BRANCH_N(npes);
   CpvAccess(_qd)->create(npes);
