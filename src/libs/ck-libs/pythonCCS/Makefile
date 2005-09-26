@@ -13,7 +13,7 @@ $(DEST): $(OBJS)
 	$(CHARMC) $(OBJS) -o $@
 
 headers: $(HEADERS)
-	cp ($HEADERS) $(CDIR)/include/
+	cp $(HEADERS) $(CDIR)/include/
 	touch headers
 
 PythonCCS.o: PythonCCS.C $(HEADDEP)
