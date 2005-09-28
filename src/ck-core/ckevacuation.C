@@ -5,8 +5,8 @@
 #include "ck.h"
 #include "ckevacuation.h"
 
-#define DEBUGC(x) x
-//#define DEBUGC(x) 
+//#define DEBUGC(x) x
+#define DEBUGC(x) 
 
 /***********************************************************************************************/
 /*
@@ -140,7 +140,7 @@ void CkEvacuatedElement(){
 	CKLOCMGR_LOOP(((CkLocMgr*)(obj))->iterate(evac););
 	
 	CmiAssert(remainingElements >= 0);
-	DEBUGC(printf("[%d] remaining elements %d \n",CkMyPe(),remainingElements););
+	DEBUGC(printf("[%d] remaining elements %d \n",CkMyPe(),remainingElements));
 	if(remainingElements == 0){
 		printf("[%d] Processor empty in %.6lfs \n",CkMyPe(),CmiWallTimer()-evacTime);
 		CpvAccess(_validProcessors)[CkMyPe()] = 0;
@@ -206,7 +206,7 @@ void CkClearAllArrayElements(){
 		obj->evacuate();
 	}
 	
-	DEBUGC(printf("[%d] remaining elements %d number Evacuated %d \n",CkMyPe(),remainingElements,numEvacuated););
+	DEBUGC(printf("[%d] remaining elements %d number Evacuated %d \n",CkMyPe(),remainingElements,numEvacuated));
 	numValidProcessors = CkNumValidPes()-1;
 	CkAnnounceEvac(remainingElements);
 	if(remainingElements == 0){
@@ -246,7 +246,7 @@ void CkElementEvacuate::addLocation(CkLocation &loc){
 		*/
 		CkVec<CkMigratable *>list;
 		locMgr->migratableList(rec,list);
-		DEBUGC(printf("[%d] ArrayElement not ready to Evacuate number of migratable %d \n",CkMyPe(),list.size()););
+		DEBUGC(printf("[%d] ArrayElement not ready to Evacuate number of migratable %d \n",CkMyPe(),list.size()));
 		for(int i=0;i<list.size();i++){
 			if(list[i]->isAsyncEvacuate()){
 				DEBUGC(printf("[%d] possible TCharm element decides to migrate \n",CkMyPe()));
