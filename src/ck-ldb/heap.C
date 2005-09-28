@@ -133,6 +133,9 @@ void minHeap::update(InfoRecord *x) {
     int index;
     for (index=0; index<numElements(); index++) 
       if (x == h[index].info) break;
+    if (index == numElements()) {
+      CmiAbort("minHeap: update a non-existent element!\n");
+    }
     update(index);
 }
 

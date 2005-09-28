@@ -95,7 +95,7 @@ public:
     int getRecvHash(LDCommData &cData);
     void clearCommHash();
     void clear() {
-      n_objs = n_comm = 0;
+      n_objs = n_comm = n_migrateobjs = 0;
       objData.free();
       commData.free();
       from_proc.free();
