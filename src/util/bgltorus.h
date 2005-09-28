@@ -158,6 +158,25 @@ class BGLTorusManager {
           tmp=pes[j+1]; pes[j+1]=pes[j]; pes[j]=tmp;
         }
   }
+
+  inline int getHopsBetweenRanks(int pe, int pe1){
+    int x,y,z,x1,y1,z1;
+    getCoordinatesByRank(pe,x,y,z);
+    getCoordinatesByRank(pe1,x1,y1,z1);
+    return (abs(x1-x)+abs(y1-y)+abs(z1-z));
+  }
+  inline int pickClosestRank(int mype, int *pes, int n){
+    int minHops=getHopsBetweenRanks(mype,pes[0]);
+    int minIdx=0;
+    int nowHops; 
+    for(int i=1;i<n;i++){
+      nowHops = getHopsBetweenRanks(mype,pes[i]);
+      if(nowHops<minHops){
+        minHops=nowHops; minIdx=i;
+      }
+    }
+    return minIdx;
+  }
 };
 
 CpvExtern(BGLTorusManager *, tmanager); 
