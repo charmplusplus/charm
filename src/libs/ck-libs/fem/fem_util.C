@@ -693,7 +693,8 @@ void FEM_MUtil::StructureTest(FEM_Mesh *m) {
   int noEle = m->elem[0].size();
 
   int *n2e, n2esize=0;
-  int e2n[m->elem[0].getConn().width()];
+  int wdt = m->elem[0].getConn().width(); 
+  int e2n[wdt];
 
   for(int i=0; i<noNodes; i++) {
     if(m->node.is_valid(i)) {
@@ -763,7 +764,8 @@ void FEM_MUtil::StructureTest(FEM_Mesh *m) {
 
 int FEM_MUtil::AreaTest(FEM_Mesh *m) {
   int noEle = m->elem[0].size();
-  int *con = new int[m->elem[0].getConn().width()];
+  int wdt = m->elem[0].getConn().width();
+  int *con = new int[wdt];
 
   for(int i=0; i<noEle; i++) {
     if(m->elem[0].is_valid(i)) {
