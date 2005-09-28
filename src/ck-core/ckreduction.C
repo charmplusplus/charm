@@ -64,13 +64,14 @@ waits for the migrant contributions to straggle in.
 
 // For status and data messages from the builtin reducer functions.
 #define RED_DEB(x) //CkPrintf x
-
+#define DEBREVAC(x) CkPrintf x
 #else
 //No debugging info-- empty defines
 #define DEBUGRED 0
 #define DEBR(x) //CkPrintf x
 #define DEBN(x) //CkPrintf x
 #define RED_DEB(x) //CkPrintf x
+#define DEBREVAC(x) //CkPrintf x
 #endif
 
 #ifndef INT_MAX
@@ -1728,13 +1729,13 @@ void CkNodeReductionMgr::pup(PUP::er &p)
 	reduction tree. 
 */
 void CkNodeReductionMgr::evacuate(){
-	DEBR(("[%d] Evacuate called on nodereductionMgr \n",CkMyNode()));
+	DEBREVAC(("[%d] Evacuate called on nodereductionMgr \n",CkMyNode()));
 	if(treeKids() == 0){
 	/*
 		if the node going down is a leaf
 	*/
 		oldleaf=true;
-		DEBR(("[%d] Leaf Node marks itself for deletion when evacuation is complete \n",CkMyNode()));
+		DEBREVAC(("[%d] Leaf Node marks itself for deletion when evacuation is complete \n",CkMyNode()));
 		/*
 			Need to ask parent for the reduction number that it has seen. 
 			Since it is a leaf, the tree does not need to be rewired. 
@@ -1746,7 +1747,7 @@ void CkNodeReductionMgr::evacuate(){
 		thisProxy[treeParent()].modifyTree(LEAFPARENT,1,&deleteNode);
 		newParent = treeParent();
 	}else{
-		DEBR(("[%d] Internal Node sends messages to change the redN tree \n",CkMyNode()));
+		DEBREVAC(("[%d] Internal Node sends messages to change the redN tree \n",CkMyNode()));
 		oldleaf= false;
 	/*
 		It is not a leaf. It needs to rewire the tree around itself.
@@ -1805,7 +1806,7 @@ void CkNodeReductionMgr::evacuate(){
 */
 
 void CkNodeReductionMgr::modifyTree(int code,int size,int *data){
-	DEBR(("[%d] Received modifyTree request with code %d \n",CkMyNode(),code));
+	DEBREVAC(("[%d] Received modifyTree request with code %d \n",CkMyNode(),code));
 	int sender;
 	newKids = kids;
 	readyDeletion = false;
@@ -1832,6 +1833,12 @@ void CkNodeReductionMgr::modifyTree(int code,int size,int *data){
 			sender = parent;
 			break;
 		case LEAFPARENT:
+			for(int i=0;i<numKids;i++){
+				if(newKids[i] == data[0]){
+					newKids.remove(i);
+					break;
+				}
+			}
 			sender = data[0];
 			newParent = parent;
 			break;
@@ -1860,7 +1867,7 @@ void CkNodeReductionMgr::collectMaxRedNo(int maxRedNo){
 		if(maxModificationRedNo == -1){
 			printf("[%d] This array has not started reductions yet \n",CkMyNode());
 		}else{
-			DEBR(("[%d] maxModificationRedNo for this nodegroup %d \n",CkMyNode(),maxModificationRedNo));
+			DEBREVAC(("[%d] maxModificationRedNo for this nodegroup %d \n",CkMyNode(),maxModificationRedNo));
 		}
 		thisProxy[parent].unblockNode(maxModificationRedNo);
 		for(int i=0;i<numKids;i++){
@@ -1897,6 +1904,7 @@ void CkNodeReductionMgr::clearBlockedMsgs(){
 	if the reduction number exceeds the maxModificationRedNo, change the tree
 	to become the new one
 */
+
 void CkNodeReductionMgr::updateTree(){
 	if(redNo > maxModificationRedNo){
 		parent = newParent;
@@ -1904,13 +1912,18 @@ void CkNodeReductionMgr::updateTree(){
 		maxModificationRedNo = INT_MAX;
 		numKids = kids.size();
 		readyDeletion = true;
-		DEBR(("[%d] Updating Tree numKids %d \n",CkMyNode(),numKids));
+		DEBREVAC(("[%d] Updating Tree numKids %d \n",CkMyNode(),numKids));
+	}else{
+		if(maxModificationRedNo != INT_MAX){
+			DEBREVAC(("[%d] Updating delayed because redNo %d maxModificationRedNo %d \n",CkMyNode(),redNo,maxModificationRedNo));
+			startReduction(redNo,CkMyNode());
+		}	
 	}
 }
 
 
 void CkNodeReductionMgr::doneEvacuate(){
-	DEBR(("[%d] doneEvacuate called \n",CkMyNode()));
+	DEBREVAC(("[%d] doneEvacuate called \n",CkMyNode()));
 /*	if(oldleaf){
 		
 			It used to be a leaf
@@ -1945,7 +1958,7 @@ void CkNodeReductionMgr::doneEvacuate(){
 }
 
 void CkNodeReductionMgr::DeleteChild(int deletedChild){
-	DEBR(("[%d] Deleting child %d \n",CkMyNode(),deletedChild));
+	DEBREVAC(("[%d] Deleting child %d \n",CkMyNode(),deletedChild));
 	for(int i=0;i<numKids;i++){
 		if(kids[i] == deletedChild){
 			kids.remove(i);
@@ -1963,7 +1976,7 @@ void CkNodeReductionMgr::DeleteNewChild(int deletedChild){
 			break;
 		}
 	}
-	DEBR(("[%d] Deleting  new child %d readyDeletion %d newKids %d \n",CkMyNode(),deletedChild,readyDeletion,newKids.size()));
+	DEBREVAC(("[%d] Deleting  new child %d readyDeletion %d newKids %d \n",CkMyNode(),deletedChild,readyDeletion,newKids.size()));
 	finishReduction();
 }
 
@@ -1979,7 +1992,7 @@ int CkNodeReductionMgr::findMaxRedNo(){
 		then tree can be changed before the reduction redNo can be started
 	*/ 
 	if(redNo == max && msgs.length() == 0){
-		DEBR(("[%d] Redn %d has not received any contributions \n",CkMyNode(),max));
+		DEBREVAC(("[%d] Redn %d has not received any contributions \n",CkMyNode(),max));
 		max--;
 	}
 	return max;

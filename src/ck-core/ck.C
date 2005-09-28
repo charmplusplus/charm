@@ -933,7 +933,7 @@ static void _skipCldEnqueue(int pe,envelope *env, int infoFn)
   if(pe == CkMyPe() ){
     if(!CmiNodeAlive(CkMyPe())){
 	printf("[%d] Invalid processor sending itself a message \n",CkMyPe());
-	return;
+//	return;
     }
   }
   if (pe == CkMyPe() && !CmiImmIsRunning()) {

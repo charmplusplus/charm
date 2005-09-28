@@ -327,3 +327,20 @@ int CkNumValidPes(){
 };
 
 
+void processRaiseEvacFile(char *raiseEvacFile){
+	FILE *fp = fopen(raiseEvacFile,"r");
+	if(fp == NULL){
+		printf("Could not open raiseevac file %s. Ignoring raiseevac \n",raiseEvacFile);
+		return;
+	}
+	char line[100];
+	while(fgets(line,99,fp)!=0){
+		int pe,faultTime;
+		sscanf(line,"%d %d",&pe,&faultTime);
+		if(pe == CkMyPe()){
+			printf("[%d] Processor to be evacuated after %ds\n",CkMyPe(),faultTime);
+			CcdCallFnAfter((CcdVoidFn)CkDecideEvacPe, 0, faultTime*1000);
+		}
+	}
+	fclose(fp);	
+}

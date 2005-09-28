@@ -139,7 +139,9 @@ int _ringexit = 0;		    // for charm exit
 
 	flag which marks whether or not to trigger the processor shutdowns
 */
-int _raiseEvac=0;
+static int _raiseEvac=0;
+static char *_raiseEvacFile;
+void processRaiseEvacFile(char *raiseEvacFile);
 
 static inline void _parseCommandLineOpts(char **argv)
 {
@@ -191,7 +193,7 @@ static inline void _parseCommandLineOpts(char **argv)
 
 		if the argument +raiseevac is present then cause faults
 	*/
-	if(CmiGetArgFlagDesc(argv,"+raiseevac","Generates processor evacuation on random processors")){
+	if(CmiGetArgStringDesc(argv,"+raiseevac", &_raiseEvacFile,"Generates processor evacuation on random processors")){
 		_raiseEvac = 1;
 	}
 }
@@ -814,9 +816,16 @@ void _initCharm(int unused_argc, char **argv)
 
 	evacuate = 0;
 	CcdCallOnCondition(CcdSIGUSR1,(CcdVoidFn)CkDecideEvacPe,0);
-	if(CkMyPe() == 1 && _raiseEvac){
-	//	CcdCallOnConditionKeep(CcdPERIODIC_10s,(CcdVoidFn)CkDecideEvacPe,0);
-		CcdCallOnCondition(CcdPERIODIC_10s,(CcdVoidFn)CkDecideEvacPe,0);
+	if(_raiseEvac){
+		processRaiseEvacFile(_raiseEvacFile);
+		/*
+		if(CkMyPe() == 2){
+		//	CcdCallOnConditionKeep(CcdPERIODIC_10s,(CcdVoidFn)CkDecideEvacPe,0);
+			CcdCallFnAfter((CcdVoidFn)CkDecideEvacPe, 0, 10000);
+		}
+		if(CkMyPe() == 3){
+			CcdCallFnAfter((CcdVoidFn)CkDecideEvacPe, 0, 10000);
+		}*/
 	}	
 	
 	if (faultFunc) {
