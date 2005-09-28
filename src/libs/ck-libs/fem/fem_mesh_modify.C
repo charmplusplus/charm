@@ -122,18 +122,23 @@ CDECL void FEM_Print_e2e(int mesh, int eid){
 int FEM_add_node_local(FEM_Mesh *m, int addGhost){
   int newNode;
   if(addGhost){
-	newNode = m->node.getGhost()->get_next_invalid(); // find a place for new node in tables, reusing old invalid nodes if possible
+	newNode = m->node.getGhost()->get_next_invalid(m,true,true); // find a place for new node in tables, reusing old invalid nodes if possible
     m->n2e_removeAll(FEM_To_ghost_index(newNode));    // initialize element adjacencies
     m->n2n_removeAll(FEM_To_ghost_index(newNode));    // initialize node adjacencies
     //add a lock
     //m->getfmMM()->fmgLockN.push_back(new FEM_lockN(FEM_To_ghost_index(newNode),m->getfmMM()));
   }
   else{
-    newNode = m->node.get_next_invalid();
+    newNode = m->node.get_next_invalid(m,true,false);
     m->n2e_removeAll(newNode);    // initialize element adjacencies
     m->n2n_removeAll(newNode);    // initialize node adjacencies
     //add a lock
-    m->getfmMM()->fmLockN.push_back(new FEM_lockN(newNode,m->getfmMM()));
+    if(newNode >= m->getfmMM()->fmLockN.size()) {
+      m->getfmMM()->fmLockN.push_back(new FEM_lockN(newNode,m->getfmMM()));
+    }
+    else {
+      m->getfmMM()->fmLockN[newNode]->reset(newNode,m->getfmMM());
+    }
   }
   return newNode;  // return a new index
 }
@@ -226,12 +231,17 @@ void FEM_remove_node_local(FEM_Mesh *m, int node) {
   int *adjNodes, *adjElts;
   m->n2n_getAll(node, &adjNodes, &numAdjNodes);
   m->n2e_getAll(node, &adjElts, &numAdjElts);
-    
+  
   // mark node as deleted/invalid
   if(FEM_Is_ghost_index(node)){
-    if((numAdjNodes==0) && (numAdjElts==0)) {
-      m->node.ghost->set_invalid(FEM_To_ghost_index(node));
-    } //otherwise this ghost node is connected to some element in another chunk, which the chunk that just informed us doesn't know abt
+    CkAssert((numAdjNodes==0) && (numAdjElts==0));
+    //otherwise this ghost node is connected to some element in another chunk, which the chunk that just informed us doesn't know abt
+    m->node.ghost->set_invalid(FEM_To_ghost_index(node),true);
+    //look up the ghostrecv idxl list & clean up all instances
+    const IDXL_Rec *irec = m->node.ghost->ghostRecv.getRec(FEM_To_ghost_index(node));
+    int size = 0;
+    if(irec) size = irec->getShared();
+    CkAssert(size==0);
   }
   else {
     //look it up on the idxl list and delete any instances in it
@@ -248,19 +258,20 @@ void FEM_remove_node_local(FEM_Mesh *m, int node) {
       for(int chkno=0; chkno<size; chkno++) {
 	int remoteChunk = chknos[chkno];
 	int sharedIdx = sharedIndices[chkno];
-	m->node.ghostSend.removeNode(node, remoteChunk);
 	//go to that remote chunk & delete this idxl list and this ghost node
 	meshMod[remoteChunk].removeGhostNode(m->getfmMM()->getIdx(), sharedIdx);
+	m->node.ghostSend.removeNode(node, remoteChunk);
       }
       free(chknos);
       free(sharedIndices);
     }
     
-    CkAssert((numAdjNodes==0) && (numAdjElts==0)); // we shouldn't be removing a node away that is connected to anything
+    CkAssert((numAdjNodes==0) && (numAdjElts==0)); // we shouldn't be removing a node away that is connected to something
     /*if(!((numAdjNodes==0) && (numAdjElts==0))) { // we shouldn't be removing a node away that is connected to anything
       CkPrintf("Error:: node %d has %d node adjacencies and %d edge adjacencies\n",node,numAdjNodes,numAdjElts);
       }*/
-    m->node.set_invalid(node);
+    m->node.set_invalid(node,true);
+    m->getfmMM()->fmLockN[node]->reset(node,m->getfmMM());
   }
   if(numAdjNodes != 0) delete[] adjNodes;
   if(numAdjElts != 0) delete[] adjElts;
@@ -299,7 +310,7 @@ void FEM_remove_node(FEM_Mesh *m, int node){
     
     // mark node as deleted/invalid locally
     //FEM_remove_node_local(m,node);
-    //m->node.set_invalid(node);
+    //m->node.set_invalid(node,true);
     if(numAdjNodes!=0) delete[] adjNodes;
     if(numAdjElts!=0) delete[] adjElts;
   }
@@ -330,10 +341,10 @@ void FEM_remove_element_local(FEM_Mesh *m, int element, int etype){
   
   // delete element by marking invalid
   if(FEM_Is_ghost_index(element)){
-    m->elem[etype].getGhost()->set_invalid(FEM_To_ghost_index(element));
+    m->elem[etype].getGhost()->set_invalid(FEM_To_ghost_index(element),false);
   }
   else {
-    m->elem[etype].set_invalid(element);
+    m->elem[etype].set_invalid(element,false);
   }
   
   // We must now remove any n2n adjacencies which existed because of the 
@@ -353,7 +364,7 @@ void FEM_remove_element_local(FEM_Mesh *m, int element, int etype){
     if(adjelts[i] != -1){
       int *adjnodes2 = new int[nodesPerEl];
       m->e2n_getAll(adjelts[i], adjnodes2, etype);
-	
+      
       for(int j=0;j<nodesPerEl;j++){     // for each j,k pair of nodes adjacent to the neighboring element
 	for(int k=j+1;k<nodesPerEl;k++){   
 	  if(!m->n2n_exists(adjnodes2[j],adjnodes2[k]))
@@ -369,6 +380,7 @@ void FEM_remove_element_local(FEM_Mesh *m, int element, int etype){
  
   delete[] adjelts;
   delete[] adjnodes;
+  return;
 }
 
 // Can be called on local or ghost elements
@@ -431,11 +443,11 @@ int FEM_remove_element(FEM_Mesh *m, int elementid, int elemtype, int permanent){
 	  CkVec<int> ghostREIndices;
 	  int numSharedNodes = 0;
 	  int *sharedIndices = (int*)malloc(connSize*sizeof(int));
+	  m->elem[elemtype].ghostSend.removeNode(elementid, chk);
 	  if(permanent) {
 	    //get the list of n2e for all nodes of this element. If any node has only this element in its list.
 	    //it no longer should be a ghost on chk
 	    //the next step is to figure out all the ghost elements & nodes that it no longer needs to have
-	    m->elem[elemtype].ghostSend.removeNode(elementid, chk);
 	    const IDXL_List ll = m->elem[elemtype].ghostSend.getList(chk);
 	    int size = ll.size();
 	    int *nodes = (int*)malloc(connSize*sizeof(int));
@@ -489,7 +501,7 @@ int FEM_remove_element(FEM_Mesh *m, int elementid, int elemtype, int permanent){
 	      if(losingThisNode) {
 		//was a shared node, but now it should be a ghost node
 		for(int k=0; k<numElems; k++) {
-		  int *nds = (int*)malloc(3*sizeof(int));
+		  int *nds = (int*)malloc(m->elem[elemtype].getConn().width()*sizeof(int));
 		  if(FEM_Is_ghost_index(elems[k])) {
 		    m->e2n_getAll(elems[k], nds, elemtype);
 		    int geShouldBeDeleted = 1;
@@ -719,12 +731,12 @@ int FEM_add_element_local(FEM_Mesh *m, const int *conn, int connSize, int elemTy
   // lengthen element attributes
   int newEl;
   if(addGhost){
-    newEl = m->elem[elemType].getGhost()->get_next_invalid(); // find a place in the array for the new el
+    newEl = m->elem[elemType].getGhost()->get_next_invalid(m,false,true); // find a place in the array for the new el
     ((FEM_Elem*)m->elem[elemType].getGhost())->connIs(newEl,conn);// update element's conn, i.e. e2n table
     newEl = FEM_From_ghost_index(newEl); // return the signed ghost value
   }
   else{
-    newEl = m->elem[elemType].get_next_invalid();
+    newEl = m->elem[elemType].get_next_invalid(m,false,false);
     m->elem[elemType].connIs(newEl,conn);  // update element's conn, i.e. e2n table
   }
   
@@ -743,7 +755,7 @@ int FEM_add_element_local(FEM_Mesh *m, const int *conn, int connSize, int elemTy
   m->e2e_removeAll(newEl);
   update_new_element_e2e(m,newEl,elemType);
 
-  int *adjes = new int[3];
+  int *adjes = new int[connSize];
   m->e2e_getAll(newEl, adjes, 0);
   CkAssert(!((adjes[0]==adjes[1] && adjes[0]!=-1) || (adjes[1]==adjes[2] && adjes[1]!=-1) || (adjes[2]==adjes[0] && adjes[2]!=-1)));
   delete[] adjes;
@@ -1235,7 +1247,7 @@ int FEM_Modify_UnlockN(FEM_Mesh *m, int nodeId, int readlock) {
   return -1; //should not reach here
 }
 
-CDECL void FEM_REF_INIT(int mesh) {
+CDECL void FEM_REF_INIT(int mesh, int dim) {
   CkArrayID femRefId;
   int cid;
   int size;
@@ -1257,7 +1269,7 @@ CDECL void FEM_REF_INIT(int mesh) {
   meshMod[cid].insert(fm);
 
   FEM_Mesh *m=FEM_Mesh_lookup(mesh,"FEM_REF_INIT");
-  FEMMeshMsg *msg = new FEMMeshMsg(m); 
+  FEMMeshMsg *msg = new FEMMeshMsg(m,dim); 
   meshMod[cid].setFemMesh(msg);
 
   return;
@@ -1318,7 +1330,7 @@ void femMeshModify::setFemMesh(FEMMeshMsg *fm) {
   fmMesh->setFemMeshModify(this);
   fmAdapt = new FEM_Adapt(fmMesh, this);
   fmAdaptL = new FEM_AdaptL(fmMesh, this);
-  int dim = 2; // FIX ME!  Look this up somewhere!
+  int dim = fm->dimn;
   fmAdaptAlgs = new FEM_Adapt_Algs(fmMesh, this, dim);
   fmInp = new FEM_Interpolate(fmMesh, this);
   //populate the node locks

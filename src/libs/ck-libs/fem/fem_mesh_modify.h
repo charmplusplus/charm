@@ -121,9 +121,11 @@ class double2Msg : public CMessage_double2Msg {
 class FEMMeshMsg : public CMessage_FEMMeshMsg {
  public:
   FEM_Mesh *m;
+  int dimn;
 
-  FEMMeshMsg(FEM_Mesh *mh) {
+  FEMMeshMsg(FEM_Mesh *mh, int dim) {
     m = mh;
+    dimn = dim;
   }
 
   ~FEMMeshMsg() {}

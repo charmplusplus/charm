@@ -6,6 +6,8 @@
 #include "fem_lock_node.h"
 #include "fem_mesh_modify.h"
 
+//#define DEBUG_LOCKS
+
 FEM_lockN::FEM_lockN(int i,femMeshModify *mod) {
   owner = -1;
   pending = -1;
@@ -17,6 +19,15 @@ FEM_lockN::FEM_lockN(int i,femMeshModify *mod) {
 
 FEM_lockN::~FEM_lockN() {
   //before deleting it, ensure that it is not holding any locks
+}
+
+void FEM_lockN::reset(int i,femMeshModify *mod) {
+  owner = -1;
+  pending = -1;
+  theMod = mod;
+  idx = i;
+  noreadLocks = 0;
+  nowriteLocks = 0;
 }
 
 int FEM_lockN::rlock() {
@@ -59,6 +70,9 @@ int FEM_lockN::wlock(int own) {
 }
 
 int FEM_lockN::wunlock(int own) {
+  if(!(noreadLocks==0 && nowriteLocks>0)) {
+    CkPrintf("[%d] Error:: unlocking unacquired write lock %d{%d} .\n",owner, idx, theMod->idx);
+  }
   CkAssert(noreadLocks==0 && nowriteLocks>0);
   if(nowriteLocks) {
     nowriteLocks--;
@@ -71,4 +85,11 @@ int FEM_lockN::wunlock(int own) {
     return -1;
   }
   return -1;
+}
+
+bool FEM_lockN::haslocks() {
+  if(noreadLocks>0 || nowriteLocks>0) {
+    return true;
+  }
+  else return false;
 }

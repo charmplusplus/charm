@@ -221,6 +221,7 @@ void FEM_MUtil::removeNodeAll(FEM_Mesh *m, int localIdx)
       fm->chk = mmod->idx;
       fm->index = sidx[i];
       meshMod[schunks[i]].removeSharedNodeRemote(fm);
+      m->node.shared.removeNode(localIdx, schunks[i]);      
     }
     free(schunks);
     free(sidx);
@@ -264,22 +265,28 @@ void FEM_MUtil::removeNodeRemote(FEM_Mesh *m, int chk, int sharedIdx) {
   int localIdx;
   const IDXL_List ll = m->node.shared.getList(chk);
   localIdx = ll[sharedIdx];
+  m->node.shared.removeNode(localIdx, chk);
   FEM_remove_node_local(m,localIdx);
   return;
 }
 
 void FEM_MUtil::removeGhostNodeRemote(FEM_Mesh *m, int fromChk, int sharedIdx) {
   int localIdx = lookup_in_IDXL(m,sharedIdx,fromChk,2); //look in the ghostrecv list
-  m->node.ghost->ghostRecv.removeNode(localIdx, fromChk);
-  int ghostid = FEM_To_ghost_index(localIdx);
-  int numAdjNodes, numAdjElts;
-  int *adjNodes, *adjElts;
-  m->n2n_getAll(ghostid, &adjNodes, &numAdjNodes);
-  m->n2e_getAll(ghostid, &adjElts, &numAdjElts);
-    
-  // mark node as deleted/invalid
-  CkAssert((numAdjNodes==0) && (numAdjElts==0));
-  m->node.ghost->set_invalid(localIdx);
+  if(localIdx >= 0) {
+    m->node.ghost->ghostRecv.removeNode(localIdx, fromChk);
+    if(m->node.ghost->ghostRecv.getRec(localIdx)==NULL) {
+      int ghostid = FEM_To_ghost_index(localIdx);
+      int numAdjNodes, numAdjElts;
+      int *adjNodes, *adjElts;
+      m->n2n_getAll(ghostid, &adjNodes, &numAdjNodes);
+      m->n2e_getAll(ghostid, &adjElts, &numAdjElts);
+      
+      // mark node as deleted/invalid
+      CkAssert((numAdjNodes==0) && (numAdjElts==0));
+      m->node.ghost->set_invalid(localIdx,true);
+    }
+    //else, it still comes as a ghost from some other chunk. That chunk should call a remove on this and it should be deleted then.
+  }
   return;
 }
 
@@ -456,10 +463,10 @@ void FEM_MUtil::removeGhostElementRemote(FEM_Mesh *m, int chk, int elementid, in
   const IDXL_List lgre = m->elem[elemtype].ghost->ghostRecv.getList(chk);
   localIdx = lgre[elementid];
   if(localIdx == -1) {
-	//    CkPrintf("Ghost element at shared index %d, already removed\n",elementid);
+    CkPrintf("Ghost element at shared index %d, already removed\n",elementid);
     return;
   }
-  m->elem[elemtype].ghost->ghostRecv.removeNode(localIdx, chk); 
+  m->elem[elemtype].ghost->ghostRecv.removeNode(localIdx, chk);
   FEM_remove_element_local(m, FEM_To_ghost_index(localIdx), elemtype);
 
   //convert existing remote ghost indices to local ghost indices 
@@ -548,7 +555,7 @@ int FEM_MUtil::Replace_node_local(FEM_Mesh *m, int oldIdx, int newIdx) {
   if(newIdx==-1) {
     newIdx = m->node.size();
     m->node.setLength(newIdx+1); // lengthen node attributes
-    m->node.set_valid(newIdx);   // set new node as valid
+    m->node.set_valid(newIdx,true);   // set new node as valid
     m->n2e_removeAll(newIdx);    // initialize element adjacencies
     m->n2n_removeAll(newIdx);    // initialize node adjacencies
   }
@@ -686,7 +693,7 @@ void FEM_MUtil::StructureTest(FEM_Mesh *m) {
   int noEle = m->elem[0].size();
 
   int *n2e, n2esize=0;
-  int e2n[3];
+  int e2n[m->elem[0].getConn().width()];
 
   for(int i=0; i<noNodes; i++) {
     if(m->node.is_valid(i)) {
@@ -756,7 +763,7 @@ void FEM_MUtil::StructureTest(FEM_Mesh *m) {
 
 int FEM_MUtil::AreaTest(FEM_Mesh *m) {
   int noEle = m->elem[0].size();
-  int *con = new int[3];
+  int *con = new int[m->elem[0].getConn().width()];
 
   for(int i=0; i<noEle; i++) {
     if(m->elem[0].is_valid(i)) {
@@ -846,9 +853,10 @@ void FEM_MUtil::FEM_Print_n2e(FEM_Mesh *m, int eid){
 
 void FEM_MUtil::FEM_Print_e2n(FEM_Mesh *m, int eid){
   CkPrintf("element %d is adjacent to nodes:", eid);
-  int *adjns = new int[3];
+  int consz = m->elem[0].getConn().width();
+  int *adjns = new int[consz];
   m->e2n_getAll(eid, adjns, 0); 
-  for(int i=0;i<3;i++)
+  for(int i=0;i<consz;i++)
     CkPrintf(" %d", adjns[i]);
   CkPrintf("\n");
   delete [] adjns;
@@ -856,9 +864,10 @@ void FEM_MUtil::FEM_Print_e2n(FEM_Mesh *m, int eid){
 
 void FEM_MUtil::FEM_Print_e2e(FEM_Mesh *m, int eid){
   CkPrintf("element %d is adjacent to elements:", eid);
-  int *adjes = new int[3];
+  int consz = m->elem[0].getConn().width();
+  int *adjes = new int[consz];
   m->e2e_getAll(eid, adjes, 0); 
-  for(int i=0;i<3;i++)
+  for(int i=0;i<consz;i++)
     CkPrintf(" %d", adjes[i]);
   CkPrintf("\n");
   delete [] adjes;

@@ -12,8 +12,6 @@
 #include "fem.h"
 #include "fem_mesh.h"
 
-//#define DEBUG_LOCKS
-
 class femMeshModify;
 
 //there is one fem_lock associated with every node (locks on elements are not required)
@@ -29,11 +27,13 @@ class FEM_lockN {
   FEM_lockN() {};
   FEM_lockN(int i,femMeshModify *mod);
   ~FEM_lockN();
-    
+
+  void reset(int i,femMeshModify *mod);
   int rlock();
   int runlock();
   int wlock(int own);
   int wunlock(int own);
+  bool FEM_lockN::haslocks();
   int getIdx() { return idx; }
 };
 

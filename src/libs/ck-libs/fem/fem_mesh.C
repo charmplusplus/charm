@@ -9,6 +9,7 @@ FEM Implementation file: mesh creation and user-data manipulation.
 #include "fem.h"
 #include "fem_impl.h"
 #include "charm-api.h" /*for CDECL, FTN_NAME*/
+#include "fem_mesh_modify.h"
 
 extern int femVersion;
 
@@ -1152,58 +1153,74 @@ void FEM_Entity::allocateValid(void) {
 
 }
 
-void FEM_Entity::set_valid(unsigned int idx){
-  CkAssert(idx < size() && idx >=0 && first_invalid<=last_invalid);
-  valid->getChar()(idx,0)=1;
-
-  if(idx == first_invalid)
-  	// Move first_invalid to the next invalid entry	
-	while((first_invalid<last_invalid) && is_valid(first_invalid)){
-	  first_invalid++;
-	}
-  else if(idx == last_invalid)
-	// Move last_invalid to the previous invalid entry	
-	while((first_invalid<last_invalid) && is_valid(last_invalid))
-	  last_invalid--;
-
-  // If we have no invalid elements left, then put both pointers to 0
-  if( first_invalid == last_invalid && is_valid(first_invalid) )
-	first_invalid = last_invalid = 0;
-  
+void FEM_Entity::set_valid(unsigned int idx, bool isNode){
+  if(false) {
+    CkAssert(idx < size() && idx >=0);
+    valid->getChar()(idx,0)=1;
+  }
+  else {
+    CkAssert(idx < size() && idx >=0 && first_invalid<=last_invalid);
+    valid->getChar()(idx,0)=1;
+    
+    if(idx == first_invalid)
+      // Move first_invalid to the next invalid entry	
+      while((first_invalid<last_invalid) && is_valid(first_invalid)){
+	first_invalid++;
+      }
+    else if(idx == last_invalid)
+      // Move last_invalid to the previous invalid entry	
+      while((first_invalid<last_invalid) && is_valid(last_invalid))
+	last_invalid--;
+    
+    // If we have no invalid elements left, then put both pointers to 0
+    if( first_invalid == last_invalid && is_valid(first_invalid) )
+      first_invalid = last_invalid = 0;
+  }
 }
 
-void FEM_Entity::set_invalid(unsigned int idx){
-  CkAssert(idx < size() && idx >=0 && first_invalid<=last_invalid);
-  valid->getChar()(idx,0)=0;
-
-  // If there are currently no invalid entities
-  if(first_invalid==0 && last_invalid==0 && is_valid(0)){
-	first_invalid = last_invalid = idx;
-	return;
+void FEM_Entity::set_invalid(unsigned int idx, bool isNode){
+  if(false) {
+    CkAssert(idx < size() && idx >=0);
+    valid->getChar()(idx,0)=0;
   }
-
-  if(idx < first_invalid){
-	first_invalid = idx;
+  else {
+    CkAssert(idx < size() && idx >=0 && first_invalid<=last_invalid);
+    valid->getChar()(idx,0)=0;
+    
+    // If there are currently no invalid entities
+    if(first_invalid==0 && last_invalid==0 && is_valid(0)){
+      first_invalid = last_invalid = idx;
+      return;
+    }
+    
+    if(idx < first_invalid){
+      first_invalid = idx;
+    }
+    
+    if(idx > last_invalid){
+      last_invalid = idx;
+    }
+    
+    // TODO:
+    // We should probably have an algorithm for shrinking the entire attribute 
+    // array if we invalidate the final element. In this case we should scan backwards
+    // to find the largest indexed valid entity and resize down to it.
+    // 
+    // It may be necessary to modify the idxl lists if we do this type of shrinking.
+    // Someone needs to confirm whether that is necessary. If not, then it should be 
+    // simple to allow shrinking of the number of nodes or elements.
+    
   }
-  
-  if(idx > last_invalid){
-	last_invalid = idx;
-  }
-
-  // TODO:
-  // We should probably have an algorithm for shrinking the entire attribute 
-  // array if we invalidate the final element. In this case we should scan backwards
-  // to find the largest indexed valid entity and resize down to it.
-  // 
-  // It may be necessary to modify the idxl lists if we do this type of shrinking.
-  // Someone needs to confirm whether that is necessary. If not, then it should be 
-  // simple to allow shrinking of the number of nodes or elements.
-
 }
 
 int FEM_Entity::is_valid(unsigned int idx){
+  /*
+    CkAssert(idx < size() && idx >=0);
+    return valid->getChar()(idx,0);
+  */
   CkAssert(idx < size() && idx >=0 && first_invalid<=last_invalid);
   return valid->getChar()(idx,0);
+
 }
 
 unsigned int FEM_Entity::count_valid(){
@@ -1218,27 +1235,57 @@ unsigned int FEM_Entity::count_valid(){
 /// The invalid slot in the tables can then be reused when "creating" a new element or node
 /// We either return an empty slot, or resize the array and return a value at the end
 /// If someone has a better name for this function, please change it.
-unsigned int FEM_Entity::get_next_invalid(){
+unsigned int FEM_Entity::get_next_invalid(FEM_Mesh *m, bool isNode, bool isGhost){
   unsigned int retval;
-
-  CkAssert(!is_valid(first_invalid) || first_invalid==0);
-
-  // if we have an invalid entity to return
-  if(! is_valid(first_invalid)){
- 	retval = first_invalid;
- 	set_valid(retval);
+  if(false) {
+    retval = size();
+    setLength(retval+1);  
   }
-  else{
+  else {
+    CkAssert(!is_valid(first_invalid) || first_invalid==0);
+    
+    // if we have an invalid entity to return
+    bool flag1 = false;
+    if(!is_valid(first_invalid)){
+      retval = first_invalid;
+      if(isNode && !isGhost) { //it is a node & the entity is not a ghost entity
+	while(retval <= last_invalid) {
+	  if(m->getfmMM()->fmLockN[retval]->haslocks()) {
+	    retval++;
+	  }
+	  else if(hasConn(retval)) { //has some connectivity
+	    retval++;
+	  }
+	  else {
+	    flag1 = true;
+	    break;
+	  }
+	}
+      }
+      else if(isNode) {
+	while(retval <= last_invalid) {
+	  if(hasConn(retval)) { //has some connectivity
+	    retval++;
+	  }
+	  else {
+	    flag1 = true;
+	    break;
+	  }
+	}
+      }      
+      else{
 	// resize array and return new entity
-	retval = size();
-	setLength(retval+1);
-	set_valid(retval);
+	flag1 = true;
+      }
+    }
+    if(!flag1) {
+      retval = size();
+      setLength(retval+1);
+    }
   }
+  set_valid(retval,isNode);
   return retval;
 }
-
-
-
 
 void FEM_Entity::setMaxLength(int newLen,int newMaxLen,void *pargs,FEM_Mesh_alloc_fn fn){
         CkPrintf("resize fn %p \n",fn);
@@ -1481,7 +1528,11 @@ void FEM_Node::allocatePrimary(void) {
   primary->setDatatype(FEM_BYTE);
 }
 
-
+bool FEM_Node::hasConn(unsigned int idx) {
+  if((elemAdjacency->get()[idx].length() > 0)||(nodeAdjacency->get()[idx].length() > 0))
+    return true;
+  else return false;
+}
 
 void FEM_Node::pup(PUP::er &p) {
 	p.comment(" ---------------- Nodes ------------------ ");	
@@ -1574,6 +1625,10 @@ void FEM_Elem::create(int attr,const char *caller) {
 
 const char *FEM_Elem::getName(void) const {
 	return "FEM_ELEM";
+}
+
+bool FEM_Elem::hasConn(unsigned int idx) {
+  return false;
 }
 
 /********************* Sparse ******************/
@@ -1887,14 +1942,14 @@ void FEM_Mesh_allocate_valid_attr(int fem_mesh, int entity_type){
 void FEM_set_entity_valid(int mesh, int entityType, int entityIdx){
   FEM_Mesh *m=FEM_Mesh_lookup(mesh,"FEM_");
   FEM_Entity *entity = m->lookup(entityType,"FEM_");
-  entity->set_valid(entityIdx);
+  entity->set_valid(entityIdx,true);
 }
 
 // mark an entity as invalid
 void FEM_set_entity_invalid(int mesh, int entityType, int entityIdx){
   FEM_Mesh *m=FEM_Mesh_lookup(mesh,"FEM_Mesh_create_valid_elem");
   FEM_Entity *entity = m->lookup(entityType,"FEM_Mesh_allocate_valid_attr");
-  return entity->set_invalid(entityIdx);
+  return entity->set_invalid(entityIdx,true);
 }
 
 // Determine if an entity is valid

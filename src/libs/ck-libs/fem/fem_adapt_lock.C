@@ -69,11 +69,13 @@ int FEM_AdaptL::unlockNodes(int *gotlocks, int *lockrnodes, int numRNodes, int *
       }
       if(FEM_Is_ghost_index(lockrnodes[i])) {
 	if(!theMesh->node.ghost->is_valid(FEM_To_ghost_index(lockrnodes[i]))) {
+	  gotlocks[i] = -1;
 	  //free(ungetlocks);
 	  //return -1;
 	}
       } else {
 	if(!theMesh->node.is_valid(lockrnodes[i])) {
+	  gotlocks[i] = -1;
 	  //free(ungetlocks);
 	  //return -1;
 	}
@@ -88,11 +90,13 @@ int FEM_AdaptL::unlockNodes(int *gotlocks, int *lockrnodes, int numRNodes, int *
       }
       if(FEM_Is_ghost_index(lockwnodes[i])) {
 	if(!theMesh->node.ghost->is_valid(FEM_To_ghost_index(lockwnodes[i]))) {
+	  gotlocks[i] = -1;
 	  //free(ungetlocks);
 	  //return -1;
 	}
       } else {
 	if(!theMesh->node.is_valid(lockwnodes[i])) {
+	  gotlocks[i] = -1;
 	  //free(ungetlocks);
 	  //return -1;
 	}
@@ -867,13 +871,14 @@ int FEM_AdaptL::edge_contraction_help(int e1, int e2, int n1, int n2, int e1_n1,
   int *gotlocks = (int*)malloc(size*sizeof(int));
   int *lockw = (int*)malloc(size*sizeof(int));
   for(int k=0; k<size; k++) {
-    gotlocks[k] = 1;
     lockw[k] = lockedNodes[k];
+    gotlocks[k] = 1;
   }
   if(locked) {
 #ifdef DEBUG_LOCKS
     CkPrintf("[%d]Done contraction, Trying to unlock %d, %d, & %d\n",theMod->idx,conn[0],conn[1],conn[2]);
 #endif
+    //unlock all other than the one that was deleted. Its lock was reset in remove
     unlockNodes(gotlocks, lockw, 0, lockw, size);
     locked = false;
   }
