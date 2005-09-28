@@ -693,8 +693,8 @@ void FEM_MUtil::StructureTest(FEM_Mesh *m) {
   int noEle = m->elem[0].size();
 
   int *n2e, n2esize=0;
-  int wdt = m->elem[0].getConn().width(); 
-  int e2n[wdt];
+  int wdt = m->elem[0].getConn().width();
+  int *e2n = (int*)malloc(wdt*sizeof(int));
 
   for(int i=0; i<noNodes; i++) {
     if(m->node.is_valid(i)) {
@@ -760,12 +760,14 @@ void FEM_MUtil::StructureTest(FEM_Mesh *m) {
       delete [] n2e;
     }
   }
+  free(e2n);
+  return;
 }
 
 int FEM_MUtil::AreaTest(FEM_Mesh *m) {
   int noEle = m->elem[0].size();
   int wdt = m->elem[0].getConn().width();
-  int *con = new int[wdt];
+  int *con = (int*)malloc(wdt*sizeof(int));
 
   for(int i=0; i<noEle; i++) {
     if(m->elem[0].is_valid(i)) {
@@ -778,7 +780,7 @@ int FEM_MUtil::AreaTest(FEM_Mesh *m) {
       }
     }
   }
-  delete [] con;
+  free(con);
   return 1;
 }
 
