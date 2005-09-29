@@ -112,8 +112,8 @@ init(void)
 {
   CkPrintf("init started\n");
   double startTime=CmiWallTimer();
-  const char *eleName="mesh1.tri";//"adpmm/xxx.1.ele";//"88mesh/mesh1.tri";
-  const char *nodeName="mesh1.node";//"adpmm/xxx.1.node";//"88mesh/mesh1.node";
+  const char *eleName="mesh2M.tri";//"adpmm/xxx.1.ele";//*/"88mesh/mesh1.tri";
+  const char *nodeName="mesh2M.node";//"adpmm/xxx.1.node";//*/"88mesh/mesh1.node";
   int nPts=0; //Number of nodes
   vector2d *pts=0; //Node coordinates
   int *bounds;
@@ -207,8 +207,8 @@ init(void)
 
 
   // Register values to the elements so we can keep track of them after partitioning
-  double values[1024];
-  for(int i=0;i<1024;i++)values[i]=i;
+  double *values = (double*)malloc(nEle*sizeof(double));
+  for(int i=0;i<nEle;i++)values[i]=i;
 
   // triangles
   FEM_Mesh_data(fem_mesh,      // Add nodes to the current mesh
@@ -236,6 +236,7 @@ init(void)
   delete[] ele;
   delete[] pts;
   delete[] bounds;
+  free(values);
   
   double *sizingData = new double[nEle];
   for (int i=0; i<nEle; i++) sizingData[i]=-1.0;
@@ -315,7 +316,7 @@ driver(void)
 	MPI_Comm_rank(comm,&rank);
 	
 	MPI_Barrier(comm);
-	FEM_REF_INIT(mesh);
+	FEM_REF_INIT(mesh,2);
 	
 	FEM_Mesh *meshP = FEM_Mesh_lookup(FEM_Mesh_default_read(),"driver");
 	FEM_AdaptL *ada = meshP->getfmMM()->getfmAdaptL();
@@ -357,7 +358,7 @@ driver(void)
 #ifdef SUMMARY_ON
 	FEM_Print_Mesh_Summary(mesh);
 #endif
-=======
+
   g.S11=new double[nelems];
   g.S22=new double[nelems];
   g.S12=new double[nelems];
@@ -390,7 +391,6 @@ driver(void)
   startTime=totalStart=CkWallTimer();
   for (int t=0;t<tSteps;t++) {
     if (1) { //Structural mechanics
->>>>>>> 1.4
 
 	int adjs[3];
 	int elemid;
@@ -698,27 +698,55 @@ driver(void)
 	CkPrintf("Starting Local edge contract on individual chunks\n");
 	int contract[2];
 	if(rank == 0) {
-	  contract[1] = 16;
-	  contract[0] = 21;
+	  contract[1] = 15;
+	  contract[0] = 8;
 	}
 	else if(rank == 1) {
-	  contract[0] = 5;
-	  contract[1] = 6;
+	  contract[0] = 10;
+	  contract[1] = 20;
 	}
 	else if(rank == 2) {
-	  contract[0] = 19;
-	  contract[1] = 17;
+	  contract[0] = 15;
+	  contract[1] = 4;
 	}
 	else {
 	  contract[0] = 0;
 	  contract[1] = 1;
 	}
+
+#ifdef SUMMARY_ON
+	FEM_Print_Mesh_Summary(mesh);
+#endif
+	ret_op = ada->edge_contraction(contract[0],contract[1]);
+	publish_data_netfem(netIndex,g); netIndex++;
+	adaptAlgs->tests();
+
+	CkPrintf("Starting Local edge bisect on individual chunks\n");
+	int bisect[2];
+	if(rank == 0) {
+	  bisect[0] = 16;
+	  bisect[1] = 21;
+	}
+	else if(rank == 1) {
+	  bisect[0] = 10;
+	  bisect[1] = 9;
+	}
+	else if(rank == 2) {
+	  bisect[0] = 5;
+	  bisect[1] = 3;
+	}
+	else {
+	  bisect[0] = 0;
+	  bisect[1] = 1;
+	}
+	ret_op = ada->edge_bisect(bisect[0],bisect[1]);
+	publish_data_netfem(netIndex,g); netIndex++;
+	adaptAlgs->tests();
+	MPI_Barrier(comm);
 	
 #ifdef SUMMARY_ON
 	FEM_Print_Mesh_Summary(mesh);
 #endif
-	if(rank==0) ret_op = ada->edge_contraction(contract[0],contract[1]);
-	publish_data_netfem(netIndex,g); netIndex++;
 
 	//CkPrintf("Starting Local vertex split on individual chunks\n");
 	/*
@@ -845,9 +873,9 @@ driver(void)
 	  */
 
       
-      double targetArea = 0.00004;
+      double targetArea = 0.0000004;
       
-      for(int tstep = 0; tstep < 1; tstep++) {
+      for(int tstep = 0; tstep < 0; tstep++) {
 	adaptAlgs->simple_refine(targetArea);
 	publish_data_netfem(netIndex,g); netIndex++;
 	adaptAlgs->tests();
@@ -862,6 +890,7 @@ driver(void)
 #ifdef SUMMARY_ON
 	FEM_Print_Mesh_Summary(mesh);
 #endif
+	
 	adaptAlgs->simple_coarsen(targetArea);
 	publish_data_netfem(netIndex,g); netIndex++;
 	adaptAlgs->tests();
@@ -878,9 +907,9 @@ driver(void)
 #endif
       }
 
-      targetArea = 0.00004;
+      targetArea = 0.0000004;
       
-      for(int tstep = 0; tstep < 4; tstep++) {
+      for(int tstep = 0; tstep < 0; tstep++) {
 	adaptAlgs->simple_refine(targetArea);
 	publish_data_netfem(netIndex,g); netIndex++;
 	adaptAlgs->tests();
@@ -900,7 +929,7 @@ driver(void)
       }
       targetArea /= 0.4;
       
-      for(int tstep = 0; tstep < 4; tstep++) {
+      for(int tstep = 0; tstep < 0; tstep++) {
 	adaptAlgs->simple_coarsen(targetArea);
 	publish_data_netfem(netIndex,g); netIndex++;
 	adaptAlgs->tests();
@@ -1020,7 +1049,7 @@ driver(void)
 #ifdef SUMMARY_ON
       FEM_Print_Mesh_Summary(mesh);
 #endif
-      publish_data_netfem(netIndex,g); netIndex++;
+      //publish_data_netfem(netIndex,g); netIndex++;
       
       CkExit();
   }
