@@ -189,6 +189,7 @@ class BGLTorusManager {
         if (getHopsBetweenRanks(pe, pes[j+1]) < getHopsBetweenRanks(pe, pes[j])){
           tmp=idx[j+1]; idx[j+1]=idx[j]; idx[j]=tmp;
         }
+  }
 };
 
 CpvExtern(BGLTorusManager *, tmanager); 
