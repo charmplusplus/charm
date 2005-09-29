@@ -57,7 +57,7 @@ void mm_free(void *ptr);
 
 
 #ifndef CMK_OPTIMIZE
-unsigned int memory_allocated = 0;
+CMK_TYPEDEF_UINT8 memory_allocated = 0;
 #endif
 
 /*Rank of the processor that's currently holding the CmiMemLock,
