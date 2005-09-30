@@ -181,7 +181,7 @@ class BGLTorusManager {
     int minHops = getHopsBetweenRanks(pe,pes[0]);
     int minIdx = 0;
     int nowHops, tmp; 
-    for(int i=1;i<n;i++){
+    for(int i=0;i<n;i++){
       idx[i] = i;
     }
     for (int i=0; i<n-1; i++)
