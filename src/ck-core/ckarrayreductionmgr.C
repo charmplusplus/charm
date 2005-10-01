@@ -171,5 +171,20 @@ void CkArrayReductionMgr::startLocalGroupReductions(int number){
 	}
 };
 
+int CkArrayReductionMgr::getTotalGCount(){
+	int firstPE = CkNodeFirst(CkMyNode());
+	int totalGCount=0;
+	for(int i=0;i<size;i++){
+		CProxy_CkReductionMgr reductionMgrProxy(attachedGroup);
+		CkReductionMgr *mgrPtr = reductionMgrProxy[firstPE+i].ckLocalBranch();
+		CkAssert(mgrPtr != NULL);
+		totalGCount += mgrPtr->getGCount();
+	}
+	return totalGCount;
+};
+
+void CkArrayReductionMgr::LateMigrantMsg(CkReductionMsg *m){
+	addContribution(m);
+};
 
 #include "CkArrayReductionMgr.def.h"

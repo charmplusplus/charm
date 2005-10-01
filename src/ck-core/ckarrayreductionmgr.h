@@ -25,6 +25,8 @@ class CkArrayReductionMgr : public NodeGroup{
 		void setAttachedGroup(CkGroupID groupID);
 		void startNodeGroupReduction(int number,CkGroupID groupID);
 		virtual void startLocalGroupReductions(int number);
+		virtual int getTotalGCount();
+		void LateMigrantMsg(CkReductionMsg *m);
 };
 #endif
 

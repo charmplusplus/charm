@@ -135,6 +135,15 @@ public:
 
 	virtual CmiBool isReductionMgr(void){ return CmiTrue; }
 	virtual void flushStates();
+	/*FAULT_EVAC: used to get the gcount on a processor when 
+		it is evacuated.
+		TODO: It needs to be fixed as it should return the gcount
+		and the adjustment information for objects that might have
+		contributed and died.
+		The current implementation lets us get by in the case
+		when there are no gcount
+	*/
+	int getGCount(){return gcount;};
 private:
 
 

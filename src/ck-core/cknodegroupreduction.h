@@ -152,6 +152,8 @@ public:
 	//CkReductionMgrs on a particular node. It is overwritten by CkArrayReductionMgr to make the actual calls
 	// since it knows the CkReductionMgrs on a node.
 
+	virtual int getTotalGCount(){return 0;};
+
 private:
 //Data members
 	//Stored callback function (may be NULL if none has been set)
@@ -184,9 +186,11 @@ private:
 //State:
 	void startReduction(int number,int srcPE);
 	void doAddContribution(CkReductionMsg *m);
-	void addContribution(CkReductionMsg *m);
 	void finishReduction(void);
+protected:	
+	void addContribution(CkReductionMsg *m);
 
+private:
 
 //Reduction tree utilities
 /* for binomial trees*/
@@ -218,6 +222,7 @@ private:
 	bool oldleaf;
 	bool blocked;
 	int newParent;
+	int additionalGCount,newAdditionalGCount; //gcount that gets passed to u from the node u replace
 	CkVec<int> newKids;
 	CkMsgQ<CkReductionMsg> bufferedMsgs;
 	CkMsgQ<CkReductionMsg> bufferedRemoteMsgs;
