@@ -67,6 +67,15 @@ class ValueList : public Printable {
       if(next)
         next->print(str);
     }
+    void printValue(XStr& str) {
+      if(val) {
+        val->print(str);
+      }
+      if(next) {
+	  cout<<"Unsupported type\n";
+	  abort();
+      }
+    }
 };
 
 class Construct : public Printable {
