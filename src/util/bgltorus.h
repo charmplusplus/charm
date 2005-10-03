@@ -205,7 +205,7 @@ class BGLTorusManager {
     }
     for (int i=0; i<n-1; i++)
       for (int j=0; j<n-1-i; j++)
-        if (getHopsBetweenRanks(pe, pes[j+1]) < getHopsBetweenRanks(pe, pes[j])){
+        if (getHopsBetweenRanks(pe, pes[idx[j+1]]) < getHopsBetweenRanks(pe, pes[idx[j]])){
           tmp=idx[j+1]; idx[j+1]=idx[j]; idx[j]=tmp;
         }
   }
