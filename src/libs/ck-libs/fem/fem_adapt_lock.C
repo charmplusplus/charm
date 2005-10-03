@@ -129,7 +129,7 @@ int FEM_AdaptL::edge_flip(int n1, int n2) {
 
   isEdge = findAdjData(n1, n2, &e1, &e2, &e1_n1, &e1_n2, &e1_n3, &e2_n1, &e2_n2, &e2_n3,&n3, &n4);
   if(isEdge == -1) {
-    CkPrintf("[%d]Warning: Flip %d->%d not done as it is no longer a valid edge\n",theMod->idx,n1,n2);
+    //CkPrintf("[%d]Warning: Flip %d->%d not done as it is no longer a valid edge\n",theMod->idx,n1,n2);
     free(locknodes);
     free(gotlocks);
     return -1;
@@ -143,7 +143,7 @@ int FEM_AdaptL::edge_flip(int n1, int n2) {
     isEdge = findAdjData(n1, n2, &e1, &e2, &e1_n1, &e1_n2, &e1_n3, &e2_n1, &e2_n2, &e2_n3,&n3, &n4);
     if(isEdge == -1) {
       unlockNodes(gotlocks, locknodes, 0, locknodes, numNodes);
-      CkPrintf("[%d]Warning: Flip %d->%d not done as it is no longer a valid edge\n",theMod->idx,n1,n2);
+      //CkPrintf("[%d]Warning: Flip %d->%d not done as it is no longer a valid edge\n",theMod->idx,n1,n2);
       free(locknodes);
       free(gotlocks);
       return -1;
@@ -158,7 +158,7 @@ int FEM_AdaptL::edge_flip(int n1, int n2) {
       numtries++;
       if(numtries>=1000) {
 	if(!warned) {
-	  CkPrintf("[%d]Warning: Possibly a livelock in edge_flip %d & %d, supporting %d, %d\n",theMod->idx,n1,n2,n3,n4);
+	  //CkPrintf("[%d]Warning: Possibly a livelock in edge_flip %d & %d, supporting %d, %d\n",theMod->idx,n1,n2,n3,n4);
 	  warned = true;
 	}
 	numtries = 0;
@@ -193,7 +193,7 @@ int FEM_AdaptL::edge_bisect(int n1, int n2) {
 
   isEdge = findAdjData(n1, n2, &e1, &e2, &e1_n1, &e1_n2, &e1_n3, &e2_n1, &e2_n2, &e2_n3,&n3, &n4);
   if(isEdge == -1) {
-    CkPrintf("[%d]Warning: Bisect %d->%d not done as it is no longer a valid edge\n",theMod->idx,n1,n2);
+    //CkPrintf("[%d]Warning: Bisect %d->%d not done as it is no longer a valid edge\n",theMod->idx,n1,n2);
     free(locknodes);
     free(gotlocks);
     return -1;
@@ -207,7 +207,7 @@ int FEM_AdaptL::edge_bisect(int n1, int n2) {
     isEdge = findAdjData(n1, n2, &e1, &e2, &e1_n1, &e1_n2, &e1_n3, &e2_n1, &e2_n2, &e2_n3,&n3, &n4);
     if(isEdge == -1) {
       unlockNodes(gotlocks, locknodes, 0, locknodes, numNodes);
-      CkPrintf("[%d]Warning: Bisect %d->%d not done as it is no longer a valid edge\n",theMod->idx,n1,n2);
+      //CkPrintf("[%d]Warning: Bisect %d->%d not done as it is no longer a valid edge\n",theMod->idx,n1,n2);
       free(locknodes);
       free(gotlocks);
       return -1;
@@ -222,7 +222,7 @@ int FEM_AdaptL::edge_bisect(int n1, int n2) {
       numtries++;
       if(numtries>=1000) {
 	if(!warned) {
-	  CkPrintf("[%d]Warning: Possibly a livelock in edge_bisect %d & %d, supporting %d, %d\n",theMod->idx,n1,n2,n3,n4);
+	  //CkPrintf("[%d]Warning: Possibly a livelock in edge_bisect %d & %d, supporting %d, %d\n",theMod->idx,n1,n2,n3,n4);
 	  warned = true;
 	}
 	numtries = 0;
@@ -252,7 +252,7 @@ int FEM_AdaptL::vertex_remove(int n1, int n2) {
 
   isEdge = findAdjData(n1, n2, &e1, &e2, &e1_n1, &e1_n2, &e1_n3, &e2_n1, &e2_n2, &e2_n3,&n3, &n4);
   if(isEdge == -1) {
-    CkPrintf("[%d]Warning: Vertex Remove %d->%d not done as it is no longer a valid edge\n",theMod->idx,n1,n2);
+    //CkPrintf("[%d]Warning: Vertex Remove %d->%d not done as it is no longer a valid edge\n",theMod->idx,n1,n2);
     free(locknodes);
     free(gotlocks);
     return -1;
@@ -266,7 +266,7 @@ int FEM_AdaptL::vertex_remove(int n1, int n2) {
   int *nbrNodes, nnsize, n5;
   theMesh->n2n_getAll(n1, &nbrNodes, &nnsize);
   if(!(nnsize == 4 || (nnsize==3 && e2==-1))) {
-    CkPrintf("[%d]Warning: Vertex Remove %d->%d on node %d with %d connections (!= 4)\n",theMod->idx,n1,n2,n1,nnsize);
+    //CkPrintf("[%d]Warning: Vertex Remove %d->%d on node %d with %d connections (!= 4)\n",theMod->idx,n1,n2,n1,nnsize);
     free(locknodes);
     free(gotlocks);
     return -1;    
@@ -288,7 +288,7 @@ int FEM_AdaptL::vertex_remove(int n1, int n2) {
     isEdge = findAdjData(n1, n2, &e1, &e2, &e1_n1, &e1_n2, &e1_n3, &e2_n1, &e2_n2, &e2_n3,&n3, &n4);
     if(isEdge == -1) {
       unlockNodes(gotlocks, locknodes, 0, locknodes, numNodes);
-      CkPrintf("[%d]Warning: Vertex Remove %d->%d not done as it is no longer a valid edge\n",theMod->idx,n1,n2);
+      //CkPrintf("[%d]Warning: Vertex Remove %d->%d not done as it is no longer a valid edge\n",theMod->idx,n1,n2);
       free(locknodes);
       free(gotlocks);
       return -1;
@@ -311,7 +311,7 @@ int FEM_AdaptL::vertex_remove(int n1, int n2) {
     free(nbrNodes);
     if(!(nnsize == 4 || (nnsize==3 && e2==-1))) {
       unlockNodes(gotlocks, locknodes, 0, locknodes, numNodes);
-      CkPrintf("[%d]Warning: Vertex Remove %d->%d on node %d with %d connections (!= 4)\n",theMod->idx,n1,n2,n1,nnsize);
+      //CkPrintf("[%d]Warning: Vertex Remove %d->%d on node %d with %d connections (!= 4)\n",theMod->idx,n1,n2,n1,nnsize);
       free(locknodes);
       free(gotlocks);
       return -1;    
@@ -327,7 +327,7 @@ int FEM_AdaptL::vertex_remove(int n1, int n2) {
       numtries++;
       if(numtries>=1000) {
 	if(!warned) {
-	  CkPrintf("[%d]Warning: Possibly a livelock in vertex_remove %d & %d, supporting %d, %d and %d\n",theMod->idx,n1,n2,n3,n4,n5);
+	  //CkPrintf("[%d]Warning: Possibly a livelock in vertex_remove %d & %d, supporting %d, %d and %d\n",theMod->idx,n1,n2,n3,n4,n5);
 	  warned = true;
 	}
 	numtries = 0;
@@ -460,7 +460,7 @@ int FEM_AdaptL::edge_contraction(int n1, int n2) {
       numtries++;
       if(numtries>=1000) {
 	if(!warned) {
-	  CkPrintf("[%d]Warning: Possibly a livelock in edge_contract %d & %d, supporting %d, %d. Avoiding this contract operation.\n",theMod->idx,n1,n2,n3,n4);
+	  //CkPrintf("[%d]Warning: Possibly a livelock in edge_contract %d & %d, supporting %d, %d. Avoiding this contract operation.\n",theMod->idx,n1,n2,n3,n4);
 	  warned = true;
 	}
         //it is ok to skip an edge_contract, if the lock is too difficult to get
@@ -636,7 +636,7 @@ int FEM_AdaptL::edge_contraction_help(int e1, int e2, int n1, int n2, int e1_n1,
 	    unlockNodes(gotlocks, conn, 0, conn, 3);
 	    locked = false;
 	  }
-	  CkPrintf("[%d]Warning: Element %d is no longer valid\n",theMod->idx,nbrElems[i]);
+	  //CkPrintf("[%d]Warning: Element %d is no longer valid\n",theMod->idx,nbrElems[i]);
 	  delete [] eConn;
 	  if(nesize!=0) delete[] nbrElems;
 	  free(conn);
@@ -781,7 +781,7 @@ int FEM_AdaptL::edge_contraction_help(int e1, int e2, int n1, int n2, int e1_n1,
 
       if(theMod->fmAdaptAlgs->didItFlip(conn[0],conn[1],conn[2],new_coord)) {
 	flipSliver = true;
-	CkPrintf("[%d]Warning: Elem %d(%d,%d,%d) would become a sliver if %d->%d is contracted\n",theMod->idx,nbrElems[i],conn[0],conn[1],conn[2],n1,n2);
+	//CkPrintf("[%d]Warning: Elem %d(%d,%d,%d) would become a sliver if %d->%d is contracted\n",theMod->idx,nbrElems[i],conn[0],conn[1],conn[2],n1,n2);
 	break;
       }
     }
@@ -798,7 +798,7 @@ int FEM_AdaptL::edge_contraction_help(int e1, int e2, int n1, int n2, int e1_n1,
 	}
 	if(theMod->fmAdaptAlgs->didItFlip(conn1[0],conn1[1],conn1[2],new_coord)) {
 	  flipSliver = true;
-	  CkPrintf("[%d]Warning: Elem %d(%d,%d,%d) would become a sliver if %d->%d is contracted\n",theMod->idx,nbr1Elems[i],conn1[0],conn1[1],conn1[2],n1,n2);
+	  //CkPrintf("[%d]Warning: Elem %d(%d,%d,%d) would become a sliver if %d->%d is contracted\n",theMod->idx,nbr1Elems[i],conn1[0],conn1[1],conn1[2],n1,n2);
 	  break;
 	}
       }
