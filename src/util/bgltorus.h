@@ -68,10 +68,29 @@ class BGLTorusManager {
     Z = CmiMyPe() / (xsize * ysize);
   } 
   
+  inline int absx(int n){
+    int an = abs(n);
+    int aan = nxsize - an;
+    CkAssert(aan>=0);
+    return ((an>aan)?aan:an);
+  }
+  inline int absy(int n){
+    int an = abs(n);
+    int aan = nysize - an;
+    CkAssert(aan>=0);
+    return ((an>aan)?aan:an);
+  }
+  inline int absz(int n){
+    int an = abs(n);
+    int aan = nzsize - an;
+    CkAssert(aan>=0);
+    return ((an>aan)?aan:an);
+  }
+  
   static int isNeighborByCoord(int x1, int y1, int z1, int x2, int y2, int z2, int dist) {
-    if(abs(x1 - x2) <= dist && 
-       abs(y1 - y2) <= dist && 
-       abs(z1 - z2) <= dist)
+    if(absx(x1 - x2) <= dist && 
+       absy(y1 - y2) <= dist && 
+       absz(z1 - z2) <= dist)
       return 1;
     
     return 0;
@@ -125,7 +144,7 @@ class BGLTorusManager {
   inline int getHopsToCoordinates(int x1, int y1, int z1) {
     int x,y,z;
     getMyCoordinates(x,y,z);
-    return (abs(x1-x)+abs(y1-y)+abs(z1-z));
+    return (absx(x1-x)+absy(y1-y)+absz(z1-z));
   }
   inline int getHopsToRank(int pe){
     int pe_x, pe_y, pe_z;
@@ -143,9 +162,9 @@ class BGLTorusManager {
     dy=y1-y;
     dz=z1-z;
     if(dx==0 && dy==0 && dz==0) return -1;
-    if(abs(dx)>=abs(dy) && abs(dx)>=abs(dz)) return (dx>0)?0:1;
-    if(abs(dy)> abs(dx) && abs(dy)>=abs(dz)) return (dy>0)?2:3;
-    if(abs(dz)> abs(dx) && abs(dz)> abs(dy)) return (dz>0)?4:5;
+    if(absx(dx)>=absy(dy) && absx(dx)>=absz(dz)) return (dx>0)?0:1;
+    if(absy(dy)> absx(dx) && absy(dy)>=absz(dz)) return (dy>0)?2:3;
+    if(absz(dz)> absx(dx) && absz(dz)> absy(dy)) return (dz>0)?4:5;
   }
 
   /* sort pes by ascending order of hops to me */
@@ -153,7 +172,7 @@ class BGLTorusManager {
     int i,j,tmp;
     for (i=0; i<n-1; i++)
       for (j=0; j<n-1-i; j++)
-        if (getHopsToRank(pes[j+1]) < getHopsToRank(pes[j])){
+        if (getHopsToRak(pes[j+1]) < getHopsToRank(pes[j])){
           tmp=pes[j+1]; pes[j+1]=pes[j]; pes[j]=tmp;
         }
   }
@@ -162,7 +181,7 @@ class BGLTorusManager {
     int x,y,z,x1,y1,z1;
     getCoordinatesByRank(pe,x,y,z);
     getCoordinatesByRank(pe1,x1,y1,z1);
-    return (abs(x1-x)+abs(y1-y)+abs(z1-z));
+    return (absx(x1-x)+absy(y1-y)+absz(z1-z));
   }
   inline int pickClosestRank(int mype, int *pes, int n){
     int minHops=getHopsBetweenRanks(mype,pes[0]);
