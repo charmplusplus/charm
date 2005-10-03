@@ -36,6 +36,7 @@ PUPmarshall(IDXL_Share);
 class IDXL_Rec {
 	int entity; //Index of entity (node or element) we describe
 	CkVec<IDXL_Share> shares;
+	int oldlength;
 public:
 	IDXL_Rec(int entity_=-1);
 	~IDXL_Rec();

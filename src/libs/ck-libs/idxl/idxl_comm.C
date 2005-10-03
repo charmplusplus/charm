@@ -9,6 +9,7 @@ Orion Sky Lawlor, olawlor@acm.org, 1/7/2003
  */
 IDXL_Rec::IDXL_Rec(int entity_) {
 	entity=entity_; 
+	oldlength=0;
 }
 IDXL_Rec::~IDXL_Rec() {}
 void IDXL_Rec::pup(PUP::er &p)
@@ -23,7 +24,10 @@ void IDXL_Rec::add(int chk,int idx)
 	if (chk<0 || chk>1000000)
 		CkAbort("FEM IDXL_Rec::add> Tried to add absurd chunk number!\n");
 #endif
-	shares.reserve(n+1); //Grow slowly, to save memory
+	if(n >= oldlength) {
+	  oldlength = 2*(n+1);
+	  shares.reserve(oldlength); //Grow fast, to save extra copies
+	}
 	shares.push_back(IDXL_Share(chk,idx));
 }
 
