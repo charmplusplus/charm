@@ -64,7 +64,11 @@ int FEM_lockN::wlock(int own) {
 #endif
     return 1;
   } else {
-    return -1;
+    if(pending==-1 || own<=pending) {
+      pending = own;
+      return -2; //keep trying
+    }
+    return -1; //give up trying for a while
   }
   return -1;
 }

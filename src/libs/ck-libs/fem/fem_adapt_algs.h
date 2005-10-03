@@ -15,7 +15,7 @@
 #include "fem_mesh.h"
 #include "vector2d.h"  // **CW** tentative
 
-#define SLIVERAREA 1.0e-12
+#define SLIVERAREA 1.0e-18
 #define REFINE_TOL 1.5
 #define COARSEN_TOL 0.85
 #define QUALITY_MIN 0.6

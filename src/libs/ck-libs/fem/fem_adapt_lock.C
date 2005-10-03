@@ -156,7 +156,7 @@ int FEM_AdaptL::edge_flip(int n1, int n2) {
       locknodes[2] = n3;
       locknodes[3] = n4;
       numtries++;
-      if(numtries>=10) {
+      if(numtries>=1000) {
 	if(!warned) {
 	  CkPrintf("[%d]Warning: Possibly a livelock in edge_flip %d & %d, supporting %d, %d\n",theMod->idx,n1,n2,n3,n4);
 	  warned = true;
@@ -220,7 +220,7 @@ int FEM_AdaptL::edge_bisect(int n1, int n2) {
       locknodes[2] = n3;
       locknodes[3] = n4;
       numtries++;
-      if(numtries>=10) {
+      if(numtries>=1000) {
 	if(!warned) {
 	  CkPrintf("[%d]Warning: Possibly a livelock in edge_bisect %d & %d, supporting %d, %d\n",theMod->idx,n1,n2,n3,n4);
 	  warned = true;
@@ -325,7 +325,7 @@ int FEM_AdaptL::vertex_remove(int n1, int n2) {
       locknodes[3] = n4;
       locknodes[4] = n5;
       numtries++;
-      if(numtries>=10) {
+      if(numtries>=1000) {
 	if(!warned) {
 	  CkPrintf("[%d]Warning: Possibly a livelock in vertex_remove %d & %d, supporting %d, %d and %d\n",theMod->idx,n1,n2,n3,n4,n5);
 	  warned = true;
@@ -439,7 +439,7 @@ int FEM_AdaptL::edge_contraction(int n1, int n2) {
 	}
       }
       if(numtries>=50) {
-	CkPrintf("Possibly a livelock in cloud nodes edge_contract\n");
+	//CkPrintf("Possibly a livelock in cloud nodes edge_contract\n");
 	//it is ok to skip an edge_contract, if the lock is too difficult to get
 	if(locked) {
 	  unlockNodes(gotlocks, locknodes, 0, locknodes, numNodes);
@@ -458,7 +458,7 @@ int FEM_AdaptL::edge_contraction(int n1, int n2) {
       locknodes[2] = n3;
       locknodes[3] = n4;
       numtries++;
-      if(numtries>=50) {
+      if(numtries>=1000) {
 	if(!warned) {
 	  CkPrintf("[%d]Warning: Possibly a livelock in edge_contract %d & %d, supporting %d, %d. Avoiding this contract operation.\n",theMod->idx,n1,n2,n3,n4);
 	  warned = true;

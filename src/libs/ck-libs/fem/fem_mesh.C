@@ -955,6 +955,7 @@ void FEM_IndexAttribute::copyEntity(int dstEntity,const FEM_Attribute &src,int s
 FEM_VarIndexAttribute::FEM_VarIndexAttribute(FEM_Entity *e,int myAttr)
 	:FEM_Attribute(e,myAttr)
 {
+  oldlength = 0;
 	allocate(getMax(),getWidth(),getDatatype());
 	setDatatype(FEM_INT);
 };

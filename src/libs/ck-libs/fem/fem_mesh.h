@@ -562,15 +562,18 @@ public:
 private:
 	typedef FEM_Attribute super;
 	CkVec<CkVec<ID> > idx;
+	int oldlength;
 protected:
 	virtual void allocate(int _length,int _width,int _datatype){
-		int oldlength = idx.size();
-		setWidth(1,"allocate"); //there is 1 vector per entity 
-		idx.reserve(_length);
-		for(int i=oldlength;i<_length;i++){
-			CkVec<ID> tempVec;
-			idx.insert(i,tempVec);
-		}
+	  if(_length > oldlength){
+	    setWidth(1,"allocate"); //there is 1 vector per entity 
+	    oldlength = _length*2;
+	    idx.reserve(oldlength);
+	    for(int i=idx.size();i<oldlength;i++){
+	      CkVec<ID> tempVec;
+	      idx.insert(i,tempVec);
+	    }
+	  }
 	};
 public:
 	FEM_VarIndexAttribute(FEM_Entity *owner,int myAttr);
