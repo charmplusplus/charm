@@ -10,7 +10,7 @@
 Initial version of \charmpp{} FEM Framework was developed
 by Milind Bhandarkar with inputs from Timothy Hinrichs and Karthikeyan
 Mahesh. The current version is almost completely rewritten by
-Orion Lawlor.
+Orion Lawlor. The most recent version is being called by the name ParFUM. ParFUM is short for Parallel Framework for Unstructured Meshes. This manual has not yet been updated to reflect all of ParFUM's features.
 }
 
 \begin{document}
@@ -32,6 +32,9 @@ features of \charmpp, including run-time load balancing,  performance
 monitoring and visualization, and checkpoint/restart, with no additional
 effort. The FEM framework also combines naturally with other \charmpp
 frameworks built on TCHARM.
+
+The FEM framework has been undergoing a wave of recent improvements. A choice to rename the new version ParFUM has been adopted.ParFUM is short for Parallel Framework for Unstructured Meshes. Section \ref{sec:ParFUM} describes some of the new features included in ParFUM that were not present in FEM.
+
 
 \subsection{Philosophy}
 
@@ -586,6 +589,18 @@ The returned indices will all refer to ghost elements in my chunk.
 %   
 % ``There has to be a better way:''
 %   FEM_Composite_elem, FEM_Combine_elem
+
+
+
+\section{ParFUM}
+\label{sec:ParFUM}
+
+ParFUM is the name for the latest versions of FEM.  ParFUM includes additional features including parallel mesh modification and adaptivity.  ParFUM also contains functions which generate additional topological adjacency information.  ParFUM cannot be built separate from \charmpp{} since it uses various messaging mechanisms that MPI does not readily support.
+
+
+
+
+
 
 
 \input{index}
