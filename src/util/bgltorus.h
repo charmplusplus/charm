@@ -87,10 +87,10 @@ class BGLTorusManager {
     return ((an>aan)?aan:an);
   }
   
-  static int isNeighborByCoord(int x1, int y1, int z1, int x2, int y2, int z2, int dist) {
-    if(abs(x1 - x2) <= dist && 
-       abs(y1 - y2) <= dist && 
-       abs(z1 - z2) <= dist)
+  int isNeighborByCoord(int x1, int y1, int z1, int x2, int y2, int z2, int dist) {
+    if(absx(x1 - x2) <= dist && 
+       absy(y1 - y2) <= dist && 
+       absz(z1 - z2) <= dist)
       return 1;
     
     return 0;
