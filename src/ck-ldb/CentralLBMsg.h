@@ -13,12 +13,13 @@ public:
   CkMarshalledCLBStatsMessage(void) {}
   CkMarshalledCLBStatsMessage(CLBStatsMsg *m) { add(m); } //Takes ownership of message
   CkMarshalledCLBStatsMessage(const CkMarshalledCLBStatsMessage &);
-  ~CkMarshalledCLBStatsMessage();
+  ~CkMarshalledCLBStatsMessage() { free(); }
   void add(CLBStatsMsg *m) { msgs.push_back(m); } 
   void add(CkMarshalledCLBStatsMessage &msg);     // add multiple messages
   CLBStatsMsg *getMessage(int c=0) {void *ret=msgs[c]; msgs[c]=NULL; return (CLBStatsMsg*)ret;}
   int  getCount() { return msgs.size(); }
   void pup(PUP::er &p);
+  void free();
 };
 PUPmarshall(CkMarshalledCLBStatsMessage);
 

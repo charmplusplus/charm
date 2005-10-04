@@ -52,11 +52,26 @@ public:
   void getSummary(double &maxLoad, double &maxCpuLoad, double &totalLoad);
 };
 
+// class for computing the parent and children of a processor
+class SpanningTree
+{
+	public:
+		int arity;
+		int parent;
+		int numChildren;
+		SpanningTree();
+		void calcParent(int n);
+		void calcNumChildren(int n);
+};
+
 class CentralLB : public BaseLB
 {
 private:
   void initLB(const CkLBOptions &);
 public:
+  int count;
+  CkMarshalledCLBStatsMessage bufMsg;
+  SpanningTree st;
   CentralLB(const CkLBOptions & opt):BaseLB(opt) { initLB(opt); } 
   CentralLB(CkMigrateMessage *m):BaseLB(m) {}
   virtual ~CentralLB();
@@ -74,6 +89,8 @@ public:
   void SendStats();
   void ReceiveCounts(CkReductionMsg *);
   void ReceiveStats(CkMarshalledCLBStatsMessage &msg);	// Receive stats on PE 0
+  void ReceiveStatsViaTree(CkMarshalledCLBStatsMessage &msg); // Receive stats using a tree structure  
+  
   void depositData(CLBStatsMsg *m);
   void LoadBalance(void); 
   void ResumeClients(int);                      // Resuming clients needs

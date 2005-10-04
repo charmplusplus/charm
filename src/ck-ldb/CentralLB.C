@@ -19,6 +19,7 @@
 #define  DEBUGF(x)       // CmiPrintf x;
 
 #define USE_REDUCTION  1
+#define USE_LDB_SPANNING_TREE 0
 
 CkGroupID loadbalancer;
 int * lb_ptr;
@@ -239,7 +240,14 @@ void CentralLB::SendStats()
     msg->next_lb = LBDatabaseObj()->new_lbbalancer();
   }
 
+#if USE_LDB_SPANNING_TREE
+  if (CkMyPe() == cur_ld_balancer)
+    thisProxy[CkMyPe()].ReceiveStats(msg);
+  else
+    thisProxy[CkMyPe()].ReceiveStatsViaTree(msg);
+#else    
   thisProxy[cur_ld_balancer].ReceiveStats(msg);
+#endif
 
 #ifdef __BLUEGENE__
   BgEndStreaming();
@@ -410,6 +418,23 @@ void CentralLB::ReceiveStats(CkMarshalledCLBStatsMessage &msg)
     statsData->count = stats_msg_count;
     thisProxy[CkMyPe()].LoadBalance();
   }
+#endif
+}
+
+void CentralLB::ReceiveStatsViaTree(CkMarshalledCLBStatsMessage &msg)
+{
+#if CMK_LBDB_ON
+        CmiAssert(CkMyPe() != 0);
+	bufMsg.add(msg);         // buffer messages
+	count++;
+	if (count == st.numChildren+1) {
+		if(st.parent == 0)
+			thisProxy[0].ReceiveStats(bufMsg);
+		else 
+			thisProxy[st.parent].ReceiveStatsViaTree(bufMsg);
+		count = 0;
+                bufMsg.free();
+	} 
 #endif
 }
 
@@ -1047,10 +1072,11 @@ void CLBStatsMsg::pup(PUP::er &p) {
 // the entry function, it is just used to use to pup.
 // I don't use CLBStatsMsg directly as marshalled parameter because
 // I want the data pointer stored and not to be freed by the Charm++.
-CkMarshalledCLBStatsMessage::~CkMarshalledCLBStatsMessage() {
+void CkMarshalledCLBStatsMessage::free() { 
   int count = msgs.size();
   for  (int i=0; i<count; i++) 
     if (msgs[i]) delete msgs[i];
+  msgs.free();
 }
 
 void CkMarshalledCLBStatsMessage::add(CkMarshalledCLBStatsMessage &m)
@@ -1074,6 +1100,33 @@ void CkMarshalledCLBStatsMessage::pup(PUP::er &p)
   }
 }
 
-#include "CentralLB.def.h"
+SpanningTree::SpanningTree()
+{
+	double sq = sqrt(CkNumPes()*4-3) - 1; // 1 + arity + arity*arity = CkNumPes()
+	arity = ceil(sq/2);
+	calcParent(CkMyPe());
+	calcNumChildren(CkMyPe());
+}
 
+void SpanningTree::calcParent(int n)
+{
+	if(n == 0)
+		parent=-1;
+	else
+		parent = (n-1)/arity;
+}
+
+void SpanningTree::calcNumChildren(int n)
+{
+	int fullNode=(CkNumPes()-1-arity)/arity;
+	if(n <= fullNode)
+		numChildren = arity;
+	if(n == fullNode+1)
+		numChildren = CkNumPes()-1-(fullNode+1)*arity;
+	if(n > fullNode+1)
+		numChildren = 0;
+}
+
+#include "CentralLB.def.h"
+ 
 /*@}*/
