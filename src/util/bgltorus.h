@@ -71,19 +71,19 @@ class BGLTorusManager {
   inline int absx(int n){
     int an = abs(n);
     int aan = nxsize - an;
-    CkAssert(aan>=0);
+    CmiAssert(aan>=0);
     return ((an>aan)?aan:an);
   }
   inline int absy(int n){
     int an = abs(n);
     int aan = nysize - an;
-    CkAssert(aan>=0);
+    CmiAssert(aan>=0);
     return ((an>aan)?aan:an);
   }
   inline int absz(int n){
     int an = abs(n);
     int aan = nzsize - an;
-    CkAssert(aan>=0);
+    CmiAssert(aan>=0);
     return ((an>aan)?aan:an);
   }
   
@@ -172,7 +172,7 @@ class BGLTorusManager {
     int i,j,tmp;
     for (i=0; i<n-1; i++)
       for (j=0; j<n-1-i; j++)
-        if (getHopsToRak(pes[j+1]) < getHopsToRank(pes[j])){
+        if (getHopsToRank(pes[j+1]) < getHopsToRank(pes[j])){
           tmp=pes[j+1]; pes[j+1]=pes[j]; pes[j]=tmp;
         }
   }
