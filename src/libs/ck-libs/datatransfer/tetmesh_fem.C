@@ -5,7 +5,8 @@
  */
 #include "tetmesh.h"
 #include "fem.h"
-
+#include <assert.h>
+ 
 /// Read this mesh from the FEM framework's mesh m
 void readFEM(int m,TetMesh &t) {
 	int nNode=FEM_Mesh_get_length(m,FEM_NODE);
