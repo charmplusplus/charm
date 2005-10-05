@@ -60,6 +60,7 @@ public:
 	int addTet(const conn_t &c) {tet.push_back(c); return tet.size()-1;}
 	int addPoint(const CkVector3d &pt) {pts.push_back(pt); return pts.size()-1;}
 
+	int nonGhostTet, nonGhostPt;
 private:
 	std::vector<conn_t> tet; //< Connectivity
 	std::vector<CkVector3d> pts; //< nPts 3d node locations.
