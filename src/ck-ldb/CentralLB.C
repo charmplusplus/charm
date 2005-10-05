@@ -1107,21 +1107,22 @@ void CkMarshalledCLBStatsMessage::pup(PUP::er &p)
 SpanningTree::SpanningTree()
 {
 	double sq = sqrt(CkNumPes()*4-3) - 1; // 1 + arity + arity*arity = CkNumPes()
-	arity = ceil(sq/2);
+	arity = (int)ceil(sq/2);
 	calcParent(CkMyPe());
 	calcNumChildren(CkMyPe());
 }
 
 void SpanningTree::calcParent(int n)
 {
-	if(n == 0)
-		parent=-1;
-	else
-		parent = (n-1)/arity;
+	parent=-1;
+	if(n != 0  && arity>0)
+	  parent = (n-1)/arity;
 }
 
 void SpanningTree::calcNumChildren(int n)
 {
+	numChildren = 0;
+	if (arity == 0) return;
 	int fullNode=(CkNumPes()-1-arity)/arity;
 	if(n <= fullNode)
 		numChildren = arity;
