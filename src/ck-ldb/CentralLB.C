@@ -1106,7 +1106,7 @@ void CkMarshalledCLBStatsMessage::pup(PUP::er &p)
 
 SpanningTree::SpanningTree()
 {
-	double sq = sqrt(CkNumPes()*4-3) - 1; // 1 + arity + arity*arity = CkNumPes()
+	double sq = sqrt(CkNumPes()*4.0-3.0) - 1; // 1 + arity + arity*arity = CkNumPes()
 	arity = (int)ceil(sq/2);
 	calcParent(CkMyPe());
 	calcNumChildren(CkMyPe());
