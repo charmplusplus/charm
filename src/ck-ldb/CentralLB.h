@@ -67,9 +67,9 @@ class SpanningTree
 class CentralLB : public BaseLB
 {
 private:
+  int count;
   void initLB(const CkLBOptions &);
 public:
-  int count;
   CkMarshalledCLBStatsMessage bufMsg;
   SpanningTree st;
   CentralLB(const CkLBOptions & opt):BaseLB(opt) { initLB(opt); } 

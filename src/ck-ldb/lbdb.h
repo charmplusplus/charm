@@ -106,6 +106,7 @@ typedef struct {
   LDObjHandle handle;
   double cpuTime;
   double wallTime;
+  double minWall, maxWall;
   CmiBool migratable;
   CmiBool asyncArrival;
 #ifdef __cplusplus
@@ -394,6 +395,8 @@ inline void LDObjData::pup(PUP::er &p) {
   p|handle;
   p|cpuTime;
   p|wallTime;
+  p|minWall;
+  p|maxWall;
   p|migratable;
   if (_lb_version > -1) p|asyncArrival;
 }

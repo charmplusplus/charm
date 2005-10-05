@@ -26,8 +26,11 @@ public:
     data.handle = _h;
     data.migratable = _migratable;
     data.asyncArrival = _asyncArrival;
-    data.cpuTime = 0.;
-    data.wallTime = 0.;
+    Clear();
+//    data.cpuTime = 0.;
+//    data.wallTime = 0.;
+//    data.minWall = 1e6;
+//    data.maxWall = 0.;
     userData = usr_ptr;
     parentDB = _parentDB;
 //    migratable = _migratable;
