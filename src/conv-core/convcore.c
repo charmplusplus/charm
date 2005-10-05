@@ -892,7 +892,8 @@ void CmiTimerInit()
   CmiBarrier();
   CmiBarrier();
 
-  inittime_wallclock = rts_get_timebase();
+  /* inittime_wallclock = rts_get_timebase(); */
+  inittime_wallclock = 0.0;    /* use bgl absolute time */
 }
 
 double CmiWallTimer()
