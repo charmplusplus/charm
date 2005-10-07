@@ -167,24 +167,6 @@ PersistentHandle CmiCreatePersistent(int destPE, int maxBytes)
   return h;
 }
 
-static void setupRecvSlot(PersistentReceivesTable *slot, int maxBytes)
-{
-  int i;
-  for (i=0; i<PERSIST_BUFFERS_NUM; i++) {
-    char *buf = PerAlloc(maxBytes+sizeof(int)*2);
-    _MEMCHECK(buf);
-    memset(buf, 0, maxBytes+sizeof(int)*2);
-    slot->messagePtr[i] = buf;
-#if CONVERSE_VERSION_ELAN
-    /* note: assume first integer in elan converse header is the msg size */
-    slot->recvSizePtr[i] = (unsigned int*)buf;
-#else
-    slot->recvSizePtr[i] = (unsigned int*)CmiAlloc(sizeof(unsigned int));
-#endif
-  }
-  slot->sizeMax = maxBytes;
-}
-
 static void persistentRequestHandler(void *env)
 {             
   PersistentRequestMsg *msg = (PersistentRequestMsg *)env;

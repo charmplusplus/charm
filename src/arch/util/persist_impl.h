@@ -40,5 +40,6 @@ void CmiSendPersistentMsg(PersistentHandle h, int destPE, int size, void *m);
 int PumpPersistent();
 void swapSendSlotBuffers(PersistentSendsTable *slot);
 void swapRecvSlotBuffers(PersistentReceivesTable *slot);
+void setupRecvSlot(PersistentReceivesTable *slot, int maxBytes);
 
 /*@}*/

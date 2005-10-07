@@ -2451,6 +2451,19 @@ void persist_machine_init()
        CmiRegisterHandler((CmiHandler)sendPerMsgHandler);
 }
 
+void setupRecvSlot(PersistentReceivesTable *slot, int maxBytes)
+{
+  int i;
+  for (i=0; i<PERSIST_BUFFERS_NUM; i++) {
+    char *buf = PerAlloc(maxBytes+sizeof(int)*2);
+    _MEMCHECK(buf);
+    memset(buf, 0, maxBytes+sizeof(int)*2);
+    slot->messagePtr[i] = buf;
+    slot->recvSizePtr[i] = (unsigned int*)CmiAlloc(sizeof(unsigned int));
+  }
+  slot->sizeMax = maxBytes;
+}
+
 #endif
 
 /*@}*/

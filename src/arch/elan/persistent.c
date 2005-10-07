@@ -270,3 +270,19 @@ void PerFree(char *msg)
 void persist_machine_init(void)
 {
 }
+
+void setupRecvSlot(PersistentReceivesTable *slot, int maxBytes)
+{
+  int i;
+  for (i=0; i<PERSIST_BUFFERS_NUM; i++) {
+    char *buf = PerAlloc(maxBytes+sizeof(int)*2);
+    _MEMCHECK(buf);
+    memset(buf, 0, maxBytes+sizeof(int)*2);
+    slot->messagePtr[i] = buf;
+    /* note: assume first integer in elan converse header is the msg size */
+    slot->recvSizePtr[i] = (unsigned int*)buf;
+  }
+  slot->sizeMax = maxBytes;
+}
+
+
