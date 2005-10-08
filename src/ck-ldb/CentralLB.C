@@ -451,7 +451,7 @@ void CentralLB::LoadBalance()
   if (_lb_args.debug()) 
       CmiPrintf("[%s] Load balancing step %d starting at %f in PE%d\n",
                  lbName(), step(),start_lb_time, cur_ld_balancer);
-      CmiPrintf("[%d] n_obj:%d migratable:%d n_comm:%d\n", CkMyPe(), statsData->n_objs, statsData->n_migrateobjs, statsData->n_comm);
+ //     CmiPrintf("[%d] n_obj:%d migratable:%d n_comm:%d\n", CkMyPe(), statsData->n_objs, statsData->n_migrateobjs, statsData->n_comm);
 //    double strat_start_time = CkWallTimer();
 
   // if we are in simulation mode read data
