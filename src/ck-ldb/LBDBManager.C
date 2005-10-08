@@ -519,7 +519,7 @@ void LocalBarrier::ResumeClients(void)
 				count++;
 		}	
 	
-	printf("[%d] ResumeClients in LocalBarrier done max_client %d count %d \n",CkMyPe(),max_client,count);
+	//printf("[%d] ResumeClients in LocalBarrier done max_client %d count %d \n",CkMyPe(),max_client,count);
 }
 
 #endif

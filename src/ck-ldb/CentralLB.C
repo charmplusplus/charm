@@ -70,7 +70,7 @@ void CentralLB::initLB(const CkLBOptions &opt)
   startLbFnHdl = theLbdb->getLBDB()->
     AddStartLBFn((LDStartLBFn)(staticStartLB),(void*)(this));
 
-   CkPrintf("[%d] CentralLB initLB \n",CkMyPe());
+  // CkPrintf("[%d] CentralLB initLB \n",CkMyPe());
   if (opt.getSeqNo() > 0) turnOff();
 
   stats_msg_count = 0;
@@ -719,7 +719,7 @@ void CentralLB::ResumeClients(int balancing)
   	      lbName(), step()-1,end_lb_time, end_lb_time - start_lb_time);
   }
 
-//  ComlibNotifyMigrationDone();  
+  ComlibNotifyMigrationDone();  
 
   theLbdb->ResumeClients();
   if (balancing)  {
