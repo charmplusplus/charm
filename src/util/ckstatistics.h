@@ -107,6 +107,15 @@ public:
 		fprintf(dest,"ave= %g  stddev= %g  min= %g  max= %g  n= %d\n",
 			(double)getMean(), (double)getStddev(), (double)getMin(), (double)getMax(), (int)getCount());
 	}
+
+	/**
+         * Print a terse textual description of this sample to this FILE.
+         */
+        void printMinAveMax(FILE *dest) {
+		fprintf(dest,"min= %g  ave= %g  max= %g \n",
+			(double)getMin(), (double)getMean(), (double)getMax());
+	}
+
 	/**
 	 * Print a textual description of this sample to stdout.
 	 */
