@@ -94,7 +94,7 @@ Group::Group()
 
 CK_REDUCTION_CONTRIBUTE_METHODS_DEF(Group,
 				    ((CkReductionMgr *)this),
-				    reductionInfo);
+				    reductionInfo,false);
 CK_REDUCTION_CLIENT_DEF(CProxy_Group,(CkReductionMgr *)CkLocalBranch(_ck_gid));
 
 
@@ -333,7 +333,7 @@ void CkReductionMgr::contributorArriving(contributorInfo *ci)
 // Each contributor must contribute exactly once to the each reduction.
 void CkReductionMgr::contribute(contributorInfo *ci,CkReductionMsg *m)
 {
-  DEBR((AA"Contributor %p contributed for %d in grp %d\n"AB,ci,ci->redNo,thisgroup.idx));
+  DEBR((AA"Contributor %p contributed for %d in grp %d ismigratable %d \n"AB,ci,ci->redNo,thisgroup.idx,m->isMigratableContributor()));
   m->ci=ci;
   m->redNo=ci->redNo++;
   m->sourceFlag=-1;//A single contribution
@@ -586,6 +586,7 @@ CkReductionMsg *CkReductionMgr::reduceMessages(void)
   int nMsgs=0;
   CkReductionMsg **msgArr=new CkReductionMsg*[msgs.length()];
   CkReductionMsg *m;
+	bool isMigratableContributor;
 
   // Copy message queue into msgArr, skipping placeholders:
   while (NULL!=(m=msgs.deq()))
@@ -600,6 +601,8 @@ CkReductionMsg *CkReductionMgr::reduceMessages(void)
         msgs_callback=m->callback;
       if (m->userFlag!=-1)
         msgs_userFlag=m->userFlag;
+			
+			isMigratableContributor=m->isMigratableContributor();
     }
     else
     { //This is just a placeholder message-- forget it
@@ -627,6 +630,7 @@ CkReductionMsg *CkReductionMgr::reduceMessages(void)
   ret->userFlag=msgs_userFlag;
   ret->callback=msgs_callback;
   ret->sourceFlag=msgs_nSources;
+	ret->setMigratableContributor(isMigratableContributor);
   DEBR((AA"Reduced gcount=%d; sourceFlag=%d\n"AB,ret->gcount,ret->sourceFlag));
 
   return ret;
@@ -730,12 +734,15 @@ void CkReductionMgr :: endArrayReduction(){
 		}
 		return;
 	}
+
+/*
+	NOT NEEDED ANYMORE DONE at nodegroup level
 	if(msgs_gcount  > msgs_nSources){
 		for(i=0;i<numMsgs;i++){
 			finalMsgs.enq(tempMsgs[i]);
 		}
 		return;
-	}
+	}*/
 
 	if (nMsgs==0||r==CkReduction::invalid)
   		//No valid reducer in the whole vector
@@ -818,6 +825,7 @@ CkReductionMsg *CkReductionMsg::buildNew(int NdataSize,const void *srcData,
   ret->ci=NULL;
   ret->sourceFlag=-1000;
   ret->gcount=0;
+	ret->migratableContributor = true;
   return ret;
 }
 
@@ -1141,7 +1149,7 @@ void CProxy_NodeGroup::ckSetReductionClient(CkCallback *cb) const {
 
 CK_REDUCTION_CONTRIBUTE_METHODS_DEF(NodeGroup,
 				    ((CkNodeReductionMgr *)this),
-				    reductionInfo);
+				    reductionInfo,false);
 
 /* this contribute also adds up the count across all messages it receives.
   Useful for summing up number of array elements who have contributed ****/ 
@@ -1457,9 +1465,9 @@ void CkNodeReductionMgr::finishReduction(void)
   }
   else
   {
-		if(result->gcount+additionalGCount != result->sourceFlag){
+		if(result->isMigratableContributor() && result->gcount+additionalGCount != result->sourceFlag){
 #if DEBUGRED
-			CkPrintf("[%d,%d] NodeGroup %d> Node Reduction %d not done yet gcounts %d sources %d \n",CkMyNode(),CkMyPe(),thisgroup.idx,redNo,result->gcount,result->sourceFlag);
+			CkPrintf("[%d,%d] NodeGroup %d> Node Reduction %d not done yet gcounts %d sources %d migratable %d \n",CkMyNode(),CkMyPe(),thisgroup.idx,redNo,result->gcount,result->sourceFlag,result->isMigratableContributor());
 #endif			
 			msgs.enq(result);
 			return;
@@ -1635,10 +1643,12 @@ CkReductionMsg *CkNodeReductionMgr::reduceMessages(void)
   int nMsgs=0;
   CkReductionMsg *m;
   CkReductionMsg **msgArr=new CkReductionMsg*[msgs.length()];
+	bool isMigratableContributor;
+	
 
   while(NULL!=(m=msgs.deq()))
   {
-    DEBR((AA"***** gcount=%d; sourceFlag=%d\n"AB,m->gcount,m->nSources()));	  
+    DEBR((AA"***** gcount=%d; sourceFlag=%d ismigratable %d \n"AB,m->gcount,m->nSources(),m->isMigratableContributor()));	  
     msgs_gcount+=m->gcount;
     if (m->sourceFlag!=0)
     { //This is a real message from an element, not just a placeholder
@@ -1652,6 +1662,9 @@ CkReductionMsg *CkNodeReductionMgr::reduceMessages(void)
       }
       if (m->userFlag!=-1)
         msgs_userFlag=m->userFlag;
+
+			isMigratableContributor= m->isMigratableContributor();
+				
     }
     else
     { //This is just a placeholder message-- replace it
@@ -1679,6 +1692,7 @@ CkReductionMsg *CkNodeReductionMgr::reduceMessages(void)
   ret->callback=msgs_callback;
   ret->secondaryCallback = msgs_secondaryCallback;
   ret->sourceFlag=msgs_nSources;
+	ret->setMigratableContributor(isMigratableContributor);
   DEBR((AA"Reduced gcount=%d; sourceFlag=%d\n"AB,ret->gcount,ret->sourceFlag));
 
   return ret;

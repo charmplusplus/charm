@@ -249,6 +249,9 @@ public:
 	// if it didn't come from a previous reduction function.
 	inline int isFromUser(void) const {return sourceFlag==-1;}
 
+	inline bool isMigratableContributor(void) const {return migratableContributor;}
+	inline void setMigratableContributor(bool _mig){ migratableContributor = _mig;}
+
 	~CkReductionMsg();
 
 //Implementation-only fields (don't access these directly!)
@@ -263,6 +266,7 @@ private:
 	int userFlag; //Some sort of identifying flag, for client use
 	CkCallback callback; //What to do when done
 	CkCallback secondaryCallback; // the group callback is piggybacked on the nodegrp reduction
+	bool migratableContributor; // are the contributors migratable
 
 	int sourceFlag;/*Flag:
 		0 indicates this is a placeholder message (meaning: nothing to report)
@@ -299,12 +303,13 @@ private:
 	const CkCallback &cb,int userFlag=-1); \
   void contribute(CkReductionMsg *msg);\*/
 
-#define CK_REDUCTION_CONTRIBUTE_METHODS_DEF(me,myRednMgr,myRednInfo) \
+#define CK_REDUCTION_CONTRIBUTE_METHODS_DEF(me,myRednMgr,myRednInfo,migratable) \
 void me::contribute(int dataSize,const void *data,CkReduction::reducerType type,\
 	int userFlag)\
 {\
 	CkReductionMsg *msg=CkReductionMsg::buildNew(dataSize,data,type);\
 	msg->setUserFlag(userFlag);\
+	msg->setMigratableContributor(migratable);\
 	myRednMgr->contribute(&myRednInfo,msg);\
 }\
 void me::contribute(int dataSize,const void *data,CkReduction::reducerType type,\
@@ -313,10 +318,14 @@ void me::contribute(int dataSize,const void *data,CkReduction::reducerType type,
 	CkReductionMsg *msg=CkReductionMsg::buildNew(dataSize,data,type);\
 	msg->setUserFlag(userFlag);\
 	msg->setCallback(cb);\
+	msg->setMigratableContributor(migratable);\
 	myRednMgr->contribute(&myRednInfo,msg);\
 }\
 void me::contribute(CkReductionMsg *msg) \
-	{myRednMgr->contribute(&myRednInfo,msg);}\
+	{\
+	msg->setMigratableContributor(migratable);\
+	myRednMgr->contribute(&myRednInfo,msg);\
+	}\
 
 
 //A group that can contribute to reductions

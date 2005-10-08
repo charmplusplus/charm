@@ -512,9 +512,14 @@ void LocalBarrier::CallReceivers(void)
 
 void LocalBarrier::ResumeClients(void)
 {
+	int count=0;
   for(int i=0; i < max_client; i++)
-    if (clients[i] != 0) 
+    if (clients[i] != 0) {
       ((client*)clients[i])->fn(((client*)clients[i])->data);
+				count++;
+		}	
+	
+	printf("[%d] ResumeClients in LocalBarrier done max_client %d count %d \n",CkMyPe(),max_client,count);
 }
 
 #endif

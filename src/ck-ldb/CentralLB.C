@@ -16,7 +16,7 @@
 #include "LBDBManager.h"
 #include "LBSimulation.h"
 
-#define  DEBUGF(x)       // CmiPrintf x;
+#define  DEBUGF(x)        //CmiPrintf x;
 
 #define USE_REDUCTION  1
 #define USE_LDB_SPANNING_TREE 0
@@ -70,7 +70,7 @@ void CentralLB::initLB(const CkLBOptions &opt)
   startLbFnHdl = theLbdb->getLBDB()->
     AddStartLBFn((LDStartLBFn)(staticStartLB),(void*)(this));
 
-  // CkPrintf("[%d] CentralLB seq %d\n",CkMyPe(), seq);
+   CkPrintf("[%d] CentralLB initLB \n",CkMyPe());
   if (opt.getSeqNo() > 0) turnOff();
 
   stats_msg_count = 0;
@@ -151,7 +151,9 @@ void CentralLB::AtSync()
     MigrationDone(0);
     return;
   }
-  thisProxy [CkMyPe()].ProcessAtSync();
+	if(CmiNodeAlive(CkMyPe())){
+  	thisProxy [CkMyPe()].ProcessAtSync();
+	}
 #endif
 }
 
@@ -196,6 +198,9 @@ void CentralLB::ReceiveCounts(CkReductionMsg  *msg)
   statsData->to_proc.resize(n_objs);
   statsData->commData.resize(n_comm);
 
+
+	DEBUGF(("[%d] ReceiveCounts\n",CkMyPe()));
+	
     // broadcast call to let everybody start to send stats
   thisProxy.SendStats();
 }
@@ -221,18 +226,14 @@ void CentralLB::SendStats()
   theLbdb->GetTime(&msg->total_walltime,&msg->total_cputime,
 		   &msg->idletime, &msg->bg_walltime,&msg->bg_cputime);
   msg->pe_speed = myspeed;
-  DEBUGF((
-    "Processors %d Total time (wall,cpu) = %f %f Idle = %f Bg = %f %f\n",
-    CkMyPe(),msg->total_walltime,msg->total_cputime,
-    msg->idletime,msg->bg_walltime,msg->bg_cputime));
+  DEBUGF(("Processor %d Total time (wall,cpu) = %f %f Idle = %f Bg = %f %f\n", CkMyPe(),msg->total_walltime,msg->total_cputime,msg->idletime,msg->bg_walltime,msg->bg_cputime));
 
   msg->n_objs = osz;
   theLbdb->GetObjData(msg->objData);
   msg->n_comm = csz;
   theLbdb->GetCommData(msg->commData);
 //  theLbdb->ClearLoads();
-  DEBUGF(("PE %d sending stats to ReceiveStats %d objs, %d comm\n",
-           CkMyPe(),msg->n_objs,msg->n_comm));
+  DEBUGF(("PE %d sending stats to ReceiveStats %d objs, %d comm\n",CkMyPe(),msg->n_objs,msg->n_comm));
 
   if(CkMyPe() == cur_ld_balancer) {
     msg->avail_vector = new char[CkNumPes()];
@@ -267,16 +268,14 @@ void CentralLB::Migrated(LDObjHandle h, int waitBarrier)
 #if CMK_LBDB_ON
   if (waitBarrier) {
 	    migrates_completed++;
-      DEBUGF(("[%d] An object migrated! %d %d\n",
-     	   CkMyPe(),migrates_completed,migrates_expected));
+      DEBUGF(("[%d] An object migrated! %d %d\n",CkMyPe(),migrates_completed,migrates_expected));
     if (migrates_completed == migrates_expected) {
       MigrationDone(1);
     }
   }
   else {
     future_migrates_completed ++;
-    DEBUGF(("[%d] An object migrated with no barrier! %d expected: %d\n",
-    	   CkMyPe(),future_migrates_completed,future_migrates_expected));
+    DEBUGF(("[%d] An object migrated with no barrier! %d expected: %d\n",CkMyPe(),future_migrates_completed,future_migrates_expected));
     if (future_migrates_completed == future_migrates_expected)  {
 	CheckMigrationComplete();
     }
@@ -371,8 +370,7 @@ void CentralLB::ReceiveStats(CkMarshalledCLBStatsMessage &msg)
   {
     CLBStatsMsg *m = (CLBStatsMsg *)msg.getMessage(num);
     const int pe = m->from_pe;
-    DEBUGF(("Stats msg received, %d %d %d %d %p\n",
-  	   pe,stats_msg_count,m->n_objs,m->serial,m));
+    DEBUGF(("Stats msg received, %d %d %d %p\n", pe,stats_msg_count,m->n_objs,m));
 	
     if(!CmiNodeAlive(pe)){
 	DEBUGF(("[%d] ReceiveStats called from invalidProcessor %d\n",CkMyPe(),pe));
@@ -411,7 +409,6 @@ void CentralLB::ReceiveStats(CkMarshalledCLBStatsMessage &msg)
     }
   }    // end of for
 
-  DEBUGF(("[0] ReceiveStats from %d step: %d count: %d\n", pe, step(), stats_msg_count));
   const int clients = CkNumValidPes();
 
   if (stats_msg_count == clients) {
@@ -697,8 +694,11 @@ void CentralLB::MigrationDone(int balancing)
                   thisProxy);
     contribute(0, NULL, CkReduction::sum_int, cb);
   }
-  else 
-    thisProxy [CkMyPe()].ResumeClients(balancing);
+  else{	
+		if(CmiNodeAlive(CkMyPe())){
+	    thisProxy [CkMyPe()].ResumeClients(balancing);
+		}	
+	}	
 #endif
 }
 
@@ -719,7 +719,7 @@ void CentralLB::ResumeClients(int balancing)
   	      lbName(), step()-1,end_lb_time, end_lb_time - start_lb_time);
   }
 
-  ComlibNotifyMigrationDone();  
+//  ComlibNotifyMigrationDone();  
 
   theLbdb->ResumeClients();
   if (balancing)  {
@@ -748,7 +748,7 @@ void CentralLB::CheckMigrationComplete()
     lbdone = 0;
     future_migrates_expected = -1;
     future_migrates_completed = 0;
-    DEBUGF(("[%d] MigrationComplete\n", CkMyPe()));
+    DEBUGF(("[%d] Migration Complete\n", CkMyPe()));
     // release local barrier  so that the next load balancer can go
     LDOMHandle h;
     h.id.id.idx = 0;

@@ -83,6 +83,7 @@ CkReductionMsg *CkArrayReductionMgr::reduceMessages(void){
 	int nMsgs=0;
 	CkReductionMsg *m;
 	CkReductionMsg **msgArr=new CkReductionMsg*[my_msgs.length()];
+	bool isMigratableContributor;
 
 	while(NULL!=(m=my_msgs.deq()))
 	{
@@ -99,6 +100,9 @@ CkReductionMsg *CkArrayReductionMgr::reduceMessages(void){
 				msgs_secondaryCallback = m->secondaryCallback;
 			if (m->userFlag!=-1)
 				msgs_userFlag=m->userFlag;
+
+			isMigratableContributor=m->isMigratableContributor();
+				
 		}
 		else
 		{ //This is just a placeholder message-- replace it
@@ -125,9 +129,9 @@ CkReductionMsg *CkArrayReductionMgr::reduceMessages(void){
   	ret->gcount=msgs_gcount;
   	ret->userFlag=msgs_userFlag;
   	ret->callback=msgs_callback;
-	ret->secondaryCallback = msgs_secondaryCallback;
+		ret->secondaryCallback = msgs_secondaryCallback;
   	ret->sourceFlag=msgs_nSources;
-
+		ret->setMigratableContributor(isMigratableContributor);	
 	return ret;
 }
 

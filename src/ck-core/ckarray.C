@@ -215,7 +215,7 @@ void ArrayElement::ckJustMigrated(void) {
 }
 
 CK_REDUCTION_CONTRIBUTE_METHODS_DEF(ArrayElement,thisArray,
-   *(contributorInfo *)&listenerData[thisArray->reducer->ckGetOffset()]);
+   *(contributorInfo *)&listenerData[thisArray->reducer->ckGetOffset()],true);
 
 /// Remote method: calls destructor
 void ArrayElement::ckDestroy(void)
