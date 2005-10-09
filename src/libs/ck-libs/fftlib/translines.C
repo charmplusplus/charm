@@ -98,7 +98,7 @@ NormalLineArray::doFirstFFT(int fftid, int direction)
 		for(z = 0; z < sizeZ; z+=ysquare[1]){
 		    SendFFTMsg *msg = new(sendDataSize, sizeof(int)*8) SendFFTMsg;
 		    sendData = msg->data;
-		    msg->ypos = thisIndex.x; 
+		    msg->ypos = thisIndex.y; 
 		    msg->size = sendDataSize;
 		    msg->id = fftid;
 		    msg->direction = direction;
@@ -313,7 +313,7 @@ NormalLineArray::doThirdFFT(int zpos, int xpos, complex *val, int datasize, int 
 
 
 #ifdef HEAVYVERBOSE
-    {
+	{
 	char fname[80];
 	if(direction)
 	snprintf(fname,80,"zline_%d.x%d.y%d.out", fftid, thisIndex.x, thisIndex.y);
@@ -323,7 +323,7 @@ NormalLineArray::doThirdFFT(int zpos, int xpos, complex *val, int datasize, int 
 	for(int x = 0; x < sizeX*xsquare[0]*xsquare[1]; x++)
 	    fprintf(fp, "%g %g\n", line[x].re, line[x].im);
 	fclose(fp);
-    }
+	}
 #endif
 
 
