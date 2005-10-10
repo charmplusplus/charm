@@ -466,7 +466,7 @@ PairCalculator::calculatePairs_gemm(calculatePairsMsg *msg)
 #endif
 
     numRecd = 0; 
-#define NEW_DECOMP	
+//#define NEW_DECOMP	
     if (msg->flag_dp) {
 #ifndef NEW_DECOMP	
       if(thisIndex.w != 0) {   // Adjusting for double packing of incoming data
