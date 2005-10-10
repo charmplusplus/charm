@@ -66,4 +66,4 @@ CMK_F90LIBS="-L$XLC_F/blrts_lib -lxlf90 -lxlopt -lxl -lxlfmath"
 CMK_MOD_NAME_ALLCAPS=1
 CMK_MOD_EXT="mod"
 CMK_F90_USE_MODDIR=1
-CMK_F90_MODINC="-p"
+CMK_F90_MODINC="-moddir="
