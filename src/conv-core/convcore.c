@@ -2434,7 +2434,7 @@ void CmiIOInit(char **argv) {
     CpvAccess(expIOBufferSize) = DEFAULT_IO_BUFFER_SIZE;
   }
   CpvAccess(explicitIOBuffer) = (char*)CmiAlloc(CpvAccess(expIOBufferSize)*
-						sizeof(char*));
+						sizeof(char));
   if (setvbuf(stdout, CpvAccess(explicitIOBuffer), _IOFBF, 
 	      CpvAccess(expIOBufferSize))) {
     CmiAbort("Explicit IO Buffering failed\n");
