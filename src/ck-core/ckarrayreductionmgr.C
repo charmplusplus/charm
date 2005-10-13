@@ -187,8 +187,5 @@ int CkArrayReductionMgr::getTotalGCount(){
 	return totalGCount;
 };
 
-void CkArrayReductionMgr::LateMigrantMsg(CkReductionMsg *m){
-	addContribution(m);
-};
 
 #include "CkArrayReductionMgr.def.h"

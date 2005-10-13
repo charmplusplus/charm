@@ -146,6 +146,7 @@ public:
 	//Sent up the reduction tree with reduced data
 	void RecvMsg(CkReductionMsg *m);
 	void doRecvMsg(CkReductionMsg *m);
+	void LateMigrantMsg(CkReductionMsg *m);
 
   virtual void flushStates();	// flush state varaibles
 	virtual void startLocalGroupReductions(int number){}; // can be used to start reductions on all the 

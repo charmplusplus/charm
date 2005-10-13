@@ -516,6 +516,7 @@ void CkReductionMgr::finishReduction(void)
   result->gcount+=gcount+adj(redNo).gcount;
   result->secondaryCallback = result->callback;
   result->callback = CkCallback(CkIndex_CkReductionMgr::ArrayReductionHandler(NULL),0,thisProxy);
+	DEBR((AA"Reduced mesg gcount %d localgcount %d\n"AB,result->gcount,gcount));
 
   //CkPrintf("[%d] Got all local Messages in finishReduction %d in redNo %d\n",CkMyPe(),nContrib,redNo);
 
@@ -1238,7 +1239,9 @@ void CkNodeReductionMgr::contribute(contributorInfo *ci,CkReductionMsg *m)
   m->redNo=ci->redNo++;
   m->sourceFlag=-1;//A single contribution
   m->gcount=0;
-
+#if DEBUGRED
+	CkPrintf("[%d,%d] NodeGroup %d> localContribute called for redNo %d \n",CkMyNode(),CkMyPe(),thisgroup.idx,m->redNo);
+#endif
   addContribution(m);
 
 }
@@ -1415,6 +1418,28 @@ void CkNodeReductionMgr::addContribution(CkReductionMsg *m)
   CmiUnlock(lockEverything);
   interrupt = 0;
 }
+
+void CkNodeReductionMgr::LateMigrantMsg(CkReductionMsg *m){
+	if(blocked){
+		DEBR(("[%d] This node is blocked, so local message is being buffered as no %d\n",CkMyNode(),bufferedMsgs.length()));
+		bufferedMsgs.enq(m);
+		return;
+	}
+	
+	if (isFuture(m->redNo)) {//An early contribution-- add to future Q
+		DEBR((AA"Latemigrant %p gives early node contribution-- for #%d\n"AB,m->ci,m->redNo));
+		futureMsgs.enq(m);
+	} else {// An ordinary contribution
+		DEBR((AA"Recv'd late migrant contribution %d for #%d at %d\n"AB,nContrib,m->redNo,this));
+		msgs.enq(m);
+		finishReduction();
+	}
+};
+
+
+
+
+
 /** check if the nodegroup reduction is finished at this node. In that case send it
 up the reduction tree **/
 
@@ -1519,6 +1544,9 @@ void CkNodeReductionMgr::finishReduction(void)
 
     interrupt = 0;
     if (m!=NULL){ //One of these addContributions may have finished us.
+#if DEBUGRED
+		CkPrintf("[%d,%d] NodeGroup %d> Mesg with redNo %d might be useful in new reduction %d \n",CkMyNode(),CkMyPe(),thisgroup.idx,m->redNo,redNo);
+#endif
       doAddContribution(m);//<- if *still* early, puts it back in the queue
     }
   }
@@ -1693,7 +1721,7 @@ CkReductionMsg *CkNodeReductionMgr::reduceMessages(void)
   ret->secondaryCallback = msgs_secondaryCallback;
   ret->sourceFlag=msgs_nSources;
 	ret->setMigratableContributor(isMigratableContributor);
-  DEBR((AA"Reduced gcount=%d; sourceFlag=%d\n"AB,ret->gcount,ret->sourceFlag));
+  DEBR((AA"Node Reduced gcount=%d; sourceFlag=%d\n"AB,ret->gcount,ret->sourceFlag));
 
   return ret;
 }
