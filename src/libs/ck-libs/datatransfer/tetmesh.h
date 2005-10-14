@@ -94,6 +94,7 @@ void writeNoboite(FILE *f,TetMesh &t);
 
 /// Read this mesh from the FEM framework's mesh m
 void readFEM(int m,TetMesh &t);
+void readGhostFEM(int m,TetMesh &t);
 
 /// Write this mesh to the FEM framework's mesh m
 void writeFEM(int m,TetMesh &t);
