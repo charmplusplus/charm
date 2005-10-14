@@ -9,7 +9,7 @@ extern void _registerFEMMeshModify(void);
 
 void FEM_ADAPT_Init(int meshID) {
   _registerFEMMeshModify();
-  FEM_REF_INIT(meshID);
+  FEM_REF_INIT(meshID, 2);  // dim=2
   FEM_Mesh *meshP = FEM_Mesh_lookup(meshID, "FEM_ADAPT_Init");
   CtvInitialize(FEM_Adapt_Algs *, _adaptAlgs);
   CtvAccess(_adaptAlgs) = meshP->getfmMM()->getfmAdaptAlgs();
@@ -29,7 +29,7 @@ FDECL void FTN_NAME(FEM_ADAPT_REFINE,fem_adapt_refine)(int *qm, int *method, dou
 }
 
 void FEM_ADAPT_Coarsen(int qm, int method, double factor, double *sizes) {
-  CtvAccess(_adaptAlgs)->FEM_Refine(qm, method, factor, sizes);
+  CtvAccess(_adaptAlgs)->FEM_Coarsen(qm, method, factor, sizes);
 }
 FDECL void FTN_NAME(FEM_ADAPT_COARSEN,fem_adapt_coarsen)(int *qm, int *method, double *factor, double *sizes)
 {

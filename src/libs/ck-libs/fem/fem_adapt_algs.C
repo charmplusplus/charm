@@ -13,6 +13,8 @@
 #define MINAREA 1.0e-12
 #define MAXAREA 1.0e12
 
+CtvDeclare(FEM_Adapt_Algs *, _adaptAlgs);
+
 FEM_Adapt_Algs::FEM_Adapt_Algs(FEM_Mesh *m, femMeshModify *fm, int dimension) 
 { 
   theMesh = m; 
@@ -242,6 +244,9 @@ void FEM_Adapt_Algs::SetMeshSize(int method, double factor, double *sizes)
       }
       theMesh->elem[0].setMeshSizing(i, factor*avgEdgeLength);
     }
+  }
+  else if (method == 3) { // mesh sizing has been set independently; use as is
+    return;
   }
 }
 

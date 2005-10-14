@@ -9,6 +9,8 @@
 #ifndef __CHARM_FEM_ADAPT_ALGS_H
 #define __CHARM_FEM_ADAPT_ALGS_H
 
+#include "charm++.h"
+#include "tcharm.h"
 #include "charm-api.h"
 #include "ckvector3d.h"
 #include "fem.h"
@@ -19,6 +21,9 @@
 #define REFINE_TOL 1.5
 #define COARSEN_TOL 0.85
 #define QUALITY_MIN 0.6
+
+class FEM_Adapt_Algs;
+CtvExtern(FEM_Adapt_Algs *, _adaptAlgs);
 
 class femMeshModify;
 class FEM_Adapt;
