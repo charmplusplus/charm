@@ -1933,39 +1933,64 @@ void FEM_writeMesh(FEM_Mesh *m,const char *prefix,int chunkNo,int nChunks)
 
 
 // Setup the entity FEM_IS_VALID tables
-void FEM_Mesh_allocate_valid_attr(int fem_mesh, int entity_type){  
+CDECL void FEM_Mesh_allocate_valid_attr(int fem_mesh, int entity_type){  
   FEM_Mesh *m=FEM_Mesh_lookup(fem_mesh,"FEM_Mesh_create_valid_elem");
   FEM_Entity *entity = m->lookup(entity_type,"FEM_Mesh_allocate_valid_attr");
   entity->allocateValid();
 }
+FORTRAN_AS_C(FEM_MESH_ALLOCATE_VALID_ATTR,
+             FEM_Mesh_allocate_valid_attr,
+             fem_mesh_allocate_valid_attr, 
+             (int *fem_mesh, int *entity_type),  (*fem_mesh, *entity_type) )
+
 
 // mark an entity as valid
-void FEM_set_entity_valid(int mesh, int entityType, int entityIdx){
+CDECL void FEM_set_entity_valid(int mesh, int entityType, int entityIdx){
   FEM_Mesh *m=FEM_Mesh_lookup(mesh,"FEM_");
   FEM_Entity *entity = m->lookup(entityType,"FEM_");
   entity->set_valid(entityIdx,true);
 }
+FORTRAN_AS_C(FEM_SET_ENTITY_VALID, 
+             FEM_set_entity_valid, 
+             fem_set_entity_valid,  
+             (int *fem_mesh, int *entity_type, int *entityIdx),  (*fem_mesh, *entity_type, *entityIdx) ) 
+
 
 // mark an entity as invalid
-void FEM_set_entity_invalid(int mesh, int entityType, int entityIdx){
+CDECL void FEM_set_entity_invalid(int mesh, int entityType, int entityIdx){
   FEM_Mesh *m=FEM_Mesh_lookup(mesh,"FEM_Mesh_create_valid_elem");
   FEM_Entity *entity = m->lookup(entityType,"FEM_Mesh_allocate_valid_attr");
   return entity->set_invalid(entityIdx,true);
 }
+FORTRAN_AS_C(FEM_SET_ENTITY_INVALID,  
+             FEM_set_entity_invalid,  
+             fem_set_entity_invalid,   
+             (int *fem_mesh, int *entity_type, int *entityIdx),  (*fem_mesh, *entity_type, *entityIdx) )  
+
 
 // Determine if an entity is valid
-int FEM_is_valid(int mesh, int entityType, int entityIdx){
+CDECL int FEM_is_valid(int mesh, int entityType, int entityIdx){
   FEM_Mesh *m=FEM_Mesh_lookup(mesh,"FEM_Mesh_create_valid_elem");
   FEM_Entity *entity = m->lookup(entityType,"FEM_Mesh_allocate_valid_attr");
   return (entity->is_valid(entityIdx) != 0);
 }
+FORTRAN_AS_C(FEM_IS_VALID,   
+             FEM_is_valid,   
+             fem_is_valid,    
+             (int *fem_mesh, int *entity_type, int *entityIdx),  (*fem_mesh, *entity_type, *entityIdx) )   
+
 
 // Count number of valid items for this entity type
-unsigned int FEM_count_valid(int mesh, int entityType){
+CDECL unsigned int FEM_count_valid(int mesh, int entityType){
   FEM_Mesh *m=FEM_Mesh_lookup(mesh,"FEM_Mesh_create_valid_elem");
   FEM_Entity *entity = m->lookup(entityType,"FEM_Mesh_allocate_valid_attr");
   return entity->count_valid();
 }
+FORTRAN_AS_C(FEM_COUNT_VALID,    
+             FEM_count_valid,    
+             fem_count_valid,     
+             (int *fem_mesh, int *entity_type),  (*fem_mesh, *entity_type) )    
+ 
 
 // Set coordinates for some entity's item number idx 
 void FEM_set_entity_coord2(int mesh, int entityType, int idx, double x, double y){

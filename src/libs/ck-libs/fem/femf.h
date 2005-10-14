@@ -48,7 +48,7 @@
 	   integer, parameter :: FEM_NODE_NODE_ADJACENCY=(FEM_ATTRIB_FIRST+11)
 	   integer, parameter :: FEM_ELEM_ELEM_ADJACENCY=(FEM_ATTRIB_FIRST+12)
 	   integer, parameter :: FEM_ELEM_ELEM_ADJ_TYPES=(FEM_ATTRIB_FIRST+13)
-	   integer, parameter :: FEM_IS_VALID=(FEM_ATTRIB_FIRST+14)		 
+!	   integer, parameter :: FEM_IS_VALID_ATTR=(FEM_ATTRIB_FIRST+14)		 
        integer, parameter :: FEM_MESH_SIZING=(FEM_ATTRIB_FIRST+15)
        integer, parameter :: FEM_INDEX_0=IDXL_INDEX_0
        integer, parameter :: FEM_INDEX_1=IDXL_INDEX_1
@@ -308,8 +308,15 @@
        subroutine   FEM_Mesh_get2ElementsOnEdge(fem_mesh,n1,n2,e1,e2)
          integer, intent(in)  :: fem_mesh, n1, n2
          integer, intent(out) :: e1, e2
-       end subroutine                                        
+       end subroutine      
+         
+       integer function  FEM_is_valid(fem_mesh,entityType,entityIdx)
+         integer, intent(in)  :: fem_mesh, entityType, entityIdx
+       end function       
 
+       integer function FEM_count_valid(fem_mesh,entityType,entityIdx)
+         integer, intent(in)  :: fem_mesh, entityType, entityIdx
+       end function    
 
        end interface
 
