@@ -1209,6 +1209,7 @@ void CkNodeReductionMgr::flushStates()
   while (!msgs.isEmpty()) { delete msgs.deq(); }
   while (!futureMsgs.isEmpty()) delete futureMsgs.deq();
   while (!futureRemoteMsgs.isEmpty()) delete futureRemoteMsgs.deq();
+  while (!futureLateMigrantMsgs.isEmpty()) delete futureLateMigrantMsgs.deq();
   }
 }
 
@@ -1428,9 +1429,11 @@ void CkNodeReductionMgr::LateMigrantMsg(CkReductionMsg *m){
 	
 	if (isFuture(m->redNo)) {//An early contribution-- add to future Q
 		DEBR((AA"Latemigrant %p gives early node contribution-- for #%d\n"AB,m->ci,m->redNo));
-		futureMsgs.enq(m);
+//		CkPrintf("[%d,%d] NodeGroup %d> Latemigrant gives early node contribution %d in redNo %d\n",CkMyNode(),CkMyPe(),thisgroup.idx,m->redNo,redNo);
+		futureLateMigrantMsgs.enq(m);
 	} else {// An ordinary contribution
 		DEBR((AA"Recv'd late migrant contribution %d for #%d at %d\n"AB,nContrib,m->redNo,this));
+//		CkPrintf("[%d,%d] NodeGroup %d> Latemigrant contribution %d in redNo %d\n",CkMyNode(),CkMyPe(),thisgroup.idx,m->redNo,redNo);
 		msgs.enq(m);
 		finishReduction();
 	}
@@ -1565,6 +1568,18 @@ void CkNodeReductionMgr::finishReduction(void)
     interrupt = 0;
     if (m!=NULL)
       doRecvMsg(m);//<- if *still* early, puts it back in the queue
+  }
+  
+  n = futureLateMigrantMsgs.length();
+  for(i=0;i<n;i++){
+    CkReductionMsg *m = futureLateMigrantMsgs.deq();
+    if(m != NULL){
+      if(m->redNo == redNo){
+        msgs.enq(m);
+      }else{
+        futureLateMigrantMsgs.enq(m);
+      }
+    }
   }
 }
 
@@ -1739,6 +1754,7 @@ void CkNodeReductionMgr::pup(PUP::er &p)
   p|msgs;
   p|futureMsgs;
   p|futureRemoteMsgs;
+  p|futureLateMigrantMsgs;
 	p|parent;
   if(p.isUnpacking()) {
     gcount=CkNumNodes();

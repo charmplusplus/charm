@@ -175,7 +175,9 @@ private:
 	CkMsgQ<CkReductionMsg> futureMsgs;
 	//Remote messages queued for future reductions (sent to us too early)
 	CkMsgQ<CkReductionMsg> futureRemoteMsgs;
-
+	//Late migrant messages queued for future reductions
+	CkMsgQ<CkReductionMsg> futureLateMigrantMsgs;
+	
 	//My Big LOCK
 	CmiNodeLock lockEverything;
 
