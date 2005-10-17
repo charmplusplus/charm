@@ -5,6 +5,17 @@
 #define __UIUC_CHARM_CONV_CONFIG_H
 
 /* 
+ Include the automatically determined options.
+  conv-autoconfig.h is written by the configure script.
+
+ This header declares all automatically-determined properties
+ of the machine, like compiler features, headers, and syscalls.
+ Generally, more features should be moved into this header
+ from the other manually generated headers.
+*/
+#include "conv-autoconfig.h"
+
+/* 
  Include the machine.c configuration header 
   (e.g., charm/src/arch/net/conv-common.h )
 
@@ -22,17 +33,6 @@
  signals, threads, timers, and other details. 
 */
 #include "conv-mach.h"
-
-/* 
- Include the automatically determined options.
-  conv-autoconfig.h is written by the configure script.
-
- This header declares all automatically-determined properties
- of the machine, like compiler features, headers, and syscalls.
- Generally, more features should be moved into this header
- from the other manually generated headers.
-*/
-#include "conv-autoconfig.h"
 
 /* 
  Include the build-time options.
