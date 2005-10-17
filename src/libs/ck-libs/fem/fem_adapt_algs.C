@@ -245,7 +245,12 @@ void FEM_Adapt_Algs::SetMeshSize(int method, double factor, double *sizes)
       theMesh->elem[0].setMeshSizing(i, factor*avgEdgeLength);
     }
   }
-  else if (method == 3) { // mesh sizing has been set independently; use as is
+  else if (method == 3) { // scale existing mesh size
+    for (int i=0; i<numElements; i++) {
+      theMesh->elem[0].setMeshSizing(i, factor*theMesh->elem[0].getMeshSizing(i));
+    }
+  }
+  else if (method == 4) { // mesh sizing has been set independently; use as is
     return;
   }
 }
