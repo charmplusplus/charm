@@ -93,12 +93,12 @@ void ftraceRegisterFunc(char *name,int *outIdx,int lenName){
 	delete [] newstr;
 }
 
-void ftraceBeginFunc(int idx){
-	traceBeginFuncIndexProj(idx,"FORTRAN",0);
+void ftraceBeginFunc(int *idx){
+	traceBeginFuncIndexProj(*idx,"FORTRAN",0);
 }
 
-void ftraceEndFunc(int idx){
-	traceEndFuncIndexProj(idx);
+void ftraceEndFunc(int *idx){
+	traceEndFuncIndexProj(*idx);
 }
 
 
