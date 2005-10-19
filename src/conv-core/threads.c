@@ -104,6 +104,9 @@
 #if CMK_MEMORY_PROTECTABLE
 #include <malloc.h> /*<- for memalign*/
 #endif
+#if CMK_VERSION_BLUEGENE
+#include "rts.h"	/*<- for rts_memory_alias */
+#endif
 
 #include "converse.h"
 #include "qt.h"
@@ -147,9 +150,8 @@
 
 typedef struct CthThreadBase
 {
- 	CthThreadToken *token; /* token that shall be enqueued into the ready queue*/
-	int scheduled;				 /* has this thread been added to the ready queue ?
-													*/
+  CthThreadToken *token; /* token that shall be enqueued into the ready queue*/
+  int scheduled;	 /* has this thread been added to the ready queue ? */
  
   CmiObjId   tid;        /* globally unique tid */
   CthAwkFn   awakenfn;   /* Insert this thread into the ready queue */
@@ -247,6 +249,16 @@ void CthAliasEnable(CthThreadBase *t) {
 	_curMappedStack=t;
 	if (0) printf("Mmapping in thread %p from runtime stack %p\n",t,&s);
 	
+#if CMK_VERSION_BLUEGENE
+        /* Blue Gene/L does not have mmap */
+        /* So this depends on a hack in CNK for syscall rts_memory_alias to
+           map stack pointer to a fix address */
+        {
+        register char *dest=(char *)0x70000000; /* point stack at high memory, not user memory */
+        int alias_slot;
+        rts_memory_alias(t->stack,dest,t->stacksize,&alias_slot);
+        }
+#else
 	/* Linux mmap flag MAP_POPULATE, to pre-fault in all the pages,
 	   only seems to slow down overall performance. */
 	/* Linux mmap flag MAP_GROWSDOWN is rejected at runtime under 2.4.25 */
@@ -257,6 +269,7 @@ void CthAliasEnable(CthThreadBase *t) {
 		perror("threads.c CthAliasEnable mmap");
 		CmiAbort("threads.c CthAliasEnable mmap failed");
 	}
+#endif
 }
 #else
 #define CthAliasEnable(t) /* empty */
