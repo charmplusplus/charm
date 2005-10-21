@@ -1106,7 +1106,7 @@ Array::genSubDecls(XStr& str)
     } else if (indexSuffix==(const char*)"2D") {
     str << 
     "    "<<etype<<" operator () (int idx) const \n"
-    "        {return "<<etype<<"(ckGetArrayID(), *(CkArrayIndex2D*)&ckGetArrayElements()[idx], CK_DELCTOR_CALL);}\n";
+    "        {return "<<etype<<"(ckGetArrayID(), *(CkArrayIndex2D*)&ckGetArrayElements()[idx], CK_DELCTOR_CALL);}\n"
     "    static CkSectionID ckNew(const CkArrayID &aid, CkArrayIndex2D *elems, int nElems) {\n"
     "      return CkSectionID(aid, elems, nElems);\n"
     "    } \n"
@@ -1120,7 +1120,7 @@ Array::genSubDecls(XStr& str)
     } else if (indexSuffix==(const char*)"3D") {
     str << 
     "    "<<etype<<" operator () (int idx) const \n"
-    "        {return "<<etype<<"(ckGetArrayID(), *(CkArrayIndex3D*)&ckGetArrayElements()[idx], CK_DELCTOR_CALL);}\n";
+    "        {return "<<etype<<"(ckGetArrayID(), *(CkArrayIndex3D*)&ckGetArrayElements()[idx], CK_DELCTOR_CALL);}\n"
     "    static CkSectionID ckNew(const CkArrayID &aid, CkArrayIndex3D *elems, int nElems) {\n"
     "      return CkSectionID(aid, elems, nElems);\n"
     "    } \n"
@@ -1135,21 +1135,21 @@ Array::genSubDecls(XStr& str)
     } else if (indexSuffix==(const char*)"4D") {
     str << 
     "    "<<etype<<" operator () (int idx) const \n"
-    "        {return "<<etype<<"(ckGetArrayID(), *(CkArrayIndex4D*)&ckGetArrayElements()[idx], CK_DELCTOR_CALL);}\n";
+    "        {return "<<etype<<"(ckGetArrayID(), *(CkArrayIndex4D*)&ckGetArrayElements()[idx], CK_DELCTOR_CALL);}\n"
     "    static CkSectionID ckNew(const CkArrayID &aid, CkArrayIndex4D *elems, int nElems) {\n"
     "      return CkSectionID(aid, elems, nElems);\n"
     "    } \n";
     } else if (indexSuffix==(const char*)"5D") {
     str << 
     "    "<<etype<<" operator () (int idx) const \n"
-    "        {return "<<etype<<"(ckGetArrayID(), *(CkArrayIndex5D*)&ckGetArrayElements()[idx], CK_DELCTOR_CALL);}\n";
+    "        {return "<<etype<<"(ckGetArrayID(), *(CkArrayIndex5D*)&ckGetArrayElements()[idx], CK_DELCTOR_CALL);}\n"
     "    static CkSectionID ckNew(const CkArrayID &aid, CkArrayIndex5D *elems, int nElems) {\n"
     "      return CkSectionID(aid, elems, nElems);\n"
     "    } \n";
     } else if (indexSuffix==(const char*)"6D") {
     str << 
     "    "<<etype<<" operator () (int idx) const \n"
-    "        {return "<<etype<<"(ckGetArrayID(), *(CkArrayIndex6D*)&ckGetArrayElements()[idx], CK_DELCTOR_CALL);}\n";
+    "        {return "<<etype<<"(ckGetArrayID(), *(CkArrayIndex6D*)&ckGetArrayElements()[idx], CK_DELCTOR_CALL);}\n"
     "    static CkSectionID ckNew(const CkArrayID &aid, CkArrayIndex6D *elems, int nElems) {\n"
     "      return CkSectionID(aid, elems, nElems);\n"
     "    } \n";
