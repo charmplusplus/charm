@@ -1125,7 +1125,7 @@ Array::genSubDecls(XStr& str)
     "      return CkSectionID(aid, elems, nElems);\n"
     "    } \n"
     "    static CkSectionID ckNew(const CkArrayID &aid, int l1, int u1, int s1, int l2, int u2, int s2, int l3, int u3, int s3) {\n"
-    "      CkVec<CkArrayIndex2D> al;\n"
+    "      CkVec<CkArrayIndex3D> al;\n"
     "      for (int i=l1; i<=u1; i+=s1) \n"
     "        for (int j=l2; j<=u2; j+=s2) \n"
     "          for (int k=l2; k<=u2; k+=s2) \n"
