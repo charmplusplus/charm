@@ -73,6 +73,16 @@ public:
   virtual void neighbors(int mype, int* _n, int &nb);
 };
 
+class LBTopo_mesh3d: public LBTopology {
+private:
+  int width;
+  int goodcoor(int, int, int);
+public:
+  LBTopo_mesh3d(int p);
+  virtual int max_neighbors();
+  virtual void neighbors(int mype, int* _n, int &nb);
+};
+
 class LBTopo_graph: public LBTopology {
 public:
   LBTopo_graph(int p): LBTopology(p) {}
