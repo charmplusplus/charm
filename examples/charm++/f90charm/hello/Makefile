@@ -1,5 +1,5 @@
 OPTS=-g
-CHARMC=$(HOME)/current/charm/net-linux-icc/bin/charmc $(OPTS)
+CHARMC=../../../../bin/charmc $(OPTS)
 
 OBJS = hello.o hellof.o
 
