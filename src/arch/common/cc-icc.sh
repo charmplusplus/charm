@@ -11,7 +11,7 @@ CMK_NATIVE_LD="$CMK_LD"
 CMK_NATIVE_LDXX="$CMK_LDXX"
 
 # for absoft?
-#CMK_F90LIBS='-L/usr/local/intel/compiler70/ia32/lib -L/opt/intel/compiler70/ia32/lib -lintrins -lIEPCF90 -lPEPCF90 -lF90 -lintrins -limf  '
+#CMK_F90LIBS='-L/usr/local/intel/compiler70/ia32/lib -L/opt/intel/compiler70/ia32/lib -lintrins -lIEPCF90 -lPEPCF90 -lF90 -lintrins -limf '
 #CMK_MOD_NAME_ALLCAPS=1
 #CMK_MOD_EXT="mod"
 #CMK_F90_USE_MODDIR=""
@@ -33,7 +33,7 @@ then
   then
     CMK_F90LIBS="-L$F90LIBDIR -lifcore -lifport "
   else
-    CMK_F90LIBS="-L$F90LIBDIR -lintrins -lIEPCF90 -lF90 -lintrins -limf "
+    CMK_F90LIBS="-L$F90LIBDIR -lintrins -lIEPCF90 -lPEPCF90 -lF90 -lintrins -limf "
   fi
 fi
 # for_main.o is important for main() in f90 code
