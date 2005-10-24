@@ -10,6 +10,8 @@ Orion Sky Lawlor, olawlor@acm.org, 1/3/2003
 #ifndef __CHARM_FEM_MESH_H
 #define __CHARM_FEM_MESH_H
 
+#include "charm-api.h"
+
 #ifndef __CHARM_IDXL_COMM_H
 #  include "idxl_comm.h" /*for IDXL_Side */
 #endif
