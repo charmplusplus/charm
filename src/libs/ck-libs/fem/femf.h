@@ -309,6 +309,10 @@
          integer, intent(in)  :: fem_mesh, n1, n2
          integer, intent(out) :: e1, e2
        end subroutine      
+
+	   subroutine  FEM_Mesh_allocate_valid_attr(fem_mesh, entity_type)
+         integer, intent(in)  :: fem_mesh, entity_type
+       end subroutine   
          
        integer function  FEM_is_valid(fem_mesh,entityType,entityIdx)
          integer, intent(in)  :: fem_mesh, entityType, entityIdx
