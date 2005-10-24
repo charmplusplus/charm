@@ -10,6 +10,13 @@
 !         call pxfgetarg(i,argv(i),length(i),ierr)
 !         if (ierr .ne. 0) print*,'Arg ',i,' error'
 !      end do
+
+      argc = IARGC()
+      do i = 0,argc
+         call GETARG(i,argv(i))
+         length(i) = LEN_TRIM(argv(i));
+      end do
+
       call conversemain(argc,argv,length)
 
       END
