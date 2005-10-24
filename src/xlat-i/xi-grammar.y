@@ -577,6 +577,8 @@ NonEntryMember  : Readonly ';'
 		{ $$ = $2; }
 		| INCLUDE IncludeFile ';'
 		{ $$ = $2; }
+		| CLASS Name ';'
+		{ $$ = new ClassDeclaration(lineno,$2); } 
 		;
 
 InitNode	: INITNODE OptVoid QualName
@@ -604,7 +606,7 @@ PUPableClass    : QualName
 		;
 
 IncludeFile    : LITERAL
-		{ $$ = new IncludeFile(lineno,$1,0); } 
+		{ $$ = new IncludeFile(lineno,$1); } 
 		;
 
 Member		: Entry ';'
