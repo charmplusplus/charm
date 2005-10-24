@@ -120,13 +120,14 @@ void FEM_Adapt_Algs::FEM_Coarsen(int qm, int method, double factor,
 int FEM_Adapt_Algs::Coarsen(int qm, int method, double factor, double *sizes)
 {
   // loop through elemsToRefine
-  int elId, mods=0, iter_mods=1;
+  int elId, mods=0, iter_mods=1, pass=0;
   double qFactor;
   SetMeshSize(method, factor, sizes);
   coarsenElements = NULL;
   coarsenHeapSize = 0;
   while (iter_mods != 0) {
     iter_mods=0;
+    pass++;
     numNodes = theMesh->node.size();
     numElements = theMesh->elem[0].size();
     // sort elements to be refined by quality into elemsToRefine
@@ -189,9 +190,9 @@ int FEM_Adapt_Algs::Coarsen(int qm, int method, double factor, double *sizes)
       CthYield(); // give other chunks on the same PE a chance
     }
     mods += iter_mods;
-    CkPrintf("ParFUM_Coarsen: %d modifications in last pass.\n", iter_mods);
+    CkPrintf("ParFUM_Coarsen: %d modifications in pass %d.\n", iter_mods, pass);
   }
-  CkPrintf("ParFUM_Coarsen: %d total modifications.\n", mods);
+  CkPrintf("ParFUM_Coarsen: %d total modifications over %d passes.\n", mods, pass);
   return mods;
 }
 
