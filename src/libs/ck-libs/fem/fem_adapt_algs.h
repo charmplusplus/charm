@@ -100,6 +100,11 @@ class FEM_Adapt_Algs {
       if method = 1, keep regional mesh sizes, and scale by factor
       if method = 2, uses sizes to size mesh by regions */
   void FEM_Remesh(int qm, int method, double factor, double *sizes);
+  
+  /// Set sizes on mesh elements based on their average edge length
+  void SetReferenceMesh();
+  /// Adjust sizes on mesh elements to avoid sharp discontinuities
+  void GradateMesh(double smoothness);
  private:
   // Helper methods
   /// Performs refinement; returns number of modifications

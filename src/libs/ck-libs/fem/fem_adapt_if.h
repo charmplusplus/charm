@@ -64,30 +64,22 @@ FDECL void FTN_NAME(FEM_ADAPT_SETELEMENTSSIZEFIELD,fem_adapt_setelementssizefiel
 
 void FEM_ADAPT_SetReferenceMesh(int meshID) {
     FEM_Mesh* mesh = FEM_Mesh_lookup(meshID, "FEM_ADAPT_Init");
-
-    // for each element, set its size to its average edge length
-    // TODO: do we need to run this loop for element types other than 0?
-    
-    double avgLength;
-    int width = mesh->elem[0].getConn().width();
-    int* eConn = (int*)malloc(width*sizeof(int));
-    int numElements = mesh->elem[0].size();
-    
-    for (int i=0; i<numElements; ++i, avgLength=0) {
-        mesh->e2n_getAll(i, eConn);
-        
-        for (int j=0; j<width-1; ++j) {
-            avgLength += CtvAccess(_adaptAlgs)->length(eConn[j], eConn[j+1]);
-        }
-        avgLength += CtvAccess(_adaptAlgs)->length(eConn[0], eConn[width-1]);
-        avgLength /= width;
-        mesh->elem[0].setMeshSizing(i, avgLength);      
-    }
-    free(eConn);
+    mesh->getfmMM()->getfmAdaptAlgs()->SetReferenceMesh();
 }
 FDECL void FTN_NAME(FEM_ADAPT_SETREFERENCEMESH, fem_adapt_setreferencemesh)(int* meshID)
 {
     FEM_ADAPT_SetReferenceMesh(*meshID);
+}
+
+
+void FEM_ADAPT_GradateMesh(int meshID, double smoothness)
+{
+    FEM_Mesh* mesh = FEM_Mesh_lookup(meshID, "FEM_ADAPT_Init");
+    mesh->getfmMM()->getfmAdaptAlgs()->GradateMesh(smoothness);
+}
+FDECL void FTN_NAME(FEM_ADAPT_GRADATEMESH, fem_adapt_gradatemesh)(int* meshID, double* smoothness)
+{
+    FEM_ADAPT_GradateMesh(*meshID, *smoothness);
 }
 
 #endif

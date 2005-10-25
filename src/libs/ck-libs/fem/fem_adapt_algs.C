@@ -246,15 +246,107 @@ void FEM_Adapt_Algs::SetMeshSize(int method, double factor, double *sizes)
       theMesh->elem[0].setMeshSizing(i, factor*avgEdgeLength);
     }
   }
-  else if (method == 3) { // scale existing mesh size
-    for (int i=0; i<numElements; i++) {
-      theMesh->elem[0].setMeshSizing(i, factor*theMesh->elem[0].getMeshSizing(i));
-    }
-  }
-  else if (method == 4) { // mesh sizing has been set independently; use as is
+  else if (method == 3) { // mesh sizing has been set independently; use as is
     return;
   }
 }
+
+
+void FEM_Adapt_Algs::SetReferenceMesh()
+{
+    // for each element, set its size to its average edge length
+    // TODO: do we need to run this loop for element types other than 0?
+    
+    double avgLength;
+    int width = theMesh->elem[0].getConn().width();
+    int* eConn = (int*)malloc(width*sizeof(int));
+    int numElements = theMesh->elem[0].size();
+    
+    for (int i=0; i<numElements; ++i, avgLength=0) {
+        theMesh->e2n_getAll(i, eConn);
+        
+        for (int j=0; j<width-1; ++j) {
+            avgLength += length(eConn[j], eConn[j+1]);
+        }
+        avgLength += length(eConn[0], eConn[width-1]);
+        avgLength /= width;
+        theMesh->elem[0].setMeshSizing(i, avgLength);      
+    }
+    free(eConn);
+}
+
+
+void FEM_Adapt_Algs::GradateMesh(double smoothness)
+{
+    // Resize mesh elements to avoid jumps in element size
+    // Algorithm based on h-shock correction, described in
+    // Mesh Gradation Control, Borouchaki et al
+    // IJNME43 1998 www.ann.jussieu.fr/~frey/publications/ijnme4398.pdf
+
+    const double beta = smoothness;
+
+    double maxShock = 0;
+    double minShock = 1e10;
+    int iteration = 0;
+
+    int* adjNodes, *boundNodes;
+    int nadjNodes, nnodes;
+    int meshNum = FEM_Mesh_default_read();
+
+    nnodes = theMesh->node.size();
+    boundNodes = new int[nnodes];
+    FEM_Mesh_data(meshNum, FEM_NODE, FEM_BOUNDARY, 
+            boundNodes, 0, nnodes, FEM_INT, 1);
+
+
+    printf("Running h-shock mesh gradation with beta=%.3f\n", beta);
+    while (maxShock > beta) {
+        
+        for (int node=0; node<nnodes; ++node) {
+            // only do internal nodes (?)
+            if (boundNodes[node] < 0 || !FEM_is_valid(meshNum, FEM_NODE, node))
+                continue;
+            
+            theMesh->n2n_getAll(node, &adjNodes, &nadjNodes);
+            for (int adjNode=0; adjNode<nadjNodes; ++adjNode) {
+                // get length of edge
+                // (do we need to worry about ghost/non-ghost?)
+                double edgelen = length(node, adjNode);
+                
+                // get adjacent elemnents and their sizes
+                int e1, e2;
+                theMesh->get2ElementsOnEdge(node, adjNode, &e1, &e2);
+                double s1, s2;
+                s1 = theMesh->elem[0].getMeshSizing(e1);
+                s2 = theMesh->elem[0].getMeshSizing(e2);
+                
+                // h-shock=max(size ratio)^(1/edge length)
+                double ratio = (s1 > s2) ? s1/s2 : s2/s1;
+                double hs = pow(ratio, 1.0/edgelen);
+                if (hs > maxShock) maxShock = hs;
+                if (hs < minShock) minShock = hs;
+                
+                // if hs > beta, resize the larger elt:
+                // new size = old size / eta^2
+                // eta = (beta / h-shock)^(edge length)
+                //     = beta^(edge length) / size ratio
+                if (hs > beta) {
+                    double etasq = pow(pow(beta, edgelen) / ratio, 2.0);
+                    if (s1 > s2) {
+                        theMesh->elem[0].setMeshSizing(e1, etasq);
+                    } else {
+                        theMesh->elem[0].setMeshSizing(e2, etasq);
+                    }
+                }
+            }
+        }
+        printf("Finished iteration %d\n", iteration++);
+        printf("Max shock:%8.3f\n", maxShock);
+        printf("Min shock:%8.3f\n", minShock);
+        printf("Target:%8.3f\n", beta);
+    }
+}
+
 
 int FEM_Adapt_Algs::simple_refine(double targetA, double xmin, double ymin, double xmax, double ymax) {
   int noEle = theMesh->elem[0].size();
