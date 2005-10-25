@@ -1,0 +1,12 @@
+message nodeMsg;
+message transmitMsg;
+
+poser Node : sim adapt4 chpt {
+  entry Node(nodeMsg *);
+  // Event methods
+  entry [event] void recv(transmitMsg *);
+};
+
+
+
+
