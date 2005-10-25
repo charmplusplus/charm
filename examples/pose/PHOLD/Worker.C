@@ -14,7 +14,7 @@ worker::worker(WorkerData *m)
     for (int i=0; i<numMsgs; i++) {
       wm = new WorkMsg;
       wm->fromPE = -1;
-      POSE_invoke(work(wm), worker, POSE_rand()%numObjs, POSE_rand()%(tscale/100));
+      POSE_invoke(work(wm), worker, POSE_rand()%numObjs, 1+POSE_rand()%(tscale/100));
     }
   }
 }
@@ -58,7 +58,7 @@ void worker::work(WorkMsg *m)
   if (OVT() < tscale) {
     wm = new WorkMsg;
     wm->fromPE = myHandle;
-    offset = POSE_rand() % (tscale/100);
+    offset = 1 + POSE_rand() % (tscale/100);
     while ((nbr < 0) || (nbr >= numObjs)) {
       away = (POSE_rand() % locality) + 1;
       sign = POSE_rand() % 2;

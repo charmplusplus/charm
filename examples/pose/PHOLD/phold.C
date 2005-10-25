@@ -16,7 +16,7 @@ main::main(CkArgMsg *m)
   char *text;
 
   if(m->argc<7) {
-    CkPrintf("Usage: phold <#LPs> <#initMsgs> <initMsgDist> <timestampIncFn> <moveFn> [ -g[f|m|c|z] | -t<granularity> ] <spacialLocality> <timescale>\n");
+    CkPrintf("Usage: phold <#LPs> <#initMsgs> <initMsgDist (RANDOM)> <timestampIncFn (RANDOM)> <moveFn (RANDOM)> [ -g[f|m|c|z] | -t<granularity> ] <spacialLocality (%)> <timescale (>=100)>\n");
     CkExit();
   }
   numLPs = atoi(m->argv[1]);
