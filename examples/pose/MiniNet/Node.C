@@ -35,17 +35,18 @@ Node& Node::operator=(const Node& obj)
 
 void Node::recv(transmitMsg *m)
 {
-  if (m->dest == myHandle) {
+  if (m->dest == myHandle) { // this message was for me!
     parent->CommitPrintf("%d received %s from %d at time %d\n", 
 			 myHandle, m->data, m->src, ovt);
   }
-  else {
-    parent->CommitPrintf("%d forwarding message from %d to %d at time %d\n", 
-			 myHandle, m->src, m->dest, ovt);
+  else { // this message is not for me
     transmitMsg *tm = new transmitMsg;
     tm->src = m->src;
     tm->dest = m->dest;
     strcpy(tm->data, m->data);
+    elapse(1); // It took me a time unit to think about how to route this msg
+    parent->CommitPrintf("%d forwarding message from %d to %d at time %d\n", 
+			 myHandle, m->src, m->dest, ovt);
     if (nbr1 == tm->dest) { // sophisticated routing algorithm!
       POSE_invoke(recv(tm), Node, nbr1, 3); // a hop takes 3 time units
     }
