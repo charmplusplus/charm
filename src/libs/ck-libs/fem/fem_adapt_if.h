@@ -21,21 +21,27 @@ FDECL void FTN_NAME(FEM_ADAPT_INIT,fem_adapt_init)(int *meshID)
 }
 
 
-void FEM_ADAPT_Refine(int qm, int method, double factor, double *sizes) {
-  CtvAccess(_adaptAlgs)->FEM_Refine(qm, method, factor, sizes);
+void FEM_ADAPT_Refine(int meshID, int qm, int method, double factor,
+        double *sizes) {
+    FEM_Mesh* mesh = FEM_Mesh_lookup(meshID, "FEM_ADAPT_Init");
+    mesh->getfmMM()->getfmAdaptAlgs()->FEM_Refine(qm, method, factor, sizes);
 }
-FDECL void FTN_NAME(FEM_ADAPT_REFINE,fem_adapt_refine)(int *qm, int *method, double *factor, double *sizes)
+FDECL void FTN_NAME(FEM_ADAPT_REFINE,fem_adapt_refine)(int* meshID, 
+        int *qm, int *method, double *factor, double *sizes)
 {
-  FEM_ADAPT_Refine(*qm, *method, *factor, sizes);
+  FEM_ADAPT_Refine(*meshID, *qm, *method, *factor, sizes);
 }
 
 
-void FEM_ADAPT_Coarsen(int qm, int method, double factor, double *sizes) {
-  CtvAccess(_adaptAlgs)->FEM_Coarsen(qm, method, factor, sizes);
+void FEM_ADAPT_Coarsen(int meshID, int qm, int method, double factor, 
+        double *sizes) {
+    FEM_Mesh* mesh = FEM_Mesh_lookup(meshID, "FEM_ADAPT_Init");
+    mesh->getfmMM()->getfmAdaptAlgs()->FEM_Coarsen(qm, method, factor, sizes);
 }
-FDECL void FTN_NAME(FEM_ADAPT_COARSEN,fem_adapt_coarsen)(int *qm, int *method, double *factor, double *sizes)
+FDECL void FTN_NAME(FEM_ADAPT_COARSEN,fem_adapt_coarsen)(int* meshID, 
+        int *qm, int *method, double *factor, double *sizes)
 {
-  FEM_ADAPT_Coarsen(*qm, *method, *factor, sizes);
+  FEM_ADAPT_Coarsen(*meshID, *qm, *method, *factor, sizes);
 }
 
 
