@@ -172,7 +172,7 @@ void FEM_Node::setElemAdjacency(int type, const FEM_Elem &elem){
 //  triangles and tetrahedra, but may not make as much sense for more complicated
 //  element types where all nodes are not directly connected by edges.
 void FEM_Node::setNodeAdjacency(const FEM_Elem &elem){
-  CkPrintf("In FEM_Node::setNodeAdjacency()\n");
+  //CkPrintf("In FEM_Node::setNodeAdjacency()\n");
   int nodesPerElem = elem.getNodesPer();
   CkVec<CkVec<var_id> > &adjacencyTable = nodeAdjacency->get();
   FEM_VarIndexAttribute *ghostAdjacencyAttr = ((FEM_Node *)getGhost())->nodeAdjacency;
@@ -541,6 +541,9 @@ void FEM_Mesh::createElemElemAdj()
 /// neighbors allocated to correct size
 void FEM_Mesh::e2e_getAll(int e, int *neighbors, int etype) 
 {
+#ifdef DEBUG
+  CmiMemoryCheck();
+#endif
   if (e == -1) return; // non existent element
   FEM_IndexAttribute *eAdj;
   if(FEM_Is_ghost_index(e)){
@@ -557,11 +560,17 @@ void FEM_Mesh::e2e_getAll(int e, int *neighbors, int etype)
       neighbors[i] = eAdjs[e][i];
     }
   }
+#ifdef DEBUG
+  CmiMemoryCheck();
+#endif
 }
 
 /// Given id of element e of type etype, return the id of the idx-th adjacent element
 int FEM_Mesh::e2e_getNbr(int e, short idx, int etype) 
 {     
+#ifdef DEBUG
+  CmiMemoryCheck();
+#endif
   if (e == -1) return -1;
   FEM_IndexAttribute *eAdj;
   if(FEM_Is_ghost_index(e)){
@@ -574,12 +583,18 @@ int FEM_Mesh::e2e_getNbr(int e, short idx, int etype)
     AllocTable2d<int> &eAdjs = eAdj->get();
     return eAdjs[e][idx];
   }
+#ifdef DEBUG
+  CmiMemoryCheck();
+#endif
 }
 
 /// Given id of element e and id of another element nbr, return i such that
 /// nbr is the i-th element adjacent to e
 int FEM_Mesh::e2e_getIndex(int e, int nbr, int etype) 
 { 
+#ifdef DEBUG
+  CmiMemoryCheck();
+#endif
   if (e == -1) return -1;
   FEM_IndexAttribute *eAdj;
   if(FEM_Is_ghost_index(e)){
@@ -600,6 +615,9 @@ int FEM_Mesh::e2e_getIndex(int e, int nbr, int etype)
       }
     }
   }
+#ifdef DEBUG
+  CmiMemoryCheck();
+#endif
   return -1;
 }
 
@@ -607,6 +625,9 @@ int FEM_Mesh::e2e_getIndex(int e, int nbr, int etype)
 /// has the correct size
 void FEM_Mesh::e2e_setAll(int e, int *neighbors, int etype) 
 {
+#ifdef DEBUG
+  CmiMemoryCheck();
+#endif
   if (e == -1) return;
   FEM_IndexAttribute *eAdj;
   if(FEM_Is_ghost_index(e)){
@@ -627,12 +648,18 @@ void FEM_Mesh::e2e_setAll(int e, int *neighbors, int etype)
       eAdjs[e][i] = neighbors[i];
     }
   }
+#ifdef DEBUG
+  CmiMemoryCheck();
+#endif
   
 }
 
 /// Set the idx-th element adjacent to e to be newElem
 void FEM_Mesh::e2e_setIndex(int e, short idx, int newElem, int etype) 
 {
+#ifdef DEBUG
+  CmiMemoryCheck();
+#endif
   if (e == -1) return;
   FEM_IndexAttribute *eAdj;
   if(FEM_Is_ghost_index(e)){
@@ -645,11 +672,17 @@ void FEM_Mesh::e2e_setIndex(int e, short idx, int newElem, int etype)
     AllocTable2d<int> &eAdjs = eAdj->get();
     eAdjs[e][idx] = newElem;
   }
+#ifdef DEBUG
+  CmiMemoryCheck();
+#endif
 }
 
 /// Find element oldNbr in e's adjacent elements and replace with newNbr
 void FEM_Mesh::e2e_replace(int e, int oldNbr, int newNbr, int etype) 
 {
+#ifdef DEBUG
+  CmiMemoryCheck();
+#endif
   if (e == -1) return;
   FEM_IndexAttribute *eAdj;
   if(FEM_Is_ghost_index(e)){
@@ -672,11 +705,17 @@ void FEM_Mesh::e2e_replace(int e, int oldNbr, int newNbr, int etype)
       }
     }
   }
+#ifdef DEBUG
+  CmiMemoryCheck();
+#endif
 }
 
 /// Remove all neighboring elements in adjacency
 void FEM_Mesh::e2e_removeAll(int e, int etype)
 {
+#ifdef DEBUG
+  CmiMemoryCheck();
+#endif
   if (e == -1) return;
   FEM_IndexAttribute *eAdj;
   if(FEM_Is_ghost_index(e)) {
@@ -693,6 +732,9 @@ void FEM_Mesh::e2e_removeAll(int e, int etype)
       eAdjs[e][i] = -1;
     }
   }
+#ifdef DEBUG
+  CmiMemoryCheck();
+#endif
 }
 
 //  ------- Element-to-node: preserve initial ordering
@@ -700,6 +742,9 @@ void FEM_Mesh::e2e_removeAll(int e, int etype)
 /// adjnodes allocated to correct size
 void FEM_Mesh::e2n_getAll(int e, int *adjnodes, int etype) 
 {
+#ifdef DEBUG
+  CmiMemoryCheck();
+#endif
   if (e == -1) return;
   if(FEM_Is_ghost_index(e)){
     FEM_IndexAttribute *eConn = (FEM_IndexAttribute *)elem[etype].getGhost()->lookup(FEM_CONN,"e2n_getAll");
@@ -715,11 +760,17 @@ void FEM_Mesh::e2n_getAll(int e, int *adjnodes, int etype)
       adjnodes[i] = conn[e][i];
     }
   }
+#ifdef DEBUG
+  CmiMemoryCheck();
+#endif
 }
 
 /// Given id of element e, return the id of the idx-th adjacent node
 int FEM_Mesh::e2n_getNode(int e, short idx, int etype) 
 { 
+#ifdef DEBUG
+  CmiMemoryCheck();
+#endif
   if (e == -1) return -1;
   if(FEM_Is_ghost_index(e)){
     FEM_IndexAttribute *eConn = (FEM_IndexAttribute *)elem[etype].getGhost()->lookup(FEM_CONN,"e2n_getAll");
@@ -731,12 +782,18 @@ int FEM_Mesh::e2n_getNode(int e, short idx, int etype)
     AllocTable2d<int> &conn = eConn->get();
     return conn[e][idx];
   }
+#ifdef DEBUG
+  CmiMemoryCheck();
+#endif
 }
 
 /// Given id of element e and id of a node n, return i such that
 /// n is the i-th node adjacent to e
 short FEM_Mesh::e2n_getIndex(int e, int n, int etype) 
 {
+#ifdef DEBUG
+  CmiMemoryCheck();
+#endif
   if (e == -1) return -1;
   if(FEM_Is_ghost_index(e)){
     FEM_IndexAttribute *eConn = (FEM_IndexAttribute *)elem[etype].getGhost()->lookup(FEM_CONN,"e2n_getAll");
@@ -752,6 +809,9 @@ short FEM_Mesh::e2n_getIndex(int e, int n, int etype)
       if (conn[e][i] == n)
         return i;
   }
+#ifdef DEBUG
+  CmiMemoryCheck();
+#endif
   return -1;
 }
 
@@ -759,6 +819,9 @@ short FEM_Mesh::e2n_getIndex(int e, int n, int etype)
 /// has the correct size
 void FEM_Mesh::e2n_setAll(int e, int *adjnodes, int etype) 
 {
+#ifdef DEBUG
+  CmiMemoryCheck();
+#endif
   if (e == -1) return;
   if(FEM_Is_ghost_index(e)){
     FEM_IndexAttribute *eConn = (FEM_IndexAttribute *)elem[etype].getGhost()->lookup(FEM_CONN,"e2n_getAll");
@@ -774,11 +837,17 @@ void FEM_Mesh::e2n_setAll(int e, int *adjnodes, int etype)
       conn[e][i] = adjnodes[i];
     }
   }  
+#ifdef DEBUG
+  CmiMemoryCheck();
+#endif
 }
 
 /// Set the idx-th node adjacent to e to be newNode
 void FEM_Mesh::e2n_setIndex(int e, short idx, int newNode, int etype) 
 {
+#ifdef DEBUG
+  CmiMemoryCheck();
+#endif
   if (e == -1) return;
   if(FEM_Is_ghost_index(e)){
     FEM_IndexAttribute *eConn = (FEM_IndexAttribute *)elem[etype].getGhost()->lookup(FEM_CONN,"e2n_getAll");
@@ -790,11 +859,17 @@ void FEM_Mesh::e2n_setIndex(int e, short idx, int newNode, int etype)
     AllocTable2d<int> &conn = eConn->get();
     conn[e][idx] = newNode;
   }
+#ifdef DEBUG
+  CmiMemoryCheck();
+#endif
 }
 
 /// Find node oldNode in e's adjacent ndoes and replace with newNode
 void FEM_Mesh::e2n_replace(int e, int oldNode, int newNode, int etype) 
 {
+#ifdef DEBUG
+  CmiMemoryCheck();
+#endif
   if (e == -1) return;
   if(FEM_Is_ghost_index(e)){
     FEM_IndexAttribute *eConn = (FEM_IndexAttribute *)elem[etype].getGhost()->lookup(FEM_CONN,"e2n_getAll");
@@ -816,10 +891,16 @@ void FEM_Mesh::e2n_replace(int e, int oldNode, int newNode, int etype)
       }
     }
   }  
+#ifdef DEBUG
+  CmiMemoryCheck();
+#endif
 }
 
 void FEM_Mesh::e2n_removeAll(int e, int etype)
 {
+#ifdef DEBUG
+  CmiMemoryCheck();
+#endif
   if (e == -1) return;
   if(FEM_Is_ghost_index(e)){
     FEM_IndexAttribute *eConn = (FEM_IndexAttribute *)elem[etype].getGhost()->lookup(FEM_CONN,"e2n_getAll");
@@ -833,6 +914,9 @@ void FEM_Mesh::e2n_removeAll(int e, int etype)
     for (int i=0; i<conn.width(); i++)
 	  conn[e][i] = -1;
   }  
+#ifdef DEBUG
+  CmiMemoryCheck();
+#endif
 }
 
 
@@ -843,6 +927,9 @@ void FEM_Mesh::e2n_removeAll(int e, int etype)
 /// length of adjnodes in sz; assumes adjnodes is not allocated, but sz is
 void FEM_Mesh::n2n_getAll(int n, int **adjnodes, int *sz) 
 {
+#ifdef DEBUG
+  CmiMemoryCheck();
+#endif
   if (n == -1) {
     *sz = 0;
     return;
@@ -868,11 +955,17 @@ void FEM_Mesh::n2n_getAll(int n, int **adjnodes, int *sz)
 	}
   }
   
+#ifdef DEBUG
+  CmiMemoryCheck();
+#endif
 }
  
 /// Adds newNode to node n's node adjacency list
 void FEM_Mesh::n2n_add(int n, int newNode) 
 {
+#ifdef DEBUG
+  CmiMemoryCheck();
+#endif
   if (n == -1) return;
   if(FEM_Is_ghost_index(n)){
 	FEM_VarIndexAttribute *nAdj = (FEM_VarIndexAttribute *)node.getGhost()->lookup(FEM_NODE_NODE_ADJACENCY,"n2n_add");
@@ -888,6 +981,9 @@ void FEM_Mesh::n2n_add(int n, int newNode)
 	CkVec<FEM_VarIndexAttribute::ID> &nsVec = nVec[n];
 	nsVec.push_back(nn);
   }
+#ifdef DEBUG
+  CmiMemoryCheck();
+#endif
 }
 
 
@@ -896,6 +992,9 @@ void FEM_Mesh::n2n_add(int n, int newNode)
 /// Removes oldNode from n's node adjacency list
 void FEM_Mesh::n2n_remove(int n, int oldNode) 
 {
+#ifdef DEBUG
+  CmiMemoryCheck();
+#endif
   if (n == -1) return;
   if(FEM_Is_ghost_index(n)){
 	FEM_VarIndexAttribute *nAdj = (FEM_VarIndexAttribute *)node.getGhost()->lookup(FEM_NODE_NODE_ADJACENCY,"n2n_remove");
@@ -919,11 +1018,17 @@ void FEM_Mesh::n2n_remove(int n, int oldNode)
 	  }
 	}
   }
+#ifdef DEBUG
+  CmiMemoryCheck();
+#endif
 }
 
 /// Is queryNode in node n's adjacency vector?
 int FEM_Mesh::n2n_exists(int n, int queryNode) 
 {
+#ifdef DEBUG
+  CmiMemoryCheck();
+#endif
   if (n == -1) return 0;
   if(FEM_Is_ghost_index(n)){
 	CkAssert(node.getGhost());
@@ -942,12 +1047,18 @@ int FEM_Mesh::n2n_exists(int n, int queryNode)
       if (nsVec[i].getSignedId() == queryNode) 
 	return 1;
   }
+#ifdef DEBUG
+  CmiMemoryCheck();
+#endif
   return 0;
 }
 
 /// Finds oldNode in n's node adjacency list, and replaces it with newNode
 void FEM_Mesh::n2n_replace(int n, int oldNode, int newNode) 
 {
+#ifdef DEBUG
+  CmiMemoryCheck();
+#endif
   if (n == -1) return;
   if(FEM_Is_ghost_index(n)){
 	FEM_VarIndexAttribute *nAdj = (FEM_VarIndexAttribute *)node.getGhost()->lookup(FEM_NODE_NODE_ADJACENCY,"n2n_replace");
@@ -972,11 +1083,17 @@ void FEM_Mesh::n2n_replace(int n, int oldNode, int newNode)
 	}
 
   }
+#ifdef DEBUG
+  CmiMemoryCheck();
+#endif
 }
 
 /// Remove all nodes from n's node adjacency list
 void FEM_Mesh::n2n_removeAll(int n)
 {
+#ifdef DEBUG
+  CmiMemoryCheck();
+#endif
   if (n == -1) return;
   if(FEM_Is_ghost_index(n)){
 	FEM_VarIndexAttribute *nAdj = (FEM_VarIndexAttribute *)node.getGhost()->lookup(FEM_NODE_NODE_ADJACENCY,"n2n_removeAll");  
@@ -990,6 +1107,9 @@ void FEM_Mesh::n2n_removeAll(int n)
 	CkVec<FEM_VarIndexAttribute::ID> &nsVec = nVec[n];
 	nsVec.free();
   }
+#ifdef DEBUG
+  CmiMemoryCheck();
+#endif
 }
 
 //  ------- Node-to-element
@@ -1038,6 +1158,10 @@ void FEM_Mesh::n2e_getAll(int n, int **adjelements, int *sz)
 /// Adds newElem to node n's element adjacency list
 void FEM_Mesh::n2e_add(int n, int newElem) 
 {
+#ifdef DEBUG
+  CmiMemoryCheck();
+#endif
+
   if (n == -1) return;
   if(FEM_Is_ghost_index(n)){
 	FEM_VarIndexAttribute *eAdj = (FEM_VarIndexAttribute *)node.getGhost()->lookup(FEM_NODE_ELEM_ADJACENCY,"n2e_add");     
@@ -1053,11 +1177,18 @@ void FEM_Mesh::n2e_add(int n, int newElem)
 	FEM_VarIndexAttribute::ID ne(1, newElem);
 	nsVec.push_back(ne);
   }
+#ifdef DEBUG
+  CmiMemoryCheck();
+#endif
+
 }
 
 /// Removes oldElem from n's element adjacency list
 void FEM_Mesh::n2e_remove(int n, int oldElem) 
 {
+#ifdef DEBUG
+  CmiMemoryCheck();
+#endif
   if (n == -1) return;
   if(FEM_Is_ghost_index(n)){
 	FEM_VarIndexAttribute *eAdj = (FEM_VarIndexAttribute *)node.getGhost()->lookup(FEM_NODE_ELEM_ADJACENCY,"n2e_remove");
@@ -1081,11 +1212,17 @@ void FEM_Mesh::n2e_remove(int n, int oldElem)
 	  }
 	}
   }
+#ifdef DEBUG
+  CmiMemoryCheck();
+#endif
 }
  
 /// Finds oldElem in n's element adjacency list, and replaces it with newElem
 void FEM_Mesh::n2e_replace(int n, int oldElem, int newElem) 
 {
+#ifdef DEBUG
+  CmiMemoryCheck();
+#endif
   if (n == -1) return;
   if(FEM_Is_ghost_index(n)){
 	FEM_VarIndexAttribute *eAdj = (FEM_VarIndexAttribute *)node.getGhost()->lookup(FEM_NODE_ELEM_ADJACENCY,"n2e_replace");
@@ -1109,11 +1246,17 @@ void FEM_Mesh::n2e_replace(int n, int oldElem, int newElem)
 	  }
 	}
   }
+#ifdef DEBUG
+  CmiMemoryCheck();
+#endif
 }
 
 /// Remove all elements from n's element adjacency list
 void FEM_Mesh::n2e_removeAll(int n)
 {
+#ifdef DEBUG
+  CmiMemoryCheck();
+#endif
   if (n == -1) return;
   if(FEM_Is_ghost_index(n)){
 	FEM_VarIndexAttribute *eAdj = (FEM_VarIndexAttribute *)node.getGhost()->lookup(FEM_NODE_ELEM_ADJACENCY,"n2e_removeAll");
@@ -1127,6 +1270,9 @@ void FEM_Mesh::n2e_removeAll(int n)
 	CkVec<FEM_VarIndexAttribute::ID> &nsVec = eVec[n];
 	nsVec.free();
   }
+#ifdef DEBUG
+  CmiMemoryCheck();
+#endif
 }
 
 /// Get an element on edge (n1, n2) where n1, n2 are chunk-local

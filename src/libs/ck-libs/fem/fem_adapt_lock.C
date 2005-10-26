@@ -9,6 +9,7 @@
 //#define DEBUG_1
 //#define DEBUG_2
 #define ERVAL -1000000000  //might cause a problem if there are 100million nodes
+#define ERVAL1 -1000000001
 
 int FEM_AdaptL::lockNodes(int *gotlocks, int *lockrnodes, int numRNodes, int *lockwnodes, int numWNodes) {
   bool donelocks = false;
@@ -393,8 +394,30 @@ int FEM_AdaptL::edge_contraction(int n1, int n2) {
     return 0;
   }
   bool locked;
+  int gotlock = 0;
   while(!done) {
-    int gotlock = lockNodes(gotlocks, locknodes, 0, locknodes, numNodes);
+    if(ret==ERVAL1) {
+      //get new nodes, IT has ALL locks
+      isEdge = findAdjData(n1, n2, &e1, &e2, &e1_n1, &e1_n2, &e1_n3, &e2_n1, &e2_n2, &e2_n3,&n3, &n4);
+      FEM_Modify_correctLockN(theMesh, n1);
+      FEM_Modify_correctLockN(theMesh, n2);
+      FEM_Modify_correctLockN(theMesh, n3);
+      FEM_Modify_correctLockN(theMesh, n4);
+      locknodes[0] = n1;
+      locknodes[1] = n2;
+      locknodes[2] = n3;
+      locknodes[3] = n4;
+      if (e1 == -1) {
+	unlockNodes(gotlocks, locknodes, 0, locknodes, numNodes);
+	free(locknodes);
+	free(gotlocks);
+	return 0;
+      }
+      gotlock = 1;
+    }
+    else {
+      gotlock = lockNodes(gotlocks, locknodes, 0, locknodes, numNodes);
+    }
     locked = true;
     isEdge = findAdjData(n1, n2, &e1, &e2, &e1_n1, &e1_n2, &e1_n3, &e2_n1, &e2_n2, &e2_n3,&n3, &n4);
     if(isEdge == -1) {
@@ -419,12 +442,12 @@ int FEM_AdaptL::edge_contraction(int n1, int n2) {
     if(gotlock==1 && locknodes[2]==n3 && locknodes[3]==n4) {
       int numtries1=0;
       ret = ERVAL;
-      while(ret == ERVAL && numtries1 < 10) {
+      while(ret==ERVAL && numtries1 < 10) {
 	ret = edge_contraction_help(e1, e2, n1, n2, e1_n1, e1_n2, e1_n3, e2_n1, e2_n2, e2_n3, n3, n4);
-	if(ret != ERVAL) {
-	  done = true;
-	} 
-	else {
+	if(ret == ERVAL1) {
+	  done = false;
+	}
+	else if(ret == ERVAL) {
 	  numtries1++;
 	  if(numtries1 >= 10) {
 	    if(locked) {
@@ -436,6 +459,9 @@ int FEM_AdaptL::edge_contraction(int n1, int n2) {
 	    numtries++;
 	  }
 	  CthYield();
+	}
+	else {
+	  done = true;
 	}
       }
       if(numtries>=50) {
@@ -485,6 +511,86 @@ int FEM_AdaptL::edge_contraction_help(int e1, int e2, int n1, int n2, int e1_n1,
 				     int e1_n2, int e1_n3, int e2_n1, 
 				     int e2_n2, int e2_n3, int n3, int n4)
 {
+
+  int e1chunk=-1, e2chunk=-1;
+  int index = theMod->getIdx();
+
+  //if e1 or e2 has a node which is connected to a node which would become a ghost after it is deleted, then let that other chunk eat into this, before the operation
+  int e1new=-1;
+  int e2new=-1;
+  if(e1>=0) {
+    int e1conn[3];
+    theMesh->e2n_getAll(e1, e1conn, 0);
+    for(int i=0; i<3; i++) {
+      if(e1conn[i]!=n1 && e1conn[i]!=n2) {
+	int e1ghostelem=-1;
+	int *e1Elems, esize1;
+	theMesh->n2e_getAll(e1conn[i], &e1Elems, &esize1);
+	int e1count=0;
+	for(int j=0; j<esize1; j++) {
+	  if(e1Elems[j]>=0) e1count++;
+	  else e1ghostelem=e1Elems[j];
+	}
+	if(e1count==1 && e1ghostelem<-1) {
+	  //the remote chunk needs to eat e1
+	  int e1remoteChk = theMesh->elem[0].ghost->ghostRecv.getRec(FEM_To_ghost_index(e1ghostelem))->getChk(0);
+	  /*int e1chunk = FEM_remove_element(theMesh, e1, 0, 1);
+	  CkAssert(e1chunk==index && e1remoteChk!=index);
+	  //get the index of the newly created ghosts
+	  e1conn[i] = FEM_To_ghost_index(theMesh->node.ghost->size()-1);
+	  e1 = FEM_add_element(theMesh, e1conn, 3, 0, e1remoteChk);
+	  CkAssert(e1<-1);
+	  */
+	  int sharedIdx = theMod->fmUtil->exists_in_IDXL(theMesh,e1,e1remoteChk,3);
+	  CkPrintf("[%d]Edge Contraction, edge %d->%d, chunk %d eating into chunk %d\n",theMod->idx, n1, n2, e1remoteChk, index);
+	  e1new = meshMod[e1remoteChk].eatIntoElement(index,sharedIdx)->i;
+	  e1 = theMod->fmUtil->lookup_in_IDXL(theMesh,e1new,e1remoteChk,4);
+	  //theMesh->n2e_getAll(deletenode, &nbrElems, &nesize);
+	  e1 = FEM_To_ghost_index(e1);
+	  free(e1Elems);
+	  return ERVAL1;
+	}
+	//free(e1Elems);
+      }
+    }
+  }
+  if(e2>=0) {
+    int e2conn[3];
+    int e2remoteChk=-1;
+    theMesh->e2n_getAll(e2, e2conn, 0);
+    for(int i=0; i<3; i++) {
+      if(e2conn[i]!=n1 && e2conn[i]!=n2) {
+	int e2ghostelem=-1;
+	int *e2Elems, esize2;
+	theMesh->n2e_getAll(e2conn[i], &e2Elems, &esize2);
+	int e2count=0;
+	for(int j=0; j<esize2; j++) {
+	  if(e2Elems[j]>=0) e2count++;
+	  else e2ghostelem=e2Elems[j];
+	}
+	if(e2count==1 && e2ghostelem<-1) {
+	  //the remote chunk needs to eat e2
+	  int e2remoteChk = theMesh->elem[0].ghost->ghostRecv.getRec(FEM_To_ghost_index(e2ghostelem))->getChk(0);
+	  /*int e2chunk = FEM_remove_element(theMesh, e2, 0, 1);
+	  CkAssert(e2chunk==index && e2remoteChk!=index);
+	  e2conn[i] = FEM_To_ghost_index(theMesh->node.ghost->size()-1);
+	  e2 = FEM_add_element(theMesh, e2conn, 3, 0, e2remoteChk);
+	  CkAssert(e2<-1);
+	  */
+	  int sharedIdx = theMod->fmUtil->exists_in_IDXL(theMesh,e2,e2remoteChk,3);
+	  CkPrintf("[%d]Edge Contraction, edge %d->%d, chunk %d eating into chunk %d\n",theMod->idx, n1, n2, e2remoteChk, index);
+	  e2new = meshMod[e2remoteChk].eatIntoElement(index,sharedIdx)->i;
+	  e2 = theMod->fmUtil->lookup_in_IDXL(theMesh,e2new,e2remoteChk,4);
+	  //theMesh->n2e_getAll(deletenode, &nbrElems, &nesize);
+	  e2 = FEM_To_ghost_index(e2);
+	  free(e2Elems);
+	  return ERVAL1;
+	}
+	//free(e2Elems);
+      }
+    }
+  }
+
   int *conn = (int*)malloc(3*sizeof(int));
   int *adjnodes = (int*)malloc(2*sizeof(int));
   adjnodes[0] = n1;
@@ -494,10 +600,15 @@ int FEM_AdaptL::edge_contraction_help(int e1, int e2, int n1, int n2, int e1_n1,
   adjelems[1] = e2;
   int numtries = 0;
 
+  if((n1==24 && n2==29) || (n1==45 && n2==23)) {
+    CkPrintf("Crit\n");
+  }
+
   //FEM_Modify_Lock(theMesh, adjnodes, 2, adjelems, 2);  
 
   //New code for updating a node rather than deleting both
   int keepnode=0, deletenode=0, shared=0, n1_shared=0, n2_shared=0;
+  //CkPrintf("[%d]Edge Contraction, edge %d->%d\n",theMod->idx, n1, n2);
   n1_shared = theMod->getfmUtil()->isShared(n1);
   n2_shared = theMod->getfmUtil()->isShared(n2);
   if(n1_shared && n2_shared) {
@@ -836,22 +947,20 @@ int FEM_AdaptL::edge_contraction_help(int e1, int e2, int n1, int n2, int e1_n1,
 
   inp->FEM_InterpolateNodeOnEdge(nm); //update the attributes of keepnode across shared
 
-  int e1chunk=-1, e2chunk=-1;
-  int index = theMod->getIdx();
 
 #ifdef DEBUG_1
-  CkPrintf("[%d]Edge Contraction, edge %d(%d)->%d(%d) on chunk %d\n",theMod->idx, n1,n1_bound, n2,n2_bound, theMod->getfmUtil()->getIdx());
+  CkPrintf("[%d]Edge Contraction, edge %d(%d:%d)->%d(%d:%d) on chunk %d\n",theMod->idx, n1,n1_bound,n1_shared, n2,n2_bound,n2_shared, theMod->getfmUtil()->getIdx());
 #endif
 #ifdef DEBUG_2
   CkPrintf("Adjacencies before edge contract\n");
   printAdjacencies(adjnodes, 2, adjelems, 2);
 #endif
-  e1chunk = FEM_remove_element(theMesh, e1, 0);
+  e1chunk = FEM_remove_element(theMesh, e1, 0, 0);
 #ifdef DEBUG_2
   CkPrintf("Adjacencies after remove element %d\n",e1);
   printAdjacencies(adjnodes, 2, adjelems, 2);
 #endif
-  e2chunk = FEM_remove_element(theMesh, e2, 0);
+  e2chunk = FEM_remove_element(theMesh, e2, 0, 0);
 #ifdef DEBUG_2
   CkPrintf("Adjacencies after remove element %d\n",e2);
   printAdjacencies(adjnodes, 2, adjelems, 2);
@@ -867,6 +976,8 @@ int FEM_AdaptL::edge_contraction_help(int e1, int e2, int n1, int n2, int e1_n1,
       nbrElems[i] = FEM_add_element(theMesh, conn, 3, 0, echunk); //add it to the same chunk from where it was removed
     }
   }
+
+  //unlock
   int size = lockedNodes.size();
   int *gotlocks = (int*)malloc(size*sizeof(int));
   int *lockw = (int*)malloc(size*sizeof(int));

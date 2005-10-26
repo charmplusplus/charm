@@ -21,6 +21,9 @@ FEM_MUtil::~FEM_MUtil() {
 void FEM_MUtil::getChunkNos(int entType, int entNo, int *numChunks, IDXL_Share ***chunks, int elemType) {
   int type = 0; //0 - local, 1 - shared, 2 - ghost.
 
+#ifdef DEBUG 
+  CmiMemoryCheck(); 
+#endif
   if(entType == 0) { //nodes
     //only nodes can be shared
     if(FEM_Is_ghost_index(entNo)) type = 2;
@@ -111,6 +114,9 @@ void FEM_MUtil::getChunkNos(int entType, int entNo, int *numChunks, IDXL_Share *
       }
     }
   }
+#ifdef DEBUG 
+  CmiMemoryCheck(); 
+#endif
   return;
 }
 
@@ -118,6 +124,9 @@ bool FEM_MUtil::isShared(int index) {
   //this function will be only called for a shared list
   //have to figure out if node.shared is kept up to date
   const IDXL_Rec *irec = mmod->fmMesh->node.shared.getRec(index);
+#ifdef DEBUG 
+  CmiMemoryCheck(); 
+#endif
   //if an entry exists in the shared idxl lists, then it is a shared node
   if(irec != NULL) return true;
   return false;
@@ -139,6 +148,9 @@ void FEM_MUtil::splitEntityAll(FEM_Mesh *m, int localIdx, int nBetween, int *bet
       tween[w1] = c->getRec(between[w1]-idxbase);
     }
     int chk = tween[0]->getChk(zs);
+#ifdef DEBUG 
+    CmiMemoryCheck(); 
+#endif
 
     //Make sure this processor shares all our entities
     int w = 0;
@@ -188,6 +200,9 @@ void FEM_MUtil::splitEntityRemote(FEM_Mesh *m, int chk, int localIdx, int nBetwe
     localIndices[i] = ll[between[i]];
   }
 
+#ifdef DEBUG 
+  CmiMemoryCheck(); 
+#endif
   FEM_Interpolate *inp = m->getfmMM()->getfmInp();
   FEM_Interpolate::NodalArgs nm;
   nm.n = localIdx;
@@ -222,6 +237,9 @@ void FEM_MUtil::removeNodeAll(FEM_Mesh *m, int localIdx)
       fm->index = sidx[i];
       meshMod[schunks[i]].removeSharedNodeRemote(fm);
       m->node.shared.removeNode(localIdx, schunks[i]);      
+#ifdef DEBUG 
+      CmiMemoryCheck(); 
+#endif
     }
     free(schunks);
     free(sidx);
@@ -252,6 +270,9 @@ int FEM_MUtil::exists_in_IDXL(FEM_Mesh *m, int localIdx, int chk, int type, int 
     ll = m->elem[elemType].ghost->ghostRecv.getList(chk);
     localIdx = FEM_To_ghost_index(localIdx);
   }
+#ifdef DEBUG 
+  CmiMemoryCheck();
+#endif
   for(int w2=0; w2<ll.size(); w2++) {
     if(ll[w2] == localIdx) {
       exists = w2;
@@ -266,6 +287,9 @@ void FEM_MUtil::removeNodeRemote(FEM_Mesh *m, int chk, int sharedIdx) {
   const IDXL_List ll = m->node.shared.getList(chk);
   localIdx = ll[sharedIdx];
   m->node.shared.removeNode(localIdx, chk);
+#ifdef DEBUG 
+  CmiMemoryCheck(); 
+#endif
   FEM_remove_node_local(m,localIdx);
   return;
 }
@@ -282,6 +306,9 @@ void FEM_MUtil::removeGhostNodeRemote(FEM_Mesh *m, int fromChk, int sharedIdx) {
       m->n2e_getAll(ghostid, &adjElts, &numAdjElts);
       
       // mark node as deleted/invalid
+#ifdef DEBUG 
+      CmiMemoryCheck(); 
+#endif
       CkAssert((numAdjNodes==0) && (numAdjElts==0));
       m->node.ghost->set_invalid(localIdx,true);
     }
@@ -304,6 +331,9 @@ void FEM_MUtil::addGhostElementRemote(FEM_Mesh *m, int chk, int elemType, int nu
     conn[i+numNewGhostIndices] = FEM_To_ghost_index(ll1[ghostIndices[i]]);
   }
   //convert sharedIndices to localIndices
+#ifdef DEBUG 
+  CmiMemoryCheck(); 
+#endif
   const IDXL_List ll2 = m->node.shared.getList(chk);
   for(int i=0; i<numSharedIndices; i++) {
     conn[i+numNewGhostIndices+numGhostIndices] = ll2[sharedIndices[i]];
@@ -322,6 +352,9 @@ chunkListMsg *FEM_MUtil::getChunksSharingGhostNodeRemote(FEM_Mesh *m, int chk, i
   if(tween) {
     int numChunkList = tween->getShared();
   }
+#ifdef DEBUG 
+  CmiMemoryCheck(); 
+#endif
   chunkListMsg *clm = new (numChunkList, 0) chunkListMsg;
   clm->numChunkList = numChunkList;
   for(int i=0; i<numChunkList; i++) {
@@ -334,6 +367,9 @@ void FEM_MUtil::buildChunkToNodeTable(int *nodetype, int sharedcount, int ghostc
   if((sharedcount > 0 && ghostcount == 0) || (ghostcount > 0 && localcount == 0)) { 
     *allShared = (CkVec<int> **)malloc(connSize*sizeof(CkVec<int> *));
     for(int i=0; i<connSize; i++) {
+#ifdef DEBUG 
+      CmiMemoryCheck(); 
+#endif
       (*allShared)[i] = new CkVec<int>; //list of chunks shared with node
       int numchunks;
       IDXL_Share **chunks1;
@@ -419,6 +455,9 @@ void FEM_MUtil::buildChunkToNodeTable(int *nodetype, int sharedcount, int ghostc
       }
     }
   }
+#ifdef DEBUG 
+  CmiMemoryCheck(); 
+#endif
   CkAssert(*numSharedChunks>0);
   return;
 }
@@ -449,6 +488,9 @@ void FEM_MUtil::addElemRemote(FEM_Mesh *m, int chk, int elemtype, int connSize, 
     }
   }
 
+#ifdef DEBUG 
+  CmiMemoryCheck(); 
+#endif
   FEM_add_element(m, localIndices, connSize, elemtype);
   free(localIndices);
   return;
@@ -466,6 +508,9 @@ void FEM_MUtil::removeGhostElementRemote(FEM_Mesh *m, int chk, int elementid, in
     CkPrintf("Ghost element at shared index %d, already removed\n",elementid);
     return;
   }
+#ifdef DEBUG 
+  CmiMemoryCheck(); 
+#endif
   m->elem[elemtype].ghost->ghostRecv.removeNode(localIdx, chk);
   FEM_remove_element_local(m, FEM_To_ghost_index(localIdx), elemtype);
 
@@ -475,12 +520,18 @@ void FEM_MUtil::removeGhostElementRemote(FEM_Mesh *m, int chk, int elementid, in
     for(int i=0; i<numGhostIndex; i++) {
       localIdx = lgrn[ghostIndices[i]];
       m->node.ghost->ghostRecv.removeNode(localIdx, chk); //do not delete ghost nodes
-      //FIXME: ensure that there are no other instances to this in the IDXL lists, before
-      //deleting this entry. Currently, remove node won't remove this, if this has connections
-      FEM_remove_node_local(m, FEM_To_ghost_index(localIdx));
+      if(m->node.ghost->ghostRecv.getRec(localIdx)) {
+	//it is a ghost because of other chunks
+      }
+      else {
+	FEM_remove_node_local(m, FEM_To_ghost_index(localIdx));
+      }
     }
   }
 
+#ifdef DEBUG 
+  CmiMemoryCheck(); 
+#endif
   if(numGhostREIndex > 0) {
     const IDXL_List lgse = m->elem[elemtype].ghostSend.getList(chk);
     for(int i=0; i<numGhostREIndex; i++) {
@@ -497,12 +548,17 @@ void FEM_MUtil::removeGhostElementRemote(FEM_Mesh *m, int chk, int elementid, in
     }
   }
 
+#ifdef DEBUG 
+  CmiMemoryCheck(); 
+#endif
   if(numSharedIndex > 0) { //a shared node became ghost
     const IDXL_List lsn = m->node.shared.getList(chk);
     for(int i=0; i<numSharedIndex; i++) {
       localIdx = lsn[sharedIndices[i]];
       m->node.shared.removeNode(localIdx, chk);
+      idxllock(m,chk,1);
       m->node.ghostSend.addNode(localIdx, chk);
+      idxlunlock(m,chk,1);
     }
   }
 
@@ -514,6 +570,9 @@ void FEM_MUtil::removeElemRemote(FEM_Mesh *m, int chk, int elementid, int elemty
   const IDXL_List ll = m->elem[elemtype].ghostSend.getList(chk);
   int localIdx = ll[elementid];
   FEM_remove_element(m, localIdx, elemtype, permanent);
+#ifdef DEBUG 
+  CmiMemoryCheck(); 
+#endif
   return;
 }
 
@@ -535,6 +594,9 @@ int FEM_MUtil::lookup_in_IDXL(FEM_Mesh *m, int sharedIdx, int chk, int type, int
   else if(type == 4) { //ghost node recv 
     ll = m->elem[elemType].ghost->ghostRecv.getList(chk);
   }
+#ifdef DEBUG 
+  CmiMemoryCheck(); 
+#endif
   localIdx = ll[sharedIdx];
   return localIdx;
 }
@@ -544,6 +606,9 @@ int FEM_MUtil::getRemoteIdx(FEM_Mesh *m, int elementid, int elemtype) {
   int ghostid = FEM_To_ghost_index(elementid);
   const IDXL_Rec *irec = m->elem[elemtype].ghost->ghostRecv.getRec(ghostid);
   int size = irec->getShared();
+#ifdef DEBUG 
+  CmiMemoryCheck(); 
+#endif
   CkAssert(size == 1);
   int remoteChunk = irec->getChk(0);
   int sharedIdx = irec->getIdx(0);
@@ -558,8 +623,12 @@ int FEM_MUtil::Replace_node_local(FEM_Mesh *m, int oldIdx, int newIdx) {
     m->node.set_valid(newIdx,true);   // set new node as valid
     m->n2e_removeAll(newIdx);    // initialize element adjacencies
     m->n2n_removeAll(newIdx);    // initialize node adjacencies
+    mmod->fmLockN.push_back(new FEM_lockN(newIdx,mmod));
   }
 
+#ifdef DEBUG 
+  CmiMemoryCheck(); 
+#endif
   CkVec<FEM_Attribute *>*attrs;
   CkVec<FEM_Attribute *>*nattrs;
   if(FEM_Is_ghost_index(oldIdx)){
@@ -571,10 +640,13 @@ int FEM_MUtil::Replace_node_local(FEM_Mesh *m, int oldIdx, int newIdx) {
   }
   nattrs = m->node.getAttrVec();
 
+#ifdef DEBUG 
+  CmiMemoryCheck(); 
+#endif
   for(int j=0; j<attrs->size(); j++){
     FEM_Attribute *att = (FEM_Attribute *)(*attrs)[j];
     FEM_Attribute *natt = (FEM_Attribute *)(*nattrs)[j];
-    if(att->getAttr() < FEM_ATTRIB_TAG_MAX){ 
+    if(att->getAttr() < FEM_ATTRIB_TAG_MAX || att->getAttr()==FEM_BOUNDARY){ 
       FEM_DataAttribute *d = (FEM_DataAttribute *)natt;
       if(FEM_Is_ghost_index(oldIdx)){
 	d->copyEntity(newIdx, *att, FEM_To_ghost_index(oldIdx));
@@ -604,6 +676,9 @@ int FEM_MUtil::Replace_node_local(FEM_Mesh *m, int oldIdx, int newIdx) {
   }
 
   //get rid of all connections of the older node
+#ifdef DEBUG 
+  CmiMemoryCheck(); 
+#endif
   m->n2n_removeAll(oldIdx);
   m->n2e_removeAll(oldIdx);
 
@@ -624,6 +699,9 @@ void FEM_MUtil::addToSharedList(FEM_Mesh *m, int fromChk, int sharedIdx) {
   int *enbrs;
   int esize;
   m->n2e_getAll(localIdx, &enbrs, &esize);
+#ifdef DEBUG 
+  CmiMemoryCheck(); 
+#endif
   for(int i=0; i<esize; i++) {
     if(enbrs[i] >= 0) { //if it is a local element
       //if it exists in the ghostsend list already
@@ -641,6 +719,9 @@ void FEM_MUtil::addToSharedList(FEM_Mesh *m, int fromChk, int sharedIdx) {
 	int *nnbrs = (int*)malloc(connSize*sizeof(int));
 	m->e2n_getAll(enbrs[i], nnbrs, elemType);
 	for(int j=0; j<connSize; j++) {
+#ifdef DEBUG 
+	  CmiMemoryCheck(); 
+#endif
 	  int sharedNode = mmod->fmUtil->exists_in_IDXL(m,nnbrs[j],fromChk,0);
 	  if(sharedNode == -1) {
 	    //node 'j' is a ghost on chunk 'i'
@@ -684,6 +765,9 @@ void FEM_MUtil::addToSharedList(FEM_Mesh *m, int fromChk, int sharedIdx) {
       }
     }
   }
+#ifdef DEBUG 
+  CmiMemoryCheck(); 
+#endif
   delete[] enbrs;
   return;
 }
@@ -691,10 +775,32 @@ void FEM_MUtil::addToSharedList(FEM_Mesh *m, int fromChk, int sharedIdx) {
 void FEM_MUtil::StructureTest(FEM_Mesh *m) {
   int noNodes = m->node.size();
   int noEle = m->elem[0].size();
+  int noGhostEle = m->elem[0].ghost->size();
 
-  int *n2e, n2esize=0;
   int wdt = m->elem[0].getConn().width();
   int *e2n = (int*)malloc(wdt*sizeof(int));
+
+  for(int i=0; i<noEle; i++) {
+    if(m->elem[0].is_valid(i)) {
+      m->e2n_getAll(i,e2n,0);
+      if(e2n[0]==e2n[1] || e2n[1]==e2n[2] || e2n[2]==e2n[0]) {
+	CkPrintf("WARNING: element %d, has connectivity (%d,%d,%d)\n",i,e2n[0],e2n[1],e2n[2]);
+	CkAssert(false);
+      }
+    }
+  }
+  for(int i=0; i<noGhostEle; i++) {
+    if(m->elem[0].ghost->is_valid(i)) {
+      int ghostIndex = FEM_To_ghost_index(i);
+      m->e2n_getAll(ghostIndex,e2n,0);
+      if(e2n[0]==e2n[1] || e2n[1]==e2n[2] || e2n[2]==e2n[0]) {
+	CkPrintf("WARNING: element %d, has connectivity (%d,%d,%d)\n",ghostIndex,e2n[0],e2n[1],e2n[2]);
+	CkAssert(false);
+      }
+    }
+  }
+
+  int *n2e, n2esize=0;
 
   for(int i=0; i<noNodes; i++) {
     if(m->node.is_valid(i)) {
@@ -718,6 +824,7 @@ void FEM_MUtil::StructureTest(FEM_Mesh *m) {
 	FEM_Print_coords(m,i);
 	FEM_Print_n2e(m,i);
 	CkPrintf("WARNING: isolated local node %d, with no local element connectivity\n",i);
+	CkAssert(false);
       }
 
       //ensure that there is a cloud of connectivity, no disconnected elements, other than boundaries
@@ -754,7 +861,7 @@ void FEM_MUtil::StructureTest(FEM_Mesh *m) {
 	if(numdeadends>=2 && numunused!=0) {
 	  FEM_Print_coords(m,i);
 	  CkPrintf("WARNING: local element connectivity of %d is discontinuous\n",i);
-	  //CkAssert(false);
+	  CkAssert(false);
 	}
       }
       delete [] n2e;
@@ -811,6 +918,16 @@ int FEM_MUtil::IdxlListTest(FEM_Mesh *m) {
     }
   }
   
+  return 1;
+}
+
+int FEM_MUtil::residualLockTest(FEM_Mesh *m) {
+  int noNodes = m->node.size();
+  for(int i=0; i<noNodes; i++) {
+    if(m->node.is_valid(i)) {
+      CkAssert(!mmod->fmLockN[i]->haslocks());
+    }
+  }
   return 1;
 }
 
@@ -909,39 +1026,61 @@ void FEM_MUtil::FEM_Print_coords(FEM_Mesh *m, int nodeid) {
 }
 
 void FEM_MUtil::idxllock(FEM_Mesh *m, int chk, int type) {
+#ifdef DEBUG 
+CmiMemoryCheck();
+#endif
   if(idx < chk) {
     idxllockLocal(m,chk,type);
-    meshMod[chk].idxllockRemote(idx,type);
+    //meshMod[chk].idxllockRemote(idx,type);
   } else {
     meshMod[chk].idxllockRemote(idx,type);
-    idxllockLocal(m,chk,type);
+    //idxllockLocal(m,chk,type);
   }
+#ifdef DEBUG 
+  CmiMemoryCheck(); 
+#endif
   return;
 }
 
 void FEM_MUtil::idxlunlock(FEM_Mesh *m, int chk, int type) {
+#ifdef DEBUG 
+  CmiMemoryCheck(); 
+#endif
   if(idx < chk) {
-    meshMod[chk].idxlunlockRemote(idx,type);
+    //meshMod[chk].idxlunlockRemote(idx,type);
     idxlunlockLocal(m,chk,type);
   } else {
-    idxlunlockLocal(m,chk,type);
+    //idxlunlockLocal(m,chk,type);
     meshMod[chk].idxlunlockRemote(idx,type);
   }
+#ifdef DEBUG 
+  CmiMemoryCheck(); 
+#endif
   return;
 }
 
 void FEM_MUtil::idxllockLocal(FEM_Mesh *m, int toChk, int type) {
+  CkAssert(toChk>=0 && toChk<mmod->numChunks && toChk!=idx && type>=0 && type<5);
   while(mmod->fmIdxlLock[toChk*5 + type] == true) {
     //block by looping,
     CthYield();
   }
+  //CkPrintf("%d locking idxl list %d: type %d\n",idx,toChk,type);
   mmod->fmIdxlLock[toChk*5 + type] = true;
+#ifdef DEBUG 
+  CmiMemoryCheck(); 
+#endif
   return;
 }
 
 void FEM_MUtil::idxlunlockLocal(FEM_Mesh *m, int toChk, int type) {
+  CkAssert(toChk>=0 && toChk<mmod->numChunks && toChk!=idx && type>=0 && type<5);
   CkAssert(mmod->fmIdxlLock[toChk*5 + type] == true);
+  //CkPrintf("%d unlocking idxl list %d: type %d\n",idx,toChk,type);
   mmod->fmIdxlLock[toChk*5 + type] = false;
+#ifdef DEBUG 
+  CmiMemoryCheck(); 
+#endif
   return;
 }
 

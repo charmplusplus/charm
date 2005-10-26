@@ -22,6 +22,7 @@ FEM_lockN::~FEM_lockN() {
 }
 
 void FEM_lockN::reset(int i,femMeshModify *mod) {
+  //CkAssert(noreadLocks==0 && nowriteLocks==0);
   owner = -1;
   pending = -1;
   theMod = mod;
@@ -64,10 +65,10 @@ int FEM_lockN::wlock(int own) {
 #endif
     return 1;
   } else {
-    if(pending==-1 || own<=pending) {
+    /*if(pending==-1 || own<=pending) {
       pending = own;
       return -2; //keep trying
-    }
+      }*/
     return -1; //give up trying for a while
   }
   return -1;
@@ -96,4 +97,11 @@ bool FEM_lockN::haslocks() {
     return true;
   }
   else return false;
+}
+
+int FEM_lockN::lockOwner() {
+  if(noreadLocks>0 || nowriteLocks>0) {
+    return owner;
+  }
+  else return -1;
 }

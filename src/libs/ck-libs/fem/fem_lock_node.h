@@ -33,7 +33,8 @@ class FEM_lockN {
   int runlock();
   int wlock(int own);
   int wunlock(int own);
-  bool FEM_lockN::haslocks();
+  bool haslocks();
+  int lockOwner();
   int getIdx() { return idx; }
 };
 

@@ -10,7 +10,7 @@
 #include "fem_adapt_algs.h"
 #include "fem_mesh_modify.h"
 
-#define MINAREA 1.0e-12
+#define MINAREA 1.0e-18
 #define MAXAREA 1.0e12
 
 CtvDeclare(FEM_Adapt_Algs *, _adaptAlgs);
@@ -476,6 +476,7 @@ int FEM_Adapt_Algs::simple_coarsen(double targetA, double xmin, double ymin, dou
 	  int ret = theAdaptor->edge_contraction(shortestEdge[0], shortestEdge[1]);
 	  if(ret != -1) adapted = true;
 	}
+	//tests();
       }
       //if(adapted) break;
     }
@@ -498,6 +499,13 @@ void FEM_Adapt_Algs::tests() {
 
   theMod->fmUtil->StructureTest(theMesh);
   theMod->fmUtil->IdxlListTest(theMesh);
+  theMod->fmUtil->residualLockTest(theMesh);
+  /*for(int i=0; i<theMesh->node.size(); i++) {
+    if(theMesh->node.is_valid(i)) CkPrintf("Valid -- ");
+    else  CkPrintf("Invalid -- ");
+    theMod->fmUtil->FEM_Print_coords(theMesh,i);
+    }*/
+
   return;
 }
 

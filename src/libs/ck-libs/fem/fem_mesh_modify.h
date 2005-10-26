@@ -55,6 +55,7 @@ int FEM_Modify_Lock(FEM_Mesh *m, int* affectedNodes=0, int numAffectedNodes=0, i
 int FEM_Modify_Unlock(FEM_Mesh *m);
 int FEM_Modify_LockN(FEM_Mesh *m, int nodeId, int readLock);
 int FEM_Modify_UnlockN(FEM_Mesh *m, int nodeId, int readLock);
+void FEM_Modify_correctLockN(FEM_Mesh *m, int nodeId);
 
 // Internal functions which shouldn't be used by anyone else
 int FEM_add_node_local(FEM_Mesh *m, int addGhost=0);
@@ -275,7 +276,7 @@ class femMeshModify : public CBase_femMeshModify {
   FEM_lock *fmLock;
   CkVec<FEM_lockN *> fmLockN;
   //CkVec<FEM_lockN *> *fmgLockN;
-  CkVec<bool> fmIdxlLock; //each chunk has (n-1)*5 idxl lists, but just (n-1) locks, only one other chunk will try to lock it. The default value is 0, which means that none of the idxl lists are locked by the nbr, otherwise depending on the value 1,2,3,4,5 various idxl lists are locked
+  CkVec<bool> fmIdxlLock; //each chunk can have (n-1)*5 idxl lists. The default value is 0, which means that none of the idxl lists are locked, otherwise depending on the value 1,2,3,4,5 various idxl lists are locked
   FEM_MUtil *fmUtil;
   FEM_Interpolate *fmInp;
   FEM_Adapt *fmAdapt;
@@ -323,6 +324,7 @@ class femMeshModify : public CBase_femMeshModify {
 
   void removeGhostNode(int fromChk, int sharedIdx);
 
+  intMsg *eatIntoElement(int fromChk, int sharedIdx);
   void refine_flip_element_leb(int fromChk, int propElemT, int propNodeT,
 			       int newNodeT, int nbrOpNodeT, int nbrghost,
 			       double longEdgeLen);
@@ -338,6 +340,8 @@ class femMeshModify : public CBase_femMeshModify {
 
   void idxllockRemote(int fromChk, int type);
   void idxlunlockRemote(int fromChk, int type);
+
+  intMsg *hasLockRemoteNode(int sharedIdx, int fromChk, int isGhost);
 };
 
 

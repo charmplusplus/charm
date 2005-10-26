@@ -1215,13 +1215,13 @@ void FEM_Entity::set_invalid(unsigned int idx, bool isNode){
 }
 
 int FEM_Entity::is_valid(unsigned int idx){
-  /*
+  if(false) {
     CkAssert(idx < size() && idx >=0);
     return valid->getChar()(idx,0);
-  */
-  CkAssert(idx < size() && idx >=0 && first_invalid<=last_invalid);
-  return valid->getChar()(idx,0);
-
+  } else {
+    CkAssert(idx < size() && idx >=0 && first_invalid<=last_invalid);
+    return valid->getChar()(idx,0);
+  }
 }
 
 unsigned int FEM_Entity::count_valid(){

@@ -53,6 +53,7 @@ class FEM_MUtil {
   int AreaTest(FEM_Mesh *m);
   int IdxlListTest(FEM_Mesh *m);
   void verifyIdxlListRemote(FEM_Mesh *m, int fromChk, int fsize, int type);
+  int residualLockTest(FEM_Mesh *m);
 
   void FEM_Print_n2n(FEM_Mesh *m, int nodeid);
   void FEM_Print_n2e(FEM_Mesh *m, int nodeid);

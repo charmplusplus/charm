@@ -117,6 +117,8 @@ int FEM_Adapt::edge_flip_help(int e1, int e2, int n1, int n2, int e1_n1,
 
 #ifdef DEBUG_1
   CkPrintf("Flipping edge %d->%d on chunk %d\n", n1, n2, theMod->getfmUtil()->getIdx());
+#endif
+#ifdef DEBUG_2
   CkPrintf("Adjacencies before flip\n");
   printAdjacencies(locknodes, numNodes, lockelems, numElems);
 #endif
@@ -237,7 +239,7 @@ int FEM_Adapt::edge_flip_help(int e1, int e2, int n1, int n2, int e1_n1,
   printAdjacencies(locknodes, numNodes, lockelems, numElems);
 #endif
 
-#ifdef DEBUG_1
+#ifdef DEBUG_2
   CkPrintf("Adjacencies after flip\n");
   printAdjacencies(locknodes, numNodes, lockelems, numElems);
 #endif
@@ -353,6 +355,8 @@ int FEM_Adapt::edge_bisect_help(int e1, int e2, int n1, int n2, int e1_n1,
 
 #ifdef DEBUG_1
   CkPrintf("Bisect edge %d->%d on chunk %d\n", n1, n2, theMod->getfmUtil()->getIdx());
+#endif
+#ifdef DEBUG_2
   CkPrintf("Adjacencies before bisect\n");
   printAdjacencies(locknodes, numNodes, lockelems, numElems);
 #endif
@@ -366,6 +370,8 @@ int FEM_Adapt::edge_bisect_help(int e1, int e2, int n1, int n2, int e1_n1,
     forceshared = -1;
   }
   n5 = FEM_add_node(theMesh,adjnodes,2,n5chunk,forceshared,0);
+  //lock this node immediately
+  FEM_Modify_LockN(theMesh, n5, 0);
 #ifdef DEBUG_2
   CkPrintf("Adjacencies after add node %d\n",n5);
   printAdjacencies(locknodes, numNodesNew, lockelems, numElemsNew);
@@ -454,6 +460,7 @@ int FEM_Adapt::edge_bisect_help(int e1, int e2, int n1, int n2, int e1_n1,
   free(locknodes);
   free(lockelems);
   free(adjnodes);
+  FEM_Modify_UnlockN(theMesh, n5, 0);
   return n5;
 }
 // ======================  END edge_bisect  ================================
@@ -620,6 +627,8 @@ int FEM_Adapt::vertex_remove_help(int e1, int e2, int n1, int n2, int e1_n1,
 
 #ifdef DEBUG_1
     CkPrintf("Vertex Remove edge %d->%d on chunk %d\n", n1, n2, theMod->getfmUtil()->getIdx());
+#endif
+#ifdef DEBUG_2
     CkPrintf("Adjacencies before vertex remove\n");
     printAdjacencies(locknodes, numNodes, lockelems, numElems);
 #endif
@@ -675,7 +684,7 @@ int FEM_Adapt::vertex_remove_help(int e1, int e2, int n1, int n2, int e1_n1,
 #endif
     }
 
-#ifdef DEBUG_1
+#ifdef DEBUG_2
     CkPrintf("Adjacencies after vertex remove\n");
     printAdjacencies(locknodes, numNodesNew, lockelems, numElemsNew);
 #endif
@@ -870,6 +879,8 @@ int FEM_Adapt::edge_contraction_help(int e1, int e2, int n1, int n2, int e1_n1,
 
 #ifdef DEBUG_1
   CkPrintf("Edge Contraction, edge %d->%d on chunk %d\n", n1, n2, theMod->getfmUtil()->getIdx());
+#endif
+#ifdef DEBUG_2
   CkPrintf("Adjacencies before edge contract\n");
   printAdjacencies(adjnodes, 2, adjelems, 2);
 #endif
@@ -1060,6 +1071,8 @@ int FEM_Adapt::vertex_split_help(int n, int n1, int n2, int e1, int e3)
   //FEM_Modify_Lock(theMesh, locknodes, 4, lockelems, 6);
 #ifdef DEBUG_1
   CkPrintf("Vertex Split, %d-%d-%d on chunk %d\n", n1, n, n2, theMod->getfmUtil()->getIdx());
+#endif
+#ifdef DEBUG_2
   CkPrintf("Adjacencies before vertex split\n");
   printAdjacencies(locknodes, 4, lockelems, 4);
 #endif
@@ -1139,7 +1152,7 @@ int FEM_Adapt::vertex_split_help(int n, int n1, int n2, int e1, int e3)
   CkPrintf("Adjacencies after add element %d: conn(%d,%d,%d)\n",lockelems[5],conn[0],conn[1],conn[2]);
   printAdjacencies(locknodes, 4, lockelems, 6);
 #endif
-#ifdef DEBUG_1
+#ifdef DEBUG_2
   CkPrintf("Adjacencies after vertex split\n");
   printAdjacencies(locknodes, 4, lockelems, 4);
 #endif

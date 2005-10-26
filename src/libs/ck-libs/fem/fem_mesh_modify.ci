@@ -44,7 +44,7 @@ module FEMMeshModify {
 
   array [1D] femMeshModify {
     entry femMeshModify(femMeshModMsg *);
-    entry [sync] void setFemMesh(FEMMeshMsg *);
+    entry [sync,threaded] void setFemMesh(FEMMeshMsg *);
     entry [sync,threaded] intMsg *lockRemoteChunk(int2Msg *);
     entry [sync,threaded] intMsg *unlockRemoteChunk(int2Msg *);
     entry [sync,threaded] intMsg *lockRemoteNode(int, int, int, int);
@@ -58,7 +58,7 @@ module FEMMeshModify {
     entry [sync,threaded] void removeGhostElem(removeGhostElemMsg *);
     entry [sync,threaded] void removeElementRemote(removeElemMsg *);
     entry [sync,threaded] void removeGhostNode(int fromChk, int sharedIdx);
-    entry /*[sync,threaded]*/ void refine_flip_element_leb(int, int, int, int, int, int, double);
+    entry [sync,threaded] void refine_flip_element_leb(int, int, int, int, int, int, double);
     entry [sync,threaded] void addToSharedList(int, int);
     entry [sync,threaded] void updateNodeAttrs(int, int, double, double, int);
     entry [sync,threaded] double2Msg *getRemoteCoord(int, int);
@@ -68,5 +68,7 @@ module FEMMeshModify {
     entry [sync,threaded] void verifyIdxlList(int, int, int);
     entry [sync,threaded] void idxllockRemote(int, int);
     entry [sync,threaded] void idxlunlockRemote(int, int);
+    entry [sync,threaded] intMsg* eatIntoElement(int, int);
+    entry [sync,threaded] intMsg* hasLockRemoteNode(int, int, int);
   };
 };
