@@ -2752,7 +2752,7 @@ void Entry::genCall(XStr& str, const XStr &preCall)
   if (!isConstructor() && fortranMode) {
     str << "/* FORTRAN */\n";
     str << "  int index = impl_obj->thisIndex;\n";
-    str << "  " << fortranify(name)
+    str << "  ::" << fortranify(name)
 	<< "((char **)(impl_obj->user_data), &index, ";
     param->unmarshallAddress(str); str<<");\n";
     str << "/* FORTRAN END */\n";
