@@ -578,6 +578,7 @@ class Chare : public TEntity {
                         const char *suffix, const char *sep);
     XStr proxyName(int withTemplates=1); 
     XStr indexName(int withTemplates=1); 
+    XStr indexList();
     XStr baseName(int withTemplates=1) 
     {
     	XStr str;
@@ -628,6 +629,7 @@ class Array : public Chare {
     Array(int ln, attrib_t Nattr, NamedType *index,
     	NamedType *t, TypeList *b=0, MemberList *l=0);
     virtual int is1D(void) {return indexSuffix==(const char*)"1D";}
+    virtual const char* dim(void) {return indexSuffix.get_string_const();}
     virtual void genSubDecls(XStr& str);
     virtual char *chareTypeName(void) {return (char *) "array";}
 };

@@ -453,6 +453,28 @@ XStr Chare::indexName(int withTemplates)
   return str;
 }
 
+XStr Chare::indexList()
+{
+  // generating "int *index1, int *index2, int *index3"
+  XStr str;
+  if (!isArray()) { // Currently, only arrays are supported
+      cerr << (char *)baseName() << ": only chare arrays are currently supported\n";
+      exit(1);
+  }
+  XStr dim = ((Array*)this)->dim();
+  if (dim==(const char*)"1D")
+    str << "int *index1";
+  else if (dim==(const char*)"2D")
+    str << "int *index1, int *index2";
+  else if (dim==(const char*)"3D")
+    str << "int *index1, int *index2, int *index3";
+  else {
+      cerr << (char *)baseName() << ": only up to 3 dimension chare arrays are currently supported\n";
+      exit(1);
+  }
+  return str;
+}
+
 static const char *forWhomStr(forWhom w)
 {
   switch(w) {
@@ -1202,9 +1224,10 @@ Chare::genDefs(XStr& str)
     }
     // We have to generate the chare array itself
     str << "/* FORTRAN */\n";
-    str << "extern \"C\" void " << fortranify(baseName(), "_allocate") << "(char **, void *, int *);\n";
+    str << "extern \"C\" void " << fortranify(baseName(), "_allocate") << "(char **, void *, " << indexList() << ");\n";
     str << "\n";
-    str << "class " << baseName() << " : public ArrayElement1D\n";
+    XStr dim = ((Array*)this)->dim();
+    str << "class " << baseName() << " : public ArrayElement" << dim << "\n";
     str << "{\n";
     str << "public:\n";
     str << "  char user_data[64];\n";
@@ -1213,23 +1236,52 @@ Chare::genDefs(XStr& str)
     str << "  {\n";
 //    str << "    CkPrintf(\"" << baseName() << " %d created\\n\",thisIndex);\n";
     str << "    CkArrayID *aid = &thisArrayID;\n";
-    str << "    " << fortranify(baseName(), "_allocate") << "((char **)&user_data, &aid, &thisIndex);\n";
+    if (dim==(const char*)"1D")
+      str << "    " << fortranify(baseName(), "_allocate") << "((char **)&user_data, &aid, &thisIndex);\n";
+    else if (dim==(const char*)"2D")
+      str << "    " << fortranify(baseName(), "_allocate") << "((char **)&user_data, &aid, &thisIndex.x, &thisIndex.y);\n";
+    else if (dim==(const char*)"3D")
+      str << "    " << fortranify(baseName(), "_allocate") << "((char **)&user_data, &aid, &thisIndex.x, &thisIndex.y, &thisIndex.z);\n";
     str << "  }\n";
     str << "\n";
     str << "  " << baseName() << "(CkMigrateMessage *m)\n";
     str << "  {\n";
-    str << "    CkPrintf(\"" << baseName() << " %d migrating\\n\",thisIndex);\n";
+    str << "    /* CkPrintf(\"" << baseName() << " %d migrating\\n\",thisIndex);*/ \n";
     str << "  }\n";
     str << "\n";
     str << "};\n";
     str << "\n";
-    str << "extern \"C\" void " << fortranify(baseName(), "_cknew") << "(int *numElem, long *aindex)\n";
-    str << "{\n";
-    str << "    CkArrayID *aid = new CkArrayID;\n";
-    str << "    *aid = CProxy_" << baseName() << "::ckNew(*numElem); \n";
+    if (dim==(const char*)"1D") {
+      str << "extern \"C\" void " << fortranify(baseName(), "_cknew") << "(int *numElem, long *aindex)\n";
+      str << "{\n";
+      str << "    CkArrayID *aid = new CkArrayID;\n";
+      str << "    *aid = CProxy_" << baseName() << "::ckNew(*numElem); \n";
+    }
+    else if (dim==(const char*)"2D") {
+      str << "extern \"C\" void " << fortranify(baseName(), "_cknew") << "(int *numx, int *numy, long *aindex)\n";
+      str << "{\n";
+      str << "    CkArrayID *aid = new CkArrayID;\n";
+      str << "    *aid = CProxy_" << baseName() << "::ckNew(); \n";
+      str << "    CProxy_" << baseName() << " p(*aid);\n";
+      str << "    for (int i=0; i<*numx; i++) \n";
+      str << "      for (int j=0; j<*numy; j++) \n";
+      str << "        p[CkArrayIndex2D(i, j)].insert(); \n";
+      str << "    p.doneInserting(); \n";
+    }
+    else if (dim==(const char*)"3D") {
+      str << "extern \"C\" void " << fortranify(baseName(), "_cknew") << "(int *numx, int *numy, int *numz, long *aindex)\n";
+      str << "{\n";
+      str << "    CkArrayID *aid = new CkArrayID;\n";
+      str << "    *aid = CProxy_" << baseName() << "::ckNew(); \n";
+      str << "    CProxy_" << baseName() << " p(*aid);\n";
+      str << "    for (int i=0; i<*numx; i++) \n";
+      str << "      for (int j=0; j<*numy; j++) \n";
+      str << "        for (int k=0; k<*numz; k++) \n";
+      str << "          p[CkArrayIndex3D(i, j, k)].insert(); \n";
+      str << "    p.doneInserting(); \n";
+    }
     str << "    *aindex = (long)aid;\n";
     str << "}\n";
-
   }
   if(!type->isTemplated()) {
     if(!templat) {
@@ -2750,10 +2802,29 @@ void Entry::genCall(XStr& str, const XStr &preCall)
 	param->beginUnmarshall(str);
   str << preCall;
   if (!isConstructor() && fortranMode) {
+    if (!container->isArray()) { // Currently, only arrays are supported
+      cerr << (char *)container->baseName() << ": only chare arrays are currently supported\n";
+      exit(1);
+    }
     str << "/* FORTRAN */\n";
-    str << "  int index = impl_obj->thisIndex;\n";
+    XStr dim; dim << ((Array*)container)->dim();
+    if (dim==(const char*)"1D")
+      str << "  int index1 = impl_obj->thisIndex;\n";
+    else if (dim==(const char*)"2D") {
+      str << "  int index1 = impl_obj->thisIndex.x;\n";
+      str << "  int index2 = impl_obj->thisIndex.y;\n";
+    }
+    else if (dim==(const char*)"3D") {
+      str << "  int index1 = impl_obj->thisIndex.x;\n";
+      str << "  int index2 = impl_obj->thisIndex.y;\n";
+      str << "  int index3 = impl_obj->thisIndex.z;\n";
+    }
     str << "  ::" << fortranify(name)
-	<< "((char **)(impl_obj->user_data), &index, ";
+	<< "((char **)(impl_obj->user_data), &index1, ";
+    if (dim==(const char*)"2D" || dim==(const char*)"3D")
+        str << "&index2, ";
+    if (dim==(const char*)"3D")
+        str << "&index3, ";
     param->unmarshallAddress(str); str<<");\n";
     str << "/* FORTRAN END */\n";
   }
@@ -2832,9 +2903,10 @@ void Entry::genDefs(XStr& str)
 
       str << "/* FORTRAN SECTION */\n";
 
+      XStr dim; dim << ((Array*)container)->dim();
       // Declare the Fortran Entry Function
       // This is called from C++
-      str << "extern \"C\" void " << fortranify(name) << "(char **, int*, ";
+      str << "extern \"C\" void " << fortranify(name) << "(char **, " << container->indexList() << ", ";
       param->printAddress(str);
       str << ");\n";
 
@@ -2843,14 +2915,19 @@ void Entry::genDefs(XStr& str)
       str << "extern \"C\" void "
         //<< container->proxyName() << "_" 
           << fortranify("SendTo_", container->baseName(), "_", name)
-          << "(long* aindex, int *index, ";
+          << "(long* aindex, " << container->indexList() << ", ";
       param->printAddress(str);
       str << ")\n";
       str << "{\n";
       str << "  CkArrayID *aid = (CkArrayID *)*aindex;\n";
       str << "\n";
       str << "  " << container->proxyName() << " h(*aid);\n";
-      str << "  h[*index]." << name << "(";
+      if (dim==(const char*)"1D")  
+        str << "  h[*index1]." << name << "(";
+      else if (dim==(const char*)"2D")  
+        str << "  h[CkArrayIndex2D(*index1, *index2)]." << name << "(";
+      else if (dim==(const char*)"3D")  
+        str << "  h[CkArrayIndex3D(*index1, *index2, *index3)]." << name << "(";
       param->printValue(str);
       str << ");\n";
       str << "}\n";
