@@ -1471,6 +1471,7 @@ double FEM_Entity::getMeshSizing(int r) {
 void FEM_Entity::setMeshSizing(int r,double s)
 {
   if (!meshSizing) allocateMeshSizing();
+  if (s <= 0.0) return;
   if (r >= 0)  meshSizing->getDouble()(r,0)=s;
   else ghost->meshSizing->getDouble()(FEM_To_ghost_index(r),0)=s;
 }

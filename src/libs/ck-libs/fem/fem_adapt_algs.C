@@ -9,6 +9,7 @@
 // Ask: TLW
 #include "fem_adapt_algs.h"
 #include "fem_mesh_modify.h"
+#include "fem_adapt_if.h"
 
 #define MINAREA 1.0e-18
 #define MAXAREA 1.0e12
@@ -42,6 +43,7 @@ int FEM_Adapt_Algs::Refine(int qm, int method, double factor, double *sizes)
 {
   // loop through elemsToRefine
   int elId, mods=0, iter_mods=1;
+  int elemWidth = theMesh->elem[0].getConn().width();
   SetMeshSize(method, factor, sizes);
   refineElements = refineStack = NULL;
   refineTop = refineHeapSize = 0;
@@ -57,14 +59,15 @@ int FEM_Adapt_Algs::Refine(int qm, int method, double factor, double *sizes)
     for (int i=0; i<numElements; i++) { 
       if (theMesh->elem[0].is_valid(i)) {
 	// find maxEdgeLength of i
-	int *eConn = (int*)malloc(3*sizeof(int));
-	double tmpLen, maxEdgeLength;
+	int *eConn = (int*)malloc(elemWidth*sizeof(int));
+	double tmpLen, maxEdgeLength = 0.0;
 	theMesh->e2n_getAll(i, eConn);
-	maxEdgeLength = length(eConn[0], eConn[1]);
-	tmpLen = length(eConn[1], eConn[2]);
-	if (tmpLen > maxEdgeLength) maxEdgeLength = tmpLen;
-	tmpLen = length(eConn[2], eConn[0]);
-	if (tmpLen > maxEdgeLength) maxEdgeLength = tmpLen;
+	for (int j=0; j<elemWidth-1; j++) {
+	  for (int k=j+1; k<elemWidth; k++) {
+	    tmpLen = length(eConn[j], eConn[k]);
+	    if (tmpLen > maxEdgeLength) maxEdgeLength = tmpLen;
+	  }
+	}
 	double qFactor=getAreaQuality(i);
 	if ((theMesh->elem[0].getMeshSizing(i) > 0.0) &&
 	    (maxEdgeLength > (theMesh->elem[0].getMeshSizing(i)*REFINE_TOL))) {
@@ -79,18 +82,23 @@ int FEM_Adapt_Algs::Refine(int qm, int method, double factor, double *sizes)
       }
       else  elId=Delete_Min(0);
       if ((elId != -1) && (theMesh->elem[0].is_valid(elId))) {
-	int *eConn = (int*)malloc(3*sizeof(int));
-	double tmpLen, maxEdgeLength;
+	int *eConn = (int*)malloc(elemWidth*sizeof(int));
+	int n1, n2;
+	double tmpLen, maxEdgeLength = 0.0;
 	theMesh->e2n_getAll(elId, eConn);
-	maxEdgeLength = length(eConn[0], eConn[1]);
-	tmpLen = length(eConn[1], eConn[2]);
-	if (tmpLen > maxEdgeLength) maxEdgeLength = tmpLen;
-	tmpLen = length(eConn[2], eConn[0]);
-	if (tmpLen > maxEdgeLength) maxEdgeLength = tmpLen;
+	for (int j=0; j<elemWidth-1; j++) {
+	  for (int k=j+1; k<elemWidth; k++) {
+	    tmpLen = length(eConn[j], eConn[k]);
+	    if (tmpLen > maxEdgeLength) { 
+	      maxEdgeLength = tmpLen;
+	      n1 = eConn[j]; n2 = eConn[k];
+	    }
+	  }
+	}
 	if ((theMesh->elem[0].getMeshSizing(elId) > 0.0) &&
 	    (maxEdgeLength > (theMesh->elem[0].getMeshSizing(elId)*REFINE_TOL))) {
-	  (void)refine_element_leb(elId); // refine the element
-	  iter_mods++;
+	  CkPrintf("Refining elem %d...\n", elId);
+	  if (theAdaptor->edge_bisect(n1, n2) > 0)  iter_mods++;
 	}
       }
       CthYield(); // give other chunks on the same PE a chance
@@ -121,6 +129,7 @@ int FEM_Adapt_Algs::Coarsen(int qm, int method, double factor, double *sizes)
 {
   // loop through elemsToRefine
   int elId, mods=0, iter_mods=1, pass=0;
+  int elemWidth = theMesh->elem[0].getConn().width();
   double qFactor;
   SetMeshSize(method, factor, sizes);
   coarsenElements = NULL;
@@ -138,21 +147,23 @@ int FEM_Adapt_Algs::Coarsen(int qm, int method, double factor, double *sizes)
     for (int i=0; i<numElements; i++) { 
       if (theMesh->elem[0].is_valid(i)) {
 	// find minEdgeLength of i
-	int *eConn = (int*)malloc(3*sizeof(int));
-	double tmpLen, minEdgeLength, avgEdgeLength;
+	int *eConn = (int*)malloc(elemWidth*sizeof(int));
 	theMesh->e2n_getAll(i, eConn);
-	avgEdgeLength = minEdgeLength = length(eConn[0], eConn[1]);
-	tmpLen = length(eConn[1], eConn[2]);
-	avgEdgeLength += tmpLen;
-	if (tmpLen < minEdgeLength) minEdgeLength = tmpLen;
-	tmpLen = length(eConn[2], eConn[0]);
-	avgEdgeLength += tmpLen;
-	if (tmpLen < minEdgeLength) minEdgeLength = tmpLen;
-	qFactor=getAreaQuality(i);
+	double tmpLen, avgEdgeLength=0.0, 
+	  minEdgeLength = length(eConn[0], eConn[1]);
+	for (int j=0; j<elemWidth-1; j++) {
+	  for (int k=j+1; k<elemWidth; k++) {
+	    tmpLen = length(eConn[j], eConn[k]);
+	    avgEdgeLength += tmpLen;
+	    if (tmpLen < minEdgeLength) minEdgeLength = tmpLen;
+	  }
+	}
 	avgEdgeLength /= 3.0;
+	qFactor=getAreaQuality(i);
 	if (((theMesh->elem[0].getMeshSizing(i) > 0.0) &&
 	     (avgEdgeLength < (theMesh->elem[0].getMeshSizing(i)*COARSEN_TOL)))
 	    || (qFactor < QUALITY_MIN)) {
+	  CkPrintf("Marking elem %d for coarsening\n", i);
 	  Insert(i, qFactor*minEdgeLength, 1);
 	}
       }
@@ -160,23 +171,20 @@ int FEM_Adapt_Algs::Coarsen(int qm, int method, double factor, double *sizes)
     while (coarsenHeapSize>0) { // loop through the elements
       elId=Delete_Min(1);
       if ((elId != -1) && (theMesh->elem[0].is_valid(elId))) {
-	int *eConn = (int*)malloc(3*sizeof(int));
-	double tmpLen, minEdgeLength, avgEdgeLength;
+	int *eConn = (int*)malloc(elemWidth*sizeof(int));
 	int n1, n2;
 	theMesh->e2n_getAll(elId, eConn);
-	avgEdgeLength = minEdgeLength = length(eConn[0], eConn[1]);
-	n1 = eConn[0]; n2 = eConn[1];
-	tmpLen = length(eConn[1], eConn[2]);
-	avgEdgeLength += tmpLen;
-	if (tmpLen < minEdgeLength) { 
-	  minEdgeLength = tmpLen;
-	  n1 = eConn[1]; n2 = eConn[2];
-	}
-	tmpLen = length(eConn[2], eConn[0]);
-	avgEdgeLength += tmpLen;
-	if (tmpLen < minEdgeLength) {
-	  minEdgeLength = tmpLen;
-	  n1 = eConn[2]; n2 = eConn[0];
+	double tmpLen, avgEdgeLength=0.0, 
+	  minEdgeLength = length(eConn[0], eConn[1]);
+	for (int j=0; j<elemWidth-1; j++) {
+	  for (int k=j+1; k<elemWidth; k++) {
+	    tmpLen = length(eConn[j], eConn[k]);
+	    avgEdgeLength += tmpLen;
+	    if (tmpLen < minEdgeLength) {
+	      minEdgeLength = tmpLen;
+	      n1 = eConn[j]; n2 = eConn[k];
+	    }
+	  }
 	}
 	avgEdgeLength /= 3.0;
 	qFactor=getAreaQuality(elId);
@@ -184,6 +192,7 @@ int FEM_Adapt_Algs::Coarsen(int qm, int method, double factor, double *sizes)
 	if (((theMesh->elem[0].getMeshSizing(elId) > 0.0) &&
 	     (avgEdgeLength < (theMesh->elem[0].getMeshSizing(elId)*COARSEN_TOL)))
 	    || (qFactor < QUALITY_MIN)) {
+	  CkPrintf("Coarsening elem %d...\n", elId);
 	  if (theAdaptor->edge_contraction(n1, n2) > 0)  iter_mods++;
 	}
       }
@@ -230,19 +239,19 @@ void FEM_Adapt_Algs::SetMeshSize(int method, double factor, double *sizes)
   }
   else if (method == 2) {
     double avgEdgeLength = 0.0;
+    int width = theMesh->elem[0].getConn().width();
+    int* eConn = (int*)malloc(width*sizeof(int));
+    int numEdges=3;
+    if (dim==3) numEdges=6;
     for (int i=0; i<numElements; i++) {
-      int eConn[4];
       theMesh->e2n_getAll(i, eConn);
-      avgEdgeLength = length(eConn[0], eConn[1]) + length(eConn[1], eConn[2]) +
-	length(eConn[2], eConn[0]);
-      if (dim == 3) {
-	avgEdgeLength += length(eConn[0], eConn[3]) + length(eConn[1], eConn[3]) +
-	  length(eConn[2], eConn[3]);
-	avgEdgeLength /= 6.0;
+      for (int j=0; j<width-1; j++) {
+	for (int k=j+1; k<width; k++) {
+	  avgEdgeLength += length(eConn[j], eConn[k]);
+	}
       }
-      else {
-	avgEdgeLength /= 3.0;
-      }
+      avgEdgeLength += length(eConn[0], eConn[width-1]);
+      avgEdgeLength /= (double)numEdges;
       theMesh->elem[0].setMeshSizing(i, factor*avgEdgeLength);
     }
   }
@@ -254,25 +263,23 @@ void FEM_Adapt_Algs::SetMeshSize(int method, double factor, double *sizes)
 
 void FEM_Adapt_Algs::SetReferenceMesh()
 {
-    // for each element, set its size to its average edge length
-    // TODO: do we need to run this loop for element types other than 0?
-    
-    double avgLength;
-    int width = theMesh->elem[0].getConn().width();
-    int* eConn = (int*)malloc(width*sizeof(int));
-    int numElements = theMesh->elem[0].size();
-    
-    for (int i=0; i<numElements; ++i, avgLength=0) {
-        theMesh->e2n_getAll(i, eConn);
-        
-        for (int j=0; j<width-1; ++j) {
-            avgLength += length(eConn[j], eConn[j+1]);
-        }
-        avgLength += length(eConn[0], eConn[width-1]);
-        avgLength /= width;
-        theMesh->elem[0].setMeshSizing(i, avgLength);      
+  // for each element, set its size to its average edge length
+  // TODO: do we need to run this loop for element types other than 0?
+  double avgLength = 0.0;
+  int width = theMesh->elem[0].getConn().width();
+  int* eConn = (int*)malloc(width*sizeof(int));
+  int numElements = theMesh->elem[0].size();
+  
+  for (int i=0; i<numElements; ++i, avgLength=0) {
+    theMesh->e2n_getAll(i, eConn);
+    for (int j=0; j<width-1; ++j) {
+      avgLength += length(eConn[j], eConn[j+1]);
     }
-    free(eConn);
+    avgLength += length(eConn[0], eConn[width-1]);
+    avgLength /= width;
+    theMesh->elem[0].setMeshSizing(i, avgLength);      
+  }
+  free(eConn);
 }
 
 

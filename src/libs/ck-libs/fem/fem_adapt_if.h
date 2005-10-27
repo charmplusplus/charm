@@ -2,8 +2,6 @@
 #define __CHARM_FEM_ADAPT_IF_H
 
 #include "charm-api.h"
-#include "fem_mesh_modify.h"
-#include "fem_adapt_algs.h"
 
 extern void _registerFEMMeshModify(void);
 
