@@ -1276,14 +1276,14 @@ bool FEM_Adapt::isCorner(int n1) {
   FEM_Mesh_dataP(theMesh, FEM_NODE, FEM_BOUNDARY, &n1_bound, n1, 1 , FEM_INT, 1);
   if(n1_bound==0) return false; //it is internal
   int nbr1=-1, nbr2=-1;
-  for (int i=0; i<n1NumNodes; i++) {
+  /*for (int i=0; i<n1NumNodes; i++) {
     int n2 = n1AdjNodes[i];
     FEM_Mesh_dataP(theMesh, FEM_NODE, FEM_BOUNDARY, &n2_bound, n2, 1 , FEM_INT, 1);
     if(n1_bound == n2_bound) {
       nbr1 = n2;
       break;
     }
-  }
+    }*/
   for (int i=0; i<n1NumNodes; i++) {
     int ret = 0;
     int n2 = n1AdjNodes[i];
@@ -1322,10 +1322,6 @@ bool FEM_Adapt::isCorner(int n1) {
 	if(abs(n2_bound) < abs(n1_bound)) {
 	  if(n1NumNodes!=0) delete[] n1AdjNodes;
 	  return true;
-	}
-	else {
-	  if(n1NumNodes!=0) delete[] n1AdjNodes;
-	  return false;
 	}
       }
     }

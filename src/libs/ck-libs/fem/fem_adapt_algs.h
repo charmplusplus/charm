@@ -36,14 +36,16 @@ class FEM_Adapt_Algs {
   friend class FEM_Interpolate;
   friend class FEM_MUtil;
 
+ public:
+  int coord_attr;
+  int bc_attr;
+
  protected: 
   FEM_Mesh *theMesh;
   femMeshModify *theMod;
   //FEM_Adapt *theAdaptor;
   FEM_AdaptL *theAdaptor;
   int numNodes, numElements, dim;
-  int coord_attr;
-  int bc_attr;
   // These are for element sorting
   typedef struct {
     int elID;

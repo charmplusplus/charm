@@ -96,7 +96,7 @@ void FEM_Interpolate::FEM_InterpolateNodeOnEdge(NodalArgs args)
       FEM_Mesh_dataP(theMesh, FEM_NODE, theMod->fmAdaptAlgs->coord_attr, coord, args.n, 1 , FEM_DOUBLE, 2);
       FEM_Mesh_dataP(theMesh, FEM_NODE, FEM_BOUNDARY, &bound, args.n, 1 , FEM_INT, 1);
       int sharedIdx = theMod->fmUtil->exists_in_IDXL(theMesh,args.n,chk,0);
-      meshMod[chk].updateNodeAttrs(theMod->idx, sharedIdx, coord[0], coord[1], bound);
+      meshMod[chk].updateNodeAttrs(theMod->idx, sharedIdx, coord[0], coord[1], bound, false);
     }
     for(int j=0; j<numchunks; j++) {
       delete chunks1[j];
@@ -133,6 +133,7 @@ void FEM_Interpolate::FEM_InterpolateNodeOnFace(NodalArgs args)
       }
     }
   }
+  return;
 }
 
 /* A node is added inside a volume; interpolate from nodes of element; this
@@ -161,6 +162,7 @@ void FEM_Interpolate::FEM_InterpolateNodeInElement(NodalArgs args)
       }
     }
   }
+  return;
 }
 
 /* An element added is completely encapsulated by element to be removed; for 
@@ -182,6 +184,7 @@ void FEM_Interpolate::FEM_InterpolateElementCopy(ElementArgs args)
       elattr->copyEntity(args.e,*elattr,args.oldElement);
     }
   }
+  return;
 }
 
 /* An element is added and derives data from its nodes; assumes relevant data 
@@ -204,4 +207,108 @@ void FEM_Interpolate::FEM_InterpolateElementToNodes(int e)
   // DEFAULT BEHAVIOR: NO ELEMENT DATA
   // This function intentionally left blank; derived classes may define it, or
   // user is responsible for transferring element data to nodes on their own
+  return;
 }
+
+//This is to be used to copy the attributes of oldnode to newnode
+//oldnode or newnode can be ghost or local
+//currently it will only copy coordinates & boundary
+void FEM_Interpolate::FEM_InterpolateCopyAttributes(int oldnode, int newnode) {
+  //this code works when ghost nodes also have attributes, currently they do not
+  //only the local nodes have attributes
+  /*CkVec<FEM_Attribute *>*attrs;
+  CkVec<FEM_Attribute *>*nattrs;
+  int oldIdx, newIdx;
+  if(FEM_Is_ghost_index(oldnode)){
+    attrs =  theMesh->node.ghost->getAttrVec();
+    oldIdx = FEM_From_ghost_index(oldnode);
+  }
+  else{
+    attrs =  theMesh->node.getAttrVec();
+    oldIdx = oldnode;
+  }
+  if(FEM_Is_ghost_index(newnode)) {
+    nattrs = theMesh->node.ghost->getAttrVec();
+    newIdx = FEM_From_ghost_index(newnode);
+  }
+  else {
+    nattrs = theMesh->node.getAttrVec();
+    newIdx = newnode;
+  }
+
+#ifdef DEBUG 
+  CmiMemoryCheck(); 
+#endif
+  for(int j=0; j<attrs->size(); j++){
+    FEM_Attribute *att = (FEM_Attribute *)(*attrs)[j];
+    FEM_Attribute *natt = (FEM_Attribute *)(*nattrs)[j];
+    if((att->getAttr() < FEM_ATTRIB_TAG_MAX) || (att->getAttr() == FEM_BOUNDARY)){ 
+      FEM_DataAttribute *d = (FEM_DataAttribute *)natt;
+      d->copyEntity(newIdx, *att, oldIdx);
+    }
+  }
+  */
+  double crds[2];
+  int bound;
+  int numchunks;
+  IDXL_Share **chunks1;
+  int index = theMod->idx;
+
+  theMod->fmUtil->FEM_Print_coords(theMesh,oldnode);
+  if(FEM_Is_ghost_index(oldnode) || FEM_Is_ghost_index(newnode)) {
+    theMod->fmUtil->getChunkNos(0,oldnode,&numchunks,&chunks1);
+  }
+
+  if(!FEM_Is_ghost_index(oldnode)) {
+    FEM_Mesh_dataP(theMesh, FEM_NODE, theMod->fmAdaptAlgs->coord_attr, (void *)crds, oldnode, 1, FEM_DOUBLE, 2);
+    FEM_Mesh_dataP(theMesh, FEM_NODE, FEM_BOUNDARY, (void *)&bound, oldnode, 1, FEM_INT, 1);
+  }
+  else {
+    for(int j=0; j<numchunks; j++) {
+      int chk = chunks1[j]->chk;
+      if(chk==index) continue;
+      int ghostidx = theMod->fmUtil->exists_in_IDXL(theMesh,oldnode,chk,2);
+      double2Msg *d = meshMod[chk].getRemoteCoord(index,ghostidx);
+      intMsg *im = meshMod[chk].getRemoteBound(index,ghostidx);
+      crds[0] = d->i;
+      crds[1] = d->j;
+      bound = im->i;
+      break;
+    }
+  }
+
+  //update it on all chunks from which it receives that ghost
+  if(FEM_Is_ghost_index(newnode)) {
+    for(int j=0; j<numchunks; j++) {
+      int chk = chunks1[j]->chk;
+      if(chk==index) continue;
+      int sharedIdx = theMod->fmUtil->exists_in_IDXL(theMesh,newnode,chk,2);
+      meshMod[chk].updateNodeAttrs(theMod->idx, sharedIdx, crds[0], crds[1], bound, true);
+    }
+  }
+  else {
+    CkVec<FEM_Attribute *>*attrs = theMesh->node.getAttrVec();
+    for (int i=0; i<attrs->size(); i++) {
+      FEM_Attribute *a = (FEM_Attribute *)(*attrs)[i];
+      if (a->getAttr() == theMod->fmAdaptAlgs->coord_attr) {
+	FEM_DataAttribute *d = (FEM_DataAttribute *)a;
+	d->getDouble().setRow(newnode,crds,0);
+      }
+      else if(a->getAttr() == FEM_BOUNDARY) {
+	FEM_DataAttribute *d = (FEM_DataAttribute *)a;
+	d->getInt().setRow(newnode,bound);
+      }
+    }
+  }
+
+  if(FEM_Is_ghost_index(oldnode) || FEM_Is_ghost_index(newnode)) {
+    for(int j=0; j<numchunks; j++) {
+      delete chunks1[j];
+    }
+    if(numchunks != 0) free(chunks1);
+  }
+  theMod->fmUtil->FEM_Print_coords(theMesh,newnode);
+
+  return;
+}
+

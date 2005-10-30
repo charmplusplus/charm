@@ -309,7 +309,12 @@ void FEM_MUtil::removeGhostNodeRemote(FEM_Mesh *m, int fromChk, int sharedIdx) {
 #ifdef DEBUG 
       CmiMemoryCheck(); 
 #endif
-      CkAssert((numAdjNodes==0) && (numAdjElts==0));
+      if(!((numAdjNodes==0) && (numAdjElts==0))) {
+	CkPrintf("Error: Node %d cannot be removed, it is connected to :\n",ghostid);
+	FEM_Print_n2e(m,ghostid);
+	FEM_Print_n2n(m,ghostid);
+      }
+      //CkAssert((numAdjNodes==0) && (numAdjElts==0));
       m->node.ghost->set_invalid(localIdx,true);
     }
     //else, it still comes as a ghost from some other chunk. That chunk should call a remove on this and it should be deleted then.
@@ -324,6 +329,7 @@ void FEM_MUtil::addGhostElementRemote(FEM_Mesh *m, int chk, int elemType, int nu
     int newGhostNode = FEM_add_node_local(m, 1);
     m->node.ghost->ghostRecv.addNode(newGhostNode,chk);
     conn[i] = FEM_To_ghost_index(newGhostNode);
+    FEM_Ghost_Essential_attributes(m, mmod->fmAdaptAlgs->coord_attr, FEM_BOUNDARY, conn[i]);
   }
   //convert existing remote ghost indices to local ghost indices 
   const IDXL_List ll1 = m->node.ghost->ghostRecv.getList(chk);
@@ -629,34 +635,9 @@ int FEM_MUtil::Replace_node_local(FEM_Mesh *m, int oldIdx, int newIdx) {
 #ifdef DEBUG 
   CmiMemoryCheck(); 
 #endif
-  CkVec<FEM_Attribute *>*attrs;
-  CkVec<FEM_Attribute *>*nattrs;
-  if(FEM_Is_ghost_index(oldIdx)){
-    attrs =  m->node.ghost->getAttrVec();
-    //oldIdx = FEM_To_ghost_index(oldIdx);
-  }
-  else{
-    attrs =  m->node.getAttrVec();
-  }
-  nattrs = m->node.getAttrVec();
-
-#ifdef DEBUG 
-  CmiMemoryCheck(); 
-#endif
-  for(int j=0; j<attrs->size(); j++){
-    FEM_Attribute *att = (FEM_Attribute *)(*attrs)[j];
-    FEM_Attribute *natt = (FEM_Attribute *)(*nattrs)[j];
-    if(att->getAttr() < FEM_ATTRIB_TAG_MAX || att->getAttr()==FEM_BOUNDARY){ 
-      FEM_DataAttribute *d = (FEM_DataAttribute *)natt;
-      if(FEM_Is_ghost_index(oldIdx)){
-	d->copyEntity(newIdx, *att, FEM_To_ghost_index(oldIdx));
-      }
-      else {
-	d->copyEntity(newIdx, *att, oldIdx);
-      }
-    }
-  }
-
+  FEM_Interpolate *inp = mmod->getfmInp();
+  inp->FEM_InterpolateCopyAttributes(oldIdx,newIdx);
+  
   //update the conectivity of neighboring nodes and elements
   int *nnbrs;
   int nsize;
@@ -776,6 +757,7 @@ void FEM_MUtil::StructureTest(FEM_Mesh *m) {
   int noNodes = m->node.size();
   int noEle = m->elem[0].size();
   int noGhostEle = m->elem[0].ghost->size();
+  int noGhostNodes = m->node.ghost->size();
 
   int wdt = m->elem[0].getConn().width();
   int *e2n = (int*)malloc(wdt*sizeof(int));
@@ -783,9 +765,19 @@ void FEM_MUtil::StructureTest(FEM_Mesh *m) {
   for(int i=0; i<noEle; i++) {
     if(m->elem[0].is_valid(i)) {
       m->e2n_getAll(i,e2n,0);
+      //must have all different connections
       if(e2n[0]==e2n[1] || e2n[1]==e2n[2] || e2n[2]==e2n[0]) {
-	CkPrintf("WARNING: element %d, has connectivity (%d,%d,%d)\n",i,e2n[0],e2n[1],e2n[2]);
+	CkPrintf("ERROR: element %d, has connectivity (%d,%d,%d)\n",i,e2n[0],e2n[1],e2n[2]);
 	CkAssert(false);
+      }
+      //local elem must have all local node connectivity 
+      if(e2n[0]<0 || e2n[1]<0 || e2n[2]<0) {
+	CkPrintf("ERROR: element %d, has connectivity (%d,%d,%d)\n",i,e2n[0],e2n[1],e2n[2]);
+	CkAssert(false);
+      }
+      for(int j=0; j<3; j++) {
+	//all nodes must be valid
+	CkAssert(m->node.is_valid(e2n[j]));
       }
     }
   }
@@ -794,8 +786,19 @@ void FEM_MUtil::StructureTest(FEM_Mesh *m) {
       int ghostIndex = FEM_To_ghost_index(i);
       m->e2n_getAll(ghostIndex,e2n,0);
       if(e2n[0]==e2n[1] || e2n[1]==e2n[2] || e2n[2]==e2n[0]) {
-	CkPrintf("WARNING: element %d, has connectivity (%d,%d,%d)\n",ghostIndex,e2n[0],e2n[1],e2n[2]);
+	//must have all different connections
+	CkPrintf("ERROR: element %d, has connectivity (%d,%d,%d)\n",ghostIndex,e2n[0],e2n[1],e2n[2]);
 	CkAssert(false);
+      }
+      if(!(e2n[0]>=0 || e2n[1]>=0 || e2n[2]>=0)) {
+	//must have at least one local node
+	CkPrintf("ERROR: element %d, has connectivity (%d,%d,%d)\n",ghostIndex,e2n[0],e2n[1],e2n[2]);
+	CkAssert(false);
+      }
+      for(int j=0; j<3; j++) {
+	//all nodes must be valid
+	if(e2n[j]>=0) CkAssert(m->node.is_valid(e2n[j]));
+	else CkAssert(m->node.ghost->is_valid(FEM_From_ghost_index(e2n[j])));
       }
     }
   }
@@ -810,6 +813,9 @@ void FEM_MUtil::StructureTest(FEM_Mesh *m) {
       continue;
     }
     if(n2esize > 0) {
+      for(int j=0; j<n2esize; j++)
+	CkAssert(n2e[j]!=-1);
+
       m->e2n_getAll(n2e[0],e2n,0);
 
       //any local/shared node should have at least one local element connected to it
@@ -823,7 +829,7 @@ void FEM_MUtil::StructureTest(FEM_Mesh *m) {
       if(!done) {
 	FEM_Print_coords(m,i);
 	FEM_Print_n2e(m,i);
-	CkPrintf("WARNING: isolated local node %d, with no local element connectivity\n",i);
+	CkPrintf("ERROR: isolated local node %d, with no local element connectivity\n",i);
 	CkAssert(false);
       }
 
@@ -860,13 +866,66 @@ void FEM_MUtil::StructureTest(FEM_Mesh *m) {
 	}
 	if(numdeadends>=2 && numunused!=0) {
 	  FEM_Print_coords(m,i);
-	  CkPrintf("WARNING: local element connectivity of %d is discontinuous\n",i);
+	  CkPrintf("ERROR: cloud connectivity of node %d is discontinuous\n",i);
 	  CkAssert(false);
 	}
       }
       delete [] n2e;
     }
   }
+  /*for(int i=0; i<noGhostNodes; i++) {
+    int ghostidx = FEM_To_ghost_index(i);
+    if(m->node.ghost->is_valid(i)) {
+      m->n2e_getAll(ghostidx,&n2e,&n2esize);
+    } 
+    else {
+      continue;
+    }
+    if(n2esize > 0) {
+      for(int j=0; j<n2esize; j++)
+	CkAssert(n2e[j]!=-1);
+      m->e2n_getAll(n2e[0],e2n,0);
+      //ensure that there is a cloud of connectivity, no disconnected elements, other than boundaries
+      int testnode = ghostidx;
+      int startnode = (e2n[0]==testnode) ? e2n[1] : e2n[0];
+      int othernode = (e2n[2]==testnode) ? e2n[1] : e2n[2];
+      int previousnode = startnode;
+      int nextnode = -1;
+      int numdeadends = 0;
+      int numunused = n2esize-1;
+      n2e[0] = -1;
+      for(int j=0; j<n2esize-1; j++) {
+	nextnode = -1;
+	for(int k=1; k<n2esize; k++) {
+	  if(n2e[k]==-1) continue;
+	  m->e2n_getAll(n2e[k],e2n,0);
+	  if(e2n[0]==previousnode || e2n[1]==previousnode || e2n[2]==previousnode) {
+	    nextnode = (e2n[0]==previousnode) ? ((e2n[1]==testnode)? e2n[2]:e2n[1]) : ((e2n[1]==previousnode)? ((e2n[0]==testnode)? e2n[2]:e2n[0]):((e2n[1]==testnode)? e2n[0]:e2n[1]));
+	    previousnode = nextnode;
+	    n2e[k] = -1;
+	    numunused--;
+	  }
+	}
+	if(nextnode==othernode && othernode!=-1) {
+	  //it has reached a full circle
+	  break;
+	}
+	else if(nextnode==-1) {
+	  //this is one edge, start travelling along the other end
+	  numdeadends++;
+	  previousnode = othernode;
+	  othernode = -1;
+	}
+	if(numdeadends>=2 && numunused!=0) {
+	  FEM_Print_coords(m,ghostidx);
+	  CkPrintf("ERROR: cloud connectivity of node %d is discontinuous\n",ghostidx);
+	  CkAssert(false);
+	}
+      }
+      delete [] n2e;
+    }
+    }*/
+
   free(e2n);
   return;
 }

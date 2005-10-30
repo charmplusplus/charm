@@ -63,6 +63,7 @@ void FEM_remove_node_local(FEM_Mesh *m, int node);
 int FEM_add_element_local(FEM_Mesh *m, const int *conn, int connSize, int elemType, int addGhost);
 void FEM_remove_element_local(FEM_Mesh *m, int element, int etype);
 
+void FEM_Ghost_Essential_attributes(FEM_Mesh *m, int coord_attr, int bc_attr, int nodeid);
 
 void FEM_Mesh_dataP(FEM_Mesh *fem_mesh,int entity,int attr,void *data, int firstItem, int length, int datatype,int width);
 void FEM_Mesh_data_layoutP(FEM_Mesh *fem_mesh,int entity,int attr,void *data, int firstItem, int length, IDXL_Layout_t layout);
@@ -330,7 +331,7 @@ class femMeshModify : public CBase_femMeshModify {
 			       double longEdgeLen);
 
   void addToSharedList(int fromChk, int sharedIdx);
-  void updateNodeAttrs(int fromChk, int sharedIdx, double coordX, double coordY, int bound);
+  void updateNodeAttrs(int fromChk, int sharedIdx, double coordX, double coordY, int bound, bool isGhost);
   double2Msg *getRemoteCoord(int fromChk, int ghostIdx);
   intMsg *getRemoteBound(int fromChk, int ghostIdx);
 

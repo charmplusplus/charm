@@ -41,23 +41,23 @@ class FEM_Interpolate {
   typedef void (* FEM_InterpolateNodeFn)(NodalArgs, FEM_Mesh *);
   typedef void (* FEM_InterpolateElementFn)(ElementArgs);
 
-  FEM_InterpolateNodeFn nodeEdgeFnPtr, nodeFaceFnPtr, nodeElementFnPtr;
+  FEM_InterpolateNodeFn nodeEdgeFnPtr, nodeFaceFnPtr, nodeElementFnPtr, nodeCopyFnPtr;
   FEM_InterpolateElementFn elemCopyFnPtr, elemNodeFnPtr;
 
   /// Basic Constructor
   FEM_Interpolate() {
-    nodeEdgeFnPtr = nodeFaceFnPtr = nodeElementFnPtr = NULL;
+    nodeEdgeFnPtr = nodeFaceFnPtr = nodeElementFnPtr = nodeCopyFnPtr = NULL;
     elemCopyFnPtr = elemNodeFnPtr = NULL;
   }
 
   FEM_Interpolate(FEM_Mesh *m) {
-    nodeEdgeFnPtr = nodeFaceFnPtr = nodeElementFnPtr = NULL;
+    nodeEdgeFnPtr = nodeFaceFnPtr = nodeElementFnPtr = nodeCopyFnPtr = NULL;
     elemCopyFnPtr = elemNodeFnPtr = NULL;
     theMesh = m;
   }
 
   FEM_Interpolate(FEM_Mesh *m, femMeshModify *fm) {
-    nodeEdgeFnPtr = nodeFaceFnPtr = nodeElementFnPtr = NULL;
+    nodeEdgeFnPtr = nodeFaceFnPtr = nodeElementFnPtr = nodeCopyFnPtr = NULL;
     elemCopyFnPtr = elemNodeFnPtr = NULL;
     theMesh = m;
     theMod = fm;
@@ -83,11 +83,15 @@ class FEM_Interpolate {
   void FEM_SetInterpolateElementNodeFnPtr(FEM_InterpolateElementFn fnPtr) {
     elemNodeFnPtr = fnPtr;
   }
+  void FEM_SetInterpolateCopyAttributesFnPtr(FEM_InterpolateNodeFn fnPtr) {
+    nodeCopyFnPtr = fnPtr;
+  }
   void FEM_ResetInterpolateNodeEdgeFnPtr() { nodeEdgeFnPtr = NULL; }
   void FEM_ResetInterpolateNodeFaceFnPtr() { nodeFaceFnPtr = NULL; }
   void FEM_ResetInterpolateNodeElementFnPtr() { nodeElementFnPtr = NULL; }
   void FEM_ResetInterpolateElementCopyFnPtr() { elemCopyFnPtr = NULL; }  
   void FEM_ResetInterpolateElementNodeFnPtr() { elemNodeFnPtr = NULL; }
+  void FEM_ReetInterpolateCopyAttributesFnPtr() { nodeCopyFnPtr = NULL; }
 
   // Nodal data
   /// A node is added on an edge; interpolate from neighboring nodes
@@ -122,6 +126,9 @@ class FEM_Interpolate {
   /** Store data of an element temporarily on all nodes; this data is used 
       later to derive an element's data **/
   virtual void FEM_InterpolateElementToNodes(int e);
+
+  //node data
+  virtual void FEM_InterpolateCopyAttributes(int oldnode, int newnode);
 };
 
 #endif

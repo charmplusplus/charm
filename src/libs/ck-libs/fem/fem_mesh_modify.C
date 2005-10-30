@@ -281,7 +281,12 @@ void FEM_remove_node_local(FEM_Mesh *m, int node) {
       free(sharedIndices);
     }
     
-    CkAssert((numAdjNodes==0) && (numAdjElts==0)); // we shouldn't be removing a node away that is connected to something
+    if(!((numAdjNodes==0) && (numAdjElts==0))) {
+      CkPrintf("Error: Node %d cannot be removed, it is connected to :\n",node);
+      m->getfmMM()->fmUtil->FEM_Print_n2e(m,node);
+      m->getfmMM()->fmUtil->FEM_Print_n2n(m,node);
+    }
+    //CkAssert((numAdjNodes==0) && (numAdjElts==0)); // we shouldn't be removing a node away that is connected to something
     /*if(!((numAdjNodes==0) && (numAdjElts==0))) { // we shouldn't be removing a node away that is connected to anything
       CkPrintf("Error:: node %d has %d node adjacencies and %d edge adjacencies\n",node,numAdjNodes,numAdjElts);
       }*/
@@ -567,13 +572,21 @@ int FEM_remove_element(FEM_Mesh *m, int elementid, int elemtype, int permanent){
 			CmiMemoryCheck(); 
 #endif
 			m->n2e_getAll(nds[l], &elts, &numElts);
-			if(numElts == 0) {
-			  //remove this ghost node
-			  int sgn = m->getfmMM()->getfmUtil()->exists_in_IDXL(m,nds[l],chk,2);
-			  m->node.ghost->ghostRecv.removeNode(FEM_To_ghost_index(nds[l]), chk);
-			  FEM_remove_node_local(m,nds[l]);
-			  ghostRNIndices.push_back(sgn);
-			  numGhostRN++;
+			//if this is no longer connected to this chunk
+			if(nds[l]<-1) { //it is a ghost
+			  bool removeflag = true;
+			  for(int lm=0; lm<numElts; lm++) {
+			    if(elts[lm]>=0 || m->getfmMM()->getfmUtil()->exists_in_IDXL(m,elts[lm],chk,4)>=0)
+			      removeflag = false;
+			  }
+			  if(removeflag) {
+			    //remove this ghost node on this chunk
+			    int sgn = m->getfmMM()->getfmUtil()->exists_in_IDXL(m,nds[l],chk,2);
+			    m->node.ghost->ghostRecv.removeNode(FEM_To_ghost_index(nds[l]), chk);
+			    if(numElts==0) FEM_remove_node_local(m,nds[l]);
+			    ghostRNIndices.push_back(sgn);
+			    numGhostRN++;
+			  }
 			}
 			if(numElts!=0) delete[] elts;
 		      }
@@ -584,6 +597,9 @@ int FEM_remove_element(FEM_Mesh *m, int elementid, int elemtype, int permanent){
 		if(i==numSharedChunks-1) {
 		  int newghost = FEM_add_node_local(m,1);
 		  int ghostidx = FEM_To_ghost_index(newghost);
+		  //do not need to update the coords, since ghosts do not have attributes
+		  //FEM_Interpolate *inp = m->getfmMM()->getfmInp();
+		  //inp->FEM_InterpolateCopyAttributes(nodes[j],ghostidx);
 		  for(int k=0; k<numElems; k++) {
 		    m->e2n_replace(elems[k],nodes[j],ghostidx,elemtype);
 		    m->n2e_remove(nodes[j],elems[k]);
@@ -1466,32 +1482,48 @@ CDECL void FEM_REF_INIT(int mesh, int dim) {
   return;
 }
 
-//this would be only done for attributes of a node
-void FEM_Update_attributes(FEM_Mesh *m, int attr_id, int id) {
+//this would be only done for attributes of a node, currently for coords & boundary
+void FEM_Ghost_Essential_attributes(FEM_Mesh *m, int coord_attr, int bc_attr, int nodeid) {
   femMeshModify *theMod = m->getfmMM();
   FEM_MUtil *util = theMod->getfmUtil();
-  if(util->isShared(id)) {
-    //build up the list of chunks it is shared/local to
+  int index = theMod->idx;
+
+  if(FEM_Is_ghost_index(nodeid)) {
+    //build up the list of chunks it is ghost to
     int numchunks;
     IDXL_Share **chunks1;
-    util->getChunkNos(0,id,&numchunks,&chunks1);
-
+    util->getChunkNos(0,nodeid,&numchunks,&chunks1);
     for(int j=0; j<numchunks; j++) {
       int chk = chunks1[j]->chk;
-      if(chk==theMod->getIdx()) continue;
-      //meshMod[chk].updateNodeAttrs();
+      if(chk==index) continue;
+      int ghostidx = util->exists_in_IDXL(m,nodeid,chk,2);
+      double2Msg *d = meshMod[chk].getRemoteCoord(index,ghostidx);
+      intMsg *im = meshMod[chk].getRemoteBound(index,ghostidx);
+      double *coord = new double[2];
+      coord[0] = d->i; coord[1] = d->j;
+      int bound = im->i;
+      CkVec<FEM_Attribute *>*attrs = m->node.ghost->getAttrVec();
+      for (int i=0; i<attrs->size(); i++) {
+	FEM_Attribute *a = (FEM_Attribute *)(*attrs)[i];
+	if (a->getAttr() == theMod->fmAdaptAlgs->coord_attr) {
+	  FEM_DataAttribute *d = (FEM_DataAttribute *)a;
+	  d->getDouble().setRow(FEM_From_ghost_index(nodeid),coord,0);
+	}
+	else if(a->getAttr() == FEM_BOUNDARY) {
+	  FEM_DataAttribute *d = (FEM_DataAttribute *)a;
+	  d->getInt().setRow(FEM_From_ghost_index(nodeid),bound);
+	}
+      }
+      delete [] coord;
+      for(int j=0; j<numchunks; j++) {
+	delete chunks1[j];
+      }
+      if(numchunks != 0) free(chunks1);
+      break;
     }
-    for(int j=0; j<numchunks; j++) {
-      delete chunks1[j];
-    }
-    free(chunks1);
   }
-  //else if() {
-    //in ghost send list
-  //}
-  //else if() {
-    //in the ghost recv list, probably this won't be used, because noone is supposed to update attributes of a ghost node
-  //}
+
+  return;
 }
 
 
@@ -1811,11 +1843,15 @@ void femMeshModify::addToSharedList(int fromChk, int sharedIdx) {
 #endif
 }
 
-void femMeshModify::updateNodeAttrs(int fromChk, int sharedIdx, double coordX, double coordY, int bound) {
+void femMeshModify::updateNodeAttrs(int fromChk, int sharedIdx, double coordX, double coordY, int bound, bool isGhost) {
 #ifdef DEBUG 
   CmiMemoryCheck(); 
 #endif
-  int localIdx = fmUtil->lookup_in_IDXL(fmMesh, sharedIdx, fromChk, 0);
+  int localIdx = -1;
+  if(!isGhost) {
+    localIdx = fmUtil->lookup_in_IDXL(fmMesh, sharedIdx, fromChk, 0);
+  }
+  else localIdx = fmUtil->lookup_in_IDXL(fmMesh, sharedIdx, fromChk, 2);
   double *coord = new double[2];
   coord[0] = coordX; coord[1] = coordY;
   CkVec<FEM_Attribute *>*attrs = (fmMesh->node).getAttrVec();

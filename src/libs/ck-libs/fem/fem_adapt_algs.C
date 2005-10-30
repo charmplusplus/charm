@@ -498,7 +498,8 @@ int FEM_Adapt_Algs::simple_coarsen(double targetA, double xmin, double ymin, dou
   free(n3_coord);
   free(shortestEdge);
 
-  return 1;
+  if(adapted) return -1;
+  else return 1;
 }
 
 void FEM_Adapt_Algs::tests() {

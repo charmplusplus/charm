@@ -1251,27 +1251,33 @@ unsigned int FEM_Entity::get_next_invalid(FEM_Mesh *m, bool isNode, bool isGhost
       retval = first_invalid;
       if(isNode && !isGhost) { //it is a node & the entity is not a ghost entity
 	while(retval <= last_invalid) {
-	  if(m->getfmMM()->fmLockN[retval]->haslocks()) {
-	    retval++;
+	  if(!is_valid(retval)) {
+	    if(m->getfmMM()->fmLockN[retval]->haslocks()) {
+	      retval++;
+	    }
+	    else if(hasConn(retval)) { //has some connectivity
+	      retval++;
+	    }
+	    else {
+	      flag1 = true;
+	      break;
+	    }
 	  }
-	  else if(hasConn(retval)) { //has some connectivity
-	    retval++;
-	  }
-	  else {
-	    flag1 = true;
-	    break;
-	  }
+	  else retval++;
 	}
       }
       else if(isNode) {
 	while(retval <= last_invalid) {
-	  if(hasConn(retval)) { //has some connectivity
-	    retval++;
+	  if(!is_valid(retval)) {
+	    if(hasConn(retval)) { //has some connectivity
+	      retval++;
+	    }
+	    else {
+	      flag1 = true;
+	      break;
+	    }
 	  }
-	  else {
-	    flag1 = true;
-	    break;
-	  }
+	  else retval++;
 	}
       }      
       else{
