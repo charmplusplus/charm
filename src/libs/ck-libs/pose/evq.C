@@ -151,6 +151,8 @@ void eventQueue::CommitStatsHelper(Event *commitPtr)
   localStats->Commit();
 #endif
 #ifdef POSE_DOP_ON
+  // if more than one event occurs at the same virtual time on this object, 
+  // only count the first event
   if (lastLoggedVT >= commitPtr->svt)
     commitPtr->svt = commitPtr->evt = -1;
   else lastLoggedVT = commitPtr->evt;
