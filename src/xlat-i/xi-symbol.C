@@ -1150,7 +1150,7 @@ Array::genSubDecls(XStr& str)
     "      CkVec<CkArrayIndex3D> al;\n"
     "      for (int i=l1; i<=u1; i+=s1) \n"
     "        for (int j=l2; j<=u2; j+=s2) \n"
-    "          for (int k=l2; k<=u2; k+=s2) \n"
+    "          for (int k=l3; k<=u3; k+=s3) \n"
     "          al.push_back(CkArrayIndex3D(i, j, k));\n"
     "      return CkSectionID(aid, al.getVec(), al.size());\n"
     "    } \n";
@@ -1160,6 +1160,15 @@ Array::genSubDecls(XStr& str)
     "        {return "<<etype<<"(ckGetArrayID(), *(CkArrayIndex4D*)&ckGetArrayElements()[idx], CK_DELCTOR_CALL);}\n"
     "    static CkSectionID ckNew(const CkArrayID &aid, CkArrayIndex4D *elems, int nElems) {\n"
     "      return CkSectionID(aid, elems, nElems);\n"
+    "    } \n"
+    "    static CkSectionID ckNew(const CkArrayID &aid, int l1, int u1, int s1, int l2, int u2, int s2, int l3, int u3, int s3, int l4, int u4, int s4) {\n"
+    "      CkVec<CkArrayIndex4D> al;\n"
+    "      for (int i=l1; i<=u1; i+=s1) \n"
+    "        for (int j=l2; j<=u2; j+=s2) \n"
+    "          for (int k=l3; k<=u3; k+=s3) \n"
+    "            for (int l=l4; l<=u4; l+=s4) \n"
+    "              al.push_back(CkArrayIndex4D(i, j, k, l));\n"
+    "      return CkSectionID(aid, al.getVec(), al.size());\n"
     "    } \n";
     } else if (indexSuffix==(const char*)"5D") {
     str << 
@@ -1167,6 +1176,16 @@ Array::genSubDecls(XStr& str)
     "        {return "<<etype<<"(ckGetArrayID(), *(CkArrayIndex5D*)&ckGetArrayElements()[idx], CK_DELCTOR_CALL);}\n"
     "    static CkSectionID ckNew(const CkArrayID &aid, CkArrayIndex5D *elems, int nElems) {\n"
     "      return CkSectionID(aid, elems, nElems);\n"
+    "    } \n"
+    "    static CkSectionID ckNew(const CkArrayID &aid, int l1, int u1, int s1, int l2, int u2, int s2, int l3, int u3, int s3, int l4, int u4, int s4, int l5, int u5, int s5) {\n"
+    "      CkVec<CkArrayIndex5D> al;\n"
+    "      for (int i=l1; i<=u1; i+=s1) \n"
+    "        for (int j=l2; j<=u2; j+=s2) \n"
+    "          for (int k=l3; k<=u3; k+=s3) \n"
+    "            for (int l=l4; l<=u4; l+=s4) \n"
+    "              for (int m=l5; m<=u5; m+=s5) \n"
+    "                al.push_back(CkArrayIndex5D(i, j, k, l, m));\n"
+    "      return CkSectionID(aid, al.getVec(), al.size());\n"
     "    } \n";
     } else if (indexSuffix==(const char*)"6D") {
     str << 
@@ -1174,6 +1193,17 @@ Array::genSubDecls(XStr& str)
     "        {return "<<etype<<"(ckGetArrayID(), *(CkArrayIndex6D*)&ckGetArrayElements()[idx], CK_DELCTOR_CALL);}\n"
     "    static CkSectionID ckNew(const CkArrayID &aid, CkArrayIndex6D *elems, int nElems) {\n"
     "      return CkSectionID(aid, elems, nElems);\n"
+    "    } \n"
+    "    static CkSectionID ckNew(const CkArrayID &aid, int l1, int u1, int s1, int l2, int u2, int s2, int l3, int u3, int s3, int l4, int u4, int s4, int l5, int u5, int s5, int l6, int u6, int s6) {\n"
+    "      CkVec<CkArrayIndex6D> al;\n"
+    "      for (int i=l1; i<=u1; i+=s1) \n"
+    "        for (int j=l2; j<=u2; j+=s2) \n"
+    "          for (int k=l3; k<=u3; k+=s3) \n"
+    "            for (int l=l4; l<=u4; l+=s4) \n"
+    "              for (int m=l5; m<=u5; m+=s5) \n"
+    "                for (int n=l6; n<=u6; n+=s6) \n"
+    "                  al.push_back(CkArrayIndex6D(i, j, k, l, m, n));\n"
+    "      return CkSectionID(aid, al.getVec(), al.size());\n"
     "    } \n";
     }
 
