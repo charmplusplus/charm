@@ -92,23 +92,6 @@ static int using_malloc_checking;
    further malloc checking is safe.  */
 static int disallow_malloc_check;
 
-/* Activate a standard set of debugging hooks. */
-void
-__malloc_check_init()
-{
-  if (disallow_malloc_check) {
-    disallow_malloc_check = 0;
-    return;
-  }
-  using_malloc_checking = 1;
-  __malloc_hook = malloc_check;
-  __free_hook = free_check;
-  __realloc_hook = realloc_check;
-  __memalign_hook = memalign_check;
-  if(check_action & 1)
-    fprintf(stderr, "malloc: using debugging hooks\n");
-}
-
 /* A simple, standard set of debugging hooks.  Overhead is `only' one
    byte per chunk; still this will catch most cases of double frees or
    overruns.  The goal here is to avoid obscure crashes due to invalid
@@ -263,6 +246,17 @@ malloc_check(sz, caller) size_t sz; const Void_t *caller;
   return mem2mem_check(victim, sz);
 }
 
+#if HAVE_MMAP
+/* forward declaration */
+void
+internal_function
+#if __STD_C
+munmap_chunk(mchunkptr p);
+#else
+munmap_chunk();
+#endif
+#endif
+
 static void
 #if __STD_C
 free_check(Void_t* mem, const Void_t *caller)
@@ -391,6 +385,23 @@ memalign_check(alignment, bytes, caller)
     NULL;
   (void)mutex_unlock(&main_arena.mutex);
   return mem2mem_check(mem, bytes);
+}
+
+/* Activate a standard set of debugging hooks. */
+void
+__malloc_check_init()
+{
+  if (disallow_malloc_check) {
+    disallow_malloc_check = 0;
+    return;
+  }
+  using_malloc_checking = 1;
+  __malloc_hook = malloc_check;
+  __free_hook = free_check;
+  __realloc_hook = realloc_check;
+  __memalign_hook = memalign_check;
+  if(check_action & 1)
+    fprintf(stderr, "malloc: using debugging hooks\n");
 }
 
 #ifndef NO_THREADS

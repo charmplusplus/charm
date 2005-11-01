@@ -4988,7 +4988,7 @@ Void_t*
 #if __STD_C
 _int_pvalloc(mstate av, size_t bytes)
 #else
-_int_pvalloc(av, bytes) mstate av, size_t bytes;
+_int_pvalloc(av, bytes) mstate av; size_t bytes;
 #endif
 {
   size_t pagesz;

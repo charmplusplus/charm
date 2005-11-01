@@ -45,17 +45,6 @@
 
 #endif
 
-#if CMK_MEMORY_BUILD_OS 
-#define mm_malloc   malloc
-#define mm_free     free
-#else 
-
-void *mm_malloc(size_t size);
-void mm_free(void *ptr);
-
-#endif
-
-
 #ifndef CMK_OPTIMIZE
 CMK_TYPEDEF_UINT8 memory_allocated = 0;
 #endif
@@ -80,29 +69,7 @@ int CmiMemoryIs(int flag)
  */
 static char *memory_lifeRaft=NULL;
 
-void CmiOutOfMemoryInit(void) {
-#if CMK_MEMORY_PREALLOCATE_HACK
-  /* Work around problems with brk() on some systems (e.g., Blue Gene/L)
-     by grabbing a bunch of memory from the OS (which calls brk()),
-     then releasing the memory back to malloc(), except for one block
-     at the end, which is used to prevent malloc from moving brk() back down. 
-  */
-#define MEMORY_PREALLOCATE_MAX 1024
-  void *ptrs[MEMORY_PREALLOCATE_MAX];
-  int i,len=0;
-  for (i=0;i<MEMORY_PREALLOCATE_MAX;i++) {
-    ptrs[i] = mm_malloc(1024*1024);
-    if (ptrs[i]==NULL) break;
-    else len=i+1; /* this allocation worked */
-  }
-  /* we now own all the memory-- release all but the last meg. */
-  /* printf("CMK_MEMORY_PREALLOCATE_HACK claimed %d megs\n",len); */
-  for (i=len-2;i>=0;i--) {
-    mm_free(ptrs[i]);
-  }
-#endif
-  memory_lifeRaft=(char *)mm_malloc(65536/2);
-}
+void CmiOutOfMemoryInit(void);
 
 void CmiOutOfMemory(int nBytes) 
 { /* We're out of memory: free up the liferaft memory and abort */
@@ -342,3 +309,34 @@ void CmiMemoryMarkBlock(void *blk) {}
 void CmiMemorySweep(const char *where) {}
 void CmiMemoryCheck(void) {}
 #endif
+
+void memory_preallocate_hack()
+{
+#if CMK_MEMORY_PREALLOCATE_HACK
+  /* Work around problems with brk() on some systems (e.g., Blue Gene/L)
+     by grabbing a bunch of memory from the OS (which calls brk()),
+     then releasing the memory back to malloc(), except for one block
+     at the end, which is used to prevent malloc from moving brk() back down. 
+  */
+#define MEMORY_PREALLOCATE_MAX 1024
+  void *ptrs[MEMORY_PREALLOCATE_MAX];
+  int i,len=0;
+  for (i=0;i<MEMORY_PREALLOCATE_MAX;i++) {
+    ptrs[i] = mm_malloc(1024*1024);
+    if (ptrs[i]==NULL) break;
+    else len=i+1; /* this allocation worked */
+  }
+  /* we now own all the memory-- release all but the last meg. */
+  /* printf("CMK_MEMORY_PREALLOCATE_HACK claimed %d megs\n",len); */
+  for (i=len-2;i>=0;i--) {
+    mm_free(ptrs[i]);
+  }
+#endif
+}
+
+void CmiOutOfMemoryInit(void) {
+#if CMK_MEMORY_PREALLOCATE_HACK
+  memory_preallocate_hack();
+#endif
+  memory_lifeRaft=(char *)mm_malloc(65536/2);
+}
