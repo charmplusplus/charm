@@ -483,7 +483,6 @@ int FEM_Adapt_Algs::simple_coarsen(double targetA, double xmin, double ymin, dou
 	  int ret = theAdaptor->edge_contraction(shortestEdge[0], shortestEdge[1]);
 	  if(ret != -1) adapted = true;
 	}
-	//tests();
       }
       //if(adapted) break;
     }

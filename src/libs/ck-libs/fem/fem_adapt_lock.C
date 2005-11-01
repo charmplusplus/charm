@@ -515,7 +515,7 @@ int FEM_AdaptL::edge_contraction_help(int e1, int e2, int n1, int n2, int e1_n1,
   int e1chunk=-1, e2chunk=-1;
   int index = theMod->getIdx();
 
-  if(n1==19 && n2==15) {
+  if(n1==13 && n2==36) {
     CkPrintf("Crit\n");
   }
 
