@@ -45,6 +45,12 @@
 
 #endif
 
+	 
+#if CMK_MEMORY_BUILD_OS
+#define mm_malloc   malloc
+#define mm_free     free
+#endif
+
 #ifndef CMK_OPTIMIZE
 CMK_TYPEDEF_UINT8 memory_allocated = 0;
 #endif
