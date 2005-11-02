@@ -178,7 +178,7 @@ void globalStat::DOPcalc(int gvt, double grt)
 	if (vinStart > -1)
 	  for (j=vinStart; j<=vinEnd; j++) gvtDOP[j]++;
       }
-      else CkPrintf("WARNING: file corrupted... skipping line.\n");
+      else CkPrintf("WARNING: DOP post-processing corrupted... likely NFS to blame.\n");
     }
     fclose(fp);
   }
