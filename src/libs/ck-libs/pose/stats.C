@@ -172,8 +172,9 @@ void globalStat::DOPcalc(int gvt, double grt)
       if (sscanf(line, "%lf %lf %d %d\n", &rinStart, &rinEnd, 
 		 &vinStart, &vinEnd) == 4) {
 	usStart = (unsigned long int)(rinStart * 1000000.0);
-	usEnd = (unsigned long int)(rinEnd * 1000000.0) + 1;
+	usEnd = (unsigned long int)(rinEnd * 1000000.0);
 	for (j=usStart; j<usEnd; j++) grtDOP[j]++;
+	if (usStart == usEnd) grtDOP[usStart]++;
 	if (vinStart > -1)
 	  for (j=vinStart; j<=vinEnd; j++) gvtDOP[j]++;
       }
