@@ -741,7 +741,7 @@ For example, for a 3D array:
   CProxySection_Hello proxy = CProxySection_Hello::ckNew(helloArrayID, elems.getVec(), elems.size());
 \end{alltt}
 
-Alternatively, one can do the same thing by providing (lbound:ubound:stride) 
+Alternatively, one can do the same thing by providing [lbound:ubound:stride] 
 for each dimension:
 
 \begin{alltt}
@@ -749,7 +749,7 @@ for each dimension:
 \end{alltt}
 
 The above codes create a section proxy that contains array elements of 
-[0:9, 0:19:2, 0:29:2).
+[0:9, 0:19:2, 0:29:2].
 
 For user-defined array index other than CkArrayIndex1D to CkArrayIndex6D,
 one needs to use the generic array index type: CkArrayIndexMax.
@@ -816,7 +816,10 @@ it can serve as multicast/reduction delegation for all array sections:
 \end{alltt}
 
 Note, to use CkMulticast library, all multicast messages must inherit from 
-CkMcastBaseMsg, as following:
+CkMcastBaseMsg, as the following.
+Note that CkMcastBaseMsg must come first, this is IMPORTANT for CkMulticast 
+library to retrieve section infromation out of the message.
+
 
 \begin{alltt}
 class HiMsg : public CkMcastBaseMsg, public CMessage_HiMsg
@@ -889,13 +892,29 @@ types(Section~\ref{builtin_reduction}) or define his/her own reducer functions
 
 \paragraph{Array section multicast/reduction when migration happens}
 Using multicast/reduction, you don't need to worry about array migrations.
-When migration happens, you can still use the \kw{CkSectionInfo} for
-reduction. Reduction messages will be correctly delivered but 
-may not be as efficient until a new multicast spanning tree is updated
-internally in \kw{CkMulticastMgr}. A new updated \kw{CkSectionInfo} is always
-contained in a multicast message, so it is recommended that 
-\kw{CkGetSectionInfo()} function is called everytime time when a multicast 
-message arrives(as shown in the above SayHi example).
+When migration happens, array element in the array section can still use 
+the \kw{CkSectionInfo} it stored previously for doing reduction. 
+Reduction messages will be correctly delivered but may not be as efficient 
+until a new multicast spanning tree is rebuilt internally 
+in \kw{CkMulticastMgr} library. 
+When a new spanning tree is rebuilt, a updated \kw{CkSectionInfo} is 
+passed along with a multicast message, 
+so it is recommended that 
+\kw{CkGetSectionInfo()} function is always called when a multicast 
+message arrives (as shown in the above SayHi example).
 
+In case when a multicast root migrates, one needs to reconstruct the 
+spanning tree to get optimal performance. One will get the following
+warning message if not doing so:
+"Warning: Multicast not optimized after multicast root migrated."
+In current implementation, user needs to initiate the rebuilding process
+like:
+
+\begin{alltt}
+void Foo::pup(PUP::er & p) {
+    // if I am multicast root and it is unpacking
+   if (ismcastroot && p.isUnpacking()) { recreateSection(); }
+}
+\end{alltt}
 
 
