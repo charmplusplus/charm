@@ -707,9 +707,10 @@ void CkMulticastMgr::recvMsg(multicastGrpMsg *msg)
 void CkGetSectionInfo(CkSectionInfo &id, void *msg)
 {
   CkMcastBaseMsg *m = (CkMcastBaseMsg *)msg;
-  if (CkMcastBaseMsg::checkMagic(m) == 0) 
+  if (CkMcastBaseMsg::checkMagic(m) == 0) {
     CmiPrintf("ERROR: This is not a CkMulticast message!\n");
     CmiAbort("Did you remember to do CkMulticast delegation, and inherit multicast message from CkMcastBaseMsg in correct order?");
+  }
   // ignore invalid cookie sent by SimpleSend
   if (m->gpe() != -1) {
     id.type = MulticastMsg;
