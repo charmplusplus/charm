@@ -595,6 +595,7 @@ char *arg_charmrunip;
 
 int   arg_debug;
 int   arg_debug_no_pause;
+int   arg_charmdebug;
 
 int   arg_local;	/* start node programs directly by exec on localhost */
 int   arg_batch_spawn;  /* control starting node programs, several at a time */
@@ -656,6 +657,14 @@ void arg_init(int argc, char **argv)
 #if CMK_USE_RSH
   pparam_flag(&arg_debug,         0, "debug",         "Run each node under gdb in an xterm window");
   pparam_flag(&arg_debug_no_pause,0, "debug-no-pause","Like debug, except doesn't pause at beginning");
+
+  /* When the ++charmdebug flag is used, charmrun listens from its stdin for
+     commands, and forwards them to the gdb info program (a child), or to the
+     processor gdbs. The stderr is redirected to the stdout, so the two streams
+     are mixed together. The channel for stderr is reused to forward the replies
+     of gdb back to the java debugger. */
+  pparam_flag(&arg_charmdebug,    0, "charmdebug",    "Used only when charmrun is started by charmdebug");
+
   pparam_int(&arg_maxrsh,        16, "maxrsh",        "Maximum number of rsh's to run at a time");
   pparam_str(&arg_shell,          0, "remote-shell",  "which remote shell to use");
   pparam_str(&arg_debugger,       0, "debugger",      "which debugger to use");
@@ -1350,6 +1359,11 @@ SOCKET *req_clients; /*TCP request sockets for each node*/
 int  req_nClients;/*Number of entries in above list (==nodetab_rank0_size)*/
 int             req_ending=0;
 
+/* socket and std streams for the gdb info program */
+int gdb_info_pid=0;
+int gdb_info_std[3];
+FILE *gdb_stream=NULL;
+
 #define REQ_OK 0
 #define REQ_FAILED -1
 
@@ -1656,6 +1670,11 @@ void req_poll()
   for (i=0;i<req_nClients;i++)
 	FD_SET(req_clients[i],&rfds);
   if (CcsServer_fd()!=INVALID_SOCKET) FD_SET(CcsServer_fd(),&rfds);
+  if (arg_charmdebug) {
+    FD_SET(0, &rfds);
+    FD_SET(gdb_info_std[1], &rfds);
+    FD_SET(gdb_info_std[2], &rfds);
+  }
   DEBUGF(("Req_poll: Calling select...\n"));
   status=select(FD_SETSIZE, &rfds, 0, 0, &tmo);
   DEBUGF(("Req_poll: Select returned %d...\n",status));
@@ -1681,6 +1700,49 @@ void req_poll()
 		  DEBUGF(("Activity on CCS server port...\n"));
 		  req_ccs_connect();
 	 }
+
+  if (arg_charmdebug) {
+    char buf[100];
+    if (FD_ISSET(0, &rfds)) {
+      int indata = read(0, buf, 5);
+      buf[indata] = 0;
+      if (indata < 5) fprintf(stderr,"Error reading command (%s)\n",buf);
+      if (strncmp(buf,"info:",5)==0) {
+	/* Found info command, forward data to gdb info program */
+	printf("Command to be forwarded\n");
+	char c;
+	int num=0;
+	while (read(0, &c, 1)!=-1) {
+	  buf[num++]=c;
+	  if (c=='\n' || num >= 99) {
+	    write(gdb_info_std[0], buf, num);
+	    if (c=='\n') break;
+	  }
+	}
+      }
+      printf("Command from charmdebug: %d(%s)\n",indata,buf);
+    }
+    /* All streams from gdb are forwarded to the stderr stream through the FILE
+       gdb_stream which has been duplicated from stderr */
+    if (FD_ISSET(gdb_info_std[1], &rfds)) {
+      int indata = read(gdb_info_std[1], buf, 100);
+      /*printf("read data from gdb info stdout %d\n",indata);*/
+      if (indata > 0) {
+	buf[indata] = 0;
+	fprintf(gdb_stream,"%s",buf);
+	fflush(gdb_stream);
+      }
+    }
+    if (FD_ISSET(gdb_info_std[2], &rfds)) {
+      int indata = read(gdb_info_std[2], buf, 100);
+      /*printf("read data from gdb info stderr %d\n",indata);*/
+      if (indata > 0) {
+	buf[indata] = 0;
+	fprintf(gdb_stream,"%s",buf);
+	fflush(gdb_stream);
+      }
+    }
+  }
 }
 
 
@@ -1825,6 +1887,7 @@ void start_nodes_scyld(void);
 #endif
 void start_nodes_local(char **envp);
 void kill_nodes(void);
+void open_gdb_info(void);
 
 static void fast_idleFn(void) {sleep(0);}
 void finish_nodes(void);
@@ -1873,6 +1936,14 @@ int main(int argc, char **argv, char **envp)
     else
       start_nodes_local(envp);
 #endif
+
+  if (arg_charmdebug) {
+    /* Open an additional connection to node 0 with a gdb to grab info */
+    printf("opening connection with node 0 for info gdb\n");
+    open_gdb_info();
+    gdb_stream = fdopen(dup(2), "a");
+    dup2(1, 2);
+  }
 
   if(arg_verbose) fprintf(stderr, "Charmrun> node programs all started\n");
 
@@ -2560,6 +2631,58 @@ void rsh_script(FILE *f, int nodeno, int rank0no, char **argv)
 }
 
 int *rsh_pids=NULL;
+
+/* open a rsh connection with processor 0 and open a gdb session for info */
+void open_gdb_info() {
+  char **rshargv;
+  int fdin[2];
+  int fdout[2];
+  int fderr[2];
+  int i;
+
+  /* find the node-program */
+  arg_nodeprog_r = pathextfix(arg_nodeprog_a, nodetab_pathfixes(0), nodetab_ext(0));
+
+  rshargv = (char **)malloc(sizeof(char *)*6);
+  rshargv[0]=nodetab_shell(0);
+  rshargv[1]=nodetab_name(0);
+  rshargv[2]="-l";
+  rshargv[3]=nodetab_login(0);
+  rshargv[4] = (char *)malloc(sizeof(char)*8+strlen(arg_nodeprog_r));
+  sprintf(rshargv[4],"gdb -q %s",arg_nodeprog_r);
+  rshargv[5]=0;
+
+  pipe(fdin);
+  pipe(fdout);
+  pipe(fderr);
+
+  gdb_info_pid = fork();
+  if (gdb_info_pid < 0) {
+    perror("ERROR> starting info gdb"); exit(1);
+  } else if (gdb_info_pid == 0) {
+    /* child process */
+    close(fdin[1]);
+    close(fdout[0]);
+    close(fderr[0]);
+    printf("executing: \"%s\" \"%s\" \"%s\" \"%s\" \"%s\"\n",rshargv[0],rshargv[1],rshargv[2],rshargv[3],rshargv[4]);
+    dup2(fdin[0],0);
+    dup2(fdout[1],1);
+    dup2(fderr[1],2);
+    for(i=3; i<1024; i++) close(i);
+    execvp(rshargv[0], rshargv);
+    fprintf(stderr,"Charmrun> Couldn't find rsh program '%s'!\n",rshargv[0]);
+    exit(1);
+  }
+  /* else we are in the parent */
+  free(rshargv[4]);
+  free(rshargv);
+  gdb_info_std[0] = fdin[1];
+  gdb_info_std[1] = fdout[0];
+  gdb_info_std[2] = fderr[0];
+  close(fdin[0]);
+  close(fdout[1]);
+  close(fderr[1]);
+}
 
 /* returns pid */
 void start_one_node_rsh(int rank0no)

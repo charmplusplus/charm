@@ -74,6 +74,10 @@ int pup_isSizing(const pup_er p);
 int pup_isDeleting(const pup_er p);
 int pup_isUserlevel(const pup_er p);
 
+/*Insert a synchronization into the data stream */
+void pup_syncComment(const pup_er p, unsigned int sync, char *message);
+void pup_comment(const pup_er p, char *message);
+
 /*Pack/unpack data items, declared with macros for brevity.
 The macros expand like:
 void pup_int(pup_er p,int *i); <- single integer pack/unpack
@@ -96,6 +100,29 @@ PUP_BASIC_DATATYPE(double,double)
 
 /*Pack/unpack untyped byte array:*/
 void pup_bytes(pup_er p,void *ptr,int nBytes);
+
+enum {
+  pup_sync_builtin=0x70000000, // Built-in, standard sync codes begin here
+  pup_sync_begin=pup_sync_builtin+0x01000000, // Sync code at start of collection
+  pup_sync_end=pup_sync_builtin+0x02000000, // Sync code at end of collection
+  pup_sync_last_system=pup_sync_builtin+0x09000000, // Sync code at end of "system" portion of object
+  pup_sync_array_m=0x00100000, // Linear-indexed (0..n) array-- use item to separate
+  pup_sync_list_m=0x00200000, // Some other collection-- use index and item
+  pup_sync_object_m=0x00300000, // Sync mask for general object
+  
+  pup_sync_begin_array=pup_sync_begin+pup_sync_array_m,
+  pup_sync_begin_list=pup_sync_begin+pup_sync_list_m, 
+  pup_sync_begin_object=pup_sync_begin+pup_sync_object_m, 
+  
+  pup_sync_end_array=pup_sync_end+pup_sync_array_m, 
+  pup_sync_end_list=pup_sync_end+pup_sync_list_m, 
+  pup_sync_end_object=pup_sync_end+pup_sync_object_m, 
+  
+  pup_sync_item=pup_sync_builtin+0x00110000, // Sync code for a list or array item
+  pup_sync_index=pup_sync_builtin+0x00120000, // Sync code for index of item in a list
+  
+  pup_sync_last
+};
 
 #ifdef __cplusplus
 };

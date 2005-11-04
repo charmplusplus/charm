@@ -106,31 +106,6 @@ Return the given items, formatted as tagged network binary data.
 Return the given items, formatted as ASCII text.
 */
 
-class CpdListAccessor_c : public CpdListAccessor {
-  const char *path; //Path to this item
-  CpdListLengthFn_c lenFn;
-  void *lenParam;
-  CpdListItemsFn_c itemsFn;
-  void *itemsParam;
-public:
-  CpdListAccessor_c(const char *path_,
-            CpdListLengthFn_c lenFn_,void *lenParam_,
-            CpdListItemsFn_c itemsFn_,void *itemsParam_)
-  {
-      path=path_;
-      lenFn=lenFn_;
-      lenParam=lenParam_;
-      itemsFn=itemsFn_;
-      itemsParam=itemsParam_;
-  }
-  
-  virtual const char *getPath(void) const {return path;}
-  virtual int getLength(void) const {return (*lenFn)(lenParam);}
-  virtual void pup(PUP::er &p,CpdListItemsRequest &req) {
-    (itemsFn)(itemsParam,(pup_er *)&p,&req);
-  }
-};
-
 static void CpdListBoundsCheck(CpdListAccessor *l,int &lo,int &hi)
 {
     int len=l->getLength();

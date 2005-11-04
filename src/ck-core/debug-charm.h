@@ -50,6 +50,31 @@ public:
 */
 void CpdListRegister(CpdListAccessor *acc);
 
+class CpdListAccessor_c : public CpdListAccessor {
+  const char *path; //Path to this item
+  CpdListLengthFn_c lenFn;
+  void *lenParam;
+  CpdListItemsFn_c itemsFn;
+  void *itemsParam;
+public:
+  CpdListAccessor_c(const char *path_,
+            CpdListLengthFn_c lenFn_,void *lenParam_,
+            CpdListItemsFn_c itemsFn_,void *itemsParam_)
+  {
+      path=path_;
+      lenFn=lenFn_;
+      lenParam=lenParam_;
+      itemsFn=itemsFn_;
+      itemsParam=itemsParam_;
+  }
+  
+  virtual const char *getPath(void) const {return path;}
+  virtual int getLength(void) const {return (*lenFn)(lenParam);}
+  virtual void pup(PUP::er &p,CpdListItemsRequest &req) {
+    (itemsFn)(itemsParam,(pup_er *)&p,&req);
+  }
+};
+
 /**
   A typical CpdList accessor: length is stored at some fixed 
    location in memory, path is a constant string, and the 

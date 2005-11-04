@@ -145,6 +145,10 @@ static void meta_init(char **argv) {}
 #include "memory-isomalloc.c"
 #endif 
 
+#if CMK_MEMORY_BUILD_CHARMDEBUG
+#include "memory-charmdebug.c"
+#endif
+
 /*A trivial sample implementation of the meta_* calls:*/
 #if 0
 /* Use Gnumalloc as meta-meta malloc fallbacks (mm_*) */
@@ -346,3 +350,9 @@ void CmiOutOfMemoryInit(void) {
 #endif
   memory_lifeRaft=(char *)mm_malloc(65536/2);
 }
+
+#ifndef CMK_MEMORY_BUILD_CHARMDEBUG
+/* declare the cpd_memory routines */
+int  cpd_memory_length(void *lenParam) { return 0; }
+void cpd_memory_pup(void *itemParam,pup_er p,CpdListItemsRequest *req) { }
+#endif

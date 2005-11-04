@@ -44,6 +44,14 @@ FDECL int FTN_NAME(FPUP_ISDELETING,fpup_isdeleting)(const pup_er p)
 FDECL int FTN_NAME(FPUP_ISUSERLEVEL,fpup_isuserlevel)(const pup_er p)
   { return (mp.isUserlevel())?1:0;}
 
+/*Insert a synchronization into the data stream */
+CDECL void pup_syncComment(const pup_er p, unsigned int sync, char *message)
+  { mp.syncComment(sync, message); }
+/*FDECL void FNT_NAME(FPUP_SYNCCOMMENT,fpup_syncComment)(const pup_er p, unsigned int sync, char *message)
+  { mp.syncComment(sync, message); }*/
+CDECL void pup_comment(const pup_er p, char *message)
+  { mp.comment(message); }
+
 #undef PUP_BASIC_DATATYPE /*from pup_c.h*/
 #undef PUP_BASIC_DATATYPEF /*from pup_c.h*/
 

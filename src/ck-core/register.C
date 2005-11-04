@@ -180,6 +180,10 @@ static void pupReadonlyMsg(PUP::er &p,int i)
 }
 
 extern void CpdCharmInit(void);
+extern "C" {
+  int cpd_memory_length(void*);
+  void cpd_memory_pup(void*,void*,CpdListItemsRequest*);
+}
 
 void _registerDone(void)
 {
@@ -189,6 +193,7 @@ void _registerDone(void)
   CpdListRegister(new CpdSimpleListAccessor("charm/mains",_mainTable.size(),pupMain));
   CpdListRegister(new CpdSimpleListAccessor("charm/readonly",_readonlyTable.size(),pupReadonly));
   CpdListRegister(new CpdSimpleListAccessor("charm/readonlyMsg",_readonlyMsgs.size(),pupReadonlyMsg));
+  CpdListRegister(new CpdListAccessor_c("converse/memory",cpd_memory_length,0,cpd_memory_pup,0));
 #if CMK_CCS_AVAILABLE
   CpdCharmInit();
 #endif

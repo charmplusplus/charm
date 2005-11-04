@@ -300,7 +300,8 @@ TRACELIBS=$(L)/libtrace-projections.a  $(L)/libtrace-summary.a \
 MEMLIBS=$(L)/libmemory-default.o $(L)/libmemory-os.o $(L)/libmemory-gnu.o \
           $(L)/libmemory-gnuold.o $(L)/libmemory-verbose.o 	\
 	  $(L)/libmemory-paranoid.o \
-	  $(L)/libmemory-leak.o $(L)/libmemory-isomalloc.o
+	  $(L)/libmemory-leak.o $(L)/libmemory-isomalloc.o \
+	  $(L)/libmemory-charmdebug.o
 THREADLIBS=$(L)/libthreads-default.o $(L)/libthreads-qt.o 	\
 	  $(L)/libthreads-context.o $(L)/libthreads-uJcontext.o \
 	  $(L)/libthreads-pthreads.o $(L)/libthreads-fibers.o \
@@ -496,6 +497,9 @@ $(L)/libmemory-cache.o: memory-cache.c $(MEM_DEPS)
 
 $(L)/libmemory-isomalloc.o: memory-isomalloc.c $(MEM_DEPS)
 	-$(CHARMC) -o $@ -DCMK_MEMORY_BUILD_ISOMALLOC memory.c || touch $@
+
+$(L)/libmemory-charmdebug.o: memory-charmdebug.c $(MEM_DEPS)
+	-$(CHARMC) -o $@ -DCMK_MEMORY_BUILD_CHARMDEBUG memory.c || touch $@
 
 ## Thread libraries (-thread)
 $(L)/libthreads-default.o: threads.c $(CVHEADERS)
