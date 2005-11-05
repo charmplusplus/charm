@@ -248,7 +248,7 @@ public:
 void CtgGlobalStruct::pup(PUP::er &p) {
     p | seg_size;
     if (p.isUnpacking()) allocate(seg_size);
-    p(data_seg, seg_size);
+    p((char *)data_seg, seg_size);
 }
 
 /// Singleton object describing our global variables:
