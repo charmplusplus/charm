@@ -151,9 +151,9 @@ void CentralLB::AtSync()
     MigrationDone(0);
     return;
   }
-	if(CmiNodeAlive(CkMyPe())){
-  	thisProxy [CkMyPe()].ProcessAtSync();
-	}
+  if(CmiNodeAlive(CkMyPe())){
+    thisProxy [CkMyPe()].ProcessAtSync();
+  }
 #endif
 }
 
@@ -695,10 +695,10 @@ void CentralLB::MigrationDone(int balancing)
     contribute(0, NULL, CkReduction::sum_int, cb);
   }
   else{	
-		if(CmiNodeAlive(CkMyPe())){
-	    thisProxy [CkMyPe()].ResumeClients(balancing);
-		}	
-	}	
+    if(CmiNodeAlive(CkMyPe())){
+	thisProxy [CkMyPe()].ResumeClients(balancing);
+    }	
+  }	
 #endif
 }
 
