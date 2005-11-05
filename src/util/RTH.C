@@ -49,13 +49,13 @@ void freeLocals(RTH_Locals *locals) {
 
 void RTH_StackFrame::pup(PUP::er &p)
 {
-	p((void *)&fn,sizeof(fn)); //< evil- bytes.  Should pack function index (or something).
+	p((char *)&fn,sizeof(fn)); //< evil- bytes.  Should pack function index (or something).
 	p|pc; // Fine, program counter is portable
 	p|localsSize;
 	if (p.isUnpacking()) {
 		locals=allocLocals(localsSize);
 	}
-	p((void *)locals,localsSize); //< evil- bytes.  Should rely on pup routine for everything.
+	p((char *)locals,localsSize); //< evil- bytes.  Should rely on pup routine for everything.
 	locals->pup(p);
 }
 
