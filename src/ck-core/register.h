@@ -194,7 +194,7 @@ class ReadonlyInfo {
       if (pup!=NULL)
         (pup)((void *)&p);
       else
-        p(ptr,size);
+        p((char *)ptr,size);
     }
     ReadonlyInfo(const char *n,const char *t,
 	 int s, void *p,CkPupReadonlyFnPtr pf) 

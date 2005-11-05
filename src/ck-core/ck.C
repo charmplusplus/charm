@@ -80,7 +80,7 @@ void CkMessage::ckDebugPup(PUP::er &p,void *msg) {
   int ts=UsrToEnv(msg)->getTotalsize();
   int msgLen=ts-sizeof(envelope);
   if (msgLen>0)
-    p(msg,msgLen);
+    p((char*)msg,msgLen);
 }
 
 IrrGroup::IrrGroup(void) {

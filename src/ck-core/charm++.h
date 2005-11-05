@@ -658,7 +658,7 @@ class CProxy_Chare : public CProxy {
     	CProxy::pup(p);
     	p(_ck_cid.onPE);
     	//Copy the pointer as straight bytes
-    	p((void *)&_ck_cid.objPtr,sizeof(_ck_cid.objPtr));
+    	p((char *)&_ck_cid.objPtr,sizeof(_ck_cid.objPtr));
     }
 };
 PUPmarshall(CProxy_Chare)
