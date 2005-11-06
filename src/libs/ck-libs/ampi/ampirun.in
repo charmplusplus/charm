@@ -4,6 +4,7 @@
 
 mfile=""
 nodefile=""
+arch=@base_version@
 charmarch=
 opts=
 
@@ -26,8 +27,6 @@ ConvertMachinefile()
 
 CharmArch()
 {
-bindir=`dirname $0`
-test -f $bindir/.vdir && arch=`cat $bindir/.vdir`
 if test x$arch = x
 then
   echo "Unknown Charm architecture!"
