@@ -16,6 +16,7 @@ version=`pwd | awk -F/ '{print $(NF-1)}'`
 base_version=`cat .vdir`
 AC_DEFINE_UNQUOTED(CMK_MACHINE_NAME, "$version",[machine name])
 AC_MSG_RESULT($version)
+AC_SUBST(base_version)
 
 t="test.cpp"
 
@@ -833,4 +834,8 @@ EOT
 esac
 fi
 
-AC_OUTPUT()
+AC_OUTPUT(
+libs/ck-libs/ampi/ampirun,
+
+chmod +x libs/ck-libs/ampi/ampirun
+)
