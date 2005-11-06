@@ -2,9 +2,83 @@
 #
 # Tiny wrapper around charmc for the "-np" MPI-style argument.
 
-# delete our "-np" argument
-shift
-nPE=$1
-shift
-charmrun +p$nPE "$@"
+mfile=""
+nodefile=""
+charmarch=
+opts=
+
+# machinefile => nodelist
+ConvertMachinefile()
+{
+  if test ! -f $mfile
+  then
+    echo "Error: $mfile not found!"
+    exit 1
+  fi
+  nodefile="/tmp/.node.$$"
+  echo 'group main ++shell "/usr/bin/ssh -q -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -o CheckHostIP=no -o BatchMode=yes"' > $nodefile
+  nodes=`grep -v '^#' $mfile | awk -F: '{ print $1; }'`
+  for node in $nodes
+  do
+    echo "host $node" >> $nodefile
+  done
+}
+
+CharmArch()
+{
+bindir=`dirname $0`
+test -f $bindir/.vdir && arch=`cat $bindir/.vdir`
+if test x$arch = x
+then
+  echo "Unknown Charm architecture!"
+  exit 1
+elif `echo $arch | grep 'mpi-' > /dev/null 2>&1`
+then
+  charmarch="mpi"
+elif `echo $arch | grep 'net-' > /dev/null 2>&1`
+then
+  charmarch="net"
+fi
+}
+
+while [ ! $# -eq 0 ]
+do
+  arg="$1"
+  case "$arg" in
+  -np)
+     shift
+     nPE=$1
+     shift
+     ;;
+  -machinefile)
+     shift
+     mfile=$1
+     shift
+     ;;
+  *)
+     break
+     ;;
+  esac
+done
+
+if test x$mfile = x
+then
+mfile=$PBS_NODEFILE
+fi
+
+if test x$mfile != x
+then
+  CharmArch
+  if test "$charmarch" = "net"
+  then
+    ConvertMachinefile
+    opts="$opts ++nodelist $nodefile"
+  elif test "$charmarch" = "mpi"
+  then
+    opts="$opts -machinefile $mfile"
+  fi
+fi
+
+echo charmrun +p$nPE "$@" $opts
+charmrun +p$nPE "$@" $opts
 
