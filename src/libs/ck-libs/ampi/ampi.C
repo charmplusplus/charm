@@ -2812,7 +2812,7 @@ int AMPI_Allgather(void *sendbuf, int sendcount, MPI_Datatype sendtype,
 {
   AMPIAPI("AMPI_Allgather");
   if(getAmpiParent()->isInter(comm)) CkAbort("MPI_Allgather not allowed for Inter-communicator!");
-  if(comm==MPI_COMM_SELF||comm==MPI_COMM_NULL) return copyDatatype(comm,sendtype,sendcount,sendbuf,recvbuf);
+  if(comm==MPI_COMM_SELF) return copyDatatype(comm,sendtype,sendcount,sendbuf,recvbuf);
   ampi *ptr = getAmpiInstance(comm);
   int size = ptr->getSize(comm);
   int i;
@@ -2896,7 +2896,7 @@ int AMPI_Allgatherv(void *sendbuf, int sendcount, MPI_Datatype sendtype,
 {
   AMPIAPI("AMPI_Allgatherv");
   if(getAmpiParent()->isInter(comm)) CkAbort("MPI_Allgatherv not allowed for Inter-communicator!");
-  if(comm==MPI_COMM_SELF||comm==MPI_COMM_NULL) return copyDatatype(comm,sendtype,sendcount,sendbuf,recvbuf);
+  if(comm==MPI_COMM_SELF) return copyDatatype(comm,sendtype,sendcount,sendbuf,recvbuf);
   ampi *ptr = getAmpiInstance(comm);
   int size = ptr->getSize(comm);
   int i;
