@@ -887,7 +887,7 @@ void ampi::pup(PUP::er &p)
   p|nbcasts;
   p|tmpVec;
   p|remoteProxy;
-	p|resumeOnRecv;
+  p|resumeOnRecv;
   p|comlibProxy;
   p|ciStreaming;
   p|ciBcast;
@@ -1400,8 +1400,7 @@ ampi::delesend(int t, int sRank, const void* buf, int count, int type,  int rank
 int
 ampi::recv(int t, int s, void* buf, int count, int type, int comm, int *sts)
 {
-	ampi *dis;
-	MPI_Comm disComm = myComm.getComm();
+  MPI_Comm disComm = myComm.getComm();
   if(s==MPI_PROC_NULL) {
     ((MPI_Status *)sts)->MPI_SOURCE = MPI_PROC_NULL;
     ((MPI_Status *)sts)->MPI_TAG = MPI_ANY_TAG;
@@ -1428,15 +1427,15 @@ ampi::recv(int t, int s, void* buf, int count, int type, int comm, int *sts)
  )
 
   resumeOnRecv=true;
+  ampi *dis = getAmpiInstance(disComm);
   while(1) {
-		//This is done to take into account the case in which an ampi thread has migrated
-		//while waiting for a message
-		dis = getAmpiInstance(disComm);
+      //This is done to take into account the case in which an ampi 
+      // thread has migrated while waiting for a message
     tags[0] = t; tags[1] = s; tags[2] = comm;
     msg = (AmpiMsg *) CmmGet(dis->msgs, 3, tags, sts);
     if (msg) break;
     dis->thread->suspend();
-		dis = getAmpiInstance(disComm);
+    dis = getAmpiInstance(disComm);
   }
   dis->resumeOnRecv=false;
   CkDDT_DataType *ddt = dis->getDDT()->getType(type);
@@ -2417,7 +2416,7 @@ int AMPI_Waitall(int count, MPI_Request request[], MPI_Status sts[])
       request[i] = MPI_REQUEST_NULL;
     }
   }
-	delete reqvec;
+  delete reqvec;
   return 0;
 }
 
