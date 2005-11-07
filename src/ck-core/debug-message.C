@@ -61,7 +61,7 @@ void CkPupMessage(PUP::er &p,void **atMsg,int pack_mode) {
 		env=_allocEnv(type,userSize,prioBits);
 	if (pack_mode == 1) {
 	  /*Pup entire header and message as raw bytes.*/
-	  p((void *)env,size);
+	  p((char *)env,size);
 	} 
  	else if (pack_mode == 2) {
 	    /*Pup header in detail and message separately.*/
@@ -94,17 +94,17 @@ void envelope::pup(PUP::er &p) {
 	if (!p.isUnpacking()) convHeaderSize = CmiReservedHeaderSize;
 	p(convHeaderSize);
 	//puping converse hdr hopefully not go beyond boundry
-	p((void *)core,convHeaderSize);
+	p((char *)core,convHeaderSize);
 	p(ref);
-	p((void *)&attribs,sizeof(attribs));
+	p((char *)&attribs,sizeof(attribs));
 	p(epIdx);
 	p(pe);
 	p(event);
-	p(getPrioPtr(),getPrioBytes());
+	p((char*)getPrioPtr(),getPrioBytes());
 	switch(getMsgtype()) {
 	case NewChareMsg: case NewVChareMsg: 
 	case ForChareMsg: case ForVidMsg: case FillVidMsg:
-		p((void *)&(type.chare.ptr),sizeof(void *));
+		p((char *)&(type.chare.ptr),sizeof(void *));
 		p(type.chare.forAnyPe);
 		break;
 	case BocInitMsg: case ForNodeBocMsg: case ForBocMsg:
@@ -136,5 +136,5 @@ void CkMessage::pup(PUP::er &p) {
 	//Default message pup: just copy user portion as bytes
 	envelope *env=UsrToEnv((void *)this);
 	int userSize=env->getTotalsize()-sizeof(envelope)-env->getPrioBytes();
-	p((void *)this,userSize);
+	p((char *)this,userSize);
 }

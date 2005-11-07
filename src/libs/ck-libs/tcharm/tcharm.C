@@ -269,15 +269,15 @@ void TCharm::UserData::pup(PUP::er &p)
   p(mode);
   switch(mode) {
   case 'c': { /* C mode: userdata is on the stack, so keep address */
-     p((void*)&data,sizeof(data));
+     p((char*)&data,sizeof(data));
      //FIXME: function pointers may not be valid across processors
-     p((void*)&cfn, sizeof(TCHARM_Pup_fn));
+     p((char*)&cfn, sizeof(TCHARM_Pup_fn));
      if (cfn) cfn(pext,data);
      } break;
   case 'g': { /* Global mode: zero out userdata on arrival */
      if (p.isUnpacking()) data=0;
      //FIXME: function pointers may not be valid across processors
-     p((void*)&gfn, sizeof(TCHARM_Pup_global_fn));
+     p((char*)&gfn, sizeof(TCHARM_Pup_global_fn));
      if (gfn) gfn(pext);
      } break;
   default:

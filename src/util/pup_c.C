@@ -95,10 +95,10 @@ PUP_BASIC_DATATYPEF(DOUBLE,double,double)
 /*Pack/unpack untyped byte array:*/
 CDECL void pup_bytes(pup_er p,void *ptr,int nBytes)
 {
-  mp(ptr,nBytes);
+  mp((char *)ptr,nBytes);
 }
 
 FDECL void FTN_NAME(FPUP_BYTES,fpup_bytes)(pup_er p,void *ptr,int *nBytes)
 {
-  mp(ptr,*nBytes);
+  mp((char *)ptr,*nBytes);
 }
