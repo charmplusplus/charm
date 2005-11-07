@@ -190,7 +190,7 @@ public:
     p(n);
     if(p.isUnpacking())
       locs = new vector3d[n];
-    p((void*)locs, n*sizeof(vector3d));
+    p((char*)locs, n*sizeof(vector3d));
     p(nPatches);
     if(p.isUnpacking())
       patches = new patch*[nPatches];

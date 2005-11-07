@@ -826,7 +826,7 @@ MBlockChunk::pup(PUP::er &p)
     if (p.isUnpacking()) fields[i]=new field_t;
     fields[i]->pup(p);
   }
-  p((void*)bcs, MBLK_MAXBC*sizeof(bcs[0]));
+  p((char*)bcs, MBLK_MAXBC*sizeof(bcs[0]));
   p(seqnum);
   p(update.wait_seqnum);
   p(update.nRecd);
