@@ -92,7 +92,7 @@ class FEM_Adapt {
       performed on n1 and n2 by searching for an element with edge [n1,n2]. **/
   virtual int edge_flip(int n1, int n2);
   int edge_flip_help(int e1, int e2, int n1, int n2, int e1_n1, 
-			     int e1_n2, int e1_n3, int n3, int n4);
+			     int e1_n2, int e1_n3, int n3, int n4,int *locknodes);
   
   /// Bisect edge (n1, n2) and the two adjacent elements
   /** Given edge e:(n1, n2), remove the two elements (n1,n2,n3) and (n2,n1,n4) 

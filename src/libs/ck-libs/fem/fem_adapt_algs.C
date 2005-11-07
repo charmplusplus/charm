@@ -97,7 +97,7 @@ int FEM_Adapt_Algs::Refine(int qm, int method, double factor, double *sizes)
 	}
 	if ((theMesh->elem[0].getMeshSizing(elId) > 0.0) &&
 	    (maxEdgeLength > (theMesh->elem[0].getMeshSizing(elId)*REFINE_TOL))) {
-	  CkPrintf("Refining elem %d...\n", elId);
+	  //CkPrintf("Refining elem %d...\n", elId);
 	  if (theAdaptor->edge_bisect(n1, n2) > 0)  iter_mods++;
 	}
       }
@@ -163,7 +163,7 @@ int FEM_Adapt_Algs::Coarsen(int qm, int method, double factor, double *sizes)
 	if (((theMesh->elem[0].getMeshSizing(i) > 0.0) &&
 	     (avgEdgeLength < (theMesh->elem[0].getMeshSizing(i)*COARSEN_TOL)))
 	    || (qFactor < QUALITY_MIN)) {
-	  CkPrintf("Marking elem %d for coarsening\n", i);
+	  //CkPrintf("Marking elem %d for coarsening\n", i);
 	  Insert(i, qFactor*minEdgeLength, 1);
 	}
       }
@@ -192,7 +192,7 @@ int FEM_Adapt_Algs::Coarsen(int qm, int method, double factor, double *sizes)
 	if (((theMesh->elem[0].getMeshSizing(elId) > 0.0) &&
 	     (avgEdgeLength < (theMesh->elem[0].getMeshSizing(elId)*COARSEN_TOL)))
 	    || (qFactor < QUALITY_MIN)) {
-	  CkPrintf("Coarsening elem %d...\n", elId);
+	  //CkPrintf("Coarsening elem %d...\n", elId);
 	  if (theAdaptor->edge_contraction(n1, n2) > 0)  iter_mods++;
 	}
       }
@@ -372,56 +372,62 @@ void FEM_Adapt_Algs::GradateMesh(double smoothness)
 
 
 int FEM_Adapt_Algs::simple_refine(double targetA, double xmin, double ymin, double xmax, double ymax) {
-  int noEle = theMesh->elem[0].size();
   int *con = (int*)malloc(3*sizeof(int));
-  double *areas = (double*)malloc(noEle*sizeof(double));
-  int *map1 = (int*)malloc(noEle*sizeof(int));
   double *n1_coord = (double*)malloc(2*sizeof(double));
   double *n2_coord = (double*)malloc(2*sizeof(double));
   double *n3_coord = (double*)malloc(2*sizeof(double));
+  bool adapted = true;
 
-  for(int i=0; i<noEle; i++) {
-    if(theMesh->elem[0].is_valid(i)) {
-      theMesh->e2n_getAll(i,con,0);
-      getCoord(con[0], n1_coord);
-      getCoord(con[1], n2_coord);
-      getCoord(con[2], n3_coord);
-      //do a refinement only if it has any node within the refinement box
-      if((n1_coord[0]<xmax && n1_coord[0]>xmin && n1_coord[1]<ymax && n1_coord[1]>ymin) || (n2_coord[0]<xmax && n2_coord[0]>xmin && n2_coord[1]<ymax && n2_coord[1]>ymin) || (n3_coord[0]<xmax && n3_coord[0]>xmin && n3_coord[1]<ymax && n3_coord[1]>ymin)) {
-	areas[i] = getArea(n1_coord, n2_coord, n3_coord);
+  while(adapted) {
+    adapted = false;
+    int noEle = theMesh->elem[0].size();
+    double *areas = (double*)malloc(noEle*sizeof(double));
+    int *map1 = (int*)malloc(noEle*sizeof(int));
+    for(int i=0; i<noEle; i++) {
+      if(theMesh->elem[0].is_valid(i)) {
+	theMesh->e2n_getAll(i,con,0);
+	getCoord(con[0], n1_coord);
+	getCoord(con[1], n2_coord);
+	getCoord(con[2], n3_coord);
+	//do a refinement only if it has any node within the refinement box
+	if((n1_coord[0]<xmax && n1_coord[0]>xmin && n1_coord[1]<ymax && n1_coord[1]>ymin) || (n2_coord[0]<xmax && n2_coord[0]>xmin && n2_coord[1]<ymax && n2_coord[1]>ymin) || (n3_coord[0]<xmax && n3_coord[0]>xmin && n3_coord[1]<ymax && n3_coord[1]>ymin)) {
+	  areas[i] = getArea(n1_coord, n2_coord, n3_coord);
 	} 
-      else {
-	areas[i] = MINAREA; //make it believe that this triangle does not need refinement
+	else {
+	  areas[i] = MINAREA; //make it believe that this triangle does not need refinement
+	}
+      } else {
+	areas[i] = MINAREA;
       }
-    } else {
-      areas[i] = MINAREA;
+      map1[i] = i;
     }
-    map1[i] = i;
+
+    for(int i=0; i<noEle; i++) {
+      for(int j=i+1; j<noEle; j++) {
+	if(areas[j] > areas[i]) {
+	  double tmp = areas[j];
+	  areas[j] = areas[i];
+	  areas[i] = tmp;
+	  int t = map1[j];
+	  map1[j] = map1[i];
+	  map1[i] = t;
+	}
+      }
+    }
+    
+    for(int i=0; i<noEle; i++) {
+      if(theMesh->elem[0].is_valid(map1[i])) {
+	if(areas[i] > targetA) {
+	  refine_element_leb(map1[i]);
+	  adapted = true;
+	}
+      }
+    }
+    free(areas);
+    free(map1);
   }
 
-  for(int i=0; i<noEle; i++) {
-    for(int j=i+1; j<noEle; j++) {
-      if(areas[j] > areas[i]) {
-	double tmp = areas[j];
-	areas[j] = areas[i];
-	areas[i] = tmp;
-	int t = map1[j];
-	map1[j] = map1[i];
-	map1[i] = t;
-      }
-    }
-  }
-
-  for(int i=0; i<noEle; i++) {
-    if(theMesh->elem[0].is_valid(map1[i])) {
-      if(areas[i] > targetA) {
-	refine_element_leb(map1[i]);
-      }
-    }
-  }
   free(con);
-  free(areas);
-  free(map1);
   free(n1_coord);
   free(n2_coord);
   free(n3_coord);

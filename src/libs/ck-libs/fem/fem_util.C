@@ -1075,6 +1075,9 @@ int FEM_MUtil::residualLockTest(FEM_Mesh *m) {
       CkAssert(!mmod->fmLockN[i]->haslocks());
     }
   }
+  for(int i=0; i<mmod->numChunks*5; i++) {
+    CkAssert(mmod->fmIdxlLock[i]==false);
+  }
   return 1;
 }
 

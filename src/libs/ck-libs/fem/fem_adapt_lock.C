@@ -173,7 +173,11 @@ int FEM_AdaptL::edge_flip(int n1, int n2) {
     free(gotlocks);
     return 0;
   }
-  int ret = edge_flip_help(e1, e2, n1, n2, e1_n1, e1_n2, e1_n3, n3, n4);
+  int ret = edge_flip_help(e1, e2, n1, n2, e1_n1, e1_n2, e1_n3, n3, n4,locknodes);
+  if(ret!=-1) {
+    FEM_Modify_correctLockN(theMesh, locknodes[2]);
+    FEM_Modify_correctLockN(theMesh, locknodes[3]);
+  }
   unlockNodes(gotlocks, locknodes, 0, locknodes, numNodes);
 
   free(locknodes);
@@ -354,7 +358,7 @@ int FEM_AdaptL::edge_contraction(int n1, int n2) {
   bool done = false;
   int isEdge = 0;
   int numtries = 0;
-  int ret = 0;
+  int ret = -1;
   bool warned = false;
 
   if(n1<0 || n2<0) {
@@ -391,7 +395,7 @@ int FEM_AdaptL::edge_contraction(int n1, int n2) {
   if (e1 == -1) {
     free(locknodes);
     free(gotlocks);
-    return 0;
+    return -1;
   }
   bool locked;
   int gotlock = 0;
@@ -411,7 +415,7 @@ int FEM_AdaptL::edge_contraction(int n1, int n2) {
 	unlockNodes(gotlocks, locknodes, 0, locknodes, numNodes);
 	free(locknodes);
 	free(gotlocks);
-	return 0;
+	return -1;
       }
       gotlock = 1;
     }
@@ -430,14 +434,14 @@ int FEM_AdaptL::edge_contraction(int n1, int n2) {
       free(gotlocks);
       return -1;
     }
-    if (e1 == -1) {
+    if (e1 == -1 || e2==-1) {
       if(locked) {
 	unlockNodes(gotlocks, locknodes, 0, locknodes, numNodes);
 	locked = false;
       }
       free(locknodes);
       free(gotlocks);
-      return 0;
+      return -1;
     }
     if(gotlock==1 && locknodes[2]==n3 && locknodes[3]==n4) {
       int numtries1=0;
@@ -627,7 +631,7 @@ int FEM_AdaptL::edge_contraction_help(int e1, int e2, int n1, int n2, int e1_n1,
   //FEM_Modify_Lock(theMesh, adjnodes, 2, adjelems, 2);  
 
   //New code for updating a node rather than deleting both
-  int keepnode=0, deletenode=0, shared=0, n1_shared=0, n2_shared=0;
+  int keepnode=-1, deletenode=-1, shared=0, n1_shared=0, n2_shared=0;
 #ifdef DEBUG_1
   CkPrintf("[%d]Edge Contraction, edge %d->%d\n",theMod->idx, n1, n2);
 #endif

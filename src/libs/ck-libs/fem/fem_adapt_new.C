@@ -81,7 +81,7 @@ int FEM_Adapt::edge_flip(int n1, int n2)
     free(lockelems);
     return 0; // edge on boundary are not there
   }
-  int ret = edge_flip_help(e1, e2, n1, n2, e1_n1, e1_n2, e1_n3, n3, n4);
+  int ret = edge_flip_help(e1, e2, n1, n2, e1_n1, e1_n2, e1_n3, n3, n4,locknodes);
   FEM_Modify_Unlock(theMesh);
   free(locknodes);
   free(lockelems);
@@ -89,13 +89,13 @@ int FEM_Adapt::edge_flip(int n1, int n2)
 }
 
 int FEM_Adapt::edge_flip_help(int e1, int e2, int n1, int n2, int e1_n1, 
-			      int e1_n2, int e1_n3, int n3, int n4) 
+			      int e1_n2, int e1_n3, int n3, int n4, int *locknodes) 
 {
   int *conn = (int*)malloc(3*sizeof(int));
   int numNodes = 4;
   int numElems = 2;
-  int newNode = 0;
-  int *locknodes = (int*)malloc(numNodes*sizeof(int));
+  int newNode = -1;
+  //int *locknodes = (int*)malloc(numNodes*sizeof(int));
   int *lockelems = (int*)malloc(numElems*sizeof(int));
 
   locknodes[0] = n1;
@@ -174,8 +174,8 @@ int FEM_Adapt::edge_flip_help(int e1, int e2, int n1, int n2, int e1_n1,
 	  CkPrintf("Changing node %d to node %d\n",oldn4,n4);
 	}
       }
-#ifdef DEBUG_2
       locknodes[3] = n4;
+#ifdef DEBUG_2
       lockelems[1] = newel;
       CkPrintf("Adjacencies after add element %d: conn(%d,%d,%d)\n",e2,n1,n2,n4);
       printAdjacencies(locknodes, numNodes, lockelems, numElems);
@@ -201,8 +201,8 @@ int FEM_Adapt::edge_flip_help(int e1, int e2, int n1, int n2, int e1_n1,
 	  CkPrintf("Changing node %d to node %d\n",oldn3,n3);
 	}
       }
+      locknodes[2] = n3;
 #ifdef DEBUG_2
-      locknodes[3] = n3;
       lockelems[1] = newel;
       CkPrintf("Adjacencies after add element %d: conn(%d,%d,%d)\n",e2,n1,n2,n3);
       printAdjacencies(locknodes, numNodes, lockelems, numElems);
@@ -246,7 +246,7 @@ int FEM_Adapt::edge_flip_help(int e1, int e2, int n1, int n2, int e1_n1,
 
   //make sure that it always comes here, don't return with unlocking
   free(conn);
-  free(locknodes);
+  //free(locknodes);
   free(lockelems);
   return newNode;
 }

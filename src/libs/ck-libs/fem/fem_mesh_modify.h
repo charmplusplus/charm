@@ -304,6 +304,7 @@ class femMeshModify : public CBase_femMeshModify {
       } else {
       return fmgLockN[FEM_To_ghost_index(nodeid)];
       }*/
+    CkAssert(nodeid < fmLockN.size());
     return fmLockN[nodeid];
   }
   FEM_MUtil *getfmUtil(){return fmUtil;}

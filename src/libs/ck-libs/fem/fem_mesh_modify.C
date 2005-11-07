@@ -471,6 +471,7 @@ int FEM_remove_element(FEM_Mesh *m, int elementid, int elemtype, int permanent){
 	  chknos[i] = irec->getChk(i);
 	  inds[i] = irec->getIdx(i);
 	}
+	int newghost = -1, ghostidx = -1; //need to create a new ghost
 	for(int i=0; i<numSharedChunks; i++) {
 #ifdef DEBUG 
 	  CmiMemoryCheck(); 
@@ -546,7 +547,6 @@ int FEM_remove_element(FEM_Mesh *m, int elementid, int elemtype, int permanent){
 	      }
 	    
 	      if(losingThisNode) {
-		int newghost = -1, ghostidx = -1; //need to create a new ghost
 		//was a shared node, but now it should be a ghost node
 		for(int k=0; k<numElems; k++) {
 		  int *nds = (int*)malloc(m->elem[elemtype].getConn().width()*sizeof(int));
