@@ -116,7 +116,7 @@ then
   then  # tungsten
     mfile="/tmp/.mfile.$$"
     echo $LSB_HOSTS | sed 's/ /\n/g' | sort > $mfile
-  endif
+  fi
 fi
 
 if test x$mfile != x
