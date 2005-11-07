@@ -1373,7 +1373,11 @@ void foo(void) {
 	printf("Hello, world!\n");
 }
 EOT
-echo "set C++ compiler as: $CMK_CXX $OPTS_CXX"
+#echo "set C++ compiler as: $CMK_CXX $OPTS_CXX $OPTS"
+echo "$as_me:$LINENO: checking \"C++ compiler as\"" >&5
+echo $ECHO_N "checking \"C++ compiler as\"... $ECHO_C" >&6
+echo "$as_me:$LINENO: result: \"$CMK_CXX $OPTS_CXX $OPTS\"" >&5
+echo "${ECHO_T}\"$CMK_CXX $OPTS_CXX $OPTS\"" >&6
 test_cxx "whether C++ compiler works" "ok" "no" ""
 if test $fail -eq 1
 then
@@ -1389,7 +1393,11 @@ int main() {
 	return 0;
 }
 EOT
-echo "set C++ linker as: $CMK_LDXX $OPTS_LDXX"
+#echo "set C++ linker as: $CMK_LDXX $OPTS_LDXX"
+echo "$as_me:$LINENO: checking \"C++ linker as\"" >&5
+echo $ECHO_N "checking \"C++ linker as\"... $ECHO_C" >&6
+echo "$as_me:$LINENO: result: \"$CMK_LDXX $OPTS_LDXX\"" >&5
+echo "${ECHO_T}\"$CMK_LDXX $OPTS_LDXX\"" >&6
 test_link "whether linker works" "ok" "no" ""
 if test $fail -eq 1
 then
@@ -2088,7 +2096,12 @@ fi
 
 ################## Fortran #########################
 
-echo "set F77 compiler as: $CMK_CF77"
+#echo "set F77 compiler as: $CMK_CF77"
+echo "$as_me:$LINENO: checking \"F77 compiler as\"" >&5
+echo $ECHO_N "checking \"F77 compiler as\"... $ECHO_C" >&6
+echo "$as_me:$LINENO: result: \"$CMK_CF77\"" >&5
+echo "${ECHO_T}\"$CMK_CF77\"" >&6
+
 echo "$as_me:$LINENO: checking \"whether Fortran 77 compiler works\"" >&5
 echo $ECHO_N "checking \"whether Fortran 77 compiler works\"... $ECHO_C" >&6
 ### test fortran 77 compiler ###
@@ -2107,7 +2120,12 @@ echo "${ECHO_T}\"yes\"" >&6
 fi
 
 ### test fortran 90 compiler ###
-echo "set F90 compiler as: $CMK_CF90"
+#echo "set F90 compiler as: $CMK_CF90"
+echo "$as_me:$LINENO: checking \"F90 compiler as\"" >&5
+echo $ECHO_N "checking \"F90 compiler as\"... $ECHO_C" >&6
+echo "$as_me:$LINENO: result: \"$CMK_CF90\"" >&5
+echo "${ECHO_T}\"$CMK_CF90\"" >&6
+
 echo "$as_me:$LINENO: checking \"whether Fortran 90 compiler works\"" >&5
 echo $ECHO_N "checking \"whether Fortran 90 compiler works\"... $ECHO_C" >&6
 cat > conftest2.f90 <<EOF

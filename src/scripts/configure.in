@@ -142,7 +142,9 @@ void foo(void) {
 	printf("Hello, world!\n");
 }
 EOT
-echo "set C++ compiler as: $CMK_CXX $OPTS_CXX"
+#echo "set C++ compiler as: $CMK_CXX $OPTS_CXX $OPTS"
+AC_MSG_CHECKING("C++ compiler as")
+AC_MSG_RESULT("$CMK_CXX $OPTS_CXX $OPTS")
 test_cxx "whether C++ compiler works" "ok" "no" ""
 if test $fail -eq 1
 then
@@ -158,7 +160,9 @@ int main() {
 	return 0;
 }
 EOT
-echo "set C++ linker as: $CMK_LDXX $OPTS_LDXX"
+#echo "set C++ linker as: $CMK_LDXX $OPTS_LDXX"
+AC_MSG_CHECKING("C++ linker as")
+AC_MSG_RESULT("$CMK_LDXX $OPTS_LDXX")
 test_link "whether linker works" "ok" "no" ""
 if test $fail -eq 1
 then
@@ -674,7 +678,10 @@ fi
 
 ################## Fortran #########################
 
-echo "set F77 compiler as: $CMK_CF77"
+#echo "set F77 compiler as: $CMK_CF77"
+AC_MSG_CHECKING("F77 compiler as")
+AC_MSG_RESULT("$CMK_CF77")
+
 AC_MSG_CHECKING("whether Fortran 77 compiler works")
 ### test fortran 77 compiler ###
 cat > conftest.f <<EOF
@@ -690,7 +697,10 @@ else
 fi
 
 ### test fortran 90 compiler ###
-echo "set F90 compiler as: $CMK_CF90"
+#echo "set F90 compiler as: $CMK_CF90"
+AC_MSG_CHECKING("F90 compiler as")
+AC_MSG_RESULT("$CMK_CF90")
+
 AC_MSG_CHECKING("whether Fortran 90 compiler works")
 cat > conftest2.f90 <<EOF
       SUBROUTINE FOO_foo
