@@ -240,8 +240,11 @@ class er {
 #endif
 
   //For raw memory (n gives number of bytes)
+/*
+  // pup void * is error-prune, let's avoid it - Gengbin
   void operator()(void *a,int nBytes)
     {bytes((void *)a,nBytes,1,Tbyte);}
+*/
 
   //For allocatable objects (system will new/delete object and call pup routine)
   void operator()(able** a)
@@ -584,10 +587,10 @@ public:
 			return CmiTrue;
 		}
 		void pup(er &p) {
-			 p((void *)hash,sizeof(unsigned char)*len);
+			 p((char *)hash,sizeof(unsigned char)*len);
 		}
 		void pup(er &p) const {
-			 p((void *)hash,sizeof(unsigned char)*len);
+			 p((char *)hash,sizeof(unsigned char)*len);
 		}
 	};
 
@@ -822,8 +825,8 @@ inline void PUParray(PUP::er &p,T *t,int n) {
 
 /// Copy this type as raw memory (like memcpy).
 #define PUPbytes(type) \
-  inline void operator|(PUP::er &p,type &t) {p((void *)&t,sizeof(type));} \
-  inline void PUParray(PUP::er &p,type *ta,int n) { p((void *)ta,n*sizeof(type)); } \
+  inline void operator|(PUP::er &p,type &t) {p((char *)&t,sizeof(type));} \
+  inline void PUParray(PUP::er &p,type *ta,int n) { p((char *)ta,n*sizeof(type)); } \
   namespace PUP { template<> class as_bytes<type> { \
   	public: enum {value=1};  \
   }; };
@@ -831,7 +834,7 @@ inline void PUParray(PUP::er &p,T *t,int n) {
 
 /// Make PUP work with this function pointer type, copied as raw bytes.
 #define PUPfunctionpointer(fnPtrType) \
-  inline void operator|(PUP::er &p,fnPtrType &t) {p((void *)&t,sizeof(fnPtrType));}
+  inline void operator|(PUP::er &p,fnPtrType &t) {p((char *)&t,sizeof(fnPtrType));}
 
 /// Make PUP work with this enum type, copied as an "int".
 #define PUPenum(enumType) \
