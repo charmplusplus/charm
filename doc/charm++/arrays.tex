@@ -913,7 +913,11 @@ like:
 \begin{alltt}
 void Foo::pup(PUP::er & p) {
     // if I am multicast root and it is unpacking
-   if (ismcastroot && p.isUnpacking()) { recreateSection(); }
+   if (ismcastroot && p.isUnpacking()) {
+      CProxySection_Foo   fooProxy;    // proxy for the section
+      CkMulticastMgr *mg = CProxy_CkMulticastMgr(mCastGrpId).ckLocalBranch();
+      mg->resetSection(fooProxy);
+   }
 }
 \end{alltt}
 
