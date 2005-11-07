@@ -1709,9 +1709,9 @@ void req_poll()
       if (indata < 5) fprintf(stderr,"Error reading command (%s)\n",buf);
       if (strncmp(buf,"info:",5)==0) {
 	/* Found info command, forward data to gdb info program */
-	printf("Command to be forwarded\n");
 	char c;
 	int num=0;
+	printf("Command to be forwarded\n");
 	while (read(0, &c, 1)!=-1) {
 	  buf[num++]=c;
 	  if (c=='\n' || num >= 99) {
