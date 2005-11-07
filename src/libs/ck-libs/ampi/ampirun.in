@@ -1,12 +1,16 @@
 #!/bin/sh
 #
-# Tiny wrapper around charmc for the "-np" MPI-style argument.
+# wrapper for MPI-style argument.
 
+verbose=0
 mfile=""
 nodefile=""
-arch=@base_version@
 charmarch=
+nPE=
 opts=
+
+# replaced by configure
+arch=@base_version@
 
 # machinefile => nodelist
 ConvertMachinefile()
@@ -17,6 +21,7 @@ ConvertMachinefile()
     exit 1
   fi
   nodefile="/tmp/.node.$$"
+  test $verbose = 1 && echo "Generating nodelist file: $nodefile"
   echo 'group main ++shell "/usr/bin/ssh -q -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -o CheckHostIP=no -o BatchMode=yes"' > $nodefile
   nodes=`grep -v '^#' $mfile | awk -F: '{ print $1; }'`
   for node in $nodes
@@ -37,27 +42,66 @@ then
 elif `echo $arch | grep 'net-' > /dev/null 2>&1`
 then
   charmarch="net"
+else
+  echo "Unknown Charm architecture: $arch !"
+  exit 1
 fi
 }
+
+printHelp()
+{
+  echo "`basename $0` [mpirun_options...] <progname> [options...]"
+  echo 
+  echo mpirun_options:
+  echo "-machinefile <machine-file name>"
+  echo "          Take the list of possible machines to run on from the"
+  echo "          file <machine-file name>.  This is a list of all available"
+  echo "          machines; use -np <np> to request a specific number of machines."
+  echo "-np <np>"
+  echo "          specify the number of processors to run on"
+  echo "-v        Verbose - throw in some comments"
+  echo
+}
+
+End() 
+{
+  test -n "$nodefile" && /bin/rm -f $nodefile
+  exit $1
+}
+
+if test $# -eq 0
+then
+  echo "`basename $0`: Missing: program name"
+  exit 0
+fi
 
 while [ ! $# -eq 0 ]
 do
   arg="$1"
   case "$arg" in
+  -help)
+     printHelp
+     exit 0
+     ;;
+  -v)
+     verbose=1
+     ;;
   -np)
      shift
      nPE=$1
-     shift
+     ;;
+  -np*)
+     nPE=`echo $1 | sed -e 's/^-np//'`
      ;;
   -machinefile)
      shift
      mfile=$1
-     shift
      ;;
   *)
-     break
+     opts="$opts $1"
      ;;
   esac
+  shift
 done
 
 if test x$mfile = x
@@ -78,6 +122,13 @@ then
   fi
 fi
 
-echo charmrun +p$nPE "$@" $opts
-charmrun +p$nPE "$@" $opts
+trap 'End 1' 2
+
+test x$nPE = x && nPE=1
+
+test $verbose = 1 && echo charmrun +p$nPE $opts
+charmrun +p$nPE $opts
+status=$?
+
+End $status
 
