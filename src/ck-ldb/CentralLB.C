@@ -18,8 +18,8 @@
 
 #define  DEBUGF(x)        //CmiPrintf x;
 
-#define USE_REDUCTION  1
-#define USE_LDB_SPANNING_TREE 0
+#define USE_REDUCTION 1
+#define USE_LDB_SPANNING_TREE 1
 
 CkGroupID loadbalancer;
 int * lb_ptr;
@@ -58,6 +58,7 @@ void CentralLB::staticAtSync(void* data)
 void CentralLB::initLB(const CkLBOptions &opt)
 {
 #if CMK_LBDB_ON
+  count_msgs=0;
   lbname = "CentralLB";
   thisProxy = CProxy_CentralLB(thisgroup);
   //  CkPrintf("Construct in %d\n",CkMyPe());
@@ -410,7 +411,7 @@ void CentralLB::ReceiveStats(CkMarshalledCLBStatsMessage &msg)
   }    // end of for
 
   const int clients = CkNumValidPes();
-
+ 
   if (stats_msg_count == clients) {
     statsData->count = stats_msg_count;
     thisProxy[CkMyPe()].LoadBalance();
@@ -418,18 +419,19 @@ void CentralLB::ReceiveStats(CkMarshalledCLBStatsMessage &msg)
 #endif
 }
 
+/** added by Abhinav for receiving msgs via spanning tree */
 void CentralLB::ReceiveStatsViaTree(CkMarshalledCLBStatsMessage &msg)
 {
 #if CMK_LBDB_ON
-        CmiAssert(CkMyPe() != 0);
+	CmiAssert(CkMyPe() != 0);
 	bufMsg.add(msg);         // buffer messages
-	count++;
-	if (count == st.numChildren+1) {
+	count_msgs++;
+	if (count_msgs == st.numChildren+1) {
 		if(st.parent == 0)
 			thisProxy[0].ReceiveStats(bufMsg);
-		else 
+		else
 			thisProxy[st.parent].ReceiveStatsViaTree(bufMsg);
-		count = 0;
+		count_msgs = 0;
                 bufMsg.free();
 	} 
 #endif
@@ -1115,8 +1117,8 @@ SpanningTree::SpanningTree()
 void SpanningTree::calcParent(int n)
 {
 	parent=-1;
-	if(n != 0  && arity>0)
-	  parent = (n-1)/arity;
+	if(n != 0  && arity > 0)
+		parent = (n-1)/arity;
 }
 
 void SpanningTree::calcNumChildren(int n)

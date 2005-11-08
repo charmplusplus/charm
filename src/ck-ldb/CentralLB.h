@@ -52,7 +52,9 @@ public:
   void getSummary(double &maxLoad, double &maxCpuLoad, double &totalLoad);
 };
 
-// class for computing the parent and children of a processor
+/** added by Abhinav
+ * class for computing the parent and children of a processor 
+ */
 class SpanningTree
 {
 	public:
@@ -67,7 +69,7 @@ class SpanningTree
 class CentralLB : public BaseLB
 {
 private:
-  int count;
+  int count_msgs;
   void initLB(const CkLBOptions &);
 public:
   CkMarshalledCLBStatsMessage bufMsg;
