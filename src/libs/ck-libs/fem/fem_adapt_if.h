@@ -6,6 +6,11 @@
 extern void _registerFEMMeshModify(void);
 
 void FEM_ADAPT_Init(int meshID) {
+  const int triangleFaces[6] = {0,1,1,2,2,0};
+  FEM_Add_elem2face_tuples(meshID, 0, 2, 3, triangleFaces);
+  FEM_Mesh_create_elem_elem_adjacency(meshID);
+  FEM_Mesh_create_node_elem_adjacency(meshID);
+  FEM_Mesh_create_node_node_adjacency(meshID);
   _registerFEMMeshModify();
   FEM_REF_INIT(meshID, 2);  // dim=2
   FEM_Mesh *meshP = FEM_Mesh_lookup(meshID, "FEM_ADAPT_Init");
