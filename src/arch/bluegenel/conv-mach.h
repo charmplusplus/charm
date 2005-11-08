@@ -1,7 +1,7 @@
 #ifndef _CONV_MACH_H
 #define _CONV_MACH_H
 
-#define CMK_NO_OUTSTANDING_SENDS			   1
+#define CMK_NO_OUTSTANDING_SENDS			   0
 
 #define CMK_MEMORY_PREALLOCATE_HACK                        1
 
@@ -15,8 +15,8 @@
 
 #define CMK_IS_HETERO                                      0
 
-#define CMK_MALLOC_USE_GNU_MALLOC                          0
-#define CMK_MALLOC_USE_OS_BUILTIN                          1
+#define CMK_MALLOC_USE_GNU_MALLOC                          1
+#define CMK_MALLOC_USE_OS_BUILTIN                          0
 
 #define CMK_MEMORY_PAGESIZE                                8192
 #define CMK_MEMORY_PROTECTABLE                             1
@@ -66,6 +66,8 @@
 
 #undef CMK_CCS_AVAILABLE
 #define CMK_CCS_AVAILABLE				   0
+
+#define  BGL_VERSION_CONTROLX                              0
 
 #endif
 

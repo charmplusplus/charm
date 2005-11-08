@@ -1,8 +1,11 @@
-XLC_PRE=/auto/BGX/ibmcompilers/sles9/curr/opt/ibmcmp
+XLC_PRE=/opt/ibmcmp
+#XLC_PRE=/.../torolab.ibm.com/fs/projects/vabld/run/vacpp/80/bgl/daily/latest/
 XLC_POST=bin/blrts_
 XLC_F=$XLC_PRE/xlf/9.1
 CMK_CC="$XLC_PRE/vac/7.0/${XLC_POST}xlc -qcpluscmt "
+#CMK_CC="$XLC_PRE/${XLC_POST}xlc -qcpluscmt  -F/.../torolab.ibm.com/fs/projects/vabld/run/vacpp/80//bgl/daily/051002/etc/blrts-vac.cfg.ppcfloor"
 CMK_CXX="$XLC_PRE/vacpp/7.0/${XLC_POST}xlC "
+#CMK_CXX="$XLC_PRE/${XLC_POST}xlC  -F/.../torolab.ibm.com/fs/projects/vabld/run/vacpp/80//bgl/daily/051002/etc/blrts-vac.cfg.ppcfloor"
 CMK_LD="$CMK_CC  "
 CMK_LDXX="$CMK_CXX  "
 CMK_CF77="$XLC_F/${XLC_POST}xlf "

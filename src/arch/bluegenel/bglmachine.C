@@ -1,3 +1,4 @@
+
 #include <stdio.h>
 #include <errno.h>
 #include <stdlib.h>
@@ -9,18 +10,25 @@
 #include "pcqueue.h"
 #include <stack>
 
-#define EAGER_MESSAGE_SIZE 1024
+#define EAGER_MESSAGE_SIZE 100
 
 #include "BLMPI_EagerProtocol.h"
 #include "BLMPI_RzvProtocol.h"
-#include "BLMPI_VNModeProtocol.h"
 #include "BGLML_Torus.h"
+#include "BGLML_Tree.h"
+#include "BLRMA_Put.h"
+
+#if CMK_PERSISTENT_COMM
+#include "persist_impl.h"
+#endif
 
 #if 0
 #define BGL_DEBUG CmiPrintf
 #else
 #define BGL_DEBUG // CmiPrintf
 #endif
+
+int phscount;
 
 inline char *ALIGN_16(char *p){
   return((char *)((((unsigned long)p)+0xf)&0xfffffff0));
@@ -33,7 +41,9 @@ static void ** _recvArray;
 PCQueue message_q;                   //queue to receive incoming messages
 PCQueue broadcast_q;                 //queue to send broadcast messages
 
-static unsigned long long PROGRESS_PERIOD=10000;           //10k cycles
+#define PROGRESS_PERIOD 8
+#define PROGRESS_CYCLES 4000           //10k cycles
+
 /*
     To reduce the buffer used in broadcast and distribute the load from
   broadcasting node, define CMK_BROADCAST_SPANNING_TREE enforce the use of
@@ -70,7 +80,11 @@ extern "C" unsigned char computeCheckSum(unsigned char *data, int len);
 #define CMI_CHECK_CHECKSUM(msg, len)    \
         if (checksum_flag)      \
           if (computeCheckSum((unsigned char*)msg, len) != 0)  { \
-            printf("Checksum error %d\n", len);                    \
+            printf("\n\n------------------------------\n\nReceiver %d size %d:", CmiMyPe(), len); \    
+            for(int count = 0; count < len; count++) { \
+                printf("%2x", msg[count]);                 \
+            }                                             \    
+            printf("------------------------------\n\n"); \
             CmiAbort("Fatal error: checksum doesn't agree!\n"); \
           }
 #else
@@ -93,8 +107,6 @@ int               _Cmi_numnodes;  /* Total number of address spaces */
 static int        Cmi_nodestart; /* First processor in this address space */
 CpvDeclare(void*, CmiLocalQueue);
 
-int               vn_peer;    //peer in virtual node mode
-
 int               idleblock = 0;
 
 #include "machine-smp.c"
@@ -113,24 +125,11 @@ void CmiMemUnlock(void) {}
 #if BGL_VERSION_CONTROLX
 /* Code to support interrupts in BGL */
 
-volatile int bgx_lock;
-volatile int bgx_unhandled_interrupt;
-volatile int bgx_in_interrupt;
-/*
-#define bgxLock() {bgx_lock ++;}
-#define bgxUnlock() {bgx_lock --;}
-#define bgxIsLocked() (bgx_lock > 0)
-*/
-extern "C" void BGX_InterruptHandler() {
+volatile int bgx_in_interrupt=0;
+volatile int bgx_csection=0;
+volatile int handler_registered=0;
 
-  //Check, do interrupts need to be turned off
-  //printf("%d Interrupt %d\n", CmiMyPe(), bgx_lock);
-  /*
-  if(bgxIsLocked()) {
-    bgx_unhandled_interrupt = 1;
-    return;
-  }
-  */
+extern "C" void BGX_InterruptHandler() {
 
   bgx_in_interrupt = 1;
   while(BGLML_Messager_advance(_msgr)>0);
@@ -138,35 +137,35 @@ extern "C" void BGX_InterruptHandler() {
 }
 
 extern "C" void BGX_BeginCriticalSection() {
+  
+  if(!handler_registered)
+    return;
+
   if(bgx_in_interrupt)
     return;
 
-  rts_disable_torus_interrupts();
+  bgx_csection ++;
 
-  //bgxLock();
+  if(bgx_csection > 1)
+    return;
+
+  rts_disable_torus_interrupts();
 }
 
 extern "C" void BGX_EndCriticalSection() {
 
+  if(!handler_registered)
+    return;
+
   if(bgx_in_interrupt)
     return;
 
-  rts_enable_torus_interrupts();
-
-  /*
-  if(bgx_unhandled_interrupt) {
-    while(BGLML_Messager_advance(_msgr)>0);
-  }
-
-  bgxUnlock();
-
-  if(bgx_unhandled_interrupt) {
-    bgx_unhandled_interrupt = 0;
-
-    //enable interrupts
-    printf("End Critical Section: enabling interrupts\n");
-  }
-  */
+  bgx_csection --;
+  
+  if(bgx_csection > 0)
+    return;
+  
+  rts_enable_torus_interrupts();  
 }
 
 #else
@@ -209,7 +208,10 @@ static void CmiPushPE(int pe,void *msg)
 #if CMK_SMP
   CmiLock(procState[pe].recvLock);
 #endif
+
   PCQueuePush(cs->recv,(char *)msg);
+  //printf("%d: {%d} PCQueue length = %d, msg = %x\n", CmiMyPe(), bgx_in_interrupt, PCQueueLength(cs->recv), msg);
+  
 #if CMK_SMP
   CmiUnlock(procState[pe].recvLock);
 #endif
@@ -253,12 +255,36 @@ int CmiMyRank(void)
 }
 #endif
 
+#define MAX_OUTSTANDING 1024
+#define MAX_POSTED 8
+#define MAX_QLEN 1024
+#define MAX_BYTES 2000000
+
+static int msgQueueLen = 0;
+static int msgQBytes = 0;
+static int numPosted = 0;
+
+static int request_max;
+static int maxMessages;
+static int maxBytes;
+static int no_outstanding_sends=0; /*FLAG: consume outstanding Isends in scheduler loop*/
+static int progress_cycles;
+
+static int outstanding_recvs = 0;
+
+static int Cmi_dim;     /* hypercube dim of network */
+
+static char     **Cmi_argv;
+static char     **Cmi_argvcopy;
+static CmiStartFn Cmi_startfn;   /* The start function */
+static int        Cmi_usrsched;  /* Continue after start function finishes? */
+
 extern "C" void ConverseCommonInit(char **argv);
 extern "C" void ConverseCommonExit(void);
 extern "C" void CthInit(char **argv);
 
 static inline void SendMsgsUntil(int, int);
-static inline void AdvanceCommunications(int max_out = 80);
+static inline void AdvanceCommunications(int max_out = MAX_OUTSTANDING);
 static void ConverseRunPE(int everReturn);
 static void CommunicationServer(int sleepTime);
 static void CommunicationServerThread(int sleepTime);
@@ -272,29 +298,14 @@ typedef struct msg_list {
   char *send_buf;
   int size;
   int destpe;
-  struct msg_list *next;
+  //struct msg_list *next;
+#if CMK_PERSISTENT_COMM
+  PersistentHandle phs;
+  int phscount;
+  int phsSize;
+#endif
 } SMSG_LIST;
 
-#define MAX_QLEN 80
-#define MAX_BYTES 20000000
-
-static int msgQueueLen = 0;
-static int msgQBytes = 0;
-static int numPosted = 0;
-
-static int request_max;
-static int maxMessages;
-static int maxBytes;
-static int no_outstanding_sends=0; /*FLAG: consume outstanding Isends in scheduler loop*/
-
-static int outstanding_recvs = 0;
-
-static int Cmi_dim;     /* hypercube dim of network */
-
-static char     **Cmi_argv;
-static char     **Cmi_argvcopy;
-static CmiStartFn Cmi_startfn;   /* The start function */
-static int        Cmi_usrsched;  /* Continue after start function finishes? */
 
 typedef struct {
   int sleepMs; /*Milliseconds to sleep while idle*/
@@ -326,7 +337,7 @@ static void send_done(void *data){
   msgQBytes -= msg_tmp->size;
 
   if(msg_tmp->send_buf)
-    free(msg_tmp->send_buf);
+    CmiFree(msg_tmp->send_buf);
 
   free(data);
   data=NULL;
@@ -335,33 +346,46 @@ static void send_done(void *data){
   numPosted --;
 }
 
-/* recv done callback: push the recved msg to recv queue */
-static void recv_done(void *clientdata){
-  /*
-    struct CmiMsgInfo *info = (struct CmiMsgInfo *)ALIGN_16((char *)clientdata);
-    char* msg = info->msgptr;
-    int sndlen = info->sndlen;
-  */
+//Called on receiving a persistent message
+void persist_recv_done(void *clientdata) {
 
   char *msg = (char *) clientdata;
   int sndlen = ((CmiMsgHeaderBasic *) msg)->size;
 
-  /*
-  printf("------------------------------\n\nReceiver %d :", CmiMyPe());
-
-  for(int count = 0; count < sndlen; count++) {
-    printf("%x", msg[count]);
-  }
-
-  printf("------------------------------\n\n");
-  */
-
-  /* then we do what PumpMsgs used to do:
-   * push msg to recv queue */
+  ///  printf("[%d] persistent receive of size %d\n", CmiMyPe(), sndlen);
+  
+  //Cannot broadcast Persistent message
 
   CMI_CHECK_CHECKSUM(msg, sndlen);
   if (CMI_MAGIC(msg) != CHARM_MAGIC_NUMBER) { /* received a non-charm msg */
-    //CmiFree(clientdata);
+    CmiAbort("Charm++ Warning: Non Charm++ Message Received. \n");
+    return;
+  }
+  
+  CmiReference(msg);
+
+#if CMK_NODE_QUEUE_AVAILABLE
+  if (CMI_DEST_RANK(msg) == DGRAM_NODEMESSAGE)
+    CmiPushNode(msg);
+  else
+#endif
+    CmiPushPE(CMI_DEST_RANK(msg), (void *)msg);
+}
+
+/* recv done callback: push the recved msg to recv queue */
+static void recv_done(void *clientdata){
+
+  char *msg = (char *) clientdata;
+  int sndlen = ((CmiMsgHeaderBasic *) msg)->size;
+  
+  /* then we do what PumpMsgs used to do:
+   * push msg to recv queue */
+  
+  //if(bgx_in_interrupt)
+  //printf("[%d] receive of size %d\n", CmiMyPe(), sndlen);
+
+  CMI_CHECK_CHECKSUM(msg, sndlen);
+  if (CMI_MAGIC(msg) != CHARM_MAGIC_NUMBER) { /* received a non-charm msg */
     CmiAbort("Charm++ Warning: Non Charm++ Message Received. \n");
     return;
   }
@@ -375,6 +399,7 @@ static void recv_done(void *clientdata){
 
 #if CMK_BROADCAST_SPANNING_TREE | CMK_BROADCAST_HYPERCUBE
   if(CMI_BROADCAST_ROOT(msg) != 0) {
+    //printf ("%d: Receiving bcast message %d bytes\n", CmiMyPe(), sndlen);
     PCQueuePush(broadcast_q, msg);
   }
 #endif
@@ -382,37 +407,8 @@ static void recv_done(void *clientdata){
 
   //rts_dcache_evict_normal();
 
-  //CmiFree(clientdata);
-  outstanding_recvs--;
+  outstanding_recvs --;
 }
-
-/* first packet recv callback, gets recv_done for the whole msg */
-void first_pkt_vn_recv_done (
-                             const BGLQuad    * msginfo,
-                             unsigned        senderrank,
-                             const unsigned     sndlen,
-                             unsigned         * rcvlen,
-                             char            ** buffer,
-                             void           (** cb_done)(void *),
-                             void            ** clientdata
-                             )
-{
-  outstanding_recvs++;
-
-  int alloc_size = sndlen;
-
-  printf ("Receiving VN message %d bytes\n", sndlen);
-  *rcvlen = sndlen>0?sndlen:1;  /* to avoid malloc(0) which
-                                   might return NULL */
-
-  *buffer = (char *)CmiAlloc(alloc_size);
-  *cb_done = recv_done;
-
-  *clientdata = *buffer;
-
-  return;
-}
-
 
 /* first packet recv callback, gets recv_done for the whole msg */
 BLMPI_Eager_Recv_t * first_pkt_eager_recv_done (
@@ -425,9 +421,11 @@ BLMPI_Eager_Recv_t * first_pkt_eager_recv_done (
                                           void            ** clientdata
                                          )
 {
-  outstanding_recvs++;
+  outstanding_recvs ++;
 
   int alloc_size = sndlen + sizeof(BLMPI_Eager_Recv_t) + 16;
+  
+  //printf ("%d: {%d} Receiving message %d bytes\n", CmiMyPe(), bgx_in_interrupt, sndlen);
 
   /* printf ("Receiving %d bytes\n", sndlen); */
   *rcvlen = sndlen>0?sndlen:1;  /* to avoid malloc(0) which might
@@ -466,13 +464,15 @@ BLMPI_Rzv_Recv_t * first_pkt_rzv_recv_done   (
 
 inline void sendBroadcastMessages() {
   while(!PCQueueEmpty(broadcast_q)) {
-    void *msg = PCQueuePop(broadcast_q);
+    char *msg = (char *) PCQueuePop(broadcast_q);
 
 #if CMK_BROADCAST_SPANNING_TREE
-    SendSpanningChildren(((CmiMsgHeaderBasic *) msg)->size, (char *) msg);
+    SendSpanningChildren(((CmiMsgHeaderBasic *) msg)->size, msg);
 #elif CMK_BROADCAST_HYPERCUBE
-    SendHypercube(((CmiMsgHeaderBasic *) msg)->size, (char *) msg);
+    SendHypercube(((CmiMsgHeaderBasic *) msg)->size, msg);
 #endif
+    
+    //CMI_CHECK_CHECKSUM(msg, (((CmiMsgHeaderBasic *) msg)->size));
   }
 }
 
@@ -502,16 +502,12 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
   BLMPI_Eager_Init(_msgr, first_pkt_eager_recv_done, _recvArray, 11, 12);
   BLMPI_Rzv_Init(_msgr, first_pkt_rzv_recv_done, 14, 15, 3, 13);
   
-  CpvInitialize(BGLTorusManager*, tmanager);
-  CpvAccess(tmanager) = new BGLTorusManager();
+#if CMK_PERSISTENT_COMM
+  BLRMA_Put_Init(_msgr, 1, 2);
+  phs =  NULL;
+#endif
 
-  vn_peer = -1;
-  if(CpvAccess(tmanager)->isVnodeMode()) {
-    BLMPI_VNMode_Init(_msgr, first_pkt_vn_recv_done);
-    vn_peer = BGLML_Messager_vnpeerrank(_msgr);
-
-    printf("VN PEER [%d] = %d\n", _Cmi_mynode, vn_peer);
-  }
+  CmiBarrier();    
 
   /* processor per node */
   _Cmi_mynodesize = 1;
@@ -540,11 +536,15 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
   Cmi_argvcopy = CmiCopyArgs(argv);
   Cmi_argv = argv; Cmi_startfn = fn; Cmi_usrsched = usched;
 
+  CpvInitialize(BGLTorusManager*, tmanager);
+  CpvAccess(tmanager) = new BGLTorusManager();
+
+
   /* find dim = log2(numpes), to pretend we are a hypercube */
   for ( Cmi_dim=0,n=_Cmi_numpes; n>1; n/=2 )
     Cmi_dim++ ;
 
-  request_max=MAX_QLEN;
+  request_max=MAX_POSTED;
   CmiGetArgInt(argv,"+requestmax",&request_max);
  
   maxMessages = MAX_QLEN;
@@ -571,13 +571,11 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
 
   /* Network progress function is used to poll the network when for
      messages. This flushes receive buffers on some  implementations*/
-  networkProgressPeriod = 0;
+  networkProgressPeriod = PROGRESS_PERIOD;
   CmiGetArgInt(argv, "+networkProgressPeriod", &networkProgressPeriod);
   
-  int progress_cycles = 0;
+  progress_cycles = PROGRESS_CYCLES;
   CmiGetArgInt(argv, "+progressCycles", &progress_cycles);
-
-  PROGRESS_PERIOD = progress_cycles;
 
   CmiStartThreads(argv);
   ConverseRunPE(initret);
@@ -622,6 +620,14 @@ static void ConverseRunPE(int everReturn)
     debugLog=fopen(ln,"w");
   }
 #endif
+
+#if BGL_VERSION_CONTROLX
+  rts_install_torus_interrupt_handler(BGX_InterruptHandler);
+  rts_enable_torus_interrupts();  
+  handler_registered = 1;
+#endif
+
+  CmiBarrier();
 
   /* Converse initialization finishes, immediate messages can be processed.
      node barrier previously should take care of the node synchronization */
@@ -721,7 +727,7 @@ void ConverseExit(void){
 
   CmiFree(procState);
   CmiFree(_msgr_buf);
-  CmiFree(_recvArray); 
+  free(_recvArray); 
 #if (CMK_DEBUG_MODE || CMK_WEB_MODE || NODE_0_IS_CONVHOST)
   if (CmiMyPe() == 0){
     CmiPrintf("End of program\n");
@@ -742,25 +748,24 @@ void CmiAbort(const char * message){
 void *CmiGetNonLocal(){
   static int count=0;
   CmiState cs = CmiGetState();
-  void *msg;
+
+  void *msg = NULL;
   CmiIdleLock_checkMessage(&cs->idle);
   /* although it seems that lock is not needed, I found it crashes very often
      on mpi-smp without lock */
 
   AdvanceCommunications();
   
+  //int length = PCQueueLength(cs->recv);
+  //if(length != 0)
+  //printf("%d: {%d} PCQueue length = %d\n", CmiMyPe(), bgx_in_interrupt, length);
+  
   CmiLock(procState[cs->rank].recvLock);
+
+  //if(length > 0)
   msg =  PCQueuePop(cs->recv); 
   CmiUnlock(procState[cs->rank].recvLock);
 
-/*
-  if (msg) {
-    MACHSTATE2(3,"CmiGetNonLocal done on pe %d for queue %p", CmiMyPe(), cs->recv); }
-  else {
-    count++;
-    if (count%1000000==0) MACHSTATE2(3,"CmiGetNonLocal empty on pe %d for queue %p", CmiMyPe(), cs->recv);
-  }
-*/
 #if !CMK_SMP
   if (no_outstanding_sends) {
     SendMsgsUntil(0, 0);
@@ -768,6 +773,12 @@ void *CmiGetNonLocal(){
   
   if(!msg) {
     AdvanceCommunications();
+    
+    //int length = PCQueueLength(cs->recv);
+    //if(length != 0)
+    //    printf("%d: {%d} PCQueue length = %d\n", CmiMyPe(), bgx_in_interrupt, length);
+
+    //if(length > 0)
     return PCQueuePop(cs->recv);
   }
 #endif /* !CMK_SMP */
@@ -787,62 +798,68 @@ static void CmiSendSelf(char *msg){
     CdsFifo_Enqueue(CpvAccess(CmiLocalQueue),msg);
 }
 
-inline void machineSend(SMSG_LIST *msg_tmp){
 
-  ((CmiMsgHeaderBasic *)(msg_tmp->msg))->size = msg_tmp->size;
+inline void machineSend(SMSG_LIST *msg_tmp);
+
+#if CMK_PERSISTENT_COMM
+#include "persistent.C"
+#endif
+
+inline void machineSend(SMSG_LIST *msg_tmp) {
   
   CMI_MAGIC(msg_tmp->msg) = CHARM_MAGIC_NUMBER;
   CMI_SET_CHECKSUM(msg_tmp->msg, msg_tmp->size);
   CQdCreate(CpvAccess(cQdState), 1);
   /*
-  printf("------------------------------\n\nSender %d :", CmiMyPe());
+  printf("------------------------------\n\nSender %d Receiver %d size %d:", 
+	 CmiMyPe(), msg_tmp->destpe, msg_tmp->size);
   
   for(int count = 0; count < msg_tmp->size; count++) {
-    printf("%x", msg_tmp->msg[count]);
+    printf("%2x", msg_tmp->msg[count]);
   } 
   
   printf("------------------------------\n\n");
   */
+
   numPosted ++;
 
-  BGX_BeginCriticalSection();
-
-
   if(msg_tmp->destpe == CmiMyPe())
-     CmiAbort("Sending to self\n");
+    CmiAbort("Sending to self\n");
+  
+  //printf("%d : Sending message to %d of size %d\n", CmiMyPe(), msg_tmp->destpe, msg_tmp->size);
 
-  //Check if destination is the peer in the same node
-  if(vn_peer >= 0 && msg_tmp->destpe == vn_peer) {
-    msg_tmp->send_buf = 0;
-    
-    printf("%d : Sending vn message to %d of size %d\n", CmiMyPe(), vn_peer, msg_tmp->size);
-    
-    BLMPI_VNMode_Send(_msgr, &(msg_tmp->info), msg_tmp->msg, msg_tmp->size, 
-                      send_done,(void *)msg_tmp);
-    
-    BGX_EndCriticalSection();
-    return;
+#if CMK_PERSISTENT_COMM
+  if(msg_tmp->phs) {
+    if(machineSendPersistentMsg(msg_tmp))
+      return;
   }
+#endif
 
-  if(msg_tmp->size > EAGER_MESSAGE_SIZE) {
-    msg_tmp->send_buf = (char *) malloc (sizeof(BLMPI_Eager_Send_t));
-    BLMPI_Eager_Send_t *send = (BLMPI_Eager_Send_t *)(msg_tmp->send_buf);
-    BLMPI_Eager_Send(send, _msgr, &(msg_tmp->info), msg_tmp->msg, msg_tmp->size,
-		     msg_tmp->destpe, send_done,(void *)msg_tmp);
+  CmiAssert(msg_tmp->destpe >= 0 && msg_tmp->destpe < CmiNumPes());
+
+  if(msg_tmp->size < EAGER_MESSAGE_SIZE) {
+    //msg_tmp->send_buf = (char *) malloc (sizeof(BLMPI_Eager_Send_t));
+    msg_tmp->send_buf = (char *) CmiAlloc (sizeof(BLMPI_Eager_Send_t));    
+
+    BLMPI_Eager_Send_t *send = (BLMPI_Eager_Send_t *)
+      ALIGN_16(msg_tmp->send_buf);
+    BLMPI_Eager_Send(send, _msgr, &(msg_tmp->info), msg_tmp->msg, 
+		     msg_tmp->size, msg_tmp->destpe, send_done, 
+		     (void *)msg_tmp);
   }
   else {
     //printf("%d : Sending rzv message to %d of size %d\n", CmiMyPe(), msg_tmp->destpe, msg_tmp->size);
-    msg_tmp->send_buf = (char *) malloc (sizeof(BLMPI_Rzv_Send_t));
-    
+    //    msg_tmp->send_buf = (char *) malloc (sizeof(BLMPI_Rzv_Send_t));
+
+    msg_tmp->send_buf = (char *) CmiAlloc (sizeof(BLMPI_Rzv_Send_t));
+
     //CmiAssert((unsigned long)msg_tmp->send_buf % 16 == 0);
     //CmiAssert((unsigned long)msg_tmp % 16 == 0);
     
-    BLMPI_Rzv_Send_t *send = (BLMPI_Rzv_Send_t *)(msg_tmp->send_buf);
+    BLMPI_Rzv_Send_t *send = (BLMPI_Rzv_Send_t *)ALIGN_16(msg_tmp->send_buf);
     BLMPI_Rzv_Send(send, _msgr, &(msg_tmp->info), msg_tmp->msg, msg_tmp->size, 
-		   msg_tmp->destpe,send_done,(void *)msg_tmp);
+		   msg_tmp->destpe, send_done, (void *)msg_tmp);
   }
-
-  BGX_EndCriticalSection();
 }
 
 static inline void sendQueuedMessages() {
@@ -856,12 +873,15 @@ static inline void sendQueuedMessages() {
  * Send is synchronous, and free msg after posted
  */
 inline void  CmiGeneralFreeSend(int destPE, int size, char* msg){
+
+  ((CmiMsgHeaderBasic *)msg)->size = size;
+  
   CmiState cs = CmiGetState();
   if(destPE==cs->pe){
     CmiSendSelf(msg);
     return;
   }
-
+  
   SendMsgsUntil(maxMessages, maxBytes);
 
   sendQueuedMessages();
@@ -871,16 +891,26 @@ inline void  CmiGeneralFreeSend(int destPE, int size, char* msg){
   msg_tmp->destpe = destPE;
   msg_tmp->size = size;
   msg_tmp->msg = msg;
-  msg_tmp->next = NULL;
-  
+  msg_tmp->send_buf = NULL;
+
+#if CMK_PERSISTENT_COMM
+  msg_tmp->phs = phs;
+  msg_tmp->phscount = phscount;
+  msg_tmp->phsSize = phsSize;
+#endif
+
+  BGX_BeginCriticalSection();
+
   if(numPosted > request_max) {
     PCQueuePush(message_q, (char *)msg_tmp);
   }    
   else 
     machineSend(msg_tmp);    
-
+  
   msgQBytes += size;
   msgQueueLen++;
+  
+  BGX_EndCriticalSection();
 }
 
 void CmiSyncSendFn(int destPE, int size, char *msg){
@@ -900,7 +930,10 @@ void CmiSyncSendFn1(int destPE, int size, char *msg)
 {
   char *copymsg;
   copymsg = (char *)CmiAlloc(size);
-  memcpy(copymsg,msg,size);
+  memcpy(copymsg, msg, size);
+
+  //  asm volatile("sync" ::: "memory");
+
   CmiGeneralFreeSend(destPE,size,copymsg);
 }
 
@@ -910,10 +943,11 @@ void SendSpanningChildren(int size, char *msg)
   CmiState cs = CmiGetState();
   int startpe = CMI_BROADCAST_ROOT(msg)-1;
   int i;
+
   CmiAssert(startpe>=0 && startpe<_Cmi_numpes);
   int dist = cs->pe-startpe;
   if(dist<0) dist+=_Cmi_numpes;
-  for (i=1; i<=BROADCAST_SPANNING_FACTOR; i++) {
+  for (i=1; i <= BROADCAST_SPANNING_FACTOR; i++) {
     int p = BROADCAST_SPANNING_FACTOR*dist + i;
     if (p > _Cmi_numpes - 1) break;
     p += startpe;
@@ -921,6 +955,8 @@ void SendSpanningChildren(int size, char *msg)
     CmiAssert(p>=0 && p<_Cmi_numpes && p!=cs->pe);
     CmiSyncSendFn1(p, size, msg);
   }
+
+  //SendMsgsUntil(0,0);
 }
 
 /* send msg along the hypercube in broadcast. (Sameer) */
@@ -942,6 +978,8 @@ void SendHypercube(int size, char *msg)
     /*   CmiPrintf("p = %d, logp = %5.1f\n", p, logp);*/
     if(p < CmiNumPes()) {
       CMI_SET_CYCLE(msg, i + 1);
+
+      CmiAssert(p>=0 && p<_Cmi_numpes && p!=cs->pe);
       CmiSyncSendFn1(p, size, msg);
     }
   }
@@ -955,8 +993,18 @@ void CmiSyncBroadcastFn(int size, char *msg){
 }
 
 void CmiFreeBroadcastFn(int size, char *msg){
+  
+  //printf("%d: Calling Broadcast %d\n", CmiMyPe(), size);
+  /*
+  printf("------------------------------\n\nSender %d :", CmiMyPe());
+  
+  for(int count = 0; count < size; count++) {
+    printf("%2x", msg[count]);
+  } 
+  
+  printf("------------------------------\n\n");
+  */
 
-  //printf("Calling Broadcast %d\n", size);
 
   CmiState cs = CmiGetState();
 #if CMK_BROADCAST_SPANNING_TREE
@@ -969,12 +1017,16 @@ void CmiFreeBroadcastFn(int size, char *msg){
   CmiFree(msg);
 #else
   int i;
+
   for ( i=cs->pe+1; i<_Cmi_numpes; i++ ) 
     CmiSyncSendFn(i,size,msg);
+  
   for ( i=0; i<cs->pe; i++ ) 
     CmiSyncSendFn(i,size,msg);
+
   CmiFree(msg);
 #endif
+  //SendMsgsUntil(0,0);
 }
 
 void CmiSyncBroadcastAllFn(int size, char *msg){
@@ -986,13 +1038,13 @@ void CmiSyncBroadcastAllFn(int size, char *msg){
 
 void CmiFreeBroadcastAllFn(int size, char *msg){
   
-  //printf("Calling All Broadcast %d\n", size);
+  //printf("%d: Calling All Broadcast %d\n", CmiMyPe(), size);
 
   CmiState cs = CmiGetState();
 #if CMK_BROADCAST_SPANNING_TREE
+  CmiSyncSendFn(cs->pe,size,msg);
   CMI_SET_BROADCAST_ROOT(msg, cs->pe+1);
   SendSpanningChildren(size, msg);
-  CmiSyncSendFn(cs->pe,size,msg);
   CmiFree(msg);
 #elif CMK_BROADCAST_HYPERCUBE
   CmiSyncSendFn(cs->pe,size,msg);
@@ -1001,22 +1053,32 @@ void CmiFreeBroadcastAllFn(int size, char *msg){
   CmiFree(msg);
 #else
   int i ;
+
+  CmiSyncSendFn(CmiMyPe(), size, msg);
+  
   for ( i=0; i<_Cmi_numpes; i++ ) {
+    if(i== CmiMyPe())
+      continue;
+
     CmiSyncSendFn(i,size,msg);
   }
   CmiFree(msg);
 #endif
+
+  //SendMsgsUntil(0,0);
 }
 
 static inline void AdvanceCommunications(int max_out){
 
   BGX_BeginCriticalSection();
 
+  sendBroadcastMessages();
+
   while(msgQueueLen > maxMessages && msgQBytes > maxBytes){
     while(BGLML_Messager_advance(_msgr)>0) ;
     sendQueuedMessages();
   }
-
+  
   int target = outstanding_recvs - max_out;
   while(target > 0){
     while(BGLML_Messager_advance(_msgr)>0) ;
@@ -1024,10 +1086,10 @@ static inline void AdvanceCommunications(int max_out){
   }
   
   while(BGLML_Messager_advance(_msgr)>0);
-  
-  sendQueuedMessages();
-  sendBroadcastMessages();
 
+  sendBroadcastMessages();
+  sendQueuedMessages();
+  
 #if CMK_IMMEDIATE_MSG
   if(received_immediate)
     CmiHandleImmediate();
@@ -1042,11 +1104,13 @@ static inline void SendMsgsUntil(int targetm, int targetb){
 
   BGX_BeginCriticalSection();
 
+  sendBroadcastMessages();
+  
   while(msgQueueLen>targetm && msgQBytes > targetb){
     while(BGLML_Messager_advance(_msgr)>0) ;
     sendQueuedMessages();
   }
-
+  
   while(BGLML_Messager_advance(_msgr)>0) ;
   
   sendBroadcastMessages();
@@ -1054,19 +1118,13 @@ static inline void SendMsgsUntil(int targetm, int targetb){
   BGX_EndCriticalSection();
 }
 
-static int interrupts_enabled=0;
-
-void CmiNotifyIdle(){
-#if BGL_VERSION_CONTROLX
-  if(!interrupts_enabled) {
-    rts_install_torus_interrupt_handler(BGX_InterruptHandler);
-    rts_enable_torus_interrupts();  
-    
-    interrupts_enabled = 1;
-  }
-#endif
-  
+void CmiNotifyIdle(){  
   AdvanceCommunications();
+
+  CmiState cs = CmiGetStateN(pe);
+  //int length = PCQueueLength(cs->recv);
+  //if(length != 0)
+  //printf("%d: {%d} PCQueue length = %d\n", CmiMyPe(), bgx_in_interrupt, length);
 }
 
 static void CmiNotifyBeginIdle(CmiIdleState *s)
@@ -1158,25 +1216,37 @@ void CmiSyncListSendFn(int npes, int *pes, int size, char *msg){
 void CmiFreeListSendFn(int npes, int *pes, int size, char *msg) {
   CMI_SET_BROADCAST_ROOT(msg,0);
   
+  //printf("%d: In Free List Send Fn\n", CmiMyPe());
+
   //CmiBecomeImmediate(msg);
 
   int i;
-  for(i=0;i<npes;i++) {
-    if(pes[i] == CmiMyPe() || pes[i] == vn_peer) {
+  for(i=0; i<npes; i++) {
+    if(pes[i] == CmiMyPe())
       CmiSyncSend(pes[i], size, msg);
-    }
+  }
+  
+  for(i=0;i<npes;i++) {
+    if(pes[i] == CmiMyPe());
     else if(i < npes - 1){
       CmiReference(msg);
       CmiSyncSendAndFree(pes[i], size, msg);
+      //CmiSyncSend(pes[i], size, msg);
     }
+#if CMK_PERSISTENT_COMM
+    if(phs) 
+      phscount ++;
+#endif
   }
   
-  if (npes  && (pes[npes-1] != CmiMyPe() && pes[npes-1] != vn_peer))
+  if (npes  && (pes[npes-1] != CmiMyPe()))
     CmiSyncSendAndFree(pes[npes-1], size, msg);
   else 
     CmiFree(msg);
   
-  //SendMsgsUntil(0,0);
+  phscount = 0;
+  
+  //  SendMsgsUntil(0,0);
   SendMsgsUntil(maxMessages, maxBytes);
 }
 
@@ -1272,7 +1342,7 @@ void CmiMachineProgressImpl()
 {
   unsigned long long new_time = rts_get_timebase();
   
-  if(new_time < lastProgress + PROGRESS_PERIOD) {
+  if(new_time < lastProgress + progress_cycles) {
     lastProgress = new_time;
     return;
   }
@@ -1292,6 +1362,7 @@ void CmiMachineProgressImpl()
 /* Dummy implementation */
 extern "C" void CmiBarrier()
 {
-  BGLML_Torus_SimpleBarrier(_msgr);
+  //BGLML_Torus_SimpleBarrier(_msgr);
+  //BGLML_Tree_Barrier(_msgr, 1);
 }
 

@@ -18,6 +18,8 @@ fi
 
 BGL_BIN=$BGL_FLOOR/blrts-gnu/bin
 BGL_INC="-I$BGL_INSTALL/bglsys/include"
+#BGL_LIB="-L$BGL_INSTALL/bglsys/lib -L/gsa/watgsa/home/s/a/sameer77/bgx/new2/bglsw-install/blrts-gnu/powerpc-bgl-blrts-gnu/lib -lc"
+
 BGL_LIB="-L$BGL_INSTALL/bglsys/lib"
 
 # test if compiler binary present
