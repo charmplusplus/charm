@@ -243,10 +243,15 @@ void CentralLB::SendStats()
   }
 
 #if USE_LDB_SPANNING_TREE
-  if (CkMyPe() == cur_ld_balancer)
-    thisProxy[CkMyPe()].ReceiveStats(msg);
+  if(CkNumPes()>1024)
+  {
+    if (CkMyPe() == cur_ld_balancer)
+      thisProxy[CkMyPe()].ReceiveStats(msg);
+    else
+      thisProxy[CkMyPe()].ReceiveStatsViaTree(msg);
+  }
   else
-    thisProxy[CkMyPe()].ReceiveStatsViaTree(msg);
+    thisProxy[cur_ld_balancer].ReceiveStats(msg);
 #else    
   thisProxy[cur_ld_balancer].ReceiveStats(msg);
 #endif
@@ -392,7 +397,7 @@ void CentralLB::ReceiveStats(CkMarshalledCLBStatsMessage &msg)
 #else
       // store per processor data right away
       struct ProcStats &procStat = statsData->procs[pe];
-      procStat.pe = pe;
+      procStat.pe = pe;CkPrintf
       procStat.total_walltime = m->total_walltime;
       procStat.total_cputime = m->total_cputime;
       procStat.idletime = m->idletime;
@@ -426,9 +431,13 @@ void CentralLB::ReceiveStatsViaTree(CkMarshalledCLBStatsMessage &msg)
 	CmiAssert(CkMyPe() != 0);
 	bufMsg.add(msg);         // buffer messages
 	count_msgs++;
+	//CkPrintf("here %d\n", CkMyPe());
 	if (count_msgs == st.numChildren+1) {
 		if(st.parent == 0)
+		{
 			thisProxy[0].ReceiveStats(bufMsg);
+			//CkPrintf("from %d\n", CkMyPe());
+		}
 		else
 			thisProxy[st.parent].ReceiveStatsViaTree(bufMsg);
 		count_msgs = 0;
