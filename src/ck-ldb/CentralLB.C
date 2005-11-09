@@ -95,6 +95,7 @@ void CentralLB::initLB(const CkLBOptions &opt)
   cur_ld_balancer = 0;
   lbdone = 0;
   count_msgs=0;
+  statsMsg = NULL;
 
   if (_lb_args.statsOn()) theLbdb->CollectStatsOn();
 
@@ -167,6 +168,9 @@ void CentralLB::ProcessAtSync()
     start_lb_time = CkWallTimer();
   }
 
+  // build message
+  BuildStatsMsg();
+
 #if USE_REDUCTION
     // reduction to get total number of objects and comm
     // so that processor 0 can pre-allocate load balancing database
@@ -198,17 +202,14 @@ void CentralLB::ReceiveCounts(CkReductionMsg  *msg)
   statsData->to_proc.resize(n_objs);
   statsData->commData.resize(n_comm);
 
-
-	DEBUGF(("[%d] ReceiveCounts\n",CkMyPe()));
+  DEBUGF(("[%d] ReceiveCounts\n",CkMyPe()));
 	
     // broadcast call to let everybody start to send stats
   thisProxy.SendStats();
 }
 
-// called on every processor
-void CentralLB::SendStats()
+void CentralLB::BuildStatsMsg()
 {
-#if CMK_LBDB_ON
   // build and send stats
   const int osz = theLbdb->GetObjDataSz();
   const int csz = theLbdb->GetCommDataSz();
@@ -241,19 +242,29 @@ void CentralLB::SendStats()
     msg->next_lb = LBDatabaseObj()->new_lbbalancer();
   }
 
+  CmiAssert(statsMsg == NULL);
+  statsMsg = msg;
+}
+
+// called on every processor
+void CentralLB::SendStats()
+{
+#if CMK_LBDB_ON
+  CmiAssert(statsMsg != NULL);
+
 #if USE_LDB_SPANNING_TREE
   if(CkNumPes()>1024)
   {
     if (CkMyPe() == cur_ld_balancer)
-      thisProxy[CkMyPe()].ReceiveStats(msg);
+      thisProxy[CkMyPe()].ReceiveStats(statsMsg);
     else
-      thisProxy[CkMyPe()].ReceiveStatsViaTree(msg);
+      thisProxy[CkMyPe()].ReceiveStatsViaTree(statsMsg);
   }
   else
-    thisProxy[cur_ld_balancer].ReceiveStats(msg);
-#else    
-  thisProxy[cur_ld_balancer].ReceiveStats(msg);
 #endif
+  thisProxy[cur_ld_balancer].ReceiveStats(statsMsg);
+
+  statsMsg = NULL;
 
 #ifdef __BLUEGENE__
   BgEndStreaming();
@@ -358,11 +369,13 @@ void CentralLB::depositData(CLBStatsMsg *m)
       statsData->objData[nobj] = m->objData[i];
       if (m->objData[i].migratable) nmigobj++;
       nobj++;
+      CmiAssert(nobj <= statsData->objData.capacity());
   }
   int &n_comm = statsData->n_comm;
   for (i=0; i<m->n_comm; i++) {
       statsData->commData[n_comm] = m->commData[i];
       n_comm++;
+      CmiAssert(n_comm <= statsData->commData.capacity());
   }
   delete m;
 }
@@ -1048,11 +1061,13 @@ CLBStatsMsg::CLBStatsMsg(int osz, int csz) {
   objData = new LDObjData[osz];
   commData = new LDCommData[csz];
   avail_vector = NULL;
+  n_objs = osz;
+  n_comm = csz;
 }
 
 CLBStatsMsg::~CLBStatsMsg() {
-  delete [] objData;
-  delete [] commData;
+  if (n_objs) delete [] objData;
+  if (n_comm) delete [] commData;
   if (avail_vector) delete [] avail_vector;
 }
 

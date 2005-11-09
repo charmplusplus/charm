@@ -69,6 +69,7 @@ class SpanningTree
 class CentralLB : public BaseLB
 {
 private:
+  CLBStatsMsg *statsMsg;
   int count_msgs;
   void initLB(const CkLBOptions &);
 public:
@@ -240,6 +241,7 @@ private:
 
   FutureModel *predicted_model;
 
+  void BuildStatsMsg();
   void buildStats();
 
 public:
