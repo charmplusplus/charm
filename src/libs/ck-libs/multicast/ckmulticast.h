@@ -13,6 +13,8 @@ class reductionInfo;
 typedef mCastEntry * mCastEntryPtr;
 PUPbytes(mCastEntryPtr);
 
+#define MAXMCASTCHILDREN 2
+
 #include "CkMulticast.decl.h"
 
 #if 0
@@ -60,20 +62,23 @@ class CkMulticastMgr: public CkDelegateMgr {
       void pup(PUP::er &p){ p|idx; p|pe; }
     };
     typedef CkVec<IndexPos>  arrayIndexPosList;
+    int factor;           // spanning tree factor, can be negative
 
   public:
-    CkMulticastMgr()  { }
+    CkMulticastMgr()  { factor = MAXMCASTCHILDREN; }
+    CkMulticastMgr(int f)  { factor = f; }
     int useDefCtor(void){ return 1; }
+      // user interface
     void setSection(CkSectionInfo &id, CkArrayID aid, CkArrayIndexMax *, int n);
     void setSection(CkSectionInfo &id);
     void setSection(CProxySection_ArrayElement &proxy);
-    void resetSection(CProxySection_ArrayElement &proxy);
+    void resetSection(CProxySection_ArrayElement &proxy);  // called by root
     virtual void initDelegateMgr(CProxy *proxy);
     void retrieveCookie(CkSectionInfo s, CkSectionInfo srcInfo);
     void recvCookieInfo(CkSectionInfo s, int red);
     void ArraySectionSend(CkDelegateData *pd,int ep,void *m, CkArrayID a, CkSectionID &s, int opts);
     void SimpleSend(int ep,void *m, CkArrayID a, CkSectionID &sid, int opts);
-    // entry
+      // entry
     void teardown(CkSectionInfo s);  /**< entry: tear down the tree */
     void freeup(CkSectionInfo s);    /**< entry: free old tree */
     void setup(multicastSetupMsg *);  
@@ -92,6 +97,7 @@ class CkMulticastMgr: public CkDelegateMgr {
     // entry
     void recvRedMsg(CkReductionMsg *msg);
     void updateRedNo(mCastEntryPtr, int red);
+    void retire(CkSectionInfo s, CkSectionInfo root);  /**< entry: tear down the tree */
   public:
 //    typedef CkMcastReductionMsg *(*reducerFn)(int nMsg,CkMcastReductionMsg **msgs);
   private:
@@ -101,7 +107,6 @@ class CkMulticastMgr: public CkDelegateMgr {
     enum {MAXREDUCERS=256};
 //    static CkReduction::reducerFn reducerTable[MAXREDUCERS];
     void releaseFutureReduceMsgs(mCastEntryPtr entry);
-    void releaseBufferedReduceMsgs(mCastEntryPtr entry);
     inline CkReductionMsg *buildContributeMsg(int dataSize,void *data,CkReduction::reducerType type, CkSectionInfo &id, CkCallback &cb);
     void reduceFragment (int index, CkSectionInfo& id,
                          mCastEntry* entry, reductionInfo& redInfo,
@@ -109,6 +114,7 @@ class CkMulticastMgr: public CkDelegateMgr {
     CkReductionMsg* combineFrags (CkSectionInfo& id,
                                   mCastEntry* entry,
                                   reductionInfo& redInfo);
+    void releaseBufferedReduceMsgs(mCastEntryPtr entry);
 };
 
 
