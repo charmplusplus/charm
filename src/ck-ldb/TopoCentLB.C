@@ -55,7 +55,8 @@ TopoCentLB::~TopoCentLB(){
 	if(topo) delete topo;
 }
 
-
+/*This routine partitions the task graph minimizing the communication and balancing the object load on all partitions*/
+/*It uses METIS library to accomplish that*/
 void TopoCentLB::computePartitions(CentralLB::LDStats *stats,int count,int *newmap)
 {
 	
@@ -74,6 +75,7 @@ void TopoCentLB::computePartitions(CentralLB::LDStats *stats,int count,int *newm
     origmap[i] = 0;
   }
 
+  //Prepare compute loads for METIS library
   for (i=0; i<stats->n_objs; i++) {
     LDObjData &odata = stats->objData[i];
     if (!odata.migratable) 
@@ -100,8 +102,6 @@ void TopoCentLB::computePartitions(CentralLB::LDStats *stats,int count,int *newm
 			totalwt+=objwt[i];
   }
 	
-	//CkPrintf("\nmax obj wt :%d \n totalwt before :%d \n\n",maxobj,totalwt);
-	
   int **comm = new int*[numobjs];
   for (i=0; i<numobjs; i++) {
     comm[i] = new int[numobjs];
@@ -110,6 +110,7 @@ void TopoCentLB::computePartitions(CentralLB::LDStats *stats,int count,int *newm
     }
   }
 
+  //Prepare communication for METIS library
   const int csz = stats->n_comm;
   for(i=0; i<csz; i++) {
       LDCommData &cdata = stats->commData[i];
@@ -120,12 +121,8 @@ void TopoCentLB::computePartitions(CentralLB::LDStats *stats,int count,int *newm
       	int recverID = stats->getHash(cdata.receiver.get_destObj());
       	CmiAssert(senderID < numobjs);
       	CmiAssert(recverID < numobjs);
-      	//comm[senderID][recverID] += (int)(cdata.messages*alpha + cdata.bytes*beta);
-      	//comm[recverID][senderID] += (int)(cdata.messages*alpha + cdata.bytes*beta);
-    		//CkPrintf("in compute partitions...%d\n",comm[senderID][recverID]);
 				comm[senderID][recverID] += cdata.messages;
       	comm[recverID][senderID] += cdata.messages;
-
 				//Use bytes or messages -- do i include messages for objlist too...??
 			}
 			else if (cdata.receiver.get_type() == LD_OBJLIST_MSG) {
@@ -172,11 +169,7 @@ void TopoCentLB::computePartitions(CentralLB::LDStats *stats,int count,int *newm
     xadj[i+1] = count4all;
   }
 
-  /*if (_lb_args.debug() >= 2) {
-  CkPrintf("Pre-LDB Statistics step %d\n", step());
-  printStats(count, numobjs, objtime, comm, origmap);
-  }*/
-
+  //Call METIS routine
   int wgtflag = 3; // Weights both on vertices and edges
   int numflag = 0; // C Style numbering
   int options[5];
@@ -205,18 +198,28 @@ void TopoCentLB::computePartitions(CentralLB::LDStats *stats,int count,int *newm
 				 &wgtflag, &numflag, &count, options, 
 				 &edgecut, newmap);
 		*/
-   //CkPrintf("before calling metis.\n");
 	 	METIS_PartGraphRecursive(&numobjs, xadj, adjncy, objwt, edgewt,
                                  &wgtflag, &numflag, &count, options,
                                  &edgecut, newmap);
-   	 //CkPrintf("after calling Metis function.\n");
   }
 	 
-  /*if (_lb_args.debug() >= 2) {
-  	CkPrintf("Post-LDB Statistics step %d\n", step());
-  	printStats(count, numobjs, objtime, comm, newmap);
-  }*/
+ 
+  //Debugging code: Checking load on each partition
+  if(_lb_args.debug() >=2){
+	  int total=0;
+	  int *chkwt = new int[count];
+	  for(i=0;i<count;i++)
+		  chkwt[i]=0;
+	  for(i=0;i<numobjs;i++){
+	  	chkwt[newmap[i]] += objwt[i];
+		  total += objwt[i];
+	  }
+	  for(i=0;i<count;i++)
+		  CkPrintf("%d -- %d\n",i,chkwt[i]);
+	  CkPrintf("Totalwt of all partitions after call to METIS:%d, Avg is %d\n",total,total/count);
+  }
 
+  //Clean up all the variables allocated in this routine
   for(i=0;i<numobjs;i++)
     delete[] comm[i];
   delete[] comm;
@@ -226,38 +229,6 @@ void TopoCentLB::computePartitions(CentralLB::LDStats *stats,int count,int *newm
   delete[] objwt;
   delete[] edgewt;
 	delete[] handles;
-
-	//CkPrintf("chking wts on each partition...\n");
-
-	/*int avg=0;
-	int *chkwt = new int[count];
-	for(i=0;i<count;i++)
-		chkwt[i]=0;
-	//totalwt=0;
-	for(i=0;i<numobjs;i++){
-		chkwt[newmap[i]] += objwt[i];
-		avg += objwt[i];
-		
-	}
-	
-	
-	for(i=0;i<count;i++)
-		CkPrintf("%d -- %d\n",i,chkwt[i]);
-	
-	//CkPrintf("totalwt after:%d avg is %d\n",avg,avg/count);
-*/
-  /*if(!sameMapFlag) {
-    for(i=0; i<numobjs; i++) {
-      if(origmap[i] != newmap[i]) {
-				CmiAssert(stats->from_proc[i] == origmap[i]);
-				///Dont assign....wait........
-				stats->to_proc[i] =  newmap[i];
-				if (_lb_args.debug() >= 3)
-          CkPrintf("[%d] Obj %d migrating from %d to %d\n", CkMyPe(),i,stats->from_proc[i],stats->to_proc[i]);
-      }
-    }
-  }*/
-
   delete[] origmap;
 
 }
@@ -289,12 +260,11 @@ void TopoCentLB::Heapify(HeapNode *heap, int node, int heapSize)
   int right = 2*node+2;
   int xchange;
 	
-  //heap[left].load > heap[node].load)
   if (left < heapSize && (heap[left].key > heap[node].key))
     xchange = left;
   else 
 		xchange = node;
-  //heap[right].load > heap[xchange].load) 
+  
   if (right < heapSize && (heap[right].key > heap[xchange].key))
     xchange = right;
 
@@ -332,7 +302,6 @@ void TopoCentLB :: increaseKey(HeapNode *heap,int i,double wt){
 	int val;
 	if(wt != -1.00){
 		#ifdef MAX_EDGE
-			//CkPrintf("me here...\n");
 			if(wt>heap[i].key)
 				heap[i].key = wt;
 		#else
@@ -353,22 +322,19 @@ void TopoCentLB :: increaseKey(HeapNode *heap,int i,double wt){
 	}
 }
 
+/*This routine implements the algorithm used to produce the partition-processor mapping*/
+/*The algorithm uses an idea similar to the standard MST algorithm*/
 void TopoCentLB :: calculateMST(PartGraph *partgraph,LBTopology *topo,int *proc_mapping,int max_comm_part){
 
-	//Edge **markedEdges;
-	//int *parent;
 	int *inHeap;
 	double *keys;
 	int count = partgraph->n_nodes;
 	int i=0,j=0;
-	
-	//parent = new int[partgraph->n_nodes];
+
+  //Arrays needed for keeping information
 	inHeap = new int[partgraph->n_nodes];
 	keys = new double[partgraph->n_nodes];
 
-	//int **hopCount;
-	//int **topoGraph;
-	//int *topoDegree;
 	int *assigned_procs = new int[count];
 
 	hopCount = new double*[count];
@@ -380,11 +346,10 @@ void TopoCentLB :: calculateMST(PartGraph *partgraph,LBTopology *topo,int *proc_
 			hopCount[i][j] = 0;
 	}
 
-	//CkPrintf("getting hopcount\n");
-	//double start=CmiWallTimer();
+  //Call a topology routine to fill up hopCount
 	topo->get_pairwise_hop_count(hopCount);
-	//CkPrintf("after getting hopcount:%lf\n",(CmiWallTimer()-start));
-	int max_neighbors = topo->max_neighbors();
+	
+  int max_neighbors = topo->max_neighbors();
 	
 	HeapNode *heap = new HeapNode[partgraph->n_nodes];
 	heapMapping = new int[partgraph->n_nodes];
@@ -395,13 +360,8 @@ void TopoCentLB :: calculateMST(PartGraph *partgraph,LBTopology *topo,int *proc_
 		heap[i].key = 0.00;
 		heap[i].node = i;
 		keys[i] = 0.00;
-		//parent[i] = -1;
 		inHeap[i] = 1;
 		heapMapping[i]=i;
-		/*if(i==0){ //Take 0 as root
-			heap[0].key = 1.00;
-			keys[0] = 0;
-		}*/
 	}
 
 	//Assign the max comm partition first
@@ -416,11 +376,11 @@ void TopoCentLB :: calculateMST(PartGraph *partgraph,LBTopology *topo,int *proc_
 	//srand(count);
 
 	while(heapSize > 0){
+
+    /****Phase1: Extracting appropriate partition from heap****/
+
 		HeapNode max = extractMax(heap,&heapSize);
 		inHeap[max.node] = 0;
-
-		//for(j=0;j<heapSize;j++)
-			//heapMapping[heap[j].node]=j;
 
 		for(i=0;i<partgraph->n_nodes;i++){
 			commParts[i]=-1;
@@ -428,13 +388,15 @@ void TopoCentLB :: calculateMST(PartGraph *partgraph,LBTopology *topo,int *proc_
 			if(wt == 0)
 				continue;
 			if(inHeap[i]){
-				//parent[i] = max.node;
 			#ifdef MAX_EDGE
 				if(wt>keys[i])
 					keys[i]=wt;
 			#else
 				keys[i] += wt;
 			#endif
+        /*This part has been COMMENTED out for optimizing the code: we handle the updation using heapMapping*/
+        /*array instead of searching for node in the heap everytime*/
+
 				//Update in the heap too
 				//First, find where this node is..in the heap
 				/*for(j=0;j<heapSize;j++)
@@ -445,8 +407,11 @@ void TopoCentLB :: calculateMST(PartGraph *partgraph,LBTopology *topo,int *proc_
 				increaseKey(heap,heapMapping[i],wt);
 			}
 		}
+		 
+    /*Phase2: ASSIGNING partition to processor*/
 		
-		if(heapSize == partgraph->n_nodes-1){ //For now, assign max comm partition to 0th proc in the topology
+    //Special case
+		if(heapSize == partgraph->n_nodes-1){ //Assign max comm partition to 0th proc in the topology
 			proc_mapping[max.node]=0;
 			assigned_procs[0]=1;
 			continue;
@@ -470,6 +435,7 @@ void TopoCentLB :: calculateMST(PartGraph *partgraph,LBTopology *topo,int *proc_
 			}
 		}
 
+    //Optimized the loop by commenting out the get_hop_count code and getting all the hop counts initially
 		for(m=0;m<count;m++){
 			if(!assigned_procs[m]){
 				cost=0;
@@ -477,7 +443,6 @@ void TopoCentLB :: calculateMST(PartGraph *partgraph,LBTopology *topo,int *proc_
 					//if(!hopCount[proc_mapping[commParts[p]]][m])
 						//hopCount[proc_mapping[commParts[p]]][m]=topo->get_hop_count(proc_mapping[commParts[p]],m);
 					cost += hopCount[proc_mapping[commParts[p]]][m]*partgraph->edges[commParts[p]][max.node];
-					//CkPrintf("hop count:%d\n",hopCount[proc_mapping[commParts[p]]][pot_proc]);
 				}
 				if(min_cost==-1 || cost<min_cost){
 					min_cost=cost;
@@ -507,10 +472,10 @@ void TopoCentLB :: work(CentralLB::LDStats *stats,int count)
   int i,j;
 	LDObjData *odata;
 	
-	//if (_lb_args.debug() >= 2) {
+	if (_lb_args.debug() >= 2) {
     CkPrintf("In TopoCentLB Strategy...\n");
-  //}
-	//double start = CmiWallTimer();
+  }
+  
   // Make sure that there is at least one available processor.
   for (proc = 0; proc < count; proc++) {
     if (stats->procs[proc].available) {
@@ -535,18 +500,19 @@ void TopoCentLB :: work(CentralLB::LDStats *stats,int count)
       newmap[i]=stats->from_proc[i];
     }
 	}
-	
-	/*for(i=0;i<stats->n_objs;i++)
-		CkPrintf(" %d,%d ",i,newmap[i]);
-	*/
+
+  //Debugging Code
+  if(_lb_args.debug() >=2){
+	  CkPrintf("Map obtained from partitioning:\n");
+    for(i=0;i<stats->n_objs;i++)
+		  CkPrintf(" %d,%d ",i,newmap[i]);
+  }
+
 	int max_objs = findMaxObjs(newmap,stats->n_objs,count);
-	
-	//Check to see if edgecut contains the reqd. no. of edges
 	
 	partgraph = new PartGraph(count,max_objs);
 
 	//Fill up the partition graph - first fill the nodes and then, the edges
-
 
 	for(i=0;i<stats->n_objs;i++)
 	{
@@ -562,7 +528,9 @@ void TopoCentLB :: work(CentralLB::LDStats *stats,int count)
 	int max_comm_part=-1;
 	
 	double max_comm=0;
-	
+
+  //Try putting random amount of communication on the partition graph edges to see if things work fine
+  //This also checks the running time of the algorithm since number of edges is high than in a practical scenario
 	#ifdef RAND_COMM
 	for(i=0;i<count;i++){
 		for(j=i+1;j<count;j++){
@@ -589,13 +557,11 @@ void TopoCentLB :: work(CentralLB::LDStats *stats,int count)
 		}
 	}
 	#else
+  //Adding communication to the partition graph edges
 	for(i=0;i<stats->n_comm;i++)
 	{
 		//DO I consider other comm too....i.e. to or from a processor
-
 		LDCommData &cdata = stats->commData[i];
-		//if(cdata.from_proc() || cdata.receiver.get_type() != LD_OBJ_MSG)
-    	//continue;
 		if(!cdata.from_proc() && cdata.receiver.get_type() == LD_OBJ_MSG){
     	int senderID = stats->getHash(cdata.sender);
     	int recverID = stats->getHash(cdata.receiver.get_destObj());
@@ -615,7 +581,8 @@ void TopoCentLB :: work(CentralLB::LDStats *stats,int count)
 			
 			partgraph->nodes[newmap[senderID]].comm += cdata.bytes;
 			partgraph->nodes[newmap[recverID]].comm += cdata.bytes;
-			
+
+      //Keeping track of maximum communiacting partition
 			if(partgraph->nodes[newmap[senderID]].comm > max_comm){
 				max_comm = partgraph->nodes[newmap[senderID]].comm;
 				max_comm_part = newmap[senderID];
@@ -624,21 +591,13 @@ void TopoCentLB :: work(CentralLB::LDStats *stats,int count)
 				max_comm = partgraph->nodes[newmap[recverID]].comm;
 				max_comm_part = newmap[recverID];
 			}
-
-			//partgraph->edges[newmap[recverID]][newmap[senderID]] += 1000*(cdata.messages*alpha + cdata.bytes*beta);
-			//bytesComm[newmap[senderID]][newmap[recverID]] += cdata.bytes;
-			//bytesComm[newmap[recverID]][newmap[senderID]] += cdata.bytes;
-
 		}
 		else if(cdata.receiver.get_type() == LD_OBJLIST_MSG) {
-    	//CkPrintf("\nin obj list cal...\n\n");
 			int nobjs;
     	LDObjKey *objs = cdata.receiver.get_destObjs(nobjs);
       int senderID = stats->getHash(cdata.sender);
-      //addedComm = new int[count];
 			for(j=0;j<count;j++)
 				addedComm[j]=0;
-			//CkPrintf("in obj list loop...\n");
 			for (j=0; j<nobjs; j++) {
       	int recverID = stats->getHash(objs[j]);
         if((senderID == -1)||(recverID == -1))
@@ -648,13 +607,12 @@ void TopoCentLB :: work(CentralLB::LDStats *stats,int count)
 				if(newmap[senderID]==newmap[recverID])
 					continue;
 	
-				//CkPrintf("from %d to %d\n",newmap[senderID],newmap[recverID]);
 				if(partgraph->edges[newmap[senderID]][newmap[recverID]] == 0){
-					//CkPrintf("sender:%d recver:%d\n",newmap[senderID],newmap[recverID]);
 					partgraph->nodes[newmap[senderID]].degree++;
 					partgraph->nodes[newmap[recverID]].degree++;
 				}
-		
+
+        //Communication added only once for a message sent to many objects on a single processor
 				if(!addedComm[newmap[recverID]]){
 					partgraph->edges[newmap[senderID]][newmap[recverID]] += cdata.bytes;
 					partgraph->edges[newmap[recverID]][newmap[senderID]] += cdata.bytes;
@@ -670,14 +628,11 @@ void TopoCentLB :: work(CentralLB::LDStats *stats,int count)
 						max_comm = partgraph->nodes[newmap[recverID]].comm;
 						max_comm_part = newmap[recverID];
 					}
-
 					//bytesComm[newmap[senderID]][newmap[recverID]] += cdata.bytes;
 					//bytesComm[newmap[recverID]][newmap[senderID]] += cdata.bytes;
 					addedComm[newmap[recverID]]=1;
 				}
       }
-			//CkPrintf("outside loop..\n");
-    	//delete [] addedComm;
 		}
 
 	}
@@ -692,18 +647,17 @@ void TopoCentLB :: work(CentralLB::LDStats *stats,int count)
 	int *neigh;
 	int num_neigh=0;
 
+  //Parsing the command line input for getting the processor topology
 	char *lbcopy = strdup(_lbtopo);
- 	char *ptr = strchr(lbcopy, ':');
-  if (ptr!=NULL){
-  	ptr = strtok(lbcopy, ":");
-		//CkPrintf("token:%s\n",ptr);
-	}
+  char *ptr = strchr(lbcopy, ':');
+  if (ptr!=NULL)
+    ptr = strtok(lbcopy, ":");
 	else
 		ptr=lbcopy;
 
 	topofn = LBTopoLookup(ptr);
   if (topofn == NULL) {
-  	char str[1024];
+    char str[1024];
     CmiPrintf("TopoCentLB> Fatal error: Unknown topology: %s. Choose from:\n", ptr);
     printoutTopo();
     sprintf(str, "TopoCentLB> Fatal error: Unknown topology: %s", ptr);
@@ -712,23 +666,23 @@ void TopoCentLB :: work(CentralLB::LDStats *stats,int count)
   
 	topo = topofn(count);
 
-	//double fourth = CmiWallTimer();
+  //Call the core routine to produce the partition processor mapping
 	calculateMST(partgraph,topo,proc_mapping,max_comm_part);
 	//Returned partition graph is a Maximum Spanning Tree -- converted in above function itself
 
-	//Construct the Topology Graph
-	
-	/*CkPrintf("part,proc mapping..\n");
-	for(i=0;i<count;i++)
-		CkPrintf("%d,%d len:%d\n",i,proc_mapping[i],(partgraph->nodes[i]).num_objs);
-		*/
+  //Debugging code: Result of mapping partition graph onto processor graph
+	if (_lb_args.debug()>1) {
+	  CkPrintf("Resultant mapping..(partition,processor)\n");
+	  for(i=0;i<count;i++)
+		  CkPrintf("%d,%d\n",i,proc_mapping[i]);
+  }
+
+  //Store the result in the load balancing database
 	int pe;
 	PartGraph::Node* n;
 	for(i=0;i<count;i++){
 		pe = proc_mapping[i];
-		//CkPrintf("%d %d\n",i,pe);
 		n = &partgraph->nodes[i];
-		//CkPrintf("here..%d,first object:%d\n",n->num_objs,n->obj_list[0]);
 		for(j=0;j<n->num_objs;j++){
 			stats->to_proc[n->obj_list[j]] = pe;
 			if (_lb_args.debug()>1) 
