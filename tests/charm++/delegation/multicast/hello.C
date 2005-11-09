@@ -11,7 +11,7 @@ CProxySection_Hello *mcast;
 int nElements;			// readonly
 int sectionSize;		// readonly
 
-#define SECTIONSIZE  5
+#define SECTIONSIZE  6
 #define REDUCE_TIME  100
 
 void client(CkSectionInfo sid, void *param, int dataSize, void *data);
@@ -53,7 +53,7 @@ public:
 
     arr = CProxy_Hello::ckNew(nElements);
 
-    mCastGrpId = CProxy_CkMulticastMgr::ckNew();
+    mCastGrpId = CProxy_CkMulticastMgr::ckNew(3);   // new factor
 
     arr[0].start();
 
@@ -87,8 +87,10 @@ public:
 
   Hello(CkMigrateMessage *m) {}
 
+    // only on index 0
   void start()
   {
+    CkAssert(thisIndex == 0);
 CmiPrintf("start %d elements\n", nElements);
     CkMulticastMgr *mg = CProxy_CkMulticastMgr(mCastGrpId).ckLocalBranch();
 
@@ -164,7 +166,7 @@ CmiPrintf("start %d elements\n", nElements);
 #if 0
       CkMulticastMgr *mg = CProxy_CkMulticastMgr(mCastGrpId).ckLocalBranch();
       if (cnt->reductionNo % 32 == 0)
-        mg->rebuild(mcp.ckGetSectionCookie());
+        mg->rebuild(mcp.ckGetSectionInfo());
 #endif
   
       if (cnt.reductionNo%3 == 0) {
@@ -207,6 +209,14 @@ CmiPrintf("start %d elements\n", nElements);
     p(init);
     p|cnt;
     p|mcp;
+#if 1
+    if (p.isUnpacking() && thisIndex == 0) {
+      CkMulticastMgr *mg = CProxy_CkMulticastMgr(mCastGrpId).ckLocalBranch();
+      mg->resetSection(mcp);
+      CkCallback *cb = new CkCallback(CkIndex_Hello::cb_client(NULL), CkArrayIndex1D(0), thisProxy);
+      mg->setReductionClient(mcp, cb);
+    }
+#endif
   }
 };
 
@@ -241,7 +251,7 @@ void client(CkSectionInfo sid, void *param, int dataSize, void *data)
   else {
     CkMulticastMgr *mg = CProxy_CkMulticastMgr(mCastGrpId).ckLocalBranch();
     if (c->reductionNo % 32 == 0)
-    mg->rebuild(mcp.ckGetSectionCookie());
+    mg->rebuild(mcp.ckGetSectionInfo());
 
     if (c->reductionNo%3 == 0) {
     HiMsg *hiMsg = new (1, 0) HiMsg;
