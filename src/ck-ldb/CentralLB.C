@@ -58,7 +58,6 @@ void CentralLB::staticAtSync(void* data)
 void CentralLB::initLB(const CkLBOptions &opt)
 {
 #if CMK_LBDB_ON
-  count_msgs=0;
   lbname = "CentralLB";
   thisProxy = CProxy_CentralLB(thisgroup);
   //  CkPrintf("Construct in %d\n",CkMyPe());
@@ -95,7 +94,7 @@ void CentralLB::initLB(const CkLBOptions &opt)
   future_migrates_expected = -1;
   cur_ld_balancer = 0;
   lbdone = 0;
-  int num_proc = CkNumPes();
+  count_msgs=0;
 
   if (_lb_args.statsOn()) theLbdb->CollectStatsOn();
 

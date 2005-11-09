@@ -40,7 +40,11 @@ private:
   int _lb_percentMovesAllowed; //Specifies restriction on num of chares to be moved(as a percentage of total number of chares). Used by RefineKLB
 public:
   CkLBArgs() {
+#if CMK_BLUEGENE_CHARM
+    _autoLbPeriod = 0.02;       // bigsim needs it to be faster (lb may hang)
+#else
     _autoLbPeriod = 0.5;	// 0.5 second default
+#endif
     _lb_debug = _lb_ignoreBgLoad = _lb_syncResume = _lb_useCpuTime = 0;
     _lb_printsumamry = _lb_migObjOnly = 0;
     _lb_statson = _lb_traceComm = 1;
