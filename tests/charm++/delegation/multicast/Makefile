@@ -10,10 +10,10 @@ hello.decl.h hello.def.h : hello.ci
 	$(CHARMC) hello.ci
 
 test: hello
-	./charmrun +p2 ./hello 10
+	./charmrun +p3 ./hello 10
 
 bgtest: hello
-	./charmrun +p2 ./hello 10 +x1 +y1 +z2
+	./charmrun +p3 ./hello 10 +x1 +y1 +z3
 
 clean:
 	rm -f conv-host *.o charmrun
