@@ -24,7 +24,7 @@ Date: 04/19/2005
 #define EPSILON  -0.001
 
 #define _lb_debug_on 0
-#define _lb_debug2_on 1
+#define _lb_debug2_on 0
 #define _make_new_grouping_ 0
 #define _FASTER_
 #define _DIJKSTRA_LIKE_ 0
@@ -302,6 +302,11 @@ void TopoLB::initDataStructures(CentralLB::LDStats *stats,int count,int *newmap)
     CkPrintf("Before initing dist\n");
  
   topo->get_pairwise_hop_count(dist);
+  /*for(i=0;i<count;i++){
+   for(int j=0;j<count;j++)
+    CkPrintf("%.0lf ",dist[i][j]);
+   CkPrintf("\n");
+  }*/
   for(i=0;i<count;i++)
   {
     double totaldist=0;
@@ -724,7 +729,14 @@ void TopoLB :: work(CentralLB::LDStats *stats,int count)
 
   /**************Initialize Topology ****************************/
   LBtopoFn topofn;
-  topofn = LBTopoLookup(_lbtopo);
+  char *lbcopy = strdup(_lbtopo);
+  char *ptr = strchr(lbcopy, ':');
+  if (ptr!=NULL)
+    ptr = strtok(lbcopy, ":");
+	else
+		ptr=lbcopy;
+
+  topofn = LBTopoLookup(ptr);
   if (topofn == NULL) 
   {
   	char str[1024];
