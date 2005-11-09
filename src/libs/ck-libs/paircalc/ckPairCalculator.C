@@ -200,13 +200,13 @@ PairCalculator::pup(PUP::er &p)
 
   }
   if(existsLeft)
-    p((void*) inDataLeft, numExpected * N * 2* sizeof(double));
+    p((char*) inDataLeft, numExpected * N * 2* sizeof(double));
   if(existsRight)
-    p((void*) inDataRight, numExpected* N * 2* sizeof(double));
+    p((char*) inDataRight, numExpected* N * 2* sizeof(double));
   if(existsNew)
-    p((void*) newData, newelems* sizeof(complex));
+    p((char*) newData, newelems* sizeof(complex));
   if(existsOut)
-    p((void*) outData, grainSize*grainSize* sizeof(double));
+    p((char*) outData, grainSize*grainSize* sizeof(double));
 
 #ifdef _PAIRCALC_DEBUG_
   if (p.isUnpacking())

@@ -155,8 +155,9 @@ void pup(PUP::er &p){
 #ifdef _PAIRCALC_DEBUG_
   CkPrintf("PairCalcReducer on %d pupping\n",CkMyPe());
 #endif
-    p(localElements,2);
-    p(numRegistered,2);
+  p|localElements[0];
+  p|localElements[1];
+  p(numRegistered,2);
     p|acceptCount;
     p|reduction_elementCount;
     p|isAllReduce;
