@@ -800,10 +800,12 @@ A special ''CkMulticastMgr'' Chare Group is created as a
 deletegation for section multicast/reduction - all the messages sent
 by the section proxy will be passed to the local delegation branch.
 
-To use the CkMulticast delegation, you need to create the CkMulticastMgr Group 
-first, and setup the delegation relationship between the section proxy and 
-CkMulticastMgr Group. You only need to create one CkMulticastMgr Group though,
-it can serve as multicast/reduction delegation for all array sections:
+To use the CkMulticast delegation, one needs to create the CkMulticastMgr Group 
+first, and then setup the delegation relationship between the section proxy and 
+CkMulticastMgr Group. 
+One only needs to create one CkMulticastMgr Group globally.
+CkMulticastMgr group can serve all multicast/reduction delegations
+for different array sections in an application:
 
 \begin{alltt}
   CProxySection_Hello sectProxy = CProxySection_Hello::ckNew(...);
@@ -813,6 +815,15 @@ it can serve as multicast/reduction delegation for all array sections:
   sectProxy.ckSectionDelegate(mCastGrpId);  // initialize section proxy
 
   sectProxy.someEntry(...)           //multicast via delegation library as before
+\end{alltt}
+
+By default, CkMulticastMgr group builds a spanning tree for multicast/reduction
+with a factor of 2 (binary tree).
+One can specify a different factor when creating a CkMulticastMgr group.
+For example,
+
+\begin{alltt}
+  CkGroupID mCastGrpId = CProxy_CkMulticastMgr::ckNew(3);   // factor is 3
 \end{alltt}
 
 Note, to use CkMulticast library, all multicast messages must inherit from 
@@ -891,6 +902,7 @@ types(Section~\ref{builtin_reduction}) or define his/her own reducer functions
 (Section~\ref{new_type_reduction}).
 
 \paragraph{Array section multicast/reduction when migration happens}
+
 Using multicast/reduction, you don't need to worry about array migrations.
 When migration happens, array element in the array section can still use 
 the \kw{CkSectionInfo} it stored previously for doing reduction. 
@@ -917,6 +929,9 @@ void Foo::pup(PUP::er & p) {
       CProxySection_Foo   fooProxy;    // proxy for the section
       CkMulticastMgr *mg = CProxy_CkMulticastMgr(mCastGrpId).ckLocalBranch();
       mg->resetSection(fooProxy);
+        // you may want to reset reduction client to root
+      CkCallback *cb = new CkCallback(...);
+      mg->setReductionClient(mcp, cb);
    }
 }
 \end{alltt}
