@@ -70,9 +70,6 @@ int FEM_Adapt_Algs::Refine(int qm, int method, double factor, double *sizes)
 	  }
 	}
 	double qFactor=getAreaQuality(i);
-	if (theMesh->elem[0].getMeshSizing(i) <= 0.0) {
-	  CkAbort("ParFUM_Refine: Unitialized mesh sizing\n");
-	}
 	if ((theMesh->elem[0].getMeshSizing(i) > 0.0) &&
 	    (maxEdgeLength > (theMesh->elem[0].getMeshSizing(i)*REFINE_TOL))) {
 	  Insert(i, qFactor*(1.0/maxEdgeLength), 0);
