@@ -317,11 +317,15 @@ void FEM_Adapt_Algs::GradateMesh(double smoothness)
     const double beta = smoothness;
 
     double maxShock, minShock;
-    int iteration = 0;
+    int iteration = 0, updates = 0;
 
     int* adjNodes, *boundNodes;
     int nadjNodes, nnodes;
     int meshNum = FEM_Mesh_default_read();
+
+    if (smoothness < 1.0) {
+        printf("");
+    }
 
     nnodes = theMesh->node.size();
     boundNodes = new int[nnodes];
@@ -330,66 +334,104 @@ void FEM_Adapt_Algs::GradateMesh(double smoothness)
 
 
     printf("Running h-shock mesh gradation with beta=%.3f\n", beta);
+    fflush(NULL);
+
+#ifndef GRADATION_ITER_LIMIT
+#define GRADATION_ITER_LIMIT    10
+#endif
+    
     do {
         maxShock = 0;
         minShock = 1e10;
         
         for (int node=0; node<nnodes; ++node) {
-            // only do internal nodes (?)
-            if (boundNodes[node] < 0 || !FEM_is_valid(meshNum, FEM_NODE, node))
-                continue;
+            if (boundNodes[node]< 0 || !FEM_is_valid(meshNum, FEM_NODE, node))
+               continue;
+            //if (!FEM_is_valid(meshNum, FEM_NODE, node))
+            //    continue;
             
             theMesh->n2n_getAll(node, &adjNodes, &nadjNodes);
             for (int adjNode=0; adjNode<nadjNodes; ++adjNode) {
-                // get length of edge
-                // (do we need to worry about ghost/non-ghost?)
                 double edgelen = length(node, adjNodes[adjNode]);
-                if (edgelen > 1e6) {
-                    printf("Edge (%d, %d) has length %8.3f\n", node, adjNodes[adjNode], edgelen);
-                }
                 
                 // get adjacent elemnents and their sizes
+                // TODO: are we skipping boundary elts here?
                 int e1, e2;
                 theMesh->get2ElementsOnEdge(node, adjNodes[adjNode], &e1, &e2);
+                
                 double s1, s2;
                 s1 = theMesh->elem[0].getMeshSizing(e1);
                 s2 = theMesh->elem[0].getMeshSizing(e2);
+
+                if (s1 <= 0 || s2 <= 0) continue;
                 
                 // h-shock=max(size ratio)^(1/edge length)
-                CkAssert(s1 > 1e-6 && s2 > 1e-6 && "Size 0 element");
+                CkAssert(s1 >= 0 && s2 >= 0 && "Bad size");
                 CkAssert(edgelen > 1e-6 && "Length 0 edge");
-                CkAssert(edgelen < 1e6 && "Length inf edge");
+                CkAssert(edgelen == edgelen && "Length inf edge");
 
                 double ratio = (s1 > s2) ? s1/s2 : s2/s1;
-                double hs = pow(ratio, 1.0/edgelen);
-                if (hs > maxShock) maxShock = hs;
-                if (hs < minShock) minShock = hs;
-
-                if (hs > 100) {
-                    printf("hs: %8.5f\ns1: %8.5f\ns2: %8.5f\nedgelen: %8.5f\nratio: %8.5f\n", hs, s1, s2, edgelen, ratio);
-                }
+                CkAssert (ratio >= 1.0 && ratio == ratio && "Bad ratio");
                 
-                // if hs > beta, resize the larger elt:
-                // new size = old size / eta^2
-                // eta = (beta / h-shock)^(edge length)
-                //     = beta^(edge length) / size ratio
-                if (hs > beta) {
-                    double etasq = pow(beta, edgelen) / ratio;
-                    etasq *= etasq;
+                // WARNING WARNING WARNING
+                // TEST ONLY, THIS IS NOT CORRECT
+                if (ratio > beta) {
                     if (s1 > s2) {
-                        theMesh->elem[0].setMeshSizing(e1, s1 / etasq);
+                        theMesh->elem[0].setMeshSizing(e1, s1 - (s1-s2)/3);
+                        theMesh->elem[0].setMeshSizing(e2, s2 + (s1-s2)/3);
                     } else {
-                        theMesh->elem[0].setMeshSizing(e2, s2 / etasq);
+                        theMesh->elem[0].setMeshSizing(e2, s2 - (s2-s1)/3);
+                        theMesh->elem[0].setMeshSizing(e1, s1 + (s2-s1)/3);
                     }
+                    updates++;
                 }
+                if (ratio > maxShock) maxShock = ratio;
+                if (ratio < minShock) minShock = ratio;
+                
+                
+                ////double hs = ratio;
+                //double hs = pow(ratio, 1.0/edgelen);
+                //
+                //if (hs > maxShock) maxShock = hs;
+                //if (hs < minShock) minShock = hs;
+
+                //// if hs > beta, resize the larger elt:
+                //// new size = old size / eta^2
+                //// eta = (beta / h-shock)^(edge length)
+                ////     = beta^(edge length) / size ratio
+                //
+                //if (hs > beta) {
+                //    double etasq = pow(beta, edgelen) / ratio;
+                //    etasq *= etasq;
+
+                //    //if (hs > 100) {
+                //    //    printf("hs: %8.5f\ns1: %8.5f\ns2: %8.5f\nedgelen: %8.5f\nratio: %8.5f\netasq: %8.5f", hs, s1, s2, edgelen, ratio, etasq);
+                //    //    abort();
+                //    //}
+                //    
+                //    if (s1 > s2) {
+                //        theMesh->elem[0].setMeshSizing(e1, s1 / etasq);
+                //    } else {
+                //        theMesh->elem[0].setMeshSizing(e2, s2 / etasq);
+                //    }
+                //    updates++;
+                //}
+                
             }
             delete[] adjNodes;
         } 
-        printf("Finished iteration %d\n", iteration++);
+        
+        printf("Finished iteration %d\n", iteration);
         printf("Max shock:%8.3f\n", maxShock);
         printf("Min shock:%8.3f\n", minShock);
         printf("Target:%8.3f\n", beta);
-    } while (maxShock > beta);
+        
+    } while (maxShock > beta && ++iteration < GRADATION_ITER_LIMIT);
+    tests();
+
+    printf("%d total updates in %d iterations in GradateMesh\n", 
+            updates, iteration);
+    fflush(NULL);
 
     delete[] boundNodes;
 }
