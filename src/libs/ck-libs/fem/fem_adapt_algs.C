@@ -56,7 +56,6 @@ int FEM_Adapt_Algs::Refine(int qm, int method, double factor, double *sizes)
     refineStack = new elemHeap[numElements];
     if (refineElements) delete [] refineElements;
     refineElements = new elemHeap[numElements+1];
-    int numToRefine = 0;
     for (int i=0; i<numElements; i++) { 
       if (theMesh->elem[0].is_valid(i)) {
 	// find maxEdgeLength of i
@@ -73,11 +72,9 @@ int FEM_Adapt_Algs::Refine(int qm, int method, double factor, double *sizes)
 	if ((theMesh->elem[0].getMeshSizing(i) > 0.0) &&
 	    (maxEdgeLength > (theMesh->elem[0].getMeshSizing(i)*REFINE_TOL))) {
 	  Insert(i, qFactor*(1.0/maxEdgeLength), 0);
-	  numToRefine++;
 	}
       }
     }
-    CkPrintf("ParFUM_Refine: # to refine: %d\n", numToRefine);
     while (refineHeapSize>0 || refineTop > 0) { // loop through the elements
       int n1, n2;
       if (refineTop>0) {
@@ -243,7 +240,11 @@ void FEM_Adapt_Algs::SetMeshSize(int method, double factor, double *sizes)
     CkPrintf("ParFUM_SetMeshSize: UNIFORM %4.6e\n", factor);
   }
   else if (method == 1) { // copy sizing from array
-    theMesh->elem[0].setMeshSizing(sizes);
+    for (int i=0; i<numElements; i++) {
+      if (sizes[i] > 0.0) {
+	theMesh->elem[0].setMeshSizing(i, sizes[i]);
+      }
+    }
     CkPrintf("ParFUM_SetMeshSize: SIZES input\n");
   }
   else if (method == 2) { // calculate current sizing and scale by factor
