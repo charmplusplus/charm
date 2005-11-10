@@ -29,29 +29,27 @@ do
 done
 
 # cu.ncsa
-if  hostname | grep  Cu >/dev/null 2>/dev/null 
-then 
-
-extra="-procs $pes"
-
-else
-
-# Try to guess the number of nodes and tasks per node to use
-nodes=$pes
-tp=1
-for i in 4 2 3
-do
-  if [ `expr $pes / $i '*' $i` -eq $pes ]
-  then
+case `hostname` in
+cu*|Cu*)
+  extra="-procs $pes"
+  ;;
+*)
+  # Try to guess the number of nodes and tasks per node to use
+  nodes=$pes
+  tp=1
+  for i in 4 2 3
+  do
+    if [ `expr $pes / $i '*' $i` -eq $pes ]
+    then
 	nodes=`expr $pes / $i`
 	tp=$i
 	break
-  fi
-done
+    fi
+  done
 
-extra="-nodes $nodes -tasks_per_node $tp -rmpool 1"
-
-fi
+  extra="-nodes $nodes -tasks_per_node $tp -rmpool 1"
+  ;;
+esac
 
 # Prepend path to executable
 args=`pwd`/"$args"
