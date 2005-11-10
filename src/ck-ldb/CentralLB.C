@@ -210,6 +210,7 @@ void CentralLB::ReceiveCounts(CkReductionMsg  *msg)
 
 void CentralLB::BuildStatsMsg()
 {
+#if CMK_LBDB_ON
   // build and send stats
   const int osz = theLbdb->GetObjDataSz();
   const int csz = theLbdb->GetCommDataSz();
@@ -244,6 +245,7 @@ void CentralLB::BuildStatsMsg()
 
   CmiAssert(statsMsg == NULL);
   statsMsg = msg;
+#endif
 }
 
 // called on every processor
@@ -1058,16 +1060,16 @@ int CentralLB::useMem() {
 */
 
 CLBStatsMsg::CLBStatsMsg(int osz, int csz) {
+  n_objs = osz;
+  n_comm = csz;
   objData = new LDObjData[osz];
   commData = new LDCommData[csz];
   avail_vector = NULL;
-  n_objs = osz;
-  n_comm = csz;
 }
 
 CLBStatsMsg::~CLBStatsMsg() {
-  if (n_objs) delete [] objData;
-  if (n_comm) delete [] commData;
+  delete [] objData;
+  delete [] commData;
   if (avail_vector) delete [] avail_vector;
 }
 
