@@ -79,6 +79,7 @@ int FEM_Adapt_Algs::Refine(int qm, int method, double factor, double *sizes)
     }
     CkPrintf("ParFUM_Refine: # to refine: %d\n", numToRefine);
     while (refineHeapSize>0 || refineTop > 0) { // loop through the elements
+      int n1, n2;
       if (refineTop>0) {
 	refineTop--;
 	elId=refineStack[refineTop].elID;
@@ -100,7 +101,6 @@ int FEM_Adapt_Algs::Refine(int qm, int method, double factor, double *sizes)
 	}
 	if ((theMesh->elem[0].getMeshSizing(elId) > 0.0) &&
 	    (maxEdgeLength > (theMesh->elem[0].getMeshSizing(elId)*REFINE_TOL))) {
-	  //CkPrintf("Refining elem %d...\n", elId);
 	  if (theAdaptor->edge_bisect(n1, n2) > 0)  iter_mods++;
 	}
       }
