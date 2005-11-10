@@ -662,8 +662,8 @@ int FEM_MUtil::Replace_node_local(FEM_Mesh *m, int oldIdx, int newIdx) {
   m->n2n_removeAll(oldIdx);
   m->n2e_removeAll(oldIdx);
 
-  delete[] nnbrs;
-  delete[] enbrs;
+  if(nsize>0) delete[] nnbrs;
+  if(esize>0) delete[] enbrs;
   return newIdx;  // return a new index
 }
 
@@ -706,6 +706,30 @@ void FEM_MUtil::addToSharedList(FEM_Mesh *m, int fromChk, int sharedIdx) {
 	  if(sharedNode == -1) {
 	    //node 'j' is a ghost on chunk 'i'
 	    int sharedGhost = mmod->fmUtil->exists_in_IDXL(m,nnbrs[j],fromChk,1);
+	    if( sharedGhost == -1) {
+	      //this might be a new ghost, figure out if any of the chunks sharing
+	      //this node has created this as a ghost on 'fromChk'
+	      const IDXL_Rec *irec = m->node.shared.getRec(nnbrs[j]);
+	      if(irec) {
+		int noShared = irec->getShared();
+		for(int sharedck=0; sharedck<noShared; sharedck++) {
+		  int ckshared = irec->getChk(sharedck);
+		  int idxshared = irec->getIdx(sharedck);
+		  if(ckshared == fromChk) continue;
+		  CkAssert(fromChk!=idx && fromChk!=ckshared && ckshared!=idx);
+		  int idxghostsend = meshMod[ckshared].getIdxGhostSend(idx,idxshared,fromChk)->i;
+		  if(idxghostsend != -1) {
+		    m->node.ghostSend.addNode(nnbrs[j],fromChk);
+		    meshMod[fromChk].updateIdxlList(idx,idxghostsend,ckshared);
+		    sharedGhost = exists_in_IDXL(m,nnbrs[j],fromChk,1);
+		    CkAssert(sharedGhost != -1);
+		    break; //found a chunk that sends it out, update my tables
+		  }
+		  //Chunk 'ckshared' does not send this to Chunk 'fromChk' as ghost
+		}
+	      }
+	      //else it is a new ghost
+	    }
 	    if( sharedGhost == -1) {
 	      //it is a new ghost
 	      m->node.ghostSend.addNode(nnbrs[j],fromChk);

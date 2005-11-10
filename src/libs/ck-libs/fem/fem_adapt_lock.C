@@ -171,7 +171,7 @@ int FEM_AdaptL::edge_flip(int n1, int n2) {
     unlockNodes(gotlocks, locknodes, 0, locknodes, numNodes);
     free(locknodes);
     free(gotlocks);
-    return 0;
+    return -1;
   }
   int ret = edge_flip_help(e1, e2, n1, n2, e1_n1, e1_n2, e1_n3, n3, n4,locknodes);
   if(ret!=-1) {
@@ -519,7 +519,7 @@ int FEM_AdaptL::edge_contraction_help(int e1, int e2, int n1, int n2, int e1_n1,
   int e1chunk=-1, e2chunk=-1;
   int index = theMod->getIdx();
 
-  if(n1==13 && n2==36) {
+  if(n1==62 && n2==61) {
     CkPrintf("Crit\n");
   }
 
@@ -551,13 +551,6 @@ int FEM_AdaptL::edge_contraction_help(int e1, int e2, int n1, int n2, int e1_n1,
 	  if(e1ghostelem<-1) {
 	    //the remote chunk needs to eat e1
 	    int e1remoteChk = theMesh->elem[0].ghost->ghostRecv.getRec(FEM_To_ghost_index(e1ghostelem))->getChk(0);
-	    /*int e1chunk = FEM_remove_element(theMesh, e1, 0, 1);
-	      CkAssert(e1chunk==index && e1remoteChk!=index);
-	      //get the index of the newly created ghosts
-	      e1conn[i] = FEM_To_ghost_index(theMesh->node.ghost->size()-1);
-	      e1 = FEM_add_element(theMesh, e1conn, 3, 0, e1remoteChk);
-	      CkAssert(e1<-1);
-	    */
 	    int sharedIdx = theMod->fmUtil->exists_in_IDXL(theMesh,e1,e1remoteChk,3);
 	    CkPrintf("[%d]Edge Contraction, edge %d->%d, chunk %d eating into chunk %d\n",theMod->idx, n1, n2, e1remoteChk, index);
 	    e1new = meshMod[e1remoteChk].eatIntoElement(index,sharedIdx)->i;
@@ -598,12 +591,6 @@ int FEM_AdaptL::edge_contraction_help(int e1, int e2, int n1, int n2, int e1_n1,
 	  if(e2ghostelem<-1) {
 	    //the remote chunk needs to eat e2
 	    int e2remoteChk = theMesh->elem[0].ghost->ghostRecv.getRec(FEM_To_ghost_index(e2ghostelem))->getChk(0);
-	    /*int e2chunk = FEM_remove_element(theMesh, e2, 0, 1);
-	      CkAssert(e2chunk==index && e2remoteChk!=index);
-	      e2conn[i] = FEM_To_ghost_index(theMesh->node.ghost->size()-1);
-	      e2 = FEM_add_element(theMesh, e2conn, 3, 0, e2remoteChk);
-	      CkAssert(e2<-1);
-	    */
 	    int sharedIdx = theMod->fmUtil->exists_in_IDXL(theMesh,e2,e2remoteChk,3);
 	    CkPrintf("[%d]Edge Contraction, edge %d->%d, chunk %d eating into chunk %d\n",theMod->idx, n1, n2, e2remoteChk, index);
 	    e2new = meshMod[e2remoteChk].eatIntoElement(index,sharedIdx)->i;
@@ -981,12 +968,12 @@ int FEM_AdaptL::edge_contraction_help(int e1, int e2, int n1, int n2, int e1_n1,
   CkPrintf("Adjacencies before edge contract\n");
   printAdjacencies(adjnodes, 2, adjelems, 2);
 #endif
-  e1chunk = FEM_remove_element(theMesh, e1, 0, 0);
+  e1chunk = FEM_remove_element(theMesh, e1, 0);
 #ifdef DEBUG_2
   CkPrintf("Adjacencies after remove element %d\n",e1);
   printAdjacencies(adjnodes, 2, adjelems, 2);
 #endif
-  e2chunk = FEM_remove_element(theMesh, e2, 0, 0);
+  e2chunk = FEM_remove_element(theMesh, e2, 0);
 #ifdef DEBUG_2
   CkPrintf("Adjacencies after remove element %d\n",e2);
   printAdjacencies(adjnodes, 2, adjelems, 2);

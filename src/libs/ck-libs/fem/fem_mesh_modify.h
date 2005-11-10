@@ -49,7 +49,7 @@ extern CProxy_femMeshModify meshMod;
 // The internal functions which take in a FEM_Mesh*, but could feasibly be used by others
 int FEM_add_node(FEM_Mesh *m, int* adjacent_nodes=0, int num_adjacent_nodes=0, int chunkNo=-1, int forceShared=0, int upcall=0);
 void FEM_remove_node(FEM_Mesh *m, int node);
-int FEM_remove_element(FEM_Mesh *m, int element, int elem_type=0, int permanent=0);
+int FEM_remove_element(FEM_Mesh *m, int element, int elem_type=0, int permanent=-1);
 int FEM_add_element(FEM_Mesh *m, int* conn, int conn_size, int elem_type=0, int chunkNo=-1);
 int FEM_Modify_Lock(FEM_Mesh *m, int* affectedNodes=0, int numAffectedNodes=0, int* affectedElts=0, int numAffectedElts=0, int elemtype=0);
 int FEM_Modify_Unlock(FEM_Mesh *m);
@@ -277,7 +277,7 @@ class femMeshModify : public CBase_femMeshModify {
   FEM_lock *fmLock;
   CkVec<FEM_lockN *> fmLockN;
   //CkVec<FEM_lockN *> *fmgLockN;
-  CkVec<bool> fmIdxlLock; //each chunk can have (n-1)*5 idxl lists. The default value is 0, which means that none of the idxl lists are locked, otherwise depending on the value 1,2,3,4,5 various idxl lists are locked
+  CkVec<bool> fmIdxlLock; //each chunk can have numChunks*5 idxl lists. 
   FEM_MUtil *fmUtil;
   FEM_Interpolate *fmInp;
   FEM_Adapt *fmAdapt;

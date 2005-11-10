@@ -126,7 +126,7 @@ int FEM_Adapt::edge_flip_help(int e1, int e2, int n1, int n2, int e1_n1,
   double e1Sz = theMesh->elem[0].getMeshSizing(e1);
   double e2Sz = theMesh->elem[0].getMeshSizing(e2);
   if(n1 < 0 || n2 < 0 || n3 < 0) {
-    e1chunk = FEM_remove_element(theMesh, e1, 0, 1);
+    e1chunk = FEM_remove_element(theMesh, e1, 0, index);
   }
   else {
     e1chunk = FEM_remove_element(theMesh, e1, 0);
@@ -138,7 +138,7 @@ int FEM_Adapt::edge_flip_help(int e1, int e2, int n1, int n2, int e1_n1,
 #endif
   //if this is a ghost, then eat into it
   if(n1 < 0 || n2 < 0 || n4 < 0) {
-    e2chunk = FEM_remove_element(theMesh, e2, 0, 1);
+    e2chunk = FEM_remove_element(theMesh, e2, 0, index);
   }
   else {
     e2chunk = FEM_remove_element(theMesh, e2, 0);
