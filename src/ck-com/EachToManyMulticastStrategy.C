@@ -290,12 +290,13 @@ void EachToManyMulticastStrategy::beginProcessing(int numElements){
             ->getStrategyTableEntry(myInstanceID);
         sentry->numElements = expectedDeposits;
     }
-    
+    /*
     if(!mflag) 
         setLearner(new AAPLearner());    
     else 
         setLearner(new AAMLearner());                
-    
+    */
+
     if(expectedDeposits > 0)
         return;
     
