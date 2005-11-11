@@ -37,7 +37,7 @@ extern "C" {
        Call COLLIDE_Init()
      
   */   
-  void ParFUM_Collide_Init(int dimension);
+  collide_t ParFUM_Collide_Init(int dimension);
 
 
   /* ParFUM_Collide() will create bounding boxes for each element in the local mesh chunk.
@@ -49,7 +49,7 @@ extern "C" {
        Call COLLIDE_Boxes_prio()
        return the number of collisions which involve a local element
   */  
-  int ParFUM_Collide();
+  int ParFUM_Collide(collide_t c);
 
 
   /* ParFUM_Collide_GetCollisions() is used to get the data for any remote elements which 
@@ -63,10 +63,11 @@ extern "C" {
      attribute
           
      Algorithm: 
-       Create Bounding boxes for elements, and priority array
-       Call COLLIDE_Boxes_prio()
+
+
+
   */  
-  void ParFUM_Collide_GetCollisions(void* results);
+  void ParFUM_Collide_GetCollisions(collide_t c, void* results);
 
 
 }
