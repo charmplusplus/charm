@@ -55,6 +55,8 @@ int FEM_Modify_Lock(FEM_Mesh *m, int* affectedNodes=0, int numAffectedNodes=0, i
 int FEM_Modify_Unlock(FEM_Mesh *m);
 int FEM_Modify_LockN(FEM_Mesh *m, int nodeId, int readLock);
 int FEM_Modify_UnlockN(FEM_Mesh *m, int nodeId, int readLock);
+void FEM_Modify_LockAll(FEM_Mesh*m, int nodeId);
+void FEM_Modify_LockUpdate(FEM_Mesh*m, int nodeId);
 void FEM_Modify_correctLockN(FEM_Mesh *m, int nodeId);
 
 // Internal functions which shouldn't be used by anyone else
@@ -333,6 +335,8 @@ class femMeshModify : public CBase_femMeshModify {
 
   void addToSharedList(int fromChk, int sharedIdx);
   void updateNodeAttrs(int fromChk, int sharedIdx, double coordX, double coordY, int bound, bool isGhost);
+  void UpdateGhostSend(int fromChk, int sharedIdx);
+
   double2Msg *getRemoteCoord(int fromChk, int ghostIdx);
   intMsg *getRemoteBound(int fromChk, int ghostIdx);
 

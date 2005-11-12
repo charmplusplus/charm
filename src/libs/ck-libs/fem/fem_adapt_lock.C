@@ -174,10 +174,10 @@ int FEM_AdaptL::edge_flip(int n1, int n2) {
     return -1;
   }
   int ret = edge_flip_help(e1, e2, n1, n2, e1_n1, e1_n2, e1_n3, n3, n4,locknodes);
-  if(ret!=-1) {
+  /*if(ret!=-1) {
     FEM_Modify_correctLockN(theMesh, locknodes[2]);
     FEM_Modify_correctLockN(theMesh, locknodes[3]);
-  }
+    }*/ //should not need to do it anymore
   unlockNodes(gotlocks, locknodes, 0, locknodes, numNodes);
 
   free(locknodes);
@@ -403,10 +403,10 @@ int FEM_AdaptL::edge_contraction(int n1, int n2) {
     if(ret==ERVAL1) {
       //get new nodes, IT has ALL locks
       isEdge = findAdjData(n1, n2, &e1, &e2, &e1_n1, &e1_n2, &e1_n3, &e2_n1, &e2_n2, &e2_n3,&n3, &n4);
-      FEM_Modify_correctLockN(theMesh, n1);
+      /*FEM_Modify_correctLockN(theMesh, n1);
       FEM_Modify_correctLockN(theMesh, n2);
       FEM_Modify_correctLockN(theMesh, n3);
-      FEM_Modify_correctLockN(theMesh, n4);
+      FEM_Modify_correctLockN(theMesh, n4);*/ //shouldnot need to do it any more
       locknodes[0] = n1;
       locknodes[1] = n2;
       locknodes[2] = n3;

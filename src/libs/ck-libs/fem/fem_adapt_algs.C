@@ -486,9 +486,11 @@ int FEM_Adapt_Algs::simple_refine(double targetA, double xmin, double ymin, doub
 	  adapted = true;
 	}
       }
+      //if(adapted) break;
     }
     free(areas);
     free(map1);
+    //if(adapted) break;
   }
 
   free(con);
@@ -496,7 +498,8 @@ int FEM_Adapt_Algs::simple_refine(double targetA, double xmin, double ymin, doub
   free(n2_coord);
   free(n3_coord);
 
-  return 1;
+  if(adapted) return -1;
+  else return 1;
 }
 
 int FEM_Adapt_Algs::simple_coarsen(double targetA, double xmin, double ymin, double xmax, double ymax) {

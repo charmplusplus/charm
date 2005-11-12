@@ -61,6 +61,7 @@ module FEMMeshModify {
     entry [sync,threaded] void refine_flip_element_leb(int, int, int, int, int, int, double);
     entry [sync,threaded] void addToSharedList(int, int);
     entry [sync,threaded] void updateNodeAttrs(int, int, double, double, int, bool);
+    entry [sync,threaded] void UpdateGhostSend(int, int);
     entry [sync,threaded] double2Msg *getRemoteCoord(int, int);
     entry [sync,threaded] intMsg *getRemoteBound(int, int);
     entry [sync,threaded] intMsg *getIdxGhostSend(int, int, int);

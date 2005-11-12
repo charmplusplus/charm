@@ -244,6 +244,31 @@ int FEM_Adapt::edge_flip_help(int e1, int e2, int n1, int n2, int e1_n1,
   printAdjacencies(locknodes, numNodes, lockelems, numElems);
 #endif
 
+  //get rid of some unnecessary ghost node sends
+  for(int i=0; i<4;i++) {
+    int nodeToUpdate = -1;
+    if(i==1) nodeToUpdate = n1;
+    else if(i==2) nodeToUpdate = n2;
+    else if(i==3) nodeToUpdate = n3;
+    else if(i==4) nodeToUpdate = n4;
+    theMod->fmUtil->UpdateGhostSend(nodeToUpdate);
+    const IDXL_Rec *irec=theMesh->node.shared.getRec(nodeToUpdate);
+    if(irec) {
+      int numchunks = irec->getShared();
+      int *chunks1 = new int[numchunks];
+      int *inds1 = new int[numchunks];
+      for(int j=0; j<numchunks; j++) {
+	chunks1[j] = irec->getChk(j);
+	inds1[j] = irec->getIdx(j);
+      }
+      for(int j=0; j<numchunks; j++) {
+	meshMod[chunks1[j]].UpdateGhostSend(index,inds1[j]);
+      }
+      delete[] chunks1;
+      delete[] inds1;
+    }
+  }
+
   //make sure that it always comes here, don't return with unlocking
   free(conn);
   //free(locknodes);
@@ -397,7 +422,7 @@ int FEM_Adapt::edge_bisect_help(int e1, int e2, int n1, int n2, int e1_n1,
 
   // hmm... if e2 is a ghost and we remove it and create all the new elements
   // locally, then we don't really need to add a *shared* node
-  //but we are not moving chunk boundaries
+  //but we are not moving chunk boundaries for bisect
   if(e1chunk==-1 || e2chunk==-1) {
     //it is fine, let it continue
     e4chunk = e2chunk;
@@ -448,6 +473,31 @@ int FEM_Adapt::edge_bisect_help(int e1, int e2, int n1, int n2, int e1_n1,
   CkPrintf("Adjacencies after add element %d: conn(%d,%d,%d)\n",lockelems[3],conn[0],conn[1],conn[2]);
   printAdjacencies(locknodes, numNodesNew, lockelems, numElemsNew);
 #endif
+  }
+
+  //get rid of some unnecessary ghost node sends
+  for(int i=0; i<4;i++) {
+    int nodeToUpdate = -1;
+    if(i==1) nodeToUpdate = n1;
+    else if(i==2) nodeToUpdate = n2;
+    else if(i==3) nodeToUpdate = n3;
+    else if(i==4) nodeToUpdate = n4;
+    theMod->fmUtil->UpdateGhostSend(nodeToUpdate);
+    const IDXL_Rec *irec=theMesh->node.shared.getRec(nodeToUpdate);
+    if(irec) {
+      int numchunks = irec->getShared();
+      int *chunks1 = new int[numchunks];
+      int *inds1 = new int[numchunks];
+      for(int j=0; j<numchunks; j++) {
+	chunks1[j] = irec->getChk(j);
+	inds1[j] = irec->getIdx(j);
+      }
+      for(int j=0; j<numchunks; j++) {
+	meshMod[chunks1[j]].UpdateGhostSend(index,inds1[j]);
+      }
+      delete[] chunks1;
+      delete[] inds1;
+    }
   }
 
 #ifdef DEBUG_2
