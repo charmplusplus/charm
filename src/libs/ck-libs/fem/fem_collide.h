@@ -18,10 +18,21 @@ Author: Isaac Dooley 11-09-2005
 #ifndef _CHARM_FEM_COLLIDE_H
 #define _CHARM_FEM_COLLIDE_H
 
+#include "collidec.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+  struct ParFUM_collider {
+	collide_t collide_grid;
+	double box_padding;
+	int dimension;
+
+	unsigned int *boxToElementMapping;
+	unsigned int numCollidableElements; // size of boxToElementMapping array
+  };
+
 
 
   /* ParFUM_Collide_init() will initialize the collision library. 
@@ -37,7 +48,7 @@ extern "C" {
        Call COLLIDE_Init()
      
   */   
-  collide_t ParFUM_Collide_Init(int dimension);
+  ParFUM_collider ParFUM_Collide_Init(int dimension);
 
 
   /* ParFUM_Collide() will create bounding boxes for each element in the local mesh chunk.
@@ -49,8 +60,7 @@ extern "C" {
        Call COLLIDE_Boxes_prio()
        return the number of collisions which involve a local element
   */  
-  int ParFUM_Collide(collide_t c);
-
+  int ParFUM_Collide(ParFUM_collider *c, double box_padding = 0.0);
 
   /* ParFUM_Collide_GetCollisions() is used to get the data for any remote elements which 
      It should be called after Collide even if ParFUM_Collide returned 0
@@ -67,7 +77,11 @@ extern "C" {
 
 
   */  
-  void ParFUM_Collide_GetCollisions(collide_t c, void* results);
+  void ParFUM_Collide_GetCollisions(ParFUM_collider *c, void* results);
+
+
+  void ParFUM_Collide_Destroy(ParFUM_collider *c);
+
 
 
 }
