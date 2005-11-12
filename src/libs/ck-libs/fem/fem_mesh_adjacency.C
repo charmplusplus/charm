@@ -1364,7 +1364,7 @@ void FEM_Mesh::get2ElementsOnEdge(int n1, int n2, int *result_e1, int *result_e2
     }
   }
 
-  CkAssert(found==2);
+
 #ifdef DEBUG
   CmiMemoryCheck();
 #endif 
