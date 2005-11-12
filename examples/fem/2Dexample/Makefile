@@ -3,7 +3,7 @@ CHARMC=../../../bin/charmc $(OPTS)
 all: pgm
 
 pgm: pgm.o
-	$(CHARMC) -o pgm pgm.o -language fem -module netfem #-memory paranoid 
+	$(CHARMC) -o pgm pgm.o -language fem -module netfem #-memory paranoid
 
 pgm.o: pgm.C
 	$(CHARMC) -I../../../src/libs/ck-libs/fem -c pgm.C

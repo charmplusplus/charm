@@ -1,9 +1,9 @@
 #!/bin/bash
 
 let "i = 0";
-let "maxi = 19";
+let "maxi = 999";
 let "j = 1";
-let "maxj = 20";
+let "maxj = 1000";
 let "count = 1";
 let "total = $maxi * ($maxj-1) *2";
 echo $total;

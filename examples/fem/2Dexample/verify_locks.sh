@@ -1,7 +1,7 @@
 #!/bin/bash
 let "i = 0";
-let "max = 450";
-let "numChunks = 7";
+let "max = 100";
+let "numChunks = 2";
 let "chunk = 0";
 while [ $chunk -le $numChunks ]
 do

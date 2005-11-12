@@ -37,8 +37,8 @@ double getArea(double *n1_coord, double *n2_coord, double *n3_coord) {
   return (sqrt(sLen*(sLen-aLen)*(sLen-bLen)*(sLen-cLen)));
 }
 
-void publish_data_netfem(int i,  myGlobals g) {
-  MPI_Barrier(MPI_COMM_WORLD);
+void publish_data_netfem(int i,  myGlobals g, MPI_Comm comm) {
+  MPI_Barrier(comm);
   if (1) { //Publish data to the net
     int mesh=FEM_Mesh_default_read(); // Tell framework we are reading data from the mesh
     int rank = FEM_My_partition();
@@ -93,7 +93,7 @@ void publish_data_netfem(int i,  myGlobals g) {
 
     double finalArea;
     CkPrintf("Chunk[%d]: local area: %.12f\n",rank,totalArea);
-    MPI_Reduce((void*)&totalArea,(void*)&finalArea,1,MPI_DOUBLE,MPI_SUM,0,MPI_COMM_WORLD);
+    MPI_Reduce((void*)&totalArea,(void*)&finalArea,1,MPI_DOUBLE,MPI_SUM,0,comm);
     if(rank == 0) CkPrintf("Chunk[%d]: total area: %.12f\n",rank,finalArea);
 
     delete [] g.coord;
@@ -112,8 +112,8 @@ init(void)
 {
   CkPrintf("init started\n");
   double startTime=CmiWallTimer();
-  const char *eleName="mesh2M.tri";//"adpmm/xxx.1.ele";//*/"88mesh/mesh1.tri";
-  const char *nodeName="mesh2M.node";//"adpmm/xxx.1.node";//*/"88mesh/mesh1.node";
+  const char *eleName="mesh1.tri";//"adpmm/xxx.1.ele";//*/"88mesh/mesh1.tri";
+  const char *nodeName="mesh1.node";//"adpmm/xxx.1.node";//*/"88mesh/mesh1.node";
   int nPts=0; //Number of nodes
   vector2d *pts=0; //Node coordinates
   int *bounds;
@@ -307,14 +307,18 @@ driver(void)
 	FEM_Mesh_create_node_node_adjacency(mesh);
 
 	int netIndex = 0;
-	publish_data_netfem(netIndex,g); netIndex++;
+	int rank = 0;
+	MPI_Comm comm=MPI_COMM_WORLD;
+	//MPI_Group iwgroup,commgroup;
+	//MPI_Comm_group(MPI_COMM_WORLD, &commgroup);
+	//MPI_Comm_create(MPI_COMM_WORLD,commgroup,&comm);
+	MPI_Comm_rank(comm,&rank);
+	
+	publish_data_netfem(netIndex,g,comm); netIndex++;
 #ifdef SUMMARY_ON
 	FEM_Print_Mesh_Summary(mesh);
 #endif
-	int rank = 0;
-	MPI_Comm comm = MPI_COMM_WORLD;
-	MPI_Comm_rank(comm,&rank);
-	
+
 	MPI_Barrier(comm);
 	FEM_REF_INIT(mesh,2);
 	
@@ -444,7 +448,7 @@ driver(void)
 	  CkPrintf("New Element\n");
 	}
 	//FEM_Modify_Unlock(mesh);
-	publish_data_netfem(netIndex,g); netIndex++;
+	publish_data_netfem(netIndex,g,comm); netIndex++;
 #ifdef SUMMARY_ON
 	FEM_Print_Mesh_Summary(mesh);
 	//FEM_Print_n2e(mesh,adjs[0]);
@@ -487,7 +491,7 @@ driver(void)
 		  FEM_Modify_Unlock(mesh);
 		  CkPrintf("New conn for element is: %d %d %d\n", conn[0], conn[1], conn[2]);
 		  
-		  publish_data_netfem(netIndex,g); netIndex++;
+		  publish_data_netfem(netIndex,g,comm); netIndex++;
 		  FEM_Print_Mesh_Summary(mesh);
 		}
 		else{
@@ -501,34 +505,33 @@ driver(void)
 	    MPI_Barrier(comm);
 	    FEM_Print_Mesh_Summary(mesh);
 
-	    publish_data_netfem(netIndex,g); netIndex++;
+	    publish_data_netfem(netIndex,g,comm); netIndex++;
 	    FEM_Print_Mesh_Summary(mesh);
 	  }
 	}
 	
-	publish_data_netfem(netIndex,g); netIndex++;
+	publish_data_netfem(netIndex,g,comm); netIndex++;
 	*/	
-
 	/*
 	CkPrintf("Starting Local edge flips on individual chunks\n");
 	int flip[4];
 	if(rank == 0) {
-	  flip[0] = 1;
-	  flip[1] = 2;
+	  flip[0] = 20;
+	  flip[1] = 21;
 	  flip[2] = 0;
 	  flip[3] = 3;
 	}
 	else if(rank == 1) {
-	  flip[0] = 1;
-	  flip[1] = 2;
+	  flip[0] = 9;
+	  flip[1] = 10;
 	  flip[2] = 0;
 	  flip[3] = 4;
 	}
 	else if(rank == 2) {
-	  flip[0] = 13;
-	  flip[1] = 14;
-	  flip[2] = 15;
-	  flip[3] = 7;
+	  flip[0] = 1;
+	  flip[1] = 2;
+	  flip[2] = 6;
+	  flip[3] = -5;
 	}
 	else {
 	  flip[0] = 0;
@@ -540,13 +543,15 @@ driver(void)
 	FEM_Print_Mesh_Summary(mesh);
 #endif
 	ret_op = ada->edge_flip(flip[0],flip[1]);
-	publish_data_netfem(netIndex,g); netIndex++;
-	ret_op = ada->edge_flip(flip[2],flip[3]);
-	publish_data_netfem(netIndex,g); netIndex++;
+	publish_data_netfem(netIndex,g,comm); netIndex++;
+	adaptAlgs->tests();
+	MPI_Barrier(comm);
+	//ret_op = ada->edge_flip(flip[2],flip[3]);
+	//publish_data_netfem(netIndex,g,comm); netIndex++;
 #ifdef SUMMARY_ON
 	FEM_Print_Mesh_Summary(mesh);
 #endif
-	
+
 	CkPrintf("Starting shared edge flips on individual chunks\n");
 	int sflip[4];
 	if(rank == 0) {
@@ -577,13 +582,13 @@ driver(void)
 	FEM_Print_Mesh_Summary(mesh);
 #endif
 	ret_op = ada->edge_flip(sflip[0],sflip[1]);
-	publish_data_netfem(netIndex,g); netIndex++;
+	publish_data_netfem(netIndex,g,comm); netIndex++;
 	if(ret_op > 0) {
 	  if(sflip[2]<0) sflip[2] = ret_op;
 	  else if(sflip[3]<0) sflip[3] = ret_op;
 	}
 	ret_op = ada->edge_flip(sflip[2],sflip[3]);
-	publish_data_netfem(netIndex,g); netIndex++;
+	publish_data_netfem(netIndex,g,comm); netIndex++;
 #ifdef SUMMARY_ON
 	FEM_Print_Mesh_Summary(mesh);
 #endif
@@ -607,7 +612,7 @@ driver(void)
 	  bisect[1] = 1;
 	}
 	if(rank==2) ret_op = ada->edge_bisect(bisect[0],bisect[1]);
-	publish_data_netfem(netIndex,g); netIndex++;
+	publish_data_netfem(netIndex,g,comm); netIndex++;
 	adaptAlgs->tests();
 	MPI_Barrier(comm);
 	
@@ -637,7 +642,7 @@ driver(void)
 	FEM_Print_Mesh_Summary(mesh);
 #endif
 	ret_op = ada->vertex_remove(vr[0],vr[1]);
-	publish_data_netfem(netIndex,g); netIndex++;
+	publish_data_netfem(netIndex,g,comm); netIndex++;
 #ifdef SUMMARY_ON
 	FEM_Print_Mesh_Summary(mesh);
 #endif
@@ -646,16 +651,16 @@ driver(void)
 	CkPrintf("Starting shared edge bisect on individual chunks\n");
 	int sbisect[2];
 	if(rank == 0) {
-	  sbisect[0] = 1;//4;//21;
-	  sbisect[1] = 19;//20;
+	  sbisect[0] = 1;
+	  sbisect[1] = 19;
 	}
 	else if(rank == 1) {
 	  sbisect[0] = 0;
 	  sbisect[1] = 21;
 	}
 	else if(rank == 2) {
-	  sbisect[0] = 20;//9;//3;
-	  sbisect[1] = 8;//2;//19;
+	  sbisect[0] = 1;
+	  sbisect[1] = 9;
 	}
 	else {
 	  sbisect[0] = 0;
@@ -666,7 +671,14 @@ driver(void)
 	FEM_Print_Mesh_Summary(mesh);
 #endif
 	ret_op = ada->edge_bisect(sbisect[0],sbisect[1]);
-	publish_data_netfem(netIndex,g); netIndex++;
+	publish_data_netfem(netIndex,g,comm); netIndex++;
+	adaptAlgs->tests();
+	MPI_Barrier(comm);
+#ifdef SUMMARY_ON
+	FEM_Print_Mesh_Summary(mesh);
+#endif
+
+	
 	CkPrintf("Starting shared vertex remove on individual chunks\n");
 
 	int svr[2];
@@ -690,7 +702,7 @@ driver(void)
 	FEM_Print_Mesh_Summary(mesh);
 #endif
 	ret_op = ada->vertex_remove(svr[0],svr[1]);
-	publish_data_netfem(netIndex,g); netIndex++;
+	publish_data_netfem(netIndex,g,comm); netIndex++;
 #ifdef SUMMARY_ON
 	FEM_Print_Mesh_Summary(mesh);
 #endif
@@ -698,28 +710,35 @@ driver(void)
 	CkPrintf("Starting Local edge contract on individual chunks\n");
 	int contract[2];
 	if(rank == 0) {
-	  contract[1] = 15;
-	  contract[0] = 8;
+	  contract[1] = 20;
+	  contract[0] = 21;
 	}
 	else if(rank == 1) {
 	  contract[0] = 10;
-	  contract[1] = 20;
+	  contract[1] = 9;
 	}
 	else if(rank == 2) {
-	  contract[0] = 15;
-	  contract[1] = 4;
+	  contract[0] = 1;
+	  contract[1] = 2;
 	}
 	else {
 	  contract[0] = 0;
 	  contract[1] = 1;
 	}
-
+	
 #ifdef SUMMARY_ON
 	FEM_Print_Mesh_Summary(mesh);
 #endif
 	ret_op = ada->edge_contraction(contract[0],contract[1]);
-	publish_data_netfem(netIndex,g); netIndex++;
+	publish_data_netfem(netIndex,g,comm); netIndex++;
 	adaptAlgs->tests();
+	MPI_Barrier(comm);
+
+	//if(rank==2) adaptAlgs->simple_coarsen(0.00004);
+	if(rank==0) ret_op = ada->edge_contraction(21,8); //21,8
+	publish_data_netfem(netIndex,g,comm); netIndex++;
+	adaptAlgs->tests();
+	MPI_Barrier(comm);
 
 	CkPrintf("Starting Local edge bisect on individual chunks\n");
 	int bisect[2];
@@ -740,7 +759,7 @@ driver(void)
 	  bisect[1] = 1;
 	}
 	ret_op = ada->edge_bisect(bisect[0],bisect[1]);
-	publish_data_netfem(netIndex,g); netIndex++;
+	publish_data_netfem(netIndex,g,comm); netIndex++;
 	adaptAlgs->tests();
 	MPI_Barrier(comm);
 	
@@ -775,7 +794,7 @@ driver(void)
 	//FEM_Print_Mesh_Summary(mesh);
 #endif
 	//ret_op = ada->vertex_split(vs[0],vs[1],vs[2]);
-	//publish_data_netfem(netIndex,g); netIndex++;
+	//publish_data_netfem(netIndex,g,comm); netIndex++;
 #ifdef SUMMARY_ON
 	FEM_Print_Mesh_Summary(mesh);
 #endif
@@ -804,7 +823,7 @@ driver(void)
 	FEM_Print_Mesh_Summary(mesh);
 #endif
 	ret_op = ada->edge_contraction(scontract[0],scontract[1]);
-	publish_data_netfem(netIndex,g); netIndex++;
+	publish_data_netfem(netIndex,g,comm); netIndex++;
 	/*
 	//CkPrintf("Starting shared vertex split on individual chunks\n");
 	int svs[3];
@@ -832,7 +851,7 @@ driver(void)
 	//FEM_Print_Mesh_Summary(mesh);
 #endif
 	//ret_op = ada->vertex_split(svs[0],svs[1],svs[2]);
-	//publish_data_netfem(netIndex,g); netIndex++;
+	//publish_data_netfem(netIndex,g,comm); netIndex++;
 #ifdef SUMMARY_ON
 	FEM_Print_Mesh_Summary(mesh);
 #endif
@@ -858,7 +877,7 @@ driver(void)
 	}
 
 	adaptAlgs->refine_element_leb(leb_elem[0]);
-	publish_data_netfem(netIndex,g); netIndex++;
+	publish_data_netfem(netIndex,g,comm); netIndex++;
 	*/
 	/*
 	  int nEle;
@@ -867,39 +886,44 @@ driver(void)
 	  for (int i=0; i<nEle; i++)
 	  if (FEM_is_valid(mesh, FEM_ELEM, i))
 	  adaptAlgs->refine_element_leb(i);
-	  publish_data_netfem(netIndex,g); netIndex++;
+	  publish_data_netfem(netIndex,g,comm); netIndex++;
 	  FEM_Print_Mesh_Summary(mesh);
 	  //}
 	  */
 
       
-      double targetArea = 0.0000004;
+      double targetArea = 0.00004;
       
       for(int tstep = 0; tstep < 0; tstep++) {
-	adaptAlgs->simple_refine(targetArea);
-	publish_data_netfem(netIndex,g); netIndex++;
-	adaptAlgs->tests();
-	MPI_Barrier(comm);
-	
+	int ret = -1;
+	//for(int tstep1=0; tstep1<60; tstep1++) {
+	  while(ret==-1) {
+	  ret = adaptAlgs->simple_refine(targetArea);
+	  publish_data_netfem(netIndex,g,comm); netIndex++;
+	  adaptAlgs->tests();
+	  MPI_Barrier(comm);
+	}
 	//int *nodes = new int[g.nnodes];
 	//for (int i=0; i<g.nnodes; i++) nodes[i]=i;	
 	//FEM_mesh_smooth(mesh, nodes, g.nnodes, FEM_DATA+0);
-	//publish_data_netfem(netIndex,g); netIndex++;
+	//publish_data_netfem(netIndex,g,comm); netIndex++;
 	//delete [] nodes;
 
 #ifdef SUMMARY_ON
 	FEM_Print_Mesh_Summary(mesh);
 #endif
-	
-	adaptAlgs->simple_coarsen(targetArea);
-	publish_data_netfem(netIndex,g); netIndex++;
-	adaptAlgs->tests();
-	MPI_Barrier(comm);
-	
+	ret = -1;
+	//for(int tstep1=0; tstep1<60; tstep1++) {
+	while(ret==-1) {
+	  ret = adaptAlgs->simple_coarsen(targetArea);
+	  publish_data_netfem(netIndex,g,comm); netIndex++;
+	  adaptAlgs->tests();
+	  MPI_Barrier(comm);
+	}
 	//int *nodes = new int[g.nnodes];
 	//for (int i=0; i<g.nnodes; i++) nodes[i]=i;
 	//FEM_mesh_smooth(mesh, nodes, g.nnodes, FEM_DATA+0);
-	//publish_data_netfem(netIndex,g); netIndex++;
+	//publish_data_netfem(netIndex,g,comm); netIndex++;
 	//delete [] nodes;
 
 #ifdef SUMMARY_ON
@@ -907,18 +931,21 @@ driver(void)
 #endif
       }
 
-      targetArea = 0.0000004;
-      
-      for(int tstep = 0; tstep < 0; tstep++) {
-	adaptAlgs->simple_refine(targetArea);
-	publish_data_netfem(netIndex,g); netIndex++;
-	adaptAlgs->tests();
-	MPI_Barrier(comm);
-	
+      targetArea *= 0.5;
+      for(int tstep = 0; tstep < 4; tstep++) {
+	int ret = -1;
+	//for(int tstep1=0; tstep1<60; tstep1++) {
+	while(ret==-1) {
+	  ret = adaptAlgs->simple_refine(targetArea);
+	  publish_data_netfem(netIndex,g,comm); netIndex++;
+	  adaptAlgs->tests();
+	  MPI_Barrier(comm);
+	}
+
 	//int *nodes = new int[g.nnodes];
 	//for (int i=0; i<g.nnodes; i++) nodes[i]=i;	
 	//FEM_mesh_smooth(mesh, nodes, g.nnodes, FEM_DATA+0);
-	//publish_data_netfem(netIndex,g); netIndex++;
+	//publish_data_netfem(netIndex,g,comm); netIndex++;
 	//delete [] nodes;
 
 
@@ -927,21 +954,25 @@ driver(void)
 	FEM_Print_Mesh_Summary(mesh);
 #endif
       }
-      targetArea /= 0.4;
+      targetArea *= 2.0;
       
       for(int tstep = 0; tstep < 0; tstep++) {
-	adaptAlgs->simple_coarsen(targetArea);
-	publish_data_netfem(netIndex,g); netIndex++;
-	adaptAlgs->tests();
-	MPI_Barrier(comm);
-	
+	int ret = -1;
+	//for(int tstep1=0; tstep1<60;tstep1++) {
+	while(ret==-1) {
+	  ret = adaptAlgs->simple_coarsen(targetArea);
+	  //MPI_Barrier(comm);
+	  publish_data_netfem(netIndex,g,comm); netIndex++;
+	  adaptAlgs->tests();
+	  MPI_Barrier(comm);
+	}
 	//int *nodes = new int[g.nnodes];
 	//for (int i=0; i<g.nnodes; i++) nodes[i]=i;
 	//FEM_mesh_smooth(mesh, nodes, g.nnodes, FEM_DATA+0);
-	//publish_data_netfem(netIndex,g); netIndex++;
+	//publish_data_netfem(netIndex,g,comm); netIndex++;
 	//delete [] nodes;
 
-	targetArea *= 1.5;
+	targetArea *= 2.0;
 #ifdef SUMMARY_ON
 	FEM_Print_Mesh_Summary(mesh);
 #endif
@@ -956,13 +987,13 @@ driver(void)
       for(int tstep = 0; tstep < 0; tstep++) {
 	targetArea = 0.000002;
 	adaptAlgs->simple_refine(targetArea, xmin, ymin, xmax, ymax);
-	publish_data_netfem(netIndex,g); netIndex++;
+	publish_data_netfem(netIndex,g,comm); netIndex++;
 #ifdef SUMMARY_ON
 	FEM_Print_Mesh_Summary(mesh);
 #endif
 	targetArea = 0.0000014;
 	adaptAlgs->simple_coarsen(targetArea, xmin, ymin, xmax, ymax);
-	publish_data_netfem(netIndex,g); netIndex++;
+	publish_data_netfem(netIndex,g,comm); netIndex++;
 #ifdef SUMMARY_ON
 	FEM_Print_Mesh_Summary(mesh);
 #endif
@@ -981,20 +1012,20 @@ driver(void)
       for(int tstep = 0; tstep < 0; tstep++) {
 	targetArea = 0.000025;
 	adaptAlgs->simple_refine(targetArea, xmin, ymin, xmax, ymax);
-	publish_data_netfem(netIndex,g); netIndex++;
+	publish_data_netfem(netIndex,g,comm); netIndex++;
 #ifdef SUMMARY_ON
 	FEM_Print_Mesh_Summary(mesh);
 #endif
 	targetArea = 0.00005;
 	adaptAlgs->simple_coarsen(targetArea, xmin, ymin, xmax, ymax);
-	//publish_data_netfem(netIndex,g); netIndex++;
+	//publish_data_netfem(netIndex,g,comm); netIndex++;
 #ifdef SUMMARY_ON
 	FEM_Print_Mesh_Summary(mesh);
 #endif
 	/*if(tstep > 2) {
 	  targetArea = 0.000025;
 	  adaptAlgs->simple_refine(targetArea, xcrackmin, ymin, xcrackmax, ymax);
-	  //publish_data_netfem(netIndex,g); netIndex++;
+	  //publish_data_netfem(netIndex,g,comm); netIndex++;
 #ifdef SUMMARY_ON
 	  FEM_Print_Mesh_Summary(mesh);
 #endif
@@ -1006,6 +1037,51 @@ driver(void)
 	ymin += 0.02;
 	ymax += 0.02;
       }
+
+      bool adapted = true;
+      for(int j=0; j<0; j++) {
+	int i=0;
+	adapted = false;
+	if(rank==2) {
+	  for(i=0; i<meshP->elem[0].ghost->size(); i++) {
+	    if(meshP->elem[0].ghost->is_valid(i)) {
+	      adapted = true;
+	      break;
+	    }
+	  }
+	}
+	if(adapted) {
+	  //lock the nodes
+	  int conn[3];
+	  bool done = false;
+	  int *gotlocks = (int*)malloc(3*sizeof(int));
+	  bool bailout = false;
+	  while(!done) {
+	    if(meshP->elem[0].ghost->is_valid(i)) {
+	      meshP->e2n_getAll(FEM_To_ghost_index(i),conn,0);
+	      int gotlock = ada->lockNodes(gotlocks, conn, 0, conn, 3);
+	      if(gotlock==1) done = true;
+	    }
+	    else {
+	      bailout = true;
+	      break;
+	    }
+	  }
+	  if(!bailout) {
+	    int newEl = meshP->getfmMM()->fmUtil->eatIntoElement(FEM_To_ghost_index(i));
+	    meshP->e2n_getAll(newEl,conn,0);
+	    //FEM_Modify_correctLockN(meshP, conn[0]);
+	    //FEM_Modify_correctLockN(meshP, conn[1]);
+	    //FEM_Modify_correctLockN(meshP, conn[2]);
+	    ada->unlockNodes(gotlocks, conn, 0, conn, 3);
+	    free(gotlocks);
+	  }
+	}
+	publish_data_netfem(netIndex,g,comm); netIndex++;
+	adaptAlgs->tests();
+	MPI_Barrier(comm);
+      }
+
       /*
     //Debugging/perf. output
     double curTime=CkWallTimer();
@@ -1049,7 +1125,7 @@ driver(void)
 #ifdef SUMMARY_ON
       FEM_Print_Mesh_Summary(mesh);
 #endif
-      //publish_data_netfem(netIndex,g); netIndex++;
+      publish_data_netfem(netIndex,g,comm); netIndex++;
       
       CkExit();
   }
