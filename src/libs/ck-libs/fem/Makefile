@@ -1,21 +1,14 @@
 CDIR=../../../..
 CHARMC=$(CDIR)/bin/charmc $(OPTS)
 
-HEADERS= fem.h femf.h fem_mesh.h fem_impl.h parallel_part.h map.h \
-		 fem_mesh_modify.h  fem_adapt_new.h fem_collide.h         \
-		 fem_adapt_algs.h fem_interpolate.h fem_lock.h fem_util.h \
-		 fem_lock_node.h fem_adapt_lock.h fem_adapt_if.h     
 
-GENHEADERS= FEMMeshModify.decl.h fem.decl.h FEMMeshModify.def.h
-
-HEADDEP= $(GENHEADERS) $(HEADERS)
-
-OBJS=fem.o fem_mesh.o symmetries.o partition.o map.o fem_compat.o \
-	 call_init.o parallel_part.o fem_mesh_modify.o                \
-	 fem_mesh_adjacency.o fem_adapt_new.o fem_adapt_algs.o        \
-	 fem_interpolate.o fem_lock.o fem_util.o fem_lock_node.o      \
-	 fem_adapt_lock.o fem_collide.o                               
-
+HEADERS=fem.h femf.h fem_mesh.h fem_impl.h parallel_part.h map.h  fem_mesh_modify.h FEMMeshModify.decl.h fem_adapt_new.h fem_adapt_algs.h fem_interpolate.h fem_lock.h fem_util.h fem_lock_node.h fem_adapt_lock.h fem_adapt_if.h
+HEADDEP=$(HEADERS) fem_impl.h 
+OBJS=fem.o fem_mesh.o symmetries.o \
+	partition.o map.o fem_compat.o call_init.o \
+	parallel_part.o fem_mesh_modify.o fem_mesh_adjacency.o \
+	fem_adapt_new.o fem_adapt_algs.o fem_interpolate.o \
+	fem_lock.o fem_util.o fem_lock_node.o fem_adapt_lock.o
 COMPAT=compat_init.o compat_finit.o compat_driver.o compat_fdriver.o 
 LIB=libmodulefem
 
@@ -23,46 +16,104 @@ LIBDIR=$(CDIR)/lib
 DEST=$(LIBDIR)/$(LIB).a
 COMPATLIB=$(LIBDIR)/libfem-compat.a
 
-#Should this be here?:
 FEMMAIN=$(LIBDIR)/libfemmain.o
 
-#Automatic rules:
-.SUFFIXES: .c .o .C .decl.h .ci .def.h
-.ci.decl.h: $< $(HEADERS)
-	$(CHARMC) $<
-.ci.def.h: $< $(HEADERS)
-	$(CHARMC) $<
-.c.o: $< $(HEADDEP)
-	$(CHARMC) -c $<
-.C.o: $< $(HEADDEP)
+.SUFFIXES:
+.SUFFIXES: .c .o
+
+.c.o:
 	$(CHARMC) -c $<
 
 all: $(DEST) $(COMPATLIB) $(FEMMAIN)
 
-
-#Manual rules since some dependencies are a little screwy. These should be fixed
-fem_mesh_modify.o: $(HEADDEP)
-	$(CHARMC) -c fem_mesh_modify.C
-FEMMeshModify.decl.h: $(HEADERS)
-	$(CHARMC) fem_mesh_modify.ci
-FEMMeshModify.def.h: $(HEADERS)
-	$(CHARMC) fem_mesh_modify.ci
-
-# Build libmodulefem
-$(DEST): $(OBJS) $(COMPAT) headers $(HEADDEP)
+$(DEST): $(OBJS) $(COMPAT) headers
 	$(CHARMC) $(OBJS) -o $@
 	cp $(LIB).dep $(LIBDIR)/$(LIB).dep
 
-# Build libfem-compat
 $(COMPATLIB): $(COMPAT)
 	$(CHARMC) $(COMPAT) -o $@
 
-# Copy header files to include directory
 headers: $(HEADERS)
 	cp $(HEADERS) $(CDIR)/include/
 	cp vector2d.h $(CDIR)/include/
 	touch headers
 
-# clean up
+compat_init.o: compat_init.c
+
+compat_finit.o: compat_finit.c
+
+compat_driver.o: compat_driver.c
+
+compat_fdriver.o: compat_fdriver.c
+
+fem.o: fem.C $(HEADDEP)
+	$(CHARMC) -c fem.C
+
+partition.o: partition.C $(HEADDEP)
+	$(CHARMC) -c partition.C
+
+fem.decl.h: fem.ci 
+	$(CHARMC) fem.ci
+
+parallel_part.o: parallel_part.C fem.decl.h $(HEADDEP)
+	$(CHARMC) -c parallel_part.C
+
+map.o: map.C $(HEADDEP)
+	$(CHARMC) -c map.C
+
+symmetries.o: symmetries.C $(HEADDEP)
+	$(CHARMC) -c symmetries.C
+
+datatype.o: datatype.C $(HEADDEP)
+	$(CHARMC) -c datatype.C
+
+fem_compat.o: fem_compat.C $(HEADDEP)
+	$(CHARMC) -c fem_compat.C
+
+fem_mesh.o: fem_mesh.C $(HEADDEP)
+	$(CHARMC) -c fem_mesh.C
+
+#fem_adapt.o: fem_adapt.C $(HEADDEP)
+#	$(CHARMC) -c fem_adapt.C
+
+fem_adapt_new.o: fem_adapt_new.C $(HEADDEP)
+	$(CHARMC) -c fem_adapt_new.C
+
+fem_adapt_algs.o: fem_adapt_algs.C $(HEADDEP)
+	$(CHARMC) -c fem_adapt_algs.C
+
+fem_interpolate.o: fem_interpolate.C $(HEADDEP)
+	$(CHARMC) -c fem_interpolate.C
+
+fem_lock.o: fem_lock.C $(HEADDEP)
+	$(CHARMC) -c fem_lock.C
+
+fem_util.o: fem_util.C $(HEADDEP)
+	$(CHARMC) -c fem_util.C
+
+fem_lock_node.o: fem_lock_node.C $(HEADDEP)
+	$(CHARMC) -c fem_lock_node.C
+
+fem_adapt_lock.o: fem_adapt_lock.C $(HEADDEP)
+	$(CHARMC) -c fem_adapt_lock.C
+
+fem_comm.o: fem_comm.C $(HEADDEP)
+	$(CHARMC) -c fem_comm.C
+
+$(FEMMAIN): femmain.C $(HEADDEP)
+	$(CHARMC) -c femmain.C -o $(FEMMAIN)
+
+call_init.o: call_init.c
+	$(CHARMC) -c call_init.c
+
+FEMMeshModify.decl.h: fem_mesh_modify.ci
+	$(CHARMC) fem_mesh_modify.ci
+
+fem_mesh_modify.o: FEMMeshModify.decl.h fem_mesh_modify.C fem_mesh_modify.h $(HEADDEP)
+	$(CHARMC) -c fem_mesh_modify.C
+
+fem_mesh_adjacency.o: fem_mesh_adjacency.C $(HEADDEP)
+	$(CHARMC) -c fem_mesh_adjacency.C
+
 clean:
 	rm -rf *.a *.def.h *.decl.h *.o SunWS_cache $(DEST) $(COMPATLIB) headers
