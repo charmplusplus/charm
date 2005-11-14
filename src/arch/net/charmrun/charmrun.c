@@ -663,7 +663,9 @@ void arg_init(int argc, char **argv)
      processor gdbs. The stderr is redirected to the stdout, so the two streams
      are mixed together. The channel for stderr is reused to forward the replies
      of gdb back to the java debugger. */
+#if !defined(_WIN32)
   pparam_flag(&arg_charmdebug,    0, "charmdebug",    "Used only when charmrun is started by charmdebug");
+#endif
 
   pparam_int(&arg_maxrsh,        16, "maxrsh",        "Maximum number of rsh's to run at a time");
   pparam_str(&arg_shell,          0, "remote-shell",  "which remote shell to use");
@@ -1937,6 +1939,7 @@ int main(int argc, char **argv, char **envp)
       start_nodes_local(envp);
 #endif
 
+#if !defined(_WIN32)
   if (arg_charmdebug) {
     /* Open an additional connection to node 0 with a gdb to grab info */
     printf("opening connection with node 0 for info gdb\n");
@@ -1944,6 +1947,7 @@ int main(int argc, char **argv, char **envp)
     gdb_stream = fdopen(dup(2), "a");
     dup2(1, 2);
   }
+#endif
 
   if(arg_verbose) fprintf(stderr, "Charmrun> node programs all started\n");
 
