@@ -385,6 +385,8 @@ void TopoLB::initDataStructures(CentralLB::LDStats *stats,int count,int *newmap)
       }
     }
   }
+  /*****FIXED A MEMORY LEAK******/
+  delete[] multicastAdded;
 
   /***************************/
   //Just a test
@@ -693,7 +695,9 @@ void TopoLB::performMapping(int *newmap, int count)
 #endif
     
   }
-  
+ 
+  /****FIXED a memory leak******/
+  delete [] distnew;
   /******************  Fill out final composition Mapping **************************/
 
 }

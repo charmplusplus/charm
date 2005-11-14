@@ -51,7 +51,6 @@ CmiBool TopoCentLB::QueryBalanceNow (int _step)
 }
 
 TopoCentLB::~TopoCentLB(){
-	if(partgraph)	delete partgraph;
 	if(topo) delete topo;
 }
 
@@ -698,6 +697,8 @@ void TopoCentLB :: work(CentralLB::LDStats *stats,int count)
 
 	delete[] hopCount;
 	delete[] heapMapping;
+	
+  delete partgraph;
 }
 
 #include "TopoCentLB.def.h"

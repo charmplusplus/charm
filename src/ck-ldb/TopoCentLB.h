@@ -81,6 +81,9 @@ class TopoCentLB : public CentralLB
         for(int i=0;i<n_nodes;i++)
           delete[] nodes[i].obj_list;
         delete[] nodes;
+        
+        for(int i=0;i<n_nodes;i++)
+          delete[] edges[i];
         delete[] edges;
       }
     //private:
