@@ -1,6 +1,7 @@
 #!/bin/sh
 ##############################################################################
-# unix2nt_cc: Maps UNIX C/C++ compiler command-line options to 
+# unix2nt_cc:  for VC++ ver 8
+# Maps UNIX C/C++ compiler command-line options to 
 # Microsoft Visual C++ 6.0 command line options. 
 # That is, this script is a UNIX-ifying wrapper for 
 # the NT CL and LINK commands. 
@@ -21,13 +22,11 @@ then
 fi
 
 # Configurable option: Location of MSDEV
-#VCC_DIR="C:/Program Files/Microsoft Visual Studio/Vc98"
 VCC_DIR="C:/Program Files/Microsoft Visual Studio 8/VC"
 SDK_DIR="C:/Program Files/Microsoft Platform SDK"
 
 #CL command-line options for -O and -g mode
 CL_CMD="$VCC_DIR/BIN/CL.EXE"
-#CL_COMMON=' /nologo /W3 /GB /GX /DWIN32 /D_WINDOWS /FD /Zp4 '
 CL_COMMON=' /nologo /W3 /EHsc /DWIN32 /D_WINDOWS /FD /Zp4'
 CL_COMMON="$CL_COMMON /I`cygpath -d \"$SDK_DIR/Include\"`"
 CL_O=$CL_COMMON" /DNDEBUG /MT /Ox"
@@ -38,13 +37,16 @@ CL_DLL="/LD"
 #LINK command-line options for -O and -g mode
 LINK_CMD="$VCC_DIR/BIN/LINK.EXE"
 LINK_COMMON='/nologo /subsystem:console '
+LINK_COMMON="$LINK_COMMON /LIBPATH:`cygpath -d \"$SDK_DIR/Lib\"`"
 LINK_O=$LINK_COMMON
 LINK_DEF=$LINK_COMMON
 LINK_G="$LINK_COMMON /DEBUG"
 #LINK_POST='ws2_32.lib kernel32.lib user32.lib gdi32.lib winspool.lib 
 #  comdlg32.lib advapi32.lib shell32.lib ole32.lib oleaut32.lib uuid.lib 
 #  odbc32.lib odbccp32.lib /SUBSYSTEM:CONSOLE /INCREMENTAL:NO /MACHINE:IX86 '
-LINK_POST='/MACHINE:X86 /ERRORREPORT:PROMPT kernel32.lib'
+LINK_POST='ws2_32.lib kernel32.lib user32.lib gdi32.lib winspool.lib
+  comdlg32.lib advapi32.lib shell32.lib ole32.lib oleaut32.lib uuid.lib 
+  /MACHINE:X86 /ERRORREPORT:PROMPT '
 
 if [ "x$LIB" = "x" ]
 then
