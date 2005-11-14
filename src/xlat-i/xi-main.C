@@ -77,7 +77,7 @@ void abortxi(char *name)
   exit(1) ;
 }
 
-main(int argc, char *argv[])
+int main(int argc, char *argv[])
 {
   char *fname=NULL;
   fortranMode = 0;
