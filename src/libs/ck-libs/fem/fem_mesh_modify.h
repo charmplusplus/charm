@@ -203,10 +203,12 @@ class chunkListMsg : public CMessage_chunkListMsg {
  public:
   int numChunkList;
   int *chunkList;
+  int *indexList;
 
   ~chunkListMsg() {
-    if(chunkList) {
+    if(numChunkList>0) {
       delete chunkList;
+      delete indexList;
     }
   }
 };
@@ -342,6 +344,8 @@ class femMeshModify : public CBase_femMeshModify {
 
   intMsg *getIdxGhostSend(int fromChk, int idxshared, int toChk);
   void updateIdxlList(int fromChk, int idxTrans, int transChk);
+  void removeIDXLRemote(int fromChk, int sharedIdx, int type);
+  void addTransIDXLRemote(int fromChk, int sharedIdx, int type);
   void verifyIdxlList(int fromChk, int size, int type);
 
   void idxllockRemote(int fromChk, int type);

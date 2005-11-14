@@ -25,6 +25,7 @@ module FEMMeshModify {
   };
   message chunkListMsg {
     int chunkList[];
+    int indexList[];
   };
   message addElemMsg {
     int conn[];
@@ -66,6 +67,8 @@ module FEMMeshModify {
     entry [sync,threaded] intMsg *getRemoteBound(int, int);
     entry [sync,threaded] intMsg *getIdxGhostSend(int, int, int);
     entry [sync,threaded] void updateIdxlList(int, int, int);
+    entry [sync,threaded] void removeIDXLRemote(int, int, int);
+    entry [sync,threaded] void addTransIDXLRemote(int, int, int);
     entry [sync,threaded] void verifyIdxlList(int, int, int);
     entry [sync,threaded] void idxllockRemote(int, int);
     entry [sync,threaded] void idxlunlockRemote(int, int);
