@@ -9,7 +9,8 @@
 ##############################################################################
 
 # Configurable option: Location of MSDEV
-VCC_DIR="C:/Program Files/Microsoft Visual Studio/Vc98"
+#VCC_DIR="C:/Program Files/Microsoft Visual Studio/Vc98"
+VCC_DIR="C:/Program Files/Microsoft Visual Studio 8/VC"
 
 LIB_CMD="$VCC_DIR/BIN/LIB.EXE"
 LIB_OPTS='/nologo'
