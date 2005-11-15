@@ -129,7 +129,8 @@ bool FEM_MUtil::isShared(int index) {
 
 //An IDXL helper function which is same as splitEntity, but instead of just adding to this chunk's
 //idxl list, it will add to the idxl lists of all chunks.
-void FEM_MUtil::splitEntityAll(FEM_Mesh *m, int localIdx, int nBetween, int *between, int idxbase)
+//degenerate now, unless we find some use for it in 3D
+void FEM_MUtil::splitEntityAll(FEM_Mesh *m, int localIdx, int nBetween, int *between)
 {
   //Find the commRecs for the surrounding nodes
   IDXL_Side *c = &(m->node.shared);
@@ -137,10 +138,10 @@ void FEM_MUtil::splitEntityAll(FEM_Mesh *m, int localIdx, int nBetween, int *bet
   
   //Make a new commRec as the interesection of the surrounding entities--
   // we loop over the first entity's comm. list
-  tween[0] = c->getRec(between[0] - idxbase);
+  tween[0] = c->getRec(between[0]);
   for (int zs=tween[0]->getShared()-1; zs>=0; zs--) {
     for (int w1=0; w1<nBetween; w1++) {
-      tween[w1] = c->getRec(between[w1]-idxbase);
+      tween[w1] = c->getRec(between[w1]);
     }
     int chk = tween[0]->getChk(zs);
 #ifdef DEBUG 
@@ -171,24 +172,43 @@ void FEM_MUtil::splitEntityAll(FEM_Mesh *m, int localIdx, int nBetween, int *bet
 	  }
 	}
       }
-      sharedNodeMsg *fm = new (2, 0) sharedNodeMsg;
+      sharedNodeMsg *fm = new (nBetween, 0) sharedNodeMsg;
       fm->chk = mmod->idx;
       fm->nBetween = nBetween;
       for(int j=0; j<nBetween; j++) {
 	fm->between[j] = sharedIndices[j];
       }
       meshMod[chk].addSharedNodeRemote(fm);
-      //idxlunlock(m,chk,0);
       idxlunlock(m,chk,0); //coarser lock
       free(sharedIndices);
-      //break;
     }
   }
   free(tween);
   return;
 }
 
-void FEM_MUtil::splitEntityRemote(FEM_Mesh *m, int chk, int localIdx, int nBetween, int *between, int idxbase)
+//adds this new shared node to chunks only which share this edge(n=2) or face(n=3)
+void FEM_MUtil::splitEntitySharing(FEM_Mesh *m, int localIdx, int nBetween, int *between, int numChunks, int *chunks)
+{
+  for(int i=0; i<numChunks; i++) {
+    int chk = chunks[i];
+    if(chk==idx) continue;
+    sharedNodeMsg *fm = new (nBetween, 0) sharedNodeMsg;
+    fm->chk = idx;
+    fm->nBetween = nBetween;
+    for(int j=0; j<nBetween; j++) {
+      fm->between[j] = exists_in_IDXL(m,between[j],chk,0);
+      CkAssert(fm->between[j]!=-1);
+    }
+    idxllock(m,chk,0); //coarser lock
+    m->node.shared.addNode(localIdx,chk); //add in the shared entry of this chunk
+    meshMod[chk].addSharedNodeRemote(fm);
+    idxlunlock(m,chk,0); //coarser lock
+  }
+  return;
+}
+
+void FEM_MUtil::splitEntityRemote(FEM_Mesh *m, int chk, int localIdx, int nBetween, int *between)
 {
   //convert the shared indices to local indices
   int *localIndices = (int *)malloc(nBetween*sizeof(int));
@@ -209,7 +229,7 @@ void FEM_MUtil::splitEntityRemote(FEM_Mesh *m, int chk, int localIdx, int nBetwe
   nm.frac = 0.5;
   inp->FEM_InterpolateNodeOnEdge(nm);
 
-  splitEntity(m->node.shared, localIdx, nBetween, localIndices, idxbase);
+  m->node.shared.addNode(localIdx,chk);
   free(localIndices);
   return;
 }
@@ -523,7 +543,7 @@ void FEM_MUtil::addElemRemote(FEM_Mesh *m, int chk, int elemtype, int connSize, 
 #ifdef DEBUG 
   CmiMemoryCheck(); 
 #endif
-  FEM_add_element(m, localIndices, connSize, elemtype);
+  FEM_add_element(m, localIndices, connSize, elemtype, idx);
   free(localIndices);
   return;
 }
@@ -583,17 +603,32 @@ void FEM_MUtil::removeGhostElementRemote(FEM_Mesh *m, int chk, int elementid, in
 #ifdef DEBUG 
   CmiMemoryCheck(); 
 #endif
-  if(numSharedIndex > 0) { //a shared node became ghost
+  if(numSharedIndex > 0) { //a shared node or corner became ghost
     const IDXL_List lsn = m->node.shared.addList(chk);
     for(int i=0; i<numSharedIndex; i++) {
       bool flag1 = true;
-      if(sharedIndices[i]<0) {
+      /*if(sharedIndices[i]<-500000000) {
+	//a corner, local node, became ghost
+	const IDXL_List lgrn = m->node.ghost->ghostRecv.addList(chk);
+	if(sharedIndices[i]<-1000000000) {
+	  sharedIndices[i] += 500000000;
+	  flag1 = false;
+	}
 	sharedIndices[i] += 1000000000;
-	flag1 = false;
+	localIdx = lgrn[sharedIndices[i]];
+	if(flag1) m->node.ghostSend.addNode(localIdx, chk);
+	//ghostrecv remove will be done in addtosharedlist
+	//will need to add a new node on this chunk
       }
-      localIdx = lsn[sharedIndices[i]];
-      if(flag1) m->node.ghostSend.addNode(localIdx, chk);
-      m->node.shared.removeNode(localIdx, chk);
+      else */{
+	if(sharedIndices[i]<0 && sharedIndices[i]>=-500000000) {
+	  sharedIndices[i] += 500000000;
+	  flag1 = false;
+	}
+	localIdx = lsn[sharedIndices[i]];
+	if(flag1) m->node.ghostSend.addNode(localIdx, chk);
+	m->node.shared.removeNode(localIdx, chk);
+      }
     }
   }
 

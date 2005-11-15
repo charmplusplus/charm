@@ -386,22 +386,6 @@ int FEM_Adapt::edge_bisect_help(int e1, int e2, int n1, int n2, int e1_n1,
   printAdjacencies(locknodes, numNodes, lockelems, numElems);
 #endif
 
-  //add node
-  int *adjnodes = (int*)malloc(2*sizeof(int));
-  adjnodes[0] = n1;
-  adjnodes[1] = n2;
-  int forceshared = 0;
-  if(e1>=0 && e2>=0) {
-    forceshared = -1;
-  }
-  n5 = FEM_add_node(theMesh,adjnodes,2,n5chunk,forceshared,0);
-  //lock this node immediately
-  FEM_Modify_LockN(theMesh, n5, 0);
-#ifdef DEBUG_2
-  CkPrintf("Adjacencies after add node %d\n",n5);
-  printAdjacencies(locknodes, numNodesNew, lockelems, numElemsNew);
-#endif
-
   //remove elements
   double e1Sz = theMesh->elem[0].getMeshSizing(e1);
   e1chunk = FEM_remove_element(theMesh, e1, 0); 
@@ -418,6 +402,35 @@ int FEM_Adapt::edge_bisect_help(int e1, int e2, int n1, int n2, int e1_n1,
   lockelems[1] = -1;
   CkPrintf("Adjacencies after remove element %d\n",e2);
   printAdjacencies(locknodes, numNodes, lockelems, numElems);
+#endif
+
+  //add node
+  int *adjnodes = (int*)malloc(2*sizeof(int));
+  adjnodes[0] = n1;
+  adjnodes[1] = n2;
+  int *chunks;
+  int numChunks=0;
+  int forceshared = 0;
+  if(e1chunk==e2chunk || (e1chunk==-1 || e2chunk==-1)) {
+    forceshared = -1;
+    numChunks = 1;
+    chunks = new int[1];
+    if(e1chunk!=-1) chunks[0] = e1chunk;
+    else chunks[0] = e2chunk;
+  }
+  else {
+    numChunks = 2;
+    chunks = new int[2];
+    chunks[0] = e1chunk;
+    chunks[1] = e2chunk;
+  }
+  n5 = FEM_add_node(theMesh,adjnodes,2,chunks,numChunks,forceshared,0);
+  delete[] chunks;
+  //lock this node immediately
+  FEM_Modify_LockN(theMesh, n5, 0);
+#ifdef DEBUG_2
+  CkPrintf("Adjacencies after add node %d\n",n5);
+  printAdjacencies(locknodes, numNodesNew, lockelems, numElemsNew);
 #endif
 
   // hmm... if e2 is a ghost and we remove it and create all the new elements
@@ -1128,7 +1141,10 @@ int FEM_Adapt::vertex_split_help(int n, int n1, int n2, int e1, int e3)
 #endif
   int *adjnodes = (int*)malloc(2*sizeof(int));
   adjnodes[0] = n; //looks like it will never be shared, since according to later code, all n1, n & n2 should be local.. appears to be not correct
-  int np = FEM_add_node(theMesh,adjnodes,1,-1,0,0);
+  //the new node will be shared to wahtever the old node was shared to, we'll do this later
+  int *chunks;
+  int numChunks = 0;
+  int np = FEM_add_node(theMesh,adjnodes,1,chunks,numChunks,0,0);
   locknodes[3] = np;
 #ifdef DEBUG_2
   CkPrintf("Adjacencies after add node %d\n",np);

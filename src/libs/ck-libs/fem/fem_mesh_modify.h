@@ -47,7 +47,7 @@ extern CProxy_femMeshModify meshMod;
 
 
 // The internal functions which take in a FEM_Mesh*, but could feasibly be used by others
-int FEM_add_node(FEM_Mesh *m, int* adjacent_nodes=0, int num_adjacent_nodes=0, int chunkNo=-1, int forceShared=0, int upcall=0);
+int FEM_add_node(FEM_Mesh *m, int* adjacent_nodes=0, int num_adjacent_nodes=0, int *chunks=0, int numChunks=0, int forceShared=0, int upcall=0);
 void FEM_remove_node(FEM_Mesh *m, int node);
 int FEM_remove_element(FEM_Mesh *m, int element, int elem_type=0, int permanent=-1);
 int FEM_add_element(FEM_Mesh *m, int* conn, int conn_size, int elem_type=0, int chunkNo=-1);
@@ -140,13 +140,15 @@ class addNodeMsg : public CMessage_addNodeMsg {
   int chk;
   int nBetween;
   int *between;
-  int chunkNo;
+  int *chunks;
+  int numChunks;
   int forceShared;
   int upcall;
 
   ~addNodeMsg() {
     if(between) {
       delete between;
+      delete chunks;
     }
   }
 };

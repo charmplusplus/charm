@@ -31,8 +31,9 @@ class FEM_MUtil {
   //chunks identifies the chunks that need to be locked
   void getChunkNos(int entType, int entNo, int *numChunks, IDXL_Share ***chunks, int elemType=0);
   bool isShared(int index);
-  void splitEntityAll(FEM_Mesh *m, int localIdx, int nBetween, int *between, int idxbase);
-  void splitEntityRemote(FEM_Mesh *m, int chk, int localIdx, int nBetween, int *between, int idxbase);
+  void splitEntityAll(FEM_Mesh *m, int localIdx, int nBetween, int *between);
+  void splitEntitySharing(FEM_Mesh *m, int localIdx, int nBetween, int *between, int numChunks, int *chunks);
+  void splitEntityRemote(FEM_Mesh *m, int chk, int localIdx, int nBetween, int *between);
   void removeNodeAll(FEM_Mesh *m, int localIdx);
   void removeNodeRemote(FEM_Mesh *m, int chk, int sharedIdx);
   int exists_in_IDXL(FEM_Mesh *m, int localIdx, int chk, int type, int elemType=0);

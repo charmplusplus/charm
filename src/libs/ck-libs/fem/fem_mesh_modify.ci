@@ -18,6 +18,7 @@ module FEMMeshModify {
   message removeSharedNodeMsg;
   message addNodeMsg {
     int between[];
+    int chunks[];
   };
   message addGhostElemMsg {
     int ghostIndices[];
