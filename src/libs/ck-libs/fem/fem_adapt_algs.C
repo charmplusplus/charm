@@ -174,10 +174,10 @@ int FEM_Adapt_Algs::Coarsen(int qm, int method, double factor, double *sizes)
       elId=Delete_Min(1);
       if ((elId != -1) && (theMesh->elem[0].is_valid(elId))) {
 	int *eConn = (int*)malloc(elemWidth*sizeof(int));
-	int n1, n2;
 	theMesh->e2n_getAll(elId, eConn);
+	int n1=eConn[0], n2=eConn[1];
 	double tmpLen, avgEdgeLength=0.0, 
-	  minEdgeLength = length(eConn[0], eConn[1]);
+	  minEdgeLength = length(n1, n2);
 	for (int j=0; j<elemWidth-1; j++) {
 	  for (int k=j+1; k<elemWidth; k++) {
 	    tmpLen = length(eConn[j], eConn[k]);
@@ -188,6 +188,7 @@ int FEM_Adapt_Algs::Coarsen(int qm, int method, double factor, double *sizes)
 	    }
 	  }
 	}
+	CkAssert(n1!=-1 && n2!=-1);
 	avgEdgeLength /= 3.0;
 	qFactor=getAreaQuality(elId);
 	// coarsen element's short edge
