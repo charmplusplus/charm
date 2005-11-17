@@ -53,7 +53,7 @@ Displaying lower priority messages doesn't stop higher priority ones.
 #define MACHINE_DEBUG_PRIO 3
 #define MACHINE_DEBUG_LOG 1 /**Controls whether output goes to log file*/
 
-FILE *debugLog;
+extern FILE *debugLog;
 # define MACHSTATE_I(prio,args) if ((debugLog)&&(prio)>=MACHINE_DEBUG_PRIO) {\
 	fprintf args ; fflush(debugLog); }
 # define MACHSTATE(prio,str) \
