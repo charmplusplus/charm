@@ -252,7 +252,7 @@ int  portFinish = 0;
 #  define SIGBUS -1  /*These signals don't exist in Win32*/
 #  define SIGKILL -1
 #  define SIGQUIT -1
-#  define SIGTERM -1
+/*#  define SIGTERM -1*/       /* VC++ ver 8 now has SIGTERM */
 
 #else /*UNIX*/
 #  include <pwd.h>
@@ -977,7 +977,7 @@ static void pingCharmrun(void *ignored)
 {
   double clock=GetClock();
   if (clock > Cmi_check_last + Cmi_check_delay) {
-    MACHSTATE2(2,"CommunicationsClock pinging charmrun comm_flag=%d Cmi_charmrun_fd_sendflag=%d", comm_flag, Cmi_charmrun_fd_sendflag);
+    MACHSTATE1(2,"CommunicationsClock pinging charmrun Cmi_charmrun_fd_sendflag=%d", Cmi_charmrun_fd_sendflag);
     Cmi_check_last = clock; 
 #if CMK_USE_GM
     if (!Cmi_netpoll)  /* GM netpoll, charmrun service is done in interrupt */
@@ -1224,7 +1224,7 @@ static int servicingStdout;
 static void CmiStdoutInit(void) {
 	int i;
 	if (Cmi_charmrun_fd==-1) return; /* standalone mode */
-	
+
 /*There's some way to do this same thing in windows, but I don't know how*/
 #if !defined(_WIN32) || defined(__CYGWIN__)
 	/*Prevent buffering in stdio library:*/
@@ -2206,6 +2206,10 @@ static int net_default_skt_abort(int code,const char *msg)
   return -1;
 }
 
+#if MACHINE_DEBUG_LOG
+FILE *debugLog = NULL;
+#endif
+
 void ConverseInit(int argc, char **argv, CmiStartFn fn, int usc, int everReturn)
 {
 #if MACHINE_DEBUG
@@ -2263,6 +2267,7 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usc, int everReturn)
   }
 #endif
 
+    /* NOTE: can not acutally call timer before timerInit ! GZ */
   MACHSTATE2(5,"Init: (netpoll=%d), (idlepoll=%d)",Cmi_netpoll,Cmi_idlepoll);
 
   skt_set_idle(obtain_idleFn);
