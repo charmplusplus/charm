@@ -1312,6 +1312,10 @@ static void CmiNotifyStillIdle(CmiIdleState *s)
 #endif
 }
 
+#if MACHINE_DEBUG_LOG
+FILE *debugLog = NULL;
+#endif
+
 static void ConverseRunPE(int everReturn)
 {
   CmiIdleState *s=CmiNotifyGetState();
