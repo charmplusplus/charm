@@ -403,6 +403,18 @@ int FEM_AdaptL::edge_contraction(int n1, int n2) {
     if(ret==ERVAL1) {
       //get new nodes, IT has ALL locks
       isEdge = findAdjData(n1, n2, &e1, &e2, &e1_n1, &e1_n2, &e1_n3, &e2_n1, &e2_n2, &e2_n3,&n3, &n4);
+      if(isEdge == -1) {
+	if(locked) {
+	  //if we have lost the entire region, nothing will be unlocked, as all nodes will be invalid
+	  //so it needs to be handled in the aquiring step itself.
+	  unlockNodes(gotlocks, locknodes, 0, locknodes, numNodes);
+	  locked = false;
+	}
+	CkPrintf("Edge contract %d->%d not done as it is no longer a valid edge\n",n1,n2);
+	free(locknodes);
+	free(gotlocks);
+	return -1;
+      }
       /*FEM_Modify_correctLockN(theMesh, n1);
       FEM_Modify_correctLockN(theMesh, n2);
       FEM_Modify_correctLockN(theMesh, n3);
@@ -554,9 +566,12 @@ int FEM_AdaptL::edge_contraction_help(int e1, int e2, int n1, int n2, int e1_n1,
 	    int sharedIdx = theMod->fmUtil->exists_in_IDXL(theMesh,e1,e1remoteChk,3);
 	    CkPrintf("[%d]Edge Contraction, edge %d->%d, chunk %d eating into chunk %d\n",theMod->idx, n1, n2, e1remoteChk, index);
 	    e1new = meshMod[e1remoteChk].eatIntoElement(index,sharedIdx)->i;
-	    e1 = theMod->fmUtil->lookup_in_IDXL(theMesh,e1new,e1remoteChk,4);
-	    //theMesh->n2e_getAll(deletenode, &nbrElems, &nesize);
-	    e1 = FEM_To_ghost_index(e1);
+	    if(e1new!=-1) {
+	      e1 = theMod->fmUtil->lookup_in_IDXL(theMesh,e1new,e1remoteChk,4);
+	      //theMesh->n2e_getAll(deletenode, &nbrElems, &nesize);
+	      e1 = FEM_To_ghost_index(e1);
+	    }
+	    else e1 = -1;
 	    free(e1Elems);
 	    return ERVAL1;
 	  }
@@ -594,9 +609,12 @@ int FEM_AdaptL::edge_contraction_help(int e1, int e2, int n1, int n2, int e1_n1,
 	    int sharedIdx = theMod->fmUtil->exists_in_IDXL(theMesh,e2,e2remoteChk,3);
 	    CkPrintf("[%d]Edge Contraction, edge %d->%d, chunk %d eating into chunk %d\n",theMod->idx, n1, n2, e2remoteChk, index);
 	    e2new = meshMod[e2remoteChk].eatIntoElement(index,sharedIdx)->i;
-	    e2 = theMod->fmUtil->lookup_in_IDXL(theMesh,e2new,e2remoteChk,4);
-	    //theMesh->n2e_getAll(deletenode, &nbrElems, &nesize);
-	    e2 = FEM_To_ghost_index(e2);
+	    if(e2new!=-1) {
+	      e2 = theMod->fmUtil->lookup_in_IDXL(theMesh,e2new,e2remoteChk,4);
+	      //theMesh->n2e_getAll(deletenode, &nbrElems, &nesize);
+	      e2 = FEM_To_ghost_index(e2);
+	    }
+	    else e2 = -1;
 	    free(e2Elems);
 	    return ERVAL1;
 	  }

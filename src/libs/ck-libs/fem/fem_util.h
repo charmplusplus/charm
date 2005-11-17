@@ -51,6 +51,8 @@ class FEM_MUtil {
   int Replace_node_local(FEM_Mesh *m, int oldIdx, int newIdx);
   void addToSharedList(FEM_Mesh *m, int fromChk, int sharedIdx);
   int eatIntoElement(int localIdx);
+  int getLockOwner(int nodeId);
+  bool knowsAbtNode(int chk, int nodeId);
   void UpdateGhostSend(int nodeId);
 
   void StructureTest(FEM_Mesh *m);

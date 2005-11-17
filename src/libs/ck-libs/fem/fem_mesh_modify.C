@@ -12,8 +12,6 @@
 #include "fem_impl.h"
 #include "fem_mesh_modify.h"
 
-#define MAX_CHUNK 1000000
-
 CProxy_femMeshModify meshMod;
 
 
@@ -1364,6 +1362,7 @@ int FEM_Modify_LockN(FEM_Mesh *m, int nodeId, int readlock) {
     else {
       int sharedIdx = m->getfmMM()->getfmUtil()->exists_in_IDXL(m,nodeId,minChunk,0);
       if(sharedIdx < 0) return -1;
+      CkAssert(minChunk!=MAX_CHUNK);
       if(readlock) {
 	return meshMod[minChunk].lockRemoteNode(sharedIdx, index, 0, 1)->i;
       } else {
@@ -1392,6 +1391,7 @@ int FEM_Modify_LockN(FEM_Mesh *m, int nodeId, int readlock) {
     if(numchunks!=0) free(chunks1);
     int sharedIdx = m->getfmMM()->getfmUtil()->exists_in_IDXL(m,nodeId,minChunk,2);
     if(sharedIdx < 0) return -1;
+    CkAssert(minChunk!=MAX_CHUNK);
     if(readlock) {
       return meshMod[minChunk].lockRemoteNode(sharedIdx, index, 1, 1)->i;
     } else {
@@ -1439,6 +1439,7 @@ int FEM_Modify_UnlockN(FEM_Mesh *m, int nodeId, int readlock) {
       }
     }
     else {
+      CkAssert(minChunk!=MAX_CHUNK);
       int sharedIdx = m->getfmMM()->getfmUtil()->exists_in_IDXL(m,nodeId,minChunk,0);
       if(readlock) {
 	return meshMod[minChunk].unlockRemoteNode(sharedIdx, index, 0, 1)->i;
@@ -1463,6 +1464,7 @@ int FEM_Modify_UnlockN(FEM_Mesh *m, int nodeId, int readlock) {
       delete chunks1[j];
     }
     if(numchunks!=0) free(chunks1);
+    CkAssert(minChunk!=MAX_CHUNK);
     int sharedIdx = m->getfmMM()->getfmUtil()->exists_in_IDXL(m,nodeId,minChunk,2);
     if(readlock) {
       return meshMod[minChunk].unlockRemoteNode(sharedIdx, index, 1, 1)->i;
@@ -1581,6 +1583,7 @@ void FEM_Modify_correctLockN(FEM_Mesh *m, int nodeId) {
 	  if(minChunk==index) done = m->getfmMM()->getfmLockN(nodeId)->wlock(index);
 	  else {
 	    int sharedIdx = m->getfmMM()->getfmUtil()->exists_in_IDXL(m,nodeId,minChunk,0);
+	    CkAssert(minChunk!=MAX_CHUNK);
 	    done = meshMod[minChunk].lockRemoteNode(sharedIdx, index, 0, 0)->i;
 	  }
 	  break;
@@ -1981,10 +1984,85 @@ intMsg *femMeshModify::eatIntoElement(int fromChk, int sharedIdx) {
   if(localIdx==-1) return imsg;
   int newEl = fmUtil->eatIntoElement(FEM_To_ghost_index(localIdx));
   int returnIdx = fmUtil->exists_in_IDXL(fmMesh, newEl, fromChk, 3);
-  CkAssert(returnIdx!=-1);
+  //CkAssert(returnIdx!=-1); //returnIdx=-1 means that it was a discontinuous part
+  if(returnIdx==-1) {
+    //the other node has lost the entire region, unlock all the nodes involved
+    //if there is a node 'fromChk' doesn't know about, but it is holding a lock on it, unlock it
+    const int nodesPerEl = fmMesh->elem[0].getConn().width(); // should be the number of nodes that can be adjacent to this element
+    int *adjnodes = new int[nodesPerEl];
+    int numLocks = nodesPerEl + 1; //for 2D.. will be different for 3D
+    int *lockednodes = new int[numLocks];
+    fmMesh->e2n_getAll(newEl, adjnodes, 0);
+    //get the other node, which will be on an element that is an e2e of newEl
+    //and which fromChk doesn't know abt, but has a lock on
+    int *adjelems = new int[nodesPerEl];
+    fmMesh->e2e_getAll(newEl, adjelems, 0);
+    int *nnds = new int[nodesPerEl];
+    int newNode = -1;
+    bool foundNewNode = false;
+    for(int i=0; i<nodesPerEl; i++) {
+      if(adjelems[i]!=-1) {
+	fmMesh->e2n_getAll(adjelems[i], nnds, 0);
+	for(int j=0; j<nodesPerEl; j++) {
+	  bool istarget = true;
+	  for(int k=0; k<nodesPerEl; k++) {
+	    if(nnds[j]==adjnodes[k]) {
+	      istarget = false;
+	    }
+	  }
+	  //get the owner of the lock
+	  if(istarget) {
+	    int lockowner = fmUtil->getLockOwner(nnds[j]);
+	    if(lockowner==fromChk) {
+	      bool knows = fmUtil->knowsAbtNode(fromChk,nnds[j]);
+	      //fromChk doesn't know abt this node
+	      if(!knows) {
+		newNode = nnds[j];
+		foundNewNode = true;
+		break;
+	      }
+	    }
+	  }
+	  if(foundNewNode) break;
+	}
+      }
+      if(foundNewNode) break;
+    }
+    int *gotlocks = new int[numLocks];
+    for(int i=0; i<nodesPerEl; i++) {
+      lockednodes[i] = adjnodes[i];
+      gotlocks[i] = 1;
+    }
+    if(foundNewNode) {
+      lockednodes[nodesPerEl] = newNode;
+      gotlocks[nodesPerEl] = 1;
+    }
+    else numLocks--;
+    fmAdaptL->unlockNodes(gotlocks, lockednodes, 0, lockednodes, numLocks);
+    delete[] lockednodes;
+    delete[] gotlocks;
+    delete[] adjnodes;
+    delete[] adjelems;
+    delete[] nnds;
+  }
   imsg->i = returnIdx;
   return imsg;
 }
+
+intMsg *femMeshModify::getLockOwner(int fromChk, int sharedIdx) {
+  int localIdx = fmUtil->lookup_in_IDXL(fmMesh, sharedIdx, fromChk, 0);
+  int ret = fmUtil->getLockOwner(localIdx);
+  intMsg *imsg = new intMsg(ret);
+  return imsg;
+}
+
+boolMsg *femMeshModify::knowsAbtNode(int fromChk, int toChk, int sharedIdx) {
+  int localIdx = fmUtil->lookup_in_IDXL(fmMesh, sharedIdx, fromChk, 1);
+  bool ret = fmUtil->knowsAbtNode(toChk,localIdx);
+  boolMsg *bmsg = new boolMsg(ret);
+  return bmsg;
+}
+
 
 void femMeshModify::refine_flip_element_leb(int fromChk, int propElemT, 
 					    int propNodeT, int newNodeT, 

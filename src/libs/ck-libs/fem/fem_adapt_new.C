@@ -386,25 +386,23 @@ int FEM_Adapt::edge_bisect_help(int e1, int e2, int n1, int n2, int e1_n1,
   printAdjacencies(locknodes, numNodes, lockelems, numElems);
 #endif
 
-  //remove elements
-  double e1Sz = theMesh->elem[0].getMeshSizing(e1);
-  e1chunk = FEM_remove_element(theMesh, e1, 0); 
-#ifdef DEBUG_2
-  CkPrintf("Adjacencies after remove element %d\n",e1);
-  lockelems[0] = -1;
-  printAdjacencies(locknodes, numNodes, lockelems, numElems);
-#endif
-  double e2Sz = -1.0; 
-  if (e2 != -1) e2Sz = theMesh->elem[0].getMeshSizing(e2);
-  e2chunk = FEM_remove_element(theMesh, e2, 0);  // assumes intelligent behavior when no e2 exists
-
-#ifdef DEBUG_2
-  lockelems[1] = -1;
-  CkPrintf("Adjacencies after remove element %d\n",e2);
-  printAdjacencies(locknodes, numNodes, lockelems, numElems);
-#endif
-
   //add node
+  if(e1==-1) e1chunk=-1;
+  else if(e1>=0) e1chunk=index;
+  else {
+    int ghostid = FEM_To_ghost_index(e1);
+    const IDXL_Rec *irec = theMesh->elem[0].ghost->ghostRecv.getRec(ghostid);
+    CkAssert(irec->getShared()==1);
+    e1chunk = irec->getChk(0);
+  }
+  if(e2==-1) e2chunk=-1;
+  else if(e2>=0) e2chunk=index;
+  else {
+    int ghostid = FEM_To_ghost_index(e2);
+    const IDXL_Rec *irec = theMesh->elem[0].ghost->ghostRecv.getRec(ghostid);
+    CkAssert(irec->getShared()==1);
+    e2chunk = irec->getChk(0);
+  }
   int *adjnodes = (int*)malloc(2*sizeof(int));
   adjnodes[0] = n1;
   adjnodes[1] = n2;
@@ -431,6 +429,24 @@ int FEM_Adapt::edge_bisect_help(int e1, int e2, int n1, int n2, int e1_n1,
 #ifdef DEBUG_2
   CkPrintf("Adjacencies after add node %d\n",n5);
   printAdjacencies(locknodes, numNodesNew, lockelems, numElemsNew);
+#endif
+
+  //remove elements
+  double e1Sz = theMesh->elem[0].getMeshSizing(e1);
+  e1chunk = FEM_remove_element(theMesh, e1, 0); 
+#ifdef DEBUG_2
+  CkPrintf("Adjacencies after remove element %d\n",e1);
+  lockelems[0] = -1;
+  printAdjacencies(locknodes, numNodes, lockelems, numElems);
+#endif
+  double e2Sz = -1.0; 
+  if (e2 != -1) e2Sz = theMesh->elem[0].getMeshSizing(e2);
+  e2chunk = FEM_remove_element(theMesh, e2, 0);  // assumes intelligent behavior when no e2 exists
+
+#ifdef DEBUG_2
+  lockelems[1] = -1;
+  CkPrintf("Adjacencies after remove element %d\n",e2);
+  printAdjacencies(locknodes, numNodes, lockelems, numElems);
 #endif
 
   // hmm... if e2 is a ghost and we remove it and create all the new elements
@@ -1278,6 +1294,7 @@ int FEM_Adapt::findAdjData(int n1, int n2, int *e1, int *e2, int *e1n1,
   (*e1n1) = (*e1n2) = (*e1n3) = (*n3) = -1;
 
   //if n1,n2 is not an edge return 
+  if(theMesh->node.is_valid(n1)==0 || theMesh->node.is_valid(n2)==0) return -1;
   if(theMesh->n2n_exists(n1,n2)!=1 || theMesh->n2n_exists(n2,n1)!=1) return -1; 
 
   (*e1) = theMesh->getElementOnEdge(n1, n2); // assumed to return local element

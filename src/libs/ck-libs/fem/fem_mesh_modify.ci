@@ -8,6 +8,7 @@ module FEMMeshModify {
   readonly CProxy_femMeshModify meshMod;
 
   message femMeshModMsg;
+  message boolMsg;
   message intMsg;
   message int2Msg;
   message double2Msg;
@@ -74,6 +75,8 @@ module FEMMeshModify {
     entry [sync,threaded] void idxllockRemote(int, int);
     entry [sync,threaded] void idxlunlockRemote(int, int);
     entry [sync,threaded] intMsg* eatIntoElement(int, int);
+    entry [sync,threaded] intMsg *getLockOwner(int, int);
+    entry [sync,threaded] boolMsg *knowsAbtNode(int, int, int);
     entry [sync,threaded] intMsg* hasLockRemoteNode(int, int, int);
   };
 };

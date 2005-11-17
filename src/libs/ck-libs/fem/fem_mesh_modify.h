@@ -45,6 +45,8 @@ adjacent elements.
 
 extern CProxy_femMeshModify meshMod;
 
+#define MAX_CHUNK 1000000000
+
 
 // The internal functions which take in a FEM_Mesh*, but could feasibly be used by others
 int FEM_add_node(FEM_Mesh *m, int* adjacent_nodes=0, int num_adjacent_nodes=0, int *chunks=0, int numChunks=0, int forceShared=0, int upcall=0);
@@ -85,6 +87,17 @@ class femMeshModMsg : public CMessage_femMeshModMsg {
   }
   
   ~femMeshModMsg() {}
+};
+
+class boolMsg : public CMessage_boolMsg {
+ public:
+  bool b;
+
+  boolMsg(bool bo) {
+    b = bo;
+  }
+
+  ~boolMsg() {}
 };
 
 class intMsg : public CMessage_intMsg {
@@ -333,6 +346,9 @@ class femMeshModify : public CBase_femMeshModify {
   void removeGhostNode(int fromChk, int sharedIdx);
 
   intMsg *eatIntoElement(int fromChk, int sharedIdx);
+  intMsg *getLockOwner(int fromChk, int sharedIdx);
+  boolMsg *knowsAbtNode(int fromChk, int toChk, int sharedIdx);
+
   void refine_flip_element_leb(int fromChk, int propElemT, int propNodeT,
 			       int newNodeT, int nbrOpNodeT, int nbrghost,
 			       double longEdgeLen);

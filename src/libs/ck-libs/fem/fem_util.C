@@ -901,6 +901,59 @@ int FEM_MUtil::eatIntoElement(int localIdx) {
   return newEl;
 }
 
+int FEM_MUtil::getLockOwner(int nodeId) {
+  int owner = -1;
+  if(nodeId>=0) {//it is local/shared
+    const IDXL_Rec *irec = mmod->fmMesh->node.shared.getRec(nodeId);
+    //find the minchunk
+    int minchunk = MAX_CHUNK;
+    if(irec) {
+      for(int i=0; i<irec->getShared(); i++) {
+	int pchk = irec->getChk(i);
+	if(pchk<minchunk) minchunk = pchk;
+      }
+    }
+    else minchunk = idx;
+    if(minchunk == idx) owner = mmod->fmMesh->getfmMM()->getfmLockN(nodeId)->lockOwner();
+    else {
+      int sharedIdx = mmod->getfmUtil()->exists_in_IDXL(mmod->fmMesh,nodeId,minchunk,0);
+      owner = meshMod[minchunk].hasLockRemoteNode(sharedIdx, idx, 0)->i;
+    }
+  }
+  else {
+    int otherchk = mmod->fmMesh->node.ghost->ghostRecv.getRec(FEM_From_ghost_index(nodeId))->getChk(0);
+    int sharedIdx = mmod->fmMesh->node.ghost->ghostRecv.getRec(FEM_From_ghost_index(nodeId))->getIdx(0);
+    owner = meshMod[otherchk].getLockOwner(idx, sharedIdx)->i;
+  }
+  CkAssert(owner != -1);
+  return owner;
+}
+
+bool FEM_MUtil::knowsAbtNode(int chk, int nodeId) {
+  if(nodeId >= 0) {
+    const IDXL_Rec *irec = mmod->fmMesh->node.ghostSend.getRec(nodeId);
+    if(irec) {
+      for(int i=0; i<irec->getShared(); i++) {
+	if(irec->getChk(i) == chk) return true;
+      }
+    }
+    irec = mmod->fmMesh->node.shared.getRec(nodeId);
+    if(irec) {
+      for(int i=0; i<irec->getShared(); i++) {
+	if(irec->getChk(i) == chk) return true;
+      }
+    }
+  }
+  else { // it is a ghost on this chunk
+    //find any chunk that owns it
+    int owner = mmod->fmMesh->node.ghost->ghostRecv.getRec(FEM_From_ghost_index(nodeId))->getChk(0);
+    int sharedIdx = mmod->fmMesh->node.ghost->ghostRecv.getRec(FEM_From_ghost_index(nodeId))->getIdx(0);
+    //does 'chk' know abt 'nodeId' in owner
+    return meshMod[owner].knowsAbtNode(idx, chk, sharedIdx)->b;
+  }
+  return false;
+}
+
 void FEM_MUtil::StructureTest(FEM_Mesh *m) {
   int noNodes = m->node.size();
   int noEle = m->elem[0].size();
