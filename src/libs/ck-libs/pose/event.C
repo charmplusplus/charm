@@ -53,7 +53,7 @@ void Event::pup(PUP::er &p)
     p(msgSize); // unpack msgSize
     if (msgSize > 0) { // if nonzero, unpack msg
       msg = (eventMsg *)CmiAlloc(msgSize); // allocate space
-      p(msg, msgSize); // unpack into space
+      p((char *)msg, msgSize); // unpack into space
       msg = (eventMsg *)EnvToUsr((envelope *)msg); // reset msg pointer
     }
     else // empty message
@@ -63,7 +63,7 @@ void Event::pup(PUP::er &p)
     if (msg != NULL) { // msg is not null
       msgSize = (UsrToEnv(msg))->getTotalsize(); // get msg size
       p(msgSize); // pack msg size
-      p(UsrToEnv(msg), msgSize); // pack from start of envelope
+      p((char *)(UsrToEnv(msg)), msgSize); // pack from start of envelope
     }
     else { // msg is null
       msgSize = 0;                           
