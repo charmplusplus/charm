@@ -1,4 +1,11 @@
 #!/bin/sh
+
+if test "$OS" = 'Windows_NT'
+then
+  junction=`which createlink 2>/dev/null`
+fi
+test x$junction = x && junction='cp -f'
+
 srcs=` echo $* | awk '{ for (i=1; i<NF; i++) printf "%s ", $i}'`
 dest=` echo $* | awk '{ printf $NF}'`
 test -z "$srcs" && exit 0
@@ -17,12 +24,20 @@ fi
 
 for src in $srcs
 do
-while [ ! -r $src ] 
-do
+  while [ ! -r $src ] 
+  do
 #Strip one ../ from the source path
-	src=`echo $src | awk -F/ '{printf "%s",$2;for (i=3;i<=NF;i++) printf "/%s",$i}'`
-done
-test -n "$src" && cp -f $src $dest
+    src=`echo $src | awk -F/ '{printf "%s",$2;for (i=3;i<=NF;i++) printf "/%s",$i}'`
+  done
+  if test -n "$src" 
+  then
+    destFile=$dest
+    test -d $dest && destFile=$dest/`basename $src`
+    echo $junction $src $destFile
+    $junction $src $destFile
+    status=$?
+    test $status -ne 0 && echo "ERROR" &&exit $status
+  fi
 done
 
-
+exit 0
