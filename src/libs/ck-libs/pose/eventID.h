@@ -6,6 +6,10 @@
 #include "charm++.h"
 #include "limits.h"
 
+#ifdef WIN32
+#define snprintf _snprintf
+#endif
+
 /// Unique identifier for a POSE event
 class eventID 
 {
