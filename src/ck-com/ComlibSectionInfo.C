@@ -1,4 +1,8 @@
+#include "charm++.h" // for CMK_HAS_ALLOCA_H
+
+#if CMK_HAS_ALLOCA_H
 #include <alloca.h>
+#endif
 
 #include "ComlibManager.h"
 #include "ComlibSectionInfo.h"
