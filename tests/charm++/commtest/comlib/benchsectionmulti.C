@@ -278,7 +278,7 @@ public:
 
     void ResumeFromSync() {
         ComlibResetSectionProxy(&sproxy);
-        myinst.setSourcePe();
+        //myinst.setSourcePe();
         sendMessage();
     }
 

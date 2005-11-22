@@ -288,7 +288,7 @@ public:
 
     //Resume from loadbalancing
     void ResumeFromSync() {
-        myinst.setSourcePe();
+      //myinst.setSourcePe();
         sendMessage();
     }
 

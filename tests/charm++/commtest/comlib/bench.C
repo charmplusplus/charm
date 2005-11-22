@@ -287,7 +287,7 @@ public:
     //Finished loadbalancing
     void ResumeFromSync() {
         //        CkPrintf("%d: resuming\n", CkMyPe());
-        myInst.setSourcePe();
+        //myInst.setSourcePe();
 	sendMessage();
     }
 
