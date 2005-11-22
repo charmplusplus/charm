@@ -34,6 +34,7 @@ class FEM_lockN {
   int wlock(int own);
   int wunlock(int own);
   bool haslocks();
+  bool verifyLock(void);
   int lockOwner();
   int getIdx() { return idx; }
 };

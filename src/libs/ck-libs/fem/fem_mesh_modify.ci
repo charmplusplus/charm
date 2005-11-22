@@ -78,5 +78,7 @@ module FEMMeshModify {
     entry [sync,threaded] intMsg *getLockOwner(int, int);
     entry [sync,threaded] boolMsg *knowsAbtNode(int, int, int);
     entry [sync,threaded] intMsg* hasLockRemoteNode(int, int, int);
+    entry [sync,threaded] void modifyLockAll(int, int);
+    entry [sync,threaded] boolMsg *verifyLock(int, int, int);
   };
 };

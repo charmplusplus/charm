@@ -16,6 +16,7 @@ int FEM_AdaptL::lockNodes(int *gotlocks, int *lockrnodes, int numRNodes, int *lo
   int numNodes = numRNodes + numWNodes;
   for(int i=0; i<numNodes; i++) gotlocks[i] = 0;
   int tryCounts=0;
+  int ret = 1;
 
   while(!donelocks) {
     for(int i=0; i<numRNodes; i++) {
@@ -24,9 +25,15 @@ int FEM_AdaptL::lockNodes(int *gotlocks, int *lockrnodes, int numRNodes, int *lo
 	continue;
       }
       if(FEM_Is_ghost_index(lockrnodes[i])) {
-	if(!theMesh->node.ghost->is_valid(FEM_To_ghost_index(lockrnodes[i]))) return -1;
+	if(!theMesh->node.ghost->is_valid(FEM_To_ghost_index(lockrnodes[i]))) {
+	  ret = -2;
+	  break;
+	}
       } else {
-	if(!theMesh->node.is_valid(lockrnodes[i])) return -1;
+	if(!theMesh->node.is_valid(lockrnodes[i])) {
+	  ret = -2;
+	  break;
+	}
       }
       if(gotlocks[i]<=0) gotlocks[i] = FEM_Modify_LockN(theMesh, lockrnodes[i], 1);
     }
@@ -36,12 +43,27 @@ int FEM_AdaptL::lockNodes(int *gotlocks, int *lockrnodes, int numRNodes, int *lo
 	continue;
       }
       if(FEM_Is_ghost_index(lockwnodes[i])) {
-	if(!theMesh->node.ghost->is_valid(FEM_To_ghost_index(lockwnodes[i]))) return -1;
+	if(!theMesh->node.ghost->is_valid(FEM_To_ghost_index(lockwnodes[i]))) {
+#ifdef DEBUG_LOCKS
+	  CkPrintf("[%d] Trying to lock invalid ghost %d\n",theMod->idx,lockwnodes[i]);
+#endif
+	  ret = -2;
+	  break;
+	}
       } else {
-	if(!theMesh->node.is_valid(lockwnodes[i])) return -1;
+	if(!theMesh->node.is_valid(lockwnodes[i])) {
+#ifdef DEBUG_LOCKS
+	  CkPrintf("[%d] Trying to lock invalid node %d\n",theMod->idx,lockwnodes[i]);
+#endif
+	  ret = -2;
+	  break;
+	}
       }
-      if(gotlocks[numRNodes+i]<=0) gotlocks[numRNodes+i] = FEM_Modify_LockN(theMesh, lockwnodes[i], 0);
+      if(gotlocks[numRNodes+i]<=0) {
+	gotlocks[numRNodes+i] = FEM_Modify_LockN(theMesh, lockwnodes[i], 0);
+      }
     }
+    if(ret==-2) return ret;
     bool tmplocks = true;
     for(int i=0; i<numNodes; i++) {
       tmplocks = tmplocks && (gotlocks[i]>0);
@@ -92,12 +114,18 @@ int FEM_AdaptL::unlockNodes(int *gotlocks, int *lockrnodes, int numRNodes, int *
       if(FEM_Is_ghost_index(lockwnodes[i])) {
 	if(!theMesh->node.ghost->is_valid(FEM_To_ghost_index(lockwnodes[i]))) {
 	  gotlocks[i] = -1;
+#ifdef DEBUG_LOCKS
+	  CkPrintf("[%d] Trying to unlock invalid ghost %d\n",theMod->idx,lockwnodes[i]);
+#endif
 	  //free(ungetlocks);
 	  //return -1;
 	}
       } else {
 	if(!theMesh->node.is_valid(lockwnodes[i])) {
 	  gotlocks[i] = -1;
+#ifdef DEBUG_LOCKS
+	  CkPrintf("[%d] Trying to unlock invalid node %d\n",theMod->idx,lockwnodes[i]);
+#endif
 	  //free(ungetlocks);
 	  //return -1;
 	}
@@ -361,26 +389,22 @@ int FEM_AdaptL::edge_contraction(int n1, int n2) {
   int ret = -1;
   bool warned = false;
 
+  bool invalidcoarsen = false;
   if(n1<0 || n2<0) {
+    invalidcoarsen = true;
+  }
+  if(!theMesh->node.is_valid(n1)) {
+    invalidcoarsen = true;
+  }
+  if(!theMesh->node.is_valid(n2)) {
+    invalidcoarsen = true;
+  }
+  if(invalidcoarsen) {
     free(locknodes);
     free(gotlocks);
+    CkPrintf("Warning: Trying to coarsen invalid edge %d - %d\n",n1,n2);
     return -1; //should not contract an edge which is not local
   }
-  /*
-  //if either of the nodes is on the boundary, do not contract
-  int n1_bound, n2_bound;
-  FEM_Mesh_dataP(theMesh, FEM_NODE, FEM_BOUNDARY, &n1_bound, n1, 1 , FEM_INT, 1);   
-  FEM_Mesh_dataP(theMesh, FEM_NODE, FEM_BOUNDARY, &n2_bound, n2, 1 , FEM_INT, 1);   
-  CkVec<FEM_Attribute *>*attrs = (theMesh->node).getAttrVec();
-  for (int i=0; i<attrs->size(); i++) {
-    FEM_Attribute *a = (FEM_Attribute *)(*attrs)[i];
-    if (a->getAttr()==FEM_BOUNDARY) {
-      FEM_DataAttribute *d = (FEM_DataAttribute*)a;
-      if(d->getInt()[n1][0] < 0) return -1; //it is on the boundary
-      if(d->getInt()[n2][0] < 0) return -1; //it is on the boundary
-    }
-  }
-  */
   isEdge = findAdjData(n1, n2, &e1, &e2, &e1_n1, &e1_n2, &e1_n3, &e2_n1, &e2_n2, &e2_n3,&n3, &n4);
   if(isEdge == -1) {
     CkPrintf("Edge Contract %d->%d not done as it is no longer a valid edge\n",n1,n2);
@@ -419,8 +443,6 @@ int FEM_AdaptL::edge_contraction(int n1, int n2) {
       FEM_Modify_correctLockN(theMesh, n2);
       FEM_Modify_correctLockN(theMesh, n3);
       FEM_Modify_correctLockN(theMesh, n4);*/ //shouldnot need to do it any more
-      locknodes[0] = n1;
-      locknodes[1] = n2;
       locknodes[2] = n3;
       locknodes[3] = n4;
       if (e1 == -1) {
@@ -448,6 +470,8 @@ int FEM_AdaptL::edge_contraction(int n1, int n2) {
     }
     if (e1 == -1 || e2==-1) {
       if(locked) {
+	locknodes[2] = n3;
+	locknodes[3] = n4;
 	unlockNodes(gotlocks, locknodes, 0, locknodes, numNodes);
 	locked = false;
       }
@@ -458,21 +482,21 @@ int FEM_AdaptL::edge_contraction(int n1, int n2) {
     if(gotlock==1 && locknodes[2]==n3 && locknodes[3]==n4) {
       int numtries1=0;
       ret = ERVAL;
-      while(ret==ERVAL && numtries1 < 10) {
+      while(ret==ERVAL && numtries1 < 5) {
 	ret = edge_contraction_help(e1, e2, n1, n2, e1_n1, e1_n2, e1_n3, e2_n1, e2_n2, e2_n3, n3, n4);
 	if(ret == ERVAL1) {
 	  done = false;
 	}
 	else if(ret == ERVAL) {
 	  numtries1++;
-	  if(numtries1 >= 10) {
+	  if(numtries1 >= 5) {
+	    locknodes[2] = n3;
+	    locknodes[3] = n4;
 	    if(locked) {
 	      unlockNodes(gotlocks, locknodes, 0, locknodes, numNodes);
 	      locked = false;
 	    }
-	    locknodes[2] = n3;
-	    locknodes[3] = n4;
-	    numtries++;
+	    numtries+=10;
 	  }
 	  CthYield();
 	}
@@ -483,6 +507,11 @@ int FEM_AdaptL::edge_contraction(int n1, int n2) {
       if(numtries>=50) {
 	//CkPrintf("Possibly a livelock in cloud nodes edge_contract\n");
 	//it is ok to skip an edge_contract, if the lock is too difficult to get
+	isEdge = findAdjData(n1, n2, &e1, &e2, &e1_n1, &e1_n2, &e1_n3, &e2_n1, &e2_n2, &e2_n3,&n3, &n4);
+	if(isEdge!=-1) {
+	  locknodes[2] = n3;
+	  locknodes[3] = n4;
+	}
 	if(locked) {
 	  unlockNodes(gotlocks, locknodes, 0, locknodes, numNodes);
 	  locked = false;
@@ -500,7 +529,7 @@ int FEM_AdaptL::edge_contraction(int n1, int n2) {
       locknodes[2] = n3;
       locknodes[3] = n4;
       numtries++;
-      if(numtries>=1000) {
+      if(numtries>=50) {
 	if(!warned) {
 	  //CkPrintf("[%d]Warning: Possibly a livelock in edge_contract %d & %d, supporting %d, %d. Avoiding this contract operation.\n",theMod->idx,n1,n2,n3,n4);
 	  warned = true;
@@ -514,6 +543,14 @@ int FEM_AdaptL::edge_contraction(int n1, int n2) {
     }
   }
   if(locked) {
+    int deletednode = -1;
+    if(ret==n1) deletednode = n2;
+    else if(ret==n2) deletednode = n1;
+    if(deletednode!=-1) {
+      for(int i=0; i<numNodes;i++) {
+	if(locknodes[i]==deletednode) locknodes[i]=-1;
+      }
+    }
     unlockNodes(gotlocks, locknodes, 0, locknodes, numNodes);
     locked = false;
   }
@@ -531,8 +568,47 @@ int FEM_AdaptL::edge_contraction_help(int e1, int e2, int n1, int n2, int e1_n1,
   int e1chunk=-1, e2chunk=-1;
   int index = theMod->getIdx();
 
-  if(n1==62 && n2==61) {
+  if(n1==8 && n2==15) {
     CkPrintf("Crit\n");
+  }
+
+  //if n1 & n2 are shared differently or are on two different boundaries return
+  int n1_shared=0, n2_shared=0;
+  bool same = true;
+  n1_shared = theMod->getfmUtil()->isShared(n1);
+  n2_shared = theMod->getfmUtil()->isShared(n2);
+  if(n1_shared && n2_shared) {
+    const IDXL_Rec *irec1 = theMesh->node.shared.getRec(n1);
+    const IDXL_Rec *irec2 = theMesh->node.shared.getRec(n2);
+    if(irec1->getShared() == irec2->getShared()) {
+      for(int i=0; i<irec1->getShared(); i++) {
+	same = false;
+	for(int j=0; j<irec2->getShared(); j++) {
+	  if(irec1->getChk(i) == irec2->getChk(j)) {
+	    same = true; break;
+	  }
+	}
+	if(!same) break;
+      }
+    }
+    else {
+      same = false;
+    }
+    if(!same) {
+      return -1;
+    }
+  }
+  int n1_bound, n2_bound;
+  FEM_Mesh_dataP(theMesh, FEM_NODE, FEM_BOUNDARY, &n1_bound, n1, 1 , FEM_INT, 1);
+  FEM_Mesh_dataP(theMesh, FEM_NODE, FEM_BOUNDARY, &n2_bound, n2, 1 , FEM_INT, 1);
+  if((n1_bound < 0) && (n2_bound < 0) && (n1_bound != n2_bound)) {
+    bool kcorner = isCorner(n1);
+    bool dcorner = isCorner(n2);
+    if((kcorner && !dcorner && abs(n1_bound-n2_bound)==1) || (dcorner && !kcorner && abs(n1_bound-n2_bound)==1)) {
+    }
+    else {
+      return -1;
+    }
   }
 
   //if e1 or e2 has a node which is connected to a node which would become a ghost after it is deleted, then let that other chunk eat into this, before the operation
@@ -631,19 +707,18 @@ int FEM_AdaptL::edge_contraction_help(int e1, int e2, int n1, int n2, int e1_n1,
   int *adjelems = (int*)malloc(2*sizeof(int));
   adjelems[0] = e1;
   adjelems[1] = e2;
-  int numtries = 0;
 
   //FEM_Modify_Lock(theMesh, adjnodes, 2, adjelems, 2);  
 
   //New code for updating a node rather than deleting both
-  int keepnode=-1, deletenode=-1, shared=0, n1_shared=0, n2_shared=0;
+  int keepnode=-1, deletenode=-1, shared=0;
 #ifdef DEBUG_1
   CkPrintf("[%d]Edge Contraction, edge %d->%d\n",theMod->idx, n1, n2);
 #endif
-  n1_shared = theMod->getfmUtil()->isShared(n1);
-  n2_shared = theMod->getfmUtil()->isShared(n2);
+  //n1_shared = theMod->getfmUtil()->isShared(n1);
+  //n2_shared = theMod->getfmUtil()->isShared(n2);
   if(n1_shared && n2_shared) {
-    bool same = true;
+    /*same = true;
     const IDXL_Rec *irec1 = theMesh->node.shared.getRec(n1);
     const IDXL_Rec *irec2 = theMesh->node.shared.getRec(n2);
     if(irec1->getShared() == irec2->getShared()) {
@@ -659,7 +734,7 @@ int FEM_AdaptL::edge_contraction_help(int e1, int e2, int n1, int n2, int e1_n1,
     }
     else {
       same = false;
-    }
+      }*/
     if(same) {
       keepnode = n1;
       deletenode = n2;
@@ -687,7 +762,6 @@ int FEM_AdaptL::edge_contraction_help(int e1, int e2, int n1, int n2, int e1_n1,
     deletenode = n2;
   }
 
-  int n1_bound, n2_bound;
   FEM_Mesh_dataP(theMesh, FEM_NODE, FEM_BOUNDARY, &n1_bound, keepnode, 1 , FEM_INT, 1);
   FEM_Mesh_dataP(theMesh, FEM_NODE, FEM_BOUNDARY, &n2_bound, deletenode, 1 , FEM_INT, 1);
   //update keepnode's attributes; choose frac wisely, check if either node is on the boundary, update frac
@@ -754,10 +828,11 @@ int FEM_AdaptL::edge_contraction_help(int e1, int e2, int n1, int n2, int e1_n1,
   }*/
 
 
-  CkVec<int> lockedNodes;
-  bool locked = false;
   int *nbrElems, nesize, echunk;
   theMesh->n2e_getAll(deletenode, &nbrElems, &nesize);
+  bool locked = false;
+  /*CkVec<int> lockedNodes;
+  int numtries = 0;
   for (int i=0; i<nesize; i++) {
     if ((nbrElems[i] != e1) && (nbrElems[i] != e2)) {
       theMesh->e2n_getAll(nbrElems[i], conn);
@@ -877,11 +952,6 @@ int FEM_AdaptL::edge_contraction_help(int e1, int e2, int n1, int n2, int e1_n1,
 	    unlockNodes(gotlocks1, lockw, 0, lockw, size);
 	    free(gotlocks1);
 	    free(lockw);
-	    /*if(locked) {
-	      CkPrintf("[%d]Trying to unlock %d(%d), %d(%d), & %d(%d)\n",theMod->idx,conn[0],gotlocks[0],conn[1],gotlocks[1],conn[2],gotlocks[2]);
-	      unlockNodes(gotlocks, conn, 0, conn, 3);
-	      locked = false;
-	      }*/
 	    //CkPrintf("Possibly a livelock in edge_contract_help\n");
 	    delete [] eConn;
 	    if(nesize!=0) delete[] nbrElems;
@@ -897,7 +967,72 @@ int FEM_AdaptL::edge_contraction_help(int e1, int e2, int n1, int n2, int e1_n1,
       delete[] eConn;
       free(gotlocks);
     }
+  }*/
+
+  //lock the adjacent nodes
+  CkVec<int> lockedNodes;
+  int *nnNodes;
+  int nnsize;
+  int nncount=0;
+  int numtries=0;
+  bool done = false;
+  while(!done) {
+    lockedNodes.removeAll();
+    nncount=0;
+    theMesh->n2n_getAll(deletenode, &nnNodes, &nnsize);
+    for(int i=0; i<nnsize; i++) {
+      if(nnNodes[i]!=n1 && nnNodes[i]!=n2 && nnNodes[i]!=n3 && nnNodes[i]!=n4) {
+	lockedNodes.push_back(nnNodes[i]);
+	nncount++;
+      }
+    }
+    int *gotlocks = new int[nncount];
+    int *lockw = new int[nncount];
+    for(int i=0; i<nncount; i++) {
+      gotlocks[i]=-1;
+      lockw[i] = lockedNodes[i];
+    }
+    int gotlock = lockNodes(gotlocks,lockw,0,lockw,nncount);
+    locked = true;
+    numtries++;
+    if(gotlock==1) {
+      bool isConn = true;
+      int *nnNodes1;
+      int nnsize1;
+      theMesh->n2n_getAll(deletenode, &nnNodes1, &nnsize1);
+      if(nnsize!=nnsize1) isConn=false;
+      else {
+	for(int i=0; i<nnsize; i++) {
+	  isConn = false;
+	  for(int j=0; j<nnsize1; j++) {
+	    if(nnNodes1[i] == nnNodes[j]) {
+	      isConn=true; break;
+	    }
+	  }
+	  if(!isConn) break;
+	}
+      }
+      if(!isConn) { //connectivity has changed, try acquiring the locks again
+	unlockNodes(gotlocks,lockw,0,lockw,nncount);
+	if(numtries>=3) {
+	  if(nnsize1!=0) free(nnNodes1);
+	  if(nnsize!=0) free(nnNodes);
+	  if(nncount!=0) delete [] lockw;
+	  if(nncount!=0) delete [] gotlocks;
+	  return ERVAL;
+	}
+	CthYield();
+      }
+      else done = true;
+      if(nnsize1!=0) free(nnNodes1);
+    }
+    else unlockNodes(gotlocks,lockw,0,lockw,nncount);
+    if(nnsize!=0) free(nnNodes);
+    if(nncount!=0) delete [] lockw;
+    if(nncount!=0) delete [] gotlocks;
+    if(numtries>=3 && !done) return ERVAL;
   }
+
 
   //verify if it is causing a flip/sliver
   double *n1_coord = new double[2];

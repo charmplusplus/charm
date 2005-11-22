@@ -538,7 +538,7 @@ int FEM_remove_element(FEM_Mesh *m, int elementid, int elemtype, int permanent){
 	      newghost[i] = FEM_add_node_local(m,1);
 	      ghostidx[i] = FEM_To_ghost_index(newghost[i]);
 	      //lock it on the min chunk other than index, correct this lock later
-	      FEM_Modify_LockAll(m,nodes[i]);
+	      FEM_Modify_LockAll(m,nodes[i],false);
 	    }
 	  }
 	}
@@ -1056,7 +1056,7 @@ int FEM_add_element(FEM_Mesh *m, int* conn, int connSize, int elemType, int chun
 	  FEM_remove_node_local(m,conn[i]);
 	  conn[i] = newN;
 	  //lock the newly formed node, if it needs to be
-	  FEM_Modify_LockUpdate(m,conn[i]);
+	  //FEM_Modify_LockUpdate(m,conn[i]);
 	  for(int j=0; j<numchunks; j++) {
 	    delete chunks1[j];
 	  }
@@ -1337,6 +1337,7 @@ int FEM_Modify_Unlock(FEM_Mesh *m) {
 }
 
 int FEM_Modify_LockN(FEM_Mesh *m, int nodeId, int readlock) {
+  int ret = -1;
   if(is_shared(m,nodeId)) {
     //find the index of the least chunk it is shared on and try to lock it
     int index = m->getfmMM()->getIdx();
@@ -1352,22 +1353,31 @@ int FEM_Modify_LockN(FEM_Mesh *m, int nodeId, int readlock) {
       delete chunks1[j];
     }
     if(numchunks!=0) free(chunks1);
+    CkAssert(minChunk!=MAX_CHUNK);
     if(minChunk==index) {
       if(readlock) {
-	return m->getfmMM()->getfmLockN(nodeId)->rlock();
+	ret = m->getfmMM()->getfmLockN(nodeId)->rlock();
       } else {
-	return m->getfmMM()->getfmLockN(nodeId)->wlock(index);
+	ret = m->getfmMM()->getfmLockN(nodeId)->wlock(index);
       }
+      if(ret==1) {
+	m->getfmMM()->getfmLockN(nodeId)->verifyLock();
+      }
+      return ret;
     }
     else {
+      CkAssert(minChunk!=MAX_CHUNK);
       int sharedIdx = m->getfmMM()->getfmUtil()->exists_in_IDXL(m,nodeId,minChunk,0);
       if(sharedIdx < 0) return -1;
-      CkAssert(minChunk!=MAX_CHUNK);
       if(readlock) {
-	return meshMod[minChunk].lockRemoteNode(sharedIdx, index, 0, 1)->i;
+	ret = meshMod[minChunk].lockRemoteNode(sharedIdx, index, 0, 1)->i;
       } else {
-	return meshMod[minChunk].lockRemoteNode(sharedIdx, index, 0, 0)->i;
+	ret = meshMod[minChunk].lockRemoteNode(sharedIdx, index, 0, 0)->i;
       }
+      if(ret==1) {
+	meshMod[minChunk].verifyLock(index,sharedIdx,0);
+      }
+      return ret;
     }
   }
   else if(FEM_Is_ghost_index(nodeId)) {
@@ -1389,22 +1399,33 @@ int FEM_Modify_LockN(FEM_Mesh *m, int nodeId, int readlock) {
       delete chunks1[j];
     }
     if(numchunks!=0) free(chunks1);
+    if(minChunk==MAX_CHUNK) return -1;
     int sharedIdx = m->getfmMM()->getfmUtil()->exists_in_IDXL(m,nodeId,minChunk,2);
     if(sharedIdx < 0) return -1;
-    CkAssert(minChunk!=MAX_CHUNK);
     if(readlock) {
-      return meshMod[minChunk].lockRemoteNode(sharedIdx, index, 1, 1)->i;
+      ret = meshMod[minChunk].lockRemoteNode(sharedIdx, index, 1, 1)->i;
     } else {
-      return meshMod[minChunk].lockRemoteNode(sharedIdx, index, 1, 0)->i;
+      ret = meshMod[minChunk].lockRemoteNode(sharedIdx, index, 1, 0)->i;
     }
+    /*if(ret==1) {
+      if(nodeId==-8 && index==4) {
+	CkPrintf("Locking node %d on chunk %d\n",nodeId, minChunk);
+      }
+      meshMod[minChunk].verifyLock(index, sharedIdx, 1);
+      }*/
+    return ret;
   }
   else {
     if(readlock) {
-      return m->getfmMM()->getfmLockN(nodeId)->rlock();
+      ret = m->getfmMM()->getfmLockN(nodeId)->rlock();
     } else {
       int index = m->getfmMM()->getIdx();
-      return m->getfmMM()->getfmLockN(nodeId)->wlock(index);
+      ret = m->getfmMM()->getfmLockN(nodeId)->wlock(index);
     }
+    /*if(ret==1) {
+      m->getfmMM()->getfmLockN(nodeId)->verifyLock();
+      }*/
+    return ret;
   }
 #ifdef DEBUG 
   CmiMemoryCheck(); 
@@ -1464,7 +1485,7 @@ int FEM_Modify_UnlockN(FEM_Mesh *m, int nodeId, int readlock) {
       delete chunks1[j];
     }
     if(numchunks!=0) free(chunks1);
-    CkAssert(minChunk!=MAX_CHUNK);
+    if(minChunk==MAX_CHUNK) return -1;
     int sharedIdx = m->getfmMM()->getfmUtil()->exists_in_IDXL(m,nodeId,minChunk,2);
     if(readlock) {
       return meshMod[minChunk].unlockRemoteNode(sharedIdx, index, 1, 1)->i;
@@ -1485,31 +1506,42 @@ int FEM_Modify_UnlockN(FEM_Mesh *m, int nodeId, int readlock) {
 
 //lock it on the minchunk other than 'this chunk'
 //should only be called when 'this chunk' is losing the node as local/shared
-void FEM_Modify_LockAll(FEM_Mesh*m, int nodeId) {
+void FEM_Modify_LockAll(FEM_Mesh*m, int nodeId, bool lockall) {
   int index = m->getfmMM()->getIdx();
   int numchunks;
   const IDXL_Rec *irec = m->node.shared.getRec(nodeId);
   //if it is a corner node, it might not have been a shared node, so can't lock it on anything else
   if(irec) {
     numchunks = irec->getShared();
-    int minchunk=MAX_CHUNK;
-    int sharedIdx = -1;
-    for(int i=0; i<numchunks; i++) {
-      int pchk = irec->getChk(i); 
-      if(pchk<minchunk) {
-	minchunk = pchk;
-	sharedIdx = irec->getIdx(i);
+    if(!lockall) {
+      int minchunk=MAX_CHUNK;
+      int sharedIdx = -1;
+      for(int i=0; i<numchunks; i++) {
+	int pchk = irec->getChk(i); 
+	if(pchk<minchunk) {
+	  minchunk = pchk;
+	  sharedIdx = irec->getIdx(i);
+	}
       }
+      CkAssert(minchunk!=MAX_CHUNK && sharedIdx!=-1);
+      //lock it on this chunk, if not already locked
+      int done = meshMod[minchunk].lockRemoteNode(sharedIdx, index, 0, 0)->i;
+      //if done=-1, then it is already locked, otherwise we just locked it
     }
-    CkAssert(minchunk!=MAX_CHUNK && sharedIdx!=-1);
-    //lock it on this chunk, if not already locked
-    int done = meshMod[minchunk].lockRemoteNode(sharedIdx, index, 0, 0)->i;
-    //if done=-1, then it is already locked, otherwise we just locked it
+    else {
+      for(int i=0; i<numchunks; i++) {
+	int pchk = irec->getChk(i); 
+	int sharedIdx = irec->getIdx(i);
+	int done = meshMod[pchk].lockRemoteNode(sharedIdx, index, 0, 0)->i;
+      }
+      m->getfmMM()->getfmLockN(nodeId)->wlock(index);
+    }
   }
   return;
 }
 
-void FEM_Modify_LockUpdate(FEM_Mesh*m, int nodeId) {
+//must be a local node, lock it & then unlock it if needed
+void FEM_Modify_LockUpdate(FEM_Mesh*m, int nodeId, bool lockall) {
   int index = m->getfmMM()->getIdx();
   int numchunks;
   const IDXL_Rec *irec = m->node.shared.getRec(nodeId);
@@ -1526,17 +1558,33 @@ void FEM_Modify_LockUpdate(FEM_Mesh*m, int nodeId) {
 	minI=i;
       }
     }
-    if(minchunk>index) {
-      int prevminchunk=minchunk;
-      minchunk=index;
-      int sharedIdx = -1;
-      sharedIdx = irec->getIdx(minI);
-      CkAssert(prevminchunk!=MAX_CHUNK && sharedIdx!=-1);
-      meshMod[prevminchunk].unlockRemoteNode(sharedIdx, index, 0, 0);
+    if(!lockall) {
+      if(minchunk>index) {
+	int prevminchunk=minchunk;
+	minchunk=index;
+	int sharedIdx = irec->getIdx(minI);
+	CkAssert(prevminchunk!=MAX_CHUNK && sharedIdx!=-1);
+	meshMod[prevminchunk].unlockRemoteNode(sharedIdx, index, 0, 0);
+      }
+      else if(minchunk < index) {
+	//unlock the previously acquired lock
+	int sharedIdx = irec->getIdx(minI);
+	meshMod[minchunk].lockRemoteNode(sharedIdx, index, 0, 0);
+	m->getfmMM()->getfmLockN(nodeId)->wunlock(index);
+      }
     }
     else {
-      //unlock the previously acquired lock
-      m->getfmMM()->getfmLockN(nodeId)->wunlock(index);
+      if(minchunk>index) minchunk=index;
+      if(minchunk!=index) {
+	m->getfmMM()->getfmLockN(nodeId)->wunlock(index);
+      }
+      for(int i=0; i<numchunks; i++) {
+	int pchk = irec->getChk(i);
+	if(pchk!=minchunk) {
+	  int sharedIdx = irec->getIdx(i);
+	  meshMod[pchk].unlockRemoteNode(sharedIdx, index, 0, 0);
+	}
+      }
     }
   }
   return;
@@ -1582,8 +1630,8 @@ void FEM_Modify_correctLockN(FEM_Mesh *m, int nodeId) {
 	  }
 	  if(minChunk==index) done = m->getfmMM()->getfmLockN(nodeId)->wlock(index);
 	  else {
-	    int sharedIdx = m->getfmMM()->getfmUtil()->exists_in_IDXL(m,nodeId,minChunk,0);
 	    CkAssert(minChunk!=MAX_CHUNK);
+	    int sharedIdx = m->getfmMM()->getfmUtil()->exists_in_IDXL(m,nodeId,minChunk,0);
 	    done = meshMod[minChunk].lockRemoteNode(sharedIdx, index, 0, 0)->i;
 	  }
 	  break;
@@ -1861,6 +1909,12 @@ intMsg *femMeshModify::hasLockRemoteNode(int sharedIdx, int fromChk, int isGhost
   CmiMemoryCheck(); 
 #endif
   return imsg;
+}
+
+void femMeshModify::modifyLockAll(int fromChk, int sharedIdx) {
+  int localIdx = fmUtil->lookup_in_IDXL(fmMesh, sharedIdx, fromChk, 1);
+  FEM_Modify_LockAll(fmMesh, localIdx);
+  return;
 }
 
 intMsg *femMeshModify::addNodeRemote(addNodeMsg *msg) {
@@ -2264,6 +2318,26 @@ void femMeshModify::idxlunlockRemote(int fromChk, int type) {
   CmiMemoryCheck(); 
 #endif
   return;
+}
+
+boolMsg *femMeshModify::verifyLock(int fromChk, int sharedIdx, int isGhost) {
+  int localIdx;
+  if(isGhost) {
+    localIdx = fmUtil->lookup_in_IDXL(fmMesh, sharedIdx, fromChk, 1);
+  } else {
+    localIdx = fmUtil->lookup_in_IDXL(fmMesh, sharedIdx, fromChk, 0);
+  }
+  //CkAssert(localIdx != -1);
+  boolMsg *bmsg = new boolMsg(0);
+  bool ret;
+  if(localIdx == -1) {
+    ret = false;
+  }
+  else {
+    ret = fmLockN[localIdx]->verifyLock();
+  }
+  bmsg->b = ret;
+  return bmsg;
 }
 
 #include "FEMMeshModify.def.h"

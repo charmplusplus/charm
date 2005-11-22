@@ -893,9 +893,24 @@ int FEM_MUtil::eatIntoElement(int localIdx) {
 #ifdef DEBUG_1
   CkPrintf("Chunk %d eating elem %d(%d,%d,%d)\n",idx,localIdx,adjnodes[0],adjnodes[1],adjnodes[2]);
 #endif
+  int remChk = mmod->fmMesh->elem[0].ghost->ghostRecv.getRec(FEM_From_ghost_index(localIdx))->getChk(0);
+  //a ghost elem should be coming from only one chunk
+  for(int i=0; i<nodesPerEl; i++) {
+    if(FEM_Is_ghost_index(adjnodes[i])) { 
+      //this will be a new node on this chunk, lock it on all shared chunks
+      int sharedIdx = exists_in_IDXL(mmod->fmMesh,adjnodes[i],remChk,2);
+      meshMod[remChk].modifyLockAll(idx,sharedIdx);
+    }
+  }
   FEM_remove_element(mmod->fmMesh,localIdx,0,idx);
   for(int j=0; j<nodesPerEl; j++) oldnodes[j] = adjnodes[j];
   int newEl = FEM_add_element(mmod->fmMesh, adjnodes, nodesPerEl, 0, idx);
+  for(int i=0; i<nodesPerEl; i++) {
+    if(adjnodes[i]!=oldnodes[i]) {
+      //correct the lock
+      FEM_Modify_LockUpdate(mmod->fmMesh,adjnodes[i]);
+    }
+  }
   free(adjnodes);
   free(oldnodes);
   return newEl;
@@ -916,6 +931,7 @@ int FEM_MUtil::getLockOwner(int nodeId) {
     else minchunk = idx;
     if(minchunk == idx) owner = mmod->fmMesh->getfmMM()->getfmLockN(nodeId)->lockOwner();
     else {
+      CkAssert(minchunk!=MAX_CHUNK);
       int sharedIdx = mmod->getfmUtil()->exists_in_IDXL(mmod->fmMesh,nodeId,minchunk,0);
       owner = meshMod[minchunk].hasLockRemoteNode(sharedIdx, idx, 0)->i;
     }
@@ -925,7 +941,7 @@ int FEM_MUtil::getLockOwner(int nodeId) {
     int sharedIdx = mmod->fmMesh->node.ghost->ghostRecv.getRec(FEM_From_ghost_index(nodeId))->getIdx(0);
     owner = meshMod[otherchk].getLockOwner(idx, sharedIdx)->i;
   }
-  CkAssert(owner != -1);
+  //CkAssert(owner != -1);
   return owner;
 }
 
@@ -1446,4 +1462,3 @@ void FEM_MUtil::idxlunlockLocal(FEM_Mesh *m, int toChk, int type) {
 #endif
   return;
 }
-

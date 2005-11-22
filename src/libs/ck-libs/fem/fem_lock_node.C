@@ -23,6 +23,7 @@ FEM_lockN::~FEM_lockN() {
 
 void FEM_lockN::reset(int i,femMeshModify *mod) {
   //CkAssert(noreadLocks==0 && nowriteLocks==0);
+  if(haslocks()) wunlock(idx);
   owner = -1;
   pending = -1;
   theMod = mod;
@@ -72,6 +73,21 @@ int FEM_lockN::wlock(int own) {
     return -1; //give up trying for a while
   }
   return -1;
+}
+
+bool FEM_lockN::verifyLock(void) {
+  const IDXL_Rec *irec = theMod->fmMesh->node.shared.getRec(idx);
+  if(irec) {
+    int minchunk = theMod->idx;
+    for(int i=0; i<irec->getShared(); i++) {
+      int pchk = irec->getChk(i);
+      if(pchk<minchunk) minchunk=pchk;
+    }
+    //if someone wants to lock me, I should be on the smallest chunk
+    if(minchunk!=theMod->idx) return false;
+  }
+  if(nowriteLocks==1) return true;
+  else return false;
 }
 
 int FEM_lockN::wunlock(int own) {
