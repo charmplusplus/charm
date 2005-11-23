@@ -1890,6 +1890,7 @@ void start_nodes_scyld(void);
 void start_nodes_local(char **envp);
 void kill_nodes(void);
 void open_gdb_info(void);
+void read_global_segments_size(void);
 
 static void fast_idleFn(void) {sleep(0);}
 void finish_nodes(void);
@@ -1939,15 +1940,19 @@ int main(int argc, char **argv, char **envp)
       start_nodes_local(envp);
 #endif
 
-#if !defined(_WIN32)
   if (arg_charmdebug) {
+#if (defined(_WIN32) && !defined(__CYGWIN__)) || CMK_BPROC
+    /* Gdb stream (and charmdebug) currently valid only with rsh subsystem */
+    CmiAbort("Charmdebug is supported currently only with the rsh subsystem\n");
+#else
     /* Open an additional connection to node 0 with a gdb to grab info */
     printf("opening connection with node 0 for info gdb\n");
+    read_global_segments_size();
     open_gdb_info();
     gdb_stream = fdopen(dup(2), "a");
     dup2(1, 2);
-  }
 #endif
+  }
 
   if(arg_verbose) fprintf(stderr, "Charmrun> node programs all started\n");
 
@@ -2635,6 +2640,42 @@ void rsh_script(FILE *f, int nodeno, int rank0no, char **argv)
 }
 
 int *rsh_pids=NULL;
+
+/* use the command "size" to get information about the position of the ".data"
+   and ".bss" segments inside the program memory */
+void read_global_segments_size() {
+  char **rshargv;
+  int childPid;
+
+  /* find the node-program */
+  arg_nodeprog_r = pathextfix(arg_nodeprog_a, nodetab_pathfixes(0), nodetab_ext(0));
+
+  rshargv = (char **)malloc(sizeof(char *)*6);
+  rshargv[0]=nodetab_shell(0);
+  rshargv[1]=nodetab_name(0);
+  rshargv[2]="-l";
+  rshargv[3]=nodetab_login(0);
+  rshargv[4] = (char *)malloc(sizeof(char)*9+strlen(arg_nodeprog_r));
+  sprintf(rshargv[4],"size -A %s",arg_nodeprog_r);
+  rshargv[5]=0;
+
+  childPid = fork();
+  if (childPid < 0) {
+    perror("ERROR> getting the size of the global variables segments"); exit(1);
+  } else if (childPid == 0) {
+    /* child process */
+    dup2(2, 1);
+    /*printf("executing: \"%s\" \"%s\" \"%s\" \"%s\" \"%s\"\n",rshargv[0],rshargv[1],rshargv[2],rshargv[3],rshargv[4]);*/
+    execvp(rshargv[0], rshargv);
+    fprintf(stderr,"Charmrun> Couldn't find rsh program '%s'!\n",rshargv[0]);
+    exit(1);
+  } else {
+    /* else we are in the parent */
+    free(rshargv[4]);
+    free(rshargv);
+    waitpid(childPid, NULL, 0);
+  }
+}
 
 /* open a rsh connection with processor 0 and open a gdb session for info */
 void open_gdb_info() {
