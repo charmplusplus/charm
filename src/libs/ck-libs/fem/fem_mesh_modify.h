@@ -399,6 +399,7 @@ class femMeshModify : public CBase_femMeshModify {
   void addghostsendl1(int fromChk, int transChk, int transIdx);
   void addghostsendr(int fromChk, int sharedIdx, int toChk, int transIdx);
   void addghostsendr1(int fromChk, int transChk, int transIdx);
+  boolMsg *willItLose(int fromChk, int sharedIdx);
 };
 
 

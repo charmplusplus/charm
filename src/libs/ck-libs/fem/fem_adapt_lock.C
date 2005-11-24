@@ -389,6 +389,7 @@ int FEM_AdaptL::edge_contraction(int n1, int n2) {
   int ret = -1;
   bool warned = false;
   int newe1=-1, newe2=-1;
+  int acquirecount=0;
 
   bool invalidcoarsen = false;
   if(n1<0 || n2<0) {
@@ -426,6 +427,7 @@ int FEM_AdaptL::edge_contraction(int n1, int n2) {
   int gotlock = 0;
   while(!done) {
     if(ret==ERVAL1) {
+      acquirecount++;
       ret=-1; //reset ret
       //get new nodes, IT has ALL locks
       int *newnodes = new int[4];
@@ -448,16 +450,16 @@ int FEM_AdaptL::edge_contraction(int n1, int n2) {
 	  //should happen only if they are both ghosts
 	  CkAssert(FEM_Is_ghost_index(newe1) && FEM_Is_ghost_index(newe2));
 	  if(newe1!=e1) {//updated e1 now
-	    theMesh->e2n_getAll(newe1,newnodes,3);
+	    theMesh->e2n_getAll(newe1,newnodes,0);
 	  }
 	  if(newe2!=e2) {//updated e2 now
-	    theMesh->e2n_getAll(newe2,newnodes,3);
+	    theMesh->e2n_getAll(newe2,newnodes,0);
 	  }
-	  newcount==3;
+	  newcount=3;
 	  //check if the other node is valid still
 	  for(int i=0; i<4; i++) {
 	    bool othernodevalid = true;
-	    for(int j=0; i<3; i++) {
+	    for(int j=0; j<3; j++) {
 	      if(locknodes[i] == newnodes[j]) othernodevalid = false;
 	    }
 	    if(othernodevalid && FEM_Is_ghost_index(locknodes[i])) {
@@ -511,13 +513,14 @@ int FEM_AdaptL::edge_contraction(int n1, int n2) {
       } else {
 	isEdge=-1;
       }
-      if(isEdge == -1) {
+      if(isEdge == -1 || acquirecount>=2) {
 	if(locked) {
 	  //if we have lost the entire region, nothing will be unlocked, as all nodes will be invalid
 	  //so it needs to be handled in the aquiring step itself.
 	  unlockNodes(gotlocks, locknodes, 0, locknodes, numNodes);
 	  locked = false;
 	}
+	if(acquirecount>2) CkPrintf("Edge contract %d->%d not done as it is causes an acquire livelock\n",n1,n2);
 	CkPrintf("Edge contract %d->%d not done as it is no longer a valid edge\n",n1,n2);
 	free(locknodes);
 	free(gotlocks);
@@ -861,6 +864,49 @@ int FEM_AdaptL::edge_contraction_help(int *e1P, int *e2P, int n1, int n2, int e1
       }
     }
   }
+  if(FEM_Is_ghost_index(e1)) {
+    //find out if this chunk should acquire it
+    int remChk = theMesh->elem[0].ghost->ghostRecv.getRec(FEM_From_ghost_index(e1))->getChk(0);
+    int shidx = theMesh->elem[0].ghost->ghostRecv.getRec(FEM_From_ghost_index(e1))->getIdx(0);
+    //if this ghostelem has a ghost node connectivity, then do not acquire it
+    bool shouldacquire = true;
+    int e1nbrs[3];
+    theMesh->e2n_getAll(e1,e1nbrs,0);
+    for(int i=0; i<3;i++) {
+      if(FEM_Is_ghost_index(e1nbrs[i])) {
+	shouldacquire=false; break;
+      }
+    }
+    bool shouldacquire1 = meshMod[remChk].willItLose(index,shidx)->b;
+    if(shouldacquire && shouldacquire1) {
+      e1new = theMod->fmUtil->eatIntoElement(e1);
+      *e1P = e1new;
+      return ERVAL1;
+    }
+    else if(shouldacquire1) return -1;
+  }
+  if(FEM_Is_ghost_index(e2)) {
+    //find out if this chunk should acquire it
+    int remChk = theMesh->elem[0].ghost->ghostRecv.getRec(FEM_From_ghost_index(e2))->getChk(0);
+    int shidx = theMesh->elem[0].ghost->ghostRecv.getRec(FEM_From_ghost_index(e2))->getIdx(0);
+    //if this ghostelem has a ghost node connectivity, then do not acquire it
+    bool shouldacquire = true;
+    int e2nbrs[3];
+    theMesh->e2n_getAll(e2,e2nbrs,0);
+    for(int i=0; i<3;i++) {
+      if(FEM_Is_ghost_index(e2nbrs[i])) {
+	shouldacquire=false; break;
+      }
+    }
+    bool shouldacquire1 = meshMod[remChk].willItLose(index,shidx)->b;
+    if(shouldacquire && shouldacquire1) {
+      e2new = theMod->fmUtil->eatIntoElement(e2);
+      *e2P = e2new;
+      return ERVAL1;
+    }
+    else if(shouldacquire1) return -1;
+  }
+
 
   int *conn = (int*)malloc(3*sizeof(int));
   int *adjnodes = (int*)malloc(2*sizeof(int));

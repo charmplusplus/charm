@@ -93,5 +93,6 @@ module FEMMeshModify {
     entry [sync,threaded] void addghostsendl1(int, int, int);
     entry [sync,threaded] void addghostsendr(int, int, int, int);
     entry [sync,threaded] void addghostsendr1(int, int, int);
+    entry [sync,threaded] boolMsg *willItLose(int, int);
   };
 };

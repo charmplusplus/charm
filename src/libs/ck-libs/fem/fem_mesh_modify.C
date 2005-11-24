@@ -80,7 +80,7 @@ CDECL void FEM_Print_Mesh_Summary(int mesh){
 
   // Print Element information
   CkPrintf("     Element Types: %d\n", m->elem.size());
-  for (int t=0;t<1/*m->elem.size()*/;t++) // for each element type t
+  for (int t=0;t<m->elem.size();t++) // for each element type t
     if (m->elem.has(t)) {
       unsigned int numEl = m->elem[t].size();
       unsigned int numElG = m->elem[t].getGhost()->size();
@@ -2446,6 +2446,29 @@ void femMeshModify::addghostsendr(int fromChk, int sharedIdx, int toChk, int tra
 void femMeshModify::addghostsendr1(int fromChk, int transChk, int transIdx) {
   int localIdx = fmUtil->lookup_in_IDXL(fmMesh, transIdx, transChk, 0);
   fmMesh->node.ghostSend.addNode(localIdx,fromChk);
+}
+
+boolMsg *femMeshModify::willItLose(int fromChk, int sharedIdx) {
+  int localIdx = fmUtil->lookup_in_IDXL(fmMesh, sharedIdx, fromChk, 3);
+  int nnbrs[3];
+  fmMesh->e2n_getAll(localIdx,nnbrs,0);
+  //if it loses any node if it loses this element, then it should let fromChk, acquire this elem
+  bool willlose = true;
+  for(int i=0; i<3; i++) {
+    int *enbrs, numenbrs;
+    fmMesh->n2e_getAll(nnbrs[i],&enbrs,&numenbrs);
+    willlose = true;
+    for(int j=0; j<numenbrs; j++) {
+      if(enbrs[j]>=0 && enbrs[j]!=localIdx) {
+	willlose = false;
+	break;
+      }
+    }
+    if(numenbrs>0) delete [] enbrs;
+    if(willlose) break;
+  }
+  boolMsg *bmsg = new boolMsg(willlose);
+  return bmsg;
 }
 
 #include "FEMMeshModify.def.h"
