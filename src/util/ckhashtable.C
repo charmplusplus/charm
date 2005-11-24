@@ -379,6 +379,15 @@ CDECL CkHashtable_c CkCreateHashtable_string(int objBytes,int initSize)
   return (CkHashtable_c)new CkHashtable(layout,initSize,0.5,
 					CkHashFunction_string,CkHashCompare_string);
 }
+/*Create hashtable with a C pointer as the key*/
+CDECL CkHashtable_c CkCreateHashtable_pointer(int objBytes,int initSize)
+{
+  int objStart=2*sizeof(char *);
+  CkHashtableLayout layout(sizeof(char *),sizeof(char *),
+			   objStart,objBytes,objStart+objBytes);  
+  return (CkHashtable_c)new CkHashtable(layout,initSize,0.5,
+					CkHashFunction_pointer,CkHashCompare_pointer);
+}
 CDECL void CkDeleteHashtable(CkHashtable_c h)
 {
 	delete (CkHashtable *)h;

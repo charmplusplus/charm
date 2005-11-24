@@ -355,4 +355,6 @@ void CmiOutOfMemoryInit(void) {
 /* declare the cpd_memory routines */
 int  cpd_memory_length(void *lenParam) { return 0; }
 void cpd_memory_pup(void *itemParam,pup_er p,CpdListItemsRequest *req) { }
+void cpd_memory_leak(void *itemParam,pup_er p,CpdListItemsRequest *req) { }
+void setProtection(char *mem, char *ptr, int len, int flag) { }
 #endif

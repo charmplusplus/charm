@@ -36,6 +36,8 @@ typedef void *CkHashtable_c;
 CkHashtable_c CkCreateHashtable_int(int objBytes,int initSize);
 /*Create hashtable with a C string pointer as the key */
 CkHashtable_c CkCreateHashtable_string(int objBytes,int initSize);
+/*Create hashtable with a C pointer as the key */
+CkHashtable_c CkCreateHashtable_pointer(int objBytes,int initSize);
 
 void CkDeleteHashtable(CkHashtable_c h);
 
@@ -77,6 +79,11 @@ CkHashCode CkHashFunction_default(const void *keyData,size_t keyLen);
 CkHashCode CkHashFunction_string(const void *keyData,size_t keyLen);
 inline CkHashCode CkHashFunction_int(const void *keyData,size_t /*len*/)
 	{return *(int *)keyData;}
+inline CkHashCode CkHashFunction_pointer(const void *keyData,size_t /*len*/)
+	{if (sizeof(char*)==sizeof(int)) return *(int *)keyData;
+	else if (sizeof(char*)==2*sizeof(int)) return ((int*)keyData)[0] & ((int*)keyData)[1];
+	else *((char*)0) = 0;
+	}
 
 //Functions return 1 if two keys are equal; 0 otherwise
 typedef int (*CkHashCompare)(const void *key1,const void *key2,size_t keyLen);
@@ -84,6 +91,8 @@ int CkHashCompare_default(const void *key1,const void *key2,size_t keyLen);
 int CkHashCompare_string(const void *key1,const void *key2,size_t keyLen);
 inline int CkHashCompare_int(const void *k1,const void *k2,size_t /*len*/)
 	{return *(int *)k1 == *(int *)k2;}
+inline int CkHashCompare_pointer(const void *k1,const void *k2,size_t /*len*/)
+	{return *(char **)k1 == *(char **)k2;}
 
 ///////////////////////// Hashtable //////////////////////
 

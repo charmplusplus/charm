@@ -1447,15 +1447,16 @@ Written by Josh Yelon around 1995
 #  define CMK_STACKPROTECT 0
 
 #  define CthMemAlign(x,n) 0
-#  define CthMemoryProtect(p,l) CmiAbort("Shouldn't call CthMemoryProtect!\n")
-#  define CthMemoryUnprotect(p,l) CmiAbort("Shouldn't call CthMemoryUnprotect!\n")
+#  define CthMemoryProtect(m,p,l) CmiAbort("Shouldn't call CthMemoryProtect!\n")
+#  define CthMemoryUnprotect(m,p,l) CmiAbort("Shouldn't call CthMemoryUnprotect!\n")
 #else
 #  define CMK_STACKPROTECT 1
 
+  extern void setProtection(char*, char*, int, int);
 #  include "sys/mman.h"
 #  define CthMemAlign(x,n) memalign((x),(n))
-#  define CthMemoryProtect(p,l) mprotect(p,l,PROT_NONE)
-#  define CthMemoryUnprotect(p,l) mprotect(p,l,PROT_READ | PROT_WRITE)
+#  define CthMemoryProtect(m,p,l) mprotect(p,l,PROT_NONE);setProtection((char*)m,p,l,1);
+#  define CthMemoryUnprotect(m,p,l) mprotect(p,l,PROT_READ | PROT_WRITE);setProtection((char*)m,p,l,0);
 #endif
 
 struct CthThreadStruct
@@ -1484,7 +1485,7 @@ static void CthThreadFree(CthThread t)
 {
   CthThreadBaseFree(&t->base);
   if (t->protlen!=0) {
-    CthMemoryUnprotect(t->protect, t->protlen);
+    CthMemoryUnprotect(t->stack, t->protect, t->protlen);
     free(t->stack);
   }
   free(t);
@@ -1571,7 +1572,7 @@ static CthThread CthCreateInner(CthVoidFn fn, void *arg, int size,int Migratable
     result->protect = ((char*)stack);
 #endif
     result->protlen = CMK_MEMORY_PAGESIZE;
-    CthMemoryProtect(result->protect, result->protlen);
+    CthMemoryProtect(stack, result->protect, result->protlen);
   }
   return result;
 }
