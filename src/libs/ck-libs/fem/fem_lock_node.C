@@ -95,7 +95,7 @@ int FEM_lockN::wunlock(int own) {
     CkPrintf("[%d] Error:: unlocking unacquired write lock %d{%d} .\n",owner, idx, theMod->idx);
     nowriteLocks=1;
     }*/
-  CkAssert(noreadLocks==0 && nowriteLocks>0);
+  //CkAssert(noreadLocks==0 && nowriteLocks>0);
   if(nowriteLocks) {
     nowriteLocks--;
 #ifdef DEBUG_LOCKS

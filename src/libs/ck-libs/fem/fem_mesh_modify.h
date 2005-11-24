@@ -160,8 +160,8 @@ class addNodeMsg : public CMessage_addNodeMsg {
 
   ~addNodeMsg() {
     if(between) {
-      delete between;
-      delete chunks;
+      //delete between;
+      //delete chunks;
     }
   }
 };
@@ -182,9 +182,9 @@ class sharedNodeMsg : public CMessage_sharedNodeMsg {
     }*/
 
   ~sharedNodeMsg() {
-    if(between) {
-      delete between;
-    }
+    //if(between) {
+    //delete between;
+    //}
   }
 };
 
@@ -206,10 +206,10 @@ class addGhostElemMsg : public CMessage_addGhostElemMsg {
 
   ~addGhostElemMsg() {
     if(ghostIndices) {
-      delete ghostIndices;
+      //delete ghostIndices;
     }
     if(sharedIndices) {
-      delete sharedIndices;
+      //delete sharedIndices;
     }
   }
 };
@@ -222,8 +222,8 @@ class chunkListMsg : public CMessage_chunkListMsg {
 
   ~chunkListMsg() {
     if(numChunkList>0) {
-      delete chunkList;
-      delete indexList;
+      //delete chunkList;
+      //delete indexList;
     }
   }
 };
@@ -239,10 +239,10 @@ class addElemMsg : public CMessage_addElemMsg {
 
   ~addElemMsg() {
     if(conn) {
-      delete conn;
+      //delete conn;
     }
     if(ghostIndices) {
-      delete ghostIndices;
+      //delete ghostIndices;
     }
   }
 };
@@ -263,10 +263,10 @@ class removeGhostElemMsg : public CMessage_removeGhostElemMsg {
 
   ~removeGhostElemMsg() {
     if(ghostIndices) {
-      delete ghostIndices;
-      delete ghostRNIndices;
-      delete ghostREIndices;
-      delete sharedIndices;
+      //   delete ghostIndices;
+      //   delete ghostRNIndices;
+      //    delete ghostREIndices;
+      //    delete sharedIndices;
     }
   }
 };
@@ -279,6 +279,25 @@ class removeElemMsg : public CMessage_removeElemMsg {
   int permanent;
 };
 
+class verifyghostsendMsg : public CMessage_verifyghostsendMsg {
+ public:
+  int fromChk;
+  int sharedIdx;
+  int numchks;
+  int *chunks;
+  
+  ~verifyghostsendMsg() {
+  }
+};
+
+class findgsMsg : public CMessage_findgsMsg {
+ public:
+  int numchks;
+  int *chunks;
+  
+  ~findgsMsg() {
+  }
+};
 
 class femMeshModify : public CBase_femMeshModify {
   friend class FEM_lock;
@@ -355,7 +374,8 @@ class femMeshModify : public CBase_femMeshModify {
 
   void addToSharedList(int fromChk, int sharedIdx);
   void updateNodeAttrs(int fromChk, int sharedIdx, double coordX, double coordY, int bound, bool isGhost);
-  void UpdateGhostSend(int fromChk, int sharedIdx);
+  void updateghostsend(verifyghostsendMsg *vmsg);
+  findgsMsg *findghostsend(int fromChk, int sharedIdx);
 
   double2Msg *getRemoteCoord(int fromChk, int ghostIdx);
   intMsg *getRemoteBound(int fromChk, int ghostIdx);
@@ -372,6 +392,13 @@ class femMeshModify : public CBase_femMeshModify {
   intMsg *hasLockRemoteNode(int sharedIdx, int fromChk, int isGhost);
   void modifyLockAll(int fromChk, int sharedIdx);
   boolMsg *verifyLock(int fromChk, int sharedIdx, int isGhost);
+  void verifyghostsend(verifyghostsendMsg *vmsg);
+  boolMsg *shouldLoseGhost(int fromChk, int sharedIdx, int toChk);
+
+  void addghostsendl(int fromChk, int sharedIdx, int toChk, int transIdx);
+  void addghostsendl1(int fromChk, int transChk, int transIdx);
+  void addghostsendr(int fromChk, int sharedIdx, int toChk, int transIdx);
+  void addghostsendr1(int fromChk, int transChk, int transIdx);
 };
 
 

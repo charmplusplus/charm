@@ -53,7 +53,8 @@ class FEM_MUtil {
   int eatIntoElement(int localIdx);
   int getLockOwner(int nodeId);
   bool knowsAbtNode(int chk, int nodeId);
-  void UpdateGhostSend(int nodeId);
+  void UpdateGhostSend(int nodeId, int *chunkl, int numchunkl);
+  void findGhostSend(int nodeId, int **chunkl, int *numchunkl);
 
   void StructureTest(FEM_Mesh *m);
   int AreaTest(FEM_Mesh *m);

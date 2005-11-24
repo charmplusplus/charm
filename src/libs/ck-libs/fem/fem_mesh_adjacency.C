@@ -1169,6 +1169,15 @@ void FEM_Mesh::n2e_add(int n, int newElem)
 	CkVec<FEM_VarIndexAttribute::ID> &nsVec = eVec[FEM_To_ghost_index(n)];
 	FEM_VarIndexAttribute::ID ne(1, newElem);
 	nsVec.push_back(ne);
+	int *testn2e, testn2ec;
+	n2e_getAll(n,&testn2e,&testn2ec);
+	for(int i=0; i<testn2ec; i++) {
+	  if(FEM_Is_ghost_index(testn2e[i]))
+	    CkAssert(elem[0].ghost->is_valid(FEM_From_ghost_index(testn2e[i])));
+	  else 
+	    CkAssert(elem[0].is_valid(testn2e[i]));
+	}
+	if(testn2ec!=0) delete[] testn2e;
   }
   else {
 	FEM_VarIndexAttribute *eAdj = (FEM_VarIndexAttribute *)node.lookup(FEM_NODE_ELEM_ADJACENCY,"n2e_add");     
@@ -1234,6 +1243,15 @@ void FEM_Mesh::n2e_replace(int n, int oldElem, int newElem)
 		break;
 	  }
 	}
+	int *testn2e, testn2ec;
+	n2e_getAll(n,&testn2e,&testn2ec);
+	for(int i=0; i<testn2ec; i++) {
+	  if(FEM_Is_ghost_index(testn2e[i]))
+	    CkAssert(elem[0].ghost->is_valid(FEM_From_ghost_index(testn2e[i])));
+	  else 
+	    CkAssert(elem[0].is_valid(testn2e[i]));
+	}
+	if(testn2ec!=0) delete[] testn2e;
   }
   else{
 	FEM_VarIndexAttribute *eAdj = (FEM_VarIndexAttribute *)node.lookup(FEM_NODE_ELEM_ADJACENCY,"n2e_replace");

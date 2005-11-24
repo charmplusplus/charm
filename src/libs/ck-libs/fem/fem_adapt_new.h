@@ -120,7 +120,7 @@ class FEM_Adapt {
       removing the two elements (n1,n2,n3) and (n1,n2,n4) adjacent to e, and 
       finally removing nodes n1 and n2; return 1 if successful, 0 if not **/
   virtual int edge_contraction(int n1, int n2);
-  virtual int edge_contraction_help(int e1, int e2, int n1, int n2, int e1_n1, 
+  virtual int edge_contraction_help(int *e1P, int *e2P, int n1, int n2, int e1_n1, 
 				    int e1_n2, int e1_n3, int e2_n1, int e2_n2,
 				    int e2_n3, int n3, int n4);
 

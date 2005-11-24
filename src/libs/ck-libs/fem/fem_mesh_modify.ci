@@ -44,6 +44,12 @@ module FEMMeshModify {
     int ghostElts[];
     int ghostNds[];
   };*/
+  message verifyghostsendMsg {
+    int chunks[];
+  };
+  message findgsMsg {
+    int chunks[];
+  };
 
   array [1D] femMeshModify {
     entry femMeshModify(femMeshModMsg *);
@@ -64,7 +70,6 @@ module FEMMeshModify {
     entry [sync,threaded] void refine_flip_element_leb(int, int, int, int, int, int, double);
     entry [sync,threaded] void addToSharedList(int, int);
     entry [sync,threaded] void updateNodeAttrs(int, int, double, double, int, bool);
-    entry [sync,threaded] void UpdateGhostSend(int, int);
     entry [sync,threaded] double2Msg *getRemoteCoord(int, int);
     entry [sync,threaded] intMsg *getRemoteBound(int, int);
     entry [sync,threaded] intMsg *getIdxGhostSend(int, int, int);
@@ -80,5 +85,13 @@ module FEMMeshModify {
     entry [sync,threaded] intMsg* hasLockRemoteNode(int, int, int);
     entry [sync,threaded] void modifyLockAll(int, int);
     entry [sync,threaded] boolMsg *verifyLock(int, int, int);
+    entry [sync,threaded] void updateghostsend(verifyghostsendMsg *);
+    entry [sync,threaded] void verifyghostsend(verifyghostsendMsg *);
+    entry [sync,threaded] findgsMsg *findghostsend(int, int);
+    entry [sync,threaded] boolMsg *shouldLoseGhost(int, int, int);
+    entry [sync,threaded] void addghostsendl(int, int, int, int);
+    entry [sync,threaded] void addghostsendl1(int, int, int);
+    entry [sync,threaded] void addghostsendr(int, int, int, int);
+    entry [sync,threaded] void addghostsendr1(int, int, int);
   };
 };

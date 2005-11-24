@@ -84,62 +84,62 @@ int FEM_AdaptL::unlockNodes(int *gotlocks, int *lockrnodes, int numRNodes, int *
   bool donelocks = false;
   int numNodes = numRNodes + numWNodes;
   int *ungetlocks = (int*)malloc(numNodes*sizeof(int));
-  while(!donelocks) {
-    for(int i=0; i<numRNodes; i++) {
-      if(lockrnodes[i]==-1) {
-	ungetlocks[i] = 1;
-	continue;
-      }
-      if(FEM_Is_ghost_index(lockrnodes[i])) {
-	if(!theMesh->node.ghost->is_valid(FEM_To_ghost_index(lockrnodes[i]))) {
-	  gotlocks[i] = -1;
-	  //free(ungetlocks);
-	  //return -1;
-	}
-      } else {
-	if(!theMesh->node.is_valid(lockrnodes[i])) {
-	  gotlocks[i] = -1;
-	  //free(ungetlocks);
-	  //return -1;
-	}
-      }
-      if(gotlocks[i]>0) ungetlocks[i] = FEM_Modify_UnlockN(theMesh, lockrnodes[i], 1);
-      else ungetlocks[i] = 1;
+  //while(!donelocks) {
+  for(int i=0; i<numRNodes; i++) {
+    if(lockrnodes[i]==-1) {
+      ungetlocks[i] = 1;
+      continue;
     }
-    for(int i=0; i<numWNodes; i++) {
-      if(lockwnodes[i]==-1) {
-	ungetlocks[numRNodes+i] = 1;
-	continue;
+    if(FEM_Is_ghost_index(lockrnodes[i])) {
+      if(!theMesh->node.ghost->is_valid(FEM_To_ghost_index(lockrnodes[i]))) {
+	gotlocks[i] = -1;
+	//free(ungetlocks);
+	//return -1;
       }
-      if(FEM_Is_ghost_index(lockwnodes[i])) {
-	if(!theMesh->node.ghost->is_valid(FEM_To_ghost_index(lockwnodes[i]))) {
-	  gotlocks[i] = -1;
-#ifdef DEBUG_LOCKS
-	  CkPrintf("[%d] Trying to unlock invalid ghost %d\n",theMod->idx,lockwnodes[i]);
-#endif
-	  //free(ungetlocks);
-	  //return -1;
-	}
-      } else {
-	if(!theMesh->node.is_valid(lockwnodes[i])) {
-	  gotlocks[i] = -1;
-#ifdef DEBUG_LOCKS
-	  CkPrintf("[%d] Trying to unlock invalid node %d\n",theMod->idx,lockwnodes[i]);
-#endif
-	  //free(ungetlocks);
-	  //return -1;
-	}
+    } else {
+      if(!theMesh->node.is_valid(lockrnodes[i])) {
+	gotlocks[i] = -1;
+	//free(ungetlocks);
+	//return -1;
       }
-      if(gotlocks[numRNodes+i]>0) ungetlocks[numRNodes+i] = FEM_Modify_UnlockN(theMesh, lockwnodes[i], 0);
-      else ungetlocks[numRNodes+i] = 1;
     }
-    bool tmplocks = true;
-    for(int i=0; i<numNodes; i++) {
-      tmplocks = tmplocks && (ungetlocks[i]>0);
-    }
-    if(tmplocks) donelocks = true;
-    else CthYield(); //block for a while
+    if(gotlocks[i]>0) ungetlocks[i] = FEM_Modify_UnlockN(theMesh, lockrnodes[i], 1);
+    else ungetlocks[i] = 1;
   }
+  for(int i=0; i<numWNodes; i++) {
+    if(lockwnodes[i]==-1) {
+      ungetlocks[numRNodes+i] = 1;
+      continue;
+    }
+    if(FEM_Is_ghost_index(lockwnodes[i])) {
+      if(!theMesh->node.ghost->is_valid(FEM_To_ghost_index(lockwnodes[i]))) {
+	gotlocks[i] = -1;
+#ifdef DEBUG_LOCKS
+	CkPrintf("[%d] Trying to unlock invalid ghost %d\n",theMod->idx,lockwnodes[i]);
+#endif
+	//free(ungetlocks);
+	//return -1;
+      }
+    } else {
+      if(!theMesh->node.is_valid(lockwnodes[i])) {
+	gotlocks[i] = -1;
+#ifdef DEBUG_LOCKS
+	CkPrintf("[%d] Trying to unlock invalid node %d\n",theMod->idx,lockwnodes[i]);
+#endif
+	//free(ungetlocks);
+	//return -1;
+      }
+    }
+    if(gotlocks[numRNodes+i]>0) ungetlocks[numRNodes+i] = FEM_Modify_UnlockN(theMesh, lockwnodes[i], 0);
+    else ungetlocks[numRNodes+i] = 1;
+  }
+  bool tmplocks = true;
+  for(int i=0; i<numNodes; i++) {
+    tmplocks = tmplocks && (ungetlocks[i]>0);
+  }
+  if(tmplocks) donelocks = true;
+  //else CthYield(); //block for a while
+  //}
   free(ungetlocks);  
   return 1;
 }
@@ -388,6 +388,7 @@ int FEM_AdaptL::edge_contraction(int n1, int n2) {
   int numtries = 0;
   int ret = -1;
   bool warned = false;
+  int newe1=-1, newe2=-1;
 
   bool invalidcoarsen = false;
   if(n1<0 || n2<0) {
@@ -425,8 +426,91 @@ int FEM_AdaptL::edge_contraction(int n1, int n2) {
   int gotlock = 0;
   while(!done) {
     if(ret==ERVAL1) {
+      ret=-1; //reset ret
       //get new nodes, IT has ALL locks
-      isEdge = findAdjData(n1, n2, &e1, &e2, &e1_n1, &e1_n2, &e1_n3, &e2_n1, &e2_n2, &e2_n3,&n3, &n4);
+      int *newnodes = new int[4];
+      int newcount=0;
+      if(newe1!=-1 && newe2!=-1) {
+	int *e1conns = new int[3];
+	int *e2conns = new int[3];
+	theMesh->e2n_getAll(newe1,e1conns,0);
+	theMesh->e2n_getAll(newe2,e2conns,0);
+	for(int i=0; i<3; i++) {
+	  for(int j=0; j<3; j++) {
+	    if(e1conns[i] == e2conns[j]) {
+	      newnodes[newcount++] = e1conns[i];
+	      break;
+	    }
+	  }
+	}
+	if(newcount!=2) {
+	  //they do not share an edge now.. check if they are both different & valid
+	  //should happen only if they are both ghosts
+	  CkAssert(FEM_Is_ghost_index(newe1) && FEM_Is_ghost_index(newe2));
+	  if(newe1!=e1) {//updated e1 now
+	    theMesh->e2n_getAll(newe1,newnodes,3);
+	  }
+	  if(newe2!=e2) {//updated e2 now
+	    theMesh->e2n_getAll(newe2,newnodes,3);
+	  }
+	  newcount==3;
+	  //check if the other node is valid still
+	  for(int i=0; i<4; i++) {
+	    bool othernodevalid = true;
+	    for(int j=0; i<3; i++) {
+	      if(locknodes[i] == newnodes[j]) othernodevalid = false;
+	    }
+	    if(othernodevalid && FEM_Is_ghost_index(locknodes[i])) {
+	      newnodes[newcount++]=locknodes[i];
+	    }
+	  }
+	}
+	else {
+	  for(int i=0; i<3; i++) {
+	    if(e1conns[i]!=newnodes[0] && e1conns[i]!=newnodes[1]) {
+	      newnodes[newcount++] = e1conns[i];
+	      break;
+	    }
+	  }
+	  CkAssert(newcount==3);
+	  for(int i=0; i<3; i++) {
+	    if(e2conns[i]!=newnodes[0] && e2conns[i]!=newnodes[1]) {
+	      newnodes[newcount++] = e2conns[i];
+	      break;
+	    }
+	  }
+	  CkAssert(newcount==4);
+	}
+	delete [] e1conns;
+	delete [] e2conns;
+      }
+      else{
+	if(newe1!=-1) {
+	  theMesh->e2n_getAll(newe1,newnodes,0);
+	  newcount=3;
+	}
+	else if(newe2!=-1) {
+	  theMesh->e2n_getAll(newe2,newnodes,0);
+	  newcount=3;
+	}
+      }
+      e1 = newe1;
+      e2 = newe2;
+      n1 = newnodes[0];
+      n2 = newnodes[1];
+      n3 = newnodes[2];
+      n4 = newnodes[3];
+      locknodes[0] = n1;
+      locknodes[1] = n2;
+      locknodes[2] = n3;
+      locknodes[3] = n4;
+      numNodes = newcount;
+      delete [] newnodes;
+      if(numNodes!=0) {
+	isEdge = findAdjData(n1, n2, &e1, &e2, &e1_n1, &e1_n2, &e1_n3, &e2_n1, &e2_n2, &e2_n3,&n3, &n4);
+      } else {
+	isEdge=-1;
+      }
       if(isEdge == -1) {
 	if(locked) {
 	  //if we have lost the entire region, nothing will be unlocked, as all nodes will be invalid
@@ -439,17 +523,15 @@ int FEM_AdaptL::edge_contraction(int n1, int n2) {
 	free(gotlocks);
 	return -1;
       }
-      /*FEM_Modify_correctLockN(theMesh, n1);
-      FEM_Modify_correctLockN(theMesh, n2);
-      FEM_Modify_correctLockN(theMesh, n3);
-      FEM_Modify_correctLockN(theMesh, n4);*/ //shouldnot need to do it any more
-      locknodes[2] = n3;
-      locknodes[3] = n4;
-      if (e1 == -1) {
+      if (e1==-1 || e2==-1) {
 	unlockNodes(gotlocks, locknodes, 0, locknodes, numNodes);
 	free(locknodes);
 	free(gotlocks);
 	return -1;
+      }
+      if(locknodes[2]==n4 && locknodes[3]==n3) {
+	n3 = locknodes[2];
+	n4 = locknodes[3];
       }
       gotlock = 1;
     }
@@ -470,8 +552,8 @@ int FEM_AdaptL::edge_contraction(int n1, int n2) {
     }
     if (e1 == -1 || e2==-1) {
       if(locked) {
-	locknodes[2] = n3;
-	locknodes[3] = n4;
+	//locknodes[2] = n3;
+	//locknodes[3] = n4;
 	unlockNodes(gotlocks, locknodes, 0, locknodes, numNodes);
 	locked = false;
       }
@@ -483,7 +565,8 @@ int FEM_AdaptL::edge_contraction(int n1, int n2) {
       int numtries1=0;
       ret = ERVAL;
       while(ret==ERVAL && numtries1 < 5) {
-	ret = edge_contraction_help(e1, e2, n1, n2, e1_n1, e1_n2, e1_n3, e2_n1, e2_n2, e2_n3, n3, n4);
+	newe1=e1; newe2=e2;
+	ret = edge_contraction_help(&newe1, &newe2, n1, n2, e1_n1, e1_n2, e1_n3, e2_n1, e2_n2, e2_n3, n3, n4);
 	if(ret == ERVAL1) {
 	  done = false;
 	}
@@ -560,17 +643,18 @@ int FEM_AdaptL::edge_contraction(int n1, int n2) {
 }
 
 
-int FEM_AdaptL::edge_contraction_help(int e1, int e2, int n1, int n2, int e1_n1,
+int FEM_AdaptL::edge_contraction_help(int *e1P, int *e2P, int n1, int n2, int e1_n1,
 				     int e1_n2, int e1_n3, int e2_n1, 
 				     int e2_n2, int e2_n3, int n3, int n4)
 {
-
+  int e1=*e1P, e2=*e2P;
+  
   int e1chunk=-1, e2chunk=-1;
   int index = theMod->getIdx();
 
-  if(n1==8 && n2==15) {
+  /*if(n1==8 && n2==15) {
     CkPrintf("Crit\n");
-  }
+    }*/
 
   //if n1 & n2 are shared differently or are on two different boundaries return
   int n1_shared=0, n2_shared=0;
@@ -617,8 +701,26 @@ int FEM_AdaptL::edge_contraction_help(int e1, int e2, int n1, int n2, int e1_n1,
   if(e1>=0) {
     int e1conn[3];
     theMesh->e2n_getAll(e1, e1conn, 0);
+    //let the eating progress, only if both n1 & n2 will not be lost
+    //necessary for the locking code to know what all it has locked
+    /*int *n1n2es, *n2n2es;
+    int n1n2ecount, n2n2ecount;
+    theMesh->n2e_getAll(n1,&n1n2es,&n1n2ecount);
+    theMesh->n2e_getAll(n2,&n2n2es,&n2n2ecount);
+    int n1n2elocalcount=0, n2n2elocalcount=0;
+    for(int i=0; i<n1n2ecount; i++) {
+      if(n1n2es[i]>=0) n1n2elocalcount++;
+    }
+    for(int i=0; i<n2n2ecount; i++) {
+      if(n2n2es[i]>=0) n2n2elocalcount++;
+    }
+    if(n1n2elocalcount==1 && n2n2elocalcount==1) {
+      delete[] n1n2es;
+      delete[] n2n2es;
+      return -1;
+      }*/
     for(int i=0; i<3; i++) {
-      if(e1conn[i]!=n1 && e1conn[i]!=n2) {
+      //if(e1conn[i]!=n1 && e1conn[i]!=n2) {
 	int *e1Elems, esize1;
 	theMesh->n2e_getAll(e1conn[i], &e1Elems, &esize1);
 	int e1count=0;
@@ -641,6 +743,26 @@ int FEM_AdaptL::edge_contraction_help(int e1, int e2, int n1, int n2, int e1_n1,
 	    int e1remoteChk = theMesh->elem[0].ghost->ghostRecv.getRec(FEM_To_ghost_index(e1ghostelem))->getChk(0);
 	    int sharedIdx = theMod->fmUtil->exists_in_IDXL(theMesh,e1,e1remoteChk,3);
 	    CkPrintf("[%d]Edge Contraction, edge %d->%d, chunk %d eating into chunk %d\n",theMod->idx, n1, n2, e1remoteChk, index);
+	    if(FEM_Is_ghost_index(e2)) { //unlock the 4th node, if it will be lost
+	      int e2conn[3];
+	      theMesh->e2n_getAll(e2, e2conn, 0);
+	      int gotlocksn4 = 1, lockn4=-1;
+	      for(int k=0; k<3; k++) {
+		if(e2conn[k]!=n1 && e2conn[k]!=n2) lockn4=e2conn[k];
+	      }
+	      //if my only local n2n are nodes which e1 will lose at the end of this acquire
+	      //then unlock me
+	      int *n4ns, n4ncount;
+	      bool shouldbeunlocked=true;
+	      theMesh->n2n_getAll(lockn4, &n4ns, &n4ncount);
+	      for(int k=0; k<n4ncount; k++) {
+		if(n4ns[k]>=0 && n4ns[k]!=n1 && n4ns[k]!=n2) shouldbeunlocked=false; 
+	      }
+	      if(shouldbeunlocked) {
+		unlockNodes(&gotlocksn4, &lockn4, 0, &lockn4, 1);
+	      }
+	      if(n4ncount!=0) delete[] n4ns;
+	    }
 	    e1new = meshMod[e1remoteChk].eatIntoElement(index,sharedIdx)->i;
 	    if(e1new!=-1) {
 	      e1 = theMod->fmUtil->lookup_in_IDXL(theMesh,e1new,e1remoteChk,4);
@@ -649,19 +771,38 @@ int FEM_AdaptL::edge_contraction_help(int e1, int e2, int n1, int n2, int e1_n1,
 	    }
 	    else e1 = -1;
 	    free(e1Elems);
+	    *e1P = e1;
 	    return ERVAL1;
 	  }
 	}
 	//free(e1Elems);
-      }
+	//}
     }
   }
   if(e2>=0) {
     int e2conn[3];
     int e2remoteChk=-1;
     theMesh->e2n_getAll(e2, e2conn, 0);
+    //let the eating progress, only if both n1 & n2 will not be lost
+    //necessary for the locking code to know what all it has locked
+    /*int *n1n2es, *n2n2es;
+    int n1n2ecount, n2n2ecount;
+    theMesh->n2e_getAll(n1,&n1n2es,&n1n2ecount);
+    theMesh->n2e_getAll(n2,&n2n2es,&n2n2ecount);
+    int n1n2elocalcount=0, n2n2elocalcount=0;
+    for(int i=0; i<n1n2ecount; i++) {
+      if(n1n2es[i]>=0) n1n2elocalcount++;
+    }
+    for(int i=0; i<n2n2ecount; i++) {
+      if(n2n2es[i]>=0) n2n2elocalcount++;
+    }
+    if(n1n2elocalcount==1 && n2n2elocalcount==1) {
+      delete[] n1n2es;
+      delete[] n2n2es;
+      return -1;
+      }*/
     for(int i=0; i<3; i++) {
-      if(e2conn[i]!=n1 && e2conn[i]!=n2) {
+      //if(e2conn[i]!=n1 && e2conn[i]!=n2) {
 	int *e2Elems, esize2;
 	theMesh->n2e_getAll(e2conn[i], &e2Elems, &esize2);
 	int e2count=0;
@@ -684,6 +825,26 @@ int FEM_AdaptL::edge_contraction_help(int e1, int e2, int n1, int n2, int e1_n1,
 	    int e2remoteChk = theMesh->elem[0].ghost->ghostRecv.getRec(FEM_To_ghost_index(e2ghostelem))->getChk(0);
 	    int sharedIdx = theMod->fmUtil->exists_in_IDXL(theMesh,e2,e2remoteChk,3);
 	    CkPrintf("[%d]Edge Contraction, edge %d->%d, chunk %d eating into chunk %d\n",theMod->idx, n1, n2, e2remoteChk, index);
+	    if(FEM_Is_ghost_index(e1)) {
+	      int e1conn[3];
+	      theMesh->e2n_getAll(e1, e1conn, 0);
+	      int gotlocksn4 = 1, lockn4=-1;
+	      for(int k=0; k<3; k++) {
+		if(e1conn[k]!=n1 && e1conn[k]!=n2) lockn4=e1conn[k];
+	      }
+	      //if my only local n2n are nodes which e1 will lose at the end of this acquire
+	      //then unlock me
+	      int *n4ns, n4ncount;
+	      bool shouldbeunlocked=true;
+	      theMesh->n2n_getAll(lockn4, &n4ns, &n4ncount);
+	      for(int k=0; k<n4ncount; k++) {
+		if(n4ns[k]>=0 && n4ns[k]!=n1 && n4ns[k]!=n2) shouldbeunlocked=false; 
+	      }
+	      if(shouldbeunlocked) {
+		unlockNodes(&gotlocksn4, &lockn4, 0, &lockn4, 1);
+	      }
+	      if(n4ncount!=0) delete[] n4ns;
+	    }
 	    e2new = meshMod[e2remoteChk].eatIntoElement(index,sharedIdx)->i;
 	    if(e2new!=-1) {
 	      e2 = theMod->fmUtil->lookup_in_IDXL(theMesh,e2new,e2remoteChk,4);
@@ -691,11 +852,12 @@ int FEM_AdaptL::edge_contraction_help(int e1, int e2, int n1, int n2, int e1_n1,
 	      e2 = FEM_To_ghost_index(e2);
 	    }
 	    else e2 = -1;
+	    *e2P = e2;
 	    free(e2Elems);
 	    return ERVAL1;
 	  }
 	  //free(e2Elems);
-	}
+	  //}
       }
     }
   }
@@ -712,9 +874,6 @@ int FEM_AdaptL::edge_contraction_help(int e1, int e2, int n1, int n2, int e1_n1,
 
   //New code for updating a node rather than deleting both
   int keepnode=-1, deletenode=-1, shared=0;
-#ifdef DEBUG_1
-  CkPrintf("[%d]Edge Contraction, edge %d->%d\n",theMod->idx, n1, n2);
-#endif
   //n1_shared = theMod->getfmUtil()->isShared(n1);
   //n2_shared = theMod->getfmUtil()->isShared(n2);
   if(n1_shared && n2_shared) {

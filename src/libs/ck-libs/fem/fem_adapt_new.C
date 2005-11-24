@@ -5,7 +5,7 @@
 
 #include "fem_adapt_new.h"  
 #include "fem_mesh_modify.h"
-
+#include <vector>
 //#define DEBUG_1
 //#define DEBUG_2
 
@@ -247,23 +247,68 @@ int FEM_Adapt::edge_flip_help(int e1, int e2, int n1, int n2, int e1_n1,
   //get rid of some unnecessary ghost node sends
   for(int i=0; i<4;i++) {
     int nodeToUpdate = -1;
-    if(i==1) nodeToUpdate = n1;
-    else if(i==2) nodeToUpdate = n2;
-    else if(i==3) nodeToUpdate = n3;
-    else if(i==4) nodeToUpdate = n4;
-    theMod->fmUtil->UpdateGhostSend(nodeToUpdate);
+    if(i==0) nodeToUpdate = n1;
+    else if(i==1) nodeToUpdate = n2;
+    else if(i==2) nodeToUpdate = n3;
+    else if(i==3) nodeToUpdate = n4;
+    //if any of the chunks sharing this node sends this as a ghost, then all of them have to
+    //so find out the set of chunks I need to send this as a ghost to
+    //collect info from each of the shared chunks, do a union of all these chunks
+    //send this updated list to everyone.
+    //if anyone needs to add or delete some ghosts, they will
+    int *chkl, numchkl=0;
+    std::vector<int> finalchkl;
+    theMod->fmUtil->findGhostSend(nodeToUpdate, &chkl, &numchkl);
+    for(int j=0; j<numchkl; j++) {
+      finalchkl.push_back(chkl[j]);
+    }
+    if(numchkl>0) delete[] chkl;
+
     const IDXL_Rec *irec=theMesh->node.shared.getRec(nodeToUpdate);
+    int numchunks=0;
+    int *chunks1, *inds1;
     if(irec) {
-      int numchunks = irec->getShared();
-      int *chunks1 = new int[numchunks];
-      int *inds1 = new int[numchunks];
+      numchunks = irec->getShared();
+      chunks1 = new int[numchunks];
+      inds1 = new int[numchunks];
       for(int j=0; j<numchunks; j++) {
 	chunks1[j] = irec->getChk(j);
 	inds1[j] = irec->getIdx(j);
       }
-      for(int j=0; j<numchunks; j++) {
-	meshMod[chunks1[j]].UpdateGhostSend(index,inds1[j]);
+    }
+    for(int j=0; j<numchunks; j++) {
+      findgsMsg *fmsg = meshMod[chunks1[j]].findghostsend(index,inds1[j]);
+      if(fmsg->numchks>0) {
+	for(int k=0; k<fmsg->numchks; k++) {
+	  bool shouldbeadded = true;
+	  for(int l=0; l<finalchkl.size(); l++) {
+	    if(fmsg->chunks[k]==finalchkl[l]) {
+	      shouldbeadded = false;
+	      break;
+	    }
+	  }
+	  if(shouldbeadded) finalchkl.push_back(fmsg->chunks[k]);
+	}
       }
+      delete fmsg;
+    }
+
+    int *finall, numfinall=finalchkl.size();
+    if(numfinall>0) finall = new int[numfinall];
+    for(int j=0; j<numfinall; j++) finall[j] = finalchkl[j];
+    finalchkl.clear();
+
+    theMod->fmUtil->UpdateGhostSend(nodeToUpdate, finall, numfinall);
+    for(int j=0; j<numchunks; j++) {
+      verifyghostsendMsg *vmsg = new(numfinall)verifyghostsendMsg();
+      vmsg->fromChk = index;
+      vmsg->sharedIdx = inds1[j];
+      vmsg->numchks = numfinall;
+      for(int k=0; k<numfinall; k++) vmsg->chunks[k] = finall[k];
+      meshMod[chunks1[j]].updateghostsend(vmsg);
+    }
+    if(numfinall>0) delete[] finall;
+    if(numchunks>0) {
       delete[] chunks1;
       delete[] inds1;
     }
@@ -507,23 +552,68 @@ int FEM_Adapt::edge_bisect_help(int e1, int e2, int n1, int n2, int e1_n1,
   //get rid of some unnecessary ghost node sends
   for(int i=0; i<4;i++) {
     int nodeToUpdate = -1;
-    if(i==1) nodeToUpdate = n1;
-    else if(i==2) nodeToUpdate = n2;
-    else if(i==3) nodeToUpdate = n3;
-    else if(i==4) nodeToUpdate = n4;
-    theMod->fmUtil->UpdateGhostSend(nodeToUpdate);
+    if(i==0) nodeToUpdate = n1;
+    else if(i==1) nodeToUpdate = n2;
+    else if(i==2) nodeToUpdate = n3;
+    else if(i==3) nodeToUpdate = n4;
+    //if any of the chunks sharing this node sends this as a ghost, then all of them have to
+    //so find out the set of chunks I need to send this as a ghost to
+    //collect info from each of the shared chunks, do a union of all these chunks
+    //send this updated list to everyone.
+    //if anyone needs to add or delete some ghosts, they will
+    int *chkl, numchkl=0;
+    std::vector<int> finalchkl;
+    theMod->fmUtil->findGhostSend(nodeToUpdate, &chkl, &numchkl);
+    for(int j=0; j<numchkl; j++) {
+      finalchkl.push_back(chkl[j]);
+    }
+    if(numchkl>0) delete[] chkl;
+
     const IDXL_Rec *irec=theMesh->node.shared.getRec(nodeToUpdate);
+    int numchunks=0;
+    int *chunks1, *inds1;
     if(irec) {
-      int numchunks = irec->getShared();
-      int *chunks1 = new int[numchunks];
-      int *inds1 = new int[numchunks];
+      numchunks = irec->getShared();
+      chunks1 = new int[numchunks];
+      inds1 = new int[numchunks];
       for(int j=0; j<numchunks; j++) {
 	chunks1[j] = irec->getChk(j);
 	inds1[j] = irec->getIdx(j);
       }
-      for(int j=0; j<numchunks; j++) {
-	meshMod[chunks1[j]].UpdateGhostSend(index,inds1[j]);
+    }
+    for(int j=0; j<numchunks; j++) {
+      findgsMsg *fmsg = meshMod[chunks1[j]].findghostsend(index,inds1[j]);
+      if(fmsg->numchks>0) {
+	for(int k=0; k<fmsg->numchks; k++) {
+	  bool shouldbeadded = true;
+	  for(int l=0; l<finalchkl.size(); l++) {
+	    if(fmsg->chunks[k]==finalchkl[l]) {
+	      shouldbeadded = false;
+	      break;
+	    }
+	  }
+	  if(shouldbeadded) finalchkl.push_back(fmsg->chunks[k]);
+	}
       }
+      delete fmsg;
+    }
+
+    int *finall, numfinall=finalchkl.size();
+    if(numfinall>0) finall = new int[numfinall];
+    for(int j=0; j<numfinall; j++) finall[j] = finalchkl[j];
+    finalchkl.clear();
+
+    theMod->fmUtil->UpdateGhostSend(nodeToUpdate, finall, numfinall);
+    for(int j=0; j<numchunks; j++) {
+      verifyghostsendMsg *vmsg = new(numfinall)verifyghostsendMsg();
+      vmsg->fromChk = index;
+      vmsg->sharedIdx = inds1[j];
+      vmsg->numchks = numfinall;
+      for(int k=0; k<numfinall; k++) vmsg->chunks[k] = finall[k];
+      meshMod[chunks1[j]].updateghostsend(vmsg);
+    }
+    if(numfinall>0) delete[] finall;
+    if(numchunks>0) {
       delete[] chunks1;
       delete[] inds1;
     }
@@ -856,17 +946,18 @@ int FEM_Adapt::edge_contraction(int n1, int n2)
       lockelems[1] = e2;
     }
   }
-  int ret = edge_contraction_help(e1, e2, n1, n2, e1_n1, e1_n2, e1_n3, e2_n1, e2_n2, e2_n3, n3, n4);
+  int ret = edge_contraction_help(&e1, &e2, n1, n2, e1_n1, e1_n2, e1_n3, e2_n1, e2_n2, e2_n3, n3, n4);
   FEM_Modify_Unlock(theMesh);
   free(locknodes);
   free(lockelems);
   return ret;
 }
 
-int FEM_Adapt::edge_contraction_help(int e1, int e2, int n1, int n2, int e1_n1,
+int FEM_Adapt::edge_contraction_help(int *e1P, int *e2P, int n1, int n2, int e1_n1,
 				     int e1_n2, int e1_n3, int e2_n1, 
 				     int e2_n2, int e2_n3, int n3, int n4)
 {
+  int e1=*e1P, e2=*e2P;
   int *conn = (int*)malloc(3*sizeof(int));
   int *adjnodes = (int*)malloc(2*sizeof(int));
   adjnodes[0] = n1;
@@ -1294,6 +1385,7 @@ int FEM_Adapt::findAdjData(int n1, int n2, int *e1, int *e2, int *e1n1,
   (*e1n1) = (*e1n2) = (*e1n3) = (*n3) = -1;
 
   //if n1,n2 is not an edge return 
+  if(n1<0 || n2<0) return -1;
   if(theMesh->node.is_valid(n1)==0 || theMesh->node.is_valid(n2)==0) return -1;
   if(theMesh->n2n_exists(n1,n2)!=1 || theMesh->n2n_exists(n2,n1)!=1) return -1; 
 

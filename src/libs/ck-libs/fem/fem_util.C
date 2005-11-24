@@ -6,7 +6,7 @@
 
 #include "fem_util.h"
 #include "fem_mesh_modify.h"
-
+#include <vector>
 
 extern void splitEntity(IDXL_Side &c, int localIdx, int nBetween, int *between, int idxbase);
 
@@ -743,6 +743,17 @@ void FEM_MUtil::addToSharedList(FEM_Mesh *m, int fromChk, int sharedIdx) {
   m->node.shared.addNode(localIdx, fromChk);
   m->node.ghostSend.removeNode(localIdx, fromChk);
 
+  //find all chunks that receive this node as a ghost
+  const IDXL_Rec *irec2 = m->node.ghostSend.getRec(localIdx);
+  if(irec2!=NULL) {
+    for(int i=0; i<irec2->getShared(); i++) {
+      //tell that chunk to verify if it needs to add this node as a ghost
+      int pchk = irec2->getChk(i);
+      int shidx = irec2->getIdx(i);
+      meshMod[pchk].addghostsendr(idx,shidx,fromChk,exists_in_IDXL(m,localIdx,fromChk,0));
+    }
+  }
+
   int *enbrs;
   int esize;
   m->n2e_getAll(localIdx, &enbrs, &esize);
@@ -830,11 +841,24 @@ void FEM_MUtil::addToSharedList(FEM_Mesh *m, int fromChk, int sharedIdx) {
 	for(int j=0; j<numNodesToAdd; j++) {
 	  m->node.ghostSend.addNode(nodesToAdd[j],fromChk);
 	}
-	free(nodesToAdd);
 	fm->connSize = connSize;
 	meshMod[fromChk].addGhostElem(fm); 
+
+	for(int j=0; j<numNodesToAdd; j++) {
+	  //make the chunks which share this node also add this node as a ghost node
+	  //if it is not already sending it
+	  const IDXL_Rec *irec1 = m->node.shared.getRec(nodesToAdd[j]);
+	  if(irec1!=NULL) {
+	    for(int sh=0; sh<irec1->getShared(); sh++) {
+	      int transIdx = exists_in_IDXL(m,nodesToAdd[j],fromChk,1);
+	      meshMod[irec1->getChk(sh)].addghostsendl(idx,irec1->getIdx(sh),fromChk,transIdx);
+	    }
+	  }
+	}
+
 	//idxlunlock(m, fromChk, 1);
 	//idxlunlock(m, fromChk, 3);
+	free(nodesToAdd);
 	free(sharedGhosts);
 	free(sharedNodes);
 	free(nnbrs);
@@ -848,35 +872,76 @@ void FEM_MUtil::addToSharedList(FEM_Mesh *m, int fromChk, int sharedIdx) {
   return;
 }
 
-//get rid of unnecessary ghostsends.. called from edge_bisect
-void FEM_MUtil::UpdateGhostSend(int nodeId) {
+//find the set of chunks I need to send this node as a ghost to
+void FEM_MUtil::findGhostSend(int nodeId, int **chunkl, int *numchunkl) {
+  if(nodeId<0) return;
+  std::vector<int> chkl;
+  int *adjnds, numadjnds=0;
+  mmod->fmMesh->n2n_getAll(nodeId, &adjnds, &numadjnds);
+  for(int j=0; j<numadjnds; j++) {
+    int node1 = adjnds[j];
+    if(node1>=0) {
+      const IDXL_Rec *irec = mmod->fmMesh->node.shared.getRec(node1);
+      if(irec) {
+	for(int k=0; k<irec->getShared(); k++) {
+	  int pchk = irec->getChk(k);
+	  //add this to ckl, if it does not exist already
+	  //if nodeId is shared on pchk, continue
+	  if(exists_in_IDXL(mmod->fmMesh,nodeId,pchk,0)!=-1) continue;
+	  bool shouldadd=true;
+	  for(int l=0; l<chkl.size(); l++) {
+	    if(chkl[l]==pchk) {
+	      shouldadd=false;
+	      break;
+	    }
+	  }
+	  if(shouldadd) chkl.push_back(pchk);
+	}
+      }
+    }
+  }
+  if(numadjnds>0) delete[] adjnds;
+  *numchunkl = chkl.size();
+  if(numchunkl>0) 
+    *chunkl = new int[*numchunkl];
+  for(int i=0;i<*numchunkl;i++) {
+    (*chunkl)[i] = chkl[i];
+  }
+  //delete the vector
+  chkl.clear();
+  return;
+}
+
+//get rid of unnecessary ghostsends..
+void FEM_MUtil::UpdateGhostSend(int nodeId, int *chunkl, int numchunkl) {
   if(nodeId<0) return;
   const IDXL_Rec *irec = mmod->fmMesh->node.ghostSend.getRec(nodeId);
+  int numchunks=0;
+  int *chunks1, *inds1;
   if(irec) {
-    int numchunks = irec->getShared();
-    int *chunks1 = new int[numchunks];
-    int *inds1 = new int[numchunks];
+    numchunks = irec->getShared();
+    chunks1 = new int[numchunks];
+    inds1 = new int[numchunks];
     for(int i=0; i<numchunks; i++) {
       chunks1[i] = irec->getChk(i);
       inds1[i] = irec->getIdx(i);
     }
-    int *adjelts, numadjelts=0;
-    mmod->fmMesh->n2e_getAll(nodeId, &adjelts, &numadjelts);
-    for(int i=0; i<numchunks; i++) {
-      bool shouldbeSent = false;
-      int chk = chunks1[i];
-      for(int j=0; j<numadjelts; j++) {
-	if(exists_in_IDXL(mmod->fmMesh,adjelts[j],chk,3,0)!=-1) {
-	  shouldbeSent = true;
-	  break;
-	}
-      }
-      if(!shouldbeSent) {
-	meshMod[chk].removeGhostNode(idx, inds1[i]);
-	mmod->fmMesh->node.ghostSend.removeNode(nodeId,chk);
+  }
+  for(int i=0; i<numchunks; i++) {
+    bool shouldbeSent = false;
+    for(int j=0; j<numchunkl; j++) { //if it is not in this list
+      if(chunks1[i]==chunkl[j]) {
+	shouldbeSent=true;
+	break;
       }
     }
-    if(numadjelts>0) delete[] adjelts;
+    if(!shouldbeSent) {
+      meshMod[chunks1[i]].removeGhostNode(idx, inds1[i]);
+      mmod->fmMesh->node.ghostSend.removeNode(nodeId,chunks1[i]);
+    }
+  }
+
+  if(numchunks>0) {
     delete[] chunks1;
     delete[] inds1;
   }
@@ -1034,13 +1099,16 @@ void FEM_MUtil::StructureTest(FEM_Mesh *m) {
 	CkPrintf("ERROR: local node %d, with inconsistent adjacency list\n",i);
 	CkAssert(false);
       }
-    } 
+    }
     else {
       continue;
     }
     if(n2esize > 0) {
-      for(int j=0; j<n2esize; j++)
+      for(int j=0; j<n2esize; j++) {
 	CkAssert(n2e[j]!=-1);
+	if(FEM_Is_ghost_index(n2e[j])) CkAssert(m->elem[0].ghost->is_valid(FEM_From_ghost_index(n2e[j]))==1);
+	else CkAssert(m->elem[0].is_valid(n2e[j])==1);
+      }
 
       m->e2n_getAll(n2e[0],e2n,0);
 
@@ -1181,6 +1249,8 @@ void FEM_MUtil::StructureTest(FEM_Mesh *m) {
 	int n2n1Count = 0;
 	for(int j=0; j<n2esize; j++) {
 	  CkAssert(n2e[j]!=-1);
+	  if(FEM_Is_ghost_index(n2e[j])) CkAssert(m->elem[0].ghost->is_valid(FEM_From_ghost_index(n2e[j]))==1);
+	  else CkAssert(m->elem[0].is_valid(n2e[j])==1);
 	  //each of these elems should have me in its e2n
 	  int e2n1[3];
 	  m->e2n_getAll(n2e[j],e2n1,0);
@@ -1224,16 +1294,28 @@ void FEM_MUtil::StructureTest(FEM_Mesh *m) {
 	  CkPrintf("ERROR: ghost node %d has inconsistent adjacency list\n",ghostidx);
 	  CkAssert(false);
 	}
-
 	delete [] n2n1;
 	delete [] n2e;
       }
       if(n2nsize > 0) {
-	for(int j=0; j<n2nsize; j++)
+	for(int j=0; j<n2nsize; j++) {
 	  CkAssert(n2n[j]!=-1);
+	}
 	delete [] n2n;
       }
-    } 
+      //verify that it is coming correctly from all chunks as a ghost
+      const IDXL_Rec *irec = m->node.ghost->ghostRecv.getRec(i);
+      //go to a chunk which owns it & verify that these are the only chunks that own it
+      int remChk = irec->getChk(0);
+      int sharedIdx = irec->getIdx(0);
+      int numsh = irec->getShared();
+      verifyghostsendMsg *vmsg = new(numsh,0)verifyghostsendMsg();
+      vmsg->fromChk = idx;
+      vmsg->sharedIdx = sharedIdx;
+      vmsg->numchks = numsh;
+      for(int k=0; k<numsh; k++) vmsg->chunks[k] = irec->getChk(k);
+      meshMod[remChk].verifyghostsend(vmsg);
+    }
     else {
       continue;
     }
