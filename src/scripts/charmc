@@ -547,6 +547,11 @@ do
 		shift
 		;;
 
+	-I)
+		OPTS_CPP="$OPTS_CPP -I$1"
+		shift
+		;;
+
 	-D*|-I*)
 		OPTS_CPP="$OPTS_CPP $arg"
 		;;
