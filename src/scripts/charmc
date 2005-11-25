@@ -518,7 +518,13 @@ do
 	"-fortran77"|"-f77lib"|"-f77libs")
 		USE_F77_LIBRARIES="1" 
 		;;
-	"-M"|"-E"|"-P"|"-S")
+	"-E")
+# Run preprocessor/assembler only
+		PREPROCESS="yes"
+		SKIPLINK="yes"
+		OPTS="$OPTS $arg"
+		;;
+	"-M"|"-P"|"-S")
 # Run preprocessor/assembler only
 		SKIPLINK="yes"
 		OPTS="$OPTS $arg"
@@ -846,6 +852,11 @@ then
     CMK_LDXX="$CMK_NATIVE_LDXX" 
 fi
 
+if [ -n "$PREPROCESS" ]
+then
+    CMK_CF90=$CMK_FPP
+fi
+
 if [ -n "$PURIFY" ]
 then
     CMK_LD="purify $CMK_LD"
@@ -1058,7 +1069,8 @@ do
 		NU_OBJ=$BASEO
 		;;
 	*.f90|*.F90)
-		Do $CMK_CF90 -I$CHARMINC $OPTS_CPP $OPTS_F90 -c $FILE $DESTO
+		test -z "$PREPROCESS" && OPTS_F90="$OPTS_F90 -c"
+		Do $CMK_CF90 -I$CHARMINC $OPTS_CPP $OPTS_F90 $FILE $DESTO
 		NU_OBJ=$BASEO
 		;;
 	*.fc|*.FC)

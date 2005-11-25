@@ -41,6 +41,7 @@ CMK_LD_SHARED="-shared"
 [ -z "$CMK_NM" ] && CMK_NM='nm '
 [ -z "$CMK_SHARED_SUF" ] && CMK_SHARED_SUF='so'
 
+[ -z "$CMK_FPP" ] && CMK_FPP="$CMK_CF90"
 [ -z "$CMK_CF90_FIXED" ] && CMK_CF90_FIXED="$CMK_CF90"
 [ -z "$CMK_CC_RELIABLE" ] && CMK_CC_RELIABLE="$CMK_CC"
 [ -z "$CMK_CC_FASTEST" ] && CMK_CC_FASTEST="$CMK_CC"
