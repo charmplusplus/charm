@@ -125,7 +125,7 @@ email to (ppl@cs.uiuc.edu).
 
  2. I just downloaded Charm++ net-win32 binaries from your website, how to use it?
 
-   The recommended way to use windows binary package is still under Cygwin.
+   The recommended way to run windows binary is under Cygwin.
    First, unzip the binary packages to desired location; Set PATH environment
    varaible to include the charm bin/ directory. That's it, you can now cd 
    to Charm++ testsuite directory, for example: pgms/charm++/megatest, to 
@@ -136,7 +136,7 @@ email to (ppl@cs.uiuc.edu).
 
  3. How to compile under Windows98?
 
-   Compiling Charm++ with cygwin/gnu compiler is still supported under 
-   Windows98. However, we don't support VC++ with Windows98 any more.
+   Compiling Charm++ with cygwin/gnu compiler (net-cygwin) under Windows98 
+   is still supported. However, we don't support VC++ with Windows98 any more.
    To compile Charm++ under Windows98, one can check out Charm++ version
    before November 2005. 
