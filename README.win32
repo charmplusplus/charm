@@ -6,8 +6,11 @@
 You can compile charm++ under Windows9x/2000/NT with VC++ plus Cygwin.
 Cygwin are ports of the popular GNU development tools and utilities for 
 Windows 9x/2K and NT, which emulates a UNIX environment under Windows.
-If you are not comfortable with Cygwin, you still can compile Charm++ with
-VC++, but this is not prefered, see FAQ below for help.
+
+Note that since November 2005, Windows98 is not supported with VC++.
+Support for WindowsNT/XP is improved to take advantage of the creation of
+symbolic link under WindowsNT.
+Please read the FAQ at end of this file.
 
 
                        Setup and Compilation
@@ -24,13 +27,27 @@ To compile charm with VC++:
    your VC++ install directory, usually at: 
    /Program Files/Microsoft Visual Studio/VC98/Bin
    However VCVARS32.BAT(a DOS Batch) cannot be executed under Bash Shell 
-   , you have to: for Win8x, put it into AUTOEXEC.BAT; for WinNT, you 
-   have to merge the settings in VCVARS32.BAT into your environment varaibles 
-   settings(the most important one is the PATH varaible)  
+   , you have to: for Win8x, put it into AUTOEXEC.BAT; for WinNT, 
+   you have to merge call VCVARS32.BAT in cygwin.bat which is the target of the
+   Cygwin icon on desktop. Note that this dos batch is renamed to 
+   vcvarsall.bat for VC++ version 8.
+   For example, if cygwin is installed under c:\cygwin,
+   modify c:\cygwin\cygwin.bat to something like:
+
+   >>>>>>>>>>>>>>>>>>>
+   @echo off
+
+   call "C:\Program Files\Microsoft Visual Studio 8\VC\vcvarsall" x86
+
+   C:
+   chdir D:\cygwin\bin
+
+   bash --login -i
+   >>>>>>>>>>>>>>>>>>>>
 
 3. This step is optional if you have installed Microsoft Visual Studio under 
    the following (default) location: 
-     /Program Files/Microsoft Visual Studio/Vc98.
+     /Program Files/Microsoft Visual Studio 8\VC
    In case it is not at this directory, edit the following (text) files to 
    modify them to point to your visual studio c++ compiler directory:
     src\arch\win32\unix2nt_ar
@@ -93,8 +110,8 @@ email to (ppl@cs.uiuc.edu).
  1. I don't like Cygwin, can I compile Charm++ without Cygwin?
 
    Yes, there is an un-documented way to compile Charm++ under MS-DOS windows 
-   with VC++ and nmake. This is occasionally maintained and not guarranteed 
-   to be always working.
+   with VC++ and nmake. However, this is only occasionally maintained and not 
+   guarranteed to always work.
    Follow this steps:
    1 open a MS-DOS windows, cd to Charm++ directory, and mkdir net-win32\tmp;
    2 cd to net-win32\tmp, copy Makefile.win32 from 
@@ -117,6 +134,9 @@ email to (ppl@cs.uiuc.edu).
    programs, see the Makefile example under: 
    pgms/charm++/megatest/Makefile.win32.
 
+ 3. How to compile under Windows98?
 
-
-
+   Compiling Charm++ with cygwin/gnu compiler is still supported under 
+   Windows98. However, we don't support VC++ with Windows98 any more.
+   To compile Charm++ under Windows98, one can check out Charm++ version
+   before November 2005. 
