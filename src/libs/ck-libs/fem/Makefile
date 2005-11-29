@@ -27,7 +27,7 @@ FEMMAIN=$(LIBDIR)/libfemmain.o
 all: $(DEST) $(COMPATLIB) $(FEMMAIN)
 
 $(DEST): $(OBJS) $(COMPAT) headers
-	$(CHARMC) $(OBJS) -o $@
+	$(CHARMC) $(OBJS) -o $@ -lstdc++
 	cp $(LIB).dep $(LIBDIR)/$(LIB).dep
 
 $(COMPATLIB): $(COMPAT)
