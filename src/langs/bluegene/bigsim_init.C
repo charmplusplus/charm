@@ -15,13 +15,6 @@
 #include <string.h>
 #include <stdlib.h>
 
-#define  DEBUGF(x)      //CmiPrintf x;
-
-#include "queueing.h"
-#include "blue.h"
-#include "blue_impl.h"    	// implementation header file
-#include "blue_timing.h" 	// timing module
-
 #if CMK_STL_USE_DOT_H  /* Pre-standard C++ */
 #  include <fstream.h>
 #  include <iostream.h>
@@ -30,6 +23,13 @@
 #  include <iostream>
    using namespace std;
 #endif
+
+#define  DEBUGF(x)      //CmiPrintf x;
+
+#include "queueing.h"
+#include "blue.h"
+#include "blue_impl.h"    	// implementation header file
+#include "blue_timing.h" 	// timing module
 
 extern CmiStartFn bgMain(int argc, char **argv);
 
