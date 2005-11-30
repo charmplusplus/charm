@@ -257,7 +257,7 @@ int FEM_Adapt::edge_flip_help(int e1, int e2, int n1, int n2, int e1_n1,
     //send this updated list to everyone.
     //if anyone needs to add or delete some ghosts, they will
     int *chkl, numchkl=0;
-    std::vector<int> finalchkl;
+    CkVec<int> finalchkl;
     theMod->fmUtil->findGhostSend(nodeToUpdate, &chkl, &numchkl);
     for(int j=0; j<numchkl; j++) {
       finalchkl.push_back(chkl[j]);
@@ -296,7 +296,7 @@ int FEM_Adapt::edge_flip_help(int e1, int e2, int n1, int n2, int e1_n1,
     int *finall, numfinall=finalchkl.size();
     if(numfinall>0) finall = new int[numfinall];
     for(int j=0; j<numfinall; j++) finall[j] = finalchkl[j];
-    finalchkl.clear();
+    finalchkl.free();
 
     theMod->fmUtil->UpdateGhostSend(nodeToUpdate, finall, numfinall);
     for(int j=0; j<numchunks; j++) {
@@ -562,7 +562,7 @@ int FEM_Adapt::edge_bisect_help(int e1, int e2, int n1, int n2, int e1_n1,
     //send this updated list to everyone.
     //if anyone needs to add or delete some ghosts, they will
     int *chkl, numchkl=0;
-    std::vector<int> finalchkl;
+    CkVec<int> finalchkl;
     theMod->fmUtil->findGhostSend(nodeToUpdate, &chkl, &numchkl);
     for(int j=0; j<numchkl; j++) {
       finalchkl.push_back(chkl[j]);
@@ -601,7 +601,7 @@ int FEM_Adapt::edge_bisect_help(int e1, int e2, int n1, int n2, int e1_n1,
     int *finall, numfinall=finalchkl.size();
     if(numfinall>0) finall = new int[numfinall];
     for(int j=0; j<numfinall; j++) finall[j] = finalchkl[j];
-    finalchkl.clear();
+    finalchkl.free();
 
     theMod->fmUtil->UpdateGhostSend(nodeToUpdate, finall, numfinall);
     for(int j=0; j<numchunks; j++) {

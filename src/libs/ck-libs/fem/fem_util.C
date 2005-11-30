@@ -875,7 +875,7 @@ void FEM_MUtil::addToSharedList(FEM_Mesh *m, int fromChk, int sharedIdx) {
 //find the set of chunks I need to send this node as a ghost to
 void FEM_MUtil::findGhostSend(int nodeId, int **chunkl, int *numchunkl) {
   if(nodeId<0) return;
-  std::vector<int> chkl;
+  CkVec<int> chkl;
   int *adjnds, numadjnds=0;
   mmod->fmMesh->n2n_getAll(nodeId, &adjnds, &numadjnds);
   for(int j=0; j<numadjnds; j++) {
@@ -908,7 +908,7 @@ void FEM_MUtil::findGhostSend(int nodeId, int **chunkl, int *numchunkl) {
     (*chunkl)[i] = chkl[i];
   }
   //delete the vector
-  chkl.clear();
+  chkl.free();
   return;
 }
 

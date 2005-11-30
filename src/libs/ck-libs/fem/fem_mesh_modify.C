@@ -13,7 +13,6 @@
 #include "fem_mesh_modify.h"
 
 CProxy_femMeshModify meshMod;
-#include <vector>
 
 CDECL int FEM_add_node(int mesh, int* adjacent_nodes, int num_adjacent_nodes, int *chunks, int numChunks, int forceShared, int upcall){
   return FEM_add_node(FEM_Mesh_lookup(mesh,"FEM_add_node"), adjacent_nodes, num_adjacent_nodes, chunks, numChunks, forceShared, upcall);
@@ -571,7 +570,7 @@ int FEM_remove_element(FEM_Mesh *m, int elementid, int elemtype, int permanent){
 	    //get the list of n2e for all nodes of this element. If any node has only this element in its list.
 	    //it no longer should be a ghost on chk
 	    //the next step is to figure out all the ghost elements & nodes that it no longer needs to have
-	    std::vector<int> testelems;
+	    CkVec<int> testelems;
 	    const IDXL_List ll = m->elem[elemtype].ghostSend.addList(chk);
 	    int size = ll.size();
 	    const IDXL_List ln = m->node.ghostSend.addList(chk);
