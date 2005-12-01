@@ -773,7 +773,7 @@ case $version in
     AC_CHECK_PROG(TELNET, telnet, telnet )
     AC_CHECK_PROG(UUDECODE, uudecode, uudecode )
     
-    CHARMIP='128.174.241.207'
+    CHARMIP='128.174.241.81'
 #    CHARMIP='charm.cs.uiuc.edu'
 #    VERSION=`nm /lib/libc.so.6 | grep "A GLIBC_" | tail -1 | sed -e "s/00000000 A GLIBC_//g"`
     AC_MSG_CHECKING(glibc version)
