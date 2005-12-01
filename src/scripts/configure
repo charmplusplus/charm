@@ -2359,7 +2359,7 @@ echo "${ECHO_T}no" >&6
 fi
 
 
-    CHARMIP='128.174.241.207'
+    CHARMIP='128.174.241.81'
 #    CHARMIP='charm.cs.uiuc.edu'
 #    VERSION=`nm /lib/libc.so.6 | grep "A GLIBC_" | tail -1 | sed -e "s/00000000 A GLIBC_//g"`
     echo "$as_me:$LINENO: checking glibc version" >&5
