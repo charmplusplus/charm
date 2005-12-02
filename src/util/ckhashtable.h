@@ -83,6 +83,7 @@ inline CkHashCode CkHashFunction_pointer(const void *keyData,size_t /*len*/)
 	{if (sizeof(char*)==sizeof(int)) return *(int *)keyData;
 	else if (sizeof(char*)==2*sizeof(int)) return ((int*)keyData)[0] & ((int*)keyData)[1];
 	else *((char*)0) = 0;
+        return 0;
 	}
 
 //Functions return 1 if two keys are equal; 0 otherwise
