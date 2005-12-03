@@ -24,8 +24,8 @@ adjacent elements.
 
 */
 
-#ifndef _FEM_REF_
-#define _FEM_REF_
+#ifndef _ParFUM_MESH_MODIFY_H_
+#define _ParFUM_MESH_MODIFY_H_
 
 #include "tcharm.h"
 #include "charm++.h"

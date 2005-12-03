@@ -76,4 +76,4 @@ headers: $(HEADDEP)
 
 # clean up
 clean:
-	rm -rf *.a *.def.h *.decl.h *.o SunWS_cache $(DEST) $(COMPATLIB)
+	rm -rf *.a *.def.h *.decl.h *.o *~ SunWS_cache $(DEST) $(COMPATLIB) $(GENHEADERS)

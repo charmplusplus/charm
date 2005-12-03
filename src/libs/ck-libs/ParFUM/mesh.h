@@ -7,8 +7,8 @@ Finite Element Meshes inside the FEM framework.
 
 Orion Sky Lawlor, olawlor@acm.org, 1/3/2003
 */
-#ifndef __CHARM_mesh_h
-#define __CHARM_mesh_h
+#ifndef __PARFUM_mesh_h
+#define __PARFUM_mesh_h
 
 #include "charm-api.h"
 
