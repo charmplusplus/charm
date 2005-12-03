@@ -10,8 +10,8 @@ CMK_LDXX="mpCC_r -brtl "
 CMK_CF77='mpxlf_r'
 CMK_CF90='mpxlf90_r -qsuffix=f=f90'
 CMK_CF90_FIXED='mpxlf90_r '
-CMK_C_OPTIMIZE='-O3 -qstrict -Q  '
-CMK_CXX_OPTIMIZE='-O3 -qstrict -Q '
+CMK_C_OPTIMIZE='-O3 -qstrict -Q!  '
+CMK_CXX_OPTIMIZE='-O3 -qstrict -Q! '
 CMK_AR='ar cq'
 CMK_RANLIB='true'
 CMK_LIBS="-lckqt -lhC"
