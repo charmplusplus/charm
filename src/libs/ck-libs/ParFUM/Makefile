@@ -1,23 +1,18 @@
 CDIR=../../../..
 CHARMC=$(CDIR)/bin/charmc $(OPTS)
 
+#Headers to be copied to include directory so application users can see them
 HEADERS= ParFUM.h ParFUMf.h
 
-INTERNALHEADERS= mesh.h impl.h parallel_part.h map.h    \
-		mesh_modify.h  ParFUM_adapt.h collide.h    \
-		adapt_algs.h interpolate.h lock.h util.h   \
-		lock_node.h adapt_lock.h ParFUM_adapt_if.h
+#Headers internal to ParFUM
+INTERNALHEADERS= mesh.h impl.h parallel_part.h map.h mesh_modify.h  ParFUM_adapt.h collide.h adapt_algs.h interpolate.h lock.h util.h lock_node.h adapt_lock.h ParFUM_adapt_if.h
 
-GENHEADERS= FEMMeshModify.def.h	FEMMeshModify.decl.h   \
-		fem.decl.h fem.def.h
+#Headers generated from .ci files
+GENHEADERS= FEMMeshModify.def.h	FEMMeshModify.decl.h fem.decl.h fem.def.h
 
 HEADDEP= $(GENHEADERS) $(HEADERS) $(INTERNALHEADERS)
 
-OBJS=ParFUM.o mesh.o symmetries.o partition.o map.o compat.o \
-	 call_init.o parallel_part.o mesh_modify.o                \
-	 mesh_adjacency.o adapt.o adapt_algs.o        \
-	 interpolate.o lock.o util.o lock_node.o      \
-	 adapt_lock.o collide.o                               
+OBJS=ParFUM.o mesh.o symmetries.o partition.o map.o compat.o call_init.o parallel_part.o mesh_modify.o mesh_adjacency.o adapt.o adapt_algs.o interpolate.o lock.o util.o lock_node.o adapt_lock.o collide.o             
 
 COMPAT=compat_init.o compat_finit.o compat_driver.o compat_fdriver.o 
 LIB=libmoduleParFUM
@@ -25,30 +20,15 @@ LIB=libmoduleParFUM
 LIBDIR=$(CDIR)/lib
 DEST=$(LIBDIR)/$(LIB).a
 COMPATLIB=$(LIBDIR)/libParFUM-compat.a
-
-#Should this be here?:
 PARFUMMAIN=$(LIBDIR)/libParFUMmain.o
-
-#Automatic rules:
-.SUFFIXES: .c .o .C .decl.h .ci .def.h
-.ci.decl.h: $< $(HEADDEP)
-	$(CHARMC) $<
-.ci.def.h: $< $(HEADDEP)
-	$(CHARMC) $<
-.c.o: $< $(HEADDEP)
-	$(CHARMC) -c $<
-.C.o: $< $(HEADDEP)
-	$(CHARMC) -c $<
 
 all: $(DEST) $(COMPATLIB) $(PARFUMMAIN)
 
 
-#Manual rules since some dependencies are a little screwy. These should be fixed
 fem.decl.h: ParFUM.ci
 	$(CHARMC) ParFUM.ci
 fem.def.h: ParFUM.ci
 	$(CHARMC) ParFUM.ci
-
 FEMMeshModify.def.h: mesh_modify.ci
 	$(CHARMC) mesh_modify.ci
 FEMMeshModify.decl.h: mesh_modify.ci
@@ -64,6 +44,8 @@ $(DEST): $(OBJS) $(COMPAT) headers $(HEADDEP)
 $(COMPATLIB): $(COMPAT)
 	$(CHARMC) $(COMPAT) -o $@
 
+# Build fortran file with definitions for init and driver. 
+# This allows us to use a single library with either fortran or c
 $(PARFUMMAIN): main.C $(HEADDEP)
 	$(CHARMC) main.C -o $(PARFUMMAIN)
 
@@ -73,6 +55,83 @@ headers: $(HEADDEP)
 	cp vector2d.h $(CDIR)/include/
 	cp cktimer.h $(CDIR)/include/
 	touch headers
+
+
+#Automatic rules for some reason break because they don't use the dependencies
+#.SUFFIXES: .c .o .C
+#.c.o: $(HEADDEP) $< 
+#	$(CHARMC) -c $<
+#.C.o: $(HEADDEP) $<
+#	$(CHARMC) -c $<
+
+
+mesh_modify.o: mesh_modify.C $(HEADDEP)
+	$(CHARMC) -c mesh_modify.C
+
+ParFUM.o: ParFUM.C $(HEADDEP)
+	$(CHARMC) -c ParFUM.C
+
+mesh.o: mesh.C $(HEADDEP)
+	$(CHARMC) -c mesh.C
+
+symmetries.o: symmetries.C $(HEADDEP)
+	$(CHARMC) -c symmetries.C
+
+partition.o: partition.C $(HEADDEP)
+	$(CHARMC) -c partition.C
+
+map.o: map.C $(HEADDEP)
+	$(CHARMC) -c map.C
+
+compat.o: compat.C $(HEADDEP)
+	$(CHARMC) -c compat.C
+
+call_init.o: call_init.C $(HEADDEP)
+	$(CHARMC) -c call_init.C
+
+parallel_part.o: parallel_part.C $(HEADDEP)
+	$(CHARMC) -c parallel_part.C
+
+mesh_adjacency.o: mesh_adjacency.C $(HEADDEP)
+	$(CHARMC) -c mesh_adjacency.C
+
+adapt.o: adapt.C $(HEADDEP)
+	$(CHARMC) -c adapt.C
+
+adapt_algs.o: adapt_algs.C $(HEADDEP)
+	$(CHARMC) -c adapt_algs.C
+
+interpolate.o: interpolate.C $(HEADDEP)
+	$(CHARMC) -c interpolate.C
+
+lock.o: lock.C $(HEADDEP)
+	$(CHARMC) -c lock.C
+
+util.o: util.C $(HEADDEP)
+	$(CHARMC) -c util.C
+
+lock_node.o: lock_node.C $(HEADDEP)
+	$(CHARMC) -c lock_node.C
+
+adapt_lock.o: adapt_lock.C $(HEADDEP)
+	$(CHARMC) -c adapt_lock.C
+
+collide.o: collide.C $(HEADDEP)
+	$(CHARMC) -c collide.C
+
+compat_init.o: compat_init.C $(HEADDEP)
+	$(CHARMC) -c compat_init.C
+
+compat_finit.o: compat_finit.C $(HEADDEP)
+	$(CHARMC) -c compat_finit.C
+
+compat_driver.o: compat_driver.C $(HEADDEP)
+	$(CHARMC) -c compat_driver.C
+
+compat_fdriver.o: compat_fdriver.C $(HEADDEP)
+	$(CHARMC) -c compat_fdriver.C
+
+
 
 # clean up
 clean:
