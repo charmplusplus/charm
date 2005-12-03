@@ -1167,7 +1167,7 @@ void FEM_Mesh::n2e_add(int n, int newElem)
 	FEM_VarIndexAttribute *eAdj = (FEM_VarIndexAttribute *)node.getGhost()->lookup(FEM_NODE_ELEM_ADJACENCY,"n2e_add");     
 	CkVec<CkVec<FEM_VarIndexAttribute::ID> > &eVec = eAdj->get();
 	CkVec<FEM_VarIndexAttribute::ID> &nsVec = eVec[FEM_To_ghost_index(n)];
-	FEM_VarIndexAttribute::ID ne(1, newElem);
+	FEM_VarIndexAttribute::ID ne(0, newElem);
 	nsVec.push_back(ne);
 	int *testn2e, testn2ec;
 	n2e_getAll(n,&testn2e,&testn2ec);
@@ -1183,7 +1183,7 @@ void FEM_Mesh::n2e_add(int n, int newElem)
 	FEM_VarIndexAttribute *eAdj = (FEM_VarIndexAttribute *)node.lookup(FEM_NODE_ELEM_ADJACENCY,"n2e_add");     
 	CkVec<CkVec<FEM_VarIndexAttribute::ID> > &eVec = eAdj->get();
 	CkVec<FEM_VarIndexAttribute::ID> &nsVec = eVec[n];
-	FEM_VarIndexAttribute::ID ne(1, newElem);
+	FEM_VarIndexAttribute::ID ne(0, newElem);
 	nsVec.push_back(ne);
   }
 #ifdef DEBUG
