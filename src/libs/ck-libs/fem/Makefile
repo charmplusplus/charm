@@ -9,7 +9,6 @@ OBJS=fem.o fem_mesh.o symmetries.o \
 	parallel_part.o fem_mesh_modify.o fem_mesh_adjacency.o \
 	fem_adapt_new.o fem_adapt_algs.o fem_interpolate.o \
 	fem_lock.o fem_util.o fem_lock_node.o fem_adapt_lock.o
-	
 COMPAT=compat_init.o compat_finit.o compat_driver.o compat_fdriver.o 
 LIB=libmodulefem
 
