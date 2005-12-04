@@ -7,9 +7,9 @@
 // This module implements high level mesh adaptivity algorithms that make use 
 // of the primitive mesh adaptivity operations provided by fem_adapt(_new).
 // Ask: TLW
-#include "fem_adapt_algs.h"
-#include "fem_mesh_modify.h"
-#include "fem_adapt_if.h"
+#include "adapt_algs.h"
+#include "mesh_modify.h"
+#include "ParFUM_adapt_if.h"
 
 #define MINAREA 1.0e-18
 #define MAXAREA 1.0e12

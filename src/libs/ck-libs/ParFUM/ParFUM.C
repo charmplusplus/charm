@@ -59,8 +59,8 @@ CDECL void FEM_Init(FEM_Comm_t defaultComm)
 FORTRAN_AS_C(FEM_INIT,FEM_Init,fem_init, (int *comm), (*comm))
 
 #ifndef FEM_PARALLEL_PART
-// This lets FEM be a "-module", too.  (Normally comes from .ci file...)
-void _registerfem(void) {}
+// This lets ParFUM be a "-module", too.  (Normally comes from .ci file...)
+//void _registerParFUM(void) {}
 #endif
 
 /*******************************************************

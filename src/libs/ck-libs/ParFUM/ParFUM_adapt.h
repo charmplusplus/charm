@@ -1,4 +1,4 @@
-/* File: ParFUM_adapt.h
+/* File: fem_adapt_new.h
  * Authors: Terry Wilmarth, Nilesh Choudhury
  *
  */

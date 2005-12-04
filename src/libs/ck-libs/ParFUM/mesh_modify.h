@@ -40,7 +40,7 @@ adjacent elements.
 #include "lock_node.h"
 #include "util.h"
 #include "idxl.h"
-#include "FEMMeshModify.decl.h"
+#include "ParFUM.decl.h"
 
 extern CProxy_femMeshModify meshMod;
 

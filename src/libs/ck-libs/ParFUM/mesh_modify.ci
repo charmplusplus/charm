@@ -1,9 +1,9 @@
-/* File: fem_mesh_modify.ci
+/* File: mesh_modify.ci
  * Authors: Nilesh Choudhury
  * 
  */
 
-module FEMMeshModify {
+module ParFUM {
 
   readonly CProxy_femMeshModify meshMod;
 

@@ -2470,4 +2470,4 @@ boolMsg *femMeshModify::willItLose(int fromChk, int sharedIdx) {
   return bmsg;
 }
 
-#include "FEMMeshModify.def.h"
+#include "ParFUM.def.h"

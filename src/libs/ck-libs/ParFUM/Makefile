@@ -8,7 +8,7 @@ HEADERS= ParFUM.h ParFUMf.h
 INTERNALHEADERS= mesh.h impl.h parallel_part.h map.h mesh_modify.h  ParFUM_adapt.h collide.h adapt_algs.h interpolate.h lock.h util.h lock_node.h adapt_lock.h ParFUM_adapt_if.h
 
 #Headers generated from .ci files
-GENHEADERS= FEMMeshModify.def.h	FEMMeshModify.decl.h fem.decl.h fem.def.h
+GENHEADERS= ParFUM.def.h	ParFUM.decl.h fem.decl.h fem.def.h
 
 HEADDEP= $(GENHEADERS) $(HEADERS) $(INTERNALHEADERS)
 
@@ -29,9 +29,9 @@ fem.decl.h: ParFUM.ci
 	$(CHARMC) ParFUM.ci
 fem.def.h: ParFUM.ci
 	$(CHARMC) ParFUM.ci
-FEMMeshModify.def.h: mesh_modify.ci
+ParFUM.def.h: mesh_modify.ci
 	$(CHARMC) mesh_modify.ci
-FEMMeshModify.decl.h: mesh_modify.ci
+ParFUM.decl.h: mesh_modify.ci
 	$(CHARMC) mesh_modify.ci
 
 
@@ -52,6 +52,7 @@ $(PARFUMMAIN): main.C $(HEADDEP)
 # Copy header files to include directory
 headers: $(HEADDEP)
 	cp $(HEADERS) $(CDIR)/include/
+	cp $(GENHEADERS) $(CDIR)/include/
 	cp vector2d.h $(CDIR)/include/
 	cp cktimer.h $(CDIR)/include/
 	touch headers
@@ -86,8 +87,8 @@ map.o: map.C $(HEADDEP)
 compat.o: compat.C $(HEADDEP)
 	$(CHARMC) -c compat.C
 
-call_init.o: call_init.C $(HEADDEP)
-	$(CHARMC) -c call_init.C
+call_init.o: call_init.c $(HEADDEP)
+	$(CHARMC) -c call_init.c
 
 parallel_part.o: parallel_part.C $(HEADDEP)
 	$(CHARMC) -c parallel_part.C
@@ -119,17 +120,17 @@ adapt_lock.o: adapt_lock.C $(HEADDEP)
 collide.o: collide.C $(HEADDEP)
 	$(CHARMC) -c collide.C
 
-compat_init.o: compat_init.C $(HEADDEP)
-	$(CHARMC) -c compat_init.C
+compat_init.o: compat_init.c $(HEADDEP)
+	$(CHARMC) -c compat_init.c
 
-compat_finit.o: compat_finit.C $(HEADDEP)
-	$(CHARMC) -c compat_finit.C
+compat_finit.o: compat_finit.c $(HEADDEP)
+	$(CHARMC) -c compat_finit.c
 
-compat_driver.o: compat_driver.C $(HEADDEP)
-	$(CHARMC) -c compat_driver.C
+compat_driver.o: compat_driver.c $(HEADDEP)
+	$(CHARMC) -c compat_driver.c
 
-compat_fdriver.o: compat_fdriver.C $(HEADDEP)
-	$(CHARMC) -c compat_fdriver.C
+compat_fdriver.o: compat_fdriver.c $(HEADDEP)
+	$(CHARMC) -c compat_fdriver.c
 
 
 
