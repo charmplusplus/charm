@@ -1,6 +1,11 @@
 #ifndef COMMLIBMANAGER_H
 #define COMMLIBMANAGER_H
 
+/**
+   @defgroup Comlib  Charm++ Communication Optimization Framework 
+*/
+/*@{*/
+
 #include "charm++.h"
 #include "cksection.h"
 #include "envelope.h"
@@ -22,8 +27,8 @@ PUPbytes(comID);
 
 #include "comlib.decl.h"
 
-//Dummy message to be sent incase there are no messages to send. 
-//Used by only the EachToMany strategy!
+///Dummy message to be sent in case there are no messages to send. 
+///Used by only the EachToMany strategy!
 class ComlibDummyMsg: public CMessage_ComlibDummyMsg {
     int dummy;
 };
@@ -73,7 +78,9 @@ class ComlibMulticastMsg : public CkMcastBaseMsg,
 
 class ComlibManager;
 
-//An Instance of the communication library.
+/** An Instance of the communication library. It can be seen as the proxy given
+    by ComlibManager upon registration of a strategy to the framework.
+ */
 class ComlibInstanceHandle : public CkDelegateData {
  private:    
     int _instid;
@@ -114,6 +121,12 @@ class ComlibInstanceHandle : public CkDelegateData {
 
 class LBMigrateMsg;
 
+/** The main group doing the management of all the system. It takes care of
+    holding all the registered strategies, calling them when a message arrives,
+    and modifying them when needed by the learning framework. It installed
+    itself as a delegated class from CkDelegateMgr, overwriting the standard
+    path of message sending in charm.
+ */
 class ComlibManager: public CkDelegateMgr {
     friend class ComlibInstanceHandle;
 
@@ -131,9 +144,9 @@ class ComlibManager: public CkDelegateMgr {
     CkArrayIndexMax dummyArrayIndex;
 
     //For compatibility and easier use!
-    int strategyID; //Identifier of the strategy
+    int strategyID; //<Identifier of the strategy
 
-    //Pointer to the converse comm lib strategy table
+    ///Pointer to the converse comm lib strategy table
     StrategyTable *strategyTable;
 
     CkQ<CharmStrategy *> ListOfStrategies; //temporary list of strategies
@@ -166,21 +179,21 @@ class ComlibManager: public CkDelegateMgr {
                                //each of which is triggered by a
                                //loadbalancing operation
 
-    void init(); //initialization function
+    void init(); ///Initialization function
 
     //charm_message for multicast for a section of that group
     void multicast(CharmMessageHolder *cmsg); //charm message holder here
     //void multicast(void *charm_msg, int npes, int *pelist);
 
     //The following funtions can be accessed only from ComlibInstanceHandle
-    void beginIteration();     //Notify begining of a bracket with
-                               //strategy identifier
+    void beginIteration();     ///Notify begining of a bracket with
+                               ///strategy identifier
 
-    void endIteration();       //Notify end, endIteration must be
-                               //called if a beginIteration is
-                               //called. Otherwise end of the entry
-                               //method is assumed to be the end of
-                               //the bracket.
+    void endIteration();       ///Notify end, endIteration must be
+                               ///called if a beginIteration is
+                               ///called. Otherwise end of the entry
+                               ///method is assumed to be the end of
+                               ///the bracket.
     
     void setInstance(int id); 
 
@@ -298,5 +311,7 @@ void ComlibLBMigrationUpdate(LBMigrateMsg *);
         CProxy_ComlibManager cgproxy(CkpvAccess(cmgrID)); \
         cgproxy.ckLocalBranch()->clib_stats.recordRecvM(sid, bytes, src_arr, nsrc); \
 }\
+
+/*@}*/
 
 #endif

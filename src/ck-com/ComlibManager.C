@@ -1,4 +1,7 @@
-
+/**
+   @addtogroup Comlib
+*/
+/*@{*/
 #include "ComlibManager.h"
 #include "EachToManyMulticastStrategy.h"
 #include "DirectMulticastStrategy.h"
@@ -1172,4 +1175,4 @@ void ComlibLBMigrationUpdate(LBMigrateMsg *msg) {
 
 #include "comlib.def.h"
 
-
+/*@}*/
