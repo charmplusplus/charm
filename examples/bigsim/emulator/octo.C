@@ -165,8 +165,11 @@ void BgNodeStart(int argc, char** argv)
   BnvInitialize(int, num_messages);
   BnvAccess(num_messages) = -1;
   BnvInitialize(double, max_time);
+  BnvAccess(max_time) = 0.0;
   BnvInitialize(int, reduce_count);
+  BnvAccess(reduce_count) = 0;
  
+  
   int center_x = (numBgX == 2) ? 0 : numBgX/2;
   int center_y = (numBgY == 2) ? 0 : numBgY/2;
   int center_z = (numBgZ == 2) ? 0 : numBgZ/2;
@@ -243,10 +246,13 @@ void ReduceOcto(char* info)
 
   OctoData* d = (OctoData*)BgGetNodeData();
   TimeMsg* msg = (TimeMsg*)info;
+
   BnvAccess(reduce_count)++;
-  // CmiPrintf("ReduceOcto at node %d %d %d message %d/%d with time %f "
-  //           "max time is %f\n", x, y, z, d->reduce_count, d->num_messages,
-  //           msg->time, d->max_time);
+
+  //CmiPrintf("ReduceOcto at node %d %d %d message %d/%d with time %f "
+  //          "max time is %f\n", x, y, z, BnvAccess(reduce_count), 
+  //          BnvAccess(num_messages), msg->time, BnvAccess(max_time));
+
   if (msg->time > BnvAccess(max_time)) { BnvAccess(max_time) = msg->time; }
 
   // check to see if all children have been heard from
