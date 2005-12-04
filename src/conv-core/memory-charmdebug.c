@@ -403,8 +403,9 @@ static void *setSlot(Slot *s,int userSize) {
   s->next->prev=s;
   s->prev->next=s;
   
-  s->magic=SLOTMAGIC;
-  /* Here we should set the last 4 bits of magic to classify the memory */
+  /* Set the last 4 bits of magic to classify the memory together with the magic */
+  s->magic=SLOTMAGIC + (memory_status_info>0? USER_TYPE : SYSTEM_TYPE);
+  //if (memory_status_info>0) printf("user allocation\n");
   s->userSize=userSize;
   s->extraStack=(SlotStack *)0;
   {
@@ -462,12 +463,12 @@ static void meta_free(void *mem) {
   if (mem==NULL) return; /*Legal, but misleading*/
 
   s=((Slot *)mem)-1;
-  if ((s->magic&0xFFFFFFF0)==SLOTMAGIC_VALLOC)
+  if ((s->magic&~FLAGS_MASK)==SLOTMAGIC_VALLOC)
   { /*Allocated with special alignment*/
     freeSlot(s);
     mm_free(((char *)mem)-meta_getpagesize());
   }
-  else if ((s->magic&0xFFFFFFF0)==SLOTMAGIC) 
+  else if ((s->magic&~FLAGS_MASK)==SLOTMAGIC) 
   { /*Ordinary allocated block */
     freeSlot(s);
     mm_free(s);
@@ -531,5 +532,19 @@ void setProtection(char* mem, char *ptr, int len, int flag) {
   } else {
     sl->extraStack->protectedMemory = NULL;
     sl->extraStack->protectedMemoryLength = 0;
+  }
+}
+
+void setMemoryTypeChare(void *ptr) {
+  Slot *sl = UserToSlot(ptr);
+  sl->magic = (sl->magic & ~FLAGS_MASK) | CHARE_TYPE;
+}
+
+/* The input parameter is the pointer to the envelope, after the CmiChunkHeader */
+void setMemoryTypeMessage(void *ptr) {
+  void *realptr = (char*)ptr - sizeof(CmiChunkHeader);
+  Slot *sl = UserToSlot(realptr);
+  if ((sl->magic&~FLAGS_MASK) == SLOTMAGIC || (sl->magic&~FLAGS_MASK) == SLOTMAGIC_VALLOC) {
+    sl->magic = (sl->magic & ~FLAGS_MASK) | MESSAGE_TYPE;
   }
 }

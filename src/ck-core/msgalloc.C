@@ -25,7 +25,8 @@ void* CkAllocMsg(int msgIdx, int msgBytes, int prioBits)
 {
   register envelope* env;
   env = _allocEnv(ForChareMsg, msgBytes, prioBits);
-  
+  setMemoryTypeMessage(env);
+
   env->setQueueing(_defaultQueueing);
   env->setMsgIdx(msgIdx);
   return EnvToUsr(env);
@@ -102,6 +103,7 @@ CkMarshallMsg *CkAllocateMarshallMsgNoninline(int size,const CkEntryOptions *opt
 	CkMarshallMsg *m=new (size,opts->getPriorityBits())CkMarshallMsg;
 	//Copy the user's priority data into the message
 	envelope *env=UsrToEnv(m);
+	setMemoryTypeMessage(env);
 	memcpy(env->getPrioPtr(),opts->getPriorityPtr(),env->getPrioBytes());
 	//Set the message's queueing type
 	env->setQueueing((unsigned char)opts->getQueueing());

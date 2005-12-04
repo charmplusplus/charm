@@ -545,6 +545,7 @@ CkMigratable *CkArray::allocateMigrated(int elChareType,const CkArrayIndex &idx,
 	}
 	return ret;
 }
+
 ArrayElement *CkArray::allocate(int elChareType,const CkArrayIndex &idx,
 		     CkMessage *msg,CmiBool fromMigration) 
 {
@@ -560,7 +561,11 @@ ArrayElement *CkArray::allocate(int elChareType,const CkArrayIndex &idx,
 	
 	//Build the element
 	int elSize=_chareTable[elChareType]->size;
-	return (ArrayElement *)malloc(elSize);
+	ArrayElement *elem = (ArrayElement *)malloc(elSize);
+#ifndef CMK_OPTIMIZE
+	if (elem!=NULL) setMemoryTypeChare(elem);
+#endif
+	return elem;
 }
 
 /// This method is called by ck.C or the user to add an element.

@@ -75,6 +75,14 @@ typedef bool CmiBool;
 extern "C" {
 #endif
 
+/* Global variables used by charmdebug to maintain information */
+#ifndef CMK_OPTIMIZE
+extern int memory_status_info;
+#define setMemoryStatus(p) memory_status_info = p;
+#else
+#define setMemoryStatus(p) /* empty */
+#endif
+
 /******************************************************************************
  *
  * Deal with Shared Memory

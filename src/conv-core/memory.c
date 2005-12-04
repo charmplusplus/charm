@@ -86,6 +86,10 @@ void CmiOutOfMemory(int nBytes)
   CmiAbort(errMsg);
 }
 
+/* Global variables keeping track of the status of the system (mostly used by charmdebug) */
+#ifndef CMK_OPTIMIZE
+int memory_status_info=0;
+#endif
 
 #if CMK_MEMORY_BUILD_OS
 /* Just use the OS's built-in malloc.  All we provide is CmiMemoryInit.
@@ -356,5 +360,10 @@ void CmiOutOfMemoryInit(void) {
 int  cpd_memory_length(void *lenParam) { return 0; }
 void cpd_memory_pup(void *itemParam,pup_er p,CpdListItemsRequest *req) { }
 void cpd_memory_leak(void *itemParam,pup_er p,CpdListItemsRequest *req) { }
+/* routine used by CthMemory{Protect,Unprotect} to specify that some region of
+   memory has been protected */
 void setProtection(char *mem, char *ptr, int len, int flag) { }
+/* Routines used to specify how the memory will the used */
+void setMemoryTypeChare(void *ptr) { }
+void setMemoryTypeMessage(void *ptr) { }
 #endif

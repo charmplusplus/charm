@@ -443,6 +443,7 @@ void CkCreateLocalGroup(CkGroupID groupID, int epIdx, envelope *env)
   register int gIdx = _entryTable[epIdx]->chareIdx;
   register void *obj = malloc(_chareTable[gIdx]->size);
   _MEMCHECK(obj);
+  setMemoryTypeChare(obj);
   CmiImmediateLock(CkpvAccess(_groupTableImmLock));
   CkpvAccess(_groupTable)->find(groupID).setObj(obj);
   CkpvAccess(_groupTable)->find(groupID).setcIdx(gIdx);
@@ -468,6 +469,7 @@ void CkCreateLocalNodeGroup(CkGroupID groupID, int epIdx, envelope *env)
   int objSize=_chareTable[gIdx]->size;
   register void *obj = malloc(objSize);
   _MEMCHECK(obj);
+  setMemoryTypeChare(obj);
   CkpvAccess(_currentGroup) = groupID;
 
 // Now that the NodeGroup is created, add it to the table.

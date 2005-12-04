@@ -1136,6 +1136,7 @@ void CmiHandleMessage(void *msg)
 #ifndef CMK_OPTIMIZE
 	CmiUInt2 handler=CmiGetHandler(msg); /* Save handler for use after msg is gone */
 	_LOG_E_HANDLER_BEGIN(handler); /* projector */
+	setMemoryStatus(1)  /* charmdebug */
 #endif
 
 /*
@@ -1150,6 +1151,7 @@ void CmiHandleMessage(void *msg)
 	h=&CmiGetHandlerInfo(msg);
 	(h->hdlr)(msg,h->userPtr);
 #ifndef CMK_OPTIMIZE
+	setMemoryStatus(0)  /* charmdebug */
 	_LOG_E_HANDLER_END(handler); 	/* projector */
 #endif
 }

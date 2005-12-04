@@ -14,6 +14,20 @@
 
 #include "middle.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+#ifndef CMK_OPTIMIZE
+extern void setMemoryTypeChare(void*); /* for memory debugging */
+extern void setMemoryTypeMessage(void*); /* for memory debugging */
+#else
+#define setMemoryTypeChare(p) /* empty memory debugging method */
+#define setMemoryTypeMessage(p) /* empty memory debugging method */
+#endif
+#ifdef __cplusplus
+}
+#endif
+
 class CMessage_CkArgMsg {
 public: static int __idx;
 };
@@ -161,10 +175,18 @@ public:
 	char *msgBuf;
 };
 
+/* forword declaration */
+class envelope;
+extern envelope *UsrToEnv(const void *const msg);
+
 CkMarshallMsg *CkAllocateMarshallMsgNoninline(int size,const CkEntryOptions *opts);
 inline CkMarshallMsg *CkAllocateMarshallMsg(int size,const CkEntryOptions *opts=NULL)
 {
-	if (opts==NULL) return new (size,0)CkMarshallMsg;
+	if (opts==NULL) {
+	  CkMarshallMsg *newMemory = new (size,0)CkMarshallMsg;
+	  setMemoryTypeMessage(UsrToEnv(newMemory));
+	  return newMemory;
+	}
 	else return CkAllocateMarshallMsgNoninline(size,opts);
 }
 
