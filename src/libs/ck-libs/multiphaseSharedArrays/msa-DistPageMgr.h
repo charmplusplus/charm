@@ -27,7 +27,7 @@ template <class ENTRY, class MERGER,
 
 using namespace std;
 
-inline int min(int a, int b)
+inline int mymin(int a, int b)
 {
     return (a<b)?a:b;
 }
@@ -1062,7 +1062,7 @@ public:
         //ckout << "[" << CkMyPe() << "] SyncAckcount = " << syncAckCount << endl;
         // DONE @@ what if fewer worker threads than pe's ?
         // @@ what if fewer worker threads than pe's and >1 threads on 1 pe?
-        if(syncAckCount == min(numberOfWorkerThreads, CkNumPes())){
+        if(syncAckCount == mymin(numberOfWorkerThreads, CkNumPes())){
 						MSADEBPRINT(printf("SyncAck starting reduction on pageArray of size %d number of pages %d\n",nEntries,nPages););
             pageArray.Sync();					
 				}		
