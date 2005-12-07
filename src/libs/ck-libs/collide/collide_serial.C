@@ -7,7 +7,12 @@ Utilities for efficiently determining object intersections,
 given a giant list of objects.
 */
 #include <stdio.h>
+#if CMK_STL_USE_DOT_H
 #include <iostream.h>
+#else
+#include <iostream>
+using namespace std;
+#endif
 #include "collide_serial.h"
 #include "charm.h" /* for CkAbort */
 
@@ -251,9 +256,9 @@ CollideOctant *CollideOctant::divide(int alongAxis)
 //Enumerate all Collisions in this CollideOctant:
 
 template <class T>
-inline T max(T a,T b) {if (a>b) return a; return b;}
+inline T mymax(T a,T b) {if (a>b) return a; return b;}
 template <class T>
-inline T min(T a,T b) {if (a<b) return a; return b;}
+inline T mymin(T a,T b) {if (a<b) return a; return b;}
 
 //The basic O(n^2) Collision algorithm:
 static void simpleFindCollisions(const CollideOctant &o,CollisionList &dest)
@@ -272,11 +277,11 @@ static void simpleFindCollisions(const CollideOctant &o,CollisionList &dest)
 			
 			//Territory is used to avoid duplicate intersections 
 			// across different grid cells
-			if (!o.x_inTerritory(max(abox.axis(0).getMin(),bbox.axis(0).getMin())))
+			if (!o.x_inTerritory(mymax(abox.axis(0).getMin(),bbox.axis(0).getMin())))
 				{STATS(rejTerritory[0]++) continue;}
-			if (!o.y_inTerritory(max(abox.axis(1).getMin(),bbox.axis(1).getMin())))
+			if (!o.y_inTerritory(mymax(abox.axis(1).getMin(),bbox.axis(1).getMin())))
 				{STATS(rejTerritory[1]++) continue;}
-			if (!o.z_inTerritory(max(abox.axis(2).getMin(),bbox.axis(2).getMin())))
+			if (!o.z_inTerritory(mymax(abox.axis(2).getMin(),bbox.axis(2).getMin())))
 				{STATS(rejTerritory[2]++) continue;}
 			
 			//	if (!poly3d::collide(a,b)) {STATS(rejCollide++) continue;}
