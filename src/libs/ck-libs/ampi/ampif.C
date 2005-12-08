@@ -194,6 +194,28 @@ REDUCERF(MPI_MAXLOC , mpi_maxloc)
 REDUCERF(MPI_MINLOC , mpi_minloc)
 #endif
 
+// must be consistent with mpif.h
+#define MPI_OP_FIRST   100
+
+static MPI_Op mpi_ops[128] = {
+  MPI_MAX,
+  MPI_MIN,
+  MPI_SUM,
+  MPI_PROD,
+  MPI_LAND,
+  MPI_BAND,
+  MPI_LOR,
+  MPI_BOR,
+  MPI_LXOR,
+  MPI_BXOR,
+  MPI_MAXLOC,
+  MPI_MINLOC
+};
+
+static int mpi_opc = 12;
+
+#define GET_MPI_OP(idx)      (CmiAssert(idx - MPI_OP_FIRST >= 0 && idx - MPI_OP_FIRST < mpi_opc), mpi_ops[idx - MPI_OP_FIRST])
+
 void mpi_init_universe(int *unicomm)
 {
   AMPIAPI("mpi_init_universe");
@@ -285,15 +307,17 @@ void mpi_bcast(void *buf, int *count, int *type, int *root, int *comm,
 }
 
 void mpi_reduce(void *inbuf, void *outbuf, int *count, int *type,
-   int *op, int *root, int *comm, int *ierr)
+   int *opc, int *root, int *comm, int *ierr)
 {
-  *ierr = AMPI_Reduce(inbuf, outbuf, *count, *type, (MPI_Op)op, *root, *comm);
+  MPI_Op op = GET_MPI_OP(*opc);
+  *ierr = AMPI_Reduce(inbuf, outbuf, *count, *type, op, *root, *comm);
 }
 
 void mpi_allreduce(void *inbuf,void *outbuf,int *count,int *type,
-   int *op, int *comm, int *ierr)
+   int *opc, int *comm, int *ierr)
 {
-  *ierr = AMPI_Allreduce(inbuf, outbuf, *count, *type, (MPI_Op)op, *comm);
+  MPI_Op op = GET_MPI_OP(*opc);
+  *ierr = AMPI_Allreduce(inbuf, outbuf, *count, *type, op, *comm);
 }
 
 double mpi_wtime(void)
@@ -571,35 +595,44 @@ void mpi_ialltoall(void *sendbuf, int* sendcount, int* sendtype,
 }
 
 void mpi_ireduce(void *sendbuf, void *recvbuf, int* count, int* type,
-                int* op, int* root, int* comm, int *request, int* ierr)
+                int* opc, int* root, int* comm, int *request, int* ierr)
 {
+  MPI_Op op = GET_MPI_OP(*opc);
   *ierr = AMPI_Ireduce(sendbuf, recvbuf, *count, *type,
-                      (MPI_Op)op, *root, *comm, (MPI_Request*) request);
+                      op, *root, *comm, (MPI_Request*) request);
 }
 
 void mpi_iallreduce(void *inbuf, void *outbuf, int* count, int* type,
-                   int* op, int* comm, int *request, int* ierr)
+                   int* opc, int* comm, int *request, int* ierr)
 {
+  MPI_Op op = GET_MPI_OP(*opc);
   *ierr = AMPI_Iallreduce(inbuf, outbuf, *count, *type,
-                         (MPI_Op)op, *comm, (MPI_Request*) request);
+                         op, *comm, (MPI_Request*) request);
 }
 void mpi_reduce_scatter(void *sendbuf, void *recvbuf, int *recvcounts,
-                       int* datatype, int* op, int* comm, int* ierr)
+                       int* datatype, int* opc, int* comm, int* ierr)
 {
+  MPI_Op op = GET_MPI_OP(*opc);
   *ierr = AMPI_Reduce_scatter(sendbuf, recvbuf, recvcounts,
-                             *datatype, (MPI_Op)op, *comm);
+                             *datatype, op, *comm);
 }
 
-void mpi_scan(void* sendbuf, void* recvbuf, int* count, int* datatype, int* op, int* comm, int* ierr)
+void mpi_scan(void* sendbuf, void* recvbuf, int* count, int* datatype, int* opc, int* comm, int* ierr)
 {
-  *ierr = AMPI_Scan(sendbuf,recvbuf,*count,*datatype,*(MPI_Op *)op,*comm );
+  MPI_Op op = GET_MPI_OP(*opc);
+  *ierr = AMPI_Scan(sendbuf,recvbuf,*count,*datatype,op,*comm );
 }
 
-void mpi_op_create(int* function, int* commute, int* op, int* ierr){
-  *ierr = MPI_Op_create((MPI_User_function *)function, *commute, (MPI_Op *)op);
+void mpi_op_create(int* function, int* commute, int* opc, int* ierr){
+  MPI_Op op;
+  *ierr = MPI_Op_create((MPI_User_function *)function, *commute, (MPI_Op *)&op);
+  mpi_ops[mpi_opc++] = op;
+  *opc = mpi_opc-1;
 }
 
-void mpi_op_free(int* op, int* ierr){
+void mpi_op_free(int* opc, int* ierr){
+  MPI_Op op = GET_MPI_OP(*opc);
+  GET_MPI_OP(*opc) = NULL;
   *ierr = MPI_Op_free((MPI_Op *)op);
 }
 
@@ -939,8 +972,9 @@ void mpi_get(void *orgaddr, int *orgcnt, int *orgtype, int *rank,
 
 void mpi_accumulate(void *orgaddr, int *orgcnt, int *orgtype, int *rank,
 		   int *targdisp, int *targcnt, int *targtype, 
-		   int *op, int win, int *ierr){
-  *ierr = AMPI_Accumulate(orgaddr, *orgcnt, *orgtype, *rank, *targdisp, *targcnt, *targtype, (MPI_Op)op, win);
+		   int *opc, int win, int *ierr){
+  MPI_Op op = GET_MPI_OP(*opc);
+  *ierr = AMPI_Accumulate(orgaddr, *orgcnt, *orgtype, *rank, *targdisp, *targcnt, *targtype, op, win);
 }
 
 void mpi_info_create(int* info, int* ierr){
