@@ -194,27 +194,16 @@ REDUCERF(MPI_MAXLOC , mpi_maxloc)
 REDUCERF(MPI_MINLOC , mpi_minloc)
 #endif
 
+typedef MPI_Op  MPI_Op_Array[128];
+
+CkpvStaticDeclare(MPI_Op_Array, mpi_ops);
+
+CpvStaticDeclare(int, mpi_opc);
+
 // must be consistent with mpif.h
 #define MPI_OP_FIRST   100
 
-static MPI_Op mpi_ops[128] = {
-  MPI_MAX,
-  MPI_MIN,
-  MPI_SUM,
-  MPI_PROD,
-  MPI_LAND,
-  MPI_BAND,
-  MPI_LOR,
-  MPI_BOR,
-  MPI_LXOR,
-  MPI_BXOR,
-  MPI_MAXLOC,
-  MPI_MINLOC
-};
-
-static int mpi_opc = 12;
-
-#define GET_MPI_OP(idx)      (CmiAssert(idx - MPI_OP_FIRST >= 0 && idx - MPI_OP_FIRST < mpi_opc), mpi_ops[idx - MPI_OP_FIRST])
+#define GET_MPI_OP(idx)      (CmiAssert(idx - MPI_OP_FIRST >= 0 && idx - MPI_OP_FIRST < CkpvAccess(mpi_opc)), CkpvAccess(mpi_ops)[idx - MPI_OP_FIRST])
 
 void mpi_init_universe(int *unicomm)
 {
@@ -226,6 +215,23 @@ void mpi_init_universe(int *unicomm)
 }
 
 void mpi_init(int *ierr){
+  CkpvInitialize(MPI_Op_Array, mpi_ops);
+  register int i = 0;
+  CkpvAccess(mpi_ops)[i++] = MPI_MAX;
+  CkpvAccess(mpi_ops)[i++] = MPI_MIN;
+  CkpvAccess(mpi_ops)[i++] = MPI_SUM;
+  CkpvAccess(mpi_ops)[i++] = MPI_PROD;
+  CkpvAccess(mpi_ops)[i++] = MPI_LAND;
+  CkpvAccess(mpi_ops)[i++] = MPI_BAND;
+  CkpvAccess(mpi_ops)[i++] = MPI_LOR;
+  CkpvAccess(mpi_ops)[i++] = MPI_BOR;
+  CkpvAccess(mpi_ops)[i++] = MPI_LXOR;
+  CkpvAccess(mpi_ops)[i++] = MPI_BXOR;
+  CkpvAccess(mpi_ops)[i++] = MPI_MAXLOC;
+  CkpvAccess(mpi_ops)[i++] = MPI_MINLOC;
+
+  CpvInitialize(int, mpi_opc);
+  CpvAccess(mpi_opc) = i;
   *ierr = AMPI_Init(NULL,NULL);
 }
 
@@ -626,8 +632,8 @@ void mpi_scan(void* sendbuf, void* recvbuf, int* count, int* datatype, int* opc,
 void mpi_op_create(int* function, int* commute, int* opc, int* ierr){
   MPI_Op op;
   *ierr = MPI_Op_create((MPI_User_function *)function, *commute, (MPI_Op *)&op);
-  mpi_ops[mpi_opc++] = op;
-  *opc = mpi_opc-1;
+  CkpvAccess(mpi_ops)[CkpvAccess(mpi_opc)++] = op;
+  *opc = CkpvAccess(mpi_opc)-1;
 }
 
 void mpi_op_free(int* opc, int* ierr){
