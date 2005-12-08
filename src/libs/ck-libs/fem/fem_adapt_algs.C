@@ -344,7 +344,7 @@ void FEM_Adapt_Algs::GradateMesh(double smoothness)
         minShock = 1e10;
         
         for (int node=0; node<nnodes; ++node) {
-            if (boundNodes[node]< 0 || !FEM_is_valid(meshNum, FEM_NODE, node))
+            if (boundNodes[node]> 0 || !FEM_is_valid(meshNum, FEM_NODE, node))
                continue;
             //if (!FEM_is_valid(meshNum, FEM_NODE, node))
             //    continue;
@@ -988,7 +988,7 @@ void  FEM_Adapt_Algs::FEM_mesh_smooth(FEM_Mesh *meshP, int *nodes, int nNodes, i
     newPos.x=0;
     newPos.y=0;
     CkAssert(idx<nodesInChunk);  
-    if (FEM_is_valid(mesh, FEM_NODE, idx) && boundVals[idx]>-1) //node must be internal
+    if (FEM_is_valid(mesh, FEM_NODE, idx) && boundVals[idx]==0) //node must be internal
     {
       meshP->n2n_getAll(idx, &adjnodes, &nNod);
       for (int j=0; j<nNod; j++) { //for all adjacent nodes, find coords

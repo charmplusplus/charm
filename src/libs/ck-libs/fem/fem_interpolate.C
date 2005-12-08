@@ -36,7 +36,7 @@ void FEM_Interpolate::FEM_InterpolateNodeOnEdge(NodalArgs args)
       } else if(args.frac==0.0) {
 	a->copyEntity(args.n,*a,args.nodes[1]);
       } else {
-	if(n1_bound<0 && n2_bound<0 && n1_bound!=n2_bound) {
+	if(n1_bound>0 && n2_bound>0 && n1_bound!=n2_bound) {
 	  //figure out if one of them is a corner,
 	  bool n1corner = theMod->fmAdaptL->isCorner(args.nodes[0]);
 	  bool n2corner = theMod->fmAdaptL->isCorner(args.nodes[1]);
@@ -64,14 +64,14 @@ void FEM_Interpolate::FEM_InterpolateNodeOnEdge(NodalArgs args)
 	    d->getInt().setRow(args.n,nbound);
 	  }
 	}
-	else if(n1_bound<0 && n2_bound<0) {
+	else if(n1_bound>0 && n2_bound>0) {
 	  //both nodes on same boundary, copy from any one
 	  a->copyEntity(args.n,*a,args.nodes[0]);
 	}
-	else if(n1_bound<0) {
+	else if(n1_bound>0) {
 	  a->copyEntity(args.n,*a,args.nodes[1]);
 	}
-	else if(n2_bound<0) {
+	else if(n2_bound>0) {
 	  a->copyEntity(args.n,*a,args.nodes[0]);
 	}
 	else {

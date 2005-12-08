@@ -999,13 +999,13 @@ int FEM_Adapt::edge_contraction_help(int *e1P, int *e2P, int n1, int n2, int e1_
   //update keepnode's attributes; choose frac wisely, check if either node is on the boundary, update frac
   FEM_Interpolate *inp = theMod->getfmInp();
   FEM_Interpolate::NodalArgs nm;
-  if((n1_bound < 0) && (n2_bound < 0) && (n1_bound != n2_bound)) {
+  if((n1_bound > 0) && (n2_bound > 0) && (n1_bound != n2_bound)) {
     free(conn);
     free(adjnodes);
     free(adjelems);
     return -1; //they are on different boundaries
   }
-  else if(n1_bound<0 && n2_bound<0) {
+  else if(n1_bound>0 && n2_bound>0) {
     nm.frac = 0.5;
     //TODO: must ensure that any of the two nodes is not a corner
     if(isCorner(keepnode)) {
@@ -1015,10 +1015,10 @@ int FEM_Adapt::edge_contraction_help(int *e1P, int *e2P, int n1, int n2, int e1_
       nm.frac = 0.0;
     }
   }
-  else if(n1_bound < 0) { //keep its attributes
+  else if(n1_bound > 0) { //keep its attributes
     nm.frac = 1.0;
   }
-  else if(n2_bound < 0) {
+  else if(n2_bound > 0) {
     if(shared==2) {
       keepnode = n2;
       deletenode = n1;
