@@ -1,0 +1,50 @@
+This is a simple 2D structural dynamics program
+parallelized using the Charm++ FEM Framework.
+
+
+INPUT
+
+Several very important values like the material 
+properties, boundary conditions, and timestep 
+are hardcoded, which is very silly.
+
+The input mesh for this program is read from 
+files named "xxx.1.ele" and "xxx.1.node".
+The mesh format is compatible with Shewchuk's
+"triangle" 2D meshing program, part of the 
+Archimedes toolkit:
+	http://www-2.cs.cmu.edu/~quake/triangle.html
+
+For example, to generate a new mesh, use:
+	triangle -pqVAa xxx.poly
+
+
+PROCESSING
+
+Time loop:
+  Compute internal force vector for linear-strain triangles
+     in cst_nl.C
+  Communicate to sum internal force vector with other partitions.
+  Advance nodes based on net force and velocity.
+  Occasionally migrate or output results.
+
+
+OUTPUT
+
+This program exports its solution data via NetFEM.
+You can run the program so NetFEM will connect to it
+like:
+	./charmrun ./pgm ++server ++server-port 1234 +p4
+You'd then connect the NetFEM client to yourhostname:1234.
+
+
+CREDITS
+
+The physics code in simple2D is derived from f90 codes
+by Philippe Geubelle and Michael Scot Breitenfeld.
+
+The translation to C and rather silly "simplification"
+were performed by Orion Sky Lawlor, olawlor@acm.org,
+at the University of Illinois at Urbana-Champaign
+Parallel Programming Lab.  Any errors introduced are mine.
+
