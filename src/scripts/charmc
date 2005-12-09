@@ -351,6 +351,8 @@ do
 		"ampif") AddModules tcharmmain ampif ; USE_F90_LIBRARIES="1" ;;
 		"fem") AddModules tcharmmain fem ; AMPIMAIN="femmain";;
 		"femf") AddModules tcharmmain fem ; AMPIMAIN="femmain"; USE_F90_LIBRARIES="1" ;;
+    "ParFUM") AddModules tcharmmain ParFUM ; AMPIMAIN="ParFUMmain";;
+    "ParFUMf") AddModules tcharmmain ParFUM ; AMPIMAIN="ParFUMmain"; USE_F90_LIBRARIES="1" ;;
 		"mblock") AddModules tcharmmain mblock ;;
 		"mblockf") AddModules tcharmmain mblock ; USE_F90_LIBRARIES="1" ;;
 		*) 
