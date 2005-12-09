@@ -376,6 +376,27 @@ int FEM_AdaptL::vertex_remove(int n1, int n2) {
   return ret;
 }
 
+// ======================  BEGIN edge_contraction  ============================
+/* Given and edge e:(n1, n2), determine the two adjacent elements (n1,n2,n3) 
+   and (n1,n2,n4). Contract edge e by creating node n5, removing all elements 
+   incident on n1 xor n2 and reinserting with incidence on n5, removing the two
+   elements (n1,n2,n3) and (n1,n2,n4) adjacent to e, and finally removing nodes
+   n1 and n2; return 1 if successful, 0 if not 
+
+       n3                 n3
+        o                  o
+       / \                 |
+      /   \                |  
+ \   /     \   /         \ | / 
+  \ /       \ /           \|/   
+n1 o---------o n2          o n5     
+  / \       / \           /|\    
+ /   \     /   \         / | \ 
+      \   /                |  
+       \ /                 | 
+        o                  o
+       n4                 n4
+*/
 int FEM_AdaptL::edge_contraction(int n1, int n2) {
   int e1, e1_n1, e1_n2, e1_n3, n3;
   int e2, e2_n1, e2_n2, e2_n3, n4;
@@ -688,10 +709,11 @@ int FEM_AdaptL::edge_contraction_help(int *e1P, int *e2P, int n1, int n2, int e1
   int n1_bound, n2_bound;
   FEM_Mesh_dataP(theMesh, FEM_NODE, FEM_BOUNDARY, &n1_bound, n1, 1 , FEM_INT, 1);
   FEM_Mesh_dataP(theMesh, FEM_NODE, FEM_BOUNDARY, &n2_bound, n2, 1 , FEM_INT, 1);
-  if((n1_bound > 0) && (n2_bound > 0) && (n1_bound != n2_bound)) {
+  if((n1_bound != 0) && (n2_bound != 0) && (n1_bound != n2_bound)) {
     bool kcorner = isCorner(n1);
     bool dcorner = isCorner(n2);
-    if((kcorner && !dcorner && abs(n1_bound-n2_bound)==1) || (dcorner && !kcorner && abs(n1_bound-n2_bound)==1)) {
+    bool edgeb = isEdgeBoundary(n1,n2);
+    if((kcorner && !dcorner && edgeb) || (dcorner && !kcorner && edgeb)) {
     }
     else {
       return -1;
@@ -972,13 +994,14 @@ int FEM_AdaptL::edge_contraction_help(int *e1P, int *e2P, int n1, int n2, int e1
   //update keepnode's attributes; choose frac wisely, check if either node is on the boundary, update frac
   FEM_Interpolate *inp = theMod->getfmInp();
   FEM_Interpolate::NodalArgs nm;
-  if((n1_bound > 0) && (n2_bound > 0) && (n1_bound != n2_bound)) {
+  if((n1_bound != 0) && (n2_bound != 0) && (n1_bound != n2_bound)) {
     bool kcorner = isCorner(keepnode);
     bool dcorner = isCorner(deletenode);
-    if(kcorner && !dcorner && abs(n1_bound-n2_bound)==1) {
+    bool edgeb = isEdgeBoundary(keepnode,deletenode);
+    if(kcorner && !dcorner && edgeb) {
       nm.frac = 1.0;
     }
-    else if(dcorner && !kcorner && abs(n1_bound-n2_bound)==1) {
+    else if(dcorner && !kcorner && edgeb) {
       nm.frac = 0.0;
     }
     else {//boundary attribute should be 0
@@ -989,7 +1012,7 @@ int FEM_AdaptL::edge_contraction_help(int *e1P, int *e2P, int n1, int n2, int e1
       return -1; //they are on different boundaries
     }
   }
-  else if(n1_bound>0 && n2_bound>0) {
+  else if(n1_bound!=0 && n2_bound!=0) {
     nm.frac = 0.5;
     //TODO: must ensure that any of the two nodes is not a corner
     if(isCorner(keepnode)) {
@@ -999,10 +1022,10 @@ int FEM_AdaptL::edge_contraction_help(int *e1P, int *e2P, int n1, int n2, int e1
       nm.frac = 0.0;
     }
   }
-  else if(n1_bound > 0) { //keep its attributes
+  else if(n1_bound != 0) { //keep its attributes
     nm.frac = 1.0;
   }
-  else if(n2_bound > 0) {
+  else if(n2_bound != 0) {
     if(shared==2) {
       keepnode = n2;
       deletenode = n1;
@@ -1374,6 +1397,8 @@ int FEM_AdaptL::edge_contraction_help(int *e1P, int *e2P, int n1, int n2, int e1
   free(adjelems);
   return keepnode;
 }
+// ======================  END edge_contraction  ==============================
+
 
 #undef DEBUG_1
 

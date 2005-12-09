@@ -344,7 +344,7 @@ void FEM_Adapt_Algs::GradateMesh(double smoothness)
         minShock = 1e10;
         
         for (int node=0; node<nnodes; ++node) {
-            if (boundNodes[node]> 0 || !FEM_is_valid(meshNum, FEM_NODE, node))
+            if (boundNodes[node]!= 0 || !FEM_is_valid(meshNum, FEM_NODE, node))
                continue;
             //if (!FEM_is_valid(meshNum, FEM_NODE, node))
             //    continue;

@@ -90,7 +90,7 @@ class FEM_Adapt {
       quadrilateral formed by two faces incident to edge (n1, n2) is assumed. 
       n1 and n2 are assumed to be local to this chunk. An adjacency test is
       performed on n1 and n2 by searching for an element with edge [n1,n2]. **/
-  virtual int edge_flip(int n1, int n2);
+  //virtual int edge_flip(int n1, int n2);
   int edge_flip_help(int e1, int e2, int n1, int n2, int e1_n1, 
 			     int e1_n2, int e1_n3, int n3, int n4,int *locknodes);
   
@@ -98,7 +98,7 @@ class FEM_Adapt {
   /** Given edge e:(n1, n2), remove the two elements (n1,n2,n3) and (n2,n1,n4) 
       adjacent to e, and bisect e by adding node n5. Add elements (n1,n5,n3), 
       (n5,n2,n3), (n5,n1,n4) and (n2,n5,n4); returns new node n5. **/
-  virtual int edge_bisect(int n1, int n2);
+  //virtual int edge_bisect(int n1, int n2);
   int edge_bisect_help(int e1, int e2, int n1, int n2, int e1_n1, 
 			       int e1_n2, int e1_n3, int e2_n1, int e2_n2, 
 			       int e2_n3, int n3, int n4);
@@ -108,7 +108,7 @@ class FEM_Adapt {
       adjacent elements.  n2 indicates that the two elements removed are
       adjacent to edge [n1,n2]. This could be performed with edge_contraction,
       but this is a simpler operation. **/
-  virtual int vertex_remove(int n1, int n2);
+  //virtual int vertex_remove(int n1, int n2);
   int vertex_remove_help(int e1, int e2, int n1, int n2, int e1_n1, 
 				 int e1_n2, int e1_n3, int e2_n1, int e2_n2, 
 				 int e2_n3, int n3, int n4, int n5);
@@ -119,10 +119,8 @@ class FEM_Adapt {
       elements incident on n1 xor n2 and reinserting with incidence on n5, 
       removing the two elements (n1,n2,n3) and (n1,n2,n4) adjacent to e, and 
       finally removing nodes n1 and n2; return 1 if successful, 0 if not **/
-  virtual int edge_contraction(int n1, int n2);
-  virtual int edge_contraction_help(int *e1P, int *e2P, int n1, int n2, int e1_n1, 
-				    int e1_n2, int e1_n3, int e2_n1, int e2_n2,
-				    int e2_n3, int n3, int n4);
+  //virtual int edge_contraction(int n1, int n2);
+  //virtual int edge_contraction_help(int *e1P, int *e2P, int n1, int n2, int e1_n1, int e1_n2, int e1_n3, int e2_n1, int e2_n2, int e2_n3, int n3, int n4);
 
   /// Split a node n into two nodes with an edge in between
   /** Given a node n and two adjacent nodes n1 and n2, split n into two nodes
@@ -135,6 +133,7 @@ class FEM_Adapt {
   virtual void printAdjacencies(int *nodes, int numNodes, int *elems, int numElems);
 
   virtual bool isCorner(int n1);
+  virtual bool isEdgeBoundary(int n1, int n2);
 };
 
 

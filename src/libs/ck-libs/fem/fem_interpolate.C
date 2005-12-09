@@ -36,7 +36,7 @@ void FEM_Interpolate::FEM_InterpolateNodeOnEdge(NodalArgs args)
       } else if(args.frac==0.0) {
 	a->copyEntity(args.n,*a,args.nodes[1]);
       } else {
-	if(n1_bound>0 && n2_bound>0 && n1_bound!=n2_bound) {
+	if(n1_bound!=0 && n2_bound!=0 && n1_bound!=n2_bound) {
 	  //figure out if one of them is a corner,
 	  bool n1corner = theMod->fmAdaptL->isCorner(args.nodes[0]);
 	  bool n2corner = theMod->fmAdaptL->isCorner(args.nodes[1]);
@@ -47,31 +47,32 @@ void FEM_Interpolate::FEM_InterpolateNodeOnEdge(NodalArgs args)
 	    a->copyEntity(args.n,*a,args.nodes[0]);
 	  }
 	  else if(n2corner && n1corner) { //assign it a new number other than the two
-	    //a->copyEntity(args.n,*a,args.nodes[0]); 
+	    //add a new boundary number less than n1 & n2 and which is not used for any other boundary
+	    //can not do this yet, need some global data structure to do this
+	    //FIXME!!!
 	    int nbound = 0;
-	    if(abs(n1_bound - n2_bound) == 2) {
-	      nbound = (abs(n1_bound)<abs(n2_bound)) ? n1_bound-1 : n2_bound-1;
-	    } else {
-	      nbound = (abs(n1_bound)<abs(n2_bound)) ? n1_bound+1 : n2_bound+1;
-	    }
+	    //if(abs(n1_bound - n2_bound) == 2) {
+	    //nbound = (abs(n1_bound)<abs(n2_bound)) ? n1_bound-1 : n2_bound-1;
+	    //} else {
+	    nbound = (abs(n1_bound)<abs(n2_bound)) ? n1_bound : n2_bound;
+	    //}
 	    FEM_DataAttribute *d = (FEM_DataAttribute *)a;
 	    d->getInt().setRow(args.n,nbound);
 	  }
 	  else {//boundary attribute should be 0
-	    //a->copyEntity(args.n,*a,args.nodes[0]); 
 	    int nbound = 0;
 	    FEM_DataAttribute *d = (FEM_DataAttribute *)a;
 	    d->getInt().setRow(args.n,nbound);
 	  }
 	}
-	else if(n1_bound>0 && n2_bound>0) {
+	else if(n1_bound!=0 && n2_bound!=0) {
 	  //both nodes on same boundary, copy from any one
 	  a->copyEntity(args.n,*a,args.nodes[0]);
 	}
-	else if(n1_bound>0) {
+	else if(n1_bound!=0) {
 	  a->copyEntity(args.n,*a,args.nodes[1]);
 	}
-	else if(n2_bound>0) {
+	else if(n2_bound!=0) {
 	  a->copyEntity(args.n,*a,args.nodes[0]);
 	}
 	else {
@@ -176,13 +177,24 @@ void FEM_Interpolate::FEM_InterpolateElementCopy(ElementArgs args)
   }
   // do default interpolation
   // DEFAULT BEHAVIOR: COPY ALL ELEMENT DATA
-  FEM_Entity *elem = theMesh->lookup(args.elType,"FEM_InterpolateElementCopy");
-  CkVec<FEM_Attribute *>*elemattrs = elem->getAttrVec();
-  for(int j=0;j<elemattrs->size();j++){
-    FEM_Attribute *elattr = (FEM_Attribute *)(*elemattrs)[j];
-    if(elattr->getAttr() < FEM_ATTRIB_FIRST){ 
-      elattr->copyEntity(args.e,*elattr,args.oldElement);
+  if(args.e>=0 && args.oldElement>=0) {
+    CkVec<FEM_Attribute *>*elemattrs = (theMesh->elem[0]).getAttrVec();
+    for(int j=0;j<elemattrs->size();j++){
+      FEM_Attribute *elattr = (FEM_Attribute *)(*elemattrs)[j];
+      if(elattr->getAttr() < FEM_ATTRIB_FIRST){ 
+	elattr->copyEntity(args.e,*elattr,args.oldElement);
+      }
     }
+  }
+  else if(FEM_Is_ghost_index(args.e) && FEM_Is_ghost_index(args.oldElement)) {
+    const IDXL_Rec *irec1 = theMesh->elem[args.elType].ghost->ghostRecv.getRec(FEM_To_ghost_index(args.oldElement));
+    int remotechk = irec1->getChk(0);
+    int sharedIdx1 = irec1->getIdx(0);
+    int sharedIdx2 = theMod->fmUtil->exists_in_IDXL(theMesh,args.e,remotechk,4,0);
+    meshMod[remotechk].interpolateElemCopy(theMod->idx, sharedIdx1, sharedIdx2);
+  }
+  else {
+    //acquire operation, do not worry abt this at the moment
   }
   return;
 }
@@ -214,40 +226,6 @@ void FEM_Interpolate::FEM_InterpolateElementToNodes(int e)
 //oldnode or newnode can be ghost or local
 //currently it will only copy coordinates & boundary
 void FEM_Interpolate::FEM_InterpolateCopyAttributes(int oldnode, int newnode) {
-  //this code works when ghost nodes also have attributes, currently they do not
-  //only the local nodes have attributes
-  /*CkVec<FEM_Attribute *>*attrs;
-  CkVec<FEM_Attribute *>*nattrs;
-  int oldIdx, newIdx;
-  if(FEM_Is_ghost_index(oldnode)){
-    attrs =  theMesh->node.ghost->getAttrVec();
-    oldIdx = FEM_From_ghost_index(oldnode);
-  }
-  else{
-    attrs =  theMesh->node.getAttrVec();
-    oldIdx = oldnode;
-  }
-  if(FEM_Is_ghost_index(newnode)) {
-    nattrs = theMesh->node.ghost->getAttrVec();
-    newIdx = FEM_From_ghost_index(newnode);
-  }
-  else {
-    nattrs = theMesh->node.getAttrVec();
-    newIdx = newnode;
-  }
-
-#ifdef DEBUG 
-  CmiMemoryCheck(); 
-#endif
-  for(int j=0; j<attrs->size(); j++){
-    FEM_Attribute *att = (FEM_Attribute *)(*attrs)[j];
-    FEM_Attribute *natt = (FEM_Attribute *)(*nattrs)[j];
-    if((att->getAttr() < FEM_ATTRIB_TAG_MAX) || (att->getAttr() == FEM_BOUNDARY)){ 
-      FEM_DataAttribute *d = (FEM_DataAttribute *)natt;
-      d->copyEntity(newIdx, *att, oldIdx);
-    }
-  }
-  */
   double crds[2];
   int bound;
   int numchunks;

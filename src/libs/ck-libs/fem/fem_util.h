@@ -72,6 +72,8 @@ class FEM_MUtil {
   void idxlunlock(FEM_Mesh *m, int chk, int type);
   void idxllockLocal(FEM_Mesh *m, int toChk, int type);
   void idxlunlockLocal(FEM_Mesh *m, int toChk, int type);
+
+  void copyElemData(int etype, int elemid, int newEl);
 };
 
 #endif

@@ -23,6 +23,9 @@ CDECL void FEM_remove_node(int mesh,int node){
 CDECL int FEM_remove_element(int mesh, int element, int elem_type, int permanent){
   return FEM_remove_element(FEM_Mesh_lookup(mesh,"FEM_remove_element"), element, elem_type, permanent);
 }
+CDECL int FEM_purge_element(int mesh, int element, int elem_type) {
+  return FEM_purge_element(FEM_Mesh_lookup(mesh,"FEM_remove_element"), element, elem_type);
+}
 CDECL int FEM_add_element(int mesh, int* conn, int conn_size, int elem_type, int chunkNo){
   return FEM_add_element(FEM_Mesh_lookup(mesh,"FEM_add_element"), conn, conn_size, elem_type, chunkNo);
 }
@@ -419,13 +422,13 @@ void FEM_remove_element_local(FEM_Mesh *m, int element, int etype){
     }
   }
   
-  // delete element by marking invalid
-  if(FEM_Is_ghost_index(element)){
+  //done in purge now
+  /*if(FEM_Is_ghost_index(element)){
     m->elem[etype].getGhost()->set_invalid(FEM_To_ghost_index(element),false);
   }
   else {
     m->elem[etype].set_invalid(element,false);
-  }
+    }*/
 #ifdef DEBUG 
   CmiMemoryCheck(); 
 #endif
@@ -565,7 +568,8 @@ int FEM_remove_element(FEM_Mesh *m, int elementid, int elemtype, int permanent){
 	  CkVec<int> ghostREIndices;
 	  int numSharedNodes = 0;
 	  int *sharedIndices = (int*)malloc(connSize*sizeof(int));
-	  m->elem[elemtype].ghostSend.removeNode(elementid, chk);
+	  //purge will do this now
+	  //m->elem[elemtype].ghostSend.removeNode(elementid, chk);
 	  if(permanent>=0) {
 	    //get the list of n2e for all nodes of this element. If any node has only this element in its list.
 	    //it no longer should be a ghost on chk
@@ -809,6 +813,46 @@ int FEM_remove_element(FEM_Mesh *m, int elementid, int elemtype, int permanent){
 
 void FEM_remove_element_remote(FEM_Mesh *m, int element, int elemtype){
   // remove local element from elem[elemType] table
+}
+
+int FEM_purge_element(FEM_Mesh *m, int elementid, int elemtype) {
+  if(elementid==-1) return 1;
+  int index = m->getfmMM()->idx;
+  if(FEM_Is_ghost_index(elementid)) {
+    const IDXL_Rec *irec1 = m->elem[elemtype].ghost->ghostRecv.getRec(FEM_To_ghost_index(elementid));
+    int remotechk = irec1->getChk(0);
+    int sharedIdx = irec1->getIdx(0);
+    meshMod[remotechk].purgeElement(index,sharedIdx);
+  }
+  else {
+    const IDXL_Rec *irec = m->elem[elemtype].ghostSend.getRec(elementid);
+    if(irec){
+      int numSharedChunks = irec->getShared();
+      int connSize = m->elem[elemtype].getConn().width();
+      int *chknos, *inds;
+      if(numSharedChunks>0) {
+	chknos = (int*)malloc(numSharedChunks*sizeof(int));
+	inds = (int*)malloc(numSharedChunks*sizeof(int));
+	for(int i=0; i<numSharedChunks; i++) {
+	  chknos[i] = irec->getChk(i);
+	  inds[i] = irec->getIdx(i);
+	}
+      }
+      for(int i=0; i<numSharedChunks; i++) {
+	meshMod[chknos[i]].cleanupIDXL(index,inds[i]);
+	m->elem[elemtype].ghostSend.removeNode(elementid, chknos[i]);
+      }
+      if(numSharedChunks>0) {
+	free(chknos);
+	free(inds);
+      }
+    }
+  }
+  // delete element by marking invalid
+  if(!FEM_Is_ghost_index(elementid)){
+    m->elem[elemtype].set_invalid(elementid,false);
+  }
+  return 1;
 }
 
 
@@ -2468,6 +2512,26 @@ boolMsg *femMeshModify::willItLose(int fromChk, int sharedIdx) {
   }
   boolMsg *bmsg = new boolMsg(willlose);
   return bmsg;
+}
+
+void femMeshModify::interpolateElemCopy(int fromChk, int sharedIdx1, int sharedIdx2) {
+  int localIdx1 = fmUtil->lookup_in_IDXL(fmMesh, sharedIdx1, fromChk, 3);
+  int localIdx2 = fmUtil->lookup_in_IDXL(fmMesh, sharedIdx2, fromChk, 3);
+  CkAssert(localIdx1!=-1 && localIdx2!=-1);
+  fmUtil->copyElemData(0,localIdx1,localIdx2);
+}
+
+void femMeshModify::cleanupIDXL(int fromChk, int sharedIdx) {
+  int localIdx = fmUtil->lookup_in_IDXL(fmMesh, sharedIdx, fromChk, 4);
+  CkAssert(fmUtil->exists_in_IDXL(fmMesh,FEM_To_ghost_index(localIdx),fromChk,4)!=-1);
+  fmMesh->elem[0].ghost->ghostRecv.removeNode(localIdx, fromChk);
+  fmMesh->elem[0].getGhost()->set_invalid(localIdx,false);
+}
+
+void femMeshModify::purgeElement(int fromChk, int sharedIdx) {
+  int localIdx = fmUtil->lookup_in_IDXL(fmMesh, sharedIdx, fromChk, 3);
+  CkAssert(localIdx!=-1);
+  FEM_purge_element(fmMesh,localIdx,0);
 }
 
 #include "FEMMeshModify.def.h"

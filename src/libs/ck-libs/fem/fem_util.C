@@ -563,7 +563,8 @@ void FEM_MUtil::removeGhostElementRemote(FEM_Mesh *m, int chk, int elementid, in
 #ifdef DEBUG 
   CmiMemoryCheck(); 
 #endif
-  m->elem[elemtype].ghost->ghostRecv.removeNode(localIdx, chk);
+  //purge should do this now
+  //m->elem[elemtype].ghost->ghostRecv.removeNode(localIdx, chk);
   FEM_remove_element_local(m, FEM_To_ghost_index(localIdx), elemtype);
 
   //convert existing remote ghost indices to local ghost indices 
@@ -1544,3 +1545,14 @@ void FEM_MUtil::idxlunlockLocal(FEM_Mesh *m, int toChk, int type) {
 #endif
   return;
 }
+
+//copies the elem data from elemid to newEl
+void FEM_MUtil::copyElemData(int etype, int elemid, int newEl) {
+  FEM_Interpolate *inp = mmod->getfmInp();
+  FEM_Interpolate::ElementArgs em;
+  em.e = newEl;
+  em.oldElement = elemid;
+  em.elType = etype;
+  inp->FEM_InterpolateElementCopy(em);
+}
+
