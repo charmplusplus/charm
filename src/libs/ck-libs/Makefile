@@ -1,6 +1,6 @@
 CHARMC=../../bin/charmc $(OPTS)
 CHARMINC=.
-DIRS=sparseContiguousReducer tcharm ampi idxl parmetis multiphaseSharedArrays fem ifem \
+DIRS=sparseContiguousReducer tcharm ampi idxl parmetis multiphaseSharedArrays fem ifem ParFUM \
         armci collide mblock barrier \
 	multicast irecv netfem liveViz taskGraph search datatransfer
 
@@ -23,6 +23,9 @@ parmetis: ampi
 
 fem:  idxl ampi parmetis
 	(cd fem; $(MAKE) all OPTS='$(OPTS)')
+
+ParFUM:	idxl ampi parmetis
+	(cd ParFUM; $(MAKE) all OPTS='$(OPTS)')
 
 python:
 	(cd pythonCCS; $(MAKE) all OPTS='$(OPTS)')
