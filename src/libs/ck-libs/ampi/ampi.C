@@ -390,10 +390,19 @@ static void EndIdle(void *dummy,double curWallTime)
 }
 #endif
 
+/* for fortran reduction operation table to handle mapping */
+typedef MPI_Op  MPI_Op_Array[128];
+CtvDeclare(int, mpi_opc);
+CtvDeclare(MPI_Op_Array, mpi_ops);
+
 static void ampiProcInit(void){
   CtvInitialize(ampiParent*, ampiPtr);
   CtvInitialize(int,ampiInitDone);
   CtvInitialize(int,ampiFinalized);
+
+  CtvInitialize(MPI_Op_Array, mpi_ops);
+  CtvInitialize(int, mpi_opc);
+
   CkpvInitialize(int, argvExtracted);
   CkpvAccess(argvExtracted) = 0;
   REGISTER_AMPI
@@ -463,6 +472,27 @@ void ampiCreateMain(MPI_MainFn mainFn, const char *name,int nameLen)
 #define AMPI_BARRIER_SEMAID 0x00A34200 /* __AMPI__ */
 
 static CProxy_ampiWorlds ampiWorldsGroup;
+
+static void init_operations()
+{
+  CtvInitialize(MPI_Op_Array, mpi_ops);
+  register int i = 0;
+  CtvAccess(mpi_ops)[i++] = MPI_MAX;
+  CtvAccess(mpi_ops)[i++] = MPI_MIN;
+  CtvAccess(mpi_ops)[i++] = MPI_SUM;
+  CtvAccess(mpi_ops)[i++] = MPI_PROD;
+  CtvAccess(mpi_ops)[i++] = MPI_LAND;
+  CtvAccess(mpi_ops)[i++] = MPI_BAND;
+  CtvAccess(mpi_ops)[i++] = MPI_LOR;
+  CtvAccess(mpi_ops)[i++] = MPI_BOR;
+  CtvAccess(mpi_ops)[i++] = MPI_LXOR;
+  CtvAccess(mpi_ops)[i++] = MPI_BXOR;
+  CtvAccess(mpi_ops)[i++] = MPI_MAXLOC;
+  CtvAccess(mpi_ops)[i++] = MPI_MINLOC;
+
+  CtvInitialize(int, mpi_opc);
+  CtvAccess(mpi_opc) = i;
+}
 
 /*
 Called from MPI_Init, a collective initialization call:
@@ -557,6 +587,8 @@ static ampi *ampiInit(char **argv)
 #if CMK_BLUEGENE_CHARM
   TRACE_BG_AMPI_START(ptr->getThread(), "AMPI_START");
 #endif
+
+  init_operations();     // initialize fortran reduction operation table
 
   return ptr;
 }
