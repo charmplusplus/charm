@@ -198,7 +198,7 @@ typedef MPI_Op  MPI_Op_Array[128];
 
 CkpvStaticDeclare(MPI_Op_Array, mpi_ops);
 
-CpvStaticDeclare(int, mpi_opc);
+CkpvStaticDeclare(int, mpi_opc);
 
 // must be consistent with mpif.h
 #define MPI_OP_FIRST   100
