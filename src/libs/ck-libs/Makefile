@@ -1,34 +1,75 @@
 CHARMC=../../bin/charmc $(OPTS)
 CHARMINC=.
-DIRS=sparseContiguousReducer tcharm ampi idxl parmetis multiphaseSharedArrays fem ifem ParFUM \
+DIRS=   sparseContiguousReducer tcharm ampi idxl parmetis \
+        multiphaseSharedArrays fem ifem ParFUM \
         armci collide mblock barrier \
-	multicast irecv netfem liveViz taskGraph search datatransfer
+	irecv netfem liveViz taskGraph search datatransfer pythonCCS
 
-all:  
-	for d in $(DIRS); do (cd $$d && $(MAKE) all OPTS='$(OPTS)' || exit 1) || exit 1; done
-	-(CHARMINC=../../../include;. $$CHARMINC/conv-config.sh; \
-	if test "$$CMK_BUILD_PYTHON" != ""; then (cd pythonCCS && $(MAKE) all OPTS='$(OPTS)' || exit 1); fi)
+.PHONY: $(DIRS)
 
-idxl:
-	(cd idxl; $(MAKE) all OPTS='$(OPTS)')
+all:  $(DIRS)
+
+sparseContiguousReducer:
+	$(MAKE) -C $@ all OPTS='$(OPTS)'
 
 tcharm:
-	(cd tcharm; $(MAKE) all OPTS='$(OPTS)')
+	$(MAKE) -C $@ all OPTS='$(OPTS)'
 
 ampi:  tcharm
-	(cd ampi; $(MAKE) all OPTS='$(OPTS)')
+	$(MAKE) -C $@ all OPTS='$(OPTS)'
+
+idxl:
+	$(MAKE) -C $@ all OPTS='$(OPTS)'
 
 parmetis: ampi
-	(cd parmetis; $(MAKE) all OPTS='$(OPTS)')
+	$(MAKE) -C $@ all OPTS='$(OPTS)'
+
+multiphaseSharedArrays:
+	$(MAKE) -C $@ all OPTS='$(OPTS)'
 
 fem:  idxl ampi parmetis
-	(cd fem; $(MAKE) all OPTS='$(OPTS)')
+	$(MAKE) -C $@ all OPTS='$(OPTS)'
 
 ParFUM:	idxl ampi parmetis collide
-	(cd ParFUM; $(MAKE) all OPTS='$(OPTS)')
+	$(MAKE) -C $@ all OPTS='$(OPTS)'
 
-python:
-	(cd pythonCCS; $(MAKE) all OPTS='$(OPTS)')
+ifem:
+	$(MAKE) -C $@ all OPTS='$(OPTS)'
+
+armci:
+	$(MAKE) -C $@ all OPTS='$(OPTS)'
+
+collide:
+	$(MAKE) -C $@ all OPTS='$(OPTS)'
+
+mblock:
+	$(MAKE) -C $@ all OPTS='$(OPTS)'
+
+barrier:
+	$(MAKE) -C $@ all OPTS='$(OPTS)'
+
+irecv:
+	$(MAKE) -C $@ all OPTS='$(OPTS)'
+
+netfem:
+	$(MAKE) -C $@ all OPTS='$(OPTS)'
+
+liveViz:
+	$(MAKE) -C $@ all OPTS='$(OPTS)'
+
+taskGraph:
+	$(MAKE) -C $@ all OPTS='$(OPTS)'
+
+search:
+	$(MAKE) -C $@ all OPTS='$(OPTS)'
+
+datatransfer:
+	$(MAKE) -C $@ all OPTS='$(OPTS)'
+
+pythonCCS:
+	-(CHARMINC=../../../include;. $$CHARMINC/conv-config.sh; \
+	if test "$$CMK_BUILD_PYTHON" != ""; then ($(MAKE) -C $@ all OPTS='$(OPTS)' || exit 1); fi)
+
 
 clean:
 	for d in $(DIRS); do (cd $$d && make clean OPTS='$(OPTS)'); done
