@@ -102,6 +102,7 @@ public:
 
         //Use the multicast learner
         strat->setMulticast();
+        strat->enableLearning();
 
         //Alltoall multicast is effectively an all-to-all broadcast.
         //So we can try the broadcast strategy here too
@@ -288,7 +289,7 @@ public:
 
     //Resume from loadbalancing
     void ResumeFromSync() {
-      //myinst.setSourcePe();
+        myinst.setSourcePe();
         sendMessage();
     }
 

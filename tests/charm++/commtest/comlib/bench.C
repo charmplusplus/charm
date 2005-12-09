@@ -117,6 +117,7 @@ public:
                                         nElements, elem_array, 
                                         nElements, elem_array);
         
+        strat->enableLearning();
         cinst.setStrategy(strat);                
 
         for(count =0; count < nElements; count++)
@@ -287,7 +288,7 @@ public:
     //Finished loadbalancing
     void ResumeFromSync() {
         //        CkPrintf("%d: resuming\n", CkMyPe());
-        //myInst.setSourcePe();
+        myInst.setSourcePe();
 	sendMessage();
     }
 
