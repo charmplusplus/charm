@@ -230,8 +230,8 @@ void mpi_init(int *ierr){
   CkpvAccess(mpi_ops)[i++] = MPI_MAXLOC;
   CkpvAccess(mpi_ops)[i++] = MPI_MINLOC;
 
-  CpvInitialize(int, mpi_opc);
-  CpvAccess(mpi_opc) = i;
+  CkpvInitialize(int, mpi_opc);
+  CkpvAccess(mpi_opc) = i;
   *ierr = AMPI_Init(NULL,NULL);
 }
 
