@@ -7,7 +7,6 @@
 #include "fem_mesh_modify.h"
 
 //#define DEBUG_1
-//#define DEBUG_2
 #define ERVAL -1000000000  //might cause a problem if there are 100million nodes
 #define ERVAL1 -1000000001
 
@@ -1345,20 +1344,10 @@ int FEM_AdaptL::edge_contraction_help(int *e1P, int *e2P, int n1, int n2, int e1
 #ifdef DEBUG_1
   CkPrintf("[%d]Edge Contraction, edge %d(%d:%d)->%d(%d:%d) on chunk %d\n",theMod->idx, n1,n1_bound,n1_shared, n2,n2_bound,n2_shared, theMod->getfmUtil()->getIdx());
 #endif
-#ifdef DEBUG_2
-  CkPrintf("Adjacencies before edge contract\n");
-  printAdjacencies(adjnodes, 2, adjelems, 2);
-#endif
   e1chunk = FEM_remove_element(theMesh, e1, 0);
-#ifdef DEBUG_2
-  CkPrintf("Adjacencies after remove element %d\n",e1);
-  printAdjacencies(adjnodes, 2, adjelems, 2);
-#endif
   e2chunk = FEM_remove_element(theMesh, e2, 0);
-#ifdef DEBUG_2
-  CkPrintf("Adjacencies after remove element %d\n",e2);
-  printAdjacencies(adjnodes, 2, adjelems, 2);
-#endif
+  FEM_purge_element(theMesh,e1,0);
+  FEM_purge_element(theMesh,e2,0);
 
   for (int i=0; i<nesize; i++) {
     if ((nbrElems[i] != e1) && (nbrElems[i] != e2)) {
@@ -1366,8 +1355,11 @@ int FEM_AdaptL::edge_contraction_help(int *e1P, int *e2P, int n1, int n2, int e1
       for (int j=0; j<3; j++) {
 	if (conn[j] == deletenode) conn[j] = keepnode;
       }
+      int eTopurge = nbrElems[i];
       echunk = FEM_remove_element(theMesh, nbrElems[i], 0);
       nbrElems[i] = FEM_add_element(theMesh, conn, 3, 0, echunk); //add it to the same chunk from where it was removed
+      theMod->fmUtil->copyElemData(0,eTopurge,nbrElems[i]);
+      FEM_purge_element(theMesh,eTopurge,0);
     }
   }
 

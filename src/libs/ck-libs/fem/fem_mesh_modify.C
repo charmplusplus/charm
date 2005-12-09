@@ -649,6 +649,7 @@ int FEM_remove_element(FEM_Mesh *m, int elementid, int elemtype, int permanent){
 		      int sge = m->getfmMM()->getfmUtil()->exists_in_IDXL(m,elems[k],chk,4,elemtype);
 		      m->elem[elemtype].ghost->ghostRecv.removeNode(FEM_To_ghost_index(elems[k]), chk);
 		      FEM_remove_element_local(m,elems[k],elemtype);
+		      m->elem[elemtype].ghost->set_invalid(FEM_From_ghost_index(elems[k]),false);
 		      ghostREIndices.push_back(sge);
 		      numGhostRE++;
 

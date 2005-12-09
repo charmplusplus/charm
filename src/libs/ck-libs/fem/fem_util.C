@@ -971,6 +971,8 @@ int FEM_MUtil::eatIntoElement(int localIdx) {
   FEM_remove_element(mmod->fmMesh,localIdx,0,idx);
   for(int j=0; j<nodesPerEl; j++) oldnodes[j] = adjnodes[j];
   int newEl = FEM_add_element(mmod->fmMesh, adjnodes, nodesPerEl, 0, idx);
+  copyElemData(0,localIdx,newEl); //special copy across chunk
+  FEM_purge_element(mmod->fmMesh,localIdx,0);
   for(int i=0; i<nodesPerEl; i++) {
     if(adjnodes[i]!=oldnodes[i]) {
       //correct the lock
