@@ -24,7 +24,7 @@ parmetis: ampi
 fem:  idxl ampi parmetis
 	(cd fem; $(MAKE) all OPTS='$(OPTS)')
 
-ParFUM:	idxl ampi parmetis
+ParFUM:	idxl ampi parmetis collide
 	(cd ParFUM; $(MAKE) all OPTS='$(OPTS)')
 
 python:
