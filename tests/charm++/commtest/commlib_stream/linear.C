@@ -57,8 +57,8 @@ public:
         
         arr = CProxy_Hello::ckNew(nElements);
         
-        StreamingStrategy *strat=new StreamingStrategy(1,bucketSize);
-        StreamingStrategy *sstrat=new StreamingStrategy(1,bucketSize);
+        StreamingStrategy *strat=new StreamingStrategy(0.1,bucketSize);
+        StreamingStrategy *sstrat=new StreamingStrategy(0.1,bucketSize);
 
         MeshStreamingStrategy *mstrat=new 
 	  MeshStreamingStrategy(1, bucketSize);
