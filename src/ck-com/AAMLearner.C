@@ -69,6 +69,7 @@ Strategy *AAMLearner::optimizePattern(Strategy *strat,
         */
         
         ostrat->setInstance(in_strat->getInstance());
+        ((EachToManyMulticastStrategy *)ostrat)->enableLearning();
     }
     else
         CkAbort("Groups Not Implemented Yet\n");

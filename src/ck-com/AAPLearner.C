@@ -62,11 +62,12 @@ Strategy *AAPLearner::optimizePattern(Strategy *strat,
         in_strat->ainfo.getDestinationArray(daid, didxlist, ndest);
                 
         ostrat = new EachToManyMulticastStrategy
-	     (minstrat, said, daid,
+            (minstrat, said, daid,
              nsrc, sidxlist, ndest,
              didxlist);
 
         ostrat->setInstance(in_strat->getInstance());
+        ((EachToManyMulticastStrategy *) ostrat)->enableLearning();
     }
     
     //Group strategy implement later, foo bar !!
@@ -79,6 +80,8 @@ Strategy *AAPLearner::optimizePattern(Strategy *strat,
 
         ostrat = new EachToManyMulticastStrategy
             (minstrat, src_npes, src_pelist, dest_npes, dest_pelist);
+        ((EachToManyMulticastStrategy *) ostrat)->enableLearning();
+        ostrat->setInstance(in_strat->getInstance());
     }
 
     return ostrat;

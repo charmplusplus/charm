@@ -17,6 +17,7 @@ class EachToManyMulticastStrategy: public CharmStrategy {
     virtual void commonInit();
 
     RouterStrategy *rstrat;
+    int useLearner;
 
  public:
     //Group constructor
@@ -45,7 +46,8 @@ class EachToManyMulticastStrategy: public CharmStrategy {
     virtual void localMulticast(void *msg);
     
     PUPable_decl(EachToManyMulticastStrategy);
-
+    
+    inline void enableLearning() {useLearner = 1;}
 };
 #endif
 

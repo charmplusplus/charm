@@ -42,7 +42,8 @@ void *itrDoneHandler(void *msg){
     int nexpected = sentry->numElements;
     
     if(nexpected == 0) {             
-        ComlibPrintf("[%d] Calling Dummy Done Inserting, %d, %d\n", CkMyPe(), instid, nexpected);
+        ComlibPrintf("[%d] Calling Dummy Done Inserting, %d, %d\n", 
+                     CkMyPe(), instid, nexpected);
         nm_mgr = (EachToManyMulticastStrategy *)sentry->strategy;    
         nm_mgr->doneInserting();
 	
@@ -153,6 +154,7 @@ void EachToManyMulticastStrategy::commonInit() {
     
     ComlibPrintf("Creating Strategy %d\n", routerID);
 
+    useLearner = 0;
     rstrat = NULL;
 }
 
@@ -220,7 +222,8 @@ void EachToManyMulticastStrategy::pup(PUP::er &p){
 
     p | routerID; 
     p | npes; p | ndestpes;     
-    
+    p | useLearner;
+
     if(p.isUnpacking() && npes > 0) {
         pelist = new int[npes];    
     }
@@ -290,13 +293,14 @@ void EachToManyMulticastStrategy::beginProcessing(int numElements){
             ->getStrategyTableEntry(myInstanceID);
         sentry->numElements = expectedDeposits;
     }
-    /*
-    if(!mflag) 
-        setLearner(new AAPLearner());    
-    else 
-        setLearner(new AAMLearner());                
-    */
-
+    
+    if(useLearner) {
+        if(!mflag) 
+            setLearner(new AAPLearner());    
+        else 
+            setLearner(new AAMLearner());                
+    }
+    
     if(expectedDeposits > 0)
         return;
     
@@ -314,7 +318,7 @@ void EachToManyMulticastStrategy::finalizeProcessing() {
     if(rstrat)
         delete rstrat;
 
-    if(getLearner() != NULL)
+    if(useLearner && getLearner() != NULL)
         delete getLearner();
 }
 
