@@ -2,12 +2,12 @@ XLC_PRE=/opt/ibmcmp
 #XLC_PRE=/.../torolab.ibm.com/fs/projects/vabld/run/vacpp/80/bgl/daily/latest/
 XLC_POST=bin/blrts_
 XLC_F=$XLC_PRE/xlf/9.1
-CMK_CC="$XLC_PRE/vac/7.0/${XLC_POST}xlc -qcpluscmt "
+CMK_CC="$XLC_PRE/vac/7.0/${XLC_POST}xlc -qcpluscmt $BGL_INC"
 #CMK_CC="$XLC_PRE/${XLC_POST}xlc -qcpluscmt  -F/.../torolab.ibm.com/fs/projects/vabld/run/vacpp/80//bgl/daily/051002/etc/blrts-vac.cfg.ppcfloor"
-CMK_CXX="$XLC_PRE/vacpp/7.0/${XLC_POST}xlC "
+CMK_CXX="$XLC_PRE/vacpp/7.0/${XLC_POST}xlC $BGL_INC"
 #CMK_CXX="$XLC_PRE/${XLC_POST}xlC  -F/.../torolab.ibm.com/fs/projects/vabld/run/vacpp/80//bgl/daily/051002/etc/blrts-vac.cfg.ppcfloor"
-CMK_LD="$CMK_CC  "
-CMK_LDXX="$CMK_CXX  "
+CMK_LD="$CMK_CC $BGL_LIB "
+CMK_LDXX="$CMK_CXX  $BGL_LIB"
 CMK_CF77="$XLC_F/${XLC_POST}xlf "
 CMK_CF90="$XLC_F/${XLC_POST}xlf90  -qsuffix=f=f90" 
 CMK_CF90_FIXED="$XLC_PRE/xlf/8.1/${XLC_POST}xlf90 " 

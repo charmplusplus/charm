@@ -18,9 +18,11 @@ fi
 
 BGL_BIN=$BGL_FLOOR/blrts-gnu/bin
 BGL_INC="-I$BGL_INSTALL/bglsys/include"
+#-I$BGL_INSTALL/blrts-gnu/powerpc-bgl-blrts-gnu/sys-include/" 
+
 #BGL_LIB="-L$BGL_INSTALL/bglsys/lib -L/gsa/watgsa/home/s/a/sameer77/bgx/new2/bglsw-install/blrts-gnu/powerpc-bgl-blrts-gnu/lib -lc"
 
-BGL_LIB="-L$BGL_INSTALL/bglsys/lib"
+BGL_LIB="-L$BGL_INSTALL/bglsys/lib -L$BGL_INSTALL/blrts-gnu/powerpc-bgl-blrts-gnu/lib"
 
 # test if compiler binary present
 if test ! -x $BGL_BIN/powerpc-bgl-blrts-gnu-g++
@@ -29,9 +31,9 @@ then
  exit 1
 fi
 
-OPTS_CPP="$OPTS_CPP $BGL_INC "
-GCC_OPTS="-gdwarf-2 -Wno-deprecated"
-OPTS_LD="$OPTS_LD $BGL_LIB "
+OPTS_CPP="$OPTS_CPP"
+GCC_OPTS="-gdwarf-2 -Wno-deprecated $BGL_INC -I$BGL_INSTALL/blrts-gnu/powerpc-bgl-blrts-gnu/sys-include"
+OPTS_LD="$OPTS_LD"
 
 CMK_CPP_CHARM="$BGL_BIN/powerpc-bgl-blrts-gnu-cpp -P"
 CMK_CPP_C="$BGL_BIN/powerpc-bgl-blrts-gnu-cpp -E "
@@ -43,8 +45,8 @@ CMK_CF77="$BGL_BIN/powerpc-bgl-blrts-gnu-g77 "
 CMK_CF90='f90'
 CMK_RANLIB="$BGL_BIN/powerpc-bgl-blrts-gnu-ranlib "
 CMK_AR="$BGL_BIN/powerpc-bgl-blrts-gnu-ar q "
-CMK_LD="$CMK_CC "
-CMK_LDXX="$CMK_CXX "
+CMK_LD="$CMK_CC $BGL_LIB"
+CMK_LDXX="$CMK_CXX $BGL_LIB"
 CMK_LIBS='-lckqt -lbglml.rts -lrts.rts -ldevices.rts'
 CMK_LD_LIBRARY_PATH="-Wl,-rpath,$CHARMLIBSO/"
 #CMK_SEQ_LIBS=''

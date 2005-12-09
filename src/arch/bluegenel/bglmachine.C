@@ -12,11 +12,15 @@
 
 #define EAGER_MESSAGE_SIZE 100
 
+#include "rts.h"
 #include "BLMPI_EagerProtocol.h"
 #include "BLMPI_RzvProtocol.h"
 #include "BGLML_Torus.h"
 #include "BGLML_Tree.h"
+
+#if CMK_PERSISTENT_COMM
 #include "BLRMA_Put.h"
+#endif
 
 #if CMK_PERSISTENT_COMM
 #include "persist_impl.h"
@@ -59,6 +63,12 @@ PCQueue broadcast_q;                 //queue to send broadcast messages
 #endif /* CMK_SMP */
 
 #define BROADCAST_SPANNING_FACTOR      4
+
+#define MAX_OUTSTANDING 1    //1024    
+#define MAX_POSTED 8
+#define MAX_QLEN 128
+#define MAX_BYTES 2000000
+
 
 #define CMI_BROADCAST_ROOT(msg)          ((CmiMsgHeaderBasic *)msg)->root
 #define CMI_GET_CYCLE(msg)               ((CmiMsgHeaderBasic *)msg)->root
@@ -113,6 +123,10 @@ int               idleblock = 0;
 CsvDeclare(CmiNodeState, NodeState);
 #include "immediate.c"
 
+static inline void AdvanceCommunications(int max_out = MAX_OUTSTANDING);
+static int outstanding_recvs = 0;
+
+
 #if !CMK_SMP
 /************ non SMP **************/
 static struct CmiStateStruct Cmi_state;
@@ -125,47 +139,61 @@ void CmiMemUnlock(void) {}
 #if BGL_VERSION_CONTROLX
 /* Code to support interrupts in BGL */
 
-volatile int bgx_in_interrupt=0;
-volatile int bgx_csection=0;
-volatile int handler_registered=0;
+volatile int bgx_in_interrupt;
+volatile int bgx_lock;
+rts_mutex_t torus_lock = RTS_MUTEX_INITIALIZER;
 
-extern "C" void BGX_InterruptHandler() {
+static int interrupts_enabled;
 
-  bgx_in_interrupt = 1;
-  while(BGLML_Messager_advance(_msgr)>0);
-  bgx_in_interrupt = 0;
+extern "C" void * BGX_InterruptThread(void *) {
+  
+  while (1) {
+    rts_mutex_lock(&torus_lock);
+    
+    //printf("Here Goes\n");
+
+    bgx_in_interrupt = 1;
+    /*
+    int target = outstanding_recvs - MAX_OUTSTANDING;
+    while(target > 0){
+      while(BGLML_Messager_advance(_msgr)>0) ;
+      target = outstanding_recvs - MAX_OUTSTANDING;
+    }
+    */
+
+    //while(BGLML_Messager_advance(_msgr) > 0);
+    AdvanceCommunications();
+    bgx_in_interrupt = 0;
+    
+    rts_mutex_unlock(&torus_lock);    
+    rts_rearm_torus_device();
+  }
+  
+  return NULL;
 }
 
 extern "C" void BGX_BeginCriticalSection() {
-  
-  if(!handler_registered)
-    return;
+  //CmiAssert(bgx_in_interrupt == 0);
 
   if(bgx_in_interrupt)
     return;
 
-  bgx_csection ++;
+  CmiAssert(bgx_lock == 0);
 
-  if(bgx_csection > 1)
-    return;
-
-  rts_disable_torus_interrupts();
+  rts_mutex_lock(&torus_lock);
+  bgx_lock = 1;  
 }
 
 extern "C" void BGX_EndCriticalSection() {
-
-  if(!handler_registered)
-    return;
-
+  //CmiAssert(bgx_in_interrupt == 0);
+  
   if(bgx_in_interrupt)
     return;
-
-  bgx_csection --;
   
-  if(bgx_csection > 0)
-    return;
+  CmiAssert(bgx_lock == 1);
   
-  rts_enable_torus_interrupts();  
+  rts_mutex_unlock(&torus_lock);
+  bgx_lock = 0;  
 }
 
 #else
@@ -255,10 +283,6 @@ int CmiMyRank(void)
 }
 #endif
 
-#define MAX_OUTSTANDING 1024
-#define MAX_POSTED 8
-#define MAX_QLEN 1024
-#define MAX_BYTES 2000000
 
 static int msgQueueLen = 0;
 static int msgQBytes = 0;
@@ -269,8 +293,6 @@ static int maxMessages;
 static int maxBytes;
 static int no_outstanding_sends=0; /*FLAG: consume outstanding Isends in scheduler loop*/
 static int progress_cycles;
-
-static int outstanding_recvs = 0;
 
 static int Cmi_dim;     /* hypercube dim of network */
 
@@ -284,7 +306,6 @@ extern "C" void ConverseCommonExit(void);
 extern "C" void CthInit(char **argv);
 
 static inline void SendMsgsUntil(int, int);
-static inline void AdvanceCommunications(int max_out = MAX_OUTSTANDING);
 static void ConverseRunPE(int everReturn);
 static void CommunicationServer(int sleepTime);
 static void CommunicationServerThread(int sleepTime);
@@ -381,9 +402,6 @@ static void recv_done(void *clientdata){
   /* then we do what PumpMsgs used to do:
    * push msg to recv queue */
   
-  //if(bgx_in_interrupt)
-  //printf("[%d] receive of size %d\n", CmiMyPe(), sndlen);
-
   CMI_CHECK_CHECKSUM(msg, sndlen);
   if (CMI_MAGIC(msg) != CHARM_MAGIC_NUMBER) { /* received a non-charm msg */
     CmiAbort("Charm++ Warning: Non Charm++ Message Received. \n");
@@ -531,6 +549,10 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
       CmiPrintf("Charm++: Will%s consume outstanding sends in scheduler loop\n",        no_outstanding_sends?"":" not");
   }
   
+
+  if (CmiGetArgFlag(argv,"+enable_interrupts")) 
+    interrupts_enabled = 1;
+
   _Cmi_numpes = _Cmi_numnodes * _Cmi_mynodesize;
   Cmi_nodestart = _Cmi_mynode * _Cmi_mynodesize;
   Cmi_argvcopy = CmiCopyArgs(argv);
@@ -622,9 +644,8 @@ static void ConverseRunPE(int everReturn)
 #endif
 
 #if BGL_VERSION_CONTROLX
-  rts_install_torus_interrupt_handler(BGX_InterruptHandler);
-  rts_enable_torus_interrupts();  
-  handler_registered = 1;
+  if(interrupts_enabled)
+    rts_thread_create(&BGX_InterruptThread, 0);
 #endif
 
   CmiBarrier();
@@ -850,7 +871,7 @@ inline void machineSend(SMSG_LIST *msg_tmp) {
   else {
     //printf("%d : Sending rzv message to %d of size %d\n", CmiMyPe(), msg_tmp->destpe, msg_tmp->size);
     //    msg_tmp->send_buf = (char *) malloc (sizeof(BLMPI_Rzv_Send_t));
-
+    
     msg_tmp->send_buf = (char *) CmiAlloc (sizeof(BLMPI_Rzv_Send_t));
 
     //CmiAssert((unsigned long)msg_tmp->send_buf % 16 == 0);
@@ -884,8 +905,6 @@ inline void  CmiGeneralFreeSend(int destPE, int size, char* msg){
   
   SendMsgsUntil(maxMessages, maxBytes);
 
-  sendQueuedMessages();
-
   SMSG_LIST *msg_tmp = (SMSG_LIST *) malloc(sizeof(SMSG_LIST));
   
   msg_tmp->destpe = destPE;
@@ -900,7 +919,9 @@ inline void  CmiGeneralFreeSend(int destPE, int size, char* msg){
 #endif
 
   BGX_BeginCriticalSection();
-
+  
+  sendQueuedMessages();
+  
   if(numPosted > request_max) {
     PCQueuePush(message_q, (char *)msg_tmp);
   }    
@@ -955,8 +976,6 @@ void SendSpanningChildren(int size, char *msg)
     CmiAssert(p>=0 && p<_Cmi_numpes && p!=cs->pe);
     CmiSyncSendFn1(p, size, msg);
   }
-
-  //SendMsgsUntil(0,0);
 }
 
 /* send msg along the hypercube in broadcast. (Sameer) */
@@ -1070,9 +1089,9 @@ void CmiFreeBroadcastAllFn(int size, char *msg){
 
 static inline void AdvanceCommunications(int max_out){
 
-  BGX_BeginCriticalSection();
-
   sendBroadcastMessages();
+
+  BGX_BeginCriticalSection();
 
   while(msgQueueLen > maxMessages && msgQBytes > maxBytes){
     while(BGLML_Messager_advance(_msgr)>0) ;
@@ -1086,25 +1105,25 @@ static inline void AdvanceCommunications(int max_out){
   }
   
   while(BGLML_Messager_advance(_msgr)>0);
+  BGX_EndCriticalSection();
 
   sendBroadcastMessages();
-  sendQueuedMessages();
-  
+
 #if CMK_IMMEDIATE_MSG
   if(received_immediate)
     CmiHandleImmediate();
   received_immediate = 0;
 #endif
   
-  BGX_EndCriticalSection();
+  BGX_BeginCriticalSection();  
+  sendQueuedMessages();
+  BGX_EndCriticalSection();  
 }
-
 
 static inline void SendMsgsUntil(int targetm, int targetb){
 
-  BGX_BeginCriticalSection();
-
   sendBroadcastMessages();
+  BGX_BeginCriticalSection();
   
   while(msgQueueLen>targetm && msgQBytes > targetb){
     while(BGLML_Messager_advance(_msgr)>0) ;
@@ -1113,9 +1132,9 @@ static inline void SendMsgsUntil(int targetm, int targetb){
   
   while(BGLML_Messager_advance(_msgr)>0) ;
   
-  sendBroadcastMessages();
-
   BGX_EndCriticalSection();
+
+  sendBroadcastMessages();
 }
 
 void CmiNotifyIdle(){  
@@ -1363,6 +1382,7 @@ void CmiMachineProgressImpl()
 extern "C" void CmiBarrier()
 {
   //BGLML_Torus_SimpleBarrier(_msgr);
-  //BGLML_Tree_Barrier(_msgr, 1);
+  if(interrupts_enabled)
+    BGLML_Tree_Barrier(_msgr, 1);
 }
 
