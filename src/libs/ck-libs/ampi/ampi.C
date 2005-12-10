@@ -476,19 +476,20 @@ static CProxy_ampiWorlds ampiWorldsGroup;
 static void init_operations()
 {
   CtvInitialize(MPI_Op_Array, mpi_ops);
-  register int i = 0;
-  CtvAccess(mpi_ops)[i++] = MPI_MAX;
-  CtvAccess(mpi_ops)[i++] = MPI_MIN;
-  CtvAccess(mpi_ops)[i++] = MPI_SUM;
-  CtvAccess(mpi_ops)[i++] = MPI_PROD;
-  CtvAccess(mpi_ops)[i++] = MPI_LAND;
-  CtvAccess(mpi_ops)[i++] = MPI_BAND;
-  CtvAccess(mpi_ops)[i++] = MPI_LOR;
-  CtvAccess(mpi_ops)[i++] = MPI_BOR;
-  CtvAccess(mpi_ops)[i++] = MPI_LXOR;
-  CtvAccess(mpi_ops)[i++] = MPI_BXOR;
-  CtvAccess(mpi_ops)[i++] = MPI_MAXLOC;
-  CtvAccess(mpi_ops)[i++] = MPI_MINLOC;
+  int i = 0;
+  MPI_Op *tab = CtvAccess(mpi_ops);
+  tab[i++] = MPI_MAX;
+  tab[i++] = MPI_MIN;
+  tab[i++] = MPI_SUM;
+  tab[i++] = MPI_PROD;
+  tab[i++] = MPI_LAND;
+  tab[i++] = MPI_BAND;
+  tab[i++] = MPI_LOR;
+  tab[i++] = MPI_BOR;
+  tab[i++] = MPI_LXOR;
+  tab[i++] = MPI_BXOR;
+  tab[i++] = MPI_MAXLOC;
+  tab[i++] = MPI_MINLOC;
 
   CtvInitialize(int, mpi_opc);
   CtvAccess(mpi_opc) = i;
@@ -4100,7 +4101,8 @@ CDECL
 int AMPI_Cart_sub(MPI_Comm comm, int *remain_dims, MPI_Comm *newcomm) {
   AMPIAPI("AMPI_Cart_sub");
 
-  int i, color, key, *coords, ndims, rank;
+  int i, *coords, ndims, rank;
+  int color = 1, key = 1;
 
   AMPI_Comm_rank(comm, &rank);
   ampiCommStruct &c = getAmpiParent()->getCart(comm);

@@ -201,7 +201,8 @@ CtvExtern(int, mpi_opc);
 // must be consistent with mpif.h
 #define MPI_OP_FIRST   100
 
-#define GET_MPI_OP(idx)      (CmiAssert(idx - MPI_OP_FIRST >= 0 && idx - MPI_OP_FIRST < CtvAccess(mpi_opc)), CtvAccess(mpi_ops)[idx - MPI_OP_FIRST])
+//#define GET_MPI_OP(idx)      (CmiAssert(idx - MPI_OP_FIRST >= 0 && idx - MPI_OP_FIRST < CtvAccess(mpi_opc)), CtvAccess(mpi_ops)[idx - MPI_OP_FIRST])
+inline MPI_Op & GET_MPI_OP(int idx)      { MPI_Op *tab=CtvAccess(mpi_ops); return tab[idx - MPI_OP_FIRST]; }
 
 void mpi_init_universe(int *unicomm)
 {
@@ -613,14 +614,14 @@ void mpi_scan(void* sendbuf, void* recvbuf, int* count, int* datatype, int* opc,
 void mpi_op_create(int* function, int* commute, int* opc, int* ierr){
   MPI_Op op;
   *ierr = MPI_Op_create((MPI_User_function *)function, *commute, (MPI_Op *)&op);
-  CtvAccess(mpi_ops)[CtvAccess(mpi_opc)++] = op;
+  GET_MPI_OP(CtvAccess(mpi_opc)++) = op;
   *opc = CtvAccess(mpi_opc)-1;
 }
 
 void mpi_op_free(int* opc, int* ierr){
   MPI_Op op = GET_MPI_OP(*opc);
   GET_MPI_OP(*opc) = NULL;
-  *ierr = MPI_Op_free((MPI_Op *)op);
+  *ierr = MPI_Op_free((MPI_Op *)&op);
 }
 
 void mpi_comm_dup(int *comm, int *newcomm, int *ierr)
