@@ -195,6 +195,23 @@ void FEM_Interpolate::FEM_InterpolateElementCopy(ElementArgs args)
   }
   else {
     //acquire operation, do not worry abt this at the moment
+    CkAssert(!FEM_Is_ghost_index(args.e) && FEM_Is_ghost_index(args.oldElement));
+    const IDXL_Rec *irec1 = theMesh->elem[args.elType].ghost->ghostRecv.getRec(FEM_To_ghost_index(args.oldElement));
+    int remotechk = irec1->getChk(0);
+    int sharedIdx = irec1->getIdx(0);
+    elemDataMsg *em = meshMod[remotechk].packElemData(theMod->idx,sharedIdx);
+    PUP::fromMem pmem(em->data);
+    int count=0;
+    CkVec<FEM_Attribute *>*elemattrs = (theMesh->elem[0]).getAttrVec();
+    for(int j=0;j<elemattrs->size();j++){
+      FEM_Attribute *elattr = (FEM_Attribute *)(*elemattrs)[j];
+      if(elattr->getAttr() < FEM_ATTRIB_FIRST){
+	elattr->pupSingle(pmem, args.e);
+	count++;
+      }
+    }
+    CkAssert(em->datasize==count);
+    delete em;
   }
   return;
 }
@@ -289,4 +306,3 @@ void FEM_Interpolate::FEM_InterpolateCopyAttributes(int oldnode, int newnode) {
 
   return;
 }
-

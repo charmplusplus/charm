@@ -250,6 +250,11 @@ public:
 		if (this->table==NULL) allocate(this->rows);
 		p(this->table,this->rows*this->cols); //T better be a basic type, or this won't compile!
 	}
+
+	void pupSingle(PUP::er &p, int pupindx) {
+	  p|table[pupindx];
+	}
+
 	friend void operator|(PUP::er &p,AllocTable2d<T> &t) {t.pup(p);}
 
 	/// Add a row to the table (by analogy with std::vector):
@@ -323,6 +328,7 @@ protected:
 public:
 	FEM_Attribute(FEM_Entity *owner_,int myAttr_);
 	virtual void pup(PUP::er &p);
+	virtual void pupSingle(PUP::er &p, int pupindx);
 	virtual ~FEM_Attribute();
 	
 	/// Install this attribute as our ghost:
@@ -438,6 +444,7 @@ protected:
 public:
 	FEM_DataAttribute(FEM_Entity *owner,int myAttr);
 	virtual void pup(PUP::er &p);
+	virtual void pupSingle(PUP::er &p, int pupindx);
 	~FEM_DataAttribute();
 	
 	AllocTable2d<unsigned char> &getChar(void) {return *char_data;}
@@ -495,6 +502,7 @@ protected:
 public:
 	FEM_IndexAttribute(FEM_Entity *owner,int myAttr, Checker *checker_=NULL);
 	virtual void pup(PUP::er &p);
+	virtual void pupSingle(PUP::er &p, int pupindx);
 	~FEM_IndexAttribute();
 	
 	AllocTable2d<int> &get(void) {return idx;}
@@ -581,6 +589,7 @@ public:
 	FEM_VarIndexAttribute(FEM_Entity *owner,int myAttr);
 	~FEM_VarIndexAttribute(){};
 	virtual void pup(PUP::er &p);
+	virtual void pupSingle(PUP::er &p, int pupindx);
 	CkVec<CkVec<ID> > &get(){return idx;};
 	const CkVec<CkVec<ID> > &get() const {return idx;};
 	

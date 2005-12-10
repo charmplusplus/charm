@@ -523,6 +523,13 @@ void FEM_Attribute::pup(PUP::er &p) {
 	p|datatype;
 	if (p.isUnpacking()) tryAllocate();
 }
+void FEM_Attribute::pupSingle(PUP::er &p, int pupindx) {
+	// e, attr, and ghost are always set by the constructor
+	p|width;
+	if (p.isUnpacking() && femVersion > 0 && width<0)  width=0;
+	p|datatype;
+	if (p.isUnpacking()) tryAllocate();
+}
 FEM_Attribute::~FEM_Attribute() {}
 
 void FEM_Attribute::setLength(int next,const char *caller) {
@@ -662,6 +669,17 @@ void FEM_DataAttribute::pup(PUP::er &p) {
 	case FEM_FLOAT:  if (float_data) float_data->pup(p); break;
 	case FEM_DOUBLE: if (double_data) double_data->pup(p); break;
 	default: CkAbort("Invalid datatype in FEM_DataAttribute::pup");
+	}
+}
+void FEM_DataAttribute::pupSingle(PUP::er &p, int pupindx) {
+	super::pupSingle(p,pupindx);
+	switch(getDatatype()) {
+	case -1: /* not allocated yet */ break;
+	case FEM_BYTE:   if (char_data) char_data->pupSingle(p,pupindx); break;
+	case FEM_INT:    if (int_data) int_data->pupSingle(p,pupindx); break;
+	case FEM_FLOAT:  if (float_data) float_data->pupSingle(p,pupindx); break;
+	case FEM_DOUBLE: if (double_data) double_data->pupSingle(p,pupindx); break;
+	default: CkAbort("Invalid datatype in FEM_DataAttribute::pupSingle");
 	}
 }
 FEM_DataAttribute::~FEM_DataAttribute() {
@@ -868,6 +886,10 @@ void FEM_IndexAttribute::pup(PUP::er &p) {
 	super::pup(p);
 	p|idx;
 }
+void FEM_IndexAttribute::pupSingle(PUP::er &p, int pupindx) {
+	super::pupSingle(p,pupindx);
+	idx.pupSingle(p,pupindx);
+}
 FEM_IndexAttribute::~FEM_IndexAttribute() {
 	if (checker) delete checker;
 }
@@ -963,6 +985,11 @@ FEM_VarIndexAttribute::FEM_VarIndexAttribute(FEM_Entity *e,int myAttr)
 void FEM_VarIndexAttribute::pup(PUP::er &p){
 	super::pup(p);
 	p | idx;
+};
+
+void FEM_VarIndexAttribute::pupSingle(PUP::er &p, int pupindx){
+	super::pupSingle(p,pupindx);
+	p|idx[pupindx];
 };
 
 void FEM_VarIndexAttribute::set(const void *src,int firstItem,int length,

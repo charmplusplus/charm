@@ -300,6 +300,16 @@ class findgsMsg : public CMessage_findgsMsg {
   }
 };
 
+class elemDataMsg : public CMessage_elemDataMsg {
+ public:
+  int datasize;
+  char *data;
+
+  elemDataMsg(int size) {
+    datasize = size;
+  }
+};
+
 class femMeshModify : public CBase_femMeshModify {
   friend class FEM_lock;
   friend class FEM_MUtil;
@@ -405,6 +415,7 @@ class femMeshModify : public CBase_femMeshModify {
   void interpolateElemCopy(int fromChk, int sharedIdx1, int sharedIdx2);
   void cleanupIDXL(int fromChk, int sharedIdx);
   void purgeElement(int fromChk, int sharedIdx);
+  elemDataMsg *packElemData(int fromChk, int sharedIdx);
 };
 
 

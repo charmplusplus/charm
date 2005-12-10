@@ -2535,4 +2535,30 @@ void femMeshModify::purgeElement(int fromChk, int sharedIdx) {
   FEM_purge_element(fmMesh,localIdx,0);
 }
 
+
+elemDataMsg *femMeshModify::packElemData(int fromChk, int sharedIdx) {
+  int localIdx = fmUtil->lookup_in_IDXL(fmMesh, sharedIdx, fromChk, 3);
+  CkAssert(localIdx!=-1);
+  CkVec<FEM_Attribute *>*elemattrs = (fmMesh->elem[0]).getAttrVec();
+  int count = 0;
+  PUP::sizer psizer;
+  for(int j=0;j<elemattrs->size();j++){
+    FEM_Attribute *elattr = (FEM_Attribute *)(*elemattrs)[j];
+    if(elattr->getAttr() < FEM_ATTRIB_FIRST){ 
+      elattr->pupSingle(psizer, localIdx);
+      count++;
+    }
+  }
+  elemDataMsg *edm = new (psizer.size()) elemDataMsg(count);
+
+  PUP::toMem pmem(edm->data);
+  for(int j=0;j<elemattrs->size();j++){
+    FEM_Attribute *elattr = (FEM_Attribute *)(*elemattrs)[j];
+    if(elattr->getAttr() < FEM_ATTRIB_FIRST){ 
+      elattr->pupSingle(pmem, localIdx);
+    }
+  }
+  return edm;
+}
+
 #include "FEMMeshModify.def.h"
