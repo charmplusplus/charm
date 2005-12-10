@@ -17,7 +17,7 @@ int main(int argc, char **argv)
   bool fCreatedLink  = CreateHardLink(dest, src, NULL);
   if (!fCreatedLink) {
     int err=GetLastError();
-    printf("CreateHardLink failed errno=%d, WSAerr=%d\n",errno, err);
+    printf("CreateHardLink %s => %s failed errno=%d, WSAerr=%d\n", src, dest, errno, err);
     return 1;
   }
   else {

@@ -33,7 +33,7 @@ do
   then
     destFile=$dest
     test -d $dest && destFile=$dest/`basename $src`
-    echo $junction $src $destFile
+#    echo $junction $src $destFile
     $junction $src $destFile
     status=$?
     test $status -ne 0 && echo "ERROR" &&exit $status
