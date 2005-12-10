@@ -6,7 +6,7 @@ Author: Isaac Dooley 11-11-2005
 
 */
 
-#include "collide.h"
+#include "ParFUM_collide.h"
 #include "mpi.h"
 
 #define NULL 0
