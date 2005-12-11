@@ -252,7 +252,7 @@ public:
 	}
 
 	void pupSingle(PUP::er &p, int pupindx) {
-	  p|table[pupindx];
+	  p|this->table[pupindx];
 	}
 
 	friend void operator|(PUP::er &p,AllocTable2d<T> &t) {t.pup(p);}
