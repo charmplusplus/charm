@@ -22,7 +22,7 @@
 #define CMK_MALLOC_USE_OS_BUILTIN                          1
 
 #define CMI_IO_BUFFER_EXPLICIT                             1
-#define CMI_IO_FLUSH_EXPLICIT                              1
+#define CMI_IO_FLUSH_USER                                  1
 
 #define CMK_GETPAGESIZE_AVAILABLE                      1
 #define CMK_MEMORY_PAGESIZE                                8192

@@ -2442,8 +2442,17 @@ void CmiIOInit(char **argv) {
     CmiAbort("Explicit IO Buffering failed\n");
   }
 #endif
-  CpvAccess(expIOFlushFlag) = CmiGetArgFlagDesc(argv,"+io_flush_explicit",
-						"Explicit IO Flush Request");
+#if CMI_IO_FLUSH_USER
+  /* system default to have user control flushing of IO */
+  /* Now look for user override */
+  CpvAccess(expIOFlushFlag) = !CmiGetArgFlagDesc(argv,"+io_flush_system",
+						 "System Controls IO Flush");
+#else
+  /* system default to have system handle IO flushing */
+  /* Now look for user override */
+  CpvAccess(expIOFlushFlag) = CmiGetArgFlagDesc(argv,"+io_flush_user",
+						"User Controls IO Flush");
+#endif
 }
 #endif
 
@@ -2454,12 +2463,9 @@ void CmiPrintf(const char *format, ...)
   va_list args;
   va_start(args,format);
   vfprintf(stdout,format, args);
-#if ! CMI_IO_FLUSH_EXPLICIT
-  /* even if the system flushes implicitly, the user can override */
   if (!CpvAccess(expIOFlushFlag)) {
     CmiFlush(stdout);
   }
-#endif
   va_end(args);
 }
 
