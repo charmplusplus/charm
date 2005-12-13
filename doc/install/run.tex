@@ -254,3 +254,15 @@ follows:
 	pathname and appended extension if specified) on all nodes.
 \end{enumerate}
 
+\subsubsection{IO buffering options}
+\label{io buffer options}
+There may be circumstances where a \charmpp{} application may want to take
+or relinquish control of stdout buffer flushing. Most systems default to
+giving the \charmpp{} runtime control over stdout but a few default to
+giving the application that control. The user can override these system
+defaults with the following runtime options:
+
+\begin{description}
+\item[{\tt +io\_flush\_user}]     User (application) controls stdout flushing
+\item[{\tt +io\_flush\_system}]   The \charmpp{} runtime controls flushing
+\end{description}
