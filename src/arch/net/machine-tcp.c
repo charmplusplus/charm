@@ -382,6 +382,22 @@ static void IntegrateMessageDatagram(char **msg, int len)
       if (node->asm_fill > node->asm_total)
          CmiAbort("\n\n\t\tLength mismatch!!\n\n");
       if (node->asm_fill == node->asm_total) {
+        /* do it at integration - the following function may re-entrant */
+#if CMK_BROADCAST_SPANNING_TREE
+        if (rank == DGRAM_BROADCAST
+#if CMK_NODE_QUEUE_AVAILABLE
+          || rank == DGRAM_NODEBROADCAST
+#endif
+           )
+          SendSpanningChildren(NULL, 0, node->asm_total, newmsg, broot, rank);
+#elif CMK_BROADCAST_HYPERCUBE
+        if (rank == DGRAM_BROADCAST
+#if CMK_NODE_QUEUE_AVAILABLE
+          || rank == DGRAM_NODEBROADCAST
+#endif
+           )
+          SendHypercube(NULL, 0, node->asm_total, newmsg, broot, rank);
+#endif
         if (rank == DGRAM_BROADCAST) {
           for (i=1; i<_Cmi_mynodesize; i++)
             CmiPushPE(i, CopyMsg(newmsg, node->asm_total));
@@ -397,21 +413,6 @@ static void IntegrateMessageDatagram(char **msg, int len)
         }
         node->asm_msg = 0;
       }
-#if CMK_BROADCAST_SPANNING_TREE
-      if (rank == DGRAM_BROADCAST
-#if CMK_NODE_QUEUE_AVAILABLE
-          || rank == DGRAM_NODEBROADCAST
-#endif
-         )
-        SendSpanningChildren(NULL, 0, len, newmsg+node->asm_fill-len, broot, rank);
-#elif CMK_BROADCAST_HYPERCUBE
-      if (rank == DGRAM_BROADCAST
-#if CMK_NODE_QUEUE_AVAILABLE
-          || rank == DGRAM_NODEBROADCAST
-#endif
-         )
-        SendHypercube(NULL, 0, len, newmsg+node->asm_fill-len, broot, rank);
-#endif
     } 
     else {
       CmiPrintf("message ignored1: magic not agree:%d != %d!\n", magic, Cmi_charmrun_pid&DGRAM_MAGIC_MASK);
