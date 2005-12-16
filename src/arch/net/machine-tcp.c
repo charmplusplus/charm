@@ -218,12 +218,13 @@ here-- WSAEINVAL, WSAENOTSOCK-- yet everything is actually OK.
     if (Cmi_charmrun_fd!=-1)
 	ctrlskt_ready_read = CMK_PIPE_CHECKREAD(Cmi_charmrun_fd);
     if (dataskt!=-1) {
-      for (i=0; i<_Cmi_numnodes; i++)
+      for (i=0; i<CmiNumNodes(); i++)
       {
         if (i == CmiMyNode()) continue;
         if (nodes[i].send_queue_h) {
           sockWriteStates[i] = CMK_PIPE_CHECKWRITE(nodes[i].sock);
           if (sockWriteStates[i]) dataskt_ready_write = 1;
+	  /* sockWriteStates[i] = dataskt_ready_write = 1; */
         }
         else
           sockWriteStates[i] = 0;
@@ -232,7 +233,6 @@ here-- WSAEINVAL, WSAENOTSOCK-- yet everything is actually OK.
       }
     }
   }
-
   MACHSTATE(1,"} CheckSocketsReady")
   return nreadable;
 }
@@ -362,7 +362,10 @@ static void IntegrateMessageDatagram(char **msg, int len)
           if (!newmsg)
             fprintf(stderr, "%d: Out of mem\n", _Cmi_mynode);
           memcpy(newmsg, *msg, len);
-	  freeMaxBuf(*msg);		/* free buffer, must be max size */
+	  if (len == PACKET_MAX) 
+	      freeMaxBuf(*msg);		/* free buffer, must be max size */
+	  else 
+	      CmiFree(*msg);
 	}
 #else
         newmsg = *msg;
@@ -372,12 +375,17 @@ static void IntegrateMessageDatagram(char **msg, int len)
         node->asm_fill = len;
         node->asm_msg = newmsg;
       } else {
-        size = len - DGRAM_HEADER_SIZE;
 #if ! FRAGMENTATION
 	CmiAssert(0);
+#else
+        size = len - DGRAM_HEADER_SIZE;
         memcpy(newmsg + node->asm_fill, (*msg)+DGRAM_HEADER_SIZE, size);
-#endif
         node->asm_fill += size;
+	if (len == PACKET_MAX) 
+	      freeMaxBuf(*msg);		/* free buffer, must be max size */
+	else 
+	      CmiFree(*msg);
+#endif
       }
       if (node->asm_fill > node->asm_total)
          CmiAbort("\n\n\t\tLength mismatch!!\n\n");
@@ -437,6 +445,12 @@ void ReceiveDatagram(int node)
     KillEveryoneCode(4559318);
 
 #if FRAGMENTATION
+  if (size == PACKET_MAX)
+      buf = getMaxBuf();
+  else
+      buf = (char *)CmiAlloc(size);
+#if 0
+   /* buggy code */
   CmiAssert(size<=PACKET_MAX);
   if (nodeptr->asm_msg == NULL) {
     if (size == PACKET_MAX)
@@ -453,6 +467,7 @@ void ReceiveDatagram(int node)
     temp = *head;
     newmsg = 1;
   }
+#endif
 #else
   buf = (char *)CmiAlloc(size);
 #endif
@@ -517,7 +532,6 @@ int TransmitDatagram(int pe)
   int count;
   unsigned int seqno;
   
-/*CmiPrintf("[%d] TransmitDatagram to %d\n", CmiMyPe(), pe);*/
   node = nodes+pe;
   dg = node->send_queue_h;
   if (dg) {
