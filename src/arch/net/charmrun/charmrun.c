@@ -1943,7 +1943,8 @@ int main(int argc, char **argv, char **envp)
   if (arg_charmdebug) {
 #if (defined(_WIN32) && !defined(__CYGWIN__)) || CMK_BPROC
     /* Gdb stream (and charmdebug) currently valid only with rsh subsystem */
-    CmiAbort("Charmdebug is supported currently only with the rsh subsystem\n");
+    fprintf(stderr, "Charmdebug is supported currently only with the rsh subsystem\n");
+    abort(); 
 #else
     /* Open an additional connection to node 0 with a gdb to grab info */
     printf("opening connection with node 0 for info gdb\n");
