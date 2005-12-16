@@ -66,6 +66,7 @@
 
 #if ! CMK_BOOL_DEFINED
 enum CmiBool {CmiFalse=0, CmiTrue=1};
+typedef enum {false = 0, true = 1} bool;
 #else
 typedef bool CmiBool;
 #define CmiFalse false
