@@ -9,6 +9,10 @@
 #include "xi-symbol.h"
 #include <ctype.h> // for tolower()
 
+#if ! CMK_BOOL_DEFINED
+typedef enum {false = 0, true = 1} bool;
+#endif
+
 #if CMK_STL_USE_DOT_H  /* Pre-standard C++ */
 #  include <fstream.h>
 #else /* ISO C++ */
