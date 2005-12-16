@@ -474,7 +474,7 @@ CDECL const char *FEM_Get_attr_name(int attr,char *storage)
 	case FEM_NODE_NODE_ADJACENCY: return "FEM_NODE_NODE_ADJACENCY";
 	case FEM_ELEM_ELEM_ADJACENCY: return "FEM_ELEM_ELEM_ADJACENCY";
 	case FEM_ELEM_ELEM_ADJ_TYPES: return "FEM_ELEM_ELEM_ADJ_TYPES";
-	case FEM_IS_VALID: return "FEM_IS_VALID";
+	case FEM_IS_VALID_ATTR: return "FEM_IS_VALID_ATTR";
 	case FEM_MESH_SIZING: return "FEM_MESH_SIZING";
 
 	default: break;
@@ -1139,7 +1139,7 @@ void FEM_Entity::setLength(int newlen)
 
 void FEM_Entity::allocateValid(void) {
   if (!valid){
-	valid=new FEM_DataAttribute(this,FEM_IS_VALID);
+	valid=new FEM_DataAttribute(this,FEM_IS_VALID_ATTR);
 	add(valid);
 	valid->setWidth(1); //Only 1 flag per node
 	valid->setLength(size());
@@ -1368,7 +1368,7 @@ void FEM_Entity::create(int attr,const char *caller) {
 	allocateSym();
   else if (attr==FEM_GLOBALNO) 
 	allocateGlobalno();
-  else if (attr==FEM_IS_VALID)
+  else if (attr==FEM_IS_VALID_ATTR)
 	allocateValid();
   else if (attr==FEM_MESH_SIZING) 
 	allocateMeshSizing();
@@ -1939,7 +1939,7 @@ void FEM_writeMesh(FEM_Mesh *m,const char *prefix,int chunkNo,int nChunks)
 }
 
 
-// Setup the entity FEM_IS_VALID tables
+// Setup the entity FEM_IS_VALID_ATTR tables
 CDECL void FEM_Mesh_allocate_valid_attr(int fem_mesh, int entity_type){  
   FEM_Mesh *m=FEM_Mesh_lookup(fem_mesh,"FEM_Mesh_create_valid_elem");
   FEM_Entity *entity = m->lookup(entity_type,"FEM_Mesh_allocate_valid_attr");
