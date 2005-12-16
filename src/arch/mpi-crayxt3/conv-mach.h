@@ -12,7 +12,7 @@
 
 #define CMK_CONVERSE_MPI                                   1
 
-#define CMK_MEMORY_PREALLOCATE_HACK			   1
+#define CMK_MEMORY_PREALLOCATE_HACK			   0
 
 #define CMK_DEFAULT_MAIN_USES_COMMON_CODE                  1
 
