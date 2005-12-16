@@ -1345,6 +1345,11 @@ void FEM_Mesh::get2ElementsOnEdge(int n1, int n2, int *result_e1, int *result_e2
   CmiMemoryCheck();
 #endif
 
+  if(n1==n2){
+    CkPrintf("ERROR: You called get2ElementsOnEdge() with two identical nodes %d, and %d \n", n1, n2);
+    CkExit();
+  }
+
   n2e_getAll(n1, &n1AdjElems, &n1NumElems);
   n2e_getAll(n2, &n2AdjElems, &n2NumElems);
   CkAssert(n1AdjElems!=0);
