@@ -8,6 +8,7 @@
 #ifndef _CONV_MACH_H
 #define _CONV_MACH_H
 
+#define CMK_AMD64                                          1
 #define CMK_CONVERSE_MPI                                   1
 
 #define CMK_DEFAULT_MAIN_USES_COMMON_CODE                  1
