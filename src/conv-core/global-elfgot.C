@@ -59,12 +59,33 @@ A more readable summary is at:
 
 #define DEBUG_GOT_MANAGER 0
 
-typedef Elf32_Addr ELF_TYPE_Addr;
-typedef Elf32_Dyn  ELF_TYPE_Dyn;
-typedef Elf32_Rel  ELF_TYPE_Rel;
-typedef Elf32_Sym  ELF_TYPE_Sym;
+#if CMK_AMD64
+typedef Elf64_Addr    ELFXX_TYPE_Addr;
+typedef Elf64_Dyn     ELFXX_TYPE_Dyn;
+typedef Elf64_Rela    ELFXX_TYPE_Rel;
+typedef Elf64_Sym     ELFXX_TYPE_Sym;
+#define ELFXX_R_TYPE   ELF64_R_TYPE
+#define ELFXX_R_SYM    ELF64_R_SYM
+#define ELFXX_ST_TYPE  ELF64_ST_TYPE
+#define CMK_DT_REL     DT_RELA
+#define CMK_DT_RELSZ   DT_RELASZ
+#define is_elf_global(x)  ((x) == R_X86_64_GLOB_DAT)
+#elif CMK_IA64
+#error "NOT SUPPORTED"
+#else
+typedef Elf32_Addr    ELFXX_TYPE_Addr;
+typedef Elf32_Dyn     ELFXX_TYPE_Dyn;
+typedef Elf32_Rel     ELFXX_TYPE_Rel;
+typedef Elf32_Sym     ELFXX_TYPE_Sym;
+#define ELFXX_R_TYPE   ELF32_R_TYPE
+#define ELFXX_R_SYM    ELF32_R_SYM
+#define ELFXX_ST_TYPE  ELF32_ST_TYPE
+#define CMK_DT_REL     DT_REL
+#define CMK_DT_RELSZ   DT_RELSZ
+#define is_elf_global(x)  ((x) == R_386_GLOB_DAT)
+#endif
 
-extern ELF_TYPE_Dyn _DYNAMIC[];      //The Dynamic section table pointer
+extern ELFXX_TYPE_Dyn _DYNAMIC[];      //The Dynamic section table pointer
 
 /****************** Global Variable Understanding *********************/
 /**
@@ -74,10 +95,10 @@ class CtgGlobalList
 {
   int datalen; ///< Number of bytes in the table of global data.
   struct CtgRec {
-    ELF_TYPE_Addr *got; ///< Points to our entry in the GOT.
+    ELFXX_TYPE_Addr *got; ///< Points to our entry in the GOT.
     int off; ///< Our byte offset into the table of global data.
     CtgRec() {got=NULL;}
-    CtgRec(ELF_TYPE_Addr *got_,int off_) :got(got_), off(off_) {}
+    CtgRec(ELFXX_TYPE_Addr *got_,int off_) :got(got_), off(off_) {}
   };
   CkVec<CtgRec> rec;
   int nRec;
@@ -100,7 +121,7 @@ public:
   inline void install(void *datav) const {
     char *data=(char *)datav;
     for (int i=0;i<nRec;i++)
-      *(rec[i].got)=(ELF_TYPE_Addr)(data+rec[i].off);
+      *(rec[i].got)=(ELFXX_TYPE_Addr)(data+rec[i].off);
   }
   
 private:
@@ -146,22 +167,22 @@ CtgGlobalList::CtgGlobalList() {
     int relt_size = 0;
     int type, symindx;
     char *sym_name;
-    ELF_TYPE_Rel *relt=NULL;       //Relocation table
-    ELF_TYPE_Sym *symt=NULL;       //symbol table
+    ELFXX_TYPE_Rel *relt=NULL;       //Relocation table
+    ELFXX_TYPE_Sym *symt=NULL;       //symbol table
     char *str_tab=NULL;         //String table
 
 /*Find tables and sizes of tables from the dynamic segment table*/
     count = 0;
     while(_DYNAMIC[count].d_tag != 0){
 
-        if(_DYNAMIC[count].d_tag == DT_REL)
-            relt = (ELF_TYPE_Rel *) _DYNAMIC[count].d_un.d_ptr;
+        if(_DYNAMIC[count].d_tag == CMK_DT_REL)
+            relt = (ELFXX_TYPE_Rel *) _DYNAMIC[count].d_un.d_ptr;
 
-        else if(_DYNAMIC[count].d_tag == DT_RELSZ)
-            relt_size = _DYNAMIC[count].d_un.d_val/ sizeof(ELF_TYPE_Rel);
+        else if(_DYNAMIC[count].d_tag == CMK_DT_RELSZ)
+            relt_size = _DYNAMIC[count].d_un.d_val/ sizeof(ELFXX_TYPE_Rel);
 
         else if(_DYNAMIC[count].d_tag == DT_SYMTAB)
-            symt = (ELF_TYPE_Sym *) _DYNAMIC[count].d_un.d_ptr;
+            symt = (ELFXX_TYPE_Sym *) _DYNAMIC[count].d_un.d_ptr;
 
         else if(_DYNAMIC[count].d_tag == DT_STRTAB)
             str_tab = (char *)_DYNAMIC[count].d_un.d_ptr;
@@ -172,10 +193,10 @@ CtgGlobalList::CtgGlobalList() {
 /*Figure out which relocation data entries refer to global data:
 */
     for(count = 0; count < relt_size; count ++){
-        type = ELF32_R_TYPE(relt[count].r_info);
-        symindx = ELF32_R_SYM(relt[count].r_info);
+        type = ELFXX_R_TYPE(relt[count].r_info);
+        symindx = ELFXX_R_SYM(relt[count].r_info);
         
-        if(type == R_386_GLOB_DAT) { /* It's global data */
+        if(is_elf_global(type)) { /* It's global data */
             sym_name = str_tab + symt[symindx].st_name;
 #if DEBUG_GOT_MANAGER
             printf("relt[%d]= %s: %d bytes, %p sym, R_==%d\n", count, sym_name, 
@@ -187,11 +208,11 @@ CtgGlobalList::CtgGlobalList() {
 	      || strcmp(sym_name, "_GLOBAL_OFFSET_TABLE_") == 0
 	    )) 
 	    { /* It's not system data */
-              if(ELF32_ST_TYPE(symt[symindx].st_info) == STT_OBJECT || ELF32_ST_TYPE(symt[symindx].st_info) == STT_NOTYPE) /* ? */
+              if(ELFXX_ST_TYPE(symt[symindx].st_info) == STT_OBJECT || ELFXX_ST_TYPE(symt[symindx].st_info) == STT_NOTYPE) /* ? */
 	        if (isUserSymbol(sym_name))
 		{ /* It's got the right name-- it's a user global */
                     int gSize = ALIGN8(symt[symindx].st_size);
-		    ELF_TYPE_Addr *gGot=(ELF_TYPE_Addr *)relt[count].r_offset;
+		    ELFXX_TYPE_Addr *gGot=(ELFXX_TYPE_Addr *)relt[count].r_offset;
 		    
 #if DEBUG_GOT_MANAGER
             printf("   -> %s is a user global, of size %d, at %p\n",
