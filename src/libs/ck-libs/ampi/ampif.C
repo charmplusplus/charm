@@ -806,8 +806,11 @@ void mpi_get_count(int *sts, int *dtype, int *cnt, int *ierr)
 
 void mpi_print(char *str, int *len)
 {
-  str[*len] = '\0';
-  AMPI_Print(str);
+  char *buf = new char[*len+1];
+  memcpy(buf, str, *len);
+  buf[*len] = '\0';
+  AMPI_Print(buf);
+  delete [] buf;
 }
 
 void mpi_migrate(void)
