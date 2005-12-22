@@ -2378,7 +2378,7 @@ int rsh_fork(int nodeno,const char *startScript)
       int fdScript=open(startScript,O_RDONLY);
   /**/  unlink(startScript); /**/
       dup2(fdScript,0);/*Open script as standard input*/
-      removeEnv("DISPLAY="); /*No DISPLAY disables ssh's slow X11 forwarding*/
+      //removeEnv("DISPLAY="); /*No DISPLAY disables ssh's slow X11 forwarding*/
       for(i=3; i<1024; i++) close(i);
       execvp(rshargv[0], rshargv);
       fprintf(stderr,"Charmrun> Couldn't find rsh program '%s'!\n",rshargv[0]);
@@ -2450,8 +2450,13 @@ void rsh_script(FILE *f, int nodeno, int rank0no, char **argv)
   if (arg_verbose) fprintf(f,"Echo 'remote responding...'\n");
   
   fprintf(f,"test -f \"$HOME/.charmrunrc\" && . \"$HOME/.charmrunrc\"\n");
+#if 0
+/* let's leave DISPLAY untouched and rely on X11 forwarding,
+   changing DISPLAY to charmrun does not always work if X11 forwarding presents 
+*/
   if (arg_display)
     fprintf(f,"DISPLAY='%s';export DISPLAY\n",arg_display);
+#endif
   netstart = create_netstart(rank0no);
   fprintf(f,"NETSTART='%s';export NETSTART\n",netstart);
   fprintf(f,"CmiMyNode='%d'; export CmiMyNode\n",nodeno);
@@ -2461,6 +2466,9 @@ void rsh_script(FILE *f, int nodeno, int rank0no, char **argv)
   /* VMI environment variable */
   fprintf(f,"VMI_PROCS='%d'; export VMI_PROCS\n",arg_requested_pes);
   fprintf(f,"VMI_KEY='charmrun%d'; export VMI_KEY\n",getpid());
+#endif
+#ifdef CMK_G95
+  fprintf(f,"G95_UNBUFFERED_ALL=TRUE; export G95_UNBUFFERED_ALL\n");
 #endif
   
   if (arg_verbose) {
@@ -2774,6 +2782,11 @@ void finish_one_node(int rank0no)
   if (!rsh_pids) return; /*nothing to do*/
   if (arg_verbose) printf("Charmrun> waiting for rsh (%s:%d), pid %d\n",
 		host,rank0no,rsh_pids[rank0no]);
+    /* on gcc4, charmrun hangs here waiting for rsh processors to finish
+       this should not cause any problem since gdb will kill residue processes
+    */
+  if (arg_debug_no_pause || arg_debug) ;
+  else {
   do {
      	waitpid(rsh_pids[rank0no],&status,0);
   } while (!WIFEXITED(status));
@@ -2783,6 +2796,7 @@ void finish_one_node(int rank0no)
      		WEXITSTATUS(status),host,rank0no);
      exit(1);
   }     
+  }
 }
 
 void finish_nodes()
