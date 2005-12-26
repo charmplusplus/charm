@@ -1,17 +1,15 @@
+OPTS=-g
 CDIR=../../../..
-CHARMC=$(CDIR)/bin/charmc $(OPTS)
+CHARMC=$(CDIR)/bin/charmc
 
 DEST= $(CDIR)/lib/libmodulearmci.a
 
 all: $(DEST)
 
-$(DEST): armci_setup.o armci_vp.o armci_api.o armci_util.o
-	$(CHARMC) armci_setup.o armci_vp.o armci_api.o armci_util.o \
+$(DEST): armci_vp.o armci_api.o armci_util.o
+	$(CHARMC) armci_vp.o armci_api.o armci_util.o \
 		-o $@
 	cp armci.h $(CDIR)/include
-
-armci_setup.o: armci_setup.C armci.decl.h armci.def.h armci_impl.h
-	$(CHARMC) $(OPTS) -c armci_setup.C
 
 armci_vp.o: armci_vp.C armci.decl.h armci.def.h armci_impl.h
 	$(CHARMC) $(OPTS) -c armci_vp.C
