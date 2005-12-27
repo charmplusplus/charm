@@ -287,6 +287,7 @@ CDECL int ARMCI_Free(void *address) {
   return 0;
 }
 CDECL void *ARMCI_Malloc_local(int bytes){
+  return NULL;
 }
 
 CDECL int ARMCI_Free_local(void *ptr){
