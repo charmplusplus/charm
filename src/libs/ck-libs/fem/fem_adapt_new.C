@@ -792,6 +792,13 @@ void FEM_Adapt::printAdjacencies(int *nodes, int numNodes, int *elems, int numEl
   return;
 }
 
+bool FEM_Adapt::isFixedNode(int n1) {
+  for(int i=0; i<theMod->fmfixedNodes.size(); i++) {
+    if(theMod->fmfixedNodes[i]==n1) return true;
+  }
+  return false;
+}
+
 bool FEM_Adapt::isCorner(int n1) {
   //if it has at least two adjacent nodes on different boundaries and the edges are boundaries
   int *n1AdjNodes;

@@ -675,10 +675,6 @@ int FEM_AdaptL::edge_contraction_help(int *e1P, int *e2P, int n1, int n2, int e1
   int e1chunk=-1, e2chunk=-1;
   int index = theMod->getIdx();
 
-  /*if(n1==8 && n2==15) {
-    CkPrintf("Crit\n");
-    }*/
-
   //if n1 & n2 are shared differently or are on two different boundaries return
   int n1_shared=0, n2_shared=0;
   bool same = true;
@@ -709,8 +705,8 @@ int FEM_AdaptL::edge_contraction_help(int *e1P, int *e2P, int n1, int n2, int e1
   FEM_Mesh_dataP(theMesh, FEM_NODE, FEM_BOUNDARY, &n1_bound, n1, 1 , FEM_INT, 1);
   FEM_Mesh_dataP(theMesh, FEM_NODE, FEM_BOUNDARY, &n2_bound, n2, 1 , FEM_INT, 1);
   if((n1_bound != 0) && (n2_bound != 0) && (n1_bound != n2_bound)) {
-    bool kcorner = isCorner(n1);
-    bool dcorner = isCorner(n2);
+    bool kcorner = isFixedNode(n1);
+    bool dcorner = isFixedNode(n2);
     bool edgeb = isEdgeBoundary(n1,n2);
     if((kcorner && !dcorner && edgeb) || (dcorner && !kcorner && edgeb)) {
     }
@@ -943,6 +939,14 @@ int FEM_AdaptL::edge_contraction_help(int *e1P, int *e2P, int n1, int n2, int e1
   int keepnode=-1, deletenode=-1, shared=0;
   //n1_shared = theMod->getfmUtil()->isShared(n1);
   //n2_shared = theMod->getfmUtil()->isShared(n2);
+  bool n1fixed = isFixedNode(n1);
+  bool n2fixed = isFixedNode(n2);
+  if(n1fixed && n2fixed) { //both are fixed, so return
+    free(conn);
+    free(adjnodes);
+    free(adjelems);
+    return -1;
+  }
   if(n1_shared && n2_shared) {
     /*same = true;
     const IDXL_Rec *irec1 = theMesh->node.shared.getRec(n1);
@@ -962,8 +966,14 @@ int FEM_AdaptL::edge_contraction_help(int *e1P, int *e2P, int n1, int n2, int e1
       same = false;
       }*/
     if(same) {
-      keepnode = n1;
-      deletenode = n2;
+      if(n1fixed) {
+	keepnode = n2;
+	deletenode = n1;
+      }
+      else {
+	keepnode = n1;
+	deletenode = n2;
+      }
       shared = 2;
     } else {
       free(conn);
@@ -972,30 +982,50 @@ int FEM_AdaptL::edge_contraction_help(int *e1P, int *e2P, int n1, int n2, int e1
       return -1; //they are on different boundaries
     }
   }
-  else if(n1_shared) {
+  else if(n1_shared && !n2fixed) {
     //update n1 & delete n2
     keepnode = n1;
     deletenode = n2;
     shared = 1;
-  } else if(n2_shared) {
+  } else if(n2_shared && !n1fixed) {
     //update n2 & delete n1
     keepnode = n2;
     deletenode = n1;
     shared = 1;
-  } else {
+  } else if(!n1_shared && !n2_shared) {
     //keep either
-    keepnode = n1;
-    deletenode = n2;
+    if(n1fixed) {
+      keepnode = n2;
+      deletenode = n1;
+    }
+    else {
+      keepnode = n1;
+      deletenode = n2;
+    }
   }
-
+  else {
+    free(conn);
+    free(adjnodes);
+    free(adjelems);
+    return -1;
+  }
+  
   FEM_Mesh_dataP(theMesh, FEM_NODE, FEM_BOUNDARY, &n1_bound, keepnode, 1 , FEM_INT, 1);
   FEM_Mesh_dataP(theMesh, FEM_NODE, FEM_BOUNDARY, &n2_bound, deletenode, 1 , FEM_INT, 1);
   //update keepnode's attributes; choose frac wisely, check if either node is on the boundary, update frac
   FEM_Interpolate *inp = theMod->getfmInp();
   FEM_Interpolate::NodalArgs nm;
   if((n1_bound != 0) && (n2_bound != 0) && (n1_bound != n2_bound)) {
-    bool kcorner = isCorner(keepnode);
-    bool dcorner = isCorner(deletenode);
+    bool kcorner;
+    bool dcorner;
+    if(kcorner==n1) {
+      kcorner = n1fixed;
+      dcorner = n2fixed;
+    }
+    else {
+      kcorner = n2fixed;
+      dcorner = n1fixed;
+    }
     bool edgeb = isEdgeBoundary(keepnode,deletenode);
     if(kcorner && !dcorner && edgeb) {
       nm.frac = 1.0;
@@ -1014,10 +1044,10 @@ int FEM_AdaptL::edge_contraction_help(int *e1P, int *e2P, int n1, int n2, int e1
   else if(n1_bound!=0 && n2_bound!=0) {
     nm.frac = 0.5;
     //TODO: must ensure that any of the two nodes is not a corner
-    if(isCorner(keepnode)) {
+    if(isFixedNode(keepnode)) {
       nm.frac = 1.0;
     } 
-    else if(isCorner(deletenode)) {
+    else if(isFixedNode(deletenode)) {
       nm.frac = 0.0;
     }
   }
@@ -1039,6 +1069,7 @@ int FEM_AdaptL::edge_contraction_help(int *e1P, int *e2P, int n1, int n2, int e1
   nm.nodes[0] = keepnode;
   nm.nodes[1] = deletenode;
   nm.n = keepnode;
+  nm.addNode = false;
 
   //hack, if it is shared, do not change the attributes, since I am not updating them now across all chunks
   /*if(n1_shared || n2_shared) {

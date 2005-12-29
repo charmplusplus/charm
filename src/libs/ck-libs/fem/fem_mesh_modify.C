@@ -190,6 +190,7 @@ int FEM_add_node(FEM_Mesh *m, int* adjacentNodes, int numAdjacentNodes, int*chun
     nm.nodes[i] = adjacentNodes[i];
   }
   nm.frac = 0.5;
+  nm.addNode = true;
   inp->FEM_InterpolateNodeOnEdge(nm);
 
   if(numChunks>1) {
@@ -694,7 +695,7 @@ int FEM_remove_element(FEM_Mesh *m, int elementid, int elemtype, int permanent){
 	        lockedRemoteIDXL = true;
 	        bool losingacorner = false;
 		/*if(ssn==-1) {
-		  losingacorner=m->getfmMM()->fmAdapt->isCorner(nodes[j]);
+		  losingacorner=m->getfmMM()->fmAdapt->isFixedNode(nodes[j]);
 		  //this is a special case, when it is a physical corner
 		  if(losingacorner) {
 		    ssn = -1000000000;
@@ -1874,6 +1875,12 @@ void femMeshModify::setFemMesh(FEMMeshMsg *fm) {
     }*/
   for(int i=0; i<numChunks*5; i++) {
     fmIdxlLock.push_back(false);
+  }
+  //compute all the fixed nodes
+  for(int i=0; i<nsize; i++) {
+    if(fmAdaptL->isCorner(i)) {
+      fmfixedNodes.push_back(i);
+    }
   }
 #ifdef DEBUG 
   CmiMemoryCheck(); 

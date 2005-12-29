@@ -26,10 +26,11 @@ class FEM_Interpolate {
   typedef struct {
     int n;
     int nodes[8];
-    int dim;    
+    int dim;
     int nNbrs;
     double coord[3];
     double frac;
+    bool addNode;
   } NodalArgs;
 
   typedef struct {

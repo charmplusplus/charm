@@ -132,6 +132,7 @@ class FEM_Adapt {
 
   virtual void printAdjacencies(int *nodes, int numNodes, int *elems, int numElems);
 
+  virtual bool isFixedNode(int n1);
   virtual bool isCorner(int n1);
   virtual bool isEdgeBoundary(int n1, int n2);
 };

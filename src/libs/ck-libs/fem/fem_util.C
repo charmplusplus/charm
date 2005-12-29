@@ -227,6 +227,7 @@ void FEM_MUtil::splitEntityRemote(FEM_Mesh *m, int chk, int localIdx, int nBetwe
     nm.nodes[i] = localIndices[i];
   }
   nm.frac = 0.5;
+  nm.addNode = true;
   inp->FEM_InterpolateNodeOnEdge(nm);
 
   m->node.shared.addNode(localIdx,chk);
@@ -326,12 +327,12 @@ void FEM_MUtil::removeGhostNodeRemote(FEM_Mesh *m, int fromChk, int sharedIdx) {
 #ifdef DEBUG 
       CmiMemoryCheck(); 
 #endif
-      /*if(!((numAdjNodes==0) && (numAdjElts==0))) {
+      if(!((numAdjNodes==0) && (numAdjElts==0))) {
 	CkPrintf("Error: Node %d cannot be removed, it is connected to :\n",ghostid);
 	FEM_Print_n2e(m,ghostid);
 	FEM_Print_n2n(m,ghostid);
-	}*/
-      CkAssert((numAdjNodes==0) && (numAdjElts==0));
+      }
+      //CkAssert((numAdjNodes==0) && (numAdjElts==0));
       m->node.ghost->set_invalid(localIdx,true);
     }
     //else, it still comes as a ghost from some other chunk. That chunk should call a remove on this and it should be deleted then.
