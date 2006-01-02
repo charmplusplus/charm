@@ -277,6 +277,9 @@ This is slightly hacked as:
 #endif
 #endif /*__STD_C*/
 
+#if __STD_C && !__STDC__
+#define  __STDC__   1
+#endif
 
 /*
   Void_t* is the pointer type that malloc should say it returns
