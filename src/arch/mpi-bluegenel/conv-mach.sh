@@ -58,12 +58,13 @@ CMK_QT="generic"
 # fortran
 #CMK_CF77="$BGL_BIN/powerpc-bgl-blrts-gnu-g77 "
 #CMK_F90LIBS='-L/usr/absoft/lib -L/opt/absoft/lib -lf90math -lfio -lU77 -lf77math '
-XLC_F=$XLC_PRE/xlf/9.1
+XLC_F=/opt/ibmcmp/xlf/9.1
+XLC_POST=bin/blrts_
 CMK_CF77="$XLC_F/${XLC_POST}xlf "
 CMK_CF90="$XLC_F/${XLC_POST}xlf90  -qsuffix=f=f90" 
 CMK_CF90_FIXED="$XLC_PRE/xlf/8.1/${XLC_POST}xlf90 " 
 CMK_F90LIBS="-L$XLC_F/blrts_lib -lxlf90 -lxlopt -lxl -lxlfmath"
-CMK_MOD_NAME_ALLCAPS=1
+CMK_MOD_NAME_ALLCAPS=
 CMK_MOD_EXT="mod"
 CMK_F90_USE_MODDIR=1
-CMK_F90_MODINC="-moddir="
+CMK_F90_MODINC="-I"
