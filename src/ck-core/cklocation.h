@@ -466,6 +466,7 @@ enum CkElementCreation_t {
 /// Abstract superclass of all array manager objects 
 class CkArrMgr {
 public:
+	virtual ~CkArrMgr() {}
 	/// Insert this initial element on this processor
 	virtual void insertInitial(const CkArrayIndex &idx,void *ctorMsg, int local=1)=0;
 	

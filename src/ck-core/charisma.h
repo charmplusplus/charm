@@ -295,6 +295,7 @@ class CkArrayIndexCharisma: public CkArrayIndex
 class CharismaInPort
 {
   public:
+    virtual ~CharismaInPort() {}
     virtual void send(void *msg, int len) = 0;
     void _create(const char *name)
     {
@@ -307,6 +308,7 @@ class CharismaOutPort
   protected:
     CharismaInPort *inport;
   public:
+    virtual ~CharismaOutPort() {}
     virtual void emitData(void *data, int len)
     {
       inport->send(data, len);

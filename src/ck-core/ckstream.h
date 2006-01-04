@@ -83,6 +83,7 @@ CkpvExtern(_CkErrStream*, _ckerr);
 
 class CkOStream {
  public:
+  virtual ~CkOStream() {}
   virtual CkOStream& operator << (_CkOStream& (*f)(_CkOStream &)) = 0;
 #define SHIFTLEFT(type) \
   virtual CkOStream& operator << (type x) = 0
