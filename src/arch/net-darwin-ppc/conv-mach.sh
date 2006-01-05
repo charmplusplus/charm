@@ -21,7 +21,7 @@ CMK_MOD_EXT="mod"
 # need -lstdc++ for c++ reference, and it needs to be put at very last 
 # of command line.
 # Mac environment varaible
-export MACOSX_DEPLOYMENT_TARGET=10.3
+test -z "$MACOSX_DEPLOYMENT_TARGET" && export MACOSX_DEPLOYMENT_TARGET=10.3
 CMK_SHARED_SUF="dylib"
 #CMK_LD_SHARED=" -dynamic -dynamiclib -undefined dynamic_lookup -flat_namespace "
 CMK_LD_SHARED=" -dynamic -dynamiclib -undefined dynamic_lookup "
