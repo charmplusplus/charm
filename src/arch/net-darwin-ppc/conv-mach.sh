@@ -1,3 +1,5 @@
+CMK_MACOSX=1
+
 CMK_CPP_CHARM="/lib/cpp -P"
 CMK_CPP_C="cc -E"
 CMK_CC="cc -Wno-long-double -fPIC -dynamic -fno-common "
