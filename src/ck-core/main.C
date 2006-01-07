@@ -7,6 +7,8 @@
 
 #include "ck.h"
 
+#undef CMK_G95
+
 #ifdef CMK_G95
 extern "C" void g95_runtime_start(int argc, char *argv[]);
 extern "C" void g95_runtime_stop();
