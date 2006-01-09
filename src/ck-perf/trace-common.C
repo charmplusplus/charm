@@ -417,10 +417,13 @@ void registerFunction(char *name){
 */
 
 extern "C"
-int traceRegisterFunction(const char* name) {
+int traceRegisterFunction(const char* name, int idx) {
 #ifndef CMK_OPTIMIZE
-  int idx;
-  CkpvAccess(_traces)->regFunc(name, idx);
+  if(idx==-999){
+    CkpvAccess(_traces)->regFunc(name, idx);
+  } else {
+    CkpvAccess(_traces)->regFunc(name, idx, 1);
+  }
   return idx;
 #else
   return 0;
