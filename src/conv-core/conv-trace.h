@@ -31,7 +31,11 @@ int  traceRegisterUserEvent(const char*, int e
 #endif
 );
 
-int traceRegisterFunction(const char*);
+int traceRegisterFunction(const char*, int idx
+#ifdef __cplusplus
+=-999
+#endif
+);
 void traceBeginFuncIndexProj(int, char* file, int);
 void traceEndFuncIndexProj(int);
 
