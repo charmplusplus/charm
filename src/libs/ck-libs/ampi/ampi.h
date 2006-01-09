@@ -708,14 +708,30 @@ int AMPI_Info_free(MPI_Info *info);
 void AMPI_Install_Idle_Timer();
 void AMPI_Uninstall_Idle_Timer();
 
-extern int traceRegisterFunction(const char *name);
+extern int traceRegisterFunction(const char *name, int idx);
 extern void traceBeginFuncProj(char *,char *,int);
 extern void traceEndFuncProj(char *);
+extern void traceBeginFuncIndexProj(int, char *, int);
+extern void traceEndFuncIndexProj(int);
 
+/*
 #define TRACEFUNC(code,name) traceBeginFuncProj(name,__FILE__,__LINE__); \
 code;\
 traceEndFuncProj(name);
-#define REGISTER_FUNCTION(x) traceRegisterFunction(x);
+#define REGISTER_FUNCTION(x) traceRegisterFunction(x, -999);
+#define REG_FUNC_WITHID(x, id) traceRegisterFunction(x, id);
+*/
+
+#define _TRACE_REGISTER_FUNCTION_ID(x, id) traceRegisterFunction(x, id);
+#define _TRACE_BEGIN_FUNCTION_ID(id) traceBeginFuncIndexProj(id, __FILE__, __LINE__);
+#define _TRACE_END_FUNCTION_ID(id) traceEndFuncIndexProj(id);
+
+#define _TRACE_REGISTER_FUNCTION_NAME(x) traceRegisterFunction(x, -999);
+#define _TRACE_BEGIN_FUNCTION_NAME(name) traceBeginFuncProj(name, __FILE__, __LINE__);
+#define _TRACE_END_FUNCTION_NAME(name) traceEndFuncProj(name);
+
+
+
 
 #include "ampiProjections.h"
 #ifdef __cplusplus
