@@ -78,7 +78,7 @@ FEM_Mesh_set_conn(int fem_mesh,int entity,
 	checkIsSet(fem_mesh,true,"FEM_Mesh_set_conn");
 	FEM_Mesh_conn(fem_mesh,entity,(int *)conn,firstItem,length,width);
 }
-CDECL void
+FDECL void
 FTN_NAME(FEM_MESH_SET_CONN,fem_mesh_set_conn)(int *fem_mesh,int *entity,
   	const int *conn, int *firstItem,int *length, int *width)
 {
