@@ -119,7 +119,7 @@ class Trace {
     virtual void traceFlushLog() {}
 
     //for tracing function calls
-    virtual void regFunc(const char *name, int &idx){}
+    virtual void regFunc(const char *name, int &idx, int idxSpecifiedByUser=0){}
     virtual void beginFunc(char *name,char *file,int line){}
     virtual void beginFunc(int idx,char *file,int line){}
     virtual void endFunc(char *name){}    
@@ -207,7 +207,7 @@ public:
     void traceEnd();
 
     /*Calls for tracing function begins and ends*/
-    inline void regFunc(const char *name, int &idx){ ALLDO(regFunc(name, idx)); }
+    inline void regFunc(const char *name, int &idx, int idxSpecifiedByUser=0){ ALLDO(regFunc(name, idx, idxSpecifiedByUser)); }
     inline void beginFunc(char *name,char *file,int line){ ALLDO(beginFunc(name,file,line)); };
     inline void beginFunc(int idx,char *file,int line){ ALLDO(beginFunc(idx,file,line)); };
     inline void endFunc(char *name){ ALLDO(endFunc(name)); }
