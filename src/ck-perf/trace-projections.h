@@ -234,6 +234,11 @@ class TraceProjections : public Trace {
 
     int funcCount;
     CkHashtableT<StrKey,int> funcHashtable;
+    
+    //as user now can specify the idx, it's possible that user may specify an existing idx
+    //so that we need a data structure to track idx. --added by Chao Mei
+    CkVec<int> idxVec;
+    int idxRegistered(int idx);    
 #if CMK_HAS_COUNTER_PAPI
     int papiEventSet;
     LONG_LONG_PAPI *papiValues;
@@ -272,7 +277,7 @@ class TraceProjections : public Trace {
     //functions that perform function tracing
     CkHashtableIterator *getfuncIterator(){return funcHashtable.iterator();};
     int getFuncNumber(){return funcHashtable.numObjects();};
-    void regFunc(const char *name, int &idx);
+    void regFunc(const char *name, int &idx, int idxSpecifiedByUser=0);
     void beginFunc(char *name,char *file,int line);
 		void beginFunc(int idx,char *file,int line);
     void endFunc(char *name);
