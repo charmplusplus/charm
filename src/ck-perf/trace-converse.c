@@ -41,7 +41,7 @@ void traceWriteSts(void) {}
 void traceFlushLog(void) {}
 int  traceAvailable() {return 0;}
 
-int traceRegisterFunction(const char *name) {}
+int traceRegisterFunction(const char *name, int idx) {}
 void traceBeginFuncIndexProj(int idx, char* name, int lineNo) {}
 void traceEndFuncIndexProj(int idx) {}
 void traceBeginFuncProj(char *name,char *file,int line){}
