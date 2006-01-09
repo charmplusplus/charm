@@ -1049,19 +1049,55 @@ void TraceProjections::endComputation(void)
   _logPool->add(END_COMPUTATION, 0, 0, TraceTimer(), -1, -1);
 }
 
-void TraceProjections::regFunc(const char *name, int &idx){
-	StrKey k((char*)name,strlen(name));
-	int num = funcHashtable.get(k);
-	if(num == 0){
-		char *st = new char[strlen(name)+1];
-		memcpy(st,name,strlen(name)+1);
-		StrKey *newKey = new StrKey(st,strlen(st));
-		int &ref = funcHashtable.put(*newKey);
-		ref=funcCount;
-		num = funcCount;
-		funcCount++;
-	}
-	idx = num;	
+int TraceProjections::idxRegistered(int idx)
+{
+    int idxVecLen = idxVec.size();
+    for(int i=0; i<idxVecLen; i++)
+    {
+	if(idx == idxVec[i])
+	    return 1;
+    }
+    return 0;
+}
+
+void TraceProjections::regFunc(const char *name, int &idx, int idxSpecifiedByUser){
+    StrKey k((char*)name,strlen(name));
+    int num = funcHashtable.get(k);
+    
+    if(num!=0) {
+	return;
+	//as for mpi programs, the same function may be registered for several times
+	//CmiError("\"%s has been already registered! Please change the name!\"\n", name);
+    }
+    
+    int isIdxExisting=0;
+    if(idxSpecifiedByUser)
+	isIdxExisting=idxRegistered(idx);
+    if(isIdxExisting){
+	return;
+	//same reason with num!=0
+	//CmiError("The identifier %d for the trace function has been already registered!", idx);
+    }
+
+    if(idxSpecifiedByUser) {
+    	char *st = new char[strlen(name)+1];
+    	memcpy(st,name,strlen(name)+1);
+    	StrKey *newKey = new StrKey(st,strlen(st));
+    	int &ref = funcHashtable.put(*newKey);
+    	ref=idx;
+        funcCount++;
+	idxVec.push_back(idx);	
+    } else {
+    	char *st = new char[strlen(name)+1];
+    	memcpy(st,name,strlen(name)+1);
+    	StrKey *newKey = new StrKey(st,strlen(st));
+    	int &ref = funcHashtable.put(*newKey);
+    	ref=funcCount;
+    	num = funcCount;
+    	funcCount++;
+    	idx = num;
+	idxVec.push_back(idx);
+    }
 }
 
 void TraceProjections::beginFunc(char *name,char *file,int line){
