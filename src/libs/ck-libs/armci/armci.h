@@ -23,6 +23,13 @@
 extern "C" {
 #endif
 
+/* Like for AMPI, silently rename the user's main routine.
+ * This is needed so we can call the routine as a new thread,
+ * instead of as an actual "main".
+ */
+#define main ARMCI_Main_cpp
+int ARMCI_Main_cpp(int argc,char **argv); /* prototype for C++ main routine */
+
 /* Datatypes */
 #define ARMCI_ACC_INT	1
 #define ARMCI_ACC_LNG	2
@@ -38,9 +45,6 @@ extern "C" {
 #define ARMCI_FETCH_AND_ADD_LONG	2
 #define ARMCI_SWAP			3
 #define ARMCI_SWAP_LONG			4
-
-/* user's thread start routine */
-int armciStart(int argc, char **argv);
   
 /* redefine global variables used by armci */
 #define armci_me TCHARM_Element()
@@ -55,10 +59,7 @@ typedef struct {
   int bytes;
 } armci_giov_t;
 
-typedef struct {
-  int data[4];
-  double dummy;
-} armci_hdl_t;
+typedef int armci_hdl_t;
 
 /* virtual processor Aggregate Remote Memory Copy Interface (ARMCI) */
 
@@ -70,6 +71,9 @@ int ARMCI_Init(void);
 int ARMCI_Finalize(void);
 void ARMCI_Error(char *msg, int code);
 void ARMCI_Cleanup(void);
+
+int ARMCI_Procs(int *procs);
+int ARMCI_Myid(int *myid);
 
 /* ****************************** */
 /* vector IO-type copy operations */
@@ -289,7 +293,6 @@ int armci_notify_wait(int proc, int *pval);
 };
 #endif
 
-#define ARMCI_INIT_HANDLE(hdl) do {((double *)((hdl)->data))[0]=0; \
-  ((double *)((hdl)->data))[1]=0; }while(0)
+#define ARMCI_INIT_HANDLE(hdl) 
 
 #endif

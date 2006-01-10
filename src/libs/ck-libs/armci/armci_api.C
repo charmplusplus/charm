@@ -14,14 +14,11 @@ int armci_nproc;
 // This is called by the user's thread when it starts up.
 CDECL int ARMCI_Init(void) {
   if (TCHARM_Element()==0) {
-    CkArrayID _tc_aid;
-    CkArrayOptions opt = TCHARM_Attach_start(&_tc_aid, NULL);
-    CkArrayID aid = CProxy_ArmciVirtualProcessor::ckNew(_tc_aid, opt);
+    CkArrayID threadsAID;
+    int nChunks;
+    CkArrayOptions opts = TCHARM_Attach_start(&threadsAID, &nChunks);
+    CkArrayID aid = CProxy_ArmciVirtualProcessor::ckNew(threadsAID, opts);
     CProxy_ArmciVirtualProcessor vpProxy = CProxy_ArmciVirtualProcessor(aid);
-    // FIXME: should do reductions to element 0 of the array, not some bizarre malloc'd thing.
-    CkArrayID *clientAid = new CkArrayID;
-    *clientAid = aid;
-    vpProxy.setReductionClient(mallocClient, (void *)clientAid);
   }
   
   ArmciVirtualProcessor *vp=(ArmciVirtualProcessor *)
@@ -30,6 +27,7 @@ CDECL int ARMCI_Init(void) {
 }
 
 CDECL int ARMCI_Finalize(void) {
+  TCHARM_Done();
   return 0;
 }
 
@@ -38,6 +36,16 @@ CDECL void ARMCI_Cleanup(void) {
 
 CDECL void ARMCI_Error(char *message, int code) {
   ckerr << "armci error: " << message << " | code = " << code << endl;
+}
+
+
+CDECL int ARMCI_Procs(int *procs){
+  *procs = TCHARM_Num_elements();
+  return 0;
+}
+CDECL int ARMCI_Myid(int *myid){
+  *myid = TCHARM_Element();
+  return 0;
 }
 
 CDECL int ARMCI_GetV(
@@ -99,10 +107,14 @@ CDECL int ARMCI_NbAccV(
 CDECL int ARMCI_Put(void *src, void *dst, int bytes, int proc) {
   TCHARM_API_TRACE("ARMCI_Put", "armci");
   ArmciVirtualProcessor *vp = CtvAccess(_armci_ptr);
-  return vp->put(src, dst, bytes, proc);
+  vp->put(src, dst, bytes, proc);
+  return 0;
 }
 
 CDECL int ARMCI_NbPut(void *src, void* dst, int bytes, int proc, armci_hdl_t *handle){
+  TCHARM_API_TRACE("ARMCI_NbPut", "armci");
+  ArmciVirtualProcessor *vp = CtvAccess(_armci_ptr);
+  *handle = vp->nbput(src, dst, bytes, proc);
   return 0;
 }
 
@@ -110,10 +122,14 @@ CDECL int ARMCI_NbPut(void *src, void* dst, int bytes, int proc, armci_hdl_t *ha
 CDECL int ARMCI_Get(void *src, void *dst, int bytes, int proc) {
   TCHARM_API_TRACE("ARMCI_Get", "armci");
   ArmciVirtualProcessor *vp = CtvAccess(_armci_ptr);
-  return vp->get(src, dst, bytes, proc);
+  vp->get(src, dst, bytes, proc);
+  return 0;
 }
 
 CDECL int ARMCI_NbGet(void *src, void* dst, int bytes, int proc, armci_hdl_t *handle){
+  TCHARM_API_TRACE("ARMCI_NbGet", "armci");
+  ArmciVirtualProcessor *vp = CtvAccess(_armci_ptr);
+  *handle = vp->nbget(src, dst, bytes, proc);
   return 0;
 }
 
@@ -130,16 +146,17 @@ CDECL int ARMCI_NbAcc(int datatype, void *scale, void* src, void* dst, int bytes
 CDECL int ARMCI_PutS(void *src_ptr, int src_stride_ar[], 
 	        void *dst_ptr, int dst_stride_ar[],
 	        int count[], int stride_levels, int proc) {
-  char *buffer;
-  
+  TCHARM_API_TRACE("ARMCI_PutS", "armci");
+  ArmciVirtualProcessor *vp = CtvAccess(_armci_ptr);
+  vp->puts(src_ptr, src_stride_ar, dst_ptr, dst_stride_ar, count, stride_levels, proc);
   return 0;
 }
 
 CDECL int ARMCI_NbPutS(
 		 void *src_ptr,         /* ptr to 1st segment at source */
-		 int src_stride_arr[], /* array of strides at source  */
+		 int src_stride_ar[], /* array of strides at source  */
 		 void* dst_ptr,         /* ptr to 1st segment at dest */
-		 int dst_stride_arr[], /* array of strides at destination */
+		 int dst_stride_ar[], /* array of strides at destination */
 		 int count[],           /* number of units at each stride  */
 		                          /* level count[0]=bytes  */
 		 int stride_levels,    /* number of stride levels */
@@ -151,27 +168,33 @@ CDECL int ARMCI_NbPutS(
                                             /* implicit handle non-blocking */
                                             /* transfer */
 		 ){
+  TCHARM_API_TRACE("ARMCI_NbPutS", "armci");
+  ArmciVirtualProcessor *vp = CtvAccess(_armci_ptr);
+  *handle = vp->nbputs(src_ptr, src_stride_ar, dst_ptr, dst_stride_ar, count, stride_levels, proc);
   return 0;
 }
 
 CDECL int ARMCI_GetS(
 	        void *src_ptr,         /* pointer to 1st segment at source */
-	        int src_stride_arr[], /* array of strides at source */
+	        int src_stride_ar[], /* array of strides at source */
 	        void* dst_ptr,         /* ptr to 1st segment at destination */
-	        int dst_stride_arr[], /* array of strides at destination */
+	        int dst_stride_ar[], /* array of strides at destination */
 	        int count[],           /* number of units at each stride  */
 	                                 /* level count[0]=bytes */
 	        int stride_levels,    /* number of stride levels */
 	        int proc                /* remote process(or) ID */
 	        ){
+  TCHARM_API_TRACE("ARMCI_GetS", "armci");
+  ArmciVirtualProcessor *vp = CtvAccess(_armci_ptr);
+  vp->gets(src_ptr, src_stride_ar, dst_ptr, dst_stride_ar, count, stride_levels, proc);
   return 0;
 }
 
 CDECL int ARMCI_NbGetS(
 	        void *src_ptr,         /* pointer to 1st segment at source */
-	        int src_stride_arr[], /* array of strides at source */
+	        int src_stride_ar[], /* array of strides at source */
 	        void* dst_ptr,         /* ptr to 1st segment at destination */
-	        int dst_stride_arr[], /* array of strides at destination */
+	        int dst_stride_ar[], /* array of strides at destination */
 	        int count[],           /* number of units at each stride  */
 	                                 /* level count[0]=bytes */
 	        int stride_levels,    /* number of stride levels */
@@ -183,6 +206,9 @@ CDECL int ARMCI_NbGetS(
                                             /* implicit handle non-blocking */
                                             /* transfer */
 	        ){
+  TCHARM_API_TRACE("ARMCI_NbGetS", "armci");
+  ArmciVirtualProcessor *vp = CtvAccess(_armci_ptr);
+  *handle = vp->nbgets(src_ptr, src_stride_ar, dst_ptr, dst_stride_ar, count, stride_levels, proc);
   return 0;
 }
 
@@ -237,31 +263,54 @@ CDECL double ARMCI_GetValueDouble(void *src, int proc) { return 0.0; }
 
 // global completion operations
 CDECL int ARMCI_Wait(armci_hdl_t *handle){
+  TCHARM_API_TRACE("ARMCI_Wait", "armci");
+  ArmciVirtualProcessor *vp = CtvAccess(_armci_ptr);
+  vp->wait(*handle);
   return 0;
 }
 
 CDECL int ARMCI_WaitProc(int proc){
+  TCHARM_API_TRACE("ARMCI_WaitProc", "armci");
+  ArmciVirtualProcessor *vp = CtvAccess(_armci_ptr);
+  vp->waitproc(proc);
   return 0;
 }
 
 CDECL int ARMCI_WaitAll(){
+  TCHARM_API_TRACE("ARMCI_WaitAll", "armci");
+  ArmciVirtualProcessor *vp = CtvAccess(_armci_ptr);
+  vp->waitall();
   return 0;
 }
 
 CDECL int ARMCI_Test(armci_hdl_t *handle){
-  return 0;
+  TCHARM_API_TRACE("ARMCI_Test", "armci");
+  ArmciVirtualProcessor *vp = CtvAccess(_armci_ptr);
+  if(vp->test(*handle))
+    return 0;
+  else
+    return 1;
 }
 
 CDECL int ARMCI_Barrier(){
+  TCHARM_API_TRACE("ARMCI_Barrier", "armci");
+  ArmciVirtualProcessor *vp = CtvAccess(_armci_ptr);
+  vp->barrier();
   return 0;
 }
 
 // these are no-ops because Put is blocking
 CDECL int ARMCI_Fence(int proc) {
+  TCHARM_API_TRACE("ARMCI_Fence", "armci");
+  ArmciVirtualProcessor *vp = CtvAccess(_armci_ptr);
+  vp->fence(proc);
   return 0;
 }
 
 CDECL int ARMCI_AllFence(void) {
+  TCHARM_API_TRACE("ARMCI_AllFence", "armci");
+  ArmciVirtualProcessor *vp = CtvAccess(_armci_ptr);
+  vp->allfence();
   return 0;
 }
 
@@ -270,27 +319,32 @@ CDECL int ARMCI_AllFence(void) {
 // malloc is a collective operation. The user is expected to allocate
 // and manage ptr_arr.
 CDECL int ARMCI_Malloc(void *ptr_arr[], int bytes) {
-  TCHARM_API_TRACE("ARMCI_Malloc", "armci");
-  // shift work off to entry method for split-phase communication.
   ArmciVirtualProcessor *vp = CtvAccess(_armci_ptr);
-  // requestAddresses is called to bridge the split-phase gap at the
-  // virtual processor object.
-  return vp->requestAddresses(ptr_arr, bytes);
+//  pointer ptr = malloc(bytes);
+  pointer ptr = vp->BlockMalloc(bytes);
+  // TCHARM_API_TRACE disables isomalloc, so malloc first.
+  TCHARM_API_TRACE("ARMCI_Malloc", "armci");
+  vp->requestAddresses(ptr, ptr_arr, bytes);
+  return 0;  
 }
 
 // CmiIsomalloc does not return a value and no indication is given about
 // the success nor failure of the operation. Hence, it is assumed always
 // that free works.
 CDECL int ARMCI_Free(void *address) {
-  TCHARM_API_TRACE("ARMCI_Free", "armci");
   CmiIsomallocBlockListFree(address);
+//  free(address);
+  TCHARM_API_TRACE("ARMCI_Free", "armci");
   return 0;
 }
 CDECL void *ARMCI_Malloc_local(int bytes){
-  return NULL;
+  TCHARM_API_TRACE("ARMCI_Malloc_local", "armci");
+  return malloc(bytes);
 }
 
 CDECL int ARMCI_Free_local(void *ptr){
+  TCHARM_API_TRACE("ARMCI_Free_local", "armci");
+  free(ptr);
   return 0;
 }
 
