@@ -24,5 +24,6 @@ module armci {
 
 		entry void mallocClient(CkReductionMsg *msg);
 		entry void resumeThread();
+		entry void sendNote(int proc);
 	};
 };

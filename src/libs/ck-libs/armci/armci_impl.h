@@ -38,6 +38,15 @@ public:
    }
 };
 
+class Armci_Note{
+public:
+  int proc;
+  int acked;
+  Armci_Note() : proc(-1), acked(0) { }
+  Armci_Note(int p, int a) : proc(p), acked(a) { }
+  void pup(PUP::er &p){ p|proc; p|acked; }
+};
+
 // structure definitions and forward declarations (for reductions)
 typedef struct peAddr {
   int pe;
@@ -56,6 +65,7 @@ class ArmciVirtualProcessor : public TCharmClient1D {
   CProxy_ArmciVirtualProcessor thisProxy;
   AddressMessage *addressReply;
   CkPupPtrVec<Armci_Hdl> hdlList;
+  CkPupPtrVec<Armci_Note> noteList;
  protected:
   virtual void setupThreadPrivate(CthThread forThread);
  public:
@@ -65,7 +75,6 @@ class ArmciVirtualProcessor : public TCharmClient1D {
   
   pointer BlockMalloc(int bytes) { return (void *)CmiIsomallocBlockListMalloc(memBlock, bytes); }
   void getAddresses(AddressMessage *msg);
-  CkPupPtrVec<Armci_Hdl> getHandleList(void) { return hdlList; }
 
   void put(pointer src, pointer dst, int bytes, int dst_proc);
   void putData(pointer dst, int nbytes, char *data, int src_proc, int hdl);
@@ -107,6 +116,10 @@ class ArmciVirtualProcessor : public TCharmClient1D {
   void putDataFromGets(pointer dst_ptr, int dst_stride_ar[], 
   		int count[], int stride_levels,
 		int nbytes, char *data, int hdl);
+
+  void notify(int proc);
+  void sendNote(int proc);
+  void notify_wait(int proc);
 
   // non-entry methods. Mainly interfaces to API interface methods.
   void requestAddresses(pointer  ptr, pointer ptr_arr[], int bytes);

@@ -84,7 +84,7 @@ int ArmciVirtualProcessor::nbput(pointer src, pointer dst,
 
   Armci_Hdl* entry = new Armci_Hdl(ARMCI_PUT, dst_proc, nbytes, src, dst);
   hdlList.push_back(entry);
-  hdl = hdlList.size();
+  hdl = hdlList.size() - 1;
   
   buffer = new char[nbytes];
   buffer = (char *)memcpy(buffer, src, nbytes);
@@ -118,7 +118,7 @@ int ArmciVirtualProcessor::nbget(pointer src, pointer dst,
   int hdl;  
   Armci_Hdl* entry = new Armci_Hdl(ARMCI_GET, src_proc, nbytes, src, dst);
   hdlList.push_back(entry);
-  hdl = hdlList.size();
+  hdl = hdlList.size() - 1;
   
   thisProxy[src_proc].requestFromGet(src, dst, nbytes, thisIndex, hdl);
 
@@ -135,9 +135,8 @@ void ArmciVirtualProcessor::wait(int hdl){
 }
 
 void ArmciVirtualProcessor::waitmulti(vector<int> procs){
-  for(vector<int>::iterator ti = procs.begin(), te = procs.end(); ti != te; ti++){
-    wait(*ti);
-    procs.erase(ti);
+  for(int i=0;i<procs.size();i++){
+    wait(procs[i]);
   }
 }
 
@@ -217,7 +216,6 @@ void ArmciVirtualProcessor::puts(pointer src_ptr, int src_stride_ar[],
     nbytes *= count[i];
   buffer = new char[nbytes];
   buffer = (char *)stridedCopy(src_ptr, buffer, src_stride_ar, count, stride_levels, 1);
-//CkPrintf("in puts verifying accessibility dst=%p (%6.6f), data=%u (%6.6f)\n",dst_ptr,*((double *)dst_ptr),buffer,*((double *)buffer));
   thisProxy[dst_proc].putsData(dst_ptr, dst_stride_ar, count, stride_levels, nbytes, buffer, thisIndex, -1);
   // blocking call. Wait for acknowledgement from dst_proc
   thread->suspend();
@@ -233,7 +231,7 @@ int ArmciVirtualProcessor::nbputs(pointer src_ptr, int src_stride_ar[],
   
   Armci_Hdl* entry = new Armci_Hdl(ARMCI_PUT, dst_proc, nbytes, src_ptr, dst_ptr);
   hdlList.push_back(entry);
-  hdl = hdlList.size();
+  hdl = hdlList.size() - 1;
   
   buffer = new char[nbytes];
   buffer = (char *)stridedCopy(src_ptr, buffer, src_stride_ar, count, stride_levels, 1);
@@ -244,7 +242,6 @@ int ArmciVirtualProcessor::nbputs(pointer src_ptr, int src_stride_ar[],
 void ArmciVirtualProcessor::putsData(pointer dst_ptr, int dst_stride_ar[], 
   		int count[], int stride_levels,
 		int nbytes, char *data, int src_proc, int hdl){
-//CkPrintf("verifying accessibility dst=%p (%6.6f), data=%u (%6.6f)\n",dst_ptr,*((double *)dst_ptr),data,*((double *)data));
   stridedCopy(dst_ptr, data, dst_stride_ar, count, stride_levels, 0);
   thisProxy[src_proc].putAck(hdl);
 }
@@ -266,7 +263,7 @@ int ArmciVirtualProcessor::nbgets(pointer src_ptr, int src_stride_ar[],
     nbytes *= count[i];
   Armci_Hdl* entry = new Armci_Hdl(ARMCI_GET, src_proc, nbytes, src_ptr, dst_ptr);
   hdlList.push_back(entry);
-  hdl = hdlList.size();
+  hdl = hdlList.size() - 1;
 
   thisProxy[src_proc].requestFromGets(src_ptr, src_stride_ar, dst_ptr, dst_stride_ar, 
   					count, stride_levels, thisIndex, hdl);
@@ -275,7 +272,6 @@ int ArmciVirtualProcessor::nbgets(pointer src_ptr, int src_stride_ar[],
 }
 void ArmciVirtualProcessor::requestFromGets(pointer src_ptr, int src_stride_ar[], 
 	   pointer dst_ptr, int dst_stride_ar[], int count[], int stride_levels, int dst_proc, int hdl){
-//CkPrintf("verifying accessibility src=%p (%6.6f)\n",src_ptr,*((double *)src_ptr));
   char *buffer;
   int nbytes = 1;
   for(int i=0;i<stride_levels+1;i++) 
@@ -293,12 +289,58 @@ void ArmciVirtualProcessor::putDataFromGets(pointer dst_ptr, int dst_stride_ar[]
   thread->resume();
 }
 
+void ArmciVirtualProcessor::notify(int proc){
+  thisProxy[proc].sendNote(thisIndex);
+}
+void ArmciVirtualProcessor::sendNote(int proc){
+  // check if unacked note exists
+  // if so, resume thread and remove the note
+  // if not, create an acked note
+  int hasNote = -1;
+  for(int i=0;i<noteList.size();i++){
+    if(noteList[i]->proc == proc){
+      CkAssert(noteList[i]->acked == 0);
+      hasNote = i;
+      break;
+    }
+  }
+  if(hasNote!=-1){
+    delete noteList[hasNote];
+    noteList.remove(hasNote);
+    thread->resume();
+  } else {
+    Armci_Note* newNote = new Armci_Note(proc, 1);
+    noteList.push_back(newNote);
+  }
+}
+void ArmciVirtualProcessor::notify_wait(int proc){
+  // check if notify already arrived
+  // if so, remove it and continue
+  // if not, create unacked note and suspend
+  int hasNote = -1;
+  for(int i=0;i<noteList.size();i++){
+    if(noteList[i]->proc == proc){
+      CkAssert(noteList[i]->acked == 1);
+      hasNote = i;
+      break;
+    }
+  }
+  if(hasNote!=-1){
+    delete noteList[hasNote];
+    noteList.remove(hasNote);
+  } else {
+    Armci_Note* newNote = new Armci_Note(proc, 0);
+    noteList.push_back(newNote);
+    thread->suspend();
+  }
+}
 
 void ArmciVirtualProcessor::pup(PUP::er &p) {
   TCharmClient1D::pup(p);
   CmiIsomallocBlockListPup(&p, &memBlock);
   p|thisProxy;
   p|hdlList;
+  p|noteList;
   CkPupMessage(p, (void **)&addressReply, 1);
 }
 
@@ -328,16 +370,13 @@ ckout << "[" << thisIndex << "]malloced " << bytes << " bytes starting " << ptr 
 
 void* ArmciVirtualProcessor::stridedCopy(void *base, void *buffer_ptr,
 		  int *stride, int *count, int stride_levels, bool flatten) {
-//CkPrintf("[%d]base=%u, buffer=%u, level=%d\n",thisIndex,base,buffer_ptr,stride_levels);
   if (stride_levels == 0) {
     if (flatten) {
       memcpy(buffer_ptr, base, count[stride_levels]);
     } else {
       memcpy(base, buffer_ptr, count[stride_levels]);
     }
-//CkPrintf("[%d]memcpy base=%u, buffer=%u, bytes=%d\n",thisIndex,base,buffer_ptr,count[stride_levels]);
   } else {
-//CkPrintf("[%d]count[%d]=%d\n",thisIndex,stride_levels,count[stride_levels]);
     int mystride = 1;
     for(int i=0;i<stride_levels;i++)
       mystride *= count[i];

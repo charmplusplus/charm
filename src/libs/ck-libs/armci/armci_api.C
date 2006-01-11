@@ -13,6 +13,7 @@ int armci_nproc;
 // Bind the virtual processors in the armci library to TCharm's.
 // This is called by the user's thread when it starts up.
 CDECL int ARMCI_Init(void) {
+  TCHARM_API_TRACE("ARMCI_Init", "armci");
   if (TCHARM_Element()==0) {
     CkArrayID threadsAID;
     int nChunks;
@@ -27,23 +28,28 @@ CDECL int ARMCI_Init(void) {
 }
 
 CDECL int ARMCI_Finalize(void) {
+  TCHARM_API_TRACE("ARMCI_Finalize", "armci");
   TCHARM_Done();
   return 0;
 }
 
 CDECL void ARMCI_Cleanup(void) {
+  TCHARM_API_TRACE("ARMCI_Cleanup", "armci");
 }
 
 CDECL void ARMCI_Error(char *message, int code) {
+  TCHARM_API_TRACE("ARMCI_Error", "armci");
   ckerr << "armci error: " << message << " | code = " << code << endl;
 }
 
 
 CDECL int ARMCI_Procs(int *procs){
+  TCHARM_API_TRACE("ARMCI_Procs", "armci");
   *procs = TCHARM_Num_elements();
   return 0;
 }
 CDECL int ARMCI_Myid(int *myid){
+  TCHARM_API_TRACE("ARMCI_Myid", "armci");
   *myid = TCHARM_Element();
   return 0;
 }
@@ -367,10 +373,16 @@ CDECL void ARMCI_Unlock(int mutex, int proc){
 }
 
 CDECL int armci_notify(int proc){
+  TCHARM_API_TRACE("armci_notify", "armci");
+  ArmciVirtualProcessor *vp = CtvAccess(_armci_ptr);
+  vp->notify(proc);
   return 0;
 }
 
 CDECL int armci_notify_wait(int proc, int *pval){
+  TCHARM_API_TRACE("armci_notify_wait", "armci");
+  ArmciVirtualProcessor *vp = CtvAccess(_armci_ptr);
+  vp->notify_wait(proc);
   return 0;
 }
 

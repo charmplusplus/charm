@@ -60,6 +60,7 @@ typedef struct {
 } armci_giov_t;
 
 typedef int armci_hdl_t;
+typedef int armci_size_t;
 
 /* virtual processor Aggregate Remote Memory Copy Interface (ARMCI) */
 
@@ -72,7 +73,9 @@ int ARMCI_Finalize(void);
 void ARMCI_Error(char *msg, int code);
 void ARMCI_Cleanup(void);
 
+/* 0 */
 int ARMCI_Procs(int *procs);
+/* 0 */
 int ARMCI_Myid(int *myid);
 
 /* ****************************** */
@@ -134,7 +137,6 @@ int ARMCI_NbGet(void *src, void* dst, int bytes, int proc,
 		armci_hdl_t *handle);
   
 int ARMCI_Acc(int datatype, void *scale, void* src, void* dst, int bytes, int proc);
-
 int ARMCI_NbAcc(int datatype, void *scale, void* src, void* dst, int bytes, int proc, 
                 armci_hdl_t* handle);
 
@@ -182,6 +184,7 @@ int ARMCI_GetS(
 	        int proc                /* remote process(or) ID */
 	        );
 
+/* 0 */ 
 int ARMCI_NbGetS(
 		void *src_ptr, 
 		int src_stride_ar[], 
@@ -238,7 +241,9 @@ double ARMCI_GetValueDouble(void *src, int proc);
 /* Functions for Non-blocking support */
 /* 0 */
 int ARMCI_Wait(armci_hdl_t *handle);
+/* 0 */
 int ARMCI_WaitProc(int proc);
+/* 0 */
 int ARMCI_WaitAll();
 /* 0 */
 int ARMCI_Test(armci_hdl_t *handle);
