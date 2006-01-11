@@ -348,6 +348,7 @@ do
 		# Parse out some fake languages (that are actually modules)
 		case "$1" in
 		"ampi") AddModules tcharmmain ampi ;;
+		"armci") AddModules tcharmmain armci ;;
 		"ampif") AddModules tcharmmain ampif ; USE_F90_LIBRARIES="1" ;;
 		"fem") AddModules tcharmmain fem ; AMPIMAIN="femmain";;
 		"femf") AddModules tcharmmain fem ; AMPIMAIN="femmain"; USE_F90_LIBRARIES="1" ;;
