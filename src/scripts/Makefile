@@ -59,6 +59,8 @@ AMPI:  charm++
 	$(MAKE) CONVLIBS
 	$(MAKE) AMPIC AMPIF
 
+ARMCI: charm++ LIBS
+
 AMPIC: charm++ LIBS
 
 AMPIF: AMPIC
