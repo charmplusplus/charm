@@ -123,7 +123,7 @@ class ArmciVirtualProcessor : public TCharmClient1D {
 
   // non-entry methods. Mainly interfaces to API interface methods.
   void requestAddresses(pointer  ptr, pointer ptr_arr[], int bytes);
-  void *stridedCopy(void *base, void *buffer_ptr,
+  void stridedCopy(void *base, void *buffer_ptr,
 		  int *stride, int *count, 
 		  int dim_id, bool flatten);
   virtual void pup(PUP::er &p);

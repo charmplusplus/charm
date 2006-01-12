@@ -6,7 +6,7 @@ module armci {
 	message AddressMessage {
 		pointer addresses[];
 	};
-	
+
 	array [1D] ArmciVirtualProcessor {
 		entry ArmciVirtualProcessor(CProxy_TCharm _thr_proxy);
 		entry void getAddresses(AddressMessage *msg);
