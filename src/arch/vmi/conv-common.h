@@ -4,31 +4,23 @@
 #define NODE_0_IS_CONVHOST                                 1
 #define CMK_WEB_MODE                                       0
 
-#define CMK_CMIPRINTF_IS_A_BUILTIN                         0 
+#define CMK_CMIPRINTF_IS_A_BUILTIN                         1
 
 #define CMK_CMIDELIVERS_USE_COMMON_CODE                    1
 
-#define CMK_PERSISTENT_COMM                                0
+#define CMK_PERSISTENT_COMM                                1
 
-#if CMK_PERSISTENT_COMM
-#define CMK_MULTICAST_GROUP_TYPE                struct { unsigned pe, id; }
-#define CMK_MULTICAST_DEF_USE_COMMON_CODE                  1
-#define CMK_MULTICAST_LIST_USE_COMMON_CODE                 0
-#define CMK_MULTICAST_LIST_USE_SPECIAL_CODE                1
-#define CMK_MULTICAST_GROUP_USE_COMMON_CODE                1
-#else
 #define CMK_MULTICAST_GROUP_TYPE                struct { unsigned pe, id; }
 #define CMK_MULTICAST_DEF_USE_COMMON_CODE                  1
 #define CMK_MULTICAST_LIST_USE_COMMON_CODE                 1
 #define CMK_MULTICAST_LIST_USE_SPECIAL_CODE                0
 #define CMK_MULTICAST_GROUP_USE_COMMON_CODE                1
-#endif
 
 #define CMK_BROADCAST_SPANNING_TREE                        1
 #define CMK_SPANTREE_MAXSPAN                               4
 #define CMK_SPANTREE_USE_COMMON_CODE                       1
 
-#define CMK_MSG_HEADER_FIELDS  CmiUInt2 vmitype,tree_rank,tree_root,hdl,xhdl,info,stratid,root;
+#define CMK_MSG_HEADER_FIELDS  unsigned char vmitype,vmicredits; CmiUInt2 tree_rank,tree_root,hdl,xhdl,info,stratid,root;
 #define CMK_MSG_HEADER_BASIC  CMK_MSG_HEADER_EXT
 #define CMK_MSG_HEADER_EXT    { CMK_MSG_HEADER_FIELDS }
 #define CMK_MSG_HEADER_BLUEGENE    { CMK_MSG_HEADER_FIELDS CMK_BLUEGENE_FIELDS }

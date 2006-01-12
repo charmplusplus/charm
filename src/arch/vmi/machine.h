@@ -29,22 +29,25 @@
 
 #include "vmi.h"
 
+/* These settings can only be changed at compile time. */
+#define CMI_VMI_OPTIMIZE        0
+#define CMI_VMI_USE_MEMORY_POOL 1
 
 /*
-  These settings are used to control behavior of this machine layer
-  configured at compile time.  In some cases, these settings can also be
-  overridden at runtime by setting similarly-named environment variables.
+  These settings are defaults that can be overridden at runtime by
+  setting environment variables of the same name.
 */
-#define CMI_VMI_OPTIMIZE                0
-#define CMI_VMI_USE_MEMORY_POOL         1
-#define CMI_VMI_CONNECTION_TIMEOUT      300
-#define CMI_VMI_MAXIMUM_HANDLES         10000
-#define CMI_VMI_SMALL_MESSAGE_BOUNDARY  512 
-#define CMI_VMI_MEDIUM_MESSAGE_BOUNDARY 4096 
-#define CMI_VMI_RDMA_CHUNK_COUNT        3
-#define CMI_VMI_RDMA_CHUNK_SIZE         262144
-
-
+#define CMI_VMI_CONNECTION_TIMEOUT           300       /* seconds */
+#define CMI_VMI_MAXIMUM_HANDLES              10000
+#define CMI_VMI_WAN_LATENCY                  1000      /* microseconds */
+#define CMI_VMI_SMALL_MESSAGE_BOUNDARY       512       /* bytes */
+#define CMI_VMI_MEDIUM_MESSAGE_BOUNDARY      16384     /* bytes */
+#define CMI_VMI_EAGER_INTERVAL               10000
+#define CMI_VMI_EAGER_THRESHOLD              1000
+#define CMI_VMI_EAGER_SHORT_POLLSIZE_MAXIMUM 32
+#define CMI_VMI_EAGER_SHORT_SLOTS            16
+#define CMI_VMI_EAGER_LONG_BUFFERS           3
+#define CMI_VMI_EAGER_LONG_BUFFER_SIZE       1048576   /* bytes */
 
 /*
   If CMI_VMI_OPTIMIZE is defined, all of the checks for success for
@@ -57,21 +60,41 @@
 #if CMI_VMI_OPTIMIZE
 #define CMI_VMI_CHECK_SUCCESS(status,message)
 #else
-#define CMI_VMI_CHECK_SUCCESS(status,message)                             \
-          if (!VMI_SUCCESS (status)) {                                    \
-            VMI_perror (message, status);                                 \
+#define CMI_VMI_CHECK_SUCCESS(status,message)   \
+          if (!VMI_SUCCESS (status)) {          \
+            VMI_perror (message, status);       \
           }
 #endif
 
 
-
 /*
-  The following settings are used to describe the startup methods that
-  may be used to assign ranks to the processes in the computation.
-  (So far, only startup via the Charm++ Resource Manager (CRM) is possible.)
+  The VMI versions of CmiAlloc() and CmiFree() prepend additional information
+  onto each memory allocation, similar to what Converse already does.  This
+  information holds a context associated with the memory chunk.  Normally
+  this context is NULL, but in the case of eager message buffers the
+  context points to the handle associated with the message buffer.  When the
+  application calls CmiFree() on this message buffer, the call is intercepted
+  and the message buffer is marked as free rather than deallocating the
+  memory.
 */
-#define CMI_VMI_STARTUP_TYPE_CRM 0
+#define CONTEXTFIELD(m) (((CMI_VMI_Memory_Chunk_T *)(m))[-1].context)
 
+typedef struct
+{
+  void           *context;
+  CmiChunkHeader  chunk_header;
+} CMI_VMI_Memory_Chunk_T;
+
+#define CMI_VMI_EAGER_SHORT_SENTINEL_READY    0
+#define CMI_VMI_EAGER_SHORT_SENTINEL_DATA     1
+#define CMI_VMI_EAGER_SHORT_SENTINEL_RECEIVED 2
+#define CMI_VMI_EAGER_SHORT_SENTINEL_FREE     3
+
+typedef struct
+{
+  unsigned short msgsize;
+  unsigned short sentinel;
+} CMI_VMI_Eager_Short_Slot_Footer_T;
 
 
 /*
@@ -88,47 +111,59 @@
 #define CMI_VMI_BUCKET4_SIZE 8192
 #define CMI_VMI_BUCKET5_SIZE 16384
 
-#define CMI_VMI_BUCKET1_PREALLOCATE 100
-#define CMI_VMI_BUCKET1_GROW         50
+#define CMI_VMI_BUCKET1_PREALLOCATE 128
+#define CMI_VMI_BUCKET1_GROW        128
 
-#define CMI_VMI_BUCKET2_PREALLOCATE 100
-#define CMI_VMI_BUCKET2_GROW         50
+#define CMI_VMI_BUCKET2_PREALLOCATE 128
+#define CMI_VMI_BUCKET2_GROW        128
 
-#define CMI_VMI_BUCKET3_PREALLOCATE 100
-#define CMI_VMI_BUCKET3_GROW         50
+#define CMI_VMI_BUCKET3_PREALLOCATE 128
+#define CMI_VMI_BUCKET3_GROW        128
 
-#define CMI_VMI_BUCKET4_PREALLOCATE 100
-#define CMI_VMI_BUCKET4_GROW         50
+#define CMI_VMI_BUCKET4_PREALLOCATE 128
+#define CMI_VMI_BUCKET4_GROW        128
 
-#define CMI_VMI_BUCKET5_PREALLOCATE 100
-#define CMI_VMI_BUCKET5_GROW         50
+#define CMI_VMI_BUCKET5_PREALLOCATE 128
+#define CMI_VMI_BUCKET5_GROW        128
 #endif
 
 
+/*
+  The following settings are used to describe the startup methods that
+  may be used to assign ranks to the processes in the computation.
+  (So far, only startup via the Charm++ Resource Manager (CRM) is possible.)
+*/
+#define CMI_VMI_STARTUP_TYPE_UNKNOWN  0
+#define CMI_VMI_STARTUP_TYPE_CHARMRUN 1
+#define CMI_VMI_STARTUP_TYPE_CRM      2
+
 
 /*
-  The following data structure holds per-process state information for
-  each process in the computation.  The machine layer determines the
-  total number of processes in the computation (from the CRM, during
-  startup) and then creates an array of CMI_VMI_Process_T structures.
+  The following message structures are used for communicating with
+  Charmrun.  These are only needed for startup CMI_VMI_STARTUP_TYPE_CHARMRUN.
 */
-typedef enum
+typedef struct Charmrun_Header
 {
-  CMI_VMI_CONNECTION_CONNECTING,
-  CMI_VMI_CONNECTION_CONNECTED,
-  CMI_VMI_CONNECTION_DISCONNECTING,
-  CMI_VMI_CONNECTION_DISCONNECTED,
-  CMI_VMI_CONNECTION_ERROR
-} CMI_VMI_Connection_State_T;
+  int  msg_len;
+  char msg_type[12];
+} Charmrun_Header;
 
-typedef struct
+typedef struct Charmrun_InitnodeMsg
 {
-  int                        rank;
-  int                        node_IP;
-  PVMI_CONNECT               connection;
-  CMI_VMI_Connection_State_T state;
-} CMI_VMI_Process_T;
+  int node_number;
+  int nPE;
+  int dataport;
+  int mach_id;
+  int IP;
+} Charmrun_InitnodeMsg;
 
+typedef struct Charmrun_Nodetab
+{
+  int nPE;
+  int dataport;
+  int mach_id;
+  int IP;
+} Charmrun_Nodetab;
 
 
 /*
@@ -144,24 +179,40 @@ typedef struct
 #define CMI_BROADCAST_ROOT(msg)   ((CmiMsgHeaderBasic *)msg)->tree_root
 #define CMI_DEST_RANK(msg)        ((CmiMsgHeaderBasic *)msg)->tree_rank
 
-#define CMI_SET_BROADCAST_ROOT(msg,tree_root)   CMI_BROADCAST_ROOT(msg) = (tree_root);
+#define CMI_SET_BROADCAST_ROOT(msg,tree_root) CMI_BROADCAST_ROOT(msg) = (tree_root);
 #endif
-
 
 
 /*
   Messages sent from one process to another using the VMI machine layer
   are tagged with a "type" field which is part of the Converse message
-  header.  So far, there are two message types.  "Standard" messages
-  are simply placed into the Converse remote message queue when they
-  received.  "Rendezvous" messages are used to signal the start of a
-  rendezvous message to set up an RDMA send between processes.
+  header.
+
+  "Standard" messages are simply placed into the Converse remote message
+  queue when they received.
+
+  "Barrier" messages are used to organize a barrier of all processes in
+  the computation.  These have to be handled out-of-band at a lower
+  layer than Converse to avoid race conditions.
+
+  "Persistent Request" messages are used by the persistent handle setup
+  function CmiCreatePersistent() to signal the receiver that a particular
+  sender thinks it will be sending many messages to the receiver.  The
+  receiver can use this hint to decide whether to set up an eager channel.
+
+  "Credit" messages are used to replentish eager short credits on a sender.
+  Normally credit replentishes are sent in the message headers of other
+  messages ("piggyback") but if a process does not communicate frequently
+  with its eager sender, no opportunities to piggyback credits may happen.
+  In these cases, a separate message is sent.
 */
 #define CMI_VMI_MESSAGE_TYPE(msg) ((CmiMsgHeaderBasic *)msg)->vmitype
-#define CMI_VMI_MESSAGE_TYPE_STANDARD   1
-#define CMI_VMI_MESSAGE_TYPE_RENDEZVOUS 2
-#define CMI_VMI_MESSAGE_TYPE_BARRIER    3
+#define CMI_VMI_MESSAGE_CREDITS(msg) ((CmiMsgHeaderBasic *)msg)->vmicredits
 
+#define CMI_VMI_MESSAGE_TYPE_STANDARD           1
+#define CMI_VMI_MESSAGE_TYPE_BARRIER            2
+#define CMI_VMI_MESSAGE_TYPE_PERSISTENT_REQUEST 3
+#define CMI_VMI_MESSAGE_TYPE_CREDIT             4
 
 
 /*
@@ -171,11 +222,14 @@ typedef struct
   CMI_VMI_Connect_Message_T are connect messages that are only sent during
   the connection setup phase.
 
-  CMI_VMI_Rendezvous_Message_T are used to set up an RDMA send between
-  processes.
+  CMI_VMI_Barrier_Message_T are used to signal barrier operations.
 
-  The "Persistent" messages are used to create a persistent RDMA channel
-  between a pair of processes via Gengbin's API.
+  CMI_VMI_Persistent_Request_Message_T are used to indicate to a receiver
+  that the sender will likely perform a lot of send operations, thus if
+  the receiver has resources it is a good idea to set up eager channels.
+
+  CMI_VMI_Credit_Message_T are used to send eager credit replentish messages
+  when no opportunity to piggyback credits has happened.
 */
 typedef struct
 {
@@ -185,39 +239,32 @@ typedef struct
 typedef struct
 {
   char header[CmiMsgHeaderSizeBytes];
-  int rank;
-  int msgsize;
-  VMI_virt_addr_t context;
-} CMI_VMI_Rendezvous_Message_T;
-
-typedef struct
-{
-  char header[CmiMsgHeaderSizeBytes];
 } CMI_VMI_Barrier_Message_T;
 
-#if CMK_PERSISTENT_COMM
 typedef struct
-{
+{ 
   char header[CmiMsgHeaderSizeBytes];
-  int rank;
-  int maxsize;
-  VMI_virt_addr_t context;
+  int  maxsize;
 } CMI_VMI_Persistent_Request_Message_T;
 
 typedef struct
 {
   char header[CmiMsgHeaderSizeBytes];
-  VMI_virt_addr_t context;
-  int rdma_receive_index;
-} CMI_VMI_Persistent_Grant_Message_T;
+} CMI_VMI_Credit_Message_T;
+
+
+/* Publish messages (sent as payload with VMI_RDMA_Publish_Buffer() call). */
+typedef enum
+{
+  CMI_VMI_PUBLISH_TYPE_GET,
+  CMI_VMI_PUBLISH_TYPE_EAGER_SHORT,
+  CMI_VMI_PUBLISH_TYPE_EAGER_LONG
+} CMI_VMI_Publish_Type_T;
 
 typedef struct
 {
-  char header[CmiMsgHeaderSizeBytes];
-  int rdma_receive_index;
-} CMI_VMI_Persistent_Destroy_Message_T;
-#endif   /* CMK_PERSISTENT_COMM */
-
+  CMI_VMI_Publish_Type_T type;
+} CMI_VMI_Publish_Message_T;
 
 
 /*
@@ -235,9 +282,10 @@ typedef enum
 typedef enum
 {
   CMI_VMI_SEND_HANDLE_TYPE_STREAM,
-  CMI_VMI_SEND_HANDLE_TYPE_RDMA,
-  CMI_VMI_SEND_HANDLE_TYPE_RDMABROAD,
-  CMI_VMI_SEND_HANDLE_TYPE_PERSISTENT
+  CMI_VMI_SEND_HANDLE_TYPE_RDMAGET,
+  CMI_VMI_SEND_HANDLE_TYPE_RDMABROADCAST,
+  CMI_VMI_SEND_HANDLE_TYPE_EAGER_SHORT,
+  CMI_VMI_SEND_HANDLE_TYPE_EAGER_LONG
 } CMI_VMI_Send_Handle_Type_T;
 
 typedef enum
@@ -254,28 +302,28 @@ typedef struct
 
 typedef struct
 {
-  int chunk_size;
-  int bytes_sent;
   PVMI_CACHE_ENTRY cacheentry;
-} CMI_VMI_Send_Handle_RDMA_T;
+} CMI_VMI_Send_Handle_RDMAGet_T;
 
 typedef struct
 {
-  int chunk_size;
-  int *bytes_sent;
-  PVMI_CACHE_ENTRY *cacheentry;
-} CMI_VMI_Send_Handle_RDMABROAD_T;
+  PVMI_CACHE_ENTRY cacheentry;
+} CMI_VMI_Send_Handle_RDMABroadcast_T;
 
 typedef struct
 {
-  int                ready;
-  PVMI_CONNECT       connection;
-  int                destrank;
+  PVMI_REMOTE_BUFFER remote_buffer;
+  int                offset;
+  PVMI_CACHE_ENTRY   cacheentry;
+  PVMI_RDMA_OP       rdmaop;
+} CMI_VMI_Send_Handle_Eager_Short_T;
+
+typedef struct
+{
   int                maxsize;
   PVMI_REMOTE_BUFFER remote_buffer;
-  int                rdma_receive_index;
   PVMI_CACHE_ENTRY   cacheentry;
-} CMI_VMI_Send_Handle_Persistent_T;
+} CMI_VMI_Send_Handle_Eager_Long_T;
 
 typedef struct
 {
@@ -284,46 +332,52 @@ typedef struct
 
   union
   {
-    CMI_VMI_Send_Handle_Stream_T     stream;
-    CMI_VMI_Send_Handle_RDMA_T       rdma;
-    CMI_VMI_Send_Handle_RDMABROAD_T  rdmabroad;
-    CMI_VMI_Send_Handle_Persistent_T persistent;
+    CMI_VMI_Send_Handle_Stream_T        stream;
+    CMI_VMI_Send_Handle_RDMAGet_T       rdmaget;
+    CMI_VMI_Send_Handle_RDMABroadcast_T rdmabroadcast;
+    CMI_VMI_Send_Handle_Eager_Short_T   eager_short;
+    CMI_VMI_Send_Handle_Eager_Long_T    eager_long;
   } data;
 } CMI_VMI_Send_Handle_T;
 
 typedef enum
 {
-  CMI_VMI_RECEIVE_HANDLE_TYPE_RDMA,
-  CMI_VMI_RECEIVE_HANDLE_TYPE_PERSISTENT
+  CMI_VMI_RECEIVE_HANDLE_TYPE_RDMAGET,
+  CMI_VMI_RECEIVE_HANDLE_TYPE_EAGER_SHORT,
+  CMI_VMI_RECEIVE_HANDLE_TYPE_EAGER_LONG
 } CMI_VMI_Receive_Handle_Type_T;
 
 typedef struct
 {
-  int              bytes_published;
-  int              bytes_received;
-  int              chunk_size;
-  int              chunk_count;
-  int              chunks_outstanding;
-  int              send_index;
-  int              receive_index;
-  PVMI_CACHE_ENTRY cacheentry[CMI_VMI_RDMA_CHUNK_COUNT];
-  VMI_virt_addr_t  remote_handle_address;
-} CMI_VMI_Receive_Handle_RDMA_T;
+  PVMI_CACHE_ENTRY  cacheentry;
+  void             *process;
+} CMI_VMI_Receive_Handle_RDMAGet_T;
 
 typedef struct
 {
+  int                                sender_rank;
+  char                              *publish_buffer;
+  PVMI_CACHE_ENTRY                   cacheentry;
+  char                              *eager_buffer;
+  CMI_VMI_Eager_Short_Slot_Footer_T *footer;
+} CMI_VMI_Receive_Handle_Eager_Short_T;
+
+typedef struct
+{
+  int              sender_rank;
+  int              maxsize;
   PVMI_CACHE_ENTRY cacheentry;
-  VMI_virt_addr_t  remote_handle_address;
-} CMI_VMI_Receive_Handle_Persistent_T;
+} CMI_VMI_Receive_Handle_Eager_Long_T;
 
 typedef struct
 {
-  CMI_VMI_Receive_Handle_Type_T  receive_handle_type;
+  CMI_VMI_Receive_Handle_Type_T receive_handle_type;
 
   union
   {
-    CMI_VMI_Receive_Handle_RDMA_T       rdma;
-    CMI_VMI_Receive_Handle_Persistent_T persistent;
+    CMI_VMI_Receive_Handle_RDMAGet_T     rdmaget;
+    CMI_VMI_Receive_Handle_Eager_Short_T eager_short;
+    CMI_VMI_Receive_Handle_Eager_Long_T  eager_long;
   } data;
 } CMI_VMI_Receive_Handle_T;
 
@@ -342,6 +396,46 @@ typedef struct
   } data;
 } CMI_VMI_Handle_T;
 
+
+/*
+  The following data structure holds per-process state information for
+  each process in the computation.  The machine layer determines the
+  total number of processes in the computation during startup and then
+  creates an array of CMI_VMI_Process_T structures.
+*/
+typedef enum
+{
+  CMI_VMI_CONNECTION_CONNECTING,
+  CMI_VMI_CONNECTION_CONNECTED,
+  CMI_VMI_CONNECTION_DISCONNECTING,
+  CMI_VMI_CONNECTION_DISCONNECTED,
+  CMI_VMI_CONNECTION_ERROR
+} CMI_VMI_Connection_State_T;
+
+typedef struct
+{
+  int                        rank;
+  int                        node_IP;
+  PVMI_CONNECT               connection;
+  CMI_VMI_Connection_State_T connection_state;
+
+  CMI_VMI_Handle_T *eager_short_send_handles[CMI_VMI_EAGER_SHORT_SLOTS];
+  int               eager_short_send_size;
+  int               eager_short_send_index;
+  int               eager_short_send_credits_available;
+
+  CMI_VMI_Handle_T *eager_short_receive_handles[CMI_VMI_EAGER_SHORT_SLOTS];
+  int               eager_short_receive_size;
+  int               eager_short_receive_index;
+  int               eager_short_receive_dirty;
+  int               eager_short_receive_credits_replentish;
+
+  CMI_VMI_Handle_T *eager_long_send_handles[CMI_VMI_EAGER_LONG_BUFFERS];
+  int               eager_long_send_size;
+
+  CMI_VMI_Handle_T *eager_long_receive_handles[CMI_VMI_EAGER_LONG_BUFFERS];
+  int               eager_long_receive_size;
+} CMI_VMI_Process_T;
 
 
 /*
@@ -405,67 +499,45 @@ typedef struct CRM_Msg{
 
 
 
-/*
-  Function prototypes follow.
-*/
-int CMI_VMI_CRM_Register (char *key, int numProcesses, BOOLEAN reg);
-int CMI_VMI_Startup_CRM (char *key);
-VMI_CONNECT_RESPONSE
-CMI_VMI_Connection_Accept_Handler (PVMI_CONNECT connection, PVMI_SLAB slab,
-				   ULONG  data_size);
-void CMI_VMI_Connection_Response_Handler (PVOID context, PVOID response,
-					  USHORT size, PVOID handle,
-					  VMI_CONNECT_RESPONSE status);
-void CMI_VMI_Connection_Response_Handler (PVOID context, PVOID response,
-					  USHORT size, PVOID handle,
-					  VMI_CONNECT_RESPONSE status);
-void CMI_VMI_Connection_Disconnect_Handler (PVMI_CONNECT connection);
-int CMI_VMI_Open_Connections (char *key);
 
-#if CMK_BROADCAST_SPANNING_TREE
-int CMI_VMI_Spanning_Children_Count (char *msg);
-void CMI_VMI_Send_Spanning_Children (int msgsize, char *msg);
-#endif
 
-VMI_RECV_STATUS CMI_VMI_Stream_Receive_Handler (PVMI_CONNECT connection,
-						PVMI_STREAM_RECV stream,
-						VMI_STREAM_COMMAND command,
-						PVOID context,
-						PVMI_SLAB slab);
-void CMI_VMI_Stream_Completion_Handler (PVOID context, VMI_STATUS sstatus);
-void CMI_VMI_RDMA_Fragment_Handler (PVMI_RDMA_OP op, PVOID context,
-				    VMI_STATUS rstatus);
-void CMI_VMI_RDMA_Completion_Handler (PVMI_RDMA_OP op, PVOID context,
-				      VMI_STATUS rstatus);
-void CMI_VMI_RDMA_Publish_Handler (PVMI_CONNECT connection,
-				   PVMI_REMOTE_BUFFER remote_buffer);
-void CMI_VMI_RDMA_Notification_Handler (PVMI_CONNECT connection,
-					UINT32 rdma_size,
-					UINT32 context,
-					VMI_STATUS remote_status);
+/***********************/
+/* FUNCTION PROTOTYPES */
+/***********************/
 
-void ConverseInit (int argc, char **argv, CmiStartFn start_function,
-		   int user_calls_scheduler, int init_returns);
+/* Externally-visible API functions */
+void ConverseInit (int argc, char **argv, CmiStartFn start_function, int user_calls_scheduler, int init_returns);
 void ConverseExit ();
 void CmiAbort (const char *message);
-void *CmiGetNonLocal (void);
+
+void CmiNotifyIdle ();
+
 void CmiMemLock ();
 void CmiMemUnlock ();
-void CmiNotifyIdle ();
+
+void CmiPrintf (const char *format, ...);
+void CmiError (const char *format, ...);
+
 void CmiBarrier ();
 void CmiBarrierZero ();
+
 void CmiSyncSendFn (int destrank, int msgsize, char *msg);
 CmiCommHandle CmiAsyncSendFn (int destrank, int msgsize, char *msg);
 void CmiFreeSendFn (int destrank, int msgsize, char *msg);
+
 void CmiSyncBroadcastFn (int msgsize, char *msg);
 CmiCommHandle CmiAsyncBroadcastFn (int msgsize, char *msg);
 void CmiFreeBroadcastFn (int msgsize, char *msg);
+
 void CmiSyncBroadcastAllFn (int msgsize, char *msg);
 CmiCommHandle CmiAsyncBroadcastAllFn (int msgsize, char *msg);
 void CmiFreeBroadcastAllFn (int msgsize, char *msg);
-int CmiAllAsyncMsgsSent ();
+
 int CmiAsyncMsgSent (CmiCommHandle commhandle);
+int CmiAllAsyncMsgsSent ();
 void CmiReleaseCommHandle (CmiCommHandle commhandle);
+
+void *CmiGetNonLocal (void);
 
 #if CMK_PERSISTENT_COMM
 void CmiPersistentInit ();
@@ -473,28 +545,87 @@ PersistentHandle CmiCreatePersistent (int destrank, int maxsize);
 void CmiUsePersistentHandle (PersistentHandle *handle_array, int array_size);
 void CmiDestroyPersistent (PersistentHandle phandle);
 void CmiDestroyAllPersistent ();
-void CMI_VMI_Persistent_Request_Handler (char *msg);
-void CMI_VMI_Persistent_Grant_Handler (char *msg);
-void CMI_VMI_Persistent_Destroy_Handler (char *msg);
+PersistentReq CmiCreateReceiverPersistent (int maxsize);
+PersistentHandle CmiRegisterReceivePersistent (PersistentReq request);
 #endif
 
-#if CMK_MULTICAST_LIST_USE_SPECIAL_CODE
-void CmiSyncListSendFn (int npes, int *pes, int len, char *msg);
-CmiCommHandle CmiAsyncListSendFn(int npes, int *pes, int len, char *msg);
-void CmiFreeListSendFn (int npes, int *pes, int msgsize, char *msg);
-#endif
 
-CMI_VMI_Handle_T *CMI_VMI_Allocate_Handle ();
-void *CMI_VMI_CmiAlloc (int size);
+/* Startup and shutdown functions */
+void CMI_VMI_Read_Environment ();
+
+int CMI_VMI_Startup_Charmrun ();
+
+int CMI_VMI_Startup_CRM ();
+int CMI_VMI_CRM_Register (char *key, int numProcesses, BOOLEAN reg);
+
+int CMI_VMI_Initialize_VMI ();
+
+int CMI_VMI_Terminate_VMI ();
+
+
+/* Socket send and receive functions */
+int CMI_VMI_Socket_Send (int sockfd, const void *msg, int size);
+int CMI_VMI_Socket_Receive (int sockfd, void *msg, int size);
+
+
+/* Connection open and close functions */
+int CMI_VMI_Open_Connections ();
+int CMI_VMI_Open_Connection (int remote_rank, char *remote_key, PVMI_BUFFER connect_message_buffer);
+VMI_CONNECT_RESPONSE CMI_VMI_Connection_Handler (PVMI_CONNECT connection, PVMI_SLAB slab, ULONG data_size);
+void CMI_VMI_Connection_Response_Handler (PVOID context, PVOID response, USHORT size, PVOID handle, VMI_CONNECT_RESPONSE status);
+
+int CMI_VMI_Close_Connections ();
+void CMI_VMI_Disconnection_Handler (PVMI_CONNECT connection);
+void CMI_VMI_Disconnection_Response_Handler (PVMI_CONNECT connection, PVOID context, VMI_STATUS status);
+
+
+
+/* Memory allocation and deallocation functions */
+void *CMI_VMI_CmiAlloc (int request_size);
 void CMI_VMI_CmiFree (void *ptr);
 
+PVMI_CACHE_ENTRY CMI_VMI_CacheEntry_From_Context (void *context);
+
+
+/* Handle allocation and deallocation functions */
+CMI_VMI_Handle_T *CMI_VMI_Allocate_Handle ();
+void CMI_VMI_Deallocate_Handle (CMI_VMI_Handle_T *handle);
+
+
+/* Send and receive functions */
+VMI_RECV_STATUS CMI_VMI_Stream_Notification_Handler (PVMI_CONNECT connection, PVMI_STREAM_RECV stream, VMI_STREAM_COMMAND command, PVOID context, PVMI_SLAB slab);
+void CMI_VMI_Stream_Completion_Handler (PVOID context, VMI_STATUS sstatus);
+
+void CMI_VMI_RDMA_Publish_Handler (PVMI_CONNECT connection, PVMI_REMOTE_BUFFER remote_buffer, PVMI_SLAB publish_data, ULONG publish_data_size);
+
+void CMI_VMI_RDMA_Put_Notification_Handler (PVMI_CONNECT connection, UINT32 rdma_size, UINT32 context, VMI_STATUS remote_status);
+void CMI_VMI_RDMA_Put_Completion_Handler (PVMI_RDMA_OP rdmaop, PVOID context, VMI_STATUS remote_status);
+
+void CMI_VMI_RDMA_Get_Notification_Handler (PVMI_CONNECT connection, UINT32 context, VMI_STATUS remote_status);
+void CMI_VMI_RDMA_Get_Completion_Handler (PVMI_RDMA_OP rdmaop, PVOID context, VMI_STATUS sstatus);
+
+
+/* Spanning tree send functions */
+#if CMK_BROADCAST_SPANNING_TREE
+int CMI_VMI_Spanning_Children_Count (char *msg);
+void CMI_VMI_Send_Spanning_Children (int msgsize, char *msg);
+#endif
+
+
+/* Eager communication setup and send (short, long) functions */
+void CMI_VMI_Eager_Setup (int sender_rank, int maxsize);
+
+void CMI_VMI_Send_Eager_Short (int destrank, int msgsize, char *msg);
+
+void CMI_VMI_Sync_Send_Eager_Long (int destrank, int msgsize, char *msg, CMI_VMI_Handle_T *handle);
+CmiCommHandle CMI_VMI_Async_Send_Eager_Long (int destrank, int msgsize, char *msg, CMI_VMI_Handle_T *handle);
+void CMI_VMI_Free_Send_Eager_Long (int destrank, int msgsize, char *msg, CMI_VMI_Handle_T *handle);
+
+
+/* NCSA CRM functions */
 BOOLEAN CRMInit ();
 SOCKET createSocket(char *hostName, int port, int *localAddr);
-BOOLEAN CRMRegister (char *key, ULONG numPE, int shutdownPort,
-		     SOCKET *clientSock, int *clientAddr, PCRM_Msg *msg2);
-BOOLEAN CRMParseMsg (PCRM_Msg msg, int rank, int *nodeIP,
-		     int *shutdownPort, int *nodePE);
-int CRMSend (SOCKET s, char *msg, int n);
-int CRMRecv (SOCKET s, char *msg, int n);
+BOOLEAN CRMRegister (char *key, ULONG numPE, int shutdownPort, SOCKET *clientSock, int *clientAddr, PCRM_Msg *msg2);
+BOOLEAN CRMParseMsg (PCRM_Msg msg, int rank, int *nodeIP, int *shutdownPort, int *nodePE);
 
 /*@}*/

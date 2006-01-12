@@ -1,34 +1,11 @@
 /**************************************************************************
 ** Greg Koenig (koenig@uiuc.edu)
 **
-***************************************************************************
-**
 ** This code does not work correctly with glibc 2.2.92 or lower due to
 ** problems with Converse threads interacting with VMI's use of pthreads.
 ** To check which version is on a system:
 **
 **    nm -a /lib/libc.so.6 | grep 'A GLIBC_'
-**
-***************************************************************************
-**
-** IMPROVE STARTUP/SHUTDOWN
-**    * startup via charmrun
-**    * startup via improved CRM
-**    * processes organize into a ring for improved normal/fault shutdown
-**    * fix race condition in shutdown
-**    * open connections as-needed, not all at startup (optional)
-**
-** HETEROGENEOUS ARCHITECTURE SUPPORT
-**    * use network byte order for components of msg hdr
-**    * must use UINT64 instead of VMI_ADDR_CAST
-**
-** SHARED MEMORY SUPPORT
-**
-** CONVERSE VECTOR SEND ROUTINES
-**    * not actually invoked by Charm++, so impact neglegible
-**
-** VMI HARDWARE MULTICAST SUPPORT
-**    * very cool, but very complicated
 */
 
 /** @file
@@ -39,17 +16,14 @@
 
 #include "machine.h"
 
-#define VMI21 1
-
 /* The following are external variables used by the VMI core. */
 extern USHORT VMI_DEVICE_RUNTIME;
 extern PVMI_NETADDRESS localAddress;
 extern VMIStreamRecv recvFn;
 
-
 /* The following are variables and functions used by the Converse core. */
-int _Cmi_mype;
 int _Cmi_numpes;
+int _Cmi_mype;
 int _Cmi_myrank = 0;
 
 CpvDeclare (void *, CmiLocalQueue);
@@ -58,77 +32,35 @@ CpvDeclare (void *, CMI_VMI_RemoteQueue);
 extern void CthInit (char **argv);
 extern void ConverseCommonInit (char **argv);
 
-
-/* This global variable is the array of all processes in the computation. */
-CMI_VMI_Process_T *CMI_VMI_Processes;
-
-
-/* This global variable is the array of send and receive handles. */
-CMI_VMI_Handle_T *CMI_VMI_Handles;
-
-
-/* This global variable is the count of outstanding asynchronous messages. */
-volatile int CMI_VMI_AsyncMsgCount;
-
-
-/* This global variable is the count of nodes that have reached a barrier. */
-volatile int CMI_VMI_Barrier_Count;
-
-
-/*
-  These global variables are the maximum number of (send and receive)
-  handles and the next index within the handle array to allocate.
-*/
+/* Global variables. */
+char *CMI_VMI_Username;
+char *CMI_VMI_Program_Key;
+int CMI_VMI_Startup_Type;
+int CMI_VMI_Connection_Timeout;
 int CMI_VMI_Maximum_Handles;
-int CMI_VMI_Next_Handle;
-
-
-/*
-  These global variables hold the message boundaries between small and
-  medium sized messages and between medium and large sized messages.  The
-  values are obtained from environment variables or from compile-time
-  constants if not set in the environment.
-*/
+int CMI_VMI_WAN_Latency;
 int CMI_VMI_Small_Message_Boundary;
 int CMI_VMI_Medium_Message_Boundary;
+int CMI_VMI_Eager_Interval;
+int CMI_VMI_Eager_Threshold;
+int CMI_VMI_Eager_Short_Pollsize_Maximum;
+int CMI_VMI_Eager_Short_Slots;
+int CMI_VMI_Eager_Long_Buffers;
 
+volatile int CMI_VMI_AsyncMsgCount;
+volatile int CMI_VMI_Barrier_Count;
 
-/*
-  RDMA sends operate in a "pipeline" fashion to avoid having to pin huge
-  amounts of memory at any given time.  These global variables hold the
-  number of "chunks" in an RDMA send that may be outstanding at any given
-  time and the maximum size of each chunk.  The values are obtained from
-  environment variables or from compile-time constants if not set in the
-  environment.
-*/
-int CMI_VMI_RDMA_Chunk_Count;
-int CMI_VMI_RDMA_Chunk_Size;
+int CMI_VMI_Charmrun_Socket;
+char CMI_VMI_Charmrun_IP[1024];
+int CMI_VMI_Charmrun_Port;
 
+CMI_VMI_Process_T *CMI_VMI_Processes;
+CMI_VMI_Process_T **CMI_VMI_Eager_Short_Pollset;
+int CMI_VMI_Eager_Short_Pollset_Size;
 
-/*
-  These global variables are used during connection setup.
+CMI_VMI_Handle_T *CMI_VMI_Handles;
+int CMI_VMI_Next_Handle;
 
-  They keep track of the number of outgoing connections issued and the
-  number of these that were accepted, rejected, or entered an error state.
-
-  They also keep track of the number of incoming connections expected and
-  the number of these that were accepted, rejected, or entered an error state.
-*/
-volatile int CMI_VMI_OIssue;
-volatile int CMI_VMI_OAccept;
-volatile int CMI_VMI_OError;
-volatile int CMI_VMI_OReject;
-
-volatile int CMI_VMI_IExpect;
-volatile int CMI_VMI_IAccept;
-volatile int CMI_VMI_IError;
-volatile int CMI_VMI_IReject;
-
-
-/*
-  If a memory pool is being used, the following global variables are used
-  to hold pointers to the pools for variously-sized chunks of memory.
-*/
 #if CMI_VMI_USE_MEMORY_POOL
 PVMI_BUFFER_POOL CMI_VMI_Bucket1_Pool;
 PVMI_BUFFER_POOL CMI_VMI_Bucket2_Pool;
@@ -137,25 +69,2101 @@ PVMI_BUFFER_POOL CMI_VMI_Bucket4_Pool;
 PVMI_BUFFER_POOL CMI_VMI_Bucket5_Pool;
 #endif
 
+char *CRMHost;
+int CRMPort;
 
-/*
-  If Gengbin's persistent communication API is being used (which allows
-  a persistent RDMA channel to be maintained between a pair of processes),
-  the following global variables are used to hold the state of this.
+
+
+/**************************************************************************
+** This function is the entry point for all Converse and Charm++ codes.
+** 
+** argc
+** argv
+** start_function - the user-supplied function to run (function pointer)
+** user_calls_scheduler - boolean for whether ConverseInit() should invoke
+**                        the scheduler or whether user code will do it
+** init_returns - boolean for whether ConverseInit() returns
 */
-#if CMK_PERSISTENT_COMM
-int CMI_VMI_Persistent_Request_Handler_ID;
-int CMI_VMI_Persistent_Grant_Handler_ID;
-int CMI_VMI_Persistent_Destroy_Handler_ID;
+void ConverseInit (int argc, char **argv, CmiStartFn start_function, int user_calls_scheduler, int init_returns)
+{
+  int rc;
+  int i;
+  int j;
 
-CMI_VMI_Handle_T *CMI_VMI_Persistent_Handles;
-int CMI_VMI_Persistent_Handles_Size;
+
+  DEBUG_PRINT ("ConverseInit() called.\n");
+
+  /* Get a default program key from argv[0]. */
+  if (!(CMI_VMI_Program_Key = strdup (argv[0]))) {
+    CmiAbort ("Unable to allocate memory for the program key.");
+  }
+
+  /* Initialize global variables. */
+  CMI_VMI_Startup_Type                 = CMI_VMI_STARTUP_TYPE_UNKNOWN;
+  CMI_VMI_Connection_Timeout           = CMI_VMI_CONNECTION_TIMEOUT;
+  CMI_VMI_Maximum_Handles              = CMI_VMI_MAXIMUM_HANDLES;
+  CMI_VMI_WAN_Latency                  = CMI_VMI_WAN_LATENCY;
+  CMI_VMI_Small_Message_Boundary       = CMI_VMI_SMALL_MESSAGE_BOUNDARY;
+  CMI_VMI_Medium_Message_Boundary      = CMI_VMI_MEDIUM_MESSAGE_BOUNDARY;
+  CMI_VMI_Eager_Interval               = CMI_VMI_EAGER_INTERVAL;
+  CMI_VMI_Eager_Threshold              = CMI_VMI_EAGER_THRESHOLD;
+  CMI_VMI_Eager_Short_Pollsize_Maximum = CMI_VMI_EAGER_SHORT_POLLSIZE_MAXIMUM;
+  CMI_VMI_Eager_Short_Slots            = CMI_VMI_EAGER_SHORT_SLOTS;
+  CMI_VMI_Eager_Long_Buffers           = CMI_VMI_EAGER_LONG_BUFFERS;
+
+  CMI_VMI_AsyncMsgCount = 0;
+  CMI_VMI_Barrier_Count = 0;
+
+  /* Read global variable values from the environment. */
+  CMI_VMI_Read_Environment ();
+
+  /* Set up the process array and initialize. */
+  CMI_VMI_Processes = (CMI_VMI_Process_T *) (malloc (_Cmi_numpes * sizeof (CMI_VMI_Process_T)));
+  if (!CMI_VMI_Processes) {
+    CmiAbort ("Unable to allocate memory for process array.");
+  }
+
+  CMI_VMI_Eager_Short_Pollset = (CMI_VMI_Process_T **) (malloc (_Cmi_numpes * sizeof (CMI_VMI_Process_T *)));
+  if (!CMI_VMI_Eager_Short_Pollset) {
+    CmiAbort ("Unable to allocate memory for eager pollset array.");
+  }
+
+  for (i = 0; i < _Cmi_numpes; i++) {
+    (&CMI_VMI_Processes[i])->connection_state = CMI_VMI_CONNECTION_DISCONNECTED;
+
+    for (j = 0; j < CMI_VMI_Eager_Short_Slots; j++) {
+      (&CMI_VMI_Processes[i])->eager_short_send_handles[j] = NULL;
+      (&CMI_VMI_Processes[i])->eager_short_receive_handles[j] = NULL;
+    }
+
+    (&CMI_VMI_Processes[i])->eager_short_send_size = 0;
+    (&CMI_VMI_Processes[i])->eager_short_send_index = 0;
+    (&CMI_VMI_Processes[i])->eager_short_send_credits_available = 0;
+
+    (&CMI_VMI_Processes[i])->eager_short_receive_size = 0;
+    (&CMI_VMI_Processes[i])->eager_short_receive_index = 0;
+    (&CMI_VMI_Processes[i])->eager_short_receive_dirty = 0;
+    (&CMI_VMI_Processes[i])->eager_short_receive_credits_replentish = 0;
+
+    CMI_VMI_Eager_Short_Pollset[i] = (CMI_VMI_Process_T *) NULL;
+
+    for (j = 0; j < CMI_VMI_Eager_Long_Buffers; j++) {
+      (&CMI_VMI_Processes[i])->eager_long_send_handles[j] = NULL;
+      (&CMI_VMI_Processes[i])->eager_long_receive_handles[j] = NULL;
+    }
+
+    (&CMI_VMI_Processes[i])->eager_long_send_size = 0;
+    (&CMI_VMI_Processes[i])->eager_long_receive_size = 0;
+  }
+
+  CMI_VMI_Eager_Short_Pollset_Size = 0;
+
+  /* Set up the send/receive handle array and initialize. */
+  CMI_VMI_Handles = (CMI_VMI_Handle_T *) (malloc (CMI_VMI_Maximum_Handles * sizeof (CMI_VMI_Handle_T)));
+  if (!CMI_VMI_Handles) {
+    CmiAbort ("Unable to allocate memory for handle array.");
+  }
+
+  for (i = 0; i < CMI_VMI_Maximum_Handles; i++) {
+    (&CMI_VMI_Handles[i])->index = i;
+    (&CMI_VMI_Handles[i])->refcount = 0;
+  }
+
+  CMI_VMI_Next_Handle = 0;
+
+  /* Print out debug information if compiled with debug support. */
+  DEBUG_PRINT ("The program key is %s.\n", key);
+  DEBUG_PRINT ("The startup type is %d.\n", CMI_VMI_Startup_Type);
+
+  /* Start up via the startup type selected. */
+  switch (CMI_VMI_Startup_Type) {
+    case CMI_VMI_STARTUP_TYPE_CHARMRUN:
+      rc = CMI_VMI_Startup_Charmrun ();
+      break;
+
+    case CMI_VMI_STARTUP_TYPE_CRM:
+      rc = CMI_VMI_Startup_CRM ();
+      break;
+
+    default:
+      CmiAbort ("An unknown startup type was specified.");
+      break;
+  }
+
+  if (rc < 0) {
+    CmiAbort ("There was a fatal error during the startup phase.");
+  }
+
+  /* Initialize VMI. */
+  rc = CMI_VMI_Initialize_VMI ();
+
+  if (rc < 0) {
+    CmiAbort ("There was a fatal error during VMI initialization.");
+  }
+
+  DEBUG_PRINT ("VMI was initialized successfully.\n");
+
+  /*
+    Create the FIFOs for holding local and remote messages.
+
+    NOTE: FIFO creation must happen at this point due to a race condition
+          where some processes may open their connections and start sending
+          messages before all of the other processes are started, and we
+          must be able to deal with this situation.
+  */
+  CpvAccess (CmiLocalQueue) = CdsFifo_Create ();
+  CpvAccess (CMI_VMI_RemoteQueue) = CdsFifo_Create ();
+
+  /* Open connections. */
+  rc = CMI_VMI_Open_Connections ();
+
+  if (rc < 0) {
+    CmiAbort ("Fatal error during connection setup phase.");
+  }
+
+  DEBUG_PRINT ("ConverseInit() is starting the main processing loop.\n");
+
+  /* Initialize Converse and start the main processing loop. */
+  CthInit (argv);
+  ConverseCommonInit (argv);
+
+  /* Set up CmiNotifyIdle() to be called when processor goes idle. */
+  CcdCallOnConditionKeep (CcdPROCESSOR_STILL_IDLE, CmiNotifyIdle, NULL);
+
+  if (!init_returns) {
+    start_function (CmiGetArgc (argv), argv);
+    if (!user_calls_scheduler) {
+      CsdScheduler (-1);
+    }
+    ConverseExit ();
+  }
+}
+
+
+
+/**************************************************************************
+** This function is the exit point for all Converse and Charm++ codes.
+*/
+void ConverseExit ()
+{
+  VMI_STATUS status;
+
+
+  DEBUG_PRINT ("ConverseExit() called.\n");
+
+  /* Barrier to ensure that all processes are ready to shut down. */
+  CmiBarrier ();
+
+  /* ConverseCommonExit() shuts down CCS and closes Projections logs. */
+  ConverseCommonExit ();
+
+  /* Close all connections. */
+  CMI_VMI_Close_Connections ();
+
+  /* Destroy queues. */
+  CdsFifo_Destroy (CpvAccess (CMI_VMI_RemoteQueue));
+  CdsFifo_Destroy (CpvAccess (CmiLocalQueue));
+
+  /* Terminate VMI. */
+  CMI_VMI_Terminate_VMI ();
+
+  /* Free memory. */
+  free (CMI_VMI_Handles);
+  free (CMI_VMI_Eager_Short_Pollset);
+  free (CMI_VMI_Processes);
+  free (CMI_VMI_Program_Key);
+  free (CMI_VMI_Username);
+
+  /* Signal the charmrun terminal that the computation has ended (if necessary). */
+  if (CMI_VMI_Startup_Type == CMI_VMI_STARTUP_TYPE_CHARMRUN) {
+    Charmrun_Header hdr;
+    int rc;
+
+    hdr.msg_len = htonl (0);
+    strcpy (hdr.msg_type, "ending");
+
+    rc = CMI_VMI_Socket_Send (CMI_VMI_Charmrun_Socket, (const void *) &hdr, (int) sizeof (Charmrun_Header));
+    if (rc < 0) {
+      DEBUG_PRINT ("Error sending to charmrun.\n");
+    }
+
+    /* Do NOT close CMI_VMI_Charmrun_Socket here or charmrun will die! */
+
+    sleep (1);
+  }
+
+  /* Exit. */
+  exit (0);
+}
+
+
+
+/**************************************************************************
+**
+*/
+void CmiAbort (const char *message)
+{
+  DEBUG_PRINT ("CmiAbort() called.\n");
+
+  printf ("%s\n", message);
+  exit (1);
+}
+
+
+
+/**************************************************************************
+**
+*/
+void CmiNotifyIdle ()
+{
+  VMI_STATUS status;
+
+  CMI_VMI_Process_T *process;
+  CMI_VMI_Handle_T *handle;
+
+  int index;
+  char *msg;
+  CMI_VMI_Eager_Short_Slot_Footer_T *footer;
+  int credits_temp;
+
+  CMI_VMI_Credit_Message_T credit_msg;
+  PVOID addrs[1];
+  ULONG sz[1];
+
+  int i;
+
+
+  /* Check the eager pollset to see if any new messages have arrived. */
+  for (i = 0; i < CMI_VMI_Eager_Short_Pollset_Size; i++) {
+    /* Get the next process in the eager short pollset. */
+    process = CMI_VMI_Eager_Short_Pollset[i];
+
+    /* Examine the footer of the process's next eager short handle. */
+    index = process->eager_short_receive_index;
+    handle = process->eager_short_receive_handles[index];
+    footer = handle->data.receive.data.eager_short.footer;
+
+    /* Get data out of the eager short handle (and any after it). */
+    while (footer->sentinel == CMI_VMI_EAGER_SHORT_SENTINEL_DATA) {
+      /* Get a pointer to the start of the message data. */
+      msg = (char *) ((void *) handle->data.receive.data.eager_short.footer - footer->msgsize);
+
+      /* Deal with any eager send credits send with the message. */
+      credits_temp = CMI_VMI_MESSAGE_CREDITS (msg);
+      process->eager_short_send_credits_available += credits_temp;
+
+      /* Set up the Converse memory fields prior to the message data. */
+      SIZEFIELD (msg) = footer->msgsize;
+      REFFIELD (msg) = 1;
+      CONTEXTFIELD (msg) = handle;
+
+      /* Mark the message footer as "received". */
+      footer->sentinel = CMI_VMI_EAGER_SHORT_SENTINEL_RECEIVED;
+
+      /* Enqueue the message. */
+      CdsFifo_Enqueue (CpvAccess (CMI_VMI_RemoteQueue), msg);
+
+      /* Examine the footer of the process's next eager short handle. */
+      index = (index + 1) % process->eager_short_receive_size;
+      process->eager_short_receive_index = index;
+      handle = process->eager_short_receive_handles[index];
+      footer = handle->data.receive.data.eager_short.footer;
+    }
+  }
+
+  /*
+    Check to see if any processes have a large number of outstanding eager short credits.
+
+    Normally, eager short credits are replentished on the sender when we send a message
+    to it.  If we do not communicate frequently with the sender, this does not happen
+    automatically and we need to explicitly send credit updates.
+  */
+  for (i = 0; i < _Cmi_numpes; i++) {
+    process = &CMI_VMI_Processes[i];
+
+    if (process->eager_short_receive_credits_replentish >= (0.75 * CMI_VMI_Eager_Short_Slots)) {
+      CMI_VMI_MESSAGE_TYPE (&credit_msg) = CMI_VMI_MESSAGE_TYPE_CREDIT;
+      CMI_VMI_MESSAGE_CREDITS (&credit_msg) = process->eager_short_receive_credits_replentish;
+
+#if CMK_BROADCAST_SPANNING_TREE
+      CMI_SET_BROADCAST_ROOT (&credit_msg, 0);
+#endif
+
+      addrs[0] = (PVOID) &credit_msg;
+      sz[0] = (ULONG) (sizeof (CMI_VMI_Credit_Message_T));
+
+      status = VMI_Stream_Send_Inline (process->connection, addrs, sz, 1, sizeof (CMI_VMI_Credit_Message_T));
+      CMI_VMI_CHECK_SUCCESS (status, "VMI_Stream_Send_Inline()");
+
+      process->eager_short_receive_credits_replentish = 0;
+    }
+  }
+
+  /*
+    Check to see if any processes are communicating with us frequently.
+    These processes are candidates for eager communications.
+  */
+  // Not implemented yet.
+
+  /* Pump the message loop. */
+  status = VMI_Poll ();
+  CMI_VMI_CHECK_SUCCESS (status, "VMI_Poll()");
+}
+
+
+
+/**************************************************************************
+**
+*/
+void CmiMemLock ()
+{
+  /* Empty. */
+}
+
+
+
+/**************************************************************************
+**
+*/
+void CmiMemUnlock ()
+{
+  /* Empty. */
+}
+
+
+
+/**************************************************************************
+** This is our implementation of CmiPrintf().  For the case where the code
+** was started by charmrun, we must use the charmrun protocol to send
+** output back to the charmrun terminal.  Otherwise, we can simply send
+** output to the program's stdout (which is automatically redirected to
+** a socket that is attached to the right place).
+**
+** NOTE: When sending to the charmrun terminal, an explicit NULL must be
+** included at the end of the message buffer.  The charmrun terminal reuses
+** its buffer, so if a terminating NULL is not sent, the tail of any
+** previous larger-sized message is printed after the shorter message sent
+** here.
+*/
+void CmiPrintf (const char *format, ...)
+{
+  if (CMI_VMI_Startup_Type == CMI_VMI_STARTUP_TYPE_CHARMRUN) {
+    Charmrun_Header hdr;
+    va_list args;
+    char *temp_str;
+    int rc;
+
+    va_start (args, format);
+    vasprintf (&temp_str, format, args);
+
+    hdr.msg_len = htonl (strlen (temp_str) + 1);
+    strcpy (hdr.msg_type, "print");
+
+    rc = CMI_VMI_Socket_Send (CMI_VMI_Charmrun_Socket, (const void *) &hdr, sizeof (Charmrun_Header));
+    if (rc < 0) {
+      DEBUG_PRINT ("Error sending to charmrun.\n");
+    }
+    rc = CMI_VMI_Socket_Send (CMI_VMI_Charmrun_Socket, temp_str, ((strlen (temp_str)) + 1));
+    if (rc < 0) {
+      DEBUG_PRINT ("Error sending to charmrun.\n");
+    }
+
+    free (temp_str);
+  } else {
+    va_list args;
+    va_start (args, format);
+    vprintf (format, args);
+    fflush (stdout);
+    va_end (args);
+  }
+}
+
+
+
+/**************************************************************************
+** See comments for CmiPrintf() above.
+*/
+void CmiError (const char *format, ...)
+{
+  if (CMI_VMI_Startup_Type == CMI_VMI_STARTUP_TYPE_CHARMRUN) {
+    Charmrun_Header hdr;
+    va_list args;
+    char *temp_str;
+    int rc;
+
+    va_start (args, format);
+    vasprintf (&temp_str, format, args);
+
+    hdr.msg_len = htonl (strlen (temp_str) + 1);
+    strcpy (hdr.msg_type, "printerr");
+
+    rc = CMI_VMI_Socket_Send (CMI_VMI_Charmrun_Socket, (const void *) &hdr, sizeof (Charmrun_Header));
+    if (rc < 0) {
+      DEBUG_PRINT ("Error sending to charmrun.\n");
+    }
+    rc = CMI_VMI_Socket_Send (CMI_VMI_Charmrun_Socket, temp_str, ((strlen (temp_str)) + 1));
+    if (rc < 0) {
+      DEBUG_PRINT ("Error sending to charmrun.\n");
+    }
+
+    free (temp_str);
+  } else {
+    va_list args;
+    va_start (args, format);
+    vfprintf (stderr, format, args);
+    fflush (stdout);
+    va_end (args);
+  }
+}
+
+
+
+/**************************************************************************
+** This is a simple barrier function, similar to the one implemented in the
+** net-linux-gm machine layer.  This routine assumes that there are few
+** messages in flight; I have not tested extensively with many outstanding
+** messages and there could very well be some nasty race conditions.
+**
+** This routine was implemented to allow clocks to be synchronized at
+** program startup time, so Projections timeline views do not show message
+** sends that appear after the corresponding message deliveries.
+**
+** THIS CODE ASSUMES THAT CMI_VMI_Barrier_Count IS INITIALIZED TO 0
+** DURING ConverseInit()!  We cannot initialize it in this function due
+** to a race condition where PE 0 might invoke CmiBarrer() much later
+** than other nodes in the computation.  In this case, it might have
+** already seen barrier messages coming in from the other nodes and
+** counted them in the stream receive handler prior to invoking
+** CmiBarrier().
+**
+** TODO: This routine should use spanning trees if this machine layer has
+** been configured for that type of message broadcast.
+*/
+void CmiBarrier ()
+{
+  VMI_STATUS status;
+
+  CMI_VMI_Barrier_Message_T barrier_msg;
+  PVOID addrs[1];
+  ULONG sz[1];
+
+  int i;
+
+
+  /* PE 0 coordinates the barrier. */
+  if (_Cmi_mype == 0) {
+    /* Wait until all processes send us a barrier message. */
+    while (CMI_VMI_Barrier_Count < (_Cmi_numpes - 1)) {
+      status = VMI_Poll ();
+      CMI_VMI_CHECK_SUCCESS (status, "VMI_Poll()");
+    }
+
+    /* Reset the barrier count immediately to set up next barrier operation. */
+    CMI_VMI_Barrier_Count = 0;
+
+    /* Send a barrier message to each process to signal that barrier is finished. */
+    CMI_VMI_MESSAGE_TYPE (&barrier_msg) = CMI_VMI_MESSAGE_TYPE_BARRIER;
+    CMI_VMI_MESSAGE_CREDITS (&barrier_msg) = 0;
+
+#if CMK_BROADCAST_SPANNING_TREE
+    CMI_SET_BROADCAST_ROOT (&barrier_msg, 0);
+#endif
+
+    addrs[0] = (PVOID) &barrier_msg;
+    sz[0] = (ULONG) (sizeof (CMI_VMI_Barrier_Message_T));
+
+    for (i = 1; i < _Cmi_numpes; i++) {
+      status = VMI_Stream_Send_Inline ((&CMI_VMI_Processes[i])->connection, addrs, sz, 1, sizeof (CMI_VMI_Barrier_Message_T));
+      CMI_VMI_CHECK_SUCCESS (status, "VMI_Stream_Send_Inline()");
+    }
+  } else {
+    /* Send a barrier message to PE 0. */
+    CMI_VMI_MESSAGE_TYPE (&barrier_msg) = CMI_VMI_MESSAGE_TYPE_BARRIER;
+    CMI_VMI_MESSAGE_CREDITS (&barrier_msg) = 0;
+
+#if CMK_BROADCAST_SPANNING_TREE
+    CMI_SET_BROADCAST_ROOT (&barrier_msg, 0);
+#endif
+
+    addrs[0] = (PVOID) &barrier_msg;
+    sz[0] = (ULONG) (sizeof (CMI_VMI_Barrier_Message_T));
+
+    status = VMI_Stream_Send_Inline ((&CMI_VMI_Processes[0])->connection, addrs, sz, 1, sizeof (CMI_VMI_Barrier_Message_T));
+    CMI_VMI_CHECK_SUCCESS (status, "VMI_Stream_Send_Inline()");
+
+    /* Wait until PE 0 notifies us that barrier is finished. */
+    while (CMI_VMI_Barrier_Count < 1) {
+      status = VMI_Poll ();
+      CMI_VMI_CHECK_SUCCESS (status, "VMI_Poll()");
+    }
+
+    /* Reset the barrier count immediately to set up next barrier operation. */
+    CMI_VMI_Barrier_Count = 0;
+  }
+}
+
+
+
+/**************************************************************************
+**
+*/
+void CmiBarrierZero ()
+{
+  CmiBarrier ();
+}
+
+
+
+/**************************************************************************
+**
+*/
+void CmiSyncSendFn (int destrank, int msgsize, char *msg)
+{
+  VMI_STATUS status;
+
+  char *msgcopy;
+
+  CMI_VMI_Process_T *process;
+
+  PVOID addrs[2];
+  ULONG sz[2];
+
+  CMI_VMI_Handle_T *handle;
+
+  PVMI_CACHE_ENTRY cacheentry;
+
+  CMI_VMI_Publish_Message_T publish_msg;
+
+  void *context;
+
+  int index;
+
+
+  DEBUG_PRINT ("CmiSyncSendFn() called.\n");
+
+  if (destrank == _Cmi_mype) {
+    msgcopy = CmiAlloc (msgsize);
+    memcpy (msgcopy, msg, msgsize);
+    CdsFifo_Enqueue (CpvAccess (CmiLocalQueue), msgcopy);
+    return;
+  }
+
+  process = &CMI_VMI_Processes[destrank];
+
+  if ((msgsize < CMI_VMI_Medium_Message_Boundary) && (process->eager_short_send_credits_available > 0)) {
+    CMI_VMI_Send_Eager_Short (destrank, msgsize, msg);
+    return;
+  }
+
+  if (process->eager_long_send_size > 0) {
+    index = process->eager_long_send_size - 1;
+    handle = process->eager_long_send_handles[index];
+
+    if (msgsize < handle->data.send.data.eager_long.maxsize) {
+      process->eager_long_send_size = index;
+
+      CMI_VMI_Sync_Send_Eager_Long (destrank, msgsize, msg, handle);
+      return;
+    }
+  }
+
+  CMI_VMI_MESSAGE_TYPE (msg) = CMI_VMI_MESSAGE_TYPE_STANDARD;
+  CMI_VMI_MESSAGE_CREDITS (msg) = process->eager_short_receive_credits_replentish;
+  process->eager_short_receive_credits_replentish = 0;
+
+#if CMK_BROADCAST_SPANNING_TREE
+  CMI_SET_BROADCAST_ROOT (msg, 0);
+#endif
+
+  if (msgsize < CMI_VMI_Medium_Message_Boundary) {
+    addrs[0] = (PVOID) msg;
+    sz[0] = (ULONG) msgsize;
+
+    status = VMI_Stream_Send_Inline ((&CMI_VMI_Processes[destrank])->connection, addrs, sz, 1, msgsize);
+    CMI_VMI_CHECK_SUCCESS (status, "VMI_Stream_Send_Inline()");
+  } else {
+    context = CONTEXTFIELD (msg);
+    if (context) {
+      cacheentry = CMI_VMI_CacheEntry_From_Context (context);
+    } else {
+      status = VMI_Cache_Register (msg, msgsize, &cacheentry);
+      CMI_VMI_CHECK_SUCCESS (status, "VMI_Cache_Register()");
+    }
+
+    handle = CMI_VMI_Allocate_Handle ();
+
+    handle->refcount += 1;
+    handle->msg = msg;
+    handle->msgsize = msgsize;
+    handle->handle_type = CMI_VMI_HANDLE_TYPE_SEND;
+    handle->data.send.send_handle_type = CMI_VMI_SEND_HANDLE_TYPE_RDMAGET;
+    handle->data.send.message_disposition = CMI_VMI_MESSAGE_DISPOSITION_NONE;
+    handle->data.send.data.rdmaget.cacheentry = cacheentry;
+
+    handle->refcount += 1;
+    CMI_VMI_AsyncMsgCount += 1;
+
+    publish_msg.type = CMI_VMI_PUBLISH_TYPE_GET;
+
+    status = VMI_RDMA_Publish_Buffer ((&CMI_VMI_Processes[destrank])->connection, cacheentry->bufferHandle, (VMI_virt_addr_t) (VMI_ADDR_CAST) msg,
+				      msgsize, (VMI_virt_addr_t) NULL, (UINT32) handle->index, &publish_msg, sizeof (CMI_VMI_Publish_Message_T));
+    CMI_VMI_CHECK_SUCCESS (status, "VMI_RDMA_Publish_Buffer()");
+
+    while (handle->refcount > 2) {
+      sched_yield ();
+      status = VMI_Poll ();
+      CMI_VMI_CHECK_SUCCESS (status, "VMI_Poll()");
+    }
+
+    if (!context) {
+      status = VMI_Cache_Deregister (cacheentry);
+      CMI_VMI_CHECK_SUCCESS (status, "VMI_Cache_Deregister()");
+    }
+
+    CMI_VMI_Deallocate_Handle (handle);
+  }
+}
+
+
+
+/**************************************************************************
+**
+*/
+CmiCommHandle CmiAsyncSendFn (int destrank, int msgsize, char *msg)
+{
+  VMI_STATUS status;
+
+  char *msgcopy;
+
+  CMI_VMI_Process_T *process;
+
+  PVMI_BUFFER bufHandles[2];
+  PVOID addrs[2];
+  ULONG sz[2];
+
+  CMI_VMI_Handle_T *handle;
+
+  PVMI_CACHE_ENTRY cacheentry;
+
+  CMI_VMI_Publish_Message_T publish_msg;
+
+  void *context;
+
+  int index;
+
+
+  DEBUG_PRINT ("CmiAsyncSendFn() called.\n");
+
+  if (destrank == _Cmi_mype) {
+    msgcopy = CmiAlloc (msgsize);
+    memcpy (msgcopy, msg, msgsize);
+    CdsFifo_Enqueue (CpvAccess (CmiLocalQueue), msgcopy);
+    return ((CmiCommHandle) NULL);
+  }
+
+  process = &CMI_VMI_Processes[destrank];
+
+  if ((msgsize < CMI_VMI_Medium_Message_Boundary) && (process->eager_short_send_credits_available > 0)) {
+    CMI_VMI_Send_Eager_Short (destrank, msgsize, msg);
+    return ((CmiCommHandle) NULL);
+  }
+
+  if (process->eager_long_send_size > 0) {
+    index = process->eager_long_send_size - 1;
+    handle = process->eager_long_send_handles[index];
+
+    if (msgsize < handle->data.send.data.eager_long.maxsize) {
+      process->eager_long_send_size = index;
+
+      return CMI_VMI_Async_Send_Eager_Long (destrank, msgsize, msg, handle);
+    }
+  }
+
+  CMI_VMI_MESSAGE_TYPE (msg) = CMI_VMI_MESSAGE_TYPE_STANDARD;
+  CMI_VMI_MESSAGE_CREDITS (msg) = process->eager_short_receive_credits_replentish;
+  process->eager_short_receive_credits_replentish = 0;
+
+#if CMK_BROADCAST_SPANNING_TREE
+  CMI_SET_BROADCAST_ROOT (msg, 0);
+#endif
+
+  if (msgsize < CMI_VMI_Small_Message_Boundary) {
+    addrs[0] = (PVOID) msg;
+    sz[0] = msgsize;
+
+    status = VMI_Stream_Send_Inline ((&CMI_VMI_Processes[destrank])->connection, addrs, sz, 1, msgsize);
+    CMI_VMI_CHECK_SUCCESS (status, "VMI_Stream_Send_Inline()");
+
+    handle = NULL;
+  } else if (msgsize < CMI_VMI_Medium_Message_Boundary) {
+    context = CONTEXTFIELD (msg);
+    if (context) {
+      cacheentry = CMI_VMI_CacheEntry_From_Context (context);
+    } else {
+      status = VMI_Cache_Register (msg, msgsize, &cacheentry);
+      CMI_VMI_CHECK_SUCCESS (status, "VMI_Cache_Register()");
+    }
+
+    handle = CMI_VMI_Allocate_Handle ();
+
+    handle->refcount += 1;
+    handle->msg = msg;
+    handle->msgsize = msgsize;
+    handle->handle_type = CMI_VMI_HANDLE_TYPE_SEND;
+    handle->data.send.send_handle_type = CMI_VMI_SEND_HANDLE_TYPE_STREAM;
+    handle->data.send.message_disposition = CMI_VMI_MESSAGE_DISPOSITION_NONE;
+    handle->data.send.data.stream.cacheentry = cacheentry;
+
+    bufHandles[0] = cacheentry->bufferHandle;
+    addrs[0] = (PVOID) msg;
+    sz[0] = msgsize;
+
+    handle->refcount += 1;
+    CMI_VMI_AsyncMsgCount += 1;
+
+    status = VMI_Stream_Send ((&CMI_VMI_Processes[destrank])->connection, bufHandles, addrs, sz, 1, CMI_VMI_Stream_Completion_Handler, (PVOID) handle, TRUE);
+    CMI_VMI_CHECK_SUCCESS (status, "VMI_Stream_Send()");
+  } else {
+    context = CONTEXTFIELD (msg);
+    if (context) {
+      cacheentry = CMI_VMI_CacheEntry_From_Context (context);
+    } else {
+      status = VMI_Cache_Register (msg, msgsize, &cacheentry);
+      CMI_VMI_CHECK_SUCCESS (status, "VMI_Cache_Register()");
+    }
+
+    handle = CMI_VMI_Allocate_Handle ();
+
+    handle->refcount += 1;
+    handle->msg = msg;
+    handle->msgsize = msgsize;
+    handle->handle_type = CMI_VMI_HANDLE_TYPE_SEND;
+    handle->data.send.send_handle_type = CMI_VMI_SEND_HANDLE_TYPE_RDMAGET;
+    handle->data.send.message_disposition = CMI_VMI_MESSAGE_DISPOSITION_NONE;
+    handle->data.send.data.rdmaget.cacheentry = cacheentry;
+
+    handle->refcount += 1;
+    CMI_VMI_AsyncMsgCount += 1;
+
+    publish_msg.type = CMI_VMI_PUBLISH_TYPE_GET;
+
+    status = VMI_RDMA_Publish_Buffer ((&CMI_VMI_Processes[destrank])->connection, cacheentry->bufferHandle, (VMI_virt_addr_t) (VMI_ADDR_CAST) msg,
+				      msgsize, (VMI_virt_addr_t) NULL, (UINT32) handle->index, &publish_msg, sizeof (CMI_VMI_Publish_Message_T));
+    CMI_VMI_CHECK_SUCCESS (status, "VMI_RDMA_Publish_Buffer()");
+  }
+
+  return ((CmiCommHandle) handle);
+}
+
+
+
+/**************************************************************************
+**
+*/
+void CmiFreeSendFn (int destrank, int msgsize, char *msg)
+{
+  VMI_STATUS status;
+
+  char *msgcopy;
+
+  CMI_VMI_Process_T *process;
+
+  PVMI_BUFFER bufHandles[2];
+  PVOID addrs[2];
+  ULONG sz[2];
+
+  CMI_VMI_Handle_T *handle;
+
+  PVMI_CACHE_ENTRY cacheentry;
+
+  CMI_VMI_Publish_Message_T publish_msg;
+
+  void *context;
+
+  int index;
+
+
+  DEBUG_PRINT ("CmiFreeSendFn() called.\n");
+
+  if (destrank == _Cmi_mype) {
+    CdsFifo_Enqueue (CpvAccess (CmiLocalQueue), msg);
+    return;
+  }
+
+  process = &CMI_VMI_Processes[destrank];
+
+  if ((msgsize < CMI_VMI_Medium_Message_Boundary) && (process->eager_short_send_credits_available > 0)) {
+    CMI_VMI_Send_Eager_Short (destrank, msgsize, msg);
+    CmiFree (msg);
+    return;
+  }
+
+  if (process->eager_long_send_size > 0) {
+    index = process->eager_long_send_size - 1;
+    handle = process->eager_long_send_handles[index];
+
+    if (msgsize < handle->data.send.data.eager_long.maxsize) {
+      process->eager_long_send_size = index;
+
+      CMI_VMI_Free_Send_Eager_Long (destrank, msgsize, msg, handle);
+      return;
+    }
+  }
+
+  CMI_VMI_MESSAGE_TYPE (msg) = CMI_VMI_MESSAGE_TYPE_STANDARD;
+  CMI_VMI_MESSAGE_CREDITS (msg) = process->eager_short_receive_credits_replentish;
+  process->eager_short_receive_credits_replentish = 0;
+
+#if CMK_BROADCAST_SPANNING_TREE
+  CMI_SET_BROADCAST_ROOT (msg, 0);
+#endif
+
+  if (msgsize < CMI_VMI_Small_Message_Boundary) {
+    addrs[0] = (PVOID) msg;
+    sz[0] = msgsize;
+
+    status = VMI_Stream_Send_Inline ((&CMI_VMI_Processes[destrank])->connection, addrs, sz, 1, msgsize);
+    CMI_VMI_CHECK_SUCCESS (status, "VMI_Stream_Send_Inline()");
+
+    CmiFree (msg);
+  } else if (msgsize < CMI_VMI_Medium_Message_Boundary) {
+    context = CONTEXTFIELD (msg);
+    if (context) {
+      cacheentry = CMI_VMI_CacheEntry_From_Context (context);
+    } else {
+      status = VMI_Cache_Register (msg, msgsize, &cacheentry);
+      CMI_VMI_CHECK_SUCCESS (status, "VMI_Cache_Register()");
+    }
+
+    handle = CMI_VMI_Allocate_Handle ();
+
+    /* Do NOT increment handle->refcount here! */
+    handle->msg = msg;
+    handle->msgsize = msgsize;
+    handle->handle_type = CMI_VMI_HANDLE_TYPE_SEND;
+    handle->data.send.send_handle_type = CMI_VMI_SEND_HANDLE_TYPE_STREAM;
+    handle->data.send.message_disposition = CMI_VMI_MESSAGE_DISPOSITION_FREE;
+    handle->data.send.data.stream.cacheentry = cacheentry;
+
+    bufHandles[0] = cacheentry->bufferHandle;
+    addrs[0] = (PVOID) msg;
+    sz[0] = msgsize;
+
+    handle->refcount += 1;
+    CMI_VMI_AsyncMsgCount += 1;
+
+    status = VMI_Stream_Send ((&CMI_VMI_Processes[destrank])->connection, bufHandles, addrs, sz, 1, CMI_VMI_Stream_Completion_Handler, (PVOID) handle, TRUE);
+    CMI_VMI_CHECK_SUCCESS (status, "VMI_Stream_Send()");
+  } else {
+    context = CONTEXTFIELD (msg);
+    if (context) {
+      cacheentry = CMI_VMI_CacheEntry_From_Context (context);
+    } else {
+      status = VMI_Cache_Register (msg, msgsize, &cacheentry);
+      CMI_VMI_CHECK_SUCCESS (status, "VMI_Cache_Register()");
+    }
+
+    handle = CMI_VMI_Allocate_Handle ();
+
+    /* Do NOT increment handle->refcount here! */
+    handle->msg = msg;
+    handle->msgsize = msgsize;
+    handle->handle_type = CMI_VMI_HANDLE_TYPE_SEND;
+    handle->data.send.send_handle_type = CMI_VMI_SEND_HANDLE_TYPE_RDMAGET;
+    handle->data.send.message_disposition = CMI_VMI_MESSAGE_DISPOSITION_FREE;
+    handle->data.send.data.rdmaget.cacheentry = cacheentry;
+
+    handle->refcount += 1;
+    CMI_VMI_AsyncMsgCount += 1;
+
+    publish_msg.type = CMI_VMI_PUBLISH_TYPE_GET;
+
+    status = VMI_RDMA_Publish_Buffer ((&CMI_VMI_Processes[destrank])->connection, cacheentry->bufferHandle, (VMI_virt_addr_t) (VMI_ADDR_CAST) msg,
+				      msgsize, (VMI_virt_addr_t) NULL, (UINT32) handle->index, &publish_msg, sizeof (CMI_VMI_Publish_Message_T));
+    CMI_VMI_CHECK_SUCCESS (status, "VMI_RDMA_Publish_Buffer()");
+  }
+}
+
+
+
+/**************************************************************************
+**
+*/
+void CmiSyncBroadcastFn (int msgsize, char *msg)
+{
+  VMI_STATUS status;
+
+  PVMI_BUFFER bufHandles[2];
+  PVOID addrs[2];
+  ULONG sz[2];
+
+  CMI_VMI_Handle_T *handle;
+
+  int i;
+
+  PVMI_CACHE_ENTRY cacheentry;
+
+  int childcount;
+  int startrank;
+  int destrank;
+
+  CMI_VMI_Publish_Message_T publish_msg;
+
+  void *context;
+
+
+  DEBUG_PRINT ("CmiSyncBroadcastFn() called.\n");
+
+  CMI_VMI_MESSAGE_TYPE (msg) = CMI_VMI_MESSAGE_TYPE_STANDARD;
+  CMI_VMI_MESSAGE_CREDITS (msg) = 0;
+
+  if (msgsize < CMI_VMI_Medium_Message_Boundary) {
+    context = CONTEXTFIELD (msg);
+    if (context) {
+      cacheentry = CMI_VMI_CacheEntry_From_Context (context);
+    } else {
+      status = VMI_Cache_Register (msg, msgsize, &cacheentry);
+      CMI_VMI_CHECK_SUCCESS (status, "VMI_Cache_Register()");
+    }
+
+    handle = CMI_VMI_Allocate_Handle ();
+
+    handle->refcount += 1;
+    handle->msg = msg;
+    handle->msgsize = msgsize;
+    handle->handle_type = CMI_VMI_HANDLE_TYPE_SEND;
+    handle->data.send.send_handle_type = CMI_VMI_SEND_HANDLE_TYPE_STREAM;
+    handle->data.send.message_disposition = CMI_VMI_MESSAGE_DISPOSITION_NONE;
+    handle->data.send.data.stream.cacheentry = cacheentry;
+
+    bufHandles[0] = cacheentry->bufferHandle;
+    addrs[0] = (PVOID) msg;
+    sz[0] = (ULONG) msgsize;
+
+#if CMK_BROADCAST_SPANNING_TREE
+    CMI_SET_BROADCAST_ROOT (msg, (_Cmi_mype + 1));
+
+    childcount = CMI_VMI_Spanning_Children_Count (msg);
+
+    handle->refcount += childcount;
+    CMI_VMI_AsyncMsgCount += childcount;
+
+    startrank = CMI_BROADCAST_ROOT (msg) - 1;
+    for (i = 1; i <= CMI_VMI_BROADCAST_SPANNING_FACTOR; i++) {
+      destrank = _Cmi_mype - startrank;
+
+      if (destrank < 0) {
+	destrank += _Cmi_numpes;
+      }
+
+      destrank = CMI_VMI_BROADCAST_SPANNING_FACTOR * destrank + i;
+
+      if (destrank > (_Cmi_numpes - 1)) {
+	break;
+      }
+
+      destrank += startrank;
+      destrank %= _Cmi_numpes;
+
+      status = VMI_Stream_Send ((&CMI_VMI_Processes[destrank])->connection, bufHandles, addrs, sz, 1, CMI_VMI_Stream_Completion_Handler, (PVOID) handle, TRUE);
+      CMI_VMI_CHECK_SUCCESS (status, "VMI_Stream_Send()");
+    }
+#else
+    handle->refcount += (_Cmi_numpes - 1);
+    CMI_VMI_AsyncMsgCount += (_Cmi_numpes - 1);
+
+    for (i = 0; i < _Cmi_mype; i++) {
+      status = VMI_Stream_Send ((&CMI_VMI_Processes[i])->connection, bufHandles, addrs, sz, 1, CMI_VMI_Stream_Completion_Handler, (PVOID) handle, TRUE);
+      CMI_VMI_CHECK_SUCCESS (status, "VMI_Stream_Send()");
+    }
+
+    for (i = (_Cmi_mype + 1); i < _Cmi_numpes; i++) {
+      status = VMI_Stream_Send ((&CMI_VMI_Processes[i])->connection, bufHandles, addrs, sz, 1, CMI_VMI_Stream_Completion_Handler, (PVOID) handle, TRUE);
+      CMI_VMI_CHECK_SUCCESS (status, "VMI_Stream_Send()");
+    }
+#endif
+
+    while (handle->refcount > 2) {
+      sched_yield ();
+      status = VMI_Poll ();
+      CMI_VMI_CHECK_SUCCESS (status, "VMI_Poll()");
+    }
+
+    if (!context) {
+      status = VMI_Cache_Deregister (cacheentry);
+      CMI_VMI_CHECK_SUCCESS (status, "VMI_Cache_Deregister()");
+    }
+
+    CMI_VMI_Deallocate_Handle (handle);
+  } else {
+    context = CONTEXTFIELD (msg);
+    if (context) {
+      cacheentry = CMI_VMI_CacheEntry_From_Context (context);
+    } else {
+      status = VMI_Cache_Register (msg, msgsize, &cacheentry);
+      CMI_VMI_CHECK_SUCCESS (status, "VMI_Cache_Register()");
+    }
+
+    handle = CMI_VMI_Allocate_Handle ();
+
+    handle->refcount += 1;
+    handle->msg = msg;
+    handle->msgsize = msgsize;
+    handle->handle_type = CMI_VMI_HANDLE_TYPE_SEND;
+    handle->data.send.send_handle_type=CMI_VMI_SEND_HANDLE_TYPE_RDMABROADCAST;
+    handle->data.send.message_disposition = CMI_VMI_MESSAGE_DISPOSITION_NONE;
+    handle->data.send.data.rdmabroadcast.cacheentry = cacheentry;
+
+    publish_msg.type = CMI_VMI_PUBLISH_TYPE_GET;
+
+#if CMK_BROADCAST_SPANNING_TREE
+    CMI_SET_BROADCAST_ROOT (msg, (_Cmi_mype + 1));
+
+    childcount = CMI_VMI_Spanning_Children_Count (msg);
+
+    handle->refcount += childcount;
+    CMI_VMI_AsyncMsgCount += childcount;
+
+    startrank = CMI_BROADCAST_ROOT (msg) - 1;
+    for (i = 1; i <= CMI_VMI_BROADCAST_SPANNING_FACTOR; i++) {
+      destrank = _Cmi_mype - startrank;
+
+      if (destrank < 0) {
+	destrank += _Cmi_numpes;
+      }
+
+      destrank = CMI_VMI_BROADCAST_SPANNING_FACTOR * destrank + i;
+
+      if (destrank > (_Cmi_numpes - 1)) {
+	break;
+      }
+
+      destrank += startrank;
+      destrank %= _Cmi_numpes;
+
+      status = VMI_RDMA_Publish_Buffer ((&CMI_VMI_Processes[destrank])->connection, cacheentry->bufferHandle, (VMI_virt_addr_t) (VMI_ADDR_CAST) msg,
+					msgsize, (VMI_virt_addr_t) NULL, (UINT32) handle->index, &publish_msg, sizeof (CMI_VMI_Publish_Message_T));
+      CMI_VMI_CHECK_SUCCESS (status, "VMI_RDMA_Publish_Buffer()");
+    }
+#else
+    handle->refcount += (_Cmi_numpes - 1);
+    CMI_VMI_AsyncMsgCount += (_Cmi_numpes - 1);
+
+    for (i = 0; i < _Cmi_mype; i++) {
+      status = VMI_RDMA_Publish_Buffer ((&CMI_VMI_Processes[i])->connection, cacheentry->bufferHandle, (VMI_virt_addr_t) (VMI_ADDR_CAST) msg, msgsize,
+					(VMI_virt_addr_t) NULL, (UINT32) handle->index, &publish_msg, sizeof (CMI_VMI_Publish_Message_T));
+      CMI_VMI_CHECK_SUCCESS (status, "VMI_RDMA_Publish_Buffer()");
+    }
+
+    for (i = (_Cmi_mype + 1); i < _Cmi_numpes; i++) {
+      status = VMI_RDMA_Publish_Buffer ((&CMI_VMI_Processes[i])->connection, cacheentry->bufferHandle, (VMI_virt_addr_t) (VMI_ADDR_CAST) msg, msgsize,
+					(VMI_virt_addr_t) NULL, (UINT32) handle->index, &publish_msg, sizeof (CMI_VMI_Publish_Message_T));
+      CMI_VMI_CHECK_SUCCESS (status, "VMI_RDMA_Publish_Buffer()");
+    }
+#endif
+
+    while (handle->refcount > 2) {
+      sched_yield ();
+      status = VMI_Poll ();
+      CMI_VMI_CHECK_SUCCESS (status, "VMI_Poll()");
+    }
+
+    if (!context) {
+      status = VMI_Cache_Deregister (cacheentry);
+      CMI_VMI_CHECK_SUCCESS (status, "VMI_Cache_Deregister()");
+    }
+
+    CMI_VMI_Deallocate_Handle (handle);
+  }
+}
+
+
+
+/**************************************************************************
+**
+*/
+CmiCommHandle CmiAsyncBroadcastFn (int msgsize, char *msg)
+{
+  VMI_STATUS status;
+
+  PVMI_BUFFER bufHandles[2];
+  PVOID addrs[2];
+  ULONG sz[2];
+
+  CMI_VMI_Handle_T *handle;
+
+  int i;
+
+  PVMI_CACHE_ENTRY cacheentry;
+
+  int childcount;
+  int startrank;
+  int destrank;
+
+  CMI_VMI_Publish_Message_T publish_msg;
+
+  void *context;
+
+
+  DEBUG_PRINT ("CmiAsyncBroadcastFn() called.\n");
+
+  CMI_VMI_MESSAGE_TYPE (msg) = CMI_VMI_MESSAGE_TYPE_STANDARD;
+  CMI_VMI_MESSAGE_CREDITS (msg) = 0;
+
+  if (msgsize < CMI_VMI_Small_Message_Boundary) {
+    addrs[0] = (PVOID) msg;
+    sz[0] = msgsize;
+
+#if CMK_BROADCAST_SPANNING_TREE
+    CMI_SET_BROADCAST_ROOT (msg, (_Cmi_mype + 1));
+
+    childcount = CMI_VMI_Spanning_Children_Count (msg);
+
+    startrank = CMI_BROADCAST_ROOT (msg) - 1;
+    for (i = 1; i <= CMI_VMI_BROADCAST_SPANNING_FACTOR; i++) {
+      destrank = _Cmi_mype - startrank;
+
+      if (destrank < 0) {
+	destrank += _Cmi_numpes;
+      }
+
+      destrank = CMI_VMI_BROADCAST_SPANNING_FACTOR * destrank + i;
+
+      if (destrank > (_Cmi_numpes - 1)) {
+	break;
+      }
+
+      destrank += startrank;
+      destrank %= _Cmi_numpes;
+
+      status = VMI_Stream_Send_Inline ((&CMI_VMI_Processes[destrank])->connection, addrs, sz, 1, msgsize);
+      CMI_VMI_CHECK_SUCCESS (status, "VMI_Stream_Send_Inline()");
+    }
+#else
+    for (i = 0; i < _Cmi_mype; i++) {
+      status = VMI_Stream_Send_Inline ((&CMI_VMI_Processes[i])->connection, addrs, sz, 1, msgsize);
+      CMI_VMI_CHECK_SUCCESS (status, "VMI_Stream_Send_Inline()");
+    }
+
+    for (i = (_Cmi_mype + 1); i < _Cmi_numpes; i++) {
+      status = VMI_Stream_Send_Inline ((&CMI_VMI_Processes[i])->connection, addrs, sz, 1, msgsize);
+      CMI_VMI_CHECK_SUCCESS (status, "VMI_Stream_Send_Inline()");
+    }
+#endif
+
+    handle = NULL;
+  } else if (msgsize < CMI_VMI_Medium_Message_Boundary) {
+    context = CONTEXTFIELD (msg);
+    if (context) {
+      cacheentry = CMI_VMI_CacheEntry_From_Context (context);
+    } else {
+      status = VMI_Cache_Register (msg, msgsize, &cacheentry);
+      CMI_VMI_CHECK_SUCCESS (status, "VMI_Cache_Register()");
+    }
+
+    handle = CMI_VMI_Allocate_Handle ();
+
+    handle->refcount += 1;
+    handle->msg = msg;
+    handle->msgsize = msgsize;
+    handle->handle_type = CMI_VMI_HANDLE_TYPE_SEND;
+    handle->data.send.send_handle_type = CMI_VMI_SEND_HANDLE_TYPE_STREAM;
+    handle->data.send.message_disposition = CMI_VMI_MESSAGE_DISPOSITION_NONE;
+    handle->data.send.data.stream.cacheentry = cacheentry;
+
+    bufHandles[0] = cacheentry->bufferHandle;
+    addrs[0] = (PVOID) msg;
+    sz[0] = (ULONG) msgsize;
+
+#if CMK_BROADCAST_SPANNING_TREE
+    CMI_SET_BROADCAST_ROOT (msg, (_Cmi_mype + 1));
+
+    childcount = CMI_VMI_Spanning_Children_Count (msg);
+
+    handle->refcount += childcount;
+    CMI_VMI_AsyncMsgCount += childcount;
+
+    startrank = CMI_BROADCAST_ROOT (msg) - 1;
+    for (i = 1; i <= CMI_VMI_BROADCAST_SPANNING_FACTOR; i++) {
+      destrank = _Cmi_mype - startrank;
+
+      if (destrank < 0) {
+	destrank += _Cmi_numpes;
+      }
+
+      destrank = CMI_VMI_BROADCAST_SPANNING_FACTOR * destrank + i;
+
+      if (destrank > (_Cmi_numpes - 1)) {
+	break;
+      }
+
+      destrank += startrank;
+      destrank %= _Cmi_numpes;
+
+      status = VMI_Stream_Send ((&CMI_VMI_Processes[destrank])->connection, bufHandles, addrs, sz, 1, CMI_VMI_Stream_Completion_Handler, (PVOID) handle, TRUE);
+      CMI_VMI_CHECK_SUCCESS (status, "VMI_Stream_Send()");
+    }
+#else
+    handle->refcount += (_Cmi_numpes - 1);
+    CMI_VMI_AsyncMsgCount += (_Cmi_numpes - 1);
+
+    for (i = 0; i < _Cmi_mype; i++) {
+      status = VMI_Stream_Send ((&CMI_VMI_Processes[i])->connection, bufHandles, addrs, sz, 1, CMI_VMI_Stream_Completion_Handler, (PVOID) handle, TRUE);
+      CMI_VMI_CHECK_SUCCESS (status, "VMI_Stream_Send()");
+    }
+
+    for (i = (_Cmi_mype + 1); i < _Cmi_numpes; i++) {
+      status = VMI_Stream_Send ((&CMI_VMI_Processes[i])->connection, bufHandles, addrs, sz, 1, CMI_VMI_Stream_Completion_Handler, (PVOID) handle, TRUE);
+      CMI_VMI_CHECK_SUCCESS (status, "VMI_Stream_Send()");
+    }
+#endif
+  } else {
+    context = CONTEXTFIELD (msg);
+    if (context) {
+      cacheentry = CMI_VMI_CacheEntry_From_Context (context);
+    } else {
+      status = VMI_Cache_Register (msg, msgsize, &cacheentry);
+      CMI_VMI_CHECK_SUCCESS (status, "VMI_Cache_Register()");
+    }
+
+    handle = CMI_VMI_Allocate_Handle ();
+
+    handle->refcount += 1;
+    handle->msg = msg;
+    handle->msgsize = msgsize;
+    handle->handle_type = CMI_VMI_HANDLE_TYPE_SEND;
+    handle->data.send.send_handle_type = CMI_VMI_SEND_HANDLE_TYPE_RDMABROADCAST;
+    handle->data.send.message_disposition = CMI_VMI_MESSAGE_DISPOSITION_NONE;
+    handle->data.send.data.rdmabroadcast.cacheentry = cacheentry;
+
+    publish_msg.type = CMI_VMI_PUBLISH_TYPE_GET;
+
+#if CMK_BROADCAST_SPANNING_TREE
+    CMI_SET_BROADCAST_ROOT (msg, (_Cmi_mype + 1));
+
+    childcount = CMI_VMI_Spanning_Children_Count (msg);
+
+    handle->refcount += childcount;
+    CMI_VMI_AsyncMsgCount += childcount;
+
+    startrank = CMI_BROADCAST_ROOT (msg) - 1;
+    for (i = 1; i <= CMI_VMI_BROADCAST_SPANNING_FACTOR; i++) {
+      destrank = _Cmi_mype - startrank;
+
+      if (destrank < 0) {
+	destrank += _Cmi_numpes;
+      }
+
+      destrank = CMI_VMI_BROADCAST_SPANNING_FACTOR * destrank + i;
+
+      if (destrank > (_Cmi_numpes - 1)) {
+	break;
+      }
+
+      destrank += startrank;
+      destrank %= _Cmi_numpes;
+
+      status = VMI_RDMA_Publish_Buffer ((&CMI_VMI_Processes[destrank])->connection, cacheentry->bufferHandle, (VMI_virt_addr_t) (VMI_ADDR_CAST) msg,
+					msgsize, (VMI_virt_addr_t) NULL, (UINT32) handle->index, &publish_msg, sizeof (CMI_VMI_Publish_Message_T));
+      CMI_VMI_CHECK_SUCCESS (status, "VMI_RDMA_Publish_Buffer()");
+    }
+#else
+    handle->refcount += (_Cmi_numpes - 1);
+    CMI_VMI_AsyncMsgCount += (_Cmi_numpes - 1);
+
+    for (i = 0; i < _Cmi_mype; i++) {
+      status = VMI_RDMA_Publish_Buffer ((&CMI_VMI_Processes[i])->connection, cacheentry->bufferHandle, (VMI_virt_addr_t) (VMI_ADDR_CAST) msg, msgsize,
+					(VMI_virt_addr_t) NULL, (UINT32) handle->index, &publish_msg, sizeof (CMI_VMI_Publish_Message_T));
+      CMI_VMI_CHECK_SUCCESS (status, "VMI_RDMA_Publish_Buffer()");
+    }
+
+    for (i = (_Cmi_mype + 1); i < _Cmi_numpes; i++) {
+      status = VMI_RDMA_Publish_Buffer ((&CMI_VMI_Processes[i])->connection, cacheentry->bufferHandle, (VMI_virt_addr_t) (VMI_ADDR_CAST) msg, msgsize,
+					(VMI_virt_addr_t) NULL, (UINT32) handle->index, &publish_msg, sizeof (CMI_VMI_Publish_Message_T));
+      CMI_VMI_CHECK_SUCCESS (status, "VMI_RDMA_Publish_Buffer()");
+    }
+#endif
+  }
+
+  return ((CmiCommHandle) handle);
+}
+
+
+
+/**************************************************************************
+**
+*/
+void CmiFreeBroadcastFn (int msgsize, char *msg)
+{
+  VMI_STATUS status;
+
+  PVMI_BUFFER bufHandles[2];
+  PVOID addrs[2];
+  ULONG sz[2];
+
+  CMI_VMI_Handle_T *handle;
+
+  int i;
+
+  PVMI_CACHE_ENTRY cacheentry;
+
+  int childcount;
+  int startrank;
+  int destrank;
+
+  CMI_VMI_Publish_Message_T publish_msg;
+
+  void *context;
+
+
+  DEBUG_PRINT ("CmiFreeBroadcastFn() called.\n");
+
+  CMI_VMI_MESSAGE_TYPE (msg) = CMI_VMI_MESSAGE_TYPE_STANDARD;
+  CMI_VMI_MESSAGE_CREDITS (msg) = 0;
+
+  if (msgsize < CMI_VMI_Small_Message_Boundary) {
+    addrs[0] = (PVOID) msg;
+    sz[0] = msgsize;
+
+#if CMK_BROADCAST_SPANNING_TREE
+    CMI_SET_BROADCAST_ROOT (msg, (_Cmi_mype + 1));
+
+    childcount = CMI_VMI_Spanning_Children_Count (msg);
+
+    startrank = CMI_BROADCAST_ROOT (msg) - 1;
+    for (i = 1; i <= CMI_VMI_BROADCAST_SPANNING_FACTOR; i++) {
+      destrank = _Cmi_mype - startrank;
+
+      if (destrank < 0) {
+	destrank += _Cmi_numpes;
+      }
+
+      destrank = CMI_VMI_BROADCAST_SPANNING_FACTOR * destrank + i;
+
+      if (destrank > (_Cmi_numpes - 1)) {
+	break;
+      }
+
+      destrank += startrank;
+      destrank %= _Cmi_numpes;
+
+      status = VMI_Stream_Send_Inline ((&CMI_VMI_Processes[destrank])->connection, addrs, sz, 1, msgsize);
+      CMI_VMI_CHECK_SUCCESS (status, "VMI_Stream_Send_Inline()");
+    }
+#else
+    for (i = 0; i < _Cmi_mype; i++) {
+      status = VMI_Stream_Send_Inline ((&CMI_VMI_Processes[i])->connection, addrs, sz, 1, msgsize);
+      CMI_VMI_CHECK_SUCCESS (status, "VMI_Stream_Send_Inline()");
+    }
+
+    for (i = (_Cmi_mype + 1); i < _Cmi_numpes; i++) {
+      status = VMI_Stream_Send_Inline ((&CMI_VMI_Processes[i])->connection, addrs, sz, 1, msgsize);
+      CMI_VMI_CHECK_SUCCESS (status, "VMI_Stream_Send_Inline()");
+    }
+#endif
+
+    CmiFree (msg);
+  } else if (msgsize < CMI_VMI_Medium_Message_Boundary) {
+    context = CONTEXTFIELD (msg);
+    if (context) {
+      cacheentry = CMI_VMI_CacheEntry_From_Context (context);
+    } else {
+      status = VMI_Cache_Register (msg, msgsize, &cacheentry);
+      CMI_VMI_CHECK_SUCCESS (status, "VMI_Cache_Register()");
+    }
+
+    handle = CMI_VMI_Allocate_Handle ();
+
+    /* Do NOT increment handle->refcount here! */
+    handle->msg = msg;
+    handle->msgsize = msgsize;
+    handle->handle_type = CMI_VMI_HANDLE_TYPE_SEND;
+    handle->data.send.send_handle_type = CMI_VMI_SEND_HANDLE_TYPE_STREAM;
+    handle->data.send.message_disposition = CMI_VMI_MESSAGE_DISPOSITION_FREE;
+    handle->data.send.data.stream.cacheentry = cacheentry;
+
+    bufHandles[0] = cacheentry->bufferHandle;
+    addrs[0] = (PVOID) msg;
+    sz[0] = (ULONG) msgsize;
+
+#if CMK_BROADCAST_SPANNING_TREE
+    CMI_SET_BROADCAST_ROOT (msg, (_Cmi_mype + 1));
+
+    childcount = CMI_VMI_Spanning_Children_Count (msg);
+
+    handle->refcount += childcount;
+    CMI_VMI_AsyncMsgCount += childcount;
+
+    startrank = CMI_BROADCAST_ROOT (msg) - 1;
+    for (i = 1; i <= CMI_VMI_BROADCAST_SPANNING_FACTOR; i++) {
+      destrank = _Cmi_mype - startrank;
+
+      if (destrank < 0) {
+	destrank += _Cmi_numpes;
+      }
+
+      destrank = CMI_VMI_BROADCAST_SPANNING_FACTOR * destrank + i;
+
+      if (destrank > (_Cmi_numpes - 1)) {
+	break;
+      }
+
+      destrank += startrank;
+      destrank %= _Cmi_numpes;
+
+      status = VMI_Stream_Send ((&CMI_VMI_Processes[destrank])->connection, bufHandles, addrs, sz, 1, CMI_VMI_Stream_Completion_Handler, (PVOID) handle, TRUE);
+      CMI_VMI_CHECK_SUCCESS (status, "VMI_Stream_Send()");
+    }
+#else
+    handle->refcount += (_Cmi_numpes - 1);
+    CMI_VMI_AsyncMsgCount += (_Cmi_numpes - 1);
+
+    for (i = 0; i < _Cmi_mype; i++) {
+      status = VMI_Stream_Send ((&CMI_VMI_Processes[i])->connection, bufHandles, addrs, sz, 1, CMI_VMI_Stream_Completion_Handler, (PVOID) handle, TRUE);
+      CMI_VMI_CHECK_SUCCESS (status, "VMI_Stream_Send()");
+    }
+
+    for (i = (_Cmi_mype + 1); i < _Cmi_numpes; i++) {
+      status = VMI_Stream_Send ((&CMI_VMI_Processes[i])->connection, bufHandles, addrs, sz, 1, CMI_VMI_Stream_Completion_Handler, (PVOID) handle, TRUE);
+      CMI_VMI_CHECK_SUCCESS (status, "VMI_Stream_Send()");
+    }
+#endif
+  } else {
+    context = CONTEXTFIELD (msg);
+    if (context) {
+      cacheentry = CMI_VMI_CacheEntry_From_Context (context);
+    } else {
+      status = VMI_Cache_Register (msg, msgsize, &cacheentry);
+      CMI_VMI_CHECK_SUCCESS (status, "VMI_Cache_Register()");
+    }
+
+    handle = CMI_VMI_Allocate_Handle ();
+
+    /* Do NOT increment handle->refcount here! */
+    handle->msg = msg;
+    handle->msgsize = msgsize;
+    handle->handle_type = CMI_VMI_HANDLE_TYPE_SEND;
+    handle->data.send.send_handle_type=CMI_VMI_SEND_HANDLE_TYPE_RDMABROADCAST;
+    handle->data.send.message_disposition = CMI_VMI_MESSAGE_DISPOSITION_FREE;
+    handle->data.send.data.rdmabroadcast.cacheentry = cacheentry;
+
+    publish_msg.type = CMI_VMI_PUBLISH_TYPE_GET;
+
+#if CMK_BROADCAST_SPANNING_TREE
+    CMI_SET_BROADCAST_ROOT (msg, (_Cmi_mype + 1));
+
+    childcount = CMI_VMI_Spanning_Children_Count (msg);
+
+    handle->refcount += childcount;
+    CMI_VMI_AsyncMsgCount += childcount;
+
+    startrank = CMI_BROADCAST_ROOT (msg) - 1;
+    for (i = 1; i <= CMI_VMI_BROADCAST_SPANNING_FACTOR; i++) {
+      destrank = _Cmi_mype - startrank;
+
+      if (destrank < 0) {
+	destrank += _Cmi_numpes;
+      }
+
+      destrank = CMI_VMI_BROADCAST_SPANNING_FACTOR * destrank + i;
+
+      if (destrank > (_Cmi_numpes - 1)) {
+	break;
+      }
+
+      destrank += startrank;
+      destrank %= _Cmi_numpes;
+
+      status = VMI_RDMA_Publish_Buffer ((&CMI_VMI_Processes[destrank])->connection, cacheentry->bufferHandle, (VMI_virt_addr_t) (VMI_ADDR_CAST) msg,
+					msgsize, (VMI_virt_addr_t) NULL, (UINT32) handle->index, &publish_msg, sizeof (CMI_VMI_Publish_Message_T));
+      CMI_VMI_CHECK_SUCCESS (status, "VMI_RDMA_Publish_Buffer()");
+    }
+#else
+    handle->refcount += (_Cmi_numpes - 1);
+    CMI_VMI_AsyncMsgCount += (_Cmi_numpes - 1);
+
+    for (i = 0; i < _Cmi_mype; i++) {
+      status = VMI_RDMA_Publish_Buffer ((&CMI_VMI_Processes[i])->connection, cacheentry->bufferHandle, (VMI_virt_addr_t) (VMI_ADDR_CAST) msg, msgsize,
+					(VMI_virt_addr_t) NULL, (UINT32) handle->index, &publish_msg, sizeof (CMI_VMI_Publish_Message_T));
+      CMI_VMI_CHECK_SUCCESS (status, "VMI_RDMA_Publish_Buffer()");
+    }
+
+    for (i = (_Cmi_mype + 1); i < _Cmi_numpes; i++) {
+      status = VMI_RDMA_Publish_Buffer ((&CMI_VMI_Processes[i])->connection, cacheentry->bufferHandle, (VMI_virt_addr_t) (VMI_ADDR_CAST) msg, msgsize,
+					(VMI_virt_addr_t) NULL, (UINT32) handle->index, &publish_msg, sizeof (CMI_VMI_Publish_Message_T));
+      CMI_VMI_CHECK_SUCCESS (status, "VMI_RDMA_Publish_Buffer()");
+    }
+#endif
+  }
+}
+
+
+
+/**************************************************************************
+**
+*/
+void CmiSyncBroadcastAllFn (int msgsize, char *msg)
+{
+  char *msgcopy;
+
+
+  DEBUG_PRINT ("CmiSyncBroadcastAllFn() called.\n");
+
+  msgcopy = CmiAlloc (msgsize);
+  memcpy (msgcopy, msg, msgsize);
+  CdsFifo_Enqueue (CpvAccess (CmiLocalQueue), msgcopy);
+
+  CmiSyncBroadcastFn (msgsize, msg);
+}
+
+
+
+/**************************************************************************
+**
+*/
+CmiCommHandle CmiAsyncBroadcastAllFn (int msgsize, char *msg)
+{
+  char *msgcopy;
+
+
+  DEBUG_PRINT ("CmiAsyncBroadcastAllFn() called.\n");
+
+  msgcopy = CmiAlloc (msgsize);
+  memcpy (msgcopy, msg, msgsize);
+  CdsFifo_Enqueue (CpvAccess (CmiLocalQueue), msgcopy);
+
+  return (CmiAsyncBroadcastFn (msgsize, msg));
+}
+
+
+
+/**************************************************************************
+** The idea here is that for short messages, just do a sync broadcast
+** since internally all of the sends for short messages happen
+** synchronously anyway and these are pretty quick due to high memory
+** bus bandwidth; for medium messages, copy the message and enqueue the
+** copy locally and then call FreeBroadcast to send the message to the
+** other processes asynchronously (and free the message at an idle point
+** in the future when doing periodic resource cleanup); for large messages,
+** send synchronously to all other processes and then enqueue the actual
+** message to avoid copying it.
+*/
+void CmiFreeBroadcastAllFn (int msgsize, char *msg)
+{
+  char *msgcopy;
+
+
+  DEBUG_PRINT ("CmiFreeBroadcastAllFn() called.\n");
+
+#if CMK_BROADCAST_SPANNING_TREE
+  if (msgsize < CMI_VMI_Small_Message_Boundary) {
+    CmiSyncBroadcastFn (msgsize, msg);
+    CdsFifo_Enqueue (CpvAccess (CmiLocalQueue), msg);
+  } else if (msgsize < CMI_VMI_Medium_Message_Boundary) {
+    msgcopy = CmiAlloc (msgsize);
+    memcpy (msgcopy, msg, msgsize);
+    CdsFifo_Enqueue (CpvAccess (CmiLocalQueue), msgcopy);
+
+    CmiFreeBroadcastFn (msgsize, msg);
+  } else {
+    CmiSyncBroadcastFn (msgsize, msg);
+    CdsFifo_Enqueue (CpvAccess (CmiLocalQueue), msg);
+  }
+#else
+  if (msgsize < CMI_VMI_Medium_Message_Boundary) {
+    msgcopy = CmiAlloc (msgsize);
+    memcpy (msgcopy, msg, msgsize);
+    CdsFifo_Enqueue (CpvAccess (CmiLocalQueue), msgcopy);
+
+    CmiFreeBroadcastFn (msgsize, msg);
+  } else {
+    CmiSyncBroadcastFn (msgsize, msg);
+    CdsFifo_Enqueue (CpvAccess (CmiLocalQueue), msg);
+  }
+#endif
+}
+
+
+
+/**************************************************************************
+**
+*/
+int CmiAsyncMsgSent (CmiCommHandle commhandle)
+{
+  CMI_VMI_Handle_T *handle;
+
+
+  DEBUG_PRINT ("CmiAsyncMsgSent() called.\n");
+
+  if (commhandle) {
+    handle = (CMI_VMI_Handle_T *) commhandle;
+    return (handle->refcount <= 2);
+  }
+
+  return (TRUE);
+}
+
+
+
+/**************************************************************************
+**
+*/
+int CmiAllAsyncMsgsSent ()
+{
+  DEBUG_PRINT ("CmiAllAsyncMsgsSent() called.\n");
+
+  return (CMI_VMI_AsyncMsgCount < 1);
+}
+
+
+
+/**************************************************************************
+**
+*/
+void CmiReleaseCommHandle (CmiCommHandle commhandle)
+{
+  VMI_STATUS status;
+
+  CMI_VMI_Handle_T *handle;
+
+  void *context;
+
+  int i;
+
+
+  DEBUG_PRINT ("CmiReleaseCommHandle() called.\n");
+
+  handle = (CMI_VMI_Handle_T *) commhandle;
+
+  if (handle) {
+    handle->refcount -= 1;
+
+    if (handle->refcount <= 1) {
+      if (handle->data.send.send_handle_type == CMI_VMI_SEND_HANDLE_TYPE_STREAM) {
+	context = CONTEXTFIELD (handle->msg);
+	if (!context) {
+	  status = VMI_Cache_Deregister (handle->data.send.data.stream.cacheentry);
+	  CMI_VMI_CHECK_SUCCESS (status, "VMI_Cache_Deregister()");
+	}
+      }
+
+      if (handle->data.send.send_handle_type == CMI_VMI_SEND_HANDLE_TYPE_RDMAGET) {
+	context = CONTEXTFIELD (handle->msg);
+	if (!context) {
+	  status = VMI_Cache_Deregister (handle->data.send.data.rdmaget.cacheentry);
+	  CMI_VMI_CHECK_SUCCESS (status, "VMI_Cache_Deregister()");
+	}
+      }
+
+      if (handle->data.send.send_handle_type == CMI_VMI_SEND_HANDLE_TYPE_RDMABROADCAST) {
+	context = CONTEXTFIELD (handle->msg);
+	if (!context) {
+	  status = VMI_Cache_Deregister (handle->data.send.data.rdmabroadcast.cacheentry);
+	  CMI_VMI_CHECK_SUCCESS (status, "VMI_Cache_Deregister()");
+	}
+      }
+
+      if (handle->data.send.send_handle_type == CMI_VMI_SEND_HANDLE_TYPE_EAGER_LONG) {
+	context = CONTEXTFIELD (handle->msg);
+	if (!context) {
+	  status = VMI_Cache_Deregister (handle->data.send.data.eager_long.cacheentry);
+	  CMI_VMI_CHECK_SUCCESS (status, "VMI_Cache_Deregister()");
+	}
+      }
+
+      if (handle->data.send.message_disposition == CMI_VMI_MESSAGE_DISPOSITION_FREE) {
+	CmiFree (handle->msg);
+      }
+
+      CMI_VMI_Deallocate_Handle (handle);
+    }
+  }
+}
+
+
+
+/**************************************************************************
+** This code must call VMI_Poll() to ensure forward progress of the message
+** pumping loop.
+*/
+void *CmiGetNonLocal (void)
+{
+  VMI_STATUS status;
+
+
+  DEBUG_PRINT ("CmiGetNonLocal() called.\n");
+
+  status = VMI_Poll ();
+  CMI_VMI_CHECK_SUCCESS (status, "VMI_Poll()");
+
+  return (CdsFifo_Dequeue (CpvAccess (CMI_VMI_RemoteQueue)));
+}
+
+
+
+#if CMK_PERSISTENT_COMM
+/**************************************************************************
+** done
+*/
+void CmiPersistentInit ()
+{
+  DEBUG_PRINT ("CmiPersistentInit() called.\n");
+}
+
+
+
+/**************************************************************************
+** done
+*/
+PersistentHandle CmiCreatePersistent (int destrank, int maxsize)
+{
+  VMI_STATUS status;
+
+  CMI_VMI_Persistent_Request_Message_T request_msg;
+  PVOID addrs[1];
+  ULONG sz[1];
+
+
+  DEBUG_PRINT ("CmiCreatePersistent() called.\n");
+
+  CMI_VMI_MESSAGE_TYPE (&request_msg) = CMI_VMI_MESSAGE_TYPE_PERSISTENT_REQUEST;
+  CMI_VMI_MESSAGE_CREDITS (&request_msg) = 0;
+
+#if CMK_BROADCAST_SPANNING_TREE
+  CMI_SET_BROADCAST_ROOT (&request_msg, 0);
+#endif
+
+  request_msg.maxsize = maxsize;
+
+  addrs[0] = (PVOID) &request_msg;
+  sz[0] = (ULONG) (sizeof (CMI_VMI_Persistent_Request_Message_T));
+
+  status = VMI_Stream_Send_Inline ((&CMI_VMI_Processes[destrank])->connection, addrs, sz, 1, sizeof (CMI_VMI_Persistent_Request_Message_T));
+  CMI_VMI_CHECK_SUCCESS (status, "VMI_Stream_Send_Inline()");
+
+  return ((PersistentHandle) NULL);
+}
+
+
+
+/**************************************************************************
+** done
+*/
+void CmiUsePersistentHandle (PersistentHandle *handle_array, int array_size)
+{
+  DEBUG_PRINT ("CmiUserPersistentHandle() called.\n");
+}
+
+
+
+/**************************************************************************
+** done
+*/
+void CmiDestroyPersistent (PersistentHandle phandle)
+{
+  DEBUG_PRINT ("CmiDestroyPersistent() called.\n");
+}
+
+
+
+/**************************************************************************
+** done
+*/
+void CmiDestroyAllPersistent ()
+{
+  DEBUG_PRINT ("CmiDestroyAllPersistent() called.\n");
+}
+
+
+
+/**************************************************************************
+**
+*/
+PersistentReq CmiCreateReceiverPersistent (int maxsize)
+{
+  PersistentReq request;
+
+
+  DEBUG_PRINT ("CmiCreateReceiverPersistent() called.\n");
+
+  request.pe = _Cmi_mype;
+  request.maxBytes = maxsize;
+
+  return (request);
+}
+
+
+
+/**************************************************************************
+**
+*/
+PersistentHandle CmiRegisterReceivePersistent (PersistentReq request)
+{
+  DEBUG_PRINT ("CmiRegisterReceiverPersistent() called.\n");
+
+  CMI_VMI_Eager_Setup (request.pe, request.maxBytes);
+
+  return ((PersistentHandle) NULL);
+}
 #endif   /* CMK_PERSISTENT_COMM */
 
 
-/* The following are for the NCSA CRM code which we currently use. */
-char *CRMHost;
-int CRMPort;
+
+/**************************************************************************
+**
+*/
+void CMI_VMI_Read_Environment ()
+{
+  char *value;
+
+  int dummy1;
+  int dummy2;
+
+
+  /* Get the username for this process. */
+  if (value = (getpwuid (getuid ()))->pw_name) {
+    if (!(CMI_VMI_Username = strdup (value))) {
+      CmiAbort ("Unable to allocate memory for the username.");
+    }
+  } else {
+    CmiAbort ("Unable to get the username for this process.");
+  }
+
+  /* Get the program key. */
+  if (value = getenv ("VMI_KEY")) {
+    /* Free the default value established in ConverseInit() from argv[0]. */
+    free (CMI_VMI_Program_Key);
+
+    if (!(CMI_VMI_Program_Key = strdup (value))) {
+      CmiAbort ("Unable to allocate memory for the program key.");
+    }
+  }
+
+  /* Get the total number of processes in the computation. */
+  if (value = getenv ("VMI_PROCS")) {
+    _Cmi_numpes = atoi (value);
+  } else {
+    CmiAbort ("Unable to determine the number of processes in the computation (VMI_PROCS).");
+  }
+
+  /* Get parameters for runtime behavior that override default values. */
+  if (value = getenv ("CMI_VMI_CONNECTION_TIMEOUT")) {
+    CMI_VMI_Connection_Timeout = atoi (value);
+  }
+
+  if (value = getenv ("CMI_VMI_MAXIMUM_HANDLES")) {
+    CMI_VMI_Maximum_Handles = atoi (value);
+  }
+
+  if (value = getenv ("CMI_VMI_WAN_LATENCY")) {
+    CMI_VMI_WAN_Latency = atoi (value);
+  }
+
+  if (value = getenv ("CMI_VMI_SMALL_MESSAGE_BOUNDARY")) {
+    CMI_VMI_Small_Message_Boundary = atoi (value);
+  }
+
+  if (value = getenv ("CMI_VMI_MEDIUM_MESSAGE_BOUNDARY")) {
+    CMI_VMI_Medium_Message_Boundary = atoi (value);
+  }
+
+  if (value = getenv ("CMI_VMI_EAGER_INTERVAL")) {
+    CMI_VMI_Eager_Interval = atoi (value);
+  }
+
+  if (value = getenv ("CMI_VMI_EAGER_THRESHOLD")) {
+    CMI_VMI_Eager_Threshold = atoi (value);
+  }
+
+  if (value = getenv ("CMI_VMI_EAGER_SHORT_POLLSIZE_MAXIMUM")) {
+    CMI_VMI_Eager_Short_Pollsize_Maximum = atoi (value);
+  }
+
+  if (value = getenv ("CMI_VMI_EAGER_SHORT_SLOTS")) {
+    CMI_VMI_Eager_Short_Slots = atoi (value);
+  }
+
+  if (value = getenv ("CMI_VMI_EAGER_LONG_BUFFERS")) {
+    CMI_VMI_Eager_Long_Buffers = atoi (value);
+  }
+
+  /* Figure out the startup type. */
+  value = getenv ("NETSTART");
+  if (value) {
+    CMI_VMI_Startup_Type = CMI_VMI_STARTUP_TYPE_CHARMRUN;
+    sscanf (value, "%d%s%d%d%d", &_Cmi_mype, CMI_VMI_Charmrun_IP, &CMI_VMI_Charmrun_Port, &dummy1, &dummy2);
+  } else {
+    CMI_VMI_Startup_Type = CMI_VMI_STARTUP_TYPE_CRM;
+  }
+}
+
+
+
+/**************************************************************************
+**
+*/
+int CMI_VMI_Startup_Charmrun ()
+{
+  VMI_STATUS status;
+
+  char *a;
+
+  pid_t myPID;
+
+  Charmrun_Header hdr;
+  Charmrun_InitnodeMsg register_msg;
+  int numnodes;
+  Charmrun_Nodetab *nodedata;
+
+  struct sockaddr_in serv_addr;
+  int rc;
+
+  int i;
+  int j;
+
+
+
+  myPID = getpid ();
+
+  CMI_VMI_Charmrun_Socket = socket (AF_INET, SOCK_STREAM, 0);
+  if (CMI_VMI_Charmrun_Socket < 0) {
+    DEBUG_PRINT ("Error opening socket to charmrun.\n");
+    return (-1);
+  }
+
+  bzero ((char *) &serv_addr, sizeof (serv_addr));
+  serv_addr.sin_family = AF_INET;
+  serv_addr.sin_addr.s_addr = inet_addr (CMI_VMI_Charmrun_IP);
+  serv_addr.sin_port = htons (CMI_VMI_Charmrun_Port);
+
+  rc = connect (CMI_VMI_Charmrun_Socket, (struct sockaddr *) &serv_addr, sizeof (serv_addr));
+  if (rc < 0) {
+    DEBUG_PRINT ("Error connecting to charmrun.\n");
+    return (rc);
+  }
+
+  hdr.msg_len = htonl (sizeof (Charmrun_InitnodeMsg));
+  strcpy (hdr.msg_type, "initnode");
+
+  register_msg.node_number = htonl (_Cmi_mype);
+  register_msg.nPE = htonl (0);            // ignored
+  register_msg.dataport = htonl (myPID);   // not used by us - must not be 0!
+  register_msg.mach_id = htonl (0);        // not used by us
+  register_msg.IP = htonl (0);             // ignored
+
+  rc = CMI_VMI_Socket_Send (CMI_VMI_Charmrun_Socket, (const void *) &hdr, sizeof (Charmrun_Header));
+  if (rc < 0) {
+    DEBUG_PRINT ("Error sending to charmrun.\n");
+    return (rc);
+  }
+  rc = CMI_VMI_Socket_Send (CMI_VMI_Charmrun_Socket, (const void *) &register_msg, sizeof (Charmrun_InitnodeMsg));
+  if (rc < 0) {
+    DEBUG_PRINT ("Error sending to charmrun.\n");
+    return (rc);
+  }
+
+  rc = CMI_VMI_Socket_Receive (CMI_VMI_Charmrun_Socket, (void *) &hdr, sizeof (Charmrun_Header));
+  if (rc < 0) {
+    DEBUG_PRINT ("Error receiving from charmrun.\n");
+    return (rc);
+  }
+  rc = CMI_VMI_Socket_Receive (CMI_VMI_Charmrun_Socket, (void *) &numnodes, sizeof (int));
+  if (rc < 0) {
+    DEBUG_PRINT ("Error receiving from charmrun.\n");
+    return (rc);
+  }
+
+  numnodes = ntohl (numnodes);
+
+  nodedata = (Charmrun_Nodetab *) malloc (numnodes * sizeof (Charmrun_Nodetab));
+
+  rc = CMI_VMI_Socket_Receive (CMI_VMI_Charmrun_Socket, (void *) nodedata, (numnodes * sizeof (Charmrun_Nodetab)));
+  if (rc < 0) {
+    DEBUG_PRINT ("Error receiving from charmrun.\n");
+    return (rc);
+  }
+
+  for (i = 0; i < numnodes; i++) {
+    (&CMI_VMI_Processes[i])->node_IP = (&nodedata[i])->IP;
+    (&CMI_VMI_Processes[i])->rank = i;
+  }
+
+  free (nodedata);
+
+  /* Return successfully. */
+  return (0);
+}
+
+
+
+/**************************************************************************
+**
+*/
+int CMI_VMI_Startup_CRM ()
+{
+  VMI_STATUS status;
+
+  int i;
+  int j;
+  char *a;
+
+
+  /* Initialize the CRM. */
+  if (!CRMInit ()) {
+    DEBUG_PRINT ("Failed to initialize CRM.");
+    return (-1);
+  }
+
+  /* Register with the CRM. */
+  _Cmi_mype = CMI_VMI_CRM_Register (CMI_VMI_Program_Key, _Cmi_numpes, TRUE);
+  if (_Cmi_mype < 0) {
+    DEBUG_PRINT ("Unable to synchronize with the CRM.");
+    return (-1);
+  }
+
+  DEBUG_PRINT ("This process is rank %d of %d processes.\n", _Cmi_mype, _Cmi_numpes);
+
+#if 0
+  /*
+    Re-synchronize with all processes.
+
+    In this step, we re-synchronize with all processes prior to attempting
+    to set up connections.  This is to avoid a race condition in which a
+    process could initialize VMI and then attempt to synchronize with a
+    much slower process that has not yet had an opportunity to initialize
+    VMI or set up its receive and connection accept handlers.  For this
+    reason, IT IS CRITICAL that we set state such as the VMI stream
+    receive function, the connection accept function, etc. at the end of
+    the previous step!
+
+    The synchronization key used for this step is the same for all processes
+    and is "[synchronization key]:Initialized" (with "[synchronization key]"
+    being the initial key used to synchronize with the CRM in step above).
+  */
+
+  /* Prepare the initialization key for re-synchronization with the CRM. */
+  initialization_key = (char *) malloc (strlen (CMI_VMI_Program_Key) + 13);
+  if (!initialization_key) {
+    DEBUG_PRINT ("Unable to allocate space for initialization key.");
+    return (-1);
+  }
+  sprintf (initialization_key, "%s:Initialized\0", key);
+
+  /* Re-register with the CRM. */
+  if (CMI_VMI_CRM_Register (initialization_key, _Cmi_numpes, FALSE) < -1) {
+    DEBUG_PRINT ("Unable to re-synchronize with all processes.");
+    return (-1);
+  }
+
+  DEBUG_PRINT ("Successfully re-synchronized with initialized processes.\n");
+
+  /* Free memory. */
+  free (initialization_key);
+#endif
+
+  /* Return successfully. */
+  return (0);
+}
 
 
 
@@ -231,12 +2239,18 @@ int CMI_VMI_CRM_Register (char *key, int numProcesses, BOOLEAN reg)
 
       /* Check for the current process in the list to obtain our rank. */
       if ((nodeIP == myIP) && (processPID == myPID)) {
-	myRank = processRank;
+	// myRank = processRank;
+	// Something is wrong here because processRank is all wanky.
+	// This *used* to work and now doesn't.
+	// Just set the rank to i and go on -- we will rewrite this soon.
+	myRank = i;
       }
 
       /* Cache remote nodes IP address. */
       (&CMI_VMI_Processes[i])->node_IP = nodeIP;
-      (&CMI_VMI_Processes[i])->rank    = processRank;
+      // (&CMI_VMI_Processes[i])->rank    = processRank;
+      // Same comment as above.
+      (&CMI_VMI_Processes[i])->rank    = i;
     }
   }
 
@@ -251,112 +2265,32 @@ int CMI_VMI_CRM_Register (char *key, int numProcesses, BOOLEAN reg)
 
 
 /**************************************************************************
+** This function initializes VMI.  It assumes that we know our rank in the
+** computation (i.e., _Cmi_mype is set).
 **
+** We need a unique VMI key for each process, so we use
+** "[syncronization key]:[process rank]" for each processes's key.
+** This enables us to figure out each process's key later when we connect
+** to that process.
 */
-int CMI_VMI_Startup_CRM (char *key)
+int CMI_VMI_Initialize_VMI ()
 {
   VMI_STATUS status;
 
-  int i;
-  char *a;
   char *vmi_key;
   char *vmi_inlined_data_size;
-  char *initialization_key;
 
-
-  /*
-    STEP 1 - Synchronize with all processes.
-
-    In this step, we use the CRM to synchronize with all processes.
-    The synchronization key used for this step is taken from the VMI_KEY
-    environment variable or from argv[0] if VMI_KEY is not defined.
-  */
-
-  /* Read VMI_PROCS environment variable for the number of processes. */
-  a = getenv ("VMI_PROCS");
-  if (!a) {
-    DEBUG_PRINT ("Environment variable VMI_PROCS is not set.");
-    return (-1);
-  }
-  _Cmi_numpes = atoi (a);
-
-  CMI_VMI_Processes = (CMI_VMI_Process_T *) malloc (_Cmi_numpes *
-			             sizeof (CMI_VMI_Process_T));
-  if (!CMI_VMI_Processes) {
-    DEBUG_PRINT ("Unable to allocate memory for processes.");
-    return (-1);
-  }
-  for (i = 0; i < _Cmi_numpes; i++) {
-    (&CMI_VMI_Processes[i])->state = CMI_VMI_CONNECTION_DISCONNECTED;
-  }
-
-  /* Initialize the CRM. */
-  if (!CRMInit ()) {
-    DEBUG_PRINT ("Failed to initialize CRM.");
-    return (-1);
-  }
-
-  /* Register with the CRM. */
-  _Cmi_mype = CMI_VMI_CRM_Register (key, _Cmi_numpes, TRUE);
-  if (_Cmi_mype < 0) {
-    DEBUG_PRINT ("Unable to synchronize with the CRM.");
-    return (-1);
-  }
-
-  DEBUG_PRINT ("This process is rank %d of %d processes.\n", _Cmi_mype,
-	                                                     _Cmi_numpes);
-
-
-  /*
-    STEP 2 - Initialize VMI.
-
-    In this step, we initialize VMI.  At this point we know that all
-    processes for the computation are present.  We need a unique VMI key
-    for each process, so we use "[syncronization key]:[process rank]" for
-    each processes's key.
-  */
-
-  a = getenv ("CMI_VMI_SMALL_MESSAGE_BOUNDARY");
-  if (a) {
-    CMI_VMI_Small_Message_Boundary = atoi (a);
-  } else {
-    CMI_VMI_Small_Message_Boundary = CMI_VMI_SMALL_MESSAGE_BOUNDARY;
-  }
-
-  a = getenv ("CMI_VMI_MEDIUM_MESSAGE_BOUNDARY");
-  if (a) {
-    CMI_VMI_Medium_Message_Boundary = atoi (a);
-  } else {
-    CMI_VMI_Medium_Message_Boundary = CMI_VMI_MEDIUM_MESSAGE_BOUNDARY;
-  }
-
-  a = getenv ("CMI_VMI_RDMA_CHUNK_COUNT");
-  if (a) {
-    CMI_VMI_RDMA_Chunk_Count = atoi (a);
-    if (CMI_VMI_RDMA_Chunk_Count > CMI_VMI_RDMA_CHUNK_COUNT) {
-      CMI_VMI_RDMA_Chunk_Count = CMI_VMI_RDMA_CHUNK_COUNT;
-    }
-  } else {
-    CMI_VMI_RDMA_Chunk_Count = CMI_VMI_RDMA_CHUNK_COUNT;
-  }
-
-  a = getenv ("CMI_VMI_RDMA_CHUNK_SIZE");
-  if (a) {
-    CMI_VMI_RDMA_Chunk_Size = atoi (a);
-  } else {
-    CMI_VMI_RDMA_Chunk_Size = CMI_VMI_RDMA_CHUNK_SIZE;
-  }
 
   /* Set the VMI_KEY environment variable. */
-  vmi_key = (char *) malloc (strlen (key) + 32);
+  vmi_key = (char *) malloc ((strlen (CMI_VMI_Program_Key)) + 32);
   if (!vmi_key) {
     DEBUG_PRINT ("Unable to allocate memory for VMI key.");
     return (-1);
   }
 
-  sprintf (vmi_key, "VMI_KEY=%s:%d\0", key, _Cmi_mype);
+  sprintf (vmi_key, "VMI_KEY=%s:%d\0", CMI_VMI_Program_Key, _Cmi_mype);
 
-  if (putenv (vmi_key) == -1) {
+  if (putenv (vmi_key) < 0) {
     DEBUG_PRINT ("Unable to set VMI_KEY environment variable.");
     return (-1);
   }
@@ -368,10 +2302,9 @@ int CMI_VMI_Startup_CRM (char *key)
     return (-1);
   }
 
-  sprintf (vmi_inlined_data_size, "VMI_INLINED_DATA_SZ=%d\0",
-	   CMI_VMI_Medium_Message_Boundary);
+  sprintf (vmi_inlined_data_size, "VMI_INLINED_DATA_SZ=%d\0", CMI_VMI_Medium_Message_Boundary);
 
-  if (putenv (vmi_inlined_data_size) == -1) {
+  if (putenv (vmi_inlined_data_size) < 0) {
     DEBUG_PRINT ("Unable to set VMI_INLINED_DATA_SZ environment variable.");
     return (-1);
   }
@@ -382,86 +2315,43 @@ int CMI_VMI_Startup_CRM (char *key)
   status = VMI_Init (0, NULL);
   CMI_VMI_CHECK_SUCCESS (status, "VMI_Init()");
 
-#if CMI_VMI_USE_MEMORY_POOL
-  /* Create buffer pools. */
-  status = VMI_Pool_Create_Buffer_Pool (CMI_VMI_BUCKET1_SIZE, sizeof (PVOID),
-       CMI_VMI_BUCKET1_PREALLOCATE, CMI_VMI_BUCKET1_GROW, VMI_POOL_CLEARONCE,
-       &CMI_VMI_Bucket1_Pool);
-  CMI_VMI_CHECK_SUCCESS (status, "VMI_Pool_Create_Buffer_Pool()");
-
-  status = VMI_Pool_Create_Buffer_Pool (CMI_VMI_BUCKET2_SIZE, sizeof (PVOID),
-       CMI_VMI_BUCKET2_PREALLOCATE, CMI_VMI_BUCKET2_GROW, VMI_POOL_CLEARONCE,
-       &CMI_VMI_Bucket2_Pool);
-  CMI_VMI_CHECK_SUCCESS (status, "VMI_Pool_Create_Buffer_Pool()");
-
-  status = VMI_Pool_Create_Buffer_Pool (CMI_VMI_BUCKET3_SIZE, sizeof (PVOID),
-       CMI_VMI_BUCKET3_PREALLOCATE, CMI_VMI_BUCKET3_GROW, VMI_POOL_CLEARONCE,
-       &CMI_VMI_Bucket3_Pool);
-  CMI_VMI_CHECK_SUCCESS (status, "VMI_Pool_Create_Buffer_Pool()");
-
-  status = VMI_Pool_Create_Buffer_Pool (CMI_VMI_BUCKET4_SIZE, sizeof (PVOID),
-       CMI_VMI_BUCKET4_PREALLOCATE, CMI_VMI_BUCKET4_GROW, VMI_POOL_CLEARONCE,
-       &CMI_VMI_Bucket4_Pool);
-  CMI_VMI_CHECK_SUCCESS (status, "VMI_Pool_Create_Buffer_Pool()");
-
-  status = VMI_Pool_Create_Buffer_Pool (CMI_VMI_BUCKET5_SIZE, sizeof (PVOID),
-       CMI_VMI_BUCKET5_PREALLOCATE, CMI_VMI_BUCKET5_GROW, VMI_POOL_CLEARONCE,
-       &CMI_VMI_Bucket5_Pool);
-  CMI_VMI_CHECK_SUCCESS (status, "VMI_Pool_Create_Buffer_Pool()");
-#endif   /* CMI_VMI_USE_MEMORY_POOL */
-
-  /* Set a stream receive function. */
-  VMI_STREAM_SET_RECV_FUNCTION (CMI_VMI_Stream_Receive_Handler);
-
   /* Set a connection accept function. */
-  status = VMI_Connection_Accept_Fn (CMI_VMI_Connection_Accept_Handler);
+  status = VMI_Connection_Accept_Fn (CMI_VMI_Connection_Handler);
   CMI_VMI_CHECK_SUCCESS (status, "VMI_Connection_Accept_Fn()");
 
   /* Set a connection disconnect function. */
-  status = VMI_Connection_Disconnect_Fn(CMI_VMI_Connection_Disconnect_Handler);
+  status = VMI_Connection_Disconnect_Fn (CMI_VMI_Disconnection_Handler);
   CMI_VMI_CHECK_SUCCESS (status, "VMI_Connection_Disconnect_Fn()");
 
-  DEBUG_PRINT ("Initialized VMI successfully.\n");
+  /* Set a stream receive function. */
+  VMI_STREAM_SET_RECV_FUNCTION (CMI_VMI_Stream_Notification_Handler);
 
+  /* Create buffer pools. */
+#if CMI_VMI_USE_MEMORY_POOL
+  status = VMI_Pool_Create_Buffer_Pool (CMI_VMI_BUCKET1_SIZE, sizeof (PVOID), CMI_VMI_BUCKET1_PREALLOCATE,
+					CMI_VMI_BUCKET1_GROW, VMI_POOL_CLEARONCE, &CMI_VMI_Bucket1_Pool);
+  CMI_VMI_CHECK_SUCCESS (status, "VMI_Pool_Create_Buffer_Pool()");
 
-  /*
-    STEP 3 - Re-synchronize with all processes.
+  status = VMI_Pool_Create_Buffer_Pool (CMI_VMI_BUCKET2_SIZE, sizeof (PVOID), CMI_VMI_BUCKET2_PREALLOCATE,
+					CMI_VMI_BUCKET2_GROW, VMI_POOL_CLEARONCE, &CMI_VMI_Bucket2_Pool);
+  CMI_VMI_CHECK_SUCCESS (status, "VMI_Pool_Create_Buffer_Pool()");
 
-    In this step, we re-synchronize with all processes prior to attempting
-    to set up connections.  This is to avoid a race condition in which a
-    process could initialize VMI and then attempt to synchronize with a
-    much slower process that has not yet had an opportunity to initialize
-    VMI or set up its receive and connection accept handlers.  For this
-    reason, IT IS CRITICAL that we set state such as the VMI stream
-    receive function, the connection accept function, etc. at the end of
-    the previous step!
+  status = VMI_Pool_Create_Buffer_Pool (CMI_VMI_BUCKET3_SIZE, sizeof (PVOID), CMI_VMI_BUCKET3_PREALLOCATE,
+					CMI_VMI_BUCKET3_GROW, VMI_POOL_CLEARONCE, &CMI_VMI_Bucket3_Pool);
+  CMI_VMI_CHECK_SUCCESS (status, "VMI_Pool_Create_Buffer_Pool()");
 
-    The synchronization key used for this step is the same for all processes
-    and is "[synchronization key]:Initialized" (with "[synchronization key]"
-    being the initial key used to synchronize with the CRM in Step 1 above).
-  */
+  status = VMI_Pool_Create_Buffer_Pool (CMI_VMI_BUCKET4_SIZE, sizeof (PVOID), CMI_VMI_BUCKET4_PREALLOCATE,
+					CMI_VMI_BUCKET4_GROW, VMI_POOL_CLEARONCE, &CMI_VMI_Bucket4_Pool);
+  CMI_VMI_CHECK_SUCCESS (status, "VMI_Pool_Create_Buffer_Pool()");
 
-  /* Prepare the initialization key for re-synchronization with the CRM. */
-  initialization_key = (char *) malloc (strlen (key) + 13);
-  if (!initialization_key) {
-    DEBUG_PRINT ("Unable to allocate space for initialization key.");
-    return (-1);
-  }
-  sprintf (initialization_key, "%s:Initialized\0", key);
-
-  /* Re-register with the CRM. */
-  if (CMI_VMI_CRM_Register (initialization_key, _Cmi_numpes, FALSE) < -1) {
-    DEBUG_PRINT ("Unable to re-synchronize with all processes.");
-    return (-1);
-  }
-
-  DEBUG_PRINT ("Successfully re-synchronized with initialized processes.\n");
-
+  status = VMI_Pool_Create_Buffer_Pool (CMI_VMI_BUCKET5_SIZE, sizeof (PVOID), CMI_VMI_BUCKET5_PREALLOCATE,
+					CMI_VMI_BUCKET5_GROW, VMI_POOL_CLEARONCE, &CMI_VMI_Bucket5_Pool);
+  CMI_VMI_CHECK_SUCCESS (status, "VMI_Pool_Create_Buffer_Pool()");
+#endif
 
   /* Free memory. */
-  free (vmi_key);
-  free (initialization_key);
   free (vmi_inlined_data_size);
+  free (vmi_key);
 
   /* Return successfully. */
   return (0);
@@ -470,196 +2360,90 @@ int CMI_VMI_Startup_CRM (char *key)
 
 
 /**************************************************************************
-** This function is invoked asynchronously to handle an incoming connection
-** request.
+**
 */
-VMI_CONNECT_RESPONSE
-CMI_VMI_Connection_Accept_Handler (PVMI_CONNECT connection, PVMI_SLAB slab,
-				   ULONG  data_size)
+int CMI_VMI_Terminate_VMI ()
 {
   VMI_STATUS status;
 
-  CMI_VMI_Connect_Message_T *data;
-  ULONG rank;
-  ULONG size;
-  PVMI_SLAB_STATE state;
+
+  /* Release memory used by buffer pools. */
+#if CMI_VMI_USE_MEMORY_POOL
+  status = VMI_Pool_Destroy_Buffer_Pool (CMI_VMI_Bucket1_Pool);
+  CMI_VMI_CHECK_SUCCESS (status, "VMI_Pool_Destroy_Buffer_Pool()");
+
+  status = VMI_Pool_Destroy_Buffer_Pool (CMI_VMI_Bucket2_Pool);
+  CMI_VMI_CHECK_SUCCESS (status, "VMI_Pool_Destroy_Buffer_Pool()");
+
+  status = VMI_Pool_Destroy_Buffer_Pool (CMI_VMI_Bucket3_Pool);
+  CMI_VMI_CHECK_SUCCESS (status, "VMI_Pool_Destroy_Buffer_Pool()");
+
+  status = VMI_Pool_Destroy_Buffer_Pool (CMI_VMI_Bucket4_Pool);
+  CMI_VMI_CHECK_SUCCESS (status, "VMI_Pool_Destroy_Buffer_Pool()");
+
+  status = VMI_Pool_Destroy_Buffer_Pool (CMI_VMI_Bucket5_Pool);
+  CMI_VMI_CHECK_SUCCESS (status, "VMI_Pool_Destroy_Buffer_Pool()");
+#endif   /* CMI_VMI_USE_MEMORY_POOL */
+
+  /* Terminate VMI. */
+  SET_VMI_SUCCESS (status);
+  VMI_Terminate (status);
 
 
-  DEBUG_PRINT ("CMI_VMI_Connection_Accept_Handler() called.\n");
-
-  /* Initialize the number of bytes expected from the connect data. */
-  size = sizeof (CMI_VMI_Connect_Message_T);
-
-  /* Make sure we received the expected number of bytes. */
-  if (data_size != size) {
-    CMI_VMI_IError++;
-    return VMI_CONNECT_RESPONSE_ERROR;
-  }
-
-  /* Allocate connection data structure. */
-  data = (CMI_VMI_Connect_Message_T *) malloc (size);
-  if (!data) {
-    CMI_VMI_IError++;
-    return VMI_CONNECT_RESPONSE_ERROR;
-  }
-
-  /* Save the slab state prior to reading. */
-  status = VMI_Slab_Save_State (slab, &state);
-  if (!VMI_SUCCESS (status)) {
-    free (data);
-    CMI_VMI_IError++;
-    return VMI_CONNECT_RESPONSE_ERROR;
-  }
-
-  /* Copy connect data. */
-  status = VMI_Slab_Copy_Bytes (slab, size, data);
-  if (!VMI_SUCCESS (status)) {
-    VMI_Slab_Restore_State (slab, state);
-    free (data);
-    CMI_VMI_IError++;
-    return VMI_CONNECT_RESPONSE_ERROR;
-  }
-
-  /* Get rank of connecting process. */
-  rank = ntohl (data->rank);
-
-  DEBUG_PRINT ("Accepting a connection request from rank %u.\n", rank);
-
-  /* Update the connection state. */
-  (&CMI_VMI_Processes[rank])->connection = connection;
-  (&CMI_VMI_Processes[rank])->state = CMI_VMI_CONNECTION_CONNECTED;
-
-  VMI_CONNECT_SET_RECEIVE_CONTEXT (connection, (&CMI_VMI_Processes[rank]));
-
-  status = VMI_RDMA_Set_Publish_Callback (connection,
-             (VMIRDMABuffer) CMI_VMI_RDMA_Publish_Handler);
-  CMI_VMI_CHECK_SUCCESS (status, "VMI_RDMA_Set_Publish_Callback()");
-
-#if VMI21
-  status = VMI_RDMA_Set_Put_Notification_Callback (connection,
-	                   CMI_VMI_RDMA_Notification_Handler);
-  CMI_VMI_CHECK_SUCCESS (status, "VMI_RDMA_Set_Put_Notification_Callback()");
-#else
-  status = VMI_RDMA_Set_Notification_Callback (connection,
-		       CMI_VMI_RDMA_Notification_Handler);
-  CMI_VMI_CHECK_SUCCESS (status, "VMI_RDMA_Set_Notification_Callback()");
-#endif
-
-  /* Free the connect data buffer. */
-  free (data);
-
-  /* Accepted the connection. */
-  CMI_VMI_IAccept++;
-  return VMI_CONNECT_RESPONSE_ACCEPT;
+  /* Return successfully. */
+  return (0);
 }
 
 
 
 /**************************************************************************
-** This function is invoked asynchronously to handle a process's response
-** to our connection request.
+**
 */
-void CMI_VMI_Connection_Response_Handler (PVOID context, PVOID response,
-					  USHORT size, PVOID handle,
-					  VMI_CONNECT_RESPONSE status)
+int CMI_VMI_Socket_Send (int sockfd, const void *msg, int size)
 {
-  CMI_VMI_Process_T *process;
+  int sent;
+  int rc;
 
 
-  DEBUG_PRINT ("CMI_VMI_Connection_Response_Handler() called.\n");
+  DEBUG_PRINT ("CMI_VMI_Socket_Send() called.\n");
 
-  /* Cast the context to a CMI_VMI_Process_Info pointer. */
-  process = (CMI_VMI_Process_T *) context;
-
-  switch (status)
-  {
-    case VMI_CONNECT_RESPONSE_ACCEPT:
-      DEBUG_PRINT ("Process %d accepted connection.\n", process->rank);
-
-      /* Update the connection state. */
-      process->state = CMI_VMI_CONNECTION_CONNECTED;
-
-      VMI_CONNECT_SET_RECEIVE_CONTEXT (process->connection, process);
-
-      status = VMI_RDMA_Set_Publish_Callback (process->connection,
-					      CMI_VMI_RDMA_Publish_Handler);
-      CMI_VMI_CHECK_SUCCESS (status, "VMI_RDMA_Set_Publish_Callback()");
-
-#if VMI21
-      status = VMI_RDMA_Set_Put_Notification_Callback (process->connection,
-				        CMI_VMI_RDMA_Notification_Handler);
-      CMI_VMI_CHECK_SUCCESS (status,
-			     "VMI_RDMA_Set_Put_Notification_Callback()");
-#else
-      status = VMI_RDMA_Set_Notification_Callback (process->connection,
-				    CMI_VMI_RDMA_Notification_Handler);
-      CMI_VMI_CHECK_SUCCESS (status, "VMI_RDMA_Set_Notification_Callback()");
-#endif
-
-      /* Increment the count of outgoing connection accepts. */
-      CMI_VMI_OAccept++;
-
-      break;
-
-    case VMI_CONNECT_RESPONSE_REJECT:
-      DEBUG_PRINT ("Process %d rejected connection.\n", process->rank);
-
-      /* Update the connection state. */
-      process->state = CMI_VMI_CONNECTION_DISCONNECTED;
-
-      /* Increment the count of outgoing connection rejects. */
-      CMI_VMI_OReject++;
-
-      break;
-
-    case VMI_CONNECT_RESPONSE_ERROR:
-      DEBUG_PRINT ("Error connecting to process %d [%d.%d.%d.%d].\n",
-		   process->rank,
-		   (process->node_IP >>  0) & 0xFF,
-		   (process->node_IP >>  8) & 0xFF,
-		   (process->node_IP >> 16) & 0xFF,
-		   (process->node_IP >> 24) & 0xFF);
-
-      /* Update the connection state. */
-      process->state = CMI_VMI_CONNECTION_ERROR;
-
-      /* Increment the count of outgoing connection errors. */
-      CMI_VMI_OError++;
-
-      break;
-
-    default:
-      DEBUG_PRINT ("Error connecting to process %d\n", process->rank);
-      DEBUG_PRINT ("Error code 0x%08x\n", status);
-
-      /* Update the connection state. */
-      process->state = CMI_VMI_CONNECTION_ERROR;
-
-      /* Increment the count of outgoing connection errors. */
-      CMI_VMI_OError++;
-
-      break;
+  sent = 0;
+  while (sent < size) {
+    rc = send (sockfd, (const void *) (msg + sent), (size - sent), 0);
+    if (rc < 0) {
+      return (rc);
+    } else {
+      sent += rc;
+    }
   }
 
-  /* Deallocate the connection receive context. */
-  VMI_Buffer_Deallocate ((PVMI_BUFFER) context);
+  return (sent);
 }
 
 
 
 /**************************************************************************
-** This function is invoked asynchronously to handle an incoming disconnect
-** request.
+**
 */
-void CMI_VMI_Connection_Disconnect_Handler (PVMI_CONNECT connection)
+int CMI_VMI_Socket_Receive (int sockfd, void *msg, int size)
 {
-  CMI_VMI_Process_T *process;
+  int received;
+  int rc;
 
 
-  DEBUG_PRINT ("CMI_VMI_Connection_Disconnect_Handler() called.\n");
+  DEBUG_PRINT ("CMI_VMI_Socket_Receive() called.\n");
 
-  process = (CMI_VMI_Process_T *) VMI_CONNECT_GET_RECEIVE_CONTEXT (connection);
-  process->state = CMI_VMI_CONNECTION_DISCONNECTED;
+  received = 0;
+  while (received < size) {
+    rc = recv (sockfd, (void *) (msg + received), (size - received), 0);
+    if (rc < 0) {
+      return (rc);
+    } else {
+      received += rc;
+    }
+  }
+
+  return (received);
 }
 
 
@@ -676,11 +2460,10 @@ void CMI_VMI_Connection_Disconnect_Handler (PVMI_CONNECT connection)
 ** can store the connection information in the correct slot in the
 ** CMI_VMI_ProcessList[].
 */
-int CMI_VMI_Open_Connections (char *key)
+int CMI_VMI_Open_Connections ()
 {
   VMI_STATUS status;
 
-  char *username;
   char *remote_key;
 
   PVMI_BUFFER connect_message_buffer;
@@ -688,38 +2471,25 @@ int CMI_VMI_Open_Connections (char *key)
 
   int i;
 
-  CMI_VMI_Process_T *process;
-  struct hostent *remote_host;
-  PVMI_NETADDRESS remote_address;
+  //CMI_VMI_Process_T *process;
 
   struct timeval tp;
   long start_time;
   long now_time;
+  BOOLEAN pending;
 
 
   DEBUG_PRINT ("CMI_VMI_Open_Connections() called.\n");
 
-  /*
-    Step 1 - Set up data structures
-  */
-
-  /* Get the username for this process. */
-  username = (getpwuid (getuid ()))->pw_name;
-  if (!username) {
-    DEBUG_PRINT ("Unable to get username.\n");
-    return (-1);
-  }
-
   /* Allocate space for the remote key. */
-  remote_key = malloc (strlen (key) + 32);
+  remote_key = malloc ((strlen (CMI_VMI_Program_Key)) + 32);
   if (!remote_key) {
     DEBUG_PRINT ("Unable to allocate memory for remote key.\n");
     return (-1);
   }
 
   /* Allocate a buffer for connection message. */
-  status = VMI_Buffer_Allocate (sizeof (CMI_VMI_Connect_Message_T),
-				&connect_message_buffer);
+  status = VMI_Buffer_Allocate (sizeof (CMI_VMI_Connect_Message_T), &connect_message_buffer);
   if (!VMI_SUCCESS (status)) {
     DEBUG_PRINT ("Unable to allocate connection message buffer.\n");
     free (remote_key);
@@ -727,171 +2497,1126 @@ int CMI_VMI_Open_Connections (char *key)
   }
 
   /* Set up the connection message field. */
-  connect_message_data = (CMI_VMI_Connect_Message_T *)
-                          VMI_BUFFER_ADDRESS (connect_message_buffer);
+  connect_message_data = (CMI_VMI_Connect_Message_T *) VMI_BUFFER_ADDRESS (connect_message_buffer);
   connect_message_data->rank = htonl (_Cmi_mype);
 
-  CMI_VMI_OAccept = 0;
-  CMI_VMI_OReject = 0;
-  CMI_VMI_OError  = 0;
-  CMI_VMI_OIssue  = 0;
-
-  CMI_VMI_IAccept  = 0;
-  CMI_VMI_IReject  = 0;
-  CMI_VMI_IError   = 0;
-  CMI_VMI_IExpect  = 0;
-
-
-  /*
-    Step 2 - Initiate connections.
-
-    Here we initiate a connection to each process with a rank lower than
-    this process's rank.
-  */
+  /* Open connections to every process with a lower rank than ours. */
   for (i = 0; i < _Cmi_mype; i++) {
-    /* Get a pointer to the process to make things easier. */
-    process = &CMI_VMI_Processes[i];
+    /* Construct a remote VMI key in terms of the program key and peer's rank */
+    sprintf (remote_key, "%s:%u\0", CMI_VMI_Program_Key, (&CMI_VMI_Processes[i])->rank);
 
-    /* Allocate a connection object */
-    status = VMI_Connection_Create (&process->connection);
-    if (!VMI_SUCCESS (status)) {
-      DEBUG_PRINT ("Unable to create connection object for process %d.\n", i);
-      free (remote_key);
-      VMI_Buffer_Deallocate (connect_message_buffer);
-      return (-1);
-    }
-
-    /* Build the remote IPV4 address. We need remote hosts name for this. */
-    remote_host = gethostbyaddr (&process->node_IP, sizeof (process->node_IP),
-			         AF_INET);
-    if (!remote_host) {
-      DEBUG_PRINT ("Error looking up host [%d.%d.%d.%d].\n",
-		   (process->node_IP >>  0) & 0xFF,
-		   (process->node_IP >>  8) & 0xFF,
-		   (process->node_IP >> 16) & 0xFF,
-		   (process->node_IP >> 24) & 0xFF);
-      free (remote_key);
-      VMI_Buffer_Deallocate (connect_message_buffer);
-      return (-1);
-    }
-
-    /* Construct a remote VMI key in terms of our progKey and peer's rank */
-    sprintf (remote_key, "%s:%u\0", key, process->rank);
-
-    /* Allocate a remote IPv4 NETADDRESS. */
-    status = VMI_Connection_Allocate_IPV4_Address (remote_host->h_name, 0,
-						   username, remote_key,
-						   &remote_address);
-    if (!VMI_SUCCESS (status)) {
-      DEBUG_PRINT ("Unable to allocate remote node IP V4 address.\n");
-      DEBUG_PRINT ("Error 0x%08x.\n", status);
-      free (remote_key);
-      VMI_Buffer_Deallocate (connect_message_buffer);
-      return (-1);
-    }
-
-    /* Now bind the local and remote addresses. */
-    status = VMI_Connection_Bind (*localAddress, *remote_address,
-				  process->connection);
-    if (!VMI_SUCCESS (status)) {
-      DEBUG_PRINT ("Error binding connection for process %d.\n", i);
-      free (remote_key);
-      VMI_Buffer_Deallocate (connect_message_buffer);
-      return (-1);
-    }
-
-    /*
-      Do this here to avoid a race condition where we complete the connect
-      right away and then set the state here to
-      CMI_VMI_CONNECTION_STATE_CONNECTING.
-    */
-    process->state = CMI_VMI_CONNECTION_CONNECTING;
-
-    /* Issue the actual connection request. */
-    status = VMI_Connection_Issue (process->connection, connect_message_buffer,
-         (VMIConnectIssue) CMI_VMI_Connection_Response_Handler, process);
-    if (!VMI_SUCCESS (status)) {
-      DEBUG_PRINT ("Error issuing connection for process %d.\n", i);
-      free (remote_key);
-      VMI_Buffer_Deallocate (connect_message_buffer);
-      return (-1);
-    }
-
-    /* Increment number of issued connections. */
-    CMI_VMI_OIssue++;
+    CMI_VMI_Open_Connection (i, remote_key, connect_message_buffer);
 
     DEBUG_PRINT ("Issued a connection to process %d:\n", i);
-    DEBUG_PRINT ("\tRank - %d\n", process->rank);
-    DEBUG_PRINT ("\tIP - [%d.%d.%d.%d].\n", (process->node_IP >>  0) & 0xFF,
-		                            (process->node_IP >>  8) & 0xFF,
-		                            (process->node_IP >> 16) & 0xFF,
-		                            (process->node_IP >> 24) & 0xFF);
-    DEBUG_PRINT ("\tHostname - %s\n", remote_host->h_name);
+    DEBUG_PRINT ("\tRank - %d\n", (&CMI_VMI_Processes[i])->rank);
     DEBUG_PRINT ("\tKey - %s\n", remote_key);
+    DEBUG_PRINT ("\tHostname - %s\n", remote_host->h_name);
+    DEBUG_PRINT ("\tIP - [%d.%d.%d.%d].\n", ((process->node_IP >>  0) & 0xFF),
+		                            ((process->node_IP >>  8) & 0xFF),
+		                            ((process->node_IP >> 16) & 0xFF),
+		                            ((process->node_IP >> 24) & 0xFF));
   }
 
   /* Set the connection state to ourself to "connected". */
-  (&CMI_VMI_Processes[_Cmi_mype])->state = CMI_VMI_CONNECTION_CONNECTED;
+  (&CMI_VMI_Processes[_Cmi_mype])->connection_state = CMI_VMI_CONNECTION_CONNECTED;
 
-
-  /*
-    Step 3 - Wait for connections.
-
-    Now wait for all outgoing connections to complete and for all
-    incoming connections to arrive.
-  */
-
-  /* Calculate how many pprocesses are supposed to connect to us. */
-  CMI_VMI_IExpect = ((_Cmi_numpes - _Cmi_mype) - 1);
-
-  DEBUG_PRINT ("The rank of this process is %d.\n", _Cmi_mype);
-  DEBUG_PRINT ("This process issued %d connection requests.\n",
-	       CMI_VMI_OIssue);
-  DEBUG_PRINT ("This process is expecting %d connections to arrive.\n",
-	       CMI_VMI_IExpect);
-
-  /* Complete all connection requests and accepts. */
+  /* Wait for connections.  */
   gettimeofday (&tp, NULL);
   start_time = tp.tv_sec;
   now_time   = tp.tv_sec;
-  while ( (((CMI_VMI_OAccept+CMI_VMI_OReject+CMI_VMI_OError)<CMI_VMI_OIssue) ||
-	   ((CMI_VMI_IAccept+CMI_VMI_IReject+CMI_VMI_IError)<CMI_VMI_IExpect))
-         &&
-	 ((start_time + CMI_VMI_CONNECTION_TIMEOUT) > now_time)) {
+  pending    = TRUE;
+
+  while (pending && ((start_time + CMI_VMI_Connection_Timeout) > now_time)) {
     sched_yield ();
     status = VMI_Poll ();
-    if (!VMI_SUCCESS (status)) {
-      DEBUG_PRINT ("VMI_Poll() failed while waiting for connections.\n");
-      DEBUG_PRINT ("Error 0x%08x\n", status);
-      return (-1);
-    }
+    CMI_VMI_CHECK_SUCCESS (status, "VMI_Poll()");
+
     gettimeofday (&tp, NULL);
     now_time = tp.tv_sec;
+
+    pending = FALSE;
+    for (i = 0; i < _Cmi_numpes; i++) {
+      pending = pending || ((&CMI_VMI_Processes[i])->connection_state != CMI_VMI_CONNECTION_CONNECTED);
+    }
+
+    /* Every 30 seconds, retry any outgoing connections that had errors. */
+    if (pending && ((now_time - start_time) % 30 == 0)) {
+      for (i = 0; i < _Cmi_mype; i++) {
+	if ((&CMI_VMI_Processes[i])->connection_state == CMI_VMI_CONNECTION_ERROR) {
+	  sprintf (remote_key, "%s:%u\0", CMI_VMI_Program_Key, (&CMI_VMI_Processes[i])->rank);
+	  CMI_VMI_Open_Connection (i, remote_key, connect_message_buffer);
+	}
+      }
+    }
   }
 
-  /*
-    Step 4 - Verify that there were no connection problems.
-  */
-  if ( (CMI_VMI_OReject > 0) || (CMI_VMI_OError > 0) ||
-       (CMI_VMI_IReject > 0) || (CMI_VMI_IError > 0) ) {
-    DEBUG_PRINT ("%d outgoing connections were rejected.\n", CMI_VMI_OReject);
-    DEBUG_PRINT ("%d outgoing connections had errors.\n", CMI_VMI_OError);
-    DEBUG_PRINT ("%d incoming connections were rejected.\n", CMI_VMI_IReject);
-    DEBUG_PRINT ("%d incoming connections had errors.\n", CMI_VMI_IError);
-
-    free (remote_key);
-    VMI_Buffer_Deallocate (connect_message_buffer);
-
-    return (-1);
-  }
-
-  DEBUG_PRINT ("All connections are complete for process %d.\n", _Cmi_mype);
-
+  /* Free memory. */
   free (remote_key);
   VMI_Buffer_Deallocate (connect_message_buffer);
 
-  /* Successfully set up connections. */
+  /* Verify that there were no connection problems. */
+  if (pending) {
+    DEBUG_PRINT ("There were connection errors for process %d.\n", _Cmi_mype);
+    return (-1);
+  }
+
+  DEBUG_PRINT ("All connections are open for process %d.\n", _Cmi_mype);
+
   return (0);
+}
+
+
+
+/**************************************************************************
+**
+*/
+int CMI_VMI_Open_Connection (int remote_rank, char *remote_key, PVMI_BUFFER connect_message_buffer)
+{
+  VMI_STATUS status;
+
+  CMI_VMI_Process_T *process;
+  struct hostent *remote_host;
+  PVMI_NETADDRESS remote_address;
+
+
+  DEBUG_PRINT ("CMI_VMI_Open_Connection() called.\n");
+
+  /* Get a pointer to the process to make things easier. */
+  process = &CMI_VMI_Processes[remote_rank];
+
+  /* Allocate a connection object */
+  status = VMI_Connection_Create (&process->connection);
+  if (!VMI_SUCCESS (status)) {
+    DEBUG_PRINT ("Unable to create connection to process %d.\n", remote_rank);
+    return (-1);
+  }
+
+  /* Build the remote IPV4 address. We need remote hosts name for this. */
+  remote_host = gethostbyaddr (&process->node_IP, sizeof (process->node_IP), AF_INET);
+  if (!remote_host) {
+    DEBUG_PRINT ("Error looking up host [%d.%d.%d.%d].\n", ((process->node_IP >>  0) & 0xFF),
+		                                           ((process->node_IP >>  8) & 0xFF),
+		                                           ((process->node_IP >> 16) & 0xFF),
+		                                           ((process->node_IP >> 24) & 0xFF));
+    return (-1);
+  }
+
+  /* Allocate a remote IPv4 NETADDRESS. */
+  status = VMI_Connection_Allocate_IPV4_Address (remote_host->h_name, 0, CMI_VMI_Username, remote_key, &remote_address);
+  if (!VMI_SUCCESS (status)) {
+    DEBUG_PRINT ("Unable to allocate remote node IP V4 address.\n");
+    return (-1);
+  }
+
+  /* Now bind the local and remote addresses. */
+  status = VMI_Connection_Bind (*localAddress, *remote_address, process->connection);
+  if (!VMI_SUCCESS (status)) {
+    DEBUG_PRINT ("Error binding connection for process %d.\n", i);
+    return (-1);
+  }
+
+  /*
+    Do this here to avoid a race condition where we complete the connect right
+    away and then set the state here to CMI_VMI_CONNECTION_STATE_CONNECTING.
+  */
+  process->connection_state = CMI_VMI_CONNECTION_CONNECTING;
+
+  /* Issue the actual connection request. */
+  status = VMI_Connection_Issue (process->connection, connect_message_buffer, (VMIConnectIssue) CMI_VMI_Connection_Response_Handler, process);
+  if (!VMI_SUCCESS (status)) {
+    DEBUG_PRINT ("Error issuing connection for process %d.\n", i);
+    return (-1);
+  }
+}
+
+
+
+/**************************************************************************
+** This function is invoked asynchronously to handle an incoming connection
+** request.
+*/
+VMI_CONNECT_RESPONSE CMI_VMI_Connection_Handler (PVMI_CONNECT connection, PVMI_SLAB slab, ULONG data_size)
+{
+  VMI_STATUS status;
+
+  CMI_VMI_Connect_Message_T *data;
+  ULONG rank;
+  ULONG size;
+  PVMI_SLAB_STATE state;
+
+
+  DEBUG_PRINT ("CMI_VMI_Connection_Handler() called.\n");
+
+  /* Initialize the number of bytes expected from the connect data. */
+  size = sizeof (CMI_VMI_Connect_Message_T);
+
+  /* Make sure we received the expected number of bytes. */
+  if (data_size != size) {
+    return VMI_CONNECT_RESPONSE_ERROR;
+  }
+
+  /* Allocate connection data structure. */
+  data = (CMI_VMI_Connect_Message_T *) malloc (size);
+  if (!data) {
+    return VMI_CONNECT_RESPONSE_ERROR;
+  }
+
+  /* Save the slab state prior to reading. */
+  status = VMI_Slab_Save_State (slab, &state);
+  if (!VMI_SUCCESS (status)) {
+    free (data);
+    return VMI_CONNECT_RESPONSE_ERROR;
+  }
+
+  /* Copy connect data. */
+  status = VMI_Slab_Copy_Bytes (slab, size, data);
+  if (!VMI_SUCCESS (status)) {
+    VMI_Slab_Restore_State (slab, state);
+    free (data);
+    return VMI_CONNECT_RESPONSE_ERROR;
+  }
+
+  /* Get rank of connecting process. */
+  rank = ntohl (data->rank);
+
+  DEBUG_PRINT ("Accepting a connection request from rank %u.\n", rank);
+
+  /* Update the connection state. */
+  (&CMI_VMI_Processes[rank])->connection = connection;
+  (&CMI_VMI_Processes[rank])->connection_state = CMI_VMI_CONNECTION_CONNECTED;
+
+
+  VMI_CONNECT_SET_RECEIVE_CONTEXT (connection, (&CMI_VMI_Processes[rank]));
+
+  status = VMI_RDMA_Set_Publish_Callback (connection, (VMIRDMABuffer) CMI_VMI_RDMA_Publish_Handler);
+  CMI_VMI_CHECK_SUCCESS (status, "VMI_RDMA_Set_Publish_Callback()");
+
+  status = VMI_RDMA_Set_Put_Notification_Callback (connection, CMI_VMI_RDMA_Put_Notification_Handler);
+  CMI_VMI_CHECK_SUCCESS (status, "VMI_RDMA_Set_Put_Notification_Callback()");
+
+  status = VMI_RDMA_Set_Get_Notification_Callback (connection, CMI_VMI_RDMA_Get_Notification_Handler);
+  CMI_VMI_CHECK_SUCCESS (status, "VMI_RDMA_Set_Get_Notification_Callback()");
+
+
+  /* Free the connect data buffer. */
+  free (data);
+
+  /* Accepted the connection. */
+  return VMI_CONNECT_RESPONSE_ACCEPT;
+}
+
+
+
+/**************************************************************************
+** This function is invoked asynchronously to handle a process's response
+** to our connection request.
+*/
+void CMI_VMI_Connection_Response_Handler (PVOID context, PVOID response, USHORT size, PVOID handle, VMI_CONNECT_RESPONSE status)
+{
+  CMI_VMI_Process_T *process;
+
+
+  DEBUG_PRINT ("CMI_VMI_Connection_Response_Handler() called.\n");
+
+  /* Cast the context to a CMI_VMI_Process_Info pointer. */
+  process = (CMI_VMI_Process_T *) context;
+
+  switch (status)
+  {
+    case VMI_CONNECT_RESPONSE_ACCEPT:
+      DEBUG_PRINT ("Process %d accepted connection.\n", process->rank);
+
+      /* Update the connection state. */
+      process->connection_state = CMI_VMI_CONNECTION_CONNECTED;
+
+
+      VMI_CONNECT_SET_RECEIVE_CONTEXT (process->connection, process);
+
+      status = VMI_RDMA_Set_Publish_Callback (process->connection, CMI_VMI_RDMA_Publish_Handler);
+      CMI_VMI_CHECK_SUCCESS (status, "VMI_RDMA_Set_Publish_Callback()");
+
+      status = VMI_RDMA_Set_Put_Notification_Callback (process->connection, CMI_VMI_RDMA_Put_Notification_Handler);
+      CMI_VMI_CHECK_SUCCESS(status,"VMI_RDMA_Set_Put_Notification_Callback()");
+
+      status = VMI_RDMA_Set_Get_Notification_Callback (process->connection, CMI_VMI_RDMA_Get_Notification_Handler);
+      CMI_VMI_CHECK_SUCCESS(status,"VMI_RDMA_Set_Get_Notification_Callback()");
+
+
+      break;
+
+    case VMI_CONNECT_RESPONSE_REJECT:
+      DEBUG_PRINT ("Process %d rejected connection.\n", process->rank);
+
+      /* Update the connection state. */
+      process->connection_state = CMI_VMI_CONNECTION_DISCONNECTED;
+
+      break;
+
+    case VMI_CONNECT_RESPONSE_ERROR:
+      DEBUG_PRINT ("Error connecting to process %d [%d.%d.%d.%d].\n", process->rank, ((process->node_IP >>  0) & 0xFF),
+		                                                                     ((process->node_IP >>  8) & 0xFF),
+		                                                                     ((process->node_IP >> 16) & 0xFF),
+		                                                                     ((process->node_IP >> 24) & 0xFF));
+
+      /* Update the connection state. */
+      process->connection_state = CMI_VMI_CONNECTION_ERROR;
+
+      break;
+
+    default:
+      DEBUG_PRINT ("Error connecting to process %d\n", process->rank);
+      DEBUG_PRINT ("Error code 0x%08x\n", status);
+
+      /* Update the connection state. */
+      process->connection_state = CMI_VMI_CONNECTION_ERROR;
+
+      break;
+  }
+
+  /* Deallocate the connection receive context. */
+  VMI_Buffer_Deallocate ((PVMI_BUFFER) context);
+}
+
+
+
+/**************************************************************************
+**
+*/
+int CMI_VMI_Close_Connections ()
+{
+  VMI_STATUS status;
+
+  struct timeval tp;
+  long start_time;
+  long now_time;
+  BOOLEAN pending;
+
+  int i;
+
+
+  /* Issue a disconnect request to each process with a lower rank. */
+  for (i = 0; i < _Cmi_mype; i++) {
+    (&CMI_VMI_Processes[i])->connection_state = CMI_VMI_CONNECTION_DISCONNECTING;
+
+    status = VMI_Connection_Disconnect ((&CMI_VMI_Processes[i])->connection, CMI_VMI_Disconnection_Response_Handler, (PVOID) (&CMI_VMI_Processes[i]));
+    CMI_VMI_CHECK_SUCCESS (status, "VMI_Connection_Disconnect()");
+  }
+
+  /* Set the connection state to ourself to "disconnected". */
+  (&CMI_VMI_Processes[_Cmi_mype])->connection_state = CMI_VMI_CONNECTION_DISCONNECTED;
+
+  /* Wait until all processes are disconnected or timeout occurs. */
+  gettimeofday (&tp, NULL);
+  start_time = tp.tv_sec;
+  now_time   = tp.tv_sec;
+  pending    = TRUE;
+
+  while (pending && ((start_time + CMI_VMI_Connection_Timeout) > now_time)) {
+    sched_yield ();
+    status = VMI_Poll ();
+    CMI_VMI_CHECK_SUCCESS (status, "VMI_Poll()");
+
+    gettimeofday (&tp, NULL);
+    now_time = tp.tv_sec;
+
+    pending = FALSE;
+    for (i = 0; i < _Cmi_numpes; i++) {
+      pending = (pending || ((&CMI_VMI_Processes[i])->connection_state != CMI_VMI_CONNECTION_DISCONNECTED));
+    }
+  }
+
+  /* Return the return code. */
+  if (pending) {
+    return (-1);
+  }
+
+  return (0);
+}
+
+
+
+/**************************************************************************
+** This function is invoked asynchronously to handle an incoming disconnect
+** request.
+*/
+void CMI_VMI_Disconnection_Handler (PVMI_CONNECT connection)
+{
+  CMI_VMI_Process_T *process;
+
+
+  DEBUG_PRINT ("CMI_VMI_Disconnection_Handler() called.\n");
+
+  process = (CMI_VMI_Process_T *) VMI_CONNECT_GET_RECEIVE_CONTEXT (connection);
+  process->connection_state = CMI_VMI_CONNECTION_DISCONNECTED;
+}
+
+
+
+/**************************************************************************
+** This function is invoked asynchronously to handle a process's response
+** to our disconnection request.
+*/
+void CMI_VMI_Disconnection_Response_Handler (PVMI_CONNECT connection, PVOID context, VMI_STATUS status)
+{
+  CMI_VMI_Process_T *process;
+
+
+  DEBUG_PRINT ("CMI_VMI_Disconnection_Response_Handler() called.\n");
+
+  process = (CMI_VMI_Process_T *) context;
+  process->connection_state = CMI_VMI_CONNECTION_DISCONNECTED;
+}
+
+
+
+#if CMI_VMI_USE_MEMORY_POOL
+/**************************************************************************
+**
+*/
+void *CMI_VMI_CmiAlloc (int request_size)
+{
+  VMI_STATUS status;
+
+  int size;
+  void *ptr;
+
+
+  DEBUG_PRINT ("CMI_VMI_CmiAlloc() (memory pool version) called.\n");
+
+  size = request_size + (sizeof (CMI_VMI_Memory_Chunk_T) - sizeof (CmiChunkHeader));
+
+  if (size < CMI_VMI_BUCKET1_SIZE) {
+    status = VMI_Pool_Allocate_Buffer (CMI_VMI_Bucket1_Pool, &ptr, NULL);
+    CMI_VMI_CHECK_SUCCESS (status, "VMI_Pool_Allocate_Buffer()");
+  } else if (size < CMI_VMI_BUCKET2_SIZE) {
+    status = VMI_Pool_Allocate_Buffer (CMI_VMI_Bucket2_Pool, &ptr, NULL);
+    CMI_VMI_CHECK_SUCCESS (status, "VMI_Pool_Allocate_Buffer()");
+  } else if (size < CMI_VMI_BUCKET3_SIZE) {
+    status = VMI_Pool_Allocate_Buffer (CMI_VMI_Bucket3_Pool, &ptr, NULL);
+    CMI_VMI_CHECK_SUCCESS (status, "VMI_Pool_Allocate_Buffer()");
+  } else if (size < CMI_VMI_BUCKET4_SIZE) {
+    status = VMI_Pool_Allocate_Buffer (CMI_VMI_Bucket4_Pool, &ptr, NULL);
+    CMI_VMI_CHECK_SUCCESS (status, "VMI_Pool_Allocate_Buffer()");
+  } else if (size < CMI_VMI_BUCKET5_SIZE) {
+    status = VMI_Pool_Allocate_Buffer (CMI_VMI_Bucket5_Pool, &ptr, NULL);
+    CMI_VMI_CHECK_SUCCESS (status, "VMI_Pool_Allocate_Buffer()");
+  } else {
+    ptr = malloc (size);
+  }
+
+  ptr += sizeof (CMI_VMI_Memory_Chunk_T);
+  CONTEXTFIELD (ptr) = NULL;
+
+  ptr -= sizeof (CmiChunkHeader);
+
+  return (ptr);
+}
+
+
+
+/**************************************************************************
+**
+*/
+void CMI_VMI_CmiFree (void *ptr)
+{
+  VMI_STATUS status;
+
+  int size;
+
+  void *context;
+
+  CMI_VMI_Process_T *process;
+  CMI_VMI_Handle_T *handle;
+
+  CMI_VMI_Eager_Short_Slot_Footer_T *footer;
+  int sender_rank;
+  int credits_temp;
+  int index;
+
+  PVMI_CACHE_ENTRY cacheentry;
+  char *publish_buffer;
+  int buffer_size;
+
+  CMI_VMI_Publish_Message_T publish_msg;
+
+
+  DEBUG_PRINT ("CMI_VMI_CmiFree() (memory pool version) called.\n");
+
+  ptr += sizeof (CmiChunkHeader);
+
+  size = SIZEFIELD (ptr) + sizeof (CMI_VMI_Memory_Chunk_T);
+
+  context = CONTEXTFIELD (ptr);
+  if (context) {
+    handle = (CMI_VMI_Handle_T *) context;
+
+    if (handle->data.receive.receive_handle_type == CMI_VMI_RECEIVE_HANDLE_TYPE_EAGER_SHORT) {
+      sender_rank = handle->data.receive.data.eager_short.sender_rank;
+      process = &CMI_VMI_Processes[sender_rank];
+
+      footer = handle->data.receive.data.eager_short.footer;
+      footer->sentinel = CMI_VMI_EAGER_SHORT_SENTINEL_FREE;
+
+      credits_temp = 0;
+      index = process->eager_short_receive_dirty;
+      handle = process->eager_short_receive_handles[index];
+      footer = handle->data.receive.data.eager_short.footer;
+      while (footer->sentinel == CMI_VMI_EAGER_SHORT_SENTINEL_FREE) {
+	footer->sentinel = CMI_VMI_EAGER_SHORT_SENTINEL_READY;
+	credits_temp += 1;
+
+	index = (index + 1) % process->eager_short_receive_size;
+	handle = process->eager_short_receive_handles[index];
+	footer = handle->data.receive.data.eager_short.footer;
+      }
+
+      process->eager_short_receive_dirty = index;
+      process->eager_short_receive_credits_replentish += credits_temp;
+    } else {
+      sender_rank = handle->data.receive.data.eager_long.sender_rank;
+      process = &CMI_VMI_Processes[sender_rank];
+
+      publish_buffer = handle->msg;
+      buffer_size = handle->data.receive.data.eager_long.maxsize;
+      cacheentry = handle->data.receive.data.eager_long.cacheentry;
+
+      /* Fill in the publish data which will be sent to the sender. */
+      publish_msg.type = CMI_VMI_PUBLISH_TYPE_EAGER_LONG;
+
+      /* Publish the eager buffer to the sender. */
+      status = VMI_RDMA_Publish_Buffer (process->connection, cacheentry->bufferHandle, (VMI_virt_addr_t) (VMI_ADDR_CAST) publish_buffer, buffer_size,
+					(VMI_virt_addr_t) NULL, (UINT32) handle->index, &publish_msg, sizeof (CMI_VMI_Publish_Message_T));
+      CMI_VMI_CHECK_SUCCESS (status, "VMI_RDMA_Publish_Buffer()");
+    }
+  } else {
+    ptr -= sizeof (CMI_VMI_Memory_Chunk_T);
+
+    if (size < CMI_VMI_BUCKET1_SIZE) {
+      status = VMI_Pool_Deallocate_Buffer (CMI_VMI_Bucket1_Pool, ptr);
+      CMI_VMI_CHECK_SUCCESS (status, "VMI_Pool_Deallocate_Buffer()");
+    } else if (size < CMI_VMI_BUCKET2_SIZE) {
+      status = VMI_Pool_Deallocate_Buffer (CMI_VMI_Bucket2_Pool, ptr);
+      CMI_VMI_CHECK_SUCCESS (status, "VMI_Pool_Deallocate_Buffer()");
+    } else if (size < CMI_VMI_BUCKET3_SIZE) {
+      status = VMI_Pool_Deallocate_Buffer (CMI_VMI_Bucket3_Pool, ptr);
+      CMI_VMI_CHECK_SUCCESS (status, "VMI_Pool_Deallocate_Buffer()");
+    } else if (size < CMI_VMI_BUCKET4_SIZE) {
+      status = VMI_Pool_Deallocate_Buffer (CMI_VMI_Bucket4_Pool, ptr);
+      CMI_VMI_CHECK_SUCCESS (status, "VMI_Pool_Deallocate_Buffer()");
+    } else if (size < CMI_VMI_BUCKET5_SIZE) {
+      status = VMI_Pool_Deallocate_Buffer (CMI_VMI_Bucket5_Pool, ptr);
+      CMI_VMI_CHECK_SUCCESS (status, "VMI_Pool_Deallocate_Buffer()");
+    } else {
+      free (ptr);
+    }
+  }
+}
+#else   /* CMI_VMI_USE_MEMORY_POOL */
+/**************************************************************************
+**
+*/
+void *CMI_VMI_CmiAlloc (int request_size)
+{
+  int size;
+  void *ptr;
+
+
+  DEBUG_PRINT ("CMI_VMI_CmiAlloc() (simple version) called.\n");
+
+  size = request_size +
+         (sizeof (CMI_VMI_Memory_Chunk_T) - sizeof (CmiChunkHeader));
+
+  ptr = malloc (size);
+
+  ptr += sizeof (CMI_VMI_Memory_Chunk_T);
+  CONTEXTFIELD (ptr) = NULL;
+
+  ptr -= sizeof (CmiChunkHeader);
+
+  return (ptr);
+}
+
+
+
+/**************************************************************************
+**
+*/
+void CMI_VMI_CmiFree (void *ptr)
+{
+  int size;
+
+  void *context;
+
+  CMI_VMI_Process_T *process;
+  CMI_VMI_Handle_T *handle;
+
+  CMI_VMI_Eager_Short_Slot_Footer_T *footer;
+  int sender_rank;
+  int credits_temp;
+  int index;
+
+
+  DEBUG_PRINT ("CMI_VMI_CmiFree() (simple version) called.\n");
+
+  ptr += sizeof (CmiChunkHeader);
+
+  size = SIZEFIELD (ptr) + sizeof (CMI_VMI_Memory_Chunk_T);
+
+  context = CONTEXTFIELD (ptr);
+  if (context) {
+    handle = (CMI_VMI_Handle_T *) context;
+
+    if (handle->data.receive.receive_handle_type == CMI_VMI_RECEIVE_HANDLE_TYPE_EAGER_SHORT) {
+      sender_rank = handle->data.receive.data.eager_short.sender_rank;
+      process = &CMI_VMI_Processes[sender_rank];
+
+      footer = handle->data.receive.data.eager_short.footer;
+      footer->sentinel = CMI_VMI_EAGER_SHORT_SENTINEL_FREE;
+
+      credits_temp = 0;
+      index = process->eager_short_receive_dirty;
+      handle = process->eager_short_receive_handles[index];
+      footer = handle->data.receive.data.eager_short.footer;
+      while (footer->sentinel == CMI_VMI_EAGER_SHORT_SENTINEL_FREE) {
+	footer->sentinel = CMI_VMI_EAGER_SHORT_SENTINEL_READY;
+	credits_temp += 1;
+
+	index = (index + 1) % process->eager_short_receive_size;
+	handle = process->eager_short_receive_handles[index];
+	footer = handle->data.receive.data.eager_short.footer;
+      }
+
+      process->eager_short_receive_dirty = index;
+      process->eager_short_receive_credits_replentish += credits_temp;
+    } else {
+      sender_rank = handle->data.receive.data.eager_long.sender_rank;
+      process = &CMI_VMI_Processes[sender_rank];
+
+      publish_buffer = handle->msg;
+      buffer_size = handle->data.receive.data.eager_long.maxsize;
+      cacheentry = handle->data.receive.data.eager_long.cacheentry;
+
+      /* Fill in the publish data which will be sent to the sender. */
+      publish_msg.type = CMI_VMI_PUBLISH_TYPE_EAGER_LONG;
+
+      /* Publish the eager buffer to the sender. */
+      status = VMI_RDMA_Publish_Buffer (process->connection, cacheentry->bufferHandle, (VMI_virt_addr_t) (VMI_ADDR_CAST) publish_buffer, buffer_size,
+					(VMI_virt_addr_t) NULL, (UINT32) handle->index, &publish_msg, sizeof (CMI_VMI_Publish_Message_T));
+      CMI_VMI_CHECK_SUCCESS (status, "VMI_RDMA_Publish_Buffer()");
+    }
+  } else {
+    ptr -= sizeof (CMI_VMI_Memory_Chunk_T);
+
+    free (ptr);
+  }
+}
+#endif   /* CMI_VMI_USE_MEMORY_POOL */
+
+
+
+/**************************************************************************
+**
+*/
+PVMI_CACHE_ENTRY CMI_VMI_CacheEntry_From_Context (void *context)
+{
+  CMI_VMI_Handle_T *handle;
+
+
+  handle = (CMI_VMI_Handle_T *) context;
+
+  switch (handle->data.receive.receive_handle_type)
+  {
+    case CMI_VMI_RECEIVE_HANDLE_TYPE_EAGER_SHORT:
+      return (handle->data.receive.data.eager_short.cacheentry);
+      break;
+
+    case CMI_VMI_RECEIVE_HANDLE_TYPE_EAGER_LONG:
+      return (handle->data.receive.data.eager_long.cacheentry);
+      break;
+
+    default:
+      CmiAbort ("CMI_VMI_CacheEntry_From_Context() called on invalid handle type.");
+      break;
+  }
+}
+
+
+
+/**************************************************************************
+**
+*/
+CMI_VMI_Handle_T *CMI_VMI_Allocate_Handle ()
+{
+  VMI_STATUS status;
+
+  int i;
+  int j;
+
+
+  DEBUG_PRINT ("CMI_VMI_Allocate_Handle() called.\n");
+
+  i = CMI_VMI_Next_Handle;
+  j = CMI_VMI_Next_Handle;
+  while ((&CMI_VMI_Handles[i])->refcount > 0) {
+    i = ((i + 1) % CMI_VMI_Maximum_Handles);
+
+    if (i == j) {
+      i = CMI_VMI_Maximum_Handles;
+      CMI_VMI_Maximum_Handles *= 2;
+      CMI_VMI_Handles = (CMI_VMI_Handle_T *) realloc (CMI_VMI_Handles, CMI_VMI_Maximum_Handles * sizeof (CMI_VMI_Handle_T));
+      for (j = i; j < CMI_VMI_Maximum_Handles; j++) {
+	(&CMI_VMI_Handles[j])->index = j;
+	(&CMI_VMI_Handles[j])->refcount = 0;
+      }
+    }
+  }
+
+  (&CMI_VMI_Handles[i])->refcount = 1;
+
+  CMI_VMI_Next_Handle = ((i + 1) % CMI_VMI_Maximum_Handles);
+
+  return (&CMI_VMI_Handles[i]);
+}
+
+
+
+/**************************************************************************
+**
+*/
+void CMI_VMI_Deallocate_Handle (CMI_VMI_Handle_T *handle)
+{
+  DEBUG_PRINT ("CMI_VMI_Allocate_Handle() called.\n");
+
+  handle->refcount = 0;
+}
+
+
+
+/**************************************************************************
+** This function is invoked asynchronously to handle an incoming message
+** receive on a stream.
+**
+** This function is on the receive side.
+*/
+VMI_RECV_STATUS CMI_VMI_Stream_Notification_Handler (PVMI_CONNECT connection, PVMI_STREAM_RECV stream, VMI_STREAM_COMMAND command, PVOID context, PVMI_SLAB slab)
+{
+  VMI_STATUS status;
+
+  ULONG size;
+  char *msg;
+  PVMI_SLAB_STATE state;
+
+  CMI_VMI_Process_T *process;
+  int credits_temp;
+
+  CMI_VMI_Persistent_Request_Message_T *request_msg;
+
+
+  DEBUG_PRINT ("CMI_VMI_Stream_Notification_Handler() called.\n");
+
+  /* Save the slab state. */
+  status = VMI_Slab_Save_State (slab, &state);
+  CMI_VMI_CHECK_SUCCESS (status, "VMI_Slab_Save_State()");
+
+  size = VMI_SLAB_BYTES_REMAINING (slab);
+
+  msg = CmiAlloc (size);
+
+  /* Copy the message body into the message buffer. */
+  status = VMI_Slab_Copy_Bytes (slab, size, msg);
+  CMI_VMI_CHECK_SUCCESS (status, "VMI_Slab_Copy_Bytes()");
+
+  /* Restore the slab state. */
+  status = VMI_Slab_Restore_State (slab, state);
+  CMI_VMI_CHECK_SUCCESS (status, "VMI_Slab_Restore_State()");
+
+  /* Deal with any eager send credits send with the message. */
+  process = (CMI_VMI_Process_T *) VMI_CONNECT_GET_RECEIVE_CONTEXT (connection);
+  credits_temp = CMI_VMI_MESSAGE_CREDITS (msg);
+  process->eager_short_send_credits_available += credits_temp;
+
+  switch (CMI_VMI_MESSAGE_TYPE (msg))
+  {
+    case CMI_VMI_MESSAGE_TYPE_BARRIER:
+      CMI_VMI_Barrier_Count++;
+      CmiFree (msg);
+      break;
+
+    case CMI_VMI_MESSAGE_TYPE_CREDIT:
+      CmiFree (msg);
+      break;
+
+    case CMI_VMI_MESSAGE_TYPE_PERSISTENT_REQUEST:
+      request_msg = (CMI_VMI_Persistent_Request_Message_T *) msg;
+      CMI_VMI_Eager_Setup (process->rank, request_msg->maxsize);
+      CmiFree (msg);
+      break;
+
+    default:
+#if CMK_BROADCAST_SPANNING_TREE
+      if (CMI_BROADCAST_ROOT (msg)) {
+        /* Message is enqueued after send to spanning children completes. */
+	CMI_VMI_Send_Spanning_Children (size, msg);
+      } else {
+	CdsFifo_Enqueue (CpvAccess (CMI_VMI_RemoteQueue), msg);
+      }
+#else
+      CdsFifo_Enqueue (CpvAccess (CMI_VMI_RemoteQueue), msg);
+#endif
+      break;
+  }
+
+  /* Tell VMI that the slab can be discarded. */
+  return (VMI_SLAB_DONE);
+}
+
+
+
+/**************************************************************************
+** This function is invoked asynchronously to handle the completion of a
+** send on a stream.
+**
+** This function is on the send side.
+*/
+void CMI_VMI_Stream_Completion_Handler (PVOID context, VMI_STATUS sstatus)
+{
+  VMI_STATUS status;
+
+  CMI_VMI_Handle_T *handle;
+
+  void *mem_context;
+
+
+  DEBUG_PRINT ("CMI_VMI_Stream_Completion_Handler() called.\n");
+
+  handle = (CMI_VMI_Handle_T *) context;
+
+  CMI_VMI_AsyncMsgCount -= 1;
+  handle->refcount -= 1;
+
+  if (handle->refcount <= 1) {
+    mem_context = CONTEXTFIELD (handle->msg);
+    if (!mem_context) {
+      status = VMI_Cache_Deregister (handle->data.send.data.stream.cacheentry);
+      CMI_VMI_CHECK_SUCCESS (status, "VMI_Cache_Deregister()");
+    }
+
+    if (handle->data.send.message_disposition == CMI_VMI_MESSAGE_DISPOSITION_FREE) {
+      CmiFree (handle->msg);
+    }
+
+#if CMK_BROADCAST_SPANNING_TREE
+    if (handle->data.send.message_disposition == CMI_VMI_MESSAGE_DISPOSITION_ENQUEUE) {
+      CdsFifo_Enqueue (CpvAccess (CMI_VMI_RemoteQueue), handle->msg);
+    }
+#endif
+
+    CMI_VMI_Deallocate_Handle (handle);
+  }
+}
+
+
+
+/**************************************************************************
+** This function is invoked asynchronously to handle an RDMA publish of a
+** buffer from a remote process.
+**
+** This function is on the receive side.
+**
+**
+** REMEMBER: We can cast the remote buffer's local context to a send handle:
+**
+**   handle = (CMI_VMI_Handle_T *) (VMI_ADDR_CAST) remote_buffer->lctxt;
+**
+** as long as the publisher (sender) specifies an address IN OUR ADDRESS
+** SPACE as the 5th argument to VMI_RDMA_Publish_Buffer().
+*/
+void CMI_VMI_RDMA_Publish_Handler (PVMI_CONNECT connection, PVMI_REMOTE_BUFFER remote_buffer, PVMI_SLAB publish_data, ULONG publish_data_size)
+{
+  VMI_STATUS status;
+
+  CMI_VMI_Handle_T *handle;
+  PVMI_CACHE_ENTRY cacheentry;
+  PVMI_RDMA_OP rdmaop;
+  ULONG msgsize;
+  char *msg;
+
+  PVMI_BUFFER_OP msgop;
+  CMI_VMI_Publish_Message_T *publish_msg;
+
+  CMI_VMI_Process_T *process;
+  int slot_size;
+  int i;
+  int offset;
+  int index;
+
+
+  DEBUG_PRINT ("CMI_VMI_RDMA_Publish_Handler() called.\n");
+
+  process = (CMI_VMI_Process_T *) VMI_CONNECT_GET_RECEIVE_CONTEXT (connection);
+
+  msgop = VMI_SLAB_GET_BUFFEROPS (publish_data);
+  publish_msg = (CMI_VMI_Publish_Message_T *) VMI_BUFFEROP_GET_ADDRESS (msgop);
+
+  switch (publish_msg->type)
+  {
+    case CMI_VMI_PUBLISH_TYPE_GET:
+      msgsize = remote_buffer->rsz;
+      msg = CmiAlloc (msgsize);
+
+      status = VMI_Cache_Register (msg, msgsize, &cacheentry);
+      CMI_VMI_CHECK_SUCCESS (status, "VMI_Cache_Register()");
+
+      status = VMI_RDMA_Alloc_Op (&rdmaop);
+      CMI_VMI_CHECK_SUCCESS (status, "VMI_RDMA_Alloc_Op()");
+
+      rdmaop->numBufs = 1;
+      rdmaop->buffers[0] = cacheentry->bufferHandle;
+      rdmaop->addr[0] = msg;
+      rdmaop->sz[0] = msgsize;
+      rdmaop->rbuffer = remote_buffer;
+      rdmaop->roffset = 0;
+      rdmaop->notify = TRUE;
+
+      handle = CMI_VMI_Allocate_Handle ();
+
+      handle->refcount += 1;
+      handle->msg = msg;
+      handle->msgsize = msgsize;
+      handle->handle_type = CMI_VMI_HANDLE_TYPE_RECEIVE;
+      handle->data.receive.receive_handle_type = CMI_VMI_RECEIVE_HANDLE_TYPE_RDMAGET;
+      handle->data.receive.data.rdmaget.cacheentry = cacheentry;
+      handle->data.receive.data.rdmaget.process = (void *) process;
+
+      status = VMI_RDMA_Get (connection, rdmaop, handle, CMI_VMI_RDMA_Get_Completion_Handler);
+      CMI_VMI_CHECK_SUCCESS (status, "VMI_RDMA_Get()");
+
+      break;
+
+    case CMI_VMI_PUBLISH_TYPE_EAGER_SHORT:
+      slot_size = sizeof (CMI_VMI_Memory_Chunk_T) + CMI_VMI_Medium_Message_Boundary + sizeof (CMI_VMI_Eager_Short_Slot_Footer_T);
+
+      for (i = 0; i < CMI_VMI_Eager_Short_Slots; i++) {
+	offset = (i * slot_size) + sizeof (CMI_VMI_Memory_Chunk_T);
+
+	msg = CmiAlloc (CMI_VMI_Medium_Message_Boundary + sizeof (CMI_VMI_Eager_Short_Slot_Footer_T));
+
+	status = VMI_Cache_Register (msg, CMI_VMI_Medium_Message_Boundary + sizeof (CMI_VMI_Eager_Short_Slot_Footer_T), &cacheentry);
+	CMI_VMI_CHECK_SUCCESS (status, "VMI_Cache_Register()");
+
+	status = VMI_RDMA_Alloc_Op (&rdmaop);
+	CMI_VMI_CHECK_SUCCESS (status, "VMI_RDMA_Alloc_Op()");
+
+	handle = CMI_VMI_Allocate_Handle ();
+
+	handle->refcount += 1;
+	handle->msg = msg;
+	handle->msgsize = -1;
+	handle->handle_type = CMI_VMI_HANDLE_TYPE_SEND;
+	handle->data.send.send_handle_type = CMI_VMI_SEND_HANDLE_TYPE_EAGER_SHORT;
+	handle->data.send.message_disposition = CMI_VMI_MESSAGE_DISPOSITION_NONE;
+	handle->data.send.data.eager_short.remote_buffer = remote_buffer;
+	handle->data.send.data.eager_short.offset = offset;
+	handle->data.send.data.eager_short.cacheentry = cacheentry;
+	handle->data.send.data.eager_short.rdmaop = rdmaop;
+
+	index = process->eager_short_send_size;
+	process->eager_short_send_handles[index] = handle;
+	process->eager_short_send_size += 1;
+	process->eager_short_send_credits_available += 1;
+      }
+
+      break;
+
+    case CMI_VMI_PUBLISH_TYPE_EAGER_LONG:
+      handle = CMI_VMI_Allocate_Handle ();
+
+      handle->refcount += 1;
+      handle->msg = NULL;
+      handle->msgsize = -1;
+      handle->handle_type = CMI_VMI_HANDLE_TYPE_SEND;
+      handle->data.send.send_handle_type = CMI_VMI_SEND_HANDLE_TYPE_EAGER_LONG;
+      handle->data.send.message_disposition = CMI_VMI_MESSAGE_DISPOSITION_NONE;
+      handle->data.send.data.eager_long.maxsize = remote_buffer->rsz;
+      handle->data.send.data.eager_long.remote_buffer = remote_buffer;
+      handle->data.send.data.eager_long.cacheentry = NULL;
+
+      index = process->eager_long_send_size;
+      process->eager_long_send_handles[index] = handle;
+      process->eager_long_send_size += 1;
+
+      break;
+  }
+}
+
+
+
+/**************************************************************************
+** done
+*/
+void CMI_VMI_RDMA_Put_Notification_Handler (PVMI_CONNECT connection, UINT32 rdma_size, UINT32 context, VMI_STATUS remote_status)
+{
+  VMI_STATUS status;
+
+  CMI_VMI_Handle_T *handle;
+
+  PVMI_CACHE_ENTRY cacheentry;
+  PVMI_RDMA_OP rdmaop;
+
+  char *publish_buffer;
+
+  CMI_VMI_Publish_Message_T publish_msg;
+
+  int buffer_size;
+
+  char *msg;
+
+
+  DEBUG_PRINT ("CMI_VMI_RDMA_Put_Notification_Handler() called.\n");
+
+  /* Cast the context into an index into the handle array. */
+  handle = &CMI_VMI_Handles[context];
+
+  msg = handle->msg;
+  SIZEFIELD (msg) = rdma_size;
+  REFFIELD (msg) = 1;
+  CONTEXTFIELD (msg) = handle;
+
+  CdsFifo_Enqueue (CpvAccess (CMI_VMI_RemoteQueue), handle->msg);
+}
+
+
+
+/**************************************************************************
+**
+*/
+void CMI_VMI_RDMA_Put_Completion_Handler (PVMI_RDMA_OP rdmaop, PVOID context, VMI_STATUS remote_status)
+{
+  VMI_STATUS status;
+
+  CMI_VMI_Handle_T *handle;
+
+  void *mem_context;
+
+
+  DEBUG_PRINT ("CMI_VMI_RDMA_Put_Completion_Handler() called.\n");
+
+  handle = (CMI_VMI_Handle_T *) context;
+
+  CMI_VMI_AsyncMsgCount -= 1;
+  handle->refcount -= 1;
+
+  status = VMI_RDMA_Dealloc_Buffer (rdmaop->rbuffer);
+  CMI_VMI_CHECK_SUCCESS (status, "VMI_RDMA_Dealloc_Buffer()");
+
+  status = VMI_RDMA_Dealloc_Op (rdmaop);
+  CMI_VMI_CHECK_SUCCESS (status, "VMI_RDMA_Dealloc_Op()");
+
+  if (handle->refcount <= 1) {
+    mem_context = CONTEXTFIELD (handle->msg);
+    if (!mem_context) {
+      status = VMI_Cache_Deregister (handle->data.send.data.eager_long.cacheentry);
+      CMI_VMI_CHECK_SUCCESS (status, "VMI_Cache_Deregister()");
+    }
+
+    if (handle->data.send.message_disposition == CMI_VMI_MESSAGE_DISPOSITION_FREE) {
+      CmiFree (handle->msg);
+    }
+
+    CMI_VMI_Deallocate_Handle (handle);
+  }
+}
+
+
+
+/**************************************************************************
+** This function is invoked asynchronously to handle the completion of an
+** RDMA Get from a remote process.
+**
+** This function is on the send side.
+*/
+void CMI_VMI_RDMA_Get_Notification_Handler (PVMI_CONNECT connection, UINT32 context, VMI_STATUS remote_status)
+{
+  VMI_STATUS status;
+
+  CMI_VMI_Handle_T *handle;
+
+  void *mem_context;
+
+
+  DEBUG_PRINT ("CMI_VMI_RDMA_Get_Notification_Handler() called.\n");
+
+  handle = &(CMI_VMI_Handles[context]);
+
+  mem_context = CONTEXTFIELD (handle->msg);
+  if (!mem_context) {
+    status = VMI_Cache_Deregister (handle->data.send.data.rdmaget.cacheentry);
+    CMI_VMI_CHECK_SUCCESS (status, "VMI_Cache_Deregister()");
+  }
+  
+  handle->refcount -= 1;
+  CMI_VMI_AsyncMsgCount -= 1;
+
+  if (handle->refcount <= 1) {
+    if (handle->data.send.message_disposition == CMI_VMI_MESSAGE_DISPOSITION_FREE) {
+      CmiFree (handle->msg);
+    }
+
+    CMI_VMI_Deallocate_Handle (handle);
+  }
+}
+
+
+
+/**************************************************************************
+** This function is on the receive side.
+*/
+void CMI_VMI_RDMA_Get_Completion_Handler (PVMI_RDMA_OP rdmaop, PVOID context, VMI_STATUS sstatus)
+{
+  VMI_STATUS status;
+
+  ULONG msgsize;
+  char *msg;
+
+  CMI_VMI_Handle_T *handle;
+  CMI_VMI_Process_T *process;
+
+  int credits_temp;
+
+
+  DEBUG_PRINT ("CMI_VMI_RDMA_Get_Completion_Handler() called.\n");
+
+  handle = (CMI_VMI_Handle_T *) context;
+
+  msg = handle->msg;
+  msgsize = handle->msgsize;
+
+  status = VMI_Cache_Deregister (handle->data.receive.data.rdmaget.cacheentry);
+  CMI_VMI_CHECK_SUCCESS (status, "VMI_Cache_Deregister()");
+
+  status = VMI_RDMA_Dealloc_Buffer (rdmaop->rbuffer);
+  CMI_VMI_CHECK_SUCCESS (status, "VMI_RDMA_Dealloc_Buffer()");
+
+  status = VMI_RDMA_Dealloc_Op (rdmaop);
+  CMI_VMI_CHECK_SUCCESS (status, "VMI_RDMA_Dealloc_Op()");
+
+  /* Deal with any eager send credits send with the message. */
+  process = (CMI_VMI_Process_T *) handle->data.receive.data.rdmaget.process;
+  credits_temp = CMI_VMI_MESSAGE_CREDITS (msg);
+  process->eager_short_send_credits_available += credits_temp;
+
+#if CMK_BROADCAST_SPANNING_TREE
+  if (CMI_BROADCAST_ROOT (msg)) {
+    /* Message is enqueued into CMI_VMI_RemoteQueue when send to all spanning children finishes. */
+    CMI_VMI_Send_Spanning_Children (msgsize, msg);
+  } else {
+    CdsFifo_Enqueue (CpvAccess (CMI_VMI_RemoteQueue), msg);
+  }
+#else
+  CdsFifo_Enqueue (CpvAccess (CMI_VMI_RemoteQueue), msg);
+#endif
+
+  CMI_VMI_Deallocate_Handle (handle);
 }
 
 
@@ -960,7 +3685,7 @@ void CMI_VMI_Send_Spanning_Children (int msgsize, char *msg)
   int startrank;
   int destrank;
 
-  CMI_VMI_Rendezvous_Message_T rendezvous_msg;
+  CMI_VMI_Publish_Message_T publish_msg;
 
 
   DEBUG_PRINT ("CMI_VMI_Send_Spanning_Children() called.\n");
@@ -983,7 +3708,7 @@ void CMI_VMI_Send_Spanning_Children (int msgsize, char *msg)
     handle->msgsize = msgsize;
     handle->handle_type = CMI_VMI_HANDLE_TYPE_SEND;
     handle->data.send.send_handle_type = CMI_VMI_SEND_HANDLE_TYPE_STREAM;
-    handle->data.send.message_disposition=CMI_VMI_MESSAGE_DISPOSITION_ENQUEUE;
+    handle->data.send.message_disposition = CMI_VMI_MESSAGE_DISPOSITION_ENQUEUE;
     handle->data.send.data.stream.cacheentry = cacheentry;
 
     bufHandles[0] = cacheentry->bufferHandle;
@@ -1010,40 +3735,22 @@ void CMI_VMI_Send_Spanning_Children (int msgsize, char *msg)
       destrank += startrank;
       destrank %= _Cmi_numpes;
 
-      status = VMI_Stream_Send ((&CMI_VMI_Processes[destrank])->connection,
-				bufHandles, addrs, sz, 1,
-				CMI_VMI_Stream_Completion_Handler,
-				(PVOID) handle, TRUE);
+      status = VMI_Stream_Send ((&CMI_VMI_Processes[destrank])->connection, bufHandles, addrs, sz, 1, CMI_VMI_Stream_Completion_Handler, (PVOID) handle, TRUE);
       CMI_VMI_CHECK_SUCCESS (status, "VMI_Stream_Send()");
     }
   } else {
+    status = VMI_Cache_Register (msg, msgsize, &cacheentry);
+    CMI_VMI_CHECK_SUCCESS (status, "VMI_Cache_Register()");
+
     handle = CMI_VMI_Allocate_Handle ();
 
     /* Do NOT increment handle->refcount here! */
     handle->msg = msg;
     handle->msgsize = msgsize;
     handle->handle_type = CMI_VMI_HANDLE_TYPE_SEND;
-    handle->data.send.send_handle_type = CMI_VMI_SEND_HANDLE_TYPE_RDMABROAD;
+    handle->data.send.send_handle_type=CMI_VMI_SEND_HANDLE_TYPE_RDMABROADCAST;
     handle->data.send.message_disposition=CMI_VMI_MESSAGE_DISPOSITION_ENQUEUE;
-    handle->data.send.data.rdmabroad.chunk_size = CMI_VMI_RDMA_Chunk_Size;
-    handle->data.send.data.rdmabroad.bytes_sent = CmiAlloc (_Cmi_numpes *
-							    sizeof (int));
-    handle->data.send.data.rdmabroad.cacheentry = CmiAlloc (_Cmi_numpes *
-					       sizeof (PVMI_CACHE_ENTRY));
-    for (i = 0; i < _Cmi_numpes; i++) {
-      handle->data.send.data.rdmabroad.bytes_sent[i] = 0;
-      handle->data.send.data.rdmabroad.cacheentry[i] = NULL;
-    }
-
-    CMI_VMI_MESSAGE_TYPE (&rendezvous_msg) = CMI_VMI_MESSAGE_TYPE_RENDEZVOUS;
-    rendezvous_msg.rank = _Cmi_mype;
-    rendezvous_msg.msgsize = msgsize;
-    rendezvous_msg.context = (VMI_virt_addr_t) (VMI_ADDR_CAST) handle;
-
-    CMI_SET_BROADCAST_ROOT (&rendezvous_msg, 0);
-
-    addrs[0] = (PVOID) &rendezvous_msg;
-    sz[0] = (ULONG) (sizeof (CMI_VMI_Rendezvous_Message_T));
+    handle->data.send.data.rdmabroadcast.cacheentry = cacheentry;
 
     handle->refcount += childcount;
     CMI_VMI_AsyncMsgCount += childcount;
@@ -1065,10 +3772,11 @@ void CMI_VMI_Send_Spanning_Children (int msgsize, char *msg)
       destrank += startrank;
       destrank %= _Cmi_numpes;
 
-      status=VMI_Stream_Send_Inline((&CMI_VMI_Processes[destrank])->connection,
-				    addrs, sz, 1,
-				    sizeof (CMI_VMI_Rendezvous_Message_T));
-      CMI_VMI_CHECK_SUCCESS (status, "VMI_Stream_Send_Inline()");
+      publish_msg.type = CMI_VMI_PUBLISH_TYPE_GET;
+
+      status = VMI_RDMA_Publish_Buffer ((&CMI_VMI_Processes[destrank])->connection, cacheentry->bufferHandle, (VMI_virt_addr_t) (VMI_ADDR_CAST) msg,
+					msgsize, (VMI_virt_addr_t) NULL, (UINT32) handle->index, &publish_msg, sizeof (CMI_VMI_Publish_Message_T));
+      CMI_VMI_CHECK_SUCCESS (status, "VMI_RDMA_Publish_Buffer()");
     }
   }
 }
@@ -1077,704 +3785,121 @@ void CMI_VMI_Send_Spanning_Children (int msgsize, char *msg)
 
 
 /**************************************************************************
-** This function is invoked asynchronously to handle an incoming message
-** receive on a stream.
 **
-** This function is on the receive side.
 */
-VMI_RECV_STATUS CMI_VMI_Stream_Receive_Handler (PVMI_CONNECT connection,
-						PVMI_STREAM_RECV stream,
-						VMI_STREAM_COMMAND command,
-						PVOID context,
-						PVMI_SLAB slab)
+void CMI_VMI_Eager_Setup (int sender_rank, int maxsize)
 {
   VMI_STATUS status;
 
-  ULONG size;
-  char *msg;
-  PVMI_SLAB_STATE state;
-
-  PVMI_CACHE_ENTRY cacheentry;
-  int i;
-  int rank;
-  int msgsize;
-  VMI_virt_addr_t remote_handle_address;
-  PUCHAR pubaddr;
-  int pubsize;
-  char *msg2;
-
-  CMI_VMI_Handle_T *handle;
-
-
-  DEBUG_PRINT ("CMI_VMI_Stream_Receive_Handler() called.\n");
-
-  /* Save the slab state. */
-  status = VMI_Slab_Save_State (slab, &state);
-  CMI_VMI_CHECK_SUCCESS (status, "VMI_Slab_Save_State()");
-
-  size = VMI_SLAB_BYTES_REMAINING (slab);
-
-  msg = CmiAlloc (size);
-
-  /* Copy the message body into the message buffer. */
-  status = VMI_Slab_Copy_Bytes (slab, size, msg);
-  CMI_VMI_CHECK_SUCCESS (status, "VMI_Slab_Copy_Bytes()");
-
-  /* Restore the slab state. */
-  status = VMI_Slab_Restore_State (slab, state);
-  CMI_VMI_CHECK_SUCCESS (status, "VMI_Slab_Restore_State()");
-
-  if (CMI_VMI_MESSAGE_TYPE (msg) == CMI_VMI_MESSAGE_TYPE_BARRIER) {
-    CMI_VMI_Barrier_Count++;
-  } else if (CMI_VMI_MESSAGE_TYPE (msg) == CMI_VMI_MESSAGE_TYPE_STANDARD) {
-#if CMK_BROADCAST_SPANNING_TREE
-    if (CMI_BROADCAST_ROOT (msg)) {
-      /* Message is enqueued into CMI_VMI_RemoteQueue when send to all
-	 spanning children finishes. */
-      CMI_VMI_Send_Spanning_Children (size, msg);
-    } else {
-      CdsFifo_Enqueue (CpvAccess (CMI_VMI_RemoteQueue), msg);
-    }
-#else
-    CdsFifo_Enqueue (CpvAccess (CMI_VMI_RemoteQueue), msg);
-#endif
-  } else {
-    rank = ((CMI_VMI_Rendezvous_Message_T *) msg)->rank;
-    msgsize = ((CMI_VMI_Rendezvous_Message_T *) msg)->msgsize;
-    remote_handle_address = ((CMI_VMI_Rendezvous_Message_T *) msg)->context;
-
-    CmiFree (msg);
-
-    msg2 = (char *) CmiAlloc (msgsize);
-
-    handle = CMI_VMI_Allocate_Handle ();
-
-    handle->msg = msg2;
-    handle->msgsize = msgsize;
-    handle->handle_type = CMI_VMI_HANDLE_TYPE_RECEIVE;
-    handle->data.receive.receive_handle_type=CMI_VMI_RECEIVE_HANDLE_TYPE_RDMA;
-    handle->data.receive.data.rdma.bytes_published = 0;
-    handle->data.receive.data.rdma.bytes_received = 0;
-    handle->data.receive.data.rdma.chunk_size = CMI_VMI_RDMA_Chunk_Size;
-    handle->data.receive.data.rdma.chunk_count = CMI_VMI_RDMA_Chunk_Count;
-    handle->data.receive.data.rdma.chunks_outstanding = 0;
-    handle->data.receive.data.rdma.send_index = 0;
-    handle->data.receive.data.rdma.receive_index = 0;
-    handle->data.receive.data.rdma.remote_handle_address =
-                                                      remote_handle_address;
-
-    /*
-      This is the constant CMI_VMI_RDMA_CHUNK_COUNT because the cacheentry
-      array is allocated statically within the structure.
-    */
-    for (i = 0; i < CMI_VMI_RDMA_CHUNK_COUNT; i++) {
-      handle->data.receive.data.rdma.cacheentry[i] = NULL;
-    }
-
-    while ((handle->data.receive.data.rdma.bytes_published < handle->msgsize)
-       &&  (handle->data.receive.data.rdma.chunks_outstanding <
-	    handle->data.receive.data.rdma.chunk_count)) {
-      pubaddr = handle->msg + handle->data.receive.data.rdma.bytes_published;
-      pubsize = handle->msgsize-handle->data.receive.data.rdma.bytes_published;
-
-      if (pubsize > handle->data.receive.data.rdma.chunk_size) {
-	pubsize = handle->data.receive.data.rdma.chunk_size;
-      }
-
-      status = VMI_Cache_Register (pubaddr, pubsize, &cacheentry);
-      CMI_VMI_CHECK_SUCCESS (status, "VMI_Cache_Register()");
-
-      handle->data.receive.data.rdma.cacheentry[handle->data.receive.data.rdma.send_index] = cacheentry;
-
-      handle->data.receive.data.rdma.send_index++;
-      if (handle->data.receive.data.rdma.send_index >=
-	  handle->data.receive.data.rdma.chunk_count) {
-	handle->data.receive.data.rdma.send_index = 0;
-      }
-
-      handle->data.receive.data.rdma.chunks_outstanding++;
-
-#if VMI21
-      status = VMI_RDMA_Publish_Buffer (connection,
-           cacheentry->bufferHandle, (VMI_virt_addr_t) (VMI_ADDR_CAST) pubaddr,
-           pubsize, remote_handle_address, (UINT32) handle->index, NULL, 0);
-      CMI_VMI_CHECK_SUCCESS (status, "VMI_RDMA_Publish_Buffer()");
-#else
-      status = VMI_RDMA_Publish_Buffer (connection,
-           cacheentry->bufferHandle, (VMI_virt_addr_t) (VMI_ADDR_CAST) pubaddr,
-           pubsize, remote_handle_address, (UINT32) handle->index);
-      CMI_VMI_CHECK_SUCCESS (status, "VMI_RDMA_Publish_Buffer()");
-#endif
-
-      handle->data.receive.data.rdma.bytes_published += pubsize;
-    }
-  }
-
-  /* Tell VMI that the slab can be discarded. */
-  return (VMI_SLAB_DONE);
-}
-
-
-
-/**************************************************************************
-** This function is invoked asynchronously to handle the completion of a
-** send on a stream.
-**
-** This function is on the send side.
-*/
-void CMI_VMI_Stream_Completion_Handler (PVOID context, VMI_STATUS sstatus)
-{
-  VMI_STATUS status;
-
-  CMI_VMI_Handle_T *handle;
-
-
-  DEBUG_PRINT ("CMI_VMI_Stream_Completion_Handler() called.\n");
-
-  handle = (CMI_VMI_Handle_T *) context;
-
-  CMI_VMI_AsyncMsgCount--;
-  handle->refcount--;
-
-  if (handle->refcount <= 1) {
-    status = VMI_Cache_Deregister (handle->data.send.data.stream.cacheentry);
-    CMI_VMI_CHECK_SUCCESS (status, "VMI_Cache_Deregister()");
-
-    if (handle->data.send.message_disposition ==
-	CMI_VMI_MESSAGE_DISPOSITION_FREE) {
-      CmiFree (handle->msg);
-    }
-
-#if CMK_BROADCAST_SPANNING_TREE
-    if (handle->data.send.message_disposition ==
-	CMI_VMI_MESSAGE_DISPOSITION_ENQUEUE) {
-      CdsFifo_Enqueue (CpvAccess (CMI_VMI_RemoteQueue), handle->msg);
-    }
-#endif
-
-    handle->refcount = 0;
-  }
-}
-
-
-
-/**************************************************************************
-** This function is invoked asynchronously to handle the completion of an
-** RDMA Put for a fragment of a message (i.e., there is at least one more
-** fragment left in the message after this one).
-**
-** This function is on the send side.
-*/
-void CMI_VMI_RDMA_Fragment_Handler (PVMI_RDMA_OP op, PVOID context,
-				    VMI_STATUS rstatus)
-{
-  VMI_STATUS status;
-
-  PVMI_CACHE_ENTRY cacheentry;
-
-
-  DEBUG_PRINT ("CMI_VMI_RDMA_Fragment_Handler() called.\n");
-
-  /* Cast the context to a cache entry. */
-  cacheentry = (PVMI_CACHE_ENTRY) context;
-
-  /* Deallocate the RDMA op's buffer, the RDMA op, and the cache entry. */
-  status = VMI_RDMA_Dealloc_Buffer (op->rbuffer);
-  CMI_VMI_CHECK_SUCCESS (status, "VMI_RDMA_Dealloc_Buffer()");
-
-  status = VMI_RDMA_Dealloc_Op (op);
-  CMI_VMI_CHECK_SUCCESS (status, "VMI_RDMA_Dealloc_Op()");
-
-  status = VMI_Cache_Deregister (cacheentry);
-  CMI_VMI_CHECK_SUCCESS (status, "VMI_Cache_Deregister()");
-}
-
-
-
-/**************************************************************************
-** This function is invoked asynchronously to handle the completion of an
-** RDMA Put for the last fragment of a message (i.e., there are no more
-** fragments left in the message after this one).
-**
-** This function is on the send side.
-*/
-void CMI_VMI_RDMA_Completion_Handler (PVMI_RDMA_OP op, PVOID context,
-				      VMI_STATUS rstatus)
-{
-  VMI_STATUS status;
-
-  int i;
-
-  PVMI_CACHE_ENTRY cacheentry;
-  CMI_VMI_Handle_T *handle;
-
-
-  DEBUG_PRINT ("CMI_VMI_RDMA_Completion_Handler() called.\n");
-
-  handle = (CMI_VMI_Handle_T *) context;
-
-  /* Deallocate the RDMA op's buffer, the RDMA op, and the cache entry. */
-  status = VMI_RDMA_Dealloc_Buffer (op->rbuffer);
-  CMI_VMI_CHECK_SUCCESS (status, "VMI_RDMA_Dealloc_Buffer()");
-
-  status = VMI_RDMA_Dealloc_Op (op);
-  CMI_VMI_CHECK_SUCCESS (status, "VMI_RDMA_Dealloc_Op()");
-
-  if (handle->data.send.send_handle_type == CMI_VMI_SEND_HANDLE_TYPE_RDMA) {
-    status = VMI_Cache_Deregister (handle->data.send.data.rdma.cacheentry);
-    CMI_VMI_CHECK_SUCCESS (status, "VMI_Cache_Deregister()");
-  }
-
-  if (handle->data.send.send_handle_type ==
-                                      CMI_VMI_SEND_HANDLE_TYPE_PERSISTENT) {
-    status=VMI_Cache_Deregister(handle->data.send.data.persistent.cacheentry);
-    CMI_VMI_CHECK_SUCCESS (status, "VMI_Cache_Deregister()");
-
-    handle->msg = NULL;
-    handle->msgsize = -1;
-  }
-
-  /*
-    We cannot de-register the cache entry for RDMA broadcasts because we
-    have no way to determine the rank of the process that just completed.
-    The best we can do is de-register all of the cache entries when the
-    handle for the RDMA broadcast is released.
-  */
-
-  CMI_VMI_AsyncMsgCount--;
-  handle->refcount--;
-
-  if (handle->refcount <= 1) {
-    if (handle->data.send.send_handle_type ==
-	CMI_VMI_SEND_HANDLE_TYPE_RDMABROAD){
-
-      for (i = 0; i < _Cmi_numpes; i++) {
-	if (handle->data.send.data.rdmabroad.cacheentry[i]) {
-	  status = VMI_Cache_Deregister
-	            (handle->data.send.data.rdmabroad.cacheentry[i]);
-	  CMI_VMI_CHECK_SUCCESS (status, "VMI_Cache_Deregister()");
-	}
-      }
-
-      CmiFree (handle->data.send.data.rdmabroad.bytes_sent);
-      CmiFree (handle->data.send.data.rdmabroad.cacheentry);
-    }
-
-    if (handle->data.send.message_disposition ==
-	CMI_VMI_MESSAGE_DISPOSITION_FREE) {
-      CmiFree (handle->msg);
-    }
-
-#if CMK_BROADCAST_SPANNING_TREE
-    if (handle->data.send.message_disposition ==
-	CMI_VMI_MESSAGE_DISPOSITION_ENQUEUE) {
-      CdsFifo_Enqueue (CpvAccess (CMI_VMI_RemoteQueue), handle->msg);
-    }
-#endif
-
-    handle->refcount = 0;
-  }
-}
-
-
-
-/**************************************************************************
-** This function is invoked asynchronously to handle an RDMA publish of a
-** buffer from a remote process.
-**
-** This function is on the send side.
-*/
-void CMI_VMI_RDMA_Publish_Handler (PVMI_CONNECT connection,
-				   PVMI_REMOTE_BUFFER remote_buffer)
-{
-  VMI_STATUS status;
-
-  PVMI_CACHE_ENTRY cacheentry;
-  BOOLEAN complete_flag;
-  CMI_VMI_Handle_T *handle;
-  char *putaddr;
-  int putlen;
-  PVMI_RDMA_OP rdmaop;
   CMI_VMI_Process_T *process;
-  int rank;
-
-
-  DEBUG_PRINT ("CMI_VMI_RDMA_Publish_Handler() called.\n");
-
-  /* Cast the remote buffer's local context to a send handle. */
-  handle = (CMI_VMI_Handle_T *) (VMI_ADDR_CAST) remote_buffer->lctxt;
-
-  if (handle->data.send.send_handle_type == CMI_VMI_SEND_HANDLE_TYPE_RDMA) {
-    putaddr = handle->msg + handle->data.send.data.rdma.bytes_sent;
-    putlen = handle->msgsize - handle->data.send.data.rdma.bytes_sent;
-
-    if (putlen > handle->data.send.data.rdma.chunk_size) {
-      putlen = handle->data.send.data.rdma.chunk_size;
-      complete_flag = FALSE;
-    } else {
-      complete_flag = TRUE;
-    }
-
-    status = VMI_Cache_Register (putaddr, putlen, &cacheentry);
-    CMI_VMI_CHECK_SUCCESS (status, "VMI_Cache_Register()");
-
-    status = VMI_RDMA_Alloc_Op (&rdmaop);
-    CMI_VMI_CHECK_SUCCESS (status, "VMI_RDMA_Alloc_Op()");
-
-    rdmaop->numBufs = 1;
-    rdmaop->buffers[0] = cacheentry->bufferHandle;
-    rdmaop->addr[0] = putaddr;
-    rdmaop->sz[0] = putlen;
-    rdmaop->rbuffer = remote_buffer;
-    rdmaop->roffset = 0;
-
-    handle->data.send.data.rdma.bytes_sent += putlen;
-
-    if (complete_flag) {
-      handle->data.send.data.rdma.cacheentry = cacheentry;
-
-#if VMI21
-      status = VMI_RDMA_Put (connection, rdmaop, (PVOID) handle,
-	   (VMIRDMACompleteNotification) CMI_VMI_RDMA_Completion_Handler);
-      CMI_VMI_CHECK_SUCCESS (status, "VMI_RDMA_Put()");
-#else
-      status = VMI_RDMA_Put (connection, rdmaop, (PVOID) handle,
-	   (VMIRDMAWriteComplete) CMI_VMI_RDMA_Completion_Handler);
-      CMI_VMI_CHECK_SUCCESS (status, "VMI_RDMA_Put()");
-#endif
-    } else {
-#if VMI21
-      status = VMI_RDMA_Put (connection, rdmaop, (PVOID) cacheentry, 
-	   (VMIRDMACompleteNotification) CMI_VMI_RDMA_Fragment_Handler);
-      CMI_VMI_CHECK_SUCCESS (status, "VMI_RDMA_Put()");
-#else
-      status = VMI_RDMA_Put (connection, rdmaop, (PVOID) cacheentry, 
-	   (VMIRDMAWriteComplete) CMI_VMI_RDMA_Fragment_Handler);
-      CMI_VMI_CHECK_SUCCESS (status, "VMI_RDMA_Put()");
-#endif
-    }
-  } else if (handle->data.send.send_handle_type ==
-	     CMI_VMI_SEND_HANDLE_TYPE_RDMABROAD) {
-    process =
-          (CMI_VMI_Process_T *) VMI_CONNECT_GET_RECEIVE_CONTEXT (connection);
-    rank = process->rank;
-
-    putaddr = handle->msg + handle->data.send.data.rdmabroad.bytes_sent[rank];
-    putlen = handle->msgsize-handle->data.send.data.rdmabroad.bytes_sent[rank];
-
-    if (putlen > handle->data.send.data.rdmabroad.chunk_size) {
-      putlen = handle->data.send.data.rdmabroad.chunk_size;
-      complete_flag = FALSE;
-    } else {
-      complete_flag = TRUE;
-    }
-
-    status = VMI_Cache_Register (putaddr, putlen, &cacheentry);
-    CMI_VMI_CHECK_SUCCESS (status, "VMI_Cache_Register()");
-
-    status = VMI_RDMA_Alloc_Op (&rdmaop);
-    CMI_VMI_CHECK_SUCCESS (status, "VMI_RDMA_Alloc_Op()");
-
-    rdmaop->numBufs = 1;
-    rdmaop->buffers[0] = cacheentry->bufferHandle;
-    rdmaop->addr[0] = putaddr;
-    rdmaop->sz[0] = putlen;
-    rdmaop->rbuffer = remote_buffer;
-    rdmaop->roffset = 0;
-
-    handle->data.send.data.rdmabroad.bytes_sent[rank] += putlen;
-
-    if (complete_flag) {
-      handle->data.send.data.rdmabroad.cacheentry[rank] = cacheentry;
-
-#if VMI21
-      status = VMI_RDMA_Put (connection, rdmaop, (PVOID) handle,
-	   (VMIRDMACompleteNotification) CMI_VMI_RDMA_Completion_Handler);
-      CMI_VMI_CHECK_SUCCESS (status, "VMI_RDMA_Put()");
-#else
-      status = VMI_RDMA_Put (connection, rdmaop, (PVOID) handle,
-	   (VMIRDMAWriteComplete) CMI_VMI_RDMA_Completion_Handler);
-      CMI_VMI_CHECK_SUCCESS (status, "VMI_RDMA_Put()");
-#endif
-    } else {
-#if VMI21
-      status = VMI_RDMA_Put (connection, rdmaop, (PVOID) cacheentry,
-	   (VMIRDMACompleteNotification) CMI_VMI_RDMA_Fragment_Handler);
-      CMI_VMI_CHECK_SUCCESS (status, "VMI_RDMA_Put()");
-#else
-      status = VMI_RDMA_Put (connection, rdmaop, (PVOID) cacheentry,
-	   (VMIRDMAWriteComplete) CMI_VMI_RDMA_Fragment_Handler);
-      CMI_VMI_CHECK_SUCCESS (status, "VMI_RDMA_Put()");
-#endif
-    }
-  } else {
-#if CMK_PERSISTENT_COMM
-    handle->data.send.data.persistent.remote_buffer = remote_buffer;
-    handle->data.send.data.persistent.ready++;
-#else
-    CmiAbort ("CMI_VMI_RDMA_Publish_Handler() got bad handle type.");
-#endif
-  }
-}
-
-
-
-/**************************************************************************
-** This function is invoked asynchronously to handle the completion of an
-** RDMA Put from a remote process.
-**
-** This function is on the receive side.
-*/
-void CMI_VMI_RDMA_Notification_Handler (PVMI_CONNECT connection,
-					UINT32 rdma_size,
-					UINT32 context,
-					VMI_STATUS remote_status)
-{
-  VMI_STATUS status;
-
   CMI_VMI_Handle_T *handle;
 
+  int slot_size;
+  int buffer_size;
+  int i;
+  int index;
+
+  char *publish_buffer;
+  char *eager_buffer;
+
   PVMI_CACHE_ENTRY cacheentry;
-  char *pubaddr;
-  int pubsize;
+
+  CMI_VMI_Eager_Short_Slot_Footer_T *footer;
+
+  CMI_VMI_Publish_Message_T publish_msg;
 
 
-  DEBUG_PRINT ("CMI_VMI_RDMA_Notification_Handler() called.\n");
+  DEBUG_PRINT ("CMI_VMI_Eager_Setup() called.\n");
 
-  handle = &(CMI_VMI_Handles[context]);
+  /* Get a pointer to the sender's process table entry. */
+  process = &CMI_VMI_Processes[sender_rank];
 
-  if (handle->data.receive.receive_handle_type ==
-      CMI_VMI_RECEIVE_HANDLE_TYPE_RDMA) {
-    handle->data.receive.data.rdma.bytes_received += rdma_size;
-    handle->data.receive.data.rdma.chunks_outstanding--;
-    cacheentry = handle->data.receive.data.rdma.cacheentry[handle->data.receive.data.rdma.receive_index];
-    status = VMI_Cache_Deregister (cacheentry);
-    CMI_VMI_CHECK_SUCCESS (status, "VMI_Cache_Deregister()");
+  if (VMI_CONNECT_ONE_WAY_LATENCY (process->connection) < CMI_VMI_WAN_Latency) {
+    /* Compute the size of each slot and the size of the total buffer. */
+    slot_size = sizeof (CMI_VMI_Memory_Chunk_T) + CMI_VMI_Medium_Message_Boundary + sizeof (CMI_VMI_Eager_Short_Slot_Footer_T);
+    buffer_size = CMI_VMI_Eager_Short_Slots * slot_size;
 
-    handle->data.receive.data.rdma.receive_index++;
-    if (handle->data.receive.data.rdma.receive_index >=
-	handle->data.receive.data.rdma.chunk_count) {
-      handle->data.receive.data.rdma.receive_index = 0;
-    }
+    /* Allocate the eager buffer. */
+    publish_buffer = CmiAlloc (buffer_size);
 
-    if (handle->data.receive.data.rdma.bytes_published < handle->msgsize) {
-      pubaddr = handle->msg + handle->data.receive.data.rdma.bytes_published;
-      pubsize = handle->msgsize-handle->data.receive.data.rdma.bytes_published;
-
-      if (pubsize > handle->data.receive.data.rdma.chunk_size) {
-	pubsize = handle->data.receive.data.rdma.chunk_size;
-      }
-
-      status = VMI_Cache_Register (pubaddr, pubsize, &cacheentry);
-      CMI_VMI_CHECK_SUCCESS (status, "VMI_Cache_Register()");
-
-      handle->data.receive.data.rdma.cacheentry[handle->data.receive.data.rdma.send_index] = cacheentry;
-
-      handle->data.receive.data.rdma.send_index++;
-      if (handle->data.receive.data.rdma.send_index >=
-	  handle->data.receive.data.rdma.chunk_count) {
-	handle->data.receive.data.rdma.send_index = 0;
-      }
-
-      handle->data.receive.data.rdma.chunks_outstanding++;
-
-#if VMI21
-      status = VMI_RDMA_Publish_Buffer (connection, cacheentry->bufferHandle,
-                 (VMI_virt_addr_t) (VMI_ADDR_CAST) pubaddr, pubsize,
-		 handle->data.receive.data.rdma.remote_handle_address,
-		 (UINT32) handle->index, NULL, 0);
-      CMI_VMI_CHECK_SUCCESS (status, "VMI_RDMA_Publish_Buffer()");
-#else
-      status = VMI_RDMA_Publish_Buffer (connection, cacheentry->bufferHandle,
-                          (VMI_virt_addr_t) (VMI_ADDR_CAST) pubaddr, pubsize,
-	                handle->data.receive.data.rdma.remote_handle_address,
-                                                     (UINT32) handle->index);
-      CMI_VMI_CHECK_SUCCESS (status, "VMI_RDMA_Publish_Buffer()");
-#endif
-
-      handle->data.receive.data.rdma.bytes_published += pubsize;
-    }
-
-    if (handle->data.receive.data.rdma.bytes_received >= handle->msgsize) {
-#if CMK_BROADCAST_SPANNING_TREE
-      if (CMI_BROADCAST_ROOT (handle->msg)) {
-	/* Message is enqueued into CMI_VMI_RemoteQueue when send to all
-	   spanning children finishes. */
-	CMI_VMI_Send_Spanning_Children (handle->msgsize, handle->msg);
-      } else {
-	CdsFifo_Enqueue (CpvAccess (CMI_VMI_RemoteQueue), handle->msg);
-      }
-#else
-      CdsFifo_Enqueue (CpvAccess (CMI_VMI_RemoteQueue), handle->msg);
-#endif
-
-      handle->refcount = 0;
-    }
-#if CMK_PERSISTENT_COMM
-  } else if (handle->data.receive.receive_handle_type ==
-	     CMI_VMI_RECEIVE_HANDLE_TYPE_PERSISTENT) {
-    cacheentry = handle->data.receive.data.persistent.cacheentry;
-    status = VMI_Cache_Deregister (cacheentry);
-    CMI_VMI_CHECK_SUCCESS (status, "VMI_Cache_Deregister()");
-
-    CdsFifo_Enqueue (CpvAccess (CMI_VMI_RemoteQueue), handle->msg);
-
-    handle->msg = (char *) CmiAlloc (handle->msgsize);
-
-    status = VMI_Cache_Register (handle->msg, handle->msgsize, &cacheentry);
+    /* Register the eager buffer so it can be published. */
+    status = VMI_Cache_Register (publish_buffer, buffer_size, &cacheentry);
     CMI_VMI_CHECK_SUCCESS (status, "VMI_Cache_Register()");
 
-    handle->data.receive.data.persistent.cacheentry = cacheentry;
+    /* Allocate handles into buffer slots and set them up. */
+    for (i = 0; i < CMI_VMI_Eager_Short_Slots; i++) {
+      handle = CMI_VMI_Allocate_Handle ();
 
-    status = VMI_RDMA_Publish_Buffer (connection, cacheentry->bufferHandle,
-	    (VMI_virt_addr_t) (VMI_ADDR_CAST) handle->msg, handle->msgsize,
-                handle->data.receive.data.persistent.remote_handle_address,
-				                   (UINT32) handle->index);
+      eager_buffer = publish_buffer + (slot_size * i);
+      footer = (CMI_VMI_Eager_Short_Slot_Footer_T *) (eager_buffer + sizeof (CMI_VMI_Memory_Chunk_T) + CMI_VMI_Medium_Message_Boundary);
+
+      handle->refcount += 1;
+      handle->msg = NULL;
+      handle->msgsize = -1;
+      handle->handle_type = CMI_VMI_HANDLE_TYPE_RECEIVE;
+      handle->data.receive.receive_handle_type = CMI_VMI_RECEIVE_HANDLE_TYPE_EAGER_SHORT;
+      handle->data.receive.data.eager_short.sender_rank = sender_rank;
+      handle->data.receive.data.eager_short.publish_buffer = publish_buffer;
+      handle->data.receive.data.eager_short.cacheentry = cacheentry;
+      handle->data.receive.data.eager_short.eager_buffer = eager_buffer;
+      handle->data.receive.data.eager_short.footer = footer;
+
+      footer->msgsize = -1;
+      footer->sentinel = CMI_VMI_EAGER_SHORT_SENTINEL_READY;
+
+      index = process->eager_short_receive_size;
+      process->eager_short_receive_handles[index] = handle;
+      process->eager_short_receive_size += 1;
+    }
+
+    /* Add the sender process to the poll set. */
+    index = CMI_VMI_Eager_Short_Pollset_Size;
+    CMI_VMI_Eager_Short_Pollset[index] = &CMI_VMI_Processes[sender_rank];
+    CMI_VMI_Eager_Short_Pollset_Size += 1;
+
+    /* Fill in the publish data which will be sent to the sender. */
+    publish_msg.type = CMI_VMI_PUBLISH_TYPE_EAGER_SHORT;
+
+    /* Publish the eager buffer to the sender. */
+    status = VMI_RDMA_Publish_Buffer (process->connection, cacheentry->bufferHandle, (VMI_virt_addr_t) (VMI_ADDR_CAST) publish_buffer, buffer_size,
+				      (VMI_virt_addr_t) NULL, (UINT32) NULL, &publish_msg, sizeof (CMI_VMI_Publish_Message_T));
     CMI_VMI_CHECK_SUCCESS (status, "VMI_RDMA_Publish_Buffer()");
+  }
+
+  if (maxsize < CMI_VMI_EAGER_LONG_BUFFER_SIZE) {
+    buffer_size = CMI_VMI_EAGER_LONG_BUFFER_SIZE;
   } else {
-    CmiAbort ("CMI_VMI_RDMA_Notification_Handler() got bad handle type.");
-  }
-#else   /* CMK_PERSISTENT_COMM */
-  } else {
-    CmiAbort ("CMI_VMI_RDMA_Notification_Handler() got bad handle type.");
-  }
-#endif   /* CMK_PERSISTENT_COMM */
-}
-
-
-
-/**************************************************************************
-** argc
-** argv
-** start_function - the user-supplied function to run (function pointer)
-** user_calls_scheduler - boolean for whether ConverseInit() should invoke
-**                        the scheduler or whether user code will do it
-** init_returns - boolean for whether ConverseInit() returns
-*/
-void ConverseInit (int argc, char **argv, CmiStartFn start_function,
-		   int user_calls_scheduler, int init_returns)
-{
-  int rc;
-  int i;
-  int startup_type;
-  char *a;
-  char *key;
-  char *ready_key;
-
-
-  DEBUG_PRINT ("ConverseInit() called.\n");
-
-  /* Initialize the global asynchronous message count. */
-  CMI_VMI_AsyncMsgCount = 0;
-
-  /* Initialize the global barrier messages count. */
-  CMI_VMI_Barrier_Count = 0;
-
-  /* Initialize the maximum number of send and receive handles. */
-  a = getenv ("CMI_VMI_MAXIMUM_HANDLES");
-  if (a) {
-    CMI_VMI_Maximum_Handles = atoi (a);
-  } else {
-    CMI_VMI_Maximum_Handles = CMI_VMI_MAXIMUM_HANDLES;
-  }
-  CMI_VMI_Handles = (CMI_VMI_Handle_T *) malloc (CMI_VMI_Maximum_Handles *
-	       			               sizeof (CMI_VMI_Handle_T));
-  if (!CMI_VMI_Handles) {
-    CmiAbort ("Unable to allocate memory for send and receive handles.");
-  }
-  for (i = 0; i < CMI_VMI_Maximum_Handles; i++) {
-    (&CMI_VMI_Handles[i])->index = i;
-    (&CMI_VMI_Handles[i])->refcount = 0;
-  }
-  CMI_VMI_Next_Handle = 0;
-
-  /* Get the program key for this process. */
-  a = getenv ("VMI_KEY");
-  if (a) {
-    key = strdup (a);
-  } else {
-    key = (char *) malloc (strlen (argv[0]) + 1);
-    if (!key) {
-      CmiAbort ("Unable to allocate memory for program key.");
-    }
-    sprintf (key, "%s\0", argv[0]);
+    buffer_size = maxsize;
   }
 
-  DEBUG_PRINT ("The program key is %s.\n", key);
+  for (i = 0; i < CMI_VMI_Eager_Long_Buffers; i++) {
+    publish_buffer = CmiAlloc (buffer_size);
 
-  /* Get the startup type. */
-  a = getenv ("CMI_VMI_STARTUP_TYPE");
-  if (a) {
-    startup_type = atoi (a);
-  } else {
-    startup_type = CMI_VMI_STARTUP_TYPE_CRM;
-  }
+    status = VMI_Cache_Register (publish_buffer, buffer_size, &cacheentry);
+    CMI_VMI_CHECK_SUCCESS (status, "VMI_Cache_Register()");
 
-  DEBUG_PRINT ("The startup type is %d.\n", startup_type);
+    handle = CMI_VMI_Allocate_Handle ();
 
-  /* Start up via the startup type selected. */
-  switch (startup_type) {
-    case CMI_VMI_STARTUP_TYPE_CRM:
-      rc = CMI_VMI_Startup_CRM (key);
-      break;
+    handle->refcount += 1;
+    handle->msg = publish_buffer;
+    handle->msgsize = -1;
+    handle->handle_type = CMI_VMI_HANDLE_TYPE_RECEIVE;
+    handle->data.receive.receive_handle_type = CMI_VMI_RECEIVE_HANDLE_TYPE_EAGER_LONG;
+    handle->data.receive.data.eager_long.sender_rank = sender_rank;
+    handle->data.receive.data.eager_long.maxsize = buffer_size;
+    handle->data.receive.data.eager_long.cacheentry = cacheentry;
 
-    default:
-      CmiAbort ("An unknown startup type was specified.");
-      break;
-  }
+    index = process->eager_long_receive_size;
+    process->eager_long_receive_handles[index] = handle;
+    process->eager_long_receive_size += 1;
 
-  if (rc < 0) {
-    CmiAbort ("Fatal error during startup phase.");
-  }
+    /* Fill in the publish data which will be sent to the sender. */
+    publish_msg.type = CMI_VMI_PUBLISH_TYPE_EAGER_LONG;
 
-  /* Create the FIFOs for holding local and remote messages. */
-  /* NOTE: This needs to come here due to a race condition where some
-           processes may open their connections and start sending messages
-           before all of the other processes are started, and we need to
-           be able to deal with this situation.                           */
-  CpvAccess (CmiLocalQueue) = CdsFifo_Create ();
-  CpvAccess (CMI_VMI_RemoteQueue) = CdsFifo_Create ();
-
-  /* Open connections. */
-  if (CMI_VMI_Open_Connections (key) < 0) {
-    CmiAbort ("Fatal error during connection setup phase.");
-  }
-
-  /* Prepare the ready key for re-re-synchronization with the CRM. */
-  /* This is needed because some processes may open all of their connections
-     before all other processes finish opening their connections.  When the
-     fast processes finish and start sending messages (e.g., spanning
-     broadcasts) there is a problem when later nodes try to deal with
-     these messages properly.                                               */
-  ready_key = (char *) malloc (strlen (key) + 13);
-  if (!ready_key) {
-    DEBUG_PRINT ("Unable to allocate space for ready key.");
-    return (-1);
-  }
-  sprintf (ready_key, "%s:Ready\0", key);
-
-  /* Re-re-register with the CRM. */
-  if (CMI_VMI_CRM_Register (ready_key, _Cmi_numpes, FALSE) < -1) {
-    DEBUG_PRINT ("Unable to re-re-synchronize with all processes.");
-    return (-1);
-  }
-
-  /* Free memory. */
-  free (ready_key);
-  free (key);
-
-  DEBUG_PRINT ("ConverseInit() is starting the main processing loop.\n");
-
-  /* Initialize Converse and start the main processing loop. */
-  CthInit (argv);
-  ConverseCommonInit (argv);
-
-  if (!init_returns) {
-    start_function (CmiGetArgc (argv), argv);
-    if (!user_calls_scheduler) {
-      CsdScheduler (-1);
-    }
-    ConverseExit ();
+    /* Publish the eager buffer to the sender. */
+    status = VMI_RDMA_Publish_Buffer (process->connection, cacheentry->bufferHandle, (VMI_virt_addr_t)(VMI_ADDR_CAST)publish_buffer, buffer_size,
+				      (VMI_virt_addr_t) NULL, (UINT32) handle->index, &publish_msg, sizeof (CMI_VMI_Publish_Message_T));
+    CMI_VMI_CHECK_SUCCESS (status, "VMI_RDMA_Publish_Buffer()");
   }
 }
 
@@ -1783,333 +3908,65 @@ void ConverseInit (int argc, char **argv, CmiStartFn start_function,
 /**************************************************************************
 **
 */
-void ConverseExit ()
+void CMI_VMI_Send_Eager_Short (int destrank, int msgsize, char *msg)
 {
   VMI_STATUS status;
-
-
-  DEBUG_PRINT ("ConverseExit() called.\n");
-
-  /* ConverseCommonExit() shuts down CCS and closes Projections logs. */
-  ConverseCommonExit ();
-
-  /* Should close all VMI connections here. */
-  /* There is a race condition here because not all processes may have
-     entered ConverseExit() simultaneously. */
-
-#if CMI_VMI_USE_MEMORY_POOL
-  status = VMI_Pool_Destroy_Buffer_Pool (CMI_VMI_Bucket1_Pool);
-  CMI_VMI_CHECK_SUCCESS (status, "VMI_Pool_Destroy_Buffer_Pool()");
-
-  status = VMI_Pool_Destroy_Buffer_Pool (CMI_VMI_Bucket2_Pool);
-  CMI_VMI_CHECK_SUCCESS (status, "VMI_Pool_Destroy_Buffer_Pool()");
-
-  status = VMI_Pool_Destroy_Buffer_Pool (CMI_VMI_Bucket3_Pool);
-  CMI_VMI_CHECK_SUCCESS (status, "VMI_Pool_Destroy_Buffer_Pool()");
-
-  status = VMI_Pool_Destroy_Buffer_Pool (CMI_VMI_Bucket4_Pool);
-  CMI_VMI_CHECK_SUCCESS (status, "VMI_Pool_Destroy_Buffer_Pool()");
-
-  status = VMI_Pool_Destroy_Buffer_Pool (CMI_VMI_Bucket5_Pool);
-  CMI_VMI_CHECK_SUCCESS (status, "VMI_Pool_Destroy_Buffer_Pool()");
-#endif   /* CMI_VMI_USE_MEMORY_POOL */
-
-  /* Free memory. */
-  free (CMI_VMI_Processes);
-  free (CMI_VMI_Handles);
-
-  /* Destroy queues. */
-  CdsFifo_Destroy (CpvAccess (CMI_VMI_RemoteQueue));
-  CdsFifo_Destroy (CpvAccess (CmiLocalQueue));
-
-  /* VMI will not terminate properly while there are open connections. */
-  exit (0);
-
-  /* Terminate VMI. */
-  SET_VMI_SUCCESS (status);
-  VMI_Terminate (status);
-}
-
-
-
-/**************************************************************************
-**
-*/
-void CmiAbort (const char *message)
-{
-  DEBUG_PRINT ("CmiAbort() called.\n");
-
-  printf ("%s\n", message);
-  exit (1);
-}
-
-
-
-/**************************************************************************
-** This code must call VMI_Poll() to ensure forward progress of the message
-** pumping loop.
-*/
-void *CmiGetNonLocal (void)
-{
-  VMI_STATUS status;
-
-
-  status = VMI_Poll ();
-  CMI_VMI_CHECK_SUCCESS (status, "VMI_Poll()");
-
-  return (CdsFifo_Dequeue (CpvAccess (CMI_VMI_RemoteQueue)));
-}
-
-
-
-/**************************************************************************
-**
-*/
-void CmiMemLock ()
-{
-  /* Empty. */
-}
-
-
-
-/**************************************************************************
-**
-*/
-void CmiMemUnlock ()
-{
-  /* Empty. */
-}
-
-
-
-/**************************************************************************
-**
-*/
-void CmiNotifyIdle ()
-{
-  VMI_STATUS status;
-
-
-  status = VMI_Poll ();
-  CMI_VMI_CHECK_SUCCESS (status, "VMI_Poll()");
-}
-
-
-
-/**************************************************************************
-** This is a simple barrier function, similar to the one implemented in the
-** net-linux-gm machine layer.  This routine assumes that there are few
-** messages in flight; I have not tested extensively with many outstanding
-** messages and there could very well be some nasty race conditions.
-**
-** This routine was implemented to allow clocks to be synchronized at
-** program startup time, so Projections timeline views do not show message
-** sends that appear after the corresponding message deliveries.
-**
-** THIS CODE ASSUMES THAT CMI_VMI_Barrier_Count IS INITIALIZED TO 0
-** DURING ConverseInit().  We cannot initialize it in this function due
-** to a race condition where Rank 0 might invoke CmiBarrer() much later
-** than other nodes in the computation.  In this case, it might have
-** already seen barrier messages coming in from the other nodes and
-** counted them in the stream receive handler prior to invoking
-** CmiBarrier().
-**
-** TODO: This routine should use spanning trees if this machine layer has
-** been configured for that type of message broadcast.
-*/
-void CmiBarrier ()
-{
-  VMI_STATUS status;
-  int num_processes;
-  CMI_VMI_Barrier_Message_T barrier_msg;
-  PVOID addrs[1];
-  ULONG sz[1];
-  int i;
-
-
-  if (CmiMyPe() == 0) {
-    num_processes = CmiNumPes() - 1;
-
-    while (CMI_VMI_Barrier_Count < num_processes) {
-      status = VMI_Poll ();
-      CMI_VMI_CHECK_SUCCESS (status, "VMI_Poll()");
-    }
-
-    CMI_VMI_Barrier_Count = 0;
-
-    num_processes++;
-
-    CMI_VMI_MESSAGE_TYPE (&barrier_msg) = CMI_VMI_MESSAGE_TYPE_BARRIER;
-
-#if CMK_BROADCAST_SPANNING_TREE
-    CMI_SET_BROADCAST_ROOT (&barrier_msg, 0);
-#endif
-
-    addrs[0] = (PVOID) &barrier_msg;
-    sz[0] = (ULONG) (sizeof (CMI_VMI_Barrier_Message_T));
-
-    for (i = 1; i < num_processes; i++) {
-      status = VMI_Stream_Send_Inline ((&CMI_VMI_Processes[i])->connection,
-				       addrs, sz, 1,
-				       sizeof (CMI_VMI_Barrier_Message_T));
-      CMI_VMI_CHECK_SUCCESS (status, "VMI_Stream_Send_Inline()");
-    }
-  } else {
-    CMI_VMI_MESSAGE_TYPE (&barrier_msg) = CMI_VMI_MESSAGE_TYPE_BARRIER;
-
-#if CMK_BROADCAST_SPANNING_TREE
-    CMI_SET_BROADCAST_ROOT (&barrier_msg, 0);
-#endif
-
-    addrs[0] = (PVOID) &barrier_msg;
-    sz[0] = (ULONG) (sizeof (CMI_VMI_Barrier_Message_T));
-
-    status = VMI_Stream_Send_Inline ((&CMI_VMI_Processes[0])->connection,
-				     addrs, sz, 1,
-				     sizeof (CMI_VMI_Barrier_Message_T));
-    CMI_VMI_CHECK_SUCCESS (status, "VMI_Stream_Send_Inline()");
-
-    while (CMI_VMI_Barrier_Count < 1) {
-      status = VMI_Poll ();
-      CMI_VMI_CHECK_SUCCESS (status, "VMI_Poll()");
-    }
-
-    CMI_VMI_Barrier_Count = 0;
-  }
-}
-
-
-
-/**************************************************************************
-**
-*/
-void CmiBarrierZero ()
-{
-  CmiBarrier ();
-}
-
-
-
-/**************************************************************************
-**
-*/
-void CmiSyncSendFn (int destrank, int msgsize, char *msg)
-{
-  VMI_STATUS status;
-
-  char *msgcopy;
-
-  PVOID addrs[2];
-  ULONG sz[2];
 
   CMI_VMI_Handle_T *handle;
-
-  CMI_VMI_Rendezvous_Message_T rendezvous_msg;
+  CMI_VMI_Process_T *process;
 
   PVMI_CACHE_ENTRY cacheentry;
   PVMI_RDMA_OP rdmaop;
 
+  int index;
+  int offset;
 
-  DEBUG_PRINT ("CmiSyncSendFn() called.\n");
+  CMI_VMI_Eager_Short_Slot_Footer_T footer;
+
+
+  DEBUG_PRINT ("CMI_VMI_Send_Eager_Short() called.\n");
+
+  process = &CMI_VMI_Processes[destrank];
 
   CMI_VMI_MESSAGE_TYPE (msg) = CMI_VMI_MESSAGE_TYPE_STANDARD;
+  CMI_VMI_MESSAGE_CREDITS (msg) = process->eager_short_receive_credits_replentish;
+  process->eager_short_receive_credits_replentish = 0;
 
 #if CMK_BROADCAST_SPANNING_TREE
   CMI_SET_BROADCAST_ROOT (msg, 0);
 #endif
 
-  if (destrank == _Cmi_mype) {
-    msgcopy = CmiAlloc (msgsize);
-    memcpy (msgcopy, msg, msgsize);
-    CdsFifo_Enqueue (CpvAccess (CmiLocalQueue), msgcopy);
-#if CMK_PERSISTENT_COMM
-  /* NOTE: The next line is an assignment AND a test for non-null! */
-  } else if ((handle = &CMI_VMI_Persistent_Handles[0]) &&
-	     (handle->data.send.data.persistent.destrank == destrank) &&
-	     (handle->data.send.data.persistent.maxsize <= msgsize) &&
-	     (handle->data.send.data.persistent.ready >= 2)) {
-    handle->refcount = 1;
-    handle->msg = msg;
-    handle->msgsize = msgsize;
+  index = process->eager_short_send_index;
+  handle = process->eager_short_send_handles[index];
 
-    status = VMI_Cache_Register (msg, msgsize, &cacheentry);
-    CMI_VMI_CHECK_SUCCESS (status, "VMI_Cache_Register()");
+  memcpy (handle->msg, msg, msgsize);
 
-    handle->data.send.data.persistent.cacheentry = cacheentry;
+  footer.msgsize = msgsize;
+  footer.sentinel = CMI_VMI_EAGER_SHORT_SENTINEL_DATA;
+  memcpy (handle->msg + msgsize, &footer, sizeof (CMI_VMI_Eager_Short_Slot_Footer_T));
 
-    status = VMI_RDMA_Alloc_Op (&rdmaop);
-    CMI_VMI_CHECK_SUCCESS (status, "VMI_RDMA_Alloc_Op()");
+  handle->msgsize = msgsize;
+  handle->data.send.message_disposition = CMI_VMI_MESSAGE_DISPOSITION_NONE;
 
-    rdmaop->numBufs = 1;
-    rdmaop->buffers[0] = cacheentry->bufferHandle;
-    rdmaop->addr[0] = msg;
-    rdmaop->sz[0] = msgsize;
-    rdmaop->rbuffer = handle->data.send.data.persistent.remote_buffer;
-    rdmaop->roffset = 0;
+  cacheentry = handle->data.send.data.eager_short.cacheentry;
+  rdmaop = handle->data.send.data.eager_short.rdmaop;
 
-    handle->refcount += 2;
-    CMI_VMI_AsyncMsgCount++;
+  offset = handle->data.send.data.eager_short.offset;
+  offset += (CMI_VMI_Medium_Message_Boundary - msgsize);
 
-    status = VMI_RDMA_Put (handle->data.send.data.persistent.connection,
-			                         rdmaop, (PVOID) handle,
-		(VMIRDMAWriteComplete) CMI_VMI_RDMA_Completion_Handler);
-    CMI_VMI_CHECK_SUCCESS (status, "VMI_RDMA_Put()");
+  rdmaop->numBufs = 1;
+  rdmaop->buffers[0] = cacheentry->bufferHandle;
+  rdmaop->addr[0] = handle->msg;
+  rdmaop->sz[0] = msgsize + sizeof (CMI_VMI_Eager_Short_Slot_Footer_T);
+  rdmaop->rbuffer = handle->data.send.data.eager_short.remote_buffer;
+  rdmaop->roffset = offset;
+  rdmaop->notify = FALSE;
 
-    while (handle->refcount > 2) {
-      sched_yield ();
-      status = VMI_Poll ();
-      CMI_VMI_CHECK_SUCCESS (status, "VMI_Poll()");
-    }
+  status = VMI_RDMA_Put (process->connection, rdmaop, (PVOID) NULL, (VMIRDMACompleteNotification) NULL);
+  CMI_VMI_CHECK_SUCCESS (status, "VMI_RDMA_Put()");
 
-    handle->refcount = 1;
-#endif   /* CMK_PERSISTENT_COMM */
-  } else if (msgsize < CMI_VMI_Medium_Message_Boundary) {
-    addrs[0] = (PVOID) msg;
-    sz[0] = (ULONG) msgsize;
-
-    status = VMI_Stream_Send_Inline((&CMI_VMI_Processes[destrank])->connection,
-				    addrs, sz, 1, msgsize);
-    CMI_VMI_CHECK_SUCCESS (status, "VMI_Stream_Send_Inline()");
-  } else {
-    handle = CMI_VMI_Allocate_Handle ();
-
-    handle->refcount += 1;
-    handle->msg = msg;
-    handle->msgsize = msgsize;
-    handle->handle_type = CMI_VMI_HANDLE_TYPE_SEND;
-    handle->data.send.send_handle_type = CMI_VMI_SEND_HANDLE_TYPE_RDMA;
-    handle->data.send.message_disposition = CMI_VMI_MESSAGE_DISPOSITION_NONE;
-    handle->data.send.data.rdma.chunk_size = CMI_VMI_RDMA_Chunk_Size;
-    handle->data.send.data.rdma.bytes_sent = 0;
-    handle->data.send.data.rdma.cacheentry = NULL;
-
-    handle->refcount += 1;
-    CMI_VMI_AsyncMsgCount += 1;
-
-    CMI_VMI_MESSAGE_TYPE (&rendezvous_msg) = CMI_VMI_MESSAGE_TYPE_RENDEZVOUS;
-    rendezvous_msg.rank = _Cmi_mype;
-    rendezvous_msg.msgsize = msgsize;
-    rendezvous_msg.context = (VMI_virt_addr_t) (VMI_ADDR_CAST) handle;
-
-#if CMK_BROADCAST_SPANNING_TREE
-    CMI_SET_BROADCAST_ROOT (&rendezvous_msg, 0);
-#endif
-
-    addrs[0] = (PVOID) &rendezvous_msg;
-    sz[0] = (ULONG) (sizeof (CMI_VMI_Rendezvous_Message_T));
-
-    status = VMI_Stream_Send_Inline((&CMI_VMI_Processes[destrank])->connection,
-		          addrs, sz, 1, sizeof (CMI_VMI_Rendezvous_Message_T));
-    CMI_VMI_CHECK_SUCCESS (status, "VMI_Stream_Send_Inline()");
-
-    while (handle->refcount > 2) {
-      sched_yield ();
-      status = VMI_Poll ();
-      CMI_VMI_CHECK_SUCCESS (status, "VMI_Poll()");
-    }
-
-    handle->refcount = 0;
-  }
+  process->eager_short_send_index = ((index + 1) % process->eager_short_send_size);
+  process->eager_short_send_credits_available -= 1;
 }
 
 
@@ -2117,497 +3974,74 @@ void CmiSyncSendFn (int destrank, int msgsize, char *msg)
 /**************************************************************************
 **
 */
-CmiCommHandle CmiAsyncSendFn (int destrank, int msgsize, char *msg)
+void CMI_VMI_Sync_Send_Eager_Long (int destrank, int msgsize, char *msg, CMI_VMI_Handle_T *handle)
 {
   VMI_STATUS status;
 
-  char *msgcopy;
-
-  PVMI_BUFFER bufHandles[2];
-  PVOID addrs[2];
-  ULONG sz[2];
-
-  CMI_VMI_Handle_T *handle;
-
-  CMI_VMI_Rendezvous_Message_T rendezvous_msg;
+  CMI_VMI_Process_T *process;
 
   PVMI_CACHE_ENTRY cacheentry;
-
   PVMI_RDMA_OP rdmaop;
 
+  int index;
 
-  DEBUG_PRINT ("CmiAsyncSendFn() called.\n");
+  void *context;
+
+
+  DEBUG_PRINT ("CMI_VMI_Sync_Send_Eager_Long() called.\n");
+
+  process = &CMI_VMI_Processes[destrank];
 
   CMI_VMI_MESSAGE_TYPE (msg) = CMI_VMI_MESSAGE_TYPE_STANDARD;
+  CMI_VMI_MESSAGE_CREDITS (msg) = process->eager_short_receive_credits_replentish;
+  process->eager_short_receive_credits_replentish = 0;
 
 #if CMK_BROADCAST_SPANNING_TREE
   CMI_SET_BROADCAST_ROOT (msg, 0);
 #endif
 
-  if (destrank == _Cmi_mype) {
-    msgcopy = CmiAlloc (msgsize);
-    memcpy (msgcopy, msg, msgsize);
-    CdsFifo_Enqueue (CpvAccess (CmiLocalQueue), msgcopy);
-
-    handle = NULL;
-#if CMK_PERSISTENT_COMM
-  /* NOTE: The next line is an assignment AND a test for non-null! */
-  } else if ((handle = &CMI_VMI_Persistent_Handles[0]) &&
-	     (handle->data.send.data.persistent.destrank == destrank) &&
-	     (handle->data.send.data.persistent.maxsize <= msgsize) &&
-	     (handle->data.send.data.persistent.ready >= 2)) {
-    handle->refcount = 1;
-    handle->msg = msg;
-    handle->msgsize = msgsize;
-
-    status = VMI_Cache_Register (msg, msgsize, &cacheentry);
-    CMI_VMI_CHECK_SUCCESS (status, "VMI_Cache_Register()");
-
-    handle->data.send.data.persistent.cacheentry = cacheentry;
-
-    status = VMI_RDMA_Alloc_Op (&rdmaop);
-    CMI_VMI_CHECK_SUCCESS (status, "VMI_RDMA_Alloc_Op()");
-
-    rdmaop->numBufs = 1;
-    rdmaop->buffers[0] = cacheentry->bufferHandle;
-    rdmaop->addr[0] = msg;
-    rdmaop->sz[0] = msgsize;
-    rdmaop->rbuffer = handle->data.send.data.persistent.remote_buffer;
-    rdmaop->roffset = 0;
-
-    handle->refcount += 2;
-    CMI_VMI_AsyncMsgCount++;
-
-    status = VMI_RDMA_Put (handle->data.send.data.persistent.connection,
-			                         rdmaop, (PVOID) handle,
-		(VMIRDMAWriteComplete) CMI_VMI_RDMA_Completion_Handler);
-    CMI_VMI_CHECK_SUCCESS (status, "VMI_RDMA_Put()");
-#endif   /* CMK_PERSISTENT_COMM */
-  } else if (msgsize < CMI_VMI_Small_Message_Boundary) {
-    addrs[0] = (PVOID) msg;
-    sz[0] = msgsize;
-
-    status = VMI_Stream_Send_Inline((&CMI_VMI_Processes[destrank])->connection,
-				    addrs, sz, 1, msgsize);
-    CMI_VMI_CHECK_SUCCESS (status, "VMI_Stream_Send_Inline()");
-
-    handle = NULL;
-  } else if (msgsize < CMI_VMI_Medium_Message_Boundary) {
-    handle = CMI_VMI_Allocate_Handle ();
-
-    status = VMI_Cache_Register (msg, msgsize, &cacheentry);
-    CMI_VMI_CHECK_SUCCESS (status, "VMI_Cache_Register()");
-
-    handle->refcount += 1;
-    handle->msg = msg;
-    handle->msgsize = msgsize;
-    handle->handle_type = CMI_VMI_HANDLE_TYPE_SEND;
-    handle->data.send.send_handle_type = CMI_VMI_SEND_HANDLE_TYPE_STREAM;
-    handle->data.send.message_disposition = CMI_VMI_MESSAGE_DISPOSITION_NONE;
-    handle->data.send.data.stream.cacheentry = cacheentry;
-
-    bufHandles[0] = cacheentry->bufferHandle;
-    addrs[0] = (PVOID) msg;
-    sz[0] = msgsize;
-
-    handle->refcount += 1;
-    CMI_VMI_AsyncMsgCount++;
-
-    status = VMI_Stream_Send ((&CMI_VMI_Processes[destrank])->connection,
-			      bufHandles, addrs, sz, 1,
-			      CMI_VMI_Stream_Completion_Handler,
-			      (PVOID) handle, TRUE);
-    CMI_VMI_CHECK_SUCCESS (status, "VMI_Stream_Send()");
+  context = CONTEXTFIELD (msg);
+  if (context) {
+    cacheentry = CMI_VMI_CacheEntry_From_Context (context);
   } else {
-    handle = CMI_VMI_Allocate_Handle ();
-
-    handle->refcount += 1;
-    handle->msg = msg;
-    handle->msgsize = msgsize;
-    handle->handle_type = CMI_VMI_HANDLE_TYPE_SEND;
-    handle->data.send.send_handle_type = CMI_VMI_SEND_HANDLE_TYPE_RDMA;
-    handle->data.send.message_disposition = CMI_VMI_MESSAGE_DISPOSITION_NONE;
-    handle->data.send.data.rdma.chunk_size = CMI_VMI_RDMA_Chunk_Size;
-    handle->data.send.data.rdma.bytes_sent = 0;
-    handle->data.send.data.rdma.cacheentry = NULL;
-
-    handle->refcount += 1;
-    CMI_VMI_AsyncMsgCount++;
-
-    CMI_VMI_MESSAGE_TYPE (&rendezvous_msg) = CMI_VMI_MESSAGE_TYPE_RENDEZVOUS;
-    rendezvous_msg.rank = _Cmi_mype;
-    rendezvous_msg.msgsize = msgsize;
-    rendezvous_msg.context = (VMI_virt_addr_t) (VMI_ADDR_CAST) handle;
-
-#if CMK_BROADCAST_SPANNING_TREE
-    CMI_SET_BROADCAST_ROOT (&rendezvous_msg, 0);
-#endif
-
-    addrs[0] = (PVOID) &rendezvous_msg;
-    sz[0] = (ULONG) (sizeof (CMI_VMI_Rendezvous_Message_T));
-
-    status = VMI_Stream_Send_Inline((&CMI_VMI_Processes[destrank])->connection,
-				    addrs, sz, 1,
-				    sizeof (CMI_VMI_Rendezvous_Message_T));
-    CMI_VMI_CHECK_SUCCESS (status, "VMI_Stream_Send_Inline()");
+    status = VMI_Cache_Register (msg, msgsize, &cacheentry);
+    CMI_VMI_CHECK_SUCCESS (status, "VMI_Cache_Register()");
   }
 
-  return ((CmiCommHandle) handle);
-}
+  handle->msg = msg;
+  handle->msgsize = msgsize;
+  handle->data.send.message_disposition = CMI_VMI_MESSAGE_DISPOSITION_NONE;
+  handle->data.send.data.eager_long.cacheentry = cacheentry;
 
+  status = VMI_RDMA_Alloc_Op (&rdmaop);
+  CMI_VMI_CHECK_SUCCESS (status, "VMI_RDMA_Alloc_Op()");
 
+  rdmaop->numBufs = 1;
+  rdmaop->buffers[0] = cacheentry->bufferHandle;
+  rdmaop->addr[0] = handle->msg;
+  rdmaop->sz[0] = msgsize;
+  rdmaop->rbuffer = handle->data.send.data.eager_long.remote_buffer;
+  rdmaop->roffset = 0;
+  rdmaop->notify = TRUE;
 
-/**************************************************************************
-**
-*/
-void CmiFreeSendFn (int destrank, int msgsize, char *msg)
-{
-  VMI_STATUS status;
+  CMI_VMI_AsyncMsgCount += 1;
+  handle->refcount += 1;
 
-  char *msgcopy;
+  status = VMI_RDMA_Put (process->connection, rdmaop, (PVOID) handle, (VMIRDMACompleteNotification) CMI_VMI_RDMA_Put_Completion_Handler);
+  CMI_VMI_CHECK_SUCCESS (status, "VMI_RDMA_Put()");
 
-  PVMI_BUFFER bufHandles[2];
-  PVOID addrs[2];
-  ULONG sz[2];
-
-  CMI_VMI_Handle_T *handle;
-
-  CMI_VMI_Rendezvous_Message_T rendezvous_msg;
-
-  PVMI_CACHE_ENTRY cacheentry;
-
-  PVMI_RDMA_OP rdmaop;
-
-
-  DEBUG_PRINT ("CmiFreeSendFn() called.\n");
-
-  CMI_VMI_MESSAGE_TYPE (msg) = CMI_VMI_MESSAGE_TYPE_STANDARD;
-
-#if CMK_BROADCAST_SPANNING_TREE
-  CMI_SET_BROADCAST_ROOT (msg, 0);
-#endif
-
-  if (destrank == _Cmi_mype) {
-    CdsFifo_Enqueue (CpvAccess (CmiLocalQueue), msg);
-#if CMK_PERSISTENT_COMM
-  /* NOTE: The next line is an assignment AND a test for non-null! */
-  } else if ((handle = &CMI_VMI_Persistent_Handles[0]) &&
-	     (handle->data.send.data.persistent.destrank == destrank) &&
-	     (handle->data.send.data.persistent.maxsize <= msgsize) &&
-	     (handle->data.send.data.persistent.ready >= 2)) {
-
-    // NOTE: This code really should not free any message buffers because
-    // the idea behind a persistent handle is to avoid pinning and
-    // unpinning the buffer in memory, right?
-    //
-    // THIS NEEDS TO BE THOUGHT ABOUT AND FIXED!
-
-    handle->refcount = 1;
-    handle->msg = msg;
-    handle->msgsize = msgsize;
-
-    status = VMI_Cache_Register (msg, msgsize, &cacheentry);
-    CMI_VMI_CHECK_SUCCESS (status, "VMI_Cache_Register()");
-
-    handle->data.send.data.persistent.cacheentry = cacheentry;
-
-    status = VMI_RDMA_Alloc_Op (&rdmaop);
-    CMI_VMI_CHECK_SUCCESS (status, "VMI_RDMA_Alloc_Op()");
-
-    rdmaop->numBufs = 1;
-    rdmaop->buffers[0] = cacheentry->bufferHandle;
-    rdmaop->addr[0] = msg;
-    rdmaop->sz[0] = msgsize;
-    rdmaop->rbuffer = handle->data.send.data.persistent.remote_buffer;
-    rdmaop->roffset = 0;
-
-    handle->refcount += 1;
-    CMI_VMI_AsyncMsgCount++;
-
-    status = VMI_RDMA_Put (handle->data.send.data.persistent.connection,
-			                         rdmaop, (PVOID) handle,
-		(VMIRDMAWriteComplete) CMI_VMI_RDMA_Completion_Handler);
-    CMI_VMI_CHECK_SUCCESS (status, "VMI_RDMA_Put()");
-#endif   /* CMK_PERSISTENT_COMM */
-  } else if (msgsize < CMI_VMI_Small_Message_Boundary) {
-    addrs[0] = (PVOID) msg;
-    sz[0] = msgsize;
-
-    status = VMI_Stream_Send_Inline((&CMI_VMI_Processes[destrank])->connection,
-				    addrs, sz, 1, msgsize);
-    CMI_VMI_CHECK_SUCCESS (status, "VMI_Stream_Send_Inline()");
-
-    CmiFree (msg);
-  } else if (msgsize < CMI_VMI_Medium_Message_Boundary) {
-    handle = CMI_VMI_Allocate_Handle ();
-
-    status = VMI_Cache_Register (msg, msgsize, &cacheentry);
-    CMI_VMI_CHECK_SUCCESS (status, "VMI_Cache_Register()");
-
-    /* Do NOT increment handle->refcount here! */
-    handle->msg = msg;
-    handle->msgsize = msgsize;
-    handle->handle_type = CMI_VMI_HANDLE_TYPE_SEND;
-    handle->data.send.send_handle_type = CMI_VMI_SEND_HANDLE_TYPE_STREAM;
-    handle->data.send.message_disposition = CMI_VMI_MESSAGE_DISPOSITION_FREE;
-    handle->data.send.data.stream.cacheentry = cacheentry;
-
-    bufHandles[0] = cacheentry->bufferHandle;
-    addrs[0] = (PVOID) msg;
-    sz[0] = msgsize;
-
-    handle->refcount += 1;
-    CMI_VMI_AsyncMsgCount++;
-
-    status = VMI_Stream_Send ((&CMI_VMI_Processes[destrank])->connection,
-			      bufHandles, addrs, sz, 1,
-			      CMI_VMI_Stream_Completion_Handler,
-			      (PVOID) handle, TRUE);
-    CMI_VMI_CHECK_SUCCESS (status, "VMI_Stream_Send()");
-  } else {
-    handle = CMI_VMI_Allocate_Handle ();
-
-    /* Do NOT increment handle->refcount here! */
-    handle->msg = msg;
-    handle->msgsize = msgsize;
-    handle->handle_type = CMI_VMI_HANDLE_TYPE_SEND;
-    handle->data.send.send_handle_type = CMI_VMI_SEND_HANDLE_TYPE_RDMA;
-    handle->data.send.message_disposition = CMI_VMI_MESSAGE_DISPOSITION_FREE;
-    handle->data.send.data.rdma.chunk_size = CMI_VMI_RDMA_Chunk_Size;
-    handle->data.send.data.rdma.bytes_sent = 0;
-    handle->data.send.data.rdma.cacheentry = NULL;
-
-    handle->refcount += 1;
-    CMI_VMI_AsyncMsgCount++;
-
-    CMI_VMI_MESSAGE_TYPE (&rendezvous_msg) = CMI_VMI_MESSAGE_TYPE_RENDEZVOUS;
-    rendezvous_msg.rank = _Cmi_mype;
-    rendezvous_msg.msgsize = msgsize;
-    rendezvous_msg.context = (VMI_virt_addr_t) (VMI_ADDR_CAST) handle;
-
-#if CMK_BROADCAST_SPANNING_TREE
-    CMI_SET_BROADCAST_ROOT (&rendezvous_msg, 0);
-#endif
-
-    addrs[0] = (PVOID) &rendezvous_msg;
-    sz[0] = (ULONG) (sizeof (CMI_VMI_Rendezvous_Message_T));
-
-    status = VMI_Stream_Send_Inline((&CMI_VMI_Processes[destrank])->connection,
-				    addrs, sz, 1,
-				    sizeof (CMI_VMI_Rendezvous_Message_T));
-    CMI_VMI_CHECK_SUCCESS (status, "VMI_Stream_Send_Inline()");
+  while (handle->refcount > 2) {
+    sched_yield ();
+    status = VMI_Poll ();
+    CMI_VMI_CHECK_SUCCESS (status, "VMI_Poll()");
   }
-}
 
-
-
-/**************************************************************************
-**
-*/
-void CmiSyncBroadcastFn (int msgsize, char *msg)
-{
-  VMI_STATUS status;
-
-  PVMI_BUFFER bufHandles[2];
-  PVOID addrs[2];
-  ULONG sz[2];
-
-  CMI_VMI_Handle_T *handle;
-
-  int i;
-
-  PVMI_CACHE_ENTRY cacheentry;
-
-  int childcount;
-  int startrank;
-  int destrank;
-
-  CMI_VMI_Rendezvous_Message_T rendezvous_msg;
-
-
-  DEBUG_PRINT ("CmiSyncBroadcastFn() called.\n");
-
-  CMI_VMI_MESSAGE_TYPE (msg) = CMI_VMI_MESSAGE_TYPE_STANDARD;
-
-  if (msgsize < CMI_VMI_Medium_Message_Boundary) {
-    handle = CMI_VMI_Allocate_Handle ();
-
-    status = VMI_Cache_Register (msg, msgsize, &cacheentry);
-    CMI_VMI_CHECK_SUCCESS (status, "VMI_Cache_Register()");
-
-    handle->refcount += 1;
-    handle->msg = msg;
-    handle->msgsize = msgsize;
-    handle->handle_type = CMI_VMI_HANDLE_TYPE_SEND;
-    handle->data.send.send_handle_type = CMI_VMI_SEND_HANDLE_TYPE_STREAM;
-    handle->data.send.message_disposition = CMI_VMI_MESSAGE_DISPOSITION_NONE;
-    handle->data.send.data.stream.cacheentry = cacheentry;
-
-    bufHandles[0] = cacheentry->bufferHandle;
-    addrs[0] = (PVOID) msg;
-    sz[0] = (ULONG) msgsize;
-
-#if CMK_BROADCAST_SPANNING_TREE
-    CMI_SET_BROADCAST_ROOT (msg, (_Cmi_mype + 1));
-
-    childcount = CMI_VMI_Spanning_Children_Count (msg);
-
-    handle->refcount += childcount;
-    CMI_VMI_AsyncMsgCount += childcount;
-
-    startrank = CMI_BROADCAST_ROOT (msg) - 1;
-    for (i = 1; i <= CMI_VMI_BROADCAST_SPANNING_FACTOR; i++) {
-      destrank = _Cmi_mype - startrank;
-
-      if (destrank < 0) {
-	destrank += _Cmi_numpes;
-      }
-
-      destrank = CMI_VMI_BROADCAST_SPANNING_FACTOR * destrank + i;
-
-      if (destrank > (_Cmi_numpes - 1)) {
-	break;
-      }
-
-      destrank += startrank;
-      destrank %= _Cmi_numpes;
-
-      status = VMI_Stream_Send ((&CMI_VMI_Processes[destrank])->connection,
-				bufHandles, addrs, sz, 1,
-				CMI_VMI_Stream_Completion_Handler,
-				(PVOID) handle, TRUE);
-      CMI_VMI_CHECK_SUCCESS (status, "VMI_Stream_Send()");
-    }
-#else   /* CMK_BROADCAST_SPANNING_TREE */
-    handle->refcount += (_Cmi_numpes - 1);
-    CMI_VMI_AsyncMsgCount += (_Cmi_numpes - 1);
-
-    for (i = 0; i < _Cmi_mype; i++) {
-      status = VMI_Stream_Send ((&CMI_VMI_Processes[i])->connection,
-				bufHandles, addrs, sz, 1,
-				CMI_VMI_Stream_Completion_Handler,
-				(PVOID) handle, TRUE);
-      CMI_VMI_CHECK_SUCCESS (status, "VMI_Stream_Send()");
-    }
-
-    for (i = (_Cmi_mype + 1); i < _Cmi_numpes; i++) {
-      status = VMI_Stream_Send ((&CMI_VMI_Processes[i])->connection,
-				bufHandles, addrs, sz, 1,
-				CMI_VMI_Stream_Completion_Handler,
-				(PVOID) handle, TRUE);
-      CMI_VMI_CHECK_SUCCESS (status, "VMI_Stream_Send()");
-    }
-#endif   /* CMK_BROADCAST_SPANNING_TREE */
-
-    while (handle->refcount > 2) {
-      sched_yield ();
-      status = VMI_Poll ();
-      CMI_VMI_CHECK_SUCCESS (status, "VMI_Poll()");
-    }
-
+  if (!context) {
     status = VMI_Cache_Deregister (cacheentry);
     CMI_VMI_CHECK_SUCCESS (status, "VMI_Cache_Deregister()");
-
-    handle->refcount = 0;
-  } else {
-    handle = CMI_VMI_Allocate_Handle ();
-
-    handle->refcount += 1;
-    handle->msg = msg;
-    handle->msgsize = msgsize;
-    handle->handle_type = CMI_VMI_HANDLE_TYPE_SEND;
-    handle->data.send.send_handle_type = CMI_VMI_SEND_HANDLE_TYPE_RDMABROAD;
-    handle->data.send.message_disposition = CMI_VMI_MESSAGE_DISPOSITION_NONE;
-    handle->data.send.data.rdmabroad.chunk_size = CMI_VMI_RDMA_Chunk_Size;
-    handle->data.send.data.rdmabroad.bytes_sent = CmiAlloc (_Cmi_numpes *
-							    sizeof (int));
-    handle->data.send.data.rdmabroad.cacheentry = CmiAlloc (_Cmi_numpes *
-					       sizeof (PVMI_CACHE_ENTRY));
-    for (i = 0; i < _Cmi_numpes; i++) {
-      handle->data.send.data.rdmabroad.bytes_sent[i] = 0;
-      handle->data.send.data.rdmabroad.cacheentry[i] = NULL;
-    }
-
-    CMI_VMI_MESSAGE_TYPE (&rendezvous_msg) = CMI_VMI_MESSAGE_TYPE_RENDEZVOUS;
-    rendezvous_msg.rank = _Cmi_mype;
-    rendezvous_msg.msgsize = msgsize;
-    rendezvous_msg.context = (VMI_virt_addr_t) (VMI_ADDR_CAST) handle;
-
-#if CMK_BROADCAST_SPANNING_TREE
-    CMI_SET_BROADCAST_ROOT (&rendezvous_msg, 0);
-#endif
-
-    addrs[0] = (PVOID) &rendezvous_msg;
-    sz[0] = (ULONG) (sizeof (CMI_VMI_Rendezvous_Message_T));
-
-#if CMK_BROADCAST_SPANNING_TREE
-    CMI_SET_BROADCAST_ROOT (msg, (_Cmi_mype + 1));
-
-    childcount = CMI_VMI_Spanning_Children_Count (msg);
-
-    handle->refcount += childcount;
-    CMI_VMI_AsyncMsgCount += childcount;
-
-    startrank = CMI_BROADCAST_ROOT (msg) - 1;
-    for (i = 1; i <= CMI_VMI_BROADCAST_SPANNING_FACTOR; i++) {
-      destrank = _Cmi_mype - startrank;
-
-      if (destrank < 0) {
-	destrank += _Cmi_numpes;
-      }
-
-      destrank = CMI_VMI_BROADCAST_SPANNING_FACTOR * destrank + i;
-
-      if (destrank > (_Cmi_numpes - 1)) {
-	break;
-      }
-
-      destrank += startrank;
-      destrank %= _Cmi_numpes;
-
-      status=VMI_Stream_Send_Inline((&CMI_VMI_Processes[destrank])->connection,
-				    addrs, sz, 1,
-				    sizeof (CMI_VMI_Rendezvous_Message_T));
-      CMI_VMI_CHECK_SUCCESS (status, "VMI_Stream_Send_Inline()");
-    }
-#else   /* CMK_BROADCAST_SPANNING_TREE */
-    handle->refcount += (_Cmi_numpes - 1);
-    CMI_VMI_AsyncMsgCount += (_Cmi_numpes - 1);
-
-    for (i = 0; i < _Cmi_mype; i++) {
-      status = VMI_Stream_Send_Inline ((&CMI_VMI_Processes[i])->connection,
-				       addrs, sz, 1,
-				       sizeof (CMI_VMI_Rendezvous_Message_T));
-      CMI_VMI_CHECK_SUCCESS (status, "VMI_Stream_Send_Inline()");
-    }
-
-    for (i = (_Cmi_mype + 1); i < _Cmi_numpes; i++) {
-      status = VMI_Stream_Send_Inline ((&CMI_VMI_Processes[i])->connection,
-				       addrs, sz, 1,
-				       sizeof (CMI_VMI_Rendezvous_Message_T));
-      CMI_VMI_CHECK_SUCCESS (status, "VMI_Stream_Send_Inline()");
-    }
-#endif   /* CMK_BROADCAST_SPANNING_TREE */
-
-    while (handle->refcount > 2) {
-      sched_yield ();
-      status = VMI_Poll ();
-      CMI_VMI_CHECK_SUCCESS (status, "VMI_Poll()");
-    }
-
-    for (i = 0; i < _Cmi_numpes; i++) {
-      if (handle->data.send.data.rdmabroad.cacheentry[i]) {
-	status = VMI_Cache_Deregister
-                  (handle->data.send.data.rdmabroad.cacheentry[i]);
-	CMI_VMI_CHECK_SUCCESS (status, "VMI_Cache_Deregister()");
-      }
-    }
-
-    CmiFree (handle->data.send.data.rdmabroad.bytes_sent);
-    CmiFree (handle->data.send.data.rdmabroad.cacheentry);
-
-    handle->refcount = 0;
   }
+
+  CMI_VMI_Deallocate_Handle (handle);
 }
 
 
@@ -2615,225 +4049,61 @@ void CmiSyncBroadcastFn (int msgsize, char *msg)
 /**************************************************************************
 **
 */
-CmiCommHandle CmiAsyncBroadcastFn (int msgsize, char *msg)
+CmiCommHandle CMI_VMI_Async_Send_Eager_Long (int destrank, int msgsize, char *msg, CMI_VMI_Handle_T *handle)
 {
   VMI_STATUS status;
 
-  PVMI_BUFFER bufHandles[2];
-  PVOID addrs[2];
-  ULONG sz[2];
-
-  CMI_VMI_Handle_T *handle;
-
-  int i;
+  CMI_VMI_Process_T *process;
 
   PVMI_CACHE_ENTRY cacheentry;
+  PVMI_RDMA_OP rdmaop;
 
-  int childcount;
-  int startrank;
-  int destrank;
+  int index;
 
-  CMI_VMI_Rendezvous_Message_T rendezvous_msg;
+  void *context;
 
 
-  DEBUG_PRINT ("CmiAsyncBroadcastFn() called.\n");
+  DEBUG_PRINT ("CMI_VMI_Async_Send_Eager_Long() called.\n");
+
+  process = &CMI_VMI_Processes[destrank];
 
   CMI_VMI_MESSAGE_TYPE (msg) = CMI_VMI_MESSAGE_TYPE_STANDARD;
-
-  if (msgsize < CMI_VMI_Small_Message_Boundary) {
-    addrs[0] = (PVOID) msg;
-    sz[0] = msgsize;
+  CMI_VMI_MESSAGE_CREDITS (msg) = process->eager_short_receive_credits_replentish;
+  process->eager_short_receive_credits_replentish = 0;
 
 #if CMK_BROADCAST_SPANNING_TREE
-    CMI_SET_BROADCAST_ROOT (msg, (_Cmi_mype + 1));
-
-    childcount = CMI_VMI_Spanning_Children_Count (msg);
-
-    startrank = CMI_BROADCAST_ROOT (msg) - 1;
-    for (i = 1; i <= CMI_VMI_BROADCAST_SPANNING_FACTOR; i++) {
-      destrank = _Cmi_mype - startrank;
-
-      if (destrank < 0) {
-	destrank += _Cmi_numpes;
-      }
-
-      destrank = CMI_VMI_BROADCAST_SPANNING_FACTOR * destrank + i;
-
-      if (destrank > (_Cmi_numpes - 1)) {
-	break;
-      }
-
-      destrank += startrank;
-      destrank %= _Cmi_numpes;
-
-      status=VMI_Stream_Send_Inline((&CMI_VMI_Processes[destrank])->connection,
-				    addrs, sz, 1, msgsize);
-      CMI_VMI_CHECK_SUCCESS (status, "VMI_Stream_Send_Inline()");
-    }
-#else   /* CMK_BROADCAST_SPANNING_TREE */
-    for (i = 0; i < _Cmi_mype; i++) {
-      status = VMI_Stream_Send_Inline ((&CMI_VMI_Processes[i])->connection,
-				       addrs, sz, 1, msgsize);
-      CMI_VMI_CHECK_SUCCESS (status, "VMI_Stream_Send_Inline()");
-    }
-
-    for (i = (_Cmi_mype + 1); i < _Cmi_numpes; i++) {
-      status = VMI_Stream_Send_Inline ((&CMI_VMI_Processes[i])->connection,
-				       addrs, sz, 1, msgsize);
-      CMI_VMI_CHECK_SUCCESS (status, "VMI_Stream_Send_Inline()");
-    }
-#endif   /* CMK_BROADCAST_SPANNING_TREE */
-
-    handle = NULL;
-  } else if (msgsize < CMI_VMI_Medium_Message_Boundary) {
-    handle = CMI_VMI_Allocate_Handle ();
-
-    status = VMI_Cache_Register (msg, msgsize, &cacheentry);
-    CMI_VMI_CHECK_SUCCESS (status, "VMI_Cache_Register()");
-
-    handle->refcount += 1;
-    handle->msg = msg;
-    handle->msgsize = msgsize;
-    handle->handle_type = CMI_VMI_HANDLE_TYPE_SEND;
-    handle->data.send.send_handle_type = CMI_VMI_SEND_HANDLE_TYPE_STREAM;
-    handle->data.send.message_disposition = CMI_VMI_MESSAGE_DISPOSITION_NONE;
-    handle->data.send.data.stream.cacheentry = cacheentry;
-
-    bufHandles[0] = cacheentry->bufferHandle;
-    addrs[0] = (PVOID) msg;
-    sz[0] = (ULONG) msgsize;
-
-#if CMK_BROADCAST_SPANNING_TREE
-    CMI_SET_BROADCAST_ROOT (msg, (_Cmi_mype + 1));
-
-    childcount = CMI_VMI_Spanning_Children_Count (msg);
-
-    handle->refcount += childcount;
-    CMI_VMI_AsyncMsgCount += childcount;
-
-    startrank = CMI_BROADCAST_ROOT (msg) - 1;
-    for (i = 1; i <= CMI_VMI_BROADCAST_SPANNING_FACTOR; i++) {
-      destrank = _Cmi_mype - startrank;
-
-      if (destrank < 0) {
-	destrank += _Cmi_numpes;
-      }
-
-      destrank = CMI_VMI_BROADCAST_SPANNING_FACTOR * destrank + i;
-
-      if (destrank > (_Cmi_numpes - 1)) {
-	break;
-      }
-
-      destrank += startrank;
-      destrank %= _Cmi_numpes;
-
-      status = VMI_Stream_Send ((&CMI_VMI_Processes[destrank])->connection,
-				bufHandles, addrs, sz, 1,
-				CMI_VMI_Stream_Completion_Handler,
-				(PVOID) handle, TRUE);
-      CMI_VMI_CHECK_SUCCESS (status, "VMI_Stream_Send()");
-    }
-#else   /* CMK_BROADCAST_SPANNING_TREE */
-    handle->refcount += (_Cmi_numpes - 1);
-    CMI_VMI_AsyncMsgCount += (_Cmi_numpes - 1);
-
-    for (i = 0; i < _Cmi_mype; i++) {
-      status = VMI_Stream_Send ((&CMI_VMI_Processes[i])->connection,
-				bufHandles, addrs, sz, 1,
-				CMI_VMI_Stream_Completion_Handler,
-				(PVOID) handle, TRUE);
-      CMI_VMI_CHECK_SUCCESS (status, "VMI_Stream_Send()");
-    }
-
-    for (i = (_Cmi_mype + 1); i < _Cmi_numpes; i++) {
-      status = VMI_Stream_Send ((&CMI_VMI_Processes[i])->connection,
-				bufHandles, addrs, sz, 1,
-				CMI_VMI_Stream_Completion_Handler,
-				(PVOID) handle, TRUE);
-      CMI_VMI_CHECK_SUCCESS (status, "VMI_Stream_Send()");
-    }
-#endif   /* CMK_BROADCAST_SPANNING_TREE */
-  } else {
-    handle = CMI_VMI_Allocate_Handle ();
-
-    handle->refcount += 1;
-    handle->msg = msg;
-    handle->msgsize = msgsize;
-    handle->handle_type = CMI_VMI_HANDLE_TYPE_SEND;
-    handle->data.send.send_handle_type = CMI_VMI_SEND_HANDLE_TYPE_RDMABROAD;
-    handle->data.send.message_disposition = CMI_VMI_MESSAGE_DISPOSITION_NONE;
-    handle->data.send.data.rdmabroad.chunk_size = CMI_VMI_RDMA_Chunk_Size;
-    handle->data.send.data.rdmabroad.bytes_sent = CmiAlloc (_Cmi_numpes *
-							    sizeof (int));
-    handle->data.send.data.rdmabroad.cacheentry = CmiAlloc (_Cmi_numpes *
-					       sizeof (PVMI_CACHE_ENTRY));
-    for (i = 0; i < _Cmi_numpes; i++) {
-      handle->data.send.data.rdmabroad.bytes_sent[i] = 0;
-      handle->data.send.data.rdmabroad.cacheentry[i] = NULL;
-    }
-
-    CMI_VMI_MESSAGE_TYPE (&rendezvous_msg) = CMI_VMI_MESSAGE_TYPE_RENDEZVOUS;
-    rendezvous_msg.rank = _Cmi_mype;
-    rendezvous_msg.msgsize = msgsize;
-    rendezvous_msg.context = (VMI_virt_addr_t) (VMI_ADDR_CAST) handle;
-
-#if CMK_BROADCAST_SPANNING_TREE
-    CMI_SET_BROADCAST_ROOT (&rendezvous_msg, 0);
+  CMI_SET_BROADCAST_ROOT (msg, 0);
 #endif
 
-    addrs[0] = (PVOID) &rendezvous_msg;
-    sz[0] = (ULONG) (sizeof (CMI_VMI_Rendezvous_Message_T));
-
-#if CMK_BROADCAST_SPANNING_TREE
-    CMI_SET_BROADCAST_ROOT (msg, (_Cmi_mype + 1));
-
-    childcount = CMI_VMI_Spanning_Children_Count (msg);
-
-    handle->refcount += childcount;
-    CMI_VMI_AsyncMsgCount += childcount;
-
-    startrank = CMI_BROADCAST_ROOT (msg) - 1;
-    for (i = 1; i <= CMI_VMI_BROADCAST_SPANNING_FACTOR; i++) {
-      destrank = _Cmi_mype - startrank;
-
-      if (destrank < 0) {
-	destrank += _Cmi_numpes;
-      }
-
-      destrank = CMI_VMI_BROADCAST_SPANNING_FACTOR * destrank + i;
-
-      if (destrank > (_Cmi_numpes - 1)) {
-	break;
-      }
-
-      destrank += startrank;
-      destrank %= _Cmi_numpes;
-
-      status=VMI_Stream_Send_Inline((&CMI_VMI_Processes[destrank])->connection,
-				    addrs, sz, 1,
-				    sizeof (CMI_VMI_Rendezvous_Message_T));
-      CMI_VMI_CHECK_SUCCESS (status, "VMI_Stream_Send_Inline()");
-    }
-#else   /* CMK_BROADCAST_SPANNING_TREE */
-    handle->refcount += (_Cmi_numpes - 1);
-    CMI_VMI_AsyncMsgCount += (_Cmi_numpes - 1);
-
-    for (i = 0; i < _Cmi_mype; i++) {
-      status = VMI_Stream_Send_Inline ((&CMI_VMI_Processes[i])->connection,
-				       addrs, sz, 1,
-				       sizeof (CMI_VMI_Rendezvous_Message_T));
-      CMI_VMI_CHECK_SUCCESS (status, "VMI_Stream_Send_Inline()");
-    }
-
-    for (i = (_Cmi_mype + 1); i < _Cmi_numpes; i++) {
-      status = VMI_Stream_Send_Inline ((&CMI_VMI_Processes[i])->connection,
-				       addrs, sz, 1,
-				       sizeof (CMI_VMI_Rendezvous_Message_T));
-      CMI_VMI_CHECK_SUCCESS (status, "VMI_Stream_Send_Inline()");
-    }
-#endif   /* CMK_BROADCAST_SPANNING_TREE */
+  context = CONTEXTFIELD (msg);
+  if (context) {
+    cacheentry = CMI_VMI_CacheEntry_From_Context (context);
+  } else {
+    status = VMI_Cache_Register (msg, msgsize, &cacheentry);
+    CMI_VMI_CHECK_SUCCESS (status, "VMI_Cache_Register()");
   }
+
+  handle->msg = msg;
+  handle->msgsize = msgsize;
+  handle->data.send.message_disposition = CMI_VMI_MESSAGE_DISPOSITION_NONE;
+  handle->data.send.data.eager_long.cacheentry = cacheentry;
+
+  status = VMI_RDMA_Alloc_Op (&rdmaop);
+  CMI_VMI_CHECK_SUCCESS (status, "VMI_RDMA_Alloc_Op()");
+
+  rdmaop->numBufs = 1;
+  rdmaop->buffers[0] = cacheentry->bufferHandle;
+  rdmaop->addr[0] = handle->msg;
+  rdmaop->sz[0] = msgsize;
+  rdmaop->rbuffer = handle->data.send.data.eager_long.remote_buffer;
+  rdmaop->roffset = 0;
+  rdmaop->notify = TRUE;
+
+  CMI_VMI_AsyncMsgCount += 1;
+  handle->refcount += 1;
+
+  status = VMI_RDMA_Put (process->connection, rdmaop, (PVOID) handle, (VMIRDMACompleteNotification) CMI_VMI_RDMA_Put_Completion_Handler);
+  CMI_VMI_CHECK_SUCCESS (status, "VMI_RDMA_Put()");
 
   return ((CmiCommHandle) handle);
 }
@@ -2843,902 +4113,62 @@ CmiCommHandle CmiAsyncBroadcastFn (int msgsize, char *msg)
 /**************************************************************************
 **
 */
-void CmiFreeBroadcastFn (int msgsize, char *msg)
+void CMI_VMI_Free_Send_Eager_Long (int destrank, int msgsize, char *msg, CMI_VMI_Handle_T *handle)
 {
   VMI_STATUS status;
 
-  PVMI_BUFFER bufHandles[2];
-  PVOID addrs[2];
-  ULONG sz[2];
-
-  CMI_VMI_Handle_T *handle;
-
-  int i;
+  CMI_VMI_Process_T *process;
 
   PVMI_CACHE_ENTRY cacheentry;
+  PVMI_RDMA_OP rdmaop;
 
-  int childcount;
-  int startrank;
-  int destrank;
+  int index;
 
-  CMI_VMI_Rendezvous_Message_T rendezvous_msg;
+  void *context;
 
 
-  DEBUG_PRINT ("CmiFreeBroadcastFn() called.\n");
+  DEBUG_PRINT ("CMI_VMI_Free_Send_Eager_Long() called.\n");
+
+  process = &CMI_VMI_Processes[destrank];
 
   CMI_VMI_MESSAGE_TYPE (msg) = CMI_VMI_MESSAGE_TYPE_STANDARD;
-
-  if (msgsize < CMI_VMI_Small_Message_Boundary) {
-    addrs[0] = (PVOID) msg;
-    sz[0] = msgsize;
+  CMI_VMI_MESSAGE_CREDITS (msg) = process->eager_short_receive_credits_replentish;
+  process->eager_short_receive_credits_replentish = 0;
 
 #if CMK_BROADCAST_SPANNING_TREE
-    CMI_SET_BROADCAST_ROOT (msg, (_Cmi_mype + 1));
+  CMI_SET_BROADCAST_ROOT (msg, 0);
+#endif
 
-    childcount = CMI_VMI_Spanning_Children_Count (msg);
-
-    startrank = CMI_BROADCAST_ROOT (msg) - 1;
-    for (i = 1; i <= CMI_VMI_BROADCAST_SPANNING_FACTOR; i++) {
-      destrank = _Cmi_mype - startrank;
-
-      if (destrank < 0) {
-	destrank += _Cmi_numpes;
-      }
-
-      destrank = CMI_VMI_BROADCAST_SPANNING_FACTOR * destrank + i;
-
-      if (destrank > (_Cmi_numpes - 1)) {
-	break;
-      }
-
-      destrank += startrank;
-      destrank %= _Cmi_numpes;
-
-      status=VMI_Stream_Send_Inline((&CMI_VMI_Processes[destrank])->connection,
-				    addrs, sz, 1, msgsize);
-      CMI_VMI_CHECK_SUCCESS (status, "VMI_Stream_Send_Inline()");
-    }
-#else   /* CMK_BROADCAST_SPANNING_TREE */
-    for (i = 0; i < _Cmi_mype; i++) {
-      status = VMI_Stream_Send_Inline ((&CMI_VMI_Processes[i])->connection,
-				       addrs, sz, 1, msgsize);
-      CMI_VMI_CHECK_SUCCESS (status, "VMI_Stream_Send_Inline()");
-    }
-
-    for (i = (_Cmi_mype + 1); i < _Cmi_numpes; i++) {
-      status = VMI_Stream_Send_Inline ((&CMI_VMI_Processes[i])->connection,
-				       addrs, sz, 1, msgsize);
-      CMI_VMI_CHECK_SUCCESS (status, "VMI_Stream_Send_Inline()");
-    }
-#endif   /* CMK_BROADCAST_SPANNING_TREE */
-
-    CmiFree (msg);
-  } else if (msgsize < CMI_VMI_Medium_Message_Boundary) {
-    handle = CMI_VMI_Allocate_Handle ();
-
+  context = CONTEXTFIELD (msg);
+  if (context) {
+    cacheentry = CMI_VMI_CacheEntry_From_Context (context);
+  } else {
     status = VMI_Cache_Register (msg, msgsize, &cacheentry);
     CMI_VMI_CHECK_SUCCESS (status, "VMI_Cache_Register()");
-
-    /* Do NOT increment handle->refcount here! */
-    handle->msg = msg;
-    handle->msgsize = msgsize;
-    handle->handle_type = CMI_VMI_HANDLE_TYPE_SEND;
-    handle->data.send.send_handle_type = CMI_VMI_SEND_HANDLE_TYPE_STREAM;
-    handle->data.send.message_disposition = CMI_VMI_MESSAGE_DISPOSITION_FREE;
-    handle->data.send.data.stream.cacheentry = cacheentry;
-
-    bufHandles[0] = cacheentry->bufferHandle;
-    addrs[0] = (PVOID) msg;
-    sz[0] = (ULONG) msgsize;
-
-#if CMK_BROADCAST_SPANNING_TREE
-    CMI_SET_BROADCAST_ROOT (msg, (_Cmi_mype + 1));
-
-    childcount = CMI_VMI_Spanning_Children_Count (msg);
-
-    handle->refcount += childcount;
-    CMI_VMI_AsyncMsgCount += childcount;
-
-    startrank = CMI_BROADCAST_ROOT (msg) - 1;
-    for (i = 1; i <= CMI_VMI_BROADCAST_SPANNING_FACTOR; i++) {
-      destrank = _Cmi_mype - startrank;
-
-      if (destrank < 0) {
-	destrank += _Cmi_numpes;
-      }
-
-      destrank = CMI_VMI_BROADCAST_SPANNING_FACTOR * destrank + i;
-
-      if (destrank > (_Cmi_numpes - 1)) {
-	break;
-      }
-
-      destrank += startrank;
-      destrank %= _Cmi_numpes;
-
-      status = VMI_Stream_Send ((&CMI_VMI_Processes[destrank])->connection,
-				bufHandles, addrs, sz, 1,
-				CMI_VMI_Stream_Completion_Handler,
-				(PVOID) handle, TRUE);
-      CMI_VMI_CHECK_SUCCESS (status, "VMI_Stream_Send()");
-    }
-#else   /* CMK_BROADCAST_SPANNING_TREE */
-    handle->refcount += (_Cmi_numpes - 1);
-    CMI_VMI_AsyncMsgCount += (_Cmi_numpes - 1);
-
-    for (i = 0; i < _Cmi_mype; i++) {
-      status = VMI_Stream_Send ((&CMI_VMI_Processes[i])->connection,
-				bufHandles, addrs, sz, 1,
-				CMI_VMI_Stream_Completion_Handler,
-				(PVOID) handle, TRUE);
-      CMI_VMI_CHECK_SUCCESS (status, "VMI_Stream_Send()");
-    }
-
-    for (i = (_Cmi_mype + 1); i < _Cmi_numpes; i++) {
-      status = VMI_Stream_Send ((&CMI_VMI_Processes[i])->connection,
-				bufHandles, addrs, sz, 1,
-				CMI_VMI_Stream_Completion_Handler,
-				(PVOID) handle, TRUE);
-      CMI_VMI_CHECK_SUCCESS (status, "VMI_Stream_Send()");
-    }
-#endif   /* CMK_BROADCAST_SPANNING_TREE */
-  } else {
-    handle = CMI_VMI_Allocate_Handle ();
-
-    /* Do NOT increment handle->refcount here! */
-    handle->msg = msg;
-    handle->msgsize = msgsize;
-    handle->handle_type = CMI_VMI_HANDLE_TYPE_SEND;
-    handle->data.send.send_handle_type = CMI_VMI_SEND_HANDLE_TYPE_RDMABROAD;
-    handle->data.send.message_disposition = CMI_VMI_MESSAGE_DISPOSITION_FREE;
-    handle->data.send.data.rdmabroad.chunk_size = CMI_VMI_RDMA_Chunk_Size;
-    handle->data.send.data.rdmabroad.bytes_sent = CmiAlloc (_Cmi_numpes *
-							    sizeof (int));
-    handle->data.send.data.rdmabroad.cacheentry = CmiAlloc (_Cmi_numpes *
-					       sizeof (PVMI_CACHE_ENTRY));
-    for (i = 0; i < _Cmi_numpes; i++) {
-      handle->data.send.data.rdmabroad.bytes_sent[i] = 0;
-      handle->data.send.data.rdmabroad.cacheentry[i] = NULL;
-    }
-
-    CMI_VMI_MESSAGE_TYPE (&rendezvous_msg) = CMI_VMI_MESSAGE_TYPE_RENDEZVOUS;
-    rendezvous_msg.rank = _Cmi_mype;
-    rendezvous_msg.msgsize = msgsize;
-    rendezvous_msg.context = (VMI_virt_addr_t) (VMI_ADDR_CAST) handle;
-
-#if CMK_BROADCAST_SPANNING_TREE
-    CMI_SET_BROADCAST_ROOT (&rendezvous_msg, 0);
-#endif
-
-    addrs[0] = (PVOID) &rendezvous_msg;
-    sz[0] = (ULONG) (sizeof (CMI_VMI_Rendezvous_Message_T));
-
-#if CMK_BROADCAST_SPANNING_TREE
-    CMI_SET_BROADCAST_ROOT (msg, (_Cmi_mype + 1));
-
-    childcount = CMI_VMI_Spanning_Children_Count (msg);
-
-    handle->refcount += childcount;
-    CMI_VMI_AsyncMsgCount += childcount;
-
-    startrank = CMI_BROADCAST_ROOT (msg) - 1;
-    for (i = 1; i <= CMI_VMI_BROADCAST_SPANNING_FACTOR; i++) {
-      destrank = _Cmi_mype - startrank;
-
-      if (destrank < 0) {
-	destrank += _Cmi_numpes;
-      }
-
-      destrank = CMI_VMI_BROADCAST_SPANNING_FACTOR * destrank + i;
-
-      if (destrank > (_Cmi_numpes - 1)) {
-	break;
-      }
-
-      destrank += startrank;
-      destrank %= _Cmi_numpes;
-
-      status=VMI_Stream_Send_Inline((&CMI_VMI_Processes[destrank])->connection,
-				    addrs, sz, 1,
-				    sizeof (CMI_VMI_Rendezvous_Message_T));
-      CMI_VMI_CHECK_SUCCESS (status, "VMI_Stream_Send_Inline()");
-    }
-#else   /* CMK_BROADCAST_SPANNING_TREE */
-    handle->refcount += (_Cmi_numpes - 1);
-    CMI_VMI_AsyncMsgCount += (_Cmi_numpes - 1);
-
-    for (i = 0; i < _Cmi_mype; i++) {
-      status = VMI_Stream_Send_Inline ((&CMI_VMI_Processes[i])->connection,
-				       addrs, sz, 1,
-				       sizeof (CMI_VMI_Rendezvous_Message_T));
-      CMI_VMI_CHECK_SUCCESS (status, "VMI_Stream_Send_Inline()");
-    }
-
-    for (i = (_Cmi_mype + 1); i < _Cmi_numpes; i++) {
-      status = VMI_Stream_Send_Inline ((&CMI_VMI_Processes[i])->connection,
-				       addrs, sz, 1,
-				       sizeof (CMI_VMI_Rendezvous_Message_T));
-      CMI_VMI_CHECK_SUCCESS (status, "VMI_Stream_Send_Inline()");
-    }
-#endif   /* CMK_BROADCAST_SPANNING_TREE */
-  }
-}
-
-
-
-/**************************************************************************
-**
-*/
-void CmiSyncBroadcastAllFn (int msgsize, char *msg)
-{
-  char *msgcopy;
-
-
-  DEBUG_PRINT ("CmiSyncBroadcastAllFn() called.\n");
-
-  msgcopy = CmiAlloc (msgsize);
-  memcpy (msgcopy, msg, msgsize);
-  CdsFifo_Enqueue (CpvAccess (CmiLocalQueue), msgcopy);
-
-  CmiSyncBroadcastFn (msgsize, msg);
-}
-
-
-
-/**************************************************************************
-**
-*/
-CmiCommHandle CmiAsyncBroadcastAllFn (int msgsize, char *msg)
-{
-  char *msgcopy;
-
-
-  DEBUG_PRINT ("CmiAsyncBroadcastAllFn() called.\n");
-
-  msgcopy = CmiAlloc (msgsize);
-  memcpy (msgcopy, msg, msgsize);
-  CdsFifo_Enqueue (CpvAccess (CmiLocalQueue), msgcopy);
-
-  return (CmiAsyncBroadcastFn (msgsize, msg));
-}
-
-
-
-/**************************************************************************
-**
-*/
-void CmiFreeBroadcastAllFn (int msgsize, char *msg)
-{
-  char *msgcopy;
-
-
-  DEBUG_PRINT ("CmiFreeBroadcastAllFn() called.\n");
-
-#if CMK_BROADCAST_SPANNING_TREE
-  if (msgsize < CMI_VMI_Small_Message_Boundary) {
-    CmiSyncBroadcastFn (msgsize, msg);
-    CdsFifo_Enqueue (CpvAccess (CmiLocalQueue), msg);
-  } else if (msgsize < CMI_VMI_Medium_Message_Boundary) {
-    msgcopy = CmiAlloc (msgsize);
-    memcpy (msgcopy, msg, msgsize);
-    CdsFifo_Enqueue (CpvAccess (CmiLocalQueue), msgcopy);
-
-    CmiFreeBroadcastFn (msgsize, msg);
-  } else {
-    CmiSyncBroadcastFn (msgsize, msg);
-    CdsFifo_Enqueue (CpvAccess (CmiLocalQueue), msg);
-  }
-#else   /* CMK_BROADCAST_SPANNING_TREE */
-  if (msgsize < CMI_VMI_Medium_Message_Boundary) {
-    msgcopy = CmiAlloc (msgsize);
-    memcpy (msgcopy, msg, msgsize);
-    CdsFifo_Enqueue (CpvAccess (CmiLocalQueue), msgcopy);
-
-    CmiFreeBroadcastFn (msgsize, msg);
-  } else {
-    CmiSyncBroadcastFn (msgsize, msg);
-    CdsFifo_Enqueue (CpvAccess (CmiLocalQueue), msg);
-  }
-#endif   /* CMK_BROADCAST_SPANNING_TREE */
-}
-
-
-
-/**************************************************************************
-**
-*/
-int CmiAllAsyncMsgsSent ()
-{
-  DEBUG_PRINT ("CmiAllAsyncMsgsSent() called.\n");
-
-  return (CMI_VMI_AsyncMsgCount < 1);
-}
-
-
-
-/**************************************************************************
-**
-*/
-int CmiAsyncMsgSent (CmiCommHandle commhandle)
-{
-  CMI_VMI_Handle_T *handle;
-
-
-  DEBUG_PRINT ("CmiAsyncMsgSent() called.\n");
-
-  handle = (CMI_VMI_Handle_T *) commhandle;
-
-  if (handle) {
-    return (handle->refcount <= 2);
-  } else {
-    return (TRUE);
-  }
-}
-
-
-
-/**************************************************************************
-**
-*/
-void CmiReleaseCommHandle (CmiCommHandle commhandle)
-{
-  VMI_STATUS status;
-
-  CMI_VMI_Handle_T *handle;
-
-  int i;
-
-
-  DEBUG_PRINT ("CmiReleaseCommHandle() called.\n");
-
-  handle = (CMI_VMI_Handle_T *) commhandle;
-
-  if (handle) {
-    handle->refcount--;
-
-    if (handle->refcount <= 1) {
-      if (handle->data.send.send_handle_type == 
-	  CMI_VMI_SEND_HANDLE_TYPE_STREAM) {
-	status=VMI_Cache_Deregister (handle->data.send.data.stream.cacheentry);
-	CMI_VMI_CHECK_SUCCESS (status, "VMI_Cache_Deregister()");
-      }
-
-      if (handle->data.send.send_handle_type ==
-	  CMI_VMI_SEND_HANDLE_TYPE_RDMABROAD) {
-	for (i = 0; i < _Cmi_numpes; i++) {
-	  if (handle->data.send.data.rdmabroad.cacheentry[i]) {
-	    status = VMI_Cache_Deregister
-	              (handle->data.send.data.rdmabroad.cacheentry[i]);
-	    CMI_VMI_CHECK_SUCCESS (status, "VMI_Cache_Deregister()");
-	  }
-	}
-
-	CmiFree (handle->data.send.data.rdmabroad.bytes_sent);
-	CmiFree (handle->data.send.data.rdmabroad.cacheentry);
-      }
-
-      if (handle->data.send.message_disposition ==
-	  CMI_VMI_MESSAGE_DISPOSITION_FREE) {
-	CmiFree (handle->msg);
-      }
-
-      handle->refcount = 0;
-    }
-  }
-}
-
-
-
-#if CMK_PERSISTENT_COMM
-/**************************************************************************
-**
-*/
-void CmiPersistentInit ()
-{
-  DEBUG_PRINT ("CmiPersistentInit() called.\n");
-
-  CMI_VMI_Persistent_Request_Handler_ID =
-    CmiRegisterHandler ((CmiHandler) CMI_VMI_Persistent_Request_Handler);
-
-  CMI_VMI_Persistent_Grant_Handler_ID =
-    CmiRegisterHandler ((CmiHandler) CMI_VMI_Persistent_Grant_Handler);
-
-  CMI_VMI_Persistent_Destroy_Handler_ID =
-    CmiRegisterHandler ((CmiHandler) CMI_VMI_Persistent_Destroy_Handler);
-}
-
-
-
-/**************************************************************************
-**
-*/
-PersistentHandle CmiCreatePersistent (int destrank, int maxsize)
-{
-  VMI_STATUS status;
-
-  CMI_VMI_Persistent_Request_Message_T request_msg;
-  CMI_VMI_Handle_T *handle;
-
-  PVOID addrs[1];
-  ULONG sz[1];
-
-
-  DEBUG_PRINT ("CmiCreatePersitsent() called.\n");
-
-  handle = CMI_VMI_Allocate_Handle ();
-
-  handle->msg = NULL;
-  handle->msgsize = -1;
-  handle->handle_type = CMI_VMI_HANDLE_TYPE_SEND;
-  handle->data.send.send_handle_type = CMI_VMI_SEND_HANDLE_TYPE_PERSISTENT;
-  handle->data.send.free_message = FALSE;
-  handle->data.send.data.persistent.ready = 0;
-  handle->data.send.data.persistent.connection =
-                                (&CMI_VMI_Processes[destrank])->connection;
-  handle->data.send.data.persistent.destrank = destrank;
-  handle->data.send.data.persistent.maxsize = maxsize;
-  handle->data.send.data.persistent.remote_buffer = NULL;
-  handle->data.send.data.persistent.rdma_receive_index = -1;
-
-  CMI_VMI_MESSAGE_TYPE (&request_msg) = CMI_VMI_MESSAGE_TYPE_STANDARD;
-  CmiSetHandler (&request_msg, CMI_VMI_Persistent_Request_Handler_ID);
-  request_msg.rank = _Cmi_mype;
-  request_msg.maxsize = maxsize;
-  request_msg.context = (VMI_virt_addr_t) (VMI_ADDR_CAST) handle;
-
-#if CMK_BROADCAST_SPANNING_TREE
-  CMI_SET_BROADCAST_ROOT (&request_msg, 0);
-#endif
-
-  addrs[0] = (PVOID) &request_msg;
-  sz[0] = (ULONG) (sizeof (CMI_VMI_Persistent_Request_Message_T));
-
-  status = VMI_Stream_Send_Inline ((&CMI_VMI_Processes[destrank])->connection,
-		 addrs, sz, 1, sizeof (CMI_VMI_Persistent_Request_Message_T));
-  CMI_VMI_CHECK_SUCCESS (status, "VMI_Stream_Send_Inline()");
-
-  return ((PersistentHandle) handle);
-}
-
-
-
-/**************************************************************************
-**
-*/
-void CmiUsePersistentHandle (PersistentHandle *handle_array, int array_size)
-{
-  DEBUG_PRINT ("CmiUsePersistentHandle() called.\n");
-
-  CMI_VMI_Persistent_Handles = (CMI_VMI_Handle_T *) handle_array;
-  CMI_VMI_Persistent_Handles_Size = array_size;
-}
-
-
-
-/**************************************************************************
-**
-*/
-void CmiDestroyPersistent (PersistentHandle phandle)
-{
-  VMI_STATUS status;
-
-  CMI_VMI_Persistent_Destroy_Message_T destroy_msg;
-  CMI_VMI_Handle_T *handle;
-
-  PVOID addrs[1];
-  ULONG sz[1];
-
-
-  DEBUG_PRINT ("CmiDestroyPersistent() called.\n");
-
-  handle = (CMI_VMI_Handle_T *) phandle;
-
-  CMI_VMI_MESSAGE_TYPE (&destroy_msg) = CMI_VMI_MESSAGE_TYPE_STANDARD;
-  CmiSetHandler (&destroy_msg, CMI_VMI_Persistent_Destroy_Handler_ID);
-  destroy_msg.rdma_receive_index =
-                 handle->data.send.data.persistent.rdma_receive_index;
-
-#if CMK_BROADCAST_SPANNING_TREE
-  CMI_SET_BROADCAST_ROOT (&destroy_msg, 0);
-#endif
-
-  addrs[0] = (PVOID) &destroy_msg;
-  sz[0] = (ULONG) (sizeof (CMI_VMI_Persistent_Destroy_Message_T));
-
-  status = VMI_Stream_Send_Inline(handle->data.send.data.persistent.connection,
-                  addrs, sz, 1, sizeof (CMI_VMI_Persistent_Destroy_Message_T));
-  CMI_VMI_CHECK_SUCCESS (status, "VMI_Stream_Send_Inline()");
-
-  handle->refcount = 0;
-}
-
-
-
-/**************************************************************************
-**
-*/
-void CmiDestroyAllPersistent ()
-{
-  int i;
-
-  CMI_VMI_Handle_T *handle;
-
-
-  DEBUG_PRINT ("CmiDestroyAllPersistent() called.\n");
-
-  for (i = 0; i < CMI_VMI_Maximum_Handles; i++) {
-    handle = &CMI_VMI_Handles[i];
-
-    if ((handle->refcount > 0) &&
-	(handle->handle_type == CMI_VMI_HANDLE_TYPE_SEND) &&
-	(handle->data.send.send_handle_type ==
-	 CMI_VMI_SEND_HANDLE_TYPE_PERSISTENT)) {
-      CmiDestroyPersistent ((PersistentHandle) handle);
-    }
-  }
-}
-#endif   /* CMK_PERSISTENT_COMM */
-
-
-
-#if CMK_PERSISTENT_COMM
-/**************************************************************************
-** This is a Converse handler.
-*/
-void CMI_VMI_Persistent_Request_Handler (char *msg)
-{
-  VMI_STATUS status;
-
-  char *msg2;
-
-  int rank;
-  int maxsize;
-  VMI_virt_addr_t remote_handle_address;
-
-  PVMI_CACHE_ENTRY cacheentry;
-  CMI_VMI_Handle_T *handle;
-
-  CMI_VMI_Persistent_Grant_Message_T grant_msg;
-
-  PVOID addrs[1];
-  ULONG sz[1];
-
-
-  DEBUG_PRINT ("CMI_VMI_Persistent_Request_Handler() called.\n");
-
-  rank = ((CMI_VMI_Persistent_Request_Message_T *) msg)->rank;
-  maxsize = ((CMI_VMI_Persistent_Request_Message_T *) msg)->maxsize;
-  remote_handle_address =
-                   ((CMI_VMI_Persistent_Request_Message_T *) msg)->context;
-
-  CmiFree (msg);
-
-  handle = CMI_VMI_Allocate_Handle ();
-
-  msg2 = (char *) CmiAlloc (maxsize);
-
-  status = VMI_Cache_Register (msg2, maxsize, &cacheentry);
-  CMI_VMI_CHECK_SUCCESS (status, "VMI_Cache_Register()");
-
-  handle->msg = msg2;
-  handle->msgsize = maxsize;
-  handle->handle_type = CMI_VMI_HANDLE_TYPE_RECEIVE;
-  handle->data.receive.receive_handle_type =
-                                      CMI_VMI_RECEIVE_HANDLE_TYPE_PERSISTENT;
-  handle->data.receive.data.persistent.cacheentry = cacheentry;
-  handle->data.receive.data.persistent.remote_handle_address =
-                                                       remote_handle_address;
-
-  status = VMI_RDMA_Publish_Buffer ((&CMI_VMI_Processes[rank])->connection,
-       cacheentry->bufferHandle, (VMI_virt_addr_t) (VMI_ADDR_CAST) msg2,
-       maxsize, remote_handle_address, (UINT32) handle->index);
-  CMI_VMI_CHECK_SUCCESS (status, "VMI_RDMA_Publish_Buffer()");
-
-  CMI_VMI_MESSAGE_TYPE (&grant_msg) = CMI_VMI_MESSAGE_TYPE_STANDARD;
-  CmiSetHandler (&grant_msg, CMI_VMI_Persistent_Grant_Handler_ID);
-  grant_msg.context = (VMI_virt_addr_t) (VMI_ADDR_CAST) remote_handle_address;
-  grant_msg.rdma_receive_index = handle->index;
-
-#if CMK_BROADCAST_SPANNING_TREE
-  CMI_SET_BROADCAST_ROOT (&grant_msg, 0);
-#endif
-
-  addrs[0] = (PVOID) &grant_msg;
-  sz[0] = (ULONG) (sizeof (CMI_VMI_Persistent_Grant_Message_T));
-
-  status = VMI_Stream_Send_Inline ((&CMI_VMI_Processes[rank])->connection,
-	       addrs, sz, 1, sizeof (CMI_VMI_Persistent_Grant_Message_T));
-  CMI_VMI_CHECK_SUCCESS (status, "VMI_Stream_Send_Inline()");
-}
-
-
-
-/**************************************************************************
-** This is a Converse handler.
-*/
-void CMI_VMI_Persistent_Grant_Handler (char *msg)
-{
-  CMI_VMI_Handle_T *handle;
-
-
-  DEBUG_PRINT ("CMI_VMI_Persistent_Grant_Handler() called.\n");
-
-  handle = (CMI_VMI_Handle_T *) (VMI_ADDR_CAST)
-            ((CMI_VMI_Persistent_Grant_Message_T *) msg)->context;
-  handle->data.send.data.persistent.rdma_receive_index =
-            ((CMI_VMI_Persistent_Grant_Message_T *) msg)->rdma_receive_index;
-
-  CmiFree (msg);
-
-  handle->data.send.data.persistent.ready++;
-}
-
-
-
-/**************************************************************************
-** This is a Converse handler.
-*/
-void CMI_VMI_Persistent_Destroy_Handler (char *msg)
-{
-  VMI_STATUS status;
-  int handle_index;
-
-  CMI_VMI_Handle_T *handle;
-
-
-  DEBUG_PRINT ("CMI_VMI_Persistent_Destroy_Handler() called.\n");
-
-  handle_index =
-       ((CMI_VMI_Persistent_Destroy_Message_T *) msg)->rdma_receive_index;
-
-  CmiFree (msg);
-
-  handle = &CMI_VMI_Handles[handle_index];
-
-  CmiFree (handle->msg);
-  CmiFree (handle->data.receive.data.persistent.cacheentry);
-
-  handle->refcount = 0;
-}
-#endif   /* CMK_PERSISTENT_COMM */
-
-
-
-#if CMK_MULTICAST_LIST_USE_SPECIAL_CODE
-/**************************************************************************
-**
-*/
-void CmiSyncListSendFn (int npes, int *pes, int len, char *msg)
-{
-  DEBUG_PRINT ("CmiSyncListSendFn() called.\n");
-
-  CmiError ("ListSend not implemented.");
-}
-
-
-
-/**************************************************************************
-**
-*/
-CmiCommHandle CmiAsyncListSendFn(int npes, int *pes, int len, char *msg)
-{
-  DEBUG_PRINT ("CmiAsyncListSendFn() called.\n");
-
-  CmiError ("ListSend not implemented.");
-  return ((CmiCommHandle) NULL);
-}
-
-
-
-/**************************************************************************
-**
-*/
-void CmiFreeListSendFn (int npes, int *pes, int msgsize, char *msg)
-{
-  VMI_STATUS status;
-
-  CMI_VMI_Handle_T *handle;
-  PVMI_RDMA_OP rdmaop;
-  PVMI_CACHE_ENTRY cacheentry;
-  char *putaddr;
-  int putlen;
-  int i;
-
-
-  DEBUG_PRINT ("CmiFreeListSendFn() called.\n");
-
-  /*
-    NOTE: This code completely ignores pes passed in as a parameter and
-    instead uses the destinations held in the persistent handle array.
-  */
-
-  CmiAssert (npes == CMI_VMI_Persistent_Handles_Size);
-
-  status = VMI_Cache_Register (msg, msgsize, &cacheentry);
-  CMI_VMI_CHECK_SUCCESS (status, "VMI_Cache_Register()");
-
-  for (i = 0; i < CMI_VMI_Persistent_Handles_Size; i++) {
-    handle = &CMI_VMI_Persistent_Handles[i];
-
-    // WARNING: Check the use of refcount in this code!!
-
-    handle->refcount++;
-    handle->msg = msg;
-    handle->msgsize = msgsize;
-
-    handle->data.send.data.persistent.cacheentry = cacheentry;
-
-    status = VMI_RDMA_Alloc_Op (&rdmaop);
-    CMI_VMI_CHECK_SUCCESS (status, "VMI_RDMA_Alloc_Op()");
-
-    rdmaop->numBufs = 1;
-    rdmaop->buffers[0] = cacheentry->bufferHandle;
-    rdmaop->addr[0] = msg;
-    rdmaop->sz[0] = msgsize;
-    rdmaop->rbuffer = handle->data.send.data.persistent.remote_buffer;
-    rdmaop->roffset = 0;
-
-    CMI_VMI_AsyncMsgCount++;
-
-    status = VMI_RDMA_Put (handle->data.send.data.persistent.connection,
-			                         rdmaop, (PVOID) handle,
-	        (VMIRDMAWriteComplete) CMI_VMI_RDMA_Completion_Handler);
-    CMI_VMI_CHECK_SUCCESS (status, "VMI_RDMA_Put()");
-
-    while (handle->refcount > 1) {
-      sched_yield ();
-      status = VMI_Poll ();
-      CMI_VMI_CHECK_SUCCESS (status, "VMI_Poll()");
-    }
   }
 
-  status = VMI_Cache_Deregister (cacheentry);
-  CMI_VMI_CHECK_SUCCESS (status, "VMI_Cache_Deregister()");
+  handle->msg = msg;
+  handle->msgsize = msgsize;
+  handle->data.send.message_disposition = CMI_VMI_MESSAGE_DISPOSITION_FREE;
+  handle->data.send.data.eager_long.cacheentry = cacheentry;
 
-  CmiFree (msg);
+  status = VMI_RDMA_Alloc_Op (&rdmaop);
+  CMI_VMI_CHECK_SUCCESS (status, "VMI_RDMA_Alloc_Op()");
+
+  rdmaop->numBufs = 1;
+  rdmaop->buffers[0] = cacheentry->bufferHandle;
+  rdmaop->addr[0] = handle->msg;
+  rdmaop->sz[0] = msgsize;
+  rdmaop->rbuffer = handle->data.send.data.eager_long.remote_buffer;
+  rdmaop->roffset = 0;
+  rdmaop->notify = TRUE;
+
+  CMI_VMI_AsyncMsgCount += 1;
+  /* Do NOT increment handle->refcount here! */
+
+  status = VMI_RDMA_Put (process->connection, rdmaop, (PVOID) handle, (VMIRDMACompleteNotification) CMI_VMI_RDMA_Put_Completion_Handler);
+  CMI_VMI_CHECK_SUCCESS (status, "VMI_RDMA_Put()");
 }
-#endif
-
-
-
-/**************************************************************************
-**
-*/
-CMI_VMI_Handle_T *CMI_VMI_Allocate_Handle ()
-{
-  VMI_STATUS status;
-
-  int i;
-  int j;
-
-
-  DEBUG_PRINT ("CMI_VMI_Allocate_Handle() called.\n");
-
-  i = CMI_VMI_Next_Handle;
-  j = CMI_VMI_Next_Handle;
-  while ((&CMI_VMI_Handles[i])->refcount > 0) {
-    i++;
-
-    if (i >= CMI_VMI_Maximum_Handles) {
-      i = 0;
-    }
-
-    if (i == j) {
-      i = CMI_VMI_Maximum_Handles;
-      CMI_VMI_Maximum_Handles *= 2;
-      CMI_VMI_Handles = (CMI_VMI_Handle_T *) realloc (CMI_VMI_Handles,
-		 CMI_VMI_Maximum_Handles * sizeof (CMI_VMI_Handle_T));
-      for (j = i; j < CMI_VMI_Maximum_Handles; j++) {
-	(&CMI_VMI_Handles[j])->index = j;
-	(&CMI_VMI_Handles[j])->refcount = 0;
-      }
-    }
-  }
-
-  (&CMI_VMI_Handles[i])->refcount = 1;
-  CMI_VMI_Next_Handle = (i + 1);
-  if (CMI_VMI_Next_Handle >= CMI_VMI_Maximum_Handles) {
-    CMI_VMI_Next_Handle = 0;
-  }
-
-  return (&CMI_VMI_Handles[i]);
-}
-
-
-
-#if CMI_VMI_USE_MEMORY_POOL
-/**************************************************************************
-**
-*/
-void *CMI_VMI_CmiAlloc (int size)
-{
-  VMI_STATUS status;
-
-  void *ptr;
-
-
-  DEBUG_PRINT ("CMI_VMI_CmiAlloc() (memory pool version) called.\n");
-
-  if (size < CMI_VMI_BUCKET1_SIZE) {
-    status = VMI_Pool_Allocate_Buffer (CMI_VMI_Bucket1_Pool, &ptr, NULL);
-    CMI_VMI_CHECK_SUCCESS (status, "VMI_Pool_Allocate_Buffer()");
-  } else if (size < CMI_VMI_BUCKET2_SIZE) {
-    status = VMI_Pool_Allocate_Buffer (CMI_VMI_Bucket2_Pool, &ptr, NULL);
-    CMI_VMI_CHECK_SUCCESS (status, "VMI_Pool_Allocate_Buffer()");
-  } else if (size < CMI_VMI_BUCKET3_SIZE) {
-    status = VMI_Pool_Allocate_Buffer (CMI_VMI_Bucket3_Pool, &ptr, NULL);
-    CMI_VMI_CHECK_SUCCESS (status, "VMI_Pool_Allocate_Buffer()");
-  } else if (size < CMI_VMI_BUCKET4_SIZE) {
-    status = VMI_Pool_Allocate_Buffer (CMI_VMI_Bucket4_Pool, &ptr, NULL);
-    CMI_VMI_CHECK_SUCCESS (status, "VMI_Pool_Allocate_Buffer()");
-  } else if (size < CMI_VMI_BUCKET5_SIZE) {
-    status = VMI_Pool_Allocate_Buffer (CMI_VMI_Bucket5_Pool, &ptr, NULL);
-    CMI_VMI_CHECK_SUCCESS (status, "VMI_Pool_Allocate_Buffer()");
-  } else {
-    ptr = malloc (size);
-  }
-
-  return (ptr);
-}
-
-
-
-/**************************************************************************
-**
-*/
-void CMI_VMI_CmiFree (void *ptr)
-{
-  VMI_STATUS status;
-
-  int size;
-
-
-  DEBUG_PRINT ("CMI_VMI_CmiFree() (memory pool version) called.\n");
-
-  size = (((int *) ptr)[0]) + sizeof (int) + sizeof (int);
-
-  if (size < CMI_VMI_BUCKET1_SIZE) {
-    status = VMI_Pool_Deallocate_Buffer (CMI_VMI_Bucket1_Pool, ptr);
-    CMI_VMI_CHECK_SUCCESS (status, "VMI_Pool_Deallocate_Buffer()");
-  } else if (size < CMI_VMI_BUCKET2_SIZE) {
-    status = VMI_Pool_Deallocate_Buffer (CMI_VMI_Bucket2_Pool, ptr);
-    CMI_VMI_CHECK_SUCCESS (status, "VMI_Pool_Deallocate_Buffer()");
-  } else if (size < CMI_VMI_BUCKET3_SIZE) {
-    status = VMI_Pool_Deallocate_Buffer (CMI_VMI_Bucket3_Pool, ptr);
-    CMI_VMI_CHECK_SUCCESS (status, "VMI_Pool_Deallocate_Buffer()");
-  } else if (size < CMI_VMI_BUCKET4_SIZE) {
-    status = VMI_Pool_Deallocate_Buffer (CMI_VMI_Bucket4_Pool, ptr);
-    CMI_VMI_CHECK_SUCCESS (status, "VMI_Pool_Deallocate_Buffer()");
-  } else if (size < CMI_VMI_BUCKET5_SIZE) {
-    status = VMI_Pool_Deallocate_Buffer (CMI_VMI_Bucket5_Pool, ptr);
-    CMI_VMI_CHECK_SUCCESS (status, "VMI_Pool_Deallocate_Buffer()");
-  } else {
-    free (ptr);
-  }
-}
-#else   /* CMI_VMI_USE_MEMORY_POOL */
-/**************************************************************************
-**
-*/
-void *CMI_VMI_CmiAlloc (int size)
-{
-  DEBUG_PRINT ("CMI_VMI_CmiAlloc() (simple version) called.\n");
-
-  return (malloc (size));
-}
-
-
-
-/**************************************************************************
-**
-*/
-void CMI_VMI_CmiFree (void *ptr)
-{
-  DEBUG_PRINT ("CMI_VMI_CmiFree() (simple version) called.\n");
-
-  free (ptr);
-}
-#endif   /* CMI_VMI_USE_MEMORY_POOL */
 
 
 
@@ -3988,8 +4418,7 @@ SOCKET createSocket(char *hostName, int port, int *localAddr)
 /**************************************************************************
 **
 */
-BOOLEAN CRMRegister (char *key, ULONG numPE, int shutdownPort,
-		     SOCKET *clientSock, int *clientAddr, PCRM_Msg *msg2)
+BOOLEAN CRMRegister (char *key, ULONG numPE, int shutdownPort, SOCKET *clientSock, int *clientAddr, PCRM_Msg *msg2)
 {
   PCRM_Msg msg;
   int bytes;
@@ -4025,8 +4454,10 @@ BOOLEAN CRMRegister (char *key, ULONG numPE, int shutdownPort,
 
   /* Send the Register message to the CRM. */
   bsend = ((sizeof (int) * 4) + strlen (key));
-  bytes = CRMSend(*clientSock, (char *) &msg -> msgCode, sizeof(int));
-  bytes += CRMSend(*clientSock, (char *) &msg -> msg.CRMReg.np, bsend - 4);
+  bytes = CMI_VMI_Socket_Send (*clientSock, (char *) &msg -> msgCode,
+			       sizeof (int));
+  bytes += CMI_VMI_Socket_Send (*clientSock, (char *) &msg -> msg.CRMReg.np,
+				bsend - 4);
 
   if (bytes != bsend)
   {
@@ -4034,7 +4465,7 @@ BOOLEAN CRMRegister (char *key, ULONG numPE, int shutdownPort,
   }
   
   /* Receive the return code from the CRM. */
-  bytes = CRMRecv (*clientSock, (char *) msg, sizeof (int));
+  bytes = CMI_VMI_Socket_Receive (*clientSock, (void *) msg, sizeof (int));
   if (bytes == SOCKET_ERROR)
   {
     goto sockError;
@@ -4047,7 +4478,8 @@ BOOLEAN CRMRegister (char *key, ULONG numPE, int shutdownPort,
   {
     case CRM_MSG_SUCCESS:
       /* Get the number of processors. */
-      bytes = CRMRecv (*clientSock, (char *) &bsend, sizeof (int));
+      bytes = CMI_VMI_Socket_Receive (*clientSock, (void *) &bsend,
+				      sizeof (int));
       if (bytes == SOCKET_ERROR)
       {
 	goto sockError;
@@ -4059,8 +4491,8 @@ BOOLEAN CRMRegister (char *key, ULONG numPE, int shutdownPort,
       /* Get the block of nodeCtx's. */
       msg->msg.CRMCtx.node = (struct nodeCtx *) malloc (sizeof (nodeCtx) *
 							msg->msg.CRMCtx.np);
-      bytes = CRMRecv (*clientSock,
-		       (char *) msg->msg.CRMCtx.node,
+      bytes = CMI_VMI_Socket_Receive (*clientSock,
+		       (void *) msg->msg.CRMCtx.node,
 		       sizeof (nodeCtx) * msg->msg.CRMCtx.np);
       if (bytes == SOCKET_ERROR)
       {
@@ -4071,7 +4503,8 @@ BOOLEAN CRMRegister (char *key, ULONG numPE, int shutdownPort,
       break;
 
     case CRM_MSG_FAILED:
-      bytes = CRMRecv (*clientSock, (char *) &msg->msg.CRMErr, sizeof(errMsg));
+      bytes = CMI_VMI_Socket_Receive (*clientSock, (void *) &msg->msg.CRMErr,
+				      sizeof (errMsg));
       if (bytes == SOCKET_ERROR)
       {
 	goto sockError;
@@ -4127,8 +4560,7 @@ sockError:
 /**************************************************************************
 **
 */
-BOOLEAN CRMParseMsg (PCRM_Msg msg, int rank, int *nodeIP,
-		     int *shutdownPort, int *nodePE)
+BOOLEAN CRMParseMsg (PCRM_Msg msg, int rank, int *nodeIP, int *shutdownPort, int *nodePE)
 {
   PNodeCtx msgRank;
 
@@ -4152,66 +4584,6 @@ BOOLEAN CRMParseMsg (PCRM_Msg msg, int rank, int *nodeIP,
   *nodePE = (int) ntohl ((u_long) msgRank->nodePE);
 
   return TRUE;
-}
-
-
-
-/**************************************************************************
-**
-*/
-int CRMSend (SOCKET s, char *msg, int n)
-{
-  int sent;
-  int bsent;
-
-
-  DEBUG_PRINT ("CRMSend() called.\n");
-  
-  sent = 0;
-  while (sent < n)
-  {
-    bsent = send (s, (const void *) (msg + sent), (n - sent), 0);
-    if (bsent < 0)
-    {
-      return bsent;
-    }
-    else
-    {
-      sent += bsent;
-    }
-  }
-
-  return sent;
-}
-
-
-
-/**************************************************************************
-**
-*/
-int CRMRecv (SOCKET s, char *msg, int n)
-{
-  int recvd;
-  int brecv;
-
-
-  DEBUG_PRINT ("CRMRecv() called.\n");
-
-  recvd = 0;
-  while (recvd < n)
-  {
-    brecv = recv (s, (void *) (msg + recvd), (n - recvd), 0);
-    if (brecv < 0)
-    {
-      return brecv;
-    }
-    else
-    {
-      recvd += brecv;
-    }
-  }
-
-  return recvd;
 }
 
 /*@}*/
