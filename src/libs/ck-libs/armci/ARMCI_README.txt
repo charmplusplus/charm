@@ -21,6 +21,11 @@ Following is a list of implemented (and yet-to-implement) functions.
 int ARMCI_Procs(int *procs);
 int ARMCI_Myid(int *myid);
 
+void ARMCI_Migrate(void);
+void ARMCI_Async_Migrate(void);
+void ARMCI_Checkpoint(char* dirname);
+void ARMCI_MemCheckpoint(void);
+
 int ARMCI_Init(void);
 int ARMCI_Finalize(void);
 void ARMCI_Error(char *msg, int code);
@@ -54,11 +59,6 @@ int armci_notify(int proc);
 int armci_notify_wait(int proc, int *pval);
 
 /* Functions yet to implement */
-void ARMCI_Migrate(void);
-void ARMCI_Async_Migrate(void);
-void ARMCI_Checkpoint(char* dirname);
-void ARMCI_MemCheckpoint(void);
-
 int ARMCI_GetV(...);
 int ARMCI_NbGetV(...);
 int ARMCI_PutV(...);
