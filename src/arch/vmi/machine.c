@@ -3043,6 +3043,8 @@ void *CMI_VMI_CmiAlloc (int request_size)
 */
 void CMI_VMI_CmiFree (void *ptr)
 {
+  VMI_STATUS status;
+
   int size;
 
   void *context;
@@ -3054,6 +3056,12 @@ void CMI_VMI_CmiFree (void *ptr)
   int sender_rank;
   int credits_temp;
   int index;
+
+  PVMI_CACHE_ENTRY cacheentry;
+  char *publish_buffer;
+  int buffer_size;
+
+  CMI_VMI_Publish_Message_T publish_msg;
 
 
   DEBUG_PRINT ("CMI_VMI_CmiFree() (simple version) called.\n");
