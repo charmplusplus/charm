@@ -289,10 +289,12 @@ int armci_notify(int proc);
 /* 1 */
 int armci_notify_wait(int proc, int *pval);
 
-/* this is highly platform specific and I don't think it needs to be
-   included. */
-/* extern void ARMCI_Set_shm_limit(unsigned long shmemlimit); */
-/* extern int ARMCI_Uses_shm(); */
+/***********************************/
+/* ARMCI Virtualization extensions */
+void ARMCI_Migrate(void);
+void ARMCI_Async_Migrate(void);
+void ARMCI_Checkpoint(char* dirname);
+void ARMCI_MemCheckpoint(void);
 
 #ifdef __cplusplus
 };

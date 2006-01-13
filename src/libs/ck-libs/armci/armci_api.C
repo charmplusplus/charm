@@ -386,4 +386,24 @@ CDECL int armci_notify_wait(int proc, int *pval){
   return 0;
 }
 
+CDECL void ARMCI_Migrate(void){
+  TCHARM_API_TRACE("ARMCI_Migrate", "armci");
+  TCHARM_Migrate();
+}
+CDECL void ARMCI_Async_Migrate(void){
+  TCHARM_API_TRACE("ARMCI_Async_Migrate", "armci");
+  TCHARM_Async_Migrate();
+}
+CDECL void ARMCI_Checkpoint(char* dname){
+  TCHARM_API_TRACE("ARMCI_Checkpoint", "armci");
+  ARMCI_Barrier();
+  ArmciVirtualProcessor *vp = CtvAccess(_armci_ptr);
+  vp->startCheckpoint(dname);
+}
+CDECL void ARMCI_MemCheckpoint(void){
+  TCHARM_API_TRACE("ARMCI_MemCheckpoint", "armci");
+  ARMCI_Barrier();
+  ArmciVirtualProcessor *vp = CtvAccess(_armci_ptr);
+  vp->startCheckpoint("");
+}
 

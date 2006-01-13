@@ -1,4 +1,3 @@
-OPTS=-g
 CDIR=../../../..
 CHARMC=$(CDIR)/bin/charmc
 
