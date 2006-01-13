@@ -170,6 +170,14 @@ typedef struct CthThreadBase
   struct CthThreadListener *listener; /* pointer to the first of the listeners */
 } CthThreadBase;
 
+/* By default, there are no flags */
+static int CmiThreadIs_flag=0;
+
+int CmiThreadIs(int flag)
+{
+	return (CmiThreadIs_flag&flag)==flag;
+}
+
 /*Macros to convert between base and specific thread types*/
 #define B(t) ((CthThreadBase *)(t))
 #define S(t) ((CthThread)(t))
@@ -768,6 +776,8 @@ void CthInit(char **argv)
   sp = QT_SP(switchbuf, SWITCHBUF_SIZE);
   sp = QT_ARGS(sp,0,0,0,(qt_only_t*)CthDummy);
   p->switchbuf_sp = sp;
+
+  CmiThreadIs_flag |= CMI_THREAD_IS_STACKCOPY;
 }
 
 static void CthOnly(CthThread t, void *dum1, void *dum2)
@@ -934,6 +944,7 @@ void CthInit(char **argv)
   t->fiber = ConvertThreadToFiber(t);
   _MEMCHECK(t->fiber);
 
+  CmiThreadIs_flag |= CMI_THREAD_IS_FIBERS;
 }
 
 void CthThreadFree(CthThread old)
@@ -1114,6 +1125,8 @@ void CthInit(char **argv)
   CthCpvAccess(CthCurrent)=t;
   CthThreadInit(t);
   t->self = pthread_self();
+
+  CmiThreadIs_flag |= CMI_THREAD_IS_PTHREADS;
 }
 
 void CthFree(t)
@@ -1283,6 +1296,11 @@ void CthInit(char **argv)
 #ifdef MINSIGSTKSZ
   if (CthCpvAccess(_defaultStackSize) < MINSIGSTKSZ) 
     CthCpvAccess(_defaultStackSize) = MINSIGSTKSZ;
+#endif
+#if CMK_THREADS_USE_CONTEXT
+  CmiThreadIs_flag |= CMI_THREAD_IS_CONTEXT;
+#else
+  CmiThreadIs_flag |= CMI_THREAD_IS_UJCONTEXT;
 #endif
 }
 
@@ -1499,6 +1517,12 @@ void CthInit(char **argv)
   mainThread=CthThreadInit();
   CthCpvAccess(CthCurrent)=mainThread;
   /* mainThread->base.suspendable=0;*/ /*Can't suspend main thread (trashes Quickthreads jump buffer)*/
+
+#if CMK_THREADS_ALIAS_STACK
+  CmiThreadIs_flag |= CMI_THREAD_IS_QT_ALIAS;
+#else
+  CmiThreadIs_flag |= CMI_THREAD_IS_QT;
+#endif
 }
 
 void CthFree(CthThread t)

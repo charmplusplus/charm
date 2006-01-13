@@ -531,6 +531,15 @@ CMK_TYPEDEF_UINT8 CmiMemoryUsage();
 #define CMI_MEMORY_IS_PARANOID (1<<2)
 int CmiMemoryIs(int flag); /* return state of this flag */
 
+#define CMI_THREAD_IS_QT         (1<<1)
+#define CMI_THREAD_IS_CONTEXT    (1<<2)
+#define CMI_THREAD_IS_UJCONTEXT  (1<<3)
+#define CMI_THREAD_IS_PTHREADS   (1<<4)
+#define CMI_THREAD_IS_FIBERS     (1<<5)
+#define CMI_THREAD_IS_QT_ALIAS   (1<<6)
+#define CMI_THREAD_IS_STACKCOPY  (1<<7)
+int CmiThreadIs(int flag); /* return state of this flag */
+
 void CmiMkdir(const char *dirName);
 
 double   CmiCpuTimer(void);
