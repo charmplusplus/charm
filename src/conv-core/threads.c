@@ -1611,7 +1611,11 @@ CthThread CthPup(pup_er p, CthThread t)
   if (pup_isUnpacking(p)) {
 	  t=CthThreadInit();
   }
+#if CMK_THREADS_ALIAS_STACK
+  CthPupBase(p,&t->base,0);
+#else
   CthPupBase(p,&t->base,1);
+#endif
   
   /*Pup the stack pointer as bytes-- this works because stack is migratable*/
   pup_bytes(p,&t->stackp,sizeof(t->stackp));
