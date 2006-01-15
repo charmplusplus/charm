@@ -373,9 +373,9 @@ static void CthThreadBaseInit(CthThreadBase *th)
   __pthread_find_self_with_pid=1;
   __pthread_nonstandard_stacks=1;
 #endif
-	th->token = (CthThreadToken *)malloc(sizeof(CthThreadToken));
-	th->token->thread = S(th);
-	th->scheduled = 0;
+  th->token = (CthThreadToken *)malloc(sizeof(CthThreadToken));
+  th->token->thread = S(th);
+  th->scheduled = 0;
 
   th->awakenfn = 0;
   th->choosefn = 0;
@@ -1302,6 +1302,9 @@ void CthInit(char **argv)
 #else
   CmiThreadIs_flag |= CMI_THREAD_IS_UJCONTEXT;
 #endif
+#if CMK_THREADS_ALIAS_STACK
+  CmiThreadIs_flag |= CMI_THREAD_IS_ALIAS;
+#endif
 }
 
 static void CthThreadFree(CthThread t)
@@ -1433,7 +1436,11 @@ CthThread CthPup(pup_er p, CthThread t)
 	  _MEMCHECK(t);
 	  CthThreadInit(t);
   }
+#if CMK_THREADS_ALIAS_STACK
+  CthPupBase(p,&t->base,0);
+#else
   CthPupBase(p,&t->base,1);
+#endif
   
   /*Pup the processor context as bytes-- this is not guarenteed to work!*/
   pup_bytes(p,&t->context,sizeof(t->context));
@@ -1518,10 +1525,9 @@ void CthInit(char **argv)
   CthCpvAccess(CthCurrent)=mainThread;
   /* mainThread->base.suspendable=0;*/ /*Can't suspend main thread (trashes Quickthreads jump buffer)*/
 
-#if CMK_THREADS_ALIAS_STACK
-  CmiThreadIs_flag |= CMI_THREAD_IS_QT_ALIAS;
-#else
   CmiThreadIs_flag |= CMI_THREAD_IS_QT;
+#if CMK_THREADS_ALIAS_STACK
+  CmiThreadIs_flag |= CMI_THREAD_IS_ALIAS;
 #endif
 }
 

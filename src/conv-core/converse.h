@@ -536,7 +536,7 @@ int CmiMemoryIs(int flag); /* return state of this flag */
 #define CMI_THREAD_IS_UJCONTEXT  (1<<3)
 #define CMI_THREAD_IS_PTHREADS   (1<<4)
 #define CMI_THREAD_IS_FIBERS     (1<<5)
-#define CMI_THREAD_IS_QT_ALIAS   (1<<6)
+#define CMI_THREAD_IS_ALIAS      (1<<6)
 #define CMI_THREAD_IS_STACKCOPY  (1<<7)
 int CmiThreadIs(int flag); /* return state of this flag */
 
