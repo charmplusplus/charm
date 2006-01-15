@@ -307,7 +307,10 @@ MEMLIBS=$(L)/libmemory-default.o $(L)/libmemory-os.o $(L)/libmemory-gnu.o \
 THREADLIBS=$(L)/libthreads-default.o $(L)/libthreads-qt.o 	\
 	  $(L)/libthreads-context.o $(L)/libthreads-uJcontext.o \
 	  $(L)/libthreads-pthreads.o $(L)/libthreads-fibers.o \
-	  $(L)/libthreads-stackcopy.o $(L)/libthreads-memoryalias.o 
+	  $(L)/libthreads-stackcopy.o $(L)/libthreads-memoryalias.o \
+          $(L)/libthreads-qt-memoryalias.o	\
+          $(L)/libthreads-context-memoryalias.o	\
+   	  $(L)/libthreads-uJcontext-memoryalias.o
 
 CVLIBS=$(L)/libconv-core.a \
 	$(L)/libconv-cplus-y.a $(L)/libconv-cplus-n.a \
@@ -526,7 +529,16 @@ $(L)/libthreads-stackcopy.o: threads.c $(CVHEADERS)
 	-$(CHARMC) -o $@ -DCMK_THREADS_BUILD_STACKCOPY=1 -IQuickThreads threads.c || touch $@
 
 $(L)/libthreads-memoryalias.o: threads.c $(CVHEADERS)
+	-$(CHARMC) -o $@ -DCMK_THREADS_ALIAS_STACK=1 -DCMK_THREADS_BUILD_DEFAULT=1 -IQuickThreads threads.c || touch $@
+
+$(L)/libthreads-qt-memoryalias.o: threads.c $(CVHEADERS)
 	-$(CHARMC) -o $@ -DCMK_THREADS_ALIAS_STACK=1 -DCMK_THREADS_BUILD_QT=1 -IQuickThreads threads.c || touch $@
+
+$(L)/libthreads-context-memoryalias.o: threads.c $(CVHEADERS)
+	-$(CHARMC) -o $@ -DCMK_THREADS_ALIAS_STACK=1 -DCMK_THREADS_BUILD_CONTEXT=1 -IQuickThreads threads.c || touch $@
+
+$(L)/libthreads-uJcontext-memoryalias.o: threads.c $(CVHEADERS)
+	-$(CHARMC) -o $@ -DCMK_THREADS_ALIAS_STACK=1 -DCMK_THREADS_BUILD_JCONTEXT=1 -IQuickThreads -I. threads.c || touch $@
 
 ## Global swapping (-swapglobal)
 swapglobal-target: $(L)/libglobal-swap.o
