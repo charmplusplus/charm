@@ -681,7 +681,7 @@ FDECL int FTN_NAME(TCHARM_NUM_ELEMENTS,tcharm_num_elements)(void)
 static void checkAddress(void *data)
 {
 	if (tcharm_nomig||tcharm_nothreads) return; //Stack is not isomalloc'd
-	if (CmiThreadIs(CMI_THREAD_IS_QT_ALIAS)) return; // memory alias thread
+	if (CmiThreadIs(CMI_THREAD_IS_ALIAS)) return; // memory alias thread
 	if (!CmiIsomallocInRange(data))
 	    CkAbort("The UserData you register must be allocated on the stack!\n");
 }
