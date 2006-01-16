@@ -9,6 +9,9 @@
 /* bproc version */
 #undef CMK_BPROC_VERSION
 
+/* whether ucontext has pointer */
+#undef CMK_CONTEXT_FPU_POINTER
+
 /* C++ *_casts<> does not work */
 #undef CMK_CPP_CAST_ILLEGAL
 

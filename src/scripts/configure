@@ -1465,6 +1465,18 @@ cat >>confdefs.h <<_ACEOF
 _ACEOF
 
 
+#### Check ucontext and FPU pointer ####
+cat > $t <<EOT
+#include <ucontext.h>
+fpregset_t *fp;
+EOT
+test_cxx "whether ucontext has FPU pointer" "yes" "no" ""
+
+cat >>confdefs.h <<_ACEOF
+#define CMK_CONTEXT_FPU_POINTER $pass
+_ACEOF
+
+
 ###################### C++ Compiler Features #####################
 
 #### check explicit ####
