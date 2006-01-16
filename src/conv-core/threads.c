@@ -209,7 +209,11 @@ CthThreadToken *CthGetToken(CthThread t){
 #endif
 
 /** Address to map all migratable thread stacks to. */
+#if CMK_IA64
+#define CMK_THREADS_ALIAS_LOCATION   ((void *)0x6000000000000000)
+#else
 #define CMK_THREADS_ALIAS_LOCATION ((void *)0xb0000000)
+#endif
 
 #if CMK_THREADS_ALIAS_STACK
 #include <stdlib.h> /* for mkstemp */
@@ -557,10 +561,10 @@ void CthSetStrategy(CthThread t, CthAwkFn awkfn, CthThFn chsfn)
 static void CthBaseResume(CthThread t)
 {
 	
-	struct CthThreadListener *l;
-	for(l=B(t)->listener;l!=NULL;l=l->next){
-			l->resume(l);
-	}
+  struct CthThreadListener *l;
+  for(l=B(t)->listener;l!=NULL;l=l->next){
+	l->resume(l);
+  }
   CpvAccess(_numSwitches)++;
   CthFixData(t); /*Thread-local storage may have changed in other thread.*/
   CthCpvAccess(CthCurrent) = t;
@@ -1436,13 +1440,11 @@ CthThread CthPup(pup_er p, CthThread t)
 	  _MEMCHECK(t);
 	  CthThreadInit(t);
   }
-#if CMK_THREADS_ALIAS_STACK
-  CthPupBase(p,&t->base,0);
-#else
   CthPupBase(p,&t->base,1);
-#endif
   
   /*Pup the processor context as bytes-- this is not guarenteed to work!*/
+  /* so far, context and context-memoryalias works for IA64, not ia32 */
+  /* so far, uJcontext and context-memoryalias works for IA32, not ia64 */
   pup_bytes(p,&t->context,sizeof(t->context));
   if (pup_isDeleting(p)) {
 	  CthFree(t);
