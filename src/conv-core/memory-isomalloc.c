@@ -26,7 +26,7 @@ CpvStaticDeclare(CmiIsomallocBlockList *,isomalloc_blocklist);
 
 static void meta_init(char **argv)
 {
-	CmiMemoryIs_flag|=CMI_MEMORY_IS_ISOMALLOC;
+   CmiMemoryIs_flag|=CMI_MEMORY_IS_ISOMALLOC;
    CpvInitialize(CmiIsomallocBlockList *,isomalloc_blocklist);
 }
 

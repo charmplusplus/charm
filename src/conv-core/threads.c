@@ -1446,6 +1446,14 @@ CthThread CthPup(pup_er p, CthThread t)
   /* so far, context and context-memoryalias works for IA64, not ia32 */
   /* so far, uJcontext and context-memoryalias works for IA32, not ia64 */
   pup_bytes(p,&t->context,sizeof(t->context));
+#if !CMK_THREADS_USE_JCONTEXT && CMK_CONTEXT_FPU_POINTER
+    /* context is not portable for ia32 due to pointer in uc_mcontext.fpregs,
+       pup it separately */
+  if (pup_isUnpacking(p)) {
+      t->context.uc_mcontext.fpregs = malloc(sizeof(fpregset_t));
+  }
+  pup_bytes(p,t->context.uc_mcontext.fpregs,sizeof(fpregset_t));
+#endif
   if (pup_isDeleting(p)) {
 	  CthFree(t);
 	  return 0;
