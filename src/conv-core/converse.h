@@ -968,11 +968,11 @@ void CmiIsomallocBlockListFree(void *doomedMallocedBlock);
 
 typedef struct CthThreadStruct *CthThread;
 typedef struct {
-	/*Start with a message header so threads can be enqueued 
+  /*Start with a message header so threads can be enqueued 
     as messages (e.g., by CthEnqueueNormalThread in convcore.c)
   */
   char cmicore[CmiMsgHeaderSizeBytes];
-	CthThread thread;
+  CthThread thread;
 } CthThreadToken;
 
 CthThreadToken *CthGetToken(CthThread);
