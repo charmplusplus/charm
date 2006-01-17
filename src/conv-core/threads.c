@@ -204,6 +204,7 @@ CthThreadToken *CthGetToken(CthThread t){
       running on.  The usual Charm approach of switching to the 
       (non-migratable) scheduler thread on context switch works fine.
 */
+
 #ifndef CMK_THREADS_ALIAS_STACK
 #define CMK_THREADS_ALIAS_STACK 0
 #endif
@@ -212,7 +213,7 @@ CthThreadToken *CthGetToken(CthThread t){
 #if CMK_IA64
 #define CMK_THREADS_ALIAS_LOCATION   ((void *)0x6000000000000000)
 #else
-#define CMK_THREADS_ALIAS_LOCATION ((void *)0xb0000000)
+#define CMK_THREADS_ALIAS_LOCATION   ((void *)0xb0000000)
 #endif
 
 #if CMK_THREADS_ALIAS_STACK
@@ -225,7 +226,7 @@ CthThreadToken *CthGetToken(CthThread t){
 int CthAliasCreate(int stackSize)
 {
   /* Make a file to contain thread stack */
-  char tmpName[1024];
+  char tmpName[128];
   char lastByte=0;
   int fd;
   sprintf(tmpName,"/tmp/charmThreadStackXXXXXX");
@@ -274,6 +275,9 @@ void CthAliasEnable(CthThreadBase *t) {
 	/* Linux mmap flag MAP_POPULATE, to pre-fault in all the pages,
 	   only seems to slow down overall performance. */
 	/* Linux mmap flag MAP_GROWSDOWN is rejected at runtime under 2.4.25 */
+#if CMK_AIX
+        if (_curMappedStack) munmap(_curMappedStack->stack,_curMappedStack->stacksize);
+#endif
 	s=mmap(t->stack,t->stacksize,
 		PROT_READ|PROT_WRITE|PROT_EXEC, /* exec for gcc nested function thunks */
 		flags, t->aliasStackHandle,0);
