@@ -8,6 +8,7 @@
 #ifndef _CONV_MACH_H
 #define _CONV_MACH_H
 
+#define CMK_OSF1                                           1
 
 #define CMK_ASYNC_NOT_NEEDED                               0
 #define CMK_ASYNC_USE_FIOASYNC_AND_FIOSETOWN               0
