@@ -1453,6 +1453,10 @@ CthThread CthPup(pup_er p, CthThread t)
       t->context.uc_mcontext.fpregs = malloc(sizeof(fpregset_t));
   }
   pup_bytes(p,t->context.uc_mcontext.fpregs,sizeof(fpregset_t));
+#else
+  if (pup_isUnpacking(p)) {
+      t->context.uc_link = 0;
+  }
 #endif
   if (pup_isDeleting(p)) {
 	  CthFree(t);
