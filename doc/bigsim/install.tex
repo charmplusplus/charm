@@ -6,12 +6,12 @@
 BigSim Simulator is part of Charm++ distribution as a runtime 
 library. One needs to download Charm++ and compile BigSim simulator.
 
-You should begin with downloading Charm++ from website:
+You should begin with downloading Charm++ from the website:
 http://charm.cs.uiuc.edu
 
-Please refer to "Charm++ Installation and Usage Manual" and also the README
-in the source code for detailed instruction on how to compile Charm++.
-In short, the "build" script is the main tool for compiling \charmpp{}.
+Please refer to ``Charm++ Installation and Usage Manual" and also the file README
+in the source code for detailed instructions on how to compile Charm++.
+In short, the ``build" script is the main tool for compiling \charmpp{}.
 You need to provide target and platform options:
 \begin{verbatim}
 ./build <target> <platform> [options ...] [charmc-options ...]
@@ -24,7 +24,7 @@ For example, to compile on a Linux machine, type:
 
 which builds essential \charmpp{} kernel using UDP sockets as 
 communication method, 
-alternatively, you can build Charm++ kernel on MPI like:
+alternatively, you can build Charm++ kernel on MPI using:
 \begin{verbatim}
 ./build charm++ mpi-linux -O
 \end{verbatim}
@@ -34,8 +34,8 @@ on. See the charm/README file for a complete list of supported platforms.
 
 \subsubsection{Compile Charm++ Emulator Only}
 
-BigSIm emulator is implemented on top of Converse in Charm++, 
-to compile BigSim emualtor only, one can compile emulator libraries
+BigSim emulator is implemented on top of Converse in Charm++, 
+to compile BigSim emulator only, one can compile emulator libraries
 directly on top of normal Charm++ using ``bluegene'' as the compilation
 target, like
 \begin{verbatim}
@@ -54,25 +54,25 @@ needs to be specified:
 ./build bluegene net-linux bluegene -O
 \end{verbatim}
 
-The first "bluegene" is the compilation target that tells "build" to
+The first ``bluegene" is the compilation target that tells ``build" to
 compile BigSim emulator libraries in addition to \charmpp{} kernel;
-The second "bluegene" is a build option to platform "net-linux", which tells
-"build" to compile the Charm++ on top of BigSim Emulator. 
-To build AMPI on BigSim, use "bgampi" as make target, which subsumes target
-of "bluegene":
+The second ``bluegene" is a build option to platform ``net-linux", which tells
+``build" to compile the Charm++ on top of BigSim Emulator. 
+To build AMPI on BigSim, use ``bgampi" as make target, which subsumes target
+of ``bluegene":
 \begin{verbatim}
 ./build bgampi net-linux bluegene -O
 \end{verbatim}
 
-For the above "build" command, it creates a directory named 
-"net-linux-bluegene" under charm, which contains all the header files and
+For the above ``build" command, it creates a directory named 
+``net-linux-bluegene" under charm, which contains all the header files and
 libraries needed for compiling a user application.
 
 \subsection{Compiling BigSim Applications}
 
 \charmpp{} provides a compiler script {\tt charmc} to compile all programs.
 
-There are three methods to write a BigSim applicaiton:
+There are three methods to write a BigSim application:
 
 \subsubsection{Writing a BigSim application using low level machine API}
 The low level machine API mimics the actual machine low level programming
@@ -116,7 +116,7 @@ One can also write a MPI application for Blue Gene Simulator.
 The Adaptive MPI, or AMPI is implemented on top of Charm++ that supports
 dynamic load balancing and multithreading for MPI applications. This is based
 on the user-level migrating threads and load balancing capabilities provided
-by the \charmpp{} framework. This allows legacy MPI program to run 
+by the \charmpp{} framework. This allows legacy MPI programs to run 
 on top of Blue Gene \charmpp{} and take advantage of the \charmpp{}'s
 virtualization and adaptive load balancing capability.
 
@@ -139,14 +139,14 @@ charm/pgms/charm++/ampi, specifically charm/pgms/charm++/Cjacobi3D.
 To run a parallel Blue Gene application, \charmpp{} provides a utility program
 called {\tt charmrun} to start the parallel program. 
 For detailed description on how to run a \charmpp{} application, 
-refer to file charm/README in the source code distribution.
+refer to the file charm/README in the source code distribution.
 
 To run a Blue Gene application, you need to specify these parameters to 
 {\tt charmrun} to define the simulated Blue Gene machine size:
 \begin{enumerate}
-\item {\tt +x, +y} and {\tt +z}:  define the size of of machine in three dimensions, these define the number of nodes along each dimension of the machine;
+\item {\tt +x, +y} and {\tt +z}:  define the size of the machine in three dimensions, these define the number of nodes along each dimension of the machine;
 \item {\tt +wth} and {\tt +cth}:  For one node, these two parameters define the number of worker processors({\tt +wth}) and the number of communication processors({\tt +cth}).
-\item {\tt +bgcorrect}: starts the simulation mode for performance prediction. Otherwise the program is running without doing parallel event simulation for performance prediction of the application.
+\item {\tt +bgcorrect}: starts the simulation mode for performance prediction. Otherwise the program runs without doing parallel event simulation for performance prediction of the application.
 \item {\tt +bgwalltime}: used only in simulation mode, when specified, use wallclock measurement of the time taken on the simulating machine to estimate the time it takes to run on the target machine.
 \item {\tt +bgcounter}:  used only in simulation mode, when specified, use the performance counter to estimate the time on target machine. This is currently only supported when perfex is installed, like Origin2000.
 \end{enumerate}

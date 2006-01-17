@@ -34,13 +34,13 @@ targeting 1 petaflops of peak performance.
 
 
 It is important that one can study the programming issues and performance
-of paralle applications on such machines even before the machine is built.
-Thus, we have developed a parallel simulator --- BigSim to facilitate this research.
+of parallel applications on such machines even before the machine is built.
+Thus, we have developed a parallel simulator -- BigSim to facilitate this research.
 
 Since our research was initiated by Blue Gene/C project, in this manual, 
 we also call our simulator as Blue Gene Simulator.
 Our simulator is capable of simulating a broad class of "Massively Parallel
-Processors-In-Memory", or MPPIMs machines. 
+Processors-In-Memory", or MPPIM machines. 
 
 \subsection{Simulator system components}
 
@@ -55,7 +55,7 @@ Our simulator system includes these components:
 
 \subsection{History}
 
-The first version of Blue Gene emulator was first written in Charm++, a 
+The first version of Blue Gene emulator was written in Charm++, a 
 parallel object language in fall, 2001. 
 
 The second version of Blue Gene emulator was completely rewritten on top 
@@ -71,17 +71,17 @@ performance by avoiding the cross layer overhead.
 %Another advantage is that the lighter weighted emulator makes it easier
 %to port higher level of programming language onto the emulator.
 
-Charm++ was soon ported to the emulator later in 2002 which provided
-first parallel language model on top of the emulator.
+Charm++ was soon ported to the emulator in 2002 which provided the
+ first parallel language model on top of the emulator.
 
 A performance simulation capability was added to the emulator in spring 2003.
 The new simulator was renamed to BigSim at the same time.
-During the same year, we developed a POSE-based postmoterm mode network
+During the same year, we developed a POSE-based postmortem mode network
 simulator called BigNetSim.
 
 
 In the following sections, we will first describe how to download and compile
-Blue Gene simulator(Sec. ~\ref{install}). Section~\ref{bgemulator} will describe
+Blue Gene simulator(Section ~\ref{install}). Section~\ref{bgemulator} will describe
 the low level machine API in detail. 
 
 

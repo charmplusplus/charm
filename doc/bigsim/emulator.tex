@@ -45,8 +45,8 @@ example programs and instructions for executing them.
 \subsection{Blue Gene Programming Environment}
 
 The basic philosophy of the Blue Gene Emulator is to hide intricate details
-of Blue Gene machine from
-application developer.Thus, the application developer needs to provide
+of the Blue Gene machine from the
+application developer. Thus, the application developer needs to provide
 intialization details and handler
 functions only and gets the result as though running on a real machine.
 Communication, Thread creation,
@@ -107,10 +107,10 @@ All the functions defined in API Level 0 are used internally for the
 implementation of bluegene node communication and worker threads.
 
 From this level, the functions defined are exposed to users to write bluegene
-program on emulator.
+programs on the emulator.
 
-Considering that the emulator machine will emulator several Bluegene nodes on
-each physical node, the emulator program define this function 
+Considering that the emulator machine will emulate several Bluegene nodes on
+each physical node, the emulator program defines this function 
 \function{BgEmulatorInit(int argc, char **argv)} to initialize each emulator
 node. In this function, user program can define the Bluegene machine size,
 number of communication/worker threads, and check the command line arguments.
@@ -136,18 +136,18 @@ functions:
 
 \function{int BgRegisterHandler(BgHandler h)}
 \desc{
-	reister user message handler functions; 
+	register user message handler functions; 
 }
 
 For each Blue Gene node, the execution starts at 
-\function{BgNodeStart(int argc, char **argv)} called by emulator for each 
-bluegene node, where application handlers can be registered and computation 
+\function{BgNodeStart(int argc, char **argv)} called by the emulator,
+where application handlers can be registered and computation 
 is triggered by creating a task at required nodes.
 
-Similar to pthread's thread specifc data, each bluegene node can has its
-own node specific data associated with it. To do this, user need to define its 
-own the Node Specific Variables encapsulated in a struct definition and register
- the pointer to the data to the emulator by following function:
+Similar to pthread's thread specifc data, each bluegene node has its
+own node specific data associated with it. To do this, the user needs to define its 
+own node-specific variables encapsulated in a struct definition and register
+ the pointer to the data with the emulator by following function:
 
 \function{void BgSetNodeData(char *data)}
 
@@ -163,8 +163,8 @@ to terminate the emulator.
 
 \subsubsection{Handler Function API: Level 1a}
 
-The following functions can be called in user's application program to retrie
-ve the BleneGene machine information, get thread execution time, and perform
+The following functions can be called in user's application program to retrieve
+the Blue Gene machine information, get thread execution time, and perform
 the communication.
 
 \function{void BgGetSize(int *sx, int *sy, int *sz);}
@@ -179,11 +179,12 @@ the communication.
 
 \function{void BgSendPacket(int x, int y, int z, int threadID, int handlerID, WorkType type, int numbytes, char* data);}
 \desc{
-Sends a trunk of data to Node[x,y,z] and also specifies the
-handler function to be used for this message ie. handlerID;
-threadID specifes the desired thread ID to handle the message, ANYTHREAD means
+This sends a trunk of data to Node[x, y, z] and also specifies the
+handler function to be used for this message i.e. the handlerID;
+threadID specifes the desired thread to handle the message, ANYTHREAD means
 no preference.
-specify the thread category:
+
+To specify the thread category:
 \begin{description}
 \item[1:] a small piece of work that can be done by
 communication thread itself, so NO scheduling overhead.
