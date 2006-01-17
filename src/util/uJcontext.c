@@ -102,11 +102,11 @@ int setJcontext (const uJcontext_t *u)
 			asm __volatile__ ("mr 1,%0" :: "r"(new_sp));
 #else /* Portable alloca version */
 			char *old_sp=(char *)&old_sp; /* address of any local variable */
-			register int allocLen=old_sp-new_sp;
+			register CmiInt8 allocLen=old_sp-new_sp;
 			alloca(allocLen);
 #endif
 		}
-		VERBOSE( printf("Back from alloca"); printStack(); )
+		VERBOSE( printf("After alloca"); printStack(); )
 		
 		/* Call the user function for the thread */
 		mu_fn(mu->_uc_args[0],mu->_uc_args[1]);
