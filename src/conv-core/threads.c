@@ -1450,14 +1450,13 @@ CthThread CthPup(pup_er p, CthThread t)
     /* context is not portable for ia32 due to pointer in uc_mcontext.fpregs,
        pup it separately */
   if (pup_isUnpacking(p)) {
-      t->context.uc_mcontext.fpregs = malloc(sizeof(fpregset_t));
+      t->context.uc_mcontext.fpregs = malloc(sizeof(struct _libc_fpstate));
   }
-  pup_bytes(p,t->context.uc_mcontext.fpregs,sizeof(fpregset_t));
-#else
+  pup_bytes(p,t->context.uc_mcontext.fpregs,sizeof(struct _libc_fpstate));
+#endif
   if (pup_isUnpacking(p)) {
       t->context.uc_link = 0;
   }
-#endif
   if (pup_isDeleting(p)) {
 	  CthFree(t);
 	  return 0;
