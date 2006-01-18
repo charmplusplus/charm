@@ -1089,6 +1089,9 @@ Use Posix Threads to simulate cooperative user-level
 threads.  This version is very portable but inefficient.
 
 Written by Milind Bhandarkar around November 2000
+
+IMPORTANT:  for SUN, must link with -mt compiler flag
+Rewritten by Gengbin Zheng
 */
 #elif CMK_THREADS_USE_PTHREADS
 
@@ -1202,6 +1205,7 @@ CthThread CthCreate(CthVoidFn fn, void *arg, int size)
 
   /* try set pthread stack, not necessarily supported on all platforms */
   pthread_attr_init(&attr);
+  /* pthread_attr_setscope(&attr, PTHREAD_SCOPE_SYSTEM); */
   if (size<1024) size = CthCpvAccess(_defaultStackSize);
   if (0!=(r=pthread_attr_setstacksize(&attr,size))) {
       if (!reported) {
@@ -1212,8 +1216,11 @@ CthThread CthCreate(CthVoidFn fn, void *arg, int size)
       }
   }
 
-  if (0 != pthread_create(&(result->self), &attr, CthOnly, (void*) result)) 
+  r = pthread_create(&(result->self), &attr, CthOnly, (void*) result);
+  if (0 != r) {
+    CmiPrintf("pthread_create failed with %d\n", r);
     CmiAbort("CthCreate failed to created a new pthread\n");
+  }
   do {
   pthread_cond_wait(&(self->cond), &CthCpvAccess(sched_mutex));
   } while (result->inited==0);
