@@ -614,6 +614,7 @@ int   arg_in_xterm;
 char *arg_debugger;
 char *arg_xterm;
 char *arg_display;
+int arg_ssh_display;
 char *arg_mylogin;
 #endif
 
@@ -674,6 +675,7 @@ void arg_init(int argc, char **argv)
   pparam_str(&arg_shell,          0, "remote-shell",  "which remote shell to use");
   pparam_str(&arg_debugger,       0, "debugger",      "which debugger to use");
   pparam_str(&arg_display,        0, "display",       "X Display for xterm");
+  pparam_flag(&arg_ssh_display,   0, "ssh-display",   "use own X Display for each ssh session");
   pparam_flag(&arg_in_xterm,      0, "in-xterm",      "Run each node in an xterm window");
   pparam_str(&arg_xterm,          0, "xterm",         "which xterm to use");
 #endif
@@ -2458,13 +2460,11 @@ void rsh_script(FILE *f, int nodeno, int rank0no, char **argv)
   if (arg_verbose) fprintf(f,"Echo 'remote responding...'\n");
   
   fprintf(f,"test -f \"$HOME/.charmrunrc\" && . \"$HOME/.charmrunrc\"\n");
-#if 0
 /* let's leave DISPLAY untouched and rely on X11 forwarding,
    changing DISPLAY to charmrun does not always work if X11 forwarding presents 
 */
-  if (arg_display)
+  if (arg_display && !arg_ssh_display)
     fprintf(f,"DISPLAY='%s';export DISPLAY\n",arg_display);
-#endif
   netstart = create_netstart(rank0no);
   fprintf(f,"NETSTART='%s';export NETSTART\n",netstart);
   fprintf(f,"CmiMyNode='%d'; export CmiMyNode\n",nodeno);
