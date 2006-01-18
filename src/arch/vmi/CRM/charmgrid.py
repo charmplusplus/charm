@@ -8,7 +8,7 @@
 ## the Charm Resource Manager (CRM) to launch independent pieces of a Grid
 ## job on multiple clusters in a Grid environment.
 ##
-## This code requires Pythong 2.3.x or higher!
+## This code requires Python 2.3.x or higher!
 
 import os
 import string
