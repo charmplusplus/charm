@@ -61,7 +61,7 @@ void ArmciVirtualProcessor::setupThreadPrivate(CthThread forThread) {
   armci_nproc = thread->getNumElements();
 }
 
-void ArmciVirtualProcessor::getAddresses(AddressMessage *msg) {
+void ArmciVirtualProcessor::getAddresses(AddressMsg *msg) {
   addressReply = msg;
   thread->resume();
 }
@@ -73,12 +73,10 @@ void ArmciVirtualProcessor::put(pointer src, pointer dst,
     memcpy(dst,src,nbytes);
     return;
   }
-  char *buffer;
-  buffer = new char[nbytes];
-  buffer = (char *)memcpy(buffer, src, nbytes);
-  thisProxy[dst_proc].putData(dst, nbytes, buffer, thisIndex, -1);
+  ArmciMsg *msg = new (nbytes, 0) ArmciMsg(dst,nbytes,thisIndex,-1);
+  memcpy(msg->data, src, nbytes);
+  thisProxy[dst_proc].putData(msg);
   // blocking call. Wait for acknowledgement from target
-  delete [] buffer;
   thread->suspend();
 }
 
@@ -89,15 +87,13 @@ int ArmciVirtualProcessor::nbput(pointer src, pointer dst,
     return -1;
   }
   int hdl = hdlList.size();
-  char *buffer;
-
   Armci_Hdl* entry = new Armci_Hdl(ARMCI_PUT, dst_proc, nbytes, src, dst);
   hdlList.push_back(entry);
 
-  buffer = new char[nbytes];
-  buffer = (char *)memcpy(buffer, src, nbytes);
-  thisProxy[dst_proc].putData(dst, nbytes, buffer, thisIndex, hdl);
-  delete [] buffer;
+  ArmciMsg *msg = new (nbytes, 0) ArmciMsg(dst,nbytes,thisIndex,hdl);
+  memcpy(msg->data, src, nbytes);
+  thisProxy[dst_proc].putData(msg);
+  
   return hdl;
 }
 
@@ -105,6 +101,12 @@ void ArmciVirtualProcessor::putData(pointer dst, int nbytes, char *data,
 				    int src_proc, int hdl) {
   memcpy(dst, data, nbytes);
   thisProxy[src_proc].putAck(hdl);
+}
+
+void ArmciVirtualProcessor::putData(ArmciMsg *m) {
+  memcpy(m->dst, m->data, m->nbytes);
+  thisProxy[m->src_proc].putAck(m->hdl);
+  delete m;
 }
 
 void ArmciVirtualProcessor::putAck(int hdl) {
@@ -201,16 +203,15 @@ void ArmciVirtualProcessor::resumeThread(void){
 }
 
 int ArmciVirtualProcessor::test(int hdl){
+  if(hdl == -1) return 1;
   return hdlList[hdl]->acked;
 }
 
 void ArmciVirtualProcessor::requestFromGet(pointer src, pointer dst, int nbytes,
 				       int dst_proc, int hdl) {
-  char *buffer;
-  buffer = new char[nbytes];
-  buffer = (char *)memcpy(buffer, src, nbytes);
-  thisProxy[dst_proc].putDataFromGet(dst, nbytes, buffer, hdl);
-  delete [] buffer;
+  ArmciMsg *msg = new (nbytes, 0) ArmciMsg(dst,nbytes,-1,-1);
+  memcpy(msg->data, src, nbytes);
+  thisProxy[dst_proc].putDataFromGet(msg);
 }
 
 // this is essentially the same as putData except that no acknowledgement
@@ -221,6 +222,15 @@ void ArmciVirtualProcessor::putDataFromGet(pointer dst, int nbytes, char *data, 
   if(hdl != -1) { // non-blocking 
     hdlList[hdl]->acked = 1;  
   }
+  thread->resume();
+}
+
+void ArmciVirtualProcessor::putDataFromGet(ArmciMsg *m) {
+  memcpy(m->dst, m->data, m->nbytes);
+  if(m->hdl != -1) { // non-blocking 
+    hdlList[m->hdl]->acked = 1;  
+  }
+  delete m;
   thread->resume();
 }
 
@@ -401,7 +411,6 @@ void ArmciVirtualProcessor::requestAddresses(pointer ptr, pointer ptr_arr[], int
   // reset the reply field
   addressReply = NULL;
   addressPair *pair = new addressPair;
-ckout << "[" << thisIndex << "]malloced " << bytes << " bytes starting " << ptr << endl;
   pair->pe = thisPE;
   pair->ptr = ptr;
   // do a reduction to get everyone else's data.
@@ -441,7 +450,7 @@ void ArmciVirtualProcessor::stridedCopy(void *base, void *buffer_ptr,
 void ArmciVirtualProcessor::mallocClient(CkReductionMsg *msg) {
   int numBlocks = msg->getSize()/sizeof(addressPair);
   addressPair *dataBlocks = (addressPair *)msg->getData();
-  AddressMessage *addrmsg = new(numBlocks, 0) AddressMessage;
+  AddressMsg *addrmsg = new(numBlocks, 0) AddressMsg;
   // constructing the ordered set of shared pointers
   for (int i=0; i<numBlocks; i++) {
     addrmsg->addresses[dataBlocks[i].pe] = dataBlocks[i].ptr;

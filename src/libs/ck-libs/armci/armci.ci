@@ -3,19 +3,25 @@ module armci {
 
 	readonly int armci_nproc;
 
-	message AddressMessage {
+	message AddressMsg {
 		pointer addresses[];
+	};
+
+	message ArmciMsg {
+		char data[];
 	};
 
 	array [1D] ArmciVirtualProcessor {
 		entry ArmciVirtualProcessor(CProxy_TCharm _thr_proxy);
-		entry void getAddresses(AddressMessage *msg);
-		entry void putData(pointer remote, int nbytes, char data[nbytes], int src_proc, int hdl);
+		entry void getAddresses(AddressMsg *msg);
+		entry void putData(pointer dst, int nbytes, char data[nbytes], int src_proc, int hdl);
+		entry void putData(ArmciMsg* msg);
+		entry void putAck(int hdl);
+		entry void requestFromGet(pointer src, pointer dst, int nbytes, int dst_proc, int hdl);
+		entry void putDataFromGet(pointer dst, int nbytes, char data[nbytes], int hdl);
+		entry void putDataFromGet(ArmciMsg* msg);
 		entry void putsData(pointer dst_ptr, int dst_stride_ar[stride_levels], int count[stride_levels+1], 
 				int stride_levels, int nbytes, char data[nbytes], int src_proc, int hdl);
-		entry void putAck(int hdl);
-		entry void requestFromGet(pointer local, pointer remote, int nbytes, int dst_proc, int hdl);
-		entry void putDataFromGet(pointer remote, int nbytes, char data[nbytes], int hdl);
 		entry void requestFromGets(pointer src_ptr, int src_stride_ar[stride_levels], 
 	   			pointer dst_ptr, int dst_stride_ar[stride_levels],
 	   			int count[stride_levels+1], int stride_levels, int dst_proc, int hdl);

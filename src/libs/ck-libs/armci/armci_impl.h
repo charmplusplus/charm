@@ -57,13 +57,46 @@ extern CkArrayID armciVPAid;
 
 #define ARMCI_TCHARM_SEMAID 0x00A53C10 /* __ARMCI_ */
 
+class ArmciMsg : public CMessage_ArmciMsg {
+public:
+  pointer dst; 
+  int nbytes;
+  int src_proc;
+  int hdl;
+  char *data;
+  
+  ArmciMsg(void) { data = NULL; }
+  ArmciMsg(pointer d, int n, int s, int h) :
+    dst(d), nbytes(n), src_proc(s), hdl(h) { }
+  static ArmciMsg* pup(PUP::er &p, ArmciMsg *m){
+    pointer d;
+    int n, s, h;
+    if(p.isPacking() || p.isSizing()){
+      d = m->dst;
+      n = m->nbytes;
+      s = m->src_proc;
+      h = m->hdl;
+    }
+    p|d; p|n; p|s; p|h;
+    if(p.isUnpacking()){
+      m = new (n, 0) ArmciMsg(d,n,s,h);
+    }
+    p(m->data,n);
+    if(p.isDeleting()){
+      delete m;
+      m = NULL;
+    }
+    return m;
+  }
+};
+
 // virtual processor class declaration
 // ARMCI is supposed to be platform neutral, so calling this a thread did
 // not seem like a proper abstraction.
 class ArmciVirtualProcessor : public TCharmClient1D {
   CmiIsomallocBlockList *memBlock;
   CProxy_ArmciVirtualProcessor thisProxy;
-  AddressMessage *addressReply;
+  AddressMsg *addressReply;
   CkPupPtrVec<Armci_Hdl> hdlList;
   CkPupPtrVec<Armci_Note> noteList;
  protected:
@@ -74,10 +107,11 @@ class ArmciVirtualProcessor : public TCharmClient1D {
   ~ArmciVirtualProcessor();
   
   pointer BlockMalloc(int bytes) { return (void *)CmiIsomallocBlockListMalloc(memBlock, bytes); }
-  void getAddresses(AddressMessage *msg);
+  void getAddresses(AddressMsg *msg);
 
   void put(pointer src, pointer dst, int bytes, int dst_proc);
   void putData(pointer dst, int nbytes, char *data, int src_proc, int hdl);
+  void putData(ArmciMsg* msg);
   void putAck(int hdl);
   int nbput(pointer src, pointer dst, int bytes, int dst_proc);
   void wait(int hdl);
@@ -93,6 +127,7 @@ class ArmciVirtualProcessor : public TCharmClient1D {
   int nbget(pointer src, pointer dst, int bytes, int dst_proc);
   void requestFromGet(pointer src, pointer dst, int nbytes, int dst_proc, int hdl);
   void putDataFromGet(pointer dst, int nbytes, char *data, int hdl);
+  void putDataFromGet(ArmciMsg* msg);
 
   void puts(pointer src_ptr, int src_stride_ar[], 
 	   pointer dst_ptr, int dst_stride_ar[],
@@ -134,10 +169,10 @@ class ArmciVirtualProcessor : public TCharmClient1D {
   void checkpoint(int len, char* dname);
 };
 
-class AddressMessage : public CMessage_AddressMessage {
+class AddressMsg : public CMessage_AddressMsg {
  public:
   pointer *addresses;
-  friend class CMessage_AddressMessage;
+  friend class CMessage_AddressMsg;
 };
 
 // pointer to the current tcshmem thread. Needed to regain context after
