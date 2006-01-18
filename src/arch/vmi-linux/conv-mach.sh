@@ -1,5 +1,7 @@
-VMI_INCDIR="-I/opt/vmi-2.0b-3-gcc/include" 
-VMI_LIBDIR="-L/opt/vmi-2.0b-3-gcc/lib"
+VMI_DIR="/usr/local/vmi-2.1.0-1-gcc"
+#
+VMI_INCDIR="-I$VMI_DIR/include" 
+VMI_LIBDIR="-L$VMI_DIR/lib"
 #
 CMK_CPP_CHARM="/lib/cpp -P"
 CMK_CPP_C="gcc -E $CMK_INCDIR $VMI_INCDIR "

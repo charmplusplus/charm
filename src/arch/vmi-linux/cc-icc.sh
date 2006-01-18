@@ -1,5 +1,7 @@
-VMI_INCDIR="-I/usr/local/apps/vmi-2.0b-3-gcc/include"
-VMI_LIBDIR="-L/usr/local/apps/vmi-2.0b-3-gcc/lib"
+VMI_DIR="/usr/local/vmi-2.1.0-1-gcc"
+#
+VMI_INCDIR="-I$VMI_DIR/include"
+VMI_LIBDIR="-L$VMI_DIR/lib"
 #
 CMK_CPP_C="icc -E $CMK_INCDIR $VMI_INCDIR "
 CMK_CC="icc $CMK_INCDIR $VMI_INCDIR "
