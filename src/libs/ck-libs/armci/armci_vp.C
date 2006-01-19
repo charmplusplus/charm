@@ -69,10 +69,10 @@ void ArmciVirtualProcessor::getAddresses(AddressMsg *msg) {
 // implemented as a blocking put for now
 void ArmciVirtualProcessor::put(pointer src, pointer dst,
 			       int nbytes, int dst_proc) {
-  if(dst_proc == thisIndex){
+/*  if(dst_proc == thisIndex){
     memcpy(dst,src,nbytes);
     return;
-  }
+  }*/
   ArmciMsg *msg = new (nbytes, 0) ArmciMsg(dst,nbytes,thisIndex,-1);
   memcpy(msg->data, src, nbytes);
   thisProxy[dst_proc].putData(msg);
@@ -82,10 +82,10 @@ void ArmciVirtualProcessor::put(pointer src, pointer dst,
 
 int ArmciVirtualProcessor::nbput(pointer src, pointer dst,
 			       int nbytes, int dst_proc) {
-  if(dst_proc == thisIndex){
+/*  if(dst_proc == thisIndex){
     memcpy(dst,src,nbytes);
     return -1;
-  }
+  }*/
   int hdl = hdlList.size();
   Armci_Hdl* entry = new Armci_Hdl(ARMCI_PUT, dst_proc, nbytes, src, dst);
   hdlList.push_back(entry);
@@ -161,7 +161,7 @@ void ArmciVirtualProcessor::waitmulti(vector<int> procs){
 void ArmciVirtualProcessor::waitproc(int proc){
   vector<int> procs;
   for(int i=0;i<hdlList.size();i++){
-    if(hdlList[i]->proc == proc)
+    if(hdlList[i]->acked == 0 && hdlList[i]->proc == proc)
       procs.push_back(i);
   }
   waitmulti(procs);
@@ -170,7 +170,8 @@ void ArmciVirtualProcessor::waitproc(int proc){
 void ArmciVirtualProcessor::waitall(){
   vector<int> procs;
   for(int i=0;i<hdlList.size();i++){
-    procs.push_back(i);
+    if(hdlList[i]->acked == 0)
+      procs.push_back(i);
   }
   waitmulti(procs);
 }
@@ -178,7 +179,7 @@ void ArmciVirtualProcessor::waitall(){
 void ArmciVirtualProcessor::fence(int proc){
   vector<int> procs;
   for(int i=0;i<hdlList.size();i++){
-    if((hdlList[i]->op == ARMCI_PUT || hdlList[i]->op == ARMCI_ACC) && hdlList[i]->proc == proc)
+    if(hdlList[i]->acked == 0 && (hdlList[i]->op == ARMCI_PUT || hdlList[i]->op == ARMCI_ACC) && hdlList[i]->proc == proc)
       procs.push_back(i);
   }
   waitmulti(procs);
@@ -186,7 +187,7 @@ void ArmciVirtualProcessor::fence(int proc){
 void ArmciVirtualProcessor::allfence(){
   vector<int> procs;
   for(int i=0;i<hdlList.size();i++){
-    if(hdlList[i]->op == ARMCI_PUT || hdlList[i]->op == ARMCI_ACC)
+    if(hdlList[i]->acked == 0 && hdlList[i]->op == ARMCI_PUT || hdlList[i]->op == ARMCI_ACC)
       procs.push_back(i);
   }
   waitmulti(procs);
@@ -209,7 +210,7 @@ int ArmciVirtualProcessor::test(int hdl){
 
 void ArmciVirtualProcessor::requestFromGet(pointer src, pointer dst, int nbytes,
 				       int dst_proc, int hdl) {
-  ArmciMsg *msg = new (nbytes, 0) ArmciMsg(dst,nbytes,-1,-1);
+  ArmciMsg *msg = new (nbytes, 0) ArmciMsg(dst,nbytes,-1,hdl);
   memcpy(msg->data, src, nbytes);
   thisProxy[dst_proc].putDataFromGet(msg);
 }
