@@ -119,7 +119,7 @@ def socket_getdata (s):
 ##       time (seconds since epoch), [TCP/IP address (int), socket, port]]
 ##
 def main():
-    write_to_log ('CRM starting up')
+    write_to_log ('CRM starting')
 
     unaffiliated = []
     affiliated = []
