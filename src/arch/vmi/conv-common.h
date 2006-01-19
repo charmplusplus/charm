@@ -64,8 +64,8 @@
 #define CMK_SIGNAL_USE_SIGACTION                           1
 #define CMK_SIGNAL_USE_SIGACTION_WITH_RESTART              0
 
-#define CMK_TIMER_USE_RDTSC                                1
-#define CMK_TIMER_USE_GETRUSAGE                            0
+#define CMK_TIMER_USE_RDTSC                                0
+#define CMK_TIMER_USE_GETRUSAGE                            1
 #define CMK_TIMER_USE_SPECIAL                              0
 #define CMK_TIMER_USE_TIMES                                0
 
