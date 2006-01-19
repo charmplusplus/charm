@@ -310,7 +310,7 @@ char startProgram(const char *exeName, const char *args,
 		char **argv=(char **)malloc(sizeof(char *)*1000);
 		ret|=chdir(cwd);
 		putenv(env);
-#if 0
+#if 1
 		/*Redirect program's stdin, out, err to /dev/null*/
 		fd=open("/dev/null",O_RDWR);
 		dup2(fd,0);
