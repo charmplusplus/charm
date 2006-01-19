@@ -1468,6 +1468,7 @@ _ACEOF
 #### Check ucontext and FPU pointer ####
 cat > $t <<EOT
 #include <ucontext.h>
+struct _libc_fpstate   fpstate;
 fpregset_t *fp;
 EOT
 test_cxx "whether ucontext has FPU pointer" "yes" "no" ""
