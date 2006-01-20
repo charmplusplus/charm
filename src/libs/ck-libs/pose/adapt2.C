@@ -16,9 +16,9 @@ void adapt2::Step()
 
   if (rbFlag) {
     timeLeash = eq->currentPtr->timestamp - lastGVT;
-    if (timeLeash < MIN_LEASH) timeLeash = MIN_LEASH;
+    if (timeLeash < pose_config.min_leash) timeLeash = pose_config.min_leash;
   }
-  else if (timeLeash < MAX_LEASH) timeLeash += LEASH_FLEX;
+  else if (timeLeash < pose_config.max_leash) timeLeash += pose_config.leash_flex;
   // Shorten the leash as we near POSE_endtime
   if ((POSE_endtime > POSE_UnsetTS) && (lastGVT + timeLeash > POSE_endtime))
     timeLeash = POSE_endtime - lastGVT;

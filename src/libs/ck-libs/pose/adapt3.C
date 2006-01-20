@@ -54,7 +54,7 @@ void adapt3::Step()
     //       can't advance gvt if we don't execute events with timestamp > gvt
     if (((eq->frontPtr->timestamp > lastGVT) ||
          (eq->frontPtr->timestamp < ev->prev->timestamp)) &&
-        (eq->mem_usage > MAX_USAGE)) break;
+        (eq->mem_usage > pose_config.max_usage)) break;
 #endif
     iter++;
     currentEvent = ev;

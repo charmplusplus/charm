@@ -61,42 +61,45 @@ eventQueue::~eventQueue()
 /// Insert e in the queue in timestamp order
 void eventQueue::InsertEvent(Event *e)
 {
-#ifdef DETERMINISTIC_EVENTS
-  InsertEventDeterministic(e);
-#else
+  if(pose_config.deterministic)
+    {
+      InsertEventDeterministic(e);
+    }
+  else
+    {
 #ifdef EQ_SANITIZE
-  sanitize();
+      sanitize();
 #endif
-  Event *tmp = backPtr->prev; // start at back of queue
+      Event *tmp = backPtr->prev; // start at back of queue
 
-  if (e->timestamp > largest) largest = e->timestamp;
-  eventCount++;
-  // check if new event should go on heap: 
-  // greater than last timestamp in queue, 
-  // or currentPtr is at back (presumably because heap is empty)
-  //CkPrintf("Received event "); e->evID.dump(); CkPrintf(" at %d...\n", e->timestamp);
-  if ((tmp->timestamp < e->timestamp || (tmp->timestamp == e->timestamp && tmp->evID < e->evID)) && (currentPtr != backPtr))
-    eqh->InsertEvent(e); // insert in heap
-  else { // tmp->timestamp > e->timestamp; insert in linked list
-    if ((currentPtr != backPtr) && (currentPtr->timestamp > e->timestamp))
-      tmp = currentPtr; // may be closer to insertion point
-    while (tmp->timestamp > e->timestamp || (tmp->timestamp == e->timestamp && tmp->evID > e->evID)) // search for position
-      tmp = tmp->prev;
-    // insert e
-    e->prev = tmp;
-    e->next = tmp->next;
-    e->next->prev = e;
-    tmp->next = e;
-    // if e is inserted before currPtr, move currPtr back to avoid rollback
-    if ((currentPtr->prev == e) && (currentPtr->done < 1))
-      currentPtr = currentPtr->prev;
-    else if ((currentPtr == backPtr) || (e->timestamp < currentPtr->timestamp || (e->timestamp == currentPtr->timestamp && e->evID < currentPtr->evID)))
-      SetRBevent(e);
-  }
+      if (e->timestamp > largest) largest = e->timestamp;
+      eventCount++;
+      // check if new event should go on heap: 
+      // greater than last timestamp in queue, 
+      // or currentPtr is at back (presumably because heap is empty)
+      //CkPrintf("Received event "); e->evID.dump(); CkPrintf(" at %d...\n", e->timestamp);
+      if ((tmp->timestamp < e->timestamp || (tmp->timestamp == e->timestamp && tmp->evID < e->evID)) && (currentPtr != backPtr))
+	eqh->InsertEvent(e); // insert in heap
+      else { // tmp->timestamp > e->timestamp; insert in linked list
+	if ((currentPtr != backPtr) && (currentPtr->timestamp > e->timestamp))
+	  tmp = currentPtr; // may be closer to insertion point
+	while (tmp->timestamp > e->timestamp || (tmp->timestamp == e->timestamp && tmp->evID > e->evID)) // search for position
+	  tmp = tmp->prev;
+	// insert e
+	e->prev = tmp;
+	e->next = tmp->next;
+	e->next->prev = e;
+	tmp->next = e;
+	// if e is inserted before currPtr, move currPtr back to avoid rollback
+	if ((currentPtr->prev == e) && (currentPtr->done < 1))
+	  currentPtr = currentPtr->prev;
+	else if ((currentPtr == backPtr) || (e->timestamp < currentPtr->timestamp || (e->timestamp == currentPtr->timestamp && e->evID < currentPtr->evID)))
+	  SetRBevent(e);
+      }
 #ifdef EQ_SANITIZE
-  sanitize();
+      sanitize();
 #endif
-#endif
+    }
 }
 
 /// Insert e in the queue in timestamp order

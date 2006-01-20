@@ -227,10 +227,8 @@ class sim : public CBase_sim {
   /// The local statistics collector
   localStat *localStats; 
 #endif
-#ifdef LB_ON
   /// The local load balancer
   LBgroup *localLBG;
-#endif
   /// Basic Constructor
   sim(void);
   sim(CkMigrateMessage *) {};
@@ -254,10 +252,10 @@ class sim : public CBase_sim {
 #ifndef SEQUENTIAL_POSE
       localPVT = (PVT *)CkLocalBranch(ThePVT);
       myPVTidx = localPVT->objRegister(thisIndex, localPVT->getGVT(), sync, this);
-#endif
-#ifdef LB_ON
-      localLBG = TheLBG.ckLocalBranch();
-      myLBidx = localLBG->objRegister(thisIndex, sync, this);
+      if(pose_config.lb_on){
+	localLBG = TheLBG.ckLocalBranch();
+	myLBidx = localLBG->objRegister(thisIndex, sync, this);
+      }
 #endif
       active = 0;
     }
@@ -266,9 +264,8 @@ class sim : public CBase_sim {
 #ifndef SEQUENTIAL_POSE
       localPVT->objRemove(myPVTidx);
 #endif
-#ifdef LB_ON
-      localLBG->objRemove(myLBidx);
-#endif
+      if(pose_config.lb_on)
+	localLBG->objRemove(myLBidx);
     }
   }
   /// Start a forward execution step on myStrat

@@ -19,9 +19,8 @@ sim::sim()
 {
 #ifndef SEQUENTIAL_POSE
   localPVT = (PVT *)CkLocalBranch(ThePVT);
-#endif
-#ifdef LB_ON
-  localLBG = TheLBG.ckLocalBranch();
+  if(pose_config.lb_on)
+    localLBG = TheLBG.ckLocalBranch();
 #endif
 #ifndef CMK_OPTIMIZE
   if(pose_config.stats)
@@ -47,8 +46,10 @@ sim::~sim()
 void sim::Step()
 {
   if (active < 0) return; // object is migrating; deactivate it 
-#ifdef TRACE_DETAIL
-  double critStart = CmiWallTimer();  // trace timing
+#ifndef CMK_OPTIMIZE
+  double critStart;
+  if(pose_config.trace)
+    critStart=CmiWallTimer();  // trace timing
 #endif
 #ifndef CMK_OPTIMIZE
   int tstat;
@@ -84,8 +85,9 @@ void sim::Step()
       else localStats->SwitchTimer(tstat);
     }
 #endif
-#ifdef TRACE_DETAIL
-  traceUserBracketEvent(60, critStart, CmiWallTimer());
+#ifndef CMK_OPTIMIZE
+  if(pose_config.trace)
+    traceUserBracketEvent(60, critStart, CmiWallTimer());
 #endif
 }
 
@@ -119,8 +121,10 @@ void sim::Step(prioMsg *m)
 void sim::Commit()
 {
   if (active < 0)  return; // object is migrating
-#ifdef TRACE_DETAIL
-  double critStart = CmiWallTimer();  // trace timing
+#ifndef CMK_OPTIMIZE
+  double critStart;
+  if(pose_config.trace)
+    critStart= CmiWallTimer();  // trace timing
 #endif
 #ifndef CMK_OPTIMIZE
   int tstat;
@@ -144,9 +148,12 @@ void sim::Commit()
     lastGVT = localPVT->getGVT();
     eq->CommitEvents(this, lastGVT); // commit events up to GVT
   }
-#ifdef TRACE_DETAIL
-  traceUserBracketEvent(50, critStart, CmiWallTimer());
-  critStart = CmiWallTimer();
+#ifndef CMK_OPTIMIZE
+  if(pose_config.trace)
+    {
+      traceUserBracketEvent(50, critStart, CmiWallTimer());
+      critStart = CmiWallTimer();
+    }
 #endif
 #ifndef CMK_OPTIMIZE
   if(pose_config.stats)
@@ -159,30 +166,31 @@ void sim::Commit()
     if (!tstat)  localStats->TimerStop();
     else localStats->SwitchTimer(tstat);
 #endif
-#ifdef TRACE_DETAIL
-  traceUserBracketEvent(60, critStart, CmiWallTimer());
+#ifndef CMK_OPTIMIZE
+  if(pose_config.trace)
+    traceUserBracketEvent(60, critStart, CmiWallTimer());
 #endif
 }
 
 /// Report load information to local load balancer
 void sim::ReportLBdata()
 {
-#ifdef LB_ON
-  double rbOh;
-  int numEvents = 0;
-  Event *tmp = eq->currentPtr;
+  if(pose_config.lb_on){
+    double rbOh;
+    int numEvents = 0;
+    Event *tmp = eq->currentPtr;
 
-  if (DOs-UNDOs == 0) rbOh = 1.0;
-  else rbOh = ((double)DOs)/((double)(DOs-UNDOs));
-  while (tmp->timestamp > POSE_UnsetTS) {
-    numEvents++;
-    tmp = tmp->next;
+    if (DOs-UNDOs == 0) rbOh = 1.0;
+    else rbOh = ((double)DOs)/((double)(DOs-UNDOs));
+    while (tmp->timestamp > POSE_UnsetTS) {
+      numEvents++;
+      tmp = tmp->next;
+    }
+    localLBG->objUpdate(myLBidx, objID->ovt, eq->currentPtr->timestamp,
+			numEvents, rbOh, srVector);
+    DOs = UNDOs = 0;
+    for (int i=0; i<CkNumPes(); i++) srVector[i] = 0;
   }
-  localLBG->objUpdate(myLBidx, objID->ovt, eq->currentPtr->timestamp,
-		      numEvents, rbOh, srVector);
-  DOs = UNDOs = 0;
-  for (int i=0; i<CkNumPes(); i++) srVector[i] = 0;
-#endif
 }
 
 /// Add m to cancellation list
@@ -198,8 +206,10 @@ void sim::Cancel(cancelMsg *m)
   cancels.Insert(m->timestamp, m->evID); // add to cancellations list
   localPVT->objUpdate(m->timestamp, RECV); // tell PVT branch about recv
   CkFreeMsg(m);
-#ifdef TRACE_DETAIL
-  double critStart = CmiWallTimer();  // trace timing
+#ifndef CMK_OPTIMIZE
+  double critStart;
+  if(pose_config.trace)
+    critStart= CmiWallTimer();  // trace timing
 #endif
 #ifndef CMK_OPTIMIZE
   if(pose_config.stats)
@@ -210,8 +220,9 @@ void sim::Cancel(cancelMsg *m)
   if(pose_config.stats)
     localStats->TimerStop();
 #endif
-#ifdef TRACE_DETAIL
-  traceUserBracketEvent(60, critStart, CmiWallTimer());
+#ifndef CMK_OPTIMIZE
+  if(pose_config.trace)
+    traceUserBracketEvent(60, critStart, CmiWallTimer());
 #endif
 }
 

@@ -39,7 +39,7 @@ public:
   /// Basic Constructor
   opt() { 
     STRAT_T = OPT_T; 
-    cpRate = STORE_RATE; 
+    cpRate = pose_config.store_rate;
     specEventCount = eventCount = stepCount = avgEventsPerStep = rbCount = jumpCount = rbFlag = 0;
     avgRBoffset = POSE_TimeMax/2;
     idle = avgTimeLeash = avgJump = 0;
@@ -90,8 +90,10 @@ public:
   }
   /// Send cancellation messages to all of event e's spawned events
   void CancelSpawn(Event *e) {  
-#ifdef TRACE_DETAIL
-    double critStart = CmiWallTimer();
+#ifndef CMK_OPTIMIZE
+    double critStart;
+    if(pose_config.trace)
+      critStart= CmiWallTimer();
 #endif
     cancelMsg *m;
     SpawnedEvent *ev = e->spawnedList;
@@ -109,8 +111,9 @@ public:
       delete ev; // delete the spawn
       ev = e->spawnedList; // move on to next in list
     }
-#ifdef TRACE_DETAIL
-    traceUserBracketEvent(30, critStart, CmiWallTimer());
+#ifndef CMK_OPTIMIZE
+    if(pose_config.trace)
+      traceUserBracketEvent(30, critStart, CmiWallTimer());
 #endif
   }
 };

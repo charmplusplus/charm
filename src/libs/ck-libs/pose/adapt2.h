@@ -18,7 +18,7 @@
 
 class adapt2 : public opt3 {
  public:
-  adapt2() { timeLeash = SPEC_WINDOW; STRAT_T = ADAPT2_T; }
+  adapt2() { timeLeash = pose_config.spec_window; STRAT_T = ADAPT2_T; }
   virtual void Step();
 };
 

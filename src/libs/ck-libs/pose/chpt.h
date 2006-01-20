@@ -10,7 +10,7 @@ template<class StateType> class chpt : public rep {
  public:
   int sinceLast;
   /// Basic Constructor
-  chpt() { sinceLast = STORE_RATE; }
+  chpt() { sinceLast = pose_config.store_rate; }
   /// Destructor
   virtual ~chpt() { }
   void registerTimestamp(int idx, eventMsg *m, int offset);

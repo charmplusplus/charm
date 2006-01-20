@@ -109,15 +109,13 @@ class eventQueue {
   /// Set rollback point to event e
   void SetRBevent(Event *e) {
     if (!RBevent) RBevent = e; 
-#ifdef DETERMINISTIC_EVENTS
-    else if ((RBevent->timestamp > e->timestamp) ||
+    else if ((pose_config.deterministic) && (RBevent->timestamp > e->timestamp) ||
 	     ((RBevent->timestamp == e->timestamp) && 
 	      (e->evID < RBevent->evID))) {
       CmiAssert(RBevent->prev->next == RBevent);
       CmiAssert(RBevent->next->prev == RBevent);
       RBevent = e;
     }
-#else
     else if ((RBevent->timestamp > e->timestamp) ||
              (RBevent->timestamp == e->timestamp && RBevent->evID > e->evID)
             ) {
@@ -125,7 +123,6 @@ class eventQueue {
       CmiAssert(RBevent->next->prev == RBevent);
       RBevent = e;
     }
-#endif
   }
   /// Dump the event queue
   void dump();        

@@ -12,7 +12,7 @@
 
 class spec : public opt3 {
 public:
-  spec() { timeLeash = SPEC_WINDOW; STRAT_T = SPEC_T; }
+  spec() { timeLeash = pose_config.spec_window; STRAT_T = SPEC_T; }
   virtual void Step();
 };
 

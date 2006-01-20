@@ -99,17 +99,19 @@ class POSE_Config
   int spec_window;
   int min_leash;
   int max_leash;
+  int leash_flex;
   bool deterministic;
   POSE_Config()
     {
-#ifdef POSE_STATS_ON
+#ifdef POSE_STATS_ON                   //w
       stats=true;
 #else
       stats=false;
 #endif
+      // timestamp start end tracing not supported yet
       start_proj=-1;
       end_proj=-1;
-#ifdef TRACE_DETAIL
+#ifdef TRACE_DETAIL                    //w
       trace=true;
 #else      
       trace=false;
@@ -120,7 +122,8 @@ class POSE_Config
 #else
       dop=false;
 #endif
-      max_usage=MAX_USAGE;
+      max_usage=MAX_USAGE;               //w
+/** MSG POOLING AND COMMLIB OPTIONS NOT SUPPORTED YET **/
 #ifdef MSG_RECYCLING
       msg_pool=true;
 #else
@@ -136,19 +139,20 @@ class POSE_Config
       commlib_timeout=COMM_TIMEOUT;
       commlib_maxmsg=COMM_MAXMSG;
 #ifdef LB_ON
-      lb_on=true;
+      lb_on=true;                  //w
 #else
-      lb_on=false;
+      lb_on=false;                 //w
 #endif
-      lb_skip=LB_SKIP;
-      lb_threshold=LB_THRESHOLD;
-      lb_diff=LB_DIFF;
-      store_rate=STORE_RATE;
-      max_iter=MAX_ITERATIONS;
-      spec_window=SPEC_WINDOW;
-      min_leash=MIN_LEASH;
-      max_leash=MAX_LEASH;
-#ifdef DETERMINISTIC_EVENTS
+      lb_skip=LB_SKIP;             //w
+      lb_threshold=LB_THRESHOLD;   //w
+      lb_diff=LB_DIFF;             //w
+      store_rate=STORE_RATE;       //w
+      max_iter=MAX_ITERATIONS;     //apparently defunct 
+      spec_window=SPEC_WINDOW;     //w
+      min_leash=MIN_LEASH;         //w
+      max_leash=MAX_LEASH;         //w
+      leash_flex=LEASH_FLEX;       //w
+#ifdef DETERMINISTIC_EVENTS        //w
       deterministic=true;
 #else
       deterministic=false;

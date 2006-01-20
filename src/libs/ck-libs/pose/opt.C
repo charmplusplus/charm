@@ -40,9 +40,10 @@ void opt::Step()
 /// Rollback to predetermined RBevent
 void opt::Rollback()
 {
-#ifdef TRACE_DETAIL
+#ifndef CMK_OPTIMIZE
   double critStart;
-  critStart = CmiWallTimer();  // trace timing
+  if(pose_config.trace)
+    critStart = CmiWallTimer();  // trace timing
 #endif
 #ifndef CMK_OPTIMIZE
   if(pose_config.stats)
@@ -62,8 +63,9 @@ void opt::Rollback()
     if(pose_config.stats)
       localStats->SwitchTimer(SIM_TIMER);      
 #endif
-#ifdef TRACE_DETAIL
-    traceUserBracketEvent(40, critStart, CmiWallTimer());
+#ifndef CMK_OPTIMIZE
+    if(pose_config.trace)
+      traceUserBracketEvent(40, critStart, CmiWallTimer());
 #endif
     return;
   }
@@ -108,7 +110,8 @@ void opt::Rollback()
   if(pose_config.stats)
     localStats->SwitchTimer(SIM_TIMER);      
 #endif
-#ifdef TRACE_DETAIL
+#ifndef CMK_OPTIMIZE
+  if(pose_config.trace)
     traceUserBracketEvent(40, critStart, CmiWallTimer());
 #endif
 }
@@ -143,9 +146,10 @@ void opt::UndoEvent(Event *e)
 /// Cancel events in cancellation list that have arrived
 void opt::CancelEvents() 
 {
-#ifdef TRACE_DETAIL
+#ifndef CMK_OPTIMIZE
   double critStart;
-  critStart = CmiWallTimer();  // trace timing
+  if(pose_config.trace)
+    critStart = CmiWallTimer();  // trace timing
 #endif
 #ifndef CMK_OPTIMIZE
   if(pose_config.stats)
@@ -194,8 +198,9 @@ void opt::CancelEvents()
 	  if(pose_config.stats)
 	    localStats->SwitchTimer(SIM_TIMER);      
 #endif
-#ifdef TRACE_DETAIL
-	  traceUserBracketEvent(20, critStart, CmiWallTimer());
+#ifndef CMK_OPTIMIZE
+	  if(pose_config.trace)
+	    traceUserBracketEvent(20, critStart, CmiWallTimer());
 #endif
 	  return;  // seen all cancellations during this call
 	}
@@ -260,8 +265,9 @@ void opt::CancelEvents()
       if(pose_config.stats)
 	localStats->SwitchTimer(SIM_TIMER);      
 #endif
-#ifdef TRACE_DETAIL
-    traceUserBracketEvent(20, critStart, CmiWallTimer());
+#ifndef CMK_OPTIMIZE
+      if(pose_config.trace)
+	traceUserBracketEvent(20, critStart, CmiWallTimer());
 #endif
       return;
     }
@@ -271,7 +277,8 @@ void opt::CancelEvents()
   if(pose_config.stats)
     localStats->SwitchTimer(SIM_TIMER);      
 #endif
-#ifdef TRACE_DETAIL
+#ifndef CMK_OPTIMIZE
+  if(pose_config.trace)
     traceUserBracketEvent(20, critStart, CmiWallTimer());
 #endif
 }
@@ -279,9 +286,10 @@ void opt::CancelEvents()
 /// Cancel events in cancellation list that have arrived
 void opt::CancelUnexecutedEvents() 
 {
-#ifdef TRACE_DETAIL
+#ifndef CMK_OPTIMIZE
   double critStart;
-  critStart = CmiWallTimer();  // trace timing
+  if(pose_config.trace)
+    critStart = CmiWallTimer();  // trace timing
 #endif
 #ifndef CMK_OPTIMIZE
   if(pose_config.stats)
@@ -329,8 +337,9 @@ void opt::CancelUnexecutedEvents()
 	  if(pose_config.stats)
 	    localStats->SwitchTimer(SIM_TIMER);      
 #endif
-#ifdef TRACE_DETAIL
-    traceUserBracketEvent(20, critStart, CmiWallTimer());
+#ifndef CMK_OPTIMIZE
+	  if(pose_config.trace)
+	    traceUserBracketEvent(20, critStart, CmiWallTimer());
 #endif
 	  return;  // seen all cancellations during this call
 	}
@@ -347,8 +356,9 @@ void opt::CancelUnexecutedEvents()
 	if(pose_config.stats)
 	  localStats->SwitchTimer(SIM_TIMER);      
 #endif
-#ifdef TRACE_DETAIL
-    traceUserBracketEvent(20, critStart, CmiWallTimer());
+#ifndef CMK_OPTIMIZE
+	if(pose_config.trace)
+	  traceUserBracketEvent(20, critStart, CmiWallTimer());
 #endif
 	return;
       }
@@ -360,8 +370,9 @@ void opt::CancelUnexecutedEvents()
 	if(pose_config.stats)
 	  localStats->SwitchTimer(SIM_TIMER);      
 #endif
-#ifdef TRACE_DETAIL
-    traceUserBracketEvent(20, critStart, CmiWallTimer());
+#ifndef CMK_OPTIMIZE
+	if(pose_config.trace)
+	  traceUserBracketEvent(20, critStart, CmiWallTimer());
 #endif
 	return; 
       }
@@ -373,8 +384,9 @@ void opt::CancelUnexecutedEvents()
 	if(pose_config.stats)
 	  localStats->SwitchTimer(SIM_TIMER);      
 #endif
-#ifdef TRACE_DETAIL
-    traceUserBracketEvent(20, critStart, CmiWallTimer());
+#ifndef CMK_OPTIMIZE
+	if(pose_config.trace)
+	  traceUserBracketEvent(20, critStart, CmiWallTimer());
 #endif
 	return;
       }
@@ -385,7 +397,8 @@ void opt::CancelUnexecutedEvents()
   if(pose_config.stats)
     localStats->SwitchTimer(SIM_TIMER);      
 #endif
-#ifdef TRACE_DETAIL
+#ifndef CMK_OPTIMIZE
+  if(pose_config.trace)
     traceUserBracketEvent(20, critStart, CmiWallTimer());
 #endif
 }

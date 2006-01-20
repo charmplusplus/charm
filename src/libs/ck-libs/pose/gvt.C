@@ -345,8 +345,9 @@ GVT::GVT()
 #ifndef CMK_OPTIMIZE
   localStats = (localStat *)CkLocalBranch(theLocalStats);
 #endif
-#ifdef LB_ON
-  nextLBstart = LB_SKIP - 1;
+#ifndef SEQUENTIAL_POSE
+  if(pose_config.lb_on)
+    nextLBstart = pose_config.lb_skip - 1;
 #endif
   estGVT = lastEarliest = inactiveTime = POSE_UnsetTS;
   lastSends = lastRecvs = inactive = 0;
@@ -526,25 +527,26 @@ void GVT::computeGVT(UpdateMsg *m)
     else {
       p.setGVT(gmsg);
 
-#ifdef LB_ON
-      // perform load balancing
+      if(pose_config.lb_on)
+	{
+	  // perform load balancing
 #ifndef CMK_OPTIMIZE
-      if(pose_config.stats)
-	localStats->SwitchTimer(LB_TIMER);
+	  if(pose_config.stats)
+	    localStats->SwitchTimer(LB_TIMER);
 #endif
-      static int lb_skip = LB_SKIP;
-      if (CkNumPes() > 1) {
-	nextLBstart++;
-	if (lb_skip == nextLBstart) {
-	  TheLBG.calculateLocalLoad();
-	  nextLBstart = 0;
+	  static int lb_skip = pose_config.lb_skip;
+	  if (CkNumPes() > 1) {
+	    nextLBstart++;
+	    if (lb_skip == nextLBstart) {
+	      TheLBG.calculateLocalLoad();
+	      nextLBstart = 0;
+	    }
+	  }
+#ifndef CMK_OPTIMIZE
+	  if(pose_config.stats)
+	    localStats->SwitchTimer(GVT_TIMER);
+#endif
 	}
-      }
-#ifndef CMK_OPTIMIZE
-      if(pose_config.stats)
-	localStats->SwitchTimer(GVT_TIMER);
-#endif
-#endif
 
       // transmit data to start next GVT estimation on next GVT branch
       UpdateMsg *umsg = new UpdateMsg;

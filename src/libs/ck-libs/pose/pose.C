@@ -35,7 +35,7 @@ void POSE_init(int IDflag, int ET) // can specify both
   POSEreadCmdLine();
   POSE_inactDetect = IDflag;
   POSE_endtime = ET;
-#ifdef TRACE_DETAIL
+#ifndef CMK_OPTIMIZE
   traceRegisterUserEvent("Forward Execution", 10);
   traceRegisterUserEvent("Cancellation", 20);
   traceRegisterUserEvent("Cancel Spawn", 30);
@@ -86,12 +86,13 @@ void POSE_init(int IDflag, int ET) // can specify both
   // Start off using normal forward execution
   CpvInitialize(int, stateRecovery);
   CpvAccess(stateRecovery) = 0;
-#ifdef LB_ON
-  // Initialize the load balancer
-  TheLBG = CProxy_LBgroup::ckNew();
-  TheLBstrategy = CProxy_LBstrategy::ckNew();
-  CkPrintf("Load balancing is ON.\n");
-#endif
+  if(pose_config.lb_on)
+    {
+      // Initialize the load balancer
+      TheLBG = CProxy_LBgroup::ckNew();
+      TheLBstrategy = CProxy_LBstrategy::ckNew();
+      CkPrintf("Load balancing is ON.\n");
+    }
 #endif
   CProxy_pose::ckNew(&POSE_Coordinator_ID, 0);
 #ifdef SEQUENTIAL_POSE
@@ -233,17 +234,20 @@ void POSEreadCmdLine()
   CmiArgGroup("Charm++","POSE");
   pose_config.stats=CmiGetArgFlagDesc(argv, "+stats_pose",
                         "Gather timing information and other statistics");
+  /*  semantic meaning for these still to be determined
   CmiGetArgIntDesc(argv, "+start_proj_pose",&pose_config.start_proj,
                         "GVT to initiate projections tracing");
   CmiGetArgIntDesc(argv, "+end_proj_pose",&pose_config.end_proj,
                         "GVT to end projections tracing");
+  */
   pose_config.trace=CmiGetArgFlagDesc(argv, "+trace_pose",
                         "Traces key POSE operations like Forward Execution, Rollback, Cancellation, Fossil Collection, etc. via user events for display in projections");
 
   pose_config.dop=CmiGetArgFlagDesc(argv, "+crit_post",
                         "Critical path analysis by measuring degree of parallelism");
-  
+
   CmiGetArgIntDesc(argv, "+memman_pose", &pose_config.max_usage , "Coarse memory management: Restricts forward execution of objects with over <max_usage>/<checkpoint store_rate> checkpoints; default to 10");
+  /*
   pose_config.msg_pool=CmiGetArgFlagDesc(argv, "+pose_msgpool",  "Store and reuse pools of messages under a certain size default 1000");
   CmiGetArgIntDesc(argv, "+msgpoolsize_pose", &pose_config.msg_pool_size , "Store and reuse pools of messages under a certain size default 1000");
 
@@ -258,15 +262,22 @@ void POSEreadCmdLine()
     pose_config.commlib_strat=prio;
   CmiGetArgIntDesc(argv, "+commlib_timeout-pose", &pose_config.commlib_timeout , "Use commlib with timeout N; default 1ms");
   CmiGetArgIntDesc(argv, "+commlib_maxmsg_pose", &pose_config.commlib_maxmsg , "Use commlib with max msg N;  default 5");
+  */
   pose_config.lb_on=CmiGetArgFlagDesc(argv, "+lb_on_pose", "Use load balancing");
   CmiGetArgIntDesc(argv, "+lb_skip_pose", &pose_config.lb_skip , "Load balancing skip N; default 51");
   CmiGetArgIntDesc(argv, "+lb_threshold_pose", &pose_config.lb_threshold , "Load balancing threshold N; default 4000");
   CmiGetArgIntDesc(argv, "+lb_diff_pose", &pose_config.lb_diff , "Load balancing  min diff between min and max load PEs; default 2000");
   CmiGetArgIntDesc(argv, "+checkpoint_rate_pose", &pose_config.store_rate , " Set checkpoint to 1 for every <rate> events. Default to 1. ");
-  CmiGetArgIntDesc(argv, "+FEmax_pose", &pose_config.max_iter , "Sets max events executed in single forward execution step.  Default to 100.");
+  /* max_iteration seems to be defunct */
+  //  CmiGetArgIntDesc(argv, "+FEmax_pose", &pose_config.max_iter , "Sets max events executed in single forward execution step.  Default to 100.");
   CmiGetArgIntDesc(argv, "+leash_specwindow_pose", &pose_config.spec_window , "Sets speculative window behavior.");
   CmiGetArgIntDesc(argv, "+leash_min_pose", &pose_config.min_leash , "Sets speculative window behavior minimum leash. Default 10.");
   CmiGetArgIntDesc(argv, "+leash_max_pose", &pose_config.max_leash , "Sets speculative window behavior maximum leash. Default 100.");
   CmiGetArgIntDesc(argv, "+leash_flex_pose", &pose_config.max_leash , "Sets speculative window behavior leash flex. Default 10.");
-  pose_config.deterministic =CmiGetArgFlagDesc(argv, "+deterministic_pose",  "sorts events of same timestamp by event id for repeatable behavior ");
+  if(pose_config.deterministic= CmiGetArgFlagDesc(argv, "+deterministic_pose",  "sorts events of same timestamp by event id for repeatable behavior "))
+    {
+      CkPrintf("enter at your own risk, this feature is broken\n");
+    }
+
+
 }  

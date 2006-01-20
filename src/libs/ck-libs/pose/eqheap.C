@@ -6,47 +6,50 @@
 /// Insert event in heap
 void HeapNode::insert(Event *e)
 {
-#ifdef DETERMINISTIC_EVENTS
-  insertDeterministic(e);
-#else
+  if(pose_config.deterministic)
+    {
+      insertDeterministic(e);
+    }
+  else
+    {
 #ifdef EH_SANITIZE
-  sanitize();
+      sanitize();
 #endif
-  CmiAssert(this != NULL);
-  CmiAssert(e->timestamp > this->e->timestamp || (e->timestamp == this->e->timestamp && e->evID >= this->e->evID));
-  HeapNode *eh;
-  if (left == NULL) {  // make it the left subheap
-    eh = new HeapNode(e, 1, NULL, NULL);
-    left = eh;
-    subheapsize += 1;
-  }
-  else if (right == NULL) {  // make it the right subheap
-    eh = new HeapNode(e, 1, NULL, NULL);
-    right = eh;
-    subheapsize += 1;
-  }
-  else if (e->timestamp < left->e->timestamp || (e->timestamp == left->e->timestamp && e->evID <= left->e->evID)) { // make root of left subtree
-    eh = new HeapNode(e, left->subheapsize+1, left, NULL);
-    left = eh;
-    subheapsize += 1;
-  }
-  else if (e->timestamp < right->e->timestamp || (e->timestamp == right->e->timestamp && e->evID <= right->e->evID)) { // make root of right subtree
-    eh = new HeapNode(e, right->subheapsize+1, right, NULL);
-    right = eh;
-    subheapsize += 1;
-  }
-  else if (left->subheapsize < right->subheapsize) { // insert in left subtree
-    subheapsize += 1;
-    left->insert(e);
-  }
-  else { // insert in right subtree
-    subheapsize += 1;
-    right->insert(e);
-  }
+      CmiAssert(this != NULL);
+      CmiAssert(e->timestamp > this->e->timestamp || (e->timestamp == this->e->timestamp && e->evID >= this->e->evID));
+      HeapNode *eh;
+      if (left == NULL) {  // make it the left subheap
+	eh = new HeapNode(e, 1, NULL, NULL);
+	left = eh;
+	subheapsize += 1;
+      }
+      else if (right == NULL) {  // make it the right subheap
+	eh = new HeapNode(e, 1, NULL, NULL);
+	right = eh;
+	subheapsize += 1;
+      }
+      else if (e->timestamp < left->e->timestamp || (e->timestamp == left->e->timestamp && e->evID <= left->e->evID)) { // make root of left subtree
+	eh = new HeapNode(e, left->subheapsize+1, left, NULL);
+	left = eh;
+	subheapsize += 1;
+      }
+      else if (e->timestamp < right->e->timestamp || (e->timestamp == right->e->timestamp && e->evID <= right->e->evID)) { // make root of right subtree
+	eh = new HeapNode(e, right->subheapsize+1, right, NULL);
+	right = eh;
+	subheapsize += 1;
+      }
+      else if (left->subheapsize < right->subheapsize) { // insert in left subtree
+	subheapsize += 1;
+	left->insert(e);
+      }
+      else { // insert in right subtree
+	subheapsize += 1;
+	right->insert(e);
+      }
 #ifdef EH_SANITIZE
-  sanitize();
+      sanitize();
 #endif
-#endif
+    }
 }
 
 /// Insert event in heap deterministically
@@ -106,22 +109,20 @@ HeapNode *HeapNode::conjoin(HeapNode *h)
 #endif
   if (!this) return h;
   else if (!h) return this;
-#ifdef DETERMINISTIC_EVENTS
-  else if ((e->timestamp < h->e->timestamp) ||
-           ((e->timestamp == h->e->timestamp) && (e->evID <= h->e->evID))) {
-#else
-  else if (e->timestamp < h->e->timestamp || (e->timestamp == h->e->timestamp && e->evID <= h->e->evID)) { // make this the root
-#endif
-    // conjoin this's kids into this's left and make this's right h
-    if (!left) left = right;
-    else left = left->conjoin(right);
-    right = h;
-    subheapsize += h->subheapsize;
+  else if (((pose_config.deterministic) && (e->timestamp < h->e->timestamp) ||
+	    ((e->timestamp == h->e->timestamp) && (e->evID <= h->e->evID))) ||
+	   (e->timestamp < h->e->timestamp || (e->timestamp == h->e->timestamp && e->evID <= h->e->evID)))
+    { 
+      // conjoin this's kids into this's left and make this's right h
+      if (!left) left = right;
+      else left = left->conjoin(right);
+      right = h;
+      subheapsize += h->subheapsize;
 #ifdef EH_SANITIZE
-    sanitize();
+      sanitize();
 #endif
-    return this;
-  }
+      return this;
+    }
   else { // make h the root
     // conjoin h's kids into h's right and make h's left this
     if (h->left) h->right = h->left->conjoin(h->right);
@@ -229,53 +230,55 @@ void EqHeap::InsertEvent(Event *e)
 {
   HeapNode *eh;
 
-#ifdef DETERMINISTIC_EVENTS
-  InsertDeterministic(e);
-#else
-#ifdef EH_SANITIZE
-    sanitize();
-#endif
-  CmiAssert((top == NULL) || (top->subheapsize > 0));
-  if (top == NULL) // make the top of the heap
-    top = new HeapNode(e, 1, NULL, NULL);
-  else if (e->timestamp < top->e->timestamp || (e->timestamp == top->e->timestamp && e->evID < top->e->evID)) { // insert at top of heap
-    if (top->subheapsize == 1) // only one node in heap
-      top = new HeapNode(e, 2, top, NULL); // make old top into left subheap
-    else if (top->left && top->right) { // full(ish) heap
-      // try to improve the balance by one
-      if (top->left->subheapsize < top->right->subheapsize) {
-	eh = new HeapNode(e, top->subheapsize+1, top, top->right);
-	top->subheapsize -= top->right->subheapsize;
-	top->right = NULL;
-	top = eh;
-      }
-      else {
-	eh = new HeapNode(e, top->subheapsize+1, top->left, top);
-	top->subheapsize -= top->left->subheapsize;
-	top->left = NULL;
-	top = eh;
-      }
-    }
-    else if (top->left) { // at least keep the balance about the same
-      eh = new HeapNode(e, top->subheapsize+1, top->left, top);
-      top->subheapsize = 1;
-      top->left = NULL;
-      top = eh;
-    }
-    else if (top->right) { // at least keep the balance about the same
-      eh = new HeapNode(e, top->subheapsize+1, top, top->right);
-      top->subheapsize = 1;
-      top->right = NULL;
-      top = eh;
-    }
+  if(pose_config.deterministic){
+    InsertDeterministic(e);
   }
-  else // insert somewhere below the top node
-    top->insert(e);
-  heapSize++;
+  else
+    {
 #ifdef EH_SANITIZE
-    sanitize();
+      sanitize();
 #endif
+      CmiAssert((top == NULL) || (top->subheapsize > 0));
+      if (top == NULL) // make the top of the heap
+	top = new HeapNode(e, 1, NULL, NULL);
+      else if (e->timestamp < top->e->timestamp || (e->timestamp == top->e->timestamp && e->evID < top->e->evID)) { // insert at top of heap
+	if (top->subheapsize == 1) // only one node in heap
+	  top = new HeapNode(e, 2, top, NULL); // make old top into left subheap
+	else if (top->left && top->right) { // full(ish) heap
+	  // try to improve the balance by one
+	  if (top->left->subheapsize < top->right->subheapsize) {
+	    eh = new HeapNode(e, top->subheapsize+1, top, top->right);
+	    top->subheapsize -= top->right->subheapsize;
+	    top->right = NULL;
+	    top = eh;
+	  }
+	  else {
+	    eh = new HeapNode(e, top->subheapsize+1, top->left, top);
+	    top->subheapsize -= top->left->subheapsize;
+	    top->left = NULL;
+	    top = eh;
+	  }
+	}
+	else if (top->left) { // at least keep the balance about the same
+	  eh = new HeapNode(e, top->subheapsize+1, top->left, top);
+	  top->subheapsize = 1;
+	  top->left = NULL;
+	  top = eh;
+	}
+	else if (top->right) { // at least keep the balance about the same
+	  eh = new HeapNode(e, top->subheapsize+1, top, top->right);
+	  top->subheapsize = 1;
+	  top->right = NULL;
+	  top = eh;
+	}
+      }
+      else // insert somewhere below the top node
+	top->insert(e);
+      heapSize++;
+#ifdef EH_SANITIZE
+      sanitize();
 #endif
+    }
 }
 
 /// Insert event e in heap with low timestamps at top of heap

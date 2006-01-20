@@ -14,8 +14,8 @@ void adapt::Step()
   if (!parent->cancels.IsEmpty()) CancelEvents();
   parent->Status();
 
-  if (rbFlag) timeLeash = MIN_LEASH;
-  else if (timeLeash < MAX_LEASH) timeLeash += LEASH_FLEX; //expand spec window
+  if (rbFlag) timeLeash = pose_config.min_leash;
+  else if (timeLeash < pose_config.max_leash) timeLeash += pose_config.leash_flex; //expand spec window
   // Shorten the leash as we near POSE_endtime
   if ((POSE_endtime > POSE_UnsetTS) && (lastGVT + timeLeash > POSE_endtime))
     timeLeash = POSE_endtime - lastGVT + 1;

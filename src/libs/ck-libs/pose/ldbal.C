@@ -20,7 +20,7 @@ int LBgroup::computeObjectLoad(POSE_TimeType ovt, POSE_TimeType eet, double rbOh
   int offset = eet - gvt; 
 
   if (!offset)  return 100;
-  else if (offset < SPEC_WINDOW)  return 90;
+  else if (offset < pose_config.spec_window)  return 90;
   else if (eet < 0)  return 50;
   else  return 80;
 }
@@ -135,7 +135,7 @@ void LBgroup::balance(BalanceSpecs *bs)
   int underLoad, contrib;
   destMsg *dm;
 
-  if (bs->sortArray[0].peLoad + LB_DIFF < bs->sortArray[CkNumPes()-1].peLoad){
+  if (bs->sortArray[0].peLoad + pose_config.lb_diff < bs->sortArray[CkNumPes()-1].peLoad){
     // we only want to move objects that are not tightly coupled with other 
     // local objects via communication, so we build a list of movable objects
     // the very first time this processor is overloaded
@@ -149,7 +149,7 @@ void LBgroup::balance(BalanceSpecs *bs)
     if ((peLoad > bs->avgLoad) &&
 	(bs->sortArray[myIndex].peLoad - 
 	 bs->sortArray[bs->sortArray[myIndex].startPEidx].peLoad 
-	 > LB_THRESHOLD)) {
+	 > pose_config.lb_threshold)) {
       CkPrintf("[%d] overload: checking balancing prospects.\n", CkMyPe());
       // Load up the table with movable objects
       for (i=0; i<CkNumPes(); i++)
@@ -181,7 +181,7 @@ void LBgroup::balance(BalanceSpecs *bs)
 	for (i=start; i<=end; i++) {
 	  //CkPrintf("start=%d end=%d avgPeLd=%f i=%d [i].peLoad=%f\n", start, end, bs->avgPeLd, i, bs->sortArray[i].peLoad);
 	  if (bs->sortArray[myIndex].peLoad - bs->sortArray[i].peLoad 
-	      < LB_THRESHOLD)
+	      < pose_config.lb_threshold)
 	    break;
 	  if (bs->avgLoad > bs->sortArray[i].peLoad)
 	    underLoad = bs->avgLoad - bs->sortArray[i].peLoad;

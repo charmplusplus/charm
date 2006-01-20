@@ -600,9 +600,9 @@ foreach my $incfile ($inC,@otherfiles)
 	$outChandle->print("  if(pose_config.stats)\n");
 	$outChandle->print("    {localStats->TimerStart(SIM_TIMER);}\n");
 	$outChandle->print("#endif\n");
-	$outChandle->print("#ifdef LB_ON  \n");
-	$outChandle->print("  LBgroup *localLBG = TheLBG.ckLocalBranch();\n\n");
-	$outChandle->print("#endif  \n");
+	$outChandle->print("  LBgroup *localLBG;\n\n");
+	$outChandle->print("  if(pose_config.lb_on)\n");
+	$outChandle->print("     localLBG = TheLBG.ckLocalBranch();\n\n");
 	$outChandle->print("  myStrat = new ".$strat{$class}."();\n");
 	$outChandle->print("  $messagename->parent = this;\n");
 	$outChandle->print("  $messagename->str = myStrat;\n");
@@ -617,9 +617,8 @@ foreach my $incfile ($inC,@otherfiles)
 	$outChandle->print("  PVT *pvt = (PVT *)CkLocalBranch(ThePVT);\n");
 	$outChandle->print("  myPVTidx = pvt->objRegister(thisIndex, _ts, sync, this);\n");
 	$outChandle->print("#endif\n");
-	$outChandle->print("#ifdef LB_ON  \n");
-	$outChandle->print("  myLBidx = localLBG->objRegister(thisIndex, sync, this);\n");
-	$outChandle->print("#endif  \n");
+	$outChandle->print("  if(pose_config.lb_on)\n");
+	$outChandle->print("    myLBidx = localLBG->objRegister(thisIndex, sync, this);\n");
 	$outChandle->print("}\n");
 	#create the pup constructor
 	if (exists($puppy{$class})) {
