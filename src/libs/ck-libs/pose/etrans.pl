@@ -759,9 +759,8 @@ foreach my $incfile ($inC,@otherfiles)
 	    $outChandle->print("#ifndef CMK_OPTIMIZE\n");
 	    $outChandle->print("  if(pose_config.stats)\n");
 	    $outChandle->print("    if (!CpvAccess(stateRecovery)) {localStats->Do();\n");
-	    $outChandle->print("#ifdef POSE_DOP_ON\n");
-	    $outChandle->print("    st = CmiWallTimer();\n");
-	    $outChandle->print("#endif\n");
+	    $outChandle->print("    if(pose_config.dop)\n");
+	    $outChandle->print("      st = CmiWallTimer();\n");
 	    $outChandle->print("    localStats->SwitchTimer(DO_TIMER);}\n");
 	    $outChandle->print("#endif\n");
 
@@ -769,12 +768,12 @@ foreach my $incfile ($inC,@otherfiles)
 	    $outChandle->print("#ifndef CMK_OPTIMIZE\n");
 	    $outChandle->print("  if(pose_config.stats)\n");
 	    $outChandle->print("    if (!CpvAccess(stateRecovery)) {\n");
-	    $outChandle->print("#ifdef POSE_DOP_ON\n");
-	    $outChandle->print("    et = CmiWallTimer();\n");
-	    $outChandle->print("    eq->currentPtr->ert = eq->currentPtr->srt + (et-st);\n");
-	    $outChandle->print("    ((state_$key *) objID)->ort = eq->currentPtr->ert+0.000001;\n");
-	    $outChandle->print("    eq->currentPtr->evt = ((state_$key *) objID)->OVT();\n");
-	    $outChandle->print("#endif\n");
+	    $outChandle->print("    if(pose_config.dop){\n");
+	    $outChandle->print("      et = CmiWallTimer();\n");
+	    $outChandle->print("      eq->currentPtr->ert = eq->currentPtr->srt + (et-st);\n");
+	    $outChandle->print("      ((state_$key *) objID)->ort = eq->currentPtr->ert+0.000001;\n");
+	    $outChandle->print("      eq->currentPtr->evt = ((state_$key *) objID)->OVT();\n");
+	    $outChandle->print("    }\n");
 	    $outChandle->print("    localStats->SwitchTimer(SIM_TIMER);}\n");
 	    $outChandle->print("#endif\n");
 
@@ -1220,10 +1219,10 @@ sub posefuncmap
 		  $output.="int _POSE_handle = ".$segments[3].";\n";
 		  $output.="POSE_TimeType _POSE_timeOffset = ".$segments[4].";\n";
 		  $output.="registerTimestamp(_POSE_handle, ".$msg.",_POSE_timeOffset);\n";
-		  $output.="#ifdef POSE_DOP_ON\n";
-		  $output.="parent->ct = CmiWallTimer();\n";
-		  $output.="$msg->rst = parent->ct - parent->st + parent->eq->currentPtr->srt;\n";
-		  $output.="#endif\n";
+		  $output.="if(pose_config.dop){\n";
+		  $output.="  parent->ct = CmiWallTimer();\n";
+		  $output.="  $msg->rst = parent->ct - parent->st + parent->eq->currentPtr->srt;\n";
+		  $output.="}\n";
 		  #$output.="char str[30];\n";
 		  #$output.="CkPrintf(\"[%d] SEND(event) to [%d] @ %d: Event=%s\\n\", parent->thisIndex, _POSE_handle, $msg->timestamp, $msg->evID.sdump(str));\n";		  
 		  $output.="#ifndef CMK_OPTIMIZE\n";
@@ -1290,10 +1289,10 @@ sub posefuncmap
 		    $output.="int _POSE_atTime = ".$segments[4].";\n";
 		    $output.="if (!CpvAccess(stateRecovery)) {\n";
 		    $output.="registerTimestamp(_POSE_handle, ".$msg.", _POSE_atTime);\n";
-		    $output.="#ifdef POSE_DOP_ON\n";
-		    $output.="parent->ct = CmiWallTimer();\n";
-		    $output.="$msg->rst = parent->ct - parent->st + parent->eq->currentPtr->srt;\n";
-		    $output.="#endif\n";
+		    $output.="if(pose_config.dop){\n";
+		    $output.="  parent->ct = CmiWallTimer();\n";
+		    $output.="  $msg->rst = parent->ct - parent->st + parent->eq->currentPtr->srt;\n";
+		    $output.="}\n";
 		    #$output.="char str[30];\n";
 		    #$output.="CkPrintf(\"[%d] SEND(event) to [%d] @ %d: Event=%s\\n\", parent->thisIndex, _POSE_handle, $msg->timestamp, $msg->evID.sdump(str));\n";		  
 		    $output.="#ifndef CMK_OPTIMIZE\n";
@@ -1352,10 +1351,10 @@ sub posefuncmap
 		      $output.="POSE_TimeType _POSE_timeOffset = ".$segments[2].";\n";
 		      $output.="if (!CpvAccess(stateRecovery)) {\n";
 		      $output.="registerTimestamp(parent->thisIndex, ".$msg.", _POSE_timeOffset);\n";
-		      $output.="#ifdef POSE_DOP_ON\n";
-		      $output.="parent->ct = CmiWallTimer();\n";
-		      $output.="$msg->rst = parent->ct - parent->st + parent->eq->currentPtr->srt;\n";
-		      $output.="#endif\n";
+		      $output.="if(pose_config.dop){\n";
+		      $output.="  parent->ct = CmiWallTimer();\n";
+		      $output.="  $msg->rst = parent->ct - parent->st + parent->eq->currentPtr->srt;\n";
+		      $output.="}\n";
 		      #$output.="char str[30];\n";
 		      #$output.="CkPrintf(\"[%d] SEND(event) to [%d] @ %d: Event=%s\\n\", parent->thisIndex, parent->thisIndex, $msg->timestamp, $msg->evID.sdump(str));\n";		  
 		      $output.="#ifndef CMK_OPTIMIZE\n";

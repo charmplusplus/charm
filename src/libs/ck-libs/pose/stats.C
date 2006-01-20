@@ -125,11 +125,11 @@ void globalStat::localStatReport(localStatSummary *m)
 	     doMax, rbMax, gvtMax, simMax, cpMax, canMax, lbMax, fcMax, commMax, doAvg, rbAvg, gvtAvg, simAvg, cpAvg, canAvg, lbAvg, fcAvg, commAvg, maxTime, totalDos, totalDos-totalUndos, totalCommits, avgDo, maxDo, minDo, totalGvts, GvtTime, totalLoops, (doAvg*CkNumPes())/totalLoops);
     //CkPrintf("Avg. Max# Checkpoints=%d Bytes checkpointed=%d\n", maxChkPts, cpBytes);
 
-#ifdef POSE_DOP_ON
-    CkPrintf("Overhead-free maximally parallel runtime=%f  Max GVT=%d\n",
+    if(pose_config.dop){
+      CkPrintf("Overhead-free maximally parallel runtime=%f  Max GVT=%d\n",
 	     maxGRT, maxGVT);
-    DOPcalc(maxGVT, maxGRT);
-#endif
+      DOPcalc(maxGVT, maxGRT);
+    }
 
     POSE_exit();
     /*

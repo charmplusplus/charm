@@ -4,11 +4,11 @@
 /// Basic Constructor
 eventQueue::eventQueue()
 {
-#ifdef POSE_DOP_ON
-  sprintf(filename, "dop%d.log", CkMyPe());
-  fp = fopen(filename, "a");
-  lastLoggedVT = 0;
-#endif
+  if(pose_config.dop){
+    sprintf(filename, "dop%d.log", CkMyPe());
+    fp = fopen(filename, "a");
+    lastLoggedVT = 0;
+  }
   Event *e;
   eqh = new EqHeap();  // create the heap for incoming events
   largest = POSE_UnsetTS;
@@ -154,26 +154,26 @@ void eventQueue::CommitStatsHelper(Event *commitPtr)
     localStats->Commit();
   }
 
-#ifdef POSE_DOP_ON
-  fpos_t fptr;
-  // if more than one event occurs at the same virtual time on this object, 
-  // only count the first event
-  if (lastLoggedVT >= commitPtr->svt)
-    commitPtr->svt = commitPtr->evt = -1;
-  else lastLoggedVT = commitPtr->evt;
+  if(pose_config.dop)
+    {
+      fpos_t fptr;
+      // if more than one event occurs at the same virtual time on this object, 
+      // only count the first event
+      if (lastLoggedVT >= commitPtr->svt)
+	commitPtr->svt = commitPtr->evt = -1;
+      else lastLoggedVT = commitPtr->evt;
 #if USE_LONG_TIMESTAMPS
-  while (!fprintf(fp, "%f %f %lld %lld\n", commitPtr->srt, commitPtr->ert, 
-		  commitPtr->svt, commitPtr->evt))
-    fsetpos(fp, &fptr);
+      while (!fprintf(fp, "%f %f %lld %lld\n", commitPtr->srt, commitPtr->ert, 
+		      commitPtr->svt, commitPtr->evt))
+	fsetpos(fp, &fptr);
 #else
-  while (!fprintf(fp, "%f %f %d %d\n", commitPtr->srt, commitPtr->ert, 
-		  commitPtr->svt, commitPtr->evt))
-    fsetpos(fp, &fptr);
+      while (!fprintf(fp, "%f %f %d %d\n", commitPtr->srt, commitPtr->ert, 
+		      commitPtr->svt, commitPtr->evt))
+	fsetpos(fp, &fptr);
 #endif
-  fgetpos(fp, &fptr);
-  localStats->SetMaximums(commitPtr->evt, commitPtr->ert);
-#endif
-
+      fgetpos(fp, &fptr);
+      localStats->SetMaximums(commitPtr->evt, commitPtr->ert);
+    }
 #endif
 }
 
