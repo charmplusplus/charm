@@ -66,7 +66,7 @@ public:
     collection and forward execution on objects with new estimate. */
 class PVT : public Group {  
  private:
-#ifdef POSE_STATS_ON
+#ifndef CMK_OPTIMIZE
   localStat *localStats;
 #endif
   /// PVT of local optimistic posers
@@ -137,7 +137,7 @@ class PVT : public Group {
     GVT invocation. */
 class GVT : public Group { 
 private:
-#ifdef POSE_STATS_ON
+#ifndef CMK_OPTIMIZE
   localStat *localStats;
 #endif
   /// Latest GVT estimate

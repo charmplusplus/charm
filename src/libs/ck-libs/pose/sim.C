@@ -23,8 +23,9 @@ sim::sim()
 #ifdef LB_ON
   localLBG = TheLBG.ckLocalBranch();
 #endif
-#ifdef POSE_STATS_ON
-  localStats = (localStat *)CkLocalBranch(theLocalStats);
+#ifndef CMK_OPTIMIZE
+  if(pose_config.stats)
+    localStats = (localStat *)CkLocalBranch(theLocalStats);
 #endif
   lastGVT = active = DOs = UNDOs = 0;
   srVector = (int *)malloc(CkNumPes() * sizeof(int));
@@ -49,10 +50,14 @@ void sim::Step()
 #ifdef TRACE_DETAIL
   double critStart = CmiWallTimer();  // trace timing
 #endif
-#ifdef POSE_STATS_ON
-  int tstat = localStats->TimerRunning();
-  if (!tstat)  localStats->TimerStart(SIM_TIMER);
-  else localStats->SwitchTimer(SIM_TIMER);
+#ifndef CMK_OPTIMIZE
+  int tstat;
+  if(pose_config.stats)
+    {
+      tstat= localStats->TimerRunning();
+      if (!tstat)  localStats->TimerStart(SIM_TIMER);
+      else localStats->SwitchTimer(SIM_TIMER);
+    }
 #endif
   prioMsg *pm;
   switch (myStrat->STRAT_T) { // step based on strategy type
@@ -72,9 +77,12 @@ void sim::Step()
     CkPrintf("Invalid strategy type: %d\n", myStrat->STRAT_T); 
     break;
   }
-#ifdef POSE_STATS_ON
-  if (!tstat)  localStats->TimerStop();
-  else localStats->SwitchTimer(tstat);
+#ifndef CMK_OPTIMIZE
+  if(pose_config.stats)  
+    {
+      if (!tstat)  localStats->TimerStop();
+      else localStats->SwitchTimer(tstat);
+    }
 #endif
 #ifdef TRACE_DETAIL
   traceUserBracketEvent(60, critStart, CmiWallTimer());
@@ -86,17 +94,24 @@ void sim::Step(prioMsg *m)
 {
   CkFreeMsg(m);
   if (active < 0) return; // object is migrating; deactivate it 
-#ifdef POSE_STATS_ON
-  int tstat = localStats->TimerRunning();
-  if (!tstat)
-    localStats->TimerStart(SIM_TIMER);
-  else localStats->SwitchTimer(SIM_TIMER);
+#ifndef CMK_OPTIMIZE
+  int tstat;
+  if(pose_config.stats)
+    {
+      tstat= localStats->TimerRunning();
+      if (!tstat)
+	localStats->TimerStart(SIM_TIMER);
+      else localStats->SwitchTimer(SIM_TIMER);
+    }
 #endif
   myStrat->Step(); // Call Step on strategy
-#ifdef POSE_STATS_ON
-  if (!tstat)
-    localStats->TimerStop();
-  else localStats->SwitchTimer(tstat);
+#ifndef CMK_OPTIMIZE
+  if(pose_config.stats)
+    {
+      if (!tstat)
+	localStats->TimerStop();
+      else localStats->SwitchTimer(tstat);
+    }
 #endif
 }
 
@@ -107,14 +122,19 @@ void sim::Commit()
 #ifdef TRACE_DETAIL
   double critStart = CmiWallTimer();  // trace timing
 #endif
-#ifdef POSE_STATS_ON
-  int tstat = localStats->TimerRunning();
-  if (!tstat)  localStats->TimerStart(SIM_TIMER);
-  else localStats->SwitchTimer(SIM_TIMER);
+#ifndef CMK_OPTIMIZE
+  int tstat;
+  if(pose_config.stats)
+    {
+      tstat = localStats->TimerRunning();
+      if (!tstat)  localStats->TimerStart(SIM_TIMER);
+      else localStats->SwitchTimer(SIM_TIMER);
+    }
 #endif
   localPVT = (PVT *)CkLocalBranch(ThePVT);
-#ifdef POSE_STATS_ON
-  localStats->SwitchTimer(FC_TIMER);
+#ifndef CMK_OPTIMIZE
+  if(pose_config.stats)
+    localStats->SwitchTimer(FC_TIMER);
 #endif
   if (localPVT->done()) { // simulation inactive
     eq->CommitEvents(this, POSE_endtime); // commit all events in queue
@@ -128,14 +148,16 @@ void sim::Commit()
   traceUserBracketEvent(50, critStart, CmiWallTimer());
   critStart = CmiWallTimer();
 #endif
-#ifdef POSE_STATS_ON
-  localStats->SwitchTimer(SIM_TIMER);
+#ifndef CMK_OPTIMIZE
+  if(pose_config.stats)
+    localStats->SwitchTimer(SIM_TIMER);
 #endif
   if (!localPVT->done() && (eq->currentPtr->timestamp > -1)) 
     Step(); // not done; try stepping again
-#ifdef POSE_STATS_ON
-  if (!tstat)  localStats->TimerStop();
-  else localStats->SwitchTimer(tstat);
+#ifndef CMK_OPTIMIZE
+  if(pose_config.stats)
+    if (!tstat)  localStats->TimerStop();
+    else localStats->SwitchTimer(tstat);
 #endif
 #ifdef TRACE_DETAIL
   traceUserBracketEvent(60, critStart, CmiWallTimer());
@@ -166,8 +188,9 @@ void sim::ReportLBdata()
 /// Add m to cancellation list
 void sim::Cancel(cancelMsg *m) 
 {
-#ifdef POSE_STATS_ON
-  localStats->TimerStart(CAN_TIMER);
+#ifndef CMK_OPTIMIZE
+  if(pose_config.stats)
+    localStats->TimerStart(CAN_TIMER);
 #endif
   //  char str[20];
   //  CkPrintf("[%d] RECV(cancel) %s at %d...\n", CkMyPe(), m->evID.sdump(str), m->timestamp);      
@@ -178,12 +201,14 @@ void sim::Cancel(cancelMsg *m)
 #ifdef TRACE_DETAIL
   double critStart = CmiWallTimer();  // trace timing
 #endif
-#ifdef POSE_STATS_ON
-  localStats->SwitchTimer(SIM_TIMER);      
+#ifndef CMK_OPTIMIZE
+  if(pose_config.stats)
+    localStats->SwitchTimer(SIM_TIMER);      
 #endif
   myStrat->Step(); // call Step to handle cancellation
-#ifdef POSE_STATS_ON
-  localStats->TimerStop();
+#ifndef CMK_OPTIMIZE
+  if(pose_config.stats)
+    localStats->TimerStop();
 #endif
 #ifdef TRACE_DETAIL
   traceUserBracketEvent(60, critStart, CmiWallTimer());

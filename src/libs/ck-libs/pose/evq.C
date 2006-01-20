@@ -145,12 +145,14 @@ void eventQueue::InsertEventDeterministic(Event *e)
 
 void eventQueue::CommitStatsHelper(Event *commitPtr)
 {
-#ifdef POSE_STATS_ON      
-  fpos_t fptr;
+#ifndef CMK_OPTIMIZE
   localStat *localStats = (localStat *)CkLocalBranch(theLocalStats);
-  localStats->Commit();
-#endif
+  if(pose_config.stats){
+    localStats->Commit();
+  }
+
 #ifdef POSE_DOP_ON
+  fpos_t fptr;
   // if more than one event occurs at the same virtual time on this object, 
   // only count the first event
   if (lastLoggedVT >= commitPtr->svt)
@@ -167,6 +169,8 @@ void eventQueue::CommitStatsHelper(Event *commitPtr)
 #endif
   fgetpos(fp, &fptr);
   localStats->SetMaximums(commitPtr->evt, commitPtr->ert);
+#endif
+
 #endif
 }
 

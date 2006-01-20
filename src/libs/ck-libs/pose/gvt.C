@@ -14,9 +14,12 @@ PVT::PVT()
 #ifdef POSE_COMM_ON
   //comm_debug = 1;
 #endif
-#ifdef POSE_STATS_ON
+#ifndef CMK_OPTIMIZE
   localStats = (localStat *)CkLocalBranch(theLocalStats);
-  localStats->TimerStart(GVT_TIMER);
+  if(pose_config.stats)
+    {
+      localStats->TimerStart(GVT_TIMER);
+    }
 #endif
   optPVT = conPVT = estGVT = POSE_UnsetTS;
   startPhaseActive = gvtTurn = simdone = 0;
@@ -52,8 +55,9 @@ PVT::PVT()
     else reportsExpected = 1 + (P-2)/4 + (P-2)%2;
   }
   //  CkPrintf("PE %d reports to %d, receives %d reports, reduces and sends to %d, and reports directly to GVT if %d = 1!\n", CkMyPe(), reportTo, reportsExpected, reportReduceTo, reportEnd);
-#ifdef POSE_STATS_ON
-  localStats->TimerStop();
+#ifndef CMK_OPTIMIZE
+  if(pose_config.stats)
+    localStats->TimerStop();
 #endif
 }
 
@@ -69,8 +73,9 @@ void PVT::startPhase(prioBcMsg *m)
   register int i;
 
   if (startPhaseActive) return;
-#ifdef POSE_STATS_ON
-  localStats->TimerStart(GVT_TIMER);
+#ifndef CMK_OPTIMIZE
+  if(pose_config.stats)
+    localStats->TimerStart(GVT_TIMER);
 #endif
   startPhaseActive = 1;
   if (m->bc) {
@@ -155,16 +160,18 @@ void PVT::startPhase(prioBcMsg *m)
   */
   objs.SetIdle(); // Set objects to idle
   iterMin = POSE_UnsetTS;
-#ifdef POSE_STATS_ON
-  localStats->TimerStop();
+#ifndef CMK_OPTIMIZE
+  if(pose_config.stats)
+    localStats->TimerStop();
 #endif
 }
 
 /// ENTRY: receive GVT estimate; wake up objects
 void PVT::setGVT(GVTMsg *m)
 {
-#ifdef POSE_STATS_ON
-  localStats->TimerStart(GVT_TIMER);
+#ifndef CMK_OPTIMIZE
+  if(pose_config.stats)
+    localStats->TimerStart(GVT_TIMER);
 #endif
   CProxy_PVT p(ThePVT);
   CkAssert(m->estGVT >= estGVT);
@@ -184,8 +191,9 @@ void PVT::setGVT(GVTMsg *m)
   *((int *)CkPriorityPtr(startMsg)) = 0;
   CkSetQueueing(startMsg, CK_QUEUEING_IFIFO); 
   p[CkMyPe()].startPhase(startMsg);
-#ifdef POSE_STATS_ON
-  localStats->TimerStop();
+#ifndef CMK_OPTIMIZE
+  if(pose_config.stats)
+    localStats->TimerStop();
 #endif
 }
 
@@ -206,12 +214,14 @@ void PVT::objRemove(int pvtIdx)
 /// Update send/recv table at timestamp
 void PVT::objUpdate(POSE_TimeType timestamp, int sr)
 {
-#ifdef POSE_STATS_ON
+#ifndef CMK_OPTIMIZE
   int tstat = localStats->TimerRunning();
-  if (tstat)
-    localStats->SwitchTimer(GVT_TIMER);
-  else
-    localStats->TimerStart(GVT_TIMER);
+  if(pose_config.stats){
+    if (tstat)
+      localStats->SwitchTimer(GVT_TIMER);
+    else
+      localStats->TimerStart(GVT_TIMER);
+  }
 #endif
   //if ((timestamp < estGVT) && (estGVT > POSE_UnsetTS))
   //CkPrintf("timestamp=%d estGVT=%d simdone=%d sr=%d\n", timestamp, estGVT, simdone, sr);
@@ -225,11 +235,13 @@ void PVT::objUpdate(POSE_TimeType timestamp, int sr)
     SendsAndRecvs->Restructure(estGVT, timestamp, sr);
   }
   else SendsAndRecvs->Insert(timestamp, sr);
-#ifdef POSE_STATS_ON
-  if (tstat)
-    localStats->SwitchTimer(tstat);
-  else
-    localStats->TimerStop();
+#ifndef CMK_OPTIMIZE
+  if(pose_config.stats){
+    if (tstat)
+      localStats->SwitchTimer(tstat);
+    else
+      localStats->TimerStop();
+  }
 #endif
 
 }
@@ -253,8 +265,9 @@ void PVT::objUpdateOVT(int pvtIdx, POSE_TimeType safeTime, POSE_TimeType ovt)
 /// Reduction point for PVT reports
 void PVT::reportReduce(UpdateMsg *m)
 {
-#ifdef POSE_STATS_ON
-  localStats->TimerStart(GVT_TIMER);
+#ifndef CMK_OPTIMIZE
+  if(pose_config.stats)
+    localStats->TimerStart(GVT_TIMER);
 #endif
   CProxy_PVT p(ThePVT);
   CProxy_GVT g(TheGVT);
@@ -320,15 +333,16 @@ void PVT::reportReduce(UpdateMsg *m)
     }
     done = 0;
   }
-#ifdef POSE_STATS_ON
-  localStats->TimerStop();
+#ifndef CMK_OPTIMIZE
+  if(pose_config.stats)
+    localStats->TimerStop();
 #endif
 }
 
 /// Basic Constructor
 GVT::GVT() 
 {
-#ifdef POSE_STATS_ON
+#ifndef CMK_OPTIMIZE
   localStats = (localStat *)CkLocalBranch(theLocalStats);
 #endif
 #ifdef LB_ON
@@ -360,8 +374,9 @@ GVT::GVT()
 /// ENTRY: Run the GVT
 void GVT::runGVT(UpdateMsg *m) 
 {
-#ifdef POSE_STATS_ON
-  localStats->TimerStart(GVT_TIMER);
+#ifndef CMK_OPTIMIZE
+  if(pose_config.stats)
+    localStats->TimerStart(GVT_TIMER);
 #endif
   estGVT = m->optPVT;
   inactive = m->inactive;
@@ -370,16 +385,18 @@ void GVT::runGVT(UpdateMsg *m)
   CProxy_GVT g(TheGVT);
   m->runGVTflag = 1;
   g[CkMyPe()].computeGVT(m);  // start the next PVT phase of the GVT algorithm
-#ifdef POSE_STATS_ON
-  localStats->TimerStop();
+#ifndef CMK_OPTIMIZE
+  if(pose_config.stats)
+    localStats->TimerStop();
 #endif
 }
 
 /// ENTRY: Gathers PVT reports; calculates and broadcasts GVT to PVTs
 void GVT::computeGVT(UpdateMsg *m)
 {
-#ifdef POSE_STATS_ON
-  localStats->TimerStart(GVT_TIMER);
+#ifndef CMK_OPTIMIZE
+  if(pose_config.stats)
+    localStats->TimerStart(GVT_TIMER);
 #endif
   CProxy_PVT p(ThePVT);
   CProxy_GVT g(TheGVT);
@@ -411,8 +428,9 @@ void GVT::computeGVT(UpdateMsg *m)
   CkFreeMsg(m);
 
   if (done == reportsExpected+startOffset) { // all PVT reports are in
-#ifdef POSE_STATS_ON
-    localStats->GvtInc();
+#ifndef CMK_OPTIMIZE
+    if(pose_config.stats)
+      localStats->GvtInc();
 #endif
     done = 0;
     startOffset = 1;
@@ -510,8 +528,9 @@ void GVT::computeGVT(UpdateMsg *m)
 
 #ifdef LB_ON
       // perform load balancing
-#ifdef POSE_STATS_ON
-      localStats->SwitchTimer(LB_TIMER);
+#ifndef CMK_OPTIMIZE
+      if(pose_config.stats)
+	localStats->SwitchTimer(LB_TIMER);
 #endif
       static int lb_skip = LB_SKIP;
       if (CkNumPes() > 1) {
@@ -521,8 +540,9 @@ void GVT::computeGVT(UpdateMsg *m)
 	  nextLBstart = 0;
 	}
       }
-#ifdef POSE_STATS_ON
-      localStats->SwitchTimer(GVT_TIMER);
+#ifndef CMK_OPTIMIZE
+      if(pose_config.stats)
+	localStats->SwitchTimer(GVT_TIMER);
 #endif
 #endif
 
@@ -546,8 +566,9 @@ void GVT::computeGVT(UpdateMsg *m)
       cur = tmp;
     }
   }
-#ifdef POSE_STATS_ON
-  localStats->TimerStop();
+#ifndef CMK_OPTIMIZE
+  if(pose_config.stats)
+    localStats->TimerStop();
 #endif
 }
 

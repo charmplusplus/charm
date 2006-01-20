@@ -16,6 +16,7 @@
 extern CProxy_sim POSE_Objects; 
 extern CProxy_sim POSE_Objects_RO; 
 extern CkChareID POSE_Coordinator_ID; 
+extern POSE_Config pose_config;
 class sim; // needed for eventMsg definition below
 
 /// All user event messages inherit from this
@@ -222,7 +223,7 @@ class sim : public CBase_sim {
   /// Relative start time, start time, end time and current time
   /** Used to calculate degree of parallelism */
   double st, et, ct;
-#ifdef POSE_STATS_ON
+#ifndef CMK_OPTIMIZE
   /// The local statistics collector
   localStat *localStats; 
 #endif
@@ -247,7 +248,7 @@ class sim : public CBase_sim {
     // pup cancellations
     cancels.pup(p);
     if (p.isUnpacking()) { // reactivate migrated object
-#ifdef POSE_STATS_ON
+#ifndef CMK_OPTIMIZE
       localStats = (localStat *)CkLocalBranch(theLocalStats);
 #endif
 #ifndef SEQUENTIAL_POSE

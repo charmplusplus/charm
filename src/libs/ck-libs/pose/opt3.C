@@ -31,8 +31,9 @@ void opt3::Step()
       eq->ShiftEvent(); // shift to next event
       ev = eq->currentPtr; // reset ev
     }
-#ifdef POSE_STATS_ON
-    if (iter > 0) localStats->Loop();
+#ifndef CMK_OPTIMIZE
+    if(pose_config.stats)
+      if (iter > 0) localStats->Loop();
 #endif  
     if (eq->currentPtr->timestamp > POSE_UnsetTS) {
       // execute next event if there is one

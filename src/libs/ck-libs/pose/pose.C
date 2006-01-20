@@ -4,6 +4,7 @@
 
 CpvDeclare(int, stateRecovery);
 
+void POSEreadCmdLine();
 #ifdef POSE_COMM_ON
 extern int comm_debug;
 #endif
@@ -13,7 +14,9 @@ int POSE_inactDetect;
 POSE_TimeType POSE_endtime;
 POSE_TimeType POSE_GlobalClock;
 POSE_TimeType POSE_GlobalTS;
+POSE_Config pose_config;
 ComlibInstanceHandle POSE_commlib_insthndl;
+
 
 // Main initialization for all of POSE
 void POSE_init() // use inactivity detection by default
@@ -29,6 +32,7 @@ void POSE_init(int ET) // a single parameter specifies endtime
 void POSE_init(int IDflag, int ET) // can specify both
 {
   CkPrintf("Initializing POSE...  \n");
+  POSEreadCmdLine();
   POSE_inactDetect = IDflag;
   POSE_endtime = ET;
 #ifdef TRACE_DETAIL
@@ -71,7 +75,7 @@ void POSE_init(int IDflag, int ET) // can specify both
   //#endif
   //#endif
   // Initialize statistics collection if desired
-#ifdef POSE_STATS_ON
+#ifndef CMK_OPTIMIZE
   theLocalStats = CProxy_localStat::ckNew();
   CProxy_globalStat::ckNew(&theGlobalStats);
 #endif
@@ -176,8 +180,8 @@ void pose::registerCallBack(callBack *cbm)
 /// Stop the simulation
 void pose::stop(void) 
 { 
-#ifdef POSE_STATS_ON
-  CProxy_localStat stats(theLocalStats);
+#ifndef CMK_OPTIMIZE
+    CProxy_localStat stats(theLocalStats);
 #endif
 #ifdef SEQUENTIAL_POSE
 #if USE_LONG_TIMESTAMPS
@@ -188,10 +192,19 @@ void pose::stop(void)
   // Call sequential termination here...
   POSE_Objects.Terminate();
 #endif
-#ifdef POSE_STATS_ON
-  CkPrintf("%d PE Simulation finished at %f. Gathering stats...\n", 
-	   CkNumPes(), CmiWallTimer() - sim_timer);
-  stats.SendStats();
+#ifndef CMK_OPTIMIZE
+  if(pose_config.stats)
+    {
+      CkPrintf("%d PE Simulation finished at %f. Gathering stats...\n", 
+	       CkNumPes(), CmiWallTimer() - sim_timer);
+      stats.SendStats();
+    }
+  else
+    {
+      CkPrintf("%d PE Simulation finished at %f.\n", CkNumPes(), 
+	       CmiWallTimer() - sim_timer);
+      POSE_exit();
+    }
 #else
   CkPrintf("%d PE Simulation finished at %f.\n", CkNumPes(), 
 	   CmiWallTimer() - sim_timer);
@@ -214,3 +227,46 @@ void _registerseqpose(void)
   _registerpose();
 }
 
+void POSEreadCmdLine()
+{
+  char **argv = CkGetArgv();
+  CmiArgGroup("Charm++","POSE");
+  pose_config.stats=CmiGetArgFlagDesc(argv, "+stats_pose",
+                        "Gather timing information and other statistics");
+  CmiGetArgIntDesc(argv, "+start_proj_pose",&pose_config.start_proj,
+                        "GVT to initiate projections tracing");
+  CmiGetArgIntDesc(argv, "+end_proj_pose",&pose_config.end_proj,
+                        "GVT to end projections tracing");
+  pose_config.trace=CmiGetArgFlagDesc(argv, "+trace_pose",
+                        "Traces key POSE operations like Forward Execution, Rollback, Cancellation, Fossil Collection, etc. via user events for display in projections");
+
+  pose_config.dop=CmiGetArgFlagDesc(argv, "+crit_post",
+                        "Critical path analysis by measuring degree of parallelism");
+  
+  CmiGetArgIntDesc(argv, "+memman_pose", &pose_config.max_usage , "Coarse memory management: Restricts forward execution of objects with over <max_usage>/<checkpoint store_rate> checkpoints; default to 10");
+  pose_config.msg_pool=CmiGetArgFlagDesc(argv, "+pose_msgpool",  "Store and reuse pools of messages under a certain size default 1000");
+  CmiGetArgIntDesc(argv, "+msgpoolsize_pose", &pose_config.msg_pool_size , "Store and reuse pools of messages under a certain size default 1000");
+
+  CmiGetArgIntDesc(argv, "+msgpoolmax_pose", &pose_config.max_pool_msg_size , "Store and reuse pools of messages under a certain size");
+  char *strat;
+  CmiGetArgStringDesc(argv, "+commlib_strat_pose", &strat , "Use commlib with strat in {stream|mesh|prio}");
+  if(strcmp("stream",strat)==0)
+    pose_config.commlib_strat=stream;
+  if(strcmp("mesh",strat)==0)
+    pose_config.commlib_strat=mesh;
+  if(strcmp("prio",strat)==0)
+    pose_config.commlib_strat=prio;
+  CmiGetArgIntDesc(argv, "+commlib_timeout-pose", &pose_config.commlib_timeout , "Use commlib with timeout N; default 1ms");
+  CmiGetArgIntDesc(argv, "+commlib_maxmsg_pose", &pose_config.commlib_maxmsg , "Use commlib with max msg N;  default 5");
+  pose_config.lb_on=CmiGetArgFlagDesc(argv, "+lb_on_pose", "Use load balancing");
+  CmiGetArgIntDesc(argv, "+lb_skip_pose", &pose_config.lb_skip , "Load balancing skip N; default 51");
+  CmiGetArgIntDesc(argv, "+lb_threshold_pose", &pose_config.lb_threshold , "Load balancing threshold N; default 4000");
+  CmiGetArgIntDesc(argv, "+lb_diff_pose", &pose_config.lb_diff , "Load balancing  min diff between min and max load PEs; default 2000");
+  CmiGetArgIntDesc(argv, "+checkpoint_rate_pose", &pose_config.store_rate , " Set checkpoint to 1 for every <rate> events. Default to 1. ");
+  CmiGetArgIntDesc(argv, "+FEmax_pose", &pose_config.max_iter , "Sets max events executed in single forward execution step.  Default to 100.");
+  CmiGetArgIntDesc(argv, "+leash_specwindow_pose", &pose_config.spec_window , "Sets speculative window behavior.");
+  CmiGetArgIntDesc(argv, "+leash_min_pose", &pose_config.min_leash , "Sets speculative window behavior minimum leash. Default 10.");
+  CmiGetArgIntDesc(argv, "+leash_max_pose", &pose_config.max_leash , "Sets speculative window behavior maximum leash. Default 100.");
+  CmiGetArgIntDesc(argv, "+leash_flex_pose", &pose_config.max_leash , "Sets speculative window behavior leash flex. Default 10.");
+  pose_config.deterministic =CmiGetArgFlagDesc(argv, "+deterministic_pose",  "sorts events of same timestamp by event id for repeatable behavior ");
+}  

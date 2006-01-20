@@ -1,6 +1,7 @@
 /// Checkpointing representation to be used with optimistic strategy
 #ifndef CHPT_H
 #define CHPT_H
+extern POSE_Config pose_config;
 
 /// Templated checkpointing class derived from rep
 /** This class makes it possible for optimistic synchronization strategies
@@ -41,9 +42,10 @@ void chpt<StateType>::registerTimestamp(int idx, eventMsg *m, int offset)
 template<class StateType>
 void chpt<StateType>::checkpoint(StateType *data)
 {
-#ifdef POSE_STATS_ON
+#ifndef CMK_OPTIMIZE
   localStat *localStats = (localStat *)CkLocalBranch(theLocalStats);
-  localStats->SwitchTimer(CP_TIMER);
+  if(pose_config.stats)
+    localStats->SwitchTimer(CP_TIMER);
 #endif
   if (usesAntimethods()) {
     myStrat->currentEvent->cpData = new rep;
@@ -60,14 +62,15 @@ void chpt<StateType>::checkpoint(StateType *data)
       myStrat->currentEvent->cpData->copy = 1;
       *((StateType *)myStrat->currentEvent->cpData) = *data;
       sinceLast = 0;
-#ifdef POSE_STATS_ON
+#ifndef CMK_OPTIMIZE
       //localStats->Checkpoint();
       //localStats->CPbytes(sizeof(StateType));
 #endif
     }
     else sinceLast++;
   }
-#ifdef POSE_STATS_ON
+#ifndef CMK_OPTIMIZE
+  if(pose_config.stats)
     localStats->SwitchTimer(SIM_TIMER);
 #endif
 }

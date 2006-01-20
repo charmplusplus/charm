@@ -23,6 +23,8 @@
 // Global readonly variables to access stats facility from all PEs
 extern CkChareID theGlobalStats;
 extern CkGroupID theLocalStats;
+// our configuration bundle
+extern POSE_Config pose_config;
 
 /// Message to gather local stats from all PEs for printing
 class localStatSummary : public CMessage_localStatSummary {

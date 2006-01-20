@@ -4,7 +4,8 @@ module pose {
   readonly double sim_timer;
   readonly int POSE_inactDetect;
   readonly ComlibInstanceHandle POSE_commlib_insthndl;
-  readonly POSE_TimeType POSE_endtime;
+  readonly POSE_TimeType POSE_endtime;  
+  readonly POSE_Config pose_config;
   message callBack;
   chare pose {
     entry pose();

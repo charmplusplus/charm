@@ -6,8 +6,9 @@ CProxy_LBstrategy TheLBstrategy;
 
 LBgroup::LBgroup(void)
 {
-#ifdef POSE_STATS_ON
-  localStats = (localStat *)CkLocalBranch(theLocalStats);
+#ifndef CMK_OPTIMIZE
+  if(pose_config.stats)
+    localStats = (localStat *)CkLocalBranch(theLocalStats);
 #endif
   busy = reportTo = 0;
 }
@@ -89,13 +90,16 @@ void LBgroup::objUpdate(int ldIdx, POSE_TimeType ovt, POSE_TimeType eet, int ne,
 // entry methods
 void LBgroup::calculateLocalLoad(void)
 {
-#ifdef POSE_STATS_ON
-  localStats->TimerStart(LB_TIMER);
+
+#ifndef CMK_OPTIMIZE
+  if(pose_config.stats)
+    localStats->TimerStart(LB_TIMER);
 #endif
   if (busy) {
     TheLBG[CkMyPe()].calculateLocalLoad();
-#ifdef POSE_STATS_ON
-    localStats->TimerStop();
+#ifndef CMK_OPTIMIZE
+    if(pose_config.stats)
+      localStats->TimerStop();
 #endif
     return;
   }
@@ -115,16 +119,17 @@ void LBgroup::calculateLocalLoad(void)
   // reduce loads to strategy
   rootLB[reportTo].recvLoadReport(lr);
   reportTo = (reportTo + 1) % CkNumPes();
-
-#ifdef POSE_STATS_ON
-  localStats->TimerStop();
+#ifndef CMK_OPTIMIZE
+  if(pose_config.stats)
+    localStats->TimerStop();
 #endif
 }
 
 void LBgroup::balance(BalanceSpecs *bs)
 {
-#ifdef POSE_STATS_ON
-  localStats->TimerStart(LB_TIMER);
+#ifndef CMK_OPTIMIZE
+  if(pose_config.stats)
+    localStats->TimerStart(LB_TIMER);
 #endif
   int myIndex = bs->indexArray[CkMyPe()], i, start, end, objIdx;
   int underLoad, contrib;
@@ -204,15 +209,17 @@ void LBgroup::balance(BalanceSpecs *bs)
   }
   CkFreeMsg(bs);
   busy = 0;
-#ifdef POSE_STATS_ON
-  localStats->TimerStop();
+#ifndef CMK_OPTIMIZE
+  if(pose_config.stats)
+    localStats->TimerStop();
 #endif
 }
 
 LBstrategy::LBstrategy(void)
 {
-#ifdef POSE_STATS_ON
-  localStats = (localStat *)CkLocalBranch(theLocalStats);
+#ifndef CMK_OPTIMIZE
+  if(pose_config.stats)
+    localStats = (localStat *)CkLocalBranch(theLocalStats);
 #endif
   peLoads = (int *)malloc(CkNumPes()*sizeof(int));
   for (int i=0; i<CkNumPes(); i++)
@@ -299,8 +306,9 @@ int LBstrategy::findMinPE()
 
 void LBstrategy::recvLoadReport(LoadReport *lr)
 {
-#ifdef POSE_STATS_ON
-  localStats->TimerStart(LB_TIMER);
+#ifndef CMK_OPTIMIZE
+  if(pose_config.stats)
+    localStats->TimerStart(LB_TIMER);
 #endif
   int i, avgLd = 0, totalLd = 0;
   static int done=0;
@@ -320,7 +328,8 @@ void LBstrategy::recvLoadReport(LoadReport *lr)
 
     done = 0;
   }
-#ifdef POSE_STATS_ON
-  localStats->TimerStop();
+#ifndef CMK_OPTIMIZE
+  if(pose_config.stats)
+    localStats->TimerStop();
 #endif
 }

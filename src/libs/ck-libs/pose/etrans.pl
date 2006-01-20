@@ -525,13 +525,14 @@ foreach my $incfile ($inC,@otherfiles)
 
 	$outChandle->print("#ifndef CMK_OPTIMIZE\n");
 	$outChandle->print("$messagename->sanitize();\n");
-	$outChandle->print("#endif\n");
-	$outChandle->print("#ifdef POSE_STATS_ON\n");
-	$outChandle->print("  int tstat = localStats->TimerRunning();\n");
-	$outChandle->print("  if (tstat)\n");
-	$outChandle->print("    localStats->SwitchTimer(SIM_TIMER);\n");
-	$outChandle->print("  else\n");
-	$outChandle->print("    localStats->TimerStart(SIM_TIMER);\n");
+	$outChandle->print("  int tstat;\n");
+	$outChandle->print("  if(pose_config.stats){\n");
+	$outChandle->print("    tstat = localStats->TimerRunning();\n");
+	$outChandle->print("    if (tstat)\n");
+	$outChandle->print("      localStats->SwitchTimer(SIM_TIMER);\n");
+	$outChandle->print("    else\n");
+	$outChandle->print("      localStats->TimerStart(SIM_TIMER);\n");
+	$outChandle->print("  }\n");
 	$outChandle->print("#endif\n");
 	$outChandle->print("#ifndef SEQUENTIAL_POSE\n");
 	$outChandle->print("  PVT *pvt = (PVT *)CkLocalBranch(ThePVT);\n");
@@ -574,11 +575,12 @@ foreach my $incfile ($inC,@otherfiles)
 	$outChandle->print("    eq->InsertEvent(e);\n");
 	$outChandle->print("    Step();\n");
 	$outChandle->print("  }\n");
-	$outChandle->print("#ifdef POSE_STATS_ON\n");
-	$outChandle->print("  if (tstat)\n");
-	$outChandle->print("    localStats->SwitchTimer(tstat);\n");
-	$outChandle->print("  else\n");
-	$outChandle->print("    localStats->TimerStop();\n");
+	$outChandle->print("#ifndef CMK_OPTIMIZE\n");
+	$outChandle->print("  if(pose_config.stats){\n");
+	$outChandle->print("    if (tstat)\n");
+	$outChandle->print("      localStats->SwitchTimer(tstat);\n");
+	$outChandle->print("    else\n");
+	$outChandle->print("      localStats->TimerStop();}\n");
 	$outChandle->print("#endif\n");
 	$outChandle->print("}\n");
       } elsif ($isnoneventmethod) {
@@ -594,7 +596,10 @@ foreach my $incfile ($inC,@otherfiles)
 	#create the wrapper parent class constructor
 	$outChandle->print($returntype." ") if($returntype);
 	$outChandle->print(join('',$class,"::",$method,'(',$message,' *',$messagename,"){\n"));
-	$outChandle->print("#ifdef POSE_STATS_ON\n  localStats->TimerStart(SIM_TIMER);\n#endif\n");
+	$outChandle->print("#ifndef CMK_OPTIMIZE\n");
+	$outChandle->print("  if(pose_config.stats)\n");
+	$outChandle->print("    {localStats->TimerStart(SIM_TIMER);}\n");
+	$outChandle->print("#endif\n");
 	$outChandle->print("#ifdef LB_ON  \n");
 	$outChandle->print("  LBgroup *localLBG = TheLBG.ckLocalBranch();\n\n");
 	$outChandle->print("#endif  \n");
@@ -602,12 +607,12 @@ foreach my $incfile ($inC,@otherfiles)
 	$outChandle->print("  $messagename->parent = this;\n");
 	$outChandle->print("  $messagename->str = myStrat;\n");
 	$outChandle->print("  POSE_TimeType _ts = $messagename->timestamp;\n");
-	$outChandle->print("#ifdef POSE_STATS_ON\n  localStats->SwitchTimer(DO_TIMER);\n#endif\n");
+	$outChandle->print("#ifndef CMK_OPTIMIZE\n  if(pose_config.stats){\n    localStats->SwitchTimer(DO_TIMER);}\n#endif\n");
 
 	$outChandle->print("  objID = new state_$method($messagename);\n");
-	$outChandle->print("#ifdef POSE_STATS_ON\n  localStats->SwitchTimer(SIM_TIMER);\n#endif\n");
+	$outChandle->print("#ifndef CMK_OPTIMIZE\n  if(pose_config.stats){\n    localStats->SwitchTimer(SIM_TIMER);}\n#endif\n");
 	$outChandle->print("  myStrat->init(eq, objID, this, thisIndex);\n");
-	$outChandle->print("#ifdef POSE_STATS_ON\n  localStats->TimerStop();\n#endif\n");
+	$outChandle->print("#ifndef CMK_OPTIMIZE\n  if(pose_config.stats){\n    localStats->TimerStop();}\n#endif\n");
 	$outChandle->print("#ifndef SEQUENTIAL_POSE\n");
 	$outChandle->print("  PVT *pvt = (PVT *)CkLocalBranch(ThePVT);\n");
 	$outChandle->print("  myPVTidx = pvt->objRegister(thisIndex, _ts, sync, this);\n");
@@ -752,7 +757,8 @@ foreach my $incfile ($inC,@otherfiles)
 	    }
 	    $outChandle->print("$count) {\n");
 	    $first = 0;
-	    $outChandle->print("#ifdef POSE_STATS_ON\n");
+	    $outChandle->print("#ifndef CMK_OPTIMIZE\n");
+	    $outChandle->print("  if(pose_config.stats)\n");
 	    $outChandle->print("    if (!CpvAccess(stateRecovery)) {localStats->Do();\n");
 	    $outChandle->print("#ifdef POSE_DOP_ON\n");
 	    $outChandle->print("    st = CmiWallTimer();\n");
@@ -761,7 +767,8 @@ foreach my $incfile ($inC,@otherfiles)
 	    $outChandle->print("#endif\n");
 
 	    $outChandle->print("    ((state_$key *) objID)->$i->[0](($i->[1] *)msg);\n");
-	    $outChandle->print("#ifdef POSE_STATS_ON\n");
+	    $outChandle->print("#ifndef CMK_OPTIMIZE\n");
+	    $outChandle->print("  if(pose_config.stats)\n");
 	    $outChandle->print("    if (!CpvAccess(stateRecovery)) {\n");
 	    $outChandle->print("#ifdef POSE_DOP_ON\n");
 	    $outChandle->print("    et = CmiWallTimer();\n");
@@ -1195,12 +1202,14 @@ sub posefuncmap
 		  $output.="#ifndef CMK_OPTIMIZE\n";
 		  $output.="$msg->sanitize();\n";
 		  $output.="#endif\n";
-		  $output.="#ifdef POSE_STATS_ON\n";
-		  $output.="  parent->localStats->SwitchTimer(COMM_TIMER);\n";
+		  $output.="#ifndef CMK_OPTIMIZE\n";
+		  $output.="  if(pose_config.stats)\n";
+		  $output.="    parent->localStats->SwitchTimer(COMM_TIMER);\n";
 		  $output.="#endif\n";
 		  $output.="(* (CProxy_".$segments[2]." *)&parent->thisProxy)[_POSE_handle].".$segments[1].";\n";
-		  $output.="#ifdef POSE_STATS_ON\n";
-		  $output.="  parent->localStats->SwitchTimer(DO_TIMER);\n";
+		  $output.="#ifndef CMK_OPTIMIZE\n";
+		  $output.="  if(pose_config.stats)\n";
+		  $output.="    parent->localStats->SwitchTimer(DO_TIMER);\n";
 		  $output.="#endif\n";
 		  #$output.="int _destPE = parent->thisProxy.ckLocalBranch()->lastKnown(CkArrayIndex1D(_POSE_handle));\n";
 
@@ -1221,12 +1230,14 @@ sub posefuncmap
 		  $output.="#ifndef CMK_OPTIMIZE\n";
 		  $output.="$msg->sanitize();\n";
 		  $output.="#endif\n";
-		  $output.="#ifdef POSE_STATS_ON\n";
-		  $output.="  parent->localStats->SwitchTimer(COMM_TIMER);\n";
+		  $output.="#ifndef CMK_OPTIMIZE\n";
+		  $output.="  if(pose_config.stats)\n";
+		  $output.="    parent->localStats->SwitchTimer(COMM_TIMER);\n";
 		  $output.="#endif\n";
 		  $output.="(* (CProxy_".$segments[2]." *)&parent->thisProxy)[_POSE_handle].".$segments[1].";\n";
-		  $output.="#ifdef POSE_STATS_ON\n";
-		  $output.="  parent->localStats->SwitchTimer(DO_TIMER);\n";
+		  $output.="#ifndef CMK_OPTIMIZE\n";
+		  $output.="  if(pose_config.stats)\n";
+		  $output.="    parent->localStats->SwitchTimer(DO_TIMER);\n";
 		  $output.="#endif\n";
 		  #$output.="int _destPE = parent->thisProxy.ckLocalBranch()->lastKnown(CkArrayIndex1D(_POSE_handle));\n";
 		  #$output.="parent->srVector[_destPE]++;\n";
@@ -1258,13 +1269,15 @@ sub posefuncmap
 		    $output.="#ifndef CMK_OPTIMIZE\n";
 		    $output.="$msg->sanitize();\n";
 		    $output.="#endif\n";
-		  $output.="#ifdef POSE_STATS_ON\n";
-		  $output.="  parent->localStats->SwitchTimer(COMM_TIMER);\n";
+		  $output.="#ifndef CMK_OPTIMIZE\n";
+		  $output.="  if(pose_config.stats)\n";
+		  $output.="   parent->localStats->SwitchTimer(COMM_TIMER);\n";
 		  $output.="#endif\n";
 
 		    $output.="(*(CProxy_".$segments[2]." *)&parent->thisProxy)[_POSE_handle].".$segments[1].";\n";
-		  $output.="#ifdef POSE_STATS_ON\n";
-		  $output.="  parent->localStats->SwitchTimer(DO_TIMER);\n";
+		  $output.="#ifndef CMK_OPTIMIZE\n";
+		  $output.="  if(pose_config.stats)\n";
+		  $output.="    parent->localStats->SwitchTimer(DO_TIMER);\n";
 		  $output.="#endif\n";
 		    #$output.="int _destPE = parent->thisProxy.ckLocalBranch()->lastKnown(CkArrayIndex1D(_POSE_handle));\n";
 		    #$output.="parent->srVector[_destPE]++;\n";
@@ -1287,12 +1300,14 @@ sub posefuncmap
 		    $output.="#ifndef CMK_OPTIMIZE\n";
 		    $output.="$msg->sanitize();\n";
 		    $output.="#endif\n";
-		  $output.="#ifdef POSE_STATS_ON\n";
-		  $output.="  parent->localStats->SwitchTimer(COMM_TIMER);\n";
+		  $output.="#ifndef CMK_OPTIMIZE\n";
+		  $output.="  if(pose_config.stats)\n";
+		  $output.="    parent->localStats->SwitchTimer(COMM_TIMER);\n";
 		  $output.="#endif\n";
 		    $output.="(* (CProxy_".$segments[2]." *)&parent->thisProxy)[_POSE_handle].".$segments[1].";\n";
-		  $output.="#ifdef POSE_STATS_ON\n";
-		  $output.="  parent->localStats->SwitchTimer(DO_TIMER);\n";
+		  $output.="#ifndef CMK_OPTIMIZE\n";
+		  $output.="  if(pose_config.stats)\n";
+		  $output.="    parent->localStats->SwitchTimer(DO_TIMER);\n";
 		  $output.="#endif\n";
 		    #$output.="int _destPE = parent->thisProxy.ckLocalBranch()->lastKnown(CkArrayIndex1D(_POSE_handle));\n";
 		    #$output.="parent->srVector[_destPE]++;\n";
@@ -1321,12 +1336,14 @@ sub posefuncmap
 		      $output.="#ifndef CMK_OPTIMIZE\n";
 		      $output.="$msg->sanitize();\n";
 		      $output.="#endif\n";
-		  $output.="#ifdef POSE_STATS_ON\n";
-		  $output.="  parent->localStats->SwitchTimer(COMM_TIMER);\n";
+		  $output.="#ifndef CMK_OPTIMIZE\n";
+		  $output.="  if(pose_config.stats)\n";
+		  $output.="    parent->localStats->SwitchTimer(COMM_TIMER);\n";
 		  $output.="#endif\n";
 		      $output.="(* (CProxy_".$simobjtype." *)&parent->thisProxy)[parent->thisIndex].".$segments[1].";\n";
-		  $output.="#ifdef POSE_STATS_ON\n";
-		  $output.="  parent->localStats->SwitchTimer(DO_TIMER);\n";
+		  $output.="#ifndef CMK_OPTIMIZE\n";
+		  $output.="  if(pose_config.stats)\n";
+		  $output.="    parent->localStats->SwitchTimer(DO_TIMER);\n";
 		  $output.="#endif\n";
 
 		      #$output.="parent->srVector[CkMyPe()]++;\n";
@@ -1345,12 +1362,14 @@ sub posefuncmap
 		      $output.="#ifndef CMK_OPTIMIZE\n";
 		      $output.="$msg->sanitize();\n";
 		      $output.="#endif\n";
-		  $output.="#ifdef POSE_STATS_ON\n";
-		  $output.="  parent->localStats->SwitchTimer(COMM_TIMER);\n";
+		  $output.="#ifndef CMK_OPTIMIZE\n";
+		  $output.="  if(pose_config.stats)\n";
+		  $output.="    parent->localStats->SwitchTimer(COMM_TIMER);\n";
 		  $output.="#endif\n";
 		      $output.="(* (CProxy_".$simobjtype." *)&parent->thisProxy)[parent->thisIndex].".$segments[1].";\n";
-		  $output.="#ifdef POSE_STATS_ON\n";
-		  $output.="  parent->localStats->SwitchTimer(DO_TIMER);\n";
+		  $output.="#ifndef CMK_OPTIMIZE\n";
+		  $output.="  if(pose_config.stats)\n";
+		  $output.="    parent->localStats->SwitchTimer(DO_TIMER);\n";
 		  $output.="#endif\n";
 		      #$output.="parent->srVector[CkMyPe()]++;\n";
 		      $output.="}\n";
@@ -1359,7 +1378,7 @@ sub posefuncmap
 		      die "untranslatably deranged to call POSE_local_invoke from non sim object";
 		    }
 		  } else {
-		    die "what the hell is up with .".$segments[1];
+		    die "could not parse .".$segments[1];
 		  }
 		}
     }

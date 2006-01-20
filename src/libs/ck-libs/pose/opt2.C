@@ -28,8 +28,9 @@ void opt2::Step()
       eq->ShiftEvent(); // shift to next event
       ev = eq->currentPtr; // reset ev
     }
-#ifdef POSE_STATS_ON
-    if (iter > 0) localStats->Loop();
+#ifndef CMK_OPTIMIZE
+    if(pose_config.stats)
+      if (iter > 0) localStats->Loop();
 #endif  
     if (eq->currentPtr->timestamp >= 0) { // if more events, schedule the next
       prioMsg *pm = new prioMsg;

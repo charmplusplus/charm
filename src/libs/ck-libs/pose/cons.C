@@ -8,13 +8,15 @@ void con::Step()
 {
   Event *ev;
 
-#ifdef POSE_STATS_ON
+#ifndef CMK_OPTIMIZE
+  if(pose_config.stats)
     localStats->SwitchTimer(CAN_TIMER);
 #endif
   if (!parent->cancels.IsEmpty())  // Cancel as much as possible
     CancelEvents();
-#ifdef POSE_STATS_ON
-  localStats->SwitchTimer(SIM_TIMER);
+#ifndef CMK_OPTIMIZE
+  if(pose_config.stats)
+    localStats->SwitchTimer(SIM_TIMER);
 #endif
   // Prepare to execute an event
   ev = eq->currentPtr;
@@ -23,13 +25,16 @@ void con::Step()
     currentEvent = ev;
     ev->done = 2;
     parent->DOs++;
-#ifdef POSE_STATS_ON
-    localStats->Do();
+#ifndef CMK_OPTIMIZE
+    if(pose_config.stats){
+      localStats->Do();
       localStats->SwitchTimer(DO_TIMER);
+    }
 #endif
       parent->ResolveFn(ev->fnIdx, ev->msg);  // execute it
-#ifdef POSE_STATS_ON
-      localStats->SwitchTimer(SIM_TIMER);
+#ifndef CMK_OPTIMIZE
+      if(pose_config.stats)
+	localStats->SwitchTimer(SIM_TIMER);
 #endif
       ev->done = 1;
       eq->ShiftEvent();                       // move on to next event

@@ -89,6 +89,8 @@ extern POSE_TimeType POSE_GlobalTS;
 /// For getting access to the commlib strategy
 extern ComlibInstanceHandle POSE_commlib_insthndl;
 
+extern POSE_Config pose_config;
+
 /// Set busy wait time
 void POSE_set_busy_wait(double n);
 /// Busy wait for busyWait

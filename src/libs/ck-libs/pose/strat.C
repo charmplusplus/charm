@@ -4,8 +4,9 @@
 /// Basic Constructor
 strat::strat() 
 {
-#ifdef POSE_STATS_ON
-  localStats = (localStat *)CkLocalBranch(theLocalStats);
+#ifndef CMK_OPTIMIZE
+  if(pose_config.stats)
+    localStats = (localStat *)CkLocalBranch(theLocalStats);
 #endif
   eq = NULL;
   userObj = NULL;

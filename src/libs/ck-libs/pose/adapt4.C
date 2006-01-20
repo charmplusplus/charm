@@ -65,20 +65,23 @@ void adapt4::Step()
     localPVT->incEventCount();
     specEventCount++;
     eventCount++;
-#ifdef TRACE_DETAIL
-    critStart = CmiWallTimer();  // trace timing
+#ifndef CMK_OPTIMIZE
+    if(pose_config.trace)
+      critStart = CmiWallTimer();  // trace timing
 #endif
     parent->ResolveFn(ev->fnIdx, ev->msg); // execute it
-#ifdef TRACE_DETAIL
-    traceUserBracketEvent(10, critStart, CmiWallTimer());
+#ifndef CMK_OPTIMIZE
+    if(pose_config.trace)
+      traceUserBracketEvent(10, critStart, CmiWallTimer());
 #endif
     ev->done = 1; // flag the event as executed
     eq->mem_usage++;
     eq->ShiftEvent(); // shift to next event
     ev = eq->currentPtr;
   }
-#ifdef POSE_STATS_ON
-  if (iter > 0) localStats->Loop();
+#ifndef CMK_OPTIMIZE
+  if(pose_config.stats)
+    if (iter > 0) localStats->Loop();
 #endif
 }
  

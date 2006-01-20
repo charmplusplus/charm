@@ -71,4 +71,90 @@ const POSE_TimeType POSE_UnsetTS=-1;
 const POSE_TimeType POSE_TimeMax=INT_MAX;
 #endif
 
+// POSE Command line struct
+//glorified struct
+enum POSE_Commlib_strat {nostrat, stream, mesh, prio};
+
+class POSE_Config 
+{
+ public:
+  bool stats;
+  int start_proj;
+  int end_proj;
+  bool trace;
+  bool dop;
+  int max_usage;
+  bool msg_pool;
+  int msg_pool_size;
+  int max_pool_msg_size;
+  POSE_Commlib_strat commlib_strat;
+  int commlib_timeout;
+  int commlib_maxmsg;
+  bool lb_on;
+  int lb_skip;
+  int lb_threshold;
+  int lb_diff;
+  int store_rate;
+  int max_iter;
+  int spec_window;
+  int min_leash;
+  int max_leash;
+  bool deterministic;
+  POSE_Config()
+    {
+#ifdef POSE_STATS_ON
+      stats=true;
+#else
+      stats=false;
+#endif
+      start_proj=-1;
+      end_proj=-1;
+#ifdef TRACE_DETAIL
+      trace=true;
+#else      
+      trace=false;
+#endif
+
+#ifdef POSE_DOP_ON
+      dop=true;
+#else
+      dop=false;
+#endif
+      max_usage=MAX_USAGE;
+#ifdef MSG_RECYCLING
+      msg_pool=true;
+#else
+      msg_pool=false;
+#endif
+      msg_pool_size=40;
+      max_pool_msg_size=1000;
+#ifdef POSE_COMM_ON
+      commlib_strat=nostrat;
+#else
+      commlib_strat=stream;
+#endif
+      commlib_timeout=COMM_TIMEOUT;
+      commlib_maxmsg=COMM_MAXMSG;
+#ifdef LB_ON
+      lb_on=true;
+#else
+      lb_on=false;
+#endif
+      lb_skip=LB_SKIP;
+      lb_threshold=LB_THRESHOLD;
+      lb_diff=LB_DIFF;
+      store_rate=STORE_RATE;
+      max_iter=MAX_ITERATIONS;
+      spec_window=SPEC_WINDOW;
+      min_leash=MIN_LEASH;
+      max_leash=MAX_LEASH;
+#ifdef DETERMINISTIC_EVENTS
+      deterministic=true;
+#else
+      deterministic=false;
+#endif
+    }
+};
+PUPbytes(POSE_Config);
+
 #endif

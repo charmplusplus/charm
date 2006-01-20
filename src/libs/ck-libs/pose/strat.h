@@ -20,7 +20,7 @@
 class strat
 {
  protected:
-#ifdef POSE_STATS_ON
+#ifndef CMK_OPTIMIZE
   localStat *localStats;
 #endif
   /// Local PVT branch

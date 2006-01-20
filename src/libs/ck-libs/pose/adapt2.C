@@ -36,8 +36,9 @@ void adapt2::Step()
     eq->ShiftEvent(); // shift to next event
     ev = eq->currentPtr;
   }
-#ifdef POSE_STATS_ON
-  if (iter > 0) localStats->Loop();
-#endif  
+#ifndef CMK_OPTIMIZE
+  if(pose_config.stats)
+    if (iter > 0) localStats->Loop();
+#endif
 }
 

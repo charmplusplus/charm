@@ -8,6 +8,9 @@
 
 extern CProxy_sim POSE_Objects_RO;
 
+// our configuration bundle
+extern POSE_Config pose_config;
+
 /// Base representation class
 class rep 
 {

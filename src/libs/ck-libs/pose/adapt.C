@@ -33,8 +33,9 @@ void adapt::Step()
     ev = eq->currentPtr;
     iter++;
   }
-#ifdef POSE_STATS_ON
-  if (iter > 0) localStats->Loop();
+#ifndef CMK_OPTIMIZE
+  if(pose_config.stats)
+    if (iter > 0) localStats->Loop();
 #endif  
 }
 
