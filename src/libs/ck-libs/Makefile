@@ -18,7 +18,7 @@ tcharm:
 ampi:  tcharm
 	$(MAKE) -C $@ all OPTS='$(OPTS)'
 
-idxl:
+idxl:  ampi
 	$(MAKE) -C $@ all OPTS='$(OPTS)'
 
 parmetis: ampi
@@ -33,10 +33,10 @@ fem:  idxl ampi parmetis
 ParFUM:	idxl ampi parmetis collide
 	$(MAKE) -C $@ all OPTS='$(OPTS)'
 
-ifem:
+ifem: fem
 	$(MAKE) -C $@ all OPTS='$(OPTS)'
 
-armci:
+armci: tcharm ampi
 	$(MAKE) -C $@ all OPTS='$(OPTS)'
 
 collide:
@@ -63,7 +63,7 @@ taskGraph:
 search:
 	$(MAKE) -C $@ all OPTS='$(OPTS)'
 
-datatransfer:
+datatransfer: ampi fem
 	$(MAKE) -C $@ all OPTS='$(OPTS)'
 
 pythonCCS:
