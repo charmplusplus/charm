@@ -2922,6 +2922,8 @@ void restart_node(int crashed_node){
 	restart_rsh_pid =rsh_fork(pe,startScript);
 	/**wait for the reply from the new process*/
 	status=0;
+        if (arg_debug_no_pause || arg_debug) ;
+        else {
 	do{
 		waitpid(restart_rsh_pid,&status,0);
 	}while(!WIFEXITED(status));
@@ -2930,6 +2932,7 @@ void restart_node(int crashed_node){
          WEXITSTATUS(status));
          exit(1);
   	}     
+        }
 	printf("Charmrun finished launching new process in %fs\n", GetClock()-ftTimer);
 }
 
