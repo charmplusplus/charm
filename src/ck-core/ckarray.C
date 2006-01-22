@@ -830,7 +830,7 @@ void CkArrayBroadcaster::springCleaning(void)
 
 void CkArrayBroadcaster::flushState() 
 { 
-  bcastNo = oldBcastNo = -1; 
+  bcastNo = oldBcastNo = 0; 
   CkArrayMessage *msg;
   while (NULL!=(msg=oldBcasts.deq())) delete msg;
 }
