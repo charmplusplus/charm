@@ -119,6 +119,7 @@ class LBDBInit : public Chare {
 // class which implement a virtual function for the FuturePredictor
 class LBPredictorFunction {
 public:
+  virtual ~LBPredictorFunction() {}
   int num_params;
 
   virtual void initialize_params(double *x) {double normall=1.0/pow((double)2,31); for (int i=0; i<num_params; ++i) x[i]=rand()*normall;}

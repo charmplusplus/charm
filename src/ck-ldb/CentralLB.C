@@ -18,8 +18,14 @@
 
 #define  DEBUGF(x)        //CmiPrintf x;
 
-#define USE_REDUCTION 1
+#if CMK_MEM_CHECKPOINT
+   /* can not handle reduction in inmem FT */
+#define USE_REDUCTION         0
+#define USE_LDB_SPANNING_TREE 0
+#else
+#define USE_REDUCTION         1
 #define USE_LDB_SPANNING_TREE 1
+#endif
 
 CkGroupID loadbalancer;
 int * lb_ptr;
