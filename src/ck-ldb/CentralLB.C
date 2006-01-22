@@ -411,7 +411,7 @@ void CentralLB::ReceiveStats(CkMarshalledCLBStatsMessage &msg)
 #else
       // store per processor data right away
       struct ProcStats &procStat = statsData->procs[pe];
-      procStat.pe = pe;CkPrintf
+      procStat.pe = pe;
       procStat.total_walltime = m->total_walltime;
       procStat.total_cputime = m->total_cputime;
       procStat.idletime = m->idletime;
@@ -735,7 +735,6 @@ void CentralLB::ResumeClients(CkReductionMsg *msg)
 
 void CentralLB::ResumeClients(int balancing)
 {
-
 #if CMK_LBDB_ON
   DEBUGF(("[%d] Resuming clients. balancing:%d.\n",CkMyPe(),balancing));
   if (balancing && _lb_args.debug() && CkMyPe() == cur_ld_balancer) {
@@ -744,7 +743,7 @@ void CentralLB::ResumeClients(int balancing)
   	      lbName(), step()-1,end_lb_time, end_lb_time - start_lb_time);
   }
 
-  ComlibNotifyMigrationDone();  
+  if (balancing) ComlibNotifyMigrationDone();  
 
   theLbdb->ResumeClients();
   if (balancing)  {
