@@ -30,8 +30,9 @@
 #include "vmi.h"
 
 /* These settings can only be changed at compile time. */
-#define CMI_VMI_OPTIMIZE        0
-#define CMI_VMI_USE_MEMORY_POOL 0
+#define CMI_VMI_OPTIMIZE           0
+#define CMI_VMI_USE_MEMORY_POOL    1
+#define CMI_VMI_TERMINATE_VMI_HACK 0
 
 /*
   These settings are defaults that can be overridden at runtime by

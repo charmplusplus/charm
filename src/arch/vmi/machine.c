@@ -265,7 +265,9 @@ void ConverseExit ()
   CdsFifo_Destroy (CpvAccess (CmiLocalQueue));
 
   /* Terminate VMI. */
+#if ! CMI_VMI_TERMINATE_VMI_HACK
   CMI_VMI_Terminate_VMI ();
+#endif
 
   /* Free memory. */
   free (CMI_VMI_Handles);
@@ -332,6 +334,8 @@ void CmiNotifyIdle ()
 
   int i;
 
+
+  DEBUG_PRINT ("CmiNotifyIdle() called.\n");
 
   /* Check the eager pollset to see if any new messages have arrived. */
   for (i = 0; i < CMI_VMI_Eager_Short_Pollset_Size; i++) {
@@ -417,6 +421,8 @@ void CmiNotifyIdle ()
 */
 void CmiMemLock ()
 {
+  DEBUG_PRINT ("CmiMemLock() called.\n");
+
   /* Empty. */
 }
 
@@ -427,6 +433,8 @@ void CmiMemLock ()
 */
 void CmiMemUnlock ()
 {
+  DEBUG_PRINT ("CmiMemUnlock() called.\n");
+
   /* Empty. */
 }
 
@@ -447,6 +455,8 @@ void CmiMemUnlock ()
 */
 void CmiPrintf (const char *format, ...)
 {
+  DEBUG_PRINT ("CmiPrintf() called.\n");
+
   if (CMI_VMI_Startup_Type == CMI_VMI_STARTUP_TYPE_CHARMRUN) {
     Charmrun_Header hdr;
     va_list args;
@@ -485,6 +495,8 @@ void CmiPrintf (const char *format, ...)
 */
 void CmiError (const char *format, ...)
 {
+  DEBUG_PRINT ("CmiError() called.\n");
+
   if (CMI_VMI_Startup_Type == CMI_VMI_STARTUP_TYPE_CHARMRUN) {
     Charmrun_Header hdr;
     va_list args;
@@ -550,6 +562,8 @@ void CmiBarrier ()
   int i;
 
 
+  DEBUG_PRINT ("CmiBarrier() called.\n");
+
   /* PE 0 coordinates the barrier. */
   if (_Cmi_mype == 0) {
     /* Wait until all processes send us a barrier message. */
@@ -609,6 +623,8 @@ void CmiBarrier ()
 */
 void CmiBarrierZero ()
 {
+  DEBUG_PRINT ("CmiBarrierZero() called.\n");
+
   CmiBarrier ();
 }
 
@@ -1920,6 +1936,8 @@ void CMI_VMI_Read_Environment ()
   int dummy2;
 
 
+  DEBUG_PRINT ("CMI_VMI_Read_Environment() called.\n");
+
   /* Get the username for this process. */
   if (value = (getpwuid (getuid ()))->pw_name) {
     if (!(CMI_VMI_Username = strdup (value))) {
@@ -2022,6 +2040,7 @@ int CMI_VMI_Startup_Charmrun ()
   int j;
 
 
+  DEBUG_PRINT ("CMI_VMI_Startup_Charmrun() called.\n");
 
   myPID = getpid ();
 
@@ -2107,6 +2126,8 @@ int CMI_VMI_Startup_CRM ()
   int j;
   char *a;
 
+
+  DEBUG_PRINT ("CMI_VMI_Startup_CRM() called.\n");
 
   /* Initialize the CRM. */
   if (!CRMInit ()) {
@@ -2281,6 +2302,8 @@ int CMI_VMI_Initialize_VMI ()
   char *vmi_inlined_data_size;
 
 
+  DEBUG_PRINT ("CMI_VMI_Initialize_VMI() called.\n");
+
   /* Set the VMI_KEY environment variable. */
   vmi_key = (char *) malloc ((strlen (CMI_VMI_Program_Key)) + 32);
   if (!vmi_key) {
@@ -2366,6 +2389,8 @@ int CMI_VMI_Terminate_VMI ()
 {
   VMI_STATUS status;
 
+
+  DEBUG_PRINT ("CMI_VMI_Terminate_VMI() called.\n");
 
   /* Release memory used by buffer pools. */
 #if CMI_VMI_USE_MEMORY_POOL
@@ -2794,6 +2819,8 @@ int CMI_VMI_Close_Connections ()
   int i;
 
 
+  DEBUG_PRINT ("CMI_VMI_Close_Connections() called.\n");
+
   /* Issue a disconnect request to each process with a lower rank. */
   for (i = 0; i < _Cmi_mype; i++) {
     (&CMI_VMI_Processes[i])->connection_state = CMI_VMI_CONNECTION_DISCONNECTING;
@@ -3130,6 +3157,8 @@ PVMI_CACHE_ENTRY CMI_VMI_CacheEntry_From_Context (void *context)
   CMI_VMI_Handle_T *handle;
 
 
+  DEBUG_PRINT ("CMI_VMI_CacheEntry_From_Context() called.\n");
+
   handle = (CMI_VMI_Handle_T *) context;
 
   switch (handle->data.receive.receive_handle_type)
@@ -3193,7 +3222,7 @@ CMI_VMI_Handle_T *CMI_VMI_Allocate_Handle ()
 */
 void CMI_VMI_Deallocate_Handle (CMI_VMI_Handle_T *handle)
 {
-  DEBUG_PRINT ("CMI_VMI_Allocate_Handle() called.\n");
+  DEBUG_PRINT ("CMI_VMI_Deallocate_Handle() called.\n");
 
   handle->refcount = 0;
 }
