@@ -13,6 +13,7 @@
 class ComlibGlobalStats;
 class ComlibLearner {
  public:
+    virtual ~ComlibLearner() {}
     //Configures parameters of the learner. Will be called by the
     //communication library on every processor after the second
     //barrier of the communication library.
