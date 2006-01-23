@@ -1,4 +1,4 @@
-#!/usr/local/bin/python
+#!/usr/bin/python
 ###########################################################################
 ## Greg Koenig (koenig@uiuc.edu)
 ##
@@ -36,15 +36,16 @@ except KeyError:
 ##
 def ParseCommandLine ():
     # Set default values for all variables.
-    nodelist      = DEFAULT_NODELIST
-    nodegroup     = DEFAULT_NODEGROUP
-    crm           = DEFAULT_CRM
-    vmi_procs     = DEFAULT_VMI_PROCS
-    vmi_specfile  = DEFAULT_VMI_SPECFILE
-    vmi_key       = DEFAULT_VMI_KEY
-    verbose       = DEFAULT_VERBOSE
-    command       = DEFAULT_COMMAND
-    vmi_gridprocs = -1
+    nodelist         = DEFAULT_NODELIST
+    nodegroup        = DEFAULT_NODEGROUP
+    crm              = DEFAULT_CRM
+    vmi_procs        = DEFAULT_VMI_PROCS
+    vmi_specfile     = DEFAULT_VMI_SPECFILE
+    vmi_key          = DEFAULT_VMI_KEY
+    verbose          = DEFAULT_VERBOSE
+    command          = DEFAULT_COMMAND
+    vmi_gridprocs    = -1
+    disable_regcache = False
 
     # If they didn't give any command-line arguments, display usage and exit.
     if (len (sys.argv) == 1):
@@ -86,12 +87,15 @@ def ParseCommandLine ():
             vmi_key = sys.argv[i]
             i = i + 1
 
-        elif (arg == '++help'):
-            DisplayUsage ()
-            sys.exit (0)
+        elif (arg == '++disable-regcache'):
+            disable_regcache = True
 
         elif (arg == '++verbose'):
             verbose = True
+
+        elif (arg == '++help'):
+            DisplayUsage ()
+            sys.exit (0)
 
         else:
             if (arg[0:2] == '++'):
@@ -111,7 +115,7 @@ def ParseCommandLine ():
 
     # Return a list of all variables.
     return [nodelist, nodegroup, crm, vmi_procs, vmi_gridprocs, \
-            vmi_specfile, vmi_key, verbose, command]
+            vmi_specfile, vmi_key, disable_regcache, verbose, command]
 
 
 
@@ -122,16 +126,18 @@ def DisplayUsage ():
     print 'USAGE: charmgrid [options] <command> [command arguments]'
     print ' '
     print '[options] include:'
-    print '  ++nodelist    the Charm++ nodelist to use'
-    print '  ++nodegroup   the Charm++ nodegroup to use (default="main")'
-    print '  ++crm         the Charm++ Resource Manager to coordinate with'
-    print '  ++p           the number of processors to start for this sub-job'
-    print '  ++g           the total number of processors to expect for an entire Grid job'
-    print '                (defaults to g=p if not specified)'
-    print '  ++specfile    the VMI specfile to use'
-    print '  ++key         the program key to use for coordination with CRM'
-    print '  ++verbose     displays additional information during startup'
-    print '  ++help        displays this help text'
+    print '  ++nodelist           the Charm++ nodelist to use'
+    print '  ++nodegroup          the Charm++ nodegroup to use (default="main")'
+    print '  ++crm                the Charm++ Resource Manager to coordinate with'
+    print '  ++p                  the number of processors to start for this sub-job'
+    print '  ++g                  the total number of processors in an entire Grid job'
+    print '                       (defaults to g=p if not specified)'
+    print '  ++specfile           the VMI specfile to use'
+    print '  ++key                the program key to use for coordination with CRM'
+    print '  ++disable-regcache   disable VMI cache manager'
+    print '                       (this option significantly decreases performance)'
+    print '  ++verbose            displays additional information during startup'
+    print '  ++help               displays this help text'
     print ' '
 
 
@@ -201,8 +207,8 @@ def ParseNodelistFile (nodelist):
 ###########################################################################
 ## Write a script to launch the job portion on a single node.
 ##
-def WriteNodeScript (filename, crm, vmi_specfile, vmi_gridprocs, \
-                     vmi_key, working_directory, command):
+def WriteNodeScript (filename, crm, vmi_specfile, vmi_gridprocs, vmi_key, \
+                     disable_regcache, working_directory, command):
     outfile = open (filename, 'w')
 
     outfile.write ('CRM="' + crm + '"')
@@ -214,8 +220,12 @@ def WriteNodeScript (filename, crm, vmi_specfile, vmi_gridprocs, \
     outfile.write ('VMI_PROCS="' + vmi_gridprocs + '"')
     outfile.write (' ; export VMI_PROCS\n')
 
-    outfile.write ('VMI_KEY="'+ vmi_key + '"')
+    outfile.write ('VMI_KEY="' + vmi_key + '"')
     outfile.write (' ; export VMI_KEY\n')
+
+    if (disable_regcache):
+        outfile.write ('VMI_DISABLE_REGCACHE="1"')
+        outfile.write (' ; export VMI_DISABLE_REGCACHE\n')
 
     outfile.write ('cd ' + working_directory + '\n')
 
@@ -244,8 +254,6 @@ def LaunchJob (node, job_script):
 
 
 
-
-
 ###########################################################################
 ## This is the main program.
 ##
@@ -260,8 +268,9 @@ def main ():
     vmi_gridprocs     = parsed_command_line[4]
     vmi_specfile      = parsed_command_line[5]
     vmi_key           = parsed_command_line[6]
-    verbose           = parsed_command_line[7]
-    command           = parsed_command_line[8]
+    disable_vmicache  = parsed_command_line[7]
+    verbose           = parsed_command_line[8]
+    command           = parsed_command_line[9]
 
     # Parse the nodelist file.
     # Locate the group name and its list of nodes that corresponds to
@@ -341,7 +350,8 @@ def main ():
             # The child unlinks (deletes) this script during launch.
             job_script = '/tmp/charmgrid.' + str (pid) + '.' + str (i)
             WriteNodeScript (job_script, crm, vmi_specfile, vmi_gridprocs, \
-                             vmi_key, working_directory, command)
+                             vmi_key, disable_regcache, working_directory, \
+                             command)
 
             # Get the node to launch on.  This is round-robin across
             # the nodes in the group specified by the user.
