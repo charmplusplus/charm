@@ -268,6 +268,10 @@ typedef struct OtherNodeStruct
   int 			   gm_pending;
 #endif
 
+#if CMK_USE_MX
+  mx_endpoint_addr_t       endpoint_addr;
+#endif
+
 #if CMK_USE_AMMASSO
   /* DMK : TODO : If any of these can be shared, then they can be moved to mycb_t in "machine-ammasso.c"  */
 
@@ -717,6 +721,10 @@ void SendHypercube(OutgoingMsg ogm, int root, int size, char *msg, unsigned int 
 #if CMK_USE_GM
 
 #include "machine-gm.c"
+
+#elif CMK_USE_MX
+
+#include "machine-mx.c"
 
 #elif CMK_USE_AMMASSO
 
