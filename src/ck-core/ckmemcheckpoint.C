@@ -72,7 +72,6 @@ inline int ChkptOnPe() { return (CkMyPe()+1)%CkNumPes(); }
 #if CMK_MEM_CHECKPOINT
 void ArrayElement::init_checkpt() {
 	if (_memChkptOn == 0) return;
-	// CmiPrintf("[%d] ArrayElement::init_checkpt %d\n", CkMyPe(), info.fromMigration);
 	// only master init checkpoint
         if (thisArray->getLocMgr()->firstManager->mgr!=thisArray) return;
 
@@ -81,6 +80,7 @@ void ArrayElement::init_checkpt() {
 	CmiAssert(budPEs[0] != budPEs[1]);
         // inform checkPTMgr
         CProxy_CkMemCheckPT checkptMgr(ckCheckPTGroupID);
+	//CmiPrintf("[%d] ArrayElement::init_checkpt array %d %p pe: %d %d\n", CkMyPe(), ((CkGroupID)thisArrayID).idx, this, budPEs[0], budPEs[1]);
         checkptMgr[budPEs[0]].createEntry(thisArrayID, thisArray->getLocMgr()->getGroupID(), thisIndexMax, budPEs[1]);        
 	checkptMgr[budPEs[1]].createEntry(thisArrayID, thisArray->getLocMgr()->getGroupID(), thisIndexMax, budPEs[0]);
 }
@@ -312,13 +312,15 @@ void CkMemCheckPT::createEntry(CkArrayID aid, CkGroupID loc, CkArrayIndexMax ind
   for (idx=0; idx<len; idx++) {
     CkCheckPTInfo *entry = ckTable[idx];
     if (index == entry->index) {
-      if (aid == entry->aid) {
-        CkPrintf("[%d] CkMemCheckPT::createEntry a duplciated entry. \n", CkMyPe());
-        CmiAbort("CkMemCheckPT::createEntry a duplciated entry");
-      }
       if (loc == entry->locMgr) {
-	// bindTo array elements
-        return;
+	  // bindTo array elements
+          return;
+      }
+        // for array inheritance, the following check may fail
+        // because ArrayElement constructor of all superclasses are called
+      if (aid == entry->aid) {
+        CkPrintf("[%d] CkMemCheckPT::createEntry a duplciated entry for arrayID %d:", CkMyPe(), ((CkGroupID)aid).idx); index.print(); CkPrintf("\n");
+        CmiAbort("CkMemCheckPT::createEntry a duplciated entry");
       }
     }
   }
@@ -328,6 +330,7 @@ void CkMemCheckPT::createEntry(CkArrayID aid, CkGroupID loc, CkArrayIndexMax ind
   else
     newEntry = new CkDiskCheckPTInfo(aid, loc, index, buddy, len+1);
   ckTable.push_back(newEntry);
+  //CkPrintf("[%d] CkMemCheckPT::createEntry for arrayID %d:", CkMyPe(), ((CkGroupID)aid).idx); index.print(); CkPrintf("\n");
 }
 
 // loop through my checkpoint table and ask checkpointed array elements
@@ -704,6 +707,7 @@ void CkMemCheckPT::recoverArrayElements()
 // turn load balancer back on
 void CkMemCheckPT::finishUp()
 {
+  //CkPrintf("[%d] CkMemCheckPT::finishUp\n", CkMyPe());
   CKLOCMGR_LOOP(mgr->doneInserting(););
   
   inRestarting = 0;
@@ -727,7 +731,7 @@ void CkMemCheckPT::quiescence(CkCallback &cb)
   static int pe_count = 0;
   pe_count ++;
   CmiAssert(CkMyPe() == 0);
-//  CkPrintf("quiescence %d\n", pe_count);
+  //CkPrintf("quiescence %d %d\n", pe_count, CkNumPes());
   if (pe_count == CkNumPes()) {
     pe_count = 0;
     cb.send();

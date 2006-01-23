@@ -372,7 +372,7 @@ CkArrayID CProxy_ArrayBase::ckCreateArray(CkArrayMessage *m,int ctor,
   CkMarshalledMessage marsh(m);
   CProxy_CkArrayReductionMgr nodereductionProxy = CProxy_CkArrayReductionMgr::ckNew();
   CkGroupID ag=CProxy_CkArray::ckNew(opts,marsh,nodereductionProxy);
-	nodereductionProxy.setAttachedGroup(ag);
+  nodereductionProxy.setAttachedGroup(ag);
   return (CkArrayID)ag;
 }
 CkArrayID CProxy_ArrayBase::ckCreateEmptyArray(void)
