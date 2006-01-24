@@ -1448,6 +1448,7 @@ CthThread CthCreateMigratable(CthVoidFn fn,void *arg,int size)
 
 CthThread CthPup(pup_er p, CthThread t)
 {
+  int flag;
   if (pup_isUnpacking(p)) {
 	  t=(CthThread)malloc(sizeof(struct CthThreadStruct));
 	  _MEMCHECK(t);
@@ -1462,10 +1463,14 @@ CthThread CthPup(pup_er p, CthThread t)
 #if !CMK_THREADS_USE_JCONTEXT && CMK_CONTEXT_FPU_POINTER
     /* context is not portable for ia32 due to pointer in uc_mcontext.fpregs,
        pup it separately */
-  if (pup_isUnpacking(p)) {
+  if (!pup_isUnpacking(p)) flag = t->context.uc_mcontext.fpregs != NULL;
+  pup_int(p,&flag);
+  if (flag) {
+    if (pup_isUnpacking(p)) {
       t->context.uc_mcontext.fpregs = malloc(sizeof(struct _libc_fpstate));
+    }
+    pup_bytes(p,t->context.uc_mcontext.fpregs,sizeof(struct _libc_fpstate));
   }
-  pup_bytes(p,t->context.uc_mcontext.fpregs,sizeof(struct _libc_fpstate));
 #endif
   if (pup_isUnpacking(p)) {
       t->context.uc_link = 0;
