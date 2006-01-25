@@ -349,8 +349,8 @@ class CkDDT {
     types[11] = CkDDT_UNSIGNED_SHORT;
     typeTable[12] = new CkDDT_DataType(CkDDT_UNSIGNED);
     types[12] = CkDDT_UNSIGNED;
-    typeTable[13] = new CkDDT_DataType(CkDDT_UNSIGNED_SHORT);
-    types[13] = CkDDT_UNSIGNED_SHORT;
+    typeTable[13] = new CkDDT_DataType(CkDDT_UNSIGNED_LONG);
+    types[13] = CkDDT_UNSIGNED_LONG;
     typeTable[14] = new CkDDT_DataType(CkDDT_LONG_DOUBLE);
     types[14] = CkDDT_LONG_DOUBLE;
     typeTable[15] = new CkDDT_DataType(CkDDT_FLOAT_INT);
