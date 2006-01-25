@@ -11,6 +11,7 @@ Orion Sky Lawlor, olawlor@acm.org, 7/23/2002
 #include <stdlib.h>
 #include <assert.h>
 #include "impl.h"
+#include "ckvector3d.h"
 
 
 /*******************
