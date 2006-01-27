@@ -25,7 +25,7 @@
 #define CMK_SHARED_VARS_PTHREADS                           0
 #define CMK_SHARED_VARS_NT_THREADS                         0
 
-#define CMK_THREADS_USE_CONTEXT                            1
+#define CMK_THREADS_USE_CONTEXT                            0
 #define CMK_THREADS_USE_JCONTEXT                           0
 /* This two following must not be used! */
 #define CMK_THREADS_USE_PTHREADS                           0
