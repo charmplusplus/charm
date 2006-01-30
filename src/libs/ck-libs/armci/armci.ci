@@ -10,6 +10,11 @@ module armci {
 	message ArmciMsg {
 		char data[];
 	};
+	message ArmciStridedMsg {
+		int dst_stride_ar[];
+		int count[];
+		char data[];
+	};
 
 	array [1D] ArmciVirtualProcessor {
 		entry ArmciVirtualProcessor(CProxy_TCharm _thr_proxy);
@@ -22,11 +27,13 @@ module armci {
 		entry void putDataFromGet(ArmciMsg* msg);
 		entry void putsData(pointer dst_ptr, int dst_stride_ar[stride_levels], int count[stride_levels+1], 
 				int stride_levels, int nbytes, char data[nbytes], int src_proc, int hdl);
+		entry void putsData(ArmciStridedMsg* msg);
 		entry void requestFromGets(pointer src_ptr, int src_stride_ar[stride_levels], 
 	   			pointer dst_ptr, int dst_stride_ar[stride_levels],
 	   			int count[stride_levels+1], int stride_levels, int dst_proc, int hdl);
 		entry void putDataFromGets(pointer dst_ptr, int dst_stride_ar[stride_levels], 
 				int count[stride_levels+1], int stride_levels, int nbytes, char data[nbytes], int hdl);
+		entry void putDataFromGets(ArmciStridedMsg* msg);
 
 		entry void mallocClient(CkReductionMsg *msg);
 		entry void checkpoint(int len, char dname[len]);

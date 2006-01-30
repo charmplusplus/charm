@@ -73,11 +73,13 @@ void ArmciVirtualProcessor::put(pointer src, pointer dst,
     memcpy(dst,src,nbytes);
     return;
   }*/
-  ArmciMsg *msg = new (nbytes, 0) ArmciMsg(dst,nbytes,thisIndex,-1);
+  int hdl = hdlList.size();
+  Armci_Hdl* entry = new Armci_Hdl(ARMCI_BPUT, dst_proc, nbytes, src, dst);
+  hdlList.push_back(entry);
+
+  ArmciMsg *msg = new (nbytes, 0) ArmciMsg(dst,nbytes,thisIndex,hdl);
   memcpy(msg->data, src, nbytes);
   thisProxy[dst_proc].putData(msg);
-  // blocking call. Wait for acknowledgement from target
-  thread->suspend();
 }
 
 int ArmciVirtualProcessor::nbput(pointer src, pointer dst,
@@ -118,10 +120,10 @@ void ArmciVirtualProcessor::putAck(int hdl) {
 
 void ArmciVirtualProcessor::get(pointer src, pointer dst,
 			       int nbytes, int src_proc) {
-  if(src_proc == thisIndex){
+/*  if(src_proc == thisIndex){
     memcpy(dst,src,nbytes);
     return;
-  }
+  }*/
   thisProxy[src_proc].requestFromGet(src, dst, nbytes, thisIndex, -1);
   // wait for reply
   thread->suspend();
@@ -129,10 +131,10 @@ void ArmciVirtualProcessor::get(pointer src, pointer dst,
 
 int ArmciVirtualProcessor::nbget(pointer src, pointer dst,
 			       int nbytes, int src_proc) {
-  if(src_proc == thisIndex){
+/*  if(src_proc == thisIndex){
     memcpy(dst,src,nbytes);
     return -1;
-  }
+  }*/
   int hdl = hdlList.size();
   Armci_Hdl* entry = new Armci_Hdl(ARMCI_GET, src_proc, nbytes, src, dst);
   hdlList.push_back(entry);
@@ -161,7 +163,7 @@ void ArmciVirtualProcessor::waitmulti(vector<int> procs){
 void ArmciVirtualProcessor::waitproc(int proc){
   vector<int> procs;
   for(int i=0;i<hdlList.size();i++){
-    if(hdlList[i]->acked == 0 && hdlList[i]->proc == proc)
+    if(hdlList[i]->acked == 0 && hdlList[i]->proc == proc && hdlList[i]->op & BLOCKING_MASK == 0)
       procs.push_back(i);
   }
   waitmulti(procs);
@@ -170,7 +172,7 @@ void ArmciVirtualProcessor::waitproc(int proc){
 void ArmciVirtualProcessor::waitall(){
   vector<int> procs;
   for(int i=0;i<hdlList.size();i++){
-    if(hdlList[i]->acked == 0)
+    if(hdlList[i]->acked == 0 && hdlList[i]->op & BLOCKING_MASK == 0)
       procs.push_back(i);
   }
   waitmulti(procs);
@@ -179,7 +181,7 @@ void ArmciVirtualProcessor::waitall(){
 void ArmciVirtualProcessor::fence(int proc){
   vector<int> procs;
   for(int i=0;i<hdlList.size();i++){
-    if(hdlList[i]->acked == 0 && (hdlList[i]->op == ARMCI_PUT || hdlList[i]->op == ARMCI_ACC) && hdlList[i]->proc == proc)
+    if(hdlList[i]->acked == 0 && (hdlList[i]->op & BLOCKING_MASK == 1) && hdlList[i]->proc == proc)
       procs.push_back(i);
   }
   waitmulti(procs);
@@ -187,7 +189,7 @@ void ArmciVirtualProcessor::fence(int proc){
 void ArmciVirtualProcessor::allfence(){
   vector<int> procs;
   for(int i=0;i<hdlList.size();i++){
-    if(hdlList[i]->acked == 0 && hdlList[i]->op == ARMCI_PUT || hdlList[i]->op == ARMCI_ACC)
+    if(hdlList[i]->acked == 0 && (hdlList[i]->op & BLOCKING_MASK == 1))
       procs.push_back(i);
   }
   waitmulti(procs);
@@ -238,50 +240,54 @@ void ArmciVirtualProcessor::putDataFromGet(ArmciMsg *m) {
 void ArmciVirtualProcessor::puts(pointer src_ptr, int src_stride_ar[], 
 	   pointer dst_ptr, int dst_stride_ar[],
 	   int count[], int stride_levels, int dst_proc){
-  char *buffer;
   int nbytes = 1;
   for(int i=0;i<stride_levels+1;i++) 
     nbytes *= count[i];
   
-  if(dst_proc == thisIndex){
+/*  if(dst_proc == thisIndex){
     buffer = new char[nbytes];
     stridedCopy(src_ptr, buffer, src_stride_ar, count, stride_levels, 1);
     stridedCopy(dst_ptr, buffer, dst_stride_ar, count, stride_levels, 0);
     return;
   }
+*/
+  int hdl = hdlList.size();
+  Armci_Hdl* entry = new Armci_Hdl(ARMCI_BPUT, dst_proc, nbytes, src_ptr, dst_ptr);
+  hdlList.push_back(entry);
   
-  buffer = new char[nbytes];
-  stridedCopy(src_ptr, buffer, src_stride_ar, count, stride_levels, 1);
-  thisProxy[dst_proc].putsData(dst_ptr, dst_stride_ar, count, stride_levels, nbytes, buffer, thisIndex, -1);
-  // blocking call. Wait for acknowledgement from dst_proc
-  delete [] buffer;
-  thread->suspend();
+  ArmciStridedMsg *m = new (stride_levels,stride_levels+1,nbytes, 0) ArmciStridedMsg(dst_ptr,stride_levels,nbytes,thisIndex,hdl);
+  memcpy(m->dst_stride_ar,dst_stride_ar,sizeof(int)*stride_levels);
+  memcpy(m->count,count,sizeof(int)*(stride_levels+1));
+  stridedCopy(src_ptr, m->data, src_stride_ar, count, stride_levels, 1);
+  thisProxy[dst_proc].putsData(m);
 }
+
 int ArmciVirtualProcessor::nbputs(pointer src_ptr, int src_stride_ar[], 
 	   pointer dst_ptr, int dst_stride_ar[],
 	   int count[], int stride_levels, int dst_proc){
-  int hdl = hdlList.size();
-  char *buffer;
   int nbytes = 1;
   for(int i=0;i<stride_levels+1;i++) 
     nbytes *= count[i];
   
-  if(dst_proc == thisIndex){
+/*  if(dst_proc == thisIndex){
     buffer = new char[nbytes];
     stridedCopy(src_ptr, buffer, src_stride_ar, count, stride_levels, 1);
     stridedCopy(dst_ptr, buffer, dst_stride_ar, count, stride_levels, 0);
     return -1;
   }
-  
+  */
+  int hdl = hdlList.size();
   Armci_Hdl* entry = new Armci_Hdl(ARMCI_PUT, dst_proc, nbytes, src_ptr, dst_ptr);
   hdlList.push_back(entry);
-  
-  buffer = new char[nbytes];
-  stridedCopy(src_ptr, buffer, src_stride_ar, count, stride_levels, 1);
-  thisProxy[dst_proc].putsData(dst_ptr, dst_stride_ar, count, stride_levels, nbytes, buffer, thisIndex, hdl);
-  delete [] buffer;
+ 
+  ArmciStridedMsg *m = new (stride_levels,stride_levels+1,nbytes, 0) ArmciStridedMsg(dst_ptr,stride_levels,nbytes,thisIndex,hdl);
+  memcpy(m->dst_stride_ar,dst_stride_ar,sizeof(int)*stride_levels);
+  memcpy(m->count,count,sizeof(int)*(stride_levels+1));
+  stridedCopy(src_ptr, m->data, src_stride_ar, count, stride_levels, 1);
+  thisProxy[dst_proc].putsData(m);
   return hdl;
 }
+
 void ArmciVirtualProcessor::putsData(pointer dst_ptr, int dst_stride_ar[], 
   		int count[], int stride_levels,
 		int nbytes, char *data, int src_proc, int hdl){
@@ -289,10 +295,16 @@ void ArmciVirtualProcessor::putsData(pointer dst_ptr, int dst_stride_ar[],
   thisProxy[src_proc].putAck(hdl);
 }
 
+void ArmciVirtualProcessor::putsData(ArmciStridedMsg *m){
+  stridedCopy(m->dst, m->data, m->dst_stride_ar, m->count, m->stride_levels, 0);
+  thisProxy[m->src_proc].putAck(m->hdl);
+  delete m;
+}
+
 void ArmciVirtualProcessor::gets(pointer src_ptr, int src_stride_ar[], 
 	   pointer dst_ptr, int dst_stride_ar[],
 	   int count[], int stride_levels, int src_proc){
-  if(src_proc == thisIndex){
+/*  if(src_proc == thisIndex){
     char *buffer;
     int nbytes = 1;
     for(int i=0;i<stride_levels+1;i++) 
@@ -301,7 +313,7 @@ void ArmciVirtualProcessor::gets(pointer src_ptr, int src_stride_ar[],
     stridedCopy(src_ptr, buffer, src_stride_ar, count, stride_levels, 1);
     stridedCopy(dst_ptr, buffer, dst_stride_ar, count, stride_levels, 0);
     return;
-  }
+  }*/
   thisProxy[src_proc].requestFromGets(src_ptr, src_stride_ar, dst_ptr, dst_stride_ar, 
   					count, stride_levels, thisIndex, -1);
   // wait for reply
@@ -314,13 +326,13 @@ int ArmciVirtualProcessor::nbgets(pointer src_ptr, int src_stride_ar[],
   int nbytes = 1;
   for(int i=0;i<stride_levels+1;i++) 
     nbytes *= count[i];
-  if(src_proc == thisIndex){
+/*  if(src_proc == thisIndex){
     char *buffer;
     buffer = new char[nbytes];
     stridedCopy(src_ptr, buffer, src_stride_ar, count, stride_levels, 1);
     stridedCopy(dst_ptr, buffer, dst_stride_ar, count, stride_levels, 0);
     return -1;
-  }
+  }*/
   
   Armci_Hdl* entry = new Armci_Hdl(ARMCI_GET, src_proc, nbytes, src_ptr, dst_ptr);
   hdlList.push_back(entry);
@@ -332,14 +344,15 @@ int ArmciVirtualProcessor::nbgets(pointer src_ptr, int src_stride_ar[],
 }
 void ArmciVirtualProcessor::requestFromGets(pointer src_ptr, int src_stride_ar[], 
 	   pointer dst_ptr, int dst_stride_ar[], int count[], int stride_levels, int dst_proc, int hdl){
-  char *buffer;
   int nbytes = 1;
   for(int i=0;i<stride_levels+1;i++) 
     nbytes *= count[i];
-  buffer = new char[nbytes];
-  stridedCopy(src_ptr, buffer, src_stride_ar, count, stride_levels, 1);
-  thisProxy[dst_proc].putDataFromGets(dst_ptr, dst_stride_ar, count, stride_levels, nbytes, buffer, hdl);
-  delete [] buffer;
+  
+  ArmciStridedMsg *m = new (stride_levels,stride_levels+1,nbytes, 0) ArmciStridedMsg(dst_ptr,stride_levels,nbytes,thisIndex,hdl);
+  memcpy(m->dst_stride_ar,dst_stride_ar,sizeof(int)*stride_levels);
+  memcpy(m->count,count,sizeof(int)*(stride_levels+1));
+  stridedCopy(src_ptr, m->data, src_stride_ar, count, stride_levels, 1);
+  thisProxy[dst_proc].putDataFromGets(m);
 }
 void ArmciVirtualProcessor::putDataFromGets(pointer dst_ptr, int dst_stride_ar[], 
 		int count[], int stride_levels, int nbytes, char *data, int hdl){
@@ -347,6 +360,15 @@ void ArmciVirtualProcessor::putDataFromGets(pointer dst_ptr, int dst_stride_ar[]
   if(hdl != -1) { // non-blocking 
     hdlList[hdl]->acked = 1;  
   }
+  thread->resume();
+}
+
+void ArmciVirtualProcessor::putDataFromGets(ArmciStridedMsg *m){
+  stridedCopy(m->dst, m->data, m->dst_stride_ar, m->count, m->stride_levels, 0);
+  if(m->hdl != -1) { // non-blocking 
+    hdlList[m->hdl]->acked = 1;  
+  }
+  delete m;
   thread->resume();
 }
 

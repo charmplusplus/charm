@@ -15,10 +15,13 @@ PUPbytes(pointer); //Pointers get sent as raw bytes
 #include "armci.h"
 
 /* Operations for Armci_Hdl */
-#define ARMCI_INVALID	0
-#define ARMCI_GET 	1
-#define ARMCI_PUT 	2
-#define ARMCI_ACC 	3
+#define ARMCI_INVALID	0x0
+#define ARMCI_GET 	0x1
+#define ARMCI_PUT 	0x2
+#define ARMCI_ACC 	0x3
+#define ARMCI_BPUT	0x6
+#define ARMCI_BACC 	0x7
+#define BLOCKING_MASK	0x4
 
 class Armci_Hdl {
 public:
@@ -90,6 +93,45 @@ public:
   }
 };
 
+class ArmciStridedMsg : public CMessage_ArmciStridedMsg {
+public:
+  pointer dst; 
+  int stride_levels;
+  int nbytes;
+  int src_proc;
+  int hdl;
+  int *dst_stride_ar;
+  int *count;
+  char *data;
+  
+  ArmciStridedMsg(void) { dst_stride_ar = NULL; count = NULL; data = NULL; }
+  ArmciStridedMsg(pointer d, int l, int n, int s, int h) :
+    dst(d), stride_levels(l), nbytes(n), src_proc(s), hdl(h) { }
+  static ArmciStridedMsg* pup(PUP::er &p, ArmciStridedMsg *m){
+    pointer d;
+    int l, n, s, h;
+    if(p.isPacking() || p.isSizing()){
+      d = m->dst;
+      l = m->stride_levels;
+      n = m->nbytes;
+      s = m->src_proc;
+      h = m->hdl;
+    }
+    p|d; p|l; p|n; p|s; p|h;
+    if(p.isUnpacking()){
+      m = new (l,l+1,n, 0) ArmciStridedMsg(d,l,n,s,h);
+    }
+    p((char *)(m->dst_stride_ar),sizeof(int)*l);
+    p((char *)(m->count),sizeof(int)*(l+1));
+    p(m->data,n);
+    if(p.isDeleting()){
+      delete m;
+      m = NULL;
+    }
+    return m;
+  }
+};
+
 // virtual processor class declaration
 // ARMCI is supposed to be platform neutral, so calling this a thread did
 // not seem like a proper abstraction.
@@ -138,6 +180,7 @@ class ArmciVirtualProcessor : public TCharmClient1D {
   void putsData(pointer dst_ptr, int dst_stride_ar[], 
   		int count[], int stride_levels,
 		int nbytes, char *data, int src_proc, int hdl);
+  void putsData(ArmciStridedMsg *m);
   
   void gets(pointer src_ptr, int src_stride_ar[], 
 	   pointer dst_ptr, int dst_stride_ar[],
@@ -151,6 +194,7 @@ class ArmciVirtualProcessor : public TCharmClient1D {
   void putDataFromGets(pointer dst_ptr, int dst_stride_ar[], 
   		int count[], int stride_levels,
 		int nbytes, char *data, int hdl);
+  void putDataFromGets(ArmciStridedMsg *m);
 
   void notify(int proc);
   void sendNote(int proc);
