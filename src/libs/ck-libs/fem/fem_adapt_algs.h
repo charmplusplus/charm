@@ -18,11 +18,11 @@
 #include "vector2d.h"  // **CW** tentative
 
 #define SLIVERAREA 1.0e-18
-#define REFINE_TOL 1.4  // Refine elements with largest edge length > 
+#define REFINE_TOL 1.75  // Refine elements with largest edge length > 
                         // REFINE_TOL*desiredEdgeLength
-#define COARSEN_TOL 0.6 // Coarsen element with average edge length <
+#define COARSEN_TOL 0.7 // Coarsen element with average edge length <
                         // COARSEN_TOL*desiredEdgeLength
-#define QUALITY_MIN 0.4 
+#define QUALITY_MIN 0.2
 
 class FEM_Adapt_Algs;
 CtvExtern(FEM_Adapt_Algs *, _adaptAlgs);

@@ -70,7 +70,7 @@ int FEM_Adapt_Algs::Refine(int qm, int method, double factor, double *sizes)
 	}
 	double qFactor=getAreaQuality(i);
 	if ((theMesh->elem[0].getMeshSizing(i) > 0.0) &&
-	    (maxEdgeLength > (theMesh->elem[0].getMeshSizing(i)*REFINE_TOL))) {
+	    (maxEdgeLength > (theMesh->elem[0].getMeshSizing(i)*REFINE_TOL))){
 	  Insert(i, qFactor*(1.0/maxEdgeLength), 0);
 	}
       }
@@ -97,7 +97,7 @@ int FEM_Adapt_Algs::Refine(int qm, int method, double factor, double *sizes)
 	  }
 	}
 	if ((theMesh->elem[0].getMeshSizing(elId) > 0.0) &&
-	    (maxEdgeLength > (theMesh->elem[0].getMeshSizing(elId)*REFINE_TOL))) {
+	    (maxEdgeLength>(theMesh->elem[0].getMeshSizing(elId)*REFINE_TOL))){
 	  if (theAdaptor->edge_bisect(n1, n2) > 0)  iter_mods++;
 	}
       }
@@ -277,9 +277,9 @@ void FEM_Adapt_Algs::SetMeshSize(int method, double factor, double *sizes)
   else if (method == 4) { // mesh sizing has been set independently; use as is
     CkPrintf("ParFUM_SetMeshSize: USE EXISTING SIZES \n");
   }
-  CkPrintf("Current mesh sizing: ");
+  //  CkPrintf("Current mesh sizing: ");
   for (int i=0; i<numElements; i++) {
-    CkPrintf("%4.6e ", theMesh->elem[0].getMeshSizing(i));
+    //CkPrintf("%4.6e ", theMesh->elem[0].getMeshSizing(i));
   }
 }
 
