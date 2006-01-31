@@ -6,6 +6,7 @@
  *****************************************************************************/
 
 #include "sockRoutines.h"
+
 #ifndef CMK_NO_SOCKETS /*<- for ASCI Red*/
 
 #include <stdio.h>
@@ -533,6 +534,19 @@ unsigned int ChMessageInt(ChMessageInt_t src)
   int i; unsigned int ret=0;
   for (i=0;i<4;i++) {ret<<=8;ret+=src.data[i];}
   return (int)ret;
+}
+
+ChMessageLong_t ChMessageLong_new(unsigned long src)
+{ /*Convert long integer to bytes*/
+  int i; ChMessageLong_t ret;
+  for (i=0;i<8;i++) ret.data[i]=(unsigned char)(src>>(8*(7-i)));
+  return ret;
+}
+unsigned long ChMessageLong(ChMessageLong_t src)
+{ /*Convert bytes to long integer*/
+  int i; unsigned long ret=0;
+  for (i=0;i<8;i++) {ret<<=8;ret+=src.data[i];}
+  return (long)ret;
 }
 
 int ChMessage_recv(SOCKET fd,ChMessage *dst)

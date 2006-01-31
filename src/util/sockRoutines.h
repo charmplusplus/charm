@@ -230,6 +230,12 @@ typedef struct {
 ChMessageInt_t ChMessageInt_new(unsigned int src); /*Convert integer to bytes*/
 unsigned int ChMessageInt(ChMessageInt_t src); /*Convert bytes to integer*/
 
+typedef struct {
+  unsigned char data[8];/*8-byte, big-endian integer*/
+} ChMessageLong_t;
+ChMessageLong_t ChMessageLong_new(unsigned long src); /*Convert long integer to bytes*/
+unsigned long ChMessageLong(ChMessageLong_t src); /*Convert bytes to long integer*/
+
 #define CH_TYPELEN 12 /*Maximum length for the message type field*/
 typedef struct ChMessageHeader {
   ChMessageInt_t len; /*Length of message to follow (not incl. header)*/
@@ -257,6 +263,7 @@ typedef struct {
 	ChMessageInt_t nPE; /* Number of compute processors on this node */
 	ChMessageInt_t dataport; /* node's data port (UDP or GM) */
 	ChMessageInt_t mach_id; /* node's hardware address (GM-only) */
+	ChMessageLong_t nic_id; /* node's NIC hardware address (MX-only) */
 	skt_ip_t IP; /* node's IP address */
 } ChNodeinfo;
 
