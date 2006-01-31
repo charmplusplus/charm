@@ -1459,7 +1459,9 @@ static void node_addresses_obtain(char **argv)
 	me.info.nPE=ChMessageInt_new(0);
 	me.info.IP=_skt_invalid_ip;
 	me.info.mach_id=ChMessageInt_new(Cmi_mach_id);
+#ifdef CMK_USE_MX
 	me.info.nic_id=ChMessageLong_new(Cmi_nic_id);
+#endif
   	me.info.dataport=ChMessageInt_new(dataport);
 
   	/*Send our node info. to charmrun.
