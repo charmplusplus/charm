@@ -234,6 +234,14 @@ struct gm_port *gmport = NULL;
 int  portFinish = 0;
 #endif
 
+#if CMK_USE_MX
+#include "myriexpress.h"
+mx_endpoint_t      endpoint;
+mx_endpoint_addr_t endpoint_addr;
+int MX_FILTER   =  123456;
+static uint64_t Cmi_nic_id=0; /* Machine-specific identifier (MX-only) */
+#endif
+
 #if CMK_USE_AMMASSO
   #include "clustercore/ccil_api.h"
 #endif
@@ -946,6 +954,7 @@ static void ctrl_sendone_nolock(const char *type,
 				const char *data1,int dataLen1,
 				const char *data2,int dataLen2)
 {
+  MACHSTATE1(2,"ctrl_sendone_nolock { type=%s", type);
   const void *bufs[3]; int lens[3]; int nBuffers=0;
   ChMessageHeader hdr;
   skt_abortFn oldAbort=skt_set_abort(sendone_abort_fn);
@@ -959,6 +968,7 @@ static void ctrl_sendone_nolock(const char *type,
   skt_sendV(Cmi_charmrun_fd,nBuffers,bufs,lens);
   Cmi_charmrun_fd_sendflag=0;
   skt_set_abort(oldAbort);
+  MACHSTATE(2,"} ctrl_sendone_nolock");
 }
 
 static void ctrl_sendone_locking(const char *type,
@@ -1031,7 +1041,7 @@ static void ctrl_getone(void)
   MACHSTATE(2,"ctrl_getone")
   MACHLOCK_ASSERT(comm_flag,"ctrl_getone")
   ChMessage_recv(Cmi_charmrun_fd,&msg);
-  MACHSTATE1(2,"ctrl_getone recv one '%s'", msg.header.type)
+  MACHSTATE1(2,"ctrl_getone recv one '%s'", msg.header.type);
 
   if (strcmp(msg.header.type,"die")==0) {
     MACHSTATE(2,"ctrl_getone bye bye")
@@ -1449,6 +1459,7 @@ static void node_addresses_obtain(char **argv)
 	me.info.nPE=ChMessageInt_new(0);
 	me.info.IP=_skt_invalid_ip;
 	me.info.mach_id=ChMessageInt_new(Cmi_mach_id);
+	me.info.nic_id=ChMessageLong_new(Cmi_nic_id);
   	me.info.dataport=ChMessageInt_new(dataport);
 
   	/*Send our node info. to charmrun.
@@ -1460,7 +1471,9 @@ static void node_addresses_obtain(char **argv)
   	/*We get the other node addresses from a message sent
   	  back via the charmrun control port.*/
   	if (!skt_select1(Cmi_charmrun_fd,600*1000)) CmiAbort("Timeout waiting for nodetab!\n");
+        MACHSTATE(2,"recv initnode {");
   	ChMessage_recv(Cmi_charmrun_fd,&nodetabmsg);
+        MACHSTATE(2,"} recv initnode");
   }
   node_addresses_store(&nodetabmsg);
   ChMessage_free(&nodetabmsg);
@@ -1667,7 +1680,7 @@ static OutgoingMsg PrepareOutgoing(CmiState cs,int pe,int size,int freemode,char
 
 CmiCommHandle CmiGeneralNodeSend(int node, int size, int freemode, char *data)
 {
-  
+  MACHSTATE(1,"CmiGeneralNodeSend {");
   CmiState cs = CmiGetState(); OutgoingMsg ogm;
 
   if (freemode == 'S') {
@@ -1694,6 +1707,7 @@ CmiCommHandle CmiGeneralNodeSend(int node, int size, int freemode, char *data)
   CmiCommUnlock();
   /* Check if any packets have arrived recently (preserves kernel network buffers). */
   CommunicationServer(0, 2);
+  MACHSTATE(1,"} CmiGeneralNodeSend");
   return (CmiCommHandle)ogm;
 }
 
@@ -1714,6 +1728,7 @@ CmiCommHandle CmiGeneralNodeSend(int node, int size, int freemode, char *data)
 
 CmiCommHandle CmiGeneralSend(int pe, int size, int freemode, char *data)
 {
+  MACHSTATE(1,"CmiGeneralSend {");
   CmiState cs = CmiGetState(); OutgoingMsg ogm;
 
   if (freemode == 'S') {
@@ -1771,6 +1786,7 @@ CmiCommHandle CmiGeneralSend(int pe, int size, int freemode, char *data)
   CmiCommUnlock();
   /* Check if any packets have arrived recently (preserves kernel network buffers). */
   CommunicationServer(0, 2);
+  MACHSTATE(1,"}  CmiGeneralSend");
   return (CmiCommHandle)ogm;
 }
 
@@ -2068,6 +2084,10 @@ static void ConverseRunPE(int everReturn)
   CmiCheckGmStatus();
 #endif
 
+#if CMK_USE_MX
+  CmiMXMakeConnection();  
+#endif
+
   ConverseCommonInit(CmiMyArgv);
 
   /* initialize the network progress counter*/
@@ -2116,7 +2136,7 @@ static void ConverseRunPE(int everReturn)
     setitimer(ITIMER_REAL, &i, NULL);
     }
 
-#if ! CMK_USE_GM && ! CMK_USE_TCP
+#if ! CMK_USE_GM && ! CMK_USE_MX && ! CMK_USE_TCP
     /*Occasionally check for retransmissions, outgoing acks, etc.*/
     /*no need for GM case */
     CcdCallFnAfter((CcdVoidFn)CommunicationsClockCaller,NULL,Cmi_comm_clock_delay);
@@ -2153,6 +2173,7 @@ static void ConverseRunPE(int everReturn)
 
 void ConverseExit(void)
 {
+  MACHSTATE(2,"ConverseExit {");
   machine_initiated_shutdown=1;
   if (CmiMyRank()==0) {
     if(Cmi_print_stats)
@@ -2170,6 +2191,8 @@ void ConverseExit(void)
  	while (1) CommunicationServer(500, 2);
 #endif
   }
+  MACHSTATE(2,"} ConverseExit");
+
 /*Comm. thread will kill us.*/
   while (1) CmiYield();
 }
