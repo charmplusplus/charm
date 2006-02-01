@@ -954,10 +954,10 @@ static void ctrl_sendone_nolock(const char *type,
 				const char *data1,int dataLen1,
 				const char *data2,int dataLen2)
 {
-  MACHSTATE1(2,"ctrl_sendone_nolock { type=%s", type);
   const void *bufs[3]; int lens[3]; int nBuffers=0;
   ChMessageHeader hdr;
   skt_abortFn oldAbort=skt_set_abort(sendone_abort_fn);
+  MACHSTATE1(2,"ctrl_sendone_nolock { type=%s", type);
   if (Cmi_charmrun_fd==-1) 
   	charmrun_abort("ctrl_sendone called in standalone!\n");
   Cmi_charmrun_fd_sendflag=1;
@@ -1730,8 +1730,8 @@ CmiCommHandle CmiGeneralNodeSend(int node, int size, int freemode, char *data)
 
 CmiCommHandle CmiGeneralSend(int pe, int size, int freemode, char *data)
 {
-  MACHSTATE(1,"CmiGeneralSend {");
   CmiState cs = CmiGetState(); OutgoingMsg ogm;
+  MACHSTATE(1,"CmiGeneralSend {");
 
   if (freemode == 'S') {
 #if CMK_USE_GM

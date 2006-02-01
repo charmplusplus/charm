@@ -466,11 +466,11 @@ extern void CmiAmmassoNodeAddressesStoreHandler(int pe, struct sockaddr_in *addr
 */
 static void node_addresses_store(ChMessage *msg)
 {
-  MACHSTATE(1,"node_addresses_store {");	
   ChMessageInt_t *n32=(ChMessageInt_t *)msg->data;
   ChNodeinfo *d=(ChNodeinfo *)(n32+1);
   int nodestart;
   int i,j,n;
+  MACHSTATE(1,"node_addresses_store {");	
   _Cmi_numnodes=ChMessageInt(n32[0]);
   
   if ((sizeof(ChMessageInt_t)+sizeof(ChNodeinfo)*_Cmi_numnodes)
