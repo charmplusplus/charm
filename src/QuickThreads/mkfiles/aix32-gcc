@@ -1,5 +1,5 @@
 
-CC=gcc -I.
+CC=../../bin/charmc -I. $(OPTS)
 
 all: qt stp testpgm
 
