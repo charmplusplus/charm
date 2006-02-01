@@ -137,7 +137,8 @@ trap 'End 1' 2
 test x$nPE = x && nPE=1
 
 test $verbose = 1 && echo charmrun +p$nPE $opts
-charmrun +p$nPE $opts
+exedir=`dirname $0`
+$exedir/charmrun +p$nPE $opts
 status=$?
 
 End $status
