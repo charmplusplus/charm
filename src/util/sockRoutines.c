@@ -536,17 +536,17 @@ unsigned int ChMessageInt(ChMessageInt_t src)
   return (int)ret;
 }
 
-ChMessageLong_t ChMessageLong_new(unsigned long src)
+ChMessageLong_t ChMessageLong_new(CMK_TYPEDEF_UINT8 src)
 { /*Convert long integer to bytes*/
   int i; ChMessageLong_t ret;
   for (i=0;i<8;i++) ret.data[i]=(unsigned char)(src>>(8*(7-i)));
   return ret;
 }
-unsigned long ChMessageLong(ChMessageLong_t src)
+CMK_TYPEDEF_UINT8 ChMessageLong(ChMessageLong_t src)
 { /*Convert bytes to long integer*/
-  int i; unsigned long ret=0;
+  int i; CMK_TYPEDEF_UINT8 ret=0;
   for (i=0;i<8;i++) {ret<<=8;ret+=src.data[i];}
-  return (long)ret;
+  return (CMK_TYPEDEF_UINT8)ret;
 }
 
 int ChMessage_recv(SOCKET fd,ChMessage *dst)
