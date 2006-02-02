@@ -247,7 +247,9 @@ typedef struct OtherNodeStruct
   int nodestart, nodesize;
   skt_ip_t IP;
   unsigned int mach_id;
-  unsigned long nic_id;
+#if CMK_USE_MX
+  CmiUInt8 nic_id;
+#endif
   unsigned int dataport;
   struct sockaddr_in addr;
 #if CMK_USE_TCP
@@ -482,7 +484,9 @@ static void node_addresses_store(ChMessage *msg)
     nodes[i].nodestart = nodestart;
     nodes[i].nodesize  = ChMessageInt(d[i].nPE);
     nodes[i].mach_id = ChMessageInt(d[i].mach_id);
+#if CMK_USE_MX
     nodes[i].nic_id = ChMessageLong(d[i].nic_id);
+#endif
 #if CMK_USE_GM
     CmiGmConvertMachineID(& nodes[i].mach_id);
 #endif
@@ -493,10 +497,6 @@ static void node_addresses_store(ChMessage *msg)
       Cmi_self_IP=nodes[i].IP;
     }
     nodes[i].dataport = ChMessageInt(d[i].dataport);
-    MACHSTATE4(1," Nodetable[%d]={'pe' %d,IP=%08x,port=%d}",
-	       i,nodes[i].nodestart,nodes[i].IP,nodes[i].dataport);
-    MACHSTATE2(1," nic_id=%ld, endpoint_id=%d", nodes[i].nic_id, nodes[i].mach_id);
-
     nodes[i].addr = skt_build_addr(nodes[i].IP,nodes[i].dataport);
 #if CMK_USE_TCP
     nodes[i].sock = INVALID_SOCKET;
