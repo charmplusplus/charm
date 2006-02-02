@@ -42,3 +42,8 @@
 #define CMK_MACHINE_PROGRESS_DEFINED                       1
 
 #define NODE_0_IS_CONVHOST                                 0
+
+/* call cpu timer for LB */
+#define CMK_LBDB_CPUTIMER				   1
+
+
