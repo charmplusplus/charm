@@ -295,7 +295,7 @@ public:
   {
 	ArrayElement1D::pup(p);//<- pack our superclass
 	p(nTimes);p(sendTime);
-	p(usec);p(lastTime);
+	p(usec);//p(lastTime);
 	p(work_per_sec);
 	p(busywork);
 	p(n_received);
