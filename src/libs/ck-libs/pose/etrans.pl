@@ -1164,7 +1164,7 @@ sub posefuncmap
 	    }
 	    $output.=");}\n";
 	  } else {
-	    die "what the hell is up with .".$segments[1]."in $line";
+	    die "could not parse ".$segments[1]."in $line";
 	  }
 	} elsif ($type==2)	#create_complete
 	  {
@@ -1243,7 +1243,7 @@ sub posefuncmap
 		  $output.="else delete ".$msg.";}\n";
 		}
 	      } else {
-		die "what the hell is up with .".$segments[1]."in $line";
+		die "could not parse .".$segments[1]."in $line";
 	      }
 	    } elsif ($type==4)	#invoke_at
 	      {
@@ -1313,7 +1313,7 @@ sub posefuncmap
 		    $output.="else delete ".$msg.";}\n";
 		  }
 		} else {
-		  die "what the hell is up with .".$segments[1]."in $line";
+		  die "could not parse ".$segments[1]."in $line";
 		}
 	      } elsif ($type==5) #local_invoke
 		{

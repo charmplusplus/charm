@@ -243,7 +243,7 @@ void POSEreadCmdLine()
   pose_config.trace=CmiGetArgFlagDesc(argv, "+trace_pose",
                         "Traces key POSE operations like Forward Execution, Rollback, Cancellation, Fossil Collection, etc. via user events for display in projections");
 
-  pose_config.dop=CmiGetArgFlagDesc(argv, "+crit_post",
+  pose_config.dop=CmiGetArgFlagDesc(argv, "+dop_pose",
                         "Critical path analysis by measuring degree of parallelism");
 
   CmiGetArgIntDesc(argv, "+memman_pose", &pose_config.max_usage , "Coarse memory management: Restricts forward execution of objects with over <max_usage>/<checkpoint store_rate> checkpoints; default to 10");
