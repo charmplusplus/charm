@@ -104,7 +104,11 @@ void LBMachineUtil::Clear()
     start_totalwall = start_totalcpu = -1.;
   } else {
     const double cur_wall = CkWallTimer();
+#if CMK_LBDB_CPUTIMER
     const double cur_cpu = CkCpuTimer();
+#else
+    const double cur_cpu = cur_wall;
+#endif
 
     start_totalwall = cur_wall;
     start_totalcpu = cur_cpu;
@@ -116,7 +120,11 @@ void LBMachineUtil::TotalTime(double* walltime, double* cputime)
 {
   if (state == on) {
     const double cur_wall = CkWallTimer();
+#if CMK_LBDB_CPUTIMER
     const double cur_cpu = CkCpuTimer();
+#else
+    const double cur_cpu = cur_wall;
+#endif
     total_walltime += (cur_wall - start_totalwall);
     total_cputime += (cur_cpu - start_totalcpu);
     start_totalwall = cur_wall;
