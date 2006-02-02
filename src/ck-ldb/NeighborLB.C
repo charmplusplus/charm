@@ -111,7 +111,8 @@ LBMigrateMsg* NeighborLB::Strategy(NborBaseLB::LDStats* stats, int count)
       } while (!objfound);
 
       if (!objfound) {
-	//	CkPrintf("[%d] No suitable object found!\n",CkMyPe());
+        if (_lb_args.debug()>2) 
+	  CkPrintf("[%d] No suitable object found!\n",CkMyPe());
 	break;
       }
 
