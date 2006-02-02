@@ -358,7 +358,8 @@ void LBDB::BackgroundLoad(double* walltime, double* cputime)
   double idle;
   IdleTime(&idle);
   
-  *walltime = totalwall - idle - obj_walltime;
+  //*walltime = totalwall - idle - obj_walltime;
+  *walltime = totalwall - idle - obj_cputime;
   *cputime = totalcpu - obj_cputime;
   if (*walltime < 0) *walltime = 0.;
 }
@@ -370,9 +371,11 @@ void LBDB::GetTime(double *total_walltime,double *total_cputime,
 
   IdleTime(idletime);
   
-  *bg_walltime = *total_walltime - *idletime - obj_walltime;
+  //*bg_walltime = *total_walltime - *idletime - obj_walltime;
+  *bg_walltime = *total_walltime - *idletime - obj_cputime;
   *bg_cputime = *total_cputime - obj_cputime;
   if (*bg_walltime < 0) *bg_walltime = 0.;
+  //CkPrintf("HERE [%d] total: %f %f obj: %f %f idle: %f bg: %f\n", CkMyPe(), *total_walltime, *total_cputime, obj_walltime, obj_cputime, *idletime, *bg_walltime);
 }
 
 void LBDB::DumpDatabase()

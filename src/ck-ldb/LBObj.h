@@ -86,6 +86,9 @@ public:
 #endif
 	  *cputime = endCTime - startCTime;
 	}
+        else {
+          *walltime = *cputime = 0.0;
+        }
   }
 
   inline LDOMHandle &parentOM() { return data.handle.omhandle; }
