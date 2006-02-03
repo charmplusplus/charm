@@ -20,3 +20,4 @@ then
 fi
 
 CMK_SYSLIBS="$CMK_SYSLIBS -lgm"
+CMK_LIBS="$CMK_LIBS -Wl,-u,_gmpi_macosx_malloc_hack"

@@ -13,7 +13,9 @@ OPTS_LD="$OPTS_LD -multiply_defined suppress -flat_namespace "
 CMK_LD="$CMK_CC "
 OPTS_LDXX="$OPTS_LDXX -multiply_defined suppress -flat_namespace "
 CMK_LDXX="$CMK_CXX "
-CMK_LIBS="-Wl,-u,_gmpi_macosx_malloc_hack -lckqt -lmpich -lpmpich"
+CMK_LIBS="-lckqt -lmpich -lpmpich"
+
+CMK_QT="generic-light"
 
 # Assumes IBM xlf90 compiler:
 CMK_CF77="f77 -qnocommon -qextname -qthreaded "
@@ -24,12 +26,10 @@ CMK_MOD_EXT="mod"
 
 # native compilers
 CMK_NATIVE_LIBS=""
-CMK_NATIVE_CC="gcc "
-CMK_NATIVE_LD="gcc"
-CMK_NATIVE_CXX="g++ "
-CMK_NATIVE_LDXX="g++"
-CMK_NATIVE_CC="gcc "
-CMK_NATIVE_CXX="g++ "
+CMK_NATIVE_CC="gcc"
+CMK_NATIVE_LD="$CMK_NATIVE_CC"
+CMK_NATIVE_CXX="g++"
+CMK_NATIVE_LDXX="$CMK_NATIVE_CXX"
 
 # setting for shared lib
 # need -lstdc++ for c++ reference, and it needs to be put at very last
