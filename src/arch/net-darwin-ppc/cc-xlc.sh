@@ -12,6 +12,12 @@ CMK_NATIVE_CXX="xlc++_r -qstaticinline "
 CMK_NATIVE_LDXX="xlc++_r "
 CMK_NATIVE_LIBS="-lstdc++ "
 
+CMK_SEQ_CC="xlc_r "
+CMK_SEQ_LD="xlc_r "
+CMK_SEQ_CXX="xlc++_r -qstaticinline "
+CMK_SEQ_LDXX="xlc++_r "
+CMK_SEQ_LIBS="-lstdc++ "
+
 CMK_LD_SHARED=" -qmkshrobj -Wl,-dynamic -Wl,-undefined,dynamic_lookup "
 
 CMK_AR="ar cq"
