@@ -10,18 +10,12 @@
  * - CmiMachineExit()
 
   written by 
-  Gengbin Zheng, gzheng@uiuc.edu  4/22/2001
+  Yan Shi, yanshi@uiuc.edu     2/2/2006
+  Gengbin Zheng, gzheng@uiuc.edu  2/3/2006
   
   ChangeLog:
-  * 3/7/2004,  Gengbin Zheng
-    implemented fault tolerant gm layer. When GM detects a catastrophic error,
-    it temporarily disables the delivery of all messages with the same sender 
-    port, target port, and priority as the message that experienced the error. 
-    This layer needs to properly handle the error message of GM and resume 
-    the port.
-
-  TODO:
-  1. DMAable buffer reuse;
+  * 2/3/2006,  Gengbin Zheng
+    implement packetization, and fix buffer change after send bug
 */
 
 /**
@@ -110,31 +104,7 @@ static PendingSentMsg sent_handles_end=NULL; //where the next pointer points to 
 
 unsigned long MATCH_FILTER = 0x1111111122223333L;
 unsigned long MATCH_MASK   = 0xffffffffffffffffL;
-#if 0 
-void enqueue_sending(char *msg, int length, OtherNode node, int size)
-{
-  MACHSTATE(5,"enqueue_sending {");
-  mx_return_t rc;
-  mx_request_t sent_handle;
-  mx_segment_t buffer_desc;
-  buffer_desc.segment_ptr = msg;
-  buffer_desc.segment_length = length;
-  PendingSentMsg pm;
-  MACHSTATE1(5," mx_isend to endpoint_addr=%d, 1", node->endpoint_addr);
-  InsertPendingSentMsg(pm,msg); 
-  MACHSTATE1(5," mx_isend to endpoint_addr=%d, 2", node->endpoint_addr);
-  rc = mx_isend(endpoint, &buffer_desc, 1, node->endpoint_addr, MATCH_FILTER, NULL, &(pm->handle));  
-  MACHSTATE1(5," mx_isend returns %d", rc);
-  if (rc != MX_SUCCESS) {
-    MACHSTATE1(3," mx_isend returns %d", rc);
-    printf("Cannot mx_isend\n");
-    return;
-  } 
-  MACHSTATE(5,"} enqueue_sending");
-}
-#endif
 
-static void send_progress();
 static void alarmInterrupt(int arg);
 static void processMessage(char *msg, int len);
 static void processMXError(mx_status_t status);
@@ -367,24 +337,26 @@ static void CommunicationServer(int withDelayMs, int where)
 
 static void processMessage(char *msg, int len)
 {
+  char *newmsg;
   int rank, srcpe, seqno, magic, i;
   unsigned int broot;
   int size;
   unsigned char checksum;
 
-  DgramHeaderBreak(msg, rank, srcpe, magic, seqno, broot);
+  if (len >= DGRAM_HEADER_SIZE) {
+    DgramHeaderBreak(msg, rank, srcpe, magic, seqno, broot);
 
-  DgramHeader *header = (DgramHeader *)(msg); 
-  MACHSTATE2(8, "Break header Cmi-charmrun_id=%d, magic=%d", Cmi_charmrun_pid, header->magic);
-  MACHSTATE3(8, "srcpe=%d, seqno=%d, rank=%d", srcpe, seqno, rank);    
+  //  DgramHeader *header = (DgramHeader *)(msg); 
+    MACHSTATE2(8, "Break header Cmi-charmrun_id=%d, magic=%d", Cmi_charmrun_pid, header->magic);
+    MACHSTATE3(8, "srcpe=%d, seqno=%d, rank=%d", srcpe, seqno, rank);    
  
 #ifdef CMK_USE_CHECKSUM
-  checksum = computeCheckSum(msg, len);
-  if (checksum == 0)
+    checksum = computeCheckSum(msg, len);
+    if (checksum == 0)
 #else
-  if (magic == (Cmi_charmrun_pid&DGRAM_MAGIC_MASK))
+    if (magic == (Cmi_charmrun_pid&DGRAM_MAGIC_MASK))
 #endif
-  {
+    {
       OtherNode node = nodes_by_pe[srcpe];
       /* check seqno */
       if (seqno == node->recv_expect) {
@@ -400,35 +372,57 @@ static void processMessage(char *msg, int len)
          CmiAbort("\n\n\t\tPacket out of order!!\n\n");
       }
 
-      size = CmiMsgHeaderGetLength(msg);
-      node->asm_rank = rank;
-      node->asm_total = size;
-      node->asm_fill = len;
-      node->asm_msg = msg;
+      newmsg = node->asm_msg;
+      if (newmsg == 0) {
+        size = CmiMsgHeaderGetLength(msg);
+        if (size != len) {
+          newmsg = (char *)CmiAlloc(size);
+          _MEMCHECK(newmsg);
+          if (len > size) {
+           CmiPrintf("size: %d, len:%d.\n", size, len);
+           CmiAbort("\n\n\t\tLength mismatch!!\n\n");
+          }
+          memcpy(newmsg, msg, len);
+          CmiFree(msg);			/* free original msg */
+        }
+        else 
+          newmsg = msg;
+        node->asm_rank = rank;
+        node->asm_total = size;
+        node->asm_fill = len;
+        node->asm_msg = newmsg;
+      }
+      else {
+        size = len - DGRAM_HEADER_SIZE;
+        if (node->asm_fill+size > node->asm_total) {
+         CmiPrintf("asm_total: %d, asm_fill: %d, len:%d.\n", node->asm_total, node->asm_fill, len);
+         CmiAbort("\n\n\t\tLength mismatch!!\n\n");
+        }
+        memcpy(newmsg + node->asm_fill, msg+DGRAM_HEADER_SIZE, size);
+        CmiFree(msg);			/* free original msg */
+        node->asm_fill += size;
+      }
        	
-      CmiAssert(size == len);
-
       /* get a full packet */
       if (node->asm_fill == node->asm_total) {
         switch (rank) {
         case DGRAM_BROADCAST: {
           for (i=1; i<_Cmi_mynodesize; i++)
-            CmiPushPE(i, CopyMsg(msg, node->asm_total));
-          CmiPushPE(0, msg);
+            CmiPushPE(i, CopyMsg(newmsg, node->asm_total));
+          CmiPushPE(0, newmsg);
           break;
         }
 #if CMK_NODE_QUEUE_AVAILABLE
         case DGRAM_NODEBROADCAST: 
         case DGRAM_NODEMESSAGE: {
-          CmiPushNode(msg);
+          CmiPushNode(newmsg);
           break;
         }
 #endif
         default:
-          CmiPushPE(rank, msg);
+          CmiPushPE(rank, newmsg);
         }
         node->asm_msg = 0;
-      }
       /* do it after integration - the following function may re-entrant */
 #if CMK_BROADCAST_SPANNING_TREE
       if (rank == DGRAM_BROADCAST
@@ -436,17 +430,18 @@ static void processMessage(char *msg, int len)
           || rank == DGRAM_NODEBROADCAST
 #endif
          )
-        SendSpanningChildren(NULL, 0, len, msg, broot, rank);
+        SendSpanningChildren(NULL, 0, node->asm_total, newmsg, broot, rank);
 #elif CMK_BROADCAST_HYPERCUBE
       if (rank == DGRAM_BROADCAST
 #if CMK_NODE_QUEUE_AVAILABLE
           || rank == DGRAM_NODEBROADCAST
 #endif
          )
-        SendHypercube(NULL, 0, len, msg, broot, rank);
+        SendHypercube(NULL, 0, node->asm_total, newmsg, broot, rank);
 #endif
-  } 
-  else {
+      }
+    } 
+    else {   /* checksum failed */
 #ifdef CMK_USE_CHECKSUM
       CmiPrintf("[%d] message ignored: checksum (%d) not 0!\n", CmiMyPe(), checksum);
 #else
@@ -455,8 +450,12 @@ static void processMessage(char *msg, int len)
 #endif
       CmiPrintf("recved: rank:%d src:%d mag:%d seqno:%d len:%d\n", rank, srcpe, magic, seqno,
 len);
+    }
   }
-
+  else {
+      CmiPrintf("[%d] message ignored: size is too small: %d!\n", CmiMyPe(), len);
+      CmiPrintf("[%d] possible size: %d\n", CmiMsgHeaderGetLength(msg));
+  }
 }
 
 /***********************************************************************
@@ -475,18 +474,17 @@ void EnqueueOutgoingDgram
   uint32_t result;
   char *data;
 
+  len = dlen + DGRAM_HEADER_SIZE;;
+
   if (copy) {
-    data = CopyMsg(ptr, dlen);
+    data = CopyMsg(ptr-DGRAM_HEADER_SIZE, len);
   }
   else {
-    data = ptr;
+    data = ptr-DGRAM_HEADER_SIZE;
     ogm->refcount++; 
   }
 
-  len = dlen;
-
   seqno = node->send_next;
-//if (CmiMyPe() == 0) CmiPrintf("[%d] SEQNO: %d to %d\n", CmiMyPe(), seqno, node-nodes);
   MACHSTATE5(2, "[%d] SEQNO: %d to %d rank: %d %d", CmiMyPe(), seqno, node-nodes, rank, broot);
   DgramHeaderMake(data, rank, ogm->src, Cmi_charmrun_pid, seqno, broot);
 #if 0
@@ -519,7 +517,6 @@ void EnqueueOutgoingDgram
     rc = mx_ibuffered(endpoint, &pm->handle, &result);
   } while (rc == MX_SUCCESS && !result);
 #endif
-  //if(ogm->refcount==0) CmiFree(ogm);  //Garbage collection will do it
   MACHSTATE(2, "} EnqueueOutgoingDgram");
 }
 
@@ -528,21 +525,20 @@ safe */
 void DeliverViaNetwork(OutgoingMsg ogm, OtherNode node, int rank, unsigned int broot, int copy)
 {
   int size; char *data;
-  size = ogm->size;
-  data = ogm->data;
-  MACHSTATE3(2, "DeliverViaNetwork { : size:%d, to node mach_id=%d, nic=%ld", size,
-node->mach_id, node->nic_id);
+
+  MACHSTATE3(2, "DeliverViaNetwork { : size:%d, to node mach_id=%d, nic=%ld", size, node->mach_id, node->nic_id);
+
+  size = ogm->size - DGRAM_HEADER_SIZE;
+  data = ogm->data + DGRAM_HEADER_SIZE;
+
+  while (size > Cmi_dgram_max_data) {
+    copy = 1;     /* since we are packetizing, we need to copy anyway now */
+    EnqueueOutgoingDgram(ogm, data, Cmi_dgram_max_data, node, rank, broot, copy);
+    data += Cmi_dgram_max_data;
+    size -= Cmi_dgram_max_data;
+  }
   if (size>0) EnqueueOutgoingDgram(ogm, data, size, node, rank, broot, copy);
 
-#if 0
-  /* a simple flow control */
-  while (pendinglen >= MAXPENDINGSEND) {
-      /* pending max len exceeded, busy wait until get a token 
-         Doing this surprisingly improve the performance by 2s for 200MB msg */
-      MACHSTATE(4,"Polling until token available")
-      CommunicationServer_nolock(0);
-  }
-#endif
   MACHSTATE(2, "} DeliverViaNetwork");
 }
 
@@ -697,6 +693,9 @@ void CmiMachineInit(char **argv)
     printf("Cannot decompose endpoint address\n");
     return;
   }
+
+  Cmi_dgram_max_data = 1024*1-DGRAM_HEADER_SIZE;
+
   MACHSTATE(3,"} CmiMachineInit");
 }
 
