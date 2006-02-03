@@ -45,6 +45,7 @@ int FEM_Adapt_Algs::Refine(int qm, int method, double factor, double *sizes)
   int elId, mods=0, iter_mods=1;
   int elemWidth = theMesh->elem[0].getConn().width();
   SetMeshSize(method, factor, sizes);
+  GradateMesh(1.0);
   refineElements = refineStack = NULL;
   refineTop = refineHeapSize = 0;
   while (iter_mods != 0) {
@@ -134,6 +135,7 @@ int FEM_Adapt_Algs::Coarsen(int qm, int method, double factor, double *sizes)
   int elemWidth = theMesh->elem[0].getConn().width();
   double qFactor;
   SetMeshSize(method, factor, sizes);
+  GradateMesh(1.0);
   coarsenElements = NULL;
   coarsenHeapSize = 0;
   while (iter_mods != 0) {
