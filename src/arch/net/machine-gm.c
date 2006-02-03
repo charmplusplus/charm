@@ -707,7 +707,8 @@ void EnqueueOutgoingDgram
   send_progress();
 }
 
-void DeliverViaNetwork(OutgoingMsg ogm, OtherNode node, int rank, unsigned int broot)
+/* copy is ignored, since we always copy */
+void DeliverViaNetwork(OutgoingMsg ogm, OtherNode node, int rank, unsigned int broot, int copy)
 {
   int size; char *data;
  

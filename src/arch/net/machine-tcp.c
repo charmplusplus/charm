@@ -572,7 +572,8 @@ void EnqueueOutgoingDgram
   }
 }
 
-void DeliverViaNetwork(OutgoingMsg ogm, OtherNode node, int rank, unsigned int broot)
+/* ignore copy, because it is safe to reuse the msg buffer after send */
+void DeliverViaNetwork(OutgoingMsg ogm, OtherNode node, int rank, unsigned int broot, int copy)
 {
   int size; char *data;
 

@@ -107,7 +107,7 @@ static void CmiNotifyStillIdle(CmiIdleState *s);
 void sendAck(OtherNode node);
 AmmassoToken *getQPSendToken(OtherNode node);
 int sendDataOnQP(char* data, int len, OtherNode node, char flags);
-void DeliverViaNetwork(OutgoingMsg msg, OtherNode otherNode, int rank, unsigned int broot);
+void DeliverViaNetwork(OutgoingMsg msg, OtherNode otherNode, int rank, unsigned int broot, int copy);
 static void CommunicationServer(int withDelayMs, int where);
 void CmiMachineExit();
 
@@ -844,7 +844,7 @@ int sendDataOnQP(char* data, int len, OtherNode node, char flags) {
 /* DeliverViaNetwork()
  *
  */
-void DeliverViaNetwork(OutgoingMsg msg, OtherNode otherNode, int rank, unsigned int broot) {
+void DeliverViaNetwork(OutgoingMsg msg, OtherNode otherNode, int rank, unsigned int broot, int copy) {
 
   cc_status_t rtn;
   cc_stag_index_t stag;

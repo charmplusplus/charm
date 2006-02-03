@@ -79,6 +79,7 @@ typedef struct PendingSentMsgStruct
 {
   mx_request_t handle;
   OutgoingMsg ogm;
+  char *data;
   struct PendingSentMsgStruct *next;
   struct PendingSentMsgStruct *prev;
 }
@@ -90,10 +91,10 @@ static PendingSentMsg sent_handles_end=NULL; //where the next pointer points to 
 #define InsertPendingSentMsg(pm, ogm) \
   {pm = (PendingSentMsg)CmiAlloc(sizeof(struct PendingSentMsgStruct));\
    _MEMCHECK(pm); MACHSTATE1(3,"alloc msg %u",pm);\
-   pm->next=sent_handles; pm->prev=NULL;MACHSTATE(3,"Here");\
-   if(sent_handles==NULL) {sent_handles_end=pm;}\
-   else {sent_handles->prev=pm;} MACHSTATE(3,"Here2");\
-   sent_handles=pm; pm->ogm=ogm; MACHSTATE(3,"Insert done");}\
+   pm->prev=sent_handles_end; pm->next=NULL; \
+   if(sent_handles==NULL) {sent_handles=sent_handles_end=pm;}\
+   else {sent_handles_end->next=pm;} MACHSTATE(3,"Here2");\
+   sent_handles_end=pm; pm->ogm=ogm; pm->data=data;MACHSTATE(3,"Insert done");}\
 
 #define FreePendingSentMsg(pm) \
    { if(pm!=NULL) { if(pm->prev==NULL && pm->next==NULL)\
@@ -103,7 +104,8 @@ static PendingSentMsg sent_handles_end=NULL; //where the next pointer points to 
                     else if(pm->next!=NULL && pm->prev==NULL)\
                       {pm->next->prev=NULL;sent_handles=pm->next;}\
 		    else {pm->next->prev=pm->prev;pm->prev->next=pm->next;}\
-                    pm->ogm->refcount--; if(pm->ogm->refcount<=0) FreeOutgoingMsg(pm->ogm);\
+                    if (pm->ogm) {pm->ogm->refcount--; GarbageCollectMsg(pm->ogm);} \
+		    else CmiFree(pm->data); \
                     CmiFree(pm); } }	                				
 
 unsigned long MATCH_FILTER = 0x1111111122223333L;
@@ -259,7 +261,6 @@ static void ServiceCharmrun_nolock()
 }
 
 static void PumpMsgs(void) {
-  MACHSTATE(3,"PumpMsg {");
   mx_return_t rc;
   mx_status_t status;
   PendingSentMsg pm, ptr=sent_handles;
@@ -270,7 +271,7 @@ static void PumpMsgs(void) {
     rc = mx_iprobe(endpoint, MATCH_FILTER, MATCH_MASK, &status, &result);
     if(rc != MX_SUCCESS) {
       MACHSTATE1(3," mx_iprobe returns %d", rc);
-      printf("Cannot mx_iprobe)\n");
+      CmiAbort("Cannot mx_iprobe)\n");
       return;
     } 
     if(result) { 
@@ -287,7 +288,6 @@ static void PumpMsgs(void) {
     }
     else break;  // no incoming message ready
   }
-  MACHSTATE(3,"} PumpMsg");
 }
 
 static void processMXError(mx_status_t status){
@@ -306,16 +306,17 @@ static void ReleaseSentMsgs(void) {
     mx_return_t rc;
     mx_status_t status;
     unsigned int result;
-    PendingSentMsg pm = sent_handles_end;
+    PendingSentMsg next, pm = sent_handles;
     while (pm!=NULL) {
       rc = mx_test(endpoint, &(pm->handle), &status, &result);
       if(rc != MX_SUCCESS)
         break;
+      next = pm->next;
       if(result!=0 && status.code == MX_STATUS_SUCCESS) {
         MACHSTATE1(2," Sent complete. Free sent msg size %d", status.msg_length);
 	FreePendingSentMsg(pm);
       }
-      pm = pm->prev;
+      pm = next;
     }
     MACHSTATE(2,"} ReleaseSentMsgs");
 }
@@ -405,13 +406,14 @@ static void processMessage(char *msg, int len)
       node->asm_fill = len;
       node->asm_msg = msg;
        	
+      CmiAssert(size == len);
 
       /* get a full packet */
       if (node->asm_fill == node->asm_total) {
         switch (rank) {
         case DGRAM_BROADCAST: {
           for (i=1; i<_Cmi_mynodesize; i++)
-            CmiPushPE(i, msg);
+            CmiPushPE(i, CopyMsg(msg, node->asm_total));
           CmiPushPE(0, msg);
           break;
         }
@@ -466,19 +468,27 @@ len);
  ***********************************************************************/
 
 void EnqueueOutgoingDgram
-     (OutgoingMsg ogm, char *ptr, int dlen, OtherNode node, int rank, int broot)
+     (OutgoingMsg ogm, char *ptr, int dlen, OtherNode node, int rank, int broot, int copy)
 {
   int size, len, seqno;
   int alloclen, allocSize;
+  uint32_t result;
+  char *data;
 
-  /* don't have to worry about ref count because we do copy, and
-     ogm can be free'ed right away */
-  ogm->refcount++; 
+  if (copy) {
+    data = CopyMsg(ptr, dlen);
+  }
+  else {
+    data = ptr;
+    ogm->refcount++; 
+  }
 
   len = dlen;
 
   seqno = node->send_next;
-  DgramHeaderMake(ptr, rank, ogm->src, Cmi_charmrun_pid, seqno, broot);
+//if (CmiMyPe() == 0) CmiPrintf("[%d] SEQNO: %d to %d\n", CmiMyPe(), seqno, node-nodes);
+  MACHSTATE5(2, "[%d] SEQNO: %d to %d rank: %d %d", CmiMyPe(), seqno, node-nodes, rank, broot);
+  DgramHeaderMake(data, rank, ogm->src, Cmi_charmrun_pid, seqno, broot);
 #if 0
   DgramHeader *header = (DgramHeader *)(ptr);
   MACHSTATE2(3,"Make header Cmi_charmrun_pid=%d magic=%d", Cmi_charmrun_pid, header->magic);
@@ -493,28 +503,36 @@ void EnqueueOutgoingDgram
   mx_return_t rc;
   mx_request_t sent_handle;
   mx_segment_t buffer_desc;
-  buffer_desc.segment_ptr = ogm->data;
+  buffer_desc.segment_ptr = data;
   buffer_desc.segment_length = len;
   PendingSentMsg pm;
+  if (copy)  ogm = NULL;
   InsertPendingSentMsg(pm,ogm);
   rc = mx_isend(endpoint, &buffer_desc, 1, node->endpoint_addr, MATCH_FILTER, NULL, &(pm->handle));
   if (rc != MX_SUCCESS) {
     MACHSTATE1(3," mx_isend returns %d", rc);
-    printf("Cannot mx_isend\n");
-    return;
+    CmiAbort("mx_isend failed\n");
   }
+#if 0
+  /* wait for it to be safe to change values in workspace */
+  do {
+    rc = mx_ibuffered(endpoint, &pm->handle, &result);
+  } while (rc == MX_SUCCESS && !result);
+#endif
   //if(ogm->refcount==0) CmiFree(ogm);  //Garbage collection will do it
   MACHSTATE(2, "} EnqueueOutgoingDgram");
 }
 
-void DeliverViaNetwork(OutgoingMsg ogm, OtherNode node, int rank, unsigned int broot)
+/* can not guarantee that buffer is not altered after return, so it is not
+safe */
+void DeliverViaNetwork(OutgoingMsg ogm, OtherNode node, int rank, unsigned int broot, int copy)
 {
   int size; char *data;
   size = ogm->size;
   data = ogm->data;
   MACHSTATE3(2, "DeliverViaNetwork { : size:%d, to node mach_id=%d, nic=%ld", size,
 node->mach_id, node->nic_id);
-  if (size>0) EnqueueOutgoingDgram(ogm, data, size, node, rank, broot);
+  if (size>0) EnqueueOutgoingDgram(ogm, data, size, node, rank, broot, copy);
 
 #if 0
   /* a simple flow control */

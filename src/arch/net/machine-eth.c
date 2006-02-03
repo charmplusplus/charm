@@ -346,7 +346,7 @@ void EnqueueOutgoingDgram
  * function takes the outgoing messages, splits it into datagrams and
  * enqueues them into the Send Queue.
  ***********************************************************************/
-void DeliverViaNetwork(OutgoingMsg ogm, OtherNode node, int rank, unsigned int broot)
+void DeliverViaNetwork(OutgoingMsg ogm, OtherNode node, int rank, unsigned int broot, int copy)
 {
   int size; char *data;
   OtherNode myNode = nodes+CmiMyNode();

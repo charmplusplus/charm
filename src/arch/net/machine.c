@@ -1510,7 +1510,7 @@ void DeliverOutgoingNodeMessage(OutgoingMsg ogm)
 #else
     for (i=0; i<_Cmi_numnodes; i++)
       if (i!=_Cmi_mynode)
-	DeliverViaNetwork(ogm, nodes + i, DGRAM_NODEMESSAGE, DGRAM_ROOTPE_MASK);
+	DeliverViaNetwork(ogm, nodes + i, DGRAM_NODEMESSAGE, DGRAM_ROOTPE_MASK, 1);
 #endif
     GarbageCollectMsg(ogm);
     break;
@@ -1518,7 +1518,7 @@ void DeliverOutgoingNodeMessage(OutgoingMsg ogm)
     node = nodes+dst;
     rank=DGRAM_NODEMESSAGE;
     if (dst != _Cmi_mynode) {
-      DeliverViaNetwork(ogm, node, rank, DGRAM_ROOTPE_MASK);
+      DeliverViaNetwork(ogm, node, rank, DGRAM_ROOTPE_MASK, 0);
       GarbageCollectMsg(ogm);
     } else {
       if (ogm->freemode == 'A') {
@@ -1567,7 +1567,7 @@ void DeliverOutgoingMessage(OutgoingMsg ogm)
       if (i!=_Cmi_mynode){
 	/*FAULT_EVAC : is the target processor valid*/
 	if(CmiNodeAlive(i)){
-	  DeliverViaNetwork(ogm, nodes + i, DGRAM_BROADCAST, DGRAM_ROOTPE_MASK);
+	  DeliverViaNetwork(ogm, nodes + i, DGRAM_BROADCAST, DGRAM_ROOTPE_MASK, 1);
 	}
       }	
 #endif
@@ -1587,7 +1587,7 @@ void DeliverOutgoingMessage(OutgoingMsg ogm)
       if (i!=_Cmi_mynode){
 	/*FAULT_EVAC : is the target processor valid*/
 	if(CmiNodeAlive(i)){
-	  DeliverViaNetwork(ogm, nodes + i, DGRAM_BROADCAST, DGRAM_ROOTPE_MASK);
+	  DeliverViaNetwork(ogm, nodes + i, DGRAM_BROADCAST, DGRAM_ROOTPE_MASK, 1);
 	}
       }	
 #endif
@@ -1601,7 +1601,7 @@ void DeliverOutgoingMessage(OutgoingMsg ogm)
     node = nodes_by_pe[dst];
     rank = dst - node->nodestart;
     if (node->nodestart != Cmi_nodestart) {
-      DeliverViaNetwork(ogm, node, rank, DGRAM_ROOTPE_MASK);
+      DeliverViaNetwork(ogm, node, rank, DGRAM_ROOTPE_MASK, 0);
       GarbageCollectMsg(ogm);
     } else {
       if (ogm->freemode == 'A') {
@@ -1986,7 +1986,7 @@ void SendSpanningChildren(OutgoingMsg ogm, int root, int size, char *msg, unsign
     CmiAssert(p!=_Cmi_mynode);
     /* CmiPrintf("SendSpanningChildren: %d => %d\n", _Cmi_mynode, p); */
     if (!root && !ogm) ogm=PrepareOutgoing(cs, PE_BROADCAST_OTHERS, size,'F',CopyMsg(msg, size));
-    DeliverViaNetwork(ogm, nodes + p, noderank, startpe);
+    DeliverViaNetwork(ogm, nodes + p, noderank, startpe, 1);
   }
   if (!root && ogm) GarbageCollectMsg(ogm);
 }
@@ -2027,9 +2027,9 @@ void SendHypercube(OutgoingMsg ogm, int root, int size, char *msg, unsigned int 
   for (i = 0; i < npes; i++) {
     int p = dest_pes[i];
     /* CmiPrintf("SendHypercube: %d => %d (%d)\n", cs->pe, p, i); */
-    if (!root && !ogm) 
+    if (!root && ! ogm) 
       ogm=PrepareOutgoing(cs ,PE_BROADCAST_OTHERS, size,'F',CopyMsg(msg, size));
-    DeliverViaNetwork(ogm, nodes + p, noderank, CmiMyNode());
+    DeliverViaNetwork(ogm, nodes + p, noderank, CmiMyNode(), 1);
   }
   if (!root && ogm) GarbageCollectMsg(ogm);
   CmiTmpFree(dest_pes);

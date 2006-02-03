@@ -717,8 +717,8 @@ static void CommunicationPeriodicCaller(void *ignored)
 #endif
 
 /* common hardware dependent API */
-void EnqueueOutgoingDgram(OutgoingMsg ogm, char *ptr, int dlen, OtherNode node, int rank, int broot);
-void DeliverViaNetwork(OutgoingMsg ogm, OtherNode node, int rank, unsigned int broot);
+/*void EnqueueOutgoingDgram(OutgoingMsg ogm, char *ptr, int dlen, OtherNode node, int rank, int broot);*/
+void DeliverViaNetwork(OutgoingMsg ogm, OtherNode node, int rank, unsigned int broot, int copy);
 
 void SendSpanningChildren(OutgoingMsg ogm, int root, int size, char *msg, unsigned int startpe, int nodesend);
 void SendHypercube(OutgoingMsg ogm, int root, int size, char *msg, unsigned int curcycle, int nodesend);
