@@ -382,6 +382,8 @@ $(L)/libconv-core.a: $(LIBCONV_CORE)
 
 $(L)/libconv-cplus-y.a: $(L)/libconv-cplus-n.a
 
+include Makefile.machine
+
 $(L)/libconv-cplus-n.a: machine.c $(CVHEADERS)
 	@-test -f $(INC)/mpi.h && mv -f $(INC)/mpi.h $(INC)/mpi.BAK || true
 	$(CHARMC) -o machine.o  -DFOR_CPLUS=1 machine.c
