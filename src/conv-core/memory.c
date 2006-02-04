@@ -51,9 +51,7 @@
 #define mm_free     free
 #endif
 
-#ifndef CMK_OPTIMIZE
 CMK_TYPEDEF_UINT8 memory_allocated = 0;
-#endif
 
 /*Rank of the processor that's currently holding the CmiMemLock,
 or -1 if nobody has it.  Only set when malloc might be reentered.
@@ -122,10 +120,15 @@ CMK_TYPEDEF_UINT8 CmiMemoryUsage() { return 0; }
 
 #if CMK_MEMORY_BUILD_GNU
 #  include "memory-gnu.c"
+static void meta_init(char **argv) {
+  CmiMemoryIs_flag |= CMI_MEMORY_IS_GNU;
+}
 #else
 #  include "memory-gnuold.c"
+static void meta_init(char **argv) {
+  CmiMemoryIs_flag |= CMI_MEMORY_IS_GNUOLD;
+}
 #endif
-static void meta_init(char **argv) {}
 
 #endif /* CMK_MEMORY_BUILD_GNU or old*/
 
@@ -292,11 +295,7 @@ void free_reentrant(void *mem)
 
 CMK_TYPEDEF_UINT8 CmiMemoryUsage()
 {
-#ifndef CMK_OPTIMIZE
   return memory_allocated;
-#else
-  return 0;
-#endif
 }
 
 #endif /* ! CMK_MEMORY_BUILD_BUILTIN*/

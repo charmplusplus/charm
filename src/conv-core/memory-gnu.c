@@ -20,6 +20,8 @@ This is slightly hacked as:
 #define memalign mm_memalign
 #define valloc   mm_valloc
 
+extern CMK_TYPEDEF_UINT8 memory_allocated;
+
 #define HAVE_MMAP CMK_HAS_MMAP
 #ifndef __USE_GNU
 #  define __USE_GNU 1 /* enables MREMAP_MAYMOVE in linux mman.h (!) */
@@ -1351,7 +1353,7 @@ int      __posix_memalign(void **, size_t, size_t);
 #define M_TRIM_THRESHOLD       -1
 
 #ifndef DEFAULT_TRIM_THRESHOLD
-#define DEFAULT_TRIM_THRESHOLD (512 * 1024)
+#define DEFAULT_TRIM_THRESHOLD (256 * 1024)
 #endif
 
 /*
@@ -1451,7 +1453,7 @@ int      __posix_memalign(void **, size_t, size_t);
 
 #ifndef DEFAULT_MMAP_MAX
 #if HAVE_MMAP
-#define DEFAULT_MMAP_MAX       (262144)
+#define DEFAULT_MMAP_MAX       (131072)
 #else
 #define DEFAULT_MMAP_MAX       (0)
 #endif
@@ -3353,9 +3355,7 @@ public_fREe(Void_t* mem)
 #if HAVE_MMAP
   if (chunk_is_mmapped(p))                       /* release mmapped memory. */
   {
-#ifndef CMK_OPTIMIZE
     memory_allocated -= chunksize(p);
-#endif
     munmap_chunk(p);
     return;
   }
@@ -3741,10 +3741,6 @@ public_mALLOPt(int p, int v)
   return result;
 }
 
-#ifndef CMK_OPTIMIZE
-extern CMK_TYPEDEF_UINT8 memory_allocated;
-#endif
-
 /*
   ------------------------------ malloc ------------------------------
 */
@@ -3782,9 +3778,7 @@ _int_malloc(mstate av, size_t bytes)
 
   checked_request2size(bytes, nb);
 
-#ifndef CMK_OPTIMIZE
   memory_allocated += nb;
-#endif
 
   /*
     If the size qualifies as a fastbin, first check corresponding bin.
@@ -4155,9 +4149,7 @@ _int_free(mstate av, Void_t* mem)
   if (mem != 0) {
     p = mem2chunk(mem);
     size = chunksize(p);
-#ifndef CMK_OPTIMIZE
     memory_allocated -= size;
-#endif
 
     check_inuse_chunk(av, p);
 

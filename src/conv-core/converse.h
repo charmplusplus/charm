@@ -528,7 +528,9 @@ void CmiMemorySweep(const char *where); /* print current allocations, for -memor
 CMK_TYPEDEF_UINT8 CmiMemoryUsage();
 
 #define CMI_MEMORY_IS_ISOMALLOC (1<<1)
-#define CMI_MEMORY_IS_PARANOID (1<<2)
+#define CMI_MEMORY_IS_PARANOID  (1<<2)
+#define CMI_MEMORY_IS_GNU       (1<<3)
+#define CMI_MEMORY_IS_GNUOLD    (1<<4)
 int CmiMemoryIs(int flag); /* return state of this flag */
 
 #define CMI_THREAD_IS_QT         (1<<1)
