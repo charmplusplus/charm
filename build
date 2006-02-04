@@ -334,6 +334,7 @@ echo "Copying src/scripts/Makefile to $VERSION/tmp"
 rm -f $VERSION/tmp/Makefile
 rm -f $VERSION/tmp/Make.depends
 rm -f $VERSION/tmp/Make.lb
+rm -f $VERSION/tmp/Make.machine
 
 
 # Create the bin, lib, include, etc. links:
@@ -369,6 +370,7 @@ fi
 $VERSION/tmp/system_ln "../../src/scripts/Make.depends" $VERSION/tmp/Make.depends
 $VERSION/tmp/system_ln "../../src/ck-ldb/Make.lb" $VERSION/tmp/Make.lb
 $VERSION/tmp/system_ln "../../src/scripts/Makefile" $VERSION/tmp/Makefile
+touch $VERSION/tmp/Makefile.machine
 
 ConvUsr="$VERSION/tmp/conv-mach-pre.sh"
 echo "Generating $ConvUsr"
