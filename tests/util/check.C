@@ -1,4 +1,5 @@
 #include "converse.h"
+#include "charm++.h"
 #include <stdio.h>
 
 void check_test(int argc, char** argv) {
@@ -45,6 +46,8 @@ void check_test(int argc, char** argv) {
     CmiPrintf("Error: sizeof(CmiFloat8) is %d!\n",sizeof(float8));
     exit(1);
   }
+  CmiPrintf("All tests passed\n");
+  CmiPrintf("Info: converse header: %d envelope: %d\n", CmiReservedHeaderSize, sizeof(envelope));
 }
 
 int main(int argc, char **argv)
