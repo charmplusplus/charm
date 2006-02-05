@@ -73,7 +73,7 @@ void * CmiPoolAlloc(unsigned int numBytes)
   char *p;
   int bin=0;
   int n=numBytes+CMI_POOL_HEADER_SIZE;
-  int *header;
+  CmiInt8 *header;
   /* get 8 more bytes, so I can store a header to the left*/
   numBytes = n;
   while (n !=0) /* find the bin*/
@@ -87,7 +87,7 @@ void * CmiPoolAlloc(unsigned int numBytes)
       CmiAssert(bin>0);
       if(CpvAccess(bins)[bin] != NULL) 
 	{
-	  /*	  CmiPrintf("p\n");*/
+	  /* CmiPrintf("p\n"); */
 #ifndef CMK_OPTIMIZE
 	  CpvAccess(numKallocs)++;
 #endif
@@ -109,7 +109,7 @@ void * CmiPoolAlloc(unsigned int numBytes)
 	}
       else
 	{
-	  /*  CmiPrintf("np %d\n",bin);*/
+	  /* CmiPrintf("np %d\n",bin); */
 #ifndef CMK_OPTIMIZE
 	  CpvAccess(numMallocs)++;
 #endif
@@ -128,7 +128,7 @@ void * CmiPoolAlloc(unsigned int numBytes)
       bin=0; 
 
     }
-  header = (int *) (p-CMI_POOL_HEADER_SIZE);
+  header = (CmiInt8 *) (p-CMI_POOL_HEADER_SIZE);
   CmiAssert(header !=NULL);
   *header = bin; /* stamp the bin number on the header.*/
   return p;
@@ -140,7 +140,7 @@ void * CmiPoolAlloc(unsigned int numBytes)
 void CmiPoolFree(void * p) 
 {
   char **header = (char **)( (char*)p - CMI_POOL_HEADER_SIZE);
-  int bin = (int) *header;
+  int bin = *(CmiInt8 *)header;
   /*  CmiPrintf("f%d\n",bin,CpvAccess(maxBin));  */
   if(bin==0)
     {
@@ -149,7 +149,7 @@ void CmiPoolFree(void * p)
 #endif
       free_nomigrate(header);
     }
-  else
+  else if(bin<CpvAccess(maxBin))
     {
 #ifndef CMK_OPTIMIZE
       CpvAccess(numFrees)++;
@@ -161,6 +161,8 @@ void CmiPoolFree(void * p)
       CpvAccess(binLengths)[bin]++;
 #endif
     }
+  else
+    CmiAbort("CmiPoolFree: Invalid Bin");
 }
 
 void  CmiPoolAllocStats()
