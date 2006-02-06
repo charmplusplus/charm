@@ -50,7 +50,7 @@ extremely verbose, 2 shows most procedure entrance/exits,
 3 shows most communication, and 5 only shows rare or unexpected items.
 Displaying lower priority messages doesn't stop higher priority ones.
 */
-#define MACHINE_DEBUG_PRIO 3
+#define MACHINE_DEBUG_PRIO 2
 #define MACHINE_DEBUG_LOG 1 /**Controls whether output goes to log file*/
 
 extern FILE *debugLog;
@@ -66,6 +66,8 @@ extern FILE *debugLog;
 	MACHSTATE_I(prio,(debugLog,"[%d %.6f]> "str"\n",CmiMyRank(),CmiWallTimer(),a,b,c))
 # define MACHSTATE4(prio,str,a,b,c,d) \
 	MACHSTATE_I(prio,(debugLog,"[%d %.6f]> "str"\n",CmiMyRank(),CmiWallTimer(),a,b,c,d))
+# define MACHSTATE5(prio,str,a,b,c,d,e) \
+	MACHSTATE_I(prio,(debugLog,"[%d %.6f]> "str"\n",CmiMyRank(),CmiWallTimer(),a,b,c,d,e))
 #else
 # define MACHINE_DEBUG_LOG 0
 # define MACHSTATE(n,x) /*empty*/
@@ -73,6 +75,7 @@ extern FILE *debugLog;
 # define MACHSTATE2(n,x,a,b) /*empty*/
 # define MACHSTATE3(n,x,a,b,c) /*empty*/
 # define MACHSTATE4(n,x,a,b,c,d) /*empty*/
+# define MACHSTATE5(n,x,a,b,c,d,e) /*empty*/
 #endif
 
 
