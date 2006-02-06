@@ -21,6 +21,9 @@ void FEM_ADAPT_Coarsen(int meshID, int qm, int method, double factor,
 FDECL void FTN_NAME(FEM_ADAPT_COARSEN,fem_adapt_coarsen)(int* meshID, 
         int *qm, int *method, double *factor, double *sizes);
 
+void FEM_ADAPT_AdaptMesh(int meshID, int qm, int method, double factor, double *sizes);
+FDECL void FTN_NAME(FEM_ADAPT_ADAPTMESH,fem_adapt_adaptmesh)(int* meshID, 
+        int *qm, int *method, double *factor, double *sizes);
 
 void FEM_ADAPT_SetElementSizeField(int meshID, int elem, double size);
 FDECL void FTN_NAME(FEM_ADAPT_SETELEMENTSIZEFIELD,fem_adapt_setelementsizefield)(int *meshID, int *elem, double *size);

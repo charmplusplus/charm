@@ -14,6 +14,7 @@
 #define MINAREA 1.0e-18
 #define MAXAREA 1.0e12
 
+#define GRADATION 1.4
 CtvDeclare(FEM_Adapt_Algs *, _adaptAlgs);
 
 FEM_Adapt_Algs::FEM_Adapt_Algs(FEM_Mesh *m, femMeshModify *fm, int dimension) 
@@ -23,6 +24,17 @@ FEM_Adapt_Algs::FEM_Adapt_Algs(FEM_Mesh *m, femMeshModify *fm, int dimension)
   dim = dimension; 
   //theAdaptor = theMod->fmAdapt;
   theAdaptor = theMod->fmAdaptL;
+}
+
+void FEM_Adapt_Algs::FEM_AdaptMesh(int qm, int method, double factor, 
+				   double *sizes)
+{
+  numNodes = theMesh->node.size();
+  numElements = theMesh->elem[0].size();
+  SetMeshSize(method, factor, sizes);
+  GradateMesh(GRADATION);
+  (void)Refine(qm, method, factor, sizes);
+  
 }
 
 /* Perform refinements on a mesh.  Tries to maintain/improve element quality as
@@ -35,7 +47,10 @@ void FEM_Adapt_Algs::FEM_Refine(int qm, int method, double factor,
 {
   numNodes = theMesh->node.size();
   numElements = theMesh->elem[0].size();
+  SetMeshSize(method, factor, sizes);
+  GradateMesh(GRADATION);
   (void)Refine(qm, method, factor, sizes);
+  (void)Coarsen(qm, method, factor, sizes);
 }
 
 /* Performs refinement; returns number of modifications */
@@ -44,8 +59,6 @@ int FEM_Adapt_Algs::Refine(int qm, int method, double factor, double *sizes)
   // loop through elemsToRefine
   int elId, mods=0, iter_mods=1;
   int elemWidth = theMesh->elem[0].getConn().width();
-  SetMeshSize(method, factor, sizes);
-  GradateMesh(1.0);
   refineElements = refineStack = NULL;
   refineTop = refineHeapSize = 0;
   while (iter_mods != 0) {
@@ -61,18 +74,23 @@ int FEM_Adapt_Algs::Refine(int qm, int method, double factor, double *sizes)
       if (theMesh->elem[0].is_valid(i)) {
 	// find maxEdgeLength of i
 	int *eConn = (int*)malloc(elemWidth*sizeof(int));
-	double tmpLen, maxEdgeLength = 0.0;
+	double tmpLen, avgEdgeLength=0.0, maxEdgeLength = 0.0;
 	theMesh->e2n_getAll(i, eConn);
 	for (int j=0; j<elemWidth-1; j++) {
 	  for (int k=j+1; k<elemWidth; k++) {
 	    tmpLen = length(eConn[j], eConn[k]);
+	    avgEdgeLength += tmpLen;
 	    if (tmpLen > maxEdgeLength) maxEdgeLength = tmpLen;
 	  }
 	}
+	avgEdgeLength /= 3.0;
 	double qFactor=getAreaQuality(i);
+	if (theMesh->elem[0].getMeshSizing(i) <= 0.0) 
+	  CkPrintf("WARNING: mesh element %d has no sizing!\n", i);
 	if ((theMesh->elem[0].getMeshSizing(i) > 0.0) &&
-	    (maxEdgeLength > (theMesh->elem[0].getMeshSizing(i)*REFINE_TOL))){
-	  Insert(i, qFactor*(1.0/maxEdgeLength), 0);
+	    (avgEdgeLength > (theMesh->elem[0].getMeshSizing(i)*REFINE_TOL))){
+	  //Insert(i, qFactor*(1.0/maxEdgeLength), 0);
+	  Insert(i, 1.0/maxEdgeLength, 0);
 	}
       }
     }
@@ -86,25 +104,28 @@ int FEM_Adapt_Algs::Refine(int qm, int method, double factor, double *sizes)
       if ((elId != -1) && (theMesh->elem[0].is_valid(elId))) {
 	int *eConn = (int*)malloc(elemWidth*sizeof(int));
 	int n1, n2;
-	double tmpLen, maxEdgeLength = 0.0;
+	double tmpLen, avgEdgeLength=0.0, maxEdgeLength = 0.0;
 	theMesh->e2n_getAll(elId, eConn);
 	for (int j=0; j<elemWidth-1; j++) {
 	  for (int k=j+1; k<elemWidth; k++) {
 	    tmpLen = length(eConn[j], eConn[k]);
+	    avgEdgeLength += tmpLen;
 	    if (tmpLen > maxEdgeLength) { 
 	      maxEdgeLength = tmpLen;
 	      n1 = eConn[j]; n2 = eConn[k];
 	    }
 	  }
 	}
+	avgEdgeLength /= 3.0;
 	if ((theMesh->elem[0].getMeshSizing(elId) > 0.0) &&
-	    (maxEdgeLength>(theMesh->elem[0].getMeshSizing(elId)*REFINE_TOL))){
+	    (avgEdgeLength>(theMesh->elem[0].getMeshSizing(elId)*REFINE_TOL))){
 	  if (theAdaptor->edge_bisect(n1, n2) > 0)  iter_mods++;
 	}
       }
       CthYield(); // give other chunks on the same PE a chance
     }
     mods += iter_mods;
+    GradateMesh(GRADATION);
     CkPrintf("ParFUM_Refine: %d modifications in last pass.\n", iter_mods);
   }
   CkPrintf("ParFUM_Refine: %d total modifications.\n", mods);
@@ -124,6 +145,8 @@ void FEM_Adapt_Algs::FEM_Coarsen(int qm, int method, double factor,
   CkPrintf("WARNING: ParFUM_Coarsen: Under construction.\n");
   numNodes = theMesh->node.size();
   numElements = theMesh->elem[0].size();
+  SetMeshSize(method, factor, sizes);
+  GradateMesh(GRADATION);
   (void)Coarsen(qm, method, factor, sizes);
 }
 
@@ -134,8 +157,6 @@ int FEM_Adapt_Algs::Coarsen(int qm, int method, double factor, double *sizes)
   int elId, mods=0, iter_mods=1, pass=0;
   int elemWidth = theMesh->elem[0].getConn().width();
   double qFactor;
-  SetMeshSize(method, factor, sizes);
-  GradateMesh(1.0);
   coarsenElements = NULL;
   coarsenHeapSize = 0;
   while (iter_mods != 0) {
@@ -168,7 +189,8 @@ int FEM_Adapt_Algs::Coarsen(int qm, int method, double factor, double *sizes)
 	     (avgEdgeLength < (theMesh->elem[0].getMeshSizing(i)*COARSEN_TOL)))
 	    || (qFactor < QUALITY_MIN)) {
 	  //CkPrintf("Marking elem %d for coarsening\n", i);
-	  Insert(i, qFactor*minEdgeLength, 1);
+	  //Insert(i, qFactor*minEdgeLength, 1);
+	  Insert(i, minEdgeLength, 1);
 	}
       }
     }
@@ -204,6 +226,7 @@ int FEM_Adapt_Algs::Coarsen(int qm, int method, double factor, double *sizes)
       CthYield(); // give other chunks on the same PE a chance
     }
     mods += iter_mods;
+    GradateMesh(GRADATION);
     CkPrintf("ParFUM_Coarsen: %d modifications in pass %d.\n", iter_mods, pass);
   }
   CkPrintf("ParFUM_Coarsen: %d total modifications over %d passes.\n", mods, pass);
@@ -279,9 +302,9 @@ void FEM_Adapt_Algs::SetMeshSize(int method, double factor, double *sizes)
   else if (method == 4) { // mesh sizing has been set independently; use as is
     CkPrintf("ParFUM_SetMeshSize: USE EXISTING SIZES \n");
   }
-  //  CkPrintf("Current mesh sizing: ");
+  CkPrintf("Current mesh sizing: ");
   for (int i=0; i<numElements; i++) {
-    //CkPrintf("%4.6e ", theMesh->elem[0].getMeshSizing(i));
+    CkPrintf("%4.6e ", theMesh->elem[0].getMeshSizing(i));
   }
 }
 

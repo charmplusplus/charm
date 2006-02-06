@@ -18,11 +18,11 @@
 #include "vector2d.h"  // **CW** tentative
 
 #define SLIVERAREA 1.0e-18
-#define REFINE_TOL 1.75  // Refine elements with largest edge length > 
+#define REFINE_TOL 1.2  // Refine elements with largest edge length > 
                         // REFINE_TOL*desiredEdgeLength
 #define COARSEN_TOL 0.7 // Coarsen element with average edge length <
                         // COARSEN_TOL*desiredEdgeLength
-#define QUALITY_MIN 0.2
+#define QUALITY_MIN 0.3
 
 class FEM_Adapt_Algs;
 CtvExtern(FEM_Adapt_Algs *, _adaptAlgs);
@@ -82,6 +82,9 @@ class FEM_Adapt_Algs {
       if method = 1, coarsen elements up to sizes specified in sizes array
       Negative entries in size array indicate no coarsening. */
   void FEM_Coarsen(int qm, int method, double factor, double *sizes);
+  /// Perform refinement/coarsening on a mesh
+    /** Same as above */
+  void FEM_AdaptMesh(int qm, int method, double factor, double *sizes);
   /// Smooth the mesh using method according to some quality measure qm
   void FEM_Smooth(int qm, int method);
   /// Repair the mesh according to some quality measure qm

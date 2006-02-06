@@ -22,7 +22,7 @@ FDECL void FTN_NAME(FEM_ADAPT_INIT,fem_adapt_init)(int *meshID)
 
 void FEM_ADAPT_Refine(int meshID, int qm, int method, double factor,
         double *sizes) {
-    FEM_Mesh* mesh = FEM_Mesh_lookup(meshID, "FEM_ADAPT_Init");
+    FEM_Mesh* mesh = FEM_Mesh_lookup(meshID, "FEM_ADAPT_Refine");
     mesh->getfmMM()->getfmAdaptAlgs()->FEM_Refine(qm, method, factor, sizes);
 }
 FDECL void FTN_NAME(FEM_ADAPT_REFINE,fem_adapt_refine)(int* meshID, 
@@ -34,7 +34,7 @@ FDECL void FTN_NAME(FEM_ADAPT_REFINE,fem_adapt_refine)(int* meshID,
 
  void FEM_ADAPT_Coarsen(int meshID, int qm, int method, double factor, 
         double *sizes) {
-    FEM_Mesh* mesh = FEM_Mesh_lookup(meshID, "FEM_ADAPT_Init");
+    FEM_Mesh* mesh = FEM_Mesh_lookup(meshID, "FEM_ADAPT_Coarsen");
     mesh->getfmMM()->getfmAdaptAlgs()->FEM_Coarsen(qm, method, factor, sizes);
 }
 FDECL  void FTN_NAME(FEM_ADAPT_COARSEN,fem_adapt_coarsen)(int* meshID, 
@@ -43,9 +43,20 @@ FDECL  void FTN_NAME(FEM_ADAPT_COARSEN,fem_adapt_coarsen)(int* meshID,
   FEM_ADAPT_Coarsen(*meshID, *qm, *method, *factor, sizes);
 }
 
+void FEM_ADAPT_AdaptMesh(int meshID, int qm, int method, double factor,
+        double *sizes) {
+    FEM_Mesh* mesh = FEM_Mesh_lookup(meshID, "FEM_ADAPT_AdaptMesh");
+    mesh->getfmMM()->getfmAdaptAlgs()->FEM_AdaptMesh(qm, method, factor, sizes);
+}
+FDECL void FTN_NAME(FEM_ADAPT_ADAPTMESH,fem_adapt_adaptmesh)(int* meshID, 
+        int *qm, int *method, double *factor, double *sizes)
+{
+  FEM_ADAPT_AdaptMesh(*meshID, *qm, *method, *factor, sizes);
+}
+
 
  void FEM_ADAPT_SetElementSizeField(int meshID, int elem, double size) {
-  FEM_Mesh *meshP = FEM_Mesh_lookup(meshID, "FEM_ADAPT_Init");
+  FEM_Mesh *meshP = FEM_Mesh_lookup(meshID, "FEM_ADAPT_SetElementSizeField");
   meshP->elem[0].setMeshSizing(elem, size);
 }
 FDECL  void FTN_NAME(FEM_ADAPT_SETELEMENTSIZEFIELD,fem_adapt_setelementsizefield)(int *meshID, int *elem, double *size)
@@ -55,7 +66,7 @@ FDECL  void FTN_NAME(FEM_ADAPT_SETELEMENTSIZEFIELD,fem_adapt_setelementsizefield
 
 
  void FEM_ADAPT_SetElementsSizeField(int meshID, double *sizes) {
-  FEM_Mesh *meshP = FEM_Mesh_lookup(meshID, "FEM_ADAPT_Init");
+  FEM_Mesh *meshP = FEM_Mesh_lookup(meshID, "FEM_ADAPT_SetElementsSizeField");
   int numElements = meshP->elem[0].size();
   for (int i=0; i<numElements; i++) {
     meshP->elem[0].setMeshSizing(i, sizes[i]);
@@ -68,7 +79,7 @@ FDECL  void FTN_NAME(FEM_ADAPT_SETELEMENTSSIZEFIELD,fem_adapt_setelementssizefie
 
 
 void FEM_ADAPT_SetReferenceMesh(int meshID) {
-    FEM_Mesh* mesh = FEM_Mesh_lookup(meshID, "FEM_ADAPT_Init");
+    FEM_Mesh* mesh = FEM_Mesh_lookup(meshID, "FEM_ADAPT_SetReferenceMesh");
     mesh->getfmMM()->getfmAdaptAlgs()->SetReferenceMesh();
 }
 FDECL void FTN_NAME(FEM_ADAPT_SETREFERENCEMESH, fem_adapt_setreferencemesh)(int* meshID)
@@ -79,7 +90,7 @@ FDECL void FTN_NAME(FEM_ADAPT_SETREFERENCEMESH, fem_adapt_setreferencemesh)(int*
 
 void FEM_ADAPT_GradateMesh(int meshID, double smoothness)
 {
-    FEM_Mesh* mesh = FEM_Mesh_lookup(meshID, "FEM_ADAPT_Init");
+    FEM_Mesh* mesh = FEM_Mesh_lookup(meshID, "FEM_ADAPT_GradateMesh");
     mesh->getfmMM()->getfmAdaptAlgs()->GradateMesh(smoothness);
 }
 FDECL void FTN_NAME(FEM_ADAPT_GRADATEMESH, fem_adapt_gradatemesh)(int* meshID, double* smoothness)
