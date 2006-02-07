@@ -284,15 +284,15 @@ static void PumpEvents(int getone) {
     }
     if (result == 0) break;
 again0:
-    /*rc = mx_test(endpoint, &recv_handle, &status, &result);*/
-    rc = mx_wait(endpoint, &recv_handle, MX_INFINITE, &status, &result);
+    rc = mx_test(endpoint, &recv_handle, &status, &result);
+    /*rc = mx_wait(endpoint, &recv_handle, MX_INFINITE, &status, &result);*/
     if (rc != MX_SUCCESS) {
       const char *errmsg = getErrorMsg(rc);
       CmiPrintf("mx_wait error: %s\n", errmsg);
       CmiAbort("Abort");
     }
     if(result==0) {
-      CmiPrintf("mx_wait error: TIME OUT\n");
+      CmiPrintf("mx_test or wait: TIME OUT\n");
       goto again0;
     }
     else {
