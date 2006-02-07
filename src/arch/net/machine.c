@@ -989,7 +989,7 @@ static void pingCharmrun(void *ignored)
   if (clock > Cmi_check_last + Cmi_check_delay) {
     MACHSTATE1(2,"CommunicationsClock pinging charmrun Cmi_charmrun_fd_sendflag=%d", Cmi_charmrun_fd_sendflag);
     Cmi_check_last = clock; 
-#if CMK_USE_GM
+#if CMK_USE_GM || CMK_USE_MX
     if (!Cmi_netpoll)  /* GM netpoll, charmrun service is done in interrupt */
 #endif
     CmiCommLockOrElse(return;); /*Already busy doing communication*/
@@ -999,7 +999,7 @@ static void pingCharmrun(void *ignored)
     CmiCommUnlock();
   }
 #if 1
-#if CMK_USE_GM
+#if CMK_USE_GM || CMK_USE_MX
   if (!Cmi_netpoll)
 #endif
   CmiStdoutFlush(); /*Make sure stdout buffer hasn't filled up*/
@@ -2102,7 +2102,7 @@ static void ConverseRunPE(int everReturn)
   if (Cmi_netpoll == 1 && CmiMyPe() == 0)
     CmiPrintf("Charm++: scheduler running in netpoll mode.\n");
   
-#if CMK_USE_GM
+#if CMK_USE_GM || CMK_USE_MX
   if (Cmi_charmrun_fd != -1)
 #endif
   {
@@ -2111,6 +2111,7 @@ static void ConverseRunPE(int everReturn)
   CcdCallOnConditionKeep(CcdPROCESSOR_STILL_IDLE,
       (CcdVoidFn) CmiNotifyStillIdle, (void *) s);
   }
+
 #if CMK_SHARED_VARS_UNAVAILABLE
   if (Cmi_netpoll) /*Repeatedly call CommServer*/
     CcdCallOnConditionKeep(CcdPERIODIC, 
@@ -2300,9 +2301,10 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usc, int everReturn)
   	set_signals();
 #if CMK_USE_TCP
   	dataskt=skt_server(&dataport);
-#elif !CMK_USE_GM
+#elif !CMK_USE_GM && !CMK_USE_MX
   	dataskt=skt_datagram(&dataport, Cmi_os_buffer_size);
 #else
+          /* GM and MX do not need to create any socket for communication */
         dataskt=-1;
 #endif
 	MACHSTATE2(5,"skt_connect at dataskt:%d Cmi_charmrun_port:%d",dataskt, Cmi_charmrun_port);
