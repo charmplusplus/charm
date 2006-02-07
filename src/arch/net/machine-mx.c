@@ -92,8 +92,8 @@ static PendingSentMsg sent_handles_end=NULL; /* end of the queue */
      else CmiFree(pm->data); \
      putPool(pm); }
 
-unsigned long MATCH_FILTER = 0x1111111122223333L;
-unsigned long MATCH_MASK   = 0xffffffffffffffffL;
+CmiUInt8 MATCH_FILTER = 0x1111111122223333L;
+CmiUInt8 MATCH_MASK   = 0xffffffffffffffffL;
 
 static void processMessage(char *msg, int len);
 static const char *getErrorMsg(mx_return_t rc);
@@ -331,6 +331,24 @@ void recv_callback(void * context, uint64_t match_info, int length)
     CmiPrintf("mx_irecv error: %s\n", errmsg);
     CmiAbort("Abort");
   }
+/*
+  if (length <= 32) {
+    rc = mx_test(endpoint, &recv_handle, &status, &result);
+    if (rc != MX_SUCCESS) {
+      const char *errmsg = getErrorMsg(rc);
+      CmiPrintf("mx_wait error: %s\n", errmsg);
+      CmiAbort("Abort");
+    }
+    if(result==0) {
+      return;
+    }
+    else {
+      PendingSentMsg pm = (PendingSentMsg)status.context;
+      processMessage(pm->data, status.msg_length);
+      putPool(pm);
+    }
+  }
+*/
 }
 #endif
 
