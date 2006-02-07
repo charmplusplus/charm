@@ -216,6 +216,9 @@ void FEM_Interpolate::FEM_InterpolateElementCopy(ElementArgs args)
       if(elattr->getAttr() < FEM_ATTRIB_FIRST){ 
 	elattr->copyEntity(args.e,*elattr,args.oldElement);
       }
+      else if(elattr->getAttr()==FEM_MESH_SIZING) {
+	elattr->copyEntity(args.e,*elattr,args.oldElement);
+      }
     }
   }
   else if(FEM_Is_ghost_index(args.e) && FEM_Is_ghost_index(args.oldElement)) {

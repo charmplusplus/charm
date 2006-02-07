@@ -143,13 +143,13 @@ int FEM_Adapt::edge_flip_help(int e1, int e2, int n1, int n2, int e1_n1,
   lockelems[0] = FEM_add_element(theMesh, conn, 3, 0, e1chunk);
   theMod->fmUtil->copyElemData(0,e1Topurge,lockelems[0]);
   FEM_purge_element(theMesh,e1Topurge,0);
-  theMesh->elem[0].setMeshSizing(lockelems[0], e1Sz);
+  //theMesh->elem[0].setMeshSizing(lockelems[0], e1Sz);
   // add n2, n3, n4
   conn[e1_n1] = n4;  conn[e1_n2] = n2;  conn[e1_n3] = n3;
   lockelems[1] = FEM_add_element(theMesh, conn, 3, 0, e2chunk);
   theMod->fmUtil->copyElemData(0,e2Topurge,lockelems[1]);
   FEM_purge_element(theMesh,e2Topurge,0);
-  theMesh->elem[0].setMeshSizing(lockelems[1], e2Sz);
+  //theMesh->elem[0].setMeshSizing(lockelems[1], e2Sz);
 
   //get rid of some unnecessary ghost node sends
   for(int i=0; i<4;i++) {
@@ -354,23 +354,23 @@ int FEM_Adapt::edge_bisect_help(int e1, int e2, int n1, int n2, int e1_n1,
   conn[e1_n1] = n1;  conn[e1_n2] = n5;  conn[e1_n3] = n3;
   lockelems[0] = FEM_add_element(theMesh, conn, 3, 0, e1chunk);
   theMod->fmUtil->copyElemData(0,e1,lockelems[0]);
-  theMesh->elem[0].setMeshSizing(lockelems[0], e1Sz);
+  //theMesh->elem[0].setMeshSizing(lockelems[0], e1Sz);
   // add n2, n5, n3
   conn[e1_n1] = n5;  conn[e1_n2] = n2;  conn[e1_n3] = n3;
   lockelems[1] = FEM_add_element(theMesh, conn, 3, 0, e3chunk);
   theMod->fmUtil->copyElemData(0,e1,lockelems[1]);
-  theMesh->elem[0].setMeshSizing(lockelems[1], e1Sz);
+  //theMesh->elem[0].setMeshSizing(lockelems[1], e1Sz);
   if (e2 != -1) { // e2 exists
     // add n1, n5, n4
     conn[e2_n1] = n1;  conn[e2_n2] = n5;  conn[e2_n3] = n4;
     lockelems[2] = FEM_add_element(theMesh, conn, 3, 0, e2chunk);
     theMod->fmUtil->copyElemData(0,e2,lockelems[2]);
-    theMesh->elem[0].setMeshSizing(lockelems[2], e2Sz);
+    //theMesh->elem[0].setMeshSizing(lockelems[2], e2Sz);
     // add n2, n5, n4
     conn[e2_n1] = n5;  conn[e2_n2] = n2;  conn[e2_n3] = n4;
     lockelems[3] = FEM_add_element(theMesh, conn, 3, 0, e4chunk);
     theMod->fmUtil->copyElemData(0,e2,lockelems[3]);
-    theMesh->elem[0].setMeshSizing(lockelems[3], e2Sz);
+    //theMesh->elem[0].setMeshSizing(lockelems[3], e2Sz);
   }
 
   FEM_purge_element(theMesh,e1,0);
