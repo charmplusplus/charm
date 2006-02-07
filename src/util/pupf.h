@@ -29,4 +29,13 @@
           INTEGER :: p
           logical fpup_isuserlevel
         end function
+        subroutine fpup_complex(p,c)
+	  INTEGER p
+          complex c
+        end subroutine
+        subroutine fpup_complexes(p,c,size)
+	  INTEGER p
+          complex,pointer,dimension(:) :: c
+          INTEGER size
+        end subroutine
       end interface
