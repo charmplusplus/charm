@@ -14,8 +14,11 @@
   Gengbin Zheng, gzheng@uiuc.edu  2/3/2006
   
   ChangeLog:
-  * 2/3/2006,  Gengbin Zheng
+  * 2/3/2006:  Gengbin Zheng
     implement packetization, and fix buffer change after send bug
+  * 2/7/2006:  Gengbin Zheng
+    implement active message mode using callback
+    short message pingpong time improved by 0.5us
 */
 
 /**
@@ -23,11 +26,13 @@
  * @{
  */
 
+#define MX_ACTIVE_MESSAGE                     1
+
 /* default as in busywaiting mode */
 #undef CMK_WHEN_PROCESSOR_IDLE_BUSYWAIT
 #undef CMK_WHEN_PROCESSOR_IDLE_USLEEP
-#define CMK_WHEN_PROCESSOR_IDLE_BUSYWAIT 1
-#define CMK_WHEN_PROCESSOR_IDLE_USLEEP 0
+#define CMK_WHEN_PROCESSOR_IDLE_BUSYWAIT  1
+#define CMK_WHEN_PROCESSOR_IDLE_USLEEP    0
 
 
 /******************************************************************************
@@ -36,102 +41,67 @@
  *
  *****************************************************************************/
 
-/* max length of pending messages */
-#if 0
-#define MAXPENDINGSEND  500
-//#if 0
-typedef struct PendingMsgStruct
-{
-  void *msg;
-  int length;		/* length of message */
-  int size;		/* size of message, usually around log2(length)  */
-  int mach_id;                /* receiver machine id(GM) */
-  int dataport;		/* receiver data port */
-  int node_idx;		/* receiver pe id */
-  struct PendingMsgStruct *next;
-}
-*PendingMsg;
-
-static int pendinglen = 0;
-
-/* reuse PendingMsg memory */
-static PendingMsg pend_freelist=NULL;
-
-#define FreePendingMsg(d) 	\
-  d->next = pend_freelist;\
-  pend_freelist = d;\
-
-#define MallocPendingMsg(d) \
-  d = pend_freelist;\
-  if (d==0) {d = ((PendingMsg)malloc(sizeof(struct PendingMsgStruct)));\
-             _MEMCHECK(d);\
-  } else pend_freelist = d->next;
-#endif
-
-
 typedef struct PendingSentMsgStruct
 {
-  mx_request_t handle;
-  OutgoingMsg ogm;
+  OutgoingMsg  ogm;
   char *data;
   struct PendingSentMsgStruct *next;
-  struct PendingSentMsgStruct *prev;
+  mx_request_t handle;
+  int flag;			/* used for active message mode */
 }
 *PendingSentMsg;
 
-static PendingSentMsg sent_handles=NULL;     //where the newly sent goes --> end of queue  
-static PendingSentMsg sent_handles_end=NULL; //where the next pointer points to --> start of the queue
+#define CMK_PMPOOL  1
 
-#define InsertPendingSentMsg(pm, ogm) \
-  {pm = (PendingSentMsg)CmiAlloc(sizeof(struct PendingSentMsgStruct));\
-   _MEMCHECK(pm); MACHSTATE1(3,"alloc msg %u",pm);\
-   pm->prev=sent_handles_end; pm->next=NULL; \
-   if(sent_handles==NULL) {sent_handles=sent_handles_end=pm;}\
-   else {sent_handles_end->next=pm;} MACHSTATE(3,"Here2");\
-   sent_handles_end=pm; pm->ogm=ogm; pm->data=data;MACHSTATE(3,"Insert done");}\
+#if CMK_PMPOOL
+#define MAXPMS 200
+static PendingSentMsg pmpool[MAXPMS];
+static int pmNums = 0;
+
+#define putPool(pm) 	{	\
+  if (pmNums == MAXPMS) free(pm);	\
+  else pmpool[pmNums++] = pm; }	
+
+#define getPool(pm)	{	\
+  if (pmNums == 0) {pm = (PendingSentMsg)malloc(sizeof(struct PendingSentMsgStruct));}	\
+  else { pm = pmpool[--pmNums];	}\
+}
+#else
+#define putPool(pm) { free(pm); }
+#define getPool(pm) { pm = (PendingSentMsg)malloc(sizeof(struct PendingSentMsgStruct)); _MEMCHECK(pm);}
+#endif
+
+static PendingSentMsg sent_handles=NULL;     /* head of queue  */
+static PendingSentMsg sent_handles_end=NULL; /* end of the queue */
+
+#define NewPendingSentMsg(pm, ogm) \
+  { getPool(pm);        \
+    pm->next=NULL; pm->ogm=ogm; pm->data=data; \
+    MACHSTATE1(1,"alloc msg %p",pm);\
+  }
+
+#define InsertPendingSentMsg(pm) \
+  { if(sent_handles_end==NULL) {sent_handles=pm;}  \
+    else {sent_handles_end->next=pm;} \
+    sent_handles_end=pm; MACHSTATE(1,"Insert done");}
 
 #define FreePendingSentMsg(pm) \
-   { if(pm!=NULL) { if(pm->prev==NULL && pm->next==NULL)\
-                      {sent_handles_end=NULL;sent_handles=NULL;}\
-                    else if(pm->prev!=NULL && pm->next==NULL)\
-			{pm->prev->next=NULL;sent_handles_end=pm->prev;}\
-                    else if(pm->next!=NULL && pm->prev==NULL)\
-                      {pm->next->prev=NULL;sent_handles=pm->next;}\
-		    else {pm->next->prev=pm->prev;pm->prev->next=pm->next;}\
-                    if (pm->ogm) {pm->ogm->refcount--; GarbageCollectMsg(pm->ogm);} \
-		    else CmiFree(pm->data); \
-                    CmiFree(pm); } }	                				
+   { sent_handles=pm->next;	\
+     if (sent_handles == NULL) sent_handles_end = NULL; \
+     if (pm->ogm) {pm->ogm->refcount--; GarbageCollectMsg(pm->ogm);} \
+     else CmiFree(pm->data); \
+     putPool(pm); }
 
 unsigned long MATCH_FILTER = 0x1111111122223333L;
 unsigned long MATCH_MASK   = 0xffffffffffffffffL;
 
-static void alarmInterrupt(int arg);
 static void processMessage(char *msg, int len);
+static const char *getErrorMsg(mx_return_t rc);
 static void processMXError(mx_status_t status);
-
-/******************************************************************************
- *
- * DMA message pool
- *
- *****************************************************************************/
-#if 0
-#define CMK_MSGPOOL  1
-
-#define MAXMSGLEN  200
-
-static char* msgpool[MAXMSGLEN];
-static int msgNums = 0;
-
-static int maxMsgSize = 0;
-
-#define putPool(msg) 	{	\
-  if (msgNums == MAXMSGLEN) gm_dma_free(gmport, msg);	\
-  else msgpool[msgNums++] = msg; }	
-
-#define getPool(msg, len)	{	\
-  if (msgNums == 0) msg  = gm_dma_malloc(gmport, maxMsgSize);	\
-  else msg = msgpool[--msgNums];	\
-}
+static void PumpMsgs(int getone);
+static void ReleaseSentMsgs(void);
+#if MX_ACTIVE_MESSAGE
+static void PumpEvents(int getone);
 #endif
 
 /******************************************************************************
@@ -145,24 +115,37 @@ char none;
 
 static CmiIdleState *CmiNotifyGetState(void) { return NULL; }
 
-static void CmiNotifyStillIdle(CmiIdleState *s);
-
-static void CmiNotifyBeginIdle(CmiIdleState *s)
-{
-  CmiNotifyStillIdle(s);
-}
-
-
-
 static void CmiNotifyStillIdle(CmiIdleState *s)
 {
+  int sleep = 1;
   MACHSTATE(1,"CmiNotifyStillIdle {");
-  CommunicationServer(0,0);
+#if 0
+  CommunicationServer(0,2);
+#else
+#if MX_ACTIVE_MESSAGE
+  CmiCommLock();
+  PumpEvents(1);
+  CmiCommUnlock();
+#else
+#if CMK_WHEN_PROCESSOR_IDLE_BUSYWAIT
+  sleep = 0;
+#endif
+  CmiCommLock();
+  ReleaseSentMsgs();
+  PumpMsgs(sleep);			/* busy waiting */
+  CmiCommUnlock();
+#endif
+#endif
   MACHSTATE(1,"} CmiNotifyStillIdle");
 }
 
 void CmiNotifyIdle(void) {
   CmiNotifyStillIdle(NULL);
+}
+
+static void CmiNotifyBeginIdle(CmiIdleState *s)
+{
+  CmiNotifyStillIdle(s);
 }
 
 /****************************************************************************
@@ -230,46 +213,136 @@ static void ServiceCharmrun_nolock()
   MACHSTATE(2,"} ServiceCharmrun_nolock end")
 }
 
-static void PumpMsgs(void) {
+static void PumpMsgs(int getone) {
   mx_return_t rc;
   mx_status_t status;
-  PendingSentMsg pm, ptr=sent_handles;
-  unsigned int result;
+  uint32_t result;
   mx_segment_t buffer_desc;
   mx_request_t recv_handle; 
+
+  MACHSTATE1(2,"PumpMsgs(%d) {", getone);
   while (1) {
-    rc = mx_iprobe(endpoint, MATCH_FILTER, MATCH_MASK, &status, &result);
+    if (getone)
+      rc = mx_probe(endpoint, 1, MATCH_FILTER, MATCH_MASK, &status, &result);
+    else
+      rc = mx_iprobe(endpoint, MATCH_FILTER, MATCH_MASK, &status, &result);
     if(rc != MX_SUCCESS) {
-      MACHSTATE1(3," mx_iprobe returns %d", rc);
-      CmiAbort("Cannot mx_iprobe)\n");
-      return;
+      const char *errmsg = getErrorMsg(rc);
+      CmiPrintf("mx_iprobe error: %s\n", errmsg);
+      CmiAbort("mx_iprobe Abort");
     } 
-    if(result) { 
-      buffer_desc.segment_length = status.msg_length;
-      buffer_desc.segment_ptr = (char *) CmiAlloc(status.msg_length);
-      MACHSTATE(1,"Non-blocking receive {")
-      MACHSTATE1(1," size %d", status.msg_length); 
-      rc = mx_irecv(endpoint, &buffer_desc, 1, MATCH_FILTER, MATCH_MASK, NULL, &recv_handle);
-      MACHSTATE1(1,"} Non-blocking receive return %d", rc);
-      rc = mx_wait(endpoint, &recv_handle, MX_INFINITE, &status, &result);
-      MACHSTATE3(1,"mx_wait return rc=%d result=%d status=%d", rc, result, status.code);
-      if(result==0) processMXError(status);
-      else processMessage(buffer_desc.segment_ptr, buffer_desc.segment_length);
+    if (result == 0) {         /* no incoming */
+      break;
     }
-    else break;  // no incoming message ready
+    MACHSTATE(2,"PumpMsgs recv one");
+    buffer_desc.segment_length = status.msg_length;
+    buffer_desc.segment_ptr = (char *) CmiAlloc(status.msg_length);
+    MACHSTATE(1,"Non-blocking receive {")
+    MACHSTATE1(1," size %d", status.msg_length); 
+    rc = mx_irecv(endpoint, &buffer_desc, 1, MATCH_FILTER, MATCH_MASK, NULL, &recv_handle);
+    if (rc != MX_SUCCESS) {
+      const char *errmsg = getErrorMsg(rc);
+      CmiPrintf("mx_irecv error: %s\n", errmsg);
+      CmiAbort("Abort");
+    }
+    MACHSTATE1(1,"} Non-blocking receive return %d", rc);
+again:
+    rc = mx_wait(endpoint, &recv_handle, MX_INFINITE, &status, &result);
+    /*rc = mx_test(endpoint, &recv_handle, &status, &result);*/
+    MACHSTATE3(1,"mx_wait return rc=%d result=%d status=%d", rc, result, status.code);
+    if (rc != MX_SUCCESS) {
+      const char *errmsg = getErrorMsg(rc);
+      CmiPrintf("mx_wait error: %s\n", errmsg);
+      CmiAbort("Abort");
+    }
+    if(result==0) {
+      CmiPrintf("mx_wait error: TIME OUT\n");
+      goto again;
+    }
+    else {
+      processMessage(buffer_desc.segment_ptr, buffer_desc.segment_length);
+    }
+    if (getone) break;
+  }    /* end while */
+  MACHSTATE1(2,"} PumpMsgs(%d)", getone);
+}
+
+#if MX_ACTIVE_MESSAGE
+static void PumpEvents(int getone) {
+  mx_return_t rc;
+  mx_status_t status;
+  uint32_t result;
+  mx_segment_t buffer_desc;
+  mx_request_t recv_handle; 
+
+  while (1) {
+    rc = mx_ipeek(endpoint, &recv_handle, &result);
+    if (rc != MX_SUCCESS) {
+      const char *errmsg = getErrorMsg(rc);
+      CmiPrintf("mx_ipeek error: %s\n", errmsg);
+      CmiAbort("Abort");
+    }
+    if (result == 0) break;
+again0:
+    /*rc = mx_test(endpoint, &recv_handle, &status, &result);*/
+    rc = mx_wait(endpoint, &recv_handle, MX_INFINITE, &status, &result);
+    if (rc != MX_SUCCESS) {
+      const char *errmsg = getErrorMsg(rc);
+      CmiPrintf("mx_wait error: %s\n", errmsg);
+      CmiAbort("Abort");
+    }
+    if(result==0) {
+      CmiPrintf("mx_wait error: TIME OUT\n");
+      goto again0;
+    }
+    else {
+      PendingSentMsg pm = (PendingSentMsg)status.context;
+      if (pm->flag == 1) {    /* send */
+        if (pm->ogm) {pm->ogm->refcount--; GarbageCollectMsg(pm->ogm);}
+        else CmiFree(pm->data);
+      }
+      else {                  /* recv */
+        processMessage(pm->data, status.msg_length);
+      }
+      putPool(pm);
+    }
+    if (getone) break;
   }
 }
 
-static void processMXError(mx_status_t status){
-  switch(status.code){
-    case MX_STATUS_SUCCESS: MACHSTATE(4,"mx_wait successful"); break;
-    case MX_STATUS_PENDING: MACHSTATE(4,"mx_wait pending"); break;
-    case MX_STATUS_BUFFERED: MACHSTATE(4,"mx_wait buffered"); break;
-    case MX_STATUS_REJECTED: MACHSTATE(4,"mx_wait rejected"); break;
-    case MX_STATUS_TIMEOUT: MACHSTATE(4,"mx_wait timeout"); break;
-    default: MACHSTATE(4,"mx_wait returns other");
+/* active message model */
+void recv_callback(void * context, uint64_t match_info, int length)
+{
+  mx_segment_t buffer_desc;
+  mx_request_t recv_handle; 
+  mx_return_t rc;
+  mx_status_t status;
+  uint32_t result;
+  PendingSentMsg pm;
+
+  buffer_desc.segment_length = length;
+  buffer_desc.segment_ptr = (char *) CmiAlloc(length);
+  getPool(pm);
+  pm->flag = 2;
+  pm->data = buffer_desc.segment_ptr;
+  rc = mx_irecv(endpoint, &buffer_desc, 1, match_info, MX_MATCH_MASK_NONE, pm, &recv_handle);
+  if (rc != MX_SUCCESS) {
+    const char *errmsg = getErrorMsg(rc);
+    CmiPrintf("mx_irecv error: %s\n", errmsg);
+    CmiAbort("Abort");
   }
 }
+#endif
+
+#define test_send_complete(handle, status, result) \
+            {	\
+              mx_return_t rc;	\
+              rc = mx_test(endpoint, &(handle), &status, &result);	\
+              if (rc != MX_SUCCESS) {	\
+                  MACHSTATE1(3," mx_test returns %d", rc);	\
+                  CmiAbort("mx_test failed\n");	\
+              }	\
+            }
 
 static void ReleaseSentMsgs(void) {
     MACHSTATE(2,"ReleaseSentMsgs {");
@@ -278,14 +351,14 @@ static void ReleaseSentMsgs(void) {
     unsigned int result;
     PendingSentMsg next, pm = sent_handles;
     while (pm!=NULL) {
-      rc = mx_test(endpoint, &(pm->handle), &status, &result);
-      if(rc != MX_SUCCESS)
-        break;
+      test_send_complete(pm->handle, status, result);
       next = pm->next;
       if(result!=0 && status.code == MX_STATUS_SUCCESS) {
-        MACHSTATE1(2," Sent complete. Free sent msg size %d", status.msg_length);
+        MACHSTATE1(2,"Sent complete. Free sent msg size %d", status.msg_length);
 	FreePendingSentMsg(pm);
       }
+      else 
+        break;
       pm = next;
     }
     MACHSTATE(2,"} ReleaseSentMsgs");
@@ -293,8 +366,12 @@ static void ReleaseSentMsgs(void) {
  
 static void CommunicationServer_nolock(int withDelayMs) {
   MACHSTATE(2,"CommunicationServer_nolock start {")
-  PumpMsgs();
+#if MX_ACTIVE_MESSAGE
+  PumpEvents(0);
+#else
+  PumpMsgs(0);
   ReleaseSentMsgs();
+#endif
   MACHSTATE(2,"}CommunicationServer_nolock end");
 }
 
@@ -313,10 +390,12 @@ static void CommunicationServer(int withDelayMs, int where)
   MACHSTATE2(2,"CommunicationServer(%d) from %d {",withDelayMs, where)
 
   if (where == 2 && machine_initiated_shutdown) {
+      /* Converse exit, wait for pingCharm to quit */
     return;
   }
+
   if (where == 1) {
-    /* don't service charmrun if converse exits, this fixed a hang bug */
+      /* don't service charmrun if converse exits, this fixed a hang bug */
     if (!machine_initiated_shutdown) ServiceCharmrun_nolock();
     return;
   }
@@ -329,7 +408,7 @@ static void CommunicationServer(int withDelayMs, int where)
 
 #if CMK_IMMEDIATE_MSG
   if (where == 0)
-  CmiHandleImmediate();
+    CmiHandleImmediate();
 #endif
 
   MACHSTATE(2,"} CommunicationServer")
@@ -346,9 +425,8 @@ static void processMessage(char *msg, int len)
   if (len >= DGRAM_HEADER_SIZE) {
     DgramHeaderBreak(msg, rank, srcpe, magic, seqno, broot);
 
-  //  DgramHeader *header = (DgramHeader *)(msg); 
-    MACHSTATE2(8, "Break header Cmi-charmrun_id=%d, magic=%d", Cmi_charmrun_pid, header->magic);
-    MACHSTATE3(8, "srcpe=%d, seqno=%d, rank=%d", srcpe, seqno, rank);    
+    MACHSTATE2(1, "Break header Cmi-charmrun_id=%d, magic=%d", Cmi_charmrun_pid, magic);
+    MACHSTATE3(1, "srcpe=%d, seqno=%d, rank=%d", srcpe, seqno, rank);    
  
 #ifdef CMK_USE_CHECKSUM
     checksum = computeCheckSum(msg, len);
@@ -423,7 +501,7 @@ static void processMessage(char *msg, int len)
           CmiPushPE(rank, newmsg);
         }
         node->asm_msg = 0;
-      /* do it after integration - the following function may re-entrant */
+          /* do it after integration - the following function may re-entrant */
 #if CMK_BROADCAST_SPANNING_TREE
       if (rank == DGRAM_BROADCAST
 #if CMK_NODE_QUEUE_AVAILABLE
@@ -448,7 +526,7 @@ static void processMessage(char *msg, int len)
       CmiPrintf("[%d] message ignored: magic not agree:%d != %d!\n", 
                  CmiMyPe(), magic, Cmi_charmrun_pid&DGRAM_MAGIC_MASK);
 #endif
-      CmiPrintf("recved: rank:%d src:%d mag:%d seqno:%d len:%d\n", rank, srcpe, magic, seqno,
+      CmiPrintf("[%d] recved: rank:%d src:%d magic:%d seqno:%d len:%d\n", CmiMyPe(), rank, srcpe, magic, seqno,
 len);
     }
   }
@@ -470,7 +548,9 @@ void EnqueueOutgoingDgram
      (OutgoingMsg ogm, char *ptr, int dlen, OtherNode node, int rank, int broot, int copy)
 {
   int size, len, seqno;
-  int alloclen, allocSize;
+  mx_return_t rc;
+  mx_request_t sent_handle;
+  mx_segment_t buffer_desc;
   uint32_t result;
   char *data;
 
@@ -485,37 +565,27 @@ void EnqueueOutgoingDgram
   }
 
   seqno = node->send_next;
-  MACHSTATE5(2, "[%d] SEQNO: %d to %d rank: %d %d", CmiMyPe(), seqno, node-nodes, rank, broot);
+  MACHSTATE5(1, "[%d] SEQNO: %d to node %d rank: %d %d", CmiMyPe(), seqno, node-nodes, rank, broot);
   DgramHeaderMake(data, rank, ogm->src, Cmi_charmrun_pid, seqno, broot);
-#if 0
-  DgramHeader *header = (DgramHeader *)(ptr);
-  MACHSTATE2(3,"Make header Cmi_charmrun_pid=%d magic=%d", Cmi_charmrun_pid, header->magic);
-  MACHSTATE3(3,"srcpe=%d, seqno=%d, rank=%d", header->srcpe, header->seqno, header->dstrank);
-#endif
   node->send_next = ((seqno+1)&DGRAM_SEQNO_MASK);
 
   MACHSTATE1(2, "EnqueueOutgoingDgram { len=%d", len);
   /* MX will put outgoing message in queue and progress to send */
   /* Note: Assume that MX provides unlimited buffers 
        so no user maintain is required */
-  mx_return_t rc;
-  mx_request_t sent_handle;
-  mx_segment_t buffer_desc;
   buffer_desc.segment_ptr = data;
   buffer_desc.segment_length = len;
   PendingSentMsg pm;
   if (copy)  ogm = NULL;
-  InsertPendingSentMsg(pm,ogm);
-  rc = mx_isend(endpoint, &buffer_desc, 1, node->endpoint_addr, MATCH_FILTER, NULL, &(pm->handle));
+  NewPendingSentMsg(pm, ogm);
+  pm->flag = 1;
+  rc = mx_isend(endpoint, &buffer_desc, 1, node->endpoint_addr, MATCH_FILTER, pm, &(pm->handle));
   if (rc != MX_SUCCESS) {
     MACHSTATE1(3," mx_isend returns %d", rc);
     CmiAbort("mx_isend failed\n");
   }
-#if 0
-  /* wait for it to be safe to change values in workspace */
-  do {
-    rc = mx_ibuffered(endpoint, &pm->handle, &result);
-  } while (rc == MX_SUCCESS && !result);
+#if !MX_ACTIVE_MESSAGE
+  InsertPendingSentMsg(pm);
 #endif
   MACHSTATE(2, "} EnqueueOutgoingDgram");
 }
@@ -526,10 +596,10 @@ void DeliverViaNetwork(OutgoingMsg ogm, OtherNode node, int rank, unsigned int b
 {
   int size; char *data;
 
-  MACHSTATE3(2, "DeliverViaNetwork { : size:%d, to node mach_id=%d, nic=%ld", size, node->mach_id, node->nic_id);
-
   size = ogm->size - DGRAM_HEADER_SIZE;
   data = ogm->data + DGRAM_HEADER_SIZE;
+
+  MACHSTATE3(2, "DeliverViaNetwork { : size:%d, to node mach_id=%d, nic=%ld", ogm->size, node->mach_id, node->nic_id);
 
   while (size > Cmi_dgram_max_data) {
     copy = 1;     /* since we are packetizing, we need to copy anyway now */
@@ -671,7 +741,7 @@ void CmiMachineInit(char **argv)
     return; 
   }
 
-  rc = mx_open_endpoint(MX_ANY_NIC, MX_ANY_ENDPOINT, MX_FILTER, 0, 0, &endpoint);
+  rc = mx_open_endpoint(MX_ANY_NIC, MX_ANY_ENDPOINT, MX_FILTER, NULL, 0, &endpoint);
   if (rc != MX_SUCCESS) {
     MACHSTATE1(3," open endpoint address returns %d", rc);
     printf("Cannot open endpoint address\n");
@@ -694,7 +764,13 @@ void CmiMachineInit(char **argv)
     return;
   }
 
-  Cmi_dgram_max_data = 1024*1-DGRAM_HEADER_SIZE;
+  dataport = 1;     /* fake it so that charmrun checking won't fail */
+
+  Cmi_dgram_max_data = 1024-DGRAM_HEADER_SIZE;
+
+#if  MX_ACTIVE_MESSAGE
+  mx_register_unexp_callback(endpoint, recv_callback, NULL);
+#endif
 
   MACHSTATE(3,"} CmiMachineInit");
 }
@@ -740,6 +816,25 @@ void CmiMXMakeConnection()
   }
   if (doabort) CmiAbort("CmiMXMakeConnection");
   MACHSTATE(3,"}CmiMXMakeConnection");
+}
+
+static const char *getErrorMsg(mx_return_t rc)
+{
+/*
+  char *errmsg;
+  switch (rc) {
+  case MX_SUCCESS:  return "MX_SUCCESS";
+  case MX_NO_RESOURCES: return "MX_NO_RESOURCES";
+  };
+  return "Unknown MX error message";
+*/
+  return mx_strerror(rc);
+}
+
+static void processMXError(mx_status_t status){
+  const char *str = mx_strstatus(status.code);
+  CmiPrintf("processMXError: %s\n", str);
+  MACHSTATE(4, str);
 }
 
 /*@}*/
