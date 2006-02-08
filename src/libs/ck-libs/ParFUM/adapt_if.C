@@ -1,4 +1,11 @@
-#include "fem_adapt_if.h"
+/*
+ * The user visible adaptivity interface
+ *
+ */
+
+
+#include "ParFUM.h"
+#include "ParFUM_internals.h"
 
 
 void FEM_ADAPT_Init(int meshID) {

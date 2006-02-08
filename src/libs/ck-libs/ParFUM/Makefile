@@ -12,7 +12,7 @@ GENHEADERS= ParFUM.def.h	ParFUM.decl.h fem.decl.h fem.def.h
 
 HEADDEP= $(GENHEADERS) $(HEADERS) $(INTERNALHEADERS)
 
-OBJS=ParFUM.o mesh.o symmetries.o partition.o map.o compat.o call_init.o parallel_part.o mesh_modify.o mesh_adjacency.o adapt.o adapt_algs.o interpolate.o lock.o util.o lock_node.o adapt_lock.o             
+OBJS=ParFUM.o mesh.o symmetries.o partition.o map.o compat.o call_init.o parallel_part.o mesh_modify.o mesh_adjacency.o adapt.o adapt_algs.o adapt_if.o interpolate.o lock.o util.o lock_node.o adapt_lock.o             
 
 COMPAT=compat_init.o compat_finit.o compat_driver.o compat_fdriver.o 
 LIB=libmoduleParFUM
@@ -97,6 +97,9 @@ mesh_adjacency.o: mesh_adjacency.C $(HEADDEP)
 
 adapt.o: adapt.C $(HEADDEP)
 	$(CHARMC) -c adapt.C
+
+adapt_if.o: adapt_if.C $(HEADDEP)
+	$(CHARMC) -c adapt_if.C
 
 adapt_algs.o: adapt_algs.C $(HEADDEP)
 	$(CHARMC) -c adapt_algs.C

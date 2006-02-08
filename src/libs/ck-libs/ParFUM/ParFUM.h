@@ -475,17 +475,9 @@ FDECL void FTN_NAME(FEM_ADAPT_SETREFERENCEMESH, fem_adapt_setreferencemesh)(int*
 void FEM_ADAPT_GradateMesh(int meshID, double smoothness);
 FDECL void FTN_NAME(FEM_ADAPT_GRADATEMESH, fem_adapt_gradatemesh)(int* meshID, double* smoothness);
 
-
-
   // End Adaptivity interface
-
-
-
-
-
-
-
 
 }
 #endif
+
 
