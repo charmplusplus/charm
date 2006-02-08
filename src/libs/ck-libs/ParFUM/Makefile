@@ -5,7 +5,7 @@ CHARMC=$(CDIR)/bin/charmc $(OPTS)
 HEADERS= ParFUM.h ParFUMf.h ParFUM_internals.h cktimer.h
 
 #Headers internal to ParFUM
-INTERNALHEADERS= ParFUM_internals.h vector2d.h
+INTERNALHEADERS= ParFUM_internals.h
 
 #Headers generated from .ci files
 GENHEADERS= ParFUM.def.h	ParFUM.decl.h fem.decl.h fem.def.h
@@ -52,7 +52,6 @@ $(PARFUMMAIN): main.C $(HEADDEP)
 headers: $(HEADDEP)
 	cp $(HEADERS) $(CDIR)/include/
 	cp $(GENHEADERS) $(CDIR)/include/
-	cp vector2d.h $(CDIR)/include/
 	cp cktimer.h $(CDIR)/include/
 	touch headers
 
