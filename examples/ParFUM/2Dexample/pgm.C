@@ -110,8 +110,8 @@ init(void)
 {
   CkPrintf("init started\n");
   double startTime=CmiWallTimer();
-  const char *eleName=/*"mesh1.tri";//"adpmm/xxx.1.ele";//*/"88mesh/mesh1.tri";
-  const char *nodeName=/*"mesh1.node";//"adpmm/xxx.1.node";//*/"88mesh/mesh1.node";
+  const char *eleName="mesh1.tri";//"adpmm/xxx.1.ele";//*/"88mesh/mesh1.tri";
+  const char *nodeName="mesh1.node";//"adpmm/xxx.1.node";//*/"88mesh/mesh1.node";
   int nPts=0; //Number of nodes
   vector2d *pts=0; //Node coordinates
   int *bounds;
@@ -890,7 +890,7 @@ driver(void)
 	  */
 
       
-      double targetArea = 0.000004;
+      double targetArea = 0.0001;
       
       for(int tstep = 0; tstep < 0; tstep++) {
 	int ret = -1;
