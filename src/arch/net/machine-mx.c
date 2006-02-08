@@ -51,7 +51,7 @@ typedef struct PendingSentMsgStruct
 }
 *PendingSentMsg;
 
-#define CMK_PMPOOL  1
+#define CMK_PMPOOL  0
 
 #if CMK_PMPOOL
 #define MAXPMS 200
