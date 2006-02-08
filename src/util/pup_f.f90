@@ -71,19 +71,35 @@
 
 
       subroutine fpup_complex(p,c)
-	integer p
+        INTEGER p
         complex c
-	call fpup_double(p,aimag(c))
-	call fpup_double(p,real(c))
+        call fpup_real(p,REAL(c))
+        call fpup_real(p,AIMAG(c))
       end subroutine
       subroutine fpup_complexes(p,c,size)
-	integer p
+        INTEGER p
         complex,pointer,dimension(:) :: c
-	integer size
-	integer i
-	do i = 1, size, 1
+        integer size
+        integer i
+        do i = 1, size, 1
           call fpup_complex(p,c(i))
-	end do
+        end do
+      end subroutine
+
+      subroutine fpup_doublecomplex(p,c)
+        INTEGER p
+        double complex c
+        call fpup_double(p,DBLE(c))
+        call fpup_double(p,DIMAG(c))
+      end subroutine
+      subroutine fpup_doublecomplexes(p,c,size)
+        INTEGER p
+        double complex,pointer,dimension(:) :: c
+        integer size
+        integer i
+        do i = 1, size, 1
+          call fpup_doublecomplex(p,c(i))
+        end do
       end subroutine
 
 

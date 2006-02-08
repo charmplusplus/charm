@@ -38,4 +38,13 @@
           complex,pointer,dimension(:) :: c
           INTEGER size
         end subroutine
+        subroutine fpup_doublecomplex(p,c)
+	  INTEGER p
+          double complex c
+        end subroutine
+        subroutine fpup_doublecomplexes(p,c,size)
+	  INTEGER p
+          double complex,pointer,dimension(:) :: c
+          INTEGER size
+        end subroutine
       end interface
