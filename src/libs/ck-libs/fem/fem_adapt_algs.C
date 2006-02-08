@@ -31,6 +31,7 @@ void FEM_Adapt_Algs::FEM_AdaptMesh(int qm, int method, double factor,
 				   double *sizes)
 {
   SetMeshSize(method, factor, sizes);
+  GradateMesh(GRADATION);
   (void)Refine(qm, method, factor, sizes);
   GradateMesh(GRADATION);
   (void)Coarsen(qm, method, factor, sizes);
