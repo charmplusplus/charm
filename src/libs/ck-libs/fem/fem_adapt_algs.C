@@ -14,7 +14,7 @@
 #define MINAREA 1.0e-18
 #define MAXAREA 1.0e12
 
-#define GRADATION 1.8
+#define GRADATION 1.3
 
 CtvDeclare(FEM_Adapt_Algs *, _adaptAlgs);
 
@@ -318,7 +318,12 @@ void FEM_Adapt_Algs::SetMeshSize(int method, double factor, double *sizes)
       }
     }
   }
-  else if (method == 4) { // mesh sizing has been set independently; use as is
+  else if (method == 4) { // scale existing sizes by factor
+    for (int i=0; i<numElements; i++) {
+      theMesh->elem[0].setMeshSizing(i, factor*theMesh->elem[0].getMeshSizing(i));
+    }
+  }
+  else if (method == 5) { // mesh sizing has been set independently; use as is
     CkPrintf("ParFUM_SetMeshSize: USE EXISTING SIZES \n");
   }
   //  CkPrintf("Current mesh sizing: ");
