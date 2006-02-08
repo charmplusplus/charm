@@ -573,7 +573,7 @@ int FEM_AdaptL::edge_contraction(int n1, int n2) {
       free(gotlocks);
       return -1;
     }
-    if (e1 == -1 || e2==-1) {
+    /*if (e1 == -1 || e2==-1) {
       if(locked) {
 	//locknodes[2] = n3;
 	//locknodes[3] = n4;
@@ -583,7 +583,7 @@ int FEM_AdaptL::edge_contraction(int n1, int n2) {
       free(locknodes);
       free(gotlocks);
       return -1;
-    }
+      }*/
     if(gotlock==1 && locknodes[2]==n3 && locknodes[3]==n4) {
       int numtries1=0;
       ret = ERVAL;
@@ -994,7 +994,7 @@ int FEM_AdaptL::edge_contraction_help(int *e1P, int *e2P, int n1, int n2, int e1
     shared = 1;
   } else if(!n1_shared && !n2_shared) {
     //keep either
-    if(n1fixed) {
+    if(n2fixed) {
       keepnode = n2;
       deletenode = n1;
     }
@@ -1018,7 +1018,7 @@ int FEM_AdaptL::edge_contraction_help(int *e1P, int *e2P, int n1, int n2, int e1
   if((n1_bound != 0) && (n2_bound != 0) && (n1_bound != n2_bound)) {
     bool kcorner;
     bool dcorner;
-    if(kcorner==n1) {
+    if(keepnode==n1) {
       kcorner = n1fixed;
       dcorner = n2fixed;
     }
@@ -1373,12 +1373,12 @@ int FEM_AdaptL::edge_contraction_help(int *e1P, int *e2P, int n1, int n2, int e1
 
 
 #ifdef DEBUG_1
-  CkPrintf("[%d]Edge Contraction, edge %d(%d:%d)->%d(%d:%d) on chunk %d\n",theMod->idx, n1,n1_bound,n1_shared, n2,n2_bound,n2_shared, theMod->getfmUtil()->getIdx());
+  CkPrintf("[%d]Edge Contraction, edge %d(%d:%d)->%d(%d:%d) on chunk %d:: deleted %d\n",theMod->idx, n1,n1_bound,n1_shared, n2,n2_bound,n2_shared, theMod->getfmUtil()->getIdx(),deletenode);
 #endif
   e1chunk = FEM_remove_element(theMesh, e1, 0);
-  e2chunk = FEM_remove_element(theMesh, e2, 0);
+  if(e2!=-1) e2chunk = FEM_remove_element(theMesh, e2, 0);
   FEM_purge_element(theMesh,e1,0);
-  FEM_purge_element(theMesh,e2,0);
+  if(e2!=-1) FEM_purge_element(theMesh,e2,0);
 
   for (int i=0; i<nesize; i++) {
     if ((nbrElems[i] != e1) && (nbrElems[i] != e2)) {
