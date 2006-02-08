@@ -29,7 +29,7 @@ class FEM_ElemAdj_Layer;
 class chunkListMsg;
 
 /* BUG: this should not be used */
-void _registerFEMMeshModify(void);
+void _registerParFUM(void);
 
 #ifdef __cplusplus
 extern "C" {
