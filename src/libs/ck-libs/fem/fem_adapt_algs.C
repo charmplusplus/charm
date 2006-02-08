@@ -274,6 +274,9 @@ void FEM_Adapt_Algs::FEM_Remesh(int qm, int method, double factor,
 /* Set sizes on elements throughout the mesh; note: size is edge length */
 void FEM_Adapt_Algs::SetMeshSize(int method, double factor, double *sizes)
 {
+  numNodes = theMesh->node.size();
+  numElements = theMesh->elem[0].size();
+
   if (method == 0) { // set uniform sizing specified in factor
 
     for (int i=0; i<numElements; i++) {
