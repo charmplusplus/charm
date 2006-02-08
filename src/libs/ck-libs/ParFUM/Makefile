@@ -2,7 +2,7 @@ CDIR=../../../..
 CHARMC=$(CDIR)/bin/charmc $(OPTS)
 
 #Headers to be copied to include directory so application users can see them
-HEADERS= ParFUM.h ParFUMf.h ParFUM_internals.h cktimer.h
+HEADERS= ParFUM.h ParFUMf.h ParFUM_internals.h
 
 #Headers internal to ParFUM
 INTERNALHEADERS= ParFUM_internals.h
@@ -52,7 +52,6 @@ $(PARFUMMAIN): main.C $(HEADDEP)
 headers: $(HEADDEP)
 	cp $(HEADERS) $(CDIR)/include/
 	cp $(GENHEADERS) $(CDIR)/include/
-	cp cktimer.h $(CDIR)/include/
 	touch headers
 
 
