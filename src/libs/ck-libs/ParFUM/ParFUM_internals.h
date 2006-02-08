@@ -33,7 +33,6 @@ includes all the old fem_mesh.h type files.
 #include "msa/msa.h"
 #include "cklists.h"
 #include "pup.h"
-#include "../parmetis/parmetis.h"
 
 #include "ParFUM.decl.h"
 

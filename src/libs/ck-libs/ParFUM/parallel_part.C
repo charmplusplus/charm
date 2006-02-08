@@ -11,6 +11,7 @@
 #include "ParFUM.h"
 #include "ParFUM_internals.h"
 
+#include "../parmetis/parmetis.h"
 
 
 
