@@ -1,4 +1,4 @@
-/* File: mesh_modify.ci
+/* File: fem_mesh_modify.ci
  * Authors: Nilesh Choudhury
  * 
  */
@@ -50,6 +50,9 @@ module ParFUM {
   message findgsMsg {
     int chunks[];
   };
+  message elemDataMsg {
+    char data[];
+  };
 
   array [1D] femMeshModify {
     entry femMeshModify(femMeshModMsg *);
@@ -94,5 +97,9 @@ module ParFUM {
     entry [sync,threaded] void addghostsendr(int, int, int, int);
     entry [sync,threaded] void addghostsendr1(int, int, int);
     entry [sync,threaded] boolMsg *willItLose(int, int);
+    entry [sync,threaded] void interpolateElemCopy(int, int, int);
+    entry [sync,threaded] void cleanupIDXL(int, int);
+    entry [sync,threaded] void purgeElement(int, int);
+    entry [sync,threaded] elemDataMsg *packElemData(int fromChk, int sharedIdx);
   };
 };

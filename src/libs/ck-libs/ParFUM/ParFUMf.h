@@ -17,7 +17,7 @@
 
        integer, parameter :: FEM_TRIANGULAR=3
        integer, parameter :: FEM_TETRAHEDRAL=4
-       integer, parameter :: ParFUM.hEXAHEDRAL=8
+       integer, parameter :: FEM_HEXAHEDRAL=8
        integer, parameter :: FEM_QUADRILATERAL=4
        
        integer, parameter :: FEM_ENTITY_FIRST=1610000000

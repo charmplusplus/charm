@@ -7,7 +7,6 @@
 #include "ParFUM_internals.h"
 
 //#define DEBUG_1
-//#define DEBUG_2
 #define ERVAL -1000000000  //might cause a problem if there are 100million nodes
 #define ERVAL1 -1000000001
 
@@ -376,6 +375,27 @@ int FEM_AdaptL::vertex_remove(int n1, int n2) {
   return ret;
 }
 
+// ======================  BEGIN edge_contraction  ============================
+/* Given and edge e:(n1, n2), determine the two adjacent elements (n1,n2,n3) 
+   and (n1,n2,n4). Contract edge e by creating node n5, removing all elements 
+   incident on n1 xor n2 and reinserting with incidence on n5, removing the two
+   elements (n1,n2,n3) and (n1,n2,n4) adjacent to e, and finally removing nodes
+   n1 and n2; return 1 if successful, 0 if not 
+
+       n3                 n3
+        o                  o
+       / \                 |
+      /   \                |  
+ \   /     \   /         \ | / 
+  \ /       \ /           \|/   
+n1 o---------o n2          o n5     
+  / \       / \           /|\    
+ /   \     /   \         / | \ 
+      \   /                |  
+       \ /                 | 
+        o                  o
+       n4                 n4
+*/
 int FEM_AdaptL::edge_contraction(int n1, int n2) {
   int e1, e1_n1, e1_n2, e1_n3, n3;
   int e2, e2_n1, e2_n2, e2_n3, n4;
@@ -553,7 +573,7 @@ int FEM_AdaptL::edge_contraction(int n1, int n2) {
       free(gotlocks);
       return -1;
     }
-    if (e1 == -1 || e2==-1) {
+    /*if (e1 == -1 || e2==-1) {
       if(locked) {
 	//locknodes[2] = n3;
 	//locknodes[3] = n4;
@@ -563,7 +583,7 @@ int FEM_AdaptL::edge_contraction(int n1, int n2) {
       free(locknodes);
       free(gotlocks);
       return -1;
-    }
+      }*/
     if(gotlock==1 && locknodes[2]==n3 && locknodes[3]==n4) {
       int numtries1=0;
       ret = ERVAL;
@@ -655,10 +675,6 @@ int FEM_AdaptL::edge_contraction_help(int *e1P, int *e2P, int n1, int n2, int e1
   int e1chunk=-1, e2chunk=-1;
   int index = theMod->getIdx();
 
-  /*if(n1==8 && n2==15) {
-    CkPrintf("Crit\n");
-    }*/
-
   //if n1 & n2 are shared differently or are on two different boundaries return
   int n1_shared=0, n2_shared=0;
   bool same = true;
@@ -688,10 +704,11 @@ int FEM_AdaptL::edge_contraction_help(int *e1P, int *e2P, int n1, int n2, int e1
   int n1_bound, n2_bound;
   FEM_Mesh_dataP(theMesh, FEM_NODE, FEM_BOUNDARY, &n1_bound, n1, 1 , FEM_INT, 1);
   FEM_Mesh_dataP(theMesh, FEM_NODE, FEM_BOUNDARY, &n2_bound, n2, 1 , FEM_INT, 1);
-  if((n1_bound < 0) && (n2_bound < 0) && (n1_bound != n2_bound)) {
-    bool kcorner = isCorner(n1);
-    bool dcorner = isCorner(n2);
-    if((kcorner && !dcorner && abs(n1_bound-n2_bound)==1) || (dcorner && !kcorner && abs(n1_bound-n2_bound)==1)) {
+  if((n1_bound != 0) && (n2_bound != 0) && (n1_bound != n2_bound)) {
+    bool kcorner = isFixedNode(n1);
+    bool dcorner = isFixedNode(n2);
+    bool edgeb = isEdgeBoundary(n1,n2);
+    if((kcorner && !dcorner && edgeb) || (dcorner && !kcorner && edgeb)) {
     }
     else {
       return -1;
@@ -922,6 +939,14 @@ int FEM_AdaptL::edge_contraction_help(int *e1P, int *e2P, int n1, int n2, int e1
   int keepnode=-1, deletenode=-1, shared=0;
   //n1_shared = theMod->getfmUtil()->isShared(n1);
   //n2_shared = theMod->getfmUtil()->isShared(n2);
+  bool n1fixed = isFixedNode(n1);
+  bool n2fixed = isFixedNode(n2);
+  if(n1fixed && n2fixed) { //both are fixed, so return
+    free(conn);
+    free(adjnodes);
+    free(adjelems);
+    return -1;
+  }
   if(n1_shared && n2_shared) {
     /*same = true;
     const IDXL_Rec *irec1 = theMesh->node.shared.getRec(n1);
@@ -941,8 +966,14 @@ int FEM_AdaptL::edge_contraction_help(int *e1P, int *e2P, int n1, int n2, int e1
       same = false;
       }*/
     if(same) {
-      keepnode = n1;
-      deletenode = n2;
+      if(n1fixed) {
+	keepnode = n2;
+	deletenode = n1;
+      }
+      else {
+	keepnode = n1;
+	deletenode = n2;
+      }
       shared = 2;
     } else {
       free(conn);
@@ -951,34 +982,55 @@ int FEM_AdaptL::edge_contraction_help(int *e1P, int *e2P, int n1, int n2, int e1
       return -1; //they are on different boundaries
     }
   }
-  else if(n1_shared) {
+  else if(n1_shared && !n2fixed) {
     //update n1 & delete n2
     keepnode = n1;
     deletenode = n2;
     shared = 1;
-  } else if(n2_shared) {
+  } else if(n2_shared && !n1fixed) {
     //update n2 & delete n1
     keepnode = n2;
     deletenode = n1;
     shared = 1;
-  } else {
+  } else if(!n1_shared && !n2_shared) {
     //keep either
-    keepnode = n1;
-    deletenode = n2;
+    if(n2fixed) {
+      keepnode = n2;
+      deletenode = n1;
+    }
+    else {
+      keepnode = n1;
+      deletenode = n2;
+    }
   }
-
+  else {
+    free(conn);
+    free(adjnodes);
+    free(adjelems);
+    return -1;
+  }
+  
   FEM_Mesh_dataP(theMesh, FEM_NODE, FEM_BOUNDARY, &n1_bound, keepnode, 1 , FEM_INT, 1);
   FEM_Mesh_dataP(theMesh, FEM_NODE, FEM_BOUNDARY, &n2_bound, deletenode, 1 , FEM_INT, 1);
   //update keepnode's attributes; choose frac wisely, check if either node is on the boundary, update frac
   FEM_Interpolate *inp = theMod->getfmInp();
   FEM_Interpolate::NodalArgs nm;
-  if((n1_bound < 0) && (n2_bound < 0) && (n1_bound != n2_bound)) {
-    bool kcorner = isCorner(keepnode);
-    bool dcorner = isCorner(deletenode);
-    if(kcorner && !dcorner && abs(n1_bound-n2_bound)==1) {
+  if((n1_bound != 0) && (n2_bound != 0) && (n1_bound != n2_bound)) {
+    bool kcorner;
+    bool dcorner;
+    if(keepnode==n1) {
+      kcorner = n1fixed;
+      dcorner = n2fixed;
+    }
+    else {
+      kcorner = n2fixed;
+      dcorner = n1fixed;
+    }
+    bool edgeb = isEdgeBoundary(keepnode,deletenode);
+    if(kcorner && !dcorner && edgeb) {
       nm.frac = 1.0;
     }
-    else if(dcorner && !kcorner && abs(n1_bound-n2_bound)==1) {
+    else if(dcorner && !kcorner && edgeb) {
       nm.frac = 0.0;
     }
     else {//boundary attribute should be 0
@@ -989,20 +1041,20 @@ int FEM_AdaptL::edge_contraction_help(int *e1P, int *e2P, int n1, int n2, int e1
       return -1; //they are on different boundaries
     }
   }
-  else if(n1_bound<0 && n2_bound<0) {
+  else if(n1_bound!=0 && n2_bound!=0) {
     nm.frac = 0.5;
     //TODO: must ensure that any of the two nodes is not a corner
-    if(isCorner(keepnode)) {
+    if(isFixedNode(keepnode)) {
       nm.frac = 1.0;
     } 
-    else if(isCorner(deletenode)) {
+    else if(isFixedNode(deletenode)) {
       nm.frac = 0.0;
     }
   }
-  else if(n1_bound < 0) { //keep its attributes
+  else if(n1_bound != 0) { //keep its attributes
     nm.frac = 1.0;
   }
-  else if(n2_bound < 0) {
+  else if(n2_bound != 0) {
     if(shared==2) {
       keepnode = n2;
       deletenode = n1;
@@ -1017,6 +1069,7 @@ int FEM_AdaptL::edge_contraction_help(int *e1P, int *e2P, int n1, int n2, int e1
   nm.nodes[0] = keepnode;
   nm.nodes[1] = deletenode;
   nm.n = keepnode;
+  nm.addNode = false;
 
   //hack, if it is shared, do not change the attributes, since I am not updating them now across all chunks
   /*if(n1_shared || n2_shared) {
@@ -1320,22 +1373,12 @@ int FEM_AdaptL::edge_contraction_help(int *e1P, int *e2P, int n1, int n2, int e1
 
 
 #ifdef DEBUG_1
-  CkPrintf("[%d]Edge Contraction, edge %d(%d:%d)->%d(%d:%d) on chunk %d\n",theMod->idx, n1,n1_bound,n1_shared, n2,n2_bound,n2_shared, theMod->getfmUtil()->getIdx());
-#endif
-#ifdef DEBUG_2
-  CkPrintf("Adjacencies before edge contract\n");
-  printAdjacencies(adjnodes, 2, adjelems, 2);
+  CkPrintf("[%d]Edge Contraction, edge %d(%d:%d)->%d(%d:%d) on chunk %d:: deleted %d\n",theMod->idx, n1,n1_bound,n1_shared, n2,n2_bound,n2_shared, theMod->getfmUtil()->getIdx(),deletenode);
 #endif
   e1chunk = FEM_remove_element(theMesh, e1, 0);
-#ifdef DEBUG_2
-  CkPrintf("Adjacencies after remove element %d\n",e1);
-  printAdjacencies(adjnodes, 2, adjelems, 2);
-#endif
-  e2chunk = FEM_remove_element(theMesh, e2, 0);
-#ifdef DEBUG_2
-  CkPrintf("Adjacencies after remove element %d\n",e2);
-  printAdjacencies(adjnodes, 2, adjelems, 2);
-#endif
+  if(e2!=-1) e2chunk = FEM_remove_element(theMesh, e2, 0);
+  FEM_purge_element(theMesh,e1,0);
+  if(e2!=-1) FEM_purge_element(theMesh,e2,0);
 
   for (int i=0; i<nesize; i++) {
     if ((nbrElems[i] != e1) && (nbrElems[i] != e2)) {
@@ -1343,8 +1386,11 @@ int FEM_AdaptL::edge_contraction_help(int *e1P, int *e2P, int n1, int n2, int e1
       for (int j=0; j<3; j++) {
 	if (conn[j] == deletenode) conn[j] = keepnode;
       }
+      int eTopurge = nbrElems[i];
       echunk = FEM_remove_element(theMesh, nbrElems[i], 0);
       nbrElems[i] = FEM_add_element(theMesh, conn, 3, 0, echunk); //add it to the same chunk from where it was removed
+      theMod->fmUtil->copyElemData(0,eTopurge,nbrElems[i]);
+      FEM_purge_element(theMesh,eTopurge,0);
     }
   }
 
@@ -1374,6 +1420,8 @@ int FEM_AdaptL::edge_contraction_help(int *e1P, int *e2P, int n1, int n2, int e1
   free(adjelems);
   return keepnode;
 }
+// ======================  END edge_contraction  ==============================
+
 
 #undef DEBUG_1
 

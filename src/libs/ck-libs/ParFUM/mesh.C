@@ -5,6 +5,7 @@ Orion Sky Lawlor, olawlor@acm.org, 12/20/2002
 
 FEM Implementation file: mesh creation and user-data manipulation.
 */
+
 #include "ParFUM.h"
 #include "ParFUM_internals.h"
 
@@ -75,7 +76,7 @@ FEM_Mesh_set_conn(int fem_mesh,int entity,
 	checkIsSet(fem_mesh,true,"FEM_Mesh_set_conn");
 	FEM_Mesh_conn(fem_mesh,entity,(int *)conn,firstItem,length,width);
 }
-CDECL void
+FDECL void
 FTN_NAME(FEM_MESH_SET_CONN,fem_mesh_set_conn)(int *fem_mesh,int *entity,
   	const int *conn, int *firstItem,int *length, int *width)
 {
@@ -90,7 +91,7 @@ FEM_Mesh_get_conn(int fem_mesh,int entity,
 	checkIsSet(fem_mesh,false,"FEM_Mesh_get_conn");
 	FEM_Mesh_conn(fem_mesh,entity,conn,firstItem,length,width);
 }
-CDECL void
+FDECL void
 FTN_NAME(FEM_MESH_GET_CONN,fem_mesh_get_conn)(int *fem_mesh,int *entity,
   	int *conn, int *firstItem,int *length, int *width)
 {
@@ -520,6 +521,13 @@ void FEM_Attribute::pup(PUP::er &p) {
 	p|datatype;
 	if (p.isUnpacking()) tryAllocate();
 }
+void FEM_Attribute::pupSingle(PUP::er &p, int pupindx) {
+	// e, attr, and ghost are always set by the constructor
+	p|width;
+	if (p.isUnpacking() && femVersion > 0 && width<0)  width=0;
+	p|datatype;
+	if (p.isUnpacking()) tryAllocate();
+}
 FEM_Attribute::~FEM_Attribute() {}
 
 void FEM_Attribute::setLength(int next,const char *caller) {
@@ -659,6 +667,17 @@ void FEM_DataAttribute::pup(PUP::er &p) {
 	case FEM_FLOAT:  if (float_data) float_data->pup(p); break;
 	case FEM_DOUBLE: if (double_data) double_data->pup(p); break;
 	default: CkAbort("Invalid datatype in FEM_DataAttribute::pup");
+	}
+}
+void FEM_DataAttribute::pupSingle(PUP::er &p, int pupindx) {
+	super::pupSingle(p,pupindx);
+	switch(getDatatype()) {
+	case -1: /* not allocated yet */ break;
+	case FEM_BYTE:   if (char_data) char_data->pupSingle(p,pupindx); break;
+	case FEM_INT:    if (int_data) int_data->pupSingle(p,pupindx); break;
+	case FEM_FLOAT:  if (float_data) float_data->pupSingle(p,pupindx); break;
+	case FEM_DOUBLE: if (double_data) double_data->pupSingle(p,pupindx); break;
+	default: CkAbort("Invalid datatype in FEM_DataAttribute::pupSingle");
 	}
 }
 FEM_DataAttribute::~FEM_DataAttribute() {
@@ -865,6 +884,10 @@ void FEM_IndexAttribute::pup(PUP::er &p) {
 	super::pup(p);
 	p|idx;
 }
+void FEM_IndexAttribute::pupSingle(PUP::er &p, int pupindx) {
+	super::pupSingle(p,pupindx);
+	idx.pupSingle(p,pupindx);
+}
 FEM_IndexAttribute::~FEM_IndexAttribute() {
 	if (checker) delete checker;
 }
@@ -960,6 +983,11 @@ FEM_VarIndexAttribute::FEM_VarIndexAttribute(FEM_Entity *e,int myAttr)
 void FEM_VarIndexAttribute::pup(PUP::er &p){
 	super::pup(p);
 	p | idx;
+};
+
+void FEM_VarIndexAttribute::pupSingle(PUP::er &p, int pupindx){
+	super::pupSingle(p,pupindx);
+	p|idx[pupindx];
 };
 
 void FEM_VarIndexAttribute::set(const void *src,int firstItem,int length,
@@ -1936,7 +1964,7 @@ void FEM_writeMesh(FEM_Mesh *m,const char *prefix,int chunkNo,int nChunks)
 }
 
 
-// Setup the entity FEM_IS_VALID_ATTR tables
+// Setup the entity FEM_IS_VALID tables
 CDECL void FEM_Mesh_allocate_valid_attr(int fem_mesh, int entity_type){  
   FEM_Mesh *m=FEM_Mesh_lookup(fem_mesh,"FEM_Mesh_create_valid_elem");
   FEM_Entity *entity = m->lookup(entity_type,"FEM_Mesh_allocate_valid_attr");

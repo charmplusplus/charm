@@ -10,6 +10,7 @@
 #include "ParFUM.h"
 #include "ParFUM_internals.h"
 
+
 #define MINAREA 1.0e-18
 #define MAXAREA 1.0e12
 
