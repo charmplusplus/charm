@@ -2,9 +2,8 @@
  * Authors: Nilesh Choudhury
  *
  */
-
-#include "lock.h"
-#include "mesh_modify.h"
+#include "ParFUM.h"
+#include "ParFUM_internals.h"
 
 FEM_lock::FEM_lock(int i, femMeshModify *m) {
   idx = i;

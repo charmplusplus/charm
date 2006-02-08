@@ -2,10 +2,10 @@ CDIR=../../../..
 CHARMC=$(CDIR)/bin/charmc $(OPTS)
 
 #Headers to be copied to include directory so application users can see them
-HEADERS= ParFUM.h ParFUMf.h
+HEADERS= ParFUM.h ParFUMf.h ParFUM_internals.h cktimer.h
 
 #Headers internal to ParFUM
-INTERNALHEADERS= mesh.h impl.h parallel_part.h map.h mesh_modify.h  ParFUM_adapt.h adapt_algs.h interpolate.h lock.h util.h lock_node.h adapt_lock.h ParFUM_adapt_if.h ParFUM_collide.h
+INTERNALHEADERS= ParFUM_internals.h vector2d.h
 
 #Headers generated from .ci files
 GENHEADERS= ParFUM.def.h	ParFUM.decl.h fem.decl.h fem.def.h
@@ -23,7 +23,6 @@ COMPATLIB=$(LIBDIR)/libParFUM-compat.a
 PARFUMMAIN=$(LIBDIR)/libParFUMmain.o
 
 all: $(DEST) $(COMPATLIB) $(PARFUMMAIN)
-
 
 fem.decl.h: ParFUM.ci
 	$(CHARMC) ParFUM.ci

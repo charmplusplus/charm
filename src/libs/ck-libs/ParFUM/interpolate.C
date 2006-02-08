@@ -4,8 +4,8 @@
  */
 
 // FEM_Interpolate default implementation - TLW
-#include "interpolate.h"
-#include "mesh_modify.h"
+#include "ParFUM.h"
+#include "ParFUM_internals.h"
 
 /* A node is added on an edge; interpolate from neighboring nodes; this uses n,
    nodes[2], dim and frac. Frac is between 0.0 and 1.0 and weights nodes[0]; 

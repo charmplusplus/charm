@@ -21,7 +21,9 @@
   Originally written by Orion Sky Lawlor, olawlor@acm.org, 9/28/2000
 */
 
-#include "map.h"
+
+#include "ParFUM.h"
+#include "ParFUM_internals.h"
 
 
 

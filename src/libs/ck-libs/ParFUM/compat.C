@@ -9,8 +9,7 @@ using anything in impl.h; this file mostly relies on
 public, documented interfaces.
 */
 #include "ParFUM.h"
-#include "impl.h"
-#include "charm-api.h" /*for CDECL, FTN_NAME*/
+#include "ParFUM_internals.h"
 
 #define S FEM_Mesh_default_write()
 #define G FEM_Mesh_default_read()

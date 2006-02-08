@@ -1,10 +1,35 @@
 /*Charm++ Finite Element Framework:
 C interface file
 */
-#ifndef _CHARM_ParFUM_h
-#define _CHARM_ParFUM_h
+#ifndef __PARFUM_H
+#define __PARFUM_H
 #include "pup_c.h"  /* for pup_er */
 #include "idxlc.h"
+#include "collidec.h"  // from collision framework
+#include "charm-api.h"
+#include "ckvector3d.h"
+#include "charm++.h"
+#include "tcharm.h"
+#include "charm-api.h"
+#include "ckvector3d.h"
+
+
+// Forward declaration
+class FEM_Entity;
+class FEM_Mesh;
+class FEM_Elem;
+class FEM_Node;
+class femMeshModify;
+class FEM_Adapt_Algs;
+class FEM_Adapt;
+class FEM_AdaptL;
+class IDXL_Chunk;
+class l2g_t;
+class FEM_ElemAdj_Layer;
+class chunkListMsg;
+
+/* BUG: this should not be used */
+void _registerFEMMeshModify(void);
 
 #ifdef __cplusplus
 extern "C" {
@@ -333,9 +358,134 @@ to mark the chunk to which a ghost node or element belongs datatype=FEM_INDEX*/
    -> Replace with IDXL_Combine
 */
 
-#ifdef __cplusplus
-}
-#endif
 
+
+
+/* 
+ParFUM Collision Interface File
+
+A few outstanding questions:
+
+Is the use of an element based attribute to store any needed collision data a good thing?
+Perhaps we should just use the user data attributes for the element. This may require there 
+to be consequtive user data attributes. I.e. no FEM_DATA+5,FEM_DATA+82, without those inbetween.
+Do we need to transmit nodal data for each element?
+Does the user need anything beyond just some data attributes for the one remote element which is 
+colliding locally?
+
+THESE FUNCTIONS ARE NOT YET IMPLEMENTED!
+
+Author: Isaac Dooley 11-09-2005
+*/
+
+  struct ParFUM_collider {
+	collide_t collide_grid;
+	double box_padding;
+	int dimension;
+
+	unsigned int *boxToElementMapping;
+	unsigned int numCollidableElements; // size of boxToElementMapping array
+  };
+
+
+
+  /* ParFUM_Collide_init() will initialize the collision library. 
+     It should be called once in driver after mesh has been loaded.
+     
+     dimension should reflect the number of coordinates associated 
+     with a node. This cannot exceed 3 with the current Collision
+     Library. The user's nodal coordinates must be registered as a 
+     particular attribute in order to determine the optimal grid sizing.
+
+     Algorithm:
+       Determine Grid Sizing
+       Call COLLIDE_Init()
+     
+  */   
+  ParFUM_collider ParFUM_Collide_Init(int dimension);
+
+
+  /* ParFUM_Collide() will create bounding boxes for each element in the local mesh chunk.
+     It will then collide these bounding boxes with those both locally and remotely.
+     It should be called at each timestep for which collisions are being tested.
+    
+     Algorithm: 
+       Create Bounding boxes for all valid elements, and priority array
+       Call COLLIDE_Boxes_prio()
+       return the number of collisions which involve a local element
+  */  
+  int ParFUM_Collide(ParFUM_collider *c, double box_padding = 0.0);
+
+  /* ParFUM_Collide_GetCollisions() is used to get the data for any remote elements which 
+     It should be called after Collide even if ParFUM_Collide returned 0
+
+     The data it returns will be double precision values associated with the
+     element attribute ParFUM_COLLISION_DATA
+
+     results should be an array allocated by the user with length equal to the number of 
+     collisions times the amount of space needed for each item in the ParFUM_COLLISION_DATA 
+     attribute
+          
+     Algorithm: 
+
+
+
+  */  
+  void ParFUM_Collide_GetCollisions(ParFUM_collider *c, void* results);
+
+  void ParFUM_Collide_Destroy(ParFUM_collider *c);
+
+
+// End of Collision interface
+
+
+
+// User functions for adaptivity
+
+void FEM_ADAPT_Init(int meshID);
+FDECL void FTN_NAME(FEM_ADAPT_INIT,fem_adapt_init)(int *meshID);
+
+
+void FEM_ADAPT_Refine(int meshID, int qm, int method, double factor, double *sizes);
+FDECL void FTN_NAME(FEM_ADAPT_REFINE,fem_adapt_refine)(int* meshID, 
+        int *qm, int *method, double *factor, double *sizes);
+
+
+void FEM_ADAPT_Coarsen(int meshID, int qm, int method, double factor, 
+        double *sizes);
+FDECL void FTN_NAME(FEM_ADAPT_COARSEN,fem_adapt_coarsen)(int* meshID, 
+        int *qm, int *method, double *factor, double *sizes);
+
+void FEM_ADAPT_AdaptMesh(int meshID, int qm, int method, double factor, double *sizes);
+FDECL void FTN_NAME(FEM_ADAPT_ADAPTMESH,fem_adapt_adaptmesh)(int* meshID, 
+        int *qm, int *method, double *factor, double *sizes);
+
+void FEM_ADAPT_SetElementSizeField(int meshID, int elem, double size);
+FDECL void FTN_NAME(FEM_ADAPT_SETELEMENTSIZEFIELD,fem_adapt_setelementsizefield)(int *meshID, int *elem, double *size);
+
+
+void FEM_ADAPT_SetElementsSizeField(int meshID, double *sizes);
+FDECL void FTN_NAME(FEM_ADAPT_SETELEMENTSSIZEFIELD,fem_adapt_setelementssizefield)(int *meshID, double *sizes);
+
+
+void FEM_ADAPT_SetReferenceMesh(int meshID);
+FDECL void FTN_NAME(FEM_ADAPT_SETREFERENCEMESH, fem_adapt_setreferencemesh)(int* meshID);
+
+
+void FEM_ADAPT_GradateMesh(int meshID, double smoothness);
+FDECL void FTN_NAME(FEM_ADAPT_GRADATEMESH, fem_adapt_gradatemesh)(int* meshID, double* smoothness);
+
+
+
+  // End Adaptivity interface
+
+
+
+
+
+
+
+
+}
 #endif
 

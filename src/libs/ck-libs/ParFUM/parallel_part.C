@@ -8,16 +8,10 @@
   05/30/2004
 */
 
-
-#include <assert.h>
-#include "impl.h"
 #include "ParFUM.h"
-#include "fem.decl.h"
-#include "msa/msa.h"
-#include "cklists.h"
-#include "pup.h"
-#include "../parmetis/parmetis.h"
-#include "parallel_part.h"
+#include "ParFUM_internals.h"
+
+
 
 
 int FEM_Mesh_Parallel_broadcast(int fem_mesh,int masterRank,FEM_Comm_t comm_context){

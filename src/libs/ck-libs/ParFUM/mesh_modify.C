@@ -7,10 +7,8 @@
  *
  */
 
-#include "charm.h"
 #include "ParFUM.h"
-#include "impl.h"
-#include "mesh_modify.h"
+#include "ParFUM_internals.h"
 
 CProxy_femMeshModify meshMod;
 

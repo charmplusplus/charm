@@ -5,7 +5,9 @@ Parallel Programming Lab, Univ. of Illinois 2000
 Main leftover implementation file.
 See README.txt for details.
  */
-#include "impl.h"
+
+#include "ParFUM.h"
+#include "ParFUM_internals.h"
 
 int femVersion = 1;
 

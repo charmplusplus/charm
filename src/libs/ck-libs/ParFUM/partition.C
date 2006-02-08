@@ -9,11 +9,8 @@ The partitioning is done using metis.
 
 Originally written by Karthik Mahesh, September 2000.
 */
-#include <stdio.h>
-#include <stdlib.h>
-#include <assert.h>
-#include "impl.h"
-#include "cktimer.h"
+#include "ParFUM.h"
+#include "ParFUM_internals.h"
 
 class NList
 {

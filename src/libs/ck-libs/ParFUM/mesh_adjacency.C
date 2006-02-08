@@ -10,9 +10,7 @@
  */
 
 #include "ParFUM.h"
-#include "impl.h"
-#include "charm-api.h" /*for CDECL, FTN_NAME*/
-
+#include "ParFUM_internals.h"
 
 
 //#define DEBUG

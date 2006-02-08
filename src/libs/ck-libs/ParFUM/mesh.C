@@ -5,11 +5,8 @@ Orion Sky Lawlor, olawlor@acm.org, 12/20/2002
 
 FEM Implementation file: mesh creation and user-data manipulation.
 */
-#include <assert.h>
 #include "ParFUM.h"
-#include "impl.h"
-#include "charm-api.h" /*for CDECL, FTN_NAME*/
-#include "mesh_modify.h"
+#include "ParFUM_internals.h"
 
 extern int femVersion;
 

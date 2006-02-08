@@ -2,11 +2,8 @@
  * Authors: Nilesh Choudhury
  * 
  */
-
-
-#include "util.h"
-#include "mesh_modify.h"
-#include <vector>
+#include "ParFUM.h"
+#include "ParFUM_internals.h"
 
 extern void splitEntity(IDXL_Side &c, int localIdx, int nBetween, int *between, int idxbase);
 

@@ -2,10 +2,9 @@
  * Authors: Nilesh Choudhury, Terry Wilmarth
  *
  */
+#include "ParFUM.h"
+#include "ParFUM_internals.h"
 
-#include "ParFUM_adapt.h"  
-#include "mesh_modify.h"
-#include <vector>
 //#define DEBUG_1
 //#define DEBUG_2
 

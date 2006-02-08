@@ -5,9 +5,8 @@ ParFUM Collision Interface
 Author: Isaac Dooley 11-11-2005
 
 */
-
-#include "ParFUM_collide.h"
-#include "mpi.h"
+#include "ParFUM.h"
+#include "ParFUM_internals.h"
 
 #define NULL 0
 

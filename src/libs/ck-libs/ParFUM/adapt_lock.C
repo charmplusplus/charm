@@ -3,8 +3,8 @@
  *
  */
 
-#include "adapt_lock.h"
-#include "mesh_modify.h"
+#include "ParFUM.h"
+#include "ParFUM_internals.h"
 
 //#define DEBUG_1
 //#define DEBUG_2

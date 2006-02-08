@@ -2,9 +2,8 @@
  * Authors: Nilesh Choudhury
  * 
  */
-
-#include "lock_node.h"
-#include "mesh_modify.h"
+#include "ParFUM.h"
+#include "ParFUM_internals.h"
 
 //#define DEBUG_LOCKS
 

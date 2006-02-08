@@ -15,10 +15,9 @@ this routine is not linked.
 
 Orion Sky Lawlor, olawlor@acm.org, 2003/7/13
 */
-#include "mpi.h"
+
 #include "ParFUM.h"
-#include "converse.h" /* for CmiGetArg */
-#include "charm-api.h" /* for Fortran name mangling FTN_NAME */
+#include "ParFUM_internals.h"
 
 CDECL void fem_impl_call_init(void);
 

@@ -7,12 +7,8 @@ mirror symmetry.
 
 Orion Sky Lawlor, olawlor@acm.org, 7/23/2002
 */
-#include <stdio.h>
-#include <stdlib.h>
-#include <assert.h>
-#include "impl.h"
-#include "ckvector3d.h"
-
+#include "ParFUM.h"
+#include "ParFUM_internals.h"
 
 /*******************
 Trivial Union/Find data structure.
