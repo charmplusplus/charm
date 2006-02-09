@@ -1,15 +1,16 @@
 /*
-Finite Element Method (FEM) Framework for Charm++
-Parallel Programming Lab, Univ. of Illinois 2000
+ParFUM - Parallel Framework for Unstructured Meshing
+Parallel Programming Lab, Univ. of Illinois 2006
 
-Main leftover implementation file.
-See README.txt for details.
  */
 
 #include "ParFUM.h"
 #include "ParFUM_internals.h"
 
+
+/* Some Globals */
 int femVersion = 1;
+static FEM_Partition *mypartition=NULL;
 
 /* TCharm semaphore ID, used for mesh startup */
 #define FEM_TCHARM_SEMAID 0x00FE300 /* __FEM__ */
@@ -164,12 +165,13 @@ FEM_Mesh_assemble(int nParts,const int *srcMeshes) {
 FORTRAN_AS_C_RETURN(int,FEM_MESH_ASSEMBLE,FEM_Mesh_assemble,fem_mesh_assemble,
 	(int *nParts,const int *src),(*nParts,src))
 
-static FEM_Partition *partition=NULL;
+
+/* mypartition is static to this file, and is declared above */
 FEM_Partition &FEM_curPartition(void) {
-	if (partition==NULL) partition=new FEM_Partition();
-	return *partition;
+  if (mypartition==NULL) mypartition=new FEM_Partition();
+	return *mypartition;
 }
-static void clearPartition(void) {delete partition; partition=NULL;}
+static void clearPartition(void) {delete mypartition; mypartition=NULL;}
 
 FEM_Partition::FEM_Partition() 
 {
