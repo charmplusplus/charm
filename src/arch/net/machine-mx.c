@@ -23,6 +23,7 @@
   * 2/8/2006:  Gengbin Zheng
     implement buffering of future messages (I haven't seen out-of-order
     messages so far, but it may happen)
+    Using POOL relies on charmrun set MX_MONOTHREAD=1.
 */
 
 /**
