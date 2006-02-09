@@ -2479,6 +2479,10 @@ void rsh_script(FILE *f, int nodeno, int rank0no, char **argv)
 #ifdef CMK_G95
   fprintf(f,"G95_UNBUFFERED_ALL=TRUE; export G95_UNBUFFERED_ALL\n");
 #endif
+#if CMK_USE_MX
+  fprintf(f,"MX_MONOTHREAD=1; export MX_MONOTHREAD\n");
+  /*fprintf(f,"MX_RCACHE=1; export MX_RCACHE\n");*/
+#endif
   
   if (arg_verbose) {
     printf("Charmrun> Sending \"%s\" to client %d.\n", netstart, rank0no);
