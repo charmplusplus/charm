@@ -2,7 +2,7 @@
 /** @file
  * Myrinet API GM implementation of Converse NET version
  * @ingroup NET
- * contains only GM API specific code for:
+ * contains only MX API specific code for:
  * - CmiMachineInit()
  * - CmiNotifyIdle()
  * - DeliverViaNetwork()
@@ -10,15 +10,19 @@
  * - CmiMachineExit()
 
   written by 
-  Yan Shi, yanshi@uiuc.edu     2/2/2006
+  Yan Shi, yanshi@uiuc.edu        2/1/2006
   Gengbin Zheng, gzheng@uiuc.edu  2/3/2006
   
   ChangeLog:
   * 2/3/2006:  Gengbin Zheng
-    implement packetization, and fix buffer change after send bug
+    implemented packetization, and fix a bug related to buffer reuse/change
+    in pending send 
   * 2/7/2006:  Gengbin Zheng
     implement active message mode using callback
     short message pingpong time improved by 0.5us
+  * 2/8/2006:  Gengbin Zheng
+    implement buffering of future messages (I haven't seen out-of-order
+    messages so far, but it may happen)
 */
 
 /**
@@ -26,7 +30,10 @@
  * @{
  */
 
+/* use unexp callback */
 #define MX_ACTIVE_MESSAGE                     1
+
+/*#define CMK_USE_CHECKSUM                      0*/
 
 /* default as in busywaiting mode */
 #undef CMK_WHEN_PROCESSOR_IDLE_BUSYWAIT
@@ -51,7 +58,7 @@ typedef struct PendingSentMsgStruct
 }
 *PendingSentMsg;
 
-#define CMK_PMPOOL  0
+#define CMK_PMPOOL  1
 
 #if CMK_PMPOOL
 #define MAXPMS 200
@@ -92,12 +99,12 @@ static PendingSentMsg sent_handles_end=NULL; /* end of the queue */
      else CmiFree(pm->data); \
      putPool(pm); }
 
-CmiUInt8 MATCH_FILTER = 0x1111111122223333L;
+CmiUInt8 MATCH_FILTER = 0x11111111FFFFFFFFL;
 CmiUInt8 MATCH_MASK   = 0xffffffffffffffffL;
 
-static void processMessage(char *msg, int len);
+static int processMessage(char *msg, int len);
 static const char *getErrorMsg(mx_return_t rc);
-static void processMXError(mx_status_t status);
+static void processStatusCode(mx_status_t status);
 static void PumpMsgs(int getone);
 static void ReleaseSentMsgs(void);
 #if MX_ACTIVE_MESSAGE
@@ -283,7 +290,6 @@ static void PumpEvents(int getone) {
       CmiAbort("Abort");
     }
     if (result == 0) break;
-again0:
     rc = mx_test(endpoint, &recv_handle, &status, &result);
     /*rc = mx_wait(endpoint, &recv_handle, MX_INFINITE, &status, &result);*/
     if (rc != MX_SUCCESS) {
@@ -292,8 +298,7 @@ again0:
       CmiAbort("Abort");
     }
     if(result==0) {
-      CmiPrintf("mx_test or wait: TIME OUT\n");
-      goto again0;
+      CmiAbort("mx_test or wait: TIME OUT\n");  /* this should never happen */
     }
     else {
       PendingSentMsg pm = (PendingSentMsg)status.context;
@@ -301,8 +306,11 @@ again0:
         if (pm->ogm) {pm->ogm->refcount--; GarbageCollectMsg(pm->ogm);}
         else CmiFree(pm->data);
       }
-      else {                  /* recv */
+      else if (pm->flag == 2) {                  /* recv */
         processMessage(pm->data, status.msg_length);
+      }
+      else {
+        CmiAbort("Invalid PendingSentMsg!");
       }
       putPool(pm);
     }
@@ -325,14 +333,16 @@ void recv_callback(void * context, uint64_t match_info, int length)
   getPool(pm);
   pm->flag = 2;
   pm->data = buffer_desc.segment_ptr;
-  rc = mx_irecv(endpoint, &buffer_desc, 1, match_info, MX_MATCH_MASK_NONE, pm, &recv_handle);
+  if (MATCH_FILTER != match_info) {
+    CmiAbort("Invalid match_info");
+  }
+  rc = mx_irecv(endpoint, &buffer_desc, 1, MATCH_FILTER, MATCH_MASK, pm, &recv_handle);
   if (rc != MX_SUCCESS) {
     const char *errmsg = getErrorMsg(rc);
     CmiPrintf("mx_irecv error: %s\n", errmsg);
     CmiAbort("Abort");
   }
-/*
-  if (length <= 32) {
+  if (1) {
     rc = mx_test(endpoint, &recv_handle, &status, &result);
     if (rc != MX_SUCCESS) {
       const char *errmsg = getErrorMsg(rc);
@@ -343,12 +353,12 @@ void recv_callback(void * context, uint64_t match_info, int length)
       return;
     }
     else {
-      PendingSentMsg pm = (PendingSentMsg)status.context;
+      processStatusCode(status);
+      CmiPrintf("PUSH HERE\n");
       processMessage(pm->data, status.msg_length);
       putPool(pm);
     }
   }
-*/
 }
 #endif
 
@@ -432,7 +442,22 @@ static void CommunicationServer(int withDelayMs, int where)
   MACHSTATE(2,"} CommunicationServer")
 }
 
-static void processMessage(char *msg, int len)
+void processFutureMessages(OtherNode node)
+{
+  if (!CdsFifo_Empty(node->futureMsgs)) {
+    int len = CdsFifo_Length(node->futureMsgs);
+    CmiPrintf("[%d] processFutureMessages %d\n", CmiMyPe(), len);
+    int i=0;
+    while (i<len) {
+      FutureMessage f = (FutureMessage)CdsFifo_Dequeue(node->futureMsgs);
+      int status = processMessage(f->msg, f->len);
+      free(f);
+      i++;
+    }
+  }
+}
+
+static int processMessage(char *msg, int len)
 {
   char *newmsg;
   int rank, srcpe, seqno, magic, i;
@@ -461,11 +486,18 @@ static void processMessage(char *msg, int len)
       else if (seqno < node->recv_expect) {
         CmiPrintf("[%d] Warning: Past packet received from PE %d (expecting: %d seqno: %d)\n", CmiMyPe(), srcpe, node->recv_expect, seqno);
 	CmiPrintf("\n\n\t\t[%d] packet ignored!\n\n");
-	return;
+	return 0;
       }
       else {
-         CmiPrintf("[%d] Error detected - Packet out of order from PE %d,(expecting: %d got: %d)\n", CmiMyPe(), srcpe, node->recv_expect, seqno);
-         CmiAbort("\n\n\t\tPacket out of order!!\n\n");
+        CmiPrintf("[%d] Error detected - Packet out of order from PE %d (expecting: %d got: %d)\n", CmiMyPe(), srcpe, node->recv_expect, seqno);
+/*
+        CmiAbort("\n\n\t\tPacket out of order!!\n\n");
+*/
+        FutureMessage f = (FutureMessage)malloc(sizeof(struct FutureMessageStruct));
+        f->msg = msg;
+        f->len = len;
+        CdsFifo_Enqueue(node->futureMsgs, f);
+        return 0;
       }
 
       newmsg = node->asm_msg;
@@ -536,6 +568,7 @@ static void processMessage(char *msg, int len)
         SendHypercube(NULL, 0, node->asm_total, newmsg, broot, rank);
 #endif
       }
+      processFutureMessages(node);
     } 
     else {   /* checksum failed */
 #ifdef CMK_USE_CHECKSUM
@@ -552,6 +585,8 @@ len);
       CmiPrintf("[%d] message ignored: size is too small: %d!\n", CmiMyPe(), len);
       CmiPrintf("[%d] possible size: %d\n", CmiMsgHeaderGetLength(msg));
   }
+
+  return 1;
 }
 
 /***********************************************************************
@@ -586,6 +621,12 @@ void EnqueueOutgoingDgram
   MACHSTATE5(1, "[%d] SEQNO: %d to node %d rank: %d %d", CmiMyPe(), seqno, node-nodes, rank, broot);
   DgramHeaderMake(data, rank, ogm->src, Cmi_charmrun_pid, seqno, broot);
   node->send_next = ((seqno+1)&DGRAM_SEQNO_MASK);
+#ifdef CMK_USE_CHECKSUM
+  {
+  DgramHeader *head = (DgramHeader *)data;
+  head->magic ^= computeCheckSum(data, len);
+  }
+#endif
 
   MACHSTATE1(2, "EnqueueOutgoingDgram { len=%d", len);
   /* MX will put outgoing message in queue and progress to send */
@@ -784,6 +825,8 @@ void CmiMachineInit(char **argv)
 
   dataport = 1;     /* fake it so that charmrun checking won't fail */
 
+  MATCH_FILTER &= Cmi_charmrun_pid;
+
   Cmi_dgram_max_data = 1024-DGRAM_HEADER_SIZE;
 
 #if  MX_ACTIVE_MESSAGE
@@ -849,9 +892,9 @@ static const char *getErrorMsg(mx_return_t rc)
   return mx_strerror(rc);
 }
 
-static void processMXError(mx_status_t status){
+static void processStatusCode(mx_status_t status){
   const char *str = mx_strstatus(status.code);
-  CmiPrintf("processMXError: %s\n", str);
+  CmiPrintf("processStatusCode: %s\n", str);
   MACHSTATE(4, str);
 }
 
