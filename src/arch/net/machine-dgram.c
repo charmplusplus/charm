@@ -242,18 +242,25 @@ typedef enum __qp_connection_state {
 } qp_connection_state_t;
 #endif
   
+typedef struct FutureMessageStruct {
+  char *msg;
+  int len;
+} *FutureMessage;
+
 typedef struct OtherNodeStruct
 {
   int nodestart, nodesize;
   skt_ip_t IP;
   unsigned int mach_id;
-#if CMK_USE_MX
-  CmiUInt8 nic_id;
-#endif
   unsigned int dataport;
   struct sockaddr_in addr;
 #if CMK_USE_TCP
   SOCKET	sock;		/* for TCP */
+#endif
+#if CMK_USE_MX
+  CmiUInt8 nic_id;
+  mx_endpoint_addr_t       endpoint_addr;
+  CdsFifo                  futureMsgs;   /* out-of-order */
 #endif
 
   unsigned int             send_last;    /* seqno of last dgram sent */
@@ -269,10 +276,6 @@ typedef struct OtherNodeStruct
   struct PendingMsgStruct *sendhead, *sendtail;  /* gm send queue */
   int 			   disable;
   int 			   gm_pending;
-#endif
-
-#if CMK_USE_MX
-  mx_endpoint_addr_t       endpoint_addr;
 #endif
 
 #if CMK_USE_AMMASSO
@@ -392,6 +395,9 @@ static void OtherNode_init(OtherNode node)
     node->sendhead = node->sendtail = NULL;
     node->disable = 0;
     node->gm_pending = 0;
+#endif
+#if CMK_USE_MX
+    node->futureMsgs = CdsFifo_Create();
 #endif
 
     /*
