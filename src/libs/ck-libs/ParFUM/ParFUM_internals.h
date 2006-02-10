@@ -1980,6 +1980,7 @@ public:
 		}
 		shared = new int[numShared];
 		memcpy(shared,rhs.shared,numShared*sizeof(int));
+                return *this;
 	}
 
 	bool operator == (const NodeElem &rhs){
@@ -2038,7 +2039,9 @@ class MeshElem{
 		}	
 		m = new FEM_Mesh;
 		m->copyShape(*(rhs.m));
-		(*this)+= rhs;
+		(*this) += rhs;
+                
+                return *this;
 	}
 	MeshElem& operator+=(const MeshElem &rhs){
 		int oldel = m->nElems();
@@ -2054,7 +2057,9 @@ class MeshElem{
 					}	
 				}	
 			}
-		}	
+		}
+
+                return *this;
 	}
 	virtual void pup(PUP::er &p){
 		if(p.isUnpacking()){
@@ -2119,6 +2124,7 @@ public:
 		}
 		chunk = rhs.chunk;
 		elementNo = rhs.elementNo;
+                return *this;
 	}
 	bool operator==(const Hashnode &rhs){
 		if(numnodes != rhs.numnodes){
