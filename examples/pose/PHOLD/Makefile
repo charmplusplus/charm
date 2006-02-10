@@ -52,9 +52,9 @@ $(PGM):	$(SIM_OBJECTS)
 	$(CHARMC) $(SIM_OBJECTS) $(OTHER) $(LIBS) -o $(PGM) \
 	-module pose -language charm++
 
-$(PGM).seq:	$(SIM_OBJECTS) 
+$(PGM).seq: seqobjs
 	$(CHARMC) $(SIM_OBJECTS) $(OTHER) $(LIBS) -o $(PGM).seq \
-	-module seqpose -language charm++
+	-DSEQUENTIAL_POSE=1 -module seqpose -language charm++
 
 $(PGM).seq.proj:	$(SIM_OBJECTS) 
 	$(CHARMC) $(SIM_OBJECTS) $(OTHER) $(LIBS) -o $(PGM).seq.proj \
@@ -119,6 +119,15 @@ Worker.def.h Worker.decl.h : Worker_sim.ci
 
 Worker_sim.C Worker_sim.h Worker_sim.ci: Worker.C Worker.h Worker.ci 
 	$(CHARMBIN)/etrans.pl Worker
+
+seqobjs: seqtrans
+	$(CHARMC) $(INCLUDES) $(LIBS) Worker_sim.ci
+	$(CHARMC) -c $(LIBS) $(INCLUDES) -I$(CHARMINC) -DSEQUENTIAL_POSE=1 Worker_sim.C
+	$(CHARMC) $(INCLUDES) $(LIBS) $(PGM).ci
+	$(CHARMC) -c -I$(CHARMINC) $(INCLUDES) $(LIBS) -DSEQUENTIAL_POSE=1 $(PGM).C
+
+seqtrans: Worker.C Worker.h Worker.ci
+	$(CHARMBIN)/etrans.pl -s Worker
 
 test:
 	./pgm 1000 100 SMALL 50 -gf 200
