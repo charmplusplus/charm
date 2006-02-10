@@ -3,15 +3,13 @@ C interface file
 */
 #ifndef __PARFUM_H
 #define __PARFUM_H
+#include "charm++.h"
 #include "pup_c.h"  /* for pup_er */
 #include "idxlc.h"
 #include "collidec.h"  // from collision framework
 #include "charm-api.h"
 #include "ckvector3d.h"
-#include "charm++.h"
 #include "tcharm.h"
-#include "charm-api.h"
-#include "ckvector3d.h"
 
 
 // Forward declaration
