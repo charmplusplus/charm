@@ -49,6 +49,13 @@ syntax() {
   echo '  mpcc            SUN Solaris C++ compiler for MPI'
   echo '  pathscale       use pathscale compiler suite'
   echo ''
+  echo 'Choose a fortran compile (only one option is allowed from this section):'
+  echo '  g95             G95 at http://ww.g95.org'
+  echo '  absoft          Absoft fortran compiler'
+  echo "  pgf90           Portland Group\'s Fortran compiler"
+  echo '  ifc             Intel Fortran compiler (older versions)'
+  echo '  ifort           Intel Fortran compiler (newer versions)'
+  echo ''
   echo 'Platform specific options (choose multiple if apply):'
   echo '  smp             support for SMP, multithreaded charm on each node'
   echo '  mpt             use SGI Message Passing Toolkit (only for mpi version)'
