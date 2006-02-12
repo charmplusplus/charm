@@ -2963,6 +2963,8 @@ class elemDataMsg : public CMessage_elemDataMsg {
   }
 };
 
+class FEM_Interpolate;
+
 class femMeshModify : public CBase_femMeshModify {
   friend class FEM_lock;
   friend class FEM_MUtil;
