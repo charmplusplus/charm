@@ -7,7 +7,12 @@
 #include "converse.h"
 
 #include <bglpersonality.h>
-#include <rts.h>
+
+extern "C" int rts_get_personality(struct BGLPersonality *dst, unsigned size);
+extern "C" int rts_coordinatesForRank(unsigned logicalRank, unsigned *x, 
+				  unsigned *y, unsigned *z, unsigned *t);
+
+/*#include <rts.h>*/
 #include <stdlib.h>
 
 class BGLTorusManager;
@@ -32,18 +37,63 @@ class BGLTorusManager {
     ysize = my_bg.ySize;
     zsize = my_bg.zSize;  
 
+    int numnodes = CmiNumPes();
+    if(my_bg.opFlags & BGLPERSONALITY_OPFLAGS_VIRTUALNM) 
+      numnodes = CmiNumPes() / 2;
+    
+    int max_t = 0;
+    if(xsize * ysize * zsize != numnodes) {
+      xsize = ysize = zsize = 0;
+      
+      int mx,my,mz;        //min values for x,y.z
+      mx = my = mz = CmiNumPes();
+      unsigned int tmpx, tmpy, tmpz, tmpt;
+      for(int count = 0; count < CmiNumPes(); count ++) {
+	rts_coordinatesForRank(count, &tmpx, &tmpy, &tmpz, &tmpt);
+	
+	if(tmpx > xsize)
+	  xsize = tmpx;
+	
+	if(tmpx < mx)
+	  mx = tmpx;
+	
+	if(tmpy > ysize)
+	  ysize = tmpy;
+	
+	if(tmpy < my)
+	  my = tmpy;
+	
+	if(tmpz > zsize)
+	  zsize = tmpz;
+	
+	if(tmpz < mz)
+	  mz = tmpz;
+
+	if(tmpt > max_t)
+	  max_t = tmpt;
+      }
+
+      xsize = xsize - mx + 1;
+      ysize = ysize - my + 1;
+      zsize = zsize - mz + 1;
+    }
+    
     nxsize = xsize;
     nysize = ysize;
     nzsize = zsize;
     
-    if(my_bg.opFlags & BGLPERSONALITY_OPFLAGS_VIRTUALNM) {
-      isVN = 1;
-      xsize *= 2;
+    if(xsize * ysize * zsize != numnodes) {
+      zsize *= max_t + 1;   //Assuming XYZT
+      isVN = max_t;
     }
-
-    //CmiPrintf("BGL Torus Constructor %d,%d,%d\n", xsize, ysize, zsize);
+    else if(my_bg.opFlags & BGLPERSONALITY_OPFLAGS_VIRTUALNM) {
+      isVN = 1;
+      zsize *= 2;      //Assuming XYZT
+    }    
+    
+    //CmiPrintf("BGL Torus Constructor %d,%d,%d  nodes %d,%d,%d\n", xsize, ysize, zsize, nxsize, nysize, nzsize);
   }
-
+  
   inline int getXSize() { return xsize;}
   inline int getYSize() { return ysize;}
   inline int getZSize() { return zsize;}
