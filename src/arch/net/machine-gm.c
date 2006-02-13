@@ -415,23 +415,24 @@ static void processMessage(char *msg, int len)
           CmiPushPE(rank, newmsg);
         }
         node->asm_msg = 0;
-      }
+
       /* do it after integration - the following function may re-entrant */
 #if CMK_BROADCAST_SPANNING_TREE
-      if (rank == DGRAM_BROADCAST
+        if (rank == DGRAM_BROADCAST
 #if CMK_NODE_QUEUE_AVAILABLE
           || rank == DGRAM_NODEBROADCAST
 #endif
-         )
-        SendSpanningChildren(NULL, 0, len, msg, broot, rank);
+           )
+          SendSpanningChildren(NULL, 0, len, msg, broot, rank);
 #elif CMK_BROADCAST_HYPERCUBE
-      if (rank == DGRAM_BROADCAST
+        if (rank == DGRAM_BROADCAST
 #if CMK_NODE_QUEUE_AVAILABLE
           || rank == DGRAM_NODEBROADCAST
 #endif
-         )
-        SendHypercube(NULL, 0, len, msg, broot, rank);
+           )
+          SendHypercube(NULL, 0, len, msg, broot, rank);
 #endif
+      }
     } 
     else {
 #ifdef CMK_USE_CHECKSUM
