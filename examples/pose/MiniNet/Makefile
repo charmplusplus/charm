@@ -9,7 +9,11 @@
 #
 # ***********************************************************************
 
-OPTS=-O#-DCMK_OPTIMIZE=1 -DCMK_MEMCHECKS_OFF=1
+OPTS=-O #-DSEQUENTIAL_POSE=1 #
+#USE THIS Line for sequential
+#OPTS=-O -DSEQUENTIAL_POSE=1 
+#USE THIS Line for sequential max speed no debugging
+#OPTS=-O -DSEQUENTIAL_POSE=1 -DCMK_OPTIMIZE=1 -DCMK_MEMCHECKS_OFF=1
 
 CHARMBASE=../../..
 CHARMBIN=$(CHARMBASE)/bin
@@ -54,11 +58,11 @@ $(PGM):	$(SIM_OBJECTS)
 
 $(PGM).seq:	$(SIM_OBJECTS) 
 	$(CHARMC) $(SIM_OBJECTS) $(OTHER) $(LIBS) -o $(PGM).seq \
-	-module seqpose -language charm++
+	-DSEQUENTIAL_POSE=1 -module seqpose -language charm++
 
 $(PGM).seq.proj:	$(SIM_OBJECTS) 
 	$(CHARMC) $(SIM_OBJECTS) $(OTHER) $(LIBS) -o $(PGM).seq.proj \
-	-module seqpose -language charm++ -tracemode projections
+	-DSEQUENTIAL_POSE=1 -module seqpose -language charm++ -tracemode projections
 
 $(PGM).alt:	$(SIM_OBJECTS) 
 	$(CHARMC) $(SIM_OBJECTS) $(OTHER) $(LIBS) -o $(PGM).alt \
