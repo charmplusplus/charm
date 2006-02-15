@@ -18,9 +18,9 @@
 #include "vector2d.h"  // **CW** tentative
 
 #define SLIVERAREA 1.0e-18
-#define REFINE_TOL 1.2  // Refine elements with average edge length > 
+#define REFINE_TOL 1.1  // Refine elements with average edge length > 
                         // REFINE_TOL*desiredEdgeLength
-#define COARSEN_TOL 0.6 // Coarsen element with average edge length <
+#define COARSEN_TOL 0.8 // Coarsen element with average edge length <
                         // COARSEN_TOL*desiredEdgeLength
 #define QUALITY_MIN 0.6
 

@@ -214,7 +214,8 @@ int FEM_Adapt_Algs::Coarsen(int qm, int method, double factor, double *sizes)
 	      || (qFactor < QUALITY_MIN)) {
 	  //){
 
-	  int eNbr = theMesh->e2e_getNbr(elId, n1+n2-1, 0);
+	  int eNbr = theMesh->e2e_getNbr(elId, theMesh->e2n_getIndex(elId,n1)+
+					 theMesh->e2n_getIndex(elId,n2)-1, 0);
 	  // determine if eNbr should also be coarsened
 	  if ((eNbr >= 0) && (theMesh->elem[0].is_valid(eNbr))) {
 	    eConn = (int*)malloc(elemWidth*sizeof(int));
