@@ -56,7 +56,7 @@ $(PGM):	$(SIM_OBJECTS)
 	$(CHARMC) $(SIM_OBJECTS) $(OTHER) $(LIBS) -o $(PGM) \
 	-module pose -language charm++
 
-$(PGM).seq:	$(SIM_OBJECTS) 
+$(PGM).seq:	seqobjs
 	$(CHARMC) $(SIM_OBJECTS) $(OTHER) $(LIBS) -o $(PGM).seq \
 	-DSEQUENTIAL_POSE=1 -module seqpose -language charm++
 
@@ -123,6 +123,15 @@ Node.def.h Node.decl.h : Node_sim.ci
 
 Node_sim.C Node_sim.h Node_sim.ci: Node.C Node.h Node.ci 
 	$(CHARMBIN)/etrans.pl Node
+
+seqobjs: seqtrans
+	$(CHARMC) $(INCLUDES) $(LIBS) Node_sim.ci
+	$(CHARMC) -c $(LIBS) $(INCLUDES) -I$(CHARMINC) -DSEQUENTIAL_POSE=1 Node_sim.C
+	$(CHARMC) $(INCLUDES) $(LIBS) $(PGM).ci
+	$(CHARMC) -c -I$(CHARMINC) $(INCLUDES) $(LIBS) -DSEQUENTIAL_POSE=1 $(PGM).C
+
+seqtrans: Node.C Node.h Node.ci
+	$(CHARMBIN)/etrans.pl -s Node
 
 test:
 	./pgm
