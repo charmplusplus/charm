@@ -980,11 +980,28 @@ static void ctrl_sendone_locking(const char *type,
   CmiCommUnlock();
 }
 
+
+#define MEMORYUSAGE_OUTPUT 0 
+#if MEMORYUSAGE_OUTPUT 
+#define MEMORYUSAGE_OUTPUT_FREQ 10 //how many prints in a second
+static int memoryusage_counter;
+#define memoryusage_isOutput ((memoryusage_counter%MEMORYUSAGE_OUTPUT_FREQ)==0)
+#define memoryusage_output {\
+  memoryusage_counter++;\
+  printf("-- %d %f %ld --\n", CmiMyPe(), GetClock(), CmiMemoryUsage());}
+#endif
+
 static double Cmi_check_last;
 
 /* if charmrun dies, we finish */
 static void pingCharmrun(void *ignored) 
 {
+#if MEMORYUSAGE_OUTPUT
+  memoryusage_output;
+  if(memoryusage_isOutput){
+    memoryusage_counter = 0;
+#endif 
+
   double clock=GetClock();
   if (clock > Cmi_check_last + Cmi_check_delay) {
     MACHSTATE1(2,"CommunicationsClock pinging charmrun Cmi_charmrun_fd_sendflag=%d", Cmi_charmrun_fd_sendflag);
@@ -1004,6 +1021,7 @@ static void pingCharmrun(void *ignored)
 #endif
   CmiStdoutFlush(); /*Make sure stdout buffer hasn't filled up*/
 #endif
+  }
 }
 
 /* periodic charm ping, for gm and netpoll */
@@ -2101,7 +2119,9 @@ static void ConverseRunPE(int everReturn)
   /* better to show the status here */
   if (Cmi_netpoll == 1 && CmiMyPe() == 0)
     CmiPrintf("Charm++: scheduler running in netpoll mode.\n");
-  
+#if MEMORYUSAGE_OUTPUT
+  memoryusage_counter = 0;
+#endif
 #if CMK_USE_GM || CMK_USE_MX
   if (Cmi_charmrun_fd != -1)
 #endif
@@ -2132,10 +2152,17 @@ static void ConverseRunPE(int everReturn)
     /*Occasionally ping charmrun, to test if it's dead*/
     struct itimerval i;
     CmiSignal(SIGALRM, 0, 0, pingCharmrun);
+#if MEMORYUSAGE_OUTPUT
+    i.it_interval.tv_sec = 0;
+    i.it_interval.tv_usec = 1000000/MEMORYUSAGE_OUTPUT_FREQ;
+    i.it_value.tv_sec = 0;
+    i.it_value.tv_usec = 1000000/MEMORYUSAGE_OUTPUT_FREQ;
+#else
     i.it_interval.tv_sec = 1;
     i.it_interval.tv_usec = 0;
     i.it_value.tv_sec = 1;
     i.it_value.tv_usec = 0;
+#endif
     setitimer(ITIMER_REAL, &i, NULL);
     }
 
@@ -2344,10 +2371,8 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usc, int everReturn)
   #if CMK_USE_AMMASSO
     CmiAmmassoOpenQueuePairs();
   #endif
-
   ConverseRunPE(everReturn);
 }
-
 
 #if CMK_PERSISTENT_COMM
 
