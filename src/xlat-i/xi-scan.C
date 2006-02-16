@@ -1985,6 +1985,7 @@ struct rwtable rwtable[] = {
   "class",	CLASS,
   "include",	INCLUDE,
   "sync",	SYNC,
+  "iget",       IGET,
   "exclusive",	EXCLUSIVE,
   "immediate",  IMMEDIATE,
   "expedited",  SKIPSCHED,
