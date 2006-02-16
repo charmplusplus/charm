@@ -721,6 +721,7 @@ class Message : public TEntity {
 #define SSKIPSCHED    0x800 //<- is a message skipping charm scheduler
 #define SPYTHON       0x1000
 #define SINLINE       0x2000 //<- inline message
+#define SIGET   0x4000 
 
 /* An entry construct */
 class Entry : public Member {
@@ -790,6 +791,7 @@ class Entry : public Member {
     int getStackSize(void) { return (stacksize ? stacksize->getIntVal() : 0); }
     int isThreaded(void) { return (attribs & STHREADED); }
     int isSync(void) { return (attribs & SSYNC); }
+    int isIget(void) { return (attribs & SIGET); }
     int isConstructor(void) { return !strcmp(name, container->baseName(0).get_string());}
     int isExclusive(void) { return (attribs & SLOCKED); }
     int isImmediate(void) { return (attribs & SIMMEDIATE); }

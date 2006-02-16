@@ -1223,8 +1223,9 @@ Array::genSubDecls(XStr& str)
     "    } \n";
   }
   
-  if(list)
+  if(list){
     list->genDecls(str);
+  }
   str << CIClassEnd;
   if (!isTemplated()) str << "PUPmarshall("<<ptype<<");\n";
 }
@@ -2177,7 +2178,7 @@ Entry::Entry(int l, int a, Type *r, char *n, ParamList *p, Value *sz, SdagConstr
   if (param && param->isMarshalled() && !isThreaded()) attribs|=SNOKEEP;
 
   if(!isThreaded() && stacksize) die("Non-Threaded methods cannot have stacksize",line);
-  if(retType && !isSync() && !retType->isVoid()) 
+  if(retType && !isSync() && !isIget() && !retType->isVoid()) 
     die("A remote method normally returns void.  To return non-void, you need to declare the method as [sync], which means it has blocking semantics.",line);
   if (isPython()) pythonDoc = python_doc;
 }
@@ -2393,7 +2394,10 @@ void Entry::genArrayDecl(XStr& str)
     genArrayStaticConstructorDecl(str);
   } else {
     if (isSync() && !container->isForElement()) return; //No sync broadcast
-    str << "    "<<retType<<" "<<name<<"("<<paramType(1,1)<<") ;\n"; //no const
+    if(isIget())
+      str << "    "<<"CkFutureID"<<" "<<name<<"("<<paramType(1,1)<<") ;\n"; //no const
+    else		
+      str << "    "<<retType<<" "<<name<<"("<<paramType(1,1)<<") ;\n"; //no const
   }
 }
 
@@ -2415,10 +2419,17 @@ void Entry::genArrayDefs(XStr& str)
     if (isSync() && !container->isForElement()) return; //No sync broadcast
     
     XStr retStr; retStr<<retType;
-    str << makeDecl(retStr,1)<<"::"<<name<<"("<<paramType(0,1)<<") \n"; //no const
+    if(isIget())
+      str << makeDecl("CkFutureID ",1)<<"::"<<name<<"("<<paramType(0,1)<<") \n"; /\
+/no const
+    else
+      str << makeDecl(retStr,1)<<"::"<<name<<"("<<paramType(0,1)<<") \n"; //no const
     str << "{\n  ckCheck();\n"<<marshallMsg();
     str << "  CkArrayMessage *impl_amsg=(CkArrayMessage *)impl_msg;\n";
     str << "  impl_amsg->array_setIfNotThere("<<ifNot<<");\n";
+    if(isIget()) {
+	    str << "  CkFutureID f=CkCreateAttachedFuture(impl_amsg);"<<"\n";
+    }
     if(isSync()) {
       str << syncReturn() << "ckSendSync(impl_amsg, "<<epIdx()<<"));\n";
     } 
@@ -2433,6 +2444,9 @@ void Entry::genArrayDefs(XStr& str)
       }
       else
         str << "  ckBroadcast(impl_amsg, "<<epIdx()<<opts<<");\n";
+    }
+    if(isIget()) {
+	    str << "  return f;\n";
     }
     str << "}\n";
   }
@@ -2906,7 +2920,7 @@ void Entry::genDefs(XStr& str)
   str << container->tspec()<<" int "<<indexName()<<"::"<<epIdx(0)<<"=0;\n";
 
   // Add special pre- and post- call code
-  if(isSync()) {
+  if(isSync() || isIget()) {
   //A synchronous method can return a value, and must finish before
   // the caller can proceed.
     if(isConstructor()) die("Constructors cannot be [sync]",line);

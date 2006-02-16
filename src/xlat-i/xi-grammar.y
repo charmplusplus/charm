@@ -65,7 +65,7 @@ extern char *python_doc;
 %token STACKSIZE
 %token THREADED
 %token TEMPLATE
-%token SYNC EXCLUSIVE IMMEDIATE SKIPSCHED INLINE VIRTUAL MIGRATABLE 
+%token SYNC IGET EXCLUSIVE IMMEDIATE SKIPSCHED INLINE VIRTUAL MIGRATABLE 
 %token CREATEHERE CREATEHOME NOKEEP NOTRACE
 %token VOID
 %token CONST
@@ -661,6 +661,8 @@ EAttrib		: THREADED
 		{ $$ = STHREADED; }
 		| SYNC
 		{ $$ = SSYNC; }
+                | IGET
+                { $$ = SIGET; }
 		| EXCLUSIVE
 		{ $$ = SLOCKED; }
 		| CREATEHERE
