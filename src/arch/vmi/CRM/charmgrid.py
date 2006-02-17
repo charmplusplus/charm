@@ -427,7 +427,7 @@ def main ():
     eager_short_slots                = parsed_command_line[18]
     eager_long_buffers               = parsed_command_line[19]
     eager_long_buffer_size           = parsed_command_line[20]
-    disable_vmicache                 = parsed_command_line[21]
+    disable_regcache                 = parsed_command_line[21]
     ##
     command                          = parsed_command_line[22]
 
