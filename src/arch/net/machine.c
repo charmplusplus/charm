@@ -1000,6 +1000,8 @@ static void pingCharmrun(void *ignored)
   memoryusage_output;
   if(memoryusage_isOutput){
     memoryusage_counter = 0;
+#else
+  {
 #endif 
 
   double clock=GetClock();
