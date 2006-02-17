@@ -17,14 +17,13 @@ import sys
 # These are constants for default values that can be changed by the user.
 try:
     HOME_DIRECTORY = os.environ['HOME']
-    DEFAULT_NODELIST     = HOME_DIRECTORY + '/.nodelist'
-    DEFAULT_NODEGROUP    = 'main'
-    DEFAULT_CRM          = '141.142.222.53'   # koenig.ncsa.uiuc.edu
-    DEFAULT_VMI_PROCS    = '1'
-    DEFAULT_VMI_SPECFILE = '/home/koenig/ON-DEMAND/VMI21-install/specfiles/myrinet.xml'
-    DEFAULT_VMI_KEY      = 'gak'
-    DEFAULT_VERBOSE      = False
-    DEFAULT_COMMAND      = ''
+
+    DEFAULT_NODELIST_FILENAME = HOME_DIRECTORY + '/.nodelist'
+    DEFAULT_NODEGROUP         = 'main'
+    DEFAULT_VMI_PROCS         = '1'
+    DEFAULT_CRM               = '141.142.222.53'   # koenig.ncsa.uiuc.edu
+    DEFAULT_VMI_KEY           = 'gak'
+    DEFAULT_VMI_SPECFILE      = '/home/koenig/ON-DEMAND/VMI21-install/specfiles/myrinet.xml'
 
 except KeyError:
     print 'ERROR: Unable to get home directory from environment.'
@@ -36,18 +35,34 @@ except KeyError:
 ##
 def ParseCommandLine ():
     # Set default values for all variables.
-    nodelist         = DEFAULT_NODELIST
-    nodegroup        = DEFAULT_NODEGROUP
-    crm              = DEFAULT_CRM
-    vmi_procs        = DEFAULT_VMI_PROCS
-    vmi_specfile     = DEFAULT_VMI_SPECFILE
-    vmi_key          = DEFAULT_VMI_KEY
-    verbose          = DEFAULT_VERBOSE
-    command          = DEFAULT_COMMAND
-    vmi_gridprocs    = -1
-    disable_regcache = False
+    nodelist_filename                = DEFAULT_NODELIST_FILENAME
+    nodegroup                        = DEFAULT_NODEGROUP
+    vmi_procs                        = DEFAULT_VMI_PROCS
+    crm                              = DEFAULT_CRM
+    vmi_key                          = DEFAULT_VMI_KEY
+    vmi_specfile                     = DEFAULT_VMI_SPECFILE
+    verbose                          = False
+    #
+    vmi_gridprocs                    = ''
+    wan_latency                      = ''
+    cluster_number                   = ''
+    probe_clusters                   = False
+    #
+    connection_timeout               = ''
+    maximum_handles                  = ''
+    small_message_boundary           = ''
+    medium_message_boundary          = ''
+    eager_interval                   = ''
+    eager_threshold                  = ''
+    eager_short_pollset_size_maximum = ''
+    eager_short_slots                = ''
+    eager_long_buffers               = ''
+    eager_long_buffer_size           = ''
+    disable_regcache                 = False
+    ##
+    command                          = ''
 
-    # If they didn't give any command-line arguments, display usage and exit.
+    # If the user didn't give any command-line arguments, display usage and exit.
     if (len (sys.argv) == 1):
         DisplayUsage ()
         sys.exit (1)
@@ -60,43 +75,74 @@ def ParseCommandLine ():
         i = i + 1
 
         if (arg == '++nodelist'):
-            nodelist = sys.argv[i]
+            nodelist_filename = sys.argv[i]
             i = i + 1
-
         elif (arg == '++nodegroup'):
             nodegroup = sys.argv[i]
             i = i + 1
-
-        elif (arg == '++crm'):
-            crm = sys.argv[i]
-            i = i + 1
-
 	elif (arg == '++p'):
             vmi_procs = sys.argv[i]
             i = i + 1
-
-	elif (arg == '++g'):
-            vmi_gridprocs = sys.argv[i]
+        elif (arg == '++crm'):
+            crm = sys.argv[i]
             i = i + 1
-
-        elif (arg == '++specfile'):
-            vmi_specfile = sys.argv[i]
-            i = i + 1
-
         elif (arg == '++key'):
             vmi_key = sys.argv[i]
             i = i + 1
-
-        elif (arg == '++disable-regcache'):
-            disable_regcache = True
-
+        elif (arg == '++specfile'):
+            vmi_specfile = sys.argv[i]
+            i = i + 1
         elif (arg == '++verbose'):
             verbose = True
-
         elif (arg == '++help'):
             DisplayUsage ()
             sys.exit (0)
-
+        #
+	elif (arg == '++g'):
+            vmi_gridprocs = sys.argv[i]
+            i = i + 1
+	elif (arg == '++wan-latency'):
+            wan_latency = sys.argv[i]
+            i = i + 1
+	elif (arg == '++cluster'):
+            cluster_number = sys.argv[i]
+            i = i + 1
+	elif (arg == '++probe-clusters'):
+            probe_clusters = True
+        #
+	elif (arg == '++connection-timeout'):
+            connection_timeout = sys.argv[i]
+            i = i + 1
+	elif (arg == '++maximum-handles'):
+            maximum_handles = sys.argv[i]
+            i = i + 1
+	elif (arg == '++small-message-boundary'):
+            small_message_boundary = sys.argv[i]
+            i = i + 1
+	elif (arg == '++medium-message-boundary'):
+            medium_message_boundary = sys.argv[i]
+            i = i + 1
+	elif (arg == '++eager-interval'):
+            eager_interval = sys.argv[i]
+            i = i + 1
+	elif (arg == '++eager-threshold'):
+            eager_threshold = sys.argv[i]
+            i = i + 1
+	elif (arg == '++eager-short-pollset-size-maximum'):
+            eager_short_pollset_size_maximum = sys.argv[i]
+            i = i + 1
+	elif (arg == '++eager-short-slots'):
+            eager_short_slots = sys.argv[i]
+            i = i + 1
+	elif (arg == '++eager-long-buffers'):
+            eager_long_buffers = sys.argv[i]
+            i = i + 1
+	elif (arg == '++eager-long-buffer-size'):
+            eager_long_buffer_size = sys.argv[i]
+            i = i + 1
+        elif (arg == '++disable-regcache'):
+            disable_regcache = True
+        ##
         else:
             if (arg[0:2] == '++'):
                 DisplayUsage ()
@@ -110,12 +156,18 @@ def ParseCommandLine ():
     # If the user did not specify a number of processors for a Grid
     # job, then the number defaults to the number of processors in
     # this single job (i.e., there is only a single subjob for this job).
-    if (vmi_gridprocs <= 0):
+    if (vmi_gridprocs == ''):
         vmi_gridprocs = vmi_procs
 
     # Return a list of all variables.
-    return [nodelist, nodegroup, crm, vmi_procs, vmi_gridprocs, \
-            vmi_specfile, vmi_key, disable_regcache, verbose, command]
+    return [nodelist_filename, nodegroup, vmi_procs, crm, vmi_key,        \
+            vmi_specfile, verbose, vmi_gridprocs, wan_latency,            \
+            cluster_number, probe_clusters, connection_timeout,           \
+            maximum_handles, small_message_boundary,                      \
+            medium_message_boundary, eager_interval, eager_threshold,     \
+            eager_short_pollset_size_maximum, eager_short_slots,          \
+            eager_long_buffers, eager_long_buffer_size, disable_regcache, \
+            command]
 
 
 
@@ -125,19 +177,45 @@ def DisplayUsage ():
     print ' '
     print 'USAGE: charmgrid [options] <command> [command arguments]'
     print ' '
-    print '[options] include:'
-    print '  ++nodelist           the Charm++ nodelist to use'
-    print '  ++nodegroup          the Charm++ nodegroup to use (default="main")'
-    print '  ++crm                the Charm++ Resource Manager to coordinate with'
-    print '  ++p                  the number of processors to start for this sub-job'
-    print '  ++g                  the total number of processors in an entire Grid job'
-    print '                       (defaults to g=p if not specified)'
-    print '  ++specfile           the VMI specfile to use'
-    print '  ++key                the program key to use for coordination with CRM'
-    print '  ++disable-regcache   disable VMI cache manager'
-    print '                       (this option significantly decreases performance)'
-    print '  ++verbose            displays additional information during startup'
-    print '  ++help               displays this help text'
+    print 'common options include:'
+    print '  ++nodelist <nodelist>     the Charm nodelist to use'
+    print '  ++nodegroup <nodegroup>   the Charm nodegroup to use'
+    print '  ++p <#>                   the number of processes in this job (or subjob)'
+    print '  ++crm <CRM>               the Charm Resource Manager (CRM) to coordinate with'
+    print '  ++key <key>               the program key to use for coordination with CRM'
+    print '  ++specfile <specfile>     the VMI device specfile to use'
+    print '  ++verbose                 displays additional information during startup'
+    print '  ++help                    displays this help text'
+    print ' '
+    print 'Grid options include:'
+    print '  ++g <#>                   the total number of processes in an entire Grid job'
+    print '                            (combined ++p subjobs must add up to ++g job size)'
+    print '  ++wan-latency <latency>   inter-node latencies below this indicate nodes on'
+    print '                            the same LAN, above means WAN peers (microseconds)'
+    print '  ++cluster <#>             the cluster number for processes in this subjob'
+    print '  ++probe-clusters          probe the cluster topology for Grid job'
+    print ' '
+    print 'tuning options include:'
+    print '  ++connection-timeout <seconds>           timeout to wait for connection setup'
+    print '  ++maximum-handles <#>                    number of send/receive handles'
+    print '                                           (grows automatically as program runs)'
+    print '  ++small-message-boundary <bytes>         messages below boundary use small'
+    print '                                           protocol (inline stream or eager Put)'
+    print '  ++medium-message-boundary <bytes>        messages below boundary use medium'
+    print '                                           protocol (stream or eager Put)'
+    print '  ++eager-interval <#>                     after every # message receives, look'
+    print '                                           for eager protocol candidates'
+    print '  ++eager-threshold <#>                    a sender must send # messages over'
+    print '                                           eager interval to be eager candidate'
+    print '  ++eager-short-pollset-size-maximum <#>   maximum number of processes that can'
+    print '                                           be switched to eager short protocol'
+    print '  ++eager-short-slots <#>                  eager short buffer gets broken into'
+    print '                                           this many slots (window count)'
+    print '  ++eager-long-buffers <#>                 number of eager long buffers to set'
+    print '                                           up (window count)'
+    print '  ++eager-long-buffer-size <bytes>         maximum size of an eager long message'
+    print '  ++disable-regcache                       disable the VMI cache manager'
+    print '                                           (significantly decreases performance)'
     print ' '
 
 
@@ -207,12 +285,22 @@ def ParseNodelistFile (nodelist):
 ###########################################################################
 ## Write a script to launch the job portion on a single node.
 ##
-def WriteNodeScript (filename, crm, vmi_specfile, vmi_gridprocs, vmi_key, \
-                     disable_regcache, working_directory, command):
+def WriteNodeScript (filename, crm, vmi_key, vmi_specfile, vmi_gridprocs, wan_latency,     \
+                     cluster_number, probe_clusters, connection_timeout, maximum_handles,  \
+                     small_message_boundary, medium_message_boundary, eager_interval,      \
+                     eager_threshold, eager_short_pollset_size_maximum, eager_short_slots, \
+                     eager_long_buffers, eager_long_buffer_size, disable_regcache,         \
+                     working_directory, command):
+
     outfile = open (filename, 'w')
+
+    ##
 
     outfile.write ('CRM="' + crm + '"')
     outfile.write (' ; export CRM\n')
+
+    outfile.write ('VMI_KEY="' + vmi_key + '"')
+    outfile.write (' ; export VMI_KEY\n')
 
     outfile.write ('VMI_SPECFILE="' + vmi_specfile + '"')
     outfile.write (' ; export VMI_SPECFILE\n')
@@ -220,12 +308,67 @@ def WriteNodeScript (filename, crm, vmi_specfile, vmi_gridprocs, vmi_key, \
     outfile.write ('VMI_PROCS="' + vmi_gridprocs + '"')
     outfile.write (' ; export VMI_PROCS\n')
 
-    outfile.write ('VMI_KEY="' + vmi_key + '"')
-    outfile.write (' ; export VMI_KEY\n')
+    #
+
+    if (wan_latency != ''):
+        outfile.write ('CMI_VMI_WAN_LATENCY="' + wan_latency + '"')
+        outfile.write (' ; export CMI_VMI_WAN_LATENCY\n')
+
+    if (cluster_number != ''):
+        outfile.write ('CMI_VMI_CLUSTER="' + cluster_number + '"')
+        outfile.write (' ; export CMI_VMI_CLUSTER\n')
+
+    if (probe_clusters):
+        outfile.write ('CMI_VMI_PROBE_CLUSTERS=1')
+        outfile.write (' ; export CMI_VMI_PROBE_CLUSTERS\n')
+
+    #
+
+    if (connection_timeout != ''):
+        outfile.write ('CMI_VMI_CONNECTION_TIMEOUT="' + connection_timeout + '"')
+        outfile.write (' ; export CMI_VMI_CONNECTION_TIMEOUT\n')
+
+    if (maximum_handles != ''):
+        outfile.write ('CMI_VMI_MAXIMUM_HANDLES="' + maximum_handles + '"')
+        outfile.write (' ; export CMI_VMI_MAXIMUM_HANDLES\n')
+
+    if (small_message_boundary != ''):
+        outfile.write ('CMI_VMI_SMALL_MESSAGE_BOUNDARY="' + small_message_boundary + '"')
+        outfile.write (' ; export CMI_VMI_SMALL_MESSAGE_BOUNDARY\n')
+
+    if (medium_message_boundary != ''):
+        outfile.write ('CMI_VMI_MEDIUM_MESSAGE_BOUNDARY="' + medium_message_boundary + '"')
+        outfile.write (' ; export CMI_VMI_MEDIUM_MESSAGE_BOUNDARY\n')
+
+    if (eager_interval != ''):
+        outfile.write ('CMI_VMI_EAGER_INTERVAL="' + eager_interval + '"')
+        outfile.write (' ; export CMI_VMI_EAGER_INTERVAL\n')
+
+    if (eager_threshold != ''):
+        outfile.write ('CMI_VMI_EAGER_THRESHOLD="' + eager_threshold + '"')
+        outfile.write (' ; export CMI_VMI_EAGER_THRESHOLD\n')
+
+    if (eager_short_pollset_size_maximum != ''):
+        outfile.write ('CMI_VMI_EAGER_SHORT_POLLSET_SIZE_MAXIMUM="' + eager_short_pollset_size_maximum + '"')
+        outfile.write (' ; export CMI_VMI_EAGER_SHORT_POLLSET_SIZE_MAXIMUM\n')
+
+    if (eager_short_slots != ''):
+        outfile.write ('CMI_VMI_EAGER_SHORT_SLOTS="' + eager_short_slots + '"')
+        outfile.write (' ; export CMI_VMI_EAGER_SHORT_SLOTS\n')
+
+    if (eager_long_buffers != ''):
+        outfile.write ('CMI_VMI_EAGER_LONG_BUFFERS="' + eager_long_buffers + '"')
+        outfile.write (' ; export CMI_VMI_EAGER_LONG_BUFFERS\n')
+
+    if (eager_long_buffer_size != ''):
+        outfile.write ('CMI_VMI_EAGER_LONG_BUFFER_SIZE="' + eager_long_buffer_size + '"')
+        outfile.write (' ; export CMI_VMI_EAGER_LONG_BUFFER_SIZE\n')
 
     if (disable_regcache):
         outfile.write ('VMI_DISABLE_REGCACHE="1"')
         outfile.write (' ; export VMI_DISABLE_REGCACHE\n')
+
+    ##
 
     outfile.write ('cd ' + working_directory + '\n')
 
@@ -261,16 +404,32 @@ def main ():
     # Parse the command line.
     parsed_command_line = ParseCommandLine ()
 
-    nodelist_filename = parsed_command_line[0]
-    nodegroup         = parsed_command_line[1]
-    crm               = parsed_command_line[2]
-    vmi_procs         = parsed_command_line[3]
-    vmi_gridprocs     = parsed_command_line[4]
-    vmi_specfile      = parsed_command_line[5]
-    vmi_key           = parsed_command_line[6]
-    disable_vmicache  = parsed_command_line[7]
-    verbose           = parsed_command_line[8]
-    command           = parsed_command_line[9]
+    nodelist_filename                = parsed_command_line[0]
+    nodegroup                        = parsed_command_line[1]
+    vmi_procs                        = parsed_command_line[2]
+    crm                              = parsed_command_line[3]
+    vmi_key                          = parsed_command_line[4]
+    vmi_specfile                     = parsed_command_line[5]
+    verbose                          = parsed_command_line[6]
+    #
+    vmi_gridprocs                    = parsed_command_line[7]
+    wan_latency                      = parsed_command_line[8]
+    cluster_number                   = parsed_command_line[9]
+    probe_clusters                   = parsed_command_line[10]
+    #
+    connection_timeout               = parsed_command_line[11]
+    maximum_handles                  = parsed_command_line[12]
+    small_message_boundary           = parsed_command_line[13]
+    medium_message_boundary          = parsed_command_line[14]
+    eager_interval                   = parsed_command_line[15]
+    eager_threshold                  = parsed_command_line[16]
+    eager_short_pollset_size_maximum = parsed_command_line[17]
+    eager_short_slots                = parsed_command_line[18]
+    eager_long_buffers               = parsed_command_line[19]
+    eager_long_buffer_size           = parsed_command_line[20]
+    disable_vmicache                 = parsed_command_line[21]
+    ##
+    command                          = parsed_command_line[22]
 
     # Parse the nodelist file.
     # Locate the group name and its list of nodes that corresponds to
@@ -349,9 +508,12 @@ def main ():
             # This script is /tmp/charmgrid.pid.i
             # The child unlinks (deletes) this script during launch.
             job_script = '/tmp/charmgrid.' + str (pid) + '.' + str (i)
-            WriteNodeScript (job_script, crm, vmi_specfile, vmi_gridprocs, \
-                             vmi_key, disable_regcache, working_directory, \
-                             command)
+            WriteNodeScript (job_script, crm, vmi_key, vmi_specfile, vmi_gridprocs, wan_latency,   \
+                             cluster_number, probe_clusters, connection_timeout, maximum_handles,  \
+                             small_message_boundary, medium_message_boundary, eager_interval,      \
+                             eager_threshold, eager_short_pollset_size_maximum, eager_short_slots, \
+                             eager_long_buffers, eager_long_buffer_size, disable_regcache,         \
+                             working_directory, command)
 
             # Get the node to launch on.  This is round-robin across
             # the nodes in the group specified by the user.

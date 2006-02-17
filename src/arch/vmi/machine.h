@@ -11,6 +11,7 @@
 #include <ctype.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <limits.h>
 #include <signal.h>
 #include <stdarg.h>
 #include <stdio.h>
@@ -38,17 +39,18 @@
   These settings are defaults that can be overridden at runtime by
   setting environment variables of the same name.
 */
-#define CMI_VMI_CONNECTION_TIMEOUT           300       /* seconds */
-#define CMI_VMI_MAXIMUM_HANDLES              10000
-#define CMI_VMI_WAN_LATENCY                  1000      /* microseconds */
-#define CMI_VMI_SMALL_MESSAGE_BOUNDARY       512       /* bytes */
-#define CMI_VMI_MEDIUM_MESSAGE_BOUNDARY      16384     /* bytes */
-#define CMI_VMI_EAGER_INTERVAL               10000
-#define CMI_VMI_EAGER_THRESHOLD              1000
-#define CMI_VMI_EAGER_SHORT_POLLSIZE_MAXIMUM 32
-#define CMI_VMI_EAGER_SHORT_SLOTS            16
-#define CMI_VMI_EAGER_LONG_BUFFERS           3
-#define CMI_VMI_EAGER_LONG_BUFFER_SIZE       1048576   /* bytes */
+#define CMI_VMI_WAN_LATENCY                      1000      /* microseconds */
+#define CMI_VMI_PROBE_CLUSTERS                   0         /* Boolean */
+#define CMI_VMI_CONNECTION_TIMEOUT               300       /* seconds */
+#define CMI_VMI_MAXIMUM_HANDLES                  10000
+#define CMI_VMI_SMALL_MESSAGE_BOUNDARY           512       /* bytes */
+#define CMI_VMI_MEDIUM_MESSAGE_BOUNDARY          16384     /* bytes */
+#define CMI_VMI_EAGER_INTERVAL                   10000
+#define CMI_VMI_EAGER_THRESHOLD                  1000
+#define CMI_VMI_EAGER_SHORT_POLLSET_SIZE_MAXIMUM 32
+#define CMI_VMI_EAGER_SHORT_SLOTS                16
+#define CMI_VMI_EAGER_LONG_BUFFERS               3
+#define CMI_VMI_EAGER_LONG_BUFFER_SIZE           1048576   /* bytes */
 
 /*
   If CMI_VMI_OPTIMIZE is defined, all of the checks for success for
@@ -131,57 +133,80 @@ typedef struct
 
 /*
   The following settings are used to describe the startup methods that
-  may be used to assign ranks to the processes in the computation.
+  may be used to assign an ordering to the processes in the computation.
   (So far, only startup via the Charm++ Resource Manager (CRM) is possible.)
 */
 #define CMI_VMI_STARTUP_TYPE_UNKNOWN  0
-#define CMI_VMI_STARTUP_TYPE_CHARMRUN 1
-#define CMI_VMI_STARTUP_TYPE_CRM      2
+#define CMI_VMI_STARTUP_TYPE_CRM      1
+#define CMI_VMI_STARTUP_TYPE_CHARMRUN 2
 
+/*
+  The following settings and message structures are used for communicating with
+  the CRM.  These are only needed for startup CMI_VMI_STARTUP_TYPE_CRM.
+*/
+#define CMI_VMI_CRM_PORT 7777
+
+#define CMI_VMI_CRM_MESSAGE_SUCCESS  0
+#define CMI_VMI_CRM_MESSAGE_FAILURE  1
+#define CMI_VMI_CRM_MESSAGE_REGISTER 2
+
+#define CMI_VMI_CRM_ERROR_CONFLICT 0
+#define CMI_VMI_CRM_ERROR_TIMEOUT  1
+
+typedef struct CMI_VMI_CRM_Register_Message_T
+{
+  int numpes;
+  int cluster;
+  int node_context;
+  int key_length;
+  char key[1024];
+} CMI_VMI_CRM_Register_Message_T;
+
+typedef struct CMI_VMI_CRM_Nodeblock_Message_T
+{
+  int node_IP;
+  int node_context;
+  int cluster;
+} CMI_VMI_CRM_Nodeblock_Message_T;
 
 /*
   The following message structures are used for communicating with
   Charmrun.  These are only needed for startup CMI_VMI_STARTUP_TYPE_CHARMRUN.
 */
-typedef struct Charmrun_Header
+typedef struct CMI_VMI_Charmrun_Message_Header_T
 {
   int  msg_len;
   char msg_type[12];
-} Charmrun_Header;
+} CMI_VMI_Charmrun_Message_Header_T;
 
-typedef struct Charmrun_InitnodeMsg
+typedef struct CMI_VMI_Charmrun_Register_Message_T
 {
   int node_number;
-  int nPE;
+  int numpes;
   int dataport;
   int mach_id;
-  int IP;
-} Charmrun_InitnodeMsg;
+  int node_IP;
+} CMI_VMI_Charmrun_Register_Message_T;
 
-typedef struct Charmrun_Nodetab
+typedef struct CMI_VMI_Charmrun_Nodeblock_Message_T
 {
-  int nPE;
+  int numpes;
   int dataport;
   int mach_id;
-  int IP;
-} Charmrun_Nodetab;
+  int node_IP;
+} CMI_VMI_Charmrun_Nodeblock_Message_T;
 
 
 /*
-  If CMK_BROADCAST_SPANNING_TREE is defined, broadcasts are done via a
-  spanning tree.  (Otherwise, broadcasts are done by iterating through
-  each process in the process list and sending a separate message.)
+  Sometimes vmi-linux needs to determine information about processes
+  within a Grid environment.  Such information may include the latency
+  between two processes or the cluster that a process belongs to.
+  Because it is quite costly (and usually unnecessary) to distribute
+  this information to all processes in a computation, some processes
+  may have "unknown" entries for these values.
 */
-#if CMK_BROADCAST_SPANNING_TREE
-#ifndef CMI_VMI_BROADCAST_SPANNING_FACTOR
-#define CMI_VMI_BROADCAST_SPANNING_FACTOR 4
-#endif
-
-#define CMI_BROADCAST_ROOT(msg)   ((CmiMsgHeaderBasic *)msg)->tree_root
-#define CMI_DEST_RANK(msg)        ((CmiMsgHeaderBasic *)msg)->tree_rank
-
-#define CMI_SET_BROADCAST_ROOT(msg,tree_root) CMI_BROADCAST_ROOT(msg) = (tree_root);
-#endif
+#define CMI_VMI_LATENCY_UNKNOWN LONG_MAX
+#define CMI_VMI_CLUSTER_UNKNOWN -1
 
 
 /*
@@ -206,14 +231,28 @@ typedef struct Charmrun_Nodetab
   messages ("piggyback") but if a process does not communicate frequently
   with its eager sender, no opportunities to piggyback credits may happen.
   In these cases, a separate message is sent.
+
+  "Latency Vector Request" messages are used to request a vector of
+  latencies from a given node to all other nodes in the computation.
+  The node responding to the message replies with a "Latency Vector Reply"
+  message.
+
+  "Cluster Mapping" messages are used to distribute a mapping of processes
+  to clusters computed in process 0.  The user may specify that the cluster
+  mapping should be probed at startup, and this message type distributes the
+  results of this probe to all processes.
 */
 #define CMI_VMI_MESSAGE_TYPE(msg) ((CmiMsgHeaderBasic *)msg)->vmitype
 #define CMI_VMI_MESSAGE_CREDITS(msg) ((CmiMsgHeaderBasic *)msg)->vmicredits
 
-#define CMI_VMI_MESSAGE_TYPE_STANDARD           1
-#define CMI_VMI_MESSAGE_TYPE_BARRIER            2
-#define CMI_VMI_MESSAGE_TYPE_PERSISTENT_REQUEST 3
-#define CMI_VMI_MESSAGE_TYPE_CREDIT             4
+#define CMI_VMI_MESSAGE_TYPE_UNKNOWN                0
+#define CMI_VMI_MESSAGE_TYPE_STANDARD               1
+#define CMI_VMI_MESSAGE_TYPE_BARRIER                2
+#define CMI_VMI_MESSAGE_TYPE_PERSISTENT_REQUEST     3
+#define CMI_VMI_MESSAGE_TYPE_CREDIT                 4
+#define CMI_VMI_MESSAGE_TYPE_LATENCY_VECTOR_REQUEST 5
+#define CMI_VMI_MESSAGE_TYPE_LATENCY_VECTOR_REPLY   6
+#define CMI_VMI_MESSAGE_TYPE_CLUSTER_MAPPING        7
 
 
 /*
@@ -231,6 +270,15 @@ typedef struct Charmrun_Nodetab
 
   CMI_VMI_Credit_Message_T are used to send eager credit replentish messages
   when no opportunity to piggyback credits has happened.
+
+  CMI_VMI_Latency_Vector_Request_Message_T are used to request a latency vector
+  from a specified process to all other processes in the computation.
+
+  CMI_VMI_Latency_Vector_Reply_Message_T are used to reply to the above message.
+
+  CMI_VMI_Cluster_Mapping_Message_T are used to distribute process-to-cluster
+  mappings (computed by process 0) to all processes in a computation.  This is
+  used when the user requests that the cluster mapping be probed during startup.
 */
 typedef struct
 {
@@ -252,6 +300,23 @@ typedef struct
 {
   char header[CmiMsgHeaderSizeBytes];
 } CMI_VMI_Credit_Message_T;
+
+typedef struct
+{
+  char header[CmiMsgHeaderSizeBytes];
+} CMI_VMI_Latency_Vector_Request_Message_T;
+
+typedef struct
+{
+  char header[CmiMsgHeaderSizeBytes];
+  unsigned long latency[1];
+} CMI_VMI_Latency_Vector_Reply_Message_T;
+
+typedef struct
+{
+  char header[CmiMsgHeaderSizeBytes];
+  int cluster[1];
+} CMI_VMI_Cluster_Mapping_Message_T;
 
 
 /* Publish messages (sent as payload with VMI_RDMA_Publish_Buffer() call). */
@@ -419,6 +484,14 @@ typedef struct
   int                        node_IP;
   PVMI_CONNECT               connection;
   CMI_VMI_Connection_State_T connection_state;
+  int                        cluster;
+
+  unsigned long *latency_vector;
+
+  int normal_short_count;
+  int normal_long_count;
+  int eager_short_count;
+  int eager_long_count;
 
   CMI_VMI_Handle_T *eager_short_send_handles[CMI_VMI_EAGER_SHORT_SLOTS];
   int               eager_short_send_size;
@@ -440,63 +513,20 @@ typedef struct
 
 
 /*
-  The following bits of code are taken directly from the NCSA version
-  of the CRM.  This is very old code that should be rewritten sometime.
+  If CMK_BROADCAST_SPANNING_TREE is defined, broadcasts are done via a
+  spanning tree.  (Otherwise, broadcasts are done by iterating through
+  each process in the process list and sending a separate message.)
 */
-#define MAX_STR_LENGTH 256
-#define CRM_DEFAULT_PORT 7777
-#define SOCKET_ERROR -1
+#if CMK_BROADCAST_SPANNING_TREE
+#ifndef CMI_VMI_BROADCAST_SPANNING_FACTOR
+#define CMI_VMI_BROADCAST_SPANNING_FACTOR 4
+#endif
 
-/* Message Codes to CRM  */
-#define CRM_MSG_SUCCESS		0 /* Response from CRM */
-#define CRM_MSG_REGISTER	1
-#define CRM_MSG_REMOVE		2
-#define CRM_MSG_FAILED		3
+#define CMI_BROADCAST_ROOT(msg)   ((CmiMsgHeaderBasic *)msg)->tree_root
+#define CMI_DEST_RANK(msg)        ((CmiMsgHeaderBasic *)msg)->tree_rank
 
-/* Register Context. */
-typedef struct regMsg{
-  int np; /* Number of processors. */
-  int shutdownPort; /* Port shutdown server is runnig on */
-  int keyLength;
-  char key[MAX_STR_LENGTH];
-} regMsg, *PRegMsg;
-
-/* Remove CRM Context Request Message */
-typedef struct delMsg{
-  int keyLength;
-  char key[MAX_STR_LENGTH];
-} delMsg, *PDelMsg;
-
-/* Error Codes for failed response */
-typedef struct errMsg{
-#define CRM_ERR_CTXTCONFLICT	1
-#define CRM_ERR_INVALIDCTXT	2
-#define CRM_ERR_TIMEOUT         3
-#define CRM_ERR_OVERFLOW        4
-  int errCode;
-} errMsg, *PErrMsg;
-
-/* Response for valid registration */
-typedef struct nodeCtx{
-  int nodeIP;
-  int shutdownPort;
-  int nodePE;
-} nodeCtx, *PNodeCtx;
-
-typedef struct ctxMsg{
-  int np; /* # of PE */
-  struct nodeCtx *node;
-} ctxMsg, *PCtxMsg;
-
-typedef struct CRM_Msg{
-  int msgCode;
-  union{
-    regMsg CRMReg;
-    delMsg CRMDel;
-    errMsg CRMErr;
-    ctxMsg CRMCtx;
-  } msg;
-} CRM_Msg, *PCRM_Msg;
+#define CMI_SET_BROADCAST_ROOT(msg,tree_root) CMI_BROADCAST_ROOT(msg) = (tree_root);
+#endif
 
 
 
@@ -540,6 +570,10 @@ void CmiReleaseCommHandle (CmiCommHandle commhandle);
 
 void *CmiGetNonLocal (void);
 
+void CmiProbeLatencies ();
+unsigned long CmiGetLatency (int process1, int process2);
+int CmiGetCluster (int process);
+
 #if CMK_PERSISTENT_COMM
 void CmiPersistentInit ();
 PersistentHandle CmiCreatePersistent (int destrank, int maxsize);
@@ -554,10 +588,9 @@ PersistentHandle CmiRegisterReceivePersistent (PersistentReq request);
 /* Startup and shutdown functions */
 void CMI_VMI_Read_Environment ();
 
-int CMI_VMI_Startup_Charmrun ();
-
 int CMI_VMI_Startup_CRM ();
-int CMI_VMI_CRM_Register (char *key, int numProcesses, BOOLEAN reg);
+
+int CMI_VMI_Startup_Charmrun ();
 
 int CMI_VMI_Initialize_VMI ();
 
@@ -580,6 +613,12 @@ void CMI_VMI_Disconnection_Handler (PVMI_CONNECT connection);
 void CMI_VMI_Disconnection_Response_Handler (PVMI_CONNECT connection, PVOID context, VMI_STATUS status);
 
 
+/* Latency and cluster mapping functions */
+void CMI_VMI_Reply_Latencies (int sourcerank);
+void CMI_VMI_Compute_Cluster_Mapping ();
+void CMI_VMI_Distribute_Cluster_Mapping ();
+void CMI_VMI_Wait_Cluster_Mapping ();
+
 
 /* Memory allocation and deallocation functions */
 void *CMI_VMI_CmiAlloc (int request_size);
@@ -589,11 +628,16 @@ PVMI_CACHE_ENTRY CMI_VMI_CacheEntry_From_Context (void *context);
 
 
 /* Handle allocation and deallocation functions */
-CMI_VMI_Handle_T *CMI_VMI_Allocate_Handle ();
-void CMI_VMI_Deallocate_Handle (CMI_VMI_Handle_T *handle);
+CMI_VMI_Handle_T *CMI_VMI_Handle_Allocate ();
+void CMI_VMI_Handle_Deallocate (CMI_VMI_Handle_T *handle);
 
 
-/* Send and receive functions */
+/* Eager communication setup functions */
+void CMI_VMI_Eager_Short_Setup (int sender_rank);
+void CMI_VMI_Eager_Long_Setup (int sender_rank, int maxsize);
+
+
+/* Send and receive handler functions */
 VMI_RECV_STATUS CMI_VMI_Stream_Notification_Handler (PVMI_CONNECT connection, PVMI_STREAM_RECV stream, VMI_STREAM_COMMAND command, PVOID context, PVMI_SLAB slab);
 void CMI_VMI_Stream_Completion_Handler (PVOID context, VMI_STATUS sstatus);
 
@@ -613,20 +657,7 @@ void CMI_VMI_Send_Spanning_Children (int msgsize, char *msg);
 #endif
 
 
-/* Eager communication setup and send (short, long) functions */
-void CMI_VMI_Eager_Setup (int sender_rank, int maxsize);
-
-void CMI_VMI_Send_Eager_Short (int destrank, int msgsize, char *msg);
-
-void CMI_VMI_Sync_Send_Eager_Long (int destrank, int msgsize, char *msg, CMI_VMI_Handle_T *handle);
-CmiCommHandle CMI_VMI_Async_Send_Eager_Long (int destrank, int msgsize, char *msg, CMI_VMI_Handle_T *handle);
-void CMI_VMI_Free_Send_Eager_Long (int destrank, int msgsize, char *msg, CMI_VMI_Handle_T *handle);
-
-
-/* NCSA CRM functions */
-BOOLEAN CRMInit ();
-SOCKET createSocket(char *hostName, int port, int *localAddr);
-BOOLEAN CRMRegister (char *key, ULONG numPE, int shutdownPort, SOCKET *clientSock, int *clientAddr, PCRM_Msg *msg2);
-BOOLEAN CRMParseMsg (PCRM_Msg msg, int rank, int *nodeIP, int *shutdownPort, int *nodePE);
+/* Receive functions */
+void CMI_VMI_Common_Receive ();
 
 /*@}*/

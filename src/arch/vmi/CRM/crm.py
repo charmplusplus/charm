@@ -40,12 +40,12 @@ CRM_TIMEOUT     = 300
 CRM_LOGFILENAME = '/home/koenig/crm.log'
 
 # These are constants that SHOULD NOT be changed.
-CRM_MSG_SUCCESS  = 0
-CRM_MSG_REGISTER = 1
-CRM_MSG_FAILED   = 3
+CRM_MESSAGE_SUCCESS  = 0
+CRM_MESSAGE_FAILURE  = 1
+CRM_MESSAGE_REGISTER = 2
 
-CRM_ERR_CTXTCONFLICT = 1
-CRM_ERR_TIMEOUT      = 3
+CRM_ERROR_CONFLICT = 0
+CRM_ERROR_TIMEOUT  = 1
 
 
 
@@ -63,35 +63,59 @@ def write_to_log (log_str):
 
 
 ###########################################################################
+## This function gets the message code sent from a process checking in with
+## the CRM.  This data is a 4-byte integer that indicates the type of
+## message that follows.
+##
+## The function returns a list of the message code sent by the client or
+## an empty list if an exception occurrs.
+##
+def socket_getcode (s):
+    try:
+        packed_code = s.recv (4)
+
+        unpacked_code = struct.unpack ('i', packed_code)
+
+        msg_code = socket.ntohl (unpacked_code[0])
+
+        return ([msg_code])
+
+    except:
+        return ([])
+
+
+
+###########################################################################
 ## This function gets the registration data sent from a process checking
 ## in with the CRM.  This data is:
 ##
-##    message identifier (4 bytes - int)
 ##    total number of processes in Grid computation (4 bytes - int)
-##    TCP/IP port that the process is listening on (4 bytes - int)
+##    the cluster number that the process belongs to (4 bytes - int)
+##    a context that is unique per node (4 bytes - int)
 ##    length of program key (4 bytes - int)
 ##    program key (N bytes - char)
 ##
-## The function returns a list of the data sent by the client.
+## The function returns a list of the data sent by the client or an empty
+## list if an exception occurrs.
 ##
 def socket_getdata (s):
     try:
-        packed_code = s.recv (4)
-        packed_np   = s.recv (4)
-        packed_port = s.recv (4)
-        packed_len  = s.recv (4)
-        packed_data = packed_code + packed_np + packed_port + packed_len
+        packed_numpes  = s.recv (4)
+        packed_cluster = s.recv (4)
+        packed_context = s.recv (4)
+        packed_keylen  = s.recv (4)
 
+        packed_data   = packed_numpes + packed_cluster + packed_context + packed_keylen
         unpacked_data = struct.unpack ('iiii', packed_data)
 
-        msg_code = socket.ntohl (unpacked_data[0])
-        msg_np   = socket.ntohl (unpacked_data[1])
-        msg_port = socket.ntohl (unpacked_data[2])
-        msg_len  = socket.ntohl (unpacked_data[3])
+        msg_numpes  = socket.ntohl (unpacked_data[0])
+        msg_cluster = socket.ntohl (unpacked_data[1])
+        msg_context = socket.ntohl (unpacked_data[2])
+        msg_keylen  = socket.ntohl (unpacked_data[3])
 
-        msg_key = s.recv (msg_len)
+        msg_key = s.recv (msg_keylen)
 
-        return ([msg_code, msg_np, msg_port, msg_key])
+        return ([msg_numpes, msg_cluster, msg_context, msg_key])
 
     except:
         return ([])
@@ -115,8 +139,9 @@ def socket_getdata (s):
 ##      now waiting for the CRM to coordinate their peers; each entry
 ##      is represented by a list containing its information:
 ##
-##      [program key, number of processes, last process checkin
-##       time (seconds since epoch), [TCP/IP address (int), socket, port]]
+##      [program key, number of processes,
+##       last process checkin time (seconds since epoch),
+##       [TCP/IP address (int), socket, cluster, context]]
 ##
 def main():
     write_to_log ('CRM starting')
@@ -150,8 +175,8 @@ def main():
 	for i in unaffiliated:
             unaff_ip, unaff_socket, unaff_time = i
             if (time_now > (unaff_time + CRM_TIMEOUT)):
-                msg_code = socket.htonl (CRM_MSG_FAILED)
-                msg_error = socket.htonl (CRM_ERR_TIMEOUT)
+                msg_code = socket.htonl (CRM_MESSAGE_FAILURE)
+                msg_error = socket.htonl (CRM_ERROR_TIMEOUT)
                 packed_data = struct.pack ('ii', msg_code, msg_error)
                 unaff_socket.send (packed_data)
                 unaff_socket.close ()
@@ -168,16 +193,19 @@ def main():
         for i in a1:
             # a1 is a list of all sockets that have data.
             # i is an iterator through this list.
-            parsed_data = socket_getdata (i)
+            parsed_data = socket_getcode (i)
             if (len (parsed_data) > 0):
-                msg_code, msg_np, msg_port, msg_key = parsed_data
-                if (msg_code == CRM_MSG_REGISTER):
+                # This socket returned some kind of data.
+                msg_code = parsed_data[0]
+                if (msg_code == CRM_MESSAGE_REGISTER):
                     # This socket returned a registration code.
+                    parsed_data = socket_getdata (i)
+                    msg_numpes, msg_cluster, msg_context, msg_key = parsed_data
                     aff_key = ''
                     for j in affiliated:
-                        aff_key, aff_np, aff_time, aff_ip_sock_port = j
+                        aff_key, aff_numpes, aff_time, aff_ip_context_cluster_socket = j
                         if (msg_key == aff_key):
-                            if (msg_np == aff_np):
+                            if (msg_numpes == aff_numpes):
                                 # Gave right key and number of processes.
                                 # Update affiliated list entry with current time.
                                 # Remove this connection from unaffiliated list.
@@ -186,7 +214,7 @@ def main():
                                     if (k[1] == i):
                                         unaff_ip, unaff_socket, unaff_time = k
                                         break
-                                j[3].append ( [unaff_ip,i,msg_port] )
+                                j[3].append ( [unaff_ip, msg_context, msg_cluster, i] )
                                 unaffiliated.remove (k)
                                 write_to_log ('Unaffiliated connection joined key ' + msg_key)
                                 break
@@ -197,8 +225,8 @@ def main():
                                 for j in unaffiliated:
                                     unaff_ip, unaff_socket, unaff_time = j
                                     if (unaff_socket == i):
-                                        msg_code = socket.htonl (CRM_MSG_FAILED)
-                                        msg_error = socket.htonl (CRM_ERR_CTXTCONFLICT)
+                                        msg_code = socket.htonl (CRM_MESSAGE_FAILURE)
+                                        msg_error = socket.htonl (CRM_ERROR_CONFLICT)
                                         packed_data = struct.pack ('ii', msg_code, msg_error)
                                         unaff_socket.send (packed_data)
                                         unaff_socket.close ()
@@ -213,10 +241,10 @@ def main():
                             unaff_ip, unaff_socket, unaff_time = j
                             if (unaff_socket == i):
                                 break
-                        new_entry = [msg_key, msg_np, time_now, [[unaff_ip,i,msg_port]]]
+                        new_entry = [msg_key, msg_numpes, time_now, [[unaff_ip, msg_context, msg_cluster, i]]]
                         affiliated.append (new_entry)
                         unaffiliated.remove (j)
-                        write_to_log ('Unaffiliated connection started new key ' + msg_key + ' for ' + str(msg_np) + ' processors')
+                        write_to_log ('Unaffiliated connection started new key ' + msg_key + ' for ' + str (msg_numpes) + ' processors')
                 else:
                     # This socket sent a bad message code - dump it.
                     for j in unaffiliated:
@@ -238,12 +266,12 @@ def main():
 
         # Drop any affiliated connections that have timed out.
 	for i in affiliated:
-            aff_key, aff_np, aff_time, aff_ip_sock_port = i
+            aff_key, aff_numpes, aff_time, aff_ip_context_cluster_socket = i
             if (time_now > (aff_time + CRM_TIMEOUT)):
-                for j in aff_ip_sock_port:
-                    aff_ip, aff_socket, aff_port = j
-                    msg_code = socket.htonl (CRM_MSG_FAILED)
-                    msg_error = socket.htonl (CRM_ERR_TIMEOUT)
+                for j in aff_ip_socket_context:
+                    aff_ip, aff_context, aff_cluster, aff_socket = j
+                    msg_code = socket.htonl (CRM_MESSAGE_FAILURE)
+                    msg_error = socket.htonl (CRM_ERROR_TIMEOUT)
                     packed_data = struct.pack ('ii', msg_code, msg_error)
                     aff_socket.send (packed_data)
                     aff_socket.close ()
@@ -260,9 +288,9 @@ def main():
         # affiliated list and discarded.
         a = []
         for i in affiliated:
-            aff_key, aff_np, aff_time, aff_ip_sock_port = i
-            for j in aff_ip_sock_port:
-                aff_ip, aff_socket, aff_port = j
+            aff_key, aff_numpes, aff_time, aff_ip_context_cluster_socket = i
+            for j in aff_ip_context_cluster_socket:
+                aff_ip, aff_context, aff_cluster, aff_socket = j
                 a.append (aff_socket)
         a1, a2, a3 = select.select (a, [], [], 0.1)
         for i in a1:
@@ -273,9 +301,9 @@ def main():
                 # Drop this connection - it sent zero-length data.
                 # This usually means that the remote process disappeared.
                 for j in affiliated:
-                    aff2_key, aff2_np, aff2_time, aff2_ip_sock_port = j
-                    for k in aff2_ip_sock_port:
-                        aff2_ip, aff2_socket, aff2_port = k
+                    aff2_key, aff2_numpes, aff2_time, aff2_ip_context_cluster_socket = j
+                    for k in aff2_ip_context_cluster_socket:
+                        aff2_ip, aff2_context, aff2_cluster, aff2_socket = k
                         if (aff2_socket == i):
                             break
                     aff2_socket.close ()
@@ -288,36 +316,35 @@ def main():
         # Respond to any members of the affiliated list that have had all
         # processes in the group check in.
         for i in affiliated:
-            aff_key, aff_np, aff_time, aff_ip_sock_port = i
-            if (aff_np == len (aff_ip_sock_port)):
-                # Sort the list of [TCP/IP address, socket, port] connections.
+            aff_key, aff_numpes, aff_time, aff_ip_context_cluster_socket = i
+            if (aff_numpes == len (aff_ip_context_cluster_socket)):
+                # Sort the list of [TCP/IP address, context, cluster, socket] connections.
                 # Since TCP/IP address is first, the sort is on this field.
-                aff_ip_sock_port.sort ()
+                # The sort uses the context field to break ties of same TCP/IP address.
+                # TCP/IP address and context together are guaranteed to be unique.
+                aff_ip_context_cluster_socket.sort ()
 
                 # Iterate through each connection and send a success code
                 # to the connection followed by the list of all processes
                 # in the key.  After this, close the connection.
-                for j in aff_ip_sock_port:
-                    aff_ip, aff_socket, aff_port = j
+                for j in aff_ip_context_cluster_socket:
+                    aff_ip, aff_context, aff_cluster, aff_socket = j
 
-                    msg_code = socket.htonl (CRM_MSG_SUCCESS)
-                    msg_np = socket.htonl (aff_np)
-                    packed_data = struct.pack ('ii', msg_code, msg_np)
+                    msg_code = socket.htonl (CRM_MESSAGE_SUCCESS)
+                    msg_numpes = socket.htonl (aff_numpes)
+                    packed_data = struct.pack ('ii', msg_code, msg_numpes)
                     aff_socket.send (packed_data)
 
-                    tmp = 0
-                    for k in aff_ip_sock_port:
-                        tmp_ip, tmp_sock, tmp_port = k
+                    for k in aff_ip_context_cluster_socket:
+                        tmp_ip, tmp_context, tmp_cluster, tmp_socket = k
 
                         tmp_ip = socket.htonl (tmp_ip)
-                        tmp_port = socket.htonl (tmp_port)
-                        tmp = socket.htonl (tmp)
+                        tmp_context = socket.htonl (tmp_context)
+                        tmp_cluster = socket.htonl (tmp_cluster)
 
-                        packed_data = struct.pack ('Lii', tmp_ip,tmp_port,tmp)
+                        packed_data = struct.pack ('Lii', tmp_ip, tmp_context, tmp_cluster)
 
                         aff_socket.send (packed_data)
-
-                        tmp = tmp + 1
 
                     aff_socket.close ()
 
