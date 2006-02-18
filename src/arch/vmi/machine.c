@@ -287,9 +287,6 @@ void ConverseExit ()
 
   DEBUG_PRINT ("ConverseExit() called.\n");
 
-  /* Barrier to ensure that all processes are ready to shut down. */
-  CmiBarrier ();
-
   /* ConverseCommonExit() shuts down CCS and closes Projections logs. */
   ConverseCommonExit ();
 
@@ -307,21 +304,22 @@ void ConverseExit ()
     }
 
     /* Do NOT close CMI_VMI_Charmrun_Socket here or charmrun will die! */
-
-    sleep (1);
   }
+
+#if ! CMI_VMI_TERMINATE_VMI_HACK
+  /* Barrier to ensure that all processes are ready to shut down. */
+  CmiBarrier ();
 
   /* Close all connections. */
   CMI_VMI_Close_Connections ();
 
+  /* Terminate VMI. */
+  CMI_VMI_Terminate_VMI ();
+#endif
+
   /* Destroy queues. */
   CdsFifo_Destroy (CpvAccess (CMI_VMI_RemoteQueue));
   CdsFifo_Destroy (CpvAccess (CmiLocalQueue));
-
-  /* Terminate VMI. */
-#if ! CMI_VMI_TERMINATE_VMI_HACK
-  CMI_VMI_Terminate_VMI ();
-#endif
 
   /* Free memory. */
   for (i = 0; i < _Cmi_numpes; i++) {
