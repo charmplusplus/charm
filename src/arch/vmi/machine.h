@@ -31,9 +31,7 @@
 #include "vmi.h"
 
 /* These settings can only be changed at compile time. */
-#define CMI_VMI_OPTIMIZE           0
-#define CMI_VMI_USE_MEMORY_POOL    1
-#define CMI_VMI_TERMINATE_VMI_HACK 1
+#define CMI_VMI_OPTIMIZE 0
 
 /*
   These settings are defaults that can be overridden at runtime by
@@ -41,10 +39,13 @@
 */
 #define CMI_VMI_WAN_LATENCY                      1000      /* microseconds */
 #define CMI_VMI_PROBE_CLUSTERS                   0         /* Boolean */
+#define CMI_VMI_MEMORY_POOL                      1         /* Boolean */
+#define CMI_VMI_TERMINATE_VMI_HACK               1         /* Boolean */
 #define CMI_VMI_CONNECTION_TIMEOUT               300       /* seconds */
 #define CMI_VMI_MAXIMUM_HANDLES                  10000
 #define CMI_VMI_SMALL_MESSAGE_BOUNDARY           512       /* bytes */
 #define CMI_VMI_MEDIUM_MESSAGE_BOUNDARY          16384     /* bytes */
+#define CMI_VMI_EAGER_PROTOCOL                   0         /* Boolean */
 #define CMI_VMI_EAGER_INTERVAL                   10000
 #define CMI_VMI_EAGER_THRESHOLD                  1000
 #define CMI_VMI_EAGER_SHORT_POLLSET_SIZE_MAXIMUM 32
@@ -107,7 +108,6 @@ typedef struct
   provides an efficient method of allocating and deallocating memory
   that does not need to call malloc() and free() repeatedly.
 */
-#if CMI_VMI_USE_MEMORY_POOL
 #define CMI_VMI_BUCKET1_SIZE 1024
 #define CMI_VMI_BUCKET2_SIZE 2048
 #define CMI_VMI_BUCKET3_SIZE 4096
@@ -128,7 +128,6 @@ typedef struct
 
 #define CMI_VMI_BUCKET5_PREALLOCATE 128
 #define CMI_VMI_BUCKET5_GROW        128
-#endif
 
 
 /*

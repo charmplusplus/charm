@@ -39,10 +39,13 @@ int CMI_VMI_Startup_Type;
 int CMI_VMI_WAN_Latency;
 int CMI_VMI_Cluster;
 int CMI_VMI_Probe_Clusters;
+int CMI_VMI_Memory_Pool;
+int CMI_VMI_Terminate_VMI_Hack;
 int CMI_VMI_Connection_Timeout;
 int CMI_VMI_Maximum_Handles;
 int CMI_VMI_Small_Message_Boundary;
 int CMI_VMI_Medium_Message_Boundary;
+int CMI_VMI_Eager_Protocol;
 int CMI_VMI_Eager_Interval;
 int CMI_VMI_Eager_Threshold;
 int CMI_VMI_Eager_Short_Pollset_Size_Maximum;
@@ -72,13 +75,11 @@ int CMI_VMI_Next_Handle;
 int CMI_VMI_Latency_Vectors_Received;
 BOOLEAN CMI_VMI_Cluster_Mapping_Received;
 
-#if CMI_VMI_USE_MEMORY_POOL
 PVMI_BUFFER_POOL CMI_VMI_Bucket1_Pool;
 PVMI_BUFFER_POOL CMI_VMI_Bucket2_Pool;
 PVMI_BUFFER_POOL CMI_VMI_Bucket3_Pool;
 PVMI_BUFFER_POOL CMI_VMI_Bucket4_Pool;
 PVMI_BUFFER_POOL CMI_VMI_Bucket5_Pool;
-#endif
 
 
 
@@ -111,10 +112,13 @@ void ConverseInit (int argc, char **argv, CmiStartFn start_function, int user_ca
   CMI_VMI_WAN_Latency                      = CMI_VMI_WAN_LATENCY;
   CMI_VMI_Cluster                          = CMI_VMI_CLUSTER_UNKNOWN;
   CMI_VMI_Probe_Clusters                   = CMI_VMI_PROBE_CLUSTERS;
+  CMI_VMI_Memory_Pool                      = CMI_VMI_MEMORY_POOL;
+  CMI_VMI_Terminate_VMI_Hack               = CMI_VMI_TERMINATE_VMI_HACK;
   CMI_VMI_Connection_Timeout               = CMI_VMI_CONNECTION_TIMEOUT;
   CMI_VMI_Maximum_Handles                  = CMI_VMI_MAXIMUM_HANDLES;
   CMI_VMI_Small_Message_Boundary           = CMI_VMI_SMALL_MESSAGE_BOUNDARY;
   CMI_VMI_Medium_Message_Boundary          = CMI_VMI_MEDIUM_MESSAGE_BOUNDARY;
+  CMI_VMI_Eager_Protocol                   = CMI_VMI_EAGER_PROTOCOL;
   CMI_VMI_Eager_Interval                   = CMI_VMI_EAGER_INTERVAL;
   CMI_VMI_Eager_Threshold                  = CMI_VMI_EAGER_THRESHOLD;
   CMI_VMI_Eager_Short_Pollset_Size_Maximum = CMI_VMI_EAGER_SHORT_POLLSET_SIZE_MAXIMUM;
@@ -287,9 +291,6 @@ void ConverseExit ()
 
   DEBUG_PRINT ("ConverseExit() called.\n");
 
-  /* ConverseCommonExit() shuts down CCS and closes Projections logs. */
-  ConverseCommonExit ();
-
   /* Signal the charmrun terminal that the computation has ended (if necessary). */
   if (CMI_VMI_Startup_Type == CMI_VMI_STARTUP_TYPE_CHARMRUN) {
     CMI_VMI_Charmrun_Message_Header_T hdr;
@@ -306,34 +307,45 @@ void ConverseExit ()
     /* Do NOT close CMI_VMI_Charmrun_Socket here or charmrun will die! */
   }
 
-#if ! CMI_VMI_TERMINATE_VMI_HACK
+  /* ConverseCommonExit() shuts down CCS and closes Projections logs. */
+  ConverseCommonExit ();
+
   /* Barrier to ensure that all processes are ready to shut down. */
   CmiBarrier ();
 
-  /* Close all connections. */
-  CMI_VMI_Close_Connections ();
+  for (i = 0; i < 100000; i++) {
+    status = VMI_Poll ();
+    CMI_VMI_CHECK_SUCCESS (status, "VMI_Poll()");
+  }
 
-  /* Terminate VMI. */
-  CMI_VMI_Terminate_VMI ();
-#endif
+  /* If a clean VMI termination is requested, do it. */
+  if (!CMI_VMI_Terminate_VMI_Hack) {
+    CMI_VMI_Close_Connections ();
 
-  /* Destroy queues. */
+    for (i = 0; i < 100000; i++) {
+      status = VMI_Poll ();
+      CMI_VMI_CHECK_SUCCESS (status, "VMI_Poll()");
+    }
+
+    CMI_VMI_Terminate_VMI ();
+  }
+
+  /* Free resources and exit. */
   CdsFifo_Destroy (CpvAccess (CMI_VMI_RemoteQueue));
   CdsFifo_Destroy (CpvAccess (CmiLocalQueue));
 
-  /* Free memory. */
   for (i = 0; i < _Cmi_numpes; i++) {
     if ((&CMI_VMI_Processes[i])->latency_vector) {
       free ((&CMI_VMI_Processes[i])->latency_vector);
     }
   }
+
   free (CMI_VMI_Handles);
   free (CMI_VMI_Eager_Short_Pollset);
   free (CMI_VMI_Processes);
   free (CMI_VMI_Program_Key);
   free (CMI_VMI_Username);
 
-  /* Exit. */
   exit (0);
 }
 
@@ -376,59 +388,61 @@ void CmiNotifyIdle ()
 
   DEBUG_PRINT ("CmiNotifyIdle() called.\n");
 
-  /*
-    Check to see if any processes have a large number of outstanding eager short credits.
+  if (CMI_VMI_Eager_Protocol) {
+    /*
+      Check to see if any processes have a large number of outstanding eager short credits.
 
-    Normally, eager short credits are replentished on the sender when we send a message
-    to it.  If we do not communicate frequently with the sender, this does not happen
-    automatically and we need to explicitly send credit updates.
-  */
-  for (i = 0; i < _Cmi_numpes; i++) {
-    process = &CMI_VMI_Processes[i];
+      Normally, eager short credits are replentished on the sender when we send a message
+      to it.  If we do not communicate frequently with the sender, this does not happen
+      automatically and we need to explicitly send credit updates.
+    */
+    for (i = 0; i < _Cmi_numpes; i++) {
+      process = &CMI_VMI_Processes[i];
 
-    if (process->eager_short_receive_credits_replentish >= (0.75 * CMI_VMI_Eager_Short_Slots)) {
-      CMI_VMI_MESSAGE_TYPE (&credit_msg) = CMI_VMI_MESSAGE_TYPE_CREDIT;
-      CMI_VMI_MESSAGE_CREDITS (&credit_msg) = process->eager_short_receive_credits_replentish;
+      if (process->eager_short_receive_credits_replentish >= (0.75 * CMI_VMI_Eager_Short_Slots)) {
+	CMI_VMI_MESSAGE_TYPE (&credit_msg) = CMI_VMI_MESSAGE_TYPE_CREDIT;
+	CMI_VMI_MESSAGE_CREDITS (&credit_msg) = process->eager_short_receive_credits_replentish;
 
 #if CMK_BROADCAST_SPANNING_TREE
-      CMI_SET_BROADCAST_ROOT (&credit_msg, 0);
+	CMI_SET_BROADCAST_ROOT (&credit_msg, 0);
 #endif
 
-      addrs[0] = (PVOID) &credit_msg;
-      sz[0] = (ULONG) (sizeof (CMI_VMI_Credit_Message_T));
+	addrs[0] = (PVOID) &credit_msg;
+	sz[0] = (ULONG) (sizeof (CMI_VMI_Credit_Message_T));
 
-      status = VMI_Stream_Send_Inline (process->connection, addrs, sz, 1, sizeof (CMI_VMI_Credit_Message_T));
-      CMI_VMI_CHECK_SUCCESS (status, "VMI_Stream_Send_Inline()");
+	status = VMI_Stream_Send_Inline (process->connection, addrs, sz, 1, sizeof (CMI_VMI_Credit_Message_T));
+	CMI_VMI_CHECK_SUCCESS (status, "VMI_Stream_Send_Inline()");
 
-      process->eager_short_receive_credits_replentish = 0;
-    }
-  }
-
-  /*
-    Check to see if any processes are communicating with us frequently.
-    These processes are candidates for eager communications.
-  */
-  if (CMI_VMI_Message_Receive_Count > CMI_VMI_Eager_Interval) {
-    for (i = 0; i < _Cmi_numpes; i++) {
-      if ((CMI_VMI_Eager_Short_Pollset_Size < CMI_VMI_Eager_Short_Pollset_Size_Maximum) &&
-	  ((&CMI_VMI_Processes[i])->normal_short_count > CMI_VMI_Eager_Threshold) &&
-	  ((&CMI_VMI_Processes[i])->eager_short_receive_size == 0) &&
-	  (VMI_CONNECT_ONE_WAY_LATENCY ((&CMI_VMI_Processes[i])->connection) < CMI_VMI_WAN_Latency)) {
-	CMI_VMI_Eager_Short_Setup (i);
+	process->eager_short_receive_credits_replentish = 0;
       }
-
-      if (((&CMI_VMI_Processes[i])->normal_long_count > CMI_VMI_Eager_Threshold) &&
-          ((&CMI_VMI_Processes[i])->eager_long_receive_size == 0)) {
-	CMI_VMI_Eager_Long_Setup (i, CMI_VMI_Eager_Long_Buffer_Size);
-      }
-
-      (&CMI_VMI_Processes[i])->normal_short_count = 0;
-      (&CMI_VMI_Processes[i])->normal_long_count = 0;
-      (&CMI_VMI_Processes[i])->eager_short_count = 0;
-      (&CMI_VMI_Processes[i])->eager_long_count = 0;
     }
 
-    CMI_VMI_Message_Receive_Count = 0;
+    /*
+      Check to see if any processes are communicating with us frequently.
+      These processes are candidates for eager communications.
+    */
+    if (CMI_VMI_Message_Receive_Count > CMI_VMI_Eager_Interval) {
+      for (i = 0; i < _Cmi_numpes; i++) {
+	if ((CMI_VMI_Eager_Short_Pollset_Size < CMI_VMI_Eager_Short_Pollset_Size_Maximum) &&
+	    ((&CMI_VMI_Processes[i])->normal_short_count > CMI_VMI_Eager_Threshold) &&
+	    ((&CMI_VMI_Processes[i])->eager_short_receive_size == 0) &&
+	    (VMI_CONNECT_ONE_WAY_LATENCY ((&CMI_VMI_Processes[i])->connection) < CMI_VMI_WAN_Latency)) {
+	  CMI_VMI_Eager_Short_Setup (i);
+	}
+
+	if (((&CMI_VMI_Processes[i])->normal_long_count > CMI_VMI_Eager_Threshold) &&
+	    ((&CMI_VMI_Processes[i])->eager_long_receive_size == 0)) {
+	  CMI_VMI_Eager_Long_Setup (i, CMI_VMI_Eager_Long_Buffer_Size);
+	}
+
+	(&CMI_VMI_Processes[i])->normal_short_count = 0;
+	(&CMI_VMI_Processes[i])->normal_long_count = 0;
+	(&CMI_VMI_Processes[i])->eager_short_count = 0;
+	(&CMI_VMI_Processes[i])->eager_long_count = 0;
+      }
+
+      CMI_VMI_Message_Receive_Count = 0;
+    }
   }
 
   /* Pump the message loop. */
@@ -683,7 +697,6 @@ void CmiSyncSendFn (int destrank, int msgsize, char *msg)
   CMI_VMI_Eager_Short_Slot_Footer_T footer;
 
 
-
   DEBUG_PRINT ("CmiSyncSendFn() called.\n");
 
   if (destrank == _Cmi_mype) {
@@ -744,10 +757,16 @@ void CmiSyncSendFn (int destrank, int msgsize, char *msg)
       CMI_VMI_CHECK_SUCCESS (status, "VMI_Stream_Send_Inline()");
     }
   } else {
-    context = CONTEXTFIELD (msg);
-    if (context) {
-      cacheentry = CMI_VMI_CacheEntry_From_Context (context);
+    if (CMI_VMI_Eager_Protocol) {
+      context = CONTEXTFIELD (msg);
+      if (context) {
+	cacheentry = CMI_VMI_CacheEntry_From_Context (context);
+      } else {
+	status = VMI_Cache_Register (msg, msgsize, &cacheentry);
+	CMI_VMI_CHECK_SUCCESS (status, "VMI_Cache_Register()");
+      }
     } else {
+      context = NULL;
       status = VMI_Cache_Register (msg, msgsize, &cacheentry);
       CMI_VMI_CHECK_SUCCESS (status, "VMI_Cache_Register()");
     }
@@ -913,10 +932,16 @@ CmiCommHandle CmiAsyncSendFn (int destrank, int msgsize, char *msg)
 
       handle = NULL;
     } else {
-      context = CONTEXTFIELD (msg);
-      if (context) {
-	cacheentry = CMI_VMI_CacheEntry_From_Context (context);
+      if (CMI_VMI_Eager_Protocol) {
+	context = CONTEXTFIELD (msg);
+	if (context) {
+	  cacheentry = CMI_VMI_CacheEntry_From_Context (context);
+	} else {
+	  status = VMI_Cache_Register (msg, msgsize, &cacheentry);
+	  CMI_VMI_CHECK_SUCCESS (status, "VMI_Cache_Register()");
+	}
       } else {
+	context = NULL;
 	status = VMI_Cache_Register (msg, msgsize, &cacheentry);
 	CMI_VMI_CHECK_SUCCESS (status, "VMI_Cache_Register()");
       }
@@ -942,10 +967,16 @@ CmiCommHandle CmiAsyncSendFn (int destrank, int msgsize, char *msg)
       CMI_VMI_CHECK_SUCCESS (status, "VMI_Stream_Send()");
     }
   } else {
-    context = CONTEXTFIELD (msg);
-    if (context) {
-      cacheentry = CMI_VMI_CacheEntry_From_Context (context);
+    if (CMI_VMI_Eager_Protocol) {
+      context = CONTEXTFIELD (msg);
+      if (context) {
+	cacheentry = CMI_VMI_CacheEntry_From_Context (context);
+      } else {
+	status = VMI_Cache_Register (msg, msgsize, &cacheentry);
+	CMI_VMI_CHECK_SUCCESS (status, "VMI_Cache_Register()");
+      }
     } else {
+      context = NULL;
       status = VMI_Cache_Register (msg, msgsize, &cacheentry);
       CMI_VMI_CHECK_SUCCESS (status, "VMI_Cache_Register()");
     }
@@ -1098,10 +1129,16 @@ void CmiFreeSendFn (int destrank, int msgsize, char *msg)
 
       CmiFree (msg);
     } else {
-      context = CONTEXTFIELD (msg);
-      if (context) {
-	cacheentry = CMI_VMI_CacheEntry_From_Context (context);
+      if (CMI_VMI_Eager_Protocol) {
+	context = CONTEXTFIELD (msg);
+	if (context) {
+	  cacheentry = CMI_VMI_CacheEntry_From_Context (context);
+	} else {
+	  status = VMI_Cache_Register (msg, msgsize, &cacheentry);
+	  CMI_VMI_CHECK_SUCCESS (status, "VMI_Cache_Register()");
+	}
       } else {
+	context = NULL;
 	status = VMI_Cache_Register (msg, msgsize, &cacheentry);
 	CMI_VMI_CHECK_SUCCESS (status, "VMI_Cache_Register()");
       }
@@ -1127,10 +1164,16 @@ void CmiFreeSendFn (int destrank, int msgsize, char *msg)
       CMI_VMI_CHECK_SUCCESS (status, "VMI_Stream_Send()");
     }
   } else {
-    context = CONTEXTFIELD (msg);
-    if (context) {
-      cacheentry = CMI_VMI_CacheEntry_From_Context (context);
+    if (CMI_VMI_Eager_Protocol) {
+      context = CONTEXTFIELD (msg);
+      if (context) {
+	cacheentry = CMI_VMI_CacheEntry_From_Context (context);
+      } else {
+	status = VMI_Cache_Register (msg, msgsize, &cacheentry);
+	CMI_VMI_CHECK_SUCCESS (status, "VMI_Cache_Register()");
+      }
     } else {
+      context = NULL;
       status = VMI_Cache_Register (msg, msgsize, &cacheentry);
       CMI_VMI_CHECK_SUCCESS (status, "VMI_Cache_Register()");
     }
@@ -1220,10 +1263,16 @@ void CmiSyncBroadcastFn (int msgsize, char *msg)
   CMI_VMI_MESSAGE_CREDITS (msg) = 0;
 
   if (msgsize < CMI_VMI_Medium_Message_Boundary) {
-    context = CONTEXTFIELD (msg);
-    if (context) {
-      cacheentry = CMI_VMI_CacheEntry_From_Context (context);
+    if (CMI_VMI_Eager_Protocol) {
+      context = CONTEXTFIELD (msg);
+      if (context) {
+	cacheentry = CMI_VMI_CacheEntry_From_Context (context);
+      } else {
+	status = VMI_Cache_Register (msg, msgsize, &cacheentry);
+	CMI_VMI_CHECK_SUCCESS (status, "VMI_Cache_Register()");
+      }
     } else {
+      context = NULL;
       status = VMI_Cache_Register (msg, msgsize, &cacheentry);
       CMI_VMI_CHECK_SUCCESS (status, "VMI_Cache_Register()");
     }
@@ -1298,10 +1347,16 @@ void CmiSyncBroadcastFn (int msgsize, char *msg)
 
     CMI_VMI_Handle_Deallocate (handle);
   } else {
-    context = CONTEXTFIELD (msg);
-    if (context) {
-      cacheentry = CMI_VMI_CacheEntry_From_Context (context);
+    if (CMI_VMI_Eager_Protocol) {
+      context = CONTEXTFIELD (msg);
+      if (context) {
+	cacheentry = CMI_VMI_CacheEntry_From_Context (context);
+      } else {
+	status = VMI_Cache_Register (msg, msgsize, &cacheentry);
+	CMI_VMI_CHECK_SUCCESS (status, "VMI_Cache_Register()");
+      }
     } else {
+      context = NULL;
       status = VMI_Cache_Register (msg, msgsize, &cacheentry);
       CMI_VMI_CHECK_SUCCESS (status, "VMI_Cache_Register()");
     }
@@ -1458,10 +1513,16 @@ CmiCommHandle CmiAsyncBroadcastFn (int msgsize, char *msg)
 
     handle = NULL;
   } else if (msgsize < CMI_VMI_Medium_Message_Boundary) {
-    context = CONTEXTFIELD (msg);
-    if (context) {
-      cacheentry = CMI_VMI_CacheEntry_From_Context (context);
+    if (CMI_VMI_Eager_Protocol) {
+      context = CONTEXTFIELD (msg);
+      if (context) {
+	cacheentry = CMI_VMI_CacheEntry_From_Context (context);
+      } else {
+	status = VMI_Cache_Register (msg, msgsize, &cacheentry);
+	CMI_VMI_CHECK_SUCCESS (status, "VMI_Cache_Register()");
+      }
     } else {
+      context = NULL;
       status = VMI_Cache_Register (msg, msgsize, &cacheentry);
       CMI_VMI_CHECK_SUCCESS (status, "VMI_Cache_Register()");
     }
@@ -1523,10 +1584,16 @@ CmiCommHandle CmiAsyncBroadcastFn (int msgsize, char *msg)
     }
 #endif
   } else {
-    context = CONTEXTFIELD (msg);
-    if (context) {
-      cacheentry = CMI_VMI_CacheEntry_From_Context (context);
+    if (CMI_VMI_Eager_Protocol) {
+      context = CONTEXTFIELD (msg);
+      if (context) {
+	cacheentry = CMI_VMI_CacheEntry_From_Context (context);
+      } else {
+	status = VMI_Cache_Register (msg, msgsize, &cacheentry);
+	CMI_VMI_CHECK_SUCCESS (status, "VMI_Cache_Register()");
+      }
     } else {
+      context = NULL;
       status = VMI_Cache_Register (msg, msgsize, &cacheentry);
       CMI_VMI_CHECK_SUCCESS (status, "VMI_Cache_Register()");
     }
@@ -1672,10 +1739,16 @@ void CmiFreeBroadcastFn (int msgsize, char *msg)
 
     CmiFree (msg);
   } else if (msgsize < CMI_VMI_Medium_Message_Boundary) {
-    context = CONTEXTFIELD (msg);
-    if (context) {
-      cacheentry = CMI_VMI_CacheEntry_From_Context (context);
+    if (CMI_VMI_Eager_Protocol) {
+      context = CONTEXTFIELD (msg);
+      if (context) {
+	cacheentry = CMI_VMI_CacheEntry_From_Context (context);
+      } else {
+	status = VMI_Cache_Register (msg, msgsize, &cacheentry);
+	CMI_VMI_CHECK_SUCCESS (status, "VMI_Cache_Register()");
+      }
     } else {
+      context = NULL;
       status = VMI_Cache_Register (msg, msgsize, &cacheentry);
       CMI_VMI_CHECK_SUCCESS (status, "VMI_Cache_Register()");
     }
@@ -1737,10 +1810,16 @@ void CmiFreeBroadcastFn (int msgsize, char *msg)
     }
 #endif
   } else {
-    context = CONTEXTFIELD (msg);
-    if (context) {
-      cacheentry = CMI_VMI_CacheEntry_From_Context (context);
+    if (CMI_VMI_Eager_Protocol) {
+      context = CONTEXTFIELD (msg);
+      if (context) {
+	cacheentry = CMI_VMI_CacheEntry_From_Context (context);
+      } else {
+	status = VMI_Cache_Register (msg, msgsize, &cacheentry);
+	CMI_VMI_CHECK_SUCCESS (status, "VMI_Cache_Register()");
+      }
     } else {
+      context = NULL;
       status = VMI_Cache_Register (msg, msgsize, &cacheentry);
       CMI_VMI_CHECK_SUCCESS (status, "VMI_Cache_Register()");
     }
@@ -1950,32 +2029,56 @@ void CmiReleaseCommHandle (CmiCommHandle commhandle)
 
     if (handle->refcount <= 1) {
       if (handle->data.send.send_handle_type == CMI_VMI_SEND_HANDLE_TYPE_STREAM) {
-	context = CONTEXTFIELD (handle->msg);
-	if (!context) {
+	if (CMI_VMI_Eager_Protocol) {
+	  context = CONTEXTFIELD (handle->msg);
+	  if (!context) {
+	    status = VMI_Cache_Deregister (handle->data.send.data.stream.cacheentry);
+	    CMI_VMI_CHECK_SUCCESS (status, "VMI_Cache_Deregister()");
+	  }
+	} else {
+	  context = NULL;
 	  status = VMI_Cache_Deregister (handle->data.send.data.stream.cacheentry);
 	  CMI_VMI_CHECK_SUCCESS (status, "VMI_Cache_Deregister()");
 	}
       }
 
       if (handle->data.send.send_handle_type == CMI_VMI_SEND_HANDLE_TYPE_RDMAGET) {
-	context = CONTEXTFIELD (handle->msg);
-	if (!context) {
+	if (CMI_VMI_Eager_Protocol) {
+	  context = CONTEXTFIELD (handle->msg);
+	  if (!context) {
+	    status = VMI_Cache_Deregister (handle->data.send.data.rdmaget.cacheentry);
+	    CMI_VMI_CHECK_SUCCESS (status, "VMI_Cache_Deregister()");
+	  }
+	} else {
+	  context = NULL;
 	  status = VMI_Cache_Deregister (handle->data.send.data.rdmaget.cacheentry);
 	  CMI_VMI_CHECK_SUCCESS (status, "VMI_Cache_Deregister()");
 	}
       }
 
       if (handle->data.send.send_handle_type == CMI_VMI_SEND_HANDLE_TYPE_RDMABROADCAST) {
-	context = CONTEXTFIELD (handle->msg);
-	if (!context) {
+	if (CMI_VMI_Eager_Protocol) {
+	  context = CONTEXTFIELD (handle->msg);
+	  if (!context) {
+	    status = VMI_Cache_Deregister (handle->data.send.data.rdmabroadcast.cacheentry);
+	    CMI_VMI_CHECK_SUCCESS (status, "VMI_Cache_Deregister()");
+	  }
+	} else {
+	  context = NULL;
 	  status = VMI_Cache_Deregister (handle->data.send.data.rdmabroadcast.cacheentry);
 	  CMI_VMI_CHECK_SUCCESS (status, "VMI_Cache_Deregister()");
 	}
       }
 
       if (handle->data.send.send_handle_type == CMI_VMI_SEND_HANDLE_TYPE_EAGER_LONG) {
-	context = CONTEXTFIELD (handle->msg);
-	if (!context) {
+	if (CMI_VMI_Eager_Protocol) {
+	  context = CONTEXTFIELD (handle->msg);
+	  if (!context) {
+	    status = VMI_Cache_Deregister (handle->data.send.data.eager_long.cacheentry);
+	    CMI_VMI_CHECK_SUCCESS (status, "VMI_Cache_Deregister()");
+	  }
+	} else {
+	  context = NULL;
 	  status = VMI_Cache_Deregister (handle->data.send.data.eager_long.cacheentry);
 	  CMI_VMI_CHECK_SUCCESS (status, "VMI_Cache_Deregister()");
 	}
@@ -2058,7 +2161,6 @@ void *CmiGetNonLocal (void)
       footer = handle->data.receive.data.eager_short.footer;
     }
   }
-
 
   status = VMI_Poll ();
   CMI_VMI_CHECK_SUCCESS (status, "VMI_Poll()");
@@ -2173,20 +2275,22 @@ PersistentHandle CmiCreatePersistent (int destrank, int maxsize)
 
   DEBUG_PRINT ("CmiCreatePersistent() called.\n");
 
-  CMI_VMI_MESSAGE_TYPE (&request_msg) = CMI_VMI_MESSAGE_TYPE_PERSISTENT_REQUEST;
-  CMI_VMI_MESSAGE_CREDITS (&request_msg) = 0;
+  if (CMI_VMI_Eager_Protocol) {
+    CMI_VMI_MESSAGE_TYPE (&request_msg) = CMI_VMI_MESSAGE_TYPE_PERSISTENT_REQUEST;
+    CMI_VMI_MESSAGE_CREDITS (&request_msg) = 0;
 
 #if CMK_BROADCAST_SPANNING_TREE
-  CMI_SET_BROADCAST_ROOT (&request_msg, 0);
+    CMI_SET_BROADCAST_ROOT (&request_msg, 0);
 #endif
 
-  request_msg.maxsize = maxsize;
+    request_msg.maxsize = maxsize;
 
-  addrs[0] = (PVOID) &request_msg;
-  sz[0] = (ULONG) (sizeof (CMI_VMI_Persistent_Request_Message_T));
+    addrs[0] = (PVOID) &request_msg;
+    sz[0] = (ULONG) (sizeof (CMI_VMI_Persistent_Request_Message_T));
 
-  status = VMI_Stream_Send_Inline ((&CMI_VMI_Processes[destrank])->connection, addrs, sz, 1, sizeof (CMI_VMI_Persistent_Request_Message_T));
-  CMI_VMI_CHECK_SUCCESS (status, "VMI_Stream_Send_Inline()");
+    status = VMI_Stream_Send_Inline ((&CMI_VMI_Processes[destrank])->connection, addrs, sz, 1, sizeof (CMI_VMI_Persistent_Request_Message_T));
+    CMI_VMI_CHECK_SUCCESS (status, "VMI_Stream_Send_Inline()");
+  }
 
   return ((PersistentHandle) NULL);
 }
@@ -2248,13 +2352,15 @@ PersistentHandle CmiRegisterReceivePersistent (PersistentReq request)
 {
   DEBUG_PRINT ("CmiRegisterReceiverPersistent() called.\n");
 
-  CMI_VMI_Eager_Short_Setup (request.pe);
+  if (CMI_VMI_Eager_Protocol) {
+    CMI_VMI_Eager_Short_Setup (request.pe);
 
-  if (request.maxBytes > CMI_VMI_Medium_Message_Boundary) {
-    if (request.maxBytes < CMI_VMI_Eager_Long_Buffer_Size) {
-      CMI_VMI_Eager_Long_Setup (request.pe, CMI_VMI_Eager_Long_Buffer_Size);
-    } else {
-      CMI_VMI_Eager_Long_Setup (request.pe, request.maxBytes);
+    if (request.maxBytes > CMI_VMI_Medium_Message_Boundary) {
+      if (request.maxBytes < CMI_VMI_Eager_Long_Buffer_Size) {
+	CMI_VMI_Eager_Long_Setup (request.pe, CMI_VMI_Eager_Long_Buffer_Size);
+      } else {
+	CMI_VMI_Eager_Long_Setup (request.pe, request.maxBytes);
+      }
     }
   }
 
@@ -2316,6 +2422,14 @@ void CMI_VMI_Read_Environment ()
     CMI_VMI_Probe_Clusters = atoi (value);
   }
 
+  if (value = getenv ("CMI_VMI_MEMORY_POOL")) {
+    CMI_VMI_Memory_Pool = atoi (value);
+  }
+
+  if (value = getenv ("CMI_VMI_TERMINATE_VMI_HACK")) {
+    CMI_VMI_Terminate_VMI_Hack = atoi (value);
+  }
+
   if (value = getenv ("CMI_VMI_CONNECTION_TIMEOUT")) {
     CMI_VMI_Connection_Timeout = atoi (value);
   }
@@ -2344,6 +2458,10 @@ void CMI_VMI_Read_Environment ()
     if (CMI_VMI_Medium_Message_Boundary > 65536) {
       CMI_VMI_Medium_Message_Boundary = 65536;
     }
+  }
+
+  if (value = getenv ("CMI_VMI_EAGER_PROTOCOL")) {
+    CMI_VMI_Eager_Protocol = atoi (value);
   }
 
   if (value = getenv ("CMI_VMI_EAGER_INTERVAL")) {
@@ -2751,27 +2869,27 @@ int CMI_VMI_Initialize_VMI ()
   VMI_STREAM_SET_RECV_FUNCTION (CMI_VMI_Stream_Notification_Handler);
 
   /* Create buffer pools. */
-#if CMI_VMI_USE_MEMORY_POOL
-  status = VMI_Pool_Create_Buffer_Pool (CMI_VMI_BUCKET1_SIZE, sizeof (PVOID), CMI_VMI_BUCKET1_PREALLOCATE,
-					CMI_VMI_BUCKET1_GROW, VMI_POOL_CLEARONCE, &CMI_VMI_Bucket1_Pool);
-  CMI_VMI_CHECK_SUCCESS (status, "VMI_Pool_Create_Buffer_Pool()");
+  if (CMI_VMI_Memory_Pool) {
+    status = VMI_Pool_Create_Buffer_Pool (CMI_VMI_BUCKET1_SIZE, sizeof (PVOID), CMI_VMI_BUCKET1_PREALLOCATE,
+					  CMI_VMI_BUCKET1_GROW, VMI_POOL_CLEARONCE, &CMI_VMI_Bucket1_Pool);
+    CMI_VMI_CHECK_SUCCESS (status, "VMI_Pool_Create_Buffer_Pool()");
 
-  status = VMI_Pool_Create_Buffer_Pool (CMI_VMI_BUCKET2_SIZE, sizeof (PVOID), CMI_VMI_BUCKET2_PREALLOCATE,
-					CMI_VMI_BUCKET2_GROW, VMI_POOL_CLEARONCE, &CMI_VMI_Bucket2_Pool);
-  CMI_VMI_CHECK_SUCCESS (status, "VMI_Pool_Create_Buffer_Pool()");
+    status = VMI_Pool_Create_Buffer_Pool (CMI_VMI_BUCKET2_SIZE, sizeof (PVOID), CMI_VMI_BUCKET2_PREALLOCATE,
+					  CMI_VMI_BUCKET2_GROW, VMI_POOL_CLEARONCE, &CMI_VMI_Bucket2_Pool);
+    CMI_VMI_CHECK_SUCCESS (status, "VMI_Pool_Create_Buffer_Pool()");
 
-  status = VMI_Pool_Create_Buffer_Pool (CMI_VMI_BUCKET3_SIZE, sizeof (PVOID), CMI_VMI_BUCKET3_PREALLOCATE,
-					CMI_VMI_BUCKET3_GROW, VMI_POOL_CLEARONCE, &CMI_VMI_Bucket3_Pool);
-  CMI_VMI_CHECK_SUCCESS (status, "VMI_Pool_Create_Buffer_Pool()");
+    status = VMI_Pool_Create_Buffer_Pool (CMI_VMI_BUCKET3_SIZE, sizeof (PVOID), CMI_VMI_BUCKET3_PREALLOCATE,
+					  CMI_VMI_BUCKET3_GROW, VMI_POOL_CLEARONCE, &CMI_VMI_Bucket3_Pool);
+    CMI_VMI_CHECK_SUCCESS (status, "VMI_Pool_Create_Buffer_Pool()");
 
-  status = VMI_Pool_Create_Buffer_Pool (CMI_VMI_BUCKET4_SIZE, sizeof (PVOID), CMI_VMI_BUCKET4_PREALLOCATE,
-					CMI_VMI_BUCKET4_GROW, VMI_POOL_CLEARONCE, &CMI_VMI_Bucket4_Pool);
-  CMI_VMI_CHECK_SUCCESS (status, "VMI_Pool_Create_Buffer_Pool()");
+    status = VMI_Pool_Create_Buffer_Pool (CMI_VMI_BUCKET4_SIZE, sizeof (PVOID), CMI_VMI_BUCKET4_PREALLOCATE,
+					  CMI_VMI_BUCKET4_GROW, VMI_POOL_CLEARONCE, &CMI_VMI_Bucket4_Pool);
+    CMI_VMI_CHECK_SUCCESS (status, "VMI_Pool_Create_Buffer_Pool()");
 
-  status = VMI_Pool_Create_Buffer_Pool (CMI_VMI_BUCKET5_SIZE, sizeof (PVOID), CMI_VMI_BUCKET5_PREALLOCATE,
-					CMI_VMI_BUCKET5_GROW, VMI_POOL_CLEARONCE, &CMI_VMI_Bucket5_Pool);
-  CMI_VMI_CHECK_SUCCESS (status, "VMI_Pool_Create_Buffer_Pool()");
-#endif
+    status = VMI_Pool_Create_Buffer_Pool (CMI_VMI_BUCKET5_SIZE, sizeof (PVOID), CMI_VMI_BUCKET5_PREALLOCATE,
+					  CMI_VMI_BUCKET5_GROW, VMI_POOL_CLEARONCE, &CMI_VMI_Bucket5_Pool);
+    CMI_VMI_CHECK_SUCCESS (status, "VMI_Pool_Create_Buffer_Pool()");
+  }
 
   /* Free memory. */
   free (vmi_inlined_data_size);
@@ -2794,22 +2912,22 @@ int CMI_VMI_Terminate_VMI ()
   DEBUG_PRINT ("CMI_VMI_Terminate_VMI() called.\n");
 
   /* Release memory used by buffer pools. */
-#if CMI_VMI_USE_MEMORY_POOL
-  status = VMI_Pool_Destroy_Buffer_Pool (CMI_VMI_Bucket1_Pool);
-  CMI_VMI_CHECK_SUCCESS (status, "VMI_Pool_Destroy_Buffer_Pool()");
+  if (CMI_VMI_Memory_Pool) {
+    status = VMI_Pool_Destroy_Buffer_Pool (CMI_VMI_Bucket1_Pool);
+    CMI_VMI_CHECK_SUCCESS (status, "VMI_Pool_Destroy_Buffer_Pool()");
 
-  status = VMI_Pool_Destroy_Buffer_Pool (CMI_VMI_Bucket2_Pool);
-  CMI_VMI_CHECK_SUCCESS (status, "VMI_Pool_Destroy_Buffer_Pool()");
+    status = VMI_Pool_Destroy_Buffer_Pool (CMI_VMI_Bucket2_Pool);
+    CMI_VMI_CHECK_SUCCESS (status, "VMI_Pool_Destroy_Buffer_Pool()");
 
-  status = VMI_Pool_Destroy_Buffer_Pool (CMI_VMI_Bucket3_Pool);
-  CMI_VMI_CHECK_SUCCESS (status, "VMI_Pool_Destroy_Buffer_Pool()");
+    status = VMI_Pool_Destroy_Buffer_Pool (CMI_VMI_Bucket3_Pool);
+    CMI_VMI_CHECK_SUCCESS (status, "VMI_Pool_Destroy_Buffer_Pool()");
 
-  status = VMI_Pool_Destroy_Buffer_Pool (CMI_VMI_Bucket4_Pool);
-  CMI_VMI_CHECK_SUCCESS (status, "VMI_Pool_Destroy_Buffer_Pool()");
+    status = VMI_Pool_Destroy_Buffer_Pool (CMI_VMI_Bucket4_Pool);
+    CMI_VMI_CHECK_SUCCESS (status, "VMI_Pool_Destroy_Buffer_Pool()");
 
-  status = VMI_Pool_Destroy_Buffer_Pool (CMI_VMI_Bucket5_Pool);
-  CMI_VMI_CHECK_SUCCESS (status, "VMI_Pool_Destroy_Buffer_Pool()");
-#endif   /* CMI_VMI_USE_MEMORY_POOL */
+    status = VMI_Pool_Destroy_Buffer_Pool (CMI_VMI_Bucket5_Pool);
+    CMI_VMI_CHECK_SUCCESS (status, "VMI_Pool_Destroy_Buffer_Pool()");
+  }
 
   /* Terminate VMI. */
   SET_VMI_SUCCESS (status);
@@ -3122,7 +3240,6 @@ VMI_CONNECT_RESPONSE CMI_VMI_Connection_Handler (PVMI_CONNECT connection, PVMI_S
 
   status = VMI_RDMA_Set_Get_Notification_Callback (connection, CMI_VMI_RDMA_Get_Notification_Handler);
   CMI_VMI_CHECK_SUCCESS (status, "VMI_RDMA_Set_Get_Notification_Callback()");
-
 
   /* Free the connect data buffer. */
   free (data);
@@ -3480,7 +3597,6 @@ void CMI_VMI_Wait_Cluster_Mapping ()
 
 
 
-#if CMI_VMI_USE_MEMORY_POOL
 /**************************************************************************
 **
 */
@@ -3494,31 +3610,41 @@ void *CMI_VMI_CmiAlloc (int request_size)
 
   DEBUG_PRINT ("CMI_VMI_CmiAlloc() (memory pool version) called.\n");
 
-  size = request_size + (sizeof (CMI_VMI_Memory_Chunk_T) - sizeof (CmiChunkHeader));
+  if (CMI_VMI_Eager_Protocol) {
+    size = request_size + (sizeof (CMI_VMI_Memory_Chunk_T) - sizeof (CmiChunkHeader));
+  } else {
+    size = request_size;
+  }
 
-  if (size < CMI_VMI_BUCKET1_SIZE) {
-    status = VMI_Pool_Allocate_Buffer (CMI_VMI_Bucket1_Pool, &ptr, NULL);
-    CMI_VMI_CHECK_SUCCESS (status, "VMI_Pool_Allocate_Buffer()");
-  } else if (size < CMI_VMI_BUCKET2_SIZE) {
-    status = VMI_Pool_Allocate_Buffer (CMI_VMI_Bucket2_Pool, &ptr, NULL);
-    CMI_VMI_CHECK_SUCCESS (status, "VMI_Pool_Allocate_Buffer()");
-  } else if (size < CMI_VMI_BUCKET3_SIZE) {
-    status = VMI_Pool_Allocate_Buffer (CMI_VMI_Bucket3_Pool, &ptr, NULL);
-    CMI_VMI_CHECK_SUCCESS (status, "VMI_Pool_Allocate_Buffer()");
-  } else if (size < CMI_VMI_BUCKET4_SIZE) {
-    status = VMI_Pool_Allocate_Buffer (CMI_VMI_Bucket4_Pool, &ptr, NULL);
-    CMI_VMI_CHECK_SUCCESS (status, "VMI_Pool_Allocate_Buffer()");
-  } else if (size < CMI_VMI_BUCKET5_SIZE) {
-    status = VMI_Pool_Allocate_Buffer (CMI_VMI_Bucket5_Pool, &ptr, NULL);
-    CMI_VMI_CHECK_SUCCESS (status, "VMI_Pool_Allocate_Buffer()");
+  if (CMI_VMI_Memory_Pool) {
+    if (size < CMI_VMI_BUCKET1_SIZE) {
+      status = VMI_Pool_Allocate_Buffer (CMI_VMI_Bucket1_Pool, &ptr, NULL);
+      CMI_VMI_CHECK_SUCCESS (status, "VMI_Pool_Allocate_Buffer()");
+    } else if (size < CMI_VMI_BUCKET2_SIZE) {
+      status = VMI_Pool_Allocate_Buffer (CMI_VMI_Bucket2_Pool, &ptr, NULL);
+      CMI_VMI_CHECK_SUCCESS (status, "VMI_Pool_Allocate_Buffer()");
+    } else if (size < CMI_VMI_BUCKET3_SIZE) {
+      status = VMI_Pool_Allocate_Buffer (CMI_VMI_Bucket3_Pool, &ptr, NULL);
+      CMI_VMI_CHECK_SUCCESS (status, "VMI_Pool_Allocate_Buffer()");
+    } else if (size < CMI_VMI_BUCKET4_SIZE) {
+      status = VMI_Pool_Allocate_Buffer (CMI_VMI_Bucket4_Pool, &ptr, NULL);
+      CMI_VMI_CHECK_SUCCESS (status, "VMI_Pool_Allocate_Buffer()");
+    } else if (size < CMI_VMI_BUCKET5_SIZE) {
+      status = VMI_Pool_Allocate_Buffer (CMI_VMI_Bucket5_Pool, &ptr, NULL);
+      CMI_VMI_CHECK_SUCCESS (status, "VMI_Pool_Allocate_Buffer()");
+    } else {
+      ptr = malloc (size);
+    }
   } else {
     ptr = malloc (size);
   }
 
-  ptr += sizeof (CMI_VMI_Memory_Chunk_T);
-  CONTEXTFIELD (ptr) = NULL;
+  if (CMI_VMI_Eager_Protocol) {
+    ptr += sizeof (CMI_VMI_Memory_Chunk_T);
+    CONTEXTFIELD (ptr) = NULL;
 
-  ptr -= sizeof (CmiChunkHeader);
+    ptr -= sizeof (CmiChunkHeader);
+  }
 
   return (ptr);
 }
@@ -3555,9 +3681,14 @@ void CMI_VMI_CmiFree (void *ptr)
 
   ptr += sizeof (CmiChunkHeader);
 
-  size = SIZEFIELD (ptr) + sizeof (CMI_VMI_Memory_Chunk_T);
+  if (CMI_VMI_Eager_Protocol) {
+    size = SIZEFIELD (ptr) + sizeof (CMI_VMI_Memory_Chunk_T);
+    context = CONTEXTFIELD (ptr);
+  } else {
+    size = SIZEFIELD (ptr);
+    context = NULL;
+  }
 
-  context = CONTEXTFIELD (ptr);
   if (context) {
     handle = (CMI_VMI_Handle_T *) context;
 
@@ -3601,137 +3732,36 @@ void CMI_VMI_CmiFree (void *ptr)
       CMI_VMI_CHECK_SUCCESS (status, "VMI_RDMA_Publish_Buffer()");
     }
   } else {
-    ptr -= sizeof (CMI_VMI_Memory_Chunk_T);
+    if (CMI_VMI_Eager_Protocol) {
+      ptr -= sizeof (CMI_VMI_Memory_Chunk_T);
+    } else {
+      ptr -= sizeof (CmiChunkHeader);
+    }
 
-    if (size < CMI_VMI_BUCKET1_SIZE) {
-      status = VMI_Pool_Deallocate_Buffer (CMI_VMI_Bucket1_Pool, ptr);
-      CMI_VMI_CHECK_SUCCESS (status, "VMI_Pool_Deallocate_Buffer()");
-    } else if (size < CMI_VMI_BUCKET2_SIZE) {
-      status = VMI_Pool_Deallocate_Buffer (CMI_VMI_Bucket2_Pool, ptr);
-      CMI_VMI_CHECK_SUCCESS (status, "VMI_Pool_Deallocate_Buffer()");
-    } else if (size < CMI_VMI_BUCKET3_SIZE) {
-      status = VMI_Pool_Deallocate_Buffer (CMI_VMI_Bucket3_Pool, ptr);
-      CMI_VMI_CHECK_SUCCESS (status, "VMI_Pool_Deallocate_Buffer()");
-    } else if (size < CMI_VMI_BUCKET4_SIZE) {
-      status = VMI_Pool_Deallocate_Buffer (CMI_VMI_Bucket4_Pool, ptr);
-      CMI_VMI_CHECK_SUCCESS (status, "VMI_Pool_Deallocate_Buffer()");
-    } else if (size < CMI_VMI_BUCKET5_SIZE) {
-      status = VMI_Pool_Deallocate_Buffer (CMI_VMI_Bucket5_Pool, ptr);
-      CMI_VMI_CHECK_SUCCESS (status, "VMI_Pool_Deallocate_Buffer()");
+    if (CMI_VMI_Memory_Pool) {
+      if (size < CMI_VMI_BUCKET1_SIZE) {
+	status = VMI_Pool_Deallocate_Buffer (CMI_VMI_Bucket1_Pool, ptr);
+	CMI_VMI_CHECK_SUCCESS (status, "VMI_Pool_Deallocate_Buffer()");
+      } else if (size < CMI_VMI_BUCKET2_SIZE) {
+	status = VMI_Pool_Deallocate_Buffer (CMI_VMI_Bucket2_Pool, ptr);
+	CMI_VMI_CHECK_SUCCESS (status, "VMI_Pool_Deallocate_Buffer()");
+      } else if (size < CMI_VMI_BUCKET3_SIZE) {
+	status = VMI_Pool_Deallocate_Buffer (CMI_VMI_Bucket3_Pool, ptr);
+	CMI_VMI_CHECK_SUCCESS (status, "VMI_Pool_Deallocate_Buffer()");
+      } else if (size < CMI_VMI_BUCKET4_SIZE) {
+	status = VMI_Pool_Deallocate_Buffer (CMI_VMI_Bucket4_Pool, ptr);
+	CMI_VMI_CHECK_SUCCESS (status, "VMI_Pool_Deallocate_Buffer()");
+      } else if (size < CMI_VMI_BUCKET5_SIZE) {
+	status = VMI_Pool_Deallocate_Buffer (CMI_VMI_Bucket5_Pool, ptr);
+	CMI_VMI_CHECK_SUCCESS (status, "VMI_Pool_Deallocate_Buffer()");
+      } else {
+	free (ptr);
+      }
     } else {
       free (ptr);
     }
   }
 }
-#else   /* CMI_VMI_USE_MEMORY_POOL */
-/**************************************************************************
-**
-*/
-void *CMI_VMI_CmiAlloc (int request_size)
-{
-  int size;
-  void *ptr;
-
-
-  DEBUG_PRINT ("CMI_VMI_CmiAlloc() (simple version) called.\n");
-
-  size = request_size +
-         (sizeof (CMI_VMI_Memory_Chunk_T) - sizeof (CmiChunkHeader));
-
-  ptr = malloc (size);
-
-  ptr += sizeof (CMI_VMI_Memory_Chunk_T);
-  CONTEXTFIELD (ptr) = NULL;
-
-  ptr -= sizeof (CmiChunkHeader);
-
-  return (ptr);
-}
-
-
-
-/**************************************************************************
-**
-*/
-void CMI_VMI_CmiFree (void *ptr)
-{
-  VMI_STATUS status;
-
-  int size;
-
-  void *context;
-
-  CMI_VMI_Process_T *process;
-  CMI_VMI_Handle_T *handle;
-
-  CMI_VMI_Eager_Short_Slot_Footer_T *footer;
-  int sender_rank;
-  int credits_temp;
-  int index;
-
-  PVMI_CACHE_ENTRY cacheentry;
-  char *publish_buffer;
-  int buffer_size;
-
-  CMI_VMI_Publish_Message_T publish_msg;
-
-
-  DEBUG_PRINT ("CMI_VMI_CmiFree() (simple version) called.\n");
-
-  ptr += sizeof (CmiChunkHeader);
-
-  size = SIZEFIELD (ptr) + sizeof (CMI_VMI_Memory_Chunk_T);
-
-  context = CONTEXTFIELD (ptr);
-  if (context) {
-    handle = (CMI_VMI_Handle_T *) context;
-
-    if (handle->data.receive.receive_handle_type == CMI_VMI_RECEIVE_HANDLE_TYPE_EAGER_SHORT) {
-      sender_rank = handle->data.receive.data.eager_short.sender_rank;
-      process = &CMI_VMI_Processes[sender_rank];
-
-      footer = handle->data.receive.data.eager_short.footer;
-      footer->sentinel = CMI_VMI_EAGER_SHORT_SENTINEL_FREE;
-
-      credits_temp = 0;
-      index = process->eager_short_receive_dirty;
-      handle = process->eager_short_receive_handles[index];
-      footer = handle->data.receive.data.eager_short.footer;
-      while (footer->sentinel == CMI_VMI_EAGER_SHORT_SENTINEL_FREE) {
-	footer->sentinel = CMI_VMI_EAGER_SHORT_SENTINEL_READY;
-	credits_temp += 1;
-
-	index = (index + 1) % process->eager_short_receive_size;
-	handle = process->eager_short_receive_handles[index];
-	footer = handle->data.receive.data.eager_short.footer;
-      }
-
-      process->eager_short_receive_dirty = index;
-      process->eager_short_receive_credits_replentish += credits_temp;
-    } else {
-      sender_rank = handle->data.receive.data.eager_long.sender_rank;
-      process = &CMI_VMI_Processes[sender_rank];
-
-      publish_buffer = handle->msg;
-      buffer_size = handle->data.receive.data.eager_long.maxsize;
-      cacheentry = handle->data.receive.data.eager_long.cacheentry;
-
-      /* Fill in the publish data which will be sent to the sender. */
-      publish_msg.type = CMI_VMI_PUBLISH_TYPE_EAGER_LONG;
-
-      /* Publish the eager buffer to the sender. */
-      status = VMI_RDMA_Publish_Buffer (process->connection, cacheentry->bufferHandle, (VMI_virt_addr_t) (VMI_ADDR_CAST) publish_buffer,
-					(UINT32) buffer_size, (VMI_virt_addr_t) (VMI_ADDR_CAST) NULL, (UINT32) handle->index,
-					(PVOID) &publish_msg, (ULONG) sizeof (CMI_VMI_Publish_Message_T));
-      CMI_VMI_CHECK_SUCCESS (status, "VMI_RDMA_Publish_Buffer()");
-    }
-  } else {
-    ptr -= sizeof (CMI_VMI_Memory_Chunk_T);
-
-    free (ptr);
-  }
-}
-#endif   /* CMI_VMI_USE_MEMORY_POOL */
 
 
 
@@ -4028,8 +4058,14 @@ void CMI_VMI_Stream_Completion_Handler (PVOID context, VMI_STATUS sstatus)
   handle->refcount -= 1;
 
   if (handle->refcount <= 1) {
-    mem_context = CONTEXTFIELD (handle->msg);
-    if (!mem_context) {
+    if (CMI_VMI_Eager_Protocol) {
+      mem_context = CONTEXTFIELD (handle->msg);
+      if (!mem_context) {
+	status = VMI_Cache_Deregister (handle->data.send.data.stream.cacheentry);
+	CMI_VMI_CHECK_SUCCESS (status, "VMI_Cache_Deregister()");
+      }
+    } else {
+      mem_context = NULL;
       status = VMI_Cache_Deregister (handle->data.send.data.stream.cacheentry);
       CMI_VMI_CHECK_SUCCESS (status, "VMI_Cache_Deregister()");
     }
@@ -4252,6 +4288,7 @@ void CMI_VMI_RDMA_Put_Completion_Handler (PVMI_RDMA_OP rdmaop, PVOID context, VM
   CMI_VMI_CHECK_SUCCESS (status, "VMI_RDMA_Dealloc_Op()");
 
   if (handle->refcount <= 1) {
+    /* Do not need to check for CMI_VMI_Eager_Protocol here because Put is only used for eager. */
     mem_context = CONTEXTFIELD (handle->msg);
     if (!mem_context) {
       status = VMI_Cache_Deregister (handle->data.send.data.eager_long.cacheentry);
@@ -4287,8 +4324,14 @@ void CMI_VMI_RDMA_Get_Notification_Handler (PVMI_CONNECT connection, UINT32 cont
 
   handle = &(CMI_VMI_Handles[context]);
 
-  mem_context = CONTEXTFIELD (handle->msg);
-  if (!mem_context) {
+  if (CMI_VMI_Eager_Protocol) {
+    mem_context = CONTEXTFIELD (handle->msg);
+    if (!mem_context) {
+      status = VMI_Cache_Deregister (handle->data.send.data.rdmaget.cacheentry);
+      CMI_VMI_CHECK_SUCCESS (status, "VMI_Cache_Deregister()");
+    }
+  } else {
+    mem_context = NULL;
     status = VMI_Cache_Deregister (handle->data.send.data.rdmaget.cacheentry);
     CMI_VMI_CHECK_SUCCESS (status, "VMI_Cache_Deregister()");
   }
@@ -4346,6 +4389,7 @@ void CMI_VMI_RDMA_Get_Completion_Handler (PVMI_RDMA_OP rdmaop, PVOID context, VM
   CMI_VMI_Common_Receive (process->rank, msgsize, msg);
 
 #if 0
+
   /* Deal with any eager send credits send with the message. */
   credits_temp = CMI_VMI_MESSAGE_CREDITS (msg);
   process->eager_short_send_credits_available += credits_temp;
@@ -4360,6 +4404,7 @@ void CMI_VMI_RDMA_Get_Completion_Handler (PVMI_RDMA_OP rdmaop, PVOID context, VM
 #else
   CdsFifo_Enqueue (CpvAccess (CMI_VMI_RemoteQueue), msg);
 #endif
+
 #endif
 
   CMI_VMI_Handle_Deallocate (handle);
