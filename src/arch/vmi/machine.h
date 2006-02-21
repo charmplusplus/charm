@@ -605,11 +605,11 @@ int CMI_VMI_Socket_Receive (int sockfd, void *msg, int size);
 int CMI_VMI_Open_Connections ();
 int CMI_VMI_Open_Connection (int remote_rank, char *remote_key, PVMI_BUFFER connect_message_buffer);
 VMI_CONNECT_RESPONSE CMI_VMI_Connection_Handler (PVMI_CONNECT connection, PVMI_SLAB slab, ULONG data_size);
-void CMI_VMI_Connection_Response_Handler (PVOID context, PVOID response, USHORT size, PVOID handle, VMI_CONNECT_RESPONSE status);
+void CMI_VMI_Connection_Response_Handler (PVOID context, PVOID response, USHORT size, PVOID handle, VMI_CONNECT_RESPONSE sstatus);
 
 int CMI_VMI_Close_Connections ();
 void CMI_VMI_Disconnection_Handler (PVMI_CONNECT connection);
-void CMI_VMI_Disconnection_Response_Handler (PVMI_CONNECT connection, PVOID context, VMI_STATUS status);
+void CMI_VMI_Disconnection_Response_Handler (PVMI_CONNECT connection, PVOID context, VMI_STATUS sstatus);
 
 
 /* Latency and cluster mapping functions */

@@ -3254,8 +3254,10 @@ VMI_CONNECT_RESPONSE CMI_VMI_Connection_Handler (PVMI_CONNECT connection, PVMI_S
 ** This function is invoked asynchronously to handle a process's response
 ** to our connection request.
 */
-void CMI_VMI_Connection_Response_Handler (PVOID context, PVOID response, USHORT size, PVOID handle, VMI_CONNECT_RESPONSE status)
+void CMI_VMI_Connection_Response_Handler (PVOID context, PVOID response, USHORT size, PVOID handle, VMI_CONNECT_RESPONSE sstatus)
 {
+  VMI_STATUS status;
+
   CMI_VMI_Process_T *process;
 
 
@@ -3272,18 +3274,16 @@ void CMI_VMI_Connection_Response_Handler (PVOID context, PVOID response, USHORT 
       /* Update the connection state. */
       process->connection_state = CMI_VMI_CONNECTION_CONNECTED;
 
-
       VMI_CONNECT_SET_RECEIVE_CONTEXT (process->connection, process);
 
       status = VMI_RDMA_Set_Publish_Callback (process->connection, CMI_VMI_RDMA_Publish_Handler);
       CMI_VMI_CHECK_SUCCESS (status, "VMI_RDMA_Set_Publish_Callback()");
 
       status = VMI_RDMA_Set_Put_Notification_Callback (process->connection, CMI_VMI_RDMA_Put_Notification_Handler);
-      CMI_VMI_CHECK_SUCCESS(status,"VMI_RDMA_Set_Put_Notification_Callback()");
+      CMI_VMI_CHECK_SUCCESS (status,"VMI_RDMA_Set_Put_Notification_Callback()");
 
       status = VMI_RDMA_Set_Get_Notification_Callback (process->connection, CMI_VMI_RDMA_Get_Notification_Handler);
-      CMI_VMI_CHECK_SUCCESS(status,"VMI_RDMA_Set_Get_Notification_Callback()");
-
+      CMI_VMI_CHECK_SUCCESS (status,"VMI_RDMA_Set_Get_Notification_Callback()");
 
       break;
 
@@ -3401,7 +3401,7 @@ void CMI_VMI_Disconnection_Handler (PVMI_CONNECT connection)
 ** This function is invoked asynchronously to handle a process's response
 ** to our disconnection request.
 */
-void CMI_VMI_Disconnection_Response_Handler (PVMI_CONNECT connection, PVOID context, VMI_STATUS status)
+void CMI_VMI_Disconnection_Response_Handler (PVMI_CONNECT connection, PVOID context, VMI_STATUS sstatus)
 {
   CMI_VMI_Process_T *process;
 
