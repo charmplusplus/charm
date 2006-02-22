@@ -3267,7 +3267,7 @@ void CMI_VMI_Connection_Response_Handler (PVOID context, PVOID response, USHORT 
   /* Cast the context to a CMI_VMI_Process_Info pointer. */
   process = (CMI_VMI_Process_T *) context;
 
-  switch (status)
+  switch (sstatus)
   {
     case VMI_CONNECT_RESPONSE_ACCEPT:
       DEBUG_PRINT ("Process %d accepted connection.\n", process->rank);
