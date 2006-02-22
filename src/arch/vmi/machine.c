@@ -3232,14 +3232,15 @@ VMI_CONNECT_RESPONSE CMI_VMI_Connection_Handler (PVMI_CONNECT connection, PVMI_S
 
   VMI_CONNECT_SET_RECEIVE_CONTEXT (connection, (&CMI_VMI_Processes[rank]));
 
+  /* A bug in VMI 2.1 prevents the following three calls from returning a proper return code. */
   status = VMI_RDMA_Set_Publish_Callback (connection, (VMIRDMABuffer) CMI_VMI_RDMA_Publish_Handler);
-  CMI_VMI_CHECK_SUCCESS (status, "VMI_RDMA_Set_Publish_Callback()");
+  /* CMI_VMI_CHECK_SUCCESS (status, "VMI_RDMA_Set_Publish_Callback()"); */
 
   status = VMI_RDMA_Set_Put_Notification_Callback (connection, CMI_VMI_RDMA_Put_Notification_Handler);
-  CMI_VMI_CHECK_SUCCESS (status, "VMI_RDMA_Set_Put_Notification_Callback()");
+  /* CMI_VMI_CHECK_SUCCESS (status, "VMI_RDMA_Set_Put_Notification_Callback()"); */
 
   status = VMI_RDMA_Set_Get_Notification_Callback (connection, CMI_VMI_RDMA_Get_Notification_Handler);
-  CMI_VMI_CHECK_SUCCESS (status, "VMI_RDMA_Set_Get_Notification_Callback()");
+  /* CMI_VMI_CHECK_SUCCESS (status, "VMI_RDMA_Set_Get_Notification_Callback()"); */
 
   /* Free the connect data buffer. */
   free (data);
@@ -3276,14 +3277,15 @@ void CMI_VMI_Connection_Response_Handler (PVOID context, PVOID response, USHORT 
 
       VMI_CONNECT_SET_RECEIVE_CONTEXT (process->connection, process);
 
+      /* A bug in VMI 2.1 prevents the following three calls from returning a proper return code. */
       status = VMI_RDMA_Set_Publish_Callback (process->connection, CMI_VMI_RDMA_Publish_Handler);
-      CMI_VMI_CHECK_SUCCESS (status, "VMI_RDMA_Set_Publish_Callback()");
+      /* CMI_VMI_CHECK_SUCCESS (status, "VMI_RDMA_Set_Publish_Callback()"); */
 
       status = VMI_RDMA_Set_Put_Notification_Callback (process->connection, CMI_VMI_RDMA_Put_Notification_Handler);
-      CMI_VMI_CHECK_SUCCESS (status,"VMI_RDMA_Set_Put_Notification_Callback()");
+      /* CMI_VMI_CHECK_SUCCESS (status,"VMI_RDMA_Set_Put_Notification_Callback()"); */
 
       status = VMI_RDMA_Set_Get_Notification_Callback (process->connection, CMI_VMI_RDMA_Get_Notification_Handler);
-      CMI_VMI_CHECK_SUCCESS (status,"VMI_RDMA_Set_Get_Notification_Callback()");
+      /* CMI_VMI_CHECK_SUCCESS (status,"VMI_RDMA_Set_Get_Notification_Callback()"); */
 
       break;
 
