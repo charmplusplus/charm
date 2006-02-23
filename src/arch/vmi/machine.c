@@ -295,6 +295,7 @@ void ConverseExit ()
   if (CMI_VMI_Startup_Type == CMI_VMI_STARTUP_TYPE_CHARMRUN) {
     CMI_VMI_Charmrun_Message_Header_T hdr;
     int rc;
+    char dummy[10];
 
     hdr.msg_len = htonl (0);
     strcpy (hdr.msg_type, "ending");
@@ -304,22 +305,22 @@ void ConverseExit ()
       DEBUG_PRINT ("Error sending to charmrun.\n");
     }
 
+    /*
+	Receiving from the charmrun socket acts as a sort of "barrier" because the call
+	blocks until all processes signal ending and the charmrun closes all sockets.
+    */
+    CMI_VMI_Socket_Receive (CMI_VMI_Charmrun_Socket, dummy, 1);
+
     /* Do NOT close CMI_VMI_Charmrun_Socket here or charmrun will die! */
   }
 
   /* ConverseCommonExit() shuts down CCS and closes Projections logs. */
   ConverseCommonExit ();
 
-  /* Barrier to ensure that all processes are ready to shut down. */
-  CmiBarrier ();
-
-  for (i = 0; i < 100000; i++) {
-    status = VMI_Poll ();
-    CMI_VMI_CHECK_SUCCESS (status, "VMI_Poll()");
-  }
-
   /* If a clean VMI termination is requested, do it. */
   if (!CMI_VMI_Terminate_VMI_Hack) {
+    CmiBarrier ();
+
     CMI_VMI_Close_Connections ();
 
     for (i = 0; i < 100000; i++) {
@@ -600,7 +601,7 @@ void CmiBarrier ()
 
   DEBUG_PRINT ("CmiBarrier() called.\n");
 
-  /* PE 0 coordinates the barrier. */
+  /* Process 0 coordinates the barrier. */
   if (_Cmi_mype == 0) {
     /* Wait until all processes send us a barrier message. */
     while (CMI_VMI_Barrier_Count < (_Cmi_numpes - 1)) {
@@ -627,7 +628,7 @@ void CmiBarrier ()
       CMI_VMI_CHECK_SUCCESS (status, "VMI_Stream_Send_Inline()");
     }
   } else {
-    /* Send a barrier message to PE 0. */
+    /* Send a barrier message to Process 0. */
     CMI_VMI_MESSAGE_TYPE (&barrier_msg) = CMI_VMI_MESSAGE_TYPE_BARRIER;
     CMI_VMI_MESSAGE_CREDITS (&barrier_msg) = 0;
 
@@ -641,7 +642,7 @@ void CmiBarrier ()
     status = VMI_Stream_Send_Inline ((&CMI_VMI_Processes[0])->connection, addrs, sz, 1, sizeof (CMI_VMI_Barrier_Message_T));
     CMI_VMI_CHECK_SUCCESS (status, "VMI_Stream_Send_Inline()");
 
-    /* Wait until PE 0 notifies us that barrier is finished. */
+    /* Wait until Process 0 notifies us that barrier is finished. */
     while (CMI_VMI_Barrier_Count < 1) {
       status = VMI_Poll ();
       CMI_VMI_CHECK_SUCCESS (status, "VMI_Poll()");
