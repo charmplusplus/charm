@@ -116,7 +116,7 @@ char *PCQueuePop(PCQueue Q)
     circ = Q->head;
     pull = circ->pull;
     data = circ->data[pull];
-#ifdef XT3_ONLY_PCQUEUE_WORKAROUND
+#if XT3_ONLY_PCQUEUE_WORKAROUND
     if (data && (Q->len > 0)) {
 #else
     if (data) {
