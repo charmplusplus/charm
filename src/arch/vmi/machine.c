@@ -309,13 +309,18 @@ void ConverseExit ()
 	Receiving from the charmrun socket acts as a sort of "barrier" because the call
 	blocks until all processes signal ending and the charmrun closes all sockets.
     */
-    CMI_VMI_Socket_Receive (CMI_VMI_Charmrun_Socket, dummy, 1);
+    //CMI_VMI_Socket_Receive (CMI_VMI_Charmrun_Socket, dummy, 1);
 
     /* Do NOT close CMI_VMI_Charmrun_Socket here or charmrun will die! */
   }
 
   /* ConverseCommonExit() shuts down CCS and closes Projections logs. */
   ConverseCommonExit ();
+
+  sleep (30);
+
+  exit (0);
+
 
   /* If a clean VMI termination is requested, do it. */
   if (!CMI_VMI_Terminate_VMI_Hack) {
