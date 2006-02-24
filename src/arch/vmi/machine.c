@@ -291,36 +291,15 @@ void ConverseExit ()
 
   DEBUG_PRINT ("ConverseExit() called.\n");
 
-  /* Barrier to ensure that all processes are ready to exit. */
-  CmiBarrier ();
-
   /* ConverseCommonExit() shuts down CCS and closes Projections logs. */
   ConverseCommonExit ();
 
-  /* If a clean VMI termination is requested, do it. */
-  if (!CMI_VMI_Terminate_VMI_Hack) {
-    CMI_VMI_Close_Connections ();
+  /*
+    Signal the charmrun terminal that the computation has ended (if necessary).
 
-    CMI_VMI_Terminate_VMI ();
-  }
-
-  /* Free resources. */
-  CdsFifo_Destroy (CpvAccess (CMI_VMI_RemoteQueue));
-  CdsFifo_Destroy (CpvAccess (CmiLocalQueue));
-
-  for (i = 0; i < _Cmi_numpes; i++) {
-    if ((&CMI_VMI_Processes[i])->latency_vector) {
-      free ((&CMI_VMI_Processes[i])->latency_vector);
-    }
-  }
-
-  free (CMI_VMI_Handles);
-  free (CMI_VMI_Eager_Short_Pollset);
-  free (CMI_VMI_Processes);
-  free (CMI_VMI_Program_Key);
-  free (CMI_VMI_Username);
-
-  /* Signal the charmrun terminal that the computation has ended (if necessary). */
+    NOTE: Get rid of charmrun as early in ConverseExit() as possible in case
+    something bad happens below.
+  */
   if (CMI_VMI_Startup_Type == CMI_VMI_STARTUP_TYPE_CHARMRUN) {
     CMI_VMI_Charmrun_Message_Header_T hdr;
     int rc;
@@ -335,12 +314,46 @@ void ConverseExit ()
     }
 
     /*
-	Reading from the charmrun socket acts as a sort of "barrier" because the call
-	blocks until all processes signal ending and the charmrun closes all sockets.
+      Reading from the charmrun socket acts as a sort of "barrier" because the call
+      blocks until all processes signal ending and the charmrun closes all sockets.
 
-	NOTE: This *must* be a read() to work correctly!
+      NOTE: This *must* be a read() to work correctly!
     */
     read (CMI_VMI_Charmrun_Socket, dummy, 1);
+  }
+
+  /* If a clean VMI termination is requested, do it. */
+  if (!CMI_VMI_Terminate_VMI_Hack) {
+    /* Barrier to ensure that all processes are ready to exit. */
+    CmiBarrier ();
+
+    /* Close all VMI connections. */
+    CMI_VMI_Close_Connections ();
+
+    /* Call VMI_Poll() several times in case some messages are still outstanding. */
+    for (i = 0; i < 1000000; i++) {
+      status = VMI_Poll ();
+      CMI_VMI_CHECK_SUCCESS (status, "VMI_Poll()");
+    }
+
+    /* Terminate VMI cleanly. */
+    CMI_VMI_Terminate_VMI ();
+
+    /* Free resources. */
+    CdsFifo_Destroy (CpvAccess (CMI_VMI_RemoteQueue));
+    CdsFifo_Destroy (CpvAccess (CmiLocalQueue));
+
+    for (i = 0; i < _Cmi_numpes; i++) {
+      if ((&CMI_VMI_Processes[i])->latency_vector) {
+        free ((&CMI_VMI_Processes[i])->latency_vector);
+      }
+    }
+
+    free (CMI_VMI_Handles);
+    free (CMI_VMI_Eager_Short_Pollset);
+    free (CMI_VMI_Processes);
+    free (CMI_VMI_Program_Key);
+    free (CMI_VMI_Username);
   }
 
   exit (0);
