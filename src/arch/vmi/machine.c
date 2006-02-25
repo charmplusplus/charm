@@ -291,9 +291,13 @@ void ConverseExit ()
 
   DEBUG_PRINT ("ConverseExit() called.\n");
 
-  sleep (10);
+  /* ConverseCommonExit() shuts down CCS and closes Projections logs. */
+  ConverseCommonExit ();
 
-  /* Call VMI_Poll() several times in case some messages are still outstanding. */
+  /* Barrier to ensure that all processes are ready to exit. */
+  CmiBarrier ();
+
+  /* Call VMI_Poll() several times to drain the network. */
   for (i = 0; i < 1000000; i++) {
     status = VMI_Poll ();
     CMI_VMI_CHECK_SUCCESS (status, "VMI_Poll()");
@@ -320,7 +324,11 @@ void ConverseExit ()
 
     /*
       Reading from the charmrun socket acts as a sort of "barrier" because the call
-      blocks until all processes signal ending and the charmrun closes all sockets.
+      blocks until all processes signal ending and charmrun closes all sockets.  This
+      is important because it ensures that no processes exit until all processes signal
+      charmrun that they are ready to terminate.  Failing to do this causes charmrun
+      to print an error message if any processes exit before all processes signal that
+      they are terminating.
 
       NOTE: This *must* be a read() to work correctly!
     */
@@ -329,16 +337,10 @@ void ConverseExit ()
 
   /* If a clean VMI termination is requested, do it. */
   if (!CMI_VMI_Terminate_VMI_Hack) {
-    /* ConverseCommonExit() shuts down CCS and closes Projections logs. */
-    ConverseCommonExit ();
-
-    /* Barrier to ensure that all processes are ready to exit. */
-    CmiBarrier ();
-
     /* Close all VMI connections. */
     CMI_VMI_Close_Connections ();
 
-    /* Call VMI_Poll() several times in case some messages are still outstanding. */
+    /* Call VMI_Poll() several times to drain the network. */
     for (i = 0; i < 1000000; i++) {
       status = VMI_Poll ();
       CMI_VMI_CHECK_SUCCESS (status, "VMI_Poll()");
@@ -364,6 +366,7 @@ void ConverseExit ()
     free (CMI_VMI_Username);
   }
 
+  /* Must call exit() in order to actually terminate the program. */
   exit (0);
 }
 
