@@ -291,8 +291,13 @@ void ConverseExit ()
 
   DEBUG_PRINT ("ConverseExit() called.\n");
 
-  /* ConverseCommonExit() shuts down CCS and closes Projections logs. */
-  ConverseCommonExit ();
+  sleep (10);
+
+  /* Call VMI_Poll() several times in case some messages are still outstanding. */
+  for (i = 0; i < 1000000; i++) {
+    status = VMI_Poll ();
+    CMI_VMI_CHECK_SUCCESS (status, "VMI_Poll()");
+  }
 
   /*
     Signal the charmrun terminal that the computation has ended (if necessary).
@@ -324,6 +329,9 @@ void ConverseExit ()
 
   /* If a clean VMI termination is requested, do it. */
   if (!CMI_VMI_Terminate_VMI_Hack) {
+    /* ConverseCommonExit() shuts down CCS and closes Projections logs. */
+    ConverseCommonExit ();
+
     /* Barrier to ensure that all processes are ready to exit. */
     CmiBarrier ();
 
