@@ -248,13 +248,21 @@ void ConverseInit (int argc, char **argv, CmiStartFn start_function, int user_ca
     CmiAbort ("Fatal error during connection setup phase.");
   }
 
-  /* Probe the cluster mapping by requesting all-to-all latencies (if requested). */
+  /*
+    Probe the cluster mapping by requesting all-to-all latencies (if requested).
+
+    NOTE: This must start with a CmiBarrier() because some processes may not have
+    completed opening connections, so probing latencies on these connections will
+    certainly result in a segfault.
+  */
   if (CMI_VMI_Probe_Clusters) {
     if (_Cmi_mype == 0) {
+      CmiBarrier ();
       CmiProbeLatencies ();
       CMI_VMI_Compute_Cluster_Mapping ();
       CMI_VMI_Distribute_Cluster_Mapping ();
     } else {
+      CmiBarrier ();
       CMI_VMI_Wait_Cluster_Mapping ();
     }
   }
@@ -330,7 +338,7 @@ void ConverseExit ()
       to print an error message if any processes exit before all processes signal that
       they are terminating.
 
-      NOTE: This *must* be a read() to work correctly!
+      NOTE: This must be a read() to work correctly!
     */
     read (CMI_VMI_Charmrun_Socket, dummy, 1);
   }
