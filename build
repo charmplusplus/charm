@@ -30,6 +30,7 @@ syntax() {
   echo '<options>: compiler and platform specific options'
   echo 'cc cc64 cxx kcc pgcc acc icc ecc gcc3 mpcc pathscale'
   echo 'help smp gm tcp vmi scyld clustermatic bluegene ooc syncft papi'
+  echo 'pthreads lam'
   echo '--incdir --libdir --basedir --no-build-shared -j'
   if test $more = 1
   then
@@ -57,6 +58,7 @@ syntax() {
   echo '  ifort           Intel Fortran compiler (newer versions)'
   echo ''
   echo 'Platform specific options (choose multiple if apply):'
+  echo '  lam             Use LAM MPI'
   echo '  smp             support for SMP, multithreaded charm on each node'
   echo '  mpt             use SGI Message Passing Toolkit (only for mpi version)'
   echo '  gm              use Myrinet for communication'
@@ -64,6 +66,7 @@ syntax() {
   echo "  vmi             use NCSA's VMI for communication (only for mpi version)"
   echo '  scyld           compile for Scyld Beowulf cluster based on bproc'
   echo '  clustermatic    compile for Clustermatic (support version 3 and 4) '
+  echo '  pthreads        compile with pthreads Converse threads'
   echo ''
   echo 'Advanced options:'
   echo '  bluegene	  compile for BigSim (Blue Gene) simulator'
@@ -311,7 +314,12 @@ done
 
 [ "x$VERSION" = "x" ] && syntax && exit 1
 
-[ -z "$MAKE" ] && MAKE='make'
+if [ -z "$MAKE" ] 
+then
+  # prefer gmake
+  MAKE=`which gmake 2>/dev/null`
+  [ -z "$MAKE" -o ! -x "$MAKE" ] && MAKE='make'
+fi
 
 if [ ! -f $src/$BASEVERSION/conv-mach.h ] 
 then
