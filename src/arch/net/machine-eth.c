@@ -48,7 +48,7 @@ static void CmiNotifyStillIdle(CmiIdleState *s)
 #if CMK_SHARED_VARS_UNAVAILABLE
   /*No comm. thread-- listen on sockets for incoming messages*/
   MACHSTATE(3,"idle commserver {")
-  CommunicationServer(10, 0);
+  CommunicationServer(Cmi_idlepoll?0:10, 0);
   MACHSTATE(3,"} idle commserver")
 #else
   int nSpins=20; /*Number of times to spin before sleeping*/
