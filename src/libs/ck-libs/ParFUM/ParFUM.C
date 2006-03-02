@@ -324,6 +324,10 @@ FEM_Mesh_broadcast(int fem_mesh,int masterRank,FEM_Comm_t comm_context)
 		return FEM_Mesh_recv(masterRank,tag,comm_context);
 	}
 #else
+	MPI_Barrier((MPI_Comm)comm_context);
+	_registerfem();
+	MPI_Barrier((MPI_Comm)comm_context);
+	
 	return FEM_Mesh_Parallel_broadcast(fem_mesh,masterRank,comm_context);
 #endif
 }

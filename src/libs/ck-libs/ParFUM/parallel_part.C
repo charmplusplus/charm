@@ -38,7 +38,7 @@ int FEM_Mesh_Parallel_broadcast(int fem_mesh,int masterRank,FEM_Comm_t comm_cont
 int FEM_master_parallel_part(int fem_mesh,int masterRank,FEM_Comm_t comm_context){
   const char *caller="FEM_Create_connmsa"; 
   FEMAPI(caller);
-  ParFUM.hunk *c=ParFUM.hunk::get(caller);
+  FEM_chunk *c=FEM_chunk::get(caller);
   FEM_Mesh *m=c->lookup(fem_mesh,caller);
   m->setAbsoluteGlobalno();
   int nelem = m->nElems();
@@ -179,7 +179,7 @@ int FEM_master_parallel_part(int fem_mesh,int masterRank,FEM_Comm_t comm_context
   delete gdata;
 	
   me.m->becomeGetting();
-  ParFUM.hunk *chunk = ParFUM.hunk::get("FEM_Mesh_Parallel_broadcast");
+  FEM_chunk *chunk = FEM_chunk::get("FEM_Mesh_Parallel_broadcast");
   int tempMeshNo = chunk->meshes.put(me.m);
   int new_mesh = FEM_Mesh_copy(tempMeshNo);
 	
@@ -283,7 +283,7 @@ int FEM_slave_parallel_part(int fem_mesh,int masterRank,FEM_Comm_t comm_context)
   makeGhosts(me.m,(MPI_Comm )comm_context,masterRank,gdata->numLayers,gdata->layers);
 	
   me.m->becomeGetting();
-  ParFUM.hunk *chunk = ParFUM.hunk::get("FEM_Mesh_Parallel_broadcast");
+  FEM_chunk *chunk = FEM_chunk::get("FEM_Mesh_Parallel_broadcast");
   int tempMeshNo = chunk->meshes.put(me.m);
   int new_mesh = FEM_Mesh_copy(tempMeshNo);
 	
@@ -1084,5 +1084,5 @@ bool sharedWith(int lnode,int chunk,FEM_Mesh *m){
     return false;
   }
 }
-#include "ParFUM.def.h"
+#include "fem.def.h"
 #endif
