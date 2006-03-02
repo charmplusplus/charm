@@ -2428,8 +2428,11 @@ void Entry::genArrayDefs(XStr& str)
     str << "  CkArrayMessage *impl_amsg=(CkArrayMessage *)impl_msg;\n";
     str << "  impl_amsg->array_setIfNotThere("<<ifNot<<");\n";
     if(isIget()) {
-	    str << "  CkFutureID f=CkCreateAttachedFuture(impl_amsg);"<<"\n";
+	    str << "  int status;"<<"\n";	
+	    str << "  CkFutureID f=CkCreateAttachedFutureStatus(impl_amsg,"<<epIdx()<<",this,&CProxyElement_ArrayBase::ckSendWrapper, &status);"<<"\n";
+	    str << "  if(status)"<<"\n";
     }
+    
     if(isSync()) {
       str << syncReturn() << "ckSendSync(impl_amsg, "<<epIdx()<<"));\n";
     } 
