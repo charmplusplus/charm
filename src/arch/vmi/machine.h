@@ -43,8 +43,8 @@
 #define CMI_VMI_TERMINATE_VMI_HACK               1         /* Boolean */
 #define CMI_VMI_CONNECTION_TIMEOUT               300       /* seconds */
 #define CMI_VMI_MAXIMUM_HANDLES                  10000
-#define CMI_VMI_SMALL_MESSAGE_BOUNDARY           512       /* bytes */
-#define CMI_VMI_MEDIUM_MESSAGE_BOUNDARY          16384     /* bytes */
+#define CMI_VMI_SMALL_MESSAGE_BOUNDARY           2048      /* bytes */
+#define CMI_VMI_MEDIUM_MESSAGE_BOUNDARY          32768     /* bytes */
 #define CMI_VMI_EAGER_PROTOCOL                   0         /* Boolean */
 #define CMI_VMI_EAGER_INTERVAL                   10000
 #define CMI_VMI_EAGER_THRESHOLD                  1000
