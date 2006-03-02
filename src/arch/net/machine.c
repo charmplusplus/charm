@@ -980,15 +980,16 @@ static void ctrl_sendone_locking(const char *type,
   CmiCommUnlock();
 }
 
-
+#ifndef MEMORYUSAGE_OUTPUT
 #define MEMORYUSAGE_OUTPUT 0 
+#endif
 #if MEMORYUSAGE_OUTPUT 
 #define MEMORYUSAGE_OUTPUT_FREQ 10 //how many prints in a second
 static int memoryusage_counter;
 #define memoryusage_isOutput ((memoryusage_counter%MEMORYUSAGE_OUTPUT_FREQ)==0)
 #define memoryusage_output {\
   memoryusage_counter++;\
-  printf("-- %d %f %ld --\n", CmiMyPe(), GetClock(), CmiMemoryUsage());}
+  if(CmiMyPe()==0) printf("-- %d %f %ld --\n", CmiMyPe(), GetClock(), CmiMemoryUsage());}
 #endif
 
 static double Cmi_check_last;
