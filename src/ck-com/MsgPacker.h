@@ -83,7 +83,7 @@ class MsgPacker {
     
     //Takes a queue of envelopes as char* ptrs and not charm message holders
     //Used by mesh streaming strategy
-    MsgPacker::MsgPacker(CkQ<char *> &msgq, int n_msgs);
+    MsgPacker(CkQ<char *> &msgq, int n_msgs);
     
     void getMessage(CombinedMessage *&msg, int &size);
     static void deliver(CombinedMessage *cmb_msg);
