@@ -1,7 +1,17 @@
 #ifndef _GRIDCOMMLB_H_
 #define _GRIDCOMMLB_H_
 
+#include <limits.h>
+#include <stdio.h>
+
+#include "charm++.h"
+#include "cklists.h"
+
 #include "CentralLB.h"
+
+#if CONVERSE_VERSION_VMI
+extern "C" int CmiGetCluster (int process);
+#endif
 
 void CreateGridCommLB ();
 
@@ -15,6 +25,8 @@ class PE_Data_T
     int num_lan_msgs;
     int num_wan_objs;
     int num_wan_msgs;
+    double relative_speed;
+    double scaled_load;
 };
 
 class Object_Data_T
@@ -26,13 +38,14 @@ class Object_Data_T
     int to_pe;
     int num_lan_msgs;
     int num_wan_msgs;
+    double load;
 };
 
 class GridCommLB : public CentralLB
 {
   public:
     GridCommLB (const CkLBOptions &);
-    GridCommLB (CkMigrateMessage *m);
+    GridCommLB (CkMigrateMessage *msg);
 
     void work (CentralLB::LDStats *stats, int count);
 
@@ -47,6 +60,7 @@ class GridCommLB : public CentralLB
 
     int Num_PEs;
     int Num_Objects;
+    int Num_Clusters;
     PE_Data_T *PE_Data;
     Object_Data_T *Object_Data;
 };
