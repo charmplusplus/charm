@@ -14,7 +14,7 @@
 #define MINAREA 1.0e-18
 #define MAXAREA 1.0e12
 
-#define GRADATION 1.8
+#define GRADATION 1.3
 
 CtvDeclare(FEM_Adapt_Algs *, _adaptAlgs);
 
@@ -214,7 +214,8 @@ int FEM_Adapt_Algs::Coarsen(int qm, int method, double factor, double *sizes)
 	      || (qFactor < QUALITY_MIN)) {
 	  //){
 
-	  int eNbr = theMesh->e2e_getNbr(elId, n1+n2-1, 0);
+	  int eNbr = theMesh->e2e_getNbr(elId, theMesh->e2n_getIndex(elId,n1)+
+					 theMesh->e2n_getIndex(elId,n2)-1, 0);
 	  // determine if eNbr should also be coarsened
 	  if ((eNbr >= 0) && (theMesh->elem[0].is_valid(eNbr))) {
 	    eConn = (int*)malloc(elemWidth*sizeof(int));
@@ -318,7 +319,12 @@ void FEM_Adapt_Algs::SetMeshSize(int method, double factor, double *sizes)
       }
     }
   }
-  else if (method == 4) { // mesh sizing has been set independently; use as is
+  else if (method == 4) { // scale existing sizes by factor
+    for (int i=0; i<numElements; i++) {
+      theMesh->elem[0].setMeshSizing(i, factor*theMesh->elem[0].getMeshSizing(i));
+    }
+  }
+  else if (method == 5) { // mesh sizing has been set independently; use as is
     CkPrintf("ParFUM_SetMeshSize: USE EXISTING SIZES \n");
   }
   //  CkPrintf("Current mesh sizing: ");
@@ -1056,4 +1062,5 @@ void  FEM_Adapt_Algs::FEM_mesh_smooth(FEM_Mesh *meshP, int *nodes, int nNodes, i
   delete [] coords;
   delete [] boundVals;
 }
+
 

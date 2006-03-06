@@ -3089,11 +3089,11 @@ class femMeshModify : public CBase_femMeshModify {
 // Ask: TLW
 
 #define SLIVERAREA 1.0e-18
-#define REFINE_TOL 1.3  // Refine elements with average edge length > 
+#define REFINE_TOL 1.1  // Refine elements with average edge length > 
                         // REFINE_TOL*desiredEdgeLength
-#define COARSEN_TOL 0.6 // Coarsen element with average edge length <
+#define COARSEN_TOL 0.8 // Coarsen element with average edge length <
                         // COARSEN_TOL*desiredEdgeLength
-#define QUALITY_MIN 0.3
+#define QUALITY_MIN 0.6
 
 class FEM_Adapt_Algs;
 CtvExtern(FEM_Adapt_Algs *, _adaptAlgs);
