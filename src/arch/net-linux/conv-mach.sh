@@ -12,6 +12,7 @@ CMK_LDXX="$CMK_CXX "
 CMK_LD_SHARED="-shared"
 CMK_LD_LIBRARY_PATH="-Wl,-rpath,$CHARMLIBSO/"
 CMK_XIOPTS=""
+CMK_QT="i386-gcc"
 
 # fortran compiler Absoft or gnu f95
 CMK_CF77="g77 "
@@ -32,7 +33,7 @@ else
   if test -n "$CMK_CF90"
   then
     CMK_FPP="/lib/cpp -P -CC"
-    CMK_CF90="$CMK_CF90 -fpic"
+    CMK_CF90="$CMK_CF90 -fpic -fautomatic -fdollar-ok "
     CMK_CF90_FIXED="$CMK_CF90 -ffixed-form "
     CMK_F90LIBS="-lgfortran "
     CMK_MOD_NAME_ALLCAPS=
