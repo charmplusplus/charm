@@ -30,6 +30,7 @@ A more readable summary is at:
  *
  *  Developed by Sameer Kumar (sameer@ks.uiuc.edu) 8/25/03
  *  Made functional by Orion Lawlor (olawlor@acm.org) 2003/9/16
+ *  Made working on AMD64 by Gengbin Zheng 12/20/2005
  *
  *  FIXME2: Sanity check. I am assuming that if a symbol is in the
  *  relocation table it is in the global offset table. A sanity check
@@ -250,7 +251,11 @@ public:
     
     void allocate(int size) {
       seg_size=size;
-      data_seg=malloc(seg_size);
+        /* global data segment need to be isomalloc */
+      if (CmiMemoryIs(CMI_MEMORY_IS_ISOMALLOC))
+        data_seg=CmiIsomalloc(seg_size);
+      else
+        data_seg=malloc(seg_size);
     }
     
     CtgGlobalStruct(void) {
@@ -269,7 +274,11 @@ public:
 void CtgGlobalStruct::pup(PUP::er &p) {
     p | seg_size;
     if (p.isUnpacking()) allocate(seg_size);
-    p((char *)data_seg, seg_size);
+        /* global data segment need to be isomalloc pupped */
+    if (CmiMemoryIs(CMI_MEMORY_IS_ISOMALLOC))
+      CmiIsomallocPup(&p, &data_seg);
+    else 
+      p((char *)data_seg, seg_size);
 }
 
 /// Singleton object describing our global variables:
