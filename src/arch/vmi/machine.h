@@ -567,7 +567,7 @@ int CmiAsyncMsgSent (CmiCommHandle commhandle);
 int CmiAllAsyncMsgsSent ();
 void CmiReleaseCommHandle (CmiCommHandle commhandle);
 
-void *CmiGetNonLocal (void);
+void *CmiGetNonLocal ();
 
 void CmiProbeLatencies ();
 unsigned long CmiGetLatency (int process1, int process2);
@@ -605,11 +605,11 @@ int CMI_VMI_Socket_Receive (int sockfd, void *msg, int size);
 int CMI_VMI_Open_Connections ();
 int CMI_VMI_Open_Connection (int remote_rank, char *remote_key, PVMI_BUFFER connect_message_buffer);
 VMI_CONNECT_RESPONSE CMI_VMI_Connection_Handler (PVMI_CONNECT connection, PVMI_SLAB slab, ULONG data_size);
-void CMI_VMI_Connection_Response_Handler (PVOID context, PVOID response, USHORT size, PVOID handle, VMI_CONNECT_RESPONSE sstatus);
+void CMI_VMI_Connection_Response_Handler (PVOID context, PVOID response, USHORT size, PVOID handle, VMI_CONNECT_RESPONSE remote_status);
 
 int CMI_VMI_Close_Connections ();
 void CMI_VMI_Disconnection_Handler (PVMI_CONNECT connection);
-void CMI_VMI_Disconnection_Response_Handler (PVMI_CONNECT connection, PVOID context, VMI_STATUS sstatus);
+void CMI_VMI_Disconnection_Response_Handler (PVMI_CONNECT connection, PVOID context, VMI_STATUS remote_status);
 
 
 /* Latency and cluster mapping functions */
@@ -638,7 +638,7 @@ void CMI_VMI_Eager_Long_Setup (int sender_rank, int maxsize);
 
 /* Send and receive handler functions */
 VMI_RECV_STATUS CMI_VMI_Stream_Notification_Handler (PVMI_CONNECT connection, PVMI_STREAM_RECV stream, VMI_STREAM_COMMAND command, PVOID context, PVMI_SLAB slab);
-void CMI_VMI_Stream_Completion_Handler (PVOID context, VMI_STATUS sstatus);
+void CMI_VMI_Stream_Completion_Handler (PVOID context, VMI_STATUS remote_status);
 
 void CMI_VMI_RDMA_Publish_Handler (PVMI_CONNECT connection, PVMI_REMOTE_BUFFER remote_buffer, PVMI_SLAB publish_data, ULONG publish_data_size);
 
@@ -646,7 +646,7 @@ void CMI_VMI_RDMA_Put_Notification_Handler (PVMI_CONNECT connection, UINT32 rdma
 void CMI_VMI_RDMA_Put_Completion_Handler (PVMI_RDMA_OP rdmaop, PVOID context, VMI_STATUS remote_status);
 
 void CMI_VMI_RDMA_Get_Notification_Handler (PVMI_CONNECT connection, UINT32 context, VMI_STATUS remote_status);
-void CMI_VMI_RDMA_Get_Completion_Handler (PVMI_RDMA_OP rdmaop, PVOID context, VMI_STATUS sstatus);
+void CMI_VMI_RDMA_Get_Completion_Handler (PVMI_RDMA_OP rdmaop, PVOID context, VMI_STATUS remote_status);
 
 
 /* Spanning tree send functions */

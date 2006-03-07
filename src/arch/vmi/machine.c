@@ -253,7 +253,7 @@ void ConverseInit (int argc, char **argv, CmiStartFn start_function, int user_ca
 
     NOTE: This must start with a CmiBarrier() because some processes may not have
     completed opening connections, so probing latencies on these connections will
-    certainly result in a segfault.
+    result in a segfault.
   */
   if (CMI_VMI_Probe_Clusters) {
     if (_Cmi_mype == 0) {
@@ -450,16 +450,16 @@ void CmiNotifyIdle ()
       Check to see if any processes are communicating with us frequently.
       These processes are candidates for eager communications.
     */
-    if (CMI_VMI_Message_Receive_Count > CMI_VMI_Eager_Interval) {
+    if (CMI_VMI_Message_Receive_Count >= CMI_VMI_Eager_Interval) {
       for (i = 0; i < _Cmi_numpes; i++) {
 	if ((CMI_VMI_Eager_Short_Pollset_Size < CMI_VMI_Eager_Short_Pollset_Size_Maximum) &&
-	    ((&CMI_VMI_Processes[i])->normal_short_count > CMI_VMI_Eager_Threshold) &&
+	    ((&CMI_VMI_Processes[i])->normal_short_count >= CMI_VMI_Eager_Threshold) &&
 	    ((&CMI_VMI_Processes[i])->eager_short_receive_size == 0) &&
 	    (VMI_CONNECT_ONE_WAY_LATENCY ((&CMI_VMI_Processes[i])->connection) < CMI_VMI_WAN_Latency)) {
 	  CMI_VMI_Eager_Short_Setup (i);
 	}
 
-	if (((&CMI_VMI_Processes[i])->normal_long_count > CMI_VMI_Eager_Threshold) &&
+	if (((&CMI_VMI_Processes[i])->normal_long_count >= CMI_VMI_Eager_Threshold) &&
 	    ((&CMI_VMI_Processes[i])->eager_long_receive_size == 0)) {
 	  CMI_VMI_Eager_Long_Setup (i, CMI_VMI_Eager_Long_Buffer_Size);
 	}
@@ -2128,7 +2128,7 @@ void CmiReleaseCommHandle (CmiCommHandle commhandle)
 ** This code must call VMI_Poll() to ensure forward progress of the message
 ** pumping loop.
 */
-void *CmiGetNonLocal (void)
+void *CmiGetNonLocal ()
 {
   VMI_STATUS status;
 
@@ -3284,7 +3284,7 @@ VMI_CONNECT_RESPONSE CMI_VMI_Connection_Handler (PVMI_CONNECT connection, PVMI_S
 ** This function is invoked asynchronously to handle a process's response
 ** to our connection request.
 */
-void CMI_VMI_Connection_Response_Handler (PVOID context, PVOID response, USHORT size, PVOID handle, VMI_CONNECT_RESPONSE sstatus)
+void CMI_VMI_Connection_Response_Handler (PVOID context, PVOID response, USHORT size, PVOID handle, VMI_CONNECT_RESPONSE remote_status)
 {
   VMI_STATUS status;
 
@@ -3296,7 +3296,7 @@ void CMI_VMI_Connection_Response_Handler (PVOID context, PVOID response, USHORT 
   /* Cast the context to a CMI_VMI_Process_Info pointer. */
   process = (CMI_VMI_Process_T *) context;
 
-  switch (sstatus)
+  switch (remote_status)
   {
     case VMI_CONNECT_RESPONSE_ACCEPT:
       DEBUG_PRINT ("Process %d accepted connection.\n", process->rank);
@@ -3432,7 +3432,7 @@ void CMI_VMI_Disconnection_Handler (PVMI_CONNECT connection)
 ** This function is invoked asynchronously to handle a process's response
 ** to our disconnection request.
 */
-void CMI_VMI_Disconnection_Response_Handler (PVMI_CONNECT connection, PVOID context, VMI_STATUS sstatus)
+void CMI_VMI_Disconnection_Response_Handler (PVMI_CONNECT connection, PVOID context, VMI_STATUS remote_status)
 {
   CMI_VMI_Process_T *process;
 
@@ -3639,7 +3639,7 @@ void *CMI_VMI_CmiAlloc (int request_size)
   void *ptr;
 
 
-  DEBUG_PRINT ("CMI_VMI_CmiAlloc() (memory pool version) called.\n");
+  DEBUG_PRINT ("CMI_VMI_CmiAlloc() called.\n");
 
   if (CMI_VMI_Eager_Protocol) {
     size = request_size + (sizeof (CMI_VMI_Memory_Chunk_T) - sizeof (CmiChunkHeader));
@@ -3648,19 +3648,19 @@ void *CMI_VMI_CmiAlloc (int request_size)
   }
 
   if (CMI_VMI_Memory_Pool) {
-    if (size < CMI_VMI_BUCKET1_SIZE) {
+    if (size <= CMI_VMI_BUCKET1_SIZE) {
       status = VMI_Pool_Allocate_Buffer (CMI_VMI_Bucket1_Pool, &ptr, NULL);
       CMI_VMI_CHECK_SUCCESS (status, "VMI_Pool_Allocate_Buffer()");
-    } else if (size < CMI_VMI_BUCKET2_SIZE) {
+    } else if (size <= CMI_VMI_BUCKET2_SIZE) {
       status = VMI_Pool_Allocate_Buffer (CMI_VMI_Bucket2_Pool, &ptr, NULL);
       CMI_VMI_CHECK_SUCCESS (status, "VMI_Pool_Allocate_Buffer()");
-    } else if (size < CMI_VMI_BUCKET3_SIZE) {
+    } else if (size <= CMI_VMI_BUCKET3_SIZE) {
       status = VMI_Pool_Allocate_Buffer (CMI_VMI_Bucket3_Pool, &ptr, NULL);
       CMI_VMI_CHECK_SUCCESS (status, "VMI_Pool_Allocate_Buffer()");
-    } else if (size < CMI_VMI_BUCKET4_SIZE) {
+    } else if (size <= CMI_VMI_BUCKET4_SIZE) {
       status = VMI_Pool_Allocate_Buffer (CMI_VMI_Bucket4_Pool, &ptr, NULL);
       CMI_VMI_CHECK_SUCCESS (status, "VMI_Pool_Allocate_Buffer()");
-    } else if (size < CMI_VMI_BUCKET5_SIZE) {
+    } else if (size <= CMI_VMI_BUCKET5_SIZE) {
       status = VMI_Pool_Allocate_Buffer (CMI_VMI_Bucket5_Pool, &ptr, NULL);
       CMI_VMI_CHECK_SUCCESS (status, "VMI_Pool_Allocate_Buffer()");
     } else {
@@ -3708,7 +3708,7 @@ void CMI_VMI_CmiFree (void *ptr)
   CMI_VMI_Publish_Message_T publish_msg;
 
 
-  DEBUG_PRINT ("CMI_VMI_CmiFree() (memory pool version) called.\n");
+  DEBUG_PRINT ("CMI_VMI_CmiFree() called.\n");
 
   ptr += sizeof (CmiChunkHeader);
 
@@ -3716,7 +3716,7 @@ void CMI_VMI_CmiFree (void *ptr)
     size = SIZEFIELD (ptr) + sizeof (CMI_VMI_Memory_Chunk_T);
     context = CONTEXTFIELD (ptr);
   } else {
-    size = SIZEFIELD (ptr);
+    size = SIZEFIELD (ptr) + sizeof (CmiChunkHeader);
     context = NULL;
   }
 
@@ -3770,19 +3770,19 @@ void CMI_VMI_CmiFree (void *ptr)
     }
 
     if (CMI_VMI_Memory_Pool) {
-      if (size < CMI_VMI_BUCKET1_SIZE) {
+      if (size <= CMI_VMI_BUCKET1_SIZE) {
 	status = VMI_Pool_Deallocate_Buffer (CMI_VMI_Bucket1_Pool, ptr);
 	CMI_VMI_CHECK_SUCCESS (status, "VMI_Pool_Deallocate_Buffer()");
-      } else if (size < CMI_VMI_BUCKET2_SIZE) {
+      } else if (size <= CMI_VMI_BUCKET2_SIZE) {
 	status = VMI_Pool_Deallocate_Buffer (CMI_VMI_Bucket2_Pool, ptr);
 	CMI_VMI_CHECK_SUCCESS (status, "VMI_Pool_Deallocate_Buffer()");
-      } else if (size < CMI_VMI_BUCKET3_SIZE) {
+      } else if (size <= CMI_VMI_BUCKET3_SIZE) {
 	status = VMI_Pool_Deallocate_Buffer (CMI_VMI_Bucket3_Pool, ptr);
 	CMI_VMI_CHECK_SUCCESS (status, "VMI_Pool_Deallocate_Buffer()");
-      } else if (size < CMI_VMI_BUCKET4_SIZE) {
+      } else if (size <= CMI_VMI_BUCKET4_SIZE) {
 	status = VMI_Pool_Deallocate_Buffer (CMI_VMI_Bucket4_Pool, ptr);
 	CMI_VMI_CHECK_SUCCESS (status, "VMI_Pool_Deallocate_Buffer()");
-      } else if (size < CMI_VMI_BUCKET5_SIZE) {
+      } else if (size <= CMI_VMI_BUCKET5_SIZE) {
 	status = VMI_Pool_Deallocate_Buffer (CMI_VMI_Bucket5_Pool, ptr);
 	CMI_VMI_CHECK_SUCCESS (status, "VMI_Pool_Deallocate_Buffer()");
       } else {
@@ -4072,7 +4072,7 @@ VMI_RECV_STATUS CMI_VMI_Stream_Notification_Handler (PVMI_CONNECT connection, PV
 **
 ** This function is on the send side.
 */
-void CMI_VMI_Stream_Completion_Handler (PVOID context, VMI_STATUS sstatus)
+void CMI_VMI_Stream_Completion_Handler (PVOID context, VMI_STATUS remote_status)
 {
   VMI_STATUS status;
 
@@ -4384,7 +4384,7 @@ void CMI_VMI_RDMA_Get_Notification_Handler (PVMI_CONNECT connection, UINT32 cont
 /**************************************************************************
 ** This function is on the receive side.
 */
-void CMI_VMI_RDMA_Get_Completion_Handler (PVMI_RDMA_OP rdmaop, PVOID context, VMI_STATUS sstatus)
+void CMI_VMI_RDMA_Get_Completion_Handler (PVMI_RDMA_OP rdmaop, PVOID context, VMI_STATUS remote_status)
 {
   VMI_STATUS status;
 
