@@ -18,6 +18,9 @@
 /* C++ *_casts<> work */
 #undef CMK_CPP_CAST_LEGAL
 
+/* whether C inline works in C */
+#undef CMK_C_INLINE
+
 /* dlopen */
 #undef CMK_DLL_USE_DLOPEN
 

@@ -46,6 +46,26 @@ test_result() {
 	fi
 }
 
+# Test: tries to compile C file $t (described by $1).
+#  If successful, prints $2 and sets $pass/clears $fail
+#  If failure, prints $3 and sets $pass/clears $fail
+#  additional arguments to c++ compiler are passed as $4
+test_cc() {
+        AC_MSG_CHECKING("$1")
+	$CMK_CC -I../include -I. $CMK_LIBDIR $CMK_INCDIR $OPTS_CC $OPTS_LD -c $t -o test.o $4 > out 2>&1
+	test_result $? "$1" "$2" "$3"
+ 	strictpass=$pass
+	strictfail=$fail
+        if test $pass -eq 1
+	then 
+ 	  if cat out | grep -i "warn" > /dev/null 2>&1
+	  then 
+	    strictpass="0" && strictfail="1"
+          fi
+        fi
+	/bin/rm -f out
+}
+
 # Test: tries to compile C++ file $t (described by $1).
 #  If successful, prints $2 and sets $pass/clears $fail
 #  If failure, prints $3 and sets $pass/clears $fail
@@ -65,6 +85,7 @@ test_cxx() {
         fi
 	/bin/rm -f out
 }
+
 # Testlink: tries to compile and link a C++ file $t (described by $1).
 #  If successful, prints $2 and sets $pass/clears $fail
 #  If failure, prints $3 and sets $pass/clears $fail
@@ -224,6 +245,16 @@ test_cxx "whether ucontext has FPU pointer" "yes" "no" ""
 AC_DEFINE_UNQUOTED(CMK_CONTEXT_FPU_POINTER, $pass, [whether ucontext has pointer])
 
 ###################### C++ Compiler Features #####################
+
+#### check C inline ####
+cat > $t <<EOT
+inline static int foo()
+{
+  return 1;
+}
+EOT
+test_cc "whether inline works in C" "ok" "no" ""
+AC_DEFINE_UNQUOTED(CMK_C_INLINE, $pass, [whether C inline works in C])
 
 #### check explicit ####
 cat > $t <<EOT
