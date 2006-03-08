@@ -375,12 +375,12 @@ static void processMessage(char *msg, int len)
       newmsg = node->asm_msg;
       if (newmsg == 0) {
         size = CmiMsgHeaderGetLength(msg);
-        newmsg = (char *)CmiAlloc(size);
-  	_MEMCHECK(newmsg);
         if (len > size) {
          CmiPrintf("size: %d, len:%d.\n", size, len);
          CmiAbort("\n\n\t\tLength mismatch!!\n\n");
         }
+        newmsg = (char *)CmiAlloc(size);
+        _MEMCHECK(newmsg);
         memcpy(newmsg, msg, len);
         node->asm_rank = rank;
         node->asm_total = size;
@@ -423,14 +423,14 @@ static void processMessage(char *msg, int len)
           || rank == DGRAM_NODEBROADCAST
 #endif
            )
-          SendSpanningChildren(NULL, 0, len, msg, broot, rank);
+          SendSpanningChildren(NULL, 0, node->asm_total, newmsg, broot, rank);
 #elif CMK_BROADCAST_HYPERCUBE
         if (rank == DGRAM_BROADCAST
 #if CMK_NODE_QUEUE_AVAILABLE
           || rank == DGRAM_NODEBROADCAST
 #endif
            )
-          SendHypercube(NULL, 0, len, msg, broot, rank);
+          SendHypercube(NULL, 0, node->asm_total, newmsg, broot, rank);
 #endif
       }
     } 
