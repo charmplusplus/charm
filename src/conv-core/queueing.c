@@ -90,8 +90,7 @@ prioq pq;
 #if CMK_C_INLINE
 inline
 #endif
-static void CqsPrioqExpand(pq)
-prioq pq;
+static void CqsPrioqExpand(prioq pq)
 {
   int oldsize = pq->heapsize;
   int newsize = oldsize * 2;
