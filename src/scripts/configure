@@ -1509,7 +1509,7 @@ inline static int foo()
   return 1;
 }
 EOT
-test_cc "whether inline works in C" "ok" "no" ""
+test_cc "whether inline works in C" "yes" "no" ""
 
 cat >>confdefs.h <<_ACEOF
 #define CMK_C_INLINE $pass
