@@ -322,6 +322,9 @@ char *CthGetData(CthThread t) { return B(t)->data; }
 room for all the thread-local variables 
 initialized so far on this processor.
 */
+#if CMK_C_INLINE
+inline
+#endif
 static void CthFixData(CthThread t)
 {
   int newsize = CthCpvAccess(CthDatasize);
@@ -564,9 +567,11 @@ void CthSetStrategy(CthThread t, CthAwkFn awkfn, CthThFn chsfn)
   B(t)->choosefn = chsfn;
 }
 
+#if CMK_C_INLINE
+inline
+#endif
 static void CthBaseResume(CthThread t)
 {
-	
   struct CthThreadListener *l;
   for(l=B(t)->listener;l!=NULL;l=l->next){
 	l->resume(l);
@@ -592,21 +597,21 @@ Suspend: finds the next thread to execute, and resumes it
 void CthSuspend(void)
 {
   CthThread next;
-	struct CthThreadListener *l;
+  struct CthThreadListener *l;
   CthThreadBase *cur=B(CthCpvAccess(CthCurrent));
 
   if (cur->suspendable == 0)
     CmiAbort("Fatal Error> trying to suspend a non-suspendable thread!\n");
   
-	/*
-		Call the suspend function on listeners
-	*/
-	for(l=cur->listener;l!=NULL;l=l->next){
-			l->suspend(l);
-	}
+  /*
+	Call the suspend function on listeners
+  */
+  for(l=cur->listener;l!=NULL;l=l->next){
+	l->suspend(l);
+  }
   if (cur->choosefn == 0) CthNoStrategy();
   next = cur->choosefn();
-	cur->scheduled=0;
+  cur->scheduled=0;
 #ifndef CMK_OPTIMIZE
 #if !CMK_TRACE_IN_CHARM
   if(CpvAccess(traceOn))
@@ -626,7 +631,7 @@ void CthAwaken(CthThread th)
 #endif
 #endif
   B(th)->awakenfn(B(th)->token, CQS_QUEUEING_FIFO, 0, 0);
-	B(th)->scheduled = 1;
+  B(th)->scheduled = 1;
 }
 
 void CthYield()

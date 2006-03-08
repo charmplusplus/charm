@@ -9,7 +9,7 @@
 #include <string.h>
 #include "queueing.h"
 
-void CqsDeqInit(d)
+static void CqsDeqInit(d)
 deq d;
 {
   d->bgn  = d->space;
@@ -18,7 +18,7 @@ deq d;
   d->tail = d->space;
 }
 
-void CqsDeqExpand(d)
+static void CqsDeqExpand(d)
 deq d;
 {
   int rsize = (d->end - d->head);
@@ -74,7 +74,7 @@ deq d;
   return data;
 }
 
-void CqsPrioqInit(pq)
+static void CqsPrioqInit(pq)
 prioq pq;
 {
   int i;
@@ -87,7 +87,10 @@ prioq pq;
   for (i=0; i<pq->hash_key_size; i++) pq->hashtab[i]=0;
 }
 
-void CqsPrioqExpand(pq)
+#if CMK_C_INLINE
+inline
+#endif
+static void CqsPrioqExpand(pq)
 prioq pq;
 {
   int oldsize = pq->heapsize;
