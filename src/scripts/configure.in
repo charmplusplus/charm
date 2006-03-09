@@ -19,6 +19,7 @@ AC_MSG_RESULT($version)
 AC_SUBST(base_version)
 
 t="test.cpp"
+tc="test.c"
 
 # test result passed in $1
 # If the test suceeded, print $3 and set "pass"/clear "fail"
@@ -52,7 +53,7 @@ test_result() {
 #  additional arguments to c++ compiler are passed as $4
 test_cc() {
         AC_MSG_CHECKING("$1")
-	$CMK_CC -I../include -I. $CMK_LIBDIR $CMK_INCDIR $OPTS_CC $OPTS_LD -c $t -o test.o $4 > out 2>&1
+	$CMK_CC -I../include -I. $CMK_LIBDIR $CMK_INCDIR $OPTS_CC $OPTS_LD -c $tc -o test.o $4 > out 2>&1
 	test_result $? "$1" "$2" "$3"
  	strictpass=$pass
 	strictfail=$fail
@@ -139,7 +140,7 @@ EOT
 }
 
 test_finish() {
-	rm -f $t testlink test.o	> /dev/null 2>&1
+	rm -f $t $tc testlink test.o	> /dev/null 2>&1
 	/bin/rm -f out
 	exit $1
 }
@@ -247,14 +248,14 @@ AC_DEFINE_UNQUOTED(CMK_CONTEXT_FPU_POINTER, $pass, [whether ucontext has pointer
 ###################### C++ Compiler Features #####################
 
 #### check C inline ####
-cat > $t <<EOT
+cat > $tc <<EOT
 inline static int foo()
 {
   return 1;
 }
 EOT
 test_cc "whether inline works in C" "yes" "no" ""
-AC_DEFINE_UNQUOTED(CMK_C_INLINE, $pass, [whether C inline works in C])
+AC_DEFINE_UNQUOTED(CMK_C_INLINE, $strictpass, [whether C inline works in C])
 
 #### check explicit ####
 cat > $t <<EOT

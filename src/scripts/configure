@@ -1245,6 +1245,7 @@ echo "${ECHO_T}$version" >&6
 
 
 t="test.cpp"
+tc="test.c"
 
 # test result passed in $1
 # If the test suceeded, print $3 and set "pass"/clear "fail"
@@ -1281,7 +1282,7 @@ echo "${ECHO_T}\"$4\"" >&6
 test_cc() {
         echo "$as_me:$LINENO: checking \"$1\"" >&5
 echo $ECHO_N "checking \"$1\"... $ECHO_C" >&6
-	$CMK_CC -I../include -I. $CMK_LIBDIR $CMK_INCDIR $OPTS_CC $OPTS_LD -c $t -o test.o $4 > out 2>&1
+	$CMK_CC -I../include -I. $CMK_LIBDIR $CMK_INCDIR $OPTS_CC $OPTS_LD -c $tc -o test.o $4 > out 2>&1
 	test_result $? "$1" "$2" "$3"
  	strictpass=$pass
 	strictfail=$fail
@@ -1371,7 +1372,7 @@ EOT
 }
 
 test_finish() {
-	rm -f $t testlink test.o	> /dev/null 2>&1
+	rm -f $t $tc testlink test.o	> /dev/null 2>&1
 	/bin/rm -f out
 	exit $1
 }
@@ -1503,7 +1504,7 @@ _ACEOF
 ###################### C++ Compiler Features #####################
 
 #### check C inline ####
-cat > $t <<EOT
+cat > $tc <<EOT
 inline static int foo()
 {
   return 1;
@@ -1512,7 +1513,7 @@ EOT
 test_cc "whether inline works in C" "yes" "no" ""
 
 cat >>confdefs.h <<_ACEOF
-#define CMK_C_INLINE $pass
+#define CMK_C_INLINE $strictpass
 _ACEOF
 
 
