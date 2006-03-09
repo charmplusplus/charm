@@ -1,14 +1,14 @@
 CDIR=../../../..
 CHARMC=$(CDIR)/bin/charmc $(OPTS)
 
-#Headers to be copied to include directory so application users can see them
-HEADERS= ParFUM.h ParFUMf.h ParFUM_internals.h
-
 #Headers internal to ParFUM
-INTERNALHEADERS= ParFUM_internals.h
+INTERNALHEADERS= ParFUM_internals.h ParFUM_locking.h ParFUM_Mesh_Modify.h ParFUM_Adapt_Algs.h ParFUM_Adapt.h ParFUM_Interpolate.h
+
+#Headers to be copied to include directory so application users can see them
+HEADERS= ParFUM.h ParFUMf.h $(INTERNALHEADERS)
 
 #Headers generated from .ci files
-GENHEADERS= ParFUM.def.h	ParFUM.decl.h fem.decl.h fem.def.h
+GENHEADERS= ParFUM.def.h ParFUM.decl.h fem.decl.h fem.def.h
 
 HEADDEP= $(GENHEADERS) $(HEADERS) $(INTERNALHEADERS)
 
