@@ -1,0 +1,23 @@
+
+CHARMC=../../bin/charmc -I. -ma $(OPTS)
+CHARMC_SHARED = ../../bin/charmc -seq -I. -shared $(OPTS)
+
+all: qt stp testpgm
+
+qt: md/setjmp_d.h qt.c md/setjmp64_.c
+	rm -f qtmd.h
+	../system_ln  md/setjmp_d.h qtmd.h
+	$(CHARMC) -c -o qt.o qt.c
+	$(CHARMC) -c -o qtmds.o md/setjmp64_.c
+	CHARMINC=..; . ../conv-config.sh;	\
+	$(CHARMC) -shared -o libqt.$$CMK_SHARED_SUF qt.o qtmds.o
+	$(CHARMC) -o libqt.a qt.o qtmds.o 
+
+stp:
+	$(CC) -c stp.c
+	ar q libstp.a stp.o
+
+testpgm:
+	$(CC) -c meas.c
+	$(CC) -c -o qtmdb.o md/setjmp_b.c
+	$(CC) -o run meas.o qtmdb.o libstp.a libqt.a
