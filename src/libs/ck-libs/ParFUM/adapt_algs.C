@@ -404,14 +404,13 @@ void FEM_Adapt_Algs::GradateMesh(double smoothness)
                 double edgelen = length(node, adjNodes[adjNode]);
                 
                 // get adjacent elemnents and their sizes
-                // TODO: are we skipping boundary elts here?
                 int e1, e2;
                 theMesh->get2ElementsOnEdge(node, adjNodes[adjNode], &e1, &e2);
+                if (e1 == -1 || e2 == -1) continue;
                 
                 double s1, s2;
                 s1 = theMesh->elem[0].getMeshSizing(e1);
                 s2 = theMesh->elem[0].getMeshSizing(e2);
-
                 if (s1 <= 0 || s2 <= 0) continue;
                 
                 // h-shock=max(size ratio)^(1/edge length)
