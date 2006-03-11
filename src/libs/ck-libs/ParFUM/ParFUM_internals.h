@@ -1900,10 +1900,11 @@ public:
 		delete vec;
 	}
 	ElemList(const ElemList &rhs){
+		vec = new CkVec<T>();
 		*this=rhs;
 	}
 	ElemList& operator=(const ElemList& rhs){
-		 vec = new CkVec<T>();
+//		 vec = new CkVec<T>();
 		*vec = *(rhs.vec);
 	}
 	ElemList& operator+=(const ElemList& rhs){
@@ -1983,13 +1984,21 @@ public:
                 return *this;
 	}
 
-	bool operator == (const NodeElem &rhs){
+	inline	bool operator == (const NodeElem &rhs){
 		if(global == rhs.global){
 			return true;
 		}else{
 			return false;
 		}
 	}
+	inline 	bool operator >=(const NodeElem &rhs){
+		return (global >= rhs.global);
+	}
+
+	inline bool operator <=(const NodeElem &rhs){
+		return (global <= rhs.global);
+	}
+
 	virtual void pup(PUP::er &p){
 		p | global;
 		p | numShared;

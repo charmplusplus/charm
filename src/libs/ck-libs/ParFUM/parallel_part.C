@@ -51,8 +51,8 @@ int FEM_master_parallel_part(int fem_mesh,int masterRank,FEM_Comm_t comm_context
   /*load the connectivity information into the eptr and
     eind datastructure. It will be read by the other slave 
     elements and used to call parmetis*/
-  MSA1DINT eptr(nelem,numChunks);
-  MSA1DINT eind(nelem*10,numChunks);
+  MSA1DINT eptrMSA(nelem,numChunks);
+  MSA1DINT eindMSA(nelem*10,numChunks);
   /*
     after the msa array has been created and loaded with connectivity data
     tell the slaves about the msa array 
@@ -60,27 +60,27 @@ int FEM_master_parallel_part(int fem_mesh,int masterRank,FEM_Comm_t comm_context
   struct conndata data;
   data.nelem = nelem;
   data.nnode = m->node.size();
-  data.arr1 = eptr;
-  data.arr2 = eind;
+  data.arr1 = eptrMSA;
+  data.arr2 = eindMSA;
   MPI_Bcast_pup(data,masterRank,(MPI_Comm)comm_context);
 
-  eptr.enroll(numChunks);
-  eind.enroll(numChunks);
+  eptrMSA.enroll(numChunks);
+  eindMSA.enroll(numChunks);
   int indcount=0,ptrcount=0;
   for(int t=0;t<m->elem.size();t++){
     if(m->elem.has(t)){
       FEM_Elem &k=m->elem[t];
       for(int e=0;e<k.size();e++){
-	eptr.set(ptrcount)=indcount;
-	ptrcount++;
-	for(int n=0;n<k.getNodesPer();n++){
-	  eind.set(indcount)=k.getConn(e,n);
-	  indcount++;
-	}
+				eptrMSA.set(ptrcount)=indcount;
+				ptrcount++;
+				for(int n=0;n<k.getNodesPer();n++){
+				  eindMSA.set(indcount)=k.getConn(e,n);
+				  indcount++;
+				}
       }
     }
   }
-  eptr.set(ptrcount) = indcount;
+  eptrMSA.set(ptrcount) = indcount;
   printf("master -> ptrcount %d indcount %d \n",ptrcount,indcount);
   /*
     break up the mesh such that each chunk gets the same number of elements
@@ -128,17 +128,18 @@ int FEM_master_parallel_part(int fem_mesh,int masterRank,FEM_Comm_t comm_context
   /*
     Set up a msa to store the elements that belong to a partition
   */
+	/*
   MSA1DINTLIST part2elem(numChunks,numChunks);
   MPI_Bcast_pup(part2elem,masterRank,(MPI_Comm)comm_context);
   part2elem.enroll(numChunks);
 	
-  FEM_write_part2elem(part2elem,partdata,(MPI_Comm)comm_context);
+  FEM_write_part2elem(part2elem,partdata,(MPI_Comm)comm_context);*/
 	
   /*
     Get the list of elements and nodes that belong to this partition
   */
   NodeList lnodes = part2node.get(masterRank);
-  IntList lelems = part2elem.get(masterRank);
+//  IntList lelems = part2elem.get(masterRank);
 	
 
   /*
@@ -154,7 +155,17 @@ int FEM_master_parallel_part(int fem_mesh,int masterRank,FEM_Comm_t comm_context
   MeshElem me = part2mesh.get(masterRank);
   printf("[%d] Number of elements in my partitioned mesh %d number of nodes %d \n",masterRank,me.m->nElems(),me.m->node.size());
 	
+  DEBUG(printf("[%d] Memory usage on vp 0 before FreeMem %d \n",CkMyPe(),CmiMemoryUsage()));
+	//Free up the eptr and eind MSA arrays stored in data
+	data.arr1.FreeMem();
+	data.arr2.FreeMem();
+	nodepart.FreeMem();
+  DEBUG(printf("[%d] Memory usage on vp 0 after FreeMem %d \n",CkMyPe(),CmiMemoryUsage()));
+	
   addIDXLists(me.m,lnodes,masterRank);
+	
+	part2node.FreeMem();
+  DEBUG(printf("[%d] Memory usage on vp 0 after addIDXL %d \n",CkMyPe(),CmiMemoryUsage()));
 	
   /*
     Broadcast  the user data to all the meshes
@@ -169,7 +180,7 @@ int FEM_master_parallel_part(int fem_mesh,int masterRank,FEM_Comm_t comm_context
     collect the ghost data and send it to all the chunks.
   */
   struct ghostdata *gdata = gatherGhosts();
-  printf("[%d] number of ghost layers %d \n",masterRank,gdata->numLayers);
+  DEBUG(printf("[%d] number of ghost layers %d \n",masterRank,gdata->numLayers));
   MPI_Bcast_pup(*gdata,masterRank,(MPI_Comm)comm_context);
 
   /*
@@ -185,6 +196,9 @@ int FEM_master_parallel_part(int fem_mesh,int masterRank,FEM_Comm_t comm_context
 	
   FEM_Mesh *nmesh = c->lookup(new_mesh,"master_parallel_broadcast");
   DEBUG(printf("[%d] Length of udata vector in master new_mesh %d \n",masterRank,nmesh->udata.size()));
+	
+	part2mesh.FreeMem();
+  printf("[%d] Memory usage on vp 0 at end of parallel partition %d \n",CkMyPe(),CmiMemoryUsage());
 		
   return new_mesh;
 };
@@ -238,16 +252,16 @@ int FEM_slave_parallel_part(int fem_mesh,int masterRank,FEM_Comm_t comm_context)
   /*
     write the msa that stores the elements that belong to each partition
   */
-  MSA1DINTLIST part2elem;
+/*  MSA1DINTLIST part2elem;
   MPI_Bcast_pup(part2elem,masterRank,(MPI_Comm)comm_context);
   part2elem.enroll(numChunks);
 	
-  FEM_write_part2elem(part2elem,partdata,(MPI_Comm)comm_context);
+  FEM_write_part2elem(part2elem,partdata,(MPI_Comm)comm_context);*/
   /*
     Get the list of elements and nodes that belong to this partition
   */
   NodeList lnodes = part2node.get(myRank);
-  IntList lelems = part2elem.get(myRank);
+//  IntList lelems = part2elem.get(myRank);
 
   /*
     Get the FEM msa and write the different mesh
@@ -262,6 +276,11 @@ int FEM_slave_parallel_part(int fem_mesh,int masterRank,FEM_Comm_t comm_context)
   */
   MeshElem me = part2mesh.get(myRank);
   printf("[%d] Number of elements in my partitioned mesh %d number of nodes %d \n",myRank,me.m->nElems(),me.m->node.size());
+	
+	//Free up the eptr and eind MSA arrays stored in data
+	data.arr1.FreeMem();
+	data.arr2.FreeMem();
+	nodepart.FreeMem();
 	
   addIDXLists(me.m,lnodes,myRank);
 	
@@ -286,7 +305,9 @@ int FEM_slave_parallel_part(int fem_mesh,int masterRank,FEM_Comm_t comm_context)
   FEM_chunk *chunk = FEM_chunk::get("FEM_Mesh_Parallel_broadcast");
   int tempMeshNo = chunk->meshes.put(me.m);
   int new_mesh = FEM_Mesh_copy(tempMeshNo);
-	
+
+
+	part2mesh.FreeMem();
   delete gdata;
   return new_mesh;
 }
@@ -533,11 +554,11 @@ void	FEM_write_part2mesh(MSA1DFEMMESH &part2mesh,struct partconndata *partdata,s
   part2mesh.sync();
 }
 /*
-  horrible bubble sort, replace by quicksort 
+  horrible bubble sort, replace by quicksort : done
 */
 void sortNodeList(NodeList &lnodes){
   CkVec<NodeElem> *vec = lnodes.vec;
-  for(int i=0;i<vec->size();i++){
+/*  for(int i=0;i<vec->size();i++){
     for(int j=i+1;j<vec->size();j++){
       if((*vec)[i].global > (*vec)[j].global){
 	NodeElem t = (*vec)[i];
@@ -545,15 +566,18 @@ void sortNodeList(NodeList &lnodes){
 	(*vec)[j] = t;
       }
     }
-  }
+  }*/
+	vec->quickSort();
 }
 
 
 void addIDXLists(FEM_Mesh *m,NodeList &lnodes,int myChunk){
+	double startAddIDXL = CkWallTimer();	
   /*
     Sort the nodelist by global number
   */
   sortNodeList(lnodes);
+	DEBUG(printf("[%d] Sorting finished %.6lfs after starting addIDXL\n",myChunk,CkWallTimer()-startAddIDXL));
 	
   CkVec<NodeElem> *vec = lnodes.vec;
   /*
@@ -567,7 +591,7 @@ void addIDXLists(FEM_Mesh *m,NodeList &lnodes,int myChunk){
   /*
     For each node, if it is shared, add it to the IDXL_List of 
     the correct chunk in my mesh 
-    At the same time, set the priy flag for each node
+    At the same time, set the primary flag for each node
     A node is defined as primary if it is not shared with any
     other chunk, which has a lower chunk number
   */
@@ -614,6 +638,7 @@ void addIDXLists(FEM_Mesh *m,NodeList &lnodes,int myChunk){
       }
     }
   }
+	DEBUG(printf("[%d] Time for addIDXL %.6lfs\n",myChunk,CkWallTimer()-startAddIDXL));
 }
 
 /*
