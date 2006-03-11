@@ -297,6 +297,46 @@ class CkVec : private CkSTLHelper<T> {
         pupCkVec(p,*this);
      }
 #endif
+
+		void quickSort(){
+		  q_sort(0, len - 1);
+		}
+		
+
+		void q_sort(int left, int right){
+		  int l_hold, r_hold;
+			int pivot;
+
+		  l_hold = left;
+		  r_hold = right;
+			pivot = left;
+			if(left >= right)
+				return;
+		  while (left < right)
+		  {
+    		while ((block[right] >= block[pivot]) && (left < right))
+		      right--;
+		    while ((block[left] <= block[pivot]) && (left < right))
+		      left++;
+			
+				if(left < right){
+					T val = block[left];
+					block[left] = block[right];
+					block[right] = val;
+				}
+			}
+			T val = block[left];
+			block[left] = block[pivot];
+			block[pivot] = val;
+		  pivot = left;
+		  left = l_hold;
+		  right = r_hold;
+		  if (left < pivot)
+    		q_sort(left, pivot-1);
+		  if (right > pivot)
+    		q_sort(pivot+1, right);
+		}
+
 };
 
 /// Default pup routine for CkVec: pup each of the elements
