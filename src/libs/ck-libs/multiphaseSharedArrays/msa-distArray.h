@@ -95,7 +95,7 @@ public:
         //(cache->getArray()).destroy();
         //cg.destroy();
         // TODO: calling FreeMem does not seem to work. Need to debug it.
-        //cache->FreeMem();
+        cache->FreeMem();
     }
 
     /**
