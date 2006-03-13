@@ -424,12 +424,12 @@ int FEM_AdaptL::edge_contraction(int n1, int n2) {
   if(invalidcoarsen) {
     free(locknodes);
     free(gotlocks);
-    CkPrintf("Warning: Trying to coarsen invalid edge %d - %d\n",n1,n2);
+    CkPrintf("[%d]Warning: Trying to coarsen invalid edge %d - %d\n",theMod->idx,n1,n2);
     return -1; //should not contract an edge which is not local
   }
   isEdge = findAdjData(n1, n2, &e1, &e2, &e1_n1, &e1_n2, &e1_n3, &e2_n1, &e2_n2, &e2_n3,&n3, &n4);
   if(isEdge == -1) {
-    CkPrintf("Edge Contract %d->%d not done as it is no longer a valid edge\n",n1,n2);
+    CkPrintf("[%d]Edge Contract %d->%d not done as it is no longer a valid edge\n",theMod->idx,n1,n2);
     free(locknodes);
     free(gotlocks);
     return -1;
@@ -540,8 +540,8 @@ int FEM_AdaptL::edge_contraction(int n1, int n2) {
 	  unlockNodes(gotlocks, locknodes, 0, locknodes, numNodes);
 	  locked = false;
 	}
-	if(acquirecount>2) CkPrintf("Edge contract %d->%d not done as it is causes an acquire livelock\n",n1,n2);
-	CkPrintf("Edge contract %d->%d not done as it is no longer a valid edge\n",n1,n2);
+	if(acquirecount>2) CkPrintf("[%d]Edge contract %d->%d not done as it is causes an acquire livelock\n",theMod->idx,n1,n2);
+	CkPrintf("[%d]Edge contract %d->%d not done as it is no longer a valid edge\n",theMod->idx,n1,n2);
 	free(locknodes);
 	free(gotlocks);
 	return -1;
@@ -568,7 +568,7 @@ int FEM_AdaptL::edge_contraction(int n1, int n2) {
 	unlockNodes(gotlocks, locknodes, 0, locknodes, numNodes);
 	locked = false;
       }
-      CkPrintf("Edge contract %d->%d not done as it is no longer a valid edge\n",n1,n2);
+      CkPrintf("[%d]Edge contract %d->%d not done as it is no longer a valid edge\n",theMod->idx,n1,n2);
       free(locknodes);
       free(gotlocks);
       return -1;
@@ -714,7 +714,14 @@ int FEM_AdaptL::edge_contraction_help(int *e1P, int *e2P, int n1, int n2, int e1
       return -1;
     }
   }
-
+  //for debugging:
+  if((n1==15||n1==16) && (n2==15||n2==16)) {
+    CkPrintf("Debugging\n");
+  }
+  if((n1==8||n1==14) && (n2==8||n2==14)) {
+    CkPrintf("Debugging\n");
+  }
+  //end debugging
   //if e1 or e2 has a node which is connected to a node which would become a ghost after it is deleted, then let that other chunk eat into this, before the operation
   int e1new=-1;
   int e2new=-1;

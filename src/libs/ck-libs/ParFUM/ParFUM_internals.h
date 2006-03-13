@@ -2537,6 +2537,20 @@ public:
 class FEM_MUtil {
   int idx;
   femMeshModify *mmod;
+  //a data structure to remember mappings from oldnode to newnode yet to be updated
+  class tuple {
+   public:
+    int oldIdx, newIdx;
+    tuple() {
+      oldIdx = -1;
+      newIdx = -1;
+    }
+    tuple(int o, int n) {
+      oldIdx = o;
+      newIdx = n;
+    }
+  };
+  CkVec<tuple> outStandingMappings;
 
  public:
   FEM_MUtil() {}
