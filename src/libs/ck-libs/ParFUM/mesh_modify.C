@@ -1223,10 +1223,15 @@ int FEM_add_element(FEM_Mesh *m, int* conn, int connSize, int elemType, int chun
 	    //find out what chk calls this node (from the ghostrecv idxl list)
 	    int idx = m->getfmMM()->getfmUtil()->exists_in_IDXL(m, conn[i], chk, 2);
 	    m->node.ghost->ghostRecv.removeNode(FEM_To_ghost_index(conn[i]), chk);
-	    meshMod[chk].addToSharedList(index, idx); 
 	    //when doing this add, make all idxl lists consistent, and return the list 
 	    //of n2e connections for this node, which are local to this chunk, 
 	    //and also a list of the connectivity
+	    meshMod[chk].addToSharedList(index, idx); 
+	    //when adding a new node, always verify if this new node is a corner on
+	    //the other chunk, if so add it to the list of fixed nodes (corners)
+	    int idx1 = m->getfmMM()->getfmUtil()->exists_in_IDXL(m, newN, chk, 0);
+	    bool isfixed = meshMod[chk].isFixedNodeRemote(index,idx1)->b;
+	    if(isfixed) m->getfmMM()->fmfixedNodes.push_back(newN);
 	    //coarser lock
 	    m->getfmMM()->getfmUtil()->idxlunlock(m, chk, 0);
 	  }
@@ -2689,6 +2694,16 @@ elemDataMsg *femMeshModify::packElemData(int fromChk, int sharedIdx) {
     }
   }
   return edm;
+}
+
+boolMsg *femMeshModify::isFixedNodeRemote(int fromChk, int sharedIdx) {
+  int localIdx = fmUtil->lookup_in_IDXL(fmMesh, sharedIdx, fromChk, 0);
+  for(int i=0; i<fmfixedNodes.size(); i++) {
+    if(fmfixedNodes[i]==localIdx) {
+      return new boolMsg(true);
+    }
+  }
+  return new boolMsg(false);
 }
 
 #include "ParFUM.def.h"

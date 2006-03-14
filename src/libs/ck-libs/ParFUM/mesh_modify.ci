@@ -101,5 +101,6 @@ module ParFUM {
     entry [sync,threaded] void cleanupIDXL(int, int);
     entry [sync,threaded] void purgeElement(int, int);
     entry [sync,threaded] elemDataMsg *packElemData(int fromChk, int sharedIdx);
+    entry [sync,threaded] boolMsg *isFixedNodeRemote(int fromChk, int sharedIdx);
   };
 };

@@ -607,9 +607,9 @@ int FEM_Adapt_Algs::simple_coarsen(double targetA, double xmin, double ymin, dou
 	  if(ret != -1) adapted = true;
 	}
       }
-      //if(adapted) break;
+      if(adapted) break;
     }
-    //if(adapted) break;
+    if(adapted) break;
   }
 
   free(con);
