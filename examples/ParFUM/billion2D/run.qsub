@@ -1,0 +1,9 @@
+#PBS -q batch
+#PBS -j oe
+#PBS -l nodes=4:ppn=2:myr
+#PBS -l walltime=20:12:00
+#PBS -o /private/automount/home/idooley2/charm/examples/ParFUM/billion2D/4node.out
+#PBS -N largeMeshRefine
+cd ${PBS_O_WORKDIR}
+rjq /private/automount/home/idooley2/charm/examples/ParFUM/billion2D/pgm +p8 +vp8
+
