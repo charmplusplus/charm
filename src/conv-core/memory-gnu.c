@@ -3412,7 +3412,11 @@ public_rEALLOc(Void_t* oldmem, size_t bytes)
 
 #if HAVE_MREMAP
     newp = mremap_chunk(oldp, nb);
-    if(newp) return chunk2mem(newp);
+    if(newp) {
+      memory_allocated -= oldsize;
+      memory_allocated += nb;
+      return chunk2mem(newp);
+    }
 #endif
     /* Note the extra SIZE_SZ overhead. */
     if(oldsize - SIZE_SZ >= nb) return oldmem; /* do nothing */
@@ -3421,6 +3425,7 @@ public_rEALLOc(Void_t* oldmem, size_t bytes)
     if (newmem == 0) return 0; /* propagate failure */
     MALLOC_COPY(newmem, oldmem, oldsize - 2*SIZE_SZ);
     munmap_chunk(oldp);
+    memory_allocated -= oldsize;
     return newmem;
   }
 #endif
@@ -4581,6 +4586,8 @@ _int_realloc(mstate av, Void_t* oldmem, size_t bytes)
     if (oldsize == newsize - offset)
       return oldmem;
 
+    memory_allocated -= oldsize;
+    memory_allocated += newsize;
     cp = (char*)mremap((char*)oldp - offset, oldsize + offset, newsize, 1);
 
     if (cp != MAP_FAILED) {
