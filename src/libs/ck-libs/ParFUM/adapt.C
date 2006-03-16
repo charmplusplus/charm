@@ -101,7 +101,9 @@ int FEM_Adapt::edge_flip_help(int e1, int e2, int n1, int n2, int e1_n1,
 	  int oldn4 = n4;
 	  n4 = conn[j];
 	  newNode = n4;
+#ifndef FEM_SILENT
 	  CkPrintf("Changing node %d to node %d\n",oldn4,n4);
+#endif
 	}
       }
       locknodes[3] = n4;
@@ -121,7 +123,9 @@ int FEM_Adapt::edge_flip_help(int e1, int e2, int n1, int n2, int e1_n1,
 	  int oldn3 = n3;
 	  n3 = conn[j]; 
 	  newNode = n3;
+#ifndef FEM_SILENT
 	  CkPrintf("Changing node %d to node %d\n",oldn3,n3);
+#endif
 	}
       }
       locknodes[2] = n3;
