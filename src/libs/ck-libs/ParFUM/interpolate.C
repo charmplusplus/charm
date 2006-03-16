@@ -284,7 +284,9 @@ void FEM_Interpolate::FEM_InterpolateCopyAttributes(int oldnode, int newnode) {
   IDXL_Share **chunks1;
   int index = theMod->idx;
 
+#ifndef FEM_SILENT
   theMod->fmUtil->FEM_Print_coords(theMesh,oldnode);
+#endif
   if(FEM_Is_ghost_index(oldnode) || FEM_Is_ghost_index(newnode)) {
     theMod->fmUtil->getChunkNos(0,oldnode,&numchunks,&chunks1);
   }
@@ -337,7 +339,8 @@ void FEM_Interpolate::FEM_InterpolateCopyAttributes(int oldnode, int newnode) {
     }
     if(numchunks != 0) free(chunks1);
   }
+#ifndef FEM_SILENT
   theMod->fmUtil->FEM_Print_coords(theMesh,newnode);
-
+#endif
   return;
 }
