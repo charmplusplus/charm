@@ -1223,7 +1223,7 @@ case "$LANGUAGE" in
 	USE_F90_LIBRARIES="1"
 	;;
 "f90charm")
-        PRE_LIBRARIES="$PRE_LIBRARIES -lf90charm "
+        PRE_LIBRARIES="$PRE_LIBRARIES -lf90charm -lckf"
         POST_LIBRARIES="$POST_LIBRARIES $CMK_F90LIBS"
 	;;
 "bluegene")
