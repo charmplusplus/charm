@@ -526,6 +526,8 @@ void CthPupBase(pup_er p,CthThreadBase *t,int useMigratable)
 		}
 		CthAliasEnable(t);
 		pup_bytes(p,t->stack,t->stacksize);
+#elif CMK_THREADS_USE_STACKCOPY
+		/* do nothing */
 #else /* isomalloc */
 		CmiIsomallocPup(p,&t->stack);
 #endif
@@ -689,7 +691,23 @@ location on every processor; but the context-switching overhead (especially
 for threads with deep stacks) is extremely high.
 
 Written by Josh Yelon around May 1999
+
+stack grows down as:
+lo   <- savedptr    <- savedstack
+
+...
+
+high <- stackbase
+
+NOTE: this only works when system stack base is same on all processors.
+Which is not the case on my FC4 laptop ?!
+
+extended it to work for tcharm and registered user data migration
+tested platforms: opteron, Cygwin.
+
+Gengbin Zheng March, 2006
 */
+
 #if CMK_THREADS_USE_STACKCOPY
 
 #define SWITCHBUF_SIZE 16384
@@ -716,9 +734,13 @@ CthThread CthPup(pup_er p, CthThread t)
     pup_int(p,&t->savedsize);
     if (pup_isUnpacking(p)) {
       t->savedstack = (qt_t*) malloc(t->savedsize);_MEMCHECK(t->savedstack);
+      t->stacklen = t->savedsize;       /* reflect actual size */
     }
     pup_bytes(p, (void*) t->savedstack, t->savedsize);
-    
+
+      /* assume system stacks are same on all processors !! */
+    pup_bytes(p,&t->savedptr,sizeof(t->savedptr));  
+
     if (pup_isDeleting(p))
       {CthFree(t);t=0;}
 
@@ -781,9 +803,14 @@ void CthInit(char **argv)
   p = (CthProcInfo)malloc(sizeof(struct CthProcInfo));
   _MEMCHECK(p);
   CthCpvAccess(CthProc)=p;
+
   /* leave some space for current stack frame < 256 bytes */
+  /* sp must be same on all processors for migration to work ! */
   sp = (qt_t*)(((size_t)&t) & ~((size_t)0xFF));
   p->stackbase = QT_SP(sp, 0x100);
+
+  /* printf("sp: %p\n", sp); */
+
   switchbuf = (qt_t*)malloc(QT_STKALIGN + SWITCHBUF_SIZE);
   _MEMCHECK(switchbuf);
   switchbuf = (qt_t*)((((size_t)switchbuf)+QT_STKALIGN) & ~(QT_STKALIGN-1));
@@ -799,6 +826,25 @@ static void CthOnly(CthThread t, void *dum1, void *dum2)
 {
   t->startfn(t->startarg);
   CthThreadFinished(t);
+}
+
+/* p is a pointer on stack */
+size_t CthStackPointerPos(CthThread t, char *p)
+{
+  CthProcInfo proc = CthCpvAccess(CthProc);
+  return p - (char *)proc->stackbase;
+}
+
+char * CthStackPointerByPos(CthThread t, size_t size)
+{
+  CmiAssert(t);
+  CthProcInfo proc = CthCpvAccess(CthProc);
+#ifdef QT_GROW_DOWN
+  char *p = (char *)t->savedstack + t->savedsize + size;
+#else
+  char *p = (char *)t->savedstack + size;
+#endif
+  return p;
 }
 
 static void CthResume1(qt_t *sp, CthProcInfo proc, CthThread t)
@@ -1669,6 +1715,21 @@ CthThread CthPup(pup_er p, CthThread t)
 	  return 0;
   }
   return t;
+}
+
+size_t CthStackPointerPos(CthThread t, char *p)
+{
+  size_t s = p - (char *)B(t)->stack;
+  /* size_t s = (size_t)p; */
+  return s;
+}
+
+char * CthStackPointerByPos(CthThread t, size_t size)
+{
+  CmiAssert(B(t)->stack!=NULL);
+  char *p = (char *)B(t)->stack + size;
+  /* char *p = (char *)size; */
+  return p;
 }
 
 #endif
