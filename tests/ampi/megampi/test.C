@@ -185,8 +185,10 @@ void MPI_Tester::test(void)
 	sendI=fn(rank,0,gather_key);
 	TEST_MPI(MPI_Gather, (&sendI,1,MPI_INT, recvV,1,MPI_INT, master, comm));
 	if (rank==master)
-		for (i=0;i<size;i++)
-			testEqual(recvV[i],fn(i,0,gather_key),"Gather results");
+		for (i=0;i<size;i++) {
+			int expected = fn(i,0,gather_key);
+			testEqual(recvV[i],expected,"Gather results");
+		}
 	
 	// FIXME: add gatherv
 	
