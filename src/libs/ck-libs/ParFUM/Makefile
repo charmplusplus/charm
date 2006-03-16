@@ -132,7 +132,8 @@ compat_driver.o: compat_driver.c $(HEADDEP)
 compat_fdriver.o: compat_fdriver.c $(HEADDEP)
 	$(CHARMC) -c compat_fdriver.c
 
-
+docs: ParFUM.doxy ParFUM_Adapt_Algs.h ParFUM_Adapt.h ParFUMf.h ParFUM.h ParFUM_internals.h ParFUM_Interpolate.h ParFUM_locking.h ParFUM_Mesh_Modify.h adapt_algs.C adapt.C adapt_if.C adapt_lock.C collide.C compat.C interpolate.C lock.C lock_node.C main.C map.C mesh_adjacency.C mesh.C mesh_modify.C parallel_part.C ParFUM.C partition.C symmetries.C util.C call_init.c compat_driver.c compat_fdriver.c compat_finit.c compat_init.c
+	doxygen ParFUM.doxy
 
 # clean up
 clean:
