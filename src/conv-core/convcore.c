@@ -2421,6 +2421,9 @@ void CmiInitCell()
   CcdCallOnConditionKeep(CcdPROCESSOR_STILL_IDLE,
       (CcdVoidFn) OffloadAPIProgress, NULL);
 }
+
+#include "cell-api.c"
+
 #endif
 
 /****
