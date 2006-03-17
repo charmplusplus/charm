@@ -3331,6 +3331,7 @@ public_mALLOc(size_t bytes)
     (void)mutex_unlock(&ar_ptr->mutex);
   assert(!victim || chunk_is_mmapped(mem2chunk(victim)) ||
 	 ar_ptr == arena_for_chunk(mem2chunk(victim)));
+  memory_allocated += chunksize(mem2chunk(victim));
   return victim;
 }
 
@@ -3351,11 +3352,11 @@ public_fREe(Void_t* mem)
     return;
 
   p = mem2chunk(mem);
+  memory_allocated -= chunksize(p);
 
 #if HAVE_MMAP
   if (chunk_is_mmapped(p))                       /* release mmapped memory. */
   {
-    memory_allocated -= chunksize(p);
     munmap_chunk(p);
     return;
   }
@@ -3405,6 +3406,9 @@ public_rEALLOc(Void_t* oldmem, size_t bytes)
 
   checked_request2size(bytes, nb);
 
+  memory_allocated -= oldsize;
+  memory_allocated += nb;
+
 #if HAVE_MMAP
   if (chunk_is_mmapped(oldp))
   {
@@ -3413,8 +3417,6 @@ public_rEALLOc(Void_t* oldmem, size_t bytes)
 #if HAVE_MREMAP
     newp = mremap_chunk(oldp, nb);
     if(newp) {
-      memory_allocated -= oldsize;
-      memory_allocated += nb;
       return chunk2mem(newp);
     }
 #endif
@@ -3425,7 +3427,6 @@ public_rEALLOc(Void_t* oldmem, size_t bytes)
     if (newmem == 0) return 0; /* propagate failure */
     MALLOC_COPY(newmem, oldmem, oldsize - 2*SIZE_SZ);
     munmap_chunk(oldp);
-    memory_allocated -= oldsize;
     return newmem;
   }
 #endif
@@ -3497,6 +3498,7 @@ public_mEMALIGn(size_t alignment, size_t bytes)
   }
   assert(!p || chunk_is_mmapped(mem2chunk(p)) ||
 	 ar_ptr == arena_for_chunk(mem2chunk(p)));
+  memory_allocated += chunksize(mem2chunk(p));
   return p;
 }
 
@@ -3513,6 +3515,7 @@ public_vALLOc(size_t bytes)
     return 0;
   p = _int_valloc(ar_ptr, bytes);
   (void)mutex_unlock(&ar_ptr->mutex);
+  memory_allocated += chunksize(mem2chunk(p));
   return p;
 }
 
@@ -3527,6 +3530,7 @@ public_pVALLOc(size_t bytes)
   arena_get(ar_ptr, bytes + 2*mp_.pagesize + MINSIZE);
   p = _int_pvalloc(ar_ptr, bytes);
   (void)mutex_unlock(&ar_ptr->mutex);
+  memory_allocated += chunksize(mem2chunk(p));
   return p;
 }
 
@@ -3614,6 +3618,7 @@ public_cALLOc(size_t n, size_t elem_size)
     if (mem == 0) return 0;
   }
   p = mem2chunk(mem);
+  memory_allocated += chunksize(p);
 
   /* Two optional cases in which clearing not necessary */
 #if HAVE_MMAP
@@ -3674,6 +3679,7 @@ public_iCALLOc(size_t n, size_t elem_size, Void_t** chunks)
 
   m = _int_icalloc(ar_ptr, n, elem_size, chunks);
   (void)mutex_unlock(&ar_ptr->mutex);
+  memory_allocated += chunksize(mem2chunk(m));
   return m;
 }
 
@@ -3689,6 +3695,7 @@ public_iCOMALLOc(size_t n, size_t sizes[], Void_t** chunks)
 
   m = _int_icomalloc(ar_ptr, n, sizes, chunks);
   (void)mutex_unlock(&ar_ptr->mutex);
+  memory_allocated += chunksize(mem2chunk(m));
   return m;
 }
 
@@ -3782,8 +3789,6 @@ _int_malloc(mstate av, size_t bytes)
   */
 
   checked_request2size(bytes, nb);
-
-  memory_allocated += nb;
 
   /*
     If the size qualifies as a fastbin, first check corresponding bin.
@@ -4154,7 +4159,6 @@ _int_free(mstate av, Void_t* mem)
   if (mem != 0) {
     p = mem2chunk(mem);
     size = chunksize(p);
-    memory_allocated -= size;
 
     check_inuse_chunk(av, p);
 
@@ -4586,8 +4590,6 @@ _int_realloc(mstate av, Void_t* oldmem, size_t bytes)
     if (oldsize == newsize - offset)
       return oldmem;
 
-    memory_allocated -= oldsize;
-    memory_allocated += newsize;
     cp = (char*)mremap((char*)oldp - offset, oldsize + offset, newsize, 1);
 
     if (cp != MAP_FAILED) {
