@@ -2383,6 +2383,10 @@ void ConverseCommonInit(char **argv)
   CmiInitImmediateMsg();
   CldModuleInit(argv);
   
+#if CMK_CELL
+  void CmiInitCell();
+  CmiInitCell();
+#endif
   /* main thread is suspendable */
 /*
   CthSetSuspendable(CthSelf(), 0);
@@ -2401,7 +2405,23 @@ void ConverseCommonExit(void)
 #if CMI_IO_BUFFER_EXPLICIT
   CmiFlush(stdout);  /* end of program, always flush */
 #endif
+
+#if CMK_CELL
+  CloseOffloadAPI();
+#endif
 }
+
+
+#if CMK_CELL
+void CmiInitCell()
+{
+  InitOffloadAPI(offloadCallback);
+  CcdCallOnConditionKeep(CcdPERIODIC, 
+        (CcdVoidFn) OffloadAPIProgress, NULL);
+  CcdCallOnConditionKeep(CcdPROCESSOR_STILL_IDLE,
+      (CcdVoidFn) OffloadAPIProgress, NULL);
+}
+#endif
 
 /****
  * CW Lee - 9/14/2005

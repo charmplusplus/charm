@@ -1427,6 +1427,10 @@ CpvExtern(char *,_validProcessors);
 #include "conv-lists.h"
 #include "conv-trace.h"
 #include "persistent.h"
+#if CMK_CELL
+#include "cell-api.h"
+#endif
+
 
 #if defined(__cplusplus)
 }
