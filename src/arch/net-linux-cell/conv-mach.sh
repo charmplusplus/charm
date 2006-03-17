@@ -1,11 +1,12 @@
 CELL_SDK_DIR="$HOME/cellsim"
+
 CMK_CPP_CHARM='/usr/lib/cpp'
 CMK_CPP_C='ppu32-gcc -E'
 CMK_CXXPP='ppu32-g++ -E'
 CMK_CC="ppu32-gcc -fPIC -w -I$CELL_SDK_DIR/sysroot/usr/include"
 CMK_CXX="ppu32-g++ -fPIC -w  -I$CELL_SDK_DIR/sysroot/usr/include"
-CMK_LD="$CMK_CC -L$HOME/cellsim/systemsim-cell-release/run/cell/linux/spert -L$CELL_SDK_DIR/sysroot/usr/lib "
-CMK_LDXX="$CMK_CXX -L$HOME/cellsim/systemsim-cell-release/run/cell/linux/spert -L$CELL_SDK_DIR/sysroot/usr/lib "
+CMK_LD="$CMK_CC -L$CELL_SDK_DIR/sysroot/usr/lib "
+CMK_LDXX="$CMK_CXX -L$CELL_SDK_DIR/sysroot/usr/lib "
 
 CMK_SEQ_CC=$CMK_CC
 CMK_SEQ_CXX=$CMK_CXX
