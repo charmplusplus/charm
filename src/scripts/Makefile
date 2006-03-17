@@ -164,7 +164,7 @@ CVHEADERS=cpthreads.h converse.h conv-trace.h conv-random.h conv-qd.h \
 	routerstrategy.h convcomlib.h dummyconversestrategy.h  treerouter.h \
 	convcomlibmanager.h graphrouter.h petable.h gridrouter.h router.h \
 	prefixrouter.h pipebroadcastconverse.h pipelinestrategy.h cmipool.h \
-	comlib.h
+	comlib.h cell-api.h
 
 # The .c files are there to be #included by clients whole
 # This is a bit unusual, but makes client linking simpler.
@@ -324,7 +324,7 @@ LIBCONV_CORE= convcore.o conv-conds.o queueing.o msgmgr.o \
 	traceCore.o traceCoreCommon.o \
 	converseProjections.o machineProjections.o \
 	quiescence.o isomalloc.o conv-counter.o \
-	global-nop.o cmipool.o
+	global-nop.o cmipool.o cell-api.o
 
 #############################################
 #
