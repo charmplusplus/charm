@@ -1,15 +1,8 @@
-TOOLCHAIN_DIR = /opt/sce/toolchain-2.3
-CELL_SDK_DIR = /home/strife/cellsim
 
 CHARMDIR=../..
 CHARMC=$(CHARMDIR)/bin/charmc
 
-PPU_CC = ppu32-gcc $(OPTS)
-PPU_CXX = ppu32-g++ $(OPTS)
-SPU_CC = spu-gcc $(OPTS)
-SPU_CXX = spu-g++ $(OPTS)
-SPU_AR = spu-ar
-PPU_EMBEDSPU = ppu32-embedspu
+include $(CHARMDIR)/tmp/Makefile.cell
 
 RM = rm -f
 

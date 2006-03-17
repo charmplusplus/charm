@@ -1,13 +1,9 @@
-CELL_SDK_DIR = /home/strife/cellsim
 
 CHARM_BASE_DIR = ../../../..
 CHARM_BIN_DIR = $(CHARM_BASE_DIR)/bin
 CHARMC = $(CHARM_BIN_DIR)/charmc $(OPTS)
 
-SPU_CC = spu-gcc $(OPTS)
-SPU_CXX = spu-g++ $(OPTS)
-SPU_AR = spu-ar
-PPU_EMBEDSPU = ppu32-embedspu
+include $(CHARM_BASE_DIR)/tmp/Makefile.cell
 
 OBJS = hello.o
 
