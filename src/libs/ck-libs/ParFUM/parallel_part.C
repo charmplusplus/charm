@@ -81,7 +81,7 @@ int FEM_master_parallel_part(int fem_mesh,int masterRank,FEM_Comm_t comm_context
     }
   }
   eptrMSA.set(ptrcount) = indcount;
-  printf("master -> ptrcount %d indcount %d \n",ptrcount,indcount);
+  printf("master -> ptrcount %d indcount %d sizeof(MSA1DINT) %d sizeof(MSA1DINTLIST) %d memory %d\n",ptrcount,indcount,sizeof(MSA1DINT),sizeof(MSA1DINTLIST),CmiMemoryUsage());
   /*
     break up the mesh such that each chunk gets the same number of elements
     and the nodes corresponding to those elements. However this is not the partition.
@@ -103,7 +103,7 @@ int FEM_master_parallel_part(int fem_mesh,int masterRank,FEM_Comm_t comm_context
   */
   struct partconndata *partdata = FEM_call_parmetis(data,comm_context);
 
-  printf("done with parmetis \n");
+  printf("done with parmetis %d FEM_Mesh %d\n",CmiMemoryUsage(),sizeof(FEM_Mesh));
 	
   /*
     Set up a msa to store the partitions to which a node belongs.
@@ -155,7 +155,7 @@ int FEM_master_parallel_part(int fem_mesh,int masterRank,FEM_Comm_t comm_context
   MeshElem me = part2mesh.get(masterRank);
   printf("[%d] Number of elements in my partitioned mesh %d number of nodes %d \n",masterRank,me.m->nElems(),me.m->node.size());
 	
-  DEBUG(printf("[%d] Memory usage on vp 0 before FreeMem %d \n",CkMyPe(),CmiMemoryUsage()));
+  printf("[%d] Memory usage on vp 0 close to max %d \n",CkMyPe(),CmiMemoryUsage());
 	//Free up the eptr and eind MSA arrays stored in data
 	data.arr1.FreeMem();
 	data.arr2.FreeMem();
