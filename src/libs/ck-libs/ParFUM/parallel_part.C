@@ -1009,6 +1009,7 @@ void makeGhost(FEM_Mesh *m,MPI_Comm comm,int masterRank,int totalShared,FEM_Ghos
     In the same routine, if they have not been seen earlier, add them to the 
     ghost nodes.
   */	
+	MPI_Barrier(comm);
   FEM_Mesh *gmesh = ghostmeshes->get(myChunk).m;
   DEBUG(printf("[%d] my ghost mesh is at %p \n",myChunk,gmesh));
 	
