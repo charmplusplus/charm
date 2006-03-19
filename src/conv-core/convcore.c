@@ -1229,7 +1229,6 @@ void *CsdNextMessage(CsdSchedulerState_t *s) {
         }
 
 	return NULL;
-
 }
 
 int CsdScheduler(int maxmsgs)
@@ -1376,7 +1375,7 @@ void CthStandinCode()
   while (1) CsdScheduler(0);
 }
 
-CthThread CthSuspendNormalThread()
+static CthThread CthSuspendNormalThread()
 {
   return CpvAccess(CthSchedulingThread);
 }
