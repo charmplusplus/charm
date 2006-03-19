@@ -1095,6 +1095,17 @@ public:
 	resident_pages=0;
     }
 
+		/** 
+			Deregister a client. Decremenet the number of local threads. If total number of local threads 
+			hits 0 FreeMem()
+		*/
+		inline void unroll(){
+        numberLocalWorkerThreads--;
+				if(numberLocalWorkerThreads == 0){
+					FreeMem();
+				}
+		}
+
     /**
      * Issue a prefetch request for the given range of pages. These pages will
      * be locked into the cache, so that they will not be swapped out.
