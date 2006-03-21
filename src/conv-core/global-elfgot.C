@@ -335,6 +335,7 @@ void CtgInstall(CtgGlobals g) {
 	CtgGlobals *cur=&CpvAccess(_curCtg);
 	CtgGlobals oldG=*cur;
 	if (g==NULL) g=_ctgListGlobals;
+	if (g == oldG) return;
 	*cur=g;
 	oldG->installed=0;
 	_ctgList->install(g->data_seg);
