@@ -1787,7 +1787,7 @@ CDECL void AMPI_Allow_Migrate(void)
 
 CDECL void AMPI_Setmigratable(MPI_Comm comm, int mig){
 #if CMK_LBDB_ON
-  AMPIAPI("AMPI_Setmigratable");
+  //AMPIAPI("AMPI_Setmigratable");
   ampi *ptr=getAmpiInstance(comm);
   ptr->setMigratable(mig);
 #else
@@ -1833,7 +1833,7 @@ CDECL int AMPI_Finalized(int *isFinalized)
 
 CDECL int AMPI_Comm_rank(MPI_Comm comm, int *rank)
 {
-  AMPIAPI("AMPI_Comm_rank");
+  //AMPIAPI("AMPI_Comm_rank");
   *rank = getAmpiInstance(comm)->getRank(comm);
   return 0;
 }
@@ -1841,7 +1841,7 @@ CDECL int AMPI_Comm_rank(MPI_Comm comm, int *rank)
 CDECL
 int AMPI_Comm_size(MPI_Comm comm, int *size)
 {
-  AMPIAPI("AMPI_Comm_size");
+  //AMPIAPI("AMPI_Comm_size");
   *size = getAmpiInstance(comm)->getSize(comm);
   return 0;
 }
@@ -2217,14 +2217,14 @@ int AMPI_Scan(void* sendbuf, void* recvbuf, int count, MPI_Datatype datatype, MP
 
 CDECL
 int AMPI_Op_create(MPI_User_function *function, int commute, MPI_Op *op){
-  AMPIAPI("AMPI_Op_create");
+  //AMPIAPI("AMPI_Op_create");
   *op = function;
   return 0;
 }
 
 CDECL
 int AMPI_Op_free(MPI_Op *op){
-  AMPIAPI("AMPI_Op_free");
+  //AMPIAPI("AMPI_Op_free");
   *op = MPI_OP_NULL;
   return 0;
 }
@@ -2233,7 +2233,7 @@ int AMPI_Op_free(MPI_Op *op){
 CDECL
 double AMPI_Wtime(void)
 {
-  AMPIAPI("AMPI_Wtime");
+//  AMPIAPI("AMPI_Wtime");
 #if CMK_BLUEGENE_CHARM
   return BgGetTime();
 #else
@@ -2243,7 +2243,7 @@ double AMPI_Wtime(void)
 
 CDECL
 double AMPI_Wtick(void){
-  AMPIAPI("AMPI_Wtick");
+  //AMPIAPI("AMPI_Wtick");
   return 1e-6;
 }
 
@@ -2397,11 +2397,11 @@ CDECL
 int AMPI_Wait(MPI_Request *request, MPI_Status *sts)
 {
   AMPIAPI("AMPI_Wait");
-  checkRequest(*request);
   if(*request == MPI_REQUEST_NULL){
     stsempty(*sts);
     return 0;
   }
+  checkRequest(*request);
   AmpiRequestList* reqs = getReqs();
   AMPI_DEBUG("MPI_Wait: request=%d, reqs.size=%d, &reqs=%d\n",*request,reqs->size(),reqs);
   (*reqs)[*request]->wait(sts);
