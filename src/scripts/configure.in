@@ -234,7 +234,7 @@ cat > $t <<EOT
 long double foo(void) { return 17.0; }
 EOT
 test_cxx "whether long double works" "ok" "no" ""
-AC_DEFINE_UNQUOTED(CMK_LONG_DOUBLE_DEFINED, $pass, [whether long double works])
+AC_DEFINE_UNQUOTED(CMK_LONG_DOUBLE_DEFINED, $strictpass, [whether long double works])
 
 #### Check ucontext and FPU pointer ####
 cat > $t <<EOT

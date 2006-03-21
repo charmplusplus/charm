@@ -1484,7 +1484,7 @@ EOT
 test_cxx "whether long double works" "ok" "no" ""
 
 cat >>confdefs.h <<_ACEOF
-#define CMK_LONG_DOUBLE_DEFINED $pass
+#define CMK_LONG_DOUBLE_DEFINED $strictpass
 _ACEOF
 
 
