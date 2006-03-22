@@ -49,6 +49,8 @@ OPTS_CXX=""
 OPTS_F90=""
 OPTS_LD=""  
 OPTS_LDXX=""
+OPTS_PIC="$CMK_PIC"
+test -z "$OPTS_PIC" && OPTS_PIC='-fpic'
 
 OBJECT=""
 POST_LANGUAGE=""
@@ -410,11 +412,10 @@ do
 	
 	"-swapglobal"|"-swapglobals")
 		SWAPGLOBALS="1"
-		# fixme: -fpic is only for gcc-- should wait until we read config script
-		OPTS_CC="$OPTS_CC -fpic"
-		OPTS_CXX="$OPTS_CXX -fpic"
-		OPTS_F90="$OPTS_F90 -fpic"
-		OPTS_LD="$OPTS_LD -fpic"
+		OPTS_CC="$OPTS_CC $OPTS_PIC"
+		OPTS_CXX="$OPTS_CXX $OPTS_PIC"
+		OPTS_F90="$OPTS_F90 $OPTS_PIC"
+		OPTS_LD="$OPTS_LD $OPTS_PIC"
 		;;
 
 	"-verbose")
