@@ -1726,8 +1726,9 @@ size_t CthStackPointerPos(CthThread t, char *p)
 
 char * CthStackPointerByPos(CthThread t, size_t size)
 {
-  CmiAssert(B(t)->stack!=NULL);
-  char *p = (char *)B(t)->stack + size;
+  char *p;
+  CmiAssert(t && B(t)->stack);
+  p = (char *)B(t)->stack + size;
   /* char *p = (char *)size; */
   return p;
 }
