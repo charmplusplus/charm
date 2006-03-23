@@ -512,7 +512,7 @@ static void *meta_memalign(size_t align, size_t size) {
   char *alloc=(char *)mm_memalign(align,overhead+size);
   Slot *s=(Slot *)(alloc+overhead-sizeof(Slot));  
   void *user=setSlot(s,size);
-  s->magic = SLOTMAGIC_VALLOC + s->magic&0xF;
+  s->magic = SLOTMAGIC_VALLOC + (s->magic&0xF);
   s->extraStack = (SlotStack *)alloc; /* use the extra space as stack */
   s->extraStack->protectedMemory = NULL;
   s->extraStack->protectedMemoryLength = 0;
