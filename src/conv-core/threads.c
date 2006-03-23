@@ -436,23 +436,23 @@ static void *CthAllocateStack(CthThreadBase *th,int *stackSize,int useMigratable
 }
 static void CthThreadBaseFree(CthThreadBase *th)
 {
-	struct CthThreadListener *l,*lnext;
-	/*
-	 * remove the token if it is not queued in the converse scheduler		
-	 */
-	if(th->scheduled == 0){
-		free(th->token);
-	}else{
-		th->token->thread = NULL;
-	}
-	/* Call the free function pointer on all the listeners on
-			this thread and also delete the thread listener objects
-	*/
-	for(l=th->listener;l!=NULL;l=lnext){
-			lnext=l->next;
-			l->next=0;
-			l->free(l);
-	}
+  struct CthThreadListener *l,*lnext;
+  /*
+   * remove the token if it is not queued in the converse scheduler		
+   */
+  if(th->scheduled == 0){
+	free(th->token);
+  }else{
+	th->token->thread = NULL;
+  }
+  /* Call the free function pointer on all the listeners on
+     this thread and also delete the thread listener objects
+  */
+  for(l=th->listener;l!=NULL;l=lnext){
+	lnext=l->next;
+	l->next=0;
+	l->free(l);
+  }
   free(th->data);
   if (th->isMigratable) {
 #if CMK_THREADS_ALIAS_STACK
@@ -1590,11 +1590,10 @@ static CthThread CthThreadInit(void)
 
 static void CthThreadFree(CthThread t)
 {
-  CthThreadBaseFree(&t->base);
   if (t->protlen!=0) {
     CthMemoryUnprotect(t->stack, t->protect, t->protlen);
-    free(t->stack);
   }
+  CthThreadBaseFree(&t->base);
   free(t);
 }
 
