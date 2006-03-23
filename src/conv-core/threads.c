@@ -1666,7 +1666,7 @@ static CthThread CthCreateInner(CthVoidFn fn, void *arg, int size,int Migratable
 	  if (size==0) size=CthCpvAccess(_defaultStackSize);
 	  size = (size+(CMK_MEMORY_PAGESIZE*2)-1) & ~(CMK_MEMORY_PAGESIZE-1);
 	  stack = (qt_t*)CthMemAlign(CMK_MEMORY_PAGESIZE, size);
-          result->base->stack = stack;
+          B(result)->stack = stack;
   } else
 	  stack=CthAllocateStack(&result->base,&size,Migratable);
   CthAliasEnable(B(result)); /* Change to new thread's stack while setting args */
