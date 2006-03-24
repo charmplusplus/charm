@@ -50,7 +50,12 @@ public:
     CkPrintf("[%d] BEFORE\n", thisIndex);
     char buf[16] __attribute__((aligned(16)));
     sprintf(buf, "%d", thisIndex);
-    sendWorkRequest(FUNC_SAYHI, buf, strlen(buf)+1, NULL, 0, CthSelf());
+    sendWorkRequest(FUNC_SAYHI,
+                    NULL, 0,            // readWrite data
+                    buf, strlen(buf)+1, // readOnly data
+                    NULL, 0,            // writeOnly data
+                    CthSelf()
+                   );
     CthSuspend();
     CkPrintf("[%d] AFTER\n", thisIndex);
     if (thisIndex < nElements-1)

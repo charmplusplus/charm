@@ -11,8 +11,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Function Prototypes
 
-void funcLookup(int funcIndex, void* data, int dataLen, void* msg, int msgLen);
-void sayHi(char* data, char* msg);
+void funcLookup(int funcIndex, void* readWritePtr, int readWriteLen, void* readOnlyPtr, int readOnlyLen, void* writeOnlyPtr, int writeOnlyLen);
+void sayHi(char* readWritePtr, char* readOnlyPtr);
 
 
 #endif //__HELLO_SHARED_H__
