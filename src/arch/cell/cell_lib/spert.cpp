@@ -1,8 +1,6 @@
 #include <stdio.h>
 #include <spu_intrinsics.h>
-//#include <spu/spu_mfcio.h>
 #include <spu_mfcio.h>
-//#include <stidc/bpa_mfc.h>
 #include <cbe_mfc.h>
 #include <unistd.h>
 #include <string.h>
@@ -14,7 +12,12 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Required External Function(s) that the User Needs to Provide
 
-extern void funcLookup(int funcIndex, void* data, int dataLen, void* msg, int msgLen);
+//extern void funcLookup(int funcIndex, void* data, int dataLen, void* msg, int msgLen);
+extern void funcLookup(int funcIndex,
+                       void* readWritePtr, int readWriteLen,
+                       void* readOnlyPtr, int readOnlyLen,
+                       void* writeOnlyPtr, int writeOnlyPtr
+                      );
 
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -40,12 +43,6 @@ int main(unsigned long long id, unsigned long long param) {
 
   /*volatile*/ SPEData myData;
 
-
-  //printf("[%llu] DEBUG : ( stack) myData @ %p\n", id, &myData);
-  //printf("[%llu] DEBUG : (global) msgQueueRaw @ %p\n", id, msgQueueRaw);
-  //printf("[%llu] DEBUG : (global) msgQueue @ %p\n", id, msgQueue);
-
-
   // Tell the world this SPE is alive
   printf(" --==>> Hello From SPE 0x%llx's Runtime <<==--\n", id);
 
@@ -67,18 +64,12 @@ int main(unsigned long long id, unsigned long long param) {
   // Wait for all transfers to complete.  See "SPU C/C++ Language Extentions", page 64 for details.
   spu_mfcstat(2);
 
-  // DEBUG
-  //printf("SPEData @ %p = {\n", &myData);
-  //printf("  messageQueue = %u\n", myData.messageQueue);
-  //printf("  messageQueueLength = %d\n", myData.messageQueueLength);
-  //printf("}\n");
-
   // Entry into the SPE's scheduler
   speScheduler(&myData, id);
 
   // Tell the world this SPE is going away
   printf(" --==>> Goodbye From SPE 0x%llx's Runtime <<==--\n", id);
-  printf("  \"It's a cruel cruel world...\"\n");
+  printf("  \"I do not regret the things I have done, but those I did not do.\" - Lucas, Empire Records\n");
 
   return 0;
 }
@@ -92,50 +83,35 @@ void speScheduler(SPEData *speData, unsigned long long id) {
   int cnt = 0;
   int tagStatus;
 
-  //printf("[%llu] DEBUG : ( stack) speScheduler::keepLooping @ %p\n", id, &keepLooping);
-  //printf("[%llu] DEBUG : ( stack) speScheduler::tagStatus @ %p\n", id, &tagStatus);
-  //printf("[%llu] DEBUG : SIZEOF_16(SPEMessage) = %d\n", SIZEOF_16(SPEMessage));
-
   // DEBUG
   int debugCounter = 0;
 
-  printf("[%llu] --==>> Starting SPE Scheduler ...\n", id);
+  printf("[%llx] --==>> Starting SPE Scheduler ...\n", id);
 
   // Initialize the tag status registers to all tags enabled
   spu_writech(MFC_WrTagMask, (unsigned int)-1);
 
   // Create the local message queue
-  //volatile char* msgQueueRaw[SPE_MESSAGE_QUEUE_BYTE_COUNT];
-  //volatile SPEMessage* msgQueue[SPE_MESSAGE_QUEUE_LENGTH];
   int msgState[SPE_MESSAGE_QUEUE_LENGTH];
-  void* msgData[SPE_MESSAGE_QUEUE_LENGTH];
-  void* msgMsg[SPE_MESSAGE_QUEUE_LENGTH];
+  void* readWritePtr[SPE_MESSAGE_QUEUE_LENGTH];
+  void* readOnlyPtr[SPE_MESSAGE_QUEUE_LENGTH];
+  void* writeOnlyPtr[SPE_MESSAGE_QUEUE_LENGTH];
   int msgCounter[SPE_MESSAGE_QUEUE_LENGTH];
   for (int i = 0; i < SPE_MESSAGE_QUEUE_LENGTH; i++) {
     msgQueue[i] = (SPEMessage*)(((char*)msgQueueRaw) + (SIZEOF_16(SPEMessage) * i));
     msgState[i] = SPE_MESSAGE_STATE_CLEAR;
-    msgData[i] = NULL;
-    msgMsg[i] = NULL;
+    readWritePtr[i] = NULL;
+    readOnlyPtr[i] = NULL;
+    writeOnlyPtr[i] = NULL;
     msgCounter[i] = 0;
   }
-
-  //printf("[%llu] :: msgQueueRaw = %p, SIZEOF_16(SPEMessage) = 0x%x\n", id, msgQueueRaw, SIZEOF_16(SPEMessage));
-  //printf("[%llu] :: msqQueue = { ", id);
-  //for (int k = 0; k < SPE_MESSAGE_QUEUE_LENGTH; k++)
-  //  printf("%p ", msgQueue[k]);
-  //printf("}\n");
 
   // Once the message queue has been created, check in with the main processor by sending a pointer to it
   spu_write_out_mbox((unsigned int)msgQueueRaw);
 
-  //printf(" >>> Initial Message Queue Read...\n");
-  //printf("    Importing Message Queue @ %p\n", speData->messageQueue);
-
   // Do the intial read of the message queue from main memory
   spu_mfcdma32(msgQueueRaw, (PPU_POINTER_TYPE)(speData->messageQueue), SPE_MESSAGE_QUEUE_BYTE_COUNT, 31, MFC_GET_CMD);
-  spu_mfcstat(2);  // wait for the dma to finish
-
-  //printf(" >>> Finished\n");
+  //spu_mfcstat(2);  // wait for the dma to finish
 
   // The scheduler loop
   while (keepLooping != FALSE) {
@@ -161,19 +137,21 @@ void speScheduler(SPEData *speData, unsigned long long id) {
     if ((debugCounter % 5000) == 0 && debugCounter != 0) {
       #if 1
 
-        printf("[%llu] :: still going... \n", id);
+        printf("[%llx] :: still going... \n", id);
 
       #else
 
-        printf("[%llu] :: still going... msgQueue[0] @ %p (msgQueue: %p) = { fi = %d, d = %d, dl = %d, m = %d, ml = %d, s = %d, cnt = %d, cmd = %d }\n",
+        printf("[%llx] :: still going... msgQueue[0] @ %p (msgQueue: %p) = { fi = %d, rw = %d, rwl = %d, ro = %d, rol = %d, wo = %d, wol = %d, s = %d, cnt = %d, cmd = %d }\n",
                id,
                &(msgQueue[0]),
                msgQueue,
                (volatile int)(msgQueue[0]->funcIndex),
-               msgQueue[0]->data,
-               msgQueue[0]->dataLen,
-               msgQueue[0]->msg,
-               msgQueue[0]->msgLen,
+               msgQueue[0]->readWritePtr,
+               msgQueue[0]->readWriteLen,
+               msgQueue[0]->readOnlyPtr,
+               msgQueue[0]->readOnlyLen,
+               msgQueue[0]->writeOnlyPtr,
+               msgQueue[0]->writeOnlyLen,
                (volatile int)(msgQueue[0]->state),
                (volatile int)(msgQueue[0]->counter),
 	       (volatile int)(msgQueue[0]->command)
@@ -207,9 +185,6 @@ void speScheduler(SPEData *speData, unsigned long long id) {
           msgCounter[i] != msgQueue[i]->counter
          ) {
 
-        //printf("[%llu] :: Received Message! ---------------------------------------------------------------------\n", id);
-        //printf("[%llu] :: New Message (index: %d)...\n", id, i);
-
         // Start by checking the command
         int command = msgQueue[i]->command;
         if (command == SPE_MESSAGE_COMMAND_EXIT) {
@@ -234,10 +209,6 @@ void speScheduler(SPEData *speData, unsigned long long id) {
     // TODO: Change this so if only one DMA command entry is available, use it and then initiate the second
     //   one later.
     unsigned int numDMAQueueEntries = mfc_stat_cmd_queue();
-
-    //if ((debugCounter % 5000) == 0 && debugCounter != 0)
-    //  printf("[%llu] :: numDMAQueueEntries = %d\n", id, numDMAQueueEntries);
-
     for (int i = 0; (i < SPE_MESSAGE_QUEUE_LENGTH) /* && (numDMAQueueEntries > 0) */; i++) {
 
       if (msgState[i] == SPE_MESSAGE_STATE_PRE_FETCHING) {
@@ -247,63 +218,71 @@ void speScheduler(SPEData *speData, unsigned long long id) {
         //   enough queue entries... measure this to see if it is true... if it is, then try to get these
         //   if statements out of the way for something that is faster).
         int numDMAEntriesNeeded = 0;
-        if (msgQueue[i]-> data != (PPU_POINTER_TYPE)NULL) numDMAEntriesNeeded++;
-        if (msgQueue[i]-> msg != (PPU_POINTER_TYPE)NULL) numDMAEntriesNeeded++;
+        if (msgQueue[i]->readWritePtr != (PPU_POINTER_TYPE)NULL) numDMAEntriesNeeded++;
+        if (msgQueue[i]->readOnlyPtr != (PPU_POINTER_TYPE)NULL) numDMAEntriesNeeded++;
         if (numDMAEntriesNeeded > numDMAQueueEntries) continue;  // Skip this message for now
 
-        //printf("[%llu] :: Fetching Data for queue entry %d ----------------------------------------------------\n", id, i);
+        // Fetch the readWrite data
+        if (msgQueue[i]->readWritePtr != (PPU_POINTER_TYPE)NULL) {
 
-        // Fetch the data
-        if (msgQueue[i]->data != (PPU_POINTER_TYPE)NULL) {
-          int retrieveSize = ROUNDUP_16(msgQueue[i]->dataLen);
-          msgData[i] = (void*)(new char[retrieveSize]);
-          //msgData[i] = (void*)malloc_aligned(retrieveSize, 16);
-          //printf("[%llu] DEBUG : (   new) speScheduler::msgData allocated @ %p (size: %d)\n", id, msgData[i], retrieveSize);
+          // Allocate a buffer locally on the SPE
+          int retrieveSize = ROUNDUP_16(msgQueue[i]->readWriteLen);
+          readWritePtr[i] = (void*)(new char[retrieveSize]);
 
-          if ((int)msgData[i] > 0x40000) {
+          // Verify the pointer that was returned
+          if (((int)readWritePtr[i]) > 0x40000) {
             printf("!!!!! ERROR !!!!! : new returned a value greater than the LS size : Expect bad things in the near future !!!!!\n");
 	  }
-
-          //printf("msgData[%d] = %p\n", i, msgData[i]);
-
-          if (msgData[i] == NULL) {
-            printf("===== ERROR ERROR ERROR ===== : speScheduler() : Unable to allocate memory for data... expect bad things soon!...\n");
+          if (readWritePtr[i] == NULL) {
+            printf("===== ERROR ===== : speScheduler() : Unable to allocate memory for readWritePtr... expect bad things soon!...\n");
             continue;
-          }
-          spu_mfcdma32(msgData[i], (PPU_POINTER_TYPE)(msgQueue[i]->data), retrieveSize, i, MFC_GET_CMD);
+	  }
+
+          // Initiate the transfer
+          spu_mfcdma32(readWritePtr[i], (PPU_POINTER_TYPE)(msgQueue[i]->readWritePtr), retrieveSize, i, MFC_GET_CMD);
           numDMAQueueEntries--;
-	}
+        }
 
-        else {
-          //printf("[%llu] :: NO DATA FOR MESSAGE %d -------------------------------------------------------------\n", id, i);  
-	}
+        // Fetch the readOnly data
+        if (msgQueue[i]->readOnlyPtr != (PPU_POINTER_TYPE)NULL) {
 
-        // Fetch the message
-        if (msgQueue[i]->msg != (PPU_POINTER_TYPE)NULL) {
-          int retrieveSize = ROUNDUP_16(msgQueue[i]->msgLen);
-          msgMsg[i] = (void*)(new char[retrieveSize]);
-          //msgMsg[i] = (void*)malloc_aligned(retrieveSize, 16);
+          // Allocate a buffer locally on the SPE
+          int retrieveSize = ROUNDUP_16(msgQueue[i]->readOnlyLen);
+          readOnlyPtr[i] = (void*)(new char[retrieveSize]);
 
-          //printf("[%llu] DEBUG : (   new) speScheduler::msgMsg allocated @ %p (size: %d)\n", id, msgMsg[i], retrieveSize);
-
-          if ((int)msgMsg[i] > 0x40000) {
+          // Verify the pointer that was returned
+          if (((int)readOnlyPtr[i]) > 0x40000) {
             printf("!!!!! ERROR !!!!! : new returned a value greater than the LS size : Expect bad things in the near future !!!!!\n");
 	  }
-
-          //printf("msgMsg[%d] = %p\n", i, msgMsg[i]);
-
-          if (msgMsg[i] == NULL) {
-            printf("===== ERROR ERROR ERROR ===== : speScheduler() : Unable to allocate memory for message... expect bad things soon!...\n");
+          if (readOnlyPtr[i] == NULL) {
+            printf("===== ERROR ===== : speScheduler() : Unable to allocate memory for readOnlyPtr... expect bad things soon!...\n");
             continue;
 	  }
-          spu_mfcdma32(msgMsg[i], (PPU_POINTER_TYPE)(msgQueue[i]->msg), retrieveSize, i, MFC_GET_CMD);
+
+          // Initiate the transfer
+          spu_mfcdma32(readOnlyPtr[i], (PPU_POINTER_TYPE)(msgQueue[i]->readOnlyPtr), retrieveSize, i, MFC_GET_CMD);
           numDMAQueueEntries--;
+        }
+
+        // Allocate memory for the writeOnly data
+        if (msgQueue[i]->writeOnlyPtr != (PPU_POINTER_TYPE)NULL) {
+
+          // Allocate a buffer locally on the SPE
+          // NOTE: The wroteOnly buffer still needs to be aligned so it can be written back later (even through
+          //   it is not being DMAed to the SPE now).
+          int retrieveSize = ROUNDUP_16(msgQueue[i]->writeOnlyLen);
+          writeOnlyPtr[i] = (void*)(new char[retrieveSize]);
+
+          // Verify the pointer that was returned
+          if (((int)writeOnlyPtr[i]) > 0x40000) {
+            printf("!!!!! ERROR !!!!! : new returned a value greater than the LS size : Expect bad things in the near future !!!!!\n");
+	  }
+          if (writeOnlyPtr[i] == NULL) {
+            printf("===== ERROR ===== : speScheduler() : Unable to allocate memory for writeOnlyPtr... expect bad things soon!...\n");
+            continue;
+	  }
 	}
 
-        else {
-          //printf("[%llu] :: NO MSG FOR MESSAGE %d --------------------------------------------------------------\n", id, i);  
-	}
-        
         // Update the state of the message (locally)
         msgState[i] = SPE_MESSAGE_STATE_FETCHING;
       }
@@ -313,10 +292,6 @@ void speScheduler(SPEData *speData, unsigned long long id) {
     // Read the tag status to see if the data has arrived for any of the fetching message entries
     mfc_write_tag_update_immediate();
     tagStatus = mfc_read_tag_status(); //spu_readch(MFC_RdTagStat);
-
-    //if ((debugCounter % 5000) == 0 && debugCounter != 0)
-    //  printf("[%llu] :: Checking for Incoming DMA Completion 0x%08x\n", id, tagStatus);
-
     for (int i = 0; i < SPE_MESSAGE_QUEUE_LENGTH; i++) {
       if (msgState[i] == SPE_MESSAGE_STATE_FETCHING && ((tagStatus & (0x01 << i)) != 0))
         msgState[i] = SPE_MESSAGE_STATE_READY;
@@ -330,34 +305,15 @@ void speScheduler(SPEData *speData, unsigned long long id) {
 
         volatile SPEMessage *msg = msgQueue[runIndex];
 
-        // DEBUG
-        //printf("[%llu] :: --==>> SPE : Execute Message :: msgQueue[%d]->funcIndex = %d\n",
-        //       id, runIndex, msgQueue[runIndex]->funcIndex
-        //      );
-
-        // TODO : Execute the message here
-        funcLookup(msg->funcIndex, msgData[runIndex], msg->dataLen, msgMsg[runIndex], msg->msgLen);
-
-        //// DEBUG
-        //printf("[%llu] :: (1) msgState = {", id);
-        //for (int j = 0; j < SPE_MESSAGE_QUEUE_LENGTH; j++)
-        //  printf("%d ", msgState[j]);
-        //printf("}\n");
+        // Execute the function specified
+        funcLookup(msg->funcIndex,
+                   readWritePtr[runIndex], msg->readWriteLen,
+                   readOnlyPtr[runIndex], msg->readOnlyLen,
+                   writeOnlyPtr[runIndex], msg->writeOnlyLen
+                  );
 
         // Update the state of the message queue entry
         msgState[runIndex] = SPE_MESSAGE_STATE_EXECUTED;
-
-        //// DEBUG
-        //printf("[%llu] :: (2) msgState = {", id);
-        //for (int j = 0; j < SPE_MESSAGE_QUEUE_LENGTH; j++)
-        //  printf("%d ", msgState[j]);
-        //printf("}\n");
-
-        //// Try the commit the data to memory
-        //if (msgQueue[i]->data != (PPU_POINTER_TYPE)NULL && mfc_stat_cmd_queue() > 0) {
-        //  spu_mfcdma32(msgData[i], (PPU_POINTER_TYPE)(msgQueue[i]->data), ROUNDUP_16(msgQueue[i]->dataLen), i, MFC_PUT_CMD);
-        //  msgState[runIndex] = SPE_MESSAGE_STATE_COMMITTING;
-	//}
 
         // Move runIndex to the next message and break from the loop (execute only one)
         runIndex++;
@@ -374,34 +330,38 @@ void speScheduler(SPEData *speData, unsigned long long id) {
     }
 
 
-    // Check for messages that are executed but not committed yet
+    // Check for messages that have been executed but still need data committed to main memory
+    numDMAQueueEntries = mfc_stat_cmd_queue();
     for (int i = 0; i < SPE_MESSAGE_QUEUE_LENGTH; i++) {
       if (msgState[i] == SPE_MESSAGE_STATE_EXECUTED) {
 
-        //// DEBUG
-        //printf("[%llu] :: (3a) msgState = {", id);
-        //for (int j = 0; j < SPE_MESSAGE_QUEUE_LENGTH; j++)
-        //  printf("%d ", msgState[j]);
-        //printf("}\n");
+        // Check to see if there is data to be written back to main memory or not
+        if (readWritePtr[i] != NULL || writeOnlyPtr[i] != NULL) {
 
-        // Check to see if there is data and it should be committed back to memory and there is a DMA command queue entry open
-        if (msgQueue[i]->data != (PPU_POINTER_TYPE)NULL && mfc_stat_cmd_queue() > 0) {
+          // Check to see if there are enough DMA entries to write the data back to memory
+          int numDMAEntriesNeeded = 0;
+          if (readWritePtr[i] != NULL) numDMAEntriesNeeded++;
+          if (writeOnlyPtr[i] != NULL) numDMAEntriesNeeded++;
+          if (numDMAEntriesNeeded > numDMAQueueEntries) continue;
 
-          spu_mfcdma32(msgData[i], (PPU_POINTER_TYPE)(msgQueue[i]->data), ROUNDUP_16(msgQueue[i]->dataLen), i, MFC_PUT_CMD);
+          // Write the readWrite data back to main memory
+          if (readWritePtr[i] != NULL) {
+            spu_mfcdma32(readWritePtr[i], (PPU_POINTER_TYPE)(msgQueue[i]->readWritePtr), ROUNDUP_16(msgQueue[i]->readWriteLen), i, MFC_PUT_CMD);
+            numDMAQueueEntries--;
+	  }
+
+          // Write the writeOnly data back to main memory
+          if (writeOnlyPtr[i] != NULL) {
+            spu_mfcdma32(writeOnlyPtr[i], (PPU_POINTER_TYPE)(msgQueue[i]->writeOnlyPtr), ROUNDUP_16(msgQueue[i]->writeOnlyLen), i, MFC_PUT_CMD);
+            numDMAQueueEntries--;
+	  }
+
+          // Advance the state
           msgState[i] = SPE_MESSAGE_STATE_COMMITTING;
 
-        // Otherwise, check to see if there is no data to commit
-        } else if (msgQueue[i]->data == (PPU_POINTER_TYPE)NULL) {
-
+        } else {
           msgState[i] = SPE_MESSAGE_STATE_COMMITTING;
         }
-
-        //// DEBUG
-        //printf("[%llu] :: (3b) msgState = {", id);
-        //for (int j = 0; j < SPE_MESSAGE_QUEUE_LENGTH; j++)
-        //  printf("%d ", msgState[j]);
-        //printf("}\n");
-
 
       }
     }
@@ -418,27 +378,16 @@ void speScheduler(SPEData *speData, unsigned long long id) {
     for (int i = 0; i < SPE_MESSAGE_QUEUE_LENGTH; i++) {
       if (msgState[i] == SPE_MESSAGE_STATE_COMMITTING && ((tagStatus * (0x01 << i)) != 0)) {
 
-        //// DEBUG
-        //printf("[%llu] :: (4) msgState = {", id);
-        //for (int j = 0; j < SPE_MESSAGE_QUEUE_LENGTH; j++)
-        //  printf("%d ", msgState[j]);
-        //printf("}\n");
-
         // Check to see if there is an available entry in the outbound mailbox
         if (spu_stat_out_mbox() > 0) {
 
           // Free the local data and message buffers
-          //if (msgData[i] != NULL) { free_aligned((void*)msgData[i]); msgData[i] = NULL; }
-          //if ( msgMsg[i] != NULL) { free_aligned((void*) msgMsg[i]);  msgMsg[i] = NULL; }
-
-          if (msgData[i] != NULL) { delete [] ((char*)msgData[i]); msgData[i] = NULL; }
-          if ( msgMsg[i] != NULL) { delete [] ((char*)msgMsg[i]); msgMsg[i] = NULL; }
+          if (readWritePtr[i] != NULL) { delete [] ((char*)readWritePtr[i]); readWritePtr[i] = NULL; }
+          if (readOnlyPtr[i] != NULL) { delete [] ((char*)readOnlyPtr[i]); readOnlyPtr[i] = NULL; }
+          if (writeOnlyPtr[i] != NULL) { delete [] ((char*)writeOnlyPtr[i]); writeOnlyPtr[i] = NULL; }
 
           // Clear the entry
           msgState[i] = SPE_MESSAGE_STATE_CLEAR;
-
-          // DEBUG
-          //printf("[%llu] :: Finished with message %d\n", id, i);
 
           // Send the index of the entry in the message queue to the PPE
           spu_write_out_mbox((unsigned int)i);
@@ -452,5 +401,4 @@ void speScheduler(SPEData *speData, unsigned long long id) {
 
   } // end while (keepLooping)
 
-  printf(" --==>> Exiting SPE Scheduler ...\n");
 }

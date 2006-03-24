@@ -9,11 +9,18 @@
 #include "spert_common.h"
 
 
-#define MALLOC_ALIGNED_ZERO_MEMORY  1
+///////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Defines
 
-void* malloc_aligned(size_t size, char alignment) {
+#define MALLOC_ALIGNED_ZERO_MEMORY   0
+#define ALLOCA_ALIGNED_ZERO_MEMORY   0
 
-  // TODO : In the future, use posix_memalign() call instead (if available)
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Function Bodies
+
+
+extern "C" inline void* malloc_aligned_helper(size_t size, char alignment, int zeroFlag) {
 
   void* rtn = NULL;
   int tailPadding;
@@ -33,9 +40,15 @@ void* malloc_aligned(size_t size, char alignment) {
   tailPadding = alignment - (size % alignment);
   if (tailPadding == alignment)
     tailPadding = 0;
-  rtn = malloc(size + alignment + tailPadding);
-  #if MALLOC_ALIGNED_ZERO_MEMORY
-    memset(rtn, 0, size + alignment + tailPadding);
+
+  // Allocate the memory
+  // NOTE : If the ZERO_MEMORY define for this function is set, force the memory to be zeroed.
+  #if MALLOC_ALIGNED_ZERO_MEMORY != 0
+    rtn = calloc(size + alignment + tailPadding, 1);
+  #else
+    rtn = ((zeroFlag != 0) ?
+            (calloc(size + alignment + tailPadding, 1)) :
+            (malloc(size + alignment + tailPadding)))   ;
   #endif
 
   // Calculate the offset into the returned memory chunk that has the required alignment
@@ -49,8 +62,47 @@ void* malloc_aligned(size_t size, char alignment) {
   return (void*)((char*)rtn + offset);
 }
 
+extern "C" void* malloc_aligned(size_t size, char alignment) {
+  return malloc_aligned_helper(size, alignment, 0);
+}
+extern "C" void* calloc_aligned(size_t size, char alignment) {
+  return malloc_aligned_helper(size, alignment, 0);
+}
 
-void free_aligned(void* ptr) {
+
+extern "C" void* alloca_aligned(size_t size, char alignment, int zeroFlag) {
+
+  void* rtn = NULL;
+  int tailPadding;
+  char offset = 0;
+
+  // Verify the parameters
+  if (size <= 0 || alignment <= 0)
+    return NULL;
+
+  // Malloc memory of size equal to size + (alignment - 1) + (alignment - (size % alignment)).
+  //   size : The ammount of memory needed by the caller.
+  //   'alignment - 1' : The number of bytes needed to ensure that the first byte returned
+  //     to the caller is aligned properly.
+  //   'alignment - (size % alignment)' : The number of bytes needed to ensure the end of the
+  //     memory region is aligned properly for DMA transfers.
+  tailPadding = alignment - (size % alignment);
+  if (tailPadding == alignment)
+    tailPadding = 0;
+
+  // Allocate the memory
+  // NOTE : If the ZERO_MEMORY define for this function is set, force the memory to be zeroed.
+  rtn = alloca(size + alignment - 1 + tailPadding);
+  #if ALLOCA_ALIGNED_ZERO_MEMORY != 0
+    memset(rtn, 0, size + alignment - 1 + tailPadding);
+  #endif
+
+  // Return the address with offset
+  return (void*)((char*)rtn + (((size_t)rtn) % alignment));
+}
+
+
+extern "C" void free_aligned(void* ptr) {
 
   char offset;
 

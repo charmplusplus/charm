@@ -1,6 +1,13 @@
 #ifndef __COMMON_H__
 #define __COMMON_H__
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Defines
+
 #ifndef TRUE
   #define TRUE (-1)
 #endif
@@ -18,13 +25,22 @@
 #define SIZEOF_16(s)   ( ((sizeof(s) & 0xF) == 0) ? (sizeof(s)) : ((sizeof(s) & 0xFFFFFFF0) + (0x10)) )
 #define ROUNDUP_16(s)  ( ((s & 0xF) == 0) ? (s) : ((s & 0xFFFFFFF0) + (0x10)) )
 
-// This is a malloc function (and corresponding free) that will automatically align
-//   the returned pointer on the alignment boundry specified (in bytes).
+
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Function Prototypes
+
+// These memory functions ensure that both the start and the end of the returned memory region
+//   are aligned (in bytes) on the specified byte boundries.
+// NOTE: Like the alloca_aligned() function calls alloca and as such, there is no need to free
+//   the memory returned by this function.  (See the man page for alloca for details.)
 extern void* malloc_aligned(size_t size, char alignment);
+extern void* calloc_aligned(size_t size, char alignment);
+extern void* alloca_aligned(size_t size, char alignment, int zeroFlag);
 extern void free_aligned(void* ptr);
 
 
-/// Defines from bpa_map.def ///////////////////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////
+/// Defines from bpa_map.def ////////////////////////////////////////////////////////////////////////////////
 
 #define BP_BASE 0x20000000000ULL
 
@@ -48,5 +64,9 @@ extern void free_aligned(void* ptr);
 #define DMA_TAGSTATUS_INTR_ANY  1L
 #define DMA_TAGSTATUS_INTR_ALL  2L
 
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif //__COMMON_H__

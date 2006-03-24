@@ -48,12 +48,18 @@ void (*callbackFunc)(void*) = NULL;
 // Work Request Structures
 PtrList *allocatedWRHandlesList = NULL;
 
+// A Queue of WorkRequest structures that have been filled but are waiting on an open SPE messageQueue slot
 WorkRequest *wrQueuedHead = NULL;
 WorkRequest *wrQueuedTail = NULL;
 
+// A Queue of WorkRequest structures that have finished execution on some SPE and are waiting for the
+//   caller to call isFinished() using the corresponding handle.
+// NOTE: If InitOffloadAPI() was originally called with a callback function, the callback function will be
+//   called instead and the WorkRequest structure will be immediately free'd.
 WorkRequest *wrFinishedHead = NULL;
 WorkRequest *wrFinishedTail = NULL;
 
+// A Queue of WorkRequest structures that are free to be used for future work requests.
 WorkRequest *wrFreeHead = NULL;
 WorkRequest *wrFreeTail = NULL;
 
@@ -64,9 +70,9 @@ WorkRequest *wrFreeTail = NULL;
 SPEThread* createSPEThread(SPEData *speData);
 SPEThread** createSPEThreads(SPEThread **speThreads, int numThreads);
 
-int sendSPEMessage(SPEThread* speThread, int funcIndex, void* data, int dataLen, void* msg, int msgLen, WorkRequest* wrPtr);
+int sendSPEMessage(SPEThread* speThread, int funcIndex, void* readWritePtr, int readWriteLen, void* readOnlyPtr, int readOnlyLen, void* writeOnlyPtr, int writeOnlyLen, WorkRequest* wrPtr);
 int sendSPEMessage(SPEThread* speThread, int command);
-int sendSPEMessage(SPEThread* speThread, int funcIndex, void* data, int dataLen, void* msg, int msgLen, WorkRequest* wrPtr, int command);
+int sendSPEMessage(SPEThread* speThread, int funcIndex, void* readWritePtr, int readWriteLen, void* readOnlyPtr, int readOnlyLen, void* writeOnlyPtr, int writeOnlyLen, WorkRequest* wrPtr, int command);
 
 WorkRequest* createWRHandles(int numHandles);
 
@@ -112,9 +118,6 @@ int InitOffloadAPI(void (*cbFunc)(void*)) {
       #endif
     }
   #else
-    //// Create the elements of the speThreads array (createSPEThreads assumes that the threads have already been created)
-    //for (int i = 0; i < NUM_SPE_THREADS; i++)
-    //  speThreads[i] = new SPEThread;
 
     if (createSPEThreads(speThreads, NUM_SPE_THREADS) == NULL) {
       fprintf(stderr, "OffloadAPI :: ERROR :: createSPEThreads returned NULL... Exiting.\n");
@@ -139,6 +142,7 @@ int InitOffloadAPI(void (*cbFunc)(void*)) {
 
   return 1;  // Sucess
 }
+
 
 extern "C"
 void CloseOffloadAPI() {
@@ -171,11 +175,7 @@ void CloseOffloadAPI() {
   // Clean up the speThreads
   for (int i = 0; i < NUM_SPE_THREADS; i++) {
     free_aligned((void*)(speThreads[i]->speData->messageQueue));
-    //#if CREATE_EACH_THREAD_ONE_BY_ONE
-      free_aligned((void*)(speThreads[i]->speData));
-    //#else
-    //  if (i == 0) free_aligned((void*)(speThreads[0]->speData));
-    //#endif
+    free_aligned((void*)(speThreads[i]->speData));
     delete speThreads[i];
   }
 
@@ -191,9 +191,13 @@ void CloseOffloadAPI() {
 }
 
 
-
 extern "C"
-WRHandle sendWorkRequest(int funcIndex, void* dataPtr, int dataLen, void* msgPtr, int msgLen, void* userData) {
+WRHandle sendWorkRequest(int funcIndex,
+                         void* readWritePtr, int readWriteLen,
+                         void* readOnlyPtr, int readOnlyLen,
+                         void* writeOnlyPtr, int writeOnlyLen,
+                         void* userData
+                        ) {
 
   // NOTE: This is used in an attempt to more evenly distribute the workload amongst all the SPE Threads
   // Also NOTE: Since NUM_SPE_THREADS should be 8, the "% NUM_SPE_THREADS" should be transformed into masks/shifts
@@ -207,14 +211,11 @@ WRHandle sendWorkRequest(int funcIndex, void* dataPtr, int dataLen, void* msgPtr
   // Tell the PPU's portion of the spert to make progress
   OffloadAPIProgress();
 
-  //printf("sendWorkRequest() - DEBUG 1.0...\n");
-
   // Verify the parameters
   if (funcIndex < 0) return INVALID_WRHandle;
-  if (dataPtr != NULL && dataLen <= 0) return INVALID_WRHandle;
-  if (msgPtr != NULL && msgLen <= 0) return INVALID_WRHandle;
-
-  //printf("sendWorkRequest() - DEBUG 2.0...\n");
+  if (readWritePtr != NULL && readWriteLen <= 0) return INVALID_WRHandle;
+  if (readOnlyPtr != NULL && readOnlyLen <= 0) return INVALID_WRHandle;
+  if (writeOnlyPtr != NULL && writeOnlyLen <= 0) return INVALID_WRHandle;
 
   // Ensure that there is at least one free WRHandle structure
   if (wrFreeHead == NULL) {  // Out of free work request structures
@@ -232,10 +233,12 @@ WRHandle sendWorkRequest(int funcIndex, void* dataPtr, int dataLen, void* msgPtr
   wrEntry->speIndex = -1;
   wrEntry->entryIndex = -1;
   wrEntry->funcIndex = funcIndex;
-  wrEntry->data = dataPtr;
-  wrEntry->dataLen = dataLen;
-  wrEntry->msg = msgPtr;
-  wrEntry->msgLen = msgLen;
+  wrEntry->readWritePtr = readWritePtr;
+  wrEntry->readWriteLen = readWriteLen;
+  wrEntry->readOnlyPtr = readOnlyPtr;
+  wrEntry->readOnlyLen = readOnlyLen;
+  wrEntry->writeOnlyPtr = writeOnlyPtr;
+  wrEntry->writeOnlyLen = writeOnlyLen;
   wrEntry->userData = userData;
   wrEntry->next = NULL;
 
@@ -250,10 +253,12 @@ WRHandle sendWorkRequest(int funcIndex, void* dataPtr, int dataLen, void* msgPtr
 
     int actualSPEThreadIndex = (i + speIndex) % NUM_SPE_THREADS;
 
-    //printf("sendWorkRequest() - DEBUG 2.1 - Calling sendSPEMessage() on SPE Thread %d...\n", actualSPEThreadIndex);
-
     sentIndex = sendSPEMessage(speThreads[actualSPEThreadIndex],
-                               funcIndex, dataPtr, dataLen, msgPtr, msgLen, wrEntry,
+                               funcIndex,
+                               readWritePtr, readWriteLen,
+                               readOnlyPtr, readOnlyLen,
+                               writeOnlyPtr, writeOnlyLen,
+                               wrEntry,
                                SPE_MESSAGE_COMMAND_NONE
                               );
     if (sentIndex >= 0) {
@@ -262,8 +267,6 @@ WRHandle sendWorkRequest(int funcIndex, void* dataPtr, int dataLen, void* msgPtr
       break;
     }
   }
-
-  //printf("sendWorkRequest() - DEBUG 3.0... processingSPEIndex = %d, sentIndex = %d\n", processingSPEIndex, sentIndex);
 
   // Check to see if the message was sent or not
   if (processingSPEIndex < 0) {
@@ -305,12 +308,8 @@ WRHandle sendWorkRequest(int funcIndex, void* dataPtr, int dataLen, void* msgPtr
     }
   }
 
-  // DEBUG
-  //printf("sendWorkRequest() - DEBUG 4.0... processingSPEIndex = %d, sentIndex = %d\n", processingSPEIndex, sentIndex);
-  //fflush(NULL);
-
-  // For now, return the index in the message queue as the work request handle
-  return wrEntry; //CREATE_WRHandle(processingSPEIndex, sentIndex);
+  // Return the WorkRequest pointer as the handle
+  return wrEntry;
 }
 
 
@@ -324,26 +323,6 @@ int isFinished(WRHandle wrHandle) {
 
   // Tell the PPU's portion of the spert to make progress
   OffloadAPIProgress();
-
-  //// Verify the WRHandle
-  //int speIndex = WRHandle_SPE(wrHandle);
-  //int msgIndex = WRHandle_MSG(wrHandle);
-
-  //printf("isFinished() - DEBUG 1.0 - (%d) wrHandle = %u, speIndex = %d, msgIndex = %d\n", rand() % 10, wrHandle, speIndex, msgIndex);
-
-  //if (speIndex < 0 || speIndex >= NUM_SPE_THREADS) return 0;
-  //if (msgIndex < 0 || msgIndex >= SPE_MESSAGE_QUEUE_LENGTH) return 0;
-
-  // Check if the status of the message entry is FINISHED
-  //SPEMessage* msg = (SPEMessage*)(((char*)(speThreads[speIndex]->speData->messageQueue)) + (SIZEOF_16(SPEMessage) * msgIndex));
-  //if (msg->state == SPE_MESSAGE_STATE_FINISHED || msg->state == SPE_MESSAGE_STATE_CLEAR) {
-
-    // Reset the state to CLEAR (since the caller requested the information and it is now finished)
-    //msg->state = SPE_MESSAGE_STATE_CLEAR;
-
-    // Return non-zero
-    //return -1;
-  //}
 
   // Search the wrFinished list for the handle (remove it if it is there)
   WorkRequest *wrEntry = wrFinishedHead;
@@ -364,10 +343,12 @@ int isFinished(WRHandle wrHandle) {
       wrEntry->speIndex = -1;
       wrEntry->entryIndex = -1;
       wrEntry->funcIndex = -1;
-      wrEntry->data = NULL;
-      wrEntry->dataLen = 0;
-      wrEntry->msg = NULL;
-      wrEntry->msgLen = 0;
+      wrEntry->readWritePtr = NULL;
+      wrEntry->readWriteLen = 0;
+      wrEntry->readOnlyPtr = NULL;
+      wrEntry->readOnlyLen = 0;
+      wrEntry->writeOnlyPtr = NULL;
+      wrEntry->writeOnlyLen = 0;
       wrEntry->userData = NULL;
       wrEntry->next = NULL;
 
@@ -400,10 +381,8 @@ extern "C"
 void waitForWRHandle(WRHandle wrHandle) {
 
   // Verify the WRHandle
-  int speIndex = wrHandle->speIndex; //WRHandle_SPE(wrHandle);
-  int msgIndex = wrHandle->entryIndex; //WRHandle_MSG(wrHandle);
-
-  //printf("WaitForWRHandle() - DEBUG 1.0 - (%d) wrHandle = 0x%08x, speIndex = %d, msgIndex = %d\n", rand() % 10, wrHandle, speIndex, msgIndex);
+  int speIndex = wrHandle->speIndex;
+  int msgIndex = wrHandle->entryIndex;
 
   if (speIndex < 0 || speIndex >= NUM_SPE_THREADS) return;
   if (msgIndex < 0 || msgIndex >= SPE_MESSAGE_QUEUE_LENGTH) return;
@@ -420,14 +399,11 @@ void OffloadAPIProgress() {
   for (int i = 0; i < NUM_SPE_THREADS; i++) {
 
     // Get the number of entries in the mailbox from the SPE
-    int usedEntries = /* NUM_SPE_OUT_MAILBOX_ENTRIES - */ spe_stat_out_mbox(speThreads[i]->speID);
+    int usedEntries = spe_stat_out_mbox(speThreads[i]->speID);
     while (usedEntries > 0) {
 
       // Read the message queue index that was sent by the SPE from the outbound mailbox
       unsigned int speMessageQueueIndex = spe_read_out_mbox(speThreads[i]->speID);
-
-      //printf("--==>> PPE Received Message Reply from SPE %d (queue index: %d) <<==--\n", i, speMessageQueueIndex);
-
       SPEMessage *msg = (SPEMessage*)((char*)(speThreads[i]->speData->messageQueue) + (speMessageQueueIndex * SIZEOF_16(SPEMessage)));
 
       if ((WorkRequest*)(msg->wrPtr) != NULL && ((WorkRequest*)(msg->wrPtr))->next != NULL) {
@@ -437,19 +413,13 @@ void OffloadAPIProgress() {
       if (msg->state != SPE_MESSAGE_STATE_SENT) {
 
         // Warn the user that something bad has just happened
-        fprintf(stderr, " --- OffloadAPI :: ERROR :: Invalid message queue index received from SPE %d...\n", i);
+        fprintf(stderr, " --- OffloadAPI :: ERROR :: Invalid message queue index (%d) received from SPE %d...\n", speMessageQueueIndex, i);
         msg->state = SPE_MESSAGE_STATE_CLEAR;
 
         // Kill self out of shame
         exit(EXIT_FAILURE);
 
       } else {
-
-        //// If there is a callback function, call it for this entry
-        //if (callbackFunc != NULL)
-        //  callbackFunc((void*)(msg->userData));
-        //
-        //msg->state = SPE_MESSAGE_STATE_FINISHED;
 
         // If there is a callback function, call it for this entry and then place the entry back into the wrFree list
         WorkRequest *wrPtr = (WorkRequest*)(msg->wrPtr);
@@ -464,10 +434,12 @@ void OffloadAPIProgress() {
             wrPtr->speIndex = -1;
             wrPtr->entryIndex = -1;
             wrPtr->funcIndex = -1;
-            wrPtr->data = NULL;
-            wrPtr->dataLen = 0;
-            wrPtr->msg = NULL;
-            wrPtr->msgLen = 0;
+            wrPtr->readWritePtr = NULL;
+            wrPtr->readWriteLen = 0;
+            wrPtr->readOnlyPtr = NULL;
+            wrPtr->readOnlyLen = 0;
+            wrPtr->writeOnlyPtr = NULL;
+            wrPtr->writeOnlyLen = 0;
             wrPtr->userData = NULL;
             wrPtr->next = NULL;
 
@@ -483,8 +455,6 @@ void OffloadAPIProgress() {
 	  } else {
 
             // TODO : Do any gathering of data on SPE load-balance here (before clearing speIndex and entryIndex)
-
-            //printf(" --- OffloadAPI :: Adding WRHandle (%p) to wrFinished list...\n", wrPtr);
 
             // Clear the fields of the work request as needed
             wrPtr->speIndex = -1;
@@ -521,8 +491,11 @@ void OffloadAPIProgress() {
     for (int i = 0; i < NUM_SPE_THREADS; i++) {
       sentIndex = sendSPEMessage(speThreads[i],
                                  wrEntry->funcIndex,
-                                 wrEntry->data, wrEntry->dataLen,
-                                 wrEntry->msg, wrEntry->msgLen,
+				 //wrEntry->data, wrEntry->dataLen,
+                                 //wrEntry->msg, wrEntry->msgLen,
+                                 wrEntry->readWritePtr, wrEntry->readWriteLen,
+                                 wrEntry->readOnlyPtr, wrEntry->readOnlyLen,
+                                 wrEntry->writeOnlyPtr, wrEntry->writeOnlyLen,
                                  wrEntry,
                                  SPE_MESSAGE_COMMAND_NONE
                                 );
@@ -747,31 +720,26 @@ SPEThread** createSPEThreads(SPEThread **speThreads, int numThreads) {
 }
 
 
-int sendSPEMessage(SPEThread* speThread, int funcIndex, void* data, int dataLen, void* msg, WorkRequest* wrPtr, int msgLen) {
-  return sendSPEMessage(speThread, funcIndex, data, dataLen, msg, msgLen, wrPtr, SPE_MESSAGE_COMMAND_NONE);
+int sendSPEMessage(SPEThread* speThread, int funcIndex, void* readWritePtr, int readWriteLen, void* readOnlyPtr, int readOnlyLen, void* writeOnlyPtr, int writeOnlyLen, WorkRequest* wrPtr) {
+  return sendSPEMessage(speThread, funcIndex, readWritePtr, readWriteLen, readOnlyPtr, readOnlyLen, writeOnlyPtr, writeOnlyLen, wrPtr, SPE_MESSAGE_COMMAND_NONE);
 }
 
 int sendSPEMessage(SPEThread* speThread, int command) {
-  return sendSPEMessage(speThread, 0, NULL, 0, NULL, 0, NULL, command);
+  return sendSPEMessage(speThread, 0, NULL, 0, NULL, 0, NULL, 0, NULL, command);
 }
 
 // Returns the index in the message queue that was used (or -1 on failure)
 int sendSPEMessage(SPEThread *speThread,
                    int funcIndex,
-                   void *data,
-                   int dataLen,
-                   void *message,
-                   int messageLen,
+                   void *readWritePtr, int readWriteLen,
+                   void *readOnlyPtr, int readOnlyLen,
+                   void* writeOnlyPtr, int writeOnlyLen,
                    WorkRequest *wrPtr,
                    int command
                   ) {
 
-  //printf("  sendSPEMessage() - Called...\n");
-
   // Verify the parameters
   if (speThread == NULL) return -1;
-
-  //printf("  sendSPEMessage() - DEBUG 1.0...\n");
 
   if (funcIndex < 0 && command == SPE_MESSAGE_COMMAND_NONE)
     return -1;
@@ -779,17 +747,16 @@ int sendSPEMessage(SPEThread *speThread,
   if (command < SPE_MESSAGE_COMMAND_MIN || command > SPE_MESSAGE_COMMAND_MAX)
     command = SPE_MESSAGE_COMMAND_NONE;
 
-  if (funcIndex < 0 && data == NULL && message == NULL && command == SPE_MESSAGE_COMMAND_NONE)
+  if (funcIndex < 0 && readWritePtr == NULL && readOnlyPtr == NULL && writeOnlyPtr == NULL && command == SPE_MESSAGE_COMMAND_NONE)
     return -1;
 
-  //printf("  sendSPEMessage() - DEBUG 2.0...\n");
-
-  if (data == NULL) dataLen = 0;
-  if (dataLen < 0) { data = NULL; dataLen = 0; }
-
-  if (message == NULL) messageLen = 0;
-  if (messageLen < 0) { message = NULL; messageLen = 0; }
-
+  // Ensure that the data pointers are consistent with their associated lengths
+  if (readWritePtr == NULL) readWriteLen = 0;
+  if (readWriteLen < 0) { readWritePtr = NULL; readWriteLen = 0; }
+  if (readOnlyPtr == NULL) readOnlyLen = 0;
+  if (readOnlyLen < 0) { readOnlyPtr = NULL; readOnlyLen = 0; }
+  if (writeOnlyPtr == NULL) writeOnlyLen = 0;
+  if (writeOnlyLen < 0) { writeOnlyPtr = NULL; writeOnlyLen = 0; }
 
   // Find the next available index
   for (int i = 0; i < SPE_MESSAGE_QUEUE_LENGTH; i++) {
@@ -797,17 +764,15 @@ int sendSPEMessage(SPEThread *speThread,
     int index = (speThread->msgIndex + i) % SPE_MESSAGE_QUEUE_LENGTH;
     volatile SPEMessage* msg = (SPEMessage*)(((char*)speThread->speData->messageQueue) + (index * SIZEOF_16(SPEMessage)));
     
-    //printf("  sendSPEMessage() - DEBUG 2.1...  (speThread->msgIndex = %d, i = %d, index = %d)...\n", speThread->msgIndex, i, index);
-
     if (msg->state == SPE_MESSAGE_STATE_CLEAR) {
 
-      //printf("  sendSPEMessage() - DEBUG 2.1.0 - state = CLEAR...\n");
-
       msg->funcIndex = funcIndex;
-      msg->data = (PPU_POINTER_TYPE)data;
-      msg->dataLen = dataLen;
-      msg->msg = (PPU_POINTER_TYPE)message;
-      msg->msgLen = messageLen;
+      msg->readWritePtr = (PPU_POINTER_TYPE)readWritePtr;
+      msg->readWriteLen = readWriteLen;
+      msg->readOnlyPtr = (PPU_POINTER_TYPE)readOnlyPtr;
+      msg->readOnlyLen = readOnlyLen;
+      msg->writeOnlyPtr = (PPU_POINTER_TYPE)writeOnlyPtr;
+      msg->writeOnlyLen = writeOnlyLen;
       msg->state = SPE_MESSAGE_STATE_SENT;
       msg->command = command;
       msg->wrPtr = (PPU_POINTER_TYPE)wrPtr;
@@ -831,10 +796,12 @@ int sendSPEMessage(SPEThread *speThread,
 	      );
         printf("  sendSPEMessage() : message[%d] = {", index);
         printf(" funcIndex = %d", msg->funcIndex);
-        printf(", data = %u", msg->data);
-        printf(", dataLen = %d", msg->dataLen);
-        printf(", msg = %u", msg->msg);
-        printf(", msgLen = %d", msg->msgLen);
+        printf(", readWritePtr = %u", msg->readWritePtr);
+        printf(", readWriteLen = %d", msg->readWriteLen);
+        printf(", readOnlyPtr = %u", msg->readOnlyPtr);
+        printf(", readOnlyLen = %d", msg->readOnlyLen);
+        printf(", writeOnlyPtr = %u", msg->writeOnlyPtr);
+        printf(", writeOnlyLen = %d", msg->writeOnlyLen);
         printf(", wrPtr = %u", msg->wrPtr);
         printf(", state = %d", msg->state);
         printf(", command = %d", msg->command);
@@ -844,14 +811,9 @@ int sendSPEMessage(SPEThread *speThread,
 
       speThread->msgIndex = (index + 1) % SPE_MESSAGE_QUEUE_LENGTH;
 
-      //printf("  sendSPEMessage() - DEBUG 2.2... (index = %d)...\n", index);
-
       return index;
     } // end if (msg->state == SPE_MESSAGE_STATE_CLEAR)
-
   } // end for (loop through message queue entries)
-
-  //printf("  sendSPEMessage() - DEBUG 3.0...\n");
 
   // If execution reaches here, an available slot in the message queue was not found
   return -1;

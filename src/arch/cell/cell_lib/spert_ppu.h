@@ -19,6 +19,9 @@ extern "C" {
 // DISPLAY DEBUG DATA (the greater the number, more data is shown)
 #define DEBUG_DISPLAY  0
 
+// NOTE: When using the simulator, setting NUM_SPE_THREADS to a number lower than the number
+//   of physical SPEs will reduce the ammount of time it takes to initiate all the SPEs (which
+//   can be slow on the simulator).
 #define NUM_SPE_THREADS  8               // This is limited by the number of physical SPEs present
 
 #define CREATE_EACH_THREAD_ONE_BY_ONE   0  // Set this to non-zero to create and wait for each SPE thread one-by-one
@@ -34,8 +37,6 @@ extern spe_program_handle_t spert_main;
 // Data Structrues
 
 // Work Request Handle : Used to keep track of and access outstanding work requests
-//typedef unsigned int WRHandle;
-//#define INVALID_WRHandle (0xFFFFFFFF)
 typedef struct __work_request {
 
   int isFirstInSet;  // Flag to indicate that this work request handle is the first
@@ -46,10 +47,12 @@ typedef struct __work_request {
   int entryIndex;    // Index in the message queue this work request was assigned to (-1 means not assigned yet or finished)
 
   int funcIndex;     // These fields contain the information passed in via a call to
-  void* data;        //   sendWorkRequest().  See sendWorkRequest for details.
-  int dataLen;
-  void* msg;
-  int msgLen;
+  void* readWritePtr;
+  int readWriteLen;
+  void* readOnlyPtr;
+  int readOnlyLen;
+  void* writeOnlyPtr;
+  int writeOnlyLen;
   void *userData;
 
   struct __work_request *next;    // Pointer to the next WRHandle in the linked list of WRHandles
@@ -78,16 +81,18 @@ extern int InitOffloadAPI(void(*cbFunc)(void*)
 );
 extern void CloseOffloadAPI();
 
-extern WRHandle sendWorkRequest(int funcIndex,   // Index of the function to be called
-                                void* dataPtr,   // Pointer to data that should be loaded and passed to the function
-                                int dataLen,     // Length (in bytes) of the data pointed to by dataPtr
-                                void* msgPtr,    // Pointer to message that should be loaded and passed to the function
-                                int msgLen,      // Length (in bytes) of the message pointed to by msgPtr
-                                void* userData   // A pointer to user defined data that will be passed to the callback function (if there is one) once this request is finished
+extern WRHandle sendWorkRequest(int funcIndex,      // Index of the function to be called
+                                void* readWritePtr, // Pointer to data that should be loaded and passed to the function
+                                int readWriteLen,   // Length (in bytes) of the data pointed to by dataPtr
+                                void* readOnlyPtr,  // Pointer to message that should be loaded and passed to the function
+                                int readOnlyLen,    // Length (in bytes) of the message pointed to by msgPtr
+                                void* writeOnlyPtr, //
+                                int writeOnlyLen,   // 
+                                void* userData      // A pointer to user defined data that will be passed to the callback function (if there is one) once this request is finished
 #ifdef __cplusplus
  = NULL   
 #endif
-                               );                // Returns: INVALID_WRHandle on failure, a valid WRHandle otherwise
+                               );                   // Returns: INVALID_WRHandle on failure, a valid WRHandle otherwise
 
 extern int isFinished(WRHandle wrHandle    // A work request handle returned by sendWorkRequest
                      );                    // Returns: Non-zero on finished, zero otherwize
