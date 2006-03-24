@@ -1,0 +1,17 @@
+module jacobi {
+
+  array [1D] Jacobi {
+
+    entry Jacobi(void);
+
+    entry void startIteration(void);
+
+    entry void northData(int size, float ghostData[size]);
+    entry void southData(int size, float ghostData[size]);
+    entry void eastData(int size, float ghostData[size]);
+    entry void westData(int size, float ghostData[size]);
+
+    entry [threaded] void doCalculation();
+  };
+
+};
