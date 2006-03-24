@@ -466,7 +466,8 @@ static void meta_free(void *mem) {
   if ((s->magic&~FLAGS_MASK)==SLOTMAGIC_VALLOC)
   { /*Allocated with special alignment*/
     freeSlot(s);
-    mm_free(((char *)mem)-meta_getpagesize());
+    mm_free(s->extraSlot);
+    /*mm_free(((char *)mem)-meta_getpagesize());*/
   }
   else if ((s->magic&~FLAGS_MASK)==SLOTMAGIC) 
   { /*Ordinary allocated block */
