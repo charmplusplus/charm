@@ -55,9 +55,10 @@ class GridCommRefineLB : public CentralLB
 
   private:
     int Get_Cluster (int pe);
-    int Find_Maximum_WAN_Object (int cluster);
+    int Find_Maximum_WAN_Object (int pe);
     int Find_Minimum_WAN_PE (int cluster);
     void Assign_Object_To_PE (int target_object, int target_pe);
+    void Remove_Object_From_PE (int target_object, int target_pe);
     CmiBool QueryBalanceNow (int step);
 
     int Num_PEs;
@@ -65,6 +66,7 @@ class GridCommRefineLB : public CentralLB
     int Num_Clusters;
     PE_Data_T *PE_Data;
     Object_Data_T *Object_Data;
+    double CK_LDB_GridCommRefineLB_Tolerance;
 };
 
 #endif

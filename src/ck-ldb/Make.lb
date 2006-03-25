@@ -13,6 +13,7 @@ LOADBALANCERS=\
    $(L)/libmoduleGreedyCommLB.a \
    $(L)/libmoduleGreedyAgentLB.a \
    $(L)/libmoduleGridCommLB.a \
+   $(L)/libmoduleGridCommRefineLB.a \
    $(L)/libmoduleComm1LB.a \
    $(L)/libmoduleOrbLB.a \
    $(L)/libmoduleRecBisectBfLB.a \
@@ -118,6 +119,15 @@ GridCommLB.decl.h: GridCommLB.ci charmxi
 
 $(L)/libmoduleGridCommLB.a: GridCommLB.o manager.o
 	$(CHARMC) -o $(L)/libmoduleGridCommLB.a GridCommLB.o manager.o
+
+
+GridCommRefineLB.def.h: GridCommRefineLB.decl.h
+
+GridCommRefineLB.decl.h: GridCommRefineLB.ci charmxi
+	$(CHARMXI) GridCommRefineLB.ci
+
+$(L)/libmoduleGridCommRefineLB.a: GridCommRefineLB.o manager.o
+	$(CHARMC) -o $(L)/libmoduleGridCommRefineLB.a GridCommRefineLB.o manager.o
 	
 
 Comm1LB.def.h: Comm1LB.decl.h
@@ -265,6 +275,7 @@ LB_OBJ=EveryLB.o \
     GreedyCommLB.o \
     GreedyAgentLB.o \
     GridCommLB.o \
+    GridCommRefineLB.o \
     Comm1LB.o \
     OrbLB.o \
     RecBisectBfLB.o \

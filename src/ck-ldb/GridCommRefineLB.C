@@ -122,8 +122,8 @@ CmiBool GridCommRefineLB::QueryBalanceNow (int step)
 ** specified PE or -1 if the information is unknown.
 **
 ** For machine layers other than vmi-linux, simply return the constant 0.
-** GridCommLB will assume a single-cluster computation and will balance
-** on the scaled processor load and number of LAN messages.
+** GridCommRefineLB will assume a single-cluster computation and will
+** balance on the scaled processor load and number of LAN messages.
 */
 int GridCommRefineLB::Get_Cluster (int pe)
 {
@@ -275,6 +275,7 @@ void GridCommRefineLB::Assign_Object_To_PE (int target_object, int target_pe)
 void GridCommRefineLB::work (CentralLB::LDStats *stats, int count)
 {
   int i;
+  int j;
   CmiBool available;
   CmiBool all_pes_mapped;
   int max_cluster;
@@ -285,6 +286,9 @@ void GridCommRefineLB::work (CentralLB::LDStats *stats, int count)
   int recv_object;
   int recv_pe;
   int recv_cluster;
+  int num_cluster_pes;
+  int num_wan_objs;
+  int avg_wan_objs;
   int target_object;
   int target_pe;
   LDCommData *com_data;
@@ -446,7 +450,7 @@ void GridCommRefineLB::work (CentralLB::LDStats *stats, int count)
     // Move objects away from PEs that exceed the average.
     for (j = 0; j < Num_PEs; j++) {
       if (i == (&PE_Data[j])->cluster) {
-	while ((&PE_Data[j])->num_wan_objs > (avg_wan_objs * FOOBAR)) {
+	while ((&PE_Data[j])->num_wan_objs > (avg_wan_objs * CK_LDB_GridCommRefineLB_Tolerance)) {
 	  target_object = Find_Maximum_WAN_Object (j);
 	  target_pe = Find_Minimum_WAN_PE (i);
 
