@@ -154,6 +154,9 @@ int FEM_add_node_local(FEM_Mesh *m, int addGhost){
       m->getfmMM()->fmLockN[newNode]->reset(newNode,m->getfmMM());
     }
   }
+#ifdef DEBUG_2
+  CkPrintf("[%d]Adding Node %d\n",m->getfmMM()->getfmUtil()->getIdx(),(addGhost==0)?newNode:FEM_To_ghost_index(newNode));
+#endif
   return newNode;  // return a new index
 }
 
@@ -334,6 +337,9 @@ void FEM_remove_node_local(FEM_Mesh *m, int node) {
   }
   if(numAdjNodes != 0) delete[] adjNodes;
   if(numAdjElts != 0) delete[] adjElts;
+#ifdef DEBUG_2
+  CkPrintf("[%d]Removing Node %d\n",m->getfmMM()->getfmUtil()->getIdx(),node);
+#endif
 #ifdef DEBUG 
   CmiMemoryCheck(); 
 #endif
@@ -399,12 +405,14 @@ void FEM_remove_element_local(FEM_Mesh *m, int element, int etype){
   CmiMemoryCheck(); 
 #endif
   m->e2n_getAll(element, adjnodes, etype);
+#ifdef DEBUG_2
+  CkPrintf("[%d]Deleting element %d(%d,%d,%d)\n",m->getfmMM()->getfmUtil()->getIdx(),element,adjnodes[0],adjnodes[1],adjnodes[2]);
+#endif
   for(int i=0;i<nodesPerEl;i++) {
     //if(adjnodes[i] != -1) //if an element is local, then an adjacent node should not be -1
     m->n2e_remove(adjnodes[i],element);
   }
   // replace this element with -1 in adjacent elements' adjacencies
-  // FIXME: hopefully there will be at most as many faces on an element as vertices
   const int numAdjElts = nodesPerEl;  
   int *adjelts = new int[numAdjElts]; 
   m->e2e_getAll(element, adjelts, etype);
@@ -657,6 +665,17 @@ int FEM_remove_element(FEM_Mesh *m, int elementid, int elemtype, int permanent){
 		    }
 		  }
 		}
+		//since we have a remote call in between, to make the program thread-safe
+		//we will need to verify if the connectivity of this node changed
+		int *elems1, numElems1;
+		m->n2e_getAll(nodes[j], &elems1, &numElems1);
+		if(numElems1!=numElems) {
+		  CkAssert(false);
+		}
+		else {
+		  if(numElems1!=0) delete[] elems1;
+		}
+
 		//add this to the list of ghost nodes to be deleted on the remote chunk
 		if(shouldBeDeleted) {
 		  //convert this local index to a shared index
@@ -776,23 +795,26 @@ int FEM_remove_element(FEM_Mesh *m, int elementid, int elemtype, int permanent){
 		  //if this node will not be a ghost, then these neighboring nodes and elems
 		  //to this node do not really need updating, but I believe it will not
 		  //hurt, because the connectivity in this case will be -1
-		  for(int k=0; k<numElems; k++) {
+		  int *elems1, numElems1;
+		  m->n2e_getAll(nodes[j], &elems1, &numElems1);
+		  for(int k=0; k<numElems1; k++) {
 		    bool flagElem = false;
-		    if(FEM_Is_ghost_index(elems[k])) {
-		      if(m->elem[0].ghost->is_valid(FEM_From_ghost_index(elems[k]))) {
+		    if(FEM_Is_ghost_index(elems1[k])) {
+		      if(m->elem[0].ghost->is_valid(FEM_From_ghost_index(elems1[k]))) {
 			flagElem = true;
 		      }
 		    }
 		    else {
-		      if(m->elem[0].is_valid(elems[k])) flagElem = true;
+		      if(m->elem[0].is_valid(elems1[k])) flagElem = true;
 		    }
 		    if(flagElem) {
-		      m->e2n_replace(elems[k],nodes[j],ghostidx[j],elemtype);
-		      m->n2e_remove(nodes[j],elems[k]);
-		      m->n2e_add(ghostidx[j],elems[k]);
-		      testelems.push_back(elems[k]);
+		      m->e2n_replace(elems1[k],nodes[j],ghostidx[j],elemtype);
+		      m->n2e_remove(nodes[j],elems1[k]);
+		      m->n2e_add(ghostidx[j],elems1[k]);
+		      testelems.push_back(elems1[k]);
 		    }
 		  }
+		  if(numElems1!=0) delete[] elems1;
 		  int *n2ns;
 		  int numn2ns;
 		  m->n2n_getAll(nodes[j],&n2ns,&numn2ns);
@@ -1100,6 +1122,9 @@ int FEM_add_element_local(FEM_Mesh *m, const int *conn, int connSize, int elemTy
   int *adjes = new int[connSize];
   m->e2e_getAll(newEl, adjes, 0);
   CkAssert(!((adjes[0]==adjes[1] && adjes[0]!=-1) || (adjes[1]==adjes[2] && adjes[1]!=-1) || (adjes[2]==adjes[0] && adjes[2]!=-1)));
+#ifdef DEBUG_2
+  CkPrintf("[%d]Adding element %d(%d,%d,%d)\n",m->getfmMM()->getfmUtil()->getIdx(),newEl,conn[0],conn[1],conn[2]);
+#endif
   delete[] adjes;
   return newEl;
 }
@@ -1170,12 +1195,9 @@ int FEM_add_element(FEM_Mesh *m, int* conn, int connSize, int elemType, int chun
 #ifdef DEBUG 
       CmiMemoryCheck(); 
 #endif
-      meshMod[chunkNo].addElementRemote(am);
-      //pick up the last entry from the element ghostrecv IDXL with remoteChunk, 
-      //that is the index of the last element added.
+      int shidx = meshMod[chunkNo].addElementRemote(am)->i;
       const IDXL_List ilist = m->elem[elemType].ghost->ghostRecv.addList(chunkNo);
-      int size = ilist.size();
-      newEl = ilist[size-1];
+      newEl = ilist[shidx];
       newEl = FEM_To_ghost_index(newEl);
       free(nodetype);
       return newEl;
@@ -1350,12 +1372,9 @@ int FEM_add_element(FEM_Mesh *m, int* conn, int connSize, int elemType, int chun
 	  j++;
 	}
       }
-      meshMod[remoteChunk].addElementRemote(am);
-      //pick up the last entry from the element ghostrecv IDXL with remoteChunk, 
-      //that is the index of the last element added.
+      int shidx = meshMod[remoteChunk].addElementRemote(am)->i;
       const IDXL_List ilist = m->elem[elemType].ghost->ghostRecv.addList(remoteChunk);
-      int size = ilist.size();
-      newEl = ilist[size-1];
+      newEl = ilist[shidx];
       newEl = FEM_To_ghost_index(newEl);
     }
   }
@@ -2193,15 +2212,16 @@ chunkListMsg *femMeshModify::getChunksSharingGhostNode(int2Msg *i2m) {
   return clm;
 }
 
-void femMeshModify::addElementRemote(addElemMsg *fm) {
+intMsg *femMeshModify::addElementRemote(addElemMsg *fm) {
 #ifdef DEBUG 
   CmiMemoryCheck(); 
 #endif
-  fmUtil->addElemRemote(fmMesh, fm->chk, fm->elemtype, fm->connSize, fm->conn, fm->numGhostIndex, fm->ghostIndices);
-#ifdef DEBUG 
-  CmiMemoryCheck(); 
-#endif
-  return;
+  int newEl = fmUtil->addElemRemote(fmMesh, fm->chk, fm->elemtype, fm->connSize, fm->conn, fm->numGhostIndex, fm->ghostIndices);
+  //expecting that this element will always be local to this chunk
+  CkAssert(!FEM_Is_ghost_index(newEl));
+  int shidx = fmUtil->exists_in_IDXL(fmMesh,newEl,fm->chk,3);
+  intMsg *imsg = new intMsg(shidx);
+  return imsg;
 }
 
 void femMeshModify::removeGhostElem(removeGhostElemMsg *fm) {

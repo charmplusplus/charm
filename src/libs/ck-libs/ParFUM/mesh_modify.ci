@@ -66,7 +66,7 @@ module ParFUM {
     entry [sync,threaded] void removeSharedNodeRemote(removeSharedNodeMsg *);
     entry [sync,threaded] void addGhostElem(addGhostElemMsg *);
     entry [sync,threaded] chunkListMsg *getChunksSharingGhostNode(int2Msg *);
-    entry [sync,threaded] void addElementRemote(addElemMsg *fm);
+    entry [sync,threaded] intMsg *addElementRemote(addElemMsg *fm);
     entry [sync,threaded] void removeGhostElem(removeGhostElemMsg *);
     entry [sync,threaded] void removeElementRemote(removeElemMsg *);
     entry [sync,threaded] void removeGhostNode(int fromChk, int sharedIdx);

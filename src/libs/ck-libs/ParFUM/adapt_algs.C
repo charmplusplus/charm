@@ -532,8 +532,10 @@ int FEM_Adapt_Algs::simple_refine(double targetA, double xmin, double ymin, doub
     for(int i=0; i<noEle; i++) {
       if(theMesh->elem[0].is_valid(map1[i])) {
 	if(areas[i] > targetA) {
-	  refine_element_leb(map1[i]);
-	  adapted = true;
+	  int ret = refine_element_leb(map1[i]);
+	  if(ret!=-1) {
+	    adapted = true;
+	  }
 	}
       }
       //if(adapted) break;

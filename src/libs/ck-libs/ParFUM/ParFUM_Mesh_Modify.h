@@ -354,7 +354,7 @@ class femMeshModify : public CBase_femMeshModify {
 
   void addGhostElem(addGhostElemMsg *fm);
   chunkListMsg *getChunksSharingGhostNode(int2Msg *);
-  void addElementRemote(addElemMsg *fm);
+  intMsg *addElementRemote(addElemMsg *fm);
 
   void removeGhostElem(removeGhostElemMsg *fm);
   void removeElementRemote(removeElemMsg *fm);

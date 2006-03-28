@@ -334,7 +334,7 @@ void FEM_MUtil::removeGhostNodeRemote(FEM_Mesh *m, int fromChk, int sharedIdx) {
 	CkPrintf("Error: Node %d cannot be removed, it is connected to :\n",ghostid);
 	FEM_Print_n2e(m,ghostid);
 	FEM_Print_n2n(m,ghostid);
-	CkAssert(false);
+	//CkAssert(false);
       }
       //CkAssert((numAdjNodes==0) && (numAdjElts==0));
       m->node.ghost->set_invalid(localIdx,true);
@@ -531,7 +531,7 @@ void FEM_MUtil::buildChunkToNodeTable(int *nodetype, int sharedcount, int ghostc
 //local node or a shared node on this chunk, and since the other chunk
 //should know about all the connectivity, so it should be either in the 
 //shared or ghostsend idxl lists
-void FEM_MUtil::addElemRemote(FEM_Mesh *m, int chk, int elemtype, int connSize, int *conn, int numGhostIndex, int *ghostIndices) {
+int FEM_MUtil::addElemRemote(FEM_Mesh *m, int chk, int elemtype, int connSize, int *conn, int numGhostIndex, int *ghostIndices) {
   //translate all the coordinates to local coordinates
   //chk is the chunk who send this message
   //convert sharedIndices to localIndices & ghost to local indices
@@ -555,9 +555,9 @@ void FEM_MUtil::addElemRemote(FEM_Mesh *m, int chk, int elemtype, int connSize, 
       localIndices[i] = ll2[conn[i]];
     }
   }
-  FEM_add_element(m, localIndices, connSize, elemtype, idx);
+  int newEl = FEM_add_element(m, localIndices, connSize, elemtype, idx);
   free(localIndices);
-  return;
+  return newEl;
 }
 
 
@@ -760,7 +760,9 @@ void FEM_MUtil::addToSharedList(FEM_Mesh *m, int fromChk, int sharedIdx) {
       //tell that chunk to verify if it needs to add this node as a ghost
       int pchk = irec2->getChk(i);
       int shidx = irec2->getIdx(i);
+      idxllock(m,pchk,0);
       meshMod[pchk].addghostsendr(idx,shidx,fromChk,exists_in_IDXL(m,localIdx,fromChk,0));
+      idxlunlock(m,pchk,0);
     }
   }
   int *enbrs;
@@ -1110,7 +1112,7 @@ void FEM_MUtil::StructureTest(FEM_Mesh *m) {
     if(m->node.is_valid(i)) {
       m->n2e_getAll(i,&n2e,&n2esize);
       m->n2n_getAll(i,&n2n,&n2nsize);
-      if(n2esize!=n2nsize && n2nsize!=(n2esize+1)) {
+      if(n2esize>n2nsize) {
 	FEM_Print_coords(m,i);
 	FEM_Print_n2e(m,i);
 	FEM_Print_n2n(m,i);
@@ -1174,7 +1176,7 @@ void FEM_MUtil::StructureTest(FEM_Mesh *m) {
 	  previousnode = othernode;
 	  othernode = -1;
 	}
-	if(numdeadends>=2 && numunused!=0) {
+	if(numdeadends>2 && numunused!=0) {
 	  FEM_Print_coords(m,i);
 	  FEM_Print_n2e(m,i);
 	  FEM_Print_n2n(m,i);

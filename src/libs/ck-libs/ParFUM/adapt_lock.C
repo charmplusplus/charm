@@ -683,10 +683,8 @@ int FEM_AdaptL::edge_contraction_help(int *e1P, int *e2P, int n1, int n2, int e1
 				     int e2_n2, int e2_n3, int n3, int n4)
 {
   int e1=*e1P, e2=*e2P;
-  
   int e1chunk=-1, e2chunk=-1;
   int index = theMod->getIdx();
-
   //if n1 & n2 are shared differently or are on two different boundaries return
   int n1_shared=0, n2_shared=0;
   bool same = true;
@@ -981,7 +979,7 @@ int FEM_AdaptL::edge_contraction_help(int *e1P, int *e2P, int n1, int n2, int e1
       same = false;
       }*/
     if(same) {
-      if(n1fixed) {
+      if(n2fixed) {
 	keepnode = n2;
 	deletenode = n1;
       }
