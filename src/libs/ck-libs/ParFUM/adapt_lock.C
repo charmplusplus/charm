@@ -415,11 +415,13 @@ int FEM_AdaptL::edge_contraction(int n1, int n2) {
   if(n1<0 || n2<0) {
     invalidcoarsen = true;
   }
-  if(!theMesh->node.is_valid(n1)) {
-    invalidcoarsen = true;
+  if(n1>0) {
+    if(!theMesh->node.is_valid(n1))
+      invalidcoarsen = true;
   }
-  if(!theMesh->node.is_valid(n2)) {
-    invalidcoarsen = true;
+  if(n2>0) {
+    if(!theMesh->node.is_valid(n2))
+      invalidcoarsen = true;
   }
   if(invalidcoarsen) {
     free(locknodes);

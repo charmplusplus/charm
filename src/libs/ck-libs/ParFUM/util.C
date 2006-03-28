@@ -1080,7 +1080,7 @@ void FEM_MUtil::StructureTest(FEM_Mesh *m) {
 	CkAssert(false);
       }
       for(int j=0; j<3; j++) {
-	//all nodes must be valid
+	//all nodes must be valid and all local elems should have local connectivity
 	CkAssert(m->node.is_valid(e2n[j]));
       }
     }
@@ -1265,8 +1265,12 @@ void FEM_MUtil::StructureTest(FEM_Mesh *m) {
 	int n2n1Count = 0;
 	for(int j=0; j<n2esize; j++) {
 	  CkAssert(n2e[j]!=-1);
-	  if(FEM_Is_ghost_index(n2e[j])) CkAssert(m->elem[0].ghost->is_valid(FEM_From_ghost_index(n2e[j]))==1);
-	  else CkAssert(m->elem[0].is_valid(n2e[j])==1);
+	  if(FEM_Is_ghost_index(n2e[j])) {
+	    CkAssert(m->elem[0].ghost->is_valid(FEM_From_ghost_index(n2e[j]))==1);
+	  }
+	  else {
+	    CkAssert(m->elem[0].is_valid(n2e[j])==1);
+	  }
 	  //each of these elems should have me in its e2n
 	  int e2n1[3];
 	  m->e2n_getAll(n2e[j],e2n1,0);

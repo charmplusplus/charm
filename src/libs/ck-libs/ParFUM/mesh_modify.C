@@ -360,28 +360,32 @@ void FEM_remove_node(FEM_Mesh *m, int node){
   if(FEM_Is_ghost_index(node)) {
     //this is interpreted as a chunk trying to delete this ghost node, 
     //this is just to get rid of its version of the node entity
-  }
-  CkAssert(m->node.is_valid(node)); // make sure the node is still there
-  // if node is shared:
-  if(is_shared(m, node)){
-    // verify it is not adjacent to any elements locally
-    int numAdjNodes, numAdjElts;
-    int *adjNodes, *adjElts;
-    m->n2n_getAll(node, &adjNodes, &numAdjNodes);
-    m->n2e_getAll(node, &adjElts, &numAdjElts);
-    // we shouldn't be removing a node away that is connected to anything
-    CkAssert((numAdjNodes==0) && (numAdjElts==0)); 
-    // verify it is not adjacent to any elements on any of the associated chunks
-    // delete it on remote chunks(shared and ghost), update IDXL tables
-    m->getfmMM()->getfmUtil()->removeNodeAll(m, node);
-    // mark node as deleted/invalid locally
-    //FEM_remove_node_local(m,node);
-    //m->node.set_invalid(node,true);
-    if(numAdjNodes!=0) delete[] adjNodes;
-    if(numAdjElts!=0) delete[] adjElts;
+    CkAssert(m->node.ghost->is_valid(FEM_To_ghost_index(node))); // make sure the node is still there
+    FEM_remove_node_local(m,node);
   }
   else {
-    FEM_remove_node_local(m,node);
+    CkAssert(m->node.is_valid(node)); // make sure the node is still there
+    // if node is shared:
+    if(is_shared(m, node)){
+      // verify it is not adjacent to any elements locally
+      int numAdjNodes, numAdjElts;
+      int *adjNodes, *adjElts;
+      m->n2n_getAll(node, &adjNodes, &numAdjNodes);
+      m->n2e_getAll(node, &adjElts, &numAdjElts);
+      // we shouldn't be removing a node away that is connected to anything
+      CkAssert((numAdjNodes==0) && (numAdjElts==0)); 
+      // verify it is not adjacent to any elements on any of the associated chunks
+      // delete it on remote chunks(shared and ghost), update IDXL tables
+      m->getfmMM()->getfmUtil()->removeNodeAll(m, node);
+      // mark node as deleted/invalid locally
+      //FEM_remove_node_local(m,node);
+      //m->node.set_invalid(node,true);
+      if(numAdjNodes!=0) delete[] adjNodes;
+      if(numAdjElts!=0) delete[] adjElts;
+    }
+    else {
+      FEM_remove_node_local(m,node);
+    }
   }
 #ifdef DEBUG 
   CmiMemoryCheck(); 
