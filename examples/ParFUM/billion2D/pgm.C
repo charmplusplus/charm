@@ -162,6 +162,9 @@ driver(void)
 
   int mesh=FEM_Mesh_default_read(); // Tell framework we are reading data from the mesh
 
+  if(myId==0)
+    printf("In driver()\n");
+
   _registerParFUM();
 
   if(myId==0)
@@ -175,13 +178,12 @@ driver(void)
   long int elems;
   long int total_element_count;
   FEM_ADAPT_Init(mesh);  // setup the valid and adjs
-  FEM_ADAPT_SetReferenceMesh(mesh);
   FEM_Mesh *meshP = FEM_Mesh_lookup(FEM_Mesh_default_read(),"driver");
   FEM_Adapt_Algs *adaptAlgs= meshP->getfmMM()->getfmAdaptAlgs();
   adaptAlgs->FEM_Adapt_Algs_Init(FEM_DATA+0,FEM_DATA+1);
+  adaptAlgs->SetMeshSize(0, 1, NULL);
 
-
-  double sizing = 0.004;
+  double sizing = 1000000.0;
   int i=0;
   while(1){
     i++;
@@ -190,20 +192,20 @@ driver(void)
       
     // Nilesh's refine works
     adaptAlgs->simple_refine(sizing);
-    sizing = 0.7 * sizing;
     
     MPI_Barrier(MPI_COMM_WORLD);
     elems = FEM_count_valid(mesh, FEM_ELEM+0);
     total_element_count = 0;
     CkAssert(MPI_SUCCESS == MPI_Reduce(&elems, &total_element_count, 1, MPI_LONG, MPI_SUM ,0, MPI_COMM_WORLD));
     if(myId==0)
-      CkPrintf("after iteration %d: Total Elements=%ld Time=%lf\n", i, total_element_count, CmiWallTimer()-start_time);
+      CkPrintf("after iteration %d: Total Elements=%ld Time=%lf Sizing=%.20lf\n", i, total_element_count, CmiWallTimer()-start_time, sizing);
     
     print_mem_usage();
     
-    if(total_element_count > 50*1000)
+    if(total_element_count > 200*1000)
       CkExit();
 
+    sizing = 0.7 * sizing;
   }    
 
 }
