@@ -268,7 +268,7 @@ def main():
 	for i in affiliated:
             aff_key, aff_numpes, aff_time, aff_ip_context_cluster_socket = i
             if (time_now > (aff_time + CRM_TIMEOUT)):
-                for j in aff_ip_socket_context:
+                for j in aff_ip_context_cluster_socket:
                     aff_ip, aff_context, aff_cluster, aff_socket = j
                     msg_code = socket.htonl (CRM_MESSAGE_FAILURE)
                     msg_error = socket.htonl (CRM_ERROR_TIMEOUT)
