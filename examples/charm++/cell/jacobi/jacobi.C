@@ -141,7 +141,7 @@ void Jacobi::doCalculation() {
 
   // Display the matrix
   #if DISPLAY_MATRIX != 0
-    printf("matrix[%d] = {\n", thisIndex);
+    printf("matrix[%d] @ %p = {\n", thisIndex, matrix);
     for (int y = 0; y < DATA_BUFFER_ROWS; y++) {
       printf("  ");
       for (int x = 0; x < DATA_BUFFER_COLS; x++) {
@@ -151,6 +151,19 @@ void Jacobi::doCalculation() {
     }
     printf("}\n");
   #endif
+
+  #if DISPLAY_MATRIX != 0
+    printf("matrixTmp[%d] @ %p = {\n", thisIndex, matrixTmp);
+    for (int y = 0; y < DATA_BUFFER_ROWS; y++) {
+      printf("  ");
+      for (int x = 0; x < DATA_BUFFER_COLS; x++) {
+        printf(" %f", matrixTmp[GET_DATA_I(x,y)]);
+      }
+      printf("\n");
+    }
+    printf("}\n");
+  #endif
+
 
   // Swap the matrix and matrixTmp pointers
   float *tmp = matrix;

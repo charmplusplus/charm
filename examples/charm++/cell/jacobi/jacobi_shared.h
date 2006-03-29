@@ -37,8 +37,8 @@
 
 #define MAX_ERROR  0.01f  // The value that all errors have to be below for the program to finish
 
-#define DISPLAY_MATRIX  1
-
+#define DISPLAY_MATRIX          1
+#define DISPLAY_MAX_ERROR_FREQ  1
 
 #define DATA_BUFFER_ROWS   (NUM_ROWS + 2)
 #define DATA_BUFFER_COLS   (NUM_COLS + 2)

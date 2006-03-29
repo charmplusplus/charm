@@ -10,6 +10,9 @@ Main::Main(CkArgMsg *msg) {
 
   // Print some header information for the user
   CkPrintf(" ----- 2D Jacobi for Cell -----\n");
+  CkPrintf("   Matrix : [ %d x %d ]\n", NUM_ROWS * NUM_CHARES, NUM_COLS * NUM_CHARES);
+  CkPrintf("   Chare Matrix : [ %d x %d ]\n", NUM_CHARES, NUM_CHARES);
+  CkPrintf("   Per Chare Matrix : [ %d x %d ]\n", NUM_ROWS, NUM_COLS);
 
   // Init the member variables
   iterationCount = 0;
@@ -36,8 +39,10 @@ void Main::maxErrorReductionClient(CkReductionMsg *msg) {
 
   float maxError = *((float*)(msg->getData()));
 
-  if (iterationCount == 1 || (iterationCount % 10) == 0)
-    CkPrintf("Iteration %d Finished... maxError = %f...\n", iterationCount, maxError);
+  #if DISPLAY_MAX_ERROR_FREQ > 0
+    if (iterationCount == 1 || (iterationCount % DISPLAY_MAX_ERROR_FREQ) == 0)
+      CkPrintf("Iteration %d Finished... maxError = %f...\n", iterationCount, maxError);
+  #endif
 
   if (maxError <= MAX_ERROR) {
     CkPrintf("final maxError = %f\n", maxError);
