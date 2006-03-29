@@ -15,6 +15,13 @@
 #define SPE_MESSAGE_QUEUE_LENGTH      10   // DO NOT SET ABOVE 31 (because of the way tags are used with the DMA engines)
 #define SPE_MESSAGE_QUEUE_BYTE_COUNT  (SIZEOF_16(SPEMessage) * SPE_MESSAGE_QUEUE_LENGTH)
 
+// Set to non-zero if the write-only buffer should be zero-ed out on the SPE before being filled in
+#define SPE_ZERO_WRITE_ONLY_MEMORY    0
+
+// The number of dma list entries in a pre-allocated dma list.
+#define SPE_DMA_LIST_LENGTH                8        // Per message in message queue
+#define SPE_DMA_LIST_ENTRY_MAX_LENGTH      0x4000   // Maximum length of a buffer pointed to by a single dma list entry (should be a power of 2)
+
 // Defines for SPEMessage::state
 #define SPE_MESSAGE_STATE_MIN            0
 #define SPE_MESSAGE_STATE_CLEAR          0

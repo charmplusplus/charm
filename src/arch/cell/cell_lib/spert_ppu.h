@@ -82,12 +82,12 @@ extern int InitOffloadAPI(void(*cbFunc)(void*)
 extern void CloseOffloadAPI();
 
 extern WRHandle sendWorkRequest(int funcIndex,      // Index of the function to be called
-                                void* readWritePtr, // Pointer to data that should be loaded and passed to the function
-                                int readWriteLen,   // Length (in bytes) of the data pointed to by dataPtr
-                                void* readOnlyPtr,  // Pointer to message that should be loaded and passed to the function
-                                int readOnlyLen,    // Length (in bytes) of the message pointed to by msgPtr
-                                void* writeOnlyPtr, //
-                                int writeOnlyLen,   // 
+                                void* readWritePtr, // Pointer to a readWrite buffer (read before execution, written after)
+                                int readWriteLen,   // Length (in bytes) of the buffer pointed to by readWritePtr
+                                void* readOnlyPtr,  // Pointer to a readOnly buffer (read before execution)
+                                int readOnlyLen,    // Length (in bytes) of the buffer pointed to by readOnlyPtr
+                                void* writeOnlyPtr, // Pointer to a writeOnly buffer (written after execution)
+                                int writeOnlyLen,   // Length (in bytes) of the buffer pointed to by writeOnlyPtr
                                 void* userData      // A pointer to user defined data that will be passed to the callback function (if there is one) once this request is finished
 #ifdef __cplusplus
  = NULL   

@@ -21,13 +21,27 @@ extern void funcLookup(int funcIndex,
 
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Data Structures
+
+typedef struct __dma_list_entry {
+  unsigned int size;  // The size of the DMA transfer (actually three values (from MSB): notify:1, reserved:15, size:16)
+  unsigned int ea;    // Effective address of the data
+} DMAListEntry;
+
+
+/////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Global Data
 
 //const int SPEData_dmaTransferSize = (sizeof(SPEData) & 0xFFFFFFF0) + (0x10);
 const int SPEData_dmaTransferSize = SIZEOF_16(SPEData);
 
-volatile char* msgQueueRaw[SPE_MESSAGE_QUEUE_BYTE_COUNT];
+volatile char* msgQueueRaw[SPE_MESSAGE_QUEUE_BYTE_COUNT] __attribute__((aligned(128)));
 volatile SPEMessage* msgQueue[SPE_MESSAGE_QUEUE_LENGTH];
+
+// NOTE: Allocate two per entry (two buffers are read in from memory, two are
+//   written out to memory, read write does not overlap for a given message).
+volatile DMAListEntry dmaListEntry[2 * SPE_MESSAGE_QUEUE_LENGTH] __attribute__((aligned(16)));
+int dmaListSize[SPE_MESSAGE_QUEUE_LENGTH];
 
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -48,10 +62,6 @@ int main(unsigned long long id, unsigned long long param) {
 
   // Initialize globals
   memset(msgQueueRaw, 0x00, SPE_MESSAGE_QUEUE_BYTE_COUNT);
-
-  // Set the MFC's Tag Mask to enable all bits.  (When the MFC Tag Status is read,
-  //   its contents will be ANDed with this mask.)
-  //spu_writech(MFC_WrTagMask, (unsigned int)(-1));   // speScheduler will control the tag mask
 
   // Read in the data from main storage
   spu_mfcdma32((void*)&myData,          // LS Pointer
@@ -86,17 +96,22 @@ void speScheduler(SPEData *speData, unsigned long long id) {
   // DEBUG
   int debugCounter = 0;
 
-  printf("[%llx] --==>> Starting SPE Scheduler ...\n", id);
+  printf("[0x%llx] --==>> Starting SPE Scheduler ...\n", id);
 
   // Initialize the tag status registers to all tags enabled
   spu_writech(MFC_WrTagMask, (unsigned int)-1);
+
+  // Clear out the DMAListEntry array
+  memset((void*)dmaListEntry, 0, sizeof(DMAListEntry) * 2 * SPE_MESSAGE_QUEUE_LENGTH);
 
   // Create the local message queue
   int msgState[SPE_MESSAGE_QUEUE_LENGTH];
   void* readWritePtr[SPE_MESSAGE_QUEUE_LENGTH];
   void* readOnlyPtr[SPE_MESSAGE_QUEUE_LENGTH];
   void* writeOnlyPtr[SPE_MESSAGE_QUEUE_LENGTH];
+  void* localMemPtr[SPE_MESSAGE_QUEUE_LENGTH];
   int msgCounter[SPE_MESSAGE_QUEUE_LENGTH];
+  DMAListEntry* dmaList[SPE_MESSAGE_QUEUE_LENGTH];
   for (int i = 0; i < SPE_MESSAGE_QUEUE_LENGTH; i++) {
     msgQueue[i] = (SPEMessage*)(((char*)msgQueueRaw) + (SIZEOF_16(SPEMessage) * i));
     msgState[i] = SPE_MESSAGE_STATE_CLEAR;
@@ -104,6 +119,8 @@ void speScheduler(SPEData *speData, unsigned long long id) {
     readOnlyPtr[i] = NULL;
     writeOnlyPtr[i] = NULL;
     msgCounter[i] = 0;
+    dmaListSize[i] = -1;
+    dmaList[i] = NULL;
   }
 
   // Once the message queue has been created, check in with the main processor by sending a pointer to it
@@ -111,7 +128,6 @@ void speScheduler(SPEData *speData, unsigned long long id) {
 
   // Do the intial read of the message queue from main memory
   spu_mfcdma32(msgQueueRaw, (PPU_POINTER_TYPE)(speData->messageQueue), SPE_MESSAGE_QUEUE_BYTE_COUNT, 31, MFC_GET_CMD);
-  //spu_mfcstat(2);  // wait for the dma to finish
 
   // The scheduler loop
   while (keepLooping != FALSE) {
@@ -137,11 +153,11 @@ void speScheduler(SPEData *speData, unsigned long long id) {
     if ((debugCounter % 5000) == 0 && debugCounter != 0) {
       #if 1
 
-        printf("[%llx] :: still going... \n", id);
+        printf("[0x%llx] :: still going... \n", id);
 
       #else
 
-        printf("[%llx] :: still going... msgQueue[0] @ %p (msgQueue: %p) = { fi = %d, rw = %d, rwl = %d, ro = %d, rol = %d, wo = %d, wol = %d, s = %d, cnt = %d, cmd = %d }\n",
+        printf("[0x%llx] :: still going... msgQueue[0] @ %p (msgQueue: %p) = { fi = %d, rw = %d, rwl = %d, ro = %d, rol = %d, wo = %d, wol = %d, s = %d, cnt = %d, cmd = %d }\n",
                id,
                &(msgQueue[0]),
                msgQueue,
@@ -201,90 +217,134 @@ void speScheduler(SPEData *speData, unsigned long long id) {
 
 
     // Check for messages that need data fetched
-    // NOTE: The for loop condition check to make sure that numDMAQueueEntries is >= 2.  This is because
-    //   two DMA entries are needed: one for data and one for the message (scatter/gather lists aren't
-    //   being used yet).  Since the queue is 16 entries long, if there isn't enough room, there are still
-    //   15 outstanding DMA requests so it is probably OK to delay the current requests while still keeping
-    //   the SPE busy.
-    // TODO: Change this so if only one DMA command entry is available, use it and then initiate the second
-    //   one later.
     unsigned int numDMAQueueEntries = mfc_stat_cmd_queue();
-    for (int i = 0; (i < SPE_MESSAGE_QUEUE_LENGTH) /* && (numDMAQueueEntries > 0) */; i++) {
-
+    for (int i = 0; i < SPE_MESSAGE_QUEUE_LENGTH; i++) {
       if (msgState[i] == SPE_MESSAGE_STATE_PRE_FETCHING) {
 
-        // Make sure there are enough entries left for the message to use
-        // TODO : There might be a better way of doing this (hopefully the common path is that there are
-        //   enough queue entries... measure this to see if it is true... if it is, then try to get these
-        //   if statements out of the way for something that is faster).
-        int numDMAEntriesNeeded = 0;
-        if (msgQueue[i]->readWritePtr != (PPU_POINTER_TYPE)NULL) numDMAEntriesNeeded++;
-        if (msgQueue[i]->readOnlyPtr != (PPU_POINTER_TYPE)NULL) numDMAEntriesNeeded++;
-        if (numDMAEntriesNeeded > numDMAQueueEntries) continue;  // Skip this message for now
+        // Check to see if this message does not needs to fetch any data
+        if ((msgQueue[i]->readWritePtr == (PPU_POINTER_TYPE)NULL) && (msgQueue[i]->readOnlyPtr == (PPU_POINTER_TYPE)NULL)) {
+          msgState[i] = SPE_MESSAGE_STATE_READY;
+          continue;
+	}
 
-        // Fetch the readWrite data
-        if (msgQueue[i]->readWritePtr != (PPU_POINTER_TYPE)NULL) {
+        // Allocate the memory for the message queue entry (if need be)
+        // NOTE: First check to see if it is non-null.  What might have happened was that there was enough memory
+        //   last time but the DMA queue was full and a retry was needed.  So this time, the memory is there and
+        //   only the DMA needs to be retried.
+        if (localMemPtr[i] == NULL) {
 
-          // Allocate a buffer locally on the SPE
-          int retrieveSize = ROUNDUP_16(msgQueue[i]->readWriteLen);
-          readWritePtr[i] = (void*)(new char[retrieveSize]);
+          // Allocate the memory and place a pointer to the allocated buffer into localMemPtr.  This buffer will
+          //   be divided up into three regions: readOnly, readWrite, write (IN THAT ORDER!; the regions may be
+          //   empty if no pointer for the region was supplied by the original sendWorkRequest() call on the PPU).
+          register int memNeeded = ROUNDUP_16(msgQueue[i]->readWriteLen) +
+                                   ROUNDUP_16(msgQueue[i]->readOnlyLen) +
+                                   ROUNDUP_16(msgQueue[i]->writeOnlyLen);
+          register int offset = 0;
+          localMemPtr[i] = (void*)(new char[memNeeded]);
 
-          // Verify the pointer that was returned
-          if (((int)readWritePtr[i]) > 0x40000) {
-            printf("!!!!! ERROR !!!!! : new returned a value greater than the LS size : Expect bad things in the near future !!!!!\n");
-	  }
-          if (readWritePtr[i] == NULL) {
-            printf("===== ERROR ===== : speScheduler() : Unable to allocate memory for readWritePtr... expect bad things soon!...\n");
-            continue;
-	  }
-
-          // Initiate the transfer
-          spu_mfcdma32(readWritePtr[i], (PPU_POINTER_TYPE)(msgQueue[i]->readWritePtr), retrieveSize, i, MFC_GET_CMD);
-          numDMAQueueEntries--;
-        }
-
-        // Fetch the readOnly data
-        if (msgQueue[i]->readOnlyPtr != (PPU_POINTER_TYPE)NULL) {
-
-          // Allocate a buffer locally on the SPE
-          int retrieveSize = ROUNDUP_16(msgQueue[i]->readOnlyLen);
-          readOnlyPtr[i] = (void*)(new char[retrieveSize]);
-
-          // Verify the pointer that was returned
-          if (((int)readOnlyPtr[i]) > 0x40000) {
-            printf("!!!!! ERROR !!!!! : new returned a value greater than the LS size : Expect bad things in the near future !!!!!\n");
-	  }
-          if (readOnlyPtr[i] == NULL) {
-            printf("===== ERROR ===== : speScheduler() : Unable to allocate memory for readOnlyPtr... expect bad things soon!...\n");
-            continue;
+          // Check the pointer (if it is bad, then skip this message for now and try again later)
+          // TODO: There are probably better checks for this (use _end, etc.)
+          if (localMemPtr[i] == NULL || (unsigned int)localMemPtr[i] >= (unsigned int)0x40000) {
+            localMemPtr[i] = NULL;
+            break;
 	  }
 
-          // Initiate the transfer
-          spu_mfcdma32(readOnlyPtr[i], (PPU_POINTER_TYPE)(msgQueue[i]->readOnlyPtr), retrieveSize, i, MFC_GET_CMD);
-          numDMAQueueEntries--;
-        }
-
-        // Allocate memory for the writeOnly data
-        if (msgQueue[i]->writeOnlyPtr != (PPU_POINTER_TYPE)NULL) {
-
-          // Allocate a buffer locally on the SPE
-          // NOTE: The wroteOnly buffer still needs to be aligned so it can be written back later (even through
-          //   it is not being DMAed to the SPE now).
-          int retrieveSize = ROUNDUP_16(msgQueue[i]->writeOnlyLen);
-          writeOnlyPtr[i] = (void*)(new char[retrieveSize]);
-
-          // Verify the pointer that was returned
-          if (((int)writeOnlyPtr[i]) > 0x40000) {
-            printf("!!!!! ERROR !!!!! : new returned a value greater than the LS size : Expect bad things in the near future !!!!!\n");
+          // Assign the buffer specific pointers
+          // NOTE: Order matters here.  Need to allocate the read buffers next to each other and the write
+          //   buffers next to each other
+          if (msgQueue[i]->readOnlyPtr != (PPU_POINTER_TYPE)NULL) {
+            readOnlyPtr[i] = localMemPtr[i];
+            offset += ROUNDUP_16(msgQueue[i]->readOnlyLen);
+          } else {
+            readOnlyPtr[i] = NULL;
 	  }
-          if (writeOnlyPtr[i] == NULL) {
-            printf("===== ERROR ===== : speScheduler() : Unable to allocate memory for writeOnlyPtr... expect bad things soon!...\n");
-            continue;
+
+          if (msgQueue[i]->readWritePtr != (PPU_POINTER_TYPE)NULL) {
+            readWritePtr[i] = (void*)((char*)localMemPtr[i] + offset);
+            offset += ROUNDUP_16(msgQueue[i]->readWriteLen);
+          } else {
+            readWritePtr[i] = NULL;
+	  }
+
+          if (msgQueue[i]->writeOnlyPtr != (PPU_POINTER_TYPE)NULL) {
+            writeOnlyPtr[i] = (void*)((char*)localMemPtr[i] + offset);
+            #if SPE_ZERO_WRITE_ONLY_MEMORY != 0
+              memset(writeOnlyPtr[i], 0, ROUNDUP_16(msgQueue[i]->writeOnlyLen));
+            #endif
+          } else {
+            writeOnlyPtr[i] == NULL;
 	  }
 	}
 
-        // Update the state of the message (locally)
-        msgState[i] = SPE_MESSAGE_STATE_FETCHING;
+        // Create the DMA list
+        // NOTE: Check to see if the dma list has already been created yet or not (if dmaListSize[i] < 0, not created)
+        if (dmaListSize[i] < 0) {
+
+          // Count the number of DMA entries needed for the read DMA list
+          register int entryCount = 0;
+          entryCount += (ROUNDUP_16(msgQueue[i]->readWriteLen) / SPE_DMA_LIST_ENTRY_MAX_LENGTH) +
+                        (((msgQueue[i]->readWriteLen & (SPE_DMA_LIST_ENTRY_MAX_LENGTH - 1)) == 0x0) ? (0) : (1));
+          entryCount += (ROUNDUP_16(msgQueue[i]->readOnlyLen) / SPE_DMA_LIST_ENTRY_MAX_LENGTH) +
+                        (((msgQueue[i]->readOnlyLen & (SPE_DMA_LIST_ENTRY_MAX_LENGTH - 1)) == 0x0) ? (0) : (1));
+
+          // Allocate a larger DMA list if needed
+          if (entryCount > SPE_DMA_LIST_LENGTH) {
+            dmaList[i] = new DMAListEntry[entryCount];
+	  } else {
+            dmaList[i] = (DMAListEntry*)(&(dmaListEntry[i * SPE_DMA_LIST_LENGTH]));
+	  }
+          dmaListSize[i] = entryCount;
+
+
+          // Fill in the list
+          register int listIndex = 0;
+
+          if (readOnlyPtr[i] != NULL) {
+            register int bufferLeft = msgQueue[i]->readOnlyLen;
+            register unsigned int srcOffset = (unsigned int)(msgQueue[i]->readOnlyPtr);
+
+            while (bufferLeft > 0) {
+              dmaList[i][listIndex].size = ((bufferLeft > SPE_DMA_LIST_ENTRY_MAX_LENGTH) ? (SPE_DMA_LIST_ENTRY_MAX_LENGTH) : (bufferLeft));
+              dmaList[i][listIndex].ea = srcOffset;
+
+              bufferLeft -= SPE_DMA_LIST_ENTRY_MAX_LENGTH;
+              listIndex++;
+              srcOffset += SPE_DMA_LIST_ENTRY_MAX_LENGTH;
+	    }
+	  }
+
+          if (readWritePtr[i] != NULL) {
+            register int bufferLeft = msgQueue[i]->readWriteLen;
+            register unsigned int srcOffset = (unsigned int)(msgQueue[i]->readWritePtr);
+
+            while (bufferLeft > 0) {
+              dmaList[i][listIndex].size = ((bufferLeft > SPE_DMA_LIST_ENTRY_MAX_LENGTH) ? (SPE_DMA_LIST_ENTRY_MAX_LENGTH) : (bufferLeft));
+              dmaList[i][listIndex].ea = srcOffset;
+
+              bufferLeft -= SPE_DMA_LIST_ENTRY_MAX_LENGTH;
+              listIndex++;
+              srcOffset += SPE_DMA_LIST_ENTRY_MAX_LENGTH;
+	    }
+	  }
+	}
+
+        // Initiate the DMA command
+        if (numDMAQueueEntries > 0) {
+          spu_mfcdma64(localMemPtr[i],
+                       0,
+                       (unsigned int)(dmaList[i]),
+                       dmaListSize[i] * sizeof(DMAListEntry),
+                       i,
+                       MFC_GETL_CMD
+		      );
+
+          // Decrement the counter of available DMA queue entries left
+          numDMAQueueEntries--;
+
+          // Update the state of the message queue entry now that the data should be in-flight
+          msgState[i] = SPE_MESSAGE_STATE_FETCHING;
+	}
+
       }
     }
 
@@ -293,8 +353,18 @@ void speScheduler(SPEData *speData, unsigned long long id) {
     mfc_write_tag_update_immediate();
     tagStatus = mfc_read_tag_status(); //spu_readch(MFC_RdTagStat);
     for (int i = 0; i < SPE_MESSAGE_QUEUE_LENGTH; i++) {
-      if (msgState[i] == SPE_MESSAGE_STATE_FETCHING && ((tagStatus & (0x01 << i)) != 0))
+      if (msgState[i] == SPE_MESSAGE_STATE_FETCHING && ((tagStatus & (0x01 << i)) != 0)) {
+
+        // Update the state to show that this message queue entry is ready to be executed
         msgState[i] = SPE_MESSAGE_STATE_READY;
+
+        // Clean up the dmaList
+        if (dmaListSize[i] > SPE_DMA_LIST_LENGTH) {
+          delete [] dmaList[i];
+          dmaList[i] = NULL;
+	}
+        dmaListSize[i] = -1;  // NOTE: Clear this so data that the dmaList looks like it has not been set now
+      }
     }
 
 
@@ -335,38 +405,94 @@ void speScheduler(SPEData *speData, unsigned long long id) {
     for (int i = 0; i < SPE_MESSAGE_QUEUE_LENGTH; i++) {
       if (msgState[i] == SPE_MESSAGE_STATE_EXECUTED) {
 
-        // Check to see if there is data to be written back to main memory or not
-        if (readWritePtr[i] != NULL || writeOnlyPtr[i] != NULL) {
+        // Check to see if this message does not needs to fetch any data
+        if ((msgQueue[i]->readWritePtr == (PPU_POINTER_TYPE)NULL) && (msgQueue[i]->writeOnlyPtr == (PPU_POINTER_TYPE)NULL)) {
+          msgState[i] = SPE_MESSAGE_STATE_COMMITTING;  // The index still needs to be passed back to the PPU
+          continue;
+	}
 
-          // Check to see if there are enough DMA entries to write the data back to memory
-          int numDMAEntriesNeeded = 0;
-          if (readWritePtr[i] != NULL) numDMAEntriesNeeded++;
-          if (writeOnlyPtr[i] != NULL) numDMAEntriesNeeded++;
-          if (numDMAEntriesNeeded > numDMAQueueEntries) continue;
+        // Create the DMA list
+        // NOTE: Check to see if the dma list has already been created yet or not (if dmaListSize[i] < 0, not created)
+        if (dmaListSize[i] < 0) {
 
-          // Write the readWrite data back to main memory
+          // Count the number of DMA entries needed for the read DMA list
+          register int entryCount = 0;
+          entryCount += (ROUNDUP_16(msgQueue[i]->readWriteLen) / SPE_DMA_LIST_ENTRY_MAX_LENGTH) +
+                        (((msgQueue[i]->readWriteLen & (SPE_DMA_LIST_ENTRY_MAX_LENGTH - 1)) == 0x0) ? (0) : (1));
+          entryCount += (ROUNDUP_16(msgQueue[i]->writeOnlyLen) / SPE_DMA_LIST_ENTRY_MAX_LENGTH) +
+                        (((msgQueue[i]->writeOnlyLen & (SPE_DMA_LIST_ENTRY_MAX_LENGTH - 1)) == 0x0) ? (0) : (1));
+
+          // Allocate a larger DMA list if needed
+          if (entryCount > SPE_DMA_LIST_LENGTH) {
+            dmaList[i] = new DMAListEntry[entryCount];
+	  } else {
+            dmaList[i] = (DMAListEntry*)(&(dmaListEntry[i * SPE_DMA_LIST_LENGTH]));
+	  }
+          dmaListSize[i] = entryCount;
+
+
+          // Fill in the list
+          readOnlyPtr[i] = NULL;   // Use this pointer to point to the first buffer to be written to memory (don't nead readOnly data anymore)
+          register int listIndex = 0;
+
           if (readWritePtr[i] != NULL) {
-            spu_mfcdma32(readWritePtr[i], (PPU_POINTER_TYPE)(msgQueue[i]->readWritePtr), ROUNDUP_16(msgQueue[i]->readWriteLen), i, MFC_PUT_CMD);
-            numDMAQueueEntries--;
+            register int bufferLeft = msgQueue[i]->readWriteLen;
+            register unsigned int srcOffset = (unsigned int)(msgQueue[i]->readWritePtr);
+
+            while (bufferLeft > 0) {
+              dmaList[i][listIndex].size = ((bufferLeft > SPE_DMA_LIST_ENTRY_MAX_LENGTH) ? (SPE_DMA_LIST_ENTRY_MAX_LENGTH) : (bufferLeft));
+              dmaList[i][listIndex].ea = srcOffset;
+
+              bufferLeft -= SPE_DMA_LIST_ENTRY_MAX_LENGTH;
+              listIndex++;
+              srcOffset += SPE_DMA_LIST_ENTRY_MAX_LENGTH;
+	    }
+
+            // Store the start of the write portion of the localMem buffer in readOnlyPtr
+            readOnlyPtr[i] = readWritePtr[i];
 	  }
 
-          // Write the writeOnly data back to main memory
           if (writeOnlyPtr[i] != NULL) {
-            spu_mfcdma32(writeOnlyPtr[i], (PPU_POINTER_TYPE)(msgQueue[i]->writeOnlyPtr), ROUNDUP_16(msgQueue[i]->writeOnlyLen), i, MFC_PUT_CMD);
-            numDMAQueueEntries--;
+            register int bufferLeft = msgQueue[i]->writeOnlyLen;
+            register unsigned int srcOffset = (unsigned int)(msgQueue[i]->writeOnlyPtr);
+
+            while (bufferLeft > 0) {
+              dmaList[i][listIndex].size = ((bufferLeft > SPE_DMA_LIST_ENTRY_MAX_LENGTH) ? (SPE_DMA_LIST_ENTRY_MAX_LENGTH) : (bufferLeft));
+              dmaList[i][listIndex].ea = srcOffset;
+
+              bufferLeft -= SPE_DMA_LIST_ENTRY_MAX_LENGTH;
+              listIndex++;
+              srcOffset += SPE_DMA_LIST_ENTRY_MAX_LENGTH;
+	    }
+
+            // Store the start of the write portion of the localMem buffer in readOnlyPtr (if
+            //   it is not set already... i.e. - this buffer isn't first)
+            if (readOnlyPtr[i] == NULL) readOnlyPtr[i] = writeOnlyPtr[i];
 	  }
+	}
 
-          // Advance the state
-          msgState[i] = SPE_MESSAGE_STATE_COMMITTING;
 
-        } else {
+        // Initiate the DMA command
+        if (numDMAQueueEntries > 0) {
+          spu_mfcdma64(readOnlyPtr[i],  // This pointer is being used to point to the start of the write portion of localMem
+                       0,
+                       (unsigned int)(dmaList[i]),
+                       dmaListSize[i] * sizeof(DMAListEntry),
+                       i,
+                       MFC_PUTL_CMD
+		      );
+
+          // Decrement the counter of available DMA queue entries left
+          numDMAQueueEntries--;
+
+          // Update the state of the message queue entry now that the data should be in-flight
           msgState[i] = SPE_MESSAGE_STATE_COMMITTING;
-        }
+	}
 
       }
     }
 
- 
+
     // Initiate the next message queue read from main memory
     spu_mfcdma32(msgQueueRaw, (PPU_POINTER_TYPE)(speData->messageQueue), SPE_MESSAGE_QUEUE_BYTE_COUNT, 31, MFC_GET_CMD);
 
@@ -382,12 +508,23 @@ void speScheduler(SPEData *speData, unsigned long long id) {
         if (spu_stat_out_mbox() > 0) {
 
           // Free the local data and message buffers
-          if (readWritePtr[i] != NULL) { delete [] ((char*)readWritePtr[i]); readWritePtr[i] = NULL; }
-          if (readOnlyPtr[i] != NULL) { delete [] ((char*)readOnlyPtr[i]); readOnlyPtr[i] = NULL; }
-          if (writeOnlyPtr[i] != NULL) { delete [] ((char*)writeOnlyPtr[i]); writeOnlyPtr[i] = NULL; }
+          if (localMemPtr[i] != NULL) {
+            delete [] ((char*)localMemPtr[i]);
+            localMemPtr[i] = NULL;
+            readWritePtr[i] = NULL;
+            readOnlyPtr[i] = NULL;
+            writeOnlyPtr[i] = NULL;
+	  }
 
           // Clear the entry
           msgState[i] = SPE_MESSAGE_STATE_CLEAR;
+
+          // Clear the dmaList size so it looks like the dma list has not been set
+          if (dmaListSize[i] > SPE_DMA_LIST_LENGTH) {
+            delete [] dmaList[i];
+            dmaList[i] = NULL;
+	  }
+          dmaListSize[i] = -1;
 
           // Send the index of the entry in the message queue to the PPE
           spu_write_out_mbox((unsigned int)i);
