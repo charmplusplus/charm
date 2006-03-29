@@ -272,7 +272,7 @@ void FEM_remove_node_local(FEM_Mesh *m, int node) {
   m->n2e_getAll(node, &adjElts, &numAdjElts);
   // mark node as deleted/invalid
   if(FEM_Is_ghost_index(node)){
-    CkAssert((numAdjNodes==0) && (numAdjElts==0));
+    //CkAssert((numAdjNodes==0) && (numAdjElts==0));
     //otherwise this ghost node is connected to some element in another chunk, 
     //which the chunk that just informed us doesn't know abt
     //look up the ghostrecv idxl list & clean up all instances
