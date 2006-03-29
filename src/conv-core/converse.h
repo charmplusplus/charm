@@ -526,6 +526,8 @@ void CmiMemoryMark(void); /* ignore current allocations, for -memory leak */
 void CmiMemoryMarkBlock(void *blk); /* ignore this allocation, for -memory leak */
 void CmiMemorySweep(const char *where); /* print current allocations, for -memory leak */
 CMK_TYPEDEF_UINT8 CmiMemoryUsage();
+CMK_TYPEDEF_UINT8 CmiMaxMemoryUsage();
+void CmiResetMaxMemory();
 
 #define CMI_MEMORY_IS_ISOMALLOC (1<<1)
 #define CMI_MEMORY_IS_PARANOID  (1<<2)

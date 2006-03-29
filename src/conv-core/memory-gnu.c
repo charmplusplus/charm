@@ -21,6 +21,7 @@ This is slightly hacked as:
 #define valloc   mm_valloc
 
 extern CMK_TYPEDEF_UINT8 memory_allocated;
+extern CMK_TYPEDEF_UINT8 memory_allocated_max;
 
 #define HAVE_MMAP CMK_HAS_MMAP
 #ifndef __USE_GNU
@@ -3332,6 +3333,10 @@ public_mALLOc(size_t bytes)
   assert(!victim || chunk_is_mmapped(mem2chunk(victim)) ||
 	 ar_ptr == arena_for_chunk(mem2chunk(victim)));
   memory_allocated += chunksize(mem2chunk(victim));
+  
+  if(memory_allocated > memory_allocated_max)
+    memory_allocated_max=memory_allocated;
+
   return victim;
 }
 
@@ -3408,7 +3413,10 @@ public_rEALLOc(Void_t* oldmem, size_t bytes)
 
   memory_allocated -= oldsize;
   memory_allocated += nb;
-
+   
+  if(memory_allocated > memory_allocated_max)
+    memory_allocated_max=memory_allocated;
+  
 #if HAVE_MMAP
   if (chunk_is_mmapped(oldp))
   {
@@ -3499,6 +3507,10 @@ public_mEMALIGn(size_t alignment, size_t bytes)
   assert(!p || chunk_is_mmapped(mem2chunk(p)) ||
 	 ar_ptr == arena_for_chunk(mem2chunk(p)));
   memory_allocated += chunksize(mem2chunk(p));
+
+  if(memory_allocated > memory_allocated_max)
+    memory_allocated_max=memory_allocated;
+  
   return p;
 }
 
@@ -3516,6 +3528,10 @@ public_vALLOc(size_t bytes)
   p = _int_valloc(ar_ptr, bytes);
   (void)mutex_unlock(&ar_ptr->mutex);
   memory_allocated += chunksize(mem2chunk(p));
+
+  if(memory_allocated > memory_allocated_max)
+    memory_allocated_max=memory_allocated;
+
   return p;
 }
 
@@ -3531,6 +3547,10 @@ public_pVALLOc(size_t bytes)
   p = _int_pvalloc(ar_ptr, bytes);
   (void)mutex_unlock(&ar_ptr->mutex);
   memory_allocated += chunksize(mem2chunk(p));
+
+  if(memory_allocated > memory_allocated_max)
+    memory_allocated_max=memory_allocated;
+  
   return p;
 }
 
@@ -3620,6 +3640,9 @@ public_cALLOc(size_t n, size_t elem_size)
   p = mem2chunk(mem);
   memory_allocated += chunksize(p);
 
+  if(memory_allocated > memory_allocated_max)
+    memory_allocated_max=memory_allocated;
+
   /* Two optional cases in which clearing not necessary */
 #if HAVE_MMAP
   if (chunk_is_mmapped(p))
@@ -3680,6 +3703,8 @@ public_iCALLOc(size_t n, size_t elem_size, Void_t** chunks)
   m = _int_icalloc(ar_ptr, n, elem_size, chunks);
   (void)mutex_unlock(&ar_ptr->mutex);
   memory_allocated += chunksize(mem2chunk(m));
+  if(memory_allocated > memory_allocated_max)
+    memory_allocated_max=memory_allocated;
   return m;
 }
 
@@ -3696,6 +3721,10 @@ public_iCOMALLOc(size_t n, size_t sizes[], Void_t** chunks)
   m = _int_icomalloc(ar_ptr, n, sizes, chunks);
   (void)mutex_unlock(&ar_ptr->mutex);
   memory_allocated += chunksize(mem2chunk(m));
+  
+  if(memory_allocated > memory_allocated_max)
+    memory_allocated_max=memory_allocated;
+  
   return m;
 }
 
