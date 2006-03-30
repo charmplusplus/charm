@@ -491,8 +491,6 @@ void OffloadAPIProgress() {
     for (int i = 0; i < NUM_SPE_THREADS; i++) {
       sentIndex = sendSPEMessage(speThreads[i],
                                  wrEntry->funcIndex,
-				 //wrEntry->data, wrEntry->dataLen,
-                                 //wrEntry->msg, wrEntry->msgLen,
                                  wrEntry->readWritePtr, wrEntry->readWriteLen,
                                  wrEntry->readOnlyPtr, wrEntry->readOnlyLen,
                                  wrEntry->writeOnlyPtr, wrEntry->writeOnlyLen,
