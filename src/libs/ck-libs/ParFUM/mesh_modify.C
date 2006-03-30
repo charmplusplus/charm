@@ -563,7 +563,7 @@ int FEM_remove_element(FEM_Mesh *m, int elementid, int elemtype, int permanent){
 	  //verify if it is losing all nodes, this means that this was an isolated element
 	  //and this element does not have to be a ghost
 	  if(losingThisNode[0]==1 && losingThisNode[1]==1 && losingThisNode[2]==1) {
-	    //only if it is connected to the any other node of this chunk, it will be a ghost
+	    //only if it is connected to any other node of this chunk, it will be a ghost
 	    for(int i=0; i<connSize; i++) {
 	      int *ndnbrs;
 	      int numndnbrs;
@@ -580,11 +580,13 @@ int FEM_remove_element(FEM_Mesh *m, int elementid, int elemtype, int permanent){
 	  }
 	  //add a new ghost for every node that should be lost and a ghost added
 	  for(int i=0; i<connSize; i++) {
+	    if(losingThisNode[i]) {
+	      //lock it on the min chunk on which this node is local
+	      FEM_Modify_LockAll(m,nodes[i],false);
+	    }
 	    if(losingThisNode[i]==1 && willBeGhost[i]==1) {
 	      newghost[i] = FEM_add_node_local(m,1);
 	      ghostidx[i] = FEM_To_ghost_index(newghost[i]); //translate the index
-	      //lock it on the min chunk on which this node is local
-	      FEM_Modify_LockAll(m,nodes[i],false);
 	    }
 	  }
 	}
@@ -2497,8 +2499,10 @@ void femMeshModify::removeIDXLRemote(int fromChk, int sharedIdx, int type) {
   CmiMemoryCheck(); 
 #endif
   int localIdx = fmUtil->lookup_in_IDXL(fmMesh, sharedIdx, fromChk, type);
-  CkAssert(localIdx != -1);
-  fmMesh->node.ghostSend.removeNode(localIdx,fromChk);
+  //CkAssert(localIdx != -1);
+  if(localIdx!=-1) {
+    fmMesh->node.ghostSend.removeNode(localIdx,fromChk);
+  }
 #ifdef DEBUG 
   CmiMemoryCheck(); 
 #endif

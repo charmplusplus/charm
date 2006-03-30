@@ -630,6 +630,9 @@ void FEM_MUtil::removeGhostElementRemote(FEM_Mesh *m, int chk, int elementid, in
 	outStandingMappings.push_back(tuple(FEM_To_ghost_index(localIdx),newN));
 	FEM_remove_node_local(m,FEM_To_ghost_index(localIdx));
 	//we think it comes here only if its a corner node,
+#ifdef DEBUG_1
+	CkPrintf("Corner node %d converted from ghost to local\n");
+#endif
 	mmod->fmfixedNodes.push_back(newN);
       }
       else {

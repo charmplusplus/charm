@@ -1312,11 +1312,13 @@ int FEM_Mesh::getElementOnEdge(int n1, int n2)
   CmiMemoryCheck();
 #endif 
 
+  bool flag = false;
   for (int i=0; i<n1NumElems; i++) {
     for (int j=0; j<n2NumElems; j++) {
       if (n1AdjElems[i] == n2AdjElems[j]) {
         if(n1AdjElems[i] >= 0) {
           ret = n1AdjElems[i];
+	  flag = true;
           break;
         }
         else {
@@ -1324,6 +1326,7 @@ int FEM_Mesh::getElementOnEdge(int n1, int n2)
         }
       }
     }
+    if(flag) break;
   }
   delete[] n1AdjElems;
   delete[] n2AdjElems;
@@ -1375,9 +1378,6 @@ void FEM_Mesh::get2ElementsOnEdge(int n1, int n2, int *result_e1, int *result_e2
           found++;
         }
         else {
-#ifdef DEBUG
-          CmiMemoryCheck();
-#endif          
           CkPrintf("ERROR: Found a third element(%d) on edge %d,%d \n", n1AdjElems[i], n1, n2);
            CkExit();
         }
