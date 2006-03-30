@@ -52,7 +52,7 @@
 #endif
 
 CMK_TYPEDEF_UINT8 memory_allocated = 0;
-CMK_TYPEDEF_UINT8 memory_allocated_max = 0; // Max Memory Used So Far (High-Water Mark)
+CMK_TYPEDEF_UINT8 memory_allocated_max = 0; /* High-Water Mark */
 
 /*Rank of the processor that's currently holding the CmiMemLock,
 or -1 if nobody has it.  Only set when malloc might be reentered.
