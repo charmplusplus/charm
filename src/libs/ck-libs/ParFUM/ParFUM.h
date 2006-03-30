@@ -473,6 +473,18 @@ FDECL void FTN_NAME(FEM_ADAPT_SETREFERENCEMESH, fem_adapt_setreferencemesh)(int*
 void FEM_ADAPT_GradateMesh(int meshID, double smoothness);
 FDECL void FTN_NAME(FEM_ADAPT_GRADATEMESH, fem_adapt_gradatemesh)(int* meshID, double* smoothness);
 
+
+void FEM_ADAPT_TestMesh(int meshID);
+FDECL void FTN_NAME(FEM_ADAPT_TESTMESH, fem_adapt_testmesh)(int* meshID);
+
+
+void FEM_ADAPT_SimpleRefineMesh(int meshID, double targetA, double xmin, double ymin, double xmax, double ymax);
+FDECL void FTN_NAME(FEM_ADAPT_SIMPLEREFINEMESH, fem_adapt_simplerefinemesh)(int* meshID, double* targetA, double* xmin, double* ymin, double* xmax, double* ymax);
+
+
+void FEM_ADAPT_SimpleCoarsenMesh(int meshID, double targetA, double xmin, double ymin, double xmax, double ymax);
+FDECL void FTN_NAME(FEM_ADAPT_SIMPLECOARSENMESH, fem_adapt_simplecoarsenmesh)(int* meshID, double* targetA, double* xmin, double* ymin, double* xmax, double* ymax);
+
   // End Adaptivity interface
 
 }

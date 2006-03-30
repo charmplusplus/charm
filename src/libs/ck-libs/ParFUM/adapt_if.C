@@ -105,3 +105,29 @@ FDECL void FTN_NAME(FEM_ADAPT_GRADATEMESH, fem_adapt_gradatemesh)(int* meshID, d
     FEM_ADAPT_GradateMesh(*meshID, *smoothness);
 }
 
+void FEM_ADAPT_TestMesh(int meshID) {
+    FEM_Mesh* mesh = FEM_Mesh_lookup(meshID, "FEM_ADAPT_GradateMesh");
+    mesh->getfmMM()->getfmAdaptAlgs()->tests();
+}
+FDECL void FTN_NAME(FEM_ADAPT_TESTMESH, fem_adapt_testmesh)(int* meshID)
+{
+    FEM_ADAPT_TestMesh(*meshID);
+}
+
+void FEM_ADAPT_SimpleRefineMesh(int meshID, double targetA, double xmin, double ymin, double xmax, double ymax) {
+    FEM_Mesh* mesh = FEM_Mesh_lookup(meshID, "FEM_ADAPT_GradateMesh");
+    mesh->getfmMM()->getfmAdaptAlgs()->simple_refine(targetA,xmin,ymin,xmax,ymax);
+}
+FDECL void FTN_NAME(FEM_ADAPT_SIMPLEREFINEMESH, fem_adapt_simplerefinemesh)(int* meshID, double* targetA, double* xmin, double* ymin, double* xmax, double* ymax)
+{
+    FEM_ADAPT_SimpleRefineMesh(*meshID,*targetA,*xmin,*ymin,*xmax,*ymax);
+}
+
+void FEM_ADAPT_SimpleCoarsenMesh(int meshID, double targetA, double xmin, double ymin, double xmax, double ymax) {
+    FEM_Mesh* mesh = FEM_Mesh_lookup(meshID, "FEM_ADAPT_GradateMesh");
+    mesh->getfmMM()->getfmAdaptAlgs()->simple_coarsen(targetA,xmin,ymin,xmax,ymax);
+}
+FDECL void FTN_NAME(FEM_ADAPT_SIMPLECOARSENMESH, fem_adapt_simplecoarsenmesh)(int* meshID, double* targetA, double* xmin, double* ymin, double* xmax, double* ymax)
+{
+    FEM_ADAPT_SimpleCoarsenMesh(*meshID,*targetA,*xmin,*ymin,*xmax,*ymax);
+}
