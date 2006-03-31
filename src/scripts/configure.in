@@ -754,6 +754,7 @@ then
 else
   AC_MSG_RESULT("yes")
   mv -f conftest2.o conftest.o
+  USE_FORTRAN90=1
 fi
 
 ### check fortran name mangling
@@ -801,6 +802,41 @@ else
   AC_MSG_RESULT("Fortran compiler not working")
 fi
 
+### check module name ###
+
+if test "$USE_FORTRAN90" = 1
+then
+  cat > conftest.f90 <<EOF
+      MODULE testmod
+        interface 
+          function fpup_issizing(p)
+          INTEGER :: p
+          logical fpup_issizing
+          end function
+        end interface
+      END MODULE
+EOF
+  AC_MSG_CHECKING(Fortran 90 mod name is capital)
+  $CMK_CF90 -c conftest.f90 > /dev/null 2> /dev/null
+  name=`ls TESTMOD.* 2>/dev/null`
+  if test -n "$name"
+  then
+        AC_MSG_RESULT("yes")
+	add_flag 'CMK_MOD_NAME_ALLCAPS=1' "mod name capital"
+  else
+        AC_MSG_RESULT("no")
+	name=`ls testmod.* 2>/dev/null`
+  fi
+  if test -n "$name"
+  then
+  	AC_MSG_CHECKING(Fortran 90 mod name extension)
+    	ext=`echo $name | sed -e 's/^[[^.]]*\.//'`
+	add_flag 'CMK_MOD_EXT="'$ext'"' "mod name extension"
+        AC_MSG_RESULT("$ext")
+        /bin/rm -f $name
+  fi
+  /bin/rm -f conftest.f90
+fi
 
 ### go get libpthread.a from charm website ###
 if test "$base_version" = "net-linux" || test "$base_version" = "mpi-linux"
