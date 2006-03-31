@@ -29,6 +29,7 @@ private:
   char flag;  // 1: come from array elem 2: come from BOC
   int redNo;
   int gcounter;
+  int userFlag; // user set for use by client 
   char rebuilt;
   CkCallback callback;   /**< user callback */
 public:
@@ -91,8 +92,8 @@ class CkMulticastMgr: public CkDelegateMgr {
     void setReductionClient(CProxySection_ArrayElement &, CkCallback *cb);
     // user should be careful while passing non-default value of fragSize
     // fragSize%sizeof(data_type) should be zero
-    void contribute(int dataSize,void *data,CkReduction::reducerType type, CkSectionInfo &sid, int fragSize=-1);
-    void contribute(int dataSize,void *data,CkReduction::reducerType type, CkSectionInfo &sid, CkCallback &cb, int fragSize=-1);
+    void contribute(int dataSize,void *data,CkReduction::reducerType type, CkSectionInfo &sid, int userData=-1, int fragSize=-1);
+    void contribute(int dataSize,void *data,CkReduction::reducerType type, CkSectionInfo &sid, CkCallback &cb, int userData=-1, int fragSize=-1);
     void rebuild(CkSectionInfo &);
     // entry
     void recvRedMsg(CkReductionMsg *msg);
@@ -107,7 +108,7 @@ class CkMulticastMgr: public CkDelegateMgr {
     enum {MAXREDUCERS=256};
 //    static CkReduction::reducerFn reducerTable[MAXREDUCERS];
     void releaseFutureReduceMsgs(mCastEntryPtr entry);
-    inline CkReductionMsg *buildContributeMsg(int dataSize,void *data,CkReduction::reducerType type, CkSectionInfo &id, CkCallback &cb);
+    inline CkReductionMsg *buildContributeMsg(int dataSize,void *data,CkReduction::reducerType type, CkSectionInfo &id, CkCallback &cb, int userFlag=-1);
     void reduceFragment (int index, CkSectionInfo& id,
                          mCastEntry* entry, reductionInfo& redInfo,
                          int& updateReduceNo, int currentTreeUp);

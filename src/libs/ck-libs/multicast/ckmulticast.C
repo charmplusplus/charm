@@ -777,7 +777,7 @@ void CkMulticastMgr::setReductionClient(CProxySection_ArrayElement &proxy, redCl
   entry->red.storedClientParam = param;
 }
 
-inline CkReductionMsg *CkMulticastMgr::buildContributeMsg(int dataSize,void *data,CkReduction::reducerType type, CkSectionInfo &id, CkCallback &cb)
+inline CkReductionMsg *CkMulticastMgr::buildContributeMsg(int dataSize,void *data,CkReduction::reducerType type, CkSectionInfo &id, CkCallback &cb, int userFlag)
 {
   CkReductionMsg *msg = CkReductionMsg::buildNew(dataSize, data);
   msg->reducer = type;
@@ -787,16 +787,20 @@ inline CkReductionMsg *CkMulticastMgr::buildContributeMsg(int dataSize,void *dat
   msg->gcount = 1;
   msg->rebuilt = (id.get_pe() == CkMyPe())?0:1;
   msg->callback = cb;
+  msg->userFlag=userFlag;
   return msg;
 }
 
-void CkMulticastMgr::contribute(int dataSize,void *data,CkReduction::reducerType type, CkSectionInfo &id, int fragSize)
+
+
+void CkMulticastMgr::contribute(int dataSize,void *data,CkReduction::reducerType type, CkSectionInfo &id, int userFlag, int fragSize)
 {
   CkCallback cb;
-  contribute(dataSize, data, type, id, cb, fragSize);
+  contribute(dataSize, data, type, id, cb, userFlag, fragSize);
 }
 
-void CkMulticastMgr::contribute(int dataSize,void *data,CkReduction::reducerType type, CkSectionInfo &id, CkCallback &cb, int fragSize)
+
+void CkMulticastMgr::contribute(int dataSize,void *data,CkReduction::reducerType type, CkSectionInfo &id, CkCallback &cb, int userFlag, int fragSize)
 {
   if (id.get_val() == NULL || id.get_redNo() == -1) 
     CmiAbort("contribute: SectionID is not initialized\n");
@@ -839,6 +843,7 @@ void CkMulticastMgr::contribute(int dataSize,void *data,CkReduction::reducerType
     msg->gcount             = 1;
     msg->rebuilt            = (mpe == CkMyPe())?0:1;
     msg->callback           = cb;
+    msg->userFlag           = userFlag;
 
     mCastGrp[mpe].recvRedMsg(msg);
 
@@ -882,6 +887,7 @@ CkReductionMsg* CkMulticastMgr::combineFrags (CkSectionInfo& id,
   msg->sourceFlag = 2;
   msg->rebuilt    = redInfo.msgs[0][0]->rebuilt;
   msg->callback   = redInfo.msgs[0][0]->callback;
+  msg->userFlag   = redInfo.msgs[0][0]->userFlag;
 
   byte* data = (byte*)msg->getData ();
   for (i=0; i<nFrags; i++) {
@@ -909,6 +915,7 @@ void CkMulticastMgr::reduceFragment (int index, CkSectionInfo& id,
   int oldRedNo = redInfo.redNo;
   int nFrags   = rmsgs[0]->nFrags;
   int fragNo   = rmsgs[0]->fragNo;
+  int userFlag   = rmsgs[0]->userFlag;
                                                                                 
   // reduce msgs
   CkReduction::reducerFn f= CkReduction::reducerTable[reducer];
@@ -926,6 +933,7 @@ void CkMulticastMgr::reduceFragment (int index, CkSectionInfo& id,
   newmsg->redNo  = redInfo.redNo;
   newmsg->nFrags = nFrags;
   newmsg->fragNo = fragNo;
+  newmsg->userFlag = userFlag;
 
   // increment num-frags processed
   redInfo.npProcessed ++;
