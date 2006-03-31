@@ -22,7 +22,6 @@ CMK_CF77="f77 -qnocommon -qextname -qthreaded "
 CMK_CF90="f90 -qnocommon -qextname -qthreaded "
 CMK_CF90_FIXED="xlf90 -qnocommon -qextname -qthreaded -qsuffix=f=f"
 CMK_F90LIBS="-L/opt/ibmcmp/xlf/8.1/lib -lxlf90 -lxlopt -lxl -lxlfmath"
-CMK_MOD_EXT="mod"
 
 # native compilers
 CMK_NATIVE_LIBS=""
