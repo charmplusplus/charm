@@ -1069,10 +1069,12 @@ do
 		NU_OBJ=$BASEO
 		;;
 	*.f|*.F)
+		test -z "$CMK_CF90_FIXED" && Abort "No F90 compiler (CMK_CF90_FIXED) defined"
 		Do $CMK_CF90_FIXED -I$CHARMINC $OPTS_CPP $OPTS_F90 -c $FILE $DESTO
 		NU_OBJ=$BASEO
 		;;
 	*.f90|*.F90)
+		test -z "$CMK_CF90" && Abort "No F90 compiler (CMK_CF90) defined"
 		test -z "$PREPROCESS" && OPTS_F90="$OPTS_F90 -c"
 		Do $CMK_CF90 -I$CHARMINC $OPTS_CPP $OPTS_F90 $FILE $DESTO
 		NU_OBJ=$BASEO
