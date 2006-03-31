@@ -8,13 +8,13 @@ CMK_CPP_C="gcc -E -m64 -DNO_LOCK $CMK_INCDIR $VMI_INCDIR "
 CMK_CC="gcc -fPIC -m64 -DNO_LOCK $CMK_INCDIR $VMI_INCDIR "
 CMK_CXX="g++ -fPIC -m64 -DNO_LOCK $CMK_INCDIR $VMI_INCDIR "
 CMK_CXXPP="$CMK_CC -x c++ -E -m64 -DNO_LOCK "
-CMK_CF77="f77 "
-CMK_CF90="f90 "
 CMK_LD="$CMK_CC -rdynamic -pthread -Wl,-rpath,$VMI_DIR/lib $VMI_LIBDIR "
 CMK_LDXX="$CMK_CXX -rdynamic -pthread -Wl,-rpath,$VMI_DIR/lib $VMI_LIBDIR "
 CMK_RANLIB='ranlib'
 CMK_LIBS='-lckqt -lvmi20 -lcurl -ldl -lexpat -lssl -lcrypto'
 CMK_QT='generic64'
 CMK_XIOPTS=''
+
+CMK_CF77="f77 "
+CMK_CF90="f90 "
 CMK_F90LIBS='-lvast90 -lg2c'
-CMK_MOD_EXT="vo"
