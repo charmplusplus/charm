@@ -29,8 +29,6 @@ F90DIR=`which ifort 2> /dev/null`
 test -x "$F90DIR" && F90MAIN="`dirname $F90DIR`/../lib/for_main.o"
 CMK_F90MAINLIBS="$F90MAIN "
 CMK_F77LIBS="$CMK_F90LIBS"
-CMK_MOD_NAME_ALLCAPS=
-CMK_MOD_EXT="mod"
 CMK_F90_USE_MODDIR=
 CMK_F90_MODINC=""
 

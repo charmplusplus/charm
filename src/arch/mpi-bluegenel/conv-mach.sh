@@ -64,7 +64,5 @@ CMK_CF77="$XLC_F/${XLC_POST}xlf "
 CMK_CF90="$XLC_F/${XLC_POST}xlf90  -qsuffix=f=f90" 
 CMK_CF90_FIXED="$XLC_F/${XLC_POST}xlf90 " 
 CMK_F90LIBS="-L$XLC_F/blrts_lib -lxlf90 -lxlopt -lxl -lxlfmath"
-CMK_MOD_NAME_ALLCAPS=
-CMK_MOD_EXT="mod"
 CMK_F90_USE_MODDIR=1
 CMK_F90_MODINC="-I"
