@@ -17,4 +17,3 @@ CMK_LIBS='-lckqt -lvmi20 -lcurl -ldl -lexpat -lssl -lcrypto'
 CMK_QT='generic64'
 CMK_XIOPTS=''
 CMK_F90LIBS='-lvast90 -lg2c'
-CMK_MOD_EXT="vo"
