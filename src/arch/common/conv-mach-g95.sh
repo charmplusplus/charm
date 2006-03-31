@@ -31,8 +31,5 @@ F90DIR="`dirname $F90DIR`"
 F90LIBDIR=`cd $F90DIR/../lib/gcc-lib/*/*; pwd`
 CMK_F90LIBS="-L$F90LIBDIR -lf95 -lgcc_eh"
 
-CMK_MOD_NAME_ALLCAPS=
-CMK_MOD_EXT="mod"
 CMK_F90_USE_MODDIR=1
 CMK_F90_MODINC="-I"
-
