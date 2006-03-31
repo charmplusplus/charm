@@ -2191,6 +2191,7 @@ else
   echo "$as_me:$LINENO: result: \"yes\"" >&5
 echo "${ECHO_T}\"yes\"" >&6
   mv -f conftest2.o conftest.o
+  USE_FORTRAN90=1
 fi
 
 ### check fortran name mangling
@@ -2260,6 +2261,46 @@ else
 echo "${ECHO_T}\"Fortran compiler not working\"" >&6
 fi
 
+### check module name ###
+
+if test "$USE_FORTRAN90" = 1
+then
+  cat > conftest.f90 <<EOF
+      MODULE testmod
+        interface
+          function fpup_issizing(p)
+          INTEGER :: p
+          logical fpup_issizing
+          end function
+        end interface
+      END MODULE
+EOF
+  echo "$as_me:$LINENO: checking Fortran 90 mod name is capital" >&5
+echo $ECHO_N "checking Fortran 90 mod name is capital... $ECHO_C" >&6
+  $CMK_CF90 -c conftest.f90 > /dev/null 2> /dev/null
+  name=`ls TESTMOD.* 2>/dev/null`
+  if test -n "$name"
+  then
+        echo "$as_me:$LINENO: result: \"yes\"" >&5
+echo "${ECHO_T}\"yes\"" >&6
+	add_flag 'CMK_MOD_NAME_ALLCAPS=1' "mod name capital"
+  else
+        echo "$as_me:$LINENO: result: \"no\"" >&5
+echo "${ECHO_T}\"no\"" >&6
+	name=`ls testmod.* 2>/dev/null`
+  fi
+  if test -n "$name"
+  then
+  	echo "$as_me:$LINENO: checking Fortran 90 mod name extension" >&5
+echo $ECHO_N "checking Fortran 90 mod name extension... $ECHO_C" >&6
+    	ext=`echo $name | sed -e 's/^[^.]*\.//'`
+	add_flag 'CMK_MOD_EXT="'$ext'"' "mod name extension"
+        echo "$as_me:$LINENO: result: \"$ext\"" >&5
+echo "${ECHO_T}\"$ext\"" >&6
+        /bin/rm -f $name
+  fi
+  /bin/rm -f conftest.f90
+fi
 
 ### go get libpthread.a from charm website ###
 if test "$base_version" = "net-linux" || test "$base_version" = "mpi-linux"
