@@ -921,6 +921,23 @@ void FEM_Mesh::e2n_removeAll(int e, int etype)
 
 
 //  ------- Node-to-node
+int FEM_Mesh::n2n_getLength(int n) {
+  if (n == -1) {
+    return 0;
+  }
+  FEM_VarIndexAttribute *eAdj;
+  if(FEM_Is_ghost_index(n)){
+    eAdj = (FEM_VarIndexAttribute *)node.getGhost()->lookup(FEM_NODE_NODE_ADJACENCY,"n2n_getLength");
+    n = FEM_To_ghost_index(n);
+  }
+  else {
+    eAdj = (FEM_VarIndexAttribute *)node.lookup(FEM_NODE_NODE_ADJACENCY,"n2n_getLength");
+  }
+  CkVec<CkVec<FEM_VarIndexAttribute::ID> > &eVec = eAdj->get();
+  CkVec<FEM_VarIndexAttribute::ID> &nsVec = eVec[n];
+  return nsVec.length();
+}
+
 /// Place all of node n's adjacent nodes in adjnodes and the resulting 
 /// length of adjnodes in sz; assumes adjnodes is not allocated, but sz is
 void FEM_Mesh::n2n_getAll(int n, int **adjnodes, int *sz) 
@@ -1111,6 +1128,23 @@ void FEM_Mesh::n2n_removeAll(int n)
 }
 
 //  ------- Node-to-element
+int FEM_Mesh::n2e_getLength(int n) {
+  if (n == -1) {
+    return 0;
+  }
+  FEM_VarIndexAttribute *eAdj;
+  if(FEM_Is_ghost_index(n)){
+    eAdj = (FEM_VarIndexAttribute *)node.getGhost()->lookup(FEM_NODE_ELEM_ADJACENCY,"n2e_getLength");
+    n = FEM_To_ghost_index(n);
+  }
+  else {
+    eAdj = (FEM_VarIndexAttribute *)node.lookup(FEM_NODE_ELEM_ADJACENCY,"n2e_getLength");
+  }
+  CkVec<CkVec<FEM_VarIndexAttribute::ID> > &eVec = eAdj->get();
+  CkVec<FEM_VarIndexAttribute::ID> &nsVec = eVec[n];
+  return nsVec.length();
+}
+
 /// Place all of node n's adjacent elements in adjelements and the resulting 
 /// length of adjelements in sz; assumes adjelements is not allocated, 
 /// but sz is
@@ -1139,7 +1173,7 @@ void FEM_Mesh::n2e_getAll(int n, int **adjelements, int *sz)
 	FEM_VarIndexAttribute *eAdj = (FEM_VarIndexAttribute *)node.lookup(FEM_NODE_ELEM_ADJACENCY,"n2e_getAll");  
 	CkVec<CkVec<FEM_VarIndexAttribute::ID> > &eVec = eAdj->get();
 	CkVec<FEM_VarIndexAttribute::ID> &nsVec = eVec[n];
-  int len = nsVec.length();
+	int len = nsVec.length();
 	*sz = len;
 	if(*sz !=0) (*adjelements) = new int[*sz];
 	for (int i=0; i<(*sz); i++) {

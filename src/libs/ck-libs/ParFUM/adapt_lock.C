@@ -1308,58 +1308,71 @@ int FEM_AdaptL::edge_contraction_help(int *e1P, int *e2P, int n1, int n2, int e1
 
 
   //verify if it is causing a flip/sliver
-  double *n1_coord = new double[2];
-  double *n2_coord = new double[2];
-  double *new_coord = new double[2];
-  FEM_Mesh_dataP(theMesh, FEM_NODE, theMod->fmAdaptAlgs->coord_attr, (void *)n1_coord, nm.nodes[0], 1, FEM_DOUBLE, 2);
-  FEM_Mesh_dataP(theMesh, FEM_NODE, theMod->fmAdaptAlgs->coord_attr, (void *)n2_coord, nm.nodes[1], 1, FEM_DOUBLE, 2);
-  new_coord[0] = nm.frac*n1_coord[0] + (1-nm.frac)*n2_coord[0];
-  new_coord[1] = nm.frac*n1_coord[1] + (1-nm.frac)*n2_coord[1];
   int flipSliver = false;
   int *nbr1Elems, nesize1;
-  int *conn1 = new int[3];
-  theMesh->n2e_getAll(keepnode, &nbr1Elems, &nesize1);
-  for (int i=0; i<nesize; i++) {
-    if ((nbrElems[i] != e1) && (nbrElems[i] != e2)) {
-      theMesh->e2n_getAll(nbrElems[i], conn);
-      for(int j=0; j<2; j++) {
-	if (conn[j] == deletenode) {
-	  conn[j] = conn[2];
-	  conn[2] = deletenode;
-	}
-      }
-
-      if(theMod->fmAdaptAlgs->didItFlip(conn[0],conn[1],conn[2],new_coord)) {
-	flipSliver = true;
-	//CkPrintf("[%d]Warning: Elem %d(%d,%d,%d) would become a sliver if %d->%d is contracted\n",theMod->idx,nbrElems[i],conn[0],conn[1],conn[2],n1,n2);
-	break;
-      }
-    }
+  //if n3 or n4 has n2nsize & n2esize=3, then it will cause a flip
+  int n3n2n = theMesh->n2n_getLength(n3);
+  int n3n2e = theMesh->n2e_getLength(n3);
+  int n4n2n = theMesh->n2n_getLength(n4);
+  int n4n2e = theMesh->n2e_getLength(n4);
+  if((n3n2n==3 && n3n2e==3)||(n4n2n==3 && n4n2e==3)) {
+    flipSliver = true;
   }
   if(!flipSliver) {
-    for (int i=0; i<nesize1; i++) {
-      if ((nbr1Elems[i] != e1) && (nbr1Elems[i] != e2)) {
-	theMesh->e2n_getAll(nbr1Elems[i], conn1);
+    double *n1_coord = new double[2];
+    double *n2_coord = new double[2];
+    double *new_coord = new double[2];
+    FEM_Mesh_dataP(theMesh, FEM_NODE, theMod->fmAdaptAlgs->coord_attr, (void *)n1_coord, nm.nodes[0], 1, FEM_DOUBLE, 2);
+    FEM_Mesh_dataP(theMesh, FEM_NODE, theMod->fmAdaptAlgs->coord_attr, (void *)n2_coord, nm.nodes[1], 1, FEM_DOUBLE, 2);
+    new_coord[0] = nm.frac*n1_coord[0] + (1-nm.frac)*n2_coord[0];
+    new_coord[1] = nm.frac*n1_coord[1] + (1-nm.frac)*n2_coord[1];
+    int *conn1 = new int[3];
+    theMesh->n2e_getAll(keepnode, &nbr1Elems, &nesize1);
+    for (int i=0; i<nesize; i++) {
+      if ((nbrElems[i] != e1) && (nbrElems[i] != e2)) {
+	theMesh->e2n_getAll(nbrElems[i], conn);
 	for(int j=0; j<2; j++) {
-	  if (conn1[j] == keepnode) {
-	    conn1[j] = conn1[2];
-	    conn1[2] = keepnode;
+	  if (conn[j] == deletenode) {
+	    conn[j] = conn[2];
+	    conn[2] = deletenode;
 	  }
 	}
-	if(theMod->fmAdaptAlgs->didItFlip(conn1[0],conn1[1],conn1[2],new_coord)) {
+	
+	if(theMod->fmAdaptAlgs->didItFlip(conn[0],conn[1],conn[2],new_coord)) {
 	  flipSliver = true;
-	  //CkPrintf("[%d]Warning: Elem %d(%d,%d,%d) would become a sliver if %d->%d is contracted\n",theMod->idx,nbr1Elems[i],conn1[0],conn1[1],conn1[2],n1,n2);
+	  //CkPrintf("[%d]Warning: Elem %d(%d,%d,%d) would become a sliver if %d->%d is contracted\n",theMod->idx,nbrElems[i],conn[0],conn[1],conn[2],n1,n2);
 	  break;
 	}
       }
     }
+    if(!flipSliver) {
+      for (int i=0; i<nesize1; i++) {
+	if ((nbr1Elems[i] != e1) && (nbr1Elems[i] != e2)) {
+	  theMesh->e2n_getAll(nbr1Elems[i], conn1);
+	  for(int j=0; j<2; j++) {
+	    if (conn1[j] == keepnode) {
+	      conn1[j] = conn1[2];
+	      conn1[2] = keepnode;
+	    }
+	  }
+	  if(theMod->fmAdaptAlgs->didItFlip(conn1[0],conn1[1],conn1[2],new_coord)) {
+	    flipSliver = true;
+	    //CkPrintf("[%d]Warning: Elem %d(%d,%d,%d) would become a sliver if %d->%d is contracted\n",theMod->idx,nbr1Elems[i],conn1[0],conn1[1],conn1[2],n1,n2);
+	    break;
+	  }
+	}
+      }
+    }
+    delete [] conn1;
+    delete [] n1_coord;
+    delete [] n2_coord;
+    delete [] new_coord;
   }
   if(nesize1 != 0) delete [] nbr1Elems;
-  delete [] conn1;
-  delete [] n1_coord;
-  delete [] n2_coord;
-  delete [] new_coord;
   if(flipSliver) {
+#ifdef DEBUG_2
+    CkPrintf("[%d]Found a flip about to occur for %d-%d collapse, so aborting this\n",theMod->idx,n1,n2);
+#endif
     int size = lockedNodes.size();
     int *gotlocks = (int*)malloc(size*sizeof(int));
     int *lockw = (int*)malloc(size*sizeof(int));

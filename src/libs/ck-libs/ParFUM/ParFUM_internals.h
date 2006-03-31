@@ -1300,6 +1300,7 @@ class FEM_Mesh : public CkNoncopyable {
 
 
   //  ------- Node-to-node
+  int n2n_getLength(int n);
   /// Place all of node n's adjacent nodes in adjnodes and the resulting 
   /// length of adjnodes in sz; assumes adjnodes is not allocated, but sz is
   void n2n_getAll(int n, int **adjnodes, int *sz);
@@ -1315,6 +1316,7 @@ class FEM_Mesh : public CkNoncopyable {
   int n2n_exists(int n, int queryNode);
 
   //  ------- Node-to-element
+  int n2e_getLength(int n);
   /// Place all of node n's adjacent elements in adjelements and the resulting 
   /// length of adjelements in sz; assumes adjelements is not allocated, 
   /// but sz is
