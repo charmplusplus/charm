@@ -1308,8 +1308,8 @@ int FEM_AdaptL::edge_contraction_help(int *e1P, int *e2P, int n1, int n2, int e1
 
 
   //verify if it is causing a flip/sliver
-  int flipSliver = false;
-  int *nbr1Elems, nesize1;
+  bool flipSliver = false;
+  int *nbr1Elems=NULL, nesize1=0;
   //if n3 or n4 has n2nsize & n2esize=3, then it will cause a flip
   int n3n2n = theMesh->n2n_getLength(n3);
   int n3n2e = theMesh->n2e_getLength(n3);
