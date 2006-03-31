@@ -9,6 +9,7 @@
 
 #define  DEBUGP(x)   // CmiPrintf x;
 
+// a fake QD which just wait for several seconds to triger QD callback
 #define CMK_DUMMY_QD             0	/* seconds to wait for */
 
 #if CMK_BLUEGENE_CHARM
@@ -20,6 +21,9 @@
 
 CpvDeclare(QdState*, _qd);
 
+// called when a node asks children for their counters
+// send broadcast msg (phase 0) to children, and report to itself (phase 1)
+// stage 1 means the node is waiting for reports from children
 static inline void _bcastQD1(QdState* state, QdMsg *msg)
 {
   msg->setPhase(0);
@@ -49,6 +53,8 @@ static inline void _bcastQD1(QdState* state, QdMsg *msg)
   state->setStage(1);
 }
 
+// final phase to check if the counters become dirty or not
+// stage 2 means the node is waiting for children to report their dirty state
 static inline void _bcastQD2(QdState* state, QdMsg *msg)
 {
   msg->setPhase(1);
@@ -67,14 +73,15 @@ static inline void _handlePhase0(QdState *state, QdMsg *msg)
   if(CmiMyPe()==0) {
     QdCallback *qdcb = new QdCallback(msg->getCb());
     _MEMCHECK(qdcb);
-    state->enq(qdcb);
+    state->enq(qdcb);		// stores qd callback
   }
   if(state->getStage()==0)
-    _bcastQD1(state, msg);
+    _bcastQD1(state, msg);        // start asking children for the counters
   else
-    CkFreeMsg(msg);
+    CkFreeMsg(msg);               // already in the middle of processing
 }
 
+// collecting counters from children
 static inline void _handlePhase1(QdState *state, QdMsg *msg)
 {
   switch(state->getStage()) {
@@ -84,6 +91,7 @@ static inline void _handlePhase1(QdState *state, QdMsg *msg)
       break;
     case 1 :
       DEBUGP(("[%d] msg: getCreated:%d getProcessed:%d\n", CmiMyPe(), msg->getCreated(), msg->getProcessed()));
+        // add children's counters
       state->subtreeCreate(msg->getCreated());
       state->subtreeProcess(msg->getProcessed());
       state->reported();
@@ -91,11 +99,12 @@ static inline void _handlePhase1(QdState *state, QdMsg *msg)
         if(CmiMyPe()==0) {
           DEBUGP(("ALL: %p getCCreated:%d getCProcessed:%d\n", state, state->getCCreated(), state->getCProcessed()));
           if(state->getCCreated()==state->getCProcessed()) {
-            _bcastQD2(state, msg);
+            _bcastQD2(state, msg);    // almost reached, one pass to make sure
           } else {
-            _bcastQD1(state, msg);
+            _bcastQD1(state, msg);    // not reached, go over again
           }
         } else {
+            // report counters to parent
           msg->setCreated(state->getCCreated());
           msg->setProcessed(state->getCProcessed());
           envelope *env = UsrToEnv((void*)msg);
@@ -111,6 +120,7 @@ static inline void _handlePhase1(QdState *state, QdMsg *msg)
   }
 }
 
+// check if counters became dirty and notify parents
 static inline void _handlePhase2(QdState *state, QdMsg *msg)
 {
 //  This assertion seems too strong for smp and uth version.
@@ -120,8 +130,9 @@ static inline void _handlePhase2(QdState *state, QdMsg *msg)
   if(state->allReported()) {
     if(CmiMyPe()==0) {
       if(state->isDirty()) {
-        _bcastQD1(state, msg);
-      } else {
+        _bcastQD1(state, msg);   // dirty, restart again
+      } else {             
+          // quiescence detected, send callbacks
         QdCallback* cb;
         while(NULL!=(cb=state->deq())) {
           cb->send();
@@ -132,6 +143,7 @@ static inline void _handlePhase2(QdState *state, QdMsg *msg)
         CkFreeMsg(msg);
       }
     } else {
+        // tell parent if the counters on the node is dirty or not
       msg->setDirty(state->isDirty());
       envelope *env = UsrToEnv((void*)msg);
       CmiSyncSendAndFree(state->getParent(), env->getTotalsize(), (char *)env);
