@@ -27,16 +27,14 @@ array [1D] A \{
 \};
 \end{alltt}
 
-Just as every Chare inherits from the system class \kw{Chare}, every 
-array element inherits from the system class \kw{ArrayElement} (or one
-of its subclasses, \kw{ArrayElement1D}, \kw{ArrayElement2D}, 
-\kw{ArrayElement3D}, \kw{ArrayElement4D}, \kw{ArrayElement5D}, or
-\kw{ArrayElement6D}). Just as a Chare inherits ``thishandle'', each
+Just as every Chare inherits from the system class \kw{CBase}\_\uw{ClassName}, every 
+array element inherits from the system class \kw{CBase}\_\uw{ClassName}.
+Just as a Chare inherits ``thishandle'', each
 array element inherits ``thisArrayID'', the \kw{CkArrayID} of its array,
 and ``thisIndex'', the element's array index.
 
 \begin{alltt}
-class A : public ArrayElement1D \{
+class A : public CBase\_A \{
   public:
     A(\uw{parameters1});
     A(CkMigrateMessage *);
@@ -189,13 +187,13 @@ which must be defined before including the \texttt{.decl.h} file
 
 \begin{alltt}
 //In the .h file:
-class A1:public ArrayElement1D \{ public: A1()\{\} ...\};
-class A2:public ArrayElement2D \{ public: A2()\{\} ...\};
-class A3:public ArrayElement3D \{ public: A3()\{\} ...\};
-class A4:public ArrayElement4D \{ public: A4()\{\} ...\};
-class A5:public ArrayElement5D \{ public: A5()\{\} ...\};
-class A6:public ArrayElement6D \{ public: A6()\{\} ...\};
-class AF:public ArrayElementT<Foo> \{ public: AF()\{\} ...\};
+class A1 : public CBase\_A1 \{ public: A1()\{\} ...\};
+class A2 : public CBase\_A2 \{ public: A2()\{\} ...\};
+class A3 : public CBase\_A3 \{ public: A3()\{\} ...\};
+class A4 : public CBase\_A4 \{ public: A4()\{\} ...\};
+class A5 : public CBase\_A5 \{ public: A5()\{\} ...\};
+class A6 : public ABase\_A6 \{ public: A6()\{\} ...\};
+class AF : public CBase\_AF \{ public: AF()\{\} ...\};
 \end{alltt}
 
 A 1D array element can access its index via its inherited ``thisIndex''
@@ -559,7 +557,7 @@ You can then declare an array indexed by \uw{Foo} objects with
 array [Foo] AF \{ entry AF(); ... \}
 
 //in the .h file:
-class AF:public ArrayElementT<Foo>
+class AF : public CBase\_AF
 \{ public: AF() \{\} ... \}
 
 //in the .C file:
@@ -577,8 +575,8 @@ with the explicit keyword, we can equivalently write the last line as:
 \end{alltt}
 
 When you implement your array element class, as shown above you 
-can inherit from
-\kw{ArrayElementT}, a class templated by the index type \uw{Foo}.
+can inherit from \kw{CBase}\_\uw{ClassName}, 
+a class templated by the index type \uw{Foo}.
 The array index (an object of type \uw{Foo}) is then accessible as 
 ``thisIndex''. For example:
 
@@ -603,7 +601,7 @@ a pack/unpack or ``pup'' method:
 
 \begin{alltt}
 //In the .h file:
-class A2:public ArrayElement2D \{
+class A2 : public CBase\_A2 \{
 private: //My data members:
     int nt;
     unsigned char chr;
@@ -619,7 +617,7 @@ public:
 //In the .C file:
 void A2::pup(PUP::er \&p)
 \{
-    ArrayElement2D::pup(p); //<- MUST call superclass's pup routine
+    CBase\_A2::pup(p); //<- MUST call superclass's pup routine
     p|nt;
     p|chr;
     p(flt,7);
@@ -632,7 +630,7 @@ void A2::pup(PUP::er \&p)
 Please note that if your object contains Structured Dagger code (see section ``Structured Dagger'') you must use the following syntax to correctly pup the object:
 
 \begin{alltt}
-class bar: public ArrayElement3D \{
+class bar: public CBase\_bar \{
  private:
     int a,b;
  public:

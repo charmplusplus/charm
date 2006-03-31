@@ -16,7 +16,7 @@ A corresponding \index{chare}chare definition in the \texttt{.h} file would
 have the form:
 
 \begin{alltt}
-   class ChareType : public Chare [: superclass names] \{   
+   class ChareType : public CBase\_ChareType \{
         // Data and member functions as in C++ 
         // One or more entry methods definitions of the form: 
    public: 
@@ -84,7 +84,7 @@ and in the \texttt{mod.h} file:
 
 \begin{alltt}
 #include "mod.decl.h"
-class C : public Chare \{
+class C : public CBase\_C \{
   public:
     C(\uw{parameters});
     void someEntry(\uw{parameters});

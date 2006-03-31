@@ -5,9 +5,8 @@ A \kw{group}\footnote{Originally called {\em Branch Office Chare} or
 {\em Branched Chare}} \index{group}is a collection of chares where 
 there exists \index{chare}one chare (or {\sl branch}) on each
 processor.   Each branch has its own data members.  Groups have
-a definition syntax similar to normal chares, except that they must
-inherit from the system defined class \kw{Group}, rather than
-\kw{Chare}.
+a definition syntax similar to normal chares,
+and they have to inherit from the system defined class \kw{CBase}\_\uw{ClassName}.
 
 In the interface file, we declare
 
@@ -20,7 +19,7 @@ In the interface file, we declare
 In the \texttt{.h} file, we define \uw{GroupType} as follows:
 
 \begin{alltt}
- class GroupType : public Group [,other superclasses ] \{
+ class GroupType : public CBase\_GroupType \{
   // Data and member functions as in C++
   // Entry functions as for normal chares
  \};
@@ -53,7 +52,7 @@ group G \{
 and the following \texttt{.h} file:
 
 \begin{alltt}
-class G : public Group \{
+class G : public CBase\_G \{
   public:
     G(\uw{parameters1});
     void someEntry(\uw{parameters2});
