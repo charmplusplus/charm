@@ -13,6 +13,4 @@ CMK_NATIVE_CXX="$CMK_CXX"
 CMK_NATIVE_LD="$CMK_LD"
 CMK_NATIVE_LDXX="$CMK_LDXX"
 CMK_F90LIBS='-L/usr/local/intel/compiler70/ia32/lib -L/opt/intel/compiler70/ia32/lib -lintrins -lIEPCF90 -lF90 -lintrins -limf  '
-CMK_MOD_NAME_ALLCAPS=1
-CMK_MOD_EXT="mod"
 CMK_F90_USE_MODDIR=""

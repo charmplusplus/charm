@@ -24,4 +24,4 @@ CMK_F77LIBS="$CMK_F90LIBS"
 # for_main.o is important for main() in f90 code
 CMK_F90MAINLIBS="$F90MAIN "
 
-CMK_MOD_NAME_ALLCAPS=1
+CMK_F90_USE_MODDIR=""
