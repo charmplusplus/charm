@@ -2428,9 +2428,7 @@ void Entry::genArrayDefs(XStr& str)
     str << "  CkArrayMessage *impl_amsg=(CkArrayMessage *)impl_msg;\n";
     str << "  impl_amsg->array_setIfNotThere("<<ifNot<<");\n";
     if(isIget()) {
-	    str << "  int status;"<<"\n";	
-	    str << "  CkFutureID f=CkCreateAttachedFutureStatus(impl_amsg,"<<epIdx()<<",this,&CProxyElement_ArrayBase::ckSendWrapper, &status);"<<"\n";
-	    str << "  if(status)"<<"\n";
+	    str << "  CkFutureID f=CkCreateAttachedFutureSend(impl_amsg,"<<epIdx()<<",this,&CProxyElement_ArrayBase::ckSendWrapper);"<<"\n";
     }
     
     if(isSync()) {
@@ -2442,11 +2440,13 @@ void Entry::genArrayDefs(XStr& str)
       opts << ",0";
       if (isSkipscheduler())  opts << "+CK_MSG_EXPEDITED";
       if (isInline())  opts << "+CK_MSG_INLINE";
+      if(!isIget()) {
       if (container->isForElement() || container->isForSection()) {
         str << "  ckSend(impl_amsg, "<<epIdx()<<opts<<");\n";
       }
       else
         str << "  ckBroadcast(impl_amsg, "<<epIdx()<<opts<<");\n";
+      }
     }
     if(isIget()) {
 	    str << "  return f;\n";
