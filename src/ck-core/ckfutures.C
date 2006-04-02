@@ -290,52 +290,6 @@ void *CkRemoteCall(int ep, void *m, const CkChareID *ID)
   return CkWaitReleaseFuture(i);
 }
 
-#ifndef _IGET_TOKENQUEUE_
-#define _IGET_TOKENQUEUE_ 0
-#endif
-
-#if _IGET_TOKENQUEUE_
-#ifndef _IGET_TOKEN_ 
-#define _IGET_TOKEN_ 100 
-#endif
-#endif
-
-#if _IGET_TOKENQUEUE_
-static int iget_token = _IGET_TOKEN_;
-typedef struct iget_token_struct {
-  CkFutureID futNum;
-  void *m;
-  int ep;
-  void *obj;     
-  void(*fptr)(void*,void*,int,int);
-  struct iget_token_struct *next;
-} *iget_tokenqueue_entry;
-
-static iget_tokenqueue_entry iget_tokenqueue_head=NULL;
-static iget_tokenqueue_entry iget_tokenqueue_end=NULL;
-
-inline void iget_tokenqueue_enqueue(int futNum,void* m,int ep,void *obj,void(*fptr)(void*,void*,int,int)){
-  iget_tokenqueue_entry e=new struct iget_token_struct(); 
-  e->futNum=futNum; e->m=m; e->ep=ep; e->obj=obj; e->fptr=fptr; e->next=NULL;
-  if(iget_tokenqueue_end==NULL){
-    iget_tokenqueue_end=iget_tokenqueue_head=e;
-  } 
-  else{
-    iget_tokenqueue_end->next=e;
-    iget_tokenqueue_end=e;	   
-  }
-} 
-
-inline iget_tokenqueue_entry iget_tokenqueue_dequeue() {
-  if(iget_tokenqueue_head==NULL) 
-    return NULL;
-  iget_tokenqueue_entry e = iget_tokenqueue_head;
-  iget_tokenqueue_head = iget_tokenqueue_head->next;
-  if(iget_tokenqueue_head==NULL) 
-    iget_tokenqueue_end=NULL;
-  return e;
-}
-#endif
 
 extern "C" CkFutureID CkCreateAttachedFuture(void *msg)
 {
@@ -344,36 +298,30 @@ extern "C" CkFutureID CkCreateAttachedFuture(void *msg)
   return ret;
 }
 
-extern "C" CkFutureID CkCreateAttachedFutureStatus(void *msg, int ep, void *obj,void(*fptr)(void*,void*,int,int), int* status)
+#include "ckIgetControl.C"
+
+extern "C" CkFutureID CkCreateAttachedFutureSend(void *msg, int ep, void *obj,void(*fptr)(void*,void*,int,int))
 {
-	CkFutureID ret=createFuture();
-	UsrToEnv(msg)->setRef(ret);
-	*status = 1; 
-#if _IGET_TOKENQUEUE_
-	if(iget_token>0){
-		iget_token--;
-	} else {
-		iget_tokenqueue_enqueue(ret,msg,ep,obj,fptr);
-		*status = 0; // No send will be done this case
-	}
+  CkFutureID ret=createFuture();
+  UsrToEnv(msg)->setRef(ret);
+#if IGET_FLOWCONTROL
+  if (TheIGetControlClass.iget_request(ret,msg,ep,obj,fptr)) 
 #endif
-	return ret;
+  (fptr)(obj,msg,ep,0);
+  return ret;
 }
 
 extern "C" void *CkWaitReleaseFuture(CkFutureID futNum)
 {
-	void *result=CkWaitFuture(futNum);
-	CkReleaseFuture(futNum);
-#if _IGET_TOKENQUEUE_
-	iget_tokenqueue_entry e=iget_tokenqueue_dequeue();
-	if(e==NULL) 
-	  iget_token++;
-	else{
-	  (*e->fptr)(e->obj,e->m, e->ep, 0);
-	  delete e;
-	}
+#if IGET_FLOWCONTROL
+  TheIGetControlClass.iget_resend(futNum);
 #endif
-	return result;
+  void *result=CkWaitFuture(futNum);
+  CkReleaseFuture(futNum);
+#if IGET_FLOWCONTROL
+  TheIGetControlClass.iget_free(1);
+#endif
+  return result;
 }
 
 class FutureBOC: public IrrGroup {
