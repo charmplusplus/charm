@@ -54,25 +54,26 @@ int FEM_lockN::runlock() {
   else {
     return -1;
   }
-  return -1; //should not reach here
+  return -1; //will not reach here
 }
 
 int FEM_lockN::wlock(int own) {
   if(nowriteLocks==0 && noreadLocks==0) {
     nowriteLocks++;
     owner = own;
+    if(pending==own) pending=-1; //got the lock, reset pending
 #ifdef DEBUG_LOCKS
     CkPrintf("[%d] Got write lock on node %d{%d} .\n",owner, idx, theMod->idx);
 #endif
     return 1;
   } else {
-    /*if(pending==-1 || own<=pending) {
-      pending = own;
-      return -2; //keep trying
-      }*/
-    return -1; //give up trying for a while
+    if((pending!=-1 && own<pending) || (pending==-1 && own<owner)) {
+      pending = own; //set pending as it has higher priority
+      return -1; //keep trying
+    }
+    return -2; //give up trying for a while
   }
-  return -1;
+  return -2;
 }
 
 bool FEM_lockN::verifyLock(void) {

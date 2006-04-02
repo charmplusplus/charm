@@ -2025,7 +2025,7 @@ void femMeshModify::setFemMesh(FEMMeshMsg *fm) {
     for(int i=0; i<gsize; i++) {
     fmgLockN.push_back(new FEM_lockN(FEM_To_ghost_index(i),this));
     }*/
-  for(int i=0; i<numChunks*5; i++) {
+  for(int i=0; i<numChunks; i++) {
     fmIdxlLock.push_back(false);
   }
   //compute all the fixed nodes

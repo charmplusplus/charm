@@ -311,7 +311,7 @@ class femMeshModify : public CBase_femMeshModify {
   FEM_lock *fmLock;
   CkVec<FEM_lockN *> fmLockN;
   //CkVec<FEM_lockN *> *fmgLockN;
-  CkVec<bool> fmIdxlLock; //each chunk can have numChunks*5 idxl lists. 
+  CkVec<bool> fmIdxlLock; //each chunk can have numChunks*5 idxl lists, but numChunks locks. 
   CkVec<int> fmfixedNodes; //this list is populated initially, and never changes (defines shape)
   FEM_MUtil *fmUtil;
   FEM_Interpolate *fmInp;

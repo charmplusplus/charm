@@ -1423,7 +1423,7 @@ int FEM_MUtil::residualLockTest(FEM_Mesh *m) {
       CkAssert(!mmod->fmLockN[i]->haslocks());
     }
   }
-  for(int i=0; i<mmod->numChunks*5; i++) {
+  for(int i=0; i<mmod->numChunks; i++) {
     CkAssert(mmod->fmIdxlLock[i]==false);
   }
   return 1;
@@ -1534,27 +1534,27 @@ void FEM_MUtil::idxlunlock(FEM_Mesh *m, int chk, int type) {
 //the chunk locking always maintains an order, smaller chunk ID always wants 
 //to lock a larger one, thus trying to avoid deadlocks, by sequencing resources
 void FEM_MUtil::idxllockLocal(FEM_Mesh *m, int toChk, int type) {
-  CkAssert(toChk>=0 && toChk<mmod->numChunks && toChk!=idx && type>=0 && type<5);
-  while(mmod->fmIdxlLock[toChk*5 + type] == true) {
+  CkAssert(toChk>=0 && toChk<mmod->numChunks && toChk!=idx && type==0);
+  while(mmod->fmIdxlLock[toChk + type] == true) {
     //block by looping,
     CthYield();
   }
   //CkPrintf("%d locking idxl list %d: type %d\n",idx,toChk,type);
-  mmod->fmIdxlLock[toChk*5 + type] = true;
+  mmod->fmIdxlLock[toChk + type] = true;
 #ifdef DEBUG_IDXLLock
-  CkPrintf("[%d]locked idxl lock %d\n",idx,toChk*5+type);
+  CkPrintf("[%d]locked idxl lock %d\n",idx,toChk+type);
 #endif
   return;
 }
 
 //the unlock operation just releases the lock after verifying the lock was taken
 void FEM_MUtil::idxlunlockLocal(FEM_Mesh *m, int toChk, int type) {
-  CkAssert(toChk>=0 && toChk<mmod->numChunks && toChk!=idx && type>=0 && type<5);
-  CkAssert(mmod->fmIdxlLock[toChk*5 + type] == true);
+  CkAssert(toChk>=0 && toChk<mmod->numChunks && toChk!=idx && type==0);
+  CkAssert(mmod->fmIdxlLock[toChk + type] == true);
   //CkPrintf("%d unlocking idxl list %d: type %d\n",idx,toChk,type);
-  mmod->fmIdxlLock[toChk*5 + type] = false;
+  mmod->fmIdxlLock[toChk + type] = false;
 #ifdef DEBUG_IDXLLock
-  CkPrintf("[%d]unlocked idxl lock %d\n",idx,toChk*5+type);
+  CkPrintf("[%d]unlocked idxl lock %d\n",idx,toChk+type);
 #endif
   return;
 }

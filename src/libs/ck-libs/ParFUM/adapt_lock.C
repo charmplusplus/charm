@@ -25,16 +25,22 @@ int FEM_AdaptL::lockNodes(int *gotlocks, int *lockrnodes, int numRNodes, int *lo
       }
       if(FEM_Is_ghost_index(lockrnodes[i])) {
 	if(!theMesh->node.ghost->is_valid(FEM_To_ghost_index(lockrnodes[i]))) {
-	  ret = -2;
+	  ret = -3;
 	  break;
 	}
       } else {
 	if(!theMesh->node.is_valid(lockrnodes[i])) {
-	  ret = -2;
+	  ret = -3;
 	  break;
 	}
       }
-      if(gotlocks[i]<=0) gotlocks[i] = FEM_Modify_LockN(theMesh, lockrnodes[i], 1);
+      if(gotlocks[i]<=0) {
+	gotlocks[i] = FEM_Modify_LockN(theMesh, lockrnodes[i], 1);
+	if(gotlocks[i]==-2) { 
+	  gotlocks[i] = -1; 
+	  return -2;
+	}
+      }
     }
     for(int i=0; i<numWNodes; i++) {
       if(lockwnodes[i]==-1) {
@@ -46,7 +52,7 @@ int FEM_AdaptL::lockNodes(int *gotlocks, int *lockrnodes, int numRNodes, int *lo
 #ifdef DEBUG_LOCKS
 	  CkPrintf("[%d] Trying to lock invalid ghost %d\n",theMod->idx,lockwnodes[i]);
 #endif
-	  ret = -2;
+	  ret = -3;
 	  break;
 	}
       } else {
@@ -54,15 +60,19 @@ int FEM_AdaptL::lockNodes(int *gotlocks, int *lockrnodes, int numRNodes, int *lo
 #ifdef DEBUG_LOCKS
 	  CkPrintf("[%d] Trying to lock invalid node %d\n",theMod->idx,lockwnodes[i]);
 #endif
-	  ret = -2;
+	  ret = -3;
 	  break;
 	}
       }
       if(gotlocks[numRNodes+i]<=0) {
 	gotlocks[numRNodes+i] = FEM_Modify_LockN(theMesh, lockwnodes[i], 0);
+	if(gotlocks[numRNodes+i]==-2) { 
+	  gotlocks[numRNodes+i] = -1; 
+	  return -2;
+	}
       }
     }
-    if(ret==-2) return ret;
+    if(ret==-3) return ret;
     bool tmplocks = true;
     for(int i=0; i<numNodes; i++) {
       tmplocks = tmplocks && (gotlocks[i]>0);
@@ -73,7 +83,7 @@ int FEM_AdaptL::lockNodes(int *gotlocks, int *lockrnodes, int numRNodes, int *lo
     else {
       tryCounts++;
       if(tryCounts>=10) return -1;
-      CthYield(); //spin for a while
+      CthYield(); //let others try
     }
   }
   return 1;
@@ -166,6 +176,9 @@ int FEM_AdaptL::edge_flip(int n1, int n2) {
   locknodes[1] = n2;
   locknodes[2] = n3;
   locknodes[3] = n4;
+  for(int i=0; i<numNodes; i++) {
+    gotlocks[i] = -1;
+  }
   while(!done) {
     int gotlock = lockNodes(gotlocks, locknodes, 0, locknodes, numNodes);
     isEdge = findAdjData(n1, n2, &e1, &e2, &e1_n1, &e1_n2, &e1_n3, &e2_n1, &e2_n2, &e2_n3,&n3, &n4);
@@ -184,12 +197,14 @@ int FEM_AdaptL::edge_flip(int n1, int n2) {
       locknodes[2] = n3;
       locknodes[3] = n4;
       numtries++;
-      if(numtries>=1000) {
+      if(numtries>=13+(7*theMod->idx)%43) {
 	if(!warned) {
 	  //CkPrintf("[%d]Warning: Possibly a livelock in edge_flip %d & %d, supporting %d, %d\n",theMod->idx,n1,n2,n3,n4);
 	  warned = true;
 	}
-	numtries = 0;
+	CthYield();
+	//numtries = 0;
+	return -1;
       }
       CthYield();
     }
@@ -234,6 +249,9 @@ int FEM_AdaptL::edge_bisect(int n1, int n2) {
   locknodes[1] = n2;
   locknodes[2] = n3;
   locknodes[3] = n4;
+  for(int i=0; i<numNodes; i++) {
+    gotlocks[i] = -1;
+  }
   while(!done) {
     int gotlock = lockNodes(gotlocks, locknodes, 0, locknodes, numNodes);
     isEdge = findAdjData(n1, n2, &e1, &e2, &e1_n1, &e1_n2, &e1_n3, &e2_n1, &e2_n2, &e2_n3,&n3, &n4);
@@ -252,12 +270,14 @@ int FEM_AdaptL::edge_bisect(int n1, int n2) {
       locknodes[2] = n3;
       locknodes[3] = n4;
       numtries++;
-      if(numtries>=1000) {
+      if(numtries>=13+(7*theMod->idx)%43) {
 	if(!warned) {
 	  //CkPrintf("[%d]Warning: Possibly a livelock in edge_bisect %d & %d, supporting %d, %d\n",theMod->idx,n1,n2,n3,n4);
 	  warned = true;
 	}
 	numtries = 0;
+	//CthYield();
+	return -1;
       }
       CthYield();
     }
@@ -315,6 +335,9 @@ int FEM_AdaptL::vertex_remove(int n1, int n2) {
   locknodes[2] = n3;
   locknodes[3] = n4;
   locknodes[4] = n5;
+  for(int i=0; i<numNodes; i++) {
+    gotlocks[i] = -1;
+  }
   while(!done) {
     int gotlock = lockNodes(gotlocks, locknodes, 0, locknodes, numNodes);
     isEdge = findAdjData(n1, n2, &e1, &e2, &e1_n1, &e1_n2, &e1_n3, &e2_n1, &e2_n2, &e2_n3,&n3, &n4);
@@ -357,12 +380,13 @@ int FEM_AdaptL::vertex_remove(int n1, int n2) {
       locknodes[3] = n4;
       locknodes[4] = n5;
       numtries++;
-      if(numtries>=1000) {
+      if(numtries>=13+(7*theMod->idx)%43) {
 	if(!warned) {
 	  //CkPrintf("[%d]Warning: Possibly a livelock in vertex_remove %d & %d, supporting %d, %d and %d\n",theMod->idx,n1,n2,n3,n4,n5);
 	  warned = true;
 	}
 	numtries = 0;
+	CthYield();
       }
       CthYield();
     }
@@ -451,6 +475,9 @@ int FEM_AdaptL::edge_contraction(int n1, int n2) {
   }
   bool locked;
   int gotlock = 0;
+  for(int i=0; i<numNodes; i++) {
+    gotlocks[i] = -1;
+  }
   while(!done) {
     if(ret==ERVAL1) {
       acquirecount++;
