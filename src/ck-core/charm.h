@@ -271,7 +271,7 @@ extern void CkReleaseFuture(CkFutureID futNum);
 extern int CkProbeFuture(CkFutureID futNum);
 extern void  CkSendToFuture(CkFutureID futNum, void *msg, int pe);
 extern CkFutureID CkCreateAttachedFuture(void *msg);
-extern CkFutureID CkCreateAttachedFutureStatus(void *msg, int ep, void*,void(*fptr)(void*,void*,int,int), int *status);
+extern CkFutureID CkCreateAttachedFutureSend(void *msg, int ep, void*,void(*fptr)(void*,void*,int,int));
 extern void *CkWaitReleaseFuture(CkFutureID futNum);
 
 /******************************************************************************
