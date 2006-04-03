@@ -406,7 +406,7 @@ void FEM_Adapt_Algs::GradateMesh(double smoothness)
                 // get adjacent elemnents and their sizes
                 int e1, e2;
                 theMesh->get2ElementsOnEdge(node, adjNodes[adjNode], &e1, &e2);
-                if (e1 == -1 || e2 == -1) continue;
+                if (e1 <= -1 || e2 <= -1) continue; //this will not smooth across boundaries
                 
                 double s1, s2;
                 s1 = theMesh->elem[0].getMeshSizing(e1);
@@ -475,7 +475,6 @@ void FEM_Adapt_Algs::GradateMesh(double smoothness)
         printf("Target:%8.3f\n", beta);
         
     } while (maxShock > beta && ++iteration < GRADATION_ITER_LIMIT);
-    tests();
 
     printf("%d total updates in %d iterations in GradateMesh\n", 
             updates, iteration);

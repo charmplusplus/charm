@@ -229,7 +229,6 @@ void FEM_Interpolate::FEM_InterpolateElementCopy(ElementArgs args)
     meshMod[remotechk].interpolateElemCopy(theMod->idx, sharedIdx1, sharedIdx2);
   }
   else {
-    //acquire operation, do not worry abt this at the moment
     CkAssert(!FEM_Is_ghost_index(args.e) && FEM_Is_ghost_index(args.oldElement));
     const IDXL_Rec *irec1 = theMesh->elem[args.elType].ghost->ghostRecv.getRec(FEM_To_ghost_index(args.oldElement));
     int remotechk = irec1->getChk(0);
@@ -243,6 +242,9 @@ void FEM_Interpolate::FEM_InterpolateElementCopy(ElementArgs args)
       if(elattr->getAttr() < FEM_ATTRIB_FIRST){
 	elattr->pupSingle(pmem, args.e);
 	count++;
+      }
+      else if(elattr->getAttr()==FEM_MESH_SIZING) {
+	elattr->pupSingle(pmem,args.e);
       }
     }
     CkAssert(em->datasize==count);
