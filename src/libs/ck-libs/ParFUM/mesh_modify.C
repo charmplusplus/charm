@@ -1131,6 +1131,13 @@ int FEM_add_element_local(FEM_Mesh *m, const int *conn, int connSize, int elemTy
 #ifdef DEBUG_2
   CkPrintf("[%d]Adding element %d(%d,%d,%d)\n",m->getfmMM()->getfmUtil()->getIdx(),newEl,conn[0],conn[1],conn[2]);
 #endif
+#ifdef FEM_ELEMSORDERED
+  if(!FEM_Is_ghost_index(newEl)) {
+    int con[3];
+    m->e2n_getAll(newEl,con,0);
+    CkAssert(-m->getfmMM()->fmAdaptAlgs->getSignedArea(con[0],con[1],con[2])>SLIVERAREA);
+  }
+#endif
   delete[] adjes;
   return newEl;
 }

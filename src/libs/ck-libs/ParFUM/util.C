@@ -1354,8 +1354,12 @@ int FEM_MUtil::AreaTest(FEM_Mesh *m) {
   for(int i=0; i<noEle; i++) {
     if(m->elem[0].is_valid(i)) {
       m->e2n_getAll(i,con,0);
-      double area = mmod->fmAdaptAlgs->getArea(con[0],con[1],con[2]);
+      double area = mmod->fmAdaptAlgs->getSignedArea(con[0],con[1],con[2]);
+#ifdef FEM_ELEMSORDERED
+      if(-area < SLIVERAREA) {
+#else
       if(fabs(area) < SLIVERAREA) {
+#endif
 	CkAssert(false);
 	delete [] con;
 	return -1;
