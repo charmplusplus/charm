@@ -628,6 +628,7 @@ int FEM_Adapt_Algs::simple_coarsen(double targetA, double xmin, double ymin, dou
 void FEM_Adapt_Algs::tests() {
   //test the mesh for slivered triangles
 
+  theMod->fmUtil->AreaTest(theMesh);
   theMod->fmUtil->StructureTest(theMesh);
   theMod->fmUtil->IdxlListTest(theMesh);
   theMod->fmUtil->residualLockTest(theMesh);
@@ -831,6 +832,24 @@ bool FEM_Adapt_Algs::didItFlip(double *n1_coord, double *n2_coord, double *n3_co
   if(ret_old > MINAREA && ret_new < -MINAREA) return true;
   else if(ret_old < -MINAREA && ret_new > MINAREA) return true;
   else return false;
+}
+
+double FEM_Adapt_Algs::getSignedArea(int n1, int n2, int n3)
+{
+  double *n1_coord = (double*)malloc(dim*sizeof(double));
+  double *n2_coord = (double*)malloc(dim*sizeof(double));
+  double *n3_coord = (double*)malloc(dim*sizeof(double));
+
+  getCoord(n1, n1_coord);
+  getCoord(n2, n2_coord);
+  getCoord(n3, n3_coord);
+
+  double ret = getSignedArea(n1_coord, n2_coord, n3_coord);
+
+  free(n1_coord);
+  free(n2_coord);
+  free(n3_coord);
+  return ret;
 }
 
 double FEM_Adapt_Algs::getSignedArea(double *n1_coord, double *n2_coord, double *n3_coord) {
