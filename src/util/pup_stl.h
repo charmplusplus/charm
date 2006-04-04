@@ -36,6 +36,13 @@ inline void operator|(PUP::er &p,typename std::pair<const A,B> &v)
   p.syncComment(PUP::sync_item);
   p|v.second;
 }
+template <class T>
+inline void operator|(PUP::er &p,std::complex<T> &v)
+{
+  T re=v.real(), im=v.imag();
+  p|re; p|im;
+  v=std::complex<T>(re,im);
+}
 template <class charType> 
 inline void operator|(PUP::er &p,typename std::basic_string<charType> &v)
 {
