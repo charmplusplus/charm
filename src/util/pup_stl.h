@@ -23,6 +23,7 @@ Orion Sky Lawlor, olawlor@acm.org, 7/22/2002
 #include <list>
 #include <map>
 #include <string>
+#include <complex>
 #include <utility> /*for std::pair*/
 #include "pup.h"
 
