@@ -363,6 +363,9 @@ void FEM_Adapt_Algs::GradateMesh(double smoothness)
     // Mesh Gradation Control, Borouchaki et al
     // IJNME43 1998 www.ann.jussieu.fr/~frey/publications/ijnme4398.pdf
 
+  MPI_Comm comm=(MPI_Comm)FEM_chunk::get("FEM_Update_mesh")->defaultComm;
+  MPI_Barrier(comm);
+
     const double beta = smoothness;
 
     double maxShock, minShock;
@@ -481,6 +484,9 @@ void FEM_Adapt_Algs::GradateMesh(double smoothness)
     fflush(NULL);
 
     delete[] boundNodes;
+
+    MPI_Barrier(comm);
+    return;
 }
 
 

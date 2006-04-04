@@ -123,10 +123,12 @@ class FEMMeshMsg : public CMessage_FEMMeshMsg {
  public:
   FEM_Mesh *m;
   int dimn;
+  TCharm *t;
 
-  FEMMeshMsg(FEM_Mesh *mh, int dim) {
+  FEMMeshMsg(FEM_Mesh *mh, int dim, TCharm *t1) {
     m = mh;
     dimn = dim;
+    t = t1;
   }
 
   ~FEMMeshMsg() {}
@@ -307,6 +309,7 @@ class femMeshModify : public CBase_femMeshModify {
  public:
   int numChunks;
   int idx;
+  TCharm *tc;
   FEM_Mesh *fmMesh;
   FEM_lock *fmLock;
   CkVec<FEM_lockN *> fmLockN;

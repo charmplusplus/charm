@@ -1938,7 +1938,7 @@ CDECL void FEM_REF_INIT(int mesh, int dim) {
   femMeshModMsg *fm = new femMeshModMsg(size,cid);
   meshMod[cid].insert(fm);
   FEM_Mesh *m=FEM_Mesh_lookup(mesh,"FEM_REF_INIT");
-  FEMMeshMsg *msg = new FEMMeshMsg(m,dim); 
+  FEMMeshMsg *msg = new FEMMeshMsg(m,dim,tc); 
   meshMod[cid].setFemMesh(msg);
 #ifdef DEBUG 
   CmiMemoryCheck(); 
@@ -2017,6 +2017,7 @@ femMeshModify::~femMeshModify() {
 
 void femMeshModify::setFemMesh(FEMMeshMsg *fm) {
   fmMesh = fm->m;
+  tc = fm->t;
   fmMesh->setFemMeshModify(this);
   fmAdapt = new FEM_Adapt(fmMesh, this);
   fmAdaptL = new FEM_AdaptL(fmMesh, this);
@@ -2048,6 +2049,7 @@ void femMeshModify::setFemMesh(FEMMeshMsg *fm) {
 }
 
 intMsg *femMeshModify::lockRemoteChunk(int2Msg *msg) {
+  CtvAccess(_curTCharm) = tc;
   intMsg *imsg = new intMsg(0);
   int ret = fmLock->lock(msg->i, msg->j);
   imsg->i = ret;
@@ -2055,6 +2057,7 @@ intMsg *femMeshModify::lockRemoteChunk(int2Msg *msg) {
 }
 
 intMsg *femMeshModify::unlockRemoteChunk(int2Msg *msg) {
+  CtvAccess(_curTCharm) = tc;
   intMsg *imsg = new intMsg(0);
   int ret = fmLock->unlock(msg->i, msg->j);
   imsg->i = ret;
@@ -2062,6 +2065,7 @@ intMsg *femMeshModify::unlockRemoteChunk(int2Msg *msg) {
 }
 
 intMsg *femMeshModify::lockRemoteNode(int sharedIdx, int fromChk, int isGhost, int readLock) {
+  CtvAccess(_curTCharm) = tc;
 #ifdef DEBUG 
   CmiMemoryCheck(); 
 #endif
@@ -2104,6 +2108,7 @@ intMsg *femMeshModify::lockRemoteNode(int sharedIdx, int fromChk, int isGhost, i
 }
 
 intMsg *femMeshModify::unlockRemoteNode(int sharedIdx, int fromChk, int isGhost, int readLock) {
+  CtvAccess(_curTCharm) = tc;
 #ifdef DEBUG 
   CmiMemoryCheck(); 
 #endif
@@ -2129,6 +2134,7 @@ intMsg *femMeshModify::unlockRemoteNode(int sharedIdx, int fromChk, int isGhost,
 }
 
 intMsg *femMeshModify::hasLockRemoteNode(int sharedIdx, int fromChk, int isGhost) {
+  CtvAccess(_curTCharm) = tc;
 #ifdef DEBUG 
   CmiMemoryCheck(); 
 #endif
@@ -2149,12 +2155,14 @@ intMsg *femMeshModify::hasLockRemoteNode(int sharedIdx, int fromChk, int isGhost
 }
 
 void femMeshModify::modifyLockAll(int fromChk, int sharedIdx) {
+  CtvAccess(_curTCharm) = tc;
   int localIdx = fmUtil->lookup_in_IDXL(fmMesh, sharedIdx, fromChk, 1);
   FEM_Modify_LockAll(fmMesh, localIdx);
   return;
 }
 
 intMsg *femMeshModify::addNodeRemote(addNodeMsg *msg) {
+  CtvAccess(_curTCharm) = tc;
 #ifdef DEBUG 
   CmiMemoryCheck(); 
 #endif
@@ -2181,6 +2189,7 @@ intMsg *femMeshModify::addNodeRemote(addNodeMsg *msg) {
 }
 
 void femMeshModify::addSharedNodeRemote(sharedNodeMsg *fm) {
+  CtvAccess(_curTCharm) = tc;
 #ifdef DEBUG 
   CmiMemoryCheck(); 
 #endif
@@ -2192,6 +2201,7 @@ void femMeshModify::addSharedNodeRemote(sharedNodeMsg *fm) {
 }
 
 void femMeshModify::removeSharedNodeRemote(removeSharedNodeMsg *fm) {
+  CtvAccess(_curTCharm) = tc;
 #ifdef DEBUG 
   CmiMemoryCheck(); 
 #endif
@@ -2203,6 +2213,7 @@ void femMeshModify::removeSharedNodeRemote(removeSharedNodeMsg *fm) {
 }
 
 void femMeshModify::addGhostElem(addGhostElemMsg *fm) {
+  CtvAccess(_curTCharm) = tc;
 #ifdef DEBUG 
   CmiMemoryCheck(); 
 #endif
@@ -2214,6 +2225,7 @@ void femMeshModify::addGhostElem(addGhostElemMsg *fm) {
 }
 
 chunkListMsg *femMeshModify::getChunksSharingGhostNode(int2Msg *i2m) {
+  CtvAccess(_curTCharm) = tc;
   chunkListMsg *clm;
 #ifdef DEBUG 
   CmiMemoryCheck(); 
@@ -2226,6 +2238,7 @@ chunkListMsg *femMeshModify::getChunksSharingGhostNode(int2Msg *i2m) {
 }
 
 intMsg *femMeshModify::addElementRemote(addElemMsg *fm) {
+  CtvAccess(_curTCharm) = tc;
 #ifdef DEBUG 
   CmiMemoryCheck(); 
 #endif
@@ -2238,6 +2251,7 @@ intMsg *femMeshModify::addElementRemote(addElemMsg *fm) {
 }
 
 void femMeshModify::removeGhostElem(removeGhostElemMsg *fm) {
+  CtvAccess(_curTCharm) = tc;
 #ifdef DEBUG 
   CmiMemoryCheck(); 
 #endif
@@ -2249,6 +2263,7 @@ void femMeshModify::removeGhostElem(removeGhostElemMsg *fm) {
 }
 
 void femMeshModify::removeElementRemote(removeElemMsg *fm) {
+  CtvAccess(_curTCharm) = tc;
 #ifdef DEBUG 
   CmiMemoryCheck(); 
 #endif
@@ -2260,6 +2275,7 @@ void femMeshModify::removeElementRemote(removeElemMsg *fm) {
 }
 
 void femMeshModify::removeGhostNode(int fromChk, int sharedIdx) {
+  CtvAccess(_curTCharm) = tc;
 #ifdef DEBUG 
   CmiMemoryCheck(); 
 #endif
@@ -2271,6 +2287,7 @@ void femMeshModify::removeGhostNode(int fromChk, int sharedIdx) {
 }
 
 intMsg *femMeshModify::eatIntoElement(int fromChk, int sharedIdx) {
+  CtvAccess(_curTCharm) = tc;
   intMsg *imsg = new intMsg(-1);
   int localIdx = fmUtil->lookup_in_IDXL(fmMesh, sharedIdx, fromChk, 4);
   if(localIdx==-1) return imsg;
@@ -2345,6 +2362,7 @@ intMsg *femMeshModify::eatIntoElement(int fromChk, int sharedIdx) {
 }
 
 intMsg *femMeshModify::getLockOwner(int fromChk, int sharedIdx) {
+  CtvAccess(_curTCharm) = tc;
   int localIdx = fmUtil->lookup_in_IDXL(fmMesh, sharedIdx, fromChk, 0);
   int ret = fmUtil->getLockOwner(localIdx);
   intMsg *imsg = new intMsg(ret);
@@ -2352,6 +2370,7 @@ intMsg *femMeshModify::getLockOwner(int fromChk, int sharedIdx) {
 }
 
 boolMsg *femMeshModify::knowsAbtNode(int fromChk, int toChk, int sharedIdx) {
+  CtvAccess(_curTCharm) = tc;
   int localIdx = fmUtil->lookup_in_IDXL(fmMesh, sharedIdx, fromChk, 1);
   bool ret = fmUtil->knowsAbtNode(toChk,localIdx);
   boolMsg *bmsg = new boolMsg(ret);
@@ -2363,6 +2382,7 @@ void femMeshModify::refine_flip_element_leb(int fromChk, int propElemT,
 					    int propNodeT, int newNodeT, 
 					    int nbrOpNodeT, int nbrghost, double longEdgeLen)
 {
+  CtvAccess(_curTCharm) = tc;
 #ifdef DEBUG 
   CmiMemoryCheck();
 #endif
@@ -2384,6 +2404,7 @@ void femMeshModify::refine_flip_element_leb(int fromChk, int propElemT,
 }
 
 void femMeshModify::addToSharedList(int fromChk, int sharedIdx) {
+  CtvAccess(_curTCharm) = tc;
 #ifdef DEBUG 
   CmiMemoryCheck(); 
 #endif
@@ -2394,6 +2415,7 @@ void femMeshModify::addToSharedList(int fromChk, int sharedIdx) {
 }
 
 void femMeshModify::updateNodeAttrs(int fromChk, int sharedIdx, double coordX, double coordY, int bound, bool isGhost) {
+  CtvAccess(_curTCharm) = tc;
 #ifdef DEBUG 
   CmiMemoryCheck(); 
 #endif
@@ -2424,6 +2446,7 @@ void femMeshModify::updateNodeAttrs(int fromChk, int sharedIdx, double coordX, d
 }
 
 double2Msg *femMeshModify::getRemoteCoord(int fromChk, int ghostIdx) {
+  CtvAccess(_curTCharm) = tc;
 #ifdef DEBUG 
   CmiMemoryCheck(); 
 #endif
@@ -2438,6 +2461,7 @@ double2Msg *femMeshModify::getRemoteCoord(int fromChk, int ghostIdx) {
 }
 
 intMsg *femMeshModify::getRemoteBound(int fromChk, int ghostIdx) {
+  CtvAccess(_curTCharm) = tc;
 #ifdef DEBUG 
   CmiMemoryCheck(); 
 #endif
@@ -2452,6 +2476,7 @@ intMsg *femMeshModify::getRemoteBound(int fromChk, int ghostIdx) {
 }
 
 intMsg *femMeshModify::getIdxGhostSend(int fromChk, int idxshared, int toChk) {
+  CtvAccess(_curTCharm) = tc;
 #ifdef DEBUG 
   CmiMemoryCheck(); 
 #endif
@@ -2476,6 +2501,7 @@ intMsg *femMeshModify::getIdxGhostSend(int fromChk, int idxshared, int toChk) {
 }
 
 void femMeshModify::updateIdxlList(int fromChk, int idxTrans, int transChk) {
+  CtvAccess(_curTCharm) = tc;
 #ifdef DEBUG 
   CmiMemoryCheck(); 
 #endif
@@ -2489,6 +2515,7 @@ void femMeshModify::updateIdxlList(int fromChk, int idxTrans, int transChk) {
 }
 
 void femMeshModify::addTransIDXLRemote(int fromChk, int sharedIdx, int transChk) {
+  CtvAccess(_curTCharm) = tc;
 #ifdef DEBUG 
   CmiMemoryCheck(); 
 #endif
@@ -2502,6 +2529,7 @@ void femMeshModify::addTransIDXLRemote(int fromChk, int sharedIdx, int transChk)
 }
 
 void femMeshModify::removeIDXLRemote(int fromChk, int sharedIdx, int type) {
+  CtvAccess(_curTCharm) = tc;
 #ifdef DEBUG 
   CmiMemoryCheck(); 
 #endif
@@ -2517,6 +2545,7 @@ void femMeshModify::removeIDXLRemote(int fromChk, int sharedIdx, int type) {
 }
 
 void femMeshModify::verifyIdxlList(int fromChk, int size, int type) {
+  CtvAccess(_curTCharm) = tc;
 #ifdef DEBUG 
   CmiMemoryCheck(); 
 #endif
@@ -2528,6 +2557,7 @@ void femMeshModify::verifyIdxlList(int fromChk, int size, int type) {
 }
 
 void femMeshModify::idxllockRemote(int fromChk, int type) {
+  CtvAccess(_curTCharm) = tc;
   if(type==1) type = 2;
   else if(type ==2) type = 1;
   else if(type ==3) type = 4;
@@ -2543,6 +2573,7 @@ void femMeshModify::idxllockRemote(int fromChk, int type) {
 }
 
 void femMeshModify::idxlunlockRemote(int fromChk, int type) {
+  CtvAccess(_curTCharm) = tc;
   if(type==1) type = 2;
   else if(type ==2) type = 1;
   else if(type ==3) type = 4;
@@ -2558,6 +2589,7 @@ void femMeshModify::idxlunlockRemote(int fromChk, int type) {
 }
 
 boolMsg *femMeshModify::verifyLock(int fromChk, int sharedIdx, int isGhost) {
+  CtvAccess(_curTCharm) = tc;
   int localIdx;
   if(isGhost) {
     localIdx = fmUtil->lookup_in_IDXL(fmMesh, sharedIdx, fromChk, 1);
@@ -2578,6 +2610,7 @@ boolMsg *femMeshModify::verifyLock(int fromChk, int sharedIdx, int isGhost) {
 }
 
 void femMeshModify::verifyghostsend(verifyghostsendMsg *vmsg) {
+  CtvAccess(_curTCharm) = tc;
   int localIdx = fmUtil->lookup_in_IDXL(fmMesh, vmsg->sharedIdx, vmsg->fromChk, 1);
   const IDXL_Rec *irec = fmMesh->node.shared.getRec(localIdx);
   if (irec!=NULL) {
@@ -2597,6 +2630,7 @@ void femMeshModify::verifyghostsend(verifyghostsendMsg *vmsg) {
 }
 
 findgsMsg *femMeshModify::findghostsend(int fromChk, int sharedIdx) {
+  CtvAccess(_curTCharm) = tc;
   int localIdx = fmUtil->lookup_in_IDXL(fmMesh, sharedIdx, fromChk, 0);
   int *chkl, numchkl=0;
   fmUtil->findGhostSend(localIdx, &chkl, &numchkl);
@@ -2608,12 +2642,14 @@ findgsMsg *femMeshModify::findghostsend(int fromChk, int sharedIdx) {
 }
 
 void femMeshModify::updateghostsend(verifyghostsendMsg *vmsg) {
+  CtvAccess(_curTCharm) = tc;
   int localIdx = fmUtil->lookup_in_IDXL(fmMesh, vmsg->sharedIdx, vmsg->fromChk, 0);
   fmUtil->UpdateGhostSend(localIdx, vmsg->chunks, vmsg->numchks);
   delete vmsg;
 }
 
 boolMsg *femMeshModify::shouldLoseGhost(int fromChk, int sharedIdx, int toChk) {
+  CtvAccess(_curTCharm) = tc;
   int localIdx = fmUtil->lookup_in_IDXL(fmMesh, sharedIdx, fromChk, 0);
   int *elems, numElems;
   fmMesh->n2e_getAll(localIdx, &elems, &numElems);
@@ -2632,6 +2668,7 @@ boolMsg *femMeshModify::shouldLoseGhost(int fromChk, int sharedIdx, int toChk) {
 }
 
 void femMeshModify::addghostsendl(int fromChk, int sharedIdx, int toChk, int transIdx) {
+  CtvAccess(_curTCharm) = tc;
   int localIdx = fmUtil->lookup_in_IDXL(fmMesh, sharedIdx, fromChk, 0);
   int sharedghost = fmUtil->exists_in_IDXL(fmMesh,localIdx,toChk,1);
   if(sharedghost==-1) { //it needs to be added from this chunk
@@ -2643,11 +2680,13 @@ void femMeshModify::addghostsendl(int fromChk, int sharedIdx, int toChk, int tra
 }
 
 void femMeshModify::addghostsendl1(int fromChk, int transChk, int transIdx) {
+  CtvAccess(_curTCharm) = tc;
   int localIdx = fmUtil->lookup_in_IDXL(fmMesh, transIdx, transChk, 2);
   fmMesh->node.ghost->ghostRecv.addNode(localIdx,fromChk);
 }
 
 void femMeshModify::addghostsendr(int fromChk, int sharedIdx, int toChk, int transIdx) {
+  CtvAccess(_curTCharm) = tc;
   int localIdx = fmUtil->lookup_in_IDXL(fmMesh, sharedIdx, fromChk, 2);
   int sharedghost = fmUtil->exists_in_IDXL(fmMesh,FEM_To_ghost_index(localIdx),toChk,2);
   if(sharedghost==-1) { //it needs to be added from this chunk
@@ -2659,11 +2698,13 @@ void femMeshModify::addghostsendr(int fromChk, int sharedIdx, int toChk, int tra
 }
 
 void femMeshModify::addghostsendr1(int fromChk, int transChk, int transIdx) {
+  CtvAccess(_curTCharm) = tc;
   int localIdx = fmUtil->lookup_in_IDXL(fmMesh, transIdx, transChk, 0);
   fmMesh->node.ghostSend.addNode(localIdx,fromChk);
 }
 
 boolMsg *femMeshModify::willItLose(int fromChk, int sharedIdx) {
+  CtvAccess(_curTCharm) = tc;
   int localIdx = fmUtil->lookup_in_IDXL(fmMesh, sharedIdx, fromChk, 3);
   int nnbrs[3];
   fmMesh->e2n_getAll(localIdx,nnbrs,0);
@@ -2687,6 +2728,7 @@ boolMsg *femMeshModify::willItLose(int fromChk, int sharedIdx) {
 }
 
 void femMeshModify::interpolateElemCopy(int fromChk, int sharedIdx1, int sharedIdx2) {
+  CtvAccess(_curTCharm) = tc;
   int localIdx1 = fmUtil->lookup_in_IDXL(fmMesh, sharedIdx1, fromChk, 3);
   int localIdx2 = fmUtil->lookup_in_IDXL(fmMesh, sharedIdx2, fromChk, 3);
   CkAssert(localIdx1!=-1 && localIdx2!=-1);
@@ -2694,6 +2736,7 @@ void femMeshModify::interpolateElemCopy(int fromChk, int sharedIdx1, int sharedI
 }
 
 void femMeshModify::cleanupIDXL(int fromChk, int sharedIdx) {
+  CtvAccess(_curTCharm) = tc;
   int localIdx = fmUtil->lookup_in_IDXL(fmMesh, sharedIdx, fromChk, 4);
   CkAssert(fmUtil->exists_in_IDXL(fmMesh,FEM_To_ghost_index(localIdx),fromChk,4)!=-1);
   fmMesh->elem[0].ghost->ghostRecv.removeNode(localIdx, fromChk);
@@ -2701,6 +2744,7 @@ void femMeshModify::cleanupIDXL(int fromChk, int sharedIdx) {
 }
 
 void femMeshModify::purgeElement(int fromChk, int sharedIdx) {
+  CtvAccess(_curTCharm) = tc;
   int localIdx = fmUtil->lookup_in_IDXL(fmMesh, sharedIdx, fromChk, 3);
   CkAssert(localIdx!=-1);
   FEM_purge_element(fmMesh,localIdx,0);
@@ -2708,6 +2752,7 @@ void femMeshModify::purgeElement(int fromChk, int sharedIdx) {
 
 
 elemDataMsg *femMeshModify::packElemData(int fromChk, int sharedIdx) {
+  CtvAccess(_curTCharm) = tc;
   int localIdx = fmUtil->lookup_in_IDXL(fmMesh, sharedIdx, fromChk, 3);
   CkAssert(localIdx!=-1);
   CkVec<FEM_Attribute *>*elemattrs = (fmMesh->elem[0]).getAttrVec();
@@ -2739,6 +2784,7 @@ elemDataMsg *femMeshModify::packElemData(int fromChk, int sharedIdx) {
 }
 
 boolMsg *femMeshModify::isFixedNodeRemote(int fromChk, int sharedIdx) {
+  CtvAccess(_curTCharm) = tc;
   int localIdx = fmUtil->lookup_in_IDXL(fmMesh, sharedIdx, fromChk, 0);
   for(int i=0; i<fmfixedNodes.size(); i++) {
     if(fmfixedNodes[i]==localIdx) {

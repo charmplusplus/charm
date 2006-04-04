@@ -1156,7 +1156,7 @@ void FEM_Entity::setLength(int newlen)
 	}
       }	
       // call resize with args max n;
-      CkPrintf("Resize called \n");
+      //CkPrintf("Resize called \n");
       resize(args,&length,&max);
     }
   }
@@ -1244,7 +1244,10 @@ int FEM_Entity::is_valid(unsigned int idx){
     CkAssert(idx < size() && idx >=0);
     return valid->getChar()(idx,0);
   } else {
-    CkAssert(idx < size() && idx >=0 && first_invalid<=last_invalid);
+    if(!(idx < size() && idx >=0 && first_invalid<=last_invalid)) {
+      CkPrintf("idx %d; size %d; first_invalid %d; last_invalid %d\n");
+      CkAssert(false);
+    }
     return valid->getChar()(idx,0);
   }
 }
@@ -1320,7 +1323,7 @@ unsigned int FEM_Entity::get_next_invalid(FEM_Mesh *m, bool isNode, bool isGhost
 }
 
 void FEM_Entity::setMaxLength(int newLen,int newMaxLen,void *pargs,FEM_Mesh_alloc_fn fn){
-        CkPrintf("resize fn %p \n",fn);
+  //CkPrintf("resize fn %p \n",fn);
 	max = newMaxLen;
 	resize = fn;
 	args = pargs;

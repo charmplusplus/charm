@@ -1404,9 +1404,6 @@ int FEM_AdaptL::edge_contraction_help(int *e1P, int *e2P, int n1, int n2, int e1
 	  }
 #ifdef FEM_ELEMSORDERED
 	  //more tests -- only if all elems are fed in Clockwise
-	  if(nbr1Elems[i]==2577) {
-	    CkPrintf("Debugging\n");
-	  }
 	  theMesh->e2n_getAll(nbr1Elems[i], conn1);
 	  double nco[3][2];
 	  for(int j=0; j<3; j++) {
