@@ -1404,6 +1404,9 @@ int FEM_AdaptL::edge_contraction_help(int *e1P, int *e2P, int n1, int n2, int e1
 	  }
 #ifdef FEM_ELEMSORDERED
 	  //more tests -- only if all elems are fed in Clockwise
+	  if(nbr1Elems[i]==2577) {
+	    CkPrintf("Debugging\n");
+	  }
 	  theMesh->e2n_getAll(nbr1Elems[i], conn1);
 	  double nco[3][2];
 	  for(int j=0; j<3; j++) {
@@ -1426,7 +1429,7 @@ int FEM_AdaptL::edge_contraction_help(int *e1P, int *e2P, int n1, int n2, int e1
     delete [] n2_coord;
     delete [] new_coord;
   }
-  if(nesize1 != 0) delete [] nbr1Elems;
+  //if(nesize1 != 0) delete [] nbr1Elems;
   if(flipSliver) {
 #ifdef DEBUG_2
     CkPrintf("[%d]Found a flip about to occur for %d-%d collapse, so aborting this\n",theMod->idx,n1,n2);
@@ -1479,6 +1482,18 @@ int FEM_AdaptL::edge_contraction_help(int *e1P, int *e2P, int n1, int n2, int e1
       FEM_purge_element(theMesh,eTopurge,0);
     }
   }
+#ifdef FEM_ELEMSORDERED
+  int con[3];
+  for(int i=0; i<nesize1; i++) {
+    if(nbr1Elems[i]!=e1 && nbr1Elems[i]!=e2) {
+      theMesh->e2n_getAll(nbr1Elems[i],con);
+      if(!(-theMod->fmAdaptAlgs->getSignedArea(con[0],con[1],con[2])>SLIVERAREA)) {
+	CkAssert(false);
+      }
+    }
+  }
+#endif
+  if(nesize1 != 0) delete [] nbr1Elems;
 
   //unlock
   int size = lockedNodes.size();
