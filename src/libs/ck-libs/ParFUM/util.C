@@ -345,42 +345,40 @@ void FEM_MUtil::removeGhostNodeRemote(FEM_Mesh *m, int fromChk, int sharedIdx) {
 }
 
 
-void FEM_MUtil::addGhostElementRemote(FEM_Mesh *m, int chk, int elemType, int numGhostIndices, int *ghostIndices, int numSharedIndices, int *sharedIndices, int connSize) {
-  int numNewGhostIndices = connSize - (numGhostIndices + numSharedIndices);
-  int *conn = (int *)malloc(connSize*sizeof(int));
-  for(int i=0; i<numNewGhostIndices; i++) {
-    //DOES THIS WORK for 2 new ghost additions.. make sure!
-    int newGhostNode = FEM_add_node_local(m, 1);
-    m->node.ghost->ghostRecv.addNode(newGhostNode,chk);
-    //make this node come as ghost from all chunks that share the node
-    int sharedIdx = exists_in_IDXL(m,FEM_To_ghost_index(newGhostNode),chk,2);
-    int2Msg *i2 = new int2Msg(idx, sharedIdx);
-    chunkListMsg *clm = meshMod[chk].getChunksSharingGhostNode(i2);
-    conn[i] = FEM_To_ghost_index(newGhostNode);
-    for(int j=0; j<clm->numChunkList; j++) {
-      if(clm->chunkList[j]==idx) continue;
-      int chk1 = clm->chunkList[j];
-      int sharedIdx1 = clm->indexList[j];
-      idxllock(m,chk1,0);
-      m->node.ghost->ghostRecv.addNode(newGhostNode,chk1);
-      //on 'chk1' find the local index on shared list with 'chk' & add that to ghostsend with 'index'
-      meshMod[chk1].addTransIDXLRemote(idx,sharedIdx1,chk);
-      idxlunlock(m,chk1,0);
-    }
-    FEM_Ghost_Essential_attributes(m, mmod->fmAdaptAlgs->coord_attr, FEM_BOUNDARY, conn[i]);
-  }
+void FEM_MUtil::addGhostElementRemote(FEM_Mesh *m, int chk, int elemType, int *indices, int *typeOfIndex, int connSize) {
   //convert existing remote ghost indices to local ghost indices 
   const IDXL_List ll1 = m->node.ghost->ghostRecv.addList(chk);
-  for(int i=0; i<numGhostIndices; i++) {
-    conn[i+numNewGhostIndices] = FEM_To_ghost_index(ll1[ghostIndices[i]]);
-  }
   //convert sharedIndices to localIndices
-#ifdef DEBUG 
-  CmiMemoryCheck(); 
-#endif
   const IDXL_List ll2 = m->node.shared.addList(chk);
-  for(int i=0; i<numSharedIndices; i++) {
-    conn[i+numNewGhostIndices+numGhostIndices] = ll2[sharedIndices[i]];
+  int *conn = (int *)malloc(connSize*sizeof(int));
+  for(int i=0; i<connSize; i++) {
+    if(typeOfIndex[i]==-1) {
+      //DOES THIS WORK for 2 new ghost additions.. make sure!
+      int newGhostNode = FEM_add_node_local(m, 1);
+      m->node.ghost->ghostRecv.addNode(newGhostNode,chk);
+      //make this node come as ghost from all chunks that share the node
+      int sharedIdx = exists_in_IDXL(m,FEM_To_ghost_index(newGhostNode),chk,2);
+      int2Msg *i2 = new int2Msg(idx, sharedIdx);
+      chunkListMsg *clm = meshMod[chk].getChunksSharingGhostNode(i2);
+      conn[i] = FEM_To_ghost_index(newGhostNode);
+      for(int j=0; j<clm->numChunkList; j++) {
+	if(clm->chunkList[j]==idx) continue;
+	int chk1 = clm->chunkList[j];
+	int sharedIdx1 = clm->indexList[j];
+	idxllock(m,chk1,0);
+	m->node.ghost->ghostRecv.addNode(newGhostNode,chk1);
+	//on 'chk1' find the local index on shared list with 'chk' & add that to ghostsend with 'index'
+	meshMod[chk1].addTransIDXLRemote(idx,sharedIdx1,chk);
+	idxlunlock(m,chk1,0);
+      }
+      FEM_Ghost_Essential_attributes(m, mmod->fmAdaptAlgs->coord_attr, FEM_BOUNDARY, conn[i]);
+    }
+    else if(typeOfIndex[i]==1) {
+      conn[i] = FEM_To_ghost_index(ll1[indices[i]]);
+    }
+    else if(typeOfIndex[i]==0) {
+      conn[i] = ll2[indices[i]];
+    }
   }
   int newGhostElement = FEM_add_element_local(m, conn, connSize, elemType, 1);
   m->elem[elemType].ghost->ghostRecv.addNode(FEM_To_ghost_index(newGhostElement),chk);
@@ -778,13 +776,9 @@ void FEM_MUtil::addToSharedList(FEM_Mesh *m, int fromChk, int sharedIdx) {
       if(exists == -1) {
 	m->elem[elemType].ghostSend.addNode(enbrs[i], fromChk);
 	//ghost nodes should be added only if they were not already present as ghosts on that chunk.
-	int numNodesToAdd = 0;
-	int numSharedGhosts = 0;
-	int numSharedNodes = 0;
-	int *sharedGhosts = (int*)malloc(connSize*sizeof(int));
-	int *sharedNodes = (int*)malloc(connSize*sizeof(int));
+	int *indices = (int*)malloc(connSize*sizeof(int));
+	int *typeOfIndex = (int*)malloc(connSize*sizeof(int));
 	int *nnbrs = (int*)malloc(connSize*sizeof(int));
-	int *nodesToAdd = (int*)malloc(connSize*sizeof(int));
 	m->e2n_getAll(enbrs[i], nnbrs, elemType);
 	for(int j=0; j<connSize; j++) {
 	  int sharedNode = mmod->fmUtil->exists_in_IDXL(m,nnbrs[j],fromChk,0);
@@ -817,52 +811,49 @@ void FEM_MUtil::addToSharedList(FEM_Mesh *m, int fromChk, int sharedIdx) {
 	    }
 	    if( sharedGhost == -1) {
 	      //it is a new ghost
-	      nodesToAdd[numNodesToAdd] = nnbrs[j];
-	      numNodesToAdd++;
+	      indices[j] = nnbrs[j];
+	      typeOfIndex[j] = -1;
 	    }
 	    else {
 	      //it is a shared ghost
-	      sharedGhosts[numSharedGhosts] = sharedGhost;
-	      numSharedGhosts++;
+	      indices[j] = sharedGhost;
+	      typeOfIndex[j] = 1;
 	    }
 	  }
 	  else {
 	    //it is a shared node
-	    sharedNodes[numSharedNodes] = sharedNode;
-	    numSharedNodes++;
+	    indices[j] = sharedNode;
+	    typeOfIndex[j] = 0;
 	  }
 	}
 	//add this element as a ghost on fromChk
-	addGhostElemMsg *fm = new (numSharedGhosts, numSharedNodes, 0)addGhostElemMsg;
+	addGhostElemMsg *fm = new (connSize, connSize, 0)addGhostElemMsg;
 	fm->chk = getIdx();
 	fm->elemType = elemType;
-	fm->numGhostIndex = numSharedGhosts;
-	for(int j=0; j<numSharedGhosts; j++) {
-	  fm->ghostIndices[j] = sharedGhosts[j];
-	}
-	fm->numSharedIndex = numSharedNodes;
-	for(int j=0; j<numSharedNodes; j++) {
-	  fm->sharedIndices[j] = sharedNodes[j];
-	}
-	for(int j=0; j<numNodesToAdd; j++) {
-	  m->node.ghostSend.addNode(nodesToAdd[j],fromChk);
+	for(int j=0; j<connSize; j++) {
+	  fm->indices[j] = indices[j];
+	  fm->typeOfIndex[j] = typeOfIndex[j];
+	  if(typeOfIndex[j]==-1) {
+	    m->node.ghostSend.addNode(indices[j],fromChk);
+	  }
 	}
 	fm->connSize = connSize;
 	meshMod[fromChk].addGhostElem(fm); 
-	for(int j=0; j<numNodesToAdd; j++) {
+	for(int j=0; j<connSize; j++) {
 	  //make the chunks which share this node also add this node as a ghost node
 	  //if it is not already sending it
-	  const IDXL_Rec *irec1 = m->node.shared.getRec(nodesToAdd[j]);
-	  if(irec1!=NULL) {
-	    for(int sh=0; sh<irec1->getShared(); sh++) {
-	      int transIdx = exists_in_IDXL(m,nodesToAdd[j],fromChk,1);
-	      meshMod[irec1->getChk(sh)].addghostsendl(idx,irec1->getIdx(sh),fromChk,transIdx);
+	  if(typeOfIndex[j]==-1) {
+	    const IDXL_Rec *irec1 = m->node.shared.getRec(indices[j]);
+	    if(irec1!=NULL) {
+	      for(int sh=0; sh<irec1->getShared(); sh++) {
+		int transIdx = exists_in_IDXL(m,indices[j],fromChk,1);
+		meshMod[irec1->getChk(sh)].addghostsendl(idx,irec1->getIdx(sh),fromChk,transIdx);
+	      }
 	    }
 	  }
 	}
-	free(nodesToAdd);
-	free(sharedGhosts);
-	free(sharedNodes);
+	free(indices);
+	free(typeOfIndex);
 	free(nnbrs);
       }
     }

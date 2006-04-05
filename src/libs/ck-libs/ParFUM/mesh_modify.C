@@ -1093,7 +1093,7 @@ void update_new_element_e2e(FEM_Mesh *m, int newEl, int elemType){
 }
 
 // A helper function that adds the local element, and updates adjacencies
-int FEM_add_element_local(FEM_Mesh *m, const int *conn, int connSize, int elemType, int addGhost){
+int FEM_add_element_local(FEM_Mesh *m, int *conn, int connSize, int elemType, int addGhost){
   // lengthen element attributes
   int newEl;
   if(addGhost){
@@ -1106,6 +1106,14 @@ int FEM_add_element_local(FEM_Mesh *m, const int *conn, int connSize, int elemTy
   }
   else{
     newEl = m->elem[elemType].get_next_invalid(m,false,false);
+    /*#ifdef FEM_ELEMSORDERED
+    //correct the orientation, which might have been lost if it moves across chunks
+    if(m->getfmMM()->fmAdaptAlgs->getSignedArea(conn[0],conn[1],conn[2])>0) {
+      int tmp = conn[1];
+      conn[1] = conn[2];
+      conn[2] = tmp;
+    }
+    #endif*/
     // update element's conn, i.e. e2n table
     m->elem[elemType].connIs(newEl,conn); 
   }
@@ -1133,9 +1141,7 @@ int FEM_add_element_local(FEM_Mesh *m, const int *conn, int connSize, int elemTy
 #endif
 #ifdef FEM_ELEMSORDERED
   if(!FEM_Is_ghost_index(newEl)) {
-    int con[3];
-    m->e2n_getAll(newEl,con,0);
-    CkAssert(-m->getfmMM()->fmAdaptAlgs->getSignedArea(con[0],con[1],con[2])>SLIVERAREA);
+    CkAssert(-m->getfmMM()->fmAdaptAlgs->getSignedArea(conn[0],conn[1],conn[2])>SLIVERAREA);
   }
 #endif
   delete[] adjes;
@@ -1442,12 +1448,8 @@ int FEM_add_element(FEM_Mesh *m, int* conn, int connSize, int elemType, int chun
       m->getfmMM()->getfmUtil()->idxllock(m, chk, 0);
       m->elem[elemType].ghostSend.addNode(newEl,chk);
       //ghost nodes should be added only if they were not already present as ghosts on that chunk.
-      int numNodesToAdd = 0;
-      int numSharedGhosts = 0;
-      int numSharedNodes = 0;
-      int *sharedGhosts = (int *)malloc((connSize-1)*sizeof(int));
-      int *sharedNodes = (int *)malloc((connSize)*sizeof(int));
-      int *nodesToAdd = (int *)malloc((connSize)*sizeof(int));
+      int *sharedIndices = (int *)malloc((connSize)*sizeof(int));
+      int *typeOfIndex = (int *)malloc((connSize)*sizeof(int));
       for(int j=0; j<connSize; j++) {
 	int sharedNode = m->getfmMM()->getfmUtil()->exists_in_IDXL(m,conn[j],chk,0);
 	if(sharedNode == -1) {
@@ -1478,47 +1480,40 @@ int FEM_add_element(FEM_Mesh *m, int* conn, int connSize, int elemType, int chun
 	    //else it is a new ghost
 	  }
 	  if(sharedGhost == -1) {
-	    nodesToAdd[numNodesToAdd] = conn[j];
-	    numNodesToAdd++;
+	    sharedIndices[j] = conn[j];
+	    typeOfIndex[j] = -1;
 	  }
 	  else {
 	    //it is a shared ghost
-	    sharedGhosts[numSharedGhosts] = sharedGhost;
-	    numSharedGhosts++;
+	    sharedIndices[j] = sharedGhost;
+	    typeOfIndex[j] = 1;
 	  }
 	}
 	else {
 	  //it is a shared node
-	  sharedNodes[numSharedNodes] = sharedNode;
-	  numSharedNodes++;
+	  sharedIndices[j] = sharedNode;
+	  typeOfIndex[j] = 0;
 	}
       }
 #ifdef DEBUG 
       CmiMemoryCheck(); 
 #endif
-      addGhostElemMsg *fm = new (numSharedGhosts, numSharedNodes, 0)addGhostElemMsg;
+      addGhostElemMsg *fm = new (connSize, connSize, 0)addGhostElemMsg;
       fm->chk = index;
       fm->elemType = elemType;
-      fm->numGhostIndex = numSharedGhosts;
-      for(int j=0; j<numSharedGhosts; j++) {
-	fm->ghostIndices[j] = sharedGhosts[j];
+      for(int j=0; j<connSize; j++) {
+	fm->indices[j] = sharedIndices[j];
+	fm->typeOfIndex[j] = typeOfIndex[j];
+	if(typeOfIndex[j]==-1) {
+	  m->node.ghostSend.addNode(sharedIndices[j],chk);
+	}
       }
-      fm->numSharedIndex = numSharedNodes;
-      for(int j=0; j<numSharedNodes; j++) {
-	fm->sharedIndices[j] = sharedNodes[j];
-      }
-      for(int j=0; j<numNodesToAdd; j++) {
-	m->node.ghostSend.addNode(nodesToAdd[j],chk);
-      }
-      free(nodesToAdd);
       fm->connSize = connSize;
       meshMod[chk].addGhostElem(fm); //newEl, m->fmMM->idx, elemType;
       //m->getfmMM()->getfmUtil()->idxlunlock(m, chk, 3);
       //m->getfmMM()->getfmUtil()->idxlunlock(m, chk, 1);
       //coarser lock
       m->getfmMM()->getfmUtil()->idxlunlock(m, chk, 0);
-      free(sharedGhosts);
-      free(sharedNodes);
     }
     for(int k=0; k<numSharedChunks; k++) {
       free(sharedConn[k]);
@@ -2217,7 +2212,7 @@ void femMeshModify::addGhostElem(addGhostElemMsg *fm) {
 #ifdef DEBUG 
   CmiMemoryCheck(); 
 #endif
-  fmUtil->addGhostElementRemote(fmMesh, fm->chk, fm->elemType, fm->numGhostIndex, fm->ghostIndices, fm->numSharedIndex, fm->sharedIndices, fm->connSize);
+  fmUtil->addGhostElementRemote(fmMesh, fm->chk, fm->elemType, fm->indices, fm->typeOfIndex, fm->connSize);
 #ifdef DEBUG 
   CmiMemoryCheck(); 
 #endif

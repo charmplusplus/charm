@@ -48,7 +48,7 @@ void FEM_Modify_correctLockN(FEM_Mesh *m, int nodeId);
 // Internal functions which shouldn't be used by anyone else
 int FEM_add_node_local(FEM_Mesh *m, int addGhost=0);
 void FEM_remove_node_local(FEM_Mesh *m, int node);
-int FEM_add_element_local(FEM_Mesh *m, const int *conn, int connSize, int elemType, int addGhost);
+int FEM_add_element_local(FEM_Mesh *m, int *conn, int connSize, int elemType, int addGhost);
 void FEM_remove_element_local(FEM_Mesh *m, int element, int etype);
 
 void FEM_Ghost_Essential_attributes(FEM_Mesh *m, int coord_attr, int bc_attr, int nodeid);
@@ -184,18 +184,16 @@ class addGhostElemMsg : public CMessage_addGhostElemMsg {
  public:
   int chk;
   int elemType;
-  int numGhostIndex;
-  int *ghostIndices;
-  int numSharedIndex;
-  int *sharedIndices;
+  int *indices;
+  int *typeOfIndex;
   int connSize;
 
   ~addGhostElemMsg() {
-    if(ghostIndices) {
-      //delete ghostIndices;
+    if(indices) {
+      //delete indices;
     }
-    if(sharedIndices) {
-      //delete sharedIndices;
+    if(typeOfIndex) {
+      //delete typeOfIndex;
     }
   }
 };

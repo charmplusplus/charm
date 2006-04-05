@@ -1369,12 +1369,13 @@ int FEM_AdaptL::edge_contraction_help(int *e1P, int *e2P, int n1, int n2, int e1
 	  //CkPrintf("[%d]Warning: Elem %d(%d,%d,%d) would become a sliver if %d->%d is contracted\n",theMod->idx,nbrElems[i],conn[0],conn[1],conn[2],n1,n2);
 	  break;
 	}
-#ifdef FEM_ELEMSORDERED
+	/*#ifdef FEM_ELEMSORDERED
 	//more tests
 	theMesh->e2n_getAll(nbrElems[i], conn);
 	double nco[3][2];
 	for(int j=0; j<3; j++) {
-	  FEM_Mesh_dataP(theMesh, FEM_NODE, theMod->fmAdaptAlgs->coord_attr, (void *)(nco[j]), conn[j], 1, FEM_DOUBLE, 2);
+	  //FEM_Mesh_dataP(theMesh, FEM_NODE, theMod->fmAdaptAlgs->coord_attr, (void *)(nco[j]), conn[j], 1, FEM_DOUBLE, 2);
+	  theMod->fmAdaptAlgs->getCoord(conn[j],nco[j]);
 	  if(conn[j]==deletenode) {
 	    nco[j][0] = new_coord[0];
 	    nco[j][1] = new_coord[1];
@@ -1384,7 +1385,7 @@ int FEM_AdaptL::edge_contraction_help(int *e1P, int *e2P, int n1, int n2, int e1
 	  flipSliver = true;
 	  break;
 	}
-#endif
+	#endif*/
       }
     }
     if(!flipSliver) {
@@ -1402,12 +1403,13 @@ int FEM_AdaptL::edge_contraction_help(int *e1P, int *e2P, int n1, int n2, int e1
 	    //CkPrintf("[%d]Warning: Elem %d(%d,%d,%d) would become a sliver if %d->%d is contracted\n",theMod->idx,nbr1Elems[i],conn1[0],conn1[1],conn1[2],n1,n2);
 	    break;
 	  }
-#ifdef FEM_ELEMSORDERED
-	  //more tests -- only if all elems are fed in Clockwise
+	  /*#ifdef FEM_ELEMSORDERED
+	  //more tests -- only if all elems are fed in ordered
 	  theMesh->e2n_getAll(nbr1Elems[i], conn1);
 	  double nco[3][2];
 	  for(int j=0; j<3; j++) {
-	    FEM_Mesh_dataP(theMesh, FEM_NODE, theMod->fmAdaptAlgs->coord_attr, (void *)(nco[j]), conn1[j], 1, FEM_DOUBLE, 2);
+	    //FEM_Mesh_dataP(theMesh, FEM_NODE, theMod->fmAdaptAlgs->coord_attr, (void *)(nco[j]), conn1[j], 1, FEM_DOUBLE, 2);
+	    theMod->fmAdaptAlgs->getCoord(conn1[j],nco[j]);
 	    if(conn1[j]==keepnode) {
 	      nco[j][0] = new_coord[0];
 	      nco[j][1] = new_coord[1];
@@ -1417,7 +1419,7 @@ int FEM_AdaptL::edge_contraction_help(int *e1P, int *e2P, int n1, int n2, int e1
 	    flipSliver = true;
 	    break;
 	  }
-#endif
+	  #endif*/
 	}
       }
     }

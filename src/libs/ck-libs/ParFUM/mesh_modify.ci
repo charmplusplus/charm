@@ -22,8 +22,8 @@ module ParFUM {
     int chunks[];
   };
   message addGhostElemMsg {
-    int ghostIndices[];
-    int sharedIndices[];
+    int indices[];
+    int typeOfIndex[];
   };
   message chunkListMsg {
     int chunkList[];
