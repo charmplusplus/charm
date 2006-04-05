@@ -778,7 +778,8 @@ $(L)/libconvcom.a: $(COMLIB_OBJS)
 #for backward compatibility, keep libmodulecommlib.a with double m.
 $(L)/libmodulecomlib.a: $(COMLIB_OBJS)
 	$(CHARMC) -o $(L)/libmodulecomlib.a $(COMLIB_OBJS)
-	cp $(L)/libmodulecomlib.a $(L)/libmodulecommlib.a
+	$(CHARMC) -o $(L)/libmodulecommlib.a $(COMLIB_OBJS)
+	#cp $(L)/libmodulecomlib.a $(L)/libmodulecommlib.a
 
 ###############################################################################
 #
