@@ -44,10 +44,11 @@ public:
 class Armci_Note{
 public:
   int proc;
-  int acked;
-  Armci_Note() : proc(-1), acked(0) { }
-  Armci_Note(int p, int a) : proc(p), acked(a) { }
-  void pup(PUP::er &p){ p|proc; p|acked; }
+  int waited;
+  int notified;
+  Armci_Note() : proc(-1), waited(0), notified(0) { }
+  Armci_Note(int p, int w, int n) : proc(p), waited(w), notified(n) { }
+  void pup(PUP::er &p){ p|proc; p|waited; p|notified; }
 };
 
 // structure definitions and forward declarations (for reductions)

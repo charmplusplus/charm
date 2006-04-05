@@ -80,6 +80,7 @@ void ArmciVirtualProcessor::put(pointer src, pointer dst,
   ArmciMsg *msg = new (nbytes, 0) ArmciMsg(dst,nbytes,thisIndex,hdl);
   memcpy(msg->data, src, nbytes);
   thisProxy[dst_proc].putData(msg);
+//  thisProxy[dst_proc].putData(dst,nbytes,msg->data,thisIndex,hdl);
 }
 
 int ArmciVirtualProcessor::nbput(pointer src, pointer dst,
@@ -112,8 +113,10 @@ void ArmciVirtualProcessor::putData(ArmciMsg *m) {
 }
 
 void ArmciVirtualProcessor::putAck(int hdl) {
+//CkPrintf("[%d]putack hdl = %d \n",thisIndex,hdl);
   if(hdl != -1) { // non-blocking 
     hdlList[hdl]->acked = 1;  
+//CkPrintf(" from %d\n", hdlList[hdl]->proc);
   }
   thread->resume();
 }
@@ -184,6 +187,7 @@ void ArmciVirtualProcessor::fence(int proc){
     if(hdlList[i]->acked == 0 && (hdlList[i]->op & BLOCKING_MASK == 1) && hdlList[i]->proc == proc)
       procs.push_back(i);
   }
+//CkPrintf("[%d]waiting for %d puts to %d\n",thisIndex,procs.size(),proc);
   waitmulti(procs);
 }
 void ArmciVirtualProcessor::allfence(){
@@ -214,6 +218,7 @@ void ArmciVirtualProcessor::requestFromGet(pointer src, pointer dst, int nbytes,
 				       int dst_proc, int hdl) {
   ArmciMsg *msg = new (nbytes, 0) ArmciMsg(dst,nbytes,-1,hdl);
   memcpy(msg->data, src, nbytes);
+//CkPrintf("[%d]requestFromGet copying %f(%d) from %p\n",thisIndex,*(double *)(msg->data),nbytes,src);
   thisProxy[dst_proc].putDataFromGet(msg);
 }
 
@@ -230,6 +235,7 @@ void ArmciVirtualProcessor::putDataFromGet(pointer dst, int nbytes, char *data, 
 
 void ArmciVirtualProcessor::putDataFromGet(ArmciMsg *m) {
   memcpy(m->dst, m->data, m->nbytes);
+//CkPrintf("[%d]putDataFromGet copying %f->%f(%d) to %p\n",thisIndex,*(double *)(m->dst),*(double *)(m->data), m->nbytes, m->dst);
   if(m->hdl != -1) { // non-blocking 
     hdlList[m->hdl]->acked = 1;  
   }
@@ -256,6 +262,7 @@ void ArmciVirtualProcessor::puts(pointer src_ptr, int src_stride_ar[],
   hdlList.push_back(entry);
   
   ArmciStridedMsg *m = new (stride_levels,stride_levels+1,nbytes, 0) ArmciStridedMsg(dst_ptr,stride_levels,nbytes,thisIndex,hdl);
+
   memcpy(m->dst_stride_ar,dst_stride_ar,sizeof(int)*stride_levels);
   memcpy(m->count,count,sizeof(int)*(stride_levels+1));
   stridedCopy(src_ptr, m->data, src_stride_ar, count, stride_levels, 1);
@@ -281,6 +288,7 @@ int ArmciVirtualProcessor::nbputs(pointer src_ptr, int src_stride_ar[],
   hdlList.push_back(entry);
  
   ArmciStridedMsg *m = new (stride_levels,stride_levels+1,nbytes, 0) ArmciStridedMsg(dst_ptr,stride_levels,nbytes,thisIndex,hdl);
+
   memcpy(m->dst_stride_ar,dst_stride_ar,sizeof(int)*stride_levels);
   memcpy(m->count,count,sizeof(int)*(stride_levels+1));
   stridedCopy(src_ptr, m->data, src_stride_ar, count, stride_levels, 1);
@@ -312,6 +320,7 @@ void ArmciVirtualProcessor::gets(pointer src_ptr, int src_stride_ar[],
     buffer = new char[nbytes];
     stridedCopy(src_ptr, buffer, src_stride_ar, count, stride_levels, 1);
     stridedCopy(dst_ptr, buffer, dst_stride_ar, count, stride_levels, 0);
+    delete buffer;
     return;
   }*/
   thisProxy[src_proc].requestFromGets(src_ptr, src_stride_ar, dst_ptr, dst_stride_ar, 
@@ -331,6 +340,7 @@ int ArmciVirtualProcessor::nbgets(pointer src_ptr, int src_stride_ar[],
     buffer = new char[nbytes];
     stridedCopy(src_ptr, buffer, src_stride_ar, count, stride_levels, 1);
     stridedCopy(dst_ptr, buffer, dst_stride_ar, count, stride_levels, 0);
+    delete buffer;
     return -1;
   }*/
   
@@ -349,6 +359,7 @@ void ArmciVirtualProcessor::requestFromGets(pointer src_ptr, int src_stride_ar[]
     nbytes *= count[i];
   
   ArmciStridedMsg *m = new (stride_levels,stride_levels+1,nbytes, 0) ArmciStridedMsg(dst_ptr,stride_levels,nbytes,thisIndex,hdl);
+
   memcpy(m->dst_stride_ar,dst_stride_ar,sizeof(int)*stride_levels);
   memcpy(m->count,count,sizeof(int)*(stride_levels+1));
   stridedCopy(src_ptr, m->data, src_stride_ar, count, stride_levels, 1);
@@ -376,44 +387,46 @@ void ArmciVirtualProcessor::notify(int proc){
   thisProxy[proc].sendNote(thisIndex);
 }
 void ArmciVirtualProcessor::sendNote(int proc){
-  // check if unacked note exists
-  // if so, resume thread and remove the note
-  // if not, create an acked note
+  // check if note exists
+  // if so, decrement it and see if resume thread is appropriate
+  // if not, create a new note
   int hasNote = -1;
   for(int i=0;i<noteList.size();i++){
     if(noteList[i]->proc == proc){
-      CkAssert(noteList[i]->acked == 0);
       hasNote = i;
       break;
     }
   }
   if(hasNote!=-1){
-    delete noteList[hasNote];
-    noteList.remove(hasNote);
-    thread->resume();
+    (noteList[hasNote]->notified)++;
   } else {
-    Armci_Note* newNote = new Armci_Note(proc, 1);
+    Armci_Note* newNote = new Armci_Note(proc, 0, 1);
     noteList.push_back(newNote);
+    hasNote = noteList.size() - 1;
+  }
+  if(noteList[hasNote]->notified >= noteList[hasNote]->waited){
+    thread->resume();
   }
 }
 void ArmciVirtualProcessor::notify_wait(int proc){
-  // check if notify already arrived
-  // if so, remove it and continue
-  // if not, create unacked note and suspend
+  // check if note exists
+  // if so, check if suspend is necessary
+  // if not, create a waited note and suspend
   int hasNote = -1;
   for(int i=0;i<noteList.size();i++){
     if(noteList[i]->proc == proc){
-      CkAssert(noteList[i]->acked == 1);
       hasNote = i;
       break;
     }
   }
   if(hasNote!=-1){
-    delete noteList[hasNote];
-    noteList.remove(hasNote);
+    (noteList[hasNote]->waited)++;
   } else {
-    Armci_Note* newNote = new Armci_Note(proc, 0);
+    Armci_Note* newNote = new Armci_Note(proc, 1, 0);
     noteList.push_back(newNote);
+    hasNote = noteList.size() - 1;
+  }
+  if(noteList[hasNote]->notified < noteList[hasNote]->waited){
     thread->suspend();
   }
 }
@@ -440,7 +453,7 @@ void ArmciVirtualProcessor::requestAddresses(pointer ptr, pointer ptr_arr[], int
   CkCallback cb(CkIndex_ArmciVirtualProcessor::mallocClient(NULL),CkArrayIndex1D(0),thisProxy);
   contribute(sizeof(addressPair), pair, CkReduction::concat, cb);
   // wait for the reply to arrive.
-  thread->suspend();
+  while(addressReply==NULL) thread->suspend();
 
   // copy the acquired data to the user-allocated array.
   for (int i=0; i<numPE; i++) {
