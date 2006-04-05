@@ -1,5 +1,5 @@
 CHARMC = ../../../../bin/charmc $(OPTS)
-MODULES = -module commlib
+MODULES = -module comlib
 #OPTS = -tracemode projections
 
 OBJS = test.o benchmark.o
