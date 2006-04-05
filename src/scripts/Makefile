@@ -50,6 +50,8 @@ FEMC: charm++ LIBS
 
 FEMF: FEMC
 
+ParFUM: FEM
+
 MBLOCK: AMPI MBLOCKC MBLOCKF
 
 MBLOCKC: charm++ LIBS
@@ -513,7 +515,7 @@ $(L)/libmemory-charmdebug.o: memory-charmdebug.c $(MEM_DEPS)
 
 ## Thread libraries (-thread)
 $(L)/libthreads-default.o: threads.c $(CVHEADERS)
-	$(CHARMC) -o $@ -DCMK_THREADS_BUILD_DEFAULT=1 -IQuickThreads threads.c
+	$(CHARMC) -o $@ -DCMK_THREADS_BUILD_DEFAULT=1 -IQuickThreads -I. threads.c
 
 $(L)/libthreads-qt.o: threads.c $(CVHEADERS)
 	$(CHARMC) -o $@ -DCMK_THREADS_BUILD_QT=1 -IQuickThreads threads.c
@@ -780,7 +782,6 @@ $(L)/libconvcom.a: $(COMLIB_OBJS)
 $(L)/libmodulecomlib.a: $(COMLIB_OBJS)
 	$(CHARMC) -o $(L)/libmodulecomlib.a $(COMLIB_OBJS)
 	$(CHARMC) -o $(L)/libmodulecommlib.a $(COMLIB_OBJS)
-	#cp $(L)/libmodulecomlib.a $(L)/libmodulecommlib.a
 
 ###############################################################################
 #
