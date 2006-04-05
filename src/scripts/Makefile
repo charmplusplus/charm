@@ -29,6 +29,7 @@ all: charm++ bluegene LIBS AMPI f90charm TSM SM PVM doc
 
 charm++: basics
 	$(MAKE) charm-target
+	@echo "$(OPTS)" > OPTS
 
 bgampi: bluegene AMPI
 
