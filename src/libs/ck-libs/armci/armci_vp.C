@@ -113,10 +113,8 @@ void ArmciVirtualProcessor::putData(ArmciMsg *m) {
 }
 
 void ArmciVirtualProcessor::putAck(int hdl) {
-//CkPrintf("[%d]putack hdl = %d \n",thisIndex,hdl);
   if(hdl != -1) { // non-blocking 
     hdlList[hdl]->acked = 1;  
-//CkPrintf(" from %d\n", hdlList[hdl]->proc);
   }
   thread->resume();
 }
@@ -187,7 +185,6 @@ void ArmciVirtualProcessor::fence(int proc){
     if(hdlList[i]->acked == 0 && (hdlList[i]->op & BLOCKING_MASK == 1) && hdlList[i]->proc == proc)
       procs.push_back(i);
   }
-//CkPrintf("[%d]waiting for %d puts to %d\n",thisIndex,procs.size(),proc);
   waitmulti(procs);
 }
 void ArmciVirtualProcessor::allfence(){
@@ -218,7 +215,6 @@ void ArmciVirtualProcessor::requestFromGet(pointer src, pointer dst, int nbytes,
 				       int dst_proc, int hdl) {
   ArmciMsg *msg = new (nbytes, 0) ArmciMsg(dst,nbytes,-1,hdl);
   memcpy(msg->data, src, nbytes);
-//CkPrintf("[%d]requestFromGet copying %f(%d) from %p\n",thisIndex,*(double *)(msg->data),nbytes,src);
   thisProxy[dst_proc].putDataFromGet(msg);
 }
 
@@ -235,7 +231,6 @@ void ArmciVirtualProcessor::putDataFromGet(pointer dst, int nbytes, char *data, 
 
 void ArmciVirtualProcessor::putDataFromGet(ArmciMsg *m) {
   memcpy(m->dst, m->data, m->nbytes);
-//CkPrintf("[%d]putDataFromGet copying %f->%f(%d) to %p\n",thisIndex,*(double *)(m->dst),*(double *)(m->data), m->nbytes, m->dst);
   if(m->hdl != -1) { // non-blocking 
     hdlList[m->hdl]->acked = 1;  
   }
@@ -405,6 +400,10 @@ void ArmciVirtualProcessor::sendNote(int proc){
     hasNote = noteList.size() - 1;
   }
   if(noteList[hasNote]->notified >= noteList[hasNote]->waited){
+/*
+    noteList[hasNote]->notified -= noteList[hasNote]->waited;
+    noteList[hasNote]->waited = 0;
+*/
     thread->resume();
   }
 }
