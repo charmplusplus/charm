@@ -14,7 +14,7 @@
                         // REFINE_TOL*desiredEdgeLength
 #define COARSEN_TOL 0.8 // Coarsen element with average edge length <
                         // COARSEN_TOL*desiredEdgeLength
-#define QUALITY_MIN 0.6
+#define QUALITY_MIN 0.7
 
 class FEM_Adapt_Algs;
 CtvExtern(FEM_Adapt_Algs *, _adaptAlgs);

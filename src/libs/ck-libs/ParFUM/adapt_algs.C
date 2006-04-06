@@ -85,7 +85,8 @@ int FEM_Adapt_Algs::Refine(int qm, int method, double factor, double *sizes)
 	if (theMesh->elem[0].getMeshSizing(i) <= 0.0) 
 	  CkPrintf("WARNING: mesh element %d has no sizing!\n", i);
 	if ((theMesh->elem[0].getMeshSizing(i) > 0.0) &&
-	    (avgEdgeLength > (theMesh->elem[0].getMeshSizing(i)*REFINE_TOL))){
+	    (avgEdgeLength > (theMesh->elem[0].getMeshSizing(i)*REFINE_TOL))
+	    || (qFactor < QUALITY_MIN)) {
 	  Insert(i, qFactor*(1.0/maxEdgeLength), 0);
 	}
       }
@@ -113,17 +114,19 @@ int FEM_Adapt_Algs::Refine(int qm, int method, double factor, double *sizes)
 	  }
 	}
 	avgEdgeLength /= 3.0;
+	double qFactor=getAreaQuality(elId);
 	if ((theMesh->elem[0].getMeshSizing(elId) > 0.0) &&
-	    (avgEdgeLength>(theMesh->elem[0].getMeshSizing(elId)*REFINE_TOL))){
+	    (avgEdgeLength>(theMesh->elem[0].getMeshSizing(elId)*REFINE_TOL))
+	    || (qFactor < QUALITY_MIN)) {
 	  if (theAdaptor->edge_bisect(n1, n2) > 0)  iter_mods++;
 	}
       }
       CthYield(); // give other chunks on the same PE a chance
     }
     mods += iter_mods;
-    CkPrintf("ParFUM_Refine: %d modifications in last pass.\n", iter_mods);
+    //CkPrintf("ParFUM_Refine: %d modifications in last pass.\n", iter_mods);
   }
-  CkPrintf("ParFUM_Refine: %d total modifications.\n", mods);
+  //CkPrintf("ParFUM_Refine: %d total modifications.\n", mods);
   delete[] refineStack;
   delete[] refineElements;
   return mods;
@@ -137,7 +140,6 @@ int FEM_Adapt_Algs::Refine(int qm, int method, double factor, double *sizes)
 void FEM_Adapt_Algs::FEM_Coarsen(int qm, int method, double factor, 
 				 double *sizes)
 {
-  CkPrintf("WARNING: ParFUM_Coarsen: Under construction.\n");
   SetMeshSize(method, factor, sizes);
   GradateMesh(GRADATION);
   (void)Coarsen(qm, method, factor, sizes);
@@ -244,9 +246,9 @@ int FEM_Adapt_Algs::Coarsen(int qm, int method, double factor, double *sizes)
       CthYield(); // give other chunks on the same PE a chance
     }
     mods += iter_mods;
-    CkPrintf("ParFUM_Coarsen: %d modifications in pass %d.\n", iter_mods, pass);
+    //CkPrintf("ParFUM_Coarsen: %d modifications in pass %d.\n", iter_mods, pass);
   }
-  CkPrintf("ParFUM_Coarsen: %d total modifications over %d passes.\n", mods, pass);
+  //CkPrintf("ParFUM_Coarsen: %d total modifications over %d passes.\n", mods, pass);
   delete[] coarsenElements;
   return mods;
 }
@@ -283,7 +285,7 @@ void FEM_Adapt_Algs::SetMeshSize(int method, double factor, double *sizes)
     for (int i=0; i<numElements; i++) {
       theMesh->elem[0].setMeshSizing(i, factor);
     }
-    CkPrintf("ParFUM_SetMeshSize: UNIFORM %4.6e\n", factor);
+    //CkPrintf("ParFUM_SetMeshSize: UNIFORM %4.6e\n", factor);
   }
   else if (method == 1) { // copy sizing from array
     for (int i=0; i<numElements; i++) {
@@ -291,7 +293,7 @@ void FEM_Adapt_Algs::SetMeshSize(int method, double factor, double *sizes)
 	theMesh->elem[0].setMeshSizing(i, sizes[i]);
       }
     }
-    CkPrintf("ParFUM_SetMeshSize: SIZES input\n");
+    //CkPrintf("ParFUM_SetMeshSize: SIZES input\n");
   }
   else if (method == 2) { // calculate current sizing and scale by factor
     double avgEdgeLength = 0.0;
@@ -310,7 +312,7 @@ void FEM_Adapt_Algs::SetMeshSize(int method, double factor, double *sizes)
       avgEdgeLength /= (double)numEdges;
       theMesh->elem[0].setMeshSizing(i, factor*avgEdgeLength);
     }
-    CkPrintf("ParFUM_SetMeshSize: CALCULATED & SCALED \n");
+    //CkPrintf("ParFUM_SetMeshSize: CALCULATED & SCALED \n");
   }
   else if (method == 3) { // scale existing sizes by array sizes
     for (int i=0; i<numElements; i++) {
@@ -325,7 +327,7 @@ void FEM_Adapt_Algs::SetMeshSize(int method, double factor, double *sizes)
     }
   }
   else if (method == 5) { // mesh sizing has been set independently; use as is
-    CkPrintf("ParFUM_SetMeshSize: USE EXISTING SIZES \n");
+    //CkPrintf("ParFUM_SetMeshSize: USE EXISTING SIZES \n");
   }
   //  CkPrintf("Current mesh sizing: ");
   //for (int i=0; i<numElements; i++) {
@@ -374,10 +376,9 @@ void FEM_Adapt_Algs::GradateMesh(double smoothness)
     int* adjNodes, *boundNodes;
     int nadjNodes, nnodes;
     int meshNum = FEM_Mesh_default_read();
-
-    if (smoothness < 1.0) {
-        printf("");
-    }
+    //if (smoothness < 1.0) {
+      //printf("");
+    //}
 
     nnodes = theMesh->node.size();
     boundNodes = new int[nnodes];
@@ -385,7 +386,7 @@ void FEM_Adapt_Algs::GradateMesh(double smoothness)
             boundNodes, 0, nnodes, FEM_INT, 1);
 
 
-    printf("Running h-shock mesh gradation with beta=%.3f\n", beta);
+    //printf("Running h-shock mesh gradation with beta=%.3f\n", beta);
     fflush(NULL);
 
 #ifndef GRADATION_ITER_LIMIT
@@ -472,15 +473,14 @@ void FEM_Adapt_Algs::GradateMesh(double smoothness)
             delete[] adjNodes;
         } 
         
-        printf("Finished iteration %d\n", iteration);
-        printf("Max shock:%8.3f\n", maxShock);
-        printf("Min shock:%8.3f\n", minShock);
-        printf("Target:%8.3f\n", beta);
+	//printf("Finished iteration %d\n", iteration);
+        //printf("Max shock:%8.3f\n", maxShock);
+        //printf("Min shock:%8.3f\n", minShock);
+        //printf("Target:%8.3f\n", beta);
         
     } while (maxShock > beta && ++iteration < GRADATION_ITER_LIMIT);
 
-    printf("%d total updates in %d iterations in GradateMesh\n", 
-            updates, iteration);
+    //printf("%d total updates in %d iterations in GradateMesh\n", updates, iteration);
     fflush(NULL);
 
     delete[] boundNodes;
