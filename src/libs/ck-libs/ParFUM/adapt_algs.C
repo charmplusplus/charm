@@ -35,6 +35,10 @@ void FEM_Adapt_Algs::FEM_AdaptMesh(int qm, int method, double factor,
   (void)Refine(qm, method, factor, sizes);
   GradateMesh(GRADATION);
   (void)Coarsen(qm, method, factor, sizes);
+  SetMeshSize(4, 0.5, NULL);
+  (void)Refine(qm, 4, 0.5, NULL);
+  SetMeshSize(4, 2.0, NULL);
+  (void)Coarsen(qm, 4, 2.0, NULL);
 }
 
 /* Perform refinements on a mesh.  Tries to maintain/improve element quality as
