@@ -109,13 +109,19 @@ class win_obj {
 	     MPI_Comm comm);
   int free();
   
-  int put(void *orgaddr, int orgcnt, MPI_Datatype orgtype, 
-	  MPI_Aint targdisp, int targcnt, MPI_Datatype targtype);
+  int put(void *orgaddr, int orgcnt, int orgunit, 
+	  MPI_Aint targdisp, int targcnt, int targunit);
 
-  int get(void *orgaddr, int orgcnt, MPI_Datatype orgtype, 
-	  MPI_Aint targdisp, int targcnt, MPI_Datatype targtype);
+  int get(void *orgaddr, int orgcnt, int orgunit, 
+	  MPI_Aint targdisp, int targcnt, int targunit);
   int accumulate(void *orgaddr, int orgcnt, MPI_Datatype orgtype, MPI_Aint targdisp, int targcnt, 
   		  MPI_Datatype targtype, MPI_Op op);
+
+  int iget(int orgcnt, MPI_Datatype orgtype,
+          MPI_Aint targdisp, int targcnt, MPI_Datatype targtype);
+  int igetWait(MPI_Request *req, MPI_Status *status);
+  int igetFree(MPI_Request *req, MPI_Status *status);
+
   int fence();
 	  
   int lock(int requestRank, int pe_src, int ftHandle, int lock_type);
@@ -1348,12 +1354,19 @@ class ampi : public CBase_ampi {
 	       MPI_Aint targdisp, int targcnt, MPI_Datatype targtype, WinStruct win);
     int winGet(void *orgaddr, int orgcnt, MPI_Datatype orgtype, int rank, 
 	       MPI_Aint targdisp, int targcnt, MPI_Datatype targtype, WinStruct win);
+    int winIGet(MPI_Aint orgdisp, int orgcnt, MPI_Datatype orgtype, int rank,
+               MPI_Aint targdisp, int targcnt, MPI_Datatype targtype, WinStruct win, 
+	       MPI_Request *req);
+    int winIGetWait(MPI_Request *request, MPI_Status *status);
+    int winIGetFree(MPI_Request *request, MPI_Status *status);
     void winRemotePut(int orgtotalsize, char* orgaddr, int orgcnt, MPI_Datatype orgtype,
 		      MPI_Aint targdisp, int targcnt, MPI_Datatype targtype, 
 		      int winIndex, CkFutureID ftHandle, int pe_src);
     void winRemoteGet(int orgcnt, MPI_Datatype orgtype, MPI_Aint targdisp, 
 		      int targcnt, MPI_Datatype targtype, 
     		      int winIndex, CkFutureID ftHandle, int pe_src);
+    AmpiMsg* winRemoteIGet(int orgdisp, int orgcnt, MPI_Datatype orgtype, MPI_Aint targdisp,
+			   int targcnt, MPI_Datatype targtype, int winIndex);
     int winLock(int lock_type, int rank, WinStruct win);
     int winUnlock(int rank, WinStruct win);
     void winRemoteLock(int lock_type, int winIndex, CkFutureID ftHandle, int pe_src, int requestRank);

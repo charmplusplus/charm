@@ -32,12 +32,14 @@ module ampi {
 			   CkFutureID ftHandle, int pe_src);
     entry void winRemoteGet(int orgcnt, MPI_Datatype orgtype,
 			   MPI_Aint targdisp, int targcnt, MPI_Datatype targtype, int winIndex,
-			   CkFutureID ftHandle, int pe_src);
+                           CkFutureID ftHandle, int pe_src);
     entry void winRemoteAccumulate(int orgtotalsize, char orgaddr[orgtotalsize], int orgcnt, MPI_Datatype orgtype, 
 				  MPI_Aint targdisp, int targcnt, MPI_Datatype targtype, 
 				  MPI_Op op, int winIndex, CkFutureID ftHandle, int pe_src);
     entry void winRemoteLock(int lock_type, int winIndex, CkFutureID ftHandle, int pe_src, int requestRank);
     entry void winRemoteUnlock(int winIndex, CkFutureID ftHandle, int pe_src, int requestRank);
+    entry [iget] AmpiMsg *winRemoteIGet(int orgdisp, int orgcnt, MPI_Datatype orgtype,
+                           MPI_Aint targdisp, int targcnt, MPI_Datatype targtype, int winIndex);
   };
 
   group [migratable] ampiWorlds {

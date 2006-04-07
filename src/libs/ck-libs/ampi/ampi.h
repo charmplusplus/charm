@@ -201,11 +201,13 @@ typedef int MPI_Group;
 #define MPI_MAX_COMM_WORLDS 8
 extern MPI_Comm MPI_COMM_UNIVERSE[MPI_MAX_COMM_WORLDS];
 
-
+class AmpiMsg;
 typedef int MPI_Request;
 typedef struct {
   int MPI_TAG, MPI_SOURCE, MPI_COMM, MPI_LENGTH;
+  AmpiMsg *msg;
 } MPI_Status;
+
 #define stsempty(sts) (sts).MPI_TAG=(sts).MPI_SOURCE=(sts).MPI_COMM=(sts).MPI_LENGTH=0
 #define MPI_STATUS_IGNORE (MPI_Status *)0
 
@@ -666,8 +668,18 @@ int AMPI_Get(void *orgaddr, int orgcnt, MPI_Datatype orgtype, int rank,
 	MPI_Aint targdisp, int targcnt, MPI_Datatype targtype, MPI_Win win);
 #define MPI_Accumulate AMPI_Accumulate
 int AMPI_Accumulate(void *orgaddr, int orgcnt, MPI_Datatype orgtype, int rank,
-		   MPI_Aint targdisp, int targcnt, MPI_Datatype targtype, 
-		   MPI_Op op, MPI_Win win);
+                   MPI_Aint targdisp, int targcnt, MPI_Datatype targtype,
+                   MPI_Op op, MPI_Win win);
+
+#define MPI_IGet AMPI_IGet
+int AMPI_IGet(MPI_Aint orgdisp, int orgcnt, MPI_Datatype orgtype, int rank,
+        MPI_Aint targdisp, int targcnt, MPI_Datatype targtype, MPI_Win win,
+	MPI_Request *request);
+#define MPI_IGet_Wait AMPI_IGet_Wait
+int AMPI_IGet_Wait(MPI_Request *request, MPI_Status *status, MPI_Win win);
+#define MPI_IGet_Free AMPI_IGet_Free
+int AMPI_IGet_Free(MPI_Request *request, MPI_Status *status, MPI_Win win);
+char* MPI_IGet_Data(MPI_Status status);
 
 #define MPI_Info_create AMPI_Info_create
 int AMPI_Info_create(MPI_Info *info);

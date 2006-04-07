@@ -97,14 +97,14 @@ int win_obj::free(){
 // This is a local function. 
 // AMPI_Win_put will act as a wrapper: pack the input parameters, copy the 
 //   remote data to local, and call this function of the involved WIN object
-int win_obj::put(void *orgaddr, int orgcnt, MPI_Datatype orgtype, 
-		 MPI_Aint targdisp, int targcnt, MPI_Datatype targtype) {
+int win_obj::put(void *orgaddr, int orgcnt, int orgunit, 
+		 MPI_Aint targdisp, int targcnt, int targunit) {
   if(initflag == 0) {
     CkAbort("Put to non-existing MPI_Win\n");
     return WIN_ERROR;
   }
-  
-  if((targdisp+targcnt*sizeof(targtype)) > (winSize)){
+  int totalsize = targdisp+targcnt*targunit;
+  if(totalsize > (winSize)){
     CkAbort("Put size exceeds MPI_Win size\n");
     return WIN_ERROR;
   }
@@ -112,18 +112,34 @@ int win_obj::put(void *orgaddr, int orgcnt, MPI_Datatype orgtype,
   return WIN_SUCCESS;
 }
 
-int win_obj::get(void *orgaddr, int orgcnt, MPI_Datatype orgtype, 
-		 MPI_Aint targdisp, int targcnt, MPI_Datatype targtype){
+int win_obj::get(void *orgaddr, int orgcnt, int orgunit, 
+		 MPI_Aint targdisp, int targcnt, int targunit){
+  if(initflag == 0) {
+    CkAbort("Get from non-existing MPI_Win\n");
+    return WIN_ERROR;
+  }
+  int totalsize = targdisp+targcnt*targunit;
+  if(totalsize > (winSize)){
+    CkAbort("Get size exceeds MPI_Win size\n");
+    return WIN_ERROR;
+  }
+  // Call the RMA operation here!!!     
+
+  return WIN_SUCCESS;
+}
+
+int win_obj::iget(int orgcnt, int orgunit,
+                 MPI_Aint targdisp, int targcnt, int targunit){
   if(initflag == 0) {
     CkAbort("Get from non-existing MPI_Win\n");
     return WIN_ERROR;
   }
 
-  if((targdisp+targcnt*sizeof(targtype)) > (winSize)){
+  if((targdisp+targcnt*targunit) > (winSize)){
     CkAbort("Get size exceeds MPI_Win size\n");
     return WIN_ERROR;
   }
-  // Call the RMA operation here!!!     
+  // Call the RMA operation here!!!
 
   return WIN_SUCCESS;
 }
@@ -244,12 +260,15 @@ void
 ampi::winRemotePut(int orgtotalsize, char* sorgaddr, int orgcnt, MPI_Datatype orgtype, 
 		   MPI_Aint targdisp, int targcnt, MPI_Datatype targtype,
 		   int winIndex, CkFutureID ftHandle, int pe_src) {
-  win_obj *winobj = winObjects[winIndex];	
-
-  winobj->put(sorgaddr, orgcnt/sizeof(orgtype), orgtype, targdisp, targcnt, targtype);
-  CkDDT_DataType *ddt = getDDT()->getType(targtype);
-  char* targaddr = ((char*)(winobj->baseAddr)) + ddt->getSize(targdisp);
-  ddt->serialize(targaddr, (char*)sorgaddr, targcnt, (-1));
+  win_obj *winobj = winObjects[winIndex];
+  int orgunit, targunit;
+  CkDDT_DataType *oddt = getDDT()->getType(orgtype); 
+  CkDDT_DataType *tddt = getDDT()->getType(targtype);
+  orgunit = oddt->getSize(1);
+  targunit = tddt->getSize(1);
+  winobj->put(sorgaddr, orgcnt, orgunit, targdisp, targcnt, targunit);
+  char* targaddr = ((char*)(winobj->baseAddr)) + tddt->getSize(targdisp);
+  tddt->serialize(targaddr, (char*)sorgaddr, targcnt, (-1));
 
   int tmp = 0;
   AmpiMsg *msg = new (tmp, 0) AmpiMsg(-1, -1, -1, thisIndex, 0,myComm.getComm());
@@ -280,7 +299,7 @@ ampi::winGet(void *orgaddr, int orgcnt, MPI_Datatype orgtype, int rank,
   AMPI_DEBUG("    Future [%d] awaken\n", ftHandle);
   
   // Process the reply message and copy the data into desired memory position 
-  memcpy(sorgaddr, msg->data, orgcnt*sizeof(orgtype));  
+  memcpy(sorgaddr, msg->data, orgtotalsize);  
   ddt->serialize((char*)orgaddr, (char*)sorgaddr, orgcnt, (-1));
   AMPI_DEBUG("    Rank[%d] got win  [%d] \n", thisIndex, *(int*)msg->data);
   AMPI_DEBUG("    Rank[%d] got win  [%d] , size %d\n", thisIndex, *(int*)orgaddr, orgcnt);
@@ -294,19 +313,23 @@ ampi::winRemoteGet(int orgcnt, MPI_Datatype orgtype, MPI_Aint targdisp, int targ
 		   int pe_src) {
   AMPI_DEBUG("    RemoteGet invoked at Rank[%d:%d]\n", thisIndex, myRank);  
 
-  CkDDT_DataType *ddt = getDDT()->getType(targtype);
-  int stargtotalsize = ddt->getSize(targcnt);
+  int orgunit, targunit;
+  CkDDT_DataType *oddt = getDDT()->getType(orgtype);
+  CkDDT_DataType *tddt = getDDT()->getType(targtype);
+  orgunit = oddt->getSize(1);
+  targunit = tddt->getSize(1);
+  int stargtotalsize = tddt->getSize(targcnt);
   char* stargaddr = (char*)new char[stargtotalsize];
  
   win_obj *winobj = winObjects[winIndex];
-  winobj->get(stargaddr, orgcnt, orgtype, targdisp, targcnt, targtype);
+  winobj->get(stargaddr, orgcnt, orgunit, targdisp, targcnt, targunit);
 
   AMPI_DEBUG("    Rank[%d] get win  [%d] \n", thisIndex, *(int*)stargaddr);
   
   AmpiMsg *msg = new (stargtotalsize, 0) AmpiMsg(-1, -1, -1, thisIndex, stargtotalsize,myComm.getComm());
 
-  char* targaddr = (char*)(winobj->baseAddr) + ddt->getSize(targdisp);
-  ddt->serialize(targaddr, (char*)stargaddr, targcnt, 1);
+  char* targaddr = (char*)(winobj->baseAddr) + targunit*targdisp;
+  tddt->serialize(targaddr, (char*)stargaddr, targcnt, 1);
   memcpy(msg->data, stargaddr, stargtotalsize);
   AMPI_DEBUG("    Rank[%d] copy win  [%d] \n", thisIndex, *(int*)msg->data);
 
@@ -314,6 +337,76 @@ ampi::winRemoteGet(int orgcnt, MPI_Datatype orgtype, MPI_Aint targdisp, int targ
   CkSendToFuture(ftHandle, (void *)msg, pe_src);
   delete [] stargaddr;
  } 
+
+
+
+int
+ampi::winIGet(MPI_Aint orgdisp, int orgcnt, MPI_Datatype orgtype, int rank,
+             MPI_Aint targdisp, int targcnt, MPI_Datatype targtype, WinStruct win, 
+	     MPI_Request *req){
+  // Send the request to data and handle of Future to remote side
+  CProxy_ampi pa(thisArrayID);
+  AMPI_DEBUG("    Rank[%d:%d] request Remote iget at [%d]\n", thisIndex, myRank, rank);
+  *req = pa[rank].winRemoteIGet(orgdisp, orgcnt, orgtype, targdisp, targcnt, targtype, win.index);
+  return MPI_SUCCESS;
+}
+
+
+AmpiMsg*
+ampi::winRemoteIGet(int orgdisp, int orgcnt, MPI_Datatype orgtype, MPI_Aint targdisp, int targcnt,
+                   MPI_Datatype targtype, int winIndex) {
+  AMPI_DEBUG("    RemoteIGet invoked at Rank[%d:%d]\n", thisIndex, myRank);
+// FIX: no need for stargaddr??
+// FIX: what is targaddr pointing??
+  int orgunit, targunit;
+  CkDDT_DataType *oddt = getDDT()->getType(orgtype);
+  CkDDT_DataType *tddt = getDDT()->getType(targtype);
+  orgunit = oddt->getSize(1);
+  targunit = tddt->getSize(1);
+  int stargtotalsize = targunit*targcnt;
+  char* stargaddr = (char*)new char[stargtotalsize];
+
+  win_obj *winobj = winObjects[winIndex];
+  winobj->iget(orgcnt, orgunit, targdisp, targcnt, targunit);
+
+  AMPI_DEBUG("    Rank[%d] iget win  [%d] \n", thisIndex, *(int*)stargaddr);
+
+  AmpiMsg *msg = new (stargtotalsize, 0) AmpiMsg(-1, -1, -1, thisIndex,
+stargtotalsize,myComm.getComm());
+
+  char* targaddr = (char*)(winobj->baseAddr) + targdisp*targunit;
+  tddt->serialize(targaddr, (char*)stargaddr, targcnt, 1);
+  memcpy(msg->data, stargaddr, stargtotalsize);
+  AMPI_DEBUG("    Rank[%d] copy win  [%d] \n", thisIndex, *(int*)msg->data);
+  delete [] stargaddr;
+  return msg;
+ }
+
+int
+ampi::winIGetWait(MPI_Request *request, MPI_Status *status) {
+  // Wait on the Future object
+  AMPI_DEBUG("    [%d] IGet Waiting\n", thisIndex, *request);
+  status->msg = (AmpiMsg*)CkWaitReleaseFuture(*request);
+  AMPI_DEBUG("    [%d] IGet Waiting [%d] awaken\n", thisIndex, *request);
+  return MPI_SUCCESS;
+}
+
+int
+ampi::winIGetFree(MPI_Request *request, MPI_Status *status) {
+  AMPI_DEBUG("    [%d] : IGet [%d] frees buffer\n", thisIndex, *request);
+
+  
+  if(!(MPI_IGet_Data(*status))) {
+    AMPI_DEBUG("    [%d] IGet [%d] attempt to free NULL buffer \n", thisIndex, *request);
+    return MPI_ERR_BUFFER;
+  }
+  else {
+    delete (status->msg);	
+    return MPI_SUCCESS;	
+  }
+}
+
+
  
 int 
 ampi::winAccumulate(void *orgaddr, int orgcnt, MPI_Datatype orgtype, int rank,
@@ -478,6 +571,7 @@ ampi::getWinObjInstance(WinStruct win) {
   return winObjects[win.index];
 }
 
+
 /*
  * int AMPI_Win_create(void *base, MPI_Aint size, int disp_unit,
  *	       MPI_Info info, MPI_Comm comm, MPI_Win *newwin)
@@ -562,6 +656,8 @@ int AMPI_Get(void *orgaddr, int orgcnt, MPI_Datatype orgtype, int rank,
   // winGet is a local function which will call the remote method on #rank processor 
   return  ptr->winGet(orgaddr, orgcnt, orgtype, rank, targdisp, targcnt, targtype, winStruct);
 }
+
+
 
 /*
  * int AMPI_Accumulate(void *orgaddr, int orgcnt, MPI_Datatype orgtype, int rank,
@@ -691,6 +787,40 @@ int AMPI_Win_complete(MPI_Win win){
   return MPI_SUCCESS;
 }
 
+// FIX PLACE II
+CDECL
+int AMPI_IGet(MPI_Aint orgdisp, int orgcnt, MPI_Datatype orgtype, int rank,
+        MPI_Aint targdisp, int targcnt, MPI_Datatype targtype, MPI_Win win,
+        MPI_Request *request) {
+  AMPIAPI("AMPI_IGet");
+  WinStruct winStruct = getAmpiParent()->getWinStruct(win);
+  ampi *ptr = getAmpiInstance(winStruct.comm);
+  // winGet is a local function which will call the remote method on #rank processor
+  return  ptr->winIGet(orgdisp, orgcnt, orgtype, rank, targdisp, targcnt, targtype, winStruct,
+		       request);
+}
+
+CDECL
+int AMPI_IGet_Wait(MPI_Request *request, MPI_Status *status, MPI_Win win) {
+  AMPIAPI("AMPI_IGet_Wait");
+  WinStruct winStruct = getAmpiParent()->getWinStruct(win);
+  ampi *ptr = getAmpiInstance(winStruct.comm);
+  // winGet is a local function which will call the remote method on #rank processor
+  return  ptr->winIGetWait(request,status);
+}
+
+CDECL
+int AMPI_IGet_Free(MPI_Request *request, MPI_Status *status, MPI_Win win) {
+  AMPIAPI("AMPI_IGet_Free");
+  WinStruct winStruct = getAmpiParent()->getWinStruct(win);
+  ampi *ptr = getAmpiInstance(winStruct.comm);
+  // winGet is a local function which will call the remote method on #rank processor
+  return  ptr->winIGetFree(request, status);
+}
+
+char* 
+MPI_IGet_Data(MPI_Status status) 
+{ return (char*)((AmpiMsg*)status.msg)->data; }
 
 /*
  * int AMPI_Alloc_mem(MPI_Aint size, MPI_Info info, void *baseptr) 
