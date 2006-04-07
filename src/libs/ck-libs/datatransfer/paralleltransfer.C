@@ -455,15 +455,19 @@ void parallelTransfer_c::transfer(progress_t &progress) {
   int lastDest=firstDest+destMesh.getTets();
   bbox3d *boxes=new bbox3d[lastDest];
   int *prio=new int[lastDest];
+  progress.p("Finding bounding boxes: src");
   for (s=0;s<firstDest;s++) 
     { boxes[s]=getBox(s,srcMesh); prio[s]=1; }
+  progress.p("Finding bounding boxes: dest");
   for (d=firstDest;d<lastDest;d++) 
     { boxes[d]=getBox(d-firstDest,destMesh); prio[d]=2; }
   
   /* Collide the bounding boxes */
+  printf("[%d] Rank %d: BEGIN colliding bounding boxes...\n",CkMyPe(), myRank);
   progress.p("Colliding bounding boxes");
   COLLIDE_Boxes_prio(voxels, lastDest,(const double *)boxes,prio);
   delete[] boxes; delete[] prio;
+  printf("[%d] Rank %d: DONE colliding bounding boxes...\n",CkMyPe(), myRank);
   
   /* Extract the list of collisions */
   progress.p("Extracting collision list");

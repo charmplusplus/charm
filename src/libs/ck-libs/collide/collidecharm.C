@@ -187,7 +187,7 @@ private:
 	collideMgr *mgr;
 public:
 	voxelAggregator(const CollideLoc3d &dest,collideMgr *mgr_)
-		:destination(dest),mgr(mgr_) { }
+	  :destination(dest),mgr(mgr_) { }
 	
 	//Add this object to the packList
 	inline void add(const CollideObjRec &o) {
@@ -250,12 +250,12 @@ void CollisionAggregator::aggregate(int pe, int chunk, int n,
       sy(gridMap.world2grid(1,bbox.axis(1))),
       sz(gridMap.world2grid(2,bbox.axis(2)));
     STATS(objects++)
-      STATS(gridSizes[0]+=sx.getMax()-sx.getMin())
-      STATS(gridSizes[1]+=sy.getMax()-sy.getMin())
-      STATS(gridSizes[2]+=sz.getMax()-sz.getMin())
+    STATS(gridSizes[0]+=sx.getMax()-sx.getMin())
+    STATS(gridSizes[1]+=sy.getMax()-sy.getMin())
+    STATS(gridSizes[2]+=sz.getMax()-sz.getMin())
       
-      //Loop over all grid voxels touched by this object
-      CollideLoc3d g;
+    //Loop over all grid voxels touched by this object
+    CollideLoc3d g;
     g.z=sz.getMin();
     do { 
       g.y=sy.getMin();
@@ -422,15 +422,17 @@ void collideMgr::unregisterContributor(int chunkNo)
 void collideMgr::contribute(int chunkNo,
 	int n,const bbox3d *boxes,const int *prio)
 {
-	CM_STATUS("collideMgr::contribute "<<n<<" boxes from "<<chunkNo);
-	aggregator.aggregate(CkMyPe(),chunkNo,n,boxes,prio);
-	if (++contribCount==nContrib) //That's everybody
-	{
-		aggregator.send(); //Deliver all outgoing messages
-		if (getStepCount()%8==7)
-			aggregator.compact();//Blow away all the old voxels (saves memory)
-		tryAdvance();
-	}
+  printf("[%d] Receiving contribution from %d\n",CkMyPe(), chunkNo);
+  CM_STATUS("collideMgr::contribute "<<n<<" boxes from "<<chunkNo);
+  aggregator.aggregate(CkMyPe(),chunkNo,n,boxes,prio);
+  aggregator.send(); //Deliver all outgoing messages
+  if (++contribCount==nContrib) { //That's everybody
+    //aggregator.send(); //Deliver all outgoing messages
+    //if (getStepCount()%8==7)
+      aggregator.compact();//Blow away all the old voxels (saves memory)
+    tryAdvance();
+  }
+  printf("[%d] DONE receiving contribution from %d\n",CkMyPe(), chunkNo);
 }
 
 inline CkArrayIndex3D buildIndex(const CollideLoc3d &l) 

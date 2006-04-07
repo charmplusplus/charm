@@ -55,6 +55,13 @@ public:
 	CkVector3d *getPointArray(void);
 	const CkVector3d *getPointArray(void) const;
 	
+	void cleanup() {
+	  pts.erase(pts.begin(), pts.end());
+	  std::vector<CkVector3d>(pts).swap(pts);
+	  tet.erase(tet.begin(), tet.end());
+	  std::vector<conn_t>(tet).swap(tet);
+	}
+
 	/// Simple mesh modification.  
 	///  The new number of the added object is returned.
 	int addTet(const conn_t &c) {tet.push_back(c); return tet.size()-1;}
@@ -64,6 +71,7 @@ public:
 private:
 	std::vector<conn_t> tet; //< Connectivity
 	std::vector<CkVector3d> pts; //< nPts 3d node locations.
+
 	
 	///Check these indices for in-range
 #if OSL_TETMESH_DEBUG /* Slow bounds checks */
