@@ -56,7 +56,11 @@ processors.  The handle of a chare has type \kw{CkChareID}.  The
 variable \kw{thishandle} holds the handle of the
 chare whose entry function or public function is currently executing.
 \kw{thishandle} is a public instance variable of the chare object
-(it is inherited from the system-defined superclass for chares, \kw{Chare}).
+which is inherited from the system-defined superclass
+\kw{CBase}\_\uw{ClassType}.
+Following the older syntax, chares are also allowed to inherit directly
+for the superclass \kw{Chare} instead of \kw{CBase}\_\uw{ClassType}, although
+this form is not suggested.
 \kw{thishandle} can be used to set fields in a message. This  
 mechanism allows chares to send their handles to other chares.
 
