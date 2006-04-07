@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include "mpi.h"
+#include <math.h>
 
 #if CMK_BLUEGENE_CHARM
 extern void BgPrintf(char *);
@@ -9,7 +10,7 @@ extern void BgPrintf(char *);
 #define BGPRINTF(x)
 #endif
 
-#define DIMX 100
+#define DIMX 100 
 #define DIMY 100
 #define DIMZ 100
 
@@ -126,12 +127,27 @@ int main(int ac, char** av)
   for(i=0; i<DIMZ; i++)
     for(j=0; j<DIMY; j++)
       for(k=0; k<DIMX; k++)
-        cp->t[k][j][i] = DIMY*DIMX*(i-1) + DIMX*(j-2) + (k-1);
+        cp->t[k][j][i] = DIMY*DIMX*(i) + DIMX*(j) + (k);
+/*
+  for(i=0;i<DIMZ;i++){
+      printf("Plane %d\n",i);
+      for(j=0; j<DIMY; j++){
+        for(k=0; k<DIMX; k++)
+          printf("%5.2f\t",cp->t[k][j][i]);
+        printf("\n");
+      }
 
+  }
+*/
   MPI_Barrier(MPI_COMM_WORLD);
   starttime = MPI_Wtime();
+  MPI_Datatype linevec, planevec;
+  MPI_Type_vector(1,DIMX,DIMY*DIMX,MPI_DOUBLE,&linevec);
+  MPI_Type_commit(&linevec);
+  MPI_Type_vector(1,1,DIMX,MPI_DOUBLE,&planevec);
+  MPI_Type_commit(&planevec);
 
-  MPI_Win_create(cp->t, DIMX*DIMY*DIMZ, 1, 0, MPI_COMM_WORLD, &win);
+  MPI_Win_create(cp->t, DIMX*DIMY*DIMZ, sizeof(double), 0, MPI_COMM_WORLD, &win);
 
   maxerr = 0.0;
   for(iter=1; iter<=niter; iter++) {
@@ -145,13 +161,12 @@ int main(int ac, char** av)
     copyout(cp->sbzm, cp->t, 1, DIMX, 1, DIMY, 1, 1);
     copyout(cp->sbzp, cp->t, 1, DIMX, 1, DIMY, DIMZ, DIMZ);
 */
-
     MPI_IGet(0, DIMY*DIMZ, MPI_DOUBLE, cp->xp, 0, DIMY*DIMZ, MPI_DOUBLE, win, &reqxp);
-    MPI_IGet(0, DIMY*DIMZ, MPI_DOUBLE, cp->xm, 0, DIMY*DIMZ, MPI_DOUBLE, win, &reqxm);
-    MPI_IGet(0, DIMX*DIMZ, MPI_DOUBLE, cp->yp, 0, DIMX*DIMZ, MPI_DOUBLE, win, &reqyp);
-    MPI_IGet(0, DIMX*DIMZ, MPI_DOUBLE, cp->yp, 0, DIMX*DIMZ, MPI_DOUBLE, win, &reqym);
-    MPI_IGet(0, DIMX*DIMY, MPI_DOUBLE, cp->zp, 0, DIMX*DIMY, MPI_DOUBLE, win, &reqzp);
-    MPI_IGet(0, DIMX*DIMY, MPI_DOUBLE, cp->zp, 0, DIMX*DIMY, MPI_DOUBLE, win, &reqzm);
+    MPI_IGet(0, DIMY*DIMZ, MPI_DOUBLE, cp->xm, (DIMX-1)*DIMY*DIMZ, DIMY*DIMZ, MPI_DOUBLE, win, &reqxm);
+    MPI_IGet(0, DIMX*DIMZ, MPI_DOUBLE, cp->yp, 0, DIMZ, linevec, win, &reqyp);
+    MPI_IGet(0, DIMX*DIMZ, MPI_DOUBLE, cp->yp, (DIMY-1), DIMZ, linevec, win, &reqym);
+    MPI_IGet(0, DIMX*DIMY, MPI_DOUBLE, cp->zp, 0, DIMX*DIMY, planevec, win, &reqzp);
+    MPI_IGet(0, DIMX*DIMY, MPI_DOUBLE, cp->zp, 0, DIMX*DIMY, planevec, win, &reqzm);
 
     MPI_IGet_Wait(&reqxp, &stsxp, win);
     MPI_IGet_Wait(&reqxm, &stsxm, win);
@@ -167,10 +182,12 @@ int main(int ac, char** av)
     cp->sbzp = (double*)MPI_IGet_Data(stszp);
     cp->sbzm = (double*)MPI_IGet_Data(stszm);
 
+
     if(iter > 25 &&  iter < 85 && thisIndex == 35)
       m = 9;
     else
       m = 1;
+
     for(; m>0; m--){
       for(i=1; i<DIMZ-1; i++)
         for(j=1; j<DIMY-1; j++)
@@ -178,13 +195,14 @@ int main(int ac, char** av)
             tval = (cp->t[k][j][i] + cp->t[k][j][i+1] +
                  cp->t[k][j][i-1] + cp->t[k][j+1][i]+ 
                  cp->t[k][j-1][i] + cp->t[k+1][j][i] + cp->t[k-1][j][i])/7.0;
-            error = abs(tval-cp->t[k][j][i]);
+            error = fabs(tval-cp->t[k][j][i]);
             cp->t[k][j][i] = tval;
             if (error > maxerr) maxerr = error;
           }
 // Add boundary
-
+    
     }
+
     MPI_IGet_Free(&reqxp, &stsxp, win);
     MPI_IGet_Free(&reqxm, &stsxm, win);
     MPI_IGet_Free(&reqyp, &stsyp, win);
@@ -211,6 +229,8 @@ int main(int ac, char** av)
 #endif
   }
   MPI_Win_free(&win);
+  MPI_Type_free(&linevec);
+  MPI_Type_free(&planevec);
   MPI_Finalize();
   return 0;
 }
