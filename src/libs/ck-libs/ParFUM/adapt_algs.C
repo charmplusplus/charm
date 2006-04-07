@@ -85,8 +85,8 @@ int FEM_Adapt_Algs::Refine(int qm, int method, double factor, double *sizes)
 	if (theMesh->elem[0].getMeshSizing(i) <= 0.0) 
 	  CkPrintf("WARNING: mesh element %d has no sizing!\n", i);
 	if ((theMesh->elem[0].getMeshSizing(i) > 0.0) &&
-	    (avgEdgeLength > (theMesh->elem[0].getMeshSizing(i)*REFINE_TOL))
-	    || (qFactor < QUALITY_MIN)) {
+	    (avgEdgeLength > (theMesh->elem[0].getMeshSizing(i)*REFINE_TOL))){
+	    //|| (qFactor < QUALITY_MIN)) {
 	  Insert(i, qFactor*(1.0/maxEdgeLength), 0);
 	}
       }
@@ -114,10 +114,10 @@ int FEM_Adapt_Algs::Refine(int qm, int method, double factor, double *sizes)
 	  }
 	}
 	avgEdgeLength /= 3.0;
-	double qFactor=getAreaQuality(elId);
+	//double qFactor=getAreaQuality(elId);
 	if ((theMesh->elem[0].getMeshSizing(elId) > 0.0) &&
-	    (avgEdgeLength>(theMesh->elem[0].getMeshSizing(elId)*REFINE_TOL))
-	    || (qFactor < QUALITY_MIN)) {
+	    (avgEdgeLength>(theMesh->elem[0].getMeshSizing(elId)*REFINE_TOL))){
+	  //|| (qFactor < QUALITY_MIN)) {
 	  if (theAdaptor->edge_bisect(n1, n2) > 0)  iter_mods++;
 	}
       }
