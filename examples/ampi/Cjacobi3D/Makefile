@@ -12,6 +12,9 @@ jacobi: jacobi.C
 jacobi.iso: jacobi.C
 	$(CHARMC) -c -DNO_PUP jacobi.C
 	-$(CHARMC) -o jacobi.iso jacobi.o -language ampi -module EveryLB -memory isomalloc
+jacobi-get: jacobi-get.C
+	$(CHARMC) -c jacobi-get.C
+	$(CHARMC) -o jacobi-get jacobi-get.o -language ampi -module EveryLB
 
 test: ampi
 	./charmrun +p3 jacobi 2 2 2 +vp8 +balancer RotateLB +LBDebug
