@@ -79,7 +79,7 @@ win_obj::pup(PUP::er &p) {
 int win_obj::create(char *name, void *base, MPI_Aint size, int disp_unit, MPI_Comm comm){
   winName = NULL;
   baseAddr = base;
-  winSize = size;
+  winSize = size*disp_unit;
   this->disp_unit = disp_unit;
   this->comm = comm;
   // assume : memory pointed by base has been allocated 
