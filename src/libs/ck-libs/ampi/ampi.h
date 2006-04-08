@@ -201,11 +201,11 @@ typedef int MPI_Group;
 #define MPI_MAX_COMM_WORLDS 8
 extern MPI_Comm MPI_COMM_UNIVERSE[MPI_MAX_COMM_WORLDS];
 
-class AmpiMsg;
+struct AmpiMsg;
 typedef int MPI_Request;
 typedef struct {
   int MPI_TAG, MPI_SOURCE, MPI_COMM, MPI_LENGTH;
-  AmpiMsg *msg;
+  struct AmpiMsg *msg;
 } MPI_Status;
 
 #define stsempty(sts) (sts).MPI_TAG=(sts).MPI_SOURCE=(sts).MPI_COMM=(sts).MPI_LENGTH=0
