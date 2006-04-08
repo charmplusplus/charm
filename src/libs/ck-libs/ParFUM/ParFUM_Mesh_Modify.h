@@ -283,13 +283,33 @@ class findgsMsg : public CMessage_findgsMsg {
   }
 };
 
-class elemDataMsg : public CMessage_elemDataMsg {
+class entDataMsg : public CMessage_entDataMsg {
  public:
-  int datasize;
   char *data;
+  int datasize;
+  int memsize;
 
-  elemDataMsg(int size) {
+  entDataMsg(int size, int msize) {
     datasize = size;
+    memsize = msize;
+  }
+};
+
+class updateAttrsMsg : public CMessage_entDataMsg {
+ public:
+  char *data;
+  int datasize;
+  int fromChk;
+  int sharedIdx;
+  bool isnode;
+  bool isGhost;
+  int elemType;
+
+  updateAttrsMsg(int size) {
+    datasize = size;
+    isnode = false;
+    isGhost = false;
+    elemType = 0;
   }
 };
 
@@ -371,7 +391,7 @@ class femMeshModify : public CBase_femMeshModify {
 			       double longEdgeLen);
 
   void addToSharedList(int fromChk, int sharedIdx);
-  void updateNodeAttrs(int fromChk, int sharedIdx, double coordX, double coordY, int bound, bool isGhost);
+  void updateAttrs(updateAttrsMsg *umsg);
   void updateghostsend(verifyghostsendMsg *vmsg);
   findgsMsg *findghostsend(int fromChk, int sharedIdx);
 
@@ -402,7 +422,7 @@ class femMeshModify : public CBase_femMeshModify {
   void interpolateElemCopy(int fromChk, int sharedIdx1, int sharedIdx2);
   void cleanupIDXL(int fromChk, int sharedIdx);
   void purgeElement(int fromChk, int sharedIdx);
-  elemDataMsg *packElemData(int fromChk, int sharedIdx);
+  entDataMsg *packEntData(int fromChk, int sharedIdx, bool isnode=false, int elemType=0);
   boolMsg *isFixedNodeRemote(int fromChk, int sharedIdx);
 };
 // end mesh_modify.h

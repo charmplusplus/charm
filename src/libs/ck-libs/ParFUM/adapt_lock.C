@@ -1333,7 +1333,6 @@ int FEM_AdaptL::edge_contraction_help(int *e1P, int *e2P, int n1, int n2, int e1
     if(numtries>=3 && !done) return ERVAL;
   }
 
-
   //verify if it is causing a flip/sliver
   bool flipSliver = false;
   int *nbr1Elems=NULL, nesize1=0;

@@ -1565,3 +1565,70 @@ void FEM_MUtil::copyElemData(int etype, int elemid, int newEl) {
   inp->FEM_InterpolateElementCopy(em);
 }
 
+ void FEM_MUtil::packEntData(char **data, int *size, int *cnt, int localIdx, bool isnode, int elemType){
+  CkVec<FEM_Attribute *>*entattrs;
+  if(isnode) {
+    entattrs = (mmod->fmMesh->node).getAttrVec();
+  }
+  else {
+    entattrs = (mmod->fmMesh->elem[elemType]).getAttrVec();
+  }
+  int count = 0;
+  PUP::sizer psizer;
+  for(int j=0;j<entattrs->size();j++){
+    FEM_Attribute *attr = (FEM_Attribute *)(*entattrs)[j];
+    if(attr->getAttr() < FEM_ATTRIB_FIRST){ 
+      //FEM_DataAttribute *dattr = (FEM_DataAttribute*)attr;
+      attr->pupSingle(psizer, localIdx);
+      count++;
+    }
+    else if(attr->getAttr()==FEM_MESH_SIZING || attr->getAttr()==FEM_BOUNDARY) {
+      //FEM_DataAttribute *dattr = (FEM_DataAttribute*)attr;
+      attr->pupSingle(psizer, localIdx);
+      count++;
+    }
+  }
+  *cnt = count;
+  *size = psizer.size();
+  *data = (char*)malloc((*size)*sizeof(char));
+  PUP::toMem pmem(*data);
+  for(int j=0;j<entattrs->size();j++){
+    FEM_Attribute *attr = (FEM_Attribute *)(*entattrs)[j];
+    if(attr->getAttr() < FEM_ATTRIB_FIRST){ 
+      //FEM_DataAttribute *dattr = (FEM_DataAttribute*)eattr;
+      attr->pupSingle(pmem, localIdx);
+    }
+    else if(attr->getAttr()==FEM_MESH_SIZING || attr->getAttr()==FEM_BOUNDARY) {
+      //FEM_DataAttribute *dattr = (FEM_DataAttribute*)eattr;
+      attr->pupSingle(pmem, localIdx);
+    }
+  }
+  return;
+}
+
+ void FEM_MUtil::updateAttrs(char *data, int size, int newIndex, bool isnode, int elemType) {
+  PUP::fromMem pmem(data);
+  int count=0;
+  CkVec<FEM_Attribute *>*attrs;
+  if(isnode) {
+    attrs = (mmod->fmMesh->node).getAttrVec();
+  }
+  else {
+    attrs = (mmod->fmMesh->elem[elemType]).getAttrVec();
+  }
+  for(int j=0;j<attrs->size();j++){
+    FEM_Attribute *attr = (FEM_Attribute *)(*attrs)[j];
+    if(attr->getAttr() < FEM_ATTRIB_FIRST){
+      //FEM_DataAttribute *dattr = (FEM_DataAttribute*)attr;
+      attr->pupSingle(pmem, newIndex);
+      count++;
+    }
+    else if(attr->getAttr()==FEM_MESH_SIZING || attr->getAttr()==FEM_BOUNDARY) {
+      //FEM_DataAttribute *dattr = (FEM_DataAttribute*)attr;
+      attr->pupSingle(pmem,newIndex);
+      count++;
+    }
+  }
+  CkAssert(size==count);
+  return;
+}

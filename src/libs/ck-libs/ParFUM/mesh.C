@@ -522,11 +522,7 @@ void FEM_Attribute::pup(PUP::er &p) {
 	if (p.isUnpacking()) tryAllocate();
 }
 void FEM_Attribute::pupSingle(PUP::er &p, int pupindx) {
-	// e, attr, and ghost are always set by the constructor
-	p|width;
-	if (p.isUnpacking() && femVersion > 0 && width<0)  width=0;
-	p|datatype;
-	if (p.isUnpacking()) tryAllocate();
+  return;
 }
 FEM_Attribute::~FEM_Attribute() {}
 

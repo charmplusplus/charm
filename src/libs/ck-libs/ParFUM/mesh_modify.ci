@@ -50,7 +50,10 @@ module ParFUM {
   message findgsMsg {
     int chunks[];
   };
-  message elemDataMsg {
+  message entDataMsg {
+    char data[];
+  };
+  message updateAttrsMsg {
     char data[];
   };
 
@@ -72,7 +75,7 @@ module ParFUM {
     entry [sync,threaded] void removeGhostNode(int fromChk, int sharedIdx);
     entry [sync,threaded] void refine_flip_element_leb(int, int, int, int, int, int, double);
     entry [sync,threaded] void addToSharedList(int, int);
-    entry [sync,threaded] void updateNodeAttrs(int, int, double, double, int, bool);
+    entry [sync,threaded] void updateAttrs(updateAttrsMsg *);
     entry [sync,threaded] double2Msg *getRemoteCoord(int, int);
     entry [sync,threaded] intMsg *getRemoteBound(int, int);
     entry [sync,threaded] intMsg *getIdxGhostSend(int, int, int);
@@ -100,7 +103,7 @@ module ParFUM {
     entry [sync,threaded] void interpolateElemCopy(int, int, int);
     entry [sync,threaded] void cleanupIDXL(int, int);
     entry [sync,threaded] void purgeElement(int, int);
-    entry [sync,threaded] elemDataMsg *packElemData(int fromChk, int sharedIdx);
-    entry [sync,threaded] boolMsg *isFixedNodeRemote(int fromChk, int sharedIdx);
+    entry [sync,threaded] entDataMsg *packEntData(int, int, bool, int);
+    entry [sync,threaded] boolMsg *isFixedNodeRemote(int, int);
   };
 };

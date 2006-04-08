@@ -284,7 +284,10 @@ public:
 	}
 
 	void pupSingle(PUP::er &p, int pupindx) {
-	  p|this->table[pupindx];
+	  int startIdx = this->cols*pupindx;
+	  for(int i=0; i<this->cols; i++) {
+	    p|this->table[startIdx+i];
+	  }
 	}
 
 	friend void operator|(PUP::er &p,AllocTable2d<T> &t) {t.pup(p);}
@@ -2609,6 +2612,8 @@ class FEM_MUtil {
   void idxlunlockLocal(FEM_Mesh *m, int toChk, int type);
 
   void copyElemData(int etype, int elemid, int newEl);
+  void packEntData(char **data, int *size, int *cnt, int localIdx, bool isnode, int elemType);
+  void updateAttrs(char *data, int size, int newIndex, bool isnode, int elemType);
 };
 
 

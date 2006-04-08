@@ -2407,35 +2407,27 @@ void femMeshModify::addToSharedList(int fromChk, int sharedIdx) {
 #ifdef DEBUG 
   CmiMemoryCheck(); 
 #endif
-}
+} 
 
-void femMeshModify::updateNodeAttrs(int fromChk, int sharedIdx, double coordX, double coordY, int bound, bool isGhost) {
+void femMeshModify::updateAttrs(updateAttrsMsg* umsg) {
   CtvAccess(_curTCharm) = tc;
 #ifdef DEBUG 
-  CmiMemoryCheck(); 
+  CmiMemoryCheck();
 #endif
   int localIdx = -1;
-  if(!isGhost) {
-    localIdx = fmUtil->lookup_in_IDXL(fmMesh, sharedIdx, fromChk, 0);
+  if(!umsg->isnode) {
+    localIdx = fmUtil->lookup_in_IDXL(fmMesh, umsg->sharedIdx, umsg->fromChk, 3);
   }
-  else localIdx = fmUtil->lookup_in_IDXL(fmMesh, sharedIdx, fromChk, 2);
-  double *coord = new double[2];
-  coord[0] = coordX; coord[1] = coordY;
-  CkVec<FEM_Attribute *>*attrs = (fmMesh->node).getAttrVec();
-  for (int i=0; i<attrs->size(); i++) {
-    FEM_Attribute *a = (FEM_Attribute *)(*attrs)[i];
-    if (a->getAttr() == fmAdaptAlgs->coord_attr) {
-      FEM_DataAttribute *d = (FEM_DataAttribute *)a;
-      d->getDouble().setRow(localIdx,coord,0);
+  else {
+    if(!umsg->isGhost) {
+      localIdx = fmUtil->lookup_in_IDXL(fmMesh, umsg->sharedIdx, umsg->fromChk, 0);
     }
-    else if(a->getAttr() == FEM_BOUNDARY) {
-      FEM_DataAttribute *d = (FEM_DataAttribute *)a;
-      d->getInt().setRow(localIdx,bound);
-    }
+    else localIdx = fmUtil->lookup_in_IDXL(fmMesh, umsg->sharedIdx, umsg->fromChk, 1);
   }
-  delete [] coord;
+  CkAssert(localIdx!=-1);
+  fmUtil->updateAttrs(umsg->data,umsg->datasize,localIdx,umsg->isnode,umsg->elemType);
 #ifdef DEBUG 
-  CmiMemoryCheck(); 
+  CmiMemoryCheck();
 #endif
   return;
 }
@@ -2746,35 +2738,22 @@ void femMeshModify::purgeElement(int fromChk, int sharedIdx) {
 }
 
 
-elemDataMsg *femMeshModify::packElemData(int fromChk, int sharedIdx) {
+entDataMsg *femMeshModify::packEntData(int fromChk, int sharedIdx, bool isnode, int elemType) {
   CtvAccess(_curTCharm) = tc;
-  int localIdx = fmUtil->lookup_in_IDXL(fmMesh, sharedIdx, fromChk, 3);
+  int localIdx=-1;
+  if(isnode) {
+    localIdx = fmUtil->lookup_in_IDXL(fmMesh, sharedIdx, fromChk, 1);
+  }
+  else {
+    localIdx = fmUtil->lookup_in_IDXL(fmMesh, sharedIdx, fromChk, 3);
+  }
   CkAssert(localIdx!=-1);
-  CkVec<FEM_Attribute *>*elemattrs = (fmMesh->elem[0]).getAttrVec();
-  int count = 0;
-  PUP::sizer psizer;
-  for(int j=0;j<elemattrs->size();j++){
-    FEM_Attribute *elattr = (FEM_Attribute *)(*elemattrs)[j];
-    if(elattr->getAttr() < FEM_ATTRIB_FIRST){ 
-      elattr->pupSingle(psizer, localIdx);
-      count++;
-    }
-    else if(elattr->getAttr()==FEM_MESH_SIZING) {
-      elattr->pupSingle(psizer, localIdx);
-      count++;
-    }
-  }
-  elemDataMsg *edm = new (psizer.size()) elemDataMsg(count);
-  PUP::toMem pmem(edm->data);
-  for(int j=0;j<elemattrs->size();j++){
-    FEM_Attribute *elattr = (FEM_Attribute *)(*elemattrs)[j];
-    if(elattr->getAttr() < FEM_ATTRIB_FIRST){ 
-      elattr->pupSingle(pmem, localIdx);
-    }
-    else if(elattr->getAttr()==FEM_MESH_SIZING) {
-      elattr->pupSingle(pmem, localIdx);
-    }
-  }
+  char *data; 
+  int size, count;
+  fmUtil->packEntData(&data, &size, &count, localIdx, isnode, elemType);
+  entDataMsg *edm = new (size, 0) entDataMsg(count,size);
+  memcpy(edm->data, data, size);
+  free(data);
   return edm;
 }
 
