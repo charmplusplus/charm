@@ -1160,19 +1160,19 @@ void FEM_Entity::setLength(int newlen)
 
 void FEM_Entity::allocateValid(void) {
   if (!valid){
-	valid=new FEM_DataAttribute(this,FEM_IS_VALID_ATTR);
-	add(valid);
-	valid->setWidth(1); //Only 1 flag per node
-	valid->setLength(size());
-	valid->setDatatype(FEM_BYTE);
-	valid->reallocate();
-	
-	// Set all to valid initially
-	for(int i=0;i<size();i++)
-	  valid->getChar()(i,0)=1;
-  first_invalid = last_invalid = 0;
+    valid=new FEM_DataAttribute(this,FEM_IS_VALID_ATTR);
+    add(valid);
+    valid->setWidth(1); //Only 1 flag per node
+    valid->setLength(size());
+    valid->setDatatype(FEM_BYTE);
+    valid->reallocate();
+    
+    // Set all to valid initially
+    for(int i=0;i<size();i++) {
+      valid->getChar()(i,0)=1;
+    }
+    first_invalid = last_invalid = 0;
   }
-
 }
 
 void FEM_Entity::set_valid(unsigned int idx, bool isNode){
@@ -1181,19 +1181,26 @@ void FEM_Entity::set_valid(unsigned int idx, bool isNode){
     valid->getChar()(idx,0)=1;
   }
   else {
-    CkAssert(idx < size() && idx >=0 && first_invalid<=last_invalid);
-    valid->getChar()(idx,0)=1;
-    
-    if(idx == first_invalid)
-      // Move first_invalid to the next invalid entry	
-      while((first_invalid<last_invalid) && is_valid(first_invalid)){
-	first_invalid++;
+    int size1 = size();
+    if(size1==0) {
+      valid->getChar()(idx,0)=1;
+    }
+    else {
+      CkAssert(idx < size1 && idx >=0 && first_invalid<=last_invalid);
+      valid->getChar()(idx,0)=1;
+      if(idx == first_invalid) {
+	// Move first_invalid to the next invalid entry	
+	while((first_invalid<last_invalid) && is_valid(first_invalid)){
+	  first_invalid++;
+	}
       }
-    else if(idx == last_invalid)
-      // Move last_invalid to the previous invalid entry	
-      while((first_invalid<last_invalid) && is_valid(last_invalid))
-	last_invalid--;
-    
+      else if(idx == last_invalid) {
+	// Move last_invalid to the previous invalid entry	
+	while((first_invalid<last_invalid) && is_valid(last_invalid)) {
+	  last_invalid--;
+	}
+      }
+    }
     // If we have no invalid elements left, then put both pointers to 0
     if( first_invalid == last_invalid && is_valid(first_invalid) )
       first_invalid = last_invalid = 0;
@@ -1214,15 +1221,12 @@ void FEM_Entity::set_invalid(unsigned int idx, bool isNode){
       first_invalid = last_invalid = idx;
       return;
     }
-    
     if(idx < first_invalid){
       first_invalid = idx;
     }
-    
     if(idx > last_invalid){
       last_invalid = idx;
     }
-    
     // TODO:
     // We should probably have an algorithm for shrinking the entire attribute 
     // array if we invalidate the final element. In this case we should scan backwards
@@ -1231,7 +1235,6 @@ void FEM_Entity::set_invalid(unsigned int idx, bool isNode){
     // It may be necessary to modify the idxl lists if we do this type of shrinking.
     // Someone needs to confirm whether that is necessary. If not, then it should be 
     // simple to allow shrinking of the number of nodes or elements.
-    
   }
 }
 
@@ -1241,7 +1244,7 @@ int FEM_Entity::is_valid(unsigned int idx){
     return valid->getChar()(idx,0);
   } else {
     if(!(idx < size() && idx >=0 && first_invalid<=last_invalid)) {
-      CkPrintf("idx %d; size %d; first_invalid %d; last_invalid %d\n");
+      CkPrintf("idx %d; size %d; first_invalid %d; last_invalid %d\n",idx,size(),first_invalid,last_invalid);
       CkAssert(false);
     }
     return valid->getChar()(idx,0);
@@ -1261,57 +1264,62 @@ unsigned int FEM_Entity::count_valid(){
 /// We either return an empty slot, or resize the array and return a value at the end
 /// If someone has a better name for this function, please change it.
 unsigned int FEM_Entity::get_next_invalid(FEM_Mesh *m, bool isNode, bool isGhost){
-  unsigned int retval;
+  unsigned int retval=0;
   if(false) {
     retval = size();
     setLength(retval+1);  
   }
   else {
-    CkAssert(!is_valid(first_invalid) || first_invalid==0);
-    
-    // if we have an invalid entity to return
-    bool flag1 = false;
-    if(!is_valid(first_invalid)){
-      retval = first_invalid;
-      if(isNode && !isGhost) { //it is a node & the entity is not a ghost entity
-	while(retval <= last_invalid) {
-	  if(!is_valid(retval)) {
-	    if(m->getfmMM()->fmLockN[retval]->haslocks()) {
-	      retval++;
-	    }
-	    else if(hasConn(retval)) { //has some connectivity
-	      retval++;
-	    }
-	    else {
-	      flag1 = true;
-	      break;
-	    }
-	  }
-	  else retval++;
-	}
-      }
-      else if(isNode) {
-	while(retval <= last_invalid) {
-	  if(!is_valid(retval)) {
-	    if(hasConn(retval)) { //has some connectivity
-	      retval++;
-	    }
-	    else {
-	      flag1 = true;
-	      break;
-	    }
-	  }
-	  else retval++;
-	}
-      }      
-      else{
-	// resize array and return new entity
-	flag1 = true;
-      }
+    unsigned int size1 = size();
+    if(size1==0) { //special case because for size=0, first_invalid=last_invalid=0
+      retval= 0;
     }
-    if(!flag1) {
-      retval = size();
-      setLength(retval+1);
+    else {
+      CkAssert(!is_valid(first_invalid) || first_invalid==0);
+      // if we have an invalid entity to return
+      bool flag1 = false;
+      if(!is_valid(first_invalid)){
+	retval = first_invalid;
+	if(isNode && !isGhost) { //it is a node & the entity is not a ghost entity
+	  while(retval <= last_invalid) {
+	    if(!is_valid(retval)) {
+	      if(m->getfmMM()->fmLockN[retval]->haslocks()) {
+		retval++;
+	      }
+	      else if(hasConn(retval)) { //has some connectivity
+		retval++;
+	      }
+	      else {
+		flag1 = true;
+		break;
+	      }
+	    }
+	    else retval++;
+	  }
+	}
+	else if(isNode) {
+	  while(retval <= last_invalid) {
+	    if(!is_valid(retval)) {
+	      if(hasConn(retval)) { //has some connectivity
+		retval++;
+	      }
+	      else {
+		flag1 = true;
+		break;
+	      }
+	    }
+	    else retval++;
+	  }
+	}  
+	else{
+	  // resize array and return new entity
+	  flag1 = true;
+	}
+      }
+      if(!flag1) {
+	retval = size1;
+	setLength(retval+1);
+      }
     }
   }
   set_valid(retval,isNode);
