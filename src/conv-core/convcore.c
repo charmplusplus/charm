@@ -1375,6 +1375,7 @@ void CthStandinCode()
   while (1) CsdScheduler(0);
 }
 
+/* this fix the function pointer for thread migration and pup */
 static CthThread CthSuspendNormalThread()
 {
   return CpvAccess(CthSchedulingThread);
@@ -1402,11 +1403,11 @@ CthThread CthSuspendSchedulingThread()
 
 void CthResumeNormalThread(CthThreadToken* token)
 {
-	CthThread t = token->thread;
-	if(t == NULL){
-	 free(token);
-	 return;
-	}
+  CthThread t = token->thread;
+  if(t == NULL){
+    free(token);
+    return;
+  }
 #ifndef CMK_OPTIMIZE
 #if ! CMK_TRACE_IN_CHARM
   if(CpvAccess(traceOn))
@@ -1421,7 +1422,7 @@ void CthResumeNormalThread(CthThreadToken* token)
 
 void CthResumeSchedulingThread(CthThreadToken  *token)
 {
-	CthThread t = token->thread;
+  CthThread t = token->thread;
   CthThread me = CthSelf();
   if (me == CpvAccess(CthMainThread)) {
     CthEnqueueSchedulingThread(CthGetToken(me),CQS_QUEUEING_FIFO, 0, 0);
