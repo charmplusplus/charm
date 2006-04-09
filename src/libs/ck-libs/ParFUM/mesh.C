@@ -1273,6 +1273,7 @@ unsigned int FEM_Entity::get_next_invalid(FEM_Mesh *m, bool isNode, bool isGhost
     unsigned int size1 = size();
     if(size1==0) { //special case because for size=0, first_invalid=last_invalid=0
       retval= 0;
+      setLength(1);
     }
     else {
       CkAssert(!is_valid(first_invalid) || first_invalid==0);
