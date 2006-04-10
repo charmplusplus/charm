@@ -97,6 +97,13 @@ main(int argc, char **argv){
   sndbuf = (char *)malloc(msg_size * sizeof(char) * p);
   recvbuf = (char *)malloc(msg_size * sizeof(char) * p);
 
+    // warm up, not instrumented
+  for(i=0; i<max_msgs; i++) {
+    MPI_Alltoall(sndbuf, msg_size, MPI_CHAR, recvbuf, msg_size, MPI_CHAR, MPI_COMM_WORLD);
+  }
+  MPI_Barrier(MPI_COMM_WORLD); 
+
+    // initial memory usage
   memory_before = CmiMemoryUsage();
   CmiResetMaxMemory();
   
@@ -104,9 +111,8 @@ main(int argc, char **argv){
     MPI_Alltoall(sndbuf, msg_size, MPI_CHAR, recvbuf, msg_size, MPI_CHAR, MPI_COMM_WORLD);
   }
   MPI_Barrier(MPI_COMM_WORLD); 
-  memory_after = CmiMemoryUsage();
 
-  memory_diff = memory_after-memory_before;
+  memory_after = CmiMemoryUsage();
   local_memory_max = CmiMaxMemoryUsage() - memory_before;
 
   // Reduce MAX here

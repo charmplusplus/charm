@@ -21,4 +21,4 @@ alltoall_VPtest: alltoall_VPtest.c
 	$(CHARMC) -o alltoall_VPtest alltoall_VPtest.o $(OPTS) $(LIBS)
 
 clean:
-	rm -rf *~ *.o alltoall mpibench charmrun conv-host
+	rm -rf *~ *.o alltoall mpibench charmrun conv-host alltoall_VPtest
