@@ -1,0 +1,11 @@
+module GridMetisLB
+{
+  extern module CentralLB;
+
+  initnode void lbinit (void);
+
+  group [migratable] GridMetisLB : CentralLB
+  {
+    entry void GridMetisLB (const CkLBOptions &);  
+  };
+};
