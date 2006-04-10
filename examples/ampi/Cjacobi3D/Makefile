@@ -1,4 +1,6 @@
+CHARMBASE=../../../
 CHARMC=../../../bin/charmc $(OPTS)
+TOKENS=6
 
 ampi: jacobi jacobi.iso jacobi-get
 
@@ -15,6 +17,10 @@ jacobi.iso: jacobi.C
 jacobi-get: jacobi-get.C
 	$(CHARMC) -c jacobi-get.C
 	$(CHARMC) -o jacobi-get jacobi-get.o -language ampi -module EveryLB -lm
+
+jacobi-get-tokens:
+	cd $(CHARMBASE)/tmp; touch machine.c; touch ckfutures.C; make AMPI OPTS="-DIGET_FLOWCONTROL=1 -DIGET_TOKENNUM=$(TOKENS)"; cd -; 
+	make jacobi-get;
 
 test: ampi
 	./charmrun +p3 jacobi 2 2 2 +vp8 +balancer RotateLB +LBDebug

@@ -200,7 +200,199 @@ int main(int ac, char** av)
             if (error > maxerr) maxerr = error;
           }
 // Add boundary
-    
+//   : k=0 case 
+      k=0;
+      for(i=1; i<DIMZ-1; i++)
+	  for(j=1; j<DIMY-1; j++) {
+	      tval = (cp->t[k][j][i] + cp->t[k][j][i+1] +
+		    cp->t[k][j][i-1] + cp->t[k][j+1][i]+ 
+		    cp->t[k][j-1][i] + cp->t[k+1][j][i] + (cp->sbzp)[j*DIMZ+i])/6.0;
+            error = fabs(tval-cp->t[k][j][i]);
+            cp->t[k][j][i] = tval;
+            if (error > maxerr) maxerr = error;		      
+	  }
+//   : k=DIMZ-1 case
+      k=DIMZ-1;
+      for(i=1; i<DIMZ-1; i++)
+	  for(j=1; j<DIMY-1; j++) {
+	      tval = (cp->t[k][j][i] + cp->t[k][j][i+1] +
+		    cp->t[k][j][i-1] + cp->t[k][j+1][i]+ 
+		    cp->t[k][j-1][i] + cp->t[k-1][j][i] +
+(cp->sbzm)[j*DIMZ+i])/7.0;
+            error = fabs(tval-cp->t[k][j][i]);
+            cp->t[k][j][i] = tval;
+            if (error > maxerr) maxerr = error;		      
+	  }
+//   : j=0 case
+      j=0;
+      for(i=1; i<DIMZ-1; i++)
+	  for(k=1; k<DIMX-1; k++) {
+            tval = (cp->t[k][j][i] + cp->t[k][j][i+1] +
+                 cp->t[k][j][i-1] + cp->t[k][j+1][i]+ 
+                 (cp->sbyp)[k*DIMZ+i] + cp->t[k+1][j][i] + cp->t[k-1][j][i])/7.0;
+            error = fabs(tval-cp->t[k][j][i]);
+            cp->t[k][j][i] = tval;
+            if (error > maxerr) maxerr = error;		      
+	  }
+//   : j=DIMY-1 case
+      j=DIMY-1;
+      for(i=1; i<DIMZ-1; i++)
+	  for(k=1; k<DIMX-1; k++) {
+            tval = (cp->t[k][j][i] + cp->t[k][j][i+1] +
+                 cp->t[k][j][i-1] + (cp->sbym)[k*DIMZ+i]+ 
+                 cp->t[k][j-1][i] + cp->t[k+1][j][i] + cp->t[k-1][j][i])/7.0;
+            error = fabs(tval-cp->t[k][j][i]);
+            cp->t[k][j][i] = tval;
+            if (error > maxerr) maxerr = error;		      
+	  }
+//   : i=0 case
+      i=0;
+      for(j=1; j<DIMY-1; j++)
+	  for(k=1; k<DIMX-1; k++) {
+            tval = (cp->t[k][j][i] + cp->t[k][j][i+1] +
+                 (cp->sbzp)[k*DIMY+j] + cp->t[k][j+1][i]+ 
+                 cp->t[k][j-1][i] + cp->t[k+1][j][i] + cp->t[k-1][j][i])/7.0;
+            error = fabs(tval-cp->t[k][j][i]);
+            cp->t[k][j][i] = tval;
+            if (error > maxerr) maxerr = error;		      
+	  }
+//   : i=DIMZ-1 case
+      i=DIMZ-1;
+      for(j=1; j<DIMY-1; j++)
+	  for(k=1; k<DIMX-1; k++) {
+            tval = (cp->t[k][j][i] +  cp->sbzm[k*DIMY+j] +
+                 cp->t[k][j][i-1] + cp->t[k][j+1][i]+ 
+                 cp->t[k][j-1][i] + cp->t[k+1][j][i] + cp->t[k-1][j][i])/7.0;
+            error = fabs(tval-cp->t[k][j][i]);
+            cp->t[k][j][i] = tval;
+            if (error > maxerr) maxerr = error;		      
+	  }
+// corner lines case
+//  :i=0, j=0 or DIMY-1 
+      i=0; j=0;  
+      for(k=1; k<DIMX-1; k++) {
+	  tval = (cp->t[k][j][i] +  cp->t[k][j][i+1] +
+		  cp->sbzp[k*DIMY+j] + cp->t[k][j+1][i]+ 
+		  cp->sbyp[k*DIMZ+i] + cp->t[k+1][j][i] + cp->t[k-1][j][i])/7.0;
+	  error = fabs(tval-cp->t[k][j][i]);
+	  cp->t[k][j][i] = tval;
+	  if (error > maxerr) maxerr = error;		      
+      }
+      i=0; j=DIMY-1;  
+      for(k=1; k<DIMX-1; k++) {
+	  tval = (cp->t[k][j][i] +  cp->t[k][j][i+1] +
+		  cp->sbzp[k*DIMY+j] + cp->sbym[k*DIMZ+i] + 
+		  cp->t[k][j-1][i] + cp->t[k+1][j][i] + cp->t[k-1][j][i])/7.0;
+	  error = fabs(tval-cp->t[k][j][i]);
+	  cp->t[k][j][i] = tval;
+	  if (error > maxerr) maxerr = error;		      
+      }
+//  :i=DIMZ-1, j=0 or DIMY-1 
+      i=DIMZ-1; j=0;  
+      for(k=1; k<DIMX-1; k++) {
+	  tval = (cp->t[k][j][i] +  cp->t[k][j][i-1] +
+		  cp->sbzm[k*DIMY+j] + cp->t[k][j+1][i]+ 
+		  cp->sbyp[k*DIMZ+i] + cp->t[k+1][j][i] + cp->t[k-1][j][i])/7.0;
+	  error = fabs(tval-cp->t[k][j][i]);
+	  cp->t[k][j][i] = tval;
+	  if (error > maxerr) maxerr = error;		      
+      }
+      i=DIMZ-1; j=DIMY-1;  
+      for(k=1; k<DIMX-1; k++) {
+	  tval = (cp->t[k][j][i] +  cp->t[k][j][i-1] +
+		  cp->sbzm[k*DIMY+j] + cp->sbym[k*DIMZ+i] + 
+		  cp->t[k][j-1][i] + cp->t[k+1][j][i] + cp->t[k-1][j][i])/7.0;
+	  error = fabs(tval-cp->t[k][j][i]);
+	  cp->t[k][j][i] = tval;
+	  if (error > maxerr) maxerr = error;		      
+      }
+//  :i=0, k=0 or DIMX-1
+      i=0; k=0;
+      for(j=1; j<DIMY-1; j++) {
+            tval = (cp->t[k][j][i] + cp->sbzp[k*DIMY+j] +
+                 cp->t[k][j][i+1] + cp->t[k][j+1][i]+ 
+                 cp->t[k][j-1][i] + cp->sbxp[k*DIMX+j] +
+cp->t[k+1][j][i])/7.0;
+            error = fabs(tval-cp->t[k][j][i]);
+            cp->t[k][j][i] = tval;
+            if (error > maxerr) maxerr = error;		      
+      }
+      i=0; k=DIMX-1;
+      for(j=1; j<DIMY-1; j++) {
+            tval = (cp->t[k][j][i] + cp->sbzp[k*DIMY+j] +
+                 cp->t[k][j][i+1] + cp->t[k][j+1][i]+ 
+                 cp->t[k][j-1][i] + cp->sbxm[k*DIMY+j] + cp->t[k-1][j][i])/7.0;
+            error = fabs(tval-cp->t[k][j][i]);
+            cp->t[k][j][i] = tval;
+            if (error > maxerr) maxerr = error;		      
+      }
+//  :i=DIMZ-1, k=0 or DIMX-1
+      i=DIMZ-1; k=0;
+      for(j=1; j<DIMY-1; j++) {
+            tval = (cp->t[k][j][i] + cp->sbzm[k*DIMY+j] +
+                 cp->t[k][j][i-1] + cp->t[k][j+1][i]+ 
+                 cp->t[k][j-1][i] + cp->sbxp[k*DIMY+j] + cp->t[k+1][j][i])/7.0;
+            error = fabs(tval-cp->t[k][j][i]);
+            cp->t[k][j][i] = tval;
+            if (error > maxerr) maxerr = error;		      
+      }
+      i=DIMZ-1; k=DIMX-1;
+      for(j=1; j<DIMY-1; j++) {
+            tval = (cp->t[k][j][i] + cp->sbzm[k*DIMY+j] +
+                 cp->t[k][j][i-1] + cp->t[k][j+1][i]+ 
+                 cp->t[k][j-1][i] + cp->sbxm[k*DIMY+j] + cp->t[k-1][j][i])/7.0;
+            error = fabs(tval-cp->t[k][j][i]);
+            cp->t[k][j][i] = tval;
+            if (error > maxerr) maxerr = error;		      
+      }
+
+//  :j=0 k=0 or DIMX-1, 
+      j=0; k=0;	    
+      for(i=1; i<DIMZ-1; i++){
+	      tval = (cp->t[k][j][i] + cp->t[k][j][i+1] +
+                 cp->t[k][j][i-1] + cp->t[k][j+1][i]+ 
+                 cp->sbyp[k*DIMZ+i] + cp->t[k+1][j][i] +
+cp->sbxp[j*DIMZ+i])/7.0;
+            error = fabs(tval-cp->t[k][j][i]);
+            cp->t[k][j][i] = tval;
+            if (error > maxerr) maxerr = error;		      
+	  }
+      j=0; k=DIMY-1;	    
+      for(i=1; i<DIMZ-1; i++){
+	      tval = (cp->t[k][j][i] + cp->t[k][j][i+1] +
+                 cp->t[k][j][i-1] + cp->t[k][j+1][i]+ 
+                 cp->sbyp[k*DIMZ+i] + cp->t[k-1][j][i] +
+cp->sbxm[j*DIMZ+i])/7.0;
+            error = fabs(tval-cp->t[k][j][i]);
+            cp->t[k][j][i] = tval;
+            if (error > maxerr) maxerr = error;		      
+	  }
+
+//  :j=DIMY-1, k=0 or DIMX-1 
+      j=DIMY-1; k=0;	    
+      for(i=1; i<DIMZ-1; i++){
+	      tval = (cp->t[k][j][i] + cp->t[k][j][i+1] +
+                 cp->t[k][j][i-1] + cp->t[k][j-1][i]+ 
+                 cp->sbym[k*DIMZ+i] + cp->t[k+1][j][i] +
+cp->sbxp[j*DIMZ+i])/7.0;
+            error = fabs(tval-cp->t[k][j][i]);
+            cp->t[k][j][i] = tval;
+            if (error > maxerr) maxerr = error;		      
+	  }
+      j=DIMY-1; k=DIMY-1;	    
+      for(i=1; i<DIMZ-1; i++){
+	      tval = (cp->t[k][j][i] + cp->t[k][j][i+1] +
+                 cp->t[k][j][i-1] + cp->t[k][j-1][i]+ 
+                 cp->sbym[k*DIMZ+i] + cp->t[k-1][j][i] +
+cp->sbxm[j*DIMZ+i])/7.0;
+            error = fabs(tval-cp->t[k][j][i]);
+            cp->t[k][j][i] = tval;
+            if (error > maxerr) maxerr = error;		      
+	  }
+
+// corner points case
+
+
     }
 
     MPI_IGet_Free(&reqxp, &stsxp, win);
