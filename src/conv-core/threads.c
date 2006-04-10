@@ -692,7 +692,7 @@ for threads with deep stacks) is extremely high.
 
 Written by Josh Yelon around May 1999
 
-stack grows down as:
+stack grows down like:
 lo   <- savedptr    <- savedstack
 
 ...
@@ -828,21 +828,23 @@ static void CthOnly(CthThread t, void *dum1, void *dum2)
   CthThreadFinished(t);
 }
 
+#define USE_SPECIAL_STACKPOINTER    1
+
 /* p is a pointer on stack */
-size_t CthStackPointerPos(CthThread t, char *p)
+size_t CthStackOffset(CthThread t, char *p)
 {
   CthProcInfo proc = CthCpvAccess(CthProc);
   return p - (char *)proc->stackbase;
 }
 
-char * CthStackPointerByPos(CthThread t, size_t size)
+char * CthPointer(CthThread t, size_t pos)
 {
   CmiAssert(t);
   CthProcInfo proc = CthCpvAccess(CthProc);
 #ifdef QT_GROW_DOWN
-  char *p = (char *)t->savedstack + t->savedsize + size;
+  char *p = (char *)t->savedstack + t->savedsize + pos;
 #else
-  char *p = (char *)t->savedstack + size;
+  char *p = (char *)t->savedstack + pos;
 #endif
   return p;
 }
@@ -1717,23 +1719,26 @@ CthThread CthPup(pup_er p, CthThread t)
   return t;
 }
 
-size_t CthStackPointerPos(CthThread t, char *p)
+#endif
+
+#if ! USE_SPECIAL_STACKPOINTER
+size_t CthStackOffset(CthThread t, char *p)
 {
   size_t s = p - (char *)B(t)->stack;
   /* size_t s = (size_t)p; */
   return s;
 }
 
-char * CthStackPointerByPos(CthThread t, size_t size)
+char * CthPointer(CthThread t, size_t pos)
 {
   char *p;
   CmiAssert(t && B(t)->stack);
-  p = (char *)B(t)->stack + size;
+  p = (char *)B(t)->stack + pos;
   /* char *p = (char *)size; */
   return p;
 }
-
 #endif
+
 
 void CthTraceResume(CthThread t)
 {
