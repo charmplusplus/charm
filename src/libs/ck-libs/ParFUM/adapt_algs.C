@@ -14,7 +14,8 @@
 #define MINAREA 1.0e-18
 #define MAXAREA 1.0e12
 
-#define GRADATION 1.3
+#define GRADATION 1.2
+#define ADAPT_VERBOSE 1
 
 CtvDeclare(FEM_Adapt_Algs *, _adaptAlgs);
 
@@ -30,15 +31,18 @@ FEM_Adapt_Algs::FEM_Adapt_Algs(FEM_Mesh *m, femMeshModify *fm, int dimension)
 void FEM_Adapt_Algs::FEM_AdaptMesh(int qm, int method, double factor, 
 				   double *sizes)
 {
+#ifdef ADAPT_VERBOSE
+  CkPrintf("BEGIN: FEM_AdaptMesh...\n");
+#endif
   SetMeshSize(method, factor, sizes);
   GradateMesh(GRADATION);
   (void)Refine(qm, method, factor, sizes);
   GradateMesh(GRADATION);
   (void)Coarsen(qm, method, factor, sizes);
-  SetMeshSize(4, 0.5, NULL);
-  (void)Refine(qm, 4, 0.5, NULL);
-  SetMeshSize(4, 2.0, NULL);
-  (void)Coarsen(qm, 4, 2.0, NULL);
+  FEM_Repair(qm);
+#ifdef ADAPT_VERBOSE
+  CkPrintf("...END: FEM_AdaptMesh.\n");
+#endif
 }
 
 /* Perform refinements on a mesh.  Tries to maintain/improve element quality as
@@ -128,9 +132,13 @@ int FEM_Adapt_Algs::Refine(int qm, int method, double factor, double *sizes)
       CthYield(); // give other chunks on the same PE a chance
     }
     mods += iter_mods;
-    //CkPrintf("ParFUM_Refine: %d modifications in last pass.\n", iter_mods);
+#ifdef ADAPT_VERBOSE
+    CkPrintf("ParFUM_Refine: %d modifications in last pass.\n", iter_mods);
+#endif
   }
-  //CkPrintf("ParFUM_Refine: %d total modifications.\n", mods);
+#ifdef ADAPT_VERBOSE
+  CkPrintf("ParFUM_Refine: %d total modifications.\n", mods);
+#endif
   delete[] refineStack;
   delete[] refineElements;
   return mods;
@@ -250,9 +258,13 @@ int FEM_Adapt_Algs::Coarsen(int qm, int method, double factor, double *sizes)
       CthYield(); // give other chunks on the same PE a chance
     }
     mods += iter_mods;
-    //CkPrintf("ParFUM_Coarsen: %d modifications in pass %d.\n", iter_mods, pass);
+#ifdef ADAPT_VERBOSE
+    CkPrintf("ParFUM_Coarsen: %d modifications in pass %d.\n", iter_mods, pass);
+#endif
   }
-  //CkPrintf("ParFUM_Coarsen: %d total modifications over %d passes.\n", mods, pass);
+#ifdef ADAPT_VERBOSE
+  CkPrintf("ParFUM_Coarsen: %d total modifications over %d passes.\n", mods, pass);
+#endif
   delete[] coarsenElements;
   return mods;
 }
@@ -266,7 +278,101 @@ void FEM_Adapt_Algs::FEM_Smooth(int qm, int method)
 /* Repair the mesh according to some quality measure qm */
 void FEM_Adapt_Algs::FEM_Repair(int qm)
 {
-  CkPrintf("WARNING: ParFUM_Repair: Not yet implemented.\n");
+  double avgQual = 0.0, minQual = getAreaQuality(0);
+  int numBadElems = 0;
+#ifdef ADAPT_VERBOSE
+  CkPrintf("WARNING: ParFUM_Repair: Under construction.\n");
+  numElements = theMesh->elem[0].size();
+  for (int i=0; i<numElements; i++) { 
+    if (theMesh->elem[0].is_valid(i)) {
+      double qFactor=getAreaQuality(i);
+      avgQual += qFactor;
+      if (qFactor <  QUALITY_MIN) {
+	numBadElems++;
+	if (qFactor < minQual) minQual = qFactor;
+      }
+    }
+  }
+  avgQual /= numElements;
+  CkPrintf("BEFORE FEM_Repair: Average Element Quality = %2.6f, Min = %2.6f (1.0 is perfect)\n", avgQual, minQual);
+  //CkPrintf("BEFORE FEM_Repair: Average Element Quality = %2.6f, Min = %2.6f (1.0 is perfect)\n  %d out of %d elements were below the minimum quality tolerance of %2.6f\n", avgQual, minQual, numBadElems, numElements, QUALITY_MIN);
+#endif
+
+  int elemWidth = theMesh->elem[0].getConn().width();
+  int changes=1;
+  while (changes) {
+    changes = 0;
+    numElements = theMesh->elem[0].size();
+    for (int i=0; i<numElements; i++) { 
+      if (theMesh->elem[0].is_valid(i)) {
+	double qFactor=getAreaQuality(i);
+	if (qFactor <  0.75*QUALITY_MIN) {
+	  int elId = i;
+	  int *eConn = (int*)malloc(elemWidth*sizeof(int));
+	  theMesh->e2n_getAll(elId, eConn);
+	  int n1=eConn[0], n2=eConn[1], mn1, mn2;
+	  mn1 = n1; mn2 = n2;
+	  double tmpLen, avgEdgeLength=0.0, 
+	    minEdgeLength = length(n1, n2), maxEdgeLength;
+	  maxEdgeLength = minEdgeLength;
+	  for (int j=0; j<elemWidth-1; j++) {
+	    for (int k=j+1; k<elemWidth; k++) {
+	      tmpLen = length(eConn[j], eConn[k]);
+	      avgEdgeLength += tmpLen;
+	      if (tmpLen < minEdgeLength) {
+		minEdgeLength = tmpLen;
+		n1 = eConn[j]; n2 = eConn[k];
+	      }
+	      else if (tmpLen > maxEdgeLength) {
+		maxEdgeLength = tmpLen;
+		mn1 = eConn[j]; mn2 = eConn[k];
+	      }
+	    }
+	  }
+	  CkAssert(n1!=-1 && n2!=-1);
+	  avgEdgeLength /= 3.0;
+	  if ((maxEdgeLength > 1.25*avgEdgeLength) &&
+	      (minEdgeLength > 0.6*avgEdgeLength)) { // refine
+	    int success = theAdaptor->edge_bisect(mn1, mn2);
+	    if (success >= 0) {
+	      //CkPrintf("Refined bad element!\n");
+	      changes++;
+	    }
+	  }
+	  else if (minEdgeLength < 0.15*avgEdgeLength) { // coarsen
+	    int success = theAdaptor->edge_contraction(n1, n2);
+	    if (success >= 0) { 
+	      //CkPrintf("Coarsened bad element!\n");
+	      changes++;
+	    }
+	  }
+	  else {
+	    //CkPrintf("Leaving one bad element alone...\n");
+	  }
+	}
+      }
+    }
+  }
+
+#ifdef ADAPT_VERBOSE
+  numElements = theMesh->elem[0].size();
+  numBadElems = 0;
+  avgQual = 0.0;
+  minQual = getAreaQuality(0);
+  for (int i=0; i<numElements; i++) { 
+    if (theMesh->elem[0].is_valid(i)) {
+      double qFactor=getAreaQuality(i);
+      avgQual += qFactor;
+      if (qFactor <  QUALITY_MIN) {
+	numBadElems++;
+	if (qFactor < minQual) minQual = qFactor;
+      }
+    }
+  }
+  avgQual /= numElements;
+  CkPrintf("AFTER FEM_Repair: Average Element Quality = %2.6f, Min = %2.6f (1.0 is perfect)\n", avgQual, minQual);
+  //  CkPrintf("AFTER FEM_Repair: Average Element Quality = %2.6f, Min = %2.6f (1.0 is perfect)\n  %d out of %d elements were below the minimum quality tolerance of %2.6f\n", avgQual, minQual, numBadElems, numElements, QUALITY_MIN);
+#endif
 }
 
 /* Remesh entire mesh according to quality measure qm. If method = 0, set 
