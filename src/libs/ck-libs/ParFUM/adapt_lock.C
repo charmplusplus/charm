@@ -277,6 +277,8 @@ int FEM_AdaptL::edge_bisect(int n1, int n2) {
 	}
 	numtries = 0;
 	//CthYield();
+	free(locknodes);
+	free(gotlocks);
 	return -1;
       }
       CthYield();
@@ -831,6 +833,7 @@ int FEM_AdaptL::edge_contraction_help(int *e1P, int *e2P, int n1, int n2, int e1
 	    }
 	    else e1 = -1;
 	    *e1P = e1;
+	    if(esize1>0) delete[] e1Elems;
 	    return ERVAL1;
 	  }
 	}
@@ -913,6 +916,7 @@ int FEM_AdaptL::edge_contraction_help(int *e1P, int *e2P, int n1, int n2, int e1
 	    }
 	    else e2 = -1;
 	    *e2P = e2;
+	    if(esize2>0) delete[] e2Elems;
 	    return ERVAL1;
 	  }
 	}
@@ -1315,12 +1319,16 @@ int FEM_AdaptL::edge_contraction_help(int *e1P, int *e2P, int n1, int n2, int e1
       if(!isConn) { //connectivity has changed, try acquiring the locks again
 	unlockNodes(gotlocks,lockw,0,lockw,nncount);
 	if(numtries>=3) {
+	  if(nesize>0) delete[] nbrElems;
 	  if(nnsize1>0) delete[] nnNodes1;
 	  if(nnsize>0) delete[] nnNodes;
 	  if(nncount>0) {
 	    delete [] lockw;
 	    delete [] gotlocks;
 	  }
+	  free(conn);
+	  free(adjnodes);
+	  free(adjelems);
 	  return ERVAL;
 	}
 	CthYield();
@@ -1334,7 +1342,13 @@ int FEM_AdaptL::edge_contraction_help(int *e1P, int *e2P, int n1, int n2, int e1
       delete [] lockw;
       delete [] gotlocks;
     }
-    if(numtries>=3 && !done) return ERVAL;
+    if(numtries>=3 && !done) {
+      if(nesize>0) delete[] nbrElems;
+      free(conn);
+      free(adjnodes);
+      free(adjelems);
+      return ERVAL;
+    }
   }
 
   //verify if it is causing a flip/sliver
@@ -1453,8 +1467,8 @@ int FEM_AdaptL::edge_contraction_help(int *e1P, int *e2P, int n1, int n2, int e1
     free(gotlocks);
     free(lockw);
 
-    if(nesize!=0) delete[] nbrElems;
-    if(nesize1 > 0) delete [] nbr1Elems;
+    if(nesize>0) delete[] nbrElems;
+    if(nesize1>0) delete [] nbr1Elems;
     free(conn);
     free(adjnodes);
     free(adjelems);
@@ -1518,7 +1532,7 @@ int FEM_AdaptL::edge_contraction_help(int *e1P, int *e2P, int n1, int n2, int e1
   free(lockw);
 
   FEM_remove_node(theMesh, deletenode);
-  if(nesize!=0) delete[] nbrElems;
+  if(nesize>0) delete[] nbrElems;
   free(conn);
   free(adjnodes);
   free(adjelems);

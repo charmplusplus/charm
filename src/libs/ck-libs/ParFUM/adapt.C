@@ -224,7 +224,6 @@ int FEM_Adapt::edge_flip_help(int e1, int e2, int n1, int n2, int e1_n1,
       delete[] inds1;
     }
   }
-
   //make sure that it always comes here, don't return with unlocking
   free(conn);
   //free(locknodes);
@@ -823,6 +822,11 @@ bool FEM_Adapt::isCorner(int n1) {
       int ghostidx = theMod->fmUtil->exists_in_IDXL(theMesh,n2,chk,2);
       intMsg *im = meshMod[chk].getRemoteBound(index,ghostidx);
       n2_bound = im->i;
+      for(int j=0; j<numchunks; j++) {
+	delete chunks1[j];
+      }
+      delete im;
+      if(numchunks>0) free(chunks1);
     }
     else {
       FEM_Mesh_dataP(theMesh, FEM_NODE, FEM_BOUNDARY, &n2_bound, n2, 1 , FEM_INT, 1);

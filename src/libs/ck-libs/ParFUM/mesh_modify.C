@@ -192,6 +192,7 @@ int FEM_add_node(FEM_Mesh *m, int* adjacentNodes, int numAdjacentNodes, int*chun
     //this is the ghostsend index on that chunk, translate it from ghostrecv idxl table
     //return FEM_To_ghost_index(m->getfmMM()->getfmUtil()->lookup_in_IDXL(m,imsg->i,chunkNo,2));
     //rather this is same as
+    delete imsg;
     return FEM_To_ghost_index(newghost);
   }
   int newNode = FEM_add_node_local(m, 0);
@@ -1300,7 +1301,7 @@ int FEM_add_element(FEM_Mesh *m, int* conn, int connSize, int elemType, int chun
 	//Build up this table of nodes owned by which all chunks.
 	//The chunk that is in the table corresponding to all nodes wins the element.
 	CkVec<int> **allShared;
-	CkVec<int> *allChunks;
+	CkVec<int> *allChunks = NULL;
 	int **sharedConn; 
 	m->getfmMM()->getfmUtil()->buildChunkToNodeTable(nodetype, sharedcount, ghostcount, localcount, conn, connSize, &allShared, &numSharedChunks, &allChunks, &sharedConn);   
 	//we are looking for a chunk which does not have a ghost node
@@ -1352,6 +1353,8 @@ int FEM_add_element(FEM_Mesh *m, int* conn, int connSize, int elemType, int chun
 	  delete allShared[k];
 	}
 	free(allShared);
+	allChunks->free();
+	if(allChunks!=NULL) free(allChunks);
       }
       else {
 	remoteChunk=chunkNo;
@@ -1425,7 +1428,7 @@ int FEM_add_element(FEM_Mesh *m, int* conn, int connSize, int elemType, int chun
     //build a mapping of all shared chunks to all nodes in this element    
     CkVec<int> **allShared;
     int numSharedChunks = 0;
-    CkVec<int> *allChunks;
+    CkVec<int> *allChunks = NULL;
     int **sharedConn; 
     m->getfmMM()->getfmUtil()->buildChunkToNodeTable(nodetype, sharedcount, ghostcount, localcount, conn, connSize, &allShared, &numSharedChunks, &allChunks, &sharedConn);   
     //add all the local nodes in this element to the ghost list, if they did not exist already
@@ -1502,6 +1505,8 @@ int FEM_add_element(FEM_Mesh *m, int* conn, int connSize, int elemType, int chun
       fm->connSize = connSize;
       meshMod[chk].addGhostElem(fm); //newEl, m->fmMM->idx, elemType;
       m->getfmMM()->getfmUtil()->idxlunlock(m, chk, 0);
+      free(sharedIndices);
+      free(typeOfIndex);
     }
     for(int k=0; k<numSharedChunks; k++) {
       free(sharedConn[k]);
@@ -1511,6 +1516,8 @@ int FEM_add_element(FEM_Mesh *m, int* conn, int connSize, int elemType, int chun
       delete allShared[k];
     }
     free(allShared);
+    allChunks->free();
+    if(allChunks!=NULL) free(allChunks);
   }
   free(nodetype);
   return newEl;
@@ -1968,6 +1975,8 @@ void FEM_Ghost_Essential_attributes(FEM_Mesh *m, int coord_attr, int bc_attr, in
 	delete chunks1[j];
       }
       if(numchunks != 0) free(chunks1);
+      delete im;
+      delete d;
       break;
     }
   }
@@ -1987,6 +1996,7 @@ femMeshModify::femMeshModify(femMeshModMsg *fm) {
   fmAdaptAlgs = NULL;
   fmInp = NULL;
   fmMesh = NULL;
+  delete fm;
 }
 
 femMeshModify::~femMeshModify() {
@@ -2028,6 +2038,7 @@ void femMeshModify::setFemMesh(FEMMeshMsg *fm) {
 #ifdef DEBUG 
   CmiMemoryCheck(); 
 #endif
+  delete fm;
   return;
 }
 
@@ -2036,6 +2047,7 @@ intMsg *femMeshModify::lockRemoteChunk(int2Msg *msg) {
   intMsg *imsg = new intMsg(0);
   int ret = fmLock->lock(msg->i, msg->j);
   imsg->i = ret;
+  delete msg;
   return imsg;
 }
 
@@ -2044,6 +2056,7 @@ intMsg *femMeshModify::unlockRemoteChunk(int2Msg *msg) {
   intMsg *imsg = new intMsg(0);
   int ret = fmLock->unlock(msg->i, msg->j);
   imsg->i = ret;
+  delete msg;
   return imsg;
 }
 
@@ -2168,6 +2181,7 @@ intMsg *femMeshModify::addNodeRemote(addNodeMsg *msg) {
 #ifdef DEBUG 
   CmiMemoryCheck(); 
 #endif
+  delete msg;
   return imsg;
 }
 
@@ -2180,6 +2194,7 @@ void femMeshModify::addSharedNodeRemote(sharedNodeMsg *fm) {
 #ifdef DEBUG 
   CmiMemoryCheck(); 
 #endif
+  delete fm;
   return;
 }
 
@@ -2192,6 +2207,7 @@ void femMeshModify::removeSharedNodeRemote(removeSharedNodeMsg *fm) {
 #ifdef DEBUG 
   CmiMemoryCheck(); 
 #endif
+  delete fm;
   return;
 }
 
@@ -2204,6 +2220,7 @@ void femMeshModify::addGhostElem(addGhostElemMsg *fm) {
 #ifdef DEBUG 
   CmiMemoryCheck(); 
 #endif
+  delete fm;
   return;
 }
 
@@ -2217,6 +2234,7 @@ chunkListMsg *femMeshModify::getChunksSharingGhostNode(int2Msg *i2m) {
 #ifdef DEBUG 
   CmiMemoryCheck(); 
 #endif
+  delete i2m;
   return clm;
 }
 
@@ -2230,6 +2248,7 @@ intMsg *femMeshModify::addElementRemote(addElemMsg *fm) {
   CkAssert(!FEM_Is_ghost_index(newEl));
   int shidx = fmUtil->exists_in_IDXL(fmMesh,newEl,fm->chk,3);
   intMsg *imsg = new intMsg(shidx);
+  delete fm;
   return imsg;
 }
 
@@ -2242,6 +2261,7 @@ void femMeshModify::removeGhostElem(removeGhostElemMsg *fm) {
 #ifdef DEBUG 
   CmiMemoryCheck(); 
 #endif
+  delete fm;
   return;
 }
 
@@ -2254,6 +2274,7 @@ void femMeshModify::removeElementRemote(removeElemMsg *fm) {
 #ifdef DEBUG 
   CmiMemoryCheck(); 
 #endif
+  delete fm;
   return;
 }
 
@@ -2417,6 +2438,7 @@ void femMeshModify::updateAttrs(updateAttrsMsg* umsg) {
 #ifdef DEBUG 
   CmiMemoryCheck();
 #endif
+  delete umsg;
   return;
 }
 
@@ -2602,6 +2624,7 @@ void femMeshModify::verifyghostsend(verifyghostsendMsg *vmsg) {
       CkAssert(found);
     }
   }
+  delete vmsg;
 }
 
 findgsMsg *femMeshModify::findghostsend(int fromChk, int sharedIdx) {

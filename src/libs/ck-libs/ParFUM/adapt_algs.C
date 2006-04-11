@@ -300,7 +300,9 @@ void FEM_Adapt_Algs::FEM_Repair(int qm)
 
   int elemWidth = theMesh->elem[0].getConn().width();
   int changes=1;
-  while (changes) {
+  int count=0;
+  while (changes!=0 && count<4) {
+    count++;
     changes = 0;
     numElements = theMesh->elem[0].size();
     for (int i=0; i<numElements; i++) { 
@@ -1001,6 +1003,7 @@ int FEM_Adapt_Algs::getCoord(int n1, double *crds) {
 	delete chunks1[j];
       }
       if(numchunks != 0) free(chunks1);
+      delete d;
       break;
     }
   }

@@ -158,17 +158,8 @@ class sharedNodeMsg : public CMessage_sharedNodeMsg {
   int nBetween;
   int *between;
 
-  /*sharedNodeMsg(int c, int nB, int *B) {
-    chk = c;
-    nBetween = nB;
-    between = (int *)malloc(nBetween*sizeof(int));
-    for(int i=0; i<nBetween; i++) {
-    between[i] = B[i];
-    }
-    }*/
-
   ~sharedNodeMsg() {
-    //if(between) {
+    //if(between!=NULL) {
     //delete between;
     //}
   }
@@ -189,12 +180,12 @@ class addGhostElemMsg : public CMessage_addGhostElemMsg {
   int connSize;
 
   ~addGhostElemMsg() {
-    if(indices) {
-      //delete indices;
-    }
-    if(typeOfIndex) {
-      //delete typeOfIndex;
-    }
+    //if(indices!=NULL) {
+    //delete indices;
+    //}
+    //if(typeOfIndex!=NULL) {
+    //delete typeOfIndex;
+    //}
   }
 };
 
@@ -246,7 +237,7 @@ class removeGhostElemMsg : public CMessage_removeGhostElemMsg {
   int *sharedIndices;
 
   ~removeGhostElemMsg() {
-    if(ghostIndices) {
+    if(ghostIndices!=NULL) {
       //   delete ghostIndices;
       //   delete ghostRNIndices;
       //    delete ghostREIndices;
@@ -269,8 +260,12 @@ class verifyghostsendMsg : public CMessage_verifyghostsendMsg {
   int sharedIdx;
   int numchks;
   int *chunks;
+
+  verifyghostsendMsg() {
+  }
   
   ~verifyghostsendMsg() {
+    //if(chunks!=NULL) delete chunks;
   }
 };
 

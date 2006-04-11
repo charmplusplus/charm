@@ -370,6 +370,7 @@ void FEM_MUtil::addGhostElementRemote(FEM_Mesh *m, int chk, int elemType, int *i
 	meshMod[chk1].addTransIDXLRemote(idx,sharedIdx1,chk);
 	idxlunlock(m,chk1,0);
       }
+      delete clm;
       FEM_Ghost_Essential_attributes(m, mmod->fmAdaptAlgs->coord_attr, FEM_BOUNDARY, conn[i]);
     }
     else if(typeOfIndex[i]==1) {
@@ -419,7 +420,8 @@ chunkListMsg *FEM_MUtil::getChunksSharingGhostNodeRemote(FEM_Mesh *m, int chk, i
   return clm;
 }
 
-
+//this is the most unnecessarily complicated piece of code I have ever written..
+//rewite it asap!
 void FEM_MUtil::buildChunkToNodeTable(int *nodetype, int sharedcount, int ghostcount, int localcount, int *conn, int connSize, CkVec<int> ***allShared, int *numSharedChunks, CkVec<int> **allChunks, int ***sharedConn) {
   if((sharedcount > 0 && ghostcount == 0) || (ghostcount > 0 && localcount == 0)) { 
     *allShared = (CkVec<int> **)malloc(connSize*sizeof(CkVec<int> *));
@@ -1496,6 +1498,8 @@ void FEM_MUtil::FEM_Print_coords(FEM_Mesh *m, int nodeid) {
 	delete chunks1[j];
       }
       if(numchunks != 0) free(chunks1);
+      delete im;
+      delete d;
       break;
     }
   }
