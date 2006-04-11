@@ -500,8 +500,8 @@ protected:
 	int count;
 	int type;
 public:
+	int tag;            // the order must match MPI_Status
 	int src;
-	int tag;
 	int comm;
 
 #if CMK_BLUEGENE_CHARM
@@ -529,6 +529,8 @@ public:
 	/// Block until this request is finished,
 	///  returning a valid MPI error code.
 	virtual int wait(MPI_Status *sts) =0;
+
+	virtual void receive(ampi *aptr, AmpiMsg *msg) = 0; 
 
 	/// Frees up the request: invalidate it
 	virtual void free(void){ isvalid=false; }
@@ -563,6 +565,7 @@ public:
 	CmiBool test(MPI_Status *sts);
 	void complete(MPI_Status *sts);
 	int wait(MPI_Status *sts);
+	void receive(ampi *aptr, AmpiMsg *msg) {}
 	inline int getType(void){ return 1; }
 	virtual void pup(PUP::er &p){
 		AmpiRequest::pup(p);
@@ -572,19 +575,23 @@ public:
 
 class IReq : public AmpiRequest {
 public:
+	bool status;
+	int length;     // recv'ed length
 	IReq(void *buf_, int count_, int type_, int src_, int tag_, MPI_Comm comm_)
 	{
 		buf=buf_;  count=count_;  type=type_;  src=src_;  tag=tag_; 
-		comm=comm_;  isvalid=true; 
+		comm=comm_;  isvalid=true; status=false; length=0;
 	}
-	IReq(){};
+	IReq(): status(false){};
 	~IReq(){ }
 	CmiBool test(MPI_Status *sts);
 	void complete(MPI_Status *sts);
 	int wait(MPI_Status *sts);
 	inline int getType(void){ return 2; }
+	void receive(ampi *aptr, AmpiMsg *msg); 
 	virtual void pup(PUP::er &p){
 		AmpiRequest::pup(p);
+		p|status;  p|length;
 	}
 };
 
@@ -624,6 +631,7 @@ public:
 	CmiBool test(MPI_Status *sts);
 	void complete(MPI_Status *sts);
 	int wait(MPI_Status *sts);
+	void receive(ampi *aptr, AmpiMsg *msg) {}
 	inline int getCount(void){ return elmcount; }
 	inline int getType(void){ return 3; }
 // 	inline void free(void){ isvalid=false; delete [] myreqs; }
@@ -1229,6 +1237,7 @@ An ampi manages the communication of one thread over
 one MPI communicator.
 */
 class ampi : public CBase_ampi {
+friend class IReq;
     CProxy_ampiParent parentProxy;
     void findParent(bool forMigration);
     ampiParent *parent;
@@ -1290,6 +1299,8 @@ class ampi : public CBase_ampi {
                         int idx);
     void delesend(int t, int s, const void* buf, int count, int type,  
                   int rank, MPI_Comm destcomm, CProxy_ampi arrproxy);
+    inline int processMessage(AmpiMsg *msg, int t, int s, void* buf, int count, int type);
+    inline AmpiMsg * getMessage(int t, int s, int comm, int *sts);
     int recv(int t,int s,void* buf,int count,int type,int comm,int *sts=0);
     void probe(int t,int s,int comm,int *sts);
     int iprobe(int t,int s,int comm,int *sts);
@@ -1342,6 +1353,7 @@ class ampi : public CBase_ampi {
     It should also be indexed by the source data type and length (if any).
     */
     CmmTable msgs;
+    CmmTable posted_ireqs;         // posted irecv req
     int nbcasts;
     //------------------------ Added by YAN ---------------------
  private:
