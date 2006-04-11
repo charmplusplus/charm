@@ -940,33 +940,33 @@ int FEM_Mesh::n2n_getLength(int n) {
 
 /// Place all of node n's adjacent nodes in adjnodes and the resulting 
 /// length of adjnodes in sz; assumes adjnodes is not allocated, but sz is
-void FEM_Mesh::n2n_getAll(int n, int **adjnodes, int *sz) 
+void FEM_Mesh::n2n_getAll(int n, int *&adjnodes, int &sz) 
 {
 #ifdef DEBUG
   CmiMemoryCheck();
 #endif
   if (n == -1) {
-    *sz = 0;
+    sz = 0;
     return;
   }
   if(FEM_Is_ghost_index(n)){
 	FEM_VarIndexAttribute *nAdj = (FEM_VarIndexAttribute *)node.getGhost()->lookup(FEM_NODE_NODE_ADJACENCY,"n2n_getAll");
 	CkVec<CkVec<FEM_VarIndexAttribute::ID> > &nVec = nAdj->get();
 	CkVec<FEM_VarIndexAttribute::ID> &nsVec = nVec[FEM_To_ghost_index(n)];
-	*sz = nsVec.length();
-	if(*sz != 0) (*adjnodes) = new int[*sz];
-	for (int i=0; i<(*sz); i++) {
-	  (*adjnodes)[i] = nsVec[i].getSignedId();
+	sz = nsVec.length();
+	if(sz > 0) adjnodes = new int[sz];
+	for (int i=0; i<sz; i++) {
+	  adjnodes[i] = nsVec[i].getSignedId();
 	}
   }
   else{
 	FEM_VarIndexAttribute *nAdj = (FEM_VarIndexAttribute *)node.lookup(FEM_NODE_NODE_ADJACENCY,"n2n_getAll");
 	CkVec<CkVec<FEM_VarIndexAttribute::ID> > &nVec = nAdj->get();
 	CkVec<FEM_VarIndexAttribute::ID> &nsVec = nVec[n];
-	*sz = nsVec.length();
-	if(*sz != 0) (*adjnodes) = new int[*sz];
-	for (int i=0; i<(*sz); i++) {
-	  (*adjnodes)[i] = nsVec[i].getSignedId();
+	sz = nsVec.length();
+	if(sz > 0) adjnodes = new int[sz];
+	for (int i=0; i<sz; i++) {
+	  adjnodes[i] = nsVec[i].getSignedId();
 	}
   }
   
@@ -1148,7 +1148,7 @@ int FEM_Mesh::n2e_getLength(int n) {
 /// Place all of node n's adjacent elements in adjelements and the resulting 
 /// length of adjelements in sz; assumes adjelements is not allocated, 
 /// but sz is
-void FEM_Mesh::n2e_getAll(int n, int **adjelements, int *sz) 
+void FEM_Mesh::n2e_getAll(int n, int *&adjelements, int &sz) 
 {
 #ifdef DEBUG
   CmiMemoryCheck();
@@ -1156,17 +1156,17 @@ void FEM_Mesh::n2e_getAll(int n, int **adjelements, int *sz)
 
 
   if (n == -1) {
-    *sz = 0;
+    sz = 0;
     return;
   }
   if(FEM_Is_ghost_index(n)){
 	FEM_VarIndexAttribute *eAdj = (FEM_VarIndexAttribute *)node.getGhost()->lookup(FEM_NODE_ELEM_ADJACENCY,"n2e_getAll");  
 	CkVec<CkVec<FEM_VarIndexAttribute::ID> > &eVec = eAdj->get();
 	CkVec<FEM_VarIndexAttribute::ID> &nsVec = eVec[FEM_To_ghost_index(n)];
-	*sz = nsVec.length();
-	if(*sz !=0) (*adjelements) = new int[*sz];
-	for (int i=0; i<(*sz); i++) {
-	  (*adjelements)[i] = nsVec[i].getSignedId();
+	sz = nsVec.length();
+	if(sz > 0) adjelements = new int[sz];
+	for (int i=0; i<sz; i++) {
+	  adjelements[i] = nsVec[i].getSignedId();
 	}
   }
   else {
@@ -1174,10 +1174,10 @@ void FEM_Mesh::n2e_getAll(int n, int **adjelements, int *sz)
 	CkVec<CkVec<FEM_VarIndexAttribute::ID> > &eVec = eAdj->get();
 	CkVec<FEM_VarIndexAttribute::ID> &nsVec = eVec[n];
 	int len = nsVec.length();
-	*sz = len;
-	if(*sz !=0) (*adjelements) = new int[*sz];
-	for (int i=0; i<(*sz); i++) {
-	  (*adjelements)[i] = nsVec[i].getSignedId();
+	sz = len;
+	if(sz > 0) adjelements = new int[sz];
+	for (int i=0; i<sz; i++) {
+	  adjelements[i] = nsVec[i].getSignedId();
 	}
   }
 
@@ -1202,7 +1202,7 @@ void FEM_Mesh::n2e_add(int n, int newElem)
 	FEM_VarIndexAttribute::ID ne(0, newElem);
 	nsVec.push_back(ne);
 	int *testn2e, testn2ec;
-	n2e_getAll(n,&testn2e,&testn2ec);
+	n2e_getAll(n,testn2e,testn2ec);
 	for(int i=0; i<testn2ec; i++) {
 	  if(FEM_Is_ghost_index(testn2e[i]))
 	    CkAssert(elem[0].ghost->is_valid(FEM_From_ghost_index(testn2e[i])));
@@ -1276,7 +1276,7 @@ void FEM_Mesh::n2e_replace(int n, int oldElem, int newElem)
 	  }
 	}
 	int *testn2e, testn2ec;
-	n2e_getAll(n,&testn2e,&testn2ec);
+	n2e_getAll(n,testn2e,testn2ec);
 	for(int i=0; i<testn2ec; i++) {
 	  if(FEM_Is_ghost_index(testn2e[i]))
 	    CkAssert(elem[0].ghost->is_valid(FEM_From_ghost_index(testn2e[i])));
@@ -1337,8 +1337,8 @@ int FEM_Mesh::getElementOnEdge(int n1, int n2)
 {
   int *n1AdjElems, *n2AdjElems;
   int n1NumElems, n2NumElems;
-  n2e_getAll(n1, &n1AdjElems, &n1NumElems);
-  n2e_getAll(n2, &n2AdjElems, &n2NumElems);
+  n2e_getAll(n1, n1AdjElems, n1NumElems);
+  n2e_getAll(n2, n2AdjElems, n2NumElems);
   int ret = -1;
   //CkPrintf("%d has %d neighboring elements, %d has %d\n", n1, n1NumElems, n2, n2NumElems);
 
@@ -1385,8 +1385,8 @@ void FEM_Mesh::get2ElementsOnEdge(int n1, int n2, int *result_e1, int *result_e2
     CkExit();
   }
 
-  n2e_getAll(n1, &n1AdjElems, &n1NumElems);
-  n2e_getAll(n2, &n2AdjElems, &n2NumElems);
+  n2e_getAll(n1, n1AdjElems, n1NumElems);
+  n2e_getAll(n2, n2AdjElems, n2NumElems);
   CkAssert(n1AdjElems!=0);
   CkAssert(n2AdjElems!=0);
   int found=0;

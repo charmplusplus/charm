@@ -41,7 +41,7 @@ class FEM_Adapt {
   }
   int n2e_exists(int n, int e) {
     int *nConn, nSz;
-    theMesh->n2e_getAll(n, &nConn, &nSz);
+    theMesh->n2e_getAll(n, nConn, nSz);
     for (int i=0; i<nSz; i++) {
       if (nConn[i] == e) {
 	if(nSz!=0) free(nConn);
@@ -54,7 +54,7 @@ class FEM_Adapt {
   int findElementWithNodes(int n1, int n2, int n3) {
     int *nConn, nSz;
     int ret = -1;
-    theMesh->n2e_getAll(n1, &nConn, &nSz);
+    theMesh->n2e_getAll(n1, nConn, nSz);
     for (int i=0; i<nSz; i++) {
       if ((n2e_exists(n2, nConn[i])) && (n2e_exists(n3, nConn[i]))) {
 	ret = nConn[i];

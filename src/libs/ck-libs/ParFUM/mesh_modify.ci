@@ -105,5 +105,6 @@ module ParFUM {
     entry [sync,threaded] void purgeElement(int, int);
     entry [sync,threaded] entDataMsg *packEntData(int, int, bool, int);
     entry [sync,threaded] boolMsg *isFixedNodeRemote(int, int);
+    entry [sync,threaded] void finish(void);
   };
 };

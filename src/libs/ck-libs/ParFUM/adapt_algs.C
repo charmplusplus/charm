@@ -513,7 +513,7 @@ void FEM_Adapt_Algs::GradateMesh(double smoothness)
             //if (!FEM_is_valid(meshNum, FEM_NODE, node))
             //    continue;
             
-            theMesh->n2n_getAll(node, &adjNodes, &nadjNodes);
+            theMesh->n2n_getAll(node, adjNodes, nadjNodes);
             for (int adjNode=0; adjNode<nadjNodes; ++adjNode) {
                 double edgelen = length(node, adjNodes[adjNode]);
                 
@@ -1175,7 +1175,7 @@ void  FEM_Adapt_Algs::FEM_mesh_smooth(FEM_Mesh *meshP, int *nodes, int nNodes, i
     CkAssert(idx<nodesInChunk);  
     if (FEM_is_valid(mesh, FEM_NODE, idx) && boundVals[idx]==0) //node must be internal
     {
-      meshP->n2n_getAll(idx, &adjnodes, &nNod);
+      meshP->n2n_getAll(idx, adjnodes, nNod);
       for (int j=0; j<nNod; j++) { //for all adjacent nodes, find coords
 	if (adjnodes[j]<-1) {
 	  gIdxN = FEM_From_ghost_index(adjnodes[j]);

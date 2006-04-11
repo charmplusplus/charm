@@ -184,14 +184,10 @@ int FEM_add_node(FEM_Mesh *m, int* adjacentNodes, int numAdjacentNodes, int*chun
     am->numChunks = numChunks;
     am->upcall = upcall;
     intMsg *imsg = new intMsg(-1);
-    //m->getfmMM()->getfmUtil()->idxllock(m,chunkNo,2);
-    //coarser lock
     m->getfmMM()->getfmUtil()->idxllock(m,chunkNo,0);
     imsg = meshMod[chunkNo].addNodeRemote(am);
     int newghost = FEM_add_node_local(m,1);
     m->node.ghost->ghostRecv.addNode(newghost,chunkNo);
-    //m->getfmMM()->getfmUtil()->idxlunlock(m,chunkNo,2);
-    //coarser lock
     m->getfmMM()->getfmUtil()->idxlunlock(m,chunkNo,0);
     //this is the ghostsend index on that chunk, translate it from ghostrecv idxl table
     //return FEM_To_ghost_index(m->getfmMM()->getfmUtil()->lookup_in_IDXL(m,imsg->i,chunkNo,2));
@@ -268,8 +264,8 @@ void FEM_remove_node_local(FEM_Mesh *m, int node) {
 #ifdef DEBUG 
   CmiMemoryCheck(); 
 #endif
-  m->n2n_getAll(node, &adjNodes, &numAdjNodes);
-  m->n2e_getAll(node, &adjElts, &numAdjElts);
+  m->n2n_getAll(node, adjNodes, numAdjNodes);
+  m->n2e_getAll(node, adjElts, numAdjElts);
   // mark node as deleted/invalid
   if(FEM_Is_ghost_index(node)){
     //CkAssert((numAdjNodes==0) && (numAdjElts==0));
@@ -370,8 +366,8 @@ void FEM_remove_node(FEM_Mesh *m, int node){
       // verify it is not adjacent to any elements locally
       int numAdjNodes, numAdjElts;
       int *adjNodes, *adjElts;
-      m->n2n_getAll(node, &adjNodes, &numAdjNodes);
-      m->n2e_getAll(node, &adjElts, &numAdjElts);
+      m->n2n_getAll(node, adjNodes, numAdjNodes);
+      m->n2e_getAll(node, adjElts, numAdjElts);
       // we shouldn't be removing a node away that is connected to anything
       CkAssert((numAdjNodes==0) && (numAdjElts==0)); 
       // verify it is not adjacent to any elements on any of the associated chunks
@@ -547,7 +543,7 @@ int FEM_remove_element(FEM_Mesh *m, int elementid, int elemtype, int permanent){
 	    losingThisNode[i] = 1;
 	    //if this node is connected to any element which is local and is not being deleted now
 	    //then this chunk will not lose this node now
-	    m->n2e_getAll(nodes[i], &elems, &numElems);
+	    m->n2e_getAll(nodes[i], elems, numElems);
 	    for(int k=0; k<numElems; k++) {
 	      if((!FEM_Is_ghost_index(elems[k])) && (elems[k]!=elementid)) {
 		losingThisNode[i] = 0;
@@ -567,7 +563,7 @@ int FEM_remove_element(FEM_Mesh *m, int elementid, int elemtype, int permanent){
 	    for(int i=0; i<connSize; i++) {
 	      int *ndnbrs;
 	      int numndnbrs;
-	      m->n2n_getAll(nodes[i], &ndnbrs, &numndnbrs);
+	      m->n2n_getAll(nodes[i], ndnbrs, numndnbrs);
 	      willBeGhost[i]=0;
 	      //if this node is connected to any node that is local other than the nodes of this
 	      //element, only then will this node be a ghost.
@@ -643,7 +639,7 @@ int FEM_remove_element(FEM_Mesh *m, int elementid, int elemtype, int permanent){
 	      int numElems;
 	      //we are tyring to figure out if this local node, which might be a ghost
 	      //on some chunk be deleted on that chunk
-	      m->n2e_getAll(nodes[j], &elems, &numElems);
+	      m->n2e_getAll(nodes[j], elems, numElems);
 	      //do not delete ghost nodes on the eating chunk, and be sure 
 	      //that the node is indeed a ghost on the chunk being considered
 	      if((chk != permanent) && (m->getfmMM()->fmUtil->exists_in_IDXL(m,nodes[j],chk,1)!=-1)) {
@@ -674,7 +670,7 @@ int FEM_remove_element(FEM_Mesh *m, int elementid, int elemtype, int permanent){
 		//since we have a remote call in between, to make the program thread-safe
 		//we will need to verify if the connectivity of this node changed
 		int *elems1, numElems1;
-		m->n2e_getAll(nodes[j], &elems1, &numElems1);
+		m->n2e_getAll(nodes[j], elems1, numElems1);
 		if(numElems1!=numElems) {
 		  CkAssert(false);
 		}
@@ -729,7 +725,7 @@ int FEM_remove_element(FEM_Mesh *m, int elementid, int elemtype, int permanent){
 		      for(int l=0; l<connSize; l++) {
 			int *elts;
 			int numElts;
-			m->n2e_getAll(nds[l], &elts, &numElts);
+			m->n2e_getAll(nds[l], elts, numElts);
 			//if this is no longer connected to this chunk through 
 			//any of its neighboring elements, it should no longer be a ghost
 			if(nds[l]<-1) { //it is a ghost
@@ -802,7 +798,7 @@ int FEM_remove_element(FEM_Mesh *m, int elementid, int elemtype, int permanent){
 		  //to this node do not really need updating, but I believe it will not
 		  //hurt, because the connectivity in this case will be -1
 		  int *elems1, numElems1;
-		  m->n2e_getAll(nodes[j], &elems1, &numElems1);
+		  m->n2e_getAll(nodes[j], elems1, numElems1);
 		  for(int k=0; k<numElems1; k++) {
 		    bool flagElem = false;
 		    if(FEM_Is_ghost_index(elems1[k])) {
@@ -823,7 +819,7 @@ int FEM_remove_element(FEM_Mesh *m, int elementid, int elemtype, int permanent){
 		  if(numElems1!=0) delete[] elems1;
 		  int *n2ns;
 		  int numn2ns;
-		  m->n2n_getAll(nodes[j],&n2ns,&numn2ns);
+		  m->n2n_getAll(nodes[j],n2ns,numn2ns);
 		  for(int k=0; k<numn2ns; k++) {
 		    m->n2n_replace(n2ns[k],nodes[j],ghostidx[j]);
 		    m->n2n_remove(nodes[j],n2ns[k]);
@@ -899,8 +895,6 @@ int FEM_remove_element(FEM_Mesh *m, int elementid, int elemtype, int permanent){
 	      }
 	    }
 	  }
-	  //if(lockedRemoteIDXL) m->getfmMM()->getfmUtil()->idxlunlock(m,chk,2);
-	  //unlock this coarse lock
 	  if(lockedRemoteIDXL) m->getfmMM()->getfmUtil()->idxlunlock(m,chk,0);
 	  free(ghostIndices);
 	  free(sharedIndices);
@@ -1002,7 +996,7 @@ void update_new_element_e2e(FEM_Mesh *m, int newEl, int elemType){
   for(int i=0;i<nodesPerElem;i++){
     int sz;
     int *adjelements=0;
-    m->n2e_getAll(adjnodes[i], &adjelements, &sz);
+    m->n2e_getAll(adjnodes[i], adjelements, sz);
     for(int j=0;j<sz;j++){
       int found=0;
       // only insert if it is not already in the list
@@ -1442,9 +1436,6 @@ int FEM_add_element(FEM_Mesh *m, int* conn, int connSize, int elemType, int chun
       int chk = (*allChunks)[i];
       if(chk == index) continue; //it is this chunk
       //it is a new element so it could not have existed as a ghost on that chunk. Just add it.
-      //m->getfmMM()->getfmUtil()->idxllock(m, chk, 3);
-      //m->getfmMM()->getfmUtil()->idxllock(m, chk, 1);
-      //coarser lock
       m->getfmMM()->getfmUtil()->idxllock(m, chk, 0);
       m->elem[elemType].ghostSend.addNode(newEl,chk);
       //ghost nodes should be added only if they were not already present as ghosts on that chunk.
@@ -1510,9 +1501,6 @@ int FEM_add_element(FEM_Mesh *m, int* conn, int connSize, int elemType, int chun
       }
       fm->connSize = connSize;
       meshMod[chk].addGhostElem(fm); //newEl, m->fmMM->idx, elemType;
-      //m->getfmMM()->getfmUtil()->idxlunlock(m, chk, 3);
-      //m->getfmMM()->getfmUtil()->idxlunlock(m, chk, 1);
-      //coarser lock
       m->getfmMM()->getfmUtil()->idxlunlock(m, chk, 0);
     }
     for(int k=0; k<numSharedChunks; k++) {
@@ -2620,7 +2608,7 @@ findgsMsg *femMeshModify::findghostsend(int fromChk, int sharedIdx) {
   CtvAccess(_curTCharm) = tc;
   int localIdx = fmUtil->lookup_in_IDXL(fmMesh, sharedIdx, fromChk, 0);
   int *chkl, numchkl=0;
-  fmUtil->findGhostSend(localIdx, &chkl, &numchkl);
+  fmUtil->findGhostSend(localIdx, chkl, numchkl);
   findgsMsg *fmsg = new(numchkl)findgsMsg();
   fmsg->numchks = numchkl;
   for(int i=0; i<numchkl; i++) fmsg->chunks[i] = chkl[i];
@@ -2639,7 +2627,7 @@ boolMsg *femMeshModify::shouldLoseGhost(int fromChk, int sharedIdx, int toChk) {
   CtvAccess(_curTCharm) = tc;
   int localIdx = fmUtil->lookup_in_IDXL(fmMesh, sharedIdx, fromChk, 0);
   int *elems, numElems;
-  fmMesh->n2e_getAll(localIdx, &elems, &numElems);
+  fmMesh->n2e_getAll(localIdx, elems, numElems);
   bool shouldBeDeleted = true;
   for(int k=0; k<numElems; k++) {
     if(elems[k]>=0) {
@@ -2678,8 +2666,10 @@ void femMeshModify::addghostsendr(int fromChk, int sharedIdx, int toChk, int tra
   int sharedghost = fmUtil->exists_in_IDXL(fmMesh,FEM_To_ghost_index(localIdx),toChk,2);
   if(sharedghost==-1) { //it needs to be added from this chunk
     //lock idxl
+    fmUtil->idxllock(fmMesh,toChk,0);
     fmMesh->node.ghost->ghostRecv.addNode(localIdx,toChk);
     meshMod[toChk].addghostsendr1(idx,fromChk,transIdx);
+    fmUtil->idxlunlock(fmMesh,toChk,0);
     //unlock idxl
   }
 }
@@ -2699,7 +2689,7 @@ boolMsg *femMeshModify::willItLose(int fromChk, int sharedIdx) {
   bool willlose = true;
   for(int i=0; i<3; i++) {
     int *enbrs, numenbrs;
-    fmMesh->n2e_getAll(nnbrs[i],&enbrs,&numenbrs);
+    fmMesh->n2e_getAll(nnbrs[i],enbrs,numenbrs);
     willlose = true;
     for(int j=0; j<numenbrs; j++) {
       if(enbrs[j]>=0 && enbrs[j]!=localIdx) {
@@ -2766,6 +2756,16 @@ boolMsg *femMeshModify::isFixedNodeRemote(int fromChk, int sharedIdx) {
     }
   }
   return new boolMsg(false);
+}
+
+//need these functions for debugging
+void femMeshModify::finish(void) {
+  CkPrintf("[%d]finished this program!\n",idx);
+  return;
+}
+void femMeshModify::finish1(void) {
+  meshMod[0].finish();
+  return;
 }
 
 #include "ParFUM.def.h"

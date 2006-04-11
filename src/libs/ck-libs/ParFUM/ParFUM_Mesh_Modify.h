@@ -424,6 +424,9 @@ class femMeshModify : public CBase_femMeshModify {
   void purgeElement(int fromChk, int sharedIdx);
   entDataMsg *packEntData(int fromChk, int sharedIdx, bool isnode=false, int elemType=0);
   boolMsg *isFixedNodeRemote(int fromChk, int sharedIdx);
+
+  void finish1(void);
+  void finish(void);
 };
 // end mesh_modify.h
 

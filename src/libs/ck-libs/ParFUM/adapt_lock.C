@@ -316,7 +316,7 @@ int FEM_AdaptL::vertex_remove(int n1, int n2) {
   }
   // find n5
   int *nbrNodes, nnsize, n5;
-  theMesh->n2n_getAll(n1, &nbrNodes, &nnsize);
+  theMesh->n2n_getAll(n1, nbrNodes, nnsize);
   if(!(nnsize == 4 || (nnsize==3 && e2==-1))) {
     //CkPrintf("[%d]Warning: Vertex Remove %d->%d on node %d with %d connections (!= 4)\n",theMod->idx,n1,n2,n1,nnsize);
     free(locknodes);
@@ -356,7 +356,7 @@ int FEM_AdaptL::vertex_remove(int n1, int n2) {
     }
     // find n5
     int *nbrNodes, nnsize, n5;
-    theMesh->n2n_getAll(n1, &nbrNodes, &nnsize);
+    theMesh->n2n_getAll(n1, nbrNodes, nnsize);
     for (int i=0; i<nnsize; i++) {
       if ((nbrNodes[i] != n2) && (nbrNodes[i] != n3) && (nbrNodes[i] != n4)) {
 	n5 = nbrNodes[i];
@@ -763,8 +763,8 @@ int FEM_AdaptL::edge_contraction_help(int *e1P, int *e2P, int n1, int n2, int e1
     //necessary for the locking code to know what all it has locked
     /*int *n1n2es, *n2n2es;
     int n1n2ecount, n2n2ecount;
-    theMesh->n2e_getAll(n1,&n1n2es,&n1n2ecount);
-    theMesh->n2e_getAll(n2,&n2n2es,&n2n2ecount);
+    theMesh->n2e_getAll(n1,n1n2es,n1n2ecount);
+    theMesh->n2e_getAll(n2,n2n2es,n2n2ecount);
     int n1n2elocalcount=0, n2n2elocalcount=0;
     for(int i=0; i<n1n2ecount; i++) {
       if(n1n2es[i]>=0) n1n2elocalcount++;
@@ -780,7 +780,7 @@ int FEM_AdaptL::edge_contraction_help(int *e1P, int *e2P, int n1, int n2, int e1
     for(int i=0; i<3; i++) {
       //if(e1conn[i]!=n1 && e1conn[i]!=n2) {
 	int *e1Elems, esize1;
-	theMesh->n2e_getAll(e1conn[i], &e1Elems, &esize1);
+	theMesh->n2e_getAll(e1conn[i], e1Elems, esize1);
 	int e1count=0;
 	for(int j=0; j<esize1; j++) {
 	  if(e1Elems[j]>=0) e1count++;
@@ -814,7 +814,7 @@ int FEM_AdaptL::edge_contraction_help(int *e1P, int *e2P, int n1, int n2, int e1
 	      //then unlock me
 	      int *n4ns, n4ncount;
 	      bool shouldbeunlocked=true;
-	      theMesh->n2n_getAll(lockn4, &n4ns, &n4ncount);
+	      theMesh->n2n_getAll(lockn4, n4ns, n4ncount);
 	      for(int k=0; k<n4ncount; k++) {
 		if(n4ns[k]>=0 && n4ns[k]!=n1 && n4ns[k]!=n2) shouldbeunlocked=false; 
 	      }
@@ -826,17 +826,15 @@ int FEM_AdaptL::edge_contraction_help(int *e1P, int *e2P, int n1, int n2, int e1
 	    e1new = meshMod[e1remoteChk].eatIntoElement(index,sharedIdx)->i;
 	    if(e1new!=-1) {
 	      e1 = theMod->fmUtil->lookup_in_IDXL(theMesh,e1new,e1remoteChk,4);
-	      //theMesh->n2e_getAll(deletenode, &nbrElems, &nesize);
+	      //theMesh->n2e_getAll(deletenode, nbrElems, nesize);
 	      e1 = FEM_To_ghost_index(e1);
 	    }
 	    else e1 = -1;
-	    free(e1Elems);
 	    *e1P = e1;
 	    return ERVAL1;
 	  }
 	}
-	//free(e1Elems);
-	//}
+	if(esize1>0) delete[] e1Elems;
     }
   }
   if(e2>=0) {
@@ -847,8 +845,8 @@ int FEM_AdaptL::edge_contraction_help(int *e1P, int *e2P, int n1, int n2, int e1
     //necessary for the locking code to know what all it has locked
     /*int *n1n2es, *n2n2es;
     int n1n2ecount, n2n2ecount;
-    theMesh->n2e_getAll(n1,&n1n2es,&n1n2ecount);
-    theMesh->n2e_getAll(n2,&n2n2es,&n2n2ecount);
+    theMesh->n2e_getAll(n1,n1n2es,n1n2ecount);
+    theMesh->n2e_getAll(n2,n2n2es,n2n2ecount);
     int n1n2elocalcount=0, n2n2elocalcount=0;
     for(int i=0; i<n1n2ecount; i++) {
       if(n1n2es[i]>=0) n1n2elocalcount++;
@@ -864,7 +862,7 @@ int FEM_AdaptL::edge_contraction_help(int *e1P, int *e2P, int n1, int n2, int e1
     for(int i=0; i<3; i++) {
       //if(e2conn[i]!=n1 && e2conn[i]!=n2) {
 	int *e2Elems, esize2;
-	theMesh->n2e_getAll(e2conn[i], &e2Elems, &esize2);
+	theMesh->n2e_getAll(e2conn[i], e2Elems, esize2);
 	int e2count=0;
 	for(int j=0; j<esize2; j++) {
 	  if(e2Elems[j]>=0) e2count++;
@@ -898,7 +896,7 @@ int FEM_AdaptL::edge_contraction_help(int *e1P, int *e2P, int n1, int n2, int e1
 	      //then unlock me
 	      int *n4ns, n4ncount;
 	      bool shouldbeunlocked=true;
-	      theMesh->n2n_getAll(lockn4, &n4ns, &n4ncount);
+	      theMesh->n2n_getAll(lockn4, n4ns, n4ncount);
 	      for(int k=0; k<n4ncount; k++) {
 		if(n4ns[k]>=0 && n4ns[k]!=n1 && n4ns[k]!=n2) shouldbeunlocked=false; 
 	      }
@@ -910,17 +908,15 @@ int FEM_AdaptL::edge_contraction_help(int *e1P, int *e2P, int n1, int n2, int e1
 	    e2new = meshMod[e2remoteChk].eatIntoElement(index,sharedIdx)->i;
 	    if(e2new!=-1) {
 	      e2 = theMod->fmUtil->lookup_in_IDXL(theMesh,e2new,e2remoteChk,4);
-	      //theMesh->n2e_getAll(deletenode, &nbrElems, &nesize);
+	      //theMesh->n2e_getAll(deletenode, nbrElems, nesize);
 	      e2 = FEM_To_ghost_index(e2);
 	    }
 	    else e2 = -1;
 	    *e2P = e2;
-	    free(e2Elems);
 	    return ERVAL1;
 	  }
-	  //free(e2Elems);
-	  //}
-      }
+	}
+	if(esize2>0) delete[] e2Elems;
     }
   }
   if(FEM_Is_ghost_index(e1)) {
@@ -1129,7 +1125,7 @@ int FEM_AdaptL::edge_contraction_help(int *e1P, int *e2P, int n1, int n2, int e1
 
 
   int *nbrElems, nesize, echunk;
-  theMesh->n2e_getAll(deletenode, &nbrElems, &nesize);
+  theMesh->n2e_getAll(deletenode, nbrElems, nesize);
   bool locked = false;
   /*CkVec<int> lockedNodes;
   int numtries = 0;
@@ -1279,15 +1275,19 @@ int FEM_AdaptL::edge_contraction_help(int *e1P, int *e2P, int n1, int n2, int e1
   while(!done) {
     lockedNodes.removeAll();
     nncount=0;
-    theMesh->n2n_getAll(deletenode, &nnNodes, &nnsize);
+    theMesh->n2n_getAll(deletenode, nnNodes, nnsize);
     for(int i=0; i<nnsize; i++) {
       if(nnNodes[i]!=n1 && nnNodes[i]!=n2 && nnNodes[i]!=n3 && nnNodes[i]!=n4) {
 	lockedNodes.push_back(nnNodes[i]);
 	nncount++;
       }
     }
-    int *gotlocks = new int[nncount];
-    int *lockw = new int[nncount];
+    int *gotlocks;
+    int *lockw;
+    if(nncount>0) {
+      gotlocks = new int[nncount];
+      lockw = new int[nncount];
+    }
     for(int i=0; i<nncount; i++) {
       gotlocks[i]=-1;
       lockw[i] = lockedNodes[i];
@@ -1299,7 +1299,7 @@ int FEM_AdaptL::edge_contraction_help(int *e1P, int *e2P, int n1, int n2, int e1
       bool isConn = true;
       int *nnNodes1;
       int nnsize1;
-      theMesh->n2n_getAll(deletenode, &nnNodes1, &nnsize1);
+      theMesh->n2n_getAll(deletenode, nnNodes1, nnsize1);
       if(nnsize!=nnsize1) isConn=false;
       else {
 	for(int i=0; i<nnsize; i++) {
@@ -1315,21 +1315,25 @@ int FEM_AdaptL::edge_contraction_help(int *e1P, int *e2P, int n1, int n2, int e1
       if(!isConn) { //connectivity has changed, try acquiring the locks again
 	unlockNodes(gotlocks,lockw,0,lockw,nncount);
 	if(numtries>=3) {
-	  if(nnsize1!=0) free(nnNodes1);
-	  if(nnsize!=0) free(nnNodes);
-	  if(nncount!=0) delete [] lockw;
-	  if(nncount!=0) delete [] gotlocks;
+	  if(nnsize1>0) delete[] nnNodes1;
+	  if(nnsize>0) delete[] nnNodes;
+	  if(nncount>0) {
+	    delete [] lockw;
+	    delete [] gotlocks;
+	  }
 	  return ERVAL;
 	}
 	CthYield();
       }
       else done = true;
-      if(nnsize1!=0) free(nnNodes1);
+      if(nnsize1>0) delete[] nnNodes1;
     }
     else unlockNodes(gotlocks,lockw,0,lockw,nncount);
-    if(nnsize!=0) free(nnNodes);
-    if(nncount!=0) delete [] lockw;
-    if(nncount!=0) delete [] gotlocks;
+    if(nnsize>0) delete[] nnNodes;
+    if(nncount>0) {
+      delete [] lockw;
+      delete [] gotlocks;
+    }
     if(numtries>=3 && !done) return ERVAL;
   }
 
@@ -1353,7 +1357,6 @@ int FEM_AdaptL::edge_contraction_help(int *e1P, int *e2P, int n1, int n2, int e1
     new_coord[0] = nm.frac*n1_coord[0] + (1-nm.frac)*n2_coord[0];
     new_coord[1] = nm.frac*n1_coord[1] + (1-nm.frac)*n2_coord[1];
     int *conn1 = new int[3];
-    theMesh->n2e_getAll(keepnode, &nbr1Elems, &nesize1);
     for (int i=0; i<nesize; i++) {
       if ((nbrElems[i] != e1) && (nbrElems[i] != e2)) {
 	theMesh->e2n_getAll(nbrElems[i], conn);
@@ -1388,6 +1391,7 @@ int FEM_AdaptL::edge_contraction_help(int *e1P, int *e2P, int n1, int n2, int e1
       }
     }
     if(!flipSliver) {
+      theMesh->n2e_getAll(keepnode, nbr1Elems, nesize1);
       for (int i=0; i<nesize1; i++) {
 	if ((nbr1Elems[i] != e1) && (nbr1Elems[i] != e2)) {
 	  theMesh->e2n_getAll(nbr1Elems[i], conn1);
@@ -1450,6 +1454,7 @@ int FEM_AdaptL::edge_contraction_help(int *e1P, int *e2P, int n1, int n2, int e1
     free(lockw);
 
     if(nesize!=0) delete[] nbrElems;
+    if(nesize1 > 0) delete [] nbr1Elems;
     free(conn);
     free(adjnodes);
     free(adjelems);
@@ -1491,7 +1496,7 @@ int FEM_AdaptL::edge_contraction_help(int *e1P, int *e2P, int n1, int n2, int e1
     }
   }
 #endif
-  if(nesize1 != 0) delete [] nbr1Elems;
+  if(nesize1 > 0) delete [] nbr1Elems;
 
   //unlock
   int size = lockedNodes.size();

@@ -169,7 +169,7 @@ int FEM_Adapt::edge_flip_help(int e1, int e2, int n1, int n2, int e1_n1,
     //if anyone needs to add or delete some ghosts, they will
     int *chkl, numchkl=0;
     CkVec<int> finalchkl;
-    theMod->fmUtil->findGhostSend(nodeToUpdate, &chkl, &numchkl);
+    theMod->fmUtil->findGhostSend(nodeToUpdate, chkl, numchkl);
     for(int j=0; j<numchkl; j++) {
       finalchkl.push_back(chkl[j]);
     }
@@ -394,7 +394,7 @@ int FEM_Adapt::edge_bisect_help(int e1, int e2, int n1, int n2, int e1_n1,
     //if anyone needs to add or delete some ghosts, they will
     int *chkl, numchkl=0;
     CkVec<int> finalchkl;
-    theMod->fmUtil->findGhostSend(nodeToUpdate, &chkl, &numchkl);
+    theMod->fmUtil->findGhostSend(nodeToUpdate, chkl, numchkl);
     for(int j=0; j<numchkl; j++) {
       finalchkl.push_back(chkl[j]);
     }
@@ -810,7 +810,7 @@ bool FEM_Adapt::isCorner(int n1) {
   int n1_bound, n2_bound;
   FEM_Mesh_dataP(theMesh, FEM_NODE, FEM_BOUNDARY, &n1_bound, n1, 1 , FEM_INT, 1);
   if(n1_bound==0) return false; //it is internal
-  theMesh->n2n_getAll(n1, &n1AdjNodes, &n1NumNodes);
+  theMesh->n2n_getAll(n1, n1AdjNodes, n1NumNodes);
   for (int i=0; i<n1NumNodes; i++) {
     int n2 = n1AdjNodes[i];
     if(FEM_Is_ghost_index(n2)) {
@@ -844,8 +844,8 @@ bool FEM_Adapt::isEdgeBoundary(int n1, int n2) {
   int n1NumElems=0, n2NumElems=0;
   int ret = 0;
   //find the number of elements this edge belongs to
-  theMesh->n2e_getAll(n1, &n1AdjElems, &n1NumElems);
-  theMesh->n2e_getAll(n2, &n2AdjElems, &n2NumElems);
+  theMesh->n2e_getAll(n1, n1AdjElems, n1NumElems);
+  theMesh->n2e_getAll(n2, n2AdjElems, n2NumElems);
   for(int k=0; k<n1NumElems; k++) {
     for (int j=0; j<n2NumElems; j++) {
       if (n1AdjElems[k] == n2AdjElems[j]) {

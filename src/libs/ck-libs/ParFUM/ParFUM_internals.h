@@ -1306,7 +1306,7 @@ class FEM_Mesh : public CkNoncopyable {
   int n2n_getLength(int n);
   /// Place all of node n's adjacent nodes in adjnodes and the resulting 
   /// length of adjnodes in sz; assumes adjnodes is not allocated, but sz is
-  void n2n_getAll(int n, int **adjnodes, int *sz);
+  void n2n_getAll(int n, int *&adjnodes, int &sz);
   /// Adds newNode to node n's node adjacency list
   void n2n_add(int n, int newNode);
   /// Removes oldNode from n's node adjacency list
@@ -1323,7 +1323,7 @@ class FEM_Mesh : public CkNoncopyable {
   /// Place all of node n's adjacent elements in adjelements and the resulting 
   /// length of adjelements in sz; assumes adjelements is not allocated, 
   /// but sz is
-  void n2e_getAll(int n, int **adjelements, int *sz);
+  void n2e_getAll(int n, int *&adjelements, int &sz);
   /// Adds newElem to node n's element adjacency list
   void n2e_add(int n, int newElem);
   /// Removes oldElem from n's element adjacency list
@@ -2592,7 +2592,7 @@ class FEM_MUtil {
   int getLockOwner(int nodeId);
   bool knowsAbtNode(int chk, int nodeId);
   void UpdateGhostSend(int nodeId, int *chunkl, int numchunkl);
-  void findGhostSend(int nodeId, int **chunkl, int *numchunkl);
+  void findGhostSend(int nodeId, int *&chunkl, int &numchunkl);
 
   void StructureTest(FEM_Mesh *m);
   int AreaTest(FEM_Mesh *m);
