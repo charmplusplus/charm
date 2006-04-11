@@ -97,6 +97,7 @@ int FEM_Adapt_Algs::Refine(int qm, int method, double factor, double *sizes)
 	    //|| (qFactor < QUALITY_MIN)) {
 	  Insert(i, qFactor*(1.0/maxEdgeLength), 0);
 	}
+	free(eConn);
       }
     }
     while (refineHeapSize>0 || refineTop > 0) { // loop through the elements
@@ -128,6 +129,7 @@ int FEM_Adapt_Algs::Refine(int qm, int method, double factor, double *sizes)
 	  //|| (qFactor < QUALITY_MIN)) {
 	  if (theAdaptor->edge_bisect(n1, n2) > 0)  iter_mods++;
 	}
+	free(eConn);
       }
       CthYield(); // give other chunks on the same PE a chance
     }
@@ -199,6 +201,7 @@ int FEM_Adapt_Algs::Coarsen(int qm, int method, double factor, double *sizes)
 	  //CkPrintf("Marking elem %d for coarsening\n", i);
 	  Insert(i, qFactor*minEdgeLength, 1);
 	}
+	free(eConn);
       }
     }
     while (coarsenHeapSize>0) { // loop through the elements
@@ -222,6 +225,7 @@ int FEM_Adapt_Algs::Coarsen(int qm, int method, double factor, double *sizes)
 	CkAssert(n1!=-1 && n2!=-1);
 	avgEdgeLength /= 3.0;
 	qFactor=getAreaQuality(elId);
+	free(eConn);
 	// coarsen element's short edge
 	if (((theMesh->elem[0].getMeshSizing(elId) > 0.0) &&
 	     (avgEdgeLength < (theMesh->elem[0].getMeshSizing(elId)*COARSEN_TOL)))
@@ -248,6 +252,7 @@ int FEM_Adapt_Algs::Coarsen(int qm, int method, double factor, double *sizes)
 	      //CkPrintf("Coarsening elem %d which has desired edge length %6.6e and average edge length %6.6e.\n", elId, theMesh->elem[0].getMeshSizing(elId), avgEdgeLength);
 	      if (theAdaptor->edge_contraction(n1, n2) > 0)  iter_mods++;
 	    }
+	    free(eConn);
 	  }
 	  else {
 	    //CkPrintf("Coarsening elem %d which has desired edge length %6.6e and average edge length %6.6e.\n", elId, theMesh->elem[0].getMeshSizing(elId), avgEdgeLength);
@@ -351,6 +356,7 @@ void FEM_Adapt_Algs::FEM_Repair(int qm)
 	  else {
 	    //CkPrintf("Leaving one bad element alone...\n");
 	  }
+	  free(eConn);
 	}
       }
     }
@@ -423,6 +429,7 @@ void FEM_Adapt_Algs::SetMeshSize(int method, double factor, double *sizes)
       avgEdgeLength += length(eConn[0], eConn[width-1]);
       avgEdgeLength /= (double)numEdges;
       theMesh->elem[0].setMeshSizing(i, factor*avgEdgeLength);
+      free(eConn);
     }
     //CkPrintf("ParFUM_SetMeshSize: CALCULATED & SCALED \n");
   }
@@ -582,7 +589,7 @@ void FEM_Adapt_Algs::GradateMesh(double smoothness)
                 //}
                 
             }
-            delete[] adjNodes;
+            free(adjNodes);
         } 
         
 	//printf("Finished iteration %d\n", iteration);

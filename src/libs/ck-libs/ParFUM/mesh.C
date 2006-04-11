@@ -1243,10 +1243,7 @@ int FEM_Entity::is_valid(unsigned int idx){
     CkAssert(idx < size() && idx >=0);
     return valid->getChar()(idx,0);
   } else {
-    if(!(idx < size() && idx >=0 && first_invalid<=last_invalid)) {
-      CkPrintf("idx %d; size %d; first_invalid %d; last_invalid %d\n",idx,size(),first_invalid,last_invalid);
-      CkAssert(false);
-    }
+    CkAssert(idx < size() && idx >=0 && first_invalid<=last_invalid);
     return valid->getChar()(idx,0);
   }
 }
