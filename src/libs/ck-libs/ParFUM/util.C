@@ -1188,6 +1188,7 @@ void FEM_MUtil::StructureTest(FEM_Mesh *m) {
 	  CkAssert(false);
 	}
       }
+      if(n2esize>0) delete[] n2e; n2esize=0;
       //reconstruct n2n from n2e & e2n
       int n2n1size = 0;
       int *n2n1 = (int*)malloc(n2nsize*sizeof(int));
@@ -1239,10 +1240,12 @@ void FEM_MUtil::StructureTest(FEM_Mesh *m) {
       }
       
       delete [] n2n1;
-      delete [] n2e;
-      if(n2nsize>0) delete [] n2n;
+      if(n2esize>0) delete [] n2e; n2esize=0;
+      if(n2nsize>0) delete [] n2n; n2nsize=0;
     }
   }
+  if(n2esize>0) delete [] n2e; n2esize=0;
+  if(n2nsize>0) delete [] n2n; n2nsize=0;
   for(int i=0; i<noGhostNodes; i++) {
     int ghostidx = FEM_To_ghost_index(i);
     if(m->node.ghost->is_valid(i)) {
@@ -1317,14 +1320,14 @@ void FEM_MUtil::StructureTest(FEM_Mesh *m) {
 	  CkPrintf("ERROR: ghost node %d has inconsistent adjacency list\n",ghostidx);
 	  CkAssert(false);
 	}
-	delete [] n2n1;
-	delete [] n2e;
+	delete[] n2n1;
+	delete[] n2e;
       }
       if(n2nsize > 0) {
 	for(int j=0; j<n2nsize; j++) {
 	  CkAssert(n2n[j]!=-1);
 	}
-	delete [] n2n;
+	delete[] n2n;
       }
       //verify that it is coming correctly from all chunks as a ghost
       const IDXL_Rec *irec = m->node.ghost->ghostRecv.getRec(i);

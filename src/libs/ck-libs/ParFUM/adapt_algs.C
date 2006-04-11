@@ -66,6 +66,7 @@ int FEM_Adapt_Algs::Refine(int qm, int method, double factor, double *sizes)
   int elemWidth = theMesh->elem[0].getConn().width();
   refineElements = refineStack = NULL;
   refineTop = refineHeapSize = 0;
+  int *eConn = (int*)malloc(elemWidth*sizeof(int));
   while (iter_mods != 0) {
     iter_mods=0;
     numNodes = theMesh->node.size();
@@ -78,7 +79,6 @@ int FEM_Adapt_Algs::Refine(int qm, int method, double factor, double *sizes)
     for (int i=0; i<numElements; i++) { 
       if (theMesh->elem[0].is_valid(i)) {
 	// find maxEdgeLength of i
-	int *eConn = (int*)malloc(elemWidth*sizeof(int));
 	double tmpLen, avgEdgeLength=0.0, maxEdgeLength = 0.0;
 	theMesh->e2n_getAll(i, eConn);
 	for (int j=0; j<elemWidth-1; j++) {
@@ -97,7 +97,6 @@ int FEM_Adapt_Algs::Refine(int qm, int method, double factor, double *sizes)
 	    //|| (qFactor < QUALITY_MIN)) {
 	  Insert(i, qFactor*(1.0/maxEdgeLength), 0);
 	}
-	free(eConn);
       }
     }
     while (refineHeapSize>0 || refineTop > 0) { // loop through the elements
@@ -108,7 +107,6 @@ int FEM_Adapt_Algs::Refine(int qm, int method, double factor, double *sizes)
       }
       else  elId=Delete_Min(0);
       if ((elId != -1) && (theMesh->elem[0].is_valid(elId))) {
-	int *eConn = (int*)malloc(elemWidth*sizeof(int));
 	int n1, n2;
 	double tmpLen, avgEdgeLength=0.0, maxEdgeLength = 0.0;
 	theMesh->e2n_getAll(elId, eConn);
@@ -129,7 +127,6 @@ int FEM_Adapt_Algs::Refine(int qm, int method, double factor, double *sizes)
 	  //|| (qFactor < QUALITY_MIN)) {
 	  if (theAdaptor->edge_bisect(n1, n2) > 0)  iter_mods++;
 	}
-	free(eConn);
       }
       CthYield(); // give other chunks on the same PE a chance
     }
@@ -141,6 +138,7 @@ int FEM_Adapt_Algs::Refine(int qm, int method, double factor, double *sizes)
 #ifdef ADAPT_VERBOSE
   CkPrintf("ParFUM_Refine: %d total modifications.\n", mods);
 #endif
+  free(eConn);
   delete[] refineStack;
   delete[] refineElements;
   return mods;
@@ -168,6 +166,7 @@ int FEM_Adapt_Algs::Coarsen(int qm, int method, double factor, double *sizes)
   double qFactor;
   coarsenElements = NULL;
   coarsenHeapSize = 0;
+  int *eConn = (int*)malloc(elemWidth*sizeof(int));
   while (iter_mods != 0) {
     iter_mods=0;
     pass++;
@@ -181,7 +180,6 @@ int FEM_Adapt_Algs::Coarsen(int qm, int method, double factor, double *sizes)
     for (int i=0; i<numElements; i++) { 
       if (theMesh->elem[0].is_valid(i)) {
 	// find minEdgeLength of i
-	int *eConn = (int*)malloc(elemWidth*sizeof(int));
 	theMesh->e2n_getAll(i, eConn);
 	double tmpLen, avgEdgeLength=0.0, 
 	  minEdgeLength = length(eConn[0], eConn[1]);
@@ -201,13 +199,11 @@ int FEM_Adapt_Algs::Coarsen(int qm, int method, double factor, double *sizes)
 	  //CkPrintf("Marking elem %d for coarsening\n", i);
 	  Insert(i, qFactor*minEdgeLength, 1);
 	}
-	free(eConn);
       }
     }
     while (coarsenHeapSize>0) { // loop through the elements
       elId=Delete_Min(1);
       if ((elId != -1) && (theMesh->elem[0].is_valid(elId))) {
-	int *eConn = (int*)malloc(elemWidth*sizeof(int));
 	theMesh->e2n_getAll(elId, eConn);
 	int n1=eConn[0], n2=eConn[1];
 	double tmpLen, avgEdgeLength=0.0, 
@@ -225,7 +221,6 @@ int FEM_Adapt_Algs::Coarsen(int qm, int method, double factor, double *sizes)
 	CkAssert(n1!=-1 && n2!=-1);
 	avgEdgeLength /= 3.0;
 	qFactor=getAreaQuality(elId);
-	free(eConn);
 	// coarsen element's short edge
 	if (((theMesh->elem[0].getMeshSizing(elId) > 0.0) &&
 	     (avgEdgeLength < (theMesh->elem[0].getMeshSizing(elId)*COARSEN_TOL)))
@@ -236,7 +231,6 @@ int FEM_Adapt_Algs::Coarsen(int qm, int method, double factor, double *sizes)
 					 theMesh->e2n_getIndex(elId,n2)-1, 0);
 	  // determine if eNbr should also be coarsened
 	  if ((eNbr >= 0) && (theMesh->elem[0].is_valid(eNbr))) {
-	    eConn = (int*)malloc(elemWidth*sizeof(int));
 	    theMesh->e2n_getAll(eNbr, eConn);
 	    avgEdgeLength=0.0;
 	    for (int j=0; j<elemWidth-1; j++) {
@@ -252,7 +246,6 @@ int FEM_Adapt_Algs::Coarsen(int qm, int method, double factor, double *sizes)
 	      //CkPrintf("Coarsening elem %d which has desired edge length %6.6e and average edge length %6.6e.\n", elId, theMesh->elem[0].getMeshSizing(elId), avgEdgeLength);
 	      if (theAdaptor->edge_contraction(n1, n2) > 0)  iter_mods++;
 	    }
-	    free(eConn);
 	  }
 	  else {
 	    //CkPrintf("Coarsening elem %d which has desired edge length %6.6e and average edge length %6.6e.\n", elId, theMesh->elem[0].getMeshSizing(elId), avgEdgeLength);
@@ -270,6 +263,7 @@ int FEM_Adapt_Algs::Coarsen(int qm, int method, double factor, double *sizes)
 #ifdef ADAPT_VERBOSE
   CkPrintf("ParFUM_Coarsen: %d total modifications over %d passes.\n", mods, pass);
 #endif
+  free(eConn);
   delete[] coarsenElements;
   return mods;
 }
@@ -306,6 +300,7 @@ void FEM_Adapt_Algs::FEM_Repair(int qm)
   int elemWidth = theMesh->elem[0].getConn().width();
   int changes=1;
   int count=0;
+  int *eConn = (int*)malloc(elemWidth*sizeof(int));
   while (changes!=0 && count<4) {
     count++;
     changes = 0;
@@ -315,7 +310,6 @@ void FEM_Adapt_Algs::FEM_Repair(int qm)
 	double qFactor=getAreaQuality(i);
 	if (qFactor <  0.75*QUALITY_MIN) {
 	  int elId = i;
-	  int *eConn = (int*)malloc(elemWidth*sizeof(int));
 	  theMesh->e2n_getAll(elId, eConn);
 	  int n1=eConn[0], n2=eConn[1], mn1, mn2;
 	  mn1 = n1; mn2 = n2;
@@ -356,11 +350,11 @@ void FEM_Adapt_Algs::FEM_Repair(int qm)
 	  else {
 	    //CkPrintf("Leaving one bad element alone...\n");
 	  }
-	  free(eConn);
 	}
       }
     }
   }
+  free(eConn);
 
 #ifdef ADAPT_VERBOSE
   numElements = theMesh->elem[0].size();
