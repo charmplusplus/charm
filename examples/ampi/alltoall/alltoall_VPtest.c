@@ -113,8 +113,10 @@ main(int argc, char **argv){
   MPI_Barrier(MPI_COMM_WORLD); 
 
   memory_after = CmiMemoryUsage();
-  local_memory_max = CmiMaxMemoryUsage() - memory_before;
-  if (local_memory_max < 0) local_memory_max = 0;
+  if (CmiMaxMemoryUsage() < memory_before)  
+    local_memory_max = 0;
+  else
+    local_memory_max = CmiMaxMemoryUsage() - memory_before;
 
   // Reduce MAX here
   assert(MPI_SUCCESS==MPI_Reduce(&local_memory_max, &memory_max, 1, MPI_UNSIGNED_LONG, MPI_MAX, 0, MPI_COMM_WORLD));
