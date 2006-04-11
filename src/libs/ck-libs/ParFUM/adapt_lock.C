@@ -825,7 +825,9 @@ int FEM_AdaptL::edge_contraction_help(int *e1P, int *e2P, int n1, int n2, int e1
 	      }
 	      if(n4ncount!=0) delete[] n4ns;
 	    }
-	    e1new = meshMod[e1remoteChk].eatIntoElement(index,sharedIdx)->i;
+	    intMsg* imsg1 = meshMod[e1remoteChk].eatIntoElement(index,sharedIdx);
+	    e1new = imsg1->i;
+	    delete imsg1;
 	    if(e1new!=-1) {
 	      e1 = theMod->fmUtil->lookup_in_IDXL(theMesh,e1new,e1remoteChk,4);
 	      //theMesh->n2e_getAll(deletenode, nbrElems, nesize);
@@ -908,7 +910,9 @@ int FEM_AdaptL::edge_contraction_help(int *e1P, int *e2P, int n1, int n2, int e1
 	      }
 	      if(n4ncount!=0) delete[] n4ns;
 	    }
-	    e2new = meshMod[e2remoteChk].eatIntoElement(index,sharedIdx)->i;
+	    intMsg* imsg1 = meshMod[e2remoteChk].eatIntoElement(index,sharedIdx);
+	    e2new = imsg1->i;
+	    delete imsg1;
 	    if(e2new!=-1) {
 	      e2 = theMod->fmUtil->lookup_in_IDXL(theMesh,e2new,e2remoteChk,4);
 	      //theMesh->n2e_getAll(deletenode, nbrElems, nesize);
@@ -936,7 +940,9 @@ int FEM_AdaptL::edge_contraction_help(int *e1P, int *e2P, int n1, int n2, int e1
 	shouldacquire=false; break;
       }
     }
-    bool shouldacquire1 = meshMod[remChk].willItLose(index,shidx)->b;
+    boolMsg* bmsg = meshMod[remChk].willItLose(index,shidx);
+    bool shouldacquire1 = bmsg->b;
+    delete bmsg;
     if(shouldacquire && shouldacquire1) {
       e1new = theMod->fmUtil->eatIntoElement(e1);
       *e1P = e1new;
@@ -957,7 +963,9 @@ int FEM_AdaptL::edge_contraction_help(int *e1P, int *e2P, int n1, int n2, int e1
 	shouldacquire=false; break;
       }
     }
-    bool shouldacquire1 = meshMod[remChk].willItLose(index,shidx)->b;
+    boolMsg* bmsg = meshMod[remChk].willItLose(index,shidx);
+    bool shouldacquire1 = bmsg->b;
+    delete bmsg;
     if(shouldacquire && shouldacquire1) {
       e2new = theMod->fmUtil->eatIntoElement(e2);
       *e2P = e2new;

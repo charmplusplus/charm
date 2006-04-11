@@ -212,6 +212,7 @@ int FEM_lock::lock(int chunkNo, int own) {
       CthYield();
     }
   }
+  delete ret;
   return 1;
 }
 
@@ -240,6 +241,7 @@ int FEM_lock::unlock(int chunkNo, int own) {
       CthYield();
     }
   }
+  delete ret;
   return 1;
 }
 

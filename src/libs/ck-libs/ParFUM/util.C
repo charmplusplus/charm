@@ -797,7 +797,9 @@ void FEM_MUtil::addToSharedList(FEM_Mesh *m, int fromChk, int sharedIdx) {
 		  int idxshared = irec->getIdx(sharedck);
 		  if(ckshared == fromChk) continue;
 		  CkAssert(fromChk!=idx && fromChk!=ckshared && ckshared!=idx);
-		  int idxghostsend = meshMod[ckshared].getIdxGhostSend(idx,idxshared,fromChk)->i;
+		  intMsg* imsg = meshMod[ckshared].getIdxGhostSend(idx,idxshared,fromChk);
+		  int idxghostsend = imsg->i;
+		  delete imsg;
 		  if(idxghostsend != -1) {
 		    m->node.ghostSend.addNode(nnbrs[j],fromChk);
 		    meshMod[fromChk].updateIdxlList(idx,idxghostsend,ckshared);
@@ -1012,13 +1014,17 @@ int FEM_MUtil::getLockOwner(int nodeId) {
     else {
       CkAssert(minchunk!=MAX_CHUNK);
       int sharedIdx = mmod->getfmUtil()->exists_in_IDXL(mmod->fmMesh,nodeId,minchunk,0);
-      owner = meshMod[minchunk].hasLockRemoteNode(sharedIdx, idx, 0)->i;
+      intMsg* imsg = meshMod[minchunk].hasLockRemoteNode(sharedIdx, idx, 0);
+      owner = imsg->i;
+      delete imsg;
     }
   }
   else {
     int otherchk = mmod->fmMesh->node.ghost->ghostRecv.getRec(FEM_From_ghost_index(nodeId))->getChk(0);
     int sharedIdx = mmod->fmMesh->node.ghost->ghostRecv.getRec(FEM_From_ghost_index(nodeId))->getIdx(0);
-    owner = meshMod[otherchk].getLockOwner(idx, sharedIdx)->i;
+    intMsg* imsg1 = meshMod[otherchk].getLockOwner(idx, sharedIdx);
+    owner = imsg1->i;
+    delete imsg1;
   }
   //CkAssert(owner != -1);
   return owner;
@@ -1045,7 +1051,10 @@ bool FEM_MUtil::knowsAbtNode(int chk, int nodeId) {
     int owner = mmod->fmMesh->node.ghost->ghostRecv.getRec(FEM_From_ghost_index(nodeId))->getChk(0);
     int sharedIdx = mmod->fmMesh->node.ghost->ghostRecv.getRec(FEM_From_ghost_index(nodeId))->getIdx(0);
     //does 'chk' know abt 'nodeId' in owner
-    return meshMod[owner].knowsAbtNode(idx, chk, sharedIdx)->b;
+    boolMsg* bmsg = meshMod[owner].knowsAbtNode(idx, chk, sharedIdx);
+    bool b1 = bmsg->b;
+    delete bmsg;
+    return b1;
   }
   return false;
 }
