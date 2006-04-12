@@ -1279,8 +1279,8 @@ int FEM_AdaptL::edge_contraction_help(int *e1P, int *e2P, int n1, int n2, int e1
 
   //lock the adjacent nodes
   CkVec<int> lockedNodes;
-  int *nnNodes;
-  int nnsize;
+  int *nnNodes, *nn1Nodes;
+  int nnsize=0, nn1size=0;
   int nncount=0;
   int numtries=0;
   bool done = false;
@@ -1288,10 +1288,26 @@ int FEM_AdaptL::edge_contraction_help(int *e1P, int *e2P, int n1, int n2, int e1
     lockedNodes.removeAll();
     nncount=0;
     theMesh->n2n_getAll(deletenode, nnNodes, nnsize);
+    theMesh->n2n_getAll(keepnode, nn1Nodes, nn1size);
     for(int i=0; i<nnsize; i++) {
       if(nnNodes[i]!=n1 && nnNodes[i]!=n2 && nnNodes[i]!=n3 && nnNodes[i]!=n4) {
 	lockedNodes.push_back(nnNodes[i]);
 	nncount++;
+      }
+    }
+    for(int i=0; i<nn1size; i++) {
+      if(nn1Nodes[i]!=n1 && nn1Nodes[i]!=n2 && nn1Nodes[i]!=n3 && nn1Nodes[i]!=n4) {
+	bool nflag1 = false;
+	for(int j=0; j<nnsize; j++) {
+	  if(nn1Nodes[i]==nnNodes[j]) {
+	    nflag1 = true;
+	    break;
+	  }
+	}
+	if(!nflag1) {
+	  lockedNodes.push_back(nn1Nodes[i]);
+	  nncount++;
+	}
       }
     }
     int *gotlocks;
@@ -1309,8 +1325,8 @@ int FEM_AdaptL::edge_contraction_help(int *e1P, int *e2P, int n1, int n2, int e1
     numtries++;
     if(gotlock==1) {
       bool isConn = true;
-      int *nnNodes1;
-      int nnsize1;
+      int *nnNodes1,*nn1Nodes1;
+      int nnsize1=0,nn1size1=0;
       theMesh->n2n_getAll(deletenode, nnNodes1, nnsize1);
       if(nnsize!=nnsize1) isConn=false;
       else {
@@ -1324,12 +1340,29 @@ int FEM_AdaptL::edge_contraction_help(int *e1P, int *e2P, int n1, int n2, int e1
 	  if(!isConn) break;
 	}
       }
+      if(isConn) { 
+	theMesh->n2n_getAll(keepnode, nn1Nodes1, nn1size1);
+	if(nn1size!=nn1size1) isConn=false;
+	else {
+	  for(int i=0; i<nnsize; i++) {
+	    isConn = false;
+	    for(int j=0; j<nnsize1; j++) {
+	      if(nnNodes1[i] == nnNodes[j]) {
+		isConn=true; break;
+	      }
+	    }
+	    if(!isConn) break;
+	  }
+	}
+      }
       if(!isConn) { //connectivity has changed, try acquiring the locks again
 	unlockNodes(gotlocks,lockw,0,lockw,nncount);
 	if(numtries>=3) {
 	  if(nesize>0) delete[] nbrElems;
 	  if(nnsize1>0) delete[] nnNodes1;
+	  if(nn1size1>0) delete[] nn1Nodes1;
 	  if(nnsize>0) delete[] nnNodes;
+	  if(nn1size>0) delete[] nn1Nodes;
 	  if(nncount>0) {
 	    delete [] lockw;
 	    delete [] gotlocks;
@@ -1343,9 +1376,11 @@ int FEM_AdaptL::edge_contraction_help(int *e1P, int *e2P, int n1, int n2, int e1
       }
       else done = true;
       if(nnsize1>0) delete[] nnNodes1;
+      if(nn1size1>0) delete[] nn1Nodes1;
     }
     else unlockNodes(gotlocks,lockw,0,lockw,nncount);
     if(nnsize>0) delete[] nnNodes;
+    if(nn1size>0) delete[] nn1Nodes;
     if(nncount>0) {
       delete [] lockw;
       delete [] gotlocks;

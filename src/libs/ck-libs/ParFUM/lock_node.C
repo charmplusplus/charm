@@ -97,7 +97,7 @@ int FEM_lockN::wunlock(int own) {
     nowriteLocks=1;
     }*/
   //CkAssert(noreadLocks==0 && nowriteLocks>0);
-  if(nowriteLocks) {
+  if(nowriteLocks>0) {
     nowriteLocks--;
 #ifdef DEBUG_LOCKS
     CkPrintf("[%d] Unlocked write lock on node %d{%d} .\n",owner, idx, theMod->idx);
