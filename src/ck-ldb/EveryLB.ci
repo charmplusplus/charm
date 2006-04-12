@@ -11,6 +11,7 @@ module EveryLB {
    extern module GreedyAgentLB;
    extern module GridCommLB;
    extern module GridCommRefineLB;
+   extern module GridMetisLB;
    extern module Comm1LB;
    extern module OrbLB;
    extern module RecBisectBfLB;
