@@ -99,21 +99,22 @@ main(int argc, char **argv){
   for(i=0; i<max_msgs; i++) {
     MPI_Alltoall(sndbuf, msg_size, MPI_CHAR, recvbuf, msg_size, MPI_CHAR, MPI_COMM_WORLD);
   }
+
+  MPI_Barrier(MPI_COMM_WORLD); 
+  CmiResetMaxMemory();
+  memory_before = CmiMemoryUsage();  // initial memory usage
   MPI_Barrier(MPI_COMM_WORLD); 
 
-    // initial memory usage
-  memory_before = CmiMemoryUsage();
   if(my_id == 0){
-    CmiResetMaxMemory();
     Create_Timers (1);
     Start_Timer (0, ITIMER_REAL); 
   }
   for(i=0; i<max_msgs; i++) {
     MPI_Alltoall(sndbuf, msg_size, MPI_CHAR, recvbuf, msg_size, MPI_CHAR, MPI_COMM_WORLD);
   }
-  MPI_Barrier(MPI_COMM_WORLD); 
-
+  MPI_Barrier(MPI_COMM_WORLD);
   memory_after = CmiMemoryUsage();
+
   if (CmiMaxMemoryUsage() < memory_before)  
     local_memory_max = 0;
   else
