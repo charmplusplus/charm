@@ -300,6 +300,18 @@ extern "C" CkFutureID CkCreateAttachedFuture(void *msg)
 
 #include "ckIgetControl.C"
 
+extern "C" CkFutureID CkCreateAttachedFutureSend(void *msg, int ep,
+CkArrayID id, CkArrayIndexMax idx, void(*fptr)(CkArrayID,CkArrayIndexMax,void*,int,int))
+{
+CkFutureID ret=createFuture();
+UsrToEnv(msg)->setRef(ret);
+#if IGET_FLOWCONTROL
+if (TheIGetControlClass.iget_request(ret,msg,ep,id,idx,fptr))
+#endif
+(fptr)(id,idx,msg,ep,0);
+return ret;
+}
+/*
 extern "C" CkFutureID CkCreateAttachedFutureSend(void *msg, int ep, void *obj,void(*fptr)(void*,void*,int,int))
 {
   CkFutureID ret=createFuture();
@@ -310,7 +322,7 @@ extern "C" CkFutureID CkCreateAttachedFutureSend(void *msg, int ep, void *obj,vo
   (fptr)(obj,msg,ep,0);
   return ret;
 }
-
+*/
 extern "C" void *CkWaitReleaseFuture(CkFutureID futNum)
 {
 #if IGET_FLOWCONTROL

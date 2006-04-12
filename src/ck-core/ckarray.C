@@ -106,6 +106,18 @@ inline CkArrayIndexMax &CkArrayMessage::array_index(void)
 	return UsrToEnv((void *)this)->getsetArrayIndex();
 }
 
+/*
+void 
+CProxyElement_ArrayBase::ckSendWrapper(void *me, void *m, int ep, int opts){
+       ((CProxyElement_ArrayBase*)me)->ckSend((CkArrayMessage*)m,ep,opts);
+}
+*/
+void
+CProxyElement_ArrayBase::ckSendWrapper(CkArrayID _aid, CkArrayIndexMax _idx, void *m, int ep, int opts) {
+	CProxyElement_ArrayBase me = CProxyElement_ArrayBase(_aid,_idx);
+	((CProxyElement_ArrayBase)me).ckSend((CkArrayMessage*)m,ep,opts);
+}
+
 /*********************** CkVerboseListener ******************/
 #define VL_PRINT ckout<<"VerboseListener on PE "<<CkMyPe()<<" > "
 

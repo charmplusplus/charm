@@ -271,7 +271,14 @@ extern void CkReleaseFuture(CkFutureID futNum);
 extern int CkProbeFuture(CkFutureID futNum);
 extern void  CkSendToFuture(CkFutureID futNum, void *msg, int pe);
 extern CkFutureID CkCreateAttachedFuture(void *msg);
-extern CkFutureID CkCreateAttachedFutureSend(void *msg, int ep, void*,void(*fptr)(void*,void*,int,int));
+// forward declare
+struct CkArrayID;
+struct CkArrayIndexMax;
+extern CkFutureID CkCreateAttachedFutureSend(void *msg, int ep,
+struct CkArrayID id, struct CkArrayIndexMax idx, void(*fptr)(struct
+CkArrayID,struct CkArrayIndexMax,void*,int,int));
+//extern CkFutureID CkCreateAttachedFutureSend(void *msg, int ep, void*,void(*fptr)(void*,void*,int,int));
+
 extern void *CkWaitReleaseFuture(CkFutureID futNum);
 
 /******************************************************************************

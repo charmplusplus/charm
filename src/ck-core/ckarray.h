@@ -347,9 +347,8 @@ public:
 
 	void ckInsert(CkArrayMessage *m,int ctor,int onPe);
 	void ckSend(CkArrayMessage *m, int ep, int opts = 0) const;
-	static void ckSendWrapper(void *me, void *m, int ep, int opts = 0){
-		((CProxyElement_ArrayBase*)me)->ckSend((CkArrayMessage*)m,ep,opts);
-	}
+//      static void ckSendWrapper(void *me, void *m, int ep, int opts = 0);
+      static void ckSendWrapper(CkArrayID _aid, CkArrayIndexMax _idx, void *m, int ep, int opts);
 	void *ckSendSync(CkArrayMessage *m, int ep) const;
 	const CkArrayIndex &ckGetIndex() const {return _idx;}
 

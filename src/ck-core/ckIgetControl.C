@@ -1,4 +1,4 @@
-#define IGET_FLOWCONTROL 0 
+//#define IGET_FLOWCONTROL 0 
 
 #define CKFUTURE_IGET 	1
 #define DAGGER_IGET   	0
@@ -102,8 +102,11 @@ typedef struct iget_token_struct {
   int status;
   void *m;
   int ep;
-  void *obj;     
-  void(*fptr)(void*,void*,int,int);
+//  void *obj;     
+//  void(*fptr1)(void*,void*,int,int);
+  CkArrayID aid;
+  CkArrayIndexMax idx;
+  void(*fptr)(CkArrayID,CkArrayIndexMax,void*,int,int);   
 } *iget_tokenqueue_entry;
 
 typedef HashQueueT<CkIGetID, iget_tokenqueue_entry> HashTokenQueue;
@@ -112,7 +115,9 @@ typedef HashQueueT<CkIGetID, iget_tokenqueue_entry> HashTokenQueue;
 
 class IGetControlClass {
 public:
-  int iget_request(CkIGetID fut, void *msg, int ep, void *obj,void(*fptr)(void*,void*,int,int)) 
+//  int iget_request(CkIGetID fut, void *msg, int ep, void *obj,void(*fptr)(void*,void*,int,int)) 
+//    {return 1;}
+  int iget_request(CkIGetID fut, void *msg, int ep, CkArrayID, CkArrayIndexMax, void(*fptr)(CkArrayID,CkArrayIndexMax,void*,int,int))
     {return 1;}
   void iget_free(CthThread tid, int size) {}
   void iget_resend(CkIGetID) {}
@@ -122,7 +127,7 @@ public:
 
 class IGetControlClass {
 public:
-  int iget_request(CkIGetID fut, void *msg, int ep, void *obj,void(*fptr)(void*,void*,int,int))
+/*  int iget_request(CkIGetID fut, void *msg, int ep, void *obj,void(*fptr)(void*,void*,int,int))
   {
     int ret_status=1, size=1;
     if(iget_token>=size){
@@ -131,7 +136,22 @@ public:
     }
     else //(iget_request(CthSelf(),1)==false)
     { 
-      iget_tokenqueue_enqueue(fut,msg,ep,obj,fptr);
+      //iget_tokenqueue_enqueue(fut,msg,ep,obj,fptr);
+      ret_status = 0; // No send will be done this case
+    }
+    return ret_status;
+  }
+*/
+  int iget_request(CkIGetID fut, void *msg, int ep, CkArrayID id, CkArrayIndexMax idx, void(*fptr)(CkArrayID,CkArrayIndexMax,void*,int,int))
+  {
+    int ret_status=1, size=1;
+    if(iget_token>=size){
+      iget_token-=size;
+      //(fptr)(obj,msg,ep,0);  // Send the msg here
+    }
+    else //(iget_request(CthSelf(),1)==false)
+    {
+      iget_tokenqueue_enqueue(fut,msg,ep,id,idx,fptr);
       ret_status = 0; // No send will be done this case
     }
     return ret_status;
@@ -146,7 +166,8 @@ public:
     if(e!=NULL) 
     {
        iget_token-=size;
-       (e->fptr)(e->obj,e->m, e->ep, 0);
+    //   (e->fptr)(e->obj,e->m, e->ep, 0);
+	(e->fptr)(e->aid, e->idx, e->m, e->ep, 0);
        delete e;
      }
   }
@@ -165,7 +186,7 @@ public:
 
     //promote self to head of wait queue
     //return, and sleep on wait for future
-    iget_tokenqueue_promote(fut);
+    //iget_tokenqueue_promote(fut);
     // NEED: to set status of this entry to 1 --> this has been waited for
   }
 
@@ -200,13 +221,21 @@ public:
 private:
   HashTokenQueue queue;
   int iget_token;
-
+/*
   inline void iget_tokenqueue_enqueue(CkIGetID gid,void* m,int ep,void *obj,void(*fptr)(void*,void*,int,int))
   {
     iget_tokenqueue_entry e=new iget_token_struct(); 
     e->futNum=gid; e->m=m; e->ep=ep; e->obj=obj; e->fptr=fptr; e->status=0; 
     queue.key_enq(e,gid);
   } 
+*/
+  inline void iget_tokenqueue_enqueue(CkIGetID gid,void* m,int ep, CkArrayID aid, CkArrayIndexMax
+idx, void(*fptr)(CkArrayID,CkArrayIndexMax,void*,int,int))
+  {
+    iget_tokenqueue_entry e=new iget_token_struct();
+    e->futNum=gid; e->m=m; e->ep=ep; e->aid=aid; e->idx=idx; e->fptr=fptr; e->status=0;
+    queue.key_enq(e,gid);
+  }
 
   inline iget_tokenqueue_entry iget_tokenqueue_dequeue() {
     return queue.deq();
