@@ -65,7 +65,7 @@ main(int argc, char **argv){
   float bandwidth;
   char *sndbuf, *recvbuf;
   unsigned long memory_before, memory_after;
-  unsigned long memory_diff, local_memory_max, memory_max;
+  unsigned long memory_diff, local_memory_max, memory_min, memory_max;
 
   MPI_Init( &argc, &argv );
   MPI_Comm_rank( MPI_COMM_WORLD, &my_id );
@@ -122,6 +122,7 @@ main(int argc, char **argv){
 
   // Reduce MAX here
   assert(MPI_SUCCESS==MPI_Reduce(&local_memory_max, &memory_max, 1, MPI_UNSIGNED_LONG, MPI_MAX, 0, MPI_COMM_WORLD));
+  assert(MPI_SUCCESS==MPI_Reduce(&local_memory_max, &memory_min, 1, MPI_UNSIGNED_LONG, MPI_MIN, 0, MPI_COMM_WORLD));
 
   if(my_id==0){
     elapsed_time_msec = Read_Timer (0, ITIMER_REAL) * 1000.0 / max_msgs;
@@ -131,7 +132,7 @@ main(int argc, char **argv){
     fprintf (stdout,"%8.3f msec,\t", elapsed_time_msec);
 //    fprintf( %8.3f Mbits/sec\t",  bandwidth);
 
-    printf("Mem Usage=%ld Kb\tVP=%d\tMsgSize=%d\n", (memory_max) / 1024, p, msg_size);
+    printf("Mem Max Usage=%ld Kb\tMin Usage=%ld Kb\tVP=%d\tMsgSize=%d\n", (memory_max) / 1024, (memory_min) / 1024, p, msg_size);
 
   }
   
