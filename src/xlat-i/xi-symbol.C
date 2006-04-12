@@ -2403,6 +2403,7 @@ void Entry::genArrayDecl(XStr& str)
 
 void Entry::genArrayDefs(XStr& str)
 {
+  if(isIget() && !container->isForElement()) return;
   if (isImmediate()) {
       cerr << (char *)container->baseName() << ": Chare Array does not allow immediate message.\n";
       exit(1);
@@ -2428,7 +2429,7 @@ void Entry::genArrayDefs(XStr& str)
     str << "  CkArrayMessage *impl_amsg=(CkArrayMessage *)impl_msg;\n";
     str << "  impl_amsg->array_setIfNotThere("<<ifNot<<");\n";
     if(isIget()) {
-	    str << "  CkFutureID f=CkCreateAttachedFutureSend(impl_amsg,"<<epIdx()<<",this,&CProxyElement_ArrayBase::ckSendWrapper);"<<"\n";
+	    str << "  CkFutureID f=CkCreateAttachedFutureSend(impl_amsg,"<<epIdx()<<",ckGetArrayID(),ckGetIndex(),&CProxyElement_ArrayBase::ckSendWrapper);"<<"\n";
     }
     
     if(isSync()) {
@@ -2682,7 +2683,10 @@ void Entry::genDecls(XStr& str)
   else if(container->isGroup()) {
       genGroupDecl(str);
   } else if(container->isArray()) {
-      genArrayDecl(str);
+      if(!isIget())
+        genArrayDecl(str);
+      else if(container->isForElement())
+	genArrayDecl(str);
   } else { // chare or mainchare
       genChareDecl(str);
   }
