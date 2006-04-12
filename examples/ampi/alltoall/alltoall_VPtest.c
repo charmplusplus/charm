@@ -91,8 +91,6 @@ main(int argc, char **argv){
   if( my_id == 0 ){
     int flag=0;
  //   printf("Starting benchmark on %d processors with %d iterations\n", p, max_msgs); 
-    Create_Timers (1);
-    Start_Timer (0, ITIMER_REAL);
   }    
   sndbuf = (char *)malloc(msg_size * sizeof(char) * p);
   recvbuf = (char *)malloc(msg_size * sizeof(char) * p);
@@ -105,8 +103,11 @@ main(int argc, char **argv){
 
     // initial memory usage
   memory_before = CmiMemoryUsage();
-  CmiResetMaxMemory();
-  
+  if(my_id == 0){
+    CmiResetMaxMemory();
+    Create_Timers (1);
+    Start_Timer (0, ITIMER_REAL); 
+  }
   for(i=0; i<max_msgs; i++) {
     MPI_Alltoall(sndbuf, msg_size, MPI_CHAR, recvbuf, msg_size, MPI_CHAR, MPI_COMM_WORLD);
   }
@@ -120,7 +121,6 @@ main(int argc, char **argv){
 
   // Reduce MAX here
   assert(MPI_SUCCESS==MPI_Reduce(&local_memory_max, &memory_max, 1, MPI_UNSIGNED_LONG, MPI_MAX, 0, MPI_COMM_WORLD));
-
 
   if(my_id==0){
     elapsed_time_msec = Read_Timer (0, ITIMER_REAL) * 1000.0 / max_msgs;
