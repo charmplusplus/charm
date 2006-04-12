@@ -273,12 +273,13 @@ public:
 
 void CtgGlobalStruct::pup(PUP::er &p) {
     p | seg_size;
-    if (p.isUnpacking()) allocate(seg_size);
         /* global data segment need to be isomalloc pupped */
     if (CmiMemoryIs(CMI_MEMORY_IS_ISOMALLOC))
       CmiIsomallocPup(&p, &data_seg);
-    else 
+    else {
+      if (p.isUnpacking()) allocate(seg_size);
       p((char *)data_seg, seg_size);
+    }
 }
 
 /// Singleton object describing our global variables:
