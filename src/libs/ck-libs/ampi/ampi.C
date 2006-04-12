@@ -1607,6 +1607,22 @@ ampi::bcastraw(void* buf, int len, CkArrayID aid)
   pa.generic(msg);
 }
 
+
+AmpiMsg* 
+ampi::Alltoall_RemoteIGet(int disp, int cnt, MPI_Datatype type, int tag)
+{
+  CkAssert(tag==MPI_ATA_TAG && AlltoallGetFlag);
+  int unit;
+  CkDDT_DataType *ddt = getDDT()->getType(type);
+  unit = ddt->getSize(1);
+  int totalsize = unit*cnt;
+
+  AmpiMsg *msg = new (totalsize, 0) AmpiMsg(-1, -1, -1, thisIndex,totalsize,myComm.getComm());
+  char* addr = (char*)Alltoallbuff+disp*unit;
+  ddt->serialize((char*)msg->data, addr, cnt, (-1));
+  return msg;
+}
+
 int MPI_null_copy_fn (MPI_Comm comm, int keyval, void *extra_state,
 			void *attr_in, void *attr_out, int *flag){
   (*flag) = 0;
@@ -3164,11 +3180,14 @@ int AMPI_Alltoall(void *sendbuf, int sendcount, MPI_Datatype sendtype,
   AMPIAPI("AMPI_Alltoall");
   if(getAmpiParent()->isInter(comm)) CkAbort("MPI_Alltoall not allowed for Inter-communicator!");
   if(comm==MPI_COMM_SELF) return copyDatatype(comm,sendtype,sendcount,sendbuf,recvbuf);
+  AMPI_Barrier(comm);
   ampi *ptr = getAmpiInstance(comm);
   int size = ptr->getSize(comm);
   CkDDT_DataType *dttype;
   int itemsize;
   int i;
+
+  AMPI_Barrier(comm);
 
     // post receives
   dttype = ptr->getDDT()->getType(recvtype) ;
@@ -3179,7 +3198,7 @@ int AMPI_Alltoall(void *sendbuf, int sendcount, MPI_Datatype sendtype,
               i, MPI_ATA_TAG, comm, &reqs[i]);
   }
   //AMPI_Yield(comm);
-  //AMPI_Barrier(comm);
+  AMPI_Barrier(comm);
 
   dttype = ptr->getDDT()->getType(sendtype) ;
   itemsize = dttype->getSize(sendcount) ;
@@ -3206,6 +3225,56 @@ int AMPI_Alltoall(void *sendbuf, int sendcount, MPI_Datatype sendtype,
   for (i=0;i<size;i++) AMPI_Wait(&reqs[i], &status);
 
   delete [] reqs;
+#if AMPI_COUNTER
+  getAmpiParent()->counters.alltoall++;
+#endif
+  return 0;
+}
+
+CDECL
+int AMPI_Alltoall2(void *sendbuf, int sendcount, MPI_Datatype sendtype,
+                 void *recvbuf, int recvcount, MPI_Datatype recvtype,
+                 MPI_Comm comm)
+{
+  AMPIAPI("AMPI_Alltoall2");
+  if(getAmpiParent()->isInter(comm)) CkAbort("MPI_Alltoall not allowed for Inter-communicator!");
+  if(comm==MPI_COMM_SELF) return copyDatatype(comm,sendtype,sendcount,sendbuf,recvbuf);
+  ampi *ptr = getAmpiInstance(comm);
+  CProxy_ampi pa(ptr->ckGetArrayID());
+  int size = ptr->getSize(comm);
+  CkDDT_DataType *dttype;
+  int itemsize;
+  int recvdisp;
+  int myrank;
+  int i;
+  // Set flags for others to get
+  ptr->setA2AIGetFlag((void*)sendbuf);
+  MPI_Comm_rank(comm,&myrank);
+  recvdisp = myrank*recvcount;
+
+  AMPI_Barrier(comm);
+    // post receives
+  MPI_Request *reqs = new MPI_Request[size];
+  for(i=0;i<size;i++) {
+	  reqs[i] = pa[i].Alltoall_RemoteIGet(recvdisp, recvcount, recvtype,
+MPI_ATA_TAG);
+  }
+
+  dttype = ptr->getDDT()->getType(recvtype) ;
+  itemsize = dttype->getSize(recvcount) ;
+  AmpiMsg *msg;
+  for(i=0;i<size;i++) {
+	  msg = (AmpiMsg*)CkWaitReleaseFuture(reqs[i]);
+	  memcpy((char*)recvbuf+(itemsize*i), msg->data,itemsize);
+	  delete msg;
+  }
+  
+  delete [] reqs;
+  AMPI_Barrier(comm);
+
+  // Reset flags 
+  ptr->resetA2AIGetFlag();
+  
 #if AMPI_COUNTER
   getAmpiParent()->counters.alltoall++;
 #endif

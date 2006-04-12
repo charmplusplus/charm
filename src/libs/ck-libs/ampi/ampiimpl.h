@@ -1394,6 +1394,14 @@ friend class IReq;
     void winGetName(WinStruct win, char *name, int *length);
     win_obj* getWinObjInstance(WinStruct win); 
     int getNewSemaId(); 
+
+    AmpiMsg* Alltoall_RemoteIGet(int disp, int targcnt, MPI_Datatype targtype, int tag);
+private:
+    int AlltoallGetFlag;
+    void *Alltoallbuff;
+public:
+    void setA2AIGetFlag(void* ptr) {AlltoallGetFlag=1;Alltoallbuff=ptr;}
+    void resetA2AIGetFlag() {AlltoallGetFlag=0;Alltoallbuff=NULL;} 
     //------------------------ End of code by YAN ---------------------
 };
 

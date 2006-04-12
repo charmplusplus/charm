@@ -40,6 +40,7 @@ module ampi {
     entry void winRemoteUnlock(int winIndex, CkFutureID ftHandle, int pe_src, int requestRank);
     entry [iget] AmpiMsg *winRemoteIGet(int orgdisp, int orgcnt, MPI_Datatype orgtype,
                            MPI_Aint targdisp, int targcnt, MPI_Datatype targtype, int winIndex);
+    entry [iget] AmpiMsg *Alltoall_RemoteIGet(int disp, int cnt, MPI_Datatype type, int tag);
   };
 
   group [migratable] ampiWorlds {
