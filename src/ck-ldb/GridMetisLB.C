@@ -193,6 +193,7 @@ void GridMetisLB::Initialize_Object_Data (CentralLB::LDStats *stats)
 */
 void GridMetisLB::Initialize_Cluster_Data ()
 {
+  int cluster;
   double min_total_cpu_power;
   int i;
 
@@ -213,7 +214,7 @@ void GridMetisLB::Initialize_Cluster_Data ()
     (&Cluster_Data[cluster])->total_cpu_power += (&PE_Data[i])->relative_speed;
   }
 
-  min_total_cpu_power = DBL_MAX;
+  min_total_cpu_power = MAXDOUBLE;
   for (i = 0; i < Num_Clusters; i++) {
     if ((&Cluster_Data[i])->total_cpu_power < min_total_cpu_power) {
       min_total_cpu_power = (&Cluster_Data[i])->total_cpu_power;
@@ -230,7 +231,7 @@ void GridMetisLB::Initialize_Cluster_Data ()
 /**************************************************************************
 ** This takes objects and partitions them into clusters.
 */
-void GridMetisLB::Partition_Objects_Into_Clusters ()
+void GridMetisLB::Partition_Objects_Into_Clusters (CentralLB::LDStats *stats)
 {
   int num_migratable_objects;
   int *migratable_objects;
@@ -247,10 +248,11 @@ void GridMetisLB::Partition_Objects_Into_Clusters ()
   int send_index;
   int recv_index;
   LDObjKey *recv_objects;
+  int num_objects;
   int *xadj;
   int num_edges;
   int *adjncy;
-  int edge_weights;
+  int *edge_weights;
   int count;
   int weight_flag;
   int numbering_flag;
@@ -294,7 +296,7 @@ void GridMetisLB::Partition_Objects_Into_Clusters ()
   cluster = 0;
   partition = 0;
   while (partition < num_partitions) {
-    partition_count = (int) lround ((&Cluster_Data[i])->scaled_cpu_power);
+    partition_count = (int) lround ((&Cluster_Data[cluster])->scaled_cpu_power);
 
     for (i = partition; i < (partition + partition_count); i++) {
       partition_to_cluster_map[i] = cluster;
@@ -391,16 +393,17 @@ void GridMetisLB::Partition_Objects_Into_Clusters ()
   }
 
   // Call Metis to partition the communication graph.
-  weight_flag = 2;      // weights on edges only
+  weight_flag = 1;      // weights on edges only
   numbering_flag = 0;   // C style numbering (base 0)
   options[0] = 0;
+  newmap = new int[num_migratable_objects];
 
   METIS_PartGraphRecursive (&num_migratable_objects, xadj, adjncy, NULL, edge_weights, &weight_flag, &numbering_flag, &num_partitions, options,
 			    &edgecut, newmap);
 
   // Place the partitioned objects into their correct clusters.
   for (i = 0; i < num_migratable_objects; i++) {
-    partition = newmap[i];
+    partition = (newmap[i] - 1);
     cluster = partition_to_cluster_map[partition];
 
     index = migratable_objects[i];
@@ -413,7 +416,7 @@ void GridMetisLB::Partition_Objects_Into_Clusters ()
   delete [] edge_weights;
   delete [] adjncy;
   delete [] xadj;
-  for (i = 0; i < num_migratable_objects) {
+  for (i = 0; i < num_migratable_objects; i++) {
     delete [] communication_matrix[i];
   }
   delete [] communication_matrix;
@@ -426,7 +429,7 @@ void GridMetisLB::Partition_Objects_Into_Clusters ()
 /**************************************************************************
 ** This takes objects in a cluster and partitions them onto PEs.
 */
-void GridMetisLB::Partition_ClusterObjects_Into_PEs (int cluster)
+void GridMetisLB::Partition_ClusterObjects_Into_PEs (CentralLB::LDStats *stats, int cluster)
 {
   int num_migratable_cluster_objects;
   int *migratable_cluster_objects;
@@ -446,10 +449,11 @@ void GridMetisLB::Partition_ClusterObjects_Into_PEs (int cluster)
   int send_index;
   int recv_index;
   LDObjKey *recv_objects;
+  int num_objects;
   int *xadj;
   int num_edges;
   int *adjncy;
-  int edge_weights;
+  int *edge_weights;
   int count;
   int weight_flag;
   int numbering_flag;
@@ -505,11 +509,11 @@ void GridMetisLB::Partition_ClusterObjects_Into_PEs (int cluster)
     pe += 1;
   }
   if (pe >= Num_PEs) {
-    CmiAbort ("GridMetisLB: Error!\n");
+    CmiAbort ("GridMetisLB: Error 1!\n");
   }
   partition = 0;
   while (partition < num_partitions) {
-    partition_count = (int) lround ((&PE_Data[i])->relative_speed);
+    partition_count = (int) lround ((&PE_Data[pe])->relative_speed);
 
     for (i = partition; i < (partition + partition_count); i++) {
       partition_to_pe_map[i] = pe;
@@ -521,8 +525,8 @@ void GridMetisLB::Partition_ClusterObjects_Into_PEs (int cluster)
     while (((!(&PE_Data[pe])->available) || ((&PE_Data[pe])->cluster != cluster)) && (pe < Num_PEs)) {
       pe += 1;
     }
-    if (pe >= Num_PEs) {
-      CmiAbort ("GridMetisLB: Error!\n");
+    if (pe > Num_PEs) {
+      CmiPrintf ("[%d] GridMetisLB: PE=%d, Num_PEs=%d\n", CmiMyPe(), pe, Num_PEs);
     }
   }
 
@@ -531,7 +535,7 @@ void GridMetisLB::Partition_ClusterObjects_Into_PEs (int cluster)
   vertex = 0;
   for (i = 0; i < Num_Objects; i++) {
     if ((&Object_Data[i])->migratable && ((&Object_Data[i])->cluster == cluster)) {
-      vertex_weights[vertex] = (int) lround ((&Object_Data[i])->load);
+      vertex_weights[vertex] = (int) lround ((&Object_Data[i])->load * 10000);
       vertex += 1;
     }
   }
@@ -559,17 +563,6 @@ void GridMetisLB::Partition_ClusterObjects_Into_PEs (int cluster)
 	continue;
       }
 
-      /*
-      send_pe = (&Object_Data[send_object])->from_pe;
-      recv_pe = (&Object_Data[recv_object])->from_pe;
-
-      send_cluster = (&PE_Data[send_pe])->cluster;
-      recv_cluster = (&PE_Data[recv_pe])->cluster;
-
-      if ((send_cluster != cluster) || (recv_cluster != cluster)) {
-	continue;
-      }
-      */
       if (((&Object_Data[send_object])->cluster != cluster) || ((&Object_Data[recv_object])->cluster != cluster)) {
 	continue;
       }
@@ -586,15 +579,6 @@ void GridMetisLB::Partition_ClusterObjects_Into_PEs (int cluster)
 	continue;
       }
 
-      /*
-      send_pe = (&Object_Data[send_object])->from_pe;
-
-      send_cluster = (&PE_Data[send_pe])->cluster;
-
-      if (send_cluster != cluster) {
-	continue;
-      }
-      */
       if ((&Object_Data[send_object])->cluster != cluster) {
 	continue;
       }
@@ -612,15 +596,6 @@ void GridMetisLB::Partition_ClusterObjects_Into_PEs (int cluster)
 	  continue;
 	}
 
-	/*
-	recv_pe = (&Object_Data[recv_object])->from_pe;
-
-	recv_cluster = (&PE_Data[recv_pe])->cluster;
-
-	if (recv_cluster != cluster) {
-	  continue;
-	}
-	*/
 	if ((&Object_Data[recv_object])->cluster != cluster) {
 	  continue;
 	}
@@ -667,6 +642,9 @@ void GridMetisLB::Partition_ClusterObjects_Into_PEs (int cluster)
   weight_flag = 3;      // weights on both vertices and edges
   numbering_flag = 0;   // C style numbering (base 0)
   options[0] = 0;
+  newmap = new int[num_migratable_cluster_objects];
+
+  CmiPrintf ("[%d] GridMetisLB partitioning %d objects in cluster %d into %d partitions\n", CmiMyPe(), num_migratable_cluster_objects, cluster, num_partitions);
 
   METIS_PartGraphRecursive (&num_migratable_cluster_objects, xadj, adjncy, vertex_weights, edge_weights, &weight_flag, &numbering_flag, &num_partitions, options,
 			    &edgecut, newmap);
@@ -727,7 +705,7 @@ void GridMetisLB::work (CentralLB::LDStats *stats, int count)
   }
 
   // Initialize the PE_Data[] data structure.
-  Initialize_PE_Data ();
+  Initialize_PE_Data (stats);
 
   // If at least one available PE does not exist, return from load balancing.
   if (Available_PE_Count() < 1) {
@@ -758,14 +736,14 @@ void GridMetisLB::work (CentralLB::LDStats *stats, int count)
   }
 
   // Initialize the Object_Data[] data structure.
-  Initialize_Object_Data ();
+  Initialize_Object_Data (stats);
 
   // Initialize the Cluster_Data[] data structure.
   Initialize_Cluster_Data ();
 
-  Partition_Objects_Into_Clusters ();
+  Partition_Objects_Into_Clusters (stats);
   for (i = 0; i < Num_Clusters; i++) {
-    Partition_ClusterObjects_Into_PEs (i);
+    Partition_ClusterObjects_Into_PEs (stats, i);
   }
 
   // Make the assignment of objects to PEs in the load balancer framework.
