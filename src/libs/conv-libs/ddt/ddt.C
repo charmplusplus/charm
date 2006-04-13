@@ -286,7 +286,7 @@ CkDDT_DataType::CkDDT_DataType(int type):datatype(type)
       size = sizeof(unsigned);
       break ;
     case CkDDT_UNSIGNED_LONG:
-      size = sizeof(unsigned long);
+      size = sizeof(CmiUInt8);
       break ;
     case CkDDT_LONG_DOUBLE:
       size = sizeof(long double);
@@ -321,7 +321,7 @@ CkDDT_DataType::CkDDT_DataType(int type):datatype(type)
       break;
 #if CMK_LONG_LONG_DEFINED
     case CkDDT_LONG_LONG_INT:
-      size = sizeof(long long int);
+      size = sizeof(CmiInt8);
 #endif
     default:
       size = 0;
