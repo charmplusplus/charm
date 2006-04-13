@@ -1471,7 +1471,7 @@ ampi::processMessage(AmpiMsg *msg, int t, int s, void* buf, int count, int type)
     CkAbort(einfo);
     return -1;
   }else if(msg->length < len){ // only at rare case shall we reset count by using divide
-    count = msg->length/(getSize(1));
+    count = msg->length/(ddt->getSize(1));
   }
   if (msg->length-len==sizeof(AmpiOpHeader)) {	// reduction msg
     ddt->serialize((char*)buf, (char*)msg->data+sizeof(AmpiOpHeader), count, (-1));
@@ -3180,7 +3180,6 @@ int AMPI_Alltoall(void *sendbuf, int sendcount, MPI_Datatype sendtype,
   AMPIAPI("AMPI_Alltoall");
   if(getAmpiParent()->isInter(comm)) CkAbort("MPI_Alltoall not allowed for Inter-communicator!");
   if(comm==MPI_COMM_SELF) return copyDatatype(comm,sendtype,sendcount,sendbuf,recvbuf);
-  AMPI_Barrier(comm);
   ampi *ptr = getAmpiInstance(comm);
   int size = ptr->getSize(comm);
   CkDDT_DataType *dttype;
