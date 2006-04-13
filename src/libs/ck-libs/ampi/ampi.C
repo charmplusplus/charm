@@ -3187,9 +3187,8 @@ int AMPI_Alltoall(void *sendbuf, int sendcount, MPI_Datatype sendtype,
   int itemsize;
   int i;
 
-  AMPI_Barrier(comm);
-
-    // post receives
+#if 0
+    // use irecv to post receives
   dttype = ptr->getDDT()->getType(recvtype) ;
   itemsize = dttype->getSize(recvcount) ;
   MPI_Request *reqs = new MPI_Request[size];
@@ -3198,8 +3197,45 @@ int AMPI_Alltoall(void *sendbuf, int sendcount, MPI_Datatype sendtype,
               i, MPI_ATA_TAG, comm, &reqs[i]);
   }
   //AMPI_Yield(comm);
-  AMPI_Barrier(comm);
+  //AMPI_Barrier(comm);
 
+  dttype = ptr->getDDT()->getType(sendtype) ;
+  itemsize = dttype->getSize(sendcount) ;
+#if AMPI_COMLIB
+  if(comm == MPI_COMM_WORLD) {
+      // commlib support
+      ptr->getAlltoall().beginIteration();
+      for(i=0;i<size;i++) {
+          ptr->delesend(MPI_ATA_TAG, ptr->getRank(comm), ((char*)sendbuf)+(itemsize*i), sendcount,
+                        sendtype, i, comm, ptr->getComlibProxy());
+      }
+      ptr->getAlltoall().endIteration();
+  } else
+#endif 
+  {
+      int r = rand();
+      if (ptr->getRank(comm) %2 ==0)
+      for(i=0;i<size;i++) {
+          ptr->send(MPI_ATA_TAG, ptr->getRank(comm), ((char*)sendbuf)+(itemsize*i), sendcount, sendtype, i, comm);
+      }
+      else
+      for(i=size-1;i>=0;i--) {
+          ptr->send(MPI_ATA_TAG, ptr->getRank(comm), ((char*)sendbuf)+(itemsize*i), sendcount, sendtype, i, comm);
+      }
+  }
+  
+    // can use waitall if it is fixed for memory
+  MPI_Status status;
+  for (i=0;i<size;i++) AMPI_Wait(&reqs[i], &status);
+/*
+  MPI_Status *status = new MPI_Status[size];
+  AMPI_Waitall(size, reqs, status);
+  delete [] status;
+*/
+
+  delete [] reqs;
+#else
+    // use blocking recv
   dttype = ptr->getDDT()->getType(sendtype) ;
   itemsize = dttype->getSize(sendcount) ;
 #if AMPI_COMLIB
@@ -3219,12 +3255,15 @@ int AMPI_Alltoall(void *sendbuf, int sendcount, MPI_Datatype sendtype,
                     sendtype, i, comm);
       }
   }
-  
-    // can use waitall if it is fixed for memory
+  dttype = ptr->getDDT()->getType(recvtype) ;
+  itemsize = dttype->getSize(recvcount) ;
   MPI_Status status;
-  for (i=0;i<size;i++) AMPI_Wait(&reqs[i], &status);
+  for(i=0;i<size;i++) {
+        AMPI_Recv(((char*)recvbuf)+(itemsize*i), recvcount, recvtype,
+              i, MPI_ATA_TAG, comm, &status);
+  }
+#endif
 
-  delete [] reqs;
 #if AMPI_COUNTER
   getAmpiParent()->counters.alltoall++;
 #endif
