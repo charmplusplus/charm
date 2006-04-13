@@ -1221,7 +1221,7 @@ void FEM_mesh_smooth(int mesh, int *nodes, int nNodes, int attrNo)
     CkAssert(nodes[i]<nodesInChunk);    
     if (FEM_is_valid(mesh, FEM_NODE, i) && boundVals[i]>-1) //node must be internal
     {
-      meshP->n2e_getAll(i, &adjelems, &nEle);
+      meshP->n2e_getAll(i, adjelems, nEle);
       centroids = new vector2d[nEle];
       
       for (int j=0; j<nEle; j++) { //for all adjacent elements, find centroids
