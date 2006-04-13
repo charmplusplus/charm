@@ -307,7 +307,7 @@ void GridMetisLB::Partition_Objects_Into_Clusters (CentralLB::LDStats *stats)
   }
 
   // Create communication_matrix[] to hold all object-to-object message counts.
-  communication_matrix = new (int *)[num_migratable_objects];
+  communication_matrix = new int *[num_migratable_objects];
   for (i = 0; i < num_migratable_objects; i++) {
     communication_matrix[i] = new int[num_migratable_objects];
     for (j = 0; j < num_migratable_objects; j++) {
@@ -541,7 +541,7 @@ void GridMetisLB::Partition_ClusterObjects_Into_PEs (CentralLB::LDStats *stats, 
   }
 
   // Create communication_matrix[] to hold all object-to-object message counts;
-  communication_matrix = new (int *)[num_migratable_cluster_objects];
+  communication_matrix = new int *[num_migratable_cluster_objects];
   for (i = 0; i < num_migratable_cluster_objects; i++) {
     communication_matrix[i] = new int[num_migratable_cluster_objects];
     for (j = 0; j < num_migratable_cluster_objects; j++) {
