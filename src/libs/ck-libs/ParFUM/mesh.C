@@ -1171,14 +1171,30 @@ void FEM_Entity::allocateValid(void) {
     for(int i=0;i<size();i++) {
       valid->getChar()(i,0)=1;
     }
-    first_invalid = last_invalid = 0;
+    if(true) { //maintains a list of invalid elements. FASTER
+      invalidListLen=0; invalidListAllLen=16;
+      invalidList = new int[invalidListAllLen]; 
+      //its ok to waste a few bytes for an entity, especially when it can 
+      //bring up the performance of the average case
+      for(int i=0; i<invalidListAllLen; i++) {
+	invalidList[i] = -1; //means this position is empty
+      }
+    }
+    else {
+      first_invalid = last_invalid = 0;
+    }
   }
 }
 
-void FEM_Entity::set_valid(unsigned int idx, bool isNode){
-  if(false) {
+void FEM_Entity::set_valid(int idx, bool isNode){
+  if(true) { //maintains a list of invalid elements. FASTER
     CkAssert(idx < size() && idx >=0);
     valid->getChar()(idx,0)=1;
+    if(invalidListLen>0) {
+      if(invalidList[invalidListLen-1]==idx) {
+	invalidListLen--; //pull out the last entry from the invalid list
+      }
+    }
   }
   else {
     int size1 = size();
@@ -1207,10 +1223,19 @@ void FEM_Entity::set_valid(unsigned int idx, bool isNode){
   }
 }
 
-void FEM_Entity::set_invalid(unsigned int idx, bool isNode){
-  if(false) {
+void FEM_Entity::set_invalid(int idx, bool isNode){
+  if(true) { //maintains a list of invalid elements. FASTER
     CkAssert(idx < size() && idx >=0);
     valid->getChar()(idx,0)=0;
+    if(invalidListLen==invalidListAllLen) {
+      invalidListAllLen = invalidListAllLen<<1;
+      int* tmp = invalidList;
+      invalidList = new int[invalidListAllLen];
+      memcpy(invalidList,tmp,invalidListLen*sizeof(int));
+      delete[] tmp;
+    }
+    invalidList[invalidListLen] = idx;
+    invalidListLen++;
   }
   else {
     CkAssert(idx < size() && idx >=0 && first_invalid<=last_invalid);
@@ -1238,8 +1263,8 @@ void FEM_Entity::set_invalid(unsigned int idx, bool isNode){
   }
 }
 
-int FEM_Entity::is_valid(unsigned int idx){
-  if(false) {
+int FEM_Entity::is_valid(int idx){
+  if(true) { //maintains a list of invalid elements. FASTER
     CkAssert(idx < size() && idx >=0);
     return valid->getChar()(idx,0);
   } else {
@@ -1248,9 +1273,8 @@ int FEM_Entity::is_valid(unsigned int idx){
   }
 }
 
-unsigned int FEM_Entity::count_valid(){
-  CkAssert(first_invalid<=last_invalid);
-  unsigned int count=0;
+int FEM_Entity::count_valid(){
+  int count=0;
   for(int i=0;i<size();i++)
 	if(is_valid(i)) count++;
   return count;
@@ -1260,14 +1284,19 @@ unsigned int FEM_Entity::count_valid(){
 /// The invalid slot in the tables can then be reused when "creating" a new element or node
 /// We either return an empty slot, or resize the array and return a value at the end
 /// If someone has a better name for this function, please change it.
-unsigned int FEM_Entity::get_next_invalid(FEM_Mesh *m, bool isNode, bool isGhost){
-  unsigned int retval=0;
-  if(false) {
-    retval = size();
-    setLength(retval+1);  
+int FEM_Entity::get_next_invalid(FEM_Mesh *m, bool isNode, bool isGhost){
+  int retval=0;
+  if(true) { //maintains a list of invalid elements. FASTER
+    if(invalidListLen>0) {
+      retval = invalidList[invalidListLen-1];
+    }
+    else {
+      retval = size();
+      setLength(retval+1);  
+    }
   }
   else {
-    unsigned int size1 = size();
+    int size1 = size();
     if(size1==0) { //special case because for size=0, first_invalid=last_invalid=0
       retval= 0;
       setLength(1);
@@ -1566,7 +1595,7 @@ void FEM_Node::allocatePrimary(void) {
   primary->setDatatype(FEM_BYTE);
 }
 
-bool FEM_Node::hasConn(unsigned int idx) {
+bool FEM_Node::hasConn(int idx) {
   if((elemAdjacency->get()[idx].length() > 0)||(nodeAdjacency->get()[idx].length() > 0))
     return true;
   else return false;
@@ -1665,7 +1694,7 @@ const char *FEM_Elem::getName(void) const {
 	return "FEM_ELEM";
 }
 
-bool FEM_Elem::hasConn(unsigned int idx) {
+bool FEM_Elem::hasConn(int idx) {
   return false;
 }
 
@@ -2018,7 +2047,7 @@ FORTRAN_AS_C(FEM_IS_VALID,
 
 
 // Count number of valid items for this entity type
-CDECL unsigned int FEM_count_valid(int mesh, int entityType){
+CDECL int FEM_count_valid(int mesh, int entityType){
   FEM_Mesh *m=FEM_Mesh_lookup(mesh,"FEM_Mesh_create_valid_elem");
   FEM_Entity *entity = m->lookup(entityType,"FEM_Mesh_allocate_valid_attr");
   return entity->count_valid();

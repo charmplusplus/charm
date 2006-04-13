@@ -704,7 +704,13 @@ class FEM_Entity {
 		invalid indices. This should make searching for slots to reuse quicker.
 	*/
 	FEM_DataAttribute *valid;
-	unsigned int first_invalid, last_invalid;
+	int first_invalid, last_invalid;
+	//this is a list of invalid entities.. its a last in first out queue,
+	//which can be implemented as simple array, where we add and remove from
+	//the last element, so that we always have a compact list, and we
+	//allocate only when we need to
+	int* invalidList;
+	int invalidListLen, invalidListAllLen;
 	
 protected:
 	/**
@@ -801,12 +807,12 @@ protected:
 	 * Allocate or Modify the FEM_IS_VALID attribute data
 	 */
 	void allocateValid();
-	void set_valid(unsigned int idx, bool isNode);
-	void set_invalid(unsigned int idx, bool isNode);
-	int is_valid(unsigned int idx);
-	unsigned int count_valid();
-	unsigned int get_next_invalid(FEM_Mesh *m, bool isNode, bool isGhost);
-	virtual bool hasConn(unsigned int idx)=0;
+	void set_valid(int idx, bool isNode);
+	void set_invalid(int idx, bool isNode);
+	int is_valid(int idx);
+	int count_valid();
+	int get_next_invalid(FEM_Mesh *m, bool isNode, bool isGhost);
+	virtual bool hasConn(int idx)=0;
 	/**
 	 * Set the coordinates for a single item
 	 */
@@ -924,7 +930,7 @@ public:
 	void fillNodeAdjacency(const FEM_Elem &elem);
 	void setNodeAdjacency(const FEM_Elem &elem);
 	void fillNodeAdjacencyForElement(int node,int nodesPerElem,const int *conn,FEM_VarIndexAttribute *adjacencyAttr);
-	bool hasConn(unsigned int idx);
+	bool hasConn(int idx);
 	void print(const char *type,const IDXL_Print_Map &map);
 };
 PUPmarshall(FEM_Node);
@@ -972,7 +978,7 @@ public:
 	int *connFor(int i) {return conn->get().getRow(i);}
 	const int *connFor(int i) const {return conn->get().getRow(i);}
 	void connIs(int i,const int *src) {conn->get().setRow(i,src);}
-	bool hasConn(unsigned int idx);
+	bool hasConn(int idx);
 };
 PUPmarshall(FEM_Elem);
 

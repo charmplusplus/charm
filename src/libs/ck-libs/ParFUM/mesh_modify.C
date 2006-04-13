@@ -114,10 +114,10 @@ CDECL void FEM_Print_Mesh_Summary(int mesh){
   CkPrintf("     Element Types: %d\n", m->elem.size());
   for (int t=0;t<m->elem.size();t++) {// for each element type t
     if (m->elem.has(t)) {
-      unsigned int numEl = m->elem[t].size();
-      unsigned int numElG = m->elem[t].getGhost()->size();
-      unsigned int numValidEl = m->elem[t].count_valid();
-      unsigned int numValidElG = m->elem[t].getGhost()->count_valid();
+      int numEl = m->elem[t].size();
+      int numElG = m->elem[t].getGhost()->size();
+      int numValidEl = m->elem[t].count_valid();
+      int numValidElG = m->elem[t].getGhost()->count_valid();
       CkPrintf("     Element type %d contains %d/%d elements and %d/%d ghosts\n", t, numValidEl, numEl, numValidElG, numElG);
     }
   }

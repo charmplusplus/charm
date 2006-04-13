@@ -609,12 +609,13 @@ int FEM_Adapt_Algs::simple_refine(double targetA, double xmin, double ymin, doub
   double *n2_coord = (double*)malloc(2*sizeof(double));
   double *n3_coord = (double*)malloc(2*sizeof(double));
   bool adapted = true;
+  refineElements = refineStack = NULL;
+  refineTop = refineHeapSize = 0;
 
   while(adapted) {
     adapted = false;
     int noEle = theMesh->elem[0].size();
-    double *areas = (double*)malloc(noEle*sizeof(double));
-    int *map1 = (int*)malloc(noEle*sizeof(int));
+    refineElements = new elemHeap[noEle+1];
     for(int i=0; i<noEle; i++) {
       if(theMesh->elem[0].is_valid(i)) {
 	theMesh->e2n_getAll(i,con,0);
@@ -623,18 +624,20 @@ int FEM_Adapt_Algs::simple_refine(double targetA, double xmin, double ymin, doub
 	getCoord(con[2], n3_coord);
 	//do a refinement only if it has any node within the refinement box
 	if((n1_coord[0]<xmax && n1_coord[0]>xmin && n1_coord[1]<ymax && n1_coord[1]>ymin) || (n2_coord[0]<xmax && n2_coord[0]>xmin && n2_coord[1]<ymax && n2_coord[1]>ymin) || (n3_coord[0]<xmax && n3_coord[0]>xmin && n3_coord[1]<ymax && n3_coord[1]>ymin)) {
-	  areas[i] = getArea(n1_coord, n2_coord, n3_coord);
-	} 
+	  //areas[i] = getArea(n1_coord, n2_coord, n3_coord);
+	  Insert(i,-getArea(n1_coord, n2_coord, n3_coord),0); 
+	  //negative area to trick the minheap to become a maxheap!
+	}
 	else {
-	  areas[i] = MINAREA; //make it believe that this triangle does not need refinement
+	  Insert(i,-MINAREA,0); //make it believe that this triangle does not need refinement
 	}
       } else {
-	areas[i] = MINAREA;
+	Insert(i,-MINAREA,0);
       }
-      map1[i] = i;
     }
 
-    for(int i=0; i<noEle; i++) {
+    //bad bubblesort
+    /*for(int i=0; i<noEle; i++) {
       for(int j=i+1; j<noEle; j++) {
 	if(areas[j] > areas[i]) {
 	  double tmp = areas[j];
@@ -645,9 +648,9 @@ int FEM_Adapt_Algs::simple_refine(double targetA, double xmin, double ymin, doub
 	  map1[i] = t;
 	}
       }
-    }
+      }*/
     
-    for(int i=0; i<noEle; i++) {
+    /*for(int i=0; i<noEle; i++) {
       if(theMesh->elem[0].is_valid(map1[i])) {
 	if(areas[i] > targetA) {
 	  int ret = refine_element_leb(map1[i]);
@@ -655,11 +658,25 @@ int FEM_Adapt_Algs::simple_refine(double targetA, double xmin, double ymin, doub
 	    adapted = true;
 	  }
 	}
+	}
+      //if(adapted) break;
+      }*/
+    while(refineHeapSize>0) {
+      int tmp = Delete_Min(0);
+      if(tmp!=-1 && theMesh->elem[0].is_valid(tmp)) {
+	//since we are reusing element indices, so do not trust earlier areas
+	theMesh->e2n_getAll(tmp,con,0);
+	getCoord(con[0], n1_coord);
+	getCoord(con[1], n2_coord);
+	getCoord(con[2], n3_coord);
+	if(getArea(n1_coord, n2_coord, n3_coord) > targetA) {
+	  int ret = refine_element_leb(tmp);
+	  if(ret!=-1) adapted = true;
+	}
       }
       //if(adapted) break;
     }
-    free(areas);
-    free(map1);
+    if(refineElements!=NULL) delete[] refineElements;
     //if(adapted) break;
   }
 
@@ -675,16 +692,19 @@ int FEM_Adapt_Algs::simple_refine(double targetA, double xmin, double ymin, doub
 int FEM_Adapt_Algs::simple_coarsen(double targetA, double xmin, double ymin, double xmax, double ymax) {
   int noEle = theMesh->elem[0].size();
   int *con = (int*)malloc(3*sizeof(int));
-  double *areas = (double*)malloc(noEle*sizeof(double));
-  int *map1 = (int*)malloc(noEle*sizeof(int));
   double *n1_coord = (double*)malloc(2*sizeof(double));
   double *n2_coord = (double*)malloc(2*sizeof(double));
   double *n3_coord = (double*)malloc(2*sizeof(double));
   int *shortestEdge = (int *)malloc(2*sizeof(int));
   bool adapted = true;
+  coarsenElements = NULL;
+  coarsenHeapSize = 0;
 
   while(adapted) {
     adapted = false;
+    coarsenElements = new elemHeap[noEle+1];
+    coarsenElements[0].len=-2.0;
+    coarsenElements[0].elID=-1;
     for(int i=0; i<noEle; i++) {
       if(theMesh->elem[0].is_valid(i)) {
 	theMesh->e2n_getAll(i,con,0);
@@ -693,18 +713,17 @@ int FEM_Adapt_Algs::simple_coarsen(double targetA, double xmin, double ymin, dou
 	getCoord(con[2], n3_coord);
 	//do a coarsening only if it has any node within the coarsen box
 	if((n1_coord[0]<xmax && n1_coord[0]>xmin && n1_coord[1]<ymax && n1_coord[1]>ymin) || (n2_coord[0]<xmax && n2_coord[0]>xmin && n2_coord[1]<ymax && n2_coord[1]>ymin) || (n3_coord[0]<xmax && n3_coord[0]>xmin && n3_coord[1]<ymax && n3_coord[1]>ymin)) {
-	  areas[i] = getArea(n1_coord, n2_coord, n3_coord);
+	  Insert(i,getArea(n1_coord, n2_coord, n3_coord),1);
 	} 
 	else {
-	  areas[i] = MAXAREA; //make it believe that this triangle is big enough
+	  Insert(i,MAXAREA,1); //make it believe that this triangle is big enough
 	}
       } else {
-	areas[i] = MAXAREA;
+	Insert(i,MAXAREA,1);
       }
-      map1[i] = i;
     }
     
-    for(int i=0; i<noEle; i++) {
+    /*for(int i=0; i<noEle; i++) {
       for(int j=i+1; j<noEle; j++) {
 	if(areas[j] < areas[i]) {
 	  double tmp = areas[j];
@@ -715,9 +734,9 @@ int FEM_Adapt_Algs::simple_coarsen(double targetA, double xmin, double ymin, dou
 	  map1[i] = t;
 	}
       }
-    }
+      }*/
     
-    for(int i=0; i<noEle; i++) {
+    /*for(int i=0; i<noEle; i++) {
       if(theMesh->elem[0].is_valid(map1[i])) {
 	if(areas[i] < targetA) {
 	  //find the nodes along the smallest edge & coarsen the edge
@@ -728,13 +747,27 @@ int FEM_Adapt_Algs::simple_coarsen(double targetA, double xmin, double ymin, dou
 	}
       }
       //if(adapted) break;
+      }*/
+    while(coarsenHeapSize>0) {
+      int tmp = Delete_Min(1);
+      if(tmp!=-1 && theMesh->elem[0].is_valid(tmp)) {
+	theMesh->e2n_getAll(tmp,con,0);
+	getCoord(con[0], n1_coord);
+	getCoord(con[1], n2_coord);
+	getCoord(con[2], n3_coord);
+	if(getArea(n1_coord, n2_coord, n3_coord) < targetA) {
+	  getShortestEdge(con[0], con[1], con[2], shortestEdge);
+	  int ret = theAdaptor->edge_contraction(shortestEdge[0], shortestEdge[1]);
+	  if(ret != -1) adapted = true;
+	}
+      }
+      //if(adapted) break;
     }
+    if(coarsenElements!=NULL) delete[] coarsenElements;
     //if(adapted) break;
   }
 
   free(con);
-  free(areas);
-  free(map1);
   free(n1_coord);
   free(n2_coord);
   free(n3_coord);
