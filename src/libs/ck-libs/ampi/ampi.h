@@ -201,6 +201,7 @@ typedef int MPI_Group;
 #define MPI_MAX_COMM_WORLDS 8
 extern MPI_Comm MPI_COMM_UNIVERSE[MPI_MAX_COMM_WORLDS];
 
+/* the size of MPI_Status must conform to MPI_STATUS_SIZE in ampif.h */
 struct AmpiMsg;
 typedef int MPI_Request;
 typedef struct {

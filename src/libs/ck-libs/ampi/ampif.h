@@ -98,7 +98,7 @@
 
        integer, parameter :: MPI_TAG_UB = -10
 
-       integer, parameter :: MPI_STATUS_SIZE=4
+       integer, parameter :: MPI_STATUS_SIZE=6
        integer, parameter :: MPI_TAG=1
        integer, parameter :: MPI_SOURCE=2
        integer, parameter :: MPI_COMM=3
