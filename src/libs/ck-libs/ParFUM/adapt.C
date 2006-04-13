@@ -32,12 +32,10 @@ n1 o---------o n2  n1 o    |    o n2
 int FEM_Adapt::edge_flip_help(int e1, int e2, int n1, int n2, int e1_n1, 
 			      int e1_n2, int e1_n3, int n3, int n4, int *locknodes) 
 {
-  int *conn = (int*)malloc(3*sizeof(int));
   int numNodes = 4;
   int numElems = 2;
   int newNode = -1;
-  //int *locknodes = (int*)malloc(numNodes*sizeof(int));
-  int *lockelems = (int*)malloc(numElems*sizeof(int));
+  int lockelems[2];
 
   locknodes[0] = n1;
   locknodes[1] = n2;
@@ -93,13 +91,13 @@ int FEM_Adapt::edge_flip_help(int e1, int e2, int n1, int n2, int e1_n1,
       //if n1 or n2 or n4 had only e2 as local n2e on e2chunk then, downgrade it from shared to ghost
       //n4 is remote, upgrade it from ghost to shared node on e1chunk
       e2chunk=e1chunk; //e1chunk eats e2
-      conn[0] = n1; conn[1] = n2; conn[2] = n4;
-      int newel = FEM_add_element(theMesh, conn, 3, 0, e2chunk);
+      elemConn[0] = n1; elemConn[1] = n2; elemConn[2] = n4;
+      int newel = FEM_add_element(theMesh, elemConn, 3, 0, e2chunk);
       //find the new node index & replace n4 with that
       for(int j=0; j<3; j++) {
-	if((conn[j]!=n1)&&(conn[j]!=n2)) {
+	if((elemConn[j]!=n1)&&(elemConn[j]!=n2)) {
 	  int oldn4 = n4;
-	  n4 = conn[j];
+	  n4 = elemConn[j];
 	  newNode = n4;
 #ifndef FEM_SILENT
 	  CkPrintf("Changing node %d to node %d\n",oldn4,n4);
@@ -116,12 +114,12 @@ int FEM_Adapt::edge_flip_help(int e1, int e2, int n1, int n2, int e1_n1,
       //if n1 or n2 or n3 had only e1 as local n2e on e1chunk then, downgrade it from shared to ghost
       //n3 is remote, upgrade it from ghost to shared node on e2chunk
       e1chunk=e2chunk; //e2chunk eats e1
-      conn[0] = n1; conn[1] = n2; conn[2] = n3;
-      int newel = FEM_add_element(theMesh, conn, 3, 0, e1chunk);
+      elemConn[0] = n1; elemConn[1] = n2; elemConn[2] = n3;
+      int newel = FEM_add_element(theMesh, elemConn, 3, 0, e1chunk);
       for(int j=0; j<3; j++) {
-	if((conn[j]!=n1)&&(conn[j]!=n2)) {
+	if((elemConn[j]!=n1)&&(elemConn[j]!=n2)) {
 	  int oldn3 = n3;
-	  n3 = conn[j]; 
+	  n3 = elemConn[j]; 
 	  newNode = n3;
 #ifndef FEM_SILENT
 	  CkPrintf("Changing node %d to node %d\n",oldn3,n3);
@@ -143,14 +141,14 @@ int FEM_Adapt::edge_flip_help(int e1, int e2, int n1, int n2, int e1_n1,
   }
 
   // add n1, n3, n4
-  conn[e1_n1] = n1;  conn[e1_n2] = n4;  conn[e1_n3] = n3;
-  lockelems[0] = FEM_add_element(theMesh, conn, 3, 0, e1chunk);
+  elemConn[e1_n1] = n1;  elemConn[e1_n2] = n4;  elemConn[e1_n3] = n3;
+  lockelems[0] = FEM_add_element(theMesh, elemConn, 3, 0, e1chunk);
   theMod->fmUtil->copyElemData(0,e1Topurge,lockelems[0]);
   FEM_purge_element(theMesh,e1Topurge,0);
   //theMesh->elem[0].setMeshSizing(lockelems[0], e1Sz);
   // add n2, n3, n4
-  conn[e1_n1] = n4;  conn[e1_n2] = n2;  conn[e1_n3] = n3;
-  lockelems[1] = FEM_add_element(theMesh, conn, 3, 0, e2chunk);
+  elemConn[e1_n1] = n4;  elemConn[e1_n2] = n2;  elemConn[e1_n3] = n3;
+  lockelems[1] = FEM_add_element(theMesh, elemConn, 3, 0, e2chunk);
   theMod->fmUtil->copyElemData(0,e2Topurge,lockelems[1]);
   FEM_purge_element(theMesh,e2Topurge,0);
   //theMesh->elem[0].setMeshSizing(lockelems[1], e2Sz);
@@ -225,9 +223,6 @@ int FEM_Adapt::edge_flip_help(int e1, int e2, int n1, int n2, int e1_n1,
     }
   }
   //make sure that it always comes here, don't return with unlocking
-  free(conn);
-  //free(locknodes);
-  free(lockelems);
   return newNode;
 }
 // ======================  END edge_flip  ===================================
@@ -258,13 +253,12 @@ int FEM_Adapt::edge_bisect_help(int e1, int e2, int n1, int n2, int e1_n1,
 				int e2_n3, int n3, int n4)
 {
   int n5;
-  int *conn = (int*)malloc(3*sizeof(int));
   int numNodes = 4;
   int numElems = 2;
   int numNodesNew = 5;
   int numElemsNew = 4;
-  int *locknodes = (int*)malloc(numNodesNew*sizeof(int));
-  int *lockelems = (int*)malloc(numElemsNew*sizeof(int));
+  int locknodes[5];
+  int lockelems[4];
 
   locknodes[0] = n1;
   locknodes[1] = n2;
@@ -302,7 +296,7 @@ int FEM_Adapt::edge_bisect_help(int e1, int e2, int n1, int n2, int e1_n1,
     CkAssert(irec->getShared()==1);
     e2chunk = irec->getChk(0);
   }
-  int *adjnodes = (int*)malloc(2*sizeof(int));
+  int adjnodes[2];
   adjnodes[0] = n1;
   adjnodes[1] = n2;
   int *chunks;
@@ -354,24 +348,24 @@ int FEM_Adapt::edge_bisect_help(int e1, int e2, int n1, int n2, int e1_n1,
   }
 
   // add n1, n5, n3
-  conn[e1_n1] = n1;  conn[e1_n2] = n5;  conn[e1_n3] = n3;
-  lockelems[0] = FEM_add_element(theMesh, conn, 3, 0, e1chunk);
+  elemConn[e1_n1] = n1;  elemConn[e1_n2] = n5;  elemConn[e1_n3] = n3;
+  lockelems[0] = FEM_add_element(theMesh, elemConn, 3, 0, e1chunk);
   theMod->fmUtil->copyElemData(0,e1,lockelems[0]);
   //theMesh->elem[0].setMeshSizing(lockelems[0], e1Sz);
   // add n2, n5, n3
-  conn[e1_n1] = n5;  conn[e1_n2] = n2;  conn[e1_n3] = n3;
-  lockelems[1] = FEM_add_element(theMesh, conn, 3, 0, e3chunk);
+  elemConn[e1_n1] = n5;  elemConn[e1_n2] = n2;  elemConn[e1_n3] = n3;
+  lockelems[1] = FEM_add_element(theMesh, elemConn, 3, 0, e3chunk);
   theMod->fmUtil->copyElemData(0,e1,lockelems[1]);
   //theMesh->elem[0].setMeshSizing(lockelems[1], e1Sz);
   if (e2 != -1) { // e2 exists
     // add n1, n5, n4
-    conn[e2_n1] = n1;  conn[e2_n2] = n5;  conn[e2_n3] = n4;
-    lockelems[2] = FEM_add_element(theMesh, conn, 3, 0, e2chunk);
+    elemConn[e2_n1] = n1;  elemConn[e2_n2] = n5;  elemConn[e2_n3] = n4;
+    lockelems[2] = FEM_add_element(theMesh, elemConn, 3, 0, e2chunk);
     theMod->fmUtil->copyElemData(0,e2,lockelems[2]);
     //theMesh->elem[0].setMeshSizing(lockelems[2], e2Sz);
     // add n2, n5, n4
-    conn[e2_n1] = n5;  conn[e2_n2] = n2;  conn[e2_n3] = n4;
-    lockelems[3] = FEM_add_element(theMesh, conn, 3, 0, e4chunk);
+    elemConn[e2_n1] = n5;  elemConn[e2_n2] = n2;  elemConn[e2_n3] = n4;
+    lockelems[3] = FEM_add_element(theMesh, elemConn, 3, 0, e4chunk);
     theMod->fmUtil->copyElemData(0,e2,lockelems[3]);
     //theMesh->elem[0].setMeshSizing(lockelems[3], e2Sz);
   }
@@ -449,10 +443,6 @@ int FEM_Adapt::edge_bisect_help(int e1, int e2, int n1, int n2, int e1_n1,
     }
   }
 
-  free(conn);
-  free(locknodes);
-  free(lockelems);
-  free(adjnodes);
   FEM_Modify_UnlockN(theMesh, n5, 0);
   return n5;
 }
@@ -487,8 +477,8 @@ int FEM_Adapt::vertex_remove_help(int e1, int e2, int n1, int n2, int e1_n1,
   int numElems = 4;
   int numNodesNew = 4;
   int numElemsNew = 2;
-  int *locknodes = (int*)malloc(numNodes*sizeof(int));
-  int *lockelems = (int*)malloc(numElems*sizeof(int));
+  int locknodes[5];
+  int lockelems[4];
 
   locknodes[0] = n2;
   locknodes[1] = n3;
@@ -508,8 +498,6 @@ int FEM_Adapt::vertex_remove_help(int e1, int e2, int n1, int n2, int e1_n1,
       e4 = theMesh->e2e_getNbr(e2, get_edge_index(e2_n1, e2_n3));
       lockelems[3] = e4;
       if(e4 == -1 ) {
-	free(locknodes);
-	free(lockelems);
 	return 0;
       }
     }
@@ -530,24 +518,18 @@ int FEM_Adapt::vertex_remove_help(int e1, int e2, int n1, int n2, int e1_n1,
     }
     FEM_remove_node(theMesh, n1);
     
-    int *conn = (int*)malloc(3*sizeof(int));
     // add n2, n5, n3
-    conn[e1_n1] = n2;  conn[e1_n2] = n3;  conn[e1_n3] = n5;
-    lockelems[0] = FEM_add_element(theMesh, conn, 3, 0, e1chunk);
+    elemConn[e1_n1] = n2;  elemConn[e1_n2] = n3;  elemConn[e1_n3] = n5;
+    lockelems[0] = FEM_add_element(theMesh, elemConn, 3, 0, e1chunk);
     if (e2 != -1) {
       // add n2, n5, n4
-      conn[e2_n1] = n5;  conn[e2_n2] = n4;  conn[e2_n3] = n2;
-      lockelems[1] = FEM_add_element(theMesh, conn, 3, 0, e2chunk);
+      elemConn[e2_n1] = n5;  elemConn[e2_n2] = n4;  elemConn[e2_n3] = n2;
+      lockelems[1] = FEM_add_element(theMesh, elemConn, 3, 0, e2chunk);
     }
 
-    free(conn);
-    free(locknodes);
-    free(lockelems);
     return 1;
   }
 
-  free(locknodes);
-  free(lockelems);
   return 0;
 }
 // ======================  END vertex_remove  ==============================
@@ -577,24 +559,21 @@ int FEM_Adapt::vertex_split(int n, int n1, int n2)
 {
   if ((n < 0) || ((n1 <= -1) && (n2 <= -1)))
     CkAbort("FEM_Adapt::vertex_split: n and at least one of its neighbor must be local to this chunk; n1 and n2 must both exist\n");
-  int *locknodes = (int*)malloc(2*sizeof(int));
+  int locknodes[2];
   locknodes[0] = n1; locknodes[1] = n2;
   FEM_Modify_Lock(theMesh, locknodes, 2, locknodes, 0);
   int e1 = theMesh->getElementOnEdge(n, n1);
   if (e1 == -1) {
     FEM_Modify_Unlock(theMesh);
-    free(locknodes);
     return -1;	     
   }
   int e3 = theMesh->getElementOnEdge(n, n2);
   if (e3 == -1) {
     FEM_Modify_Unlock(theMesh);
-    free(locknodes);
     return -1;	     
   }
   int ret = vertex_split_help(n, n1, n2, e1, e3);
   FEM_Modify_Unlock(theMesh);
-  free(locknodes);
   return ret;
 }
 
@@ -614,12 +593,12 @@ int FEM_Adapt::vertex_split_help(int n, int n1, int n2, int e1, int e3)
     e3_n2 = find_local_node_index(e3, n2);
   }
 
-  int *locknodes = (int*)malloc(4*sizeof(int));
+  int locknodes[4];
   locknodes[0] = n1;
   locknodes[1] = n;
   locknodes[2] = n2;
   locknodes[3] = -1;
-  int *lockelems = (int*)malloc(6*sizeof(int));
+  int lockelems[6];
   lockelems[0] = e1;
   lockelems[1] = e2;
   lockelems[2] = e3;
@@ -631,7 +610,7 @@ int FEM_Adapt::vertex_split_help(int n, int n1, int n2, int e1, int e3)
 #ifdef DEBUG_1
   CkPrintf("Vertex Split, %d-%d-%d on chunk %d\n", n1, n, n2, theMod->getfmUtil()->getIdx());
 #endif
-  int *adjnodes = (int*)malloc(2*sizeof(int));
+  int adjnodes[2];
   adjnodes[0] = n; //looks like it will never be shared, since according to later code, all n1, n & n2 should be local.. appears to be not correct
   //the new node will be shared to wahtever the old node was shared to, we'll do this later
   int *chunks;
@@ -639,7 +618,6 @@ int FEM_Adapt::vertex_split_help(int n, int n1, int n2, int e1, int e3)
   int np = FEM_add_node(theMesh,adjnodes,1,chunks,numChunks,0,0);
   locknodes[3] = np;
 
-  int *conn = (int*)malloc(3*sizeof(int));
   int current, next, nt, nl, eknp, eknt, eknl;
   // traverse elements on one side of n starting with e2
   current = e2;
@@ -652,8 +630,8 @@ int FEM_Adapt::vertex_split_help(int n, int n1, int n2, int e1, int e3)
     nl = theMesh->e2n_getNode(current, eknl);
     FEM_remove_element(theMesh, current, 0);
     // add nl, nt, np
-    conn[eknp] = np; conn[eknt] = nt; conn[eknl] = nl;
-    int newelem = FEM_add_element(theMesh, conn, 3, 0);
+    elemConn[eknp] = np; elemConn[eknt] = nt; elemConn[eknl] = nl;
+    int newelem = FEM_add_element(theMesh, elemConn, 3, 0);
     nt = nl;
     current = next;
   }
@@ -669,24 +647,20 @@ int FEM_Adapt::vertex_split_help(int n, int n1, int n2, int e1, int e3)
       nl = theMesh->e2n_getNode(current, eknl);
       FEM_remove_element(theMesh, current, 0);
       // add nl, nt, np
-      conn[eknp] = np; conn[eknt] = nt; conn[eknl] = nl;
-      int newelem = FEM_add_element(theMesh, conn, 3, 0);
+      elemConn[eknp] = np; elemConn[eknt] = nt; elemConn[eknl] = nl;
+      int newelem = FEM_add_element(theMesh, elemConn, 3, 0);
       nt = nl;
       current = next;
     }
   }
 
   // add n, n1, np
-  conn[e1_n] = n; conn[e1_n1] = n1; conn[3 - e1_n - e1_n1] = np;
-  lockelems[4] = FEM_add_element(theMesh, conn, 3, 0);
+  elemConn[e1_n] = n; elemConn[e1_n1] = n1; elemConn[3 - e1_n - e1_n1] = np;
+  lockelems[4] = FEM_add_element(theMesh, elemConn, 3, 0);
   // add n, n2, np
-  conn[e3_n] = n; conn[e3_n2] = n2; conn[3 - e3_n - e3_n2] = np;
-  lockelems[5] = FEM_add_element(theMesh, conn, 3, 0);
+  elemConn[e3_n] = n; elemConn[e3_n2] = n2; elemConn[3 - e3_n - e3_n2] = np;
+  lockelems[5] = FEM_add_element(theMesh, elemConn, 3, 0);
 
-  free(locknodes);
-  free(lockelems);
-  free(conn);
-  free(adjnodes);
   return np;
 }
 // ======================  END vertex_split ===================

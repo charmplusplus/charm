@@ -26,6 +26,17 @@ FEM_Adapt_Algs::FEM_Adapt_Algs(FEM_Mesh *m, femMeshModify *fm, int dimension)
   dim = dimension; 
   //theAdaptor = theMod->fmAdapt;
   theAdaptor = theMod->fmAdaptL;
+  elemConn = new int[3]; //for 2D
+  coordsn1 = new double[dim];
+  coordsn2 = new double[dim];
+  coordsn3 = new double[dim];
+}
+
+FEM_Adapt_Algs::~FEM_Adapt_Algs() {
+  delete[] elemConn;
+  delete[] coordsn1;
+  delete[] coordsn2;
+  delete[] coordsn3;
 }
 
 void FEM_Adapt_Algs::FEM_AdaptMesh(int qm, int method, double factor, 
@@ -66,7 +77,6 @@ int FEM_Adapt_Algs::Refine(int qm, int method, double factor, double *sizes)
   int elemWidth = theMesh->elem[0].getConn().width();
   refineElements = refineStack = NULL;
   refineTop = refineHeapSize = 0;
-  int *eConn = (int*)malloc(elemWidth*sizeof(int));
   while (iter_mods != 0) {
     iter_mods=0;
     numNodes = theMesh->node.size();
@@ -80,10 +90,10 @@ int FEM_Adapt_Algs::Refine(int qm, int method, double factor, double *sizes)
       if (theMesh->elem[0].is_valid(i)) {
 	// find maxEdgeLength of i
 	double tmpLen, avgEdgeLength=0.0, maxEdgeLength = 0.0;
-	theMesh->e2n_getAll(i, eConn);
+	theMesh->e2n_getAll(i, elemConn);
 	for (int j=0; j<elemWidth-1; j++) {
 	  for (int k=j+1; k<elemWidth; k++) {
-	    tmpLen = length(eConn[j], eConn[k]);
+	    tmpLen = length(elemConn[j], elemConn[k]);
 	    avgEdgeLength += tmpLen;
 	    if (tmpLen > maxEdgeLength) maxEdgeLength = tmpLen;
 	  }
@@ -109,14 +119,14 @@ int FEM_Adapt_Algs::Refine(int qm, int method, double factor, double *sizes)
       if ((elId != -1) && (theMesh->elem[0].is_valid(elId))) {
 	int n1, n2;
 	double tmpLen, avgEdgeLength=0.0, maxEdgeLength = 0.0;
-	theMesh->e2n_getAll(elId, eConn);
+	theMesh->e2n_getAll(elId, elemConn);
 	for (int j=0; j<elemWidth-1; j++) {
 	  for (int k=j+1; k<elemWidth; k++) {
-	    tmpLen = length(eConn[j], eConn[k]);
+	    tmpLen = length(elemConn[j], elemConn[k]);
 	    avgEdgeLength += tmpLen;
 	    if (tmpLen > maxEdgeLength) { 
 	      maxEdgeLength = tmpLen;
-	      n1 = eConn[j]; n2 = eConn[k];
+	      n1 = elemConn[j]; n2 = elemConn[k];
 	    }
 	  }
 	}
@@ -138,7 +148,6 @@ int FEM_Adapt_Algs::Refine(int qm, int method, double factor, double *sizes)
 #ifdef ADAPT_VERBOSE
   CkPrintf("ParFUM_Refine: %d total modifications.\n", mods);
 #endif
-  free(eConn);
   delete[] refineStack;
   delete[] refineElements;
   return mods;
@@ -166,7 +175,6 @@ int FEM_Adapt_Algs::Coarsen(int qm, int method, double factor, double *sizes)
   double qFactor;
   coarsenElements = NULL;
   coarsenHeapSize = 0;
-  int *eConn = (int*)malloc(elemWidth*sizeof(int));
   while (iter_mods != 0) {
     iter_mods=0;
     pass++;
@@ -180,12 +188,12 @@ int FEM_Adapt_Algs::Coarsen(int qm, int method, double factor, double *sizes)
     for (int i=0; i<numElements; i++) { 
       if (theMesh->elem[0].is_valid(i)) {
 	// find minEdgeLength of i
-	theMesh->e2n_getAll(i, eConn);
+	theMesh->e2n_getAll(i, elemConn);
 	double tmpLen, avgEdgeLength=0.0, 
-	  minEdgeLength = length(eConn[0], eConn[1]);
+	  minEdgeLength = length(elemConn[0], elemConn[1]);
 	for (int j=0; j<elemWidth-1; j++) {
 	  for (int k=j+1; k<elemWidth; k++) {
-	    tmpLen = length(eConn[j], eConn[k]);
+	    tmpLen = length(elemConn[j], elemConn[k]);
 	    avgEdgeLength += tmpLen;
 	    if (tmpLen < minEdgeLength) minEdgeLength = tmpLen;
 	  }
@@ -204,17 +212,17 @@ int FEM_Adapt_Algs::Coarsen(int qm, int method, double factor, double *sizes)
     while (coarsenHeapSize>0) { // loop through the elements
       elId=Delete_Min(1);
       if ((elId != -1) && (theMesh->elem[0].is_valid(elId))) {
-	theMesh->e2n_getAll(elId, eConn);
-	int n1=eConn[0], n2=eConn[1];
+	theMesh->e2n_getAll(elId, elemConn);
+	int n1=elemConn[0], n2=elemConn[1];
 	double tmpLen, avgEdgeLength=0.0, 
 	  minEdgeLength = length(n1, n2);
 	for (int j=0; j<elemWidth-1; j++) {
 	  for (int k=j+1; k<elemWidth; k++) {
-	    tmpLen = length(eConn[j], eConn[k]);
+	    tmpLen = length(elemConn[j], elemConn[k]);
 	    avgEdgeLength += tmpLen;
 	    if (tmpLen < minEdgeLength) {
 	      minEdgeLength = tmpLen;
-	      n1 = eConn[j]; n2 = eConn[k];
+	      n1 = elemConn[j]; n2 = elemConn[k];
 	    }
 	  }
 	}
@@ -231,11 +239,11 @@ int FEM_Adapt_Algs::Coarsen(int qm, int method, double factor, double *sizes)
 					 theMesh->e2n_getIndex(elId,n2)-1, 0);
 	  // determine if eNbr should also be coarsened
 	  if ((eNbr >= 0) && (theMesh->elem[0].is_valid(eNbr))) {
-	    theMesh->e2n_getAll(eNbr, eConn);
+	    theMesh->e2n_getAll(eNbr, elemConn);
 	    avgEdgeLength=0.0;
 	    for (int j=0; j<elemWidth-1; j++) {
 	      for (int k=j+1; k<elemWidth; k++) {
-		avgEdgeLength += length(eConn[j], eConn[k]);
+		avgEdgeLength += length(elemConn[j], elemConn[k]);
 	      }
 	    }
 	    avgEdgeLength /= 3.0;
@@ -263,7 +271,6 @@ int FEM_Adapt_Algs::Coarsen(int qm, int method, double factor, double *sizes)
 #ifdef ADAPT_VERBOSE
   CkPrintf("ParFUM_Coarsen: %d total modifications over %d passes.\n", mods, pass);
 #endif
-  free(eConn);
   delete[] coarsenElements;
   return mods;
 }
@@ -300,7 +307,6 @@ void FEM_Adapt_Algs::FEM_Repair(int qm)
   int elemWidth = theMesh->elem[0].getConn().width();
   int changes=1;
   int count=0;
-  int *eConn = (int*)malloc(elemWidth*sizeof(int));
   while (changes!=0 && count<4) {
     count++;
     changes = 0;
@@ -310,23 +316,23 @@ void FEM_Adapt_Algs::FEM_Repair(int qm)
 	double qFactor=getAreaQuality(i);
 	if (qFactor <  0.75*QUALITY_MIN) {
 	  int elId = i;
-	  theMesh->e2n_getAll(elId, eConn);
-	  int n1=eConn[0], n2=eConn[1], mn1, mn2;
+	  theMesh->e2n_getAll(elId, elemConn);
+	  int n1=elemConn[0], n2=elemConn[1], mn1, mn2;
 	  mn1 = n1; mn2 = n2;
 	  double tmpLen, avgEdgeLength=0.0, 
 	    minEdgeLength = length(n1, n2), maxEdgeLength;
 	  maxEdgeLength = minEdgeLength;
 	  for (int j=0; j<elemWidth-1; j++) {
 	    for (int k=j+1; k<elemWidth; k++) {
-	      tmpLen = length(eConn[j], eConn[k]);
+	      tmpLen = length(elemConn[j], elemConn[k]);
 	      avgEdgeLength += tmpLen;
 	      if (tmpLen < minEdgeLength) {
 		minEdgeLength = tmpLen;
-		n1 = eConn[j]; n2 = eConn[k];
+		n1 = elemConn[j]; n2 = elemConn[k];
 	      }
 	      else if (tmpLen > maxEdgeLength) {
 		maxEdgeLength = tmpLen;
-		mn1 = eConn[j]; mn2 = eConn[k];
+		mn1 = elemConn[j]; mn2 = elemConn[k];
 	      }
 	    }
 	  }
@@ -354,7 +360,6 @@ void FEM_Adapt_Algs::FEM_Repair(int qm)
       }
     }
   }
-  free(eConn);
 
 #ifdef ADAPT_VERBOSE
   numElements = theMesh->elem[0].size();
@@ -410,20 +415,18 @@ void FEM_Adapt_Algs::SetMeshSize(int method, double factor, double *sizes)
   else if (method == 2) { // calculate current sizing and scale by factor
     double avgEdgeLength = 0.0;
     int width = theMesh->elem[0].getConn().width();
-    int* eConn = (int*)malloc(width*sizeof(int));
     int numEdges=3;
     if (dim==3) numEdges=6;
     for (int i=0; i<numElements; i++) {
-      theMesh->e2n_getAll(i, eConn);
+      theMesh->e2n_getAll(i, elemConn);
       for (int j=0; j<width-1; j++) {
 	for (int k=j+1; k<width; k++) {
-	  avgEdgeLength += length(eConn[j], eConn[k]);
+	  avgEdgeLength += length(elemConn[j], elemConn[k]);
 	}
       }
-      avgEdgeLength += length(eConn[0], eConn[width-1]);
+      avgEdgeLength += length(elemConn[0], elemConn[width-1]);
       avgEdgeLength /= (double)numEdges;
       theMesh->elem[0].setMeshSizing(i, factor*avgEdgeLength);
-      free(eConn);
     }
     //CkPrintf("ParFUM_SetMeshSize: CALCULATED & SCALED \n");
   }
@@ -455,19 +458,17 @@ void FEM_Adapt_Algs::SetReferenceMesh()
   // TODO: do we need to run this loop for element types other than 0?
   double avgLength = 0.0;
   int width = theMesh->elem[0].getConn().width();
-  int* eConn = (int*)malloc(width*sizeof(int));
   int numElements = theMesh->elem[0].size();
   
   for (int i=0; i<numElements; ++i, avgLength=0) {
-    theMesh->e2n_getAll(i, eConn);
+    theMesh->e2n_getAll(i, elemConn);
     for (int j=0; j<width-1; ++j) {
-      avgLength += length(eConn[j], eConn[j+1]);
+      avgLength += length(elemConn[j], elemConn[j+1]);
     }
-    avgLength += length(eConn[0], eConn[width-1]);
+    avgLength += length(elemConn[0], elemConn[width-1]);
     avgLength /= width;
     theMesh->elem[0].setMeshSizing(i, avgLength);      
   }
-  free(eConn);
 }
 
 
@@ -604,10 +605,6 @@ void FEM_Adapt_Algs::GradateMesh(double smoothness)
 
 
 int FEM_Adapt_Algs::simple_refine(double targetA, double xmin, double ymin, double xmax, double ymax) {
-  int *con = (int*)malloc(3*sizeof(int));
-  double *n1_coord = (double*)malloc(2*sizeof(double));
-  double *n2_coord = (double*)malloc(2*sizeof(double));
-  double *n3_coord = (double*)malloc(2*sizeof(double));
   bool adapted = true;
   refineElements = refineStack = NULL;
   refineTop = refineHeapSize = 0;
@@ -618,14 +615,13 @@ int FEM_Adapt_Algs::simple_refine(double targetA, double xmin, double ymin, doub
     refineElements = new elemHeap[noEle+1];
     for(int i=0; i<noEle; i++) {
       if(theMesh->elem[0].is_valid(i)) {
-	theMesh->e2n_getAll(i,con,0);
-	getCoord(con[0], n1_coord);
-	getCoord(con[1], n2_coord);
-	getCoord(con[2], n3_coord);
+	theMesh->e2n_getAll(i,elemConn,0);
+	getCoord(elemConn[0], coordsn1);
+	getCoord(elemConn[1], coordsn2);
+	getCoord(elemConn[2], coordsn3);
 	//do a refinement only if it has any node within the refinement box
-	if((n1_coord[0]<xmax && n1_coord[0]>xmin && n1_coord[1]<ymax && n1_coord[1]>ymin) || (n2_coord[0]<xmax && n2_coord[0]>xmin && n2_coord[1]<ymax && n2_coord[1]>ymin) || (n3_coord[0]<xmax && n3_coord[0]>xmin && n3_coord[1]<ymax && n3_coord[1]>ymin)) {
-	  //areas[i] = getArea(n1_coord, n2_coord, n3_coord);
-	  Insert(i,-getArea(n1_coord, n2_coord, n3_coord),0); 
+	if((coordsn1[0]<xmax && coordsn1[0]>xmin && coordsn1[1]<ymax && coordsn1[1]>ymin) || (coordsn2[0]<xmax && coordsn2[0]>xmin && coordsn2[1]<ymax && coordsn2[1]>ymin) || (coordsn3[0]<xmax && coordsn3[0]>xmin && coordsn3[1]<ymax && coordsn3[1]>ymin)) {
+	  Insert(i,-getArea(coordsn1, coordsn2, coordsn3),0); 
 	  //negative area to trick the minheap to become a maxheap!
 	}
 	else {
@@ -665,11 +661,11 @@ int FEM_Adapt_Algs::simple_refine(double targetA, double xmin, double ymin, doub
       int tmp = Delete_Min(0);
       if(tmp!=-1 && theMesh->elem[0].is_valid(tmp)) {
 	//since we are reusing element indices, so do not trust earlier areas
-	theMesh->e2n_getAll(tmp,con,0);
-	getCoord(con[0], n1_coord);
-	getCoord(con[1], n2_coord);
-	getCoord(con[2], n3_coord);
-	if(getArea(n1_coord, n2_coord, n3_coord) > targetA) {
+	theMesh->e2n_getAll(tmp,elemConn,0);
+	getCoord(elemConn[0], coordsn1);
+	getCoord(elemConn[1], coordsn2);
+	getCoord(elemConn[2], coordsn3);
+	if(getArea(coordsn1, coordsn2, coordsn3) > targetA) {
 	  int ret = refine_element_leb(tmp);
 	  if(ret!=-1) adapted = true;
 	}
@@ -680,21 +676,12 @@ int FEM_Adapt_Algs::simple_refine(double targetA, double xmin, double ymin, doub
     //if(adapted) break;
   }
 
-  free(con);
-  free(n1_coord);
-  free(n2_coord);
-  free(n3_coord);
-
   if(adapted) return -1;
   else return 1;
 }
 
 int FEM_Adapt_Algs::simple_coarsen(double targetA, double xmin, double ymin, double xmax, double ymax) {
   int noEle = theMesh->elem[0].size();
-  int *con = (int*)malloc(3*sizeof(int));
-  double *n1_coord = (double*)malloc(2*sizeof(double));
-  double *n2_coord = (double*)malloc(2*sizeof(double));
-  double *n3_coord = (double*)malloc(2*sizeof(double));
   int *shortestEdge = (int *)malloc(2*sizeof(int));
   bool adapted = true;
   coarsenElements = NULL;
@@ -707,13 +694,13 @@ int FEM_Adapt_Algs::simple_coarsen(double targetA, double xmin, double ymin, dou
     coarsenElements[0].elID=-1;
     for(int i=0; i<noEle; i++) {
       if(theMesh->elem[0].is_valid(i)) {
-	theMesh->e2n_getAll(i,con,0);
-	getCoord(con[0], n1_coord);
-	getCoord(con[1], n2_coord);
-	getCoord(con[2], n3_coord);
+	theMesh->e2n_getAll(i,elemConn,0);
+	getCoord(elemConn[0], coordsn1);
+	getCoord(elemConn[1], coordsn2);
+	getCoord(elemConn[2], coordsn3);
 	//do a coarsening only if it has any node within the coarsen box
-	if((n1_coord[0]<xmax && n1_coord[0]>xmin && n1_coord[1]<ymax && n1_coord[1]>ymin) || (n2_coord[0]<xmax && n2_coord[0]>xmin && n2_coord[1]<ymax && n2_coord[1]>ymin) || (n3_coord[0]<xmax && n3_coord[0]>xmin && n3_coord[1]<ymax && n3_coord[1]>ymin)) {
-	  Insert(i,getArea(n1_coord, n2_coord, n3_coord),1);
+	if((coordsn1[0]<xmax && coordsn1[0]>xmin && coordsn1[1]<ymax && coordsn1[1]>ymin) || (coordsn2[0]<xmax && coordsn2[0]>xmin && coordsn2[1]<ymax && coordsn2[1]>ymin) || (coordsn3[0]<xmax && coordsn3[0]>xmin && coordsn3[1]<ymax && coordsn3[1]>ymin)) {
+	  Insert(i,getArea(coordsn1, coordsn2, coordsn3),1);
 	} 
 	else {
 	  Insert(i,MAXAREA,1); //make it believe that this triangle is big enough
@@ -740,8 +727,8 @@ int FEM_Adapt_Algs::simple_coarsen(double targetA, double xmin, double ymin, dou
       if(theMesh->elem[0].is_valid(map1[i])) {
 	if(areas[i] < targetA) {
 	  //find the nodes along the smallest edge & coarsen the edge
-	  theMesh->e2n_getAll(map1[i],con,0);
-	  getShortestEdge(con[0], con[1], con[2], shortestEdge);
+	  theMesh->e2n_getAll(map1[i],elemConn,0);
+	  getShortestEdge(elemConn[0], elemConn[1], elemConn[2], shortestEdge);
 	  int ret = theAdaptor->edge_contraction(shortestEdge[0], shortestEdge[1]);
 	  if(ret != -1) adapted = true;
 	}
@@ -751,12 +738,12 @@ int FEM_Adapt_Algs::simple_coarsen(double targetA, double xmin, double ymin, dou
     while(coarsenHeapSize>0) {
       int tmp = Delete_Min(1);
       if(tmp!=-1 && theMesh->elem[0].is_valid(tmp)) {
-	theMesh->e2n_getAll(tmp,con,0);
-	getCoord(con[0], n1_coord);
-	getCoord(con[1], n2_coord);
-	getCoord(con[2], n3_coord);
-	if(getArea(n1_coord, n2_coord, n3_coord) < targetA) {
-	  getShortestEdge(con[0], con[1], con[2], shortestEdge);
+	theMesh->e2n_getAll(tmp,elemConn,0);
+	getCoord(elemConn[0], coordsn1);
+	getCoord(elemConn[1], coordsn2);
+	getCoord(elemConn[2], coordsn3);
+	if(getArea(coordsn1, coordsn2, coordsn3) < targetA) {
+	  getShortestEdge(elemConn[0], elemConn[1], elemConn[2], shortestEdge);
 	  int ret = theAdaptor->edge_contraction(shortestEdge[0], shortestEdge[1]);
 	  if(ret != -1) adapted = true;
 	}
@@ -766,11 +753,6 @@ int FEM_Adapt_Algs::simple_coarsen(double targetA, double xmin, double ymin, dou
     if(coarsenElements!=NULL) delete[] coarsenElements;
     //if(adapted) break;
   }
-
-  free(con);
-  free(n1_coord);
-  free(n2_coord);
-  free(n3_coord);
   free(shortestEdge);
 
   if(adapted) return -1;
@@ -800,29 +782,26 @@ void FEM_Adapt_Algs::tests() {
    does not have f as it's longest edge, recursively call refine_element_leb 
    on g, and start over. */ 
 int FEM_Adapt_Algs::refine_element_leb(int e) {
-  int *eConn = (int*)malloc(3*sizeof(int));
   int fixNode, otherNode, opNode, longEdge, nbr; 
   double eLens[3], longEdgeLen = 0.0;
 
   if(e==-1) {
-    free(eConn);
     return -1;
   }
 
-  theMesh->e2n_getAll(e, eConn);
-  eLens[0] = length(eConn[0], eConn[1]);
-  eLens[1] = length(eConn[1], eConn[2]);
-  eLens[2] = length(eConn[2], eConn[0]);
+  theMesh->e2n_getAll(e, elemConn);
+  eLens[0] = length(elemConn[0], elemConn[1]);
+  eLens[1] = length(elemConn[1], elemConn[2]);
+  eLens[2] = length(elemConn[2], elemConn[0]);
   for (int i=0; i<3; i++) {
     if (eLens[i] > longEdgeLen) {
       longEdgeLen = eLens[i];
       longEdge = i;
-      fixNode = eConn[i];
-      otherNode = eConn[(i+1)%3];
-      opNode = eConn[(i+2)%3];
+      fixNode = elemConn[i];
+      otherNode = elemConn[(i+1)%3];
+      opNode = elemConn[(i+2)%3];
     }
   }
-  free(eConn);
 
   nbr = theMesh->e2e_getNbr(e, longEdge);
   if (nbr == -1) // e's longEdge is on physical boundary
@@ -881,16 +860,10 @@ void FEM_Adapt_Algs::refine_flip_element_leb(int e, int p, int n1, int n2,
 
 double FEM_Adapt_Algs::length(int n1, int n2)
 {
-  double *n1_coord = (double*)malloc(dim*sizeof(double));
-  double *n2_coord = (double*)malloc(dim*sizeof(double));
+  getCoord(n1, coordsn1);
+  getCoord(n2, coordsn2);
 
-  getCoord(n1, n1_coord);
-  getCoord(n2, n2_coord);
-
-  double ret = length(n1_coord, n2_coord);
-
-  free(n1_coord);
-  free(n2_coord);
+  double ret = length(coordsn1, coordsn2);
   return ret;
 }
 
@@ -907,19 +880,11 @@ double FEM_Adapt_Algs::length(double *n1_coord, double *n2_coord) {
 
 double FEM_Adapt_Algs::getArea(int n1, int n2, int n3)
 {
-  double *n1_coord = (double*)malloc(dim*sizeof(double));
-  double *n2_coord = (double*)malloc(dim*sizeof(double));
-  double *n3_coord = (double*)malloc(dim*sizeof(double));
+  getCoord(n1, coordsn1);
+  getCoord(n2, coordsn2);
+  getCoord(n3, coordsn3);
 
-  getCoord(n1, n1_coord);
-  getCoord(n2, n2_coord);
-  getCoord(n3, n3_coord);
-
-  double ret = getArea(n1_coord, n2_coord, n3_coord);
-
-  free(n1_coord);
-  free(n2_coord);
-  free(n3_coord);
+  double ret = getArea(coordsn1, coordsn2, coordsn3);
   return ret;
 }
 
@@ -955,20 +920,12 @@ double FEM_Adapt_Algs::getArea(double *n1_coord, double *n2_coord, double *n3_co
 bool FEM_Adapt_Algs::didItFlip(int n1, int n2, int n3, double *n4_coord)
 {
   //n3 is the node to be deleted, n4 is the new node to be added
-  double *n1_coord = (double*)malloc(dim*sizeof(double));
-  double *n2_coord = (double*)malloc(dim*sizeof(double));
-  double *n3_coord = (double*)malloc(dim*sizeof(double));
+  getCoord(n1, coordsn1);
+  getCoord(n2, coordsn2);
+  getCoord(n3, coordsn3);
 
-  getCoord(n1, n1_coord);
-  getCoord(n2, n2_coord);
-  getCoord(n3, n3_coord);
-
-  double ret_old = getSignedArea(n1_coord, n2_coord, n3_coord);
-  double ret_new = getSignedArea(n1_coord, n2_coord, n4_coord);
-
-  free(n1_coord);
-  free(n2_coord);
-  free(n3_coord);
+  double ret_old = getSignedArea(coordsn1, coordsn2, coordsn3);
+  double ret_new = getSignedArea(coordsn1, coordsn2, n4_coord);
 
   if(ret_old > SLIVERAREA && ret_new < -SLIVERAREA) return true; //it is a flip
   else if(ret_old < -SLIVERAREA && ret_new > SLIVERAREA) return true; //it is a flip
@@ -988,19 +945,11 @@ bool FEM_Adapt_Algs::didItFlip(double *n1_coord, double *n2_coord, double *n3_co
 
 double FEM_Adapt_Algs::getSignedArea(int n1, int n2, int n3)
 {
-  double *n1_coord = (double*)malloc(dim*sizeof(double));
-  double *n2_coord = (double*)malloc(dim*sizeof(double));
-  double *n3_coord = (double*)malloc(dim*sizeof(double));
+  getCoord(n1, coordsn1);
+  getCoord(n2, coordsn2);
+  getCoord(n3, coordsn3);
 
-  getCoord(n1, n1_coord);
-  getCoord(n2, n2_coord);
-  getCoord(n3, n3_coord);
-
-  double ret = getSignedArea(n1_coord, n2_coord, n3_coord);
-
-  free(n1_coord);
-  free(n2_coord);
-  free(n3_coord);
+  double ret = getSignedArea(coordsn1, coordsn2, coordsn3);
   return ret;
 }
 
@@ -1045,21 +994,17 @@ int FEM_Adapt_Algs::getCoord(int n1, double *crds) {
 }
 
 int FEM_Adapt_Algs::getShortestEdge(int n1, int n2, int n3, int* shortestEdge) {
-  double *n1_coord = (double*)malloc(dim*sizeof(double));
-  double *n2_coord = (double*)malloc(dim*sizeof(double));
-  double *n3_coord = (double*)malloc(dim*sizeof(double));
+  getCoord(n1, coordsn1);
+  getCoord(n2, coordsn2);
+  getCoord(n3, coordsn3);
 
-  getCoord(n1, n1_coord);
-  getCoord(n2, n2_coord);
-  getCoord(n3, n3_coord);
-
-  double aLen = length(n1_coord, n2_coord);
+  double aLen = length(coordsn1, coordsn2);
   int shortest = 0;
 
-  double bLen = length(n2_coord, n3_coord);
+  double bLen = length(coordsn2, coordsn3);
   if(bLen < aLen) shortest = 1;
 
-  double cLen = length(n3_coord, n1_coord);
+  double cLen = length(coordsn3, coordsn1);
   if((cLen < aLen) && (cLen < bLen)) shortest = 2;
 
   if(shortest==0) {
@@ -1074,9 +1019,6 @@ int FEM_Adapt_Algs::getShortestEdge(int n1, int n2, int n3, int* shortestEdge) {
     shortestEdge[0] = n3;
     shortestEdge[1] = n1;
   }
-  free(n1_coord);
-  free(n2_coord);
-  free(n3_coord);
   return 1;
 }
 
@@ -1155,19 +1097,16 @@ double FEM_Adapt_Algs::getAreaQuality(int elem)
   double f, q, len[3];
   int n[3];
   double currentArea;
-  double *n1_coord = (double*)malloc(dim*sizeof(double));
-  double *n2_coord = (double*)malloc(dim*sizeof(double));
-  double *n3_coord = (double*)malloc(dim*sizeof(double));
   theMesh->e2n_getAll(elem, n);
-  getCoord(n[0], n1_coord);
-  getCoord(n[1], n2_coord);
-  getCoord(n[2], n3_coord);
+  getCoord(n[0], coordsn1);
+  getCoord(n[1], coordsn2);
+  getCoord(n[2], coordsn3);
 
-  currentArea = getArea(n1_coord, n2_coord, n3_coord);
+  currentArea = getArea(coordsn1, coordsn2, coordsn3);
 
-  len[0] = length(n1_coord, n2_coord);
-  len[1] = length(n2_coord, n3_coord);
-  len[2] = length(n3_coord, n1_coord);
+  len[0] = length(coordsn1, coordsn2);
+  len[1] = length(coordsn2, coordsn3);
+  len[2] = length(coordsn3, coordsn1);
   f = 4.0*sqrt(3.0); //proportionality constant
   q = (f*currentArea)/(len[0]*len[0]+len[1]*len[1]+len[2]*len[2]);
   return q;

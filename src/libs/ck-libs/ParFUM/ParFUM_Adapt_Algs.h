@@ -49,6 +49,8 @@ class FEM_Adapt_Algs {
   elemHeap *refineElements;
   elemHeap *refineStack;
   int refineTop, refineHeapSize, coarsenHeapSize;
+  int *elemConn;
+  double *coordsn1, *coordsn2, *coordsn3;
 
  public:
   FEM_Adapt_Algs() {
@@ -56,6 +58,7 @@ class FEM_Adapt_Algs {
   }
   /// Initialize FEM_Adapt_Algs with a chunk of the mesh
   FEM_Adapt_Algs(FEM_Mesh *m, femMeshModify *fm, int dimension);
+  ~FEM_Adapt_Algs();
   void FEM_Adapt_Algs_Init(int coord_at, int bc_at) {
     coord_attr = coord_at;
     bc_attr = bc_at;
