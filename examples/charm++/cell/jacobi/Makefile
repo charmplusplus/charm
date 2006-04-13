@@ -37,7 +37,7 @@ jacobi.o : jacobi.C jacobi.h jacobi_shared.h jacobi.decl.h main.decl.h $(GENERAL
 
 # Rule to create the embeded spu runtime that includes the user's shared code
 jacobi_shared.o : jacobi_shared.cpp jacobi_shared.h $(GENERAL_DEPENDS)
-	$(SPU_CXX) -I$(CELL_SDK_DIR)/sysroot/usr/spu/include -L$(CHARM_BASE_DIR)/lib -o jacobi_shared jacobi_shared.cpp -lcellspu
+	$(SPU_CXX) -I$(CHARM_BASE_DIR)/include -I$(CELL_SDK_DIR)/sysroot/usr/spu/include -L$(CHARM_BASE_DIR)/lib -o jacobi_shared jacobi_shared.cpp -lcellspu
 	$(PPU_EMBEDSPU) spert_main jacobi_shared jacobi_shared.o
 
 

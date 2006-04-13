@@ -1,12 +1,14 @@
 #include <stdio.h>
 
+#include "spert.h"
 #include "jacobi_shared.h"
 
 
 void funcLookup(int funcIndex,
                 void* readWritePtr, int readWriteLen,
                 void* readOnlyPtr, int readOnlyLen,
-                void* writeOnlyPtr, int writeOnlyLen
+                void* writeOnlyPtr, int writeOnlyLen,
+		DMAListEntry* dmaList
                ) {
 
   switch (funcIndex) {
