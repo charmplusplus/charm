@@ -44,7 +44,7 @@
 #define CMI_VMI_CONNECTION_TIMEOUT               300       /* seconds */
 #define CMI_VMI_MAXIMUM_HANDLES                  10000
 #define CMI_VMI_SMALL_MESSAGE_BOUNDARY           2048      /* bytes */
-#define CMI_VMI_MEDIUM_MESSAGE_BOUNDARY          32768     /* bytes */
+#define CMI_VMI_MEDIUM_MESSAGE_BOUNDARY          16384     /* bytes */
 #define CMI_VMI_EAGER_PROTOCOL                   0         /* Boolean */
 #define CMI_VMI_EAGER_INTERVAL                   10000
 #define CMI_VMI_EAGER_THRESHOLD                  1000
@@ -547,6 +547,7 @@ void CmiMemUnlock ();
 
 void CmiPrintf (const char *format, ...);
 void CmiError (const char *format, ...);
+int CmiScanf (const char *format, ...);
 
 void CmiBarrier ();
 void CmiBarrierZero ();

@@ -596,6 +596,29 @@ void CmiError (const char *format, ...)
 
 
 /**************************************************************************
+**
+*/
+int CmiScanf (const char *format, ...)
+{
+  int rc;
+
+
+  DEBUG_PRINT ("CmiScanf() called.\n");
+
+  if (CMI_VMI_Startup_Type == CMI_VMI_STARTUP_TYPE_CHARMRUN) {
+    CmiAbort ("CmiScanf() is not implemented for startup type Charmrun.");
+  } else {
+    va_list args;
+    va_start (args, format);
+    rc = vfscanf (stdin, format, args);
+    va_end (args);
+    return (rc);
+  }
+}
+
+
+
+/**************************************************************************
 ** This is a simple barrier function, similar to the one implemented in the
 ** net-linux-gm machine layer.  This routine assumes that there are few
 ** messages in flight; I have not tested extensively with many outstanding
