@@ -10,7 +10,6 @@ class FEM_Adapt {
  protected:
   FEM_Mesh *theMesh;
   femMeshModify *theMod;
-  int* elemConn;
   // Helper methods: see bottom of this file
   /// Check if e1 and e3 are on the same side of edge path (n1, n, n2)
   /** Makes use of ordering of nodes in e1 to check is e3 is on the same side
@@ -71,17 +70,11 @@ class FEM_Adapt {
 
   FEM_Adapt() {
     theMesh = NULL; theMod = NULL;
-    elemConn = (int*)malloc(3*sizeof(int));
   }
 
   /// Initialize FEM_Adapt with a chunk of the mesh
   FEM_Adapt(FEM_Mesh *m, femMeshModify *fm) { 
     theMesh = m; theMod = fm; 
-    elemConn = (int*)malloc(3*sizeof(int));
-  }
-
-  ~FEM_Adapt() {
-    delete[] elemConn;
   }
 
   /// Perform a Delaunay flip of edge (n1, n2)

@@ -36,6 +36,7 @@ int FEM_Adapt::edge_flip_help(int e1, int e2, int n1, int n2, int e1_n1,
   int numElems = 2;
   int newNode = -1;
   int lockelems[2];
+  int elemConn[3];
 
   locknodes[0] = n1;
   locknodes[1] = n2;
@@ -259,6 +260,7 @@ int FEM_Adapt::edge_bisect_help(int e1, int e2, int n1, int n2, int e1_n1,
   int numElemsNew = 4;
   int locknodes[5];
   int lockelems[4];
+  int elemConn[3];
 
   locknodes[0] = n1;
   locknodes[1] = n2;
@@ -479,6 +481,7 @@ int FEM_Adapt::vertex_remove_help(int e1, int e2, int n1, int n2, int e1_n1,
   int numElemsNew = 2;
   int locknodes[5];
   int lockelems[4];
+  int elemConn[3];
 
   locknodes[0] = n2;
   locknodes[1] = n3;
@@ -605,6 +608,7 @@ int FEM_Adapt::vertex_split_help(int n, int n1, int n2, int e1, int e3)
   lockelems[3] = e4;
   lockelems[4] = -1;
   lockelems[5] = -1;
+  int elemConn[3];
 
   //FEM_Modify_Lock(theMesh, locknodes, 4, lockelems, 6);
 #ifdef DEBUG_1
