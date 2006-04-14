@@ -2,14 +2,19 @@
 #define _GRIDMETISLB_H_
 
 #include <stdio.h>
-//#include <values.h>
 
 #include "charm++.h"
 #include "cklists.h"
 
 #include "CentralLB.h"
 
+#ifndef MAXINT
+#define MAXINT 2147483647
+#endif
+
+#ifndef MAXDOUBLE
 #define MAXDOUBLE 1e10
+#endif
 
 extern "C" void METIS_PartGraphRecursive (int*, int*, int*, int*, int*, int*,
 					  int*, int*, int*, int*, int*);

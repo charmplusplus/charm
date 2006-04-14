@@ -91,7 +91,7 @@ void GridMetisLB::Initialize_PE_Data (CentralLB::LDStats *stats)
 
   PE_Data = new PE_Data_T[Num_PEs];
 
-  min_speed = INT_MAX;
+  min_speed = MAXINT;
   for (i = 0; i < Num_PEs; i++) {
     (&PE_Data[i])->available      = stats->procs[i].available;
     (&PE_Data[i])->cluster        = Get_Cluster (i);
@@ -288,7 +288,7 @@ void GridMetisLB::Partition_Objects_Into_Clusters (CentralLB::LDStats *stats)
   // Also create a partition-to-cluster mapping so the output of Metis can be mapped back to clusters.
   num_partitions = 0;
   for (i = 0; i < Num_Clusters; i++) {
-    num_partitions += (int) lround ((&Cluster_Data[i])->scaled_cpu_power);
+    num_partitions += (int) ceil ((&Cluster_Data[i])->scaled_cpu_power);
   }
 
   partition_to_cluster_map = new int[num_partitions];
@@ -296,7 +296,7 @@ void GridMetisLB::Partition_Objects_Into_Clusters (CentralLB::LDStats *stats)
   cluster = 0;
   partition = 0;
   while (partition < num_partitions) {
-    partition_count = (int) lround ((&Cluster_Data[cluster])->scaled_cpu_power);
+    partition_count = (int) ceil ((&Cluster_Data[cluster])->scaled_cpu_power);
 
     for (i = partition; i < (partition + partition_count); i++) {
       partition_to_cluster_map[i] = cluster;
@@ -498,7 +498,7 @@ void GridMetisLB::Partition_ClusterObjects_Into_PEs (CentralLB::LDStats *stats, 
   num_partitions = 0;
   for (i = 0; i < Num_PEs; i++) {
     if (((&PE_Data[i])->available) && ((&PE_Data[i])->cluster == cluster)) {
-      num_partitions += (int) lround ((&PE_Data[i])->relative_speed);
+      num_partitions += (int) ceil ((&PE_Data[i])->relative_speed);
     }
   }
 
@@ -513,7 +513,7 @@ void GridMetisLB::Partition_ClusterObjects_Into_PEs (CentralLB::LDStats *stats, 
   }
   partition = 0;
   while (partition < num_partitions) {
-    partition_count = (int) lround ((&PE_Data[pe])->relative_speed);
+    partition_count = (int) ceil ((&PE_Data[pe])->relative_speed);
 
     for (i = partition; i < (partition + partition_count); i++) {
       partition_to_pe_map[i] = pe;
@@ -535,7 +535,7 @@ void GridMetisLB::Partition_ClusterObjects_Into_PEs (CentralLB::LDStats *stats, 
   vertex = 0;
   for (i = 0; i < Num_Objects; i++) {
     if ((&Object_Data[i])->migratable && ((&Object_Data[i])->cluster == cluster)) {
-      vertex_weights[vertex] = (int) lround ((&Object_Data[i])->load * 10000);
+      vertex_weights[vertex] = (int) ceil ((&Object_Data[i])->load * 10000);
       vertex += 1;
     }
   }
