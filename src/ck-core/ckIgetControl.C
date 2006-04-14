@@ -11,7 +11,7 @@ typedef   CkFutureID     CkIGetID;
 #endif
 
 #ifndef IGET_FLOWCONTROL
-#define IGET_FLOWCONTROL 1
+#define IGET_FLOWCONTROL 0 
 #endif
 
 #if IGET_FLOWCONTROL
@@ -181,8 +181,8 @@ public:
   {
     // if found in the wait queue
     // else return and do nothing
-    if(!iget_tokenqueue_find(fut))
-      return;
+//    if(!iget_tokenqueue_find(fut))
+//      return;
 
     //promote self to head of wait queue
     //return, and sleep on wait for future
