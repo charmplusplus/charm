@@ -178,7 +178,10 @@ FDECL {
 void FTN_NAME(caps, nocaps)(void *iv, void *iov, int *len, MPI_Datatype *dt){ \
   caps(iv, iov, len, dt); \
 }
-    
+
+#define mpi_info_maxmemory FTN_NAME (MPI_INFO_MAXMEMORY, mpi_info_maxmemory)
+#define mpi_info_memory FTN_NAME (MPI_INFO_MEMORY, mpi_info_memory)    
+
 #if !CMK_FORTRAN_USES_ALLCAPS
 REDUCERF(MPI_MAX    , mpi_max)
 REDUCERF(MPI_MIN    , mpi_min)
@@ -996,6 +999,12 @@ void mpi_info_free(int* info, int* ierr){
   *ierr = MPI_Info_free(info);
 }
 
+void mpi_info_maxmemory(){
+  CkPrintf("MaxMemory %ld\n", CmiMaxMemoryUsage());
+}
 
+void mpi_info_memory(){
+  CkPrintf("Memory %ld\n", CmiMemoryUsage());
+}
 } // extern "C"
 
