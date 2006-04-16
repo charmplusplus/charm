@@ -127,3 +127,16 @@ FDECL void FTN_NAME(CHARM_GETARG,charm_getarg)
   for (i=strlen(dest);i<destLen;i++) dest[i]=' ';
 }
 
+// memory functions
+
+FDECL CmiInt8 FTN_NAME(CMIMEMORYUSAGE, cmimemoryusage) ()
+{
+  CmiInt8 mem = CmiMemoryUsage();
+  return mem;
+}
+
+FDECL CmiInt8 FTN_NAME(CMIMAXMEMORYUSAGE, cmimaxmemoryusage) ()
+{
+  return CmiMaxMemoryUsage();
+}
+
