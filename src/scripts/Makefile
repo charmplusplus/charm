@@ -684,10 +684,14 @@ HybridBaseLB.decl.h: HybridBaseLB.ci charmxi
 
 CK_FOR_LIBS_CORE=$(L)/libckf.a
 
-LIBCKF_CORE=charmf.o 
+LIBCKF_CORE=charmf.o charmmod.o
 
 $(L)/libckf.a: $(LIBCKF_CORE)
-	$(CHARMC) -o $@ $(LIBCKF_CORE)
+	-$(CHARMC) -o $@ $(LIBCKF_CORE) || touch $@
+
+charmmod.o: charmmod.f90
+	-$(CHARMC) -c charmmod.f90 || touch $@
+	-$(CHARMC) -cpmod ../include charm.M
 
 ## Tracing libraries (profiling, -tracemode)
 LIBTRACE_PROJ=trace-projections.o
