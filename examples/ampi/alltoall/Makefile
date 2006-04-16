@@ -20,5 +20,9 @@ alltoall_VPtest: alltoall_VPtest.c
 	$(CHARMC) -c alltoall_VPtest.c $(OPTS)
 	$(CHARMC) -o alltoall_VPtest alltoall_VPtest.o $(OPTS) $(LIBS)
 
+alltoall_VPtest_f: alltoall_VPtest.f
+	$(CHARMC) -c alltoall_VPtest.f  -language ampif -swapglobals  $(OPTS)
+	$(CHARMC) -o alltoall_VPtest_f alltoall_VPtest.o -language ampif -swapglobals $(OPTS) $(LIBS)
+
 clean:
 	rm -rf *~ *.o alltoall mpibench charmrun conv-host alltoall_VPtest
