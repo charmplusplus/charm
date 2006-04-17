@@ -2254,7 +2254,7 @@ struct ghostdata{
 		}
 	}
 	~ghostdata(){
-			printf("destructor on ghostdata called \n");
+	  //printf("destructor on ghostdata called \n");
 			for(int i=0;i<numLayers;i++){
 					delete layers[i];
 			}

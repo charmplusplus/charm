@@ -26,17 +26,9 @@ FEM_Adapt_Algs::FEM_Adapt_Algs(FEM_Mesh *m, femMeshModify *fm, int dimension)
   dim = dimension; 
   //theAdaptor = theMod->fmAdapt;
   theAdaptor = theMod->fmAdaptL;
-  elemConn = new int[3]; //for 2D
-  coordsn1 = new double[dim];
-  coordsn2 = new double[dim];
-  coordsn3 = new double[dim];
 }
 
 FEM_Adapt_Algs::~FEM_Adapt_Algs() {
-  delete[] elemConn;
-  delete[] coordsn1;
-  delete[] coordsn2;
-  delete[] coordsn3;
 }
 
 void FEM_Adapt_Algs::FEM_AdaptMesh(int qm, int method, double factor, 
@@ -77,6 +69,7 @@ int FEM_Adapt_Algs::Refine(int qm, int method, double factor, double *sizes)
   int elemWidth = theMesh->elem[0].getConn().width();
   refineElements = refineStack = NULL;
   refineTop = refineHeapSize = 0;
+  int elemConn[3];
   while (iter_mods != 0) {
     iter_mods=0;
     numNodes = theMesh->node.size();
@@ -175,6 +168,7 @@ int FEM_Adapt_Algs::Coarsen(int qm, int method, double factor, double *sizes)
   double qFactor;
   coarsenElements = NULL;
   coarsenHeapSize = 0;
+  int elemConn[3];
   while (iter_mods != 0) {
     iter_mods=0;
     pass++;
@@ -286,6 +280,7 @@ void FEM_Adapt_Algs::FEM_Repair(int qm)
 {
   double avgQual = 0.0, minQual = getAreaQuality(0);
   int numBadElems = 0;
+  int elemConn[3];
 #ifdef ADAPT_VERBOSE
   CkPrintf("WARNING: ParFUM_Repair: Under construction.\n");
   numElements = theMesh->elem[0].size();
@@ -396,6 +391,7 @@ void FEM_Adapt_Algs::SetMeshSize(int method, double factor, double *sizes)
 {
   numNodes = theMesh->node.size();
   numElements = theMesh->elem[0].size();
+  int elemConn[3];
 
   if (method == 0) { // set uniform sizing specified in factor
 
@@ -459,6 +455,7 @@ void FEM_Adapt_Algs::SetReferenceMesh()
   double avgLength = 0.0;
   int width = theMesh->elem[0].getConn().width();
   int numElements = theMesh->elem[0].size();
+  int elemConn[3];
   
   for (int i=0; i<numElements; ++i, avgLength=0) {
     theMesh->e2n_getAll(i, elemConn);
@@ -608,6 +605,8 @@ int FEM_Adapt_Algs::simple_refine(double targetA, double xmin, double ymin, doub
   bool adapted = true;
   refineElements = refineStack = NULL;
   refineTop = refineHeapSize = 0;
+  int elemConn[3];
+  double coordsn1[2], coordsn2[2], coordsn3[2];
 
   while(adapted) {
     adapted = false;
@@ -686,6 +685,8 @@ int FEM_Adapt_Algs::simple_coarsen(double targetA, double xmin, double ymin, dou
   bool adapted = true;
   coarsenElements = NULL;
   coarsenHeapSize = 0;
+  int elemConn[3];
+  double coordsn1[2], coordsn2[2], coordsn3[2];
 
   while(adapted) {
     adapted = false;
@@ -784,6 +785,7 @@ void FEM_Adapt_Algs::tests() {
 int FEM_Adapt_Algs::refine_element_leb(int e) {
   int fixNode, otherNode, opNode, longEdge, nbr; 
   double eLens[3], longEdgeLen = 0.0;
+  int elemConn[3];
 
   if(e==-1) {
     return -1;
@@ -860,6 +862,7 @@ void FEM_Adapt_Algs::refine_flip_element_leb(int e, int p, int n1, int n2,
 
 double FEM_Adapt_Algs::length(int n1, int n2)
 {
+  double coordsn1[2], coordsn2[2];
   getCoord(n1, coordsn1);
   getCoord(n2, coordsn2);
 
@@ -880,6 +883,7 @@ double FEM_Adapt_Algs::length(double *n1_coord, double *n2_coord) {
 
 double FEM_Adapt_Algs::getArea(int n1, int n2, int n3)
 {
+  double coordsn1[2], coordsn2[2], coordsn3[2];
   getCoord(n1, coordsn1);
   getCoord(n2, coordsn2);
   getCoord(n3, coordsn3);
@@ -920,6 +924,7 @@ double FEM_Adapt_Algs::getArea(double *n1_coord, double *n2_coord, double *n3_co
 bool FEM_Adapt_Algs::didItFlip(int n1, int n2, int n3, double *n4_coord)
 {
   //n3 is the node to be deleted, n4 is the new node to be added
+  double coordsn1[2], coordsn2[2], coordsn3[2];
   getCoord(n1, coordsn1);
   getCoord(n2, coordsn2);
   getCoord(n3, coordsn3);
@@ -945,6 +950,7 @@ bool FEM_Adapt_Algs::didItFlip(double *n1_coord, double *n2_coord, double *n3_co
 
 double FEM_Adapt_Algs::getSignedArea(int n1, int n2, int n3)
 {
+  double coordsn1[2], coordsn2[2], coordsn3[2];
   getCoord(n1, coordsn1);
   getCoord(n2, coordsn2);
   getCoord(n3, coordsn3);
@@ -994,6 +1000,9 @@ int FEM_Adapt_Algs::getCoord(int n1, double *crds) {
 }
 
 int FEM_Adapt_Algs::getShortestEdge(int n1, int n2, int n3, int* shortestEdge) {
+  //note that getCoord might be a remote call, which means it might not have the same value in the mem
+  //location if the memory is reused by someone else meanwhile!
+  double coordsn1[2], coordsn2[2], coordsn3[2];
   getCoord(n1, coordsn1);
   getCoord(n2, coordsn2);
   getCoord(n3, coordsn3);
@@ -1097,6 +1106,8 @@ double FEM_Adapt_Algs::getAreaQuality(int elem)
   double f, q, len[3];
   int n[3];
   double currentArea;
+  double coordsn1[2], coordsn2[2], coordsn3[2];
+
   theMesh->e2n_getAll(elem, n);
   getCoord(n[0], coordsn1);
   getCoord(n[1], coordsn2);

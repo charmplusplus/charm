@@ -18,7 +18,7 @@
 int FEM_Mesh_Parallel_broadcast(int fem_mesh,int masterRank,FEM_Comm_t comm_context){
   int myRank;
   MPI_Comm_rank((MPI_Comm)comm_context,&myRank);
-  printf("[%d] FEM_Mesh_Parallel_broadcast called for mesh %d\n",myRank,fem_mesh);
+  //printf("[%d] FEM_Mesh_Parallel_broadcast called for mesh %d\n",myRank,fem_mesh);
   int new_mesh;
   if(myRank == masterRank){
     //I am the master, i have the element connectivity data and need
@@ -31,7 +31,7 @@ int FEM_Mesh_Parallel_broadcast(int fem_mesh,int masterRank,FEM_Comm_t comm_cont
   }
   //temp to keep stuff from falling apart
   MPI_Barrier((MPI_Comm)comm_context);
-  printf("[%d] Partitioned mesh number %d \n",myRank,new_mesh);
+  //printf("[%d] Partitioned mesh number %d \n",myRank,new_mesh);
   return new_mesh;
 }
 
@@ -153,7 +153,7 @@ int FEM_master_parallel_part(int fem_mesh,int masterRank,FEM_Comm_t comm_context
     Get your mesh consisting of elements and nodes out of the mesh MSA
   */
   MeshElem me = part2mesh.get(masterRank);
-  printf("[%d] Number of elements in my partitioned mesh %d number of nodes %d \n",masterRank,me.m->nElems(),me.m->node.size());
+  //printf("[%d] Number of elements in my partitioned mesh %d number of nodes %d \n",masterRank,me.m->nElems(),me.m->node.size());
 	
   printf("[%d] Memory usage on vp 0 close to max %d \n",CkMyPe(),CmiMemoryUsage());
 	//Free up the eptr and eind MSA arrays stored in data
@@ -275,7 +275,7 @@ int FEM_slave_parallel_part(int fem_mesh,int masterRank,FEM_Comm_t comm_context)
     Get your mesh consisting of elements and nodes out of the mesh MSA
   */
   MeshElem me = part2mesh.get(myRank);
-  printf("[%d] Number of elements in my partitioned mesh %d number of nodes %d \n",myRank,me.m->nElems(),me.m->node.size());
+  //printf("[%d] Number of elements in my partitioned mesh %d number of nodes %d \n",myRank,me.m->nElems(),me.m->node.size());
 	
 	//Free up the eptr and eind MSA arrays stored in data
 	data.arr1.FreeMem();
@@ -294,7 +294,7 @@ int FEM_slave_parallel_part(int fem_mesh,int masterRank,FEM_Comm_t comm_context)
 	
   struct ghostdata *gdata = new ghostdata;
   MPI_Bcast_pup(*gdata,masterRank,(MPI_Comm)comm_context);
-  printf("[%d] number of ghost layers %d \n",myRank,gdata->numLayers);
+  //printf("[%d] number of ghost layers %d \n",myRank,gdata->numLayers);
 	
   /*
     make ghosts
@@ -719,7 +719,7 @@ void makeGhosts(FEM_Mesh *m,MPI_Comm comm,int masterRank,int numLayers,FEM_Ghost
   int totalShared; // total number of shared nodes over all chunks
   MPI_Allreduce(&count, &totalShared,1, MPI_INT,
 		MPI_SUM, comm);
-  printf("[%d] Total number of shared nodes %d \n",myChunk,totalShared);
+  //printf("[%d] Total number of shared nodes %d \n",myChunk,totalShared);
   /*
     Add the FEM_CHUNK attribute to all the nodes and elements in the mesh
   */
@@ -750,7 +750,7 @@ void makeGhosts(FEM_Mesh *m,MPI_Comm comm,int masterRank,int numLayers,FEM_Ghost
   }
 
   for(int i=0;i<numLayers;i++){
-    printf("[%d] Making ghost layer %d \n",myChunk,i);
+    //printf("[%d] Making ghost layer %d \n",myChunk,i);
     makeGhost(m,comm,masterRank,totalShared,layers[i],countedSharedNode,global2local); 
   }
 };
@@ -783,7 +783,7 @@ void makeGhost(FEM_Mesh *m,MPI_Comm comm,int masterRank,int totalShared,FEM_Ghos
   }else{
     distTab = new MsaHashtable;
   }
-  printf("[%d] starting ghost generation \n",myChunk);
+  //printf("[%d] starting ghost generation \n",myChunk);
   MPI_Bcast_pup(*distTab,masterRank,comm);
   distTab->table.enroll(numChunks);
   DEBUG(printf("[%d] distributed table calling sync \n",myChunk));
@@ -794,7 +794,7 @@ void makeGhost(FEM_Mesh *m,MPI_Comm comm,int masterRank,int totalShared,FEM_Ghos
   DEBUG(m->print(0));
   DEBUG(printf("**********************************\n"));
 	
-  printf("Chunk %d Ghost layer nodesPerTuple %d numSlots %d \n",myChunk,layer->nodesPerTuple,distTab->numSlots);
+  //printf("Chunk %d Ghost layer nodesPerTuple %d numSlots %d \n",myChunk,layer->nodesPerTuple,distTab->numSlots);
   /*
     Go through all the elements and enumerate the tuples and 
     check if all the nodes in a tuple are shared. If so add it

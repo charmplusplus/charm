@@ -1310,6 +1310,9 @@ int FEM_AdaptL::edge_contraction_help(int *e1P, int *e2P, int n1, int n2, int e1
   int n3n2e = theMesh->n2e_getLength(n3);
   int n4n2n = theMesh->n2n_getLength(n4);
   int n4n2e = theMesh->n2e_getLength(n4);
+  if(n1==526 && n2==352 && theMod->idx==5) {
+    CkPrintf("Debugging\n");
+  }
   if((n3n2n==3 && n3n2e==3)||(n4n2n==3 && n4n2e==3)) {
     flipSliver = true;
   }
@@ -1452,7 +1455,9 @@ int FEM_AdaptL::edge_contraction_help(int *e1P, int *e2P, int n1, int n2, int e1
   for(int i=0; i<nesize1; i++) {
     if(nbr1Elems[i]!=e1 && nbr1Elems[i]!=e2) {
       theMesh->e2n_getAll(nbr1Elems[i],con);
-      if(!(-theMod->fmAdaptAlgs->getSignedArea(con[0],con[1],con[2])>SLIVERAREA)) {
+      double finarea = -theMod->fmAdaptAlgs->getSignedArea(con[0],con[1],con[2]);
+      if(finarea < SLIVERAREA) {
+	CkPrintf("finarea = %f",finarea);
 	CkAssert(false);
       }
     }
