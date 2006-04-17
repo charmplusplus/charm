@@ -1,0 +1,279 @@
+#!/bin/sh
+##############################################################################
+# unix2nt_cc:   for VC++ ver 6
+# Maps UNIX C/C++ compiler command-line options to 
+# Microsoft Visual C++ 6.0 command line options. 
+# That is, this script is a UNIX-ifying wrapper for 
+# the NT CL and LINK commands. 
+#
+# Known bugs: pathnames with spaces cause quoting problems.
+#
+# Orion Sky Lawlor, olawlor@acm.org, 1/22/2001
+##############################################################################
+
+#TMP environment variable seems get lost in sub shell
+export TMP=`cygpath -w /tmp`
+export TEMP=`cygpath -w /tmp`
+if [ ! -d "$TMP" ]
+then
+	echo "Error no $TMP"
+	echo "unix2nt_cc exiting..." 1>&2
+	exit 1
+fi
+
+# Configurable option: Location of MSDEV
+VCC_DIR="C:/Program Files/Microsoft Visual Studio/Vc98"
+
+#CL command-line options for -O and -g mode
+CL_CMD="$VCC_DIR/BIN/CL.EXE"
+CL_COMMON=' /nologo /W3 /GB /GX /DWIN32 /D_WINDOWS /FD /Zp4 '
+CL_O=$CL_COMMON" /DNDEBUG /MT /Ox"
+CL_DEF=$CL_COMMON" /MT"
+CL_G=$CL_COMMON" /Z7 /MTd /Od"
+CL_DLL="/LD"
+
+#LINK command-line options for -O and -g mode
+LINK_CMD="$VCC_DIR/BIN/LINK.EXE"
+LINK_COMMON='/nologo /subsystem:console '
+LINK_O=$LINK_COMMON
+LINK_DEF=$LINK_COMMON
+LINK_G="$LINK_COMMON /DEBUG"
+LINK_POST='ws2_32.lib kernel32.lib user32.lib gdi32.lib winspool.lib 
+  comdlg32.lib advapi32.lib shell32.lib ole32.lib oleaut32.lib uuid.lib 
+  odbc32.lib odbccp32.lib /SUBSYSTEM:CONSOLE /INCREMENTAL:NO /MACHINE:IX86 '
+
+if [ "x$LIB" = "x" ]
+then
+	export INCLUDE="$VCC_DIR/include"
+	export LIB="$VCC_DIR/lib"
+fi
+
+###################################################################
+#
+#  Utility routines used below
+#
+###################################################################
+
+# PrintUsage: prints a helpful command-line usage message and quits
+# Args: any additional messages
+printUsage() {
+    echo "Usage: unix2nt_cc [ flags ] <files>"
+    echo
+    echo "  flags:"
+    echo "        -c <file> -o <target> -g -O"
+    echo "        -D<define> -I<include path> -L<lib path> -l<library>"
+	echo "  files: <fName>.c <fName>.C <fName>.cpp <fName>.cxx"
+    echo
+    echo "  Compiles C, C++ programs using NT CL and LINK commands."
+	echo "Version 1.0, Parallel Programming Lab, UIUC, 2001"
+    echo $*
+    exit 1
+}
+
+# End blows away the temporary files (unless SAVE is true) and exits
+# Args: <exit code>
+End() {
+    exit $1
+}
+
+# This procedure prints an error message and exits.
+# ("1>&2" redirects the echo output to stderr).
+# Args: written to stderr
+Abort() {
+	echo "unix2nt_cc Fatal Error in directory "`pwd` 1>&2
+	echo "   $*" 1>&2
+	echo "unix2nt_cc exiting..." 1>&2
+	End 1
+}
+
+# This procedure removes the extention (the ".c" in "./main.c") from
+# its first argument, and prints the result. Unlike the builtin command
+# basename, it keeps the directory path.
+# Args: <name to strip>
+stripExtention() {
+	se_base=`echo $1 | awk -F/ '{print $NF}'`
+	se_strip=`echo $se_base | awk -F. '{ORS="";print $1;for (i=2;i<NF;i++) print "."$i}'`
+	se_ret=`echo $1 | awk -F/ '{ORS="";for (i=1;i<NF;i++) print $i"/"}'`"$se_strip"
+	echo $se_ret
+}
+
+# GetExtention returns the extention on the given file name
+# or "" if none.  (e.g. "./bob/snack.c" returns ".c")
+# Args: <name to find extention of>
+getExtention() {
+	se_base=`echo $1 | awk -F/ '{print $NF}'`
+        se_ret=`echo $se_base | awk -F. '{if (NF<=1) print ""; else print "."$NF}'`
+	echo $se_ret
+}
+
+##############################################################################
+#
+# Parse & convert the arguments
+#
+##############################################################################
+
+#Program state:
+VERBOSE="no"
+DEBUG_SCRIPT=""
+SAVE=""
+
+DOCOMPILE="no"
+DOLINK="no"
+OUTPUT=""
+CL_OPTS=$CL_DEF
+LINK_OPTS=$LINK_DEF
+LIBDIR=""
+LIBDIRS=""
+
+#NT CL and LINK command-line arguments:
+LINK=""
+CL=""
+
+[ $# -eq 0 ] && printUsage "Error: No arguments given."
+
+while [ ! $# -eq 0 ]
+do
+	arg="$1"
+	shift
+
+	case "$arg" in
+	-verbose)
+		VERBOSE="yes"
+		;;
+	-E)
+		CL="$CL /E"
+		;;
+	-O)
+		CL_OPTS=$CL_O
+		LINK_OPTS=$LINK_O
+		;;
+	-g)
+		CL_OPTS=$CL_G
+		LINK_OPTS=$LINK_G
+		;;
+	-c) 
+		CL="$CL /c";;
+	-D)
+		CL="$CL /D$1"
+		shift
+		;;
+	-D*)
+		def=`echo $arg | awk -F@ '{print substr($1,3)}'`
+		CL="$CL /D$def"
+		;;
+	-I)
+		CL="$CL /I`cygpath -w $1`"
+		shift
+		;;
+	-I*)
+		path=`echo $arg | awk -F@ '{print substr($1,3)}'`
+		CL="$CL /I`cygpath -w $path`"
+		;;
+	-L)
+		LIBDIR="`cygpath -w $1`"
+		LIBDIRS="$LIBDIRS `cygpath -u $LIBDIR`"
+		LINK=$LINK"	/LIBPATH:$LIBDIR"
+		shift
+		;;
+	-L*)
+		LIBDIR=`echo $arg | awk -F@ '{print substr($1,3)}'`
+		LIBDIR="`cygpath -w $LIBDIR`"
+		LIBDIRS="$LIBDIRS `cygpath -u $LIBDIR`"
+		LINK=$LINK"	/LIBPATH:$LIBDIR"
+		;;
+	-l*)
+		if [ "$arg" != "-lm" ]
+		then
+#Convert -lfoo to path-to-foo.a
+			L=`echo $arg | awk -F@ '{print substr($1,3)}'`
+			D="no"
+			[ -r "$L" ] && D="$L"
+			[ -r "$L.a" ] && D="$L.a"
+			[ -r "$L.lib" ] && D="$L.lib"
+			[ -r "lib$L.a" ] && D="lib$L.a"
+			test -n "$LIBDIRS" &&	\
+			for dir in $LIBDIRS
+			do
+			  [ -r "$dir/lib$L" ] && D="$dir/lib$L"
+			  [ -r "$dir/lib$L.a" ] && D="$dir/lib$L.a"
+			  [ -r "$dir/$L.lib" ] && D="$dir/$L.lib"
+			done
+			[ $D = no ] && Abort "Couldn't find library $L in . or $LIBDIRS"
+			LINK="$LINK `cygpath -w $D`"
+		fi
+		;;
+	-o)
+		out=$1
+		shift
+		if [ "x`getExtention $out`" = "x.o" ]
+		then
+#It's a .o output filename-- tell CL
+			OUTPUT="/Fo`cygpath -w $out`"
+		elif [ "x`getExtention $out`" = "x.so" ]
+		then
+			OUTPUT="/Fo`cygpath -w $out`"
+		else
+#It's an exe filename-- tell LINK
+			LINK="$LINK /out:$out.exe"
+			DOLINK="yes"
+		fi
+		;;
+	
+#Object file or library-- add to link
+	*.o|*.a|*.lib)
+		if [ "$DOCOMPILE" = "yes" ]
+		then
+		  CL="$CL `cygpath -w $arg`"
+		else
+		  LINK="$LINK `cygpath -w $arg`"
+		  DOLINK="yes"
+		fi
+		;;
+#C source file
+	*.c)
+		base=`stripExtention $arg`
+		CL="$CL /Tc`cygpath -w $arg`"
+#		OUTPUT="/Fo$base.o"
+		LINK="$LINK $base.o"
+		DOCOMPILE="yes"
+		;;
+#C++ source file
+	*.C|*.cxx|*.cpp)
+		base=`stripExtention $arg`
+		CL="$CL /Tp`cygpath -w $arg`"
+#		OUTPUT="/Fo$base.o"
+		LINK="$LINK $base.o"
+		DOCOMPILE="yes"
+		;;
+# Default
+	*)
+#		printUsage  "Error: Unrecognized argument $arg"
+		echo  "Ignored Unrecognized argument $arg"
+		;;
+	esac
+done
+
+#if [ "x$CL" != "x" ]
+if [ $DOCOMPILE = yes ]
+then
+	OPTS="$CL_OPTS $OUTPUT $CL"
+	[ $VERBOSE = yes ] && echo "unix2nt_cc> $CL_CMD" $OPTS
+	"$CL_CMD" $OPTS
+	if [ $? != 0 ]
+	then
+		Abort "Error executing" "$CL_CMD" $OPTS
+	fi
+fi
+
+if [ $DOLINK = yes ]
+then
+	OPTS="$LINK_OPTS $LINK $LINK_POST"
+	[ $VERBOSE = yes ] && echo "unix2nt_cc> $LINK_CMD" $OPTS
+	"$LINK_CMD" $OPTS
+	if [ $? != 0 ]
+	then
+		Abort "Error executing" "$LINK_CMD" $OPTS 
+	fi	
+fi
+
+exit 0
