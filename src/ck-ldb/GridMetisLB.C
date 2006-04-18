@@ -263,6 +263,14 @@ void GridMetisLB::Partition_Objects_Into_Clusters (CentralLB::LDStats *stats)
   int j;
 
 
+  if (Num_Clusters == 1) {
+    for (i = 0; i < Num_Objects; i++) {
+      (&Object_Data[i])->cluster = 0;
+    }
+
+    return;
+  }
+
   // Count the number of migratable objects, which are the only candidates to give to Metis.
   // (The non-migratable objects have been placed onto the correct destination PEs earlier.)
   // After getting the count, create a migratable_objects[] array to keep track of them.
@@ -403,7 +411,7 @@ void GridMetisLB::Partition_Objects_Into_Clusters (CentralLB::LDStats *stats)
 
   // Place the partitioned objects into their correct clusters.
   for (i = 0; i < num_migratable_objects; i++) {
-    partition = (newmap[i] - 1);
+    partition = newmap[i];
     cluster = partition_to_cluster_map[partition];
 
     index = migratable_objects[i];
