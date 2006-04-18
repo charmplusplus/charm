@@ -4398,6 +4398,12 @@ void CMI_VMI_RDMA_Get_Notification_Handler (PVMI_CONNECT connection, UINT32 cont
       CmiFree (handle->msg);
     }
 
+#if CMK_BROADCAST_SPANNING_TREE
+    if (handle->data.send.message_disposition == CMI_VMI_MESSAGE_DISPOSITION_ENQUEUE) {
+      CdsFifo_Enqueue (CpvAccess (CMI_VMI_RemoteQueue), handle->msg);
+    }
+#endif
+
     CMI_VMI_Handle_Deallocate (handle);
   }
 }
