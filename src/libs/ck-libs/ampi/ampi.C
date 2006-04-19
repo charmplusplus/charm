@@ -2423,6 +2423,7 @@ int IReq::wait(MPI_Status *sts){
   		aptr->resumeOnRecv=true;
 		aptr->block();
 	}
+	aptr->resumeOnRecv=false;
         if(sts) {
           sts->MPI_TAG = tag;
           sts->MPI_SOURCE = src;
@@ -2430,7 +2431,7 @@ int IReq::wait(MPI_Status *sts){
           sts->MPI_LENGTH = length;
         }
 #if 0
-	else if(-1==getAmpiInstance(comm)->recv(tag, src, buf, count, type, comm, (int*)sts))
+	if(-1==getAmpiInstance(comm)->recv(tag, src, buf, count, type, comm, (int*)sts))
 		CkAbort("AMPI> Error in non-blocking request wait");
 #endif
 #if CMK_BLUEGENE_CHARM
@@ -2593,13 +2594,25 @@ void PersReq::complete(MPI_Status *sts){
 }
 
 CmiBool IReq::test(MPI_Status *sts){
-	if (status == true) return true;
+        if (status == true) {           
+	  if(sts)
+            sts->MPI_LENGTH = length;           
+	  return true;
+        }
+        else {
+          getAmpiInstance(comm)->yield();
+          return false;
+        }
+/*
 	return getAmpiInstance(comm)->iprobe(tag, src, comm, (int*)sts);
+*/
 }
 void IReq::complete(MPI_Status *sts){
-	if (status == false)
+	wait(sts);
+/*
 	if(-1==getAmpiInstance(comm)->recv(tag, src, buf, count, type, comm, (int*)sts))
 		CkAbort("AMPI> Error in non-blocking request complete");
+*/
 }
 
 void IReq::receive(ampi *aptr, AmpiMsg *msg)
