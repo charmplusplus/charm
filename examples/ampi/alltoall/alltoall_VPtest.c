@@ -64,8 +64,8 @@ main(int argc, char **argv){
   float elapsed_time_msec;
   float bandwidth;
   char *sndbuf, *recvbuf;
-  unsigned long memory_before, memory_after;
-  unsigned long memory_diff, local_memory_max, memory_min, memory_max;
+  static unsigned long long memory_before, memory_after;
+  unsigned long long  memory_diff, local_memory_max, memory_max;
 
   MPI_Init( &argc, &argv );
   MPI_Comm_rank( MPI_COMM_WORLD, &my_id );
@@ -105,34 +105,47 @@ main(int argc, char **argv){
   memory_before = CmiMemoryUsage();  // initial memory usage
   MPI_Barrier(MPI_COMM_WORLD); 
 
-  if(my_id == 0){
+  if(my_id==0){
     Create_Timers (1);
-    Start_Timer (0, ITIMER_REAL); 
+    Start_Timer (0, ITIMER_REAL);
   }
+
+    // initial memory usage, only get it once on each physical node
+  static int reset = 0;
+  if (!reset) {
+    memory_before = CmiMemoryUsage();
+    CmiResetMaxMemory();
+  }
+  reset = 1;
+  
   for(i=0; i<max_msgs; i++) {
     MPI_Alltoall(sndbuf, msg_size, MPI_CHAR, recvbuf, msg_size, MPI_CHAR, MPI_COMM_WORLD);
   }
-  MPI_Barrier(MPI_COMM_WORLD);
-  memory_after = CmiMemoryUsage();
+
+  MPI_Barrier(MPI_COMM_WORLD); 
+
+  if(my_id==0){
+    elapsed_time_msec = Read_Timer (0, ITIMER_REAL) * 1000.0 / max_msgs;
+  }
 
   if (CmiMaxMemoryUsage() < memory_before)  
     local_memory_max = 0;
   else
     local_memory_max = CmiMaxMemoryUsage() - memory_before;
 
+  MPI_Barrier(MPI_COMM_WORLD); 
+
   // Reduce MAX here
   assert(MPI_SUCCESS==MPI_Reduce(&local_memory_max, &memory_max, 1, MPI_UNSIGNED_LONG, MPI_MAX, 0, MPI_COMM_WORLD));
-  assert(MPI_SUCCESS==MPI_Reduce(&local_memory_max, &memory_min, 1, MPI_UNSIGNED_LONG, MPI_MIN, 0, MPI_COMM_WORLD));
 
   if(my_id==0){
-    elapsed_time_msec = Read_Timer (0, ITIMER_REAL) * 1000.0 / max_msgs;
     bandwidth = 2 * 8 * msg_size / (1000.0 * elapsed_time_msec);
     
     //fprintf (stdout, "%5d %7d\t ", max_msgs, msg_size);
-    fprintf (stdout,"%8.3f msec,\t", elapsed_time_msec);
+    printf ("%8.3f msec,\t", elapsed_time_msec);
 //    fprintf( %8.3f Mbits/sec\t",  bandwidth);
 
-    printf("Mem Max Usage=%ld Kb\tMin Usage=%ld Kb\tVP=%d\tMsgSize=%d\n", (memory_max) / 1024, (memory_min) / 1024, p, msg_size);
+    printf("Mem Max Usage=%ld Kb\tVP=%d\tMsgSize=%d\n", (long)((memory_max) / 1024), p, msg_size);
 
   }
   
