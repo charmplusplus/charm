@@ -921,6 +921,7 @@ double FEM_Adapt_Algs::getArea(double *n1_coord, double *n2_coord, double *n3_co
   return (sqrt(sLen*(sLen-aLen)*(sLen-bLen)*(sLen-cLen)));
 }
 
+
 bool FEM_Adapt_Algs::didItFlip(int n1, int n2, int n3, double *n4_coord)
 {
   //n3 is the node to be deleted, n4 is the new node to be added
@@ -932,9 +933,26 @@ bool FEM_Adapt_Algs::didItFlip(int n1, int n2, int n3, double *n4_coord)
   double ret_old = getSignedArea(coordsn1, coordsn2, coordsn3);
   double ret_new = getSignedArea(coordsn1, coordsn2, n4_coord);
 
+  //do some quality preservation
+  double len1 = length(coordsn1, coordsn2);
+  double len2 = length(coordsn2, coordsn3);
+  double len3 = length(coordsn3, coordsn1);
+  //longest edge
+  double max = len1;
+  if(len2>max) max = len2;
+  if(len3>max) max = len3;
+  //shortest edge
+  double min = len1;
+  if(len2<min) min = len2;
+  if(len3<min) min = len3;
+
+  double shortest_al = ret_new/max;
+
   if(ret_old > SLIVERAREA && ret_new < -SLIVERAREA) return true; //it is a flip
   else if(ret_old < -SLIVERAREA && ret_new > SLIVERAREA) return true; //it is a flip
   else if(fabs(ret_new) < SLIVERAREA) return true; // it is a sliver
+  else if(fabs(shortest_al) < 1e-5) return true; //shortest altitude is too small
+  else if(fabs(min) < 1e-5) return true; //shortest edge is too small
   else return false;
 }
 
