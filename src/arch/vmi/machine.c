@@ -16,6 +16,8 @@
 
 #include "machine.h"
 
+//#define GK_DELAY_DEVICE 1
+
 /* The following are external variables used by the VMI core. */
 extern USHORT VMI_DEVICE_RUNTIME;
 extern PVMI_NETADDRESS localAddress;
@@ -81,6 +83,20 @@ PVMI_BUFFER_POOL CMI_VMI_Bucket3_Pool;
 PVMI_BUFFER_POOL CMI_VMI_Bucket4_Pool;
 PVMI_BUFFER_POOL CMI_VMI_Bucket5_Pool;
 
+#ifdef GK_DELAY_DEVICE
+typedef struct
+{
+  double  time;
+  char   *msg;
+  int     msgsize;
+  int     sender;
+  void   *next;
+} gk_delayed_msgs;
+
+double gk_timeout;
+gk_delayed_msgs *gk_head_ptr;
+gk_delayed_msgs *gk_tail_ptr;
+#endif
 
 
 /**************************************************************************
@@ -220,6 +236,26 @@ void ConverseInit (int argc, char **argv, CmiStartFn start_function, int user_ca
   if (rc < 0) {
     CmiAbort ("There was a fatal error during the startup phase.");
   }
+
+#ifdef GK_DELAY_DEVICE
+  {
+    char *value;
+    unsigned long timeout_us;
+
+    if (value = getenv ("GK_GET_LATENCY")) {
+      timeout_us = (unsigned long) atoi (value);
+      gk_timeout = ((double) timeout_us) * 0.000001;
+      if (_Cmi_mype == 0) {
+	CmiPrintf ("*** Charm is using artificial Get latency of %f\n", gk_timeout);
+      }
+    } else {
+      CmiAbort ("Charm built with GK_DELAY_DEVICE but GK_GET_LATENCY not in environment.");
+    }
+    
+    gk_head_ptr = NULL;
+    gk_tail_ptr = NULL;
+  }
+#endif
 
   /* Initialize VMI. */
   rc = CMI_VMI_Initialize_VMI ();
@@ -2216,6 +2252,40 @@ void *CmiGetNonLocal ()
 
   status = VMI_Poll ();
   CMI_VMI_CHECK_SUCCESS (status, "VMI_Poll()");
+
+#if GK_DELAY_DEVICE
+  {
+    struct timeval gk_tv;
+    double gk_time_now;
+    gk_delayed_msgs *gk_ptr;
+    char *gk_msg;
+    int gk_msgsize;
+    int gk_sender;
+
+    if (gk_head_ptr) {
+      gettimeofday (&gk_tv, NULL);
+      gk_time_now = gk_tv.tv_sec + (gk_tv.tv_usec * 0.000001);
+
+      if (gk_time_now > (gk_head_ptr->time + gk_timeout)) {
+	gk_msg = gk_head_ptr->msg;
+	gk_msgsize = gk_head_ptr->msgsize;
+	gk_sender = gk_head_ptr->sender;
+
+	if (gk_head_ptr == gk_tail_ptr) {
+	  free (gk_head_ptr);
+	  gk_head_ptr = NULL;
+	  gk_tail_ptr = NULL;
+	} else {
+	  gk_ptr = gk_head_ptr;
+	  gk_head_ptr = gk_head_ptr->next;
+	  free (gk_ptr);
+	}
+
+	CMI_VMI_Common_Receive (gk_sender, gk_msgsize, gk_msg);
+      }
+    }
+  }
+#endif
 
   return (CdsFifo_Dequeue (CpvAccess (CMI_VMI_RemoteQueue)));
 }
@@ -4446,25 +4516,32 @@ void CMI_VMI_RDMA_Get_Completion_Handler (PVMI_RDMA_OP rdmaop, PVOID context, VM
   process->normal_long_count += 1;
   CMI_VMI_Message_Receive_Count += 1;
 
-  CMI_VMI_Common_Receive (process->rank, msgsize, msg);
+#ifdef GK_DELAY_DEVICE
+  {
+    struct timeval gk_tv;
+    double gk_time_now;
+    gk_delayed_msgs *gk_new_node;
 
-#if 0
+    gettimeofday (&gk_tv, NULL);
+    gk_time_now = gk_tv.tv_sec + (gk_tv.tv_usec * 0.000001);
 
-  /* Deal with any eager send credits send with the message. */
-  credits_temp = CMI_VMI_MESSAGE_CREDITS (msg);
-  process->eager_short_send_credits_available += credits_temp;
+    gk_new_node = malloc (sizeof (gk_delayed_msgs));
+    gk_new_node->time    = gk_time_now;
+    gk_new_node->msg     = msg;
+    gk_new_node->msgsize = msgsize;
+    gk_new_node->sender  = process->rank;
+    gk_new_node->next    = NULL;
 
-#if CMK_BROADCAST_SPANNING_TREE
-  if (CMI_BROADCAST_ROOT (msg)) {
-    /* Message is enqueued into CMI_VMI_RemoteQueue when send to all spanning children finishes. */
-    CMI_VMI_Send_Spanning_Children (msgsize, msg);
-  } else {
-    CdsFifo_Enqueue (CpvAccess (CMI_VMI_RemoteQueue), msg);
+    if (gk_head_ptr) {
+      gk_tail_ptr->next = gk_new_node;
+      gk_tail_ptr = gk_new_node;
+    } else {
+      gk_head_ptr = gk_new_node;
+      gk_tail_ptr = gk_new_node;
+    }
   }
 #else
-  CdsFifo_Enqueue (CpvAccess (CMI_VMI_RemoteQueue), msg);
-#endif
-
+  CMI_VMI_Common_Receive (process->rank, msgsize, msg);
 #endif
 
   CMI_VMI_Handle_Deallocate (handle);
