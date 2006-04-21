@@ -6,7 +6,7 @@
 
 #include <pup.h>
 #include <converse.h>
-#include "X10_test.decl.h"
+#include "X10_lib.decl.h"
 #include "X10_lib.h"
 
 
@@ -31,23 +31,22 @@ typedef CkVec<CkFutureID> *finishHandle;
 
 void *beginFinish(){
   CkVec<CkFutureID> *FinishFutureList = new CkVec<CkFutureID>;
+  CkAssert(FinishFutureList->size()==0);
   return (void*)FinishFutureList;
 } 
 
 void endFinish(void* ffl){
   CkVec<CkFutureID> *FinishFutureList = (CkVec<CkFutureID> *)ffl;
   int last = FinishFutureList->length();
-  CkPrintf("MainThread: Future waiting   last=%d\n", last);
+  //  CkPrintf("MainThread: Future waiting   last=%d\n", last);
   int len = FinishFutureList->length();
   while(len > 0){
-	CkPrintf("len=%d\n", len);
 	asyncMsg *msg = (asyncMsg *)CkWaitFuture((*FinishFutureList)[len-1]);
 	FinishFutureList->remove(len-1);
-	len = FinishFutureList->length();
-	
+	len = FinishFutureList->length();	
   }
 
-  CkPrintf("MainThread: Future awaken\n");
+  //  CkPrintf("MainThread: Future awaken\n");
   delete FinishFutureList;
 }
 
@@ -55,15 +54,27 @@ void asyncCall(void *ffl, int place, int whichFunction, void *packedParams){
   CkVec<CkFutureID> * FinishFutureList = (CkVec<CkFutureID> *)ffl;
   asyncMsg *msg = new asyncMsg;
   CkFutureID ftHandle = CkCreateAttachedFuture((void*)msg);
-  CkAssert(FinishFutureList->size()==0);
   FinishFutureList->push_back(ftHandle);
-  CkPrintf("MainThread: Created Future with handle %d\n", ftHandle);
+  //  CkPrintf("MainThread: Created Future with handle %d\n", ftHandle);
   (*FinishFutureList)[FinishFutureList->length()]=ftHandle;
   placesProxy[place].startAsync(whichFunction,ftHandle,CkMyPe());
-  CkPrintf("MainThread: Created Async call with handle %d\n", ftHandle);
+  // CkPrintf("MainThread: Created Async call with handle %d\n", ftHandle);
 }
 
 
+FutureHandle futureCall(int place, int whichFunction, void *packedParams){
+  CkFutureID *fh = new CkFutureID;
+  asyncMsg *msg = new asyncMsg;
+  CkFutureID ftHandle = CkCreateAttachedFuture((void*)msg);
+  placesProxy[place].startFuture(whichFunction,ftHandle,CkMyPe());
+  return fh;
+}
+
+void * futureForce(FutureHandle fh){
+  asyncMsg *msg = (asyncMsg *)CkWaitFuture(*fh);
+  delete fh;
+  return NULL;  
+}
 
 
 
@@ -88,7 +99,7 @@ class Main : public CBase_Main
   }
   
   void libThread(){
-	CkPrintf("MainThread: executing in Main Chare\n");
+	//	CkPrintf("MainThread: executing in Main Chare\n");
 	mainThread();	
 	CkExit();
   }
@@ -105,8 +116,14 @@ public:
   
   void startAsync(int whichStatement, CkFutureID ftHandle, int pe_src){
 	asyncMsg *msg = new asyncMsg;
-	CkPrintf("Place %d: faking execution of statement %d\n", thisIndex, whichStatement);
-	CkPrintf("Place %d: Finished work, sending result to Future [%d] \n", thisIndex, ftHandle);
+	asnycHandler(whichStatement);
+	//	CkPrintf("Place %d: Finished async function, setting completion of Future [%d] \n", thisIndex, ftHandle);
+	CkSendToFuture(ftHandle, (void *)msg, pe_src);
+  }
+  
+  void startFuture(int whichStatement, CkFutureID ftHandle, int pe_src){
+	asyncMsg *msg = new asyncMsg;
+	futureHandler(whichStatement);
 	CkSendToFuture(ftHandle, (void *)msg, pe_src);
   }
   
@@ -115,4 +132,4 @@ public:
 
 
   
-#include "X10_test.def.h"  
+#include "X10_lib.def.h"  
