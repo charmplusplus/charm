@@ -528,6 +528,8 @@ void CmiMemorySweep(const char *where); /* print current allocations, for -memor
 CMK_TYPEDEF_UINT8 CmiMemoryUsage();
 CMK_TYPEDEF_UINT8 CmiMaxMemoryUsage();
 void CmiResetMaxMemory();
+CMK_TYPEDEF_UINT8 CmiMinMemoryUsage();
+void CmiResetMinMemory();
 
 #define CMI_MEMORY_IS_ISOMALLOC (1<<1)
 #define CMI_MEMORY_IS_PARANOID  (1<<2)

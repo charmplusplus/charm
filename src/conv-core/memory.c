@@ -53,6 +53,7 @@
 
 CMK_TYPEDEF_UINT8 memory_allocated = 0;
 CMK_TYPEDEF_UINT8 memory_allocated_max = 0; /* High-Water Mark */
+CMK_TYPEDEF_UINT8 memory_allocated_min = 0; /* Low-Water Mark */
 
 /*Rank of the processor that's currently holding the CmiMemLock,
 or -1 if nobody has it.  Only set when malloc might be reentered.
@@ -107,6 +108,8 @@ void free_reentrant(void *mem) { free(mem); }
 CMK_TYPEDEF_UINT8 CmiMemoryUsage() { return 0; }
 CMK_TYPEDEF_UINT8 CmiMaxMemoryUsage() { return 0; }
 void CmiResetMaxMemory() {}
+CMK_TYPEDEF_UINT8 CmiMinMemoryUsage() { return 0; }
+void CmiResetMinMemory() {}
 #else 
 /*************************************************************
 *Not* using the system malloc-- first pick the implementation:
@@ -308,6 +311,15 @@ CMK_TYPEDEF_UINT8 CmiMaxMemoryUsage()
 
 void CmiResetMaxMemory() {
   memory_allocated_max=0;
+}
+
+CMK_TYPEDEF_UINT8 CmiMinMemoryUsage()
+{
+  return memory_allocated_min;
+}
+
+void CmiResetMinMemory() {
+  memory_allocated_min=0xFFFFFFFF;
 }
 
 #endif /* ! CMK_MEMORY_BUILD_BUILTIN*/

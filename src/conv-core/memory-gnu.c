@@ -22,6 +22,7 @@ This is slightly hacked as:
 
 extern CMK_TYPEDEF_UINT8 memory_allocated;
 extern CMK_TYPEDEF_UINT8 memory_allocated_max;
+extern CMK_TYPEDEF_UINT8 memory_allocated_min;
 
 #define HAVE_MMAP CMK_HAS_MMAP
 #ifndef __USE_GNU
@@ -3336,6 +3337,8 @@ public_mALLOc(size_t bytes)
   
   if(memory_allocated > memory_allocated_max)
     memory_allocated_max=memory_allocated;
+  if(memory_allocated < memory_allocated_min)
+    memory_allocated_min=memory_allocated;
 
   return victim;
 }
@@ -3416,6 +3419,8 @@ public_rEALLOc(Void_t* oldmem, size_t bytes)
    
   if(memory_allocated > memory_allocated_max)
     memory_allocated_max=memory_allocated;
+  if(memory_allocated < memory_allocated_min)
+    memory_allocated_min=memory_allocated;
   
 #if HAVE_MMAP
   if (chunk_is_mmapped(oldp))
@@ -3510,6 +3515,8 @@ public_mEMALIGn(size_t alignment, size_t bytes)
 
   if(memory_allocated > memory_allocated_max)
     memory_allocated_max=memory_allocated;
+  if(memory_allocated < memory_allocated_min)
+    memory_allocated_min=memory_allocated;
   
   return p;
 }
@@ -3531,6 +3538,8 @@ public_vALLOc(size_t bytes)
 
   if(memory_allocated > memory_allocated_max)
     memory_allocated_max=memory_allocated;
+  if(memory_allocated < memory_allocated_min)
+    memory_allocated_min=memory_allocated;
 
   return p;
 }
@@ -3550,6 +3559,8 @@ public_pVALLOc(size_t bytes)
 
   if(memory_allocated > memory_allocated_max)
     memory_allocated_max=memory_allocated;
+  if(memory_allocated < memory_allocated_min)
+    memory_allocated_min=memory_allocated;
   
   return p;
 }
@@ -3642,6 +3653,8 @@ public_cALLOc(size_t n, size_t elem_size)
 
   if(memory_allocated > memory_allocated_max)
     memory_allocated_max=memory_allocated;
+  if(memory_allocated < memory_allocated_min)
+    memory_allocated_min=memory_allocated;
 
   /* Two optional cases in which clearing not necessary */
 #if HAVE_MMAP
@@ -3705,6 +3718,8 @@ public_iCALLOc(size_t n, size_t elem_size, Void_t** chunks)
   memory_allocated += chunksize(mem2chunk(m));
   if(memory_allocated > memory_allocated_max)
     memory_allocated_max=memory_allocated;
+  if(memory_allocated < memory_allocated_min)
+    memory_allocated_min=memory_allocated;
   return m;
 }
 
@@ -3724,6 +3739,8 @@ public_iCOMALLOc(size_t n, size_t sizes[], Void_t** chunks)
   
   if(memory_allocated > memory_allocated_max)
     memory_allocated_max=memory_allocated;
+  if(memory_allocated < memory_allocated_min)
+    memory_allocated_min=memory_allocated;
   
   return m;
 }
