@@ -184,7 +184,7 @@ void FEM_Register_array(int fem_mesh,int entity,int attr,
 		}
 	}
 	printf("firstItem %d \n",firstItem);*/
-	FEM_Register_array_layout(fem_mesh,entity,attr,data,firstItem,lo);
+    	FEM_Register_array_layout(fem_mesh,entity,attr,data,firstItem,lo);
 }
 
 void FEM_Register_array_layout(int fem_mesh,int entity,int attr, 	
@@ -1000,7 +1000,8 @@ void FEM_VarIndexAttribute::get(void *dest, int firstItem,int length,
 void FEM_VarIndexAttribute::copyEntity(int dstEntity,const FEM_Attribute &_src,int srcEntity){
 	FEM_VarIndexAttribute &src = (FEM_VarIndexAttribute &)_src;
 	const CkVec<CkVec<ID> > &srcTable = src.get();
-	idx.insert(dstEntity,srcTable[srcEntity]);
+        CkVec<ID> temp = srcTable[srcEntity];
+	idx.insert(dstEntity, temp);
 }
 
 void FEM_VarIndexAttribute::print(){
@@ -1126,36 +1127,37 @@ void FEM_Entity::copyShape(const FEM_Entity &src) {
 
 void FEM_Entity::setLength(int newlen) 
 {
-  if (!resize) {
-    if (size() != newlen) {
-      length = newlen;
-      // Each of our attributes need to be expanded for our new length:
-      for (int a=0; a<attributes.size(); a++) {
-	CkAssert(attributes[a]->getWidth() < 1000);
-	attributes[a]->reallocate();
-      }
+    if (!resize) {
+        if (size() != newlen) {
+            length = newlen;
+            // Each of our attributes need to be expanded for our new length:
+            for (int a=0; a<attributes.size(); a++) {
+                CkAssert(attributes[a]->getWidth() < 1000);
+                attributes[a]->reallocate();
+            }
+        }
     }
-  }
-  else {
-    length = newlen;
-    if (length > max) {
-      if (max > 4) {
-	max = max + (max >> 2);
-      }
-      else {
-	max = max + 10;
-      }
-      for (int a=0;a<attributes.size();a++){
-	int code = attributes[a]->getAttr();
-	if(!(code <= FEM_ATTRIB_TAG_MAX || code == FEM_CONN || code == FEM_BOUNDARY)){
-	  attributes[a]->reallocate();
-	}
-      }	
-      // call resize with args max n;
-      //CkPrintf("Resize called \n");
-      resize(args,&length,&max);
+    else {
+        length = newlen;
+        if (length > max) {
+            if (max > 4) {
+                max = max + (max >> 2);
+            } else {
+                max = max + 10;
+            }
+            for (int a=0;a<attributes.size();a++){
+                int code = attributes[a]->getAttr();
+                if (!(code <= FEM_ATTRIB_TAG_MAX || 
+                            code == FEM_CONN || 
+                            code == FEM_BOUNDARY)) {
+                    attributes[a]->reallocate();
+                }
+            }	
+            // call resize with args max n;
+            //CkPrintf("Resize called \n");
+            resize(args,&length,&max);
+        }
     }
-  }
 }
 
 void FEM_Entity::allocateValid(void) {

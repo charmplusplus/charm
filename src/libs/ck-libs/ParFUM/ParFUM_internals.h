@@ -583,6 +583,11 @@ public:
 		bool operator ==(const ID &rhs)const {
 			return (type == rhs.type) && (id == rhs.id);
 		}
+		const ID& operator =(const ID &rhs) {
+			type = rhs.type;
+			id = rhs.id;
+			return *this;
+		}
 		virtual void pup(PUP::er &p){
 			p | type;
 			p | id;
