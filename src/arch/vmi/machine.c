@@ -93,9 +93,13 @@ typedef struct
   void   *next;
 } gk_delayed_msgs;
 
-double gk_timeout;
-gk_delayed_msgs *gk_head_ptr;
-gk_delayed_msgs *gk_tail_ptr;
+double gk_timeout1;
+gk_delayed_msgs *gk_head_ptr1;
+gk_delayed_msgs *gk_tail_ptr1;
+
+double gk_timeout2;
+gk_delayed_msgs *gk_head_ptr2;
+gk_delayed_msgs *gk_tail_ptr2;
 #endif
 
 
@@ -244,16 +248,20 @@ void ConverseInit (int argc, char **argv, CmiStartFn start_function, int user_ca
 
     if (value = getenv ("GK_GET_LATENCY")) {
       timeout_us = (unsigned long) atoi (value);
-      gk_timeout = ((double) timeout_us) * 0.000001;
+      gk_timeout1 = ((double) timeout_us) * 0.000001;
+      gk_timeout2 = ((double) timeout_us) * 0.000001 * 2;
       if (_Cmi_mype == 0) {
-	CmiPrintf ("*** Charm is using artificial Get latency of %f\n", gk_timeout);
+	CmiPrintf ("*** Charm is using artificial latency of %f and artificial Get latency of %f\n", gk_timeout1, gk_timeout2);
       }
     } else {
       CmiAbort ("Charm built with GK_DELAY_DEVICE but GK_GET_LATENCY not in environment.");
     }
-    
-    gk_head_ptr = NULL;
-    gk_tail_ptr = NULL;
+
+    gk_head_ptr1 = NULL;
+    gk_tail_ptr1 = NULL;
+
+    gk_head_ptr2 = NULL;
+    gk_tail_ptr2 = NULL;
   }
 #endif
 
@@ -2262,22 +2270,54 @@ void *CmiGetNonLocal ()
     int gk_msgsize;
     int gk_sender;
 
-    if (gk_head_ptr) {
+    if (gk_head_ptr1) {
       gettimeofday (&gk_tv, NULL);
       gk_time_now = gk_tv.tv_sec + (gk_tv.tv_usec * 0.000001);
 
-      if (gk_time_now > (gk_head_ptr->time + gk_timeout)) {
-	gk_msg = gk_head_ptr->msg;
-	gk_msgsize = gk_head_ptr->msgsize;
-	gk_sender = gk_head_ptr->sender;
+      if (gk_time_now > (gk_head_ptr1->time + gk_timeout1)) {
+	gk_msg = gk_head_ptr1->msg;
+	gk_msgsize = gk_head_ptr1->msgsize;
+	gk_sender = gk_head_ptr1->sender;
 
-	if (gk_head_ptr == gk_tail_ptr) {
-	  free (gk_head_ptr);
-	  gk_head_ptr = NULL;
-	  gk_tail_ptr = NULL;
+	if (gk_head_ptr1 == gk_tail_ptr1) {
+	  free (gk_head_ptr1);
+	  gk_head_ptr1 = NULL;
+	  gk_tail_ptr1 = NULL;
 	} else {
-	  gk_ptr = gk_head_ptr;
-	  gk_head_ptr = gk_head_ptr->next;
+	  gk_ptr = gk_head_ptr1;
+	  gk_head_ptr1 = gk_head_ptr1->next;
+	  free (gk_ptr);
+	}
+
+#if CMK_BROADCAST_SPANNING_TREE
+	if (CMI_BROADCAST_ROOT (gk_msg)) {
+	  /* Message is enqueued after send to spanning children completes. */
+	  CMI_VMI_Send_Spanning_Children (gk_msgsize, gk_msg);
+	} else {
+	  CdsFifo_Enqueue (CpvAccess (CMI_VMI_RemoteQueue), gk_msg);
+	}
+#else
+	CdsFifo_Enqueue (CpvAccess (CMI_VMI_RemoteQueue), gk_msg);
+#endif
+      }
+    }
+
+    if (gk_head_ptr2) {
+      gettimeofday (&gk_tv, NULL);
+      gk_time_now = gk_tv.tv_sec + (gk_tv.tv_usec * 0.000001);
+
+      if (gk_time_now > (gk_head_ptr2->time + gk_timeout2)) {
+	gk_msg = gk_head_ptr2->msg;
+	gk_msgsize = gk_head_ptr2->msgsize;
+	gk_sender = gk_head_ptr2->sender;
+
+	if (gk_head_ptr2 == gk_tail_ptr2) {
+	  free (gk_head_ptr2);
+	  gk_head_ptr2 = NULL;
+	  gk_tail_ptr2 = NULL;
+	} else {
+	  gk_ptr = gk_head_ptr2;
+	  gk_head_ptr2 = gk_head_ptr2->next;
 	  free (gk_ptr);
 	}
 
@@ -4532,12 +4572,12 @@ void CMI_VMI_RDMA_Get_Completion_Handler (PVMI_RDMA_OP rdmaop, PVOID context, VM
     gk_new_node->sender  = process->rank;
     gk_new_node->next    = NULL;
 
-    if (gk_head_ptr) {
-      gk_tail_ptr->next = gk_new_node;
-      gk_tail_ptr = gk_new_node;
+    if (gk_head_ptr2) {
+      gk_tail_ptr2->next = gk_new_node;
+      gk_tail_ptr2 = gk_new_node;
     } else {
-      gk_head_ptr = gk_new_node;
-      gk_tail_ptr = gk_new_node;
+      gk_head_ptr2 = gk_new_node;
+      gk_tail_ptr2 = gk_new_node;
     }
   }
 #else
@@ -4738,6 +4778,32 @@ void CMI_VMI_Common_Receive (int sourcerank, int msgsize, char *msg)
   switch (CMI_VMI_MESSAGE_TYPE (msg))
   {
     case CMI_VMI_MESSAGE_TYPE_STANDARD:
+#ifdef GK_DELAY_DEVICE
+      {
+	struct timeval gk_tv;
+	double gk_time_now;
+	gk_delayed_msgs *gk_new_node;
+
+	gettimeofday (&gk_tv, NULL);
+	gk_time_now = gk_tv.tv_sec + (gk_tv.tv_usec * 0.000001);
+
+	gk_new_node = malloc (sizeof (gk_delayed_msgs));
+	gk_new_node->time    = gk_time_now;
+	gk_new_node->msg     = msg;
+	gk_new_node->msgsize = msgsize;
+	gk_new_node->sender  = process->rank;
+	gk_new_node->next    = NULL;
+
+	if (gk_head_ptr1) {
+	  gk_tail_ptr1->next = gk_new_node;
+	  gk_tail_ptr1 = gk_new_node;
+	} else {
+	  gk_head_ptr1 = gk_new_node;
+	  gk_tail_ptr1 = gk_new_node;
+	}
+      }
+      break;
+#else
 #if CMK_BROADCAST_SPANNING_TREE
       if (CMI_BROADCAST_ROOT (msg)) {
         /* Message is enqueued after send to spanning children completes. */
@@ -4749,6 +4815,7 @@ void CMI_VMI_Common_Receive (int sourcerank, int msgsize, char *msg)
       CdsFifo_Enqueue (CpvAccess (CMI_VMI_RemoteQueue), msg);
 #endif
       break;
+#endif
 
     case CMI_VMI_MESSAGE_TYPE_BARRIER:
       CMI_VMI_Barrier_Count++;
