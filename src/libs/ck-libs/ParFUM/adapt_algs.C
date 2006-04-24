@@ -312,11 +312,11 @@ void FEM_Adapt_Algs::FEM_Repair(int qm)
 	if (qFactor <  0.75*QUALITY_MIN) {
 	  int elId = i;
 	  theMesh->e2n_getAll(elId, elemConn);
-	  int n1=elemConn[0], n2=elemConn[1], mn1, mn2;
-	  mn1 = n1; mn2 = n2;
+	  int n1=elemConn[0], n2=elemConn[1], mn1, mn2, on1, on2;
+	  on1 = mn1 = n1; on2 = mn2 = n2;
 	  double tmpLen, avgEdgeLength=0.0, 
-	    minEdgeLength = length(n1, n2), maxEdgeLength;
-	  maxEdgeLength = minEdgeLength;
+	    minEdgeLength = length(n1, n2), maxEdgeLength, otherEdgeLength;
+	  otherEdgeLength = maxEdgeLength = minEdgeLength;
 	  for (int j=0; j<elemWidth-1; j++) {
 	    for (int k=j+1; k<elemWidth; k++) {
 	      tmpLen = length(elemConn[j], elemConn[k]);
@@ -324,17 +324,31 @@ void FEM_Adapt_Algs::FEM_Repair(int qm)
 	      if (tmpLen < minEdgeLength) {
 		minEdgeLength = tmpLen;
 		n1 = elemConn[j]; n2 = elemConn[k];
+		if ((on1 == n1) && (on2 == n2)) {
+		  if (on2 == elemWidth-1) {
+		    on1++; on2 = on1+1;
+		  }
+		  else on2++;
+		  otherEdgeLength = length(elemConn[on1], elemConn[on2]);
+		}
 	      }
 	      else if (tmpLen > maxEdgeLength) {
 		maxEdgeLength = tmpLen;
 		mn1 = elemConn[j]; mn2 = elemConn[k];
+		if ((on1 == mn1) && (on2 == mn2)) {
+		  if (on2 == elemWidth-1) {
+		    on1++; on2 = on1+1;
+		  }
+		  else on2++;
+		}
+		otherEdgeLength = length(elemConn[on1], elemConn[on2]);
 	      }
 	    }
 	  }
 	  CkAssert(n1!=-1 && n2!=-1);
 	  avgEdgeLength /= 3.0;
 	  if ((maxEdgeLength > 1.25*avgEdgeLength) &&
-	      (minEdgeLength > 0.6*avgEdgeLength)) { // refine
+	      (minEdgeLength+otherEdgeLength < 1.2*maxEdgeLength)) { // refine
 	    int success = theAdaptor->edge_bisect(mn1, mn2);
 	    if (success >= 0) {
 	      //CkPrintf("Refined bad element!\n");
