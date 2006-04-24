@@ -1138,7 +1138,7 @@ int FEM_add_element_local(FEM_Mesh *m, int *conn, int connSize, int elemType, in
 #endif
 #ifdef FEM_ELEMSORDERED
   if(!FEM_Is_ghost_index(newEl)) {
-    CkAssert(-m->getfmMM()->fmAdaptAlgs->getSignedArea(conn[0],conn[1],conn[2])>SLIVERAREA);
+    m->getfmMM()->fmAdaptAlgs->ensureQuality(conn[0],conn[1],conn[2]);
   }
 #endif
   delete[] adjes;

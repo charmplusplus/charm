@@ -39,6 +39,7 @@ void FEM_Adapt_Algs::FEM_AdaptMesh(int qm, int method, double factor,
 #endif
   SetMeshSize(method, factor, sizes);
   GradateMesh(GRADATION);
+  tests();
   (void)Refine(qm, method, factor, sizes);
   GradateMesh(GRADATION);
   (void)Coarsen(qm, method, factor, sizes);
@@ -136,6 +137,7 @@ int FEM_Adapt_Algs::Refine(int qm, int method, double factor, double *sizes)
     mods += iter_mods;
 #ifdef ADAPT_VERBOSE
     CkPrintf("ParFUM_Refine: %d modifications in last pass.\n", iter_mods);
+    tests();
 #endif
   }
 #ifdef ADAPT_VERBOSE
@@ -260,6 +262,7 @@ int FEM_Adapt_Algs::Coarsen(int qm, int method, double factor, double *sizes)
     mods += iter_mods;
 #ifdef ADAPT_VERBOSE
     CkPrintf("ParFUM_Coarsen: %d modifications in pass %d.\n", iter_mods, pass);
+    tests();
 #endif
   }
 #ifdef ADAPT_VERBOSE
@@ -296,6 +299,7 @@ void FEM_Adapt_Algs::FEM_Repair(int qm)
   }
   avgQual /= numElements;
   CkPrintf("BEFORE FEM_Repair: Average Element Quality = %2.6f, Min = %2.6f (1.0 is perfect)\n", avgQual, minQual);
+  tests();
   //CkPrintf("BEFORE FEM_Repair: Average Element Quality = %2.6f, Min = %2.6f (1.0 is perfect)\n  %d out of %d elements were below the minimum quality tolerance of %2.6f\n", avgQual, minQual, numBadElems, numElements, QUALITY_MIN);
 #endif
 
@@ -387,6 +391,7 @@ void FEM_Adapt_Algs::FEM_Repair(int qm)
   }
   avgQual /= numElements;
   CkPrintf("AFTER FEM_Repair: Average Element Quality = %2.6f, Min = %2.6f (1.0 is perfect)\n", avgQual, minQual);
+  tests();
   //  CkPrintf("AFTER FEM_Repair: Average Element Quality = %2.6f, Min = %2.6f (1.0 is perfect)\n  %d out of %d elements were below the minimum quality tolerance of %2.6f\n", avgQual, minQual, numBadElems, numElements, QUALITY_MIN);
 #endif
 }
@@ -544,7 +549,7 @@ void FEM_Adapt_Algs::GradateMesh(double smoothness)
                 
                 // h-shock=max(size ratio)^(1/edge length)
                 CkAssert(s1 >= 0 && s2 >= 0 && "Bad size");
-                CkAssert(edgelen > 1e-6 && "Length 0 edge");
+                //CkAssert(edgelen > 1e-6 && "Length 0 edge");
                 CkAssert(edgelen == edgelen && "Length inf edge");
 
                 double ratio = (s1 > s2) ? s1/s2 : s2/s1;
@@ -935,6 +940,26 @@ double FEM_Adapt_Algs::getArea(double *n1_coord, double *n2_coord, double *n3_co
   return (sqrt(sLen*(sLen-aLen)*(sLen-bLen)*(sLen-cLen)));
 }
 
+void FEM_Adapt_Algs::ensureQuality(int n1, int n2, int n3) {
+  double coordsn1[2], coordsn2[2], coordsn3[2];
+  getCoord(n1, coordsn1);
+  getCoord(n2, coordsn2);
+  getCoord(n3, coordsn3);
+  double area = getSignedArea(coordsn1, coordsn2, coordsn3);
+  double len1 = length(coordsn1, coordsn2);
+  double len2 = length(coordsn2, coordsn3);
+  double len3 = length(coordsn3, coordsn1);
+  double max = len1;
+  if(len2>max) max = len2;
+  if(len3>max) max = len3;
+  //shortest edge
+  double min = len1;
+  if(len2<min) min = len2;
+  if(len3<min) min = len3;
+  double shortest_al = area/max;
+  double largestR = max/shortest_al;
+  CkAssert(largestR<=100.0 && -area > SLIVERAREA);
+}
 
 bool FEM_Adapt_Algs::didItFlip(int n1, int n2, int n3, double *n4_coord)
 {
@@ -949,8 +974,8 @@ bool FEM_Adapt_Algs::didItFlip(int n1, int n2, int n3, double *n4_coord)
 
   //do some quality preservation
   double len1 = length(coordsn1, coordsn2);
-  double len2 = length(coordsn2, coordsn3);
-  double len3 = length(coordsn3, coordsn1);
+  double len2 = length(coordsn2, n4_coord);
+  double len3 = length(n4_coord, coordsn1);
   //longest edge
   double max = len1;
   if(len2>max) max = len2;
@@ -961,12 +986,14 @@ bool FEM_Adapt_Algs::didItFlip(int n1, int n2, int n3, double *n4_coord)
   if(len3<min) min = len3;
 
   double shortest_al = ret_new/max;
+  double largestR = max/shortest_al;
 
   if(ret_old > SLIVERAREA && ret_new < -SLIVERAREA) return true; //it is a flip
   else if(ret_old < -SLIVERAREA && ret_new > SLIVERAREA) return true; //it is a flip
   else if(fabs(ret_new) < SLIVERAREA) return true; // it is a sliver
-  else if(fabs(shortest_al) < 1e-5) return true; //shortest altitude is too small
-  else if(fabs(min) < 1e-5) return true; //shortest edge is too small
+  //else if(fabs(shortest_al) < 1e-5) return true; //shortest altitude is too small
+  //else if(fabs(min) < 1e-5) return true; //shortest edge is too small
+  else if(fabs(largestR)>100.0) return true;
   else return false;
 }
 

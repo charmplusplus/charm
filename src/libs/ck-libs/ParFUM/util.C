@@ -1355,14 +1355,33 @@ int FEM_MUtil::AreaTest(FEM_Mesh *m) {
   int noEle = m->elem[0].size();
   int wdt = m->elem[0].getConn().width();
   int *con = (int*)malloc(wdt*sizeof(int));
+  double n1_coord[2], n2_coord[2], n3_coord[3];
+  double smallestarea = 1.0, smallestedge = 1.0, smallestalt = 1.0, largestQ=1.0;
   for(int i=0; i<noEle; i++) {
     if(m->elem[0].is_valid(i)) {
       m->e2n_getAll(i,con,0);
-      double area = mmod->fmAdaptAlgs->getSignedArea(con[0],con[1],con[2]);
+      mmod->fmAdaptAlgs->getCoord(con[0],n1_coord);
+      mmod->fmAdaptAlgs->getCoord(con[1],n2_coord);
+      mmod->fmAdaptAlgs->getCoord(con[2],n3_coord);
+      double area = mmod->fmAdaptAlgs->getSignedArea(n1_coord,n2_coord,n3_coord);
+      double len1 = mmod->fmAdaptAlgs->length(n1_coord,n2_coord);
+      double len2 = mmod->fmAdaptAlgs->length(n2_coord,n3_coord);
+      double len3 = mmod->fmAdaptAlgs->length(n3_coord,n1_coord);
+      double min = len1, max = len1;
+      if(len2>max) max=len2;
+      if(len3>max) max=len3;
+      if(len2<min) min=len2;
+      if(len3<min) min=len3;
+      double shAl = fabs(area/max);
+      double larR = max/shAl;
+      if(fabs(area)<smallestarea) smallestarea = fabs(area);
+      if(min<smallestedge) smallestedge = min;
+      if(shAl<smallestalt) smallestalt = shAl;
+      if(larR>largestQ) largestQ = larR;
 #ifdef FEM_ELEMSORDERED
-      if(-area < SLIVERAREA) {
+      if(-area < SLIVERAREA || larR>100.0) {
 #else
-      if(fabs(area) < SLIVERAREA) {
+      if(fabs(area) < SLIVERAREA || larR>100.0) {
 #endif
 	CkAssert(false);
 	delete [] con;
@@ -1370,6 +1389,7 @@ int FEM_MUtil::AreaTest(FEM_Mesh *m) {
       }
     }
   }
+  CkPrintf("SmallestArea %lf, SmallestEdge %lf, SmallestAlt %lf worstQuality %lf\n",smallestarea,smallestedge,smallestalt,largestQ);  
   free(con);
   return 1;
 }
