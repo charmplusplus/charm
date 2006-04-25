@@ -34,16 +34,32 @@ FEM_Adapt_Algs::~FEM_Adapt_Algs() {
 void FEM_Adapt_Algs::FEM_AdaptMesh(int qm, int method, double factor, 
 				   double *sizes)
 {
+  MPI_Comm comm=(MPI_Comm)FEM_chunk::get("FEM_Update_mesh")->defaultComm;
+  MPI_Barrier(comm);
 #ifdef ADAPT_VERBOSE
   CkPrintf("BEGIN: FEM_AdaptMesh...\n");
 #endif
+#ifdef DEBUG_QUALITY
+  tests(true);
+#endif
   SetMeshSize(method, factor, sizes);
+  MPI_Barrier(comm);
   GradateMesh(GRADATION);
-  tests();
+  MPI_Barrier(comm);
   (void)Refine(qm, method, factor, sizes);
+  MPI_Barrier(comm);
   GradateMesh(GRADATION);
+  MPI_Barrier(comm);
   (void)Coarsen(qm, method, factor, sizes);
+#ifdef DEBUG_QUALITY
+  MPI_Barrier(comm);
+#endif
   FEM_Repair(qm);
+  MPI_Barrier(comm);
+#ifdef DEBUG_QUALITY
+  tests(true);
+  MPI_Barrier(comm);
+#endif
 #ifdef ADAPT_VERBOSE
   CkPrintf("...END: FEM_AdaptMesh.\n");
 #endif
@@ -137,7 +153,9 @@ int FEM_Adapt_Algs::Refine(int qm, int method, double factor, double *sizes)
     mods += iter_mods;
 #ifdef ADAPT_VERBOSE
     CkPrintf("ParFUM_Refine: %d modifications in last pass.\n", iter_mods);
-    tests();
+#endif
+#ifdef DEBUG_QUALITY
+    tests(false);
 #endif
   }
 #ifdef ADAPT_VERBOSE
@@ -262,7 +280,9 @@ int FEM_Adapt_Algs::Coarsen(int qm, int method, double factor, double *sizes)
     mods += iter_mods;
 #ifdef ADAPT_VERBOSE
     CkPrintf("ParFUM_Coarsen: %d modifications in pass %d.\n", iter_mods, pass);
-    tests();
+#endif
+#ifdef DEBUG_QUALITY
+    tests(false);
 #endif
   }
 #ifdef ADAPT_VERBOSE
@@ -299,12 +319,11 @@ void FEM_Adapt_Algs::FEM_Repair(int qm)
   }
   avgQual /= numElements;
   CkPrintf("BEFORE FEM_Repair: Average Element Quality = %2.6f, Min = %2.6f (1.0 is perfect)\n", avgQual, minQual);
-  tests();
   //CkPrintf("BEFORE FEM_Repair: Average Element Quality = %2.6f, Min = %2.6f (1.0 is perfect)\n  %d out of %d elements were below the minimum quality tolerance of %2.6f\n", avgQual, minQual, numBadElems, numElements, QUALITY_MIN);
 #endif
 
   int elemWidth = theMesh->elem[0].getConn().width();
-  int changes=1;
+  int changes=1, totalChanges=0;
   int count=0;
   while (changes!=0 && count<4) {
     count++;
@@ -316,51 +335,71 @@ void FEM_Adapt_Algs::FEM_Repair(int qm)
 	if (qFactor <  0.75*QUALITY_MIN) {
 	  int elId = i;
 	  theMesh->e2n_getAll(elId, elemConn);
-	  int n1=elemConn[0], n2=elemConn[1], mn1, mn2, on1, on2;
-	  on1 = mn1 = n1; on2 = mn2 = n2;
-	  double tmpLen, avgEdgeLength=0.0, 
-	    minEdgeLength = length(n1, n2), maxEdgeLength, otherEdgeLength;
-	  otherEdgeLength = maxEdgeLength = minEdgeLength;
-	  for (int j=0; j<elemWidth-1; j++) {
-	    for (int k=j+1; k<elemWidth; k++) {
-	      tmpLen = length(elemConn[j], elemConn[k]);
-	      avgEdgeLength += tmpLen;
-	      if (tmpLen < minEdgeLength) {
-		minEdgeLength = tmpLen;
-		n1 = elemConn[j]; n2 = elemConn[k];
-		if ((on1 == n1) && (on2 == n2)) {
-		  if (on2 == elemWidth-1) {
-		    on1++; on2 = on1+1;
-		  }
-		  else on2++;
-		  otherEdgeLength = length(elemConn[on1], elemConn[on2]);
-		}
-	      }
-	      else if (tmpLen > maxEdgeLength) {
-		maxEdgeLength = tmpLen;
-		mn1 = elemConn[j]; mn2 = elemConn[k];
-		if ((on1 == mn1) && (on2 == mn2)) {
-		  if (on2 == elemWidth-1) {
-		    on1++; on2 = on1+1;
-		  }
-		  else on2++;
-		}
-		otherEdgeLength = length(elemConn[on1], elemConn[on2]);
+	  int n1=elemConn[0], n2=elemConn[1];
+	  //too bad.. should not decide without locking!!
+	  //these values might change by the time lock is acquired
+	  double len1 = length(elemConn[0],elemConn[1]);
+	  double len2 = length(elemConn[1],elemConn[2]);
+	  double len3 = length(elemConn[2],elemConn[0]);
+	  double avglen=(len1+len2+len3)/3.0;
+	  int maxn1=0, maxn2=1;
+	  int minn1=0, minn2=1;
+	  double maxlen=len1;
+	  int maxed=0;
+	  if(len2>maxlen) {
+	    maxlen = len2;
+	    maxn1 = 1;
+	    maxn2 = 2;
+	    maxed = 1;
+	  }
+	  if(len3>maxlen) {
+	    maxlen = len3;
+	    maxn1 = 2;
+	    maxn2 = 0;
+	    maxed = 2;
+	  }
+	  double minlen = len1;
+	  if(len2<minlen) {
+	    minlen = len2;
+	    minn1 = 1;
+	    minn2 = 2;
+	  }
+	  if(len3<minlen) {
+	    minlen = len3;
+	    minn1 = 2;
+	    minn2 = 0;
+	  }
+	  double otherlen = 3*avglen - maxlen - minlen;
+	  if (maxlen > 0.95*(minlen+otherlen)) { // refine
+	    //decide if this should be a bisect or flip, 
+	    //depends on if the longest edge on this element is also the longest on the
+	    //element sharing this edge, if not, flip it
+	    int nbrEl = theMesh->e2e_getNbr(i,maxed);
+	    int con1[3];
+	    theMesh->e2n_getAll(nbrEl,con1);
+	    int nbrnode=-1;
+	    for(int j=0; j<3; j++) {
+	      if(con1[j]!=elemConn[maxn1] && con1[j]!=elemConn[maxn2]) {
+		nbrnode = con1[j];
+		break;
 	      }
 	    }
-	  }
-	  CkAssert(n1!=-1 && n2!=-1);
-	  avgEdgeLength /= 3.0;
-	  if ((maxEdgeLength > 1.25*avgEdgeLength) &&
-	      (minEdgeLength+otherEdgeLength < 1.2*maxEdgeLength)) { // refine
-	    int success = theAdaptor->edge_bisect(mn1, mn2);
+	    double len4 = length(elemConn[maxn1],nbrnode);
+	    double len5 = length(elemConn[maxn2],nbrnode);
+	    int success = -1;
+	    if(len4>maxlen || len5>maxlen) {
+	      success = theAdaptor->edge_flip(elemConn[maxn1], elemConn[maxn2]);
+	    }
+	    else {
+	      success = theAdaptor->edge_bisect(elemConn[maxn1], elemConn[maxn2]);
+	    }
 	    if (success >= 0) {
 	      //CkPrintf("Refined bad element!\n");
 	      changes++;
 	    }
 	  }
-	  else if (minEdgeLength < 0.15*avgEdgeLength) { // coarsen
-	    int success = theAdaptor->edge_contraction(n1, n2);
+	  else if (minlen < 0.10*(maxlen+otherlen)) { // coarsen
+	    int success = theAdaptor->edge_contraction(elemConn[minn1], elemConn[minn2]);
 	    if (success >= 0) { 
 	      //CkPrintf("Coarsened bad element!\n");
 	      changes++;
@@ -372,6 +411,7 @@ void FEM_Adapt_Algs::FEM_Repair(int qm)
 	}
       }
     }
+    totalChanges += changes;
   }
 
 #ifdef ADAPT_VERBOSE
@@ -390,8 +430,10 @@ void FEM_Adapt_Algs::FEM_Repair(int qm)
     }
   }
   avgQual /= numElements;
-  CkPrintf("AFTER FEM_Repair: Average Element Quality = %2.6f, Min = %2.6f (1.0 is perfect)\n", avgQual, minQual);
-  tests();
+  CkPrintf("AFTER FEM_Repair: Average Element Quality = %2.6f, Min = %2.6f (1.0 is perfect) No. of repairs %d\n", avgQual, minQual,totalChanges);
+#ifdef DEBUG_QUALITY
+    tests(false);
+#endif
   //  CkPrintf("AFTER FEM_Repair: Average Element Quality = %2.6f, Min = %2.6f (1.0 is perfect)\n  %d out of %d elements were below the minimum quality tolerance of %2.6f\n", avgQual, minQual, numBadElems, numElements, QUALITY_MIN);
 #endif
 }
@@ -494,10 +536,6 @@ void FEM_Adapt_Algs::GradateMesh(double smoothness)
     // Algorithm based on h-shock correction, described in
     // Mesh Gradation Control, Borouchaki et al
     // IJNME43 1998 www.ann.jussieu.fr/~frey/publications/ijnme4398.pdf
-
-  MPI_Comm comm=(MPI_Comm)FEM_chunk::get("FEM_Update_mesh")->defaultComm;
-  MPI_Barrier(comm);
-
     const double beta = smoothness;
 
     double maxShock, minShock;
@@ -615,7 +653,6 @@ void FEM_Adapt_Algs::GradateMesh(double smoothness)
 
     delete[] boundNodes;
 
-    MPI_Barrier(comm);
     return;
 }
 
@@ -779,9 +816,12 @@ int FEM_Adapt_Algs::simple_coarsen(double targetA, double xmin, double ymin, dou
   else return 1;
 }
 
-void FEM_Adapt_Algs::tests() {
+void FEM_Adapt_Algs::tests(bool b=true) {
   //test the mesh for slivered triangles
-
+  if(!b) {
+    theMod->fmUtil->AreaTest(theMesh);
+    return;
+  }
   theMod->fmUtil->AreaTest(theMesh);
   theMod->fmUtil->StructureTest(theMesh);
   theMod->fmUtil->IdxlListTest(theMesh);
@@ -791,7 +831,6 @@ void FEM_Adapt_Algs::tests() {
     else  CkPrintf("Invalid -- ");
     theMod->fmUtil->FEM_Print_coords(theMesh,i);
     }*/
-
   return;
 }
 
@@ -956,7 +995,7 @@ void FEM_Adapt_Algs::ensureQuality(int n1, int n2, int n3) {
   double min = len1;
   if(len2<min) min = len2;
   if(len3<min) min = len3;
-  double shortest_al = area/max;
+  double shortest_al = fabs(area/max);
   double largestR = max/shortest_al;
   CkAssert(largestR<=100.0 && -area > SLIVERAREA);
 }
@@ -968,7 +1007,12 @@ bool FEM_Adapt_Algs::didItFlip(int n1, int n2, int n3, double *n4_coord)
   getCoord(n1, coordsn1);
   getCoord(n2, coordsn2);
   getCoord(n3, coordsn3);
+  return didItFlip(coordsn1,coordsn2,coordsn3,n4_coord);
+}
 
+
+bool FEM_Adapt_Algs::didItFlip(double *coordsn1, double *coordsn2, double *coordsn3, double *n4_coord)
+{
   double ret_old = getSignedArea(coordsn1, coordsn2, coordsn3);
   double ret_new = getSignedArea(coordsn1, coordsn2, n4_coord);
 
@@ -993,17 +1037,7 @@ bool FEM_Adapt_Algs::didItFlip(int n1, int n2, int n3, double *n4_coord)
   else if(fabs(ret_new) < SLIVERAREA) return true; // it is a sliver
   //else if(fabs(shortest_al) < 1e-5) return true; //shortest altitude is too small
   //else if(fabs(min) < 1e-5) return true; //shortest edge is too small
-  else if(fabs(largestR)>100.0) return true;
-  else return false;
-}
-
-
-bool FEM_Adapt_Algs::didItFlip(double *n1_coord, double *n2_coord, double *n3_coord, double *n4_coord)
-{
-  double ret_old = getSignedArea(n1_coord, n2_coord, n3_coord);
-  double ret_new = getSignedArea(n1_coord, n2_coord, n4_coord);
-  if(ret_old > MINAREA && ret_new < -MINAREA) return true;
-  else if(ret_old < -MINAREA && ret_new > MINAREA) return true;
+  else if(fabs(largestR)>50.0) return true;
   else return false;
 }
 
@@ -1099,7 +1133,7 @@ void FEM_Adapt_Algs::Insert(int eIdx, double len, int cFlag)
     while ((coarsenElements[i/2].len>=len) && (i != 1)) {
       coarsenElements[i].len=coarsenElements[i/2].len;
       coarsenElements[i].elID=coarsenElements[i/2].elID;
-      i/=2;                     
+      i/=2;
     }
     coarsenElements[i].elID=eIdx;
     coarsenElements[i].len=len; 
@@ -1109,7 +1143,7 @@ void FEM_Adapt_Algs::Insert(int eIdx, double len, int cFlag)
     while ((refineElements[i/2].len>=len) && (i != 1)) {
       refineElements[i].len=refineElements[i/2].len;
       refineElements[i].elID=refineElements[i/2].elID;
-      i/=2;                     
+      i/=2;
     }
     refineElements[i].elID=eIdx;
     refineElements[i].len=len; 

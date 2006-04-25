@@ -107,7 +107,7 @@ FDECL void FTN_NAME(FEM_ADAPT_GRADATEMESH, fem_adapt_gradatemesh)(int* meshID, d
 
 void FEM_ADAPT_TestMesh(int meshID) {
     FEM_Mesh* mesh = FEM_Mesh_lookup(meshID, "FEM_ADAPT_GradateMesh");
-    mesh->getfmMM()->getfmAdaptAlgs()->tests();
+    mesh->getfmMM()->getfmAdaptAlgs()->tests(true);
 }
 FDECL void FTN_NAME(FEM_ADAPT_TESTMESH, fem_adapt_testmesh)(int* meshID)
 {

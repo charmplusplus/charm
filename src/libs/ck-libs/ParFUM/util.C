@@ -1354,9 +1354,10 @@ void FEM_MUtil::StructureTest(FEM_Mesh *m) {
 int FEM_MUtil::AreaTest(FEM_Mesh *m) {
   int noEle = m->elem[0].size();
   int wdt = m->elem[0].getConn().width();
-  int *con = (int*)malloc(wdt*sizeof(int));
+  int con[3];
   double n1_coord[2], n2_coord[2], n3_coord[3];
   double smallestarea = 1.0, smallestedge = 1.0, smallestalt = 1.0, largestQ=1.0;
+  int worstEl = 0;
   for(int i=0; i<noEle; i++) {
     if(m->elem[0].is_valid(i)) {
       m->e2n_getAll(i,con,0);
@@ -1377,20 +1378,26 @@ int FEM_MUtil::AreaTest(FEM_Mesh *m) {
       if(fabs(area)<smallestarea) smallestarea = fabs(area);
       if(min<smallestedge) smallestedge = min;
       if(shAl<smallestalt) smallestalt = shAl;
-      if(larR>largestQ) largestQ = larR;
+      if(larR>largestQ) {
+	largestQ = larR;
+	worstEl = i;
+      }
 #ifdef FEM_ELEMSORDERED
       if(-area < SLIVERAREA || larR>100.0) {
 #else
       if(fabs(area) < SLIVERAREA || larR>100.0) {
 #endif
 	CkAssert(false);
-	delete [] con;
 	return -1;
       }
     }
   }
   CkPrintf("SmallestArea %lf, SmallestEdge %lf, SmallestAlt %lf worstQuality %lf\n",smallestarea,smallestedge,smallestalt,largestQ);  
-  free(con);
+  m->e2n_getAll(worstEl,con,0);
+  CkPrintf("WorstEl %d\n",worstEl);
+  FEM_Print_coords(m,con[0]);
+  FEM_Print_coords(m,con[1]);
+  FEM_Print_coords(m,con[2]);
   return 1;
 }
 

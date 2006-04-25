@@ -142,7 +142,7 @@ class FEM_Adapt_Algs {
   void ensureQuality(int n1, int n2, int n3);
   double getSignedArea(int n1, int n2, int n3);
   double getSignedArea(double *n1_coord, double *n2_coord, double *n3_coord);
-  void tests(void);
+  void tests(bool b);
 };
 
 
