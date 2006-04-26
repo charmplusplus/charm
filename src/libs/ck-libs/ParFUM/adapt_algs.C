@@ -87,7 +87,9 @@ int FEM_Adapt_Algs::Refine(int qm, int method, double factor, double *sizes)
   refineElements = refineStack = NULL;
   refineTop = refineHeapSize = 0;
   int elemConn[3];
-  while (iter_mods != 0) {
+  int count = 0;
+  while (iter_mods != 0 && count<20) {
+    count++;
     iter_mods=0;
     numNodes = theMesh->node.size();
     numElements = theMesh->elem[0].size();
@@ -129,6 +131,7 @@ int FEM_Adapt_Algs::Refine(int qm, int method, double factor, double *sizes)
       if ((elId != -1) && (theMesh->elem[0].is_valid(elId))) {
 	int n1, n2;
 	double tmpLen, avgEdgeLength=0.0, maxEdgeLength = 0.0;
+	int maxEdgeIdx=0;
 	theMesh->e2n_getAll(elId, elemConn);
 	for (int j=0; j<elemWidth-1; j++) {
 	  for (int k=j+1; k<elemWidth; k++) {
@@ -136,6 +139,10 @@ int FEM_Adapt_Algs::Refine(int qm, int method, double factor, double *sizes)
 	    avgEdgeLength += tmpLen;
 	    if (tmpLen > maxEdgeLength) { 
 	      maxEdgeLength = tmpLen;
+	      if(k==elemWidth-1) {
+		maxEdgeIdx = j+1;
+	      }
+	      else maxEdgeIdx = j;
 	      n1 = elemConn[j]; n2 = elemConn[k];
 	    }
 	  }
@@ -145,7 +152,16 @@ int FEM_Adapt_Algs::Refine(int qm, int method, double factor, double *sizes)
 	if ((theMesh->elem[0].getMeshSizing(elId) > 0.0) &&
 	    (avgEdgeLength>(theMesh->elem[0].getMeshSizing(elId)*REFINE_TOL))){
 	  //|| (qFactor < QUALITY_MIN)) {
-	  if (theAdaptor->edge_bisect(n1, n2) > 0)  iter_mods++;
+	  //decide if we should do a flip or bisect
+	  bool flag = flipOrBisect(elId,n1,n2,maxEdgeIdx,maxEdgeLength);
+	  if(flag) {
+#ifdef DEBUG_FLIP
+	    if(theAdaptor->edge_flip(n1, n2) > 0)  iter_mods++;
+#endif
+	  }
+	  else {
+	    if(theAdaptor->edge_bisect(n1, n2) > 0)  iter_mods++;
+	  }
 	}
       }
       CthYield(); // give other chunks on the same PE a chance
@@ -388,7 +404,9 @@ void FEM_Adapt_Algs::FEM_Repair(int qm)
 	    double len5 = length(elemConn[maxn2],nbrnode);
 	    int success = -1;
 	    if(len4>maxlen || len5>maxlen) {
+#ifdef DEBUG_FLIP
 	      success = theAdaptor->edge_flip(elemConn[maxn1], elemConn[maxn2]);
+#endif
 	    }
 	    else {
 	      success = theAdaptor->edge_bisect(elemConn[maxn1], elemConn[maxn2]);
@@ -1000,22 +1018,67 @@ void FEM_Adapt_Algs::ensureQuality(int n1, int n2, int n3) {
   CkAssert(largestR<=100.0 && -area > SLIVERAREA);
 }
 
-bool FEM_Adapt_Algs::didItFlip(int n1, int n2, int n3, double *n4_coord)
-{
+bool FEM_Adapt_Algs::controlQualityF(int n1, int n2, int n3, int n4) {
+  //n1 or n2 will be replaced by n4
+  double coordsn1[2], coordsn2[2], coordsn3[2], coordsn4[2];
+  if(n4==-1) return false;
+  getCoord(n1, coordsn1);
+  getCoord(n2, coordsn2);
+  getCoord(n3, coordsn3);
+  getCoord(n4, coordsn4);
+  bool flag = false;
+  if(!flag) flag = controlQualityC(coordsn3,coordsn1,coordsn2,coordsn4);
+  if(!flag) flag = controlQualityC(coordsn4,coordsn2,coordsn1,coordsn3);
+  return flag;
+}
+
+bool FEM_Adapt_Algs::controlQualityR(int n1, int n2, int n3, int n4) {
+  //n1 or n2 will be replaced by n4
+  double coordsn1[2], coordsn2[2], coordsn3[2], coordsn4[2], coordsn5[2];
+  if(n4==-1) return false;
+  getCoord(n1, coordsn1);
+  getCoord(n2, coordsn2);
+  getCoord(n3, coordsn3);
+  getCoord(n4, coordsn4);
+  coordsn5[0] = (coordsn1[0]+coordsn2[0])*0.5;
+  coordsn5[1] = (coordsn1[1]+coordsn2[1])*0.5;
+  bool flag = false;
+  if(!flag) flag = theMod->fmAdaptAlgs->controlQualityR(coordsn1,coordsn3,coordsn5);
+  if(!flag) flag = theMod->fmAdaptAlgs->controlQualityR(coordsn2,coordsn3,coordsn5);
+  if(!flag) flag = theMod->fmAdaptAlgs->controlQualityR(coordsn1,coordsn4,coordsn5);
+  if(!flag) flag = theMod->fmAdaptAlgs->controlQualityR(coordsn2,coordsn4,coordsn5);
+  return flag;
+}
+
+bool FEM_Adapt_Algs::controlQualityR(double *coordsn1, double *coordsn2, double *coordsn3) {
+  double area = getArea(coordsn1, coordsn2, coordsn3);
+  //do some quality preservation
+  double len1 = length(coordsn1, coordsn2);
+  double len2 = length(coordsn2, coordsn3);
+  double len3 = length(coordsn3, coordsn1);
+  //longest edge
+  double max = len1;
+  if(len2>max) max = len2;
+  if(len3>max) max = len3;
+  double shortest_al = area/max;
+  double largestR = max/shortest_al;
+  if(largestR>50.0) return true;
+  else return false;
+}
+
+bool FEM_Adapt_Algs::controlQualityC(int n1, int n2, int n3, double *n4_coord) {
   //n3 is the node to be deleted, n4 is the new node to be added
   double coordsn1[2], coordsn2[2], coordsn3[2];
   getCoord(n1, coordsn1);
   getCoord(n2, coordsn2);
   getCoord(n3, coordsn3);
-  return didItFlip(coordsn1,coordsn2,coordsn3,n4_coord);
+  return controlQualityC(coordsn1,coordsn2,coordsn3,n4_coord);
 }
 
 
-bool FEM_Adapt_Algs::didItFlip(double *coordsn1, double *coordsn2, double *coordsn3, double *n4_coord)
-{
+bool FEM_Adapt_Algs::controlQualityC(double *coordsn1, double *coordsn2, double *coordsn3, double *n4_coord) {
   double ret_old = getSignedArea(coordsn1, coordsn2, coordsn3);
   double ret_new = getSignedArea(coordsn1, coordsn2, n4_coord);
-
   //do some quality preservation
   double len1 = length(coordsn1, coordsn2);
   double len2 = length(coordsn2, n4_coord);
@@ -1028,10 +1091,8 @@ bool FEM_Adapt_Algs::didItFlip(double *coordsn1, double *coordsn2, double *coord
   double min = len1;
   if(len2<min) min = len2;
   if(len3<min) min = len3;
-
   double shortest_al = ret_new/max;
   double largestR = max/shortest_al;
-
   if(ret_old > SLIVERAREA && ret_new < -SLIVERAREA) return true; //it is a flip
   else if(ret_old < -SLIVERAREA && ret_new > SLIVERAREA) return true; //it is a flip
   else if(fabs(ret_new) < SLIVERAREA) return true; // it is a sliver
@@ -1041,8 +1102,27 @@ bool FEM_Adapt_Algs::didItFlip(double *coordsn1, double *coordsn2, double *coord
   else return false;
 }
 
-double FEM_Adapt_Algs::getSignedArea(int n1, int n2, int n3)
-{
+bool FEM_Adapt_Algs::flipOrBisect(int elId, int n1, int n2, int maxEdgeIdx, double maxlen) {
+  //return true if it should flip
+  int nbrEl = theMesh->e2e_getNbr(elId,maxEdgeIdx);
+  int con1[3];
+  theMesh->e2n_getAll(nbrEl,con1);
+  int nbrnode=-1;
+  for(int j=0; j<3; j++) {
+    if(con1[j]!=n1 && con1[j]!=n2) {
+      nbrnode = con1[j];
+      break;
+    }
+  }
+  double len4 = length(n1,nbrnode);
+  double len5 = length(n2,nbrnode);
+  if(len4>1.2*maxlen || len5>1.2*maxlen) {
+    return true;
+  }
+  else return false;
+}
+
+double FEM_Adapt_Algs::getSignedArea(int n1, int n2, int n3) {
   double coordsn1[2], coordsn2[2], coordsn3[2];
   getCoord(n1, coordsn1);
   getCoord(n2, coordsn2);

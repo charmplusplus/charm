@@ -137,11 +137,15 @@ class FEM_Adapt_Algs {
   int getCoord(int n1, double *crds);
   int getShortestEdge(int n1, int n2, int n3, int* shortestEdge);
   double getAreaQuality(int elem);
-  bool didItFlip(int n1, int n2, int n3, double *n4_coord);
-  bool didItFlip(double *n1_coord, double *n2_coord, double *n3_coord, double *n4_coord);
+  bool controlQualityF(int n1, int n2, int n3, int n4);
+  bool controlQualityR(int n1, int n2, int n3, int n4);
+  bool controlQualityR(double *n1_coord, double *n2_coord, double *n3_coord);
+  bool controlQualityC(int n1, int n2, int n3, double *n4_coord);
+  bool controlQualityC(double *n1_coord, double *n2_coord, double *n3_coord, double *n4_coord);
   void ensureQuality(int n1, int n2, int n3);
   double getSignedArea(int n1, int n2, int n3);
   double getSignedArea(double *n1_coord, double *n2_coord, double *n3_coord);
+  bool flipOrBisect(int elId, int n1, int n2, int maxEdgeIdx, double maxlen);
   void tests(bool b);
 };
 

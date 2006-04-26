@@ -34,125 +34,64 @@ int FEM_Adapt::edge_flip_help(int e1, int e2, int n1, int n2, int e1_n1,
 {
   int numNodes = 4;
   int numElems = 2;
-  int newNode = -1;
   int lockelems[2];
   int elemConn[3];
-
   locknodes[0] = n1;
   locknodes[1] = n2;
   locknodes[2] = n3;
   locknodes[3] = n4;
   lockelems[0] = e1;
   lockelems[1] = e2;
-
-  //currently we do not move chunk boundaries, so we do not flip edges in which one of the 4 nodes of the quadrilateral is a ghost node.
-  /*if(n1 < 0 || n2 < 0 || n3 < 0 || n4 < 0) {
+  if(n1 < 0 || n2 < 0) {
     return -1;
-    }*/
-
-  //FEM_Modify_Lock(theMesh, locknodes, numNodes, lockelems, numElems);
-
-  int e1chunk=-1, e2chunk=-1;
+  }
   int index = theMod->getIdx();
+  bool flag = theMod->fmAdaptAlgs->controlQualityF(n1,n2,n3,n4);
+  if(flag) return -1;
+  int e1Topurge = e1;
+  int e2Topurge = e2;
 
 #ifdef DEBUG_1
   CkPrintf("Flipping edge %d->%d on chunk %d\n", n1, n2, theMod->getfmUtil()->getIdx());
 #endif
-
-  double e1Sz = theMesh->elem[0].getMeshSizing(e1);
-  double e2Sz = theMesh->elem[0].getMeshSizing(e2);
-  int e1Topurge = e1;
-  int e2Topurge = e2;
-
-  if(n1 < 0 || n2 < 0 || n3 < 0) {
-    e1chunk = FEM_remove_element(theMesh, e1, 0, index);
-  }
-  else {
-    e1chunk = FEM_remove_element(theMesh, e1, 0);
-  }
-  //if this is a ghost, then eat into it
-  if(n1 < 0 || n2 < 0 || n4 < 0) {
-    e2chunk = FEM_remove_element(theMesh, e2, 0, index);
-  }
-  else {
-    e2chunk = FEM_remove_element(theMesh, e2, 0);
-  }
-
-  if(e1chunk==e2chunk && e1chunk!=index) {
-    //both of them are on some other chunk
-    //will happen when all three nodes are shared between e1chunk & index
-    //do nothing, just call them on those chunks
-  }
-  else if(e1chunk==e2chunk && e1chunk==index) {
-    //common case, when both of them are local
-  }
-  else if(e1chunk!=e2chunk && (e1chunk==index || e2chunk==index)) {
-    //one is local & one is remote
-    if(e1chunk==index) {
-      //if n1 or n2 or n4 had only e2 as local n2e on e2chunk then, downgrade it from shared to ghost
-      //n4 is remote, upgrade it from ghost to shared node on e1chunk
-      e2chunk=e1chunk; //e1chunk eats e2
-      elemConn[0] = n1; elemConn[1] = n2; elemConn[2] = n4;
-      int newel = FEM_add_element(theMesh, elemConn, 3, 0, e2chunk);
-      //find the new node index & replace n4 with that
-      for(int j=0; j<3; j++) {
-	if((elemConn[j]!=n1)&&(elemConn[j]!=n2)) {
-	  int oldn4 = n4;
-	  n4 = elemConn[j];
-	  newNode = n4;
-#ifndef FEM_SILENT
-	  CkPrintf("Changing node %d to node %d\n",oldn4,n4);
-#endif
-	}
+  //FEM_Modify_Lock(theMesh, locknodes, numNodes, lockelems, numElems);
+  //if any of the two elements is remote, eat those
+  if(n3 < 0) {
+    e1Topurge = theMod->fmUtil->eatIntoElement(e1);
+    theMesh->e2n_getAll(e1Topurge,elemConn);
+    for(int i=0; i<3; i++) {
+      if(elemConn[i]!=n1 && elemConn[i]!=n2) {
+	n3 = elemConn[i];
       }
-      locknodes[3] = n4;
-      theMod->fmUtil->copyElemData(0,e2,newel); //special copy across chunk
-      FEM_purge_element(theMesh,e2,0);
-      FEM_remove_element(theMesh, newel);
-      e2Topurge = newel;
     }
-    else {
-      //if n1 or n2 or n3 had only e1 as local n2e on e1chunk then, downgrade it from shared to ghost
-      //n3 is remote, upgrade it from ghost to shared node on e2chunk
-      e1chunk=e2chunk; //e2chunk eats e1
-      elemConn[0] = n1; elemConn[1] = n2; elemConn[2] = n3;
-      int newel = FEM_add_element(theMesh, elemConn, 3, 0, e1chunk);
-      for(int j=0; j<3; j++) {
-	if((elemConn[j]!=n1)&&(elemConn[j]!=n2)) {
-	  int oldn3 = n3;
-	  n3 = elemConn[j]; 
-	  newNode = n3;
-#ifndef FEM_SILENT
-	  CkPrintf("Changing node %d to node %d\n",oldn3,n3);
-#endif
-	}
-      }
-      locknodes[2] = n3;
-      theMod->fmUtil->copyElemData(0,e1,newel); //special copy across chunk
-      FEM_purge_element(theMesh,e1,0);
-      FEM_remove_element(theMesh, newel);
-      e1Topurge = newel;
-    }
-    //effectively index eats the other element
+    locknodes[2] = n3;
   }
-  else {
-    //the chunk trying to flip both elements, doesn't own even one of them
-    //extremely rare case.. not handling this now
-    CkAbort("Flip with two external elements on two different chunks\n");
+  if(n4 < 0) {
+    e2Topurge = theMod->fmUtil->eatIntoElement(e2);
+    theMesh->e2n_getAll(e2Topurge,elemConn);
+    for(int i=0; i<3; i++) {
+      if(elemConn[i]!=n1 && elemConn[i]!=n2) {
+	n4 = elemConn[i];
+      }
+    }
+    locknodes[3] = n4;
   }
 
+  FEM_remove_element(theMesh,e1Topurge,0,0);
+  FEM_remove_element(theMesh,e2Topurge,0,0);
   // add n1, n3, n4
   elemConn[e1_n1] = n1;  elemConn[e1_n2] = n4;  elemConn[e1_n3] = n3;
-  lockelems[0] = FEM_add_element(theMesh, elemConn, 3, 0, e1chunk);
+  lockelems[0] = FEM_add_element(theMesh, elemConn, 3, 0, index);
+  //the attributes should really be interpolated, i.e. on both new elems,
+  //the values should be an average of the previous two elements
   theMod->fmUtil->copyElemData(0,e1Topurge,lockelems[0]);
-  FEM_purge_element(theMesh,e1Topurge,0);
-  //theMesh->elem[0].setMeshSizing(lockelems[0], e1Sz);
   // add n2, n3, n4
   elemConn[e1_n1] = n4;  elemConn[e1_n2] = n2;  elemConn[e1_n3] = n3;
-  lockelems[1] = FEM_add_element(theMesh, elemConn, 3, 0, e2chunk);
-  theMod->fmUtil->copyElemData(0,e2Topurge,lockelems[1]);
+  lockelems[1] = FEM_add_element(theMesh, elemConn, 3, 0, index);
+  theMod->fmUtil->copyElemData(0,e1Topurge,lockelems[1]); //both of the new elements copy from one element
+  //purge the two elements
+  FEM_purge_element(theMesh,e1Topurge,0);
   FEM_purge_element(theMesh,e2Topurge,0);
-  //theMesh->elem[0].setMeshSizing(lockelems[1], e2Sz);
 
   //get rid of some unnecessary ghost node sends
   for(int i=0; i<4;i++) {
@@ -224,7 +163,7 @@ int FEM_Adapt::edge_flip_help(int e1, int e2, int n1, int n2, int e1_n1,
     }
   }
   //make sure that it always comes here, don't return with unlocking
-  return newNode;
+  return 1; //return newNode;
 }
 // ======================  END edge_flip  ===================================
 
@@ -280,6 +219,9 @@ int FEM_Adapt::edge_bisect_help(int e1, int e2, int n1, int n2, int e1_n1,
 #ifdef DEBUG_1
   CkPrintf("Bisect edge %d->%d on chunk %d\n", n1, n2, theMod->getfmUtil()->getIdx());
 #endif
+  //verify quality
+  bool flag = theMod->fmAdaptAlgs->controlQualityR(n1,n2,n3,n4);
+  if(flag) return -1;
 
   //add node
   if(e1==-1) e1chunk=-1;
@@ -323,10 +265,7 @@ int FEM_Adapt::edge_bisect_help(int e1, int e2, int n1, int n2, int e1_n1,
   FEM_Modify_LockN(theMesh, n5, 0);
 
   //remove elements
-  double e1Sz = theMesh->elem[0].getMeshSizing(e1);
   e1chunk = FEM_remove_element(theMesh, e1, 0); 
-  double e2Sz = -1.0; 
-  if (e2 != -1) e2Sz = theMesh->elem[0].getMeshSizing(e2);
   e2chunk = FEM_remove_element(theMesh, e2, 0);  // assumes intelligent behavior when no e2 exists
 
   // hmm... if e2 is a ghost and we remove it and create all the new elements
@@ -343,7 +282,7 @@ int FEM_Adapt::edge_bisect_help(int e1, int e2, int n1, int n2, int e1_n1,
     e3chunk = e1chunk;
   }
   else {
-    //there can be a lot of conditions, but for nothing, do we have to do aything special now
+    //there can be a lot of conditions, but we do not have to do aything special now
     n5chunk = -1;
     e4chunk = e2chunk;
     e3chunk = e1chunk;
@@ -353,23 +292,19 @@ int FEM_Adapt::edge_bisect_help(int e1, int e2, int n1, int n2, int e1_n1,
   elemConn[e1_n1] = n1;  elemConn[e1_n2] = n5;  elemConn[e1_n3] = n3;
   lockelems[0] = FEM_add_element(theMesh, elemConn, 3, 0, e1chunk);
   theMod->fmUtil->copyElemData(0,e1,lockelems[0]);
-  //theMesh->elem[0].setMeshSizing(lockelems[0], e1Sz);
   // add n2, n5, n3
   elemConn[e1_n1] = n5;  elemConn[e1_n2] = n2;  elemConn[e1_n3] = n3;
   lockelems[1] = FEM_add_element(theMesh, elemConn, 3, 0, e3chunk);
   theMod->fmUtil->copyElemData(0,e1,lockelems[1]);
-  //theMesh->elem[0].setMeshSizing(lockelems[1], e1Sz);
   if (e2 != -1) { // e2 exists
     // add n1, n5, n4
     elemConn[e2_n1] = n1;  elemConn[e2_n2] = n5;  elemConn[e2_n3] = n4;
     lockelems[2] = FEM_add_element(theMesh, elemConn, 3, 0, e2chunk);
     theMod->fmUtil->copyElemData(0,e2,lockelems[2]);
-    //theMesh->elem[0].setMeshSizing(lockelems[2], e2Sz);
     // add n2, n5, n4
     elemConn[e2_n1] = n5;  elemConn[e2_n2] = n2;  elemConn[e2_n3] = n4;
     lockelems[3] = FEM_add_element(theMesh, elemConn, 3, 0, e4chunk);
     theMod->fmUtil->copyElemData(0,e2,lockelems[3]);
-    //theMesh->elem[0].setMeshSizing(lockelems[3], e2Sz);
   }
 
   FEM_purge_element(theMesh,e1,0);

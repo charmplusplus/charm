@@ -1334,7 +1334,7 @@ int FEM_AdaptL::edge_contraction_help(int *e1P, int *e2P, int n1, int n2, int e1
 	    conn[2] = deletenode;
 	  }
 	}
-	if(theMod->fmAdaptAlgs->didItFlip(conn[0],conn[1],conn[2],new_coord)) {
+	if(theMod->fmAdaptAlgs->controlQualityC(conn[0],conn[1],conn[2],new_coord)) {
 	  flipSliver = true;
 	  //CkPrintf("[%d]Warning: Elem %d(%d,%d,%d) would become a sliver if %d->%d is contracted\n",theMod->idx,nbrElems[i],conn[0],conn[1],conn[2],n1,n2);
 	  break;
@@ -1369,7 +1369,7 @@ int FEM_AdaptL::edge_contraction_help(int *e1P, int *e2P, int n1, int n2, int e1
 	      conn1[2] = keepnode;
 	    }
 	  }
-	  if(theMod->fmAdaptAlgs->didItFlip(conn1[0],conn1[1],conn1[2],new_coord)) {
+	  if(theMod->fmAdaptAlgs->controlQualityC(conn1[0],conn1[1],conn1[2],new_coord)) {
 	    flipSliver = true;
 	    //CkPrintf("[%d]Warning: Elem %d(%d,%d,%d) would become a sliver if %d->%d is contracted\n",theMod->idx,nbr1Elems[i],conn1[0],conn1[1],conn1[2],n1,n2);
 	    break;
