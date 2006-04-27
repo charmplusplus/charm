@@ -183,7 +183,7 @@ Following are AMPI extension calls, which will be explained in detail in this
 manual.
 \begin{alltt}
 MPI_Migrate     MPI_Checkpoint  MPI_Restart     MPI_Register    MPI_Get_userdata
-MPI_Ialltoall   MPI_Iallgather  MPI_Iallreduce  MPI_Ireduce
+MPI_Ialltoall   MPI_Iallgather  MPI_Iallreduce  MPI_Ireduce     MPI_IGet
 \end{alltt}
 
 
@@ -644,6 +644,38 @@ the program from the checkpointed state by specifying \texttt{"+restart
 dirname"} on the command-line. This capability is powered by the \charmpp{} 
 runtime system. For more information about \charmpp{} checkpoint/restart
 mechanism please refer to \charmpp{} manual. 
+
+\subsection{Extensions for Memory Efficiency}
+
+MPI functions usually require the user to preallocate the data buffers needed before the
+functions being called. For unblocking communication primitives, sometimes the user would
+like to do lazy memory allocation until the data actually arrives, which gives the
+oppotunities to write more memory efficient programs.     
+We provide a set of AMPI functions as an extension to the standard MPI-2 one-sided calls,
+where we provide a split phase MPI\_Get called MPI\_IGet. MPI\_IGet preserves the similar
+semantics as MPI\_Get except that no user buffer is provided to hold incoming data.
+MPI\_IGet\_Wait will block until the requested data arrives and runtime system takes
+care to allocate space, do appropriate unpacking based on data type, and return.
+MPI\_IGet\_Free lets the runtime system free the resources being used for this get request
+including the data buffer. And MPI\_IGet\_Data is the utility program that returns the
+actual data.     
+ 
+
+\begin{alltt}
+
+int MPI_IGet(MPI_Aint orgdisp, int orgcnt, MPI_Datatype orgtype, int rank,
+             MPI_Aint targdisp, int targcnt, MPI_Datatype targtype, MPI_Win win,
+             MPI_Request *request);
+
+int MPI_IGet_Wait(MPI_Request *request, MPI_Status *status, MPI_Win win);
+
+int MPI_IGet_Free(MPI_Request *request, MPI_Status *status, MPI_Win win);
+
+char* MPI_IGet_Data(MPI_Status status);
+
+\end{alltt}
+
+
 
 \subsection{Extensions for Interoperability}
 
