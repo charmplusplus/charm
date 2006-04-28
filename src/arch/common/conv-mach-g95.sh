@@ -20,12 +20,19 @@ CMK_CF90_FIXED="$CMK_CF90 -ffixed-form "
 # find f90 library:
 #it can be at g95-install/lib/gcc-lib/i686-pc-linux-gnu/4.0.1
 F90DIR=`which g95 2> /dev/null`
-#F90DIR=$HOME/g95-install/bin/g95
 readlinkcmd=`which readlink 2> /dev/null`
 if test -h "$F90DIR" && test -x "$readlinkcmd"
 then
-  F90DIR=`readlink $F90DIR`
-  test `basename $F90DIR` = "$F90DIR" && F90DIR=`which g95 2> /dev/null`
+  LINKDIR=`readlink $F90DIR`
+  case "$LINKDIR" in
+  \/*)
+       F90DIR=$LINKDIR
+       ;;
+  *)
+       basedir=`dirname $F90DIR`
+       F90DIR="$basedir/$LINKDIR"
+       ;;
+  esac
 fi
 F90DIR="`dirname $F90DIR`"
 F90LIBDIR=`cd $F90DIR/../lib/gcc-lib/*/*; pwd`
