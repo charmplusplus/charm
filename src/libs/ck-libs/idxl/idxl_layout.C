@@ -190,9 +190,12 @@ inline void gatherUserData(const void *user,int nIndices,const int *indices,
 {
 	for (int r=0;r<nIndices;r++) {
 		int sr=indices[r];
-		for (int c=0;c<width;c++)
-			compressed[c]=IDXL_LAYOUT_DEREF(T,user,sr,c);
-		compressed+=width;
+		if(sr!=-1) {
+		  for (int c=0;c<width;c++) {
+		    compressed[c]=IDXL_LAYOUT_DEREF(T,user,sr,c);
+		  }
+		  compressed+=width;
+		}
 	}
 }
 
@@ -245,9 +248,12 @@ inline void scatterAddUserData(void *user,int nIndices,const int *indices,
 {
 	for (int r=0;r<nIndices;r++) {
 		int sr=indices[r];
-		for (int c=0;c<width;c++)
-			IDXL_LAYOUT_DEREF(T,user,sr,c)+=compressed[c];
-		compressed+=width;
+		if(sr!=-1) {
+		  for (int c=0;c<width;c++){
+		    IDXL_LAYOUT_DEREF(T,user,sr,c)+=compressed[c];
+		  }
+		  compressed+=width;
+		}
 	}
 }
 
