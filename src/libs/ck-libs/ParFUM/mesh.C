@@ -1125,7 +1125,7 @@ void FEM_Entity::copyShape(const FEM_Entity &src) {
 	if (ghost) ghost->copyShape(*src.ghost);
 }
 
-void FEM_Entity::setLength(int newlen) 
+void FEM_Entity::setLength(int newlen, bool f) 
 {
     if (!resize) {
         if (size() != newlen) {
@@ -1138,7 +1138,11 @@ void FEM_Entity::setLength(int newlen)
         }
     }
     else {
-        length = newlen;
+      int otherlen = length;
+      if(!f) {
+	otherlen = newlen;
+      }
+      length = newlen;
         if (length > max) {
             if (max > 4) {
                 max = max + (max >> 2);
@@ -1155,7 +1159,9 @@ void FEM_Entity::setLength(int newlen)
             }	
             // call resize with args max n;
             //CkPrintf("Resize called \n");
-            resize(args,&length,&max);
+            resize(args,&otherlen,&max); //resets length to otherlen
+            //resize(args,&length,&max);
+	    length = newlen;
         }
     }
 }
@@ -1294,7 +1300,7 @@ int FEM_Entity::get_next_invalid(FEM_Mesh *m, bool isNode, bool isGhost){
     }
     else {
       retval = size();
-      setLength(retval+1);  
+      setLength(retval+1,true);  
     }
   }
   else {

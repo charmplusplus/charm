@@ -773,7 +773,7 @@ protected:
 	 *  The user is setting this many entities.  This reallocates
 	 * all existing attributes to make room for the new entities.
 	 */
-	void setLength(int newlen);
+	void setLength(int newlen, bool f=false);
 
 	/** Support for registration API 
 	 *  Set the current length and maximum length for this entity. 
