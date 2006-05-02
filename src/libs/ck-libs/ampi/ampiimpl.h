@@ -27,6 +27,8 @@
 
 #define AMPI_COUNTER 0
 
+#define AMPI_ALLTOALL_MEDIUM_MSG   32768
+
 #if AMPI_COUNTER
 class AmpiCounters{
 public:

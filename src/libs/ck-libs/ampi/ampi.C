@@ -3250,6 +3250,10 @@ int AMPI_Alltoall(void *sendbuf, int sendcount, MPI_Datatype sendtype,
     // use blocking recv
   dttype = ptr->getDDT()->getType(sendtype) ;
   itemsize = dttype->getSize(sendcount) ;
+  int rank = ptr->getRank(comm);
+
+  if ( itemsize <= AMPI_ALLTOALL_MEDIUM_MSG)
+  {
 #if AMPI_COMLIB
   if(comm == MPI_COMM_WORLD) {
       // commlib support
@@ -3263,16 +3267,55 @@ int AMPI_Alltoall(void *sendbuf, int sendcount, MPI_Datatype sendtype,
 #endif 
   {
       for(i=0;i<size;i++) {
-          ptr->send(MPI_ATA_TAG, ptr->getRank(comm), ((char*)sendbuf)+(itemsize*i), sendcount,
-                    sendtype, i, comm);
+          int dst = (rank+i) % size;
+          ptr->send(MPI_ATA_TAG, rank, ((char*)sendbuf)+(itemsize*dst), sendcount,
+                    sendtype, dst, comm);
       }
   }
   dttype = ptr->getDDT()->getType(recvtype) ;
   itemsize = dttype->getSize(recvcount) ;
   MPI_Status status;
   for(i=0;i<size;i++) {
-        AMPI_Recv(((char*)recvbuf)+(itemsize*i), recvcount, recvtype,
-              i, MPI_ATA_TAG, comm, &status);
+        int dst = (rank+i) % size;
+        AMPI_Recv(((char*)recvbuf)+(itemsize*dst), recvcount, recvtype,
+              dst, MPI_ATA_TAG, comm, &status);
+  }
+  }
+  else {    // large messages
+      /* Long message. Use pairwise exchange. If comm_size is a
+         power-of-two, use exclusive-or to create pairs. Else send
+         to rank+i, receive from rank-i. */
+
+    int pof2;
+    int src, dst;
+      /* Is comm_size a power-of-two? */
+    i = 1;
+    while (i < size)
+          i *= 2;
+    if (i == size)
+          pof2 = 1;
+    else
+          pof2 = 0;
+
+      /* The i=0 case takes care of moving local data into recvbuf */
+    for (i=0; i<size; i++) {
+        if (pof2 == 1) {
+              /* use exclusive-or algorithm */
+              src = dst = rank ^ i;
+        }
+        else {
+              src = (rank - i + size) % size;
+              dst = (rank + i) % size;
+        }
+
+        MPI_Status status;
+        MPI_Sendrecv(((char *)sendbuf + dst*itemsize),
+                                   sendcount, sendtype, dst,
+                                   MPI_ATA_TAG,
+                                   ((char *)recvbuf + src*itemsize),
+                                   recvcount, recvtype, src,
+                                   MPI_ATA_TAG, comm, &status);
+    }   // end of large message
   }
 #endif
 
