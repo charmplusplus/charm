@@ -25,8 +25,11 @@
 ./charmrun ./alltoall_VPtest +tcharm_stacksize 50000 +p 8 +vp 64 16000
 ./charmrun ./alltoall_VPtest +tcharm_stacksize 50000 +p 8 +vp 128 16000
 ./charmrun ./alltoall_VPtest +tcharm_stacksize 50000 +p 8 +vp 256 16000
-./charmrun ./alltoall_VPtest +tcharm_stacksize 50000 +p 8 +vp 1024 16000
 
 
-
-
+./charmrun ./alltoall_VPtest +tcharm_stacksize 50000 +p 8 +vp 8 1048576
+./charmrun ./alltoall_VPtest +tcharm_stacksize 50000 +p 8 +vp 16 1048576
+./charmrun ./alltoall_VPtest +tcharm_stacksize 50000 +p 8 +vp 32 1048576
+./charmrun ./alltoall_VPtest +tcharm_stacksize 50000 +p 8 +vp 64 1048576
+./charmrun ./alltoall_VPtest +tcharm_stacksize 50000 +p 8 +vp 128 1048576
+./charmrun ./alltoall_VPtest +tcharm_stacksize 50000 +p 8 +vp 256 1048576 
