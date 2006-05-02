@@ -391,17 +391,20 @@ void FEM_Adapt_Algs::FEM_Repair(int qm)
 	    //depends on if the longest edge on this element is also the longest on the
 	    //element sharing this edge, if not, flip it
 	    int nbrEl = theMesh->e2e_getNbr(i,maxed);
-	    int con1[3];
-	    theMesh->e2n_getAll(nbrEl,con1);
-	    int nbrnode=-1;
-	    for(int j=0; j<3; j++) {
-	      if(con1[j]!=elemConn[maxn1] && con1[j]!=elemConn[maxn2]) {
-		nbrnode = con1[j];
-		break;
+	    double len4=0.0, len5=0.0;
+	    if(nbrEl!=-1) {
+	      int con1[3];
+	      theMesh->e2n_getAll(nbrEl,con1);
+	      int nbrnode=-1;
+	      for(int j=0; j<3; j++) {
+		if(con1[j]!=elemConn[maxn1] && con1[j]!=elemConn[maxn2]) {
+		  nbrnode = con1[j];
+		  break;
+		}
 	      }
+	      len4 = length(elemConn[maxn1],nbrnode);
+	      len5 = length(elemConn[maxn2],nbrnode);
 	    }
-	    double len4 = length(elemConn[maxn1],nbrnode);
-	    double len5 = length(elemConn[maxn2],nbrnode);
 	    int success = -1;
 	    if(len4>maxlen || len5>maxlen) {
 #ifdef DEBUG_FLIP
@@ -1105,17 +1108,20 @@ bool FEM_Adapt_Algs::controlQualityC(double *coordsn1, double *coordsn2, double 
 bool FEM_Adapt_Algs::flipOrBisect(int elId, int n1, int n2, int maxEdgeIdx, double maxlen) {
   //return true if it should flip
   int nbrEl = theMesh->e2e_getNbr(elId,maxEdgeIdx);
-  int con1[3];
-  theMesh->e2n_getAll(nbrEl,con1);
-  int nbrnode=-1;
-  for(int j=0; j<3; j++) {
-    if(con1[j]!=n1 && con1[j]!=n2) {
-      nbrnode = con1[j];
-      break;
+  double len4=0.0, len5=0.0;
+  if(nbrEl!=-1) {
+    int con1[3];
+    theMesh->e2n_getAll(nbrEl,con1);
+    int nbrnode=-1;
+    for(int j=0; j<3; j++) {
+      if(con1[j]!=n1 && con1[j]!=n2) {
+	nbrnode = con1[j];
+	break;
+      }
     }
+    len4 = length(n1,nbrnode);
+    len5 = length(n2,nbrnode);
   }
-  double len4 = length(n1,nbrnode);
-  double len5 = length(n2,nbrnode);
   if(len4>1.2*maxlen || len5>1.2*maxlen) {
     return true;
   }
