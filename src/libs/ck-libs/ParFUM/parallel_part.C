@@ -155,7 +155,7 @@ int FEM_master_parallel_part(int fem_mesh,int masterRank,FEM_Comm_t comm_context
   MeshElem me = part2mesh.get(masterRank);
   //printf("[%d] Number of elements in my partitioned mesh %d number of nodes %d \n",masterRank,me.m->nElems(),me.m->node.size());
 	
-  printf("[%d] Memory usage on vp 0 close to max %d \n",CkMyPe(),CmiMemoryUsage());
+  DEBUG(printf("[%d] Memory usage on vp 0 close to max %d \n",CkMyPe(),CmiMemoryUsage()));
 	//Free up the eptr and eind MSA arrays stored in data
 	data.arr1.FreeMem();
 	data.arr2.FreeMem();
@@ -186,8 +186,12 @@ int FEM_master_parallel_part(int fem_mesh,int masterRank,FEM_Comm_t comm_context
   /*
     make ghosts for this mesh
   */
+  printf("[%d] Starting to generate number of ghost layers %d \n",masterRank,gdata->numLayers);
+	double _startTime = CkWallTimer();
   makeGhosts(me.m,(MPI_Comm)comm_context,masterRank,gdata->numLayers,gdata->layers);
   delete gdata;
+	
+	printf("[%d] Ghost generation took %.6lf \n",masterRank,CkWallTimer()-_startTime);
 	
   me.m->becomeGetting();
   FEM_chunk *chunk = FEM_chunk::get("FEM_Mesh_Parallel_broadcast");
@@ -198,7 +202,7 @@ int FEM_master_parallel_part(int fem_mesh,int masterRank,FEM_Comm_t comm_context
   DEBUG(printf("[%d] Length of udata vector in master new_mesh %d \n",masterRank,nmesh->udata.size()));
 	
 	part2mesh.FreeMem();
-  printf("[%d] Memory usage on vp 0 at end of parallel partition %d \n",CkMyPe(),CmiMemoryUsage());
+  printf("[%d] Max Memory usage on vp 0 at end of parallel partition %d \n",CkMyPe(),CmiMaxMemoryUsage());
 		
   return new_mesh;
 };
@@ -750,7 +754,7 @@ void makeGhosts(FEM_Mesh *m,MPI_Comm comm,int masterRank,int numLayers,FEM_Ghost
   }
 
   for(int i=0;i<numLayers;i++){
-    //printf("[%d] Making ghost layer %d \n",myChunk,i);
+    printf("[%d] Making ghost layer %d \n",myChunk,i);
     makeGhost(m,comm,masterRank,totalShared,layers[i],countedSharedNode,global2local); 
   }
 };
@@ -783,7 +787,7 @@ void makeGhost(FEM_Mesh *m,MPI_Comm comm,int masterRank,int totalShared,FEM_Ghos
   }else{
     distTab = new MsaHashtable;
   }
-  //printf("[%d] starting ghost generation \n",myChunk);
+  printf("[%d] starting ghost generation \n",myChunk);
   MPI_Bcast_pup(*distTab,masterRank,comm);
   distTab->table.enroll(numChunks);
   DEBUG(printf("[%d] distributed table calling sync \n",myChunk));
@@ -1000,7 +1004,6 @@ void makeGhost(FEM_Mesh *m,MPI_Comm comm,int masterRank,int totalShared,FEM_Ghos
     }
     //	printf("Elements equivalent ----------- \n");
   }
-  CmiMemoryCheck();
   DEBUG(printf("[%d] finished creating ghost mesh \n",myChunk));
   ghostmeshes->sync();
   /*

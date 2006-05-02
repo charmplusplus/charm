@@ -1666,6 +1666,7 @@ FEM_Elem::FEM_Elem(const FEM_Mesh &mesh, FEM_Elem *ghost_)
   :FEM_Entity(ghost_), elemAdjacency(0), elemAdjacencyTypes(0)
 {
 	FEM_IndexAttribute::Checker *c;
+	CmiMemoryCheck();
 	if (isGhost()) // Ghost elements can point to both real as well as ghost nodes
 		c=new FEM_Elem_Conn_Checker(mesh.node, mesh.node.getGhost());
 	else /* is real */ //Real elements only point to real nodes
@@ -1820,9 +1821,11 @@ femMeshModify *FEM_Mesh::getfmMM(){
 
 void FEM_Mesh::pup(PUP::er &p)  //For migration
 {
+	CmiMemoryCheck();
 	p.comment(" ------------- Node Data ---------- ");
 	node.pup(p);
 
+	CmiMemoryCheck();
 	p.comment(" ------------- Element Types ---------- ");
 	elem.pup(p);
 	
