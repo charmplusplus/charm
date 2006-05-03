@@ -10,7 +10,7 @@
 */
 /*@{*/
 
-#include <converse.h>
+#include "converse.h"
 
 /*
  * This C++ file contains the Charm stub functions
@@ -177,6 +177,7 @@ void _loadbalancerInit()
   // set up init value for LBPeriod time in seconds
   // it can also be set by calling LDSetLBPeriod()
   CmiGetArgDoubleDesc(argv,"+LBPeriod", &_lb_args.lbperiod(),"the minimum time period in seconds allowed for two consecutive automatic load balancing");
+  _lb_args.loop() = CmiGetArgFlagDesc(argv, "+LBLoop", "Use multiple load balancing strategies in loop");
 
   // now called in cldb.c: CldModuleGeneralInit()
   // registerLBTopos();
@@ -383,7 +384,12 @@ void LBDatabase::addLoadbalancer(BaseLB *lb, int seq) {
 void LBDatabase::nextLoadbalancer(int seq) {
   if (seq == -1) return;		// -1 means this is the only LB
   int next = seq+1;
-  if (next == nloadbalancers) next --;  // keep using the last one
+  if (_lb_args.loop()) {
+    if (next == nloadbalancers) next = 0;
+  }
+  else {
+    if (next == nloadbalancers) next --;  // keep using the last one
+  }
   if (seq != next) {
     loadbalancers[seq]->turnOff();
     CmiAssert(loadbalancers[next]);

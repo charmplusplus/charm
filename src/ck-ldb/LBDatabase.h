@@ -28,6 +28,7 @@ private:
   double _autoLbPeriod;		// in seconds
   int _lb_debug;		// 1 or greater
   int _lb_printsumamry;		// print summary
+  int _lb_loop;                 // use multiple load balancers in loop
   int _lb_ignoreBgLoad;
   int _lb_migObjOnly;		// only consider migratable objs
   int _lb_syncResume;
@@ -49,11 +50,13 @@ public:
     _lb_printsumamry = _lb_migObjOnly = 0;
     _lb_statson = _lb_traceComm = 1;
     _lb_percentMovesAllowed=100;
+    _lb_loop = 0;
   }
   inline double & lbperiod() { return _autoLbPeriod; }
   inline int & debug() { return _lb_debug; }
   inline int & printSummary() { return _lb_printsumamry; }
   inline int & lbversion() { return _lb_version; }
+  inline int & loop() { return _lb_loop; }
   inline int & ignoreBgLoad() { return _lb_ignoreBgLoad; }
   inline int & migObjOnly() { return _lb_migObjOnly; }
   inline int & syncResume() { return _lb_syncResume; }
