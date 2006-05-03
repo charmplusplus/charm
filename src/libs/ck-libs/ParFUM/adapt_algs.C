@@ -524,15 +524,17 @@ void FEM_Adapt_Algs::SetMeshSize(int method, double factor, double *sizes)
     int numEdges=3;
     if (dim==3) numEdges=6;
     for (int i=0; i<numElements; i++) {
-      theMesh->e2n_getAll(i, elemConn);
-      for (int j=0; j<width-1; j++) {
-	for (int k=j+1; k<width; k++) {
-	  avgEdgeLength += length(elemConn[j], elemConn[k]);
+      if(theMesh->elem[0].is_valid(i)) {
+	theMesh->e2n_getAll(i, elemConn);
+	for (int j=0; j<width-1; j++) {
+	  for (int k=j+1; k<width; k++) {
+	    avgEdgeLength += length(elemConn[j], elemConn[k]);
+	  }
 	}
+	avgEdgeLength += length(elemConn[0], elemConn[width-1]);
+	avgEdgeLength /= (double)numEdges;
+	theMesh->elem[0].setMeshSizing(i, factor*avgEdgeLength);
       }
-      avgEdgeLength += length(elemConn[0], elemConn[width-1]);
-      avgEdgeLength /= (double)numEdges;
-      theMesh->elem[0].setMeshSizing(i, factor*avgEdgeLength);
     }
     //CkPrintf("ParFUM_SetMeshSize: CALCULATED & SCALED \n");
   }
@@ -568,13 +570,15 @@ void FEM_Adapt_Algs::SetReferenceMesh()
   int elemConn[3];
   
   for (int i=0; i<numElements; ++i, avgLength=0) {
-    theMesh->e2n_getAll(i, elemConn);
-    for (int j=0; j<width-1; ++j) {
-      avgLength += length(elemConn[j], elemConn[j+1]);
+    if(theMesh->elem[0].is_valid(i)) {
+      theMesh->e2n_getAll(i, elemConn);
+      for (int j=0; j<width-1; ++j) {
+	avgLength += length(elemConn[j], elemConn[j+1]);
+      }
+      avgLength += length(elemConn[0], elemConn[width-1]);
+      avgLength /= width;
+      theMesh->elem[0].setMeshSizing(i, avgLength);      
     }
-    avgLength += length(elemConn[0], elemConn[width-1]);
-    avgLength /= width;
-    theMesh->elem[0].setMeshSizing(i, avgLength);      
   }
 }
 
