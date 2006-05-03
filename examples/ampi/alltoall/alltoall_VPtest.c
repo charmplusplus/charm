@@ -12,6 +12,11 @@ unsigned int Timers = 0;
 
 int  max_msgs = 2;
 
+char hash(int p, int i){
+  return (p*(100-p)*770+i*i*3)%127;
+}
+
+
 void   Create_Timers (int n);
 void   Start_Timer   (int i, int which);
 float  Read_Timer    (int i, int which);
@@ -60,14 +65,14 @@ main(int argc, char **argv){
   int my_id;		/* process id */
   int p;		/* number of processes */
   char* message;	/* storage for the message */
-  int i, k, msg_size;
+  int i, j, k, msg_size;
   MPI_Status status;	/* return status for receive */
   float elapsed_time_msec;
   float bandwidth;
   char *sndbuf, *recvbuf;
-  unsigned long memory_before, memory_after;
-  unsigned long memory_diff, local_memory_max;
-  unsigned long memory_min_small, memory_max_small, memory_min_medium, memory_max_medium, memory_min_normal, memory_max_normal, memory_min_large, memory_max_large;
+  int memory_before, memory_after;
+  int memory_diff, local_memory_max;
+  int memory_min_small, memory_max_small, memory_min_medium, memory_max_medium, memory_min_normal, memory_max_normal, memory_min_large, memory_max_large;
   
   MPI_Init( &argc, &argv );
   MPI_Comm_rank( MPI_COMM_WORLD, &my_id );
@@ -86,7 +91,8 @@ main(int argc, char **argv){
 
   if(argc>2) 
     sscanf (argv[2], "%d", &max_msgs);
-  
+
+
   /* don't start timer until everybody is ok */
   MPI_Barrier(MPI_COMM_WORLD); 
   
@@ -96,17 +102,24 @@ main(int argc, char **argv){
   sndbuf = (char *)malloc(msg_size * sizeof(char) * p);
   recvbuf = (char *)malloc(msg_size * sizeof(char) * p);
 
+  for(j=0;j<p;j++)
+	memset(sndbuf+j*msg_size,hash(my_id,j),msg_size);
+  memset(recvbuf,0,msg_size*p);
+  
+  
+  
   if(my_id == 0){
 	Create_Timers (1);
   }
 
   // Test Long
-  {
+  if(1){
 	// warm up, not instrumented
 	for(i=0; i<max_msgs; i++) {
 	  MPI_Alltoall_long(sndbuf, msg_size, MPI_CHAR, recvbuf, msg_size, MPI_CHAR, MPI_COMM_WORLD);
 	}
 
+	memset(recvbuf,0,msg_size*p);
 	MPI_Barrier(MPI_COMM_WORLD); 
 	CmiResetMaxMemory();
 	memory_before = CmiMemoryUsage();  // initial memory usage
@@ -129,17 +142,25 @@ main(int argc, char **argv){
 	// Reduce MAX here
 	assert(MPI_SUCCESS==MPI_Reduce(&local_memory_max, &memory_max_large, 1, MPI_UNSIGNED_LONG, MPI_MAX, 0, MPI_COMM_WORLD));
 	assert(MPI_SUCCESS==MPI_Reduce(&local_memory_max, &memory_min_large, 1, MPI_UNSIGNED_LONG, MPI_MIN, 0, MPI_COMM_WORLD));
+
+	if(my_id==0)printf("Large Mem Max Usage=%8d Kb\tMin Usage=%8d Kb\tVP=%d\tMsgSize=%d\n", (memory_max_large) / 1024, (memory_min_large) / 1024, p, msg_size);
+
+ 	for(j=0;j<p;j++)
+	  for(k=0;k<msg_size;k++)
+		assert(*(recvbuf+j*msg_size+k) == hash(j,my_id) );
+
   }
 
 
   // Test Short
- #if 0
+#if 0
   {
 	// warm up, not instrumented
 	for(i=0; i<max_msgs; i++) {
 	  MPI_Alltoall_short(sndbuf, msg_size, MPI_CHAR, recvbuf, msg_size, MPI_CHAR, MPI_COMM_WORLD);
 	}
 
+	memset(recvbuf,0,msg_size*p);
 	MPI_Barrier(MPI_COMM_WORLD); 
 	CmiResetMaxMemory();
 	memory_before = CmiMemoryUsage();  // initial memory usage
@@ -162,16 +183,23 @@ main(int argc, char **argv){
 	// Reduce MAX here
 	assert(MPI_SUCCESS==MPI_Reduce(&local_memory_max, &memory_max_small, 1, MPI_UNSIGNED_LONG, MPI_MAX, 0, MPI_COMM_WORLD));
 	assert(MPI_SUCCESS==MPI_Reduce(&local_memory_max, &memory_min_small, 1, MPI_UNSIGNED_LONG, MPI_MIN, 0, MPI_COMM_WORLD));
+
+	if(my_id==0)printf("Small Mem Max Usage=%8d Kb\tMin Usage=%8d Kb\tVP=%d\tMsgSize=%d\n", (memory_max_small) / 1024, (memory_min_small) / 1024, p, msg_size);
+
+	for(j=0;j<p;j++)
+	  for(k=0;k<msg_size;k++)
+		assert(*(recvbuf+j*msg_size+k) == hash(j,my_id) );
   }
 #endif
 
   // Test Medium
-  {
+  if(1){
 	// warm up, not instrumented
 	for(i=0; i<max_msgs; i++) {
 	  MPI_Alltoall_medium(sndbuf, msg_size, MPI_CHAR, recvbuf, msg_size, MPI_CHAR, MPI_COMM_WORLD);
 	}
 
+	memset(recvbuf,0,msg_size*p);
 	MPI_Barrier(MPI_COMM_WORLD); 
 	CmiResetMaxMemory();
 	memory_before = CmiMemoryUsage();  // initial memory usage
@@ -194,6 +222,12 @@ main(int argc, char **argv){
 	// Reduce MAX here
 	assert(MPI_SUCCESS==MPI_Reduce(&local_memory_max, &memory_max_medium, 1, MPI_UNSIGNED_LONG, MPI_MAX, 0, MPI_COMM_WORLD));
 	assert(MPI_SUCCESS==MPI_Reduce(&local_memory_max, &memory_min_medium, 1, MPI_UNSIGNED_LONG, MPI_MIN, 0, MPI_COMM_WORLD));
+
+	if(my_id==0)	printf("Med   Mem Max Usage=%8d Kb\tMin Usage=%8d Kb\tVP=%d\tMsgSize=%d\n", (memory_max_medium) / 1024, (memory_min_medium) / 1024, p, msg_size);
+
+	for(j=0;j<p;j++)
+	  for(k=0;k<msg_size;k++)
+		assert(*(recvbuf+j*msg_size+k) == hash(j,my_id) );
   }
 
   // Test standard version
@@ -203,6 +237,7 @@ main(int argc, char **argv){
 	  MPI_Alltoall(sndbuf, msg_size, MPI_CHAR, recvbuf, msg_size, MPI_CHAR, MPI_COMM_WORLD);
 	}
 	
+	memset(recvbuf,0,msg_size*p);
 	MPI_Barrier(MPI_COMM_WORLD); 
 	CmiResetMaxMemory();
 	memory_before = CmiMemoryUsage();  // initial memory usage
@@ -225,21 +260,21 @@ main(int argc, char **argv){
 	// Reduce MAX here
 	assert(MPI_SUCCESS==MPI_Reduce(&local_memory_max, &memory_max_normal, 1, MPI_UNSIGNED_LONG, MPI_MAX, 0, MPI_COMM_WORLD));
 	assert(MPI_SUCCESS==MPI_Reduce(&local_memory_max, &memory_min_normal, 1, MPI_UNSIGNED_LONG, MPI_MIN, 0, MPI_COMM_WORLD));
+
+	
+	if(my_id==0)  printf("Norm  Mem Max Usage=%8d Kb\tMin Usage=%8d Kb\tVP=%d\tMsgSize=%d\n", (memory_max_normal) / 1024, (memory_min_normal) / 1024, p, msg_size);
+
+	for(j=0;j<p;j++)
+	  for(k=0;k<msg_size;k++)
+		assert(*(recvbuf+j*msg_size+k) == hash(j,my_id) );
   }
 
-  if(my_id==0){
-    bandwidth = 2 * 8 * msg_size / (1000.0 * elapsed_time_msec);
+  if(my_id==0) printf("\n");
 
-    printf("Large Mem Max Usage=%ld Kb\tMin Usage=%ld Kb\tVP=%d\tMsgSize=%d\n", (memory_max_large) / 1024, (memory_min_large) / 1024, p, msg_size);
-	printf("Med   Mem Max Usage=%ld Kb\tMin Usage=%ld Kb\tVP=%d\tMsgSize=%d\n", (memory_max_medium) / 1024, (memory_min_medium) / 1024, p, msg_size);
-	//	printf("Small Mem Max Usage=%ld Kb\tMin Usage=%ld Kb\tVP=%d\tMsgSize=%d\n", (memory_max_small) / 1024, (memory_min_small) / 1024, p, msg_size);
-	printf("Norm  Mem Max Usage=%ld Kb\tMin Usage=%ld Kb\tVP=%d\tMsgSize=%d\n", (memory_max_normal) / 1024, (memory_min_normal) / 1024, p, msg_size);
-	printf("\n\n");
-  }
-  
+
   free(sndbuf);
   free(recvbuf);
- 
+  
  EXIT:
   MPI_Finalize();
 }
