@@ -1,14 +1,34 @@
 
-CMK_REAL_COMPILER=`mpiCC -show 2>/dev/null | cut -d' ' -f1 `
+# user enviorn var: MPICXX and MPICC
+# or, use the definition in file $CHARMINC/MPIOPTS
+if test -x "$CHARMINC/MPIOPTS"
+then
+  . $CHARMINC/MPIOPTS
+else
+  MPICXX_DEF=mpiCC
+  MPICC_DEF=mpicc
+fi
+
+test -z "$MPICXX" && MPICXX=$MPICXX_DEF
+test -z "$MPICC" && MPICC=$MPICC_DEF
+test "$MPICXX" != "$MPICXX_DEF" && /bin/rm -f $CHARMINC/MPIOPTS
+if test ! -f "$CHARMINC/MPIOPTS"
+then
+  echo MPICXX_DEF=$MPICXX > $CHARMINC/MPIOPTS
+  echo MPICC_DEF=$MPICC >> $CHARMINC/MPIOPTS
+  chmod +x $CHARMINC/MPIOPTS
+fi
+
+CMK_REAL_COMPILER=`$MPICXX -show 2>/dev/null | cut -d' ' -f1 `
 case "$CMK_REAL_COMPILER" in
 g++) CMK_AMD64="-m64 -fPIC" ;;
 esac
 
 CMK_CPP_CHARM="/lib/cpp -P"
-CMK_CPP_C="mpicc -E"
-CMK_CC="mpicc $CMK_AMD64 "
-CMK_CXX="mpiCC $CMK_AMD64 "
-CMK_CXXPP="mpiCC -E $CMK_AMD64 "
+CMK_CPP_C="$MPICC -E"
+CMK_CC="$MPICC $CMK_AMD64 "
+CMK_CXX="$MPICXX $CMK_AMD64 "
+CMK_CXXPP="$MPICXX -E $CMK_AMD64 "
 
 CMK_SYSLIBS="-lmpich "
 CMK_LIBS="-lckqt $CMK_SYSLIBS "
