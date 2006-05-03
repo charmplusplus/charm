@@ -101,10 +101,12 @@ int FEM_master_parallel_part(int fem_mesh,int masterRank,FEM_Comm_t comm_context
   /*
     call parmetis
   */
+	double  parStartTime = CkWallTimer();
   struct partconndata *partdata = FEM_call_parmetis(data,comm_context);
 
-  printf("done with parmetis %d FEM_Mesh %d\n",CmiMemoryUsage(),sizeof(FEM_Mesh));
+  printf("done with parmetis %d FEM_Mesh %d in %.6lf \n",CmiMemoryUsage(),sizeof(FEM_Mesh),CkWallTimer()-parStartTime);
 	
+	double dataArrangeStartTime = CkWallTimer();
   /*
     Set up a msa to store the partitions to which a node belongs.
     A node can belong to multiple partitions.
@@ -125,15 +127,6 @@ int FEM_master_parallel_part(int fem_mesh,int masterRank,FEM_Comm_t comm_context
 
   FEM_write_part2node(nodepart,part2node,partdata,(MPI_Comm)comm_context);
 
-  /*
-    Set up a msa to store the elements that belong to a partition
-  */
-	/*
-  MSA1DINTLIST part2elem(numChunks,numChunks);
-  MPI_Bcast_pup(part2elem,masterRank,(MPI_Comm)comm_context);
-  part2elem.enroll(numChunks);
-	
-  FEM_write_part2elem(part2elem,partdata,(MPI_Comm)comm_context);*/
 	
   /*
     Get the list of elements and nodes that belong to this partition
@@ -176,7 +169,10 @@ int FEM_master_parallel_part(int fem_mesh,int masterRank,FEM_Comm_t comm_context
 	
 	
   delete partdata;
-  /*
+  
+	printf("[%d] Data Arrangement took %.6lf \n",masterRank,CkWallTimer()-dataArrangeStartTime);
+	
+	/*
     collect the ghost data and send it to all the chunks.
   */
   struct ghostdata *gdata = gatherGhosts();
@@ -253,14 +249,6 @@ int FEM_slave_parallel_part(int fem_mesh,int masterRank,FEM_Comm_t comm_context)
 		
   FEM_write_part2node(nodepart,part2node,partdata,(MPI_Comm)comm_context);
 
-  /*
-    write the msa that stores the elements that belong to each partition
-  */
-/*  MSA1DINTLIST part2elem;
-  MPI_Bcast_pup(part2elem,masterRank,(MPI_Comm)comm_context);
-  part2elem.enroll(numChunks);
-	
-  FEM_write_part2elem(part2elem,partdata,(MPI_Comm)comm_context);*/
   /*
     Get the list of elements and nodes that belong to this partition
   */
