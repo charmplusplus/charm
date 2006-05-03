@@ -11,6 +11,7 @@ Licensing details should be addresssed, since this is copyrighted.
 #include "ampiEvents.h" /*** for trace generation for projector *****/
 #include "ampiProjections.h"
 
+
 /* This is the default implementation of alltoall. The algorithm is:
    
    Algorithm: MPI_Alltoall
@@ -59,12 +60,14 @@ Licensing details should be addresssed, since this is copyrighted.
 //   HELPER FUNCTIONS:
 /////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#ifndef MAX
 int MAX(int a, int b){
   if(a>b)
 	return a;
   else
 	return b;
 }
+#endif
 
 #if 0
 int MPI_Pack_size(int incount, MPI_Datatype type, MPI_Comm comm, int *size)
