@@ -122,12 +122,10 @@ class double2Msg : public CMessage_double2Msg {
 class FEMMeshMsg : public CMessage_FEMMeshMsg {
  public:
   FEM_Mesh *m;
-  int dimn;
   TCharm *t;
 
-  FEMMeshMsg(FEM_Mesh *mh, int dim, TCharm *t1) {
+  FEMMeshMsg(FEM_Mesh *mh, TCharm *t1) {
     m = mh;
-    dimn = dim;
     t = t1;
   }
 
@@ -290,7 +288,7 @@ class entDataMsg : public CMessage_entDataMsg {
   }
 };
 
-class updateAttrsMsg : public CMessage_entDataMsg {
+class updateAttrsMsg : public CMessage_updateAttrsMsg {
  public:
   char *data;
   int datasize;
@@ -323,10 +321,10 @@ class femMeshModify : public CBase_femMeshModify {
   int numChunks;
   int idx;
   TCharm *tc;
+  CProxy_TCharm tproxy;
   FEM_Mesh *fmMesh;
   FEM_lock *fmLock;
-  CkVec<FEM_lockN *> fmLockN;
-  //CkVec<FEM_lockN *> *fmgLockN;
+  CkVec<FEM_lockN> fmLockN;
   CkVec<bool> fmIdxlLock; //each chunk can have numChunks*5 idxl lists, but numChunks locks. 
   CkVec<int> fmfixedNodes; //this list is populated initially, and never changes (defines shape)
   FEM_MUtil *fmUtil;
@@ -337,8 +335,11 @@ class femMeshModify : public CBase_femMeshModify {
 
  public:
   femMeshModify(femMeshModMsg *fm);
-  femMeshModify(CkMigrateMessage *m)/* : TCharmClient1D(m) */{};
+  femMeshModify(CkMigrateMessage *m);
   ~femMeshModify();
+  void ckJustMigrated(void);
+  void pup(PUP::er &p);
+  void setPointersAfterMigrate(FEM_Mesh *m);
 
   intMsg *lockRemoteChunk(int2Msg *i2msg);
   intMsg *unlockRemoteChunk(int2Msg *i2msg);
@@ -349,7 +350,7 @@ class femMeshModify : public CBase_femMeshModify {
   int getIdx(){return idx;}
   FEM_Mesh *getfmMesh(){return fmMesh;}
   FEM_lock *getfmLock(){return fmLock;}
-  FEM_lockN *getfmLockN(int nodeid){
+  FEM_lockN getfmLockN(int nodeid){
     /*if(!FEM_Is_ghost_index(nodeid)) {
       return fmLockN[nodeid];
       } else {

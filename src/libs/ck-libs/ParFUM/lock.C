@@ -18,12 +18,34 @@ FEM_lock::FEM_lock(int i, femMeshModify *m) {
   mmod = m;
 }
 
+FEM_lock::FEM_lock(femMeshModify *m) {
+  idx = -1;
+  owner = -1;
+  isOwner = false;
+  isLocked = false;
+  hasLocks = false;
+  isLocking = false;
+  isUnlocking = false;
+  lockedChunks.removeAll();
+  mmod = m;
+}
+
 FEM_lock::~FEM_lock() {
   //before deleting it, ensure that it is not holding any locks
   if(hasLocks) {
     unlock();
   }
-  delete &lockedChunks;
+}
+
+void FEM_lock::pup(PUP::er &p) {
+  p|idx;
+  p|owner;
+  p|isOwner;
+  p|isLocked;
+  p|hasLocks;
+  p|isLocking;
+  p|isUnlocking;
+  p|lockedChunks;
 }
 
 bool FEM_lock::existsChunk(int index) {

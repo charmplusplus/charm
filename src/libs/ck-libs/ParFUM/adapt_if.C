@@ -11,15 +11,17 @@
 void FEM_ADAPT_Init(int meshID) {
   const int triangleFaces[6] = {0,1,1,2,2,0};
   FEM_Add_elem2face_tuples(meshID, 0, 2, 3, triangleFaces);
+  FEM_Mesh_allocate_valid_attr(meshID, FEM_ELEM+0);
+  FEM_Mesh_allocate_valid_attr(meshID, FEM_NODE);
   FEM_Mesh_create_elem_elem_adjacency(meshID);
   FEM_Mesh_create_node_elem_adjacency(meshID);
   FEM_Mesh_create_node_node_adjacency(meshID);
   _registerParFUM();
-  FEM_REF_INIT(meshID, 2);  // dim=2
+  FEM_REF_INIT(meshID);
   FEM_Mesh *meshP = FEM_Mesh_lookup(meshID, "FEM_ADAPT_Init");
   CtvInitialize(FEM_Adapt_Algs *, _adaptAlgs);
   CtvAccess(_adaptAlgs) = meshP->getfmMM()->getfmAdaptAlgs();
-  CtvAccess(_adaptAlgs)->FEM_Adapt_Algs_Init(FEM_DATA+0, FEM_BOUNDARY);
+  CtvAccess(_adaptAlgs)->FEM_Adapt_Algs_Init(FEM_DATA+0, FEM_BOUNDARY,2); //dimension=2
 }
 FDECL void FTN_NAME(FEM_ADAPT_INIT,fem_adapt_init)(int *meshID)
 {
@@ -114,18 +116,18 @@ FDECL void FTN_NAME(FEM_ADAPT_TESTMESH, fem_adapt_testmesh)(int* meshID)
     FEM_ADAPT_TestMesh(*meshID);
 }
 
-void FEM_ADAPT_SimpleRefineMesh(int meshID, double targetA, double xmin, double ymin, double xmax, double ymax) {
+int FEM_ADAPT_SimpleRefineMesh(int meshID, double targetA, double xmin, double ymin, double xmax, double ymax) {
     FEM_Mesh* mesh = FEM_Mesh_lookup(meshID, "FEM_ADAPT_GradateMesh");
-    mesh->getfmMM()->getfmAdaptAlgs()->simple_refine(targetA,xmin,ymin,xmax,ymax);
+    return mesh->getfmMM()->getfmAdaptAlgs()->simple_refine(targetA,xmin,ymin,xmax,ymax);
 }
 FDECL void FTN_NAME(FEM_ADAPT_SIMPLEREFINEMESH, fem_adapt_simplerefinemesh)(int* meshID, double* targetA, double* xmin, double* ymin, double* xmax, double* ymax)
 {
     FEM_ADAPT_SimpleRefineMesh(*meshID,*targetA,*xmin,*ymin,*xmax,*ymax);
 }
 
-void FEM_ADAPT_SimpleCoarsenMesh(int meshID, double targetA, double xmin, double ymin, double xmax, double ymax) {
+int FEM_ADAPT_SimpleCoarsenMesh(int meshID, double targetA, double xmin, double ymin, double xmax, double ymax) {
     FEM_Mesh* mesh = FEM_Mesh_lookup(meshID, "FEM_ADAPT_GradateMesh");
-    mesh->getfmMM()->getfmAdaptAlgs()->simple_coarsen(targetA,xmin,ymin,xmax,ymax);
+    return mesh->getfmMM()->getfmAdaptAlgs()->simple_coarsen(targetA,xmin,ymin,xmax,ymax);
 }
 FDECL void FTN_NAME(FEM_ADAPT_SIMPLECOARSENMESH, fem_adapt_simplecoarsenmesh)(int* meshID, double* targetA, double* xmin, double* ymin, double* xmax, double* ymax)
 {

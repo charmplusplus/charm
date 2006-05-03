@@ -21,6 +21,18 @@ FEM_lockN::~FEM_lockN() {
   //before deleting it, ensure that it is not holding any locks
 }
 
+void FEM_lockN::pup(PUP::er &p) {
+  p|owner;
+  p|pending;
+  p|idx;
+  p|noreadLocks;
+  p|nowriteLocks;
+}
+
+void FEM_lockN::setMeshModify(femMeshModify *mod) {
+  theMod = mod;
+}
+
 void FEM_lockN::reset(int i,femMeshModify *mod) {
   //CkAssert(noreadLocks==0 && nowriteLocks==0);
   if(haslocks()) wunlock(idx);
@@ -61,10 +73,11 @@ int FEM_lockN::wlock(int own) {
   if(nowriteLocks==0 && noreadLocks==0) {
     nowriteLocks++;
     owner = own;
-    if(pending==own) pending=-1; //got the lock, reset pending
 #ifdef DEBUG_LOCKS
     CkPrintf("[%d] Got write lock on node %d{%d} .\n",owner, idx, theMod->idx);
 #endif
+    CkAssert(nowriteLocks==1);
+    if(pending==own) pending=-1; //got the lock, reset pending
     return 1;
   } else {
     if((pending!=-1 && own<pending) || (pending==-1 && own<owner)) {
@@ -72,7 +85,7 @@ int FEM_lockN::wlock(int own) {
       return -1; //keep trying
     }
     return -2; //give up trying for a while
-  }
+    }
   return -2;
 }
 
@@ -99,6 +112,7 @@ int FEM_lockN::wunlock(int own) {
   //CkAssert(noreadLocks==0 && nowriteLocks>0);
   if(nowriteLocks>0) {
     nowriteLocks--;
+    CkAssert(nowriteLocks==0);
 #ifdef DEBUG_LOCKS
     CkPrintf("[%d] Unlocked write lock on node %d{%d} .\n",owner, idx, theMod->idx);
 #endif

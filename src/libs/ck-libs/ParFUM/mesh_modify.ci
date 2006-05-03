@@ -8,11 +8,11 @@ module ParFUM {
   readonly CProxy_femMeshModify meshMod;
 
   message femMeshModMsg;
+  message FEMMeshMsg;
   message boolMsg;
   message intMsg;
   message int2Msg;
   message double2Msg;
-  message FEMMeshMsg;
   message sharedNodeMsg {
     int between[];
   };

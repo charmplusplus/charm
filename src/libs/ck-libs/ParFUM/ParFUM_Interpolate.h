@@ -43,12 +43,15 @@ class FEM_Interpolate {
   FEM_Interpolate() {
     nodeEdgeFnPtr = nodeFaceFnPtr = nodeElementFnPtr = nodeCopyFnPtr = NULL;
     elemCopyFnPtr = elemNodeFnPtr = NULL;
+    theMesh = NULL;
+    theMod = NULL;
   }
 
   FEM_Interpolate(FEM_Mesh *m) {
     nodeEdgeFnPtr = nodeFaceFnPtr = nodeElementFnPtr = nodeCopyFnPtr = NULL;
     elemCopyFnPtr = elemNodeFnPtr = NULL;
     theMesh = m;
+    theMod = NULL;
   }
 
   FEM_Interpolate(FEM_Mesh *m, femMeshModify *fm) {
@@ -58,6 +61,18 @@ class FEM_Interpolate {
     theMod = fm;
   }
 
+  FEM_Interpolate(femMeshModify *fm) {
+    nodeEdgeFnPtr = nodeFaceFnPtr = nodeElementFnPtr = nodeCopyFnPtr = NULL;
+    elemCopyFnPtr = elemNodeFnPtr = NULL;
+    theMesh = NULL;
+    theMod = fm;
+  }
+
+  void pup(PUP::er &p) {
+    //p|theMesh;
+    //p|theMod;
+  }
+  
   void FEM_InterpolateSetMesh(FEM_Mesh *m) { theMesh = m; }
   
   // Methods to set and reset interpolate functions on the fly; these will be

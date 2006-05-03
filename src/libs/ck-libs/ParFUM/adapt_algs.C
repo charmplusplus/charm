@@ -19,12 +19,16 @@
 
 CtvDeclare(FEM_Adapt_Algs *, _adaptAlgs);
 
-FEM_Adapt_Algs::FEM_Adapt_Algs(FEM_Mesh *m, femMeshModify *fm, int dimension) 
+FEM_Adapt_Algs::FEM_Adapt_Algs(FEM_Mesh *m, femMeshModify *fm) 
 { 
   theMesh = m; 
   theMod = fm; 
-  dim = dimension; 
   //theAdaptor = theMod->fmAdapt;
+  theAdaptor = theMod->fmAdaptL;
+}
+FEM_Adapt_Algs::FEM_Adapt_Algs(femMeshModify *fm) {
+  theMesh = NULL;
+  theMod = fm;
   theAdaptor = theMod->fmAdaptL;
 }
 
@@ -133,6 +137,14 @@ int FEM_Adapt_Algs::Refine(int qm, int method, double factor, double *sizes)
 	double tmpLen, avgEdgeLength=0.0, maxEdgeLength = 0.0;
 	int maxEdgeIdx=0;
 	theMesh->e2n_getAll(elId, elemConn);
+	bool notclear = false;
+	for(int j=0; j<elemWidth; j++) {
+	  int nd = elemConn[j];
+	  if(nd>=0) notclear = theMod->fmLockN[nd].haslocks();
+	  //else cannot look up because connectivity might be screwed up,
+	  //I am hoping that at least one of the nodes will be local
+	}
+	if(notclear) continue;
 	for (int j=0; j<elemWidth-1; j++) {
 	  for (int k=j+1; k<elemWidth; k++) {
 	    tmpLen = length(elemConn[j], elemConn[k]);
@@ -243,6 +255,14 @@ int FEM_Adapt_Algs::Coarsen(int qm, int method, double factor, double *sizes)
       elId=Delete_Min(1);
       if ((elId != -1) && (theMesh->elem[0].is_valid(elId))) {
 	theMesh->e2n_getAll(elId, elemConn);
+	bool notclear = false;
+	for(int j=0; j<elemWidth; j++) {
+	  int nd = elemConn[j];
+	  if(nd>=0) notclear = theMod->fmLockN[nd].haslocks();
+	  //else cannot look up because connectivity might be screwed up,
+	  //I am hoping that at least one of the nodes will be local
+	}
+	if(notclear) continue;
 	int n1=elemConn[0], n2=elemConn[1];
 	double tmpLen, avgEdgeLength=0.0, 
 	  minEdgeLength = length(n1, n2);
@@ -351,6 +371,14 @@ void FEM_Adapt_Algs::FEM_Repair(int qm)
 	if (qFactor <  0.75*QUALITY_MIN) {
 	  int elId = i;
 	  theMesh->e2n_getAll(elId, elemConn);
+	  bool notclear = false;
+	  for(int j=0; j<elemWidth; j++) {
+	    int nd = elemConn[j];
+	    if(nd>=0) notclear = theMod->fmLockN[nd].haslocks();
+	    //else cannot look up because connectivity might be screwed up,
+	    //I am hoping that at least one of the nodes will be local
+	  }
+	  if(notclear) continue;
 	  int n1=elemConn[0], n2=elemConn[1];
 	  //too bad.. should not decide without locking!!
 	  //these values might change by the time lock is acquired
@@ -738,11 +766,31 @@ int FEM_Adapt_Algs::simple_refine(double targetA, double xmin, double ymin, doub
       if(tmp!=-1 && theMesh->elem[0].is_valid(tmp)) {
 	//since we are reusing element indices, so do not trust earlier areas
 	theMesh->e2n_getAll(tmp,elemConn,0);
+	bool notclear = false;
+	for(int j=0; j<3; j++) {
+	  int nd = elemConn[j];
+	  if(nd>=0) notclear = theMod->fmLockN[nd].haslocks();
+	  //else cannot look up because connectivity might be screwed up,
+	  //I am hoping that at least one of the nodes will be local
+	}
+	if(notclear) continue;
 	getCoord(elemConn[0], coordsn1);
 	getCoord(elemConn[1], coordsn2);
 	getCoord(elemConn[2], coordsn3);
 	if(getArea(coordsn1, coordsn2, coordsn3) > targetA) {
-	  int ret = refine_element_leb(tmp);
+	  double len1 = length(coordsn1,coordsn2);
+	  double len2 = length(coordsn2,coordsn3);
+	  double len3 = length(coordsn3,coordsn1);
+	  int n1=elemConn[0], n2=elemConn[1];
+	  double max=len1;
+	  if(len2>max) {
+	    max = len2; n1 = elemConn[1]; n2 = elemConn[2];
+	  }
+	  if(len3>max) {
+	    max = len3; n1 = elemConn[2]; n2 = elemConn[0];
+	  }
+	  //int ret = refine_element_leb(tmp);
+	  int ret = theAdaptor->edge_bisect(n1,n2);
 	  if(ret!=-1) adapted = true;
 	}
       }
@@ -817,6 +865,14 @@ int FEM_Adapt_Algs::simple_coarsen(double targetA, double xmin, double ymin, dou
       int tmp = Delete_Min(1);
       if(tmp!=-1 && theMesh->elem[0].is_valid(tmp)) {
 	theMesh->e2n_getAll(tmp,elemConn,0);
+	bool notclear = false;
+	for(int j=0; j<3; j++) {
+	  int nd = elemConn[j];
+	  if(nd>=0) notclear = theMod->fmLockN[nd].haslocks();
+	  //else cannot look up because connectivity might be screwed up,
+	  //I am hoping that at least one of the nodes will be local
+	}
+	if(notclear) continue;
 	getCoord(elemConn[0], coordsn1);
 	getCoord(elemConn[1], coordsn2);
 	getCoord(elemConn[2], coordsn3);

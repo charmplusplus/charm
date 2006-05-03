@@ -23,7 +23,9 @@ class FEM_lock {
  public:
   FEM_lock() {};
   FEM_lock(int i, femMeshModify *m);
+  FEM_lock(femMeshModify *m);
   ~FEM_lock();
+  void pup(PUP::er &p);
 
   //locks all chunks which contain all the nodes and elements that are passed 
   //in this function
@@ -60,8 +62,10 @@ class FEM_lockN {
  public:
   FEM_lockN() {};
   FEM_lockN(int i,femMeshModify *mod);
+  FEM_lockN(femMeshModify *mod);
   ~FEM_lockN();
-
+  void pup(PUP::er &p);
+  void setMeshModify(femMeshModify *mod);
   void reset(int i,femMeshModify *mod);
   int rlock();
   int runlock();

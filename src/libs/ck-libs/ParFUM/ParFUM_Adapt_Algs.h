@@ -57,11 +57,19 @@ class FEM_Adapt_Algs {
     theMesh = NULL; theMod = NULL; theAdaptor = NULL;
   }
   /// Initialize FEM_Adapt_Algs with a chunk of the mesh
-  FEM_Adapt_Algs(FEM_Mesh *m, femMeshModify *fm, int dimension);
+  FEM_Adapt_Algs(FEM_Mesh *m, femMeshModify *fm);
+  FEM_Adapt_Algs(femMeshModify *fm);
   ~FEM_Adapt_Algs();
-  void FEM_Adapt_Algs_Init(int coord_at, int bc_at) {
+  void pup(PUP::er &p) {
+    p|coord_attr;
+    p|bc_attr;
+    p|dim;
+  }
+  void FEM_AdaptAlgsSetMesh(FEM_Mesh *m) {theMesh = m;}
+  void FEM_Adapt_Algs_Init(int coord_at, int bc_at, int dimension) {
     coord_attr = coord_at;
     bc_attr = bc_at;
+    dim = dimension;
   }
   /// Perform refinements on a mesh
   /** Perform refinements on a mesh.  Tries to maintain/improve element quality

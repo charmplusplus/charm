@@ -447,10 +447,10 @@ void FEM_chunk::pup(PUP::er &p)
 // Pup the meshes
   p|default_read;
   p|default_write;
+  p|thisIndex;
   p|meshes;
   
   p|defaultComm;
-  p|thisIndex;
 }
 
 PUPable_def(FEM_Sym_Linear);
@@ -1425,7 +1425,7 @@ CDECL void FEM_Add_elem2face_tuples(int fem_mesh, int elem_type, int nodesPerTup
 {
 	FEMAPI("FEM_Add_elem2face_tuples");
 	FEM_Mesh *m = FEM_Mesh_lookup(fem_mesh,"FEM_Add_elem2face_tuples");
-	FEM_ElemAdj_Layer *cur=m->getElemAdjLayer(); // creates the structure on first access
+	FEM_ElemAdj_Layer *cur = m->getElemAdjLayer(); // creates the structure on first access
 	cur->initialized = 1;
 
 	if(cur->elem[elem_type].tuplesPerElem != 0)

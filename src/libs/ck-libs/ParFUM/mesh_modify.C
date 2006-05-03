@@ -148,10 +148,10 @@ int FEM_add_node_local(FEM_Mesh *m, int addGhost){
     m->n2n_removeAll(newNode);    // initialize node adjacencies
     //add a lock
     if(newNode >= m->getfmMM()->fmLockN.size()) {
-      m->getfmMM()->fmLockN.push_back(new FEM_lockN(newNode,m->getfmMM()));
+      m->getfmMM()->fmLockN.push_back(FEM_lockN(newNode,m->getfmMM()));
     }
     else {
-      m->getfmMM()->fmLockN[newNode]->reset(newNode,m->getfmMM());
+      m->getfmMM()->fmLockN[newNode].reset(newNode,m->getfmMM());
     }
   }
 #ifdef DEBUG_2
@@ -330,7 +330,7 @@ void FEM_remove_node_local(FEM_Mesh *m, int node) {
     CkAssert((numAdjNodes==0) && (numAdjElts==0));
     //should be done for the locked node only, i.e. the node on the smallest chunk no
     m->node.set_invalid(node,true);
-    m->getfmMM()->fmLockN[node]->reset(node,m->getfmMM());
+    m->getfmMM()->fmLockN[node].reset(node,m->getfmMM());
   }
   if(numAdjNodes != 0) delete[] adjNodes;
   if(numAdjElts != 0) delete[] adjElts;
@@ -1575,12 +1575,12 @@ int FEM_Modify_LockN(FEM_Mesh *m, int nodeId, int readlock) {
     CkAssert(minChunk!=MAX_CHUNK);
     if(minChunk==index) {
       if(readlock) {
-	ret = m->getfmMM()->getfmLockN(nodeId)->rlock();
+	ret = m->getfmMM()->fmLockN[nodeId].rlock();
       } else {
-	ret = m->getfmMM()->getfmLockN(nodeId)->wlock(index);
+	ret = m->getfmMM()->fmLockN[nodeId].wlock(index);
       }
       if(ret==1) {
-	m->getfmMM()->getfmLockN(nodeId)->verifyLock();
+	m->getfmMM()->fmLockN[nodeId].verifyLock();
       }
       return ret;
     }
@@ -1644,13 +1644,13 @@ int FEM_Modify_LockN(FEM_Mesh *m, int nodeId, int readlock) {
   }
   else {
     if(readlock) {
-      ret = m->getfmMM()->getfmLockN(nodeId)->rlock();
+      ret = m->getfmMM()->fmLockN[nodeId].rlock();
     } else {
       int index = m->getfmMM()->getIdx();
-      ret = m->getfmMM()->getfmLockN(nodeId)->wlock(index);
+      ret = m->getfmMM()->fmLockN[nodeId].wlock(index);
     }
     /*if(ret==1) {
-      m->getfmMM()->getfmLockN(nodeId)->verifyLock();
+      m->getfmMM()->fmLockN[nodeId].verifyLock();
       }*/
     return ret;
   }
@@ -1686,9 +1686,9 @@ int FEM_Modify_UnlockN(FEM_Mesh *m, int nodeId, int readlock) {
     if(numchunks!=0) free(chunks1);
     if(minChunk==index) {
       if(readlock) {
-	return m->getfmMM()->getfmLockN(nodeId)->runlock();
+	return m->getfmMM()->fmLockN[nodeId].runlock();
       } else {
-	return m->getfmMM()->getfmLockN(nodeId)->wunlock(index);
+	return m->getfmMM()->fmLockN[nodeId].wunlock(index);
       }
     }
     else {
@@ -1735,10 +1735,10 @@ int FEM_Modify_UnlockN(FEM_Mesh *m, int nodeId, int readlock) {
   }
   else {
     if(readlock) {
-      return m->getfmMM()->getfmLockN(nodeId)->runlock();
+      return m->getfmMM()->fmLockN[nodeId].runlock();
     } else {
       int index = m->getfmMM()->getIdx();
-      return m->getfmMM()->getfmLockN(nodeId)->wunlock(index);
+      return m->getfmMM()->fmLockN[nodeId].wunlock(index);
     }
   }
   return -1; //should not reach here
@@ -1781,7 +1781,7 @@ void FEM_Modify_LockAll(FEM_Mesh*m, int nodeId, bool lockall) {
 	int done = imsg->i;
 	delete imsg;
       }
-      m->getfmMM()->getfmLockN(nodeId)->wlock(index);
+      m->getfmMM()->fmLockN[nodeId].wlock(index);
     }
   }
   return;
@@ -1822,13 +1822,13 @@ void FEM_Modify_LockUpdate(FEM_Mesh*m, int nodeId, bool lockall) {
 	int sharedIdx = irec->getIdx(minI);
 	intMsg* imsg = meshMod[minchunk].lockRemoteNode(sharedIdx, index, 0, 0);
 	delete imsg;
-	m->getfmMM()->getfmLockN(nodeId)->wunlock(index);
+	m->getfmMM()->fmLockN[nodeId].wunlock(index);
       }
     }
     else {
       if(minchunk>index) minchunk=index;
       if(minchunk!=index) {
-	m->getfmMM()->getfmLockN(nodeId)->wunlock(index);
+	m->getfmMM()->fmLockN[nodeId].wunlock(index);
       }
       for(int i=0; i<numchunks; i++) {
 	int pchk = irec->getChk(i);
@@ -1863,7 +1863,7 @@ void FEM_Modify_correctLockN(FEM_Mesh *m, int nodeId) {
   if(is_shared(m,nodeId)) {
     for(int j=0; j<numchunks; j++) {
       int pchk = chunks1[j]->chk;
-      if(pchk == index) owner = m->getfmMM()->getfmLockN(nodeId)->lockOwner();
+      if(pchk == index) owner = m->getfmMM()->fmLockN[nodeId].lockOwner();
       else {
 	int sharedIdx = m->getfmMM()->getfmUtil()->exists_in_IDXL(m,nodeId,pchk,0);
 	intMsg* imsg = meshMod[pchk].hasLockRemoteNode(sharedIdx, index, 0);
@@ -1880,13 +1880,13 @@ void FEM_Modify_correctLockN(FEM_Mesh *m, int nodeId) {
 	  int locknodes = nodeId;
 	  int gotlocks = 1;
 	  int done = -1;
-	  if(pchk==index) m->getfmMM()->getfmLockN(nodeId)->wunlock(index);
+	  if(pchk==index) m->getfmMM()->fmLockN[nodeId].wunlock(index);
 	  else {
 	    int sharedIdx = m->getfmMM()->getfmUtil()->exists_in_IDXL(m,nodeId,pchk,0);
 	    intMsg* imsg = meshMod[pchk].unlockRemoteNode(sharedIdx, index, 0, 0);
 	    delete imsg;
 	  }
-	  if(minChunk==index) done = m->getfmMM()->getfmLockN(nodeId)->wlock(index);
+	  if(minChunk==index) done = m->getfmMM()->fmLockN[nodeId].wlock(index);
 	  else {
 	    CkAssert(minChunk!=MAX_CHUNK);
 	    int sharedIdx = m->getfmMM()->getfmUtil()->exists_in_IDXL(m,nodeId,minChunk,0);
@@ -1947,7 +1947,7 @@ void FEM_Modify_correctLockN(FEM_Mesh *m, int nodeId) {
 
 
 /** **/
-CDECL void FEM_REF_INIT(int mesh, int dim) {
+CDECL void FEM_REF_INIT(int mesh) {
   CkArrayID femRefId;
   int cid;
   int size;
@@ -1969,7 +1969,7 @@ CDECL void FEM_REF_INIT(int mesh, int dim) {
   femMeshModMsg *fm = new femMeshModMsg(size,cid);
   meshMod[cid].insert(fm);
   FEM_Mesh *m=FEM_Mesh_lookup(mesh,"FEM_REF_INIT");
-  FEMMeshMsg *msg = new FEMMeshMsg(m,dim,tc); 
+  FEMMeshMsg *msg = new FEMMeshMsg(m,tc); 
   meshMod[cid].setFemMesh(msg);
 #ifdef DEBUG 
   CmiMemoryCheck(); 
@@ -2040,6 +2040,17 @@ femMeshModify::femMeshModify(femMeshModMsg *fm) {
   delete fm;
 }
 
+femMeshModify::femMeshModify(CkMigrateMessage *m) {
+  tc = NULL;
+  fmMesh = NULL;
+  fmLock = new FEM_lock(this);
+  fmUtil = new FEM_MUtil(this);
+  fmInp = new FEM_Interpolate(this);
+  fmAdapt = new FEM_Adapt(this);
+  fmAdaptL = new FEM_AdaptL(this);
+  fmAdaptAlgs = new FEM_Adapt_Algs(this);
+}
+
 femMeshModify::~femMeshModify() {
   if(fmLock != NULL) {
     delete fmLock;
@@ -2049,19 +2060,55 @@ femMeshModify::~femMeshModify() {
   }
 }
 
+void femMeshModify::pup(PUP::er &p) {
+  p|numChunks;
+  p|idx;
+  p|tproxy;
+  fmLock->pup(p);
+  p|fmLockN;
+  p|fmIdxlLock;
+  p|fmfixedNodes;
+  fmUtil->pup(p);
+  fmInp->pup(p);
+  fmAdapt->pup(p);
+  fmAdaptL->pup(p);
+  fmAdaptAlgs->pup(p);
+}
+
+enum {FEM_globalID=33};
+void femMeshModify::ckJustMigrated(void) {
+  ArrayElement1D::ckJustMigrated();
+  //set the pointer to fmMM
+  tc = tproxy[idx].ckLocal();
+  CkVec<TCharm::UserData> &v=tc->sud;
+  FEM_chunk *c = (FEM_chunk*)(v[FEM_globalID].getData());
+  fmMesh = c->getMesh("ckJustMigrated");
+  fmMesh->fmMM = this;
+  setPointersAfterMigrate(fmMesh);
+}
+
+void femMeshModify::setPointersAfterMigrate(FEM_Mesh *m) {
+  fmMesh = m;
+  fmInp->FEM_InterpolateSetMesh(fmMesh);
+  fmAdapt->FEM_AdaptSetMesh(fmMesh);
+  fmAdaptL->FEM_AdaptLSetMesh(fmMesh);
+  fmAdaptAlgs->FEM_AdaptAlgsSetMesh(fmMesh);
+  for(int i=0; i<fmLockN.size(); i++) fmLockN[i].setMeshModify(this);
+}
+
 void femMeshModify::setFemMesh(FEMMeshMsg *fm) {
   fmMesh = fm->m;
   tc = fm->t;
+  tproxy = tc->getProxy();
   fmMesh->setFemMeshModify(this);
   fmAdapt = new FEM_Adapt(fmMesh, this);
   fmAdaptL = new FEM_AdaptL(fmMesh, this);
-  int dim = fm->dimn;
-  fmAdaptAlgs = new FEM_Adapt_Algs(fmMesh, this, dim);
+  fmAdaptAlgs = new FEM_Adapt_Algs(fmMesh, this);
   fmInp = new FEM_Interpolate(fmMesh, this);
   //populate the node locks
   int nsize = fmMesh->node.size();
   for(int i=0; i<nsize; i++) {
-    fmLockN.push_back(new FEM_lockN(i,this));
+    fmLockN.push_back(FEM_lockN(i,this));
   }
   /*int gsize = fmMesh->node.ghost->size();
     for(int i=0; i<gsize; i++) {
@@ -2126,12 +2173,12 @@ intMsg *femMeshModify::lockRemoteNode(int sharedIdx, int fromChk, int isGhost, i
   }
   else {
     if(readLock) {
-      ret = fmLockN[localIdx]->rlock();
+      ret = fmLockN[localIdx].rlock();
     } else {
 #ifdef DEBUG 
       CmiMemoryCheck(); 
 #endif
-      ret = fmLockN[localIdx]->wlock(fromChk);
+      ret = fmLockN[localIdx].wlock(fromChk);
 #ifdef DEBUG 
       CmiMemoryCheck(); 
 #endif
@@ -2159,9 +2206,9 @@ intMsg *femMeshModify::unlockRemoteNode(int sharedIdx, int fromChk, int isGhost,
   intMsg *imsg = new intMsg(0);
   int ret;
   if(readLock) {
-    ret = fmLockN[localIdx]->runlock();
+    ret = fmLockN[localIdx].runlock();
   } else {
-    ret = fmLockN[localIdx]->wunlock(fromChk);
+    ret = fmLockN[localIdx].wunlock(fromChk);
   }
   imsg->i = ret;
 #ifdef DEBUG 
@@ -2183,7 +2230,7 @@ intMsg *femMeshModify::hasLockRemoteNode(int sharedIdx, int fromChk, int isGhost
   }
   CkAssert(localIdx != -1);
   intMsg *imsg = new intMsg(0);
-  int ret = fmLockN[localIdx]->lockOwner();
+  int ret = fmLockN[localIdx].lockOwner();
   imsg->i = ret;
 #ifdef DEBUG 
   CmiMemoryCheck(); 
@@ -2641,7 +2688,7 @@ boolMsg *femMeshModify::verifyLock(int fromChk, int sharedIdx, int isGhost) {
     ret = false;
   }
   else {
-    ret = fmLockN[localIdx]->verifyLock();
+    ret = fmLockN[localIdx].verifyLock();
   }
   bmsg->b = ret;
   return bmsg;

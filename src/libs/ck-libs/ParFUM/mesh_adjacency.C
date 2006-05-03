@@ -37,7 +37,6 @@ FORTRAN_AS_C(FEM_MESH_CREATE_NODE_ELEM_ADJACENCY,
              fem_mesh_create_node_elem_adjacency, 
              (int *fem_mesh),  (*fem_mesh) )
 
-
 CDECL void 
 FEM_Mesh_create_node_node_adjacency(int fem_mesh){
 	const char *caller="FEM_Mesh_create_node_node_adjacency"; FEMAPI(caller);
@@ -49,7 +48,6 @@ FORTRAN_AS_C(FEM_MESH_CREATE_NODE_NODE_ADJACENCY,
              fem_mesh_create_node_node_adjacency, 
              (int *fem_mesh),  (*fem_mesh) )
 
-
 CDECL void 
 FEM_Mesh_create_elem_elem_adjacency(int fem_mesh){
 	const char *caller="FEM_Mesh_create_elem_elem_adjacency"; FEMAPI(caller);
@@ -60,8 +58,6 @@ FORTRAN_AS_C(FEM_MESH_CREATE_ELEM_ELEM_ADJACENCY,
              FEM_Mesh_create_elem_elem_adjacency,
              fem_mesh_create_elem_elem_adjacency, 
              (int *fem_mesh),  (*fem_mesh) )
-
-
 
 CDECL void 
 FEM_Mesh_create_elem_node_adjacency(int fem_mesh){
@@ -337,8 +333,10 @@ void FEM_Mesh::createNodeNodeAdj(){
  * nodes are in a shared face(an edge will have 2, a triangle 3)
  */
 FEM_ElemAdj_Layer* FEM_Mesh::getElemAdjLayer(void) {
-  if (! lastElemAdjLayer) 
+  if (! lastElemAdjLayer) { 
 	lastElemAdjLayer=new FEM_ElemAdj_Layer();
+	lastLayerSet = true;
+  }
   return lastElemAdjLayer;
 }
 

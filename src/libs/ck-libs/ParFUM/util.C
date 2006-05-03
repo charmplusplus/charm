@@ -14,6 +14,9 @@ FEM_MUtil::FEM_MUtil(int i, femMeshModify *m) {
   mmod = m;
 }
 
+FEM_MUtil::FEM_MUtil(femMeshModify *m) {
+  mmod = m;
+}
 
 FEM_MUtil::~FEM_MUtil() {
   outStandingMappings.removeAll();
@@ -713,8 +716,8 @@ int FEM_MUtil::Replace_node_local(FEM_Mesh *m, int oldIdx, int newIdx) {
     m->node.set_valid(newIdx,true);   // set new node as valid
     m->n2e_removeAll(newIdx);    // initialize element adjacencies
     m->n2n_removeAll(newIdx);    // initialize node adjacencies
-    mmod->fmLockN.push_back(new FEM_lockN(newIdx,mmod));
-    mmod->fmLockN[newIdx]->wlock(idx); //lock it anyway, will unlock if needed in lockupdate
+    mmod->fmLockN.push_back(FEM_lockN(newIdx,mmod));
+    mmod->fmLockN[newIdx].wlock(idx); //lock it anyway, will unlock if needed in lockupdate
   }
   //copy the node attributes from oldIdx to newIdx
   FEM_Interpolate *inp = mmod->getfmInp();
@@ -1010,7 +1013,7 @@ int FEM_MUtil::getLockOwner(int nodeId) {
       }
     }
     else minchunk = idx;
-    if(minchunk == idx) owner = mmod->fmMesh->getfmMM()->getfmLockN(nodeId)->lockOwner();
+    if(minchunk == idx) owner = mmod->fmLockN[nodeId].lockOwner();
     else {
       CkAssert(minchunk!=MAX_CHUNK);
       int sharedIdx = mmod->getfmUtil()->exists_in_IDXL(mmod->fmMesh,nodeId,minchunk,0);
@@ -1384,12 +1387,15 @@ int FEM_MUtil::AreaTest(FEM_Mesh *m) {
       }
 #ifdef FEM_ELEMSORDERED
       if(-area < SLIVERAREA || larR>100.0) {
-#else
-      if(fabs(area) < SLIVERAREA || larR>100.0) {
-#endif
 	CkAssert(false);
 	return -1;
       }
+#else
+      if(fabs(area) < SLIVERAREA || larR>100.0) {
+	CkAssert(false);
+	return -1;
+      }
+#endif
     }
   }
   CkPrintf("SmallestArea %lf, SmallestEdge %lf, SmallestAlt %lf worstQuality %lf\n",smallestarea,smallestedge,smallestalt,largestQ);  
@@ -1455,7 +1461,7 @@ int FEM_MUtil::residualLockTest(FEM_Mesh *m) {
   int noNodes = m->node.size();
   for(int i=0; i<noNodes; i++) {
     if(m->node.is_valid(i)) {
-      CkAssert(!mmod->fmLockN[i]->haslocks());
+      CkAssert(!mmod->fmLockN[i].haslocks());
     }
   }
   for(int i=0; i<mmod->numChunks; i++) {
@@ -1607,7 +1613,7 @@ void FEM_MUtil::copyElemData(int etype, int elemid, int newEl) {
   inp->FEM_InterpolateElementCopy(em);
 }
 
- void FEM_MUtil::packEntData(char **data, int *size, int *cnt, int localIdx, bool isnode, int elemType){
+void FEM_MUtil::packEntData(char **data, int *size, int *cnt, int localIdx, bool isnode, int elemType){
   CkVec<FEM_Attribute *>*entattrs;
   if(isnode) {
     entattrs = (mmod->fmMesh->node).getAttrVec();
@@ -1648,7 +1654,7 @@ void FEM_MUtil::copyElemData(int etype, int elemid, int newEl) {
   return;
 }
 
- void FEM_MUtil::updateAttrs(char *data, int size, int newIndex, bool isnode, int elemType) {
+void FEM_MUtil::updateAttrs(char *data, int size, int newIndex, bool isnode, int elemType) {
   PUP::fromMem pmem(data);
   int count=0;
   CkVec<FEM_Attribute *>*attrs;
@@ -1674,3 +1680,4 @@ void FEM_MUtil::copyElemData(int etype, int elemid, int newEl) {
   CkAssert(size==count);
   return;
 }
+

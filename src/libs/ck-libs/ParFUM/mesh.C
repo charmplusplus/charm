@@ -979,6 +979,7 @@ FEM_VarIndexAttribute::FEM_VarIndexAttribute(FEM_Entity *e,int myAttr)
 void FEM_VarIndexAttribute::pup(PUP::er &p){
 	super::pup(p);
 	p | idx;
+	p|oldlength;
 };
 
 void FEM_VarIndexAttribute::pupSingle(PUP::er &p, int pupindx){
@@ -1054,7 +1055,8 @@ CDECL const char *FEM_Get_entity_name(int entity,char *storage)
 
 FEM_Entity::FEM_Entity(FEM_Entity *ghost_) //Default constructor
   :length(0), max(0),ghost(ghost_), coord(0), sym(0), globalno(0), valid(0), meshSizing(0),
-	 ghostIDXL(ghost?&ghostSend:NULL, ghost?&ghost->ghostRecv:NULL),resize(NULL)
+   ghostIDXL(ghost?&ghostSend:NULL, ghost?&ghost->ghostRecv:NULL),resize(NULL),
+   invalidList(NULL),first_invalid(0),last_invalid(0),invalidListLen(0),invalidListAllLen(0)
 {
 	//No attributes initially
 	if (femVersion == 0) {
@@ -1083,23 +1085,36 @@ void FEM_Entity::pup(PUP::er &p) {
 	   
 	   This is a much better fit for this situation than using the general PUP::able.
 	 */
-		int attr=0; // The attribute type we're pupping
-		FEM_Attribute *r=NULL;
-		if (!p.isUnpacking()) { //Send side: we already know the source
-			r=attributes[a];
-			attr=r->getAttr();
-		}
-		p|attr;
-		if (p.isUnpacking()) { //Recv side: create (or recycle) the destination
-			r=lookup(attr,"FEM_Entity::pup");
-		}
-		
-		{ //Put the human-readable attribute name in the output file:
-			char attrNameStorage[256];
-			p.comment(FEM_Get_attr_name(attr,attrNameStorage));
-		}
-		
-		r->pup(p);
+	  int attr=0; // The attribute type we're pupping
+	  FEM_Attribute *r=NULL;
+	  if (!p.isUnpacking()) { //Send side: we already know the source
+	    r=attributes[a];
+	    attr=r->getAttr();
+	  }
+	  p|attr;
+	  if (p.isUnpacking()) { //Recv side: create (or recycle) the destination
+	    r=lookup(attr,"FEM_Entity::pup");
+	  }
+	  
+	  { //Put the human-readable attribute name in the output file:
+	    char attrNameStorage[256];
+	    p.comment(FEM_Get_attr_name(attr,attrNameStorage));
+	  }
+	  r->pup(p);
+	}
+	p|first_invalid;
+	p|last_invalid;
+	p|invalidListLen;
+	p|invalidListAllLen;
+	if(p.isUnpacking()) {
+	  if(invalidList!=NULL) delete[] invalidList; //was just created in allocateValid
+	  if(invalidListAllLen>0) invalidList = new int[invalidListAllLen];
+	}
+	if(invalidListAllLen>0) {
+	  PUParray(p, (int*)invalidList, invalidListAllLen);
+	}
+	if(p.isDeleting()) {
+	  if(invalidList!=NULL) delete[] invalidList;
 	}
 	
 	if (ghost!=NULL) {
@@ -1107,6 +1122,7 @@ void FEM_Entity::pup(PUP::er &p) {
 		ghost->pup(p);
 	}
 }
+
 FEM_Entity::~FEM_Entity() 
 {
 	delete ghost;
@@ -1318,7 +1334,7 @@ int FEM_Entity::get_next_invalid(FEM_Mesh *m, bool isNode, bool isGhost){
 	if(isNode && !isGhost) { //it is a node & the entity is not a ghost entity
 	  while(retval <= last_invalid) {
 	    if(!is_valid(retval)) {
-	      if(m->getfmMM()->fmLockN[retval]->haslocks()) {
+	      if(m->getfmMM()->fmLockN[retval].haslocks()) {
 		retval++;
 	      }
 	      else if(hasConn(retval)) { //has some connectivity
@@ -1443,10 +1459,11 @@ void FEM_Entity::create(int attr,const char *caller) {
 	FEM_IndexAttribute *chunkNo= new FEM_IndexAttribute(this,FEM_CHUNK,NULL);
 	add(chunkNo);
 	chunkNo->setWidth(1);
-  } else if(attr == FEM_BOUNDARY){
-	//the boundary attribute for this entity
+  }
+  else if(attr == FEM_BOUNDARY){
 	allocateBoundary();
-  } else {
+  }
+  else {
 	//It's an unrecognized tag: abort
 	char attrNameStorage[256], msg[1024];
 	sprintf(msg,"Could not locate the attribute %s for entity %s",
@@ -1689,8 +1706,10 @@ void FEM_Elem::create(int attr,const char *caller) {
   //
   // Note: allocateElemAdjacency() will create both attribute fields since they
   //       should always be used together.
-  
-  if(attr == FEM_ELEM_ELEM_ADJACENCY)
+
+  if(attr == FEM_CONN) ;
+    //who allocates the conn?
+  else if(attr == FEM_ELEM_ELEM_ADJACENCY)
     allocateElemAdjacency();
   else if(attr == FEM_ELEM_ELEM_ADJ_TYPES)
     allocateElemAdjacency();
@@ -1766,11 +1785,13 @@ FEM_Mesh::FEM_Mesh()
 	:node(new FEM_Node(NULL)),
 	 elem(*this,"FEM_ELEM"),
 	 sparse(*this,"FEM_SPARSE"),
-	 lastElemAdjLayer(NULL)
+     lastElemAdjLayer(NULL),
+	 fmMM(NULL)
 {
 	m_isSetting=true; //Meshes start out setting
-	lastElemAdjLayer=NULL; // Will be created on demand
+	lastLayerSet = false;
 }
+
 FEM_Mesh::~FEM_Mesh() {
 }
 
@@ -1836,7 +1857,13 @@ void FEM_Mesh::pup(PUP::er &p)  //For migration
 	symList.pup(p);
 	
 	p|m_isSetting;
-
+	p|lastLayerSet;
+	if(lastLayerSet) {
+	  if(p.isUnpacking()) {
+	    if(lastElemAdjLayer==NULL) lastElemAdjLayer = new FEM_ElemAdj_Layer();
+	  }
+	  lastElemAdjLayer->pup(p);
+	}
 	p.comment("-------------- Mesh data --------------");
 	udata.pup(p);
 

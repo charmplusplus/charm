@@ -138,12 +138,8 @@ to mark the chunk to which a ghost node or element belongs datatype=FEM_INDEX*/
 #define FEM_NODE_ELEM_ADJACENCY (FEM_ATTRIB_FIRST+10) /*node to element adjacency FEM_VAR_INDEX only */
 #define FEM_NODE_NODE_ADJACENCY (FEM_ATTRIB_FIRST+11) /*node to node adjacency FEM_VAR_INDEX only */
 #define FEM_ELEM_ELEM_ADJACENCY (FEM_ATTRIB_FIRST+12) /*element to element adjacency FEM_VAR_INDEX only */
-#define FEM_ELEM_ELEM_ADJ_TYPES (FEM_ATTRIB_FIRST+13) /*stores element types for those element id's listed in 
-														FEM_ELEM_ELEM_ADJACENCY, needed when using 
-														multiple element types*/
-#define FEM_IS_VALID_ATTR (FEM_ATTRIB_FIRST+14) /* Stores a flag(an IDXL_BYTE) for each element or node specifying whether the entity 
-										   exists or is valid. It may be 0 whenever a mesh modification occurs that deletes the 
-										   corresponding node or element */
+#define FEM_ELEM_ELEM_ADJ_TYPES (FEM_ATTRIB_FIRST+13) /*stores element types for those element id's listed in FEM_ELEM_ELEM_ADJACENCY, needed when using multiple element types*/
+#define FEM_IS_VALID_ATTR (FEM_ATTRIB_FIRST+14) /* Stores a flag(an IDXL_BYTE) for each element or node specifying whether the entity exists or is valid. It may be 0 whenever a mesh modification occurs that deletes the corresponding node or element */
 
 #define FEM_MESH_SIZING (FEM_ATTRIB_FIRST+15) /* Target edge length attr. */
 #define FEM_ATTRIB_LAST (FEM_ATTRIB_FIRST+16) /*This is the last valid attribute code*/
@@ -327,7 +323,7 @@ to mark the chunk to which a ghost node or element belongs datatype=FEM_INDEX*/
   int FEM_Modify_Unlock(int mesh);
   int FEM_Modify_LockN(int mesh, int nodeId, int readLock);
   int FEM_Modify_UnlockN(int mesh, int nodeId, int readLock);
-  void FEM_REF_INIT(int mesh, int dim);
+  void FEM_REF_INIT(int mesh);
   
  
 
@@ -478,11 +474,11 @@ void FEM_ADAPT_TestMesh(int meshID);
 FDECL void FTN_NAME(FEM_ADAPT_TESTMESH, fem_adapt_testmesh)(int* meshID);
 
 
-void FEM_ADAPT_SimpleRefineMesh(int meshID, double targetA, double xmin, double ymin, double xmax, double ymax);
+int FEM_ADAPT_SimpleRefineMesh(int meshID, double targetA, double xmin=0.0, double ymin=0.0, double xmax=1.0, double ymax=1.0);
 FDECL void FTN_NAME(FEM_ADAPT_SIMPLEREFINEMESH, fem_adapt_simplerefinemesh)(int* meshID, double* targetA, double* xmin, double* ymin, double* xmax, double* ymax);
 
 
-void FEM_ADAPT_SimpleCoarsenMesh(int meshID, double targetA, double xmin, double ymin, double xmax, double ymax);
+int FEM_ADAPT_SimpleCoarsenMesh(int meshID, double targetA, double xmin=0.0, double ymin=0.0, double xmax=1.0, double ymax=1.0);
 FDECL void FTN_NAME(FEM_ADAPT_SIMPLECOARSENMESH, fem_adapt_simplecoarsenmesh)(int* meshID, double* targetA, double* xmin, double* ymin, double* xmax, double* ymax);
 
   // End Adaptivity interface

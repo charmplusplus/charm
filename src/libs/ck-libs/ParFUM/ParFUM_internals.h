@@ -1182,20 +1182,20 @@ class FEM_Mesh : public CkNoncopyable {
   /// The symmetries in the mesh
   FEM_Sym_List symList;
   bool m_isSetting;
-  femMeshModify *fmMM;
   
   void checkElemType(int elType,const char *caller) const;
   void checkSparseType(int uniqueID,const char *caller) const; 
-  
-  FEM_ElemAdj_Layer* lastElemAdjLayer;
 
  public:
+  femMeshModify *fmMM;
+  bool lastLayerSet;
+  FEM_ElemAdj_Layer* lastElemAdjLayer;
   void setFemMeshModify(femMeshModify *m);
   
   FEM_Mesh();
   void pup(PUP::er &p); //For migration
   ~FEM_Mesh();
-  
+
   /// The nodes in this mesh:
   FEM_Node node; 
   
@@ -1351,13 +1351,9 @@ class FEM_Mesh : public CkNoncopyable {
 
   /// Get two elements adjacent to both n1 and n2
   void get2ElementsOnEdge(int n1, int n2, int *result_e1, int *result_e2) ;
-
-
-
-
-
 }; 
 PUPmarshall(FEM_Mesh);
+
 FEM_Mesh *FEM_Mesh_lookup(int fem_mesh,const char *caller);
 FEM_Entity *FEM_Entity_lookup(int fem_mesh,int entity,const char *caller);
 FEM_Attribute *FEM_Attribute_lookup(int fem_mesh,int entity,int attr,const char *caller);
@@ -1830,8 +1826,8 @@ class FEM_ElemAdj_Layer : public CkNoncopyable {
  public:
   int initialized;
   int nodesPerTuple; //Number of shared nodes for a pair of elements
- 
- class elemAdjInfo {
+  
+  class elemAdjInfo {
   public:
     //  int recentElType; // should not be here, but if it is it should be pup'ed
     int tuplesPerElem; //# of tuples surrounding this element, i.e. number of faces on an element
@@ -1841,17 +1837,17 @@ class FEM_ElemAdj_Layer : public CkNoncopyable {
     void pup(PUP::er &p) {//CkAbort("FEM> Shouldn't call elemGhostInfo::pup!\n");
     }
   };
- 
- elemAdjInfo elem[FEM_MAX_ELTYPE];
-
- FEM_ElemAdj_Layer() {initialized=0;}
-
+  
+  elemAdjInfo elem[FEM_MAX_ELTYPE];
+  
+  FEM_ElemAdj_Layer() {initialized=0;}
+  
   virtual void pup(PUP::er &p){
     p | nodesPerTuple;
-	p | initialized;
+    p | initialized;
     for(int i=0;i<FEM_MAX_ELTYPE;i++){
       p | elem[i].tuplesPerElem;
-	  if(elem[i].tuplesPerElem == 0){
+      if(elem[i].tuplesPerElem == 0){
 	continue;
       }
       int *arr;
@@ -2571,7 +2567,11 @@ class FEM_MUtil {
  public:
   FEM_MUtil() {}
   FEM_MUtil(int i, femMeshModify *m);
+  FEM_MUtil(femMeshModify *m);
   ~FEM_MUtil();
+  void pup(PUP::er &p) {
+    p|idx;
+  }
 
   int getIdx() { return idx; }
   //the entType signifies what type of entity to lock. node=0, elem=1;
