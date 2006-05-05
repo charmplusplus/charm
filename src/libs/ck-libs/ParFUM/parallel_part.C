@@ -13,7 +13,7 @@
 
 #include "../parmetis/parmetis.h"
 
-
+double elemlistaccTime=0;
 
 int FEM_Mesh_Parallel_broadcast(int fem_mesh,int masterRank,FEM_Comm_t comm_context){
   int myRank;
@@ -116,7 +116,9 @@ int FEM_master_parallel_part(int fem_mesh,int masterRank,FEM_Comm_t comm_context
   MPI_Bcast_pup(nodepart,masterRank,(MPI_Comm)comm_context);
   nodepart.enroll(numChunks);
 	
-  FEM_write_nodepart(nodepart,partdata);
+  FEM_write_nodepart(nodepart,partdata,(MPI_Comm)comm_context);
+	printf("Creating mapping of node to partition took %.6lf\n",CkWallTimer()-dataArrangeStartTime);
+	dataArrangeStartTime = CkWallTimer();
 	
   /*
     Set up a msa to store the nodes that belong to a partition
@@ -132,8 +134,13 @@ int FEM_master_parallel_part(int fem_mesh,int masterRank,FEM_Comm_t comm_context
     Get the list of elements and nodes that belong to this partition
   */
   NodeList lnodes = part2node.get(masterRank);
+	lnodes.uniquify();
 //  IntList lelems = part2elem.get(masterRank);
 	
+
+	printf("Creating mapping of  partition to node took %.6lf\n",CkWallTimer()-dataArrangeStartTime);
+  printf("Time spent doing +=ElemList %.6lf \n",elemlistaccTime);
+	dataArrangeStartTime = CkWallTimer();
 
   /*
     Build an MSA of FEM_Mesh, with each index containing the mesh for that  chunk
@@ -237,7 +244,7 @@ int FEM_slave_parallel_part(int fem_mesh,int masterRank,FEM_Comm_t comm_context)
   MPI_Bcast_pup(nodepart,masterRank,(MPI_Comm)comm_context);
   nodepart.enroll(numChunks);
 	
-  FEM_write_nodepart(nodepart,partdata);
+  FEM_write_nodepart(nodepart,partdata,(MPI_Comm)comm_context);
 	
   /*
     write to the msa that stores the nodes that belong to each partition
@@ -253,6 +260,7 @@ int FEM_slave_parallel_part(int fem_mesh,int masterRank,FEM_Comm_t comm_context)
     Get the list of elements and nodes that belong to this partition
   */
   NodeList lnodes = part2node.get(myRank);
+	lnodes.uniquify();
 //  IntList lelems = part2elem.get(myRank);
 
   /*
@@ -398,7 +406,7 @@ struct partconndata * FEM_call_parmetis(struct conndata &data,FEM_Comm_t comm_co
   Write the partition number of the nodes to the msa array nodepart
   A node might belong to more than one partition
 */
-void FEM_write_nodepart(MSA1DINTLIST	&nodepart,struct partconndata *data){
+void FEM_write_nodepart(MSA1DINTLIST	&nodepart,struct partconndata *data,MPI_Comm comm_context){
   nodepart.sync();
   for(int i=0;i<data->nelem;i++){
     int start=data->eptr[i];
@@ -409,6 +417,7 @@ void FEM_write_nodepart(MSA1DINTLIST	&nodepart,struct partconndata *data){
     }
   }
   nodepart.sync();
+  
 }
 
 /*
@@ -429,6 +438,7 @@ void FEM_write_part2node(MSA1DINTLIST	&nodepart,MSA1DNODELIST &part2node,struct 
   part2node.sync();
   for(int i=start;i<end;i++){
     IntList t = nodepart.get(i);
+		t.uniquify();
     int num=0;
     if(t.vec->size()>1){
       num = t.vec->size();
@@ -537,6 +547,7 @@ void	FEM_write_part2mesh(MSA1DFEMMESH &part2mesh,struct partconndata *partdata,s
   int startnode=(myChunk * data->nnode)/numChunks;
   for(int i=0;i<m->node.size();i++){
     IntList chunks = nodepart.get(i+startnode);
+		chunks.uniquify();
     for(int j=0;j<chunks.vec->size();j++){
       MeshElem &myme = part2mesh.accumulate((*(chunks.vec))[j]);
       (myme.m->node).copyShape(m->node);
@@ -598,14 +609,14 @@ void addIDXLists(FEM_Mesh *m,NodeList &lnodes,int myChunk){
     // check if it is shared with other nodes		
     if(((*vec)[i]).numShared > 0){
       ///chunk numbers to which this node belongs
-      int *shared = (*vec)[i].shared;
+//      int *shared = &(((*vec)[i].shared)[0]);
 			
       for(int j=0;j<((*vec)[i]).numShared;j++){
-	if(shared[j] != myChunk){
+	if((*vec)[i].shared[j] != myChunk){
 	  //add this node to my CommunicatioList for this globalChunk
-	  m->node.shared.addList(shared[j]).push_back(local);
+	  m->node.shared.addList((*vec)[i].shared[j]).push_back(local);
 	}
-	if(shared[j] < myChunk){
+	if((*vec)[i].shared[j] < myChunk){
 	  m->node.setPrimary(local,false);
 	}
       }
@@ -742,7 +753,7 @@ void makeGhosts(FEM_Mesh *m,MPI_Comm comm,int masterRank,int numLayers,FEM_Ghost
   }
 
   for(int i=0;i<numLayers;i++){
-    printf("[%d] Making ghost layer %d \n",myChunk,i);
+    if(myChunk == 0){printf("[%d] Making ghost layer %d \n",myChunk,i);}
     makeGhost(m,comm,masterRank,totalShared,layers[i],countedSharedNode,global2local); 
   }
 };
@@ -775,7 +786,6 @@ void makeGhost(FEM_Mesh *m,MPI_Comm comm,int masterRank,int totalShared,FEM_Ghos
   }else{
     distTab = new MsaHashtable;
   }
-  printf("[%d] starting ghost generation \n",myChunk);
   MPI_Bcast_pup(*distTab,masterRank,comm);
   distTab->table.enroll(numChunks);
   DEBUG(printf("[%d] distributed table calling sync \n",myChunk));

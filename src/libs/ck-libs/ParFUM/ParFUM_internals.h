@@ -1891,6 +1891,7 @@ class FEM_ElemAdj_Layer : public CkNoncopyable {
 #endif
 
 #define MESH_CHUNK_TAG 3000
+#define MAX_SHARED_PER_NODE 20
 
 template <class T, bool PUP_EVERY_ELEMENT=true >
 class DefaultListEntry {
@@ -1900,6 +1901,8 @@ public:
     inline T getIdentity() { return T(); }
     inline bool pupEveryElement(){ return PUP_EVERY_ELEMENT; }
 };
+
+extern double elemlistaccTime;
 
 template <class T>
 class ElemList{
@@ -1915,37 +1918,48 @@ public:
 		vec = new CkVec<T>();
 		*this=rhs;
 	}
-	ElemList& operator=(const ElemList& rhs){
+	inline ElemList& operator=(const ElemList& rhs){
 //		 vec = new CkVec<T>();
 		*vec = *(rhs.vec);
 	}
-	ElemList& operator+=(const ElemList& rhs){
+	inline ElemList& operator+=(const ElemList& rhs){
 		/*
 			add the new unique elements to the List
 		*/
+		double _start = CkWallTimer();
 		int len = vec->size();
 		for(int i=0;i<rhs.vec->length();i++){
-			int flag=0;
-			for(int j=0;j<len;j++){
-				if((*vec)[j] == (*(rhs.vec))[i]){					
-					flag = 1;
-					break;
-				}
-			}
-			if(!flag){
-				vec->push_back((*(rhs.vec))[i]);
-			}	
+			vec->push_back((*(rhs.vec))[i]);
 		}
+//		uniquify();
+		elemlistaccTime += (CkWallTimer() - _start);
+		
 	}
 	ElemList(const T &val){
 		vec =new CkVec<T>();
 		vec->push_back(val);
 	};
-	virtual void pup(PUP::er &p){
+	inline virtual void pup(PUP::er &p){
 		if(p.isUnpacking()){
 			vec = new CkVec<T>();
 		}
 		pupCkVec(p,*vec);
+	}
+	inline void uniquify(){
+		vec->quickSort(8);
+		if(vec->length() != 0){
+			int count=0;
+			for(int i=1;i<vec->length();i++){
+				if((*vec)[count] == (*vec)[i]){	
+				}else{					
+					count++;
+					if(i != count){
+						(*vec)[count] = (*vec)[i];
+					}
+				}
+			}
+			vec->resize(count+1);
+		}	
 	}
 };
 
@@ -1962,37 +1976,41 @@ public:
 		-if numShared == 0 shared is NULL
 		- else stores all the chunks that share this node
 	*/
-	int *shared;
+	int shared[MAX_SHARED_PER_NODE];
+//	int *shared;
 	NodeElem(){
 		global = -1;
 		numShared = 0;
-		shared = NULL;
+//		shared = NULL;
 	}
 	NodeElem(int g_,int num_){
 		global = g_; numShared= num_;
-		if(numShared != 0){
+/*		if(numShared != 0){
 			shared = new int[numShared];
 		}else{
 			shared = NULL;
+		}*/
+		if(numShared > MAX_SHARED_PER_NODE){
+			CkAbort("In Parallel partition the max number of chunks per node exceeds limit\n");
 		}
 	}
 	NodeElem(int g_){
 		global = g_;
 		numShared = 0;
-		shared = NULL;
+//		shared = NULL;
 	}
 	NodeElem(const NodeElem &rhs){
-		shared=NULL;
+//		shared=NULL;
 		*this = rhs;
 	}
-	NodeElem& operator=(const NodeElem &rhs){
+	inline NodeElem& operator=(const NodeElem &rhs){
 		global = rhs.global;
 		numShared = rhs.numShared;
-		if(shared != NULL){
+/*		if(shared != NULL){
 			delete [] shared;
 		}
-		shared = new int[numShared];
-		memcpy(shared,rhs.shared,numShared*sizeof(int));
+		shared = new int[numShared];*/
+		memcpy(&shared[0],&((rhs.shared)[0]),numShared*sizeof(int));
                 return *this;
 	}
 
@@ -2014,19 +2032,19 @@ public:
 	virtual void pup(PUP::er &p){
 		p | global;
 		p | numShared;
-		if(p.isUnpacking()){
+/*		if(p.isUnpacking()){
 			if(numShared != 0){
 				shared = new int[numShared];
 			}else{
 				shared = NULL;
 			}
-		}
+		}*/
 		p(shared,numShared);
 	}
 	~NodeElem(){
-		if(shared != NULL){
+/*		if(shared != NULL){
 			delete [] shared;
-		}
+		}*/
 	}
 };
 
@@ -2054,7 +2072,7 @@ class MeshElem{
 		m = NULL;
 		*this = rhs;
 	}
-	MeshElem& operator=(const MeshElem &rhs){
+	inline MeshElem& operator=(const MeshElem &rhs){
 		if(m != NULL){
 			delete m;
 		}	
@@ -2064,7 +2082,7 @@ class MeshElem{
                 
                 return *this;
 	}
-	MeshElem& operator+=(const MeshElem &rhs){
+	inline MeshElem& operator+=(const MeshElem &rhs){
 		int oldel = m->nElems();
 		m->copyShape(*(rhs.m));
 		for(int i=0;i<rhs.m->node.size();i++){
@@ -2112,10 +2130,10 @@ public:
 				}
 				return str;
 			}
-			int &operator[](int i){
+			inline int &operator[](int i){
 				return nodes[i];
 			}
-			const int &operator[](int i) const {
+			inline const int &operator[](int i) const {
 				return nodes[i];
 			}
 			virtual void pup(PUP::er &p){
@@ -2138,7 +2156,7 @@ public:
 	Hashnode(const Hashnode &rhs){
 		*this = rhs;
 	}
-	Hashnode &operator=(const Hashnode &rhs){
+	inline Hashnode &operator=(const Hashnode &rhs){
 		numnodes = rhs.numnodes;
 		for(int i=0;i<numnodes;i++){
 			nodes[i] = rhs.nodes[i];
@@ -2147,7 +2165,7 @@ public:
 		elementNo = rhs.elementNo;
                 return *this;
 	}
-	bool operator==(const Hashnode &rhs){
+	inline bool operator==(const Hashnode &rhs){
 		if(numnodes != rhs.numnodes){
 			return false;
 		}
@@ -2164,7 +2182,69 @@ public:
 		}
 		return true;
 	}
-	bool equals(tupledata &tuple){
+	inline bool operator>=(const Hashnode &rhs){
+		if(numnodes < rhs.numnodes){
+			return false;
+		};
+		if(numnodes > rhs.numnodes){
+			return true;
+		}
+		
+		for(int i=0;i<numnodes;i++){
+			if(nodes[i] < rhs.nodes[i]){
+				return false;
+			}
+			if(nodes[i] > rhs.nodes[i]){
+				return true;
+			}
+		}
+		if(chunk < rhs.chunk){
+			return false;
+		}
+		if(chunk > rhs.chunk){
+			return true;
+		}
+		if(elementNo < rhs.elementNo){
+			return false;
+		}
+		if(elementNo > rhs.elementNo){
+			return true;
+		}
+		return true;
+	}
+	
+	inline bool operator<=(const Hashnode &rhs){
+		if(numnodes < rhs.numnodes){
+			return true;
+		};
+		if(numnodes > rhs.numnodes){
+			return false;
+		}
+		
+		for(int i=0;i<numnodes;i++){
+			if(nodes[i] < rhs.nodes[i]){
+				return true;
+			}
+			if(nodes[i] > rhs.nodes[i]){
+				return false;
+			}
+		}
+		if(chunk < rhs.chunk){
+			return true;
+		}
+		if(chunk > rhs.chunk){
+			return false;
+		}
+		if(elementNo < rhs.elementNo){
+			return true;
+		}
+		if(elementNo > rhs.elementNo){
+			return false;
+		}
+		return true;
+	}
+	
+	inline bool equals(tupledata &tuple){
 		for(int i=0;i<numnodes;i++){
 			if(tuple.nodes[i] != nodes[i]){
 				return false;
@@ -2328,7 +2408,7 @@ public:
 int FEM_master_parallel_part(int ,int ,FEM_Comm_t);
 int FEM_slave_parallel_part(int ,int ,FEM_Comm_t);
 struct partconndata* FEM_call_parmetis(struct conndata &data,FEM_Comm_t comm_context);
-void FEM_write_nodepart(MSA1DINTLIST	&nodepart,struct partconndata *data);
+void FEM_write_nodepart(MSA1DINTLIST	&nodepart,struct partconndata *data,MPI_Comm comm_context);
 void FEM_write_part2node(MSA1DINTLIST	&nodepart,MSA1DNODELIST &part2node,struct partconndata *data,MPI_Comm comm_context);
 void FEM_write_part2elem(MSA1DINTLIST &part2elem,struct partconndata *data,MPI_Comm comm_context);
 FEM_Mesh * FEM_break_mesh(FEM_Mesh *m,int numElements,int numChunks);
