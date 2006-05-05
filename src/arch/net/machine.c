@@ -293,6 +293,9 @@ static unsigned int dataport=0;
 static int Cmi_mach_id=0; /* Machine-specific identifier (GM-only) */
 static SOCKET       dataskt;
 
+extern void TokenUpdatePeriodic();
+extern void getAvailSysMem();
+
 #define BROADCAST_SPANNING_FACTOR		4
 
 /****************************************************************************
@@ -2179,6 +2182,15 @@ static void ConverseRunPE(int everReturn)
     /*Initialize the clock*/
     Cmi_clock=GetClock();
   }
+
+#ifdef IGET_FLOWCONTROL 
+  /* Call the function once to determine the amount of physical memory available */
+  getAvailSysMem();
+  /* Call the function to periodically call the token adapt function */
+  CcdCallFnAfter((CcdVoidFn)TokenUpdatePeriodic, NULL, 2000); // magic number of 2000ms
+  CcdCallOnConditionKeep(CcdPERIODIC_10s,   // magic number of PERIOD 10s
+        (CcdVoidFn) TokenUpdatePeriodic, NULL);
+#endif
   
 #ifdef CMK_RANDOMLY_CORRUPT_MESSAGES
   srand((int)(1024.0*CmiWallTimer()));
