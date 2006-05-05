@@ -425,7 +425,7 @@ msgalloc.o: msgalloc.C ck.h charm++.h charm.h converse.h conv-config.h \
   ckfutures.h queueing.h
 	$(CHARMC) -c -I. msgalloc.C
 
-ckfutures.o: ckfutures.C charm++.h charm.h converse.h conv-config.h \
+ckfutures.o: ckfutures.C ckIgetControl.h charm++.h charm.h converse.h conv-config.h \
   conv-autoconfig.h conv-common.h conv-mach.h conv-mach-opt.h pup_c.h \
   conv-cpm.h conv-cpath.h conv-qd.h conv-random.h conv-lists.h \
   conv-trace.h persistent.h debug-conv.h pup.h middle.h middle-conv.h \
@@ -443,6 +443,9 @@ ckfutures.o: ckfutures.C charm++.h charm.h converse.h conv-config.h \
   ckarrayreductionmgr.h trace.h trace-bluegene.h ck.h qd.h register.h \
   stats.h ckfutures.h CkFutures.def.h
 	$(CHARMC) -c -I. ckfutures.C
+
+ckIgetControl.o: ckIgetControl.h ckIgetControl.C converse.h
+	$(CHARMC) -c -I. ckIgetControl.C
 
 debug-message.o: debug-message.C ck.h charm++.h charm.h converse.h \
   conv-config.h conv-autoconfig.h conv-common.h conv-mach.h \

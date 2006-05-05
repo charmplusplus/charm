@@ -177,7 +177,7 @@ UTILHEADERS=pup.h pupf.h pup_c.h pup_stl.h pup_mpi.h pup_toNetwork.h pup_toNetwo
 	sockRoutines.h sockRoutines.c ckpool.h bgltorus.h
 
 CKHEADERS=ck.h ckstream.h envelope.h init.h qd.h charm.h charm++.h \
-	  ckfutures.h \
+	  ckfutures.h ckIgetControl.h \
 	  ckcallback.h CkCallback.decl.h ckcallback-ccs.h 	\
 	  ckarrayreductionmgr.h cknodegroupreduction.h cksection.h \
 	  ckarray.h cklocation.h ckreduction.h ckcheckpoint.h ckmemcheckpoint.h ckevacuation.h\
@@ -564,7 +564,7 @@ $(L)/libglobal-swap.o: global-elfgot.C $(CVHEADERS)
 CK_LIBS_CORE=$(L)/libck.a
 
 LIBCK_CORE=trace-common.o tracef.o init.o register.o qd.o ck.o main.o  \
-	   msgalloc.o ckfutures.o debug-message.o debug-charm.o ckcallback.o \
+	   msgalloc.o ckfutures.o ckIgetControl.o debug-message.o debug-charm.o ckcallback.o \
 	   cklocation.o ckarray.o ckreduction.o ckarrayreductionmgr.o\
            tempo.o waitqd.o LBDatabase.o lbdb.o lbdbf.o charisma.o ckobjQ.o  \
 	   LBAgent.o LBProfit.o ckcheckpoint.o ckmemcheckpoint.o ckevacuation.o\
