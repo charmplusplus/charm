@@ -39,10 +39,10 @@ ifem: fem
 armci: tcharm ampi
 	$(MAKE) -C $@ all OPTS='$(OPTS)'
 
-collide:
+collide: tcharm
 	$(MAKE) -C $@ all OPTS='$(OPTS)'
 
-mblock:
+mblock: tcharm
 	$(MAKE) -C $@ all OPTS='$(OPTS)'
 
 barrier:
