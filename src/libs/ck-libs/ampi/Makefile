@@ -6,7 +6,7 @@ HEADDEP=$(HEADERS) ampiimpl.h ampi.decl.h ampiEvents.h
 COMPAT=compat_ampius.o compat_ampifus.o \
        compat_ampim.o compat_ampifm.o compat_ampicm.o
 OBJS=ampi.o ampif.o ampiProjections.o ampiOneSided.o \
-     ampiMisc.o 
+     ampiMisc.o mpich-alltoall.o  
 ROMIOMAKE=romio/adio/ad_hfs/Makefile romio/adio/ad_nfs/Makefile romio/adio/ad_pfs/Makefile romio/adio/ad_piofs/Makefile \
 	  romio/adio/ad_pvfs/Makefile romio/adio/ad_sfs/Makefile romio/adio/ad_testfs/Makefile romio/adio/ad_ufs/Makefile \
 	  romio/adio/ad_xfs/Makefile romio/adio/common/Makefile romio/adio/include/romioconf.h romio/Makefile \
@@ -81,6 +81,9 @@ ampiOneSided.o: ampiOneSided.C ampiimpl.h $(HEADDEP)
 
 ampiMisc.o: ampiMisc.C ampiimpl.h $(HEADDEP)
 	$(CHARMC) -c ampiMisc.C
+
+mpich-alltoall.o: mpich-alltoall.C $(HEADDEP)
+	$(CHARMC) -c mpich-alltoall.C 
 
 ampi.decl.h ampi.def.h: ampi.ci
 	$(CHARMC) ampi.ci
