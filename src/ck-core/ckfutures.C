@@ -298,19 +298,20 @@ extern "C" CkFutureID CkCreateAttachedFuture(void *msg)
   return ret;
 }
 
-#include "ckIgetControl.C"
-
 extern "C" CkFutureID CkCreateAttachedFutureSend(void *msg, int ep,
-CkArrayID id, CkArrayIndexMax idx, void(*fptr)(CkArrayID,CkArrayIndexMax,void*,int,int))
+CkArrayID id, CkArrayIndexMax idx,
+void(*fptr)(CkArrayID,CkArrayIndexMax,void*,int,int),int size=0)
 {
 CkFutureID ret=createFuture();
 UsrToEnv(msg)->setRef(ret);
 #if IGET_FLOWCONTROL
-if (TheIGetControlClass.iget_request(ret,msg,ep,id,idx,fptr))
+if (TheIGetControlClass.iget_request(ret,msg,ep,id,idx,fptr,size))
 #endif
 (fptr)(id,idx,msg,ep,0);
 return ret;
 }
+
+
 /*
 extern "C" CkFutureID CkCreateAttachedFutureSend(void *msg, int ep, void *obj,void(*fptr)(void*,void*,int,int))
 {
@@ -332,6 +333,7 @@ extern "C" void *CkWaitReleaseFuture(CkFutureID futNum)
   CkReleaseFuture(futNum);
 #if IGET_FLOWCONTROL
   TheIGetControlClass.iget_free(1);
+//  TheIGetControlClass.iget_free(sizeof(result));
 #endif
   return result;
 }

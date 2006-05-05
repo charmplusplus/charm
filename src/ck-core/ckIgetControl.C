@@ -1,152 +1,30 @@
-//#define IGET_FLOWCONTROL 0 
+#include "charm++.h"
+#include "ckIgetControl.h"
+#include <sys/time.h>
+#include <sys/resource.h>
+#include <unistd.h>
+#include <iostream>
+#include <fstream>
+#include <sys/types.h>
 
-#define CKFUTURE_IGET 	1
-#define DAGGER_IGET   	0
-#if CKFUTURE_IGET
-typedef   CkFutureID     CkIGetID;
-#define   CkIGet 	 CkCreateAttachedFutureSend
-#define   CkIGetWait 	 CkWaitReleaseFuture
-#elif DAGGER_IGET
-
-#endif
-
-#ifndef IGET_FLOWCONTROL
-#define IGET_FLOWCONTROL 0 
-#endif
-
-#if IGET_FLOWCONTROL
-#ifndef IGET_TOKENNUM
-#define IGET_TOKENNUM 6 
-#endif
-#endif
-
-// BUG: if queue length is longer than 128, trouble 
-//      new TheHashTable entry won't be inited to '-1'
-#define MAXQUEUELENGTH 1024
-
-template <class KEY, class OBJ>
-class HashQueueT {
-  CkQ<OBJ> *TheHashQueue;
-  CkQ<int> *TheHashTable;
-public:
-  HashQueueT() 
-  { 
-    TheHashQueue = new CkQ<OBJ>(); 
-    TheHashTable = new CkQ<int>(MAXQUEUELENGTH);
-    // Init table to be all "-1"
-    // VERY IMPORTANT: -1 indicates no data with this 'key' index
-    for(int i=0;i<MAXQUEUELENGTH;i++)
-      TheHashTable->insert(i,-1);
-  }
-  ~HashQueueT() {}
-  OBJ deq()
-  {
-    if(TheHashTable->length()<=0) return NULL;
-    OBJ e=TheHashQueue->deq();
-//    TheHashTable->removeFrom(e->futNum);
-    return e;
-  }
-  void key_enq(OBJ entry, KEY key) 
-  {
-    TheHashQueue->enq(entry);
-//    updatetable(TheHashTable, key, TheHashQueue->length()-1);
-  }
-  OBJ  key_deq(KEY key) 
-  {
-/*  int pos=getpostable(TheHashTable,key);
-    CkAssert(pos>=0);
-*/
-    int i;
-    for(i=0;i<TheHashQueue->length();i++)
-    {
-      if((*TheHashQueue)[i]->futNum==key)     
-	break;
-    }
-    if(i>=TheHashQueue->length()) return NULL;
-    return TheHashQueue->remove(i); 
-  }
-  void key_promote(KEY key) 
-  {
-    OBJ entry=key_deq(key);
-    TheHashQueue->insert(0,entry);
-  }
-  bool key_find(KEY key)
-  {
-/*
-    CkAssert(key<MAXQUEUELENGTH);
-    return (getpostable(TheHashTable,key)>=0);
-*/
-    int i;
-    for(i=0;i<TheHashQueue->length();i++)
-    {
-      if((*TheHashQueue)[i]->futNum==key)
-        break;
-    }
-    if(i>=TheHashQueue->length()) return false;
-    else return true;
-
-  }
-private:
-  void updatetable(CkQ<int> *table, KEY key, int pos) 
-  {
-    table->insert(key, pos);
-  }  
-  int getpostable(CkQ<int> *table, KEY key)
-  {
-    return (*table)[(int)key];
-  }
-};
-
-typedef struct iget_token_struct {
-  CkIGetID futNum;
-  int status;
-  void *m;
-  int ep;
-//  void *obj;     
-//  void(*fptr1)(void*,void*,int,int);
-  CkArrayID aid;
-  CkArrayIndexMax idx;
-  void(*fptr)(CkArrayID,CkArrayIndexMax,void*,int,int);   
-} *iget_tokenqueue_entry;
-
-typedef HashQueueT<CkIGetID, iget_tokenqueue_entry> HashTokenQueue;
+IGetControlClass TheIGetControlClass;
+int IGET_TOTALMEMORY = 480000000;
 
 #if IGET_FLOWCONTROL==0
-
-class IGetControlClass {
-public:
-//  int iget_request(CkIGetID fut, void *msg, int ep, void *obj,void(*fptr)(void*,void*,int,int)) 
-//    {return 1;}
-  int iget_request(CkIGetID fut, void *msg, int ep, CkArrayID, CkArrayIndexMax, void(*fptr)(CkArrayID,CkArrayIndexMax,void*,int,int))
-    {return 1;}
-  void iget_free(CthThread tid, int size) {}
-  void iget_resend(CkIGetID) {}
-};
-
 #elif CKFUTURE_IGET
 
-class IGetControlClass {
-public:
-/*  int iget_request(CkIGetID fut, void *msg, int ep, void *obj,void(*fptr)(void*,void*,int,int))
-  {
+int getAvailMemory(int grainsize);
+
+int 
+IGetControlClass::IGetControlClass::iget_request(CkIGetID fut, void *msg,
+int ep, CkArrayID id, CkArrayIndexMax idx,
+void(*fptr)(CkArrayID,CkArrayIndexMax,void*,int,int),int msgsize)
+ {
+    if(msgsize>0)  IGET_UNITMESSAGE=msgsize;
     int ret_status=1, size=1;
     if(iget_token>=size){
       iget_token-=size;
-      //(fptr)(obj,msg,ep,0);  // Send the msg here
-    }
-    else //(iget_request(CthSelf(),1)==false)
-    { 
-      //iget_tokenqueue_enqueue(fut,msg,ep,obj,fptr);
-      ret_status = 0; // No send will be done this case
-    }
-    return ret_status;
-  }
-*/
-  int iget_request(CkIGetID fut, void *msg, int ep, CkArrayID id, CkArrayIndexMax idx, void(*fptr)(CkArrayID,CkArrayIndexMax,void*,int,int))
-  {
-    int ret_status=1, size=1;
-    if(iget_token>=size){
-      iget_token-=size;
+      iget_outstanding++;
       //(fptr)(obj,msg,ep,0);  // Send the msg here
     }
     else //(iget_request(CthSelf(),1)==false)
@@ -157,27 +35,75 @@ public:
     return ret_status;
   }
 
-  void iget_free(int size)
+void 
+IGetControlClass::iget_free(int size)
   {
     iget_token+=size;
-
+    iget_outstanding--;
     // if some one not sent yet
     iget_tokenqueue_entry e=iget_tokenqueue_dequeue();
     if(e!=NULL) 
     {
        iget_token-=size;
+       iget_outstanding++;
     //   (e->fptr)(e->obj,e->m, e->ep, 0);
 	(e->fptr)(e->aid, e->idx, e->m, e->ep, 0);
        delete e;
      }
   }
 
+void
+IGetControlClass::iget_updateTokenNum() {
+    double currenttime = CmiWallTimer();
+    if(currenttime-lastupdatetime<1)
+       return;
+    int totalMemUsed = (int)getRSS();
+    if(totalMemUsed<=0) return;
+    int leftMem = IGET_TOTALMEMORY-totalMemUsed;
+    int iget_token_new = (leftMem)/(int)IGET_UNITMESSAGE;
+    if(leftMem<0 || iget_token_new<IGET_MINTOKENNUM) {lastupdatetime =
+currenttime;return;} //iget_token_new = IGET_MINTOKENNUM;
+    //CmiResetMaxMemory();
+    lastupdatetime = currenttime;
+    iget_token_history = iget_token ;
+    iget_token = iget_token_new - iget_outstanding;
+    if(iget_token<0) iget_token=0;
+//  iget_token = 1/3(iget_token_new + iget_token + iget_token_history);
+    printf("availMem %d,  IGET_UNIT %d, out_standinging %d\n",
+     (leftMem), IGET_UNITMESSAGE, iget_outstanding);
+   printf("Update Token num from %d to %d\n", iget_token_history, iget_token);
+  }
+
+/*
+void 
+IGetControlClass::iget_updateTokenNum() {
+    double currenttime = CmiWallTimer();
+    if(currenttime-lastupdatetime<1)
+       return; 
+//    int totalMemUsed = (int)CmiMaxMemoryUsage();
+    int leftMem = (int)getAvailMemory((int)IGET_UNITMESSAGE); //IGET_TOTALMEMORY-totalMemUsed;
+    int iget_token_new = (leftMem)/(int)IGET_UNITMESSAGE;
+    if(leftMem<0 || iget_token_new<IGET_MINTOKENNUM) {lastupdatetime =
+currenttime;return;} //iget_token_new = IGET_MINTOKENNUM;
+    //CmiResetMaxMemory();
+    lastupdatetime = currenttime;
+    iget_token_history = iget_token ;
+    iget_token = iget_token_new - iget_outstanding;
+    if(iget_token<0) iget_token=0;
+//  iget_token = 1/3(iget_token_new + iget_token + iget_token_history); 
+    printf("availMem %d,  IGET_UNIT %d, out_standinging %d\n",
+     (leftMem), IGET_UNITMESSAGE, iget_outstanding);
+   printf("Update Token num from %d to %d\n", iget_token_history, iget_token);
+  }
+*/
+
 
 /*
  *  Called when wait is posted, but no iget is really sent yet
  *  
  */
-  void iget_resend(CkIGetID fut)
+void 
+IGetControlClass::iget_resend(CkIGetID fut)
   {
     // if found in the wait queue
     // else return and do nothing
@@ -191,71 +117,116 @@ public:
   }
 
 
-/* First-come First-serve queue */
-/*   a) request for resource, 
- *      if no available, push requester into queue, return status=0 ; 
- *      if yes, return status=1, user should go ahead and do iget */
 
-
-/* Thread First-come First-serve queue: 
- *   Guarantees at least the first incoming thread would 
- *   get all its requests and progress 
- *     
+/* Get available memory in system accessible to the application 
+ *   This is done by a while loop of allocating certain size of memory
+ *   and keep those memory in core by pinning them page-by-page. The allocation
+ *   size is determined by 'grainsize'
  */
-  int  CTH_FCFS_request(CthThread tid, int size){ return 0;}  
-  void CTH_FCFS_free(){ }
+int 
+getAvailMemory(int grainsize) 
+{
 
-/* Paired First-come First-serve queue:
- *   Requests are served in pairs if there is any that exists
- *
- */
-  int  PAIR_FCFS_request() {return 0;}
-  void PAIR_FCFS_free() {}
-
-/* 
- *   Drop sent requests, to ensure progress of at least one thread
- */
-  int DROP_FCFS_request() {return 0;}
-
-  IGetControlClass() {iget_token = IGET_TOKENNUM;}
-private:
-  HashTokenQueue queue;
-  int iget_token;
+  struct rusage ru;
+  double a = 1;
+  int chunk = 50*1024*1024;
+  int subchunk = 20*1024*1024;
+  unsigned long size = chunk;
+  char *data = NULL, *olddata = NULL;
+  unsigned long init_pf = 0;
+  int pagesize = getpagesize();
 /*
-  inline void iget_tokenqueue_enqueue(CkIGetID gid,void* m,int ep,void *obj,void(*fptr)(void*,void*,int,int))
-  {
-    iget_tokenqueue_entry e=new iget_token_struct(); 
-    e->futNum=gid; e->m=m; e->ep=ep; e->obj=obj; e->fptr=fptr; e->status=0; 
-    queue.key_enq(e,gid);
-  } 
+  if(grainsize >= 10*1024*1024)
+    subchunk = 20*1024*1024;    
+  else if(grainsize >= 1024*1024)
+    subchunk = 2*1024*1024;
+  else
+    subchunk = 256*1024;
 */
-  inline void iget_tokenqueue_enqueue(CkIGetID gid,void* m,int ep, CkArrayID aid, CkArrayIndexMax
-idx, void(*fptr)(CkArrayID,CkArrayIndexMax,void*,int,int))
-  {
-    iget_tokenqueue_entry e=new iget_token_struct();
-    e->futNum=gid; e->m=m; e->ep=ep; e->aid=aid; e->idx=idx; e->fptr=fptr; e->status=0;
-    queue.key_enq(e,gid);
+  while (1) {
+    olddata = data;
+    data = (char *)realloc(data, size);
+    if (data == NULL) break;
+    for (int i=size-chunk; i<size; i+=pagesize)  data[i]=i;
+    for (int i=0; i<size; i+=pagesize)  a += data[i];
+    getrusage(RUSAGE_SELF, &ru);
+    if (size == chunk)                   // ignore init page faults
+      init_pf = ru.ru_majflt;
+    else
+      if (ru.ru_majflt > init_pf) break;
+    size += chunk;
   }
+/*
+  if(subchunk < chunk) {
+    size += subchunk;
+    while(1){
+      olddata = data;
+      data = (char *)realloc(data, size);
+      if (data == NULL) break;
+      for (int i=size-subchunk; i<size; i++)  data[i]=i;
+      for (int i=0; i<size; i+=pagesize)  a *= data[i];
+      getrusage(RUSAGE_SELF, &ru);
+      if (size == chunk)                   // ignore init page faults
+        init_pf = ru.ru_majflt;
+      else
+        if (ru.ru_majflt > init_pf) break;
+      size += subchunk;
+    }
+  }
+*/ 
+  free(olddata); 
+  return size;
+}
 
-  inline iget_tokenqueue_entry iget_tokenqueue_dequeue() {
-    return queue.deq();
-  }
+extern "C"
+void getAvailSysMem() {
+  IGET_TOTALMEMORY = getAvailMemory(0); 
+  printf("total physical memory : %d\n", IGET_TOTALMEMORY);
+}
 
-  inline iget_tokenqueue_entry iget_tokenqueue_remove(CkIGetID gid)
-  {
-    return queue.key_deq(gid);
-  }
-  inline bool iget_tokenqueue_find(CkIGetID gid)
-  {
-    return queue.key_find(gid);
-  }
-  inline void iget_tokenqueue_promote(CkIGetID gid)
-  {
-    queue.key_promote(gid);
-  }
-};
+extern "C"
+void TokenUpdatePeriodic()
+{
+  TheIGetControlClass.iget_updateTokenNum();
+}
 
-IGetControlClass TheIGetControlClass;
+extern "C"
+int getRSS()
+{
+  int ret=-1, i=0;
+  pid_t pid;
+  char filename[128], commands[256], retstring[128];
+  int fd;
+  pid = getpid();
+  sprintf(filename,"__topmem__%d", CkMyPe());
+  sprintf(commands, "export TERM=vt100; top -b -n 1 -p %d |grep %d | awk  -F' ' '{print $6}' > %s", pid,
+pid, filename);
+  system(commands);
+  i=0;
+  while(i<10){
+    i++;
+    fd = open(filename, O_RDONLY);
+    if(fd>=0) break;
+    else 
+      printf("fileopen %s fails, try again\n", filename); 
+  }
+  if(fd<0){
+    printf("fileopen %s fails, abort\n", filename); return -1;
+  }
+  lseek(fd, 0, SEEK_SET);
+  i=0;
+  while(read(fd, &retstring[i], sizeof(char))>0) i++;
+  close(fd);
+  ret = atoi(retstring);
+  if(i>2){
+    if(retstring[i-2]=='m') ret *= 1024*1024;
+    if(retstring[i-2]=='k') ret *= 1024;
+  }
+//  sprintf(commands, "rm -f %s", filename);
+//  system(commands);
+  printf("RSS %d\n",ret);
+  return ret;
+}
 
 #endif
 
