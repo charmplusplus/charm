@@ -298,12 +298,16 @@ class CkVec : private CkSTLHelper<T> {
      }
 #endif
 
-		void quickSort(){
-		  q_sort(0, len - 1);
+		inline void quickSort(){
+		  q_sort(0, len - 1,128);
+		}
+
+		inline void quickSort(int changeOverSize){
+			q_sort(0,len-1,changeOverSize);
 		}
 		
 
-		void q_sort(int left, int right){
+		inline void q_sort(int left, int right,int changeOverSize){
 		  int l_hold, r_hold;
 			int pivot;
 			
@@ -319,7 +323,7 @@ class CkVec : private CkSTLHelper<T> {
 		  l_hold = left;
 		  r_hold = right;
 			pivot = left;
-			if(right - left <= 128){
+			if(right - left <= changeOverSize){
 				bubbleSort(left,right);
 				return;
 			}
@@ -343,12 +347,12 @@ class CkVec : private CkSTLHelper<T> {
 		  left = l_hold;
 		  right = r_hold;
 		  if (left < pivot)
-    		q_sort(left, pivot-1);
+    		q_sort(left, pivot-1,changeOverSize);
 		  if (right > pivot)
-    		q_sort(pivot+1, right);
+    		q_sort(pivot+1, right,changeOverSize);
 		}
 
-		void bubbleSort(int left,int right){
+		inline void bubbleSort(int left,int right){
 			for(int i=left;i<=right;i++){
 				for(int j=i+1;j<=right;j++){
 					if(block[i] >= block[j]){
