@@ -276,7 +276,7 @@ struct CkArrayID;
 struct CkArrayIndexMax;
 extern CkFutureID CkCreateAttachedFutureSend(void *msg, int ep,
 struct CkArrayID id, struct CkArrayIndexMax idx, void(*fptr)(struct
-CkArrayID,struct CkArrayIndexMax,void*,int,int),int size=0);
+CkArrayID,struct CkArrayIndexMax,void*,int,int),int size);
 //extern CkFutureID CkCreateAttachedFutureSend(void *msg, int ep, void*,void(*fptr)(void*,void*,int,int));
 
 extern void *CkWaitReleaseFuture(CkFutureID futNum);
