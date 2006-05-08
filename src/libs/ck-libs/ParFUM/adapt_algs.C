@@ -41,7 +41,7 @@ void FEM_Adapt_Algs::FEM_AdaptMesh(int qm, int method, double factor,
   MPI_Comm comm=(MPI_Comm)FEM_chunk::get("FEM_Update_mesh")->defaultComm;
   MPI_Barrier(comm);
 #ifdef ADAPT_VERBOSE
-  CkPrintf("BEGIN: FEM_AdaptMesh...\n");
+  CkPrintf("[%d]BEGIN: FEM_AdaptMesh...\n",theMod->idx);
 #endif
 #ifdef DEBUG_QUALITY
   tests(true);
@@ -65,7 +65,7 @@ void FEM_Adapt_Algs::FEM_AdaptMesh(int qm, int method, double factor,
   MPI_Barrier(comm);
 #endif
 #ifdef ADAPT_VERBOSE
-  CkPrintf("...END: FEM_AdaptMesh.\n");
+  CkPrintf("[%d]...END: FEM_AdaptMesh.\n",theMod->idx);
 #endif
 }
 
@@ -107,6 +107,14 @@ int FEM_Adapt_Algs::Refine(int qm, int method, double factor, double *sizes)
 	// find maxEdgeLength of i
 	double tmpLen, avgEdgeLength=0.0, maxEdgeLength = 0.0;
 	theMesh->e2n_getAll(i, elemConn);
+	bool notclear = false;
+	for(int j=0; j<elemWidth; j++) {
+	  int nd = elemConn[j];
+	  if(nd>=0) notclear = theMod->fmLockN[nd].haslocks();
+	  //else cannot look up because connectivity might be screwed up,
+	  //I am hoping that at least one of the nodes will be local
+	}
+	if(notclear) continue;
 	for (int j=0; j<elemWidth-1; j++) {
 	  for (int k=j+1; k<elemWidth; k++) {
 	    tmpLen = length(elemConn[j], elemConn[k]);
@@ -180,14 +188,14 @@ int FEM_Adapt_Algs::Refine(int qm, int method, double factor, double *sizes)
     }
     mods += iter_mods;
 #ifdef ADAPT_VERBOSE
-    CkPrintf("ParFUM_Refine: %d modifications in last pass.\n", iter_mods);
+    CkPrintf("[%d]ParFUM_Refine: %d modifications in last pass.\n",theMod->idx,iter_mods);
 #endif
 #ifdef DEBUG_QUALITY
     tests(false);
 #endif
   }
 #ifdef ADAPT_VERBOSE
-  CkPrintf("ParFUM_Refine: %d total modifications.\n", mods);
+  CkPrintf("[%d]ParFUM_Refine: %d total modifications.\n",theMod->idx,mods);
 #endif
   delete[] refineStack;
   delete[] refineElements;
@@ -231,6 +239,14 @@ int FEM_Adapt_Algs::Coarsen(int qm, int method, double factor, double *sizes)
       if (theMesh->elem[0].is_valid(i)) {
 	// find minEdgeLength of i
 	theMesh->e2n_getAll(i, elemConn);
+	bool notclear = false;
+	for(int j=0; j<elemWidth; j++) {
+	  int nd = elemConn[j];
+	  if(nd>=0) notclear = theMod->fmLockN[nd].haslocks();
+	  //else cannot look up because connectivity might be screwed up,
+	  //I am hoping that at least one of the nodes will be local
+	}
+	if(notclear) continue;
 	double tmpLen, avgEdgeLength=0.0, 
 	  minEdgeLength = length(elemConn[0], elemConn[1]);
 	for (int j=0; j<elemWidth-1; j++) {
@@ -315,14 +331,14 @@ int FEM_Adapt_Algs::Coarsen(int qm, int method, double factor, double *sizes)
     }
     mods += iter_mods;
 #ifdef ADAPT_VERBOSE
-    CkPrintf("ParFUM_Coarsen: %d modifications in pass %d.\n", iter_mods, pass);
+    CkPrintf("[%d]ParFUM_Coarsen: %d modifications in pass %d.\n",theMod->idx,iter_mods,pass);
 #endif
 #ifdef DEBUG_QUALITY
     tests(false);
 #endif
   }
 #ifdef ADAPT_VERBOSE
-  CkPrintf("ParFUM_Coarsen: %d total modifications over %d passes.\n", mods, pass);
+  CkPrintf("[%d]ParFUM_Coarsen: %d total modifications over %d passes.\n",theMod->idx,mods,pass);
 #endif
   delete[] coarsenElements;
   return mods;
@@ -341,7 +357,7 @@ void FEM_Adapt_Algs::FEM_Repair(int qm)
   int numBadElems = 0;
   int elemConn[3];
 #ifdef ADAPT_VERBOSE
-  CkPrintf("WARNING: ParFUM_Repair: Under construction.\n");
+  CkPrintf("[%d]WARNING: ParFUM_Repair: Under construction.\n",theMod->idx);
   numElements = theMesh->elem[0].size();
   for (int i=0; i<numElements; i++) { 
     if (theMesh->elem[0].is_valid(i)) {
@@ -479,7 +495,7 @@ void FEM_Adapt_Algs::FEM_Repair(int qm)
     }
   }
   avgQual /= numElements;
-  CkPrintf("AFTER FEM_Repair: Average Element Quality = %2.6f, Min = %2.6f (1.0 is perfect) No. of repairs %d\n", avgQual, minQual,totalChanges);
+  CkPrintf("[%d]AFTER FEM_Repair: Average Element Quality = %2.6f, Min = %2.6f (1.0 is perfect) No. of repairs %d\n",theMod->idx,avgQual, minQual,totalChanges);
 #ifdef DEBUG_QUALITY
     tests(false);
 #endif
@@ -716,6 +732,7 @@ int FEM_Adapt_Algs::simple_refine(double targetA, double xmin, double ymin, doub
   refineTop = refineHeapSize = 0;
   int elemConn[3];
   double coordsn1[2], coordsn2[2], coordsn3[2];
+  int elemWidth=3;
 
   while(adapted) {
     adapted = false;
@@ -724,6 +741,14 @@ int FEM_Adapt_Algs::simple_refine(double targetA, double xmin, double ymin, doub
     for(int i=0; i<noEle; i++) {
       if(theMesh->elem[0].is_valid(i)) {
 	theMesh->e2n_getAll(i,elemConn,0);
+	bool notclear = false;
+	for(int j=0; j<elemWidth; j++) {
+	  int nd = elemConn[j];
+	  if(nd>=0) notclear = theMod->fmLockN[nd].haslocks();
+	  //else cannot look up because connectivity might be screwed up,
+	  //I am hoping that at least one of the nodes will be local
+	}
+	if(notclear) continue;
 	getCoord(elemConn[0], coordsn1);
 	getCoord(elemConn[1], coordsn2);
 	getCoord(elemConn[2], coordsn3);
@@ -816,6 +841,7 @@ int FEM_Adapt_Algs::simple_coarsen(double targetA, double xmin, double ymin, dou
   coarsenHeapSize = 0;
   int elemConn[3];
   double coordsn1[2], coordsn2[2], coordsn3[2];
+  int elemWidth=3;
 
   while(adapted) {
     adapted = false;
@@ -825,6 +851,14 @@ int FEM_Adapt_Algs::simple_coarsen(double targetA, double xmin, double ymin, dou
     for(int i=0; i<noEle; i++) {
       if(theMesh->elem[0].is_valid(i)) {
 	theMesh->e2n_getAll(i,elemConn,0);
+	bool notclear = false;
+	for(int j=0; j<elemWidth; j++) {
+	  int nd = elemConn[j];
+	  if(nd>=0) notclear = theMod->fmLockN[nd].haslocks();
+	  //else cannot look up because connectivity might be screwed up,
+	  //I am hoping that at least one of the nodes will be local
+	}
+	if(notclear) continue;
 	getCoord(elemConn[0], coordsn1);
 	getCoord(elemConn[1], coordsn2);
 	getCoord(elemConn[2], coordsn3);
