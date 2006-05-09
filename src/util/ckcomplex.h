@@ -16,15 +16,15 @@ extern "C" void *memalign(size_t boundary, size_t size);
 #endif
 #endif
 
-struct complex {
+struct ckcomplex {
     double re;
     double im;
     
-    inline complex() {re=0; im=0;}
-    inline complex(double r) {re=r; im=0;}
-    inline complex(double r,double i) {re=r; im=i;}
+    inline ckcomplex() {re=0; im=0;}
+    inline ckcomplex(double r) {re=r; im=0;}
+    inline ckcomplex(double r,double i) {re=r; im=i;}
     
-    inline ~complex() {}
+    inline ~ckcomplex() {}
 
     inline double getMagSqr(void) const { 
 #if PAIR_USE_SSE      
@@ -43,25 +43,25 @@ struct complex {
 #endif
     }
 
-    inline complex operator+(complex a) { 
+    inline ckcomplex operator+(ckcomplex a) { 
 #if PAIR_USE_SSE    
         __m128d dreg1 = _mm_loadu_pd((double *)this);
         __m128d dreg2 = _mm_set_pd(a.im, a.re);
   
         dreg2 = _mm_add_pd(dreg1, dreg2);
-        complex ret;
+        ckcomplex ret;
         _mm_storeu_pd((double *)&ret, dreg2);
         return ret;
 #else         
-        return complex(re+a.re,im+a.im); 
+        return ckcomplex(re+a.re,im+a.im); 
 #endif
     }
 
-    inline complex conj(void) { 
-        return complex(re, -im); 
+    inline ckcomplex conj(void) { 
+        return ckcomplex(re, -im); 
     }
 
-    inline void operator+=(complex a) { 
+    inline void operator+=(ckcomplex a) { 
         
 #if PAIR_USE_SSE
         __m128d dreg1 = _mm_loadu_pd((double *)this);
@@ -74,25 +74,25 @@ struct complex {
 
     }
     
-    inline complex operator*(double a) { 
+    inline ckcomplex operator*(double a) { 
 #if PAIR_USE_SSE
         __m128d dreg1 = _mm_loadu_pd((double *)this);
         __m128d dreg2 = _mm_set_pd(a, a);
         
         dreg2 = _mm_mul_pd(dreg1, dreg2);
         
-        complex ret;
+        ckcomplex ret;
         _mm_storeu_pd((double *)&ret, dreg2);
         return ret;
         
 #else
-        return complex(re*a, im*a); 
+        return ckcomplex(re*a, im*a); 
 #endif
     } 
 
        inline bool notzero() const { return( (0.0 != re) ? true : (0.0 != im)); }
 
-    inline void operator*=(complex a) {        
+    inline void operator*=(ckcomplex a) {        
 #if PAIR_USE_SSE
         __m128d dreg2 = _mm_set_pd(re, re); //re, re        
         __m128d dreg3 = _mm_set_pd(a.im, a.re);   //a.im, a.re
@@ -117,7 +117,7 @@ struct complex {
 #endif
     }
 
-    inline complex operator*(complex a) {
+    inline ckcomplex operator*(ckcomplex a) {
 #if PAIR_USE_SSE  
         __m128d dreg2 = _mm_set_pd(re, re); //re, re
         
@@ -132,16 +132,16 @@ struct complex {
         dreg4 =  _mm_add_pd(dreg4, dreg2);
         //a.im * re + a.re * im, a.re * re - a.im * im
 
-        complex ret;
+        ckcomplex ret;
         _mm_storeu_pd((double *)&ret, dreg4);
         return ret;
 #else
-        return complex( re * a.re - im * a.im, re * a.im + im * a.re); 
+        return ckcomplex( re * a.re - im * a.im, re * a.im + im * a.re); 
 #endif
     }
 
 
-    inline void operator -= (complex a) {
+    inline void operator -= (ckcomplex a) {
 #if PAIR_USE_SSE 
         __m128d dreg1 = _mm_loadu_pd((double *)this);
         __m128d dreg2 = _mm_loadu_pd((double *)&a);
@@ -153,8 +153,8 @@ struct complex {
     }
 
 
-    inline complex multiplyByi () {
-        return complex(-im, re);
+    inline ckcomplex multiplyByi () {
+        return ckcomplex(-im, re);
     }
         
     inline void * operator new[] (size_t size){
@@ -171,6 +171,6 @@ struct complex {
     }
 };
 
-PUPbytes(complex);
+PUPbytes(ckcomplex);
 
 #endif
