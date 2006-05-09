@@ -676,12 +676,16 @@ struct ghostdata *gatherGhosts(){
   to be passed in
 */
 
+double listSearchTime=0;
+double sharedSearchTime=0;
 
 void makeGhosts(FEM_Mesh *m,MPI_Comm comm,int masterRank,int numLayers,FEM_Ghost_Layer **layers){
   int myChunk;
   int numChunks;
   MPI_Comm_rank((MPI_Comm)comm,&myChunk);
   MPI_Comm_size((MPI_Comm)comm,&numChunks);
+
+	double _startTime=CkWallTimer();
 	
   if(numChunks == 1){
     return;
@@ -751,10 +755,18 @@ void makeGhosts(FEM_Mesh *m,MPI_Comm comm,int masterRank,int numLayers,FEM_Ghost
   for(int i=0;i<m->node.size();i++){
     global2local.put(m->node.getGlobalno(i))=i+1;
   }
-
+	if(myChunk == 0){
+		printf("Time to do preprocessing for ghosts %.6lf \n",CkWallTimer()-_startTime);
+	}
   for(int i=0;i<numLayers;i++){
-    if(myChunk == 0){printf("[%d] Making ghost layer %d \n",myChunk,i);}
+    if(myChunk == 0){printf("[%d] Starting ghost layer %d \n",myChunk,i);}
+    _startTime = CkWallTimer();
     makeGhost(m,comm,masterRank,totalShared,layers[i],countedSharedNode,global2local); 
+    if(myChunk == 0){
+       printf("[%d] Making ghost layer %d took %.6lf listSearch %.6lf sharedSearchTime %.6lf \n",myChunk,i,CkWallTimer()-_startTime,listSearchTime,sharedSearchTime);
+       listSearchTime = 0;
+       sharedSearchTime=0;
+    }
   }
 };
 
@@ -762,11 +774,14 @@ void makeGhosts(FEM_Mesh *m,MPI_Comm comm,int masterRank,int numLayers,FEM_Ghost
    Does this list contain this entry
 */
 bool listContains(FEM_Comm_List &list,int entry){
+	double _startTime=CkWallTimer();
   for(int i=0;i<list.size();i++){
     if(entry == list[i]){
+			listSearchTime += (CkWallTimer()-_startTime);
       return true;
     }
   }
+	listSearchTime += (CkWallTimer()-_startTime);
   return false;
 };
 
@@ -1098,16 +1113,20 @@ void makeGhost(FEM_Mesh *m,MPI_Comm comm,int masterRank,int totalShared,FEM_Ghos
 
 
 bool sharedWith(int lnode,int chunk,FEM_Mesh *m){
+  double _startTime=CkWallTimer();
   int lindex = m->node.shared.findLocalList(chunk);
   if(lindex != -1){
     const IDXL_List & llist = m->node.shared.getLocalList(lindex);
     for(int i=0;i<llist.size();i++){
       if(llist[i] == lnode){
+      	sharedSearchTime += CkWallTimer()-_startTime;
 	return true;
       }
     }
+    sharedSearchTime += CkWallTimer()-_startTime;
     return false;
   }else{
+    sharedSearchTime += CkWallTimer()-_startTime;
     return false;
   }
 }
