@@ -1398,12 +1398,14 @@ int FEM_MUtil::AreaTest(FEM_Mesh *m) {
 #endif
     }
   }
+#ifdef DEBUG_QUALITY
   CkPrintf("SmallestArea %lf, SmallestEdge %lf, SmallestAlt %lf worstQuality %lf\n",smallestarea,smallestedge,smallestalt,largestQ);  
   m->e2n_getAll(worstEl,con,0);
   CkPrintf("WorstEl %d\n",worstEl);
   FEM_Print_coords(m,con[0]);
   FEM_Print_coords(m,con[1]);
   FEM_Print_coords(m,con[2]);
+#endif
   return 1;
 }
 

@@ -1066,6 +1066,7 @@ FEM_Entity::FEM_Entity(FEM_Entity *ghost_) //Default constructor
 } 
 void FEM_Entity::pup(PUP::er &p) {
 	p|length;
+	p|max;
 	if (p.isUnpacking() && femVersion > 0 && length<0)  length=0;
 	p.comment(" Ghosts to send out: ");
 	ghostSend.pup(p);
