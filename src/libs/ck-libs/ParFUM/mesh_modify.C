@@ -2535,14 +2535,18 @@ double2Msg *femMeshModify::getRemoteCoord(int fromChk, int ghostIdx) {
 #ifdef DEBUG 
   CmiMemoryCheck(); 
 #endif
-  int localIdx = fmUtil->lookup_in_IDXL(fmMesh, ghostIdx, fromChk, 1);
-  double coord[2];
-  FEM_Mesh_dataP(fmMesh, FEM_NODE, fmAdaptAlgs->coord_attr, coord, localIdx, 1, FEM_DOUBLE, 2);
-  double2Msg *d = new double2Msg(coord[0], coord[1]);
-#ifdef DEBUG 
-  CmiMemoryCheck(); 
-#endif
-  return d;
+  //int localIdx = fmUtil->lookup_in_IDXL(fmMesh, ghostIdx, fromChk, 1);
+  if(ghostIdx == fmMesh->node.ghostSend.addList(fromChk).size()) {
+    double2Msg *d = new double2Msg(-2.0,-2.0);
+    return d;
+  }
+  else {
+    int localIdx = fmMesh->node.ghostSend.addList(fromChk)[ghostIdx];
+    double coord[2];
+    FEM_Mesh_dataP(fmMesh, FEM_NODE, fmAdaptAlgs->coord_attr, coord, localIdx, 1, FEM_DOUBLE, 2);
+    double2Msg *d = new double2Msg(coord[0], coord[1]);
+    return d;
+  }
 }
 
 intMsg *femMeshModify::getRemoteBound(int fromChk, int ghostIdx) {

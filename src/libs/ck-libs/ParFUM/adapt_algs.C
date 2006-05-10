@@ -15,7 +15,7 @@
 #define MAXAREA 1.0e12
 
 #define GRADATION 1.2
-#define ADAPT_VERBOSE 1
+//#define ADAPT_VERBOSE
 
 CtvDeclare(FEM_Adapt_Algs *, _adaptAlgs);
 
@@ -118,10 +118,12 @@ int FEM_Adapt_Algs::Refine(int qm, int method, double factor, double *sizes)
 	for (int j=0; j<elemWidth-1; j++) {
 	  for (int k=j+1; k<elemWidth; k++) {
 	    tmpLen = length(elemConn[j], elemConn[k]);
+	    if(tmpLen < -1.0) {notclear = true;}
 	    avgEdgeLength += tmpLen;
 	    if (tmpLen > maxEdgeLength) maxEdgeLength = tmpLen;
 	  }
 	}
+	if(notclear) continue;
 	avgEdgeLength /= 3.0;
 	double qFactor=getAreaQuality(i);
 	if (theMesh->elem[0].getMeshSizing(i) <= 0.0) 
@@ -156,6 +158,7 @@ int FEM_Adapt_Algs::Refine(int qm, int method, double factor, double *sizes)
 	for (int j=0; j<elemWidth-1; j++) {
 	  for (int k=j+1; k<elemWidth; k++) {
 	    tmpLen = length(elemConn[j], elemConn[k]);
+	    if(tmpLen < -1.0) {notclear = true;}
 	    avgEdgeLength += tmpLen;
 	    if (tmpLen > maxEdgeLength) { 
 	      maxEdgeLength = tmpLen;
@@ -167,6 +170,7 @@ int FEM_Adapt_Algs::Refine(int qm, int method, double factor, double *sizes)
 	    }
 	  }
 	}
+	if(notclear) continue;
 	avgEdgeLength /= 3.0;
 	//double qFactor=getAreaQuality(elId);
 	if ((theMesh->elem[0].getMeshSizing(elId) > 0.0) &&
@@ -252,10 +256,12 @@ int FEM_Adapt_Algs::Coarsen(int qm, int method, double factor, double *sizes)
 	for (int j=0; j<elemWidth-1; j++) {
 	  for (int k=j+1; k<elemWidth; k++) {
 	    tmpLen = length(elemConn[j], elemConn[k]);
+	    if(tmpLen < -1.0) {notclear = true;}
 	    avgEdgeLength += tmpLen;
 	    if (tmpLen < minEdgeLength) minEdgeLength = tmpLen;
 	  }
 	}
+	if(notclear) continue;
 	avgEdgeLength /= 3.0;
 	qFactor=getAreaQuality(i);
 	if (((theMesh->elem[0].getMeshSizing(i) > 0.0) &&
@@ -285,6 +291,7 @@ int FEM_Adapt_Algs::Coarsen(int qm, int method, double factor, double *sizes)
 	for (int j=0; j<elemWidth-1; j++) {
 	  for (int k=j+1; k<elemWidth; k++) {
 	    tmpLen = length(elemConn[j], elemConn[k]);
+	    if(tmpLen < -1.0) {notclear = true;}
 	    avgEdgeLength += tmpLen;
 	    if (tmpLen < minEdgeLength) {
 	      minEdgeLength = tmpLen;
@@ -292,6 +299,7 @@ int FEM_Adapt_Algs::Coarsen(int qm, int method, double factor, double *sizes)
 	    }
 	  }
 	}
+	if(notclear) continue;
 	CkAssert(n1!=-1 && n2!=-1);
 	avgEdgeLength /= 3.0;
 	qFactor=getAreaQuality(elId);
@@ -401,6 +409,7 @@ void FEM_Adapt_Algs::FEM_Repair(int qm)
 	  double len1 = length(elemConn[0],elemConn[1]);
 	  double len2 = length(elemConn[1],elemConn[2]);
 	  double len3 = length(elemConn[2],elemConn[0]);
+	  if(len1<-1.0 || len2<-1.0 || len3<-1.0) continue;
 	  double avglen=(len1+len2+len3)/3.0;
 	  int maxn1=0, maxn2=1;
 	  int minn1=0, minn2=1;
@@ -752,6 +761,7 @@ int FEM_Adapt_Algs::simple_refine(double targetA, double xmin, double ymin, doub
 	getCoord(elemConn[0], coordsn1);
 	getCoord(elemConn[1], coordsn2);
 	getCoord(elemConn[2], coordsn3);
+	if(coordsn1[0]<-1.0 ||coordsn1[1]<-1.0 || coordsn2[0]<-1.0 ||coordsn2[1]<-1.0 || coordsn3[0]<-1.0 ||coordsn3[1]<-1.0) continue;
 	//do a refinement only if it has any node within the refinement box
 	if((coordsn1[0]<xmax && coordsn1[0]>xmin && coordsn1[1]<ymax && coordsn1[1]>ymin) || (coordsn2[0]<xmax && coordsn2[0]>xmin && coordsn2[1]<ymax && coordsn2[1]>ymin) || (coordsn3[0]<xmax && coordsn3[0]>xmin && coordsn3[1]<ymax && coordsn3[1]>ymin)) {
 	  Insert(i,-getArea(coordsn1, coordsn2, coordsn3),0); 
@@ -806,6 +816,7 @@ int FEM_Adapt_Algs::simple_refine(double targetA, double xmin, double ymin, doub
 	getCoord(elemConn[0], coordsn1);
 	getCoord(elemConn[1], coordsn2);
 	getCoord(elemConn[2], coordsn3);
+	if(coordsn1[0]<-1.0 ||coordsn1[1]<-1.0 || coordsn2[0]<-1.0 ||coordsn2[1]<-1.0 || coordsn3[0]<-1.0 ||coordsn3[1]<-1.0) continue;
 	if(getArea(coordsn1, coordsn2, coordsn3) > targetA) {
 	  double len1 = length(coordsn1,coordsn2);
 	  double len2 = length(coordsn2,coordsn3);
@@ -862,6 +873,7 @@ int FEM_Adapt_Algs::simple_coarsen(double targetA, double xmin, double ymin, dou
 	getCoord(elemConn[0], coordsn1);
 	getCoord(elemConn[1], coordsn2);
 	getCoord(elemConn[2], coordsn3);
+	if(coordsn1[0]<-1.0 ||coordsn1[1]<-1.0 || coordsn2[0]<-1.0 ||coordsn2[1]<-1.0 || coordsn3[0]<-1.0 ||coordsn3[1]<-1.0) continue;
 	//do a coarsening only if it has any node within the coarsen box
 	if((coordsn1[0]<xmax && coordsn1[0]>xmin && coordsn1[1]<ymax && coordsn1[1]>ymin) || (coordsn2[0]<xmax && coordsn2[0]>xmin && coordsn2[1]<ymax && coordsn2[1]>ymin) || (coordsn3[0]<xmax && coordsn3[0]>xmin && coordsn3[1]<ymax && coordsn3[1]>ymin)) {
 	  Insert(i,getArea(coordsn1, coordsn2, coordsn3),1);
@@ -914,6 +926,7 @@ int FEM_Adapt_Algs::simple_coarsen(double targetA, double xmin, double ymin, dou
 	getCoord(elemConn[0], coordsn1);
 	getCoord(elemConn[1], coordsn2);
 	getCoord(elemConn[2], coordsn3);
+	if(coordsn1[0]<-1.0 ||coordsn1[1]<-1.0 || coordsn2[0]<-1.0 ||coordsn2[1]<-1.0 || coordsn3[0]<-1.0 ||coordsn3[1]<-1.0) continue;
 	if(getArea(coordsn1, coordsn2, coordsn3) < targetA) {
 	  getShortestEdge(elemConn[0], elemConn[1], elemConn[2], shortestEdge);
 	  int ret = theAdaptor->edge_contraction(shortestEdge[0], shortestEdge[1]);
@@ -1047,6 +1060,7 @@ double FEM_Adapt_Algs::length(double *n1_coord, double *n2_coord) {
   double d, ds_sum=0.0;
 
   for (int i=0; i<dim; i++) {
+    if(n1_coord[i]<-1.0 || n2_coord[i]<-1.0) return -2.0;
     d = n1_coord[i] - n2_coord[i];
     ds_sum += d*d;
   }

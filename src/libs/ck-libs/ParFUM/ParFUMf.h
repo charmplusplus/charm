@@ -116,6 +116,9 @@
 
 	   external FEM_Add_elem2face_tuples
 
+	 external FEM_Mesh_Become_Setting
+	 external FEM_Mesh_Become_Getting
+
        interface
        
        subroutine FEM_Init(comm) 
@@ -181,7 +184,7 @@
           integer, intent(in) :: master,comm
        end function
        
-       
+
        integer function FEM_Mesh_default_read()
        end function
        integer function FEM_Mesh_default_write()

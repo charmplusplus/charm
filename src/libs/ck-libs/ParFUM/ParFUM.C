@@ -404,8 +404,28 @@ static const FEM_Mesh *getMesh(void) {
   return FEM_chunk::get(caller)->getMesh(caller);
 }
 
-FEM_Mesh *FEM_Mesh_lookup(int fem_mesh,const char *caller) {
-	return FEM_chunk::get(caller)->lookup(fem_mesh,caller);
+FEM_Mesh *FEM_Mesh_lookup(int fem_mesh, const char *caller) {
+  return FEM_chunk::get(caller)->lookup(fem_mesh,caller);
+}
+
+CDECL void FEM_Mesh_Become_Setting(int fem_mesh) {
+  FEM_Mesh *meshP = FEM_Mesh_lookup(fem_mesh,"driver");
+  meshP->becomeSetting();
+}
+FDECL void FTN_NAME(FEM_MESH_BECOME_SETTING,fem_mesh_become_setting)
+  (int *mesh)
+{
+  FEM_Mesh_Become_Setting(*mesh);
+}
+
+CDECL void FEM_Mesh_Become_Getting(int fem_mesh) {
+  FEM_Mesh *meshP = FEM_Mesh_lookup(fem_mesh,"driver");
+  meshP->becomeGetting();
+}
+FDECL void FTN_NAME(FEM_MESH_BECOME_GETTING,fem_mesh_become_getting)
+  (int *mesh)
+{
+  FEM_Mesh_Become_Getting(*mesh);
 }
 
 /****** Custom Partitioning API *******/
