@@ -221,6 +221,9 @@ public:
 	void set(T value) {
 		for (int r=0;r<rows;r++) setRow(r,value);
 	}
+	void setRowLen(int rows_) {
+	  rows = rows_;
+	}
 };
 
 /**
@@ -278,9 +281,9 @@ public:
 	
 	/// Pup routine and operator|:
 	void pup(PUP::er &p) {
-		p|this->rows; p|this->cols;
-		if (this->table==NULL) allocate(this->rows);
-		p(this->table,this->rows*this->cols); //T better be a basic type, or this won't compile!
+	  p|this->rows; p|this->cols;
+	  if (this->table==NULL) allocate(this->rows);
+	  p(this->table,this->rows*this->cols); //T better be a basic type, or this won't compile!
 	}
 
 	void pupSingle(PUP::er &p, int pupindx) {
@@ -314,7 +317,7 @@ public:
 		}	
 		this->table = user;
 		this->rows = len;
-		max = max;
+		this->max = max;
 	}
 };
 

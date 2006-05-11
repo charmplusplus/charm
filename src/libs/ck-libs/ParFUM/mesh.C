@@ -392,11 +392,12 @@ void FEM_Register_array_layout(int fem_mesh,int entity,int attr,void *data,int f
 	
 	
 	if(m->isSetting()){
+	  a->register_data(data,length,max,layout,caller);
 	}else{
-		a->get(data,firstItem,length,layout,caller);
+	  a->get(data,firstItem,length,layout,caller);
+	  //replace the attribute's data array with the user's data
+	  a->register_data(data,max/*length*/,max,layout,caller);
 	}
-	//replace the attribute's data array with the user's data
-	a->register_data(data,length,max,layout,caller);
 }
 void FEM_Register_entity_impl(int fem_mesh,int entity,void *args,int len,int max,FEM_Mesh_alloc_fn fn){
 	char *caller = "FEM_Register_entity";
@@ -658,10 +659,38 @@ void FEM_DataAttribute::pup(PUP::er &p) {
 	super::pup(p);
 	switch(getDatatype()) {
 	case -1: /* not allocated yet */ break;
-	case FEM_BYTE:   if (char_data) char_data->pup(p); break;
-	case FEM_INT:    if (int_data) int_data->pup(p); break;
-	case FEM_FLOAT:  if (float_data) float_data->pup(p); break;
-	case FEM_DOUBLE: if (double_data) double_data->pup(p); break;
+	case FEM_BYTE:   
+	  if (char_data) {
+	    /*if(p.isSizing()) {
+	      char_data->setRowLen(getEntity()->size());
+	      }*/
+	    char_data->pup(p);
+	  } 
+	  break;
+	case FEM_INT:    
+	  if (int_data) {
+	    /*if(p.isSizing()) {
+	      int_data->setRowLen(getEntity()->size());
+	      }*/
+	    int_data->pup(p);
+	  }
+	  break;
+	case FEM_FLOAT:  
+	  if (float_data) {
+	    /*if(p.isSizing()) {
+	      float_data->setRowLen(getEntity()->size());
+	      }*/
+	    float_data->pup(p);
+	  }
+	  break;
+	case FEM_DOUBLE: 
+	  if (double_data) {
+	    /*if(p.isSizing()) {
+	      double_data->setRowLen(getEntity()->size());
+	      }*/
+	    double_data->pup(p);
+	  }
+	  break;
 	default: CkAbort("Invalid datatype in FEM_DataAttribute::pup");
 	}
 }
@@ -878,6 +907,9 @@ FEM_IndexAttribute::FEM_IndexAttribute(FEM_Entity *e,int myAttr,FEM_IndexAttribu
 }
 void FEM_IndexAttribute::pup(PUP::er &p) {
 	super::pup(p);
+	/*if(p.isSizing()) {
+	  idx.setRowLen(getEntity()->size());
+	  }*/
 	p|idx;
 }
 void FEM_IndexAttribute::pupSingle(PUP::er &p, int pupindx) {
@@ -1170,7 +1202,7 @@ void FEM_Entity::setLength(int newlen, bool f)
                 int code = attributes[a]->getAttr();
                 if (!(code <= FEM_ATTRIB_TAG_MAX || 
                             code == FEM_CONN || 
-                            code == FEM_BOUNDARY)) {
+		      code == FEM_BOUNDARY)) { //user can store bpundary & connectivity also
                     attributes[a]->reallocate();
                 }
             }	

@@ -1090,6 +1090,12 @@ void FEM_MUtil::StructureTest(FEM_Mesh *m) {
 	//all nodes must be valid and all local elems should have local connectivity
 	CkAssert(m->node.is_valid(e2n[j]));
       }
+      int e2e[3];
+      m->e2e_getAll(i,e2e,0);
+      if((e2e[0]==e2e[1]) && (e2e[0]==e2e[2]) && (e2e[0]!=-1)) {
+	CkPrintf("ERROR: element %d, has e2e (%d,%d,%d)\n",i,e2e[0],e2e[1],e2e[2]);
+	CkAssert(false);
+      }
     }
   }
   for(int i=0; i<noGhostEle; i++) {
@@ -1110,6 +1116,12 @@ void FEM_MUtil::StructureTest(FEM_Mesh *m) {
 	//all nodes must be valid
 	if(e2n[j]>=0) CkAssert(m->node.is_valid(e2n[j]));
 	else CkAssert(m->node.ghost->is_valid(FEM_From_ghost_index(e2n[j])));
+      }
+      int e2e[3];
+      m->e2e_getAll(ghostIndex,e2e,0);
+      if((e2e[0]==e2e[1]) && (e2e[0]==e2e[2]) && (e2e[0]!=-1)) {
+	CkPrintf("ERROR: element %d, has e2e (%d,%d,%d)\n",i,e2e[0],e2e[1],e2e[2]);
+	CkAssert(false);
       }
     }
   }
