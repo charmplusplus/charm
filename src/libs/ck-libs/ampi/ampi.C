@@ -3203,10 +3203,13 @@ int AMPI_Alltoall(void *sendbuf, int sendcount, MPI_Datatype sendtype,
     // use irecv to post receives
   dttype = ptr->getDDT()->getType(recvtype) ;
   itemsize = dttype->getSize(recvcount) ;
+  int rank = ptr->getRank(comm);
+
   MPI_Request *reqs = new MPI_Request[size];
   for(i=0;i<size;i++) {
-        AMPI_Irecv(((char*)recvbuf)+(itemsize*i), recvcount, recvtype,
-              i, MPI_ATA_TAG, comm, &reqs[i]);
+        int dst = (rank+i) % size;
+        AMPI_Irecv(((char*)recvbuf)+(itemsize*dst), recvcount, recvtype,
+              dst, MPI_ATA_TAG, comm, &reqs[i]);
   }
   //AMPI_Yield(comm);
   //AMPI_Barrier(comm);
@@ -3225,14 +3228,10 @@ int AMPI_Alltoall(void *sendbuf, int sendcount, MPI_Datatype sendtype,
   } else
 #endif 
   {
-      int r = rand();
-      if (ptr->getRank(comm) %2 ==0)
       for(i=0;i<size;i++) {
-          ptr->send(MPI_ATA_TAG, ptr->getRank(comm), ((char*)sendbuf)+(itemsize*i), sendcount, sendtype, i, comm);
-      }
-      else
-      for(i=size-1;i>=0;i--) {
-          ptr->send(MPI_ATA_TAG, ptr->getRank(comm), ((char*)sendbuf)+(itemsize*i), sendcount, sendtype, i, comm);
+          int dst = (rank+i) % size;
+          ptr->send(MPI_ATA_TAG, rank, ((char*)sendbuf)+(itemsize*dst), sendcount,
+                    sendtype, dst, comm);
       }
   }
   
