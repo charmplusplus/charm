@@ -86,8 +86,8 @@ class CkMarshalledMessage {
 	//Don't use these: only pass by reference
 	void operator=(const CkMarshalledMessage &);
  public:
-	CkMarshalledMessage(void) {msg=NULL;}
-	CkMarshalledMessage(CkMessage *m) {msg=m;} //Takes ownership of message
+	CkMarshalledMessage(void): msg(NULL) {}
+	CkMarshalledMessage(CkMessage *m): msg(m) {} //Takes ownership of message
 	CkMarshalledMessage(const CkMarshalledMessage &);
 	~CkMarshalledMessage() {if (msg) CkFreeMsg(msg);}
 	CkMessage *getMessage(void) {void *ret=msg; msg=NULL; return (CkMessage *)ret;}
@@ -108,11 +108,8 @@ class CkEntryOptions : public CkNoncopyable {
 	prio_t *prioPtr; //Points to message priority values
 	prio_t prioStore; //For short priorities, stores the priority value
 public:
-	CkEntryOptions(void) {
-		queueingtype=CK_QUEUEING_FIFO;
-		prioBits=0;
-		prioPtr=NULL;
-	}
+	CkEntryOptions(void): queueingtype(CK_QUEUEING_FIFO), prioBits(0), 
+                              prioPtr(NULL), prioStore(0) {}
 
 	~CkEntryOptions() {
 		if ( prioPtr != NULL && queueingtype != CK_QUEUEING_IFIFO ) {

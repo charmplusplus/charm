@@ -78,9 +78,8 @@ class CkSectionInfo {
             CmiAssert(0);
 	}
     }
-    CkSectionInfo(CkArrayID _aid, void *p = NULL) {
-	type = MulticastMsg;
-	pe = CkMyPe(); 
+    CkSectionInfo(CkArrayID _aid, void *p = NULL): type(MulticastMsg),
+                                                   pe(CkMyPe()) {
 	aid = _aid;
 	sInfo.sCookie.val=p;
 	sInfo.sCookie.redNo=0;
