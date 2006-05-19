@@ -59,14 +59,11 @@ class CpdListAccessor_c : public CpdListAccessor {
 public:
   CpdListAccessor_c(const char *path_,
             CpdListLengthFn_c lenFn_,void *lenParam_,
-            CpdListItemsFn_c itemsFn_,void *itemsParam_)
-  {
-      path=path_;
-      lenFn=lenFn_;
-      lenParam=lenParam_;
-      itemsFn=itemsFn_;
-      itemsParam=itemsParam_;
-  }
+            CpdListItemsFn_c itemsFn_,void *itemsParam_):
+	path(path_), lenFn(lenFn_), lenParam(lenParam_), 
+	itemsFn(itemsFn_), itemsParam(itemsParam_) {}
+  CpdListAccessor_c(const CpdListAccessor_c &p);//You don't want to copy
+  void operator=(const CpdListAccessor_c &p);	// You don't want to copy
   
   virtual const char *getPath(void) const {return path;}
   virtual int getLength(void) const {return (*lenFn)(lenParam);}
