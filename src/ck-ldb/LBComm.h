@@ -86,7 +86,7 @@ public:
 
   inline int from_proc() const { return (src_proc != -1); }
 private:
-  LBCommData() {};
+  LBCommData(): mykey(0), src_proc(0), n_messages(0), n_bytes(0) {};
   
   int compute_key();
   int hash(const int i, const int m) const;

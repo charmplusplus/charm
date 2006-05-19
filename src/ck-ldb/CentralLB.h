@@ -269,7 +269,11 @@ public:
   int next_lb;
 public:
   CLBStatsMsg(int osz, int csz);
-  CLBStatsMsg()  {}
+  CLBStatsMsg(): from_pe(0), pe_speed(0), 
+                 total_walltime(0.0), total_cputime(0.0),
+                 idletime(0.0), bg_walltime(0.0), bg_cputime(0.0),
+                 n_objs(0), objData(NULL), n_comm(0), commData(NULL), 
+                 avail_vector(NULL), next_lb(0)  {}
   ~CLBStatsMsg();
   void pup(PUP::er &p);
 }; 
