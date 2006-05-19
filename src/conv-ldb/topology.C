@@ -93,12 +93,7 @@ void LBTopology::get_pairwise_hop_count(double  **distance)
     int index;
     int dist;
     queueNode *next;
-    queueNode(int i,int d)
-    {
-      index=i;
-      dist=d;
-      next=NULL;
-    }
+    queueNode(int i,int d): index(i), dist(d), next(NULL) {}
   };
   
   bool *visited=new bool[npes];
@@ -987,6 +982,8 @@ public:
   char *name;
   LBtopoFn fn;
   LBTopoMap(char *s, LBtopoFn f): name(s), fn(f) {}
+  LBTopoMap(const LBTopoMap &p);		// You don't want to copy
+  void operator=(const LBTopoMap &p);		// You don't want to copy
 };
 
 class LBTopoVec {
