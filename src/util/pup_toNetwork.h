@@ -28,7 +28,7 @@ class PUP_toNetwork_sizer : public PUP::er {
 	int nBytes;
 	virtual void bytes(void *p,int n,size_t itemSize,PUP::dataType t);
  public:
-	PUP_toNetwork_sizer(void) :PUP::er(IS_SIZING) {nBytes=0;}
+	PUP_toNetwork_sizer(void) :PUP::er(IS_SIZING), nBytes(0) {}
 	int size(void) const {return nBytes;}
 };
 

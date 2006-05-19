@@ -123,13 +123,12 @@ class CkHashtableLayout {
   int oo,os; ///< Object byte offset and size
  public:
   CkHashtableLayout(int keySize,int emptyOffset,
-		    int objectOffset,int objectSize,int entryLength)
-  {
-    size=entryLength;
-    ko=0; ks=keySize;
-    po=emptyOffset; ps=1;
-    oo=objectOffset; os=objectSize;
-  }
+		    int objectOffset,int objectSize,int entryLength):
+		size(entryLength),
+		ko(0), ks(keySize),
+		po(emptyOffset), ps(1),
+		oo(objectOffset), os(objectSize)
+  {}
 
   inline int entrySize(void) const {return size;}
   inline int keySize(void) const {return ks;}
@@ -237,8 +236,10 @@ protected:
 	char *entry(int i) const {return table+i*layout.entrySize();}
 public:
 	CkHashtableIterator(char *table_,int len_,const CkHashtableLayout &lo)
-	  :len(len_),layout(lo),table(table_)
-		{curNo=0;}
+	  :len(len_),layout(lo),table(table_),curNo(0)
+		{}
+        CkHashtableIterator(const CkHashtableIterator &it);  //don't copy
+        void operator=(const CkHashtableIterator &it);	    // don't copy
 	
 	//Seek to start of hash table
 	void seekStart(void);

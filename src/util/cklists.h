@@ -53,9 +53,7 @@ class CkQ : private CkSTLHelper<T>, private CkNoncopyable {
       blklen = newlen; first = 0;
     }
   public:
-    CkQ() :first(0),len(0),mask(0) {
-      blklen = 0; block = NULL;
-    }
+    CkQ() : block(NULL), blklen(0), first(0),len(0),mask(0) {}
     CkQ(int sz) :first(0),len(0) {
       int size = 2;
       mask = 0x03;
@@ -195,7 +193,7 @@ class CkVec : private CkSTLHelper<T> {
        elementCopy(block,src.block,blklen);
     }
   public:
-    CkVec() {block=NULL;blklen=len=0;}
+    CkVec(): block(NULL), blklen(0), len(0) {}
     ~CkVec() { freeBlock(); }
     CkVec(const this_type &src) {copyFrom(src);}
     CkVec(int size) { makeBlock(size,size); } 

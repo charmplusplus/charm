@@ -147,8 +147,7 @@ class er {
 #if CMK_EXPLICIT
   explicit /* Makes constructor below behave better */
 #endif
-           er(unsigned int inType) //You don't want to create raw PUP::er's.
-              {PUP_er_state=inType;}
+           er(unsigned int inType): PUP_er_state(inType) {} //You don't want to create raw PUP::er's.
  public:
   virtual ~er();//<- does nothing, but might be needed by some child
 
@@ -336,7 +335,7 @@ class sizer : public er {
   virtual void bytes(void *p,int n,size_t itemSize,dataType t);
  public:
   //Write data to the given buffer
-  sizer(void):er(IS_SIZING) {nBytes=0;}
+  sizer(void):er(IS_SIZING),nBytes(0) {}
   
   //Return the current number of bytes to be packed
   int size(void) const {return nBytes;}
@@ -353,6 +352,8 @@ class mem : public er { //Memory-buffer packers and unpackers
   myByte *origBuf;//Start of memory buffer
   myByte *buf;//Memory buffer (stuff gets packed into/out of here)
   mem(unsigned int type,myByte *Nbuf):er(type),origBuf(Nbuf),buf(Nbuf) {}
+  mem(const mem &p);			//You don't want to copy
+  void operator=(const mem &p);		// You don't want to copy
 
   //For seeking (pack/unpack in different orders)
   virtual void impl_startSeek(seekBlock &s); /*Begin a seeking block*/
@@ -402,6 +403,8 @@ class disk : public er {
  protected:
   FILE *F;//Disk file to read from/write to
   disk(unsigned int type,FILE *f):er(type),F(f) {}
+  disk(const disk &p);			//You don't want to copy
+  void operator=(const disk &p);	// You don't want to copy
 
   //For seeking (pack/unpack in different orders)
   virtual void impl_startSeek(seekBlock &s); /*Begin a seeking block*/
@@ -447,6 +450,8 @@ class toTextUtil : public er {
  protected:
   virtual char *advance(char *cur)=0; /*Consume current buffer and return next*/
   toTextUtil(unsigned int inType,char *buf);
+  toTextUtil(const toTextUtil &p);		//You don't want to copy
+  void operator=(const toTextUtil &p);		// You don't want to copy
  public:
   virtual void comment(const char *message);
   virtual void synchronize(unsigned int m);
@@ -465,6 +470,7 @@ class sizerText : public toTextUtil {
   sizerText(void);
   int size(void) const {return charCount+1; /*add NULL*/ }
 };
+
 /* Copy data to this C string, including terminating NULL. */
 class toText : public toTextUtil {
  private:
@@ -474,6 +480,8 @@ class toText : public toTextUtil {
   virtual char *advance(char *cur);
  public:
   toText(char *outStr);
+  toText(const toText &p);			//You don't want to copy
+  void operator=(const toText &p);		// You don't want to copy
   int size(void) const {return charCount+1; /*add NULL*/ }
 };
 
@@ -485,6 +493,8 @@ class toTextFile : public er {
   //Begin writing to this file, which should be opened for ascii write.
   // You must close the file yourself when done.
   toTextFile(FILE *f_) :er(IS_PACKING), f(f_) {}
+  toTextFile(const toTextFile &p);		//You don't want to copy
+  void operator=(const toTextFile &p);		// You don't want to copy
   virtual void comment(const char *message);
 };
 class fromTextFile : public er {
@@ -501,6 +511,8 @@ class fromTextFile : public er {
   //Begin writing to this file, which should be opened for ascii read.
   // You must close the file yourself when done.
   fromTextFile(FILE *f_) :er(IS_UNPACKING), f(f_) {}
+  fromTextFile(const fromTextFile &p);		//You don't want to copy
+  void operator=(const fromTextFile &p);	// You don't want to copy
   virtual void comment(const char *message);
 };
 
@@ -688,6 +700,9 @@ class CkPointer {
 	 from a temporary.  The public copy constructor should never be called, though. */
 public:
 	CkPointer(const CkPointer<T> &src) {
+		CmiAbort("PUPable_marshall's cannot be passed by value.  Pass them only by reference!");
+	}
+  	void operator=(const CkPointer<T> &src) {
 		CmiAbort("PUPable_marshall's cannot be passed by value.  Pass them only by reference!");
 	}
 #endif

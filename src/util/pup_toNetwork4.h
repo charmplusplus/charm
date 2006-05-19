@@ -38,6 +38,8 @@ class PUP_toNetwork4_pack : public PUP::er {
 	PUP_toNetwork4_pack(void *dest) :PUP::er(IS_PACKING) {
 		start=buf=(unsigned char *)dest;
 	}
+  	PUP_toNetwork4_pack(const PUP_toNetwork4_pack &p); //don't copy
+  	void operator=(const PUP_toNetwork4_pack &p);	      // don't copy
 	inline int size(void) const {return buf-start;}
 };
 
@@ -62,6 +64,8 @@ class PUP_toNetwork4_unpack : public PUP::er {
 	PUP_toNetwork4_unpack(const void *src) :PUP::er(IS_UNPACKING) {
 		start=buf=(const unsigned char *)src;
 	}
+  	PUP_toNetwork4_unpack(const PUP_toNetwork4_unpack &p); //don't copy
+  	void operator=(const PUP_toNetwork4_unpack &p);	      // don't copy
 	inline int size(void) const {return buf-start;}
 };
 
