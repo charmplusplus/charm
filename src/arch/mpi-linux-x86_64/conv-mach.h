@@ -35,8 +35,8 @@
 
 #define CMK_THREADS_REQUIRE_NO_CPV                         0
 
-#define CMK_TIMER_USE_GETRUSAGE                            1
-#define CMK_TIMER_USE_SPECIAL                              0
+#define CMK_TIMER_USE_GETRUSAGE                            0
+#define CMK_TIMER_USE_SPECIAL                              1
 #define CMK_TIMER_USE_TIMES                                0
 #define CMK_TIMER_USE_RDTSC				   0
 
