@@ -173,4 +173,16 @@ struct ckcomplex {
 
 PUPbytes(ckcomplex);
 
+// Backward compatability:
+// Assume that you only have ckcomplex's definition of complex 
+// Unless WRAP_COMPLEX is defined, in which case you have a 
+// complex from elsewhere and want a distinct ckcomplex.
+
+// This allows old codes which used ckcomplex to just work.
+
+
+#ifndef CKCOMPLEX_ISNOT_COMPLEX
+typedef ckcomplex complex;
+#endif
+
 #endif
