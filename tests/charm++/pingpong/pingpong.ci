@@ -33,7 +33,7 @@ mainmodule pingpong {
   group PingG {
     entry PingG(void);
     entry void start(void);
-    entry void recv(void);
+    entry void recv(PingMsg *);
   }
   array [Fancy] PingF {
     entry PingF();

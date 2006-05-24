@@ -2,6 +2,8 @@
 #include <charm++.h>
 
 #define NITER 10000
+#define PAYLOAD 100
+
 
 class Fancy
 {
@@ -25,7 +27,7 @@ class CkArrayIndexFancy : public CkArrayIndex {
 class PingMsg : public CMessage_PingMsg
 {
   public:
-    char x[100];
+    char x[PAYLOAD];
 };
 
 class IdMsg : public CMessage_IdMsg
@@ -57,6 +59,7 @@ public:
     if(CkNumPes()>2) {
       CkAbort("Run this program on 1 or 2 processors only.\n");
     }
+    CkPrintf("Pingpong with payload: %d \n", PAYLOAD);
     mainProxy = thishandle;
     phase = 0;
     gid = CProxy_PingG::ckNew();
@@ -123,10 +126,10 @@ public:
   PingG(CkMigrateMessage *m) {}
   void start(void)
   {
-    (*pp).recv();
     start_time = CkWallTimer();
+    (*pp).recv(new PingMsg);
   }
-  void recv(void)
+  void recv(PingMsg *msg)
   {
     if(me==0) {
       niter++;
@@ -135,12 +138,13 @@ public:
         int titer = (CkNumPes()==1)?(NITER/2) : NITER;
         CkPrintf("Roundtrip time for Groups is %lf us\n",
                  1.0e6*(end_time-start_time)/titer);
+        delete msg;
         mainProxy.maindone();
       } else {
-        (*pp).recv();
+        (*pp).recv(msg);
       }
     } else {
-      (*pp).recv();
+      (*pp).recv(msg);
     }
   }
 };
