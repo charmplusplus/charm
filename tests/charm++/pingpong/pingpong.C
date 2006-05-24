@@ -314,7 +314,7 @@ class PingC : public Chare
   void start(void)
   {
     niter = 0;
-    pp->recv();
+    pp->recvReuse(new PingMsg);
     start_time = CkWallTimer();
   }
   void exchange(IdMsg *msg)
@@ -328,7 +328,7 @@ class PingC : public Chare
       pp->exchange(msg);
     }
   }
-  void recv(void)
+  void recvReuse(PingMsg *msg)
   {
     if(first) {
       niter++;
@@ -337,13 +337,14 @@ class PingC : public Chare
         CkPrintf("Roundtrip time for Chares (reuse msgs) is %lf us\n",
                  1.0e6*(end_time-start_time)/NITER);
         niter = 0;
+        delete msg;
         pp->recv(new PingMsg);
         start_time = CkWallTimer();
       } else {
-        pp->recv();
+        pp->recvReuse(msg);
       }
     } else {
-      pp->recv();
+      pp->recvReuse(msg);
     }
   }
   void recv(PingMsg *msg)

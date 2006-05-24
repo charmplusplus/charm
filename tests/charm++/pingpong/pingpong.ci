@@ -26,7 +26,7 @@ mainmodule pingpong {
     entry PingC(IdMsg *);
     entry void start(void);
     entry void exchange(IdMsg *);
-    entry void recv(void);
+    entry void recvReuse(PingMsg *);
     entry void recv(PingMsg *);
     entry [threaded] void trecv(void);
   };
