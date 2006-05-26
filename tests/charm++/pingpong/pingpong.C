@@ -174,12 +174,31 @@ public:
         end_time = CkWallTimer();
         CkPrintf("Roundtrip time for 1D Arrays is %lf us\n",
                  1.0e6*(end_time-start_time)/NITER);
-        mainProxy.maindone();
+        //mainProxy.maindone();
+        niter=0;
+        start_time = CkWallTimer();
+        (*pp)[0].trecv(msg);
       } else {
         (*pp)[1].recv(msg);
       }
     } else {
       (*pp)[0].recv(msg);
+    }
+  }
+  void trecv(PingMsg *msg)
+  {
+    if(thisIndex==0) {
+      niter++;
+      if(niter==NITER) {
+        end_time = CkWallTimer();
+        CkPrintf("Roundtrip time for 1D threaded Arrays is %lf us\n",
+                 1.0e6*(end_time-start_time)/NITER);
+        mainProxy.maindone();
+      } else {
+        (*pp)[1].trecv(msg);
+      }
+    } else {
+      (*pp)[0].trecv(msg);
     }
   }
 };
