@@ -767,6 +767,7 @@ static void one_slotOP(const slotOP *op,int pe,int s,int n)
 	else 
 	{/*Remote request*/
 		slotmsg *m=prepare_slotmsg(s,e);
+		CmiSetHandler(m, freeOP.remote);
 		CmiSyncSendAndFree(pe,sizeof(slotmsg),m);
 	}
 }
