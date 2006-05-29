@@ -1437,7 +1437,9 @@ CpvExtern(char *,_validProcessors);
 #if CMK_CELL
 #include "cell-api.h"
 #endif
-
+#ifdef __ONESIDED_IMPL
+#include "conv-onesided.h"
+#endif
 
 #if defined(__cplusplus)
 }
