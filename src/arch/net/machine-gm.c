@@ -40,6 +40,15 @@
 #define CMK_WHEN_PROCESSOR_IDLE_BUSYWAIT 1
 #define CMK_WHEN_PROCESSOR_IDLE_USLEEP 0
 
+#ifdef __ONESIDED_IMPL
+#ifdef __ONESIDED_GM_HARDWARE
+#include "conv-onesided.h"
+int getSrcHandler;
+int getDestHandler;
+void handleGetSrc(void *msg);
+void handleGetDest(void *msg);
+#endif
+#endif
 
 static gm_alarm_t gmalarm;
 
@@ -947,6 +956,13 @@ void CmiMachineInit(char **argv)
   msgpool[msgNums++]  = gm_dma_malloc(gmport, maxMsgSize);
 #endif
 
+#ifdef __ONESIDED_IMPL
+#ifdef __ONESIDED_GM_HARDWARE
+  getSrcHandler = CmiRegisterHandler((CmiHandler)handleGetSrc);
+  getDestHandler = CmiRegisterHandler((CmiHandler)handleGetDest);
+#endif
+#endif
+
   /* alarm will ping charmrun */
   gm_initialize_alarm(&gmalarm);
 
@@ -1030,5 +1046,184 @@ static char *getErrorMsg(gm_status_t status)
   }
   return errmsg;
 }
+
+#ifdef __ONESIDED_IMPL
+#ifdef __ONESIDED_GM_HARDWARE
+
+struct CmiRMA {
+  int completed;
+};
+typedef struct CmiRMA CmiRMA;
+
+struct CmiRMAMsg {
+  char core[CmiMsgHeaderSizeBytes];
+  CmiRMA* stat;
+};
+typedef struct CmiRMAMsg CmiRMAMsg;
+
+struct RMAPutMsg {
+  char core[CmiMsgHeaderSizeBytes];
+  void *Saddr;
+  void *Taddr;
+  unsigned int size;
+  unsigned int targetId;
+  unsigned int sourceId;
+  int dataport;
+  CmiRMA *stat;
+};
+typedef struct RMAPutMsg RMAPutMsg;
+
+int CmiRegisterMemory(void *addr, unsigned int size) {
+  gm_status_t status;
+  status = gm_register_memory(gmport, addr, size);
+  if (status != GM_SUCCESS) { 
+    printf("Cannot register memory at %p of size %d\n",addr,size);
+    gm_perror("registerMemory", status); 
+    return 0;
+  }
+  return 1;
+}
+
+int CmiUnRegisterMemory(void *addr, unsigned int size) {
+  gm_status_t status;
+  status = gm_deregister_memory(gmport, addr, size);
+  if (status != GM_SUCCESS) { 
+    printf("Cannot unregister memory at %p of size %d\n",addr,size);
+    gm_perror("UnregisterMemory", status); 
+    return 0;
+  }
+  return 1;
+}
+
+void put_callback(struct gm_port *p, void *context, gm_status_t status)
+{
+  RMAPutMsg *out = (RMAPutMsg*)context;
+  if (status != GM_SUCCESS) { 
+    switch (status) {
+      case GM_SEND_DROPPED:
+        CmiPrintf("Got DROPPED_PUT notification, resend\n");
+	gm_directed_send_with_callback(gmport,out->Saddr,(int)(out->Taddr),
+				       out->size,GM_HIGH_PRIORITY, 
+				       out->targetId, out->dataport, 
+				       put_callback, out);
+        return;
+      default:
+        CmiAbort("gm send_callback failed");
+    }
+  }
+  out->stat->completed=1;
+  gm_free_send_token (gmport, GM_HIGH_PRIORITY);
+  return;
+}
+
+void *CmiPut(unsigned int sourceId, unsigned int targetId, void *Saddr, void *Taddr, unsigned int size) {
+  int dataport = (nodes_by_pe[targetId])->dataport;
+  RMAPutMsg *context = (RMAPutMsg*)malloc(sizeof(RMAPutMsg));
+  context->Saddr = Saddr;
+  context->Taddr = Taddr;
+  context->size = size;
+  context->targetId = targetId;
+  context->sourceId = sourceId;
+  context->dataport = dataport;
+  context->stat = (CmiRMA*)malloc(sizeof(CmiRMA));
+  context->stat->completed = 0;
+  //get a token before the put
+  if (gm_alloc_send_token(gmport, GM_HIGH_PRIORITY)) {
+    //perform the put
+    gm_directed_send_with_callback(gmport,Saddr,(int)Taddr,size,
+				   GM_HIGH_PRIORITY,targetId,dataport,
+				   put_callback,(void*)context);
+  }
+  return (void*)(context->stat);
+}
+
+void handleGetSrc(void *msg) {
+  CmiRMA* stat = ((CmiRMAMsg*)msg)->stat;
+  stat->completed = 1;
+  CmiFree(msg);
+  return;
+}
+
+void get_callback_dest(struct gm_port *p, void *context, gm_status_t status)
+{
+  RMAPutMsg *out = (RMAPutMsg*)context;
+  int sizeRmaStat = sizeof(CmiRMAMsg);
+  char *msgRmaStat;
+  if (status != GM_SUCCESS) { 
+    switch (status) {
+      case GM_SEND_DROPPED:
+        CmiPrintf("Got DROPPED_PUT notification, resend\n");
+	gm_directed_send_with_callback(gmport,out->Saddr,(int)(out->Taddr),
+				       out->size,GM_HIGH_PRIORITY, 
+				       out->targetId, out->dataport, 
+				       get_callback_dest, out);
+        return;
+      default:
+        CmiAbort("gm send_callback failed");
+    }
+  }
+  gm_free_send_token (gmport, GM_HIGH_PRIORITY);
+  //send a message to update the context status on the source node
+  msgRmaStat = (void*)CmiAlloc(sizeRmaStat);
+  ((CmiRMAMsg*)msgRmaStat)->stat = out->stat;
+  CmiSetHandler(msgRmaStat,getSrcHandler);
+  CmiSyncSendAndFree(out->targetId,sizeRmaStat,msgRmaStat);
+  return;
+}
+
+void handleGetDest(void *msg) {
+  RMAPutMsg *context1 = (RMAPutMsg*)msg;
+  RMAPutMsg *context = (RMAPutMsg*)malloc(sizeof(RMAPutMsg));
+  context->Saddr = context1->Taddr;
+  context->Taddr = context1->Saddr;
+  context->size = context1->size;
+  context->targetId = context1->sourceId;
+  context->sourceId = context1->targetId;
+  context->dataport = context1->dataport;
+  context->stat = context1->stat;
+  //get a token before the put
+  if (gm_alloc_send_token(gmport, GM_HIGH_PRIORITY)) {
+    //perform the put
+    gm_directed_send_with_callback(gmport,context->Saddr,(int)context->Taddr,context->size,
+				   GM_HIGH_PRIORITY,context->targetId,context->dataport,
+				   get_callback_dest,(void*)context);
+  }
+  CmiFree(msg);
+  return;
+}
+/* Send a converse message to the destination to perform a get from destination.
+ * The destination then sends a put to write the actual message
+ * Then it sends a converse message to the sender to update the completed flag
+ */
+void *CmiGet(unsigned int sourceId, unsigned int targetId, void *Saddr, void *Taddr, unsigned int size) {
+  int dataport = (nodes_by_pe[targetId])->dataport;
+  int sizeRma;
+  char *msgRma;
+  RMAPutMsg *context;
+  sizeRma = sizeof(RMAPutMsg);
+  msgRma = (void*)CmiAlloc(sizeRma);
+
+  context = (RMAPutMsg*)msgRma;
+  context->Saddr = Saddr;
+  context->Taddr = Taddr;
+  context->size = size;
+  context->targetId = targetId;
+  context->sourceId = sourceId;
+  context->dataport = dataport;
+  context->stat = (CmiRMA*)malloc(sizeof(CmiRMA));
+  context->stat->completed = 0;
+
+  CmiSetHandler(msgRma,getDestHandler);
+  CmiSyncSendAndFree(targetId,sizeRma,msgRma);
+
+  return (void*)(context->stat);
+}
+
+int CmiWaitTest(void *obj){
+  return ((CmiRMA*)obj)->completed;
+}
+
+#endif
+#endif
 
 /*@}*/

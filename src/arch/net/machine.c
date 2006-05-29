@@ -275,6 +275,16 @@ static uint64_t Cmi_nic_id=0; /* Machine-specific identifier (MX-only) */
 
 #define PRINTBUFSIZE 16384
 
+#ifdef __ONESIDED_IMPL
+#ifdef __ONESIDED_NO_HARDWARE
+int putSrcHandler;
+int putDestHandler;
+int getSrcHandler;
+int getDestHandler;
+#include "conv-onesided.c"
+#endif
+#endif
+
 /*
 0: from smp thread
 1: from interrupt
@@ -2199,6 +2209,15 @@ static void ConverseRunPE(int everReturn)
     	CMK_RANDOMLY_CORRUPT_MESSAGES,rand());
 #endif
 
+#ifdef __ONESIDED_IMPL
+#ifdef __ONESIDED_NO_HARDWARE
+  putSrcHandler = CmiRegisterHandler((CmiHandler)handlePutSrc);
+  putDestHandler = CmiRegisterHandler((CmiHandler)handlePutDest);
+  getSrcHandler = CmiRegisterHandler((CmiHandler)handleGetSrc);
+  getDestHandler = CmiRegisterHandler((CmiHandler)handleGetDest);
+#endif
+#endif
+
   /* communication thread */
   if (CmiMyRank() == CmiMyNodeSize()) {
     Cmi_startfn(CmiGetArgc(CmiMyArgv), CmiMyArgv);
@@ -2386,6 +2405,7 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usc, int everReturn)
   #if CMK_USE_AMMASSO
     CmiAmmassoOpenQueuePairs();
   #endif
+
   ConverseRunPE(everReturn);
 }
 
