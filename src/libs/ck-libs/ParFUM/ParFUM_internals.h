@@ -2122,6 +2122,9 @@ public:
 			tupledata(tupledata &rhs){
 				memcpy(nodes,rhs.nodes,sizeof(int)*MAX_TUPLE);
 			}
+			tupledata(const tupledata &rhs){
+				memcpy(nodes,rhs.nodes,sizeof(int)*MAX_TUPLE);
+			}
 			tupledata(){};
 			//dont store the returned string
 			char *toString(int numnodes,char *str){

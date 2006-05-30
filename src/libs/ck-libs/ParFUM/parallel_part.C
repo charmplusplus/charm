@@ -830,7 +830,7 @@ void makeGhost(FEM_Mesh *m,MPI_Comm comm,int masterRank,int totalShared,FEM_Ghos
 	  // for each tuple in this element
 	  for(int t=0;t< layer->elem[i].tuplesPerElem;t++){
 	    bool possibleGhost=true;
-	    // the tuple with the global number of the nodest
+	    // the tuple with the global number of the nodes
 	    int globalNodeTuple[Hashnode::tupledata::MAX_TUPLE]; 
 						
 	    //for each node in a tuple check if it is shared
