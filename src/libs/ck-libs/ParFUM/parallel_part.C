@@ -1,4 +1,3 @@
-#ifdef FEM_PARALLEL_PART
 /*FEM framework 
   This file contains code for parallely partitioning
   the initial mesh into multiple chunks 
@@ -1131,4 +1130,3 @@ bool sharedWith(int lnode,int chunk,FEM_Mesh *m){
   }
 }
 #include "fem.def.h"
-#endif

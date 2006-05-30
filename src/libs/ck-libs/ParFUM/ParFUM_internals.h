@@ -1873,8 +1873,6 @@ class FEM_ElemAdj_Layer : public CkNoncopyable {
 // End impl.h
 
 
-#ifdef FEM_PARALLEL_PART
-
 
 /*
 	File containing the data structures, function declaration 
@@ -2425,7 +2423,6 @@ bool sharedWith(int lnode,int chunk,FEM_Mesh *m);
 
 // End Parallel Partitioner
 
-#endif
 
 
 /*

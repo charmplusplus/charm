@@ -11,6 +11,7 @@ Parallel Programming Lab, Univ. of Illinois 2006
 /* Some Globals */
 int femVersion = 1;
 static FEM_Partition *mypartition=NULL;
+int FEM_Partition_Mode=1;// is it serial or parallel partition: 1 - serial 2 - parallel
 
 /* TCharm semaphore ID, used for mesh startup */
 #define FEM_TCHARM_SEMAID 0x00FE300 /* __FEM__ */
@@ -58,13 +59,13 @@ CDECL void FEM_Init(FEM_Comm_t defaultComm)
 		FEM_chunk *c=new FEM_chunk(defaultComm);
 		TCHARM_Set_global(FEM_globalID,c,pupFEM_Chunk);
 	}
+	char **argv = CkGetArgv();
+  if(CmiGetArgFlagDesc(argv,"+Parfum_parallel_partition","ParFUM should use the parallel partitioner")){
+		FEM_Partition_Mode = 2;
+	}
 }
 FORTRAN_AS_C(FEM_INIT,FEM_Init,fem_init, (int *comm), (*comm))
 
-#ifndef FEM_PARALLEL_PART
-// This lets ParFUM be a "-module", too.  (Normally comes from .ci file...)
-//void _registerParFUM(void) {}
-#endif
 
 /*******************************************************
   Mesh basics
@@ -294,42 +295,40 @@ FORTRAN_AS_C_RETURN(int,FEM_MESH_REDUCE,FEM_Mesh_reduce,fem_mesh_reduce,
 	(int *mesh,int *rank,int *comm),(*mesh,*rank,*comm))
 
 
-#ifdef FEM_PARALLEL_PART
 extern int FEM_Mesh_Parallel_broadcast(int fem_mesh,int masterRank,FEM_Comm_t comm_context);
-#endif
 
 CDECL int 
 FEM_Mesh_broadcast(int fem_mesh,int masterRank,FEM_Comm_t comm_context)
 {
-#ifndef FEM_PARALLEL_PART
-	int tag=89375;
-	int myRank; MPI_Comm_rank((MPI_Comm)comm_context,&myRank);
-	if (myRank==masterRank) 
-	{ /* I'm the master-- split up and send */
-		int p, nParts; MPI_Comm_size((MPI_Comm)comm_context,&nParts);
-		int *parts=new int[nParts];
-		FEM_Mesh_partition(fem_mesh,nParts,parts);
-		int new_mesh=0;
-		for (p=0;p<nParts;p++)
-			if (p!=masterRank) { /* Send off received meshes */
-				FEM_Mesh_send(parts[p],p,tag,comm_context);
-				FEM_Mesh_deallocate(parts[p]);
-			}
-			else /* Just keep my own partition */
-				new_mesh=parts[p];
-		return new_mesh;
+	if(FEM_Partition_Mode == 1){ //serial partition
+		int tag=89375;
+		int myRank; MPI_Comm_rank((MPI_Comm)comm_context,&myRank);
+		if (myRank==masterRank) 
+		{ /* I'm the master-- split up and send */
+			int p, nParts; MPI_Comm_size((MPI_Comm)comm_context,&nParts);
+			int *parts=new int[nParts];
+			FEM_Mesh_partition(fem_mesh,nParts,parts);
+			int new_mesh=0;
+			for (p=0;p<nParts;p++)
+				if (p!=masterRank) { /* Send off received meshes */
+					FEM_Mesh_send(parts[p],p,tag,comm_context);
+					FEM_Mesh_deallocate(parts[p]);
+				}
+				else /* Just keep my own partition */
+					new_mesh=parts[p];
+			return new_mesh;
+		}
+		else
+		{ /* I'm a slave-- recv new mesh from master: */
+			return FEM_Mesh_recv(masterRank,tag,comm_context);
+		}
+	}else{
+		//parallel partition
+		MPI_Barrier((MPI_Comm)comm_context);
+		_registerfem();
+		MPI_Barrier((MPI_Comm)comm_context);
+		return FEM_Mesh_Parallel_broadcast(fem_mesh,masterRank,comm_context);
 	}
-	else
-	{ /* I'm a slave-- recv new mesh from master: */
-		return FEM_Mesh_recv(masterRank,tag,comm_context);
-	}
-#else
-	MPI_Barrier((MPI_Comm)comm_context);
-	_registerfem();
-	MPI_Barrier((MPI_Comm)comm_context);
-	
-	return FEM_Mesh_Parallel_broadcast(fem_mesh,masterRank,comm_context);
-#endif
 }
 FORTRAN_AS_C_RETURN(int,FEM_MESH_BROADCAST,FEM_Mesh_broadcast,fem_mesh_broadcast, 
 	(int *mesh,int *rank,int *comm),(*mesh,*rank,*comm))
