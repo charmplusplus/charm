@@ -2,9 +2,15 @@
 #define __COMMON_H__
 
 
+#ifdef __cplusplus
+extern "C" {
+#endif
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#ifdef __cplusplus
+}
+#endif
 
 #include "spert_common.h"
 
@@ -70,6 +76,7 @@ extern "C" void* calloc_aligned(size_t size, char alignment) {
 }
 
 
+/*
 extern "C" void* alloca_aligned(size_t size, char alignment, int zeroFlag) {
 
   void* rtn = NULL;
@@ -100,6 +107,7 @@ extern "C" void* alloca_aligned(size_t size, char alignment, int zeroFlag) {
   // Return the address with offset
   return (void*)((char*)rtn + (((size_t)rtn) % alignment));
 }
+*/
 
 
 extern "C" void free_aligned(void* ptr) {
