@@ -12,7 +12,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Function Prototypes
 
-void funcLookup(int funcIndex, void* readWritePtr, int readWriteLen, void* readOnlyPtr, int readOnlyLen, void* writeOnlyPtr, int writeOnlyLen);
+void funcLookup(int funcIndex, void* readWritePtr, int readWriteLen, void* readOnlyPtr, int readOnlyLen, void* writeOnlyPtr, int writeOnlyLen, DMAListEntry* dmaList);
 void sayHi(char* readWritePtr, char* readOnlyPtr);
 void strBufs(DMAListEntry* dmaList, int numReadOnly, int numReadWrite, int numWriteOnly);
 
