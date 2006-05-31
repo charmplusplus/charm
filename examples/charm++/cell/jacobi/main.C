@@ -13,6 +13,8 @@ Main::Main(CkArgMsg *msg) {
   CkPrintf("   Matrix : [ %d x %d ]\n", NUM_ROWS * NUM_CHARES, NUM_COLS * NUM_CHARES);
   CkPrintf("   Chare Matrix : [ %d x %d ]\n", NUM_CHARES, NUM_CHARES);
   CkPrintf("   Per Chare Matrix : [ %d x %d ]\n", NUM_ROWS, NUM_COLS);
+  unsigned int memNeeded = ((NUM_ROWS + 2) * (NUM_COLS + 2)) * sizeof(float) * 2;
+  CkPrintf("   Per Work Request Memory : %d (0x%08x) bytes\n", memNeeded, memNeeded);
 
   // Init the member variables
   iterationCount = 0;
