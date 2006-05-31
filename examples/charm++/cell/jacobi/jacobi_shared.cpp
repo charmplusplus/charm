@@ -2,8 +2,21 @@
 
 #include "spert.h"
 #include "jacobi_shared.h"
+#include "sim_printf.h"
 
 
+// DMK : Define own exit() function for now.  Through the linking process, this function does
+//   not seem to be included anywhere but the code for _start refers to it.  FIGURE THIS OUT!!!
+#ifdef __cplusplus
+extern "C"
+#endif
+void exit() {
+}
+
+
+#ifdef __cplusplus
+extern "C"
+#endif
 void funcLookup(int funcIndex,
                 void* readWritePtr, int readWriteLen,
                 void* readOnlyPtr, int readOnlyLen,
@@ -16,7 +29,7 @@ void funcLookup(int funcIndex,
     case FUNC_DoCalculation: doCalculation((float*)writeOnlyPtr, (float*)readOnlyPtr); break;
 
     default:
-      printf("!!! WARNING !!! :: SPE Received Invalid funcIndex (%d)... Ignoring...\n", funcIndex);
+      //sim_printf("!!! WARNING !!! :: SPE Received Invalid funcIndex (%d)... Ignoring...\n", funcIndex);
       break;
   }
 }
@@ -25,12 +38,13 @@ void funcLookup(int funcIndex,
 void doCalculation(volatile float* matrixTmp, volatile float* matrix) {
 
   float maxError = 0.0f;
+  int x, y;
 
   // Update matrixTmp with new values
   register int isNorthwestern = (matrix[DATA_BUFFER_COLS - 1] == 1.0f);
   register int startX = ((isNorthwestern) ? (2) : (1));
-  for (int y = 1; y < (DATA_BUFFER_ROWS - 1); y++) {
-    for (int x = startX; x < (DATA_BUFFER_COLS - 1); x++) {
+  for (y = 1; y < (DATA_BUFFER_ROWS - 1); y++) {
+    for (x = startX; x < (DATA_BUFFER_COLS - 1); x++) {
 
       matrixTmp[GET_DATA_I(x,y)] = (matrix[GET_DATA_I(x    , y    )] +
                                     matrix[GET_DATA_I(x - 1, y    )] +
