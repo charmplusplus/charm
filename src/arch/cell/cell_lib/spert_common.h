@@ -22,8 +22,8 @@ extern "C" {
 
 // SIZEOF_16 : Returns the size of the structure s rounded up to the nearest multiple of 16.
 //   NOTE: All of the values in this macro are constants so a good compiler should be able to reduce all of this to a constant.
-#define SIZEOF_16(s)   ( ((sizeof(s) & 0xF) == 0) ? (sizeof(s)) : ((sizeof(s) & 0xFFFFFFF0) + (0x10)) )
-#define ROUNDUP_16(s)  ( ((s & 0xF) == 0) ? (s) : ((s & 0xFFFFFFF0) + (0x10)) )
+#define SIZEOF_16(s)   ( ((sizeof(s) & 0x0000000F) == 0) ? (sizeof(s)) : ((sizeof(s) & 0xFFFFFFF0) + (0x10)) )
+#define ROUNDUP_16(s)  ( ((s & 0x0000000F) == 0) ? (s) : ((s & 0xFFFFFFF0) + (0x10)) )
 
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -35,7 +35,7 @@ extern "C" {
 //   the memory returned by this function.  (See the man page for alloca for details.)
 extern void* malloc_aligned(size_t size, char alignment);
 extern void* calloc_aligned(size_t size, char alignment);
-extern void* alloca_aligned(size_t size, char alignment, int zeroFlag);
+//extern void* alloca_aligned(size_t size, char alignment, int zeroFlag);
 extern void free_aligned(void* ptr);
 
 
