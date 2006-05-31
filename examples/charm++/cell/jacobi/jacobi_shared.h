@@ -37,7 +37,7 @@
 
 #define MAX_ERROR  0.01f  // The value that all errors have to be below for the program to finish
 
-#define DISPLAY_MATRIX          1
+#define DISPLAY_MATRIX          0
 #define DISPLAY_MAX_ERROR_FREQ  1
 
 #define DATA_BUFFER_ROWS   (NUM_ROWS + 2)
@@ -70,7 +70,12 @@
 //////////////////////////////////////////////////////////////////////////////////////////////
 // Function Prototypes
 
-extern void funcLookup(int funcIndex, void* readWritePtr, int readWriteLen, void* readOnlyPtr, int readOnlyLen, void* writeOnlyPtr, int writeOnlyPtr);
+extern void funcLookup(int funcIndex,
+                       void* readWritePtr, int readWriteLen,
+                       void* readOnlyPtr, int readOnlyLen,
+                       void* writeOnlyPtr, int writeOnlyLen,
+                       DMAListEntry* dmaList
+                      );
 extern void doCalculation(volatile float* matrixTmp, volatile float* matrix);
 
 
