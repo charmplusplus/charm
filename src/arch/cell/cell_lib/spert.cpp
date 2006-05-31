@@ -1,9 +1,20 @@
-#include <stdio.h>
-#include <stdlib.h>
+#ifdef __cplusplus
+extern "C" {
+#endif
+  #include <stdlib.h>
+  #include <unistd.h>
+  #include <stdio.h>
+  #include <malloc_align.h>
+  #include <free_align.h>
+  #include <sim_printf.h>
+#ifdef __cplusplus
+}
+#endif
+
 #include <spu_intrinsics.h>
 #include <spu_mfcio.h>
 #include <cbe_mfc.h>
-#include <unistd.h>
+
 
 #if SPE_USE_OWN_MEMSET == 0
   #include <string.h>
@@ -11,6 +22,11 @@
 
 #include "spert_common.h"
 #include "spert.h"
+
+/////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Defines
+
+#define MESSAGE_RETURN_CODE(i, ec)   ((((unsigned int)ec << 16) & 0xFFFF0000) | ((unsigned int)i & 0x0000FFFF))
 
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -61,6 +77,7 @@ extern unsigned int _end;
 
 void speScheduler(SPEData *speData, unsigned long long id);
 void debug_displayActiveMessageQueue(unsigned long long id, int* msgState, char* str);
+void debug_displayStateHistogram(unsigned long long id, int* msgState, char* str);
 
 #if SPE_USE_OWN_MEMSET != 0
 void memset(void* ptr, char val, int len);
@@ -73,20 +90,40 @@ void memset(void* ptr, char val, int len);
 int main(unsigned long long id, unsigned long long param) {
 
   /*volatile*/ SPEData myData;
+  void* _heapPtr = NULL;
+  #if SPE_DEBUG_DISPLAY >= 1
+    void* _breakBefore = NULL;
+    void* _breakAfter = NULL;
+  #endif
 
   // Tell the world this SPE is alive
   #if SPE_DEBUG_DISPLAY >= 1
-    printf(" --==>> Hello From SPE 0x%llx's Runtime <<==--\n", id);
+    sim_printf(" --==>> Hello From SPE 0x%llx's Runtime <<==--\n", id);
   #endif
 
   // From Section 4.3 of library_SDK.pdf : "The local store memory heap is initialized the first
   //   time a memory heap allocation routine is called."... Do this now so it is ready to go.
-  //void* _heapPtr = sbrk((ptrdiff_t)1024 * 96);
+  register unsigned int memLeft = SPE_TOTAL_MEMORY_SIZE - SPE_RESERVED_STACK_SIZE - (unsigned int)(&_end);
+  memLeft -= 128;  // Buffer zone between stack and heap
+  memLeft &= 0xFFFFFF00;  // Force it to be a multiple of 256 bytes
+  #if SPE_DEBUG_DISPLAY >= 1
+    sim_printf("[0x%llx] memLeft = %d\n", id, memLeft);
+  #endif
+  if (memLeft < SPE_MINIMUM_HEAP_SIZE) return -1;
+  #if SPE_DEBUG_DISPLAy >= 1
+    _breakBefore = sbrk(0);
+  #endif
+  _heapPtr = sbrk((ptrdiff_t)memLeft);
+  #if SPE_DEBUG_DISPLAy >= 1
+    _breakAfter = sbrk(0);
+  #endif
 
   // DEBUG
   #if SPE_DEBUG_DISPLAY >= 1
-    //printf("[0x%llx] :: _end = %p, _heapPtr = %p, &(_heapPtr) = %p\n", id, &_end, _heapPtr, &(_heapPtr));
-    printf("[0x%llx] :: _end = %p\n",id, &_end);
+    sim_printf("[0x%llx] :: _end = %p, _breakBefore = %p, _heapPtr = %p, _breakAfter = %p (%p)\n",
+               id, &_end, _breakBefore, _heapPtr, _breakAfter, sbrk(0)
+              );
+    //sim_printf("[0x%llx] :: _end = %p, _heapPtr = %p\n",id, &_end, _heapPtr);
   #endif
 
   // Initialize globals
@@ -112,15 +149,15 @@ int main(unsigned long long id, unsigned long long param) {
 
   // Display stat data
   #if SPE_STATS != 0
-    printf("[0x%llx] :: SPE Stats\n", id);
-    printf("[0x%llx] ::   Total Number of Scheduler Loop Iterations: %llu\n", id, statData.schedulerLoopCount);
-    printf("[0x%llx] ::   Total Number of Work Requests Executed : %llu\n", id, statData.numWorkRequestsExecuted);
+    sim_printf("[0x%llx] :: SPE Stats\n", id);
+    sim_printf("[0x%llx] ::   Total Number of Scheduler Loop Iterations: %llu\n", id, statData.schedulerLoopCount);
+    sim_printf("[0x%llx] ::   Total Number of Work Requests Executed : %llu\n", id, statData.numWorkRequestsExecuted);
   #endif
 
   // Tell the world this SPE is going away
   #if SPE_DEBUG_DISPLAY >= 1
-    printf(" --==>> Goodbye From SPE 0x%llx's Runtime <<==--\n", id);
-    printf("  \"I do not regret the things I have done, but those I did not do.\" - Lucas, Empire Records\n");
+    sim_printf(" --==>> Goodbye From SPE 0x%llx's Runtime <<==--\n", id);
+    sim_printf("  \"I do not regret the things I have done, but those I did not do.\" - Lucas, Empire Records\n");
   #endif
 
   return 0;
@@ -132,14 +169,21 @@ void speScheduler(SPEData *speData, unsigned long long id) {
   int keepLooping = TRUE;
   int fetchIndex = 0;
   int runIndex = 0;
+  int getIndex = 0;
+  int putIndex = 0;
+  int commitIndex = 0;
   int cnt = 0;
   int tagStatus;
+  unsigned int numDMAQueueEntries = 0;
+  int i, j, iOffset;
 
   // DEBUG
-  int debugCounter = 0;
+  #if SPE_DEBUG_DISPLAY_STILL_ALIVE >= 1
+    int stillAliveCounter = 0;
+  #endif
 
   #if SPE_DEBUG_DISPLAY >= 1
-    printf("[0x%llx] --==>> Starting SPE Scheduler ...\n", id);
+    sim_printf("[0x%llx] --==>> Starting SPE Scheduler ...\n", id);
   #endif
 
   // Initialize the tag status registers to all tags enabled
@@ -150,15 +194,23 @@ void speScheduler(SPEData *speData, unsigned long long id) {
 
   // Create the local message queue
   int msgState[SPE_MESSAGE_QUEUE_LENGTH];
+  #if SPE_DEBUG_DISPLAY_NO_PROGRESS >= 1
+    int msgLastStateCount = 0;
+    int msgLastState[SPE_MESSAGE_QUEUE_LENGTH];
+  #endif
   void* readWritePtr[SPE_MESSAGE_QUEUE_LENGTH];
   void* readOnlyPtr[SPE_MESSAGE_QUEUE_LENGTH];
   void* writeOnlyPtr[SPE_MESSAGE_QUEUE_LENGTH];
   void* localMemPtr[SPE_MESSAGE_QUEUE_LENGTH];
   int msgCounter[SPE_MESSAGE_QUEUE_LENGTH];
+  int errorCode[SPE_MESSAGE_QUEUE_LENGTH];
   DMAListEntry* dmaList[SPE_MESSAGE_QUEUE_LENGTH];
-  for (int i = 0; i < SPE_MESSAGE_QUEUE_LENGTH; i++) {
+  for (i = 0; i < SPE_MESSAGE_QUEUE_LENGTH; i++) {
     msgQueue[i] = (SPEMessage*)(((char*)msgQueueRaw) + (SIZEOF_16(SPEMessage) * i));
     msgState[i] = SPE_MESSAGE_STATE_CLEAR;
+    #if SPE_DEBUG_DISPLAY_NO_PROGRESS >= 1
+      msgLastState[i] = SPE_MESSAGE_STATE_CLEAR;
+    #endif
     readWritePtr[i] = NULL;
     readOnlyPtr[i] = NULL;
     writeOnlyPtr[i] = NULL;
@@ -166,6 +218,7 @@ void speScheduler(SPEData *speData, unsigned long long id) {
     dmaListSize[i] = -1;
     dmaList[i] = NULL;
     localMemPtr[i] = NULL;
+    errorCode[i] = SPE_MESSAGE_OK;
   }
 
   // Once the message queue has been created, check in with the main processor by sending a pointer to it
@@ -177,8 +230,14 @@ void speScheduler(SPEData *speData, unsigned long long id) {
   // Do the intial read of the message queue from main memory
   spu_mfcdma32(msgQueueRaw, (PPU_POINTER_TYPE)(speData->messageQueue), SPE_MESSAGE_QUEUE_BYTE_COUNT, 31, MFC_GET_CMD);
 
+  // DEBUG
+  #if SPE_DEBUG_DISPLAY >= 1
+    sim_printf("[0x%llx] :: starting scheduler loop...\n", id);
+  #endif
+
   // The scheduler loop
   while (keepLooping != FALSE) {
+
 
     // Wait for the latest message queue read (blocking)
     mfc_write_tag_mask(0x80000000);   // enable only tag group 31 (message queue request)
@@ -188,44 +247,44 @@ void speScheduler(SPEData *speData, unsigned long long id) {
 
 
     // DEBUG - Let the user know that the SPE is still alive
-    #if SPE_DEBUG_DISPLAY >= 1
-      if ((debugCounter % 5000) == 0 && debugCounter != 0) {
+    #if SPE_DEBUG_DISPLAY_STILL_ALIVE >= 1
+      if ((stillAliveCounter % SPE_DEBUG_DISPLAY_STILL_ALIVE) == 0 && stillAliveCounter != 0) {
         #if 1
 
-          printf("[0x%llx] :: still going... \n", id);
+          sim_printf("[0x%llx] :: still going... \n", id);
 
         #else
 
           for (int tmp = 0; tmp < SPE_MESSAGE_QUEUE_LENGTH; tmp++) {
-            printf("[0x%llx] :: still going... msgQueue[%d] @ %p (msgQueue: %p) = { fi = %d, rw = %d, rwl = %d, ro = %d, rol = %d, wo = %d, wol = %d, f = %x, s = %d(%d), cnt = %d, cmd = %d }\n",
-                   id,
-                   tmp,
-                   &(msgQueue[tmp]),
-                   msgQueue,
-                   (volatile int)(msgQueue[tmp]->funcIndex),
-                   msgQueue[tmp]->readWritePtr,
-                   msgQueue[tmp]->readWriteLen,
-                   msgQueue[tmp]->readOnlyPtr,
-                   msgQueue[tmp]->readOnlyLen,
-                   msgQueue[tmp]->writeOnlyPtr,
-                   msgQueue[tmp]->writeOnlyLen,
-                   msgQueue[tmp]->flags,
-                   (volatile int)(msgQueue[tmp]->state),
-                   msgState[tmp],
-                   (volatile int)(msgQueue[tmp]->counter),
-                   (volatile int)(msgQueue[tmp]->command)
-                  );
+            sim_printf("[0x%llx] :: still going... msgQueue[%d] @ %p (msgQueue: %p) = { fi = %d, rw = %d, rwl = %d, ro = %d, rol = %d, wo = %d, wol = %d, f = %x, s = %d(%d), cnt = %d, cmd = %d }\n",
+                       id,
+                       tmp,
+                       &(msgQueue[tmp]),
+                       msgQueue,
+                       (volatile int)(msgQueue[tmp]->funcIndex),
+                       msgQueue[tmp]->readWritePtr,
+                       msgQueue[tmp]->readWriteLen,
+                       msgQueue[tmp]->readOnlyPtr,
+                       msgQueue[tmp]->readOnlyLen,
+                       msgQueue[tmp]->writeOnlyPtr,
+                       msgQueue[tmp]->writeOnlyLen,
+                       msgQueue[tmp]->flags,
+                       (volatile int)(msgQueue[tmp]->state),
+                       msgState[tmp],
+                       (volatile int)(msgQueue[tmp]->counter),
+                       (volatile int)(msgQueue[tmp]->command)
+                      );
 	  }
-          //printf("[%llu] :: raw msgQueue = { ", id);
+          //sim_printf("[%llu] :: raw msgQueue = { ", id);
           //for (int ti = 0; ti < 2 * sizeof(SPEMessage) /*SPE_MESSAGE_QUEUE_BYTE_COUNT*/; ti++) {
-          //  printf("%d ", *(((char*)msgQueue) + ti));
+          //  sim_printf("%d ", *(((char*)msgQueue) + ti));
           //}
-          //printf("}\n");
-          //printf("[%llu] :: raw msgQueueRaw = { ", id);
+          //sim_printf("}\n");
+          //sim_printf("[%llu] :: raw msgQueueRaw = { ", id);
           //for (int ti = 0; ti < 2 * sizeof(SPEMessage) /*SPE_MESSAGE_QUEUE_BYTE_COUNT*/; ti++) {
-          //  printf("%d ", *(((char*)msgQueueRaw) + ti));
+          //  sim_printf("%d ", *(((char*)msgQueueRaw) + ti));
           //}
-          //printf("}\n");
+          //sim_printf("}\n");
 
         #endif
       }
@@ -239,7 +298,7 @@ void speScheduler(SPEData *speData, unsigned long long id) {
 
 
     // Check for new messages
-    for (int i = 0; i < SPE_MESSAGE_QUEUE_LENGTH; i++) {
+    for (i = 0; i < SPE_MESSAGE_QUEUE_LENGTH; i++) {
 
       // Check for a new message in this slot
       if (msgQueue[i]->state == SPE_MESSAGE_STATE_SENT &&
@@ -251,7 +310,7 @@ void speScheduler(SPEData *speData, unsigned long long id) {
         int command = msgQueue[i]->command;
         if (command == SPE_MESSAGE_COMMAND_EXIT) {
           #if SPE_DEBUG_DISPLAY >= 1
-            printf(" --==>> SPE received EXIT command...\n");
+            sim_printf(" --==>> SPE received EXIT command...\n");
           #endif
           keepLooping = FALSE;
           break;
@@ -265,14 +324,14 @@ void speScheduler(SPEData *speData, unsigned long long id) {
 
         // DEBUG
         #if SPE_DEBUG_DISPLAY >= 1
-          printf("[0x%llx] :: msg %d's state going from %d -> %d\n", id, i, SPE_MESSAGE_STATE_SENT, msgState[i]);
-        #endif
+          sim_printf("[0x%llx] :: msg %d's state going from %d -> %d\n", id, i, SPE_MESSAGE_STATE_SENT, msgState[i]);
+	#endif
 
         msgCounter[i] = msgQueue[i]->counter;        
       }
     }
 
-    
+
     // DEBUG
     #if SPE_DEBUG_DISPLAY != 0
       debug_displayActiveMessageQueue(id, msgState, "(1)");
@@ -280,8 +339,8 @@ void speScheduler(SPEData *speData, unsigned long long id) {
 
 
     // Check for messages that need data fetched (list)
-    unsigned int numDMAQueueEntries = mfc_stat_cmd_queue();
-    for (int i = 0; i < SPE_MESSAGE_QUEUE_LENGTH; i++) {
+    numDMAQueueEntries = mfc_stat_cmd_queue();
+    for (i = 0; i < SPE_MESSAGE_QUEUE_LENGTH; i++) {
       if (msgState[i] == SPE_MESSAGE_STATE_PRE_FETCHING_LIST) {
 
         // Ckeck the size of the dmaList.  If it is less than SPE_DMA_LIST_LENGTH then it will fit
@@ -293,17 +352,31 @@ void speScheduler(SPEData *speData, unsigned long long id) {
           register int memNeeded = ROUNDUP_16(dmaListSize[i] * sizeof(DMAListEntry));
 
           if (dmaListSize[i] > SPE_DMA_LIST_LENGTH) {
-            dmaList[i] = (DMAListEntry*)(new char[memNeeded]);
-            //dmaList[i] = new DMAListEntry[dmaListSize[i]];
-            //dmaList[i] = (DMAListEntry*)(malloc(sizeof(DMAListEntry) * dmaListSize[i]));
+            #ifdef __cplusplus
+            try {
+            #endif
+              //dmaList[i] = (DMAListEntry*)(new char[memNeeded]);
+              dmaList[i] = (DMAListEntry*)(_malloc_align(memNeeded, 4));
+            #ifdef __cplusplus
+	    } catch (...) {
+              dmaList[i] = NULL;
+	    }
+            #endif
 
 	    // DEBUG
             #if SPE_DEBUG_DISPLAY >= 1
-              printf("[0x%llx] :: dmaList[%d] = %p\n", id, i, dmaList[i]);
+              sim_printf("[0x%llx] :: dmaList[%d] = %p\n", id, i, dmaList[i]);
             #endif
 
-            if (dmaList[i] == NULL || ((unsigned int)dmaList[i] + (dmaListSize[i] * sizeof(DMAListEntry))) >= (unsigned int)0x40000) {
-              if (dmaList[i] != NULL) { delete [] dmaList[i]; }
+            //if (dmaList[i] != NULL) { delete [] dmaList[i]; }
+	    if ((dmaList[i] == NULL) || 
+                (((unsigned int)dmaList[i]) < ((unsigned int)(&_end))) ||
+                (((unsigned int)dmaList[i] + memNeeded) >= ((unsigned int)0x40000 - SPE_RESERVED_STACK_SIZE))
+               ) {
+              #if SPE_NOTIFY_ON_MALLOC_FAILURE != 0
+                sim_printf("[0x%llu] :: SPE :: Failed to allocate memory for dmaList[%d] (1)... will try again later...\n", id, i);
+                sim_printf("[0x%llx] :: SPE :: dmaList[%d] = %p\n", id, i, dmaList[i]);
+	      #endif
               dmaList[i] = NULL;
               dmaListSize[i] = -1;  // Try allocating again next time
               continue;  // Skip for now, try again later
@@ -334,7 +407,7 @@ void speScheduler(SPEData *speData, unsigned long long id) {
 
           // DEBUG
           #if SPE_DEBUG_DISPLAY >= 1
-            printf("[0x%llx] :: msg %d's state going from %d -> %d\n", id, i, SPE_MESSAGE_STATE_PRE_FETCHING_LIST, msgState[i]);
+            sim_printf("[0x%llx] :: msg %d's state going from %d -> %d\n", id, i, SPE_MESSAGE_STATE_PRE_FETCHING_LIST, msgState[i]);
           #endif
 	}
 
@@ -351,7 +424,7 @@ void speScheduler(SPEData *speData, unsigned long long id) {
     // Read the tag status to see if the data has arrived for any of the fetching message entries
     mfc_write_tag_update_immediate();
     tagStatus = mfc_read_tag_status(); //spu_readch(MFC_RdTagStat);
-    for (int i = 0; i < SPE_MESSAGE_QUEUE_LENGTH; i++) {
+    for (i = 0; i < SPE_MESSAGE_QUEUE_LENGTH; i++) {
       if (msgState[i] == SPE_MESSAGE_STATE_FETCHING_LIST && ((tagStatus & (0x01 << i)) != 0)) {
 
         // Update the state to show that this message queue entry is ready to be executed
@@ -359,11 +432,11 @@ void speScheduler(SPEData *speData, unsigned long long id) {
 
         // DEBUG
         #if SPE_DEBUG_DISPLAY >= 1
-          printf("[0x%llx] :: msg %d's state going from %d -> %d\n", id, i, SPE_MESSAGE_STATE_FETCHING_LIST, msgState[i]);
+          sim_printf("[0x%llx] :: msg %d's state going from %d -> %d\n", id, i, SPE_MESSAGE_STATE_FETCHING_LIST, msgState[i]);
         #endif
 
         // Roundup all of the sizes to the next highest multiple of 16
-        for (int j = 0; j < dmaListSize[i]; j++)
+        for (j = 0; j < dmaListSize[i]; j++)
           dmaList[i][j].size = ROUNDUP_16(dmaList[i][j].size);
       }
     }
@@ -377,7 +450,7 @@ void speScheduler(SPEData *speData, unsigned long long id) {
 
     // Check for messages that need data fetched (standard)
     numDMAQueueEntries = mfc_stat_cmd_queue();
-    for (int i = 0; i < SPE_MESSAGE_QUEUE_LENGTH; i++) {
+    for (i = 0; i < SPE_MESSAGE_QUEUE_LENGTH; i++) {
       if (msgState[i] == SPE_MESSAGE_STATE_LIST_READY_LIST) {
 
         // Allocate the memory needed in the LS for this work request
@@ -388,27 +461,69 @@ void speScheduler(SPEData *speData, unsigned long long id) {
 
           // Determine the number of bytes needed
           register unsigned int memNeeded = 0;
-          for (int j = 0; j < dmaListSize[i]; j++)
+          for (j = 0; j < dmaListSize[i]; j++)
             memNeeded += dmaList[i][j].size + sizeof(DMAListEntry);
           if ((dmaListSize[i] & 0x01) != 0x00)  // Force even number of dmaListEntry structures
             memNeeded += sizeof(DMAListEntry);
 
+          // Check the size of the memory needed.  If it is too large for the SPE's LS, then stop this
+          //   message with an error code because the memory allocation will never work.
+          // TODO : Should also add a define that guesses at what the expected maximum stack size is (that
+          //   could also be changed at compile-time by the end user)
+          if (memNeeded > ((unsigned int)0x40000 - ((unsigned int)(&_end)))) {
+
+            // Clear up the dmaList
+            if (dmaListSize[i] > SPE_DMA_LIST_LENGTH) {
+              if (dmaList[i] != NULL) {
+                //delete [] dmaList[i];
+	        _free_align(dmaList[i]);
+	      }
+              dmaList[i] = NULL;
+              dmaListSize[i] = -1;
+	    }
+
+            // Move the message into an error state
+            errorCode[i] = SPE_MESSAGE_ERROR_NOT_ENOUGH_MEMORY;
+            msgState[i] = SPE_MESSAGE_STATE_ERROR;
+
+            // Move onto the next message
+            continue;
+	  }
+
           // Try to allocate that memory
-          localMemPtr[i] = (void*)(new char[memNeeded]);
+          #ifdef __cplusplus
+          try {
+          #endif
+            //localMemPtr[i] = (void*)(new char[memNeeded]);
+            localMemPtr[i] = (void*)(_malloc_align(memNeeded, 4));
+          #ifdef __cplusplus
+	  } catch (...) {
+            localMemPtr[i] = NULL;
+	  }
+          #endif
 
           // DEBUG
           #if SPE_DEBUG_DISPLAY >= 1
-            printf("[0x%llx] :: localMemPtr[%d] = %p\n", id, i, localMemPtr[i]);
+            sim_printf("[0x%llx] :: localMemPtr[%d] = %p\n", id, i, localMemPtr[i]);
           #endif
 
-          if (localMemPtr[i] == NULL || ((unsigned int)localMemPtr[i]) + memNeeded >= (unsigned int)0x40000) {
-            localMemPtr[i] = NULL;
+	  //if (localMemPtr[i] == NULL || ((unsigned int)localMemPtr[i]) + memNeeded >= (unsigned int)0x40000) {
+          if ((localMemPtr[i] == NULL) || 
+              (((unsigned int)localMemPtr[i]) < ((unsigned int)(&_end))) ||
+              (((unsigned int)localMemPtr[i] + memNeeded) >= ((unsigned int)0x40000 - SPE_RESERVED_STACK_SIZE))
+             ) {
+            #if SPE_NOTIFY_ON_MALLOC_FAILURE != 0
+	      sim_printf("[0x%llu] :: SPE :: Failed to allocate memory for localMemPtr[%d] (1)... will try again later...\n", id, i);
+              sim_printf("[0x%llx] :: SPE :: localMemPtr[%d] = %p\n", id, i, localMemPtr[i]);
+	    #endif
+	    localMemPtr[i] = NULL;
             continue;  // Try again next time
 	  }
 
+
           // Setup pointers to the buffers
           register unsigned int offset = ROUNDUP_16(dmaListSize[i] * sizeof(DMAListEntry));
-          for (int j = 0; j < dmaListSize[i]; j++) {
+          for (j = 0; j < dmaListSize[i]; j++) {
             ((DMAListEntry*)(localMemPtr[i]))[j].size = ((dmaList[i][j].size) & (0x0000FFFF));  // Force notify and reserved fields to zero
             ((DMAListEntry*)(localMemPtr[i]))[j].ea = (unsigned int)(((char*)(localMemPtr[i])) + offset);
             offset += dmaList[i][j].size;
@@ -418,7 +533,7 @@ void speScheduler(SPEData *speData, unsigned long long id) {
           #if SPE_ZERO_WRITE_ONLY_MEMORY != 1
             if (msgQueue[i]->writeOnlyLen > 0) {
 	      register unsigned int writeSize = 0;
-              for (int j = dmaListSize[i] - msgQueue[i]->writeOnlyLen; j < dmaListSize[i]; j++)
+              for (j = dmaListSize[i] - msgQueue[i]->writeOnlyLen; j < dmaListSize[i]; j++)
                 writeSize += dmaList[i][j].size;
               memset(((char*)(localMemPtr[i])) + memNeeded - writeSize, 0, writeSize);
 	    }
@@ -438,19 +553,19 @@ void speScheduler(SPEData *speData, unsigned long long id) {
 
           // DEBUG
           #if SPE_DEBUG_DISPLAY >= 1
-            printf("[0x%llx] :: Pre-GETL :: msgIndex = %d, ls_addr = %p, eah = %d, list_addr = %p, list_size = %d, tag = %d...\n",
-                   id, i, ((char*)localMemPtr[i]) + ROUNDUP_16(dmaListSize[i] * sizeof(DMAListEntry)),
-                   (unsigned int)msgQueue[i]->readOnlyPtr,
-                   (unsigned int)(dmaList[i]),
-                   (msgQueue[i]->readOnlyLen + msgQueue[i]->readWriteLen) * sizeof(DMAListEntry), i
-                  );
+            sim_printf("[0x%llx] :: Pre-GETL :: msgIndex = %d, ls_addr = %p, eah = %d, list_addr = %p, list_size = %d, tag = %d...\n",
+                       id, i, ((char*)localMemPtr[i]) + ROUNDUP_16(dmaListSize[i] * sizeof(DMAListEntry)),
+                       (unsigned int)msgQueue[i]->readOnlyPtr,
+                       (unsigned int)(dmaList[i]),
+                       (msgQueue[i]->readOnlyLen + msgQueue[i]->readWriteLen) * sizeof(DMAListEntry), i
+                      );
 
-            for (int j = 0; j < dmaListSize[i]; j++) {
-              printf("[0x%llx] :: dmaList[%d][%d].size = %d (0x%x), dmaList[%d][%d].ea = 0x%08x (0x%08x)\n",
-                     id,
-                     i, j, dmaList[i][j].size, ((DMAListEntry*)(localMemPtr[i]))[j].size,
-                     i, j, dmaList[i][j].ea, ((DMAListEntry*)(localMemPtr[i]))[j].ea
-		    );
+            for (j = 0; j < dmaListSize[i]; j++) {
+              sim_printf("[0x%llx] :: dmaList[%d][%d].size = %d (0x%x), dmaList[%d][%d].ea = 0x%08x (0x%08x)\n",
+                         id,
+                         i, j, dmaList[i][j].size, ((DMAListEntry*)(localMemPtr[i]))[j].size,
+                         i, j, dmaList[i][j].ea, ((DMAListEntry*)(localMemPtr[i]))[j].ea
+	                );
             }
 	  #endif
 
@@ -470,7 +585,7 @@ void speScheduler(SPEData *speData, unsigned long long id) {
 
           // DEBUG
           #if SPE_DEBUG_DISPLAY >= 1
-            printf("[0x%llx] :: msg %d's state going from %d -> %d\n", id, i, SPE_MESSAGE_STATE_LIST_READY_LIST, msgState[i]);
+            sim_printf("[0x%llx] :: msg %d's state going from %d -> %d\n", id, i, SPE_MESSAGE_STATE_LIST_READY_LIST, msgState[i]);
           #endif
 	}
 
@@ -486,7 +601,12 @@ void speScheduler(SPEData *speData, unsigned long long id) {
 
     // Check for messages that need data fetched (standard)
     numDMAQueueEntries = mfc_stat_cmd_queue();
-    for (int i = 0; i < SPE_MESSAGE_QUEUE_LENGTH; i++) {
+    int newGetIndex = (getIndex + 1) % SPE_MESSAGE_QUEUE_LENGTH;
+    int numGetsLeft = SPE_MAX_GET_PER_LOOP;
+    for (iOffset = 0; iOffset < SPE_MESSAGE_QUEUE_LENGTH; iOffset++) {
+
+      register int i = (getIndex + iOffset) % SPE_MESSAGE_QUEUE_LENGTH;
+
       if (msgState[i] == SPE_MESSAGE_STATE_PRE_FETCHING) {
 
         // Allocate the memory for the message queue entry (if need be)
@@ -502,20 +622,57 @@ void speScheduler(SPEData *speData, unsigned long long id) {
                                    ROUNDUP_16(msgQueue[i]->readOnlyLen) +
                                    ROUNDUP_16(msgQueue[i]->writeOnlyLen);
           register int offset = 0;
-          localMemPtr[i] = (void*)(new char[memNeeded]);
-          //localMemPtr[i] = malloc(memNeeded);
 
-          // DEBUG
           #if SPE_DEBUG_DISPLAY >= 1
-            printf("[0x%llx] :: localMemPtr[%d] = %p\n", id, i, localMemPtr[i]);
+            sim_printf("[0x%llx] :: Allocating Memory for index %d :: memNeeded = %d, msgQueue[%d].totalMem = %d\n",
+                       id, i, memNeeded, i, msgQueue[i]->totalMem
+                      );
+          #endif
+
+          // Check the size of the memory needed.  If it is too large for the SPE's LS, then stop this
+          //   message with an error code because the memory allocation will never work.
+          // TODO : Should also add a define that guesses at what the expected maximum stack size is (that
+          //   could also be changed at compile-time by the end user)
+          if (memNeeded > ((unsigned int)0x40000 - ((unsigned int)(&_end)))) {
+
+            // Move the message into an error state
+            errorCode[i] = SPE_MESSAGE_ERROR_NOT_ENOUGH_MEMORY;
+            msgState[i] = SPE_MESSAGE_STATE_ERROR;
+
+            // Move onto the next message
+            continue;
+	  }
+
+          #ifdef __cplusplus
+          try {
+          #endif
+            //localMemPtr[i] = (void*)(new char[memNeeded]);
+            localMemPtr[i] = (void*)(_malloc_align(memNeeded, 4));
+          #ifdef __cplusplus
+	  } catch (...) {
+            localMemPtr[i] = NULL;
+	  }
           #endif
 
           // Check the pointer (if it is bad, then skip this message for now and try again later)
           // TODO: There are probably better checks for this (use _end, etc.)
-          if (localMemPtr[i] == NULL || ((unsigned int)localMemPtr[i] + memNeeded) >= (unsigned int)0x40000) {
+          //if (localMemPtr[i] == NULL || ((unsigned int)localMemPtr[i] + memNeeded) >= (unsigned int)0x40000) {
+          if ((localMemPtr[i] == NULL) || 
+              (((unsigned int)localMemPtr[i]) < ((unsigned int)(&_end))) ||
+              (((unsigned int)localMemPtr[i] + memNeeded) >= ((unsigned int)0x40000 - SPE_RESERVED_STACK_SIZE))
+             ) {
+            #if SPE_NOTIFY_ON_MALLOC_FAILURE != 0
+	      sim_printf("[0x%llu] :: SPE :: Failed to allocate memory for localMemPtr[%d] (2)... will try again later...\n", id, i);
+              sim_printf("[0x%llx] :: SPE :: localMemPtr[%d] = %p\n", id, i, localMemPtr[i]);
+	    #endif
             localMemPtr[i] = NULL;
-            break;
+            continue;
 	  }
+
+          // DEBUG
+          #if SPE_DEBUG_DISPLAY >= 1
+            sim_printf("[0x%llx] :: localMemPtr[%d] = %p\n", id, i, localMemPtr[i]);
+          #endif
 
           // Assign the buffer specific pointers
           // NOTE: Order matters here.  Need to allocate the read buffers next to each other and the write
@@ -551,12 +708,12 @@ void speScheduler(SPEData *speData, unsigned long long id) {
             && (msgQueue[i]->readOnlyPtr == (PPU_POINTER_TYPE)NULL)
            ) {
 
-          // Update the state (to ready to execute)
+         // Update the state (to ready to execute)
           msgState[i] = SPE_MESSAGE_STATE_READY;
 
           // DEBUG
           #if SPE_DEBUG_DISPLAY >= 1
-            printf("[0x%llx] :: msg %d's state going from %d -> %d\n", id, i, SPE_MESSAGE_STATE_PRE_FETCHING, msgState[i]);
+            sim_printf("[0x%llx] :: msg %d's state going from %d -> %d\n", id, i, SPE_MESSAGE_STATE_PRE_FETCHING, msgState[i]);
           #endif
 
           // Done with this one
@@ -577,15 +734,31 @@ void speScheduler(SPEData *speData, unsigned long long id) {
 
           // Allocate a larger DMA list if needed
           if (entryCount > SPE_DMA_LIST_LENGTH) {
-            dmaList[i] = new DMAListEntry[entryCount];
-            //dmaList[i] = (DMAListEntry*)(malloc(sizeof(DMAListEntry) * entryCount));
+            #ifdef __cplusplus
+            try {
+            #endif
+              //dmaList[i] = new DMAListEntry[entryCount];
+              dmaList[i] = (DMAListEntry*)(_malloc_align(entryCount * sizeof(DMAListEntry), 4));
+            #ifdef __cplusplus
+	    } catch (...) {
+              dmaList[i] = NULL;
+	    }
+            #endif
 
 	    // DEBUG
             #if SPE_DEBUG_DISPLAY >= 1
-              printf("[0x%llx] :: dmaList[%d] = %p\n", id, i, dmaList[i]);
+              sim_printf("[0x%llx] :: dmaList[%d] = %p\n", id, i, dmaList[i]);
             #endif
 
-            if (dmaList[i] == NULL || ((unsigned int)dmaList[i] + (entryCount * sizeof(DMAListEntry))) >= (unsigned int)0x40000) {
+	    //if (dmaList[i] == NULL || ((unsigned int)dmaList[i] + (entryCount * sizeof(DMAListEntry))) >= (unsigned int)0x40000) {
+	    if ((dmaList[i] == NULL) || 
+                (((unsigned int)dmaList[i]) < ((unsigned int)(&_end))) ||
+                (((unsigned int)dmaList[i] + (entryCount * sizeof(DMAListEntry))) >= ((unsigned int)0x40000 - SPE_RESERVED_STACK_SIZE))
+               ) {
+              #if SPE_NOTIFY_ON_MALLOC_FAILURE != 0
+	        sim_printf("[0x%llu] :: SPE :: Failed to allocate memory for dmaList[%d] (2)... will try again later...\n", id, i);
+                sim_printf("[0x%llx] :: SPE :: dmaList[%d] = %p\n", id, i, dmaList[i]);
+	      #endif
               dmaList[i] = NULL;
               continue;  // Skip for now, try again later
 	    }
@@ -603,7 +776,8 @@ void speScheduler(SPEData *speData, unsigned long long id) {
             register unsigned int srcOffset = (unsigned int)(msgQueue[i]->readOnlyPtr);
 
             while (bufferLeft > 0) {
-              dmaList[i][listIndex].size = ROUNDUP_16((bufferLeft > SPE_DMA_LIST_ENTRY_MAX_LENGTH) ? (SPE_DMA_LIST_ENTRY_MAX_LENGTH) : (bufferLeft));
+              dmaList[i][listIndex].size = ((bufferLeft > SPE_DMA_LIST_ENTRY_MAX_LENGTH) ? (SPE_DMA_LIST_ENTRY_MAX_LENGTH) : (bufferLeft));
+              dmaList[i][listIndex].size = ROUNDUP_16(dmaList[i][listIndex].size);
               dmaList[i][listIndex].ea = srcOffset;
 
               bufferLeft -= SPE_DMA_LIST_ENTRY_MAX_LENGTH;
@@ -617,7 +791,8 @@ void speScheduler(SPEData *speData, unsigned long long id) {
             register unsigned int srcOffset = (unsigned int)(msgQueue[i]->readWritePtr);
 
             while (bufferLeft > 0) {
-              dmaList[i][listIndex].size = ROUNDUP_16((bufferLeft > SPE_DMA_LIST_ENTRY_MAX_LENGTH) ? (SPE_DMA_LIST_ENTRY_MAX_LENGTH) : (bufferLeft));
+              dmaList[i][listIndex].size = ((bufferLeft > SPE_DMA_LIST_ENTRY_MAX_LENGTH) ? (SPE_DMA_LIST_ENTRY_MAX_LENGTH) : (bufferLeft));
+              dmaList[i][listIndex].size = ROUNDUP_16(dmaList[i][listIndex].size);
               dmaList[i][listIndex].ea = srcOffset;
 
               bufferLeft -= SPE_DMA_LIST_ENTRY_MAX_LENGTH;
@@ -632,16 +807,16 @@ void speScheduler(SPEData *speData, unsigned long long id) {
 
           // DEBUG
           #if SPE_DEBUG_DISPLAY >= 1
-            printf("[0x%llx] :: Pre-GETL :: msgIndex = %d, ls_addr = %p, eah = %d, list_addr = %p, list_size = %d, tag = %d...\n",
+            sim_printf("[0x%llx] :: Pre-GETL :: msgIndex = %d, ls_addr = %p, eah = %d, list_addr = %p, list_size = %d, tag = %d...\n",
                    id, i, localMemPtr[i], 0, (unsigned int)(dmaList[i]), dmaListSize[i] * sizeof(DMAListEntry), i
                   );
 
-            for (int j = 0; j < dmaListSize[i]; j++) {
-              printf("[0x%llx] :: dmaList[%d][%d].size = %d (0x%x), dmaList[%d][%d].ea = 0x%08x (0x%08x)\n",
-                     id,
-                     i, j, dmaList[i][j].size, ((DMAListEntry*)(localMemPtr[i]))[j].size,
-                     i, j, dmaList[i][j].ea, ((DMAListEntry*)(localMemPtr[i]))[j].ea
-		    );
+            for (j = 0; j < dmaListSize[i]; j++) {
+              sim_printf("[0x%llx] :: dmaList[%d][%d].size = %d (0x%x), dmaList[%d][%d].ea = 0x%08x (0x%08x)\n",
+                         id,
+                         i, j, dmaList[i][j].size, ((DMAListEntry*)(localMemPtr[i]))[j].size,
+                         i, j, dmaList[i][j].ea, ((DMAListEntry*)(localMemPtr[i]))[j].ea
+		        );
 	    }
 	  #endif
 
@@ -653,6 +828,10 @@ void speScheduler(SPEData *speData, unsigned long long id) {
                        MFC_GETL_CMD
 		      );
 
+          // Update the getIndex so it will point to the index directly after the last index that was able
+          //   to get the GET through.
+          newGetIndex = (i + 1) % SPE_MESSAGE_QUEUE_LENGTH;
+
           // Decrement the counter of available DMA queue entries left
           numDMAQueueEntries--;
 
@@ -661,12 +840,18 @@ void speScheduler(SPEData *speData, unsigned long long id) {
 
           // DEBUG
           #if SPE_DEBUG_DISPLAY >= 1
-            printf("[0x%llx] :: msg %d's state going from %d -> %d\n", id, i, SPE_MESSAGE_STATE_PRE_FETCHING, msgState[i]);
+            sim_printf("[0x%llx] :: msg %d's state going from %d -> %d\n", id, i, SPE_MESSAGE_STATE_PRE_FETCHING, msgState[i]);
           #endif
+
+	  // Check to see if this maxs out the number of GETs allowed each scheduler loop iteration
+	  numGetsLeft--;
+          if (numGetsLeft <= 0)
+            break;
 	}
 
       }
     }
+    getIndex = newGetIndex;
 
 
     // DEBUG
@@ -678,7 +863,7 @@ void speScheduler(SPEData *speData, unsigned long long id) {
     // Read the tag status to see if the data has arrived for any of the fetching message entries
     mfc_write_tag_update_immediate();
     tagStatus = mfc_read_tag_status(); //spu_readch(MFC_RdTagStat);
-    for (int i = 0; i < SPE_MESSAGE_QUEUE_LENGTH; i++) {
+    for (i = 0; i < SPE_MESSAGE_QUEUE_LENGTH; i++) {
       if (msgState[i] == SPE_MESSAGE_STATE_FETCHING && ((tagStatus & (0x01 << i)) != 0)) {
 
         // Update the state to show that this message queue entry is ready to be executed
@@ -686,15 +871,15 @@ void speScheduler(SPEData *speData, unsigned long long id) {
 
         // DEBUG
         #if SPE_DEBUG_DISPLAY >= 1
-          printf("[0x%llx] :: msg %d's state going from %d -> %d\n", id, i, SPE_MESSAGE_STATE_FETCHING, msgState[i]);
+          sim_printf("[0x%llx] :: msg %d's state going from %d -> %d\n", id, i, SPE_MESSAGE_STATE_FETCHING, msgState[i]);
         #endif
 
         // Clean up the dmaList (only if this is NOT a list type work request; if it is a
         //   list type work request (flag has LIST bit set) then do not delete the dma list)
         if ((msgQueue[i]->flags & WORK_REQUEST_FLAGS_LIST) == 0x00) {
           if (dmaListSize[i] > SPE_DMA_LIST_LENGTH) {
-            delete [] dmaList[i];
-            //free(dmaList[i]);
+            //delete [] dmaList[i];
+            _free_align(dmaList[i]);
             dmaList[i] = NULL;
 	  }
           dmaListSize[i] = -1;  // NOTE: Clear this so data that the dmaList looks like it has not been set now
@@ -710,22 +895,23 @@ void speScheduler(SPEData *speData, unsigned long long id) {
     #endif
 
 
-    // Execute a single ready message
-    for (int i = 0; i < SPE_MESSAGE_QUEUE_LENGTH; i++) {
+    // Execute SPE_MAX_EXECUTE_PER_LOOP ready messages
+    register unsigned int numExecLeft = SPE_MAX_EXECUTE_PER_LOOP;
+    for (i = 0; i < SPE_MESSAGE_QUEUE_LENGTH; i++) {
 
       if (msgState[runIndex] == SPE_MESSAGE_STATE_READY) {
 
         register volatile SPEMessage* msg = msgQueue[runIndex];
 
         #if SPE_DEBUG_DISPLAY >= 1
-          printf("[0x%llx] :: >>>>> Entering User Code...\n");
+          sim_printf("[0x%llx] :: >>>>> Entering User Code (index %d)...\n", id, runIndex);
 	#endif
 
         // Execute the function specified
         if ((msg->flags & WORK_REQUEST_FLAGS_LIST) == 0x00) {
 
           #if SPE_DEBUG_DISPLAY >= 1
-	    printf("[0x%llx] :: Executing message queue entry as standard entry...\n", id);
+	    sim_printf("[0x%llx] :: Executing message queue entry as standard entry...\n", id);
           #endif
 
           funcLookup(msg->funcIndex,
@@ -737,7 +923,7 @@ void speScheduler(SPEData *speData, unsigned long long id) {
 	} else {
 
           #if SPE_DEBUG_DISPLAY >= 1
-	    printf("[0x%llx] :: Executing message queue entry as list entry...\n", id);
+	    sim_printf("[0x%llx] :: Executing message queue entry as list entry...\n", id);
           #endif
 
           funcLookup(msg->funcIndex,
@@ -749,7 +935,7 @@ void speScheduler(SPEData *speData, unsigned long long id) {
 	}
 
         #if SPE_DEBUG_DISPLAY >= 1
-          printf("[0x%llx] :: <<<<< Leaving User Code...\n");
+          sim_printf("[0x%llx] :: <<<<< Leaving User Code...\n", id);
 	#endif
 
         #if SPE_STATS != 0
@@ -764,7 +950,7 @@ void speScheduler(SPEData *speData, unsigned long long id) {
 
         // DEBUG
         #if SPE_DEBUG_DISPLAY >= 1
-          printf("[0x%llx] :: msg %d's state going from %d -> %d\n", id, i, SPE_MESSAGE_STATE_READY, msgState[i]);
+          sim_printf("[0x%llx] :: msg %d's state going from %d -> %d\n", id, i, SPE_MESSAGE_STATE_READY, msgState[i]);
         #endif
 
         // Move runIndex to the next message and break from the loop (execute only one)
@@ -772,7 +958,11 @@ void speScheduler(SPEData *speData, unsigned long long id) {
         if (runIndex >= SPE_MESSAGE_QUEUE_LENGTH)
           runIndex = 0;
 
-        break;
+        // Decrement the count of work request that can still be execute this scheduler loop iteration
+        //   and break from this execute loop if the maximum number has already been reached.
+        numExecLeft--;
+        if (numExecLeft <= 0)
+          break;
       }
 
       // Try the next message
@@ -790,7 +980,7 @@ void speScheduler(SPEData *speData, unsigned long long id) {
 
     // Check for messages that have been executed but still need data committed to main memory
     numDMAQueueEntries = mfc_stat_cmd_queue();
-    for (int i = 0; i < SPE_MESSAGE_QUEUE_LENGTH; i++) {
+    for (i = 0; i < SPE_MESSAGE_QUEUE_LENGTH; i++) {
       if (msgState[i] == SPE_MESSAGE_STATE_EXECUTED_LIST) {
 
         // Initiate the DMA transfer of the readWrite and writeOnly buffer back to main memory
@@ -800,17 +990,17 @@ void speScheduler(SPEData *speData, unsigned long long id) {
 
             // Get the offsets in the dmaList and the localMemPtr for the readWrite section
             register unsigned int readWriteOffset = ROUNDUP_16(dmaListSize[i] * sizeof(DMAListEntry));
-            for (int j = 0; j < msgQueue[i]->readOnlyLen; j++)
+            for (j = 0; j < msgQueue[i]->readOnlyLen; j++)
               readWriteOffset += dmaList[i][j].size;
 
             // DEBUG
             #if SPE_DEBUG_DISPLAY >= 1
-              printf("[0x%llx] :: Pre-PUTL :: msgIndex = %d, ls_addr = %p, eah = %d, list_addr = %p, list_size = %d, tag = %d...\n",
-                     id, i, ((char*)localMemPtr[i]) + (readWriteOffset),
-                     (unsigned int)msgQueue[i]->readOnlyPtr,
-                     (unsigned int)(&(dmaList[i][msgQueue[i]->readOnlyLen])),
-                     (msgQueue[i]->readWriteLen + msgQueue[i]->writeOnlyLen) * sizeof(DMAListEntry), i
-                    );
+              sim_printf("[0x%llx] :: Pre-PUTL :: msgIndex = %d, ls_addr = %p, eah = %d, list_addr = %p, list_size = %d, tag = %d...\n",
+                         id, i, ((char*)localMemPtr[i]) + (readWriteOffset),
+                         (unsigned int)msgQueue[i]->readOnlyPtr,
+                         (unsigned int)(&(dmaList[i][msgQueue[i]->readOnlyLen])),
+                         (msgQueue[i]->readWriteLen + msgQueue[i]->writeOnlyLen) * sizeof(DMAListEntry), i
+                        );
             #endif
 
             spu_mfcdma64(((char*)localMemPtr[i]) + (readWriteOffset),
@@ -829,7 +1019,7 @@ void speScheduler(SPEData *speData, unsigned long long id) {
 
             // DEBUG
             #if SPE_DEBUG_DISPLAY >= 1
-              printf("[0x%llx] :: msg %d's state going from %d -> %d\n", id, i, SPE_MESSAGE_STATE_EXECUTED_LIST, msgState[i]);
+              sim_printf("[0x%llx] :: msg %d's state going from %d -> %d\n", id, i, SPE_MESSAGE_STATE_EXECUTED_LIST, msgState[i]);
             #endif
           }
 
@@ -840,7 +1030,7 @@ void speScheduler(SPEData *speData, unsigned long long id) {
 
           // DEBUG
           #if SPE_DEBUG_DISPLAY >= 1
-            printf("[0x%llx] :: msg %d's state going from %d -> %d\n", id, i, SPE_MESSAGE_STATE_EXECUTED_LIST, msgState[i]);
+            sim_printf("[0x%llx] :: msg %d's state going from %d -> %d\n", id, i, SPE_MESSAGE_STATE_EXECUTED_LIST, msgState[i]);
           #endif
 	}
 
@@ -856,7 +1046,12 @@ void speScheduler(SPEData *speData, unsigned long long id) {
 
     // Check for messages that have been executed but still need data committed to main memory
     numDMAQueueEntries = mfc_stat_cmd_queue();
-    for (int i = 0; i < SPE_MESSAGE_QUEUE_LENGTH; i++) {
+    int newPutIndex = (putIndex + 1) % SPE_MESSAGE_QUEUE_LENGTH;
+    int numPutsLeft = SPE_MAX_PUT_PER_LOOP;
+    for (iOffset = 0; iOffset < SPE_MESSAGE_QUEUE_LENGTH; iOffset++) {
+
+      register int i = (putIndex + iOffset) % SPE_MESSAGE_QUEUE_LENGTH;
+
       if (msgState[i] == SPE_MESSAGE_STATE_EXECUTED) {
 
         // Check to see if this message does not need to fetch any data
@@ -870,7 +1065,7 @@ void speScheduler(SPEData *speData, unsigned long long id) {
 
           // DEBUG
           #if SPE_DEBUG_DISPLAY >= 1
-            printf("[0x%llx] :: msg %d's state going from %d -> %d\n", id, i, SPE_MESSAGE_STATE_EXECUTED, msgState[i]);
+            sim_printf("[0x%llx] :: msg %d's state going from %d -> %d\n", id, i, SPE_MESSAGE_STATE_EXECUTED, msgState[i]);
           #endif
 
           continue;
@@ -890,15 +1085,31 @@ void speScheduler(SPEData *speData, unsigned long long id) {
 
           // Allocate a larger DMA list if needed
           if (entryCount > SPE_DMA_LIST_LENGTH) {
-            dmaList[i] = new DMAListEntry[entryCount];
-            //dmaList[i] = (DMAListEntry*)(malloc(sizeof(DMAListEntry) * entryCount));
+            #ifdef __cplusplus
+            try {
+            #endif
+              //dmaList[i] = new DMAListEntry[entryCount];
+              dmaList[i] = (DMAListEntry*)(_malloc_align(entryCount * sizeof(DMAListEntry), 4));
+            #ifdef __cplusplus
+	    } catch (...) {
+              dmaList[i] = NULL;
+	    }
+            #endif
 
 	    // DEBUG
             #if SPE_DEBUG_DISPLAY >= 1
-              printf("[0x%llx] :: dmaList[%d] = %p\n", id, i, dmaList[i]);
+              sim_printf("[0x%llx] :: dmaList[%d] = %p\n", id, i, dmaList[i]);
             #endif
 
-            if (dmaList[i] == NULL || ((unsigned int)dmaList[i] + (entryCount * sizeof(DMAListEntry)))>= (unsigned int)0x40000) {
+	    //if (dmaList[i] == NULL || ((unsigned int)dmaList[i] + (entryCount * sizeof(DMAListEntry)))>= (unsigned int)0x40000) {
+	    if ((dmaList[i] == NULL) || 
+                (((unsigned int)dmaList[i]) < ((unsigned int)(&_end))) ||
+                (((unsigned int)dmaList[i] + (entryCount * sizeof(DMAListEntry))) >= ((unsigned int)0x40000 - SPE_RESERVED_STACK_SIZE))
+               ) {
+              #if SPE_NOTIFY_ON_MALLOC_FAILURE != 0
+	        sim_printf("[0x%llu] :: SPE :: Failed to allocate memory for dmaList[%d] (3)... will try again later...\n", id, i);
+                sim_printf("[0x%llx] :: SPE :: dmaList[%d] = %p\n", id, i, dmaList[i]);
+	      #endif
               dmaList[i] = NULL;
               continue;  // Skip for now, try again later
             }
@@ -918,7 +1129,8 @@ void speScheduler(SPEData *speData, unsigned long long id) {
             register unsigned int srcOffset = (unsigned int)(msgQueue[i]->readWritePtr);
 
             while (bufferLeft > 0) {
-              dmaList[i][listIndex].size = ROUNDUP_16((bufferLeft > SPE_DMA_LIST_ENTRY_MAX_LENGTH) ? (SPE_DMA_LIST_ENTRY_MAX_LENGTH) : (bufferLeft));
+              dmaList[i][listIndex].size = ((bufferLeft > SPE_DMA_LIST_ENTRY_MAX_LENGTH) ? (SPE_DMA_LIST_ENTRY_MAX_LENGTH) : (bufferLeft));
+              dmaList[i][listIndex].size = ROUNDUP_16(dmaList[i][listIndex].size);
               dmaList[i][listIndex].ea = srcOffset;
 
               bufferLeft -= SPE_DMA_LIST_ENTRY_MAX_LENGTH;
@@ -935,7 +1147,8 @@ void speScheduler(SPEData *speData, unsigned long long id) {
             register unsigned int srcOffset = (unsigned int)(msgQueue[i]->writeOnlyPtr);
 
             while (bufferLeft > 0) {
-              dmaList[i][listIndex].size = ROUNDUP_16((bufferLeft > SPE_DMA_LIST_ENTRY_MAX_LENGTH) ? (SPE_DMA_LIST_ENTRY_MAX_LENGTH) : (bufferLeft));
+              dmaList[i][listIndex].size = ((bufferLeft > SPE_DMA_LIST_ENTRY_MAX_LENGTH) ? (SPE_DMA_LIST_ENTRY_MAX_LENGTH) : (bufferLeft));
+              dmaList[i][listIndex].size = ROUNDUP_16(dmaList[i][listIndex].size);
               dmaList[i][listIndex].ea = srcOffset;
 
               bufferLeft -= SPE_DMA_LIST_ENTRY_MAX_LENGTH;
@@ -955,10 +1168,10 @@ void speScheduler(SPEData *speData, unsigned long long id) {
 
           // DEBUG
           #if SPE_DEBUG_DISPLAY >= 1
-            printf("[0x%llx] :: Pre-PUTL :: msgIndex = %d, ls_addr = %p, eah = %d, list_addr = %p, list_size = %d, tag = %d...\n",
-                   id, i, readOnlyPtr[i], 0, (unsigned int)(dmaList[i]), dmaListSize[i] * sizeof(DMAListEntry), i
-                  );
-          #endif
+            sim_printf("[0x%llx] :: Pre-PUTL :: msgIndex = %d, ls_addr = %p, eah = %d, list_addr = %p, list_size = %d, tag = %d...\n",
+                       id, i, readOnlyPtr[i], 0, (unsigned int)(dmaList[i]), dmaListSize[i] * sizeof(DMAListEntry), i
+                      );
+	  #endif
 
           spu_mfcdma64(readOnlyPtr[i],  // This pointer is being used to point to the start of the write portion of localMem
                        0,
@@ -968,6 +1181,9 @@ void speScheduler(SPEData *speData, unsigned long long id) {
                        MFC_PUTL_CMD
 		      );
 
+          // Update the putList heuristic
+          newPutIndex = (i + 1) % SPE_MESSAGE_QUEUE_LENGTH;
+
           // Decrement the counter of available DMA queue entries left
           numDMAQueueEntries--;
 
@@ -976,12 +1192,18 @@ void speScheduler(SPEData *speData, unsigned long long id) {
 
           // DEBUG
           #if SPE_DEBUG_DISPLAY >= 1
-            printf("[0x%llx] :: msg %d's state going from %d -> %d\n", id, i, SPE_MESSAGE_STATE_EXECUTED, msgState[i]);
+            sim_printf("[0x%llx] :: msg %d's state going from %d -> %d\n", id, i, SPE_MESSAGE_STATE_EXECUTED, msgState[i]);
           #endif
+
+	  // Check to see if this maxs out the number of PUTs allowed per scheduler loop iteration
+	  numPutsLeft--;
+          if (numPutsLeft <= 0)
+            break;
 	}
 
       }
     }
+    putIndex = newPutIndex;
 
 
     // DEBUG
@@ -998,7 +1220,11 @@ void speScheduler(SPEData *speData, unsigned long long id) {
     mfc_write_tag_mask(0x7FFFFFFF);
     mfc_write_tag_update_immediate();
     tagStatus = mfc_read_tag_status(); //spu_readch(MFC_RdTagStat);
-    for (int i = 0; i < SPE_MESSAGE_QUEUE_LENGTH; i++) {
+    int commitIndexNext = (commitIndex + 1) % SPE_MESSAGE_QUEUE_LENGTH;
+    for (iOffset = 0; iOffset < SPE_MESSAGE_QUEUE_LENGTH; iOffset++) {
+
+      register int i = (commitIndex + iOffset) % SPE_MESSAGE_QUEUE_LENGTH;
+
       if (msgState[i] == SPE_MESSAGE_STATE_COMMITTING && ((tagStatus * (0x01 << i)) != 0)) {
 
         // Check to see if there is an available entry in the outbound mailbox
@@ -1006,8 +1232,8 @@ void speScheduler(SPEData *speData, unsigned long long id) {
 
           // Free the local data and message buffers
           if (localMemPtr[i] != NULL) {
-            delete [] ((char*)localMemPtr[i]);
-            //free(localMemPtr[i]);
+            //delete [] ((char*)localMemPtr[i]);
+            _free_align(localMemPtr[i]);
             localMemPtr[i] = NULL;
             readWritePtr[i] = NULL;
             readOnlyPtr[i] = NULL;
@@ -1019,23 +1245,29 @@ void speScheduler(SPEData *speData, unsigned long long id) {
 
           // DEBUG
           #if SPE_DEBUG_DISPLAY >= 1
-            printf("[0x%llx] :: msg %d's state going from %d -> %d\n", id, i, SPE_MESSAGE_STATE_COMMITTING, msgState[i]);
+            sim_printf("[0x%llx] :: msg %d's state going from %d -> %d\n", id, i, SPE_MESSAGE_STATE_COMMITTING, msgState[i]);
           #endif
 
           // Clear the dmaList size so it looks like the dma list has not been set
           if (dmaListSize[i] > SPE_DMA_LIST_LENGTH) {
-            delete [] dmaList[i];
-            //free(dmaList[i]);
+            //delete [] dmaList[i];
+            _free_align(dmaList[i]);
             dmaList[i] = NULL;
 	  }
           dmaListSize[i] = -1;
 
           // Send the index of the entry in the message queue to the PPE
-          spu_write_out_mbox((unsigned int)i);
+          //spu_write_out_mbox((unsigned int)i);
+          spu_write_out_mbox(MESSAGE_RETURN_CODE(i, SPE_MESSAGE_OK));
+
+          // Update the commitIndex heuristic
+          commitIndexNext = (i + 1) % SPE_MESSAGE_QUEUE_LENGTH;
 	}
         
       }
     }
+    commitIndex = commitIndexNext;
+
 
     // DEBUG
     #if SPE_DEBUG_DISPLAY != 0
@@ -1043,8 +1275,71 @@ void speScheduler(SPEData *speData, unsigned long long id) {
     #endif
 
 
-    // Update the debugCounter
-    debugCounter++;
+    // Check for any messages that have entered into the ERROR state
+    for (i = 0; i < SPE_MESSAGE_QUEUE_LENGTH; i++) {
+      if (msgState[i] == SPE_MESSAGE_STATE_ERROR) {
+
+        // NOTE: All clean-up should be taken care of by the code placing the message into the error
+        //   state (that way the code here does not have to handle all cases).
+
+        // Check to see if there is an available entry in the outbound mailbox
+        if (spu_stat_out_mbox() > 0) {
+
+          // DEBUG
+          #if SPE_DEBUG_DISPLAY >= 1
+	    sim_printf("[0x%llx] :: msg %d's state going from %d -> %d\n", id, i, msgState[i], SPE_MESSAGE_STATE_CLEAR);
+          #endif
+
+          // Clear the entry
+          msgState[i] = SPE_MESSAGE_STATE_CLEAR;
+
+          // Send the index of the entry in the message queue to the PPE along with the ERROR code
+          spu_write_out_mbox(MESSAGE_RETURN_CODE(i, errorCode[i]));
+
+          // Clear the error
+          errorCode[i] = SPE_MESSAGE_OK;
+	}
+      }
+    }
+
+
+    // DEBUG
+    #if SPE_DEBUG_DISPLAY >= 1
+      debug_displayActiveMessageQueue(id, msgState, "(B)");
+    #endif
+
+    // DEBUG
+    #if SPE_DEBUG_DISPLAY >= 1
+      debug_displayStateHistogram(id, msgState, "");
+    #endif
+
+    // Check to see if there has been no progress in the message's states
+    #if SPE_DEBUG_DISPLAY_NO_PROGRESS >= 1
+      int msgLastStateFlag = 0;
+      for (i = 0; i < SPE_MESSAGE_QUEUE_LENGTH; i++) {
+        if (msgState[i] != msgLastState[i]) {
+          msgLastState[i] = msgState[i];
+          msgLastStateFlag = 1;  // Something changed
+	}
+      }
+
+      if (msgLastStateFlag != 0) {  // if something changed
+        msgLastStateCount = 0;
+      } else {                      // otherwise, nothing has changed
+        msgLastStateCount++;
+        if (msgLastStateCount >= SPE_DEBUG_DISPLAY_NO_PROGRESS) {
+          for (int i = 0; i < SPE_MESSAGE_QUEUE_LENGTH; i++) {
+            sim_printf("[0x%llx] :: msgState[%d] = %d\n", id, i, msgState[i]);
+	  }
+          msgLastStateCount = 0; // reset the count
+	}
+      }
+    #endif
+
+    // Update the stillAliveCounter
+    #if SPE_DEBUG_DISPLAY_STILL_ALIVE >= 1
+      stillAliveCounter++;
+    #endif
 
     #if SPE_STATS != 0
       statData.schedulerLoopCount++;
@@ -1056,34 +1351,39 @@ void speScheduler(SPEData *speData, unsigned long long id) {
 
 
 void debug_displayActiveMessageQueue(unsigned long long id, int* msgState, char* str) {
+  #if SPE_DEBUG_DISPLAY >= 1
 
-  for (int tmp = 0; tmp < SPE_MESSAGE_QUEUE_LENGTH; tmp++) {
+  int tmp;
+
+  for (tmp = 0; tmp < SPE_MESSAGE_QUEUE_LENGTH; tmp++) {
     if (msgState[tmp] != SPE_MESSAGE_STATE_CLEAR || msgQueue[tmp]->state < SPE_MESSAGE_STATE_MIN || msgQueue[tmp]->state > SPE_MESSAGE_STATE_MAX) {
-      printf("[0x%llx] :: %s%s msgQueue[%d] @ %p (msgQueue: %p) = { fi = %d, rw = %d, rwl = %d, ro = %d, rol = %d, wo = %d, wol = %d, s = %d(%d), cnt = %d, cmd = %d }\n",
-             id,
-             ((msgQueue[tmp]->state < SPE_MESSAGE_STATE_MIN || msgQueue[tmp]->state > SPE_MESSAGE_STATE_MAX) ? ("---===!!! WARNING !!!===--- ") : ("")),
-             ((str == NULL) ? ("") : (str)),
-             tmp,
-             &(msgQueue[tmp]),
-             msgQueue,
-             (volatile int)(msgQueue[tmp]->funcIndex),
-             msgQueue[tmp]->readWritePtr,
-             msgQueue[tmp]->readWriteLen,
-             msgQueue[tmp]->readOnlyPtr,
-             msgQueue[tmp]->readOnlyLen,
-             msgQueue[tmp]->writeOnlyPtr,
-             msgQueue[tmp]->writeOnlyLen,
-             (volatile int)(msgQueue[tmp]->state),
-             msgState[tmp],
-             (volatile int)(msgQueue[tmp]->counter),
-             (volatile int)(msgQueue[tmp]->command)
-            );
+      sim_printf("[0x%llx] :: %s%s msgQueue[%d] @ %p (msgQueue: %p) = { fi = %d, rw = %d, rwl = %d, ro = %d, rol = %d, wo = %d, wol = %d, f = 0x%08X, tm = %u, s = %d(%d), cnt = %d, cmd = %d }\n",
+                 id,
+                 ((msgQueue[tmp]->state < SPE_MESSAGE_STATE_MIN || msgQueue[tmp]->state > SPE_MESSAGE_STATE_MAX) ? ("---===!!! WARNING !!!===--- ") : ("")),
+                 ((str == NULL) ? ("") : (str)),
+                 tmp,
+                 &(msgQueue[tmp]),
+                 msgQueue,
+                 (volatile)(msgQueue[tmp]->funcIndex),
+                 (volatile)msgQueue[tmp]->readWritePtr,
+                 (volatile)msgQueue[tmp]->readWriteLen,
+                 (volatile)msgQueue[tmp]->readOnlyPtr,
+                 (volatile)msgQueue[tmp]->readOnlyLen,
+                 (volatile)msgQueue[tmp]->writeOnlyPtr,
+                 (volatile)msgQueue[tmp]->writeOnlyLen,
+                 (volatile)(msgQueue[tmp]->flags),
+                 (volatile)(msgQueue[tmp]->totalMem),
+                 (volatile int)(msgQueue[tmp]->state),
+                 msgState[tmp],
+                 (volatile int)(msgQueue[tmp]->counter),
+                 (volatile int)(msgQueue[tmp]->command)
+                );
 
       if (msgQueue[tmp]->state < SPE_MESSAGE_STATE_MIN || msgQueue[tmp]->state > SPE_MESSAGE_STATE_MAX) {
-        printf("***************************************************************************************************\n");
-        printf("***************************************************************************************************\n");
-        printf("***************************************************************************************************\n");
-        printf("[0x%llx] :: msgQueueRaw @ %p, SPE_MESSAGE_QUEUE_BYTE_COUNT = %d\n",
+        sim_printf("***************************************************************************************************\n");
+        sim_printf("***************************************************************************************************\n");
+        sim_printf("***************************************************************************************************\n");
+        sim_printf("[0x%llx] :: msgQueueRaw @ %p, SPE_MESSAGE_QUEUE_BYTE_COUNT = %d\n",
                id, msgQueueRaw, SPE_MESSAGE_QUEUE_BYTE_COUNT
               );
       }
@@ -1091,6 +1391,45 @@ void debug_displayActiveMessageQueue(unsigned long long id, int* msgState, char*
     }
   }
 
+  #endif
+}
+
+
+#if SPE_DEBUG_DISPLAY >= 1
+  char __buffer[2048];
+#endif
+
+
+void debug_displayStateHistogram(unsigned long long id, int* msgState, char* str) {
+  #if SPE_DEBUG_DISPLAY >= 1
+
+  char* buf = __buffer;
+  int somethingToShowFlag = 0;
+  int state, i;
+
+  sprintf(buf, "[0x%llx] :: SPE Histogram %s...\n", id, ((str == NULL) ? ("") : (str)));
+  buf += strlen(buf);
+
+  for (state = SPE_MESSAGE_STATE_MIN; state <= SPE_MESSAGE_STATE_MAX; state++) {
+
+    sprintf(buf, "     %2d -> ", state);
+    buf += strlen(buf);
+
+    for (i = 0; i < SPE_MESSAGE_QUEUE_LENGTH; i++)
+      if (msgState[i] == state) {
+        sprintf(buf, " %2d", i);
+        buf += strlen(buf);
+        if (state > SPE_MESSAGE_STATE_SENT) somethingToShowFlag++;
+      }
+
+    sprintf(buf, "\n");
+    buf += strlen(buf);
+  }
+
+  if (somethingToShowFlag > 0)
+    sim_printf(__buffer);
+
+  #endif
 }
 
 
