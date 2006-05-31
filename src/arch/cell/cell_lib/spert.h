@@ -28,6 +28,16 @@
 #define SPE_DMA_LIST_LENGTH                8        // Per message in message queue (NOTE: Must be even: 2, 4, 10, etc.)
 #define SPE_DMA_LIST_ENTRY_MAX_LENGTH      0x4000   // Maximum length of a buffer pointed to by a single dma list entry (should be a power of 2)
 
+// The reserved area for stack
+#define SPE_TOTAL_MEMORY_SIZE    (256 * 1024)  // Defined by the architecture
+#define SPE_RESERVED_STACK_SIZE  (1024 * 4)    // Reserve this much memory for the stack
+#define SPE_MINIMUM_HEAP_SIZE    (1024 * 16)   // Require at least this amount of heap (or the SPE Runtime will exit)
+
+// The maximum number of work requests that can be serviced in a single SPE scheduler loop iteration
+#define SPE_MAX_GET_PER_LOOP       10
+#define SPE_MAX_EXECUTE_PER_LOOP   2
+#define SPE_MAX_PUT_PER_LOOP       10
+
 // Defines for SPEMessage::state
 #define SPE_MESSAGE_STATE_MIN                 0
 #define SPE_MESSAGE_STATE_CLEAR               0
@@ -42,7 +52,8 @@
 #define SPE_MESSAGE_STATE_EXECUTED_LIST       9
 #define SPE_MESSAGE_STATE_COMMITTING          10
 #define SPE_MESSAGE_STATE_FINISHED            11
-#define SPE_MESSAGE_STATE_MAX                 11
+#define SPE_MESSAGE_STATE_ERROR               12
+#define SPE_MESSAGE_STATE_MAX                 12
 
 // SPE Commands
 #define SPE_MESSAGE_COMMAND_MIN   0
@@ -50,13 +61,20 @@
 #define SPE_MESSAGE_COMMAND_EXIT  1
 #define SPE_MESSAGE_COMMAND_MAX   1
 
+// SPE Error Codes
+#define SPE_MESSAGE_OK                       (0x0000)
+#define SPE_MESSAGE_ERROR_NOT_ENOUGH_MEMORY  (0x0001)
+
 // DEBUG Display Level
 #define SPE_DEBUG_DISPLAY   0  // Set to 0 to save on LS memory usage (all printf's should be wrapped in this!)
+#define SPE_DEBUG_DISPLAY_STILL_ALIVE  0 // If > 0 then display a "still alive" message every SPE_DEBUG_DISPLAY_STILL_ALIVE iterations
+#define SPE_DEBUG_DISPLAY_NO_PROGRESS  0 // If non-zero, warn when no messages changes state for this many iterations
 #define SPE_REPORT_END      1  // Have each SPE report the address of it's _end variable (end of data segment; will be printed by PPE during spe thread creation)
 #define SPE_USE_OWN_MEMSET  0  // Set to 1 to force a local version of memset to be used (to try to remove C/C++ runtime dependence)
+#define SPE_NOTIFY_ON_MALLOC_FAILURE   0  // Set to 1 to force the SPE to notify the user when a pointer returned by malloc/new returns an un-usable pointer (message will retry malloc/new later)
 
 // STATS Data Collection
-#define SPE_STATS    1  // Set to have stat data collected during execution
+#define SPE_STATS    0  // Set to have stat data collected during execution
 
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -72,6 +90,7 @@ typedef struct __SPE_MESSAGE {
   volatile PPU_POINTER_TYPE writeOnlyPtr;
   volatile int writeOnlyLen;
   volatile unsigned int flags;
+  volatile unsigned int totalMem;  // The total amount of memory that will be needed on the SPE for the request
   volatile int state;              // Current state of the message (see SPE_MESSAGE_STATE_xxx)
   volatile int counter;            // A counter used to uniquely identify this message from the message previously held in this slot
   volatile int command;            // A control command that the PPU can use to send commands to the SPE runtime (see SPE_MESSAGE_COMMAND_xxx)
