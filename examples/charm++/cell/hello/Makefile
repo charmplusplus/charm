@@ -13,7 +13,9 @@ hello: $(OBJS) hello_shared.o
 	$(CHARMC) -language charm++ -o hello hello_shared.o $(OBJS)
 
 hello_shared.o: hello_shared.cpp hello_shared.h
-	$(SPU_CXX) -I$(CHARM_BASE_DIR)/include -I$(CELL_SDK_DIR)/sysroot/usr/spu/include -L$(CHARM_BASE_DIR)/lib -o hello_shared hello_shared.cpp -lcellspu
+	cp hello_shared.cpp hello_shared.c
+	spu-gcc $(OPTS) -c -I$(CHARM_BASE_DIR)/include -I$(CELL_SDK_DIR)/sysroot/usr/spu/include -o hello_shared_tmp.o hello_shared.c
+	spu-gcc -L$(CHARM_BASE_DIR)/lib -L$(CELL_SDK_DIR)/sysroot/usr/spu/lib -o hello_shared hello_shared_tmp.o -lcellspu -lsim
 	$(PPU_EMBEDSPU) spert_main hello_shared hello_shared.o
 
 hello.decl.h: hello.ci
