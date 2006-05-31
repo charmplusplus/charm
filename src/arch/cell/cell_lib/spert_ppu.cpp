@@ -23,6 +23,9 @@ extern "C" {
 #define WRHANDLES_NUM_INITIAL  (64)
 #define WRHANDLES_GROW_SIZE    (16)
 
+#define MESSAGE_RETURN_CODE_INDEX(rc)  ((unsigned int)rc & 0x0000FFFF)
+#define MESSAGE_RETURN_CODE_ERROR(rc)  (((unsigned int)rc >> 16) & 0x0000FFFF)
+
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Structures
@@ -519,7 +522,9 @@ void OffloadAPIProgress() {
     while (usedEntries > 0) {
 
       // Read the message queue index that was sent by the SPE from the outbound mailbox
-      unsigned int speMessageQueueIndex = spe_read_out_mbox(speThreads[i]->speID);
+      unsigned int messageReturnCode = spe_read_out_mbox(speThreads[i]->speID);
+      unsigned int speMessageQueueIndex = MESSAGE_RETURN_CODE_INDEX(messageReturnCode);
+      unsigned int speMessageErrorCode = MESSAGE_RETURN_CODE_ERROR(messageReturnCode);
       SPEMessage *msg = (SPEMessage*)((char*)(speThreads[i]->speData->messageQueue) + (speMessageQueueIndex * SIZEOF_16(SPEMessage)));
 
       if ((WorkRequest*)(msg->wrPtr) != NULL && ((WorkRequest*)(msg->wrPtr))->next != NULL) {
@@ -536,6 +541,13 @@ void OffloadAPIProgress() {
         exit(EXIT_FAILURE);
 
       } else {
+
+	// If there was an error returned by the SPE, display it now
+        if (speMessageErrorCode != SPE_MESSAGE_OK) {
+          fprintf(stderr, " --- Offload API :: ERROR :: SPE %d returned error code %d for message at index %d...\n",
+                  i, speMessageErrorCode, speMessageQueueIndex
+                 );
+	}
 
         // If there is a callback function, call it for this entry and then place the entry back into the wrFree list
         WorkRequest *wrPtr = (WorkRequest*)(msg->wrPtr);
@@ -828,7 +840,7 @@ SPEThread** createSPEThreads(SPEThread **speThreads, int numThreads) {
     #if SPE_REPORT_END != 0
       while (spe_stat_out_mbox(speThreads[i]->speID) <= 0);
       unsigned int endValue = spe_read_out_mbox(speThreads[i]->speID);
-      printf("SPE reported _end = 0x%08x\n", endValue);
+      printf("SPE %d reported _end = 0x%08x\n", i, endValue);
     #endif
   }
 
@@ -912,6 +924,7 @@ int sendSPEMessage(SPEThread *speThread, WorkRequest *wrPtr, int command) {
         msg->writeOnlyPtr = (PPU_POINTER_TYPE)NULL;
         msg->writeOnlyLen = 0;
         msg->flags = WORK_REQUEST_FLAGS_NONE;
+        msg->totalMem = 0;
       } else {
         msg->funcIndex = wrPtr->funcIndex;
         msg->readWritePtr = (PPU_POINTER_TYPE)(wrPtr->readWritePtr);
@@ -921,6 +934,20 @@ int sendSPEMessage(SPEThread *speThread, WorkRequest *wrPtr, int command) {
         msg->writeOnlyPtr = (PPU_POINTER_TYPE)(wrPtr->writeOnlyPtr);
         msg->writeOnlyLen = wrPtr->writeOnlyLen;
         msg->flags = wrPtr->flags;
+
+        // Calculate the total amount of memory that will be needed on the SPE for this message/work-request
+        if ((msg->flags & WORK_REQUEST_FLAGS_LIST) == WORK_REQUEST_FLAGS_LIST) {
+          // The memory needed is the size of the DMA list rounded up times 2 (two lists) and the size of each
+          //   of the individual entries in that list all rounded up
+          register int numEntries = wrPtr->readWriteLen + wrPtr->readOnlyLen + wrPtr->writeOnlyLen;
+          msg->totalMem = ROUNDUP_16(sizeof(DMAListEntry) * numEntries);
+          msg->totalMem *= 2;  // Second DMA List
+          for (int entryIndex; entryIndex < numEntries; entryIndex++)
+            msg->totalMem += ROUNDUP_16(((DMAListEntry*)(wrPtr->readWritePtr))[entryIndex].size);
+	} else {
+          // The memory needed is the size of the sum of the three buffers each rounded up
+          msg->totalMem = ROUNDUP_16(wrPtr->readWriteLen) + ROUNDUP_16(wrPtr->readOnlyLen) + ROUNDUP_16(wrPtr->writeOnlyLen);
+	}
       }
       msg->state = SPE_MESSAGE_STATE_SENT;
       msg->command = command;
