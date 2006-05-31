@@ -65,6 +65,7 @@ class Hello : public CBase_Hello {
 
       CkPrintf("[%d] BEFORE Second\n", thisIndex);
 
+      // An array of all the strings to pass to the Offload API for processing
       char* strBufs[] = { "This is the first of the read only buffers.",
                           "Yet another read only buffer (the second one to be exact).",
                           "Oh man, not another read only buffer.  How many of these will there be.",
@@ -76,6 +77,8 @@ class Hello : public CBase_Hello {
                           "Please stop the madness!"
                         };
 
+      // Copy each of the strings into a properly aligned buffer and create the DMA list that
+      //   will be passed to the Offload API.
       DMAListEntry dmaList[9];
       for (int i = 0; i < 9; i++) {
 
@@ -83,22 +86,28 @@ class Hello : public CBase_Hello {
         char* tmpPtr = (char*)malloc_aligned(strlen(strBufs[i]) + 1, 16);
         strcpy(tmpPtr, strBufs[i]);
 
+        // Add the aligned buffer into the DMA list
         dmaList[i].size = strlen(strBufs[i]) + 1;
         dmaList[i].ea = (unsigned int)(tmpPtr);
 
+        // Display the contents of the buffers before the work request is made
         CkPrintf("dmaList[%d].ea = 0x%08x  before:(\"%s\") (%d)\n",
                  i, dmaList[i].ea, (char*)(dmaList[i].ea), strlen((char*)(dmaList[i].ea))
                 );
       }
 
+      // Send the Work Request to the Offload API (scatter/gather work request type)
       sendWorkRequest_list(FUNC_STRBUFS,
                            0,
                            dmaList,
                            3, 3, 3,
                            CthSelf()
                           );
+      // Goto sleep, the Offload API will wake this thread back up when the work request has
+      //   finished.
       CthSuspend();
 
+      // Display the contents of the buffers now that the work request is finished
       for (int i = 0; i < 9; i++) {
         CkPrintf("dmaList[%d].ea = 0x%08x   after:(\"%s\") (%d)\n",
                  i, dmaList[i].ea, (char*)(dmaList[i].ea), strlen((char*)(dmaList[i].ea))
@@ -116,5 +125,6 @@ class Hello : public CBase_Hello {
         mainProxy.done();  // All have said hello, program is done
     }
 };
+
 
 #include "hello.def.h"
