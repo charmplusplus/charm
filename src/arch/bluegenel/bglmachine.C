@@ -10,8 +10,6 @@
 #include "pcqueue.h"
 #include <stack>
 
-#define EAGER_MESSAGE_SIZE 40000
-
 #include "rts.h"
 #include "bgml.h"
 
@@ -55,7 +53,7 @@ PCQueue broadcast_q;                 //queue to send broadcast messages
 #define BROADCAST_SPANNING_FACTOR      4
 
 #define MAX_OUTSTANDING  1024
-#define MAX_POSTED 8
+#define MAX_POSTED 64
 #define MAX_QLEN 1024
 #define MAX_BYTES 1000000
 
@@ -489,7 +487,11 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
   
   BGML_Messager_Init();
   BG2S_Configure (short_pkt_recv, first_pkt_recv_done, NULL);
-
+  
+  //BGTr_Configure ( 1 /* use_coprocessor  */, 
+  //               1 /* protocolTreshold */, 
+  //               1 /* highPrecision    */); 
+  
   _Cmi_numnodes = BGML_Messager_size();
   _Cmi_mynode = BGML_Messager_rank();
   
@@ -726,7 +728,7 @@ extern "C" void BGML_Messager_dumpTimers();
 void ConverseExit(void){
   /* #if ! CMK_SMP */
 
-  while(msgQueueLen > 0 && outstanding_recvs > 0) {
+  while(msgQueueLen > 0 || outstanding_recvs > 0) {
     AdvanceCommunications();
   }
 
@@ -754,7 +756,7 @@ void CmiAbort(const char * message){
         "{snd:%d,rcv:%d} Reason: %s\n",CmiMyPe(),msgQueueLen,outstanding_recvs,message);
   CmiPrintStackTrace(0);
 
-  while(msgQueueLen > 0 && outstanding_recvs > 0) {
+  while(msgQueueLen > 0 || outstanding_recvs > 0) {
     AdvanceCommunications();
   }
   
@@ -1085,8 +1087,11 @@ void CmiFreeBroadcastAllFn(int size, char *msg){
   //SendMsgsUntil(0,0);
 }
 
-static inline void AdvanceCommunications(int max_out){
+CpvDeclare(int, networkProgressCount);
+int  networkProgressPeriod;
+static unsigned long long lastProgress = 0;
 
+static inline void AdvanceCommunications(int max_out){
   sendBroadcastMessages();
 
   BGX_BeginCriticalSection();
@@ -1417,19 +1422,14 @@ void CmiProbeImmediateMsg();
 
 #if CMK_MACHINE_PROGRESS_DEFINED
 
-CpvDeclare(int, networkProgressCount);
-int  networkProgressPeriod;
 
-static unsigned long long lastProgress = 0;
 
 void CmiMachineProgressImpl()
 {
-  unsigned long long new_time = rts_get_timebase();
-  
+  unsigned long long new_time = rts_get_timebase();  
   if(new_time < lastProgress + progress_cycles) {
     return;
   }
-  
   lastProgress = new_time;
 
 #if !CMK_SMP
@@ -1452,5 +1452,6 @@ extern "C" void CmiBarrier()
   else
 #endif
     BGTsC_Barrier(0);
+  //BGTr_Barrier(1);
 }
 
