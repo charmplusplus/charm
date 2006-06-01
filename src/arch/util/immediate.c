@@ -58,7 +58,7 @@ void CmiDelayImmediate(void)
 
   CQdCreate(CpvAccess(cQdState),1);
   MACHSTATE(5,"Actually delaying an immediate message");
-  PCQueuePush(CsvAccess(NodeState).delayedImmQ, currentImmediateMsg);
+  PCQueuePush(CsvAccess(NodeState).delayedImmQ, (char *)currentImmediateMsg);
 }
 
 
