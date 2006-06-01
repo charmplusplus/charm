@@ -8,8 +8,240 @@
 
 //#define DEBUG_1
 
+/** Makes use of ordering of nodes in e1 to check is e3 is on the same side
+    of the path of edges (n1, n) and (n, n2) */
+int FEM_Adapt::check_orientation(int e1, int e3, int n, int n1, int n2)
+{
+  int e1_n = find_local_node_index(e1, n);
+  int e1_n1 = find_local_node_index(e1, n1);
+  int e3_n = find_local_node_index(e3, n);
+  int e3_n2 = find_local_node_index(e3, n2);
+  
+  if (((e1_n1 == (e1_n+1)%3) && (e3_n == (e3_n2+1)%3)) ||
+      ((e1_n == (e1_n1+1)%3) && (e3_n2 == (e3_n+1)%3)))
+    return 1;
+  else return 0;
+}
+
+/** Given two element-local node numberings (i.e. 0, 1, 2 for triangular 
+    elements), calculate an element-local edge numbering (also 0, 1, or 2
+    for triangular elements)
+*/
+int FEM_Adapt::get_edge_index(int local_node1, int local_node2) 
+{
+  int sum = local_node1 + local_node2;
+  CkAssert(local_node1 != local_node2);
+  if (sum == 1) return 0;
+  else if (sum == 3) return 1;
+  else if (sum == 2) return 2;
+  else {
+    CkPrintf("ERROR: local node pair is strange: [%d,%d]\n", local_node1,
+	    local_node2);
+    CkAbort("ERROR: local node pair is strange\n");
+    return -1;
+  }
+}
+
+/** Given a chunk-local element number e and a chunk-local node number n,
+    determine the element-local node numbering for node n on element e **/
+int FEM_Adapt::find_local_node_index(int e, int n) {
+  int result = theMesh->e2n_getIndex(e, n);
+  if (result < 0) {
+    CkPrintf("ERROR: node %d not found on element %d\n", n, e);
+    CkAbort("ERROR: node not found\n");
+  }
+  return result;
+}
+
+
+
+/** Extract elements adjacent to edge [n1,n2] along with element-local node
+    numberings and nodes opposite input edge **/
+int FEM_Adapt::findAdjData(int n1, int n2, int *e1, int *e2, int *e1n1, 
+			    int *e1n2, int *e1n3, int *e2n1, int *e2n2, 
+			    int *e2n3, int *n3, int *n4)
+{
+  // Set some default values in case e1 is not there
+  (*e1n1) = (*e1n2) = (*e1n3) = (*n3) = -1;
+
+  //if n1,n2 is not an edge return 
+  if(n1<0 || n2<0) return -1;
+  if(theMesh->node.is_valid(n1)==0 || theMesh->node.is_valid(n2)==0) return -1;
+  if(theMesh->n2n_exists(n1,n2)!=1 || theMesh->n2n_exists(n2,n1)!=1) return -1; 
+
+  (*e1) = theMesh->getElementOnEdge(n1, n2); // assumed to return local element
+  if ((*e1) == -1) {
+    CkPrintf("[%d]Warning: No Element on edge %d->%d\n",theMod->idx,n1,n2);
+    return -1;
+  }
+  (*e1n1) = find_local_node_index((*e1), n1);
+  (*e1n2) = find_local_node_index((*e1), n2);
+  (*e1n3) = 3 - (*e1n1) - (*e1n2);
+  (*n3) = theMesh->e2n_getNode((*e1), (*e1n3));
+  (*e2) = theMesh->e2e_getNbr((*e1), get_edge_index((*e1n1), (*e1n2)));
+  // Set some default values in case e2 is not there
+  (*e2n1) = (*e2n2) = (*e2n3) = (*n4) = -1;
+  if ((*e2) != -1) { // e2 exists
+    (*e2n1) = find_local_node_index((*e2), n1);
+    (*e2n2) = find_local_node_index((*e2), n2);
+    (*e2n3) = 3 - (*e2n1) - (*e2n2);
+    //if ((*e2) > -1) { // if e2 is a ghost, there is no e2n data
+    (*n4) = theMesh->e2n_getNode((*e2), (*e2n3));
+    //}
+  }
+  if(*n3 == *n4) {
+    CkPrintf("[%d]Warning: Identical elements %d:(%d,%d,%d) & %d:(%d,%d,%d)\n",theMod->idx,*e1,n1,n2,*n3,*e2,n1,n2,*n4);
+    return -1;
+  }
+  return 1;
+}
+
+int FEM_Adapt::e2n_getNot(int e, int n1, int n2) {
+  int eConn[3];
+  theMesh->e2n_getAll(e, eConn);
+  for (int i=0; i<3; i++) 
+    if ((eConn[i] != n2) && (eConn[i] != n1)) return eConn[i];
+  return -1; //should never come here
+}
+
+int FEM_Adapt::n2e_exists(int n, int e) {
+  int *nConn, nSz;
+  theMesh->n2e_getAll(n, nConn, nSz);
+  for (int i=0; i<nSz; i++) {
+    if (nConn[i] == e) {
+      if(nSz!=0) free(nConn);
+      return 1;
+    }
+  }
+  if(nSz!=0) free(nConn);
+  return 0;
+}
+
+int FEM_Adapt::findElementWithNodes(int n1, int n2, int n3) {
+  int *nConn, nSz;
+  int ret = -1;
+  theMesh->n2e_getAll(n1, nConn, nSz);
+  for (int i=0; i<nSz; i++) {
+    if ((n2e_exists(n2, nConn[i])) && (n2e_exists(n3, nConn[i]))) {
+      ret = nConn[i];
+      break;
+    }
+  }
+  if(nSz!=0) free(nConn);
+  return ret; //should never come here
+}
+
+
+
+int FEM_Adapt::getSharedNodeIdxl(int n, int chk) {
+  return theMod->getfmUtil()->exists_in_IDXL(theMesh, n, chk, 0, -1);
+}
+
+int FEM_Adapt::getGhostNodeIdxl(int n, int chk) { 
+  return theMod->getfmUtil()->exists_in_IDXL(theMesh, n, chk, 2, -1);
+}
+
+int FEM_Adapt::getGhostElementIdxl(int e, int chk) { 
+  return theMod->getfmUtil()->exists_in_IDXL(theMesh, e, chk, 4, 0);
+}
+
+
+
+void FEM_Adapt::printAdjacencies(int *nodes, int numNodes, int *elems, int numElems) {
+
+  for(int i=0; i<numNodes; i++) {
+    if(nodes[i] == -1) continue;
+    theMod->getfmUtil()->FEM_Print_n2e(theMesh, nodes[i]);
+    theMod->getfmUtil()->FEM_Print_n2n(theMesh, nodes[i]);
+  }
+  for(int i=0; i<numElems; i++) {
+    if(elems[i] == -1) continue;
+    theMod->getfmUtil()->FEM_Print_e2n(theMesh, elems[i]);
+    theMod->getfmUtil()->FEM_Print_e2e(theMesh, elems[i]);
+  }
+
+  return;
+}
+
+
+
+bool FEM_Adapt::isFixedNode(int n1) {
+  for(int i=0; i<theMod->fmfixedNodes.size(); i++) {
+    if(theMod->fmfixedNodes[i]==n1) return true;
+  }
+  return false;
+}
+
+/** A node is a corner if it is connected to two different boundaries and it is 
+    on the boundary
+*/
+bool FEM_Adapt::isCorner(int n1) {
+  //if it has at least two adjacent nodes on different boundaries and the edges are boundaries
+  int *n1AdjNodes;
+  int n1NumNodes=0;
+  int n1_bound, n2_bound;
+  FEM_Mesh_dataP(theMesh, FEM_NODE, FEM_BOUNDARY, &n1_bound, n1, 1 , FEM_INT, 1);
+  if(n1_bound==0) return false; //it is internal
+  theMesh->n2n_getAll(n1, n1AdjNodes, n1NumNodes);
+  for (int i=0; i<n1NumNodes; i++) {
+    int n2 = n1AdjNodes[i];
+    if(FEM_Is_ghost_index(n2)) {
+      int numchunks;
+      IDXL_Share **chunks1;
+      theMod->fmUtil->getChunkNos(0,n2,&numchunks,&chunks1);
+      int index = theMod->idx;
+      CkAssert(numchunks>0);
+      int chk = chunks1[0]->chk;
+      int ghostidx = theMod->fmUtil->exists_in_IDXL(theMesh,n2,chk,2);
+      intMsg *im = meshMod[chk].getRemoteBound(index,ghostidx);
+      n2_bound = im->i;
+      for(int j=0; j<numchunks; j++) {
+	delete chunks1[j];
+      }
+      delete im;
+      if(numchunks>0) free(chunks1);
+    }
+    else {
+      FEM_Mesh_dataP(theMesh, FEM_NODE, FEM_BOUNDARY, &n2_bound, n2, 1 , FEM_INT, 1);
+    }
+    if(n2_bound == 0) continue;
+    if(n1_bound != n2_bound) {
+      if(isEdgeBoundary(n1,n2) && abs(n1_bound)>abs(n2_bound)) {
+	if(n1NumNodes!=0) delete[] n1AdjNodes;
+	return true;
+      }
+    }
+  }
+  if(n1NumNodes!=0) delete[] n1AdjNodes;
+  return false;
+}
+
+bool FEM_Adapt::isEdgeBoundary(int n1, int n2) {
+  int *n1AdjElems, *n2AdjElems;
+  int n1NumElems=0, n2NumElems=0;
+  int ret = 0;
+  //find the number of elements this edge belongs to
+  theMesh->n2e_getAll(n1, n1AdjElems, n1NumElems);
+  theMesh->n2e_getAll(n2, n2AdjElems, n2NumElems);
+  for(int k=0; k<n1NumElems; k++) {
+    for (int j=0; j<n2NumElems; j++) {
+      if (n1AdjElems[k] == n2AdjElems[j]) {
+	if(n1AdjElems[k] != -1) {
+	  ret++;
+	}
+      }
+    }
+  }
+  if(n1NumElems!=0) delete[] n1AdjElems;
+  if(n2NumElems!=0) delete[] n2AdjElems;
+  if(ret==1) return true;
+  return false;
+}
+
+
+
 // ======================  BEGIN edge_flip  =================================
-/* Perform a Delaunay flip of the edge (n1, n2) returning 1 if successful, 0 if
+/** Perform a Delaunay flip of the edge (n1, n2) returning 1 if successful, 0 if
    not (likely due to the edge being on a boundary). The convexity of the 
    quadrilateral formed by two faces incident to edge (n1, n2) is assumed. n1 
    and n2 are assumed to be local to this chunk.  An adjacency test is 
@@ -169,7 +401,7 @@ int FEM_Adapt::edge_flip_help(int e1, int e2, int n1, int n2, int e1_n1,
 
 
 // ======================  BEGIN edge_bisect  ===============================
-/* Given edge e:(n1, n2), remove the two elements (n1,n2,n3) and 
+/** Given edge e:(n1, n2), remove the two elements (n1,n2,n3) and 
    (n2,n1,n4) adjacent to e, and bisect e by adding node 
    n5. Add elements (n1,n5,n3), (n5,n2,n3), (n5,n1,n4) and (n2,n5,n4); 
    returns new node n5.
@@ -259,7 +491,7 @@ int FEM_Adapt::edge_bisect_help(int e1, int e2, int n1, int n2, int e1_n1,
     chunks[0] = e1chunk;
     chunks[1] = e2chunk;
   }
-  n5 = FEM_add_node(theMesh,adjnodes,2,chunks,numChunks,forceshared,0);
+  n5 = FEM_add_node(theMesh,adjnodes,2,chunks,numChunks,forceshared);
   delete[] chunks;
   //lock this node immediately
   FEM_Modify_LockN(theMesh, n5, 0);
@@ -387,7 +619,7 @@ int FEM_Adapt::edge_bisect_help(int e1, int e2, int n1, int n2, int e1_n1,
 
 
 // ======================  BEGIN vertex_remove  ============================
-/* Inverse of edge bisect, this removes a degree 4 vertex n1 and 2 of its
+/** Inverse of edge bisect, this removes a degree 4 vertex n1 and 2 of its
    adjacent elements.  n2 indicates that the two elements removed are
    adjacent to edge [n1,n2]. This could be performed with edge_contraction,
    but this is a simpler operation. 
@@ -473,7 +705,7 @@ int FEM_Adapt::vertex_remove_help(int e1, int e2, int n1, int n2, int e1_n1,
 // ======================  END vertex_remove  ==============================
   
 // ======================  BEGIN vertex_split =================================
-/* Given a node n and two adjacent nodes n1 and n2, split n into two nodes n 
+/** Given a node n and two adjacent nodes n1 and n2, split n into two nodes n 
    and np such that the edges to the neighbors n1 and n2 expand into two new 
    elements (n, np, n1) and (np, n, n2); return the id of the newly created 
    node np
@@ -554,7 +786,7 @@ int FEM_Adapt::vertex_split_help(int n, int n1, int n2, int e1, int e3)
   //the new node will be shared to wahtever the old node was shared to, we'll do this later
   int *chunks;
   int numChunks = 0;
-  int np = FEM_add_node(theMesh,adjnodes,1,chunks,numChunks,0,0);
+  int np = FEM_add_node(theMesh,adjnodes,1,chunks,numChunks,0);
   locknodes[3] = np;
 
   int current, next, nt, nl, eknp, eknt, eknl;
@@ -603,177 +835,3 @@ int FEM_Adapt::vertex_split_help(int n, int n1, int n2, int e1, int e3)
   return np;
 }
 // ======================  END vertex_split ===================
-
-
-// Helpers
-int FEM_Adapt::get_edge_index(int local_node1, int local_node2) 
-{
-  int sum = local_node1 + local_node2;
-  CkAssert(local_node1 != local_node2);
-  if (sum == 1) return 0;
-  else if (sum == 3) return 1;
-  else if (sum == 2) return 2;
-  else {
-    CkPrintf("ERROR: local node pair is strange: [%d,%d]\n", local_node1,
-	    local_node2);
-    CkAbort("ERROR: local node pair is strange\n");
-    return -1;
-  }
-}
-
-int FEM_Adapt::find_local_node_index(int e, int n) {
-  int result = theMesh->e2n_getIndex(e, n);
-  if (result < 0) {
-    CkPrintf("ERROR: node %d not found on element %d\n", n, e);
-    CkAbort("ERROR: node not found\n");
-  }
-  return result;
-}
-
-int FEM_Adapt::check_orientation(int e1, int e3, int n, int n1, int n2)
-{
-  int e1_n = find_local_node_index(e1, n);
-  int e1_n1 = find_local_node_index(e1, n1);
-  int e3_n = find_local_node_index(e3, n);
-  int e3_n2 = find_local_node_index(e3, n2);
-  
-  if (((e1_n1 == (e1_n+1)%3) && (e3_n == (e3_n2+1)%3)) ||
-      ((e1_n == (e1_n1+1)%3) && (e3_n2 == (e3_n+1)%3)))
-    return 1;
-  else return 0;
-}
-
-int FEM_Adapt::findAdjData(int n1, int n2, int *e1, int *e2, int *e1n1, 
-			    int *e1n2, int *e1n3, int *e2n1, int *e2n2, 
-			    int *e2n3, int *n3, int *n4)
-{
-  // Set some default values in case e1 is not there
-  (*e1n1) = (*e1n2) = (*e1n3) = (*n3) = -1;
-
-  //if n1,n2 is not an edge return 
-  if(n1<0 || n2<0) return -1;
-  if(theMesh->node.is_valid(n1)==0 || theMesh->node.is_valid(n2)==0) return -1;
-  if(theMesh->n2n_exists(n1,n2)!=1 || theMesh->n2n_exists(n2,n1)!=1) return -1; 
-
-  (*e1) = theMesh->getElementOnEdge(n1, n2); // assumed to return local element
-  if ((*e1) == -1) {
-    CkPrintf("[%d]Warning: No Element on edge %d->%d\n",theMod->idx,n1,n2);
-    return -1;
-  }
-  (*e1n1) = find_local_node_index((*e1), n1);
-  (*e1n2) = find_local_node_index((*e1), n2);
-  (*e1n3) = 3 - (*e1n1) - (*e1n2);
-  (*n3) = theMesh->e2n_getNode((*e1), (*e1n3));
-  (*e2) = theMesh->e2e_getNbr((*e1), get_edge_index((*e1n1), (*e1n2)));
-  // Set some default values in case e2 is not there
-  (*e2n1) = (*e2n2) = (*e2n3) = (*n4) = -1;
-  if ((*e2) != -1) { // e2 exists
-    (*e2n1) = find_local_node_index((*e2), n1);
-    (*e2n2) = find_local_node_index((*e2), n2);
-    (*e2n3) = 3 - (*e2n1) - (*e2n2);
-    //if ((*e2) > -1) { // if e2 is a ghost, there is no e2n data
-    (*n4) = theMesh->e2n_getNode((*e2), (*e2n3));
-    //}
-  }
-  if(*n3 == *n4) {
-    CkPrintf("[%d]Warning: Identical elements %d:(%d,%d,%d) & %d:(%d,%d,%d)\n",theMod->idx,*e1,n1,n2,*n3,*e2,n1,n2,*n4);
-    return -1;
-  }
-  return 1;
-}
-
-int FEM_Adapt::getSharedNodeIdxl(int n, int chk) {
-  return theMod->getfmUtil()->exists_in_IDXL(theMesh, n, chk, 0, -1);
-}
-int FEM_Adapt::getGhostNodeIdxl(int n, int chk) { 
-  return theMod->getfmUtil()->exists_in_IDXL(theMesh, n, chk, 2, -1);
-}
-int FEM_Adapt::getGhostElementIdxl(int e, int chk) { 
-  return theMod->getfmUtil()->exists_in_IDXL(theMesh, e, chk, 4, 0);
-}
-
-void FEM_Adapt::printAdjacencies(int *nodes, int numNodes, int *elems, int numElems) {
-
-  for(int i=0; i<numNodes; i++) {
-    if(nodes[i] == -1) continue;
-    theMod->getfmUtil()->FEM_Print_n2e(theMesh, nodes[i]);
-    theMod->getfmUtil()->FEM_Print_n2n(theMesh, nodes[i]);
-  }
-  for(int i=0; i<numElems; i++) {
-    if(elems[i] == -1) continue;
-    theMod->getfmUtil()->FEM_Print_e2n(theMesh, elems[i]);
-    theMod->getfmUtil()->FEM_Print_e2e(theMesh, elems[i]);
-  }
-
-  return;
-}
-
-bool FEM_Adapt::isFixedNode(int n1) {
-  for(int i=0; i<theMod->fmfixedNodes.size(); i++) {
-    if(theMod->fmfixedNodes[i]==n1) return true;
-  }
-  return false;
-}
-
-bool FEM_Adapt::isCorner(int n1) {
-  //if it has at least two adjacent nodes on different boundaries and the edges are boundaries
-  int *n1AdjNodes;
-  int n1NumNodes=0;
-  int n1_bound, n2_bound;
-  FEM_Mesh_dataP(theMesh, FEM_NODE, FEM_BOUNDARY, &n1_bound, n1, 1 , FEM_INT, 1);
-  if(n1_bound==0) return false; //it is internal
-  theMesh->n2n_getAll(n1, n1AdjNodes, n1NumNodes);
-  for (int i=0; i<n1NumNodes; i++) {
-    int n2 = n1AdjNodes[i];
-    if(FEM_Is_ghost_index(n2)) {
-      int numchunks;
-      IDXL_Share **chunks1;
-      theMod->fmUtil->getChunkNos(0,n2,&numchunks,&chunks1);
-      int index = theMod->idx;
-      CkAssert(numchunks>0);
-      int chk = chunks1[0]->chk;
-      int ghostidx = theMod->fmUtil->exists_in_IDXL(theMesh,n2,chk,2);
-      intMsg *im = meshMod[chk].getRemoteBound(index,ghostidx);
-      n2_bound = im->i;
-      for(int j=0; j<numchunks; j++) {
-	delete chunks1[j];
-      }
-      delete im;
-      if(numchunks>0) free(chunks1);
-    }
-    else {
-      FEM_Mesh_dataP(theMesh, FEM_NODE, FEM_BOUNDARY, &n2_bound, n2, 1 , FEM_INT, 1);
-    }
-    if(n2_bound == 0) continue;
-    if(n1_bound != n2_bound) {
-      if(isEdgeBoundary(n1,n2) && abs(n1_bound)>abs(n2_bound)) {
-	if(n1NumNodes!=0) delete[] n1AdjNodes;
-	return true;
-      }
-    }
-  }
-  if(n1NumNodes!=0) delete[] n1AdjNodes;
-  return false;
-}
-
-bool FEM_Adapt::isEdgeBoundary(int n1, int n2) {
-  int *n1AdjElems, *n2AdjElems;
-  int n1NumElems=0, n2NumElems=0;
-  int ret = 0;
-  //find the number of elements this edge belongs to
-  theMesh->n2e_getAll(n1, n1AdjElems, n1NumElems);
-  theMesh->n2e_getAll(n2, n2AdjElems, n2NumElems);
-  for(int k=0; k<n1NumElems; k++) {
-    for (int j=0; j<n2NumElems; j++) {
-      if (n1AdjElems[k] == n2AdjElems[j]) {
-	if(n1AdjElems[k] != -1) {
-	  ret++;
-	}
-      }
-    }
-  }
-  if(n1NumElems!=0) delete[] n1AdjElems;
-  if(n2NumElems!=0) delete[] n2AdjElems;
-  if(ret==1) return true;
-  return false;
-}

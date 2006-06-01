@@ -1,14 +1,10 @@
-
-
 /* File: fem_mesh_modify.h
  * Authors: Nilesh Choudhury
  * 
  */
 
-/*
- 
+/**
 This file contains a set of functions, which allow primitive operations upon meshes in parallel. The functions are defined in fem_mesh_modify.C.
-
 
 Assumptions:
 
@@ -23,41 +19,60 @@ The calls will maintain the adjacency tables, both remotely and locally.
 A ghost element is one that is adjacent to at least one shared node. A ghost node is any non-shared 
 node adjacent to a ghost element. The e2e adjacencies need not have the same definition for 
 adjacent elements.
-
 */
 
-//stupid numbe for maximum number of chunks, but reasonable enough
+//stupid number for maximum number of chunks, but reasonable enough
 #define MAX_CHUNK 1000000000
 
-
-// The internal functions which take in a FEM_Mesh*, but could feasibly be used by others
-int FEM_add_node(FEM_Mesh *m, int* adjacent_nodes=0, int num_adjacent_nodes=0, int *chunks=0, int numChunks=0, int forceShared=0, int upcall=0);
+///Add a node between some adjacent nodes on this mesh
+int FEM_add_node(FEM_Mesh *m, int* adjacent_nodes=0, int num_adjacent_nodes=0, int *chunks=0, int numChunks=0, int forceShared=0);
+///Remove a node on this mesh
 void FEM_remove_node(FEM_Mesh *m, int node);
-int FEM_remove_element(FEM_Mesh *m, int element, int elem_type=0, int permanent=-1);
-int FEM_purge_element(FEM_Mesh *m, int element, int elem_type=0);
+///Add an element on this mesh with this connectivity
 int FEM_add_element(FEM_Mesh *m, int* conn, int conn_size, int elem_type=0, int chunkNo=-1);
+///Remove an element on this mesh
+int FEM_remove_element(FEM_Mesh *m, int element, int elem_type=0, int permanent=-1);
+///Purge the element from this mesh (invalidate entry)
+int FEM_purge_element(FEM_Mesh *m, int element, int elem_type=0);
 
-int FEM_Modify_Lock(FEM_Mesh *m, int* affectedNodes=0, int numAffectedNodes=0, int* affectedElts=0, int numAffectedElts=0, int elemtype=0);
-int FEM_Modify_Unlock(FEM_Mesh *m);
-int FEM_Modify_LockN(FEM_Mesh *m, int nodeId, int readLock);
-int FEM_Modify_UnlockN(FEM_Mesh *m, int nodeId, int readLock);
-void FEM_Modify_LockAll(FEM_Mesh*m, int nodeId, bool lockall=true);
-void FEM_Modify_LockUpdate(FEM_Mesh*m, int nodeId, bool lockall=true);
-void FEM_Modify_correctLockN(FEM_Mesh *m, int nodeId);
-
-// Internal functions which shouldn't be used by anyone else
+// Internal functions used as helper for the above functions
+///Update adjacencies for this new node, and attach a lock to it
 int FEM_add_node_local(FEM_Mesh *m, int addGhost=0);
+///Get rid of idxl entries for this node and clear adjacencies, invalidate node
 void FEM_remove_node_local(FEM_Mesh *m, int node);
+///Update adjacencies for this element and all surrounding nodes/elements
 int FEM_add_element_local(FEM_Mesh *m, int *conn, int connSize, int elemType, int addGhost);
+///Clear up the adjacencies
 void FEM_remove_element_local(FEM_Mesh *m, int element, int etype);
 
-void FEM_Ghost_Essential_attributes(FEM_Mesh *m, int coord_attr, int bc_attr, int nodeid);
+///Deprecated: locks all chunks for the nodes and elements specified
+int FEM_Modify_Lock(FEM_Mesh *m, int* affectedNodes=0, int numAffectedNodes=0, int* affectedElts=0, int numAffectedElts=0, int elemtype=0);
+///Deprecated: Unlock all chunks that have been locked by this mesh 
+int FEM_Modify_Unlock(FEM_Mesh *m);
+///Lock this node on this mesh with a read/write lock
+int FEM_Modify_LockN(FEM_Mesh *m, int nodeId, int readLock);
+///Lock the read/write lock for this node on this mesh
+int FEM_Modify_UnlockN(FEM_Mesh *m, int nodeId, int readLock);
+///Reassign the lock on a node when a chunk is losing a node
+void FEM_Modify_LockAll(FEM_Mesh*m, int nodeId, bool lockall=true);
+///Update the lock on this node (by locking the newly formed node: Deprecated
+void FEM_Modify_LockUpdate(FEM_Mesh*m, int nodeId, bool lockall=true);
+///For the newly acquired node, correct the lock by removing superfluous locks: Deprecated
+void FEM_Modify_correctLockN(FEM_Mesh *m, int nodeId);
 
+///Get the data for 'length' indices from 'fem_mesh' for the 'attr' of 'entity' starting at index 'firstItem'
 void FEM_Mesh_dataP(FEM_Mesh *fem_mesh,int entity,int attr,void *data, int firstItem, int length, int datatype,int width);
+///Get the data for 'length' indices from 'fem_mesh' for the 'attr' of 'entity' starting at index 'firstItem'
 void FEM_Mesh_data_layoutP(FEM_Mesh *fem_mesh,int entity,int attr,void *data, int firstItem, int length, IDXL_Layout_t layout);
+///Get the data for 'length' indices from 'fem_mesh' for the 'attr' of 'entity' starting at index 'firstItem'
 void FEM_Mesh_data_layoutP(FEM_Mesh *fem_mesh,int entity,int attr,void *data, int firstItem,int length, const IDXL_Layout &layout);
 
+///Copy the essential attributes for this ghost node from remote chunks
+void FEM_Ghost_Essential_attributes(FEM_Mesh *m, int coord_attr, int bc_attr, int nodeid);
 
+
+
+///Message to initialize 'numChunks' and 'chunkIdx' of femMeshModify on all chunks
 class femMeshModMsg : public CMessage_femMeshModMsg {
  public:
   int numChunks;
@@ -73,6 +88,7 @@ class femMeshModMsg : public CMessage_femMeshModMsg {
   ~femMeshModMsg() {}
 };
 
+///A Message to encapsulate a boolean
 class boolMsg : public CMessage_boolMsg {
  public:
   bool b;
@@ -84,6 +100,7 @@ class boolMsg : public CMessage_boolMsg {
   ~boolMsg() {}
 };
 
+///A message to encapsulate an integer
 class intMsg : public CMessage_intMsg {
  public:
   int i;
@@ -95,6 +112,7 @@ class intMsg : public CMessage_intMsg {
   ~intMsg(){}
 };
 
+///A message to encapsulate two integers
 class int2Msg : public CMessage_int2Msg {
  public:
   int i, j;
@@ -107,6 +125,7 @@ class int2Msg : public CMessage_int2Msg {
   ~int2Msg(){}
 };
 
+///A message to encapsulate two doubles
 class double2Msg : public CMessage_double2Msg {
  public:
   double i,j;
@@ -119,6 +138,7 @@ class double2Msg : public CMessage_double2Msg {
   ~double2Msg() {}
 };
 
+///A message to encapsulate a mesh pointer and a tcharm pointer
 class FEMMeshMsg : public CMessage_FEMMeshMsg {
  public:
   FEM_Mesh *m;
@@ -132,6 +152,7 @@ class FEMMeshMsg : public CMessage_FEMMeshMsg {
   ~FEMMeshMsg() {}
 };
 
+///A message to pack all the data needed to tell a remote chunk to add a new node
 class addNodeMsg : public CMessage_addNodeMsg {
  public:
   int chk;
@@ -140,7 +161,6 @@ class addNodeMsg : public CMessage_addNodeMsg {
   int *chunks;
   int numChunks;
   int forceShared;
-  int upcall;
 
   ~addNodeMsg() {
     if(between) {
@@ -150,6 +170,7 @@ class addNodeMsg : public CMessage_addNodeMsg {
   }
 };
 
+///A message used to tell a remote chunk to add a shared node
 class sharedNodeMsg : public CMessage_sharedNodeMsg {
  public:
   int chk;
@@ -163,12 +184,14 @@ class sharedNodeMsg : public CMessage_sharedNodeMsg {
   }
 };
 
+///A message to tell a remote chunk to remove a shared node
 class removeSharedNodeMsg : public CMessage_removeSharedNodeMsg {
  public:
   int chk;
   int index;
 };
 
+///A message to tell a remote chunk to add a ghost element (all data is packed)
 class addGhostElemMsg : public CMessage_addGhostElemMsg {
  public:
   int chk;
@@ -187,6 +210,7 @@ class addGhostElemMsg : public CMessage_addGhostElemMsg {
   }
 };
 
+///A message to return data about the chunks that share/ghost a node/element
 class chunkListMsg : public CMessage_chunkListMsg {
  public:
   int numChunkList;
@@ -201,6 +225,7 @@ class chunkListMsg : public CMessage_chunkListMsg {
   }
 };
 
+///A message to pack all data to tell a remote chunk to add an element
 class addElemMsg : public CMessage_addElemMsg {
  public:
   int chk;
@@ -220,6 +245,7 @@ class addElemMsg : public CMessage_addElemMsg {
   }
 };
 
+///A message to tell a remote chunk to remove a ghost element and some IDXL list entries
 class removeGhostElemMsg : public CMessage_removeGhostElemMsg {
  public:
   int chk;
@@ -244,6 +270,7 @@ class removeGhostElemMsg : public CMessage_removeGhostElemMsg {
   }
 };
 
+///A message to tell a remote chunk to remove an element
 class removeElemMsg : public CMessage_removeElemMsg {
  public:
   int chk;
@@ -252,6 +279,7 @@ class removeElemMsg : public CMessage_removeElemMsg {
   int permanent;
 };
 
+///A message to verify if the IDXL entries for a node/element on one chunk is consistent with another chunk
 class verifyghostsendMsg : public CMessage_verifyghostsendMsg {
  public:
   int fromChk;
@@ -267,6 +295,7 @@ class verifyghostsendMsg : public CMessage_verifyghostsendMsg {
   }
 };
 
+///A message that packs the indices of a bunch of chunks (used for ghost send)
 class findgsMsg : public CMessage_findgsMsg {
  public:
   int numchks;
@@ -276,6 +305,7 @@ class findgsMsg : public CMessage_findgsMsg {
   }
 };
 
+///A message that packs all data for a node/element
 class entDataMsg : public CMessage_entDataMsg {
  public:
   char *data;
@@ -288,6 +318,7 @@ class entDataMsg : public CMessage_entDataMsg {
   }
 };
 
+///A message that packs all attributes for a node
 class updateAttrsMsg : public CMessage_updateAttrsMsg {
  public:
   char *data;
@@ -306,8 +337,16 @@ class updateAttrsMsg : public CMessage_updateAttrsMsg {
   }
 };
 
+
+
+
 class FEM_Interpolate;
 
+///The shadow array attached to a fem chunk to perform all communication during adaptivity
+/** This data structure maintains some adaptivity information, along with
+    locks for nodes and idxl lists. It handles all the remote function calls
+    and uses FEM_MUtil to perform most of the operations.
+ */
 class femMeshModify : public CBase_femMeshModify {
   friend class FEM_lock;
   friend class FEM_MUtil;
@@ -318,38 +357,75 @@ class femMeshModify : public CBase_femMeshModify {
   friend class FEM_Adapt_Algs;
 
  public:
+  ///Total number of chunks
   int numChunks;
+  ///Index of this chunk (the chunk this is attached to)
   int idx;
+  ///The Tcharm pointer to set it even outside the thread..
   TCharm *tc;
+  ///The proxy for the current Tcharm object
   CProxy_TCharm tproxy;
+  ///cross-pointer to the fem mesh on this chunk
   FEM_Mesh *fmMesh;
+  ///Deprecated: used to lock this chunk
   FEM_lock *fmLock;
+  ///Set of locks for all nodes on this chunk
   CkVec<FEM_lockN> fmLockN;
-  CkVec<bool> fmIdxlLock; //each chunk can have numChunks*5 idxl lists, but numChunks locks. 
-  CkVec<int> fmfixedNodes; //this list is populated initially, and never changes (defines shape)
+  ///Set of locks for all idxl lists
+  /** each chunk can have numChunks*5 idxl lists, but numChunks locks. 
+   */
+  CkVec<bool> fmIdxlLock;
+  ///The list of fixed nodes
+  /** this list is populated initially, and never changes (defines shape)
+   */
+  CkVec<int> fmfixedNodes;
+  ///Pointer to the utility object (performs most adaptive utilities)
   FEM_MUtil *fmUtil;
+  ///Pointer to the object that performs the interpolations
   FEM_Interpolate *fmInp;
+  ///Deprecated: Pointer to the FEM_Adapt object
   FEM_Adapt *fmAdapt;
+  ///Pointer to the object that performs the primitive adaptive operations
   FEM_AdaptL *fmAdaptL;
+  ///Pointer to the object that performs the adaptive algorithms
   FEM_Adapt_Algs *fmAdaptAlgs;
 
  public:
+  ///constructor
   femMeshModify(femMeshModMsg *fm);
+  ///constructor for migration
   femMeshModify(CkMigrateMessage *m);
+  ///destructor
   ~femMeshModify();
-  void ckJustMigrated(void);
+
+  ///Pup to transfer this object's data
   void pup(PUP::er &p);
+  ///This function is overloaded, it is called on this object just after migration
+  void ckJustMigrated(void);
+  ///Set the mesh pointer after the migration
   void setPointersAfterMigrate(FEM_Mesh *m);
 
-  intMsg *lockRemoteChunk(int2Msg *i2msg);
-  intMsg *unlockRemoteChunk(int2Msg *i2msg);
-  intMsg *lockRemoteNode(int sharedIdx, int fromChk, int isGhost, int readLock);
-  intMsg *unlockRemoteNode(int sharedIdx, int fromChk, int isGhost, int readLock);
+  ///Initialize the mesh pointer for this chunk
   void setFemMesh(FEMMeshMsg *fm);
+
+  ///Deprecated: Try to lock this node on this chunk (the node index is local to this chunk)
+  intMsg *lockRemoteChunk(int2Msg *i2msg);
+  ///Deprecated: Unlock the node on this chunk (the node index is local to this chunk)
+  intMsg *unlockRemoteChunk(int2Msg *i2msg);
+  ///Try to lock this node on this chunk (receives a shared/ghost index)
+  intMsg *lockRemoteNode(int sharedIdx, int fromChk, int isGhost, int readLock);
+  ///Unlock this node on this chunk (receives a shared/ghost index)
+  intMsg *unlockRemoteNode(int sharedIdx, int fromChk, int isGhost, int readLock);
+
+  ///Get number of chunks
   int getNumChunks(){return numChunks;}
+  ///Get the index of this chunk
   int getIdx(){return idx;}
+  ///Get the pointer to the mesh object
   FEM_Mesh *getfmMesh(){return fmMesh;}
+  ///Deprecated: Get the pointer to the lock-chunk object
   FEM_lock *getfmLock(){return fmLock;}
+  ///Get the status of the lock for this node
   FEM_lockN getfmLockN(int nodeid){
     /*if(!FEM_Is_ghost_index(nodeid)) {
       return fmLockN[nodeid];
@@ -359,69 +435,117 @@ class femMeshModify : public CBase_femMeshModify {
     CkAssert(nodeid < fmLockN.size());
     return fmLockN[nodeid];
   }
+  ///Get the pointer to the utility object on this chunk
   FEM_MUtil *getfmUtil(){return fmUtil;}
+  ///Deprecated: Get the pointer to the primitive operation object
   FEM_Adapt *getfmAdapt(){return fmAdapt;}
+  ///Get the pointer to the object that encapsulates the primitive adaptive operations
   FEM_AdaptL *getfmAdaptL(){return fmAdaptL;}
+  ///Get the pointer to the object that encapsulates the adaptive algorithms
   FEM_Adapt_Algs *getfmAdaptAlgs(){return fmAdaptAlgs;}
+  ///Get the pointer to the interpolate object
   FEM_Interpolate *getfmInp(){return fmInp;}
 
-  intMsg *addNodeRemote(addNodeMsg *fm);
-  void addSharedNodeRemote(sharedNodeMsg *fm);
-  void removeSharedNodeRemote(removeSharedNodeMsg *fm);
-
-  void addGhostElem(addGhostElemMsg *fm);
+  ///Get the list of chunks that share this node
   chunkListMsg *getChunksSharingGhostNode(int2Msg *);
-  intMsg *addElementRemote(addElemMsg *fm);
 
-  void removeGhostElem(removeGhostElemMsg *fm);
-  void removeElementRemote(removeElemMsg *fm);
-
+  ///Add a node on this chunk
+  intMsg *addNodeRemote(addNodeMsg *fm);
+  ///Add a shared node on this chunk
+  void addSharedNodeRemote(sharedNodeMsg *fm);
+  ///Remove a shared node on this chunk
+  void removeSharedNodeRemote(removeSharedNodeMsg *fm);
+  ///Remove a ghost node on this chunk
   void removeGhostNode(int fromChk, int sharedIdx);
 
+  ///Add a ghost element on this chunk
+  void addGhostElem(addGhostElemMsg *fm);
+  ///Add a local element on this chunk
+  intMsg *addElementRemote(addElemMsg *fm);
+  ///Remove a ghost element on this chunk
+  void removeGhostElem(removeGhostElemMsg *fm);
+  ///Remove a local element on this chunk
+  void removeElementRemote(removeElemMsg *fm);
+
+  ///Acquire this element from 'fromChk'
   intMsg *eatIntoElement(int fromChk, int sharedIdx);
+  
+  ///Get the owner of the lock for this shared node
   intMsg *getLockOwner(int fromChk, int sharedIdx);
+  ///Does this chunk send this as a ghost to 'toChk'
   boolMsg *knowsAbtNode(int fromChk, int toChk, int sharedIdx);
 
+  ///propagate a flip operation across chunks
   void refine_flip_element_leb(int fromChk, int propElemT, int propNodeT,
 			       int newNodeT, int nbrOpNodeT, int nbrghost,
 			       double longEdgeLen);
 
+  ///add this node to the shared idxl lists for 'fromChk'
   void addToSharedList(int fromChk, int sharedIdx);
+  ///update the attributes of the node with this data
   void updateAttrs(updateAttrsMsg *umsg);
+  ///get rid of unnecessary node sends to some chunks for a node
   void updateghostsend(verifyghostsendMsg *vmsg);
+  ///find the set of chunks where this node should be sent as a ghost
   findgsMsg *findghostsend(int fromChk, int sharedIdx);
+  ///return the shared index on the ghost send list for chunk 'toChk'
+  intMsg *getIdxGhostSend(int fromChk, int idxshared, int toChk);
 
+  ///Get the coordinates for this node
   double2Msg *getRemoteCoord(int fromChk, int ghostIdx);
+  ///Get the boundary variable for this node
   intMsg *getRemoteBound(int fromChk, int ghostIdx);
 
-  intMsg *getIdxGhostSend(int fromChk, int idxshared, int toChk);
+  ///find the ghost received from 'transChk' at index 'idxTrans' and add this ghost as received from 'fromChk'
   void updateIdxlList(int fromChk, int idxTrans, int transChk);
+  ///remove this node from this idxl list of chunk 'fromChk'
   void removeIDXLRemote(int fromChk, int sharedIdx, int type);
+  ///find the shared node with 'transChk' at index 'sharedIdx' and send this as a ghost to 'fromChk'
   void addTransIDXLRemote(int fromChk, int sharedIdx, int type);
+  ///verify that the size of the idxl list is same on this chunk and 'fromChk'
   void verifyIdxlList(int fromChk, int size, int type);
 
+  ///lock the idxl list for 'fromChk' on this chunk (blocking call)
   void idxllockRemote(int fromChk, int type);
+  ///unlock the idxl list for 'fromChk' on this chunk
   void idxlunlockRemote(int fromChk, int type);
 
+  ///Return the lock owner for this node if there is one (return -1 otherwise)
   intMsg *hasLockRemoteNode(int sharedIdx, int fromChk, int isGhost);
+  ///Reassign lock on this node
   void modifyLockAll(int fromChk, int sharedIdx);
+  ///verify that this lock is locked on the smallest chunk
   boolMsg *verifyLock(int fromChk, int sharedIdx, int isGhost);
+  ///Verify that the number of chunks I get this node as a ghost is same as the number of chunnks that this node is shared on
   void verifyghostsend(verifyghostsendMsg *vmsg);
+  ///Should this node be send as a ghost from this chunk to 'fromChk' (if no, return true)
   boolMsg *shouldLoseGhost(int fromChk, int sharedIdx, int toChk);
 
+  ///If this node is not in the ghostSend list add it on the idxl lists on both chunks
   void addghostsendl(int fromChk, int sharedIdx, int toChk, int transIdx);
+  ///add this node to the idxl ghost recv list of this chunk
   void addghostsendl1(int fromChk, int transChk, int transIdx);
+  ///Add the node as a ghostRecv from 'toChk'
   void addghostsendr(int fromChk, int sharedIdx, int toChk, int transIdx);
+  ///Add this node on the ghostSend list with 'fromChk'
   void addghostsendr1(int fromChk, int transChk, int transIdx);
+  ///Will it lose this element as a ghost send to 'fromChk'
   boolMsg *willItLose(int fromChk, int sharedIdx);
 
+  ///The element data is copied from the first element to the second
   void interpolateElemCopy(int fromChk, int sharedIdx1, int sharedIdx2);
+  ///Remove this ghost element from the ghostRecv idxl list and delete the ghost node
   void cleanupIDXL(int fromChk, int sharedIdx);
+  ///Purge this element on this chunk
   void purgeElement(int fromChk, int sharedIdx);
+  ///Pack the data from this element/node and return it
   entDataMsg *packEntData(int fromChk, int sharedIdx, bool isnode=false, int elemType=0);
+  ///Is this node a fixed node on this chunk
   boolMsg *isFixedNodeRemote(int fromChk, int sharedIdx);
 
+  //debugging helper function
   void finish1(void);
+  //debugging helper function
   void finish(void);
 };
 // end mesh_modify.h

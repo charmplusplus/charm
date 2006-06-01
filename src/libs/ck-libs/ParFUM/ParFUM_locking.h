@@ -1,81 +1,111 @@
-/* File: lock.h
+/* File: ParFUM_locking.h
  * Authors: Nilesh Choudhury
  *
  */
 
 #define _LOCKCHUNKS
 
-//there is one fem_lock associated with every FEM_Mesh.
+///there is one fem_lock associated with every FEM_Mesh: Chunk Lock (no longer in use)
 class FEM_lock {
+  ///Index of the lock (chunk)
   int idx;
+  ///Current owner of the lock
   int owner;
+  ///Is there an owner for the lock
   bool isOwner;
+  ///Is the chunk locked
   bool isLocked;
+  ///Does this chunk have locks
   bool hasLocks;
+  ///Is this chunk locking some chunks
   bool isLocking;
+  ///Is this chunk unlocking some chunks
   bool isUnlocking;
+  ///The list of chunks locked by this chunk
   CkVec<int> lockedChunks;
+  ///cross-pointer to the femMeshModify object
   femMeshModify *mmod;
 
  private:
+  ///Is chunk 'index' locked by this chunk currently
   bool existsChunk(int index);
 
  public:
+  ///default constructor
   FEM_lock() {};
+  ///constructor
   FEM_lock(int i, femMeshModify *m);
+  ///constructor
   FEM_lock(femMeshModify *m);
+  ///destructor
   ~FEM_lock();
+  ///Pup this object
   void pup(PUP::er &p);
 
-  //locks all chunks which contain all the nodes and elements that are passed 
-  //in this function
-  //locking of the chunks is blocking and is strictly in ascending order.
-  int lock(int numNodes, int *nodes, int numElems, int* elems, int elemType=0);
-  //unlock all the concerned chunks.
-  //since at one point of time one chunk can only lock one set of chunks for
-  //one operation, one does not need to pass arguments to unlock.
-  int unlock();
-  int lock(int chunkNo, int own);
-  int unlock(int chunkNo, int own);
+  ///Return the index of this chunk
   int getIdx() { return idx; }
+
+  ///locks all chunks which contain all the following nodes and elements
+  int lock(int numNodes, int *nodes, int numElems, int* elems, int elemType=0);
+  ///unlock all the chunks this chunk has locked currently
+  int unlock();
+  ///chunk 'own' locks the chunk 'chunkNo'
+  int lock(int chunkNo, int own);
+  ///chunk 'own' unlocks the chunk 'chunkNo'
+  int unlock(int chunkNo, int own);
 };
 
 
-// end lock.h
-
-
-/* File: lock_node.h
- * Authors: Nilesh Choudhury
- * 
- */
-
-
-//there is one fem_lock associated with every node (locks on elements are not required)
-//should lock all nodes, involved in any operation
+///there is one fem_lock associated with every node (locks on elements are not required)
 class FEM_lockN {
-  int owner, pending;
+  ///owner of the lock on this node
+  int owner;
+  ///Is there some operation waiting for this lock
+  int pending;
+  ///cross-pointer to the femMeshModify object on this chunk
   femMeshModify *theMod;
-  int idx; //index of the node
+  ///index of the node which this lock protects
+  int idx;
+  ///the number of read locks on this node
   int noreadLocks;
+  ///the number of write locks on this node
   int nowriteLocks;
   
  public:
+  ///default constructor
   FEM_lockN() {};
+  ///constructor
   FEM_lockN(int i,femMeshModify *mod);
+  ///constructor
   FEM_lockN(femMeshModify *mod);
+  ///destructor
   ~FEM_lockN();
+  ///Pup routine for this object
   void pup(PUP::er &p);
+  ///Set the femMeshModify object for this chunk
   void setMeshModify(femMeshModify *mod);
-  void reset(int i,femMeshModify *mod);
-  int rlock();
-  int runlock();
-  int wlock(int own);
-  int wunlock(int own);
-  bool haslocks();
-  bool verifyLock(void);
-  int lockOwner();
+
+  ///return the index of this node
   int getIdx() { return idx; }
+  ///reset the data on this node
+  void reset(int i,femMeshModify *mod);
+
+  ///get a read lock
+  int rlock();
+  ///unlock a read lock
+  int runlock();
+  ///'own' chunk gets a write lock on this node
+  int wlock(int own);
+  ///unlock the write lock on this node by chunk 'own'
+  int wunlock(int own);
+
+  ///Are there any locks on this node
+  bool haslocks();
+  ///verify if locks exist on this node
+  bool verifyLock(void);
+  ///who owns this lock now
+  int lockOwner();
 };
 
-// end lock_node.h
+// end ParFUM_locking.h
 

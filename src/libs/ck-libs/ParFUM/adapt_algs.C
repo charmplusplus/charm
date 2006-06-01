@@ -4,9 +4,10 @@
  */
 
 
-// This module implements high level mesh adaptivity algorithms that make use 
-// of the primitive mesh adaptivity operations provided by fem_adapt(_new).
-// Ask: TLW
+/** This module implements high level mesh adaptivity algorithms that make use 
+    of the primitive mesh adaptivity operations provided by fem_adapt(_new).
+*/
+
 #include "ParFUM.h"
 #include "ParFUM_internals.h"
 
@@ -35,45 +36,14 @@ FEM_Adapt_Algs::FEM_Adapt_Algs(femMeshModify *fm) {
 FEM_Adapt_Algs::~FEM_Adapt_Algs() {
 }
 
-void FEM_Adapt_Algs::FEM_AdaptMesh(int qm, int method, double factor, 
-				   double *sizes)
-{
-  MPI_Comm comm=(MPI_Comm)FEM_chunk::get("FEM_Update_mesh")->defaultComm;
-  MPI_Barrier(comm);
-#ifdef ADAPT_VERBOSE
-  CkPrintf("[%d]BEGIN: FEM_AdaptMesh...\n",theMod->idx);
-#endif
-#ifdef DEBUG_QUALITY
-  tests(true);
-#endif
-  SetMeshSize(method, factor, sizes);
-  MPI_Barrier(comm);
-  GradateMesh(GRADATION);
-  MPI_Barrier(comm);
-  (void)Refine(qm, method, factor, sizes);
-  MPI_Barrier(comm);
-  GradateMesh(GRADATION);
-  MPI_Barrier(comm);
-  (void)Coarsen(qm, method, factor, sizes);
-#ifdef DEBUG_QUALITY
-  MPI_Barrier(comm);
-#endif
-  FEM_Repair(qm);
-  MPI_Barrier(comm);
-#ifdef DEBUG_QUALITY
-  tests(true);
-  MPI_Barrier(comm);
-#endif
-#ifdef ADAPT_VERBOSE
-  CkPrintf("[%d]...END: FEM_AdaptMesh.\n",theMod->idx);
-#endif
-}
 
-/* Perform refinements on a mesh.  Tries to maintain/improve element quality as
-   specified by a quality measure qm; if method = 0, refine areas with size 
-   larger than factor down to factor; if method = 1, refine elements down to 
-   sizes specified in sizes array; Negative entries in size array indicate no 
-   refinement. */
+
+/** Perform refinements on a mesh.  Tries to maintain/improve element quality
+ * as specified by a quality measure qm;
+ * if method = 0, refine areas with size larger than factor down to factor
+ * if method = 1, refine elements down to sizes specified in sizes array
+ * Negative entries in size array indicate no refinement. 
+ */
 void FEM_Adapt_Algs::FEM_Refine(int qm, int method, double factor, 
 				double *sizes)
 {
@@ -82,7 +52,8 @@ void FEM_Adapt_Algs::FEM_Refine(int qm, int method, double factor,
   (void)Refine(qm, method, factor, sizes);
 }
 
-/* Performs refinement; returns number of modifications */
+/** The actual refine in the previous operation
+ */
 int FEM_Adapt_Algs::Refine(int qm, int method, double factor, double *sizes)
 {
   // loop through elemsToRefine
@@ -206,11 +177,12 @@ int FEM_Adapt_Algs::Refine(int qm, int method, double factor, double *sizes)
   return mods;
 }
 
-/* Perform coarsening on a mesh.  Tries to maintain/improve element quality as 
-   specified by a quality measure qm; if method = 0, coarsen areas with size 
-   smaller than factor up to factor; if method = 1, coarsen elements up to 
-   sizes specified in sizes array; Negative entries in size array indicate no 
-   coarsening. */
+/** Perform coarsening on a mesh.  Tries to maintain/improve element quality
+ * as specified by a quality measure qm;
+ * if method = 0, coarsen areas with size smaller than factor up to factor
+ * if method = 1, coarsen elements up to sizes specified in sizes array
+ * Negative entries in size array indicate no coarsening. 
+ */
 void FEM_Adapt_Algs::FEM_Coarsen(int qm, int method, double factor, 
 				 double *sizes)
 {
@@ -219,7 +191,8 @@ void FEM_Adapt_Algs::FEM_Coarsen(int qm, int method, double factor,
   (void)Coarsen(qm, method, factor, sizes);
 }
 
-/* Performs coarsening; returns number of modifications */
+/** The actual coarsen in the previous operation
+*/
 int FEM_Adapt_Algs::Coarsen(int qm, int method, double factor, double *sizes)
 {
   // loop through elemsToRefine
@@ -352,13 +325,114 @@ int FEM_Adapt_Algs::Coarsen(int qm, int method, double factor, double *sizes)
   return mods;
 }
 
-/* Smooth the mesh using method according to some quality measure qm */
+/** Performs a sequence of refinements or coarsening as is needed
+ * to achieve the target areas for elements
+ */
+void FEM_Adapt_Algs::FEM_AdaptMesh(int qm, int method, double factor, 
+				   double *sizes)
+{
+  MPI_Comm comm=(MPI_Comm)FEM_chunk::get("FEM_Update_mesh")->defaultComm;
+  MPI_Barrier(comm);
+#ifdef ADAPT_VERBOSE
+  CkPrintf("[%d]BEGIN: FEM_AdaptMesh...\n",theMod->idx);
+#endif
+#ifdef DEBUG_QUALITY
+  tests(true);
+#endif
+  SetMeshSize(method, factor, sizes);
+  MPI_Barrier(comm);
+  GradateMesh(GRADATION);
+  MPI_Barrier(comm);
+  (void)Refine(qm, method, factor, sizes);
+  MPI_Barrier(comm);
+  GradateMesh(GRADATION);
+  MPI_Barrier(comm);
+  (void)Coarsen(qm, method, factor, sizes);
+#ifdef DEBUG_QUALITY
+  MPI_Barrier(comm);
+#endif
+  FEM_Repair(qm);
+  MPI_Barrier(comm);
+#ifdef DEBUG_QUALITY
+  tests(true);
+  MPI_Barrier(comm);
+#endif
+#ifdef ADAPT_VERBOSE
+  CkPrintf("[%d]...END: FEM_AdaptMesh.\n",theMod->idx);
+#endif
+}
+
+/** Smooth the mesh using method according to some quality measure qm
+ */
 void FEM_Adapt_Algs::FEM_Smooth(int qm, int method)
 {
   CkPrintf("WARNING: ParFUM_Smooth: Not yet implemented.\n");
 }
 
-/* Repair the mesh according to some quality measure qm */
+/** FEM_Mesh_smooth
+ *	Inputs	: meshP - a pointer to the FEM_Mesh object to smooth
+ *		: nodes - an array of local node numbers to be smoothed.  Send
+ *			  NULL pointer to smooth all nodes.
+ *		: nNodes - the size of the nodes array
+ *		: attrNo - the attribute number where the coords are registered
+ *	Shifts nodes around to improve mesh quality.  FEM_BOUNDARY attribute
+ *	and interpolator function must be registered by user to maintain 
+ *	boundary information.
+ */
+void  FEM_Adapt_Algs::FEM_mesh_smooth(FEM_Mesh *meshP, int *nodes, int nNodes, int attrNo) {
+  vector2d newPos, *coords, *ghostCoords;
+  int idx, nNod, nGn, gIdxN, *boundVals, nodesInChunk, mesh;
+  int *adjnodes;
+
+  mesh=FEM_Mesh_default_read();
+  nodesInChunk = FEM_Mesh_get_length(mesh,FEM_NODE);
+  nGn = FEM_Mesh_get_length(mesh, FEM_GHOST + FEM_NODE);
+  
+  boundVals = new int[nodesInChunk];
+  coords = new vector2d[nodesInChunk+nGn];
+
+  FEM_Mesh_data(mesh, FEM_NODE, FEM_BOUNDARY, (int*) boundVals, 0, nodesInChunk, FEM_INT, 1);    
+
+  FEM_Mesh_data(mesh, FEM_NODE, attrNo, (double*)coords, 0, nodesInChunk, FEM_DOUBLE, 2);
+
+  IDXL_Layout_t coord_layout = IDXL_Layout_create(IDXL_DOUBLE, 2);
+  FEM_Update_ghost_field(coord_layout,-1, coords); 
+  ghostCoords = &(coords[nodesInChunk]);
+  for (int i=0; i<nNodes; i++)
+  {
+    if (nodes==NULL) idx=i;
+    else idx=nodes[i];
+    newPos.x=0;
+    newPos.y=0;
+    CkAssert(idx<nodesInChunk);  
+    if (FEM_is_valid(mesh, FEM_NODE, idx) && boundVals[idx]==0) //node must be internal
+    {
+      meshP->n2n_getAll(idx, adjnodes, nNod);
+      for (int j=0; j<nNod; j++) { //for all adjacent nodes, find coords
+	if (adjnodes[j]<-1) {
+	  gIdxN = FEM_From_ghost_index(adjnodes[j]);
+	  newPos.x += ghostCoords[gIdxN].x;
+	  newPos.y += ghostCoords[gIdxN].y;
+	}
+	else {
+	  newPos.x += coords[adjnodes[j]].x;
+	  newPos.y += coords[adjnodes[j]].y;
+	}     
+      }
+      newPos.x/=nNod;
+      newPos.y/=nNod;
+      FEM_set_entity_coord2(mesh, FEM_NODE, idx, newPos.x, newPos.y);
+      delete [] adjnodes;
+    }
+  }
+
+  delete [] coords;
+  delete [] boundVals;
+}
+
+/** Elements with a bad quality metric are either flipped or coarsened to 
+ * newer elements which are of better quality
+ */
 void FEM_Adapt_Algs::FEM_Repair(int qm)
 {
   double avgQual = 0.0, minQual = getAreaQuality(0);
@@ -512,82 +586,23 @@ void FEM_Adapt_Algs::FEM_Repair(int qm)
 #endif
 }
 
-/* Remesh entire mesh according to quality measure qm. If method = 0, set 
-   entire mesh size to factor; if method = 1, use sizes array; if method = 2, 
-   uses existing regional sizes and scale by factor*/
+/** Remesh entire mesh according to quality measure qm
+ * if method = 0, set entire mesh size to factor
+ * if method = 1, keep regional mesh sizes, and scale by factor
+ * if method = 2, uses sizes to size mesh by regions 
+ */
 void FEM_Adapt_Algs::FEM_Remesh(int qm, int method, double factor, 
 				double *sizes)
 {
   CkPrintf("WARNING: ParFUM_Remesh: Under construction.\n");
 }
 
-/* Set sizes on elements throughout the mesh; note: size is edge length */
-void FEM_Adapt_Algs::SetMeshSize(int method, double factor, double *sizes)
-{
-  numNodes = theMesh->node.size();
-  numElements = theMesh->elem[0].size();
-  int elemConn[3];
-
-  if (method == 0) { // set uniform sizing specified in factor
-
-    for (int i=0; i<numElements; i++) {
-      theMesh->elem[0].setMeshSizing(i, factor);
-    }
-    //CkPrintf("ParFUM_SetMeshSize: UNIFORM %4.6e\n", factor);
-  }
-  else if (method == 1) { // copy sizing from array
-    for (int i=0; i<numElements; i++) {
-      if (sizes[i] > 0.0) {
-	theMesh->elem[0].setMeshSizing(i, sizes[i]);
-      }
-    }
-    //CkPrintf("ParFUM_SetMeshSize: SIZES input\n");
-  }
-  else if (method == 2) { // calculate current sizing and scale by factor
-    double avgEdgeLength = 0.0;
-    int width = theMesh->elem[0].getConn().width();
-    int numEdges=3;
-    if (dim==3) numEdges=6;
-    for (int i=0; i<numElements; i++) {
-      if(theMesh->elem[0].is_valid(i)) {
-	theMesh->e2n_getAll(i, elemConn);
-	for (int j=0; j<width-1; j++) {
-	  for (int k=j+1; k<width; k++) {
-	    avgEdgeLength += length(elemConn[j], elemConn[k]);
-	  }
-	}
-	avgEdgeLength += length(elemConn[0], elemConn[width-1]);
-	avgEdgeLength /= (double)numEdges;
-	theMesh->elem[0].setMeshSizing(i, factor*avgEdgeLength);
-      }
-    }
-    //CkPrintf("ParFUM_SetMeshSize: CALCULATED & SCALED \n");
-  }
-  else if (method == 3) { // scale existing sizes by array sizes
-    for (int i=0; i<numElements; i++) {
-      if (sizes[i] > 0.0) {
-	theMesh->elem[0].setMeshSizing(i, sizes[i]*theMesh->elem[0].getMeshSizing(i));
-      }
-    }
-  }
-  else if (method == 4) { // scale existing sizes by factor
-    for (int i=0; i<numElements; i++) {
-      theMesh->elem[0].setMeshSizing(i, factor*theMesh->elem[0].getMeshSizing(i));
-    }
-  }
-  else if (method == 5) { // mesh sizing has been set independently; use as is
-    //CkPrintf("ParFUM_SetMeshSize: USE EXISTING SIZES \n");
-  }
-  //  CkPrintf("Current mesh sizing: ");
-  //for (int i=0; i<numElements; i++) {
-  //CkPrintf("%4.6e ", theMesh->elem[0].getMeshSizing(i));
-  //}
-}
 
 
+/** For each element, set its size to its average edge length
+ */
 void FEM_Adapt_Algs::SetReferenceMesh()
 {
-  // for each element, set its size to its average edge length
   // TODO: do we need to run this loop for element types other than 0?
   double avgLength = 0.0;
   int width = theMesh->elem[0].getConn().width();
@@ -607,13 +622,13 @@ void FEM_Adapt_Algs::SetReferenceMesh()
   }
 }
 
-
+/** Resize mesh elements to avoid jumps in element size
+    Algorithm based on h-shock correction, described in
+    Mesh Gradation Control, Borouchaki et al
+    IJNME43 1998 www.ann.jussieu.fr/~frey/publications/ijnme4398.pdf 
+*/
 void FEM_Adapt_Algs::GradateMesh(double smoothness)
 {
-    // Resize mesh elements to avoid jumps in element size
-    // Algorithm based on h-shock correction, described in
-    // Mesh Gradation Control, Borouchaki et al
-    // IJNME43 1998 www.ann.jussieu.fr/~frey/publications/ijnme4398.pdf
     const double beta = smoothness;
 
     double maxShock, minShock;
@@ -734,7 +749,238 @@ void FEM_Adapt_Algs::GradateMesh(double smoothness)
     return;
 }
 
+/** Set sizes on elements throughout the mesh; note: size is edge length */
+void FEM_Adapt_Algs::SetMeshSize(int method, double factor, double *sizes)
+{
+  numNodes = theMesh->node.size();
+  numElements = theMesh->elem[0].size();
+  int elemConn[3];
 
+  if (method == 0) { // set uniform sizing specified in factor
+
+    for (int i=0; i<numElements; i++) {
+      theMesh->elem[0].setMeshSizing(i, factor);
+    }
+    //CkPrintf("ParFUM_SetMeshSize: UNIFORM %4.6e\n", factor);
+  }
+  else if (method == 1) { // copy sizing from array
+    for (int i=0; i<numElements; i++) {
+      if (sizes[i] > 0.0) {
+	theMesh->elem[0].setMeshSizing(i, sizes[i]);
+      }
+    }
+    //CkPrintf("ParFUM_SetMeshSize: SIZES input\n");
+  }
+  else if (method == 2) { // calculate current sizing and scale by factor
+    double avgEdgeLength = 0.0;
+    int width = theMesh->elem[0].getConn().width();
+    int numEdges=3;
+    if (dim==3) numEdges=6;
+    for (int i=0; i<numElements; i++) {
+      if(theMesh->elem[0].is_valid(i)) {
+	theMesh->e2n_getAll(i, elemConn);
+	for (int j=0; j<width-1; j++) {
+	  for (int k=j+1; k<width; k++) {
+	    avgEdgeLength += length(elemConn[j], elemConn[k]);
+	  }
+	}
+	avgEdgeLength += length(elemConn[0], elemConn[width-1]);
+	avgEdgeLength /= (double)numEdges;
+	theMesh->elem[0].setMeshSizing(i, factor*avgEdgeLength);
+      }
+    }
+    //CkPrintf("ParFUM_SetMeshSize: CALCULATED & SCALED \n");
+  }
+  else if (method == 3) { // scale existing sizes by array sizes
+    for (int i=0; i<numElements; i++) {
+      if (sizes[i] > 0.0) {
+	theMesh->elem[0].setMeshSizing(i, sizes[i]*theMesh->elem[0].getMeshSizing(i));
+      }
+    }
+  }
+  else if (method == 4) { // scale existing sizes by factor
+    for (int i=0; i<numElements; i++) {
+      theMesh->elem[0].setMeshSizing(i, factor*theMesh->elem[0].getMeshSizing(i));
+    }
+  }
+  else if (method == 5) { // mesh sizing has been set independently; use as is
+    //CkPrintf("ParFUM_SetMeshSize: USE EXISTING SIZES \n");
+  }
+  //  CkPrintf("Current mesh sizing: ");
+  //for (int i=0; i<numElements; i++) {
+  //CkPrintf("%4.6e ", theMesh->elem[0].getMeshSizing(i));
+  //}
+}
+
+/** Insert this element to the refine or coarsen heap
+ */
+void FEM_Adapt_Algs::Insert(int eIdx, double len, int cFlag)
+{
+  int i;
+  if (cFlag) {
+    i = ++coarsenHeapSize; 
+    while ((coarsenElements[i/2].len>=len) && (i != 1)) {
+      coarsenElements[i].len=coarsenElements[i/2].len;
+      coarsenElements[i].elID=coarsenElements[i/2].elID;
+      i/=2;
+    }
+    coarsenElements[i].elID=eIdx;
+    coarsenElements[i].len=len; 
+  }
+  else {
+    i = ++refineHeapSize; 
+    while ((refineElements[i/2].len>=len) && (i != 1)) {
+      refineElements[i].len=refineElements[i/2].len;
+      refineElements[i].elID=refineElements[i/2].elID;
+      i/=2;
+    }
+    refineElements[i].elID=eIdx;
+    refineElements[i].len=len; 
+  }
+}
+
+/** Removes and returns the minimum element from the refine/coarsen heap
+ */
+int FEM_Adapt_Algs::Delete_Min(int cflag)
+{
+  int Child, i, Min_ID; 
+  if (cflag) {
+    Min_ID=coarsenElements[1].elID;
+    for (i=1; i*2 <= coarsenHeapSize-1; i=Child) { // Find smaller child
+      Child = i*2; // child is left child  
+      if (Child != coarsenHeapSize)  // right child exists
+	if (coarsenElements[Child+1].len < coarsenElements[Child].len)
+	  Child++; 
+      // Percolate one level
+      if (coarsenElements[coarsenHeapSize].len >= coarsenElements[Child].len) {
+	coarsenElements[i].elID = coarsenElements[Child].elID;
+	coarsenElements[i].len = coarsenElements[Child].len;
+      }
+      else break; 
+    }
+    coarsenElements[i].elID = coarsenElements[coarsenHeapSize].elID;
+    coarsenElements[i].len = coarsenElements[coarsenHeapSize].len; 
+    coarsenHeapSize--;
+    return Min_ID; 
+  }
+  else {
+    Min_ID=refineElements[1].elID;
+    for (i=1; i*2 <= refineHeapSize-1; i=Child) { // Find smaller child
+      Child = i*2;       // child is left child  
+      if (Child !=refineHeapSize)  // right child exists
+	if (refineElements[Child+1].len < refineElements[Child].len)
+	  Child++; 
+      // Percolate one level
+      if (refineElements[refineHeapSize].len >= refineElements[Child].len){  
+	refineElements[i].elID = refineElements[Child].elID;   
+	refineElements[i].len = refineElements[Child].len;
+      }
+      else break; 
+    }
+    refineElements[i].elID = refineElements[refineHeapSize].elID;
+    refineElements[i].len = refineElements[refineHeapSize].len; 
+    refineHeapSize--;
+    return Min_ID; 
+  }
+}
+
+
+
+// =====================  BEGIN refine_element_leb ========================= 
+/** Initiate instance of Longest Edge Bisection on element e.  Propagates
+    throughout the mesh to maintain the requirement that only longest edges
+    are bisected; returns the new node index that it created
+    Given an element e, if e's longest edge f is also the longest edge
+    of e's neighbor across f, g, split f by adding a new node in the 
+    center of f, and splitting both e and g into two elements.  If g
+    does not have f as it's longest edge, recursively call refine_element_leb 
+    on g, and start over. 
+*/ 
+int FEM_Adapt_Algs::refine_element_leb(int e) {
+  int fixNode, otherNode, opNode, longEdge, nbr; 
+  double eLens[3], longEdgeLen = 0.0;
+  int elemConn[3];
+
+  if(e==-1) {
+    return -1;
+  }
+
+  theMesh->e2n_getAll(e, elemConn);
+  eLens[0] = length(elemConn[0], elemConn[1]);
+  eLens[1] = length(elemConn[1], elemConn[2]);
+  eLens[2] = length(elemConn[2], elemConn[0]);
+  for (int i=0; i<3; i++) {
+    if (eLens[i] > longEdgeLen) {
+      longEdgeLen = eLens[i];
+      longEdge = i;
+      fixNode = elemConn[i];
+      otherNode = elemConn[(i+1)%3];
+      opNode = elemConn[(i+2)%3];
+    }
+  }
+
+  nbr = theMesh->e2e_getNbr(e, longEdge);
+  if (nbr == -1) // e's longEdge is on physical boundary
+    return theAdaptor->edge_bisect(fixNode, otherNode);
+  int nbrOpNode = theAdaptor->e2n_getNot(nbr, fixNode, otherNode);
+  double fixEdgeLen = length(fixNode, nbrOpNode);
+  double otherEdgeLen = length(otherNode, nbrOpNode);
+  if ((fixEdgeLen > longEdgeLen) || (otherEdgeLen > longEdgeLen)) { 
+    // longEdge is not nbr's longest edge
+    int newNode = theAdaptor->edge_bisect(fixNode, otherNode);
+    if(newNode==-1) return -1;
+    int propElem, propNode; // get the element to propagate on
+    if (fixEdgeLen > otherEdgeLen) {
+      propElem = theAdaptor->findElementWithNodes(newNode, fixNode, nbrOpNode);
+      propNode = fixNode;
+    }
+    else {
+      propElem = theAdaptor->findElementWithNodes(newNode,otherNode,nbrOpNode);
+      propNode = otherNode;
+    }
+
+    //if propElem is ghost, then it's propagating to neighbor, otherwise not
+    if(!FEM_Is_ghost_index(propElem)) {
+      refine_flip_element_leb(propElem,propNode,newNode,nbrOpNode,longEdgeLen);
+    }
+    else {
+      int localChk, nbrChk;
+      localChk = theMod->getfmUtil()->getIdx();
+      nbrChk = theMod->getfmUtil()->getRemoteIdx(theMesh,propElem,0);
+      int propNodeT = theAdaptor->getSharedNodeIdxl(propNode, nbrChk);
+      int newNodeT = theAdaptor->getSharedNodeIdxl(newNode, nbrChk);
+      int nbrghost = (nbrOpNode>=0)?0:1;
+      int nbrOpNodeT = (nbrOpNode>=0)?(theAdaptor->getSharedNodeIdxl(nbrOpNode, nbrChk)):(theAdaptor->getGhostNodeIdxl(nbrOpNode, nbrChk));
+      int propElemT = theAdaptor->getGhostElementIdxl(propElem, nbrChk);
+      meshMod[nbrChk].refine_flip_element_leb(localChk, propElemT, propNodeT, newNodeT,nbrOpNodeT,nbrghost,longEdgeLen);
+    }
+    return newNode;
+  }
+  else return theAdaptor->edge_bisect(fixNode, otherNode); // longEdge on nbr
+}
+
+/** Continue longest edge bisection on element 'e', then flip edge (n1,n2);
+    If the length of the new edge (p, newnode) is greater than 'le' (longest edge),
+    recursively call this function on (newElem, p, n1, newNode, le)
+*/
+void FEM_Adapt_Algs::refine_flip_element_leb(int e, int p, int n1, int n2, 
+					     double le) 
+{
+  int newNode = refine_element_leb(e);
+  if(newNode == -1) return;
+  (void) theAdaptor->edge_flip(n1, n2);
+  if (length(p, newNode) > le) {
+    int localChk = theMod->getfmUtil()->getIdx();
+    int newElem = theAdaptor->findElementWithNodes(newNode, n1, p);
+    refine_flip_element_leb(newElem, p, n1, newNode, le);
+  }
+}
+// ========================  END refine_element_leb ========================
+
+
+
+/** The region is defined by (xmax, xmin, ymax, ymin) and the target area is given by targetA
+ */
 int FEM_Adapt_Algs::simple_refine(double targetA, double xmin, double ymin, double xmax, double ymax) {
   bool adapted = true;
   refineElements = refineStack = NULL;
@@ -844,6 +1090,8 @@ int FEM_Adapt_Algs::simple_refine(double targetA, double xmin, double ymin, doub
   else return 1;
 }
 
+/** The region is defined by (xmax, xmin, ymax, ymin) and the target area is given by targetA
+ */
 int FEM_Adapt_Algs::simple_coarsen(double targetA, double xmin, double ymin, double xmax, double ymax) {
   int noEle = theMesh->elem[0].size();
   int *shortestEdge = (int *)malloc(2*sizeof(int));
@@ -944,108 +1192,9 @@ int FEM_Adapt_Algs::simple_coarsen(double targetA, double xmin, double ymin, dou
   else return 1;
 }
 
-void FEM_Adapt_Algs::tests(bool b=true) {
-  //test the mesh for slivered triangles
-  if(!b) {
-    theMod->fmUtil->AreaTest(theMesh);
-    return;
-  }
-  theMod->fmUtil->AreaTest(theMesh);
-  theMod->fmUtil->StructureTest(theMesh);
-  theMod->fmUtil->IdxlListTest(theMesh);
-  theMod->fmUtil->residualLockTest(theMesh);
-  /*for(int i=0; i<theMesh->node.size(); i++) {
-    if(theMesh->node.is_valid(i)) CkPrintf("Valid -- ");
-    else  CkPrintf("Invalid -- ");
-    theMod->fmUtil->FEM_Print_coords(theMesh,i);
-    }*/
-  return;
-}
 
-// =====================  BEGIN refine_element_leb ========================= 
-/* Given an element e, if e's longest edge f is also the longest edge
-   of e's neighbor across f, g, split f by adding a new node in the 
-   center of f, and splitting both e and g into two elements.  If g
-   does not have f as it's longest edge, recursively call refine_element_leb 
-   on g, and start over. */ 
-int FEM_Adapt_Algs::refine_element_leb(int e) {
-  int fixNode, otherNode, opNode, longEdge, nbr; 
-  double eLens[3], longEdgeLen = 0.0;
-  int elemConn[3];
-
-  if(e==-1) {
-    return -1;
-  }
-
-  theMesh->e2n_getAll(e, elemConn);
-  eLens[0] = length(elemConn[0], elemConn[1]);
-  eLens[1] = length(elemConn[1], elemConn[2]);
-  eLens[2] = length(elemConn[2], elemConn[0]);
-  for (int i=0; i<3; i++) {
-    if (eLens[i] > longEdgeLen) {
-      longEdgeLen = eLens[i];
-      longEdge = i;
-      fixNode = elemConn[i];
-      otherNode = elemConn[(i+1)%3];
-      opNode = elemConn[(i+2)%3];
-    }
-  }
-
-  nbr = theMesh->e2e_getNbr(e, longEdge);
-  if (nbr == -1) // e's longEdge is on physical boundary
-    return theAdaptor->edge_bisect(fixNode, otherNode);
-  int nbrOpNode = theAdaptor->e2n_getNot(nbr, fixNode, otherNode);
-  double fixEdgeLen = length(fixNode, nbrOpNode);
-  double otherEdgeLen = length(otherNode, nbrOpNode);
-  if ((fixEdgeLen > longEdgeLen) || (otherEdgeLen > longEdgeLen)) { 
-    // longEdge is not nbr's longest edge
-    int newNode = theAdaptor->edge_bisect(fixNode, otherNode);
-    if(newNode==-1) return -1;
-    int propElem, propNode; // get the element to propagate on
-    if (fixEdgeLen > otherEdgeLen) {
-      propElem = theAdaptor->findElementWithNodes(newNode, fixNode, nbrOpNode);
-      propNode = fixNode;
-    }
-    else {
-      propElem = theAdaptor->findElementWithNodes(newNode,otherNode,nbrOpNode);
-      propNode = otherNode;
-    }
-
-    //if propElem is ghost, then it's propagating to neighbor, otherwise not
-    if(!FEM_Is_ghost_index(propElem)) {
-      refine_flip_element_leb(propElem,propNode,newNode,nbrOpNode,longEdgeLen);
-    }
-    else {
-      int localChk, nbrChk;
-      localChk = theMod->getfmUtil()->getIdx();
-      nbrChk = theMod->getfmUtil()->getRemoteIdx(theMesh,propElem,0);
-      int propNodeT = theAdaptor->getSharedNodeIdxl(propNode, nbrChk);
-      int newNodeT = theAdaptor->getSharedNodeIdxl(newNode, nbrChk);
-      int nbrghost = (nbrOpNode>=0)?0:1;
-      int nbrOpNodeT = (nbrOpNode>=0)?(theAdaptor->getSharedNodeIdxl(nbrOpNode, nbrChk)):(theAdaptor->getGhostNodeIdxl(nbrOpNode, nbrChk));
-      int propElemT = theAdaptor->getGhostElementIdxl(propElem, nbrChk);
-      meshMod[nbrChk].refine_flip_element_leb(localChk, propElemT, propNodeT, newNodeT,nbrOpNodeT,nbrghost,longEdgeLen);
-    }
-    return newNode;
-  }
-  else return theAdaptor->edge_bisect(fixNode, otherNode); // longEdge on nbr
-}
-void FEM_Adapt_Algs::refine_flip_element_leb(int e, int p, int n1, int n2, 
-					     double le) 
-{
-  int newNode = refine_element_leb(e);
-  if(newNode == -1) return;
-  (void) theAdaptor->edge_flip(n1, n2);
-  if (length(p, newNode) > le) {
-    int localChk = theMod->getfmUtil()->getIdx();
-    int newElem = theAdaptor->findElementWithNodes(newNode, n1, p);
-    refine_flip_element_leb(newElem, p, n1, newNode, le);
-  }
-}
-// ========================  END refine_element_leb ========================
 
 //HELPER functions
-
 double FEM_Adapt_Algs::length(int n1, int n2)
 {
   double coordsn1[2], coordsn2[2];
@@ -1066,7 +1215,6 @@ double FEM_Adapt_Algs::length(double *n1_coord, double *n2_coord) {
   }
   return (sqrt(ds_sum));
 }
-
 
 double FEM_Adapt_Algs::getArea(int n1, int n2, int n3)
 {
@@ -1106,134 +1254,6 @@ double FEM_Adapt_Algs::getArea(double *n1_coord, double *n2_coord, double *n3_co
   else if(sLen-bLen < 0) return 0.0;
   else if(sLen-cLen < 0) return 0.0; //area too small to note
   return (sqrt(sLen*(sLen-aLen)*(sLen-bLen)*(sLen-cLen)));
-}
-
-void FEM_Adapt_Algs::ensureQuality(int n1, int n2, int n3) {
-  double coordsn1[2], coordsn2[2], coordsn3[2];
-  getCoord(n1, coordsn1);
-  getCoord(n2, coordsn2);
-  getCoord(n3, coordsn3);
-  double area = getSignedArea(coordsn1, coordsn2, coordsn3);
-  double len1 = length(coordsn1, coordsn2);
-  double len2 = length(coordsn2, coordsn3);
-  double len3 = length(coordsn3, coordsn1);
-  double max = len1;
-  if(len2>max) max = len2;
-  if(len3>max) max = len3;
-  //shortest edge
-  double min = len1;
-  if(len2<min) min = len2;
-  if(len3<min) min = len3;
-  double shortest_al = fabs(area/max);
-  double largestR = max/shortest_al;
-  CkAssert(largestR<=100.0 && -area > SLIVERAREA);
-}
-
-bool FEM_Adapt_Algs::controlQualityF(int n1, int n2, int n3, int n4) {
-  //n1 or n2 will be replaced by n4
-  double coordsn1[2], coordsn2[2], coordsn3[2], coordsn4[2];
-  if(n4==-1) return false;
-  getCoord(n1, coordsn1);
-  getCoord(n2, coordsn2);
-  getCoord(n3, coordsn3);
-  getCoord(n4, coordsn4);
-  bool flag = false;
-  if(!flag) flag = controlQualityC(coordsn3,coordsn1,coordsn2,coordsn4);
-  if(!flag) flag = controlQualityC(coordsn4,coordsn2,coordsn1,coordsn3);
-  return flag;
-}
-
-bool FEM_Adapt_Algs::controlQualityR(int n1, int n2, int n3, int n4) {
-  //n1 or n2 will be replaced by n4
-  double coordsn1[2], coordsn2[2], coordsn3[2], coordsn4[2], coordsn5[2];
-  if(n4==-1) return false;
-  getCoord(n1, coordsn1);
-  getCoord(n2, coordsn2);
-  getCoord(n3, coordsn3);
-  getCoord(n4, coordsn4);
-  coordsn5[0] = (coordsn1[0]+coordsn2[0])*0.5;
-  coordsn5[1] = (coordsn1[1]+coordsn2[1])*0.5;
-  bool flag = false;
-  if(!flag) flag = theMod->fmAdaptAlgs->controlQualityR(coordsn1,coordsn3,coordsn5);
-  if(!flag) flag = theMod->fmAdaptAlgs->controlQualityR(coordsn2,coordsn3,coordsn5);
-  if(!flag) flag = theMod->fmAdaptAlgs->controlQualityR(coordsn1,coordsn4,coordsn5);
-  if(!flag) flag = theMod->fmAdaptAlgs->controlQualityR(coordsn2,coordsn4,coordsn5);
-  return flag;
-}
-
-bool FEM_Adapt_Algs::controlQualityR(double *coordsn1, double *coordsn2, double *coordsn3) {
-  double area = getArea(coordsn1, coordsn2, coordsn3);
-  //do some quality preservation
-  double len1 = length(coordsn1, coordsn2);
-  double len2 = length(coordsn2, coordsn3);
-  double len3 = length(coordsn3, coordsn1);
-  //longest edge
-  double max = len1;
-  if(len2>max) max = len2;
-  if(len3>max) max = len3;
-  double shortest_al = area/max;
-  double largestR = max/shortest_al;
-  if(largestR>50.0) return true;
-  else return false;
-}
-
-bool FEM_Adapt_Algs::controlQualityC(int n1, int n2, int n3, double *n4_coord) {
-  //n3 is the node to be deleted, n4 is the new node to be added
-  double coordsn1[2], coordsn2[2], coordsn3[2];
-  getCoord(n1, coordsn1);
-  getCoord(n2, coordsn2);
-  getCoord(n3, coordsn3);
-  return controlQualityC(coordsn1,coordsn2,coordsn3,n4_coord);
-}
-
-
-bool FEM_Adapt_Algs::controlQualityC(double *coordsn1, double *coordsn2, double *coordsn3, double *n4_coord) {
-  double ret_old = getSignedArea(coordsn1, coordsn2, coordsn3);
-  double ret_new = getSignedArea(coordsn1, coordsn2, n4_coord);
-  //do some quality preservation
-  double len1 = length(coordsn1, coordsn2);
-  double len2 = length(coordsn2, n4_coord);
-  double len3 = length(n4_coord, coordsn1);
-  //longest edge
-  double max = len1;
-  if(len2>max) max = len2;
-  if(len3>max) max = len3;
-  //shortest edge
-  double min = len1;
-  if(len2<min) min = len2;
-  if(len3<min) min = len3;
-  double shortest_al = ret_new/max;
-  double largestR = max/shortest_al;
-  if(ret_old > SLIVERAREA && ret_new < -SLIVERAREA) return true; //it is a flip
-  else if(ret_old < -SLIVERAREA && ret_new > SLIVERAREA) return true; //it is a flip
-  else if(fabs(ret_new) < SLIVERAREA) return true; // it is a sliver
-  //else if(fabs(shortest_al) < 1e-5) return true; //shortest altitude is too small
-  //else if(fabs(min) < 1e-5) return true; //shortest edge is too small
-  else if(fabs(largestR)>50.0) return true;
-  else return false;
-}
-
-bool FEM_Adapt_Algs::flipOrBisect(int elId, int n1, int n2, int maxEdgeIdx, double maxlen) {
-  //return true if it should flip
-  int nbrEl = theMesh->e2e_getNbr(elId,maxEdgeIdx);
-  double len4=0.0, len5=0.0;
-  if(nbrEl!=-1) {
-    int con1[3];
-    theMesh->e2n_getAll(nbrEl,con1);
-    int nbrnode=-1;
-    for(int j=0; j<3; j++) {
-      if(con1[j]!=n1 && con1[j]!=n2) {
-	nbrnode = con1[j];
-	break;
-      }
-    }
-    len4 = length(n1,nbrnode);
-    len5 = length(n2,nbrnode);
-  }
-  if(len4>1.2*maxlen || len5>1.2*maxlen) {
-    return true;
-  }
-  else return false;
 }
 
 double FEM_Adapt_Algs::getSignedArea(int n1, int n2, int n3) {
@@ -1287,7 +1307,8 @@ int FEM_Adapt_Algs::getCoord(int n1, double *crds) {
 }
 
 int FEM_Adapt_Algs::getShortestEdge(int n1, int n2, int n3, int* shortestEdge) {
-  //note that getCoord might be a remote call, which means it might not have the same value in the mem
+  //note that getCoord might be a remote call, which means 
+  //it might not have the same value in the mem
   //location if the memory is reused by someone else meanwhile!
   double coordsn1[2], coordsn2[2], coordsn3[2];
   getCoord(n1, coordsn1);
@@ -1319,75 +1340,10 @@ int FEM_Adapt_Algs::getShortestEdge(int n1, int n2, int n3, int* shortestEdge) {
 }
 
 
-void FEM_Adapt_Algs::Insert(int eIdx, double len, int cFlag)
-{
-  int i;
-  if (cFlag) {
-    i = ++coarsenHeapSize; 
-    while ((coarsenElements[i/2].len>=len) && (i != 1)) {
-      coarsenElements[i].len=coarsenElements[i/2].len;
-      coarsenElements[i].elID=coarsenElements[i/2].elID;
-      i/=2;
-    }
-    coarsenElements[i].elID=eIdx;
-    coarsenElements[i].len=len; 
-  }
-  else {
-    i = ++refineHeapSize; 
-    while ((refineElements[i/2].len>=len) && (i != 1)) {
-      refineElements[i].len=refineElements[i/2].len;
-      refineElements[i].elID=refineElements[i/2].elID;
-      i/=2;
-    }
-    refineElements[i].elID=eIdx;
-    refineElements[i].len=len; 
-  }
-}
 
-// removes and returns the minimum element of the heap 
-int FEM_Adapt_Algs::Delete_Min(int cflag)
-{
-  int Child, i, Min_ID; 
-  if (cflag) {
-    Min_ID=coarsenElements[1].elID;
-    for (i=1; i*2 <= coarsenHeapSize-1; i=Child) { // Find smaller child
-      Child = i*2; // child is left child  
-      if (Child != coarsenHeapSize)  // right child exists
-	if (coarsenElements[Child+1].len < coarsenElements[Child].len)
-	  Child++; 
-      // Percolate one level
-      if (coarsenElements[coarsenHeapSize].len >= coarsenElements[Child].len) {
-	coarsenElements[i].elID = coarsenElements[Child].elID;
-	coarsenElements[i].len = coarsenElements[Child].len;
-      }
-      else break; 
-    }
-    coarsenElements[i].elID = coarsenElements[coarsenHeapSize].elID;
-    coarsenElements[i].len = coarsenElements[coarsenHeapSize].len; 
-    coarsenHeapSize--;
-    return Min_ID; 
-  }
-  else {
-    Min_ID=refineElements[1].elID;
-    for (i=1; i*2 <= refineHeapSize-1; i=Child) { // Find smaller child
-      Child = i*2;       // child is left child  
-      if (Child !=refineHeapSize)  // right child exists
-	if (refineElements[Child+1].len < refineElements[Child].len)
-	  Child++; 
-      // Percolate one level
-      if (refineElements[refineHeapSize].len >= refineElements[Child].len){  
-	refineElements[i].elID = refineElements[Child].elID;   
-	refineElements[i].len = refineElements[Child].len;
-      }
-      else break; 
-    }
-    refineElements[i].elID = refineElements[refineHeapSize].elID;
-    refineElements[i].len = refineElements[refineHeapSize].len; 
-    refineHeapSize--;
-    return Min_ID; 
-  }
-}
-
+/** The quality metric is proportional to the area of the triangle upon
+    the sum of squares of the lengths of each of the 3 sides
+*/
 double FEM_Adapt_Algs::getAreaQuality(int elem)
 {
   double f, q, len[3];
@@ -1410,66 +1366,166 @@ double FEM_Adapt_Algs::getAreaQuality(int elem)
   return q;
 }
 
-// FEM_Mesh_mooth
-//  Inputs  : meshP - a pointer to the FEM_Mesh object to smooth
-//	    : nodes - an array of local node numbers to be smoothed.  Send
-//		  NULL pointer to smooth all nodes.
-//	    : nNodes - the number of nodes to be smoothed.  This must 
-//		      be the total number of nodes on this chunk if the nodes
-//		      array is NULL
-//	    : attrNo - the attribute number where the coords are registered
-//  Shifts nodes around to improve mesh quality.  FEM_BOUNDARY attribute
-//  and interpolator function must be registered by user to maintain 
-//  boundary information.
-void  FEM_Adapt_Algs::FEM_mesh_smooth(FEM_Mesh *meshP, int *nodes, int nNodes, int attrNo) {
-  vector2d newPos, *coords, *ghostCoords;
-  int idx, nNod, nGn, gIdxN, *boundVals, nodesInChunk, mesh;
-  int *adjnodes;
+/** The quality metric used is the maxEdgeLength / shortestAltitude of the triangle
+    If this metric is less than 100 and the area is greater than sliverArea, 
+    the quality is supposed to be good
+*/
+void FEM_Adapt_Algs::ensureQuality(int n1, int n2, int n3) {
+  double coordsn1[2], coordsn2[2], coordsn3[2];
+  getCoord(n1, coordsn1);
+  getCoord(n2, coordsn2);
+  getCoord(n3, coordsn3);
+  double area = getSignedArea(coordsn1, coordsn2, coordsn3);
+  double len1 = length(coordsn1, coordsn2);
+  double len2 = length(coordsn2, coordsn3);
+  double len3 = length(coordsn3, coordsn1);
+  double max = len1;
+  if(len2>max) max = len2;
+  if(len3>max) max = len3;
+  //shortest edge
+  double min = len1;
+  if(len2<min) min = len2;
+  if(len3<min) min = len3;
+  double shortest_al = fabs(area/max);
+  double largestR = max/shortest_al;
+  CkAssert(largestR<=100.0 && -area > SLIVERAREA);
+}
 
-  mesh=FEM_Mesh_default_read();
-  nodesInChunk = FEM_Mesh_get_length(mesh,FEM_NODE);
-  nGn = FEM_Mesh_get_length(mesh, FEM_GHOST + FEM_NODE);
-  
-  boundVals = new int[nodesInChunk];
-  coords = new vector2d[nodesInChunk+nGn];
+/** Verify the quality of the two new elements that will be created by flip
+ */
+bool FEM_Adapt_Algs::controlQualityF(int n1, int n2, int n3, int n4) {
+  //n1 or n2 will be replaced by n4
+  double coordsn1[2], coordsn2[2], coordsn3[2], coordsn4[2];
+  if(n4==-1) return false;
+  getCoord(n1, coordsn1);
+  getCoord(n2, coordsn2);
+  getCoord(n3, coordsn3);
+  getCoord(n4, coordsn4);
+  bool flag = false;
+  if(!flag) flag = controlQualityC(coordsn3,coordsn1,coordsn2,coordsn4);
+  if(!flag) flag = controlQualityC(coordsn4,coordsn2,coordsn1,coordsn3);
+  return flag;
+}
 
-  FEM_Mesh_data(mesh, FEM_NODE, FEM_BOUNDARY, (int*) boundVals, 0, nodesInChunk, FEM_INT, 1);    
+/** Verify the quality of the four new elements that will be created by flip
+ */
+bool FEM_Adapt_Algs::controlQualityR(int n1, int n2, int n3, int n4) {
+  //n1 or n2 will be replaced by n4
+  double coordsn1[2], coordsn2[2], coordsn3[2], coordsn4[2], coordsn5[2];
+  if(n4==-1) return false;
+  getCoord(n1, coordsn1);
+  getCoord(n2, coordsn2);
+  getCoord(n3, coordsn3);
+  getCoord(n4, coordsn4);
+  coordsn5[0] = (coordsn1[0]+coordsn2[0])*0.5;
+  coordsn5[1] = (coordsn1[1]+coordsn2[1])*0.5;
+  bool flag = false;
+  if(!flag) flag = theMod->fmAdaptAlgs->controlQualityR(coordsn1,coordsn3,coordsn5);
+  if(!flag) flag = theMod->fmAdaptAlgs->controlQualityR(coordsn2,coordsn3,coordsn5);
+  if(!flag) flag = theMod->fmAdaptAlgs->controlQualityR(coordsn1,coordsn4,coordsn5);
+  if(!flag) flag = theMod->fmAdaptAlgs->controlQualityR(coordsn2,coordsn4,coordsn5);
+  return flag;
+}
 
-  FEM_Mesh_data(mesh, FEM_NODE, attrNo, (double*)coords, 0, nodesInChunk, FEM_DOUBLE, 2);
+bool FEM_Adapt_Algs::controlQualityR(double *coordsn1, double *coordsn2, double *coordsn3) {
+  double area = getArea(coordsn1, coordsn2, coordsn3);
+  //do some quality preservation
+  double len1 = length(coordsn1, coordsn2);
+  double len2 = length(coordsn2, coordsn3);
+  double len3 = length(coordsn3, coordsn1);
+  //longest edge
+  double max = len1;
+  if(len2>max) max = len2;
+  if(len3>max) max = len3;
+  double shortest_al = area/max;
+  double largestR = max/shortest_al;
+  if(largestR>50.0) return true;
+  else return false;
+}
 
-  IDXL_Layout_t coord_layout = IDXL_Layout_create(IDXL_DOUBLE, 2);
-  FEM_Update_ghost_field(coord_layout,-1, coords); 
-  ghostCoords = &(coords[nodesInChunk]);
-  for (int i=0; i<nNodes; i++)
-  {
-    if (nodes==NULL) idx=i;
-    else idx=nodes[i];
-    newPos.x=0;
-    newPos.y=0;
-    CkAssert(idx<nodesInChunk);  
-    if (FEM_is_valid(mesh, FEM_NODE, idx) && boundVals[idx]==0) //node must be internal
-    {
-      meshP->n2n_getAll(idx, adjnodes, nNod);
-      for (int j=0; j<nNod; j++) { //for all adjacent nodes, find coords
-	if (adjnodes[j]<-1) {
-	  gIdxN = FEM_From_ghost_index(adjnodes[j]);
-	  newPos.x += ghostCoords[gIdxN].x;
-	  newPos.y += ghostCoords[gIdxN].y;
-	}
-	else {
-	  newPos.x += coords[adjnodes[j]].x;
-	  newPos.y += coords[adjnodes[j]].y;
-	}     
-      }
-      newPos.x/=nNod;
-      newPos.y/=nNod;
-      FEM_set_entity_coord2(mesh, FEM_NODE, idx, newPos.x, newPos.y);
-      delete [] adjnodes;
-    }
-  }
+/** Computes the longestLength, shotestLength, shortestAltitude, and other
+    quality metrics for the new element (n1,n2,n4)
+    If the new element forms a sliver or bad quality, return true
+*/
+bool FEM_Adapt_Algs::controlQualityC(int n1, int n2, int n3, double *n4_coord) {
+  //n3 is the node to be deleted, n4 is the new node to be added
+  double coordsn1[2], coordsn2[2], coordsn3[2];
+  getCoord(n1, coordsn1);
+  getCoord(n2, coordsn2);
+  getCoord(n3, coordsn3);
+  return controlQualityC(coordsn1,coordsn2,coordsn3,n4_coord);
+}
 
-  delete [] coords;
-  delete [] boundVals;
+bool FEM_Adapt_Algs::controlQualityC(double *coordsn1, double *coordsn2, double *coordsn3, double *n4_coord) {
+  double ret_old = getSignedArea(coordsn1, coordsn2, coordsn3);
+  double ret_new = getSignedArea(coordsn1, coordsn2, n4_coord);
+  //do some quality preservation
+  double len1 = length(coordsn1, coordsn2);
+  double len2 = length(coordsn2, n4_coord);
+  double len3 = length(n4_coord, coordsn1);
+  //longest edge
+  double max = len1;
+  if(len2>max) max = len2;
+  if(len3>max) max = len3;
+  //shortest edge
+  double min = len1;
+  if(len2<min) min = len2;
+  if(len3<min) min = len3;
+  double shortest_al = ret_new/max;
+  double largestR = max/shortest_al;
+  if(ret_old > SLIVERAREA && ret_new < -SLIVERAREA) return true; //it is a flip
+  else if(ret_old < -SLIVERAREA && ret_new > SLIVERAREA) return true; //it is a flip
+  else if(fabs(ret_new) < SLIVERAREA) return true; // it is a sliver
+  //else if(fabs(shortest_al) < 1e-5) return true; //shortest altitude is too small
+  //else if(fabs(min) < 1e-5) return true; //shortest edge is too small
+  else if(fabs(largestR)>50.0) return true;
+  else return false;
 }
 
 
+
+/** Used from FEM_Repair, when poor quality elements are encountered, depending
+    on their maxEdgeLength, it could be better to flip it or bisect it to get
+    better quality elements.
+    Returns true if it should flip.
+*/
+bool FEM_Adapt_Algs::flipOrBisect(int elId, int n1, int n2, int maxEdgeIdx, double maxlen) {
+  //return true if it should flip
+  int nbrEl = theMesh->e2e_getNbr(elId,maxEdgeIdx);
+  double len4=0.0, len5=0.0;
+  if(nbrEl!=-1) {
+    int con1[3];
+    theMesh->e2n_getAll(nbrEl,con1);
+    int nbrnode=-1;
+    for(int j=0; j<3; j++) {
+      if(con1[j]!=n1 && con1[j]!=n2) {
+	nbrnode = con1[j];
+	break;
+      }
+    }
+    len4 = length(n1,nbrnode);
+    len5 = length(n2,nbrnode);
+  }
+  if(len4>1.2*maxlen || len5>1.2*maxlen) {
+    return true;
+  }
+  else return false;
+}
+
+void FEM_Adapt_Algs::tests(bool b=true) {
+  //test the mesh for slivered triangles
+  if(!b) {
+    theMod->fmUtil->AreaTest(theMesh);
+    return;
+  }
+  theMod->fmUtil->AreaTest(theMesh);
+  theMod->fmUtil->StructureTest(theMesh);
+  theMod->fmUtil->IdxlListTest(theMesh);
+  theMod->fmUtil->residualLockTest(theMesh);
+  /*for(int i=0; i<theMesh->node.size(); i++) {
+    if(theMesh->node.is_valid(i)) CkPrintf("Valid -- ");
+    else  CkPrintf("Invalid -- ");
+    theMod->fmUtil->FEM_Print_coords(theMesh,i);
+    }*/
+  return;
+}

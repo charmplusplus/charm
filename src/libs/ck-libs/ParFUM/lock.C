@@ -3,6 +3,10 @@
  *
  */
 
+/** This entire class is DEPRECATED!
+    It provides locking mechanism for chunks
+ */
+
 #include "ParFUM.h"
 #include "ParFUM_internals.h"
 
@@ -48,6 +52,8 @@ void FEM_lock::pup(PUP::er &p) {
   p|lockedChunks;
 }
 
+
+
 bool FEM_lock::existsChunk(int index) {
   for(int i=0; i<lockedChunks.size(); i++) {
     if(lockedChunks[i] == index) return true;
@@ -55,9 +61,13 @@ bool FEM_lock::existsChunk(int index) {
   return false;
 }
 
-//will only return if it gets the locks
-//the set of nodes or elems that a chunk can ask to be locked can either be 
-//shared, ghosts or local nodes/elements.
+
+
+/** locking of the chunks is blocking and is strictly in ascending order.
+    will only return if it gets the locks
+    the set of nodes or elems that a chunk can ask to be locked can either be 
+    shared, ghosts or local nodes/elements.
+*/
 int FEM_lock::lock(int numNodes, int *nodes, int numElems, int* elems, int elemType) {
   bool done = false;
   int ret = 0;
@@ -170,6 +180,9 @@ int FEM_lock::lock(int numNodes, int *nodes, int numElems, int* elems, int elemT
   return 1;
 }
 
+/** Since at one point of time one chunk can only lock one set of chunks for
+    one operation, one does not need to pass arguments to unlock.
+*/
 int FEM_lock::unlock() {
   bool done = false;
   int ret = 0;
@@ -238,7 +251,8 @@ int FEM_lock::lock(int chunkNo, int own) {
   return 1;
 }
 
-//for sanity, only the owner should unlock it
+/** For sanity, only the owner should unlock it
+ */
 int FEM_lock::unlock(int chunkNo, int own) {
   intMsg *ret = new intMsg(0);
   CkAssert(!(!isLocked && (chunkNo==idx))); //noone should try to unlock me, if I am not locked

@@ -8,6 +8,30 @@
 #include "ParFUM_internals.h"
 
 
+CDECL void FEM_REF_INIT(int mesh) {
+  CkArrayID femRefId;
+  int cid;
+  int size;
+  TCharm *tc=TCharm::get();
+  MPI_Comm comm = MPI_COMM_WORLD;
+  MPI_Comm_rank(comm,&cid);
+  MPI_Comm_size(comm,&size);
+  if(cid==0) {
+    CkArrayOptions opts;
+    opts.bindTo(tc->getProxy()); //bind to the current proxy
+    femMeshModMsg *fm = new femMeshModMsg;
+    femRefId = CProxy_femMeshModify::ckNew(fm, opts);
+  }
+  MPI_Bcast(&femRefId, sizeof(CkArrayID), MPI_BYTE, 0, comm);
+  meshMod = femRefId;
+  femMeshModMsg *fm = new femMeshModMsg(size,cid);
+  meshMod[cid].insert(fm);
+  FEM_Mesh *m=FEM_Mesh_lookup(mesh,"FEM_REF_INIT");
+  FEMMeshMsg *msg = new FEMMeshMsg(m,tc); 
+  meshMod[cid].setFemMesh(msg);
+  return;
+}
+
 void FEM_ADAPT_Init(int meshID) {
   const int triangleFaces[6] = {0,1,1,2,2,0};
   FEM_Add_elem2face_tuples(meshID, 0, 2, 3, triangleFaces);
@@ -27,6 +51,7 @@ FDECL void FTN_NAME(FEM_ADAPT_INIT,fem_adapt_init)(int *meshID)
 {
   FEM_ADAPT_Init(*meshID);
 }
+
 
 
 void FEM_ADAPT_Refine(int meshID, int qm, int method, double factor,
@@ -52,6 +77,7 @@ FDECL  void FTN_NAME(FEM_ADAPT_COARSEN,fem_adapt_coarsen)(int* meshID,
   FEM_ADAPT_Coarsen(*meshID, *qm, *method, *factor, sizes);
 }
 
+
 void FEM_ADAPT_AdaptMesh(int meshID, int qm, int method, double factor,
         double *sizes) {
     FEM_Mesh* mesh = FEM_Mesh_lookup(meshID, "FEM_ADAPT_AdaptMesh");
@@ -74,7 +100,7 @@ FDECL  void FTN_NAME(FEM_ADAPT_SETELEMENTSIZEFIELD,fem_adapt_setelementsizefield
 }
 
 
- void FEM_ADAPT_SetElementsSizeField(int meshID, double *sizes) {
+void FEM_ADAPT_SetElementsSizeField(int meshID, double *sizes) {
   FEM_Mesh *meshP = FEM_Mesh_lookup(meshID, "FEM_ADAPT_SetElementsSizeField");
   int numElements = meshP->elem[0].size();
   for (int i=0; i<numElements; i++) {

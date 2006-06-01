@@ -33,6 +33,8 @@ void FEM_lockN::setMeshModify(femMeshModify *mod) {
   theMod = mod;
 }
 
+
+
 void FEM_lockN::reset(int i,femMeshModify *mod) {
   //CkAssert(noreadLocks==0 && nowriteLocks==0);
   if(haslocks()) wunlock(idx);
@@ -43,6 +45,8 @@ void FEM_lockN::reset(int i,femMeshModify *mod) {
   noreadLocks = 0;
   nowriteLocks = 0;
 }
+
+
 
 int FEM_lockN::rlock() {
   if(nowriteLocks>0) { //if someone has a write lock, do not give read locks
@@ -89,21 +93,6 @@ int FEM_lockN::wlock(int own) {
   return -2;
 }
 
-bool FEM_lockN::verifyLock(void) {
-  const IDXL_Rec *irec = theMod->fmMesh->node.shared.getRec(idx);
-  if(irec) {
-    int minchunk = theMod->idx;
-    for(int i=0; i<irec->getShared(); i++) {
-      int pchk = irec->getChk(i);
-      if(pchk<minchunk) minchunk=pchk;
-    }
-    //if someone wants to lock me, I should be on the smallest chunk
-    if(minchunk!=theMod->idx) return false;
-  }
-  if(nowriteLocks==1) return true;
-  else return false;
-}
-
 int FEM_lockN::wunlock(int own) {
   /*if(!(noreadLocks==0 && nowriteLocks>0)) {
     CkPrintf("[%d] Error:: unlocking unacquired write lock %d{%d} .\n",owner, idx, theMod->idx);
@@ -124,10 +113,27 @@ int FEM_lockN::wunlock(int own) {
   return -1;
 }
 
+
+
 bool FEM_lockN::haslocks() {
   if(noreadLocks>0 || nowriteLocks>0) {
     return true;
   }
+  else return false;
+}
+
+bool FEM_lockN::verifyLock(void) {
+  const IDXL_Rec *irec = theMod->fmMesh->node.shared.getRec(idx);
+  if(irec) {
+    int minchunk = theMod->idx;
+    for(int i=0; i<irec->getShared(); i++) {
+      int pchk = irec->getChk(i);
+      if(pchk<minchunk) minchunk=pchk;
+    }
+    //if someone wants to lock me, I should be on the smallest chunk
+    if(minchunk!=theMod->idx) return false;
+  }
+  if(nowriteLocks==1) return true;
   else return false;
 }
 

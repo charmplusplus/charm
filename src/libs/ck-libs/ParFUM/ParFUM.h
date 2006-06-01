@@ -1,6 +1,6 @@
 /*Charm++ Finite Element Framework:
-C interface file
-*/
+ * C interface file
+ */
 #ifndef __PARFUM_H
 #define __PARFUM_H
 #include "charm++.h"
@@ -12,7 +12,7 @@ C interface file
 #include "tcharm.h"
 
 
-// Forward declaration
+/** Forward declaration for the following classes */
 class FEM_Entity;
 class FEM_Mesh;
 class FEM_Elem;
@@ -33,29 +33,29 @@ void _registerParFUM(void);
 extern "C" {
 #endif
 
-/* datatypes: keep in sync with ParFUMf.h and idxl */
+/** datatypes: keep in sync with ParFUMf.h and idxl */
 #define FEM_BYTE   IDXL_BYTE
 #define FEM_INT    IDXL_INT
 #define FEM_REAL   IDXL_REAL
-#define FEM_FLOAT FEM_REAL /*alias*/
+#define FEM_FLOAT FEM_REAL
 #define FEM_DOUBLE IDXL_DOUBLE
 #define FEM_INDEX_0  IDXL_INDEX_0
 #define FEM_INDEX_1  IDXL_INDEX_1 
 #define FEM_VAR_INDEX (IDXL_FIRST_DATATYPE+6)
 
-/* reduction operations: keep in sync with ParFUMf.h */
+/** reduction operations: keep in sync with ParFUMf.h */
 #define FEM_SUM IDXL_SUM
 #define FEM_PROD IDXL_PROD
 #define FEM_MAX IDXL_MAX
 #define FEM_MIN IDXL_MIN
 
-/* element types, by their number of nodes */
+/** element types, by their number of nodes */
 #define FEM_TRIANGULAR    3
 #define FEM_TETRAHEDRAL   4
 #define FEM_HEXAHEDRAL    8
 #define FEM_QUADRILATERAL 4
 
-/* initialization flags */
+/** initialization flags */
 #define FEM_INIT_READ    2
 #define FEM_INIT_WRITE   4
 
@@ -69,26 +69,26 @@ extern "C" {
 
   typedef void (*FEM_Mesh_alloc_fn)(void *param,int *size,int *maxSize);
   
-  /* This should be MPI_Comm, but I want it for Fortran too */
+  /** This should be MPI_Comm, but I want it for Fortran too */
   typedef int FEM_Comm_t; 
 
-  /* Initialize the FEM framework (must have called MPI_Init) */
+  /** Initialize the FEM framework (must have called MPI_Init) */
   void FEM_Init(FEM_Comm_t defaultCommunicator);
   void FEM_Done(void);
 
-  /*Utility*/
+  /** Utility functions */
   int FEM_My_partition(void);
   int FEM_Num_partitions(void);
   double FEM_Timer(void);
   void FEM_Print(const char *str);
   void FEM_Print_partition(void);
 
-/* Mesh manipulation */
+  /** Mesh manipulation */
 #define FEM_MESH_FIRST 1650000000 /*This is the first mesh ID:*/
-  /* mesh creation */
-  int FEM_Mesh_allocate(void); /* build new mesh */
-  int FEM_Mesh_copy(int fem_mesh); /* copy existing mesh */
-  void FEM_Mesh_deallocate(int fem_mesh); /* delete this mesh */
+  /** mesh creation functions */
+  int FEM_Mesh_allocate(void); /** build new mesh */
+  int FEM_Mesh_copy(int fem_mesh); /** copy existing mesh */
+  void FEM_Mesh_deallocate(int fem_mesh); /** delete this mesh */
 
   int FEM_Mesh_read(const char *prefix,int partNo,int nParts);
   void FEM_Mesh_write(int fem_mesh,const char *prefix,int partNo,int nParts); 
@@ -105,46 +105,45 @@ extern "C" {
   void FEM_Mesh_copy_globalno(int src_mesh,int dest_mesh);
   void FEM_Mesh_print(int fem_mesh);
   
-/* Mesh entity codes: (keep in sync with ParFUMf.h) */
-#define FEM_ENTITY_FIRST 1610000000 /*This is the first entity code:*/
-#define FEM_NODE (FEM_ENTITY_FIRST+0) /*The unique node type*/
-#define FEM_ELEM (FEM_ENTITY_FIRST+1000) /*First element type (can add the user-defined element type) */
+// Mesh entity codes: (keep in sync with ParFUMf.h)
+#define FEM_ENTITY_FIRST 1610000000 ///<This is the first entity code:
+#define FEM_NODE (FEM_ENTITY_FIRST+0) ///<The unique node type
+#define FEM_ELEM (FEM_ENTITY_FIRST+1000) ///<First element type (can add the user-defined element type)
 #define FEM_ELEMENT FEM_ELEM /*alias*/
-#define FEM_SPARSE (FEM_ENTITY_FIRST+2000) /* First sparse entity (face) type */
+#define FEM_SPARSE (FEM_ENTITY_FIRST+2000) ///< First sparse entity (face) type
 #define FEM_EDGE FEM_SPARSE /* alias */
 #define FEM_FACE FEM_SPARSE /* alias */
-#define FEM_GHOST 10000  /* (entity add-in) Indicates we want the ghost values, not real values */
+#define FEM_GHOST 10000  ///< (entity add-in) Indicates we want the ghost values, not real values
 #define FEM_ENTITY_LAST (FEM_ENTITY_FIRST+3000+FEM_GHOST)
 
-/* Mesh entity "attributes": per-entity data */
-#define FEM_DATA   0  /* Backward-compatability routines' solution data: tag 0 */
-#define FEM_ATTRIB_TAG_MAX 1000000000 /*Largest allowable user "tag" attribute*/
-#define FEM_ATTRIB_FIRST 1620000000 /*This is the first system attribute code: one of*/
-#define FEM_CONN   (FEM_ATTRIB_FIRST+1) /* Element-node connectivity (FEM_ELEM or FEM_SPARSE, FEM_INDEX only) */
+// Mesh entity "attributes": per-entity data
+#define FEM_DATA   0  ///< Backward-compatability routines' solution data: tag 0
+#define FEM_ATTRIB_TAG_MAX 1000000000 ///< Largest allowable user "tag" attribute
+#define FEM_ATTRIB_FIRST 1620000000 ///< This is the first system attribute code: one of
+#define FEM_CONN   (FEM_ATTRIB_FIRST+1) ///< Element-node connectivity (FEM_ELEM or FEM_SPARSE, FEM_INDEX only)
 #define FEM_CONNECTIVITY FEM_CONN /*alias*/
 
-  /* rarely-used external attributes */
-#define FEM_SPARSE_ELEM (FEM_ATTRIB_FIRST+2) /* Elements each sparse data record applies to (FEM_SPARSE, 2*FEM_INDEX only) */
-#define FEM_COOR   (FEM_ATTRIB_FIRST+3) /* Node coordinates (FEM_NODE, FEM_DOUBLE only) */
+// rarely-used external attributes 
+#define FEM_SPARSE_ELEM (FEM_ATTRIB_FIRST+2) ///< Elements each sparse data record applies to (FEM_SPARSE, 2*FEM_INDEX only) 
+#define FEM_COOR   (FEM_ATTRIB_FIRST+3) ///< Node coordinates (FEM_NODE, FEM_DOUBLE only)
 #define FEM_COORD FEM_COOR /*alias*/
 #define FEM_COORDINATES FEM_COOR /*alias*/
-#define FEM_GLOBALNO  (FEM_ATTRIB_FIRST+4) /* Global item numbers (width=1, datatype=FEM_INDEX) */
-#define FEM_PARTITION (FEM_ATTRIB_FIRST+5) /* Destination chunk numbers (elements only; width=1, datatype=FEM_INDEX) */
-#define FEM_SYMMETRIES (FEM_ATTRIB_FIRST+6) /* Symmetries present (width=1, datatype=FEM_BYTE) */
-#define FEM_NODE_PRIMARY (FEM_ATTRIB_FIRST+7) /* This chunk owns this node (nodes only; width=1, datatype=FEM_BYTE) */
-#define FEM_CHUNK (FEM_ATTRIB_FIRST+8) /* For Nodes and Elements. Used during ghost creation
-to mark the chunk to which a ghost node or element belongs datatype=FEM_INDEX*/
-#define FEM_BOUNDARY (FEM_ATTRIB_FIRST+9) /*provides the boundary flag for nodes, elements and sparse elements FEM_INT*/
-#define FEM_NODE_ELEM_ADJACENCY (FEM_ATTRIB_FIRST+10) /*node to element adjacency FEM_VAR_INDEX only */
-#define FEM_NODE_NODE_ADJACENCY (FEM_ATTRIB_FIRST+11) /*node to node adjacency FEM_VAR_INDEX only */
-#define FEM_ELEM_ELEM_ADJACENCY (FEM_ATTRIB_FIRST+12) /*element to element adjacency FEM_VAR_INDEX only */
-#define FEM_ELEM_ELEM_ADJ_TYPES (FEM_ATTRIB_FIRST+13) /*stores element types for those element id's listed in FEM_ELEM_ELEM_ADJACENCY, needed when using multiple element types*/
-#define FEM_IS_VALID_ATTR (FEM_ATTRIB_FIRST+14) /* Stores a flag(an IDXL_BYTE) for each element or node specifying whether the entity exists or is valid. It may be 0 whenever a mesh modification occurs that deletes the corresponding node or element */
+#define FEM_GLOBALNO  (FEM_ATTRIB_FIRST+4) ///< Global item numbers (width=1, datatype=FEM_INDEX)
+#define FEM_PARTITION (FEM_ATTRIB_FIRST+5) ///< Destination chunk numbers (elements only; width=1, datatype=FEM_INDEX)
+#define FEM_SYMMETRIES (FEM_ATTRIB_FIRST+6) ///< Symmetries present (width=1, datatype=FEM_BYTE)
+#define FEM_NODE_PRIMARY (FEM_ATTRIB_FIRST+7) ///< This chunk owns this node (nodes only; width=1, datatype=FEM_BYTE) 
+#define FEM_CHUNK (FEM_ATTRIB_FIRST+8) ///< For Nodes and Elements. Used during ghost creation to mark the chunk to which a ghost node or element belongs datatype=FEM_INDEX
+#define FEM_BOUNDARY (FEM_ATTRIB_FIRST+9) ///< provides the boundary flag for nodes, elements and sparse elements FEM_INT
+#define FEM_NODE_ELEM_ADJACENCY (FEM_ATTRIB_FIRST+10) ///< node to element adjacency FEM_VAR_INDEX only 
+#define FEM_NODE_NODE_ADJACENCY (FEM_ATTRIB_FIRST+11) ///< node to node adjacency FEM_VAR_INDEX only 
+#define FEM_ELEM_ELEM_ADJACENCY (FEM_ATTRIB_FIRST+12) ///< element to element adjacency FEM_VAR_INDEX only 
+#define FEM_ELEM_ELEM_ADJ_TYPES (FEM_ATTRIB_FIRST+13) ///< stores element types for those element id's listed in FEM_ELEM_ELEM_ADJACENCY, needed when using multiple element types
+#define FEM_IS_VALID_ATTR (FEM_ATTRIB_FIRST+14) ///< Stores a flag(an IDXL_BYTE) for each element or node specifying whether the entity exists or is valid. It may be 0 whenever a mesh modification occurs that deletes the corresponding node or element 
 
-#define FEM_MESH_SIZING (FEM_ATTRIB_FIRST+15) /* Target edge length attr. */
-#define FEM_ATTRIB_LAST (FEM_ATTRIB_FIRST+16) /*This is the last valid attribute code*/
+#define FEM_MESH_SIZING (FEM_ATTRIB_FIRST+15) ///< Target edge length attr.
+#define FEM_ATTRIB_LAST (FEM_ATTRIB_FIRST+16) ///< This is the last valid attribute code
 
-  /* Specialized routines: */
+  // Specialized routines: 
   void FEM_Mesh_set_conn(int fem_mesh,int entity,
   	const int *conn, int firstItem, int length, int width);
   void FEM_Mesh_get_conn(int fem_mesh,int entity,
@@ -159,7 +158,7 @@ to mark the chunk to which a ghost node or element belongs datatype=FEM_INDEX*/
   
   int FEM_Mesh_get_length(int fem_mesh,int entity);
   
-  /* General purpose routines: */
+  // General purpose routines: 
   void FEM_Mesh_data(int fem_mesh,int entity,int attr,
   	void *data, int firstItem, int length, int datatype,int width);
   void FEM_Mesh_data_layout(int fem_mesh,int entity,int attr,
@@ -188,15 +187,15 @@ to mark the chunk to which a ghost node or element belongs datatype=FEM_INDEX*/
   const char *FEM_Get_attr_name(int attr,char *storage);
   const char *FEM_Get_datatype_name(int datatype,char *storage);
 
-  int FEM_Mesh_is_get(int fem_mesh); /* return 1 if this is a readable mesh */
-  int FEM_Mesh_is_set(int fem_mesh); /* return 1 if this is a writing mesh */
-  void FEM_Mesh_become_get(int fem_mesh); /* Make this a readable mesh */
-  void FEM_Mesh_become_set(int fem_mesh); /* Make this a writing mesh */
+  int FEM_Mesh_is_get(int fem_mesh); // return 1 if this is a readable mesh 
+  int FEM_Mesh_is_set(int fem_mesh); // return 1 if this is a writing mesh
+  void FEM_Mesh_become_get(int fem_mesh); // Make this a readable mesh 
+  void FEM_Mesh_become_set(int fem_mesh); // Make this a writing mesh 
 
   typedef void (*FEM_Userdata_fn)(pup_er p,void *data);
   void FEM_Mesh_pup(int fem_mesh,int dataTag,FEM_Userdata_fn fn,void *data);
 
-/* ghosts and spatial symmetries */
+  // ghosts and spatial symmetries
 #define FEM_Is_ghost_index(idx) ((idx)<-1)
 #define FEM_To_ghost_index(idx) (-(idx)-2)
 #define FEM_From_ghost_index(idx) (-(idx)-2)
@@ -219,9 +218,9 @@ to mark the chunk to which a ghost node or element belongs datatype=FEM_INDEX*/
   void FEM_Set_sym_nodes(const int *canon,const int *sym);
   void FEM_Get_sym(int who,int *destSym);
   /**
-    Based on shared node communication list, compute 
-    FEM_NODE FEM_GLOBALNO and FEM_NODE_PRIMARY
-  */
+   * Based on shared node communication list, compute 
+   * FEM_NODE FEM_GLOBALNO and FEM_NODE_PRIMARY
+   */
   void FEM_Make_node_globalno(int fem_mesh,FEM_Comm_t comm_context);
 
 /* Communication: see idxlc.h */
@@ -236,7 +235,7 @@ to mark the chunk to which a ghost node or element belongs datatype=FEM_INDEX*/
   void FEM_Get_roccom_pconn(int fem_mesh,const int *paneFmChunk,int *pconn);
   void FEM_Set_roccom_pconn(int fem_mesh,const int *paneFmChunk,const int *src,int total_len,int ghost_len);
 
-  /*Migration */
+  /* Migration */
   int FEM_Register(void *userData,FEM_PupFn _pup_ud);
   void FEM_Migrate(void);
   void *FEM_Get_userdata(int n);
@@ -268,7 +267,7 @@ to mark the chunk to which a ghost node or element belongs datatype=FEM_INDEX*/
   void FEM_set_entity_coord2(int mesh, int entityType, int entityIdx, double x, double y);
   void FEM_set_entity_coord3(int mesh, int entityType, int entityIdx, double x, double y, double z);
 
-  /*Mesh getting and setting fuctions*/
+  /* Mesh getting and setting fuctions*/
   void FEM_Mesh_Become_Setting(int mesh);
   void FEM_Mesh_Become_Getting(int mesh);
 
@@ -318,7 +317,7 @@ to mark the chunk to which a ghost node or element belongs datatype=FEM_INDEX*/
 
 
   /* Public functions that modify the mesh */
-  int FEM_add_node(int mesh, int* adjacent_nodes=0, int num_adjacent_nodes=0, int *chunks=0, int numChunks=0, int forceShared=0, int upcall=0);
+  int FEM_add_node(int mesh, int* adjacent_nodes=0, int num_adjacent_nodes=0, int *chunks=0, int numChunks=0, int forceShared=0);
   int FEM_add_element(int mesh, int* conn, int conn_size, int elem_type=0, int chunkNo=-1);
   void FEM_remove_node(int mesh,int node);
   int FEM_remove_element(int mesh, int element, int elem_type=0, int permanent=-1);
@@ -334,7 +333,7 @@ to mark the chunk to which a ghost node or element belongs datatype=FEM_INDEX*/
   // To help debugging:
   void FEM_Print_Mesh_Summary(int mesh);
 
-/* Routines we wish didn't exist: */
+  /* Routines we wish didn't exist: */
   void FEM_Serial_split(int nchunks);
   void FEM_Serial_begin(int chunkNo);
   
@@ -358,7 +357,7 @@ to mark the chunk to which a ghost node or element belongs datatype=FEM_INDEX*/
 
 
 
-/* 
+/** 
 ParFUM Collision Interface File
 
 A few outstanding questions:
@@ -386,7 +385,7 @@ Author: Isaac Dooley 11-09-2005
 
 
 
-  /* ParFUM_Collide_init() will initialize the collision library. 
+  /** ParFUM_Collide_init() will initialize the collision library. 
      It should be called once in driver after mesh has been loaded.
      
      dimension should reflect the number of coordinates associated 
@@ -402,7 +401,7 @@ Author: Isaac Dooley 11-09-2005
   ParFUM_collider ParFUM_Collide_Init(int dimension);
 
 
-  /* ParFUM_Collide() will create bounding boxes for each element in the local mesh chunk.
+  /** ParFUM_Collide() will create bounding boxes for each element in the local mesh chunk.
      It will then collide these bounding boxes with those both locally and remotely.
      It should be called at each timestep for which collisions are being tested.
     
@@ -413,7 +412,7 @@ Author: Isaac Dooley 11-09-2005
   */  
   int ParFUM_Collide(ParFUM_collider *c, double box_padding = 0.0);
 
-  /* ParFUM_Collide_GetCollisions() is used to get the data for any remote elements which 
+  /** ParFUM_Collide_GetCollisions() is used to get the data for any remote elements which 
      It should be called after Collide even if ParFUM_Collide returned 0
 
      The data it returns will be double precision values associated with the
@@ -437,7 +436,7 @@ Author: Isaac Dooley 11-09-2005
 
 
 
-// User functions for adaptivity
+/// User functions for adaptivity
 
 void FEM_ADAPT_Init(int meshID);
 FDECL void FTN_NAME(FEM_ADAPT_INIT,fem_adapt_init)(int *meshID);

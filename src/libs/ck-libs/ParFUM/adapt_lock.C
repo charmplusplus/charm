@@ -10,6 +10,10 @@
 #define ERVAL -1000000000  //might cause a problem if there are 100million nodes
 #define ERVAL1 -1000000001
 
+/** lockrnodes and lockwnodes is the set of nodes that need to be locked
+ * with read and write locks respectively. gotlocks is an array of all the 
+ * nodes which specifies if locks for each nodes has been acquired or not
+ */
 int FEM_AdaptL::lockNodes(int *gotlocks, int *lockrnodes, int numRNodes, int *lockwnodes, int numWNodes) {
   bool donelocks = false;
   int numNodes = numRNodes + numWNodes;
@@ -89,6 +93,8 @@ int FEM_AdaptL::lockNodes(int *gotlocks, int *lockrnodes, int numRNodes, int *lo
   return 1;
 }
 
+/** Same as above, instead it unlocks the nodes
+ */
 int FEM_AdaptL::unlockNodes(int *gotlocks, int *lockrnodes, int numRNodes, int *lockwnodes, int numWNodes) {
   bool donelocks = false;
   int numNodes = numRNodes + numWNodes;
@@ -141,6 +147,7 @@ int FEM_AdaptL::unlockNodes(int *gotlocks, int *lockrnodes, int numRNodes, int *
   free(ungetlocks);  
   return 1;
 }
+
 
 
 int FEM_AdaptL::edge_flip(int n1, int n2) {
@@ -361,7 +368,7 @@ int FEM_AdaptL::vertex_remove(int n1, int n2) {
 }
 
 // ======================  BEGIN edge_contraction  ============================
-/* Given and edge e:(n1, n2), determine the two adjacent elements (n1,n2,n3) 
+/** Given and edge e:(n1, n2), determine the two adjacent elements (n1,n2,n3) 
    and (n1,n2,n4). Contract edge e by creating node n5, removing all elements 
    incident on n1 xor n2 and reinserting with incidence on n5, removing the two
    elements (n1,n2,n3) and (n1,n2,n4) adjacent to e, and finally removing nodes
@@ -646,7 +653,6 @@ int FEM_AdaptL::edge_contraction(int n1, int n2) {
   }
   return ret;
 }
-
 
 int FEM_AdaptL::edge_contraction_help(int *e1P, int *e2P, int n1, int n2, int e1_n1,
 				     int e1_n2, int e1_n3, int e2_n1, 
