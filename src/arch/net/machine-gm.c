@@ -909,7 +909,7 @@ void CmiMachineInit(char **argv)
   status = gm_get_node_id(gmport, (unsigned int *)&Cmi_mach_id);
   if (status != GM_SUCCESS) { gm_perror("gm_get_node_id", status); return; }
 #if CMK_USE_GM2
-  gm_node_id_to_global_id(gmport, Cmi_mach_id, &Cmi_mach_id);
+  gm_node_id_to_global_id(gmport, (unsigned int)Cmi_mach_id, (unsigned int*)&Cmi_mach_id);
 #endif
   
   /* default abort will take care of gm clean up */
@@ -954,13 +954,6 @@ void CmiMachineInit(char **argv)
 
 #if CMK_MSGPOOL
   msgpool[msgNums++]  = gm_dma_malloc(gmport, maxMsgSize);
-#endif
-
-#ifdef __ONESIDED_IMPL
-#ifdef __ONESIDED_GM_HARDWARE
-  getSrcHandler = CmiRegisterHandler((CmiHandler)handleGetSrc);
-  getDestHandler = CmiRegisterHandler((CmiHandler)handleGetDest);
-#endif
 #endif
 
   /* alarm will ping charmrun */
@@ -1068,10 +1061,16 @@ struct RMAPutMsg {
   unsigned int size;
   unsigned int targetId;
   unsigned int sourceId;
-  int dataport;
+  unsigned int dataport;
   CmiRMA *stat;
 };
 typedef struct RMAPutMsg RMAPutMsg;
+
+void *CmiDMAAlloc(int size) {
+  void *addr = gm_dma_calloc(gmport, 1, gm_max_length_for_size(size));
+  //gm_allow_remote_memory_access(gmport);
+  return addr;
+}
 
 int CmiRegisterMemory(void *addr, unsigned int size) {
   gm_status_t status;
@@ -1081,6 +1080,7 @@ int CmiRegisterMemory(void *addr, unsigned int size) {
     gm_perror("registerMemory", status); 
     return 0;
   }
+  //gm_allow_remote_memory_access(gmport);
   return 1;
 }
 
@@ -1098,13 +1098,14 @@ int CmiUnRegisterMemory(void *addr, unsigned int size) {
 void put_callback(struct gm_port *p, void *context, gm_status_t status)
 {
   RMAPutMsg *out = (RMAPutMsg*)context;
+  unsigned int destMachId = (nodes_by_pe[out->targetId])->mach_id;
   if (status != GM_SUCCESS) { 
     switch (status) {
       case GM_SEND_DROPPED:
         CmiPrintf("Got DROPPED_PUT notification, resend\n");
-	gm_directed_send_with_callback(gmport,out->Saddr,(int)(out->Taddr),
+	gm_directed_send_with_callback(gmport,out->Saddr,(gm_remote_ptr_t)(out->Taddr),
 				       out->size,GM_HIGH_PRIORITY, 
-				       out->targetId, out->dataport, 
+				       destMachId, out->dataport, 
 				       put_callback, out);
         return;
       default:
@@ -1117,7 +1118,8 @@ void put_callback(struct gm_port *p, void *context, gm_status_t status)
 }
 
 void *CmiPut(unsigned int sourceId, unsigned int targetId, void *Saddr, void *Taddr, unsigned int size) {
-  int dataport = (nodes_by_pe[targetId])->dataport;
+  unsigned int dataport = (nodes_by_pe[targetId])->dataport;
+  unsigned int destMachId = (nodes_by_pe[targetId])->mach_id;
   RMAPutMsg *context = (RMAPutMsg*)malloc(sizeof(RMAPutMsg));
   context->Saddr = Saddr;
   context->Taddr = Taddr;
@@ -1130,8 +1132,8 @@ void *CmiPut(unsigned int sourceId, unsigned int targetId, void *Saddr, void *Ta
   //get a token before the put
   if (gm_alloc_send_token(gmport, GM_HIGH_PRIORITY)) {
     //perform the put
-    gm_directed_send_with_callback(gmport,Saddr,(int)Taddr,size,
-				   GM_HIGH_PRIORITY,targetId,dataport,
+    gm_directed_send_with_callback(gmport,Saddr,(gm_remote_ptr_t)Taddr,size,
+				   GM_HIGH_PRIORITY,destMachId,dataport,
 				   put_callback,(void*)context);
   }
   return (void*)(context->stat);
@@ -1149,6 +1151,7 @@ void get_callback_dest(struct gm_port *p, void *context, gm_status_t status)
   RMAPutMsg *out = (RMAPutMsg*)context;
   int sizeRmaStat = sizeof(CmiRMAMsg);
   char *msgRmaStat;
+  unsigned int srcMachId = (nodes_by_pe[out->targetId])->mach_id;
   if (status != GM_SUCCESS) { 
     switch (status) {
       case GM_SEND_DROPPED:
@@ -1174,6 +1177,7 @@ void get_callback_dest(struct gm_port *p, void *context, gm_status_t status)
 void handleGetDest(void *msg) {
   RMAPutMsg *context1 = (RMAPutMsg*)msg;
   RMAPutMsg *context = (RMAPutMsg*)malloc(sizeof(RMAPutMsg));
+  unsigned int srcMachId = (nodes_by_pe[context1->sourceId])->mach_id;
   context->Saddr = context1->Taddr;
   context->Taddr = context1->Saddr;
   context->size = context1->size;
@@ -1184,8 +1188,8 @@ void handleGetDest(void *msg) {
   //get a token before the put
   if (gm_alloc_send_token(gmport, GM_HIGH_PRIORITY)) {
     //perform the put
-    gm_directed_send_with_callback(gmport,context->Saddr,(int)context->Taddr,context->size,
-				   GM_HIGH_PRIORITY,context->targetId,context->dataport,
+    gm_directed_send_with_callback(gmport,context->Saddr,(gm_remote_ptr_t)context->Taddr,context->size,
+				   GM_HIGH_PRIORITY,srcMachId,context->dataport,
 				   get_callback_dest,(void*)context);
   }
   CmiFree(msg);

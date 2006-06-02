@@ -2216,6 +2216,10 @@ static void ConverseRunPE(int everReturn)
   getSrcHandler = CmiRegisterHandler((CmiHandler)handleGetSrc);
   getDestHandler = CmiRegisterHandler((CmiHandler)handleGetDest);
 #endif
+#ifdef __ONESIDED_GM_HARDWARE
+  getSrcHandler = CmiRegisterHandler((CmiHandler)handleGetSrc);
+  getDestHandler = CmiRegisterHandler((CmiHandler)handleGetDest);
+#endif
 #endif
 
   /* communication thread */

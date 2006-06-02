@@ -7,7 +7,9 @@
 #include "converse.h"
 #ifdef __ONESIDED_IMPL
 
-void CmiTestLink(void);
+#ifdef __ONESIDED_GM_HARDWARE
+void *CmiDMAAlloc(int size);
+#endif
 
 int CmiRegisterMemory(void *addr, unsigned int size);
 int CmiUnRegisterMemory(void *addr, unsigned int size);
