@@ -7,3 +7,9 @@
 
 #undef CMK_NETPOLL
 #define CMK_NETPOLL                                        1
+
+#undef __ONESIDED_IMPL
+#define __ONESIDED_IMPL 1
+
+#undef __ONESIDED_GM_HARDWARE
+#define __ONESIDED_GM_HARDWARE  1
