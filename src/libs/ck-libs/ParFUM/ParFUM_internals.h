@@ -1943,6 +1943,7 @@ class ElemList{
   inline ElemList& operator=(const ElemList& rhs){
     //		 vec = new CkVec<T>();
     *vec = *(rhs.vec);
+		return *this;
   }
   inline ElemList& operator+=(const ElemList& rhs){
     /*
