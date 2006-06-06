@@ -66,7 +66,9 @@ class NetFEM_state {
 	NetFEM_updatePackage *cur;
 public:
 	NetFEM_state() {cur=NULL;}
-	~NetFEM_state() {delete cur;}
+	~NetFEM_state() {
+		delete cur;
+	}
 	void add(NetFEM_updatePackage *u)
 	{
 		delete cur;
@@ -112,6 +114,7 @@ extern "C" void NetFEM_getCurrent(void *request)
 void NetFEM_Init(void) 
 {
 	CpvInitialize(NetFEM_state *,netfem_state);
+	CpvAccess(netfem_state) = NULL;
 	CcsRegisterHandler("NetFEM_current",(CmiHandler)NetFEM_getCurrent);
 }
 
