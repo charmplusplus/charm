@@ -1956,7 +1956,7 @@ class ElemList{
     }
     //		uniquify();
     elemlistaccTime += (CkWallTimer() - _start);
-		
+    return *this;
   }
   ElemList(const T &val){
     vec =new CkVec<T>();
