@@ -1,0 +1,22 @@
+/* File: ParFUM_SA.ci
+ * Authors: Nilesh Choudhury
+ * 
+ */
+
+module ParFUM_SA {
+
+  readonly CProxy_ParFUMShadowArray meshSA;
+
+  message lockChunksMsg{
+    int chkList[];
+  };
+
+  array [1D] ParFUMShadowArray {
+    entry ParFUMShadowArray(int s, int i);
+    entry void setFemMesh(FEMMeshMsg *m);
+    entry [sync,threaded] void IdxlLockChunksRemote(lockChunksMsg *lm);
+    entry [sync,threaded] void IdxlLockChunksSecondaryRemote(lockChunksMsg *lm);
+    entry [sync,threaded] void IdxlUnlockChunksRemote(lockChunksMsg *lm);
+    entry [sync,threaded] void IdxlUnlockChunksSecondaryRemote(lockChunksMsg *lm);
+  };
+};
