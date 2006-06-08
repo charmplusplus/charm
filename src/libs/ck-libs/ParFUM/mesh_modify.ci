@@ -3,7 +3,7 @@
  * 
  */
 
-module ParFUM {
+module ParFUM_Adapt {
 
   readonly CProxy_femMeshModify meshMod;
 

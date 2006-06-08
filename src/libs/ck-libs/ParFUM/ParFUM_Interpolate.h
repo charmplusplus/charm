@@ -3,6 +3,9 @@
  * 
  */
 
+#ifndef __ParFUM_INTERPOLATE_H
+#define __ParFUM_INTERPOLATE_H
+
 class femMeshModify;
 
 ///Interface for solution transfer operations
@@ -141,6 +144,6 @@ class FEM_Interpolate {
   virtual void FEM_InterpolateCopyAttributes(int oldnode, int newnode);
 };
 
-
 // End interpolate.h
 
+#endif

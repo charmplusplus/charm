@@ -1,4 +1,7 @@
-module fem{
+module ParFUM{
+  extern module ParFUM_Adapt;
+  extern module ParFUM_SA;
+
   group MSA_CacheGroup<int, DefaultEntry<int>, MSA_DEFAULT_ENTRIES_PER_PAGE>;	
   array [1D] MSA_PageArray<int, DefaultEntry<int>, MSA_DEFAULT_ENTRIES_PER_PAGE>;	
   

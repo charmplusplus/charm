@@ -21,6 +21,9 @@ node adjacent to a ghost element. The e2e adjacencies need not have the same def
 adjacent elements.
 */
 
+#ifndef __ParFUM_Mesh_Modify_H
+#define __ParFUM_Mesh_Modify_H
+
 //stupid number for maximum number of chunks, but reasonable enough
 #define MAX_CHUNK 1000000000
 
@@ -550,3 +553,4 @@ class femMeshModify : public CBase_femMeshModify {
 };
 // end mesh_modify.h
 
+#endif

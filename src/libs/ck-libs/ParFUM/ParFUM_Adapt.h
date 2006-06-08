@@ -6,6 +6,9 @@
  * Authors: Terry Wilmarth, Nilesh Choudhury
  */
 
+#ifndef __ParFUM_Adapt_H
+#define __ParFUM_Adapt_H
+
 class femMeshModify;
 
 ///Provides primitive mesh modification functions
@@ -156,4 +159,6 @@ class FEM_AdaptL : public FEM_Adapt {
 				    int e1_n2, int e1_n3, int e2_n1, int e2_n2,
 				    int e2_n3, int n3, int n4);
 };
+
+#endif
 

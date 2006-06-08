@@ -325,7 +325,7 @@ FEM_Mesh_broadcast(int fem_mesh,int masterRank,FEM_Comm_t comm_context)
 	}else{
 		//parallel partition
 		MPI_Barrier((MPI_Comm)comm_context);
-		_registerfem();
+		//_registerfem();
 		MPI_Barrier((MPI_Comm)comm_context);
 		return FEM_Mesh_Parallel_broadcast(fem_mesh,masterRank,comm_context);
 	}

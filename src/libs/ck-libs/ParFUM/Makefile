@@ -2,17 +2,17 @@ CDIR=../../../..
 CHARMC=$(CDIR)/bin/charmc $(OPTS)
 
 #Headers internal to ParFUM
-INTERNALHEADERS= ParFUM_internals.h ParFUM_locking.h ParFUM_Mesh_Modify.h ParFUM_Adapt_Algs.h ParFUM_Adapt.h ParFUM_Interpolate.h
+INTERNALHEADERS= ParFUM_internals.h ParFUM_locking.h ParFUM_Mesh_Modify.h ParFUM_Adapt_Algs.h ParFUM_Adapt.h ParFUM_Interpolate.h ParFUM_SA.h
 
 #Headers to be copied to include directory so application users can see them
 HEADERS= ParFUM.h ParFUMf.h $(INTERNALHEADERS)
 
 #Headers generated from .ci files
-GENHEADERS= ParFUM.def.h ParFUM.decl.h fem.decl.h fem.def.h
+GENHEADERS= ParFUM.def.h ParFUM.decl.h ParFUM_Adapt.decl.h ParFUM_Adapt.def.h ParFUM_SA.def.h ParFUM_SA.decl.h
 
 HEADDEP= $(GENHEADERS) $(HEADERS) $(INTERNALHEADERS)
 
-OBJS=ParFUM.o mesh.o symmetries.o partition.o map.o compat.o call_init.o parallel_part.o mesh_modify.o mesh_adjacency.o adapt.o adapt_algs.o adapt_if.o interpolate.o lock.o util.o lock_node.o adapt_lock.o             
+OBJS=ParFUM.o mesh.o symmetries.o partition.o map.o compat.o call_init.o parallel_part.o mesh_modify.o mesh_adjacency.o adapt.o adapt_algs.o adapt_if.o interpolate.o lock.o util.o lock_node.o adapt_lock.o ParFUM_SA.o
 
 COMPAT=compat_init.o compat_finit.o compat_driver.o compat_fdriver.o 
 LIB=libmoduleParFUM
@@ -24,15 +24,18 @@ PARFUMMAIN=$(LIBDIR)/libParFUMmain.o
 
 all: $(DEST) $(COMPATLIB) $(PARFUMMAIN)
 
-fem.decl.h: ParFUM.ci
+ParFUM.decl.h: ParFUM.ci
 	$(CHARMC) ParFUM.ci
-fem.def.h: ParFUM.ci
+ParFUM.def.h: ParFUM.ci
 	$(CHARMC) ParFUM.ci
-ParFUM.def.h: mesh_modify.ci
+ParFUM_Adapt.def.h: mesh_modify.ci
 	$(CHARMC) mesh_modify.ci
-ParFUM.decl.h: mesh_modify.ci
+ParFUM_Adapt.decl.h: mesh_modify.ci
 	$(CHARMC) mesh_modify.ci
-
+ParFUM_SA.def.h: ParFUM_SA.ci
+	$(CHARMC) ParFUM_SA.ci
+ParFUM_SA.decl.h: ParFUM_SA.ci
+	$(CHARMC) ParFUM_SA.ci
 
 # Build libmoduleParFUM
 $(DEST): $(OBJS) $(COMPAT) headers $(HEADDEP)
@@ -65,6 +68,9 @@ headers: $(HEADDEP)
 
 mesh_modify.o: mesh_modify.C $(HEADDEP)
 	$(CHARMC) -c mesh_modify.C
+
+ParFUM_SA.o: ParFUM_SA.C $(HEADDEP)
+	$(CHARMC) -c ParFUM_SA.C
 
 ParFUM.o: ParFUM.C $(HEADDEP)
 	$(CHARMC) -c ParFUM.C
@@ -132,7 +138,7 @@ compat_driver.o: compat_driver.c $(HEADDEP)
 compat_fdriver.o: compat_fdriver.c $(HEADDEP)
 	$(CHARMC) -c compat_fdriver.c
 
-docs: ParFUM.doxy ParFUM_Adapt_Algs.h ParFUM_Adapt.h ParFUMf.h ParFUM.h ParFUM_internals.h ParFUM_Interpolate.h ParFUM_locking.h ParFUM_Mesh_Modify.h adapt_algs.C adapt.C adapt_if.C adapt_lock.C collide.C compat.C interpolate.C lock.C lock_node.C main.C map.C mesh_adjacency.C mesh.C mesh_modify.C parallel_part.C ParFUM.C partition.C symmetries.C util.C call_init.c compat_driver.c compat_fdriver.c compat_finit.c compat_init.c
+docs: ParFUM.doxy ParFUM_Adapt_Algs.h ParFUM_Adapt.h ParFUMf.h ParFUM.h ParFUM_internals.h ParFUM_Interpolate.h ParFUM_locking.h ParFUM_Mesh_Modify.h adapt_algs.C adapt.C adapt_if.C adapt_lock.C collide.C compat.C interpolate.C lock.C lock_node.C main.C map.C mesh_adjacency.C mesh.C mesh_modify.C parallel_part.C ParFUM.C partition.C symmetries.C util.C call_init.c compat_driver.c compat_fdriver.c compat_finit.c compat_init.c ParFUM_SA.C
 	doxygen ParFUM.doxy
 
 # clean up

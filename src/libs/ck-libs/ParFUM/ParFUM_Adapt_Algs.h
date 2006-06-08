@@ -5,6 +5,9 @@
  * 
  */
 
+#ifndef __ParFUM_Adapt_Algs_H
+#define __ParFUM_Adapt_Algs_H
+
 #define SLIVERAREA 1.0e-18
 #define REFINE_TOL 1.1  // Refine elements with average edge length > 
                         // REFINE_TOL*desiredEdgeLength
@@ -183,4 +186,4 @@ class FEM_Adapt_Algs {
 
 // End Adapt Algs
 
-
+#endif

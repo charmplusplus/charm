@@ -40,7 +40,7 @@ void FEM_ADAPT_Init(int meshID) {
   FEM_Mesh_create_elem_elem_adjacency(meshID);
   FEM_Mesh_create_node_elem_adjacency(meshID);
   FEM_Mesh_create_node_node_adjacency(meshID);
-  _registerParFUM();
+  //_registerParFUM();
   FEM_REF_INIT(meshID);
   FEM_Mesh *meshP = FEM_Mesh_lookup(meshID, "FEM_ADAPT_Init");
   CtvInitialize(FEM_Adapt_Algs *, _adaptAlgs);

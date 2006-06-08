@@ -30,12 +30,12 @@
 #include "idxl.h"
 #include "idxl_comm.h"
 
-#include "fem.decl.h"
+#include "ParFUM.decl.h"
 #include "msa/msa.h"
 #include "cklists.h"
 #include "pup.h"
 
-#include "ParFUM.decl.h"
+#include "ParFUM_Adapt.decl.h"
 
 /* USE of this extern may be a BUG */
 extern CProxy_femMeshModify meshMod;
@@ -1203,6 +1203,8 @@ inline int zeroToMinusOne(int i) {
 }
 
 
+class ParFUMShadowArray;
+
 ///A FEM_Mesh is a collection of entities.
 /**
  * This class describes all the nodes and elements in
@@ -1218,9 +1220,11 @@ class FEM_Mesh : public CkNoncopyable {
 
  public:
   femMeshModify *fmMM;
+  ParFUMShadowArray *parfumSA;
   bool lastLayerSet;
   FEM_ElemAdj_Layer* lastElemAdjLayer;
   void setFemMeshModify(femMeshModify *m);
+  void setParfumSA(ParFUMShadowArray *m);
   
   FEM_Mesh();
   void pup(PUP::er &p); //For migration

@@ -1867,6 +1867,10 @@ void FEM_Mesh::setFemMeshModify(femMeshModify *m){
   fmMM = m;
 }
 
+void FEM_Mesh::setParfumSA(ParFUMShadowArray *m){
+  parfumSA = m;
+}
+
 
 femMeshModify *FEM_Mesh::getfmMM(){
   return fmMM;

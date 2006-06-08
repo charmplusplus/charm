@@ -3,6 +3,9 @@
  *
  */
 
+#ifndef __PARFUM_LOCKING_H
+#define __PARFUM_LOCKING_H
+
 #define _LOCKCHUNKS
 
 ///there is one fem_lock associated with every FEM_Mesh: Chunk Lock (no longer in use)
@@ -109,3 +112,4 @@ class FEM_lockN {
 
 // end ParFUM_locking.h
 
+#endif
