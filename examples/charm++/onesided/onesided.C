@@ -34,22 +34,22 @@ commtest::commtest()
 
 void commtest::startRMA(int op) {
   operation = op;
-  //srcAddr = (char*)malloc(size*sizeof(char));
-  srcAddr = (char*)CmiDMAAlloc(size);
+  srcAddr = (char*)malloc(size*sizeof(char));
+  //srcAddr = (char*)CmiDMAAlloc(size);
   initializeMem(srcAddr,size,srcChar);
   //CkPrintf("[%d]Trying to register memory %p\n",idx,srcAddr);
-  //CmiRegisterMemory((void*)srcAddr,size);
+  CmiRegisterMemory((void*)srcAddr,size);
   thisProxy[dest].remoteRMA(size,operation);
 }
 
 void commtest::remoteRMA(int len,int op) {
   size = len;
   operation = 1 - op;
-  //destAddr = (char*)malloc(size*sizeof(char));
-  destAddr = (char*)CmiDMAAlloc(size);
+  destAddr = (char*)malloc(size*sizeof(char));
+  //destAddr = (char*)CmiDMAAlloc(size);
   initializeMem(destAddr,size,srcChar);
   //CkPrintf("[%d]Trying to register memory %p\n",idx,destAddr);
-  //CmiRegisterMemory((void*)destAddr,size);
+  CmiRegisterMemory((void*)destAddr,size);
   charMsg *cm = new charMsg();
   cm->addr = destAddr;
   thisProxy[dest].recvAddr(cm);
