@@ -10,7 +10,7 @@
 class PrefixRouter : public Router {
     int *gpes;
     int *prefix_pelist;
-    int MyPe, npes;
+    int npes, MyPe;
 
  public:
     PrefixRouter(int _npes, int me) : npes(_npes), MyPe(me) {};
