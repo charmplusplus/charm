@@ -68,17 +68,78 @@ const IDXL_Rec *IDXL_Map::get(int entity) const
 IDXL_List::IDXL_List()
 {
 	chunk=-1;
+	lock = false;
 }
 IDXL_List::IDXL_List(int otherchunk)
 {
 	chunk=otherchunk;
+	lock = false;
 }
 IDXL_List::~IDXL_List() {}
+
+bool IDXL_List::lockIdxl(){
+  if(!lock) {
+    lock = true;
+    return true;
+  }
+  return false;
+}
+
+void IDXL_List::unlockIdxl(){
+  lock = false;
+}
+
+bool IDXL_List::isLocked() {
+  return lock;
+}
+
+int IDXL_List::push_back(int localIdx) {
+  int ret=shared.size();
+  shared.push_back(localIdx);
+  return ret;
+}
+
+bool IDXL_List::set(int localIdx, int sharedIdx) {
+  int size = shared.size();
+  if(sharedIdx<0 || sharedIdx > size+50) return false;
+  if(sharedIdx < size) {
+    shared[sharedIdx] = localIdx;
+  }
+  else {
+    for(int i=size; i<sharedIdx; i++) {
+      shared.push_back(-1);
+    }
+    shared.push_back(localIdx);
+  }
+  return true;
+}
+
+bool IDXL_List::unset(int sharedIdx) {
+  int size = shared.size();
+  if(sharedIdx >= size || sharedIdx < 0) return false;
+  shared[sharedIdx] = -1;
+  return true;
+}
+
+int IDXL_List::exists(int localIdx) {
+  for(int i=0; i<shared.size(); i++) {
+    if(shared[i]==localIdx) return i;
+  }
+  return -1;
+}
+
+int IDXL_List::get(int sharedIdx) {
+  int size = shared.size();
+  if(sharedIdx >= size || sharedIdx < 0) return -1;
+  return shared[sharedIdx];
+}
+
 void IDXL_List::pup(PUP::er &p)
 {
 	p|chunk;
 	p|shared;
 }
+
 bool doubleeq(double a,double b){
 		if(a-b < 1e-100 && a-b > -1e-100){
 			return true;
@@ -234,6 +295,47 @@ void IDXL_Side::add(int myChunk,int myLocalNo,
 	myList->push_back(myLocalNo);
 	hisList->push_back(hisLocalNo);
 	flushMap(); his.flushMap();
+}
+
+/// This local entity number is shared with the given local chunk
+int IDXL_Side::addNode(int localNo,int sharedWithChk) {
+  int shdIdx = addList(sharedWithChk).push_back(localNo);
+  flushMap();
+  return shdIdx;
+}
+
+int IDXL_Side::removeNode(int localNo, int sharedWithChk) {
+  int local = findLocalList(sharedWithChk);
+  int shdIdx = -1;
+  for(int i=0; i<comm[local]->size(); i++) {
+    if((*comm[local])[i] == localNo) {
+      //amounts to removing this element from this list for this chunk
+      (*comm[local])[i] = -1;
+      shdIdx = i;
+    }
+  }
+  flushMap();
+  return shdIdx;
+}
+	
+bool IDXL_Side::setNode(int localNo, int sharedWithChk, int sharedIdx) {
+  bool done = addList(sharedWithChk).set(localNo, sharedIdx);
+  flushMap();
+  return done;
+}
+
+bool IDXL_Side::unsetNode(int sharedWithChk, int sharedIdx) {
+  bool done = addList(sharedWithChk).unset(sharedIdx);
+  flushMap();
+  return done;
+}
+
+int IDXL_Side::existsNode(int localNo, int sharedWithChk) {
+  return addList(sharedWithChk).exists(localNo);
+}
+
+int IDXL_Side::getNode(int sharedWithChk, int sharedIdx) {
+  return addList(sharedWithChk).get(sharedIdx);
 }
 
 class IDXL_Identity_Map : public IDXL_Print_Map {

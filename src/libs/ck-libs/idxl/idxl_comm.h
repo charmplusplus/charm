@@ -82,6 +82,7 @@ public:
 class IDXL_List {
 	int chunk; //Global number of other chunk	
 	CkVec<int> shared; //Local indices of shared entities
+	bool lock;
 public:
 	IDXL_List();
 	IDXL_List(int otherchunk);
@@ -91,12 +92,15 @@ public:
 	int &operator[](int idx) {return shared[idx]; }
 	int operator[](int idx) const {return shared[idx]; }
 	const int *getVec(void) const {return &shared[0];}
+	bool lockIdxl();
+	void unlockIdxl();
+	bool isLocked();
 	/// We share this local index with this other chunk.
-	int push_back(int localIdx) {
-		int ret=shared.size();
-		shared.push_back(localIdx);
-		return ret;
-	}
+	int push_back(int localIdx);
+	bool set(int localIdx, int sharedIdx);
+	bool unset(int sharedIdx);
+	int exists(int localIdx);
+	int get(int sharedIdx);
 	void pup(PUP::er &p);
 	void sort2d(double *coord);
 	void sort3d(double *coord);
@@ -170,26 +174,15 @@ public:
 		}
 		return *ret;
 	}
+
+	IDXL_List *getIdxlListN(int chunk) {
+	  return getListN(chunk);
+	}
 	
 	/// Look up an entity's IDXL_Rec by the entity's local number
 	const IDXL_Rec *getRec(int entity) const;
 	
-	/// This local entity number is shared with the given local chunk
-	void addNode(int localNo,int sharedWithChk) {
-		addList(sharedWithChk).push_back(localNo);
-		flushMap();
-	}
 
-	void removeNode(int localNo, int sharedWithChk) {
-	  int local = findLocalList(sharedWithChk);
-	  for(int i=0; i<comm[local]->size(); i++) {
-	    if((*comm[local])[i] == localNo) {
-	      (*comm[local])[i] = -1; //amounts to removing this element from this list for this chunk
-	    }
-	  }
-	  flushMap();
-	}
-	
 	/// The communication lists just changed-- flush any cached information.
 	void flushMap(void);
 	
@@ -201,6 +194,16 @@ public:
 	void add(int myChunk,int myLocalNo,
 		 int hisChunk,int hisLocalNo,IDXL_Side &hisList);
 	
+	bool lockIdxl(int sharedWithChk);
+	void unlockIdxl(int sharedWithChk);
+	bool isLocked(int sharedWithChk);
+	int addNode(int localNo, int sharedWithChk);
+	int removeNode(int localNo, int sharedWithChk);
+	bool setNode(int localNo, int sharedWithChk, int sharedIdx);
+	bool unsetNode(int sharedWithChk, int sharedIdx);
+	int existsNode(int localNo, int sharedWithChk);
+	int getNode(int sharedWithChk, int sharedIdx);
+
 	void print(const IDXL_Print_Map *idxmap=NULL) const;
 
 	void sort2d(double *coord);
