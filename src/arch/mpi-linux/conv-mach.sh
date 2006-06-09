@@ -6,6 +6,7 @@ CMK_CXXPP='mpiCC -E '
 CMK_RANLIB='ranlib'
 CMK_LIBS='-lckqt -lmpich '
 CMK_LD_LIBRARY_PATH="-Wl,-rpath,$CHARMLIBSO/"
+CMK_QT="i386-gcc"
 
 CMK_NATIVE_CC='gcc '
 CMK_NATIVE_CXX='g++ '
