@@ -1926,7 +1926,7 @@ _ACEOF
 
 if test $pass -eq 1
 then
-	add_flag 'CMK_LIBS="$CMK_LIBS -lz"' "zlib"
+	add_flag 'CMK_LIBZ="-lz"' "zlib"
 fi
 
 fi
