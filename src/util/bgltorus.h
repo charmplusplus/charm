@@ -131,9 +131,10 @@ class BGLTorusManager {
     return ((an>aan)?aan:an);
   }
   inline int absz(int n){
-    int an = abs(n);
-    int aan = nzsize - an;
-    CmiAssert(aan>=0);
+    /* funny doubling  of Z in VN case */
+    int an = (isVN) ? abs(n)/2 : abs(n);
+    int aan = nzsize - an;  
+    CmiAssert(aan>=0); 
     return ((an>aan)?aan:an);
   }
   
