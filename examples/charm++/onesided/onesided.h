@@ -1,5 +1,10 @@
 #include "onesided.decl.h"
 
+
+void doneOp(void *tmp);
+
+CpvDeclare(void *, _cmvar);
+
 class charMsg : public CMessage_charMsg {
  public:
   char *addr;
@@ -19,12 +24,13 @@ class commtest : public CBase_commtest {
   unsigned int size, dest;
   char srcChar, destChar;
   int operation; //get or put (current operation)
+  int callb;
   void *pend;
  public:
   commtest(CkMigrateMessage *m) {}
   commtest(void);
-  void startRMA(int op);
-  void remoteRMA(int len, int op);
+  void startRMA(int op, int cb);
+  void remoteRMA(int len, int op, int cb);
   void recvAddr(charMsg *cm);
   void verifyCorrectRMA(char c);
   void doJnkWork(void);
@@ -33,4 +39,3 @@ class commtest : public CBase_commtest {
   void testForCompletion(void);
   void testForCorrectness(void);
 };
-

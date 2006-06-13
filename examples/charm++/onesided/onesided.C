@@ -9,7 +9,11 @@ Main::Main(CkArgMsg* m)
   CProxy_commtest arr = CProxy_commtest::ckNew(2);
   mainProxy = thisProxy;
 
-  arr[0].startRMA(atoi(m->argv[1]));
+  if(m->argc!=3) {
+    CkPrintf("USAGE: pgm <typeOfRmaOp> <with/wo Callback>\n");
+    CkExit();
+  }
+  arr[0].startRMA(atoi(m->argv[1]), atoi(m->argv[2]));
   delete m;
 }
 
@@ -29,22 +33,26 @@ commtest::commtest()
   srcChar = (idx==0)?'1':'2';
   destChar = (idx==0)?'2':'1';
   operation = 0;
+  callb = 0;
   CkPrintf("[%d]Object created on %d\n",idx,idx);
+  CpvAccess(_cmvar) = this;
 }
 
-void commtest::startRMA(int op) {
+void commtest::startRMA(int op, int cb) {
   operation = op;
+  callb = cb;
   srcAddr = (char*)malloc(size*sizeof(char));
   //srcAddr = (char*)CmiDMAAlloc(size);
   initializeMem(srcAddr,size,srcChar);
   //CkPrintf("[%d]Trying to register memory %p\n",idx,srcAddr);
   CmiRegisterMemory((void*)srcAddr,size);
-  thisProxy[dest].remoteRMA(size,operation);
+  thisProxy[dest].remoteRMA(size,operation,cb);
 }
 
-void commtest::remoteRMA(int len,int op) {
+void commtest::remoteRMA(int len,int op, int cb) {
   size = len;
   operation = 1 - op;
+  callb = cb;
   destAddr = (char*)malloc(size*sizeof(char));
   //destAddr = (char*)CmiDMAAlloc(size);
   initializeMem(destAddr,size,srcChar);
@@ -61,13 +69,27 @@ void commtest::recvAddr(charMsg *cm)
   //now that we have all info, could do either a get or put
   if(operation==0) {
     CkPrintf("[%d]Trying to do a remote put %p to %p\n",idx,srcAddr,destAddr);
-    pend = CmiPut(idx, dest, (void*)srcAddr, (void*)destAddr, size);
+    if(callb==0) {
+      pend = CmiPut(idx, dest, (void*)srcAddr, (void*)destAddr, size);
+    }
+    else {
+      void *tmp;
+      CmiPutCb(idx, dest, (void*)srcAddr, (void*)destAddr, size, doneOp, tmp);
+    }
   }
   else {
     CkPrintf("[%d]Trying to do a remote get %p to %p\n",idx,srcAddr,destAddr);
-    pend = CmiGet(idx, dest, (void*)srcAddr, (void*)destAddr, size);
+    if(callb==0) {
+      pend = CmiGet(idx, dest, (void*)srcAddr, (void*)destAddr, size);
+    }
+    else {
+      void *tmp;
+      CmiGetCb(idx, dest, (void*)srcAddr, (void*)destAddr, size, doneOp, tmp);
+    }
   }
-  testDone();
+  if(callb==0) {
+    testDone();
+  }
   delete cm;
 }
 
@@ -93,7 +115,7 @@ void commtest::verifyCorrectRMA(char c) {
     //thisProxy[dest].testDone();
   }
   else {
-    CkPrintf("[%d]DMA operation %d correctly finished!!\n",idx,operation);
+    CkPrintf("[%d]RMA operation %d correctly finished!!\n",idx,operation);
   }
   mainProxy.done();
 }
@@ -117,6 +139,7 @@ void commtest::testDone(void) {
   int done = CmiWaitTest(pend);
   CkPrintf("[%d]Test if done %p, %d!!\n",idx,pend,*((int*)pend));
   if(done==1) {
+    void *tmp;
     testForCorrectness();
   }
 }
@@ -145,6 +168,10 @@ void commtest::testForCorrectness(void) {
   else {
     verifyCorrectRMA(destChar);
   }
+}
+
+void doneOp(void *tmp) {
+  ((commtest*)(CpvAccess(_cmvar)))->testForCorrectness();
 }
 
 #include "onesided.def.h"
