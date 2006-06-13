@@ -10,14 +10,25 @@
 #ifdef __ONESIDED_IMPL
 #ifdef __ONESIDED_NO_HARDWARE
 
+#ifndef _CONV_ONESIDED_C_
+#define _CONV_ONESIDED_C_
+
+struct CmiCb {
+  CmiRdmaCallbackFn fn;
+  void *param;
+};
+typedef struct CmiCb CmiCb;
+
 /* This is an object which is kindof a handle to a get or put call.
- * If the machine layer supports a callback, the 'fn' field needs to
- * be populated, and it is called when the get/put request completes.
  * This object is polled in test to verify if the get/put has completed.
- * The ready bit is always set if the operation is complete
+ * The completed bit is always set if the operation is complete
  */
 struct CmiRMA {
-  int completed;
+  int type;
+  union {
+    int completed;
+    CmiCb *cb;
+  } ready;
 };
 typedef struct CmiRMA CmiRMA;
 
@@ -38,23 +49,11 @@ struct RMAPutMsg {
 };
 typedef struct RMAPutMsg RMAPutMsg;
 
-/* Registering a piece of memeory implies making it avaialble(visible) to 
- * all other processors.
- * Each process maintains a data structure for each registered memory,
- * each remote processor that wants to talk to this memory will have
- * a region of its own memory mapped into this.
- */
 int CmiRegisterMemory(void *addr, unsigned int size){
   //in the emulated version, this is blank
   return 1;
 }
 
-/* Unregister Memory is expensive anyway, so a linked list
- * data structure just means deletion will be slightly 
- * more expensive, won't be too bad, as this list will
- * not be long.
- * Match this address to the entry in the list and delete it
- */
 int CmiUnRegisterMemory(void *addr, unsigned int size){
   //in the emulated version, this is blank
   return 1;
@@ -62,7 +61,15 @@ int CmiUnRegisterMemory(void *addr, unsigned int size){
 
 void handlePutSrc(void *msg) {
   CmiRMA* stat = ((CmiRMAMsg*)msg)->stat;
-  stat->completed = 1;
+  if(stat->type==1) {
+    stat->ready.completed = 1;
+    //the handle is active, and the user will clean it
+  }
+  else {
+    (*(stat->ready.cb->fn))(stat->ready.cb->param);
+    CmiFree(stat->ready.cb);
+    CmiFree(stat); //clean up the internal handle
+  }
   CmiFree(msg);
   return;
 }
@@ -88,18 +95,45 @@ void *CmiPut(unsigned int sourceId, unsigned int targetId, void *Saddr, void *Ta
   unsigned int sizeRma = sizeof(RMAPutMsg)+size;
   void *msgRma = (void*)malloc(sizeRma);
   RMAPutMsg *context = (RMAPutMsg*)msgRma;
+
   context->Saddr = Saddr;
   context->Taddr = Taddr;
   context->size = size;
   context->targetId = targetId;
   context->sourceId = sourceId;
   context->stat = (CmiRMA*)malloc(sizeof(CmiRMA));
-  context->stat->completed = 0;
+  context->stat->type = 1;
+  context->stat->ready.completed = 0;
   void* putdata = (void*)(((char*)(msgRma))+sizeof(RMAPutMsg));
   memcpy(putdata,Saddr,size);
+
   CmiSetHandler(msgRma,putDestHandler);
   CmiSyncSendAndFree(targetId,sizeRma,msgRma);
+
   return (void*)(context->stat);
+}
+
+void CmiPutCb(unsigned int sourceId, unsigned int targetId, void *Saddr, void *Taddr, unsigned int size, CmiRdmaCallbackFn fn, void *param) {
+  unsigned int sizeRma = sizeof(RMAPutMsg)+size;
+  void *msgRma = (void*)malloc(sizeRma);
+  RMAPutMsg *context = (RMAPutMsg*)msgRma;
+
+  context->Saddr = Saddr;
+  context->Taddr = Taddr;
+  context->size = size;
+  context->targetId = targetId;
+  context->sourceId = sourceId;
+  context->stat = (CmiRMA*)malloc(sizeof(CmiRMA));
+  context->stat->type = 0;
+  context->stat->ready.cb = (CmiCb*)malloc(sizeof(CmiCb));
+  context->stat->ready.cb->fn = fn;
+  context->stat->ready.cb->param = param;
+  void* putdata = (void*)(((char*)(msgRma))+sizeof(RMAPutMsg));
+  memcpy(putdata,Saddr,size);
+
+  CmiSetHandler(msgRma,putDestHandler);
+  CmiSyncSendAndFree(targetId,sizeRma,msgRma);
+  return;
 }
 
 void handleGetSrc(void *msg) {
@@ -108,7 +142,15 @@ void handleGetSrc(void *msg) {
   //copy the message
   memcpy(context->Saddr,putdata,context->size);
   //note the ack
-  context->stat->completed = 1;
+  if(context->stat->type==1) {
+    context->stat->ready.completed = 1;
+    //the handle will be used still, and the user will clean it
+  }
+  else {
+    (*(context->stat->ready.cb->fn))(context->stat->ready.cb->param);
+    CmiFree(context->stat->ready.cb);
+    CmiFree(context->stat); //clean up the internal handle
+  }
   CmiFree(msg);
   return;
 }
@@ -141,7 +183,8 @@ void *CmiGet(unsigned int sourceId, unsigned int targetId, void *Saddr, void *Ta
   context->targetId = targetId;
   context->sourceId = sourceId;
   context->stat = (CmiRMA*)malloc(sizeof(CmiRMA));
-  context->stat->completed = 0;
+  context->stat->type = 1;
+  context->stat->ready.completed = 0;
 
   CmiSetHandler(msgRma,getDestHandler);
   CmiSyncSendAndFree(targetId,sizeRma,msgRma);
@@ -149,10 +192,37 @@ void *CmiGet(unsigned int sourceId, unsigned int targetId, void *Saddr, void *Ta
   return (void*)(context->stat);
 }
 
-int CmiWaitTest(void *obj){
-  return ((CmiRMA*)obj)->completed;
+void CmiGetCb(unsigned int sourceId, unsigned int targetId, void *Saddr, void *Taddr, unsigned int size, CmiRdmaCallbackFn fn, void *param) {
+  unsigned int sizeRma;
+  char *msgRma;
+  RMAPutMsg *context;
+  sizeRma = sizeof(RMAPutMsg);
+  msgRma = (char*)CmiAlloc(sizeRma*sizeof(char));
+
+  context = (RMAPutMsg*)msgRma;
+  context->Saddr = Saddr;
+  context->Taddr = Taddr;
+  context->size = size;
+  context->targetId = targetId;
+  context->sourceId = sourceId;
+  context->stat = (CmiRMA*)malloc(sizeof(CmiRMA));
+  context->stat->type = 0;
+  context->stat->ready.cb = (CmiCb*)malloc(sizeof(CmiCb));
+  context->stat->ready.cb->fn = fn;
+  context->stat->ready.cb->param = param;
+
+  CmiSetHandler(msgRma,getDestHandler);
+  CmiSyncSendAndFree(targetId,sizeRma,msgRma);
+  return;
 }
 
+
+int CmiWaitTest(void *obj){
+  CmiRMA *stat = (CmiRMA*)obj;
+  return stat->ready.completed;
+}
+
+#endif
 #endif
 #endif
 

@@ -1043,8 +1043,18 @@ static char *getErrorMsg(gm_status_t status)
 #ifdef __ONESIDED_IMPL
 #ifdef __ONESIDED_GM_HARDWARE
 
+struct CmiCb {
+  CmiRdmaCallbackFn fn;
+  void *param;
+};
+typedef struct CmiCb CmiCb;
+
 struct CmiRMA {
-  int completed;
+  int type;
+  union {
+    int completed;
+    CmiCb *cb;
+  } ready;
 };
 typedef struct CmiRMA CmiRMA;
 
@@ -1112,7 +1122,16 @@ void put_callback(struct gm_port *p, void *context, gm_status_t status)
         CmiAbort("gm send_callback failed");
     }
   }
-  out->stat->completed=1;
+  CmiPrintf("Success in put callback\n");
+  if(out->stat->type==1) {
+    out->stat->ready.completed = 1;
+    //the handle is active, and the user will clean it
+  }
+  else {
+    (*(out->stat->ready.cb->fn))(out->stat->ready.cb->param);
+    CmiFree(out->stat->ready.cb);
+    CmiFree(out->stat); //clean up the internal handle
+  }
   gm_free_send_token (gmport, GM_HIGH_PRIORITY);
   return;
 }
@@ -1128,7 +1147,8 @@ void *CmiPut(unsigned int sourceId, unsigned int targetId, void *Saddr, void *Ta
   context->sourceId = sourceId;
   context->dataport = dataport;
   context->stat = (CmiRMA*)malloc(sizeof(CmiRMA));
-  context->stat->completed = 0;
+  context->stat->type = 1;
+  context->stat->ready.completed = 0;
   //get a token before the put
   if (gm_alloc_send_token(gmport, GM_HIGH_PRIORITY)) {
     //perform the put
@@ -1139,9 +1159,46 @@ void *CmiPut(unsigned int sourceId, unsigned int targetId, void *Saddr, void *Ta
   return (void*)(context->stat);
 }
 
+void CmiPutCb(unsigned int sourceId, unsigned int targetId, void *Saddr, void *Taddr, unsigned int size, CmiRdmaCallbackFn fn, void *param) {
+  unsigned int dataport = (nodes_by_pe[targetId])->dataport;
+  unsigned int destMachId = (nodes_by_pe[targetId])->mach_id;
+  RMAPutMsg *context = (RMAPutMsg*)malloc(sizeof(RMAPutMsg));
+
+  context->Saddr = Saddr;
+  context->Taddr = Taddr;
+  context->size = size;
+  context->targetId = targetId;
+  context->sourceId = sourceId;
+  context->dataport = dataport;
+  context->stat = (CmiRMA*)malloc(sizeof(CmiRMA));
+  context->stat->type = 0;
+  CmiPrintf("Inside CmiPutCb\n");
+  context->stat->ready.cb = (CmiCb*)malloc(sizeof(CmiCb));
+  context->stat->ready.cb->fn = fn;
+  CmiPrintf("Inside 1 CmiPutCb\n");
+  context->stat->ready.cb->param = param;
+  //get a token before the put
+  CmiPrintf("Trying directed send\n");
+  if (gm_alloc_send_token(gmport, GM_HIGH_PRIORITY)) {
+    //perform the put
+    gm_directed_send_with_callback(gmport,Saddr,(gm_remote_ptr_t)Taddr,size,
+				   GM_HIGH_PRIORITY,destMachId,dataport,
+				   put_callback,(void*)context);
+  }
+  return;
+}
+
 void handleGetSrc(void *msg) {
   CmiRMA* stat = ((CmiRMAMsg*)msg)->stat;
-  stat->completed = 1;
+  if(stat->type==1) {
+    stat->ready.completed = 1;
+    //the handle is active, and the user will clean it
+  }
+  else {
+    (*(stat->ready.cb->fn))(stat->ready.cb->param);
+    CmiFree(stat->ready.cb);
+    CmiFree(stat); //clean up the internal handle
+  }
   CmiFree(msg);
   return;
 }
@@ -1215,7 +1272,8 @@ void *CmiGet(unsigned int sourceId, unsigned int targetId, void *Saddr, void *Ta
   context->sourceId = sourceId;
   context->dataport = dataport;
   context->stat = (CmiRMA*)malloc(sizeof(CmiRMA));
-  context->stat->completed = 0;
+  context->stat->type = 1;
+  context->stat->ready.completed = 0;
 
   CmiSetHandler(msgRma,getDestHandler);
   CmiSyncSendAndFree(targetId,sizeRma,msgRma);
@@ -1223,8 +1281,36 @@ void *CmiGet(unsigned int sourceId, unsigned int targetId, void *Saddr, void *Ta
   return (void*)(context->stat);
 }
 
+void CmiGetCb(unsigned int sourceId, unsigned int targetId, void *Saddr, void *Taddr, unsigned int size, CmiRdmaCallbackFn fn, void *param) {
+  int dataport = (nodes_by_pe[targetId])->dataport;
+  int sizeRma;
+  char *msgRma;
+  RMAPutMsg *context;
+  sizeRma = sizeof(RMAPutMsg);
+  msgRma = (void*)CmiAlloc(sizeRma);
+
+  context = (RMAPutMsg*)msgRma;
+  context->Saddr = Saddr;
+  context->Taddr = Taddr;
+  context->size = size;
+  context->targetId = targetId;
+  context->sourceId = sourceId;
+  context->dataport = dataport;
+  context->stat = (CmiRMA*)malloc(sizeof(CmiRMA));
+  context->stat->type = 0;
+  context->stat->ready.cb = (CmiCb*)malloc(sizeof(CmiCb));
+  context->stat->ready.cb->fn = fn;
+  context->stat->ready.cb->param = param;
+
+  CmiSetHandler(msgRma,getDestHandler);
+  CmiSyncSendAndFree(targetId,sizeRma,msgRma);
+  return;
+}
+
+
 int CmiWaitTest(void *obj){
-  return ((CmiRMA*)obj)->completed;
+  CmiRMA *stat = (CmiRMA*)obj;
+  return stat->ready.completed;
 }
 
 #endif
