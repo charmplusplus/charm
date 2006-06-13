@@ -1086,7 +1086,7 @@ int CmiRegisterMemory(void *addr, unsigned int size) {
   gm_status_t status;
   status = gm_register_memory(gmport, addr, size);
   if (status != GM_SUCCESS) { 
-    printf("Cannot register memory at %p of size %d\n",addr,size);
+    CmiPrintf("Cannot register memory at %p of size %d\n",addr,size);
     gm_perror("registerMemory", status); 
     return 0;
   }
@@ -1098,7 +1098,7 @@ int CmiUnRegisterMemory(void *addr, unsigned int size) {
   gm_status_t status;
   status = gm_deregister_memory(gmport, addr, size);
   if (status != GM_SUCCESS) { 
-    printf("Cannot unregister memory at %p of size %d\n",addr,size);
+    CmiPrintf("Cannot unregister memory at %p of size %d\n",addr,size);
     gm_perror("UnregisterMemory", status); 
     return 0;
   }
@@ -1122,15 +1122,15 @@ void put_callback(struct gm_port *p, void *context, gm_status_t status)
         CmiAbort("gm send_callback failed");
     }
   }
-  CmiPrintf("Success in put callback\n");
   if(out->stat->type==1) {
     out->stat->ready.completed = 1;
     //the handle is active, and the user will clean it
   }
   else {
     (*(out->stat->ready.cb->fn))(out->stat->ready.cb->param);
-    CmiFree(out->stat->ready.cb);
-    CmiFree(out->stat); //clean up the internal handle
+    //I do not undestand, on turing the following two frees become double frees??
+    //CmiFree(out->stat->ready.cb);
+    //CmiFree(out->stat); //clean up the internal handle
   }
   gm_free_send_token (gmport, GM_HIGH_PRIORITY);
   return;
@@ -1172,13 +1172,10 @@ void CmiPutCb(unsigned int sourceId, unsigned int targetId, void *Saddr, void *T
   context->dataport = dataport;
   context->stat = (CmiRMA*)malloc(sizeof(CmiRMA));
   context->stat->type = 0;
-  CmiPrintf("Inside CmiPutCb\n");
   context->stat->ready.cb = (CmiCb*)malloc(sizeof(CmiCb));
   context->stat->ready.cb->fn = fn;
-  CmiPrintf("Inside 1 CmiPutCb\n");
   context->stat->ready.cb->param = param;
   //get a token before the put
-  CmiPrintf("Trying directed send\n");
   if (gm_alloc_send_token(gmport, GM_HIGH_PRIORITY)) {
     //perform the put
     gm_directed_send_with_callback(gmport,Saddr,(gm_remote_ptr_t)Taddr,size,
@@ -1196,8 +1193,9 @@ void handleGetSrc(void *msg) {
   }
   else {
     (*(stat->ready.cb->fn))(stat->ready.cb->param);
-    CmiFree(stat->ready.cb);
-    CmiFree(stat); //clean up the internal handle
+    //I do not undestand, on turing the following two frees become double frees??
+    //CmiFree(stat->ready.cb);
+    //CmiFree(stat); //clean up the internal handle
   }
   CmiFree(msg);
   return;
