@@ -93,7 +93,7 @@ void handlePutDest(void *msg) {
 
 void *CmiPut(unsigned int sourceId, unsigned int targetId, void *Saddr, void *Taddr, unsigned int size) {
   unsigned int sizeRma = sizeof(RMAPutMsg)+size;
-  void *msgRma = (void*)malloc(sizeRma);
+  void *msgRma = (void*)CmiAlloc(sizeRma);
   RMAPutMsg *context = (RMAPutMsg*)msgRma;
 
   context->Saddr = Saddr;
@@ -101,21 +101,22 @@ void *CmiPut(unsigned int sourceId, unsigned int targetId, void *Saddr, void *Ta
   context->size = size;
   context->targetId = targetId;
   context->sourceId = sourceId;
-  context->stat = (CmiRMA*)malloc(sizeof(CmiRMA));
+  context->stat = (CmiRMA*)CmiAlloc(sizeof(CmiRMA));
   context->stat->type = 1;
   context->stat->ready.completed = 0;
   void* putdata = (void*)(((char*)(msgRma))+sizeof(RMAPutMsg));
   memcpy(putdata,Saddr,size);
+  void *stat = context->stat;
 
   CmiSetHandler(msgRma,putDestHandler);
   CmiSyncSendAndFree(targetId,sizeRma,msgRma);
 
-  return (void*)(context->stat);
+  return stat;
 }
 
 void CmiPutCb(unsigned int sourceId, unsigned int targetId, void *Saddr, void *Taddr, unsigned int size, CmiRdmaCallbackFn fn, void *param) {
   unsigned int sizeRma = sizeof(RMAPutMsg)+size;
-  void *msgRma = (void*)malloc(sizeRma);
+  void *msgRma = (void*)CmiAlloc(sizeRma);
   RMAPutMsg *context = (RMAPutMsg*)msgRma;
 
   context->Saddr = Saddr;
@@ -123,9 +124,9 @@ void CmiPutCb(unsigned int sourceId, unsigned int targetId, void *Saddr, void *T
   context->size = size;
   context->targetId = targetId;
   context->sourceId = sourceId;
-  context->stat = (CmiRMA*)malloc(sizeof(CmiRMA));
+  context->stat = (CmiRMA*)CmiAlloc(sizeof(CmiRMA));
   context->stat->type = 0;
-  context->stat->ready.cb = (CmiCb*)malloc(sizeof(CmiCb));
+  context->stat->ready.cb = (CmiCb*)CmiAlloc(sizeof(CmiCb));
   context->stat->ready.cb->fn = fn;
   context->stat->ready.cb->param = param;
   void* putdata = (void*)(((char*)(msgRma))+sizeof(RMAPutMsg));
@@ -158,7 +159,7 @@ void handleGetSrc(void *msg) {
 void handleGetDest(void *msg) {
   RMAPutMsg *context1 = (RMAPutMsg*)msg;
   unsigned int sizeRma = sizeof(RMAPutMsg)+context1->size;
-  void *msgRma = (void*)malloc(sizeRma);
+  void *msgRma = (void*)CmiAlloc(sizeRma);
   RMAPutMsg *context = (RMAPutMsg*)msgRma;
   memcpy(context,context1,sizeof(RMAPutMsg));
   void* putdata = (void*)(((char*)(msgRma))+sizeof(RMAPutMsg));
@@ -182,14 +183,14 @@ void *CmiGet(unsigned int sourceId, unsigned int targetId, void *Saddr, void *Ta
   context->size = size;
   context->targetId = targetId;
   context->sourceId = sourceId;
-  context->stat = (CmiRMA*)malloc(sizeof(CmiRMA));
+  context->stat = (CmiRMA*)CmiAlloc(sizeof(CmiRMA));
   context->stat->type = 1;
   context->stat->ready.completed = 0;
+  void *stat = context->stat;
 
   CmiSetHandler(msgRma,getDestHandler);
   CmiSyncSendAndFree(targetId,sizeRma,msgRma);
-
-  return (void*)(context->stat);
+  return stat;
 }
 
 void CmiGetCb(unsigned int sourceId, unsigned int targetId, void *Saddr, void *Taddr, unsigned int size, CmiRdmaCallbackFn fn, void *param) {
@@ -205,9 +206,9 @@ void CmiGetCb(unsigned int sourceId, unsigned int targetId, void *Saddr, void *T
   context->size = size;
   context->targetId = targetId;
   context->sourceId = sourceId;
-  context->stat = (CmiRMA*)malloc(sizeof(CmiRMA));
+  context->stat = (CmiRMA*)CmiAlloc(sizeof(CmiRMA));
   context->stat->type = 0;
-  context->stat->ready.cb = (CmiCb*)malloc(sizeof(CmiCb));
+  context->stat->ready.cb = (CmiCb*)CmiAlloc(sizeof(CmiCb));
   context->stat->ready.cb->fn = fn;
   context->stat->ready.cb->param = param;
 

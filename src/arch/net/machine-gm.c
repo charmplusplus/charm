@@ -1129,8 +1129,8 @@ void put_callback(struct gm_port *p, void *context, gm_status_t status)
   else {
     (*(out->stat->ready.cb->fn))(out->stat->ready.cb->param);
     //I do not undestand, on turing the following two frees become double frees??
-    //CmiFree(out->stat->ready.cb);
-    //CmiFree(out->stat); //clean up the internal handle
+    CmiFree(out->stat->ready.cb);
+    CmiFree(out->stat); //clean up the internal handle
   }
   gm_free_send_token (gmport, GM_HIGH_PRIORITY);
   return;
@@ -1139,16 +1139,17 @@ void put_callback(struct gm_port *p, void *context, gm_status_t status)
 void *CmiPut(unsigned int sourceId, unsigned int targetId, void *Saddr, void *Taddr, unsigned int size) {
   unsigned int dataport = (nodes_by_pe[targetId])->dataport;
   unsigned int destMachId = (nodes_by_pe[targetId])->mach_id;
-  RMAPutMsg *context = (RMAPutMsg*)malloc(sizeof(RMAPutMsg));
+  RMAPutMsg *context = (RMAPutMsg*)CmiAlloc(sizeof(RMAPutMsg));
   context->Saddr = Saddr;
   context->Taddr = Taddr;
   context->size = size;
   context->targetId = targetId;
   context->sourceId = sourceId;
   context->dataport = dataport;
-  context->stat = (CmiRMA*)malloc(sizeof(CmiRMA));
+  context->stat = (CmiRMA*)CmiAlloc(sizeof(CmiRMA));
   context->stat->type = 1;
   context->stat->ready.completed = 0;
+  void *stat = (void*)(context->stat); 
   //get a token before the put
   if (gm_alloc_send_token(gmport, GM_HIGH_PRIORITY)) {
     //perform the put
@@ -1156,13 +1157,13 @@ void *CmiPut(unsigned int sourceId, unsigned int targetId, void *Saddr, void *Ta
 				   GM_HIGH_PRIORITY,destMachId,dataport,
 				   put_callback,(void*)context);
   }
-  return (void*)(context->stat);
+  return stat;
 }
 
 void CmiPutCb(unsigned int sourceId, unsigned int targetId, void *Saddr, void *Taddr, unsigned int size, CmiRdmaCallbackFn fn, void *param) {
   unsigned int dataport = (nodes_by_pe[targetId])->dataport;
   unsigned int destMachId = (nodes_by_pe[targetId])->mach_id;
-  RMAPutMsg *context = (RMAPutMsg*)malloc(sizeof(RMAPutMsg));
+  RMAPutMsg *context = (RMAPutMsg*)CmiAlloc(sizeof(RMAPutMsg));
 
   context->Saddr = Saddr;
   context->Taddr = Taddr;
@@ -1170,9 +1171,9 @@ void CmiPutCb(unsigned int sourceId, unsigned int targetId, void *Saddr, void *T
   context->targetId = targetId;
   context->sourceId = sourceId;
   context->dataport = dataport;
-  context->stat = (CmiRMA*)malloc(sizeof(CmiRMA));
+  context->stat = (CmiRMA*)CmiAlloc(sizeof(CmiRMA));
   context->stat->type = 0;
-  context->stat->ready.cb = (CmiCb*)malloc(sizeof(CmiCb));
+  context->stat->ready.cb = (CmiCb*)CmiAlloc(sizeof(CmiCb));
   context->stat->ready.cb->fn = fn;
   context->stat->ready.cb->param = param;
   //get a token before the put
@@ -1194,8 +1195,8 @@ void handleGetSrc(void *msg) {
   else {
     (*(stat->ready.cb->fn))(stat->ready.cb->param);
     //I do not undestand, on turing the following two frees become double frees??
-    //CmiFree(stat->ready.cb);
-    //CmiFree(stat); //clean up the internal handle
+    CmiFree(stat->ready.cb);
+    CmiFree(stat); //clean up the internal handle
   }
   CmiFree(msg);
   return;
@@ -1231,7 +1232,7 @@ void get_callback_dest(struct gm_port *p, void *context, gm_status_t status)
 
 void handleGetDest(void *msg) {
   RMAPutMsg *context1 = (RMAPutMsg*)msg;
-  RMAPutMsg *context = (RMAPutMsg*)malloc(sizeof(RMAPutMsg));
+  RMAPutMsg *context = (RMAPutMsg*)CmiAlloc(sizeof(RMAPutMsg));
   unsigned int srcMachId = (nodes_by_pe[context1->sourceId])->mach_id;
   context->Saddr = context1->Taddr;
   context->Taddr = context1->Saddr;
@@ -1269,14 +1270,15 @@ void *CmiGet(unsigned int sourceId, unsigned int targetId, void *Saddr, void *Ta
   context->targetId = targetId;
   context->sourceId = sourceId;
   context->dataport = dataport;
-  context->stat = (CmiRMA*)malloc(sizeof(CmiRMA));
+  context->stat = (CmiRMA*)CmiAlloc(sizeof(CmiRMA));
   context->stat->type = 1;
   context->stat->ready.completed = 0;
+  void *stat = (void*)(context->stat);
 
   CmiSetHandler(msgRma,getDestHandler);
   CmiSyncSendAndFree(targetId,sizeRma,msgRma);
 
-  return (void*)(context->stat);
+  return stat;
 }
 
 void CmiGetCb(unsigned int sourceId, unsigned int targetId, void *Saddr, void *Taddr, unsigned int size, CmiRdmaCallbackFn fn, void *param) {
@@ -1294,9 +1296,9 @@ void CmiGetCb(unsigned int sourceId, unsigned int targetId, void *Saddr, void *T
   context->targetId = targetId;
   context->sourceId = sourceId;
   context->dataport = dataport;
-  context->stat = (CmiRMA*)malloc(sizeof(CmiRMA));
+  context->stat = (CmiRMA*)CmiAlloc(sizeof(CmiRMA));
   context->stat->type = 0;
-  context->stat->ready.cb = (CmiCb*)malloc(sizeof(CmiCb));
+  context->stat->ready.cb = (CmiCb*)CmiAlloc(sizeof(CmiCb));
   context->stat->ready.cb->fn = fn;
   context->stat->ready.cb->param = param;
 
