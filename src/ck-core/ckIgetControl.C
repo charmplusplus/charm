@@ -1,7 +1,9 @@
 #include "charm++.h"
 #include "ckIgetControl.h"
+#ifndef WIN32
 #include <sys/time.h>
 #include <sys/resource.h>
+#endif
 #include <unistd.h>
 #include <iostream>
 #include <fstream>
