@@ -1,3 +1,6 @@
+%% One sided communication in Converse
+%% Author: Nilesh Choudhury
+
 \chapter{\converse{} One Sided Communication Interface}
 
 This chapter deals with one sided communication support in converse.
@@ -60,8 +63,18 @@ in hardware and extra messages.
 are emulated through messages.
 \end{itemize}
 
-The RDMA operations return an opaque handle to the programmer, which can 
-only be used to verify if the operation is complete.
+There are two different sets of RDMA operations
+\begin{itemize}
+\item The first set of RDMA operations return an opaque handle to the programmer, 
+which can only be used to verify if the operation is complete. This suits
+AMPI better and closely follows the idea of separating communication
+from synchronization. So, the user program needs to keep track of 
+synchronization.
+\item The second set of RDMA operations do not return anything, instead they
+provide a callback when the operation completes. This suits nicely the charm++
+framework of sending asynchronous messages. The handler(callback) will be 
+automatically invoked when the operation completes.
+\end{itemize}
 
 {\bf For machine layer developer:} Internally, every machine layer is free
 to create a suitable data structure for this purpose. This is the reason this
@@ -76,8 +89,18 @@ of length {\it size} bytes.}
 
 \function{void *CmiGet(unsinged int sourceId, unsigned int targetId, void *Saddr, void *Taadr, unsigned int size);}
 \index{CmiGet}
-\desc{Exactly similar to {\it CmiPut} except the direction of the data transfer
+\desc{Similar to {\it CmiPut} except the direction of the data transfer
 is opposite; from target to source.}
+
+\function{void CmiPutCb(unsigned int sourceId, unsigned int targetId, void *Saddr, void *Taddr, unsigned int size, CmiRdmaCallbackFn fn, void *param);}
+\index{CmiGet}
+\desc{Similar to {\it CmiPut} except a callback is called when the operation 
+completes.}
+
+\function{void CmiGetCb(unsigned int sourceId, unsigned int targetId, void *Saddr, void *Taddr, unsigned int size, CmiRdmaCallbackFn fn, void *param);}
+\index{CmiGet}
+\desc{Similar to {\it CmiGet} except a callback is called when the operation 
+completes.}
 
 
 \section{Completion of RDMA operation}
