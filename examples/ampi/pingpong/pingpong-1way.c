@@ -51,9 +51,9 @@ int main(int argc, char **argv)
     elapsed_time_sec = MPI_Wtime() - startTime; 
 
     fprintf(stdout, "Totaltime: %8.3f s\n",elapsed_time_sec);
-    elapsed_time_sec /= 2;  //We want the ping performance not round-trip.
-    elapsed_time_sec /= max_msgs; //time for each message
-    bandwidth = msg_size / elapsed_time_sec; //bandwidth
+    elapsed_time_sec /= 2;  /* We want the ping performance not round-trip. */
+    elapsed_time_sec /= max_msgs; /* time for each message */
+    bandwidth = msg_size / elapsed_time_sec; /* bandwidth */
     
     fprintf (stdout, "%5d %7d\t ", max_msgs, msg_size);
     fprintf (stdout,"%8.3f us,\t %8.3f MB/sec\n",
