@@ -189,7 +189,7 @@ static CmiNodeLock  timerLock = 0;
 static double starttimer = 0;
 static int _is_global = 0;
 
-int CmiTimerIsSynchronized(void)
+int CmiTimerIsSynchronized()
 {
   int  flag;
   void *v;
@@ -205,7 +205,7 @@ int CmiTimerIsSynchronized(void)
   return _is_global;
 }
 
-void CmiTimerInit(void)
+void CmiTimerInit()
 {
   _is_global = CmiTimerIsSynchronized();
 
@@ -332,8 +332,8 @@ static struct CmiStateStruct Cmi_state;
 int _Cmi_mype;
 int _Cmi_myrank;
 
-void CmiMemLock(void) {}
-void CmiMemUnlock(void) {}
+void CmiMemLock() {}
+void CmiMemUnlock() {}
 
 #define CmiGetState() (&Cmi_state)
 #define CmiGetStateN(n) (&Cmi_state)
