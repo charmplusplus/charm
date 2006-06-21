@@ -35,6 +35,13 @@
 #include "cklists.h"
 #include "pup.h"
 
+#if CMK_STL_USE_DOT_H /* Pre-standard C++ */
+#  include <iostream.h>
+#else /* ISO C++ */
+#  include <iostream>
+   using namespace std;
+#endif
+
 #include "ParFUM_Adapt.decl.h"
 
 /* USE of this extern may be a BUG */
