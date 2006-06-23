@@ -61,7 +61,7 @@ HybridBaseLB::HybridBaseLB(const CkLBOptions &opt): BaseLB(opt)
   future_migrates_expected = -1;
 
   statsStrategy = FULL;
-  if (CkNumPes() > 8192) statsStrategy = SHRINK;
+  if (CkNumPes() >= 8192) statsStrategy = SHRINK;
   //statsStrategy = SHRINK;
 
   vector_n_moves = 0;
