@@ -42,7 +42,8 @@ HybridLB::HybridLB(const CkLBOptions &opt): HybridBaseLB(opt)
   // IMPORTANT: currently, the greedy LB must allow objects that
   // are not from existing processors.
   refine = (CentralLB *)AllocateRefineLB();
-  greedy = (CentralLB *)AllocateMetisLB();
+//  greedy = (CentralLB *)AllocateMetisLB();
+  greedy = (CentralLB *)AllocateGreedyLB();
 #endif
 }
 
