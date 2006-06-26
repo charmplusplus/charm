@@ -318,6 +318,8 @@ def WriteNodeScript (filename, crm, vmi_key, vmi_specfile, vmi_gridprocs, wan_la
     outfile.write ('VMI_PROCS="' + vmi_gridprocs + '"')
     outfile.write (' ; export VMI_PROCS\n')
 
+    outfile.write ('VMI_MMAP_MAX="0" ; export VMI_MMAP_MAX\n')
+
     #
 
     if (wan_latency != ''):
