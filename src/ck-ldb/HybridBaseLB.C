@@ -341,6 +341,7 @@ CLBStatsMsg * HybridBaseLB::buildCombinedLBStatsMessage(int atlevel)
   if (statsStrategy == SHRINK && atlevel == tree->numLevels()-2) 
   {
     shrink = 1;
+    obj_walltime = obj_cputime = 0.0;
     for (i=0; i<osz; i++)  {
      obj_walltime += statsData->objData[i].wallTime;
      obj_cputime += statsData->objData[i].cpuTime;
