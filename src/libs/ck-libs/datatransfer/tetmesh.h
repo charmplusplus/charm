@@ -68,6 +68,30 @@ public:
 	int addPoint(const CkVector3d &pt) {pts.push_back(pt); return pts.size()-1;}
 
 	int nonGhostTet, nonGhostPt;
+	void write_real_tecplot(char *fname) {
+	  FILE *file = fopen(fname, "w");
+	  // Header
+	  fprintf (file, "TITLE=\"%s\"\n", fname);
+	  fprintf (file, "ZONE N=%d E=%d ET=TETRAHEDRON F=FEPOINT\n",
+		   nonGhostPt, nonGhostTet);
+	  // Mesh vertices
+	  int i,n;
+	  n=nonGhostPt;
+	  for (i=0; i<n; ++i) {
+	    fprintf(file,"%lf %lf %lf %lf\n",pts[i][0],pts[i][1],pts[i][2],pts[i][3]);
+	  }
+	  // Mesh triangles
+	  n=nonGhostTet;
+	  for ( i=0; i<n; ++i) {
+	    for ( int j=0; j<4; ++j) {
+	      fprintf(file,"%d ", tet[i].nodes[j]+1);  
+	    }
+	    fprintf(file,"\n");
+	  }
+	  fclose(file);
+	}
+
+
 private:
 	std::vector<conn_t> tet; //< Connectivity
 	std::vector<CkVector3d> pts; //< nPts 3d node locations.

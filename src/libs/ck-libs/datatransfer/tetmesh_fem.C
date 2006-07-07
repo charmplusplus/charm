@@ -36,12 +36,15 @@ void readGhostFEM(int m,TetMesh &t) {
   t.nonGhostPt = nNode;
   t.nonGhostTet = nTet;
   // convert ghost node indices from negative to positive
+  //printf("nNode=%d ngNode=%d nTet=%d ngTet=%d\n", nNode, ngNode, nTet, ngTet);
   if (ngTet > 0) {
     int *tconn;
     for (int i=nTet; i<ngTet+nTet; i++) {
       tconn = t.getTet(i);
       for (int j=0; j<4; j++) {
+	//printf("Tet=%d conn[%d]=%d before conversion.\n", i, j, tconn[j]);
 	if (tconn[j] < -1) tconn[j] = (tconn[j]*-1)-2+nNode;
+	//printf("Tet=%d conn[%d]=%d after conversion.\n", i, j, tconn[j]);
 	assert(tconn[j] < nNode+ngNode);
 	assert(!(tconn[j] < -1));
       }
