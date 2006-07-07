@@ -25,7 +25,7 @@ LBVectorMigrateMsg * VectorStrategy(BaseLB::LDStats *stats, int count)
                                                                                 
   double averageLoad = total/count;
 
-  if (_lb_args.debug()>1) CkPrintf("Average load: %f\n", averageLoad);
+  if (_lb_args.debug()>1) CkPrintf("Average load: %f (total: %f, count: %d)\n", averageLoad, total, count);
 
   maxHeap *heavyProcessors = new maxHeap(count);
   Set *lightProcessors = new Set();
@@ -86,7 +86,7 @@ LBVectorMigrateMsg * VectorStrategy(BaseLB::LDStats *stats, int count)
   }
 
   if (_lb_args.debug()>1) {
-    CkPrintf("After migration: ");
+    CkPrintf("After migration: (%d)", count);
     for (i=0; i<count; i++) CkPrintf("%f ", processors[i].load);
     CkPrintf("\n");
   }
