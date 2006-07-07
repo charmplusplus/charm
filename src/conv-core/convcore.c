@@ -1244,20 +1244,21 @@ int CsdScheduler(int maxmsgs)
 /*Declare the standard scheduler housekeeping*/
 #define SCHEDULE_TOP \
       void *msg;\
-      int cycle = CpvAccess(CsdStopFlag); \
+			int rank = CmiMyRank();\
+      int cycle = Cpv_CsdStopFlag_[rank]; \
       CsdSchedulerState_t state;\
       CsdSchedulerState_new(&state);\
 
 /*A message is available-- process it*/
 #define SCHEDULE_MESSAGE \
       CmiHandleMessage(msg);\
-      if (CpvAccess(CsdStopFlag) != cycle) break;\
+      if (Cpv_CsdStopFlag_[rank] != cycle) break;\
 
 /*No message available-- go (or remain) idle*/
 #define SCHEDULE_IDLE \
       if (!isIdle) {isIdle=1;CsdBeginIdle();}\
       else CsdStillIdle();\
-      if (CpvAccess(CsdStopFlag) != cycle) {\
+      if (Cpv_CsdStopFlag_[rank] != cycle) {\
 	CsdEndIdle();\
 	break;\
       }\
@@ -2359,6 +2360,15 @@ void ConverseCommonInit(char **argv)
   CmiHandlerInit();
   CIdleTimeoutInit(argv);
   
+#if CMK_SHARED_VARS_POSIX_THREADS_SMP /*Used by the net-*-smp versions*/
+	if(CmiMyRank() == 0){
+		_Cmi_noprocforcommthread=0;
+		if(CmiGetArgFlagDesc(argv,"+CmiNoProcForComThread","Is there an extra processor for the communication thread on each node(only for net-smp-*) ?")){
+			_Cmi_noprocforcommthread=1;
+		}
+	}
+#endif
+	
 #ifndef CMK_OPTIMIZE
   traceInit(argv);
 /*initTraceCore(argv);*/ /* projector */

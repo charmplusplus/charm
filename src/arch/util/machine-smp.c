@@ -246,6 +246,9 @@ static void CmiDestoryLocks()
 static pthread_key_t Cmi_state_key=(pthread_key_t)(-1);
 static CmiState     Cmi_state_vector;
 CmiNodeLock CmiMemLock_lock;
+int _Cmi_noprocforcommthread=0;/*this variable marks if there is an extra processor for comm thread
+in smp*/
+
 
 #if 0
 #define CmiGetState() ((CmiState)pthread_getspecific(Cmi_state_key))

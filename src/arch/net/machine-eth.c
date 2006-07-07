@@ -51,7 +51,10 @@ static void CmiNotifyStillIdle(CmiIdleState *s)
   CommunicationServer(Cmi_idlepoll?0:10, 0);
   MACHSTATE(3,"} idle commserver")
 #else
-  int nSpins=20; /*Number of times to spin before sleeping*/
+#if CMK_SHARED_VARS_POSIX_THREADS_SMP
+	if(_Cmi_noprocforcommthread ){
+#endif
+	int nSpins=20; /*Number of times to spin before sleeping*/
   s->nIdles++;
   if (s->nIdles>nSpins) { /*Start giving some time back to the OS*/
     s->sleepMs+=2;
@@ -64,6 +67,9 @@ static void CmiNotifyStillIdle(CmiIdleState *s)
     CsdResetPeriodic();		/* check ccd callbacks when I am awakened */
     MACHSTATE1(3,"} idle lock(%d)",CmiMyPe())
   }
+#if CMK_SHARED_VARS_POSIX_THREADS_SMP
+	}
+#endif
 #endif
 }
 
