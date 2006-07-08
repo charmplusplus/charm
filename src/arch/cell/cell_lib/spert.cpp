@@ -101,6 +101,9 @@ int main(unsigned long long id, unsigned long long param) {
     sim_printf(" --==>> Hello From SPE 0x%llx's Runtime <<==--\n", id);
   #endif
 
+  // Call the user's funcLookup() function with funcIndex of SPE_FUNC_INDEX_INIT
+  funcLookup(SPE_FUNC_INDEX_INIT, NULL, 0, NULL, 0, NULL, 0, NULL);
+
   // From Section 4.3 of library_SDK.pdf : "The local store memory heap is initialized the first
   //   time a memory heap allocation routine is called."... Do this now so it is ready to go.
   register unsigned int memLeft = SPE_TOTAL_MEMORY_SIZE - SPE_RESERVED_STACK_SIZE - (unsigned int)(&_end);
@@ -159,6 +162,9 @@ int main(unsigned long long id, unsigned long long param) {
     sim_printf(" --==>> Goodbye From SPE 0x%llx's Runtime <<==--\n", id);
     sim_printf("  \"I do not regret the things I have done, but those I did not do.\" - Lucas, Empire Records\n");
   #endif
+
+  // Call the user's funcLookup() function with funcIndex of SPE_FUNC_INDEX_CLOSE
+  funcLookup(SPE_FUNC_INDEX_CLOSE, NULL, 0, NULL, 0, NULL, 0, NULL);
 
   return 0;
 }
@@ -236,7 +242,7 @@ void speScheduler(SPEData *speData, unsigned long long id) {
   #endif
 
   // The scheduler loop
-  while (keepLooping != FALSE) {
+  while (__builtin_expect(keepLooping != FALSE, 1)) {
 
 
     // Wait for the latest message queue read (blocking)
@@ -298,17 +304,19 @@ void speScheduler(SPEData *speData, unsigned long long id) {
 
 
     // Check for new messages
-    for (i = 0; i < SPE_MESSAGE_QUEUE_LENGTH; i++) {
+    for (i = 0; __builtin_expect(i < SPE_MESSAGE_QUEUE_LENGTH, 1); i++) {
 
       // Check for a new message in this slot
-      if (msgQueue[i]->state == SPE_MESSAGE_STATE_SENT &&
-          msgState[i] == SPE_MESSAGE_STATE_CLEAR &&
-          msgCounter[i] != msgQueue[i]->counter
+      if (__builtin_expect(msgQueue[i]->state == SPE_MESSAGE_STATE_SENT &&
+                           msgState[i] == SPE_MESSAGE_STATE_CLEAR &&
+                           msgCounter[i] != msgQueue[i]->counter,
+                           0
+                          )
          ) {
 
         // Start by checking the command
         int command = msgQueue[i]->command;
-        if (command == SPE_MESSAGE_COMMAND_EXIT) {
+        if (__builtin_expect(command == SPE_MESSAGE_COMMAND_EXIT, 0)) {
           #if SPE_DEBUG_DISPLAY >= 1
             sim_printf(" --==>> SPE received EXIT command...\n");
           #endif
@@ -340,8 +348,8 @@ void speScheduler(SPEData *speData, unsigned long long id) {
 
     // Check for messages that need data fetched (list)
     numDMAQueueEntries = mfc_stat_cmd_queue();
-    for (i = 0; i < SPE_MESSAGE_QUEUE_LENGTH; i++) {
-      if (msgState[i] == SPE_MESSAGE_STATE_PRE_FETCHING_LIST) {
+    for (i = 0; __builtin_expect(i < SPE_MESSAGE_QUEUE_LENGTH, 1); i++) {
+      if (__builtin_expect(msgState[i] == SPE_MESSAGE_STATE_PRE_FETCHING_LIST, 0)) {
 
         // Ckeck the size of the dmaList.  If it is less than SPE_DMA_LIST_LENGTH then it will fit
         //   in the preallocated area reserved for lists.  Otherwise, malloc memory to receive the
@@ -369,9 +377,11 @@ void speScheduler(SPEData *speData, unsigned long long id) {
             #endif
 
             //if (dmaList[i] != NULL) { delete [] dmaList[i]; }
-	    if ((dmaList[i] == NULL) || 
-                (((unsigned int)dmaList[i]) < ((unsigned int)(&_end))) ||
-                (((unsigned int)dmaList[i] + memNeeded) >= ((unsigned int)0x40000 - SPE_RESERVED_STACK_SIZE))
+	    if (__builtin_expect((dmaList[i] == NULL) || 
+                                 (((unsigned int)dmaList[i]) < ((unsigned int)(&_end))) ||
+                                 (((unsigned int)dmaList[i] + memNeeded) >= ((unsigned int)0x40000 - SPE_RESERVED_STACK_SIZE)),
+                                 0
+                                )
                ) {
               #if SPE_NOTIFY_ON_MALLOC_FAILURE != 0
                 sim_printf("[0x%llu] :: SPE :: Failed to allocate memory for dmaList[%d] (1)... will try again later...\n", id, i);
@@ -424,8 +434,8 @@ void speScheduler(SPEData *speData, unsigned long long id) {
     // Read the tag status to see if the data has arrived for any of the fetching message entries
     mfc_write_tag_update_immediate();
     tagStatus = mfc_read_tag_status(); //spu_readch(MFC_RdTagStat);
-    for (i = 0; i < SPE_MESSAGE_QUEUE_LENGTH; i++) {
-      if (msgState[i] == SPE_MESSAGE_STATE_FETCHING_LIST && ((tagStatus & (0x01 << i)) != 0)) {
+    for (i = 0; __builtin_expect(i < SPE_MESSAGE_QUEUE_LENGTH, 1); i++) {
+      if (__builtin_expect(msgState[i] == SPE_MESSAGE_STATE_FETCHING_LIST && ((tagStatus & (0x01 << i)) != 0), 0)) {
 
         // Update the state to show that this message queue entry is ready to be executed
         msgState[i] = SPE_MESSAGE_STATE_LIST_READY_LIST;
@@ -450,8 +460,8 @@ void speScheduler(SPEData *speData, unsigned long long id) {
 
     // Check for messages that need data fetched (standard)
     numDMAQueueEntries = mfc_stat_cmd_queue();
-    for (i = 0; i < SPE_MESSAGE_QUEUE_LENGTH; i++) {
-      if (msgState[i] == SPE_MESSAGE_STATE_LIST_READY_LIST) {
+    for (i = 0; __builtin_expect(i < SPE_MESSAGE_QUEUE_LENGTH, 1); i++) {
+      if (__builtin_expect(msgState[i] == SPE_MESSAGE_STATE_LIST_READY_LIST, 0)) {
 
         // Allocate the memory needed in the LS for this work request
         if (localMemPtr[i] == NULL) {
@@ -470,7 +480,7 @@ void speScheduler(SPEData *speData, unsigned long long id) {
           //   message with an error code because the memory allocation will never work.
           // TODO : Should also add a define that guesses at what the expected maximum stack size is (that
           //   could also be changed at compile-time by the end user)
-          if (memNeeded > ((unsigned int)0x40000 - ((unsigned int)(&_end)))) {
+          if (__builtin_expect(memNeeded > ((unsigned int)0x40000 - ((unsigned int)(&_end))), 0)) {
 
             // Clear up the dmaList
             if (dmaListSize[i] > SPE_DMA_LIST_LENGTH) {
@@ -508,9 +518,11 @@ void speScheduler(SPEData *speData, unsigned long long id) {
           #endif
 
 	  //if (localMemPtr[i] == NULL || ((unsigned int)localMemPtr[i]) + memNeeded >= (unsigned int)0x40000) {
-          if ((localMemPtr[i] == NULL) || 
-              (((unsigned int)localMemPtr[i]) < ((unsigned int)(&_end))) ||
-              (((unsigned int)localMemPtr[i] + memNeeded) >= ((unsigned int)0x40000 - SPE_RESERVED_STACK_SIZE))
+	  if (__builtin_expect((localMemPtr[i] == NULL) || 
+                               (((unsigned int)localMemPtr[i]) < ((unsigned int)(&_end))) ||
+                               (((unsigned int)localMemPtr[i] + memNeeded) >= ((unsigned int)0x40000 - SPE_RESERVED_STACK_SIZE)),
+                               0
+                              )
              ) {
             #if SPE_NOTIFY_ON_MALLOC_FAILURE != 0
 	      sim_printf("[0x%llu] :: SPE :: Failed to allocate memory for localMemPtr[%d] (1)... will try again later...\n", id, i);
@@ -530,7 +542,7 @@ void speScheduler(SPEData *speData, unsigned long long id) {
 	  }
 
           // Zero the memory if needed
-          #if SPE_ZERO_WRITE_ONLY_MEMORY != 1
+          #if SPE_ZERO_WRITE_ONLY_MEMORY != 0
             if (msgQueue[i]->writeOnlyLen > 0) {
 	      register unsigned int writeSize = 0;
               for (j = dmaListSize[i] - msgQueue[i]->writeOnlyLen; j < dmaListSize[i]; j++)
@@ -603,11 +615,11 @@ void speScheduler(SPEData *speData, unsigned long long id) {
     numDMAQueueEntries = mfc_stat_cmd_queue();
     int newGetIndex = (getIndex + 1) % SPE_MESSAGE_QUEUE_LENGTH;
     int numGetsLeft = SPE_MAX_GET_PER_LOOP;
-    for (iOffset = 0; iOffset < SPE_MESSAGE_QUEUE_LENGTH; iOffset++) {
+    for (iOffset = 0; __builtin_expect(iOffset < SPE_MESSAGE_QUEUE_LENGTH, 1); iOffset++) {
 
       register int i = (getIndex + iOffset) % SPE_MESSAGE_QUEUE_LENGTH;
 
-      if (msgState[i] == SPE_MESSAGE_STATE_PRE_FETCHING) {
+      if (__builtin_expect(msgState[i] == SPE_MESSAGE_STATE_PRE_FETCHING, 0)) {
 
         // Allocate the memory for the message queue entry (if need be)
         // NOTE: First check to see if it is non-null.  What might have happened was that there was enough memory
@@ -627,13 +639,13 @@ void speScheduler(SPEData *speData, unsigned long long id) {
             sim_printf("[0x%llx] :: Allocating Memory for index %d :: memNeeded = %d, msgQueue[%d].totalMem = %d\n",
                        id, i, memNeeded, i, msgQueue[i]->totalMem
                       );
-          #endif
+	  #endif
 
           // Check the size of the memory needed.  If it is too large for the SPE's LS, then stop this
           //   message with an error code because the memory allocation will never work.
           // TODO : Should also add a define that guesses at what the expected maximum stack size is (that
           //   could also be changed at compile-time by the end user)
-          if (memNeeded > ((unsigned int)0x40000 - ((unsigned int)(&_end)))) {
+          if (__builtin_expect(memNeeded > ((unsigned int)0x40000 - ((unsigned int)(&_end))), 0)) {
 
             // Move the message into an error state
             errorCode[i] = SPE_MESSAGE_ERROR_NOT_ENOUGH_MEMORY;
@@ -657,9 +669,11 @@ void speScheduler(SPEData *speData, unsigned long long id) {
           // Check the pointer (if it is bad, then skip this message for now and try again later)
           // TODO: There are probably better checks for this (use _end, etc.)
           //if (localMemPtr[i] == NULL || ((unsigned int)localMemPtr[i] + memNeeded) >= (unsigned int)0x40000) {
-          if ((localMemPtr[i] == NULL) || 
-              (((unsigned int)localMemPtr[i]) < ((unsigned int)(&_end))) ||
-              (((unsigned int)localMemPtr[i] + memNeeded) >= ((unsigned int)0x40000 - SPE_RESERVED_STACK_SIZE))
+          if (__builtin_expect((localMemPtr[i] == NULL) || 
+                               (((unsigned int)localMemPtr[i]) < ((unsigned int)(&_end))) ||
+                               (((unsigned int)localMemPtr[i] + memNeeded) >= ((unsigned int)0x40000 - SPE_RESERVED_STACK_SIZE)),
+                               0
+                              )
              ) {
             #if SPE_NOTIFY_ON_MALLOC_FAILURE != 0
 	      sim_printf("[0x%llu] :: SPE :: Failed to allocate memory for localMemPtr[%d] (2)... will try again later...\n", id, i);
@@ -672,7 +686,7 @@ void speScheduler(SPEData *speData, unsigned long long id) {
           // DEBUG
           #if SPE_DEBUG_DISPLAY >= 1
             sim_printf("[0x%llx] :: localMemPtr[%d] = %p\n", id, i, localMemPtr[i]);
-          #endif
+	  #endif
 
           // Assign the buffer specific pointers
           // NOTE: Order matters here.  Need to allocate the read buffers next to each other and the write
@@ -708,7 +722,7 @@ void speScheduler(SPEData *speData, unsigned long long id) {
             && (msgQueue[i]->readOnlyPtr == (PPU_POINTER_TYPE)NULL)
            ) {
 
-         // Update the state (to ready to execute)
+          // Update the state (to ready to execute)
           msgState[i] = SPE_MESSAGE_STATE_READY;
 
           // DEBUG
@@ -751,9 +765,11 @@ void speScheduler(SPEData *speData, unsigned long long id) {
             #endif
 
 	    //if (dmaList[i] == NULL || ((unsigned int)dmaList[i] + (entryCount * sizeof(DMAListEntry))) >= (unsigned int)0x40000) {
-	    if ((dmaList[i] == NULL) || 
-                (((unsigned int)dmaList[i]) < ((unsigned int)(&_end))) ||
-                (((unsigned int)dmaList[i] + (entryCount * sizeof(DMAListEntry))) >= ((unsigned int)0x40000 - SPE_RESERVED_STACK_SIZE))
+            if (__builtin_expect((dmaList[i] == NULL) || 
+                                 (((unsigned int)dmaList[i]) < ((unsigned int)(&_end))) ||
+                                 (((unsigned int)dmaList[i] + (entryCount * sizeof(DMAListEntry))) >= ((unsigned int)0x40000 - SPE_RESERVED_STACK_SIZE)),
+                                 0
+				)
                ) {
               #if SPE_NOTIFY_ON_MALLOC_FAILURE != 0
 	        sim_printf("[0x%llu] :: SPE :: Failed to allocate memory for dmaList[%d] (2)... will try again later...\n", id, i);
@@ -863,8 +879,8 @@ void speScheduler(SPEData *speData, unsigned long long id) {
     // Read the tag status to see if the data has arrived for any of the fetching message entries
     mfc_write_tag_update_immediate();
     tagStatus = mfc_read_tag_status(); //spu_readch(MFC_RdTagStat);
-    for (i = 0; i < SPE_MESSAGE_QUEUE_LENGTH; i++) {
-      if (msgState[i] == SPE_MESSAGE_STATE_FETCHING && ((tagStatus & (0x01 << i)) != 0)) {
+    for (i = 0; __builtin_expect(i < SPE_MESSAGE_QUEUE_LENGTH, 1); i++) {
+      if (__builtin_expect(msgState[i] == SPE_MESSAGE_STATE_FETCHING && ((tagStatus & (0x01 << i)) != 0), 0)) {
 
         // Update the state to show that this message queue entry is ready to be executed
         msgState[i] = SPE_MESSAGE_STATE_READY;
@@ -897,9 +913,9 @@ void speScheduler(SPEData *speData, unsigned long long id) {
 
     // Execute SPE_MAX_EXECUTE_PER_LOOP ready messages
     register unsigned int numExecLeft = SPE_MAX_EXECUTE_PER_LOOP;
-    for (i = 0; i < SPE_MESSAGE_QUEUE_LENGTH; i++) {
+    for (i = 0; __builtin_expect(i < SPE_MESSAGE_QUEUE_LENGTH, 1); i++) {
 
-      if (msgState[runIndex] == SPE_MESSAGE_STATE_READY) {
+      if (__builtin_expect(msgState[runIndex] == SPE_MESSAGE_STATE_READY, 0)) {
 
         register volatile SPEMessage* msg = msgQueue[runIndex];
 
@@ -980,8 +996,8 @@ void speScheduler(SPEData *speData, unsigned long long id) {
 
     // Check for messages that have been executed but still need data committed to main memory
     numDMAQueueEntries = mfc_stat_cmd_queue();
-    for (i = 0; i < SPE_MESSAGE_QUEUE_LENGTH; i++) {
-      if (msgState[i] == SPE_MESSAGE_STATE_EXECUTED_LIST) {
+    for (i = 0; __builtin_expect(i < SPE_MESSAGE_QUEUE_LENGTH, 1); i++) {
+      if (__builtin_expect(msgState[i] == SPE_MESSAGE_STATE_EXECUTED_LIST, 0)) {
 
         // Initiate the DMA transfer of the readWrite and writeOnly buffer back to main memory
         if ((msgQueue[i]->readWriteLen + msgQueue[i]->writeOnlyLen) > 0 && localMemPtr[i] != NULL) {
@@ -1048,11 +1064,11 @@ void speScheduler(SPEData *speData, unsigned long long id) {
     numDMAQueueEntries = mfc_stat_cmd_queue();
     int newPutIndex = (putIndex + 1) % SPE_MESSAGE_QUEUE_LENGTH;
     int numPutsLeft = SPE_MAX_PUT_PER_LOOP;
-    for (iOffset = 0; iOffset < SPE_MESSAGE_QUEUE_LENGTH; iOffset++) {
+    for (iOffset = 0; __builtin_expect(iOffset < SPE_MESSAGE_QUEUE_LENGTH, 1); iOffset++) {
 
       register int i = (putIndex + iOffset) % SPE_MESSAGE_QUEUE_LENGTH;
 
-      if (msgState[i] == SPE_MESSAGE_STATE_EXECUTED) {
+      if (__builtin_expect(msgState[i] == SPE_MESSAGE_STATE_EXECUTED, 0)) {
 
         // Check to see if this message does not need to fetch any data
         if (((msgQueue[i]->readWritePtr == (PPU_POINTER_TYPE)NULL)
@@ -1102,9 +1118,11 @@ void speScheduler(SPEData *speData, unsigned long long id) {
             #endif
 
 	    //if (dmaList[i] == NULL || ((unsigned int)dmaList[i] + (entryCount * sizeof(DMAListEntry)))>= (unsigned int)0x40000) {
-	    if ((dmaList[i] == NULL) || 
-                (((unsigned int)dmaList[i]) < ((unsigned int)(&_end))) ||
-                (((unsigned int)dmaList[i] + (entryCount * sizeof(DMAListEntry))) >= ((unsigned int)0x40000 - SPE_RESERVED_STACK_SIZE))
+	    if (__builtin_expect((dmaList[i] == NULL) || 
+                                 (((unsigned int)dmaList[i]) < ((unsigned int)(&_end))) ||
+                                 (((unsigned int)dmaList[i] + (entryCount * sizeof(DMAListEntry))) >= ((unsigned int)0x40000 - SPE_RESERVED_STACK_SIZE)),
+                                 0
+				)
                ) {
               #if SPE_NOTIFY_ON_MALLOC_FAILURE != 0
 	        sim_printf("[0x%llu] :: SPE :: Failed to allocate memory for dmaList[%d] (3)... will try again later...\n", id, i);
@@ -1221,11 +1239,11 @@ void speScheduler(SPEData *speData, unsigned long long id) {
     mfc_write_tag_update_immediate();
     tagStatus = mfc_read_tag_status(); //spu_readch(MFC_RdTagStat);
     int commitIndexNext = (commitIndex + 1) % SPE_MESSAGE_QUEUE_LENGTH;
-    for (iOffset = 0; iOffset < SPE_MESSAGE_QUEUE_LENGTH; iOffset++) {
+    for (iOffset = 0; __builtin_expect(iOffset < SPE_MESSAGE_QUEUE_LENGTH, 1); iOffset++) {
 
       register int i = (commitIndex + iOffset) % SPE_MESSAGE_QUEUE_LENGTH;
 
-      if (msgState[i] == SPE_MESSAGE_STATE_COMMITTING && ((tagStatus * (0x01 << i)) != 0)) {
+      if (__builtin_expect(msgState[i] == SPE_MESSAGE_STATE_COMMITTING && ((tagStatus * (0x01 << i)) != 0), 0)) {
 
         // Check to see if there is an available entry in the outbound mailbox
         if (spu_stat_out_mbox() > 0) {
@@ -1276,8 +1294,8 @@ void speScheduler(SPEData *speData, unsigned long long id) {
 
 
     // Check for any messages that have entered into the ERROR state
-    for (i = 0; i < SPE_MESSAGE_QUEUE_LENGTH; i++) {
-      if (msgState[i] == SPE_MESSAGE_STATE_ERROR) {
+    for (i = 0; __builtin_expect(i < SPE_MESSAGE_QUEUE_LENGTH, 1); i++) {
+      if (__builtin_expect(msgState[i] == SPE_MESSAGE_STATE_ERROR, 0)) {
 
         // NOTE: All clean-up should be taken care of by the code placing the message into the error
         //   state (that way the code here does not have to handle all cases).
