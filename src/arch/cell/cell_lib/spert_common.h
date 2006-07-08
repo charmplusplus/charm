@@ -23,7 +23,7 @@ extern "C" {
 // SIZEOF_16 : Returns the size of the structure s rounded up to the nearest multiple of 16.
 //   NOTE: All of the values in this macro are constants so a good compiler should be able to reduce all of this to a constant.
 #define SIZEOF_16(s)   ( ((sizeof(s) & 0x0000000F) == 0) ? (sizeof(s)) : ((sizeof(s) & 0xFFFFFFF0) + (0x10)) )
-#define ROUNDUP_16(s)  ( ((s & 0x0000000F) == 0) ? (s) : ((s & 0xFFFFFFF0) + (0x10)) )
+#define ROUNDUP_16(s)  ( (((s) & 0x0000000F) == 0) ? (s) : (((s) & 0xFFFFFFF0) + (0x10)) )
 
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////
