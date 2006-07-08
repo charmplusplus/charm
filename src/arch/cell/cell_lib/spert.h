@@ -30,7 +30,7 @@
 
 // The reserved area for stack
 #define SPE_TOTAL_MEMORY_SIZE    (256 * 1024)  // Defined by the architecture
-#define SPE_RESERVED_STACK_SIZE  (1024 * 4)    // Reserve this much memory for the stack
+#define SPE_RESERVED_STACK_SIZE  (1024 * 40)   // Reserve this much memory for the stack
 #define SPE_MINIMUM_HEAP_SIZE    (1024 * 16)   // Require at least this amount of heap (or the SPE Runtime will exit)
 
 // The maximum number of work requests that can be serviced in a single SPE scheduler loop iteration
@@ -55,6 +55,11 @@
 #define SPE_MESSAGE_STATE_ERROR               12
 #define SPE_MESSAGE_STATE_MAX                 12
 
+// SPE Function Indexes
+#define SPE_FUNC_INDEX_INIT       (-2)
+#define SPE_FUNC_INDEX_CLOSE      (-1)
+#define SPE_FUNC_INDEX_USER       (0)
+
 // SPE Commands
 #define SPE_MESSAGE_COMMAND_MIN   0
 #define SPE_MESSAGE_COMMAND_NONE  0
@@ -75,6 +80,12 @@
 
 // STATS Data Collection
 #define SPE_STATS    0  // Set to have stat data collected during execution
+
+// The lower and upper bounds of tags that are available to the user's code (incase the user's code needs to
+//   do DMA transactions directly and needs to use tags in doing so).
+#define SPE_USER_TAG_MIN   SPE_MESSAGE_QUEUE_LENGTH  // NOTE: 0 through SPE_MESSAGE_QUEUE_LENGTH are used for work request DMA transactions
+#define SPE_USER_TAG_MAX   30  // NOTE: 31 is reserved for message queue dma transactions (restricted by hardware)
+#define SPE_NUM_USER_TAGS  (SPE_USER_TAG_MAX - SPE_USER_TAG_MIN + 1)
 
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////
