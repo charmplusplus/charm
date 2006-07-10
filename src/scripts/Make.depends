@@ -229,7 +229,7 @@ trace-bluegene.o: trace-bluegene.C charm++.h charm.h converse.h \
   sdag.h ckcheckpoint.h CkCheckpoint.decl.h ckevacuation.h \
   ckarrayreductionmgr.h trace.h trace-bluegene.h trace-common.h blue.h \
   blue-conv.h blue_impl.h ckliststring.h blue_types.h blue_timing.h \
-  blue_logs.h blue_defs.h blue_network.h
+  bigsim_logs.h blue_defs.h blue_network.h
 	$(CHARMC) -c -I. trace-bluegene.C
 
 trace-projector.o: trace-projector.C charm++.h charm.h converse.h \
@@ -1840,7 +1840,7 @@ blue.o: blue.C cklists.h pup.h converse.h conv-config.h conv-autoconfig.h \
   conv-cpath.h conv-qd.h conv-random.h conv-lists.h conv-trace.h \
   persistent.h debug-conv.h queueing.h blue.h converse.h blue-conv.h \
   blue_impl.h conv-mach.h ckliststring.h blue_types.h blue_timing.h \
-  blue_logs.h blue_defs.h blue_network.h
+  bigsim_logs.h blue_defs.h blue_network.h
 	$(CHARMC) -c -I. blue.C
 
 blue_node.o: blue_node.C blue.h converse.h conv-config.h \
@@ -1848,7 +1848,7 @@ blue_node.o: blue_node.C blue.h converse.h conv-config.h \
   conv-cpm.h conv-cpath.h conv-qd.h conv-random.h conv-lists.h \
   conv-trace.h persistent.h debug-conv.h blue-conv.h blue_impl.h \
   ckliststring.h blue_types.h blue_timing.h cklists.h pup.h converse.h \
-  blue_logs.h blue_defs.h blue_network.h
+  bigsim_logs.h blue_defs.h blue_network.h
 	$(CHARMC) -c -I. blue_node.C
 
 blue_proc.o: blue_proc.C blue.h converse.h conv-config.h \
@@ -1856,7 +1856,7 @@ blue_proc.o: blue_proc.C blue.h converse.h conv-config.h \
   conv-cpm.h conv-cpath.h conv-qd.h conv-random.h conv-lists.h \
   conv-trace.h persistent.h debug-conv.h blue-conv.h blue_impl.h \
   ckliststring.h blue_types.h blue_timing.h cklists.h pup.h converse.h \
-  blue_logs.h blue_defs.h blue_network.h
+  bigsim_logs.h blue_defs.h blue_network.h
 	$(CHARMC) -c -I. blue_proc.C
 
 blue_init.o: blue_init.C queueing.h blue.h converse.h conv-config.h \
@@ -1864,7 +1864,7 @@ blue_init.o: blue_init.C queueing.h blue.h converse.h conv-config.h \
   conv-cpm.h conv-cpath.h conv-qd.h conv-random.h conv-lists.h \
   conv-trace.h persistent.h debug-conv.h blue-conv.h blue_impl.h \
   ckliststring.h blue_types.h blue_timing.h cklists.h pup.h converse.h \
-  blue_logs.h blue_defs.h blue_network.h
+  bigsim_logs.h blue_defs.h blue_network.h
 	$(CHARMC) -c -I. blue_init.C
 
 blue_timing.o: blue_timing.C blue.h converse.h conv-config.h \
@@ -1872,14 +1872,14 @@ blue_timing.o: blue_timing.C blue.h converse.h conv-config.h \
   conv-cpm.h conv-cpath.h conv-qd.h conv-random.h conv-lists.h \
   conv-trace.h persistent.h debug-conv.h blue-conv.h blue_impl.h \
   ckliststring.h blue_types.h blue_timing.h cklists.h pup.h converse.h \
-  blue_logs.h blue_defs.h blue_network.h
+  bigsim_logs.h blue_defs.h blue_network.h
 	$(CHARMC) -c -I. blue_timing.C
 
 blue_IO.o: blue_IO.C blue.h converse.h conv-config.h conv-autoconfig.h \
   conv-common.h conv-mach.h conv-mach-opt.h pup_c.h conv-cpm.h \
   conv-cpath.h conv-qd.h conv-random.h conv-lists.h conv-trace.h \
   persistent.h debug-conv.h blue-conv.h blue_impl.h ckliststring.h \
-  blue_types.h blue_timing.h cklists.h pup.h converse.h blue_logs.h \
+  blue_types.h blue_timing.h cklists.h pup.h converse.h bigsim_logs.h \
   blue_defs.h blue_network.h
 	$(CHARMC) -c -I. blue_IO.C
 
@@ -1888,14 +1888,14 @@ blue_logs.o: blue_logs.C blue.h converse.h conv-config.h \
   conv-cpm.h conv-cpath.h conv-qd.h conv-random.h conv-lists.h \
   conv-trace.h persistent.h debug-conv.h blue-conv.h blue_impl.h \
   ckliststring.h blue_types.h blue_timing.h cklists.h pup.h converse.h \
-  blue_logs.h blue_defs.h blue_network.h
+  bigsim_logs.h blue_defs.h blue_network.h
 	$(CHARMC) -c -I. blue_logs.C
 
 blue_api.o: blue_api.C blue.h converse.h conv-config.h conv-autoconfig.h \
   conv-common.h conv-mach.h conv-mach-opt.h pup_c.h conv-cpm.h \
   conv-cpath.h conv-qd.h conv-random.h conv-lists.h conv-trace.h \
   persistent.h debug-conv.h blue-conv.h blue_impl.h ckliststring.h \
-  blue_types.h blue_timing.h cklists.h pup.h converse.h blue_logs.h \
+  blue_types.h blue_timing.h cklists.h pup.h converse.h bigsim_logs.h \
   blue_defs.h blue_network.h
 	$(CHARMC) -c -I. blue_api.C
 
