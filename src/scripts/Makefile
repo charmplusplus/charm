@@ -280,7 +280,6 @@ dirs+sources:
 	./gatherflat ../../src/arch/`cat .vdir`      .
 	./gathertree ../../examples ../examples
 	./gathertree ../../tests ../tests
-	if [ -x ./special.sh ] ; then ./special.sh ; fi
 	rm -f ../bin/dep.pl ; cp dep.pl ../bin/
 	chmod +x charmc
 	-./system_ln  ../tmp/charmc ../bin/
@@ -290,6 +289,7 @@ dirs+sources:
 	-ln -s ../java ..
 	rm -f .gdir
 	rm -rf ../include ; mkdir ../include
+	if [ -x ./special.sh ] ; then ./special.sh ; fi
 	-./system_ln  ../tmp/conv-*.*h ../include
 	-./system_ln  ../tmp/cc-*.*h ../include
 	if [ ! -f conv-common.h ] ; then ( touch conv-common.h ) ; fi
