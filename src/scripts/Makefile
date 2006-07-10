@@ -289,9 +289,9 @@ dirs+sources:
 	-ln -s ../java ..
 	rm -f .gdir
 	rm -rf ../include ; mkdir ../include
-	if [ -x ./special.sh ] ; then ./special.sh ; fi
 	-./system_ln  ../tmp/conv-*.*h ../include
 	-./system_ln  ../tmp/cc-*.*h ../include
+	if [ -x ./special.sh ] ; then ./special.sh ; fi
 	if [ ! -f conv-common.h ] ; then ( touch conv-common.h ) ; fi
 	touch dirs+sources
 
