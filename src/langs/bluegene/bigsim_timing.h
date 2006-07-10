@@ -3,7 +3,7 @@
 
 #include "cklists.h"
 
-#include "blue_logs.h"
+#include "bigsim_logs.h"
 
 extern int programExit;
 extern double gvt;
