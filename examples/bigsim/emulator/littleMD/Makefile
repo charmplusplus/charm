@@ -3,7 +3,7 @@ CHARMC=../../../../bin/charmc $(OPTS)
 all: bgMD
 
 bgMD: bgMD.o Handlers.o 
-	$(CHARMC) -language bluegene -o bgMD bgMD.o Handlers.o
+	$(CHARMC) -language bigsim -o bgMD bgMD.o Handlers.o
 
 bgMD.o: bgMD.C bgMD.h Atom.h Cell.h SimParams.h
 	$(CHARMC) -c bgMD.C

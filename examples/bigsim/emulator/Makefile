@@ -4,25 +4,25 @@ all: jacobi3D maxReduce prime ping octo line ring
 	cd littleMD; $(MAKE)
 
 jacobi3D: jacobi3D.C
-	$(CHARMC) -language bluegene -o jacobi3D jacobi3D.C 
+	$(CHARMC) -language bigsim -o jacobi3D jacobi3D.C 
 
 maxReduce: maxReduce.C
-	$(CHARMC) -language bluegene -o maxReduce maxReduce.C
+	$(CHARMC) -language bigsim -o maxReduce maxReduce.C
 
 prime: prime.C
-	$(CHARMC) -language bluegene -o prime prime.C
+	$(CHARMC) -language bigsim -o prime prime.C
 
 ping: ping.C
-	$(CHARMC) -language bluegene -o ping ping.C
+	$(CHARMC) -language bigsim -o ping ping.C
 
 octo: octo.C
-	$(CHARMC) -language bluegene -o octo octo.C
+	$(CHARMC) -language bigsim -o octo octo.C
 
 line: line.C
-	$(CHARMC) -language bluegene -o line line.C
+	$(CHARMC) -language bigsim -o line line.C
 
 ring: ring.C
-	$(CHARMC) -language bluegene -o ring ring.C
+	$(CHARMC) -language bigsim -o ring ring.C
 
 test: all
 	./charmrun ./maxReduce +p4 +cth3 +wth10
