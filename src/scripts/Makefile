@@ -25,13 +25,13 @@ SHELL=/bin/sh
 L=../lib
 INC=../include
 
-all: charm++ bluegene LIBS AMPI f90charm TSM SM PVM doc
+all: charm++ bigsim LIBS AMPI f90charm TSM SM PVM doc
 
 charm++: basics
 	$(MAKE) charm-target
 	@echo "$(OPTS)" > OPTS
 
-bgampi: bluegene AMPI
+bgampi: bigsim AMPI
 
 TSM: converse $(L)/libtsm.a
 
@@ -105,11 +105,11 @@ LIBS: CONVLIBS CHARMLIBS
 
 test-all: test
 
-bgtest: bluegene AMPI
+bgtest: bigsim AMPI
 	cd ../tests ; $(MAKE) bgtest OPTS='$(OPTS)'
 	cd ../examples ; $(MAKE) bgtest OPTS='$(OPTS)'
 
-test: bluegene AMPI
+test: bigsim AMPI
 	cd ../tests ; $(MAKE) test OPTS='$(OPTS)'
 	cd ../examples ; $(MAKE) test OPTS='$(OPTS)'
 
@@ -798,9 +798,9 @@ $(L)/libmodulecomlib.a: $(COMLIB_OBJS)
 ###############################################################################
 
 bigsim:  basics
-	$(MAKE) bluegene-target
+	$(MAKE) bigsim-target
 
-bluegene-target: charm++ $(L)/libconv-bluegene.a $(L)/libconv-bigsim-logs.a $(L)/libconv-bluegene-stub.a $(L)/libblue-standalone.a METIS
+bigsim-target: charm++ $(L)/libconv-bigsim.a $(L)/libconv-bigsim-logs.a $(L)/libconv-bluegene-stub.a $(L)/libblue-standalone.a METIS
 
 # old (Charm++) Blue Gene emulator
 BlueGene.decl.h BlueGene.def.h : BlueGene.ci charmxi
@@ -817,7 +817,7 @@ BIGSIM_IO_OBJS = bigsim_IO.o bigsim_logs.o bigsim_api.o
 
 LIBBLUE_OBJS = $(BLUE_OBJS) $(BIGSIM_IO_OBJS) blue_stub.o blue_standalone.o
 
-$(L)/libconv-bluegene.a: $(BLUE_OBJS)
+$(L)/libconv-bigsim.a: $(BLUE_OBJS)
 	$(CHARMC) -o $@  $(BLUE_OBJS)
 
 $(L)/libconv-bigsim-logs.a: $(BIGSIM_IO_OBJS)
