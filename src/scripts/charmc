@@ -1231,16 +1231,16 @@ case "$LANGUAGE" in
         POST_LIBRARIES="$POST_LIBRARIES $CMK_F90LIBS"
 	;;
 "bluegene")
-        PRE_LIBRARIES="$PRE_LIBRARIES -lconv-bluegene -lconv-bluegene-logs"
+        PRE_LIBRARIES="$PRE_LIBRARIES -lconv-bluegene -lconv-bigsim-logs"
 	;;
 "ckbluegene")
         POST_LIBRARIES="$POST_LIBRARIES -lbluegene"
 	;;
 "bgcharm++")
-        PRE_LIBRARIES="$PRE_LIBRARIES -lconv-bluegene -lconv-bluegene-logs -lconv-bluegene-stub"
+        PRE_LIBRARIES="$PRE_LIBRARIES -lconv-bluegene -lconv-bigsim-logs -lconv-bluegene-stub"
 	;;
 "bgconverse++")
-        MIDDLE_LIBS="$MIDDLE_LIBS -lconv-bluegene -lconv-bluegene-logs"
+        MIDDLE_LIBS="$MIDDLE_LIBS -lconv-bluegene -lconv-bigsim-logs"
 	;;
 esac
 

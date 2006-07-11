@@ -9,7 +9,7 @@ syntax() {
   echo ''
   echo 'Usage: build <target> <version> <options> [charmc-options ...]'
   echo ''
-  echo '<targets>: converse charm++ LIBS AMPI FEM bluegene pose jade msa'
+  echo '<targets>: converse charm++ LIBS AMPI FEM bigsim pose jade msa'
   echo '<targets>: doc ps-doc pdf-doc html-doc'
   if test $more = 1
   then
@@ -18,7 +18,7 @@ syntax() {
   echo '  AMPI            compile Adaptive MPI on top of Charm++'
   echo '  FEM             compile FEM framework'
   echo '  LIBS            compile additional parallel libraries with Charm++ core'
-  echo '  bluegene        build additional BigSim libraries'
+  echo '  bigsim          build additional BigSim libraries'
   echo '  pose            build POSE parallel discrete event simulator'
   echo '  jade            build Jade compiler (auto-builds charm++, msa)'
   echo '  msa             build Multiphase Shared Arrays(MSA) library'
@@ -29,7 +29,7 @@ syntax() {
   echo ''
   echo '<options>: compiler and platform specific options'
   echo 'cc cc64 cxx kcc pgcc acc icc ecc gcc3 mpcc pathscale'
-  echo 'help smp gm tcp vmi scyld clustermatic bluegene ooc syncft papi'
+  echo 'help smp gm tcp vmi scyld clustermatic bigsim ooc syncft papi'
   echo 'pthreads lam'
   echo '--incdir --libdir --basedir --no-build-shared -j'
   if test $more = 1
@@ -69,7 +69,7 @@ syntax() {
   echo '  pthreads        compile with pthreads Converse threads'
   echo ''
   echo 'Advanced options:'
-  echo '  bluegene	  compile for BigSim (Blue Gene) simulator'
+  echo '  bigsim	  compile for BigSim simulator'
   echo '  ooc		  compile with out of core support'
   echo '  syncft	  compile with Charm++ fault tolerance support'
   echo '  papi            compile with PAPI performance counter support (if any)'
