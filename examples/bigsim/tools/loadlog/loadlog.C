@@ -1,7 +1,6 @@
 
 #include "blue.h"
 #include "blue_impl.h"
-#include "blue_logs.h"
 
 extern BgTimeLineRec* currTline;
 extern int currTlineIdx;
