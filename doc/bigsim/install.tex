@@ -3,19 +3,16 @@
 
 \subsection{Installing Charm++ and BigSim}
 
-BigSim Simulator is part of Charm++ distribution as a runtime 
-library. One needs to download Charm++ and compile BigSim simulator.
+BigSim Simulator is distributed as a part of the Charm++ standard distribution.
+One needs to download Charm++ and compile BigSim simulator.
+One should begin with downloading Charm++ from the website:
+http://charm.cs.uiuc.edu.
 
-You should begin with downloading Charm++ from the website:
-http://charm.cs.uiuc.edu
-
-Please refer to ``Charm++ Installation and Usage Manual" and also the file README
-in the source code for detailed instructions on how to compile Charm++.
-In short, the ``build" script is the main tool for compiling \charmpp{}.
-You need to provide target and platform options:
-\begin{verbatim}
-./build <target> <platform> [options ...] [charmc-options ...]
-\end{verbatim}
+Please refer to ``Charm++ Installation and Usage Manual" and also the file
+README in the source code for detailed instructions on how to compile Charm++.
+In short, the ``build" script is the main tool for compiling \charmpp{}.  You
+need to provide target and platform options: \begin{verbatim} ./build <target>
+<platform> [options ...] [charmc-options ...] \end{verbatim}
 
 For example, to compile on a Linux machine, type:
 \begin{verbatim}
@@ -32,40 +29,40 @@ alternatively, you can build Charm++ kernel on MPI using:
 For other platforms, change net-linux to whatever platform you are compiling 
 on. See the charm/README file for a complete list of supported platforms.
 
-\subsubsection{Compile Charm++ Emulator Only}
+\subsubsection{Build Only the BigSim Emulator}
 
-BigSim emulator is implemented on top of Converse in Charm++, 
-to compile BigSim emulator only, one can compile emulator libraries
-directly on top of normal Charm++ using ``bluegene'' as the compilation
+BigSim emulator is implemented on top of Converse in Charm++.
+To compile BigSim emulator, one can compile emulator libraries
+directly on top of normal Charm++ using ``bigsim'' as the compilation
 target, like
 \begin{verbatim}
-./build bluegene net-linux -O
+./build bigsim net-linux -O
 \end{verbatim}
 
 With emulator libraries, one can write BigSim applications using its
 low level emulator message passing API.
 
-\subsubsection{Compile Charm++ on BigSim Emulator}
+\subsubsection{Build Charm++ on BigSim Emulator}
 
 In order to build Charm++ on top of BigSim Emulator (which itself is 
-implemented on top of Converse), a special build option ``bluegene''
+implemented on top of Converse), a special build option ``bigsim''
 needs to be specified:
 \begin{verbatim}
-./build bluegene net-linux bluegene -O
+./build bigsim net-linux bigsim -O
 \end{verbatim}
 
-The first ``bluegene" is the compilation target that tells ``build" to
-compile BigSim emulator libraries in addition to \charmpp{} kernel;
-The second ``bluegene" is a build option to platform ``net-linux", which tells
-``build" to compile the Charm++ on top of BigSim Emulator. 
+The first ``bigsim" is the compilation target that tells ``build" to
+compile BigSim emulator libraries in addition to \charmpp{} kernel libraries;
+The second ``bigsim" is a build option to platform ``net-linux", which tells
+``build" to build the Charm++ on top of BigSim Emulator. 
 To build AMPI on BigSim, use ``bgampi" as make target, which subsumes target
-of ``bluegene":
+of ``bigsim":
 \begin{verbatim}
-./build bgampi net-linux bluegene -O
+./build bgampi net-linux bigsim -O
 \end{verbatim}
 
 For the above ``build" command, it creates a directory named 
-``net-linux-bluegene" under charm, which contains all the header files and
+``net-linux-bigsim" under charm, which contains all the header files and
 libraries needed for compiling a user application.
 
 \subsection{Compiling BigSim Applications}
@@ -77,21 +74,21 @@ There are three methods to write a BigSim application:
 \subsubsection{Writing a BigSim application using low level machine API}
 The low level machine API mimics the actual machine low level programming
 API. It is defined in section~\ref{bgemulator}. Writing a program in the 
-low level machine API, you just need to link \charmpp{}'s Blue Gene emulator
-library, which provides the emulation of the machine API using Converse as
+low level machine API, you just need to link \charmpp{}'s BigSim emulator
+libraries, which provide the emulation of the machine API using Converse as
 the communication layer.
 
-In order to link against the Blue Gene library, specify 
-\texttt{-language bluegene} as an argument to the {\tt charmc} linker, 
+In order to link against the BigSim library, specify 
+\texttt{-language bigsim} as an argument to the {\tt charmc} linker, 
 for example:
 \begin{verbatim}
-charmc -o hello hello.C -language bluegene
+charmc -o hello hello.C -language bigsim
 \end{verbatim}
 
 Sample applications in low level machine API can be found under directory
 charm/pgms/converse/bluegene.
 
-\subsubsection{Writing a Blue Gene application in Charm++}
+\subsubsection{Writing a BigSim application in Charm++}
 
 One can write a normal \charmpp{} application which can automatically 
 run on the emulator after compilation. \charmpp{} implements
@@ -104,8 +101,8 @@ specify \texttt{-language charm++} as an argument to the {\tt charmc} linker:
 \begin{verbatim}
 charmc -o hello hello.C -language charm++
 \end{verbatim}
-This will link both \charmpp{} runtime libraries and Blue Gene simulator 
-library.
+This will link both \charmpp{} runtime libraries and BigSim simulator 
+libraries.
 
 Sample applications in \charmpp{} can be found under directory
 charm/pgms/charm++, specifically charm/pgms/charm++/littleMD.
