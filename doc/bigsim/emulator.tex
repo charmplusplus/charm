@@ -1,12 +1,12 @@
 
-\section{Blue Gene Emulator}
+\section{BigSim Emulator}
 \label{bgemulator}
 
-The Blue Gene emulator environment is designed with the following
+The BigSim emulator environment is designed with the following
 objectives:
 
 \begin{enumerate}
-\item To support a realistic Blue Gene API on existing parallel machines
+\item To support a realistic BigSim API on existing parallel machines
 
 \item To obtain first-order performance estimates of algorithms
 
@@ -14,12 +14,11 @@ objectives:
       Blue Gene
 \end{enumerate}
 
-The ``Blue Gene'' machine supported by the emulator consists of
-three-dimensional grid of 1-chip nodes.  The user may specify the size
-of the machine along each dimension (e.g. 34x34x36).  The chip supports
-$k$ threads (e.g. 200), each with its own integer unit.  The proximity of
-the integer unit with individual memory modules within a chip is not
-currently modeled.
+The machine supported by the emulator consists of three-dimensional grid of
+1-chip nodes.  The user may specify the size of the machine along each
+dimension (e.g. 34x34x36).  The chip supports $k$ threads (e.g. 200), each with
+its own integer unit.  The proximity of the integer unit with individual memory
+modules within a chip is not currently modeled.
 
 The API supported by the emulator can be broken down into several
 components:
@@ -42,17 +41,15 @@ future.
 The following sections define the appropriate parts of the API, with
 example programs and instructions for executing them.
 
-\subsection{Blue Gene Programming Environment}
+\subsection{BigSim Programming Environment}
 
-The basic philosophy of the Blue Gene Emulator is to hide intricate details
-of the Blue Gene machine from the
-application developer. Thus, the application developer needs to provide
-intialization details and handler
-functions only and gets the result as though running on a real machine.
-Communication, Thread creation,
-Time Stamping, etc are done by the emulator.
+The basic philosophy of the BigSim Emulator is to hide intricate details of the
+simulated machine from the application developer. Thus, the application
+developer needs to provide intialization details and handler functions only and
+gets the result as though running on a real machine.  Communication, Thread
+creation, Time Stamping, etc are done by the emulator.
 
-\subsubsection{Blue Gene API: Level 0}
+\subsubsection{BigSim API: Level 0}
 
 \function{void addBgNodeInbuffer(bgMsg *msgPtr, int nodeID)}
 \desc{
@@ -115,7 +112,7 @@ each physical node, the emulator program defines this function
 node. In this function, user program can define the Bluegene machine size,
 number of communication/worker threads, and check the command line arguments.
 
-The size of the Blue Gene machine being emulated and the number of thread per
+The size of the simulated machine being emulated and the number of thread per
 node is determined either by the command line arguments or calling following
 functions:
 
@@ -139,7 +136,7 @@ functions:
 	register user message handler functions; 
 }
 
-For each Blue Gene node, the execution starts at 
+For each simulated node, the execution starts at 
 \function{BgNodeStart(int argc, char **argv)} called by the emulator,
 where application handlers can be registered and computation 
 is triggered by creating a task at required nodes.
@@ -164,8 +161,8 @@ to terminate the emulator.
 \subsubsection{Handler Function API: Level 1a}
 
 The following functions can be called in user's application program to retrieve
-the Blue Gene machine information, get thread execution time, and perform
-the communication.
+the simulated machine information, get thread execution time, and perform the
+communication.
 
 \function{void BgGetSize(int *sx, int *sy, int *sz);}
 
@@ -194,7 +191,7 @@ schedules it for a worker thread
 }
 
 
-\subsection{Writing a Blue Gene Application}
+\subsection{Writing a BigSim Application}
 
 \subsubsection{Application Skeleton}
 
