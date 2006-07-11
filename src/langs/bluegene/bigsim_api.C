@@ -2,8 +2,6 @@
 #include "blue.h"
 #include "blue_impl.h"
 
-#include "blue_logs.h"
-
 // BigSim log API
 
 int BgIsInALog(BgTimeLineRec &tlinerec)

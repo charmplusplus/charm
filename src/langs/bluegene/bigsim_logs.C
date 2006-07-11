@@ -1,8 +1,6 @@
 #include "blue.h"
 #include "blue_impl.h"
 
-#include "blue_logs.h"
-
 int bglog_version = 1;
 
 int genTimeLog = 0;			// was 1 for guna 's seq correction

@@ -1,7 +1,7 @@
 #include "blue.h"
 #include "blue_impl.h"
 #include "blue_types.h"
-#include "blue_logs.h"
+#include "bigsim_logs.h"
 #include "assert.h"
 
 BgTimeLineRec* currTline = NULL;
