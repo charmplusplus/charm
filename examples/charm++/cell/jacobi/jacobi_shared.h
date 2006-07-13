@@ -12,13 +12,13 @@
 //   After an iteration, they are switched so the one that was read during iteration 'i'
 //   is written to during iteration 'i+1'.
 //
-//        |/__ NUM_COLS  __\|
-//        |\               /|
+//        |___ NUM_COLS  ___|
+//        |                 |
 //
-//    MMM NNN NNN ... NNN NNN FFF  ____
-//    WWW DDD DDD ... DDD DDD EEE   /\
+//    MMM NNN NNN ... NNN NNN FFF  ___
+//    WWW DDD DDD ... DDD DDD EEE   |
 //    ... ... ... ... ... ... ...   NUM_ROWS
-//    WWW DDD DDD ... DDD DDD EEE  _\/_
+//    WWW DDD DDD ... DDD DDD EEE  _|_
 //    --- SSS SSS ... SSS SSS ---
 //
 // Where:
@@ -29,6 +29,7 @@
 //   EEE : Is the eastern ghost data
 //   FFF : Is a flag set for the first element (most north-west) so the single constant value
 //           is not changed on the SPE.  For all other elements, it is not set.
+//   --- : Ignored
 //
 
 #define NUM_ROWS      4  // The number of data rows each chare has
