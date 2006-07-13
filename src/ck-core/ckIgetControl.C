@@ -5,8 +5,6 @@
 #include <sys/resource.h>
 #endif
 #include <unistd.h>
-#include <iostream>
-#include <fstream>
 #include <sys/types.h>
 
 IGetControlClass TheIGetControlClass;
