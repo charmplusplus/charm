@@ -1,133 +1,153 @@
+#include "mpi.h"
 #include <stdio.h>
 #include <stdlib.h>
-#include "mpi.h"
 #include <sys/time.h>
-#include <stdlib.h>
+#include <unistd.h>
 
-#define INIT_SEC 1000000
+#define NUMTIMES 50
+#define REPS 10
+#define MAX_SIZE 32768
+#define NUM_SIZES 8
 
-#define USE_ALLTOALL
-//#define USE_BCAST
-
-struct itimerval *tim;
-unsigned int Timers = 0;
-
-void   Create_Timers (int n);
-void   Start_Timer   (int i, int which);
-float  Read_Timer    (int i, int which);
-
-void Create_Timers (int n)
+#ifndef MPIWTIME
+void getclockvalue(double *retval)
 {
-  if( Timers > 0 )
-    {
-      fprintf (stderr, "Create_Timers: timers already created!\n");
-      exit (-1);
-    }
-  
-  tim = (struct itimerval*) malloc (n * sizeof (struct itimerval));
-  Timers = n;
+  static long zsec = 0;
+  static long zusec = 0;
+  struct timeval tp;
+  struct timezone tzp;
+
+  gettimeofday(&tp, &tzp);
+
+  if ( zsec == 0 ) zsec = tp.tv_sec;
+  if ( zusec == 0 ) zusec = tp.tv_usec;
+
+  *retval = (tp.tv_sec - zsec) + (tp.tv_usec - zusec ) * 0.000001 ;
 }
-
-void Start_Timer (int i, int which)
-{
-  if( i >= Timers )
-    {
-      fprintf (stderr, "Start_Timers: out-of-range timer index %d\n", i);
-      exit (-1);
-    }
-  
-  tim[i].it_value.tv_sec = INIT_SEC;
-  tim[i].it_value.tv_usec = 0;
-  tim[i].it_interval.tv_sec = INIT_SEC;
-  tim[i].it_interval.tv_usec = 0;
-  
-  setitimer (which, &(tim[i]), NULL);
-}
-
-float Read_Timer (int i, int which)
-{
-  float elapsed_time;
-  
-  if( i >= Timers )
-    {
-      fprintf (stderr, "Read_Timer: out-of-range timer index %d\n", i);
-      exit (-1);
-    }
-  
-  getitimer (which, &(tim[i]));
-  
-  elapsed_time = ( (float)INIT_SEC - tim[i].it_value.tv_sec ) -
-    ( (float)tim[i].it_value.tv_usec/1000000 );
-  
-  return elapsed_time;
-}
-
-main(int argc, char **argv)
-{
-  int my_id;		/* process id */
-  int p=0;		/* number of processes */
-  char* message;	/* storage for the message */
-  int i,j, count, k, max_msgs, msg_size;
-  float elapsed_time_msec;
-  float bandwidth;
-  char *sendbuf, *recvbuf;
-  int nsteps=100;
-  
-  MPI_Request *request_recv = (MPI_Request *) malloc(p * sizeof(MPI_Request));
-  MPI_Status *status = (MPI_Status *)malloc(p * sizeof(MPI_Status));
-  MPI_Init( &argc, &argv );
-  MPI_Comm_rank( MPI_COMM_WORLD, &my_id );
-  MPI_Comm_size( MPI_COMM_WORLD, &p );
-  
-  if (argc < 2) {
-    fprintf (stderr, "need msg size as params\n");
-    goto EXIT;
-  }
-  if ((sscanf (argv[1], "%d", &msg_size) < 1) ){
-    fprintf (stderr, "need msg size as params\n");
-    goto EXIT;
-  }
-  max_msgs = 1000; 
-  if(argc >2) 
-    sscanf (argv[2], "%d", &max_msgs) ;
-  
-  /* don't start timer until everybody is ok */
-  MPI_Barrier(MPI_COMM_WORLD); 
-  Create_Timers (1);
-  
-  sendbuf = (char *)malloc(msg_size * sizeof(char) );
-  recvbuf = (char *)malloc(msg_size * sizeof(char) * p);
-  
-  if(my_id==0) printf("Starting benchmark on %d processors with %d iterations\n", p, max_msgs); 
-  Start_Timer (0, ITIMER_REAL);
-  
-  for(i=0; i<nsteps; i++) {
-    for(j=0; j<max_msgs; j++) {
-      MPI_Send(sendbuf, msg_size, MPI_CHAR, (my_id+1)%2, j, MPI_COMM_WORLD);
-#if 1
-      MPI_Recv(recvbuf, msg_size, MPI_CHAR, (my_id+1)%2, j, MPI_COMM_WORLD,&status[j]); 
-    }
-#else
-      MPI_Irecv(recvbuf, msg_size, MPI_CHAR, (my_id+1)%2, j, MPI_COMM_WORLD,&request_recv[j]); 
-    }
-    MPI_Waitall(max_msgs, request_recv, status); 
 #endif
-    MPI_Barrier(MPI_COMM_WORLD); 
-  }
-  
-  MPI_Barrier(MPI_COMM_WORLD); 
-  if(my_id==0){
-    elapsed_time_msec = Read_Timer (0, ITIMER_REAL) * 1000.0 / max_msgs; 
-    bandwidth = 2 * 8 * msg_size / (1000.0 * elapsed_time_msec);
-    
-    fprintf (stdout, "%5d %7d\t ", max_msgs, msg_size);
-    fprintf (stdout,"%8.4lf msec,\t %8.3f Mbits/sec\n",
-	     elapsed_time_msec/max_msgs, bandwidth);
-  }
-  free(sendbuf);
-  free(recvbuf);
-  free(request_recv);
-  free(status);
- EXIT:
-  MPI_Finalize();
+
+int main(argc,argv)
+int argc;
+char *argv[];
+{
+    int myid, root, numprocs, i, j, k, size, num_sizes, times,reps;
+    double startwtime, endwtime, opertime[NUMTIMES][NUM_SIZES];
+    double mean[NUM_SIZES],min[NUM_SIZES],max[NUM_SIZES];
+    int  namelen;
+    char processor_name[MPI_MAX_PROCESSOR_NAME];
+    int *sendb, *recvb;
+    MPI_Status status;
+    int msgsizes[NUM_SIZES];
+
+    msgsizes[0] = 2;
+    msgsizes[1] = 8;
+    msgsizes[2] = 32;
+    msgsizes[3] = 128;
+    msgsizes[4] = 512;
+    msgsizes[5] = 2048;
+    msgsizes[6] = 8192;
+    msgsizes[7] = 32768;
+
+    MPI_Init(&argc,&argv);
+    MPI_Comm_size(MPI_COMM_WORLD,&numprocs);
+    MPI_Comm_rank(MPI_COMM_WORLD,&myid);
+    MPI_Get_processor_name(processor_name,&namelen);
+
+#ifdef DEBUG
+    fprintf(stdout,"Process %d of %d on %s \n",
+	    myid, numprocs, processor_name);
+#endif
+
+/* Initialize memory buffers */
+
+    sendb = (int *)malloc(MAX_SIZE*sizeof(int)*numprocs);
+    recvb = (int *)malloc(MAX_SIZE*sizeof(int)*numprocs);
+
+#ifdef MPIWTIME
+    startwtime = MPI_Wtime();
+#else
+    getclockvalue (&startwtime);
+    getclockvalue (&endwtime);
+#endif
+
+    MPI_Barrier(MPI_COMM_WORLD);
+
+    for (i=0; i<NUMTIMES; i++)
+    {
+	for (num_sizes=0; num_sizes<NUM_SIZES; num_sizes++) {
+		size = msgsizes[num_sizes];
+		for (j=0; j<size*numprocs; j++) {
+			sendb[j] = j;
+			recvb[j] = 0;
+		}
+		MPI_Alltoall(sendb,size,MPI_INT,recvb,size,MPI_INT,MPI_COMM_WORLD);
+		MPI_Barrier(MPI_COMM_WORLD);
+#ifdef MPIWTIME
+		startwtime = MPI_Wtime();
+#else
+		getclockvalue (&startwtime);
+#endif
+		for (k=0; k< REPS ; k++) {
+			MPI_Alltoall(sendb,size,MPI_INT,recvb,size,MPI_INT,MPI_COMM_WORLD);
+		}
+#ifdef MPIWTIME
+		endwtime = MPI_Wtime();
+#else
+		getclockvalue (&endwtime);
+#endif
+		opertime[i][num_sizes] = 
+			(endwtime-startwtime)/(float)(REPS) ;
+        }
+    }
+    MPI_Barrier(MPI_COMM_WORLD);
+
+/* Report results */
+    if (myid==0) {
+      for (num_sizes=0; num_sizes < NUM_SIZES; num_sizes++) {
+	mean[num_sizes] = 0.0;
+	min[num_sizes] = 100000. ;
+	max[num_sizes] = 0.0 ;
+      }
+
+      for (i=0; i<NUMTIMES; i++) {
+	for (num_sizes=0; num_sizes < NUM_SIZES; num_sizes++) {
+#ifdef DEBUG
+		printf("%d %d %g\n",i,msgsizes[num_sizes],
+			opertime[i][num_sizes]) ;
+#endif
+		mean[num_sizes] += opertime[i][num_sizes] ;
+		if (min[num_sizes] > opertime[i][num_sizes])
+			min[num_sizes] = opertime[i][num_sizes] ;
+		if (max[num_sizes] < opertime[i][num_sizes])
+			max[num_sizes] = opertime[i][num_sizes] ;
+	}
+#ifdef DEBUG
+	printf("\n");
+#endif
+      }
+
+      for (num_sizes=0; num_sizes < NUM_SIZES; num_sizes++) 
+	mean[num_sizes] /= (float)NUMTIMES;
+
+#ifdef DEBUG
+      for (num_sizes=0; num_sizes < NUM_SIZES; num_sizes++) {
+	printf("%d %g %g %g\n",msgsizes[num_sizes],mean[num_sizes] * 1000000., 
+			min[num_sizes] * 1000000., max[num_sizes] * 1000000. ); 
+      }
+      printf("================================================\n");
+#endif
+
+      times=NUMTIMES; reps=REPS;
+      printf("#Alltoall: P=%d, NUMTIMES=%d, REPS=%d\n",
+	numprocs, times, reps);
+      printf("%d ",numprocs);
+      for (num_sizes=0; num_sizes < NUM_SIZES; num_sizes++) 
+		printf("%g ",mean[num_sizes] * 1000000.);
+      printf("\n");
+    }
+
+    MPI_Finalize();
+    return 0;
 }
+
+
