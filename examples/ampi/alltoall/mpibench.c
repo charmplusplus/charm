@@ -4,8 +4,8 @@
 #include <sys/time.h>
 #include <unistd.h>
 
-#define NUMTIMES 50
-#define REPS 100
+#define NUMTIMES 1
+#define REPS 2000
 #define MAX_SIZE 131072
 #define NUM_SIZES 9
 
