@@ -5,9 +5,9 @@
 #include <unistd.h>
 
 #define NUMTIMES 50
-#define REPS 10
-#define MAX_SIZE 32768
-#define NUM_SIZES 8
+#define REPS 100
+#define MAX_SIZE 131072
+#define NUM_SIZES 9
 
 #ifndef MPIWTIME
 void getclockvalue(double *retval)
@@ -47,6 +47,7 @@ char *argv[];
     msgsizes[5] = 2048;
     msgsizes[6] = 8192;
     msgsizes[7] = 32768;
+    msgsizes[8] = 131072;
 
     MPI_Init(&argc,&argv);
     MPI_Comm_size(MPI_COMM_WORLD,&numprocs);
