@@ -79,7 +79,7 @@ class Hello : public CBase_Hello {
 
       // Copy each of the strings into a properly aligned buffer and create the DMA list that
       //   will be passed to the Offload API.
-      DMAListEntry dmaList[9];
+      DMAListEntry dmaList[9] __attribute__((aligned(16)));
       for (int i = 0; i < 9; i++) {
 
         // Copy the string into a properly aligned buffer
