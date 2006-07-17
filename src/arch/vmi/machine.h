@@ -368,11 +368,13 @@ typedef struct
 typedef struct
 {
   PVMI_CACHE_ENTRY cacheentry;
+  int              publishes_pending;
 } CMI_VMI_Send_Handle_RDMAGet_T;
 
 typedef struct
 {
   PVMI_CACHE_ENTRY cacheentry;
+  int              publishes_pending;
 } CMI_VMI_Send_Handle_RDMABroadcast_T;
 
 typedef struct
@@ -425,6 +427,7 @@ typedef struct
   PVMI_CACHE_ENTRY                   cacheentry;
   char                              *eager_buffer;
   CMI_VMI_Eager_Short_Slot_Footer_T *footer;
+  int                                publishes_pending;
 } CMI_VMI_Receive_Handle_Eager_Short_T;
 
 typedef struct
@@ -432,6 +435,7 @@ typedef struct
   int              sender_rank;
   int              maxsize;
   PVMI_CACHE_ENTRY cacheentry;
+  int              publishes_pending;
 } CMI_VMI_Receive_Handle_Eager_Long_T;
 
 typedef struct
@@ -641,7 +645,8 @@ void CMI_VMI_Eager_Long_Setup (int sender_rank, int maxsize);
 VMI_RECV_STATUS CMI_VMI_Stream_Notification_Handler (PVMI_CONNECT connection, PVMI_STREAM_RECV stream, VMI_STREAM_COMMAND command, PVOID context, PVMI_SLAB slab);
 void CMI_VMI_Stream_Completion_Handler (PVOID context, VMI_STATUS remote_status);
 
-void CMI_VMI_RDMA_Publish_Handler (PVMI_CONNECT connection, PVMI_REMOTE_BUFFER remote_buffer, PVMI_SLAB publish_data, ULONG publish_data_size);
+void CMI_VMI_RDMA_Publish_Notification_Handler (PVMI_CONNECT connection, PVMI_REMOTE_BUFFER remote_buffer, PVMI_SLAB publish_data, ULONG publish_data_size);
+void CMI_VMI_RDMA_Publish_Completion_Handler (PVOID context, VMI_STATUS remote_status);
 
 void CMI_VMI_RDMA_Put_Notification_Handler (PVMI_CONNECT connection, UINT32 rdma_size, UINT32 context, VMI_STATUS remote_status);
 void CMI_VMI_RDMA_Put_Completion_Handler (PVMI_RDMA_OP rdmaop, PVOID context, VMI_STATUS remote_status);

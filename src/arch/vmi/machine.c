@@ -17,6 +17,7 @@
 #include "machine.h"
 
 //#define GK_DELAY_DEVICE 1
+//#define VMI22 1
 
 /* The following are external variables used by the VMI core. */
 extern USHORT VMI_DEVICE_RUNTIME;
@@ -907,6 +908,7 @@ void CmiSyncSendFn (int destrank, int msgsize, char *msg)
 
       CMI_VMI_AsyncMsgCount += 1;
       handle->refcount += 1;
+      handle->data.send.data.rdmaget.publishes_pending = 1;
 
       publish_msg.type = CMI_VMI_PUBLISH_TYPE_GET;
 
@@ -1117,13 +1119,27 @@ CmiCommHandle CmiAsyncSendFn (int destrank, int msgsize, char *msg)
 
       handle->refcount += 1;
       CMI_VMI_AsyncMsgCount += 1;
+      handle->data.send.data.rdmaget.publishes_pending = 1;
 
       publish_msg.type = CMI_VMI_PUBLISH_TYPE_GET;
 
+#if VMI22
+      status = VMI_RDMA_Publish_Buffer_With_Callback ((&CMI_VMI_Processes[destrank])->connection, cacheentry->bufferHandle, (VMI_virt_addr_t) (VMI_ADDR_CAST) msg,
+						      (UINT32) msgsize, (VMI_virt_addr_t) (VMI_ADDR_CAST) NULL, (UINT32) handle->index, (PVOID) &publish_msg,
+						      (ULONG) sizeof (CMI_VMI_Publish_Message_T), (PVOID) handle, CMI_VMI_RDMA_Publish_Completion_Handler);
+      CMI_VMI_CHECK_SUCCESS (status, "VMI_RDMA_Publish_Buffer_With_Callback()");
+
+      while (handle->data.send.data.rdmaget.publishes_pending > 0) {
+	sched_yield ();
+	status = VMI_Poll ();
+	CMI_VMI_CHECK_SUCCESS (status, "VMI_Poll()");
+      }
+#else
       status = VMI_RDMA_Publish_Buffer ((&CMI_VMI_Processes[destrank])->connection, cacheentry->bufferHandle, (VMI_virt_addr_t) (VMI_ADDR_CAST) msg,
 				        (UINT32) msgsize, (VMI_virt_addr_t) (VMI_ADDR_CAST) NULL, (UINT32) handle->index, (PVOID) &publish_msg,
 				        (ULONG) sizeof (CMI_VMI_Publish_Message_T));
       CMI_VMI_CHECK_SUCCESS (status, "VMI_RDMA_Publish_Buffer()");
+#endif
     }
   }
 
@@ -1314,13 +1330,27 @@ void CmiFreeSendFn (int destrank, int msgsize, char *msg)
 
       handle->refcount += 1;
       CMI_VMI_AsyncMsgCount += 1;
+      handle->data.send.data.rdmaget.publishes_pending = 1;
 
       publish_msg.type = CMI_VMI_PUBLISH_TYPE_GET;
 
+#if VMI22
+      status = VMI_RDMA_Publish_Buffer_With_Callback ((&CMI_VMI_Processes[destrank])->connection, cacheentry->bufferHandle, (VMI_virt_addr_t) (VMI_ADDR_CAST) msg,
+						      (UINT32) msgsize, (VMI_virt_addr_t) (VMI_ADDR_CAST) NULL, (UINT32) handle->index, (PVOID) &publish_msg,
+						      (ULONG) sizeof (CMI_VMI_Publish_Message_T), (PVOID) handle, CMI_VMI_RDMA_Publish_Completion_Handler);
+      CMI_VMI_CHECK_SUCCESS (status, "VMI_RDMA_Publish_Buffer_With_Callback()");
+
+      while (handle->data.send.data.rdmaget.publishes_pending > 0) {
+	sched_yield ();
+	status = VMI_Poll ();
+	CMI_VMI_CHECK_SUCCESS (status, "VMI_Poll()");
+      }
+#else
       status = VMI_RDMA_Publish_Buffer ((&CMI_VMI_Processes[destrank])->connection, cacheentry->bufferHandle, (VMI_virt_addr_t) (VMI_ADDR_CAST) msg,
 				        (UINT32) msgsize, (VMI_virt_addr_t) (VMI_ADDR_CAST) NULL, (UINT32) handle->index, (PVOID) &publish_msg,
 				        (ULONG) sizeof (CMI_VMI_Publish_Message_T));
       CMI_VMI_CHECK_SUCCESS (status, "VMI_RDMA_Publish_Buffer()");
+#endif
     }
   }
 }
@@ -1476,6 +1506,7 @@ void CmiSyncBroadcastFn (int msgsize, char *msg)
 
     handle->refcount += childcount;
     CMI_VMI_AsyncMsgCount += childcount;
+    handle->data.send.data.rdmabroadcast.publishes_pending = childcount;
 
     startrank = CMI_BROADCAST_ROOT (msg) - 1;
     for (i = 1; i <= CMI_VMI_BROADCAST_SPANNING_FACTOR; i++) {
@@ -1502,6 +1533,7 @@ void CmiSyncBroadcastFn (int msgsize, char *msg)
 #else
     handle->refcount += (_Cmi_numpes - 1);
     CMI_VMI_AsyncMsgCount += (_Cmi_numpes - 1);
+    handle->data.send.data.rdmabroadcast.publishes_pending = (_Cmi_numpes - 1);
 
     for (i = 0; i < _Cmi_mype; i++) {
       status = VMI_RDMA_Publish_Buffer ((&CMI_VMI_Processes[i])->connection, cacheentry->bufferHandle, (VMI_virt_addr_t) (VMI_ADDR_CAST) msg,
@@ -1713,6 +1745,7 @@ CmiCommHandle CmiAsyncBroadcastFn (int msgsize, char *msg)
 
     handle->refcount += childcount;
     CMI_VMI_AsyncMsgCount += childcount;
+    handle->data.send.data.rdmabroadcast.publishes_pending = childcount;
 
     startrank = CMI_BROADCAST_ROOT (msg) - 1;
     for (i = 1; i <= CMI_VMI_BROADCAST_SPANNING_FACTOR; i++) {
@@ -1731,27 +1764,57 @@ CmiCommHandle CmiAsyncBroadcastFn (int msgsize, char *msg)
       destrank += startrank;
       destrank %= _Cmi_numpes;
 
+#if VMI22
+      status = VMI_RDMA_Publish_Buffer_With_Callback ((&CMI_VMI_Processes[destrank])->connection, cacheentry->bufferHandle, (VMI_virt_addr_t) (VMI_ADDR_CAST) msg,
+						      (UINT32) msgsize, (VMI_virt_addr_t) (VMI_ADDR_CAST) NULL, (UINT32) handle->index, (PVOID) &publish_msg,
+						      (ULONG) sizeof (CMI_VMI_Publish_Message_T), (PVOID) handle, CMI_VMI_RDMA_Publish_Completion_Handler);
+      CMI_VMI_CHECK_SUCCESS (status, "VMI_RDMA_Publish_Buffer_With_Callback()");
+#else
       status = VMI_RDMA_Publish_Buffer ((&CMI_VMI_Processes[destrank])->connection, cacheentry->bufferHandle, (VMI_virt_addr_t) (VMI_ADDR_CAST) msg,
 					(UINT32) msgsize, (VMI_virt_addr_t) (VMI_ADDR_CAST) NULL, (UINT32) handle->index, (PVOID) &publish_msg,
 					(ULONG) sizeof (CMI_VMI_Publish_Message_T));
       CMI_VMI_CHECK_SUCCESS (status, "VMI_RDMA_Publish_Buffer()");
+#endif
     }
 #else
     handle->refcount += (_Cmi_numpes - 1);
     CMI_VMI_AsyncMsgCount += (_Cmi_numpes - 1);
+    handle->data.send.data.rdmabroadcast.publishes_pending = (_Cmi_numpes - 1);
 
     for (i = 0; i < _Cmi_mype; i++) {
+#if VMI22
+      status = VMI_RDMA_Publish_Buffer_With_Callback ((&CMI_VMI_Processes[i])->connection, cacheentry->bufferHandle, (VMI_virt_addr_t) (VMI_ADDR_CAST) msg,
+						      (UINT32) msgsize, (VMI_virt_addr_t) (VMI_ADDR_CAST) NULL, (UINT32) handle->index, (PVOID) &publish_msg,
+						      (ULONG) sizeof (CMI_VMI_Publish_Message_T), (PVOID) handle, CMI_VMI_RDMA_Publish_Completion_Handler);
+      CMI_VMI_CHECK_SUCCESS (status, "VMI_RDMA_Publish_Buffer_With_Callback()");
+#else
       status = VMI_RDMA_Publish_Buffer ((&CMI_VMI_Processes[i])->connection, cacheentry->bufferHandle, (VMI_virt_addr_t) (VMI_ADDR_CAST) msg,
 					(UINT32) msgsize, (VMI_virt_addr_t) (VMI_ADDR_CAST) NULL, (UINT32) handle->index, (PVOID) &publish_msg,
 					(ULONG) sizeof (CMI_VMI_Publish_Message_T));
       CMI_VMI_CHECK_SUCCESS (status, "VMI_RDMA_Publish_Buffer()");
+#endif
     }
 
     for (i = (_Cmi_mype + 1); i < _Cmi_numpes; i++) {
+#if VMI22
+      status = VMI_RDMA_Publish_Buffer_With_Callback ((&CMI_VMI_Processes[i])->connection, cacheentry->bufferHandle, (VMI_virt_addr_t) (VMI_ADDR_CAST) msg,
+						      (UINT32) msgsize, (VMI_virt_addr_t) (VMI_ADDR_CAST) NULL, (UINT32) handle->index, (PVOID) &publish_msg,
+						      (ULONG) sizeof (CMI_VMI_Publish_Message_T), (PVOID) handle, CMI_VMI_RDMA_Publish_Completion_Handler);
+      CMI_VMI_CHECK_SUCCESS (status, "VMI_RDMA_Publish_Buffer_With_Callback()");
+#else
       status = VMI_RDMA_Publish_Buffer ((&CMI_VMI_Processes[i])->connection, cacheentry->bufferHandle, (VMI_virt_addr_t) (VMI_ADDR_CAST) msg,
 					(UINT32) msgsize, (VMI_virt_addr_t) (VMI_ADDR_CAST) NULL, (UINT32) handle->index, (PVOID) &publish_msg,
 					(ULONG) sizeof (CMI_VMI_Publish_Message_T));
       CMI_VMI_CHECK_SUCCESS (status, "VMI_RDMA_Publish_Buffer()");
+#endif
+    }
+#endif
+
+#if VMI22
+    while (handle->data.send.data.rdmabroadcast.publishes_pending > 0) {
+      sched_yield ();
+      status = VMI_Poll ();
+      CMI_VMI_CHECK_SUCCESS (status, "VMI_Poll()");
     }
 #endif
   }
@@ -1939,6 +2002,7 @@ void CmiFreeBroadcastFn (int msgsize, char *msg)
 
     handle->refcount += childcount;
     CMI_VMI_AsyncMsgCount += childcount;
+    handle->data.send.data.rdmabroadcast.publishes_pending = childcount;
 
     startrank = CMI_BROADCAST_ROOT (msg) - 1;
     for (i = 1; i <= CMI_VMI_BROADCAST_SPANNING_FACTOR; i++) {
@@ -1957,27 +2021,57 @@ void CmiFreeBroadcastFn (int msgsize, char *msg)
       destrank += startrank;
       destrank %= _Cmi_numpes;
 
+#if VMI22
+      status = VMI_RDMA_Publish_Buffer_With_Callback ((&CMI_VMI_Processes[destrank])->connection, cacheentry->bufferHandle, (VMI_virt_addr_t) (VMI_ADDR_CAST) msg,
+						      (UINT32) msgsize, (VMI_virt_addr_t) (VMI_ADDR_CAST) NULL, (UINT32) handle->index, (PVOID) &publish_msg,
+						      (ULONG) sizeof (CMI_VMI_Publish_Message_T), (PVOID) handle, CMI_VMI_RDMA_Publish_Completion_Handler);
+      CMI_VMI_CHECK_SUCCESS (status, "VMI_RDMA_Publish_Buffer_With_Callback()");
+#else
       status = VMI_RDMA_Publish_Buffer ((&CMI_VMI_Processes[destrank])->connection, cacheentry->bufferHandle, (VMI_virt_addr_t) (VMI_ADDR_CAST) msg,
 					(UINT32) msgsize, (VMI_virt_addr_t) (VMI_ADDR_CAST) NULL, (UINT32) handle->index, (PVOID) &publish_msg,
 					(ULONG) sizeof (CMI_VMI_Publish_Message_T));
       CMI_VMI_CHECK_SUCCESS (status, "VMI_RDMA_Publish_Buffer()");
+#endif
     }
 #else
     handle->refcount += (_Cmi_numpes - 1);
     CMI_VMI_AsyncMsgCount += (_Cmi_numpes - 1);
+    handle->data.send.data.rdmabroadcast.publishes_pending = (_Cmi_numpes - 1);
 
     for (i = 0; i < _Cmi_mype; i++) {
+#if VMI22
+      status = VMI_RDMA_Publish_Buffer_With_Callback ((&CMI_VMI_Processes[i])->connection, cacheentry->bufferHandle, (VMI_virt_addr_t) (VMI_ADDR_CAST) msg,
+						      (UINT32) msgsize, (VMI_virt_addr_t) (VMI_ADDR_CAST) NULL, (UINT32) handle->index, (PVOID) &publish_msg,
+						      (ULONG) sizeof (CMI_VMI_Publish_Message_T), (PVOID) handle, CMI_VMI_RDMA_Publish_Completion_Handler);
+      CMI_VMI_CHECK_SUCCESS (status, "VMI_RDMA_Publish_Buffer_With_Callback()");
+#else
       status = VMI_RDMA_Publish_Buffer ((&CMI_VMI_Processes[i])->connection, cacheentry->bufferHandle, (VMI_virt_addr_t) (VMI_ADDR_CAST) msg,
 					(UINT32) msgsize, (VMI_virt_addr_t) (VMI_ADDR_CAST) NULL, (UINT32) handle->index, (PVOID) &publish_msg,
 					(ULONG) sizeof (CMI_VMI_Publish_Message_T));
       CMI_VMI_CHECK_SUCCESS (status, "VMI_RDMA_Publish_Buffer()");
+#endif
     }
 
     for (i = (_Cmi_mype + 1); i < _Cmi_numpes; i++) {
+#if VMI22
+      status = VMI_RDMA_Publish_Buffer_With_Callback ((&CMI_VMI_Processes[i])->connection, cacheentry->bufferHandle, (VMI_virt_addr_t) (VMI_ADDR_CAST) msg,
+						      (UINT32) msgsize, (VMI_virt_addr_t) (VMI_ADDR_CAST) NULL, (UINT32) handle->index, (PVOID) &publish_msg,
+						      (ULONG) sizeof (CMI_VMI_Publish_Message_T), (PVOID) handle, CMI_VMI_RDMA_Publish_Completion_Handler);
+      CMI_VMI_CHECK_SUCCESS (status, "VMI_RDMA_Publish_Buffer_With_Callback()");
+#else
       status = VMI_RDMA_Publish_Buffer ((&CMI_VMI_Processes[i])->connection, cacheentry->bufferHandle, (VMI_virt_addr_t) (VMI_ADDR_CAST) msg,
 					(UINT32) msgsize, (VMI_virt_addr_t) (VMI_ADDR_CAST) NULL, (UINT32) handle->index, (PVOID) &publish_msg,
 					(ULONG) sizeof (CMI_VMI_Publish_Message_T));
       CMI_VMI_CHECK_SUCCESS (status, "VMI_RDMA_Publish_Buffer()");
+#endif
+    }
+#endif
+
+#if VMI22
+    while (handle->data.send.data.rdmabroadcast.publishes_pending > 0) {
+      sched_yield ();
+      status = VMI_Poll ();
+      CMI_VMI_CHECK_SUCCESS (status, "VMI_Poll()");
     }
 #endif
   }
@@ -3395,7 +3489,7 @@ VMI_CONNECT_RESPONSE CMI_VMI_Connection_Handler (PVMI_CONNECT connection, PVMI_S
   VMI_CONNECT_SET_RECEIVE_CONTEXT (connection, (&CMI_VMI_Processes[rank]));
 
   /* A bug in VMI 2.1 prevents the following three calls from returning a proper return code. */
-  status = VMI_RDMA_Set_Publish_Callback (connection, (VMIRDMABuffer) CMI_VMI_RDMA_Publish_Handler);
+  status = VMI_RDMA_Set_Publish_Callback (connection, (VMIRDMABuffer) CMI_VMI_RDMA_Publish_Notification_Handler);
   /* CMI_VMI_CHECK_SUCCESS (status, "VMI_RDMA_Set_Publish_Callback()"); */
 
   status = VMI_RDMA_Set_Put_Notification_Callback (connection, CMI_VMI_RDMA_Put_Notification_Handler);
@@ -3440,7 +3534,7 @@ void CMI_VMI_Connection_Response_Handler (PVOID context, PVOID response, USHORT 
       VMI_CONNECT_SET_RECEIVE_CONTEXT (process->connection, process);
 
       /* A bug in VMI 2.1 prevents the following three calls from returning a proper return code. */
-      status = VMI_RDMA_Set_Publish_Callback (process->connection, CMI_VMI_RDMA_Publish_Handler);
+      status = VMI_RDMA_Set_Publish_Callback (process->connection, CMI_VMI_RDMA_Publish_Notification_Handler);
       /* CMI_VMI_CHECK_SUCCESS (status, "VMI_RDMA_Set_Publish_Callback()"); */
 
       status = VMI_RDMA_Set_Put_Notification_Callback (process->connection, CMI_VMI_RDMA_Put_Notification_Handler);
@@ -3886,14 +3980,30 @@ void CMI_VMI_CmiFree (void *ptr)
       buffer_size = handle->data.receive.data.eager_long.maxsize;
       cacheentry = handle->data.receive.data.eager_long.cacheentry;
 
+      handle->data.receive.data.eager_long.publishes_pending = 1;
+
       /* Fill in the publish data which will be sent to the sender. */
       publish_msg.type = CMI_VMI_PUBLISH_TYPE_EAGER_LONG;
 
       /* Publish the eager buffer to the sender. */
+#if VMI22
+      status = VMI_RDMA_Publish_Buffer_With_Callback (process->connection, cacheentry->bufferHandle, (VMI_virt_addr_t) (VMI_ADDR_CAST) publish_buffer,
+						      (UINT32) buffer_size, (VMI_virt_addr_t) (VMI_ADDR_CAST) NULL, (UINT32) handle->index,
+						      (PVOID) &publish_msg, (ULONG) sizeof (CMI_VMI_Publish_Message_T), (PVOID) handle,
+						      CMI_VMI_RDMA_Publish_Completion_Handler);
+      CMI_VMI_CHECK_SUCCESS (status, "VMI_RDMA_Publish_Buffer_With_Callback()");
+
+      while (handle->data.receive.data.eager_long.publishes_pending > 0) {
+	sched_yield ();
+	status = VMI_Poll ();
+	CMI_VMI_CHECK_SUCCESS (status, "VMI_Poll()");
+      }
+#else
       status = VMI_RDMA_Publish_Buffer (process->connection, cacheentry->bufferHandle, (VMI_virt_addr_t) (VMI_ADDR_CAST) publish_buffer,
 					(UINT32) buffer_size, (VMI_virt_addr_t) (VMI_ADDR_CAST) NULL, (UINT32) handle->index,
 					(PVOID) &publish_msg, (ULONG) sizeof (CMI_VMI_Publish_Message_T));
       CMI_VMI_CHECK_SUCCESS (status, "VMI_RDMA_Publish_Buffer()");
+#endif
     }
   } else {
     if (CMI_VMI_Eager_Protocol) {
@@ -4084,11 +4194,26 @@ void CMI_VMI_Eager_Short_Setup (int sender_rank)
   /* Fill in the publish data which will be sent to the sender. */
   publish_msg.type = CMI_VMI_PUBLISH_TYPE_EAGER_SHORT;
 
+  handle->data.receive.data.eager_short.publishes_pending = 1;
+
   /* Publish the eager buffer to the sender. */
+#if VMI22
+  status = VMI_RDMA_Publish_Buffer_With_Callback (process->connection, cacheentry->bufferHandle, (VMI_virt_addr_t) (VMI_ADDR_CAST) publish_buffer,
+						  (UINT32) buffer_size, (VMI_virt_addr_t) (VMI_ADDR_CAST) NULL, (UINT32) 0, (PVOID) &publish_msg,
+						  (ULONG) sizeof (CMI_VMI_Publish_Message_T), (PVOID) handle, CMI_VMI_RDMA_Publish_Completion_Handler);
+  CMI_VMI_CHECK_SUCCESS (status, "VMI_RDMA_Publish_Buffer_With_Callback()");
+
+  while (handle->data.receive.data.eager_short.publishes_pending > 0) {
+    sched_yield ();
+    status = VMI_Poll ();
+    CMI_VMI_CHECK_SUCCESS (status, "VMI_Poll()");
+  }
+#else
   status = VMI_RDMA_Publish_Buffer (process->connection, cacheentry->bufferHandle, (VMI_virt_addr_t) (VMI_ADDR_CAST) publish_buffer,
 				    (UINT32) buffer_size, (VMI_virt_addr_t) (VMI_ADDR_CAST) NULL, (UINT32) 0, (PVOID) &publish_msg,
 				    (ULONG) sizeof (CMI_VMI_Publish_Message_T));
   CMI_VMI_CHECK_SUCCESS (status, "VMI_RDMA_Publish_Buffer()");
+#endif
 }
 
 
@@ -4142,11 +4267,26 @@ void CMI_VMI_Eager_Long_Setup (int sender_rank, int maxsize)
     /* Fill in the publish data which will be sent to the sender. */
     publish_msg.type = CMI_VMI_PUBLISH_TYPE_EAGER_LONG;
 
+    handle->data.receive.data.eager_long.publishes_pending = 1;
+
     /* Publish the eager buffer to the sender. */
+#if VMI22
+    status = VMI_RDMA_Publish_Buffer_With_Callback (process->connection, cacheentry->bufferHandle, (VMI_virt_addr_t) (VMI_ADDR_CAST) publish_buffer,
+						    (UINT32) maxsize, (VMI_virt_addr_t) (VMI_ADDR_CAST) NULL, (UINT32) handle->index, (PVOID) &publish_msg,
+						    (ULONG) sizeof (CMI_VMI_Publish_Message_T), (PVOID) handle, CMI_VMI_RDMA_Publish_Completion_Handler);
+    CMI_VMI_CHECK_SUCCESS (status, "VMI_RDMA_Publish_Buffer_With_Callback()");
+
+    while (handle->data.receive.data.eager_long.publishes_pending > 0) {
+      sched_yield ();
+      status = VMI_Poll ();
+      CMI_VMI_CHECK_SUCCESS (status, "VMI_Poll()");
+    }
+#else
     status = VMI_RDMA_Publish_Buffer (process->connection, cacheentry->bufferHandle, (VMI_virt_addr_t) (VMI_ADDR_CAST) publish_buffer,
 				      (UINT32) maxsize, (VMI_virt_addr_t) (VMI_ADDR_CAST) NULL, (UINT32) handle->index,
 				      (PVOID) &publish_msg, (ULONG) sizeof (CMI_VMI_Publish_Message_T));
     CMI_VMI_CHECK_SUCCESS (status, "VMI_RDMA_Publish_Buffer()");
+#endif
   }
 }
 
@@ -4264,7 +4404,7 @@ void CMI_VMI_Stream_Completion_Handler (PVOID context, VMI_STATUS remote_status)
 ** as long as the publisher (sender) specifies an address IN OUR ADDRESS
 ** SPACE as the 5th argument to VMI_RDMA_Publish_Buffer().
 */
-void CMI_VMI_RDMA_Publish_Handler (PVMI_CONNECT connection, PVMI_REMOTE_BUFFER remote_buffer, PVMI_SLAB publish_data, ULONG publish_data_size)
+void CMI_VMI_RDMA_Publish_Notification_Handler (PVMI_CONNECT connection, PVMI_REMOTE_BUFFER remote_buffer, PVMI_SLAB publish_data, ULONG publish_data_size)
 {
   VMI_STATUS status;
 
@@ -4284,7 +4424,7 @@ void CMI_VMI_RDMA_Publish_Handler (PVMI_CONNECT connection, PVMI_REMOTE_BUFFER r
   int index;
 
 
-  DEBUG_PRINT ("CMI_VMI_RDMA_Publish_Handler() called.\n");
+  DEBUG_PRINT ("CMI_VMI_RDMA_Publish_Notification_Handler() called.\n");
 
   process = (CMI_VMI_Process_T *) VMI_CONNECT_GET_RECEIVE_CONTEXT (connection);
 
@@ -4379,6 +4519,35 @@ void CMI_VMI_RDMA_Publish_Handler (PVMI_CONNECT connection, PVMI_REMOTE_BUFFER r
       process->eager_long_send_size += 1;
 
       break;
+  }
+}
+
+
+
+/**************************************************************************
+**
+*/
+void CMI_VMI_RDMA_Publish_Completion_Handler (PVOID context, VMI_STATUS remote_status)
+{
+  CMI_VMI_Handle_T *handle;
+
+
+  DEBUG_PRINT ("CMI_VMI_RDMA_Publish_Completion_Handler() called.\n");
+
+  handle = (CMI_VMI_Handle_T *) context;
+
+  if (handle->handle_type == CMI_VMI_HANDLE_TYPE_SEND) {
+    if (handle->data.send.send_handle_type == CMI_VMI_SEND_HANDLE_TYPE_RDMAGET) {
+      handle->data.send.data.rdmaget.publishes_pending -= 1;
+    } else {
+      handle->data.send.data.rdmabroadcast.publishes_pending -= 1;
+    }
+  } else {
+    if (handle->data.receive.receive_handle_type == CMI_VMI_RECEIVE_HANDLE_TYPE_EAGER_SHORT) {
+      handle->data.receive.data.eager_short.publishes_pending -= 1;
+    } else {
+      handle->data.receive.data.eager_long.publishes_pending -= 1;
+    }
   }
 }
 
@@ -4722,6 +4891,7 @@ void CMI_VMI_Send_Spanning_Children (int msgsize, char *msg)
 
     handle->refcount += childcount;
     CMI_VMI_AsyncMsgCount += childcount;
+    handle->data.send.data.rdmabroadcast.publishes_pending = childcount;
 
     startrank = CMI_BROADCAST_ROOT (msg) - 1;
     for (i = 1; i <= CMI_VMI_BROADCAST_SPANNING_FACTOR; i++) {
@@ -4742,11 +4912,25 @@ void CMI_VMI_Send_Spanning_Children (int msgsize, char *msg)
 
       publish_msg.type = CMI_VMI_PUBLISH_TYPE_GET;
 
+#if VMI22
+      status = VMI_RDMA_Publish_Buffer_With_Callback ((&CMI_VMI_Processes[destrank])->connection, cacheentry->bufferHandle, (VMI_virt_addr_t) (VMI_ADDR_CAST) msg,
+						      (UINT32) msgsize, (VMI_virt_addr_t) (VMI_ADDR_CAST) NULL, (UINT32) handle->index, (PVOID) &publish_msg,
+						      (ULONG) sizeof (CMI_VMI_Publish_Message_T), (PVOID) handle, CMI_VMI_RDMA_Publish_Completion_Handler);
+      CMI_VMI_CHECK_SUCCESS (status, "VMI_RDMA_Publish_Buffer_With_Callback()");
+#else
       status = VMI_RDMA_Publish_Buffer ((&CMI_VMI_Processes[destrank])->connection, cacheentry->bufferHandle, (VMI_virt_addr_t) (VMI_ADDR_CAST) msg,
 					(UINT32) msgsize, (VMI_virt_addr_t) (VMI_ADDR_CAST) NULL, (UINT32) handle->index, (PVOID) &publish_msg,
 					(ULONG) sizeof (CMI_VMI_Publish_Message_T));
       CMI_VMI_CHECK_SUCCESS (status, "VMI_RDMA_Publish_Buffer()");
+#endif
     }
+#if VMI22
+    while (handle->data.send.data.rdmabroadcast.publishes_pending > 0) {
+      sched_yield ();
+      status = VMI_Poll ();
+      CMI_VMI_CHECK_SUCCESS (status, "VMI_Poll()");
+    }
+#endif
   }
 }
 #endif   /* CMK_BROADCAST_SPANNING_TREE */
