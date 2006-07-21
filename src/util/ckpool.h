@@ -17,10 +17,12 @@ template <typename type>
 class CkPoolQueue {
   type *first;
   int sz;
+  int classSize;
+  void *allocations;
 
   CkPoolQueue() {} // private, not usable
 public:
-  CkPoolQueue(int _sz) : first(NULL), sz(_sz) { CkAssert(_sz > 0); }
+  CkPoolQueue(int _sz) : first(NULL), sz(_sz), allocations(NULL) { CkAssert(_sz > 0); }
   void enqueue(type *p) {
     //printf("buffer enqueue\n");
     *(type**)p = first;
@@ -28,8 +30,9 @@ public:
   }
   type *dequeue(size_t size) {
     if (first == NULL) {
+      classSize = size;
       //printf("buffer dequeue - allocating %d\n",sz*ALIGN8(sizeof(type)));
-      first = (type*)malloc(sz * ALIGN8(size));
+      first = (type*)malloc(sz * ALIGN8(size) + sizeof(void*));
       type **src;
       type *dest;
       for (int i=0; i<sz-1; ++i) {
@@ -41,11 +44,24 @@ public:
       src = (type**)(((char*)first)+(sz-1)*ALIGN8(size));
       //printf("debug: last %p %p\n",first,src);
       *src = NULL;
+
+      void **nextAlloc = (void**)(((char*)first) + sz*ALIGN8(size));
+      *nextAlloc = allocations;
+      allocations = (void*)first;
     }
     //printf("buffer dequeue %p %p\n",first, *(type**)first);
     type *ret = first;
     first = *(type**)first;
     return ret;
+  }
+  void destroyAll() {
+    void *next;
+    first = NULL;
+    while (allocations != NULL) {
+      next = *(void**)(((char*)allocations) + sz*ALIGN8(classSize));
+      free(allocations);
+      allocations = next;
+    }
   }
 };
 
@@ -75,10 +91,17 @@ public:
     buffer.enqueue((type*)p);
   }
   friend class CkMultiPool<type>;
+  static void destroyAll();
 };
 
 template <typename type, unsigned int sz>
 CkPoolQueue<type> CkPool<type,sz>::buffer = CkPoolQueue<type>(sz);
+
+template <typename type, unsigned int sz>
+void CkPool<type,sz>::destroyAll() {
+  //printf(" - pool destroying all\n");
+  buffer.destroyAll();
+}
 
 /// CkMultiPool allows the user to have both a default queue, and specific
 /// queues from which to allocate. This should be more useful when deletion of
