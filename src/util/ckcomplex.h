@@ -20,9 +20,9 @@ struct ckcomplex {
     double re;
     double im;
     
-    inline ckcomplex() {re=0; im=0;}
-    inline ckcomplex(double r) {re=r; im=0;}
-    inline ckcomplex(double r,double i) {re=r; im=i;}
+    inline ckcomplex(double _re=0., double _im=0.): re(_re), im(_im){}
+  //    inline ckcomplex(double r) {re=r; im=0;}
+  //    inline ckcomplex(double r,double i) {re=r; im=i;}
     
     inline ~ckcomplex() {}
 
@@ -170,6 +170,8 @@ struct ckcomplex {
         free(buf);
     }
 };
+
+typedef ckcomplex complex;
 
 PUPbytes(ckcomplex);
 
