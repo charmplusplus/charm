@@ -8,7 +8,9 @@
 #ifndef _CONV_MACH_H
 #define _CONV_MACH_H
 
-#define XT3_ONLY_PCQUEUE_WORKAROUND                        1
+#define CMK_XT3                                            1
+
+#define XT3_ONLY_PCQUEUE_WORKAROUND                        0
 
 #define CMK_CONVERSE_MPI                                   1
 

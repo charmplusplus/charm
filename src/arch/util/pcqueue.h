@@ -60,12 +60,13 @@ typedef struct PCQueueStruct
   CmiMemUnlock();\
 }
 
+#if !CMK_XT3
 #define MallocCircQueueStruct(dg) {\
   CircQueue d;\
   CmiMemLock();\
   d = Cmi_freelist_circqueuestruct;\
   if (d==(CircQueue)0){\
-    d = ((CircQueue)calloc(1, sizeof(struct CircQueueStruct)));\
+    d = ((CircQueue)calloc(1, sizeof(struct CircQueueStruct))); \
   }\
   else{\
     freeCount--;\
@@ -74,6 +75,23 @@ typedef struct PCQueueStruct
   dg = d;\
   CmiMemUnlock();\
 }
+#else
+#define MallocCircQueueStruct(dg) {\
+  CircQueue d;\
+  CmiMemLock();\
+  d = Cmi_freelist_circqueuestruct;\
+  if (d==(CircQueue)0){\
+    d = ((CircQueue)malloc(sizeof(struct CircQueueStruct))); \
+    d = ((CircQueue)memset(d, 0, sizeof(struct CircQueueStruct))); \
+  }\
+  else{\
+    freeCount--;\
+    Cmi_freelist_circqueuestruct = d->next;\
+    }\
+  dg = d;\
+  CmiMemUnlock();\
+}
+#endif
 
 PCQueue PCQueueCreate(void)
 {
@@ -81,8 +99,12 @@ PCQueue PCQueueCreate(void)
   PCQueue Q;
 
   /* MallocCircQueueStruct(circ); */
+#if !CMK_XT3
   circ = (CircQueue)calloc(1, sizeof(struct CircQueueStruct));
-
+#else
+  circ = (CircQueue)malloc(sizeof(struct CircQueueStruct));
+  circ = (CircQueue)memset(circ, 0, sizeof(struct CircQueueStruct));
+#endif
   Q = (PCQueue)malloc(sizeof(struct PCQueueStruct));
   _MEMCHECK(Q);
   Q->head = circ;
@@ -161,7 +183,12 @@ void PCQueuePush(PCQueue Q, char *data)
     /* this way, the next buffer is linked in before data is filled in 
        in the last slot of this buffer */
 
+#if CMK_XT3
     circ = (CircQueue)calloc(1, sizeof(struct CircQueueStruct));
+#else
+    circ = (CircQueue)malloc(sizeof(struct CircQueueStruct));
+    circ = (CircQueue)memset(circ, 0, sizeof(struct CircQueueStruct));
+#endif
     /* MallocCircQueueStruct(circ); */
 
     Q->tail->next = circ;
