@@ -959,7 +959,7 @@ void speScheduler(SPEData *speData, unsigned long long id) {
         #endif
 
         // Update the state of the message queue entry
-        if ((msgQueue[i]->flags & WORK_REQUEST_FLAGS_LIST) == 0x00)
+        if ((msg->flags & WORK_REQUEST_FLAGS_LIST) == 0x00)
           msgState[runIndex] = SPE_MESSAGE_STATE_EXECUTED;
         else
           msgState[runIndex] = SPE_MESSAGE_STATE_EXECUTED_LIST;
@@ -1017,7 +1017,7 @@ void speScheduler(SPEData *speData, unsigned long long id) {
                          (unsigned int)(&(dmaList[i][msgQueue[i]->readOnlyLen])),
                          (msgQueue[i]->readWriteLen + msgQueue[i]->writeOnlyLen) * sizeof(DMAListEntry), i
                         );
-            #endif
+	    #endif
 
             spu_mfcdma64(((char*)localMemPtr[i]) + (readWriteOffset),
                          (unsigned int)msgQueue[i]->readOnlyPtr,  // eah
