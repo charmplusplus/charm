@@ -24,14 +24,14 @@
 
 class BGMach {
 public:
-  int x, y, z;         /* size of bluegene nodes in cube */
-  int numCth, numWth;           /* number of threads */
-  int stacksize;		/* bg thread stack size */
+  int x, y, z;             /* size of bluegene nodes in cube */
+  int numCth, numWth;      /* number of threads */
+  int stacksize;	   /* bg thread stack size */
   int timingMethod;	   /* timing method */
   double cpufactor;	   /* cpu factor to multiply to the time for walltime */
-  double fpfactor;     /* fp time factor */
-  char *traceroot;		/* bgTraceFile prefix */
-  BigSimNetwork *network;	/* network setup */
+  double fpfactor;         /* fp time factor */
+  char *traceroot;	   /* bgTraceFile prefix */
+  BigSimNetwork *network;  /* network setup */
   CkListString procList;
 public:
   BGMach() {  nullify(); }
