@@ -63,6 +63,7 @@ void CkPupGroupData(PUP::er &p);
 void CkPupNodeGroupData(PUP::er &p);
 void CkPupArrayElementsData(PUP::er &p);
 void CkPupProcessorData(PUP::er &p);
+void CkRemoveArrayElements();
 
 void CkStartCheckpoint(char* dirname,const CkCallback& cb);
 void CkRestartMain(const char* dirname);
