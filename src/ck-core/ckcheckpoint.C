@@ -344,7 +344,9 @@ void CkPupArrayElementsData(PUP::er &p)
 void CkPupProcessorData(PUP::er &p)
 {
     // save readonlys, and callback BTW
-    CkPupROData(p);
+    if(CkMyRank()==0) {
+        CkPupROData(p);
+    }
 
     // save mainchares into MainChares.dat
     if(CkMyPe()==0) {
@@ -355,7 +357,9 @@ void CkPupProcessorData(PUP::er &p)
     CkPupGroupData(p);
 
     // save nodegroups into NodeGroups.dat
-    CkPupNodeGroupData(p);
+    if(CkMyRank()==0) {
+        CkPupNodeGroupData(p);
+    }
 
     // pup array elements
     CkPupArrayElementsData(p);
@@ -387,6 +391,13 @@ static void checkpointOne(const char* dirname, CkCallback& cb){
 		CkPupMainChareData(pMain);
 		fclose(fMain);
 	}
+}
+
+void CkRemoveArrayElements()
+{
+  int i;
+  int numGroups = CkpvAccess(_groupIDTable)->size();
+  CKLOCMGR_LOOP(mgr->flushAllRecs(););
 }
 
 void CkStartCheckpoint(char* dirname,const CkCallback& cb)
