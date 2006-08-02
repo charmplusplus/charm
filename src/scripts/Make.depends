@@ -1827,13 +1827,13 @@ bigsim_proc.o: bigsim_proc.C blue.h converse.h conv-config.h \
   bigsim_logs.h blue_defs.h blue_network.h
 	$(CHARMC) -c -I. bigsim_proc.C
 
-blue_init.o: blue_init.C queueing.h blue.h converse.h conv-config.h \
+bigsim_init.o: bigsim_init.C queueing.h blue.h converse.h conv-config.h \
   conv-autoconfig.h conv-common.h conv-mach.h conv-mach-opt.h pup_c.h \
   conv-cpm.h conv-cpath.h conv-qd.h conv-random.h conv-lists.h \
   conv-trace.h persistent.h conv-onesided.h debug-conv.h blue-conv.h \
   blue_impl.h ckliststring.h blue_types.h blue_timing.h cklists.h pup.h \
   bigsim_logs.h blue_defs.h blue_network.h
-	$(CHARMC) -c -I. blue_init.C
+	$(CHARMC) -c -I. bigsim_init.C
 
 blue_timing.o: blue_timing.C blue.h converse.h conv-config.h \
   conv-autoconfig.h conv-common.h conv-mach.h conv-mach-opt.h pup_c.h \
