@@ -101,6 +101,7 @@ int FEM_master_parallel_part(int fem_mesh,int masterRank,FEM_Comm_t comm_context
     call parmetis
   */
 	double  parStartTime = CkWallTimer();
+	printf("starting FEM_call_parmetis \n");
   struct partconndata *partdata = FEM_call_parmetis(data,comm_context);
 
   printf("done with parmetis %d FEM_Mesh %d in %.6lf \n",CmiMemoryUsage(),sizeof(FEM_Mesh),CkWallTimer()-parStartTime);
