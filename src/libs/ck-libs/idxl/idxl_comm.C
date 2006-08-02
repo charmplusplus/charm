@@ -241,6 +241,12 @@ IDXL_Side::IDXL_Side(void) :cached_map(NULL)
 IDXL_Side::~IDXL_Side() {
 	flushMap();
 }
+
+void IDXL_Side::clear(){
+	flushMap();
+	comm.free();
+}
+
 void IDXL_Side::pup(PUP::er &p)  //For migration
 {
 	comm.pup(p);
@@ -317,7 +323,11 @@ int IDXL_Side::removeNode(int localNo, int sharedWithChk) {
   flushMap();
   return shdIdx;
 }
-	
+
+
+
+
+
 bool IDXL_Side::setNode(int localNo, int sharedWithChk, int sharedIdx) {
   bool done = addList(sharedWithChk).set(localNo, sharedIdx);
   flushMap();

@@ -194,6 +194,16 @@ public:
 	void add(int myChunk,int myLocalNo,
 		 int hisChunk,int hisLocalNo,IDXL_Side &hisList);
 	
+	
+	/**
+	 * Method to clear remove all the IDXL Lists stored in this IDXL_Side
+	 * Memory leak ?
+	 */
+	void clear();
+	
+	/***
+	 * added by Nilesh, needs comments.
+	 * */
 	bool lockIdxl(int sharedWithChk);
 	void unlockIdxl(int sharedWithChk);
 	bool isLocked(int sharedWithChk);
