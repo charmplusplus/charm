@@ -812,7 +812,7 @@ $(L)/libbluegene.a: BlueGene.C BlueGene.h BlueGene.decl.h BlueGene.def.h
 
 # (Converse) Blue Gene emulator
 BLUE_HEADERS = blue_types.h blue_timing.h blue_defs.h bigsim_logs.h blue.h blue_impl.h blue_network.h
-BLUE_OBJS = blue.o blue_node.o blue_proc.o blue_init.o blue_timing.o
+BLUE_OBJS = blue.o bigsim_node.o bigsim_proc.o blue_init.o blue_timing.o
 BIGSIM_IO_OBJS = bigsim_IO.o bigsim_logs.o bigsim_api.o
 
 LIBBLUE_OBJS = $(BLUE_OBJS) $(BIGSIM_IO_OBJS) blue_stub.o blue_standalone.o
