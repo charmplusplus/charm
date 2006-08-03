@@ -12,7 +12,7 @@ void ParFUM_deghosting(int meshid){
 }
 
 void ParFUM_recreateSharedNodes(int meshid) {
-  MPI_comm comm = MPI_COMM_WORLD;
+  MPI_Comm comm = MPI_COMM_WORLD;
   int comm_size, rank;
   MPI_Comm_size(comm, &comm_size);
   MPI_Comm_rank(comm, &rank);
@@ -30,9 +30,9 @@ void ParFUM_recreateSharedNodes(int meshid) {
   int numNodes;
   int coord_msg_tag=42, sharedlist_msg_tag=43;
   double *nodeCoords;
-  numNodes = FEM_Mesh_get_length(parfum_mesh,FEM_NODE);
+  numNodes = FEM_Mesh_get_length(meshid,FEM_NODE);
   nodeCoords = (double *)malloc(3*numNodes*sizeof(double));
-  FEM_Mesh_data(parfum_mesh,FEM_NODE,FEM_COORD, nodeCoords, 0, numNodes, 
+  FEM_Mesh_data(meshid,FEM_NODE,FEM_COORD, nodeCoords, 0, numNodes, 
 		FEM_DOUBLE, 3);
   // Begin exchange of node coordinates to determine shared nodes
   // FIX ME: compute bounding box, only exchange when bounding boxes collide
@@ -46,7 +46,7 @@ void ParFUM_recreateSharedNodes(int meshid) {
     MPI_Status *status;
     int source, length;
     // Probe for a coordinate message from any source; extract source and msg length
-    MPI_Probe(MPI_ANY_SOURCE, coord_msg_tag, MPI_Comm comm, status);
+    MPI_Probe(MPI_ANY_SOURCE, coord_msg_tag, comm, status);
     source = status.MPI_SOURCE;
     length = status.MPI_LENGTH;
     // Receive whatever data was available according to probe
@@ -84,7 +84,7 @@ void ParFUM_recreateSharedNodes(int meshid) {
     MPI_Status *status;
     int source, length;
     // Probe for a shared node list from any source; extract source and msg length
-    MPI_Probe(MPI_ANY_SOURCE, sharedlist_msg_tag, MPI_Comm comm, status);
+    MPI_Probe(MPI_ANY_SOURCE, sharedlist_msg_tag, comm, status);
     source = status.MPI_SOURCE;
     length = status.MPI_LENGTH;
     // Recv the shared node list the probe revealed was available
