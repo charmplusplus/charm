@@ -62,7 +62,7 @@ static int getIntFormat(void)
 main() {double d=-9.5; unsigned char *c=(unsigned char *)&d;
 int i; for (i=0;i<sizeof(double);i++) printf("c[%d]==0x%02x && ",i,c[i]); }
 */
-static int getFloatFormat(void)
+int getFloatFormat(void)
 {
 	float ftest=-9.5;//Float test value
 	double dtest=-9.5;//Double test value
