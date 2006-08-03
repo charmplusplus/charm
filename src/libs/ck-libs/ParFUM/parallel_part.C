@@ -664,6 +664,7 @@ struct ghostdata *gatherGhosts(){
     }
   }	
   res->numLayers = count;
+	DEBUG(printf("gatherGhosts found %d layers \n",res->numLayers));
   return res;
 }
 

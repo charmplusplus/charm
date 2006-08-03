@@ -34,10 +34,10 @@ void ParFUM_recreateSharedNodes(int meshid) {
   nodeCoords = (double *)malloc(3*numNodes*sizeof(double));
   FEM_Mesh_data(meshid,FEM_NODE,FEM_COORD, nodeCoords, 0, numNodes,FEM_DOUBLE, 3);
 
-	printf("Node Coords for rank %d \n",rank);
+/*	printf("Node Coords for rank %d \n",rank);
 	for(int n=0;n<numNodes;n++){
 		printf("%d -> %.5lf %.5lf %.5lf \n",n,nodeCoords[3*n+0],nodeCoords[3*n+1],nodeCoords[3*n+2]);
-	}
+	}*/
   
   // Begin exchange of node coordinates to determine shared nodes
   // FIX ME: compute bounding box, only exchange when bounding boxes collide
