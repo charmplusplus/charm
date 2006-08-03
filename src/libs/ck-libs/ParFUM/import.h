@@ -30,6 +30,7 @@ void ParFUM_deghosting(int meshid);
 void ParFUM_generateGlobalNodeNumbers(int fem_mesh);
 void ParFUM_recreateSharedNodes(int meshid);
 
+void ParFUM_createComm(int meshid);
 #endif
 
 

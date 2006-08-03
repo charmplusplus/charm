@@ -106,3 +106,10 @@ void ParFUM_recreateSharedNodes(int meshid) {
   }
   free(sharedNodeLists);
 }
+
+void ParFUM_createComm(int meshid)
+{
+  ParFUM_desharing(meshid);
+  ParFUM_deghosting(meshid);
+  ParFUM_recreateSharedNodes(meshid);
+}
