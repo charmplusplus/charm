@@ -76,7 +76,6 @@ void ParFUM_recreateSharedNodes(int meshid) {
     // Send remote nodes that were shared with this partition to remote partition
     MPI_Send((int *)&remoteSharedNodes[0], remoteSharedNodes.size(), MPI_INT, source, 
 	     sharedlist_msg_tag, comm);
-    // free status?
     free(recvNodeCoords);
   }
   for (int i=rank+1; i<comm_size; i++) {  // recv shared node lists
@@ -94,7 +93,6 @@ void ParFUM_recreateSharedNodes(int meshid) {
     sharedNodeCounts[source] = length;
     sharedNodeLists[source] = sharedNodes;
     // don't delete sharedNodes! we kept a pointer to it!
-    // free status?
   }
   // IMPLEMENT ME: use sharedNodeLists and sharedNodeCounts to move shared node data 
   // to IDXL
