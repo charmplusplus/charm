@@ -781,6 +781,8 @@ class FEM_Entity {
 		
   FEM_Comm ghostSend; //Non-ghosts we send out (only set for real entities)
   FEM_Comm ghostRecv; //Ghosts we recv into (only set for ghost entities)
+  
+	FEM_Comm_Holder ghostIDXL; //IDXL interface
 
   FEM_Entity(FEM_Entity *ghost_); //Default constructor
   void pup(PUP::er &p);
@@ -792,6 +794,10 @@ class FEM_Entity {
   /// Switch from this, a real entity, to the ghosts:
   FEM_Entity *getGhost(void) {return ghost;}
   const FEM_Entity *getGhost(void) const {return ghost;}
+	
+	//should only be called on non-ghost elements that have ghosts.
+	//empty its corresponding ghost entity and clear the idxls
+	void clearGhost();
 	
   /// Return the number of entities of this type
   inline int size(void) const {return length==-1?0:length;}
@@ -907,7 +913,6 @@ class FEM_Entity {
     else return ghost->ghostRecv; 
   }
   const FEM_Comm &getGhostRecv(void) const { return ghost->ghostRecv; }
-  FEM_Comm_Holder ghostIDXL; //IDXL interface
 	
   void addVarIndexAttribute(int code){
     FEM_VarIndexAttribute *varAttribute = new FEM_VarIndexAttribute(this,code);
@@ -1298,7 +1303,14 @@ class FEM_Mesh : public CkNoncopyable {
   /// Extract a list of our entities:
   int getEntities(int *entites);
   
-  
+  /**
+	 * clearing the idxl and data for shared nodes and ghost nodes and shared elements
+	 * 
+	 * */
+
+	void clearSharedNodes();
+	void clearGhostNodes();
+	void clearGhostElems();
   
   /********** New methods ***********/
   /*

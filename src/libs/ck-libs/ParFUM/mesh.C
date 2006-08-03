@@ -1639,6 +1639,17 @@ void FEM_Entity::copyOldGlobalno(const FEM_Entity &e) {
 	}
 }
 
+/*
+ * method to clear ghosts associated with this entity
+ * */
+
+void FEM_Entity::clearGhost(){
+	CkAssert(ghost != NULL);
+	ghostSend.clear();
+	ghost->setLength(0);
+	ghost->ghostRecv.clear();
+};
+
 /********************** Node *****************/
 FEM_Node::FEM_Node(FEM_Node *ghost_) 
   :FEM_Entity(ghost_), primary(0), sharedIDXL(&shared,&shared),
@@ -1968,6 +1979,22 @@ void FEM_Mesh::copyOldGlobalno(const FEM_Mesh &m) {
 	for (int s=0;s<m.sparse.size();s++)
 		if (m.sparse.has(s) && s<sparse.size() && sparse.has(s)) 
 			sparse[s].copyOldGlobalno(m.sparse[s]);
+}
+
+void FEM_Mesh::clearSharedNodes(){
+	node.shared.clear();
+}
+
+void FEM_Mesh::clearGhostNodes(){
+	node.clearGhost();
+}
+
+void FEM_Mesh::clearGhostElems(){
+	for(int i=0;i<elem.size();i++){
+		if(elem.has(i)){
+			elem[i].clearGhost();
+		}
+	}
 }
 
 void FEM_Index_Check(const char *caller,const char *entityType,int type,int maxType) {
