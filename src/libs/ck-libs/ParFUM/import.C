@@ -138,7 +138,7 @@ void ParFUM_createComm(int meshid)
   ParFUM_recreateSharedNodes(meshid);
 	MPI_Barrier(MPI_COMM_WORLD);
 	ParFUM_generateGlobalNodeNumbers(meshid);
-	FEM_Mesh 	*mesh = (FEM_chunk::get("ParFUM_recreateSharedNodes"))->getMesh("ParFUM_recreateSharedNodes");
+	FEM_Mesh 	*mesh = (FEM_chunk::get("ParFUM_recreateSharedNodes"))->lookup(meshid,"ParFUM_recreateSharedNodes");
 	MPI_Barrier(MPI_COMM_WORLD);
 	
 	int rank;
