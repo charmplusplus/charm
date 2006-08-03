@@ -3,19 +3,33 @@
 #include "ParFUM.h"
 #include "ParFUM_internals.h"
 
+
+#define msbInt(var,key){\
+	int *ptr = (int *)&key; \
+	var = *(ptr+endian);\
+}
+
+extern int getFloatFormat(void);
+
 inline int coordEqual(double *key1, double *key2) {
+	static const int endian = getFloatFormat();
   int maxUlps=200;
   // Make int coords lexicographically ordered as twos-complement ints
-  int x1Int = *(int*)&(key1[0]),
-    x2Int = *(int*)&(key2[0]);
+  int x1Int,x2Int;
+	msbInt(x1Int,key1[0]);
+	msbInt(x2Int,key2[0]);
   if (x1Int < 0) x1Int = 0x80000000 - x1Int;
   if (x2Int < 0) x2Int = 0x80000000 - x2Int;
-  int y1Int = *(int*)&(key1[1]),
-    y2Int = *(int*)&(key2[1]);
+	
+  int y1Int,y2Int;
+	msbInt(y1Int,key1[1]);
+	msbInt(y2Int,key2[1]);
   if (y1Int < 0) y1Int = 0x80000000 - y1Int;
   if (y2Int < 0) y2Int = 0x80000000 - y2Int;
-  int z1Int = *(int*)&(key1[2]),
-    z2Int = *(int*)&(key2[2]);
+  
+	int z1Int,z2Int;
+	msbInt(z1Int,key1[2]);
+	msbInt(z2Int,key2[2]);
   if (z1Int < 0) z1Int = 0x80000000 - z1Int;
   if (z2Int < 0) z2Int = 0x80000000 - z2Int;
 

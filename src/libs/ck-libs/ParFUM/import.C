@@ -6,7 +6,7 @@ void ParFUM_desharing(int meshid){
 
 
 void ParFUM_deghosting(int meshid){
-	FEM_Mesh 	*mesh = (FEM_chunk::get("ParFUM_desharing"))->getMesh("ParFUM_desharing");
+	FEM_Mesh 	*mesh = (FEM_chunk::get("ParFUM_deghosting"))->getMesh("ParFUM_deghosting");
 	mesh->clearGhostNodes();
 	mesh->clearGhostElems();
 }
@@ -32,11 +32,17 @@ void ParFUM_recreateSharedNodes(int meshid) {
   double *nodeCoords;
   numNodes = FEM_Mesh_get_length(meshid,FEM_NODE);
   nodeCoords = (double *)malloc(3*numNodes*sizeof(double));
-  FEM_Mesh_data(meshid,FEM_NODE,FEM_COORD, nodeCoords, 0, numNodes, 
-		FEM_DOUBLE, 3);
+  FEM_Mesh_data(meshid,FEM_NODE,FEM_COORD, nodeCoords, 0, numNodes,FEM_DOUBLE, 3);
+
+	printf("Node Coords for rank %d \n",rank);
+	for(int n=0;n<numNodes;n++){
+		printf("%d -> %.5lf %.5lf %.5lf \n",n,nodeCoords[3*n+0],nodeCoords[3*n+1],nodeCoords[3*n+2]);
+	}
+  
   // Begin exchange of node coordinates to determine shared nodes
   // FIX ME: compute bounding box, only exchange when bounding boxes collide
   for (int i=rank+1; i<comm_size; i++) { //send nodeCoords to rank i
+    printf("[%d] Sending %d doubles to rank %d \n",rank,3*numNodes,i);
     MPI_Send(nodeCoords, 3*numNodes, MPI_DOUBLE, i, coord_msg_tag, comm);
   }
   // Handle node coordinate-matching requests from other ranks
@@ -48,7 +54,8 @@ void ParFUM_recreateSharedNodes(int meshid) {
     // Probe for a coordinate message from any source; extract source and msg length
     MPI_Probe(MPI_ANY_SOURCE, coord_msg_tag, comm, &status);
     source = status.MPI_SOURCE;
-    length = status.MPI_LENGTH;
+    length = status.MPI_LENGTH/sizeof(double);
+    printf("[%d] Receiving %d doubles from rank %d \n",rank,length,i);
     // Receive whatever data was available according to probe
     recvNodeCoords = (double *)malloc(length*sizeof(double));
     MPI_Recv((void*)recvNodeCoords, length, MPI_DOUBLE, source, 
@@ -61,6 +68,7 @@ void ParFUM_recreateSharedNodes(int meshid) {
 	if (coordEqual(&nodeCoords[j*3], &recvNodeCoords[k*3])) {
 	  localSharedNodes.push_back(j); 
 	  remoteSharedNodes.push_back(k);
+	  printf("[%d] found local node %d to match with remote node %d \n",rank,j,k);
 	  break;
 	}
       }
@@ -85,7 +93,7 @@ void ParFUM_recreateSharedNodes(int meshid) {
     // Probe for a shared node list from any source; extract source and msg length
     MPI_Probe(MPI_ANY_SOURCE, sharedlist_msg_tag, comm, &status);
     source = status.MPI_SOURCE;
-    length = status.MPI_LENGTH;
+    length = status.MPI_LENGTH/sizeof(int);
     // Recv the shared node list the probe revealed was available
     sharedNodes = (int *)malloc(length*sizeof(int));
     MPI_Recv((void*)sharedNodes, length, MPI_INT, source, sharedlist_msg_tag, comm, &status);
@@ -96,7 +104,22 @@ void ParFUM_recreateSharedNodes(int meshid) {
   }
   // IMPLEMENT ME: use sharedNodeLists and sharedNodeCounts to move shared node data 
   // to IDXL
+	FEM_Mesh 	*mesh = (FEM_chunk::get("ParFUM_recreateSharedNodes"))->getMesh("ParFUM_recreateSharedNodes");
+	IDXL_Side &shared = mesh->node.shared;
 
+	for(int i=0;i<comm_size;i++){
+		if(i == rank)
+			continue;
+		if(sharedNodeCounts[i] != 0){
+			IDXL_List &list = shared.addList(i);
+			for(int j=0;j<sharedNodeCounts[i];j++){
+				list.push_back(sharedNodeLists[i][j]);
+			}
+		}
+	}
+	printf("After recreating shared nodes %d \n",rank);
+	shared.print();
+	
   // Clean up
   free(nodeCoords);
   free(sharedNodeCounts);
@@ -111,5 +134,22 @@ void ParFUM_createComm(int meshid)
 {
   ParFUM_desharing(meshid);
   ParFUM_deghosting(meshid);
+	MPI_Barrier(MPI_COMM_WORLD);
   ParFUM_recreateSharedNodes(meshid);
+	MPI_Barrier(MPI_COMM_WORLD);
+	ParFUM_generateGlobalNodeNumbers(meshid);
+	FEM_Mesh 	*mesh = (FEM_chunk::get("ParFUM_recreateSharedNodes"))->getMesh("ParFUM_recreateSharedNodes");
+	MPI_Barrier(MPI_COMM_WORLD);
+	
+	int rank;
+  MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+	struct ghostdata *gdata;
+	if(rank == 0){
+		gdata = gatherGhosts();
+	}else{
+	  gdata = new ghostdata;
+	}
+	MPI_Bcast_pup(*gdata,0,MPI_COMM_WORLD);
+	makeGhosts(mesh,MPI_COMM_WORLD,0,gdata->numLayers,gdata->layers);
+	MPI_Barrier(MPI_COMM_WORLD);
 }
