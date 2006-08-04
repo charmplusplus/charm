@@ -645,7 +645,7 @@ void speScheduler(SPEData *speData, unsigned long long id) {
           //   message with an error code because the memory allocation will never work.
           // TODO : Should also add a define that guesses at what the expected maximum stack size is (that
           //   could also be changed at compile-time by the end user)
-          if (__builtin_expect(memNeeded > ((unsigned int)0x40000 - ((unsigned int)(&_end))), 0)) {
+          if (__builtin_expect(memNeeded > ((int)0x40000 - ((int)(&_end))), 0)) {
 
             // Move the message into an error state
             errorCode[i] = SPE_MESSAGE_ERROR_NOT_ENOUGH_MEMORY;
@@ -711,7 +711,7 @@ void speScheduler(SPEData *speData, unsigned long long id) {
               memset(writeOnlyPtr[i], 0, ROUNDUP_16(msgQueue[i]->writeOnlyLen));
             #endif
           } else {
-            writeOnlyPtr[i] == NULL;
+            writeOnlyPtr[i] = NULL;
 	  }
 	}
 
