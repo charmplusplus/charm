@@ -1334,7 +1334,7 @@ int HypercubeGetBcastDestinations(int mype, int total_pes, int k, int *dest_pes)
 CpvExtern(int, CmiImmediateMsgHandlerIdx);
 
 
-CpvExtern(int, networkProgressCount);
+CpvExtern(unsigned, networkProgressCount);
 extern int networkProgressPeriod;
 
 #if !CMK_MACHINE_PROGRESS_DEFINED
@@ -1349,14 +1349,14 @@ void CmiMachineProgressImpl();
 #define CmiProbeImmediateMsg CmiMachineProgressImpl
 
 #define CmiNetworkProgress() {CpvAccess(networkProgressCount) ++; \
-      if(CpvAccess(networkProgressCount) ==  networkProgressPeriod) { \
+      if(CpvAccess(networkProgressCount) >=  networkProgressPeriod) { \
           CmiMachineProgressImpl(); \
           CpvAccess(networkProgressCount) = 0; \
       } \
 } \
 
 #define CmiNetworkProgressAfter(p) {CpvAccess(networkProgressCount) ++; \
-      if(CpvAccess(networkProgressCount) ==  p) { \
+      if(CpvAccess(networkProgressCount) >=  p) { \
           CmiMachineProgressImpl(); \
           CpvAccess(networkProgressCount) = 0; \
       } \

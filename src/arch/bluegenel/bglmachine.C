@@ -482,6 +482,10 @@ CpvDeclare(BGLTorusManager*, tmanager);
 
 BGTsC_Barrier_t        barrier;
 
+CpvDeclare(unsigned, networkProgressCount);
+int  networkProgressPeriod;
+
+
 void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret){
   int n, i;
   
@@ -1087,8 +1091,6 @@ void CmiFreeBroadcastAllFn(int size, char *msg){
   //SendMsgsUntil(0,0);
 }
 
-CpvDeclare(int, networkProgressCount);
-int  networkProgressPeriod;
 static unsigned long long lastProgress = 0;
 
 static inline void AdvanceCommunications(int max_out){
@@ -1426,6 +1428,7 @@ void CmiProbeImmediateMsg();
 
 void CmiMachineProgressImpl()
 {
+
   unsigned long long new_time = rts_get_timebase();  
   if(new_time < lastProgress + progress_cycles) {
     return;
