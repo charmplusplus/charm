@@ -5,9 +5,9 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
-#include <stdlib.h>
-#include <stdio.h>
-#include <string.h>
+  #include <stdlib.h>
+  #include <stdio.h>
+  #include <string.h>
 #ifdef __cplusplus
 }
 #endif
@@ -72,7 +72,7 @@ extern "C" void* malloc_aligned(size_t size, char alignment) {
   return malloc_aligned_helper(size, alignment, 0);
 }
 extern "C" void* calloc_aligned(size_t size, char alignment) {
-  return malloc_aligned_helper(size, alignment, 0);
+  return malloc_aligned_helper(size, alignment, 1);
 }
 
 
