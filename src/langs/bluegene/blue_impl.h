@@ -39,7 +39,7 @@ public:
   void nullify() { 
 	x=y=z=0; 
 	numCth=numWth=0; stacksize=0; 
-	timingMethod = BG_ELAPSE; cpufactor=1.0; fpfactor=0.0;
+	timingMethod = BG_WALLTIME; cpufactor=1.0; fpfactor=0.0;
 	traceroot=NULL; 
 	network=new BlueGeneNetwork;
   }
