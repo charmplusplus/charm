@@ -173,12 +173,10 @@ int main(unsigned long long id, unsigned long long param) {
 void speScheduler(SPEData *speData, unsigned long long id) {
 
   int keepLooping = TRUE;
-  int fetchIndex = 0;
   int runIndex = 0;
   int getIndex = 0;
   int putIndex = 0;
   int commitIndex = 0;
-  int cnt = 0;
   int tagStatus;
   unsigned int numDMAQueueEntries = 0;
   int i, j, iOffset;
