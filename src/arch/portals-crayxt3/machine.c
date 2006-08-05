@@ -116,7 +116,7 @@ CpvDeclare(void*, CmiLocalQueue);
 
 /*Network progress utility variables. Period controls the rate at
   which the network poll is called */
-CpvDeclare(int , networkProgressCount);
+CpvDeclare(unsigned , networkProgressCount);
 int networkProgressPeriod;
 
 int 		  idleblock = 0;

@@ -396,7 +396,7 @@ void CmiProbeImmediateMsg();
 
 #if CMK_MACHINE_PROGRESS_DEFINED
 
-CpvDeclare(int, networkProgressCount);
+CpvDeclare(unsigned, networkProgressCount);
 int  networkProgressPeriod;
 
 void CmiMachineProgressImpl();

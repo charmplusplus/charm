@@ -869,7 +869,7 @@ static void CmiDestoryLocks()
 /*Network progress utility variables. Period controls the rate at
   which the network poll is called */
 
-CpvDeclare(int , networkProgressCount);
+CpvDeclare(unsigned , networkProgressCount);
 int networkProgressPeriod;
 
 CpvDeclare(void *, CmiLocalQueue);
