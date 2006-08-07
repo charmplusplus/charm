@@ -945,6 +945,9 @@ SIMPLE_REDUCTION(logical_or,int,"%d",
   ret[i]=!!ret[i];//Make sure ret[i] is 0 or 1
 )
 
+SIMPLE_REDUCTION(bitvec_and,int,"%d",ret[i]&=value[i];)
+SIMPLE_REDUCTION(bitvec_or,int,"%d",ret[i]|=value[i];)
+
 /////////////// concat ////////////////
 /*
 This reducer simply appends the data it recieves from each element,
@@ -1092,6 +1095,12 @@ CkReduction::reducerFn CkReduction::reducerTable[CkReduction::MAXREDUCERS]={
   //Compute the logical OR of the integers passed by each element.
   // The resulting integer will be 1 if any source integer is nonzero.
     ::logical_or,
+
+    // Compute the logical bitvector AND of the integers passed by each element.
+    ::bitvec_and,
+
+    // Compute the logical bitvector OR of the integers passed by each element.
+    ::bitvec_or,
 
   //Concatenate the (arbitrary) data passed by each element
     ::concat,

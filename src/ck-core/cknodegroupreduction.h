@@ -52,6 +52,12 @@ public:
 	// The resulting integer will be 1 if any source integer is nonzero.
 		logical_or,
 
+                // Compute the logical bitvector AND of the integers passed by each element.
+                bitvec_and,
+
+                // Compute the logical bitvector OR of the integers passed by each element.
+                bitvec_or,
+
 	//Concatenate the (arbitrary) data passed by each element
 		concat,
 
