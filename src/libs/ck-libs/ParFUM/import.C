@@ -68,7 +68,7 @@ void ParFUM_recreateSharedNodes(int meshid, int dim) {
     int recvNodeCount = length/dim;
     for (int j=0; j<numNodes; j++) {
       for (int k=0; k<recvNodeCount; k++) {
-	if (coordEqual(&nodeCoords[j*dim], &recvNodeCoords[k*dim])) {
+	if (coordEqual(&nodeCoords[j*dim], &recvNodeCoords[k*dim], dim)) {
 	  localSharedNodes.push_back(j); 
 	  remoteSharedNodes.push_back(k);
 	  printf("[%d] found local node %d to match with remote node %d \n",rank,j,k);
@@ -133,7 +133,7 @@ void ParFUM_recreateSharedNodes(int meshid, int dim) {
   free(sharedNodeLists);
 }
 
-void ParFUM_createComm(int meshid, dim)
+void ParFUM_createComm(int meshid, int dim)
 {
   ParFUM_desharing(meshid);
   ParFUM_deghosting(meshid);
@@ -159,8 +159,15 @@ void ParFUM_createComm(int meshid, dim)
 
 void ParFUM_import_nodes(int meshid, int numNodes, double *nodeCoords, int dim)
 {
+  FEM_Mesh_become_set(meshid);
+  FEM_Mesh_data(meshid, FEM_NODE, FEM_COORD, nodeCoords, 0, numNodes, FEM_DOUBLE, dim);
+  FEM_Mesh_become_get(meshid);
 }
 
 void ParFUM_import_elems(int meshid, int numElems, int nodesPer, int *conn, int type)
 {
+  FEM_Mesh_become_set(meshid);
+  FEM_Mesh_data(meshid, FEM_ELEM+type, FEM_CONN, conn, 0, numElems, FEM_INDEX_0,
+		nodesPer);
+  FEM_Mesh_become_get(meshid);
 }
