@@ -119,7 +119,8 @@ class BGLTorusManager {
   } 
   
   inline int absx(int n){
-    int an = abs(n);
+    // doubling of X in TXYZ case
+    int an = (isVN && n>nxsize) ? abs(n-nxsize) : abs(n);
     int aan = nxsize - an;
     CmiAssert(aan>=0);
     return ((an>aan)?aan:an);
@@ -131,8 +132,9 @@ class BGLTorusManager {
     return ((an>aan)?aan:an);
   }
   inline int absz(int n){
-    /* funny doubling  of Z in VN case */
-    int an = (isVN) ? abs(n)/2 : abs(n);
+    /* funny doubling  of Z in VN XYZT case */
+    int an = (isVN && n>nzsize) ? abs(n-nzsize) : abs(n);
+    //int an = (isVN ) ? abs(n/2) : abs(n);
     int aan = nzsize - an;  
     CmiAssert(aan>=0); 
     return ((an>aan)?aan:an);
@@ -247,20 +249,58 @@ class BGLTorusManager {
     return minIdx;
   }
   
-  inline void sortIndexByHops(int pe, int *pes, int *idx, int n){
-    int minHops = getHopsBetweenRanks(pe,pes[0]);
-    int minIdx = 0;
-    int nowHops, tmp; 
-    for(int i=0;i<n;i++){
-      idx[i] = i;
-    }
-    for (int i=0; i<n-1; i++)
-      for (int j=0; j<n-1-i; j++)
-        if (getHopsBetweenRanks(pe, pes[idx[j+1]]) < getHopsBetweenRanks(pe, pes[idx[j]])){
+  inline void sortIndexByHops(int pe, int *pes, int *idx, int n)
+    {
+	int minHops = getHopsBetweenRanks(pe,pes[0]);
+	int minIdx = 0;
+	int nowHops, tmp;
+	for(int i=0;i<n;i++){
+	  idx[i] = i;
+	}
+	/*
+	  for (int i=0; i<n-1; i++)
+	  for (int j=0; j<n-1-i; j++)
+	  if (getHopsBetweenRanks(pe, pes[idx[j+1]]) < getHopsBetweenRanks(pe, pes[idx[j]])){
           tmp=idx[j+1]; idx[j+1]=idx[j]; idx[j]=tmp;
-        }
-  }
-};
+	  }
+	*/
+	quicksort(pe, pes, idx, 0, n-1);
+      }
+    void quicksort(int pe, int *pes, int *arr, int left, int right)
+      {
+	if(left<right)
+	  {
+	    int split = partition(pe, pes, arr, left, right);
+	    quicksort(pe, pes, arr, left, split);
+	    quicksort(pe, pes, arr, split+1, right);
+	  }
+      }
+
+    int partition(int pe, int *pes, int *idx, int left, int right)
+      {
+	int val = getHopsBetweenRanks(pe, pes[idx[(left+right)/2]]);
+	int lm = left-1;
+	int rm = right+1;
+	for(;;)
+	  {
+	    do
+	      rm--;
+	    while(getHopsBetweenRanks(pe, pes[idx[rm]]) > val);
+	    do
+	      lm++;
+	    while(getHopsBetweenRanks(pe, pes[idx[lm]]) < val);
+	    if(lm < rm)
+	      {
+		int tmp = idx[rm];
+		idx[rm] = idx[lm];
+		idx[lm] = tmp;
+	      }
+	    else
+	      return rm;
+	  }
+      }
+  };
+
 
 CpvExtern(BGLTorusManager *, tmanager); 
 
