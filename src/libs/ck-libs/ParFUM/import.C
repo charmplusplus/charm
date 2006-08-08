@@ -11,7 +11,7 @@ void ParFUM_deghosting(int meshid){
 	mesh->clearGhostElems();
 }
 
-void ParFUM_recreateSharedNodes(int meshid) {
+void ParFUM_recreateSharedNodes(int meshid, int dim) {
   MPI_Comm comm = MPI_COMM_WORLD;
   int comm_size, rank;
   MPI_Comm_size(comm, &comm_size);
@@ -31,19 +31,22 @@ void ParFUM_recreateSharedNodes(int meshid) {
   int coord_msg_tag=42, sharedlist_msg_tag=43;
   double *nodeCoords;
   numNodes = FEM_Mesh_get_length(meshid,FEM_NODE);
-  nodeCoords = (double *)malloc(3*numNodes*sizeof(double));
-  FEM_Mesh_data(meshid,FEM_NODE,FEM_COORD, nodeCoords, 0, numNodes,FEM_DOUBLE, 3);
-
-/*	printf("Node Coords for rank %d \n",rank);
-	for(int n=0;n<numNodes;n++){
-		printf("%d -> %.5lf %.5lf %.5lf \n",n,nodeCoords[3*n+0],nodeCoords[3*n+1],nodeCoords[3*n+2]);
-	}*/
+  nodeCoords = (double *)malloc(dim*numNodes*sizeof(double));
+  FEM_Mesh_data(meshid,FEM_NODE,FEM_COORD, nodeCoords, 0, numNodes,FEM_DOUBLE, dim);
+  /*
+  printf("Node Coords for rank %d \n",rank);
+  for(int n=0;n<numNodes;n++){
+    printf("%d -> ", n);
+    for (int m-0; m<dim; m++) 
+      printf("%.5lf %.5lf \n", nodeCoords[dim*n+m]);
+  }
+  */
   
   // Begin exchange of node coordinates to determine shared nodes
   // FIX ME: compute bounding box, only exchange when bounding boxes collide
   for (int i=rank+1; i<comm_size; i++) { //send nodeCoords to rank i
-    printf("[%d] Sending %d doubles to rank %d \n",rank,3*numNodes,i);
-    MPI_Send(nodeCoords, 3*numNodes, MPI_DOUBLE, i, coord_msg_tag, comm);
+    printf("[%d] Sending %d doubles to rank %d \n",rank,dim*numNodes,i);
+    MPI_Send(nodeCoords, dim*numNodes, MPI_DOUBLE, i, coord_msg_tag, comm);
   }
   // Handle node coordinate-matching requests from other ranks
   for (int i=0; i<rank; i++) {
@@ -62,10 +65,10 @@ void ParFUM_recreateSharedNodes(int meshid) {
 	      coord_msg_tag, comm, &status);
     // Match coords between local nodes and received coords
     // FIX ME: this is the dumb super-slow brute force algorithm
-    int recvNodeCount = length/3;
+    int recvNodeCount = length/dim;
     for (int j=0; j<numNodes; j++) {
       for (int k=0; k<recvNodeCount; k++) {
-	if (coordEqual(&nodeCoords[j*3], &recvNodeCoords[k*3])) {
+	if (coordEqual(&nodeCoords[j*dim], &recvNodeCoords[k*dim])) {
 	  localSharedNodes.push_back(j); 
 	  remoteSharedNodes.push_back(k);
 	  printf("[%d] found local node %d to match with remote node %d \n",rank,j,k);
@@ -104,21 +107,21 @@ void ParFUM_recreateSharedNodes(int meshid) {
   }
   // IMPLEMENT ME: use sharedNodeLists and sharedNodeCounts to move shared node data 
   // to IDXL
-	FEM_Mesh 	*mesh = (FEM_chunk::get("ParFUM_recreateSharedNodes"))->getMesh("ParFUM_recreateSharedNodes");
-	IDXL_Side &shared = mesh->node.shared;
-
-	for(int i=0;i<comm_size;i++){
-		if(i == rank)
-			continue;
-		if(sharedNodeCounts[i] != 0){
-			IDXL_List &list = shared.addList(i);
-			for(int j=0;j<sharedNodeCounts[i];j++){
-				list.push_back(sharedNodeLists[i][j]);
-			}
-		}
-	}
-	printf("After recreating shared nodes %d \n",rank);
-	shared.print();
+  FEM_Mesh *mesh = (FEM_chunk::get("ParFUM_recreateSharedNodes"))->getMesh("ParFUM_recreateSharedNodes");
+  IDXL_Side &shared = mesh->node.shared;
+  
+  for(int i=0;i<comm_size;i++){
+    if(i == rank)
+      continue;
+    if(sharedNodeCounts[i] != 0){
+      IDXL_List &list = shared.addList(i);
+      for(int j=0;j<sharedNodeCounts[i];j++){
+	list.push_back(sharedNodeLists[i][j]);
+      }
+    }
+  }
+  printf("After recreating shared nodes %d \n",rank);
+  shared.print();
 	
   // Clean up
   free(nodeCoords);
@@ -130,26 +133,34 @@ void ParFUM_recreateSharedNodes(int meshid) {
   free(sharedNodeLists);
 }
 
-void ParFUM_createComm(int meshid)
+void ParFUM_createComm(int meshid, dim)
 {
   ParFUM_desharing(meshid);
   ParFUM_deghosting(meshid);
-	MPI_Barrier(MPI_COMM_WORLD);
-  ParFUM_recreateSharedNodes(meshid);
-	MPI_Barrier(MPI_COMM_WORLD);
-	ParFUM_generateGlobalNodeNumbers(meshid);
-	FEM_Mesh 	*mesh = (FEM_chunk::get("ParFUM_recreateSharedNodes"))->lookup(meshid,"ParFUM_recreateSharedNodes");
-	MPI_Barrier(MPI_COMM_WORLD);
-	
-	int rank;
+  MPI_Barrier(MPI_COMM_WORLD);
+  ParFUM_recreateSharedNodes(meshid, dim);
+  MPI_Barrier(MPI_COMM_WORLD);
+  ParFUM_generateGlobalNodeNumbers(meshid);
+  FEM_Mesh *mesh = (FEM_chunk::get("ParFUM_recreateSharedNodes"))->lookup(meshid,"ParFUM_recreateSharedNodes");
+  MPI_Barrier(MPI_COMM_WORLD);
+  
+  int rank;
   MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-	struct ghostdata *gdata;
-	if(rank == 0){
-		gdata = gatherGhosts();
-	}else{
-	  gdata = new ghostdata;
-	}
-	MPI_Bcast_pup(*gdata,0,MPI_COMM_WORLD);
-	makeGhosts(mesh,MPI_COMM_WORLD,0,gdata->numLayers,gdata->layers);
-	MPI_Barrier(MPI_COMM_WORLD);
+  struct ghostdata *gdata;
+  if(rank == 0){
+    gdata = gatherGhosts();
+  }else{
+    gdata = new ghostdata;
+  }
+  MPI_Bcast_pup(*gdata,0,MPI_COMM_WORLD);
+  makeGhosts(mesh,MPI_COMM_WORLD,0,gdata->numLayers,gdata->layers);
+  MPI_Barrier(MPI_COMM_WORLD);
+}
+
+void ParFUM_import_nodes(int meshid, int numNodes, double *nodeCoords, int dim)
+{
+}
+
+void ParFUM_import_elems(int meshid, int numElems, int nodesPer, int *conn, int type)
+{
 }
