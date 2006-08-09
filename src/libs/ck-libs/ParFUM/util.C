@@ -1341,7 +1341,9 @@ void FEM_MUtil::FEM_Print_coords(FEM_Mesh *m, int nodeid) {
       break;
     }
   }
+#ifndef FEM_SILENT	
   CkPrintf("node %d (%f,%f) and boundary %d\n",nodeid,crds[0],crds[1],bound);
+#endif
 }
 
 

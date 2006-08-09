@@ -49,6 +49,10 @@ extern CProxy_femMeshModify meshMod;
 
 #define MAX_CHUNK 1000000000
 
+//this macro turns off prints in adaptivity added by nilesh
+#define FEM_SILENT
+
+
 CtvExtern(FEM_Adapt_Algs *, _adaptAlgs);
 
 /*
