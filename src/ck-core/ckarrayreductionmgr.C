@@ -121,7 +121,9 @@ CkReductionMsg *CkArrayReductionMgr::reduceMessages(void){
   	}
 
 	//Go back through the vector, deleting old messages
-  	for (i=0;i<nMsgs;i++) delete msgArr[i];
+  	for (i=0;i<nMsgs;i++) {
+          if (msgArr[i] != ret) delete msgArr[i];
+        }
 	delete [] msgArr;
 
 	//Set the message counts

@@ -229,7 +229,8 @@ public:
 	//"Constructor"-- builds and returns a new CkReductionMsg.
 	//  the "srcData" array you specify will be copied into this object (unless NULL).
 	static CkReductionMsg *buildNew(int NdataSize,const void *srcData,
-		CkReduction::reducerType reducer=CkReduction::invalid);
+		CkReduction::reducerType reducer=CkReduction::invalid,
+                CkReductionMsg *buf = NULL);
 
 	inline int getLength(void) const {return dataSize;}
 	inline int getSize(void) const {return dataSize;}

@@ -622,7 +622,7 @@ CkReductionMsg *CkReductionMgr::reduceMessages(void)
   }
 
   //Go back through the vector, deleting old messages
-  for (i=0;i<nMsgs;i++) delete msgArr[i];
+  for (i=0;i<nMsgs;i++) if (msgArr[i]!=ret) delete msgArr[i];
   delete [] msgArr;
 
   //Set the message counts
@@ -758,7 +758,7 @@ void CkReductionMgr :: endArrayReduction(){
   	}
 
 	for(i = 0;i<numMsgs;i++){
-		delete tempMsgs[i];
+		if (tempMsgs[i] != ret) delete tempMsgs[i];
 	}
 
 	//CkPrintf("Length of finalMsgs after endReduction %d \n",finalMsgs.length());
@@ -812,21 +812,21 @@ CkReductionMsg::~CkReductionMsg(){}
 //"Constructor"-- builds and returns a new CkReductionMsg.
 //  the "data" array you specify will be copied into this object.
 CkReductionMsg *CkReductionMsg::buildNew(int NdataSize,const void *srcData,
-    CkReduction::reducerType reducer)
+    CkReduction::reducerType reducer, CkReductionMsg *buf)
 {
   int len[1];
   len[0]=NdataSize;
-  CkReductionMsg *ret = new(len,0)CkReductionMsg();
+  CkReductionMsg *ret = buf? buf:new(len,0)CkReductionMsg();
   
   ret->dataSize=NdataSize;
-  if (srcData!=NULL)
+  if (srcData!=NULL && !buf)
     memcpy(ret->data,srcData,NdataSize);
   ret->userFlag=-1;
   ret->reducer=reducer;
   ret->ci=NULL;
   ret->sourceFlag=-1000;
   ret->gcount=0;
-	ret->migratableContributor = true;
+  ret->migratableContributor = true;
   return ret;
 }
 
@@ -906,7 +906,7 @@ static CkReductionMsg *name(int nMsg,CkReductionMsg **msg)\
     }\
   }\
   RED_DEB(("\\ PE_%d: " #name " finished\n",CkMyPe()));\
-  return CkReductionMsg::buildNew(nElem*sizeof(dataType),(void *)ret);\
+  return CkReductionMsg::buildNew(nElem*sizeof(dataType),(void *)ret, CkReduction::invalid, msg[0]);\
 }
 
 //Use this macro for reductions that have the same type for all inputs
@@ -1735,7 +1735,7 @@ CkReductionMsg *CkNodeReductionMgr::reduceMessages(void)
   }
 
   //Go back through the vector, deleting old messages
-  for (i=0;i<nMsgs;i++) delete msgArr[i];
+  for (i=0;i<nMsgs;i++) if (msgArr[i]!=ret) delete msgArr[i];
   delete [] msgArr;
   //Set the message counts
   ret->redNo=redNo;
