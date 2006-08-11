@@ -940,7 +940,7 @@ void CkMulticastMgr::reduceFragment (int index, CkSectionInfo& id,
 
   // check if migration and free messages
   for (i=0; i<rmsgs.length(); i++) {
-    delete rmsgs[i];
+    if (rmsgs[i]!=newmsg) delete rmsgs[i];
   }
   rmsgs.length() = 0;
 
