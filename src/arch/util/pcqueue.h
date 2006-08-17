@@ -183,7 +183,7 @@ void PCQueuePush(PCQueue Q, char *data)
     /* this way, the next buffer is linked in before data is filled in 
        in the last slot of this buffer */
 
-#if CMK_XT3
+#if !CMK_XT3
     circ = (CircQueue)calloc(1, sizeof(struct CircQueueStruct));
 #else
     circ = (CircQueue)malloc(sizeof(struct CircQueueStruct));
