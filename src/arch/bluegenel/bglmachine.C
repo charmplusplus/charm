@@ -23,6 +23,14 @@
 #define BGL_DEBUG // CmiPrintf
 #endif
 
+extern "C"
+void        BG2S_UnOrdered_Send     (BG2S_t               * request,
+				     const BGML_Callback_t* cb_info,
+				     const BGQuad         * msginfo,
+				     const char           * sndbuf,
+				     unsigned               sndlen,
+				     unsigned               destrank);
+
 int phscount;
 int vnpeer = -1;
 
@@ -454,7 +462,7 @@ BG2S_t * first_pkt_recv_done (const BGQuad     * info,
                                    return NULL */
 
   *buffer = (char *)CmiAlloc(alloc_size);
-  cb->cb_done = recv_done;
+  cb->function = recv_done;
   cb->clientdata = *buffer;
 
   return (BG2S_t *) ALIGN_16(*buffer + sndlen);
@@ -480,7 +488,7 @@ unsigned int *ranklist;
 #include "bgltorus.h"
 CpvDeclare(BGLTorusManager*, tmanager);
 
-BGTsC_Barrier_t        barrier;
+BGTsC_t        barrier;
 
 CpvDeclare(unsigned, networkProgressCount);
 int  networkProgressPeriod;
@@ -513,7 +521,7 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
     ranklist[count] = count;
   
   /* global barrier initialize */
-  BGTsC_Barrier_Init (&barrier, 0, size, ranklist);
+  BGTsC_Barrier_init (&barrier, 0, size, ranklist);
 #endif
   
   CmiBarrier();    
@@ -842,7 +850,7 @@ inline void machineSend(SMSG_LIST *msg_tmp) {
 #endif
   
   CmiAssert(msg_tmp->destpe >= 0 && msg_tmp->destpe < CmiNumPes());
-  msg_tmp->cb.cb_done     =   send_done;
+  msg_tmp->cb.function     =   send_done;
   msg_tmp->cb.clientdata  =   msg_tmp;
 
   BG2S_UnOrdered_Send (&msg_tmp->send, &msg_tmp->cb, &msg_tmp->info, 
@@ -923,7 +931,7 @@ inline void  machineMulticast(int npes, int *pelist, int size, char* msg){
   
   //Interrupt code to be implemented later
   
-  msg_tmp->cb.cb_done     =   send_multi_done;
+  msg_tmp->cb.function     =   send_multi_done;
   msg_tmp->cb.clientdata  =   msg_tmp;
   
   BG2S_AEMulticast (&msg_tmp->send, &msg_tmp->cb, &msg_tmp->info, 
