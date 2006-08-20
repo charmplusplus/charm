@@ -393,6 +393,8 @@ void CmiMemoryCheck(void) {}
 
 /********** Allocation/Free ***********/
 
+static int memoryTraceDisabled = 0;
+
 /* Write a valid slot to this field */
 static void *setSlot(Slot *s,int userSize) {
   char *user=SlotToUser(s);
@@ -411,7 +413,17 @@ static void *setSlot(Slot *s,int userSize) {
   {
     int i;
     int n=STACK_LEN;
-    CmiBacktraceRecord(s->from,3,&n);
+    if (memoryTraceDisabled==0) {
+      memoryTraceDisabled = 1;
+      CmiBacktraceRecord(s->from,3,&n);
+      memoryTraceDisabled = 0;
+    } else {
+      s->from[0] = (void*)10;
+      s->from[1] = (void*)9;
+      s->from[2] = (void*)8;
+      s->from[3] = (void*)7;
+      s->from[4] = (void*)6;
+    }
     for (i=n; i<STACK_LEN; ++i) s->from[i] = 0;
   }
   return (void *)user;
@@ -423,7 +435,7 @@ static void freeSlot(Slot *s) {
   s->next->prev=s->prev;
   s->prev->next=s->next;
   s->prev=s->next=(Slot *)0;//0x0F00; why was it not 0?
-  
+
   s->magic=SLOTMAGIC_FREED;
   s->userSize=-1;
 }

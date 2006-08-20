@@ -188,6 +188,8 @@ void CmiMemoryCheck(void)
 
 /********** Allocation/Free ***********/
 
+static int memoryTraceDisabled = 0;
+
 /*Write a valid slot to this field*/
 static void *setSlot(Slot *s,int userSize) {
 	char *user=Slot_toUser(s);
@@ -204,7 +206,15 @@ static void *setSlot(Slot *s,int userSize) {
 	s->magic=SLOTMAGIC;
 	{
 		int n=STACK_LEN;
-		CmiBacktraceRecord(s->from,3,&n);
+                if (memoryTraceDisabled==0) {
+                  memoryTraceDisabled = 1;
+                  CmiBacktraceRecord(s->from,3,&n);
+                  memoryTraceDisabled = 0;
+                } else {
+                  s->from[0] = (void*)10;
+                  s->from[1] = (void*)9;
+                  s->from[2] = (void*)8;
+                }
 	}
 	s->userSize=userSize;
 	setPad(s->pad); /*Padding before block*/
