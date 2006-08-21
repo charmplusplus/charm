@@ -2251,8 +2251,9 @@ int AMPI_Scan(void* sendbuf, void* recvbuf, int count, MPI_Datatype datatype, MP
         (op)(partial_scan,tmp_buf,&count,&datatype);
         memcpy(partial_scan,tmp_buf,blklen);
       }
-      mask <<= 1;
     }
+    mask <<= 1;
+
   }
 
   free(tmp_buf);
