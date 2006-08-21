@@ -6,6 +6,10 @@
 
 #include "converse.h"
 
+#if 0
+#include <bgml.h>
+#endif
+
 #include <bglpersonality.h>
 
 extern "C" int rts_get_personality(struct BGLPersonality *dst, unsigned size);
@@ -37,17 +41,17 @@ class BGLTorusManager {
     ysize = my_bg.ySize;
     zsize = my_bg.zSize;  
 
-    int numnodes = CmiNumPes();
+    unsigned numnodes = CmiNumPes();
     if(my_bg.opFlags & BGLPERSONALITY_OPFLAGS_VIRTUALNM) 
       numnodes = CmiNumPes() / 2;
     
-    int max_t = 0;
+    unsigned max_t = 0;
     if(xsize * ysize * zsize != numnodes) {
       xsize = ysize = zsize = 0;
       
       int mx,my,mz;        //min values for x,y.z
       mx = my = mz = CmiNumPes();
-      unsigned int tmpx, tmpy, tmpz, tmpt;
+      unsigned tmpx, tmpy, tmpz, tmpt;
       for(int count = 0; count < CmiNumPes(); count ++) {
 	rts_coordinatesForRank(count, &tmpx, &tmpy, &tmpz, &tmpt);
 	
@@ -83,12 +87,12 @@ class BGLTorusManager {
     nzsize = zsize;
     
     if(xsize * ysize * zsize != numnodes) {
-      zsize *= max_t + 1;   //Assuming XYZT
+      xsize *= max_t + 1;   //Assuming TXYZ
       isVN = max_t;
     }
     else if(my_bg.opFlags & BGLPERSONALITY_OPFLAGS_VIRTUALNM) {
       isVN = 1;
-      zsize *= 2;      //Assuming XYZT
+      xsize *= 2;      //Assuming TXYZ
     }    
     
     //CmiPrintf("BGL Torus Constructor %d,%d,%d  nodes %d,%d,%d\n", xsize, ysize, zsize, nxsize, nysize, nzsize);
@@ -106,37 +110,38 @@ class BGLTorusManager {
 
   static inline BGLTorusManager *getObject();
 
-  inline void getMyCoordinates(int &X, int &Y, int &Z) {
-    /*
-      X = my_bg.xCoord;
-      Y = my_bg.yCoord;
-      Z = my_bg.zCoord;
-    */
-
-    X = CmiMyPe() % xsize;
-    Y = (CmiMyPe() % (xsize * ysize)) / xsize;
-    Z = CmiMyPe() / (xsize * ysize);
+  inline void getCoordinatesByRank(int pe, int &x, int &y, int &z) {
+    //Assumed TXYZ
+    x = pe % xsize;
+    y = (pe % (xsize * ysize)) / xsize;
+    z = pe / (xsize * ysize);    
+  }
+  
+  inline void getMyCoordinates(int &X, int &Y, int &Z) {    
+    getCoordinatesByRank (CmiMyPe(), X, Y, Z);
   } 
   
   inline int absx(int n){
-    // doubling of X in TXYZ case
-    int an = (isVN && n>nxsize) ? abs(n-nxsize) : abs(n);
-    int aan = nxsize - an;
+    int an = abs(n);
+    int aan = xsize - an;
     CmiAssert(aan>=0);
     return ((an>aan)?aan:an);
   }
   inline int absy(int n){
     int an = abs(n);
-    int aan = nysize - an;
+    int aan = ysize - an;
     CmiAssert(aan>=0);
     return ((an>aan)?aan:an);
   }
+
   inline int absz(int n){
-    /* funny doubling  of Z in VN XYZT case */
-    int an = (isVN && n>nzsize) ? abs(n-nzsize) : abs(n);
-    //int an = (isVN ) ? abs(n/2) : abs(n);
-    int aan = nzsize - an;  
-    CmiAssert(aan>=0); 
+    int an = abs(n);
+    int aan = zsize - an;
+    
+    if (aan < 0)
+      printf ("aan = %d, an = %d, nz = %d \n", an, aan, zsize);
+
+    CmiAssert(aan>=0);
     return ((an>aan)?aan:an);
   }
   
@@ -149,12 +154,6 @@ class BGLTorusManager {
     return 0;
   }
 
-  inline void getCoordinatesByRank(int pe, int &x, int &y, int &z) {
-
-    x = pe % xsize;
-    y = (pe % (xsize * ysize)) / xsize;
-    z = pe / (xsize * ysize);
-  }
   
   //Assumes a TXYZ mapping
   inline int isMyNeighbor(int pe, int dist=2) {
@@ -248,7 +247,22 @@ class BGLTorusManager {
     }
     return minIdx;
   }
-  
+  /*  
+  inline void sortIndexByHops(int pe, int *pes, int *idx, int n){
+    int minHops = getHopsBetweenRanks(pe,pes[0]);
+    int minIdx = 0;
+    int nowHops, tmp; 
+    for(int i=0;i<n;i++){
+      idx[i] = i;
+    }
+    for (int i=0; i<n-1; i++)
+      for (int j=0; j<n-1-i; j++)
+        if (getHopsBetweenRanks(pe, pes[idx[j+1]]) < getHopsBetweenRanks(pe, pes[idx[j]])){
+          tmp=idx[j+1]; idx[j+1]=idx[j]; idx[j]=tmp;
+        }
+  }
+};
+  */
   inline void sortIndexByHops(int pe, int *pes, int *idx, int n)
     {
 	int minHops = getHopsBetweenRanks(pe,pes[0]);
@@ -257,13 +271,6 @@ class BGLTorusManager {
 	for(int i=0;i<n;i++){
 	  idx[i] = i;
 	}
-	/*
-	  for (int i=0; i<n-1; i++)
-	  for (int j=0; j<n-1-i; j++)
-	  if (getHopsBetweenRanks(pe, pes[idx[j+1]]) < getHopsBetweenRanks(pe, pes[idx[j]])){
-          tmp=idx[j+1]; idx[j+1]=idx[j]; idx[j]=tmp;
-	  }
-	*/
 	quicksort(pe, pes, idx, 0, n-1);
       }
     void quicksort(int pe, int *pes, int *arr, int left, int right)
@@ -300,7 +307,6 @@ class BGLTorusManager {
 	  }
       }
   };
-
 
 CpvExtern(BGLTorusManager *, tmanager); 
 
