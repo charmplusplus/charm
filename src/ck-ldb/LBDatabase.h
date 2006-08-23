@@ -213,6 +213,15 @@ public:
       return 0;
       //return LDRunningObject(myLDHandle,_o);
   };
+  inline const LDObjHandle *RunningObject() const { 
+#if CMK_LBDB_ON
+      LBDB *const db = (LBDB*)(myLDHandle.handle);
+      if (db->ObjIsRunning()) {
+        return &db->RunningObj();
+      } 
+#endif
+      return NULL;
+  };
   inline const LDObjHandle &GetObjHandle(int idx) { return LDGetObjHandle(myLDHandle, idx);}
   inline void ObjectStart(const LDObjHandle &_h) { LDObjectStart(_h); };
   inline void ObjectStop(const LDObjHandle &_h) { LDObjectStop(_h); };
@@ -372,6 +381,28 @@ inline void get_avail_vector(char * bitmap) {
 inline void set_avail_vector(char * bitmap) {
   LBDatabaseObj()->set_avail_vector(bitmap);
 }
+
+//  a helper class to suspend/resume load instrumentation when calling into
+//  runtime apis
+
+class SystemLoad
+{
+  const LDObjHandle *objHandle;
+  LBDatabase *lbdb;
+public:
+  SystemLoad() {
+    lbdb = LBDatabaseObj();
+    objHandle = lbdb->RunningObject();
+    if (objHandle != NULL) {
+      lbdb->ObjectStop(*objHandle);
+    }
+  }
+  ~SystemLoad() {
+    if (objHandle) lbdb->ObjectStart(*objHandle);
+  }
+};
+
+#define CK_RUNTIME_API          SystemLoad load_entry;
 
 #endif /* LDATABASE_H */
 
