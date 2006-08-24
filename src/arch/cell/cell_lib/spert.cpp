@@ -58,8 +58,6 @@ StatData statData = { 0, 0 };
 /////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Global Data
 
-const int SPEData_dmaTransferSize = SIZEOF_16(SPEData);
-
 volatile char* msgQueueRaw[SPE_MESSAGE_QUEUE_BYTE_COUNT] __attribute__((aligned(128)));
 volatile SPEMessage* msgQueue[SPE_MESSAGE_QUEUE_LENGTH];
 
@@ -70,6 +68,8 @@ int dmaListSize[SPE_MESSAGE_QUEUE_LENGTH];
 
 // Location of the end of the 'data segment'
 extern unsigned int _end;
+
+unsigned short vID = 0xFFFF;
 
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -82,6 +82,8 @@ void debug_displayStateHistogram(unsigned long long id, int* msgState, char* str
 #if SPE_USE_OWN_MEMSET != 0
 void memset(void* ptr, char val, int len);
 #endif
+
+unsigned short getSPEID() { return vID; }
 
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -113,11 +115,11 @@ int main(unsigned long long id, unsigned long long param) {
     sim_printf("[0x%llx] memLeft = %d\n", id, memLeft);
   #endif
   if (memLeft < SPE_MINIMUM_HEAP_SIZE) return -1;
-  #if SPE_DEBUG_DISPLAy >= 1
+  #if SPE_DEBUG_DISPLAY >= 1
     _breakBefore = sbrk(0);
   #endif
   _heapPtr = sbrk((ptrdiff_t)memLeft);
-  #if SPE_DEBUG_DISPLAy >= 1
+  #if SPE_DEBUG_DISPLAY >= 1
     _breakAfter = sbrk(0);
   #endif
 
@@ -139,13 +141,25 @@ int main(unsigned long long id, unsigned long long param) {
   // Read in the data from main storage
   spu_mfcdma32((void*)&myData,          // LS Pointer
                (unsigned int)param,     // Main-Storage Pointer
-               SPEData_dmaTransferSize, // Number of bytes to copy
+               SIZEOF_16(SPEData),      // Number of bytes to copy
                0,                       // Tag ID
                MFC_GET_CMD              // DMA Command
 	      );
 
   // Wait for all transfers to complete.  See "SPU C/C++ Language Extentions", page 64 for details.
-  spu_mfcstat(2);
+  //spu_mfcstat(2);  // Blocks for all outstanding DMA Tags to complete  // <<<===---  !!! This does not seem to work (TODO : test and let IBM know) !!!
+  mfc_write_tag_mask(0xFFFFFFFF);
+  mfc_write_tag_update_all();
+  mfc_read_tag_status();
+
+  // DEBUG
+  #if SPE_DEBUG_DISPLAY >= 1
+    sim_printf("SPE :: myData = { mq = %u, mql = %d, vID = %d }\n", myData.messageQueue, myData.messageQueueLength, myData.vID);
+  #endif
+
+
+  // Set the local vID
+  vID = myData.vID;
 
   // Entry into the SPE's scheduler
   speScheduler(&myData, id);
@@ -183,7 +197,7 @@ void speScheduler(SPEData *speData, unsigned long long id) {
 
   // DEBUG
   #if SPE_DEBUG_DISPLAY_STILL_ALIVE >= 1
-    int stillAliveCounter = 0;
+    int stillAliveCounter = SPE_DEBUG_DISPLAY_STILL_ALIVE;
   #endif
 
   #if SPE_DEBUG_DISPLAY >= 1
@@ -242,56 +256,19 @@ void speScheduler(SPEData *speData, unsigned long long id) {
   // The scheduler loop
   while (__builtin_expect(keepLooping != FALSE, 1)) {
 
-
     // Wait for the latest message queue read (blocking)
     mfc_write_tag_mask(0x80000000);   // enable only tag group 31 (message queue request)
     mfc_write_tag_update_any();
     tagStatus = mfc_read_tag_status();
     mfc_write_tag_mask(0x7FFFFFFF);   // enable all tag groups except 31
 
-
-    // DEBUG - Let the user know that the SPE is still alive
+    // Let the user know that the SPE Runtime is still running...
     #if SPE_DEBUG_DISPLAY_STILL_ALIVE >= 1
-      if ((stillAliveCounter % SPE_DEBUG_DISPLAY_STILL_ALIVE) == 0 && stillAliveCounter != 0) {
-        #if 1
-
-          sim_printf("[0x%llx] :: still going... \n", id);
-
-        #else
-
-          for (int tmp = 0; tmp < SPE_MESSAGE_QUEUE_LENGTH; tmp++) {
-            sim_printf("[0x%llx] :: still going... msgQueue[%d] @ %p (msgQueue: %p) = { fi = %d, rw = %d, rwl = %d, ro = %d, rol = %d, wo = %d, wol = %d, f = %x, s = %d(%d), cnt = %d, cmd = %d }\n",
-                       id,
-                       tmp,
-                       &(msgQueue[tmp]),
-                       msgQueue,
-                       (volatile int)(msgQueue[tmp]->funcIndex),
-                       msgQueue[tmp]->readWritePtr,
-                       msgQueue[tmp]->readWriteLen,
-                       msgQueue[tmp]->readOnlyPtr,
-                       msgQueue[tmp]->readOnlyLen,
-                       msgQueue[tmp]->writeOnlyPtr,
-                       msgQueue[tmp]->writeOnlyLen,
-                       msgQueue[tmp]->flags,
-                       (volatile int)(msgQueue[tmp]->state),
-                       msgState[tmp],
-                       (volatile int)(msgQueue[tmp]->counter),
-                       (volatile int)(msgQueue[tmp]->command)
-                      );
-	  }
-          //sim_printf("[%llu] :: raw msgQueue = { ", id);
-          //for (int ti = 0; ti < 2 * sizeof(SPEMessage) /*SPE_MESSAGE_QUEUE_BYTE_COUNT*/; ti++) {
-          //  sim_printf("%d ", *(((char*)msgQueue) + ti));
-          //}
-          //sim_printf("}\n");
-          //sim_printf("[%llu] :: raw msgQueueRaw = { ", id);
-          //for (int ti = 0; ti < 2 * sizeof(SPEMessage) /*SPE_MESSAGE_QUEUE_BYTE_COUNT*/; ti++) {
-          //  sim_printf("%d ", *(((char*)msgQueueRaw) + ti));
-          //}
-          //sim_printf("}\n");
-
-        #endif
+      if (__buildin_expect(stillAliveCounter == 0, 0)) {
+        sim_printf("[0x%llx] :: still going... \n", id);
+        stillAliveCounter = SPE_DEBUG_DISPLAY_STILL_ALIVE;
       }
+      stillAliveCounter--;
     #endif
 
 
@@ -300,6 +277,9 @@ void speScheduler(SPEData *speData, unsigned long long id) {
       debug_displayActiveMessageQueue(id, msgState, "(0)");
     #endif
 
+
+    //////////////////////////////////////////////////////////////////////////////////
+    // SPE_MESSAGE_STATE_SENT
 
     // Check for new messages
     for (i = 0; __builtin_expect(i < SPE_MESSAGE_QUEUE_LENGTH, 1); i++) {
@@ -343,6 +323,9 @@ void speScheduler(SPEData *speData, unsigned long long id) {
       debug_displayActiveMessageQueue(id, msgState, "(1)");
     #endif
 
+
+    //////////////////////////////////////////////////////////////////////////////////
+    // SPE_MESSAGE_STATE_PRE_FETCHING_LIST
 
     // Check for messages that need data fetched (list)
     numDMAQueueEntries = mfc_stat_cmd_queue();
@@ -429,6 +412,9 @@ void speScheduler(SPEData *speData, unsigned long long id) {
     #endif
 
 
+    //////////////////////////////////////////////////////////////////////////////////
+    // SPE_MESSAGE_STATE_FETCHING_LIST
+
     // Read the tag status to see if the data has arrived for any of the fetching message entries
     mfc_write_tag_update_immediate();
     tagStatus = mfc_read_tag_status(); //spu_readch(MFC_RdTagStat);
@@ -455,6 +441,9 @@ void speScheduler(SPEData *speData, unsigned long long id) {
       debug_displayActiveMessageQueue(id, msgState, "(3)");
     #endif
 
+
+    //////////////////////////////////////////////////////////////////////////////////
+    // SPE_MESSAGE_STATE_LIST_READY_LIST
 
     // Check for messages that need data fetched (standard)
     numDMAQueueEntries = mfc_stat_cmd_queue();
@@ -608,6 +597,9 @@ void speScheduler(SPEData *speData, unsigned long long id) {
       debug_displayActiveMessageQueue(id, msgState, "(4)");
     #endif
 
+
+    //////////////////////////////////////////////////////////////////////////////////
+    // SPE_MESSAGE_STATE_PRE_FETCHING
 
     // Check for messages that need data fetched (standard)
     numDMAQueueEntries = mfc_stat_cmd_queue();
@@ -874,6 +866,9 @@ void speScheduler(SPEData *speData, unsigned long long id) {
     #endif
 
 
+    //////////////////////////////////////////////////////////////////////////////////
+    // SPE_MESSAGE_STATE_FETCHING
+
     // Read the tag status to see if the data has arrived for any of the fetching message entries
     mfc_write_tag_update_immediate();
     tagStatus = mfc_read_tag_status(); //spu_readch(MFC_RdTagStat);
@@ -908,6 +903,9 @@ void speScheduler(SPEData *speData, unsigned long long id) {
       debug_displayActiveMessageQueue(id, msgState, "(6)");
     #endif
 
+
+    //////////////////////////////////////////////////////////////////////////////////
+    // SPE_MESSAGE_STATE_READY
 
     // Execute SPE_MAX_EXECUTE_PER_LOOP ready messages
     register unsigned int numExecLeft = SPE_MAX_EXECUTE_PER_LOOP;
@@ -992,6 +990,9 @@ void speScheduler(SPEData *speData, unsigned long long id) {
     #endif
 
 
+    //////////////////////////////////////////////////////////////////////////////////
+    // SPE_MESSAGE_STATE_EXECUTED_LIST
+
     // Check for messages that have been executed but still need data committed to main memory
     numDMAQueueEntries = mfc_stat_cmd_queue();
     for (i = 0; __builtin_expect(i < SPE_MESSAGE_QUEUE_LENGTH, 1); i++) {
@@ -1057,6 +1058,9 @@ void speScheduler(SPEData *speData, unsigned long long id) {
       debug_displayActiveMessageQueue(id, msgState, "(8)");
     #endif
 
+
+    //////////////////////////////////////////////////////////////////////////////////
+    // SPE_MESSAGE_QUEUE_STATE_EXECUTED
 
     // Check for messages that have been executed but still need data committed to main memory
     numDMAQueueEntries = mfc_stat_cmd_queue();
@@ -1232,6 +1236,9 @@ void speScheduler(SPEData *speData, unsigned long long id) {
     spu_mfcdma32(msgQueueRaw, (PPU_POINTER_TYPE)(speData->messageQueue), SPE_MESSAGE_QUEUE_BYTE_COUNT, 31, MFC_GET_CMD);
 
 
+    //////////////////////////////////////////////////////////////////////////////////
+    // SPE_MESSAGE_STATE_COMMITTING
+
     // Check for messages that are committed
     mfc_write_tag_mask(0x7FFFFFFF);
     mfc_write_tag_update_immediate();
@@ -1290,6 +1297,9 @@ void speScheduler(SPEData *speData, unsigned long long id) {
       debug_displayActiveMessageQueue(id, msgState, "(A)");
     #endif
 
+
+    //////////////////////////////////////////////////////////////////////////////////
+    // SPE_MESSAGE_STATE_ERROR
 
     // Check for any messages that have entered into the ERROR state
     for (i = 0; __builtin_expect(i < SPE_MESSAGE_QUEUE_LENGTH, 1); i++) {
@@ -1352,11 +1362,6 @@ void speScheduler(SPEData *speData, unsigned long long id) {
       }
     #endif
 
-    // Update the stillAliveCounter
-    #if SPE_DEBUG_DISPLAY_STILL_ALIVE >= 1
-      stillAliveCounter++;
-    #endif
-
     #if SPE_STATS != 0
       statData.schedulerLoopCount++;
     #endif
@@ -1411,14 +1416,10 @@ void debug_displayActiveMessageQueue(unsigned long long id, int* msgState, char*
 }
 
 
-#if SPE_DEBUG_DISPLAY >= 1
-  char __buffer[2048];
-#endif
-
-
 void debug_displayStateHistogram(unsigned long long id, int* msgState, char* str) {
   #if SPE_DEBUG_DISPLAY >= 1
 
+  char __buffer[2048];
   char* buf = __buffer;
   int somethingToShowFlag = 0;
   int state, i;
@@ -1450,6 +1451,7 @@ void debug_displayStateHistogram(unsigned long long id, int* msgState, char* str
 
 
 #if SPE_USE_OWN_MEMSET != 0
+// NOTE : This is meant for DEBUG
 void memset(void* ptr, char val, int len) {
   // NOTE: This will actually traverse the memory backwards
   len--;
