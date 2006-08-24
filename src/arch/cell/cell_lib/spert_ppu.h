@@ -65,16 +65,22 @@ extern "C" {
 
 
 #ifdef __cplusplus
-  #define DEFAULT_TO_NULL  = NULL
+  #define DEFAULT_TO_NULL   = NULL
+  #define DEFAULT_TO_NONE   = WORK_REQUEST_FLAGS_NONE
+  #define DEFAULT_TO_ALLSET = 0xFFFFFFFF
 #else
   #define DEFAULT_TO_NULL
+  #define DEFAULT_TO_NONE
+  #define DEFAULT_TO_ALLSET
 #endif
 
-#ifdef __cplusplus
-  #define DEFAULT_TO_NONE  = WORK_REQUEST_FLAGS_NONE
-#else
-  #define DEFAULT_TO_NONE
-#endif
+
+// WORK_REQUEST_STATE_xxx Defines
+#define WORK_REQUEST_STATE_MIN       (0)
+#define WORK_REQUEST_STATE_FREE      (0)
+#define WORK_REQUEST_STATE_INUSE     (1)
+#define WORK_REQUEST_STATE_FINISHED  (2)
+#define WORK_REQUEST_STATE_MAX       (2)
 
 
 ///////////////////////////////////////////////////////////////////////////////////////////////
@@ -94,6 +100,8 @@ extern spe_program_handle_t spert_main;
 typedef struct __work_request {
 
   int isFirstInSet;  ///< An internal flag that indicates this work request is the first element of an array of work requests (i.e. - work requests with this flag set should be free'd by the Offload API when CloseOffloadAPI() is called by the user).
+  int state; ///< An internal state that indicates the state of this work request data structure (free, in use, etc.)
+  unsigned int speAffinityMask; ///< An internal number that indicates this work request should be given to a spicific SPE
 
   int speIndex;   ///< Index of the spe thread this work request was assigned to (-1 means not assigned yet or finished).
   int entryIndex; ///< Index in the message queue this work request was assigned to (-1 means not assigned yet or finished).
@@ -107,6 +115,7 @@ typedef struct __work_request {
   int writeOnlyLen;   ///< Length (in bytes) of the buffer pointed to by writeOnlyPtr.  For scatter/gather work requests, this number is the number of DMAListEntry structures in the user's dma list that are write-only.
   unsigned int flags; ///< One or more WORK_REQUEST_FLAGS_xxx bitwise ORed together.
   void *userData;     ///< A user defined pointer that will be passed to the callback function provided to InitOffloadAPI().
+  volatile void (*callbackFunc)(void*);  // A pointer to a work request specific callback function
 
   struct __work_request *next; ///< Pointer to the next WRHandle in the linked list of WRHandles
 
@@ -133,6 +142,10 @@ typedef struct __spe_thread {
 
 ///////////////////////////////////////////////////////////////////////////////////////////////
 // Function Prototypes (Offload API)
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 /** Initialization function.  This function should be called before any other function in the
  *  Offload API.  It should only be called once.  If no callback function is specified, the
@@ -164,8 +177,16 @@ extern WRHandle sendWorkRequest(int funcIndex,      ///< Index of the function t
                                 void* writeOnlyPtr, ///< Pointer to a writeOnly buffer (written after execution)
                                 int writeOnlyLen,   ///< Length (in bytes) of the buffer pointed to by writeOnlyPtr
                                 void* userData DEFAULT_TO_NULL, ///< A pointer to user defined data that will be passed to the callback function (if there is one) once this request is finished
-				unsigned int flags DEFAULT_TO_NONE ///< Flags for the work request (see WORK_REQUEST_FLAGS_xxx defines)
+				unsigned int flags DEFAULT_TO_NONE, ///< Flags for the work request (see WORK_REQUEST_FLAGS_xxx defines)
+                                void (*callbackFunc)(void*) DEFAULT_TO_NULL, ///< A callback function to use specifically for this work request
+                                unsigned int speAffinityMask DEFAULT_TO_ALLSET  ///< The logical SPE that this work request should be executed on
                                );
+#ifndef __cplusplus
+#define sendWorkRequest(fi, rwp, rwl, rop, rol, wop, wol) sendWorkRequest(fi, rwp, rwl, rop, rol, wop, wol, NULL, WORK_REQUEST_FLAGS_NONE, NULL, -1)
+#define sendWorkRequest(fi, rwp, rwl, rop, rol, wop, wol, ud) sendWorkRequest(fi, rwp, rwl, rop, rol, wop, wol, ud, WORK_REQUEST_FLAGS_NONE, NULL, -1)
+#define sendWorkRequest(fi, rwp, rwl, rop, rol, wop, wol, ud, f) sendWorkRequest(fi, rwp, rwl, rop, rol, wop, wol, ud, f, NULL, -1)
+#define sendWorkRequest(fi, rwp, rwl, rop, rol, wop, wol, ud, f, cb) sendWorkRequest(fi, rwp, rwl, rop, rol, wop, wol, ud, f, cb, -1)
+#endif
 
 /** Creates and sends a work request to one of the SPEs.  This method of sending a work request is considered
  *  a scatter/gather type of work request.  Zero-or-more of each kind of buffer (read/write, read-only, write-only)
@@ -182,8 +203,18 @@ extern WRHandle sendWorkRequest_list(int funcIndex,         ///< Index of the fu
                                      int numReadWrite,      ///< Number of read/write pointers in dmaList (should be second in list... i.e. - All read/write pointers should be after all readOnly pointers and before all writeOnly pointers in dmaList)
                                      int numWriteOnly,      ///< Number of write only pointers in dmaList (should be third in list... i.e. - After all other types of pointers in dmaList)
                                      void* userData DEFAULT_TO_NULL, ///< A pointer to user defined data that will be passed to the callback function (if there is one) once this request is finished
-                                     unsigned int flags DEFAULT_TO_NONE
+                                     unsigned int flags DEFAULT_TO_NONE, ///< Flags for the work requests (see WORK_REQUEST_FLAGS_xxx defines)
+                                     void (*callbackFunc)(void*) DEFAULT_TO_NULL, ///< A callback function to use specifically for this work request
+                                     unsigned int speAffinityMask DEFAULT_TO_ALLSET ///< The logical SPE that this work request should be executed on
                                     );
+// Create some defines that will allow sendWorkRequest_list() to be called more easily
+#ifndef __cplusplus
+#define sendWorkRequest_list(fi, eah, dmal, nro, nrw, nwo) sendWorkRequest_list(fi, eah, dmal, nro, nrw, nwo, NULL, WORK_REQUEST_FLAGS_NONE, NULL, -1)
+#define sendWorkRequest_list(fi, eah, dmal, nro, nrw, nwo, ud) sendWorkRequest_list(fi, eah, dmal, nro, nrw, nwo, ud, WORK_REQUEST_FLAGS_NONE, NULL, -1)
+#define sendWorkRequest_list(fi, eah, dmal, nro, nrw, nwo, ud, f) sendWorkRequest_list(fi, eah, dmal, nro, nrw, nwo, ud, f, NULL, -1)
+#define sendWorkRequest_list(fi, eah, dmal, nro, nrw, nwo, ud, f, cb) sendWorkRequest_list(fi, eah, dmal, nro, nrw, nwo, ud, f, cb, -1)
+#endif
+
 
 /** Used to check if the specified work request has finished executing (including out-bound data being
  *  DMAed back into main memory).  If no callback function was specified when InitOffloadAPI() was called,
@@ -207,6 +238,11 @@ void waitForWRHandle(WRHandle wrHandle     ///< A work request handle returned b
 /** Used to allow the Offload API to make progress.  Checks for finished work requests, etc.
   */
 extern void OffloadAPIProgress();
+
+
+#ifdef __cplusplus
+}  // end extern "C"
+#endif
 
 
 /*@}*/
