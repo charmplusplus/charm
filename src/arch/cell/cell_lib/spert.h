@@ -105,7 +105,7 @@ typedef struct __SPE_MESSAGE {
   volatile int state;              // Current state of the message (see SPE_MESSAGE_STATE_xxx)
   volatile int counter;            // A counter used to uniquely identify this message from the message previously held in this slot
   volatile int command;            // A control command that the PPU can use to send commands to the SPE runtime (see SPE_MESSAGE_COMMAND_xxx)
-  volatile PPU_POINTER_TYPE wrPtr;  // A pointer to userData specified in the sendWorkRequest call that will be passed to the callback function
+  volatile PPU_POINTER_TYPE wrPtr; // A pointer to userData specified in the sendWorkRequest call that will be passed to the callback function
 } SPEMessage;
 
 
@@ -113,6 +113,7 @@ typedef struct __SPE_MESSAGE {
 typedef struct __SPE_DATA {
   volatile PPU_POINTER_TYPE messageQueue;  // Pointer to the message queue's location in main memory
   volatile int messageQueueLength;         // Length of the message queue (the number of messages)
+  volatile unsigned short vID;             // The virtual SPE number
 } SPEData;
 
 
@@ -133,5 +134,22 @@ typedef struct __dma_list_entry {
 } DMAListEntry;
 
 /* @} */
+
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Function Prototypes for SPE Functions
+// TODO : NOTE : These should probably be moved so they are only declared for the SPE (i.e. - the PPE code
+//   may need to include this file, but these functions aren't available, nor make sense, on the PPE).
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+extern unsigned short getSPEID();
+
+#ifdef __cplusplus
+}
+#endif
+
 
 #endif //__SPE_RUNTIME_H__
