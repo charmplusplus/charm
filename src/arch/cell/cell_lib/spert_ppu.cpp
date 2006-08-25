@@ -586,12 +586,33 @@ void waitForWRHandle(WRHandle wrHandle) {
 extern "C"
 void OffloadAPIProgress() {
 
+
+  // DEBUG - Mailbox Statistics
+  #define OffloadAPIProgress_statFreq  100
+  static int statCount = OffloadAPIProgress_statFreq;
+  int statCount_flag = 0;
+  static int statSum_all[8] = { 0 };
+  static int statSum_all_count[8] = { 0 };
+  static int statSum_nonZero[8] = { 0 };
+  static int statSum_nonZero_count[8] = { 0 };
+
+
   // Check the mailbox from the SPEs to see if any of the messages have finished (and mark them as such)
   for (int i = 0; i < NUM_SPE_THREADS; i++) {
 
     // Get the number of entries in the mailbox from the SPE and then read each entry
     int usedEntries = spe_stat_out_mbox(speThreads[i]->speID);
-    while (usedEntries > 0) {
+
+    // DEBUG - Mailbox Statistics
+    statCount_flag += usedEntries;
+    statSum_all[i] += usedEntries;
+    statSum_all_count[i]++;
+    if (usedEntries > 0) {
+      statSum_nonZero[i] += usedEntries;
+      statSum_nonZero_count[i]++;
+    }
+
+    while (usedEntries > 0) {      
 
       // Read the message queue index that was sent by the SPE from the outbound mailbox
       unsigned int messageReturnCode = spe_read_out_mbox(speThreads[i]->speID);
@@ -692,6 +713,42 @@ void OffloadAPIProgress() {
       usedEntries--;
     } // end while (usedEntries > 0)
   } // end for (all SPEs)
+
+
+  // DEBUG - Mailbox Statistics
+  #if 0
+    if (statCount_flag > 0)  // For print frequency, only count calls that find at least one mailbox entry
+      statCount--;
+    if (statCount <= 0) {
+      printf("PPE :: OffloadAPIProgress() - Mailbox Statistics...\n");
+      for (int i = 0; i < NUM_SPE_THREADS; i++) {
+        printf("PPE :: OffloadAPIProgress() -   SPE %d Mailbox Stats - all:%.6f(%d), non-zero:%.2f(%d)...\n",
+               i,
+               ((float)statSum_all[i]) / ((float)statSum_all_count[i]), statSum_all_count[i],
+               ((float)statSum_nonZero[i]) / ((float)statSum_nonZero_count[i]), statSum_nonZero_count[i]
+              );
+        statSum_all[i] = 0;
+        statSum_all_count[i] = 0;
+        statSum_nonZero[i] = 0;
+        statSum_nonZero_count[i] = 0;
+      }
+      statCount = OffloadAPIProgress_statFreq;
+    }
+  #else
+    for (int i = 0; i < NUM_SPE_THREADS; i++) {
+      if (statSum_nonZero_count[i] >= OffloadAPIProgress_statFreq) {
+        printf("PPE :: OffloadAPIProgress() - SPE %d Mailbox Stats - all:%.6f(%d), non-zero:%.2f(%d)...\n",
+               i,
+               ((float)statSum_all[i]) / ((float)statSum_all_count[i]), statSum_all_count[i],
+               ((float)statSum_nonZero[i]) / ((float)statSum_nonZero_count[i]), statSum_nonZero_count[i]
+              );
+        statSum_all[i] = 0;
+        statSum_all_count[i] = 0;
+        statSum_nonZero[i] = 0;
+        statSum_nonZero_count[i] = 0;
+      }
+    }
+  #endif
 
 
   // Loop through the wrQueued list and try to send outstanding messages
