@@ -737,7 +737,18 @@ void ampiParent::startCheckpoint(char* dname){
   }
   else
   	contribute(0, NULL, CkReduction::sum_int);
+
+#if CMK_BLUEGENE_CHARM
+  void *curLog;		// store current log in timeline
+  _TRACE_BG_TLINE_END(&curLog);
+  TRACE_BG_AMPI_SUSPEND();
+#endif
+
   thread->stop();
+
+#if CMK_BLUEGENE_CHARM
+  _TRACE_BG_BEGIN_EXECUTE_NOMSG("CHECKPOINT_RESUME", &curLog);
+#endif
 }
 void ampiParent::Checkpoint(int len, char* dname){
   if (len == 0) {
@@ -977,6 +988,11 @@ public:
 
 void ampi::split(int color,int key,MPI_Comm *dest, int type)
 {
+#if CMK_BLUEGENE_CHARM
+  void *curLog;		// store current log in timeline
+  _TRACE_BG_TLINE_END(&curLog);
+  TRACE_BG_AMPI_SUSPEND();
+#endif
   if (type == CART_TOPOL) {
 	ampiSplitKey splitKey(parent->getNextCart(),color,key,myRank);
 	int rootIdx=myComm.getIndexForRank(0);
@@ -996,6 +1012,10 @@ void ampi::split(int color,int key,MPI_Comm *dest, int type)
 	MPI_Comm newComm=parent->getNextSplit()-1;
 	*dest=newComm;
   }
+#if CMK_BLUEGENE_CHARM
+//  TRACE_BG_AMPI_RESUME(thread->getThread(), msg, "SPLIT_RESUME", curLog);
+  _TRACE_BG_BEGIN_EXECUTE_NOMSG("SPLIT_RESUME", &curLog);
+#endif
 }
 
 CDECL int compareAmpiSplitKey(const void *a_, const void *b_) {
@@ -1575,7 +1595,15 @@ ampi::iprobe(int t, int s, int comm, int *sts)
       ((MPI_Status*)sts)->MPI_LENGTH = msg->length;
     return 1;
   }
+#if CMK_BLUEGENE_CHARM
+  void *curLog;		// store current log in timeline
+  _TRACE_BG_TLINE_END(&curLog);
+  TRACE_BG_AMPI_SUSPEND();
+#endif
   thread->schedule();
+#if CMK_BLUEGENE_CHARM
+  _TRACE_BG_BEGIN_EXECUTE_NOMSG("IPROBE_RESUME", &curLog);
+#endif
   return 0;
 }
 
@@ -2486,6 +2514,11 @@ int AMPI_Waitall(int count, MPI_Request request[], MPI_Status sts[])
   int i,j,oldPe;
   AmpiRequestList* reqs = getReqs();
   CkVec<CkVec<int> > *reqvec = vecIndex(count,request);
+#if CMK_BLUEGENE_CHARM
+  void *curLog;		// store current log in timeline
+  _TRACE_BG_TLINE_END(&curLog);
+  TRACE_BG_AMPI_SUSPEND();
+#endif
   for(i=0;i<reqvec->size();i++){
     for(j=0;j<((*reqvec)[i]).size();j++){
       if(request[((*reqvec)[i])[j]] == MPI_REQUEST_NULL){
@@ -2495,12 +2528,12 @@ int AMPI_Waitall(int count, MPI_Request request[], MPI_Status sts[])
       oldPe = CkMyPe();
       AmpiRequest *waitReq = ((*reqs)[request[((*reqvec)[i])[j]]]);
       waitReq->wait(&sts[((*reqvec)[i])[j]]);
-			if(oldPe != CkMyPe()){
 #if 1
+      if(oldPe != CkMyPe()){
 			reqs = getReqs();
 			reqvec  = vecIndex(count,request);
+      }
 #endif
-			}
     }
   }
 #if CMK_BLUEGENE_CHARM
