@@ -1,6 +1,10 @@
 #ifndef __COMMON_H__
 #define __COMMON_H__
 
+
+#include <stdlib.h>
+
+
 #ifdef __cplusplus
 extern "C" {
 #endif
