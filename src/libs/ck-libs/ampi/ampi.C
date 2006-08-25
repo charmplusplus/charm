@@ -3251,70 +3251,197 @@ int AMPI_Alltoall(void *sendbuf, int sendcount, MPI_Datatype sendtype,
   dttype = ptr->getDDT()->getType(sendtype) ;
   itemsize = dttype->getSize(sendcount) ;
   int rank = ptr->getRank(comm);
+  int comm_size = size;
+  MPI_Status status;
 
-  if ( itemsize <= AMPI_ALLTOALL_MEDIUM_MSG)
-  {
+  if( itemsize <= AMPI_ALLTOALL_SHORT_MSG ){
+    /* Short message. Use recursive doubling. Each process sends all
+       its data at each step along with all data it received in
+       previous steps. */
+    
+    /* need to allocate temporary buffer of size
+       sendbuf_extent*comm_size */
+    
+    int sendtype_extent = getDDT()->getExtent(sendtype);
+    int recvtype_extent = getDDT()->getExtent(recvtype);
+    int sendbuf_extent = sendcount * comm_size * sendtype_extent;
+
+    void* tmp_buf = malloc(sendbuf_extent*comm_size);
+
+    /* copy local sendbuf into tmp_buf at location indexed by rank */
+    int curr_cnt = sendcount*comm_size;
+    copyDatatype(comm, sendtype, curr_cnt, sendbuf,
+		 ((char *)tmp_buf + rank*sendbuf_extent));
+
+    int mask = 0x1;
+    int src,dst,tree_root,dst_tree_root,my_tree_root;
+    int last_recv_cnt,nprocs_completed;
+    int j,k,tmp_mask;
+    i = 0;
+    while (mask < comm_size) {
+      dst = rank ^ mask;
+      
+      dst_tree_root = dst >> i;
+      dst_tree_root <<= i;
+      
+      my_tree_root = rank >> i;
+      my_tree_root <<= i;
+      
+      if (dst < comm_size) {
+	MPI_Sendrecv(((char *)tmp_buf +
+		      my_tree_root*sendbuf_extent),
+		     curr_cnt, sendtype,
+		     dst, MPI_ATA_TAG, 
+		     ((char *)tmp_buf +
+		      dst_tree_root*sendbuf_extent),
+		     sendcount*comm_size*mask,
+		     sendtype, dst, MPI_ATA_TAG, 
+		     comm, &status);
+	
+	/* in case of non-power-of-two nodes, less data may be
+	   received than specified */
+	MPI_Get_count(&status, sendtype, &last_recv_cnt);
+	curr_cnt += last_recv_cnt;
+      }
+      
+      /* if some processes in this process's subtree in this step
+	 did not have any destination process to communicate with
+	 because of non-power-of-two, we need to send them the
+	 result. We use a logarithmic recursive-halfing algorithm
+	 for this. */
+      
+      if (dst_tree_root + mask > comm_size) {
+	nprocs_completed = comm_size - my_tree_root - mask;
+	/* nprocs_completed is the number of processes in this
+	   subtree that have all the data. Send data to others
+	   in a tree fashion. First find root of current tree
+	   that is being divided into two. k is the number of
+	   least-significant bits in this process's rank that
+	   must be zeroed out to find the rank of the root */ 
+	j = mask;
+	k = 0;
+	while (j) {
+	  j >>= 1;
+	  k++;
+	}
+	k--;
+	
+	tmp_mask = mask >> 1;
+	while (tmp_mask) {
+	  dst = rank ^ tmp_mask;
+	  
+	  tree_root = rank >> k;
+	  tree_root <<= k;
+	  
+	  /* send only if this proc has data and destination
+	     doesn't have data. at any step, multiple processes
+	     can send if they have the data */
+	  if ((dst > rank) && 
+	      (rank < tree_root + nprocs_completed)
+	      && (dst >= tree_root + nprocs_completed)) {
+	    /* send the data received in this step above */
+	    MPI_Send(((char *)tmp_buf +
+		      dst_tree_root*sendbuf_extent),
+		     last_recv_cnt, sendtype,
+		     dst, MPI_ATA_TAG,
+		     comm);  
+	  }
+	  /* recv only if this proc. doesn't have data and sender
+	     has data */
+	  else if ((dst < rank) && 
+		   (dst < tree_root + nprocs_completed) &&
+		   (rank >= tree_root + nprocs_completed)) {
+	    MPI_Recv(((char *)tmp_buf +
+		      dst_tree_root*sendbuf_extent),
+		     sendcount*comm_size*mask, 
+		     sendtype,   
+		     dst, MPI_ATA_TAG,
+		     comm, &status); 
+	    MPI_Get_count(&status, sendtype, &last_recv_cnt);
+	    curr_cnt += last_recv_cnt;
+	  }
+	  tmp_mask >>= 1;
+	  k--;
+	}
+      }
+      
+      mask <<= 1;
+      i++;
+    }
+    
+    /* now copy everyone's contribution from tmp_buf to recvbuf */
+    for (int p=0; p<comm_size; p++) {
+      copyDatatype(comm,sendtype,sendcount,
+		   ((char *)tmp_buf +
+		    p*sendbuf_extent +
+		    rank*sendcount*sendtype_extent),
+		   ((char*)recvbuf +
+		    p*recvcount*recvtype_extent));
+    }
+    
+    free((char *)tmp_buf); 
+    
+  }else if ( itemsize <= AMPI_ALLTOALL_MEDIUM_MSG ){
 #if AMPI_COMLIB
-  if(comm == MPI_COMM_WORLD) {
+    if(comm == MPI_COMM_WORLD) {
       // commlib support
       ptr->getAlltoall().beginIteration();
       for(i=0;i<size;i++) {
-          ptr->delesend(MPI_ATA_TAG, ptr->getRank(comm), ((char*)sendbuf)+(itemsize*i), sendcount,
-                        sendtype, i, comm, ptr->getComlibProxy());
+	ptr->delesend(MPI_ATA_TAG, ptr->getRank(comm), ((char*)sendbuf)+(itemsize*i), sendcount,
+		      sendtype, i, comm, ptr->getComlibProxy());
       }
       ptr->getAlltoall().endIteration();
-  } else
+    } else
 #endif 
-  {
-      for(i=0;i<size;i++) {
+      {
+	for(i=0;i<size;i++) {
           int dst = (rank+i) % size;
           ptr->send(MPI_ATA_TAG, rank, ((char*)sendbuf)+(itemsize*dst), sendcount,
                     sendtype, dst, comm);
+	}
       }
-  }
-  dttype = ptr->getDDT()->getType(recvtype) ;
-  itemsize = dttype->getSize(recvcount) ;
-  MPI_Status status;
-  for(i=0;i<size;i++) {
-        int dst = (rank+i) % size;
-        AMPI_Recv(((char*)recvbuf)+(itemsize*dst), recvcount, recvtype,
-              dst, MPI_ATA_TAG, comm, &status);
-  }
-  }
-  else {    // large messages
-      /* Long message. Use pairwise exchange. If comm_size is a
-         power-of-two, use exclusive-or to create pairs. Else send
-         to rank+i, receive from rank-i. */
-
+    dttype = ptr->getDDT()->getType(recvtype) ;
+    itemsize = dttype->getSize(recvcount) ;
+    MPI_Status status;
+    for(i=0;i<size;i++) {
+      int dst = (rank+i) % size;
+      AMPI_Recv(((char*)recvbuf)+(itemsize*dst), recvcount, recvtype,
+		dst, MPI_ATA_TAG, comm, &status);
+    }
+  } else {    // large messages
+    /* Long message. Use pairwise exchange. If comm_size is a
+       power-of-two, use exclusive-or to create pairs. Else send
+       to rank+i, receive from rank-i. */
+    
     int pof2;
     int src, dst;
-      /* Is comm_size a power-of-two? */
+    /* Is comm_size a power-of-two? */
     i = 1;
     while (i < size)
-          i *= 2;
+      i *= 2;
     if (i == size)
-          pof2 = 1;
+      pof2 = 1;
     else
-          pof2 = 0;
-
-      /* The i=0 case takes care of moving local data into recvbuf */
+      pof2 = 0;
+    
+    /* The i=0 case takes care of moving local data into recvbuf */
     for (i=0; i<size; i++) {
-        if (pof2 == 1) {
-              /* use exclusive-or algorithm */
-              src = dst = rank ^ i;
-        }
-        else {
-              src = (rank - i + size) % size;
-              dst = (rank + i) % size;
-        }
-
-        MPI_Status status;
-        MPI_Sendrecv(((char *)sendbuf + dst*itemsize),
-                                   sendcount, sendtype, dst,
-                                   MPI_ATA_TAG,
-                                   ((char *)recvbuf + src*itemsize),
-                                   recvcount, recvtype, src,
-                                   MPI_ATA_TAG, comm, &status);
+      if (pof2 == 1) {
+	/* use exclusive-or algorithm */
+	src = dst = rank ^ i;
+      }
+      else {
+	src = (rank - i + size) % size;
+	dst = (rank + i) % size;
+      }
+      
+      MPI_Status status;
+      MPI_Sendrecv(((char *)sendbuf + dst*itemsize),
+		   sendcount, sendtype, dst,
+		   MPI_ATA_TAG,
+		   ((char *)recvbuf + src*itemsize),
+		   recvcount, recvtype, src,
+		   MPI_ATA_TAG, comm, &status);
     }   // end of large message
   }
 #endif
