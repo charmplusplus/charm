@@ -1,6 +1,8 @@
 #include "blue.h"
 #include "blue_impl.h"
 
+#include "bigsim_logs.h"
+
 int bglog_version = 1;
 
 int genTimeLog = 0;			// was 1 for guna 's seq correction
@@ -235,7 +237,8 @@ void BgTimeLog::addMsgBackwardDep(BgTimeLineRec &tlinerec, void* msg){
   CmiAssert(recvTime < 0.);
   int idx;
   BgTimeLog *msglog = tlinerec.getTimeLogOnThread(BgMsgID(CmiBgMsgSrcPe(msg), CmiBgMsgID(msg)), &idx);
-  CmiAssert(msglog != NULL);
+  //CmiAssert(msglog != NULL);
+  if (msglog != NULL)
   addBackwardDep(msglog);
 }
 
