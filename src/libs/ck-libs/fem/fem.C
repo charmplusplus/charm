@@ -586,7 +586,8 @@ FDECL void FTN_NAME(FEM_BARRIER,fem_barrier)(void) {TCHARM_Barrier();}
 CDECL void
 FEM_Migrate(void)
 {
-  TCHARM_Migrate();
+//  TCHARM_Migrate();
+  AMPI_Migrate();
 }
 
 CDECL void
