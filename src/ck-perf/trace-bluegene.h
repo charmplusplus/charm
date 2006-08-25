@@ -90,9 +90,10 @@ extern int traceBluegeneLinked;
 	}
 #define TRACE_BG_AMPI_WAITALL(reqs) 	\
         {	\
-	TRACE_BG_AMPI_SUSPEND();	\
+	/* TRACE_BG_AMPI_SUSPEND(); */	\
 	CthThread th = getAmpiInstance(MPI_COMM_WORLD)->getThread();	\
   	TRACE_BG_AMPI_START(th, "AMPI_WAITALL")	\
+    	_TRACE_BG_ADD_BACKWARD_DEP(curLog);	\
   	for(int i=0;i<count;i++) {	\
 	  if (request[i] == MPI_REQUEST_NULL) continue;	\
     	  void *log = (*reqs)[request[i]]->event;	\

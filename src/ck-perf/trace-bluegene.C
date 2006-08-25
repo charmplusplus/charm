@@ -81,8 +81,8 @@ void TraceBluegene::tlineEnd(void** parentLogPtr){
 
 void TraceBluegene::bgDummyBeginExec(char* name,void** parentLogPtr)
 {
-  if (!genTimeLog) return;
   startVTimer();
+  if (!genTimeLog) return;
   double startTime = BgGetCurTime();
   BgTimeLog* newLog = BgStartLogByName(tTIMELINEREC, _threadEP, name, startTime, *(BgTimeLog**)parentLogPtr);
   // if event's mesgID is (-1:-1) and there is no backward dependence
@@ -93,17 +93,19 @@ void TraceBluegene::bgDummyBeginExec(char* name,void** parentLogPtr)
 
 void TraceBluegene::bgBeginExec(char* msg, char *name)
 {
-  if (!genTimeLog) return;
   startVTimer();
+  if (!genTimeLog) return;
   BgTimeLog* newLog = new BgTimeLog(msg, name);
   tTIMELINEREC.logEntryStart(newLog);
+  // bypass
+  resetVTime();
 }
 
 // create a new log, which depends on log
 void TraceBluegene::bgAmpiBeginExec(char *msg, char *name, void *log)
 {
-  if (!genTimeLog) return;
   startVTimer();
+  if (!genTimeLog) return;
   BgTimeLog* newLog = new BgTimeLog(_threadEP,name,BgGetCurTime());
   tTIMELINEREC.logEntryStart(newLog);
   newLog->addBackwardDep((BgTimeLog*)log);
@@ -112,12 +114,12 @@ void TraceBluegene::bgAmpiBeginExec(char *msg, char *name, void *log)
 
 void TraceBluegene::bgEndExec(int commit)
 {
+  stopVTimer();
   if (!genTimeLog) return;
   if (commit) 
     BgLogEntryCommit(tTIMELINEREC);
   else
     BgEndLastLog(tTIMELINEREC);
-  stopVTimer();
 }
 
 
@@ -190,6 +192,8 @@ void TraceBluegene::bgPrint(char* str){
   if (genTimeLog)
     bgAddProjEvent(strdup(str), -1, curT, writeData, this, BG_EVENT_PRINT);
   CmiPrintf(str, curT);
+  // bypass
+  resetVTime();
 }
 
 extern "C" void BgPrintf(char *str)
