@@ -493,7 +493,15 @@ void TCharm::barrier(void) {
 	//Contribute to a synchronizing reduction
 	CkCallback cb(index_t::atBarrier(0), thisProxy[0]);
 	contribute(sizeof(vals),&vals,CkReduction::sum_int,cb);
+#if CMK_BLUEGENE_CHARM
+        void *curLog;		// store current log in timeline
+        _TRACE_BG_TLINE_END(&curLog);
+        TRACE_BG_AMPI_SUSPEND();
+#endif
 	stop();
+#if CMK_BLUEGENE_CHARM
+        _TRACE_BG_BEGIN_EXECUTE_NOMSG("TCHARM_BARRIER_RESUME", &curLog);
+#endif
 }
 
 //Called when we've reached the barrier
