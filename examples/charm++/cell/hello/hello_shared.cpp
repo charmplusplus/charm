@@ -7,11 +7,11 @@
 
 // DMK : Define own exit() function for now.  Through the linking process, this function does
 //   not seem to be included anywhere but the code for _start refers to it.  FIGURE THIS OUT!!!
-#ifdef __cplusplus
-extern "C"
-#endif
-void exit() {
-}
+//#ifdef __cplusplus
+//extern "C"
+//#endif
+//void exit() {
+//}
 
 
 #ifdef __cplusplus
