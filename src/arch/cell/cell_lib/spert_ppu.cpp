@@ -76,6 +76,7 @@ SPEThread* createSPEThread(SPEData *speData);
 SPEThread** createSPEThreads(SPEThread **speThreads, int numThreads);
 
 int sendSPEMessage(SPEThread* speThread, WorkRequest* wrPtr, int command);
+int sendSPECommand(SPEThread* speThread, int command);
 
 WorkRequest* createWRHandles(int numHandles);
 
@@ -158,7 +159,7 @@ void CloseOffloadAPI() {
 
   // Send each of the SPE threads a message to exit
   for (int i = 0; i < NUM_SPE_THREADS; i++)
-    sendSPEMessage(speThreads[i], NULL, SPE_MESSAGE_COMMAND_EXIT);
+    sendSPECommand(speThreads[i], SPE_MESSAGE_COMMAND_EXIT);
 
   // Wait for all the SPE threads to finish
   for (int i = 0; i < NUM_SPE_THREADS; i++) {
@@ -168,6 +169,7 @@ void CloseOffloadAPI() {
     #endif
 
     spe_wait(speThreads[i]->speID, &status, 0);
+
     #if DEBUG_DISPLAY >= 1
       printf("OffloadAPI :: SPE %d Finished (status : %d)\n", i, status);
     #endif
@@ -588,13 +590,15 @@ void OffloadAPIProgress() {
 
 
   // DEBUG - Mailbox Statistics
-  #define OffloadAPIProgress_statFreq  100
-  static int statCount = OffloadAPIProgress_statFreq;
-  int statCount_flag = 0;
-  static int statSum_all[8] = { 0 };
-  static int statSum_all_count[8] = { 0 };
-  static int statSum_nonZero[8] = { 0 };
-  static int statSum_nonZero_count[8] = { 0 };
+  #define OffloadAPIProgress_statFreq  0
+  #if OffloadAPIProgress_statFreq > 0
+    static int statCount = OffloadAPIProgress_statFreq;
+    int statCount_flag = 0;
+    static int statSum_all[8] = { 0 };
+    static int statSum_all_count[8] = { 0 };
+    static int statSum_nonZero[8] = { 0 };
+    static int statSum_nonZero_count[8] = { 0 };
+  #endif
 
 
   // Check the mailbox from the SPEs to see if any of the messages have finished (and mark them as such)
@@ -604,13 +608,15 @@ void OffloadAPIProgress() {
     int usedEntries = spe_stat_out_mbox(speThreads[i]->speID);
 
     // DEBUG - Mailbox Statistics
-    statCount_flag += usedEntries;
-    statSum_all[i] += usedEntries;
-    statSum_all_count[i]++;
-    if (usedEntries > 0) {
-      statSum_nonZero[i] += usedEntries;
-      statSum_nonZero_count[i]++;
-    }
+    #if OffloadAPIProgress_statFreq > 0
+      statCount_flag += usedEntries;
+      statSum_all[i] += usedEntries;
+      statSum_all_count[i]++;
+      if (usedEntries > 0) {
+        statSum_nonZero[i] += usedEntries;
+        statSum_nonZero_count[i]++;
+      }
+    #endif
 
     while (usedEntries > 0) {      
 
@@ -716,38 +722,40 @@ void OffloadAPIProgress() {
 
 
   // DEBUG - Mailbox Statistics
-  #if 0
-    if (statCount_flag > 0)  // For print frequency, only count calls that find at least one mailbox entry
-      statCount--;
-    if (statCount <= 0) {
-      printf("PPE :: OffloadAPIProgress() - Mailbox Statistics...\n");
+  #if OffloadAPIProgress_statFreq > 0
+    #if 0
+      if (statCount_flag > 0)  // For print frequency, only count calls that find at least one mailbox entry
+        statCount--;
+      if (statCount <= 0) {
+        printf("PPE :: OffloadAPIProgress() - Mailbox Statistics...\n");
+        for (int i = 0; i < NUM_SPE_THREADS; i++) {
+          printf("PPE :: OffloadAPIProgress() -   SPE %d Mailbox Stats - all:%.6f(%d), non-zero:%.2f(%d)...\n",
+                 i,
+                 ((float)statSum_all[i]) / ((float)statSum_all_count[i]), statSum_all_count[i],
+                 ((float)statSum_nonZero[i]) / ((float)statSum_nonZero_count[i]), statSum_nonZero_count[i]
+                );
+          statSum_all[i] = 0;
+          statSum_all_count[i] = 0;
+          statSum_nonZero[i] = 0;
+          statSum_nonZero_count[i] = 0;
+        }
+        statCount = OffloadAPIProgress_statFreq;
+      }
+    #else
       for (int i = 0; i < NUM_SPE_THREADS; i++) {
-        printf("PPE :: OffloadAPIProgress() -   SPE %d Mailbox Stats - all:%.6f(%d), non-zero:%.2f(%d)...\n",
-               i,
-               ((float)statSum_all[i]) / ((float)statSum_all_count[i]), statSum_all_count[i],
-               ((float)statSum_nonZero[i]) / ((float)statSum_nonZero_count[i]), statSum_nonZero_count[i]
-              );
-        statSum_all[i] = 0;
-        statSum_all_count[i] = 0;
-        statSum_nonZero[i] = 0;
-        statSum_nonZero_count[i] = 0;
+        if (statSum_nonZero_count[i] >= OffloadAPIProgress_statFreq) {
+          printf("PPE :: OffloadAPIProgress() - SPE %d Mailbox Stats - all:%.6f(%d), non-zero:%.2f(%d)...\n",
+                 i,
+                 ((float)statSum_all[i]) / ((float)statSum_all_count[i]), statSum_all_count[i],
+                 ((float)statSum_nonZero[i]) / ((float)statSum_nonZero_count[i]), statSum_nonZero_count[i]
+                );
+          statSum_all[i] = 0;
+          statSum_all_count[i] = 0;
+          statSum_nonZero[i] = 0;
+          statSum_nonZero_count[i] = 0;
+        }
       }
-      statCount = OffloadAPIProgress_statFreq;
-    }
-  #else
-    for (int i = 0; i < NUM_SPE_THREADS; i++) {
-      if (statSum_nonZero_count[i] >= OffloadAPIProgress_statFreq) {
-        printf("PPE :: OffloadAPIProgress() - SPE %d Mailbox Stats - all:%.6f(%d), non-zero:%.2f(%d)...\n",
-               i,
-               ((float)statSum_all[i]) / ((float)statSum_all_count[i]), statSum_all_count[i],
-               ((float)statSum_nonZero[i]) / ((float)statSum_nonZero_count[i]), statSum_nonZero_count[i]
-              );
-        statSum_all[i] = 0;
-        statSum_all_count[i] = 0;
-        statSum_nonZero[i] = 0;
-        statSum_nonZero_count[i] = 0;
-      }
-    }
+    #endif
   #endif
 
 
@@ -955,11 +963,6 @@ SPEThread** createSPEThreads(SPEThread **speThreads, int numThreads) {
     // Give the SPE a unique id
     speThreads[i]->speData->vID = vIDCounter;
     vIDCounter++;
-
-
-    // DEBUG
-    printf("PPE :: speThreads[%d]->speData->vID = %d\n", i, (int)(speThreads[i]->speData->vID));
-
   }
 
   // Create all the threads at once
@@ -1161,6 +1164,14 @@ int sendSPEMessage(SPEThread *speThread, WorkRequest *wrPtr, int command) {
 
   // If execution reaches here, an available slot in the message queue was not found
   return -1;
+}
+
+
+// Returns 0 on success, non-zero otherwise
+int sendSPECommand(SPEThread *speThread, int command) {
+  if (command < SPE_MESSAGE_COMMAND_MIN || command > SPE_MESSAGE_COMMAND_MAX) return -1;
+  while (spe_stat_in_mbox(speThread->speID) == 0);      // Loop while mailbox is full
+  return spe_write_in_mbox(speThread->speID, command);
 }
 
 
