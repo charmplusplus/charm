@@ -15,6 +15,8 @@ class Main : public CBase_Main {
   private:
     CProxy_Jacobi jArray;
     int iterationCount;
+    double startTime;
+    double endTime;
 
   ////////////////////////////////////////////////////////////////////////////////////////////////
   // Constructor(s) / Destructor

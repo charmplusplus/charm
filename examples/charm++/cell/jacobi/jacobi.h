@@ -14,6 +14,7 @@ class Jacobi : public CBase_Jacobi {
     float* matrixTmp;  // Pointer to the second buffer (the write buffer per iteration)
     int ghostCount;
     int ghostCountNeeded;
+    int iterCount;
 
 
   ////////////////////////////////////////////////////////////////////////////////////////////////
@@ -29,10 +30,10 @@ class Jacobi : public CBase_Jacobi {
   public:
     void startIteration();
 
-    void northData(int size, float* ghostData);
-    void southData(int size, float* ghostData);
-    void eastData(int size, float* ghostData);
-    void westData(int size, float* ghostData);
+    void northData(int size, float* ghostData, int iterRef);
+    void southData(int size, float* ghostData, int iterRef);
+    void eastData(int size, float* ghostData, int iterRef);
+    void westData(int size, float* ghostData, int iterRef);
 
     void attemptCalculation();
     void doCalculation();

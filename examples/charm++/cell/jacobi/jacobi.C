@@ -36,6 +36,9 @@ Jacobi::Jacobi() {
     matrixTmp[DATA_OFFSET] = matrix[DATA_OFFSET] = 1.0f;
     matrixTmp[DATA_BUFFER_COLS - 1] = matrix[DATA_BUFFER_COLS - 1] = 1.0f;  // Flag the first element's matrices
   }
+
+  // Init the iteration counter to zero
+  iterCount = 0;
 }
 
 Jacobi::Jacobi(CkMigrateMessage *msg) {
@@ -61,12 +64,12 @@ void Jacobi::startIteration() {
 
   // Send to the north
   if (chareY > 0) {
-    thisProxy[GET_CHARE_I(chareX, chareY-1)].southData(NUM_COLS, matrix + DATA_NORTH_DATA_OFFSET);
+    thisProxy[GET_CHARE_I(chareX, chareY-1)].southData(NUM_COLS, matrix + DATA_NORTH_DATA_OFFSET, iterCount);
   }
 
   // Send to the south
   if (chareY < (NUM_CHARES - 1)) {
-    thisProxy[GET_CHARE_I(chareX, chareY+1)].northData(NUM_COLS, matrix + DATA_SOUTH_DATA_OFFSET);
+    thisProxy[GET_CHARE_I(chareX, chareY+1)].northData(NUM_COLS, matrix + DATA_SOUTH_DATA_OFFSET, iterCount);
   }
 
   // Send to the west
@@ -74,7 +77,7 @@ void Jacobi::startIteration() {
     float buf[NUM_ROWS];
     for (int i = 0; i < NUM_ROWS; i++)
       buf[i] = matrix[DATA_BUFFER_COLS * i + DATA_WEST_DATA_OFFSET];
-    thisProxy[GET_CHARE_I(chareX - 1, chareY)].eastData(NUM_ROWS, buf);
+    thisProxy[GET_CHARE_I(chareX - 1, chareY)].eastData(NUM_ROWS, buf, iterCount);
   }
 
   // Send to the east
@@ -82,30 +85,50 @@ void Jacobi::startIteration() {
     float buf[NUM_ROWS];
     for (int i = 0; i < NUM_ROWS; i++)
       buf[i] = matrix[DATA_BUFFER_COLS * i + DATA_EAST_DATA_OFFSET];
-    thisProxy[GET_CHARE_I(chareX + 1, chareY)].westData(NUM_ROWS, buf);
+    thisProxy[GET_CHARE_I(chareX + 1, chareY)].westData(NUM_ROWS, buf, iterCount);
   }
 }
 
-void Jacobi::northData(int size, float* ghostData) {
-  memcpy(matrix + DATA_NORTH_BUFFER_OFFSET, ghostData, NUM_COLS * sizeof(float));
-  attemptCalculation();
+void Jacobi::northData(int size, float* ghostData, int iterRef) {
+  // Check to see if this message has arrived in order...
+  if (iterCount == iterRef) {  // If so, process it
+    memcpy(matrix + DATA_NORTH_BUFFER_OFFSET, ghostData, NUM_COLS * sizeof(float));
+    attemptCalculation();
+  } else {                     // If not, resend to self and try again later
+    thisProxy[thisIndex].northData(size, ghostData, iterRef);
+  }
 }
 
-void Jacobi::southData(int size, float* ghostData) {
-  memcpy(matrix + DATA_SOUTH_BUFFER_OFFSET, ghostData, NUM_COLS * sizeof(float));
-  attemptCalculation();
+void Jacobi::southData(int size, float* ghostData, int iterRef) {
+  // Check to see if this message has arrived in order...
+  if (iterCount == iterRef) {  // If so, process it
+    memcpy(matrix + DATA_SOUTH_BUFFER_OFFSET, ghostData, NUM_COLS * sizeof(float));
+    attemptCalculation();
+  } else {                     // If not, resend to self and try again later
+    thisProxy[thisIndex].southData(size, ghostData, iterRef);
+  }
 }
 
-void Jacobi::eastData(int size, float* ghostData) {
-  for (int i = 0; i < NUM_ROWS; i++)
-    matrix[DATA_BUFFER_COLS * i + DATA_EAST_BUFFER_OFFSET] = ghostData[i];
-  attemptCalculation();
+void Jacobi::eastData(int size, float* ghostData, int iterRef) {
+  // Check to see if this message has arrived in order...
+  if (iterCount == iterRef) {  // If so, process it
+    for (int i = 0; i < NUM_ROWS; i++)
+      matrix[DATA_BUFFER_COLS * i + DATA_EAST_BUFFER_OFFSET] = ghostData[i];
+    attemptCalculation();
+  } else {                     // If not, resend to self and try again later
+    thisProxy[thisIndex].eastData(size, ghostData, iterRef);
+  }
 }
 
-void Jacobi::westData(int size, float* ghostData) {
-  for (int i = 0; i < NUM_ROWS; i++)
-    matrix[DATA_BUFFER_COLS * i + DATA_WEST_BUFFER_OFFSET] = ghostData[i];
-  attemptCalculation();
+void Jacobi::westData(int size, float* ghostData, int iterRef) {
+  // Check to see if this message has arrived in order...
+  if (iterCount == iterRef) {  // If so, process it
+    for (int i = 0; i < NUM_ROWS; i++)
+      matrix[DATA_BUFFER_COLS * i + DATA_WEST_BUFFER_OFFSET] = ghostData[i];
+    attemptCalculation();
+  } else {                     // If not, resend to self and try again later
+    thisProxy[thisIndex].westData(size, ghostData, iterRef);
+  }
 }
 
 void Jacobi::attemptCalculation() {
@@ -169,6 +192,10 @@ void Jacobi::doCalculation() {
   float *tmp = matrix;
   matrix = matrixTmp;
   matrixTmp = tmp;
+
+  // Start the next iteration for this chare
+  iterCount++;
+  startIteration();
 }
 
 

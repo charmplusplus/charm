@@ -29,6 +29,9 @@ Main::Main(CkArgMsg *msg) {
   CkCallback *cb = new CkCallback(CkIndex_Main::maxErrorReductionClient(NULL), mainProxy);
   jArray.ckSetReductionClient(cb);
 
+  // Start timing
+  startTime = CkWallTimer();
+
   // Tell the jArray to start the first iteration
   iterationCount++;
   jArray.startIteration();
@@ -47,15 +50,18 @@ void Main::maxErrorReductionClient(CkReductionMsg *msg) {
   #endif
 
   if (maxError <= MAX_ERROR) {
+
+    // Stop timing
+    endTime = CkWallTimer();
+
     CkPrintf("final maxError = %f\n", maxError);
     CkPrintf("final iterationCount = %d\n", iterationCount);
+    CkPrintf("Time: %lfs\n", endTime - startTime);
+
     CkExit();
+
   } else {
     iterationCount++;
-    jArray.startIteration();
-    #if DISPLAY_MATRIX != 0
-      CkPrintf("Starting Iteration %d...\n", iterationCount);
-    #endif
   }
 
 }

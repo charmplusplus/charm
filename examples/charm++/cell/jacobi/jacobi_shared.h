@@ -32,11 +32,11 @@
 //   --- : Ignored
 //
 
-#define NUM_ROWS      4  // The number of data rows each chare has
-#define NUM_COLS      4  // The number of data columns each chare has
-#define NUM_CHARES    2  // The number of chares (per dimension)
+#define NUM_ROWS      64  // The number of data rows each chare has
+#define NUM_COLS      64  // The number of data columns each chare has
+#define NUM_CHARES    32  // The number of chares (per dimension)
 
-#define MAX_ERROR  0.01f  // The value that all errors have to be below for the program to finish
+#define MAX_ERROR  0.001f  // The value that all errors have to be below for the program to finish
 
 #define DISPLAY_MATRIX          0
 #define DISPLAY_MAX_ERROR_FREQ  1
