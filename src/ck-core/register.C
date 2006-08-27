@@ -137,10 +137,12 @@ void CkEnableTracing(int epIdx) {
 }
 
 
-static void pupEntry(PUP::er &p,int i)
+static void pupEntry(PUP::er &p,int index)
 {
-  EntryInfo *c=_entryTable[i];
+  EntryInfo *c=_entryTable[index];
   PCOMS(name) 
+  p.comment("index");
+  p(index);
   PCOM(msgIdx) 
   PCOM(chareIdx)
   PCOM(inCharm);
@@ -169,7 +171,8 @@ static void pupReadonly(PUP::er &p,int i)
   ReadonlyInfo *c=_readonlyTable[i];
   PCOMS(name) PCOMS(type) PCOM(size) 
   p.comment("value");
-  c->pupData(p);
+  //c->pupData(p); Do not use puppers, just copy memory
+  p((char *)c->ptr,c->size);
 }
 static void pupReadonlyMsg(PUP::er &p,int i)
 {

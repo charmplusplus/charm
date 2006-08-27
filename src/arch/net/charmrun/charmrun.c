@@ -1732,7 +1732,7 @@ void req_poll()
 	/* Found info command, forward data to gdb info program */
 	char c;
 	int num=0;
-	printf("Command to be forwarded\n");
+	//printf("Command to be forwarded\n");
 	while (read(0, &c, 1)!=-1) {
 	  buf[num++]=c;
 	  if (c=='\n' || num >= 99) {
@@ -1741,24 +1741,30 @@ void req_poll()
 	  }
 	}
       }
-      printf("Command from charmdebug: %d(%s)\n",indata,buf);
+      //printf("Command from charmdebug: %d(%s)\n",indata,buf);
     }
     /* All streams from gdb are forwarded to the stderr stream through the FILE
        gdb_stream which has been duplicated from stderr */
-    if (FD_ISSET(gdb_info_std[1], &rfds)) {
-      int indata = read(gdb_info_std[1], buf, 100);
-      /*printf("read data from gdb info stdout %d\n",indata);*/
-      if (indata > 0) {
-	buf[indata] = 0;
-	fprintf(gdb_stream,"%s",buf);
-	fflush(gdb_stream);
-      }
-    }
+    /* NOTE: gdb_info_std[2] must be flushed before gdb_info_std[1] because the
+       latter contains the string "(gdb) " ending the synchronization. Also the
+       std[1] should be read with the else statement. It will not work without. */
     if (FD_ISSET(gdb_info_std[2], &rfds)) {
       int indata = read(gdb_info_std[2], buf, 100);
       /*printf("read data from gdb info stderr %d\n",indata);*/
       if (indata > 0) {
 	buf[indata] = 0;
+        //printf("printing %s\n",buf);
+        //fflush(stdout);
+	//fprintf(gdb_stream,"%s",buf);
+	fflush(gdb_stream);
+      }
+    } else if (FD_ISSET(gdb_info_std[1], &rfds)) {
+      int indata = read(gdb_info_std[1], buf, 100);
+      /*printf("read data from gdb info stdout %d\n",indata);*/
+      if (indata > 0) {
+	buf[indata] = 0;
+        //printf("printing %s\n",buf);
+        //fflush(stdout);
 	fprintf(gdb_stream,"%s",buf);
 	fflush(gdb_stream);
       }

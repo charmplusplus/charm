@@ -131,23 +131,33 @@ CpvCExtern(void *,debugQueue);
 void CpdPupMessage(PUP::er &p, void *msg)
 {
   envelope *env=UsrToEnv(msg);
-  int wasPacked=env->isPacked();
+  //int wasPacked=env->isPacked();
   int size=env->getTotalsize();
   int prioBits=env->getPriobits();
-  PUPn(wasPacked);
+  int from=env->getSrcPe();
+  PUPn(from);
+  //PUPn(wasPacked);
   PUPn(prioBits);
   int userSize=size-sizeof(envelope)-sizeof(int)*CkPriobitsToInts(prioBits);
   PUPn(userSize);
-  
-  p.synchronize(PUP::sync_last_system);
+  int msgType = env->getMsgIdx();
+  PUPn(msgType);
+  int msgFor = env->getMsgtype();
+  PUPn(msgFor);
+
+  //p.synchronize(PUP::sync_last_system);
   
   int ep=CkMessageToEpIdx(msg);
   PUPn(ep);
   
+  /* user data */
+  p.comment("data");
+  p.synchronize(PUP::sync_begin_object);
   if (_entryTable[ep]->messagePup!=NULL) 
     _entryTable[ep]->messagePup(p,msg);
   else
     CkMessage::ckDebugPup(p,msg);
+  p.synchronize(PUP::sync_end_object);
 }
 
 //Cpd Lists for local and scheduler queues
@@ -183,6 +193,7 @@ public:
 	
 	if (isCharm) 
 	{ /* charm message */
+          p.comment("charmMsg");
 	  p.synchronize(PUP::sync_begin_object);
 	  envelope *env=(envelope *)msg;
 	  CkUnpackMessage(&env);
@@ -192,6 +203,7 @@ public:
 	  p.synchronize(PUP::sync_end_object);
 	}
     }
+    delete[] messages;
 
   }
 };
