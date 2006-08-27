@@ -271,6 +271,7 @@ void startVTimer()
 // should be used only when BG_WALLTIME
 static inline void advanceTime(double inc)
 {
+  if (BG_ABS(inc) < 1e-10) inc = 0.0;    // ignore floating point errors
   CmiAssert(inc>=0.0);
   inc *= cva(bgMach).cpufactor;
   tCURRTIME += inc;
