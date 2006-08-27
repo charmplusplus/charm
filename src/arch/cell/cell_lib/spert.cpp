@@ -173,8 +173,8 @@ int main(unsigned long long id, unsigned long long param) {
 
   // Tell the world this SPE is going away
   #if SPE_DEBUG_DISPLAY >= 1
-    sim_printf(" --==>> Goodbye From SPE 0x%llx's Runtime <<==--\n", id);
-    sim_printf("  \"I do not regret the things I have done, but those I did not do.\" - Lucas, Empire Records\n");
+    printf(" --==>> Goodbye From SPE 0x%llx's Runtime <<==--\n", id);
+    printf("  \"I do not regret the things I have done, but those I did not do.\" - Lucas, Empire Records\n");
   #endif
 
   // Call the user's funcLookup() function with funcIndex of SPE_FUNC_INDEX_CLOSE
@@ -256,6 +256,18 @@ void speScheduler(SPEData *speData, unsigned long long id) {
   // The scheduler loop
   while (__builtin_expect(keepLooping != FALSE, 1)) {
 
+    // Check the in mailbox for commands from the PPE
+    register int inMBoxCount = spu_stat_in_mbox();
+    while (__builtin_expect(inMBoxCount > 0, 0)) {
+      int command = spu_read_in_mbox();
+      if (command == SPE_MESSAGE_COMMAND_EXIT) {
+        keepLooping = FALSE;
+      }
+
+      inMBoxCount--;
+    }
+    if (__builtin_expect(keepLooping == FALSE, 0)) continue;
+
     // Wait for the latest message queue read (blocking)
     mfc_write_tag_mask(0x80000000);   // enable only tag group 31 (message queue request)
     mfc_write_tag_update_any();
@@ -264,8 +276,8 @@ void speScheduler(SPEData *speData, unsigned long long id) {
 
     // Let the user know that the SPE Runtime is still running...
     #if SPE_DEBUG_DISPLAY_STILL_ALIVE >= 1
-      if (__buildin_expect(stillAliveCounter == 0, 0)) {
-        sim_printf("[0x%llx] :: still going... \n", id);
+      if (__builtin_expect(stillAliveCounter == 0, 0)) {
+        printf("[0x%llx] :: SPE_%d :: still going... (keepLooping = %d)\n", id, (int)getSPEID(), keepLooping);
         stillAliveCounter = SPE_DEBUG_DISPLAY_STILL_ALIVE;
       }
       stillAliveCounter--;
