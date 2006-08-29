@@ -39,6 +39,8 @@
 */
 #define CMI_VMI_WAN_LATENCY                      1000      /* microseconds */
 #define CMI_VMI_PROBE_CLUSTERS                   0         /* Boolean */
+#define CMI_VMI_GRID_OBJECT_PRIORITIZATION       0         /* Boolean */
+#define CMI_VMI_GRID_OBJECTS_MAXIMUM             10
 #define CMI_VMI_MEMORY_POOL                      1         /* Boolean */
 #define CMI_VMI_TERMINATE_VMI_HACK               1         /* Boolean */
 #define CMI_VMI_CONNECTION_TIMEOUT               300       /* seconds */
@@ -532,6 +534,89 @@ typedef struct
 #endif
 
 
+#if CMK_GRID_OBJECT_PRIORITIZATION
+typedef struct
+{
+  int gid;
+  int nInts;
+  int index1;
+  int index2;
+  int index3;
+} CMI_VMI_Grid_Object_T;
+
+#define CkMsgAlignmentMask  (sizeof(double)-1)
+#define CkMsgAlignLength(x) (((x)+CkMsgAlignmentMask)&(~(CkMsgAlignmentMask)))
+#define CkMsgAlignOffset(x) (CkMsgAlignLength(x)-(x))
+
+typedef union
+{
+  struct s_chare
+  {
+    void *ptr;
+    unsigned int forAnyPe;
+  } chare;
+
+  struct s_group
+  {
+    int g;
+    int rednMgr;
+    int epoch;
+    unsigned short arrayEp;
+  } group;
+
+  struct s_array
+  {
+    struct
+    {
+      int nInts;
+      int index[3];
+    } index;
+    int listenerData[3];
+    int arr;
+    unsigned char hopCount;
+    unsigned char ifNotThere;
+  } array;
+
+  struct s_roData
+  {
+    unsigned int count;
+  } roData;
+
+  struct s_roMsg
+  {
+    unsigned int roIdx;
+  } roMsg;
+} CMI_VMI_Envelope_utype;
+
+typedef struct
+{
+  unsigned char msgIdx;
+  unsigned char mtype;
+  unsigned char queueing:4;
+  unsigned char isPacked:1;
+  unsigned char isUsed:1;
+} CMI_VMI_Envelope_sattribs;
+
+typedef struct
+{
+  char core[CmiReservedHeaderSize];
+  CMI_VMI_Envelope_utype u_type;
+  unsigned short ref;
+  CMI_VMI_Envelope_sattribs s_attribs;
+
+  unsigned char align[CkMsgAlignOffset(CmiReservedHeaderSize+sizeof(CMI_VMI_Envelope_utype)+sizeof(unsigned short)+sizeof(CMI_VMI_Envelope_sattribs))];
+
+  /* The remaining fields in this struct are now aligned to (void *). */
+
+  unsigned short priobits;
+  unsigned short epIdx;
+  unsigned int pe;
+  unsigned int event;
+  unsigned int totalsize;
+} CMI_VMI_Envelope;
+#endif
+
+
 
 
 
@@ -577,6 +662,14 @@ void *CmiGetNonLocal ();
 void CmiProbeLatencies ();
 unsigned long CmiGetLatency (int process1, int process2);
 int CmiGetCluster (int process);
+
+/* Grid object prioritization functions */
+#if CMK_GRID_OBJECT_PRIORITIZATION
+void CmiGridObjectRegister (int gid, int nInts, int index1, int index2, int index3);
+void CmiGridObjectDeregister (int gid, int nInts, int index1, int index2, int index3);
+void CmiGridObjectDeregisterAll ();
+int CmiGridObjectLookup (int gid, int nInts, int index1, int index2, int index3);
+#endif
 
 #if CMK_PERSISTENT_COMM
 void CmiPersistentInit ();

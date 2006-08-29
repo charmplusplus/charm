@@ -75,3 +75,5 @@
 #define CMK_WHEN_PROCESSOR_IDLE_USLEEP                     0
 
 #define CMK_LBDB_ON                                        1
+
+#define CMK_GRID_OBJECT_PRIORITIZATION                     0

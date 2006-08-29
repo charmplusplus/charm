@@ -31,6 +31,9 @@ int _Cmi_myrank = 0;
 
 CpvDeclare (void *, CmiLocalQueue);
 CpvDeclare (void *, CMI_VMI_RemoteQueue);
+#if CMK_GRID_OBJECT_PRIORITIZATION
+CpvDeclare (void *, CMI_VMI_GridQueue);
+#endif
 
 extern void CthInit (char **argv);
 extern void ConverseCommonInit (char **argv);
@@ -42,6 +45,7 @@ int CMI_VMI_Startup_Type;
 int CMI_VMI_WAN_Latency;
 int CMI_VMI_Cluster;
 int CMI_VMI_Probe_Clusters;
+int CMI_VMI_Grid_Object_Prioritization;
 int CMI_VMI_Memory_Pool;
 int CMI_VMI_Terminate_VMI_Hack;
 int CMI_VMI_Connection_Timeout;
@@ -83,6 +87,12 @@ PVMI_BUFFER_POOL CMI_VMI_Bucket2_Pool;
 PVMI_BUFFER_POOL CMI_VMI_Bucket3_Pool;
 PVMI_BUFFER_POOL CMI_VMI_Bucket4_Pool;
 PVMI_BUFFER_POOL CMI_VMI_Bucket5_Pool;
+
+#if CMK_GRID_OBJECT_PRIORITIZATION
+CMI_VMI_Grid_Object_T *CMI_VMI_Grid_Objects;
+int CMI_VMI_Grid_Objects_Index;
+int CMI_VMI_Grid_Objects_Maximum;
+#endif
 
 #ifdef GK_DELAY_DEVICE
 typedef struct
@@ -133,6 +143,10 @@ void ConverseInit (int argc, char **argv, CmiStartFn start_function, int user_ca
   CMI_VMI_WAN_Latency                      = CMI_VMI_WAN_LATENCY;
   CMI_VMI_Cluster                          = CMI_VMI_CLUSTER_UNKNOWN;
   CMI_VMI_Probe_Clusters                   = CMI_VMI_PROBE_CLUSTERS;
+  CMI_VMI_Grid_Object_Prioritization       = CMI_VMI_GRID_OBJECT_PRIORITIZATION;
+#if CMK_GRID_OBJECT_PRIORITIZATION
+  CMI_VMI_Grid_Objects_Maximum             = CMI_VMI_GRID_OBJECTS_MAXIMUM;
+#endif
   CMI_VMI_Memory_Pool                      = CMI_VMI_MEMORY_POOL;
   CMI_VMI_Terminate_VMI_Hack               = CMI_VMI_TERMINATE_VMI_HACK;
   CMI_VMI_Connection_Timeout               = CMI_VMI_CONNECTION_TIMEOUT;
@@ -285,6 +299,9 @@ void ConverseInit (int argc, char **argv, CmiStartFn start_function, int user_ca
   */
   CpvAccess (CmiLocalQueue) = CdsFifo_Create ();
   CpvAccess (CMI_VMI_RemoteQueue) = CdsFifo_Create ();
+#if CMK_GRID_OBJECT_PRIORITIZATION
+  CpvAccess (CMI_VMI_GridQueue) = CdsFifo_Create ();
+#endif
 
   /* Open connections. */
   rc = CMI_VMI_Open_Connections ();
@@ -311,6 +328,14 @@ void ConverseInit (int argc, char **argv, CmiStartFn start_function, int user_ca
       CMI_VMI_Wait_Cluster_Mapping ();
     }
   }
+
+#if CMK_GRID_OBJECT_PRIORITIZATION
+  CMI_VMI_Grid_Objects = (CMI_VMI_Grid_Object_T *) malloc (CMI_VMI_Grid_Objects_Maximum * sizeof (CMI_VMI_Grid_Object_T));
+  if (!CMI_VMI_Grid_Objects) {
+    CmiAbort ("Unable to allocate memory for Grid objects array.\n");
+  }
+  CMI_VMI_Grid_Objects_Index = 0;
+#endif
 
   DEBUG_PRINT ("ConverseInit() is starting the main processing loop.\n");
 
@@ -403,6 +428,10 @@ void ConverseExit ()
     CMI_VMI_Terminate_VMI ();
 
     /* Free resources. */
+#if CMK_GRID_OBJECT_PRIORITIZATION
+    free (CMI_VMI_Grid_Objects);
+    CdsFifo_Destroy (CpvAccess (CMI_VMI_GridQueue));
+#endif
     CdsFifo_Destroy (CpvAccess (CMI_VMI_RemoteQueue));
     CdsFifo_Destroy (CpvAccess (CmiLocalQueue));
 
@@ -2383,16 +2412,44 @@ void *CmiGetNonLocal ()
 	  free (gk_ptr);
 	}
 
+#if CMK_GRID_OBJECT_PRIORITIZATION
+      msg_prioritized = 0;
+      env = (CMI_VMI_Envelope *) gk_msg;
+      if (env->s_attribs.mtype == 16) {
+	msg_prioritized = CmiGridObjectLookup (env->u_type.array.arr,
+					       env->u_type.array.index.nInts,
+					       env->u_type.array.index.index[0],
+					       env->u_type.array.index.index[1],
+					       env->u_type.array.index.index[2]);
+      }
+#endif
+
 #if CMK_BROADCAST_SPANNING_TREE
 	if (CMI_BROADCAST_ROOT (gk_msg)) {
 	  /* Message is enqueued after send to spanning children completes. */
 	  CMI_VMI_Send_Spanning_Children (gk_msgsize, gk_msg);
 	} else {
+#if CMK_GRID_OBJECT_PRIORITIZATION
+	  if (msg_prioritized) {
+	    CdsFifo_Enqueue (CpvAccess (CMI_VMI_GridQueue), gk_msg);
+	  } else {
+	    CdsFifo_Enqueue (CpvAccess (CMI_VMI_RemoteQueue), gk_msg);
+	  }
+#else    /* CMK_GRID_OBJECT_PRIORITIZATION */
+	  CdsFifo_Enqueue (CpvAccess (CMI_VMI_RemoteQueue), gk_msg);
+#endif   /* CMK_GRID_OBJECT_PRIORITIZATION */
+	}
+#else    /* CMK_BROADCAST_SPANNING_TREE */
+#if CMK_GRID_OBJECT_PRIORITIZATION
+	if (msg_prioritized) {
+	  CdsFifo_Enqueue (CpvAccess (CMI_VMI_GridQueue), gk_msg);
+	} else {
 	  CdsFifo_Enqueue (CpvAccess (CMI_VMI_RemoteQueue), gk_msg);
 	}
-#else
+#else    /* CMK_GRID_OBJECT_PRIORITIZATION */
 	CdsFifo_Enqueue (CpvAccess (CMI_VMI_RemoteQueue), gk_msg);
-#endif
+#endif   /* CMK_GRID_OBJECT_PRIORITIZATION */
+#endif   /* CMK_BROADCAST_SPANNING_TREE */
       }
     }
 
@@ -2418,6 +2475,13 @@ void *CmiGetNonLocal ()
 	CMI_VMI_Common_Receive (gk_sender, gk_msgsize, gk_msg);
       }
     }
+  }
+#endif
+
+#if CMK_GRID_OBJECT_PRIORITIZATION
+  msg = CdsFifo_Dequeue (CpvAccess (CMI_VMI_GridQueue));
+  if (msg) {
+    return (msg);
   }
 #endif
 
@@ -2487,6 +2551,8 @@ void CmiProbeLatencies ()
 */
 unsigned long CmiGetLatency (int process1, int process2)
 {
+  DEBUG_PRINT ("CmiGetLatency() called.\n");
+
   if ((&CMI_VMI_Processes[process1])->latency_vector) {
     return ((&CMI_VMI_Processes[process1])->latency_vector[process2]);
   } else {
@@ -2501,8 +2567,134 @@ unsigned long CmiGetLatency (int process1, int process2)
 */
 int CmiGetCluster (int process)
 {
+  DEBUG_PRINT ("CmiGetCluster() called.\n");
+
   return ((&CMI_VMI_Processes[process])->cluster);
 }
+
+
+
+#if CMK_GRID_OBJECT_PRIORITIZATION
+/**************************************************************************
+**
+*/
+void CmiGridObjectRegister (int gid, int nInts, int index1, int index2, int index3)
+{
+  int i;
+
+
+  DEBUG_PRINT ("CmiGridObjectRegister() called.\n");
+
+  if (CMI_VMI_Grid_Objects_Index >= CMI_VMI_Grid_Objects_Maximum) {
+    return;
+  }
+
+  if (CmiGridObjectLookup (gid, nInts, index1, index2, index3)) {
+    return;
+  }
+
+  i = CMI_VMI_Grid_Objects_Index;
+
+  CMI_VMI_Grid_Objects[i].gid = gid;
+  CMI_VMI_Grid_Objects[i].nInts = nInts;
+  CMI_VMI_Grid_Objects[i].index1 = index1;
+  CMI_VMI_Grid_Objects[i].index2 = index2;
+  CMI_VMI_Grid_Objects[i].index3 = index3;
+
+  CMI_VMI_Grid_Objects_Index += 1;
+}
+
+
+
+/**************************************************************************
+**
+*/
+void CmiGridObjectDeregister (int gid, int nInts, int index1, int index2, int index3)
+{
+  int i;
+  int j;
+
+
+  DEBUG_PRINT ("CmiGridObjectDeregister() called.\n");
+
+  for (i = 0; i < CMI_VMI_Grid_Objects_Index; i++) {
+    if (CMI_VMI_Grid_Objects[i].gid == gid) {
+      if ((nInts == 1) && (CMI_VMI_Grid_Objects[i].index1 == index1)) {
+	break;
+      }
+      if ((nInts == 2) && ((CMI_VMI_Grid_Objects[i].index1 == index1) &&
+			   (CMI_VMI_Grid_Objects[i].index2 == index2))) {
+	break;
+      }
+      if ((nInts == 3) && ((CMI_VMI_Grid_Objects[i].index1 == index1) &&
+			   (CMI_VMI_Grid_Objects[i].index2 == index2) &&
+			   (CMI_VMI_Grid_Objects[i].index3 == index3))) {
+	break;
+      }
+    }
+  }
+
+  if (i >= CMI_VMI_Grid_Objects_Index) {
+    return;
+  }
+
+  if (i == (CMI_VMI_Grid_Objects_Index - 1)) {
+    CMI_VMI_Grid_Objects_Index -= 1;
+    return;
+  }
+
+  j = (CMI_VMI_Grid_Objects_Index - 1);
+  CMI_VMI_Grid_Objects[i].gid = CMI_VMI_Grid_Objects[j].gid;
+  CMI_VMI_Grid_Objects[i].nInts = CMI_VMI_Grid_Objects[j].nInts;
+  CMI_VMI_Grid_Objects[i].index1 = CMI_VMI_Grid_Objects[j].index1;
+  CMI_VMI_Grid_Objects[i].index2 = CMI_VMI_Grid_Objects[j].index2;
+  CMI_VMI_Grid_Objects[i].index3 = CMI_VMI_Grid_Objects[j].index3;
+  CMI_VMI_Grid_Objects_Index -= 1;
+}
+
+
+
+/**************************************************************************
+**
+*/
+void CmiGridObjectDeregisterAll ()
+{
+  DEBUG_PRINT ("CmiGridObjectDeregisterAll() called.\n");
+
+  CMI_VMI_Grid_Objects_Index = 0;
+}
+
+
+
+/**************************************************************************
+**
+*/
+int CmiGridObjectLookup (int gid, int nInts, int index1, int index2, int index3)
+{
+  int i;
+
+
+  DEBUG_PRINT ("CmiGridObjectLookup() called.\n");
+
+  for (i = 0; i < CMI_VMI_Grid_Objects_Index; i++) {
+    if (CMI_VMI_Grid_Objects[i].gid == gid) {
+      if ((nInts == 1) && (CMI_VMI_Grid_Objects[i].index1 == index1)) {
+	return (1);
+      }
+      if ((nInts == 2) && ((CMI_VMI_Grid_Objects[i].index1 == index1) &&
+			   (CMI_VMI_Grid_Objects[i].index2 == index2))) {
+	return (1);
+      }
+      if ((nInts == 3) && ((CMI_VMI_Grid_Objects[i].index1 == index1) &&
+			   (CMI_VMI_Grid_Objects[i].index2 == index2) &&
+			   (CMI_VMI_Grid_Objects[i].index3 == index3))) {
+	return (1);
+      }
+    }
+  }
+  return (0);
+}
+#endif
 
 
 
@@ -2676,6 +2868,14 @@ void CMI_VMI_Read_Environment ()
 
   if (value = getenv ("CMI_VMI_PROBE_CLUSTERS")) {
     CMI_VMI_Probe_Clusters = atoi (value);
+  }
+
+  if (value = getenv ("CMI_VMI_GRID_OBJECT_PRIORITIZATION")) {
+    CMI_VMI_Grid_Object_Prioritization = atoi (value);
+  }
+
+  if (value = getenv ("CMI_VMI_GRID_OBJECTS_MAXIMUM")) {
+    CMI_VMI_Grid_Objects_Maximum = atoi (value);
   }
 
   if (value = getenv ("CMI_VMI_MEMORY_POOL")) {
@@ -3693,6 +3893,8 @@ void CMI_VMI_Reply_Latencies (int sourcerank)
   int i;
 
 
+  DEBUG_PRINT ("CMI_VMI_Reply_Latencies() called.\n");
+
   reply_msgsize = CmiMsgHeaderSizeBytes + (_Cmi_numpes * sizeof (unsigned long));
   reply_msg = (CMI_VMI_Latency_Vector_Reply_Message_T *) CmiAlloc (reply_msgsize);
 
@@ -3748,6 +3950,8 @@ void CMI_VMI_Compute_Cluster_Mapping ()
   BOOLEAN found_flag;
 
 
+  DEBUG_PRINT ("CMI_VMI_Compute_Cluster_Mapping() called.\n");
+
   for (i = 0; i < _Cmi_numpes; i++) {
     (&CMI_VMI_Processes[i])->cluster = CMI_VMI_CLUSTER_UNKNOWN;
   }
@@ -3791,6 +3995,8 @@ void CMI_VMI_Distribute_Cluster_Mapping ()
 
   int i;
 
+
+  DEBUG_PRINT ("CMI_VMI_Distribute_Cluster_Mapping() called.\n");
 
   mapping_msgsize = CmiMsgHeaderSizeBytes + (_Cmi_numpes * sizeof (int));
   mapping_msg = (CMI_VMI_Cluster_Mapping_Message_T *) CmiAlloc (mapping_msgsize);
@@ -3846,6 +4052,8 @@ void CMI_VMI_Wait_Cluster_Mapping ()
 {
   VMI_STATUS status;
 
+
+  DEBUG_PRINT ("CMI_VMI_Wait_Cluster_Mapping() called.\n");
 
   while (!CMI_VMI_Cluster_Mapping_Received) {
     status = VMI_Poll ();
@@ -4952,6 +5160,13 @@ void CMI_VMI_Common_Receive (int sourcerank, int msgsize, char *msg)
 
   int i;
 
+#if CMK_GRID_OBJECT_PRIORITIZATION
+  int msg_prioritized;
+  CMI_VMI_Envelope *env;
+#endif
+
+
+  DEBUG_PRINT ("CMI_VMI_Common_Receive() called.\n");
 
   process = &CMI_VMI_Processes[sourcerank];
 
@@ -4962,6 +5177,17 @@ void CMI_VMI_Common_Receive (int sourcerank, int msgsize, char *msg)
   switch (CMI_VMI_MESSAGE_TYPE (msg))
   {
     case CMI_VMI_MESSAGE_TYPE_STANDARD:
+#if CMK_GRID_OBJECT_PRIORITIZATION
+      msg_prioritized = 0;
+      env = (CMI_VMI_Envelope *) msg;
+      if (env->s_attribs.mtype == 16) {
+	msg_prioritized = CmiGridObjectLookup (env->u_type.array.arr,
+					       env->u_type.array.index.nInts,
+					       env->u_type.array.index.index[0],
+					       env->u_type.array.index.index[1],
+					       env->u_type.array.index.index[2]);
+      }
+#endif
 #ifdef GK_DELAY_DEVICE
       {
 	struct timeval gk_tv;
@@ -4987,19 +5213,35 @@ void CMI_VMI_Common_Receive (int sourcerank, int msgsize, char *msg)
 	}
       }
       break;
-#else
+#else    /* GK_DELAY_DEVICE */
 #if CMK_BROADCAST_SPANNING_TREE
       if (CMI_BROADCAST_ROOT (msg)) {
         /* Message is enqueued after send to spanning children completes. */
 	CMI_VMI_Send_Spanning_Children (msgsize, msg);
       } else {
+#if CMK_GRID_OBJECT_PRIORITIZATION
+	if (msg_prioritized) {
+	  CdsFifo_Enqueue (CpvAccess (CMI_VMI_GridQueue), msg);
+	} else {
+	  CdsFifo_Enqueue (CpvAccess (CMI_VMI_RemoteQueue), msg);
+	}
+#else    /* CMK_GRID_OBJECT_PRIORITIZATION */
+	CdsFifo_Enqueue (CpvAccess (CMI_VMI_RemoteQueue), msg);
+#endif   /* CMK_GRID_OBJECT_PRIORITIZATION */
+      }
+#else    /* CMK_BROADCAST_SPANNING_TREE */
+#if CMK_GRID_OBJECT_PRIORITIZATION
+      if (msg_prioritized) {
+	CdsFifo_Enqueue (CpvAccess (CMI_VMI_GridQueue), msg);
+      } else {
 	CdsFifo_Enqueue (CpvAccess (CMI_VMI_RemoteQueue), msg);
       }
-#else
+#else    /* CMK_GRID_OBJECT_PRIORITIZATION */
       CdsFifo_Enqueue (CpvAccess (CMI_VMI_RemoteQueue), msg);
-#endif
+#endif   /* CMK_GRID_OBJECT_PRIORITIZATION */
+#endif   /* CMK_BROADCAST_SPANNING_TREE */
       break;
-#endif
+#endif   /* CK_DELAY_DEVICE */
 
     case CMI_VMI_MESSAGE_TYPE_BARRIER:
       CMI_VMI_Barrier_Count++;
