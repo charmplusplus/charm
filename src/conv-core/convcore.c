@@ -167,6 +167,10 @@ void CMI_VMI_CmiFree (void *ptr);
 void* elan_CmiAlloc(int size);
 #endif
 
+#if CMK_GRID_OBJECT_PRIORITIZATION
+CpvDeclare(void *, CkGridObject);
+#endif
+
 
 /*****************************************************************************
  *
