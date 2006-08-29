@@ -17,6 +17,12 @@ Orion Sky Lawlor, olawlor@acm.org 9/29/2001
 #include "LBDatabase.h"
 #endif // CMK_LBDB_ON
 
+#if CMK_GRID_OBJECT_PRIORITIZATION
+CpvExtern(void *, CkGridObject);
+
+extern "C" int CmiGetCluster (int pe);
+#endif
+
 /************************** Debugging Utilities **************/
 //For debugging: convert given index to a string
 static const char *idx2str(const CkArrayIndex &ind)
@@ -994,6 +1000,9 @@ CmiBool CkLocRec_local::deliver(CkArrayMessage *msg,CkDeliver_t type,int opts)
 			the_lbdb->ObjectStop(objHandle);
 		}
 #endif
+#if CMK_GRID_OBJECT_PRIORITIZATION
+		CpvAccess(CkGridObject) = obj;
+#endif
 		CmiBool status = invokeEntry(obj,(void *)msg,msg->array_ep(),doFree);
 #if CMK_LBDB_ON
 		if (objstopped) the_lbdb->ObjectStart(objHandle);
@@ -1567,6 +1576,43 @@ void CkLocMgr::deliver(CkMessage *m,CkDeliver_t type,int opts) {
 		if(rec!=NULL) the_lbdb->Send(myLBHandle,idx2LDObjid(idx),UsrToEnv(msg)->getTotalsize(), rec->lookupProcessor());
 		else /*rec==NULL*/ the_lbdb->Send(myLBHandle,idx2LDObjid(idx),UsrToEnv(msg)->getTotalsize(),homePe(msg->array_index()));
 		}
+	}
+#endif
+#if CMK_GRID_OBJECT_PRIORITIZATION
+	int gridSrcPE;
+	int gridSrcCluster;
+	int gridDestPE;
+	int gridDestCluster;
+	CkMigratable *obj;
+	ArrayElement *obj2;
+	CkGroupID gid;
+	int *data;
+
+	obj = (CkMigratable *) CpvAccess(CkGridObject);
+	if (obj) {
+	  gridSrcPE = CkMyPe ();
+	  if (rec) {
+	    gridDestPE = rec->lookupProcessor ();
+	  } else {
+	    gridDestPE = homePe (msg->array_index ());
+	  }
+	  gridSrcCluster = CmiGetCluster (gridSrcPE);
+	  gridDestCluster = CmiGetCluster (gridDestPE);
+	  if (gridSrcCluster != gridDestCluster) {
+	    obj2 = dynamic_cast<ArrayElement *> (obj);
+	    if (obj2 > 0) {
+	      printf ("BORDER OBJECT -- src PE=%d, Cluster=%d - dest PE=%d, Cluster=%d\n", gridSrcPE, gridSrcCluster,
+		                                                                           gridDestPE, gridDestCluster);
+	      gid = obj2->ckGetArrayID();
+	      data = obj2->thisIndexMax.data();
+	      printf ("\tobj information = (%d, nInts=%d, (%d, %d, %d))\n", gid.idx,
+		                                                            obj2->thisIndexMax.nInts,
+		                                                            data[0],
+		                                                            data[1],
+		                                                            data[2]);
+	    }
+	  }
+	  CpvAccess(CkGridObject) = NULL;
 	}
 #endif
 	/**FAULT_EVAC*/
