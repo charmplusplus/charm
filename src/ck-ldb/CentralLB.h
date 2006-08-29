@@ -27,6 +27,10 @@ class LBSimulation;
 /// for backward compatibility
 typedef LBMigrateMsg  CLBMigrateMsg;
 
+#if CMK_GRID_OBJECT_PRIORITIZATION
+extern void CmiGridObjectDeregisterAll();
+#endif
+
 class LBInfo
 {
 public:
