@@ -211,9 +211,11 @@ CtgGlobalList::CtgGlobalList() {
 	    )) 
 	    { /* It's not system data */
               if(ELFXX_ST_TYPE(symt[symindx].st_info) == STT_OBJECT || ELFXX_ST_TYPE(symt[symindx].st_info) == STT_NOTYPE
+/*
 #ifdef __INTEL_COMPILER
                   || ELFXX_ST_TYPE(symt[symindx].st_info) == STT_FUNC
 #endif
+*/
                  ) /* ? */
 	        if (isUserSymbol(sym_name))
 		{ /* It's got the right name-- it's a user global */
