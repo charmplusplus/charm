@@ -71,8 +71,10 @@ void ComlibManager::init(){
     
     initComlibManager();
 
+    if (CkMyRank() == 0) {
     PUPable_reg(CharmStrategy);
     PUPable_reg(CharmMessageHolder);
+    }
     
     //comm_debug = 1;
     

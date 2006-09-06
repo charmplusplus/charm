@@ -112,9 +112,11 @@ void initComlibManager(){
 
     CkpvAccess(strategy_handlerid) = CkRegisterHandler((CmiHandler) strategyHandler);
 
+    if (CkMyRank() == 0) {
     PUPable_reg(Strategy);
     PUPable_reg(RouterStrategy);
     PUPable_reg(MessageHolder);
+    }
     CkpvAccess(conv_com_object).setInitialized();
 }
 
