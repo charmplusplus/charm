@@ -188,8 +188,6 @@ extern CmiNodeLock CmiMemLock_lock;
 
 #endif
 
-extern CmiNodeLock smp_mutex;
-
 #define CmiMemcpy(dest, src, size) memcpy((dest), (src), (size))
 
 #if CMK_SHARED_VARS_EXEMPLAR /* Used only by HP Exemplar version */
@@ -406,6 +404,8 @@ for each processor in the node.
 #define CsvInitialize(t,v) do{}while(0)
 #define CsvAccess(v) CMK_TAG(Csv_,v)
 #endif
+
+extern CmiNodeLock smp_mutex;
 
 extern void CmiBarrier(void);
 extern void CmiBarrierZero(void);
