@@ -188,6 +188,8 @@ extern CmiNodeLock CmiMemLock_lock;
 
 #endif
 
+extern CmiNodeLock smp_mutex;
+
 #define CmiMemcpy(dest, src, size) memcpy((dest), (src), (size))
 
 #if CMK_SHARED_VARS_EXEMPLAR /* Used only by HP Exemplar version */
