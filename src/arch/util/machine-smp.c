@@ -360,7 +360,7 @@ static void *call_startfn(void *vindex)
   { /*Communication thread*/
 	  CommunicationServerInit();
 	  if (Cmi_charmrun_fd!=-1)
-		  while (1) CommunicationServerThread(5);
+		  while (1) CommunicationServer(5,COM_SERVER_FROM_SMP);
   }
 #endif  
   return 0;
@@ -374,6 +374,7 @@ static void CmiStartThreads(char **argv)
 
   CmiMemLock_lock=CmiCreateLock();
   comm_mutex=CmiCreateLock();
+  smp_mutex = CmiCreateLock();
 
   pthread_key_create(&Cmi_state_key, 0);
   Cmi_state_vector =
