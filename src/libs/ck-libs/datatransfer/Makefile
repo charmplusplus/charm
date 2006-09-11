@@ -6,10 +6,10 @@ MGC=.
 MGCOBJS=$(MGC)/MgcIntr3DTetrTetr.o  $(MGC)/MgcMath.o  $(MGC)/MgcPlane.o \
 	$(MGC)/MgcTetrahedron.o  $(MGC)/MgcVector3.o
 
-HEADERS=paralleltransfer.h tetmesh.h
+HEADERS=paralleltransfer.h tetmesh.h prismMesh.h
 HEADDEP=$(HEADERS) 
 TOBJS=$(MGCOBJS) GenericElement.o transfer.o tetmesh.o tetmesh_noboite.o
-OBJS=$(TOBJS) tetmesh_fem.o paralleltransfer.o
+OBJS=$(TOBJS) tetmesh_fem.o paralleltransfer.o prismMesh.o
 LIB=libdatatransfer
 
 LIBDIR=$(CDIR)/lib
