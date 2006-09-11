@@ -480,8 +480,8 @@ void CentralLB::LoadBalance()
 #endif
 
   if (_lb_args.debug()) 
-      CmiPrintf("[%s] Load balancing step %d starting at %f in PE%d\n",
-                 lbName(), step(),start_lb_time, cur_ld_balancer);
+      CmiPrintf("[%s] Load balancing step %d starting at %f in PE%d Memory:%dMB\n",
+                 lbName(), step(),start_lb_time, cur_ld_balancer, CmiMemoryUsage()/(1024.0*1024.0));
  //     CmiPrintf("[%d] n_obj:%d migratable:%d n_comm:%d\n", CkMyPe(), statsData->n_objs, statsData->n_migrateobjs, statsData->n_comm);
 //    double strat_start_time = CkWallTimer();
 
@@ -748,8 +748,8 @@ void CentralLB::ResumeClients(int balancing)
   DEBUGF(("[%d] Resuming clients. balancing:%d.\n",CkMyPe(),balancing));
   if (balancing && _lb_args.debug() && CkMyPe() == cur_ld_balancer) {
     double end_lb_time = CkWallTimer();
-    CkPrintf("[%s] Load balancing step %d finished at %f (duration %fs)\n",
-  	      lbName(), step()-1,end_lb_time, end_lb_time - start_lb_time);
+    CkPrintf("[%s] Load balancing step %d finished at %f (duration %fs) Mem:%fMB\n",
+  	      lbName(), step()-1,end_lb_time, end_lb_time - start_lb_time, CmiMemoryUsage()/1024.0/1024.0);
   }
 
   if (balancing) ComlibNotifyMigrationDone();  
