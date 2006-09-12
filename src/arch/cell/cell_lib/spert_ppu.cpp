@@ -69,6 +69,11 @@ int speSendStartIndex = 0;
 unsigned short vIDCounter = 0;
 
 
+// DEBUG
+int idCounter = 0;
+int traceFlag = 0;
+
+
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Function Prototypes
 
@@ -83,6 +88,33 @@ WorkRequest* createWRHandles(int numHandles);
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Offload API Function Bodies
+
+
+// DEBUG
+void displayList(char* listName, WorkRequest* list) {
+  printf("PPE :: List \"%s\" = {\n", listName);
+  WorkRequest* entry = list;
+  while (entry != NULL) {
+    printf("PPE ::   %p\n", entry);
+    entry = entry->next;
+  }
+  printf("PPE :: }\n");
+}
+
+
+// DEBUG
+//void displayMessageQueue(int speNum) { displayMessageQueue(speThreads[speNum]); }
+void displayMessageQueue(SPEThread* speThread) {
+  int speIndex = -1;
+  int i;
+  for (i = 0; i < NUM_SPE_THREADS; i++) if (speThreads[i] == speThread) speIndex = i;
+  printf("OffloadAPI :: Message Queue for SPE %d...\n", speIndex);
+  for (i = 0; i < SPE_MESSAGE_QUEUE_LENGTH; i++) {
+    SPEMessage *msg = (SPEMessage*)((char*)(speThread->speData->messageQueue) + (i * SIZEOF_16(SPEMessage)));
+    printf("OffloadAPI ::   [%d]>> state = %d, wrPtr = %p, rw = %lu, ro = %lu, wo = %lu\n", i, msg->state, msg->wrPtr, msg->readWritePtr, msg->readOnlyPtr, msg->writeOnlyPtr);
+  }
+}
+
 
 extern "C"
 int InitOffloadAPI(void (*cbFunc)(void*)) {
@@ -239,6 +271,7 @@ WRHandle sendWorkRequest(int funcIndex,
   WorkRequest *wrEntry = wrFreeHead;
   wrFreeHead = wrFreeHead->next;
   if (wrFreeHead == NULL) wrFreeTail = NULL;
+
   wrEntry->state = WORK_REQUEST_STATE_INUSE;
 
   // Fill in the WRHandle structure
@@ -256,6 +289,13 @@ WRHandle sendWorkRequest(int funcIndex,
   wrEntry->callbackFunc = (volatile void (*)(void*))callbackFunc;
   wrEntry->flags = flags;
   wrEntry->next = NULL;
+
+
+  // DEBUG
+  wrEntry->id = idCounter;
+  idCounter++;
+  wrEntry->traceFlag = traceFlag;
+
 
   // Try to send the message
   // NOTE: Through the use of speSendStartIndex, if the SPE's message queues aren't being overloaded, then
@@ -278,6 +318,11 @@ WRHandle sendWorkRequest(int funcIndex,
       if (sentIndex >= 0) {
         speSendStartIndex = (actualSPEThreadIndex + 1) % NUM_SPE_THREADS;
         processingSPEIndex = actualSPEThreadIndex;
+
+        // Fill in the execution data into the work request (which SPE, which message queue entry)
+        wrEntry->speIndex = processingSPEIndex;
+        wrEntry->entryIndex = sentIndex;
+
         break;
       }
     }
@@ -285,6 +330,10 @@ WRHandle sendWorkRequest(int funcIndex,
 
   // Check to see if the message was sent or not
   if (processingSPEIndex < 0) {
+
+    if (wrEntry->traceFlag) {
+      printf("OffloadAPI :: [TRACE] :: No Slots Open, Queuing Work Request...\n");
+    }
 
     #if DEBUG_DISPLAY >= 2
       if (wrQueuedHead != NULL)
@@ -313,6 +362,11 @@ WRHandle sendWorkRequest(int funcIndex,
     #endif
 
   } else {
+
+    if (wrEntry->traceFlag) {
+      printf("OffloadAPI :: [TRACE] :: Work Request Passed to SPE %d, slot %d... wrEntry = %p...\n", processingSPEIndex, sentIndex, wrEntry);
+      displayMessageQueue(speThreads[processingSPEIndex]);
+    }
 
     // Set the speIndex and entryIndex of the work request since it is queued in an SPE's message queue
     wrEntry->speIndex = processingSPEIndex;
@@ -384,6 +438,13 @@ WRHandle sendWorkRequest_list(int funcIndex,
   wrEntry->callbackFunc = (volatile void (*)(void*))callbackFunc;
   wrEntry->flags = (flags | WORK_REQUEST_FLAGS_LIST);  // force LIST flag
   wrEntry->next = NULL;
+
+
+  // DEBUG
+  wrEntry->id = idCounter;
+  idCounter++;
+  wrEntry->traceFlag = traceFlag;
+
 
   // Try to send the message
   // NOTE: Through the use of speSendStartIndex, if the SPE's message queues aren't being overloaded, then
@@ -589,7 +650,7 @@ extern "C"
 void OffloadAPIProgress() {
 
 
-  // DEBUG - Mailbox Statistics
+  // Mailbox Statistics
   #define OffloadAPIProgress_statFreq  0
   #if OffloadAPIProgress_statFreq > 0
     static int statCount = OffloadAPIProgress_statFreq;
@@ -607,7 +668,7 @@ void OffloadAPIProgress() {
     // Get the number of entries in the mailbox from the SPE and then read each entry
     int usedEntries = spe_stat_out_mbox(speThreads[i]->speID);
 
-    // DEBUG - Mailbox Statistics
+    // Mailbox Statistics
     #if OffloadAPIProgress_statFreq > 0
       statCount_flag += usedEntries;
       statSum_all[i] += usedEntries;
@@ -657,6 +718,13 @@ void OffloadAPIProgress() {
         WorkRequest *wrPtr = (WorkRequest*)(msg->wrPtr);
         if (wrPtr != NULL) {
 
+          if (wrPtr->traceFlag) {
+            printf("OffloadAPI :: [TRACE] :: spe = %d, qi = %d, ec = %d...\n",
+                   i, speMessageQueueIndex, speMessageErrorCode
+                  );
+            displayMessageQueue(speThreads[i]);
+	  }
+
           if (callbackFunc != NULL || wrPtr->callbackFunc != NULL) {
 
             // Call the callback function
@@ -694,9 +762,9 @@ void OffloadAPIProgress() {
 
             // TODO : Do any gathering of data on SPE load-balance here (before clearing speIndex and entryIndex)
 
-            // Clear the fields of the work request as needed
-            wrPtr->speIndex = -1;
-            wrPtr->entryIndex = -1;
+            //// Clear the fields of the work request as needed
+            //wrPtr->speIndex = -1;
+            //wrPtr->entryIndex = -1;
 
             // Mark the work request as finished
             wrPtr->state = WORK_REQUEST_STATE_FINISHED;
@@ -709,11 +777,26 @@ void OffloadAPIProgress() {
             //  wrFinishedTail = wrPtr;
 	    //}
 	  }
+	} else {
+          printf("OffloadAPI :: [WARNING] :: SPE Runtime Completion Received Without Work Request...\n");
 	}
 
         // Now that the work request has been moved to either the wrFree list or the wrFinished
         //   list, set the state of the message queue entry to clear so it can accempt more work.
         msg->state = SPE_MESSAGE_STATE_CLEAR;
+
+        //// DEBUG
+	// __asm__("sync");
+        //msg->funcIndex = -3;
+        //msg->readWritePtr = (PPU_POINTER_TYPE)(-1);
+        //msg->readWriteLen = -1;
+        //msg->readOnlyPtr = (PPU_POINTER_TYPE)(-1);
+        //msg->readOnlyLen = -1;
+        //msg->writeOnlyPtr = (PPU_POINTER_TYPE)(-1);
+        //msg->writeOnlyLen = -1;
+        //msg->flags = 0xFFFFFFFF;
+        //msg->totalMem = 0xFFFFFFFF;
+        //__asm__("sync");
       }
 
       usedEntries--;
@@ -721,7 +804,7 @@ void OffloadAPIProgress() {
   } // end for (all SPEs)
 
 
-  // DEBUG - Mailbox Statistics
+  // Mailbox Statistics
   #if OffloadAPIProgress_statFreq > 0
     #if 0
       if (statCount_flag > 0)  // For print frequency, only count calls that find at least one mailbox entry
@@ -827,6 +910,14 @@ void OffloadAPIProgress() {
 
 }
 
+
+int getWorkRequestID(WRHandle wrHandle) {
+  int rtn = ((wrHandle == NULL) ? (-1) : (wrHandle->id));
+  return rtn;
+}
+
+void enableTrace() { traceFlag = -1; }
+void disableTrace() { traceFlag = 0; }
 
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1085,6 +1176,14 @@ int sendSPEMessage(SPEThread *speThread, WorkRequest *wrPtr, int command) {
     
     if (msg->state == SPE_MESSAGE_STATE_CLEAR) {
 
+
+      // DEBUG
+      if (wrPtr->traceFlag) {
+        printf("PPE :: [TRACE] :: sendSPEMessage() :: message queue before new entry...\n");
+        displayMessageQueue(speThread);
+      }
+
+
       if (__builtin_expect(wrPtr == NULL, 0)) {  // NOTE: Common case should be user's code making work
         msg->funcIndex = -1;                     //   requests (not commands going to the SPE Runtime)
         msg->readWritePtr = (PPU_POINTER_TYPE)NULL;
@@ -1095,6 +1194,10 @@ int sendSPEMessage(SPEThread *speThread, WorkRequest *wrPtr, int command) {
         msg->writeOnlyLen = 0;
         msg->flags = WORK_REQUEST_FLAGS_NONE;
         msg->totalMem = 0;
+
+        // DEBUG
+        msg->traceFlag = 0;
+
       } else {
         msg->funcIndex = wrPtr->funcIndex;
         msg->readWritePtr = (PPU_POINTER_TYPE)(wrPtr->readWritePtr);
@@ -1118,6 +1221,10 @@ int sendSPEMessage(SPEThread *speThread, WorkRequest *wrPtr, int command) {
           // The memory needed is the size of the sum of the three buffers each rounded up
           msg->totalMem = ROUNDUP_16(wrPtr->readWriteLen) + ROUNDUP_16(wrPtr->readOnlyLen) + ROUNDUP_16(wrPtr->writeOnlyLen);
 	}
+
+        // DEBUG
+        msg->traceFlag = ((wrPtr->traceFlag) ? (-1) : (0));  // force -1 or 0
+
       }
       msg->state = SPE_MESSAGE_STATE_SENT;
       msg->command = command;
@@ -1127,13 +1234,17 @@ int sendSPEMessage(SPEThread *speThread, WorkRequest *wrPtr, int command) {
       //   SPE to consider the entry a new entry... even if the state has been set to SENT).
       // NOTE: Only change the value of msg->counter once so the SPE is not confused (i.e. - don't increment
       //   and then check msg->counter direclty).
-      int tmp = msg->counter;
-      tmp++;
-      if (tmp > 255) tmp = 0;
-      msg->counter = tmp;
+      int tmp0 = msg->counter0;
+      int tmp1 = msg->counter1;
+      tmp0++; if (tmp0 > 255) tmp0 = 0;
+      tmp1++; if (tmp1 > 255) tmp1 = 0;
+      __asm__ ("sync");
+      msg->counter0 = tmp0;
+      msg->counter1 = tmp1;
 
       // DEBUG
-      #if DEBUG_DISPLAY >= 3
+      //#if DEBUG_DISPLAY >= 3
+      if (wrPtr->traceFlag) {
         printf("  sendSPEMessage() : sending message to queue @ %p, slot %d (@ %p; SIZEOF_16(SPEMessage) = %d)...\n",
                speThread->speData->messageQueue,
                index,
@@ -1143,18 +1254,19 @@ int sendSPEMessage(SPEThread *speThread, WorkRequest *wrPtr, int command) {
         printf("  sendSPEMessage() : message[%d] = {", index);
         printf(" funcIndex = %d", msg->funcIndex);
         printf(", readWritePtr = %u", msg->readWritePtr);
-        printf(", readWriteLen = %d", msg->readWriteLen);
+        //printf(", readWriteLen = %d", msg->readWriteLen);
         printf(", readOnlyPtr = %u", msg->readOnlyPtr);
-        printf(", readOnlyLen = %d", msg->readOnlyLen);
+        //printf(", readOnlyLen = %d", msg->readOnlyLen);
         printf(", writeOnlyPtr = %u", msg->writeOnlyPtr);
-        printf(", writeOnlyLen = %d", msg->writeOnlyLen);
-        printf(", flags = 0x08x", msg->flags);
+        //printf(", writeOnlyLen = %d", msg->writeOnlyLen);
+        //printf(", flags = 0x08x", msg->flags);
         printf(", wrPtr = %u", msg->wrPtr);
         printf(", state = %d", msg->state);
-        printf(", command = %d", msg->command);
-        printf(", counter = %d", msg->counter);
+        //printf(", command = %d", msg->command);
+        //printf(", counter = %d", msg->counter);
         printf(" }\n");
-      #endif
+      }
+      //#endif
 
       speThread->msgIndex = (index + 1) % SPE_MESSAGE_QUEUE_LENGTH;
 

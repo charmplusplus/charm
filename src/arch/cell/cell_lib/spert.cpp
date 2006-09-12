@@ -72,6 +72,10 @@ extern unsigned int _end;
 unsigned short vID = 0xFFFF;
 
 
+// DEBUG
+int isTracingFlag = 0;
+
+
 /////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Function Prototypes
 
@@ -84,6 +88,7 @@ void memset(void* ptr, char val, int len);
 #endif
 
 unsigned short getSPEID() { return vID; }
+int isTracing() { return isTracingFlag; }
 
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -223,6 +228,44 @@ void speScheduler(SPEData *speData, unsigned long long id) {
   int msgCounter[SPE_MESSAGE_QUEUE_LENGTH];
   int errorCode[SPE_MESSAGE_QUEUE_LENGTH];
   DMAListEntry* dmaList[SPE_MESSAGE_QUEUE_LENGTH];
+
+
+  // DEBUG
+  int stateTrace[SPE_MESSAGE_QUEUE_LENGTH][SPE_MESSAGE_STATE_MAX - SPE_MESSAGE_STATE_MIN + 1]; // = { 0 };
+  int stateTrace_counter[SPE_MESSAGE_QUEUE_LENGTH]; // = { 0 };
+  char stateTraceBuf[1024];
+  #define  STATETRACE_CLEAR    {                                                                                      \
+                                 int iii = 0;                                                                         \
+                                 for (iii = 0; iii < (SPE_MESSAGE_STATE_MAX - SPE_MESSAGE_STATE_MIN + 1); iii++)      \
+                                   stateTrace[i][iii] = SPE_MESSAGE_STATE_CLEAR;                                      \
+                                 stateTrace_counter[i] = 0;                                                           \
+                               }
+  #define  STATETRACE_UPDATE   for (i = 0; i < SPE_MESSAGE_QUEUE_LENGTH; i++) {                                       \
+                                 if (stateTrace[i][stateTrace_counter[i]] != msgState[i]) {                           \
+                                   stateTrace[i][stateTrace_counter[i]] = msgState[i];                                \
+                                   stateTrace_counter[i]++;                                                           \
+                                   stateTrace[i][stateTrace_counter[i]] = msgState[i];                                \
+                                 }                                                                                    \
+                               }
+  #define  STATETRACE_OUTPUT   {                                                                                      \
+                                 int iii = 0, execed = 0; stateTraceBuf[0] = '\0';                                    \
+                                 for (iii = 0; iii < (SPE_MESSAGE_STATE_MAX - SPE_MESSAGE_STATE_MIN + 1); iii++) {    \
+                                   if (stateTrace[i][iii] == SPE_MESSAGE_STATE_EXECUTED) execed = 1;                  \
+                                 }                                                                                    \
+                                 if (execed == 0) {                                                                   \
+                                   sprintf(stateTraceBuf, "SPE :: STATE TRACE : ");                                   \
+                                   for (iii = 0; iii < (SPE_MESSAGE_STATE_MAX - SPE_MESSAGE_STATE_MIN + 1); iii++) {  \
+                                     sprintf(stateTraceBuf + strlen(stateTraceBuf), "%2d ", stateTrace[i][iii]);      \
+				   }                                                                                  \
+                                   sprintf(stateTraceBuf + strlen(stateTraceBuf), "\n");                              \
+                                   printf(stateTraceBuf);                                                             \
+				 }                                                                                    \
+                               }
+  for (i = 0; i < SPE_MESSAGE_QUEUE_LENGTH; i++) {
+    STATETRACE_CLEAR
+  }
+
+
   for (i = 0; i < SPE_MESSAGE_QUEUE_LENGTH; i++) {
     msgQueue[i] = (SPEMessage*)(((char*)msgQueueRaw) + (SIZEOF_16(SPEMessage) * i));
     msgState[i] = SPE_MESSAGE_STATE_CLEAR;
@@ -244,6 +287,10 @@ void speScheduler(SPEData *speData, unsigned long long id) {
   #if SPE_REPORT_END != 0
     spu_write_out_mbox((unsigned int)(&_end));
   #endif
+
+
+  // DEBUG
+  //__asm__ ("dsync");
 
   // Do the intial read of the message queue from main memory
   spu_mfcdma32(msgQueueRaw, (PPU_POINTER_TYPE)(speData->messageQueue), SPE_MESSAGE_QUEUE_BYTE_COUNT, 31, MFC_GET_CMD);
@@ -268,26 +315,53 @@ void speScheduler(SPEData *speData, unsigned long long id) {
     }
     if (__builtin_expect(keepLooping == FALSE, 0)) continue;
 
-    // Wait for the latest message queue read (blocking)
-    mfc_write_tag_mask(0x80000000);   // enable only tag group 31 (message queue request)
-    mfc_write_tag_update_any();
-    tagStatus = mfc_read_tag_status();
-    mfc_write_tag_mask(0x7FFFFFFF);   // enable all tag groups except 31
+
+    // DEBUG
+    register int displayMessageQueueRead = 0;
+    for (i = 0; i < SPE_MESSAGE_QUEUE_LENGTH; i++) {
+      if (msgQueue[i]->traceFlag != 0) {
+        displayMessageQueueRead = 1;
+        break;
+      }
+    }
+    if (displayMessageQueueRead) {
+      printf("SPE_%d :: Reading Message Queue...\n", (int)getSPEID());
+    }
+
 
     // Let the user know that the SPE Runtime is still running...
     #if SPE_DEBUG_DISPLAY_STILL_ALIVE >= 1
       if (__builtin_expect(stillAliveCounter == 0, 0)) {
-        printf("[0x%llx] :: SPE_%d :: still going... (keepLooping = %d)\n", id, (int)getSPEID(), keepLooping);
+        printf("[0x%llx] :: SPE_%d :: still going...\n", id, (int)getSPEID());
         stillAliveCounter = SPE_DEBUG_DISPLAY_STILL_ALIVE;
       }
       stillAliveCounter--;
     #endif
 
 
+    // Wait for the latest message queue read (blocking)
+    mfc_write_tag_mask(0x80000000);   // enable only tag group 31 (message queue request)
+    #if 0
+      mfc_write_tag_update_any();
+    #else
+      mfc_write_tag_update_all();
+    #endif
+    tagStatus = mfc_read_tag_status();
+    //mfc_write_tag_mask(0x7FFFFFFF);   // enable all tag groups except 31
+
+
+    // DEBUG
+    //__asm__ ("dsync");
+
+
     // DEBUG
     #if SPE_DEBUG_DISPLAY != 0
       debug_displayActiveMessageQueue(id, msgState, "(0)");
     #endif
+
+
+    // DEBUG
+    //__asm__ ("dsync");
 
 
     //////////////////////////////////////////////////////////////////////////////////
@@ -297,12 +371,19 @@ void speScheduler(SPEData *speData, unsigned long long id) {
     for (i = 0; __builtin_expect(i < SPE_MESSAGE_QUEUE_LENGTH, 1); i++) {
 
       // Check for a new message in this slot
-      if (__builtin_expect(msgQueue[i]->state == SPE_MESSAGE_STATE_SENT &&
-                           msgState[i] == SPE_MESSAGE_STATE_CLEAR &&
-                           msgCounter[i] != msgQueue[i]->counter,
+      // Conditions... 1) msgQueue[i]->counter0 == msgQueue[i]->counter1  // Entire entry has been written by PPE
+      //               2) msgQueue[i]->counter1 != msgCounter[i]          // Entry has not already been processed
+      //               3) msgQueue[i]->state == SPE_MESSAGE_STATE_SENT    // PPE wrote an entry and is waiting for the result
+      //               4) msgState[i] == SPE_MESSAGE_STATE_CLEAR          // SPE isn't currently processing this slot
+      if (__builtin_expect((msgQueue[i]->counter0 == msgQueue[i]->counter1) &&
+                           (msgQueue[i]->counter1 != msgCounter[i]) &&
+                           (msgQueue[i]->state == SPE_MESSAGE_STATE_SENT) &&
+                           (msgState[i] == SPE_MESSAGE_STATE_CLEAR),
                            0
                           )
          ) {
+
+        STATETRACE_CLEAR
 
         // Start by checking the command
         int command = msgQueue[i]->command;
@@ -325,10 +406,17 @@ void speScheduler(SPEData *speData, unsigned long long id) {
           sim_printf("[0x%llx] :: msg %d's state going from %d -> %d\n", id, i, SPE_MESSAGE_STATE_SENT, msgState[i]);
 	#endif
 
-        msgCounter[i] = msgQueue[i]->counter;        
+        msgCounter[i] = msgQueue[i]->counter1;
+
+        // DEBUG
+        if (__builtin_expect(msgQueue[i]->traceFlag, 0)) {
+          printf("SPE_%d :: [TRACE] :: Tracing entry at index %d...\n", (int)getSPEID(), i);
+          debug_displayActiveMessageQueue(id, msgState, "(*)");
+	}
       }
     }
 
+    STATETRACE_UPDATE
 
     // DEBUG
     #if SPE_DEBUG_DISPLAY != 0
@@ -343,6 +431,14 @@ void speScheduler(SPEData *speData, unsigned long long id) {
     numDMAQueueEntries = mfc_stat_cmd_queue();
     for (i = 0; __builtin_expect(i < SPE_MESSAGE_QUEUE_LENGTH, 1); i++) {
       if (__builtin_expect(msgState[i] == SPE_MESSAGE_STATE_PRE_FETCHING_LIST, 0)) {
+
+
+        // DEBUG
+        if (__builtin_expect(msgQueue[i]->traceFlag, 0)) {
+          printf("SPE_%d :: [TRACE] :: Processing SPE_MESSAGE_STATE_PRE_FETCHING_LIST for index %d...\n", (int)getSPEID(), i);
+          debug_displayActiveMessageQueue(id, msgState, "(*)");
+	}
+
 
         // Ckeck the size of the dmaList.  If it is less than SPE_DMA_LIST_LENGTH then it will fit
         //   in the preallocated area reserved for lists.  Otherwise, malloc memory to receive the
@@ -417,6 +513,7 @@ void speScheduler(SPEData *speData, unsigned long long id) {
       }
     }
 
+    STATETRACE_UPDATE
 
     // DEBUG
     #if SPE_DEBUG_DISPLAY != 0
@@ -428,10 +525,19 @@ void speScheduler(SPEData *speData, unsigned long long id) {
     // SPE_MESSAGE_STATE_FETCHING_LIST
 
     // Read the tag status to see if the data has arrived for any of the fetching message entries
+    mfc_write_tag_mask(0x7FFFFFFF);
     mfc_write_tag_update_immediate();
     tagStatus = mfc_read_tag_status(); //spu_readch(MFC_RdTagStat);
     for (i = 0; __builtin_expect(i < SPE_MESSAGE_QUEUE_LENGTH, 1); i++) {
       if (__builtin_expect(msgState[i] == SPE_MESSAGE_STATE_FETCHING_LIST && ((tagStatus & (0x01 << i)) != 0), 0)) {
+
+
+        // DEBUG
+        if (__builtin_expect(msgQueue[i]->traceFlag, 0)) {
+          printf("SPE_%d :: [TRACE] :: Processing SPE_MESSAGE_STATE_FETCHING_LIST for index %d...\n", (int)getSPEID(), i);
+          debug_displayActiveMessageQueue(id, msgState, "(*)");
+	}
+
 
         // Update the state to show that this message queue entry is ready to be executed
         msgState[i] = SPE_MESSAGE_STATE_LIST_READY_LIST;
@@ -447,6 +553,7 @@ void speScheduler(SPEData *speData, unsigned long long id) {
       }
     }
 
+    STATETRACE_UPDATE
 
     // DEBUG
     #if SPE_DEBUG_DISPLAY != 0
@@ -461,6 +568,14 @@ void speScheduler(SPEData *speData, unsigned long long id) {
     numDMAQueueEntries = mfc_stat_cmd_queue();
     for (i = 0; __builtin_expect(i < SPE_MESSAGE_QUEUE_LENGTH, 1); i++) {
       if (__builtin_expect(msgState[i] == SPE_MESSAGE_STATE_LIST_READY_LIST, 0)) {
+
+
+        // DEBUG
+        if (__builtin_expect(msgQueue[i]->traceFlag, 0)) {
+          printf("SPE_%d :: [TRACE] :: Processing SPE_MESSAGE_STATE_LIST_READY_LIST for index %d...\n", (int)getSPEID(), i);
+          debug_displayActiveMessageQueue(id, msgState, "(*)");
+	}
+
 
         // Allocate the memory needed in the LS for this work request
         if (localMemPtr[i] == NULL) {
@@ -603,6 +718,7 @@ void speScheduler(SPEData *speData, unsigned long long id) {
       }
     }
 
+    STATETRACE_UPDATE
 
     // DEBUG
     #if SPE_DEBUG_DISPLAY != 0
@@ -622,6 +738,14 @@ void speScheduler(SPEData *speData, unsigned long long id) {
       register int i = (getIndex + iOffset) % SPE_MESSAGE_QUEUE_LENGTH;
 
       if (__builtin_expect(msgState[i] == SPE_MESSAGE_STATE_PRE_FETCHING, 0)) {
+
+
+        // DEBUG
+        if (__builtin_expect(msgQueue[i]->traceFlag, 0)) {
+          printf("SPE_%d :: [TRACE] :: Processing SPE_MESSAGE_STATE_PRE_FETCHING for index %d...\n", (int)getSPEID(), i);
+          debug_displayActiveMessageQueue(id, msgState, "(*)");
+	}
+
 
         // Allocate the memory for the message queue entry (if need be)
         // NOTE: First check to see if it is non-null.  What might have happened was that there was enough memory
@@ -871,6 +995,7 @@ void speScheduler(SPEData *speData, unsigned long long id) {
     }
     getIndex = newGetIndex;
 
+    STATETRACE_UPDATE
 
     // DEBUG
     #if SPE_DEBUG_DISPLAY != 0
@@ -882,10 +1007,19 @@ void speScheduler(SPEData *speData, unsigned long long id) {
     // SPE_MESSAGE_STATE_FETCHING
 
     // Read the tag status to see if the data has arrived for any of the fetching message entries
+    mfc_write_tag_mask(0x7FFFFFFF);
     mfc_write_tag_update_immediate();
     tagStatus = mfc_read_tag_status(); //spu_readch(MFC_RdTagStat);
     for (i = 0; __builtin_expect(i < SPE_MESSAGE_QUEUE_LENGTH, 1); i++) {
       if (__builtin_expect(msgState[i] == SPE_MESSAGE_STATE_FETCHING && ((tagStatus & (0x01 << i)) != 0), 0)) {
+
+
+        // DEBUG
+        if (__builtin_expect(msgQueue[i]->traceFlag, 0)) {
+          printf("SPE_%d :: [TRACE] :: Processing SPE_MESSAGE_STATE_FETCHING for index %d...\n", (int)getSPEID(), i);
+          debug_displayActiveMessageQueue(id, msgState, "(*)");
+	}
+
 
         // Update the state to show that this message queue entry is ready to be executed
         msgState[i] = SPE_MESSAGE_STATE_READY;
@@ -909,6 +1043,7 @@ void speScheduler(SPEData *speData, unsigned long long id) {
       }
     }
 
+    STATETRACE_UPDATE
 
     // DEBUG
     #if SPE_DEBUG_DISPLAY != 0
@@ -925,18 +1060,33 @@ void speScheduler(SPEData *speData, unsigned long long id) {
 
       if (__builtin_expect(msgState[runIndex] == SPE_MESSAGE_STATE_READY, 0)) {
 
+
+        // DEBUG
+        if (__builtin_expect(msgQueue[runIndex]->traceFlag, 0)) {
+          printf("SPE_%d :: [TRACE] :: Processing SPE_MESSAGE_STATE_READY for index %d...\n", (int)getSPEID(), runIndex);
+          debug_displayActiveMessageQueue(id, msgState, "(*)");
+	}
+
+
         register volatile SPEMessage* msg = msgQueue[runIndex];
 
         #if SPE_DEBUG_DISPLAY >= 1
-          sim_printf("[0x%llx] :: >>>>> Entering User Code (index %d)...\n", id, runIndex);
+	  if (msgQueue[runIndex]->traceFlag)
+            printf("SPE_%d :: >>>>> Entering User Code (index %d)...\n", (int)getSPEID(), runIndex);
 	#endif
+
+
+        // DEBUG
+        isTracingFlag = ((msg->traceFlag) ? (-1) : (0));
+
 
         // Execute the function specified
         if ((msg->flags & WORK_REQUEST_FLAGS_LIST) == 0x00) {
 
           #if SPE_DEBUG_DISPLAY >= 1
-	    sim_printf("[0x%llx] :: Executing message queue entry as standard entry...\n", id);
-          #endif
+	    if (msgQueue[runIndex]->traceFlag)
+	      printf("SPE_%d :: Executing message queue entry as standard entry... fi = %d...\n", (int)getSPEID(), msg->funcIndex);
+	  #endif
 
           funcLookup(msg->funcIndex,
                      readWritePtr[runIndex], msg->readWriteLen,
@@ -947,8 +1097,9 @@ void speScheduler(SPEData *speData, unsigned long long id) {
 	} else {
 
           #if SPE_DEBUG_DISPLAY >= 1
-	    sim_printf("[0x%llx] :: Executing message queue entry as list entry...\n", id);
-          #endif
+	    if (msgQueue[runIndex]->traceFlag)
+	      printf("SPE_%d :: Executing message queue entry as list entry... fi = %d...\n", (int)getSPEID(), msg->funcIndex);
+	  #endif
 
           funcLookup(msg->funcIndex,
                      NULL, msg->readWriteLen,
@@ -959,7 +1110,8 @@ void speScheduler(SPEData *speData, unsigned long long id) {
 	}
 
         #if SPE_DEBUG_DISPLAY >= 1
-          sim_printf("[0x%llx] :: <<<<< Leaving User Code...\n", id);
+	  if (msgQueue[runIndex]->traceFlag)
+            printf("SPE_%d :: <<<<< Leaving User Code...\n", (int)getSPEID());
 	#endif
 
         #if SPE_STATS != 0
@@ -995,6 +1147,7 @@ void speScheduler(SPEData *speData, unsigned long long id) {
         runIndex = 0;
     }
 
+    STATETRACE_UPDATE
 
     // DEBUG
     #if SPE_DEBUG_DISPLAY != 0
@@ -1009,6 +1162,14 @@ void speScheduler(SPEData *speData, unsigned long long id) {
     numDMAQueueEntries = mfc_stat_cmd_queue();
     for (i = 0; __builtin_expect(i < SPE_MESSAGE_QUEUE_LENGTH, 1); i++) {
       if (__builtin_expect(msgState[i] == SPE_MESSAGE_STATE_EXECUTED_LIST, 0)) {
+
+
+        // DEBUG
+        if (__builtin_expect(msgQueue[i]->traceFlag, 0)) {
+          printf("SPE_%d :: [TRACE] :: Processing SPE_MESSAGE_STATE_EXECUTED_LIST for index %d...\n", (int)getSPEID(), i);
+          debug_displayActiveMessageQueue(id, msgState, "(*)");
+	}
+
 
         // Initiate the DMA transfer of the readWrite and writeOnly buffer back to main memory
         if ((msgQueue[i]->readWriteLen + msgQueue[i]->writeOnlyLen) > 0 && localMemPtr[i] != NULL) {
@@ -1064,6 +1225,7 @@ void speScheduler(SPEData *speData, unsigned long long id) {
       }
     }
 
+    STATETRACE_UPDATE
 
     // DEBUG
     #if SPE_DEBUG_DISPLAY != 0
@@ -1072,7 +1234,7 @@ void speScheduler(SPEData *speData, unsigned long long id) {
 
 
     //////////////////////////////////////////////////////////////////////////////////
-    // SPE_MESSAGE_QUEUE_STATE_EXECUTED
+    // SPE_MESSAGE_STATE_EXECUTED
 
     // Check for messages that have been executed but still need data committed to main memory
     numDMAQueueEntries = mfc_stat_cmd_queue();
@@ -1083,6 +1245,14 @@ void speScheduler(SPEData *speData, unsigned long long id) {
       register int i = (putIndex + iOffset) % SPE_MESSAGE_QUEUE_LENGTH;
 
       if (__builtin_expect(msgState[i] == SPE_MESSAGE_STATE_EXECUTED, 0)) {
+
+
+        // DEBUG
+        if (__builtin_expect(msgQueue[i]->traceFlag, 0)) {
+          printf("SPE_%d :: [TRACE] :: Processing SPE_MESSAGE_STATE_EXECUTED for index %d...\n", (int)getSPEID(), i);
+          debug_displayActiveMessageQueue(id, msgState, "(*)");
+	}
+
 
         // Check to see if this message does not need to fetch any data
         if (((msgQueue[i]->readWritePtr == (PPU_POINTER_TYPE)NULL)
@@ -1161,7 +1331,10 @@ void speScheduler(SPEData *speData, unsigned long long id) {
             register unsigned int srcOffset = (unsigned int)(msgQueue[i]->readWritePtr);
 
             while (bufferLeft > 0) {
-              dmaList[i][listIndex].size = ((bufferLeft > SPE_DMA_LIST_ENTRY_MAX_LENGTH) ? (SPE_DMA_LIST_ENTRY_MAX_LENGTH) : (bufferLeft));
+              dmaList[i][listIndex].size = ((bufferLeft > SPE_DMA_LIST_ENTRY_MAX_LENGTH) ?
+                                             (SPE_DMA_LIST_ENTRY_MAX_LENGTH) :
+                                             (bufferLeft)
+                                           );
               dmaList[i][listIndex].size = ROUNDUP_16(dmaList[i][listIndex].size);
               dmaList[i][listIndex].ea = srcOffset;
 
@@ -1192,6 +1365,7 @@ void speScheduler(SPEData *speData, unsigned long long id) {
             //   it is not set already... i.e. - this buffer isn't first)
             if (readOnlyPtr[i] == NULL) readOnlyPtr[i] = writeOnlyPtr[i];
 	  }
+
 	}
 
 
@@ -1237,6 +1411,7 @@ void speScheduler(SPEData *speData, unsigned long long id) {
     }
     putIndex = newPutIndex;
 
+    STATETRACE_UPDATE
 
     // DEBUG
     #if SPE_DEBUG_DISPLAY != 0
@@ -1260,10 +1435,20 @@ void speScheduler(SPEData *speData, unsigned long long id) {
 
       register int i = (commitIndex + iOffset) % SPE_MESSAGE_QUEUE_LENGTH;
 
-      if (__builtin_expect(msgState[i] == SPE_MESSAGE_STATE_COMMITTING && ((tagStatus * (0x01 << i)) != 0), 0)) {
+      if (__builtin_expect(msgState[i] == SPE_MESSAGE_STATE_COMMITTING && ((tagStatus & (0x01 << i)) != 0), 0)) {
+
+
+        // DEBUG
+        if (__builtin_expect(msgQueue[i]->traceFlag, 0)) {
+          printf("SPE_%d :: [TRACE] :: Processing SPE_MESSAGE_STATE_COMMITTING for index %d...\n", (int)getSPEID(), i);
+          debug_displayActiveMessageQueue(id, msgState, "(*)");
+	}
+
 
         // Check to see if there is an available entry in the outbound mailbox
         if (spu_stat_out_mbox() > 0) {
+
+          STATETRACE_OUTPUT
 
           // Free the local data and message buffers
           if (localMemPtr[i] != NULL) {
@@ -1303,6 +1488,7 @@ void speScheduler(SPEData *speData, unsigned long long id) {
     }
     commitIndex = commitIndexNext;
 
+    STATETRACE_UPDATE
 
     // DEBUG
     #if SPE_DEBUG_DISPLAY != 0
@@ -1316,6 +1502,17 @@ void speScheduler(SPEData *speData, unsigned long long id) {
     // Check for any messages that have entered into the ERROR state
     for (i = 0; __builtin_expect(i < SPE_MESSAGE_QUEUE_LENGTH, 1); i++) {
       if (__builtin_expect(msgState[i] == SPE_MESSAGE_STATE_ERROR, 0)) {
+
+
+        // DEBUG
+        if (__builtin_expect(msgQueue[i]->traceFlag, 0)) {
+          printf("SPE_%d :: [TRACE] :: Processing SPE_MESSAGE_STATE_ERROR for index %d...\n", (int)getSPEID(), i);
+          debug_displayActiveMessageQueue(id, msgState, "(*)");
+	}
+
+
+        STATETRACE_OUTPUT
+
 
         // NOTE: All clean-up should be taken care of by the code placing the message into the error
         //   state (that way the code here does not have to handle all cases).
@@ -1340,6 +1537,7 @@ void speScheduler(SPEData *speData, unsigned long long id) {
       }
     }
 
+    STATETRACE_UPDATE
 
     // DEBUG
     #if SPE_DEBUG_DISPLAY >= 1
@@ -1378,6 +1576,16 @@ void speScheduler(SPEData *speData, unsigned long long id) {
       statData.schedulerLoopCount++;
     #endif
 
+
+    // DEBUG
+    //__asm__("dsync");
+
+
+    // DEBUG - Moved to here (commented out at original location)
+    // Initiate the next message queue read from main memory
+    //spu_mfcdma32(msgQueueRaw, (PPU_POINTER_TYPE)(speData->messageQueue), SPE_MESSAGE_QUEUE_BYTE_COUNT, 31, MFC_GET_CMD);
+
+
   } // end while (keepLooping)
 
 }
@@ -1386,37 +1594,42 @@ void speScheduler(SPEData *speData, unsigned long long id) {
 void debug_displayActiveMessageQueue(unsigned long long id, int* msgState, char* str) {
   #if SPE_DEBUG_DISPLAY >= 1
 
+  // DEBUG
+  printf("SPE_%d :: Dumping active portion of message queue...\n", (int)getSPEID());
+
   int tmp;
 
   for (tmp = 0; tmp < SPE_MESSAGE_QUEUE_LENGTH; tmp++) {
-    if (msgState[tmp] != SPE_MESSAGE_STATE_CLEAR || msgQueue[tmp]->state < SPE_MESSAGE_STATE_MIN || msgQueue[tmp]->state > SPE_MESSAGE_STATE_MAX) {
-      sim_printf("[0x%llx] :: %s%s msgQueue[%d] @ %p (msgQueue: %p) = { fi = %d, rw = %d, rwl = %d, ro = %d, rol = %d, wo = %d, wol = %d, f = 0x%08X, tm = %u, s = %d(%d), cnt = %d, cmd = %d }\n",
+    //if (msgState[tmp] != SPE_MESSAGE_STATE_CLEAR || msgQueue[tmp]->state < SPE_MESSAGE_STATE_MIN || msgQueue[tmp]->state > SPE_MESSAGE_STATE_MAX) {
+    if (1) {
+      printf("[0x%llx] :: %s%s msgQueue[%d] @ %p (msgQueue: %p) = { fi = %d, rw = %lu, rwl = %d, ro = %lu, rol = %d, wo = %lu, wol = %d, f = 0x%08X, tm = %u, s = %d(%d), cnt = %d:%d, cmd = %d }\n",
                  id,
                  ((msgQueue[tmp]->state < SPE_MESSAGE_STATE_MIN || msgQueue[tmp]->state > SPE_MESSAGE_STATE_MAX) ? ("---===!!! WARNING !!!===--- ") : ("")),
                  ((str == NULL) ? ("") : (str)),
                  tmp,
-                 &(msgQueue[tmp]),
+                 msgQueue[tmp],
                  msgQueue,
-                 (volatile)(msgQueue[tmp]->funcIndex),
-                 (volatile)msgQueue[tmp]->readWritePtr,
-                 (volatile)msgQueue[tmp]->readWriteLen,
-                 (volatile)msgQueue[tmp]->readOnlyPtr,
-                 (volatile)msgQueue[tmp]->readOnlyLen,
-                 (volatile)msgQueue[tmp]->writeOnlyPtr,
-                 (volatile)msgQueue[tmp]->writeOnlyLen,
-                 (volatile)(msgQueue[tmp]->flags),
-                 (volatile)(msgQueue[tmp]->totalMem),
+                 (volatile int)(msgQueue[tmp]->funcIndex),
+                 (volatile PPU_POINTER_TYPE)msgQueue[tmp]->readWritePtr,
+                 (volatile int)msgQueue[tmp]->readWriteLen,
+                 (volatile PPU_POINTER_TYPE)msgQueue[tmp]->readOnlyPtr,
+                 (volatile int)msgQueue[tmp]->readOnlyLen,
+                 (volatile PPU_POINTER_TYPE)msgQueue[tmp]->writeOnlyPtr,
+                 (volatile int)msgQueue[tmp]->writeOnlyLen,
+                 (volatile int)(msgQueue[tmp]->flags),
+                 (volatile int)(msgQueue[tmp]->totalMem),
                  (volatile int)(msgQueue[tmp]->state),
                  msgState[tmp],
-                 (volatile int)(msgQueue[tmp]->counter),
+                 (volatile int)(msgQueue[tmp]->counter0),
+                 (volatile int)(msgQueue[tmp]->counter1),
                  (volatile int)(msgQueue[tmp]->command)
                 );
 
       if (msgQueue[tmp]->state < SPE_MESSAGE_STATE_MIN || msgQueue[tmp]->state > SPE_MESSAGE_STATE_MAX) {
-        sim_printf("***************************************************************************************************\n");
-        sim_printf("***************************************************************************************************\n");
-        sim_printf("***************************************************************************************************\n");
-        sim_printf("[0x%llx] :: msgQueueRaw @ %p, SPE_MESSAGE_QUEUE_BYTE_COUNT = %d\n",
+        printf("***************************************************************************************************\n");
+        printf("***************************************************************************************************\n");
+        printf("***************************************************************************************************\n");
+        printf("[0x%llx] :: msgQueueRaw @ %p, SPE_MESSAGE_QUEUE_BYTE_COUNT = %d\n",
                id, msgQueueRaw, SPE_MESSAGE_QUEUE_BYTE_COUNT
               );
       }

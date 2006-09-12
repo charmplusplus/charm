@@ -74,7 +74,7 @@
 #define SPE_DEBUG_DISPLAY   0  // Set to 0 to save on LS memory usage (all printf's should be wrapped in this!)
 #define SPE_DEBUG_DISPLAY_STILL_ALIVE  0 // If > 0 then display a "still alive" message every SPE_DEBUG_DISPLAY_STILL_ALIVE iterations
 #define SPE_DEBUG_DISPLAY_NO_PROGRESS  0 // If non-zero, warn when no messages changes state for this many iterations
-#define SPE_REPORT_END      1  // Have each SPE report the address of it's _end variable (end of data segment; will be printed by PPE during spe thread creation)
+#define SPE_REPORT_END      0  // Have each SPE report the address of it's _end variable (end of data segment; will be printed by PPE during spe thread creation)
 #define SPE_USE_OWN_MEMSET  0  // Set to 1 to force a local version of memset to be used (to try to remove C/C++ runtime dependence)
 #define SPE_NOTIFY_ON_MALLOC_FAILURE   0  // Set to 1 to force the SPE to notify the user when a pointer returned by malloc/new returns an un-usable pointer (message will retry malloc/new later)
 
@@ -93,6 +93,7 @@
 
 // SPE Message: The structure that defines a message being passed to an SPE
 typedef struct __SPE_MESSAGE {
+  volatile int counter0;
   volatile int funcIndex;          // Indicates what "function" the SPE should perform
   volatile PPU_POINTER_TYPE readWritePtr;
   volatile int readWriteLen;
@@ -103,9 +104,10 @@ typedef struct __SPE_MESSAGE {
   volatile unsigned int flags;
   volatile unsigned int totalMem;  // The total amount of memory that will be needed on the SPE for the request
   volatile int state;              // Current state of the message (see SPE_MESSAGE_STATE_xxx)
-  volatile int counter;            // A counter used to uniquely identify this message from the message previously held in this slot
   volatile int command;            // A control command that the PPU can use to send commands to the SPE runtime (see SPE_MESSAGE_COMMAND_xxx)
   volatile PPU_POINTER_TYPE wrPtr; // A pointer to userData specified in the sendWorkRequest call that will be passed to the callback function
+  volatile int traceFlag;   // DEBUG
+  volatile int counter1;            // A counter used to uniquely identify this message from the message previously held in this slot
 } SPEMessage;
 
 
@@ -146,6 +148,7 @@ extern "C" {
 #endif
 
 extern unsigned short getSPEID();
+extern int isTracing();
 
 #ifdef __cplusplus
 }

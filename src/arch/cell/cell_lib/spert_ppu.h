@@ -119,6 +119,9 @@ typedef struct __work_request {
 
   struct __work_request *next; ///< Pointer to the next WRHandle in the linked list of WRHandles
 
+  int id;        // DEBUG
+  int traceFlag; // DEBUG
+
 } WorkRequest;
 
 /** WRHandle structure that is used by Offload API calls.  This is what the caller (user of Offload API) keeps track of. */
@@ -238,6 +241,12 @@ void waitForWRHandle(WRHandle wrHandle     ///< A work request handle returned b
 /** Used to allow the Offload API to make progress.  Checks for finished work requests, etc.
   */
 extern void OffloadAPIProgress();
+
+
+// DEBUG
+extern int getWorkRequestID(WRHandle wrHandle);
+extern void enableTrace();
+extern void disableTrace();
 
 
 #ifdef __cplusplus
