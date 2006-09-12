@@ -125,7 +125,7 @@ public:
   virtual ~LBPredictorFunction() {}
   int num_params;
 
-  virtual void initialize_params(double *x) {double normall=1.0/pow((double)2,31); for (int i=0; i<num_params; ++i) x[i]=rand()*normall;}
+  virtual void initialize_params(double *x) {double normall=1.0/pow((double)2,(double)31); for (int i=0; i<num_params; ++i) x[i]=rand()*normall;}
 
   virtual double predict(double x, double *params) =0;
   virtual void print(double *params) {PredictorPrintf("LB: unknown model\n");};
