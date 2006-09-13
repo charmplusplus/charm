@@ -13,7 +13,7 @@ sparseReducer, sparseContiguousReducer
 
 <P>Languages: ARMCI, AMPI, TCharm, taskGraph, search
 
-<p>Frameworks: FEM, IFEM, IDXL, Collide, MBlock, AMR
+<p>Frameworks: <a href="group__ParFUM.html">ParFUM</a>, IFEM, IDXL, Collide, MBlock, AMR
 
 <p>Visualization: liveViz, liveViz3d, netFEM
  
