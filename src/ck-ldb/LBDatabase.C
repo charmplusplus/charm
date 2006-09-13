@@ -431,11 +431,13 @@ void LBDatabase::pup(PUP::er& p)
 
 void LBDatabase::EstObjLoad(const LDObjHandle &_h, double cputime)
 {
+#if CMK_LBDB_ON
   LBDB *const db = (LBDB*)(_h.omhandle.ldb.handle);
   LBObj *const obj = db->LbObj(_h);
 
   CmiAssert(obj != NULL);
   obj->setTiming(cputime);
+#endif
 }
 
 /*
