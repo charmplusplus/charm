@@ -569,6 +569,7 @@ void CkMigratable::commonInit(void) {
 	thisIndexMax=myRec->getIndex();
 	thisChareType=i.chareType;
 	usesAtSync=CmiFalse;
+	setLBLoad=CmiFalse;
 	barrierRegistered=CmiFalse;
 	/*
 	FAULT_EVAC
@@ -589,6 +590,7 @@ void CkMigratable::pup(PUP::er &p) {
 	Chare::pup(p);
 	p|thisIndexMax;
 	p(usesAtSync);
+	p(setLBLoad);
 #if CMK_LBDB_ON 
 	int readyMigrate;
 	if (p.isPacking()) readyMigrate = myRec->isReadyMigrate();
@@ -650,10 +652,21 @@ void CkMigratable::ResumeFromSync(void)
 {
 //	CkAbort("::ResumeFromSync() not defined for this array element!\n");
 }
+
+void CkMigratable::UserSetLBLoad() {
+	CkAbort("::UserSetLBLoad() not defined for this array element!\n");
+}
+
+// user can call this helper function to set obj load (for model-based lb)
+void CkMigratable::setObjTiming(double cputime) {
+	myRec->setObjTiming(cputime);
+}
+
 #if CMK_LBDB_ON  //For load balancing:
 void CkMigratable::ckFinishConstruction(void)
 {
 //	if ((!usesAtSync) || barrierRegistered) return;
+	myRec->setMeasure(setLBLoad);
 	if (barrierRegistered) return;
 	DEBL((AA"Registering barrier client for %s\n"AB,idx2str(thisIndexMax)));
         if (usesAtSync)
@@ -672,6 +685,8 @@ void CkMigratable::AtSync(int waitForMigration)
 	if (waitForMigration) ReadyMigrate(CmiTrue);
 	ckFinishConstruction();
 	DEBL((AA"Element %s going to sync\n"AB,idx2str(thisIndexMax)));
+          // model-based load balancing, ask user to provide cpu load
+        if (setLBLoad == CmiTrue) UserSetLBLoad();
 	myRec->getLBDB()->AtLocalBarrier(ldBarrierHandle);
 }
 void CkMigratable::ReadyMigrate(CmiBool ready)
@@ -782,6 +797,7 @@ CkLocRec_local::CkLocRec_local(CkLocMgr *mgr,CmiBool fromMigration,
 	nextPe = -1;
 	asyncMigrate = CmiFalse;
 	readyMigrate = CmiTrue;
+        enable_measure = CmiTrue;
 	bounced  = CmiFalse;
 	the_lbdb=mgr->getLBDB();
 	ldHandle=the_lbdb->RegisterObj(mgr->getOMHandle(),
@@ -821,12 +837,15 @@ void CkLocRec_local::migrateMe(int toPe) //Leaving this processor
 void CkLocRec_local::startTiming(void) {
   	running=CmiTrue;
 	DEBL((AA"Start timing for %s at %.3fs {\n"AB,idx2str(idx),CkWallTimer()));
-  	the_lbdb->ObjectStart(ldHandle);
+  	if (enable_measure) the_lbdb->ObjectStart(ldHandle);
 }
 void CkLocRec_local::stopTiming(void) {
 	DEBL((AA"} Stop timing for %s at %.3fs\n"AB,idx2str(idx),CkWallTimer()));
-  	if (running) the_lbdb->ObjectStop(ldHandle);
+  	if (running && enable_measure) the_lbdb->ObjectStop(ldHandle);
   	running=CmiFalse;
+}
+void CkLocRec_local::setObjTiming(double cputime) {
+	the_lbdb->EstObjLoad(ldHandle, cputime);
 }
 #endif
 
@@ -917,10 +936,10 @@ void CkMigratable::timingAfterCall(LDObjHandle objHandle,int *objstopped){
 //#endif
 //	if (isDeleted) return CmiFalse;//We were deleted
 //	deletedMarker=NULL;
-	myRec->stopTiming();
+	ckStopTiming();
 //	return CmiTrue;
 #if CMK_LBDB_ON
-		if (*objstopped) getLBDB()->ObjectStart(objHandle);
+	if (*objstopped) getLBDB()->ObjectStart(objHandle);
 #endif
 
  return;

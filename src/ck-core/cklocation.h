@@ -195,6 +195,7 @@ public:
   /// Control the load balancer:
   void startTiming(void);
   void stopTiming(void);
+  void setObjTiming(double cputime);
 #else
   inline void startTiming(void) {  }
   inline void stopTiming(void) { }
@@ -216,14 +217,16 @@ public:
   int  isReadyMigrate()	{ return readyMigrate; }
   CmiBool checkBufferedMigration();	// check and execute pending migration
   int   MigrateToPe();
+  inline void setMeasure(CmiBool status) { enable_measure = status; }
 private:
   LBDatabase *the_lbdb;
   LDObjHandle ldHandle;
   CmiBool  asyncMigrate;  /// if readyMove is inited
   CmiBool  readyMigrate;    /// status whether it is ready to migrate
+  CmiBool  enable_measure;
   int  nextPe;              /// next migration dest processor
 #else
-	void AsyncMigrate(CmiBool use){};
+  void AsyncMigrate(CmiBool use){};
 #endif
 /**FAULT_EVAC*/
 private:
@@ -306,10 +309,13 @@ protected:
   virtual void CkAbort(const char *str) const;
 
   CmiBool usesAtSync;//You must set this in the constructor to use AtSync().
+  CmiBool setLBLoad;//You must set this in the constructor to use AtSync().
   CmiBool barrierRegistered;//True iff barrier handle below is set
 
 public:
   virtual void ResumeFromSync(void);
+  virtual void UserSetLBLoad(void);  /// user define this when setLBLoad is true
+  void setObjTiming(double cputime);
 
 #if CMK_LBDB_ON  //For load balancing:
   void AtSync(int waitForMigration=1);
