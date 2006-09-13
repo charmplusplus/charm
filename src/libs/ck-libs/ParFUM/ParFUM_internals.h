@@ -1,5 +1,6 @@
+
 /**
- * \addtogroup ParFUM
+ \defgroup ParFUM  ParFUM Unstructured Mesh Framework
 */
 /*@{*/
 

@@ -12,7 +12,7 @@
 #include "tcharm.h"
 
 /**
- \defgroup ParFUM  ParFUM Unstructured Mesh Framework
+ * \addtogroup ParFUM
 */
 /*@{*/
 
