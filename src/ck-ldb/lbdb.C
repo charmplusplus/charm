@@ -478,10 +478,12 @@ extern "C" double LDGetLBPeriod(LDHandle _db)   // s is in seconds
   return db->GetPeriod();
 }
 
+/*
 // to be implemented
 extern "C" void LDEstObjLoad(LDObjHandle h, double load)
 {
 }
+*/
 
 // to be implemented
 extern "C" void LDQueryEstLoad(LDHandle bdb)

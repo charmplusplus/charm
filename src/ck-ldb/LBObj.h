@@ -91,6 +91,12 @@ public:
         }
   }
 
+  inline void setTiming(double cputime)
+  {
+    data.wallTime = cputime;
+    data.cpuTime = cputime;
+  }
+
   inline LDOMHandle &parentOM() { return data.handle.omhandle; }
   inline const LDObjHandle &GetLDObjHandle() const { return data.handle; }
   inline void SetMigratable(CmiBool mig) { data.migratable = mig; }
