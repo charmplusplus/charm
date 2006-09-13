@@ -1,4 +1,10 @@
-/* 
+/**
+ * \addtogroup ParFUM
+*/
+/*@{*/
+
+
+/*** 
    ParFUM_internals.h
 
    This file should contain ALL required header code that is 
@@ -2997,4 +3003,4 @@ class CkThresholdTimer {
 #endif
 // end ParFUM_internals.h
 
-
+/*@}*/

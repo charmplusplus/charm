@@ -1,3 +1,8 @@
+/**
+ * \addtogroup ParFUM
+*/
+/*@{*/
+
 /*
 This is a compatability main routine for FEM framework programs.
 It is an MPI main program that calls the old-style "init" routine 
@@ -78,4 +83,4 @@ int main(int argc,char **argv) {
 	MPI_Finalize();
 	return 0;
 }
-
+/*@}*/

@@ -1,3 +1,9 @@
+/**
+ * \addtogroup ParFUM
+*/
+/*@{*/
+
+
 /** File: fem_mesh_modify.C
  * Authors: Nilesh Choudhury, Isaac Dooley
  * 
@@ -2719,3 +2725,4 @@ void femMeshModify::finish1(void) {
 }
 
 #include "ParFUM_Adapt.def.h"
+/*@}*/

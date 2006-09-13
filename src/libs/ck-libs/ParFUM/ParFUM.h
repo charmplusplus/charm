@@ -11,6 +11,13 @@
 #include "ckvector3d.h"
 #include "tcharm.h"
 
+/**
+ \defgroup ParFUM  ParFUM Unstructured Mesh Framework
+*/
+/*@{*/
+
+
+
 
 /** Forward declaration for the following classes */
 class FEM_Entity;
@@ -493,4 +500,4 @@ FDECL void FTN_NAME(PARFUM_SA_INIT,parfum_sa_init)(int *meshId);
 }
 #endif
 
-
+/*@}*/

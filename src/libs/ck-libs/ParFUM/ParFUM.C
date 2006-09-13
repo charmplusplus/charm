@@ -1,3 +1,10 @@
+/**
+ * \addtogroup ParFUM
+*/
+/*@{*/
+
+
+
 /*
 ParFUM - Parallel Framework for Unstructured Meshing
 Parallel Programming Lab, Univ. of Illinois 2006
@@ -1429,7 +1436,7 @@ FEM_chunk::print(int fem_mesh,int idxBase)
 }  
 
 
-/*  Isaac's new element to element adjacency interface
+/**  Isaac's new element to element adjacency interface
  *  Registers a set of tuples for a single element type
  *  Must be called for each element type for which we  
  *  want adjacencies to be computed.
@@ -1461,3 +1468,5 @@ FORTRAN_AS_C(FEM_ADD_ELEM2FACE_TUPLES,FEM_Add_elem2face_tuples,fem_add_elem2face
   (int *fem_mesh,int *elem_type,int *nodesPerTuple, int *tuplesPerElem, int *elem2tuple), 
   (*fem_mesh, *elem_type, *nodesPerTuple, *tuplesPerElem, elem2tuple)
 )
+
+/*@}*/

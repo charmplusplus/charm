@@ -1,4 +1,9 @@
-/*FEM framework 
+/**
+ * \addtogroup ParFUM
+*/
+/*@{*/
+
+/**
   This file contains code for parallely partitioning
   the initial mesh into multiple chunks 
   It uses PARMETIS to do the actual partitioning.
@@ -1132,3 +1137,4 @@ bool sharedWith(int lnode,int chunk,FEM_Mesh *m){
   }
 }
 #include "ParFUM.def.h"
+/*@}*/

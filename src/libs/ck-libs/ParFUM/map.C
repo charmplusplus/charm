@@ -1,3 +1,8 @@
+/**
+ * \addtogroup ParFUM
+*/
+/*@{*/
+
 /*Charm++ Finite Element Framework:
   C++ implementation file
 
@@ -1088,3 +1093,4 @@ FEM_Mesh *FEM_Mesh_assemble(int nChunks,FEM_Mesh **chunks)
   m->becomeGetting(); //Done modifying this mesh (for now)
   return m;
 }
+/*@}*/

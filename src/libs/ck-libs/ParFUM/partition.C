@@ -1,3 +1,8 @@
+/**
+ * \addtogroup ParFUM
+*/
+/*@{*/
+
 /*Charm++ Finite Element Framework:
 C++ implementation file
 
@@ -234,3 +239,5 @@ void FEM_Mesh_partition(const FEM_Mesh *mesh,int nchunks,int *elem2chunk)
 	delete[] adjStart;
 	delete[] adjList;
 }
+
+/*@}*/
