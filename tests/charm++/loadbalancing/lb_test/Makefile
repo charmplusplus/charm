@@ -2,7 +2,7 @@
 
 OPTS=
 LBLIB=-module EveryLB 
-CHARMC=../../../bin/charmc $(OPTS)
+CHARMC=../../../../bin/charmc $(OPTS)
 
 OBJS = lb_test.o Topo.o
 
