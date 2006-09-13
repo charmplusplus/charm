@@ -5,7 +5,7 @@ using std::vector;
 
 #include "Jacobi2D.decl.h"
 
-#define  MIGRATE_STEPS              20
+#define  MIGRATE_STEPS              10
 
  class TheMain: public CBase_TheMain  {
   public: enum {NUM_CHUNKS=20};
@@ -36,7 +36,9 @@ PUPbytes(arr_t)
   public: void refine();
   public: void done(float delta);
   public: virtual void pup(PUP::er &p);
-  public: virtual void ResumeFromSync();
   public: void stepping(CkReductionMsg *m);
+  public: 
+    virtual void ResumeFromSync();
+    virtual void UserSetLBLoad();
  };
 

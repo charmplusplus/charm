@@ -1,7 +1,7 @@
 
 #include "Jacobi2D.h"
 
-#define ITERATIONS 10
+#define ITERATIONS 30
 
   TheMain::TheMain(CkArgMsg *)
   {
@@ -17,6 +17,7 @@
   void TheMain::pup(PUP::er &p) {
    CBase_TheMain::pup(p);
   }
+
   JacobiChunk::JacobiChunk() {
    int i;
    int j;
@@ -30,9 +31,11 @@
    if (((thisIndex.y == 0) || (thisIndex.y == (TheMain::NUM_CHUNKS - 1))))
    (--numNeighbors);
    maxDelta = 0.0;
-   usesAtSync = true;
    numIters = ITERATIONS;
+   usesAtSync = true;
+   setLBLoad = true;
   }
+
   void JacobiChunk::setStartTime(double t)
   {
      CkPrintf("Start time = %f\n", t);
@@ -59,6 +62,7 @@
      thisProxy(thisIndex.x,(thisIndex.y + 1)).getLeft(tmp);
     }
   }
+
   void JacobiChunk::getLeft(float left[])
   {
    int i;
@@ -128,6 +132,8 @@
       maxDelta = delta;
      }
    }
+
+     // reduction
    CkCallback cb(CkIndex_JacobiChunk::stepping(NULL), thisProxy(0,0));
    contribute(sizeof(float), &maxDelta, CkReduction::sum_float, cb);
   }
@@ -151,13 +157,14 @@
    p|maxDelta;
    p((char*)data, (TheMain::CHUNK_SIZE+2)*(TheMain::CHUNK_SIZE+2)*sizeof(float));
   }
+
   void JacobiChunk::ResumeFromSync() {
    startNextIter();
-/*
-   CkCallback cb = *(new CkCallback (CkIndex_JacobiChunk::stepping(NULL), thisProxy(0,0)));
-   contribute(0, NULL, CkReduction::sum_int, cb);
-printf("ResumeFromSync\n");
-*/
+  }
+
+  // a callback function to set object load
+  void JacobiChunk::UserSetLBLoad() {
+    setObjTiming(1.0);
   }
 
   void JacobiChunk::stepping(CkReductionMsg *m) {   // on PE 0
