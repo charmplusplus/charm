@@ -657,12 +657,12 @@ void CkMigratable::UserSetLBLoad() {
 	CkAbort("::UserSetLBLoad() not defined for this array element!\n");
 }
 
+#if CMK_LBDB_ON  //For load balancing:
 // user can call this helper function to set obj load (for model-based lb)
 void CkMigratable::setObjTiming(double cputime) {
 	myRec->setObjTiming(cputime);
 }
 
-#if CMK_LBDB_ON  //For load balancing:
 void CkMigratable::ckFinishConstruction(void)
 {
 //	if ((!usesAtSync) || barrierRegistered) return;
