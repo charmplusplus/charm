@@ -2862,66 +2862,66 @@ class FEM_MUtil {
 
 #include <math.h>
 
-typedef double real;
+typedef double Real;
 
 //vector2d is a cartesian vector in 2-space-- an x and y.
 class vector2d {
  public:
-  real x,y;
+  Real x,y;
   vector2d(void) {}//Default consructor
   //Simple 1-value constructor
-  explicit vector2d(const real init) {x=y=init;}
+  explicit vector2d(const Real init) {x=y=init;}
   //Simple 1-value constructor
   explicit vector2d(int init) {x=y=init;}
   //2-value constructor
-  vector2d(const real Nx,const real Ny) {x=Nx;y=Ny;}
+  vector2d(const Real Nx,const Real Ny) {x=Nx;y=Ny;}
   //Copy constructor
   vector2d(const vector2d &copy) {x=copy.x;y=copy.y;}
 	
-  //Cast-to-real * operators (treat vector as array)
-  operator real *() {return &x;}
-  operator const real *() const {return &x;}
+  //Cast-to-Real * operators (treat vector as array)
+  operator Real *() {return &x;}
+  operator const Real *() const {return &x;}
 	
   /*Arithmetic operations: these are carefully restricted to just those
     that make unambiguous sense (to me... now...  ;-)
     Counterexamples: vector*vector makes no sense (use .dot()) because
-    real/vector is meaningless (and we'd want a*b/b==a for b!=0), 
+    Real/vector is meaningless (and we'd want a*b/b==a for b!=0), 
     ditto for vector&vector (dot?), vector|vector (projection?), 
-    vector^vector (cross?),real+vector, vector+=real, etc.
+    vector^vector (cross?),Real+vector, vector+=real, etc.
   */
   vector2d &operator=(const vector2d &b) {x=b.x;y=b.y;return *this;}
   int operator==(const vector2d &b) const {return (x==b.x)&&(y==b.y);}
   int operator!=(const vector2d &b) const {return (x!=b.x)||(y!=b.y);}
   vector2d operator+(const vector2d &b) const {return vector2d(x+b.x,y+b.y);}
   vector2d operator-(const vector2d &b) const {return vector2d(x-b.x,y-b.y);}
-  vector2d operator*(const real scale) const 
+  vector2d operator*(const Real scale) const 
     {return vector2d(x*scale,y*scale);}
-  friend vector2d operator*(const real scale,const vector2d &v)
+  friend vector2d operator*(const Real scale,const vector2d &v)
     {return vector2d(v.x*scale,v.y*scale);}
-  vector2d operator/(const real &div) const
-    {real scale=1.0/div;return vector2d(x*scale,y*scale);}
+  vector2d operator/(const Real &div) const
+    {Real scale=1.0/div;return vector2d(x*scale,y*scale);}
   vector2d operator-(void) const {return vector2d(-x,-y);}
   void operator+=(const vector2d &b) {x+=b.x;y+=b.y;}
   void operator-=(const vector2d &b) {x-=b.x;y-=b.y;}
-  void operator*=(const real scale) {x*=scale;y*=scale;}
-  void operator/=(const real div) {real scale=1.0/div;x*=scale;y*=scale;}
+  void operator*=(const Real scale) {x*=scale;y*=scale;}
+  void operator/=(const Real div) {Real scale=1.0/div;x*=scale;y*=scale;}
 
   //Vector-specific operations
   //Return the square of the magnitude of this vector
-  real magSqr(void) const {return x*x+y*y;}
+  Real magSqr(void) const {return x*x+y*y;}
   //Return the magnitude (length) of this vector
-  real mag(void) const {return sqrt(magSqr());}
+  Real mag(void) const {return sqrt(magSqr());}
 	
   //Return the square of the distance to the vector b
-  real distSqr(const vector2d &b) const 
+  Real distSqr(const vector2d &b) const 
     {return (x-b.x)*(x-b.x)+(y-b.y)*(y-b.y);}
   //Return the distance to the vector b
-  real dist(const vector2d &b) const {return sqrt(distSqr(b));}
+  Real dist(const vector2d &b) const {return sqrt(distSqr(b));}
 	
   //Return the dot product of this vector and b
-  real dot(const vector2d &b) const {return x*b.x+y*b.y;}
+  Real dot(const vector2d &b) const {return x*b.x+y*b.y;}
   //Return the cosine of the angle between this vector and b
-  real cosAng(const vector2d &b) const {return dot(b)/(mag()*b.mag());}
+  Real cosAng(const vector2d &b) const {return dot(b)/(mag()*b.mag());}
 	
   //Return the "direction" (unit vector) of this vector
   vector2d dir(void) const {return (*this)/mag();}
@@ -2933,7 +2933,7 @@ class vector2d {
   vector2d &scale(const vector2d &b) {x*=b.x;y*=b.y;return *this;}
 	
   //Return the largest coordinate in this vector
-  real max(void) {return (x>y)?x:y;}
+  Real max(void) {return (x>y)?x:y;}
   //Make each of this vector's coordinates at least as big
   // as the given vector's coordinates.
   void enlarge(const vector2d &by)
