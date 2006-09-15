@@ -743,6 +743,8 @@ void CkMigratable::CkAddThreadListeners(CthThread tid, void *msg)
 	CthAddListener(tid,(struct CthThreadListener *)a);
 }
 #else
+void CkMigratable::setObjTiming(double cputime) {}
+
 /* no load balancer: need dummy implementations to prevent link error */
 void CkMigratable::CkAddThreadListeners(CthThread tid, void *msg)
 {
@@ -884,8 +886,6 @@ CmiBool CkLocRec_local::isObsolete(int nSprings,const CkArrayIndex &idx_)
 		/* This is suspicious-- the halfCreated queue should be extremely
 		 transient.  It's possible we just looked at the wrong time, though;
 		 so this is only a warning. 
-         B
-         B
 		*/
 		CkPrintf("CkLoc WARNING> %d messages still around for uncreated element %s!\n",
 			 len,idx2str(idx));
