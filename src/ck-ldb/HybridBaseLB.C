@@ -61,7 +61,7 @@ HybridBaseLB::HybridBaseLB(const CkLBOptions &opt): BaseLB(opt)
   future_migrates_expected = -1;
 
   statsStrategy = FULL;
-  if (CkNumPes() >= 8192) statsStrategy = SHRINK;
+  if (CkNumPes() >= 4096) statsStrategy = SHRINK;
   //statsStrategy = SHRINK;
 
   vector_n_moves = 0;
@@ -872,14 +872,14 @@ void HybridBaseLB::PropagateInfo(Location *loc, int n, int fromlevel)
     CmiAssert(unmatchedObjs.size() == 0);
     DEBUGF(("[%d] level %d PropagateInfo had %d matchedObjs. \n", CkMyPe(), atlevel, matchedObjs.size()));
 
-  // send down
+      // send down
     thisProxy.PropagateInfo(matchedObjs.getVec(), matchedObjs.size(), atlevel, lData->nChildren, lData->children);
 
     lData->statsData->clear();
     matchedObjs.free();
   }
   else {  // leaf node
-    // now start to migrate
+      // now start to migrate
     CkVec<MigrationRecord> & outObjs = lData->outObjs;
     int migs = outObjs.size() + newObjs.size();
     for (i=0; i<outObjs.size(); i++) {
