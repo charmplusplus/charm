@@ -1,4 +1,5 @@
 #include "import.h"
+
 void ParFUM_desharing(int meshid){
 	FEM_Mesh 	*mesh = (FEM_chunk::get("ParFUM_desharing"))->getMesh("ParFUM_desharing");
 	mesh->clearSharedNodes();
@@ -66,16 +67,13 @@ void ParFUM_recreateSharedNodes(int meshid, int dim) {
     // Match coords between local nodes and received coords
     // FIX ME: this is the dumb super-slow brute force algorithm
     int recvNodeCount = length/dim;
-    for (int j=0; j<numNodes; j++) {
-      for (int k=0; k<recvNodeCount; k++) {
-	if (coordEqual(&nodeCoords[j*dim], &recvNodeCoords[k*dim], dim)) {
-	  localSharedNodes.push_back(j); 
-	  remoteSharedNodes.push_back(k);
-	  printf("[%d] found local node %d to match with remote node %d \n",rank,j,k);
-	  break;
-	}
-      }
-    }
+    ParFUM_findMatchingCoords(dim,
+			      numNodes, nodeCoords,
+			      recvNodeCount, recvNodeCoords,
+			      localSharedNodes,
+			      remoteSharedNodes
+			      );
+
     // Copy local nodes that were shared with source into the data structure
     int *localSharedNodeList = (int *)malloc(localSharedNodes.size()*sizeof(int));
     for (int m=0; m<localSharedNodes.size(); m++) {
@@ -171,3 +169,85 @@ void ParFUM_import_elems(int meshid, int numElems, int nodesPer, int *conn, int 
 		nodesPer);
   FEM_Mesh_become_get(meshid);
 }
+
+
+/**
+ * To use std::sort, we need a coordinate class that defines the <
+ * operator and implements value semantics for the = operator.
+ */
+struct Coord {
+  static int dim;
+  int index;
+  double* value;
+  bool operator<(const Coord& other) const {
+    return coordLessThan(value, other.value, dim);
+  }
+  bool operator==(Coord& other) {
+    return coordEqual(value, other.value, dim);
+  }
+};
+
+int Coord::dim=0;
+
+/**
+ * Finds all the duplicate coords between two lists in n log n time.  
+ *
+ * Takes definitions for the lists of both coordinates, and returns a list 
+ * containing: 
+ *
+ * <pair_index_a1> <pair_index_b1> <pair_index_a2> <pair_index_b2>
+ *
+ */
+void ParFUM_findMatchingCoords(int dim, 
+			       int extent_a, double* a, 
+			       int extent_b, double* b,
+			       std::vector<int>& matches_a,
+			       std::vector<int>& matches_b
+			       ) {
+  using namespace std;
+  
+  //read in the arrays
+  vector<Coord> point_a(extent_a);
+  for (unsigned int ii=0; ii<point_a.size(); ii++) {
+    point_a[ii].index = ii;
+    point_a[ii].value = a+dim*ii;
+  }
+  
+  vector<Coord> point_b(extent_b);
+  for (unsigned int ii=0; ii<point_b.size(); ii++) {
+    point_b[ii].index = ii;
+    point_b[ii].value = b+dim*ii;
+  }
+  
+  //sort the lists in ascending order
+  Coord::dim = dim;
+  sort(point_a.begin(), point_a.end());
+  sort(point_b.begin(), point_b.end());
+  
+  //search through both lists, looking for nodes that are equivalent.
+  unsigned int cursor_a = 0;
+  unsigned int cursor_b = 0;
+  while((cursor_a < point_a.size()) && (cursor_b < point_b.size())) {
+    int comparison = coordCompare(point_a[cursor_a].value, point_b[cursor_b].value, dim);
+    if (1==comparison) {
+      //a < b, so advance a to meet b
+      cursor_a++;
+    } else if (-1==comparison) {
+      //a > b, so advance b to meet a
+      cursor_b++;
+    } else if (0==comparison) {
+      //we have a match!  Record the original indicies.
+      matches_a.push_back(point_a[cursor_a].index);
+      matches_b.push_back(point_b[cursor_b].index);
+      
+      //now, advance for the next comparison.
+      cursor_a++;
+      cursor_b++;
+    } else {
+      //code should never get here.
+      printf("comparison = %d\n", comparison);
+      assert(comparison == 0);
+    }
+  } 
+}
+
