@@ -365,6 +365,8 @@ public:
 	  CProxy_main mproxy(mid);
 	  mproxy.maindone();
 	} else if (nTimes % n_loadbalance == 0) {
+          if (nTimes/n_loadbalance == 1) traceBegin();
+          if (nTimes/n_loadbalance == 2) traceEnd();
 	  //We're not done yet...
 	  //Either load balance, or send a message to the next guy
 	  DEBUGF(("Element %d AtSync on PE %d\n",thisIndex,CkMyPe()));
