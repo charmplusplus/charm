@@ -1,4 +1,5 @@
 #include "import.h"
+#include <algorithm>
 
 void ParFUM_desharing(int meshid){
 	FEM_Mesh 	*mesh = (FEM_chunk::get("ParFUM_desharing"))->getMesh("ParFUM_desharing");
