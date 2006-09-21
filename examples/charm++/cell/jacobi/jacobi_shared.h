@@ -67,6 +67,9 @@
 
 #define FUNC_DoCalculation   (1)
 
+// NOTE: If setting USE_CALLBACK to 0, then the doCalculation() entry methods should
+//   be marked as '[threaded]' in the jacobi.ci file.
+#define USE_CALLBACK  0
 
 //////////////////////////////////////////////////////////////////////////////////////////////
 // Function Prototypes
