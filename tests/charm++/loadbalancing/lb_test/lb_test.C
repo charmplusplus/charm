@@ -274,6 +274,7 @@ public:
       future_receives[i]=0;
 	
     usesAtSync=CmiTrue;
+    specialTracing = 0;
 
     contribute(sizeof(i), &i, CkReduction::sum_int);
   }
@@ -300,6 +301,7 @@ public:
 	p(busywork);
 	p(n_received);
 	p(future_receives,future_bufsz);
+        p(specialTracing);
   }
 
   void Compute(HiMsg *m) { 
@@ -365,8 +367,12 @@ public:
 	  CProxy_main mproxy(mid);
 	  mproxy.maindone();
 	} else if (nTimes % n_loadbalance == 0) {
-          if (nTimes/n_loadbalance == 1) traceBegin();
-          if (nTimes/n_loadbalance == 2) traceEnd();
+          if (nTimes/n_loadbalance == 1 && traceIsOn() == 0)
+            specialTracing = 1;
+          if (specialTracing) {
+            if (nTimes/n_loadbalance == 1) traceBegin();
+            if (nTimes/n_loadbalance == 2) traceEnd();
+          }
 	  //We're not done yet...
 	  //Either load balance, or send a message to the next guy
 	  DEBUGF(("Element %d AtSync on PE %d\n",thisIndex,CkMyPe()));
@@ -481,6 +487,8 @@ private:
   int n_received;
   int future_receives[future_bufsz];
   int resumed;
+
+  int specialTracing;
 };
 
 #include "lb_test.def.h"
