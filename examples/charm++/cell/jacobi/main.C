@@ -54,7 +54,7 @@ void Main::maxErrorReductionClient(CkReductionMsg *msg) {
     // Stop timing
     endTime = CkWallTimer();
 
-    CkPrintf("final maxError = %f\n", maxError);
+    CkPrintf("final maxError = %.12f\n", maxError);
     CkPrintf("final iterationCount = %d\n", iterationCount);
     CkPrintf("Time: %lfs\n", endTime - startTime);
 
