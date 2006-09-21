@@ -23,7 +23,7 @@ try:
     DEFAULT_VMI_PROCS         = '1'
     DEFAULT_CRM               = '10.92.0.253'
     DEFAULT_VMI_KEY           = 'gak'
-    DEFAULT_VMI_SPECFILE      = '/home/koenig/ON-DEMAND/VMI21-install/specfiles/myrinet.xml'
+    DEFAULT_VMI_SPECFILE      = '/home/koenig/ON-DEMAND/VMI22-install/specfiles/myrinet.xml'
 
 except KeyError:
     print 'ERROR: Unable to get home directory from environment.'
@@ -47,8 +47,10 @@ def ParseCommandLine ():
     wan_latency                      = ''
     cluster_number                   = ''
     probe_clusters                   = ''
-    grid_object_prioritization       = ''
-    grid_objects_maximum             = ''
+    grid_queue                       = ''
+    grid_queue_maximum               = ''
+    grid_queue_interval              = ''
+    grid_queue_threshold             = ''
     #
     memory_pool                      = ''
     connection_timeout               = ''
@@ -114,11 +116,17 @@ def ParseCommandLine ():
 	elif (arg == '++probe-clusters'):
             probe_clusters = sys.argv[i]
             i = i + 1
-        elif (arg == '++grid-object-prioritization'):
-            grid_object_prioritization = sys.argv[i]
+        elif (arg == '++grid-queue'):
+            grid_queue = sys.argv[i]
             i = i + 1
-        elif (arg == '++grid-objects-maximum'):
-            grid_objects_maximum = sys.argv[i]
+        elif (arg == '++grid-queue-maximum'):
+            grid_queue_maximum = sys.argv[i]
+            i = i + 1
+        elif (arg == '++grid-queue-interval'):
+            grid_queue_interval = sys.argv[i]
+            i = i + 1
+        elif (arg == '++grid-queue-threshold'):
+            grid_queue_threshold = sys.argv[i]
             i = i + 1
         #
         elif (arg == '++memory-pool'):
@@ -177,11 +185,10 @@ def ParseCommandLine ():
         vmi_gridprocs = vmi_procs
 
     # Return a list of all variables.
-    return [nodelist_filename, nodegroup, vmi_procs, crm, vmi_key, vmi_specfile, verbose,                                 \
-            vmi_gridprocs, wan_latency, cluster_number, probe_clusters, grid_object_prioritization, grid_objects_maximum, \
-            memory_pool, connection_timeout, maximum_handles, small_message_boundary, medium_message_boundary,            \
-            eager_protocol, eager_interval, eager_threshold, eager_short_pollset_size_maximum, eager_short_slots,         \
-            eager_long_buffers, eager_long_buffer_size, disable_regcache, command]
+    return [nodelist_filename, nodegroup, vmi_procs, crm, vmi_key, vmi_specfile, verbose,                                                          \
+            vmi_gridprocs, wan_latency, cluster_number, probe_clusters, grid_queue, grid_queue_maximum, grid_queue_interval, grid_queue_threshold, \
+            memory_pool, connection_timeout, maximum_handles, small_message_boundary, medium_message_boundary, eager_protocol, eager_interval,     \
+            eager_threshold, eager_short_pollset_size_maximum, eager_short_slots, eager_long_buffers, eager_long_buffer_size, disable_regcache, command]
 
 
 
@@ -202,19 +209,24 @@ def DisplayUsage ():
     print '  ++help                    displays this help text'
     print ' '
     print 'Grid options include:'
-    print '  ++g <#>                              total number of processes in an entire'
-    print '                                       Grid job (combined ++p subjobs must add'
-    print '                                       up to ++g job size)'
-    print '  ++wan-latency <latency>              inter-node latencies below this indicate'
-    print '                                       nodes on the same LAN, above means WAN'
-    print '                                       peers (microseconds)'
-    print '  ++cluster <#>                        the cluster number for all processes in'
-    print '                                       this subjob'
-    print '  ++probe-clusters <0|1>               disable/enable automatic probing the'
-    print '                                       cluster topology of the job'
-    print '  ++grid-object-prioritization <0|1>   disable/enable Grid object prioritization'
-    print '  ++grid-objects-maximum <count>       maximum number of Grid objects per'
-    print '                                       processor'
+    print '  ++g <#>                                  total number of processes in an entire'
+    print '                                           Grid job (combined ++p subjobs must add'
+    print '                                           up to ++g job size)'
+    print '  ++wan-latency <latency>                  inter-node latencies below this indicate'
+    print '                                           nodes on the same LAN, above means WAN'
+    print '                                           peers (microseconds)'
+    print '  ++cluster <#>                            the cluster number for all processes in'
+    print '                                           this subjob'
+    print '  ++probe-clusters <0|1>                   disable/enable automatic probing the'
+    print '                                           cluster topology of the job'
+    print '  ++grid-queue <0|1>                       disable/enable the Grid queue which allows'
+    print '                                           prioritization of Grid "border" objects'
+    print '  ++grid-queue-maximum <count>             maximum number of Grid border objects per'
+    print '                                           processor'
+    print '  ++grid-queue-interval <#>                after every # message sends, look for Grid'
+    print '                                           border object candidates'
+    print '  ++grid-queue-threshold <#>               a sender must send # Grid messages over'
+    print '                                           Grid interval to be border candidate'
     print ' '
     print 'tuning options include:'
     print '  ++memory-pool <0|1>                      disable/enable memory pool'
@@ -308,12 +320,10 @@ def ParseNodelistFile (nodelist):
 ###########################################################################
 ## Write a script to launch the job portion on a single node.
 ##
-def WriteNodeScript (filename, crm, vmi_key, vmi_specfile, vmi_gridprocs, wan_latency, cluster_number,      \
-                     probe_clusters, grid_object_prioritization, grid_objects_maximum, memory_pool,         \
-                     connection_timeout,  maximum_handles, small_message_boundary, medium_message_boundary, \
-                     eager_protocol, eager_interval, eager_threshold, eager_short_pollset_size_maximum,     \
-                     eager_short_slots, eager_long_buffers, eager_long_buffer_size, disable_regcache,       \
-                     working_directory, command):
+def WriteNodeScript (filename, crm, vmi_key, vmi_specfile, vmi_gridprocs, wan_latency, cluster_number, probe_clusters, grid_queue, grid_queue_maximum, \
+                     grid_queue_interval, grid_queue_threshold, memory_pool, connection_timeout, maximum_handles, small_message_boundary,              \
+                     medium_message_boundary, eager_protocol, eager_interval, eager_threshold, eager_short_pollset_size_maximum, eager_short_slots,    \
+                     eager_long_buffers, eager_long_buffer_size, disable_regcache, working_directory, command):
 
     outfile = open (filename, 'w')
 
@@ -347,14 +357,22 @@ def WriteNodeScript (filename, crm, vmi_key, vmi_specfile, vmi_gridprocs, wan_la
         outfile.write ('CMI_VMI_PROBE_CLUSTERS="' + probe_clusters + '"')
         outfile.write (' ; export CMI_VMI_PROBE_CLUSTERS\n')
 
-    if (grid_object_prioritization != ''):
-        outfile.write ('CMI_VMI_GRID_OBJECT_PRIORITIZATION="' + grid_object_prioritization + '"')
-        outfile.write (' ; export CMI_VMI_GRID_OBJECT_PRIORITIZATION\n')
+    if (grid_queue != ''):
+        outfile.write ('CMI_VMI_GRID_QUEUE="' + grid_queue + '"')
+        outfile.write (' ; export CMI_VMI_GRID_QUEUE\n')
 
-    if (grid_objects_maximum != ''):
-        outfile.write ('CMI_VMI_GRID_OBJECTS_MAXIMUM="' + grid_objects_maximum + '"')
-        outfile.write (' ; export CMI_VMI_GRID_OBJECTS_MAXIMUM\n')
-        
+    if (grid_queue_maximum != ''):
+        outfile.write ('CMI_VMI_GRID_QUEUE_MAXIMUM="' + grid_queue_maximum + '"')
+        outfile.write (' ; export CMI_VMI_GRID_QUEUE_MAXIMUM\n')
+
+    if (grid_queue_interval != ''):
+        outfile.write ('CMI_VMI_GRID_QUEUE_INTERVAL="' + grid_queue_interval + '"')
+        outfile.write (' ; export CMI_VMI_GRID_QUEUE_INTERVAL\n')
+
+    if (grid_queue_threshold != ''):
+        outfile.write ('CMI_VMI_GRID_QUEUE_THRESHOLD="' + grid_queue_threshold + '"')
+        outfile.write (' ; export CMI_VMI_GRID_QUEUE_THRESHOLD\n')
+
     #
 
     if (memory_pool != ''):
@@ -457,24 +475,26 @@ def main ():
     wan_latency                      = parsed_command_line[8]
     cluster_number                   = parsed_command_line[9]
     probe_clusters                   = parsed_command_line[10]
-    grid_object_prioritization       = parsed_command_line[11]
-    grid_objects_maximum             = parsed_command_line[12]
+    grid_queue                       = parsed_command_line[11]
+    grid_queue_maximum               = parsed_command_line[12]
+    grid_queue_interval              = parsed_command_line[13]
+    grid_queue_threshold             = parsed_command_line[14]
     #
-    memory_pool                      = parsed_command_line[13]
-    connection_timeout               = parsed_command_line[14]
-    maximum_handles                  = parsed_command_line[15]
-    small_message_boundary           = parsed_command_line[16]
-    medium_message_boundary          = parsed_command_line[17]
-    eager_protocol                   = parsed_command_line[18]
-    eager_interval                   = parsed_command_line[19]
-    eager_threshold                  = parsed_command_line[20]
-    eager_short_pollset_size_maximum = parsed_command_line[21]
-    eager_short_slots                = parsed_command_line[22]
-    eager_long_buffers               = parsed_command_line[23]
-    eager_long_buffer_size           = parsed_command_line[24]
-    disable_regcache                 = parsed_command_line[25]
+    memory_pool                      = parsed_command_line[15]
+    connection_timeout               = parsed_command_line[16]
+    maximum_handles                  = parsed_command_line[17]
+    small_message_boundary           = parsed_command_line[18]
+    medium_message_boundary          = parsed_command_line[19]
+    eager_protocol                   = parsed_command_line[20]
+    eager_interval                   = parsed_command_line[21]
+    eager_threshold                  = parsed_command_line[22]
+    eager_short_pollset_size_maximum = parsed_command_line[23]
+    eager_short_slots                = parsed_command_line[24]
+    eager_long_buffers               = parsed_command_line[25]
+    eager_long_buffer_size           = parsed_command_line[26]
+    disable_regcache                 = parsed_command_line[27]
     ##
-    command                          = parsed_command_line[26]
+    command                          = parsed_command_line[28]
 
     # Parse the nodelist file.
     # Locate the group name and its list of nodes that corresponds to
@@ -553,11 +573,10 @@ def main ():
             # This script is /tmp/charmgrid.pid.i
             # The child unlinks (deletes) this script during launch.
             job_script = '/tmp/charmgrid.' + str (pid) + '.' + str (i)
-            WriteNodeScript (job_script, crm, vmi_key, vmi_specfile, vmi_gridprocs, wan_latency, cluster_number,   \
-                             probe_clusters, grid_object_prioritization, grid_objects_maximum, memory_pool,        \
-                             connection_timeout, maximum_handles, small_message_boundary, medium_message_boundary, \
-                             eager_protocol, eager_interval, eager_threshold, eager_short_pollset_size_maximum,    \
-                             eager_short_slots, eager_long_buffers, eager_long_buffer_size, disable_regcache,      \
+            WriteNodeScript (job_script, crm, vmi_key, vmi_specfile, vmi_gridprocs, wan_latency, cluster_number, probe_clusters, grid_queue,    \
+                             grid_queue_maximum, grid_queue_interval, grid_queue_threshold, memory_pool, connection_timeout, maximum_handles,   \
+                             small_message_boundary, medium_message_boundary, eager_protocol, eager_interval, eager_threshold,                  \
+                             eager_short_pollset_size_maximum, eager_short_slots, eager_long_buffers, eager_long_buffer_size, disable_regcache, \
                              working_directory, command)
 
             # Get the node to launch on.  This is round-robin across
