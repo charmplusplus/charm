@@ -10,8 +10,8 @@ class Jacobi : public CBase_Jacobi {
   ////////////////////////////////////////////////////////////////////////////////////////////////
   //  Member Variables
   private:
-    float* matrix;     // Pointer to the first buffer (the read buffer per iteration)
-    float* matrixTmp;  // Pointer to the second buffer (the write buffer per iteration)
+    volatile float* matrix;     // Pointer to the first buffer (the read buffer per iteration)
+    volatile float* matrixTmp;  // Pointer to the second buffer (the write buffer per iteration)
     int ghostCount;
     int ghostCountNeeded;
     int iterCount;
@@ -37,6 +37,7 @@ class Jacobi : public CBase_Jacobi {
 
     void attemptCalculation();
     void doCalculation();
+    void doCalculation_post();
 };
 
 
