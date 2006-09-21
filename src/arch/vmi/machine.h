@@ -39,8 +39,10 @@
 */
 #define CMI_VMI_WAN_LATENCY                      1000      /* microseconds */
 #define CMI_VMI_PROBE_CLUSTERS                   0         /* Boolean */
-#define CMI_VMI_GRID_OBJECT_PRIORITIZATION       0         /* Boolean */
-#define CMI_VMI_GRID_OBJECTS_MAXIMUM             10
+#define CMI_VMI_GRID_QUEUE                       0         /* Boolean */
+#define CMI_VMI_GRID_QUEUE_MAXIMUM               10
+#define CMI_VMI_GRID_QUEUE_INTERVAL              0
+#define CMI_VMI_GRID_QUEUE_THRESHOLD             0
 #define CMI_VMI_MEMORY_POOL                      1         /* Boolean */
 #define CMI_VMI_TERMINATE_VMI_HACK               1         /* Boolean */
 #define CMI_VMI_CONNECTION_TIMEOUT               300       /* seconds */
@@ -534,7 +536,7 @@ typedef struct
 #endif
 
 
-#if CMK_GRID_OBJECT_PRIORITIZATION
+#if CMK_GRID_QUEUE_AVAILABLE
 typedef struct
 {
   int gid;
@@ -664,11 +666,14 @@ unsigned long CmiGetLatency (int process1, int process2);
 int CmiGetCluster (int process);
 
 /* Grid object prioritization functions */
-#if CMK_GRID_OBJECT_PRIORITIZATION
-void CmiGridObjectRegister (int gid, int nInts, int index1, int index2, int index3);
-void CmiGridObjectDeregister (int gid, int nInts, int index1, int index2, int index3);
-void CmiGridObjectDeregisterAll ();
-int CmiGridObjectLookup (int gid, int nInts, int index1, int index2, int index3);
+#if CMK_GRID_QUEUE_AVAILABLE
+int CmiGridQueueGetInterval ();
+int CmiGridQueueGetThreshold ();
+void CmiGridQueueRegister (int gid, int nInts, int index1, int index2, int index3);
+void CmiGridQueueDeregister (int gid, int nInts, int index1, int index2, int index3);
+void CmiGridQueueDeregisterAll ();
+int CmiGridQueueLookup (int gid, int nInts, int index1, int index2, int index3);
+int CmiGridQueueLookupMsg (char *msg);
 #endif
 
 #if CMK_PERSISTENT_COMM

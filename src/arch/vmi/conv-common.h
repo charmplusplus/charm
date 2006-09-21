@@ -76,4 +76,4 @@
 
 #define CMK_LBDB_ON                                        1
 
-#define CMK_GRID_OBJECT_PRIORITIZATION                     0
+#define CMK_GRID_QUEUE_AVAILABLE                           0
