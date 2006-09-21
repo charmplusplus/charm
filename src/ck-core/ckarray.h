@@ -477,6 +477,14 @@ private:
 #endif
 public:
   void inmem_checkpoint(CkArrayCheckPTReqMessage *m);
+#if CMK_GRID_QUEUE_AVAILABLE
+public:
+  int grid_queue_interval;
+  int grid_queue_threshold;
+  int msg_count;
+  int msg_count_grid;
+  int border_flag;
+#endif
 };
 inline int *CkArrayListener::ckGetData(ArrayElement *el) const
   {return &el->listenerData[dataOffset];}

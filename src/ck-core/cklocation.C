@@ -17,10 +17,8 @@ Orion Sky Lawlor, olawlor@acm.org 9/29/2001
 #include "LBDatabase.h"
 #endif // CMK_LBDB_ON
 
-#if CMK_GRID_OBJECT_PRIORITIZATION
+#if CMK_GRID_QUEUE_AVAILABLE
 CpvExtern(void *, CkGridObject);
-
-extern "C" int CmiGetCluster (int pe);
 #endif
 
 /************************** Debugging Utilities **************/
@@ -1019,8 +1017,8 @@ CmiBool CkLocRec_local::deliver(CkArrayMessage *msg,CkDeliver_t type,int opts)
 			the_lbdb->ObjectStop(objHandle);
 		}
 #endif
-#if CMK_GRID_OBJECT_PRIORITIZATION
-		CpvAccess(CkGridObject) = obj;
+#if CMK_GRID_QUEUE_AVAILABLE
+		CpvAccess(CkGridObject) = obj;   // retain a pointer to the sending object (needed later)
 #endif
 		CmiBool status = invokeEntry(obj,(void *)msg,msg->array_ep(),doFree);
 #if CMK_LBDB_ON
@@ -1597,7 +1595,7 @@ void CkLocMgr::deliver(CkMessage *m,CkDeliver_t type,int opts) {
 		}
 	}
 #endif
-#if CMK_GRID_OBJECT_PRIORITIZATION
+#if CMK_GRID_QUEUE_AVAILABLE
 	int gridSrcPE;
 	int gridSrcCluster;
 	int gridDestPE;
@@ -1607,30 +1605,71 @@ void CkLocMgr::deliver(CkMessage *m,CkDeliver_t type,int opts) {
 	CkGroupID gid;
 	int *data;
 
-	obj = (CkMigratable *) CpvAccess(CkGridObject);
-	if (obj) {
-	  gridSrcPE = CkMyPe ();
-	  if (rec) {
-	    gridDestPE = rec->lookupProcessor ();
-	  } else {
-	    gridDestPE = homePe (msg->array_index ());
-	  }
-	  gridSrcCluster = CmiGetCluster (gridSrcPE);
-	  gridDestCluster = CmiGetCluster (gridDestPE);
-	  if (gridSrcCluster != gridDestCluster) {
-	    obj2 = dynamic_cast<ArrayElement *> (obj);
-	    if (obj2 > 0) {
-	      printf ("BORDER OBJECT -- src PE=%d, Cluster=%d - dest PE=%d, Cluster=%d\n", gridSrcPE, gridSrcCluster,
-		                                                                           gridDestPE, gridDestCluster);
-	      gid = obj2->ckGetArrayID();
-	      data = obj2->thisIndexMax.data();
-	      printf ("\tobj information = (%d, nInts=%d, (%d, %d, %d))\n", gid.idx,
-		                                                            obj2->thisIndexMax.nInts,
-		                                                            data[0],
-		                                                            data[1],
-		                                                            data[2]);
+	obj = (CkMigratable *) CpvAccess(CkGridObject);   // CkGridObject is a pointer to the sending object (retained earlier)
+	if (obj != NULL) {
+	  obj2 = dynamic_cast<ArrayElement *> (obj);
+	  if (obj2 > 0) {
+	    // Get the sending object's array gid and indexes.
+	    // These are guaranteed to exist due to the succeeding dynamic cast above.
+	    gid = obj2->ckGetArrayID ();
+	    data = obj2->thisIndexMax.data ();
+
+	    // Get the source PE and destination PE.
+	    gridSrcPE = CkMyPe ();
+	    if (rec != NULL) {
+	      gridDestPE = rec->lookupProcessor ();
+	    } else {
+	      gridDestPE = homePe (msg->array_index ());
+	    }
+
+	    // Get the source cluster and destination cluster.
+	    gridSrcCluster = CmiGetCluster (gridSrcPE);
+	    gridDestCluster = CmiGetCluster (gridDestPE);
+
+	    // If the Grid queue interval is greater than zero, it means that the more complicated
+	    // technique for registering border objects that exceed a specified threshold of
+	    // cross-cluster messages within a specified interval (and deregistering border objects
+	    // that do not meet this threshold) is used.  Otherwise a much simpler technique is used
+	    // where a border object is registered immediately upon sending a single cross-cluster
+	    // message (and deregistered when load balancing takes place).
+	    if (obj2->grid_queue_interval > 0) {
+	      // Increment the sending object's count of all messages.
+	      obj2->msg_count += 1;
+
+	      // If the source cluster and destination cluster differ, this is a Grid message.
+	      // (Increment the count of all Grid messages.)
+	      if (gridSrcCluster != gridDestCluster) {
+		obj2->msg_count_grid += 1;
+	      }
+
+	      // If the number of messages exceeds the interval, check to see if the object has
+	      // sent enough cross-cluster messages to qualify as a border object.
+	      if (obj2->msg_count >= obj2->grid_queue_interval) {
+		if (obj2->msg_count_grid >= obj2->grid_queue_threshold) {
+		  // The object is a border object; if it is not already registered, register it.
+		  if (!obj2->border_flag) {
+		    CmiGridQueueRegister (gid.idx, obj2->thisIndexMax.nInts, data[0], data[1], data[2]);
+		  }
+		  obj2->border_flag = 1;
+		} else {
+		  // The object is not a border object; if it is registered, deregister it.
+		  if (obj2->border_flag) {
+		    CmiGridQueueDeregister (gid.idx, obj2->thisIndexMax.nInts, data[0], data[1], data[2]);
+		  }
+		  obj2->border_flag = 0;
+		}
+		// Reset the counts.
+		obj2->msg_count = 0;
+		obj2->msg_count_grid = 0;
+	      }
+	    } else {
+	      if (gridSrcCluster != gridDestCluster) {
+		CmiGridQueueRegister (gid.idx, obj2->thisIndexMax.nInts, data[0], data[1], data[2]);
+	      }
 	    }
 	  }
+
+	  // Reset the CkGridObject pointer.
 	  CpvAccess(CkGridObject) = NULL;
 	}
 #endif

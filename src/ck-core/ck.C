@@ -924,9 +924,21 @@ static void _skipCldHandler(void *converseMsg)
 {
   register envelope *env = (envelope *)(converseMsg);
   CmiSetHandler(converseMsg, CmiGetXHandler(converseMsg));
+#if CMK_GRID_QUEUE_AVAILABLE
+  if (CmiGridQueueLookupMsg ((char *) converseMsg)) {
+    CqsEnqueueGeneral ((Queue) CpvAccess (CsdGridQueue),
+		       env, env->getQueueing (), env->getPriobits (),
+		       (unsigned int *) env->getPrioPtr ());
+  } else {
+    CqsEnqueueGeneral ((Queue) CpvAccess (CsdSchedQueue),
+		       env, env->getQueueing (), env->getPriobits (),
+		       (unsigned int *) env->getPrioPtr ());
+  }
+#else
   CqsEnqueueGeneral((Queue)CpvAccess(CsdSchedQueue),
   	env, env->getQueueing(),env->getPriobits(),
   	(unsigned int *)env->getPrioPtr());
+#endif
 }
 
 

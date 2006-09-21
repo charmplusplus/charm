@@ -188,6 +188,16 @@ void ArrayElement::initBasics(void)
   if (CkpvAccess(CkSaveRestorePrefetch)) 
     return; /* Just restoring from disk--don't try to set up anything. */
 #endif
+#if CMK_GRID_QUEUE_AVAILABLE
+	grid_queue_interval = 0;
+	grid_queue_threshold = 0;
+	msg_count = 0;
+	msg_count_grid = 0;
+	border_flag = 0;
+
+	grid_queue_interval = CmiGridQueueGetInterval ();
+	grid_queue_threshold = CmiGridQueueGetThreshold ();
+#endif
   ArrayElement_initInfo &info=CkpvAccess(initInfo);
   thisArray=info.thisArray;
   thisArrayID=info.thisArrayID;
@@ -207,8 +217,8 @@ ArrayElement::ArrayElement(void)
 #if CMK_MEM_CHECKPOINT
         init_checkpt();
 #endif
-
 }
+
 ArrayElement::ArrayElement(CkMigrateMessage *m) 
 {
 	initBasics();
@@ -260,6 +270,18 @@ void ArrayElement::pup(PUP::er &p)
   p(budPEs, 2);
 #endif
   p.syncComment(PUP::sync_last_system,"ArrayElement");
+#if CMK_GRID_QUEUE_AVAILABLE
+  p(grid_queue_interval);
+  p(grid_queue_threshold);
+  p(msg_count);
+  p(msg_count_grid);
+  p(border_flag);
+  if (p.isUnpacking ()) {
+    msg_count = 0;
+    msg_count_grid = 0;
+    border_flag = 0;
+  }
+#endif
 }
 
 char *ArrayElement::ckDebugChareName(void) {
