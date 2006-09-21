@@ -369,7 +369,7 @@ public:
 	} else if (nTimes % n_loadbalance == 0) {
           if (nTimes/n_loadbalance == 1 && traceIsOn() == 0)
             specialTracing = 1;
-          if (specialTracing) {
+          if (1) {
             if (nTimes/n_loadbalance == 1) traceBegin();
             if (nTimes/n_loadbalance == 2) traceEnd();
           }
