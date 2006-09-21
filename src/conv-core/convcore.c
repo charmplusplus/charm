@@ -169,8 +169,9 @@ void CMI_VMI_CmiFree (void *ptr);
 void* elan_CmiAlloc(int size);
 #endif
 
-#if CMK_GRID_OBJECT_PRIORITIZATION
+#if CMK_GRID_QUEUE_AVAILABLE
 CpvDeclare(void *, CkGridObject);
+CpvDeclare(void *, CsdGridQueue);
 #endif
 
 
@@ -1193,7 +1194,9 @@ void CsdSchedulerState_new(CsdSchedulerState_t *s)
 	s->nodeQ=CsvAccess(CsdNodeQueue);
 	s->nodeLock=CsvAccess(CsdNodeQueueLock);
 #endif
-	
+#if CMK_GRID_QUEUE_AVAILABLE
+	s->gridQ=CpvAccess(CsdGridQueue);
+#endif
 }
 
 void *CsdNextMessage(CsdSchedulerState_t *s) {
@@ -1217,6 +1220,12 @@ void *CsdNextMessage(CsdSchedulerState_t *s) {
             CpvAccess(cQdState)->mProcessed++;
             return msg;
         }
+#if CMK_GRID_QUEUE_AVAILABLE
+	CqsDequeue (s->gridQ, (void **) &msg);
+	if (msg != NULL) {
+	  return (msg);
+	}
+#endif
 #if CMK_NODE_QUEUE_AVAILABLE
 	if (NULL!=(msg=CmiGetNonLocalNodeQ())) return msg;
 	if (!CqsEmpty(s->nodeQ)
@@ -1520,6 +1529,11 @@ void CsdInit(argv)
 	CsvAccess(CsdNodeQueue) = (void *)CqsCreate();
   }
   CmiNodeAllBarrier();
+#endif
+
+#if CMK_GRID_QUEUE_AVAILABLE
+  CsvInitialize(void *, CsdGridQueue);
+  CpvAccess(CsdGridQueue) = (void *)CqsCreate();
 #endif
 
   CpvAccess(CsdStopFlag)  = 0;

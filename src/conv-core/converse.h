@@ -456,6 +456,9 @@ typedef struct {
 CpvExtern(CmiHandlerInfo*, CmiHandlerTable);
 CpvExtern(int,         CmiHandlerMax);
 CpvExtern(void*,       CsdSchedQueue);
+#if CMK_GRID_QUEUE_AVAILABLE
+CpvExtern(void *,      CsdGridQueue);
+#endif
 #if CMK_OBJECT_QUEUE_AVAILABLE
 CpvExtern(void*,       CsdObjQueue);
 #endif
@@ -710,6 +713,9 @@ typedef struct {
   void *objQ;
 #endif
   CmiNodeLock nodeLock;
+#if CMK_GRID_QUEUE_AVAILABLE
+  void *gridQ;
+#endif
 } CsdSchedulerState_t;
 extern void CsdSchedulerState_new(CsdSchedulerState_t *state);
 extern void *CsdNextMessage(CsdSchedulerState_t *state);
@@ -1446,6 +1452,28 @@ CpvExtern(char *,_validProcessors);
 
 #if defined(__cplusplus)
 }
+#endif
+
+#if CMK_GRID_QUEUE_AVAILABLE
+#if defined(__cplusplus)
+extern "C" int CmiGetCluster (int pe);
+extern "C" int CmiGridQueueGetInterval ();
+extern "C" int CmiGridQueueGetThreshold ();
+extern "C" void CmiGridQueueRegister (int gid, int nInts, int index1, int index2, int index3);
+extern "C" void CmiGridQueueDeregister (int gid, int nInts, int index1, int index2, int index3);
+extern "C" void CmiGridQueueDeregisterAll ();
+extern "C" int CmiGridQueueLookup (int gid, int nInts, int index1, int index2, int index3);
+extern "C" int CmiGridQueueLookupMsg (char *msg);
+#else
+extern int CmiGetCluster (int pe);
+extern int CmiGridQueueGetInterval ();
+extern int CmiGridQueueGetThreshold ();
+extern void CmiGridQueueRegister (int gid, int nInts, int index1, int index2, int index3);
+extern void CmiGridQueueDeregister (int gid, int nInts, int index1, int index2, int index3);
+extern void CmiGridQueueDeregisterAll ();
+extern int CmiGridQueueLookup (int gid, int nInts, int index1, int index2, int index3);
+extern int CmiGridQueueLookupMsg (char *msg);
+#endif
 #endif
 
 #include "debug-conv.h"
