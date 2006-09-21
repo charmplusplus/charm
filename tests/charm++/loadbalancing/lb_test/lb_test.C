@@ -43,6 +43,17 @@ int n_loadbalance;
 int cycle_count,element_count,step_count,print_count;
 int min_us,max_us;
 
+int specialTracing = 0;
+
+void initialize()
+{
+  if (traceIsOn() == 0) {
+    if (CkMyPe() == 0)
+    CkPrintf("traceprojections was off at initial time.\n");
+    specialTracing = 1;
+  }
+}
+
 class HiMsg : public CMessage_HiMsg {
 public:
   int length;
@@ -274,7 +285,6 @@ public:
       future_receives[i]=0;
 	
     usesAtSync=CmiTrue;
-    specialTracing = 0;
 
     contribute(sizeof(i), &i, CkReduction::sum_int);
   }
@@ -301,7 +311,6 @@ public:
 	p(busywork);
 	p(n_received);
 	p(future_receives,future_bufsz);
-        p(specialTracing);
   }
 
   void Compute(HiMsg *m) { 
@@ -367,11 +376,9 @@ public:
 	  CProxy_main mproxy(mid);
 	  mproxy.maindone();
 	} else if (nTimes % n_loadbalance == 0) {
-          if (nTimes/n_loadbalance == 1 && traceIsOn() == 0)
-            specialTracing = 1;
-          if (1) {
+          if (specialTracing) {
             if (nTimes/n_loadbalance == 1) traceBegin();
-            if (nTimes/n_loadbalance == 2) traceEnd();
+            if (nTimes/n_loadbalance == 3) traceEnd();
           }
 	  //We're not done yet...
 	  //Either load balance, or send a message to the next guy
@@ -487,8 +494,6 @@ private:
   int n_received;
   int future_receives[future_bufsz];
   int resumed;
-
-  int specialTracing;
 };
 
 #include "lb_test.def.h"
