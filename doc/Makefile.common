@@ -32,7 +32,7 @@ all: ps pdf html
 ps: $(FILE).ps
 
 $(FILE).dvi: $(TEX) $(FILE).aux 
-	tex $(FILE).tex
+	latex $(FILE).tex
 
 $(FILE).ps: $(FILE).dvi
 	dvips -t letter -f $(FILE).dvi > $(FILE).ps
