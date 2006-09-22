@@ -730,8 +730,8 @@ void CentralLB::MigrationDone(int balancing)
 	thisProxy [CkMyPe()].ResumeClients(balancing);
     }	
   }	
-#if CMK_GRID_OBJECT_PRIORITIZATION
-  CmiGridObjectDeregisterAll ();
+#if CMK_GRID_QUEUE_AVAILABLE
+  CmiGridQueueDeregisterAll ();
 #endif
 #endif
 }
