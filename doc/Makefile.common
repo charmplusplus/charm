@@ -86,7 +86,7 @@ web: all
 	/bin/cp $(FILE).ps $(WEBDIR)/ps/$(DEST).ps
 	chmod 664 $(WEBDIR)/ps/$(DEST).ps
 	/bin/cp $(FILE).pdf $(WEBDIR)/pdf/$(DEST).pdf
-        chmod 664 $(WEBDIR)/pdf/$(DEST).pdf
+	chmod 664 $(WEBDIR)/pdf/$(DEST).pdf
 	/bin/rm -rf $(WEBDIR)/html/$(DEST)
 	/bin/cp -R $(FILE) $(WEBDIR)/html/$(DEST)
 	find $(WEBDIR)/html/$(DEST) $(WEBDIR)/p*/$(DEST).p* -type f -exec chmod 664 {} \;
