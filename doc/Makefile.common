@@ -91,4 +91,5 @@ web: all
 	/bin/cp -R $(FILE) $(WEBDIR)/html/$(DEST)
 	find $(WEBDIR)/html/$(DEST) $(WEBDIR)/p*/$(DEST).p* -type f -exec chmod 664 {} \;
 	find $(WEBDIR)/html/$(DEST) -type d -exec chmod 775 {} \;
+	chgrp -R kale $(WEBDIR)/html/$(DEST) $(WEBDIR)/p*/$(DEST).p*
 
