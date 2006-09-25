@@ -132,6 +132,8 @@ FDECL {
 #define mpi_yield FTN_NAME ( MPI_YIELD , mpi_yield )
 #define mpi_resume FTN_NAME ( MPI_RESUME, mpi_resume )
 #define mpi_print FTN_NAME( MPI_PRINT , mpi_print )
+#define mpi_register_load FTN_NAME( MPI_REGISTER_LOAD, mpi_register_load)
+#define mpi_unregister_load FTN_NAME( MPI_UNREGISTER_LOAD, mpi_unregister_load)
 #define mpi_register FTN_NAME( MPI_REGISTER , mpi_register )
 #define mpi_migrate FTN_NAME( MPI_MIGRATE , mpi_migrate )
 #define mpi_migrateto FTN_NAME( MPI_MIGRATETO , mpi_migrateto )
@@ -824,6 +826,16 @@ void mpi_migrate(void)
 void mpi_migrateto(int *destPE)
 {
   AMPI_Migrateto(*destPE);
+}
+
+void mpi_register_load(MPI_LoadFn f, int id)
+{
+  AMPI_Register_load(f, id);
+}
+
+void mpi_unregister_load()
+{
+  AMPI_Unregister_load();
 }
 
 void mpi_register(void *d, MPI_PupFn f)

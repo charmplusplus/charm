@@ -619,6 +619,8 @@ ampiParent::ampiParent(MPI_Comm worldNo_,CProxy_TCharm threads_)
   STARTUP_DEBUG("ampiParent> starting up")
   thread=NULL;
   worldPtr=NULL;
+  loadFn = NULL;
+  userdata_id = -1;
   myDDT=&myDDTsto;
   prepareCtv();
 
@@ -629,8 +631,11 @@ ampiParent::ampiParent(MPI_Comm worldNo_,CProxy_TCharm threads_)
 ampiParent::ampiParent(CkMigrateMessage *msg):CBase_ampiParent(msg) {
   thread=NULL;
   worldPtr=NULL;
+  loadFn = NULL;
+  userdata_id = -1;
   myDDT=&myDDTsto;
-	AsyncEvacuate(CmiFalse);
+
+  AsyncEvacuate(CmiFalse);
 }
 
 void ampiParent::pup(PUP::er &p) {
@@ -4067,6 +4072,22 @@ void *MPI_Get_userdata(int idx)
 {
   AMPIAPI("AMPI_Get_userdata");
   return TCHARM_Get_userdata(idx);
+}
+
+CDECL
+void AMPI_Register_load(MPI_LoadFn f, int id)
+{
+  AMPIAPI("AMPI_Register_load");
+  ampiParent *ptr = getAmpiParent();
+  ptr->enable_userload(f, id);
+}
+
+CDECL
+void AMPI_Unregister_load()
+{
+  AMPIAPI("AMPI_Unregister_load");
+  ampiParent *ptr = getAmpiParent();
+  ptr->disable_userload();
 }
 
 CDECL

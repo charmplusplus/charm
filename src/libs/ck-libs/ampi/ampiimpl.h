@@ -982,6 +982,9 @@ class ampiParent : public CBase_ampiParent {
     ampiCommStruct worldStruct;
     ampiCommStruct selfStruct;
 
+    MPI_LoadFn    loadFn;        // model-based load balancing
+    int           userdata_id;   // context
+
     CkPupPtrVec<ampiCommStruct> splitComm; //Communicators from MPI_Comm_split
     CkPupPtrVec<ampiCommStruct> groupComm; //Communicators from MPI_Comm_group
     CkPupPtrVec<ampiCommStruct> cartComm;  //Communicators from MPI_Cart_create
@@ -1095,6 +1098,25 @@ public:
     }
 
     void pup(PUP::er &p);
+
+    inline void enable_userload(MPI_LoadFn f, int id) {
+      setLBLoad = CmiTrue;
+      loadFn = f;
+      userdata_id = id;
+    }
+    inline void disable_userload() {
+      setLBLoad = CmiFalse;
+      loadFn = NULL;
+      userdata_id = -1;
+    }
+    virtual void UserSetLBLoad(void) {
+      if (loadFn) {
+        void *data = NULL;
+        if (userdata_id != -1)
+          data = TCHARM_Get_userdata(userdata_id);
+        loadFn(data);
+      }
+    }
 
     void startCheckpoint(char* dname);
     void Checkpoint(int len, char* dname);
