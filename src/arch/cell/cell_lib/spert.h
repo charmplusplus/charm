@@ -54,6 +54,7 @@
 #define SPE_MESSAGE_STATE_FINISHED            11
 #define SPE_MESSAGE_STATE_ERROR               12
 #define SPE_MESSAGE_STATE_MAX                 12
+#define SPE_MESSAGE_NUM_STATES                (SPE_MESSAGE_STATE_MAX - SPE_MESSAGE_STATE_MIN + 1)
 
 // SPE Function Indexes
 #define SPE_FUNC_INDEX_INIT       (-2)
