@@ -248,6 +248,9 @@ extern int getWorkRequestID(WRHandle wrHandle);
 extern void enableTrace();
 extern void disableTrace();
 
+// DEBUG
+extern void displayLastWRTimes();
+
 
 #ifdef __cplusplus
 }  // end extern "C"
