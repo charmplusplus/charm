@@ -367,6 +367,10 @@ fmain-ok: fmain.f90
 	-@cp fmain.o ../lib
 	-@touch fmain-ok
 
+QT:
+	cd QuickThreads && make clean
+	make QuickThreads/libqt.a
+
 QuickThreads/libqt.a:  $(CVHEADERS)
 	cd QuickThreads;./configure
 	rm -f QuickThreads/libqt.a
