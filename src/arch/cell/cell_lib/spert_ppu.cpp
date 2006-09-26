@@ -4,6 +4,9 @@
 #include <string.h>
 #include <unistd.h>
 
+// DEBUG
+#include <sys/time.h>
+
 extern "C" {
   #include <libspe.h>
 }
@@ -20,11 +23,21 @@ extern "C" {
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Defines
 
-#define WRHANDLES_NUM_INITIAL  (64)
-#define WRHANDLES_GROW_SIZE    (16)
+#define WRHANDLES_NUM_INITIAL  (256)
+#define WRHANDLES_GROW_SIZE    (128)
 
 #define MESSAGE_RETURN_CODE_INDEX(rc)  ((unsigned int)(rc) & 0x0000FFFF)
 #define MESSAGE_RETURN_CODE_ERROR(rc)  (((unsigned int)(rc) >> 16) & 0x0000FFFF)
+
+#define USE_MESSAGE_QUEUE_FREE_LIST   1  // Set to non-zero to use a linked list of free message queue entries.
+                                         // Note: This can get a free message queue entry in constant time,
+                                         //   i.e. - not f(# SPEs, message queue length), but does not use the
+                                         //   heuristics for load-balancing (at the moment).
+                                         // Note: Currently, the SPE affinity mask is ignored if this is set.
+
+#define ENABLE_LAST_WR_TIMES          0  // Set to allow a call to displayLastWRTimes() to print the last time
+                                         //   (according to gettimeofday()) that a work request finished for
+                                         //   each SPE.
 
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -34,6 +47,13 @@ typedef struct __pointer_list {
   void *ptr;
   struct __pointer_list *next;
 } PtrList;
+
+typedef struct __msgQEntry_list {
+  SPEMessage* msgQEntryPtr;
+  int speIndex;
+  int entryIndex;
+  struct __msgQEntry_list *next;
+} MSGQEntryList;
 
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -62,6 +82,13 @@ WorkRequest *wrFinishedTail = NULL;
 WorkRequest *wrFreeHead = NULL;
 WorkRequest *wrFreeTail = NULL;
 
+// A Queue of free Work Request Entries
+#if USE_MESSAGE_QUEUE_FREE_LIST != 0
+MSGQEntryList __msgQEntries[NUM_SPE_THREADS * SPE_MESSAGE_QUEUE_LENGTH];
+MSGQEntryList *msgQEntryFreeHead = NULL;
+MSGQEntryList *msgQEntryFreeTail = NULL;
+#endif
+
 // This is used in an attempt to more evenly distribute the workload amongst all the SPE Threads
 int speSendStartIndex = 0;
 
@@ -81,6 +108,7 @@ SPEThread* createSPEThread(SPEData *speData);
 SPEThread** createSPEThreads(SPEThread **speThreads, int numThreads);
 
 int sendSPEMessage(SPEThread* speThread, WorkRequest* wrPtr, int command);
+int sendSPEMessage(SPEThread* speThread, int qIndex, WorkRequest* wrPtr, int command);
 int sendSPECommand(SPEThread* speThread, int command);
 
 WorkRequest* createWRHandles(int numHandles);
@@ -176,6 +204,23 @@ int InitOffloadAPI(void (*cbFunc)(void*)) {
   wrFreeHead = createWRHandles(WRHANDLES_NUM_INITIAL);
   wrFreeTail = &(wrFreeHead[WRHANDLES_NUM_INITIAL - 1]);
 
+  #if USE_MESSAGE_QUEUE_FREE_LIST != 0
+    // Initialize the wrEntryFreeList
+    for (int entryI = 0; entryI < SPE_MESSAGE_QUEUE_LENGTH; entryI++) {
+      for (int speI = 0; speI < NUM_SPE_THREADS; speI++) {
+        register int index = entryI + (speI * NUM_SPE_THREADS);
+        __msgQEntries[index].msgQEntryPtr = (SPEMessage*)(((char*)speThreads[speI]->speData->messageQueue) + (entryI * SIZEOF_16(SPEMessage)));
+        __msgQEntries[index].speIndex = speI;
+        __msgQEntries[index].entryIndex = entryI;
+        __msgQEntries[index].next = ((entryI == (SPE_MESSAGE_QUEUE_LENGTH - 1) && speI == (NUM_SPE_THREADS - 1)) ?
+                                      (NULL) :
+                                      (&(__msgQEntries[index + 1])));
+      }
+    }
+    msgQEntryFreeHead = &(__msgQEntries[0]);
+    msgQEntryFreeTail = &(__msgQEntries[(NUM_SPE_THREADS * SPE_MESSAGE_QUEUE_LENGTH) - 1]);
+  #endif
+
   return 1;  // Sucess
 }
 
@@ -249,19 +294,19 @@ WRHandle sendWorkRequest(int funcIndex,
   OffloadAPIProgress();
 
   // Verify the parameters
-  if (funcIndex < 0) return INVALID_WRHandle;
-  if (readWritePtr != NULL && readWriteLen <= 0) return INVALID_WRHandle;
-  if (readOnlyPtr != NULL && readOnlyLen <= 0) return INVALID_WRHandle;
-  if (writeOnlyPtr != NULL && writeOnlyLen <= 0) return INVALID_WRHandle;
-  if ((flags & WORK_REQUEST_FLAGS_LIST) == WORK_REQUEST_FLAGS_LIST) {
+  if (__builtin_expect(funcIndex < 0, 0)) return INVALID_WRHandle;
+  if (__builtin_expect((readWritePtr != NULL && readWriteLen <= 0) || (readWriteLen > 0 && readWritePtr == NULL), 0)) return INVALID_WRHandle;
+  if (__builtin_expect((readOnlyPtr  != NULL && readOnlyLen  <= 0) || (readOnlyLen  > 0 && readOnlyPtr  == NULL), 0)) return INVALID_WRHandle;
+  if (__builtin_expect((writeOnlyPtr != NULL && writeOnlyLen <= 0) || (writeOnlyLen > 0 && writeOnlyPtr == NULL), 0)) return INVALID_WRHandle;
+  if (__builtin_expect((flags & WORK_REQUEST_FLAGS_LIST) == WORK_REQUEST_FLAGS_LIST, 0)) {
     #if DEBUG_DISPLAY >= 1
-      fprintf(stderr, "OffloadAPI :: WARNING :: sendWorkRequest() call made with WORK_REQUEST_FLAGS_LIST flag set... ignoring...\n");
+      fprintf(stderr, " --- OffloadAPI :: WARNING :: sendWorkRequest() call made with WORK_REQUEST_FLAGS_LIST flag set... ignoring...\n");
     #endif
-    flags &= (~WORK_REQUEST_FLAGS_LIST);
+    flags &= (~WORK_REQUEST_FLAGS_LIST);  // Clear the work request's list flag
   }
 
   // Ensure that there is at least one free WRHandle structure
-  if (wrFreeHead == NULL) {  // Out of free work request structures
+  if (__builtin_expect(wrFreeHead == NULL, 0)) {  // Out of free work request structures
     // Add some more WRHandle structures to the wrFree list
     wrFreeHead = createWRHandles(WRHANDLES_GROW_SIZE);
     wrFreeTail = &(wrFreeHead[WRHANDLES_GROW_SIZE - 1]);
@@ -272,6 +317,9 @@ WRHandle sendWorkRequest(int funcIndex,
   wrFreeHead = wrFreeHead->next;
   if (wrFreeHead == NULL) wrFreeTail = NULL;
 
+  if (__builtin_expect(wrEntry->state != WORK_REQUEST_STATE_FREE, 0)) {
+    fprintf(stderr, " --- Offload API :: ERROR :: Work request struct with state != FREE in free list !!!!!\n");
+  }
   wrEntry->state = WORK_REQUEST_STATE_INUSE;
 
   // Fill in the WRHandle structure
@@ -303,35 +351,59 @@ WRHandle sendWorkRequest(int funcIndex,
   // TODO : Update this so the number of outstanding work requests that have been sent to each SPE Thread
   //   is used to pick the SPE Thread to send this request to (i.e. - Send to the thread will the SPE Thread
   //   with the least full message queue.)  For now, the speSendStartIndex heuristic should help.
-  processingSPEIndex = -1;
-  for (int i = 0; i < NUM_SPE_THREADS; i++) {
+  #if USE_MESSAGE_QUEUE_FREE_LIST == 0
 
-    // Check the affinity flag (if the bit for this SPE is not set, skip this SPE)
-    if (((0x01 << i) & speAffinityMask) != 0x00) {
+    processingSPEIndex = -1;
+    for (int i = 0; i < NUM_SPE_THREADS; i++) {
 
-      // NOTE: Since NUM_SPE_THREADS should be 8, the "% NUM_SPE_THREADS" should be transformed into masks/shifts
-      //   by strength reduction in the compiler when optimizations are turned on... for debuging purposes, leave them
-      //   as "% NUM_SPE_THREADS" in the code (if NUM_SPE_THREADS is reduced to save startup time in the simulator).
-      register int actualSPEThreadIndex = (i + speSendStartIndex) % NUM_SPE_THREADS;
-      sentIndex = sendSPEMessage(speThreads[actualSPEThreadIndex], wrEntry, SPE_MESSAGE_COMMAND_NONE);
+      // Check the affinity flag (if the bit for this SPE is not set, skip this SPE)
+      if (((0x01 << i) & speAffinityMask) != 0x00) {
 
-      if (sentIndex >= 0) {
-        speSendStartIndex = (actualSPEThreadIndex + 1) % NUM_SPE_THREADS;
-        processingSPEIndex = actualSPEThreadIndex;
+        // NOTE: Since NUM_SPE_THREADS should be 8, the "% NUM_SPE_THREADS" should be transformed into masks/shifts
+        //   by strength reduction in the compiler when optimizations are turned on... for debuging purposes, leave them
+        //   as "% NUM_SPE_THREADS" in the code (if NUM_SPE_THREADS is reduced to save startup time in the simulator).
+        register int actualSPEThreadIndex = (i + speSendStartIndex) % NUM_SPE_THREADS;
+        sentIndex = sendSPEMessage(speThreads[actualSPEThreadIndex], wrEntry, SPE_MESSAGE_COMMAND_NONE);
 
-        // Fill in the execution data into the work request (which SPE, which message queue entry)
-        wrEntry->speIndex = processingSPEIndex;
-        wrEntry->entryIndex = sentIndex;
+        if (sentIndex >= 0) {
+          speSendStartIndex = (actualSPEThreadIndex + 1) % NUM_SPE_THREADS;
+          processingSPEIndex = actualSPEThreadIndex;
 
-        break;
+          // Fill in the execution data into the work request (which SPE, which message queue entry)
+          wrEntry->speIndex = processingSPEIndex;
+          wrEntry->entryIndex = sentIndex;
+
+          break;
+        }
       }
     }
-  }
+
+  #else
+
+    // Check to see of the wrEntryFreeList has an entry
+    processingSPEIndex = -1;
+    if (msgQEntryFreeHead != NULL) {
+
+      // Remove the entry from the list
+      MSGQEntryList* msgQEntry = msgQEntryFreeHead;
+      msgQEntryFreeHead = msgQEntryFreeHead->next;
+      if (msgQEntryFreeHead == NULL) msgQEntryFreeTail = NULL;
+      msgQEntry->next = NULL;
+
+      // Fill in the cross-indexes
+      processingSPEIndex = msgQEntry->speIndex;
+      sentIndex = msgQEntry->entryIndex;
+
+      // Send the SPE Message
+      sendSPEMessage(speThreads[processingSPEIndex], sentIndex, wrEntry, SPE_MESSAGE_COMMAND_NONE);
+    }
+
+  #endif
 
   // Check to see if the message was sent or not
   if (processingSPEIndex < 0) {
 
-    if (wrEntry->traceFlag) {
+    if (__builtin_expect(wrEntry->traceFlag, 0)) {
       printf("OffloadAPI :: [TRACE] :: No Slots Open, Queuing Work Request...\n");
     }
 
@@ -363,7 +435,7 @@ WRHandle sendWorkRequest(int funcIndex,
 
   } else {
 
-    if (wrEntry->traceFlag) {
+    if (__builtin_expect(wrEntry->traceFlag, 0)) {
       printf("OffloadAPI :: [TRACE] :: Work Request Passed to SPE %d, slot %d... wrEntry = %p...\n", processingSPEIndex, sentIndex, wrEntry);
       displayMessageQueue(speThreads[processingSPEIndex]);
     }
@@ -372,8 +444,8 @@ WRHandle sendWorkRequest(int funcIndex,
     wrEntry->speIndex = processingSPEIndex;
     wrEntry->entryIndex = sentIndex;
 
-    if (wrEntry->next != NULL) {
-      printf(" ---- sendWorkRequest() ---- :: ERROR : Sent work request where wrEntry->next != NULL\n");
+    if (__builtin_expect(wrEntry->next != NULL, 0)) {
+      fprintf(stderr, " --- Offload API :: ERROR : Sent work request where wrEntry->next != NULL\n");
     }
   }
 
@@ -400,18 +472,19 @@ WRHandle sendWorkRequest_list(int funcIndex,
   OffloadAPIProgress();
 
   // Verify the parameters
-  if (funcIndex < 0) return INVALID_WRHandle;
-  if (dmaList == NULL) return INVALID_WRHandle;
-  if (numReadOnly == 0 && numReadWrite == 0 && numWriteOnly == 0) return INVALID_WRHandle;
-  if ((flags & (WORK_REQUEST_FLAGS_RW_IS_RO || WORK_REQUEST_FLAGS_RW_IS_WO)) != 0x00) {
+  if (__builtin_expect(funcIndex < 0, 0)) return INVALID_WRHandle;
+  if (__builtin_expect(dmaList == NULL, 0)) return INVALID_WRHandle;
+  if (__builtin_expect(numReadOnly == 0 && numReadWrite == 0 && numWriteOnly == 0, 0)) return INVALID_WRHandle;
+  if (__builtin_expect(numReadOnly < 0 || numReadWrite < 0 || numWriteOnly < 0, 0)) return INVALID_WRHandle;
+  if (__builtin_expect((flags & (WORK_REQUEST_FLAGS_RW_IS_RO || WORK_REQUEST_FLAGS_RW_IS_WO)) != 0x00, 0)) {
     #if DEBUG_DISPLAY >= 1
       fprintf(stderr, "OffloadAPI :: WARNING :: sendWorkRequest_list() call made with WORK_REQUEST_FLAGS_RW_TO_RO and/or WORK_REQUEST_FLAGS_RW_IS_WO flags set... ignoring...\n");
     #endif
-    flags &= (~(WORK_REQUEST_FLAGS_RW_IS_RO || WORK_REQUEST_FLAGS_RW_IS_WO));
+    flags &= (~(WORK_REQUEST_FLAGS_RW_IS_RO || WORK_REQUEST_FLAGS_RW_IS_WO));  // Force these flags to clear
   }
 
   // Ensure that there is at least one free WRHandle structure
-  if (wrFreeHead == NULL) {  // Out of free work request structures
+  if (__builtin_expect(wrFreeHead == NULL, 0)) {  // Out of free work request structures
     // Add some more WRHandle structures to the wrFree list
     wrFreeHead = createWRHandles(WRHANDLES_GROW_SIZE);
     wrFreeTail = &(wrFreeHead[WRHANDLES_GROW_SIZE - 1]);
@@ -421,6 +494,10 @@ WRHandle sendWorkRequest_list(int funcIndex,
   WorkRequest *wrEntry = wrFreeHead;
   wrFreeHead = wrFreeHead->next;
   if (wrFreeHead == NULL) wrFreeTail = NULL;
+
+  if (__builtin_expect(wrEntry->state != WORK_REQUEST_STATE_FREE, 0)) {
+    fprintf(stderr, " --- Offload API :: ERROR :: Work request struct with state != FREE in free list !!!!!\n");
+  }
   wrEntry->state = WORK_REQUEST_STATE_INUSE;
 
   // Fill in the WRHandle structure
@@ -452,22 +529,49 @@ WRHandle sendWorkRequest_list(int funcIndex,
   // TODO : Update this so the number of outstanding work requests that have been sent to each SPE Thread
   //   is used to pick the SPE Thread to send this request to (i.e. - Send to the thread with the SPE Thread
   //   with the least full message queue.)  For now, the speSendStartIndex heuristic should help.
-  processingSPEIndex = -1;
-  for (int i = 0; i < NUM_SPE_THREADS; i++) {
+  #if USE_MESSAGE_QUEUE_FREE_LIST == 0
 
-    // Check the affinity flag (if the bit for this SPE is not set, skip this SPE)
-    if (((0x01 << i) & speAffinityMask) != 0x00) {
+    processingSPEIndex = -1;
+    for (int i = 0; i < NUM_SPE_THREADS; i++) {
 
-      register int actualSPEThreadIndex = (i + speSendStartIndex) % NUM_SPE_THREADS;
-      sentIndex = sendSPEMessage(speThreads[actualSPEThreadIndex], wrEntry, SPE_MESSAGE_COMMAND_NONE);
+      // Check the affinity flag (if the bit for this SPE is not set, skip this SPE)
+      if (((0x01 << i) & speAffinityMask) != 0x00) {
 
-      if (sentIndex >= 0) {
-        speSendStartIndex = (actualSPEThreadIndex + 1) % NUM_SPE_THREADS;
-        processingSPEIndex = actualSPEThreadIndex;
-        break;
+        register int actualSPEThreadIndex = (i + speSendStartIndex) % NUM_SPE_THREADS;
+        sentIndex = sendSPEMessage(speThreads[actualSPEThreadIndex], wrEntry, SPE_MESSAGE_COMMAND_NONE);
+
+        if (sentIndex >= 0) {
+          speSendStartIndex = (actualSPEThreadIndex + 1) % NUM_SPE_THREADS;
+          processingSPEIndex = actualSPEThreadIndex;
+          break;
+        }
       }
     }
-  }
+
+  #else
+
+    // Check to see of the wrEntryFreeList has an entry
+    processingSPEIndex = -1;
+    if (msgQEntryFreeHead != NULL) {
+
+      // Remove the entry from the list
+      MSGQEntryList* msgQEntry = msgQEntryFreeHead;
+      msgQEntryFreeHead = msgQEntryFreeHead->next;
+      if (msgQEntryFreeHead == NULL) msgQEntryFreeTail = NULL;
+      msgQEntry->next = NULL;
+
+      // Fill in the cross-indexes
+      processingSPEIndex = msgQEntry->speIndex;
+      sentIndex = msgQEntry->entryIndex;
+      wrEntry->speIndex = msgQEntry->speIndex;
+      wrEntry->entryIndex = msgQEntry->entryIndex;
+
+      // Send the SPE Message
+      sendSPEMessage(speThreads[processingSPEIndex], sentIndex, wrEntry, SPE_MESSAGE_COMMAND_NONE);
+    }
+  
+
+  #endif
 
   // Check to see if the message was sent or not
   if (processingSPEIndex < 0) {
@@ -504,8 +608,8 @@ WRHandle sendWorkRequest_list(int funcIndex,
     wrEntry->speIndex = processingSPEIndex;
     wrEntry->entryIndex = sentIndex;
 
-    if (wrEntry->next != NULL) {
-      printf(" ---- sendWorkRequest() ---- :: ERROR : Sent work request where wrEntry->next != NULL\n");
+    if (__builtin_expect(wrEntry->next != NULL, 0)) {
+      fprintf(stderr, " --- Offload API :: ERROR : Sent work request where wrEntry->next != NULL\n");
     }
   }
 
@@ -515,10 +619,6 @@ WRHandle sendWorkRequest_list(int funcIndex,
 
 
 // Returns: Non-zero if finished, zero otherwise
-// TODO : What should really happen... Once OffloadAPIProgress() detects that a work request has finished, it should
-//   remove that work request from the message queue so another message can be sent to the SPE without requiring a
-//   call to isFinished() first.  For now, just require a call to isFinished() to clean up the message queue entry
-//   to get this working.
 extern "C"
 int isFinished(WRHandle wrHandle) {
 
@@ -528,21 +628,21 @@ int isFinished(WRHandle wrHandle) {
   OffloadAPIProgress();
 
   // Check to see if the work request has finished
-  if (wrHandle != INVALID_WRHandle && wrHandle->state == WORK_REQUEST_STATE_FINISHED) {
+  if (__builtin_expect(wrHandle != INVALID_WRHandle, 1) && wrHandle->state == WORK_REQUEST_STATE_FINISHED) {
 
     // Clear the entry
-    wrHandle->speIndex = -1;
-    wrHandle->entryIndex = -1;
-    wrHandle->funcIndex = -1;
-    wrHandle->readWritePtr = NULL;
-    wrHandle->readWriteLen = 0;
-    wrHandle->readOnlyPtr = NULL;
-    wrHandle->readOnlyLen = 0;
-    wrHandle->writeOnlyPtr = NULL;
-    wrHandle->writeOnlyLen = 0;
-    wrHandle->flags = WORK_REQUEST_FLAGS_NONE;
-    wrHandle->callbackFunc = NULL;
-    wrHandle->next = NULL;
+    //wrHandle->speIndex = -1;
+    //wrHandle->entryIndex = -1;
+    //wrHandle->funcIndex = -1;
+    //wrHandle->readWritePtr = NULL;
+    //wrHandle->readWriteLen = 0;
+    //wrHandle->readOnlyPtr = NULL;
+    //wrHandle->readOnlyLen = 0;
+    //wrHandle->writeOnlyPtr = NULL;
+    //wrHandle->writeOnlyLen = 0;
+    //wrHandle->flags = WORK_REQUEST_FLAGS_NONE;
+    //wrHandle->callbackFunc = NULL;
+    //wrHandle->next = NULL;
 
     // Add this entry to the free list
     wrHandle->state = WORK_REQUEST_STATE_FREE;
@@ -559,62 +659,6 @@ int isFinished(WRHandle wrHandle) {
   return rtnCode;
 }
 
-/*
-  // Otherwise, if execution reaches here
-
-
-  // Search the wrFinished list for the handle (remove it if it is there)
-  WorkRequest *wrEntry = wrFinishedHead;
-  WorkRequest *wrEntryPrev = NULL;
-  while (wrEntry != NULL) {
-    if (wrEntry == wrHandle) {
-
-      // Remove the entry, clear it, and place it back in the wrFree list
-      if (wrEntryPrev == NULL) {  // was the head
-        wrFinishedHead = wrEntry->next;
-        if (wrFinishedHead == NULL) wrFinishedTail = NULL;
-      } else {
-        wrEntryPrev->next = wrEntry->next;
-        if (wrEntryPrev->next == NULL) wrFinishedTail = wrEntryPrev;
-      }
-      
-      // Clear fields as needed
-      wrEntry->speIndex = -1;
-      wrEntry->entryIndex = -1;
-      wrEntry->funcIndex = -1;
-      wrEntry->readWritePtr = NULL;
-      wrEntry->readWriteLen = 0;
-      wrEntry->readOnlyPtr = NULL;
-      wrEntry->readOnlyLen = 0;
-      wrEntry->writeOnlyPtr = NULL;
-      wrEntry->writeOnlyLen = 0;
-      wrEntry->flags = WORK_REQUEST_FLAGS_NONE;
-      wrEntry->userData = NULL;
-      wrEntry->callbackFunc = NULL;
-      wrEntry->next = NULL;
-
-      // Add this entry to the free list now that is done being used
-      if (wrFreeTail == NULL) {
-        wrFreeTail = wrFreeHead = wrEntry;
-      } else {
-        wrFreeTail->next = wrEntry;
-        wrFreeTail = wrEntry;
-      }
-
-      // Found it, so just return non-zero ("finished")
-      return -1;
-    }
-
-    // Try the next entry
-    wrEntryPrev = wrEntry;
-    wrEntry = wrEntry->next;
-  }
-
-  return 0;  // Not finished
-}
-*/
-
-
 
 // TODO : It would be nice to change this from a busy wait to something that busy waits for a
 //   short time and then gives up and blocks (Maybe get some OS stuff out of the way while we
@@ -624,10 +668,7 @@ extern "C"
 void waitForWRHandle(WRHandle wrHandle) {
 
   // Verify the WRHandle
-  //int speIndex = wrHandle->speIndex;
-  //int msgIndex = wrHandle->entryIndex;
-  //if (speIndex < 0 || speIndex >= NUM_SPE_THREADS) return;
-  //if (msgIndex < 0 || msgIndex >= SPE_MESSAGE_QUEUE_LENGTH) return;
+  if (__builtin_expect(wrHandle == INVALID_WRHandle, 0)) return;
 
   // Check to see if the work request needs to call a callback function of some type (if so, do not block)
   if (callbackFunc == NULL && wrHandle != INVALID_WRHandle && wrHandle->callbackFunc == NULL) {
@@ -646,9 +687,22 @@ void waitForWRHandle(WRHandle wrHandle) {
 }
 
 
+// DEBUG
+#if ENABLE_LAST_WR_TIMES != 0
+  timeval lastWRTime[NUM_SPE_THREADS];
+  void displayLastWRTimes() {
+    for (int i = 0; i < NUM_SPE_THREADS; i++) {
+      double timeD = (double)lastWRTime[i].tv_sec + ((double)lastWRTime[i].tv_usec / 1000000.0);
+      printf("PPE :: displayLastWRTimes() - SPE %d -> %.9lf sec\n", i, timeD);
+    }
+  }
+#else
+  void displayLastWRTimes() { }
+#endif
+
+
 extern "C"
 void OffloadAPIProgress() {
-
 
   // Mailbox Statistics
   #define OffloadAPIProgress_statFreq  0
@@ -659,6 +713,32 @@ void OffloadAPIProgress() {
     static int statSum_all_count[8] = { 0 };
     static int statSum_nonZero[8] = { 0 };
     static int statSum_nonZero_count[8] = { 0 };
+    static int queueSample[NUM_SPE_THREADS][SPE_MESSAGE_NUM_STATES] = { 0 };
+    static int queueSample_count = OffloadAPIProgress_statFreq;
+  #endif
+
+
+  #if OffloadAPIProgress_statFreq > 0
+    queueSample_count--;
+    for (int i = 0; i < NUM_SPE_THREADS; i++) {
+      register char* qStart = (char*)(speThreads[i]->speData->messageQueue);
+      for (int j = 0; j < SPE_MESSAGE_QUEUE_LENGTH; j++) {
+        register SPEMessage* qEntry = (SPEMessage*)(qStart + (SIZEOF_16(SPEMessage) * j));
+        queueSample[i][qEntry->state]++;
+      }
+    }
+
+    if (queueSample_count <= 0) {
+      for (int i = 0; i < NUM_SPE_THREADS; i++) {
+        printf("SPE %d :: ", i);
+        for (int j = 0; j < SPE_MESSAGE_NUM_STATES; j++) {
+          printf("%f ", ((float)(queueSample[i][j]) / (float)(OffloadAPIProgress_statFreq)));
+          queueSample[i][j] = 0;
+	}
+        printf("\n");
+      }
+      queueSample_count = OffloadAPIProgress_statFreq;
+    }
   #endif
 
 
@@ -687,119 +767,113 @@ void OffloadAPIProgress() {
       unsigned int speMessageErrorCode = MESSAGE_RETURN_CODE_ERROR(messageReturnCode);
       SPEMessage *msg = (SPEMessage*)((char*)(speThreads[i]->speData->messageQueue) + (speMessageQueueIndex * SIZEOF_16(SPEMessage)));
 
-      if ((WorkRequest*)(msg->wrPtr) != NULL && ((WorkRequest*)(msg->wrPtr))->next != NULL) {
-        fprintf(stderr, " --- Offload API :: ERROR :: WorkRequest finished while still linked (msg->wrPtr->next should be NULL) !!!!!!!\n");
+      // Get a pointer to the associated work request
+      WorkRequest *wrPtr = (WorkRequest*)(msg->wrPtr);
 
+      if (__builtin_expect(wrPtr == NULL, 0)) {
+        // Warn the user that something bad has just happened
+        fprintf(stderr, " --- Offload API :: ERROR :: Received work request completion with no associated work request !!!!!\n");
         // Kill self out of shame
         exit(EXIT_FAILURE);
       }
 
-      if (msg->state != SPE_MESSAGE_STATE_SENT) {
+      if (__builtin_expect(wrPtr->next != NULL, 0)) {
+        // Warn the user that something bad has just happened
+        fprintf(stderr, " --- Offload API :: ERROR :: WorkRequest finished while still linked (msg->wrPtr->next should be NULL) !!!!!!!\n");
+        // Kill self out of shame
+        exit(EXIT_FAILURE);
+      }
 
+      if (__builtin_expect(msg->state != SPE_MESSAGE_STATE_SENT, 0)) {
         // Warn the user that something bad has just happened
         fprintf(stderr, " --- OffloadAPI :: ERROR :: Invalid message queue index (%d) received from SPE %d...\n", speMessageQueueIndex, i);
-        msg->state = SPE_MESSAGE_STATE_CLEAR;
-
         // Kill self out of shame
         exit(EXIT_FAILURE);
-
-      } else {
-
-	// If there was an error returned by the SPE, display it now
-        if (speMessageErrorCode != SPE_MESSAGE_OK) {
-          fprintf(stderr, " --- Offload API :: ERROR :: SPE %d returned error code %d for message at index %d...\n",
-                  i, speMessageErrorCode, speMessageQueueIndex
-                 );
-	}
-
-        // TODO : Do any gathering of data on SPE load-balance here (before clearing speIndex and entryIndex)
-
-        // If there is a callback function, call it for this entry and then place the entry back into the wrFree list
-        WorkRequest *wrPtr = (WorkRequest*)(msg->wrPtr);
-        if (wrPtr != NULL) {
-
-          if (wrPtr->traceFlag) {
-            printf("OffloadAPI :: [TRACE] :: spe = %d, qi = %d, ec = %d...\n",
-                   i, speMessageQueueIndex, speMessageErrorCode
-                  );
-            displayMessageQueue(speThreads[i]);
-	  }
-
-          if (callbackFunc != NULL || wrPtr->callbackFunc != NULL) {
-
-            // Call the callback function
-            if (wrPtr->callbackFunc != NULL)
-              (wrPtr->callbackFunc)((void*)wrPtr->userData);  // call work request specific callback function
-            else
-              callbackFunc((void*)(wrPtr->userData));         // call default work request callback function
-
-            // Clear the fields of the work request as needed
-            wrPtr->speIndex = -1;
-            wrPtr->entryIndex = -1;
-            wrPtr->funcIndex = -1;
-            wrPtr->readWritePtr = NULL;
-            wrPtr->readWriteLen = 0;
-            wrPtr->readOnlyPtr = NULL;
-            wrPtr->readOnlyLen = 0;
-            wrPtr->writeOnlyPtr = NULL;
-            wrPtr->writeOnlyLen = 0;
-            wrPtr->flags = WORK_REQUEST_FLAGS_NONE;
-            wrPtr->userData = NULL;
-            wrPtr->callbackFunc = NULL;
-            wrPtr->next = NULL;
-
-            // Add this entry to the end of the wrFree list
-            wrPtr->state = WORK_REQUEST_STATE_FREE;
-            if (wrFreeTail == NULL) {
-              wrFreeTail = wrFreeHead = wrPtr;
-            } else {
-              wrFreeTail->next = wrPtr;
-              wrFreeTail = wrPtr;
-            }
-
-          // Otherwise, just place the WorkRequest into the wrFinished list
-	  } else {
-
-            // TODO : Do any gathering of data on SPE load-balance here (before clearing speIndex and entryIndex)
-
-            //// Clear the fields of the work request as needed
-            //wrPtr->speIndex = -1;
-            //wrPtr->entryIndex = -1;
-
-            // Mark the work request as finished
-            wrPtr->state = WORK_REQUEST_STATE_FINISHED;
-
-            //// Add this work request to the end of the wrFinished list
-            //if (wrFinishedTail == NULL) {
-            //  wrFinishedTail = wrFinishedHead = wrPtr;
-            //} else {
-            //  wrFinishedTail->next = wrPtr;
-            //  wrFinishedTail = wrPtr;
-	    //}
-	  }
-	} else {
-          printf("OffloadAPI :: [WARNING] :: SPE Runtime Completion Received Without Work Request...\n");
-	}
-
-        // Now that the work request has been moved to either the wrFree list or the wrFinished
-        //   list, set the state of the message queue entry to clear so it can accempt more work.
-        msg->state = SPE_MESSAGE_STATE_CLEAR;
-
-        //// DEBUG
-	// __asm__("sync");
-        //msg->funcIndex = -3;
-        //msg->readWritePtr = (PPU_POINTER_TYPE)(-1);
-        //msg->readWriteLen = -1;
-        //msg->readOnlyPtr = (PPU_POINTER_TYPE)(-1);
-        //msg->readOnlyLen = -1;
-        //msg->writeOnlyPtr = (PPU_POINTER_TYPE)(-1);
-        //msg->writeOnlyLen = -1;
-        //msg->flags = 0xFFFFFFFF;
-        //msg->totalMem = 0xFFFFFFFF;
-        //__asm__("sync");
       }
 
+      // If there was an error returned by the SPE, display it now
+      if (__builtin_expect(speMessageErrorCode != SPE_MESSAGE_OK, 0)) {
+        fprintf(stderr, " --- Offload API :: ERROR :: SPE %d returned error code %d for message at index %d...\n",
+                i, speMessageErrorCode, speMessageQueueIndex
+               );
+      }
+
+      // DEBUG - Get time last work request completed from this SPE
+      #if ENABLE_LAST_WR_TIMES != 0
+        gettimeofday(&(lastWRTime[wrPtr->speIndex]), NULL);
+      #endif
+
+      // TRACE
+      if (wrPtr->traceFlag) {
+        printf("OffloadAPI :: [TRACE] :: spe = %d, qi = %d, ec = %d...\n",
+               i, speMessageQueueIndex, speMessageErrorCode
+              );
+        displayMessageQueue(speThreads[i]);
+      }
+
+      // Check to see if this work request should call a callback function upon completion
+      if (callbackFunc != NULL || wrPtr->callbackFunc != NULL) {
+
+        // Call the callback function
+        if (wrPtr->callbackFunc != NULL)
+          (wrPtr->callbackFunc)((void*)wrPtr->userData);  // call work request specific callback function
+        else
+          callbackFunc((void*)(wrPtr->userData));         // call default work request callback function
+
+        // Clear the fields of the work request as needed
+        //wrPtr->speIndex = -1;
+        //wrPtr->entryIndex = -1;
+        //wrPtr->funcIndex = -1;
+        //wrPtr->readWritePtr = NULL;
+        //wrPtr->readWriteLen = 0;
+        //wrPtr->readOnlyPtr = NULL;
+        //wrPtr->readOnlyLen = 0;
+        //wrPtr->writeOnlyPtr = NULL;
+        //wrPtr->writeOnlyLen = 0;
+        //wrPtr->flags = WORK_REQUEST_FLAGS_NONE;
+        //wrPtr->userData = NULL;
+        //wrPtr->callbackFunc = NULL;
+        //wrPtr->next = NULL;
+
+        // Add this entry to the end of the wrFree list
+        wrPtr->state = WORK_REQUEST_STATE_FREE;
+        if (wrFreeTail == NULL) {
+          wrFreeTail = wrFreeHead = wrPtr;
+        } else {
+          wrFreeTail->next = wrPtr;
+          wrFreeTail = wrPtr;
+        }
+
+      // Otherwise, just place the WorkRequest into the wrFinished list
+      } else {
+
+        // Mark the work request as finished
+        wrPtr->state = WORK_REQUEST_STATE_FINISHED;
+      }
+
+      // Now that the work request has been moved to either the wrFree list or marked as
+      //   finished, set the state of the message queue entry to clear so it can accempt
+      //   another work request
+      msg->state = SPE_MESSAGE_STATE_CLEAR;
+
+      // Re-add the message queue entry to the msgQEntryFreeList
+      #if USE_MESSAGE_QUEUE_FREE_LIST != 0
+        MSGQEntryList* msgQEntry = &(__msgQEntries[speMessageQueueIndex + (i * NUM_SPE_THREADS)]);
+        if (__builtin_expect(msgQEntry->next != NULL, 0)) {
+          printf(" --- OffloadAPI :: ERROR :: msgQEntry->next != NULL !!!!!\n");
+          msgQEntry->next = NULL;
+        }
+        if (msgQEntryFreeTail != NULL) {
+          msgQEntryFreeTail->next = msgQEntry;
+          msgQEntryFreeTail = msgQEntry;
+        } else {
+          msgQEntryFreeHead = msgQEntryFreeTail = msgQEntry;
+	}
+      #endif
+
+      // Decrement the count of remaining completion notifications from this SPE
       usedEntries--;
+
     } // end while (usedEntries > 0)
   } // end for (all SPEs)
 
@@ -849,19 +923,43 @@ void OffloadAPIProgress() {
   WorkRequest *wrEntryPrev = NULL;
   while (wrEntry != NULL) {
 
-    // Try each SPE
     register unsigned int speAffinityMask = wrEntry->speAffinityMask;
-    for (int i = 0; i < NUM_SPE_THREADS; i++) {
 
-      // Check the affinity flag (if the bit for this SPE is not set, skip this SPE)
-      if (((0x01 << i) & speAffinityMask) != 0x00) {
-        sentIndex = sendSPEMessage(speThreads[i], wrEntry, SPE_MESSAGE_COMMAND_NONE);
-        if (sentIndex >= 0) {
-          processingSPEIndex = i;
-          break;
+    #if USE_MESSAGE_QUEUE_FREE_LIST == 0
+
+      // Try each SPE
+      for (int i = 0; i < NUM_SPE_THREADS; i++) {
+
+        // Check the affinity flag (if the bit for this SPE is not set, skip this SPE)
+        if (((0x01 << i) & speAffinityMask) != 0x00) {
+          sentIndex = sendSPEMessage(speThreads[i], wrEntry, SPE_MESSAGE_COMMAND_NONE);
+          if (sentIndex >= 0) {
+            processingSPEIndex = i;
+            break;
+          }
         }
       }
-    }
+
+    #else
+
+      // Pull the first entry of the message queue free list
+      if (msgQEntryFreeHead != NULL) {
+
+        // Remove the entry from the list
+        MSGQEntryList* msgQEntry = msgQEntryFreeHead;
+        msgQEntryFreeHead = msgQEntryFreeHead->next;
+        if (msgQEntryFreeHead == NULL) msgQEntryFreeTail = NULL;
+        msgQEntry->next = NULL;
+
+        // Fill in the cross-indexes
+        processingSPEIndex = msgQEntry->speIndex;
+        sentIndex = msgQEntry->entryIndex;
+
+        // Send the SPE Message
+        sendSPEMessage(speThreads[processingSPEIndex], sentIndex, wrEntry, SPE_MESSAGE_COMMAND_NONE);
+      }
+
+    #endif
 
     // Check to see if the message was sent (remove it from the wrQueued list if so)
     if (processingSPEIndex >= 0) {
@@ -1058,6 +1156,7 @@ SPEThread** createSPEThreads(SPEThread **speThreads, int numThreads) {
 
   // Create all the threads at once
   for (int i = 0; i < numThreads; i++) {
+
     speid_t speID = spe_create_thread((spe_gid_t)NULL,         // spe_gid_t (actually a void*) - The SPE Group ID for the Thread
                                       (spe_program_handle_t*)(&spert_main),    // spe_program_handle_t* - Pointer to SPE's function that should be executed (name in embedded object file, not function name from code)
                                       (void*)speThreads[i]->speData, // void* - Argument List
@@ -1111,16 +1210,19 @@ SPEThread** createSPEThreads(SPEThread **speThreads, int numThreads) {
 
 int sendSPEMessage(SPEThread *speThread, WorkRequest *wrPtr, int command) {
 
-  // Verify the parameters
-  if (speThread == NULL) return -1;
+  // TODO : Re-write these checks now that command no longer use the message queue
 
-  if (wrPtr != NULL && wrPtr->funcIndex < 0 && command == SPE_MESSAGE_COMMAND_NONE)
-    return -1;
+  // Verify the parameters
+  //if (speThread == NULL) return -1;
+
+  //if (wrPtr != NULL && wrPtr->funcIndex < 0 && command == SPE_MESSAGE_COMMAND_NONE)
+  //  return -1;
 
   // Force the command value to a valid command
-  if (command < SPE_MESSAGE_COMMAND_MIN || command > SPE_MESSAGE_COMMAND_MAX)
-    command = SPE_MESSAGE_COMMAND_NONE;
+  //if (command < SPE_MESSAGE_COMMAND_MIN || command > SPE_MESSAGE_COMMAND_MAX)
+  //  command = SPE_MESSAGE_COMMAND_NONE;
 
+  /*
   if (wrPtr != NULL) {
 
     // Check to see if there is no work request and no command (if so, return without doing anything)
@@ -1167,6 +1269,7 @@ int sendSPEMessage(SPEThread *speThread, WorkRequest *wrPtr, int command) {
       if (wrPtr->readWriteLen <= 0 && wrPtr->readOnlyLen <= 0 && wrPtr->writeOnlyLen <= 0) return -1; // no list item info
     }
   }
+  */
 
   // Find the next available index
   for (int i = 0; i < SPE_MESSAGE_QUEUE_LENGTH; i++) {
@@ -1279,9 +1382,61 @@ int sendSPEMessage(SPEThread *speThread, WorkRequest *wrPtr, int command) {
 }
 
 
+int sendSPEMessage(SPEThread *speThread, int qIndex, WorkRequest *wrPtr, int command) {
+
+  // Get a pointer to the message queue entry
+  volatile SPEMessage* msg = (SPEMessage*)(((char*)speThread->speData->messageQueue) + (qIndex * SIZEOF_16(SPEMessage)));
+  
+  // Fill in the message queue entry
+  msg->funcIndex = wrPtr->funcIndex;
+  msg->readWritePtr = (PPU_POINTER_TYPE)(wrPtr->readWritePtr);
+  msg->readWriteLen = wrPtr->readWriteLen;
+  msg->readOnlyPtr = (PPU_POINTER_TYPE)(wrPtr->readOnlyPtr);
+  msg->readOnlyLen = wrPtr->readOnlyLen;
+  msg->writeOnlyPtr = (PPU_POINTER_TYPE)(wrPtr->writeOnlyPtr);
+  msg->writeOnlyLen = wrPtr->writeOnlyLen;
+  msg->flags = wrPtr->flags;
+
+  // Calculate the total amount of memory that will be needed on the SPE for this message/work-request
+  if ((msg->flags & WORK_REQUEST_FLAGS_LIST) == WORK_REQUEST_FLAGS_LIST) {
+    // The memory needed is the size of the DMA list rounded up times 2 (two lists) and the size of each
+    //   of the individual entries in that list all rounded up
+    register int numEntries = wrPtr->readWriteLen + wrPtr->readOnlyLen + wrPtr->writeOnlyLen;
+    msg->totalMem = ROUNDUP_16(sizeof(DMAListEntry) * numEntries);
+    msg->totalMem *= 2;  // Second DMA List within SPE's local store (with LS pointers)
+    for (int entryIndex = 0; entryIndex < numEntries; entryIndex++)
+      msg->totalMem += ROUNDUP_16(((DMAListEntry*)(wrPtr->readWritePtr))[entryIndex].size);
+  } else {
+    // The memory needed is the size of the sum of the three buffers each rounded up
+    msg->totalMem = ROUNDUP_16(wrPtr->readWriteLen) + ROUNDUP_16(wrPtr->readOnlyLen) + ROUNDUP_16(wrPtr->writeOnlyLen);
+  }
+
+  // DEBUG
+  msg->traceFlag = ((__builtin_expect(wrPtr->traceFlag, 0)) ? (-1) : (0));  // force -1 or 0
+
+  msg->state = SPE_MESSAGE_STATE_SENT;
+  msg->command = command;
+  msg->wrPtr = (PPU_POINTER_TYPE)wrPtr;
+
+  // NOTE: Important that the counter be the last then set (the change in this value is what prompts the
+  //   SPE to consider the entry a new entry... even if the state has been set to SENT).
+  // NOTE: Only change the value of msg->counter once so the SPE is not confused (i.e. - don't increment
+  //   and then check msg->counter direclty).
+  int tmp0 = msg->counter0;
+  int tmp1 = msg->counter1;
+  tmp0++; if (__builtin_expect(tmp0 > 255, 0)) tmp0 = 0;
+  tmp1++; if (__builtin_expect(tmp1 > 255, 0)) tmp1 = 0;
+  __asm__ ("sync");
+  msg->counter0 = tmp0;
+  msg->counter1 = tmp1;
+
+  return qIndex;
+}
+
+
 // Returns 0 on success, non-zero otherwise
 int sendSPECommand(SPEThread *speThread, int command) {
-  if (command < SPE_MESSAGE_COMMAND_MIN || command > SPE_MESSAGE_COMMAND_MAX) return -1;
+  if (__builtin_expect(command < SPE_MESSAGE_COMMAND_MIN || command > SPE_MESSAGE_COMMAND_MAX, 0)) return -1;
   while (spe_stat_in_mbox(speThread->speID) == 0);      // Loop while mailbox is full
   return spe_write_in_mbox(speThread->speID, command);
 }
