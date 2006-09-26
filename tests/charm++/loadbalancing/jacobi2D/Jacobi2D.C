@@ -33,7 +33,7 @@
    maxDelta = 0.0;
    numIters = ITERATIONS;
    usesAtSync = true;
-   setLBLoad = true;
+   usesAutoMeasure = true;
   }
 
   void JacobiChunk::setStartTime(double t)
