@@ -1100,12 +1100,12 @@ public:
     void pup(PUP::er &p);
 
     inline void enable_userload(MPI_LoadFn f, int id) {
-      setLBLoad = CmiTrue;
+      usesAutoMeasure = CmiFalse;
       loadFn = f;
       userdata_id = id;
     }
     inline void disable_userload() {
-      setLBLoad = CmiFalse;
+      usesAutoMeasure = CmiTrue;
       loadFn = NULL;
       userdata_id = -1;
     }
