@@ -567,7 +567,7 @@ void CkMigratable::commonInit(void) {
 	thisIndexMax=myRec->getIndex();
 	thisChareType=i.chareType;
 	usesAtSync=CmiFalse;
-	setLBLoad=CmiFalse;
+	usesAutoMeasure=CmiTrue;
 	barrierRegistered=CmiFalse;
 	/*
 	FAULT_EVAC
@@ -588,7 +588,7 @@ void CkMigratable::pup(PUP::er &p) {
 	Chare::pup(p);
 	p|thisIndexMax;
 	p(usesAtSync);
-	p(setLBLoad);
+	p(usesAutoMeasure);
 #if CMK_LBDB_ON 
 	int readyMigrate;
 	if (p.isPacking()) readyMigrate = myRec->isReadyMigrate();
@@ -664,7 +664,7 @@ void CkMigratable::setObjTiming(double cputime) {
 void CkMigratable::ckFinishConstruction(void)
 {
 //	if ((!usesAtSync) || barrierRegistered) return;
-	myRec->setMeasure(setLBLoad);
+	myRec->setMeasure(usesAutoMeasure);
 	if (barrierRegistered) return;
 	DEBL((AA"Registering barrier client for %s\n"AB,idx2str(thisIndexMax)));
         if (usesAtSync)
@@ -684,7 +684,7 @@ void CkMigratable::AtSync(int waitForMigration)
 	ckFinishConstruction();
 	DEBL((AA"Element %s going to sync\n"AB,idx2str(thisIndexMax)));
           // model-based load balancing, ask user to provide cpu load
-        if (setLBLoad == CmiTrue) UserSetLBLoad();
+        if (usesAutoMeasure == CmiFalse) UserSetLBLoad();
 	myRec->getLBDB()->AtLocalBarrier(ldBarrierHandle);
 }
 void CkMigratable::ReadyMigrate(CmiBool ready)

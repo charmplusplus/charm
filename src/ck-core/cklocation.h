@@ -309,7 +309,7 @@ protected:
   virtual void CkAbort(const char *str) const;
 
   CmiBool usesAtSync;//You must set this in the constructor to use AtSync().
-  CmiBool setLBLoad;//You must set this in the constructor to use AtSync().
+  CmiBool usesAutoMeasure; //You must set this to use auto lb instrumentation.
   CmiBool barrierRegistered;//True iff barrier handle below is set
 
 public:
