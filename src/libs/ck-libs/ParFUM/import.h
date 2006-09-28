@@ -62,6 +62,11 @@ void ParFUM_findMatchingCoords(int dim, int extent_a, double* a,
 			       std::vector<int>& matches_a,
 			       std::vector<int>& matches_b
 			       );
+
+void
+ParFUM_findBoundingBox(int nPoints,int dim, double* points, double* boundingBox);
+bool ParFUM_boundingBoxesCollide(int dim, double* box_a, double* box_b);
+
 #endif
 
 

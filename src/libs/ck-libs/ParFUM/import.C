@@ -45,65 +45,84 @@ void ParFUM_recreateSharedNodes(int meshid, int dim) {
   */
   
   // Begin exchange of node coordinates to determine shared nodes
-  // FIX ME: compute bounding box, only exchange when bounding boxes collide
+  // compute bounding box
+  double *localBoundingBox = (double*)malloc(sizeof(double)*2*dim);
+  double *allBoundingBoxes = (double*)malloc(sizeof(double)*2*comm_size);
+  ParFUM_findBoundingBox(numNodes, dim, nodeCoords, localBoundingBox);
+  MPI_Alltoall(localBoundingBox, 2*dim, MPI_DOUBLE, 
+	       allBoundingBoxes, 2*dim*comm_size, MPI_DOUBLE,
+	       comm); 
+
+  // only exchange when bounding boxes collide
   for (int i=rank+1; i<comm_size; i++) { //send nodeCoords to rank i
-    printf("[%d] Sending %d doubles to rank %d \n",rank,dim*numNodes,i);
-    MPI_Send(nodeCoords, dim*numNodes, MPI_DOUBLE, i, coord_msg_tag, comm);
+    if (ParFUM_boundingBoxesCollide(dim, localBoundingBox, &allBoundingBoxes[2*dim*i])) {
+      printf("[%d] Sending %d doubles to rank %d \n",rank,dim*numNodes,i);
+      MPI_Send(nodeCoords, dim*numNodes, MPI_DOUBLE, i, coord_msg_tag, comm);
+    }
   }
+
   // Handle node coordinate-matching requests from other ranks
   for (int i=0; i<rank; i++) {
-    std::vector<int> remoteSharedNodes, localSharedNodes;
-    double *recvNodeCoords;
-    MPI_Status status;
-    int source, length;
-    // Probe for a coordinate message from any source; extract source and msg length
-    MPI_Probe(MPI_ANY_SOURCE, coord_msg_tag, comm, &status);
-    source = status.MPI_SOURCE;
-    length = status.MPI_LENGTH/sizeof(double);
-    printf("[%d] Receiving %d doubles from rank %d \n",rank,length,i);
-    // Receive whatever data was available according to probe
-    recvNodeCoords = (double *)malloc(length*sizeof(double));
-    MPI_Recv((void*)recvNodeCoords, length, MPI_DOUBLE, source, 
-	      coord_msg_tag, comm, &status);
-    // Match coords between local nodes and received coords
-    // FIX ME: this is the dumb super-slow brute force algorithm
-    int recvNodeCount = length/dim;
-    ParFUM_findMatchingCoords(dim,
-			      numNodes, nodeCoords,
-			      recvNodeCount, recvNodeCoords,
-			      localSharedNodes,
-			      remoteSharedNodes
-			      );
+    // only recieve if the bounding boxes collide.
+    if (ParFUM_boundingBoxesCollide(dim, localBoundingBox, &allBoundingBoxes[2*dim*i])) {
+      std::vector<int> remoteSharedNodes, localSharedNodes;
+      double *recvNodeCoords;
+      MPI_Status status;
+      int source, length;
+      // Probe for a coordinate message from any source; extract source and msg length
+      MPI_Probe(MPI_ANY_SOURCE, coord_msg_tag, comm, &status);
+      source = status.MPI_SOURCE;
+      length = status.MPI_LENGTH/sizeof(double);
+      printf("[%d] Receiving %d doubles from rank %d \n",rank,length,i);
+      // Receive whatever data was available according to probe
+      recvNodeCoords = (double *)malloc(length*sizeof(double));
+      MPI_Recv((void*)recvNodeCoords, length, MPI_DOUBLE, source, 
+	       coord_msg_tag, comm, &status);
+      // Match coords between local nodes and received coords
+      int recvNodeCount = length/dim;
+      ParFUM_findMatchingCoords(dim,
+				numNodes, nodeCoords,
+				recvNodeCount, recvNodeCoords,
+				localSharedNodes,
+				remoteSharedNodes
+				);
 
-    // Copy local nodes that were shared with source into the data structure
-    int *localSharedNodeList = (int *)malloc(localSharedNodes.size()*sizeof(int));
-    for (int m=0; m<localSharedNodes.size(); m++) {
-      localSharedNodeList[m] = localSharedNodes[m];
+      // Copy local nodes that were shared with source into the data structure
+      int *localSharedNodeList = (int *)malloc(localSharedNodes.size()*sizeof(int));
+      for (int m=0; m<localSharedNodes.size(); m++) {
+	localSharedNodeList[m] = localSharedNodes[m];
+      }
+      sharedNodeCounts[source] = localSharedNodes.size();
+      sharedNodeLists[source] = localSharedNodeList;
+      // do not delete localSharedNodeList as a pointer to it is stored
+      // Send remote nodes that were shared with this partition to remote partition
+      MPI_Send((int *)&remoteSharedNodes[0], remoteSharedNodes.size(), MPI_INT, source, 
+	       sharedlist_msg_tag, comm);
+      free(recvNodeCoords);
     }
-    sharedNodeCounts[source] = localSharedNodes.size();
-    sharedNodeLists[source] = localSharedNodeList;
-    // do not delete localSharedNodeList as a pointer to it is stored
-    // Send remote nodes that were shared with this partition to remote partition
-    MPI_Send((int *)&remoteSharedNodes[0], remoteSharedNodes.size(), MPI_INT, source, 
-	     sharedlist_msg_tag, comm);
-    free(recvNodeCoords);
   }
   for (int i=rank+1; i<comm_size; i++) {  // recv shared node lists
-    int *sharedNodes;
-    MPI_Status status;
-    int source, length;
-    // Probe for a shared node list from any source; extract source and msg length
-    MPI_Probe(MPI_ANY_SOURCE, sharedlist_msg_tag, comm, &status);
-    source = status.MPI_SOURCE;
-    length = status.MPI_LENGTH/sizeof(int);
-    // Recv the shared node list the probe revealed was available
-    sharedNodes = (int *)malloc(length*sizeof(int));
-    MPI_Recv((void*)sharedNodes, length, MPI_INT, source, sharedlist_msg_tag, comm, &status);
-    // Store the shared node list in the data structure
-    sharedNodeCounts[source] = length;
-    sharedNodeLists[source] = sharedNodes;
-    // don't delete sharedNodes! we kept a pointer to it!
+    if (ParFUM_boundingBoxesCollide(dim, localBoundingBox, &allBoundingBoxes[2*dim*i])) {
+      int *sharedNodes;
+      MPI_Status status;
+      int source, length;
+      // Probe for a shared node list from any source; extract source and msg length
+      MPI_Probe(MPI_ANY_SOURCE, sharedlist_msg_tag, comm, &status);
+      source = status.MPI_SOURCE;
+      length = status.MPI_LENGTH/sizeof(int);
+      // Recv the shared node list the probe revealed was available
+      sharedNodes = (int *)malloc(length*sizeof(int));
+      MPI_Recv((void*)sharedNodes, length, MPI_INT, source, sharedlist_msg_tag, comm, &status);
+      // Store the shared node list in the data structure
+      sharedNodeCounts[source] = length;
+      sharedNodeLists[source] = sharedNodes;
+      // don't delete sharedNodes! we kept a pointer to it!
+    }
   }
+  free(localBoundingBox);
+  free(allBoundingBoxes);
+
+
   // IMPLEMENT ME: use sharedNodeLists and sharedNodeCounts to move shared node data 
   // to IDXL
   FEM_Mesh *mesh = (FEM_chunk::get("ParFUM_recreateSharedNodes"))->getMesh("ParFUM_recreateSharedNodes");
@@ -252,3 +271,77 @@ void ParFUM_findMatchingCoords(int dim,
   } 
 }
 
+void
+ParFUM_findBoundingBox
+/////////////////////////////////////////////////////
+/**
+ * Computes the bounding box for a region of points
+ *
+ * I ordered the index lookups this way so it would be conceptually
+ * identical to how C lays out 2d arrays.
+ */
+(
+ /// numer of points in our region
+ int nPoints,
+ /// are we working in 1D, 2D, or 3D ?
+ int dim,
+ /// array of points
+ double* points,
+ /**
+  * output parameter 
+  *
+  * \pre points to a double[dim*2] region of memory
+  *
+  * \post contains the bounding box for our region.  The first dim
+  * coordinates are the minimum extent for our region, while the second
+  * dim coordinates contain the maxium for our region.
+  */
+ double* boundingBox
+ ) {
+
+  assert(nPoints >= 1);
+    
+  for(int idim=0; idim<dim; idim++) {
+    boundingBox[idim] = boundingBox[dim+idim] = points[idim];
+  }
+
+  for(int ipoint=1; ipoint<nPoints; ipoint++) {
+    for (int idim=0; idim<dim; idim++) {
+      double considered = points[ipoint*dim+idim];
+      if (considered < boundingBox[idim]) {
+	boundingBox[idim] = considered;
+      } 
+      if (considered > boundingBox[dim+idim]) {
+	boundingBox[dim+idim] = considered;
+      }
+    }
+  }
+}
+ 
+bool 
+ParFUM_boundingBoxesCollide
+///////////////////////////////////////////
+/** \return true if two rectangular bounding boxes collide, false
+ * otherwise.  The format for the bounding boxes is the same as that
+ * returned by parFUM_findBoundingBox.
+ *
+ */
+(
+ /// number of spacial dimensions.
+ int dim, 
+ /// pointer to the first box
+ double* box_a, 
+ /// pointer to the second box
+ double* box_b
+ ) {
+  for (int ii=0; ii<dim; ii++) {
+    // return false if the extents indicate that no collision is possible
+    // a_max < b_min || b_max < a_min
+    // note that this operation is symmetric
+    if ((box_a[ii+dim] < box_b[ii]) || (box_b[ii+dim] < box_a[ii])) {
+      return false;
+    }
+ }
+  return true;
+}
+    
