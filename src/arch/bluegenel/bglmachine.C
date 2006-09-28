@@ -133,66 +133,6 @@ int _Cmi_myrank;
 void CmiMemLock(void) {}
 void CmiMemUnlock(void) {}
 
-#if BG_VERSION_CONTROLX
-/* Code to support interrupts in BGL */
-
-volatile int bgx_in_interrupt;
-volatile int bgx_lock;
-rts_mutex_t torus_lock = RTS_MUTEX_INITIALIZER;
-
-static int interrupts_enabled;
-
-extern "C" void * BGX_InterruptThread(void *) {
-  
-  while (1) {
-    rts_mutex_lock(&torus_lock);
-    
-    //printf("Here Goes\n");
-
-    bgx_in_interrupt = 1;
-
-    AdvanceCommunications();
-    bgx_in_interrupt = 0;
-    
-    rts_mutex_unlock(&torus_lock);    
-    rts_rearm_torus_device();
-  }
-  
-  return NULL;
-}
-
-extern "C" void BGX_BeginCriticalSection() {
-  //CmiAssert(bgx_in_interrupt == 0);
-
-  if(bgx_in_interrupt)
-    return;
-
-  CmiAssert(bgx_lock == 0);
-
-  rts_mutex_lock(&torus_lock);
-  bgx_lock = 1;  
-}
-
-extern "C" void BGX_EndCriticalSection() {
-  //CmiAssert(bgx_in_interrupt == 0);
-  
-  if(bgx_in_interrupt)
-    return;
-  
-  CmiAssert(bgx_lock == 1);
-  
-  rts_mutex_unlock(&torus_lock);
-  bgx_lock = 0;  
-}
-
-#else
-
-#define   BGX_BeginCriticalSection()
-#define   BGX_EndCriticalSection()
-
-#endif
-
-
 #define CmiGetState() (&Cmi_state)
 #define CmiGetStateN(n) (&Cmi_state)
 
@@ -444,12 +384,12 @@ void     short_pkt_recv (const BGQuad     * info,
 }
 
 
-BG2S_t * first_pkt_recv_done (const BGQuad     * info,
-			      unsigned           senderrank,
-			      const unsigned     sndlen,
-			      unsigned         * rcvlen,
-			      char            ** buffer,
-					      BGML_Callback_t  * cb 
+BG2S_t * first_pkt_recv_done (const BGQuad      * info,
+			      unsigned            senderrank,
+			      const unsigned      sndlen,
+			      unsigned          * rcvlen,
+			      char             ** buffer,
+			      BGML_Callback_t   * cb 
 			      )
 {
   outstanding_recvs ++;
@@ -493,6 +433,86 @@ BGTsC_t        barrier;
 CpvDeclare(unsigned, networkProgressCount);
 int  networkProgressPeriod;
 
+// -----------------------------------------
+// Rectangular broadcast implementation 
+// -----------------------------------------
+
+#define MAX_COMM  256
+static void * comm_table [MAX_COMM];
+
+typedef struct rectbcast_msg {
+  BGTsRC_t           request;
+  BGML_Callback_t    cb;
+  char              *msg;
+} RectBcastInfo;
+
+
+static void bcast_done (void *data) {  
+  RectBcastInfo *rinfo = (RectBcastInfo *) data;  
+  CmiFree (rinfo->msg);
+  free (rinfo);
+}
+
+static  void *   getRectBcastRequest (unsigned comm) {
+  return comm_table [comm];
+}
+
+
+static  void *  bcast_recv     (unsigned               root,
+				unsigned               comm,
+				const unsigned         sndlen,
+				unsigned             * rcvlen,
+				char                ** rcvbuf,
+				BGML_Callback_t      * const cb) {
+  
+  int alloc_size = sndlen + sizeof(BGTsRC_t) + 16;
+  
+  *rcvlen = sndlen>0?sndlen:1;  /* to avoid malloc(0) which might
+                                   return NULL */
+  
+  *rcvbuf       =  (char *)CmiAlloc(alloc_size);
+  cb->function  =   recv_done;
+  cb->clientdata = *rcvbuf;
+
+  return (BGTsRC_t *) ALIGN_16 (*rcvbuf + sndlen);
+  
+}
+
+
+extern "C"  
+void bgl_machine_RectBcast (unsigned                 commid,
+			    const char             * sndbuf,
+			    unsigned                 sndlen) 
+{
+  RectBcastInfo *rinfo  =   (RectBcastInfo *) malloc (sizeof(RectBcastInfo));   
+  rinfo->cb.function    =   bcast_done;
+  rinfo->cb.clientdata  =   rinfo;
+  
+  BGTsRC_AsyncBcast_start (commid, &rinfo->request, &rinfo->cb, sndbuf, sndlen);
+  
+}
+
+extern "C" 
+void        bgl_machine_RectBcastInit  (unsigned               commID,
+					const BGTsRC_Geometry_t* geometry) {
+  
+  CmiAssert (commID < 256);
+  CmiAssert (comm_table [commID] == NULL);
+  
+  BGTsRC_t *request =  (BGTsRC_t *) malloc (sizeof (BGTsRC_t));
+  comm_table [commID] = request;
+  
+  BGTsRC_AsyncBcast_init  (request, commID,  geometry);
+}
+
+
+
+
+//--------------------------------------------------------------
+//----- End Rectangular Broadcast Implementation ---------------
+//--------------------------------------------------------------
+
+
 
 void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret){
   int n, i;
@@ -504,6 +524,8 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
   //               1 /* protocolTreshold */, 
   //               1 /* highPrecision    */); 
   
+  BGTsC_Configure (NULL, getRectBcastRequest, bcast_recv);
+
   _Cmi_numnodes = BGML_Messager_size();
   _Cmi_mynode = BGML_Messager_rank();
   
@@ -550,11 +572,6 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
       CmiPrintf("Charm++: Will%s consume outstanding sends in scheduler loop\n",        no_outstanding_sends?"":" not");
   }
   
-#if BG_VERSION_CONTROLX
-  if (CmiGetArgFlag(argv,"+enable_interrupts")) 
-    interrupts_enabled = 1;
-#endif
-
   _Cmi_numpes = _Cmi_numnodes * _Cmi_mynodesize;
   Cmi_nodestart = _Cmi_mynode * _Cmi_mynodesize;
   Cmi_argvcopy = CmiCopyArgs(argv);
@@ -643,11 +660,6 @@ static void ConverseRunPE(int everReturn)
     sprintf(ln,"debugLog.%d",CmiMyNode());
     debugLog=fopen(ln,"w");
   }
-#endif
-
-#if BG_VERSION_CONTROLX
-  if(interrupts_enabled)
-    rts_thread_create(&BGX_InterruptThread, 0);
 #endif
 
   CmiBarrier();
@@ -851,7 +863,7 @@ inline void machineSend(SMSG_LIST *msg_tmp) {
   
   CmiAssert(msg_tmp->destpe >= 0 && msg_tmp->destpe < CmiNumPes());
   msg_tmp->cb.function     =   send_done;
-  msg_tmp->cb.clientdata  =   msg_tmp;
+  msg_tmp->cb.clientdata   =   msg_tmp;
 
   BG2S_UnOrdered_Send (&msg_tmp->send, &msg_tmp->cb, &msg_tmp->info, 
 		       msg_tmp->msg, msg_tmp->size, msg_tmp->destpe);    
@@ -892,7 +904,6 @@ inline void  CmiGeneralFreeSend(int destPE, int size, char* msg){
   msg_tmp->phsSize = phsSize;
 #endif
 
-  BGX_BeginCriticalSection();
   sendQueuedMessages();
   
   if(numPosted > request_max) {
@@ -904,7 +915,6 @@ inline void  CmiGeneralFreeSend(int destPE, int size, char* msg){
   msgQBytes += size;
   msgQueueLen++;
   
-  BGX_EndCriticalSection();
 }
 
 extern "C"
@@ -1104,8 +1114,6 @@ static unsigned long long lastProgress = 0;
 static inline void AdvanceCommunications(int max_out){
   sendBroadcastMessages();
 
-  BGX_BeginCriticalSection();
-
   while(msgQueueLen > maxMessages && msgQBytes > maxBytes){
     while(BGML_Messager_advance()>0) ;
     sendQueuedMessages();
@@ -1118,7 +1126,6 @@ static inline void AdvanceCommunications(int max_out){
   }
   
   while(BGML_Messager_advance()>0);
-  BGX_EndCriticalSection();
 
   sendBroadcastMessages();
 
@@ -1129,16 +1136,13 @@ static inline void AdvanceCommunications(int max_out){
   received_immediate = 0;
 #endif
   
-  BGX_BeginCriticalSection();  
   sendQueuedMessages();
   //while(BGML_Messager_advance()>0);
-  BGX_EndCriticalSection();  
 }
 
 static inline void SendMsgsUntil(int targetm, int targetb){
 
   sendBroadcastMessages();
-  BGX_BeginCriticalSection();
   
   while(msgQueueLen>targetm && msgQBytes > targetb){
     while(BGML_Messager_advance()>0) ;
@@ -1147,7 +1151,6 @@ static inline void SendMsgsUntil(int targetm, int targetb){
   
   while ( BGML_Messager_advance() > 0 );
   
-  BGX_EndCriticalSection();
   sendBroadcastMessages();
 }
 
@@ -1453,16 +1456,11 @@ void CmiMachineProgressImpl()
 }
 
 #endif
+
 /* Dummy implementation */
 extern "C" void CmiBarrier()
 {
-
-#if BG_VERSION_CONTROLX
-  if(interrupts_enabled)
-    BGLML_Tree_Barrier(_msgr, 1);
-  else
-#endif
-    BGTsC_Barrier(0);
+  BGTsC_Barrier(0);
   //BGTr_Barrier(1);
 }
 
