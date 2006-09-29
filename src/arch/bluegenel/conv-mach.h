@@ -67,7 +67,5 @@
 #undef CMK_CCS_AVAILABLE
 #define CMK_CCS_AVAILABLE				   0
 
-#define  BGL_VERSION_CONTROLX                              1
-
 #endif
 
