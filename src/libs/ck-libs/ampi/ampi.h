@@ -237,7 +237,6 @@ int MPI_DUP_FN ( MPI_Comm, int, void *, void *, void *, int * );
 #include "pup_c.h"
 
 typedef void (*MPI_PupFn)(pup_er, void*);
-typedef void (*MPI_LoadFn)(void *);
 
 
 /********************** MPI-2 prototypes and defines ***************************/
@@ -593,10 +592,12 @@ void AMPI_Print(char *str);
 #define MPI_Register AMPI_Register
 int AMPI_Register(void *, MPI_PupFn);
 
-#define MPI_Register_load AMPI_Register_load
-void AMPI_Register_load(MPI_LoadFn, int);
-#define MPI_unregister_load AMPI_Unregister_load
-void AMPI_Unregister_load();
+#define MPI_Start_measure AMPI_Start_measure
+void AMPI_Start_measure();
+#define MPI_Stop_measure AMPI_Stop_measure
+void AMPI_Stop_measure();
+#define MPI_Set_load AMPI_Set_load
+void AMPI_Set_load(double load);
 
 #define MPI_Migrate AMPI_Migrate
 void AMPI_Migrate(void);

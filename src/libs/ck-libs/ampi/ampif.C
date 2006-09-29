@@ -132,8 +132,9 @@ FDECL {
 #define mpi_yield FTN_NAME ( MPI_YIELD , mpi_yield )
 #define mpi_resume FTN_NAME ( MPI_RESUME, mpi_resume )
 #define mpi_print FTN_NAME( MPI_PRINT , mpi_print )
-#define mpi_register_load FTN_NAME( MPI_REGISTER_LOAD, mpi_register_load)
-#define mpi_unregister_load FTN_NAME( MPI_UNREGISTER_LOAD, mpi_unregister_load)
+#define mpi_Start_measure FTN_NAME( MPI_START_MEASURE, mpi_start_measure)
+#define mpi_Stop_measure FTN_NAME( MPI_STOP_MEASURE, mpi_stop_measure)
+#define mpi_set_load FTN_NAME( MPI_SET_LOAD, mpi_set_load)
 #define mpi_register FTN_NAME( MPI_REGISTER , mpi_register )
 #define mpi_migrate FTN_NAME( MPI_MIGRATE , mpi_migrate )
 #define mpi_migrateto FTN_NAME( MPI_MIGRATETO , mpi_migrateto )
@@ -828,14 +829,19 @@ void mpi_migrateto(int *destPE)
   AMPI_Migrateto(*destPE);
 }
 
-void mpi_register_load(MPI_LoadFn f, int id)
+void mpi_start_measure()           /* turn on auto load instrumentation */
 {
-  AMPI_Register_load(f, id);
+  AMPI_Start_measure();
 }
 
-void mpi_unregister_load()
+void mpi_stop_measure()
 {
-  AMPI_Unregister_load();
+  AMPI_Stop_measure();
+}
+
+void mpi_set_load(double load)
+{
+  AMPI_Set_load(load);
 }
 
 void mpi_register(void *d, MPI_PupFn f)
