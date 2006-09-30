@@ -437,9 +437,6 @@ int  networkProgressPeriod;
 // Rectangular broadcast implementation 
 // -----------------------------------------
 
-#define MAX_COMM  256
-static void * comm_table [MAX_COMM];
-
 typedef struct rectbcast_msg {
   BGTsRC_t           request;
   BGML_Callback_t    cb;
@@ -453,8 +450,13 @@ static void bcast_done (void *data) {
   free (rinfo);
 }
 
+
+typedef void * (*requestFnType) (unsigned);
+
+requestFnType requestFn;
+
 static  void *   getRectBcastRequest (unsigned comm) {
-  return comm_table [comm];
+  return requestFn (comm);
 }
 
 
@@ -492,19 +494,21 @@ void bgl_machine_RectBcast (unsigned                 commid,
   
 }
 
-extern "C" 
-void        bgl_machine_RectBcastInit  (unsigned               commID,
-					const BGTsRC_Geometry_t* geometry) {
-  
-  CmiAssert (commID < 256);
-  CmiAssert (comm_table [commID] == NULL);
+extern "C"   
+void    *         bgl_machine_RectBcastInit  (unsigned               commID,
+					      const BGTsRC_Geometry_t* geometry) {
   
   BGTsRC_t *request =  (BGTsRC_t *) malloc (sizeof (BGTsRC_t));
-  comm_table [commID] = request;
-  
   BGTsRC_AsyncBcast_init  (request, commID,  geometry);
+  
+  return request;
 }
 
+
+extern "C" 
+void  bgl_machineRectBcastConfigure (requestFnType fn) {
+  requestFn = fn;
+}
 
 
 
