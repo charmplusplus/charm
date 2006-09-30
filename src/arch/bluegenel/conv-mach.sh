@@ -22,7 +22,7 @@ BGL_INC="-I$BGL_INSTALL/bglsys/include"
 
 #BGL_LIB="-L$BGL_INSTALL/bglsys/lib -L/gsa/watgsa/home/s/a/sameer77/bgx/new2/bglsw-install/blrts-gnu/powerpc-bgl-blrts-gnu/lib -lc"
 
-BGL_LIB="-L$BGL_INSTALL/bglsys/lib -L$BGL_INSTALL/blrts-gnu/powerpc-bgl-blrts-gnu/lib"
+BGL_LIB="-L$BGL_INSTALL/bglsys/lib"        #" -L$BGL_INSTALL/blrts-gnu/powerpc-bgl-blrts-gnu/lib"
 
 # test if compiler binary present
 if test ! -x $BGL_BIN/powerpc-bgl-blrts-gnu-g++

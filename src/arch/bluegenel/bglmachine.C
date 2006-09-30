@@ -506,7 +506,7 @@ void    *         bgl_machine_RectBcastInit  (unsigned               commID,
 
 
 extern "C" 
-void  bgl_machineRectBcastConfigure (requestFnType fn) {
+void  bgl_machine_RectBcastConfigure (requestFnType fn) {
   requestFn = fn;
 }
 
