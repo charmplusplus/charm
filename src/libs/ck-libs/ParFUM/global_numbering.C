@@ -16,7 +16,7 @@ void ParFUM_generateGlobalNodeNumbers(int fem_mesh){
 	MPI_Barrier(MPI_COMM_WORLD);
 	MPI_Comm_rank(MPI_COMM_WORLD,&myID);
 	MPI_Comm_size(MPI_COMM_WORLD,&numberChunks);
-	FEM_Mesh 	*mesh = (FEM_chunk::get("ParFUM_renumberMesh"))->getMesh("ParFUM_renumberMesh");
+	FEM_Mesh 	*mesh = (FEM_chunk::get("ParFUM_renumberMesh"))->lookup(fem_mesh,"ParFUM_renumberMesh");
 	
 	FEM_Node *node = &(mesh->node);
 	FEM_IndexAttribute *globalAttr = (FEM_IndexAttribute *)node->lookup(FEM_GLOBALNO,"ParFUM_renumberMesh");
