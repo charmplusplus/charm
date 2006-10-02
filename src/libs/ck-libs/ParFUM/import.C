@@ -2,13 +2,13 @@
 #include <algorithm>
 
 void ParFUM_desharing(int meshid){
-	FEM_Mesh 	*mesh = (FEM_chunk::get("ParFUM_desharing"))->getMesh("ParFUM_desharing");
+	FEM_Mesh 	*mesh = (FEM_chunk::get("ParFUM_desharing"))->lookup(meshid,"ParFUM_desharing");
 	mesh->clearSharedNodes();
 }
 
 
 void ParFUM_deghosting(int meshid){
-	FEM_Mesh 	*mesh = (FEM_chunk::get("ParFUM_deghosting"))->getMesh("ParFUM_deghosting");
+	FEM_Mesh 	*mesh = (FEM_chunk::get("ParFUM_deghosting"))->lookup(meshid,"ParFUM_deghosting");
 	mesh->clearGhostNodes();
 	mesh->clearGhostElems();
 }
@@ -125,7 +125,7 @@ void ParFUM_recreateSharedNodes(int meshid, int dim) {
 
   // IMPLEMENT ME: use sharedNodeLists and sharedNodeCounts to move shared node data 
   // to IDXL
-  FEM_Mesh *mesh = (FEM_chunk::get("ParFUM_recreateSharedNodes"))->getMesh("ParFUM_recreateSharedNodes");
+  FEM_Mesh *mesh = (FEM_chunk::get("ParFUM_recreateSharedNodes"))->lookup(meshid,"ParFUM_recreateSharedNodes");
   IDXL_Side &shared = mesh->node.shared;
   
   for(int i=0;i<comm_size;i++){
