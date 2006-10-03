@@ -133,6 +133,8 @@ static char* _restartDir;
 
 int _defaultObjectQ = 0;            // for obejct queue
 int _ringexit = 0;		    // for charm exit
+int _ringtoken = 8;
+
 
 /*
 	FAULT_EVAC
@@ -182,11 +184,11 @@ static inline void _parseCommandLineOpts(char **argv)
   }
 #endif
   // shut down program in ring fashion to allow projections output w/o IO error
-  if (CmiGetArgFlagDesc(argv,"+ringexit", "Program exits in a ring fashion"))
+  if (CmiGetArgIntDesc(argv,"+ringexit",&_ringtoken, "Program exits in a ring fashion")) 
   {
     _ringexit = 1;
     if (CkMyPe()==0)
-      CkPrintf("Charm++> Program shutdown in ring.\n");
+      CkPrintf("Charm++> Program shutdown in token ring (%d).\n", _ringtoken);
   }
 	/*
 		FAULT_EVAC
@@ -290,7 +292,10 @@ static void _exitHandler(envelope *env)
       // if exit in ring, instead of broadcasting, send in ring
       if (_ringexit){
 	DEBUGF(("[%d] Ring Exit \n",CkMyPe()));
-        CmiSyncSendAndFree(0, env->getTotalsize(), (char *)env);
+        for (int i=0; i<_ringtoken; i++)
+          if (i<CkNumPes())
+            CmiSyncSend(i, env->getTotalsize(), (char *)env);
+        CmiFree(env);
       }else{
 	CmiSyncBroadcastAllAndFree(env->getTotalsize(), (char *)env);
       }	
@@ -313,8 +318,8 @@ static void _exitHandler(envelope *env)
 #ifndef CMK_OPTIMIZE
       if (_ringexit) traceClose();
 #endif
-      if (_ringexit && CkMyPe() != CkNumPes()-1)
-        CmiSyncSendAndFree(CkMyPe()+1, env->getTotalsize(), (char *)env);
+      if (_ringexit && CkMyPe()+_ringtoken < CkNumPes())
+        CmiSyncSendAndFree(CkMyPe()+_ringtoken, env->getTotalsize(), (char *)env);
       else
         CmiFree(env);
       if(CkMyPe()){
