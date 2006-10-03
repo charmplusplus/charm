@@ -18,6 +18,7 @@
 #include "../parmetis/parmetis.h"
 
 double elemlistaccTime=0;
+extern void clearPartition(void);
 
 int FEM_Mesh_Parallel_broadcast(int fem_mesh,int masterRank,FEM_Comm_t comm_context){
   int myRank;
@@ -35,6 +36,9 @@ int FEM_Mesh_Parallel_broadcast(int fem_mesh,int masterRank,FEM_Comm_t comm_cont
   }
   //temp to keep stuff from falling apart
   MPI_Barrier((MPI_Comm)comm_context);
+	if(myRank == masterRank){
+		clearPartition();
+	}
   //printf("[%d] Partitioned mesh number %d \n",myRank,new_mesh);
   return new_mesh;
 }
@@ -418,7 +422,7 @@ void FEM_write_nodepart(MSA1DINTLIST	&nodepart,struct partconndata *data,MPI_Com
     int end = data->eptr[i+1];
     for(int j=start;j<end;j++){
       nodepart.accumulate(data->eind[j],data->part[i]);
-      //		printf(" write_nodepart %d %d \n",data->eind[j],data->part[i]);
+     	DEBUG(printf(" write_nodepart %d %d \n",data->eind[j],data->part[i]));
     }
   }
   nodepart.sync();
@@ -615,7 +619,7 @@ void addIDXLists(FEM_Mesh *m,NodeList &lnodes,int myChunk){
     if(((*vec)[i]).numShared > 0){
       ///chunk numbers to which this node belongs
 //      int *shared = &(((*vec)[i].shared)[0]);
-			
+			DEBUG(printf("[%d] Global node %d local %d node is shared \n",myChunk,global,local));
       for(int j=0;j<((*vec)[i]).numShared;j++){
 	if((*vec)[i].shared[j] != myChunk){
 	  //add this node to my CommunicatioList for this globalChunk
@@ -670,6 +674,7 @@ struct ghostdata *gatherGhosts(){
   }	
   res->numLayers = count;
 	DEBUG(printf("gatherGhosts found %d layers \n",res->numLayers));
+	printf("gatherGhosts found %d layers \n",res->numLayers);
   return res;
 }
 
@@ -920,6 +925,7 @@ void makeGhost(FEM_Mesh *m,MPI_Comm comm,int masterRank,int totalShared,FEM_Ghos
     DEBUG(distTab->print());
   }
   distTab->sync();
+	DEBUG(printf("[%d] id %d says Ghost distributed hashtable printed \n",CkMyPe(),myChunk));
   /* create a new FEM_Mesh msa to transfer the ghost elements from the original mesh to target meshes */
   MSA1DFEMMESH *ghostmeshes;
   if(myChunk == masterRank){
@@ -929,7 +935,9 @@ void makeGhost(FEM_Mesh *m,MPI_Comm comm,int masterRank,int totalShared,FEM_Ghos
   }
   MPI_Bcast_pup(*ghostmeshes,masterRank,comm);
   ghostmeshes->enroll(numChunks);
+	DEBUG(printf("[%d] id %d says ghostmeshes enroll done \n",CkMyPe(),myChunk));
   ghostmeshes->sync();
+	DEBUG(printf("[%d] id %d says ghostmeshes sync done \n",CkMyPe(),myChunk));
   /*
     For each shared tuple (a tuple in which all nodes are shared) find the other chunks that share this 
     tuple. Add the element corresponding to this tuple, as a ghost to the other chunk's meshes. While adding 

@@ -179,7 +179,7 @@ FEM_Partition &FEM_curPartition(void) {
   if (mypartition==NULL) mypartition=new FEM_Partition();
 	return *mypartition;
 }
-static void clearPartition(void) {delete mypartition; mypartition=NULL;}
+void clearPartition(void) {delete mypartition; mypartition=NULL;}
 
 FEM_Partition::FEM_Partition() 
 {
