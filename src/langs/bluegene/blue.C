@@ -240,7 +240,7 @@ void resetVTime()
   int timingMethod = cva(bgMach).timingMethod;
   if (timingMethod == BG_WALLTIME) {
     double ct = CmiWallTimer();
-    CmiAssert(ct >= tSTARTTIME);
+    //CmiAssert(ct >= tSTARTTIME);
     tSTARTTIME = ct;
   }
   else if (timingMethod == BG_ELAPSE)
