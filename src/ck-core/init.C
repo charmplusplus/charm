@@ -189,6 +189,7 @@ static inline void _parseCommandLineOpts(char **argv)
     _ringexit = 1;
     if (CkMyPe()==0)
       CkPrintf("Charm++> Program shutdown in token ring (%d).\n", _ringtoken);
+    if (_ringtoken > CkNumPes())  _ringtoken = CkNumPes();
   }
 	/*
 		FAULT_EVAC
@@ -292,9 +293,12 @@ static void _exitHandler(envelope *env)
       // if exit in ring, instead of broadcasting, send in ring
       if (_ringexit){
 	DEBUGF(("[%d] Ring Exit \n",CkMyPe()));
-        for (int i=0; i<_ringtoken; i++)
-          if (i<CkNumPes())
-            CmiSyncSend(i, env->getTotalsize(), (char *)env);
+        const int stride = CkNumPes()/_ringtoken;
+        int pe = 0;
+        while (pe<CkNumPes()) {
+          CmiSyncSend(pe, env->getTotalsize(), (char *)env);
+          pe += stride;
+        }
         CmiFree(env);
       }else{
 	CmiSyncBroadcastAllAndFree(env->getTotalsize(), (char *)env);
@@ -318,8 +322,14 @@ static void _exitHandler(envelope *env)
 #ifndef CMK_OPTIMIZE
       if (_ringexit) traceClose();
 #endif
-      if (_ringexit && CkMyPe()+_ringtoken < CkNumPes())
-        CmiSyncSendAndFree(CkMyPe()+_ringtoken, env->getTotalsize(), (char *)env);
+      if (_ringexit) {
+        int stride = CkNumPes()/_ringtoken;
+        int pe = CkMyPe()+1;
+        if (pe < CkNumPes() && pe % stride != 0)
+          CmiSyncSendAndFree(pe, env->getTotalsize(), (char *)env);
+        else
+          CmiFree(env);
+      }
       else
         CmiFree(env);
       if(CkMyPe()){
