@@ -15,6 +15,8 @@ TopModel* topModel_Create(){
 
 TopNode topModel_InsertNode(TopModel*, double x, double y, double z){
 // TODO : insert a node here
+TopNode a;
+return a;
 }
 
 
@@ -97,6 +99,8 @@ void topNodeItr_next(TopNodeItr* itr){
 
 TopNode topNodeItr_GetCurr(TopNodeItr*itr){
     // TODO somehow need to get back to a TopNode
+    TopNode a;
+return a;
 }
 
 /** C-like Iterator for elements */
