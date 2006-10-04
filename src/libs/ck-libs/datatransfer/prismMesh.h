@@ -21,7 +21,7 @@ class PrismMesh {
     int nodes[PrismMesh::nodePer];
     conn_t() {nodes[0]=-1;}
     conn_t(int a,int b,int c,int d, int e, int f)
-      {nodes[0]=a; nodes[1]=b; nodes[2]=c; nodes[3]=d;nodes[4]=d;nodes[5]=d;}
+      {nodes[0]=a; nodes[1]=b; nodes[2]=c; nodes[3]=d;nodes[4]=e;nodes[5]=f;}
   };
   
   //! Create a new empty mesh.
@@ -60,8 +60,8 @@ class PrismMesh {
   }
   
   //! Simple mesh modification. The new number of the added object is returned.
-  int addPrism(const conn_t &c) {prism.push_back(c); return prism.size()-1;}
-  int addPoint(const CkVector3d &pt) {pts.push_back(pt); return pts.size()-1;}
+  int addPrism(const conn_t &c) {prism.push_back(c); nonGhostPrism++; return prism.size()-1;}
+  int addPoint(const CkVector3d &pt) {pts.push_back(pt); nonGhostPt++; return pts.size()-1;}
   
   int nonGhostPrism, nonGhostPt;
   void writeToTecplot(char *fname) {
@@ -69,16 +69,16 @@ class PrismMesh {
     // Header
     fprintf (file, "TITLE=\"%s\"\n", fname);
     fprintf (file, "ZONE N=%d E=%d ET=BRICK F=FEPOINT\n",
-	     nonGhostPt, nonGhostPrism);
+	     pts.size(), prism.size());
     // Mesh vertices
     int i,n;
-    n=nonGhostPt;
+    n=pts.size();
     for (i=0; i<n; ++i) {
       fprintf(file,"%lf %lf %lf\n",pts[i][0],pts[i][1],pts[i][2]);
     }
     // Mesh prisms
-    n=nonGhostPrism;
-    for ( i=0; i<n; ++i) {
+    n=prism.size();
+    for (i=0; i<n; ++i) {
       fprintf(file,"%d %d %d %d %d %d %d %d\n", prism[i].nodes[0]+1, 
 	      prism[i].nodes[1]+1, prism[i].nodes[2]+1, prism[i].nodes[2]+1, 
 	      prism[i].nodes[3]+1, prism[i].nodes[4]+1, prism[i].nodes[5]+1, 
