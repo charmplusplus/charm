@@ -100,6 +100,12 @@ public: short int index[5];
 	CkArrayIndex5D(){ nInts=3; }
 	CkArrayIndex5D(short int i0,short int i1,short int i2,short int i3,short int i4) {
 		index[0]=i0;index[1]=i1;index[2]=i2;index[3]=i3;index[4]=i4;nInts=3;
+        }
+	CkArrayIndex5D &operator=(const CkArrayIndex5D &that)  {
+		CmiAssert(that.nInts == 3);
+		nInts = that.nInts;
+		memcpy(index, that.index, sizeof(short int)*5);;
+		return *this;
 	}
 };
 class CkArrayIndex6D : public CkArrayIndex {
@@ -212,23 +218,45 @@ class CkVerboseListener : public CkArrayListener {
 /*********************** CkArrayOptions *******************************/
 /// Arguments for array creation:
 class CkArrayOptions {
-	int numInitial;/// Number of elements to create
-	CkGroupID map;/// Array location map object
-	CkGroupID locMgr;/// Location manager to bind to
+	CkArrayIndexMax numInitial;///< Number of elements to create
+	CkGroupID map;///< Array location map object
+	CkGroupID locMgr;///< Location manager to bind to
 	CkPupAblePtrVec<CkArrayListener> arrayListeners; //CkArrayListeners for this array
  public:
  //Used by external world:
-	CkArrayOptions(void); /// Default: empty array
-	CkArrayOptions(int numInitial_); /// With initial elements
+	CkArrayOptions(void); ///< Default: empty array
+	CkArrayOptions(int ni1_); ///< With initial elements 1D
+	CkArrayOptions(int ni1_, int ni2_); ///< With initial elements 2D 
+	CkArrayOptions(int ni1_, int ni2_, int ni3); ///< With initial elements 3D
+	//CkArrayOptions(short ni1_, short ni2_, short ni3, short ni4_); ///< With initial elements 4D
+	//CkArrayOptions(short ni1_, short ni2_, short ni3, short ni4_, short ni5_); ///< With initial elements 5D
+	//CkArrayOptions(short ni1_, short ni2_, short ni3, short ni4_, short ni5_, short ni6_); ///< With initial elements 6D
 
 	/**
 	 * These functions return "this" so you can string them together, e.g.:
 	 *   foo(CkArrayOptions().setMap(mid).bindTo(aid));
 	 */
 
-	/// Create this many initial elements
+	/// Create this many initial elements 1D
 	CkArrayOptions &setNumInitial(int ni)
-		{numInitial=ni; return *this;}
+		{numInitial=CkArrayIndex1D(ni); return *this;}
+	/// Create this many initial elements 2D
+	CkArrayOptions &setNumInitial(int ni1, int ni2)
+		{numInitial=CkArrayIndex2D(ni1, ni2); return *this;}
+	/// Create this many initial elements 3D
+	CkArrayOptions &setNumInitial(int ni1, int ni2, int ni3)
+		{numInitial=CkArrayIndex3D(ni1 ,ni2, ni3); return *this;}
+        /*
+	/// Create this many initial elements 4D
+	CkArrayOptions &setNumInitial(short ni1, short ni2, short ni3, short ni4)
+		{numInitial=CkArrayIndex4D(ni1, ni2, ni3, ni4); return *this;}
+	/// Create this many initial elements 5D
+	CkArrayOptions &setNumInitial(short ni1, short ni2, short ni3, short ni4, short ni5)
+		{numInitial=CkArrayIndex5D(ni1, ni2, ni3, ni4, ni5); return *this;}
+	/// Create this many initial elements 6D
+	CkArrayOptions &setNumInitial(short ni1, short ni2, short ni3, short ni4, short ni5, short ni6)
+		{numInitial=CkArrayIndex6D(ni1, ni2, ni3, ni4, ni5, ni6); return *this;}
+        */
 
 	/// Use this location map
 	CkArrayOptions &setMap(const CkGroupID &m)
@@ -245,7 +273,7 @@ class CkArrayOptions {
 	CkArrayOptions &addListener(CkArrayListener *listener);
 
   //Used by the array manager:
-	int getNumInitial(void) const {return numInitial;}
+	const CkArrayIndexMax &getNumInitial(void) const {return numInitial;}
 	const CkGroupID &getMap(void) const {return map;}
 	const CkGroupID &getLocationManager(void) const {return locMgr;}
 	int getListeners(void) const {return arrayListeners.size();}
@@ -436,6 +464,8 @@ public:
   virtual ~ArrayElement();
 
   int numElements; /// Initial number of array elements (DEPRICATED)
+  // On the previous line, someone wrote "deprecated", but nevertheless it is still
+  // used on TempoArray (tempo.C), ampi.C, irecv (receiver.h), as well as many tests and examples!
 
 /// Pack/unpack routine (called before and after migration)
   virtual void pup(PUP::er &p);
@@ -635,7 +665,7 @@ public:
 
 //Access & information routines
   inline CkLocMgr *getLocMgr(void) {return locMgr;}
-  inline int getNumInitial(void) const {return numInitial;}
+  inline const CkArrayIndexMax &getNumInitial(void) const {return numInitial;}
   inline int homePe(const CkArrayIndex &idx) const {return locMgr->homePe(idx);}
   inline int procNum(const CkArrayIndex &idx) const {return locMgr->procNum(idx);}
 
@@ -685,7 +715,7 @@ public:
   virtual CmiBool isArrMgr(void) {return CmiTrue;}
 
 private:
-  int numInitial;/// Number of 1D initial array elements
+  CkArrayIndexMax numInitial;/// Number of initial array elements
   CmiBool isInserting;/// Are we currently inserting elements?
 
 /// Allocate space for a new array element

@@ -175,7 +175,7 @@ class ArrayElement_initInfo {
 public:
   CkArray *thisArray;
   CkArrayID thisArrayID;
-  int numInitial;
+  CkArrayIndexMax numInitial;
   int listenerData[CK_ARRAYLISTENER_MAXLEN];
   CmiBool fromMigration;
 };
@@ -201,7 +201,7 @@ void ArrayElement::initBasics(void)
   ArrayElement_initInfo &info=CkpvAccess(initInfo);
   thisArray=info.thisArray;
   thisArrayID=info.thisArrayID;
-  numElements=info.numInitial;
+  numElements=info.numInitial.getCombinedCount();
   if (info.listenerData) {
     memcpy(listenerData,info.listenerData,sizeof(listenerData));
   }
@@ -341,8 +341,20 @@ CkArrayOptions::CkArrayOptions(void) //Default: empty array
 	locMgr.setZero();
 }
 
-CkArrayOptions::CkArrayOptions(int ni) //With initial elements
-	:numInitial(ni),map(_RRMapID)
+CkArrayOptions::CkArrayOptions(int ni1) //With initial elements (1D)
+	:numInitial(CkArrayIndex1D(ni1)),map(_RRMapID)
+{
+	locMgr.setZero();
+}
+
+CkArrayOptions::CkArrayOptions(int ni1, int ni2) //With initial elements (2D)
+	:numInitial(CkArrayIndex2D(ni1, ni2)),map(_RRMapID)
+{
+	locMgr.setZero();
+}
+
+CkArrayOptions::CkArrayOptions(int ni1, int ni2, int ni3) //With initial elements (3D)
+	:numInitial(CkArrayIndex3D(ni1, ni2, ni3)),map(_RRMapID)
 {
 	locMgr.setZero();
 }

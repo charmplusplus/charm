@@ -84,8 +84,8 @@ public:
   CkArrayMap(void);
   CkArrayMap(CkMigrateMessage *m): IrrGroup(m) {}
   virtual ~CkArrayMap();
-  virtual int registerArray(int numElements,CkArrayID aid);
-  virtual void populateInitial(int arrayHdl,int numElements,void *ctorMsg,CkArrMgr *mgr);
+  virtual int registerArray(CkArrayIndexMax& numElements,CkArrayID aid);
+  virtual void populateInitial(int arrayHdl,CkArrayIndexMax& numElements,void *ctorMsg,CkArrMgr *mgr);
   virtual int procNum(int arrayHdl,const CkArrayIndex &element) =0;
   virtual int homePe(int arrayHdl,const CkArrayIndex &element)
              { return procNum(arrayHdl, element); }
@@ -499,7 +499,7 @@ public:
 class CkLocMgr : public IrrGroup {
 	CkMagicNumber<CkMigratable> magic; //To detect heap corruption
 public:
-	CkLocMgr(CkGroupID map,CkGroupID _lbdb,int numInitial);
+	CkLocMgr(CkGroupID map,CkGroupID _lbdb,CkArrayIndexMax& numInitial);
 	CkLocMgr(CkMigrateMessage *m);
 	inline CmiBool isLocMgr(void) { return CmiTrue; }
 	CkGroupID &getGroupID(void) {return thisgroup;}
@@ -515,7 +515,7 @@ public:
 	CkMigratableList *addManager(CkArrayID aid,CkArrMgr *mgr);
 
 	/// Populate this array with initial elements
-	void populateInitial(int numElements,void *initMsg,CkArrMgr *mgr)
+	void populateInitial(CkArrayIndexMax& numElements,void *initMsg,CkArrMgr *mgr)
 		{map->populateInitial(mapHandle,numElements,initMsg,mgr);}
 
 	/// Add a new local array element, calling element's constructor

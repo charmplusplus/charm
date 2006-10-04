@@ -223,14 +223,21 @@ a run of integers used to look up an object in a hash table.
 class CkArrayIndex
 {
 public:
-	//Length of index in *integers*
+        ///Length of index in *integers*
 	int nInts;
 	
 	//Index data immediately follows...
 	
 	int *data(void) {return (&nInts)+1;}
 	const int *data(void) const {return (&nInts)+1;}
-	
+
+        int getCombinedCount(void) const {
+          if (nInts == 1) return data()[0];
+          else if (nInts == 2) return data()[0] * data()[1];
+          else if (nInts == 3) return data()[0] * data()[1] * data()[2];
+          else return 0;
+        }
+
 	void pup(PUP::er &p);
 
     //These routines allow CkArrayIndex to be used in
@@ -281,8 +288,8 @@ class CkArrayIndexMax : public CkArrayIndex {
 		for (int i=0;i<nInts;i++) index.data[i]=that.data()[i];
 	}
 public:
-	CkArrayIndexMax(void) { }
-	CkArrayIndexMax(int i) {}   // used for CkVec
+	CkArrayIndexMax(void) { nInts=0; }
+	CkArrayIndexMax(int i) { nInts=0; }   // used for CkVec
 	CkArrayIndexMax(const CkArrayIndex &that) 
 		{copyFrom(that);}
 	CkArrayIndexMax &operator=(const CkArrayIndex &that) 

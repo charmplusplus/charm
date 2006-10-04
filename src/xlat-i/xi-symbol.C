@@ -2461,9 +2461,26 @@ void Entry::genArrayStaticConstructorDecl(XStr& str)
   if (container->getForWhom()==forIndividual)
       str<< //Element insertion routine
       "    void insert("<<paramComma(1,0)<<"int onPE=-1"<<eo(1)<<");";
-  else if (container->getForWhom()==forAll)
+  else if (container->getForWhom()==forAll) {
       str<< //With options
       "    static CkArrayID ckNew("<<paramComma(1,0)<<"const CkArrayOptions &opts"<<eo(1)<<");\n";
+      if (container->isArray()) {
+        XStr dim = ((Array*)container)->dim();
+        if (dim==(const char*)"1D") {
+          str<<"    static CkArrayID ckNew("<<paramComma(1,0)<<"const int s1"<<eo(1)<<");\n";
+        } else if (dim==(const char*)"2D") {
+          str<<"    static CkArrayID ckNew("<<paramComma(1,0)<<"const int s1, const int s2"<<eo(1)<<");\n";
+        } else if (dim==(const char*)"3D") {
+          str<<"    static CkArrayID ckNew("<<paramComma(1,0)<<"const int s1, const int s2, const int s3"<<eo(1)<<");\n";
+        /*} else if (dim==(const char*)"4D") {
+          str<<"    static CkArrayID ckNew("<<paramComma(1,0)<<"const short s1, const short s2, const short s3, const short s4"<<eo(1)<<");\n";
+        } else if (dim==(const char*)"5D") {
+          str<<"    static CkArrayID ckNew("<<paramComma(1,0)<<"const short s1, const short s2, const short s3, const short s4, const short s5"<<eo(1)<<");\n";
+        } else if (dim==(const char*)"6D") {
+          str<<"    static CkArrayID ckNew("<<paramComma(1,0)<<"const short s1, const short s2, const short s3, const short s4, const short s5, const short s6"<<eo(1)<<");\n"; */
+        }
+      }
+  }
   else if (container->getForWhom()==forSection);
 }
 
@@ -2474,13 +2491,43 @@ void Entry::genArrayStaticConstructorDefs(XStr& str)
       makeDecl("void",1)<<"::insert("<<paramComma(0,0)<<"int onPE"<<eo(0)<<")\n"
       "{ \n"<<marshallMsg()<<
       "   ckInsert((CkArrayMessage *)impl_msg,"<<epIdx()<<",onPE);\n}\n";
-  else if (container->getForWhom()==forAll)
+  else if (container->getForWhom()==forAll){
       str<<
       makeDecl("CkArrayID",1)<<"::ckNew("<<paramComma(0)<<"const CkArrayOptions &opts"<<eo(0)<<")\n"
        "{ \n"<<marshallMsg()<<
 	 "   return ckCreateArray((CkArrayMessage *)impl_msg,"<<epIdx()<<",opts);\n"
        "}\n";
-      
+      if (container->isArray()) {
+        XStr dim = ((Array*)container)->dim();
+        if (dim==(const char*)"1D") {
+          str<<
+            makeDecl("CkArrayID",1)<<"::ckNew("<<paramComma(0)<<"const int s1"<<eo(0)<<")\n"
+            "{ \n"<<marshallMsg()<<
+            "   return ckCreateArray((CkArrayMessage *)impl_msg,"<<epIdx()<<",CkArrayOptions(s1));\n"
+            "}\n";
+        } else if (dim==(const char*)"2D") {
+          str<<
+            makeDecl("CkArrayID",1)<<"::ckNew("<<paramComma(0)<<"const int s1, const int s2"<<eo(0)<<")\n"
+            "{ \n"<<marshallMsg()<<
+            "   return ckCreateArray((CkArrayMessage *)impl_msg,"<<epIdx()<<",CkArrayOptions(s1, s2));\n"
+            "}\n";
+        } else if (dim==(const char*)"3D") {
+          str<<
+            makeDecl("CkArrayID",1)<<"::ckNew("<<paramComma(0)<<"const int s1, const int s2, const int s3"<<eo(0)<<")\n"
+            "{ \n"<<marshallMsg()<<
+            "   return ckCreateArray((CkArrayMessage *)impl_msg,"<<epIdx()<<",CkArrayOptions(s1, s2, s3));\n"
+            "}\n";
+        /*} else if (dim==(const char*)"4D") {
+          str<<"    static CkArrayID ckNew("<<paramComma(1,0)<<"const short s1, const short s2, const short s3, const short s4"<<eo(1)<<");\n";
+        } else if (dim==(const char*)"5D") {
+          str<<"    static CkArrayID ckNew("<<paramComma(1,0)<<"const short s1, const short s2, const short s3, const short s4, const short s5"<<eo(1)<<");\n";
+        } else if (dim==(const char*)"6D") {
+          str<<"    static CkArrayID ckNew("<<paramComma(1,0)<<"const short s1, const short s2, const short s3, const short s4, const short s5, const short s6"<<eo(1)<<");\n";
+        */
+        }
+      }
+  }
+
 }
 
 

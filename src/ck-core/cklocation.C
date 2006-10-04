@@ -155,22 +155,54 @@ be forwarded by default.
 
 CkArrayMap::CkArrayMap(void) { }
 CkArrayMap::~CkArrayMap() { }
-int CkArrayMap::registerArray(int numElements,CkArrayID aid)
+int CkArrayMap::registerArray(CkArrayIndexMax& numElements,CkArrayID aid)
 {return 0;}
 
-void CkArrayMap::populateInitial(int arrayHdl,int numElements,void *ctorMsg,CkArrMgr *mgr)
+#define CKARRAYMAP_POPULATE_INITIAL(POPULATE_CONDITION) \
+        int i; \
+	for (int i1=0; i1<numElements.data()[0]; i1++) { \
+          if (numElements.nInts == 1) { \
+            /* Make 1D indices */ \
+            i = i1; \
+            CkArrayIndex1D idx(i1); \
+            if (POPULATE_CONDITION) \
+              mgr->insertInitial(idx,CkCopyMsg(&ctorMsg)); \
+          } else { \
+            /* higher dimensionality */ \
+            for (int i2=0; i2<numElements.data()[1]; i2++) { \
+              if (numElements.nInts == 2) { \
+                /* Make 2D indices */ \
+                i = i1 * numElements.data()[1] + i2; \
+                CkArrayIndex2D idx(i1, i2); \
+                if (POPULATE_CONDITION) \
+                  mgr->insertInitial(idx,CkCopyMsg(&ctorMsg)); \
+              } else { \
+                /* higher dimensionality */ \
+                CkAssert(numElements.nInts == 3); \
+                for (int i3=0; i3<numElements.data()[2]; i3++) { \
+                  /* Make 3D indices */ \
+                  i = (i1 * numElements.data()[1] + i2) * numElements.data()[2] + i3; \
+                  CkArrayIndex3D idx(i1, i2, i3 ); \
+                  if (POPULATE_CONDITION) \
+                    mgr->insertInitial(idx,CkCopyMsg(&ctorMsg)); \
+                } \
+              } \
+            } \
+          } \
+	}
+
+void CkArrayMap::populateInitial(int arrayHdl,CkArrayIndexMax& numElements,void *ctorMsg,CkArrMgr *mgr)
 {
-	if (numElements==0) {
+	if (numElements.nInts==0) {
           CkFreeMsg(ctorMsg);
           return;
         }
 	int thisPe=CkMyPe();
-	for (int i=0;i<numElements;i++) {
-		//Make 1D indices
-		CkArrayIndex1D idx(i);
-		if (procNum(arrayHdl,idx)==thisPe)
-			mgr->insertInitial(idx,CkCopyMsg(&ctorMsg));
-	}
+        /* The CkArrayIndexMax is supposed to have at most 3 dimensions, which
+           means that all the fields are ints, and numElements.nInts represents
+           how many of them are used */
+        CKARRAYMAP_POPULATE_INITIAL(procNum(arrayHdl,idx)==thisPe);
+
 	mgr->doneInserting();
 	CkFreeMsg(ctorMsg);
 }
@@ -221,18 +253,33 @@ public:
 	DEBC((AA"Creating BlockMap\n"AB));
   }
   BlockMap(CkMigrateMessage *m):RRMap(m){ }
-  void populateInitial(int arrayHdl,int numElements,void *ctorMsg,CkArrMgr *mgr){
-	if (numElements==0) {
+  void populateInitial(int arrayHdl,CkArrayIndexMax& numElements,void *ctorMsg,CkArrMgr *mgr){
+	if (numElements.nInts==0) {
           CkFreeMsg(ctorMsg);
           return;
         }
 	int thisPe=CkMyPe();
 	int numPes=CkNumPes();
-	for (int i=0;i<numElements;i++) {
-		int binSize = (int)ceil((double)numElements/(double)numPes);
+        int binSize;
+        if (numElements.nInts == 1) {
+          binSize = (int)ceil((double)numElements.data()[0]/(double)numPes);
+        } else if (numElements.nInts == 2) {
+          binSize = (int)ceil((double)(numElements.data()[0]*numElements.data()[1])/(double)numPes);
+        } else if (numElements.nInts == 3) {
+          binSize = (int)ceil((double)(numElements.data()[0]*numElements.data()[1]*numElements.data()[2])/(double)numPes);
+        } else {
+          CkAbort("CkArrayIndex has dimension greater than 3!");
+        }
+        CKARRAYMAP_POPULATE_INITIAL(i/binSize==thisPe);
+
+        /*
+        CkArrayIndexMax idx;
+	for (idx=numElements.begin(); idx<numElements; idx.getNext(numElements)) {
+          //for (int i=0;i<numElements;i++) {
+		int binSize = (int)ceil((double)numElements.getCombinedCount()/(double)numPes);
 		if (i/binSize==thisPe)
-			mgr->insertInitial(CkArrayIndex1D(i),CkCopyMsg(&ctorMsg));
-	}
+			mgr->insertInitial(idx,CkCopyMsg(&ctorMsg));
+        }*/
 	mgr->doneInserting();
 	CkFreeMsg(ctorMsg);
   }
@@ -266,16 +313,21 @@ public:
   {
      return CLD_ANYWHERE;   // -1
   }
-  void populateInitial(int arrayHdl,int numElements,void *ctorMsg,CkArrMgr *mgr)  {
-        if (numElements==0) {
+  void populateInitial(int arrayHdl,CkArrayIndexMax& numElements,void *ctorMsg,CkArrMgr *mgr)  {
+        if (numElements.nInts==0) {
           CkFreeMsg(ctorMsg);
           return;
         }
         int thisPe=CkMyPe();
         int numPes=CkNumPes();
-        for (int i=0;i<numElements;i++)
-                        if(i%numPes==thisPe)
+        //CkArrayIndexMax idx;
+
+        CKARRAYMAP_POPULATE_INITIAL(i%numPes==thisPe);
+	/*for (idx=numElements.begin(); idx<numElements; idx.getNext(numElements)) {
+          //for (int i=0;i<numElements;i++)
+                        if((idx.getRank(numElements))%numPes==thisPe)
                                 mgr->insertInitial(CkArrayIndex1D(i),CkCopyMsg(&ctorMsg),0);
+        }*/
         mgr->doneInserting();
         CkFreeMsg(ctorMsg);
   }
@@ -286,25 +338,26 @@ CkpvStaticDeclare(double*, rem);
 
 class arrInfo {
  private:
-   int _nelems;
+   CkArrayIndexMax _nelems;
    int *_map;
    void distrib(int *speeds);
  public:
-   arrInfo(void):_nelems(-1),_map(NULL){}
-   arrInfo(int n, int *speeds)
+   arrInfo(void):_map(NULL){}
+   arrInfo(CkArrayIndexMax& n, int *speeds)
    {
      _nelems = n;
-     _map = new int[_nelems];
+     _map = new int[_nelems.getCombinedCount()];
      distrib(speeds);
    }
    ~arrInfo() { delete[] _map; }
    int getMap(const CkArrayIndex &i);
    void pup(PUP::er& p){
      p|_nelems;
+     int totalElements = _nelems.getCombinedCount();
      if(p.isUnpacking()){
-       _map = new int[_nelems];
+       _map = new int[totalElements];
      }
-     p(_map,_nelems);
+     p(_map,totalElements);
    }
 };
 
@@ -321,6 +374,7 @@ static int cmp(const void *first, const void *second)
 void
 arrInfo::distrib(int *speeds)
 {
+  int _nelemsCount = _nelems.getCombinedCount();
   double total = 0.0;
   int npes = CkNumPes();
   int i,j,k;
@@ -331,16 +385,16 @@ arrInfo::distrib(int *speeds)
     nspeeds[i] = (double) speeds[i] / total;
   int *cp = new int[npes];
   for(i=0;i<npes;i++)
-    cp[i] = (int) (nspeeds[i]*_nelems);
+    cp[i] = (int) (nspeeds[i]*_nelemsCount);
   int nr = 0;
   for(i=0;i<npes;i++)
     nr += cp[i];
-  nr = _nelems - nr;
+  nr = _nelemsCount - nr;
   if(nr != 0)
   {
     CkpvAccess(rem) = new double[npes];
     for(i=0;i<npes;i++)
-      CkpvAccess(rem)[i] = (double)_nelems*nspeeds[i] - cp[i];
+      CkpvAccess(rem)[i] = (double)_nelemsCount*nspeeds[i] - cp[i];
     int *pes = new int[npes];
     for(i=0;i<npes;i++)
       pes[i] = i;
@@ -366,7 +420,7 @@ arrInfo::getMap(const CkArrayIndex &i)
   if(i.nInts==1)
     return _map[i.data()[0]];
   else
-    return _map[((i.hash()+739)%1280107)%_nelems];
+    return _map[((i.hash()+739)%1280107)%_nelems.getCombinedCount()];
 }
 
 //Speeds maps processor number to "speed" (some sort of iterations per second counter)
@@ -430,7 +484,7 @@ public:
     DEBC((AA"Creating PropMap\n"AB));
   }
   PropMap(CkMigrateMessage *m) {}
-  int registerArray(int numElements,CkArrayID aid)
+  int registerArray(CkArrayIndexMax& numElements,CkArrayID aid)
   {
     int idx = arrs.size();
     arrs.resize(idx+1);
@@ -1325,7 +1379,7 @@ void CkLocMgr::flushAllRecs(void)
 }
 
 /*************************** LocMgr: CREATION *****************************/
-CkLocMgr::CkLocMgr(CkGroupID mapID_,CkGroupID lbdbID_,int numInitial)
+CkLocMgr::CkLocMgr(CkGroupID mapID_,CkGroupID lbdbID_,CkArrayIndexMax& numInitial)
 	:thisProxy(thisgroup),thislocalproxy(thisgroup,CkMyPe()),
 	 hash(17,0.3)
 {
@@ -1378,7 +1432,8 @@ void CkLocMgr::pup(PUP::er &p){
 		//Register with the map object
 		map=(CkArrayMap *)CkLocalBranch(mapID);
 		if (map==NULL) CkAbort("ERROR!  Local branch of array map is NULL!");
-		mapHandle=map->registerArray(0,thisgroup);
+                CkArrayIndexMax emptyIndex;
+		mapHandle=map->registerArray(emptyIndex,thisgroup);
 		// _lbdb is the fixed global groupID
 		initLB(lbdbID);
 		// delay doneInserting when it is unpacking during restart.
