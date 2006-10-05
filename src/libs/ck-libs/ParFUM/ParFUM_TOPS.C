@@ -11,6 +11,9 @@
 TopModel* topModel_Create(){
     return new TopModel;
     // We really need to support multiple meshes for this to work
+
+	// Setup tables for attributes for the new model
+
 }
 
 TopNode topModel_InsertNode(TopModel*, double x, double y, double z){

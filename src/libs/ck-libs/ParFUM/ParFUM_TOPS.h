@@ -2,6 +2,16 @@
 *	A ParFUM TOPS compatibility layer
 *	
 *      Author: Isaac Dooley 
+
+
+Implement these first
+
+Then consider how to get TOPS node to one element data structure in here so their adjacency functions just work.
+
+What kind of adaptivity do they want?
+
+LB & PUPing
+
 */
 
 
@@ -13,7 +23,12 @@
 class TopModel{
 public:
     FEM_Mesh *mesh;
+
+	// add a hash table for the attribute pointers here
+	// index into here with an int that is possibly stored in ParFUM int attribute
+
 };
+
 
 class TopNode{};
 class NodeAtt{};
