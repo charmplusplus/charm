@@ -24,7 +24,7 @@ libcellspu.a: spert.o
 
 spert.o: spert.cpp spert.h
 	cp spert.cpp spert.c
-	$(SPU_CC) -c -o spert.o spert.c
+	$(SPU_CC) --param max-inline-insns-single=1000000 --param inline-unit-growth=1000 --param large-function-growth=1000 -c -o spert.o spert.c
 
 install: libcellppu.a libcellspu.a
 	cp libcellppu.a libcellspu.a $(CHARMDIR)/lib
