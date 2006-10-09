@@ -39,19 +39,20 @@ void ParFUM_recreateSharedNodes(int meshid, int dim) {
   printf("Node Coords for rank %d \n",rank);
   for(int n=0;n<numNodes;n++){
     printf("%d -> ", n);
-    for (int m-0; m<dim; m++) 
-      printf("%.5lf %.5lf \n", nodeCoords[dim*n+m]);
+    for (int m=0; m<dim; m++) 
+      printf("%.5lf ", nodeCoords[dim*n+m]);
+    printf("\n");
   }
-  */
+  //*/
   
   // Begin exchange of node coordinates to determine shared nodes
   // compute bounding box
   double *localBoundingBox = (double*)malloc(sizeof(double)*2*dim);
-  double *allBoundingBoxes = (double*)malloc(sizeof(double)*2*comm_size);
+  double *allBoundingBoxes = (double*)malloc(sizeof(double)*2*dim*comm_size);
   ParFUM_findBoundingBox(numNodes, dim, nodeCoords, localBoundingBox);
-  MPI_Alltoall(localBoundingBox, 2*dim, MPI_DOUBLE, 
-	       allBoundingBoxes, 2*dim*comm_size, MPI_DOUBLE,
-	       comm); 
+  MPI_Allgather(localBoundingBox, 2*dim, MPI_DOUBLE, 
+  		allBoundingBoxes, 2*dim, MPI_DOUBLE,
+  		comm);
 
   // only exchange when bounding boxes collide
   for (int i=rank+1; i<comm_size; i++) { //send nodeCoords to rank i
@@ -299,10 +300,14 @@ ParFUM_findBoundingBox
  double* boundingBox
  ) {
 
-  assert(nPoints >= 1);
-    
   for(int idim=0; idim<dim; idim++) {
-    boundingBox[idim] = boundingBox[dim+idim] = points[idim];
+    double initial_value;
+    if (nPoints >= 1) {
+      initial_value = points[idim];
+    } else {
+      initial_value = FEM_BOUNDING_BOX_INVALID;
+    }
+    boundingBox[idim] = boundingBox[dim+idim] = initial_value;
   }
 
   for(int ipoint=1; ipoint<nPoints; ipoint++) {
@@ -334,14 +339,42 @@ ParFUM_boundingBoxesCollide
  /// pointer to the second box
  double* box_b
  ) {
+
   for (int ii=0; ii<dim; ii++) {
     // return false if the extents indicate that no collision is possible
     // a_max < b_min || b_max < a_min
     // note that this operation is symmetric
-    if ((box_a[ii+dim] < box_b[ii]) || (box_b[ii+dim] < box_a[ii])) {
+    if ((box_a[ii] == FEM_BOUNDING_BOX_INVALID)
+	||
+	(box_b[ii] == FEM_BOUNDING_BOX_INVALID)
+	||
+	(box_a[ii+dim] < box_b[ii]) 
+	|| 
+	(box_b[ii+dim] < box_a[ii])) {
       return false;
     }
  }
   return true;
 }
     
+void
+ParFUM_printBoundingBox
+//////////////////////////////////////////////////////////
+/** Prints a bounding box's extents
+ *
+ */
+(
+ int dim,
+ double* box
+ ) {
+  printf("Lower bound: ");
+  for (int ii=0; ii<dim; ii++) {
+    printf("%lf ", box[ii]);
+  }
+  printf("\nUpper bound: ");
+  
+  for (int ii=dim; ii<2*dim; ii++) {
+    printf("%lf ", box[ii]);
+  }
+  printf("\n");
+}

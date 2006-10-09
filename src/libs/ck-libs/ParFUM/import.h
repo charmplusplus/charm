@@ -66,6 +66,9 @@ void ParFUM_findMatchingCoords(int dim, int extent_a, double* a,
 void
 ParFUM_findBoundingBox(int nPoints,int dim, double* points, double* boundingBox);
 bool ParFUM_boundingBoxesCollide(int dim, double* box_a, double* box_b);
+void ParFUM_printBoundingBox(int dim, double* box);
+
+#define FEM_BOUNDING_BOX_INVALID (1.666e-55)
 
 #endif
 
