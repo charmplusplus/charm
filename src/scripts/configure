@@ -1247,6 +1247,9 @@ echo "${ECHO_T}$version" >&6
 t="test.cpp"
 tc="test.c"
 
+charmout="charmconfig.out"
+/bin/rm -rf $charmout
+
 # test result passed in $1
 # If the test suceeded, print $3 and set "pass"/clear "fail"
 # If the test failed, print $2 and clear "pass"/set "fail"
@@ -1282,6 +1285,8 @@ echo "${ECHO_T}\"$4\"" >&6
 test_cc() {
         echo "$as_me:$LINENO: checking \"$1\"" >&5
 echo $ECHO_N "checking \"$1\"... $ECHO_C" >&6
+	cat $tc >> $charmout
+	echo $CMK_CC -I../include -I. $CMK_LIBDIR $CMK_INCDIR $OPTS_CC $OPTS_LD -c $tc -o test.o $4 >> $charmout
 	$CMK_CC -I../include -I. $CMK_LIBDIR $CMK_INCDIR $OPTS_CC $OPTS_LD -c $tc -o test.o $4 > out 2>&1
 	test_result $? "$1" "$2" "$3"
  	strictpass=$pass
@@ -1293,6 +1298,7 @@ echo $ECHO_N "checking \"$1\"... $ECHO_C" >&6
 	    strictpass="0" && strictfail="1"
           fi
         fi
+	cat out >> $charmout
 	/bin/rm -f out
 }
 
@@ -1303,6 +1309,8 @@ echo $ECHO_N "checking \"$1\"... $ECHO_C" >&6
 test_cxx() {
         echo "$as_me:$LINENO: checking \"$1\"" >&5
 echo $ECHO_N "checking \"$1\"... $ECHO_C" >&6
+	cat $t >> $charmout
+	echo $CMK_CXX -I../include -I. $CMK_LIBDIR $CMK_INCDIR $OPTS_CXX $OPTS_LD -c $t -o test.o $4 >> $charmout
 	$CMK_CXX -I../include -I. $CMK_LIBDIR $CMK_INCDIR $OPTS_CXX $OPTS_LD -c $t -o test.o $4 > out 2>&1
 	test_result $? "$1" "$2" "$3"
  	strictpass=$pass
@@ -1314,6 +1322,7 @@ echo $ECHO_N "checking \"$1\"... $ECHO_C" >&6
 	    strictpass="0" && strictfail="1"
           fi
         fi
+	cat out >> $charmout
 	/bin/rm -f out
 }
 
@@ -1324,14 +1333,18 @@ echo $ECHO_N "checking \"$1\"... $ECHO_C" >&6
 test_link() {
         echo "$as_me:$LINENO: checking \"$1\"" >&5
 echo $ECHO_N "checking \"$1\"... $ECHO_C" >&6
+	cat $t >> $charmout
+	echo $CMK_CXX -I../include -I. $CMK_INCDIR $OPTS_CXX -c $t -o test.o $4 >> $charmout
 	$CMK_CXX -I../include -I. $CMK_INCDIR $OPTS_CXX -c $t -o test.o $4 > out 2>&1
         if test $? = 1
         then
           test_result 1 "$1" "$2" "$3"
         else
+          echo $CMK_LDXX -o testlink test.o $CMK_LIBDIR $OPTS_LD $4 >> $charmout
           $CMK_LDXX -o testlink test.o $CMK_LIBDIR $OPTS_LD $4 > out 2>&1
           test_result $? "$1" "$2" "$3"
         fi
+	cat out >> $charmout
 	/bin/rm -f out
 }
 
@@ -1343,14 +1356,18 @@ echo $ECHO_N "checking \"$1\"... $ECHO_C" >&6
 test_linkso() {
         echo "$as_me:$LINENO: checking \"$1\"" >&5
 echo $ECHO_N "checking \"$1\"... $ECHO_C" >&6
+	cat $t >> $charmout
+	echo $CMK_CXX -I../include -I. $CMK_INCDIR $OPTS_CXX -c $t -o test.o $4 >> $charmout
 	$CMK_CXX -I../include -I. $CMK_INCDIR $OPTS_CXX -c $t -o test.o $4 > out 2>&1
         if test $? = 1
         then
           test_result 1 "$1" "$2" "$3"
         else
+	  echo $CMK_LD -I../include -I. $CMK_LIBDIR $OPTS_LD $CMK_LD_SHARED test.o -o testlink.$CMK_SHARED_SUF $4 >> $charmout
 	  $CMK_LD -I../include -I. $CMK_LIBDIR $OPTS_LD $CMK_LD_SHARED test.o -o testlink.$CMK_SHARED_SUF $4 > out 2>&1
 	  test_result $? "$1" "$2" "$3"
 	fi
+	cat out >> $charmout
 	/bin/rm -f out testlink.$CMK_SHARED_SUF
 }
 
