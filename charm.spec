@@ -14,7 +14,7 @@ Name: Charm
 %endif
 
 Version: 5.9
-Release: 1
+Release: 12
 Copyright: GPL
 Group: Applications/System
 BuildRoot: /var/tmp/%{name}-root
