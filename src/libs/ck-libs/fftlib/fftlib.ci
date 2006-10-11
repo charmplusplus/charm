@@ -1,6 +1,6 @@
 module fftlib {
 
-	message SendFFTMsg {ckcomplex data[];};
+	message SendFFTMsg {complex data[];};
 
 	// The following arrays do not have entry methods corresponding to
 	// constructors. The user array that inherit from these should provide
@@ -16,22 +16,21 @@ module fftlib {
 		entry NormalSlabArray(NormalFFTinfo &info, 
 			CProxy_NormalSlabArray src, CProxy_NormalSlabArray dest,
 			bool useCommlib, ComlibInstanceHandle &inst);
-		entry void acceptDataForFFT(int numPoints, ckcomplex points[numPoints], int posn, int info_id);
-		entry void acceptDataForIFFT(int numPoints, ckcomplex points[numPoints], int posn, int info_id);
+		entry void acceptDataForFFT(int numPoints, complex points[numPoints], int posn, int info_id);
+		entry void acceptDataForIFFT(int numPoints, complex points[numPoints], int posn, int info_id);
 	};
-/*	array [1D] NormalRealSlabArray: SlabArray { 
-		entry void acceptDataForFFT(int numPoints, ckcomplex points[numPoints], int posn, int info_id);
-		entry void acceptDataForIFFT(int numPoints, ckcomplex points[numPoints], int posn, int info_id);
+	array [1D] NormalRealSlabArray: SlabArray { 
+		entry void acceptDataForFFT(int numPoints, complex points[numPoints], int posn, int info_id);
+		entry void acceptDataForIFFT(int numPoints, complex points[numPoints], int posn, int info_id);
 	};
-*/
 /*
 	// the application should make an array derived from this
 	array [2D] SparseSlabArray: SlabArray { 
-		entry void acceptDataForFFT(int n, int flags[n], int numPoints, ckcomplex points[numPoints], int posn);
-		entry void acceptDataForIFFT(int num, int flags[n], int numPoints, ckcomplex points[numPoints], int posn);
+		entry void acceptDataForFFT(int n, int flags[n], int numPoints, complex points[numPoints], int posn);
+		entry void acceptDataForIFFT(int num, int flags[n], int numPoints, complex points[numPoints], int posn);
 	};
 */
-/*
+
 	array [2D] NormalLineArray {
 		entry NormalLineArray (LineFFTinfo &info, 
 			CProxy_NormalLineArray _xProxy, CProxy_NormalLineArray _yProxy, CProxy_NormalLineArray _zProxy, 
@@ -40,5 +39,4 @@ module fftlib {
 		entry void doSecondFFT(SendFFTMsg *msg);
 		entry void doThirdFFT(SendFFTMsg *msg);
 	};
-*/
 };

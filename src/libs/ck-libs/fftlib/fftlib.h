@@ -3,23 +3,10 @@
 
 #include <charm++.h>
 #include "ckcomplex.h"
+#include "drfftw.h"
 #include "EachToManyMulticastStrategy.h"
 #include "StreamingStrategy.h"
 #include "comlib.h"
-
-// Define which FFT sequential library to use
-// Note : One flag and one flag only is set to 1
-#define FFT_USE_FFTW_2_1_5 1 
-#define FFT_USE_FFTW_3_1   0
-#define FFT_USE_ESSL       0 
-#define FFT_USE_NETLIB     0
-#define FFT_USE_FFTE	   0 
-
-#if FFT_USE_FFTW_2_1_5 
-#include "drfftw.h"
-#elif  FFT_USE_ESSL
-#include "essl.h"
-#endif
 
 #define COMPLEX_TO_REAL -11
 #define REAL_TO_COMPLEX -12
@@ -95,11 +82,11 @@ typedef struct _PencilBlock{
 class LineFFTinfo {
  public:
 	// Constructors
-	LineFFTinfo(int size[3], int _ptype, int _pblock,ckcomplex  *dptr, int _xPencilsPerSlab=1, int _yPencilsPerSlab=1, int _zPencilsPerSlab=1) {
+	LineFFTinfo(int size[3], int _ptype, int _pblock, complex *dptr, int _xPencilsPerSlab=1, int _yPencilsPerSlab=1, int _zPencilsPerSlab=1) {
 	  init(size[0], size[1], size[2], _ptype, _pblock, dptr, _xPencilsPerSlab, _yPencilsPerSlab, _zPencilsPerSlab);
 	}
 	LineFFTinfo(LineFFTinfo &info) {
-	    init(info.sizeX, info.sizeY, info.sizeZ, info.ptype, info.pblock, (ckcomplex *) NULL, info.xPencilsPerSlab, info.yPencilsPerSlab, info.zPencilsPerSlab);
+	    init(info.sizeX, info.sizeY, info.sizeZ, info.ptype, info.pblock, (complex *) NULL, info.xPencilsPerSlab, info.yPencilsPerSlab, info.zPencilsPerSlab);
 	}
 	LineFFTinfo(void) {}
 
@@ -117,16 +104,16 @@ class LineFFTinfo {
 	    p(ysquare, 2);
 	    p(zsquare, 2);
 	    if (p.isUnpacking()) 
-		dataPtr = (ckcomplex *) NULL;
+		dataPtr = (complex *) NULL;
 	}
 	int sizeX, sizeY, sizeZ;
 	int ptype;
 	int pblock;
 	int xPencilsPerSlab, yPencilsPerSlab, zPencilsPerSlab;
 	int xsquare[2], ysquare[2], zsquare[2];
-	ckcomplex *dataPtr;
+	complex *dataPtr;
  private:
-	void init(int sizex, int sizey, int sizez, int _ptype, int _pblock,ckcomplex  *dptr,  int _xPencilsPerSlab, int _yPencilsPerSlab, int _zPencilsPerSlab) {
+	void init(int sizex, int sizey, int sizez, int _ptype, int _pblock, complex *dptr,  int _xPencilsPerSlab, int _yPencilsPerSlab, int _zPencilsPerSlab) {
 	    if (sizex != sizey || sizey != sizez)
 			ckerr << "WARNING"
 				  << "This configuration of the source and destination "
@@ -193,124 +180,6 @@ typedef struct _SlabArrayInfo{
 //    ~SlabArrayInfo() {}
 }SlabArrayInfo;
 
-#define ESSL_CFT dcft
-#define ESSL_CFT2 dcft2
-
-#if FFT_USE_FFTW_2_1_5 
-#define FFT1_ONE(plan,x)  fftw_one(plan,(fftw_complex*)x,NULL);  
-#elif FFT_USE_FFTW_3_1 
-#define FFT1_ONE(plan,x)  
-#elif FFT_USE_ESSL 
-#define FFT1_ONE(plan,x)  ESSL_CFT(plan->init,x,plan->incx1,plan->incx2,x,plan->incx1,plan->incx2,plan->n,1,plan->isign,plan->scale,plan->aux1,plan->naux1,plan->aux2,plan->naux2);
-#endif 
-
-#if FFT_USE_FFTW_2_1_5 
-#define FFT1_MANY(plan,N,x) fftw(plan,N,(fftw_complex*)x,N,1,NULL,1,0);  
-#elif FFT_USE_FFTW_3_1 
-#define FFT1_MANY(plan,N,x)  
-#elif FFT_USE_ESSL 
-#define FFT1_MANY(plan,N,x)  ESSL_CFT(plan->init,x,plan->incx1,plan->incx2,x,plan->incx1,plan->incx2,plan->n, plan->m,plan->isign,plan->scale,plan->aux1,plan->naux1,plan->aux2,plan->naux2);
-#endif 
-
-#if FFT_USE_FFTW_2_1_5  
-#define FFT2_ONE(plan,x)  fftwnd_one(plan,(fftw_complex*)x,NULL);  
-#elif FFT_USE_FFTW_3_1 
-#define FFT2_ONE(plan,x)
-#elif FFT_USE_ESSL 
-#define FFT2_ONE(plan,x)  ESSL_CFT2(plan->init,x,plan->incx1,plan->incx2,x,plan->incx1,plan->incx2,plan->n,plan->m,plan->isign,plan->scale,plan->aux1,plan->naux1,plan->aux2,plan->naux2);
-#endif
-
-#if FFT_USE_ESSL
-struct essl_fft_plan_struct {
-	int init;
-	int incx1, incx2;
-	int n,m;
-	int isign;
-	double scale;
-	int naux1, naux2;
-	double *aux1, *aux2;
-};
-
-typedef struct essl_fft_plan_struct *essl_fft_plan;
-
-essl_fft_plan essl_create_1Dplan_one(int _incx1, int _incx2, int _n, int _isign){
-	essl_fft_plan plan=new essl_fft_plan_struct();
-	plan->incx1=_incx1; plan->incx2=_incx2;
-	plan->n=_n; plan->m=1;
-	plan->isign=_isign;
-	//if(plan->isign>0) 
-		plan->scale = 1;
-	//else if(plan->isign<0) 
-	//	plan->scale = 1.0/(double)(plan->n);
-	//else 
-	//	CkAbort("ESSL ISIGN CANNOT BE 0!!!\n");
-	plan->naux1 = 512;
-	plan->aux1 = (double*) (new ckcomplex[plan->naux1]);
-	plan->naux2 = 512;
-	plan->aux2 = (double*) (new ckcomplex[plan->naux2]);
-
-	// Initialize the aux1 storage
-	plan->init=1;
-	FFT1_ONE(plan,NULL);
-	plan->init=0;
-	return plan;
-}
-essl_fft_plan essl_create_1Dplan_many(int _incx1, int _incx2, int _n, int _m, int _isign){
-        essl_fft_plan plan=new essl_fft_plan_struct();
-        plan->incx1=_incx1; plan->incx2=_incx2;
-        plan->n=_n; plan->m=_m;
-        plan->isign=_isign;
-        //if(plan->isign>0)
-                plan->scale = 1;
-        //else if(plan->isign<0)
-        //        plan->scale = 1.0/(double)(plan->n);
-        //else
-        //        CkAbort("ESSL ISIGN CANNOT BE 0!!!\n");
-        plan->naux1 = 512;
-        plan->aux1 = (double*) (new ckcomplex[plan->naux1]);
-        plan->naux2 = 512;
-        plan->aux2 = (double*) (new ckcomplex[plan->naux2]);
-
-        // Initialize the aux1 storage
-        plan->init=1;
-        FFT1_MANY(plan,plan->m,NULL);
-        plan->init=0;
-        return plan;
-}
-
-essl_fft_plan essl_create_2Dplan_one(int _incx1, int _incx2, int _n, int _m, int _isign){ 
-	essl_fft_plan plan=new essl_fft_plan_struct();
-	plan->incx1=_incx1; plan->incx2=_incx2;
-	plan->n=_n; plan->m=_m;
-	plan->isign=_isign;
-	//if(plan->isign>0) 
-		plan->scale = 1;
-	//else if(plan->isign<0) 
-	//	plan->scale = 1.0/(double)(plan->n*plan->m);
-	//else 
-	//	CkAbort("ESSL ISIGN CANNOT BE 0!!!\n");
-	plan->naux1 = 512;
-	plan->aux1 = (double*) (new ckcomplex[plan->naux1]);
-	plan->naux2 = 512;
-	plan->aux2 = (double*) (new ckcomplex[plan->naux2]);
-
-	// Initialize the aux1 storage
-	plan->init=1;
-	FFT2_ONE(plan,NULL);
-	plan->init=0;
-	return plan;
-}
-
-void essl_destroy_plan(essl_fft_plan plan){
-	if(plan->naux1!=0) delete [] plan->aux1;
-	if(plan->naux2!=0) delete [] plan->aux2;
-	delete plan;
-}
-
-#endif
-
-
-
 /*
  * Abstract super class for the two dimensional array of slabs,
  * used for doing 3D FFT
@@ -352,8 +221,8 @@ class NormalSlabArray: public SlabArray {
 #if VERBOSE
 	    CkPrintf("Empty constructor called\n");
 #endif
-	    fwd2DPlan = bwd2DPlan = NULL;
-	    fwd1DPlan = bwd1DPlan = NULL;
+	    fwd2DPlan = bwd2DPlan = (fftwnd_plan) NULL;
+	    fwd1DPlan = bwd1DPlan = (fftw_plan) NULL;
 	    fftuseCommlib = false;
 	    //fftcommInstance = ComlibInstanceHandle();
 	}
@@ -364,8 +233,8 @@ class NormalSlabArray: public SlabArray {
 	~NormalSlabArray();
 
 
-	void acceptDataForFFT(int,ckcomplex  *, int, int);
-	void acceptDataForIFFT(int,ckcomplex  *, int, int);
+	void acceptDataForFFT(int, complex *, int, int);
+	void acceptDataForIFFT(int, complex *, int, int);
 
 	void doFFT(int src_id = 0, int dst_id = 0);
 	void doIFFT(int src_id = 0, int dst_id = 0);
@@ -377,18 +246,12 @@ class NormalSlabArray: public SlabArray {
 		   bool useCommlib=false, 
 		   ComlibInstanceHandle inst=ComlibInstanceHandle());
 protected:
-#if FFT_USE_FFTW_2_1_5
 	fftwnd_plan fwd2DPlan, bwd2DPlan;
 	fftw_plan fwd1DPlan, bwd1DPlan;
-#elif FFT_USE_FFTW_3_1
-#elif FFT_USE_ESSL
-	essl_fft_plan fwd2DPlan, bwd2DPlan;
-	essl_fft_plan fwd1DPlan, bwd1DPlan;
-#endif
+
 	void createPlans(NormalFFTinfo &info);
 };
 
-#if 0
 class NormalRealSlabArray: public SlabArray {
  public:
 	NormalRealSlabArray(CkMigrateMessage *m): SlabArray(m) {}
@@ -397,10 +260,10 @@ class NormalRealSlabArray: public SlabArray {
 	    CkPrintf("Empty constructor called\n");
 #endif
 	    tempdataPtr = NULL;
-	    rfwd1DXPlan = rbwd1DXPlan = NULL;
-	    fwd1DYPlan = bwd1DYPlan = NULL;
-	    fwd1DZPlan = bwd1DZPlan = NULL;
-	    rfwd2DXYPlan = rfwd2DXYPlan = NULL;
+	    rfwd1DXPlan = rbwd1DXPlan = (rfftw_plan) NULL;
+	    fwd1DYPlan = bwd1DYPlan = (fftw_plan) NULL;
+	    fwd1DZPlan = bwd1DZPlan = (fftw_plan) NULL;
+	    rfwd2DXYPlan = rfwd2DXYPlan = (rfftwnd_plan)NULL;
 	    fftuseCommlib = false;
 	    //fftcommInstance = ComlibInstanceHandle();	
 	}
@@ -411,8 +274,8 @@ class NormalRealSlabArray: public SlabArray {
 	~NormalRealSlabArray();
 
 
-	void acceptDataForFFT(int,ckcomplex  *, int, int);
-	void acceptDataForIFFT(int,ckcomplex  *, int, int);
+	void acceptDataForFFT(int, complex *, int, int);
+	void acceptDataForIFFT(int, complex *, int, int);
 
 	void doFFT(int src_id = 0, int dst_id = 0);
 	void doIFFT(int src_id = 0, int dst_id = 0);
@@ -422,17 +285,11 @@ class NormalRealSlabArray: public SlabArray {
 	void createPlans(NormalFFTinfo &info);
 
  protected:
-#if FFT_USE_FFTW
 	rfftwnd_plan rfwd2DXYPlan, rbwd2DXYPlan;
 	rfftw_plan rfwd1DXPlan, rbwd1DXPlan;
 	fftw_plan fwd1DYPlan, bwd1DYPlan; 
 	fftw_plan fwd1DZPlan, bwd1DZPlan;
-#elif FFT_USE_ESSL
-        essl_fft_plan rfwd2DXYPlan, rbwd2DXYPlan;
-        essl_fft_plan rfwd1DXPlan, rbwd1DXPlan;
-        essl_fft_plan fwd1DYPlan, bwd1DYPlan;
-        essl_fft_plan fwd1DZPlan, bwd1DZPlan;
-#endif
+
 	NormalFFTinfo *fftinfos[MAX_FFTS];
       bool fftuseCommlib;
       ComlibInstanceHandle fftcommInstance;
@@ -442,9 +299,8 @@ class NormalRealSlabArray: public SlabArray {
 		   bool useCommlib, ComlibInstanceHandle inst);
 
  private:
-	ckcomplex *tempdataPtr;
+	complex *tempdataPtr;
 };
-#endif
 
 #if 0
 /* 
@@ -490,7 +346,7 @@ class SparseSlabArray: public SlabArray {
 	SparseSlabArray(FFTinfo &info); 
 	~SparseSlabArray();
   
-	virtual void getRuns(ckcomplex **runs, int *numRuns, int *numPoints) const {*runs = NULL; *numRuns = 0; *numPoints = 0;}
+	virtual void getRuns(complex **runs, int *numRuns, int *numPoints) const {*runs = NULL; *numRuns = 0; *numPoints = 0;}
 
  private:
 	int count;
@@ -514,10 +370,10 @@ public:
     int direction;
     int ypos;
     int zpos;
-   ckcomplex  *data;
+    complex *data;
 };
 
-#if 0
+
 class NormalLineArray : public CBase_NormalLineArray {
  public:
     NormalLineArray (CkMigrateMessage *m) {}
@@ -531,8 +387,8 @@ class NormalLineArray : public CBase_NormalLineArray {
     ~NormalLineArray () {}
     void setup (LineFFTinfo &info, CProxy_NormalLineArray _xProxy, CProxy_NormalLineArray _yProxy, CProxy_NormalLineArray _zProxy, bool useCommlib, ComlibInstanceHandle &inst);
     void doFirstFFT(int id, int direction);
-    void doSecondFFT(int ypos,ckcomplex  *val, int size, int id, int direction);
-    void doThirdFFT(int zpos, int ypos,ckcomplex  *val, int size, int id, int direction);
+    void doSecondFFT(int ypos, complex *val, int size, int id, int direction);
+    void doThirdFFT(int zpos, int ypos, complex *val, int size, int id, int direction);
 
     void doSecondFFT(SendFFTMsg *msg);
     void doThirdFFT(SendFFTMsg *msg);
@@ -544,19 +400,15 @@ class NormalLineArray : public CBase_NormalLineArray {
     contribute(sizeof(int), &id_, CkReduction::sum_int);
     }
  protected:
-   ckcomplex  *line;
-#if FFT_USE_FFTW
+    complex *line;
     fftw_plan fwdplan, bwdplan;
-#elif FFT_USE_ESSL
-    essl_fft_plan fwdplan, bwdplan;
-#endif
     int id;
 
     CProxy_NormalLineArray xProxy, yProxy, zProxy;
     bool fftuseCommlib;
     CkVec<PencilArrayInfo*> infoVec;
 };
-#endif
+
 
 #define CAREFUL 1
 
