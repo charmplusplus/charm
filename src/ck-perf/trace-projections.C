@@ -19,6 +19,8 @@
 
 #define DEBUGF(x)           // CmiPrintf x
 
+#define DefaultLogBufSize      1000000
+
 // **CW** Simple delta encoding implementation
 // delta encoding is on by default. It may be turned off later in
 // the runtime.
@@ -29,6 +31,8 @@ int checknested=0;		// check illegal nested begin/end execute
 
 CkpvStaticDeclare(Trace*, _trace);
 CtvStaticDeclare(int,curThreadEvent);
+
+CkpvDeclare(int, CtrLogBufSize);
 
 typedef CkVec<char *>  usrEventVec;
 CkpvStaticDeclare(usrEventVec, usrEventlist);
@@ -702,9 +706,21 @@ curevent(0), inEntry(0), computationStarted(0)
   if (CkpvAccess(traceOnPe) == 0) return;
 
   CtvInitialize(int,curThreadEvent);
+  CkpvInitialize(int, CtrLogBufSize);
+  CkpvAccess(CtrLogBufSize) = DefaultLogBufSize;
   CtvAccess(curThreadEvent)=0;
-  checknested = CmiGetArgFlagDesc(argv,"+checknested","check projections nest begin end execute events");
-  int binary = CmiGetArgFlagDesc(argv,"+binary-trace","Write log files in (unreadable) binary format");
+  if (CmiGetArgIntDesc(argv,"+logsize",&CkpvAccess(CtrLogBufSize), 
+		       "Log entries to buffer per I/O")) {
+    if (CkMyPe() == 0) {
+      CmiPrintf("Trace: logsize: %d\n", CkpvAccess(CtrLogBufSize));
+    }
+  }
+  checknested = 
+    CmiGetArgFlagDesc(argv,"+checknested",
+		      "check projections nest begin end execute events");
+  int binary = 
+    CmiGetArgFlagDesc(argv,"+binary-trace",
+		      "Write log files in binary format");
 #if CMK_PROJECTIONS_USE_ZLIB
   int compressed = CmiGetArgFlagDesc(argv,"+gz-trace","Write log files pre-compressed with gzip");
 #endif

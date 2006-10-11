@@ -27,8 +27,6 @@ CpvCExtern(int, _traceCoreOn);   // projector
 
 #define DEBUGF(x)          // CmiPrintf x
 
-#define LogBufSize      10000
-
 #ifdef CMK_OPTIMIZE
 static int warned = 0;
 #define OPTIMIZE_WARNING if (!warned) { warned=1;  CmiPrintf("\n\n!!!! Warning: tracing not available with CMK_OPTIMIZE!\n");  return;  }
@@ -47,8 +45,6 @@ CkpvDeclare(double, traceInitTime);
 CkpvDeclare(double, traceInitCpuTime);
 CpvDeclare(int, traceOn);
 CkpvDeclare(int, traceOnPe);
-
-CkpvDeclare(int, CtrLogBufSize);
 CkpvDeclare(char*, traceRoot);
 
 int _threadMsg, _threadChare, _threadEP;
@@ -67,16 +63,11 @@ static void traceCommonInit(char **argv)
   CkpvAccess(traceInitCpuTime) = TRACE_CPUTIMER();
   CpvInitialize(int, traceOn);
   CpvInitialize(int, _traceCoreOn); //projector
-  CkpvInitialize(int, CtrLogBufSize);
   CkpvInitialize(char*, traceRoot);
   CpvAccess(traceOn) = 0;
   CpvAccess(_traceCoreOn)=0; //projector
   CkpvInitialize(int, traceOnPe);
   CkpvAccess(traceOnPe) = 1;
-  CkpvAccess(CtrLogBufSize) = LogBufSize;
-  if (CmiGetArgIntDesc(argv,"+logsize",&CkpvAccess(CtrLogBufSize), "Log entries to buffer per I/O"))
-    if (CkMyPe() == 0) 
-      CmiPrintf("Trace: logsize: %d\n", CkpvAccess(CtrLogBufSize));
   char *root;
   if (CmiGetArgStringDesc(argv, "+traceroot", &root, "Directory to write trace files to")) {
     int i;
