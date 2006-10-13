@@ -78,7 +78,7 @@ public:
   }
   LBCreateFn search(const char *name) {
     char *ptr = strpbrk((char *)name, ":,");
-    int slen = ptr-name;
+    int slen = ptr!=NULL?ptr-name:strlen(name);
     for (int i=0; i<lbtables.length(); i++)
       if (0==strncmp(name, lbtables[i].name, slen)) return lbtables[i].cfn;
     return NULL;
