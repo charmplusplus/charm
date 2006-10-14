@@ -4959,7 +4959,9 @@ void CMI_VMI_RDMA_Get_Completion_Handler (PVMI_RDMA_OP rdmaop, PVOID context, VM
   CMI_VMI_Message_Receive_Count += 1;
 
 #ifdef GK_DELAY_DEVICE
-  {
+  if (CmiGetCluster (_Cmi_mype) == CmiGetCluster (process->rank)) {
+    CMI_VMI_Common_Receive (process->rank, msgsize, msg);
+  } else {
     struct timeval gk_tv;
     double gk_time_now;
     gk_delayed_msgs *gk_new_node;
@@ -5198,7 +5200,18 @@ void CMI_VMI_Common_Receive (int sourcerank, int msgsize, char *msg)
   {
     case CMI_VMI_MESSAGE_TYPE_STANDARD:
 #ifdef GK_DELAY_DEVICE
-      {
+      if (CmiGetCluster (_Cmi_mype) == CmiGetCluster (process->rank)) {
+#if CMK_BROADCAST_SPANNING_TREE
+	if (CMI_BROADCAST_ROOT (msg)) {
+	  /* Message is enqueued after send to spanning children completes. */
+	  CMI_VMI_Send_Spanning_Children (msgsize, msg);
+	} else {
+	  CdsFifo_Enqueue (CpvAccess (CMI_VMI_RemoteQueue), msg);
+	}
+#else    /* CMK_BROADCAST_SPANNING_TREE */
+	CdsFifo_Enqueue (CpvAccess (CMI_VMI_RemoteQueue), msg);
+#endif   /* CMK_BROADCAST_SPANNING_TREE */
+      } else {
 	struct timeval gk_tv;
 	double gk_time_now;
 	gk_delayed_msgs *gk_new_node;
