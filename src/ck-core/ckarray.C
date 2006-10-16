@@ -271,11 +271,11 @@ void ArrayElement::pup(PUP::er &p)
 #endif
   p.syncComment(PUP::sync_last_system,"ArrayElement");
 #if CMK_GRID_QUEUE_AVAILABLE
-  p(grid_queue_interval);
-  p(grid_queue_threshold);
-  p(msg_count);
-  p(msg_count_grid);
-  p(border_flag);
+  p|grid_queue_interval;
+  p|grid_queue_threshold;
+  p|msg_count;
+  p|msg_count_grid;
+  p|border_flag;
   if (p.isUnpacking ()) {
     msg_count = 0;
     msg_count_grid = 0;
