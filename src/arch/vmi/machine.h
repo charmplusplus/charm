@@ -40,7 +40,7 @@
 #define CMI_VMI_WAN_LATENCY                      1000      /* microseconds */
 #define CMI_VMI_PROBE_CLUSTERS                   0         /* Boolean */
 #define CMI_VMI_GRID_QUEUE                       0         /* Boolean */
-#define CMI_VMI_GRID_QUEUE_MAXIMUM               10
+#define CMI_VMI_GRID_QUEUE_MAXIMUM               100
 #define CMI_VMI_GRID_QUEUE_INTERVAL              0
 #define CMI_VMI_GRID_QUEUE_THRESHOLD             0
 #define CMI_VMI_MEMORY_POOL                      1         /* Boolean */
