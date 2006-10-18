@@ -27,6 +27,10 @@
 #define USE_LDB_SPANNING_TREE 1
 #endif
 
+#if CMK_GRID_QUEUE_AVAILABLE
+CpvExtern(void *, CkGridObject);
+#endif
+
 CkGroupID loadbalancer;
 int * lb_ptr;
 int load_balancer_created;
@@ -732,6 +736,7 @@ void CentralLB::MigrationDone(int balancing)
   }	
 #if CMK_GRID_QUEUE_AVAILABLE
   CmiGridQueueDeregisterAll ();
+  CpvAccess(CkGridObject) = NULL;
 #endif
 #endif
 }
