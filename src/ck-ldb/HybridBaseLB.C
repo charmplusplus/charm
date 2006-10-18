@@ -1056,6 +1056,7 @@ LBMigrateMsg * HybridBaseLB::createMigrateMsg(LDStats* stats,int count)
   }
 
   if (_lb_args.printSummary()) {
+    double stime = CkWallTimer();
     if (currentLevel == 1) {
       LBInfo info(count);
       info.getInfo(stats, count, 1);	// no comm cost
@@ -1070,7 +1071,8 @@ LBMigrateMsg * HybridBaseLB::createMigrateMsg(LDStats* stats,int count)
       double mem = (1.0*useMem())/1024;
       thisProxy[0].reportLBMem(mem);
     }
-  }
+    CkPrintf("[%d] Print Summary takes %f seconds. \n", CkWallTimer()-stime);
+  }   // end print summary
 
   // translate relative pe number to its real number
   for(i=0; i < migrate_count; i++) {
