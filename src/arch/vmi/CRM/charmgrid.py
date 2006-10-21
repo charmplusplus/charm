@@ -21,14 +21,20 @@ try:
     DEFAULT_NODELIST_FILENAME = HOME_DIRECTORY + '/.nodelist'
     DEFAULT_NODEGROUP         = 'main'
     DEFAULT_VMI_PROCS         = '1'
-    DEFAULT_CRM               = '10.92.0.253'
+    DEFAULT_CRM               = '128.174.236.248:8080'   # talent.cs.uiuc.edu:8080
+    #DEFAULT_CRM               = '10.92.0.253'            # uranium.cs.uiuc.edu (internal)
     DEFAULT_VMI_KEY           = 'gak'
-    DEFAULT_VMI_SPECFILE      = '/home/koenig/ON-DEMAND/VMI22-install/specfiles/myrinet.xml'
+    DEFAULT_VMI_SPECFILE      = '/home/ncsa/koenig/ON-DEMAND/VMI22-install/specfiles/myrinet.xml'
 
 except KeyError:
     print 'ERROR: Unable to get home directory from environment.'
     sys.exit (1)
 
+try:
+    GK_GET_LATENCY = os.environ['GK_GET_LATENCY']
+
+except KeyError:
+    GK_GET_LATENCY = ''
 
 
 ###########################################################################
@@ -62,6 +68,7 @@ def ParseCommandLine ():
     eager_threshold                  = ''
     eager_short_pollset_size_maximum = ''
     eager_short_slots                = ''
+    eager_short_message_boundary     = ''
     eager_long_buffers               = ''
     eager_long_buffer_size           = ''
     disable_regcache                 = False
@@ -159,6 +166,9 @@ def ParseCommandLine ():
 	elif (arg == '++eager-short-slots'):
             eager_short_slots = sys.argv[i]
             i = i + 1
+        elif (arg == '++eager-short-message-boundary'):
+            eager_short_message_boundary = sys.argv[i]
+            i = i + 1
 	elif (arg == '++eager-long-buffers'):
             eager_long_buffers = sys.argv[i]
             i = i + 1
@@ -187,8 +197,9 @@ def ParseCommandLine ():
     # Return a list of all variables.
     return [nodelist_filename, nodegroup, vmi_procs, crm, vmi_key, vmi_specfile, verbose,                                                          \
             vmi_gridprocs, wan_latency, cluster_number, probe_clusters, grid_queue, grid_queue_maximum, grid_queue_interval, grid_queue_threshold, \
-            memory_pool, connection_timeout, maximum_handles, small_message_boundary, medium_message_boundary, eager_protocol, eager_interval,     \
-            eager_threshold, eager_short_pollset_size_maximum, eager_short_slots, eager_long_buffers, eager_long_buffer_size, disable_regcache, command]
+            memory_pool, connection_timeout, maximum_handles, small_message_boundary, medium_message_boundary,                                     \
+            eager_protocol, eager_interval, eager_threshold, eager_short_pollset_size_maximum, eager_short_slots, eager_short_message_boundary,    \
+            eager_long_buffers, eager_long_buffer_size, disable_regcache, command]
 
 
 
@@ -235,9 +246,9 @@ def DisplayUsage ():
     print '  ++maximum-handles <#>                    number of send/receive handles'
     print '                                           (grows automatically as program runs)'
     print '  ++small-message-boundary <bytes>         messages below boundary use small'
-    print '                                           protocol (inline stream or eager Put)'
+    print '                                           protocol (inline stream)'
     print '  ++medium-message-boundary <bytes>        messages below boundary use medium'
-    print '                                           protocol (stream or eager Put)'
+    print '                                           protocol (stream)'
     print '  ++eager-protocol <0|1>                   disable/enable eager protocol'
     print '  ++eager-interval <#>                     after every # message receives, look'
     print '                                           for eager protocol candidates'
@@ -247,6 +258,8 @@ def DisplayUsage ():
     print '                                           be switched to eager short protocol'
     print '  ++eager-short-slots <#>                  eager short buffer gets broken into'
     print '                                           this many slots (window count)'
+    print '  ++eager-short-message-boundary <bytes>   messages below boundary use short'
+    print '                                           eager protocol'
     print '  ++eager-long-buffers <#>                 number of eager long buffers to set'
     print '                                           up (window count)'
     print '  ++eager-long-buffer-size <bytes>         maximum size of an eager long message'
@@ -324,9 +337,15 @@ def ParseNodelistFile (nodelist):
 def WriteNodeScript (filename, crm, vmi_key, vmi_specfile, vmi_gridprocs, wan_latency, cluster_number, probe_clusters, grid_queue, grid_queue_maximum, \
                      grid_queue_interval, grid_queue_threshold, memory_pool, connection_timeout, maximum_handles, small_message_boundary,              \
                      medium_message_boundary, eager_protocol, eager_interval, eager_threshold, eager_short_pollset_size_maximum, eager_short_slots,    \
-                     eager_long_buffers, eager_long_buffer_size, disable_regcache, working_directory, command):
+                     eager_short_message_boundary, eager_long_buffers, eager_long_buffer_size, disable_regcache, working_directory, command):
 
     outfile = open (filename, 'w')
+
+    ##
+
+    if (GK_GET_LATENCY != ''):
+        outfile.write ('GK_GET_LATENCY="' + GK_GET_LATENCY + '"')
+        outfile.write (' ; export GK_GET_LATENCY\n')
 
     ##
 
@@ -416,6 +435,10 @@ def WriteNodeScript (filename, crm, vmi_key, vmi_specfile, vmi_gridprocs, wan_la
         outfile.write ('CMI_VMI_EAGER_SHORT_SLOTS="' + eager_short_slots + '"')
         outfile.write (' ; export CMI_VMI_EAGER_SHORT_SLOTS\n')
 
+    if (eager_short_message_boundary != ''):
+        outfile.write ('CMI_VMI_EAGER_SHORT_MESSAGE_BOUNDARY="' + eager_short_message_boundary + '"')
+        outfile.write (' ; export CMI_VMI_EAGER_SHORT_MESSAGE_BOUNDARY\n')
+
     if (eager_long_buffers != ''):
         outfile.write ('CMI_VMI_EAGER_LONG_BUFFERS="' + eager_long_buffers + '"')
         outfile.write (' ; export CMI_VMI_EAGER_LONG_BUFFERS\n')
@@ -491,11 +514,12 @@ def main ():
     eager_threshold                  = parsed_command_line[22]
     eager_short_pollset_size_maximum = parsed_command_line[23]
     eager_short_slots                = parsed_command_line[24]
-    eager_long_buffers               = parsed_command_line[25]
-    eager_long_buffer_size           = parsed_command_line[26]
-    disable_regcache                 = parsed_command_line[27]
+    eager_short_message_boundary     = parsed_command_line[25]
+    eager_long_buffers               = parsed_command_line[26]
+    eager_long_buffer_size           = parsed_command_line[27]
+    disable_regcache                 = parsed_command_line[28]
     ##
-    command                          = parsed_command_line[28]
+    command                          = parsed_command_line[29]
 
     # Parse the nodelist file.
     # Locate the group name and its list of nodes that corresponds to
@@ -577,8 +601,8 @@ def main ():
             WriteNodeScript (job_script, crm, vmi_key, vmi_specfile, vmi_gridprocs, wan_latency, cluster_number, probe_clusters, grid_queue,    \
                              grid_queue_maximum, grid_queue_interval, grid_queue_threshold, memory_pool, connection_timeout, maximum_handles,   \
                              small_message_boundary, medium_message_boundary, eager_protocol, eager_interval, eager_threshold,                  \
-                             eager_short_pollset_size_maximum, eager_short_slots, eager_long_buffers, eager_long_buffer_size, disable_regcache, \
-                             working_directory, command)
+                             eager_short_pollset_size_maximum, eager_short_slots, eager_short_message_boundary, eager_long_buffers,             \
+                             eager_long_buffer_size, disable_regcache, working_directory, command)
 
             # Get the node to launch on.  This is round-robin across
             # the nodes in the group specified by the user.
