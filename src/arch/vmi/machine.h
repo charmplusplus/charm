@@ -54,6 +54,7 @@
 #define CMI_VMI_EAGER_THRESHOLD                  1000
 #define CMI_VMI_EAGER_SHORT_POLLSET_SIZE_MAXIMUM 32
 #define CMI_VMI_EAGER_SHORT_SLOTS                16
+#define CMI_VMI_EAGER_SHORT_MESSAGE_BOUNDARY     16384     /* bytes */
 #define CMI_VMI_EAGER_LONG_BUFFERS               3
 #define CMI_VMI_EAGER_LONG_BUFFER_SIZE           1048576   /* bytes */
 

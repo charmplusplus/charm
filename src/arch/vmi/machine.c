@@ -53,6 +53,7 @@ int CMI_VMI_Eager_Interval;
 int CMI_VMI_Eager_Threshold;
 int CMI_VMI_Eager_Short_Pollset_Size_Maximum;
 int CMI_VMI_Eager_Short_Slots;
+int CMI_VMI_Eager_Short_Message_Boundary;
 int CMI_VMI_Eager_Long_Buffers;
 int CMI_VMI_Eager_Long_Buffer_Size;
 
@@ -159,6 +160,7 @@ void ConverseInit (int argc, char **argv, CmiStartFn start_function, int user_ca
   CMI_VMI_Eager_Threshold                  = CMI_VMI_EAGER_THRESHOLD;
   CMI_VMI_Eager_Short_Pollset_Size_Maximum = CMI_VMI_EAGER_SHORT_POLLSET_SIZE_MAXIMUM;
   CMI_VMI_Eager_Short_Slots                = CMI_VMI_EAGER_SHORT_SLOTS;
+  CMI_VMI_Eager_Short_Message_Boundary     = CMI_VMI_EAGER_SHORT_MESSAGE_BOUNDARY;
   CMI_VMI_Eager_Long_Buffers               = CMI_VMI_EAGER_LONG_BUFFERS;
   CMI_VMI_Eager_Long_Buffer_Size           = CMI_VMI_EAGER_LONG_BUFFER_SIZE;
 
@@ -839,46 +841,93 @@ void CmiSyncSendFn (int destrank, int msgsize, char *msg)
   CMI_VMI_MESSAGE_CREDITS (msg) = process->eager_short_receive_credits_replentish;
   process->eager_short_receive_credits_replentish = 0;
 
-  if (msgsize < CMI_VMI_Medium_Message_Boundary) {
-    if (process->eager_short_send_credits_available > 0) {
-      index = process->eager_short_send_index;
-      handle = process->eager_short_send_handles[index];
+  // These are assigned here for the Eager long test in the second "if" case.
+  index = process->eager_long_send_size - 1;
+  handle = process->eager_long_send_handles[index];
 
-      memcpy (handle->msg, msg, msgsize);
+  if (CMI_VMI_Eager_Protocol && (process->eager_short_send_credits_available > 0) && (msgsize < CMI_VMI_Eager_Short_Message_Boundary)) {
+    index = process->eager_short_send_index;
+    handle = process->eager_short_send_handles[index];
 
-      footer.msgsize = msgsize;
-      footer.sentinel = CMI_VMI_EAGER_SHORT_SENTINEL_DATA;
-      memcpy (handle->msg + msgsize, &footer, sizeof (CMI_VMI_Eager_Short_Slot_Footer_T));
+    memcpy (handle->msg, msg, msgsize);
 
-      handle->msgsize = msgsize;
-      handle->data.send.message_disposition = CMI_VMI_MESSAGE_DISPOSITION_NONE;
+    footer.msgsize = msgsize;
+    footer.sentinel = CMI_VMI_EAGER_SHORT_SENTINEL_DATA;
+    memcpy (handle->msg + msgsize, &footer, sizeof (CMI_VMI_Eager_Short_Slot_Footer_T));
 
-      cacheentry = handle->data.send.data.eager_short.cacheentry;
-      rdmaop = handle->data.send.data.eager_short.rdmaop;
+    handle->msgsize = msgsize;
+    handle->data.send.message_disposition = CMI_VMI_MESSAGE_DISPOSITION_NONE;
 
-      offset = handle->data.send.data.eager_short.offset;
-      offset += (CMI_VMI_Medium_Message_Boundary - msgsize);
+    cacheentry = handle->data.send.data.eager_short.cacheentry;
+    rdmaop = handle->data.send.data.eager_short.rdmaop;
 
-      rdmaop->numBufs = 1;
-      rdmaop->buffers[0] = cacheentry->bufferHandle;
-      rdmaop->addr[0] = handle->msg;
-      rdmaop->sz[0] = msgsize + sizeof (CMI_VMI_Eager_Short_Slot_Footer_T);
-      rdmaop->rbuffer = handle->data.send.data.eager_short.remote_buffer;
-      rdmaop->roffset = offset;
-      rdmaop->notify = FALSE;
+    offset = handle->data.send.data.eager_short.offset;
+    offset += (CMI_VMI_Eager_Short_Message_Boundary - msgsize);
 
-      status = VMI_RDMA_Put (process->connection, rdmaop, (PVOID) NULL, (VMIRDMACompleteNotification) NULL);
-      CMI_VMI_CHECK_SUCCESS (status, "VMI_RDMA_Put()");
+    rdmaop->numBufs = 1;
+    rdmaop->buffers[0] = cacheentry->bufferHandle;
+    rdmaop->addr[0] = handle->msg;
+    rdmaop->sz[0] = msgsize + sizeof (CMI_VMI_Eager_Short_Slot_Footer_T);
+    rdmaop->rbuffer = handle->data.send.data.eager_short.remote_buffer;
+    rdmaop->roffset = offset;
+    rdmaop->notify = FALSE;
 
-      process->eager_short_send_index = ((index + 1) % process->eager_short_send_size);
-      process->eager_short_send_credits_available -= 1;
+    status = VMI_RDMA_Put (process->connection, rdmaop, (PVOID) NULL, (VMIRDMACompleteNotification) NULL);
+    CMI_VMI_CHECK_SUCCESS (status, "VMI_RDMA_Put()");
+
+    process->eager_short_send_index = ((index + 1) % process->eager_short_send_size);
+    process->eager_short_send_credits_available -= 1;
+  } else if (CMI_VMI_Eager_Protocol && (process->eager_long_send_size > 0) && (msgsize < handle->data.send.data.eager_long.maxsize)) {
+    context = CONTEXTFIELD (msg);
+    if (context) {
+      cacheentry = CMI_VMI_CacheEntry_From_Context (context);
     } else {
-      addrs[0] = (PVOID) msg;
-      sz[0] = (ULONG) msgsize;
-
-      status = VMI_Stream_Send_Inline ((&CMI_VMI_Processes[destrank])->connection, addrs, sz, 1, msgsize);
-      CMI_VMI_CHECK_SUCCESS (status, "VMI_Stream_Send_Inline()");
+      status = VMI_Cache_Register (msg, msgsize, &cacheentry);
+      CMI_VMI_CHECK_SUCCESS (status, "VMI_Cache_Register()");
     }
+
+    process->eager_long_send_size = index;
+
+    handle->msg = msg;
+    handle->msgsize = msgsize;
+    handle->data.send.message_disposition = CMI_VMI_MESSAGE_DISPOSITION_NONE;
+    handle->data.send.data.eager_long.cacheentry = cacheentry;
+
+    status = VMI_RDMA_Alloc_Op (&rdmaop);
+    CMI_VMI_CHECK_SUCCESS (status, "VMI_RDMA_Alloc_Op()");
+
+    rdmaop->numBufs = 1;
+    rdmaop->buffers[0] = cacheentry->bufferHandle;
+    rdmaop->addr[0] = handle->msg;
+    rdmaop->sz[0] = msgsize;
+    rdmaop->rbuffer = handle->data.send.data.eager_long.remote_buffer;
+    rdmaop->roffset = 0;
+    rdmaop->notify = TRUE;
+
+    CMI_VMI_AsyncMsgCount += 1;
+    handle->refcount += 1;
+
+    status = VMI_RDMA_Put (process->connection, rdmaop, (PVOID) handle, (VMIRDMACompleteNotification) CMI_VMI_RDMA_Put_Completion_Handler);
+    CMI_VMI_CHECK_SUCCESS (status, "VMI_RDMA_Put()");
+
+    while (handle->refcount > 2) {
+      sched_yield ();
+      status = VMI_Poll ();
+      CMI_VMI_CHECK_SUCCESS (status, "VMI_Poll()");
+    }
+
+    if (!context) {
+      status = VMI_Cache_Deregister (cacheentry);
+      CMI_VMI_CHECK_SUCCESS (status, "VMI_Cache_Deregister()");
+    }
+
+    CMI_VMI_Handle_Deallocate (handle);
+  } else if (msgsize < CMI_VMI_Medium_Message_Boundary) {
+    addrs[0] = (PVOID) msg;
+    sz[0] = (ULONG) msgsize;
+
+    status = VMI_Stream_Send_Inline (process->connection, addrs, sz, 1, msgsize);
+    CMI_VMI_CHECK_SUCCESS (status, "VMI_Stream_Send_Inline()");
   } else {
     if (CMI_VMI_Eager_Protocol) {
       context = CONTEXTFIELD (msg);
@@ -894,55 +943,26 @@ void CmiSyncSendFn (int destrank, int msgsize, char *msg)
       CMI_VMI_CHECK_SUCCESS (status, "VMI_Cache_Register()");
     }
 
-    index = process->eager_long_send_size - 1;
-    handle = process->eager_long_send_handles[index];
+    handle = CMI_VMI_Handle_Allocate ();
 
-    if ((process->eager_long_send_size > 0) && (msgsize < handle->data.send.data.eager_long.maxsize)) {
-      process->eager_long_send_size = index;
+    handle->refcount += 1;
+    handle->msg = msg;
+    handle->msgsize = msgsize;
+    handle->handle_type = CMI_VMI_HANDLE_TYPE_SEND;
+    handle->data.send.send_handle_type = CMI_VMI_SEND_HANDLE_TYPE_RDMAGET;
+    handle->data.send.message_disposition = CMI_VMI_MESSAGE_DISPOSITION_NONE;
+    handle->data.send.data.rdmaget.cacheentry = cacheentry;
 
-      handle->msg = msg;
-      handle->msgsize = msgsize;
-      handle->data.send.message_disposition = CMI_VMI_MESSAGE_DISPOSITION_NONE;
-      handle->data.send.data.eager_long.cacheentry = cacheentry;
+    CMI_VMI_AsyncMsgCount += 1;
+    handle->refcount += 1;
+    handle->data.send.data.rdmaget.publishes_pending = 1;
 
-      status = VMI_RDMA_Alloc_Op (&rdmaop);
-      CMI_VMI_CHECK_SUCCESS (status, "VMI_RDMA_Alloc_Op()");
+    publish_msg.type = CMI_VMI_PUBLISH_TYPE_GET;
 
-      rdmaop->numBufs = 1;
-      rdmaop->buffers[0] = cacheentry->bufferHandle;
-      rdmaop->addr[0] = handle->msg;
-      rdmaop->sz[0] = msgsize;
-      rdmaop->rbuffer = handle->data.send.data.eager_long.remote_buffer;
-      rdmaop->roffset = 0;
-      rdmaop->notify = TRUE;
-
-      CMI_VMI_AsyncMsgCount += 1;
-      handle->refcount += 1;
-
-      status = VMI_RDMA_Put (process->connection, rdmaop, (PVOID) handle, (VMIRDMACompleteNotification) CMI_VMI_RDMA_Put_Completion_Handler);
-      CMI_VMI_CHECK_SUCCESS (status, "VMI_RDMA_Put()");
-    } else {
-      handle = CMI_VMI_Handle_Allocate ();
-
-      handle->refcount += 1;
-      handle->msg = msg;
-      handle->msgsize = msgsize;
-      handle->handle_type = CMI_VMI_HANDLE_TYPE_SEND;
-      handle->data.send.send_handle_type = CMI_VMI_SEND_HANDLE_TYPE_RDMAGET;
-      handle->data.send.message_disposition = CMI_VMI_MESSAGE_DISPOSITION_NONE;
-      handle->data.send.data.rdmaget.cacheentry = cacheentry;
-
-      CMI_VMI_AsyncMsgCount += 1;
-      handle->refcount += 1;
-      handle->data.send.data.rdmaget.publishes_pending = 1;
-
-      publish_msg.type = CMI_VMI_PUBLISH_TYPE_GET;
-
-      status = VMI_RDMA_Publish_Buffer ((&CMI_VMI_Processes[destrank])->connection, cacheentry->bufferHandle, (VMI_virt_addr_t) (VMI_ADDR_CAST) msg,
-				        (UINT32) msgsize, (VMI_virt_addr_t) (VMI_ADDR_CAST) NULL, (UINT32) handle->index, (PVOID) &publish_msg,
-				        (ULONG) sizeof (CMI_VMI_Publish_Message_T));
-      CMI_VMI_CHECK_SUCCESS (status, "VMI_RDMA_Publish_Buffer()");
-    }
+    status = VMI_RDMA_Publish_Buffer (process->connection, cacheentry->bufferHandle, (VMI_virt_addr_t) (VMI_ADDR_CAST) msg, (UINT32) msgsize,
+				      (VMI_virt_addr_t) (VMI_ADDR_CAST) NULL, (UINT32) handle->index, (PVOID) &publish_msg,
+				      (ULONG) sizeof (CMI_VMI_Publish_Message_T));
+    CMI_VMI_CHECK_SUCCESS (status, "VMI_RDMA_Publish_Buffer()");
 
     while (handle->refcount > 2) {
       sched_yield ();
@@ -1012,84 +1032,118 @@ CmiCommHandle CmiAsyncSendFn (int destrank, int msgsize, char *msg)
   CMI_VMI_MESSAGE_CREDITS (msg) = process->eager_short_receive_credits_replentish;
   process->eager_short_receive_credits_replentish = 0;
 
-  if (msgsize < CMI_VMI_Medium_Message_Boundary) {
-    if (process->eager_short_send_credits_available > 0) {
-      index = process->eager_short_send_index;
-      handle = process->eager_short_send_handles[index];
+  // These are assigned here for the Eager long test in the second "if" case.
+  index = process->eager_long_send_size - 1;
+  handle = process->eager_long_send_handles[index];
 
-      memcpy (handle->msg, msg, msgsize);
+  if (CMI_VMI_Eager_Protocol && (process->eager_short_send_credits_available > 0) && (msgsize < CMI_VMI_Eager_Short_Message_Boundary)) {
+    index = process->eager_short_send_index;
+    handle = process->eager_short_send_handles[index];
 
-      footer.msgsize = msgsize;
-      footer.sentinel = CMI_VMI_EAGER_SHORT_SENTINEL_DATA;
-      memcpy (handle->msg + msgsize, &footer, sizeof (CMI_VMI_Eager_Short_Slot_Footer_T));
+    memcpy (handle->msg, msg, msgsize);
 
-      handle->msgsize = msgsize;
-      handle->data.send.message_disposition = CMI_VMI_MESSAGE_DISPOSITION_NONE;
+    footer.msgsize = msgsize;
+    footer.sentinel = CMI_VMI_EAGER_SHORT_SENTINEL_DATA;
+    memcpy (handle->msg + msgsize, &footer, sizeof (CMI_VMI_Eager_Short_Slot_Footer_T));
 
-      cacheentry = handle->data.send.data.eager_short.cacheentry;
-      rdmaop = handle->data.send.data.eager_short.rdmaop;
+    handle->msgsize = msgsize;
+    handle->data.send.message_disposition = CMI_VMI_MESSAGE_DISPOSITION_NONE;
 
-      offset = handle->data.send.data.eager_short.offset;
-      offset += (CMI_VMI_Medium_Message_Boundary - msgsize);
+    cacheentry = handle->data.send.data.eager_short.cacheentry;
+    rdmaop = handle->data.send.data.eager_short.rdmaop;
 
-      rdmaop->numBufs = 1;
-      rdmaop->buffers[0] = cacheentry->bufferHandle;
-      rdmaop->addr[0] = handle->msg;
-      rdmaop->sz[0] = msgsize + sizeof (CMI_VMI_Eager_Short_Slot_Footer_T);
-      rdmaop->rbuffer = handle->data.send.data.eager_short.remote_buffer;
-      rdmaop->roffset = offset;
-      rdmaop->notify = FALSE;
+    offset = handle->data.send.data.eager_short.offset;
+    offset += (CMI_VMI_Eager_Short_Message_Boundary - msgsize);
 
-      status = VMI_RDMA_Put (process->connection, rdmaop, (PVOID) NULL, (VMIRDMACompleteNotification) NULL);
-      CMI_VMI_CHECK_SUCCESS (status, "VMI_RDMA_Put()");
+    rdmaop->numBufs = 1;
+    rdmaop->buffers[0] = cacheentry->bufferHandle;
+    rdmaop->addr[0] = handle->msg;
+    rdmaop->sz[0] = msgsize + sizeof (CMI_VMI_Eager_Short_Slot_Footer_T);
+    rdmaop->rbuffer = handle->data.send.data.eager_short.remote_buffer;
+    rdmaop->roffset = offset;
+    rdmaop->notify = FALSE;
 
-      process->eager_short_send_index = ((index + 1) % process->eager_short_send_size);
-      process->eager_short_send_credits_available -= 1;
+    status = VMI_RDMA_Put (process->connection, rdmaop, (PVOID) NULL, (VMIRDMACompleteNotification) NULL);
+    CMI_VMI_CHECK_SUCCESS (status, "VMI_RDMA_Put()");
 
-      handle = NULL;
-    } else if (msgsize < CMI_VMI_Small_Message_Boundary) {
-      addrs[0] = (PVOID) msg;
-      sz[0] = msgsize;
+    process->eager_short_send_index = ((index + 1) % process->eager_short_send_size);
+    process->eager_short_send_credits_available -= 1;
 
-      status = VMI_Stream_Send_Inline ((&CMI_VMI_Processes[destrank])->connection, addrs, sz, 1, msgsize);
-      CMI_VMI_CHECK_SUCCESS (status, "VMI_Stream_Send_Inline()");
-
-      handle = NULL;
+    handle = NULL;
+  } else if (CMI_VMI_Eager_Protocol && (process->eager_long_send_size > 0) && (msgsize < handle->data.send.data.eager_long.maxsize)) {
+    context = CONTEXTFIELD (msg);
+    if (context) {
+      cacheentry = CMI_VMI_CacheEntry_From_Context (context);
     } else {
-      if (CMI_VMI_Eager_Protocol) {
-	context = CONTEXTFIELD (msg);
-	if (context) {
-	  cacheentry = CMI_VMI_CacheEntry_From_Context (context);
-	} else {
-	  status = VMI_Cache_Register (msg, msgsize, &cacheentry);
-	  CMI_VMI_CHECK_SUCCESS (status, "VMI_Cache_Register()");
-	}
+      status = VMI_Cache_Register (msg, msgsize, &cacheentry);
+      CMI_VMI_CHECK_SUCCESS (status, "VMI_Cache_Register()");
+    }
+
+    process->eager_long_send_size = index;
+
+    handle->msg = msg;
+    handle->msgsize = msgsize;
+    handle->data.send.message_disposition = CMI_VMI_MESSAGE_DISPOSITION_NONE;
+    handle->data.send.data.eager_long.cacheentry = cacheentry;
+
+    status = VMI_RDMA_Alloc_Op (&rdmaop);
+    CMI_VMI_CHECK_SUCCESS (status, "VMI_RDMA_Alloc_Op()");
+
+    rdmaop->numBufs = 1;
+    rdmaop->buffers[0] = cacheentry->bufferHandle;
+    rdmaop->addr[0] = handle->msg;
+    rdmaop->sz[0] = msgsize;
+    rdmaop->rbuffer = handle->data.send.data.eager_long.remote_buffer;
+    rdmaop->roffset = 0;
+    rdmaop->notify = TRUE;
+
+    CMI_VMI_AsyncMsgCount += 1;
+    handle->refcount += 1;
+
+    status = VMI_RDMA_Put (process->connection, rdmaop, (PVOID) handle, (VMIRDMACompleteNotification) CMI_VMI_RDMA_Put_Completion_Handler);
+    CMI_VMI_CHECK_SUCCESS (status, "VMI_RDMA_Put()");
+  } else if (msgsize < CMI_VMI_Small_Message_Boundary) {
+    addrs[0] = (PVOID) msg;
+    sz[0] = msgsize;
+
+    status = VMI_Stream_Send_Inline (process->connection, addrs, sz, 1, msgsize);
+    CMI_VMI_CHECK_SUCCESS (status, "VMI_Stream_Send_Inline()");
+
+    handle = NULL;
+  } else if (msgsize < CMI_VMI_Medium_Message_Boundary) {
+    if (CMI_VMI_Eager_Protocol) {
+      context = CONTEXTFIELD (msg);
+      if (context) {
+	cacheentry = CMI_VMI_CacheEntry_From_Context (context);
       } else {
-	context = NULL;
 	status = VMI_Cache_Register (msg, msgsize, &cacheentry);
 	CMI_VMI_CHECK_SUCCESS (status, "VMI_Cache_Register()");
       }
-
-      handle = CMI_VMI_Handle_Allocate ();
-
-      handle->refcount += 1;
-      handle->msg = msg;
-      handle->msgsize = msgsize;
-      handle->handle_type = CMI_VMI_HANDLE_TYPE_SEND;
-      handle->data.send.send_handle_type = CMI_VMI_SEND_HANDLE_TYPE_STREAM;
-      handle->data.send.message_disposition = CMI_VMI_MESSAGE_DISPOSITION_NONE;
-      handle->data.send.data.stream.cacheentry = cacheentry;
-
-      bufHandles[0] = cacheentry->bufferHandle;
-      addrs[0] = (PVOID) msg;
-      sz[0] = msgsize;
-
-      CMI_VMI_AsyncMsgCount += 1;
-      handle->refcount += 1;
-
-      status = VMI_Stream_Send ((&CMI_VMI_Processes[destrank])->connection, bufHandles, addrs, sz, 1, CMI_VMI_Stream_Completion_Handler, (PVOID) handle, TRUE);
-      CMI_VMI_CHECK_SUCCESS (status, "VMI_Stream_Send()");
+    } else {
+      context = NULL;
+      status = VMI_Cache_Register (msg, msgsize, &cacheentry);
+      CMI_VMI_CHECK_SUCCESS (status, "VMI_Cache_Register()");
     }
+
+    handle = CMI_VMI_Handle_Allocate ();
+
+    handle->refcount += 1;
+    handle->msg = msg;
+    handle->msgsize = msgsize;
+    handle->handle_type = CMI_VMI_HANDLE_TYPE_SEND;
+    handle->data.send.send_handle_type = CMI_VMI_SEND_HANDLE_TYPE_STREAM;
+    handle->data.send.message_disposition = CMI_VMI_MESSAGE_DISPOSITION_NONE;
+    handle->data.send.data.stream.cacheentry = cacheentry;
+
+    bufHandles[0] = cacheentry->bufferHandle;
+    addrs[0] = (PVOID) msg;
+    sz[0] = msgsize;
+
+    CMI_VMI_AsyncMsgCount += 1;
+    handle->refcount += 1;
+
+    status = VMI_Stream_Send (process->connection, bufHandles, addrs, sz, 1, CMI_VMI_Stream_Completion_Handler, (PVOID) handle, TRUE);
+    CMI_VMI_CHECK_SUCCESS (status, "VMI_Stream_Send()");
   } else {
     if (CMI_VMI_Eager_Protocol) {
       context = CONTEXTFIELD (msg);
@@ -1105,68 +1159,39 @@ CmiCommHandle CmiAsyncSendFn (int destrank, int msgsize, char *msg)
       CMI_VMI_CHECK_SUCCESS (status, "VMI_Cache_Register()");
     }
 
-    index = process->eager_long_send_size - 1;
-    handle = process->eager_long_send_handles[index];
+    handle = CMI_VMI_Handle_Allocate ();
 
-    if ((process->eager_long_send_size > 0) && (msgsize < handle->data.send.data.eager_long.maxsize)) {
-      process->eager_long_send_size = index;
+    handle->refcount += 1;
+    handle->msg = msg;
+    handle->msgsize = msgsize;
+    handle->handle_type = CMI_VMI_HANDLE_TYPE_SEND;
+    handle->data.send.send_handle_type = CMI_VMI_SEND_HANDLE_TYPE_RDMAGET;
+    handle->data.send.message_disposition = CMI_VMI_MESSAGE_DISPOSITION_NONE;
+    handle->data.send.data.rdmaget.cacheentry = cacheentry;
 
-      handle->msg = msg;
-      handle->msgsize = msgsize;
-      handle->data.send.message_disposition = CMI_VMI_MESSAGE_DISPOSITION_NONE;
-      handle->data.send.data.eager_long.cacheentry = cacheentry;
+    handle->refcount += 1;
+    CMI_VMI_AsyncMsgCount += 1;
+    handle->data.send.data.rdmaget.publishes_pending = 1;
 
-      status = VMI_RDMA_Alloc_Op (&rdmaop);
-      CMI_VMI_CHECK_SUCCESS (status, "VMI_RDMA_Alloc_Op()");
-
-      rdmaop->numBufs = 1;
-      rdmaop->buffers[0] = cacheentry->bufferHandle;
-      rdmaop->addr[0] = handle->msg;
-      rdmaop->sz[0] = msgsize;
-      rdmaop->rbuffer = handle->data.send.data.eager_long.remote_buffer;
-      rdmaop->roffset = 0;
-      rdmaop->notify = TRUE;
-
-      CMI_VMI_AsyncMsgCount += 1;
-      handle->refcount += 1;
-
-      status = VMI_RDMA_Put (process->connection, rdmaop, (PVOID) handle, (VMIRDMACompleteNotification) CMI_VMI_RDMA_Put_Completion_Handler);
-      CMI_VMI_CHECK_SUCCESS (status, "VMI_RDMA_Put()");
-    } else {
-      handle = CMI_VMI_Handle_Allocate ();
-
-      handle->refcount += 1;
-      handle->msg = msg;
-      handle->msgsize = msgsize;
-      handle->handle_type = CMI_VMI_HANDLE_TYPE_SEND;
-      handle->data.send.send_handle_type = CMI_VMI_SEND_HANDLE_TYPE_RDMAGET;
-      handle->data.send.message_disposition = CMI_VMI_MESSAGE_DISPOSITION_NONE;
-      handle->data.send.data.rdmaget.cacheentry = cacheentry;
-
-      handle->refcount += 1;
-      CMI_VMI_AsyncMsgCount += 1;
-      handle->data.send.data.rdmaget.publishes_pending = 1;
-
-      publish_msg.type = CMI_VMI_PUBLISH_TYPE_GET;
+    publish_msg.type = CMI_VMI_PUBLISH_TYPE_GET;
 
 #if CMI_VMI_USE_VMI22
-      status = VMI_RDMA_Publish_Buffer_With_Callback ((&CMI_VMI_Processes[destrank])->connection, cacheentry->bufferHandle, (VMI_virt_addr_t) (VMI_ADDR_CAST) msg,
-						      (UINT32) msgsize, (VMI_virt_addr_t) (VMI_ADDR_CAST) NULL, (UINT32) handle->index, (PVOID) &publish_msg,
-						      (ULONG) sizeof (CMI_VMI_Publish_Message_T), (PVOID) handle, CMI_VMI_RDMA_Publish_Completion_Handler);
-      CMI_VMI_CHECK_SUCCESS (status, "VMI_RDMA_Publish_Buffer_With_Callback()");
+    status = VMI_RDMA_Publish_Buffer_With_Callback (process->connection, cacheentry->bufferHandle, (VMI_virt_addr_t) (VMI_ADDR_CAST) msg, (UINT32) msgsize,
+						    (VMI_virt_addr_t) (VMI_ADDR_CAST) NULL, (UINT32) handle->index, (PVOID) &publish_msg,
+						    (ULONG) sizeof (CMI_VMI_Publish_Message_T), (PVOID) handle, CMI_VMI_RDMA_Publish_Completion_Handler);
+    CMI_VMI_CHECK_SUCCESS (status, "VMI_RDMA_Publish_Buffer_With_Callback()");
 
-      while (handle->data.send.data.rdmaget.publishes_pending > 0) {
-	sched_yield ();
-	status = VMI_Poll ();
-	CMI_VMI_CHECK_SUCCESS (status, "VMI_Poll()");
-      }
-#else
-      status = VMI_RDMA_Publish_Buffer ((&CMI_VMI_Processes[destrank])->connection, cacheentry->bufferHandle, (VMI_virt_addr_t) (VMI_ADDR_CAST) msg,
-				        (UINT32) msgsize, (VMI_virt_addr_t) (VMI_ADDR_CAST) NULL, (UINT32) handle->index, (PVOID) &publish_msg,
-				        (ULONG) sizeof (CMI_VMI_Publish_Message_T));
-      CMI_VMI_CHECK_SUCCESS (status, "VMI_RDMA_Publish_Buffer()");
-#endif
+    while (handle->data.send.data.rdmaget.publishes_pending > 0) {
+      sched_yield ();
+      status = VMI_Poll ();
+      CMI_VMI_CHECK_SUCCESS (status, "VMI_Poll()");
     }
+#else
+    status = VMI_RDMA_Publish_Buffer (process->connection, cacheentry->bufferHandle, (VMI_virt_addr_t) (VMI_ADDR_CAST) msg, (UINT32) msgsize,
+				      (VMI_virt_addr_t) (VMI_ADDR_CAST) NULL, (UINT32) handle->index, (PVOID) &publish_msg,
+				      (ULONG) sizeof (CMI_VMI_Publish_Message_T));
+    CMI_VMI_CHECK_SUCCESS (status, "VMI_RDMA_Publish_Buffer()");
+#endif
   }
 
   return ((CmiCommHandle) handle);
@@ -1223,84 +1248,118 @@ void CmiFreeSendFn (int destrank, int msgsize, char *msg)
   CMI_VMI_MESSAGE_CREDITS (msg) = process->eager_short_receive_credits_replentish;
   process->eager_short_receive_credits_replentish = 0;
 
-  if (msgsize < CMI_VMI_Medium_Message_Boundary) {
-    if (process->eager_short_send_credits_available > 0) {
-      index = process->eager_short_send_index;
-      handle = process->eager_short_send_handles[index];
+  // These are assigned here for the Eager long test in the second "if" case.
+  index = process->eager_long_send_size - 1;
+  handle = process->eager_long_send_handles[index];
 
-      memcpy (handle->msg, msg, msgsize);
+  if (CMI_VMI_Eager_Protocol && (process->eager_short_send_credits_available > 0) && (msgsize < CMI_VMI_Eager_Short_Message_Boundary)) {
+    index = process->eager_short_send_index;
+    handle = process->eager_short_send_handles[index];
 
-      footer.msgsize = msgsize;
-      footer.sentinel = CMI_VMI_EAGER_SHORT_SENTINEL_DATA;
-      memcpy (handle->msg + msgsize, &footer, sizeof (CMI_VMI_Eager_Short_Slot_Footer_T));
+    memcpy (handle->msg, msg, msgsize);
 
-      handle->msgsize = msgsize;
-      handle->data.send.message_disposition = CMI_VMI_MESSAGE_DISPOSITION_NONE;
+    footer.msgsize = msgsize;
+    footer.sentinel = CMI_VMI_EAGER_SHORT_SENTINEL_DATA;
+    memcpy (handle->msg + msgsize, &footer, sizeof (CMI_VMI_Eager_Short_Slot_Footer_T));
 
-      cacheentry = handle->data.send.data.eager_short.cacheentry;
-      rdmaop = handle->data.send.data.eager_short.rdmaop;
+    handle->msgsize = msgsize;
+    handle->data.send.message_disposition = CMI_VMI_MESSAGE_DISPOSITION_NONE;
 
-      offset = handle->data.send.data.eager_short.offset;
-      offset += (CMI_VMI_Medium_Message_Boundary - msgsize);
+    cacheentry = handle->data.send.data.eager_short.cacheentry;
+    rdmaop = handle->data.send.data.eager_short.rdmaop;
 
-      rdmaop->numBufs = 1;
-      rdmaop->buffers[0] = cacheentry->bufferHandle;
-      rdmaop->addr[0] = handle->msg;
-      rdmaop->sz[0] = msgsize + sizeof (CMI_VMI_Eager_Short_Slot_Footer_T);
-      rdmaop->rbuffer = handle->data.send.data.eager_short.remote_buffer;
-      rdmaop->roffset = offset;
-      rdmaop->notify = FALSE;
+    offset = handle->data.send.data.eager_short.offset;
+    offset += (CMI_VMI_Eager_Short_Message_Boundary - msgsize);
 
-      status = VMI_RDMA_Put (process->connection, rdmaop, (PVOID) NULL, (VMIRDMACompleteNotification) NULL);
-      CMI_VMI_CHECK_SUCCESS (status, "VMI_RDMA_Put()");
+    rdmaop->numBufs = 1;
+    rdmaop->buffers[0] = cacheentry->bufferHandle;
+    rdmaop->addr[0] = handle->msg;
+    rdmaop->sz[0] = msgsize + sizeof (CMI_VMI_Eager_Short_Slot_Footer_T);
+    rdmaop->rbuffer = handle->data.send.data.eager_short.remote_buffer;
+    rdmaop->roffset = offset;
+    rdmaop->notify = FALSE;
 
-      process->eager_short_send_index = ((index + 1) % process->eager_short_send_size);
-      process->eager_short_send_credits_available -= 1;
+    status = VMI_RDMA_Put (process->connection, rdmaop, (PVOID) NULL, (VMIRDMACompleteNotification) NULL);
+    CMI_VMI_CHECK_SUCCESS (status, "VMI_RDMA_Put()");
 
-      CmiFree (msg);
-    } else if (msgsize < CMI_VMI_Small_Message_Boundary) {
-      addrs[0] = (PVOID) msg;
-      sz[0] = msgsize;
+    process->eager_short_send_index = ((index + 1) % process->eager_short_send_size);
+    process->eager_short_send_credits_available -= 1;
 
-      status = VMI_Stream_Send_Inline ((&CMI_VMI_Processes[destrank])->connection, addrs, sz, 1, msgsize);
-      CMI_VMI_CHECK_SUCCESS (status, "VMI_Stream_Send_Inline()");
-
-      CmiFree (msg);
+    CmiFree (msg);
+  } else if (CMI_VMI_Eager_Protocol && (process->eager_long_send_size > 0) && (msgsize < handle->data.send.data.eager_long.maxsize)) {
+    context = CONTEXTFIELD (msg);
+    if (context) {
+      cacheentry = CMI_VMI_CacheEntry_From_Context (context);
     } else {
-      if (CMI_VMI_Eager_Protocol) {
-	context = CONTEXTFIELD (msg);
-	if (context) {
-	  cacheentry = CMI_VMI_CacheEntry_From_Context (context);
-	} else {
-	  status = VMI_Cache_Register (msg, msgsize, &cacheentry);
-	  CMI_VMI_CHECK_SUCCESS (status, "VMI_Cache_Register()");
-	}
+      status = VMI_Cache_Register (msg, msgsize, &cacheentry);
+      CMI_VMI_CHECK_SUCCESS (status, "VMI_Cache_Register()");
+    }
+
+    process->eager_long_send_size = index;
+
+    handle->msg = msg;
+    handle->msgsize = msgsize;
+    handle->data.send.message_disposition = CMI_VMI_MESSAGE_DISPOSITION_FREE;
+    handle->data.send.data.eager_long.cacheentry = cacheentry;
+
+    status = VMI_RDMA_Alloc_Op (&rdmaop);
+    CMI_VMI_CHECK_SUCCESS (status, "VMI_RDMA_Alloc_Op()");
+
+    rdmaop->numBufs = 1;
+    rdmaop->buffers[0] = cacheentry->bufferHandle;
+    rdmaop->addr[0] = handle->msg;
+    rdmaop->sz[0] = msgsize;
+    rdmaop->rbuffer = handle->data.send.data.eager_long.remote_buffer;
+    rdmaop->roffset = 0;
+    rdmaop->notify = TRUE;
+
+    CMI_VMI_AsyncMsgCount += 1;
+    /* Do NOT increment handle->refcount here! */
+
+    status = VMI_RDMA_Put (process->connection, rdmaop, (PVOID) handle, (VMIRDMACompleteNotification) CMI_VMI_RDMA_Put_Completion_Handler);
+    CMI_VMI_CHECK_SUCCESS (status, "VMI_RDMA_Put()");
+  } else if (msgsize < CMI_VMI_Small_Message_Boundary) {
+    addrs[0] = (PVOID) msg;
+    sz[0] = msgsize;
+
+    status = VMI_Stream_Send_Inline (process->connection, addrs, sz, 1, msgsize);
+    CMI_VMI_CHECK_SUCCESS (status, "VMI_Stream_Send_Inline()");
+
+    CmiFree (msg);
+  } else if (msgsize < CMI_VMI_Medium_Message_Boundary) {
+    if (CMI_VMI_Eager_Protocol) {
+      context = CONTEXTFIELD (msg);
+      if (context) {
+	cacheentry = CMI_VMI_CacheEntry_From_Context (context);
       } else {
-	context = NULL;
 	status = VMI_Cache_Register (msg, msgsize, &cacheentry);
 	CMI_VMI_CHECK_SUCCESS (status, "VMI_Cache_Register()");
       }
-
-      handle = CMI_VMI_Handle_Allocate ();
-
-      /* Do NOT increment handle->refcount here! */
-      handle->msg = msg;
-      handle->msgsize = msgsize;
-      handle->handle_type = CMI_VMI_HANDLE_TYPE_SEND;
-      handle->data.send.send_handle_type = CMI_VMI_SEND_HANDLE_TYPE_STREAM;
-      handle->data.send.message_disposition = CMI_VMI_MESSAGE_DISPOSITION_FREE;
-      handle->data.send.data.stream.cacheentry = cacheentry;
-
-      bufHandles[0] = cacheentry->bufferHandle;
-      addrs[0] = (PVOID) msg;
-      sz[0] = msgsize;
-
-      handle->refcount += 1;
-      CMI_VMI_AsyncMsgCount += 1;
-
-      status = VMI_Stream_Send ((&CMI_VMI_Processes[destrank])->connection, bufHandles, addrs, sz, 1, CMI_VMI_Stream_Completion_Handler, (PVOID) handle, TRUE);
-      CMI_VMI_CHECK_SUCCESS (status, "VMI_Stream_Send()");
+    } else {
+      context = NULL;
+      status = VMI_Cache_Register (msg, msgsize, &cacheentry);
+      CMI_VMI_CHECK_SUCCESS (status, "VMI_Cache_Register()");
     }
+
+    handle = CMI_VMI_Handle_Allocate ();
+
+    /* Do NOT increment handle->refcount here! */
+    handle->msg = msg;
+    handle->msgsize = msgsize;
+    handle->handle_type = CMI_VMI_HANDLE_TYPE_SEND;
+    handle->data.send.send_handle_type = CMI_VMI_SEND_HANDLE_TYPE_STREAM;
+    handle->data.send.message_disposition = CMI_VMI_MESSAGE_DISPOSITION_FREE;
+    handle->data.send.data.stream.cacheentry = cacheentry;
+
+    bufHandles[0] = cacheentry->bufferHandle;
+    addrs[0] = (PVOID) msg;
+    sz[0] = msgsize;
+
+    handle->refcount += 1;
+    CMI_VMI_AsyncMsgCount += 1;
+
+    status = VMI_Stream_Send (process->connection, bufHandles, addrs, sz, 1, CMI_VMI_Stream_Completion_Handler, (PVOID) handle, TRUE);
+    CMI_VMI_CHECK_SUCCESS (status, "VMI_Stream_Send()");
   } else {
     if (CMI_VMI_Eager_Protocol) {
       context = CONTEXTFIELD (msg);
@@ -1316,68 +1375,39 @@ void CmiFreeSendFn (int destrank, int msgsize, char *msg)
       CMI_VMI_CHECK_SUCCESS (status, "VMI_Cache_Register()");
     }
 
-    index = process->eager_long_send_size - 1;
-    handle = process->eager_long_send_handles[index];
+    handle = CMI_VMI_Handle_Allocate ();
 
-    if ((process->eager_long_send_size > 0) && (msgsize < handle->data.send.data.eager_long.maxsize)) {
-      process->eager_long_send_size = index;
+    /* Do NOT increment handle->refcount here! */
+    handle->msg = msg;
+    handle->msgsize = msgsize;
+    handle->handle_type = CMI_VMI_HANDLE_TYPE_SEND;
+    handle->data.send.send_handle_type = CMI_VMI_SEND_HANDLE_TYPE_RDMAGET;
+    handle->data.send.message_disposition = CMI_VMI_MESSAGE_DISPOSITION_FREE;
+    handle->data.send.data.rdmaget.cacheentry = cacheentry;
 
-      handle->msg = msg;
-      handle->msgsize = msgsize;
-      handle->data.send.message_disposition = CMI_VMI_MESSAGE_DISPOSITION_FREE;
-      handle->data.send.data.eager_long.cacheentry = cacheentry;
+    handle->refcount += 1;
+    CMI_VMI_AsyncMsgCount += 1;
+    handle->data.send.data.rdmaget.publishes_pending = 1;
 
-      status = VMI_RDMA_Alloc_Op (&rdmaop);
-      CMI_VMI_CHECK_SUCCESS (status, "VMI_RDMA_Alloc_Op()");
-
-      rdmaop->numBufs = 1;
-      rdmaop->buffers[0] = cacheentry->bufferHandle;
-      rdmaop->addr[0] = handle->msg;
-      rdmaop->sz[0] = msgsize;
-      rdmaop->rbuffer = handle->data.send.data.eager_long.remote_buffer;
-      rdmaop->roffset = 0;
-      rdmaop->notify = TRUE;
-
-      CMI_VMI_AsyncMsgCount += 1;
-      /* Do NOT increment handle->refcount here! */
-
-      status = VMI_RDMA_Put (process->connection, rdmaop, (PVOID) handle, (VMIRDMACompleteNotification) CMI_VMI_RDMA_Put_Completion_Handler);
-      CMI_VMI_CHECK_SUCCESS (status, "VMI_RDMA_Put()");
-    } else {
-      handle = CMI_VMI_Handle_Allocate ();
-
-      /* Do NOT increment handle->refcount here! */
-      handle->msg = msg;
-      handle->msgsize = msgsize;
-      handle->handle_type = CMI_VMI_HANDLE_TYPE_SEND;
-      handle->data.send.send_handle_type = CMI_VMI_SEND_HANDLE_TYPE_RDMAGET;
-      handle->data.send.message_disposition = CMI_VMI_MESSAGE_DISPOSITION_FREE;
-      handle->data.send.data.rdmaget.cacheentry = cacheentry;
-
-      handle->refcount += 1;
-      CMI_VMI_AsyncMsgCount += 1;
-      handle->data.send.data.rdmaget.publishes_pending = 1;
-
-      publish_msg.type = CMI_VMI_PUBLISH_TYPE_GET;
+    publish_msg.type = CMI_VMI_PUBLISH_TYPE_GET;
 
 #if CMI_VMI_USE_VMI22
-      status = VMI_RDMA_Publish_Buffer_With_Callback ((&CMI_VMI_Processes[destrank])->connection, cacheentry->bufferHandle, (VMI_virt_addr_t) (VMI_ADDR_CAST) msg,
-						      (UINT32) msgsize, (VMI_virt_addr_t) (VMI_ADDR_CAST) NULL, (UINT32) handle->index, (PVOID) &publish_msg,
-						      (ULONG) sizeof (CMI_VMI_Publish_Message_T), (PVOID) handle, CMI_VMI_RDMA_Publish_Completion_Handler);
-      CMI_VMI_CHECK_SUCCESS (status, "VMI_RDMA_Publish_Buffer_With_Callback()");
+    status = VMI_RDMA_Publish_Buffer_With_Callback (process->connection, cacheentry->bufferHandle, (VMI_virt_addr_t) (VMI_ADDR_CAST) msg, (UINT32) msgsize,
+						    (VMI_virt_addr_t) (VMI_ADDR_CAST) NULL, (UINT32) handle->index, (PVOID) &publish_msg,
+						    (ULONG) sizeof (CMI_VMI_Publish_Message_T), (PVOID) handle, CMI_VMI_RDMA_Publish_Completion_Handler);
+    CMI_VMI_CHECK_SUCCESS (status, "VMI_RDMA_Publish_Buffer_With_Callback()");
 
-      while (handle->data.send.data.rdmaget.publishes_pending > 0) {
-	sched_yield ();
-	status = VMI_Poll ();
-	CMI_VMI_CHECK_SUCCESS (status, "VMI_Poll()");
-      }
-#else
-      status = VMI_RDMA_Publish_Buffer ((&CMI_VMI_Processes[destrank])->connection, cacheentry->bufferHandle, (VMI_virt_addr_t) (VMI_ADDR_CAST) msg,
-				        (UINT32) msgsize, (VMI_virt_addr_t) (VMI_ADDR_CAST) NULL, (UINT32) handle->index, (PVOID) &publish_msg,
-				        (ULONG) sizeof (CMI_VMI_Publish_Message_T));
-      CMI_VMI_CHECK_SUCCESS (status, "VMI_RDMA_Publish_Buffer()");
-#endif
+    while (handle->data.send.data.rdmaget.publishes_pending > 0) {
+      sched_yield ();
+      status = VMI_Poll ();
+      CMI_VMI_CHECK_SUCCESS (status, "VMI_Poll()");
     }
+#else
+    status = VMI_RDMA_Publish_Buffer (process->connection, cacheentry->bufferHandle, (VMI_virt_addr_t) (VMI_ADDR_CAST) msg, (UINT32) msgsize,
+				      (VMI_virt_addr_t) (VMI_ADDR_CAST) NULL, (UINT32) handle->index, (PVOID) &publish_msg,
+				      (ULONG) sizeof (CMI_VMI_Publish_Message_T));
+    CMI_VMI_CHECK_SUCCESS (status, "VMI_RDMA_Publish_Buffer()");
+#endif
   }
 }
 
@@ -2813,12 +2843,12 @@ PersistentReq CmiCreateReceiverPersistent (int maxsize)
 */
 PersistentHandle CmiRegisterReceivePersistent (PersistentReq request)
 {
-  DEBUG_PRINT ("CmiRegisterReceiverPersistent() called.\n");
+  DEBUG_PRINT ("CmiRegisterReceivePersistent() called.\n");
 
   if (CMI_VMI_Eager_Protocol) {
     CMI_VMI_Eager_Short_Setup (request.pe);
 
-    if (request.maxBytes > CMI_VMI_Medium_Message_Boundary) {
+    if (request.maxBytes > CMI_VMI_Eager_Short_Message_Boundary) {
       if (request.maxBytes < CMI_VMI_Eager_Long_Buffer_Size) {
 	CMI_VMI_Eager_Long_Setup (request.pe, CMI_VMI_Eager_Long_Buffer_Size);
       } else {
@@ -2925,20 +2955,6 @@ void CMI_VMI_Read_Environment ()
 
   if (value = getenv ("CMI_VMI_MEDIUM_MESSAGE_BOUNDARY")) {
     CMI_VMI_Medium_Message_Boundary = atoi (value);
-
-    /*
-      If the medium message boundary is greater than 65536 bytes,
-      then reset it to 65536.  This is because the eager short
-      footer sends the eager short msgsize as an unsigned short
-      which is limited to a maximum value of 65536.
-
-      (If this limit is unacceptable in the future, the best
-      strategy is to use different boundary variables for
-      "normal" and "eager" messages.)
-    */
-    if (CMI_VMI_Medium_Message_Boundary > 65536) {
-      CMI_VMI_Medium_Message_Boundary = 65536;
-    }
   }
 
   if (value = getenv ("CMI_VMI_EAGER_PROTOCOL")) {
@@ -2959,6 +2975,20 @@ void CMI_VMI_Read_Environment ()
 
   if (value = getenv ("CMI_VMI_EAGER_SHORT_SLOTS")) {
     CMI_VMI_Eager_Short_Slots = atoi (value);
+  }
+
+  if (value = getenv ("CMI_VMI_EAGER_SHORT_MESSAGE_BOUNDARY")) {
+    CMI_VMI_Eager_Short_Message_Boundary = atoi (value);
+
+    /*
+      If the eager short message boundary is greater than 65536
+      bytes, reset it to 65536.  This is because the eager short
+      footer sends the eager short msgsize as an unsigned short
+      which is limited to a maximum value of 65536.
+    */
+    if (CMI_VMI_Eager_Short_Message_Boundary > 65536) {
+      CMI_VMI_Eager_Short_Message_Boundary = 65536;
+    }
   }
 
   if (value = getenv ("CMI_VMI_EAGER_LONG_BUFFERS")) {
@@ -4383,7 +4413,7 @@ void CMI_VMI_Eager_Short_Setup (int sender_rank)
   process = &CMI_VMI_Processes[sender_rank];
 
   /* Compute the size of each slot and the size of the total buffer. */
-  slot_size = sizeof (CMI_VMI_Memory_Chunk_T) + CMI_VMI_Medium_Message_Boundary + sizeof (CMI_VMI_Eager_Short_Slot_Footer_T);
+  slot_size = sizeof (CMI_VMI_Memory_Chunk_T) + CMI_VMI_Eager_Short_Message_Boundary + sizeof (CMI_VMI_Eager_Short_Slot_Footer_T);
   buffer_size = CMI_VMI_Eager_Short_Slots * slot_size;
 
   /* Allocate the eager buffer. */
@@ -4398,7 +4428,7 @@ void CMI_VMI_Eager_Short_Setup (int sender_rank)
     handle = CMI_VMI_Handle_Allocate ();
 
     eager_buffer = publish_buffer + (slot_size * i);
-    footer = (CMI_VMI_Eager_Short_Slot_Footer_T *) (eager_buffer + sizeof (CMI_VMI_Memory_Chunk_T) + CMI_VMI_Medium_Message_Boundary);
+    footer = (CMI_VMI_Eager_Short_Slot_Footer_T *) (eager_buffer + sizeof (CMI_VMI_Memory_Chunk_T) + CMI_VMI_Eager_Short_Message_Boundary);
 
     handle->refcount += 1;
     handle->msg = NULL;
@@ -4700,14 +4730,14 @@ void CMI_VMI_RDMA_Publish_Notification_Handler (PVMI_CONNECT connection, PVMI_RE
       break;
 
     case CMI_VMI_PUBLISH_TYPE_EAGER_SHORT:
-      slot_size = sizeof (CMI_VMI_Memory_Chunk_T) + CMI_VMI_Medium_Message_Boundary + sizeof (CMI_VMI_Eager_Short_Slot_Footer_T);
+      slot_size = sizeof (CMI_VMI_Memory_Chunk_T) + CMI_VMI_Eager_Short_Message_Boundary + sizeof (CMI_VMI_Eager_Short_Slot_Footer_T);
 
       for (i = 0; i < CMI_VMI_Eager_Short_Slots; i++) {
 	offset = (i * slot_size) + sizeof (CMI_VMI_Memory_Chunk_T);
 
-	msg = CmiAlloc (CMI_VMI_Medium_Message_Boundary + sizeof (CMI_VMI_Eager_Short_Slot_Footer_T));
+	msg = CmiAlloc (CMI_VMI_Eager_Short_Message_Boundary + sizeof (CMI_VMI_Eager_Short_Slot_Footer_T));
 
-	status = VMI_Cache_Register (msg, CMI_VMI_Medium_Message_Boundary + sizeof (CMI_VMI_Eager_Short_Slot_Footer_T), &cacheentry);
+	status = VMI_Cache_Register (msg, CMI_VMI_Eager_Short_Message_Boundary + sizeof (CMI_VMI_Eager_Short_Slot_Footer_T), &cacheentry);
 	CMI_VMI_CHECK_SUCCESS (status, "VMI_Cache_Register()");
 
 	status = VMI_RDMA_Alloc_Op (&rdmaop);
@@ -5257,7 +5287,7 @@ void CMI_VMI_Common_Receive (int sourcerank, int msgsize, char *msg)
     case CMI_VMI_MESSAGE_TYPE_PERSISTENT_REQUEST:
       persistent_request_msg = (CMI_VMI_Persistent_Request_Message_T *) msg;
       CMI_VMI_Eager_Short_Setup (sourcerank);
-      if (persistent_request_msg->maxsize > CMI_VMI_Medium_Message_Boundary) {
+      if (persistent_request_msg->maxsize > CMI_VMI_Eager_Short_Message_Boundary) {
 	if (persistent_request_msg->maxsize < CMI_VMI_Eager_Long_Buffer_Size) {
 	  CMI_VMI_Eager_Long_Setup (sourcerank, CMI_VMI_Eager_Long_Buffer_Size);
 	} else {
