@@ -82,13 +82,12 @@ class GridMetisLB : public CentralLB
     GridMetisLB (const CkLBOptions &);
     GridMetisLB (CkMigrateMessage *msg);
 
+    CmiBool QueryBalanceNow (int step);
     void work (CentralLB::LDStats *stats, int count);
-
     void pup (PUP::er &p) { CentralLB::pup (p); }
 
   private:
     int Get_Cluster (int pe);
-    CmiBool QueryBalanceNow (int step);
     void Initialize_PE_Data (CentralLB::LDStats *stats);
     int Available_PE_Count ();
     int Compute_Number_Of_Clusters ();

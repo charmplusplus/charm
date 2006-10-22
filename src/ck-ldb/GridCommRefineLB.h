@@ -11,6 +11,10 @@
 
 #define CK_LDB_GRIDCOMMREFINELB_TOLERANCE 1.10
 
+#ifndef MAXINT
+#define MAXINT 2147483647
+#endif
+
 #if CONVERSE_VERSION_VMI
 extern "C" int CmiGetCluster (int process);
 #endif
@@ -49,17 +53,21 @@ class GridCommRefineLB : public CentralLB
     GridCommRefineLB (const CkLBOptions &);
     GridCommRefineLB (CkMigrateMessage *msg);
 
+    CmiBool QueryBalanceNow (int step);
     void work (CentralLB::LDStats *stats, int count);
-
     void pup (PUP::er &p) { CentralLB::pup (p); }
 
   private:
     int Get_Cluster (int pe);
+    void Initialize_PE_Data (CentralLB::LDStats *stats);
+    void Initialize_Object_Data (CentralLB::LDStats *stats);
+    void Examine_InterObject_Messages (CentralLB::LDStats *stats);
+    void Place_Objects_On_PEs ();
+    void Remap_Objects_To_PEs (int cluster);
     int Find_Maximum_WAN_Object (int pe);
     int Find_Minimum_WAN_PE (int cluster);
-    void Assign_Object_To_PE (int target_object, int target_pe);
     void Remove_Object_From_PE (int target_object, int target_pe);
-    CmiBool QueryBalanceNow (int step);
+    void Assign_Object_To_PE (int target_object, int target_pe);
 
     int Num_PEs;
     int Num_Objects;

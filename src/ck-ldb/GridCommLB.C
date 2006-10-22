@@ -81,7 +81,7 @@ GridCommLB::GridCommLB (CkMigrateMessage *msg) : CentralLB (msg)
 */
 CmiBool GridCommLB::QueryBalanceNow (int step)
 {
-  if (_lb_args.debug() >= 1) {
+  if (_lb_args.debug() > 2) {
     CkPrintf ("[%d] GridCommLB is balancing on step %d.\n", CkMyPe(), step);
   }
 
@@ -108,6 +108,233 @@ int GridCommLB::Get_Cluster (int pe)
 #else
   return (0);
 #endif
+}
+
+
+
+/**************************************************************************
+** Instantiate and initialize the PE_Data[] data structure.
+**
+** While doing this...
+**    - ensure that there is at least one available PE
+**    - ensure that all PEs are mapped to a cluster
+**    - determine the maximum cluster number (gives the number of clusters)
+**    - determine the minimum speed PE (used to compute relative PE speeds)
+*/
+void GridCommLB::Initialize_PE_Data (CentralLB::LDStats *stats)
+{
+  int min_speed;
+  int i;
+
+
+  PE_Data = new PE_Data_T[Num_PEs];
+
+  min_speed = MAXINT;
+  for (i = 0; i < Num_PEs; i++) {
+    (&PE_Data[i])->available      = stats->procs[i].available;
+    (&PE_Data[i])->cluster        = Get_Cluster (i);
+    (&PE_Data[i])->num_objs       = 0;
+    (&PE_Data[i])->num_lan_objs   = 0;
+    (&PE_Data[i])->num_lan_msgs   = 0;
+    (&PE_Data[i])->num_wan_objs   = 0;
+    (&PE_Data[i])->num_wan_msgs   = 0;
+    (&PE_Data[i])->relative_speed = 0.0;
+    (&PE_Data[i])->scaled_load    = 0.0;
+
+    if (stats->procs[i].pe_speed < min_speed) {
+      min_speed = stats->procs[i].pe_speed;
+    }
+  }
+
+  // Compute the relative PE speeds.
+  // Also add background CPU time to each PE's scaled load.
+  for (i = 0; i < Num_PEs; i++) {
+    (&PE_Data[i])->relative_speed = (double) (stats->procs[i].pe_speed / min_speed);
+    (&PE_Data[i])->scaled_load += stats->procs[i].bg_cputime;
+  }
+}
+
+
+
+/**************************************************************************
+**
+*/
+int GridMetisLB::Available_PE_Count ()
+{
+  int available_pe_count;
+  int i;
+
+
+  available_pe_count = 0;
+  for (i = 0; i < Num_PEs; i++) {
+    if ((&PE_Data[i])->available) {
+      available_pe_count += 1;
+    }
+  }
+  return (available_pe_count);
+}
+
+
+
+/**************************************************************************
+**
+*/
+int GridMetisLB::Compute_Number_Of_Clusters ()
+{
+  int max_cluster;
+  int i;
+
+
+  max_cluster = 0;
+  for (i = 0; i < Num_PEs; i++) {
+    if ((&PE_Data[i])->cluster < 0) {
+      return (-1);
+    }
+
+    if ((&PE_Data[i])->cluster > max_cluster) {
+      max_cluster = (&PE_Data[i])->cluster;
+    }
+  }
+  return (max_cluster + 1);
+}
+
+
+
+/**************************************************************************
+**
+*/
+void GridCommLB::Initialize_Object_Data (CentralLB::LDStats *stats)
+{
+  int i;
+
+
+  Object_Data = new Object_Data_T[Num_Objects];
+
+  for (i = 0; i < Num_Objects; i++) {
+    (&Object_Data[i])->migratable   = (&stats->objData[i])->migratable;
+    (&Object_Data[i])->cluster      = Get_Cluster (stats->from_proc[i]);
+    (&Object_Data[i])->from_pe      = stats->from_proc[i];
+    (&Object_Data[i])->to_pe        = -1;
+    (&Object_Data[i])->num_lan_msgs = 0;
+    (&Object_Data[i])->num_wan_msgs = 0;
+    (&Object_Data[i])->load         = (&stats->objData[i])->wallTime;
+  }
+}
+
+
+
+/**************************************************************************
+**
+*/
+void GridCommLB::Examine_InterObject_Messages (CentralLB::LDStats *stats)
+{
+  int i;
+  LDCommData *com_data;
+  int send_object;
+  int send_pe;
+  int send_cluster;
+  int recv_object;
+  int recv_pe;
+  int recv_cluster;
+  LDObjKey *recv_objects;
+  int num_objects;
+
+
+  for (i = 0; i < stats->n_comm; i++) {
+    com_data = &(stats->commData[i]);
+    if ((!com_data->from_proc()) && (com_data->recv_type() == LD_OBJ_MSG)) {
+      send_object = stats->getHash (com_data->sender);
+      recv_object = stats->getHash (com_data->receiver.get_destObj());
+
+      if ((send_object < 0) || (send_object > Num_Objects) || (recv_object < 0) || (recv_object > Num_Objects)) {
+        continue;
+      }
+
+      send_pe = (&Object_Data[send_object])->from_pe;
+      recv_pe = (&Object_Data[recv_object])->from_pe;
+
+      send_cluster = Get_Cluster (send_pe);
+      recv_cluster = Get_Cluster (recv_pe);
+
+      if (send_cluster == recv_cluster) {
+	(&Object_Data[send_object])->num_lan_msgs += com_data->messages;
+      } else {
+	(&Object_Data[send_object])->num_wan_msgs += com_data->messages;
+      }
+    } else if (com_data->receiver.get_type() == LD_OBJLIST_MSG) {
+      send_object = stats->getHash (com_data->sender);
+
+      if ((send_object < 0) || (send_object > Num_Objects)) {
+        continue;
+      }
+
+      send_pe = (&Object_Data[send_object])->from_pe;
+      send_cluster = Get_Cluster (send_pe);
+
+      recv_objects = com_data->receiver.get_destObjs (num_objects);   // (num_objects is passed by reference)
+
+      for (j = 0; j < num_objects; j++) {
+	recv_object = stats->getHash (recv_objects[j]);
+
+        if ((recv_object < 0) || (recv_object > Num_Objects)) {
+          continue;
+        }
+
+	recv_pe = (&Object_Data[recv_object])->from_pe;
+	recv_cluster = Get_Cluster (recv_pe);
+
+	if (send_cluster == recv_cluster) {
+	  (&Object_Data[send_object])->num_lan_msgs += com_data->messages;
+	} else {
+	  (&Object_Data[send_object])->num_wan_msgs += com_data->messages;
+	}
+      }
+    }
+  }
+}
+
+
+
+/**************************************************************************
+**
+*/
+void GridCommLB::Map_NonMigratable_Objects_To_PEs ()
+{
+  int i;
+
+
+  for (i = 0; i < Num_Objects; i++) {
+    if (!((&Object_Data[i])->migratable)) {
+      if (_lb_args.debug() > 1) {
+	CkPrintf ("[%d] GridCommLB identifies object %d as non-migratable.\n", CkMyPe(), i);
+      }
+
+      Assign_Object_To_PE (i, (&Object_Data[i])->from_pe);
+    }
+  }
+}
+
+
+
+/**************************************************************************
+**
+*/
+void GridCommLB::Map_Migratable_Objects_To_PEs (int cluster)
+{
+  int target_object;
+  int target_pe;
+
+
+  while (1) {
+    target_object = Find_Maximum_WAN_Object (cluster);
+    target_pe = Find_Minimum_WAN_PE (cluster);
+
+    if ((target_object == -1) || (target_pe == -1)) {
+      break;
+    }
+
+    Assign_Object_To_PE (target_object, target_pe);
+  }
 }
 
 
@@ -164,11 +391,40 @@ int GridCommLB::Find_Minimum_WAN_PE (int cluster)
 {
   int i;
   int min_index;
+  int min_wan_msgs;
+
+
+  min_index = -1;
+  min_wan_msgs = MAXINT;
+
+  for (i = 0; i < Num_PEs; i++) {
+    if (((&PE_Data[i])->available) && ((&PE_Data[i])->cluster == cluster)) {
+      if ((&PE_Data[i])->num_wan_msgs < min_wan_msgs) {
+	min_index = i;
+	min_wan_msgs = (&PE_Data[i])->num_wan_msgs;
+      } else if (((&PE_Data[i])->num_wan_msgs == min_wan_msgs) &&
+		 ((&PE_Data[i])->scaled_load < (&PE_Data[min_index])->scaled_load)) {
+	min_index = i;
+	min_wan_msgs = (&PE_Data[i])->num_wan_msgs;
+      } else if (((&PE_Data[i])->num_wan_msgs == min_wan_msgs) &&
+		 ((&PE_Data[i])->scaled_load == (&PE_Data[min_index])->scaled_load) &&
+		 ((&PE_Data[i])->num_objs < (&PE_Data[min_index])->num_objs)) {
+	min_index = i;
+	min_wan_msgs = (&PE_Data[i])->num_wan_msgs;
+      }
+    }
+  }
+
+  return (min_index);
+
+/*
+  int i;
+  int min_index;
   int min_wan_objs;
 
 
   min_index = -1;
-  min_wan_objs = INT_MAX;
+  min_wan_objs = MAXINT;
 
   for (i = 0; i < Num_PEs; i++) {
     if (((&PE_Data[i])->available) && ((&PE_Data[i])->cluster == cluster)) {
@@ -189,6 +445,7 @@ int GridCommLB::Find_Minimum_WAN_PE (int cluster)
   }
 
   return (min_index);
+*/
 }
 
 
@@ -227,23 +484,23 @@ void GridCommLB::Assign_Object_To_PE (int target_object, int target_pe)
 void GridCommLB::work (CentralLB::LDStats *stats, int count)
 {
   int i;
-  CmiBool available;
-  CmiBool all_pes_mapped;
-  int max_cluster;
-  int min_speed;
-  int send_object;
-  int send_pe;
-  int send_cluster;
-  int recv_object;
-  int recv_pe;
-  int recv_cluster;
-  int target_object;
-  int target_pe;
-  LDCommData *com_data;
+  // CmiBool available;
+  // CmiBool all_pes_mapped;
+  // int max_cluster;
+  // int min_speed;
+  // int send_object;
+  // int send_pe;
+  // int send_cluster;
+  // int recv_object;
+  // int recv_pe;
+  // int recv_cluster;
+  // int target_object;
+  // int target_pe;
+  // LDCommData *com_data;
 
 
-  if (_lb_args.debug() >= 1) {
-    CkPrintf ("[%d] GridCommLB is working...\n", CkMyPe());
+  if (_lb_args.debug() > 0) {
+    CkPrintf ("[%d] GridCommLB is working.\n", CkMyPe());
   }
 
   // Since this load balancer looks at communications data, it must initialize the CommHash.
@@ -253,51 +510,16 @@ void GridCommLB::work (CentralLB::LDStats *stats, int count)
   Num_PEs = count;
   Num_Objects = stats->n_objs;
 
-  if (_lb_args.debug() >= 1) {
+  if (_lb_args.debug() > 0) {
     CkPrintf ("[%d] GridCommLB is examining %d PEs and %d objects.\n", CkMyPe(), Num_PEs, Num_Objects);
   }
 
-  // Instantiate and initialize the PE_Data[] data structure.
-  //
-  // While doing this...
-  //    - ensure that there is at least one available PE
-  //    - ensure that all PEs are mapped to a cluster
-  //    - determine the maximum cluster number (gives the number of clusters)
-  //    - determine the minimum speed PE (used to compute relative PE speeds)
-  PE_Data = new PE_Data_T[Num_PEs];
-
-  available = CmiFalse;
-  all_pes_mapped = CmiTrue;
-  max_cluster = -1;
-  min_speed = INT_MAX;
-
-  for (i = 0; i < Num_PEs; i++) {
-    (&PE_Data[i])->available      = stats->procs[i].available;
-    (&PE_Data[i])->cluster        = Get_Cluster (i);
-    (&PE_Data[i])->num_objs       = 0;
-    (&PE_Data[i])->num_lan_objs   = 0;
-    (&PE_Data[i])->num_lan_msgs   = 0;
-    (&PE_Data[i])->num_wan_objs   = 0;
-    (&PE_Data[i])->num_wan_msgs   = 0;
-    (&PE_Data[i])->relative_speed = 0.0;
-    (&PE_Data[i])->scaled_load    = 0.0;
-
-    available |= (&PE_Data[i])->available;
-
-    all_pes_mapped &= ((&PE_Data[i])->cluster >= 0);
-
-    if ((&PE_Data[i])->cluster > max_cluster) {
-      max_cluster = (&PE_Data[i])->cluster;
-    }
-
-    if (stats->procs[i].pe_speed < min_speed) {
-      min_speed = stats->procs[i].pe_speed;
-    }
-  }
+  // Initialize the PE_Data[] data structure.
+  Initialize_PE_Data (stats);
 
   // If at least one available PE does not exist, return from load balancing.
-  if (!available) {
-    if (_lb_args.debug() >= 1) {
+  if (Available_PE_Count() < 1) {
+    if (_lb_args.debug() > 0) {
       CkPrintf ("[%d] GridCommLB finds no available PEs -- no balancing done.\n", CkMyPe());
     }
 
@@ -306,9 +528,11 @@ void GridCommLB::work (CentralLB::LDStats *stats, int count)
     return;
   }
 
-  // If not all PEs are mapped to a cluster, return from load balancing.
-  if (!all_pes_mapped) {
-    if (_lb_args.debug() >= 1) {
+  // Determine the number of clusters.
+  // If any PE is not mapped to a cluster, return from load balancing.
+  Num_Clusters = Compute_Number_Of_Clusters ();
+  if (Num_Clusters < 1) {
+    if (_lb_args.debug() > 0) {
       CkPrintf ("[%d] GridCommLB finds incomplete PE cluster map -- no balancing done.\n", CkMyPe());
     }
 
@@ -317,87 +541,31 @@ void GridCommLB::work (CentralLB::LDStats *stats, int count)
     return;
   }
 
-  // The number of clusters is equal to the maximum cluster number plus one.
-  Num_Clusters = max_cluster + 1;
-
-  if (_lb_args.debug() >= 1) {
+  if (_lb_args.debug() > 0) {
     CkPrintf ("[%d] GridCommLB finds %d clusters.\n", CkMyPe(), Num_Clusters);
   }
 
-  // Compute the relative PE speeds.
-  // Also add background CPU time to each PE's scaled load.
-  for (i = 0; i < Num_PEs; i++) {
-    (&PE_Data[i])->relative_speed = (double) (stats->procs[i].pe_speed / min_speed);
-
-    (&PE_Data[i])->scaled_load += stats->procs[i].bg_cputime;
-  }
-
   // Initialize the Object_Data[] data structure.
-  Object_Data = new Object_Data_T[Num_Objects];
-
-  for (i = 0; i < Num_Objects; i++) {
-    (&Object_Data[i])->migratable   = (&stats->objData[i])->migratable;
-    (&Object_Data[i])->cluster      = Get_Cluster (stats->from_proc[i]);
-    (&Object_Data[i])->from_pe      = stats->from_proc[i];
-    (&Object_Data[i])->num_lan_msgs = 0;
-    (&Object_Data[i])->num_wan_msgs = 0;
-    (&Object_Data[i])->load         = (&stats->objData[i])->wallTime;
-
-    if ((&Object_Data[i])->migratable) {
-      (&Object_Data[i])->to_pe = -1;
-    } else {
-      (&Object_Data[i])->to_pe = (&Object_Data[i])->from_pe;
-
-      (&PE_Data[(&Object_Data[i])->to_pe])->scaled_load += (&Object_Data[i])->load;
-
-      if (_lb_args.debug() >= 2) {
-	CkPrintf ("[%d] GridCommLB identifies object %d as non-migratable.\n", CkMyPe(), i);
-      }
-    }
-  }
+  Initialize_Object_Data (stats);
 
   // Examine all object-to-object messages for intra-cluster and inter-cluster communications.
-  for (i = 0; i < stats->n_comm; i++) {
-    com_data = &(stats->commData[i]);
-    if ((!com_data->from_proc()) && (com_data->recv_type() == LD_OBJ_MSG)) {
-      send_object = stats->getHash (com_data->sender);
-      recv_object = stats->getHash (com_data->receiver.get_destObj());
+  Examine_InterObject_Messages (stats);
 
-      send_pe = (&Object_Data[send_object])->from_pe;
-      recv_pe = (&Object_Data[recv_object])->from_pe;
+  // Map non-migratable objects to PEs.
+  Map_NonMigratable_Objects_To_PEs ();
 
-      send_cluster = Get_Cluster (send_pe);
-      recv_cluster = Get_Cluster (recv_pe);
-
-      if (send_cluster == recv_cluster) {
-	(&Object_Data[send_object])->num_lan_msgs += com_data->messages;
-      } else {
-	(&Object_Data[send_object])->num_wan_msgs += com_data->messages;
-      }
-    }
-  }
-
-  // Map objects to PEs in each cluster.
+  // Map migratable objects to PEs in each cluster.
   for (i = 0; i < Num_Clusters; i++) {
-    while (1) {
-      target_object = Find_Maximum_WAN_Object (i);
-      target_pe = Find_Minimum_WAN_PE (i);
-
-      if ((target_object == -1) || (target_pe == -1)) {
-	break;
-      }
-
-      Assign_Object_To_PE (target_object, target_pe);
-    }
+    Map_Migratable_Objects_To_PEs (i);
   }
 
   // Make the assignment of objects to PEs in the load balancer framework.
   for (i = 0; i < Num_Objects; i++) {
     stats->to_proc[i] = (&Object_Data[i])->to_pe;
 
-    if (_lb_args.debug() >= 3) {
+    if (_lb_args.debug() > 2) {
       CkPrintf ("[%d] GridCommLB migrates object %d from PE %d to PE %d.\n", CkMyPe(), i, stats->from_proc[i], stats->to_proc[i]);
-    } else if (_lb_args.debug() >= 2) {
+    } else if (_lb_args.debug() > 1) {
       if (stats->to_proc[i] != stats->from_proc[i]) {
 	CkPrintf ("[%d] GridCommLB migrates object %d from PE %d to PE %d.\n", CkMyPe(), i, stats->from_proc[i], stats->to_proc[i]);
       }

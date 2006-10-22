@@ -9,6 +9,10 @@
 
 #include "CentralLB.h"
 
+#ifndef MAXINT
+#define MAXINT 2147483647
+#endif
+
 #if CONVERSE_VERSION_VMI
 extern "C" int CmiGetCluster (int process);
 #endif
@@ -47,16 +51,22 @@ class GridCommLB : public CentralLB
     GridCommLB (const CkLBOptions &);
     GridCommLB (CkMigrateMessage *msg);
 
+    CmiBool QueryBalanceNow (int step);
     void work (CentralLB::LDStats *stats, int count);
-
     void pup (PUP::er &p) { CentralLB::pup (p); }
 
   private:
     int Get_Cluster (int pe);
+    void Initialize_PE_Data (CentralLB::LDStats *stats);
+    int Available_PE_Count ();
+    int Compute_Number_Of_Clusters ();
+    void Initialize_Object_Data (CentralLB::LDStats *stats);
+    void Examine_InterObject_Messages (CentralLB::LDStats *stats);
+    void Map_NonMigratable_Objects_To_PEs ();
+    void Map_Migratable_Objects_To_PEs ();
     int Find_Maximum_WAN_Object (int cluster);
     int Find_Minimum_WAN_PE (int cluster);
     void Assign_Object_To_PE (int target_object, int target_pe);
-    CmiBool QueryBalanceNow (int step);
 
     int Num_PEs;
     int Num_Objects;

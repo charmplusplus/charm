@@ -169,16 +169,17 @@ void GridMetisLB::Initialize_Object_Data (CentralLB::LDStats *stats)
   Object_Data = new Object_Data_T[Num_Objects];
 
   for (i = 0; i < Num_Objects; i++) {
-    (&Object_Data[i])->migratable   = (&stats->objData[i])->migratable;
-    (&Object_Data[i])->cluster      = Get_Cluster (stats->from_proc[i]);
-    (&Object_Data[i])->from_pe      = stats->from_proc[i];
-    (&Object_Data[i])->load         = (&stats->objData[i])->wallTime;
+    (&Object_Data[i])->migratable = (&stats->objData[i])->migratable;
+    (&Object_Data[i])->cluster    = Get_Cluster (stats->from_proc[i]);
+    (&Object_Data[i])->from_pe    = stats->from_proc[i];
+    (&Object_Data[i])->load       = (&stats->objData[i])->wallTime;
 
     if ((&Object_Data[i])->migratable) {
       (&Object_Data[i])->to_pe = -1;
     } else {
       (&Object_Data[i])->to_pe = (&Object_Data[i])->from_pe;
-      (&PE_Data[(&Object_Data[i])->to_pe])->scaled_load += (&Object_Data[i])->load;
+      //(&PE_Data[(&Object_Data[i])->to_pe])->scaled_load += (&Object_Data[i])->load;
+      (&PE_Data[(&Object_Data[i])->to_pe])->scaled_load += (&Object_Data[i])->load / (&PE_Data[(&Object_Data[i])->to_pe])->relative_speed;
       if (_lb_args.debug() > 1) {
 	CkPrintf ("[%d] GridMetisLB identifies object %d as non-migratable.\n", CkMyPe(), i);
       }
@@ -329,7 +330,8 @@ void GridMetisLB::Partition_Objects_Into_Clusters (CentralLB::LDStats *stats)
       send_object = stats->getHash (com_data->sender);
       recv_object = stats->getHash (com_data->receiver.get_destObj());
 
-      if ((recv_object == -1) && (stats->complete_flag == 0)) {
+      //if ((recv_object == -1) && (stats->complete_flag == 0)) {
+      if ((send_object < 0) || (send_object > Num_Objects) || (recv_object < 0) || (recv_object > Num_Objects)) {
 	continue;
       }
 
@@ -345,6 +347,10 @@ void GridMetisLB::Partition_Objects_Into_Clusters (CentralLB::LDStats *stats)
     } else if (com_data->receiver.get_type() == LD_OBJLIST_MSG) {
       send_object = stats->getHash (com_data->sender);
 
+      if ((send_object < 0) || (send_object > Num_Objects)) {
+	continue;
+      }
+
       if (!(&Object_Data[send_object])->migratable) {
 	continue;
       }
@@ -354,7 +360,8 @@ void GridMetisLB::Partition_Objects_Into_Clusters (CentralLB::LDStats *stats)
       for (j = 0; j < num_objects; j++) {
 	recv_object = stats->getHash (recv_objects[j]);
 
-	if (recv_object == -1) {
+	//if (recv_object == -1) {
+	if ((recv_object < 0) || (recv_object > Num_Objects)) {
 	  continue;
 	}
 
@@ -380,7 +387,7 @@ void GridMetisLB::Partition_Objects_Into_Clusters (CentralLB::LDStats *stats)
   num_edges = 0;
   for (i = 0; i < num_migratable_objects; i++) {
     for (j = 0; j < num_migratable_objects; j++) {
-      if (communication_matrix[i][j] != 0) {
+      if (communication_matrix[i][j] > 0) {
 	num_edges += 1;
       }
     }
@@ -391,7 +398,7 @@ void GridMetisLB::Partition_Objects_Into_Clusters (CentralLB::LDStats *stats)
   xadj[0] = 0;
   for (i = 0; i < num_migratable_objects; i++) {
     for (j = 0; j < num_migratable_objects; j++) {
-      if (communication_matrix[i][j] != 0) {
+      if (communication_matrix[i][j] > 0) {
 	adjncy[count] = j;
 	edge_weights[count] = communication_matrix[i][j];
 	count += 1;
@@ -406,8 +413,7 @@ void GridMetisLB::Partition_Objects_Into_Clusters (CentralLB::LDStats *stats)
   options[0] = 0;
   newmap = new int[num_migratable_objects];
 
-  METIS_PartGraphRecursive (&num_migratable_objects, xadj, adjncy, NULL, edge_weights, &weight_flag, &numbering_flag, &num_partitions, options,
-			    &edgecut, newmap);
+  METIS_PartGraphRecursive (&num_migratable_objects, xadj, adjncy, NULL, edge_weights, &weight_flag, &numbering_flag, &num_partitions, options, &edgecut, newmap);
 
   // Place the partitioned objects into their correct clusters.
   for (i = 0; i < num_migratable_objects; i++) {
@@ -517,7 +523,7 @@ void GridMetisLB::Partition_ClusterObjects_Into_PEs (CentralLB::LDStats *stats, 
     pe += 1;
   }
   if (pe >= Num_PEs) {
-    CmiAbort ("GridMetisLB: Error 1!\n");
+    CmiAbort ("GridMetisLB: Error computing partition to PE map!\n");
   }
   partition = 0;
   while (partition < num_partitions) {
@@ -533,8 +539,8 @@ void GridMetisLB::Partition_ClusterObjects_Into_PEs (CentralLB::LDStats *stats, 
     while (((!(&PE_Data[pe])->available) || ((&PE_Data[pe])->cluster != cluster)) && (pe < Num_PEs)) {
       pe += 1;
     }
-    if (pe > Num_PEs) {
-      CmiPrintf ("[%d] GridMetisLB: PE=%d, Num_PEs=%d\n", CmiMyPe(), pe, Num_PEs);
+    if (pe >= Num_PEs) {
+      CmiAbort ("GridMetisLB: Error computing partition to PE map!\n");
     }
   }
 
@@ -563,7 +569,8 @@ void GridMetisLB::Partition_ClusterObjects_Into_PEs (CentralLB::LDStats *stats, 
       send_object = stats->getHash (com_data->sender);
       recv_object = stats->getHash (com_data->receiver.get_destObj());
 
-      if (recv_object == -1 && stats->complete_flag == 0) {
+      //if ((recv_object == -1) && (stats->complete_flag == 0)) {
+      if ((send_object < 0) || (send_object > Num_Objects) || (recv_object < 0) || (recv_object > Num_Objects)) {
 	continue;
       }
 
@@ -583,6 +590,10 @@ void GridMetisLB::Partition_ClusterObjects_Into_PEs (CentralLB::LDStats *stats, 
     } else if (com_data->receiver.get_type() == LD_OBJLIST_MSG) {
       send_object = stats->getHash (com_data->sender);
 
+      if ((send_object < 0) || (send_object > Num_Objects)) {
+	continue;
+      }
+
       if (!(&Object_Data[send_object])->migratable) {
 	continue;
       }
@@ -596,7 +607,8 @@ void GridMetisLB::Partition_ClusterObjects_Into_PEs (CentralLB::LDStats *stats, 
       for (j = 0; j < num_objects; j++) {
 	recv_object = stats->getHash (recv_objects[j]);
 
-	if (recv_object == -1) {
+	//if (recv_object == -1) {
+	if ((recv_object < 0) || (recv_object > Num_Objects)) {
 	  continue;
 	}
 
@@ -626,7 +638,7 @@ void GridMetisLB::Partition_ClusterObjects_Into_PEs (CentralLB::LDStats *stats, 
   num_edges = 0;
   for (i = 0; i < num_migratable_cluster_objects; i++) {
     for (j = 0; j < num_migratable_cluster_objects; j++) {
-      if (communication_matrix[i][j] != 0) {
+      if (communication_matrix[i][j] > 0) {
 	num_edges += 1;
       }
     }
@@ -637,7 +649,7 @@ void GridMetisLB::Partition_ClusterObjects_Into_PEs (CentralLB::LDStats *stats, 
   xadj[0] = 0;
   for (i = 0; i < num_migratable_cluster_objects; i++) {
     for (j = 0; j < num_migratable_cluster_objects; j++) {
-      if (communication_matrix[i][j] != 0) {
+      if (communication_matrix[i][j] > 0) {
 	adjncy[count] = j;
 	edge_weights[count] = communication_matrix[i][j];
 	count += 1;
@@ -654,8 +666,7 @@ void GridMetisLB::Partition_ClusterObjects_Into_PEs (CentralLB::LDStats *stats, 
 
   CmiPrintf ("[%d] GridMetisLB partitioning %d objects in cluster %d into %d partitions\n", CmiMyPe(), num_migratable_cluster_objects, cluster, num_partitions);
 
-  METIS_PartGraphRecursive (&num_migratable_cluster_objects, xadj, adjncy, vertex_weights, edge_weights, &weight_flag, &numbering_flag, &num_partitions, options,
-			    &edgecut, newmap);
+  METIS_PartGraphRecursive (&num_migratable_cluster_objects, xadj, adjncy, vertex_weights, edge_weights, &weight_flag, &numbering_flag, &num_partitions, options, &edgecut, newmap);
 
   // Place the partitioned objects onto their correct PEs.
   for (i = 0; i < num_migratable_cluster_objects; i++) {
