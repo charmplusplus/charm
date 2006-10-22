@@ -2592,13 +2592,9 @@ int CmiGridQueueGetThreshold ()
 */
 void CmiGridQueueRegister (int gid, int nInts, int index1, int index2, int index3)
 {
-  int i;
-
-
   DEBUG_PRINT ("CmiGridQueueRegister() called.\n");
 
-  if ((!CMI_VMI_Grid_Queue) ||
-      (CMI_VMI_Grid_Objects_Index >= CMI_VMI_Grid_Queue_Maximum)) {
+  if ((!CMI_VMI_Grid_Queue) || (CMI_VMI_Grid_Objects_Index >= CMI_VMI_Grid_Queue_Maximum)) {
     return;
   }
 
@@ -2606,15 +2602,17 @@ void CmiGridQueueRegister (int gid, int nInts, int index1, int index2, int index
     return;
   }
 
-  i = CMI_VMI_Grid_Objects_Index;
-
-  CMI_VMI_Grid_Objects[i].gid = gid;
-  CMI_VMI_Grid_Objects[i].nInts = nInts;
-  CMI_VMI_Grid_Objects[i].index1 = index1;
-  CMI_VMI_Grid_Objects[i].index2 = index2;
-  CMI_VMI_Grid_Objects[i].index3 = index3;
+  CMI_VMI_Grid_Objects[CMI_VMI_Grid_Objects_Index].gid = gid;
+  CMI_VMI_Grid_Objects[CMI_VMI_Grid_Objects_Index].nInts = nInts;
+  CMI_VMI_Grid_Objects[CMI_VMI_Grid_Objects_Index].index1 = index1;
+  CMI_VMI_Grid_Objects[CMI_VMI_Grid_Objects_Index].index2 = index2;
+  CMI_VMI_Grid_Objects[CMI_VMI_Grid_Objects_Index].index3 = index3;
 
   CMI_VMI_Grid_Objects_Index += 1;
+
+  if (CMI_VMI_Grid_Objects_Index > 1) {
+    qsort (CMI_VMI_Grid_Objects, CMI_VMI_Grid_Objects_Index, sizeof (CMI_VMI_Grid_Object_T), CMI_VMI_Grid_Objects_Compare);
+  }
 }
 
 
@@ -2625,12 +2623,11 @@ void CmiGridQueueRegister (int gid, int nInts, int index1, int index2, int index
 void CmiGridQueueDeregister (int gid, int nInts, int index1, int index2, int index3)
 {
   int i;
-  int j;
 
 
   DEBUG_PRINT ("CmiGridQueueDeregister() called.\n");
 
-  if (!CMI_VMI_Grid_Queue) {
+  if (!CMI_VMI_Grid_Queue || (CMI_VMI_Grid_Objects_Index == 0)) {
     return;
   }
 
@@ -2655,17 +2652,14 @@ void CmiGridQueueDeregister (int gid, int nInts, int index1, int index2, int ind
     return;
   }
 
-  if (i == (CMI_VMI_Grid_Objects_Index - 1)) {
-    CMI_VMI_Grid_Objects_Index -= 1;
-    return;
+  for (j = i; j < CMI_VMI_Grid_Objects_Index; j++) {
+    CMI_VMI_Grid_Objects[j].gid = CMI_VMI_Grid_Objects[j+1].gid;
+    CMI_VMI_Grid_Objects[j].nInts = CMI_VMI_Grid_Objects[j+1].nInts;
+    CMI_VMI_Grid_Objects[j].index1 = CMI_VMI_Grid_Objects[j+1].index1;
+    CMI_VMI_Grid_Objects[j].index2 = CMI_VMI_Grid_Objects[j+1].index2;
+    CMI_VMI_Grid_Objects[j].index3 = CMI_VMI_Grid_Objects[j+1].index3;
   }
 
-  j = (CMI_VMI_Grid_Objects_Index - 1);
-  CMI_VMI_Grid_Objects[i].gid = CMI_VMI_Grid_Objects[j].gid;
-  CMI_VMI_Grid_Objects[i].nInts = CMI_VMI_Grid_Objects[j].nInts;
-  CMI_VMI_Grid_Objects[i].index1 = CMI_VMI_Grid_Objects[j].index1;
-  CMI_VMI_Grid_Objects[i].index2 = CMI_VMI_Grid_Objects[j].index2;
-  CMI_VMI_Grid_Objects[i].index3 = CMI_VMI_Grid_Objects[j].index3;
   CMI_VMI_Grid_Objects_Index -= 1;
 }
 
@@ -2689,14 +2683,31 @@ void CmiGridQueueDeregisterAll ()
 int CmiGridQueueLookup (int gid, int nInts, int index1, int index2, int index3)
 {
   int i;
+  void *ptr;
+  CMI_VMI_Grid_Object_T key;
 
 
   DEBUG_PRINT ("CmiGridQueueLookup() called.\n");
 
-  if (!CMI_VMI_Grid_Queue) {
+  if (!CMI_VMI_Grid_Queue || (CMI_VMI_Grid_Objects_Index == 0)) {
     return (0);
   }
 
+  key.gid = gid;
+  key.nInts = nInts;
+  key.index1 = index1;
+  key.index2 = index2;
+  key.index3 = index3;
+
+  ptr = bsearch (&key, CMI_VMI_Grid_Objects, CMI_VMI_Grid_Objects_Index, sizeof (CMI_VMI_Grid_Objects_T), CMI_VMI_Grid_Objects_Compare);
+
+  if (ptr != NULL) {
+    return (1);
+  }
+
+  return (0);
+
+/*
   for (i = 0; i < CMI_VMI_Grid_Objects_Index; i++) {
     if (CMI_VMI_Grid_Objects[i].gid == gid) {
       if ((nInts == 1) && (CMI_VMI_Grid_Objects[i].index1 == index1)) {
@@ -2715,6 +2726,7 @@ int CmiGridQueueLookup (int gid, int nInts, int index1, int index2, int index3)
   }
 
   return (0);
+*/
 }
 
 
@@ -2731,13 +2743,109 @@ int CmiGridQueueLookupMsg (char *msg)
 
   env = (CMI_VMI_Envelope *) msg;
   if (env->s_attribs.mtype == 16) {
-    return (CmiGridQueueLookup (env->u_type.array.arr,
-				env->u_type.array.index.nInts,
-				env->u_type.array.index.index[0],
-				env->u_type.array.index.index[1],
-				env->u_type.array.index.index[2]));
+    return (CmiGridQueueLookup (env->u_type.array.arr, env->u_type.array.index.nInts,
+				env->u_type.array.index.index[0], env->u_type.array.index.index[1], env->u_type.array.index.index[2]));
   }
   return (0);
+}
+
+
+/**************************************************************************
+**
+*/
+int CMI_VMI_Grid_Objects_Compare (const void *ptr1, const void *ptr2)
+{
+  CMI_VMI_Grid_Object_T *obj1;
+  CMI_VMI_Grid_Object_T *obj2;
+
+
+  obj1 = (CMI_VMI_Grid_Object_T *) ptr1;
+  obj2 = (CMI_VMI_Grid_Object_T *) ptr2;
+
+  if (obj1->gid < obj2->gid) {
+    return (-1);
+  }
+
+  if (obj1->gid > obj2->gid) {
+    return (1);
+  }
+
+  /*
+    At this point, obj1->gid == obj2->gid.
+    This implies that obj1->nInts == obj2->nInts.
+  */
+
+  if (obj1->nInts != obj2->nInts) {
+    CmiAbort ("Invalid data stored in Grid Queue lookup table.");
+  }
+
+  if (obj1->nInts == 1) {
+    if (obj1->index1 < obj2->index1) {
+      return (-1);
+    }
+
+    if (obj1->index1 > obj2->index1) {
+      return (1);
+    }
+
+    return (0);
+  }
+
+  if (obj1->nInts == 2) {
+    if (obj1->index1 < obj2->index1) {
+      return (-1);
+    }
+
+    if (obj1->index1 > obj2->index1) {
+      return (1);
+    }
+
+    /* At this point, obj1->index1 == obj2->index1. */
+
+    if (obj1->index2 < obj2->index2) {
+      return (-1);
+    }
+
+    if (obj1->index2 > obj2->index2) {
+      return (1);
+    }
+
+    return (0);
+  }
+
+  if (obj1->nInts == 3) {
+    if (obj1->index1 < obj2->index1) {
+      return (-1);
+    }
+
+    if (obj1->index1 > obj2->index1) {
+      return (1);
+    }
+
+    /* At this point, obj1->index1 == obj2->index1. */
+
+    if (obj1->index2 < obj2->index2) {
+      return (-1);
+    }
+
+    if (obj1->index2 > obj2->index2) {
+      return (1);
+    }
+
+    /* At this point, obj1->index2 == obj2->index2. */
+
+    if (obj1->index3 < obj2->index3) {
+      return (-1);
+    }
+
+    if (obj1->index3 > obj2->index3) {
+      return (1);
+    }
+
+    return (0);
+  }
+
+  CmiAbort ("Invalid data stored in Grid Queue lookup table.");
 }
 #endif
 

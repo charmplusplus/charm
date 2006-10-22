@@ -675,6 +675,7 @@ void CmiGridQueueDeregister (int gid, int nInts, int index1, int index2, int ind
 void CmiGridQueueDeregisterAll ();
 int CmiGridQueueLookup (int gid, int nInts, int index1, int index2, int index3);
 int CmiGridQueueLookupMsg (char *msg);
+int CMI_VMI_Grid_Objects_Compare (const void *ptr1, const void *ptr2);
 #endif
 
 #if CMK_PERSISTENT_COMM
