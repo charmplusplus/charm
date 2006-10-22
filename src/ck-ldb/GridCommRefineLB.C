@@ -183,7 +183,51 @@ void GridCommRefineLB::Initialize_PE_Data (CentralLB::LDStats *stats)
 /**************************************************************************
 **
 */
-void GridCommLB::Initialize_Object_Data (CentralLB::LDStats *stats)
+int GridCommRefineLB::Available_PE_Count ()
+{
+  int available_pe_count;
+  int i;
+
+
+  available_pe_count = 0;
+  for (i = 0; i < Num_PEs; i++) {
+    if ((&PE_Data[i])->available) {
+      available_pe_count += 1;
+    }
+  }
+  return (available_pe_count);
+}
+
+
+
+/**************************************************************************
+**
+*/
+int GridCommRefineLB::Compute_Number_Of_Clusters ()
+{
+  int max_cluster;
+  int i;
+
+
+  max_cluster = 0;
+  for (i = 0; i < Num_PEs; i++) {
+    if ((&PE_Data[i])->cluster < 0) {
+      return (-1);
+    }
+
+    if ((&PE_Data[i])->cluster > max_cluster) {
+      max_cluster = (&PE_Data[i])->cluster;
+    }
+  }
+  return (max_cluster + 1);
+}
+
+
+
+/**************************************************************************
+**
+*/
+void GridCommRefineLB::Initialize_Object_Data (CentralLB::LDStats *stats)
 {
   int i;
 
@@ -209,9 +253,10 @@ void GridCommLB::Initialize_Object_Data (CentralLB::LDStats *stats)
 /**************************************************************************
 **
 */
-void GridCommLB::Examine_InterObject_Messages (CentralLB::LDStats *stats)
+void GridCommRefineLB::Examine_InterObject_Messages (CentralLB::LDStats *stats)
 {
   int i;
+  int j;
   LDCommData *com_data;
   int send_object;
   int send_pe;
@@ -312,7 +357,7 @@ void GridCommRefineLB::Remap_Objects_To_PEs (int cluster)
   for (i = 0; i < Num_PEs; i++) {
     if (cluster == (&PE_Data[i])->cluster) {
       num_cluster_pes += 1;
-      num_wan_msgs += (&PE_Data[j])->num_wan_msgs;
+      num_wan_msgs += (&PE_Data[i])->num_wan_msgs;
     }
   }
   avg_wan_msgs = num_wan_msgs / num_cluster_pes;
@@ -571,7 +616,7 @@ void GridCommRefineLB::work (CentralLB::LDStats *stats, int count)
   // If at least one available PE does not exist, return from load balancing.
   if (Available_PE_Count() < 1) {
     if (_lb_args.debug() > 0) {
-      CkPrintf ("[%d] GridCommLB finds no available PEs -- no balancing done.\n", CkMyPe());
+      CkPrintf ("[%d] GridCommRefineLB finds no available PEs -- no balancing done.\n", CkMyPe());
     }
 
     delete [] PE_Data;
@@ -584,7 +629,7 @@ void GridCommRefineLB::work (CentralLB::LDStats *stats, int count)
   Num_Clusters = Compute_Number_Of_Clusters ();
   if (Num_Clusters < 1) {
     if (_lb_args.debug() > 0) {
-      CkPrintf ("[%d] GridCommLB finds incomplete PE cluster map -- no balancing done.\n", CkMyPe());
+      CkPrintf ("[%d] GridCommRefineLB finds incomplete PE cluster map -- no balancing done.\n", CkMyPe());
     }
 
     delete [] PE_Data;
@@ -593,7 +638,7 @@ void GridCommRefineLB::work (CentralLB::LDStats *stats, int count)
   }
 
   if (_lb_args.debug() > 0) {
-    CkPrintf ("[%d] GridCommLB finds %d clusters.\n", CkMyPe(), Num_Clusters);
+    CkPrintf ("[%d] GridCommRefineLB finds %d clusters.\n", CkMyPe(), Num_Clusters);
   }
 
   // Initialize the Object_Data[] data structure.

@@ -159,7 +159,7 @@ void GridCommLB::Initialize_PE_Data (CentralLB::LDStats *stats)
 /**************************************************************************
 **
 */
-int GridMetisLB::Available_PE_Count ()
+int GridCommLB::Available_PE_Count ()
 {
   int available_pe_count;
   int i;
@@ -179,7 +179,7 @@ int GridMetisLB::Available_PE_Count ()
 /**************************************************************************
 **
 */
-int GridMetisLB::Compute_Number_Of_Clusters ()
+int GridCommLB::Compute_Number_Of_Clusters ()
 {
   int max_cluster;
   int i;
@@ -229,6 +229,7 @@ void GridCommLB::Initialize_Object_Data (CentralLB::LDStats *stats)
 void GridCommLB::Examine_InterObject_Messages (CentralLB::LDStats *stats)
 {
   int i;
+  int j;
   LDCommData *com_data;
   int send_object;
   int send_pe;

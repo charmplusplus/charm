@@ -539,7 +539,7 @@ void GridMetisLB::Partition_ClusterObjects_Into_PEs (CentralLB::LDStats *stats, 
     while (((!(&PE_Data[pe])->available) || ((&PE_Data[pe])->cluster != cluster)) && (pe < Num_PEs)) {
       pe += 1;
     }
-    if (pe >= Num_PEs) {
+    if (pe > Num_PEs) {
       CmiAbort ("GridMetisLB: Error computing partition to PE map!\n");
     }
   }
@@ -664,7 +664,7 @@ void GridMetisLB::Partition_ClusterObjects_Into_PEs (CentralLB::LDStats *stats, 
   options[0] = 0;
   newmap = new int[num_migratable_cluster_objects];
 
-  CmiPrintf ("[%d] GridMetisLB partitioning %d objects in cluster %d into %d partitions\n", CmiMyPe(), num_migratable_cluster_objects, cluster, num_partitions);
+  CmiPrintf ("[%d] GridMetisLB is partitioning %d objects in cluster %d into %d partitions.\n", CmiMyPe(), num_migratable_cluster_objects, cluster, num_partitions);
 
   METIS_PartGraphRecursive (&num_migratable_cluster_objects, xadj, adjncy, vertex_weights, edge_weights, &weight_flag, &numbering_flag, &num_partitions, options, &edgecut, newmap);
 

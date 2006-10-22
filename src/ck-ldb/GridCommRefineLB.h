@@ -60,6 +60,8 @@ class GridCommRefineLB : public CentralLB
   private:
     int Get_Cluster (int pe);
     void Initialize_PE_Data (CentralLB::LDStats *stats);
+    int Available_PE_Count ();
+    int Compute_Number_Of_Clusters ();
     void Initialize_Object_Data (CentralLB::LDStats *stats);
     void Examine_InterObject_Messages (CentralLB::LDStats *stats);
     void Place_Objects_On_PEs ();

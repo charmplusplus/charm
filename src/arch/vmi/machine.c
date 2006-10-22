@@ -2623,6 +2623,7 @@ void CmiGridQueueRegister (int gid, int nInts, int index1, int index2, int index
 void CmiGridQueueDeregister (int gid, int nInts, int index1, int index2, int index3)
 {
   int i;
+  int j;
 
 
   DEBUG_PRINT ("CmiGridQueueDeregister() called.\n");
@@ -2699,7 +2700,7 @@ int CmiGridQueueLookup (int gid, int nInts, int index1, int index2, int index3)
   key.index2 = index2;
   key.index3 = index3;
 
-  ptr = bsearch (&key, CMI_VMI_Grid_Objects, CMI_VMI_Grid_Objects_Index, sizeof (CMI_VMI_Grid_Objects_T), CMI_VMI_Grid_Objects_Compare);
+  ptr = bsearch (&key, CMI_VMI_Grid_Objects, CMI_VMI_Grid_Objects_Index, sizeof (CMI_VMI_Grid_Object_T), CMI_VMI_Grid_Objects_Compare);
 
   if (ptr != NULL) {
     return (1);

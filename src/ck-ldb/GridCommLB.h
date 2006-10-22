@@ -63,7 +63,7 @@ class GridCommLB : public CentralLB
     void Initialize_Object_Data (CentralLB::LDStats *stats);
     void Examine_InterObject_Messages (CentralLB::LDStats *stats);
     void Map_NonMigratable_Objects_To_PEs ();
-    void Map_Migratable_Objects_To_PEs ();
+    void Map_Migratable_Objects_To_PEs (int cluster);
     int Find_Maximum_WAN_Object (int cluster);
     int Find_Minimum_WAN_PE (int cluster);
     void Assign_Object_To_PE (int target_object, int target_pe);
