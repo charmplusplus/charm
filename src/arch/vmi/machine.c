@@ -4357,25 +4357,16 @@ void CMI_VMI_CmiFree (void *ptr)
       /* Fill in the publish data which will be sent to the sender. */
       publish_msg.type = CMI_VMI_PUBLISH_TYPE_EAGER_LONG;
 
-      /* Publish the eager buffer to the sender. */
-#if CMI_VMI_USE_VMI22
-      status = VMI_RDMA_Publish_Buffer_With_Callback (process->connection, cacheentry->bufferHandle, (VMI_virt_addr_t) (VMI_ADDR_CAST) publish_buffer,
-						      (UINT32) buffer_size, (VMI_virt_addr_t) (VMI_ADDR_CAST) NULL, (UINT32) handle->index,
-						      (PVOID) &publish_msg, (ULONG) sizeof (CMI_VMI_Publish_Message_T), (PVOID) handle,
-						      CMI_VMI_RDMA_Publish_Completion_Handler);
-      CMI_VMI_CHECK_SUCCESS (status, "VMI_RDMA_Publish_Buffer_With_Callback()");
-
-      while (handle->data.receive.data.eager_long.publishes_pending > 0) {
-	sched_yield ();
-	status = VMI_Poll ();
-	CMI_VMI_CHECK_SUCCESS (status, "VMI_Poll()");
-      }
-#else
+      /*
+	Publish the eager buffer to the sender.
+	This must NEVER be VMI_RDMA_Publish_Buffer_With_Callback() here!
+	CMI_VMI_CmiFree() may be invoked while inside CMI_VMI_RDMA_Put_Completion_Handler ()
+	and this means that the publish callback cannot be called, resulting in deadlock.
+      */
       status = VMI_RDMA_Publish_Buffer (process->connection, cacheentry->bufferHandle, (VMI_virt_addr_t) (VMI_ADDR_CAST) publish_buffer,
 					(UINT32) buffer_size, (VMI_virt_addr_t) (VMI_ADDR_CAST) NULL, (UINT32) handle->index,
 					(PVOID) &publish_msg, (ULONG) sizeof (CMI_VMI_Publish_Message_T));
       CMI_VMI_CHECK_SUCCESS (status, "VMI_RDMA_Publish_Buffer()");
-#endif
     }
   } else {
     if (CMI_VMI_Eager_Protocol) {
