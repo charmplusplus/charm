@@ -33,7 +33,7 @@ void CreateAdaptAdjacencies(int meshid, int elemType)
   Deriving numAdjElem and nodeSetSize from elemType is nonTrivial
   There has to be some way of defining adjacency like in the ghosts.
   */
-	
+  
   
   // A nodeSet is a set of nodes that defines a pairing of two adjacent elements;
   // For example, in 2D triangle meshes, the nodeSet is the nodes of an edge between
@@ -68,13 +68,14 @@ void CreateAdaptAdjacencies(int meshid, int elemType)
   
   // Pull out conn for elems of elemType
   int *conn; // DO THIS!
+  conn = (elem->getConn()).getData();
   
   for (int i=0; i<numElems; i++) { // Add each element-nodeSet pair to the table
     // ADD is_valid test for this element!
     adjElem *e = new adjElem;
     for (int j=0; j<numAdjElems; j++) { // There is one nodeSet per neighbor element
       for (int k=0; k<nodeSetSize; k++) { // Build the nodeSet for an element pairing
-	e->nodeSet[k] = conn[i*nodesPerElem+nodeSetMap[j][k]];
+  e->nodeSet[k] = conn[i*nodesPerElem+nodeSetMap[j][k]];
       }
       // Add this element-nodeSet pair to the table at the min nodeID in the nodeSet
       sort(nodeSet, nodeSetSize); // Implement this or use a std::vector
@@ -93,54 +94,51 @@ void CreateAdaptAdjacencies(int meshid, int elemType)
     int found = 0;
     while (adjStart) { 
       while (rover->next) {
-	if (rover->next->elemID != adjStart->elemID) {
-	  found = 1;
-	  for (int j=0; j<nodeSetSize; j++) {
-	    if (rover->next->nodeSet[j] != adjStart->nodeSet[j]) {
-	      found = 0;
-	      break;
-	    }
-	  }
-	}
-	if (found) {
-	  break;
-	}
-	else {
-	  rover = rover->next;
-	}
+        if (rover->next->elemID != adjStart->elemID) {
+          found = 1;
+          for (int j=0; j<nodeSetSize; j++) {
+            if (rover->next->nodeSet[j] != adjStart->nodeSet[j]) {
+              found = 0;
+              break;
+            }
+          }
+        }
+        if (found) {
+          break;
+        }else {
+          rover = rover->next;
+        }
       }
       if (found) {
-	// Set adjacency of adjStart->elemID corresponding to nodeSet to 
-	// rover->next->elemID, and vice versa
-	// DO THIS!
-	
-	// Remove both elem-nodeSet pairs from the list
-	adjElem *tmp = rover->next;
-	rover->next = rover->next->next;
-	free tmp;
-	if (preStart == adjStart) {
-	  adaptAdjTable[i].adjElemList = adjStart->next;
-	  free adjStart; 
-	  adjStart = preStart = adaptAdjTable[i].adjElemList;
-	}
-	else {
-	  preStart->next = adjStart->next;
-	  free adjStart;
-	  adjStart = preStart->next;
-	}
-	rover = adjStart;
-      }
-      else {
-	if (adjStart == preStart) {
-	  adjStart = adjStart->next;
-	}
-	else {
-	  adjStart = adjStart->next;
-	  preStart = preStart->next;
-	}
-	rover = adjStart;
+  // Set adjacency of adjStart->elemID corresponding to nodeSet to 
+  // rover->next->elemID, and vice versa
+  // DO THIS!
+  
+      // Remove both elem-nodeSet pairs from the list
+        adjElem *tmp = rover->next;
+        rover->next = rover->next->next;
+        free tmp;
+        if (preStart == adjStart) {
+          adaptAdjTable[i].adjElemList = adjStart->next;
+          free adjStart; 
+          adjStart = preStart = adaptAdjTable[i].adjElemList;
+        }else {
+          preStart->next = adjStart->next;
+          free adjStart;
+          adjStart = preStart->next;
+        }
+        rover = adjStart;
+      }else {
+        if (adjStart == preStart){
+          adjStart = adjStart->next;
+        }else {
+          adjStart = adjStart->next;
+          preStart = preStart->next;
+        }
+        rover = adjStart;
       }
     }
+  }
 
     // Now all elements' local adjacencies are set; remainder in table are shared
     // nodeSets.
