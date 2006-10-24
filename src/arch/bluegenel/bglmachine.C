@@ -467,6 +467,8 @@ static  void *  bcast_recv     (unsigned               root,
 				char                ** rcvbuf,
 				BGML_Callback_t      * const cb) {
   
+  //  printf ("%d: in bcast recv \n", CmiMyPe());
+
   int alloc_size = sndlen + sizeof(BGTsRC_t) + 16;
   
   *rcvlen = sndlen>0?sndlen:1;  /* to avoid malloc(0) which might
@@ -477,18 +479,23 @@ static  void *  bcast_recv     (unsigned               root,
   cb->clientdata = *rcvbuf;
 
   return (BGTsRC_t *) ALIGN_16 (*rcvbuf + sndlen);
-  
 }
 
 
 extern "C"  
 void bgl_machine_RectBcast (unsigned                 commid,
-			    const char             * sndbuf,
+			    char                   * sndbuf,
 			    unsigned                 sndlen) 
 {
-  RectBcastInfo *rinfo  =   (RectBcastInfo *) malloc (sizeof(RectBcastInfo));   
+  CMI_SET_BROADCAST_ROOT(sndbuf,0);  
+  CMI_MAGIC(sndbuf) = CHARM_MAGIC_NUMBER;
+  ((CmiMsgHeaderBasic *)sndbuf)->size = sndlen;  
+  CMI_SET_CHECKSUM(sndbuf, sndlen);
+  
+  RectBcastInfo *rinfo  =   (RectBcastInfo *) malloc (sizeof(RectBcastInfo)); 
   rinfo->cb.function    =   bcast_done;
   rinfo->cb.clientdata  =   rinfo;
+  rinfo->msg            =   sndbuf;
   
   BGTsRC_AsyncBcast_start (commid, &rinfo->request, &rinfo->cb, sndbuf, sndlen);
   
@@ -499,6 +506,7 @@ void    *         bgl_machine_RectBcastInit  (unsigned               commID,
 					      const BGTsRC_Geometry_t* geometry) {
   
   BGTsRC_t *request =  (BGTsRC_t *) malloc (sizeof (BGTsRC_t));
+  memset(request, 0,  sizeof( BGTsRC_t));
   BGTsRC_AsyncBcast_init  (request, commID,  geometry);
   
   return request;
