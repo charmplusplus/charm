@@ -32,18 +32,20 @@ typedef struct adaptAdjStruct {
 } adaptAdj;
 
 class adjElem { // list entry for an element incident on a node
+public:
   int elemID; // local element id
   int nodeSet[4]; // quad faces is probably the max we will ever deal with
   adjElem *next;
 };
 
 class adjNode { // struct to store each node's adjacency info
+public:	
   int *sharedWithPartition; // array of partition IDs on which there is a corresponding
                             // shared node; this is NULL if this is not a shared node
   int adjElemCount;         // number of entries in adjElemList (below)
   adjElem *adjElemList;     // list of elems incident on this node
   adjNode() { sharedWithPartition = NULL; adjElemList = NULL; adjElemCount = 0; }
-} adjNode;
+};
 
 /** Create Adaptivity Adjacencies for elemType; dimension inferred. */
 void CreateAdaptAdjacencies(int meshid, int elemType);

@@ -4,13 +4,54 @@
    
    Created 11 Sept 2006 - Terry L. Wilmarth
 */
-
+#include "ParFUM.h"
 #include "ParFUM_internals.h"
+#include "adapt_adj.h"
 
 int nodeSetMap2d_tri[3][2] = {{0,1},{1,2},{2,0}};
 int nodeSetMap2d_quad[4][2] = {{0,1},{1,2},{2,3},{3,0}};
 int nodeSetMap3d_tet[4][3] = {{0,1,2},{1,0,3},{1,3,2},{0,2,3}};
 int nodeSetMap3d_hex[6][4] = {{0,1,2,3},{1,5,6,2},{2,6,7,3},{3,7,4,0},{0,4,5,1},{5,4,6,7}};
+
+inline void guessElementShape(int dim,int nodesPerElem,int *numAdjElems,int *nodeSetSize){
+	switch(dim){
+		case 2:
+					{
+					//2 dimension
+						switch(nodesPerElem){
+							case 3:
+								//Triangles
+								*numAdjElems = 3;
+								*nodeSetSize = 2;
+								break;
+							case 4:
+								//quads
+								*numAdjElems = 4;
+								*nodeSetSize = 2;
+								break;
+						}
+					}
+					break;
+		case 3:
+					{
+					//3 dimension
+						switch(nodesPerElem){
+							case 4:
+								//Tetrahedra
+								*numAdjElems = 4;
+								*nodeSetSize = 3;
+								break;
+							case 6:
+								//Hexahedra
+								*numAdjElems = 6;
+								*nodeSetSize = 4;
+								break;
+						}
+					}
+					break;
+	}
+}
+
 
 /** Create Adaptivity Adjacencies for elemType; dimension inferred. */
 void CreateAdaptAdjacencies(int meshid, int elemType)
@@ -23,16 +64,23 @@ void CreateAdaptAdjacencies(int meshid, int elemType)
   int nodeSetSize; // number of nodes shared by two adjacent elems
   int dim;
 
-  FEM_Mesh *mesh = FEM_chunk::get()->lookup(meshid,"CreateAdaptAdjacencies");
-  FEM_Elem *elem = (FEM_Elem *)mesh->lookup(FEM_ELEM+elem_Type,"CreateAdaptAdjacencies");
+  FEM_Mesh *mesh = FEM_chunk::get("CreateAdaptAdjacencies")->lookup(meshid,"CreateAdaptAdjacencies");
+  FEM_Elem *elem = (FEM_Elem *)mesh->lookup(FEM_ELEM+elemType,"CreateAdaptAdjacencies");
   FEM_Node *node = (FEM_Node *)mesh->lookup(FEM_NODE,"CreateAdaptAdjacencies");
   numElems = elem->size();
   numNodes = node->size();
   nodesPerElem = (elem->getConn()).width();
-  /*Sayantan:
+  assert(node->getCoord()!= NULL);
+	dim = (node->getCoord())->getWidth();
+	assert(dim == 2|| dim == 3);
+
+	guessElementShape(dim,nodesPerElem,&numAdjElems,&nodeSetSize);
+	
+	/*Sayantan:
   Deriving numAdjElem and nodeSetSize from elemType is nonTrivial
   There has to be some way of defining adjacency like in the ghosts.
   */
+	
   
   
   // A nodeSet is a set of nodes that defines a pairing of two adjacent elements;
@@ -68,7 +116,7 @@ void CreateAdaptAdjacencies(int meshid, int elemType)
   
   // Pull out conn for elems of elemType
   int *conn; // DO THIS!
-  conn = (elem->getConn()).getData();
+  conn = (elem->setConn()).getData();
   
   for (int i=0; i<numElems; i++) { // Add each element-nodeSet pair to the table
     // ADD is_valid test for this element!
@@ -117,14 +165,14 @@ void CreateAdaptAdjacencies(int meshid, int elemType)
       // Remove both elem-nodeSet pairs from the list
         adjElem *tmp = rover->next;
         rover->next = rover->next->next;
-        free tmp;
+        delete tmp;
         if (preStart == adjStart) {
           adaptAdjTable[i].adjElemList = adjStart->next;
-          free adjStart; 
+          delete adjStart; 
           adjStart = preStart = adaptAdjTable[i].adjElemList;
         }else {
           preStart->next = adjStart->next;
-          free adjStart;
+          delete adjStart;
           adjStart = preStart->next;
         }
         rover = adjStart;
