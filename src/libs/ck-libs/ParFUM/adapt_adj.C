@@ -5,21 +5,36 @@
    Created 11 Sept 2006 - Terry L. Wilmarth
 */
 
+#include "ParFUM_internals.h"
+
 int nodeSetMap2d_tri[3][2] = {{0,1},{1,2},{2,0}};
 int nodeSetMap2d_quad[4][2] = {{0,1},{1,2},{2,3},{3,0}};
 int nodeSetMap3d_tet[4][3] = {{0,1,2},{1,0,3},{1,3,2},{0,2,3}};
 int nodeSetMap3d_hex[6][4] = {{0,1,2,3},{1,5,6,2},{2,6,7,3},{3,7,4,0},{0,4,5,1},{5,4,6,7}};
 
 /** Create Adaptivity Adjacencies for elemType; dimension inferred. */
-void CreateAdaptAdjacencies(int elemType)
+void CreateAdaptAdjacencies(int meshid, int elemType)
 {
   // Need to derive all of these from elemType;
-  // DO THIS!
+  
   int numElems, numNodes;
   int nodesPerElem;
   int numAdjElems;
   int nodeSetSize; // number of nodes shared by two adjacent elems
   int dim;
+
+  FEM_Mesh *mesh = FEM_chunk::get()->lookup(meshid,"CreateAdaptAdjacencies");
+  FEM_Elem *elem = (FEM_Elem *)mesh->lookup(FEM_ELEM+elem_Type,"CreateAdaptAdjacencies");
+  FEM_Node *node = (FEM_Node *)mesh->lookup(FEM_NODE,"CreateAdaptAdjacencies");
+  numElems = elem->size();
+  numNodes = node->size();
+  nodesPerElem = (elem->getConn()).width();
+  /*Sayantan:
+  Deriving numAdjElem and nodeSetSize from elemType is nonTrivial
+  There has to be some way of defining adjacency like in the ghosts.
+  */
+	
+  
   // A nodeSet is a set of nodes that defines a pairing of two adjacent elements;
   // For example, in 2D triangle meshes, the nodeSet is the nodes of an edge between
   // two elements.

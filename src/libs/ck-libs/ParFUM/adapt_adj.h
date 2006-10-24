@@ -46,23 +46,23 @@ class adjNode { // struct to store each node's adjacency info
 } adjNode;
 
 /** Create Adaptivity Adjacencies for elemType; dimension inferred. */
-void CreateAdaptAdjacencies(int elemType);
+void CreateAdaptAdjacencies(int meshid, int elemType);
 
 // Access functions
 
 /** Look up elemID in elemType array, access edgeFaceID-th adaptAdj. */
-adaptAdj *GetAdaptAdj(int elemID, int elemType, int edgeFaceID);
+adaptAdj *GetAdaptAdj(int meshid, int elemID, int elemType, int edgeFaceID);
 /** Look up elemID in elemType array, calculate edgeFaceID from vertexList (with
     GetEdgeFace below), and access edgeFaceID-th adaptAdj with GetAdaptAdj above. */
-adaptAdj *GetAdaptAdj(int elemID, int elemType, int *vertexList);
+adaptAdj *GetAdaptAdj(int meshid, int elemID, int elemType, int *vertexList);
 
 /** Look up elemID in elemType array and determine the set of vertices
     associated with the edge or face represented by edgeFaceID. */
-void GetVertices(int elemID, int elemType, int edgeFaceID, int *vertexList);
+void GetVertices(int meshid, int elemID, int elemType, int edgeFaceID, int *vertexList);
 /** Look up elemID in elemType array and determine the edge or face ID specified by
     the set of vertices in vertexList. */
-int GetEdgeFace(int elemID, int elemType, int *vertexList);
+int GetEdgeFace(int meshid, int elemID, int elemType, int *vertexList);
 
 // Update functions
 /** Look up elemID in elemType array and set the adjacency on edgeFaceID to nbr. */
-void SetAdaptAdj(int elemID, int elemType, int edgeFaceID, adaptAdj nbr);
+void SetAdaptAdj(int meshid, int elemID, int elemType, int edgeFaceID, adaptAdj nbr);
