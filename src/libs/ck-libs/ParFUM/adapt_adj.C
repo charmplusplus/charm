@@ -17,48 +17,48 @@ int nodeSetMap3d_hex[6][4] = {{0,1,2,3},{1,5,6,2},{2,6,7,3},{3,7,4,0},{0,4,5,1},
 //given the dimensions and nodes per element guess whether the element 
 // is a triangle, quad, tet or hex. At the moment these are the 4 shapes
 // that are handled
-	
+  
 inline void guessElementShape(int dim,int nodesPerElem,int *numAdjElems,int *nodeSetSize,int ***nodeSetMap){
-	switch(dim){
-		case 2:
-					{
-					//2 dimension
-						switch(nodesPerElem){
-							case 3:
-								//Triangles
-								*numAdjElems = 3;
-								*nodeSetSize = 2;
-								*nodeSetMap = (int **)nodeSetMap2d_tri;
-								break;
-							case 4:
-								//quads
-								*numAdjElems = 4;
-								*nodeSetSize = 2;
-								*nodeSetMap = (int **)nodeSetMap2d_quad;
-								break;
-						}
-					}
-					break;
-		case 3:
-					{
-					//3 dimension
-						switch(nodesPerElem){
-							case 4:
-								//Tetrahedra
-								*numAdjElems = 4;
-								*nodeSetSize = 3;
-								*nodeSetMap = (int **)nodeSetMap3d_tet;
-								break;
-							case 6:
-								//Hexahedra
-								*numAdjElems = 6;
-								*nodeSetSize = 4;
-								*nodeSetMap = (int **)nodeSetMap3d_hex;
-								break;
-						}
-					}
-					break;
-	}
+  switch(dim){
+    case 2:
+          {
+          //2 dimension
+            switch(nodesPerElem){
+              case 3:
+                //Triangles
+                *numAdjElems = 3;
+                *nodeSetSize = 2;
+                *nodeSetMap = (int **)nodeSetMap2d_tri;
+                break;
+              case 4:
+                //quads
+                *numAdjElems = 4;
+                *nodeSetSize = 2;
+                *nodeSetMap = (int **)nodeSetMap2d_quad;
+                break;
+            }
+          }
+          break;
+    case 3:
+          {
+          //3 dimension
+            switch(nodesPerElem){
+              case 4:
+                //Tetrahedra
+                *numAdjElems = 4;
+                *nodeSetSize = 3;
+                *nodeSetMap = (int **)nodeSetMap3d_tet;
+                break;
+              case 6:
+                //Hexahedra
+                *numAdjElems = 6;
+                *nodeSetSize = 4;
+                *nodeSetMap = (int **)nodeSetMap3d_hex;
+                break;
+            }
+          }
+          break;
+  }
 }
 
 
@@ -80,17 +80,17 @@ void CreateAdaptAdjacencies(int meshid, int elemType)
   numNodes = node->size();
   nodesPerElem = (elem->getConn()).width();
   assert(node->getCoord()!= NULL);
-	dim = (node->getCoord())->getWidth();
-	assert(dim == 2|| dim == 3);
+  dim = (node->getCoord())->getWidth();
+  assert(dim == 2|| dim == 3);
 
-	
+  
   // A nodeSet is a set of nodes that defines a pairing of two adjacent elements;
   // For example, in 2D triangle meshes, the nodeSet is the nodes of an edge between
   // two elements.
   // The nodeSetMap is an ordering of element-local node IDs that specifies all 
   // possible nodeSets for a particular element type
   int **nodeSetMap;
-	guessElementShape(dim,nodesPerElem,&numAdjElems,&nodeSetSize,&nodeSetMap);
+  guessElementShape(dim,nodesPerElem,&numAdjElems,&nodeSetSize,&nodeSetMap);
   
 
   // Create the adaptAdj array associated with the new FEM attribute FEM_ADAPT_ADJ
@@ -109,18 +109,19 @@ void CreateAdaptAdjacencies(int meshid, int elemType)
   adaptAdjTable = new adjNode[numNodes];
 
   // Loop through shared node list and add the partition ids to adaptAdjTable.
-  // DO THIS!
+  // DO THIS! add a valid check
   
   // Pull out conn for elems of elemType
-  int *conn; // DO THIS!
+  int *conn;
   conn = (elem->setConn()).getData();
   
   for (int i=0; i<numElems; i++) { // Add each element-nodeSet pair to the table
-    // ADD is_valid test for this element!
-    adjElem *e = new adjElem(nodeSetSize);
+    // ADD is_valid test for this element! DO THIS!
     for (int j=0; j<numAdjElems; j++) { // There is one nodeSet per neighbor element
+      adjElem *e = new adjElem(nodeSetSize);
+      e->nodeSetID = j;
       for (int k=0; k<nodeSetSize; k++) { // Build the nodeSet for an element pairing
-			  e->nodeSet[k] = conn[i*nodesPerElem+nodeSetMap[j][k]];
+        e->nodeSet[k] = conn[i*nodesPerElem+nodeSetMap[j][k]];
       }
       // Add this element-nodeSet pair to the table at the min nodeID in the nodeSet
       e->nodeSet.quickSort();
@@ -132,61 +133,70 @@ void CreateAdaptAdjacencies(int meshid, int elemType)
     }
   }
 
-  for (int i=0; i<numNodes; i++) { // For each node, match up incident elements
+  for (int i=0; i<numNodes; i++) { 
+    // For each node, match up incident elements
+    //DO THIS! do a valid test or adjElemList = NULL
     adjElem *adjStart = adaptAdjTable[i].adjElemList;
-    adjElem *rover = adjStart;
-    adjElem *preStart = adjStart;
-    int found = 0;
-    while (adjStart) { 
+    adjElem *rover = adjStart; // compare rover->next with adjStart
+    adjElem *preStart = adjStart; //pointer before adjStart so that we can delete adjStart
+                                  //Note: as long as adjStart is the first element in adjElemList
+                                  //preStart = adjStart. After that preStart->next = adjStart
+    while (adjStart) { //each entry in the adjElemList of a node 
+      int found = 0; 
       while (rover->next) {
         if (rover->next->elemID != adjStart->elemID) {
-          found = 1;
+          found = 1; // found an element that is not myself, possibly a match
           for (int j=0; j<nodeSetSize; j++) {
             if (rover->next->nodeSet[j] != adjStart->nodeSet[j]) {
-              found = 0;
+              found = 0; // No, the nodeSets dont match
               break;
             }
           }
         }
         if (found) {
-          break;
+          break; // We have found a nodeSet that matches adjStart
         }else {
-          rover = rover->next;
+          rover = rover->next; // Keep looking in adjElemList for matching nodeSet
         }
       }
       if (found) {
-  // Set adjacency of adjStart->elemID corresponding to nodeSet to 
-  // rover->next->elemID, and vice versa
-  // DO THIS!
+        // We found an adjacent element for adjStart->elemID
+        
+        // Set adjacency of adjStart->elemID corresponding to nodeSet to 
+        // rover->next->elemID, and vice versa
+        // DO THIS!
+        // Store it in adaptAdjacency of each one and use nodeSetID to index into 
+        // adaptAdjacency
   
       // Remove both elem-nodeSet pairs from the list
         adjElem *tmp = rover->next;
         rover->next = rover->next->next;
         delete tmp;
-        if (preStart == adjStart) {
+        if (preStart == adjStart) { // adjStart was at the start of adjElemList
           adaptAdjTable[i].adjElemList = adjStart->next;
           delete adjStart; 
           adjStart = preStart = adaptAdjTable[i].adjElemList;
-        }else {
+        }else { //adjStart was not at the start
           preStart->next = adjStart->next;
           delete adjStart;
           adjStart = preStart->next;
         }
-        rover = adjStart;
-      }else {
-        if (adjStart == preStart){
-          adjStart = adjStart->next;
-        }else {
-          adjStart = adjStart->next;
+      }else { 
+        // No match for adjStart was found in adjElemList
+        // It means that either adjStart is on the domain boundary 
+        // or it is on the chunk boundary and its neighbor is on another VP
+        // Move adjStart to next entry in adjElemList
+        if (adjStart != preStart){
           preStart = preStart->next;
         }
-        rover = adjStart;
+        adjStart = adjStart->next;
       }
+      rover = adjStart;
     }
   }
 
-    // Now all elements' local adjacencies are set; remainder in table are shared
-    // nodeSets.
+  // Now all elements' local adjacencies are set; remainder in table are 
+  // nodeSets shared with other chunks or nodeSets on domain boundary
 
   //   For each node with remaining element-nodeSet entries:
   //     Determine if ALL nodes in nodeSet are shared with one other partition

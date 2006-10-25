@@ -24,17 +24,22 @@
    (0, 4, 5, 1), (5, 4, 6, 7) in that order
    
 */
-
+// Each instance of adaptAdj represents an element to 
+// element adjacency
 typedef struct adaptAdjStruct {
   int partID;   // partition ID
   int localID;  // local entity ID on partition partID
   int elemType; // element type (tri, quad, tet, hex, etc.)
 } adaptAdj;
 
+// Each adjElem describes an adjacency by enumerating
+// the nodes that form the "edge" shared by two 
+// adjacent elements
 class adjElem { // list entry for an element incident on a node
 public:
   int elemID; // local element id
-	CkVec<int> nodeSet;
+	int nodeSetID; // which nodeSet in nodeSetMap does this nodeSet refer to
+	CkVec<int> nodeSet; //local node ids
   adjElem *next;
 	adjElem(int nodeSetSize) : nodeSet(nodeSetSize){};
 };
@@ -44,6 +49,7 @@ public:
   int *sharedWithPartition; // array of partition IDs on which there is a corresponding
                             // shared node; this is NULL if this is not a shared node
   int adjElemCount;         // number of entries in adjElemList (below)
+														// max length of adjElemList is 2*nodal degree
   adjElem *adjElemList;     // list of elems incident on this node
   adjNode() { sharedWithPartition = NULL; adjElemList = NULL; adjElemCount = 0; }
 };
