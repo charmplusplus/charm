@@ -120,14 +120,14 @@ void CreateAdaptAdjacencies(int meshid, int elemType)
   
   for (int i=0; i<numElems; i++) { // Add each element-nodeSet pair to the table
     // ADD is_valid test for this element!
-    adjElem *e = new adjElem;
+    adjElem *e = new adjElem(nodeSetSize);
     for (int j=0; j<numAdjElems; j++) { // There is one nodeSet per neighbor element
       for (int k=0; k<nodeSetSize; k++) { // Build the nodeSet for an element pairing
-  e->nodeSet[k] = conn[i*nodesPerElem+nodeSetMap[j][k]];
+			  e->nodeSet[k] = conn[i*nodesPerElem+nodeSetMap[j][k]];
       }
       // Add this element-nodeSet pair to the table at the min nodeID in the nodeSet
-      sort(nodeSet, nodeSetSize); // Implement this or use a std::vector
-      int minNode = nodeSet[0];
+      e->nodeSet.quickSort();
+      int minNode = e->nodeSet[0];
       e->elemID = i;
       e->next = adaptAdjTable[minNode].adjElemList;
       adaptAdjTable[minNode].adjElemList = e;
