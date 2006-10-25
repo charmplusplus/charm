@@ -13,7 +13,12 @@ int nodeSetMap2d_quad[4][2] = {{0,1},{1,2},{2,3},{3,0}};
 int nodeSetMap3d_tet[4][3] = {{0,1,2},{1,0,3},{1,3,2},{0,2,3}};
 int nodeSetMap3d_hex[6][4] = {{0,1,2,3},{1,5,6,2},{2,6,7,3},{3,7,4,0},{0,4,5,1},{5,4,6,7}};
 
-inline void guessElementShape(int dim,int nodesPerElem,int *numAdjElems,int *nodeSetSize){
+
+//given the dimensions and nodes per element guess whether the element 
+// is a triangle, quad, tet or hex. At the moment these are the 4 shapes
+// that are handled
+	
+inline void guessElementShape(int dim,int nodesPerElem,int *numAdjElems,int *nodeSetSize,int ***nodeSetMap){
 	switch(dim){
 		case 2:
 					{
@@ -23,11 +28,13 @@ inline void guessElementShape(int dim,int nodesPerElem,int *numAdjElems,int *nod
 								//Triangles
 								*numAdjElems = 3;
 								*nodeSetSize = 2;
+								*nodeSetMap = (int **)nodeSetMap2d_tri;
 								break;
 							case 4:
 								//quads
 								*numAdjElems = 4;
 								*nodeSetSize = 2;
+								*nodeSetMap = (int **)nodeSetMap2d_quad;
 								break;
 						}
 					}
@@ -40,11 +47,13 @@ inline void guessElementShape(int dim,int nodesPerElem,int *numAdjElems,int *nod
 								//Tetrahedra
 								*numAdjElems = 4;
 								*nodeSetSize = 3;
+								*nodeSetMap = (int **)nodeSetMap3d_tet;
 								break;
 							case 6:
 								//Hexahedra
 								*numAdjElems = 6;
 								*nodeSetSize = 4;
+								*nodeSetMap = (int **)nodeSetMap3d_hex;
 								break;
 						}
 					}
@@ -74,12 +83,7 @@ void CreateAdaptAdjacencies(int meshid, int elemType)
 	dim = (node->getCoord())->getWidth();
 	assert(dim == 2|| dim == 3);
 
-	guessElementShape(dim,nodesPerElem,&numAdjElems,&nodeSetSize);
 	
-	/*Sayantan:
-  Deriving numAdjElem and nodeSetSize from elemType is nonTrivial
-  There has to be some way of defining adjacency like in the ghosts.
-  */
 	
   
   
@@ -89,12 +93,8 @@ void CreateAdaptAdjacencies(int meshid, int elemType)
   // The nodeSetMap is an ordering of element-local node IDs that specifies all 
   // possible nodeSets for a particular element type
   int **nodeSetMap;
-  if (numAdjElems == 3) nodeSetMap = nodeSetMap2d_tri;
-  else if (numAdjElems == 6) nodeSetMap = nodeSetMap3d_hex;
-  else if (numAdjElems == 4) {
-    if (nodeSetSize == 2) nodeSetMap = nodeSetMap2d_quad;
-    else nodeSetMap = nodeSetMap3d_tet;
-  }
+	guessElementShape(dim,nodesPerElem,&numAdjElems,&nodeSetSize,&nodeSetMap);
+  
 
   // Create the adaptAdj array associated with the new FEM attribute FEM_ADAPT_ADJ
   // This array will be populated by this function, then set on the FEM mesh
