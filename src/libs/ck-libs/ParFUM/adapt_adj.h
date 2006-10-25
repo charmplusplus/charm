@@ -34,8 +34,9 @@ typedef struct adaptAdjStruct {
 class adjElem { // list entry for an element incident on a node
 public:
   int elemID; // local element id
-  int nodeSet[4]; // quad faces is probably the max we will ever deal with
+	CkVec<int> nodeSet;
   adjElem *next;
+	adjElem(int nodeSetSize) : nodeSet(nodeSetSize){};
 };
 
 class adjNode { // struct to store each node's adjacency info
