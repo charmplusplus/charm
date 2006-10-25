@@ -57,7 +57,7 @@ void ParFUM_recreateSharedNodes(int meshid, int dim) {
   // only exchange when bounding boxes collide
   for (int i=rank+1; i<comm_size; i++) { //send nodeCoords to rank i
     if (ParFUM_boundingBoxesCollide(dim, localBoundingBox, &allBoundingBoxes[2*dim*i])) {
-      printf("[%d] Sending %d doubles to rank %d \n",rank,dim*numNodes,i);
+      //printf("[%d] Sending %d doubles to rank %d \n",rank,dim*numNodes,i);
       MPI_Send(nodeCoords, dim*numNodes, MPI_DOUBLE, i, coord_msg_tag, comm);
     }
   }
@@ -74,7 +74,7 @@ void ParFUM_recreateSharedNodes(int meshid, int dim) {
       MPI_Probe(MPI_ANY_SOURCE, coord_msg_tag, comm, &status);
       source = status.MPI_SOURCE;
       length = status.MPI_LENGTH/sizeof(double);
-      printf("[%d] Receiving %d doubles from rank %d \n",rank,length,i);
+      //printf("[%d] Receiving %d doubles from rank %d \n",rank,length,i);
       // Receive whatever data was available according to probe
       recvNodeCoords = (double *)malloc(length*sizeof(double));
       MPI_Recv((void*)recvNodeCoords, length, MPI_DOUBLE, source, 
@@ -139,8 +139,8 @@ void ParFUM_recreateSharedNodes(int meshid, int dim) {
       }
     }
   }
-  printf("After recreating shared nodes %d \n",rank);
-  shared.print();
+  //printf("After recreating shared nodes %d \n",rank);
+  //shared.print();
 	
   // Clean up
   free(nodeCoords);
@@ -266,7 +266,7 @@ void ParFUM_findMatchingCoords(int dim,
       cursor_b++;
     } else {
       //code should never get here.
-      printf("comparison = %d\n", comparison);
+      //printf("comparison = %d\n", comparison);
       assert(comparison == 0);
     }
   } 
