@@ -478,7 +478,9 @@ static  void *  bcast_recv     (unsigned               root,
   cb->function  =   recv_done;
   cb->clientdata = *rcvbuf;
 
-  return (BGTsRC_t *) ALIGN_16 (*rcvbuf + sndlen);
+  BGTsRC_t *request = (BGTsRC_t *) ALIGN_16 (*rcvbuf + sndlen);
+  memset (request, 0, sizeof(BGTsRC_t));
+  return request;
 }
 
 
@@ -493,12 +495,14 @@ void bgl_machine_RectBcast (unsigned                 commid,
   CMI_SET_CHECKSUM(sndbuf, sndlen);
   
   RectBcastInfo *rinfo  =   (RectBcastInfo *) malloc (sizeof(RectBcastInfo)); 
+
   rinfo->cb.function    =   bcast_done;
   rinfo->cb.clientdata  =   rinfo;
   rinfo->msg            =   sndbuf;
   
+  memset (&rinfo->request, 0, sizeof(BGTsRC_t));
+
   BGTsRC_AsyncBcast_start (commid, &rinfo->request, &rinfo->cb, sndbuf, sndlen);
-  
 }
 
 extern "C"   
@@ -523,7 +527,6 @@ void  bgl_machine_RectBcastConfigure (requestFnType fn) {
 //--------------------------------------------------------------
 //----- End Rectangular Broadcast Implementation ---------------
 //--------------------------------------------------------------
-
 
 
 void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret){
