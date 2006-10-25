@@ -84,9 +84,6 @@ void CreateAdaptAdjacencies(int meshid, int elemType)
 	assert(dim == 2|| dim == 3);
 
 	
-	
-  
-  
   // A nodeSet is a set of nodes that defines a pairing of two adjacent elements;
   // For example, in 2D triangle meshes, the nodeSet is the nodes of an edge between
   // two elements.
