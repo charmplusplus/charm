@@ -26,11 +26,14 @@
 */
 // Each instance of adaptAdj represents an element to 
 // element adjacency
-typedef struct adaptAdjStruct {
+class adaptAdj{
+public:
   int partID;   // partition ID
   int localID;  // local entity ID on partition partID
   int elemType; // element type (tri, quad, tet, hex, etc.)
-} adaptAdj;
+	adaptAdj():partID(-1),localID(-1),elemType(-1){};
+	adaptAdj(int _partID,int _localID,int _elemType) : partID(_partID), localID(_localID), elemType(_elemType){};
+};
 
 // Each adjElem describes an adjacency by enumerating
 // the nodes that form the "edge" shared by two 
@@ -48,10 +51,12 @@ class adjNode { // struct to store each node's adjacency info
 public:	
   int *sharedWithPartition; // array of partition IDs on which there is a corresponding
                             // shared node; this is NULL if this is not a shared node
+	int *sharedWithLocalIdx;  // local Idx in idxl list with the corresponding chunk in sharedWithPartition
   int adjElemCount;         // number of entries in adjElemList (below)
 														// max length of adjElemList is 2*nodal degree
   adjElem *adjElemList;     // list of elems incident on this node
   adjNode() { sharedWithPartition = NULL; adjElemList = NULL; adjElemCount = 0; }
+	~adjNode(){ delete [] sharedWithPartition; delete [] sharedWithLocalIdx;}
 };
 
 /** Create Adaptivity Adjacencies for elemType; dimension inferred. */

@@ -66,13 +66,14 @@ inline void guessElementShape(int dim,int nodesPerElem,int *numAdjElems,int *nod
 void CreateAdaptAdjacencies(int meshid, int elemType)
 {
   // Need to derive all of these from elemType;
-  
+  int myRank;
   int numElems, numNodes;
   int nodesPerElem;
   int numAdjElems;
   int nodeSetSize; // number of nodes shared by two adjacent elems
   int dim;
 
+	MPI_Comm_rank(MPI_COMM_WORLD,&myRank);
   FEM_Mesh *mesh = FEM_chunk::get("CreateAdaptAdjacencies")->lookup(meshid,"CreateAdaptAdjacencies");
   FEM_Elem *elem = (FEM_Elem *)mesh->lookup(FEM_ELEM+elemType,"CreateAdaptAdjacencies");
   FEM_Node *node = (FEM_Node *)mesh->lookup(FEM_NODE,"CreateAdaptAdjacencies");
@@ -109,90 +110,109 @@ void CreateAdaptAdjacencies(int meshid, int elemType)
   adaptAdjTable = new adjNode[numNodes];
 
   // Loop through shared node list and add the partition ids to adaptAdjTable.
-  // DO THIS! add a valid check
-  
+  for(int i=0;i<numNodes;i++){
+    if(node->is_valid(i)){
+      const IDXL_Rec *sharedChunkList = node->shared.getRec(i);
+      if(sharedChunkList != NULL){
+        adaptAdjTable[i].sharedWithPartition = new int [sharedChunkList->getShared()];
+        adaptAdjTable[i].sharedWithLocalIdx = new int [sharedChunkList->getShared()];
+        for(int j=0;j<sharedChunkList->getShared();j++){
+          int sharedChunk = sharedChunkList->getChk(j);
+          int sharedIdx = sharedChunkList->getIdx(j);
+          adaptAdjTable[i].sharedWithPartition[j] = sharedChunk;
+          adaptAdjTable[i].sharedWithLocalIdx[j] = sharedIdx;
+        }
+      }
+    }
+  }
+
   // Pull out conn for elems of elemType
   int *conn;
   conn = (elem->setConn()).getData();
   
   for (int i=0; i<numElems; i++) { // Add each element-nodeSet pair to the table
-    // ADD is_valid test for this element! DO THIS!
-    for (int j=0; j<numAdjElems; j++) { // There is one nodeSet per neighbor element
-      adjElem *e = new adjElem(nodeSetSize);
-      e->nodeSetID = j;
-      for (int k=0; k<nodeSetSize; k++) { // Build the nodeSet for an element pairing
-        e->nodeSet[k] = conn[i*nodesPerElem+nodeSetMap[j][k]];
+    if(elem->is_valid(i)){
+      for (int j=0; j<numAdjElems; j++) { // There is one nodeSet per neighbor element
+        adjElem *e = new adjElem(nodeSetSize);
+        e->nodeSetID = j;
+        for (int k=0; k<nodeSetSize; k++) { // Build the nodeSet for an element pairing
+          e->nodeSet[k] = conn[i*nodesPerElem+nodeSetMap[j][k]];
+        }
+        // Add this element-nodeSet pair to the table at the min nodeID in the nodeSet
+        e->nodeSet.quickSort();
+        int minNode = e->nodeSet[0];
+        e->elemID = i;
+        e->next = adaptAdjTable[minNode].adjElemList;
+        adaptAdjTable[minNode].adjElemList = e;
+        adaptAdjTable[minNode].adjElemCount++;
       }
-      // Add this element-nodeSet pair to the table at the min nodeID in the nodeSet
-      e->nodeSet.quickSort();
-      int minNode = e->nodeSet[0];
-      e->elemID = i;
-      e->next = adaptAdjTable[minNode].adjElemList;
-      adaptAdjTable[minNode].adjElemList = e;
-      adaptAdjTable[minNode].adjElemCount++;
     }
   }
 
   for (int i=0; i<numNodes; i++) { 
     // For each node, match up incident elements
-    //DO THIS! do a valid test or adjElemList = NULL
-    adjElem *adjStart = adaptAdjTable[i].adjElemList;
-    adjElem *rover = adjStart; // compare rover->next with adjStart
-    adjElem *preStart = adjStart; //pointer before adjStart so that we can delete adjStart
-                                  //Note: as long as adjStart is the first element in adjElemList
-                                  //preStart = adjStart. After that preStart->next = adjStart
-    while (adjStart) { //each entry in the adjElemList of a node 
-      int found = 0; 
-      while (rover->next) {
-        if (rover->next->elemID != adjStart->elemID) {
-          found = 1; // found an element that is not myself, possibly a match
-          for (int j=0; j<nodeSetSize; j++) {
-            if (rover->next->nodeSet[j] != adjStart->nodeSet[j]) {
-              found = 0; // No, the nodeSets dont match
-              break;
-            }
-          }
-        }
-        if (found) {
-          break; // We have found a nodeSet that matches adjStart
-        }else {
-          rover = rover->next; // Keep looking in adjElemList for matching nodeSet
-        }
-      }
-      if (found) {
-        // We found an adjacent element for adjStart->elemID
-        
-        // Set adjacency of adjStart->elemID corresponding to nodeSet to 
-        // rover->next->elemID, and vice versa
-        // DO THIS!
-        // Store it in adaptAdjacency of each one and use nodeSetID to index into 
-        // adaptAdjacency
-  
-      // Remove both elem-nodeSet pairs from the list
-        adjElem *tmp = rover->next;
-        rover->next = rover->next->next;
-        delete tmp;
-        if (preStart == adjStart) { // adjStart was at the start of adjElemList
-          adaptAdjTable[i].adjElemList = adjStart->next;
-          delete adjStart; 
-          adjStart = preStart = adaptAdjTable[i].adjElemList;
-        }else { //adjStart was not at the start
-          preStart->next = adjStart->next;
-          delete adjStart;
-          adjStart = preStart->next;
-        }
-      }else { 
-        // No match for adjStart was found in adjElemList
-        // It means that either adjStart is on the domain boundary 
-        // or it is on the chunk boundary and its neighbor is on another VP
-        // Move adjStart to next entry in adjElemList
-        if (adjStart != preStart){
-          preStart = preStart->next;
-        }
-        adjStart = adjStart->next;
-      }
-      rover = adjStart;
-    }
+		if(node->is_valid(i)){
+			CkAssert(adaptAdjTable[i].adjElemList != NULL);
+	    adjElem *adjStart = adaptAdjTable[i].adjElemList;
+  	  adjElem *rover = adjStart; // compare rover->next with adjStart
+    	adjElem *preStart = adjStart; //pointer before adjStart so that we can delete adjStart
+      	                            //Note: as long as adjStart is the first element in adjElemList
+        	                          //preStart = adjStart. After that preStart->next = adjStart
+	    while (adjStart) { //each entry in the adjElemList of a node 
+  	    int found = 0; 
+    	  while (rover->next) {
+      	  if (rover->next->elemID != adjStart->elemID) {
+        	  found = 1; // found an element that is not myself, possibly a match
+          	for (int j=0; j<nodeSetSize; j++) {
+            	if (rover->next->nodeSet[j] != adjStart->nodeSet[j]) {
+              	found = 0; // No, the nodeSets dont match
+	              break;
+  	          }
+    	      }
+      	  }
+        	if (found) {
+	          break; // We have found a nodeSet that matches adjStart
+  	      }else {
+    	      rover = rover->next; // Keep looking in adjElemList for matching nodeSet
+      	  }
+	      }
+  	    if (found) {
+    	    // We found an adjacent element for adjStart->elemID
+      	  
+        	// Set adjacency of adjStart->elemID corresponding to nodeSet to 
+	        // rover->next->elemID, and vice versa
+    	    // Store adjacency info in adaptAdjacency of each one and use nodeSetID to index into 
+      	  // adaptAdjacency
+					adaptAdjacencies[numAdjElems*adjStart->elemID+adjStart->nodeSetID] = adaptAdj(myRank,rover->next->elemID,elemType);
+					adaptAdjacencies[numAdjElems*rover->next->elemID+rover->next->nodeSetID] = adaptAdj(myRank,adjStart->elemID,elemType);
+					
+  	
+    		  // Remove both elem-nodeSet pairs from the list
+	        adjElem *tmp = rover->next;
+  	      rover->next = rover->next->next;
+    	    delete tmp;
+      	  if (preStart == adjStart) { // adjStart was at the start of adjElemList
+        	  adaptAdjTable[i].adjElemList = adjStart->next;
+	          delete adjStart; 
+  	        adjStart = preStart = adaptAdjTable[i].adjElemList;
+    	    }else { //adjStart was not at the start
+      	    preStart->next = adjStart->next;
+        	  delete adjStart;
+          	adjStart = preStart->next;
+	        }
+  	    }else { 
+    	    // No match for adjStart was found in adjElemList
+      	  // It means that either adjStart is on the domain boundary 
+        	// or it is on the chunk boundary and its neighbor is on another VP
+	        // Move adjStart to next entry in adjElemList
+  	      if (adjStart != preStart){
+    	      preStart = preStart->next;
+      	  }
+        	adjStart = adjStart->next;
+	      }
+  	    rover = adjStart;
+    	}
+		}
   }
 
   // Now all elements' local adjacencies are set; remainder in table are 
