@@ -1072,9 +1072,15 @@ CmiBool CkLocRec_local::deliver(CkArrayMessage *msg,CkDeliver_t type,int opts)
 		}
 #endif
 #if CMK_GRID_QUEUE_AVAILABLE
-		CpvAccess(CkGridObject) = obj;   // retain a pointer to the sending object (needed later)
+		// retain a pointer to the sending object (needed later)
+		CpvAccess(CkGridObject) = obj;
 #endif
+
 		CmiBool status = invokeEntry(obj,(void *)msg,msg->array_ep(),doFree);
+
+#if CMK_GRID_QUEUE_AVAILABLE
+		CpvAccess(CkGridObject) = NULL;
+#endif
 #if CMK_LBDB_ON
 		if (objstopped) the_lbdb->ObjectStart(objHandle);
 #endif
