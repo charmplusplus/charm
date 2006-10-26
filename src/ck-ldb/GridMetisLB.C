@@ -170,7 +170,8 @@ void GridMetisLB::Initialize_Object_Data (CentralLB::LDStats *stats)
 
   for (i = 0; i < Num_Objects; i++) {
     (&Object_Data[i])->migratable = (&stats->objData[i])->migratable;
-    (&Object_Data[i])->cluster    = Get_Cluster (stats->from_proc[i]);
+    //(&Object_Data[i])->cluster    = Get_Cluster (stats->from_proc[i]);
+    (&Object_Data[i])->cluster    = -1;
     (&Object_Data[i])->from_pe    = stats->from_proc[i];
     (&Object_Data[i])->load       = (&stats->objData[i])->wallTime;
 
@@ -270,6 +271,10 @@ void GridMetisLB::Partition_Objects_Into_Clusters (CentralLB::LDStats *stats)
     }
 
     return;
+  }
+
+  for (i = 0; i < Num_Objects; i++) {
+    (&Object_Data[i])->secondary_index = -1;
   }
 
   // Count the number of migratable objects, which are the only candidates to give to Metis.
@@ -478,6 +483,10 @@ void GridMetisLB::Partition_ClusterObjects_Into_PEs (CentralLB::LDStats *stats, 
   int j;
 
 
+  for (i = 0; i < Num_Objects; i++) {
+    (&Object_Data[i])->secondary_index = -1;
+  }
+
   // Count the number of migratable objects within this cluster, which are the only candidates to give to Metis.
   // (The non-migratable objects have been placed onto the correct destination PEs earlier.)
   // After getting the count, create a migratable_cluster_objects[] array to keep track of them.
@@ -675,12 +684,16 @@ void GridMetisLB::Partition_ClusterObjects_Into_PEs (CentralLB::LDStats *stats, 
 
     index = migratable_cluster_objects[i];
 
+    /* WRONG!
     for (j = 0; j < Num_Objects; j++) {
       if ((&Object_Data[j])->secondary_index == index) {
 	(&Object_Data[j])->to_pe = pe;
 	break;
       }
     }
+    */
+
+    (&Object_Data[index])->to_pe = pe;
   }
 
   // Free memory.
