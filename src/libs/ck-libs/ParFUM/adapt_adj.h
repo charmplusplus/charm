@@ -24,6 +24,13 @@
    (0, 4, 5, 1), (5, 4, 6, 7) in that order
    
 */
+#include "ParFUM.h"
+#include "ParFUM_internals.h"
+#include <set>
+#include <algorithm>
+
+#define MAX_NODESET_SIZE 6
+
 // Each instance of adaptAdj represents an element to 
 // element adjacency
 class adaptAdj{
@@ -52,12 +59,54 @@ public:
   int *sharedWithPartition; // array of partition IDs on which there is a corresponding
                             // shared node; this is NULL if this is not a shared node
 	int *sharedWithLocalIdx;  // local Idx in idxl list with the corresponding chunk in sharedWithPartition
+	int numSharedPartitions;
   int adjElemCount;         // number of entries in adjElemList (below)
 														// max length of adjElemList is 2*nodal degree
   adjElem *adjElemList;     // list of elems incident on this node
-  adjNode() { sharedWithPartition = NULL; adjElemList = NULL; adjElemCount = 0; }
+  adjNode() { sharedWithPartition = NULL; adjElemList = NULL; adjElemCount = 0; numSharedPartitions=0;}
 	~adjNode(){ delete [] sharedWithPartition; delete [] sharedWithLocalIdx;}
 };
+
+class adjRequest{
+public:
+	int elemID,chunkID,elemType,nodeSetID;
+	int translatedNodeSet[MAX_NODESET_SIZE];
+	adjRequest(): elemID(-1),chunkID(-1),elemType(-1){};
+	adjRequest(int _elemID,int _chunkID,int _nodeSetID,int _elemType ): elemID(_elemID),chunkID(_chunkID),nodeSetID(_nodeSetID), elemType(_elemType){};
+	adjRequest(const adjRequest &rhs){
+		*this = rhs;
+	}
+	inline adjRequest& operator=(const adjRequest &rhs){
+		elemID = rhs.elemID;
+		chunkID = rhs.chunkID;
+		elemType = rhs.elemType;
+		memcpy(&translatedNodeSet[0],&(rhs.translatedNodeSet[0]),MAX_NODESET_SIZE*sizeof(int));
+		return *this;
+	}
+	inline bool operator==(const adjRequest &rhs){
+		return chunkID == rhs.chunkID && elemID == rhs.elemID && nodeSetID == rhs.nodeSetID;
+	}
+	inline bool operator<=(const adjRequest &rhs){
+		if(chunkID < rhs.chunkID){ return true;}
+		if(chunkID > rhs.chunkID){ return false;}
+
+		if(elemID < rhs.elemID){ return true;}
+		if(elemID > rhs.elemID){ return false;}
+		
+		if(nodeSetID < rhs.nodeSetID){ return true;}
+		if(nodeSetID > rhs.nodeSetID){ return false;}
+
+		return true;
+	}
+	inline bool operator>=(const adjRequest &rhs){
+		if(*this == rhs){return true;}
+		if(*this <= rhs){return false;}else{return true;}
+	}
+	
+};
+
+typedef ElemList<adjRequest> AdjRequestList;
+typedef MSA1D<AdjRequestList, DefaultListEntry<AdjRequestList,true>,MSA_DEFAULT_ENTRIES_PER_PAGE> MSA1DREQLIST;
 
 /** Create Adaptivity Adjacencies for elemType; dimension inferred. */
 void CreateAdaptAdjacencies(int meshid, int elemType);
@@ -80,3 +129,10 @@ int GetEdgeFace(int meshid, int elemID, int elemType, int *vertexList);
 // Update functions
 /** Look up elemID in elemType array and set the adjacency on edgeFaceID to nbr. */
 void SetAdaptAdj(int meshid, int elemID, int elemType, int edgeFaceID, adaptAdj nbr);
+
+
+/**given the dimensions and nodes per element guess whether the element 
+ is a triangle, quad, tet or hex. At the moment these are the 4 shapes
+ that are handled */
+void guessElementShape(int dim,int nodesPerElem,int *numAdjElems,int *nodeSetSize,int ***nodeSetMap);
+
