@@ -149,7 +149,7 @@ global_numbering.o: global_numbering.C $(HEADDEP)
 import.o: import.C $(HEADDEP)
 	$(CHARMC) -c import.C $(INCS)
 
-adapt_adj.o: adapt_adj.C $(HEADDEP)
+adapt_adj.o: adapt_adj.C $(HEADDEP) adapt_adj.h
 	$(CHARMC) -c adapt_adj.C $(INCS)
 
 
