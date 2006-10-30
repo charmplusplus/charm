@@ -447,7 +447,7 @@ void HybridBaseLB::Loadbalancing(int atlevel)
   }
 
   if (atlevel == tree->numLevels()-1) {
-    if (_lb_args.debug()>1)
+    if (_lb_args.debug()>0)
         CkPrintf("[%d] Level %d Strat elapsed time %f\n", CkMyPe(), atlevel, strat_end_time-start_lb_time);
     CkPrintf("[%d] %s memUsage: %.2fKB\n", CkMyPe(), lbName(), (1.0*useMem())/1024);
   }
@@ -461,7 +461,7 @@ void HybridBaseLB::Loadbalancing(int atlevel)
         int tope = lData->children[statsData->to_proc[i]];
         // comm data
         CkVec<LDCommData> comms;
-        collectCommData(i, comms, atlevel);
+//        collectCommData(i, comms, atlevel);
         thisProxy[tope].ObjMigrated(statsData->objData[i], comms.getVec(), comms.size(), atlevel-1);
       }
     }
