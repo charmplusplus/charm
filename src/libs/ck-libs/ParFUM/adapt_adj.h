@@ -102,7 +102,13 @@ public:
 		if(*this == rhs){return true;}
 		if(*this <= rhs){return false;}else{return true;}
 	}
-	
+	virtual void pup(PUP::er &p){
+	 p | elemID;
+	 p | chunkID;
+	 p | elemType;
+	 p | nodeSetID;
+	 p(translatedNodeSet,MAX_NODESET_SIZE);
+	}
 };
 
 typedef ElemList<adjRequest> AdjRequestList;

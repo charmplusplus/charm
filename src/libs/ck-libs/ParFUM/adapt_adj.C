@@ -202,6 +202,7 @@ void CreateAdaptAdjacencies(int meshid, int elemType)
 	}
 	MPI_Bcast_pup(*requestTable,0,MPI_COMM_WORLD);
 	requestTable->enroll(numChunks);
+	requestTable->sync();
 	
   for (int i=0; i<numNodes; i++) { 
     // For each node, examine the remaining  entries in adjElemList
@@ -225,21 +226,63 @@ void CreateAdaptAdjacencies(int meshid, int elemType)
 							std::set<int> tmpIntersect;
 							set_difference(commonSharedChunks.begin(), commonSharedChunks.end(), 
 									sharedChunks.begin(), sharedChunks.end(),inserter(tmpIntersect, tmpIntersect.begin()));
-							commonSharedChunks = tmpIntersect;
+							commonSharedChunks = tmpIntersect;							
 						}
           }
 					// At this point commonSharedChunks contains the list of chunks with which
 					// the element pointed by adjStart might be shared
+					int numCommonSharedChunks = commonSharedChunks.size();
+					if(numCommonSharedChunks > 0){
+					//adjStart is possibly shared with these chunks. It is shared across 
+					//the adjStart->nodeSet set of nodes.
+						adjRequest *adjRequestList = new adjRequest[numCommonSharedChunks];
+						//Translate the nodes in the nodeSet into the index in the idxl list for each chunk
+						//in the commonSharedChunks
+						for(int j=0;j<nodeSetSize;j++){
+							int sharedNode = adjStart->nodeSet[j];
+							const IDXL_Rec *recSharedNode = node->shared.getRec(sharedNode);
+							int countChunk=0;
+							for(std::set<int>::iterator chunkIterator = commonSharedChunks.begin();chunkIterator != commonSharedChunks.end();chunkIterator++){
+								countChunk++;
+								if(j == 0){
+									// if this is the first node we need to initialize the adjRequestobject
+									new (&adjRequestList[countChunk]) adjRequest(adjStart->elemID,myRank,adjStart->nodeSetID,elemType);
+								}
+								int chunk = *chunkIterator;
+								int sharedNodeIdx=-1; // index of sharedNode in the idxl list of chunk
+								//search for this chunk in the list of nodes shared by this node
+								for(int k=0;k<recSharedNode->getShared();k++){
+									if(recSharedNode->getChk(k) == chunk){
+										//found the correct chunk
+										sharedNodeIdx = recSharedNode->getIdx(k);
+										break;
+									}
+								}
+								CkAssert(sharedNodeIdx != -1);
+								//The index of sharedNode in the index list of chunk has been found.
+								//this needs to be saved in the corresponding translatedNodeSet
+								adjRequestList[countChunk].translatedNodeSet[j] = sharedNodeIdx;
+							}
+						}
+						//Now the nodeNumbers for the nodeSets that might be along chunk boundaries have
+						//been translated into idxl indices between the two chunks
+						//We now need to write the requests into the msa array requestTable
+						//WARNING: This depends on sets getting enumerated in the same way always
+						//Might not be true
+						int countChunk=0;
+						for(std::set<int>::iterator chunkIterator = commonSharedChunks.begin();chunkIterator != commonSharedChunks.end();chunkIterator++){
+							countChunk++;
+							int chunk = *chunkIterator;
+							(*requestTable).accumulate(chunk,adjRequestList[countChunk]);
+						}
+					}
 					
-      // for each chunk in commonChunks
-      //    send: (adaptAdjTable[i]->adjElemList->elemID, chunkID, elemType)
-      //     and: translated nodeSet node to shared indices
-      // to receive, sayantan will implement this with MSA :)
 					adjStart = adjStart->next;
         }
       }
     }
   }
+	requestTable->sync();
   // look up request table, put answer in reply table 
   // receive: for local elemID, the adjacency on this set of shared indices is (remote elemID, remote partition ID, remote elem type)
   // add adjacencies to local table
