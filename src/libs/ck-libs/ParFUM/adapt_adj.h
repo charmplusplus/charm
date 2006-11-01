@@ -40,6 +40,12 @@ public:
   int elemType; // element type (tri, quad, tet, hex, etc.)
 	adaptAdj():partID(-1),localID(-1),elemType(-1){};
 	adaptAdj(int _partID,int _localID,int _elemType) : partID(_partID), localID(_localID), elemType(_elemType){};
+	inline adaptAdj &operator=(const adaptAdj &rhs){
+		partID = rhs.partID;
+		localID = rhs.localID;
+		elemType = rhs.elemType;
+		return *this;
+	}
 };
 
 // Each adjElem describes an adjacency by enumerating
@@ -110,6 +116,13 @@ public:
 	 p(translatedNodeSet,MAX_NODESET_SIZE);
 	}
 };
+
+class adjReply {
+public:
+	int requestingElemID,requestingNodeSetID;
+	adaptAdj replyingElem;
+};
+
 
 typedef ElemList<adjRequest> AdjRequestList;
 typedef MSA1D<AdjRequestList, DefaultListEntry<AdjRequestList,true>,MSA_DEFAULT_ENTRIES_PER_PAGE> MSA1DREQLIST;

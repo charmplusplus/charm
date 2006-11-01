@@ -2002,20 +2002,27 @@ class ElemList{
     }
     pupCkVec(p,*vec);
   }
+};
+template <class T>
+class UniqElemList: public ElemList<T>{
+public:
+  UniqElemList(const T &val):ElemList<T>(val){};
+  UniqElemList():ElemList<T>(){};
   inline void uniquify(){
-    vec->quickSort(8);
-    if(vec->length() != 0){
+    CkVec<T> *lvec = this->vec;
+    lvec->quickSort(8);
+    if(lvec->length() != 0){
       int count=0;
-      for(int i=1;i<vec->length();i++){
-	if((*vec)[count] == (*vec)[i]){	
+      for(int i=1;i<lvec->length();i++){
+	if((*lvec)[count] == (*lvec)[i]){	
 	}else{					
 	  count++;
 	  if(i != count){
-	    (*vec)[count] = (*vec)[i];
+	    (*lvec)[count] = (*lvec)[i];
 	  }
 	}
       }
-      vec->resize(count+1);
+      lvec->resize(count+1);
     }	
   }
 };
@@ -2332,15 +2339,15 @@ typedef MSA2D<int, DefaultEntry<int>, MSA_DEFAULT_ENTRIES_PER_PAGE, MSA_ROW_MAJO
 
 typedef MSA1D<int, DefaultEntry<int>, MSA_DEFAULT_ENTRIES_PER_PAGE> MSA1DINT;
 
-typedef ElemList<int> IntList;
+typedef UniqElemList<int> IntList;
 typedef MSA1D<IntList, DefaultListEntry<IntList,true>,MSA_DEFAULT_ENTRIES_PER_PAGE> MSA1DINTLIST;
 
-typedef ElemList<NodeElem> NodeList;
+typedef UniqElemList<NodeElem> NodeList;
 typedef MSA1D<NodeList, DefaultListEntry<NodeList,true>,MSA_DEFAULT_ENTRIES_PER_PAGE> MSA1DNODELIST;
 
 typedef MSA1D<MeshElem,DefaultEntry<MeshElem,true>,1> MSA1DFEMMESH;
 
-typedef ElemList<Hashnode> Hashtuple;
+typedef UniqElemList<Hashnode> Hashtuple;
 typedef MSA1D<Hashtuple,DefaultListEntry<Hashtuple,true>,MSA_DEFAULT_ENTRIES_PER_PAGE> MSA1DHASH;
 
 

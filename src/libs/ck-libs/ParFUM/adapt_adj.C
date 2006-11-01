@@ -44,18 +44,19 @@ inline void addElementNodeSetData(int elem,const int *conn,int numAdjElems,const
 }
 
 
-//Look for an adjElem (rover) that matches adjStart in the link list following
+//Look for an adjElem (rover->next) whose nodeSet matches that specified in searchForNodeSet in the link list following
 //adjStart and return rover such that rover->next matches
-//with adjStart
+//with the searchForNodeSet. It also checks that the elemID of the element being searched 
+//does not match with that of searchForElemID.
 //*found is set to 1 if match is found .. else to 0
-inline adjElem *searchAdjElemInList(adjElem *adjStart,int nodeSetSize,int *found){
+inline adjElem *searchAdjElemInList(adjElem *adjStart,int *searchForNodeSet,int nodeSetSize,int searchForElemID,int *found){
   adjElem *rover = adjStart; // compare rover->next with adjStart
   *found = 0;
   while (rover->next != NULL) {
-    if (rover->next->elemID != adjStart->elemID) {
+    if (rover->next->elemID != searchForElemID) {
       *found = 1; // found an element that is not myself, possibly a match
       for (int j=0; j<nodeSetSize; j++) {
-        if (rover->next->nodeSet[j] != adjStart->nodeSet[j]) {
+        if (rover->next->nodeSet[j] != searchForNodeSet[j]) {
           *found = 0; // No, the nodeSets dont match
           break;
         }
@@ -152,7 +153,7 @@ void CreateAdaptAdjacencies(int meshid, int elemType)
         //Look for an entry in adjElemList after adjStart such that 
         //the nodeset of that entry and adjStart match but they 
         //do not belong to the same element. 
-        adjElem *rover = searchAdjElemInList(adjStart,nodeSetSize,&found); 
+        adjElem *rover = searchAdjElemInList(adjStart,adjStart->nodeSet.getVec(),nodeSetSize,adjStart->elemID,&found); 
 				
         if (found) {
           // We found an adjacent element for adjStart->elemID
@@ -203,6 +204,8 @@ void CreateAdaptAdjacencies(int meshid, int elemType)
 	MPI_Bcast_pup(*requestTable,0,MPI_COMM_WORLD);
 	requestTable->enroll(numChunks);
 	requestTable->sync();
+
+//	CkVec<adjRequest *> requestVec; // This vector stores the requests made by this chunk
 	
   for (int i=0; i<numNodes; i++) { 
     // For each node, examine the remaining  entries in adjElemList
@@ -274,7 +277,9 @@ void CreateAdaptAdjacencies(int meshid, int elemType)
 							countChunk++;
 							int chunk = *chunkIterator;
 							(*requestTable).accumulate(chunk,adjRequestList[countChunk]);
+//							requestVec.push_back(&adjRequestList[countChunk]);
 						}
+						delete [] adjRequestList;
 					}
 					
 					adjStart = adjStart->next;
@@ -287,18 +292,50 @@ void CreateAdaptAdjacencies(int meshid, int elemType)
   // receive: for local elemID, the adjacency on this set of shared indices is (remote elemID, remote partition ID, remote elem type)
   // add adjacencies to local table
   // lots of error checking :)
+	
+	//Look at each request that in the requestTable for this chunk
+	//Put the data for the requests in our own table and then create replies
+	CkVec<adjRequest> *receivedRequestVec = requestTable->get(myRank).vec;
+	for(int i=0;i<receivedRequestVec->length();i++){		
+		adjRequest &receivedRequest = (*receivedRequestVec)[i];
+		const IDXL_List &sharedNodeList = node->shared.getList(receivedRequest.chunkID);
+		CkVec<int> sharedNodes(nodeSetSize);
+		//Translate all the nodes in the nodeSet of the request
+		for(int j=0;j<nodeSetSize;j++){
+			int sharedNode = sharedNodeList[receivedRequest.translatedNodeSet[j]];
+			sharedNodes.push_back(sharedNode);
+		}
+		sharedNodes.quickSort();
+		//We need to find the matching nodeset for the nodeset in the request
+		//We look it up in the adaptAdjTable for the minimum node on this chunk
+		adjNode *minNode = &adaptAdjTable[sharedNodes[0]];
+		int found=0;
+		//search for the nodeSet in the list of adjacencies around minNode
+		adjElem *rover =  searchAdjElemInList(minNode->adjElemList,sharedNodes.getVec(),nodeSetSize,-1,&found);
+		if(found){
+			 //we have found a matching adjElem for the requested nodeset
+			 //we shall set the adjacency correctly in the adjacency Table for the 
+			 //elemID in the found adjElem. We need to send a reply to the requesting chunk
+			 int matchingElemID = rover->next->elemID;
+			 adaptAdj *matchingAdaptAdj = &adaptAdjacencies[matchingElemID*numAdjElems + rover->next->nodeSetID];
+			 matchingAdaptAdj->partID = receivedRequest.chunkID;
+			 matchingAdaptAdj->localID = receivedRequest.elemID;
+			 matchingAdaptAdj->elemType = receivedRequest.elemType;
 
-  //   For each node with remaining element-nodeSet entries:
-  //     Determine if ALL nodes in nodeSet are shared with one other partition
-  //     If not, remove the pair (element has no adjacency, on domain boundary)
-  //     If all nodes shared, find the one partition P with all the nodes
-  //       Get indexesOfNodeSet, send it to P with elemID, elemType and local partID
-  //       Increment a counter of sends
-  // Receive counter amount of nbr info
-  //   With the indexesOfNodeSet and remotePartID, develop a new nodeSet
-  //   Look up nodeSet under the min node, find matching nodeSet with unused localElem
-  //   Add (remoteElemID, remoteElemType, remotePartID) to localElems adjacency
-  //   Mark localElem as used
+			 adjReply reply;
+			 //Set requesting data in reply to that in receivedRequest
+			 //Put in data from rover->next into the replyElem portion of data
+			 //Write into the replyTable
+		}else{
+			//we have no matching nodeset for this request.. hopefully some other chunk does
+			//we canignore this request
+		}
+	}
+
+	//Once the replies are back
+	//Loop through each reply and update the adaptAdjacencies for each element in the reply
+	//
+	//Register the adaptAdjacency with ParFUM
 }
 
 // Access functions

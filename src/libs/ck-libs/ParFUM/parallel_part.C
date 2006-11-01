@@ -460,7 +460,7 @@ void FEM_write_part2node(MSA1DINTLIST	&nodepart,MSA1DNODELIST &part2node,struct 
     }	
 
     for(int j=0;j<t.vec->size();j++){
-      ElemList <NodeElem> en(n);
+      UniqElemList <NodeElem> en(n);
       part2node.accumulate((*t.vec)[j],en);
     }
   }
