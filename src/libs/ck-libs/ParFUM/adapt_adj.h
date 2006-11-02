@@ -46,6 +46,11 @@ public:
 		elemType = rhs.elemType;
 		return *this;
 	}
+	virtual void pup(PUP::er &p){
+		p | partID;
+		p | localID;
+		p | elemType;
+	}
 };
 
 // Each adjElem describes an adjacency by enumerating
@@ -89,25 +94,6 @@ public:
 		memcpy(&translatedNodeSet[0],&(rhs.translatedNodeSet[0]),MAX_NODESET_SIZE*sizeof(int));
 		return *this;
 	}
-	inline bool operator==(const adjRequest &rhs){
-		return chunkID == rhs.chunkID && elemID == rhs.elemID && nodeSetID == rhs.nodeSetID;
-	}
-	inline bool operator<=(const adjRequest &rhs){
-		if(chunkID < rhs.chunkID){ return true;}
-		if(chunkID > rhs.chunkID){ return false;}
-
-		if(elemID < rhs.elemID){ return true;}
-		if(elemID > rhs.elemID){ return false;}
-		
-		if(nodeSetID < rhs.nodeSetID){ return true;}
-		if(nodeSetID > rhs.nodeSetID){ return false;}
-
-		return true;
-	}
-	inline bool operator>=(const adjRequest &rhs){
-		if(*this == rhs){return true;}
-		if(*this <= rhs){return false;}else{return true;}
-	}
 	virtual void pup(PUP::er &p){
 	 p | elemID;
 	 p | chunkID;
@@ -121,11 +107,29 @@ class adjReply {
 public:
 	int requestingElemID,requestingNodeSetID;
 	adaptAdj replyingElem;
+	adjReply(): requestingElemID(-1),requestingNodeSetID(-1), replyingElem(){};
+	adjReply(const adjReply &rhs){
+		*this = rhs;
+	}
+
+	inline adjReply& operator=(const adjReply &rhs){
+		requestingElemID = rhs.requestingElemID;
+		requestingNodeSetID = rhs.requestingNodeSetID;
+		replyingElem = rhs.replyingElem;
+	}
+	virtual void pup(PUP::er &p){
+		p | requestingElemID;
+		p | requestingNodeSetID;
+		replyingElem.pup(p);
+	}
 };
 
 
 typedef ElemList<adjRequest> AdjRequestList;
 typedef MSA1D<AdjRequestList, DefaultListEntry<AdjRequestList,true>,MSA_DEFAULT_ENTRIES_PER_PAGE> MSA1DREQLIST;
+
+typedef ElemList<adjReply> AdjReplyList;
+typedef MSA1D<AdjReplyList, DefaultListEntry<AdjReplyList,true>, MSA_DEFAULT_ENTRIES_PER_PAGE> MSA1DREPLYLIST;
 
 /** Create Adaptivity Adjacencies for elemType; dimension inferred. */
 void CreateAdaptAdjacencies(int meshid, int elemType);

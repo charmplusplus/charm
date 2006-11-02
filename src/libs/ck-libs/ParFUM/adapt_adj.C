@@ -288,6 +288,17 @@ void CreateAdaptAdjacencies(int meshid, int elemType)
     }
   }
 	requestTable->sync();
+
+
+	MSA1DREPLYLIST *replyTable;
+	if(myRank == 0){
+		replyTable = new MSA1DREPLYLIST(numChunks,numChunks);
+	}else{
+		replyTable = new MSA1DREPLYLIST;
+	}
+	MPI_Bcast_pup(*replyTable,0,MPI_COMM_WORLD);
+	replyTable->enroll(numChunks);
+	replyTable->sync();
   // look up request table, put answer in reply table 
   // receive: for local elemID, the adjacency on this set of shared indices is (remote elemID, remote partition ID, remote elem type)
   // add adjacencies to local table
@@ -322,19 +333,34 @@ void CreateAdaptAdjacencies(int meshid, int elemType)
 			 matchingAdaptAdj->localID = receivedRequest.elemID;
 			 matchingAdaptAdj->elemType = receivedRequest.elemType;
 
-			 adjReply reply;
 			 //Set requesting data in reply to that in receivedRequest
 			 //Put in data from rover->next into the replyElem portion of data
+			 adjReply reply;
+			 reply.requestingElemID = receivedRequest.elemID;
+			 reply.requestingNodeSetID = receivedRequest.nodeSetID;
+			 reply.replyingElem.partID = myRank;
+			 reply.replyingElem.localID = matchingElemID;
+			 reply.replyingElem.elemType = elemType;
 			 //Write into the replyTable
+			 replyTable->accumulate(receivedRequest.chunkID,reply);
 		}else{
 			//we have no matching nodeset for this request.. hopefully some other chunk does
 			//we canignore this request
 		}
 	}
 
+	requestTable->sync();
+	replyTable->sync();
+
 	//Once the replies are back
 	//Loop through each reply and update the adaptAdjacencies for each element in the reply
-	//
+	CkVec<adjReply> *receivedReplyVec = replyTable->get(myRank).vec;
+	for(int i=0;i< receivedReplyVec->size();i++){
+		adjReply *receivedReply = &(*receivedReplyVec)[i];
+		adaptAdjacencies[receivedReply->requestingElemID*numAdjElems + receivedReply->requestingNodeSetID] = receivedReply->replyingElem;
+	}
+
+	replyTable->sync();
 	//Register the adaptAdjacency with ParFUM
 }
 
