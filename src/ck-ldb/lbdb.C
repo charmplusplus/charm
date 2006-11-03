@@ -185,6 +185,13 @@ extern "C" void LDCollectStatsOff(LDHandle _db)
   db->TurnStatsOff();
 }
 
+extern "C" int LDCollectingStats(LDHandle _db)
+{
+  LBDB *const db = (LBDB*)(_db.handle);
+
+  return db->StatsOn();
+}
+
 extern "C" int LDRunningObject(LDHandle _h, LDObjHandle* _o)
 {
   LBDB *const db = (LBDB*)(_h.handle);
