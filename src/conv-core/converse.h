@@ -119,7 +119,11 @@ extern int _Cmi_myrank; /* Normally zero; only 1 during SIGIO handling */
 
 #define CpvDeclare(t,v) t CMK_TAG(Cpv_,v)[2]
 #define CpvExtern(t,v)  extern t CMK_TAG(Cpv_,v)[2]
+#ifdef __cplusplus
+#define CpvCExtern(t,v)    extern "C" t CMK_TAG(Cpv_,v)[2]
+#else
 #define CpvCExtern(t,v)    CpvExtern(t,v)
+#endif
 #define CpvStaticDeclare(t,v) static t CMK_TAG(Cpv_,v)[2]
 #define CpvInitialize(t,v) do {} while(0)
 #define CpvInitialized(v) 1
