@@ -301,7 +301,7 @@ void CkPupNodeGroupData(PUP::er &p)
 
 
 // handle chare array elements for this processor
-void CkPupArrayElementsData(PUP::er &p)
+void CkPupArrayElementsData(PUP::er &p, int notifyListeners)
 {
  	int i;
 	// safe in both packing/unpakcing at this stage
@@ -331,10 +331,14 @@ void CkPupArrayElementsData(PUP::er &p)
 		p|gID;
                 p|idx;
 		CkLocMgr *mgr = (CkLocMgr*)CkpvAccess(_groupTable)->find(gID).getObj();
-		mgr->resume(idx,p);
+		if (notifyListeners)
+  		  mgr->resume(idx,p);
+                else
+  		  mgr->restore(idx,p);
 	  }
 	}
 	// finish up
+        if (notifyListeners)
         for(i=0;i<numGroups;i++) {
                 IrrGroup *obj = CkpvAccess(_groupTable)->find((*CkpvAccess(_groupIDTable))[i]).getObj();
 	  	obj->ckJustMigrated();

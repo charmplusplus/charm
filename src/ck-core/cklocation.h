@@ -467,7 +467,8 @@ public:
 
 enum CkElementCreation_t {
   CkElementCreation_migrate=2, // Create object for normal migration arrival
-  CkElementCreation_resume=3 // Create object after checkpoint
+  CkElementCreation_resume=3,  // Create object after checkpoint
+  CkElementCreation_restore=4  // Create object after checkpoint, skip listeners
 };
 /// Abstract superclass of all array manager objects 
 class CkArrMgr {
@@ -589,6 +590,8 @@ public:
 	/// Pass each of our locations (each separate array index) to this destination.
 	void iterate(CkLocIterator &dest);
 
+	/// Insert and unpack this array element from this checkpoint (e.g., from CkLocation::pup), skip listeners
+	void restore(const CkArrayIndex &idx, PUP::er &p);
 	/// Insert and unpack this array element from this checkpoint (e.g., from CkLocation::pup)
 	void resume(const CkArrayIndex &idx, PUP::er &p);
 

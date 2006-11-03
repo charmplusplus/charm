@@ -2078,6 +2078,14 @@ void CkLocMgr::immigrate(CkArrayElementMigrateMessage *msg)
 	delete msg;
 }
 
+void CkLocMgr::restore(const CkArrayIndex &idx, PUP::er &p)
+{
+	CkLocRec_local *rec=createLocal(idx,CmiFalse,CmiFalse,CmiTrue /* home doesn't know yet */ );
+
+	//Create the new elements as we unpack the message
+	pupElementsFor(p,rec,CkElementCreation_restore);
+}
+
 
 /// Insert and unpack this array element from this checkpoint (e.g., from CkLocation::pup)
 void CkLocMgr::resume(const CkArrayIndex &idx, PUP::er &p)

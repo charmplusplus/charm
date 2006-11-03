@@ -61,7 +61,7 @@ void CkPupROData(PUP::er &p);
 void CkPupMainChareData(PUP::er &p);
 void CkPupGroupData(PUP::er &p);
 void CkPupNodeGroupData(PUP::er &p);
-void CkPupArrayElementsData(PUP::er &p);
+void CkPupArrayElementsData(PUP::er &p, int notifyListeners=1);
 void CkPupProcessorData(PUP::er &p);
 void CkRemoveArrayElements();
 
