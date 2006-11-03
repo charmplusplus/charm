@@ -2,10 +2,10 @@
 #ifndef __TRACE_CORE_API_H__
 #define __TRACE_CORE_API_H__
 
+CpvCExtern(int,_traceCoreOn);
 #ifdef __cplusplus
 extern "C" {
 #endif
-CpvExtern(int,_traceCoreOn);
 /* Tracing API */
 #ifdef CMK_OPTIMIZE
 #define LOGCONDITIONAL(x) 
