@@ -247,7 +247,11 @@ extern int _Cmi_numpes;
 
 #define CpvDeclare(t,v) t* CMK_TAG(Cpv_,v)
 #define CpvExtern(t,v)  extern t* CMK_TAG(Cpv_,v)
+#ifdef __cplusplus
 #define CpvCExtern(t,v)  extern "C" t* CMK_TAG(Cpv_,v)
+#else
+#define CpvCExtern(t,v)    CpvExtern(t,v)
+#endif
 #define CpvStaticDeclare(t,v) static t* CMK_TAG(Cpv_,v)
 #define CpvInitialize(t,v)\
   do  { if (CMK_TAG(Cpv_,v)==0)\
@@ -384,7 +388,11 @@ for each processor in the node.
 
 #define CpvDeclare(t,v) t* CMK_TAG(Cpv_,v)
 #define CpvExtern(t,v)  extern t* CMK_TAG(Cpv_,v)
-#define CpvCExtern(t,v)  extern "C" t* CMK_TAG(Cpv_,v)
+#ifdef __cplusplus
+#define CpvCExtern(t,v)    extern "C" t* CMK_TAG(Cpv_,v)
+#else
+#define CpvCExtern(t,v)    CpvExtern(t,v)
+#endif
 #define CpvStaticDeclare(t,v) static t* CMK_TAG(Cpv_,v)
 #define CpvInitialize(t,v)\
     do { \
