@@ -1057,6 +1057,7 @@ LBMigrateMsg * HybridBaseLB::createMigrateMsg(LDStats* stats,int count)
 
   if (_lb_args.printSummary()) {
     double stime = CkWallTimer();
+#if 0
     if (currentLevel == 1) {
       LBInfo info(count);
       info.getInfo(stats, count, 1);	// no comm cost
@@ -1067,6 +1068,7 @@ LBMigrateMsg * HybridBaseLB::createMigrateMsg(LDStats* stats,int count)
       //CkPrintf("[%d] Load Summary: max (with comm): %f max (obj only): %f total: %f on %d processors at step %d useMem: %fKB nonlocal: %d %dKB.\n", CkMyPe(), maxLoad, mCpuLoad, totalLoad, count, step(), (1.0*useMem())/1024, nmsgs, nbytes/1024);
       thisProxy[0].reportLBQulity(mLoad, mCpuLoad, totalLoad, nmsgs, nbytes/1024);
     }
+#endif
     if (currentLevel == tree->numLevels()-2) {
       double mem = (1.0*useMem())/1024;
       thisProxy[0].reportLBMem(mem);
