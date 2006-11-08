@@ -268,7 +268,7 @@ public:
 
   inline void CollectStatsOn(void) { LDCollectStatsOn(myLDHandle); };
   inline void CollectStatsOff(void) { LDCollectStatsOff(myLDHandle); };
-  inline int  CollectingStats(void) { LDCollectingStats(myLDHandle); };
+  inline int  CollectingStats(void) { return LDCollectingStats(myLDHandle); };
   inline void QueryEstLoad(void) { LDQueryEstLoad(myLDHandle); };
 
   inline int GetObjDataSz(void) { return LDGetObjDataSz(myLDHandle); };
