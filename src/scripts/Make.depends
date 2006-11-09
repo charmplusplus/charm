@@ -1958,7 +1958,7 @@ ComlibManager.o: ComlibManager.C ComlibManager.h charm++.h charm.h \
   pup_cmialloc.h RingMulticastStrategy.h MultiRingMulticast.h \
   PipeBroadcastStrategy.h pipebroadcastconverse.h BroadcastStrategy.h \
   MeshStreamingStrategy.h PrioStreaming.h qd.h CentralLB.h BaseLB.h \
-  CentralLB.decl.h CentralLBMsg.h comlib.def.h
+  CentralLB.decl.h CentralLBMsg.h comlib.def.h RectMulticastStrategy.h
 	$(CHARMC) -c -I. ComlibManager.C
 
 MPIStrategy.o: MPIStrategy.C MPIStrategy.h ComlibManager.h charm++.h \
@@ -2319,6 +2319,26 @@ BroadcastStrategy.o: BroadcastStrategy.C BroadcastStrategy.h \
   router.h convcomlibmanager.h convcomlibstrategy.h ComlibStats.h \
   comlib.decl.h
 	$(CHARMC) -c -I. BroadcastStrategy.C
+
+RectMulticastStrategy.o: RectMulticastStrategy.C \
+  RectMulticastStrategy.h ComlibManager.h charm++.h charm.h converse.h \
+  conv-config.h conv-autoconfig.h conv-common.h conv-mach.h \
+  conv-mach-opt.h pup_c.h conv-cpm.h conv-cpath.h conv-qd.h conv-random.h \
+  conv-lists.h conv-trace.h persistent.h conv-onesided.h debug-conv.h \
+  pup.h middle.h middle-conv.h cklists.h ckbitvector.h ckstream.h init.h \
+  ckhashtable.h debug-charm.h CkMarshall.decl.h cksection.h ckcallback.h \
+  conv-ccs.h sockRoutines.h ccs-server.h ckobjQ.h ckreduction.h \
+  CkReduction.decl.h cknodegroupreduction.h CkArrayReductionMgr.decl.h \
+  ckmemcheckpoint.h CkMemCheckpoint.decl.h readonly.h ckarray.h \
+  cklocation.h LBDatabase.h lbdb.h LBDBManager.h LBObj.h LBOM.h LBComm.h \
+  LBMachineUtil.h LBDatabase.decl.h NullLB.decl.h BaseLB.decl.h \
+  CkLocation.decl.h CkArray.decl.h ComlibArrayListener.h ComlibStrategy.h \
+  convcomlibstrategy.h ComlibLearner.h envelope.h CkFutures.decl.h \
+  charisma.h charisma.decl.h tempo.h tempo.decl.h waitqd.h waitqd.decl.h \
+  sdag.h ckcheckpoint.h CkCheckpoint.decl.h ckevacuation.h \
+  ckarrayreductionmgr.h trace.h trace-bluegene.h convcomlib.h router.h \
+  convcomlibmanager.h ComlibStats.h comlib.decl.h ComlibSectionInfo.h
+	$(CHARMC) -c -I. RectMulticastStrategy.C
 
 gridrouter.o: gridrouter.C gridrouter.h converse.h conv-config.h \
   conv-autoconfig.h conv-common.h conv-mach.h conv-mach-opt.h pup_c.h \

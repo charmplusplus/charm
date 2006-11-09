@@ -218,6 +218,7 @@ CKHEADERS=ck.h ckstream.h envelope.h init.h qd.h charm.h charm++.h \
           PrioStreaming.h MPIStrategy.h MsgPacker.h StreamingStrategy.h \
 	  BroadcastStrategy.h ComlibSectionInfo.h AAPLearner.h \
 	  AAMLearner.h ComlibStats.h \
+	  RectMulticastStrategy.h \
 	  $(CVHEADERS)
 
 ALLHEADERS=$(CKHEADERS) \
@@ -771,7 +772,7 @@ STRATEGY_OBJS = MPIStrategy.o StreamingStrategy.o \
                 MsgPacker.o DirectMulticastStrategy.o \
 		RingMulticastStrategy.o MultiRingMulticast.o\
                 PipeBroadcastStrategy.o MeshStreamingStrategy.o \
-                PrioStreaming.o BroadcastStrategy.o
+                PrioStreaming.o BroadcastStrategy.o RectMulticastStrategy.o
 
 CONVERSE_COM_OBJS = gridrouter.o de.o treerouter.o petable.o \
 	3dgridrouter.o graphrouter.o hypercubetopology.o \
