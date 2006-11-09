@@ -4,7 +4,8 @@
    
    Created 11 Sept 2006 - Terry L. Wilmarth
 */
-#include "adapt_adj.h"
+#include "ParFUM.h"
+#include "ParFUM_internals.h"
 using namespace std;
 
 int nodeSetMap2d_tri[3][2] = {{0,1},{1,2},{2,0}};
@@ -26,7 +27,7 @@ inline void addSharedNodeData(int node,const IDXL_Rec *sharedChunkList,adjNode *
 
 
 
-inline void addElementNodeSetData(int elem,const int *conn,int numAdjElems,const int nodesPerElem,int nodeSetSize,int **nodeSetMap,adjNode *adaptAdjTable){
+inline void addElementNodeSetData(int elem,const int *conn,int numAdjElems,const int nodesPerElem,int nodeSetSize,int nodeSetMap[MAX_ADJELEMS][MAX_NODESET_SIZE],adjNode *adaptAdjTable){
    for (int j=0; j<numAdjElems; j++) { // There is one nodeSet per neighbor element
      adjElem *e = new adjElem(nodeSetSize);
      e->nodeSetID = j;
@@ -97,8 +98,8 @@ void CreateAdaptAdjacencies(int meshid, int elemType)
   // two elements.
   // The nodeSetMap is an ordering of element-local node IDs that specifies all 
   // possible nodeSets for a particular element type
-  int **nodeSetMap;
-  guessElementShape(dim,nodesPerElem,&numAdjElems,&nodeSetSize,&nodeSetMap);
+  int nodeSetMap[MAX_ADJELEMS][MAX_NODESET_SIZE];
+  guessElementShape(dim,nodesPerElem,&numAdjElems,&nodeSetSize,nodeSetMap);
 	CkAssert(nodeSetSize <= MAX_NODESET_SIZE);
   
 
@@ -140,8 +141,8 @@ void CreateAdaptAdjacencies(int meshid, int elemType)
     // For each node, match up incident elements
     // Each adjacency between two elements is represented by two adjElems
     // We try to match those up
-    if(node->is_valid(i)){
-      CkAssert(adaptAdjTable[i].adjElemList != NULL);
+    if(node->is_valid(i) && adaptAdjTable[i].adjElemList != NULL){  
+//      CkAssert(adaptAdjTable[i].adjElemList != NULL);
       adjElem *adjStart = adaptAdjTable[i].adjElemList;
       adjElem *preStart = adjStart; //pointer before adjStart so that we can delete adjStart
                                     //Note: as long as adjStart is the first element in adjElemList
@@ -399,7 +400,15 @@ void SetAdaptAdj(int elemID, int elemType, int edgeFaceID, adaptAdj nbr)
 // is a triangle, quad, tet or hex. At the moment these are the 4 shapes
 // that are handled
   
-void guessElementShape(int dim,int nodesPerElem,int *numAdjElems,int *nodeSetSize,int ***nodeSetMap){
+#define copyNodeSetMap(numAdjElems,nodeSetSize,nodeSetMap,srcMap) {\
+	for (int i=0;i<numAdjElems;i++){ \
+		for(int j=0;j<nodeSetSize;j++){ \
+			nodeSetMap[i][j] = srcMap[i][j]; \
+		} \
+	} \
+}
+
+void guessElementShape(int dim,int nodesPerElem,int *numAdjElems,int *nodeSetSize,int nodeSetMap[MAX_ADJELEMS][MAX_NODESET_SIZE]){
   switch(dim){
     case 2:
           {
@@ -409,13 +418,13 @@ void guessElementShape(int dim,int nodesPerElem,int *numAdjElems,int *nodeSetSiz
                 //Triangles
                 *numAdjElems = 3;
                 *nodeSetSize = 2;
-                *nodeSetMap = (int **)nodeSetMap2d_tri;
+								copyNodeSetMap(3,2,nodeSetMap,nodeSetMap2d_tri)
                 break;
               case 4:
                 //quads
                 *numAdjElems = 4;
                 *nodeSetSize = 2;
-                *nodeSetMap = (int **)nodeSetMap2d_quad;
+								copyNodeSetMap(4,2,nodeSetMap,nodeSetMap2d_quad)
                 break;
             }
           }
@@ -428,13 +437,13 @@ void guessElementShape(int dim,int nodesPerElem,int *numAdjElems,int *nodeSetSiz
                 //Tetrahedra
                 *numAdjElems = 4;
                 *nodeSetSize = 3;
-                *nodeSetMap = (int **)nodeSetMap3d_tet;
+								copyNodeSetMap(4,3,nodeSetMap,nodeSetMap3d_tet)
                 break;
               case 6:
                 //Hexahedra
                 *numAdjElems = 6;
                 *nodeSetSize = 4;
-                *nodeSetMap = (int **)nodeSetMap3d_hex;
+								copyNodeSetMap(6,4,nodeSetMap,nodeSetMap3d_hex)
                 break;
             }
           }

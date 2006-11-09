@@ -16,4 +16,11 @@ module ParFUM{
 	group MSA_CacheGroup<Hashtuple,DefaultListEntry<Hashtuple,true>,MSA_DEFAULT_ENTRIES_PER_PAGE>;
 	array [1D] MSA_PageArray<Hashtuple,DefaultListEntry<Hashtuple,true>,MSA_DEFAULT_ENTRIES_PER_PAGE>;
 	
+	//for adapt adjacencies
+	group MSA_CacheGroup<AdjRequestList, DefaultListEntry<AdjRequestList,true>,MSA_DEFAULT_ENTRIES_PER_PAGE>;
+	array [1D] MSA_PageArray<AdjRequestList, DefaultListEntry<AdjRequestList,true>,MSA_DEFAULT_ENTRIES_PER_PAGE>;
+
+	group MSA_CacheGroup<AdjReplyList, DefaultListEntry<AdjReplyList,true>, MSA_DEFAULT_ENTRIES_PER_PAGE>;
+	array [1D] MSA_PageArray<AdjReplyList, DefaultListEntry<AdjReplyList,true>, MSA_DEFAULT_ENTRIES_PER_PAGE>;
+
 };

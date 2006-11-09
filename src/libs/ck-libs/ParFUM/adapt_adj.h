@@ -24,12 +24,11 @@
    (0, 4, 5, 1), (5, 4, 6, 7) in that order
    
 */
-#include "ParFUM.h"
-#include "ParFUM_internals.h"
 #include <set>
 #include <algorithm>
 
-#define MAX_NODESET_SIZE 6
+#define MAX_ADJELEMS 6
+#define MAX_NODESET_SIZE 4
 
 // Each instance of adaptAdj represents an element to 
 // element adjacency
@@ -157,5 +156,5 @@ void SetAdaptAdj(int meshid, int elemID, int elemType, int edgeFaceID, adaptAdj 
 /**given the dimensions and nodes per element guess whether the element 
  is a triangle, quad, tet or hex. At the moment these are the 4 shapes
  that are handled */
-void guessElementShape(int dim,int nodesPerElem,int *numAdjElems,int *nodeSetSize,int ***nodeSetMap);
+void guessElementShape(int dim,int nodesPerElem,int *numAdjElems,int *nodeSetSize,int nodeSetMap[MAX_ADJELEMS][MAX_NODESET_SIZE]);
 

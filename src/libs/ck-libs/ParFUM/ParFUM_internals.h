@@ -3006,7 +3006,7 @@ class CkThresholdTimer {
 #endif
 // end cktimer or ParFUM_timer
 
-
+#include "adapt_adj.h"
 
 #endif
 // end ParFUM_internals.h

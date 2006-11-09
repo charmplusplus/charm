@@ -2,7 +2,7 @@ CDIR=../../../..
 CHARMC=$(CDIR)/bin/charmc $(OPTS)
 
 #Headers internal to ParFUM
-INTERNALHEADERS= ParFUM_internals.h ParFUM_locking.h ParFUM_Mesh_Modify.h ParFUM_Adapt_Algs.h ParFUM_Adapt.h ParFUM_Interpolate.h ParFUM_SA.h import.h
+INTERNALHEADERS= ParFUM_internals.h ParFUM_locking.h ParFUM_Mesh_Modify.h ParFUM_Adapt_Algs.h ParFUM_Adapt.h ParFUM_Interpolate.h ParFUM_SA.h import.h adapt_adj.h
 
 #Headers to be copied to include directory so application users can see them
 HEADERS= ParFUM.h ParFUMf.h  $(INTERNALHEADERS)
@@ -12,7 +12,7 @@ GENHEADERS= ParFUM.def.h ParFUM.decl.h ParFUM_Adapt.decl.h ParFUM_Adapt.def.h Pa
 
 HEADDEP= $(GENHEADERS) $(HEADERS) $(INTERNALHEADERS)
 
-OBJS=ParFUM.o mesh.o symmetries.o partition.o map.o compat.o call_init.o parallel_part.o mesh_modify.o mesh_adjacency.o adapt.o adapt_algs.o adapt_if.o interpolate.o lock.o util.o lock_node.o adapt_lock.o ParFUM_SA.o global_numbering.o import.o ParFUM_TOPS.o
+OBJS=ParFUM.o mesh.o symmetries.o partition.o map.o compat.o call_init.o parallel_part.o mesh_modify.o mesh_adjacency.o adapt.o adapt_algs.o adapt_if.o interpolate.o lock.o util.o lock_node.o adapt_lock.o ParFUM_SA.o global_numbering.o import.o ParFUM_TOPS.o adapt_adj.o
 
 COMPAT=compat_init.o compat_finit.o compat_driver.o compat_fdriver.o 
 LIB=libmoduleParFUM
@@ -149,7 +149,7 @@ global_numbering.o: global_numbering.C $(HEADDEP)
 import.o: import.C $(HEADDEP)
 	$(CHARMC) -c import.C $(INCS)
 
-adapt_adj.o: adapt_adj.C $(HEADDEP) adapt_adj.h
+adapt_adj.o: adapt_adj.C $(HEADDEP)
 	$(CHARMC) -c adapt_adj.C $(INCS)
 
 
