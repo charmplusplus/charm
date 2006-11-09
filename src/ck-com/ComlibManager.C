@@ -15,6 +15,7 @@
 #include "PipeBroadcastStrategy.h"
 #include "BroadcastStrategy.h"
 #include "MeshStreamingStrategy.h"
+#include "RectMulticastStrategy.h"
 #include "PrioStreaming.h"
 
 CkpvExtern(int, RecvdummyHandle);
@@ -76,13 +77,16 @@ void ComlibManager::init(){
     PUPable_reg(CharmMessageHolder);
     }
     
-    //comm_debug = 1;
+    //    comm_debug = 1;
     
     numStatsReceived = 0;
     curComlibController = 0;
     clibIteration = 0;
     
     strategyCreated = CmiFalse;
+
+    CkpvInitialize(comRectHashType *, com_rect_ptr); 
+    CkpvAccess(com_rect_ptr)= new comRectHashType;
 
     CkpvInitialize(ClibLocationTableType*, locationTable);
     CkpvAccess(locationTable) = new CkHashtableT <ClibGlobalArrayIndex, int>;

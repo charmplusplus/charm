@@ -129,6 +129,8 @@ class ComlibSectionInfo {
     inline void initSectionID(CkSectionID *sid) {
         sid->_cookie.sInfo.cInfo.id = MaxSectionID ++;            
     }
+
+    inline int getInstID(){ return(instanceID);}
     
     void processOldSectionMessage(CharmMessageHolder *cmsg);
 
@@ -170,6 +172,8 @@ class ComlibSectionInfo {
 		    int &npes, int &nidx,
 		    ComlibMulticastIndexCount *&counts, int *&belongs);
 
+    void getPeList(envelope *cb_env, int npes, int *&pelist);
+
     void getRemotePelist(int nindices, CkArrayIndexMax *idxlist, 
                          int &npes, int *&pelist);
 
@@ -181,6 +185,10 @@ class ComlibSectionInfo {
         
     static inline int getSectionID(CkSectionID id) {
         return id._cookie.sInfo.cInfo.id;
+    }
+
+    inline CkArrayID getDestArrayID() {
+        return destArrayID;
     }
 
     void pup(PUP::er &p) {

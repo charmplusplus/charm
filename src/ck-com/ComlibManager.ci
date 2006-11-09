@@ -36,6 +36,7 @@ module comlib {
   PUPable StreamingStrategy;
   PUPable MPIStrategy;
   PUPable DirectMulticastStrategy;
+  PUPable RectMulticastStrategy;
   PUPable EachToManyMulticastStrategy;	
   PUPable RingMulticastStrategy;	
   PUPable PipeBroadcastStrategy;

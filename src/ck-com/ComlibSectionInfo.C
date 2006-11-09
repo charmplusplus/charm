@@ -93,6 +93,19 @@ ComlibMulticastMsg * ComlibSectionInfo::getNewMulticastMessage(CharmMessageHolde
     return (ComlibMulticastMsg *)EnvToUsr(newenv);
 }
 
+void ComlibSectionInfo::getPeList(envelope *cb_env, int npes, int *&pelist)
+{
+    ComlibMulticastMsg *ccmsg = (ComlibMulticastMsg *)EnvToUsr(cb_env);
+    int i;
+    
+    CkAssert(npes==ccmsg->nPes);
+    for (i=0; i<ccmsg->nPes; ++i) {
+      pelist[i]=ccmsg->indicesCount[i].pe;
+    }
+
+}
+
+
 void ComlibSectionInfo::unpack(envelope *cb_env,
 			       int &nLocalElems,
                                CkArrayIndexMax *&dest_indices, 
@@ -107,28 +120,34 @@ void ComlibSectionInfo::unpack(envelope *cb_env,
       dest_indices += ccmsg->indicesCount[i].count;
     }
 
-    CkAssert(i < ccmsg->nPes);
-    nLocalElems = ccmsg->indicesCount[i].count;
+    if(i >= ccmsg->nPes)
+      {  //cheap hack for rect bcast
+	nLocalElems=0;
+	dest_indices=NULL;
+      }
+    else
+      {
+	nLocalElems = ccmsg->indicesCount[i].count;
 
-    /*
-    CkPrintf("Unpacking: %d local elements:",nLocalElems);
-    for (int j=0; j<nLocalElems; ++j) CkPrintf(" %d",((int*)&dest_indices[j])[1]);
-    CkPrintf("\n");
-    */
-    /*
-    for(int count = 0; count < ccmsg->nIndices; count++){
-        CkArrayIndexMax idx = ccmsg->indices[count];
+	/*
+	  CkPrintf("Unpacking: %d local elements:",nLocalElems);
+	  for (int j=0; j<nLocalElems; ++j) CkPrintf(" %d",((int*)&dest_indices[j])[1]);
+	  CkPrintf("\n");
+	*/
+	/*
+	  for(int count = 0; count < ccmsg->nIndices; count++){
+	  CkArrayIndexMax idx = ccmsg->indices[count];
         
-        //This will work because. lastknown always knows if I have the
-        //element of not
-        int dest_proc = ComlibGetLastKnown(destArrayID, idx);
-        //CkArrayID::CkLocalBranch(destArrayID)->lastKnown(idx);
+	  //This will work because. lastknown always knows if I have the
+	  //element of not
+	  int dest_proc = ComlibGetLastKnown(destArrayID, idx);
+	  //CkArrayID::CkLocalBranch(destArrayID)->lastKnown(idx);
         
-        //        if(dest_proc == CkMyPe())
-        dest_indices.insertAtEnd(idx);                        
-    }
-    */
-
+	  //        if(dest_proc == CkMyPe())
+	  dest_indices.insertAtEnd(idx);                        
+	  }
+	*/
+      }
     envelope *usrenv = (envelope *) ccmsg->usrMsg;
     env = (envelope *)CmiAlloc(usrenv->getTotalsize());
     memcpy(env, ccmsg->usrMsg, usrenv->getTotalsize());

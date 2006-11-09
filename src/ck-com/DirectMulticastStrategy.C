@@ -75,7 +75,7 @@ void DirectMulticastStrategy::insertMessage(CharmMessageHolder *cmsg){
         int cur_sec_id = ComlibSectionInfo::getSectionID(*sid);
         
         if(cur_sec_id > 0) {        
-            sinfo.processOldSectionMessage(cmsg);            
+	    sinfo.processOldSectionMessage(cmsg);            
             
             ComlibSectionHashKey 
                 key(CkMyPe(), sid->_cookie.sInfo.cInfo.id);        
