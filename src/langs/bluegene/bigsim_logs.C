@@ -360,7 +360,7 @@ void BgTimeLineRec::logEntryInsert(BgTimeLog* log)
   if (!genTimeLog) return;
 //CmiPrintf("[%d] BgTimeLineRec::logEntryInsert\n", BgGetGlobalWorkerThreadID());
   CmiAssert(bgCurLog == NULL);
-  if(timeline[timeline.length()-1]->endTime == 0.0)
+  if(timeline.length() > 0 && timeline[timeline.length()-1]->endTime == 0.0)
     CmiPrintf("\nERROR tried to insert %s after %s\n",log->name,timeline[timeline.length()-1]->name);
   enq(log, 1);
   if (bgPrevLog) {
@@ -380,7 +380,7 @@ void BgTimeLineRec::logEntryClose() {
   CmiAssert(genTimeLog);
   if (!genTimeLog) return;
 //CmiPrintf("[%d] BgTimeLineRec::logEntryClose\n", BgGetGlobalWorkerThreadID());
-  BgTimeLog *lastlog = timeline[timeline.length()-1];
+  BgTimeLog *lastlog = timeline.length()?timeline[timeline.length()-1]:NULL;
   CmiAssert(bgCurLog == lastlog);
   lastlog->closeLog();
   bgCurLog = NULL;
