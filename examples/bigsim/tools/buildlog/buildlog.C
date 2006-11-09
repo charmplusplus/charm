@@ -5,52 +5,40 @@
 extern BgTimeLineRec* currTline;
 extern int currTlineIdx;
 
+#define totalPEs  2
+
 int main()
 {
   genTimeLog = 1;
 
-  BgTimeLineRec tlinerec;
+  BgTimeLineRec tlinerecs[totalPEs];
+  BgMsgID msgID;
+
+  // PE 0
+  double curTime = 1.0;
+  BgTimeLog *newlog = new BgTimeLog(1, "logname", curTime, curTime+0.5);
+  curTime = 1.4;
+    // send a message to 1
+  msgID = BgMsgID(0, 0);      // (mype, seqno)
+  BgMsgEntry *msgEntry = new BgMsgEntry(0, 1024, curTime, curTime+0.001, 1, 0);
+  newlog->addMsg(msgEntry);
+  tlinerecs[0].logEntryInsert(newlog);
+
+  // PE 1
+  curTime = 1.0;
+  newlog = new BgTimeLog(1, 0, 0, curTime, curTime+1.0);
+  tlinerecs[1].logEntryInsert(newlog);
+
+  // start output
+
+  BgWriteTraceSummary(totalPEs, totalPEs, totalPEs, 1, 1);
+
+  BgWriteTimelines(0, tlinerecs, totalPEs);
 
   char fname[128];
   strcpy(fname, "bgTrace");
+  for (int i=0; i<totalPEs; i++)
+  BgWriteThreadTimeLine(fname, i, 0, 0, 0, tlinerecs[i].timeline);
 
-  BgTimeLog *newlog = new BgTimeLog(1, "type1", 1.0, 2.0);
-printf("HERE1\n");
-  tlinerec.logEntryStart(newlog);
-printf("HERE2\n");
-
-  BgWriteThreadTimeLine(fname, 0, 0, 0, 0, tlinerec.timeline);
-printf("HERE4\n");
-
-#if 0
-  int totalProcs, numX, numY, numZ, numCth, numWth, numPes;
-
-  // load bg trace summary file
-  printf("Loading bgTrace ... \n");
-  int status = BgLoadTraceSummary("bgTrace", totalProcs, numX, numY, numZ, numCth, numWth, numPes);
-  if (status == -1) exit(1);
-  printf("========= BgLog Version: %d ========= \n", bglog_version);
-  printf("Found %d (%dx%dx%d:%dw-%dc) simulated procs on %d real procs.\n", totalProcs, numX, numY, numZ, numWth, numCth, numPes);
-                                                                                
-  int* allNodeOffsets = BgLoadOffsets(totalProcs,numPes);
-
-  // load each individual trace file for each bg proc
-  for (int i=0; i<totalProcs; i++) 
-  {
-    BgTimeLineRec tline;
-    int procNum = i;
-    currTline = &tline;
-    currTlineIdx = procNum;
-    int fileNum = BgReadProc(procNum,numWth,numPes,totalProcs,allNodeOffsets,tline);
-    CmiAssert(fileNum != -1);
-    printf("Load log of BG proc %d from bgTrace%d... \n", i, fileNum);
-                                                                                
-    // dump bg timeline log to disk in asci format
-    BgWriteThreadTimeLine("detail", 0, 0, 0, procNum, tline.timeline);
-  }
-
-  delete [] allNodeOffsets;
-  printf("End of program\n");
-#endif
 }
 
