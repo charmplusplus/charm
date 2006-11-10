@@ -251,7 +251,7 @@ class TCharmAPIRoutine {
  public:
 	TCharmAPIRoutine() { //Entering Charm++ from user code
 		state = 0;
-		TCharm *tc=CtvAccess(_curTCharm);
+		//TCharm *tc=CtvAccess(_curTCharm);
 		// if memory is not isomalloc (swap global not installed) 
 		// or thread has already been deactivated
 		if(CmiIsomallocBlockListCurrent() == NULL){
