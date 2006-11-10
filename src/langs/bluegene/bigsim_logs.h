@@ -4,6 +4,7 @@
 
 #include <string.h>
 
+#include "blue.h"
 #include "blue_defs.h"
 #include "cklists.h"
 
@@ -51,6 +52,7 @@ public:
 private:
   BgMsgEntry() {}
 public:
+  BgMsgEntry(int seqno, int _msgSize, double _sendTime, double _recvTime, int dstNode, int destrank);
   BgMsgEntry(char *msg, int node, int tid, int local, int g=1);
   inline void print() {
     CmiPrintf("msgID:%d sent:%f recvtime:%f dstPe:%d group:%d\n", msgID, sendTime, recvTime, dstPe, group);
@@ -124,6 +126,7 @@ public:
   friend class BgTimeLineRec;
 public:
   BgTimeLog(BgTimeLog *);
+  BgTimeLog(const BgMsgID &msgID);
   BgTimeLog(char *msg, char *str=NULL);
   BgTimeLog(): ep(-1), recvTime(.0), startTime(.0), endTime(.0), execTime(.0), 
 	       effRecvTime(INVALIDTIME), seqno(0), doCorrect(1), flag(0) 
@@ -132,11 +135,21 @@ public:
   BgTimeLog(int epc, char* name, double sTime);
   ~BgTimeLog();
 
+  inline void setName(char *_name) { strncpy(name, _name, 20); }
+  inline void setEP(int _ep) { ep = _ep; }
+  inline void setTime(double stime, double etime) {
+         startTime = stime;
+         endTime = etime;
+         setExecTime();
+  }
   inline void setExecTime() {
            execTime = endTime - startTime;
            if(execTime < BG_EPSILON && execTime > -BG_EPSILON)
              execTime = 0.0;
            CmiAssert(execTime >= 0.0);
+         }
+  inline void addMsg(BgMsgEntry *mentry) {
+           msgs.push_back(mentry);
          }
   inline void addMsg(char *msg, int node, int tid, int local, int group=1) { 
            msgs.push_back(new BgMsgEntry(msg, node, tid, local, group)); 
@@ -282,5 +295,8 @@ int BgLoadTraceSummary(char *fname, int &totalProcs, int &numX, int &numY, int &
 int BgReadProc(int procNum, int numWth, int numPes, int totalProcs, int* allNodeOffsets, BgTimeLineRec& tlinerec);
 int* BgLoadOffsets(int totalProcs, int numPes);
 void BgWriteThreadTimeLine(char *fname, int x, int y, int z, int th, BgTimeLine &tline);
+void BgWriteTraceSummary(int nlocalProcs, int numPes, int x, int y=1, int z=1, int numWth=1, int numCth=1, char *traceroot=NULL);
+void BgWriteTimelines(int seqno, BgTimeLineRec *tlinerecs, int nlocalProcs, int numWth=1, char *traceroot=NULL);
+extern "C" void BgGenerateLogs();
 
 #endif

@@ -20,6 +20,11 @@ static double nullTimer() { return 0.; }
 // bluegene timer call
 double (*timerFunc) (void) = nullTimer;
 
+extern "C" void BgGenerateLogs()
+{
+  genTimeLog = 1;;
+}
+
 // dstNode is the dest bg node, can be -1
 BgMsgEntry::BgMsgEntry(char *msg, int dstNode, int tid, int local, int g)
 {
@@ -35,6 +40,17 @@ BgMsgEntry::BgMsgEntry(char *msg, int dstNode, int tid, int local, int g)
   sendMsg = NULL;
   if (!local && correctTimeLog) sendMsg = msg;
 #endif
+}
+
+BgMsgEntry::BgMsgEntry(int seqno, int _msgSize, double _sendTime, double _recvTime, int dstNode, int rank)
+{
+  msgID = seqno;
+  sendTime = _sendTime;
+  recvTime = _recvTime;
+  dstPe = dstNode;
+  tID = rank;                   // CmiBgMsgThreadID(msg);
+  msgsize = _msgSize;
+  CmiAssert(msgsize > 0);
 }
 
 /*
@@ -112,6 +128,40 @@ BgTimeLog::BgTimeLog(BgTimeLog *log)
   doCorrect = 1;
   flag = 0;
 }
+
+BgTimeLog::BgTimeLog(const BgMsgID &msgID)
+{
+  msgId = msgID;
+  strcpy(name, "msgep");
+  ep = -1;
+  startTime = -1.0;
+  recvTime = -1.0;
+  endTime = execTime = 0.0;
+
+  oldStartTime= startTime;
+  effRecvTime = -1.0;
+  seqno = 0;
+  doCorrect = 1;
+  flag = 0;
+}
+
+/*
+BgTimeLog::BgTimeLog(int _ep, int srcpe, int msgid, double _startTime, double _endTime, double _recvTime, char *str)
+{
+  if (str)
+    strcpy(name,str);
+  else
+    strcpy(name,"msgep");
+  startTime = _startTime;
+  endTime = _endTime;
+  execTime = endTime - startTime;
+  ep = _ep;
+  recvTime = _recvTime;
+  msgId = BgMsgID(srcpe, msgid);
+
+  recvTime = effRecvTime = startTime;
+}
+*/
 
 BgTimeLog::BgTimeLog(int epc, char* namestr,double sTime)
 { 
