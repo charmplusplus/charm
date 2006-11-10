@@ -90,6 +90,7 @@ public:
 		elemID = rhs.elemID;
 		chunkID = rhs.chunkID;
 		elemType = rhs.elemType;
+		nodeSetID = rhs.nodeSetID;
 		memcpy(&translatedNodeSet[0],&(rhs.translatedNodeSet[0]),MAX_NODESET_SIZE*sizeof(int));
 		return *this;
 	}
@@ -157,4 +158,4 @@ void SetAdaptAdj(int meshid, int elemID, int elemType, int edgeFaceID, adaptAdj 
  is a triangle, quad, tet or hex. At the moment these are the 4 shapes
  that are handled */
 void guessElementShape(int dim,int nodesPerElem,int *numAdjElems,int *nodeSetSize,int nodeSetMap[MAX_ADJELEMS][MAX_NODESET_SIZE]);
-
+void dumpAdaptAdjacencies(adaptAdj *adaptAdjacencies,int numElems,int numAdjElems,int myRank);

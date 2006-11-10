@@ -14,7 +14,7 @@ int nodeSetMap3d_tet[4][3] = {{0,1,2},{1,0,3},{1,3,2},{0,2,3}};
 int nodeSetMap3d_hex[6][4] = {{0,1,2,3},{1,5,6,2},{2,6,7,3},{3,7,4,0},{0,4,5,1},{5,4,6,7}};
 
 inline void addSharedNodeData(int node,const IDXL_Rec *sharedChunkList,adjNode *adaptAdjTable){
-	adaptAdjTable[node].numSharedPartitions = sharedChunkList->getShared();
+  adaptAdjTable[node].numSharedPartitions = sharedChunkList->getShared();
   adaptAdjTable[node].sharedWithPartition = new int [sharedChunkList->getShared()];
   adaptAdjTable[node].sharedWithLocalIdx = new int [sharedChunkList->getShared()];
   for(int j=0;j<sharedChunkList->getShared();j++){
@@ -53,6 +53,20 @@ inline void addElementNodeSetData(int elem,const int *conn,int numAdjElems,const
 inline adjElem *searchAdjElemInList(adjElem *adjStart,int *searchForNodeSet,int nodeSetSize,int searchForElemID,int *found){
   adjElem *rover = adjStart; // compare rover->next with adjStart
   *found = 0;
+  
+  if(searchForElemID == -1){
+    //Check adjStart itself as well
+    *found = 1;
+    for(int j=0;j<nodeSetSize;j++){
+      if(adjStart->nodeSet[j] != searchForNodeSet[j]){
+        *found = 0;
+        break;
+      }
+    }
+    if(*found){
+      return NULL;
+    }
+  }
   while (rover->next != NULL) {
     if (rover->next->elemID != searchForElemID) {
       *found = 1; // found an element that is not myself, possibly a match
@@ -100,7 +114,7 @@ void CreateAdaptAdjacencies(int meshid, int elemType)
   // possible nodeSets for a particular element type
   int nodeSetMap[MAX_ADJELEMS][MAX_NODESET_SIZE];
   guessElementShape(dim,nodesPerElem,&numAdjElems,&nodeSetSize,nodeSetMap);
-	CkAssert(nodeSetSize <= MAX_NODESET_SIZE);
+  CkAssert(nodeSetSize <= MAX_NODESET_SIZE);
   
 
   // Create the adaptAdj array associated with the new FEM attribute FEM_ADAPT_ADJ
@@ -155,7 +169,7 @@ void CreateAdaptAdjacencies(int meshid, int elemType)
         //the nodeset of that entry and adjStart match but they 
         //do not belong to the same element. 
         adjElem *rover = searchAdjElemInList(adjStart,adjStart->nodeSet.getVec(),nodeSetSize,adjStart->elemID,&found); 
-				
+        
         if (found) {
           // We found an adjacent element for adjStart->elemID
           
@@ -194,176 +208,204 @@ void CreateAdaptAdjacencies(int meshid, int elemType)
 
   // Now all elements' local adjacencies are set; remainder in table are 
   // nodeSets shared with other chunks or nodeSets on domain boundary
-	
-	MPI_Barrier(MPI_COMM_WORLD);
-	MSA1DREQLIST *requestTable;
-	if(myRank == 0){
-		requestTable = new MSA1DREQLIST(numChunks,numChunks);
-	}else{
-		requestTable = new MSA1DREQLIST;
-	}
-	MPI_Bcast_pup(*requestTable,0,MPI_COMM_WORLD);
-	requestTable->enroll(numChunks);
-	requestTable->sync();
 
-//	CkVec<adjRequest *> requestVec; // This vector stores the requests made by this chunk
-	
+  MPI_Barrier(MPI_COMM_WORLD);
+  MSA1DREQLIST *requestTable;
+  if(myRank == 0){
+    requestTable = new MSA1DREQLIST(numChunks,numChunks);
+  }else{
+    requestTable = new MSA1DREQLIST;
+  }
+  MPI_Bcast_pup(*requestTable,0,MPI_COMM_WORLD);
+  requestTable->enroll(numChunks);
+  requestTable->sync();
+
+//  CkVec<adjRequest *> requestVec; // This vector stores the requests made by this chunk
+  
   for (int i=0; i<numNodes; i++) { 
     // For each node, examine the remaining  entries in adjElemList
     if(node->is_valid(i)){
       if (adaptAdjTable[i].adjElemList!=NULL) {
-				adjElem *adjStart = adaptAdjTable[i].adjElemList;
+        adjElem *adjStart = adaptAdjTable[i].adjElemList;
         while (adjStart !=NULL) {
           // create and empty set, commonSharedChunks
-					std::set<int> commonSharedChunks;
+          std::set<int> commonSharedChunks;
           for (int j=0; j<nodeSetSize; j++) {
           // look up sharedWithPartitions for node: 
           //    adaptAdjTable[i]->adjElemList->nodeset[j]
           // intersect with commonSharedChunks
-						int sharedNode = adjStart->nodeSet[j];
-						adjNode *sharedNodeAdj = &adaptAdjTable[sharedNode];
-						std::set<int> sharedChunks(sharedNodeAdj->sharedWithPartition,
-								sharedNodeAdj->sharedWithPartition+sharedNodeAdj->numSharedPartitions);
-						if(j == 0){
-							commonSharedChunks = sharedChunks;
-						}else{
-							std::set<int> tmpIntersect;
-							set_difference(commonSharedChunks.begin(), commonSharedChunks.end(), 
-									sharedChunks.begin(), sharedChunks.end(),inserter(tmpIntersect, tmpIntersect.begin()));
-							commonSharedChunks = tmpIntersect;							
-						}
+            int sharedNode = adjStart->nodeSet[j];
+            adjNode *sharedNodeAdj = &adaptAdjTable[sharedNode];
+            std::set<int> sharedChunks(sharedNodeAdj->sharedWithPartition,
+                sharedNodeAdj->sharedWithPartition+sharedNodeAdj->numSharedPartitions);
+            if(j == 0){
+              commonSharedChunks = sharedChunks;
+            }else{
+              std::set<int> tmpIntersect;
+              set_intersection(commonSharedChunks.begin(), commonSharedChunks.end(), 
+                  sharedChunks.begin(), sharedChunks.end(),inserter(tmpIntersect, tmpIntersect.begin()));
+              commonSharedChunks = tmpIntersect;              
+            }
           }
-					// At this point commonSharedChunks contains the list of chunks with which
-					// the element pointed by adjStart might be shared
-					int numCommonSharedChunks = commonSharedChunks.size();
-					if(numCommonSharedChunks > 0){
-					//adjStart is possibly shared with these chunks. It is shared across 
-					//the adjStart->nodeSet set of nodes.
-						adjRequest *adjRequestList = new adjRequest[numCommonSharedChunks];
-						//Translate the nodes in the nodeSet into the index in the idxl list for each chunk
-						//in the commonSharedChunks
-						for(int j=0;j<nodeSetSize;j++){
-							int sharedNode = adjStart->nodeSet[j];
-							const IDXL_Rec *recSharedNode = node->shared.getRec(sharedNode);
-							int countChunk=0;
-							for(std::set<int>::iterator chunkIterator = commonSharedChunks.begin();chunkIterator != commonSharedChunks.end();chunkIterator++){
-								countChunk++;
-								if(j == 0){
-									// if this is the first node we need to initialize the adjRequestobject
-									new (&adjRequestList[countChunk]) adjRequest(adjStart->elemID,myRank,adjStart->nodeSetID,elemType);
-								}
-								int chunk = *chunkIterator;
-								int sharedNodeIdx=-1; // index of sharedNode in the idxl list of chunk
-								//search for this chunk in the list of nodes shared by this node
-								for(int k=0;k<recSharedNode->getShared();k++){
-									if(recSharedNode->getChk(k) == chunk){
-										//found the correct chunk
-										sharedNodeIdx = recSharedNode->getIdx(k);
-										break;
-									}
-								}
-								CkAssert(sharedNodeIdx != -1);
-								//The index of sharedNode in the index list of chunk has been found.
-								//this needs to be saved in the corresponding translatedNodeSet
-								adjRequestList[countChunk].translatedNodeSet[j] = sharedNodeIdx;
-							}
-						}
-						//Now the nodeNumbers for the nodeSets that might be along chunk boundaries have
-						//been translated into idxl indices between the two chunks
-						//We now need to write the requests into the msa array requestTable
-						//WARNING: This depends on sets getting enumerated in the same way always
-						//Might not be true
-						int countChunk=0;
-						for(std::set<int>::iterator chunkIterator = commonSharedChunks.begin();chunkIterator != commonSharedChunks.end();chunkIterator++){
-							countChunk++;
-							int chunk = *chunkIterator;
-							(*requestTable).accumulate(chunk,adjRequestList[countChunk]);
-//							requestVec.push_back(&adjRequestList[countChunk]);
-						}
-						delete [] adjRequestList;
-					}
-					
-					adjStart = adjStart->next;
+          // At this point commonSharedChunks contains the list of chunks with which
+          // the element pointed by adjStart might be shared
+          int numCommonSharedChunks = commonSharedChunks.size();
+          if(numCommonSharedChunks > 0){
+          //adjStart is possibly shared with these chunks. It is shared across 
+          //the adjStart->nodeSet set of nodes.
+            adjRequest *adjRequestList = new adjRequest[numCommonSharedChunks];
+            //Translate the nodes in the nodeSet into the index in the idxl list for each chunk
+            //in the commonSharedChunks
+            for(int j=0;j<nodeSetSize;j++){
+              int sharedNode = adjStart->nodeSet[j];
+              const IDXL_Rec *recSharedNode = node->shared.getRec(sharedNode);
+              int countChunk=0;
+              for(std::set<int>::iterator chunkIterator = commonSharedChunks.begin();chunkIterator != commonSharedChunks.end();chunkIterator++){
+                countChunk++;
+                int chunk = *chunkIterator;
+//                if(chunk > myRank){
+                  if(j == 0){
+                    // if this is the first node we need to initialize the adjRequestobject
+                     adjRequestList[countChunk] =  adjRequest(adjStart->elemID,myRank,adjStart->nodeSetID,elemType);
+                  }
+                  int sharedNodeIdx=-1; // index of sharedNode in the idxl list of chunk
+                  //search for this chunk in the list of chunks shared by this node
+                  for(int k=0;k<recSharedNode->getShared();k++){
+                    if(recSharedNode->getChk(k) == chunk){
+                      //found the correct chunk
+                      sharedNodeIdx = recSharedNode->getIdx(k);
+                      break;
+                    }
+                  }
+                  CkAssert(sharedNodeIdx != -1);
+                  //The index of sharedNode in the index list of chunk has been found.
+                  //this needs to be saved in the corresponding translatedNodeSet
+                  adjRequestList[countChunk].translatedNodeSet[j] = sharedNodeIdx;
+//                }
+              }
+            }
+            //Now the nodeNumbers for the nodeSets that might be along chunk boundaries have
+            //been translated into idxl indices between the two chunks
+            //We now need to write the requests into the msa array requestTable
+            //WARNING: This depends on sets getting enumerated in the same way always
+            //Might not be true
+            int countChunk=0;
+            for(std::set<int>::iterator chunkIterator = commonSharedChunks.begin();chunkIterator != commonSharedChunks.end();chunkIterator++){
+              countChunk++;
+              int chunk = *chunkIterator;
+//              if(chunk > myRank){
+                printf("[%d] Sending to chunk %d request (%d,%d,%d,%d) \n",myRank,chunk,adjRequestList[countChunk].elemID,adjRequestList[countChunk].chunkID,adjRequestList[countChunk].elemType,adjRequestList[countChunk].nodeSetID);
+                (*requestTable).accumulate(chunk,adjRequestList[countChunk]);
+//              requestVec.push_back(&adjRequestList[countChunk]);
+//              }
+            }
+            delete [] adjRequestList;
+          }
+          
+          adjStart = adjStart->next;
         }
       }
     }
   }
-	requestTable->sync();
+  requestTable->sync();
+  printf("[%d] All requests made \n",myRank);
 
-
-	MSA1DREPLYLIST *replyTable;
-	if(myRank == 0){
-		replyTable = new MSA1DREPLYLIST(numChunks,numChunks);
-	}else{
-		replyTable = new MSA1DREPLYLIST;
-	}
-	MPI_Bcast_pup(*replyTable,0,MPI_COMM_WORLD);
-	replyTable->enroll(numChunks);
-	replyTable->sync();
+  MSA1DREPLYLIST *replyTable;
+  if(myRank == 0){
+    replyTable = new MSA1DREPLYLIST(numChunks,numChunks);
+  }else{
+    replyTable = new MSA1DREPLYLIST;
+  }
+  MPI_Bcast_pup(*replyTable,0,MPI_COMM_WORLD);
+  replyTable->enroll(numChunks);
+  replyTable->sync();
   // look up request table, put answer in reply table 
   // receive: for local elemID, the adjacency on this set of shared indices is (remote elemID, remote partition ID, remote elem type)
   // add adjacencies to local table
   // lots of error checking :)
-	
-	//Look at each request that in the requestTable for this chunk
-	//Put the data for the requests in our own table and then create replies
-	CkVec<adjRequest> *receivedRequestVec = requestTable->get(myRank).vec;
-	for(int i=0;i<receivedRequestVec->length();i++){		
-		adjRequest &receivedRequest = (*receivedRequestVec)[i];
-		const IDXL_List &sharedNodeList = node->shared.getList(receivedRequest.chunkID);
-		CkVec<int> sharedNodes(nodeSetSize);
-		//Translate all the nodes in the nodeSet of the request
-		for(int j=0;j<nodeSetSize;j++){
-			int sharedNode = sharedNodeList[receivedRequest.translatedNodeSet[j]];
-			sharedNodes.push_back(sharedNode);
-		}
-		sharedNodes.quickSort();
-		//We need to find the matching nodeset for the nodeset in the request
-		//We look it up in the adaptAdjTable for the minimum node on this chunk
-		adjNode *minNode = &adaptAdjTable[sharedNodes[0]];
-		int found=0;
-		//search for the nodeSet in the list of adjacencies around minNode
-		adjElem *rover =  searchAdjElemInList(minNode->adjElemList,sharedNodes.getVec(),nodeSetSize,-1,&found);
-		if(found){
-			 //we have found a matching adjElem for the requested nodeset
-			 //we shall set the adjacency correctly in the adjacency Table for the 
-			 //elemID in the found adjElem. We need to send a reply to the requesting chunk
-			 int matchingElemID = rover->next->elemID;
-			 adaptAdj *matchingAdaptAdj = &adaptAdjacencies[matchingElemID*numAdjElems + rover->next->nodeSetID];
-			 matchingAdaptAdj->partID = receivedRequest.chunkID;
-			 matchingAdaptAdj->localID = receivedRequest.elemID;
-			 matchingAdaptAdj->elemType = receivedRequest.elemType;
+  
+  //Look at each request that in the requestTable for this chunk
+  //Put the data for the requests in our own table and then create replies
+  CkVec<adjRequest> *receivedRequestVec = requestTable->get(myRank).vec;
+  for(int i=0;i<receivedRequestVec->length();i++){    
+    adjRequest &receivedRequest = (*receivedRequestVec)[i];
+    const IDXL_List &sharedNodeList = node->shared.getList(receivedRequest.chunkID);
+    CkVec<int> sharedNodes(nodeSetSize);
+    //Translate all the nodes in the nodeSet of the request
+    for(int j=0;j<nodeSetSize;j++){
+      int sharedNode = sharedNodeList[receivedRequest.translatedNodeSet[j]];
+      sharedNodes[j] = sharedNode;
+    }
+    sharedNodes.quickSort();
+    //We need to find the matching nodeset for the nodeset in the request
+    //We look it up in the adaptAdjTable for the minimum node on this chunk
+    adjNode *minNode = &adaptAdjTable[sharedNodes[0]];
+    int found=0;
+    //search for the nodeSet in the list of adjacencies around minNode
+    adjElem *rover =  searchAdjElemInList(minNode->adjElemList,sharedNodes.getVec(),nodeSetSize,-1,&found);
+    printf("[%d] Received request (%d,%d,%d,%d) minNode %d found %d\n",myRank,receivedRequest.elemID,receivedRequest.chunkID,receivedRequest.elemType,receivedRequest.nodeSetID,sharedNodes[0],found);
+    if(found){
+       //we have found a matching adjElem for the requested nodeset
+       //we shall set the adjacency correctly in the adjacency Table for the 
+       //elemID in the found adjElem. We need to send a reply to the requesting chunk
+       int matchingElemID;
+       if(rover == NULL){
+           rover = minNode->adjElemList;
+       }else{
+          rover = rover->next;
+       }
+       matchingElemID = rover->elemID;
+       adaptAdj *matchingAdaptAdj = &adaptAdjacencies[matchingElemID*numAdjElems + rover->nodeSetID];
+       CkAssert(matchingAdaptAdj->localID == -1);
+       matchingAdaptAdj->partID = receivedRequest.chunkID;
+       matchingAdaptAdj->localID = receivedRequest.elemID;
+       matchingAdaptAdj->elemType = receivedRequest.elemType;
 
-			 //Set requesting data in reply to that in receivedRequest
-			 //Put in data from rover->next into the replyElem portion of data
-			 adjReply reply;
-			 reply.requestingElemID = receivedRequest.elemID;
-			 reply.requestingNodeSetID = receivedRequest.nodeSetID;
-			 reply.replyingElem.partID = myRank;
-			 reply.replyingElem.localID = matchingElemID;
-			 reply.replyingElem.elemType = elemType;
-			 //Write into the replyTable
-			 replyTable->accumulate(receivedRequest.chunkID,reply);
-		}else{
-			//we have no matching nodeset for this request.. hopefully some other chunk does
-			//we canignore this request
-		}
-	}
+       //Set requesting data in reply to that in receivedRequest
+       //Put in data from rover->next into the replyElem portion of data
+       adjReply reply;
+       reply.requestingElemID = receivedRequest.elemID;
+       reply.requestingNodeSetID = receivedRequest.nodeSetID;
+       reply.replyingElem.partID = myRank;
+       reply.replyingElem.localID = matchingElemID;
+       reply.replyingElem.elemType = elemType;
+       //Write into the replyTable
+       replyTable->accumulate(receivedRequest.chunkID,reply);
+    }else{
+      //we have no matching nodeset for this request.. hopefully some other chunk does
+      //we canignore this request
+    }
+  }
 
-	requestTable->sync();
-	replyTable->sync();
+  requestTable->sync();
+  replyTable->sync();
 
-	//Once the replies are back
-	//Loop through each reply and update the adaptAdjacencies for each element in the reply
-	CkVec<adjReply> *receivedReplyVec = replyTable->get(myRank).vec;
-	for(int i=0;i< receivedReplyVec->size();i++){
-		adjReply *receivedReply = &(*receivedReplyVec)[i];
-		adaptAdjacencies[receivedReply->requestingElemID*numAdjElems + receivedReply->requestingNodeSetID] = receivedReply->replyingElem;
-	}
+  //Once the replies are back
+  //Loop through each reply and update the adaptAdjacencies for each element in the reply
+  CkVec<adjReply> *receivedReplyVec = replyTable->get(myRank).vec;
+  for(int i=0;i< receivedReplyVec->size();i++){
+    adjReply *receivedReply = &(*receivedReplyVec)[i];
+    printf("[%d] Replies received for (%d,%d) (%d,%d,%d)\n",myRank,receivedReply->requestingElemID,receivedReply->requestingNodeSetID,receivedReply->replyingElem.partID,receivedReply->replyingElem.localID,receivedReply->replyingElem.elemType);
+    adaptAdjacencies[receivedReply->requestingElemID*numAdjElems + receivedReply->requestingNodeSetID] = receivedReply->replyingElem;
+  }
 
-	replyTable->sync();
-	//Register the adaptAdjacency with ParFUM
+  replyTable->sync();
+  //Register the adaptAdjacency with ParFUM
+  //
+  dumpAdaptAdjacencies(adaptAdjacencies,numElems,numAdjElems,myRank);
 }
+
+void dumpAdaptAdjacencies(adaptAdj *adaptAdjacencies,int numElems,int numAdjElems,int myRank){
+  for(int i=0;i<numElems;i++){
+    printf("[%d] %d  :",myRank,i);
+    for(int j=0;j<numAdjElems;j++){
+      adaptAdj *entry = &adaptAdjacencies[i*numAdjElems+j];
+      printf("(%d,%d,%d)",entry->partID,entry->localID,entry->elemType);
+    }
+    printf("\n");
+  }
+}
+
 
 // Access functions
 
@@ -401,11 +443,11 @@ void SetAdaptAdj(int elemID, int elemType, int edgeFaceID, adaptAdj nbr)
 // that are handled
   
 #define copyNodeSetMap(numAdjElems,nodeSetSize,nodeSetMap,srcMap) {\
-	for (int i=0;i<numAdjElems;i++){ \
-		for(int j=0;j<nodeSetSize;j++){ \
-			nodeSetMap[i][j] = srcMap[i][j]; \
-		} \
-	} \
+  for (int i=0;i<numAdjElems;i++){ \
+    for(int j=0;j<nodeSetSize;j++){ \
+      nodeSetMap[i][j] = srcMap[i][j]; \
+    } \
+  } \
 }
 
 void guessElementShape(int dim,int nodesPerElem,int *numAdjElems,int *nodeSetSize,int nodeSetMap[MAX_ADJELEMS][MAX_NODESET_SIZE]){
@@ -418,13 +460,13 @@ void guessElementShape(int dim,int nodesPerElem,int *numAdjElems,int *nodeSetSiz
                 //Triangles
                 *numAdjElems = 3;
                 *nodeSetSize = 2;
-								copyNodeSetMap(3,2,nodeSetMap,nodeSetMap2d_tri)
+                copyNodeSetMap(3,2,nodeSetMap,nodeSetMap2d_tri)
                 break;
               case 4:
                 //quads
                 *numAdjElems = 4;
                 *nodeSetSize = 2;
-								copyNodeSetMap(4,2,nodeSetMap,nodeSetMap2d_quad)
+                copyNodeSetMap(4,2,nodeSetMap,nodeSetMap2d_quad)
                 break;
             }
           }
@@ -437,13 +479,13 @@ void guessElementShape(int dim,int nodesPerElem,int *numAdjElems,int *nodeSetSiz
                 //Tetrahedra
                 *numAdjElems = 4;
                 *nodeSetSize = 3;
-								copyNodeSetMap(4,3,nodeSetMap,nodeSetMap3d_tet)
+                copyNodeSetMap(4,3,nodeSetMap,nodeSetMap3d_tet)
                 break;
               case 6:
                 //Hexahedra
                 *numAdjElems = 6;
                 *nodeSetSize = 4;
-								copyNodeSetMap(6,4,nodeSetMap,nodeSetMap3d_hex)
+                copyNodeSetMap(6,4,nodeSetMap,nodeSetMap3d_hex)
                 break;
             }
           }
