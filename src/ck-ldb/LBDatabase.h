@@ -16,6 +16,7 @@
 #include <math.h>
 #include "lbdb.h"
 #include "LBDBManager.h"
+#include "lbdb++.h"
 
 #define LB_FORMAT_VERSION     2
 

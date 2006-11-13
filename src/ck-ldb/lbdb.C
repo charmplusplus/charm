@@ -185,7 +185,7 @@ extern "C" void LDCollectStatsOff(LDHandle _db)
   db->TurnStatsOff();
 }
 
-extern "C" int LDCollectingStats(LDHandle _db)
+extern "C" int CLDCollectingStats(LDHandle _db)
 {
   LBDB *const db = (LBDB*)(_db.handle);
 
