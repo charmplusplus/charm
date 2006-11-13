@@ -183,8 +183,8 @@ CKHEADERS=ck.h ckstream.h envelope.h init.h qd.h charm.h charm++.h \
 	  ckarray.h cklocation.h ckreduction.h ckcheckpoint.h ckmemcheckpoint.h ckevacuation.h\
 	  ckobjQ.h readonly.h charisma.h ComlibArrayListener.h ComlibStrategy.h\
 	  ComlibLearner.h $(UTILHEADERS) \
-	  tempo.h waitqd.h LBDatabase.h lbdb.h LBProfit.h LBDBManager.h	\
-	  LBComm.h LBOM.h LBObj.h LBMachineUtil.h LBAgent.h \
+	  tempo.h waitqd.h LBDatabase.h lbdb.h lbdb++.h LBProfit.h \
+          LBDBManager.h	LBComm.h LBOM.h LBObj.h LBMachineUtil.h LBAgent.h \
 	  Refiner.h RefinerApprox.h RefinerComm.h ObjGraph.h heap.h \
           elements.h CommLBHeap.h topology.h manager.h \
 	  BaseLB.h CentralLB.h CentralLBMsg.h RandCentLB.h RecBisectBfLB.h \
