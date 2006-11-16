@@ -920,6 +920,33 @@ class CkThrCallArg {
 extern void CkStartQD(const CkCallback& cb);
 #define CkExitAfterQuiescence() CkStartQD(CkCallback(CkCallback::ckExit))
 
+
+#if !CMK_MACHINE_PROGRESS_DEFINED
+#define CkNetworkProgress() 
+#define CkNetworkProgressAfter(p) 
+
+#else
+void CmiMachineProgressImpl();
+
+#define CkNetworkProgress() {CpvAccess(networkProgressCount) ++; \
+if (LBDatabaseObj()->getLBDB()->StatsOn() == 0) \
+      if(CpvAccess(networkProgressCount) >=  networkProgressPeriod) { \    
+        CmiMachineProgressImpl(); \
+        CpvAccess(networkProgressCount) = 0; \
+      } \
+} \
+
+#define CkNetworkProgressAfter(p) {CpvAccess(networkProgressCount) ++; \
+      if(CpvAccess(networkProgressCount) >=  p) { \
+        CmiMachineProgressImpl(); \
+        CpvAccess(networkProgressCount) = 0; \
+      } \
+} \
+
+#endif
+
+
+
 #include "ckmemcheckpoint.h"
 #include "readonly.h"
 #include "ckarray.h"
