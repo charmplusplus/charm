@@ -24,6 +24,8 @@
    (0, 4, 5, 1), (5, 4, 6, 7) in that order
    
 */
+
+// NOTE: review for mixed and cohesive element handling
 #include <set>
 #include <algorithm>
 
@@ -33,95 +35,102 @@
 // Each instance of adaptAdj represents an element to 
 // element adjacency
 class adaptAdj{
-public:
+ public:
   int partID;   // partition ID
   int localID;  // local entity ID on partition partID
   int elemType; // element type (tri, quad, tet, hex, etc.)
-	adaptAdj():partID(-1),localID(-1),elemType(-1){};
-	adaptAdj(int _partID,int _localID,int _elemType) : partID(_partID), localID(_localID), elemType(_elemType){};
-	inline adaptAdj &operator=(const adaptAdj &rhs){
-		partID = rhs.partID;
-		localID = rhs.localID;
-		elemType = rhs.elemType;
-		return *this;
-	}
-	virtual void pup(PUP::er &p){
-		p | partID;
-		p | localID;
-		p | elemType;
-	}
+  adaptAdj():partID(-1),localID(-1),elemType(-1){};
+  adaptAdj(int _partID,int _localID,int _elemType) : partID(_partID), localID(_localID), elemType(_elemType){};
+  inline adaptAdj &operator=(const adaptAdj &rhs){
+    partID = rhs.partID;
+    localID = rhs.localID;
+    elemType = rhs.elemType;
+    return *this;
+  }
+  virtual void pup(PUP::er &p){
+    p | partID;
+    p | localID;
+    p | elemType;
+  }
 };
 
 // Each adjElem describes an adjacency by enumerating
 // the nodes that form the "edge" shared by two 
 // adjacent elements
 class adjElem { // list entry for an element incident on a node
-public:
+ public:
   int elemID; // local element id
-	int nodeSetID; // which nodeSet in nodeSetMap does this nodeSet refer to
-	CkVec<int> nodeSet; //local node ids
+  int nodeSetID; // which nodeSet in nodeSetMap does this nodeSet refer to
+  CkVec<int> nodeSet; //local node ids
   adjElem *next;
-	adjElem(int nodeSetSize) : nodeSet(nodeSetSize){};
+  adjElem(int nodeSetSize) : nodeSet(nodeSetSize){};
 };
 
 class adjNode { // struct to store each node's adjacency info
-public:	
+ public:	
   int *sharedWithPartition; // array of partition IDs on which there is a corresponding
                             // shared node; this is NULL if this is not a shared node
-	int *sharedWithLocalIdx;  // local Idx in idxl list with the corresponding chunk in sharedWithPartition
-	int numSharedPartitions;
+  int *sharedWithLocalIdx;  // local Idx in idxl list with the corresponding chunk in sharedWithPartition
+  int numSharedPartitions;
   int adjElemCount;         // number of entries in adjElemList (below)
-														// max length of adjElemList is 2*nodal degree
+  // max length of adjElemList is 2*nodal degree
   adjElem *adjElemList;     // list of elems incident on this node
-  adjNode() { sharedWithPartition = NULL; adjElemList = NULL; adjElemCount = 0; numSharedPartitions=0;}
-	~adjNode(){ delete [] sharedWithPartition; delete [] sharedWithLocalIdx;}
+  adjNode() { 
+    sharedWithPartition = NULL;
+    adjElemList = new adjElem(0); // Create a dummy head node in the list
+    adjElemList->elemID = -1;
+    adjElemList->next = NULL;
+    adjElemCount = 0; 
+    numSharedPartitions=0;
+  }
+  ~adjNode(){ delete [] sharedWithPartition; delete [] sharedWithLocalIdx;}
 };
 
 class adjRequest{
-public:
-	int elemID,chunkID,elemType,nodeSetID;
-	int translatedNodeSet[MAX_NODESET_SIZE];
-	adjRequest(): elemID(-1),chunkID(-1),elemType(-1){};
-	adjRequest(int _elemID,int _chunkID,int _nodeSetID,int _elemType ): elemID(_elemID),chunkID(_chunkID),nodeSetID(_nodeSetID), elemType(_elemType){};
-	adjRequest(const adjRequest &rhs){
-		*this = rhs;
-	}
-	inline adjRequest& operator=(const adjRequest &rhs){
-		elemID = rhs.elemID;
-		chunkID = rhs.chunkID;
-		elemType = rhs.elemType;
-		nodeSetID = rhs.nodeSetID;
-		memcpy(&translatedNodeSet[0],&(rhs.translatedNodeSet[0]),MAX_NODESET_SIZE*sizeof(int));
-		return *this;
-	}
-	virtual void pup(PUP::er &p){
-	 p | elemID;
-	 p | chunkID;
-	 p | elemType;
-	 p | nodeSetID;
-	 p(translatedNodeSet,MAX_NODESET_SIZE);
-	}
+ public:
+  int elemID,chunkID,elemType,nodeSetID;
+  int translatedNodeSet[MAX_NODESET_SIZE];
+  adjRequest(): elemID(-1),chunkID(-1),elemType(-1){};
+  adjRequest(int _elemID,int _chunkID,int _nodeSetID,int _elemType ): elemID(_elemID),chunkID(_chunkID),nodeSetID(_nodeSetID), elemType(_elemType){};
+  adjRequest(const adjRequest &rhs){
+    *this = rhs;
+  }
+  inline adjRequest& operator=(const adjRequest &rhs){
+    elemID = rhs.elemID;
+    chunkID = rhs.chunkID;
+    elemType = rhs.elemType;
+    nodeSetID = rhs.nodeSetID;
+    memcpy(&translatedNodeSet[0],&(rhs.translatedNodeSet[0]),MAX_NODESET_SIZE*sizeof(int));
+    return *this;
+  }
+  virtual void pup(PUP::er &p){
+    p | elemID;
+    p | chunkID;
+    p | elemType;
+    p | nodeSetID;
+    p(translatedNodeSet,MAX_NODESET_SIZE);
+  }
 };
 
 class adjReply {
-public:
-	int requestingElemID,requestingNodeSetID;
-	adaptAdj replyingElem;
-	adjReply(): requestingElemID(-1),requestingNodeSetID(-1), replyingElem(){};
-	adjReply(const adjReply &rhs){
-		*this = rhs;
-	}
-
-	inline adjReply& operator=(const adjReply &rhs){
-		requestingElemID = rhs.requestingElemID;
-		requestingNodeSetID = rhs.requestingNodeSetID;
-		replyingElem = rhs.replyingElem;
-	}
-	virtual void pup(PUP::er &p){
-		p | requestingElemID;
-		p | requestingNodeSetID;
-		replyingElem.pup(p);
-	}
+ public:
+  int requestingElemID,requestingNodeSetID;
+  adaptAdj replyingElem;
+  adjReply(): requestingElemID(-1),requestingNodeSetID(-1), replyingElem(){};
+  adjReply(const adjReply &rhs){
+    *this = rhs;
+  }
+  
+  inline adjReply& operator=(const adjReply &rhs){
+    requestingElemID = rhs.requestingElemID;
+    requestingNodeSetID = rhs.requestingNodeSetID;
+    replyingElem = rhs.replyingElem;
+  }
+  virtual void pup(PUP::er &p){
+    p | requestingElemID;
+    p | requestingNodeSetID;
+    replyingElem.pup(p);
+  }
 };
 
 
@@ -138,24 +147,31 @@ void CreateAdaptAdjacencies(int meshid, int elemType);
 
 /** Look up elemID in elemType array, access edgeFaceID-th adaptAdj. */
 adaptAdj *GetAdaptAdj(int meshid, int elemID, int elemType, int edgeFaceID);
-/** Look up elemID in elemType array, calculate edgeFaceID from vertexList (with
-    GetEdgeFace below), and access edgeFaceID-th adaptAdj with GetAdaptAdj above. */
+/** Look up elemID in elemType array, calculate edgeFaceID from
+    vertexList (with GetEdgeFace below), and access edgeFaceID-th
+    adaptAdj with GetAdaptAdj above. */
 adaptAdj *GetAdaptAdj(int meshid, int elemID, int elemType, int *vertexList);
 
 /** Look up elemID in elemType array and determine the set of vertices
     associated with the edge or face represented by edgeFaceID. */
-void GetVertices(int meshid, int elemID, int elemType, int edgeFaceID, int *vertexList);
-/** Look up elemID in elemType array and determine the edge or face ID specified by
-    the set of vertices in vertexList. */
+void GetVertices(int meshid, int elemID, int elemType, int edgeFaceID, 
+		 int *vertexList);
+/** Look up elemID in elemType array and determine the edge or face ID
+    specified by the set of vertices in vertexList. */
 int GetEdgeFace(int meshid, int elemID, int elemType, int *vertexList);
 
 // Update functions
-/** Look up elemID in elemType array and set the adjacency on edgeFaceID to nbr. */
-void SetAdaptAdj(int meshid, int elemID, int elemType, int edgeFaceID, adaptAdj nbr);
+/** Look up elemID in elemType array and set the adjacency on
+    edgeFaceID to nbr. */
+void SetAdaptAdj(int meshid, int elemID, int elemType, int edgeFaceID, 
+		 adaptAdj nbr);
 
 
 /**given the dimensions and nodes per element guess whether the element 
  is a triangle, quad, tet or hex. At the moment these are the 4 shapes
  that are handled */
-void guessElementShape(int dim,int nodesPerElem,int *numAdjElems,int *nodeSetSize,int nodeSetMap[MAX_ADJELEMS][MAX_NODESET_SIZE]);
-void dumpAdaptAdjacencies(adaptAdj *adaptAdjacencies,int numElems,int numAdjElems,int myRank);
+void guessElementShape(int dim,int nodesPerElem,int *numAdjElems,
+		       int *nodeSetSize,
+		       int nodeSetMap[MAX_ADJELEMS][MAX_NODESET_SIZE]);
+void dumpAdaptAdjacencies(adaptAdj *adaptAdjacencies,int numElems,
+			  int numAdjElems,int myRank);

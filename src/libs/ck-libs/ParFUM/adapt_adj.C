@@ -13,10 +13,16 @@ int nodeSetMap2d_quad[4][2] = {{0,1},{1,2},{2,3},{3,0}};
 int nodeSetMap3d_tet[4][3] = {{0,1,2},{1,0,3},{1,3,2},{0,2,3}};
 int nodeSetMap3d_hex[6][4] = {{0,1,2,3},{1,5,6,2},{2,6,7,3},{3,7,4,0},{0,4,5,1},{5,4,6,7}};
 
-inline void addSharedNodeData(int node,const IDXL_Rec *sharedChunkList,adjNode *adaptAdjTable){
+int nodeSetMap2d_cohquad[2][2] = {{0,1},{2,3}}; // Cohesive for 2D triangles
+int nodeSetMap3d_cohprism[2][3] = {{0,1,2},{3,4,5}}; // Cohesive for 3D tets
+
+inline void addSharedNodeData(int node,const IDXL_Rec *sharedChunkList,
+			      adjNode *adaptAdjTable){
   adaptAdjTable[node].numSharedPartitions = sharedChunkList->getShared();
-  adaptAdjTable[node].sharedWithPartition = new int [sharedChunkList->getShared()];
-  adaptAdjTable[node].sharedWithLocalIdx = new int [sharedChunkList->getShared()];
+  adaptAdjTable[node].sharedWithPartition = 
+    new int [sharedChunkList->getShared()];
+  adaptAdjTable[node].sharedWithLocalIdx = 
+    new int [sharedChunkList->getShared()];
   for(int j=0;j<sharedChunkList->getShared();j++){
     int sharedChunk = sharedChunkList->getChk(j);
     int sharedIdx = sharedChunkList->getIdx(j);
@@ -25,48 +31,39 @@ inline void addSharedNodeData(int node,const IDXL_Rec *sharedChunkList,adjNode *
   }
 }
 
-
-
-inline void addElementNodeSetData(int elem,const int *conn,int numAdjElems,const int nodesPerElem,int nodeSetSize,int nodeSetMap[MAX_ADJELEMS][MAX_NODESET_SIZE],adjNode *adaptAdjTable){
-   for (int j=0; j<numAdjElems; j++) { // There is one nodeSet per neighbor element
-     adjElem *e = new adjElem(nodeSetSize);
-     e->nodeSetID = j;
-     for (int k=0; k<nodeSetSize; k++) { // Build the nodeSet for an element pairing
-       e->nodeSet[k] = conn[elem*nodesPerElem+nodeSetMap[j][k]];
-     }
-     // Add this element-nodeSet pair to the table at the min nodeID in the nodeSet
-     e->nodeSet.quickSort();
-     int minNode = e->nodeSet[0];
-     e->elemID = elem;
-     e->next = adaptAdjTable[minNode].adjElemList;
-     adaptAdjTable[minNode].adjElemList = e;
-     adaptAdjTable[minNode].adjElemCount++;
-   }
+inline void addElementNodeSetData(int elem,const int *conn,int numAdjElems,
+				  const int nodesPerElem,int nodeSetSize,
+      			  int nodeSetMap[MAX_ADJELEMS][MAX_NODESET_SIZE],
+				  adjNode *adaptAdjTable){
+  for (int j=0; j<numAdjElems; j++) { // one nodeSet per neighbor element
+    adjElem *e = new adjElem(nodeSetSize);
+    e->nodeSetID = j;
+    for (int k=0; k<nodeSetSize; k++) { // Build nodeSet for an element pairing
+      e->nodeSet[k] = conn[elem*nodesPerElem+nodeSetMap[j][k]];
+    }
+    // Add this element-nodeSet pair to table at min nodeID in the nodeSet
+    e->nodeSet.quickSort();
+    int minNode = e->nodeSet[0];
+    e->elemID = elem;
+    e->next = adaptAdjTable[minNode].adjElemList->next;
+    adaptAdjTable[minNode].adjElemList->next = e;
+    adaptAdjTable[minNode].adjElemCount++;
+  }
 }
 
 
-//Look for an adjElem (rover->next) whose nodeSet matches that specified in searchForNodeSet in the link list following
-//adjStart and return rover such that rover->next matches
-//with the searchForNodeSet. It also checks that the elemID of the element being searched 
-//does not match with that of searchForElemID.
-//*found is set to 1 if match is found .. else to 0
-inline adjElem *searchAdjElemInList(adjElem *adjStart,int *searchForNodeSet,int nodeSetSize,int searchForElemID,int *found){
+//Look for an adjElem (rover->next) whose nodeSet matches that
+//specified in searchForNodeSet in the link list following adjStart
+//and return rover such that rover->next matches with the
+//searchForNodeSet. It also checks that the elemID of the element
+//being searched does not match with that of searchForElemID.  *found
+//is set to 1 if match is found .. else to 0
+inline adjElem *searchAdjElemInList(adjElem *adjStart,int *searchForNodeSet,
+				    int nodeSetSize,int searchForElemID,
+				    int *found){
   adjElem *rover = adjStart; // compare rover->next with adjStart
   *found = 0;
   
-  if(searchForElemID == -1){
-    //Check adjStart itself as well
-    *found = 1;
-    for(int j=0;j<nodeSetSize;j++){
-      if(adjStart->nodeSet[j] != searchForNodeSet[j]){
-        *found = 0;
-        break;
-      }
-    }
-    if(*found){
-      return NULL;
-    }
-  }
   while (rover->next != NULL) {
     if (rover->next->elemID != searchForElemID) {
       *found = 1; // found an element that is not myself, possibly a match
@@ -107,18 +104,19 @@ void CreateAdaptAdjacencies(int meshid, int elemType)
   assert(dim == 2|| dim == 3);
 
   
-  // A nodeSet is a set of nodes that defines a pairing of two adjacent elements;
-  // For example, in 2D triangle meshes, the nodeSet is the nodes of an edge between
-  // two elements.
-  // The nodeSetMap is an ordering of element-local node IDs that specifies all 
-  // possible nodeSets for a particular element type
+  // A nodeSet is a set of nodes that defines a pairing of two
+  // adjacent elements; For example, in 2D triangle meshes, the
+  // nodeSet is the nodes of an edge between two elements.  The
+  // nodeSetMap is an ordering of element-local node IDs that
+  // specifies all possible nodeSets for a particular element type
   int nodeSetMap[MAX_ADJELEMS][MAX_NODESET_SIZE];
   guessElementShape(dim,nodesPerElem,&numAdjElems,&nodeSetSize,nodeSetMap);
   CkAssert(nodeSetSize <= MAX_NODESET_SIZE);
   
 
-  // Create the adaptAdj array associated with the new FEM attribute FEM_ADAPT_ADJ
-  // This array will be populated by this function, then set on the FEM mesh
+  // Create the adaptAdj array associated with the new FEM attribute
+  // FEM_ADAPT_ADJ This array will be populated by this function, then
+  // set on the FEM mesh
   adaptAdj *adaptAdjacencies;
   adaptAdjacencies = new adaptAdj[numElems*numAdjElems];
 
@@ -127,8 +125,9 @@ void CreateAdaptAdjacencies(int meshid, int elemType)
     adaptAdjacencies[i].partID = -1;
   }
 
-  // Create an array of size equal to the number of local nodes, each entry has a
-  // pair:  (shared partitions, list of elem-nodeSet pairs) Call this adaptAdjTable
+  // Create an array of size equal to the number of local nodes, each
+  // entry has a pair: (shared partitions, list of elem-nodeSet pairs)
+  // Call this adaptAdjTable
   adjNode *adaptAdjTable;
   adaptAdjTable = new adjNode[numNodes];
 
@@ -145,9 +144,10 @@ void CreateAdaptAdjacencies(int meshid, int elemType)
   // Pull out conn for elems of elemType
   const int *conn = (elem->getConn()).getData();
   
-  for (int i=0; i<numElems; i++) { // Add each element-nodeSet pair to the table
+  for (int i=0; i<numElems; i++) { // Add each element-nodeSet pair to table
     if(elem->is_valid(i)){
-      addElementNodeSetData(i,conn,numAdjElems,nodesPerElem,nodeSetSize,nodeSetMap,adaptAdjTable);
+      addElementNodeSetData(i,conn,numAdjElems,nodesPerElem,nodeSetSize,
+			    nodeSetMap,adaptAdjTable);
     }
   }
 
@@ -157,50 +157,42 @@ void CreateAdaptAdjacencies(int meshid, int elemType)
     // We try to match those up
     if(node->is_valid(i) && adaptAdjTable[i].adjElemList != NULL){  
 //      CkAssert(adaptAdjTable[i].adjElemList != NULL);
-      adjElem *adjStart = adaptAdjTable[i].adjElemList;
-      adjElem *preStart = adjStart; //pointer before adjStart so that we can delete adjStart
-                                    //Note: as long as adjStart is the first element in adjElemList
-                                    //preStart = adjStart. After that preStart->next = adjStart
-      while (adjStart != NULL) { //each entry in the adjElemList of a node 
+      adjElem *preTarget = adaptAdjTable[i].adjElemList;
+      adjElem *target = adaptAdjTable[i].adjElemList->next;
+      while (target != NULL) { //loop over adjElemList of a node
         int found = 0; 
-        //AdjStart represents an adjacency between two elements
+        //target represents an adjacency between two elements
         //We search for the other adjElem corresponding to that adjancency:
-        //Look for an entry in adjElemList after adjStart such that 
-        //the nodeset of that entry and adjStart match but they 
+        //Look for an entry in adjElemList after target such that 
+        //the nodeset of that entry and that of target match but they 
         //do not belong to the same element. 
-        adjElem *rover = searchAdjElemInList(adjStart,adjStart->nodeSet.getVec(),nodeSetSize,adjStart->elemID,&found); 
+        adjElem *rover = searchAdjElemInList(preTarget,
+					     target->nodeSet.getVec(),
+					     nodeSetSize,target->elemID,
+					     &found); 
         
-        if (found) {
-          // We found an adjacent element for adjStart->elemID
-          
-          // Set adjacency of adjStart->elemID corresponding to nodeSet to 
+        if (found) { // We found a local element adjacent to target->elemID
+          // Set adjacency of target->elemID corresponding to nodeSet to 
           // rover->next->elemID, and vice versa
-          // Store adjacency info in adaptAdjacency of each one and use nodeSetID to index into 
-          // adaptAdjacency
-          adaptAdjacencies[numAdjElems*adjStart->elemID+adjStart->nodeSetID] = adaptAdj(myRank,rover->next->elemID,elemType);
-          adaptAdjacencies[numAdjElems*rover->next->elemID+rover->next->nodeSetID] = adaptAdj(myRank,adjStart->elemID,elemType);
+          // Store adjacency info in adaptAdjacency of each one and
+          // use nodeSetID to index into adaptAdjacency
+          adaptAdjacencies[numAdjElems*target->elemID+target->nodeSetID] = 
+	    adaptAdj(myRank,rover->next->elemID,elemType);
+          adaptAdjacencies[numAdjElems*rover->next->elemID+rover->next->nodeSetID] = adaptAdj(myRank,target->elemID,elemType);
           // Remove both elem-nodeSet pairs from the list
           adjElem *tmp = rover->next;
           rover->next = rover->next->next;
           delete tmp;
-          if (preStart == adjStart) { // adjStart was at the start of adjElemList
-            adaptAdjTable[i].adjElemList = adjStart->next;
-            delete adjStart; 
-            adjStart = preStart = adaptAdjTable[i].adjElemList;
-          }else { //adjStart was not at the start
-            preStart->next = adjStart->next;
-            delete adjStart;
-            adjStart = preStart->next;
-          }
-        }else { 
-          // No match for adjStart was found in adjElemList
-          // It means that either adjStart is on the domain boundary 
-          // or it is on the chunk boundary and its neighbor is on another VP
-          // Move adjStart to next entry in adjElemList
-          if (adjStart != preStart){
-            preStart = preStart->next;
-          }
-          adjStart = adjStart->next;
+	  tmp = target;
+	  preTarget->next = target->next;
+	  target = target->next;
+	  delete tmp;
+        }else { // No match for target was found in adjElemList
+          // This means that either target is on the domain boundary 
+          // or it is on a partition boundary and its neighbor is on another VP
+          // Move target to next entry in adjElemList
+	  preTarget = target;
+	  target = target->next;
         }
       }
     }
@@ -222,86 +214,89 @@ void CreateAdaptAdjacencies(int meshid, int elemType)
 
 //  CkVec<adjRequest *> requestVec; // This vector stores the requests made by this chunk
   
-  for (int i=0; i<numNodes; i++) { 
-    // For each node, examine the remaining  entries in adjElemList
+  for (int i=0; i<numNodes; i++) { // Examine each node's remaining elements
     if(node->is_valid(i)){
-      if (adaptAdjTable[i].adjElemList!=NULL) {
-        adjElem *adjStart = adaptAdjTable[i].adjElemList;
+      if (adaptAdjTable[i].adjElemList->next!=NULL) {
+        adjElem *adjStart = adaptAdjTable[i].adjElemList->next;
         while (adjStart !=NULL) {
           // create and empty set, commonSharedChunks
           std::set<int> commonSharedChunks;
           for (int j=0; j<nodeSetSize; j++) {
-          // look up sharedWithPartitions for node: 
-          //    adaptAdjTable[i]->adjElemList->nodeset[j]
-          // intersect with commonSharedChunks
+	    // look up sharedWithPartitions for node: 
+	    //    adaptAdjTable[i]->adjElemList->nodeset[j]
+	    // intersect with commonSharedChunks
             int sharedNode = adjStart->nodeSet[j];
             adjNode *sharedNodeAdj = &adaptAdjTable[sharedNode];
             std::set<int> sharedChunks(sharedNodeAdj->sharedWithPartition,
-                sharedNodeAdj->sharedWithPartition+sharedNodeAdj->numSharedPartitions);
+				       sharedNodeAdj->sharedWithPartition+sharedNodeAdj->numSharedPartitions);
             if(j == 0){
               commonSharedChunks = sharedChunks;
             }else{
               std::set<int> tmpIntersect;
               set_intersection(commonSharedChunks.begin(), commonSharedChunks.end(), 
-                  sharedChunks.begin(), sharedChunks.end(),inserter(tmpIntersect, tmpIntersect.begin()));
+			       sharedChunks.begin(), sharedChunks.end(),inserter(tmpIntersect, tmpIntersect.begin()));
               commonSharedChunks = tmpIntersect;              
             }
           }
-          // At this point commonSharedChunks contains the list of chunks with which
-          // the element pointed by adjStart might be shared
+          // At this point commonSharedChunks contains the list of
+          // chunks with which the element pointed by adjStart might
+          // be shared
           int numCommonSharedChunks = commonSharedChunks.size();
           if(numCommonSharedChunks > 0){
-          //adjStart is possibly shared with these chunks. It is shared across 
-          //the adjStart->nodeSet set of nodes.
+	    //adjStart is possibly shared with these chunks. It is
+	    //shared across the adjStart->nodeSet set of nodes.
             adjRequest *adjRequestList = new adjRequest[numCommonSharedChunks];
-            //Translate the nodes in the nodeSet into the index in the idxl list for each chunk
-            //in the commonSharedChunks
+            //Translate the nodes in the nodeSet into the index in the
+            //idxl list for each chunk in the commonSharedChunks
             for(int j=0;j<nodeSetSize;j++){
               int sharedNode = adjStart->nodeSet[j];
               const IDXL_Rec *recSharedNode = node->shared.getRec(sharedNode);
               int countChunk=0;
               for(std::set<int>::iterator chunkIterator = commonSharedChunks.begin();chunkIterator != commonSharedChunks.end();chunkIterator++){
-                countChunk++;
                 int chunk = *chunkIterator;
-//                if(chunk > myRank){
-                  if(j == 0){
-                    // if this is the first node we need to initialize the adjRequestobject
-                     adjRequestList[countChunk] =  adjRequest(adjStart->elemID,myRank,adjStart->nodeSetID,elemType);
-                  }
-                  int sharedNodeIdx=-1; // index of sharedNode in the idxl list of chunk
-                  //search for this chunk in the list of chunks shared by this node
-                  for(int k=0;k<recSharedNode->getShared();k++){
-                    if(recSharedNode->getChk(k) == chunk){
-                      //found the correct chunk
-                      sharedNodeIdx = recSharedNode->getIdx(k);
-                      break;
-                    }
-                  }
-                  CkAssert(sharedNodeIdx != -1);
-                  //The index of sharedNode in the index list of chunk has been found.
-                  //this needs to be saved in the corresponding translatedNodeSet
-                  adjRequestList[countChunk].translatedNodeSet[j] = sharedNodeIdx;
-//                }
+		// if(chunk > myRank){
+		if(j == 0){
+		  // if this is the first node we need to initialize
+		  // the adjRequestobject
+		  adjRequestList[countChunk] =  adjRequest(adjStart->elemID,myRank,adjStart->nodeSetID,elemType);
+		}
+		int sharedNodeIdx=-1; // index of sharedNode in the idxl list of chunk
+		//search for this chunk in the list of chunks shared
+		//by this node
+		for(int k=0;k<recSharedNode->getShared();k++){
+		  if(recSharedNode->getChk(k) == chunk){
+		    //found the correct chunk
+		    sharedNodeIdx = recSharedNode->getIdx(k);
+		    break;
+		  }
+		}
+		CkAssert(sharedNodeIdx != -1);
+		//The index of sharedNode in the index list of chunk
+		//has been found.  this needs to be saved in the
+		//corresponding translatedNodeSet
+		adjRequestList[countChunk].translatedNodeSet[j] = sharedNodeIdx;
+		//                }
+		countChunk++;
               }
             }
-            //Now the nodeNumbers for the nodeSets that might be along chunk boundaries have
-            //been translated into idxl indices between the two chunks
-            //We now need to write the requests into the msa array requestTable
-            //WARNING: This depends on sets getting enumerated in the same way always
-            //Might not be true
+            //Now the nodeNumbers for the nodeSets that might be along
+            //chunk boundaries have been translated into idxl indices
+            //between the two chunks We now need to write the requests
+            //into the msa array requestTable WARNING: This depends on
+            //sets getting enumerated in the same way always Might not
+            //be true
             int countChunk=0;
             for(std::set<int>::iterator chunkIterator = commonSharedChunks.begin();chunkIterator != commonSharedChunks.end();chunkIterator++){
-              countChunk++;
               int chunk = *chunkIterator;
 //              if(chunk > myRank){
                 printf("[%d] Sending to chunk %d request (%d,%d,%d,%d) \n",myRank,chunk,adjRequestList[countChunk].elemID,adjRequestList[countChunk].chunkID,adjRequestList[countChunk].elemType,adjRequestList[countChunk].nodeSetID);
                 (*requestTable).accumulate(chunk,adjRequestList[countChunk]);
 //              requestVec.push_back(&adjRequestList[countChunk]);
 //              }
+              countChunk++;
             }
             delete [] adjRequestList;
           }
-          
           adjStart = adjStart->next;
         }
       }
@@ -344,18 +339,16 @@ void CreateAdaptAdjacencies(int meshid, int elemType)
     //search for the nodeSet in the list of adjacencies around minNode
     adjElem *rover =  searchAdjElemInList(minNode->adjElemList,sharedNodes.getVec(),nodeSetSize,-1,&found);
     printf("[%d] Received request (%d,%d,%d,%d) minNode %d found %d\n",myRank,receivedRequest.elemID,receivedRequest.chunkID,receivedRequest.elemType,receivedRequest.nodeSetID,sharedNodes[0],found);
-    if(found){
-       //we have found a matching adjElem for the requested nodeset
-       //we shall set the adjacency correctly in the adjacency Table for the 
-       //elemID in the found adjElem. We need to send a reply to the requesting chunk
+    if(found){ //we have found a matching adjElem for the requested nodeset
+       //we shall set the adjacency correctly in the adjacency Table
+       //for the elemID in the found adjElem. We need to send a reply
+       //to the requesting chunk
        int matchingElemID;
-       if(rover == NULL){
-           rover = minNode->adjElemList;
-       }else{
-          rover = rover->next;
-       }
-       matchingElemID = rover->elemID;
-       adaptAdj *matchingAdaptAdj = &adaptAdjacencies[matchingElemID*numAdjElems + rover->nodeSetID];
+       matchingElemID = rover->next->elemID;
+       adaptAdj *matchingAdaptAdj = &adaptAdjacencies[matchingElemID*numAdjElems + rover->next->nodeSetID];
+       adjElem *tmp = rover->next;
+       rover->next = tmp->next;
+       delete tmp;
        CkAssert(matchingAdaptAdj->localID == -1);
        matchingAdaptAdj->partID = receivedRequest.chunkID;
        matchingAdaptAdj->localID = receivedRequest.elemID;
@@ -372,16 +365,16 @@ void CreateAdaptAdjacencies(int meshid, int elemType)
        //Write into the replyTable
        replyTable->accumulate(receivedRequest.chunkID,reply);
     }else{
-      //we have no matching nodeset for this request.. hopefully some other chunk does
-      //we canignore this request
+      //we have no matching nodeset for this request.. hopefully some
+      //other chunk does; we can ignore this request
     }
   }
 
   requestTable->sync();
   replyTable->sync();
 
-  //Once the replies are back
-  //Loop through each reply and update the adaptAdjacencies for each element in the reply
+  //Once the replies are back, loop through each reply and update the
+  //adaptAdjacencies for each element in the reply
   CkVec<adjReply> *receivedReplyVec = replyTable->get(myRank).vec;
   for(int i=0;i< receivedReplyVec->size();i++){
     adjReply *receivedReply = &(*receivedReplyVec)[i];
@@ -391,7 +384,6 @@ void CreateAdaptAdjacencies(int meshid, int elemType)
 
   replyTable->sync();
   //Register the adaptAdjacency with ParFUM
-  //
   dumpAdaptAdjacencies(adaptAdjacencies,numElems,numAdjElems,myRank);
 }
 
@@ -414,8 +406,9 @@ adaptAdj *GetAdaptAdj(int elemID, int elemType, int edgeFaceID)
 {
 }
 
-/** Look up elemID in elemType array, calculate edgeFaceID from vertexList (with
-    GetEdgeFace below), and access edgeFaceID-th adaptAdj with GetAdaptAdj above. */
+/** Look up elemID in elemType array, calculate edgeFaceID from
+    vertexList (with GetEdgeFace below), and access edgeFaceID-th
+    adaptAdj with GetAdaptAdj above. */
 adaptAdj *GetAdaptAdj(int elemID, int elemType, int *vertexList)
 {
 }
@@ -426,14 +419,15 @@ void GetVertices(int elemID, int elemType, int edgeFaceID, int *vertexList)
 {
 }
 
-/** Look up elemID in elemType array and determine the edge or face ID specified by
-    the set of vertices in vertexList. */
+/** Look up elemID in elemType array and determine the edge or face ID
+    specified by the set of vertices in vertexList. */
 int GetEdgeFace(int elemID, int elemType, int *vertexList)
 {
 }
 
 // Update functions
-/** Look up elemID in elemType array and set the adjacency on edgeFaceID to nbr. */
+/** Look up elemID in elemType array and set the adjacency on
+    edgeFaceID to nbr. */
 void SetAdaptAdj(int elemID, int elemType, int edgeFaceID, adaptAdj nbr)
 {
 }
@@ -452,44 +446,44 @@ void SetAdaptAdj(int elemID, int elemType, int edgeFaceID, adaptAdj nbr)
 
 void guessElementShape(int dim,int nodesPerElem,int *numAdjElems,int *nodeSetSize,int nodeSetMap[MAX_ADJELEMS][MAX_NODESET_SIZE]){
   switch(dim){
-    case 2:
-          {
-          //2 dimension
-            switch(nodesPerElem){
-              case 3:
-                //Triangles
-                *numAdjElems = 3;
-                *nodeSetSize = 2;
-                copyNodeSetMap(3,2,nodeSetMap,nodeSetMap2d_tri)
-                break;
-              case 4:
-                //quads
-                *numAdjElems = 4;
-                *nodeSetSize = 2;
-                copyNodeSetMap(4,2,nodeSetMap,nodeSetMap2d_quad)
-                break;
-            }
-          }
-          break;
-    case 3:
-          {
-          //3 dimension
-            switch(nodesPerElem){
-              case 4:
-                //Tetrahedra
-                *numAdjElems = 4;
-                *nodeSetSize = 3;
-                copyNodeSetMap(4,3,nodeSetMap,nodeSetMap3d_tet)
-                break;
-              case 6:
-                //Hexahedra
-                *numAdjElems = 6;
-                *nodeSetSize = 4;
-                copyNodeSetMap(6,4,nodeSetMap,nodeSetMap3d_hex)
-                break;
-            }
-          }
-          break;
+  case 2:
+    {
+      //2 dimension
+      switch(nodesPerElem){
+      case 3:
+	//Triangles
+	*numAdjElems = 3;
+	*nodeSetSize = 2;
+	copyNodeSetMap(3,2,nodeSetMap,nodeSetMap2d_tri)
+	  break;
+      case 4:
+	//quads
+	*numAdjElems = 4;
+	*nodeSetSize = 2;
+	copyNodeSetMap(4,2,nodeSetMap,nodeSetMap2d_quad)
+	  break;
+      }
+    }
+    break;
+  case 3:
+    {
+      //3 dimension
+      switch(nodesPerElem){
+      case 4:
+	//Tetrahedra
+	*numAdjElems = 4;
+	*nodeSetSize = 3;
+	copyNodeSetMap(4,3,nodeSetMap,nodeSetMap3d_tet)
+	  break;
+      case 6:
+	//Hexahedra
+	*numAdjElems = 6;
+	*nodeSetSize = 4;
+	copyNodeSetMap(6,4,nodeSetMap,nodeSetMap3d_hex)
+	  break;
+      }
+    }
+    break;
   }
 }
 
