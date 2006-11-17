@@ -148,7 +148,11 @@ extern "C" {
 #define FEM_IS_VALID_ATTR (FEM_ATTRIB_FIRST+14) ///< Stores a flag(an IDXL_BYTE) for each element or node specifying whether the entity exists or is valid. It may be 0 whenever a mesh modification occurs that deletes the corresponding node or element 
 
 #define FEM_MESH_SIZING (FEM_ATTRIB_FIRST+15) ///< Target edge length attr.
-#define FEM_ATTRIB_LAST (FEM_ATTRIB_FIRST+16) ///< This is the last valid attribute code
+
+#define FEM_ADAPT_ADJ (FEM_ATTRIB_FIRST+16) ///< Element to element adjacency used for adaptivity (does not have ghosts)
+
+
+#define FEM_ATTRIB_LAST (FEM_ATTRIB_FIRST+17) ///< This is the last valid attribute code
 
   // Specialized routines: 
   void FEM_Mesh_set_conn(int fem_mesh,int entity,

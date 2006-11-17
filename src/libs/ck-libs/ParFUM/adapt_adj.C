@@ -383,8 +383,11 @@ void CreateAdaptAdjacencies(int meshid, int elemType)
   }
 
   replyTable->sync();
-  //Register the adaptAdjacency with ParFUM
   dumpAdaptAdjacencies(adaptAdjacencies,numElems,numAdjElems,myRank);
+  
+	//Register the adaptAdjacency with ParFUM
+	FEM_Register_array(meshid,FEM_ELEM+elemType,FEM_ADAPT_ADJ,(void *)adaptAdjacencies,FEM_BYTE,sizeof(adaptAdj)*numAdjElems);
+	//do not delete adaptAdjacencies. It will be used during the rest of adaptivity
 }
 
 void dumpAdaptAdjacencies(adaptAdj *adaptAdjacencies,int numElems,int numAdjElems,int myRank){
@@ -400,35 +403,44 @@ void dumpAdaptAdjacencies(adaptAdj *adaptAdjacencies,int numElems,int numAdjElem
 
 
 // Access functions
+inline adaptAdj *lookupAdaptAdjacencies(int meshid,int elemType){
+  FEM_Mesh *mesh = FEM_chunk::get("lookupAdaptAdjacencies")->lookup(meshid,"lookupAdaptAdjacencies");
+  FEM_Elem *elem = (FEM_Elem *)mesh->lookup(FEM_ELEM+elemType,"lookupAdaptAdjacencies");
+
+	FEM_DataAttribute *adaptAttr = (FEM_DataAttribute *)elem->lookup(FEM_ADAPT_ADJ,"lookupAdaptAdjacencies");
+	AllocTable2d<unsigned char> &table = adaptAttr->getChar();
+
+	return (adaptAdj  *)table.getData();
+}
 
 /** Look up elemID in elemType array, access edgeFaceID-th adaptAdj. */
-adaptAdj *GetAdaptAdj(int elemID, int elemType, int edgeFaceID)
+adaptAdj *GetAdaptAdj(int meshid,int elemID, int elemType, int edgeFaceID)
 {
 }
 
 /** Look up elemID in elemType array, calculate edgeFaceID from
     vertexList (with GetEdgeFace below), and access edgeFaceID-th
     adaptAdj with GetAdaptAdj above. */
-adaptAdj *GetAdaptAdj(int elemID, int elemType, int *vertexList)
+adaptAdj *GetAdaptAdj(int meshid,int elemID, int elemType, int *vertexList)
 {
 }
 
 /** Look up elemID in elemType array and determine the set of vertices
     associated with the edge or face represented by edgeFaceID. */
-void GetVertices(int elemID, int elemType, int edgeFaceID, int *vertexList)
+void GetVertices(int meshid,int elemID, int elemType, int edgeFaceID, int *vertexList)
 {
 }
 
 /** Look up elemID in elemType array and determine the edge or face ID
     specified by the set of vertices in vertexList. */
-int GetEdgeFace(int elemID, int elemType, int *vertexList)
+int GetEdgeFace(int meshid,int elemID, int elemType, int *vertexList)
 {
 }
 
 // Update functions
 /** Look up elemID in elemType array and set the adjacency on
     edgeFaceID to nbr. */
-void SetAdaptAdj(int elemID, int elemType, int edgeFaceID, adaptAdj nbr)
+void SetAdaptAdj(int meshid,int elemID, int elemType, int edgeFaceID, adaptAdj nbr)
 {
 }
 
