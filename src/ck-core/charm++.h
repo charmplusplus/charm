@@ -930,7 +930,7 @@ void CmiMachineProgressImpl();
 
 #define CkNetworkProgress() {CpvAccess(networkProgressCount) ++; \
 if (LBDatabaseObj()->getLBDB()->StatsOn() == 0) \
-      if(CpvAccess(networkProgressCount) >=  networkProgressPeriod) { \    
+      if(CpvAccess(networkProgressCount) >=  networkProgressPeriod) { \
         CmiMachineProgressImpl(); \
         CpvAccess(networkProgressCount) = 0; \
       } \
