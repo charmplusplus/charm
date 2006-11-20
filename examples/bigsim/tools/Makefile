@@ -1,4 +1,4 @@
-DIRS= loadlog
+DIRS= loadlog buildlog
 
 all:
 	for d in $(DIRS); do \
