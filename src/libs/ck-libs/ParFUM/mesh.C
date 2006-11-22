@@ -389,6 +389,13 @@ void FEM_Register_array_layout(int fem_mesh,int entity,int attr,void *data,int f
 	//should actually be a call on the entity
 	int max = e->getMax();
 	FEM_Attribute *a = e->lookup(attr,caller);
+	if(a->getWidth() == 0){
+		/** While registering an attribute for the first time
+		 * Its width and type should get set correctly
+		 * **/
+		a->setDatatype(layout.type);
+		a->setWidth(layout.width);
+	}
 	
 	
 	if(m->isSetting()){
@@ -1495,7 +1502,9 @@ void FEM_Entity::create(int attr,const char *caller) {
   }
   else if(attr == FEM_BOUNDARY){
 	allocateBoundary();
-  }
+  }else if(attr = FEM_ADAPT_ADJ){
+		add(new FEM_DataAttribute(this,attr));
+	}
   else {
 	//It's an unrecognized tag: abort
 	char attrNameStorage[256], msg[1024];

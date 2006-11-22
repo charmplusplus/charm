@@ -175,3 +175,6 @@ void guessElementShape(int dim,int nodesPerElem,int *numAdjElems,
 		       int nodeSetMap[MAX_ADJELEMS][MAX_NODESET_SIZE]);
 void dumpAdaptAdjacencies(adaptAdj *adaptAdjacencies,int numElems,
 			  int numAdjElems,int myRank);
+void fillLocalAdaptAdjacencies(int numNodes,FEM_Node *node,adjNode *adaptAdjTable,adaptAdj *adaptAdjacencies,int nodeSetSize,int numAdjElems,int myRank,int elemType);
+void makeAdjacencyRequests(int numNodes,FEM_Node *node,adjNode *adaptAdjTable,MSA1DREQLIST *requestTable, int nodeSetSize,int myRank,int elemType);
+void replyAdjacencyRequests(MSA1DREQLIST *requestTable,MSA1DREPLYLIST *replyTable,FEM_Node *node,adjNode *adaptAdjTable,adaptAdj *adaptAdjacencies,int nodeSetSize,int numAdjElems,int myRank,int elemType);
