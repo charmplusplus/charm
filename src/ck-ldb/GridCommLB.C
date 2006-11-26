@@ -52,10 +52,31 @@ CreateLBFunc_Def (GridCommLB, "Grid communication load balancer (evenly distribu
 */
 GridCommLB::GridCommLB (const CkLBOptions &opt) : CentralLB (opt)
 {
+  char *value;
+
+
   lbname = (char *) "GridCommLB";
 
   if (CkMyPe() == 0) {
     CkPrintf ("[%d] GridCommLB created.\n", CkMyPe());
+  }
+
+  if (value = getenv ("CK_LDB_GRIDCOMMLB_MODE")) {
+    CK_LDB_GridCommLB_Mode = atoi (value);
+  } else {
+    CK_LDB_GridCommLB_Mode = CK_LDB_GRIDCOMMLB_MODE;
+  }
+
+  if (value = getenv ("CK_LDB_GRIDCOMMLB_BACKGROUND_LOAD")) {
+    CK_LDB_GridCommLB_Background_Load = atoi (value);
+  } else {
+    CK_LDB_GridCommLB_Background_Load = CK_LDB_GRIDCOMMLB_BACKGROUND_LOAD;
+  }
+
+  if (value = getenv ("CK_LDB_GRIDCOMMLB_LOAD_TOLERANCE")) {
+    CK_LDB_GridCommLB_Load_Tolerance = atof (value);
+  } else {
+    CK_LDB_GridCommLB_Load_Tolerance = CK_LDB_GRIDCOMMLB_LOAD_TOLERANCE;
   }
 
   manager_init ();
@@ -68,7 +89,22 @@ GridCommLB::GridCommLB (const CkLBOptions &opt) : CentralLB (opt)
 */
 GridCommLB::GridCommLB (CkMigrateMessage *msg) : CentralLB (msg)
 {
+  char *value;
+
+
   lbname = (char *) "GridCommLB";
+
+  if (value = getenv ("CK_LDB_GRIDCOMMLB_MODE")) {
+    CK_LDB_GridCommLB_Mode = atoi (value);
+  } else {
+    CK_LDB_GridCommLB_Mode = CK_LDB_GRIDCOMMLB_MODE;
+  }
+
+  if (value = getenv ("CK_LDB_GRIDCOMMLB_LOAD_TOLERANCE")) {
+    CK_LDB_GridCommLB_Load_Tolerance = atof (value);
+  } else {
+    CK_LDB_GridCommLB_Load_Tolerance = CK_LDB_GRIDCOMMLB_LOAD_TOLERANCE;
+  }
 
   manager_init ();
 }
@@ -150,7 +186,9 @@ void GridCommLB::Initialize_PE_Data (CentralLB::LDStats *stats)
   // Also add background CPU time to each PE's scaled load.
   for (i = 0; i < Num_PEs; i++) {
     (&PE_Data[i])->relative_speed = (double) (stats->procs[i].pe_speed / min_speed);
-    (&PE_Data[i])->scaled_load += stats->procs[i].bg_cputime;
+    if (CK_LDB_GridCommLB_Background_Load) {
+      (&PE_Data[i])->scaled_load += stats->procs[i].bg_cputime;
+    }
   }
 }
 
@@ -327,8 +365,8 @@ void GridCommLB::Map_Migratable_Objects_To_PEs (int cluster)
 
 
   while (1) {
-    target_object = Find_Maximum_WAN_Object (cluster);
-    target_pe = Find_Minimum_WAN_PE (cluster);
+    target_object = Find_Maximum_Object (cluster);
+    target_pe = Find_Minimum_PE (cluster);
 
     if ((target_object == -1) || (target_pe == -1)) {
       break;
@@ -348,8 +386,65 @@ void GridCommLB::Map_Migratable_Objects_To_PEs (int cluster)
 **
 ** The method returns -1 if no matching object is found.
 */
-int GridCommLB::Find_Maximum_WAN_Object (int cluster)
+int GridCommLB::Find_Maximum_Object (int cluster)
 {
+  int max_index;
+  int max_load_index;
+  double max_load;
+  int max_wan_msgs_index;
+  int max_wan_msgs;
+  double load_tolerance;
+  int i;
+
+
+  max_index = -1;
+
+  max_load_index = -1;
+  max_load = -1.0;
+
+  max_wan_msgs_index = -1;
+  max_wan_msgs = -1;
+
+  for (i = 0; i < Num_Objects; i++) {
+    if (((&Object_Data[i])->cluster == cluster) && ((&Object_Data[i])->to_pe == -1)) {
+      if ((&Object_Data[i])->load > max_load) {
+	max_load_index = i;
+	max_load = (&Object_Data[i])->load;
+      }
+      if ((&Object_Data[i])->num_wan_msgs > max_wan_msgs) {
+	max_wan_msgs_index = i;
+	max_wan_msgs = (&Object_Data[i])->num_wan_msgs;
+      }
+    }
+  }
+
+  if (max_load_index < 0) {
+    return (max_load_index);
+  }
+
+  if ((&Object_Data[max_load_index])->num_wan_msgs >= (&Object_Data[max_wan_msgs_index])->num_wan_msgs) {
+    return (max_load_index);
+  }
+
+  load_tolerance = (&Object_Data[max_load_index])->load * CK_LDB_GridCommLB_Load_Tolerance;
+
+  max_index = max_load_index;
+
+  for (i = 0; i < Num_Objects; i++) {
+    if (((&Object_Data[i])->cluster == cluster) && ((&Object_Data[i])->to_pe == -1)) {
+      if (i != max_load_index) {
+	if (fabs ((&Object_Data[max_load_index])->load - (&Object_Data[i])->load) <= load_tolerance) {
+	  if ((&Object_Data[i])->num_wan_msgs > (&Object_Data[max_index])->num_wan_msgs) {
+	    max_index = i;
+	  }
+	}
+      }
+    }
+  }
+
+  return (max_index);
+
+/*
   int i;
   int max_index;
   int max_wan_msgs;
@@ -370,6 +465,7 @@ int GridCommLB::Find_Maximum_WAN_Object (int cluster)
   }
 
   return (max_index);
+*/
 }
 
 
@@ -388,65 +484,106 @@ int GridCommLB::Find_Maximum_WAN_Object (int cluster)
 **
 ** The method returns -1 if no matching PE is found.
 */
-int GridCommLB::Find_Minimum_WAN_PE (int cluster)
+int GridCommLB::Find_Minimum_PE (int cluster)
 {
-  int i;
-  int min_index;
-  int min_wan_msgs;
+  if (CK_LDB_GridCommLB_Mode == 0) {
+    int min_index;
+    int min_load_index;
+    double min_scaled_load;
+    int min_wan_msgs_index;
+    int min_wan_msgs;
+    double load_tolerance;
+    int i;
 
 
-  min_index = -1;
-  min_wan_msgs = MAXINT;
+    min_index = -1;
 
-  for (i = 0; i < Num_PEs; i++) {
-    if (((&PE_Data[i])->available) && ((&PE_Data[i])->cluster == cluster)) {
-      if ((&PE_Data[i])->num_wan_msgs < min_wan_msgs) {
-	min_index = i;
-	min_wan_msgs = (&PE_Data[i])->num_wan_msgs;
-      } else if (((&PE_Data[i])->num_wan_msgs == min_wan_msgs) &&
-		 ((&PE_Data[i])->scaled_load < (&PE_Data[min_index])->scaled_load)) {
-	min_index = i;
-	min_wan_msgs = (&PE_Data[i])->num_wan_msgs;
-      } else if (((&PE_Data[i])->num_wan_msgs == min_wan_msgs) &&
-		 ((&PE_Data[i])->scaled_load == (&PE_Data[min_index])->scaled_load) &&
-		 ((&PE_Data[i])->num_objs < (&PE_Data[min_index])->num_objs)) {
-	min_index = i;
-	min_wan_msgs = (&PE_Data[i])->num_wan_msgs;
+    min_load_index = -1;
+    min_scaled_load = MAXDOUBLE;
+
+    min_wan_msgs_index = -1;
+    min_wan_msgs = MAXINT;
+
+    for (i = 0; i < Num_PEs; i++) {
+      if (((&PE_Data[i])->available) && ((&PE_Data[i])->cluster == cluster)) {
+	if ((&PE_Data[i])->scaled_load < min_scaled_load) {
+	  min_load_index = i;
+	  min_scaled_load = (&PE_Data[i])->scaled_load;
+	}
+	if ((&PE_Data[i])->num_wan_msgs < min_wan_msgs) {
+	  min_wan_msgs_index = i;
+	  min_wan_msgs = (&PE_Data[i])->num_wan_msgs;
+	}
       }
     }
-  }
 
-  return (min_index);
+    // If no PE at all was found, return a -1.
+    if (min_load_index < 0) {
+      return (min_load_index);
+    }
 
-/*
-  int i;
-  int min_index;
-  int min_wan_objs;
+    // If the number of WAN messages on the lightest loaded PE happens to match the minimum number
+    // of WAN messages overall, we win because this target PE is overall the minimum PE in terms
+    // of both load *and* WAN messages.
+    if ((&PE_Data[min_load_index])->num_wan_msgs <= (&PE_Data[min_wan_msgs_index])->num_wan_msgs) {
+      return (min_load_index);
+    }
 
+    // Otherwise, we now search for PEs that have loads +/- our tolerance.  If any PE has a load
+    // within our tolerance, check its number of WAN messages.  The one of these that has the
+    // fewest WAN messages is probably the best candidate for placing the next object onto.
 
-  min_index = -1;
-  min_wan_objs = MAXINT;
+    load_tolerance = (&PE_Data[min_load_index])->scaled_load * CK_LDB_GridCommLB_Load_Tolerance;
 
-  for (i = 0; i < Num_PEs; i++) {
-    if (((&PE_Data[i])->available) && ((&PE_Data[i])->cluster == cluster)) {
-      if ((&PE_Data[i])->num_wan_objs < min_wan_objs) {
-	min_index = i;
-	min_wan_objs = (&PE_Data[i])->num_wan_objs;
-      } else if (((&PE_Data[i])->num_wan_objs == min_wan_objs) &&
-		 ((&PE_Data[i])->scaled_load < (&PE_Data[min_index])->scaled_load)) {
-	min_index = i;
-	min_wan_objs = (&PE_Data[i])->num_wan_objs;
-      } else if (((&PE_Data[i])->num_wan_objs == min_wan_objs) &&
-		 ((&PE_Data[i])->scaled_load == (&PE_Data[min_index])->scaled_load) &&
-		 ((&PE_Data[i])->num_lan_objs < (&PE_Data[min_index])->num_lan_objs)) {
-	min_index = i;
-	min_wan_objs = (&PE_Data[i])->num_wan_objs;
+    min_index = min_load_index;
+
+    for (i = 0; i < Num_PEs; i++) {
+      if (((&PE_Data[i])->available) && ((&PE_Data[i])->cluster == cluster)) {
+	if (i != min_load_index) {
+	  if (fabs ((&PE_Data[i])->scaled_load - (&PE_Data[min_load_index])->scaled_load) <= load_tolerance) {
+	    if ((&PE_Data[i])->num_wan_msgs < (&PE_Data[min_index])->num_wan_msgs) {
+	      min_index = i;
+	    }
+	  }
+	}
       }
     }
-  }
 
-  return (min_index);
-*/
+    return (min_index);
+  } else if (CK_LDB_GridCommLB_Mode == 1) {
+    int min_index;
+    int min_objs;
+    int i;
+
+
+    min_index = -1;
+    min_objs = MAXINT;
+
+    for (i = 0; i < Num_PEs; i++) {
+      if (((&PE_Data[i])->available) && ((&PE_Data[i])->cluster == cluster)) {
+	if ((&PE_Data[i])->num_objs < min_objs) {
+	  min_index = i;
+	  min_objs = (&PE_Data[i])->num_objs;
+	} else if (((&PE_Data[i])->num_objs == min_objs) &&
+		   ((&PE_Data[i])->num_wan_msgs < (&PE_Data[min_index])->num_wan_msgs)) {
+	  min_index = i;
+	  min_objs = (&PE_Data[i])->num_objs;
+	} else if (((&PE_Data[i])->num_objs == min_objs) &&
+		   ((&PE_Data[i])->num_wan_msgs == (&PE_Data[min_index])->num_wan_msgs) &&
+		   ((&PE_Data[i])->scaled_load < (&PE_Data[min_index])->scaled_load)) {
+	  min_index = i;
+	  min_objs = (&PE_Data[i])->num_objs;
+	}
+      }
+    }
+
+    return (min_index);
+  } else {
+    if (_lb_args.debug() > 0) {
+      CkPrintf ("[%d] GridCommLB was told to use bad mode (%d).\n", CkMyPe(), CK_LDB_GridCommLB_Mode);
+    }
+    return (-1);
+  }
 }
 
 
@@ -485,23 +622,10 @@ void GridCommLB::Assign_Object_To_PE (int target_object, int target_pe)
 void GridCommLB::work (CentralLB::LDStats *stats, int count)
 {
   int i;
-  // CmiBool available;
-  // CmiBool all_pes_mapped;
-  // int max_cluster;
-  // int min_speed;
-  // int send_object;
-  // int send_pe;
-  // int send_cluster;
-  // int recv_object;
-  // int recv_pe;
-  // int recv_cluster;
-  // int target_object;
-  // int target_pe;
-  // LDCommData *com_data;
 
 
   if (_lb_args.debug() > 0) {
-    CkPrintf ("[%d] GridCommLB is working.\n", CkMyPe());
+    CkPrintf ("[%d] GridCommLB is working (mode=%d, background load=%d, load tolerance=%f).\n", CkMyPe(), CK_LDB_GridCommLB_Mode, CK_LDB_GridCommLB_Background_Load, CK_LDB_GridCommLB_Load_Tolerance);
   }
 
   // Since this load balancer looks at communications data, it must initialize the CommHash.

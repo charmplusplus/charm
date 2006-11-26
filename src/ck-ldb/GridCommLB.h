@@ -2,6 +2,7 @@
 #define _GRIDCOMMLB_H_
 
 #include <limits.h>
+#include <math.h>
 #include <stdio.h>
 
 #include "charm++.h"
@@ -9,8 +10,16 @@
 
 #include "CentralLB.h"
 
+#define CK_LDB_GRIDCOMMLB_MODE 0
+#define CK_LDB_GRIDCOMMLB_BACKGROUND_LOAD 1
+#define CK_LDB_GRIDCOMMLB_LOAD_TOLERANCE 0.05
+
 #ifndef MAXINT
 #define MAXINT 2147483647
+#endif
+
+#ifndef MAXDOUBLE
+#define MAXDOUBLE 1e10
 #endif
 
 #if CONVERSE_VERSION_VMI
@@ -64,9 +73,13 @@ class GridCommLB : public CentralLB
     void Examine_InterObject_Messages (CentralLB::LDStats *stats);
     void Map_NonMigratable_Objects_To_PEs ();
     void Map_Migratable_Objects_To_PEs (int cluster);
-    int Find_Maximum_WAN_Object (int cluster);
-    int Find_Minimum_WAN_PE (int cluster);
+    int Find_Maximum_Object (int cluster);
+    int Find_Minimum_PE (int cluster);
     void Assign_Object_To_PE (int target_object, int target_pe);
+
+    int CK_LDB_GridCommLB_Mode;
+    int CK_LDB_GridCommLB_Background_Load;
+    double CK_LDB_GridCommLB_Load_Tolerance;
 
     int Num_PEs;
     int Num_Objects;
