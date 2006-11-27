@@ -100,6 +100,12 @@ GridCommLB::GridCommLB (CkMigrateMessage *msg) : CentralLB (msg)
     CK_LDB_GridCommLB_Mode = CK_LDB_GRIDCOMMLB_MODE;
   }
 
+  if (value = getenv ("CK_LDB_GRIDCOMMLB_BACKGROUND_LOAD")) {
+    CK_LDB_GridCommLB_Background_Load = atoi (value);
+  } else {
+    CK_LDB_GridCommLB_Background_Load = CK_LDB_GRIDCOMMLB_BACKGROUND_LOAD;
+  }
+
   if (value = getenv ("CK_LDB_GRIDCOMMLB_LOAD_TOLERANCE")) {
     CK_LDB_GridCommLB_Load_Tolerance = atof (value);
   } else {
