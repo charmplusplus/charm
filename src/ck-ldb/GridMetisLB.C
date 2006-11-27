@@ -20,10 +20,25 @@ CreateLBFunc_Def (GridMetisLB, "Grid load balancer that uses Metis to optimize c
 */
 GridMetisLB::GridMetisLB (const CkLBOptions &opt) : CentralLB (opt)
 {
+  char *value;
+
+
   lbname = (char *) "GridMetisLB";
 
   if (CkMyPe() == 0) {
     CkPrintf ("[%d] GridMetisLB created.\n", CkMyPe());
+  }
+
+  if (value = getenv ("CK_LDB_GRIDMETISLB_MODE")) {
+    CK_LDB_GridMetisLB_Mode = atoi (value);
+  } else {
+    CK_LDB_GridMetisLB_Mode = CK_LDB_GRIDMETISLB_MODE;
+  }
+
+  if (value = getenv ("CK_LDB_GRIDMETISLB_BACKGROUND_LOAD")) {
+    CK_LDB_GridMetisLB_Background_Load = atoi (value);
+  } else {
+    CK_LDB_GridMetisLB_Background_Load = CK_LDB_GRIDMETISLB_BACKGROUND_LOAD;
   }
 
   manager_init ();
@@ -36,7 +51,22 @@ GridMetisLB::GridMetisLB (const CkLBOptions &opt) : CentralLB (opt)
 */
 GridMetisLB::GridMetisLB (CkMigrateMessage *msg) : CentralLB (msg)
 {
+  char *value;
+
+
   lbname = (char *) "GridMetisLB";
+
+  if (value = getenv ("CK_LDB_GRIDMETISLB_MODE")) {
+    CK_LDB_GridMetisLB_Mode = atoi (value);
+  } else {
+    CK_LDB_GridMetisLB_Mode = CK_LDB_GRIDMETISLB_MODE;
+  }
+
+  if (value = getenv ("CK_LDB_GRIDMETISLB_BACKGROUND_LOAD")) {
+    CK_LDB_GridMetisLB_Background_Load = atoi (value);
+  } else {
+    CK_LDB_GridMetisLB_Background_Load = CK_LDB_GRIDMETISLB_BACKGROUND_LOAD;
+  }
 
   manager_init ();
 }
@@ -108,7 +138,9 @@ void GridMetisLB::Initialize_PE_Data (CentralLB::LDStats *stats)
   // Also add background CPU time to each PE's scaled load.
   for (i = 0; i < Num_PEs; i++) {
     (&PE_Data[i])->relative_speed = (double) (stats->procs[i].pe_speed / min_speed);
-    (&PE_Data[i])->scaled_load += stats->procs[i].bg_cputime;
+    if (CK_LDB_GridMetisLB_Background_Load) {
+      (&PE_Data[i])->scaled_load += stats->procs[i].bg_cputime;
+    }
   }
 }
 
@@ -243,6 +275,8 @@ void GridMetisLB::Partition_Objects_Into_Clusters (CentralLB::LDStats *stats)
   int cluster;
   int partition;
   int partition_count;
+  int *vertex_weights;
+  int vertex;
   int **communication_matrix;
   LDCommData *com_data;
   int send_object;
@@ -318,6 +352,17 @@ void GridMetisLB::Partition_Objects_Into_Clusters (CentralLB::LDStats *stats)
 
     partition += partition_count;
     cluster += 1;
+  }
+
+  if (CK_LDB_GridMetisLB_Mode == 1) {
+    vertex_weights = new int[num_migratable_objects];
+    vertex = 0;
+    for (i = 0; i < Num_Objects; i++) {
+      if ((&Object_Data[i])->migratable) {
+	vertex_weights[vertex] = (int) ceil ((&Object_Data[i])->load * 10000);
+	vertex += 1;
+      }
+    }
   }
 
   // Create communication_matrix[] to hold all object-to-object message counts.
@@ -412,13 +457,27 @@ void GridMetisLB::Partition_Objects_Into_Clusters (CentralLB::LDStats *stats)
     xadj[i+1] = count;
   }
 
-  // Call Metis to partition the communication graph.
-  weight_flag = 1;      // weights on edges only
-  numbering_flag = 0;   // C style numbering (base 0)
-  options[0] = 0;
-  newmap = new int[num_migratable_objects];
+  if (CK_LDB_GridMetisLB_Mode == 0) {
+    // Call Metis to partition the communication graph.
+    weight_flag = 1;      // weights on edges only
+    numbering_flag = 0;   // C style numbering (base 0)
+    options[0] = 0;
+    newmap = new int[num_migratable_objects];
 
-  METIS_PartGraphRecursive (&num_migratable_objects, xadj, adjncy, NULL, edge_weights, &weight_flag, &numbering_flag, &num_partitions, options, &edgecut, newmap);
+    METIS_PartGraphRecursive (&num_migratable_objects, xadj, adjncy, NULL, edge_weights, &weight_flag, &numbering_flag, &num_partitions, options, &edgecut, newmap);
+  } else if (CK_LDB_GridMetisLB_Mode == 1) {
+    // Call Metis to partition the communication graph.
+    weight_flag = 3;      // weights on both vertices and edges
+    numbering_flag = 0;   // C style numbering (base 0)
+    options[0] = 0;
+    newmap = new int[num_migratable_objects];
+
+    METIS_PartGraphRecursive (&num_migratable_objects, xadj, adjncy, vertex_weights, edge_weights, &weight_flag, &numbering_flag, &num_partitions, options, &edgecut, newmap);
+  } else {
+    if (_lb_args.debug() > 0) {
+      CkPrintf ("[%d] GridMetisLB was told to use bad mode (%d).\n", CkMyPe(), CK_LDB_GridMetisLB_Mode);
+    }
+  }
 
   // Place the partitioned objects into their correct clusters.
   for (i = 0; i < num_migratable_objects; i++) {
@@ -439,6 +498,9 @@ void GridMetisLB::Partition_Objects_Into_Clusters (CentralLB::LDStats *stats)
     delete [] communication_matrix[i];
   }
   delete [] communication_matrix;
+  if (CK_LDB_GridMetisLB_Mode == 1) {
+    delete [] vertex_weights;
+  }
   delete [] partition_to_cluster_map;
   delete [] migratable_objects;
 }
@@ -722,7 +784,7 @@ void GridMetisLB::work (CentralLB::LDStats *stats, int count)
 
 
   if (_lb_args.debug() > 0) {
-    CkPrintf ("[%d] GridMetisLB is working.\n", CkMyPe());
+    CkPrintf ("[%d] GridMetisLB is working (mode=%d, background load=%d).\n", CkMyPe(), CK_LDB_GridMetisLB_Mode, CK_LDB_GridMetisLB_Background_Load);
   }
 
   // Since this load balancer looks at communications data, it must call stats->makeCommHash().

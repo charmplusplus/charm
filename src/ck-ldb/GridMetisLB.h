@@ -8,6 +8,9 @@
 
 #include "CentralLB.h"
 
+#define CK_LDB_GRIDMETISLB_MODE 0
+#define CK_LDB_GRIDMETISLB_BACKGROUND_LOAD 1
+
 #ifndef MAXINT
 #define MAXINT 2147483647
 #endif
@@ -95,6 +98,9 @@ class GridMetisLB : public CentralLB
     void Initialize_Cluster_Data ();
     void Partition_Objects_Into_Clusters (CentralLB::LDStats *stats);
     void Partition_ClusterObjects_Into_PEs (CentralLB::LDStats *stats, int cluster);
+
+    int CK_LDB_GridMetisLB_Mode;
+    int CK_LDB_GridMetisLB_Background_Load;
 
     int Num_PEs;
     int Num_Objects;
