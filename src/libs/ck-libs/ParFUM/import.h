@@ -20,7 +20,7 @@ extern int getFloatFormat(void);
  */
 inline int coordCompare(const double *key1, const double *key2, int dim) {
   static const int endian = getFloatFormat();
-  int maxUlps=200; // 200 -> 0.0002 relative error.
+  int maxUlps=200;
   for(int ii=0; ii<dim; ii++) {
     int a, b;
     msbInt(a,key1[ii]);
@@ -62,14 +62,6 @@ void ParFUM_findMatchingCoords(int dim, int extent_a, double* a,
 			       std::vector<int>& matches_a,
 			       std::vector<int>& matches_b
 			       );
-
-void
-ParFUM_findBoundingBox(int nPoints,int dim, double* points, double* boundingBox);
-bool ParFUM_boundingBoxesCollide(int dim, double* box_a, double* box_b);
-void ParFUM_printBoundingBox(int dim, double* box);
-
-#define FEM_BOUNDING_BOX_INVALID (1.666e-55)
-
 #endif
 
 
