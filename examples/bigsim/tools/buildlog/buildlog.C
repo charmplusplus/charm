@@ -41,8 +41,9 @@ int main()
   tlinerecs[1].logEntryInsert(newlog);
 
   // start output
-    // write summary file
-  BgWriteTraceSummary(totalPEs, totalPEs, totalPEs, 1, 1);
+    // write summary file for totalPEs processor traces, running on 
+       1 REAL processor
+  BgWriteTraceSummary(totalPEs, 1, totalPEs, 1, 1);
 
     // write all timelines
   BgWriteTimelines(0, tlinerecs, totalPEs);
