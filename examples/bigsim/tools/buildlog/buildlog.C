@@ -17,13 +17,14 @@ int main()
   newlog->setName("Method0");
   newlog->setTime(curTime, curTime+0.5);
   curTime = 1.4;
+  int seqno = 0;
     // send first message to 1
-  BgMsgID msgID = BgMsgID(0, 0);      // (mype, seqno)
+  BgMsgID msgID = BgMsgID(0, seqno++);      // (mype, seqno)
   BgMsgEntry *msgEntry = new BgMsgEntry(0, 1024, curTime, curTime+0.001, 1, 0);
   newlog->addMsg(msgEntry);
   curTime += 0.003;
     // send second message to 1
-  msgID = BgMsgID(0, 1);      // (mype, seqno)
+  msgID = BgMsgID(0, seqno++);      // (mype, seqno)
   msgEntry = new BgMsgEntry(0, 1024, curTime, curTime+0.001, 1, 0);
   newlog->addMsg(msgEntry);
 
@@ -59,7 +60,7 @@ int main()
     // 1 REAL processor
   BgWriteTraceSummary(totalPEs, 1, totalPEs, 1, 1);
 
-    // write all timelines
+    // write all timelines into one bgTrace file
   BgWriteTimelines(0, tlinerecs, totalPEs);
 
 #if 0
