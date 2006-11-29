@@ -187,18 +187,15 @@ extern "C" void LDCollectStatsOff(LDHandle _db)
 
 extern "C" int CLDCollectingStats(LDHandle _db)
 {
-  LDCollectingStats(_db);
+//  LBDB *const db = (LBDB*)(_db.handle);
+//
+//  return db->StatsOn();
+  return LDCollectingStats(_db);
 }
 
-extern "C" int LDRunningObject(LDHandle _h, LDObjHandle* _o)
+extern "C" int CLDRunningObject(LDHandle _h, LDObjHandle* _o)
 {
-  LBDB *const db = (LBDB*)(_h.handle);
-
-  // same as LBDatabase::RunningObject
-  if (db->ObjIsRunning()) {
-    *_o = db->RunningObj();
-    return 1;
-  } else return 0;
+  return LDRunningObject(_h, _o);
 }
 
 extern "C" void LDObjectStart(const LDObjHandle &_h)

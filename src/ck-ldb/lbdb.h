@@ -242,7 +242,7 @@ const LDObjHandle &LDGetObjHandle(LDHandle h, int idx);
 
 void * LDObjUserData(LDObjHandle &_h);
 void LDObjTime(LDObjHandle &h, double walltime, double cputime);
-int LDRunningObject(LDHandle _h, LDObjHandle* _o );
+int  CLDRunningObject(LDHandle _h, LDObjHandle* _o );
 void LDObjectStart(const LDObjHandle &_h);
 void LDObjectStop(const LDObjHandle &_h);
 void LDSend(const LDOMHandle &destOM, const LDObjid &destid, unsigned int bytes, int destObjProc);
