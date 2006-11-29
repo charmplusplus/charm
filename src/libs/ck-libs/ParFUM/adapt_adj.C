@@ -200,10 +200,12 @@ void CreateAdaptAdjacencies(int meshid, int elemType)
 
   replyTable->sync();
   dumpAdaptAdjacencies(adaptAdjacencies,numElems,numAdjElems,myRank);
-  
+
+  mesh->becomeSetting();  
   //Register the adaptAdjacency with ParFUM
   FEM_Register_array(meshid,FEM_ELEM+elemType,FEM_ADAPT_ADJ,(void *)adaptAdjacencies,FEM_BYTE,sizeof(adaptAdj)*numAdjElems);
   //do not delete adaptAdjacencies. It will be used during the rest of adaptivity
+  mesh->becomeGetting();  
 }
 
 void fillLocalAdaptAdjacencies(int numNodes,FEM_Node *node,adjNode *adaptAdjTable,adaptAdj *adaptAdjacencies,int nodeSetSize,int numAdjElems,int myRank,int elemType){
@@ -420,6 +422,27 @@ void dumpAdaptAdjacencies(adaptAdj *adaptAdjacencies,int numElems,int numAdjElem
   }
 }
 
+void getAndDumpAdaptAdjacencies(int meshid, int numElems, int elemType, int myRank){
+  int numAdjElems;
+  FEM_Mesh *mesh = FEM_chunk::get("GetAdaptAdj")->lookup(meshid,"GetAdaptAdj");
+  FEM_Elem *elem = (FEM_Elem *)mesh->lookup(FEM_ELEM+elemType,"GetAdaptAdj");
+  FEM_Node *node = (FEM_Node *)mesh->lookup(FEM_NODE,"GetAdaptAdj");
+  const int nodesPer = (elem->getConn()).width();
+  assert(node->getCoord()!= NULL);
+  const int dim = (node->getCoord())->getWidth();
+  assert(dim == 2|| dim == 3);
+  int nodeSetSize, nodeSetMap[MAX_ADJELEMS][MAX_NODESET_SIZE]; // not used
+  guessElementShape(dim,nodesPer,&numAdjElems,&nodeSetSize,nodeSetMap);
+
+  for(int i=0;i<numElems;i++){
+    printf("[%d] %d  :",myRank,i);
+    for(int j=0;j<numAdjElems;j++){
+      adaptAdj *entry = GetAdaptAdj(meshid, i, elemType, j);
+      printf("(%d,%d,%d)",entry->partID,entry->localID,entry->elemType);
+    }
+    printf("\n");
+  }
+}
 
 // Access functions
 inline adaptAdj *lookupAdaptAdjacencies(int meshid,int elemType){
@@ -435,6 +458,19 @@ inline adaptAdj *lookupAdaptAdjacencies(int meshid,int elemType){
 /** Look up elemID in elemType array, access edgeFaceID-th adaptAdj. */
 adaptAdj *GetAdaptAdj(int meshid,int elemID, int elemType, int edgeFaceID)
 {
+  FEM_Mesh *mesh = FEM_chunk::get("GetAdaptAdj")->lookup(meshid,"GetAdaptAdj");
+  FEM_Elem *elem = (FEM_Elem *)mesh->lookup(FEM_ELEM+elemType,"GetAdaptAdj");
+  FEM_Node *node = (FEM_Node *)mesh->lookup(FEM_NODE,"GetAdaptAdj");
+  const int nodesPer = (elem->getConn()).width();
+  assert(node->getCoord()!= NULL);
+  const int dim = (node->getCoord())->getWidth();
+  assert(dim == 2|| dim == 3);
+  int numAdjacencies;
+  int nodeSetSize, nodeSetMap[MAX_ADJELEMS][MAX_NODESET_SIZE]; // not used
+  guessElementShape(dim,nodesPer,&numAdjacencies,&nodeSetSize,nodeSetMap);
+
+  adaptAdj *adaptAdjacencies = lookupAdaptAdjacencies(meshid, elemType);
+  return(&(adaptAdjacencies[elemID*numAdjacencies+edgeFaceID]));
 }
 
 /** Look up elemID in elemType array, calculate edgeFaceID from
@@ -442,18 +478,51 @@ adaptAdj *GetAdaptAdj(int meshid,int elemID, int elemType, int edgeFaceID)
     adaptAdj with GetAdaptAdj above. */
 adaptAdj *GetAdaptAdj(int meshid,int elemID, int elemType, int *vertexList)
 {
+  int edgeFaceID = GetEdgeFace(meshid, elemID, elemType, vertexList);
+  return GetAdaptAdj(meshid, elemID, elemType, edgeFaceID);
 }
 
 /** Look up elemID in elemType array and determine the set of vertices
     associated with the edge or face represented by edgeFaceID. */
 void GetVertices(int meshid,int elemID, int elemType, int edgeFaceID, int *vertexList)
 {
+  FEM_Mesh *mesh = FEM_chunk::get("GetAdaptAdj")->lookup(meshid,"GetAdaptAdj");
+  FEM_Elem *elem = (FEM_Elem *)mesh->lookup(FEM_ELEM+elemType,"GetAdaptAdj");
+  FEM_Node *node = (FEM_Node *)mesh->lookup(FEM_NODE,"GetAdaptAdj");
+  const int nodesPer = (elem->getConn()).width();
+  assert(node->getCoord()!= NULL);
+  const int dim = (node->getCoord())->getWidth();
+  assert(dim == 2|| dim == 3);
+  int numAdjacencies;
+  int nodeSetSize, nodeSetMap[MAX_ADJELEMS][MAX_NODESET_SIZE];
+  guessElementShape(dim,nodesPer,&numAdjacencies,&nodeSetSize,nodeSetMap);
+
+  for (int i=0; i<nodeSetSize; i++) {
+    vertexList[i] = nodeSetMap[edgeFaceID][i];
+  }
 }
 
 /** Look up elemID in elemType array and determine the edge or face ID
     specified by the set of vertices in vertexList. */
 int GetEdgeFace(int meshid,int elemID, int elemType, int *vertexList)
 {
+  FEM_Mesh *mesh = FEM_chunk::get("GetAdaptAdj")->lookup(meshid,"GetAdaptAdj");
+  FEM_Elem *elem = (FEM_Elem *)mesh->lookup(FEM_ELEM+elemType,"GetAdaptAdj");
+  FEM_Node *node = (FEM_Node *)mesh->lookup(FEM_NODE,"GetAdaptAdj");
+  const int nodesPer = (elem->getConn()).width();
+  assert(node->getCoord()!= NULL);
+  const int dim = (node->getCoord())->getWidth();
+  assert(dim == 2|| dim == 3);
+  int numAdjacencies;
+  int nodeSetSize, nodeSetMap[MAX_ADJELEMS][MAX_NODESET_SIZE];
+  guessElementShape(dim,nodesPer,&numAdjacencies,&nodeSetSize,nodeSetMap);
+
+  std::set<int> vertexSet(vertexList, vertexList+nodeSetSize);
+  for (int i=0; i<numAdjacencies; i++) {
+    std::set<int> aNodeSet(nodeSetMap[i], nodeSetMap[i]+nodeSetSize);
+    if (vertexSet == aNodeSet) return i; // CHECK: does set equivalence exist?
+  }
+  CkAbort("ERROR: GetEdgeFace: vertexList is not a valid nodeSet./n");
 }
 
 // Update functions
@@ -461,6 +530,19 @@ int GetEdgeFace(int meshid,int elemID, int elemType, int *vertexList)
     edgeFaceID to nbr. */
 void SetAdaptAdj(int meshid,int elemID, int elemType, int edgeFaceID, adaptAdj nbr)
 {
+  FEM_Mesh *mesh = FEM_chunk::get("GetAdaptAdj")->lookup(meshid,"GetAdaptAdj");
+  FEM_Elem *elem = (FEM_Elem *)mesh->lookup(FEM_ELEM+elemType,"GetAdaptAdj");
+  FEM_Node *node = (FEM_Node *)mesh->lookup(FEM_NODE,"GetAdaptAdj");
+  const int nodesPer = (elem->getConn()).width();
+  assert(node->getCoord()!= NULL);
+  const int dim = (node->getCoord())->getWidth();
+  assert(dim == 2|| dim == 3);
+  int numAdjacencies;
+  int nodeSetSize, nodeSetMap[MAX_ADJELEMS][MAX_NODESET_SIZE]; // not used
+  guessElementShape(dim,nodesPer,&numAdjacencies,&nodeSetSize,nodeSetMap);
+
+  adaptAdj *adaptAdjTable = lookupAdaptAdjacencies(meshid, elemType);
+  adaptAdjTable[elemID*numAdjacencies + edgeFaceID] = nbr;
 }
 
 //given the dimensions and nodes per element guess whether the element 
