@@ -115,15 +115,19 @@ CkReductionMsg *CkArrayReductionMgr::reduceMessages(void){
 		ret=CkReductionMsg::buildNew(0,NULL);
 	else
 	{//Use the reducer to reduce the messages
-		CkReduction::reducerFn f=CkReduction::reducerTable[r];
-    		ret=(*f)(nMsgs,msgArr);
-    		ret->reducer=r;
-  	}
+		if(nMsgs == 1){
+			ret = msgArr[0];
+		}else{
+			CkReduction::reducerFn f=CkReduction::reducerTable[r];
+    	ret=(*f)(nMsgs,msgArr);
+		}
+    ret->reducer=r;
+  }
 
 	//Go back through the vector, deleting old messages
   	for (i=0;i<nMsgs;i++) {
           if (msgArr[i] != ret) delete msgArr[i];
-        }
+    }
 	delete [] msgArr;
 
 	//Set the message counts

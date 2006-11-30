@@ -616,14 +616,19 @@ CkReductionMsg *CkReductionMgr::reduceMessages(void)
     ret=CkReductionMsg::buildNew(0,NULL);
   else
   {//Use the reducer to reduce the messages
-    CkReduction::reducerFn f=CkReduction::reducerTable[r];
-    ret=(*f)(nMsgs,msgArr);
+		//if there is only one msg to be reduced just return that message
+		if(nMsgs == 1){
+			ret = msgArr[0];	
+		}else{
+	    CkReduction::reducerFn f=CkReduction::reducerTable[r];
+  	  ret=(*f)(nMsgs,msgArr);
+		}
     ret->reducer=r;
   }
 
-  //Go back through the vector, deleting old messages
+	//Go back through the vector, deleting old messages
   for (i=0;i<nMsgs;i++) if (msgArr[i]!=ret) delete msgArr[i];
-  delete [] msgArr;
+	delete [] msgArr;
 
   //Set the message counts
   ret->redNo=redNo;
@@ -1729,12 +1734,16 @@ CkReductionMsg *CkNodeReductionMgr::reduceMessages(void)
     ret=CkReductionMsg::buildNew(0,NULL);
   else
   {//Use the reducer to reduce the messages
-    CkReduction::reducerFn f=CkReduction::reducerTable[r];
-    ret=(*f)(nMsgs,msgArr);
+		if(nMsgs == 1){
+			ret = msgArr[0];
+		}else{
+	    CkReduction::reducerFn f=CkReduction::reducerTable[r];
+  	  ret=(*f)(nMsgs,msgArr);
+		}
     ret->reducer=r;
   }
-
-  //Go back through the vector, deleting old messages
+	
+	//Go back through the vector, deleting old messages
   for (i=0;i<nMsgs;i++) if (msgArr[i]!=ret) delete msgArr[i];
   delete [] msgArr;
   //Set the message counts
