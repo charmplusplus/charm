@@ -3,7 +3,13 @@
 
 #include "bigsim_logs.h"
 
-int bglog_version = 1;
+/*
+ ChangeLog
+ version 2 
+     * add objId
+*/
+
+int bglog_version = 2;
 
 int genTimeLog = 0;			// was 1 for guna 's seq correction
 int correctTimeLog = 0;
@@ -266,6 +272,10 @@ void BgTimeLog::write(FILE *fp)
 //  fprintf(fp,"%p ep:%d name:%s (srcnode:%d msgID:%d) startTime:%f endTime:%f recvime:%f effRecvTime:%e seqno:%d startevent:%d\n", this, ep, name, msgId.node(), msgId.msgID(), startTime, endTime, recvTime, effRecvTime, seqno, isStartEvent());
   fprintf(fp,"%p name:%s (srcnode:%d msgID:%d) ep:%d %s\n", this, name, msgId.node(), msgId.msgID(), ep, isStartEvent()?"STARTEVENT":"");
   fprintf(fp," recvtime:%f startTime:%f endTime:%f \n", recvTime, startTime, endTime);
+  if (bglog_version >= 2) {
+    if (!objId.isNull())
+      fprintf(fp," ObjID: %d %d %d\n", objId.id[0], objId.id[1], objId.id[2]);
+  }
   for (i=0; i<msgs.length(); i++)
     msgs[i]->write(fp);
   for (i=0; i<evts.length(); i++)
@@ -333,6 +343,8 @@ void BgTimeLog::pup(PUP::er &p){
     p|seqno; p|msgId;
     p|recvTime; p|effRecvTime;p|startTime; p|execTime; p|endTime; 
     p|flag; p(name,20);
+    if (bglog_version >= 2)
+      p((int *)&objId, sizeof(CmiObjId)/sizeof(int));
     
     /*    if(p.isUnpacking())
       CmiPrintf("Puping: %d %d %d %d %e %e %e %e %e %s\n",ep,seqno,srcnode,msgID,recvTime,effRecvTime,startTime,execTime,endTime,name);

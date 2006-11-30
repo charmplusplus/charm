@@ -108,6 +108,8 @@ public:
   int seqno;
   BgMsgID  msgId;	// incoming message that generates this log
 
+  CmiObjId objId;
+
   double recvTime;	//Time at which the message was received in 'inbuffer'
   double startTime, endTime;
   double oldStartTime, execTime;
@@ -153,6 +155,9 @@ public:
          }
   inline void addMsg(char *msg, int node, int tid, int local, int group=1) { 
            msgs.push_back(new BgMsgEntry(msg, node, tid, local, group)); 
+         }
+  inline void setObjId(CmiObjId *idx) {
+           memcpy(&objId, idx, sizeof(CmiObjId));
          }
   void closeLog();
   void print(int node, int th);
