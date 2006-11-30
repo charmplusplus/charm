@@ -33,6 +33,7 @@ class TraceBluegene : public Trace {
     void bgBeginExec(char* msg, char *str);
     void bgAmpiBeginExec(char *msg, char *str, void *log);
     void bgEndExec(int);
+    virtual void beginExecute(int event,int msgType,int ep,int srcPe, int mlen,CmiObjId *idx);
     void addBackwardDep(void *log);
     void userBracketEvent(int eventID, double bt, double et) {}	// from trace.h
     void userBracketEvent(char* name, double bt, double et, void** parentLogPtr);

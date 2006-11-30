@@ -122,6 +122,17 @@ void TraceBluegene::bgEndExec(int commit)
     BgEndLastLog(tTIMELINEREC);
 }
 
+void TraceBluegene::beginExecute(int event,int msgType,int ep,int srcPe, int mlen,CmiObjId *idx)
+{
+  //printf("SET OBJ ID\n");
+  if (idx == NULL) return;
+  BgTimeLog* log;
+  if(genTimeLog)
+    log = tTIMELINE[tTIMELINE.length()-1];
+  else
+    return;
+  log->setObjId(idx);
+}
 
 void TraceBluegene::getForwardDep(void* log, void** fDepPtr){
 
