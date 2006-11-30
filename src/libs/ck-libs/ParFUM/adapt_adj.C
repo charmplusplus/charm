@@ -422,18 +422,22 @@ void dumpAdaptAdjacencies(adaptAdj *adaptAdjacencies,int numElems,int numAdjElem
   }
 }
 
-void getAndDumpAdaptAdjacencies(int meshid, int numElems, int elemType, int myRank){
-  int numAdjElems;
-  FEM_Mesh *mesh = FEM_chunk::get("GetAdaptAdj")->lookup(meshid,"GetAdaptAdj");
+inline void findNodeSet(int meshid,int elemType,int *numAdjElems,int *nodeSetSize,int  nodeSetMap[MAX_ADJELEMS][MAX_NODESET_SIZE]){
+	FEM_Mesh *mesh = FEM_chunk::get("GetAdaptAdj")->lookup(meshid,"GetAdaptAdj");
   FEM_Elem *elem = (FEM_Elem *)mesh->lookup(FEM_ELEM+elemType,"GetAdaptAdj");
   FEM_Node *node = (FEM_Node *)mesh->lookup(FEM_NODE,"GetAdaptAdj");
   const int nodesPer = (elem->getConn()).width();
   assert(node->getCoord()!= NULL);
   const int dim = (node->getCoord())->getWidth();
   assert(dim == 2|| dim == 3);
-  int nodeSetSize, nodeSetMap[MAX_ADJELEMS][MAX_NODESET_SIZE]; // not used
-  guessElementShape(dim,nodesPer,&numAdjElems,&nodeSetSize,nodeSetMap);
+  guessElementShape(dim,nodesPer,numAdjElems,nodeSetSize,nodeSetMap);
+}
 
+void getAndDumpAdaptAdjacencies(int meshid, int numElems, int elemType, int myRank){
+  int numAdjElems;
+  int nodeSetSize, nodeSetMap[MAX_ADJELEMS][MAX_NODESET_SIZE]; // not used
+	findNodeSet(meshid,elemType,&numAdjElems,&nodeSetSize,nodeSetMap);
+  
   for(int i=0;i<numElems;i++){
     printf("[%d] %d  :",myRank,i);
     for(int j=0;j<numAdjElems;j++){
@@ -445,11 +449,12 @@ void getAndDumpAdaptAdjacencies(int meshid, int numElems, int elemType, int myRa
 }
 
 // Access functions
-inline adaptAdj *lookupAdaptAdjacencies(int meshid,int elemType){
+inline adaptAdj *lookupAdaptAdjacencies(int meshid,int elemType,int *numAdjacencies){
   FEM_Mesh *mesh = FEM_chunk::get("lookupAdaptAdjacencies")->lookup(meshid,"lookupAdaptAdjacencies");
   FEM_Elem *elem = (FEM_Elem *)mesh->lookup(FEM_ELEM+elemType,"lookupAdaptAdjacencies");
 
   FEM_DataAttribute *adaptAttr = (FEM_DataAttribute *)elem->lookup(FEM_ADAPT_ADJ,"lookupAdaptAdjacencies");
+	*numAdjacencies = adaptAttr->getWidth()/sizeof(adaptAdj);
   AllocTable2d<unsigned char> &table = adaptAttr->getChar();
 
   return (adaptAdj  *)table.getData();
@@ -458,18 +463,8 @@ inline adaptAdj *lookupAdaptAdjacencies(int meshid,int elemType){
 /** Look up elemID in elemType array, access edgeFaceID-th adaptAdj. */
 adaptAdj *GetAdaptAdj(int meshid,int elemID, int elemType, int edgeFaceID)
 {
-  FEM_Mesh *mesh = FEM_chunk::get("GetAdaptAdj")->lookup(meshid,"GetAdaptAdj");
-  FEM_Elem *elem = (FEM_Elem *)mesh->lookup(FEM_ELEM+elemType,"GetAdaptAdj");
-  FEM_Node *node = (FEM_Node *)mesh->lookup(FEM_NODE,"GetAdaptAdj");
-  const int nodesPer = (elem->getConn()).width();
-  assert(node->getCoord()!= NULL);
-  const int dim = (node->getCoord())->getWidth();
-  assert(dim == 2|| dim == 3);
-  int numAdjacencies;
-  int nodeSetSize, nodeSetMap[MAX_ADJELEMS][MAX_NODESET_SIZE]; // not used
-  guessElementShape(dim,nodesPer,&numAdjacencies,&nodeSetSize,nodeSetMap);
-
-  adaptAdj *adaptAdjacencies = lookupAdaptAdjacencies(meshid, elemType);
+	int numAdjacencies;
+  adaptAdj *adaptAdjacencies = lookupAdaptAdjacencies(meshid, elemType,&numAdjacencies);
   return(&(adaptAdjacencies[elemID*numAdjacencies+edgeFaceID]));
 }
 
@@ -486,16 +481,9 @@ adaptAdj *GetAdaptAdj(int meshid,int elemID, int elemType, int *vertexList)
     associated with the edge or face represented by edgeFaceID. */
 void GetVertices(int meshid,int elemID, int elemType, int edgeFaceID, int *vertexList)
 {
-  FEM_Mesh *mesh = FEM_chunk::get("GetAdaptAdj")->lookup(meshid,"GetAdaptAdj");
-  FEM_Elem *elem = (FEM_Elem *)mesh->lookup(FEM_ELEM+elemType,"GetAdaptAdj");
-  FEM_Node *node = (FEM_Node *)mesh->lookup(FEM_NODE,"GetAdaptAdj");
-  const int nodesPer = (elem->getConn()).width();
-  assert(node->getCoord()!= NULL);
-  const int dim = (node->getCoord())->getWidth();
-  assert(dim == 2|| dim == 3);
-  int numAdjacencies;
+	int numAdjacencies;
   int nodeSetSize, nodeSetMap[MAX_ADJELEMS][MAX_NODESET_SIZE];
-  guessElementShape(dim,nodesPer,&numAdjacencies,&nodeSetSize,nodeSetMap);
+	findNodeSet(meshid,elemType,&numAdjacencies,&nodeSetSize,nodeSetMap);
 
   for (int i=0; i<nodeSetSize; i++) {
     vertexList[i] = nodeSetMap[edgeFaceID][i];
@@ -506,16 +494,9 @@ void GetVertices(int meshid,int elemID, int elemType, int edgeFaceID, int *verte
     specified by the set of vertices in vertexList. */
 int GetEdgeFace(int meshid,int elemID, int elemType, int *vertexList)
 {
-  FEM_Mesh *mesh = FEM_chunk::get("GetAdaptAdj")->lookup(meshid,"GetAdaptAdj");
-  FEM_Elem *elem = (FEM_Elem *)mesh->lookup(FEM_ELEM+elemType,"GetAdaptAdj");
-  FEM_Node *node = (FEM_Node *)mesh->lookup(FEM_NODE,"GetAdaptAdj");
-  const int nodesPer = (elem->getConn()).width();
-  assert(node->getCoord()!= NULL);
-  const int dim = (node->getCoord())->getWidth();
-  assert(dim == 2|| dim == 3);
-  int numAdjacencies;
+	int numAdjacencies;
   int nodeSetSize, nodeSetMap[MAX_ADJELEMS][MAX_NODESET_SIZE];
-  guessElementShape(dim,nodesPer,&numAdjacencies,&nodeSetSize,nodeSetMap);
+	findNodeSet(meshid,elemType,&numAdjacencies,&nodeSetSize,nodeSetMap);
 
   std::set<int> vertexSet(vertexList, vertexList+nodeSetSize);
   for (int i=0; i<numAdjacencies; i++) {
@@ -530,18 +511,8 @@ int GetEdgeFace(int meshid,int elemID, int elemType, int *vertexList)
     edgeFaceID to nbr. */
 void SetAdaptAdj(int meshid,int elemID, int elemType, int edgeFaceID, adaptAdj nbr)
 {
-  FEM_Mesh *mesh = FEM_chunk::get("GetAdaptAdj")->lookup(meshid,"GetAdaptAdj");
-  FEM_Elem *elem = (FEM_Elem *)mesh->lookup(FEM_ELEM+elemType,"GetAdaptAdj");
-  FEM_Node *node = (FEM_Node *)mesh->lookup(FEM_NODE,"GetAdaptAdj");
-  const int nodesPer = (elem->getConn()).width();
-  assert(node->getCoord()!= NULL);
-  const int dim = (node->getCoord())->getWidth();
-  assert(dim == 2|| dim == 3);
-  int numAdjacencies;
-  int nodeSetSize, nodeSetMap[MAX_ADJELEMS][MAX_NODESET_SIZE]; // not used
-  guessElementShape(dim,nodesPer,&numAdjacencies,&nodeSetSize,nodeSetMap);
-
-  adaptAdj *adaptAdjTable = lookupAdaptAdjacencies(meshid, elemType);
+	int numAdjacencies;
+  adaptAdj *adaptAdjTable = lookupAdaptAdjacencies(meshid, elemType,&numAdjacencies);
   adaptAdjTable[elemID*numAdjacencies + edgeFaceID] = nbr;
 }
 
