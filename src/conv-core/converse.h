@@ -1429,8 +1429,12 @@ void CmiStopCounters(int events[], CMK_TYPEDEF_INT8 values[], int numEvents);
 /******** Trace ********/
 
 /* this is the type for thread ID, mainly used for projection. */
-typedef struct {
+typedef struct _CmiObjId {
 int id[3];
+#if defined(__cplusplus)
+ _CmiObjId() { id[0] = id[1] = id[2] = -1; }
+  int isNull() { return id[0] == -1 && id[1] == -1 && id[2] == -1; }
+#endif
 } CmiObjId;
 
 /* public interface for thread id acquisition */
