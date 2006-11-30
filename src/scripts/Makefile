@@ -361,7 +361,7 @@ converse-target:  $(CVLIBS) fmain-ok charmrun-target swapglobal-target conv-cpm
 
 charmrun-target: sockRoutines.c sockRoutines.h ccs-server.c ccs-server.h sockRoutines-seq.o
 	if [ -d charmrun ] ; then ( cd charmrun ; $(MAKE) OPTS='$(OPTS)' ) ; fi
-	if [ -f charmrun ] ; then ( cp charmrun ../bin ) ; fi
+	if [ -f charmrun ] ; then ( cp -f charmrun ../bin ) ; fi
 
 fmain-ok: fmain.f90
 	-@$(CHARMC) -c fmain.f90
@@ -376,11 +376,11 @@ QuickThreads/libqt.a:  $(CVHEADERS)
 	cd QuickThreads;./configure
 	rm -f QuickThreads/libqt.a
 	cd QuickThreads ; $(MAKE) qt  OPTS='$(OPTS)'
-	cp QuickThreads/libqt.a ../lib/libckqt.a
+	cp -f QuickThreads/libqt.a ../lib/libckqt.a
 	-(CHARMINC=.; . ./conv-config.sh; \
 	  test -d ../lib_so && \
-	  cp QuickThreads/libqt.$$CMK_SHARED_SUF ../lib_so && \
-	  cp QuickThreads/libqt.$$CMK_SHARED_SUF ../lib_so/libckqt.$$CMK_SHARED_SUF)
+	  cp -f QuickThreads/libqt.$$CMK_SHARED_SUF ../lib_so && \
+	  cp -f QuickThreads/libqt.$$CMK_SHARED_SUF ../lib_so/libckqt.$$CMK_SHARED_SUF)
 
 METIS:  charm++
 	cd libs/ck-libs/parmetis/METISLib && $(MAKE) OPTS='$(OPTS)'

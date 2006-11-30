@@ -18,7 +18,7 @@ echo >> $out
 for bal in $LOADBALANCERS 
 do 
 	dep=""
-	[ -r libmodule$bal.dep ] && dep="cp libmodule$bal.dep "'$'"(L)/"
+	[ -r libmodule$bal.dep ] && dep="cp -f libmodule$bal.dep "'$'"(L)/"
         manager=""
         [ $bal = 'GreedyCommLB' ] && manager="manager.o"
         [ $bal = 'GridCommLB' ] && manager="manager.o"
