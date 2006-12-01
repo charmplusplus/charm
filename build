@@ -9,7 +9,7 @@ syntax() {
   echo ''
   echo 'Usage: build <target> <version> <options> [charmc-options ...]'
   echo ''
-  echo '<targets>: converse charm++ LIBS AMPI FEM bigsim pose jade msa'
+  echo '<targets>: converse charm++ LIBS AMPI FEM bigemulator pose jade msa'
   echo '<targets>: doc ps-doc pdf-doc html-doc'
   if test $more = 1
   then
@@ -18,7 +18,7 @@ syntax() {
   echo '  AMPI            compile Adaptive MPI on top of Charm++'
   echo '  FEM             compile FEM framework'
   echo '  LIBS            compile additional parallel libraries with Charm++ core'
-  echo '  bigsim          build additional BigSim libraries'
+  echo '  bigemulator     build additional BigSim libraries'
   echo '  pose            build POSE parallel discrete event simulator'
   echo '  jade            build Jade compiler (auto-builds charm++, msa)'
   echo '  msa             build Multiphase Shared Arrays(MSA) library'
@@ -29,7 +29,7 @@ syntax() {
   echo ''
   echo '<options>: compiler and platform specific options'
   echo 'cc cc64 cxx kcc pgcc acc icc ecc gcc3 gcc4 mpcc pathscale'
-  echo 'help smp gm tcp vmi scyld clustermatic bigsim ooc syncft papi'
+  echo 'help smp gm tcp vmi scyld clustermatic bigemulator ooc syncft papi'
   echo 'pthreads lam'
   echo '--incdir --libdir --basedir --no-build-shared -j'
   if test $more = 1
@@ -70,7 +70,7 @@ syntax() {
   echo '  pthreads        compile with pthreads Converse threads'
   echo ''
   echo 'Advanced options:'
-  echo '  bigsim	  compile for BigSim simulator'
+  echo '  bigemulator	  compile for BigSim simulator'
   echo '  ooc		  compile with out of core support'
   echo '  syncft	  compile with Charm++ fault tolerance support'
   echo '  papi            compile with PAPI performance counter support (if any)'
@@ -198,6 +198,7 @@ INCDIR=
 ARCH=
 BUILD_SHARED=
 WITH_ROMIO=
+BUILD_EMULATOR=0
 
 [ "$1" = '--help' -o "$1" = '-h' ] && more=1 && syntax | more && exit 1
 [ $# -lt 2 ] && syntax && exit 1
@@ -215,7 +216,7 @@ OPT_DIRS="$src/$BASEVERSION $src/$ARCH $src/common"
 while [ ! $# -eq 0 ]
 do
   case "$1" in
-    	    "--basedir")
+    "--basedir")
           	shift; 
   		for dir in $1
   		do
@@ -225,7 +226,7 @@ do
 		done
           	shift
  	  	;;
-    	    --basedir=*)
+    --basedir=*)
                 basedir=`echo $1 | awk -F= '{print $2}'`
   		for dir in $basedir
   		do
@@ -235,7 +236,7 @@ do
 		done
           	shift
  	  	;;
-    	    "--libdir")
+    "--libdir")
           	shift; CheckDir $1
   		for dir in $1
   		do
@@ -243,7 +244,7 @@ do
 		done
                 shift
  	  	;;
-    	    --libdir=*)
+    --libdir=*)
                 libdir=`echo $1 | awk -F= '{print $2}'`
 		CheckDir $libdir
   		for dir in $libdir
@@ -252,7 +253,7 @@ do
 		done
           	shift
  	  	;;
-    	    "--incdir")
+    "--incdir")
           	shift; CheckDir $1
   		for dir in $1
   		do
@@ -260,7 +261,7 @@ do
 		done
           	shift
  	  	;;
-    	    --incdir=*)
+    --incdir=*)
                 incdir=`echo $1 | awk -F= '{print $2}'`
 		CheckDir $incdir
   		for dir in $incdir
@@ -269,17 +270,17 @@ do
 		done
           	shift
  	  	;;
-	    --no-build-shared|-nobs|--no-shared)
+    --no-build-shared|-nobs|--no-shared)
 		BUILD_SHARED="-nobs"; shift
 		;;
-	    --with-romio)
+    --with-romio)
 		WITH_ROMIO="true"; shift
 		;;
-	    --build-shared|-bs)
+    --build-shared|-bs)
 		# obsolete, do nothing
 		shift
 		;;
-	    -j*)
+    -j*)
                 PMAKENUM=`echo $1 | awk -Fj '{print $2}'`
 		MAKEOPTS="$MAKEOPTS -j $PMAKENUM"
 		shift;
@@ -311,6 +312,7 @@ do
 # It specifies some other option:
           TestIfOption $1
           BOPTS="$BOPTS $1"
+          [ $1 =  "bigemulator" ] && BUILD_EMULATOR=1
         fi
         shift
 	;;
@@ -454,6 +456,11 @@ then
 fi
 
 echo $BASEVERSION > $VERSION/tmp/.vdir
+
+if test $BUILD_EMULATOR = 1
+then
+  PROGRAM="$PROGRAM bigsim"
+fi
 
 echo "Performing '$MAKE $MAKEOPTS $PROGRAM OPTS="$OPTS"' in $VERSION/tmp"
 cd $VERSION/tmp 
